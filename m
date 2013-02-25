@@ -1,45 +1,60 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 25 Feb 2013 14:49:04 +0000
-Subject: [PATCH 24/35] mfd: ab8500: Remove unnecessary 'struct device'
- declaration
-In-Reply-To: <201302251433.36121.arnd@arndb.de>
-References: <1360933026-30325-1-git-send-email-lee.jones@linaro.org>
- <1360933026-30325-25-git-send-email-lee.jones@linaro.org>
- <201302251433.36121.arnd@arndb.de>
-Message-ID: <20130225144904.GM4417@gmail.com>
+From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
+Date: Mon, 25 Feb 2013 11:44:25 -0300
+Subject: [PATCH v2 0/3] clock driver for sunxi
+In-Reply-To: <1358835176-7197-1-git-send-email-emilio@elopez.com.ar>
+References: <1358835176-7197-1-git-send-email-emilio@elopez.com.ar>
+Message-ID: <1361803468-9899-1-git-send-email-emilio@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 25 Feb 2013, Arnd Bergmann wrote:
+Hello everyone,
 
-> On Friday 15 February 2013, Lee Jones wrote:
-> > A recent patch saw the device.h include being removed from some other
-> > include files and replaced with a 'struct device' declaration instead.
-> > However, neither the include nor the declaration is actually required.
-> > 
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> >  include/linux/mfd/abx500.h |    2 --
-> >  1 file changed, 2 deletions(-)
-> 
-> In my copy of the file, we the declaration
-> 
-> 
-> int ab8500_bm_of_probe(struct device *dev,
->                        struct device_node *np,
->                        struct abx500_bm_data *bm);
-> 
-> 
-> 
-> and others that use 'struct device'. C99 requires that a struct is declared
-> in advance  before you use it in a function declaration.
+This patchset adds basic clock support for sunxi devices. Currently, it
+implements support for the two oscillators, the main PLL, the CPU mux,
+its three divisor clocks and APB1. With this in place, it is possible to
+write a cpufreq driver and have it work, and with a little more code,
+represent the UART clocks correctly (I will be sending a separate
+patchset for this).
 
-Hmm... I wonder why it doesn't complain then?
+I have tested this driver successfully on a Cubieboard (A10, sun4i)
+using the cpufreq driver from the linux-sunxi tree after minor
+modifications (the clock names are not the same).
 
-I'll remove the patch.
+Any feedback will be highly appreciated
+
+Thanks,
+
+Emilio
+
+Overview of changes from v1:
+  * Implement APB1
+  * Add missing glue for driver that got dropped on torvalds/master
+  * Drop "fixed gate" code and implement it with two clocks as suggested
+    by Gregory
+
+Emilio L?pez (3):
+  clk: arm: sunxi: Add a new clock driver for sunxi SOCs
+  arm: sunxi: Add clock definitions for the new clock driver
+  arm: sunxi: Add useful information about sunxi clocks
+
+ Documentation/arm/sunxi/clocks.txt                |  56 ++++
+ Documentation/devicetree/bindings/clock/sunxi.txt |  44 +++
+ arch/arm/boot/dts/sunxi.dtsi                      |  83 ++++-
+ drivers/clk/Makefile                              |   1 +
+ drivers/clk/sunxi/Makefile                        |   5 +
+ drivers/clk/sunxi/clk-factors.c                   | 180 +++++++++++
+ drivers/clk/sunxi/clk-factors.h                   |  27 ++
+ drivers/clk/sunxi/clk-sunxi.c                     | 362 ++++++++++++++++++++++
+ drivers/clocksource/sunxi_timer.c                 |   4 +-
+ include/linux/clk/sunxi.h                         |  22 ++
+ 10 files changed, 779 insertions(+), 5 deletions(-)
+ create mode 100644 Documentation/arm/sunxi/clocks.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/sunxi.txt
+ create mode 100644 drivers/clk/sunxi/Makefile
+ create mode 100644 drivers/clk/sunxi/clk-factors.c
+ create mode 100644 drivers/clk/sunxi/clk-factors.h
+ create mode 100644 drivers/clk/sunxi/clk-sunxi.c
+ create mode 100644 include/linux/clk/sunxi.h
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.8.2.rc0
