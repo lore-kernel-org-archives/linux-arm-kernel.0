@@ -1,36 +1,45 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 25 Feb 2013 14:43:56 +0000
-Subject: [PATCH] arm: Preserve L_PTE_VALID in pte_modify()
-In-Reply-To: <20130218162150.GI20798@mudshark.cambridge.arm.com>
-References: <1360693550-31609-1-git-send-email-catalin.marinas@arm.com>
- <20130218162150.GI20798@mudshark.cambridge.arm.com>
-Message-ID: <20130225144355.GD25276@mudshark.cambridge.arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 25 Feb 2013 14:49:04 +0000
+Subject: [PATCH 24/35] mfd: ab8500: Remove unnecessary 'struct device'
+ declaration
+In-Reply-To: <201302251433.36121.arnd@arndb.de>
+References: <1360933026-30325-1-git-send-email-lee.jones@linaro.org>
+ <1360933026-30325-25-git-send-email-lee.jones@linaro.org>
+ <201302251433.36121.arnd@arndb.de>
+Message-ID: <20130225144904.GM4417@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
+On Mon, 25 Feb 2013, Arnd Bergmann wrote:
 
-On Mon, Feb 18, 2013 at 04:21:50PM +0000, Will Deacon wrote:
-> On Tue, Feb 12, 2013 at 06:25:50PM +0000, Catalin Marinas wrote:
-> > Following commit 26ffd0d4 (ARM: mm: introduce present, faulting entries
-> > for PAGE_NONE), if a page has been mapped as PROT_NONE, the L_PTE_VALID
-> > bit is cleared by the set_pte_ext() code. With LPAE the software and
-> > hardware pte share the same location and subsequent modifications of pte
-> > range (change_protection()) will leave the L_PTE_VALID bit cleared.
+> On Friday 15 February 2013, Lee Jones wrote:
+> > A recent patch saw the device.h include being removed from some other
+> > include files and replaced with a 'struct device' declaration instead.
+> > However, neither the include nor the declaration is actually required.
 > > 
-> > This patch adds the L_PTE_VALID bit to the newprot mask in pte_modify().
-> > 
-> > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> > Reported-by: Subash Patel <subash.rp@samsung.com>
-> > Tested-by: Subash Patel <subash.rp@samsung.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> >  include/linux/mfd/abx500.h |    2 --
+> >  1 file changed, 2 deletions(-)
 > 
-> This matches what I did for arm64, so:
+> In my copy of the file, we the declaration
 > 
->   Acked-by: Will Deacon <will.deacon@arm.com>
+> 
+> int ab8500_bm_of_probe(struct device *dev,
+>                        struct device_node *np,
+>                        struct abx500_bm_data *bm);
+> 
+> 
+> 
+> and others that use 'struct device'. C99 requires that a struct is declared
+> in advance  before you use it in a function declaration.
 
-Can you put this into the patch system please?
+Hmm... I wonder why it doesn't complain then?
 
-Cheers,
+I'll remove the patch.
 
-Will
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
