@@ -1,49 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 25 Feb 2013 13:04:49 +0000
-Subject: [PATCH] ARM: VFP: fix emulation of second VFP instruction
-Message-ID: <20130225130449.GM17833@n2100.arm.linux.org.uk>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 25 Feb 2013 17:08:19 +0400
+Subject: [PATCH v2 0/4] R-Car SATA driver and platform data
+In-Reply-To: <20130219034210.GA7701@verge.net.au>
+References: <201302182327.46930.sergei.shtylyov@cogentembedded.com>
+ <20130219034210.GA7701@verge.net.au>
+Message-ID: <512B6243.9060808@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Martin Storsj? reports that the sequence:
+Hello.
 
-	ee312ac1	vsub.f32	s4, s3, s2
-	ee702ac0	vsub.f32	s5, s1, s0
-	e59f0028	ldr		r0, [pc, #40]
-	ee111a90	vmov		r1, s3
+On 19-02-2013 7:42, Simon Horman wrote:
 
-on Raspberry Pi (implementor 41 architecture 1 part 20 variant b rev 5)
-where s3 is a denormal and s2 is zero results in incorrect behaviour -
-the instruction "vsub.f32 s5, s1, s0" is not executed:
+>>     Here's the v2 of the set of 4 patches against the Simon Horman's renesas.git
+>> repo, 'next' branch:
 
-	VFP: bounce: trigger ee111a90 fpexc d0000780
-	VFP: emulate: INST=0xee312ac1 SCR=0x00000000
-	...
+>> [1/4] libata: add R-Car SATA driver
+>> [2/4] ARM: mach-shmobile: r8a7779: SATA DT configuration
+>> [3/4] ARM: mach-shmobile: r8a7779: add SATA support
+>> [4/4] ARM: mach-shmobile: marzen: add SATA support
 
-As we can see, the instruction triggering the exception is the "vmov"
-instruction, and we emulate the "vsub.f32 s4, s3, s2" but fail to
-properly take account of the FPEXC_FP2V flag in FPEXC.  This is because
-the test for the second instruction register being valid is bogus, and
-will always skip emulation of the second instruction.
+>> Patch 1 also applies to the 'upstream' branch of Jeff Garzik's libata-dev.git
+>> repo.
 
-Cc: <stable@vger.kernel.org>
-Reported-by: Martin Storsj? <martin@martin.st>
-Tested-by: Martin Storsj? <martin@martin.st>
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/vfp/vfpmodule.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+>> Patch changes since the initial posting are reported in the individual patches.
 
-diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-index 3b44e0d..5dfbb0b 100644
---- a/arch/arm/vfp/vfpmodule.c
-+++ b/arch/arm/vfp/vfpmodule.c
-@@ -413,7 +413,7 @@ void VFP_bounce(u32 trigger, u32 fpexc, struct pt_regs *regs)
- 	 * If there isn't a second FP instruction, exit now. Note that
- 	 * the FPEXC.FP2V bit is valid only if FPEXC.EX is 1.
- 	 */
--	if (fpexc ^ (FPEXC_EX | FPEXC_FP2V))
-+	if ((fpexc & (FPEXC_EX | FPEXC_FP2V)) != (FPEXC_EX | FPEXC_FP2V))
- 		goto exit;
- 
- 	/*
+> Thanks, I have updated topic/r-car-sata and verified
+> that the SATA driver is successfully initialised for both
+> non-DT and DT boot.
+
+    The SATA driver have been already merged by Linus:
+
+http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=commit;h=163cf81d266f017d718ef786fbbb6b2513ce7ec3
+
+Can we merge the rest of the patches in this merge window?
+
+WBR, Sergei
