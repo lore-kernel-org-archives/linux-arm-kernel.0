@@ -1,83 +1,39 @@
-From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
-Date: Mon, 25 Feb 2013 11:44:28 -0300
-Subject: [PATCH v2 3/3] arm: sunxi: Add useful information about sunxi clocks
-In-Reply-To: <1361803468-9899-1-git-send-email-emilio@elopez.com.ar>
-References: <1358835176-7197-1-git-send-email-emilio@elopez.com.ar>
- <1361803468-9899-1-git-send-email-emilio@elopez.com.ar>
-Message-ID: <1361803468-9899-4-git-send-email-emilio@elopez.com.ar>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 25 Feb 2013 14:51:10 +0000
+Subject: [PATCH] arm: Preserve L_PTE_VALID in pte_modify()
+In-Reply-To: <20130225144355.GD25276@mudshark.cambridge.arm.com>
+References: <1360693550-31609-1-git-send-email-catalin.marinas@arm.com>
+ <20130218162150.GI20798@mudshark.cambridge.arm.com>
+ <20130225144355.GD25276@mudshark.cambridge.arm.com>
+Message-ID: <20130225145110.GA7838@localhost.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch contains useful bits of information about the sunxi clocks
-that may help and/or be interesting for current and future developers.
+On Mon, Feb 25, 2013 at 02:43:56PM +0000, Will Deacon wrote:
+> Hi Catalin,
+> 
+> On Mon, Feb 18, 2013 at 04:21:50PM +0000, Will Deacon wrote:
+> > On Tue, Feb 12, 2013 at 06:25:50PM +0000, Catalin Marinas wrote:
+> > > Following commit 26ffd0d4 (ARM: mm: introduce present, faulting entries
+> > > for PAGE_NONE), if a page has been mapped as PROT_NONE, the L_PTE_VALID
+> > > bit is cleared by the set_pte_ext() code. With LPAE the software and
+> > > hardware pte share the same location and subsequent modifications of pte
+> > > range (change_protection()) will leave the L_PTE_VALID bit cleared.
+> > > 
+> > > This patch adds the L_PTE_VALID bit to the newprot mask in pte_modify().
+> > > 
+> > > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> > > Reported-by: Subash Patel <subash.rp@samsung.com>
+> > > Tested-by: Subash Patel <subash.rp@samsung.com>
+> > > Cc: Will Deacon <will.deacon@arm.com>
+> > 
+> > This matches what I did for arm64, so:
+> > 
+> >   Acked-by: Will Deacon <will.deacon@arm.com>
+> 
+> Can you put this into the patch system please?
 
-Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
----
- Documentation/arm/sunxi/clocks.txt | 56 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 56 insertions(+)
- create mode 100644 Documentation/arm/sunxi/clocks.txt
+Already picked by rmk (I don't remember the patch number).
 
-diff --git a/Documentation/arm/sunxi/clocks.txt b/Documentation/arm/sunxi/clocks.txt
-new file mode 100644
-index 0000000..e09a88a
---- /dev/null
-+++ b/Documentation/arm/sunxi/clocks.txt
-@@ -0,0 +1,56 @@
-+Frequently asked questions about the sunxi clock system
-+=======================================================
-+
-+This document contains useful bits of information that people tend to ask
-+about the sunxi clock system, as well as accompanying ASCII art when adequate.
-+
-+Q: Why is the main 24MHz oscillator gatable? Wouldn't that break the
-+   system?
-+
-+A: The 24MHz oscillator allows gating to save power. Indeed, if gated
-+   carelessly the system would stop functioning, but with the right
-+   steps, one can gate it and keep the system running. Consider this
-+   simplified suspend example:
-+
-+   While the system is operational, you would see something like
-+
-+      24MHz         32kHz
-+       |
-+      PLL1
-+       \
-+        \_ CPU Mux
-+             |
-+           [CPU]
-+
-+   When you are about to suspend, you switch the CPU Mux to the 32kHz
-+   oscillator:
-+
-+      24Mhz         32kHz
-+       |              |
-+      PLL1            |
-+                     /
-+           CPU Mux _/
-+             |
-+           [CPU]
-+
-+    Finally you can gate the main oscillator
-+
-+                    32kHz
-+                      |
-+                      |
-+                     /
-+           CPU Mux _/
-+             |
-+           [CPU]
-+
-+Q: Were can I learn more about the sunxi clocks?
-+
-+A: The linux-sunxi wiki contains a page documenting the clock registers,
-+   you can find it at
-+
-+        http://linux-sunxi.org/A10/CCM
-+
-+   The authoritative source for information at this time is the ccmu driver
-+   released by Allwinner, you can find it at
-+
-+        https://github.com/linux-sunxi/linux-sunxi/tree/sunxi-3.0/arch/arm/mach-sun4i/clock/ccmu
 -- 
-1.8.2.rc0
+Catalin
