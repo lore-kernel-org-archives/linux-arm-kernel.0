@@ -1,41 +1,32 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Mon, 25 Feb 2013 16:03:50 +0800
-Subject: Debugging missing interrupts
-In-Reply-To: <1361777691.4640.34.camel@localhost>
-References: <1361777691.4640.34.camel@localhost>
-Message-ID: <512B1AE6.6070903@atmel.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 25 Feb 2013 09:07:27 +0100
+Subject: [PATCH] ARM: mx27: Replace clk_register_clkdev with clock DT
+ lookup
+In-Reply-To: <CAOMZO5AB49XQXHe18+hDVmHtMfC6WoHHQkKgmZMVFTgQL1h1Lw@mail.gmail.com>
+References: <1354125330-18872-1-git-send-email-festevam@gmail.com>
+ <CAOMZO5DZv3Xi-0hHpW=eU1GHZgEsNcsDzJh9Y+=-McbN7Vb=Lg@mail.gmail.com>
+ <20121217204850.GT26326@pengutronix.de>
+ <CAOMZO5AB49XQXHe18+hDVmHtMfC6WoHHQkKgmZMVFTgQL1h1Lw@mail.gmail.com>
+Message-ID: <20130225080727.GN1906@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lexa,
+On Sun, Feb 24, 2013 at 10:31:33PM -0300, Fabio Estevam wrote:
+> Hi Sascha,
+> 
+> On Mon, Dec 17, 2012 at 6:48 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> 
+> > Looks good from a first glance, but I want to give it some testing
+> > before I apply it.
+> 
+> Have you had a chance of testing this patch?
 
-On 2/25/2013 15:34, lexa wrote:
->
-> Hello.
->
-> I have a trouble with debugging SSC interface(or maybe with audio
-> codec). I have a board based on Atmel AT91 (at91sam9m10g45) and codec TI
-> tlv320aic3106(using driver tlv320aic3x) connected to SSC interface in
-> I2S mode.
+Damn, I missed this. However, Markus did test it. So it's fine for me.
 
-Which kernel version do you use?
-SSC work as master or slave?
+Sascha
 
-> Playback is works well, but the capture cause trouble.
-> The problem is that arecord don't capture any data, he just writes wav
-> header and nothing more.
-
-Which command do you use for recording? (it will give sample rate, 
-format, and etc)
-
-> Interrupt counter on ssc0 does not increased during capture.
-> Also i checked data and clock lines by oscilloscope, and clearly see
-> that clock and data transmitting from audio codec during capture.
-> It's seem to me, that cpu somewhat doesn't accept data from codec. But i
-> don't understand why, and how to debug this.
->
-> I know that provided information is insufficient, but i simply don't
-> know how to get more detailed information about this problem.
-
-Best Regards,
-Bo Shen
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
