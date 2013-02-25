@@ -1,59 +1,43 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Mon, 25 Feb 2013 17:21:49 +0800
-Subject: Debugging missing interrupts
-In-Reply-To: <1361781448.4640.49.camel@localhost>
-References: <1361777691.4640.34.camel@localhost> <512B1AE6.6070903@atmel.com>
- <1361781448.4640.49.camel@localhost>
-Message-ID: <512B2D2D.5000206@atmel.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 25 Feb 2013 10:27:36 +0100
+Subject: [PATCH 01/35] mfd: ab8500-gpadc: Implemented suspend/resume
+In-Reply-To: <20130222103306.GA19796@opensource.wolfsonmicro.com>
+References: <1360933026-30325-1-git-send-email-lee.jones@linaro.org>
+ <1360933026-30325-2-git-send-email-lee.jones@linaro.org>
+ <20130220131912.GB13049@sirena.org.uk>
+ <CAPDyKFo0MpP-d7v8v1zwB42sboR3MWT6nUmG=-L0_nayYRY7FQ@mail.gmail.com>
+ <20130222103306.GA19796@opensource.wolfsonmicro.com>
+Message-ID: <CAPDyKFpJzuzB_7=eH7iNV69TLOTbdBCTx3CgqPTkianZCctKag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/25/2013 16:37, lexa wrote:
-> On Mon, 2013-02-25 at 16:03 +0800, Bo Shen wrote:
->> Hi Lexa,
->>
->> On 2/25/2013 15:34, lexa wrote:
->>>
->>> Hello.
->>>
->>> I have a trouble with debugging SSC interface(or maybe with audio
->>> codec). I have a board based on Atmel AT91 (at91sam9m10g45) and codec TI
->>> tlv320aic3106(using driver tlv320aic3x) connected to SSC interface in
->>> I2S mode.
->>
->> Which kernel version do you use?
+On 22 February 2013 11:38, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Thu, Feb 21, 2013 at 11:45:08PM +0100, Ulf Hansson wrote:
+>> On 20 February 2013 14:19, Mark Brown
 >
-> I use 3.2.38
+>> > This doesn't look especially sane...  You're doing a runtime get, taking
+>> > the lock without releasing it and disabling the regulator.  This is
+>> > *very* odd, both the changelog and the code need to explain what's going
+>> > on and why it's safe in a lot more detail here.
 >
->> SSC work as master or slave?
->>
+>> You need to do pm_runtime_get_sync to be able to make sure resources
+>> (which seems to be only the regulator) are safe to switch off. To my
+>> understanding this is a generic way to use for being able to switch
+>> off resources at a device suspend when runtime pm is used in
+>> conjunction.
 >
-> SSC works as slave for playback and for capture(as far as i know there
-> no difference in configuration SSC controller). Audio codec is
-> generating bit clock and word clock, and ARM is receiving them.
->
->>> Playback is works well, but the capture cause trouble.
->>> The problem is that arecord don't capture any data, he just writes wav
->>> header and nothing more.
->>
->> Which command do you use for recording? (it will give sample rate,
->> format, and etc)
+> Are you sure this actually does what you think it does, especially when
+> run on modern kernels?
 
-any information for this?
+Not sure, what you are thinking of more precisely here. Runtime pm has
+been in the kernel for quite some time now.
 
->>
->>> Interrupt counter on ssc0 does not increased during capture.
->>> Also i checked data and clock lines by oscilloscope, and clearly see
->>> that clock and data transmitting from audio codec during capture.
->>> It's seem to me, that cpu somewhat doesn't accept data from codec. But i
->>> don't understand why, and how to debug this.
+Anyway, to make it a bit clearer, we switch the regulator on/off at
+the runtime suspend/resume callbacks. We want to take similar actions
+in device suspend/resume.
+To accomplish this a pm_runtime_get_sync is done in suspend and vice
+verse in resume, otherwise you can not safely handle the regulator.
 
-Please enable the kernel debug information, this will give out necessary 
-register information for debugging. Please also provide it for analysis 
-your problem.
-
->>> I know that provided information is insufficient, but i simply don't
->>> know how to get more detailed information about this problem.
-
-Best Regards,
-Bo Shen
+Kind regards
+Ulf Hansson
