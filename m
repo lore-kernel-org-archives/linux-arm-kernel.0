@@ -1,75 +1,84 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Mon, 25 Feb 2013 18:17:13 +0100 (CET)
-Subject: [PATCH/RFC v2 2/2] ARM: shmobile: kzm9g-reference: add CPUFreq support
-In-Reply-To: <Pine.LNX.4.64.1302251644010.3030@axis700.grange>
-References: <Pine.LNX.4.64.1302251644010.3030@axis700.grange>
-Message-ID: <Pine.LNX.4.64.1302251814430.3030@axis700.grange>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 25 Feb 2013 17:25:45 +0000
+Subject: [PATCH] ARM: vfp: fix fpsid register subarchitecture field
+ mask width
+In-Reply-To: <1361520485-30269-1-git-send-email-sboyd@codeaurora.org>
+References: <1361520485-30269-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20130225172545.GO17833@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables the use of the generic cpufreq-cpu0 driver on kzm9g.
-Providing a regulator and a list of OPPs in DT, combined with a clock,
-attached to the cpu0 device is everything, the cpufreq-cpu0 driver needs.
+On Fri, Feb 22, 2013 at 12:08:05AM -0800, Stephen Boyd wrote:
+> From: Steve Muckle <smuckle@codeaurora.org>
+> 
+> The subarchitecture field in the fpsid register is 7 bits wide.
+> The topmost bit is used to designate that the subarchitecture
+> designer is not ARM. We use this field to determine which VFP
+> version is supported by the CPU. Since the topmost bit is masked
+> off we detect non-ARM subarchitectures as supporting only
+> HWCAP_VFP and not HWCAP_VFPv3 as it should be for Qualcomm's
+> processors.
+> 
+> Use the proper width for the mask so that we report the correct
+> elf_hwcap of non-ARM designed processors.
 
-Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
----
+This is a *big* can of worms.  How this register is defined depends on
+what document you look at:
 
-v2: adjust CPU frequencies in the OPP list according to v2 of patch 1/2.
+DDI0238A/B/C: 0x41011090: (VFP9) 
+ 23:	0 = hw,
+ 22:21:	00 = FSTMX/FLDMX format is standard format 1,
+ 20: 	0 = Single-precision and double-precision data supported
+ 19:16: 0001 = architecture version
+DDI0133A: 0x410000A0: (VFP10) 
+ 23:16: 0 = architecture version
+DDI0274F: 0x410120B3: (VFP11) 
+ 23:	0 = hw,
+ 22:21: 00 = FSTMX/FLDMX format is standard format 1,
+ 20:	0 = Single-precision and double-precision data supported
+ 19:16:	0001 = architecture version
+DDI0406A/B/C:
+ 23: hw, 22:16: architecture version
 
- arch/arm/boot/dts/sh73a0-kzm9g-reference.dts |   19 ++++++++++++++++---
- arch/arm/mach-shmobile/Kconfig               |    2 ++
- 2 files changed, 18 insertions(+), 3 deletions(-)
+Now, DDI0238C was updated on 4th August 2010.  The ARM ARM revs A and B
+were published before this version - only ARM ARM rev C post-dates this.
 
-diff --git a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-index d9f6c18..d7f18fd 100644
---- a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-+++ b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-@@ -18,6 +18,19 @@
- 	model = "KZM-A9-GT";
- 	compatible = "renesas,kzm9g-reference", "renesas,sh73a0";
- 
-+	cpus {
-+		cpu at 0 {
-+			cpu0-supply = <&vdd_dvfs>;
-+			operating-points = <
-+				/* kHz  uV */
-+				1196000 1315000
-+				 598000 1175000
-+				 398667 1065000
-+			>;
-+			voltage-tolerance = <1>; /* 1% */
-+		};
-+	};
-+
- 	chosen {
- 		bootargs = "console=tty0 console=ttySC4,115200 root=/dev/nfs ip=dhcp ignore_loglevel earlyprintk=sh-sci.4,115200";
- 	};
-@@ -118,10 +131,10 @@
- 		reg = <0x40>;
- 
- 		regulators {
--			sd1 {
-+			vdd_dvfs: sd1 {
- 				regulator-name = "1.315V CPU";
--				regulator-min-microvolt = <1315000>;
--				regulator-max-microvolt = <1335000>;
-+				regulator-min-microvolt = <1050000>;
-+				regulator-max-microvolt = <1350000>;
- 				regulator-always-on;
- 				regulator-boot-on;
- 			};
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 927eecc..6f621ac 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -141,6 +141,8 @@ config MACH_KZM9G
- config MACH_KZM9G_REFERENCE
- 	bool "KZM-A9-GT board - Reference Device Tree Implementation"
- 	depends on ARCH_SH73A0
-+	select ARCH_HAS_CPUFREQ
-+	select ARCH_HAS_OPP
- 	select ARCH_REQUIRE_GPIOLIB
- 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
- 	select SND_SOC_AK4642 if SND_SIMPLE_CARD
--- 
-1.7.2.5
+The ARM ARM defines bit 22 to be zero for any ARM produced VFP hardware,
+and must be one for non-ARM designed VFP hardware.
+
+Now, the ARM ARM gives these as possible values for bits 22:16:
+
+ 0000000 - VFPv1
+ 0000001 - VFPv2
+ 0000010 - VFPv3 with common VFPv2
+ 0000011 - VFPv3 h/w only
+ 0000100 - VFPv3 with common VFPv3
+
+We _do_ test bit 20 to determine if there is support for 32 double
+precision registers, and if this bit is set, we ignore the VFP.  From
+the description in the ARM ARM, this is wrong if the implementer is
+not ARM.
+
+If the information above _does_ correspond accurately with all ARM
+produced hardware (VFP9S, VFP10, VFP11, plus any other variants in
+ARMs CPUs) then they will always have bits 22:20 as zero.  This means
+we can extend the architecture field to include those bits.  We should
+also arrange for VFP support to fail if any of these bits are set.
+
+How do we handle non-ARM produced VFP hardware?  I've no idea - the
+stinking pile of dogs poo that ARM Ltd have created here means that
+we're going to have to decode this register in a per-designer way -
+and if we don't have support for your designer, then the support code
+_must_ fail to initialize and report _any_ VFP support.
+
+This is going to be horrendously disruptive, because _I_ don't know
+what values of FPSID register can be found out in the wild.  I know
+that the Dove chips have a Marvell implementer value (0x56), but
+these report a subarch value of 2 (which seems to correspond with
+ARM Ltd's implementation of architecture coding.)  Is it fully
+compatible?  Don't know.
+
+I think the only way we're going to find out is to end up with VFP
+disabled on most CPUs and wait for people to stream reports in of
+their hardware breaking.  Again, way to go ARM Ltd!  What a truely
+excellent situation this is!
