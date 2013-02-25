@@ -1,31 +1,39 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 25 Feb 2013 15:59:46 +0000
-Subject: [PATCH 2/2] ARM: mm: make mm->context.id an atomic64_t variable
-In-Reply-To: <1361805488-8798-2-git-send-email-will.deacon@arm.com>
-References: <1361805488-8798-1-git-send-email-will.deacon@arm.com>
- <1361805488-8798-2-git-send-email-will.deacon@arm.com>
-Message-ID: <20130225155946.GC612@arm.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Mon, 25 Feb 2013 17:04:15 +0100
+Subject: [PATCH v3 2/2] DMA: imx-dma: imxdma->dev used uninitialized
+In-Reply-To: <1361808255-17381-1-git-send-email-mpa@pengutronix.de>
+References: <1361543838-12604-1-git-send-email-mpa@pengutronix.de>
+ <1361808255-17381-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1361808255-17381-2-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 25, 2013 at 03:18:08PM +0000, Will Deacon wrote:
-> mm->context.id is updated under asid_lock when a new ASID is allocated
-> to an mm_struct. However, it is also read without the lock when a task
-> is being scheduled and checking whether or not the current ASID
-> generation is up-to-date.
-> 
-> If two threads of the same process are being scheduled in parallel and
-> the bottom bits of the generation in their mm->context.id match the
-> current generation (that is, the mm_struct has not been used for ~2^24
-> rollovers) then the non-atomic, lockless access to mm->context.id may
-> yield the incorrect ASID.
-> 
-> This patch fixes this issue by making mm->context.id and atomic64_t,
-> ensuring that the generation is always read consistently. For code that
-> only requires access to the ASID bits (e.g. TLB flushing by mm), then
-> the value is accessed directly, which GCC converts to an ldrb.
-> 
-> Cc: <stable@vger.kernel.org>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+imxdma->dev is used for dev_warn before it was set.
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+ drivers/dma/imx-dma.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/dma/imx-dma.c b/drivers/dma/imx-dma.c
+index 5856117..5830a0c 100644
+--- a/drivers/dma/imx-dma.c
++++ b/drivers/dma/imx-dma.c
+@@ -1077,6 +1077,7 @@ static int __init imxdma_probe(struct platform_device *pdev)
+ 	if (!imxdma)
+ 		return -ENOMEM;
+ 
++	imxdma->dev = &pdev->dev;
+ 	imxdma->devtype = pdev->id_entry->driver_data;
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+@@ -1181,7 +1182,6 @@ static int __init imxdma_probe(struct platform_device *pdev)
+ 			      &imxdma->dma_device.channels);
+ 	}
+ 
+-	imxdma->dev = &pdev->dev;
+ 	imxdma->dma_device.dev = &pdev->dev;
+ 
+ 	imxdma->dma_device.device_alloc_chan_resources = imxdma_alloc_chan_resources;
+-- 
+1.8.1.2
