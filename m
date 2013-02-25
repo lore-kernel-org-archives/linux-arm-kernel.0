@@ -1,52 +1,35 @@
-From: mark.langsdorf@calxeda.com (Mark Langsdorf)
-Date: Mon, 25 Feb 2013 07:53:47 -0600
-Subject: [PATCH v2] cpufreq: highbank: do not initialize array with a loop
-In-Reply-To: <1361790465-21760-1-git-send-email-emilio@elopez.com.ar>
-References: <1361725277-5125-1-git-send-email-emilio@elopez.com.ar>
- <1361790465-21760-1-git-send-email-emilio@elopez.com.ar>
-Message-ID: <512B6CEB.1030203@calxeda.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 25 Feb 2013 13:55:46 +0000
+Subject: [PATCH 0/2] VGIC fixes for 3.9-rc1
+In-Reply-To: <20130225134930.GB25276@mudshark.cambridge.arm.com>
+References: <1361558446-8375-1-git-send-email-marc.zyngier@arm.com>
+ <20130225134930.GB25276@mudshark.cambridge.arm.com>
+Message-ID: <512B6D62.8070608@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/25/2013 05:07 AM, Emilio L?pez wrote:
-> As uninitialized array members will be initialized to zero, we can
-> avoid using a for loop by setting a value to it.
+On 25/02/13 13:49, Will Deacon wrote:
+> On Fri, Feb 22, 2013 at 06:40:44PM +0000, Marc Zyngier wrote:
+>> I've just realised that these patches have never been on LAKML, and
+>> only to kvm-arm. It is probably better to repost them here before they
+>> get pulled in.
+>>
+>> The first patch is just a cleanup, and has very little consequence on
+>> the behaviour of the VGIC. The second one is more serious, and results
+>> in lost interrupts under heavy load.
+>>
+>> Patches are against mainline as of today, and tested on both TC2 and
+>> arm64 model.
 > 
-> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
-> ---
+> I'm probably turning up late to this party, but after wrapping my head
+> around the vgic once again:
 > 
-> Note that I don't own any device using this driver, it has only been compile
-> tested, but it shouldn't cause any issues.
+>   Reviewed-by: Will Deacon <will.deacon@arm.com>
 > 
-> Changes v1 -> v2:
->   * Move freq / 1000000 to the array definition as suggested by Viresh Kumar
-> 
->  drivers/cpufreq/highbank-cpufreq.c | 8 +-------
->  1 file changed, 1 insertion(+), 7 deletions(-)
-> 
-> diff --git a/drivers/cpufreq/highbank-cpufreq.c b/drivers/cpufreq/highbank-cpufreq.c
-> index 66e3a71..b61b5a3 100644
-> --- a/drivers/cpufreq/highbank-cpufreq.c
-> +++ b/drivers/cpufreq/highbank-cpufreq.c
-> @@ -28,13 +28,7 @@
->  
->  static int hb_voltage_change(unsigned int freq)
->  {
-> -	int i;
-> -	u32 msg[HB_CPUFREQ_IPC_LEN];
-> -
-> -	msg[0] = HB_CPUFREQ_CHANGE_NOTE;
-> -	msg[1] = freq / 1000000;
-> -	for (i = 2; i < HB_CPUFREQ_IPC_LEN; i++)
-> -		msg[i] = 0;
-> +	u32 msg[HB_CPUFREQ_IPC_LEN] = {HB_CPUFREQ_CHANGE_NOTE, freq / 1000000};
->  
->  	return pl320_ipc_transmit(msg);
->  }
-> 
-Thanks for the improvement.
+> for these two patches.
 
-Acked-By: Mark Langsdorf <mark.langsdorf@calxeda.com>
+Thanks Will. I have some paracetamol if you need any... ;-)
 
---Mark Langsdorf
-Calxeda, Inc.
+	M.
+-- 
+Jazz is not dead. It just smells funny...
