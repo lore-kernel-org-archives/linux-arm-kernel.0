@@ -1,36 +1,59 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Mon, 25 Feb 2013 10:39:20 +0200
-Subject: [PATCH 2/4] ARM: tegra: pmc: add power on function for
- secondary CPUs
-In-Reply-To: <5127BAD2.8030904@wwwdotorg.org>
-References: <1361515491-16199-1-git-send-email-josephl@nvidia.com>
- <1361515491-16199-3-git-send-email-josephl@nvidia.com>
- <5127BAD2.8030904@wwwdotorg.org>
-Message-ID: <20130225083920.GZ23234@tbergstrom-lnx.Nvidia.com>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Mon, 25 Feb 2013 17:21:49 +0800
+Subject: Debugging missing interrupts
+In-Reply-To: <1361781448.4640.49.camel@localhost>
+References: <1361777691.4640.34.camel@localhost> <512B1AE6.6070903@atmel.com>
+ <1361781448.4640.49.camel@localhost>
+Message-ID: <512B2D2D.5000206@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 22, 2013 at 07:37:06PM +0100, Stephen Warren wrote:
-> On 02/21/2013 11:44 PM, Joseph Lo wrote:
-> > Adding the power on function for secondary CPUs in PMC driver, this can
-> > help us to remove legacy powergate driver and add generic power domain
-> > support later.
-> 
-> > diff --git a/arch/arm/mach-tegra/pmc.c b/arch/arm/mach-tegra/pmc.c
-> 
-> > +static u8 tegra_cpu_domains[] = {
-> > +	0xFF,			/* not available for CPU0 */
-> > +	TEGRA_POWERGATE_CPU1,
-> > +	TEGRA_POWERGATE_CPU2,
-> > +	TEGRA_POWERGATE_CPU3,
-> > +};
-> 
-> Per Peter's comment, you probably need SoC-specific arrays here, to
-> support CPU0 having a valid value or not.
+On 2/25/2013 16:37, lexa wrote:
+> On Mon, 2013-02-25 at 16:03 +0800, Bo Shen wrote:
+>> Hi Lexa,
+>>
+>> On 2/25/2013 15:34, lexa wrote:
+>>>
+>>> Hello.
+>>>
+>>> I have a trouble with debugging SSC interface(or maybe with audio
+>>> codec). I have a board based on Atmel AT91 (at91sam9m10g45) and codec TI
+>>> tlv320aic3106(using driver tlv320aic3x) connected to SSC interface in
+>>> I2S mode.
+>>
+>> Which kernel version do you use?
+>
+> I use 3.2.38
+>
+>> SSC work as master or slave?
+>>
+>
+> SSC works as slave for playback and for capture(as far as i know there
+> no difference in configuration SSC controller). Audio codec is
+> generating bit clock and word clock, and ARM is receiving them.
+>
+>>> Playback is works well, but the capture cause trouble.
+>>> The problem is that arecord don't capture any data, he just writes wav
+>>> header and nothing more.
+>>
+>> Which command do you use for recording? (it will give sample rate,
+>> format, and etc)
 
-That was a mistake, we never use these functions on CPU0. Powergating uses
-a different path. So this is ok.
+any information for this?
 
-Cheers,
+>>
+>>> Interrupt counter on ssc0 does not increased during capture.
+>>> Also i checked data and clock lines by oscilloscope, and clearly see
+>>> that clock and data transmitting from audio codec during capture.
+>>> It's seem to me, that cpu somewhat doesn't accept data from codec. But i
+>>> don't understand why, and how to debug this.
 
-Peter.
+Please enable the kernel debug information, this will give out necessary 
+register information for debugging. Please also provide it for analysis 
+your problem.
+
+>>> I know that provided information is insufficient, but i simply don't
+>>> know how to get more detailed information about this problem.
+
+Best Regards,
+Bo Shen
