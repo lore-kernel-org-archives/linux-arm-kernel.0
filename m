@@ -1,142 +1,31 @@
-From: eag0628@gmail.com (Lai Jiangshan)
-Date: Mon, 25 Feb 2013 23:53:22 +0800
-Subject: [PATCH v6 04/46] percpu_rwlock: Implement the core design of
- Per-CPU Reader-Writer Locks
-In-Reply-To: <51226F91.7000108@linux.vnet.ibm.com>
-References: <20130218123714.26245.61816.stgit@srivatsabhat.in.ibm.com>
- <20130218123856.26245.46705.stgit@srivatsabhat.in.ibm.com>
- <CANN689F9S7c1M8+cEpz3tsxGF34+NTRBLvxgPUOtbvav5u+RRA@mail.gmail.com>
- <5122551E.1080703@linux.vnet.ibm.com>
- <51226B46.9080707@linux.vnet.ibm.com>
- <CANN689FSxOz+0Cu7EG_yKD8ZE1OpT4kyT+ybLfXSqaifodJRpw@mail.gmail.com>
- <51226F91.7000108@linux.vnet.ibm.com>
-Message-ID: <CACvQF53bdh4_BxF0y1fnTVR+T2OmRc0jmWQYftsvx92-fg-Lug@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 25 Feb 2013 15:59:30 +0000
+Subject: [PATCH 1/2] ARM: mm: fix race updating mm->context.id on ASID
+ rollover
+In-Reply-To: <1361805488-8798-1-git-send-email-will.deacon@arm.com>
+References: <1361805488-8798-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20130225155929.GB612@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Srivatsa,
+On Mon, Feb 25, 2013 at 03:18:07PM +0000, Will Deacon wrote:
+> If a thread triggers an ASID rollover, other threads of the same process
+> must be made to wait until the mm->context.id for the shared mm_struct
+> has been updated to new generation and associated book-keeping (e.g.
+> TLB invalidation) has ben performed.
+> 
+> However, there is a *tiny* window where both mm->context.id and the
+> relevant active_asids entry are updated to the new generation, but the
+> TLB flush has not been performed, which could allow another thread to
+> return to userspace with a dirty TLB, potentially leading to data
+> corruption. In reality this will never occur because one CPU would need
+> to perform a context-switch in the time it takes another to do a couple
+> of atomic test/set operations but we should plug the race anyway.
+> 
+> This patch moves the active_asids update until after the potential TLB
+> flush on context-switch.
+> 
+> Cc: <stable@vger.kernel.org>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-The target of the whole patchset is nice for me.
-A question: How did you find out the such usages of
-"preempt_disable()" and convert them? did all are converted?
-
-And I think the lock is too complex and reinvent the wheel, why don't
-you reuse the lglock?
-I wrote an untested draft here.
-
-Thanks,
-Lai
-
-PS: Some HA tools(I'm writing one) which takes checkpoints of
-virtual-machines frequently, I guess this patchset can speedup the
-tools.
-
->From 01db542693a1b7fc6f9ece45d57cb529d9be5b66 Mon Sep 17 00:00:00 2001
-From: Lai Jiangshan <laijs@cn.fujitsu.com>
-Date: Mon, 25 Feb 2013 23:14:27 +0800
-Subject: [PATCH] lglock: add read-preference local-global rwlock
-
-locality via lglock(trylock)
-read-preference read-write-lock via fallback rwlock_t
-
-Signed-off-by: Lai Jiangshan <laijs@cn.fujitsu.com>
----
- include/linux/lglock.h |   31 +++++++++++++++++++++++++++++++
- kernel/lglock.c        |   45 +++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 76 insertions(+), 0 deletions(-)
-
-diff --git a/include/linux/lglock.h b/include/linux/lglock.h
-index 0d24e93..30fe887 100644
---- a/include/linux/lglock.h
-+++ b/include/linux/lglock.h
-@@ -67,4 +67,35 @@ void lg_local_unlock_cpu(struct lglock *lg, int cpu);
- void lg_global_lock(struct lglock *lg);
- void lg_global_unlock(struct lglock *lg);
-
-+struct lgrwlock {
-+	unsigned long __percpu *fallback_reader_refcnt;
-+	struct lglock lglock;
-+	rwlock_t fallback_rwlock;
-+};
-+
-+#define DEFINE_LGRWLOCK(name)						\
-+	static DEFINE_PER_CPU(arch_spinlock_t, name ## _lock)		\
-+	= __ARCH_SPIN_LOCK_UNLOCKED;					\
-+	static DEFINE_PER_CPU(unsigned long, name ## _refcnt);		\
-+	struct lgrwlock name = {					\
-+		.fallback_reader_refcnt = &name ## _refcnt,		\
-+		.lglock = { .lock = &name ## _lock } }
-+
-+#define DEFINE_STATIC_LGRWLOCK(name)					\
-+	static DEFINE_PER_CPU(arch_spinlock_t, name ## _lock)		\
-+	= __ARCH_SPIN_LOCK_UNLOCKED;					\
-+	static DEFINE_PER_CPU(unsigned long, name ## _refcnt);		\
-+	static struct lgrwlock name = {					\
-+		.fallback_reader_refcnt = &name ## _refcnt,		\
-+		.lglock = { .lock = &name ## _lock } }
-+
-+static inline void lg_rwlock_init(struct lgrwlock *lgrw, char *name)
-+{
-+	lg_lock_init(&lgrw->lglock, name);
-+}
-+
-+void lg_rwlock_local_read_lock(struct lgrwlock *lgrw);
-+void lg_rwlock_local_read_unlock(struct lgrwlock *lgrw);
-+void lg_rwlock_global_write_lock(struct lgrwlock *lgrw);
-+void lg_rwlock_global_write_unlock(struct lgrwlock *lgrw);
- #endif
-diff --git a/kernel/lglock.c b/kernel/lglock.c
-index 6535a66..463543a 100644
---- a/kernel/lglock.c
-+++ b/kernel/lglock.c
-@@ -87,3 +87,48 @@ void lg_global_unlock(struct lglock *lg)
- 	preempt_enable();
- }
- EXPORT_SYMBOL(lg_global_unlock);
-+
-+void lg_rwlock_local_read_lock(struct lgrwlock *lgrw)
-+{
-+	struct lglock *lg = &lgrw->lglock;
-+
-+	preempt_disable();
-+	if (likely(!__this_cpu_read(*lgrw->fallback_reader_refcnt))) {
-+		if (likely(arch_spin_trylock(this_cpu_ptr(lg->lock)))) {
-+			rwlock_acquire_read(&lg->lock_dep_map, 0, 0, _RET_IP_);
-+			return;
-+		}
-+		read_lock(&lgrw->fallback_rwlock);
-+	}
-+
-+	__this_cpu_inc(*lgrw->fallback_reader_refcnt);
-+}
-+EXPORT_SYMBOL(lg_rwlock_local_read_lock);
-+
-+void lg_rwlock_local_read_unlock(struct lgrwlock *lgrw)
-+{
-+	if (likely(!__this_cpu_read(*lgrw->fallback_reader_refcnt))) {
-+		lg_local_unlock(&lgrw->lglock);
-+		return;
-+	}
-+
-+	if (!__this_cpu_dec_return(*lgrw->fallback_reader_refcnt))
-+		read_unlock(&lgrw->fallback_rwlock);
-+
-+	preempt_enable();
-+}
-+EXPORT_SYMBOL(lg_rwlock_local_read_unlock);
-+
-+void lg_rwlock_global_write_lock(struct lgrwlock *lgrw)
-+{
-+	lg_global_lock(&lgrw->lglock);
-+	write_lock(&lgrw->fallback_rwlock);
-+}
-+EXPORT_SYMBOL(lg_rwlock_global_write_lock);
-+
-+void lg_rwlock_global_write_unlock(struct lgrwlock *lgrw)
-+{
-+	write_unlock(&lgrw->fallback_rwlock);
-+	lg_global_unlock(&lgrw->lglock);
-+}
-+EXPORT_SYMBOL(lg_rwlock_global_write_unlock);
--- 
-1.7.7.6
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
