@@ -1,51 +1,39 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Mon, 25 Feb 2013 19:10:44 -0800 (PST)
-Subject: [PATCH v2 0/4] R-Car SATA driver and platform data
-In-Reply-To: <20130226000709.GB16202@verge.net.au>
-References: <201302182327.46930.sergei.shtylyov@cogentembedded.com>
- <20130219034210.GA7701@verge.net.au>
- <512B6243.9060808@cogentembedded.com>
- <20130226000709.GB16202@verge.net.au>
-Message-ID: <87r4k3db2o.wl%kuninori.morimoto.gx@renesas.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Mon, 25 Feb 2013 19:35:24 -0800
+Subject: what's the next LTSI kernel version for long-term support
+In-Reply-To: <CAGsJ_4yxQK05hHUivYEnLD9=cAE4t5jNV7+6KJGu+LsVsSk1oQ@mail.gmail.com>
+References: <CAGsJ_4yxQK05hHUivYEnLD9=cAE4t5jNV7+6KJGu+LsVsSk1oQ@mail.gmail.com>
+Message-ID: <20130226033524.GA25067@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Feb 26, 2013 at 11:06:56AM +0800, Barry Song wrote:
+> Hi Greg/All,
+> we have seen 3.4 was announced to be an LTSI in Aug, 2012. I'd like to
+> know what is the next LTSI version since we might want to align our
+> next release with LTSI.
 
-Hi Simon, Sergei
+Who is "we" here?
 
-> > >>[1/4] libata: add R-Car SATA driver
-> > >>[2/4] ARM: mach-shmobile: r8a7779: SATA DT configuration
-> > >>[3/4] ARM: mach-shmobile: r8a7779: add SATA support
-> > >>[4/4] ARM: mach-shmobile: marzen: add SATA support
-> > 
-> > >>Patch 1 also applies to the 'upstream' branch of Jeff Garzik's libata-dev.git
-> > >>repo.
-> > 
-> > >>Patch changes since the initial posting are reported in the individual patches.
-> > 
-> > >Thanks, I have updated topic/r-car-sata and verified
-> > >that the SATA driver is successfully initialised for both
-> > >non-DT and DT boot.
-> > 
-> >    The SATA driver have been already merged by Linus:
-> > 
-> > http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=commit;h=163cf81d266f017d718ef786fbbb6b2513ce7ec3
-> > 
-> > Can we merge the rest of the patches in this merge window?
-> 
-> Unfortunately the path for patches for shmobile is long, arduous and
-> out of my control.
-> 
-> I will merge the remaining patches into the renesas tree ASAP
-> and push them to arm-soc for v3.10.
+> That might help us to plan the release cycle.
 
-I guess this patch is using gic_spi() on setup-r8a7779.c
+As I've stated before, I do not announce the long-term kernel ahead of
+time, we did that once in the past and it was a total mess.  I announce
+it _after_ the kernel is released.
 
-Could you please send additional patch (or v2) to use gic_iid()
-instead of gic_spi() if Simon accepts my gic_iid() macro patch ?
-[ARM: shmobile: add gic_iid macro for ICCIAR / interrupt ID]
+I have also stated that 3.8 is NOT going to be a long-term kernel, that
+would mean I would be handling 3 long-term kernels at once, plus 1-2
+"normal" stable kernels.  That is a sure way to drive me crazy and burn
+out.
 
+> BTW, how many people and SoC vendors in ARM communicaty want to align
+> your releases with LTSI?
 
-Best regards
----
-Kuninori Morimoto
+I do not know.  There was an LTSI meeting last week at ELC where this
+was discussed, I suggest you ask the people who attended it. I was
+there, but it's not up to me to release the meeting minutes, and I
+wasn't taking notes, sorry.
+
+thanks,
+
+greg k-h
