@@ -1,36 +1,34 @@
-From: inderpal.singh@linaro.org (Inderpal Singh)
-Date: Tue, 26 Feb 2013 16:57:43 +0530
-Subject: [PATCH v2] arm: plat-samsung: check processor type before cache
- restoration in resume
-In-Reply-To: <20130226112201.GR17833@n2100.arm.linux.org.uk>
-References: <1361872613-12040-1-git-send-email-inderpal.singh@linaro.org>
- <20130226100222.GQ17833@n2100.arm.linux.org.uk>
- <CAG17yqRS2MxTxgVD0qx73BO0x8PWgCmqrQQ4+rDvP=MwMKj3qw@mail.gmail.com>
- <20130226112201.GR17833@n2100.arm.linux.org.uk>
-Message-ID: <CAG17yqQ5rYsyNaP40P8Wd5h5zwDz6js2Gd-JYW3ht_nrxpNgZQ@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 26 Feb 2013 12:30:28 +0100
+Subject: [PATCH 1/2] time : pass broadcast device parameter
+In-Reply-To: <CAKohpomqooF6DzzzdUFByA0wDxQ3RuPne15a9Vy1sScKjZfeyA@mail.gmail.com>
+References: <5123C299.3080005@linaro.org>
+ <1361484083-5906-1-git-send-email-daniel.lezcano@linaro.org>
+ <CAKohpomqooF6DzzzdUFByA0wDxQ3RuPne15a9Vy1sScKjZfeyA@mail.gmail.com>
+Message-ID: <512C9CD4.50808@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 February 2013 16:52, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Feb 26, 2013 at 04:46:01PM +0530, Inderpal Singh wrote:
->> On 26 February 2013 15:32, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > On Tue, Feb 26, 2013 at 03:26:53PM +0530, Inderpal Singh wrote:
->> >> Only cortex-a9 based samsung platforms have l2x0 cache controller. Hence check
->> >> the same before restoring the cache in resume.
->> >
->> > Why is this patch soo complicated?  Can't you read the CPUs MIDR register
->> > from assembly code?
+On 02/26/2013 09:45 AM, Viresh Kumar wrote:
+> On 22 February 2013 03:31, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
+>> The broadcast timer could be passed as parameter to the function
+>> instead of using again tick_broadcast_device.evtdev which was
+>> previously used in the caller function.
 >>
->> I wanted to read MIDR only once thats why didn't read in resume
->> function in assembly as the same resume function gets used in cpuidle
->> path.
->
-> It's more expensive to load it from memory than to read it from CP15.
+>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> 
+> I know you are going for another round with this patchset and was just
+> trying v1.
+> 
+> I did my tests on ARM Vexpress - TC2, big.LITTLE Arch.
+> 
+> Tested-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-Ok, I will change it to read from CP15 in assembly and resubmit the patch.
-Thanks for the review.
+Thanks Viresh for testing.
 
-Regards,
-Inder
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
