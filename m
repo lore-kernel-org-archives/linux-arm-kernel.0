@@ -1,45 +1,176 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 26 Feb 2013 10:59:44 +0100
-Subject: [PATCH] ARM: i.MX35: enable MAX clock
-Message-ID: <1361872784-1348-1-git-send-email-s.hauer@pengutronix.de>
+From: martinez.javier@gmail.com (Javier Martinez Canillas)
+Date: Tue, 26 Feb 2013 11:01:20 +0100
+Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
+In-Reply-To: <4F47AD08.4030504@ti.com>
+References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
+ <1329321854-24490-4-git-send-email-b-cousson@ti.com>
+ <4F44FA56.7020000@gmail.com>
+ <4F44FC37.2000701@ti.com> <4F452484.5080503@gmail.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF17BD8BC6C1@HQMAIL01.nvidia.com>
+ <4F47AD08.4030504@ti.com>
+Message-ID: <CAAwP0s0cB368R2mtbJpTZJreR-5GSRLfxC+8DJLo5nw3_OwBuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The i.MX35 has two bits per clock gate which are decoded as follows:
-      0b00 -> clock off
-      0b01 -> clock is on in run mode, off in wait/doze
-      0b10 -> clock is on in run/wait mode, off in doze
-      0b11 -> clock is always on
+On Fri, Feb 24, 2012 at 4:30 PM, Cousson, Benoit <b-cousson@ti.com> wrote:
+> On 2/22/2012 7:29 PM, Stephen Warren wrote:
+>>
+>> Rob Herring wrote at Wednesday, February 22, 2012 10:23 AM:
+>>>
+>>> On 02/22/2012 08:31 AM, Cousson, Benoit wrote:
+>>>>
+>>>> On 2/22/2012 3:23 PM, Rob Herring wrote:
+>>>>>
+>>>>> On 02/15/2012 10:04 AM, Benoit Cousson wrote:
+>>>>>>
+>>>>>> Adapt the GPIO driver to retrieve information from a DT file.
+>>>>>>
+>>>>>> Allocate the irq_base dynamically and rename bank->virtual_irq_start
+>>>>>> to bank->irq_base.
+>>>>>> Change irq_base type to int instead of u16 to match irq_alloc_descs
+>>>>>> output.
+>>>>>>
+>>>>>> Add documentation for GPIO properties specific to OMAP.
+>>>>>>
+>>>>>> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
+>>>>>> Cc: Tarun Kanti DebBarma<tarun.kanti@ti.com>
+>>>>>
+>>>>>
+>>>>> One comment below, but otherwise:
+>>>>>
+>>>>> Acked-by: Rob Herring<rob.herring@calxeda.com>
+>>>>>
+>>>>>> ---
+>>>>>>    .../devicetree/bindings/gpio/gpio-omap.txt         |   30 +++++
+>>>>>>    drivers/gpio/gpio-omap.c                           |  121
+>>>>>> ++++++++++++++++++--
+>>>>>>    2 files changed, 142 insertions(+), 9 deletions(-)
+>>>>>>    create mode 100644
+>>>>>> Documentation/devicetree/bindings/gpio/gpio-omap.txt
+>>>>>>
+>>>>>> diff --git a/Documentation/devicetree/bindings/gpio/gpio-omap.txt
+>>>>>> b/Documentation/devicetree/bindings/gpio/gpio-omap.txt
+>>>>>> new file mode 100644
+>>>>>> index 0000000..c1b3100
+>>>>>> --- /dev/null
+>>>>>> +++ b/Documentation/devicetree/bindings/gpio/gpio-omap.txt
+>>>>>> @@ -0,0 +1,30 @@
+>>>>>> +OMAP GPIO controller bindings
+>>>>>> +
+>>>>>> +Required properties:
+>>>>>> +- compatible:
+>>>>>> +  - "ti,omap2-gpio" for OMAP2 controllers
+>>>>>> +  - "ti,omap3-gpio" for OMAP3 controllers
+>>>>>> +  - "ti,omap4-gpio" for OMAP4 controllers
+>>>>>> +- #gpio-cells : Should be two.
+>>>>>> +  - first cell is the pin number
+>>>>>> +  - second cell is used to specify optional parameters (unused)
+>>>>>> +- gpio-controller : Marks the device node as a GPIO controller.
+>>>>>> +- #interrupt-cells : Should be one
+>>>>>
+>>>>>
+>>>>> There's no level/edge settings for gpios?
+>>>>
+>>>>
+>>>> That's a good question, because I was wondering as well :-)
+>>>>
+>>>> I did no see how it was done in other GPIO implementation.
+>>>
+>>>
+>>> There's not really a good example that I've found. Many gpio nodes don't
+>>> even have "interrupt-controller" set.
+>>>
+>>> So if you have an irq_set_type function for gpio's, then you should have
+>>> 2 cells.
+>
+>
+> After checking the OMAP gpio code, I do have a gpio_irq_type and the GPIO do
+> support the 4 types. I'm not sure yet about the combinations.
+>
+>
+>> Tegra's GPIO IRQ binding (gpio_nvidia.txt in linux-next at least) says:
+>>
+>> - #interrupt-cells : Should be 2.
+>>    The first cell is the GPIO number.
+>>    The second cell is used to specify flags:
+>>      bits[3:0] trigger type and level flags:
+>>        1 = low-to-high edge triggered.
+>>        2 = high-to-low edge triggered.
+>>        4 = active high level-sensitive.
+>>        8 = active low level-sensitive.
+>>        Valid combinations are 1, 2, 3, 4, 8.
+>
+>
+> Indeed, so I'll just copy / paste Tegra's binding...
+>
+> Thanks,
+> Benoit
+>
+>
 
-The reset value for the MAX clock is 0b10.
+Hello,
 
-The MAX clock is needed by the SoC, yet unused in the Kernel, so the
-common clock framework will disable it during late init time. It will
-only disable clocks though which it detects as being turned on. This
-detection is made depending on the lower bit of the gate. If the reset
-value has been altered by the bootloader to 0b11 the clock framework
-will detect the clock as turned on, yet unused, hence it will turn it
-off and the system locks up.
+I was wondering if the level/edge settings for gpios is working on OMAP.
 
-This patch turns the MAX clock on unconditionally making the Kernel
-independent of the bootloader.
+I'm adding DT support for an SMSC911x ethernet chip connected to the
+GPMC for an OMAP3 SoC based board.
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/mach-imx/clk-imx35.c |    1 +
- 1 file changed, 1 insertion(+)
+In the smsc911x driver probe function (smsc911x_drv_probe() in
+drivers/net/ethernet/smsc/smsc911x.c), a call to request_irq() with
+the flag IRQF_TRIGGER_LOW is needed because of the wiring on my board.
 
-diff --git a/arch/arm/mach-imx/clk-imx35.c b/arch/arm/mach-imx/clk-imx35.c
-index f0727e8..f310aa4 100644
---- a/arch/arm/mach-imx/clk-imx35.c
-+++ b/arch/arm/mach-imx/clk-imx35.c
-@@ -264,6 +264,7 @@ int __init mx35_clocks_init()
- 	clk_prepare_enable(clk[gpio3_gate]);
- 	clk_prepare_enable(clk[iim_gate]);
- 	clk_prepare_enable(clk[emi_gate]);
-+	clk_prepare_enable(clk[max_gate]);
- 
- 	/*
- 	 * SCC is needed to boot via mmc after a watchdog reset. The clock code
--- 
-1.7.10.4
+Reading the gpio-omap.txt documentation it says that #interrupt-cells
+should be <2> and that a value of 8 is "active low level-sensitive".
+
+So I tried this:
+
+&gpmc {
+	ethernet at 5,0 {
+		pinctrl-names = "default";
+		pinctrl-0 = <&smsc911x_pins>;
+		compatible = "smsc,lan9221", "smsc,lan9115";
+		reg = <5 0 0xff>; /* CS5 */
+		interrupt-parent = <&gpio6>;
+		interrupts = <16 8>; /* gpio line 176 */
+		interrupt-names = "smsc911x irq";
+		vmmc-supply = <&vddvario>;
+		vmmc_aux-supply = <&vdd33a>;
+		reg-io-width = <4>;
+
+		smsc,save-mac-address;
+      };
+};
+
+But in the smsc911x probe function:
+
+irq_res->flags & IRQF_TRIGGER_MASK;
+
+returns 0 which means that no trigger flags where set.
+
+I took a look to the GPIOs device node definition on omap{3,4,5}.dtsi
+and all look like this:
+
+e.g from omap3.dtsi:
+
+                gpio6: gpio at 49058000 {
+                        compatible = "ti,omap3-gpio";
+                        ti,hwmods = "gpio6";
+                        gpio-controller;
+                        #gpio-cells = <2>;
+                        interrupt-controller;
+                        #interrupt-cells = <1>;
+                };
+
+So, even when the documentation says that all the GPIO device nodes in
+OMAP2+ should use a #interrupt-cells property value of <2>, they are
+only using <1>. Changing that value to 2 makes hangs the kernel and it
+does not boot.
+
+This is not part of my dayjob and I'm working on this in my free time
+so it would be great if someone can give me some pointers or at least
+confirm that  this is a known issue so I can debug/fix/extend
+drivers/gpio/gpio-omap.c to parse and pass the IRQF_TRIGGER_*  flags
+to the IORESOURCE_IRQ resource structure.
+
+Thanks a lot and best regards,
+Javier
