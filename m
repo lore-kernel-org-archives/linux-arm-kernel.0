@@ -1,25 +1,62 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 26 Feb 2013 09:29:26 -0700
-Subject: [PATCH 1/2] ARM: tegra: pmc: add specific compatible DT string
- for Tegra30 and Tegra114
-In-Reply-To: <1361872727-4388-1-git-send-email-josephl@nvidia.com>
-References: <1361872727-4388-1-git-send-email-josephl@nvidia.com>
-Message-ID: <512CE2E6.5020904@wwwdotorg.org>
+Date: Tue, 26 Feb 2013 09:33:24 -0700
+Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
+In-Reply-To: <CAAwP0s0cB368R2mtbJpTZJreR-5GSRLfxC+8DJLo5nw3_OwBuA@mail.gmail.com>
+References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
+ <1329321854-24490-4-git-send-email-b-cousson@ti.com>
+ <4F44FA56.7020000@gmail.com> <4F44FC37.2000701@ti.com>
+ <4F452484.5080503@gmail.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF17BD8BC6C1@HQMAIL01.nvidia.com>
+ <4F47AD08.4030504@ti.com>
+ <CAAwP0s0cB368R2mtbJpTZJreR-5GSRLfxC+8DJLo5nw3_OwBuA@mail.gmail.com>
+Message-ID: <512CE3D4.7040101@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/26/2013 02:58 AM, Joseph Lo wrote:
-> The PMC HW dose not 100% compatible across all Tegra series. We need to
-> specify each of them in the DT match table.
+On 02/26/2013 03:01 AM, Javier Martinez Canillas wrote:
+...
+> I was wondering if the level/edge settings for gpios is working on OMAP.
+...
+> Reading the gpio-omap.txt documentation it says that #interrupt-cells
+> should be <2> and that a value of 8 is "active low level-sensitive".
+> 
+> So I tried this:
+> 
+> &gpmc {
+> 	ethernet at 5,0 {
+...
+> 		interrupt-parent = <&gpio6>;
+> 		interrupts = <16 8>; /* gpio line 176 */
+> 		interrupt-names = "smsc911x irq";
+...
+> 
+> But in the smsc911x probe function:
+> 
+> irq_res->flags & IRQF_TRIGGER_MASK;
+> 
+> returns 0 which means that no trigger flags where set.
+> 
+> I took a look to the GPIOs device node definition on omap{3,4,5}.dtsi
+> and all look like this:
+> 
+> e.g from omap3.dtsi:
+> 
+>                 gpio6: gpio at 49058000 {
+...
+>                         #interrupt-cells = <1>;
+...
+> So, even when the documentation says that all the GPIO device nodes in
+> OMAP2+ should use a #interrupt-cells property value of <2>, they are
+> only using <1>. Changing that value to 2 makes hangs the kernel and it
+> does not boot.
 
-> diff --git a/arch/arm/mach-tegra/pmc.c b/arch/arm/mach-tegra/pmc.c
+Take a look at what the OMAP GPIO driver is plugging in for the of_xlate
+function; does it correctly handle the case where there are two cells?
 
->  static const struct of_device_id matches[] __initconst = {
->  	{ .compatible = "nvidia,tegra20-pmc" },
-> +	{ .compatible = "nvidia,tegra30-pmc" },
-> +	{ .compatible = "nvidia,tegra114-pmc" },
->  	{ }
->  };
+Is there a default for the flags when no second cell is provided, such
+that when you set #interrupt-cells to <2>, you're changing away from the
+default and mis-configuring things?
 
-Those should be listed in order of most recent device through least
-recent device, i.e. in the opposite order.
+And, did you check for any other interrupts hooked through the GPIO
+module, for which you'll need to add the second cell into their GPIO
+specifier throughout the entire device tree?
