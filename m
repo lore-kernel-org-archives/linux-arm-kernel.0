@@ -1,87 +1,105 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Tue, 26 Feb 2013 11:30:34 -0600
-Subject: [PATCH 07/14] ARM: OMAP2+: Convert SMC91x to use
+Date: Tue, 26 Feb 2013 11:30:35 -0600
+Subject: [PATCH 08/14] ARM: OMAP2+: Convert TUSB to use
  gpmc_cs_program_settings()
 In-Reply-To: <1361899842-30303-1-git-send-email-jon-hunter@ti.com>
 References: <1361899842-30303-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <1361899842-30303-8-git-send-email-jon-hunter@ti.com>
+Message-ID: <1361899842-30303-9-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert the OMAP2+ SMC91x code to use the gpmc_cs_program_settings()
+Convert the OMAP2+ TUSB code to use the gpmc_cs_program_settings()
 function for configuring the various GPMC options instead of directly
 programming the CONFIG1 register.
 
-Move configuration of the GPMC settings outside retime function and
-this does not need to be done if the timings are changed dynamically
-at runtime.
-
 Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 ---
- arch/arm/mach-omap2/gpmc-smc91x.c |   30 +++++++++++++++++-------------
- 1 file changed, 17 insertions(+), 13 deletions(-)
+ arch/arm/mach-omap2/usb-tusb6010.c |   43 ++++++++++++++++--------------------
+ 1 file changed, 19 insertions(+), 24 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/gpmc-smc91x.c b/arch/arm/mach-omap2/gpmc-smc91x.c
-index 4b78338..0871662 100644
---- a/arch/arm/mach-omap2/gpmc-smc91x.c
-+++ b/arch/arm/mach-omap2/gpmc-smc91x.c
-@@ -49,6 +49,10 @@ static struct platform_device gpmc_smc91x_device = {
- 	.resource	= gpmc_smc91x_resources,
+diff --git a/arch/arm/mach-omap2/usb-tusb6010.c b/arch/arm/mach-omap2/usb-tusb6010.c
+index 940410a..f38efd0 100644
+--- a/arch/arm/mach-omap2/usb-tusb6010.c
++++ b/arch/arm/mach-omap2/usb-tusb6010.c
+@@ -8,6 +8,7 @@
+  * published by the Free Software Foundation.
+  */
+ 
++#include <linux/err.h>
+ #include <linux/string.h>
+ #include <linux/types.h>
+ #include <linux/errno.h>
+@@ -28,12 +29,21 @@ static unsigned		refclk_psec;
+ 
+ static struct gpmc_settings tusb_async = {
+ 	.mux_add_data	= true,
++	.wait_on_read	= true,
++	.wait_on_write	= true,
++	.device_width	= GPMC_DEVWIDTH_16BIT,
  };
  
-+static struct gpmc_settings smc91x_settings = {
-+	.device_width = GPMC_DEVWIDTH_16BIT,
-+};
+ static struct gpmc_settings tusb_sync = {
++	.burst_read	= true,
++	.burst_write	= true,
+ 	.mux_add_data	= true,
+ 	.sync_read	= true,
+ 	.sync_write	= true,
++	.wait_on_read	= true,
++	.wait_on_write	= true,
++	.burst_len	= GPMC_BURST_16,
++	.device_width	= GPMC_DEVWIDTH_16BIT,
+ };
+ 
+ /* NOTE:  timings are from tusb 6010 datasheet Rev 1.8, 12-Sept 2006 */
+@@ -168,18 +178,12 @@ tusb6010_setup_interface(struct musb_hdrc_platform_data *data,
+ 		return status;
+ 	}
+ 	tusb_resources[0].end = tusb_resources[0].start + 0x9ff;
++	tusb_async.wait_pin = waitpin;
+ 	async_cs = async;
+-	gpmc_cs_write_reg(async, GPMC_CS_CONFIG1,
+-			  GPMC_CONFIG1_PAGE_LEN(2)
+-			| GPMC_CONFIG1_WAIT_READ_MON
+-			| GPMC_CONFIG1_WAIT_WRITE_MON
+-			| GPMC_CONFIG1_WAIT_PIN_SEL(waitpin)
+-			| GPMC_CONFIG1_READTYPE_ASYNC
+-			| GPMC_CONFIG1_WRITETYPE_ASYNC
+-			| GPMC_CONFIG1_DEVICESIZE_16
+-			| GPMC_CONFIG1_DEVICETYPE_NOR
+-			| GPMC_CONFIG1_MUXADDDATA);
+ 
++	status = gpmc_cs_program_settings(async_cs, &tusb_async);
++	if (IS_ERR_VALUE(status))
++		return status;
+ 
+ 	/* SYNC region, primarily for DMA */
+ 	status = gpmc_cs_request(sync, SZ_16M, (unsigned long *)
+@@ -189,21 +193,12 @@ tusb6010_setup_interface(struct musb_hdrc_platform_data *data,
+ 		return status;
+ 	}
+ 	tusb_resources[1].end = tusb_resources[1].start + 0x9ff;
++	tusb_sync.wait_pin = waitpin;
+ 	sync_cs = sync;
+-	gpmc_cs_write_reg(sync, GPMC_CS_CONFIG1,
+-			  GPMC_CONFIG1_READMULTIPLE_SUPP
+-			| GPMC_CONFIG1_READTYPE_SYNC
+-			| GPMC_CONFIG1_WRITEMULTIPLE_SUPP
+-			| GPMC_CONFIG1_WRITETYPE_SYNC
+-			| GPMC_CONFIG1_PAGE_LEN(2)
+-			| GPMC_CONFIG1_WAIT_READ_MON
+-			| GPMC_CONFIG1_WAIT_WRITE_MON
+-			| GPMC_CONFIG1_WAIT_PIN_SEL(waitpin)
+-			| GPMC_CONFIG1_DEVICESIZE_16
+-			| GPMC_CONFIG1_DEVICETYPE_NOR
+-			| GPMC_CONFIG1_MUXADDDATA
+-			/* fclk divider gets set later */
+-			);
 +
- /*
-  * Set the gpmc timings for smc91c96. The timings are taken
-  * from the data sheet available at:
-@@ -67,18 +71,6 @@ static int smc91c96_gpmc_retime(void)
- 	const int t7 = 5;	/* Figure 12.4 write */
- 	const int t8 = 5;	/* Figure 12.4 write */
- 	const int t20 = 185;	/* Figure 12.2 read and 12.4 write */
--	u32 l;
--
--	l = GPMC_CONFIG1_DEVICESIZE_16;
--	if (gpmc_cfg->flags & GPMC_MUX_ADD_DATA)
--		l |= GPMC_CONFIG1_MUXADDDATA;
--	if (gpmc_cfg->flags & GPMC_READ_MON)
--		l |= GPMC_CONFIG1_WAIT_READ_MON;
--	if (gpmc_cfg->flags & GPMC_WRITE_MON)
--		l |= GPMC_CONFIG1_WAIT_WRITE_MON;
--	if (gpmc_cfg->wait_pin)
--		l |= GPMC_CONFIG1_WAIT_PIN_SEL(gpmc_cfg->wait_pin);
--	gpmc_cs_write_reg(gpmc_cfg->cs, GPMC_CS_CONFIG1, l);
++	status = gpmc_cs_program_settings(sync_cs, &tusb_sync);
++	if (IS_ERR_VALUE(status))
++		return status;
  
- 	/*
- 	 * FIXME: Calculate the address and data bus muxed timings.
-@@ -104,7 +96,7 @@ static int smc91c96_gpmc_retime(void)
- 	dev_t.t_cez_w = t4_w * 1000;
- 	dev_t.t_wr_cycle = (t20 - t3) * 1000;
- 
--	gpmc_calc_timings(&t, NULL, &dev_t);
-+	gpmc_calc_timings(&t, &smc91x_settings, &dev_t);
- 
- 	return gpmc_cs_set_timings(gpmc_cfg->cs, &t);
- }
-@@ -133,6 +125,18 @@ void __init gpmc_smc91x_init(struct omap_smc91x_platform_data *board_data)
- 	gpmc_smc91x_resources[0].end = cs_mem_base + 0x30f;
- 	gpmc_smc91x_resources[1].flags |= (gpmc_cfg->flags & IRQF_TRIGGER_MASK);
- 
-+	if (gpmc_cfg->flags & GPMC_MUX_ADD_DATA)
-+		smc91x_settings.mux_add_data = true;
-+	if (gpmc_cfg->flags & GPMC_READ_MON)
-+		smc91x_settings.wait_on_read = true;
-+	if (gpmc_cfg->flags & GPMC_WRITE_MON)
-+		smc91x_settings.wait_on_write = true;
-+	if (gpmc_cfg->wait_pin)
-+		smc91x_settings.wait_pin = gpmc_cfg->wait_pin;
-+	ret = gpmc_cs_program_settings(gpmc_cfg->cs, &smc91x_settings);
-+	if (IS_ERR_VALUE(ret))
-+		goto free1;
-+
- 	if (gpmc_cfg->retime) {
- 		ret = gpmc_cfg->retime();
- 		if (ret != 0)
+ 	/* IRQ */
+ 	status = gpio_request_one(irq, GPIOF_IN, "TUSB6010 irq");
 -- 
 1.7.10.4
