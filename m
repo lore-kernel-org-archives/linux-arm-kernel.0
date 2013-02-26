@@ -1,223 +1,129 @@
-From: eag0628@gmail.com (Lai Jiangshan)
-Date: Tue, 26 Feb 2013 20:59:54 +0800
-Subject: [PATCH v6 04/46] percpu_rwlock: Implement the core design of
- Per-CPU Reader-Writer Locks
-In-Reply-To: <512C7A38.8060906@linux.vnet.ibm.com>
-References: <20130218123714.26245.61816.stgit@srivatsabhat.in.ibm.com>
- <20130218123856.26245.46705.stgit@srivatsabhat.in.ibm.com>
- <CANN689F9S7c1M8+cEpz3tsxGF34+NTRBLvxgPUOtbvav5u+RRA@mail.gmail.com>
- <5122551E.1080703@linux.vnet.ibm.com>
- <51226B46.9080707@linux.vnet.ibm.com>
- <CANN689FSxOz+0Cu7EG_yKD8ZE1OpT4kyT+ybLfXSqaifodJRpw@mail.gmail.com>
- <51226F91.7000108@linux.vnet.ibm.com>
- <CACvQF53bdh4_BxF0y1fnTVR+T2OmRc0jmWQYftsvx92-fg-Lug@mail.gmail.com>
- <512BBAD8.8010006@linux.vnet.ibm.com>
- <CACvQF51jCxk5jUqmhD=QBBtUsBkQWZzakacrKO4Gsk=w61rNwQ@mail.gmail.com>
- <512C7A38.8060906@linux.vnet.ibm.com>
-Message-ID: <CACvQF51RvhM8XNqu3-1OTQ=cZUZ=pAX+_zx0a29+W67N1X+BgQ@mail.gmail.com>
+From: dsterba@suse.cz (David Sterba)
+Date: Tue, 26 Feb 2013 14:12:06 +0100
+Subject: [RFC PATCH v2 1/4] decompressor: Add LZ4 decompressor module
+In-Reply-To: <1361859870-15751-2-git-send-email-kyungsik.lee@lge.com>
+References: <1361859870-15751-1-git-send-email-kyungsik.lee@lge.com>
+ <1361859870-15751-2-git-send-email-kyungsik.lee@lge.com>
+Message-ID: <20130226131206.GW27541@twin.jikos.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 26, 2013 at 5:02 PM, Srivatsa S. Bhat
-<srivatsa.bhat@linux.vnet.ibm.com> wrote:
-> On 02/26/2013 05:47 AM, Lai Jiangshan wrote:
->> On Tue, Feb 26, 2013 at 3:26 AM, Srivatsa S. Bhat
->> <srivatsa.bhat@linux.vnet.ibm.com> wrote:
->>> Hi Lai,
->>>
->>> On 02/25/2013 09:23 PM, Lai Jiangshan wrote:
->>>> Hi, Srivatsa,
->>>>
->>>> The target of the whole patchset is nice for me.
->>>
->>> Cool! Thanks :-)
->>>
-> [...]
->>>> I wrote an untested draft here.
->>>>
->>>> Thanks,
->>>> Lai
->>>>
->>>> PS: Some HA tools(I'm writing one) which takes checkpoints of
->>>> virtual-machines frequently, I guess this patchset can speedup the
->>>> tools.
->>>>
->>>> From 01db542693a1b7fc6f9ece45d57cb529d9be5b66 Mon Sep 17 00:00:00 2001
->>>> From: Lai Jiangshan <laijs@cn.fujitsu.com>
->>>> Date: Mon, 25 Feb 2013 23:14:27 +0800
->>>> Subject: [PATCH] lglock: add read-preference local-global rwlock
->>>>
->>>> locality via lglock(trylock)
->>>> read-preference read-write-lock via fallback rwlock_t
->>>>
->>>> Signed-off-by: Lai Jiangshan <laijs@cn.fujitsu.com>
->>>> ---
->>>>  include/linux/lglock.h |   31 +++++++++++++++++++++++++++++++
->>>>  kernel/lglock.c        |   45 +++++++++++++++++++++++++++++++++++++++++++++
->>>>  2 files changed, 76 insertions(+), 0 deletions(-)
->>>>
->>>> diff --git a/include/linux/lglock.h b/include/linux/lglock.h
->>>> index 0d24e93..30fe887 100644
->>>> --- a/include/linux/lglock.h
->>>> +++ b/include/linux/lglock.h
->>>> @@ -67,4 +67,35 @@ void lg_local_unlock_cpu(struct lglock *lg, int cpu);
->>>>  void lg_global_lock(struct lglock *lg);
->>>>  void lg_global_unlock(struct lglock *lg);
->>>>
->>>> +struct lgrwlock {
->>>> +     unsigned long __percpu *fallback_reader_refcnt;
->>>> +     struct lglock lglock;
->>>> +     rwlock_t fallback_rwlock;
->>>> +};
->>>> +
->>>> +#define DEFINE_LGRWLOCK(name)                                                \
->>>> +     static DEFINE_PER_CPU(arch_spinlock_t, name ## _lock)           \
->>>> +     = __ARCH_SPIN_LOCK_UNLOCKED;                                    \
->>>> +     static DEFINE_PER_CPU(unsigned long, name ## _refcnt);          \
->>>> +     struct lgrwlock name = {                                        \
->>>> +             .fallback_reader_refcnt = &name ## _refcnt,             \
->>>> +             .lglock = { .lock = &name ## _lock } }
->>>> +
->>>> +#define DEFINE_STATIC_LGRWLOCK(name)                                 \
->>>> +     static DEFINE_PER_CPU(arch_spinlock_t, name ## _lock)           \
->>>> +     = __ARCH_SPIN_LOCK_UNLOCKED;                                    \
->>>> +     static DEFINE_PER_CPU(unsigned long, name ## _refcnt);          \
->>>> +     static struct lgrwlock name = {                                 \
->>>> +             .fallback_reader_refcnt = &name ## _refcnt,             \
->>>> +             .lglock = { .lock = &name ## _lock } }
->>>> +
->>>> +static inline void lg_rwlock_init(struct lgrwlock *lgrw, char *name)
->>>> +{
->>>> +     lg_lock_init(&lgrw->lglock, name);
->>>> +}
->>>> +
->>>> +void lg_rwlock_local_read_lock(struct lgrwlock *lgrw);
->>>> +void lg_rwlock_local_read_unlock(struct lgrwlock *lgrw);
->>>> +void lg_rwlock_global_write_lock(struct lgrwlock *lgrw);
->>>> +void lg_rwlock_global_write_unlock(struct lgrwlock *lgrw);
->>>>  #endif
->>>> diff --git a/kernel/lglock.c b/kernel/lglock.c
->>>> index 6535a66..463543a 100644
->>>> --- a/kernel/lglock.c
->>>> +++ b/kernel/lglock.c
->>>> @@ -87,3 +87,48 @@ void lg_global_unlock(struct lglock *lg)
->>>>       preempt_enable();
->>>>  }
->>>>  EXPORT_SYMBOL(lg_global_unlock);
->>>> +
->>>> +void lg_rwlock_local_read_lock(struct lgrwlock *lgrw)
->>>> +{
->>>> +     struct lglock *lg = &lgrw->lglock;
->>>> +
->>>> +     preempt_disable();
->>>> +     if (likely(!__this_cpu_read(*lgrw->fallback_reader_refcnt))) {
->>>> +             if (likely(arch_spin_trylock(this_cpu_ptr(lg->lock)))) {
->>>> +                     rwlock_acquire_read(&lg->lock_dep_map, 0, 0, _RET_IP_);
->>>> +                     return;
->>>> +             }
->>>> +             read_lock(&lgrw->fallback_rwlock);
->>>> +     }
->>>> +
->>>> +     __this_cpu_inc(*lgrw->fallback_reader_refcnt);
->>>> +}
->>>> +EXPORT_SYMBOL(lg_rwlock_local_read_lock);
->>>> +
->>>> +void lg_rwlock_local_read_unlock(struct lgrwlock *lgrw)
->>>> +{
->>>> +     if (likely(!__this_cpu_read(*lgrw->fallback_reader_refcnt))) {
->>>> +             lg_local_unlock(&lgrw->lglock);
->>>> +             return;
->>>> +     }
->>>> +
->>>> +     if (!__this_cpu_dec_return(*lgrw->fallback_reader_refcnt))
->>>> +             read_unlock(&lgrw->fallback_rwlock);
->>>> +
->>>> +     preempt_enable();
->>>> +}
->>>> +EXPORT_SYMBOL(lg_rwlock_local_read_unlock);
->>>> +
->>>
->>> If I read the code above correctly, all you are doing is implementing a
->>> recursive reader-side primitive (ie., allowing the reader to call these
->>> functions recursively, without resulting in a self-deadlock).
->>>
->>> But the thing is, making the reader-side recursive is the least of our
->>> problems! Our main challenge is to make the locking extremely flexible
->>> and also safe-guard it against circular-locking-dependencies and deadlocks.
->>> Please take a look at the changelog of patch 1 - it explains the situation
->>> with an example.
->>
->>
->> My lock fixes your requirements(I read patch 1-6 before I sent). In
->> readsite, lglock 's lock is token via trylock, the lglock doesn't
->> contribute to deadlocks, we can consider it doesn't exist when we find
->> deadlock from it. And global fallback rwlock doesn't result to
->> deadlocks because it is read-preference(you need to inc the
->> fallback_reader_refcnt inside the cpu-hotplug write-side, I don't do
->> it in generic lgrwlock)
->>
->
-> Ah, since you hadn't mentioned the increment at the writer-side in your
-> previous email, I had missed the bigger picture of what you were trying
-> to achieve.
->
->>
->> If lg_rwlock_local_read_lock() spins, which means
->> lg_rwlock_local_read_lock() spins on fallback_rwlock, and which means
->> lg_rwlock_global_write_lock() took the lgrwlock successfully and
->> return, and which means lg_rwlock_local_read_lock() will stop spinning
->> when the write side finished.
->>
->
-> Unfortunately, I see quite a few issues with the code above. IIUC, the
-> writer and the reader both increment the same counters. So how will the
-> unlock() code in the reader path know when to unlock which of the locks?
+On Tue, Feb 26, 2013 at 03:24:27PM +0900, Kyungsik Lee wrote:
+> This patch adds support for LZ4 decompression in the Linux Kernel.
+> LZ4 Decompression APIs for kernel are based on LZ4 implementation
+> by Yann Collet.
+> 
+> LZ4 homepage : http://fastcompression.blogspot.com/p/lz4.html
+> LZ4 source repository : http://code.google.com/p/lz4/
 
-The same as your code, the reader(which nested in write C.S.) just dec
-the counters.
+What SVN version did you use?
 
-> (The counter-dropping-to-zero logic is not safe, since it can be updated
-> due to different reasons). And now that I look at it again, in the absence
-> of the writer, the reader is allowed to be recursive at the heavy cost of
-> taking the global rwlock for read, every 2nd time you nest (because the
-> spinlock is non-recursive).
+> --- /dev/null
+> +++ b/include/linux/lz4.h
+> @@ -0,0 +1,48 @@
+> +#ifndef __LZ4_H__
+> +#define __LZ4_H__
+> +/*
+> + * LZ4 Kernel Interface
+> + *
+> + * Copyright (C) 2013, LG Electronics, Kyungsik Lee <kyungsik.lee@lge.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +/*
+> + * LZ4_COMPRESSBOUND()
+> + * Provides the maximum size that LZ4 may output in a "worst case" scenario
+> + * (input data not compressible)
+> + */
+> +#define LZ4_COMPRESSBOUND(isize) (isize + ((isize)/255) + 16)
 
-(I did not understand your comments of this part)
-nested reader is considered seldom. But if N(>=2) nested readers happen,
-the overhead is:
-    1 spin_try_lock() + 1 read_lock() + (N-1) __this_cpu_inc()
+For safety reasons I suggest to add a temporary variable to avoid double
+evaluation of isize.
 
-> Also, this lg_rwlock implementation uses 3
-> different data-structures - a per-cpu spinlock, a global rwlock and
-> a per-cpu refcnt, and its not immediately apparent why you need those many
-> or even those many varieties.
+> --- /dev/null
+> +++ b/lib/lz4/lz4_decompress.c
+> +	}
+> +	cpy = op + length - (STEPSIZE - 4);
+> +	if (cpy > oend - COPYLENGTH) {
+> +
+> +		/* Error: request to write beyond destination buffer */
+> +		if (cpy > oend)
+> +			goto _output_error;
+> +		LZ4_SECURECOPY(ref, op, (oend - COPYLENGTH));
+> +		while (op < cpy)
+> +			*op++ = *ref++;
+> +		op = cpy;
+> +		/*
+> +		 * Check EOF (should never happen, since last 5 bytes
+> +		 * are supposed to be literals)
+> +		 */
+> +		if (op == oend)
+> +			goto _output_error;
+> +		continue;
+> +	}
+> +		LZ4_SECURECOPY(ref, op, cpy);
+> +		op = cpy; /* correction */
+> +	}
 
-data-structures is the same as yours.
-fallback_reader_refcnt <--> reader_refcnt
-per-cpu spinlock <--> write_signal
-fallback_rwlock  <---> global_rwlock
+Does this compile? The } is an extra one, and does not match the
+original sources.
 
-> Also I see that this doesn't handle the
-> case of interrupt-handlers also being readers.
+> +	/* end of decoding */
+> +	return (int) (((char *)ip) - source);
+> +
+> +	/* write overflow error detected */
+> +_output_error:
+> +	return (int) (-(((char *)ip) - source));
+> +}
+> +
+> --- /dev/null
+> +++ b/lib/lz4/lz4defs.h
+> @@ -0,0 +1,93 @@
+> +#define LZ4_COPYSTEP(s, d)	\
+> +	do {	\
+> +		PUT8(s, d);	\
+> +		d += 8;	\
+> +		s += 8;	\
+> +	} while (0)
+> +
+> +#define LZ4_COPYPACKET(s, d)	LZ4_COPYSTEP(s, d)
+> +
+> +#define LZ4_SECURECOPY(s, d, e)	\
+> +	do {				\
+> +		if (d < e) {		\
+> +			LZ4_WILDCOPY(s, d, e);	\
+> +		}	\
+> +	} while (0)
+> +
+> +#else	/* 32-bit */
+> +#define STEPSIZE 4
+> +
+> +#define LZ4_COPYSTEP(s, d)	\
+> +	do {	\
+> +		PUT4(s, d);	\
+> +		d += 4;	\
+> +		s += 4;	\
+> +	} while (0)
+> +
+> +#define LZ4_COPYPACKET(s, d)	\
+> +	do {			\
+> +		LZ4_COPYSTEP(s, d);	\
+> +		LZ4_COPYSTEP(s, d);	\
+> +	} while (0)
+> +
+> +#define LZ4_SECURECOPY	LZ4_WILDCOPY
+> +#endif
+> +
+> +#define LZ4_READ_LITTLEENDIAN_16(d, s, p) \
+> +	(d = s - get_unaligned_le16(p))
+> +#define LZ4_WILDCOPY(s, d, e)	\
+> +	do {				\
+> +		LZ4_COPYPACKET(s, d);	\
+> +	} while (d < e)
 
-handled. nested reader will see the ref or take the fallback_rwlock
+All the \@the ends of lines would look better aligned in one column.
 
->
-> IMHO, the per-cpu rwlock scheme that I have implemented in this patchset
-> has a clean, understandable design and just enough data-structures/locks
-> to achieve its goal and has several optimizations (like reducing the
-> interrupts-disabled time etc) included - all in a very straight-forward
-> manner. Since this is non-trivial, IMHO, starting from a clean slate is
-> actually better than trying to retrofit the logic into some locking scheme
-> which we actively want to avoid (and hence effectively we aren't even
-> borrowing anything from!).
->
-> To summarize, if you are just pointing out that we can implement the same
-> logic by altering lglocks, then sure, I acknowledge the possibility.
-> However, I don't think doing that actually makes it better; it either
-> convolutes the logic unnecessarily, or ends up looking _very_ similar to
-> the implementation in this patchset, from what I can see.
->
-> Regards,
-> Srivatsa S. Bhat
->
+david
