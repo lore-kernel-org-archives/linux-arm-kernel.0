@@ -1,29 +1,44 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 25 Feb 2013 16:47:38 -0700
-Subject: Multi-platform, and secure-only ARM errata workarounds
-Message-ID: <512BF81A.3080700@wwwdotorg.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 26 Feb 2013 09:07:09 +0900
+Subject: [PATCH v2 0/4] R-Car SATA driver and platform data
+In-Reply-To: <512B6243.9060808@cogentembedded.com>
+References: <201302182327.46930.sergei.shtylyov@cogentembedded.com>
+ <20130219034210.GA7701@verge.net.au>
+ <512B6243.9060808@cogentembedded.com>
+Message-ID: <20130226000709.GB16202@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob,
+On Mon, Feb 25, 2013 at 05:08:19PM +0400, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 19-02-2013 7:42, Simon Horman wrote:
+> 
+> >>    Here's the v2 of the set of 4 patches against the Simon Horman's renesas.git
+> >>repo, 'next' branch:
+> 
+> >>[1/4] libata: add R-Car SATA driver
+> >>[2/4] ARM: mach-shmobile: r8a7779: SATA DT configuration
+> >>[3/4] ARM: mach-shmobile: r8a7779: add SATA support
+> >>[4/4] ARM: mach-shmobile: marzen: add SATA support
+> 
+> >>Patch 1 also applies to the 'upstream' branch of Jeff Garzik's libata-dev.git
+> >>repo.
+> 
+> >>Patch changes since the initial posting are reported in the individual patches.
+> 
+> >Thanks, I have updated topic/r-car-sata and verified
+> >that the SATA driver is successfully initialised for both
+> >non-DT and DT boot.
+> 
+>    The SATA driver have been already merged by Linus:
+> 
+> http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=commit;h=163cf81d266f017d718ef786fbbb6b2513ce7ec3
+> 
+> Can we merge the rest of the patches in this merge window?
 
-I'm looking into enabling CONFIG_MULTIPLATFORM on Tegra for 3.10, and
-the main blocking issue is due to commit 62e4d35 "ARM: 7609/1: disable
-errata work-arounds which access secure registers". Various Tegra
-versions need 3 of those workarounds, and our bootloader doesn't
-implement them (at the least, upstream U-Boot; not sure about our
-downstream code, but I'm fairly sure given the lack of any feedback I
-got in the bug I filed to implement them).
+Unfortunately the path for patches for shmobile is long, arduous and
+out of my control.
 
-Now, I can easily add those 3 errata workarounds to U-Boot, but that
-will require people to reflash their bootloader. This is probably
-acceptable for development/reference boards (although I'm sure people
-will find it annoying) but for re-purposed production boards (such as
-the Toshiba AC100 or various tablets) it will be impossible to update
-the factory bootloader. Switching to upstream U-Boot would currently
-lose some functionality, and significantly affect people's boot flow, so
-is likely unacceptable.
-
-Is there any other alternative I'm not seeing? Having the kernel
-suddenly become incompatible with any currently extant bootloader when I
-enable CONFIG_MULTIPLATFORM doesn't seem like a great idea.
+I will merge the remaining patches into the renesas tree ASAP
+and push them to arm-soc for v3.10.
