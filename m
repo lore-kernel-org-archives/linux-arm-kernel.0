@@ -1,64 +1,48 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 26 Feb 2013 23:17:24 +0100
-Subject: [PATCH 1/4] time : pass broadcast parameter
-In-Reply-To: <1361917047-29230-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1361917047-29230-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1361917047-29230-2-git-send-email-daniel.lezcano@linaro.org>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 26 Feb 2013 17:31:23 -0500 (EST)
+Subject: Multi-platform, and secure-only ARM errata workarounds
+In-Reply-To: <512CE533.6020005@wwwdotorg.org>
+References: <512BF81A.3080700@wwwdotorg.org>
+ <4928288.ie8EUukfVD@fb07-iapwap2.physik.uni-giessen.de>
+ <512CE533.6020005@wwwdotorg.org>
+Message-ID: <alpine.LFD.2.03.1302261729390.1254@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The broadcast timer could be passed as parameter to the function
-instead of using again tick_broadcast_device.evtdev which was
-previously used in the caller function.
+On Tue, 26 Feb 2013, Stephen Warren wrote:
 
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
----
- kernel/time/tick-broadcast.c |   11 +++++------
- 1 file changed, 5 insertions(+), 6 deletions(-)
+> On 02/26/2013 02:36 AM, Marc Dietrich wrote:
+> > Stephen,
+> > 
+> > Am Montag, 25. Februar 2013, 16:47:38 schrieb Stephen Warren:
+> >> I'm looking into enabling CONFIG_MULTIPLATFORM on Tegra for 3.10, and
+> >> the main blocking issue is due to commit 62e4d35 "ARM: 7609/1: disable
+> >> errata work-arounds which access secure registers". Various Tegra
+> >> versions need 3 of those workarounds, and our bootloader doesn't
+> >> implement them (at the least, upstream U-Boot; not sure about our
+> >> downstream code, but I'm fairly sure given the lack of any feedback I
+> >> got in the bug I filed to implement them).
+> >>
+> >> Now, I can easily add those 3 errata workarounds to U-Boot, but that
+> >> will require people to reflash their bootloader. This is probably
+> >> acceptable for development/reference boards (although I'm sure people
+> >> will find it annoying) but for re-purposed production boards (such as
+> >> the Toshiba AC100 or various tablets) it will be impossible to update
+> >> the factory bootloader. Switching to upstream U-Boot would currently
+> >> lose some functionality, and significantly affect people's boot flow, so
+> >> is likely unacceptable.
+> > 
+> > personally, I have no problem to require a certain u-boot version for a given 
+> > kernel. From a distro point of view, you will likely update the 
+> > bootloader/kernel on a distro update anyway.
+> 
+> So a distro will certainly update the kernel.
+> 
+> But updating a bootloader would be very unusual, I believe.
 
-diff --git a/kernel/time/tick-broadcast.c b/kernel/time/tick-broadcast.c
-index 2fb8cb8..6197ac0 100644
---- a/kernel/time/tick-broadcast.c
-+++ b/kernel/time/tick-broadcast.c
-@@ -406,10 +406,9 @@ struct cpumask *tick_get_broadcast_oneshot_mask(void)
- 	return to_cpumask(tick_broadcast_oneshot_mask);
- }
- 
--static int tick_broadcast_set_event(ktime_t expires, int force)
-+static int tick_broadcast_set_event(struct clock_event_device *bc,
-+				    ktime_t expires, int force)
- {
--	struct clock_event_device *bc = tick_broadcast_device.evtdev;
--
- 	if (bc->mode != CLOCK_EVT_MODE_ONESHOT)
- 		clockevents_set_mode(bc, CLOCK_EVT_MODE_ONESHOT);
- 
-@@ -479,7 +478,7 @@ again:
- 		 * Rearm the broadcast device. If event expired,
- 		 * repeat the above
- 		 */
--		if (tick_broadcast_set_event(next_event, 0))
-+		if (tick_broadcast_set_event(dev, next_event, 0))
- 			goto again;
- 	}
- 	raw_spin_unlock(&tick_broadcast_lock);
-@@ -522,7 +521,7 @@ void tick_broadcast_oneshot_control(unsigned long reason)
- 			cpumask_set_cpu(cpu, tick_get_broadcast_oneshot_mask());
- 			clockevents_set_mode(dev, CLOCK_EVT_MODE_SHUTDOWN);
- 			if (dev->next_event.tv64 < bc->next_event.tv64)
--				tick_broadcast_set_event(dev->next_event, 1);
-+				tick_broadcast_set_event(bc, dev->next_event, 1);
- 		}
- 	} else {
- 		if (cpumask_test_cpu(cpu, tick_get_broadcast_oneshot_mask())) {
-@@ -591,7 +590,7 @@ void tick_broadcast_setup_oneshot(struct clock_event_device *bc)
- 			clockevents_set_mode(bc, CLOCK_EVT_MODE_ONESHOT);
- 			tick_broadcast_init_next_event(to_cpumask(tmpmask),
- 						       tick_next_period);
--			tick_broadcast_set_event(tick_next_period, 1);
-+			tick_broadcast_set_event(bc, tick_next_period, 1);
- 		} else
- 			bc->next_event.tv64 = KTIME_MAX;
- 	} else {
--- 
-1.7.9.5
+The bootloader should grow some ability to script those errata 
+workarounds.  Most bootloaders already have memory read and write 
+commands, so only CP access is missing.
+
+
+Nicolas
