@@ -1,65 +1,78 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 26 Feb 2013 11:01:30 -0700
-Subject: Multi-platform, and secure-only ARM errata workarounds
-In-Reply-To: <20130226113538.GS17833@n2100.arm.linux.org.uk>
-References: <512BF81A.3080700@wwwdotorg.org> <201302261023.26939.arnd@arndb.de>
- <20130226113538.GS17833@n2100.arm.linux.org.uk>
-Message-ID: <512CF87A.4090404@wwwdotorg.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 26 Feb 2013 13:05:19 -0500
+Subject: Build failed for mvebu in linux-next due to duplicate commit
+ for RTC
+In-Reply-To: <512CEFEA.4060301@free-electrons.com>
+References: <512CEFEA.4060301@free-electrons.com>
+Message-ID: <20130226180519.GD23237@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/26/2013 04:35 AM, Russell King - ARM Linux wrote:
-> On Tue, Feb 26, 2013 at 10:23:26AM +0000, Arnd Bergmann wrote:
->> On Monday 25 February 2013, Stephen Warren wrote:
->>> Is there any other alternative I'm not seeing? Having the kernel
->>> suddenly become incompatible with any currently extant bootloader when I
->>> enable CONFIG_MULTIPLATFORM doesn't seem like a great idea.
->>
->> Could we make those errata be run-time enabled only when not booting
->> in secure mode?
+On Tue, Feb 26, 2013 at 06:24:58PM +0100, Gregory CLEMENT wrote:
+> Hello,
 > 
-> The long and the short answer to this is... no.
+> when I tried to use the linux-next git tree (next-20130226), I
+> encountered this error during build:
 > 
-> 1. It is impossible to tell whether we're running secure or non-secure.
+> ERROR (duplicate_node_names): Duplicate node name /soc/rtc at 10300
+
+Nice catch!
+
+> I found it was because 2 version of the same patch have been submitted
+> to linux-next,
+> git log v3.8..HEAD --grep=RTC  arch/arm/boot/dts/armada-370-xp.dtsi
 > 
-> 2. Errata need to be applied before the MMU is initialized.  We need the
->    MMU to be initialized to run any C code what so ever, so calling out
->    to platform specific code to set errata is not possible.  Moreover,
->    we no longer determine the platform in the assembly code since DT
->    came along: this was removed because detecting it in DT from assembly
->    is far from trivial (you'd need to write an assembly DT parser).
+> commit 25fe89035eb81ea8be7ebb98eba18a8da744d3a2
+> Author: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Date:   Wed Feb 20 13:15:47 2013 +1100
 > 
-> Now, as for having the secure mode errata enabled on a kernel running in
-> non-secure mode... what happens today is that we check whether something
-> before the kernel has enabled the workaround, and we omit to write to
-> the register.
+>     arm: mvebu: add RTC support for Armada 370 and Armada XP
 > 
-> What that means is that we expect whatever came before the kernel to have
-> appropriately enabled the bits in the secure registers.  If it hasn't,
-> and you have one of these secure mode workarounds enabled, the kernel
-> will fault at boot time.
+>     The Armada 370 and Armada XP Socs have the same controller that the one
+>     used in the orion platforms.  This patch updates the device tree for these
+>     SoCs.
+> 
+>     Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>     Acked-by: Andrew Lunn <andrew@lunn.ch>
+>     Cc: Russell King <linux@arm.linux.org.uk>
+>     Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+> 
+> commit f70a08ce13cdec674eae271a2e76554ff20bf5f3
+> Author: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Date:   Wed Dec 12 10:06:24 2012 +0100
+> 
+>     arm: mvebu: Add RTC support for Armada 370 and Armada XP
+> 
+>     The Armada 370 and Armada XP Socs have the same controller that the
+>     one used in the orion platforms. This patch updates the device tree
+>     for these SoCs.
+> 
+>     Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>     Acked-by: Andrew Lunn <andrew@lunn.ch>
+>     Tested-by: Florian Fainelli <florian@openwrt.org>
+>     Acked-by: Arnd Bergmann <arnd@arndb.de>
+>     Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+> 
+> I think that the commit 25fe89 came through Andrew Morton and my
+> second version f70a08ce came through Jason Cooper and then arm-soc.
+> 
+> First, what I have to do to fix this? The best solution should be to
+> remove the commit 25fe890 as it is the less recent. How can we
+> proceed ?
 
-The conditional in that statement makes me wonder which of the following
-operations will fault in non-secure mode:
+Is the diffstat different between the versions?
 
-1) Reading from the diagnostic register.
+> Then I am sorry to not have figure out this before. I thought the
+> automatic email I received from Andrew Morton where due to Jason that
+> have been pushed the patch to Andrew Morton. I wasn't aware that
+> Andrew Morton took care of the RTC subsystem a well.
 
-2) Writing to the diagnostic register, of a value the same as what's
-already there.
+At this point, it's moot which path was correct.  Whichever is easiest
+to revert should be reverted.  Thankfully it's not C code causing a
+build breakage.  The patch was just adding a devicetree node.
 
-3) Writing to the diagnostic register, of a value different than what's
-already there.
+Arnd/Olof, what do you recommend here?
 
-Would the following not fault in both secure and non-secure mode:
+thx,
 
-read diagnostic register
-if desired bit already set:
-    b 1f
-set desired bit
-write value back to diagnostic register
-1:
-
-If so, that would allow a multi-SoC kernel to keep the errata workaround
-enabled, and allow the kernel to apply the WAR /if/ booted in secure
-mode, but require the errata to be previously enabled if the kernel was
-not booted in secure mode.
+Jason.
