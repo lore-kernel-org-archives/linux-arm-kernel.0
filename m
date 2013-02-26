@@ -1,16 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 26 Feb 2013 10:02:22 +0000
-Subject: [PATCH v2] arm: plat-samsung: check processor type before
- cache restoration in resume
-In-Reply-To: <1361872613-12040-1-git-send-email-inderpal.singh@linaro.org>
-References: <1361872613-12040-1-git-send-email-inderpal.singh@linaro.org>
-Message-ID: <20130226100222.GQ17833@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 26 Feb 2013 10:18:28 +0000
+Subject: [PATCH 02/08] ARM: shmobile: Rework SH73A0_SCU_BASE IOMEM() usage
+In-Reply-To: <CANqRtoSU9xqhTCv31CskYN8bu4H7gwz93fQcvuyLQx=hdRk2MA@mail.gmail.com>
+References: <20130218134648.17303.97576.sendpatchset@w520>
+ <201302181444.21717.arnd@arndb.de>
+ <CANqRtoSU9xqhTCv31CskYN8bu4H7gwz93fQcvuyLQx=hdRk2MA@mail.gmail.com>
+Message-ID: <201302261018.28463.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 26, 2013 at 03:26:53PM +0530, Inderpal Singh wrote:
-> Only cortex-a9 based samsung platforms have l2x0 cache controller. Hence check
-> the same before restoring the cache in resume.
+On Monday 25 February 2013, Magnus Damm wrote:
+> For mach-shmobile the three major components that rely on entity
+> mapped memory maps are SMP, clocks and power domains. The clocks
+> should really be moved in the common direction and I intend to get
+> people to focus on that in the not too distant future (next 6 months).
+> Power domains should be rather easy to convert. SMP tends to be a bit
+> of a headache because last time I checked I couldn't use ioremap() at
+> ->smp_init_cpus() time. What I recall is that ioremap() hanged instead
+> of returning something.
+> 
+> Anyway, if I track down the ioremap() issue, would it be possible for
+> you to check if it can be reproduced on some other sub-architecture?
 
-Why is this patch soo complicated?  Can't you read the CPUs MIDR register
-from assembly code?
+You are right that ioremap cannot be used from ->smp_init_cpus() and any
+code called from there needs to use a static mapping for accessing
+MMIO registers. There is nothing wrong with that. There are in fact
+three distinct reasons why people use static MMIO mappings with
+iotable_init():
+
+1. For MMIO registers that need to be accessed before ioremap works.
+   This usually means the SMP startup and the early printk (which I
+   believe shmobile is not using).
+
+2. For getting hugetlb mappings of MMIO registers into the kernel
+   address space. If you have a lot of registers in the same area,
+   using a single TLB to map them is more efficient, even when 
+   accessing the registers through ioremap from a device driver.
+
+3. For hardcoding the virtual address to a location that is passed
+   to device drivers as compile-time constants.
+
+The first two are absolutely fine, there are no objections to those.
+The third one is tradtitionally used on a lot of the older platforms,
+but with the multiplatform work, we are moving away from it, towards
+passing resources in the platform device (ideally from DT, but that
+is an orthogonal question here). AFAICT, shmobile is the only "modern"
+platform that still relies on fixed virtual addresses, and it is the
+only one I know that uses a mapping where the virtual address equals
+the physical address.
+
+	Arnd
