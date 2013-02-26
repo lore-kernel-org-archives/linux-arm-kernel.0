@@ -1,41 +1,77 @@
 From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Tue, 26 Feb 2013 23:57:24 +0100
-Subject: [PATCH 0/5] ARM: S3C24XX: more fixes and enhancements for the s3c24xx
- irqs
-Message-ID: <201302262357.24544.heiko@sntech.de>
+Date: Tue, 26 Feb 2013 23:57:53 +0100
+Subject: [PATCH 1/5] ARM: S3C24XX: fix redundant checks in the irq mapping
+ function
+In-Reply-To: <201302262357.24544.heiko@sntech.de>
+References: <201302262357.24544.heiko@sntech.de>
+Message-ID: <201302262357.53354.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Asorted fixes and enhancements for the recent redo of the s3c24xx
-interrupt controllers.
+The check during the parent handling itself was wrong, as it should have
+checked for parent_irq_data.
 
-The only real error that gets fixed is the handling of 0-hwirq as
-parent_irq on s3c2412 in patch 2. No other of the s3c24xx platforms
-uses the bit0 of the parent controller as parent_irq.
+The interrupt controller structs always contain an irq_data array with 32
+entries and the only possible error could be a parent_irq assignment of >31.
 
-Heiko Stuebner (5):
-  ARM: S3C24XX: fix redundant checks in the irq mapping function
-  ARM: S3C24XX: fix irq parent check
-  ARM: S3C24XX: move s3c24xx_init_irq to s3c2410_init_irq
-  ARM: S3C24XX: make s3c24xx_init_intc static
-  ARM: S3C24XX: add handle_irq function
+As this would point to outside the irq_data array this could contain
+anything including non-NULL values. Therefore correct this to check
+the parent_irq value to be in the right range.
 
- arch/arm/Kconfig                                 |    1 +
- arch/arm/mach-s3c24xx/common.h                   |    1 +
- arch/arm/mach-s3c24xx/include/mach/entry-macro.S |   70 ---------
- arch/arm/mach-s3c24xx/irq.c                      |  167 +++++++++++++--------
- arch/arm/mach-s3c24xx/mach-amlm5900.c            |    2 +-
- arch/arm/mach-s3c24xx/mach-bast.c                |    2 +-
- arch/arm/mach-s3c24xx/mach-h1940.c               |    7 +-
- arch/arm/mach-s3c24xx/mach-n30.c                 |    4 +-
- arch/arm/mach-s3c24xx/mach-otom.c                |    2 +-
- arch/arm/mach-s3c24xx/mach-qt2410.c              |    2 +-
- arch/arm/mach-s3c24xx/mach-smdk2410.c            |    2 +-
- arch/arm/mach-s3c24xx/mach-tct_hammer.c          |    2 +-
- arch/arm/mach-s3c24xx/mach-vr1000.c              |    2 +-
- arch/arm/plat-samsung/include/plat/cpu.h         |    1 -
- 14 files changed, 115 insertions(+), 150 deletions(-)
- delete mode 100644 arch/arm/mach-s3c24xx/include/mach/entry-macro.S
+With the same explanation of a valid interrupt controller always having a
+full irq_data array, the topmost irq_data check in s3c24xx_irq_map
+can also go away.
 
+Finally the mapping function is only called thru the irq_domain ops, in
+which case the intc struct is already successfully created, so there is
+no need to check for it again.
+
+Reported-by: Julia Lawall <julia.lawall@lip6.fr>
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm/mach-s3c24xx/irq.c |   18 ++++--------------
+ 1 files changed, 4 insertions(+), 14 deletions(-)
+
+diff --git a/arch/arm/mach-s3c24xx/irq.c b/arch/arm/mach-s3c24xx/irq.c
+index 3f3de74..5257c9f 100644
+--- a/arch/arm/mach-s3c24xx/irq.c
++++ b/arch/arm/mach-s3c24xx/irq.c
+@@ -324,16 +324,6 @@ static int s3c24xx_irq_map(struct irq_domain *h, unsigned 
+int virq,
+ 	struct s3c_irq_data *parent_irq_data;
+ 	unsigned int irqno;
+ 
+-	if (!intc) {
+-		pr_err("irq-s3c24xx: no controller found for hwirq %lu\n", hw);
+-		return -EINVAL;
+-	}
+-
+-	if (!irq_data) {
+-		pr_err("irq-s3c24xx: no irq data found for hwirq %lu\n", hw);
+-		return -EINVAL;
+-	}
+-
+ 	/* attach controller pointer to irq_data */
+ 	irq_data->intc = intc;
+ 
+@@ -383,13 +373,13 @@ static int s3c24xx_irq_map(struct irq_domain *h, 
+unsigned int virq,
+ 			goto err;
+ 		}
+ 
+-		parent_irq_data = &parent_intc->irqs[irq_data->parent_irq];
+-		if (!irq_data) {
+-			pr_err("irq-s3c24xx: no irq data found for hwirq %lu\n",
+-			       hw);
++		if (irq_data->parent_irq > 31) {
++			pr_err("irq-s3c24xx: parent irq %lu is out of range\n",
++			       irq_data->parent_irq);
+ 			goto err;
+ 		}
+ 
++		parent_irq_data = &parent_intc->irqs[irq_data->parent_irq];
+ 		parent_irq_data->sub_intc = intc;
+ 		parent_irq_data->sub_bits |= (1UL << hw);
+ 
 -- 
 1.7.2.3
