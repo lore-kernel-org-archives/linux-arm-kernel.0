@@ -1,106 +1,65 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 26 Feb 2013 17:54:39 +0000
-Subject: [PATCH] ARM: vfp: fix fpsid register subarchitecture field
- mask width
-In-Reply-To: <512C2577.3030202@codeaurora.org>
-References: <1361520485-30269-1-git-send-email-sboyd@codeaurora.org>
- <20130222182705.GC19527@mudshark.cambridge.arm.com>
- <5128034A.4000008@codeaurora.org>
- <20130225111835.GA24254@mudshark.cambridge.arm.com>
- <512C2577.3030202@codeaurora.org>
-Message-ID: <20130226175439.GT17833@n2100.arm.linux.org.uk>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 26 Feb 2013 11:01:30 -0700
+Subject: Multi-platform, and secure-only ARM errata workarounds
+In-Reply-To: <20130226113538.GS17833@n2100.arm.linux.org.uk>
+References: <512BF81A.3080700@wwwdotorg.org> <201302261023.26939.arnd@arndb.de>
+ <20130226113538.GS17833@n2100.arm.linux.org.uk>
+Message-ID: <512CF87A.4090404@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 25, 2013 at 07:01:11PM -0800, Stephen Boyd wrote:
-> On 02/25/13 03:18, Will Deacon wrote:
-> > On Fri, Feb 22, 2013 at 11:46:18PM +0000, Stephen Boyd wrote:
-> >> On 2/22/2013 10:27 AM, Will Deacon wrote:
-> >>> What value do you have in fpsid? As far as I can tell, the
-> >>> subarchitecture bits 6:0 should start at 0x40 for you, right?
-> >> Yes it does.
-> > Ok, good. Could you share the different subarchitecture encodings that you
-> > have please? (assumedly some/all of these are compatible with a variant of
-> > VFP).
+On 02/26/2013 04:35 AM, Russell King - ARM Linux wrote:
+> On Tue, Feb 26, 2013 at 10:23:26AM +0000, Arnd Bergmann wrote:
+>> On Monday 25 February 2013, Stephen Warren wrote:
+>>> Is there any other alternative I'm not seeing? Having the kernel
+>>> suddenly become incompatible with any currently extant bootloader when I
+>>> enable CONFIG_MULTIPLATFORM doesn't seem like a great idea.
+>>
+>> Could we make those errata be run-time enabled only when not booting
+>> in secure mode?
 > 
-> Definitely all Krait processors have 0x40 for the subarchitecture
-> encoding. I need to check our Scorpions but I'm fairly certain they also
-> have 0x40.
+> The long and the short answer to this is... no.
 > 
-> >
-> >>> I can see cases for changing this code, I just don't see why it would go
-> >>> wrong in the case you're describing.
-> >> VFP_arch = (vfpsid & FPSID_ARCH_MASK) >> FPSID_ARCH_BIT;
-> >>
-> >> causes VFP_arch to be equal to 0 because 0x40 & 0xf == 0.
-> >>
-> >> and then a little bit later we have
-> >>
-> >>                if (VFP_arch >= 2) {
-> >>                         elf_hwcap |= HWCAP_VFPv3;
-> >>
-> >>
-> >> The branch is not taken so we never set VFPv3.
-> > Ah, that's what I feared: the low bits are zero yet you are compatible with
-> > VFPv3. That's fine, but the proposed fix feels like a kludge; the only reason
-> > we'd choose on VFPv3 is because the implementor is not ARM, which may not hold
-> > true for other vendors. I think it would be better if we translated
-> > vendor-specific subarchitectures that are compatible with VFPvN into the
-> > corresponding architecture number instead. This would also allow us to add
-> > extra hwcaps for extensions other than VFP.
+> 1. It is impossible to tell whether we're running secure or non-secure.
 > 
-> Ok. We should be able to make VFP_arch into 0x4 if the implementer is
-> 0x51 and the subarch bits are 0x40.
+> 2. Errata need to be applied before the MMU is initialized.  We need the
+>    MMU to be initialized to run any C code what so ever, so calling out
+>    to platform specific code to set errata is not possible.  Moreover,
+>    we no longer determine the platform in the assembly code since DT
+>    came along: this was removed because detecting it in DT from assembly
+>    is far from trivial (you'd need to write an assembly DT parser).
+> 
+> Now, as for having the secure mode errata enabled on a kernel running in
+> non-secure mode... what happens today is that we check whether something
+> before the kernel has enabled the workaround, and we omit to write to
+> the register.
+> 
+> What that means is that we expect whatever came before the kernel to have
+> appropriately enabled the bits in the secure registers.  If it hasn't,
+> and you have one of these secure mode workarounds enabled, the kernel
+> will fault at boot time.
 
-What I actually need from you is: for the Qualcomm implementation, what
-are the subarch bits defined as, and what do they correspond with - both
-the VFP version, and whether they correspond with any ARM common VFP
-subarchitecture version.
+The conditional in that statement makes me wonder which of the following
+operations will fault in non-secure mode:
 
-The VFP version defines what the user-visible architecture of the VFP
-looks like.
+1) Reading from the diagnostic register.
 
-The common VFP subarchitecture version partly defines the behaviour of
-the interface between the VFP hardware and the support code.
+2) Writing to the diagnostic register, of a value the same as what's
+already there.
 
-In ARM land, these are the possiblities - I've also listed those
-platforms which I definitely know of at the moment which use the
-particular version combination:
+3) Writing to the diagnostic register, of a value different than what's
+already there.
 
-VFP version	VFP subarch
-V1		-
-V2		V1		Raspberry Pi
-V3		V2		Marvell Dove (Cubox) (though, not ARM)
-V3		NULL		OMAP3430 / OMAP4430
-V3		V3
+Would the following not fault in both secure and non-secure mode:
 
-There is also mooted to be a VFPv4...
+read diagnostic register
+if desired bit already set:
+    b 1f
+set desired bit
+write value back to diagnostic register
+1:
 
-Now, we detect VFPv4 via testing for the "fused multiply accumulate"
-instructions, and flag that to userspace.  These are the VFMA, VFMS,
-VFNMA, and VFNMS instructions.  HOWEVER: we do not implement these in
-the support code, so should these ever get bounced, we will fail to
-deal with them correctly.  So VFPv4 should not be flagged as being
-implemented yet.
-
-Not only that, but VFPv4 introduces the half-precision extension as
-mandatory - which the support code doesn't support.
-
-Also... there seems to be a variant of VFPv3 with half-precision
-support... which the support code doesn't support either.
-
-And finally we get into the issues surrounding trapping/nontrapping
-implementations - nontrapping implementations are ones where (for
-example) a floating point divide by zero can't raise a SIGFPE...
-
-Last comment to make: this evening I'm beginning to wonder whether I've
-made a messup with the VFP support code: if we get a bounce due to an
-unmasked trap, we perform the operation in software and store the result.
-I don't think this is what's intended from the support code.  Problem -
-the OMAP platforms are nontrapping VFPv3 implementations which can't
-have their trap enable bits set, so I can't check this there.
-
-Dove does, but I don't use that as too much of a devel platform at the
-moment... and I don't have a RPi that I can build and boot kernels for
-(the one I've been experimenting with is someone elses, the other end
-of the country, who is not a software guy...)
+If so, that would allow a multi-SoC kernel to keep the errata workaround
+enabled, and allow the kernel to apply the WAR /if/ booted in secure
+mode, but require the errata to be previously enabled if the kernel was
+not booted in secure mode.
