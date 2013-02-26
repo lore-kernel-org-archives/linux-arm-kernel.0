@@ -1,44 +1,45 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Tue, 26 Feb 2013 17:58:59 +0800
-Subject: [PATCH 2/2] ARM: dts: tegra: fix the PMC compatible string
-Message-ID: <1361872739-4467-1-git-send-email-josephl@nvidia.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 26 Feb 2013 10:59:44 +0100
+Subject: [PATCH] ARM: i.MX35: enable MAX clock
+Message-ID: <1361872784-1348-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PMC HW does not 100% compatible across all Tegra series. We need to
-specify them in DT.
+The i.MX35 has two bits per clock gate which are decoded as follows:
+      0b00 -> clock off
+      0b01 -> clock is on in run mode, off in wait/doze
+      0b10 -> clock is on in run/wait mode, off in doze
+      0b11 -> clock is always on
 
-Signed-off-by: Joseph Lo <josephl@nvidia.com>
+The reset value for the MAX clock is 0b10.
+
+The MAX clock is needed by the SoC, yet unused in the Kernel, so the
+common clock framework will disable it during late init time. It will
+only disable clocks though which it detects as being turned on. This
+detection is made depending on the lower bit of the gate. If the reset
+value has been altered by the bootloader to 0b11 the clock framework
+will detect the clock as turned on, yet unused, hence it will turn it
+off and the system locks up.
+
+This patch turns the MAX clock on unconditionally making the Kernel
+independent of the bootloader.
+
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/boot/dts/tegra114.dtsi | 2 +-
- arch/arm/boot/dts/tegra30.dtsi  | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-imx/clk-imx35.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
-index 1dfaf28..e4ddedd 100644
---- a/arch/arm/boot/dts/tegra114.dtsi
-+++ b/arch/arm/boot/dts/tegra114.dtsi
-@@ -99,7 +99,7 @@
- 	};
+diff --git a/arch/arm/mach-imx/clk-imx35.c b/arch/arm/mach-imx/clk-imx35.c
+index f0727e8..f310aa4 100644
+--- a/arch/arm/mach-imx/clk-imx35.c
++++ b/arch/arm/mach-imx/clk-imx35.c
+@@ -264,6 +264,7 @@ int __init mx35_clocks_init()
+ 	clk_prepare_enable(clk[gpio3_gate]);
+ 	clk_prepare_enable(clk[iim_gate]);
+ 	clk_prepare_enable(clk[emi_gate]);
++	clk_prepare_enable(clk[max_gate]);
  
- 	pmc {
--		compatible = "nvidia,tegra114-pmc", "nvidia,tegra30-pmc";
-+		compatible = "nvidia,tegra114-pmc";
- 		reg = <0x7000e400 0x400>;
- 	};
- 
-diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
-index 767803e..6ae82e7 100644
---- a/arch/arm/boot/dts/tegra30.dtsi
-+++ b/arch/arm/boot/dts/tegra30.dtsi
-@@ -422,7 +422,7 @@
- 	};
- 
- 	pmc {
--		compatible = "nvidia,tegra20-pmc", "nvidia,tegra30-pmc";
-+		compatible = "nvidia,tegra30-pmc";
- 		reg = <0x7000e400 0x400>;
- 	};
- 
+ 	/*
+ 	 * SCC is needed to boot via mmc after a watchdog reset. The clock code
 -- 
-1.8.1.1
+1.7.10.4
