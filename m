@@ -1,48 +1,90 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 26 Feb 2013 17:31:23 -0500 (EST)
-Subject: Multi-platform, and secure-only ARM errata workarounds
-In-Reply-To: <512CE533.6020005@wwwdotorg.org>
-References: <512BF81A.3080700@wwwdotorg.org>
- <4928288.ie8EUukfVD@fb07-iapwap2.physik.uni-giessen.de>
- <512CE533.6020005@wwwdotorg.org>
-Message-ID: <alpine.LFD.2.03.1302261729390.1254@syhkavp.arg>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Tue, 26 Feb 2013 16:40:26 -0600
+Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
+In-Reply-To: <CAAwP0s0cB368R2mtbJpTZJreR-5GSRLfxC+8DJLo5nw3_OwBuA@mail.gmail.com>
+References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
+ <1329321854-24490-4-git-send-email-b-cousson@ti.com>
+ <4F44FA56.7020000@gmail.com> <4F44FC37.2000701@ti.com>
+ <4F452484.5080503@gmail.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF17BD8BC6C1@HQMAIL01.nvidia.com>
+ <4F47AD08.4030504@ti.com>
+ <CAAwP0s0cB368R2mtbJpTZJreR-5GSRLfxC+8DJLo5nw3_OwBuA@mail.gmail.com>
+Message-ID: <512D39DA.7020306@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 26 Feb 2013, Stephen Warren wrote:
 
-> On 02/26/2013 02:36 AM, Marc Dietrich wrote:
-> > Stephen,
-> > 
-> > Am Montag, 25. Februar 2013, 16:47:38 schrieb Stephen Warren:
-> >> I'm looking into enabling CONFIG_MULTIPLATFORM on Tegra for 3.10, and
-> >> the main blocking issue is due to commit 62e4d35 "ARM: 7609/1: disable
-> >> errata work-arounds which access secure registers". Various Tegra
-> >> versions need 3 of those workarounds, and our bootloader doesn't
-> >> implement them (at the least, upstream U-Boot; not sure about our
-> >> downstream code, but I'm fairly sure given the lack of any feedback I
-> >> got in the bug I filed to implement them).
-> >>
-> >> Now, I can easily add those 3 errata workarounds to U-Boot, but that
-> >> will require people to reflash their bootloader. This is probably
-> >> acceptable for development/reference boards (although I'm sure people
-> >> will find it annoying) but for re-purposed production boards (such as
-> >> the Toshiba AC100 or various tablets) it will be impossible to update
-> >> the factory bootloader. Switching to upstream U-Boot would currently
-> >> lose some functionality, and significantly affect people's boot flow, so
-> >> is likely unacceptable.
-> > 
-> > personally, I have no problem to require a certain u-boot version for a given 
-> > kernel. From a distro point of view, you will likely update the 
-> > bootloader/kernel on a distro update anyway.
+On 02/26/2013 04:01 AM, Javier Martinez Canillas wrote:
+
+[snip]
+
+> I was wondering if the level/edge settings for gpios is working on OMAP.
 > 
-> So a distro will certainly update the kernel.
+> I'm adding DT support for an SMSC911x ethernet chip connected to the
+> GPMC for an OMAP3 SoC based board.
 > 
-> But updating a bootloader would be very unusual, I believe.
+> In the smsc911x driver probe function (smsc911x_drv_probe() in
+> drivers/net/ethernet/smsc/smsc911x.c), a call to request_irq() with
+> the flag IRQF_TRIGGER_LOW is needed because of the wiring on my board.
+> 
+> Reading the gpio-omap.txt documentation it says that #interrupt-cells
+> should be <2> and that a value of 8 is "active low level-sensitive".
+> 
+> So I tried this:
+> 
+> &gpmc {
+> 	ethernet at 5,0 {
+> 		pinctrl-names = "default";
+> 		pinctrl-0 = <&smsc911x_pins>;
+> 		compatible = "smsc,lan9221", "smsc,lan9115";
+> 		reg = <5 0 0xff>; /* CS5 */
+> 		interrupt-parent = <&gpio6>;
+> 		interrupts = <16 8>; /* gpio line 176 */
+> 		interrupt-names = "smsc911x irq";
+> 		vmmc-supply = <&vddvario>;
+> 		vmmc_aux-supply = <&vdd33a>;
+> 		reg-io-width = <4>;
+> 
+> 		smsc,save-mac-address;
+>       };
+> };
 
-The bootloader should grow some ability to script those errata 
-workarounds.  Most bootloaders already have memory read and write 
-commands, so only CP access is missing.
+Are you requesting the gpio anywhere? If not then this is not going to
+work as-is. This was discussed fairly recently [1] and the conclusion
+was that the gpio needs to be requested before we can use as an interrupt.
 
+I have not seen your latest smsc code for omap, but when you are
+requesting the gpmc chip-select you should also request the gpio.
 
-Nicolas
+> But in the smsc911x probe function:
+> 
+> irq_res->flags & IRQF_TRIGGER_MASK;
+> 
+> returns 0 which means that no trigger flags where set.
+> 
+> I took a look to the GPIOs device node definition on omap{3,4,5}.dtsi
+> and all look like this:
+> 
+> e.g from omap3.dtsi:
+> 
+>                 gpio6: gpio at 49058000 {
+>                         compatible = "ti,omap3-gpio";
+>                         ti,hwmods = "gpio6";
+>                         gpio-controller;
+>                         #gpio-cells = <2>;
+>                         interrupt-controller;
+>                         #interrupt-cells = <1>;
+>                 };
+> 
+> So, even when the documentation says that all the GPIO device nodes in
+> OMAP2+ should use a #interrupt-cells property value of <2>, they are
+> only using <1>. Changing that value to 2 makes hangs the kernel and it
+> does not boot.
+
+I will need to take a look at that. Is your code available anywhere so I
+can test?
+
+Cheers
+Jon
+
+[1] http://permalink.gmane.org/gmane.linux.ports.arm.omap/92192
