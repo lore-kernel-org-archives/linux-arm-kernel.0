@@ -1,8 +1,8 @@
-From: heiko.stuebner@bqreaders.com (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Tue, 26 Feb 2013 23:55:44 +0100
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Tue, 26 Feb 2013 23:57:24 +0100
 Subject: [PATCH 0/5] ARM: S3C24XX: more fixes and enhancements for the s3c24xx
  irqs
-Message-ID: <201302262355.44995.heiko.stuebner@bqreaders.com>
+Message-ID: <201302262357.24544.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
