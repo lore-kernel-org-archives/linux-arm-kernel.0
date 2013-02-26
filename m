@@ -1,24 +1,30 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 26 Feb 2013 10:31:14 +0000
-Subject: Multi-platform, and secure-only ARM errata workarounds
-In-Reply-To: <201302261023.26939.arnd@arndb.de>
-References: <512BF81A.3080700@wwwdotorg.org> <201302261023.26939.arnd@arndb.de>
-Message-ID: <20130226103114.GA16875@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 26 Feb 2013 10:32:58 +0000
+Subject: [PATCH 3/3] ARM: ux500: Add Snowball pin configuration for user
+ LED
+In-Reply-To: <CACRpkdbgQP1ahFjHtCFeAcQzxHY3LvVidJFL0FfbwOOAZU5fAA@mail.gmail.com>
+References: <1357725965-27342-1-git-send-email-lee.jones@linaro.org>
+ <1357725965-27342-3-git-send-email-lee.jones@linaro.org>
+ <CACRpkdbgQP1ahFjHtCFeAcQzxHY3LvVidJFL0FfbwOOAZU5fAA@mail.gmail.com>
+Message-ID: <20130226103258.GG16685@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 26, 2013 at 10:23:26AM +0000, Arnd Bergmann wrote:
-> On Monday 25 February 2013, Stephen Warren wrote:
-> > Is there any other alternative I'm not seeing? Having the kernel
-> > suddenly become incompatible with any currently extant bootloader when I
-> > enable CONFIG_MULTIPLATFORM doesn't seem like a great idea.
-> 
-> Could we make those errata be run-time enabled only when not booting
-> in secure mode?
+On Wed, 23 Jan 2013, Linus Walleij wrote:
 
-There is no easy way to detect whether Linux booted in secure mode,
-unless we add some information in the DT. But I wouldn't add S vs NS
-information, rather which errata need to be enabled by the kernel.
+> On Wed, Jan 9, 2013 at 11:06 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> 
+> > Here we setup the GPIO pin responsible for illuminating the user
+> > LED on the Snowball low-cost development board.
+> >
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> 
+> Patch applied to my ux500 tree, branch ux500-pinctrl.
+
+Perhaps you can apply this to the for-next branch you pulled from me?
 
 -- 
-Catalin
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
