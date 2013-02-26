@@ -1,68 +1,74 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 26 Feb 2013 18:24:58 +0100
-Subject: Build failed for mvebu in linux-next due to duplicate commit for RTC
-Message-ID: <512CEFEA.4060301@free-electrons.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Tue, 26 Feb 2013 11:30:27 -0600
+Subject: [PATCH 00/14] ARM: OMAP2+: GPMC clean-up and DT update
+Message-ID: <1361899842-30303-1-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+While adding device-tree support for NOR memories, it became apparent
+that there is no common way for configuring various GPMC settings for
+devices that interface to the GPMC. These settings include bus-width,
+synchronous/asynchronous mode, burst settings, wait monitoring etc.
+Therefore, to simplify the GPMC code and add device-tree support for
+NOR, it was first necessary to consolidate how these settings are
+programmed.
 
-when I tried to use the linux-next git tree (next-20130226), I
-encountered this error during build:
+Summary of changes:
+- Clean-up/simplification of ONENAND initialisation code.
+- Add a new GPMC structure to unify storage of various GPMC settings
+  (that are non-timing related) for client devices and add a new
+  function to program these settings in a common way.
+- Migrate initialisation code for existing flash, usb and networking
+  devices to use the new structure and function for GPMC settings.
+- Add device-tree support for NOR flash memories.
+- Add additional GPMC timing parameters to GPMC device-tree binding.
+- Update GPMC NAND and ONENAND device-tree support to retrieve GPMC
+  settings from device-tree.
 
-ERROR (duplicate_node_names): Duplicate node name /soc/rtc at 10300
+Testing includes:
+- Boot testing on OMAP2420 H4, OMAP3430 SDP and OMAP4430 SDP with
+  and without device-tree present.
+- OMAP2420 H4 board has NOR flash and OMAP3430 SDP has NOR, NAND
+  and ONENAND flash. So verified that flash is detected on boot
+  as expected. Note additional patches [1] are required for OMAP2420
+  H4 and OMAP3430 SDP dts files in order to enable flash memory
+  support.
+- All of the above boards use GPMC for interfacing to a networking
+  chip and so verified that networking is working wit this series.
+  However, please note that networking is not currently supported
+  on these boards when booting with DT and so networking is only
+  tested without DT.
 
-I found it was because 2 version of the same patch have been submitted
-to linux-next,
-git log v3.8..HEAD --grep=RTC  arch/arm/boot/dts/armada-370-xp.dtsi
+[1] https://github.com/jonhunter/linux/tree/dev-gpmc
 
-commit 25fe89035eb81ea8be7ebb98eba18a8da744d3a2
-Author: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Date:   Wed Feb 20 13:15:47 2013 +1100
+Jon Hunter (14):
+  ARM: OMAP2+: Simplify code configuring ONENAND devices
+  ARM: OMAP2+: Add variable to store number of GPMC waitpins
+  ARM: OMAP2+: Add structure for storing GPMC settings
+  ARM: OMAP2+: Add function for configuring GPMC settings
+  ARM: OMAP2+: Convert ONENAND to use gpmc_cs_program_settings()
+  ARM: OMAP2+: Convert NAND to use gpmc_cs_program_settings()
+  ARM: OMAP2+: Convert SMC91x to use gpmc_cs_program_settings()
+  ARM: OMAP2+: Convert TUSB to use gpmc_cs_program_settings()
+  ARM: OMAP2+: Don't configure of chip-select options in
+    gpmc_cs_configure()
+  ARM: OMAP2+: Add function to read GPMC settings from device-tree
+  ARM: OMAP2+: Add device-tree support for NOR flash
+  ARM: OMAP2+: Add additional GPMC timing parameters
+  ARM: OMAP2+: Convert NAND to retrieve GPMC settings from DT
+  ARM: OMAP2+: Convert ONENAND to retrieve GPMC settings from DT
 
-    arm: mvebu: add RTC support for Armada 370 and Armada XP
-
-    The Armada 370 and Armada XP Socs have the same controller that the one
-    used in the orion platforms.  This patch updates the device tree for these
-    SoCs.
-
-    Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-    Acked-by: Andrew Lunn <andrew@lunn.ch>
-    Cc: Russell King <linux@arm.linux.org.uk>
-    Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
-
-commit f70a08ce13cdec674eae271a2e76554ff20bf5f3
-Author: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Date:   Wed Dec 12 10:06:24 2012 +0100
-
-    arm: mvebu: Add RTC support for Armada 370 and Armada XP
-
-    The Armada 370 and Armada XP Socs have the same controller that the
-    one used in the orion platforms. This patch updates the device tree
-    for these SoCs.
-
-    Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-    Acked-by: Andrew Lunn <andrew@lunn.ch>
-    Tested-by: Florian Fainelli <florian@openwrt.org>
-    Acked-by: Arnd Bergmann <arnd@arndb.de>
-    Signed-off-by: Jason Cooper <jason@lakedaemon.net>
-
-I think that the commit 25fe89 came through Andrew Morton and my
-second version f70a08ce came through Jason Cooper and then arm-soc.
-
-First, what I have to do to fix this? The best solution should be to
-remove the commit 25fe890 as it is the less recent. How can we
-proceed ?
-
-Then I am sorry to not have figure out this before. I thought the
-automatic email I received from Andrew Morton where due to Jason that
-have been pushed the patch to Andrew Morton. I wasn't aware that
-Andrew Morton took care of the RTC subsystem a well.
-
-Regards,
+ Documentation/devicetree/bindings/bus/ti-gpmc.txt  |   44 ++-
+ Documentation/devicetree/bindings/mtd/gpmc-nor.txt |   98 ++++++
+ .../devicetree/bindings/mtd/gpmc-onenand.txt       |    3 +
+ arch/arm/mach-omap2/gpmc-nand.c                    |   38 +-
+ arch/arm/mach-omap2/gpmc-onenand.c                 |  110 +++---
+ arch/arm/mach-omap2/gpmc-smc91x.c                  |   30 +-
+ arch/arm/mach-omap2/gpmc.c                         |  367 +++++++++++++++++---
+ arch/arm/mach-omap2/gpmc.h                         |   32 +-
+ arch/arm/mach-omap2/usb-tusb6010.c                 |   62 ++--
+ 9 files changed, 605 insertions(+), 179 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mtd/gpmc-nor.txt
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.10.4
