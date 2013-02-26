@@ -1,121 +1,87 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Tue, 26 Feb 2013 11:30:36 -0600
-Subject: [PATCH 09/14] ARM: OMAP2+: Don't configure of chip-select options in
- gpmc_cs_configure()
+Date: Tue, 26 Feb 2013 11:30:34 -0600
+Subject: [PATCH 07/14] ARM: OMAP2+: Convert SMC91x to use
+ gpmc_cs_program_settings()
 In-Reply-To: <1361899842-30303-1-git-send-email-jon-hunter@ti.com>
 References: <1361899842-30303-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <1361899842-30303-10-git-send-email-jon-hunter@ti.com>
+Message-ID: <1361899842-30303-8-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the addition of the gpmc_cs_program_settings(), we no longer need
-or use gpmc_cs_configure() to configure some of the GPMC chip-select
-options. So rename the function to gpmc_configure() and remove code that
-modifies options in the CONFIG1 register.
+Convert the OMAP2+ SMC91x code to use the gpmc_cs_program_settings()
+function for configuring the various GPMC options instead of directly
+programming the CONFIG1 register.
+
+Move configuration of the GPMC settings outside retime function and
+this does not need to be done if the timings are changed dynamically
+at runtime.
 
 Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 ---
- arch/arm/mach-omap2/gpmc-nand.c |    2 +-
- arch/arm/mach-omap2/gpmc.c      |   45 ++++++---------------------------------
- arch/arm/mach-omap2/gpmc.h      |    2 +-
- 3 files changed, 9 insertions(+), 40 deletions(-)
+ arch/arm/mach-omap2/gpmc-smc91x.c |   30 +++++++++++++++++-------------
+ 1 file changed, 17 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/gpmc-nand.c b/arch/arm/mach-omap2/gpmc-nand.c
-index 4bdfea2..a4c8537 100644
---- a/arch/arm/mach-omap2/gpmc-nand.c
-+++ b/arch/arm/mach-omap2/gpmc-nand.c
-@@ -153,7 +153,7 @@ int gpmc_nand_init(struct omap_nand_platform_data *gpmc_nand_data,
- 		if (IS_ERR_VALUE(err))
- 			goto out_free_cs;
+diff --git a/arch/arm/mach-omap2/gpmc-smc91x.c b/arch/arm/mach-omap2/gpmc-smc91x.c
+index 4b78338..0871662 100644
+--- a/arch/arm/mach-omap2/gpmc-smc91x.c
++++ b/arch/arm/mach-omap2/gpmc-smc91x.c
+@@ -49,6 +49,10 @@ static struct platform_device gpmc_smc91x_device = {
+ 	.resource	= gpmc_smc91x_resources,
+ };
  
--		err = gpmc_cs_configure(gpmc_nand_data->cs, GPMC_CONFIG_WP, 0);
-+		err = gpmc_configure(GPMC_CONFIG_WP, 0);
- 		if (IS_ERR_VALUE(err))
- 			goto out_free_cs;
- 	}
-diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-index fb8dfd2..7cf3d98 100644
---- a/arch/arm/mach-omap2/gpmc.c
-+++ b/arch/arm/mach-omap2/gpmc.c
-@@ -564,16 +564,14 @@ void gpmc_cs_free(int cs)
- EXPORT_SYMBOL(gpmc_cs_free);
++static struct gpmc_settings smc91x_settings = {
++	.device_width = GPMC_DEVWIDTH_16BIT,
++};
++
+ /*
+  * Set the gpmc timings for smc91c96. The timings are taken
+  * from the data sheet available at:
+@@ -67,18 +71,6 @@ static int smc91c96_gpmc_retime(void)
+ 	const int t7 = 5;	/* Figure 12.4 write */
+ 	const int t8 = 5;	/* Figure 12.4 write */
+ 	const int t20 = 185;	/* Figure 12.2 read and 12.4 write */
+-	u32 l;
+-
+-	l = GPMC_CONFIG1_DEVICESIZE_16;
+-	if (gpmc_cfg->flags & GPMC_MUX_ADD_DATA)
+-		l |= GPMC_CONFIG1_MUXADDDATA;
+-	if (gpmc_cfg->flags & GPMC_READ_MON)
+-		l |= GPMC_CONFIG1_WAIT_READ_MON;
+-	if (gpmc_cfg->flags & GPMC_WRITE_MON)
+-		l |= GPMC_CONFIG1_WAIT_WRITE_MON;
+-	if (gpmc_cfg->wait_pin)
+-		l |= GPMC_CONFIG1_WAIT_PIN_SEL(gpmc_cfg->wait_pin);
+-	gpmc_cs_write_reg(gpmc_cfg->cs, GPMC_CS_CONFIG1, l);
  
- /**
-- * gpmc_cs_configure - write request to configure gpmc
-- * @cs: chip select number
-+ * gpmc_configure - write request to configure gpmc
-  * @cmd: command type
-  * @wval: value to write
-  * @return status of the operation
-  */
--int gpmc_cs_configure(int cs, int cmd, int wval)
-+int gpmc_configure(int cmd, int wval)
- {
--	int err = 0;
--	u32 regval = 0;
-+	u32 regval;
+ 	/*
+ 	 * FIXME: Calculate the address and data bus muxed timings.
+@@ -104,7 +96,7 @@ static int smc91c96_gpmc_retime(void)
+ 	dev_t.t_cez_w = t4_w * 1000;
+ 	dev_t.t_wr_cycle = (t20 - t3) * 1000;
  
- 	switch (cmd) {
- 	case GPMC_ENABLE_IRQ:
-@@ -593,43 +591,14 @@ int gpmc_cs_configure(int cs, int cmd, int wval)
- 		gpmc_write_reg(GPMC_CONFIG, regval);
- 		break;
+-	gpmc_calc_timings(&t, NULL, &dev_t);
++	gpmc_calc_timings(&t, &smc91x_settings, &dev_t);
  
--	case GPMC_CONFIG_RDY_BSY:
--		regval  = gpmc_cs_read_reg(cs, GPMC_CS_CONFIG1);
--		if (wval)
--			regval |= WR_RD_PIN_MONITORING;
--		else
--			regval &= ~WR_RD_PIN_MONITORING;
--		gpmc_cs_write_reg(cs, GPMC_CS_CONFIG1, regval);
--		break;
--
--	case GPMC_CONFIG_DEV_SIZE:
--		regval  = gpmc_cs_read_reg(cs, GPMC_CS_CONFIG1);
--
--		/* clear 2 target bits */
--		regval &= ~GPMC_CONFIG1_DEVICESIZE(3);
--
--		/* set the proper value */
--		regval |= GPMC_CONFIG1_DEVICESIZE(wval);
--
--		gpmc_cs_write_reg(cs, GPMC_CS_CONFIG1, regval);
--		break;
--
--	case GPMC_CONFIG_DEV_TYPE:
--		regval  = gpmc_cs_read_reg(cs, GPMC_CS_CONFIG1);
--		regval |= GPMC_CONFIG1_DEVICETYPE(wval);
--		if (wval == GPMC_DEVICETYPE_NOR)
--			regval |= GPMC_CONFIG1_MUXADDDATA;
--		gpmc_cs_write_reg(cs, GPMC_CS_CONFIG1, regval);
--		break;
--
- 	default:
--		printk(KERN_ERR "gpmc_configure_cs: Not supported\n");
--		err = -EINVAL;
-+		pr_err("%s: command not supported\n", __func__);
-+		return -EINVAL;
- 	}
- 
--	return err;
-+	return 0;
+ 	return gpmc_cs_set_timings(gpmc_cfg->cs, &t);
  }
--EXPORT_SYMBOL(gpmc_cs_configure);
-+EXPORT_SYMBOL(gpmc_configure);
+@@ -133,6 +125,18 @@ void __init gpmc_smc91x_init(struct omap_smc91x_platform_data *board_data)
+ 	gpmc_smc91x_resources[0].end = cs_mem_base + 0x30f;
+ 	gpmc_smc91x_resources[1].flags |= (gpmc_cfg->flags & IRQF_TRIGGER_MASK);
  
- void gpmc_update_nand_reg(struct gpmc_nand_regs *reg, int cs)
- {
-diff --git a/arch/arm/mach-omap2/gpmc.h b/arch/arm/mach-omap2/gpmc.h
-index 638f94a..d73fda0 100644
---- a/arch/arm/mach-omap2/gpmc.h
-+++ b/arch/arm/mach-omap2/gpmc.h
-@@ -229,6 +229,6 @@ extern int gpmc_cs_set_reserved(int cs, int reserved);
- extern int gpmc_cs_reserved(int cs);
- extern void omap3_gpmc_save_context(void);
- extern void omap3_gpmc_restore_context(void);
--extern int gpmc_cs_configure(int cs, int cmd, int wval);
-+extern int gpmc_configure(int cmd, int wval);
- 
- #endif
++	if (gpmc_cfg->flags & GPMC_MUX_ADD_DATA)
++		smc91x_settings.mux_add_data = true;
++	if (gpmc_cfg->flags & GPMC_READ_MON)
++		smc91x_settings.wait_on_read = true;
++	if (gpmc_cfg->flags & GPMC_WRITE_MON)
++		smc91x_settings.wait_on_write = true;
++	if (gpmc_cfg->wait_pin)
++		smc91x_settings.wait_pin = gpmc_cfg->wait_pin;
++	ret = gpmc_cs_program_settings(gpmc_cfg->cs, &smc91x_settings);
++	if (IS_ERR_VALUE(ret))
++		goto free1;
++
+ 	if (gpmc_cfg->retime) {
+ 		ret = gpmc_cfg->retime();
+ 		if (ret != 0)
 -- 
 1.7.10.4
