@@ -1,69 +1,78 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 26 Feb 2013 13:13:14 +0530
-Subject: [PATCH] ARM: OMAP4: Fix the init code to have OMAP4460 errata
- available in DT build
-In-Reply-To: <512B7CF6.8030905@ti.com>
-References: <1361794156-9789-1-git-send-email-santosh.shilimkar@ti.com>
- <512B7CF6.8030905@ti.com>
-Message-ID: <512C6792.5070407@ti.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Tue, 26 Feb 2013 16:02:22 +0800
+Subject: [PATCH 3/3] pinctrl: imx: move hard-coding data into device tree
+In-Reply-To: <51267C0E.6070902@wwwdotorg.org>
+References: <1361344089-16804-1-git-send-email-shawn.guo@linaro.org>
+ <1361344089-16804-4-git-send-email-shawn.guo@linaro.org>
+ <51251E5A.1080806@wwwdotorg.org>
+ <CAP1dx+w2bLcztrRJOYs07xxSqVgo3bggJHMFt5LyL5jXQ-h6Mg@mail.gmail.com>
+ <51267C0E.6070902@wwwdotorg.org>
+Message-ID: <20130226080220.GA3037@b29396-Latitude-E6410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 25 February 2013 08:32 PM, Jon Hunter wrote:
->
-> On 02/25/2013 06:09 AM, Santosh Shilimkar wrote:
->> OMAP4460 ROM code bug needs the GIC distributor and local timer
->> bases to be available for the bug work around. In current code, dt
->> case these bases are not initialized leading to failure of the
->> errata work-around.
->>
->> Fix it by extracting the bases from dt blob and populating them.
->>
->> Reported-by: Sourav Poddar <sourav.poddar@ti.com>
->> Tested-by: Sourav Poddar <sourav.poddar@ti.com>
->> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> ---
->> Posting this one seperatly but will add along with rest of
->> my fixes so that it doesn't get lost on the list.
->>
->>   arch/arm/mach-omap2/omap4-common.c |   32 ++++++++++++++++++++++++++++++++
->>   1 file changed, 32 insertions(+)
->>
->> diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
->> index 6897ae2..d07740e 100644
->> --- a/arch/arm/mach-omap2/omap4-common.c
->> +++ b/arch/arm/mach-omap2/omap4-common.c
->> @@ -261,8 +261,40 @@ static struct of_device_id irq_match[] __initdata = {
->>   	{ }
->>   };
->>
->> +static struct of_device_id twd_match[] __initdata = {
->> +	{ .compatible = "arm,cortex-a9-twd-timer", },
->> +	{ }
->> +};
->> +
->>   void __init omap_gic_of_init(void)
->>   {
->> +	struct device_node *np;
->> +	const void *reg_prop;
->> +	unsigned long start = 0, size = 0;
->> +
->> +	/* Extract GIC distributor and TWD bases for OMAP4460 ROM Errata WA */
->> +	if (!cpu_is_omap446x())
->> +		goto skip_errata_init;
->> +
->> +	np = of_find_matching_node(NULL, irq_match);
->> +	if (np) {
->> +		reg_prop = of_get_property(np, "reg", NULL);
->> +		start = of_read_number(reg_prop, 1);
->> +		size = of_read_number(reg_prop + 4, 1);
->
-> Alternatively, you could replace the above 3 lines with ...
->
-> gic_dist_base_addr = of_iomap(np, 0);
->
-Nice !!
-Will use the alternative. Thanks Jon for pointer.
+On Thu, Feb 21, 2013 at 12:57:02PM -0700, Stephen Warren wrote:
+> On 02/21/2013 02:36 AM, Dong Aisheng wrote:
+> > On 21 February 2013 03:04, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> >> On 02/20/2013 12:08 AM, Shawn Guo wrote:
+> >>> Currently, all imx pinctrl drivers maintain a big array of struct
+> >>> imx_pin_reg which hard-codes data like register offset and mux mode
+> >>> setting for each pin function.  Every time a new imx SoC support is
+> >>> added, we need to add such a big mount of data.  With moving to single
+> >>> kernel build, it's only matter of time to be blamed on memory consuming.
+> >>>
+> >>> With DTC pre-processor support in place, the patch moves all these data
+> >>> into device tree by redefining the PIN_FUNC_ID in imxXX-pinfunc.h and
+> >>> changing the PIN_FUNC_ID parsing code a little bit.
+> ...
+> >> This patch removes a bunch of tables from the kernel. I like having the
+> >> tables in the kernel, since in theory it could allow a future debugfs or
+> >> sysfs interface to pinctrl that allows manipulation of the pinctrl HW
+> >> state at a semantic level.
+> > 
+> > Right, that's one of the considerations why i kept the register table in driver
+> > in the first binding design.
+> > 
+> >> This is only possible if the DT binding
+> >> includes details such as "set this pin to this function", and the driver
+> >> includes the tables to convert that into details such as register
+> >> address and value. I don't think such an "API" could be implemented for
+> >> IMX after this patch.
+> > 
+> > Theoretically It can, because device tree contains the pin registers
+> > informations
+> 
+> > in this way. But the problem is that it can only manipulate the used pins which
+> > are parsed from devices tree. While for those unused pins, since the driver does
+> > not have the pin register information, it can not manipulate it.
+> 
+> Right, that's the main issue I was trying to highlight; the driver no
+> longer provides complete knowledge of the HW, but only learns about
+> stuff that happens to be used/defined in the board-specific DT.
+> 
+> > But what i'm wondering now is do we really need to manipulate the unused pins
+> > from sysfs or debugfs?
+> > I still can not think out a real using case now.
+> > Anyone else can think one?
+> 
+> For early board bringup, it may be useful to boot with a minimal set of
+> entries in the DT (enough to support e.g. serial console and some device
+> for a root filesystem) and then interactively tweak the rest of the
+> pinmux to define the rest of the board, and perhaps even save the result
+> somehow, and add it to the next iteration of the DT.
+> 
+> Also, consider a hobbyist-oriented board that has 50 unused pins that
+> could be GPIO, or mapped to some otherwise unused SD, I2C, SPI, ...
+> controller. Do we want to force the user to write a new DT and reboot,
+> or would it be better to provide some runtime API to set up those pins
+> based on what they had connected to the board, and then instantiate
+> drivers or use the sysfs GPIO interface, after doing so?
+> 
 
-Regards,
-Santosh
+Yes, it can be useful sometimes.
+In order to do that, we have to add the whole register table in driver.
+Considering the defects, since using memtool can do the same things,
+maybe it's not worth for IMX to do that.
+
+Regards
+Dong Aisheng
