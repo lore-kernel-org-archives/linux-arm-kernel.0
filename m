@@ -1,34 +1,41 @@
-From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Tue, 26 Feb 2013 15:52:05 -0700
-Subject: crypto: omap-sham, omap-aes and dma_request_slave_channel_compat()
-In-Reply-To: <512D00BE.8090204@canonical.com>
-References: <512D00BE.8090204@canonical.com>
-Message-ID: <20130226225205.GA13338@animalcreek.com>
+From: heiko.stuebner@bqreaders.com (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Tue, 26 Feb 2013 23:55:44 +0100
+Subject: [PATCH 0/5] ARM: S3C24XX: more fixes and enhancements for the s3c24xx
+ irqs
+Message-ID: <201302262355.44995.heiko.stuebner@bqreaders.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[CC'ing more people & lists.]
+Asorted fixes and enhancements for the recent redo of the s3c24xx
+interrupt controllers.
 
-On Tue, Feb 26, 2013 at 11:36:46AM -0700, Tim Gardner wrote:
-> Whats up with commits 0e87e73f4abe1ada69cf780fe2550c6361a1b53b and
-> b4b87a934c30fb91cbdd18ae028acdc361e1cf0f. As far as I can tell,
-> dma_request_slave_channel_compat() does not exist in 3.9 as of
-> 52caa59ed335616c5254adff7911465a57ed9f14, nor does it exist in
-> linux-next as of Feb 26. Am I just being dense ?
+The only real error that gets fixed is the handling of 0-hwirq as
+parent_irq on s3c2412 in patch 2. No other of the s3c24xx platforms
+uses the bit0 of the parent controller as parent_irq.
 
-Yeah, order got a little messed up.  The problem is known and the
-sub-thread talking about it starts about here:
+Heiko Stuebner (5):
+  ARM: S3C24XX: fix redundant checks in the irq mapping function
+  ARM: S3C24XX: fix irq parent check
+  ARM: S3C24XX: move s3c24xx_init_irq to s3c2410_init_irq
+  ARM: S3C24XX: make s3c24xx_init_intc static
+  ARM: S3C24XX: add handle_irq function
 
-	http://www.spinics.net/lists/arm-kernel/msg225241.html
+ arch/arm/Kconfig                                 |    1 +
+ arch/arm/mach-s3c24xx/common.h                   |    1 +
+ arch/arm/mach-s3c24xx/include/mach/entry-macro.S |   70 ---------
+ arch/arm/mach-s3c24xx/irq.c                      |  167 +++++++++++++--------
+ arch/arm/mach-s3c24xx/mach-amlm5900.c            |    2 +-
+ arch/arm/mach-s3c24xx/mach-bast.c                |    2 +-
+ arch/arm/mach-s3c24xx/mach-h1940.c               |    7 +-
+ arch/arm/mach-s3c24xx/mach-n30.c                 |    4 +-
+ arch/arm/mach-s3c24xx/mach-otom.c                |    2 +-
+ arch/arm/mach-s3c24xx/mach-qt2410.c              |    2 +-
+ arch/arm/mach-s3c24xx/mach-smdk2410.c            |    2 +-
+ arch/arm/mach-s3c24xx/mach-tct_hammer.c          |    2 +-
+ arch/arm/mach-s3c24xx/mach-vr1000.c              |    2 +-
+ arch/arm/plat-samsung/include/plat/cpu.h         |    1 -
+ 14 files changed, 115 insertions(+), 150 deletions(-)
+ delete mode 100644 arch/arm/mach-s3c24xx/include/mach/entry-macro.S
 
-with the conclusion (AFAICT) that Vinod is to push it:
-
-	http://www.spinics.net/lists/arm-kernel/msg226062.html
-
-> Reverting those 2 commits at least allows the compile complete.
-
-When the dependencies are sorted out, will you revert the revert
-or do I need to do something?
-
-Mark
---
+-- 
+1.7.2.3
