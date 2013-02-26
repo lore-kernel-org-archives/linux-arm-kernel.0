@@ -1,23 +1,53 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 26 Feb 2013 14:15:33 +0530
-Subject: [PATCH 1/2] time : pass broadcast device parameter
-In-Reply-To: <1361484083-5906-1-git-send-email-daniel.lezcano@linaro.org>
-References: <5123C299.3080005@linaro.org>
- <1361484083-5906-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <CAKohpomqooF6DzzzdUFByA0wDxQ3RuPne15a9Vy1sScKjZfeyA@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 26 Feb 2013 17:53:16 +0900
+Subject: [PATCH 00/08] ARM: shmobile: CPU Hotplug and SMP CA9 SCU rework
+ part 2
+In-Reply-To: <CANqRtoQxC89zQHjM++19fRxch7x-jua_XEmvxk8t0p0D7-Vr8g@mail.gmail.com>
+References: <20130218134648.17303.97576.sendpatchset@w520>
+ <20130219004857.GA14932@verge.net.au>
+ <CANqRtoQxC89zQHjM++19fRxch7x-jua_XEmvxk8t0p0D7-Vr8g@mail.gmail.com>
+Message-ID: <20130226085312.GA11648@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 February 2013 03:31, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
-> The broadcast timer could be passed as parameter to the function
-> instead of using again tick_broadcast_device.evtdev which was
-> previously used in the caller function.
->
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+On Tue, Feb 19, 2013 at 07:09:14PM +0900, Magnus Damm wrote:
+> On Tue, Feb 19, 2013 at 9:49 AM, Simon Horman <horms@verge.net.au> wrote:
+> > On Mon, Feb 18, 2013 at 10:46:48PM +0900, Magnus Damm wrote:
+> >> ARM: shmobile: CPU Hotplug and SMP CA9 SCU rework part 2
+> >>
+> >> [PATCH 01/08] ARM: shmobile: Fix base address readout in headsmp-scu.S
+> >> [PATCH 02/08] ARM: shmobile: Rework SH73A0_SCU_BASE IOMEM() usage
+> >> [PATCH 03/08] ARM: shmobile: Use R8A7779_SCU_BASE with TWD
+> >> [PATCH 04/08] ARM: shmobile: Update r8a7779 to check SCU for hotplug
+> >> [PATCH 05/08] ARM: shmobile: Update r8a7779 to use scu_power_mode()
+> >> [PATCH 06/08] ARM: shmobile: Use sh73a0-specific cpu disable code
+> >> [PATCH 07/08] ARM: shmobile: Rearrange r8a7779 cpu hotplug code
+> >> [PATCH 08/08] ARM: shmobile: Remove unused hotplug.c
+> >>
+> >> Finalize the SCU rework by performing minor fixes and converting
+> >> the r8a7779 SMP code to make use of common scu_power_mode() code
+> >> and the early SCU setup code in headsmp-scu.S.
+> >>
+> >> Also, to save a few line remove hotplug.c while at it.
+> >>
+> >> The only remaining itch to scratch here is to fix up CPU Hotplug
+> >> of CPU0 on r8a7779, but for that to happen we first need to start
+> >> accounting for spurious interrupts during shut down.
+> >>
+> >> Signed-off-by: Magnus Damm <damm@opensource.se>
+> >> ---
+> >>
+> >>  No known dependencies apart from previous SMP cleanup series
+> >>  "[PATCH 00/06] ARM: shmobile: SMP Cortex-A9 SCU rework"
+> >>  Written against -next in renesas.git.
+> >
+> > I believe those are queued up for upstream in the soc5 branch.
+> >
+> > Please let me know when you are comfortable with me applying these patches
+> > to that branch. I'm fine with that answer being "now".
+> 
+> Now sounds wonderful. Thanks Simon.
 
-I know you are going for another round with this patchset and was just
-trying v1.
+[some time passes]
 
-I did my tests on ARM Vexpress - TC2, big.LITTLE Arch.
-
-Tested-by: Viresh Kumar <viresh.kumar@linaro.org>
+Thanks, applied to the soc5 branch.
