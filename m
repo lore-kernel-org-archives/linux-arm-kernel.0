@@ -1,45 +1,42 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Tue, 26 Feb 2013 07:09:00 +0100 (CET)
-Subject: [PATCH 1/4] ARM: shmobile: sh73a0: fix Z and ZG clock hierarchy
-In-Reply-To: <20130226054319.GA25356@verge.net.au>
-References: <1361553474-27022-1-git-send-email-g.liakhovetski@gmx.de>
- <1361553474-27022-2-git-send-email-g.liakhovetski@gmx.de>
- <20130226042946.GB26820@verge.net.au>
- <CANqRtoRjs=OxsoUQrcL6nJG-o1RpxefO3BrjBj_A2GV8HNW=qQ@mail.gmail.com>
- <20130226054319.GA25356@verge.net.au>
-Message-ID: <Pine.LNX.4.64.1302260707480.15531@axis700.grange>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Mon, 25 Feb 2013 22:21:37 -0800
+Subject: what's the next LTSI kernel version for long-term support
+In-Reply-To: <CAGsJ_4xxdcLPbKsOHXaADYzKRNeWq=n-jgoHYRMOXAqGPuyQ0w@mail.gmail.com>
+References: <CAGsJ_4yxQK05hHUivYEnLD9=cAE4t5jNV7+6KJGu+LsVsSk1oQ@mail.gmail.com>
+ <20130226033524.GA25067@kroah.com>
+ <CAGsJ_4za4tPZN6F=VG6A81OXZsU-d0S6YzwG2NT43E-kb8y52g@mail.gmail.com>
+ <20130226035538.GB1128@kroah.com>
+ <CAGsJ_4xxdcLPbKsOHXaADYzKRNeWq=n-jgoHYRMOXAqGPuyQ0w@mail.gmail.com>
+Message-ID: <20130226062137.GA25638@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon
-
-On Tue, 26 Feb 2013, Simon Horman wrote:
-
-> On Tue, Feb 26, 2013 at 02:36:24PM +0900, Magnus Damm wrote:
-> > On Tue, Feb 26, 2013 at 1:29 PM, Simon Horman <horms@verge.net.au> wrote:
-> > > On Fri, Feb 22, 2013 at 06:17:51PM +0100, Guennadi Liakhovetski wrote:
-> > >> Z and ZG clocks on sh73a0 have pll0 as their parent, not pll1.
-> > >
-> > > Thanks I have applied this to the soc5 branch and thus queued it up for v3.10.
-> > > Please let me know if you would prefer me to push it as a fix for v3.9.
-> > > And in that vein, if you regard it as -stable material.
-> > 
-> > Thanks.
-> > 
-> > Perhaps other people disagree, but I recommend not being so trigger
-> > happy with -stable unless it will potentially give us some upside.
-> > AFAIK there is no in-tree consumer of this clock anyway, so involving
-> > -stable without further testing seems like a lot of hassle with no
-> > real benefit.
+On Tue, Feb 26, 2013 at 01:36:09PM +0800, Barry Song wrote:
+> Hi Greg,
 > 
-> If there is no in-tree consumer then it is not v3.9 or -stable material.
+> 2013/2/26 Greg Kroah-Hartman <gregkh@linuxfoundation.org>:
+> > On Tue, Feb 26, 2013 at 11:46:04AM +0800, Barry Song wrote:
+> >> 2013/2/26 Greg Kroah-Hartman <gregkh@linuxfoundation.org>:
+> >> > On Tue, Feb 26, 2013 at 11:06:56AM +0800, Barry Song wrote:
+> >> >> Hi Greg/All,
+> >> >> we have seen 3.4 was announced to be an LTSI in Aug, 2012. I'd like to
+> >> >> know what is the next LTSI version since we might want to align our
+> >> >> next release with LTSI.
+> >> >
+> >> > Who is "we" here?
+> >> >
+> >> people.
+> >
+> > I don't take anonymous "we want this" requests serious at all, sorry.
+> > Please provide details as you are asking me to do work for you, right?
+> >
+> 
+> i just want to get some generic information not specific to any SoC
+> vendor at all :-)
 
-Just to confirm, that I'm not aware of any current consumers of these 
-clocks, so, no rush with stable.
+Then my generic response is going to be, "It will be announced when it
+will be announced."
 
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+sorry,
+
+greg k-h
