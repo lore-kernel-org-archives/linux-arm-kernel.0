@@ -1,66 +1,61 @@
-From: srivatsa.bhat@linux.vnet.ibm.com (Srivatsa S. Bhat)
-Date: Tue, 26 Feb 2013 20:47:30 +0530
-Subject: [PATCH v6 04/46] percpu_rwlock: Implement the core design of
- Per-CPU Reader-Writer Locks
-In-Reply-To: <CACvQF53gcuEfgM=L8-mPTt4W3GFMte-w6eyO0iv2CobAN68SNw@mail.gmail.com>
-References: <20130218123714.26245.61816.stgit@srivatsabhat.in.ibm.com>
- <20130218123856.26245.46705.stgit@srivatsabhat.in.ibm.com>
- <CANN689F9S7c1M8+cEpz3tsxGF34+NTRBLvxgPUOtbvav5u+RRA@mail.gmail.com>
- <5122551E.1080703@linux.vnet.ibm.com> <51226B46.9080707@linux.vnet.ibm.com>
- <CANN689FSxOz+0Cu7EG_yKD8ZE1OpT4kyT+ybLfXSqaifodJRpw@mail.gmail.com>
- <51226F91.7000108@linux.vnet.ibm.com>
- <CACvQF53bdh4_BxF0y1fnTVR+T2OmRc0jmWQYftsvx92-fg-Lug@mail.gmail.com>
- <512BBAD8.8010006@linux.vnet.ibm.com>
- <CACvQF53gcuEfgM=L8-mPTt4W3GFMte-w6eyO0iv2CobAN68SNw@mail.gmail.com>
-Message-ID: <512CD20A.3020100@linux.vnet.ibm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 26 Feb 2013 16:20:23 +0100
+Subject: [PATCH 1/4] arm: mvebu: limit OpenBlocks AX3-4 to 1 GB of RAM
+In-Reply-To: <20130107113411.GV3392@lunn.ch>
+References: <1357315498-4570-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <50E710CB.8070007@lunn.ch> <20130104183139.20492204@skate>
+ <50E71356.3030203@lunn.ch> <20130104190345.460151d1@skate>
+ <50E9EE7A.1080301@free-electrons.com>
+ <20130106235312.0839a879@skate> <20130107094747.GR3392@lunn.ch>
+ <20130107110712.GT3392@lunn.ch> <20130107122613.64f4ace5@skate>
+ <20130107113411.GV3392@lunn.ch>
+Message-ID: <20130226162023.3d7b2ffc@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/26/2013 07:04 PM, Lai Jiangshan wrote:
-> On Tue, Feb 26, 2013 at 3:26 AM, Srivatsa S. Bhat
-> <srivatsa.bhat@linux.vnet.ibm.com> wrote:
->> Hi Lai,
->>
->> On 02/25/2013 09:23 PM, Lai Jiangshan wrote:
->>> Hi, Srivatsa,
->>>
->>> The target of the whole patchset is nice for me.
->>
->> Cool! Thanks :-)
->>
->>> A question: How did you find out the such usages of
->>> "preempt_disable()" and convert them? did all are converted?
->>>
->>
->> Well, I scanned through the source tree for usages which implicitly
->> disabled CPU offline and converted them over.
-> 
-> How do you scan? could you show the way you scan the source tree.
-> I can follow your instructions for double checking.
-> 
+Dear Andrew Lunn,
 
-Its nothing special. I grepped the source tree for anything dealing with
-cpu_online_mask or its derivatives and also for functions/constructs that
-rely on the cpumasks internally (eg: smp_call_function). Then I audited all
-such call-sites and converted them (if needed) accordingly.
-
->> Its not limited to uses
->> of preempt_disable() alone - even spin_locks, rwlocks, local_irq_disable()
->> etc also help disable CPU offline. So I tried to dig out all such uses
->> and converted them. However, since the merge window is open, a lot of
->> new code is flowing into the tree. So I'll have to rescan the tree to
->> see if there are any more places to convert.
+On Mon, 7 Jan 2013 12:34:11 +0100, Andrew Lunn wrote:
+> > Image is also with an initramfs + appended DTB. My boot command is:
+> > 
+> > tftp 1000000 192.168.0.14:uImage.armada-xp-openblocks-ax3-4; bootm
+> > 
+> > So I'm loading to a different address than you.
 > 
-> I remember some code has such assumption:
->     preempt_disable() (or something else)
->     //the code assume that the cpu_online_map can't be changed.
->     preempt_enable()
+> Hi Thomas
 > 
-> It is very hard to find out all such kinds of assumptions and fixes them.
-> (I notice your code mainly fixes code around send_xxxx())
+> Uboot tells me:
 > 
+> DRAM:   3 GB
+>        CS 0: base 0x00000000 size  1 GB
+>        CS 2: base 0x40000000 size  1 GB
+>        CS 3: base 0x80000000 size  1 GB
+>        Addresses 14M - 0M are saved for the U-Boot usage.
+> 
+> 1000000 would be towards the beginning of this area reserved for uboot.
+> 
+> Could you try moving to somewhere outside of the first 14Mbytes and
+> see if that helps.
 
-The conversion can be carried out using the method I mentioned above.
+Jumping back on this old topic of the OpenBlocks AX3 not being stable
+with 3 GB of RAM for Gr?gory and me, but being stable for you. Could
+you check which revision of the Armada XP you have? Is it A0 or B0?
 
-Regards,
-Srivatsa S. Bhat
+I.e, check the message:
+
+ SoC:   MV78460 B0
+
+in U-Boot. Gr?gory and I are using OpenBlocks AX3 based on the A0
+version of the silicon (so the message I copy/pasted above is *not*
+from our OpenBlocks, but a different Armada XP board). However,
+PlatHome has been shipping since some time B0 revisions. Maybe it could
+explain the difference we're seeing?
+
+Thanks,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
