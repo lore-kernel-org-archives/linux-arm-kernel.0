@@ -1,63 +1,42 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 26 Feb 2013 17:44:28 +0530
-Subject: [PATCH 1/2] time : pass broadcast device parameter
-In-Reply-To: <512C9D20.8020309@linaro.org>
-References: <5123C299.3080005@linaro.org>
- <1361484083-5906-1-git-send-email-daniel.lezcano@linaro.org>
- <CAKohpomqooF6DzzzdUFByA0wDxQ3RuPne15a9Vy1sScKjZfeyA@mail.gmail.com>
- <512C9D20.8020309@linaro.org>
-Message-ID: <CAKohpong=ioMvnWErKQ1gEcG71f5et26EDJFtbsE1SOr=TN_tQ@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 26 Feb 2013 21:15:27 +0900
+Subject: [PATCH 1/4] ARM: shmobile: sh73a0: fix Z and ZG clock hierarchy
+In-Reply-To: <Pine.LNX.4.64.1302260707480.15531@axis700.grange>
+References: <1361553474-27022-1-git-send-email-g.liakhovetski@gmx.de>
+ <1361553474-27022-2-git-send-email-g.liakhovetski@gmx.de>
+ <20130226042946.GB26820@verge.net.au>
+ <CANqRtoRjs=OxsoUQrcL6nJG-o1RpxefO3BrjBj_A2GV8HNW=qQ@mail.gmail.com>
+ <20130226054319.GA25356@verge.net.au>
+ <Pine.LNX.4.64.1302260707480.15531@axis700.grange>
+Message-ID: <20130226121527.GC17704@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 February 2013 17:01, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
-> Oh, by the way, could send me the patch to set the flag to the timer
-> device ? I will include it to the patchset.
+On Tue, Feb 26, 2013 at 07:09:00AM +0100, Guennadi Liakhovetski wrote:
+> Hi Simon
+> 
+> On Tue, 26 Feb 2013, Simon Horman wrote:
+> 
+> > On Tue, Feb 26, 2013 at 02:36:24PM +0900, Magnus Damm wrote:
+> > > On Tue, Feb 26, 2013 at 1:29 PM, Simon Horman <horms@verge.net.au> wrote:
+> > > > On Fri, Feb 22, 2013 at 06:17:51PM +0100, Guennadi Liakhovetski wrote:
+> > > >> Z and ZG clocks on sh73a0 have pll0 as their parent, not pll1.
+> > > >
+> > > > Thanks I have applied this to the soc5 branch and thus queued it up for v3.10.
+> > > > Please let me know if you would prefer me to push it as a fix for v3.9.
+> > > > And in that vein, if you regard it as -stable material.
+> > > 
+> > > Thanks.
+> > > 
+> > > Perhaps other people disagree, but I recommend not being so trigger
+> > > happy with -stable unless it will potentially give us some upside.
+> > > AFAIK there is no in-tree consumer of this clock anyway, so involving
+> > > -stable without further testing seems like a lot of hassle with no
+> > > real benefit.
+> > 
+> > If there is no in-tree consumer then it is not v3.9 or -stable material.
+> 
+> Just to confirm, that I'm not aware of any current consumers of these 
+> clocks, so, no rush with stable.
 
-Sure. Find it attached too as gmail may break it.
-
-commit 14422c760bb5b2485867f3efb7842d296081ad86
-Author: Viresh Kumar <viresh.kumar@linaro.org>
-Date:   Fri Feb 22 12:42:39 2013 +0530
-
-    ARM/timer-sp: Set dynamic irq affinity
-
-    When a cpu goes to a deep idle state where its local timer is shutdown, it
-    notifies the time frame work to use the broadcast timer instead.
-
-    Unfortunately, the broadcast device could wake up any CPU,
-including an idle one
-    which is not concerned by the wake up at all.
-
-    This implies, in the worst case, an idle CPU will wake up to send an IPI to
-    another idle cpu.
-
-    This patch fixes this for ARM platforms using timer-sp, by setting
-    CLOCK_EVT_FEAT_DYNIRQ feature.
-
-    Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- arch/arm/common/timer-sp.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/common/timer-sp.c b/arch/arm/common/timer-sp.c
-index 9d2d3ba..ae3c0f9 100644
---- a/arch/arm/common/timer-sp.c
-+++ b/arch/arm/common/timer-sp.c
-@@ -158,7 +158,8 @@ static int sp804_set_next_event(unsigned long next,
- }
-
- static struct clock_event_device sp804_clockevent = {
--       .features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
-+       .features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
-+               CLOCK_EVT_FEAT_DYNIRQ,
-        .set_mode       = sp804_set_mode,
-        .set_next_event = sp804_set_next_event,
-        .rating         = 300,
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-ARM-timer-sp-Set-dynamic-irq-affinity.patch
-Type: application/octet-stream
-Size: 1493 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130226/78fd6ceb/attachment.obj>
+Thanks. I'll leave it queued up for 3.10.
