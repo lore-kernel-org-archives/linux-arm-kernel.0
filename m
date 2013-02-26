@@ -1,45 +1,40 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 26 Feb 2013 09:39:15 -0700
-Subject: Multi-platform, and secure-only ARM errata workarounds
-In-Reply-To: <4928288.ie8EUukfVD@fb07-iapwap2.physik.uni-giessen.de>
-References: <512BF81A.3080700@wwwdotorg.org>
- <4928288.ie8EUukfVD@fb07-iapwap2.physik.uni-giessen.de>
-Message-ID: <512CE533.6020005@wwwdotorg.org>
+From: schwab@suse.de (Andreas Schwab)
+Date: Tue, 26 Feb 2013 17:55:54 +0100
+Subject: [PATCH] arm64: fix padding computation in struct ucontext
+Message-ID: <mvmy5ebt3ol.fsf@hawking.suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/26/2013 02:36 AM, Marc Dietrich wrote:
-> Stephen,
-> 
-> Am Montag, 25. Februar 2013, 16:47:38 schrieb Stephen Warren:
->> I'm looking into enabling CONFIG_MULTIPLATFORM on Tegra for 3.10, and
->> the main blocking issue is due to commit 62e4d35 "ARM: 7609/1: disable
->> errata work-arounds which access secure registers". Various Tegra
->> versions need 3 of those workarounds, and our bootloader doesn't
->> implement them (at the least, upstream U-Boot; not sure about our
->> downstream code, but I'm fairly sure given the lack of any feedback I
->> got in the bug I filed to implement them).
->>
->> Now, I can easily add those 3 errata workarounds to U-Boot, but that
->> will require people to reflash their bootloader. This is probably
->> acceptable for development/reference boards (although I'm sure people
->> will find it annoying) but for re-purposed production boards (such as
->> the Toshiba AC100 or various tablets) it will be impossible to update
->> the factory bootloader. Switching to upstream U-Boot would currently
->> lose some functionality, and significantly affect people's boot flow, so
->> is likely unacceptable.
-> 
-> personally, I have no problem to require a certain u-boot version for a given 
-> kernel. From a distro point of view, you will likely update the 
-> bootloader/kernel on a distro update anyway.
+The expression to compute the padding needed to fill the uc_sigmask field
+to 1024 bits actually computes the padding needed for 1080 bits.
+Fortunately, due to the 16-byte alignment of the following field
+(uc_mcontext) the definition in glibc contains enough bytes of padding
+after uc_sigmask so that the overall offsets and size match in both
+definitions.
 
-So a distro will certainly update the kernel.
+Signed-off-by: Andreas Schwab <schwab@suse.de>
+---
+ arch/arm64/include/asm/ucontext.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-But updating a bootloader would be very unusual, I believe.
+diff --git a/arch/arm64/include/asm/ucontext.h b/arch/arm64/include/asm/ucontext.h
+index bde9607..42e04c8 100644
+--- a/arch/arm64/include/asm/ucontext.h
++++ b/arch/arm64/include/asm/ucontext.h
+@@ -22,7 +22,7 @@ struct ucontext {
+ 	stack_t		  uc_stack;
+ 	sigset_t	  uc_sigmask;
+ 	/* glibc uses a 1024-bit sigset_t */
+-	__u8		  __unused[(1024 - sizeof(sigset_t)) / 8];
++	__u8		  __unused[1024 / 8 - sizeof(sigset_t)];
+ 	/* last for future expansion */
+ 	struct sigcontext uc_mcontext;
+ };
+-- 
+1.8.1.4
 
-Also, I hope that upstream U-Boot is never going to support the bizarre
-"Tegra partition table" cruft that our "fastboot" bootloader supports,
-so you'll end up completely re-programming the flash (BCT, bootloader,
-partition table, all filesystems) if you want to switch to U-Boot. That
-seems like a fair chunk for the installer to own, but I guess if you're
-comfortable with doing that, I won't complain.
+
+-- 
+Andreas Schwab, SUSE Labs, schwab at suse.de
+GPG Key fingerprint = 0196 BAD8 1CE9 1970 F4BE  1748 E4D4 88E3 0EEA B9D7
+"And now for something completely different."
