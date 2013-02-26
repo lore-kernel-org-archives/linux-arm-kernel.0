@@ -1,37 +1,49 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 26 Feb 2013 11:42:34 +0200
-Subject: [PATCH v9 8/9] usb: chipidea: tell platform layer the ci core
- probe's result
-In-Reply-To: <1361093083-22940-9-git-send-email-peter.chen@freescale.com>
-References: <1361093083-22940-1-git-send-email-peter.chen@freescale.com>
- <1361093083-22940-9-git-send-email-peter.chen@freescale.com>
-Message-ID: <20130226094234.GC26189@arwen.pp.htv.fi>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Tue, 26 Feb 2013 10:50:21 +0100
+Subject: [Suggestion] ARM:S5PV210: version merging compiling issue for
+ 'struct fimc_source_info'
+In-Reply-To: <512C5877.7090805@asianux.com>
+References: <511F50CF.90403@asianux.com>
+ <CAH9JG2WS5q4SR8zk5=OC32PHLZ2+ZYva7csyshG7oANacqbCuA@mail.gmail.com>
+ <512C5877.7090805@asianux.com>
+Message-ID: <512C855D.6090109@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 17, 2013 at 05:24:42PM +0800, Peter Chen wrote:
-> If the probe fails, the ci13xxx_add_device will not return error,
-> (bus_probe_device doesn't has return value)
-> therefore, the platform layer can't know whether core's probe
-> is successful or not, if platform layer goes on using core's struct
-> which is initialized at core's probe, the error will occur.
-> 
-> This error is showed when I only compile gadget, the host-only
-> controller reports "no supported roles", and fails probe, but imx
-> platform code doesn't know it, and goes on using core's private data.
-> 
-> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+Hi,
 
-this just tells you that platform code shouldn't be using the driver
-directly. passing probe_retval via platform_data is an abomination, fix
-the real problem instead, whatever it is.
+On 02/26/2013 07:38 AM, Chen Gang wrote:
+> ? 2013?02?16? 19:39, Kyungmin Park ??:
+>> You can find it at recent patch from Arnd.
+> 
+>   excuse me, could you please provide more information about it ?
+> 
+>   I have checked 2 tags:
+>     the next-20130225 tag in git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git
+> 
+>       in Feb 1 2013, by Sylwester Nawrocki, Kyungmin Park, Mauro Carvalho Chehab
+>       git number: 56bc911ac3b94c731db3a6de20258827f1a61c20
+>         in include/media/s5p_fimc.h, the structure fimc_source_info is changed.
+>         in arch/arm/mach-s5pv210/mach-goni.c, the structure fimc_source_info is not changed.
+>           still use .bus_type (not use .fimc_bus_type like others).
+> 
+>       it seems, the relative members forgot to change it to .fimc_bus_type.
+> 
+>       did the patch from Arnd still not applied into next tree ?
+> 
+>     the v3.8-rc7 tag in git clone git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+>       it seems no relative changes (change nothing).
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130226/b1d050bd/attachment.sig>
+No, the fix is not yet in linux-next. I has not been merged through the media
+tree and it might take some time until it gets to Linus's tree now. You can use
+one of following patches to fix this build break:
+
+http://www.spinics.net/lists/linux-samsung-soc/msg16023.html
+https://patchwork.kernel.org/patch/2143211
+http://patchwork.linuxtv.org/patch/16892
+
+Kgene, could you push any of these fixes upstream ?
+
+
+Thanks,
+Sylwester
