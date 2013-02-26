@@ -1,7 +1,7 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Tue, 26 Feb 2013 16:40:26 -0600
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 26 Feb 2013 15:44:01 -0700
 Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
-In-Reply-To: <CAAwP0s0cB368R2mtbJpTZJreR-5GSRLfxC+8DJLo5nw3_OwBuA@mail.gmail.com>
+In-Reply-To: <512D39DA.7020306@ti.com>
 References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
  <1329321854-24490-4-git-send-email-b-cousson@ti.com>
  <4F44FA56.7020000@gmail.com> <4F44FC37.2000701@ti.com>
@@ -9,82 +9,55 @@ References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
  <74CDBE0F657A3D45AFBB94109FB122FF17BD8BC6C1@HQMAIL01.nvidia.com>
  <4F47AD08.4030504@ti.com>
  <CAAwP0s0cB368R2mtbJpTZJreR-5GSRLfxC+8DJLo5nw3_OwBuA@mail.gmail.com>
-Message-ID: <512D39DA.7020306@ti.com>
+ <512D39DA.7020306@ti.com>
+Message-ID: <512D3AB1.1080202@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 02/26/2013 03:40 PM, Jon Hunter wrote:
+> 
+> On 02/26/2013 04:01 AM, Javier Martinez Canillas wrote:
+> 
+> [snip]
+> 
+>> I was wondering if the level/edge settings for gpios is working on OMAP.
+>>
+>> I'm adding DT support for an SMSC911x ethernet chip connected to the
+>> GPMC for an OMAP3 SoC based board.
+>>
+>> In the smsc911x driver probe function (smsc911x_drv_probe() in
+>> drivers/net/ethernet/smsc/smsc911x.c), a call to request_irq() with
+>> the flag IRQF_TRIGGER_LOW is needed because of the wiring on my board.
+>>
+>> Reading the gpio-omap.txt documentation it says that #interrupt-cells
+>> should be <2> and that a value of 8 is "active low level-sensitive".
+>>
+>> So I tried this:
+>>
+>> &gpmc {
+>> 	ethernet at 5,0 {
+>> 		pinctrl-names = "default";
+>> 		pinctrl-0 = <&smsc911x_pins>;
+>> 		compatible = "smsc,lan9221", "smsc,lan9115";
+>> 		reg = <5 0 0xff>; /* CS5 */
+>> 		interrupt-parent = <&gpio6>;
+>> 		interrupts = <16 8>; /* gpio line 176 */
+>> 		interrupt-names = "smsc911x irq";
+>> 		vmmc-supply = <&vddvario>;
+>> 		vmmc_aux-supply = <&vdd33a>;
+>> 		reg-io-width = <4>;
+>>
+>> 		smsc,save-mac-address;
+>>       };
+>> };
+> 
+> Are you requesting the gpio anywhere? If not then this is not going to
+> work as-is. This was discussed fairly recently [1] and the conclusion
+> was that the gpio needs to be requested before we can use as an interrupt.
 
-On 02/26/2013 04:01 AM, Javier Martinez Canillas wrote:
-
-[snip]
-
-> I was wondering if the level/edge settings for gpios is working on OMAP.
-> 
-> I'm adding DT support for an SMSC911x ethernet chip connected to the
-> GPMC for an OMAP3 SoC based board.
-> 
-> In the smsc911x driver probe function (smsc911x_drv_probe() in
-> drivers/net/ethernet/smsc/smsc911x.c), a call to request_irq() with
-> the flag IRQF_TRIGGER_LOW is needed because of the wiring on my board.
-> 
-> Reading the gpio-omap.txt documentation it says that #interrupt-cells
-> should be <2> and that a value of 8 is "active low level-sensitive".
-> 
-> So I tried this:
-> 
-> &gpmc {
-> 	ethernet at 5,0 {
-> 		pinctrl-names = "default";
-> 		pinctrl-0 = <&smsc911x_pins>;
-> 		compatible = "smsc,lan9221", "smsc,lan9115";
-> 		reg = <5 0 0xff>; /* CS5 */
-> 		interrupt-parent = <&gpio6>;
-> 		interrupts = <16 8>; /* gpio line 176 */
-> 		interrupt-names = "smsc911x irq";
-> 		vmmc-supply = <&vddvario>;
-> 		vmmc_aux-supply = <&vdd33a>;
-> 		reg-io-width = <4>;
-> 
-> 		smsc,save-mac-address;
->       };
-> };
-
-Are you requesting the gpio anywhere? If not then this is not going to
-work as-is. This was discussed fairly recently [1] and the conclusion
-was that the gpio needs to be requested before we can use as an interrupt.
-
-I have not seen your latest smsc code for omap, but when you are
-requesting the gpmc chip-select you should also request the gpio.
-
-> But in the smsc911x probe function:
-> 
-> irq_res->flags & IRQF_TRIGGER_MASK;
-> 
-> returns 0 which means that no trigger flags where set.
-> 
-> I took a look to the GPIOs device node definition on omap{3,4,5}.dtsi
-> and all look like this:
-> 
-> e.g from omap3.dtsi:
-> 
->                 gpio6: gpio at 49058000 {
->                         compatible = "ti,omap3-gpio";
->                         ti,hwmods = "gpio6";
->                         gpio-controller;
->                         #gpio-cells = <2>;
->                         interrupt-controller;
->                         #interrupt-cells = <1>;
->                 };
-> 
-> So, even when the documentation says that all the GPIO device nodes in
-> OMAP2+ should use a #interrupt-cells property value of <2>, they are
-> only using <1>. Changing that value to 2 makes hangs the kernel and it
-> does not boot.
-
-I will need to take a look at that. Is your code available anywhere so I
-can test?
-
-Cheers
-Jon
-
-[1] http://permalink.gmane.org/gmane.linux.ports.arm.omap/92192
+That seems wrong; the GPIO/IRQ driver should handle this internally. The
+Ethernet driver shouldn't know/care whether the interrupt it's given is
+some form of dedicated interrupt or a GPIO-based interrupt, and even if
+it somehow did, there's no irq_to_gpio() any more, so the driver can't
+tell which GPIO ID it should request, unless it's given yet another
+property to represent this.
