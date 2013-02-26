@@ -1,148 +1,48 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Tue, 26 Feb 2013 22:22:08 +0100
-Subject: SMDKV210 support issue in kernel 3.8 (dma-pl330 and HDMI failed)
-In-Reply-To: <51275DF7.4010600@gmail.com>
-References: <51275DF7.4010600@gmail.com>
-Message-ID: <512D2780.3020103@gmail.com>
+From: jacmet@sunsite.dk (Peter Korsgaard)
+Date: Tue, 26 Feb 2013 22:58:02 +0100
+Subject: [RFC PATCH v2 0/4] Add support for LZ4-compressed kernel
+In-Reply-To: <alpine.LFD.2.03.1302261557220.1254@syhkavp.arg> (Nicolas Pitre's
+ message of "Tue, 26 Feb 2013 15:59:56 -0500 (EST)")
+References: <1361859870-15751-1-git-send-email-kyungsik.lee@lge.com>
+ <512D1C12.4080109@oberhumer.com>
+ <alpine.LFD.2.03.1302261557220.1254@syhkavp.arg>
+Message-ID: <87fw0i7n6d.fsf@dell.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/22/2013 01:00 PM, Lonsn wrote:
-> Hi,
-> I have tested the kernel 3.8 with a SMDKV210 like board. But I failed
-> with dma-pl330 and HDMI driver.
-> For dma-pl330, kernel print:
-> dma-pl330 dma-pl330.0: PERIPH_ID 0x0, PCELL_ID 0x0 !
-> dma-pl330: probe of dma-pl330.0 failed with error -22
-> dma-pl330 dma-pl330.1: PERIPH_ID 0x0, PCELL_ID 0x0 !
-> dma-pl330: probe of dma-pl330.1 failed with error -22
+>>>>> "Nicolas" == Nicolas Pitre <nico@fluxnic.net> writes:
 
-Maybe there is some issue with the PL330 DMA controller clocks and the
-read values are all 0 because the clocks are disabled ?
+Hi,
 
-It seems arch/arm/mach-s5pv210/clock.c might be missing "apb_pclk" clock
-supply names, which I suspect may be required after commits:
+ >> Did you actually *try* the new LZO version and the patch (which is attached
+ >> once again) as explained in https://lkml.org/lkml/2013/2/3/367 ?
+ >> 
+ >> Because the new LZO version is faster than LZ4 in my testing, at least
+ >> when comparing apples with apples and enabling unaligned access in
+ >> BOTH versions:
+ >> 
+ >> armv7 (Cortex-A9), Linaro gcc-4.6 -O3, Silesia test corpus, 256 kB block-size:
+ >> 
+ >> compression speed   decompression speed
+ >> 
+ >> LZO-2012    :          44 MB/sec          117 MB/sec     no unaligned access
+ >> LZO-2013-UA :          47 MB/sec          167 MB/sec     Unaligned Access
+ >> LZ4 r88  UA :          46 MB/sec          154 MB/sec     Unaligned Access
 
-commit 7c71b8eb268ee38235f7e924d943ea9d90e59469
-Author: Inderpal Singh <inderpal.singh@linaro.org>
-Date:   Fri Sep 7 12:14:48 2012 +0530
+ Nicolas> To be fair, you should also take into account the compressed
+ Nicolas> size of a typical ARM kernel.  Sometimes a slightly slower
+ Nicolas> decompressor may be faster overall if the compressed image to
+ Nicolas> work on is smaller.
 
-     DMA: PL330: Remove redundant runtime_suspend/resume functions
+Yes, but notice that lzo compressed BETTER than lz4 - E.G. from the
+introduction mail:
 
-     The driver's  runtime_suspend/resume functions just disable/enable
-     the clock which is already being managed at AMBA bus level
-     runtime_suspend/resume functions.
+1. ARMv7, 1.5GHz based board
+   Kernel: linux 3.4
+   Uncompressed Kernel Size: 14MB
+        Compressed Size  Decompression Speed
+   LZO  6.7MB            21.1MB/s
+   LZ4  7.3MB            29.1MB/s, 45.6MB/s(UA)
 
-     Hence, remove the driver's runtime_suspend/resume functions.
-
-     Signed-off-by: Inderpal Singh <inderpal.singh@linaro.org>
-     Tested-by: Chander Kashyap <chander.kashyap@linaro.org>
-     Signed-off-by: Vinod Koul <vinod.koul@linux.intel.com>
-
-commit faf6fbc6f2ca3b34bf464a8bb079a998e571957c
-Author: Inderpal Singh <inderpal.singh@linaro.org>
-Date:   Fri Sep 7 12:14:47 2012 +0530
-
-     DMA: PL330: Remove controller clock enable/disable
-
-     The controller clock is being enabled/disabled in AMBA bus
-     infrastructre in probe/remove functions. Hence, its not required
-     at driver level probe/remove.
-
-     Signed-off-by: Inderpal Singh <inderpal.singh@linaro.org>
-     Tested-by: Chander Kashyap <chander.kashyap@linaro.org>
-     Signed-off-by: Vinod Koul <vinod.koul@linux.intel.com>
-
-I have added people who made related changes at Cc, hopefully they
-can provide some help in debugging this.
-
-Please try the following change:
-
-8<--------------------
-diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
-index fcdf52d..87c7d3f 100644
---- a/arch/arm/mach-s5pv210/clock.c
-+++ b/arch/arm/mach-s5pv210/clock.c
-@@ -214,11 +214,6 @@ static struct clk clk_pcmcdclk2 = {
-         .name           = "pcmcdclk",
-  };
-
--static struct clk dummy_apb_pclk = {
--       .name           = "apb_pclk",
--       .id             = -1,
--};
--
-  static struct clk *clkset_vpllsrc_list[] = {
-         [0] = &clk_fin_vpll,
-         [1] = &clk_sclk_hdmi27m,
-@@ -1333,6 +1328,8 @@ static struct clk_lookup s5pv210_clk_lookup[] = {
-         CLKDEV_INIT(NULL, "spi_busclk0", &clk_p),
-         CLKDEV_INIT("s5pv210-spi.0", "spi_busclk1", &clk_sclk_spi0.clk),
-         CLKDEV_INIT("s5pv210-spi.1", "spi_busclk1", &clk_sclk_spi1.clk),
-+       CLKDEV_INIT("dma-pl330.0", "apb_pclk", &init_clocks_off[0]),
-+       CLKDEV_INIT("dma-pl330.1", "apb_pclk", &init_clocks_off[1]),
-  };
-
-  void __init s5pv210_register_clocks(void)
-@@ -1361,6 +1358,5 @@ void __init s5pv210_register_clocks(void)
-         for (ptr = 0; ptr < ARRAY_SIZE(clk_cdev); ptr++)
-                 s3c_disable_clocks(clk_cdev[ptr], 1);
-
--       s3c24xx_register_clock(&dummy_apb_pclk);
-         s3c_pwmclk_init();
-  }
-8<--------------------
-
-If it works then we could make some cleaner patch.
-
-> For HDMI driver,
-> I have added the following HDMI related code to
-> arch/arm/mach-s5pv210/mach-smdkv210.c:
-> /* I2C module and id for HDMIPHY */
-> static struct i2c_board_info hdmiphy_info = {
-> I2C_BOARD_INFO("hdmiphy-s5pv210", 0x38),
-> };
->
-> i2c_register_board_info(2, smdkv210_i2c_devs2,
-> ARRAY_SIZE(smdkv210_i2c_devs2));
->
-> s5p_i2c_hdmiphy_set_platdata(NULL);
-> s5p_hdmi_set_platdata(&hdmiphy_info, NULL, 0);
->
-> s3c_ide_set_platdata(&smdkv210_ide_pdata);
->
-> then kernel print:
-> s5p-hdmi s5pv210-hdmi: hdmiphy adapter request failed
-> s5p-hdmi s5pv210-hdmi: probe failed
-> Samsung TV Mixer driver, (c) 2010-2011 Samsung Electronics Co., Ltd.
->
-> s5p-mixer s5p-mixer: probe start
-> s5p-mixer s5p-mixer: resources acquired
-> s5p-mixer s5p-mixer: module s5p-hdmi provides no subdev!
-> s5p-mixer s5p-mixer: module s5p-sdo provides no subdev!
-> s5p-mixer s5p-mixer: failed to register any output
-> s5p-mixer s5p-mixer: probe failed
->
-> Can anybody help me on how to config the HDMI output function in linux
-> kernel 3.8? I mainly want to do video hardware decode using s5pv210 MFC
-> and then display with HDMI.
-
-For video playback (video post-processing) you might also need at least one
-FIMC device. Please refer to arch/arm/mach-goni.c for an example on how to
-add related devices to your board. You don't need the camera stuff, just 
-add:
-
-	&s5p_device_mfc,
-	&s5p_device_mfc_l,
-	&s5p_device_mfc_r,
-
-	&s5p_device_fimc0,
-	&s5p_device_fimc1,
-	&s5p_device_fimc2,
-	&s5p_device_fimc_md,
-
-to smdkv210_devices[] and related Kconfig entries to make it compile.
-You'll need a function similar to goni_reserve() in your board file
-to reserve memory for the video codec.
-
-Hope that helps.
+-- 
+Bye, Peter Korsgaard
