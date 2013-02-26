@@ -1,260 +1,124 @@
-From: srivatsa.bhat@linux.vnet.ibm.com (Srivatsa S. Bhat)
-Date: Wed, 27 Feb 2013 01:00:47 +0530
-Subject: [PATCH v6 04/46] percpu_rwlock: Implement the core design of
- Per-CPU Reader-Writer Locks
-In-Reply-To: <CACvQF50UgiqPpDk3HCmV86zKSf6tPjqr0bZowfPEOJs0g0r0MQ@mail.gmail.com>
-References: <20130218123714.26245.61816.stgit@srivatsabhat.in.ibm.com>
- <20130218123856.26245.46705.stgit@srivatsabhat.in.ibm.com>
- <CANN689F9S7c1M8+cEpz3tsxGF34+NTRBLvxgPUOtbvav5u+RRA@mail.gmail.com>
- <5122551E.1080703@linux.vnet.ibm.com>	<51226B46.9080707@linux.vnet.ibm.com>
- <CANN689FSxOz+0Cu7EG_yKD8ZE1OpT4kyT+ybLfXSqaifodJRpw@mail.gmail.com>
- <51226F91.7000108@linux.vnet.ibm.com>
- <CACvQF53bdh4_BxF0y1fnTVR+T2OmRc0jmWQYftsvx92-fg-Lug@mail.gmail.com>
- <512BBAD8.8010006@linux.vnet.ibm.com>
- <CACvQF51jCxk5jUqmhD=QBBtUsBkQWZzakacrKO4Gsk=w61rNwQ@mail.gmail.com>
- <512C7A38.8060906@linux.vnet.ibm.com>
- <CACvQF51RvhM8XNqu3-1OTQ=cZUZ=pAX+_zx0a29+W67N1X+BgQ@mail.gmail.com>
- <512CC509.1050000@linux.vnet.ibm.com>
- <CACvQF50UgiqPpDk3HCmV86zKSf6tPjqr0bZowfPEOJs0g0r0MQ@mail.gmail.com>
-Message-ID: <512D0D67.9010609@linux.vnet.ibm.com>
+From: markus@oberhumer.com (Markus F.X.J. Oberhumer)
+Date: Tue, 26 Feb 2013 21:33:22 +0100
+Subject: [RFC PATCH v2 0/4] Add support for LZ4-compressed kernel
+In-Reply-To: <1361859870-15751-1-git-send-email-kyungsik.lee@lge.com>
+References: <1361859870-15751-1-git-send-email-kyungsik.lee@lge.com>
+Message-ID: <512D1C12.4080109@oberhumer.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/26/2013 09:55 PM, Lai Jiangshan wrote:
-> On Tue, Feb 26, 2013 at 10:22 PM, Srivatsa S. Bhat
-> <srivatsa.bhat@linux.vnet.ibm.com> wrote:
->>
->> Hi Lai,
->>
->> I'm really not convinced that piggy-backing on lglocks would help
->> us in any way. But still, let me try to address some of the points
->> you raised...
->>
->> On 02/26/2013 06:29 PM, Lai Jiangshan wrote:
->>> On Tue, Feb 26, 2013 at 5:02 PM, Srivatsa S. Bhat
->>> <srivatsa.bhat@linux.vnet.ibm.com> wrote:
->>>> On 02/26/2013 05:47 AM, Lai Jiangshan wrote:
->>>>> On Tue, Feb 26, 2013 at 3:26 AM, Srivatsa S. Bhat
->>>>> <srivatsa.bhat@linux.vnet.ibm.com> wrote:
->>>>>> Hi Lai,
->>>>>>
->>>>>> On 02/25/2013 09:23 PM, Lai Jiangshan wrote:
->>>>>>> Hi, Srivatsa,
->>>>>>>
->>>>>>> The target of the whole patchset is nice for me.
->>>>>>
->>>>>> Cool! Thanks :-)
->>>>>>
->>>> [...]
->>>>
->>>> Unfortunately, I see quite a few issues with the code above. IIUC, the
->>>> writer and the reader both increment the same counters. So how will the
->>>> unlock() code in the reader path know when to unlock which of the locks?
->>>
->>> The same as your code, the reader(which nested in write C.S.) just dec
->>> the counters.
->>
->> And that works fine in my case because the writer and the reader update
->> _two_ _different_ counters.
+On 2013-02-26 07:24, Kyungsik Lee wrote:
+> Hi,
 > 
-> I can't find any magic in your code, they are the same counter.
+> [...]
 > 
->         /*
->          * It is desirable to allow the writer to acquire the percpu-rwlock
->          * for read (if necessary), without deadlocking or getting complaints
->          * from lockdep. To achieve that, just increment the reader_refcnt of
->          * this CPU - that way, any attempt by the writer to acquire the
->          * percpu-rwlock for read, will get treated as a case of nested percpu
->          * reader, which is safe, from a locking perspective.
->          */
->         this_cpu_inc(pcpu_rwlock->rw_state->reader_refcnt);
->
+> Through the benchmark, it was found that -Os Compiler flag for
+> decompress.o brought better decompression performance in most of cases
+> (ex, different compiler and hardware spec.) in ARM architecture.
+> 
+> Lastly, CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS is not always the best
+> option even though it is supported. The decompression speed can be
+> slightly slower in some cases.
+> 
+> This patchset is based on 3.8.
+> 
+> Any comments are appreciated.
 
-Whoa! Hold on, were you really referring to _this_ increment when you said
-that, in your patch you would increment the refcnt at the writer? Then I guess
-there is a major disconnect in our conversations. (I had assumed that you were
-referring to the update of writer_signal, and were just trying to have a single
-refcnt instead of reader_refcnt and writer_signal).
+Did you actually *try* the new LZO version and the patch (which is attached
+once again) as explained in https://lkml.org/lkml/2013/2/3/367 ?
 
-So, please let me clarify things a bit here. Forget about the above increment
-of reader_refcnt at the writer side. Its almost utterly insignificant for our
-current discussion. We can simply replace it with a check as shown below, at
-the reader side:
+Because the new LZO version is faster than LZ4 in my testing, at least
+when comparing apples with apples and enabling unaligned access in
+BOTH versions:
 
-void percpu_read_lock_irqsafe()
-{
-	if (current == active_writer)
-		return;
+armv7 (Cortex-A9), Linaro gcc-4.6 -O3, Silesia test corpus, 256 kB block-size:
 
-	/* Rest of the code */
-}
+                   compression speed   decompression speed
 
-Now, assuming that, in your patch, you were trying to use the per-cpu refcnt
-to allow the writer to safely take the reader path, you can simply get rid of
-that percpu-refcnt, as demonstrated above.
+  LZO-2012    :          44 MB/sec          117 MB/sec     no unaligned access
+  LZO-2013-UA :          47 MB/sec          167 MB/sec     Unaligned Access
+  LZ4 r88  UA :          46 MB/sec          154 MB/sec     Unaligned Access
 
-So that would reduce your code to the following (after simplification):
+~Markus
 
-lg_rwlock_local_read_lock()
-{
-	if (current == active_writer)
-		return;
-	if (arch_spin_trylock(per-cpu-spinlock))
-		return;
-	read_lock(global-rwlock);
-}
-
-Now, let us assume that hotplug is not happening, meaning, nobody is running
-the writer side code. Now let's see what happens at the reader side in your
-patch. As I mentioned earlier, the readers are _very_ frequent and can be in
-very hot paths. And they also happen to be nested quite often. 
-
-So, a non-nested reader acquires the per-cpu spinlock. Every subsequent nested
-reader on that CPU has to acquire the global rwlock for read. Right there you
-have 2 significant performance issues -
-1. Acquiring the (spin) lock is costly
-2. Acquiring the global rwlock causes cacheline bouncing, which hurts
-   performance.
-
-And why do we care so much about performance here? Because, the existing
-kernel does an efficient preempt_disable() here - which is an optimized
-per-cpu counter increment. Replacing that with such heavy primitives on the
-reader side can be very bad.
-
-Now, how does my patchset tackle this? My scheme just requires an increment
-of a per-cpu refcnt (reader_refcnt) and memory barrier. Which is acceptable
-from a performance-perspective, because IMHO its not horrendously worse than
-a preempt_disable().
 
 > 
->> If both of them update the same counter, there
->> will be a semantic clash - an increment of the counter can either mean that
->> a new writer became active, or it can also indicate a nested reader. A decrement
->> can also similarly have 2 meanings. And thus it will be difficult to decide
->> the right action to take, based on the value of the counter.
->>
->>>
->>>> (The counter-dropping-to-zero logic is not safe, since it can be updated
->>>> due to different reasons). And now that I look at it again, in the absence
->>>> of the writer, the reader is allowed to be recursive at the heavy cost of
->>>> taking the global rwlock for read, every 2nd time you nest (because the
->>>> spinlock is non-recursive).
->>>
->>> (I did not understand your comments of this part)
->>> nested reader is considered seldom.
->>
->> No, nested readers can be _quite_ frequent. Because, potentially all users
->> of preempt_disable() are readers - and its well-known how frequently we
->> nest preempt_disable(). As a simple example, any atomic reader who calls
->> smp_call_function() will become a nested reader, because smp_call_function()
->> itself is a reader. So reader nesting is expected to be quite frequent.
->>
->>> But if N(>=2) nested readers happen,
->>> the overhead is:
->>>     1 spin_try_lock() + 1 read_lock() + (N-1) __this_cpu_inc()
->>>
->>
->> In my patch, its just this_cpu_inc(). Note that these are _very_ hot paths.
->> So every bit of optimization that you can add is worthwhile.
->>
->> And your read_lock() is a _global_ lock - thus, it can lead to a lot of
->> cache-line bouncing. That's *exactly* why I have used per-cpu refcounts in
->> my synchronization scheme, to avoid taking the global rwlock as much as possible.
->>
->> Another important point to note is that, the overhead we are talking about
->> here, exists even when _not_ performing hotplug. And its the replacement to
->> the super-fast preempt_disable(). So its extremely important to consciously
->> minimize this overhead - else we'll end up slowing down the system significantly.
->>
+> Thanks,
+> Kyungsik
 > 
-> All I was considered is "nested reader is seldom", so I always
-> fallback to rwlock when nested.
-> If you like, I can add 6 lines of code, the overhead is
-> 1 spin_try_lock()(fast path)  + N  __this_cpu_inc()
+> 
+> Benchmark Results(PATCH v2)
+> Compiler: Linaro ARM gcc 4.6.2
+> 1. ARMv7, 1.5GHz based board
+>    Kernel: linux 3.4
+>    Uncompressed Kernel Size: 14MB
+>         Compressed Size  Decompression Speed
+>    LZO  6.7MB            21.1MB/s
+>    LZ4  7.3MB            29.1MB/s, 45.6MB/s(UA)
+> 2. ARMv7, 1.7GHz based board
+>    Kernel: linux 3.7
+>    Uncompressed Kernel Size: 14MB
+>         Compressed Size  Decompression Speed
+>    LZO  6.0MB            34.1MB/s
+>    LZ4  6.5MB            86.7MB/s
+> UA: Unaligned memory Access support
+> 
+> 
+> Change log: v2
+> - Clean up code
+> - Enable unaligned access for ARM v6 and above with
+>   CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
+> - Add lz4_decompress() for faster decompression with
+>   uncompressed output size
+> - Use lz4_decompress() for LZ4-compressed kernel during
+>   boot-process
+> - Apply -Os to decompress.o to improve decompress
+>   performance during boot-up process
+> 
+> 
+> Kyungsik Lee (4):
+>   decompressor: Add LZ4 decompressor module
+>   lib: Add support for LZ4-compressed kernel
+>   arm: Add support for LZ4-compressed kernel
+>   x86: Add support for LZ4-compressed kernel
+> 
+>  arch/arm/Kconfig                      |   1 +
+>  arch/arm/boot/compressed/.gitignore   |   1 +
+>  arch/arm/boot/compressed/Makefile     |   6 +-
+>  arch/arm/boot/compressed/decompress.c |   4 +
+>  arch/arm/boot/compressed/piggy.lz4.S  |   6 +
+>  arch/x86/Kconfig                      |   1 +
+>  arch/x86/boot/compressed/Makefile     |   5 +-
+>  arch/x86/boot/compressed/misc.c       |   4 +
+>  include/linux/decompress/unlz4.h      |  10 +
+>  include/linux/lz4.h                   |  48 +++++
+>  init/Kconfig                          |  13 +-
+>  lib/Kconfig                           |   7 +
+>  lib/Makefile                          |   2 +
+>  lib/decompress.c                      |   5 +
+>  lib/decompress_unlz4.c                | 190 +++++++++++++++++++
+>  lib/lz4/Makefile                      |   1 +
+>  lib/lz4/lz4_decompress.c              | 331 ++++++++++++++++++++++++++++++++++
+>  lib/lz4/lz4defs.h                     |  93 ++++++++++
+>  scripts/Makefile.lib                  |   5 +
+>  usr/Kconfig                           |   9 +
+>  20 files changed, 739 insertions(+), 3 deletions(-)
+>  create mode 100644 arch/arm/boot/compressed/piggy.lz4.S
+>  create mode 100644 include/linux/decompress/unlz4.h
+>  create mode 100644 include/linux/lz4.h
+>  create mode 100644 lib/decompress_unlz4.c
+>  create mode 100644 lib/lz4/Makefile
+>  create mode 100644 lib/lz4/lz4_decompress.c
+>  create mode 100644 lib/lz4/lz4defs.h
 > 
 
-I'm assuming that calculation is no longer valid, considering that
-we just discussed how the per-cpu refcnt that you were using is quite
-unnecessary and can be removed.
 
-IIUC, the overhead with your code, as per above discussion would be:
-1 spin_try_lock() [non-nested] + N read_lock(global_rwlock).
-
-Note that I'm referring to the scenario when hotplug is _not_ happening
-(ie., nobody is running writer side code).
-
-> The overhead of your code is
-> 2 smp_mb() + N __this_cpu_inc()
-> 
-
-Right. And as you can see, this is much much better than the overhead
-shown above.
-
-> I don't see how much different.
-> 
->>>> Also, this lg_rwlock implementation uses 3
->>>> different data-structures - a per-cpu spinlock, a global rwlock and
->>>> a per-cpu refcnt, and its not immediately apparent why you need those many
->>>> or even those many varieties.
->>>
->>> data-structures is the same as yours.
->>> fallback_reader_refcnt <--> reader_refcnt
->>
->> This has semantic problems, as noted above.
->>
->>> per-cpu spinlock <--> write_signal
->>
->> Acquire/release of (spin) lock is costlier than inc/dec of a counter, IIUC.
->>
->>> fallback_rwlock  <---> global_rwlock
->>>
->>>> Also I see that this doesn't handle the
->>>> case of interrupt-handlers also being readers.
->>>
->>> handled. nested reader will see the ref or take the fallback_rwlock
->>>
-> 
-> Sorry, _reentrance_ read_lock() will see the ref or take the fallback_rwlock
-> 
->>
->> I'm not referring to simple nested readers here, but interrupt handlers who
->> can act as readers. For starters, the arch_spin_trylock() is not safe when
->> interrupt handlers can also run the same code, right? You'll need to save
->> and restore interrupts at critical points in the code. Also, the __foo()
->> variants used to read/update the counters are not interrupt-safe.
-> 
-> I must missed something.
-> 
-> Could you elaborate more why arch_spin_trylock() is not safe when
-> interrupt handlers can also run the same code?
-> 
-> Could you elaborate more why __this_cpu_op variants is not
-> interrupt-safe since they are always called paired.
->
-
-Take a look at include/linux/percpu.h. You'll note that __this_cpu_*
-operations map to __this_cpu_generic_to_op(), which doesn't disable interrupts
-while doing the update. Hence you can get inconsistent results if an interrupt
-hits the CPU at that time and the interrupt handler tries to do the same thing.
-In contrast, if you use this_cpu_inc() for example, interrupts are explicitly
-disabled during the update and hence you won't get inconsistent results.
-
-> 
->> And,
->> the unlock() code in the reader path is again going to be confused about
->> what to do when interrupt handlers interrupt regular readers, due to the
->> messed up refcount.
-> 
-> I still can't understand.
->
-
-The primary reason _I_ was using the refcnt vs the reason _you_ were using the
-refcnt, appears to be very different. Maybe that's why the above statement
-didn't make sense. In your case, IIUC, you can simply get rid of the refcnt
-and replace it with the simple check I mentioned above. Whereas, I use
-refcnts to keep the reader-side synchronization fast (and for reader-writer
-communication).
-
- 
-Regards,
-Srivatsa S. Bhat
+-- 
+Markus Oberhumer, <markus@oberhumer.com>, http://www.oberhumer.com/
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: lib-lzo-huge-LZO-decompression-speedup-on-ARM.patch
+Type: text/x-patch
+Size: 1584 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130226/266cf234/attachment.bin>
