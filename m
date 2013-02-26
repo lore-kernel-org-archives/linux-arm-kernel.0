@@ -1,50 +1,58 @@
-From: dsterba@suse.cz (David Sterba)
-Date: Tue, 26 Feb 2013 15:00:51 +0100
-Subject: [RFC PATCH v2 2/4] lib: Add support for LZ4-compressed kernel
-In-Reply-To: <1361859870-15751-3-git-send-email-kyungsik.lee@lge.com>
-References: <1361859870-15751-1-git-send-email-kyungsik.lee@lge.com>
- <1361859870-15751-3-git-send-email-kyungsik.lee@lge.com>
-Message-ID: <20130226140051.GX27541@twin.jikos.cz>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 26 Feb 2013 08:07:30 -0600
+Subject: Multi-platform, and secure-only ARM errata workarounds
+In-Reply-To: <20130226113538.GS17833@n2100.arm.linux.org.uk>
+References: <512BF81A.3080700@wwwdotorg.org> <201302261023.26939.arnd@arndb.de>
+ <20130226113538.GS17833@n2100.arm.linux.org.uk>
+Message-ID: <512CC1A2.3060704@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 26, 2013 at 03:24:28PM +0900, Kyungsik Lee wrote:
-> +config KERNEL_LZ4
-> +	bool "LZ4"
-> +	depends on HAVE_KERNEL_LZ4
-> +	help
-> +	  Its compression ratio is worse than LZO. The size of the kernel
-> +	  is about 8% bigger than LZO. But the decompression speed is
-> +	  faster than LZO.
-> +
+On 02/26/2013 05:35 AM, Russell King - ARM Linux wrote:
+> On Tue, Feb 26, 2013 at 10:23:26AM +0000, Arnd Bergmann wrote:
+>> On Monday 25 February 2013, Stephen Warren wrote:
+>>> Is there any other alternative I'm not seeing? Having the kernel
+>>> suddenly become incompatible with any currently extant bootloader when I
+>>> enable CONFIG_MULTIPLATFORM doesn't seem like a great idea.
+>>
+>> Could we make those errata be run-time enabled only when not booting
+>> in secure mode?
+> 
+> The long and the short answer to this is... no.
+> 
+> 1. It is impossible to tell whether we're running secure or non-secure.
+> 
+> 2. Errata need to be applied before the MMU is initialized.  We need the
+>    MMU to be initialized to run any C code what so ever, so calling out
+>    to platform specific code to set errata is not possible.  Moreover,
+>    we no longer determine the platform in the assembly code since DT
+>    came along: this was removed because detecting it in DT from assembly
+>    is far from trivial (you'd need to write an assembly DT parser).
+> 
+> Now, as for having the secure mode errata enabled on a kernel running in
+> non-secure mode... what happens today is that we check whether something
+> before the kernel has enabled the workaround, and we omit to write to
+> the register.
+> 
+> What that means is that we expect whatever came before the kernel to have
+> appropriately enabled the bits in the secure registers.  If it hasn't,
+> and you have one of these secure mode workarounds enabled, the kernel
+> will fault at boot time.
 
-Can you please add a sentence what lz4 actually is before you start
-comparing it with the current competitor(s)?
+Only when booting in non-secure mode...
 
-> --- /dev/null
-> +++ b/lib/decompress_unlz4.c
-> @@ -0,0 +1,190 @@
-> +#define LZ4_CHUNK_SIZE (8<<20)
+> So, if Stephen has working configs with these secure mode workarounds
+> enabled, this means that the bits in the secure registers must already
+> be appropriately set.
 
-Please use a less cryptic way of representing a value of 8 MB. Also,
-this is a hardcoded value that must be used on the compressor side. It's
-an upper limit, so anything below 8MB does not break decompresssion, but
-this must be somehow checked or saved along in the binary stream. You
-seem to use the lz4demo.c on the userspace side for compression, but
-this is not a standard tool nor the output format is well-defined or
-stabilized.
+...and Stephen is booting in secure mode.
 
-For proper use I would like to see a commandline tool similar to
-gzip/bzip2/lzop that can be packaged and shipped by distros, and the
-output format defintion.
+> Could the problem be that someone has made all errata workarounds, even
+> those which apply after the system is up and running, depend on
+> !MULTIPLATFORM ?
 
-Yann has some ideas for the format
-http://fastcompression.blogspot.cz/2012/04/file-container-format-for-lz4.html
+I don't think so. All those work-arounds remain and can be enabled.
+There was one (430973) which had both a boot time chicken bit setting
+and runtime piece. Only the boot time part of it is disabled for multi-plat.
 
-For kernel, the minimum of meta information is total compressed length,
-total uncompressed length and chunk size. I don't know if the first two
-aren't stored elsewhere in the generic kernel image headers, but chunk
-size must be specified.
-
-
-david
+Rob
