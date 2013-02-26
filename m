@@ -1,105 +1,128 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Tue, 26 Feb 2013 11:30:35 -0600
-Subject: [PATCH 08/14] ARM: OMAP2+: Convert TUSB to use
- gpmc_cs_program_settings()
+Date: Tue, 26 Feb 2013 11:30:37 -0600
+Subject: [PATCH 10/14] ARM: OMAP2+: Add function to read GPMC settings from
+ device-tree
 In-Reply-To: <1361899842-30303-1-git-send-email-jon-hunter@ti.com>
 References: <1361899842-30303-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <1361899842-30303-9-git-send-email-jon-hunter@ti.com>
+Message-ID: <1361899842-30303-11-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert the OMAP2+ TUSB code to use the gpmc_cs_program_settings()
-function for configuring the various GPMC options instead of directly
-programming the CONFIG1 register.
+Adds a function to read the various GPMC chip-select settings from
+device-tree and store them in the gpmc_settings structure.
+
+Update the GPMC device-tree binding documentation to describe these
+options.
 
 Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 ---
- arch/arm/mach-omap2/usb-tusb6010.c |   43 ++++++++++++++++--------------------
- 1 file changed, 19 insertions(+), 24 deletions(-)
+ Documentation/devicetree/bindings/bus/ti-gpmc.txt |   19 ++++++++
+ arch/arm/mach-omap2/gpmc.c                        |   50 +++++++++++++++++++++
+ arch/arm/mach-omap2/gpmc.h                        |    2 +
+ 3 files changed, 71 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/usb-tusb6010.c b/arch/arm/mach-omap2/usb-tusb6010.c
-index 940410a..f38efd0 100644
---- a/arch/arm/mach-omap2/usb-tusb6010.c
-+++ b/arch/arm/mach-omap2/usb-tusb6010.c
-@@ -8,6 +8,7 @@
-  * published by the Free Software Foundation.
-  */
+diff --git a/Documentation/devicetree/bindings/bus/ti-gpmc.txt b/Documentation/devicetree/bindings/bus/ti-gpmc.txt
+index 5ddb2e9..a31c32a 100644
+--- a/Documentation/devicetree/bindings/bus/ti-gpmc.txt
++++ b/Documentation/devicetree/bindings/bus/ti-gpmc.txt
+@@ -65,6 +65,25 @@ The following are only applicable to OMAP3+ and AM335x:
+  - gpmc,wr-access
+  - gpmc,wr-data-mux-bus
  
-+#include <linux/err.h>
- #include <linux/string.h>
- #include <linux/types.h>
- #include <linux/errno.h>
-@@ -28,12 +29,21 @@ static unsigned		refclk_psec;
- 
- static struct gpmc_settings tusb_async = {
- 	.mux_add_data	= true,
-+	.wait_on_read	= true,
-+	.wait_on_write	= true,
-+	.device_width	= GPMC_DEVWIDTH_16BIT,
- };
- 
- static struct gpmc_settings tusb_sync = {
-+	.burst_read	= true,
-+	.burst_write	= true,
- 	.mux_add_data	= true,
- 	.sync_read	= true,
- 	.sync_write	= true,
-+	.wait_on_read	= true,
-+	.wait_on_write	= true,
-+	.burst_len	= GPMC_BURST_16,
-+	.device_width	= GPMC_DEVWIDTH_16BIT,
- };
- 
- /* NOTE:  timings are from tusb 6010 datasheet Rev 1.8, 12-Sept 2006 */
-@@ -168,18 +178,12 @@ tusb6010_setup_interface(struct musb_hdrc_platform_data *data,
- 		return status;
- 	}
- 	tusb_resources[0].end = tusb_resources[0].start + 0x9ff;
-+	tusb_async.wait_pin = waitpin;
- 	async_cs = async;
--	gpmc_cs_write_reg(async, GPMC_CS_CONFIG1,
--			  GPMC_CONFIG1_PAGE_LEN(2)
--			| GPMC_CONFIG1_WAIT_READ_MON
--			| GPMC_CONFIG1_WAIT_WRITE_MON
--			| GPMC_CONFIG1_WAIT_PIN_SEL(waitpin)
--			| GPMC_CONFIG1_READTYPE_ASYNC
--			| GPMC_CONFIG1_WRITETYPE_ASYNC
--			| GPMC_CONFIG1_DEVICESIZE_16
--			| GPMC_CONFIG1_DEVICETYPE_NOR
--			| GPMC_CONFIG1_MUXADDDATA);
- 
-+	status = gpmc_cs_program_settings(async_cs, &tusb_async);
-+	if (IS_ERR_VALUE(status))
-+		return status;
- 
- 	/* SYNC region, primarily for DMA */
- 	status = gpmc_cs_request(sync, SZ_16M, (unsigned long *)
-@@ -189,21 +193,12 @@ tusb6010_setup_interface(struct musb_hdrc_platform_data *data,
- 		return status;
- 	}
- 	tusb_resources[1].end = tusb_resources[1].start + 0x9ff;
-+	tusb_sync.wait_pin = waitpin;
- 	sync_cs = sync;
--	gpmc_cs_write_reg(sync, GPMC_CS_CONFIG1,
--			  GPMC_CONFIG1_READMULTIPLE_SUPP
--			| GPMC_CONFIG1_READTYPE_SYNC
--			| GPMC_CONFIG1_WRITEMULTIPLE_SUPP
--			| GPMC_CONFIG1_WRITETYPE_SYNC
--			| GPMC_CONFIG1_PAGE_LEN(2)
--			| GPMC_CONFIG1_WAIT_READ_MON
--			| GPMC_CONFIG1_WAIT_WRITE_MON
--			| GPMC_CONFIG1_WAIT_PIN_SEL(waitpin)
--			| GPMC_CONFIG1_DEVICESIZE_16
--			| GPMC_CONFIG1_DEVICETYPE_NOR
--			| GPMC_CONFIG1_MUXADDDATA
--			/* fclk divider gets set later */
--			);
++GPMC chip-select settings properties for child nodes. All are optional.
 +
-+	status = gpmc_cs_program_settings(sync_cs, &tusb_sync);
-+	if (IS_ERR_VALUE(status))
-+		return status;
++- gpmc,burst-length	Page/burst length. Must be 4, 8 or 16.
++- gpmc,burst-wrap	Enables wrap bursting
++- gpmc,burst-read	Enables read page/burst mode
++- gpmc,burst-write	Enables write page/burst mode
++- gpmc,device-nand	Device is NAND
++- gpmc,device-width	Width of device connected to the GPMC in bytes. The
++			GPMC supports 8-bit and 16-bit devices and so this
++			property must be 1 or 2.
++- gpmc,mux-add-data	Enables address and data multiplexing
++- gpmc,sync-read	Enables synchronous read. Defaults to asynchronous
++			is this is not set.
++- gpmc,sync-write	Enables synchronous writes. Defaults to asynchronous
++			is this is not set.
++- gpmc,wait-pin		Wait-pin used by client. Must be less than
++			"gpmc,num-waitpins".
++- gpmc,wait-on-read	Enables wait monitoring on reads.
++- gpmc,wait-on-write	Enables wait monitoring on writes.
  
- 	/* IRQ */
- 	status = gpio_request_one(irq, GPIOF_IN, "TUSB6010 irq");
+ Example for an AM33xx board:
+ 
+diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+index 7cf3d98..e822d2b 100644
+--- a/arch/arm/mach-omap2/gpmc.c
++++ b/arch/arm/mach-omap2/gpmc.c
+@@ -1182,6 +1182,56 @@ static struct of_device_id gpmc_dt_ids[] = {
+ };
+ MODULE_DEVICE_TABLE(of, gpmc_dt_ids);
+ 
++/**
++ * gpmc_read_settings_dt - read gpmc settings from device-tree
++ * @np:		pointer to device-tree node for a gpmc child device
++ * @p:		pointer to gpmc settings structure
++ *
++ * Reads the GPMC settings for a GPMC child device from device-tree and
++ * stores them in the GPMC settings structure passed. The GPMC settings
++ * structure is initialise to zero by this function and so any previously
++ * stored settings will be clearer.
++ */
++void gpmc_read_settings_dt(struct device_node *np, struct gpmc_settings *p)
++{
++	memset(p, 0, sizeof(struct gpmc_settings));
++
++	if (of_find_property(np, "gpmc,sync-read", NULL))
++		p->sync_read = true;
++	if (of_find_property(np, "gpmc,sync-write", NULL))
++		p->sync_write = true;
++
++	if (!of_property_read_u32(np, "gpmc,burst-length", &p->burst_len)) {
++		if (of_find_property(np, "gpmc,burst-wrap", NULL))
++			p->burst_wrap = true;
++		if (of_find_property(np, "gpmc,burst-read", NULL))
++			p->burst_read = true;
++		if (of_find_property(np, "gpmc,burst-write", NULL))
++			p->burst_write = true;
++		if (!p->burst_read && !p->burst_write)
++			pr_warn("%s: page/burst-length set but not used!\n",
++				__func__);
++	}
++
++	if (!of_property_read_u32(np, "gpmc,wait-pin", &p->wait_pin)) {
++		if (of_find_property(np, "gpmc,wait-on-read", NULL))
++			p->wait_on_read = true;
++		if (of_find_property(np, "gpmc,wait-on-write", NULL))
++			p->wait_on_write = true;
++		if (!p->wait_on_read && !p->wait_on_write)
++			pr_warn("%s: read/write wait monitoring not enabled!\n",
++				__func__);
++	}
++
++	of_property_read_u32(np, "gpmc,device-width", &p->device_width);
++
++	if (of_find_property(np, "gpmc,device-nand", NULL))
++		p->device_nand = true;
++
++	if (of_find_property(np, "gpmc,mux-add-data", NULL))
++		p->mux_add_data = true;
++}
++
+ static void __maybe_unused gpmc_read_timings_dt(struct device_node *np,
+ 						struct gpmc_timings *gpmc_t)
+ {
+diff --git a/arch/arm/mach-omap2/gpmc.h b/arch/arm/mach-omap2/gpmc.h
+index d73fda0..c517eaa 100644
+--- a/arch/arm/mach-omap2/gpmc.h
++++ b/arch/arm/mach-omap2/gpmc.h
+@@ -230,5 +230,7 @@ extern int gpmc_cs_reserved(int cs);
+ extern void omap3_gpmc_save_context(void);
+ extern void omap3_gpmc_restore_context(void);
+ extern int gpmc_configure(int cmd, int wval);
++extern void gpmc_read_settings_dt(struct device_node *np,
++				  struct gpmc_settings *p);
+ 
+ #endif
 -- 
 1.7.10.4
