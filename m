@@ -1,27 +1,44 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Mon, 25 Feb 2013 19:55:38 -0800
-Subject: what's the next LTSI kernel version for long-term support
-In-Reply-To: <CAGsJ_4za4tPZN6F=VG6A81OXZsU-d0S6YzwG2NT43E-kb8y52g@mail.gmail.com>
-References: <CAGsJ_4yxQK05hHUivYEnLD9=cAE4t5jNV7+6KJGu+LsVsSk1oQ@mail.gmail.com>
- <20130226033524.GA25067@kroah.com>
- <CAGsJ_4za4tPZN6F=VG6A81OXZsU-d0S6YzwG2NT43E-kb8y52g@mail.gmail.com>
-Message-ID: <20130226035538.GB1128@kroah.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 26 Feb 2013 13:29:46 +0900
+Subject: [PATCH 1/4] ARM: shmobile: sh73a0: fix Z and ZG clock hierarchy
+In-Reply-To: <1361553474-27022-2-git-send-email-g.liakhovetski@gmx.de>
+References: <1361553474-27022-1-git-send-email-g.liakhovetski@gmx.de>
+ <1361553474-27022-2-git-send-email-g.liakhovetski@gmx.de>
+Message-ID: <20130226042946.GB26820@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 26, 2013 at 11:46:04AM +0800, Barry Song wrote:
-> 2013/2/26 Greg Kroah-Hartman <gregkh@linuxfoundation.org>:
-> > On Tue, Feb 26, 2013 at 11:06:56AM +0800, Barry Song wrote:
-> >> Hi Greg/All,
-> >> we have seen 3.4 was announced to be an LTSI in Aug, 2012. I'd like to
-> >> know what is the next LTSI version since we might want to align our
-> >> next release with LTSI.
-> >
-> > Who is "we" here?
-> >
-> people.
+On Fri, Feb 22, 2013 at 06:17:51PM +0100, Guennadi Liakhovetski wrote:
+> Z and ZG clocks on sh73a0 have pll0 as their parent, not pll1.
 
-I don't take anonymous "we want this" requests serious at all, sorry.
-Please provide details as you are asking me to do work for you, right?
+Thanks I have applied this to the soc5 branch and thus queued it up for v3.10.
+Please let me know if you would prefer me to push it as a fix for v3.9.
+And in that vein, if you regard it as -stable material.
 
-greg k-h
+> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> ---
+>  arch/arm/mach-shmobile/clock-sh73a0.c |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-shmobile/clock-sh73a0.c b/arch/arm/mach-shmobile/clock-sh73a0.c
+> index 5fa106b..71843dd 100644
+> --- a/arch/arm/mach-shmobile/clock-sh73a0.c
+> +++ b/arch/arm/mach-shmobile/clock-sh73a0.c
+> @@ -265,12 +265,12 @@ enum { DIV4_I, DIV4_ZG, DIV4_M3, DIV4_B, DIV4_M1, DIV4_M2,
+>  
+>  static struct clk div4_clks[DIV4_NR] = {
+>  	[DIV4_I] = DIV4(FRQCRA, 20, 0xdff, CLK_ENABLE_ON_INIT),
+> -	[DIV4_ZG] = DIV4(FRQCRA, 16, 0xd7f, CLK_ENABLE_ON_INIT),
+> +	[DIV4_ZG] = SH_CLK_DIV4(&pll0_clk, FRQCRA, 16, 0xd7f, CLK_ENABLE_ON_INIT),
+>  	[DIV4_M3] = DIV4(FRQCRA, 12, 0x1dff, CLK_ENABLE_ON_INIT),
+>  	[DIV4_B] = DIV4(FRQCRA, 8, 0xdff, CLK_ENABLE_ON_INIT),
+>  	[DIV4_M1] = DIV4(FRQCRA, 4, 0x1dff, 0),
+>  	[DIV4_M2] = DIV4(FRQCRA, 0, 0x1dff, 0),
+> -	[DIV4_Z] = DIV4(FRQCRB, 24, 0x97f, 0),
+> +	[DIV4_Z] = SH_CLK_DIV4(&pll0_clk, FRQCRB, 24, 0x97f, 0),
+>  	[DIV4_ZTR] = DIV4(FRQCRB, 20, 0xdff, 0),
+>  	[DIV4_ZT] = DIV4(FRQCRB, 16, 0xdff, 0),
+>  	[DIV4_ZX] = DIV4(FRQCRB, 12, 0xdff, 0),
+> -- 
+> 1.7.2.5
+> 
