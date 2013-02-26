@@ -1,354 +1,68 @@
-From: csd@broadcom.com (Christian Daudt)
-Date: Tue, 26 Feb 2013 09:16:55 -0800
-Subject: [PATCH V6] ARM: bcm281xx: Add timer driver
-Message-ID: <1361899015-21414-1-git-send-email-csd@broadcom.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 26 Feb 2013 18:24:58 +0100
+Subject: Build failed for mvebu in linux-next due to duplicate commit for RTC
+Message-ID: <512CEFEA.4060301@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for the Broadcom timer, used in the following SoCs:
-BCM11130, BCM11140, BCM11351, BCM28145, BCM28155
+Hello,
 
-Updates from V5:
- - Rebase to latest arm-soc/for-next
+when I tried to use the linux-next git tree (next-20130226), I
+encountered this error during build:
 
-Updates from V4:
- - Switch code to use CLOCKSOURCE_OF_DECLARE
+ERROR (duplicate_node_names): Duplicate node name /soc/rtc at 10300
 
-Updates from V3:
- - Migrate to 3.9 timer framework updates
+I found it was because 2 version of the same patch have been submitted
+to linux-next,
+git log v3.8..HEAD --grep=RTC  arch/arm/boot/dts/armada-370-xp.dtsi
 
-Updates from V2:
- - prepend static fns + fields with kona_
+commit 25fe89035eb81ea8be7ebb98eba18a8da744d3a2
+Author: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Date:   Wed Feb 20 13:15:47 2013 +1100
 
-Updates from V1:
- - Rename bcm_timer.c to bcm_kona_timer.c
- - Pull .h into bcm_kona_timer.c
- - Make timers static
- - Clean up comment block
- - Switched to using clockevents_config_and_register
- - Added an error to the get_timer loop if it repeats too much
- - Added to Documentation/devicetree/bindings/arm/bcm/bcm,kona-timer.txt
- - Added missing readl to timer_disable_and_clear
+    arm: mvebu: add RTC support for Armada 370 and Armada XP
 
-Note: bcm,kona-timer was kept as the 'compatible' field to make it
-specific enough for when there are multiple bcm timers (bcm,timer is
-too generic).
+    The Armada 370 and Armada XP Socs have the same controller that the one
+    used in the orion platforms.  This patch updates the device tree for these
+    SoCs.
 
-Signed-off-by: Christian Daudt <csd@broadcom.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: John Stultz <johnstul@us.ibm.com>
-Reviewed-by: Stephen Warren <swarren@nvidia.com>
+    Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+    Acked-by: Andrew Lunn <andrew@lunn.ch>
+    Cc: Russell King <linux@arm.linux.org.uk>
+    Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
 
-diff --git a/Documentation/devicetree/bindings/arm/bcm/bcm,kona-timer.txt b/Documentation/devicetree/bindings/arm/bcm/bcm,kona-timer.txt
-new file mode 100644
-index 0000000..59fa6e6
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/bcm/bcm,kona-timer.txt
-@@ -0,0 +1,19 @@
-+Broadcom Kona Family timer
-+-----------------------------------------------------
-+This timer is used in the following Broadcom SoCs:
-+ BCM11130, BCM11140, BCM11351, BCM28145, BCM28155
-+
-+Required properties:
-+- compatible : "bcm,kona-timer"
-+- reg : Register range for the timer
-+- interrupts : interrupt for the timer
-+- clock-frequency: frequency that the clock operates
-+
-+Example:
-+	timer at 35006000 {
-+		compatible = "bcm,kona-timer";
-+		reg = <0x35006000 0x1000>;
-+		interrupts = <0x0 7 0x4>;
-+		clock-frequency = <32768>;
-+	};
-+
-diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
-index ad13588..8f71f40 100644
---- a/arch/arm/boot/dts/bcm11351.dtsi
-+++ b/arch/arm/boot/dts/bcm11351.dtsi
-@@ -47,4 +47,12 @@
- 		    cache-unified;
- 		    cache-level = <2>;
- 	};
-+
-+	timer at 35006000 {
-+		compatible = "bcm,kona-timer";
-+		reg = <0x35006000 0x1000>;
-+		interrupts = <0x0 7 0x4>;
-+		clock-frequency = <32768>;
-+	};
-+
- };
-diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-index bf02471..f112895 100644
---- a/arch/arm/mach-bcm/Kconfig
-+++ b/arch/arm/mach-bcm/Kconfig
-@@ -6,6 +6,7 @@ config ARCH_BCM
- 	select ARM_ERRATA_764369 if SMP
- 	select ARM_GIC
- 	select CPU_V7
-+	select CLKSRC_OF
- 	select GENERIC_CLOCKEVENTS
- 	select GENERIC_TIME
- 	select GPIO_BCM
-diff --git a/arch/arm/mach-bcm/board_bcm.c b/arch/arm/mach-bcm/board_bcm.c
-index f0f9aba..2595935 100644
---- a/arch/arm/mach-bcm/board_bcm.c
-+++ b/arch/arm/mach-bcm/board_bcm.c
-@@ -16,14 +16,11 @@
- #include <linux/device.h>
- #include <linux/platform_device.h>
- #include <linux/irqchip.h>
-+#include <linux/clocksource.h>
- 
- #include <asm/mach/arch.h>
- #include <asm/mach/time.h>
- 
--static void timer_init(void)
--{
--}
--
- 
- static void __init board_init(void)
- {
-@@ -35,7 +32,7 @@ static const char * const bcm11351_dt_compat[] = { "bcm,bcm11351", NULL, };
- 
- DT_MACHINE_START(BCM11351_DT, "Broadcom Application Processor")
- 	.init_irq = irqchip_init,
--	.init_time = timer_init,
-+	.init_time = clocksource_of_init,
- 	.init_machine = board_init,
- 	.dt_compat = bcm11351_dt_compat,
- MACHINE_END
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index 7d671b8..5b4a33a 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -19,5 +19,6 @@ obj-$(CONFIG_ARCH_BCM2835)	+= bcm2835_timer.o
- obj-$(CONFIG_SUNXI_TIMER)	+= sunxi_timer.o
- obj-$(CONFIG_ARCH_TEGRA)	+= tegra20_timer.o
- obj-$(CONFIG_VT8500_TIMER)	+= vt8500_timer.o
-+obj-$(CONFIG_ARCH_BCM)		+= bcm_kona_timer.o
- 
- obj-$(CONFIG_ARM_ARCH_TIMER)		+= arm_arch_timer.o
-diff --git a/drivers/clocksource/bcm_kona_timer.c b/drivers/clocksource/bcm_kona_timer.c
-new file mode 100644
-index 0000000..350f493
---- /dev/null
-+++ b/drivers/clocksource/bcm_kona_timer.c
-@@ -0,0 +1,211 @@
-+/*
-+ * Copyright (C) 2012 Broadcom Corporation
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation version 2.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/irq.h>
-+#include <linux/interrupt.h>
-+#include <linux/jiffies.h>
-+#include <linux/clockchips.h>
-+#include <linux/types.h>
-+
-+#include <linux/io.h>
-+#include <asm/mach/time.h>
-+
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+
-+
-+#define KONA_GPTIMER_STCS_OFFSET			0x00000000
-+#define KONA_GPTIMER_STCLO_OFFSET			0x00000004
-+#define KONA_GPTIMER_STCHI_OFFSET			0x00000008
-+#define KONA_GPTIMER_STCM0_OFFSET			0x0000000C
-+
-+#define KONA_GPTIMER_STCS_TIMER_MATCH_SHIFT		0
-+#define KONA_GPTIMER_STCS_COMPARE_ENABLE_SHIFT		4
-+
-+struct kona_bcm_timers {
-+	int tmr_irq;
-+	void __iomem *tmr_regs;
-+};
-+
-+static struct kona_bcm_timers timers;
-+
-+static u32 arch_timer_rate;
-+
-+/*
-+ * We use the peripheral timers for system tick, the cpu global timer for
-+ * profile tick
-+ */
-+static void kona_timer_disable_and_clear(void __iomem *base)
-+{
-+	uint32_t reg;
-+
-+	/*
-+	 * clear and disable interrupts
-+	 * We are using compare/match register 0 for our system interrupts
-+	 */
-+	reg = readl(base + KONA_GPTIMER_STCS_OFFSET);
-+
-+	/* Clear compare (0) interrupt */
-+	reg |= 1 << KONA_GPTIMER_STCS_TIMER_MATCH_SHIFT;
-+	/* disable compare */
-+	reg &= ~(1 << KONA_GPTIMER_STCS_COMPARE_ENABLE_SHIFT);
-+
-+	writel(reg, base + KONA_GPTIMER_STCS_OFFSET);
-+
-+}
-+
-+static void
-+kona_timer_get_counter(void *timer_base, uint32_t *msw, uint32_t *lsw)
-+{
-+	void __iomem *base = IOMEM(timer_base);
-+	int loop_limit = 4;
-+
-+	/*
-+	 * Read 64-bit free running counter
-+	 * 1. Read hi-word
-+	 * 2. Read low-word
-+	 * 3. Read hi-word again
-+	 * 4.1
-+	 *      if new hi-word is not equal to previously read hi-word, then
-+	 *      start from #1
-+	 * 4.2
-+	 *      if new hi-word is equal to previously read hi-word then stop.
-+	 */
-+
-+	while (--loop_limit) {
-+		*msw = readl(base + KONA_GPTIMER_STCHI_OFFSET);
-+		*lsw = readl(base + KONA_GPTIMER_STCLO_OFFSET);
-+		if (*msw == readl(base + KONA_GPTIMER_STCHI_OFFSET))
-+			break;
-+	}
-+	if (!loop_limit) {
-+		pr_err("bcm_kona_timer: getting counter failed.\n");
-+		pr_err(" Timer will be impacted\n");
-+	}
-+
-+	return;
-+}
-+
-+static const struct of_device_id bcm_timer_ids[] __initconst = {
-+	{.compatible = "bcm,kona-timer"},
-+	{},
-+};
-+
-+static void __init kona_timers_init(void)
-+{
-+	struct device_node *node;
-+	u32 freq;
-+
-+	node = of_find_matching_node(NULL, bcm_timer_ids);
-+
-+	if (!node)
-+		panic("No timer");
-+
-+	if (!of_property_read_u32(node, "clock-frequency", &freq))
-+		arch_timer_rate = freq;
-+	else
-+		panic("clock-frequency not set in the .dts file");
-+
-+	/* Setup IRQ numbers */
-+	timers.tmr_irq = irq_of_parse_and_map(node, 0);
-+
-+	/* Setup IO addresses */
-+	timers.tmr_regs = of_iomap(node, 0);
-+
-+	kona_timer_disable_and_clear(timers.tmr_regs);
-+}
-+
-+static int kona_timer_set_next_event(unsigned long clc,
-+				  struct clock_event_device *unused)
-+{
-+	/*
-+	 * timer (0) is disabled by the timer interrupt already
-+	 * so, here we reload the next event value and re-enable
-+	 * the timer.
-+	 *
-+	 * This way, we are potentially losing the time between
-+	 * timer-interrupt->set_next_event. CPU local timers, when
-+	 * they come in should get rid of skew.
-+	 */
-+
-+	uint32_t lsw, msw;
-+	uint32_t reg;
-+
-+	kona_timer_get_counter(timers.tmr_regs, &msw, &lsw);
-+
-+	/* Load the "next" event tick value */
-+	writel(lsw + clc, timers.tmr_regs + KONA_GPTIMER_STCM0_OFFSET);
-+
-+	/* Enable compare */
-+	reg = readl(timers.tmr_regs + KONA_GPTIMER_STCS_OFFSET);
-+	reg |= (1 << KONA_GPTIMER_STCS_COMPARE_ENABLE_SHIFT);
-+	writel(reg, timers.tmr_regs + KONA_GPTIMER_STCS_OFFSET);
-+
-+	return 0;
-+}
-+
-+static void kona_timer_set_mode(enum clock_event_mode mode,
-+			     struct clock_event_device *unused)
-+{
-+	switch (mode) {
-+	case CLOCK_EVT_MODE_ONESHOT:
-+		/* by default mode is one shot don't do any thing */
-+		break;
-+	case CLOCK_EVT_MODE_UNUSED:
-+	case CLOCK_EVT_MODE_SHUTDOWN:
-+	default:
-+		kona_timer_disable_and_clear(timers.tmr_regs);
-+	}
-+}
-+
-+static struct clock_event_device kona_clockevent_timer = {
-+	.name = "timer 1",
-+	.features = CLOCK_EVT_FEAT_ONESHOT,
-+	.set_next_event = kona_timer_set_next_event,
-+	.set_mode = kona_timer_set_mode
-+};
-+
-+static void __init kona_timer_clockevents_init(void)
-+{
-+	kona_clockevent_timer.cpumask = cpumask_of(0);
-+	clockevents_config_and_register(&kona_clockevent_timer,
-+		arch_timer_rate, 6, 0xffffffff);
-+}
-+
-+static irqreturn_t kona_timer_interrupt(int irq, void *dev_id)
-+{
-+	struct clock_event_device *evt = &kona_clockevent_timer;
-+
-+	kona_timer_disable_and_clear(timers.tmr_regs);
-+	evt->event_handler(evt);
-+	return IRQ_HANDLED;
-+}
-+
-+static struct irqaction kona_timer_irq = {
-+	.name = "Kona Timer Tick",
-+	.flags = IRQF_TIMER,
-+	.handler = kona_timer_interrupt,
-+};
-+
-+static void __init kona_timer_init(void)
-+{
-+	kona_timers_init();
-+	kona_timer_clockevents_init();
-+	setup_irq(timers.tmr_irq, &kona_timer_irq);
-+	kona_timer_set_next_event((arch_timer_rate / HZ), NULL);
-+}
-+
-+CLOCKSOURCE_OF_DECLARE(bcm_kona, "bcm,kona-timer",
-+	kona_timer_init);
+commit f70a08ce13cdec674eae271a2e76554ff20bf5f3
+Author: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Date:   Wed Dec 12 10:06:24 2012 +0100
+
+    arm: mvebu: Add RTC support for Armada 370 and Armada XP
+
+    The Armada 370 and Armada XP Socs have the same controller that the
+    one used in the orion platforms. This patch updates the device tree
+    for these SoCs.
+
+    Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+    Acked-by: Andrew Lunn <andrew@lunn.ch>
+    Tested-by: Florian Fainelli <florian@openwrt.org>
+    Acked-by: Arnd Bergmann <arnd@arndb.de>
+    Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+
+I think that the commit 25fe89 came through Andrew Morton and my
+second version f70a08ce came through Jason Cooper and then arm-soc.
+
+First, what I have to do to fix this? The best solution should be to
+remove the commit 25fe890 as it is the less recent. How can we
+proceed ?
+
+Then I am sorry to not have figure out this before. I thought the
+automatic email I received from Andrew Morton where due to Jason that
+have been pushed the patch to Andrew Morton. I wasn't aware that
+Andrew Morton took care of the RTC subsystem a well.
+
+Regards,
+
 -- 
-1.7.1
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
