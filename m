@@ -1,11 +1,11 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 26 Feb 2013 12:30:28 +0100
+Date: Tue, 26 Feb 2013 12:31:44 +0100
 Subject: [PATCH 1/2] time : pass broadcast device parameter
 In-Reply-To: <CAKohpomqooF6DzzzdUFByA0wDxQ3RuPne15a9Vy1sScKjZfeyA@mail.gmail.com>
 References: <5123C299.3080005@linaro.org>
  <1361484083-5906-1-git-send-email-daniel.lezcano@linaro.org>
  <CAKohpomqooF6DzzzdUFByA0wDxQ3RuPne15a9Vy1sScKjZfeyA@mail.gmail.com>
-Message-ID: <512C9CD4.50808@linaro.org>
+Message-ID: <512C9D20.8020309@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -24,7 +24,11 @@ On 02/26/2013 09:45 AM, Viresh Kumar wrote:
 > 
 > Tested-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-Thanks Viresh for testing.
+Oh, by the way, could send me the patch to set the flag to the timer
+device ? I will include it to the patchset.
+
+Thanks
+  -- Daniel
 
 -- 
  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
