@@ -1,89 +1,53 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 26 Feb 2013 18:49:42 +0000
-Subject: Multi-platform, and secure-only ARM errata workarounds
-In-Reply-To: <512CFF30.9080300@wwwdotorg.org>
-References: <512BF81A.3080700@wwwdotorg.org> <201302261023.26939.arnd@arndb.de>
- <20130226113538.GS17833@n2100.arm.linux.org.uk>
- <512CF87A.4090404@wwwdotorg.org>
- <20130226181114.GU17833@n2100.arm.linux.org.uk>
- <512CFF30.9080300@wwwdotorg.org>
-Message-ID: <20130226184942.GV17833@n2100.arm.linux.org.uk>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 26 Feb 2013 18:00:09 +0000
+Subject: [PATCH] gpio: gpiolib: Remove WARN reference
+In-Reply-To: <CAOMZO5B+3p_pKab_Au_3_kgir55vVs+sUMq8iMoQgMdTw4Ghtw@mail.gmail.com>
+References: <1361049848-14977-1-git-send-email-festevam@gmail.com>
+ <CAOMZO5B+3p_pKab_Au_3_kgir55vVs+sUMq8iMoQgMdTw4Ghtw@mail.gmail.com>
+Message-ID: <20130226180009.A2F613E40D0@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 26, 2013 at 11:30:08AM -0700, Stephen Warren wrote:
-> On 02/26/2013 11:11 AM, Russell King - ARM Linux wrote:
-> > On Tue, Feb 26, 2013 at 11:01:30AM -0700, Stephen Warren wrote:
-> >> The conditional in that statement makes me wonder which of the following
-> >> operations will fault in non-secure mode:
-> >>
-> >> 1) Reading from the diagnostic register.
-> > 
-> > Won't fault.
-> > 
-> >> 2) Writing to the diagnostic register, of a value the same as what's
-> >> already there.
-> > 
-> > Will fault.
-> > 
-> >> 3) Writing to the diagnostic register, of a value different than what's
-> >> already there.
-> > 
-> > Will fault.
-> > 
-> >> Would the following not fault in both secure and non-secure mode:
-> >>
-> >> read diagnostic register
-> >> if desired bit already set:
-> >>     b 1f
-> >> set desired bit
-> >> write value back to diagnostic register
-> >> 1:
-> > 
-> > That is exactly what we do
+On Sat, 16 Feb 2013 20:22:33 -0200, Fabio Estevam <festevam@gmail.com> wrote:
+> On Sat, Feb 16, 2013 at 7:24 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> > From: Fabio Estevam <fabio.estevam@freescale.com>
+> >
+> > mx28evk has two ethernet controllers. The GPIO that performs the
+> > ethernet reset on both ports is the same GPIO, so on the board dts file, only in
+> > one ethernet instance is passed the GPIO reset property.
+> >
+> > Replace the WARN with a pr_warn message.
+> >
+> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> Well, I asked because for the 3 WARs in question at least, that isn't
-> what the code does. For example, from proc-v7.s:
+> Please discard this patch, I think the proper fix would be in the fec driver:
+
+I agree. You shouldn't need to change the .dts file to fix the problem.
+
+g.
+
 > 
-> #ifdef CONFIG_ARM_ERRATA_742230
-> 	cmp	r6, #0x22		@ only present up to r2p2
-> 	mrcle	p15, 0, r10, c15, c0, 1	@ read diagnostic register
-> 	orrle	r10, r10, #1 << 4	@ set bit #4
-> 	mcrle	p15, 0, r10, c15, c0, 1	@ write diagnostic register
-> #endif
+>  drivers/net/ethernet/freescale/fec.c |    3 +++
+>  1 file changed, 3 insertions(+)
 > 
-> (unless that orrle affects the flags and hence skips the mcrle, but I
-> don't think so.)
-
-Hmm.  I've not really been taking much notice of how these work-arounds
-all work - maybe it's safe to write this diagnostic register from
-non-secure mode then?
-
-I have noticed this kind of fishy thing with OMAP4430 running in non-secure
-mode - some registers I thought would cause an exception don't.  No idea
-why not...
-
-> > - the problem is, that if you require
-> > workaround X to be enabled, and a different platform has that errata
-> > fixed, then the other platform will not enable the work-around, and
-> > the bit will be clear.
+> diff --git a/drivers/net/ethernet/freescale/fec.c
+> b/drivers/net/ethernet/freescale/fec.c
+> index 0fe68c4..5864a67 100644
+> --- a/drivers/net/ethernet/freescale/fec.c
+> +++ b/drivers/net/ethernet/freescale/fec.c
+> @@ -1689,6 +1689,9 @@ static void fec_reset_phy(struct platform_device *pdev)
+>  		msec = 1;
 > 
-> The 3 WARs in question are conditional upon the CPU's revision and patch
-> number (which I'll call rNpN). I assume that any Cortex-A9 with the
-> affected rNpN would require the WAR enabled; is it possible that someone
-> could have fixed a particular core bug directly (and hence not changed
-> rNpN),
+>  	phy_reset = of_get_named_gpio(np, "phy-reset-gpios", 0);
+> +	if (!gpio_is_valid(phy_reset))
+> +		return;
+> +
+>  	err = devm_gpio_request_one(&pdev->dev, phy_reset,
+>  				    GPIOF_OUT_INIT_LOW, "phy-reset");
+>  	if (err) {
+> 
+> Will submit it to net-dev.
 
-SoC folk are apparantly free to incorporate fixes into the ARM CPU
-when they fabricate it, which means that the rNpN number doesn't
-accurately reflect what workarounds are required.
-
-We've had this discussion before - a few months ago - and the conclusion
-that was arrived at was that the _only_ way out of this mess is to
-require whatever runs _before_ the kernel to enable the appropriate
-work-arounds in these apparantly secure-accessible only registers.
-
-We've now been around this problem about three or four times, and we
-ultimately end up coming back to the above, and/or talking about
-ripping out the errata workarounds from the kernel which just set
-bits in the register(s).
+-- 
+Grant Likely, B.Sc, P.Eng.
+Secret Lab Technologies, Ltd.
