@@ -1,53 +1,49 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Tue, 26 Feb 2013 17:53:16 +0900
-Subject: [PATCH 00/08] ARM: shmobile: CPU Hotplug and SMP CA9 SCU rework
- part 2
-In-Reply-To: <CANqRtoQxC89zQHjM++19fRxch7x-jua_XEmvxk8t0p0D7-Vr8g@mail.gmail.com>
-References: <20130218134648.17303.97576.sendpatchset@w520>
- <20130219004857.GA14932@verge.net.au>
- <CANqRtoQxC89zQHjM++19fRxch7x-jua_XEmvxk8t0p0D7-Vr8g@mail.gmail.com>
-Message-ID: <20130226085312.GA11648@verge.net.au>
+Date: Tue, 26 Feb 2013 17:55:25 +0900
+Subject: [PATCH 0/5] ARM: shmobile: r8a7779 and marzen initialisation
+ enhancements
+In-Reply-To: <1361242570-8867-1-git-send-email-horms+renesas@verge.net.au>
+References: <1361242570-8867-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20130226085525.GA16941@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 19, 2013 at 07:09:14PM +0900, Magnus Damm wrote:
-> On Tue, Feb 19, 2013 at 9:49 AM, Simon Horman <horms@verge.net.au> wrote:
-> > On Mon, Feb 18, 2013 at 10:46:48PM +0900, Magnus Damm wrote:
-> >> ARM: shmobile: CPU Hotplug and SMP CA9 SCU rework part 2
-> >>
-> >> [PATCH 01/08] ARM: shmobile: Fix base address readout in headsmp-scu.S
-> >> [PATCH 02/08] ARM: shmobile: Rework SH73A0_SCU_BASE IOMEM() usage
-> >> [PATCH 03/08] ARM: shmobile: Use R8A7779_SCU_BASE with TWD
-> >> [PATCH 04/08] ARM: shmobile: Update r8a7779 to check SCU for hotplug
-> >> [PATCH 05/08] ARM: shmobile: Update r8a7779 to use scu_power_mode()
-> >> [PATCH 06/08] ARM: shmobile: Use sh73a0-specific cpu disable code
-> >> [PATCH 07/08] ARM: shmobile: Rearrange r8a7779 cpu hotplug code
-> >> [PATCH 08/08] ARM: shmobile: Remove unused hotplug.c
-> >>
-> >> Finalize the SCU rework by performing minor fixes and converting
-> >> the r8a7779 SMP code to make use of common scu_power_mode() code
-> >> and the early SCU setup code in headsmp-scu.S.
-> >>
-> >> Also, to save a few line remove hotplug.c while at it.
-> >>
-> >> The only remaining itch to scratch here is to fix up CPU Hotplug
-> >> of CPU0 on r8a7779, but for that to happen we first need to start
-> >> accounting for spurious interrupts during shut down.
-> >>
-> >> Signed-off-by: Magnus Damm <damm@opensource.se>
-> >> ---
-> >>
-> >>  No known dependencies apart from previous SMP cleanup series
-> >>  "[PATCH 00/06] ARM: shmobile: SMP Cortex-A9 SCU rework"
-> >>  Written against -next in renesas.git.
-> >
-> > I believe those are queued up for upstream in the soc5 branch.
-> >
-> > Please let me know when you are comfortable with me applying these patches
-> > to that branch. I'm fine with that answer being "now".
+On Tue, Feb 19, 2013 at 11:56:05AM +0900, Simon Horman wrote:
+> Hi,
 > 
-> Now sounds wonderful. Thanks Simon.
+> This series:
+> 
+> * Removes the use of early devices from reference marzen reference DT
+> * Initialises i2c as a late device (non reference DT boot)
+> * Moves ethernet controller from SoC to marzen board DT file
+> 
+> Merge:
+> 
+> My plan to merge this is:
+> * Add r8a7779 patches to an soc branch.
+> * Rebase a boards branch on top of the soc branch.
+> * Apply marzen patches, squashing them to into existing commits
+>   to avoid breaking bisection.
 
-[some time passes]
+Applied as described above.
+The soc branch was soc5.
+The boards branch was boards3.
 
-Thanks, applied to the soc5 branch.
+> 
+> Simon Horman (5):
+>   ARM: shmobile: r8a7779: Do not use early devices with DT reference
+>   ARM: shmobile: marzen: Do not use early devices
+>   ARM: shmobile: r8a7779: Do not initialise i2c as an early device
+>   ARM: shmobile: r8a7779: Remove lan from dtsi
+>   ARM: shmobile: marzen: Add lan to dts file
+> 
+>  arch/arm/boot/dts/r8a7779-marzen-reference.dts  |   14 +++++++---
+>  arch/arm/boot/dts/r8a7779.dtsi                  |    9 -------
+>  arch/arm/mach-shmobile/board-marzen-reference.c |    2 +-
+>  arch/arm/mach-shmobile/include/mach/common.h    |    2 +-
+>  arch/arm/mach-shmobile/setup-r8a7779.c          |   33 +++++++++--------------
+>  5 files changed, 24 insertions(+), 36 deletions(-)
+> 
+> -- 
+> 1.7.10.4
+> 
