@@ -1,46 +1,67 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 26 Feb 2013 11:35:38 +0000
-Subject: Multi-platform, and secure-only ARM errata workarounds
-In-Reply-To: <201302261023.26939.arnd@arndb.de>
-References: <512BF81A.3080700@wwwdotorg.org> <201302261023.26939.arnd@arndb.de>
-Message-ID: <20130226113538.GS17833@n2100.arm.linux.org.uk>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 26 Feb 2013 12:39:26 +0100
+Subject: [PATCH v4 0/8] Reset controller API to reset IP modules on i.MX5 and
+ i.MX6
+Message-ID: <1361878774-6382-1-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 26, 2013 at 10:23:26AM +0000, Arnd Bergmann wrote:
-> On Monday 25 February 2013, Stephen Warren wrote:
-> > Is there any other alternative I'm not seeing? Having the kernel
-> > suddenly become incompatible with any currently extant bootloader when I
-> > enable CONFIG_MULTIPLATFORM doesn't seem like a great idea.
-> 
-> Could we make those errata be run-time enabled only when not booting
-> in secure mode?
+[Added Len, Pavel, Rafael, and linux-pm to Cc, as there might be some
+ need for integration with the PM runtime infrastructure?]
 
-The long and the short answer to this is... no.
+The system reset controller (SRC) on i.MX51, i.MX53, and i.MX6q controls
+reset lines to the GPU, VPU, IPU, and OpenVG IP modules.
 
-1. It is impossible to tell whether we're running secure or non-secure.
+The following patches add a simple API for devices to request being reset
+by separate reset controller hardware and implements the reset signal
+device tree binding proposed by Stephen Warren. Contrary to Tegra hardware,
+the i.MX SRC contains self-deasserting reset registers, so I've included
+both ops to manually assert/deassert a reset line, as well as a "reset"
+operation that is supposed to assert the reset line and wait for it to
+deassert.
+Also included is a GPIO reset controller driver that can handle reset
+lines of external ICs connected to GPIOs.
 
-2. Errata need to be applied before the MMU is initialized.  We need the
-   MMU to be initialized to run any C code what so ever, so calling out
-   to platform specific code to set errata is not possible.  Moreover,
-   we no longer determine the platform in the assembly code since DT
-   came along: this was removed because detecting it in DT from assembly
-   is far from trivial (you'd need to write an assembly DT parser).
+The i.MX SRC is enhanced to provide a reset controller and the IPU driver
+is made to request being reset by calling the device_reset(&pdev->dev)
+convenience wrapper during probing.
 
-Now, as for having the secure mode errata enabled on a kernel running in
-non-secure mode... what happens today is that we check whether something
-before the kernel has enabled the workaround, and we omit to write to
-the register.
+I'm not sure how integration with the PM runtime should look like, since
+there are quite different use cases for pulling a reset line. (Does the
+device need to be reset once, or to be reset every time it comes out of
+suspend? Or maybe the reset is just needed when the device gets stuck).
 
-What that means is that we expect whatever came before the kernel to have
-appropriately enabled the bits in the secure registers.  If it hasn't,
-and you have one of these secure mode workarounds enabled, the kernel
-will fault at boot time.
+Changes since v3:
+ - Addressed Stephen's concerns, adding id translation
+   functionality and the missing devm_put_reset_controller
+   to the core,
+ - switched the gpio-reset driver's reset-delays property to
+   microseconds and added an optional initially-in-reset property,
+ - and reworked the gpio-reset probe function to better handle
+   requested GPIOs returning -EPROBE_DEFER.
 
-So, if Stephen has working configs with these secure mode workarounds
-enabled, this means that the bits in the secure registers must already
-be appropriately set.
+regards
+Philipp
 
-Could the problem be that someone has made all errata workarounds, even
-those which apply after the system is up and running, depend on
-!MULTIPLATFORM ?
+---
+ .../devicetree/bindings/reset/fsl,imx-src.txt      |   49 ++++
+ .../devicetree/bindings/reset/gpio-reset.txt       |   37 +++
+ Documentation/devicetree/bindings/reset/reset.txt  |   75 +++++
+ .../bindings/staging/imx-drm/fsl-imx-drm.txt       |    3 +
+ arch/arm/boot/dts/imx51.dtsi                       |    7 +
+ arch/arm/boot/dts/imx53.dtsi                       |    7 +
+ arch/arm/boot/dts/imx6q.dtsi                       |    1 +
+ arch/arm/boot/dts/imx6qdl.dtsi                     |    4 +-
+ arch/arm/mach-imx/Kconfig                          |    3 +
+ arch/arm/mach-imx/mm-imx5.c                        |    2 +
+ arch/arm/mach-imx/src.c                            |   69 ++++-
+ drivers/Kconfig                                    |    2 +
+ drivers/Makefile                                   |    3 +
+ drivers/reset/Kconfig                              |   26 ++
+ drivers/reset/Makefile                             |    2 +
+ drivers/reset/core.c                               |  298 ++++++++++++++++++++
+ drivers/reset/gpio-reset.c                         |  208 ++++++++++++++
+ drivers/staging/imx-drm/ipu-v3/ipu-common.c        |   12 +-
+ include/linux/reset-controller.h                   |   51 ++++
+ include/linux/reset.h                              |   17 ++
+ 20 files changed, 871 insertions(+), 5 deletions(-)
