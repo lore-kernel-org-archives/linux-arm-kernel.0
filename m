@@ -1,115 +1,102 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Tue, 26 Feb 2013 14:38:47 +0800
-Subject: [Suggestion] ARM:S5PV210: version merging compiling issue for
- 'struct fimc_source_info'
-In-Reply-To: <CAH9JG2WS5q4SR8zk5=OC32PHLZ2+ZYva7csyshG7oANacqbCuA@mail.gmail.com>
-References: <511F50CF.90403@asianux.com>
- <CAH9JG2WS5q4SR8zk5=OC32PHLZ2+ZYva7csyshG7oANacqbCuA@mail.gmail.com>
-Message-ID: <512C5877.7090805@asianux.com>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Tue, 26 Feb 2013 14:47:53 +0800
+Subject: [PATCH v5 00/16] add dmaengine support for atmel spi controller and
+ to test the device tree support
+Message-ID: <1361861289-30332-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2013?02?16? 19:39, Kyungmin Park ??:
-> Hi,
-> 
-> You can find it at recent patch from Arnd.
-> 
+Hi All, 
 
-  excuse me, could you please provide more information about it ?
+This set of patches is to add dmaengine support for atmel spi and to test device tree support.
 
-  I have checked 2 tags:
-    the next-20130225 tag in git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git
+The work is based on Nicolas and Richard's work.
 
-      in Feb 1 2013, by Sylwester Nawrocki, Kyungmin Park, Mauro Carvalho Chehab
-      git number: 56bc911ac3b94c731db3a6de20258827f1a61c20
-        in include/media/s5p_fimc.h, the structure fimc_source_info is changed.
-        in arch/arm/mach-s5pv210/mach-goni.c, the structure fimc_source_info is not changed.
-          still use .bus_type (not use .fimc_bus_type like others).
+Because the Atmel DMA device tree support hasn't on mainline, to at91sam9x5ek and at91sam9n12ek
+with dma support, it doesn't work on the dmaengine mode, only on PIO mode so far.
 
-      it seems, the relative members forgot to change it to .fimc_bus_type.
+It has been tested as below:
+ 1./tested on v3.8, by using mtd utils, "mount", "umount" and "cp" commands.
+ 2./tested on "spi/next" git tree after removing commit "spi: make sure all transfer has proper speed set".
+ 3./tested by using Documentation/spi/spidev_test.c on "/dev/spidev".
+ 4./tested on on at91sam9x5ek, at91sam9m10g45ek, at91sam9263ek and at91sam9g20ek boards
 
-      did the patch from Arnd still not applied into next tree ?
+It is based on v3.8.
 
-    the v3.8-rc7 tag in git clone git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-      it seems no relative changes (change nothing).
+Changelog:
+v5:
+     1./ add pinctrl patches.
+     2./ detect capabilities by reading spi version register to replace multiple compatiles.
+     3./ change the "cs-gpios" property.
+     4./ rebase on v3.8.
+
+v4:
+     1./ Take Joe Perches's adivce, rewrite atmel_spi_is_v2(struct atmel_spi *as) 
+         and atmel_spi_use_dma(struct atmel_spi *as),
+	 and remove atmel_spi_use_pdc(struct atmel_spi *as).
+     2./ Rebase on v3.8-rc3.
+
+V3:
+     1./ Rebase on v3.8-rc2.
+     2./ Remove some Jean-Christophe's patches which has been applied on v3.8-rc2.
+     3./ Remove spi property "cs-gpios" from the SoC dtsi files to the board dts files
+         to avoid some useless pin conflicts.
+
+v2: 
+     1./ Remove the patch :PATCH]mtd: m25p80: change the m25p80_read to reading page to page
+	 which purpose to fix the BUG: when run "flashcp /bin/busybox /dev/mtdX" in the at91sam9g25ek
+	 with DMA mode, it arises a OOPS. Now fix it in this patch:
+	    [PATHC] spi/atmel_spi: add dmaengine support changing to fix the [BUG].
+     2./ Remove two patches:
+   	    which purpose to read dts property to select SPI IP version and DMA mode
+	    Now they will be gat from device tree different compatile.
+     3./ Fix DMA: when enable both spi0 AND spi1, the spi0 doesn't work BUG.
+     4./ Rebase v3.7-rc8.
+
+Best Regards,
+Wenyou Yang.
 
 
-  thanks.
+Nicolas Ferre (5):
+  spi/spi-atmel: add physical base address
+  spi/spi-atmel: call unmapping on transfers buffers
+  spi/spi-atmel: status information passed through controller data
+  spi/spi-atmel: add flag to controller data for lock operations
+  spi/spi-atmel: add dmaengine support
 
-  :-)
+Richard Genoud (6):
+  spi/spi-atmel: fix spi-atmel driver to adapt to slave_config changes
+  spi/spi-atmel: correct 16 bits transfers using PIO
+  spi/spi-atmel: correct 16 bits transfers with DMA
+  ARM: at91: add clocks for spi dt entries
+  ARM: dts: add spi nodes for atmel SoC
+  ARM: dts: add spi nodes for the atmel boards
 
-gchen.
+Wenyou Yang (5):
+  spi/spi-atmel: fix master->num_chipselect wrongly set.
+  spi/spi-atmel: detect the capabilities of SPI core by reading the
+    VERSION register.
+  spi/spi-atmel: add support transfer on CS1,2,3, not only on CS0
+  spi/spi-atmel: add pinctrl support for atmel spi
+  ARM: dts: add pinctrl property for spi node for atmel SoC
 
-
-> Thank you,
-> Kyungmin Park
-> 
-> On Saturday, February 16, 2013, Chen Gang wrote:
-> 
->     Hello Kukjin Kim:
-> 
->     ? it is a compiling issue, please help check when you have time.
-> 
->     thanks.
-> 
->     gchen.
-> 
->     in arch/arm/mach-s5pv210/mach-goni.c:848:
->     ? error: unknown field 'bus_type' specified in initializer
-> 
->     843 static struct fimc_source_info goni_camera_sensors[] = {
->     844 ? ? ? ? {
->     845 ? ? ? ? ? ? ? ? .mux_id ? ? ? ? = 0,
->     846 ? ? ? ? ? ? ? ? .flags ? ? ? ? ?= V4L2_MBUS_PCLK_SAMPLE_FALLING |
->     847 ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? V4L2_MBUS_VSYNC_ACTIVE_LOW,
->     848 ? ? ? ? ? ? ? ? .bus_type ? ? ? = FIMC_BUS_TYPE_ITU_601,
->     849 ? ? ? ? ? ? ? ? .board_info ? ? = &noon010pc30_board_info,
->     850 ? ? ? ? ? ? ? ? .i2c_bus_num ? ?= 0,
->     851 ? ? ? ? ? ? ? ? .clk_frequency ?= 16000000UL,
->     852 ? ? ? ? },
->     853 };
-> 
-> 
->     in include/media/s5p_fimc.h:50
-> 
->     ?37 /**
->     ?38 ?* struct fimc_source_info - video source description required
->     for the host
->     ?39 ?* ? ? ? ? ? ? ? ? ? ? ? ? ? interface configuration
->     ?40 ?*
->     ?41 ?* @board_info: pointer to I2C subdevice's board info
->     ?42 ?* @clk_frequency: frequency of the clock the host interface
->     provides to sensor
->     ?43 ?* @fimc_bus_type: FIMC camera input type
->     ?44 ?* @sensor_bus_type: image sensor bus type, MIPI, ITU-R BT.601 etc.
->     ?45 ?* @flags: the parallel sensor bus flags defining signals
->     polarity (V4L2_MBUS_*)
->     ?46 ?* @i2c_bus_num: i2c control bus id the sensor is attached to
->     ?47 ?* @mux_id: FIMC camera interface multiplexer index (separate
->     for MIPI and ITU)
->     ?48 ?* @clk_id: index of the SoC peripheral clock for sensors
->     ?49 ?*/
->     ?50 struct fimc_source_info {
->     ?51 ? ? ? ? struct i2c_board_info *board_info;
->     ?52 ? ? ? ? unsigned long clk_frequency;
->     ?53 ? ? ? ? enum fimc_bus_type fimc_bus_type;
->     ?54 ? ? ? ? enum fimc_bus_type sensor_bus_type;
->     ?55 ? ? ? ? u16 flags;
->     ?56 ? ? ? ? u16 i2c_bus_num;
->     ?57 ? ? ? ? u16 mux_id;
->     ?58 ? ? ? ? u8 clk_id;
->     ?59 };
->     ?60
-> 
-> 
->     _______________________________________________
->     linux-arm-kernel mailing list
->     linux-arm-kernel at lists.infradead.org <javascript:;>
->     http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-
+ arch/arm/boot/dts/at91sam9260.dtsi          |   40 ++
+ arch/arm/boot/dts/at91sam9263.dtsi          |   40 ++
+ arch/arm/boot/dts/at91sam9263ek.dts         |   10 +
+ arch/arm/boot/dts/at91sam9g20ek_common.dtsi |   10 +
+ arch/arm/boot/dts/at91sam9g45.dtsi          |   40 ++
+ arch/arm/boot/dts/at91sam9m10g45ek.dts      |   10 +
+ arch/arm/boot/dts/at91sam9n12.dtsi          |   40 ++
+ arch/arm/boot/dts/at91sam9n12ek.dts         |   10 +
+ arch/arm/boot/dts/at91sam9x5.dtsi           |   40 ++
+ arch/arm/boot/dts/at91sam9x5ek.dtsi         |   10 +
+ arch/arm/mach-at91/at91sam9260.c            |    2 +
+ arch/arm/mach-at91/at91sam9g45.c            |    2 +
+ arch/arm/mach-at91/at91sam9n12.c            |    2 +
+ arch/arm/mach-at91/at91sam9x5.c             |    2 +
+ drivers/spi/spi-atmel.c                     |  766 ++++++++++++++++++++++++---
+ drivers/spi/spi.c                           |    2 +-
+ 16 files changed, 961 insertions(+), 65 deletions(-)
 
 -- 
-Chen Gang
-
-Asianux Corporation
+1.7.9.5
