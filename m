@@ -1,142 +1,128 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Tue, 26 Feb 2013 11:30:32 -0600
-Subject: [PATCH 05/14] ARM: OMAP2+: Convert ONENAND to use
- gpmc_cs_program_settings()
+Date: Tue, 26 Feb 2013 11:30:31 -0600
+Subject: [PATCH 04/14] ARM: OMAP2+: Add function for configuring GPMC settings
 In-Reply-To: <1361899842-30303-1-git-send-email-jon-hunter@ti.com>
 References: <1361899842-30303-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <1361899842-30303-6-git-send-email-jon-hunter@ti.com>
+Message-ID: <1361899842-30303-5-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert the OMAP2+ ONENAND code to use the gpmc_cs_program_settings()
-function for configuring the various GPMC options instead of directly
-programming the CONFIG1 register.
+The GPMC has various different configuration options such as bus-width,
+synchronous or asychronous mode selection, burst mode options etc.
+Currently, there is no common function for configuring these options and
+various devices set these options by either programming the GPMC CONFIG1
+register directly or by calling gpmc_cs_configure() to set some of the
+options.
+
+Add a new function for configuring all of the GPMC options. Having a common
+function for configuring this options will simplify code and ease the
+migration to device-tree.
 
 Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 ---
- arch/arm/mach-omap2/gpmc-onenand.c |   61 +++++++++++++++---------------------
- 1 file changed, 25 insertions(+), 36 deletions(-)
+ arch/arm/mach-omap2/gpmc.c |   65 ++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/gpmc.h |    6 ++++
+ 2 files changed, 71 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/gpmc-onenand.c b/arch/arm/mach-omap2/gpmc-onenand.c
-index 8b1c08e..1e2191c 100644
---- a/arch/arm/mach-omap2/gpmc-onenand.c
-+++ b/arch/arm/mach-omap2/gpmc-onenand.c
-@@ -49,17 +49,21 @@ static struct platform_device gpmc_onenand_device = {
- 
- static struct gpmc_settings onenand_async = {
- 	.mux_add_data	= true,
-+	.device_width	= GPMC_DEVWIDTH_16BIT,
- };
- 
- static struct gpmc_settings onenand_sync = {
- 	.burst_read	= true,
-+	.burst_wrap	= true,
- 	.mux_add_data	= true,
-+	.burst_len	= GPMC_BURST_16,
-+	.device_width	= GPMC_DEVWIDTH_16BIT,
-+	.wait_pin	= 0,
- };
- 
- static void omap2_onenand_calc_async_timings(struct gpmc_timings *t)
- {
- 	struct gpmc_device_timings dev_t;
--
- 	const int t_cer = 15;
- 	const int t_avdp = 12;
- 	const int t_aavdh = 7;
-@@ -86,16 +90,6 @@ static void omap2_onenand_calc_async_timings(struct gpmc_timings *t)
- 	gpmc_calc_timings(t, &onenand_async, &dev_t);
+diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+index 465cac9..fb8dfd2 100644
+--- a/arch/arm/mach-omap2/gpmc.c
++++ b/arch/arm/mach-omap2/gpmc.c
+@@ -1137,6 +1137,71 @@ int gpmc_calc_timings(struct gpmc_timings *gpmc_t,
+ 	return 0;
  }
  
--static int gpmc_set_async_mode(int cs, struct gpmc_timings *t)
--{
--	/* Configure GPMC for asynchronous read */
--	gpmc_cs_write_reg(cs, GPMC_CS_CONFIG1,
--			  GPMC_CONFIG1_DEVICESIZE_16 |
--			  GPMC_CONFIG1_MUXADDDATA);
--
--	return gpmc_cs_set_timings(cs, t);
--}
--
- static void omap2_onenand_set_async_mode(void __iomem *onenand_base)
- {
- 	u32 reg;
-@@ -243,8 +237,11 @@ static void omap2_onenand_calc_sync_timings(struct gpmc_timings *t,
- 	/* Set synchronous read timings */
- 	memset(&dev_t, 0, sizeof(dev_t));
- 
-+	if (onenand_flags & ONENAND_FLAG_SYNCREAD)
-+		onenand_sync.sync_read = true;
- 	if (onenand_flags & ONENAND_FLAG_SYNCWRITE) {
- 		onenand_sync.sync_write = true;
-+		onenand_sync.burst_write = true;
- 	} else {
- 		dev_t.t_avdp_w = max(t_avdp, t_cer) * 1000;
- 		dev_t.t_wpl = t_wpl * 1000;
-@@ -270,29 +267,6 @@ static void omap2_onenand_calc_sync_timings(struct gpmc_timings *t,
- 	gpmc_calc_timings(t, &onenand_sync, &dev_t);
- }
- 
--static int gpmc_set_sync_mode(int cs, struct gpmc_timings *t)
--{
--	unsigned sync_read = onenand_flags & ONENAND_FLAG_SYNCREAD;
--	unsigned sync_write = onenand_flags & ONENAND_FLAG_SYNCWRITE;
--
--	/* Configure GPMC for synchronous read */
--	gpmc_cs_write_reg(cs, GPMC_CS_CONFIG1,
--			  GPMC_CONFIG1_WRAPBURST_SUPP |
--			  GPMC_CONFIG1_READMULTIPLE_SUPP |
--			  (sync_read ? GPMC_CONFIG1_READTYPE_SYNC : 0) |
--			  (sync_write ? GPMC_CONFIG1_WRITEMULTIPLE_SUPP : 0) |
--			  (sync_write ? GPMC_CONFIG1_WRITETYPE_SYNC : 0) |
--			  GPMC_CONFIG1_PAGE_LEN(2) |
--			  (cpu_is_omap34xx() ? 0 :
--				(GPMC_CONFIG1_WAIT_READ_MON |
--				 GPMC_CONFIG1_WAIT_PIN_SEL(0))) |
--			  GPMC_CONFIG1_DEVICESIZE_16 |
--			  GPMC_CONFIG1_DEVICETYPE_NOR |
--			  GPMC_CONFIG1_MUXADDDATA);
--
--	return gpmc_cs_set_timings(cs, t);
--}
--
- static int omap2_onenand_setup_async(void __iomem *onenand_base)
- {
- 	struct gpmc_timings t;
-@@ -302,7 +276,11 @@ static int omap2_onenand_setup_async(void __iomem *onenand_base)
- 
- 	omap2_onenand_calc_async_timings(&t);
- 
--	ret = gpmc_set_async_mode(gpmc_onenand_data->cs, &t);
-+	ret = gpmc_cs_program_settings(gpmc_onenand_data->cs, &onenand_async);
-+	if (IS_ERR_VALUE(ret))
-+		return ret;
++int gpmc_cs_program_settings(int cs, struct gpmc_settings *p)
++{
++	u32 config1;
 +
-+	ret = gpmc_cs_set_timings(gpmc_onenand_data->cs, &t);
- 	if (IS_ERR_VALUE(ret))
- 		return ret;
- 
-@@ -322,9 +300,20 @@ static int omap2_onenand_setup_sync(void __iomem *onenand_base, int *freq_ptr)
- 		set_onenand_cfg(onenand_base);
- 	}
- 
-+	/*
-+	 * FIXME: Appears to be legacy code from initial ONENAND commit.
-+	 * Unclear what boards this is for and if this can be removed.
-+	 */
-+	if (!cpu_is_omap34xx())
-+		onenand_sync.wait_on_read = true;
++	if ((!p->device_width) || (p->device_width > GPMC_DEVWIDTH_16BIT)) {
++		pr_err("%s: invalid width %d!", __func__, p->device_width);
++		return -EINVAL;
++	}
 +
- 	omap2_onenand_calc_sync_timings(&t, gpmc_onenand_data->flags, freq);
- 
--	ret = gpmc_set_sync_mode(gpmc_onenand_data->cs, &t);
-+	ret = gpmc_cs_program_settings(gpmc_onenand_data->cs, &onenand_sync);
-+	if (IS_ERR_VALUE(ret))
-+		return ret;
++	/* Address-data multiplexing not supported for NAND devices */
++	if (p->device_nand && p->mux_add_data) {
++		pr_err("%s: invalid configuration!\n", __func__);
++		return -EINVAL;
++	}
 +
-+	ret = gpmc_cs_set_timings(gpmc_onenand_data->cs, &t);
- 	if (IS_ERR_VALUE(ret))
- 		return ret;
++	/* Page/burst mode supports lengths of 4, 8 and 16 bytes */
++	if (p->burst_read || p->burst_write) {
++		switch (p->burst_len) {
++		case GPMC_BURST_4:
++		case GPMC_BURST_8:
++		case GPMC_BURST_16:
++			break;
++		default:
++			pr_err("%s: invalid page/burst-length (%d)\n",
++			       __func__, p->burst_len);
++			return -EINVAL;
++		}
++	}
++
++	if ((p->wait_on_read || p->wait_on_write) &&
++	    (p->wait_pin > gpmc_nr_waitpins)) {
++		pr_err("%s: invalid wait-pin (%d)\n", __func__, p->wait_pin);
++		return -EINVAL;
++	}
++
++	config1 = GPMC_CONFIG1_DEVICESIZE((p->device_width - 1));
++
++	if (p->sync_read)
++		config1 |= GPMC_CONFIG1_READTYPE_SYNC;
++	if (p->sync_write)
++		config1 |= GPMC_CONFIG1_WRITETYPE_SYNC;
++	if (p->wait_on_read)
++		config1 |= GPMC_CONFIG1_WAIT_READ_MON;
++	if (p->wait_on_write)
++		config1 |= GPMC_CONFIG1_WAIT_WRITE_MON;
++	if (p->wait_on_read || p->wait_on_write)
++		config1 |= GPMC_CONFIG1_WAIT_PIN_SEL(p->wait_pin);
++	if (p->device_nand)
++		config1	|= GPMC_CONFIG1_DEVICETYPE(GPMC_DEVICETYPE_NAND);
++	if (p->mux_add_data)
++		config1	|= GPMC_CONFIG1_MUXADDDATA;
++	if (p->burst_read)
++		config1 |= GPMC_CONFIG1_READMULTIPLE_SUPP;
++	if (p->burst_write)
++		config1 |= GPMC_CONFIG1_WRITEMULTIPLE_SUPP;
++	if (p->burst_read || p->burst_write) {
++		config1 |= GPMC_CONFIG1_PAGE_LEN(p->burst_len >> 3);
++		config1 |= p->burst_wrap ? GPMC_CONFIG1_WRAPBURST_SUPP : 0;
++	}
++
++	gpmc_cs_write_reg(cs, GPMC_CS_CONFIG1, config1);
++
++	return 0;
++}
++
+ #ifdef CONFIG_OF
+ static struct of_device_id gpmc_dt_ids[] = {
+ 	{ .compatible = "ti,omap2420-gpmc" },
+diff --git a/arch/arm/mach-omap2/gpmc.h b/arch/arm/mach-omap2/gpmc.h
+index 785e9ce..638f94a 100644
+--- a/arch/arm/mach-omap2/gpmc.h
++++ b/arch/arm/mach-omap2/gpmc.h
+@@ -73,6 +73,11 @@
+ #define GPMC_IRQ_FIFOEVENTENABLE	0x01
+ #define GPMC_IRQ_COUNT_EVENT		0x02
  
++#define GPMC_BURST_4			4
++#define GPMC_BURST_8			8
++#define GPMC_BURST_16			16
++#define GPMC_DEVWIDTH_8BIT		1
++#define GPMC_DEVWIDTH_16BIT		2
+ 
+ /* bool type time settings */
+ struct gpmc_bool_timings {
+@@ -217,6 +222,7 @@ extern void gpmc_cs_write_reg(int cs, int idx, u32 val);
+ extern u32 gpmc_cs_read_reg(int cs, int idx);
+ extern int gpmc_calc_divider(unsigned int sync_clk);
+ extern int gpmc_cs_set_timings(int cs, const struct gpmc_timings *t);
++extern int gpmc_cs_program_settings(int cs, struct gpmc_settings *p);
+ extern int gpmc_cs_request(int cs, unsigned long size, unsigned long *base);
+ extern void gpmc_cs_free(int cs);
+ extern int gpmc_cs_set_reserved(int cs, int reserved);
 -- 
 1.7.10.4
