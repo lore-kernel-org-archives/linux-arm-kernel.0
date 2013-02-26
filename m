@@ -1,39 +1,53 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Tue, 26 Feb 2013 17:07:36 +0100
-Subject: [PATCH 0/2] ARM: dts: omap3-overo: Add pwm-leds and audio support
-In-Reply-To: <51135EAC.7010406@ti.com>
-References: <1358963812-19947-1-git-send-email-florian.vaussard@epfl.ch>
- <5101273A.9090800@ti.com> <510F7BEB.1020408@epfl.ch> <51125AFC.10704@ti.com>
- <51135EAC.7010406@ti.com>
-Message-ID: <512CDDC8.6030307@epfl.ch>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 26 Feb 2013 17:08:36 +0100
+Subject: [GIT PULL] sunXi dt additions for 3.9, take 2
+Message-ID: <512CDE04.2010401@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Arnd, Olof,
 
-On 02/07/2013 08:58 AM, Peter Ujfalusi wrote:
-> Hi,
->
-> On 02/06/2013 02:30 PM, Benoit Cousson wrote:
->>> So a patch is being merged to handle triggers in the case of pwm leds [1].
->>> When done, we will be able to add back the default trigger. Do you want
->>> to wait on it to merge this series?
->>
->> What kind of dependency do we have between these two series? I mean what
->> will happen if the DTS is merged before the pwm subsystem?
->>
->> If that does not generate any regression / crash, then it is OK, if not,
->> we should take care of the order.
->
-> In this series the 'linux,default-trigger' property is not added to the
-> pwm-leds node, so it is safe to take this series.
-> I'm sure Florian will send the update to add this flag back for 3.10 or for
-> 3.9-rc (the needed patches for PWM and leds-pwm will be in 3.9).
->
+Here is the second pull request for DT additions for 3.9, containing
+the commits that were reverted, plus the missing commit that makes
+everything build.
 
-Yes, it is safe to take this series. I will provide a patch to add back
-the trigger when it is safe to.
+It depends on patches that were merged by LinusT and went through
+LinusW pinctrl tree, during this merge window.
 
-Regards,
+Thanks,
+Maxime
 
-Florian
+The following changes since commit 581981be24f9866b37af535f947da2e7b65aaa53:
+
+  ARM: sunxi: Add the pin groups for UART0 and UART1 on sun4i (2013-02-01 10:48:11 +0100)
+
+are available in the git repository at:
+
+  git://github.com/mripard/linux.git tags/sunxi-dt-for-3.9-2
+
+for you to fetch changes up to bb07ccd30af4b79fc5a4ad5b2f69b0a719b2f726:
+
+  sunxi: a13-olinuxino: Add user LED to the device tree (2013-02-26 16:40:00 +0100)
+
+----------------------------------------------------------------
+2nd set of DT additions for the allwinner sunXi platform for linux 3.9
+
+----------------------------------------------------------------
+Emilio L?pez (1):
+      sunxi: a10-cubieboard: Add user LEDs to the device tree
+
+Maxime Ripard (2):
+      sunxi: dts: Report the pinctrl nodes as gpio-controllers
+      sunxi: a13-olinuxino: Add user LED to the device tree
+
+ arch/arm/boot/dts/sun4i-a10-cubieboard.dts |   26 ++++++++++++++++++++++++++
+ arch/arm/boot/dts/sun4i-a10.dtsi           |    4 +++-
+ arch/arm/boot/dts/sun5i-a13-olinuxino.dts  |   20 ++++++++++++++++++++
+ arch/arm/boot/dts/sun5i-a13.dtsi           |    4 +++-
+ 4 files changed, 52 insertions(+), 2 deletions(-)
+
+-- 
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
