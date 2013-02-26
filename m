@@ -1,62 +1,64 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 26 Feb 2013 22:10:27 +0000
-Subject: [RFC PATCH v2 0/4] Add support for LZ4-compressed kernel
-In-Reply-To: <87fw0i7n6d.fsf@dell.be.48ers.dk>
-References: <1361859870-15751-1-git-send-email-kyungsik.lee@lge.com>
- <512D1C12.4080109@oberhumer.com>
- <alpine.LFD.2.03.1302261557220.1254@syhkavp.arg>
- <87fw0i7n6d.fsf@dell.be.48ers.dk>
-Message-ID: <20130226221027.GW17833@n2100.arm.linux.org.uk>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 26 Feb 2013 23:17:24 +0100
+Subject: [PATCH 1/4] time : pass broadcast parameter
+In-Reply-To: <1361917047-29230-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1361917047-29230-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1361917047-29230-2-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 26, 2013 at 10:58:02PM +0100, Peter Korsgaard wrote:
-> >>>>> "Nicolas" == Nicolas Pitre <nico@fluxnic.net> writes:
-> 
-> Hi,
-> 
->  >> Did you actually *try* the new LZO version and the patch (which is attached
->  >> once again) as explained in https://lkml.org/lkml/2013/2/3/367 ?
->  >> 
->  >> Because the new LZO version is faster than LZ4 in my testing, at least
->  >> when comparing apples with apples and enabling unaligned access in
->  >> BOTH versions:
->  >> 
->  >> armv7 (Cortex-A9), Linaro gcc-4.6 -O3, Silesia test corpus, 256 kB block-size:
->  >> 
->  >> compression speed   decompression speed
->  >> 
->  >> LZO-2012    :          44 MB/sec          117 MB/sec     no unaligned access
->  >> LZO-2013-UA :          47 MB/sec          167 MB/sec     Unaligned Access
->  >> LZ4 r88  UA :          46 MB/sec          154 MB/sec     Unaligned Access
-> 
->  Nicolas> To be fair, you should also take into account the compressed
->  Nicolas> size of a typical ARM kernel.  Sometimes a slightly slower
->  Nicolas> decompressor may be faster overall if the compressed image to
->  Nicolas> work on is smaller.
-> 
-> Yes, but notice that lzo compressed BETTER than lz4 - E.G. from the
-> introduction mail:
-> 
-> 1. ARMv7, 1.5GHz based board
->    Kernel: linux 3.4
->    Uncompressed Kernel Size: 14MB
->         Compressed Size  Decompression Speed
->    LZO  6.7MB            21.1MB/s
->    LZ4  7.3MB            29.1MB/s, 45.6MB/s(UA)
+The broadcast timer could be passed as parameter to the function
+instead of using again tick_broadcast_device.evtdev which was
+previously used in the caller function.
 
-Well, until someone can put all the pieces together so that a reasonably
-meaningful test between:
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+---
+ kernel/time/tick-broadcast.c |   11 +++++------
+ 1 file changed, 5 insertions(+), 6 deletions(-)
 
-- The new LZO code
-- The new LZ4 code
-
-then you're all comparing different things.  TBH, I'm disappointed that
-all the comments about this from the previous posting of LZ4 have been
-totally ignored, and we _still_ don't really have this information.  It
-seems like replying to these threads is a waste of time.
-
-So... for a selected kernel version of a particular size, can we please
-have a comparison between the new LZO code and this LZ4 code, so that
-we can see whether it's worth updating the LZO code or replacing the
-LZO code with LZ4?
+diff --git a/kernel/time/tick-broadcast.c b/kernel/time/tick-broadcast.c
+index 2fb8cb8..6197ac0 100644
+--- a/kernel/time/tick-broadcast.c
++++ b/kernel/time/tick-broadcast.c
+@@ -406,10 +406,9 @@ struct cpumask *tick_get_broadcast_oneshot_mask(void)
+ 	return to_cpumask(tick_broadcast_oneshot_mask);
+ }
+ 
+-static int tick_broadcast_set_event(ktime_t expires, int force)
++static int tick_broadcast_set_event(struct clock_event_device *bc,
++				    ktime_t expires, int force)
+ {
+-	struct clock_event_device *bc = tick_broadcast_device.evtdev;
+-
+ 	if (bc->mode != CLOCK_EVT_MODE_ONESHOT)
+ 		clockevents_set_mode(bc, CLOCK_EVT_MODE_ONESHOT);
+ 
+@@ -479,7 +478,7 @@ again:
+ 		 * Rearm the broadcast device. If event expired,
+ 		 * repeat the above
+ 		 */
+-		if (tick_broadcast_set_event(next_event, 0))
++		if (tick_broadcast_set_event(dev, next_event, 0))
+ 			goto again;
+ 	}
+ 	raw_spin_unlock(&tick_broadcast_lock);
+@@ -522,7 +521,7 @@ void tick_broadcast_oneshot_control(unsigned long reason)
+ 			cpumask_set_cpu(cpu, tick_get_broadcast_oneshot_mask());
+ 			clockevents_set_mode(dev, CLOCK_EVT_MODE_SHUTDOWN);
+ 			if (dev->next_event.tv64 < bc->next_event.tv64)
+-				tick_broadcast_set_event(dev->next_event, 1);
++				tick_broadcast_set_event(bc, dev->next_event, 1);
+ 		}
+ 	} else {
+ 		if (cpumask_test_cpu(cpu, tick_get_broadcast_oneshot_mask())) {
+@@ -591,7 +590,7 @@ void tick_broadcast_setup_oneshot(struct clock_event_device *bc)
+ 			clockevents_set_mode(bc, CLOCK_EVT_MODE_ONESHOT);
+ 			tick_broadcast_init_next_event(to_cpumask(tmpmask),
+ 						       tick_next_period);
+-			tick_broadcast_set_event(tick_next_period, 1);
++			tick_broadcast_set_event(bc, tick_next_period, 1);
+ 		} else
+ 			bc->next_event.tv64 = KTIME_MAX;
+ 	} else {
+-- 
+1.7.9.5
