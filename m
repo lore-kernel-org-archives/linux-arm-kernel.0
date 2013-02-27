@@ -1,132 +1,258 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Wed, 27 Feb 2013 08:49:10 +0800
-Subject: [PATCH Resend v5 15/16] ARM: dts: add spi nodes for the atmel boards
+Date: Wed, 27 Feb 2013 08:49:27 +0800
+Subject: [PATCH Resend v5 16/16] ARM: dts: add pinctrl property for spi node
+ for atmel SoC
 In-Reply-To: <1361925297-11854-1-git-send-email-wenyou.yang@atmel.com>
 References: <1361925297-11854-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1361926150-12646-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1361926167-12683-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Richard Genoud <richard.genoud@gmail.com>
-
-Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
-[wenyou.yang at atmel.com: added spi nodes for the sam9263ek, sam9g20ek, sam9m10g45ek and sam9n12ek boards]
-[wenyou.yang at atmel.com: submit the patch]
 Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
 Cc: linux at arm.linux.org.uk
 Cc: linux-kernel at vger.kernel.org
 ---
- arch/arm/boot/dts/at91sam9263ek.dts         |   10 ++++++++++
- arch/arm/boot/dts/at91sam9g20ek_common.dtsi |   10 ++++++++++
- arch/arm/boot/dts/at91sam9m10g45ek.dts      |   10 ++++++++++
- arch/arm/boot/dts/at91sam9n12ek.dts         |   10 ++++++++++
- arch/arm/boot/dts/at91sam9x5ek.dtsi         |   10 ++++++++++
- 5 files changed, 50 insertions(+)
+ arch/arm/boot/dts/at91sam9260.dtsi |   22 ++++++++++++++++++++++
+ arch/arm/boot/dts/at91sam9263.dtsi |   22 ++++++++++++++++++++++
+ arch/arm/boot/dts/at91sam9g45.dtsi |   22 ++++++++++++++++++++++
+ arch/arm/boot/dts/at91sam9n12.dtsi |   22 ++++++++++++++++++++++
+ arch/arm/boot/dts/at91sam9x5.dtsi  |   22 ++++++++++++++++++++++
+ 5 files changed, 110 insertions(+)
 
-diff --git a/arch/arm/boot/dts/at91sam9263ek.dts b/arch/arm/boot/dts/at91sam9263ek.dts
-index 1eb0872..a14e424 100644
---- a/arch/arm/boot/dts/at91sam9263ek.dts
-+++ b/arch/arm/boot/dts/at91sam9263ek.dts
-@@ -79,6 +79,16 @@
+diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
+index 6e31dc8..39253b9 100644
+--- a/arch/arm/boot/dts/at91sam9260.dtsi
++++ b/arch/arm/boot/dts/at91sam9260.dtsi
+@@ -322,6 +322,24 @@
  					};
  				};
- 			};
-+
-+			spi0: spi at fffa4000 {
-+				status = "okay";
-+				cs-gpios = <&pioA 5 0>, <0>, <0>, <0>;
-+				mtd_dataflash at 0 {
-+					compatible = "atmel,at45", "atmel,dataflash";
-+					spi-max-frequency = <50000000>;
-+					reg = <0>;
-+				};
-+			};
- 		};
  
- 		nand0: nand at 40000000 {
-diff --git a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
-index da15e83..23d1f46 100644
---- a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
-@@ -96,6 +96,16 @@
- 				status = "okay";
- 				pinctrl-0 = <&pinctrl_ssc0_tx>;
- 			};
-+
-+			spi0: spi at fffc8000 {
-+				status = "okay";
-+				cs-gpios = <0>, <&pioC 11 0>, <0>, <0>;
-+				mtd_dataflash at 0 {
-+					compatible = "atmel,at45", "atmel,dataflash";
-+					spi-max-frequency = <50000000>;
-+					reg = <1>;
++				spi0 {
++					pinctrl_spi0: spi0-0 {
++						atmel,pins =
++							<0 0 0x1 0x0	/* PA0 periph A SPI0_MISO pin */
++							 0 1 0x1 0x0	/* PA1 periph A SPI0_MOSI pin */
++							 0 2 0x1 0x0>;	/* PA2 periph A SPI0_SPCK pin */
++					};
 +				};
-+			};
- 		};
++
++				spi1 {
++					pinctrl_spi1: spi1-0 {
++						atmel,pins =
++							<1 0 0x1 0x0	/* PB0 periph A SPI1_MISO pin */
++							 1 1 0x1 0x0	/* PB1 periph A SPI1_MOSI pin */
++							 1 2 0x1 0x0>;	/* PB2 periph A SPI1_SPCK pin */
++					};
++				};
++
+ 				pioA: gpio at fffff400 {
+ 					compatible = "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff400 0x200>;
+@@ -477,6 +495,8 @@
+ 				compatible = "atmel,at91rm9200-spi";
+ 				reg = <0xfffc8000 0x200>;
+ 				interrupts = <12 4 3>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_spi0>;
+ 				status = "disabled";
+ 			};
  
- 		nand0: nand at 40000000 {
-diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-index 20c3191..92c52a7 100644
---- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
-+++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-@@ -102,6 +102,16 @@
+@@ -486,6 +506,8 @@
+ 				compatible = "atmel,at91rm9200-spi";
+ 				reg = <0xfffcc000 0x200>;
+ 				interrupts = <13 4 3>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_spi1>;
+ 				status = "disabled";
+ 			};
+ 
+diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
+index 6c6d9ae..94b58ab 100644
+--- a/arch/arm/boot/dts/at91sam9263.dtsi
++++ b/arch/arm/boot/dts/at91sam9263.dtsi
+@@ -303,6 +303,24 @@
  					};
  				};
- 			};
-+
-+			spi0: spi at fffa4000{
-+				status = "okay";
-+				cs-gpios = <&pioB 3 0>, <0>, <0>, <0>;
-+				mtd_dataflash at 0 {
-+					compatible = "atmel,at45", "atmel,dataflash";
-+					spi-max-frequency = <13000000>;
-+					reg = <0>;
-+				};
-+			};
- 		};
  
- 		nand0: nand at 40000000 {
-diff --git a/arch/arm/boot/dts/at91sam9n12ek.dts b/arch/arm/boot/dts/at91sam9n12ek.dts
-index 0376bf4..82551a8 100644
---- a/arch/arm/boot/dts/at91sam9n12ek.dts
-+++ b/arch/arm/boot/dts/at91sam9n12ek.dts
-@@ -67,6 +67,16 @@
++				spi0 {
++					pinctrl_spi0: spi0-0 {
++						atmel,pins =
++							<0 0 0x2 0x0	/* PA0 periph B SPI0_MISO pin */
++							 0 1 0x2 0x0	/* PA1 periph B SPI0_MOSI pin */
++							 0 2 0x2 0x0>;	/* PA2 periph B SPI0_SPCK pin */
++					};
++				};
++
++				spi1 {
++					pinctrl_spi1: spi1-0 {
++						atmel,pins =
++							<1 12 0x1 0x0	/* PB12 periph A SPI1_MISO pin */
++							 1 13 0x1 0x0	/* PB13 periph A SPI1_MOSI pin */
++							 1 14 0x1 0x0>;	/* PB14 periph A SPI1_SPCK pin */
++					};
++				};
++
+ 				pioA: gpio at fffff200 {
+ 					compatible = "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff200 0x200>;
+@@ -469,6 +487,8 @@
+ 				compatible = "atmel,at91rm9200-spi";
+ 				reg = <0xfffa4000 0x200>;
+ 				interrupts = <14 4 3>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_spi0>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -478,6 +498,8 @@
+ 				compatible = "atmel,at91rm9200-spi";
+ 				reg = <0xfffa8000 0x200>;
+ 				interrupts = <15 4 3>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_spi1>;
+ 				status = "disabled";
+ 			};
+ 		};
+diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+index e085b8a..cfdf429 100644
+--- a/arch/arm/boot/dts/at91sam9g45.dtsi
++++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+@@ -322,6 +322,24 @@
  					};
  				};
- 			};
-+
-+			spi0: spi at f0000000 {
-+				status = "okay";
-+				cs-gpios = <&pioA 14 0>, <0>, <0>, <0>;
-+				m25p80 at 0 {
-+					compatible = "atmel,at25df321a";
-+					spi-max-frequency = <50000000>;
-+					reg = <0>;
-+				};
-+			};
- 		};
  
- 		nand0: nand at 40000000 {
-diff --git a/arch/arm/boot/dts/at91sam9x5ek.dtsi b/arch/arm/boot/dts/at91sam9x5ek.dtsi
-index 8a7cf1d..09f5e66 100644
---- a/arch/arm/boot/dts/at91sam9x5ek.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5ek.dtsi
-@@ -84,6 +84,16 @@
++				spi0 {
++					pinctrl_spi0: spi0-0 {
++						atmel,pins =
++							<1 0 0x1 0x0	/* PB0 periph A SPI0_MISO pin */
++							 1 1 0x1 0x0	/* PB1 periph A SPI0_MOSI pin */
++							 1 2 0x1 0x0>;	/* PB2 periph A SPI0_SPCK pin */
++					};
++				};
++
++				spi1 {
++					pinctrl_spi1: spi1-0 {
++						atmel,pins =
++							<1 14 0x1 0x0	/* PB14 periph A SPI1_MISO pin */
++							 1 15 0x1 0x0	/* PB15 periph A SPI1_MOSI pin */
++							 1 16 0x1 0x0>;	/* PB16 periph A SPI1_SPCK pin */
++					};
++				};
++
+ 				pioA: gpio at fffff200 {
+ 					compatible = "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff200 0x200>;
+@@ -538,6 +556,8 @@
+ 				compatible = "atmel,at91rm9200-spi";
+ 				reg = <0xfffa4000 0x200>;
+ 				interrupts = <14 4 3>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_spi0>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -547,6 +567,8 @@
+ 				compatible = "atmel,at91rm9200-spi";
+ 				reg = <0xfffa8000 0x200>;
+ 				interrupts = <15 4 3>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_spi1>;
+ 				status = "disabled";
+ 			};
+ 		};
+diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
+index 9f839a9..1092190 100644
+--- a/arch/arm/boot/dts/at91sam9n12.dtsi
++++ b/arch/arm/boot/dts/at91sam9n12.dtsi
+@@ -261,6 +261,24 @@
  					};
  				};
- 			};
-+
-+			spi0: spi at f0000000 {
-+				status = "okay";
-+				cs-gpios = <&pioA 14 0>, <0>, <0>, <0>;
-+				m25p80 at 0 {
-+					compatible = "atmel,at25df321a";
-+					spi-max-frequency = <50000000>;
-+					reg = <0>;
-+				};
-+			};
- 		};
  
- 		usb0: ohci at 00600000 {
++				spi0 {
++					pinctrl_spi0: spi0-0 {
++						atmel,pins =
++							<0 11 0x1 0x0	/* PA11 periph A SPI0_MISO pin */
++							 0 12 0x1 0x0	/* PA12 periph A SPI0_MOSI pin */
++							 0 13 0x1 0x0>;	/* PA13 periph A SPI0_SPCK pin */
++					};
++				};
++
++				spi1 {
++					pinctrl_spi1: spi1-0 {
++						atmel,pins =
++							<0 21 0x2 0x0	/* PA21 periph B SPI1_MISO pin */
++							 0 22 0x2 0x0	/* PA22 periph B SPI1_MOSI pin */
++							 0 23 0x2 0x0>;	/* PA23 periph B SPI1_SPCK pin */
++					};
++				};
++
+ 				pioA: gpio at fffff400 {
+ 					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff400 0x200>;
+@@ -388,6 +406,8 @@
+ 				compatible = "atmel,at91rm9200-spi";
+ 				reg = <0xf0000000 0x100>;
+ 				interrupts = <13 4 3>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_spi0>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -397,6 +417,8 @@
+ 				compatible = "atmel,at91rm9200-spi";
+ 				reg = <0xf0004000 0x100>;
+ 				interrupts = <14 4 3>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_spi1>;
+ 				status = "disabled";
+ 			};
+ 		};
+diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+index bc98e5a..23d39ca 100644
+--- a/arch/arm/boot/dts/at91sam9x5.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+@@ -319,6 +319,24 @@
+ 					};
+ 				};
+ 
++				spi0 {
++					pinctrl_spi0: spi0-0 {
++						atmel,pins =
++							<0 11 0x1 0x0	/* PA11 periph A SPI0_MISO pin */
++							 0 12 0x1 0x0	/* PA12 periph A SPI0_MOSI pin */
++							 0 13 0x1 0x0>;	/* PA13 periph A SPI0_SPCK pin */
++					};
++				};
++
++				spi1 {
++					pinctrl_spi1: spi1-0 {
++						atmel,pins =
++							<0 21 0x2 0x0	/* PA21 periph B SPI1_MISO pin */
++							 0 22 0x2 0x0	/* PA22 periph B SPI1_MOSI pin */
++							 0 23 0x2 0x0>;	/* PA23 periph B SPI1_SPCK pin */
++					};
++				};
++
+ 				pioA: gpio at fffff400 {
+ 					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff400 0x200>;
+@@ -518,6 +536,8 @@
+ 				compatible = "atmel,at91rm9200-spi";
+ 				reg = <0xf0000000 0x100>;
+ 				interrupts = <13 4 3>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_spi0>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -527,6 +547,8 @@
+ 				compatible = "atmel,at91rm9200-spi";
+ 				reg = <0xf0004000 0x100>;
+ 				interrupts = <14 4 3>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_spi1>;
+ 				status = "disabled";
+ 			};
+ 		};
 -- 
 1.7.9.5
