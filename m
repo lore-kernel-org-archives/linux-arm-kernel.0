@@ -1,185 +1,438 @@
-From: srivatsa.bhat@linux.vnet.ibm.com (Srivatsa S. Bhat)
-Date: Thu, 28 Feb 2013 02:49:53 +0530
-Subject: [PATCH v6 04/46] percpu_rwlock: Implement the core design of
- Per-CPU Reader-Writer Locks
-In-Reply-To: <CACvQF53ph2ixdM-otzetjM5cR+2kcZj6sckOp3TnzzA_x-EZ8w@mail.gmail.com>
-References: <20130218123714.26245.61816.stgit@srivatsabhat.in.ibm.com>
- <20130218123856.26245.46705.stgit@srivatsabhat.in.ibm.com>
- <CANN689F9S7c1M8+cEpz3tsxGF34+NTRBLvxgPUOtbvav5u+RRA@mail.gmail.com>
- <5122551E.1080703@linux.vnet.ibm.com>	<51226B46.9080707@linux.vnet.ibm.com>
- <CANN689FSxOz+0Cu7EG_yKD8ZE1OpT4kyT+ybLfXSqaifodJRpw@mail.gmail.com>
- <51226F91.7000108@linux.vnet.ibm.com>
- <CACvQF53bdh4_BxF0y1fnTVR+T2OmRc0jmWQYftsvx92-fg-Lug@mail.gmail.com>
- <512BBAD8.8010006@linux.vnet.ibm.com>
- <CACvQF51jCxk5jUqmhD=QBBtUsBkQWZzakacrKO4Gsk=w61rNwQ@mail.gmail.com>
- <512C7A38.8060906@linux.vnet.ibm.com>
- <CACvQF51RvhM8XNqu3-1OTQ=cZUZ=pAX+_zx0a29+W67N1X+BgQ@mail.gmail.com>
- <512CC509.1050000@linux.vnet.ibm.com>
- <CACvQF50UgiqPpDk3HCmV86zKSf6tPjqr0bZowfPEOJs0g0r0MQ@mail.gmail.com>
- <512D0D67.9010609@linux.vnet.ibm.com>
- <CACvQF53ph2ixdM-otzetjM5cR+2kcZj6sckOp3TnzzA_x-EZ8w@mail.gmail.com>
-Message-ID: <512E7879.20109@linux.vnet.ibm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 27 Feb 2013 21:36:03 +0000
+Subject: crypto: omap-sham, omap-aes and dma_request_slave_channel_compat()
+In-Reply-To: <20130227053109.GA28537@intel.com>
+References: <512D00BE.8090204@canonical.com>
+ <20130226225205.GA13338@animalcreek.com> <20130227053109.GA28537@intel.com>
+Message-ID: <201302272136.04100.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/27/2013 06:03 AM, Lai Jiangshan wrote:
-> On Wed, Feb 27, 2013 at 3:30 AM, Srivatsa S. Bhat
-> <srivatsa.bhat@linux.vnet.ibm.com> wrote:
->> On 02/26/2013 09:55 PM, Lai Jiangshan wrote:
->>> On Tue, Feb 26, 2013 at 10:22 PM, Srivatsa S. Bhat
->>> <srivatsa.bhat@linux.vnet.ibm.com> wrote:
->>>>
->>>> Hi Lai,
->>>>
->>>> I'm really not convinced that piggy-backing on lglocks would help
->>>> us in any way. But still, let me try to address some of the points
->>>> you raised...
->>>>
->>>> On 02/26/2013 06:29 PM, Lai Jiangshan wrote:
->>>>> On Tue, Feb 26, 2013 at 5:02 PM, Srivatsa S. Bhat
->>>>> <srivatsa.bhat@linux.vnet.ibm.com> wrote:
->>>>>> On 02/26/2013 05:47 AM, Lai Jiangshan wrote:
->>>>>>> On Tue, Feb 26, 2013 at 3:26 AM, Srivatsa S. Bhat
->>>>>>> <srivatsa.bhat@linux.vnet.ibm.com> wrote:
->>>>>>>> Hi Lai,
->>>>>>>>
->>>>>>>> On 02/25/2013 09:23 PM, Lai Jiangshan wrote:
->>>>>>>>> Hi, Srivatsa,
->>>>>>>>>
->>>>>>>>> The target of the whole patchset is nice for me.
->>>>>>>>
->>>>>>>> Cool! Thanks :-)
->>>>>>>>
->>>>>> [...]
->>>>>>
->>>>>> Unfortunately, I see quite a few issues with the code above. IIUC, the
->>>>>> writer and the reader both increment the same counters. So how will the
->>>>>> unlock() code in the reader path know when to unlock which of the locks?
->>>>>
->>>>> The same as your code, the reader(which nested in write C.S.) just dec
->>>>> the counters.
->>>>
->>>> And that works fine in my case because the writer and the reader update
->>>> _two_ _different_ counters.
->>>
->>> I can't find any magic in your code, they are the same counter.
->>>
->>>         /*
->>>          * It is desirable to allow the writer to acquire the percpu-rwlock
->>>          * for read (if necessary), without deadlocking or getting complaints
->>>          * from lockdep. To achieve that, just increment the reader_refcnt of
->>>          * this CPU - that way, any attempt by the writer to acquire the
->>>          * percpu-rwlock for read, will get treated as a case of nested percpu
->>>          * reader, which is safe, from a locking perspective.
->>>          */
->>>         this_cpu_inc(pcpu_rwlock->rw_state->reader_refcnt);
->>>
->>
->> Whoa! Hold on, were you really referring to _this_ increment when you said
->> that, in your patch you would increment the refcnt at the writer? Then I guess
->> there is a major disconnect in our conversations. (I had assumed that you were
->> referring to the update of writer_signal, and were just trying to have a single
->> refcnt instead of reader_refcnt and writer_signal).
+On Wednesday 27 February 2013, Vinod Koul wrote:
+> Yes we had agreed that I will send it.
 > 
-> https://github.com/laijs/linux/commit/53e5053d5b724bea7c538b11743d0f420d98f38d
+> I have applied this one now, and will send second PULL request to Linus soon.
 > 
-> Sorry the name "fallback_reader_refcnt" misled you.
-> 
-[...]
+> Arnd,
+> The second patch of dw_dmac you wnated to send me fails to apply for me. Can you
+> either rebase or send with your updates with my ack?
 
->>> All I was considered is "nested reader is seldom", so I always
->>> fallback to rwlock when nested.
->>> If you like, I can add 6 lines of code, the overhead is
->>> 1 spin_try_lock()(fast path)  + N  __this_cpu_inc()
->>>
->>
->> I'm assuming that calculation is no longer valid, considering that
->> we just discussed how the per-cpu refcnt that you were using is quite
->> unnecessary and can be removed.
->>
->> IIUC, the overhead with your code, as per above discussion would be:
->> 1 spin_try_lock() [non-nested] + N read_lock(global_rwlock).
-> 
-> https://github.com/laijs/linux/commit/46334544bb7961550b7065e015da76f6dab21f16
-> 
-> Again, I'm so sorry the name "fallback_reader_refcnt" misled you.
-> 
+I would prefer if you send the patch. I've rebased my patch on top of
+today's upstream tree but could not see any difference to my previous
+version. Anyway, here it is again.
 
-At this juncture I really have to admit that I don't understand your
-intentions at all. What are you really trying to prove? Without giving
-a single good reason why my code is inferior, why are you even bringing
-up the discussion about a complete rewrite of the synchronization code?
-http://article.gmane.org/gmane.linux.kernel.cross-arch/17103
-http://article.gmane.org/gmane.linux.power-management.general/31345
+	Arnd
 
-I'm beginning to add 2 + 2 together based on the kinds of questions you
-have been asking...
+8<----------
+Subject: [PATCH] dmaengine: dw_dmac: move to generic DMA binding
 
-You posted a patch in this thread and started a discussion around it without
-even establishing a strong reason to do so. Now you point me to your git
-tree where your patches have even more traces of ideas being borrowed from
-my patchset (apart from my own ideas/code, there are traces of others' ideas
-being borrowed too - for example, it was Oleg who originally proposed the
-idea of splitting up the counter into 2 parts and I'm seeing that it is
-slowly crawling into your code with no sign of appropriate credits).
-http://article.gmane.org/gmane.linux.network/260288
+The original device tree binding for this driver, from Viresh Kumar
+unfortunately conflicted with the generic DMA binding, and did not allow
+to completely seperate slave device configuration from the controller.
 
-And in reply to my mail pointing out the performance implications of the
-global read_lock at the reader side in your code, you said you'll come up
-with a comparison between that and my patchset.
-http://article.gmane.org/gmane.linux.network/260288
-The issue has been well-documented in my patch description of patch 4.
-http://article.gmane.org/gmane.linux.kernel/1443258
+This is an attempt to replace it with an implementation of the generic
+binding, but it is currently completely untested, because I do not have
+any hardware with this particular controller.
 
-Are you really trying to pit bits and pieces of my own ideas/versions
-against one another and claiming them as your own?
+The patch applies on top of the slave-dma tree, which contains both the base
+support for the generic DMA binding, as well as the earlier attempt from
+Viresh. Both of these are currently not merged upstream however.
 
-You projected the work involved in handling the locking issues pertaining
-to CPU_DYING notifiers etc as a TODO, despite the fact that I had explicitly
-noted in my cover letter that I had audited and taken care of all of them.
-http://article.gmane.org/gmane.linux.documentation/9727
-http://article.gmane.org/gmane.linux.documentation/9520
+This version incorporates feedback from Viresh Kumar, Andy Shevchenko
+and Russell King.
 
-You failed to acknowledge (on purpose?) that I had done a tree-wide
-conversion despite the fact that you were replying to the very thread which
-had the 46 patches which did exactly that (and I had also mentioned it
-explicitly in my cover letter).
-http://article.gmane.org/gmane.linux.documentation/9727
-http://article.gmane.org/gmane.linux.documentation/9520
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Acked-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Cc: Vinod Koul <vinod.koul@linux.intel.com>
+Cc: devicetree-discuss at lists.ozlabs.org
+Cc: linux-arm-kernel at lists.infradead.org
 
-You then started probing more and more about the technique I used to do
-the tree-wide conversion.
-http://article.gmane.org/gmane.linux.kernel.cross-arch/17111
-
-You also retorted saying you did go through my patch descriptions, so
-its not like you have missed reading them.
-http://article.gmane.org/gmane.linux.power-management.general/31345
-
-Each of these when considered individually, might appear like innocuous and
-honest attempts at evaluating my code. But when put together, I'm beginning
-to sense a whole different angle to it altogether, as if you are trying
-to spin your own patch series, complete with the locking framework _and_
-the tree-wide conversion, heavily borrowed from mine. At the beginning of
-this discussion, I predicted that the lglock version that you are proposing
-would end up being either less efficient than my version or look very similar
-to my version. http://article.gmane.org/gmane.linux.kernel/1447139
-
-I thought it was just the former till now, but its not hard to see how it
-is getting closer to becoming the latter too. So yeah, I'm not amused.
-
-Maybe (and hopefully) you are just trying out different ideas on your own,
-and I'm just being paranoid. I really hope that is the case. If you are just
-trying to review my code, then please stop sending patches with borrowed ideas
-with your sole Signed-off-by, and purposefully ignoring the work already done
-in my patchset, because it is really starting to look suspicious, at least
-to me.
-
-Don't get me wrong - I'll whole-heartedly acknowledge and appreciate if
-_your_ code is better than mine. I just don't like the idea of somebody
-plagiarizing my ideas/code (or even others' ideas for that matter).
-However, I sincerely apologize in advance if I misunderstood/misjudged your
-intentions; I just wanted to voice my concerns out loud at this point,
-considering the bad feeling I got by looking at your responses collectively.
-
-Regards,
-Srivatsa S. Bhat
+diff --git a/Documentation/devicetree/bindings/dma/snps-dma.txt b/Documentation/devicetree/bindings/dma/snps-dma.txt
+index 5bb3dfb..d58675e 100644
+--- a/Documentation/devicetree/bindings/dma/snps-dma.txt
++++ b/Documentation/devicetree/bindings/dma/snps-dma.txt
+@@ -3,59 +3,61 @@
+ Required properties:
+ - compatible: "snps,dma-spear1340"
+ - reg: Address range of the DMAC registers
+-- interrupt-parent: Should be the phandle for the interrupt controller
+-  that services interrupts for this device
+ - interrupt: Should contain the DMAC interrupt number
+-- nr_channels: Number of channels supported by hardware
+-- is_private: The device channels should be marked as private and not for by the
+-  general purpose DMA channel allocator. False if not passed.
++- dma-channels: Number of channels supported by hardware
++- dma-requests: Number of DMA request lines supported, up to 16
++- dma-masters: Number of AHB masters supported by the controller
++- #dma-cells: must be <3>
+ - chan_allocation_order: order of allocation of channel, 0 (default): ascending,
+   1: descending
+ - chan_priority: priority of channels. 0 (default): increase from chan 0->n, 1:
+   increase from chan n->0
+ - block_size: Maximum block size supported by the controller
+-- nr_masters: Number of AHB masters supported by the controller
+ - data_width: Maximum data width supported by hardware per AHB master
+   (0 - 8bits, 1 - 16bits, ..., 5 - 256bits)
+-- slave_info:
+-	- bus_id: name of this device channel, not just a device name since
+-	  devices may have more than one channel e.g. "foo_tx". For using the
+-	  dw_generic_filter(), slave drivers must pass exactly this string as
+-	  param to filter function.
+-	- cfg_hi: Platform-specific initializer for the CFG_HI register
+-	- cfg_lo: Platform-specific initializer for the CFG_LO register
+-	- src_master: src master for transfers on allocated channel.
+-	- dst_master: dest master for transfers on allocated channel.
++
++
++Optional properties:
++- interrupt-parent: Should be the phandle for the interrupt controller
++  that services interrupts for this device
++- is_private: The device channels should be marked as private and not for by the
++  general purpose DMA channel allocator. False if not passed.
+ 
+ Example:
+ 
+-	dma at fc000000 {
++	dmahost: dma at fc000000 {
+ 		compatible = "snps,dma-spear1340";
+ 		reg = <0xfc000000 0x1000>;
+ 		interrupt-parent = <&vic1>;
+ 		interrupts = <12>;
+ 
+-		nr_channels = <8>;
++		dma-channels = <8>;
++		dma-requests = <16>;
++		dma-masters = <2>;
++		#dma-cells = <3>;
+ 		chan_allocation_order = <1>;
+ 		chan_priority = <1>;
+ 		block_size = <0xfff>;
+-		nr_masters = <2>;
+ 		data_width = <3 3 0 0>;
++	};
+ 
+-		slave_info {
+-			uart0-tx {
+-				bus_id = "uart0-tx";
+-				cfg_hi = <0x4000>;	/* 0x8 << 11 */
+-				cfg_lo = <0>;
+-				src_master = <0>;
+-				dst_master = <1>;
+-			};
+-			spi0-tx {
+-				bus_id = "spi0-tx";
+-				cfg_hi = <0x2000>;	/* 0x4 << 11 */
+-				cfg_lo = <0>;
+-				src_master = <0>;
+-				dst_master = <0>;
+-			};
+-		};
++DMA clients connected to the Designware DMA controller must use the format
++described in the dma.txt file, using a four-cell specifier for each channel.
++The four cells in order are:
++
++1. A phandle pointing to the DMA controller
++2. The DMA request line number
++3. Source master for transfers on allocated channel
++4. Destination master for transfers on allocated channel
++
++Example:
++	
++	serial at e0000000 {
++		compatible = "arm,pl011", "arm,primecell";
++		reg = <0xe0000000 0x1000>;
++		interrupts = <0 35 0x4>;
++		status = "disabled";
++		dmas = <&dmahost 12 0 1>,
++			<&dmahost 13 0 1 0>;
++		dma-names = "rx", "rx";
+ 	};
+diff --git a/drivers/dma/dw_dmac.c b/drivers/dma/dw_dmac.c
+index 51c3ea2..c599558 100644
+--- a/drivers/dma/dw_dmac.c
++++ b/drivers/dma/dw_dmac.c
+@@ -20,6 +20,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/io.h>
+ #include <linux/of.h>
++#include <linux/of_dma.h>
+ #include <linux/mm.h>
+ #include <linux/module.h>
+ #include <linux/platform_device.h>
+@@ -171,7 +172,13 @@ static void dwc_initialize(struct dw_dma_chan *dwc)
+ 	if (dwc->initialized == true)
+ 		return;
+ 
+-	if (dws) {
++	if (dws && dws->cfg_hi == ~0 && dws->cfg_lo == ~0) {
++		/* autoconfigure based on request line from DT */
++		if (dwc->direction == DMA_MEM_TO_DEV)
++			cfghi = DWC_CFGH_DST_PER(dwc->request_line);
++		else if (dwc->direction == DMA_DEV_TO_MEM)
++			cfghi = DWC_CFGH_SRC_PER(dwc->request_line);
++	} else if (dws) {
+ 		/*
+ 		 * We need controller-specific data to set up slave
+ 		 * transfers.
+@@ -1226,49 +1233,64 @@ static void dwc_free_chan_resources(struct dma_chan *chan)
+ 	dev_vdbg(chan2dev(chan), "%s: done\n", __func__);
+ }
+ 
+-bool dw_dma_generic_filter(struct dma_chan *chan, void *param)
++struct dw_dma_filter_args {
++	struct dw_dma *dw;
++	unsigned int req;
++	unsigned int src;
++	unsigned int dst;
++};
++
++static bool dw_dma_generic_filter(struct dma_chan *chan, void *param)
+ {
++	struct dw_dma_chan *dwc = to_dw_dma_chan(chan);
+ 	struct dw_dma *dw = to_dw_dma(chan->device);
+-	static struct dw_dma *last_dw;
+-	static char *last_bus_id;
+-	int i = -1;
++	struct dw_dma_filter_args *fargs = param;
++	struct dw_dma_slave *dws = &dwc->slave;
+ 
+-	/*
+-	 * dmaengine framework calls this routine for all channels of all dma
+-	 * controller, until true is returned. If 'param' bus_id is not
+-	 * registered with a dma controller (dw), then there is no need of
+-	 * running below function for all channels of dw.
+-	 *
+-	 * This block of code does this by saving the parameters of last
+-	 * failure. If dw and param are same, i.e. trying on same dw with
+-	 * different channel, return false.
+-	 */
+-	if ((last_dw == dw) && (last_bus_id == param))
+-		return false;
+-	/*
+-	 * Return true:
+-	 * - If dw_dma's platform data is not filled with slave info, then all
+-	 *   dma controllers are fine for transfer.
+-	 * - Or if param is NULL
+-	 */
+-	if (!dw->sd || !param)
+-		return true;
++	/* ensure the device matches our channel */
++        if (chan->device != &fargs->dw->dma)
++                return false;
+ 
+-	while (++i < dw->sd_count) {
+-		if (!strcmp(dw->sd[i].bus_id, param)) {
+-			chan->private = &dw->sd[i];
+-			last_dw = NULL;
+-			last_bus_id = NULL;
++	dws->dma_dev	= dw->dma.dev;
++	dws->cfg_hi	= ~0;
++	dws->cfg_lo	= ~0;
++	dws->src_master	= fargs->src;
++	dws->dst_master	= fargs->dst;
+ 
+-			return true;
+-		}
+-	}
++	dwc->request_line = fargs->req;
+ 
+-	last_dw = dw;
+-	last_bus_id = param;
+-	return false;
++	chan->private = dws;
++
++	return true;
++}
++
++static struct dma_chan *dw_dma_xlate(struct of_phandle_args *dma_spec,
++					 struct of_dma *ofdma)
++{
++	struct dw_dma *dw = ofdma->of_dma_data;
++	struct dw_dma_filter_args fargs = {
++		.dw = dw,
++	};
++	dma_cap_mask_t cap;
++
++	if (dma_spec->args_count != 3)
++		return NULL;
++
++	fargs.req = be32_to_cpup(dma_spec->args+0);
++	fargs.src = be32_to_cpup(dma_spec->args+1);
++	fargs.dst = be32_to_cpup(dma_spec->args+2);
++
++	if (WARN_ON(fargs.req >= DW_DMA_MAX_NR_REQUESTS ||
++		    fargs.src >= dw->nr_masters ||
++		    fargs.dst >= dw->nr_masters))
++		return NULL;
++
++	dma_cap_zero(cap);
++	dma_cap_set(DMA_SLAVE, cap);
++
++	/* TODO: there should be a simpler way to do this */
++	return dma_request_channel(cap, dw_dma_generic_filter, &fargs);
+ }
+-EXPORT_SYMBOL(dw_dma_generic_filter);
+ 
+ /* --------------------- Cyclic DMA API extensions -------------------- */
+ 
+@@ -1554,9 +1576,8 @@ static void dw_dma_off(struct dw_dma *dw)
+ static struct dw_dma_platform_data *
+ dw_dma_parse_dt(struct platform_device *pdev)
+ {
+-	struct device_node *sn, *cn, *np = pdev->dev.of_node;
++	struct device_node *np = pdev->dev.of_node;
+ 	struct dw_dma_platform_data *pdata;
+-	struct dw_dma_slave *sd;
+ 	u32 tmp, arr[4];
+ 
+ 	if (!np) {
+@@ -1568,7 +1589,7 @@ dw_dma_parse_dt(struct platform_device *pdev)
+ 	if (!pdata)
+ 		return NULL;
+ 
+-	if (of_property_read_u32(np, "nr_channels", &pdata->nr_channels))
++	if (of_property_read_u32(np, "dma-channels", &pdata->nr_channels))
+ 		return NULL;
+ 
+ 	if (of_property_read_bool(np, "is_private"))
+@@ -1583,7 +1604,7 @@ dw_dma_parse_dt(struct platform_device *pdev)
+ 	if (!of_property_read_u32(np, "block_size", &tmp))
+ 		pdata->block_size = tmp;
+ 
+-	if (!of_property_read_u32(np, "nr_masters", &tmp)) {
++	if (!of_property_read_u32(np, "dma-masters", &tmp)) {
+ 		if (tmp > 4)
+ 			return NULL;
+ 
+@@ -1595,36 +1616,6 @@ dw_dma_parse_dt(struct platform_device *pdev)
+ 		for (tmp = 0; tmp < pdata->nr_masters; tmp++)
+ 			pdata->data_width[tmp] = arr[tmp];
+ 
+-	/* parse slave data */
+-	sn = of_find_node_by_name(np, "slave_info");
+-	if (!sn)
+-		return pdata;
+-
+-	/* calculate number of slaves */
+-	tmp = of_get_child_count(sn);
+-	if (!tmp)
+-		return NULL;
+-
+-	sd = devm_kzalloc(&pdev->dev, sizeof(*sd) * tmp, GFP_KERNEL);
+-	if (!sd)
+-		return NULL;
+-
+-	pdata->sd = sd;
+-	pdata->sd_count = tmp;
+-
+-	for_each_child_of_node(sn, cn) {
+-		sd->dma_dev = &pdev->dev;
+-		of_property_read_string(cn, "bus_id", &sd->bus_id);
+-		of_property_read_u32(cn, "cfg_hi", &sd->cfg_hi);
+-		of_property_read_u32(cn, "cfg_lo", &sd->cfg_lo);
+-		if (!of_property_read_u32(cn, "src_master", &tmp))
+-			sd->src_master = tmp;
+-
+-		if (!of_property_read_u32(cn, "dst_master", &tmp))
+-			sd->dst_master = tmp;
+-		sd++;
+-	}
+-
+ 	return pdata;
+ }
+ #else
+@@ -1705,8 +1696,6 @@ static int dw_probe(struct platform_device *pdev)
+ 	clk_prepare_enable(dw->clk);
+ 
+ 	dw->regs = regs;
+-	dw->sd = pdata->sd;
+-	dw->sd_count = pdata->sd_count;
+ 
+ 	/* get hardware configuration parameters */
+ 	if (autocfg) {
+@@ -1837,6 +1826,14 @@ static int dw_probe(struct platform_device *pdev)
+ 
+ 	dma_async_device_register(&dw->dma);
+ 
++	if (pdev->dev.of_node) {
++		err = of_dma_controller_register(pdev->dev.of_node,
++						 dw_dma_xlate, dw);
++		if (err && err != -ENODEV)
++			dev_err(&pdev->dev,
++				"could not register of_dma_controller\n");
++	}
++
+ 	return 0;
+ }
+ 
+@@ -1845,6 +1842,8 @@ static int dw_remove(struct platform_device *pdev)
+ 	struct dw_dma		*dw = platform_get_drvdata(pdev);
+ 	struct dw_dma_chan	*dwc, *_dwc;
+ 
++	if (pdev->dev.of_node)
++		of_dma_controller_free(pdev->dev.of_node);
+ 	dw_dma_off(dw);
+ 	dma_async_device_unregister(&dw->dma);
+ 
+diff --git a/drivers/dma/dw_dmac_regs.h b/drivers/dma/dw_dmac_regs.h
+index 88dd8eb..cf0ce5c 100644
+--- a/drivers/dma/dw_dmac_regs.h
++++ b/drivers/dma/dw_dmac_regs.h
+@@ -13,6 +13,7 @@
+ #include <linux/dw_dmac.h>
+ 
+ #define DW_DMA_MAX_NR_CHANNELS	8
++#define DW_DMA_MAX_NR_REQUESTS	16
+ 
+ /* flow controller */
+ enum dw_dma_fc {
+@@ -211,6 +212,8 @@ struct dw_dma_chan {
+ 	/* hardware configuration */
+ 	unsigned int		block_size;
+ 	bool			nollp;
++	unsigned int		request_line;
++	struct dw_dma_slave	slave;
+ 
+ 	/* configuration passed via DMA_SLAVE_CONFIG */
+ 	struct dma_slave_config dma_sconfig;
+@@ -239,10 +242,6 @@ struct dw_dma {
+ 	struct tasklet_struct	tasklet;
+ 	struct clk		*clk;
+ 
+-	/* slave information */
+-	struct dw_dma_slave	*sd;
+-	unsigned int		sd_count;
+-
+ 	u8			all_chan_mask;
+ 
+ 	/* hardware configuration */
+diff --git a/include/linux/dw_dmac.h b/include/linux/dw_dmac.h
+index 41766de..481ab23 100644
+--- a/include/linux/dw_dmac.h
++++ b/include/linux/dw_dmac.h
+@@ -27,7 +27,6 @@
+  */
+ struct dw_dma_slave {
+ 	struct device		*dma_dev;
+-	const char		*bus_id;
+ 	u32			cfg_hi;
+ 	u32			cfg_lo;
+ 	u8			src_master;
+@@ -60,9 +59,6 @@ struct dw_dma_platform_data {
+ 	unsigned short	block_size;
+ 	unsigned char	nr_masters;
+ 	unsigned char	data_width[4];
+-
+-	struct dw_dma_slave *sd;
+-	unsigned int sd_count;
+ };
+ 
+ /* bursts size */
+@@ -114,6 +110,5 @@ void dw_dma_cyclic_stop(struct dma_chan *chan);
+ dma_addr_t dw_dma_get_src_addr(struct dma_chan *chan);
+ 
+ dma_addr_t dw_dma_get_dst_addr(struct dma_chan *chan);
+-bool dw_dma_generic_filter(struct dma_chan *chan, void *param);
+ 
+ #endif /* DW_DMAC_H */
