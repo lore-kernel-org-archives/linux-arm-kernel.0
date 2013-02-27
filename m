@@ -1,73 +1,54 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 27 Feb 2013 17:33:11 +0100
-Subject: [PATCH] USB otg: use try_module_get in all usb_get_phy functions
- and add missing module_put
-In-Reply-To: <20130227162146.GE21645@kroah.com>
-References: <1361974273-17087-1-git-send-email-mkl@pengutronix.de>
- <1361974273-17087-2-git-send-email-mkl@pengutronix.de>
- <20130227162146.GE21645@kroah.com>
-Message-ID: <512E3547.2000607@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 27 Feb 2013 16:31:18 +0000
+Subject: [RFC PATCH v2 0/4] Add support for LZ4-compressed kernel
+In-Reply-To: <1361980152.2035.13.camel@joe-AO722>
+References: <1361859870-15751-1-git-send-email-kyungsik.lee@lge.com>
+ <512D1C12.4080109@oberhumer.com>
+ <alpine.LFD.2.03.1302261557220.1254@syhkavp.arg>
+ <87fw0i7n6d.fsf@dell.be.48ers.dk>
+ <20130226221027.GW17833@n2100.arm.linux.org.uk>
+ <1361929234.1924.8.camel@joe-AO722>
+ <20130227095609.GY17833@n2100.arm.linux.org.uk>
+ <1361980152.2035.13.camel@joe-AO722>
+Message-ID: <20130227163118.GB17833@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/27/2013 05:21 PM, Greg KH wrote:
-> On Wed, Feb 27, 2013 at 03:11:13PM +0100, Marc Kleine-Budde wrote:
->> In patch "5d3c28b usb: otg: add device tree support to otg library"
->> devm_usb_get_phy_by_phandle() was added. It uses try_module_get() to lock the
->> phy driver in memory. The corresponding module_put() is missing in that patch.
->>
->> This patch adds try_module_get() to usb_get_phy() and usb_get_phy_dev().
->> Further the missing module_put() is added to usb_put_phy().
->>
->> Reviewed-by: Kishon Vijay Abraham I <kishon@ti.com>
->> Acked-by: Felipe Balbi <balbi@ti.com>
->> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
->> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
->> ---
->>  drivers/usb/otg/otg.c |   10 +++++++---
->>  1 file changed, 7 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/usb/otg/otg.c b/drivers/usb/otg/otg.c
->> index e181439..2bd03d2 100644
->> --- a/drivers/usb/otg/otg.c
->> +++ b/drivers/usb/otg/otg.c
->> @@ -130,7 +130,7 @@ struct usb_phy *usb_get_phy(enum usb_phy_type type)
->>  	spin_lock_irqsave(&phy_lock, flags);
->>  
->>  	phy = __usb_find_phy(&phy_list, type);
->> -	if (IS_ERR(phy)) {
->> +	if (IS_ERR(phy) || !try_module_get(phy->dev->driver->owner)) {
+On Wed, Feb 27, 2013 at 07:49:12AM -0800, Joe Perches wrote:
+> On Wed, 2013-02-27 at 09:56 +0000, Russell King - ARM Linux wrote:
+> > On Tue, Feb 26, 2013 at 05:40:34PM -0800, Joe Perches wrote:
+> > > On Tue, 2013-02-26 at 22:10 +0000, Russell King - ARM Linux wrote:
+> > > > So... for a selected kernel version of a particular size, can we please
+> > > > have a comparison between the new LZO code and this LZ4 code, so that
+> > > > we can see whether it's worth updating the LZO code or replacing the
+> > > > LZO code with LZ4?
+> > > 
+> > > How could it be questionable that it's worth updating the LZO code?
+> > 
+> > Please read the comments against the previous posting of these patches
+> > where I first stated this argument - and with agreement from those
+> > following the thread.  The thread started on 26 Jan 2013.  Thanks.
 > 
-> Ugh, really?  We really are trying this type of module locking mess?
+> https://lkml.org/lkml/2013/1/29/145
 > 
-> Why?  What is it solving?  What's wrong with having the module be able
+> I did not and do not see significant value in
+> adding LZ4 given Markus' LZO improvements.
 
-Without this patch, you can unload the phy module, while it is in use.
-As the phy framework doesn't use any existing abstraction to handle phy
-<-> user of phy pairing/unpairing (it's all open coded), any subsequent
-use of the phy's callback will result in deref'ing bogus pointers.
+Sorry, a 66% increase in decompression speed over the updated LZO code
+isn't "significant value" ?
 
-> to be unloaded whenever it wants to?  No one should be doing that and
-> expecting that their hardware would still work properly, right?
+I'm curious - what in your mind qualifies "significant value" ?
 
-Yes, but it should not result in an kernel oops.
+Maybe "significant value" is a patch which buggily involves converting
+all those "<n>" printk format strings in assembly files to KERN_* macros,
+thereby breaking those strings because you've not paid attention to what
+.asciz means?  (Yes, I've just cleaned that crap up after you...)
 
-> I really don't like this type of thing, sorry.
+> Why would the LZO code not be updated?
 
-Can you point Kishon and me to a better implementation?
-
-Marc
-
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130227/6b5ac10f/attachment.sig>
+I'm not saying that the LZO code should not be updated.  I'm saying that
+the kernel boot time decompressor is not a play ground for an ever
+increasing number of "my favourite compression method" crap.  We don't
+need four, five or even six compression methods there.  We just need
+three - a "fast but large", "small but slow" and "all round popular
+medium".
