@@ -1,60 +1,40 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 27 Feb 2013 11:05:24 -0600
-Subject: [PATCH 1/3] libfdt: add fdt type definitions in libfdt_env.h
-In-Reply-To: <1361928975-29395-1-git-send-email-kim.phillips@freescale.com>
-References: <1361928975-29395-1-git-send-email-kim.phillips@freescale.com>
-Message-ID: <512E3CD4.6000305@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 27 Feb 2013 17:14:10 +0000
+Subject: [PATCH 0/4] Convert highbank to use PSCI calls
+In-Reply-To: <512E0F79.6080301@gmail.com>
+References: <1361936528-25998-1-git-send-email-robherring2@gmail.com>
+ <201302270858.20864.arnd@arndb.de> <512E0F79.6080301@gmail.com>
+Message-ID: <20130227171410.GC22286@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/26/2013 07:36 PM, Kim Phillips wrote:
-> in preparation for the forthcoming dtc update which adds fdt specific
-> types: fdt{16,32,64}_t.
+On Wed, Feb 27, 2013 at 01:51:53PM +0000, Rob Herring wrote:
+> On 02/27/2013 02:58 AM, Arnd Bergmann wrote:
+> >> This series converts highbank to use PSCI calls for secondary core boot,
+> >> hotplug, cpuidle, suspend/resume, reset, and poweroff. Doing this removes
+> >> about 200 lines of platform code (1/3 of it) and abstracts out the A9 and
+> >> A15 differences (some of which are not yet in place).
+> > 
+> > This looks pretty cool. Can you or Will comment on what is still left
+> > for the SMP ops that is actually required as platform specific code?
+> > 
+> > Specifically, I'm wondering if we could have a set of default smp_ops
+> > based on this that we could use with the default machine descriptor [1]
+> > and any platform that has SMP enabled but a NULL smp_ops pointer.
 > 
-> Signed-off-by: Kim Phillips <kim.phillips@freescale.com>
-> ---
->  arch/arm/boot/compressed/libfdt_env.h | 4 ++++
->  include/linux/libfdt_env.h            | 6 ++++++
-
-We should kill off arch/arm/boot/compressed/libfdt_env.h and use
-include/linux/libfdt_env.h instead. The only reason I see why we have
-both is the ARM version was introduced before include/linux/libfdt_env.h
-existed.
-
-Rob
-
->  2 files changed, 10 insertions(+)
+> My smp code is exactly the same as mach-virt with this, but adds cpu_die
+> for hotplug. smp_secondary_init will go away with Catalin's series to
+> use notifiers for the gic secondary init. This leaves smp_boot_secondary.
 > 
-> diff --git a/arch/arm/boot/compressed/libfdt_env.h b/arch/arm/boot/compressed/libfdt_env.h
-> index 1f4e718..17ae0f3 100644
-> --- a/arch/arm/boot/compressed/libfdt_env.h
-> +++ b/arch/arm/boot/compressed/libfdt_env.h
-> @@ -5,6 +5,10 @@
->  #include <linux/string.h>
->  #include <asm/byteorder.h>
->  
-> +typedef __be16 fdt16_t;
-> +typedef __be32 fdt32_t;
-> +typedef __be64 fdt64_t;
-> +
->  #define fdt16_to_cpu(x)		be16_to_cpu(x)
->  #define cpu_to_fdt16(x)		cpu_to_be16(x)
->  #define fdt32_to_cpu(x)		be32_to_cpu(x)
-> diff --git a/include/linux/libfdt_env.h b/include/linux/libfdt_env.h
-> index 01508c7..da98097 100644
-> --- a/include/linux/libfdt_env.h
-> +++ b/include/linux/libfdt_env.h
-> @@ -5,6 +5,12 @@
->  
->  #include <asm/byteorder.h>
->  
-> +typedef __be16 fdt16_t;
-> +typedef __be32 fdt32_t;
-> +typedef __be64 fdt64_t;
-> +
-> +#define fdt16_to_cpu(x) be16_to_cpu(x)
-> +#define cpu_to_fdt16(x) cpu_to_be16(x)
->  #define fdt32_to_cpu(x) be32_to_cpu(x)
->  #define cpu_to_fdt32(x) cpu_to_be32(x)
->  #define fdt64_to_cpu(x) be64_to_cpu(x)
+> We could move these remaining smp_ops to psci.c and create psci_smp_ops.
+> That probably needs to be after the gic notifier changes.
 > 
+> Your patch, psci smp ops, and converting the arch timers to use
+> OF_CLKSRC_DECLARE will eliminate mach-virt unless Will has more things
+> planned for it.
+
+As long as we remain compatible with "linux,dummy-virt" then I'm not fussed
+what happens to the support code. I don't envisage adding anything else to
+it that can't live under drivers/ (e.g. new virtio devices).
+
+Will
