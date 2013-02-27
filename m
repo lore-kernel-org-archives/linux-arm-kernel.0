@@ -1,123 +1,94 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Wed, 27 Feb 2013 10:28:04 +0800
-Subject: [PATCH V2 1/4] ARM: tegra: pmc: convert PMC driver to support DT only
+Date: Wed, 27 Feb 2013 10:28:06 +0800
+Subject: [PATCH V2 3/4] ARM: tegra30: platsmp: replace the CPU power on
+ function in PMC driver
 In-Reply-To: <1361932087-13372-1-git-send-email-josephl@nvidia.com>
 References: <1361932087-13372-1-git-send-email-josephl@nvidia.com>
-Message-ID: <1361932087-13372-2-git-send-email-josephl@nvidia.com>
+Message-ID: <1361932087-13372-4-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Tegra kernel only support boot from DT now. Clean up the PMC driver
-to support DT only, that includes:
-
-* remove the ifdef of CONFIG_OF
-* replace the static mapping of PMC addr to map from DT
+Using the CPU power on function in PMC driver to bring up secondary CPUs,
+because we are going to re-factor powergate driver to support generic
+power domain. It will be removed later and added the generic power domain
+support in PMC driver.
 
 Signed-off-by: Joseph Lo <josephl@nvidia.com>
 ---
 V2:
-* removing the change from readl_relaxed back to readl, same with the
-  write function
-* adding a BUG() when there is no PMC node in DT
-* removeing the redundancy of_have_populated_dt() check
+* no change
 ---
- arch/arm/mach-tegra/pmc.c | 54 ++++++++++++++++++++++-------------------------
- 1 file changed, 25 insertions(+), 29 deletions(-)
+ arch/arm/mach-tegra/platsmp.c | 19 +++++++------------
+ 1 file changed, 7 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/pmc.c b/arch/arm/mach-tegra/pmc.c
-index 5d79d34..f7d63ab 100644
---- a/arch/arm/mach-tegra/pmc.c
-+++ b/arch/arm/mach-tegra/pmc.c
-@@ -1,5 +1,5 @@
- /*
-- * Copyright (C) 2012 NVIDIA CORPORATION. All rights reserved.
-+ * Copyright (C) 2012,2013 NVIDIA CORPORATION. All rights reserved.
-  *
-  * This program is free software; you can redistribute it and/or modify it
-  * under the terms and conditions of the GNU General Public License,
-@@ -18,59 +18,55 @@
- #include <linux/kernel.h>
- #include <linux/io.h>
- #include <linux/of.h>
+diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
+index 41971ac..601bd0c 100644
+--- a/arch/arm/mach-tegra/platsmp.c
++++ b/arch/arm/mach-tegra/platsmp.c
+@@ -26,11 +26,10 @@
+ #include <asm/smp_scu.h>
+ #include <asm/smp_plat.h>
+ 
+-#include <mach/powergate.h>
 -
--#include "iomap.h"
-+#include <linux/of_address.h>
+ #include "fuse.h"
+ #include "flowctrl.h"
+ #include "reset.h"
++#include "pmc.h"
  
- #define PMC_CTRL		0x0
- #define PMC_CTRL_INTR_LOW	(1 << 17)
+ #include "common.h"
+ #include "iomap.h"
+@@ -80,14 +79,10 @@ static int tegra20_boot_secondary(unsigned int cpu, struct task_struct *idle)
  
-+static void __iomem *tegra_pmc_base;
-+static bool tegra_pmc_invert_interrupt;
-+
- static inline u32 tegra_pmc_readl(u32 reg)
+ static int tegra30_boot_secondary(unsigned int cpu, struct task_struct *idle)
  {
--	return readl(IO_ADDRESS(TEGRA_PMC_BASE + reg));
-+	return readl(tegra_pmc_base + reg);
- }
+-	int ret, pwrgateid;
++	int ret;
+ 	unsigned long timeout;
  
- static inline void tegra_pmc_writel(u32 val, u32 reg)
- {
--	writel(val, IO_ADDRESS(TEGRA_PMC_BASE + reg));
-+	writel(val, (tegra_pmc_base + reg));
- }
- 
--#ifdef CONFIG_OF
- static const struct of_device_id matches[] __initconst = {
- 	{ .compatible = "nvidia,tegra114-pmc" },
- 	{ .compatible = "nvidia,tegra30-pmc" },
- 	{ .compatible = "nvidia,tegra20-pmc" },
- 	{ }
- };
--#endif
- 
--void __init tegra_pmc_init(void)
-+static void tegra_pmc_parse_dt(void)
- {
--	/*
--	 * For now, Harmony is the only board that uses the PMC, and it wants
--	 * the signal inverted. Seaboard would too if it used the PMC.
--	 * Hopefully by the time other boards want to use the PMC, everything
--	 * will be device-tree, or they also want it inverted.
--	 */
--	bool invert_interrupt = true;
--	u32 val;
+ 	cpu = cpu_logical_map(cpu);
+-	pwrgateid = tegra_cpu_powergate_id(cpu);
+-	if (pwrgateid < 0)
+-		return pwrgateid;
 -
--#ifdef CONFIG_OF
--	if (of_have_populated_dt()) {
--		struct device_node *np;
-+	struct device_node *np;
+ 	tegra_put_cpu_in_reset(cpu);
+ 	flowctrl_write_cpu_halt(cpu, 0);
  
--		invert_interrupt = false;
-+	np = of_find_matching_node(NULL, matches);
-+	if (np) {
-+		tegra_pmc_base = of_iomap(np, 0);
+@@ -108,7 +103,7 @@ static int tegra30_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	if (cpumask_test_cpu(cpu, &tegra_cpu_init_mask)) {
+ 		timeout = jiffies + msecs_to_jiffies(50);
+ 		do {
+-			if (tegra_powergate_is_powered(pwrgateid))
++			if (tegra_pmc_cpu_is_powered(cpu))
+ 				goto remove_clamps;
+ 			udelay(10);
+ 		} while (time_before(jiffies, timeout));
+@@ -120,14 +115,14 @@ static int tegra30_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	 * be un-gated by un-toggling the power gate register
+ 	 * manually.
+ 	 */
+-	if (!tegra_powergate_is_powered(pwrgateid)) {
+-		ret = tegra_powergate_power_on(pwrgateid);
++	if (!tegra_pmc_cpu_is_powered(cpu)) {
++		ret = tegra_pmc_cpu_power_on(cpu);
+ 		if (ret)
+ 			return ret;
  
--		np = of_find_matching_node(NULL, matches);
--		if (np) {
--			if (of_find_property(np, "nvidia,invert-interrupt",
--						NULL))
--				invert_interrupt = true;
--		}
-+		tegra_pmc_invert_interrupt = of_property_read_bool(np,
-+					     "nvidia,invert-interrupt");
-+	} else {
-+		/* Should not be here, the PMC DT node should always exist. */
-+		BUG();
- 	}
--#endif
-+}
-+
-+void __init tegra_pmc_init(void)
-+{
-+	u32 val;
-+
-+	tegra_pmc_parse_dt();
+ 		/* Wait for the power to come up. */
+ 		timeout = jiffies + msecs_to_jiffies(100);
+-		while (tegra_powergate_is_powered(pwrgateid)) {
++		while (tegra_pmc_cpu_is_powered(cpu)) {
+ 			if (time_after(jiffies, timeout))
+ 				return -ETIMEDOUT;
+ 			udelay(10);
+@@ -140,7 +135,7 @@ remove_clamps:
+ 	udelay(10);
  
- 	val = tegra_pmc_readl(PMC_CTRL);
--	if (invert_interrupt)
-+	if (tegra_pmc_invert_interrupt)
- 		val |= PMC_CTRL_INTR_LOW;
- 	else
- 		val &= ~PMC_CTRL_INTR_LOW;
+ 	/* Remove I/O clamps. */
+-	ret = tegra_powergate_remove_clamping(pwrgateid);
++	ret = tegra_pmc_cpu_remove_clamping(cpu);
+ 	if (ret)
+ 		return ret;
+ 
 -- 
 1.8.1.1
