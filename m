@@ -1,51 +1,49 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 27 Feb 2013 16:39:48 +0400
-Subject: [PATCH v10 8/8] usb: chipidea: imx: fix the error that using
- uninitialized pointer
-In-Reply-To: <1361946799-29471-9-git-send-email-peter.chen@freescale.com>
-References: <1361946799-29471-1-git-send-email-peter.chen@freescale.com>
- <1361946799-29471-9-git-send-email-peter.chen@freescale.com>
-Message-ID: <512DFE94.3010807@cogentembedded.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Wed, 27 Feb 2013 13:40:51 +0100
+Subject: [PATCH 1/9] USB otg: use try_module_get in all usb_get_phy
+ functions and add missing module_put
+In-Reply-To: <20130227123132.GM8016@arwen.pp.htv.fi>
+References: <1361968035-18644-1-git-send-email-mkl@pengutronix.de>
+ <1361968035-18644-2-git-send-email-mkl@pengutronix.de>
+ <20130227123132.GM8016@arwen.pp.htv.fi>
+Message-ID: <512DFED3.7070701@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 02/27/2013 01:31 PM, Felipe Balbi wrote:
+> On Wed, Feb 27, 2013 at 01:27:07PM +0100, Marc Kleine-Budde wrote:
+>> In patch "5d3c28b usb: otg: add device tree support to otg library"
+>> devm_usb_get_phy_by_phandle() was added. It uses try_module_get() to lock the
+>> phy driver in memory. The corresponding module_put() is missing in that patch.
+>>
+>> This patch adds try_module_get() to usb_get_phy() and usb_get_phy_dev().
+>> Further the missing module_put() is added to usb_put_phy().
+>>
+>> Reviewed-by: Kishon Vijay Abraham I <kishon@ti.com>
+>> Acked-by: Felipe Balbi <balbi@ti.com>
+>> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+>> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+> 
+> this one doesn't apply to my tree. What did you use as a base ?
 
-On 27-02-2013 10:33, Peter Chen wrote:
+As stated in the cover letter: Greg's usb-next.
 
-> If the core's probe fails, the platform layer may not get core's
-> private data, if the platform tries to use struct ci13xxx, it will
-> use uninitialized pointer. Besides, if the core's probe fails,
-> the platform layer should know it, and let its probe fail too.
+git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/usb.git
 
-> Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> ---
->   drivers/usb/chipidea/ci13xxx_imx.c |    7 +++++++
->   1 files changed, 7 insertions(+), 0 deletions(-)
+I'd really appreciate if this series goes into a single tree. So that
+other chipidea developers can base their work on this.
 
-> diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
-> index 5499cf8..720ea92 100644
-> --- a/drivers/usb/chipidea/ci13xxx_imx.c
-> +++ b/drivers/usb/chipidea/ci13xxx_imx.c
-> @@ -239,6 +239,13 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
->   	platform_set_drvdata(pdev, data);
->
->   	ci = platform_get_drvdata(plat_ci);
-> +
+Marc
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
-    No need for empty line here...
-
-> +	if (!ci) {
-> +		ret = -ENODEV;
-> +		dev_err(&pdev->dev,
-> +			"some wrong at ci core's initialization\n");
-> +		goto err_clk;
-> +	}
-
-    It'd be better to put it here.
-
->   	/*
->   	 * Internal vbus on/off policy
->   	 * - Always on for host only function
-
-WBR, Sergei
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130227/18b92a36/attachment.sig>
