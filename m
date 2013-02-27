@@ -1,194 +1,223 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Wed, 27 Feb 2013 14:33:18 +0800
-Subject: [PATCH v10 7/8] usb: chipidea: udc: fix the oops when plugs in usb
- cable after rmmod gadget
-In-Reply-To: <1361946799-29471-1-git-send-email-peter.chen@freescale.com>
-References: <1361946799-29471-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1361946799-29471-8-git-send-email-peter.chen@freescale.com>
+From: matt@genesi-usa.com (Matt Sealey)
+Date: Wed, 27 Feb 2013 00:51:56 -0600
+Subject: [PATCH 2/3] ARM: dts: imx: replace magic number with pin function
+ name
+In-Reply-To: <20130222055203.GB27371@S2101-09.ap.freescale.net>
+References: <1361344089-16804-1-git-send-email-shawn.guo@linaro.org>
+ <1361344089-16804-3-git-send-email-shawn.guo@linaro.org>
+ <51251A11.2030300@wwwdotorg.org>
+ <CAKGA1bkHH1XC38_VM=QhDrr33uqqSbwe0n+GfXEPs43K_Do=CQ@mail.gmail.com>
+ <20130221050247.GD17738@S2101-09.ap.freescale.net>
+ <CAKGA1bn22xctSj_33HQsWwnVB=RO2OJ=eYvgRD-kF+PiQcnC4Q@mail.gmail.com>
+ <20130222055203.GB27371@S2101-09.ap.freescale.net>
+Message-ID: <CAKGA1bmw+CzBDLHty1+L1VdeWLgkPpLSLpGKBJEeQj-ByyzicA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When we rmmod gadget, the ci->driver needs to be cleared.
-Otherwise, we plug in usb cable again, the driver will
-consider gadget is there, in fact, it is removed.
+On Thu, Feb 21, 2013 at 11:52 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Thu, Feb 21, 2013 at 11:36:36AM -0600, Matt Sealey wrote:
+>> On Wed, Feb 20, 2013 at 11:02 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+>> > On Wed, Feb 20, 2013 at 06:03:39PM -0600, Matt Sealey wrote:
+>> >> I am not sure I am getting this point across, but.. damn it.. nack nack nack :D
+>> >>
+>> > Do you see any downgrade side that the series introduces over the
+>> > existing implementation?
+>>
+>> Because it replaces the horribly stupid existing implementation with
+>> something that doesn't solve the fundamental logical problems caused
+>> by the existing implementation.
+>
+> When did I say that the series is targeting to solve those "fundamental
+> logical problems" in *your* view?
+>
+> ...
 
-Besides, consolidate the calling of ci->driver->disconnect, when
-we do rmmod gadget, the gadget's disconnect should be called from
-udc core.
+Why would you submit a series that doesn't solve such problems? :)
 
-Below is the oops this patch fixes.
+To replace an illogical, ridiculous system of arbitrary pin numbering
+with an illogical mapping of registers to arbitrary names is..
+illogical.
 
-root at freescale ~$ ci_hdrc ci_hdrc.0: Connected to host
-Unable to handle kernel paging request at virtual address 7f01171c
-pgd = 80004000
-[7f01171c] *pgd=4fa1e811, *pte=00000000, *ppte=00000000
-Internal error: Oops: 7 [#1] SMP ARM
-Modules linked in: f_acm libcomposite u_serial [last unloaded: g_serial]
-CPU: 0    Not tainted  (3.8.0-rc5+ #221)
-	PC is at _gadget_stop_activity+0xbc/0x128
-	LR is at ep_fifo_flush+0x68/0xa0
-	pc : [<803634cc>]    lr : [<80363938>]    psr: 20000193
-	sp : 806c7dc8  ip : 00000000  fp : 806c7de4
-	r10: 00000000  r9 : 80710ea4  r8 : 00000000
-	r7 : bf834094  r6 : bf834098  r5 : bf834010  r4 : bf8340a0
-	r3 : 7f011708  r2 : 01940194  r1 : a0000193  r0 : bf834014
-	Flags: nzCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
-	Control: 10c53c7d  Table: 4f06404a  DAC: 00000017
-	Process swapper/0 (pid: 0, stack limit = 0x806c6238)
-	Stack: (0x806c7dc8 to 0x806c8000)
-	7dc0:                   bf834010 bf809950 bf834010 0000004b 806c7e44 806c7de8
-	7de0: 80365400 8036341c 0000ec1c 00000000 0000ec1c 00000040 fff5ede0 bf834014
-	7e00: 000a1220 00000000 0000002e ffffd958 806c7e3c 806c7e20 8004e870 bf834010
-	7e20: bf809950 0000004b 0000004b 00000000 80710ea4 00000000 806c7e5c 806c7e48
-	7e40: 80362888 80365154 bfb35180 bf809950 806c7e9c 806c7e60 8008111c 803627f4
-	7e60: 00989680 00000000 bf809900 bf809964 812df8c0 bf809900 bf809950 806c3f2c
-	7e80: 0000004b 00000000 412fc09a 00000000 806c7eb4 806c7ea0 80081368 800810b8
-	7ea0: bf809900 bf809950 806c7ecc 806c7eb8 800843c8 8008130c 0000004b 806cf748
-	7ec0: 806c7ee4 806c7ed0 80081088 8008432c 806c6000 806cf748 806c7f0c 806c7ee8
-	7ee0: 8000fa44 8008105c f400010c 806ce974 806c7f30 f4000110 806d29e8 412fc09a
-	7f00: 806c7f2c 806c7f10 80008584 8000f9f4 8000fbd0 60000013 ffffffff 806c7f64
-	7f20: 806c7f84 806c7f30 8000eac0 80008554 00000000 00000000 0000000f 8001aea0
-	7f40: 806c6000 80712a48 804f0040 00000000 806d29e8 412fc09a 00000000 806c7f84
-	7f60: 806c7f88 806c7f78 8000fbcc 8000fbd0 60000013 ffffffff 806c7fac 806c7f88
-	7f80: 8001015c 8000fb9c 806cf5b0 80712980 806a4528 8fffffff 1000406a 412fc09a
-	7fa0: 806c7fbc 806c7fb0 804e5334 800100ac 806c7ff4 806c7fc0 80668940 804e52d4
-	7fc0: ffffffff ffffffff 806684bc 00000000 00000000 806a4528 10c53c7d 806ce94c
-	7fe0: 806a4524 806d29dc 00000000 806c7ff8 10008078 806686b0 00000000 00000000
-	Backtrace:
-	[<80363410>] (_gadget_stop_activity+0x0/0x128) from [<80365400>] (udc_irq+0x2b8/0xf38)
-	 r7:0000004b r6:bf834010 r5:bf809950 r4:bf834010
-	 [<80365148>] (udc_irq+0x0/0xf38) from [<80362888>] (ci_irq+0xa0/0xf4)
-	[<803627e8>] (ci_irq+0x0/0xf4) from [<8008111c>] (handle_irq_event_percpu+0x70/0x254)
-	 r5:bf809950 r4:bfb35180
-	 [<800810ac>] (handle_irq_event_percpu+0x0/0x254) from [<80081368>] (handle_irq_event+0x68/0x88)
-	[<80081300>] (handle_irq_event+0x0/0x88) from [<800843c8>] (handle_fasteoi_irq+0xa8/0x178)
-	 r5:bf809950 r4:bf809900
-	 [<80084320>] (handle_fasteoi_irq+0x0/0x178) from [<80081088>] (generic_handle_irq+0x38/0x40)
-	 r5:806cf748 r4:0000004b
-	 [<80081050>] (generic_handle_irq+0x0/0x40) from [<8000fa44>] (handle_IRQ+0x5c/0xbc)
-	 r5:806cf748 r4:806c6000
-	 [<8000f9e8>] (handle_IRQ+0x0/0xbc) from [<80008584>] (gic_handle_irq+0x3c/0x70)
-	 r9:412fc09a r8:806d29e8 r7:f4000110 r6:806c7f30 r5:806ce974
-	 r4:f400010c
-	 [<80008548>] (gic_handle_irq+0x0/0x70) from [<8000eac0>] (__irq_svc+0x40/0x54)
-	Exception stack(0x806c7f30 to 0x806c7f78)
-	7f20:                                     00000000 00000000 0000000f 8001aea0
-	7f40: 806c6000 80712a48 804f0040 00000000 806d29e8 412fc09a 00000000 806c7f84
-	7f60: 806c7f88 806c7f78 8000fbcc 8000fbd0 60000013 ffffffff
-	 r7:806c7f64 r6:ffffffff r5:60000013 r4:8000fbd0
-	 [<8000fb90>] (default_idle+0x0/0x4c) from [<8001015c>] (cpu_idle+0xbc/0xf8)
-	[<800100a0>] (cpu_idle+0x0/0xf8) from [<804e5334>] (rest_init+0x6c/0x84)
-	 r9:412fc09a r8:1000406a r7:8fffffff r6:806a4528 r5:80712980
-	 r4:806cf5b0
-	 [<804e52c8>] (rest_init+0x0/0x84) from [<80668940>] (start_kernel+0x29c/0x2ec)
-	[<806686a4>] (start_kernel+0x0/0x2ec) from [<10008078>] (0x10008078)
-	Code: e12fff33 e5953200 e3530000 0a000002 (e5933014)
-	---[ end trace aade28ad434062bd ]---
-	Kernel panic - not syncing: 0xbf8bdfa8)
-	df60: 00000000 00000000 0000000f 8001aea0 bf8bc000 80712a48 804f0040 00000000
-	df80: 806d29e8 412fc09a 00000000 bf8bdfb4 bf8bdfb8 bf8bdfa8 8000fbcc 8000fbd0
-	dfa0: 60000013 ffffffff
-	 r7:bf8bdf94 r6:ffffffff r5:60000013 r4:8000fbd0
-	 [<8000fb90>] (default_idle+0x0/0x4c) from [<8001015c>] (cpu_idle+0xbc/0xf8)
-	[<800100a0>] (cpu_idle+0x0/0xf8) from [<804e7930>] (secondary_start_kernel+0x120/0x148)
-	 r9:412fc09a r8:1000406a r7:80712d20 r6:10c03c7d r5:00000002
-	 r4:806e2008
-	 [<804e7810>] (secondary_start_kernel+0x0/0x148) from [<104e7148>] (0x104e7148)
-	 r5:0000001f r4:4f8a806a
-	 CPU3: stopping
-	 Backtrace:
-	 [<800132e8>] (dump_backtrace+0x0/0x114) from [<804ea684>] (dump_stack+0x20/0x24)
-	 r7:00000000 r6:806c3f2c r5:806cf748 r4:80712d18
-	 [<804ea664>] (dump_stack+0x0/0x24) from [<80014adc>] (handle_IPI+0x140/0x18c)
-	[<8001499c>] (handle_IPI+0x0/0x18c) from [<800085b0>] (gic_handle_irq+0x68/0x70)
-	 r9:412fc09a r8:806d29e8 r7:f4000110 r6:bf8bff60 r5:806ce974
-	 r4:f400010c
-	 [<80008548>] (gic_handle_irq+0x0/0x70) from [<8000eac0>] (__irq_svc+0x40/0x54)
-	Exception stack(0xbf8bff60 to 0xbf8bffa8)
-	ff60: 00000000 00000000 0000000f 8001aea0 bf8be000 80712a48 804f0040 00000000
-	ff80: 806d29e8 412fc09a 00000000 bf8bffb4 bf8bffb8 bf8bffa8 8000fbcc 8000fbd0
-	ffa0: 60000013 ffffffff
-	 r7:bf8bff94 r6:ffffffff r5:60000013 r4:8000fbd0
-	 [<8000fb90>] (default_idle+0x0/0x4c) from [<8001015c>] (cpu_idle+0xbc/0xf8)
-	[<800100a0>] (cpu_idle+0x0/0xf8) from [<804e7930>] (secondary_start_kernel+0x120/0x148)
-	 r9:412fc09a r8:1000406a r7:80712d20 r6:10c03c7d r5:00000003
-	 r4:806e2008
-	 [<804e7810>] (secondary_start_kernel+0x0/0x148) from [<104e7148>] (0x104e7148)
-	 r5:0000001f r4:4f8a806a
-	 CPU1: stopping
-	 Backtrace:
-	 [<800132e8>] (dump_backtrace+0x0/0x114) from [<804ea684>] (dump_stack+0x20/0x24)
-	 r7:00000000 r6:806c3f2c r5:806cf748 r4:80712d18
-	 [<804ea664>] (dump_stack+0x0/0x24) from [<80014adc>] (handle_IPI+0x140/0x18c)
-	[<8001499c>] (handle_IPI+0x0/0x18c) from [<800085b0>] (gic_handle_irq+0x68/0x70)
-	 r9:412fc09a r8:806d29e8 r7:f4000110 r6:bf8bbf60 r5:806ce974
-	 r4:f400010c
-	 [<80008548>] (gic_handle_irq+0x0/0x70) from [<8000eac0>] (__irq_svc+0x40/0x54)
-	Exception stack(0xbf8bbf60 to 0xbf8bbfa8)
-	bf60: 00000000 00000000 0000000f 8001aea0 bf8ba000 80712a48 804f0040 00000000
-	bf80: 806d29e8 412fc09a 00000000 bf8bbfb4 bf8bbfb8 bf8bbfa8 8000fbcc 8000fbd0
-	bfa0: 60000013 ffffffff
-	 r7:bf8bbf94 r6:ffffffff r5:60000013 r4:8000fbd0
-	 [<8000fb90>] (default_idle+0x0/0x4c) from [<8001015c>] (cpu_idle+0xbc/0xf8)
-	[<800100a0>] (cpu_idle+0x0/0xf8) from [<804e7930>] (secondary_start_kernel+0x120/0x148)
-	 r9:412fc09a r8:1000406a r7:80712d20 r6:10c03c7d r5:00000001
-	 r4:806e2008
+>> What you've fixed it to do, as I read this patch, is this;
+>>
+>> <arbitrary_pin_name pad_mode>
+>>
+> No, it's not arbitrary_pin_name.  It's pin function name which comes
+> from hardware manual.  It may not exactly match the public reference
+> manual, but they are obvious to be identified.  For imx6q pad SD2_DAT1
+> example, the manual says:
+>
+> Select 1 of 6 iomux modes to be used for pad: SD2_DAT1.
+>   000 ALT0 ? Select signal SD2_DATA1.
+>   001 ALT1 ? Select signal ECSPI5_SS0.
+>   010 ALT2 ? Select signal EIM_CS2.
+>   011 ALT3 ? Select signal AUD4_TXFS.
+>   100 ALT4 ? Select signal KEY_COL7.
+>   101 ALT5 ? Select signal GPIO1_IO14.
+>
+> And imx6q-pinfunc.h gives:
+>
+>   MX6Q_PAD_SD2_DAT1__USDHC2_DAT1
+>   MX6Q_PAD_SD2_DAT1__ECSPI5_SS0
+>   MX6Q_PAD_SD2_DAT1__WEIM_WEIM_CS_2
+>   MX6Q_PAD_SD2_DAT1__AUDMUX_AUD4_TXFS
+>   MX6Q_PAD_SD2_DAT1__KPP_COL_7
+>   MX6Q_PAD_SD2_DAT1__GPIO_1_14
 
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
----
- drivers/usb/chipidea/udc.c |   13 +++++++++----
- 1 files changed, 9 insertions(+), 4 deletions(-)
+So, SD2_DAT1 with function SD2_DAT1 in the manual is SD2_DAT1__USDHC2_DAT1 ?
 
-diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
-index b57b735..e355914 100644
---- a/drivers/usb/chipidea/udc.c
-+++ b/drivers/usb/chipidea/udc.c
-@@ -579,9 +579,6 @@ static int _gadget_stop_activity(struct usb_gadget *gadget)
- 	usb_ep_fifo_flush(&ci->ep0out->ep);
- 	usb_ep_fifo_flush(&ci->ep0in->ep);
- 
--	if (ci->driver)
--		ci->driver->disconnect(gadget);
--
- 	/* make sure to disable all endpoints */
- 	gadget_for_each_ep(ep, gadget) {
- 		usb_ep_disable(ep);
-@@ -612,6 +609,11 @@ __acquires(ci->lock)
- 
- 	dbg_event(0xFF, "BUS RST", 0);
- 
-+	if (ci->gadget.speed != USB_SPEED_UNKNOWN) {
-+		if (ci->driver)
-+			ci->driver->disconnect(&ci->gadget);
-+	}
-+
- 	spin_unlock(&ci->lock);
- 	retval = _gadget_stop_activity(&ci->gadget);
- 	if (retval)
-@@ -1373,6 +1375,8 @@ static int ci13xxx_vbus_session(struct usb_gadget *_gadget, int is_active)
- 			hw_device_state(ci, ci->ep0out->qh.dma);
- 			dev_dbg(ci->dev, "Connected to host\n");
- 		} else {
-+			if (ci->driver)
-+				ci->driver->disconnect(&ci->gadget);
- 			hw_device_state(ci, 0);
- 			if (ci->platdata->notify_event)
- 				ci->platdata->notify_event(ci,
-@@ -1580,13 +1584,14 @@ static int ci13xxx_stop(struct usb_gadget *gadget,
- 		if (ci->platdata->notify_event)
- 			ci->platdata->notify_event(ci,
- 			CI13XXX_CONTROLLER_STOPPED_EVENT);
--		ci->driver = NULL;
- 		spin_unlock_irqrestore(&ci->lock, flags);
- 		_gadget_stop_activity(&ci->gadget);
- 		spin_lock_irqsave(&ci->lock, flags);
- 		pm_runtime_put(&ci->gadget.dev);
- 	}
- 
-+	ci->driver = NULL;
-+
- 	spin_unlock_irqrestore(&ci->lock, flags);
- 
- 	return 0;
--- 
-1.7.0.4
+KEY_COL7 -> KPP_COL_7?
+EIM_CS2 -> WEIM_WEIM_CS_2?
+AUD4_TXFS -> AUDMUX_AUD4_TXFS?
+GPIO1_IO14 -> GPIO_1_14?
+
+This is what I call arbitrary.
+
+Since the documented NAMING of pins changes between SoC revisions
+(where pins change definition or group), manual revisions (where
+people fix definitions), and even existing source code, it makes no
+sense whatsoever to give things like this a name. Especially as it is
+possible to break out the pin definitions and see that your "use a
+macro to encode 5 values at once and leave the most-often changing
+value to the device tree" method misses one thing: it is not easy to
+set the SION bit in the ALT register for each of these without
+replacing the macro. Sometimes SION is important for debugging,
+sometimes it is not... some pins need SION *forever* and other times..
+not. On i.MX6 using RMII ethernet, you need SION to loopback the clock
+input to the MAC.. but it's possible you'd want to temporarily disable
+this in a build. The only way here is to replace the pin definition
+macro part with the actual register values, set your SION bit, and
+rebuild the device tree.
+
+The only canonical thing you can guarantee is that in general the
+registers fit within certain ranges (although on i.MX51 the ranges did
+change between revisions, this is another problem), and accept certain
+values.
+
+The only reasonable thing we can be doing with pre-processing IOMUX
+data is make sure it fits those ranges (within reason) and possibly
+use the preprocessing to ensure that invalid values never make it into
+a device tree (i.e. there are bits in the pad settings which are
+never, ever set on a particular SoC, and masking and bailing out using
+#error or pitching a #warning would be much more useful than allowing
+random bits to go into register areas that are "reserved".
+
+I half-agree with Sascha. I am responsible for porting the i.MX51
+iomux-v3.h stuff to U-Boot because using the naming scheme worked so
+much better there than mxc_request_iomux clutter since most boards
+came with almost exactly the same settings on exactly the same buses
+because it was a limited choice on i.MX51. This MOSTLY works but there
+are several - if not a ridiculous number - of entries which needed to
+be modified for any particular board. And the remit came from the
+U-Boot guys simply that we should not commit into the tree any pins
+which no board makes use of.
+
+Here, we have potential for a huge file full of macros of which a good
+deal of them will end up with NOBODY using, and therefore just clutter
+the file. If we go with the U-Boot model, we only add macros to define
+a pin configuration set if at least ONE board requires that
+definition. This will keep it nice and clean and make sure nobody
+commits huge swaths of macros which nobody is testing.
+
+Since I did that work, I've changed my mind; actually naming the pins
+by their intended function simply doesn't ADD anything to the device
+tree functionality, nor does it really help Sascha out any more than
+simply having a *really good reference* would help him out.
+
+For example, please explain to me why;
+
+MX51_PIN_EIM_23__GPIO1_2 0x6528
+
+is clearer than;
+
+0x174 0x5 0x3d8 0x7 0x654 0x7633, /* EIM_23 GPIO1_2 and some pullup
+settings or so comment comment comment */
+
+In the processed device tree all you're going to see is the numbers.
+No pin naming at all. No comments. They certainly don't appear in the
+blob. Looking at the device tree in /proc/device-tree or processed
+output before compiling, the magic macro information is COMPLETELY
+lost, which means all it does is add an arbitrary binding of a name to
+a set of values in the raw, unprocessed source - just to "explain"
+what that pin does.
+
+How does a comment not do this already in the raw, unprocessed source?
+
+How does giving it a macro name help people looking at trees that have
+gone through processing?
+
+Answer: it doesn't. We're adding work (preprocessing) for no
+significant benefit except to stop a raw, source code device tree from
+being a clutter of numbers. Since it ends up as a clutter of numbers
+anyway at runtime, adding cross-referencing and potential for
+typographical errors at all stages plus any possible automation
+errors..
+
+>> 2) copy pasting a line of 5 values from an example document and adding
+>> your pad mode bits to the end is no more time consuming or
+>> space-consuming than copying a 38-character macro name.
+>
+> DTB is meant to be machine-parseable, but DTS is meant to be
+> human-readable because it's edited by human-being, and macro name
+> is obviously more friendly here.
+
+Last I checked, I can read numbers just fine, I can even convert hex
+to decimal in my head; when I feel sleepy and not quite up to it, I
+have a calculator. I can also paste the numbers directly into my PDF
+reader to find the exact register definition within the IOMUX chapter
+- instant lookup. Looking at the DT, then looking at the macro header,
+then searching for the PDF is an extra step. To me, it is not obvious
+that this is "more friendly," simply because it is adding a level of
+indirection.
+
+>> 3) macros can be wrong and they will inherit into every device tree,
+>> breaking every board that uses them.
+>
+> The macros should eventually come from some tool/program and design
+> database.  It should stand little chance to be wrong.  Even there is
+> something wrong with the macros, it should be noticed from the very
+> beginning, exactly because it will get any board device tree using
+> the macros wrong.
+
+Your examples seem to have mismatching database revisions, then?
+
+> With the help of macros, patch #3 changes the PIN_FUNC_ID from an
+> integer to a tuple of integers without touching any DTS files at all.
+
+Understood, but I don't see the benefit of converting "98" to
+"MX51_PIN_EIM_23__GPIO_1_2" when eventually it gets converted into a
+string of 5 numbers which are in the manual. At least how the benefit
+outweighs a comment in the DTS if there really needs to be some
+explanation of the fields (these already exist in the current trees to
+explain what the numbers mean in the first place).
+
+Especially as nobody can agree what the canonical pin naming should be
+despite several (I count 6) implementations of naming the pins, and
+that in several cases the values returned by the macros may not be
+EXACTLY what you wanted (SION bit is the biggest example), it still
+maps an arbitrary value (number in the old version, string literal
+macro name in the series you sent).
+
+If someone gets the macro wrong - a typo or missed pin - or needs to
+continually add new macros for new boards - this is going to create an
+inordinate amount of churn in the macro file and therefore in a
+binding. God forbid if the binding has to change. Please don't submit
+a file with every pin you THINK is in the i.MX5/6 and think it is
+done, because we know already from the patch Sascha referenced..
+people miss things and get things wrong.
+
+If the binding is simply "an array of 6 values per pin configuration,
+please see the manual for the register offsets and bit definitions"
+then the ONLY error can be in the authorship of the device tree source
+code and the onus is on.. that guy. Not the "Linux source code being
+wrong" or "the binding being out of date". You cannot by any means
+introduce automation errors or mistakes in a binding this way.
+Bindings - and any preprocessor macros which they depend on - should
+be fixed. Not constantly fluctuating at the time someone finds a
+mistake, or on the assumption that someone will be cross-checking
+every single value in a huge list of pins in a binding where it is
+possible it cannot be tested on a real board.
+
+--
+Matt Sealey <matt@genesi-usa.com>
+Product Development Analyst, Genesi USA, Inc.
