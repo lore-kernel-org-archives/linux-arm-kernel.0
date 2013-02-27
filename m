@@ -1,57 +1,79 @@
 From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 27 Feb 2013 13:27:14 +0100
-Subject: [PATCH 8/9] USB mxs-phy: Register phy with framework
+Date: Wed, 27 Feb 2013 13:27:12 +0100
+Subject: [PATCH 6/9] USB chipidea: introduce dual role mode pdata flags
 In-Reply-To: <1361968035-18644-1-git-send-email-mkl@pengutronix.de>
 References: <1361968035-18644-1-git-send-email-mkl@pengutronix.de>
-Message-ID: <1361968035-18644-9-git-send-email-mkl@pengutronix.de>
+Message-ID: <1361968035-18644-7-git-send-email-mkl@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sascha Hauer <s.hauer@pengutronix.de>
 
-We now have usb_add_phy_dev(), so use it to register with the framework
-to be able to find the phy from the USB driver.
+Even if a chipidea core is otg capable the board may not. This allows
+to explicitly set the core to host/peripheral mode. Without these
+flags the driver falls back to the old behaviour.
 
-Reviewed-by: Kishon Vijay Abraham I <kishon@ti.com>
-Reviewed-by: Peter Chen <peter.chen@freescale.com>
-Acked-by: Felipe Balbi <balbi@ti.com>
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
 ---
- drivers/usb/otg/mxs-phy.c |    9 +++++++++
- 1 file changed, 9 insertions(+)
+ drivers/usb/chipidea/core.c  |   22 ++++++++++++++++------
+ include/linux/usb/chipidea.h |    2 +-
+ 2 files changed, 17 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/usb/otg/mxs-phy.c b/drivers/usb/otg/mxs-phy.c
-index b0d9f11..aa40325 100644
---- a/drivers/usb/otg/mxs-phy.c
-+++ b/drivers/usb/otg/mxs-phy.c
-@@ -127,6 +127,7 @@ static int mxs_phy_probe(struct platform_device *pdev)
- 	void __iomem *base;
- 	struct clk *clk;
- 	struct mxs_phy *mxs_phy;
-+	int ret;
+diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+index 04d68cb..ec27060 100644
+--- a/drivers/usb/chipidea/core.c
++++ b/drivers/usb/chipidea/core.c
+@@ -435,6 +435,7 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+ 	struct resource	*res;
+ 	void __iomem	*base;
+ 	int		ret;
++	enum usb_dr_mode dr_mode;
  
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!res) {
-@@ -166,11 +167,19 @@ static int mxs_phy_probe(struct platform_device *pdev)
+ 	if (!dev->platform_data) {
+ 		dev_err(dev, "platform data missing\n");
+@@ -487,14 +488,23 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+ 		return -ENODEV;
+ 	}
  
- 	platform_set_drvdata(pdev, &mxs_phy->phy);
- 
-+	ret = usb_add_phy_dev(&mxs_phy->phy);
-+	if (ret)
-+		return ret;
++	/* For now we treat dual-role as otg */
++	dr_mode = ci->platdata->dr_mode;
++	if (dr_mode == USB_DR_MODE_UNKNOWN || dr_mode == USB_DR_MODE_DUAL_ROLE)
++		dr_mode = USB_DR_MODE_OTG;
 +
- 	return 0;
- }
+ 	/* initialize role(s) before the interrupt is requested */
+-	ret = ci_hdrc_host_init(ci);
+-	if (ret)
+-		dev_info(dev, "doesn't support host\n");
++	if (dr_mode == USB_DR_MODE_OTG || dr_mode == USB_DR_MODE_HOST) {
++		ret = ci_hdrc_host_init(ci);
++		if (ret)
++			dev_info(dev, "doesn't support host\n");
++	}
  
- static int mxs_phy_remove(struct platform_device *pdev)
- {
-+	struct mxs_phy *mxs_phy = platform_get_drvdata(pdev);
-+
-+	usb_remove_phy(&mxs_phy->phy);
-+
- 	platform_set_drvdata(pdev, NULL);
+-	ret = ci_hdrc_gadget_init(ci);
+-	if (ret)
+-		dev_info(dev, "doesn't support gadget\n");
++	if (dr_mode == USB_DR_MODE_OTG || dr_mode == USB_DR_MODE_PERIPHERAL) {
++		ret = ci_hdrc_gadget_init(ci);
++		if (ret)
++			dev_info(dev, "doesn't support gadget\n");
++	}
  
- 	return 0;
+ 	if (!ci->roles[CI_ROLE_HOST] && !ci->roles[CI_ROLE_GADGET]) {
+ 		dev_err(dev, "no supported roles\n");
+diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
+index 1a2aa18..b314647 100644
+--- a/include/linux/usb/chipidea.h
++++ b/include/linux/usb/chipidea.h
+@@ -20,7 +20,7 @@ struct ci13xxx_platform_data {
+ #define CI13XXX_REQUIRE_TRANSCEIVER	BIT(1)
+ #define CI13XXX_PULLUP_ON_VBUS		BIT(2)
+ #define CI13XXX_DISABLE_STREAMING	BIT(3)
+-
++	enum usb_dr_mode	dr_mode;
+ #define CI13XXX_CONTROLLER_RESET_EVENT		0
+ #define CI13XXX_CONTROLLER_STOPPED_EVENT	1
+ 	void	(*notify_event) (struct ci13xxx *ci, unsigned event);
 -- 
 1.7.10.4
