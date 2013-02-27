@@ -1,50 +1,79 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Wed, 27 Feb 2013 08:47:09 +0800
-Subject: [PATCH Resend v5 12/16] spi/spi-atmel: add pinctrl support for atmel
- spi
+Date: Wed, 27 Feb 2013 08:47:56 +0800
+Subject: [PATCH Resend v5 13/16] ARM: at91: add clocks for spi dt entries
 In-Reply-To: <1361925297-11854-1-git-send-email-wenyou.yang@atmel.com>
 References: <1361925297-11854-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1361926029-12518-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1361926076-12566-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Richard Genoud <richard.genoud@gmail.com>
+
+Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+[<wenyou.yang at atmel.com: declare the spi clocks for sam9260, at91sam9g45, and at91sam9n12]
+[wenyou.yang at atmel.com: submit the patch]
 Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-Cc: spi-devel-general at lists.sourceforge.net
+Cc: linux at arm.linux.org.uk
+Cc: linux at maxim.org.za
 Cc: linux-kernel at vger.kernel.org
 ---
- drivers/spi/spi-atmel.c |    8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/mach-at91/at91sam9260.c |    2 ++
+ arch/arm/mach-at91/at91sam9g45.c |    2 ++
+ arch/arm/mach-at91/at91sam9n12.c |    2 ++
+ arch/arm/mach-at91/at91sam9x5.c  |    2 ++
+ 4 files changed, 8 insertions(+)
 
-diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-index 00ca85f..0ed3e1a 100644
---- a/drivers/spi/spi-atmel.c
-+++ b/drivers/spi/spi-atmel.c
-@@ -23,6 +23,7 @@
- #include <linux/platform_data/atmel.h>
- #include <linux/platform_data/dma-atmel.h>
- #include <linux/of.h>
-+#include <linux/pinctrl/consumer.h>
- 
- #include <asm/io.h>
- #include <asm/gpio.h>
-@@ -1503,11 +1504,18 @@ static int atmel_spi_probe(struct platform_device *pdev)
- 	int			ret;
- 	struct spi_master	*master;
- 	struct atmel_spi	*as;
-+	struct pinctrl		*pinctrl;
- 
- 	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!regs)
- 		return -ENXIO;
- 
-+	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
-+	if (IS_ERR(pinctrl)) {
-+		dev_err(&pdev->dev, "Failed to request pinctrl\n");
-+		return PTR_ERR(pinctrl);
-+	}
-+
- 	irq = platform_get_irq(pdev, 0);
- 	if (irq < 0)
- 		return irq;
+diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
+index b67cd53..44199bc 100644
+--- a/arch/arm/mach-at91/at91sam9260.c
++++ b/arch/arm/mach-at91/at91sam9260.c
+@@ -232,6 +232,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
+ 	CLKDEV_CON_DEV_ID("t2_clk", "fffdc000.timer", &tc5_clk),
+ 	CLKDEV_CON_DEV_ID("hclk", "500000.ohci", &ohci_clk),
+ 	CLKDEV_CON_DEV_ID("mci_clk", "fffa8000.mmc", &mmc_clk),
++	CLKDEV_CON_DEV_ID("spi_clk", "fffc8000.spi", &spi0_clk),
++	CLKDEV_CON_DEV_ID("spi_clk", "fffcc000.spi", &spi1_clk),
+ 	/* fake hclk clock */
+ 	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &ohci_clk),
+ 	CLKDEV_CON_ID("pioA", &pioA_clk),
+diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
+index d3addee..2ec5efe 100644
+--- a/arch/arm/mach-at91/at91sam9g45.c
++++ b/arch/arm/mach-at91/at91sam9g45.c
+@@ -262,6 +262,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
+ 	CLKDEV_CON_DEV_ID("mci_clk", "fffd0000.mmc", &mmc1_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "fff84000.i2c", &twi0_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "fff88000.i2c", &twi1_clk),
++	CLKDEV_CON_DEV_ID("spi_clk", "fffa4000.spi", &spi0_clk),
++	CLKDEV_CON_DEV_ID("spi_clk", "fffa8000.spi", &spi1_clk),
+ 	/* fake hclk clock */
+ 	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &uhphs_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "fffff200.gpio", &pioA_clk),
+diff --git a/arch/arm/mach-at91/at91sam9n12.c b/arch/arm/mach-at91/at91sam9n12.c
+index 5dfc8fd..ccd0783 100644
+--- a/arch/arm/mach-at91/at91sam9n12.c
++++ b/arch/arm/mach-at91/at91sam9n12.c
+@@ -172,6 +172,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
+ 	CLKDEV_CON_DEV_ID("dma_clk", "ffffec00.dma-controller", &dma_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "f8010000.i2c", &twi0_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "f8014000.i2c", &twi1_clk),
++	CLKDEV_CON_DEV_ID("spi_clk", "f0000000.spi", &spi0_clk),
++	CLKDEV_CON_DEV_ID("spi_clk", "f0004000.spi", &spi1_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "fffff400.gpio", &pioAB_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "fffff600.gpio", &pioAB_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "fffff800.gpio", &pioCD_clk),
+diff --git a/arch/arm/mach-at91/at91sam9x5.c b/arch/arm/mach-at91/at91sam9x5.c
+index 44a9a62..a200d8a 100644
+--- a/arch/arm/mach-at91/at91sam9x5.c
++++ b/arch/arm/mach-at91/at91sam9x5.c
+@@ -237,6 +237,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
+ 	CLKDEV_CON_DEV_ID(NULL, "f8010000.i2c", &twi0_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "f8014000.i2c", &twi1_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "f8018000.i2c", &twi2_clk),
++	CLKDEV_CON_DEV_ID("spi_clk", "f0000000.spi", &spi0_clk),
++	CLKDEV_CON_DEV_ID("spi_clk", "f0004000.spi", &spi1_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "fffff400.gpio", &pioAB_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "fffff600.gpio", &pioAB_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "fffff800.gpio", &pioCD_clk),
 -- 
 1.7.9.5
