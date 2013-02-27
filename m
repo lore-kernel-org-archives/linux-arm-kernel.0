@@ -1,33 +1,37 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Wed, 27 Feb 2013 17:53:20 +0100
-Subject: [RFC PATCH v2 0/4] Add support for LZ4-compressed kernel
-In-Reply-To: <20130227163118.GB17833@n2100.arm.linux.org.uk>
-References: <1361859870-15751-1-git-send-email-kyungsik.lee@lge.com>
- <512D1C12.4080109@oberhumer.com>
- <alpine.LFD.2.03.1302261557220.1254@syhkavp.arg>
- <87fw0i7n6d.fsf@dell.be.48ers.dk>
- <20130226221027.GW17833@n2100.arm.linux.org.uk>
- <1361929234.1924.8.camel@joe-AO722>
- <20130227095609.GY17833@n2100.arm.linux.org.uk>
- <1361980152.2035.13.camel@joe-AO722>
- <20130227163118.GB17833@n2100.arm.linux.org.uk>
-Message-ID: <20130227165320.GB2638@pd.tnic>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 27 Feb 2013 14:03:58 -0300
+Subject: [PATCH] ARM: mxs_defconfig: Make USB host functional again
+Message-ID: <1361984638-19725-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 27, 2013 at 04:31:18PM +0000, Russell King - ARM Linux wrote:
-> I'm not saying that the LZO code should not be updated. I'm saying
-> that the kernel boot time decompressor is not a play ground for an
-> ever increasing number of "my favourite compression method" crap.
-> We don't need four, five or even six compression methods there. We
-> just need three - a "fast but large", "small but slow" and "all round
-> popular medium".
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Hell yeah!
+commit 09f6ffde2e (USB: EHCI: fix build error by making ChipIdea host a normal 
+EHCI driver) introduced CONFIG_USB_EHCI_HCD as a dependency for USB_CHIPIDEA_HOST.
 
+Select CONFIG_USB_EHCI_HCD, so that USB host can be functional again.
+
+Cc: <stable@vger.kernel.org> # 3.8
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+On 3.7.9 USB host works fine on mx28, but it is broken on 3.8.
+
+So this is a regression and that's why stable is put in Cc.
+ arch/arm/configs/mxs_defconfig |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
+index 7bf5351..a55b206 100644
+--- a/arch/arm/configs/mxs_defconfig
++++ b/arch/arm/configs/mxs_defconfig
+@@ -118,6 +118,7 @@ CONFIG_FRAMEBUFFER_CONSOLE=y
+ CONFIG_FONTS=y
+ CONFIG_LOGO=y
+ CONFIG_USB=y
++CONFIG_USB_EHCI_HCD=y
+ CONFIG_USB_CHIPIDEA=y
+ CONFIG_USB_CHIPIDEA_HOST=y
+ CONFIG_USB_STORAGE=y
 -- 
-Regards/Gruss,
-    Boris.
-
-Sent from a fat crate under my desk. Formatting is fine.
---
+1.7.9.5
