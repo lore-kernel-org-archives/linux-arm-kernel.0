@@ -1,173 +1,132 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Wed, 27 Feb 2013 08:48:37 +0800
-Subject: [PATCH Resend v5 14/16] ARM: dts: add spi nodes for atmel SoC
+Date: Wed, 27 Feb 2013 08:49:10 +0800
+Subject: [PATCH Resend v5 15/16] ARM: dts: add spi nodes for the atmel boards
 In-Reply-To: <1361925297-11854-1-git-send-email-wenyou.yang@atmel.com>
 References: <1361925297-11854-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1361926117-12604-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1361926150-12646-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Richard Genoud <richard.genoud@gmail.com>
 
 Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
-[wenyou.yang at atmel.com: add spi nodes for sam9260, sam9263, sam9g45 and sam9n12]
-[wenyou.yang at atmel.com: remove spi property "cs-gpios" to the board dts files]
+[wenyou.yang at atmel.com: added spi nodes for the sam9263ek, sam9g20ek, sam9m10g45ek and sam9n12ek boards]
 [wenyou.yang at atmel.com: submit the patch]
 Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
 Cc: linux at arm.linux.org.uk
 Cc: linux-kernel at vger.kernel.org
 ---
- arch/arm/boot/dts/at91sam9260.dtsi |   18 ++++++++++++++++++
- arch/arm/boot/dts/at91sam9263.dtsi |   18 ++++++++++++++++++
- arch/arm/boot/dts/at91sam9g45.dtsi |   18 ++++++++++++++++++
- arch/arm/boot/dts/at91sam9n12.dtsi |   18 ++++++++++++++++++
- arch/arm/boot/dts/at91sam9x5.dtsi  |   18 ++++++++++++++++++
- 5 files changed, 90 insertions(+)
+ arch/arm/boot/dts/at91sam9263ek.dts         |   10 ++++++++++
+ arch/arm/boot/dts/at91sam9g20ek_common.dtsi |   10 ++++++++++
+ arch/arm/boot/dts/at91sam9m10g45ek.dts      |   10 ++++++++++
+ arch/arm/boot/dts/at91sam9n12ek.dts         |   10 ++++++++++
+ arch/arm/boot/dts/at91sam9x5ek.dtsi         |   10 ++++++++++
+ 5 files changed, 50 insertions(+)
 
-diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
-index cb7bcc5..6e31dc8 100644
---- a/arch/arm/boot/dts/at91sam9260.dtsi
-+++ b/arch/arm/boot/dts/at91sam9260.dtsi
-@@ -471,6 +471,24 @@
- 				status = "disabled";
+diff --git a/arch/arm/boot/dts/at91sam9263ek.dts b/arch/arm/boot/dts/at91sam9263ek.dts
+index 1eb0872..a14e424 100644
+--- a/arch/arm/boot/dts/at91sam9263ek.dts
++++ b/arch/arm/boot/dts/at91sam9263ek.dts
+@@ -79,6 +79,16 @@
+ 					};
+ 				};
  			};
++
++			spi0: spi at fffa4000 {
++				status = "okay";
++				cs-gpios = <&pioA 5 0>, <0>, <0>, <0>;
++				mtd_dataflash at 0 {
++					compatible = "atmel,at45", "atmel,dataflash";
++					spi-max-frequency = <50000000>;
++					reg = <0>;
++				};
++			};
+ 		};
  
+ 		nand0: nand at 40000000 {
+diff --git a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
+index da15e83..23d1f46 100644
+--- a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
++++ b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
+@@ -96,6 +96,16 @@
+ 				status = "okay";
+ 				pinctrl-0 = <&pinctrl_ssc0_tx>;
+ 			};
++
 +			spi0: spi at fffc8000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "atmel,at91rm9200-spi";
-+				reg = <0xfffc8000 0x200>;
-+				interrupts = <12 4 3>;
-+				status = "disabled";
-+			};
-+
-+			spi1: spi at fffcc000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "atmel,at91rm9200-spi";
-+				reg = <0xfffcc000 0x200>;
-+				interrupts = <13 4 3>;
-+				status = "disabled";
-+			};
-+
- 			adc0: adc at fffe0000 {
- 				compatible = "atmel,at91sam9260-adc";
- 				reg = <0xfffe0000 0x100>;
-diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
-index 271d4de..6c6d9ae 100644
---- a/arch/arm/boot/dts/at91sam9263.dtsi
-+++ b/arch/arm/boot/dts/at91sam9263.dtsi
-@@ -462,6 +462,24 @@
- 				reg = <0xfffffd40 0x10>;
- 				status = "disabled";
- 			};
-+
-+			spi0: spi at fffa4000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "atmel,at91rm9200-spi";
-+				reg = <0xfffa4000 0x200>;
-+				interrupts = <14 4 3>;
-+				status = "disabled";
-+			};
-+
-+			spi1: spi at fffa8000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "atmel,at91rm9200-spi";
-+				reg = <0xfffa8000 0x200>;
-+				interrupts = <15 4 3>;
-+				status = "disabled";
++				status = "okay";
++				cs-gpios = <0>, <&pioC 11 0>, <0>, <0>;
++				mtd_dataflash at 0 {
++					compatible = "atmel,at45", "atmel,dataflash";
++					spi-max-frequency = <50000000>;
++					reg = <1>;
++				};
 +			};
  		};
  
  		nand0: nand at 40000000 {
-diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-index 6b1d4ca..e085b8a 100644
---- a/arch/arm/boot/dts/at91sam9g45.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-@@ -531,6 +531,24 @@
- 				reg = <0xfffffd40 0x10>;
- 				status = "disabled";
+diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts b/arch/arm/boot/dts/at91sam9m10g45ek.dts
+index 20c3191..92c52a7 100644
+--- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
++++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
+@@ -102,6 +102,16 @@
+ 					};
+ 				};
  			};
 +
-+			spi0: spi at fffa4000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "atmel,at91rm9200-spi";
-+				reg = <0xfffa4000 0x200>;
-+				interrupts = <14 4 3>;
-+				status = "disabled";
-+			};
-+
-+			spi1: spi at fffa8000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "atmel,at91rm9200-spi";
-+				reg = <0xfffa8000 0x200>;
-+				interrupts = <15 4 3>;
-+				status = "disabled";
++			spi0: spi at fffa4000{
++				status = "okay";
++				cs-gpios = <&pioB 3 0>, <0>, <0>, <0>;
++				mtd_dataflash at 0 {
++					compatible = "atmel,at45", "atmel,dataflash";
++					spi-max-frequency = <13000000>;
++					reg = <0>;
++				};
 +			};
  		};
  
  		nand0: nand at 40000000 {
-diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
-index 80e29c6..9f839a9 100644
---- a/arch/arm/boot/dts/at91sam9n12.dtsi
-+++ b/arch/arm/boot/dts/at91sam9n12.dtsi
-@@ -381,6 +381,24 @@
- 				#size-cells = <0>;
- 				status = "disabled";
- 			};
-+
-+			spi0: spi at f0000000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "atmel,at91rm9200-spi";
-+				reg = <0xf0000000 0x100>;
-+				interrupts = <13 4 3>;
-+				status = "disabled";
-+			};
-+
-+			spi1: spi at f0004000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "atmel,at91rm9200-spi";
-+				reg = <0xf0004000 0x100>;
-+				interrupts = <14 4 3>;
-+				status = "disabled";
-+			};
- 		};
- 
- 		nand0: nand at 40000000 {
-diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-index 8ecca69..bc98e5a 100644
---- a/arch/arm/boot/dts/at91sam9x5.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-@@ -511,6 +511,24 @@
- 					trigger-value = <0x6>;
+diff --git a/arch/arm/boot/dts/at91sam9n12ek.dts b/arch/arm/boot/dts/at91sam9n12ek.dts
+index 0376bf4..82551a8 100644
+--- a/arch/arm/boot/dts/at91sam9n12ek.dts
++++ b/arch/arm/boot/dts/at91sam9n12ek.dts
+@@ -67,6 +67,16 @@
+ 					};
  				};
  			};
 +
 +			spi0: spi at f0000000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "atmel,at91rm9200-spi";
-+				reg = <0xf0000000 0x100>;
-+				interrupts = <13 4 3>;
-+				status = "disabled";
-+			};
-+
-+			spi1: spi at f0004000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "atmel,at91rm9200-spi";
-+				reg = <0xf0004000 0x100>;
-+				interrupts = <14 4 3>;
-+				status = "disabled";
++				status = "okay";
++				cs-gpios = <&pioA 14 0>, <0>, <0>, <0>;
++				m25p80 at 0 {
++					compatible = "atmel,at25df321a";
++					spi-max-frequency = <50000000>;
++					reg = <0>;
++				};
 +			};
  		};
  
  		nand0: nand at 40000000 {
+diff --git a/arch/arm/boot/dts/at91sam9x5ek.dtsi b/arch/arm/boot/dts/at91sam9x5ek.dtsi
+index 8a7cf1d..09f5e66 100644
+--- a/arch/arm/boot/dts/at91sam9x5ek.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5ek.dtsi
+@@ -84,6 +84,16 @@
+ 					};
+ 				};
+ 			};
++
++			spi0: spi at f0000000 {
++				status = "okay";
++				cs-gpios = <&pioA 14 0>, <0>, <0>, <0>;
++				m25p80 at 0 {
++					compatible = "atmel,at25df321a";
++					spi-max-frequency = <50000000>;
++					reg = <0>;
++				};
++			};
+ 		};
+ 
+ 		usb0: ohci at 00600000 {
 -- 
 1.7.9.5
