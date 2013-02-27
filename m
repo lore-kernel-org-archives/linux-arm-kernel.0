@@ -1,30 +1,29 @@
-From: B29397@freescale.com (Chen Peter-B29397)
-Date: Wed, 27 Feb 2013 08:57:07 +0000
-Subject: [PATCH v8 8/8] usb: chipidea: udc: fix the oops when plugs in
- usb cable after rmmod gadget
-In-Reply-To: <20130227084218.GL8016@arwen.pp.htv.fi>
-References: <1360051215-27722-1-git-send-email-peter.chen@freescale.com>
- <1360051215-27722-9-git-send-email-peter.chen@freescale.com>
- <20130213084128.GB2426@arwen.pp.htv.fi>
- <20130217030951.GA1588@nchen-desktop>
- <20130226182141.GB2626@arwen.pp.htv.fi>
- <20130227031002.GB20402@nchen-desktop>
- <20130227084218.GL8016@arwen.pp.htv.fi>
-Message-ID: <F281D0F91ED19E4D8E63A7504E8A649803DCC3FE@039-SN2MPN1-022.039d.mgd.msft.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 27 Feb 2013 08:58:20 +0000
+Subject: [PATCH 0/4] Convert highbank to use PSCI calls
+In-Reply-To: <1361936528-25998-1-git-send-email-robherring2@gmail.com>
+References: <1361936528-25998-1-git-send-email-robherring2@gmail.com>
+Message-ID: <201302270858.20864.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
-> > > >  		} else {
-> > > > +			if (ci->driver)
-> > > > +				ci->driver->disconnect(&ci->gadget);
-> > >
-> > > This looks wrong. Why do you need to call ->disconnect() here ?
-> >
-> > When we disconnect usb cable from the host, we need to notify gadget
-> module
-> > disconnection occurs, the gadget module may not be unloaded in future.
+On Wednesday 27 February 2013, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-Sorry, can you point that?
+> This series converts highbank to use PSCI calls for secondary core boot,
+> hotplug, cpuidle, suspend/resume, reset, and poweroff. Doing this removes
+> about 200 lines of platform code (1/3 of it) and abstracts out the A9 and
+> A15 differences (some of which are not yet in place).
 
-Peter,
+Hi Rob,
+
+This looks pretty cool. Can you or Will comment on what is still left
+for the SMP ops that is actually required as platform specific code?
+
+Specifically, I'm wondering if we could have a set of default smp_ops
+based on this that we could use with the default machine descriptor [1]
+and any platform that has SMP enabled but a NULL smp_ops pointer.
+
+	Arnd
+
+[1] https://patchwork.kernel.org/patch/2074871/
