@@ -1,34 +1,33 @@
-From: kim.phillips@freescale.com (Kim Phillips)
-Date: Wed, 27 Feb 2013 10:45:12 -0600
-Subject: [PATCH 2/3] dtc: import latest upstream dtc
-In-Reply-To: <1361934486.18483.5@driftwood>
-References: <1361928975-29395-1-git-send-email-kim.phillips@freescale.com>
- <1361928975-29395-2-git-send-email-kim.phillips@freescale.com>
- <1361934486.18483.5@driftwood>
-Message-ID: <20130227104512.c07c0ade0107aa7f4ec18217@freescale.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Wed, 27 Feb 2013 17:53:20 +0100
+Subject: [RFC PATCH v2 0/4] Add support for LZ4-compressed kernel
+In-Reply-To: <20130227163118.GB17833@n2100.arm.linux.org.uk>
+References: <1361859870-15751-1-git-send-email-kyungsik.lee@lge.com>
+ <512D1C12.4080109@oberhumer.com>
+ <alpine.LFD.2.03.1302261557220.1254@syhkavp.arg>
+ <87fw0i7n6d.fsf@dell.be.48ers.dk>
+ <20130226221027.GW17833@n2100.arm.linux.org.uk>
+ <1361929234.1924.8.camel@joe-AO722>
+ <20130227095609.GY17833@n2100.arm.linux.org.uk>
+ <1361980152.2035.13.camel@joe-AO722>
+ <20130227163118.GB17833@n2100.arm.linux.org.uk>
+Message-ID: <20130227165320.GB2638@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 26 Feb 2013 21:08:06 -0600
-Rob Landley <rob@landley.net> wrote:
+On Wed, Feb 27, 2013 at 04:31:18PM +0000, Russell King - ARM Linux wrote:
+> I'm not saying that the LZO code should not be updated. I'm saying
+> that the kernel boot time decompressor is not a play ground for an
+> ever increasing number of "my favourite compression method" crap.
+> We don't need four, five or even six compression methods there. We
+> just need three - a "fast but large", "small but slow" and "all round
+> popular medium".
 
-> On 02/26/2013 07:36:14 PM, Kim Phillips wrote:
-> > This updates scripts/dtc to upstream dtc commit 27cdc1b
-> 
-> There's an upstream for dts?
+Hell yeah!
 
-dtc - the device tree compiler, yes.
+-- 
+Regards/Gruss,
+    Boris.
 
-> > "Added license header to dtc/libfdt/fdt.h and libfdt_env.h"
-> > from git://git.jdl.com/software/dtc.git.
-> 
-> That git repository has a Documentation directory with for example  
-> "dts-format.txt" in it. My current linux git repository does not  
-> contain a file called dts-format.txt.
-
-this patch isn't attempting to update dts-format.txt, or any other
-file that exists in the upstream dtc project that isn't present -
-and used - in the kernel.  The purpose of this patch is to update
-libfdt, which has in-kernel users.
-
-Kim
+Sent from a fat crate under my desk. Formatting is fine.
+--
