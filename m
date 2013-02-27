@@ -1,124 +1,43 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Wed, 27 Feb 2013 20:41:02 +0100
-Subject: [PATCH Resend v5 02/16] spi/spi-atmel: detect the capabilities of
- SPI core by reading the VERSION register.
-In-Reply-To: <1361925520-11981-1-git-send-email-wenyou.yang@atmel.com>
+Date: Wed, 27 Feb 2013 20:47:14 +0100
+Subject: [PATCH Resend v5 00/16] spi/spi-atmel: add dmaengine support for
+ atmel spi controller and to test the device tree support
+In-Reply-To: <1361925297-11854-1-git-send-email-wenyou.yang@atmel.com>
 References: <1361925297-11854-1-git-send-email-wenyou.yang@atmel.com>
- <1361925520-11981-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <CAGhQ9Vwh1Y=_ShuAB+6mfS9SLed-6UthUHk3fdJoVKDcmP6edA@mail.gmail.com>
+Message-ID: <CAGhQ9VymJxSRxDUUqzFgkOaY5tjmHe5kmeDtsrYQwMUwAAi0Dw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 February 2013 01:38, Wenyou Yang <wenyou.yang@atmel.com> wrote:
-> The "has_dma_support" needed for future use with dmaengine driver.
+On 27 February 2013 01:34, Wenyou Yang <wenyou.yang@atmel.com> wrote:
+> Hi All,
 >
-> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> Cc: spi-devel-general at lists.sourceforge.net
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  drivers/spi/spi-atmel.c |   70 ++++++++++++++++++++++++++++++++++++++---------
->  1 file changed, 57 insertions(+), 13 deletions(-)
+> This set of patches is to add dmaengine support for atmel spi and to test device tree support.
 >
-> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-> index 5bf3786..a8e091b 100644
-> --- a/drivers/spi/spi-atmel.c
-> +++ b/drivers/spi/spi-atmel.c
-> @@ -39,6 +39,7 @@
->  #define SPI_CSR1                               0x0034
->  #define SPI_CSR2                               0x0038
->  #define SPI_CSR3                               0x003c
-> +#define SPI_VERSION                            0x00fc
->  #define SPI_RPR                                        0x0100
->  #define SPI_RCR                                        0x0104
->  #define SPI_TPR                                        0x0108
-> @@ -71,6 +72,8 @@
->  #define SPI_FDIV_SIZE                          1
->  #define SPI_MODFDIS_OFFSET                     4
->  #define SPI_MODFDIS_SIZE                       1
-> +#define SPI_WDRBT_OFFSET                       5
-> +#define SPI_WDRBT_SIZE                         1
->  #define SPI_LLB_OFFSET                         7
->  #define SPI_LLB_SIZE                           1
->  #define SPI_PCS_OFFSET                         16
-> @@ -180,6 +183,11 @@
->  #define spi_writel(port,reg,value) \
->         __raw_writel((value), (port)->regs + SPI_##reg)
+> The work is based on Nicolas and Richard's work.
 >
-> +struct atmel_spi_caps {
-> +       bool    is_spi2;
-> +       bool    has_wdrbt;
-> +       bool    has_dma_support;
-> +};
+> Because the Atmel DMA device tree support hasn't on mainline, to at91sam9x5ek and at91sam9n12ek
+> with dma support, it doesn't work on the dmaengine mode, only on PIO mode so far.
 >
->  /*
->   * The core SPI transfer engine just talks to a register bank to set up
-> @@ -204,6 +212,8 @@ struct atmel_spi {
+> It has been tested as below:
+>  1./tested on v3.8, by using mtd utils, "mount", "umount" and "cp" commands.
+>  2./tested on "spi/next" git tree after removing commit "spi: make sure all transfer has proper speed set".
+>  3./tested by using Documentation/spi/spidev_test.c on "/dev/spidev".
+>  4./tested on on at91sam9x5ek, at91sam9m10g45ek, at91sam9263ek and at91sam9g20ek boards
 >
->         void                    *buffer;
->         dma_addr_t              buffer_dma;
-> +
-> +       struct atmel_spi_caps   caps;
->  };
->
->  /* Controller-specific per-slave state */
-> @@ -222,14 +232,10 @@ struct atmel_spi_device {
->   *  - SPI_SR.TXEMPTY, SPI_SR.NSSR (and corresponding irqs)
->   *  - SPI_CSRx.CSAAT
->   *  - SPI_CSRx.SBCR allows faster clocking
-> - *
-> - * We can determine the controller version by reading the VERSION
-> - * register, but I haven't checked that it exists on all chips, and
-> - * this is cheaper anyway.
->   */
-> -static bool atmel_spi_is_v2(void)
-> +static bool atmel_spi_is_v2(struct atmel_spi *as)
->  {
-> -       return !cpu_is_at91rm9200();
-> +       return as->caps.is_spi2;
->  }
+> It is based on v3.8.
 
-Since you are removing cpu_is_at91rm9200() you might want to remove
-the mach/cpu.h include as well.
+Did a quick test on at91rm9200 and it still works:
+(DataFlash on SPI CS0 in HW mode)
 
-Regarding the includes. I think asm/{io.h, gpio.h} should be converted
-to linux/{io.h, gpio.h}. In it's own patch, though.
+[    1.100000] atmel_spi fffe0000.spi: version: 0x0
+[    1.120000] atmel_spi fffe0000.spi: Atmel SPI Controller at
+0xfffe0000 (irq 23)
+[    1.130000] atmel_spi fffe0000.spi: master is unqueued, this is deprecated
+[    1.130000] mtd_dataflash spi32766.0: AT45DB642x (8448 KBytes)
+pagesize 1056 bytes (OTP)
 
-<snip>
-
-> @@ -910,6 +921,32 @@ static void atmel_spi_cleanup(struct spi_device *spi)
->         kfree(asd);
->  }
->
-> +static inline unsigned int atmel_get_version(struct atmel_spi *as)
-> +{
-> +       return spi_readl(as, VERSION) & 0x00000fff;
-> +}
-> +
-> +static void __init atmel_get_caps(struct atmel_spi *as)
-> +{
-> +       unsigned int version;
-> +
-> +       version = atmel_get_version(as);
-> +       dev_info(&as->pdev->dev, "version: 0x%x\n", version);
-> +
-> +       as->caps.is_spi2 = false;
-> +       as->caps.has_wdrbt = false;
-> +       as->caps.has_dma_support = false;
-> +
-> +       if (version > 0x121)
-> +               as->caps.is_spi2 = true;
-> +
-> +       if (version >= 0x210)
-> +               as->caps.has_wdrbt = true;
-> +
-> +       if (version >= 0x212)
-> +               as->caps.has_dma_support = true;
-> +}
-
-This could be just written as: as->caps.has_dma_support = (version >= 0x212);
-or using a conditional.
-
-It would save some lines.
+so;
+Tested-by: Joachim Eastwood <manabian@gmail.com>
 
 regards
 Joachim Eastwood
