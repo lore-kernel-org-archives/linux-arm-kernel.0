@@ -1,43 +1,57 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 27 Feb 2013 10:33:23 +0200
-Subject: [RESEND PATCH v9 0/2] usb: phy: samsung: Introducing usb phy
- driver for samsung SoCs
-In-Reply-To: <CAFp+6iGx1z9BcE3nLTVvOMG6VWVuYhDuKm5wu3DtbL8M1pfUtg@mail.gmail.com>
-References: <1358499623-13901-1-git-send-email-p.paneri@samsung.com>
- <20130227081521.GG8016@arwen.pp.htv.fi>
- <CAFp+6iGx1z9BcE3nLTVvOMG6VWVuYhDuKm5wu3DtbL8M1pfUtg@mail.gmail.com>
-Message-ID: <20130227083323.GJ8016@arwen.pp.htv.fi>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 27 Feb 2013 09:33:53 +0100
+Subject: [PATCH 1/4] arm: mvebu: limit OpenBlocks AX3-4 to 1 GB of RAM
+In-Reply-To: <20130227070333.GK17242@lunn.ch>
+References: <20130104183139.20492204@skate> <50E71356.3030203@lunn.ch>
+ <20130104190345.460151d1@skate>
+ <50E9EE7A.1080301@free-electrons.com>
+ <20130106235312.0839a879@skate> <20130107094747.GR3392@lunn.ch>
+ <20130107110712.GT3392@lunn.ch> <20130107122613.64f4ace5@skate>
+ <20130107113411.GV3392@lunn.ch> <20130226162023.3d7b2ffc@skate>
+ <20130227070333.GK17242@lunn.ch>
+Message-ID: <20130227093353.03e63046@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 27, 2013 at 02:00:25PM +0530, Vivek Gautam wrote:
-> Hi Balbi,
-> 
-> 
-> On Wed, Feb 27, 2013 at 1:45 PM, Felipe Balbi <balbi@ti.com> wrote:
-> > Hi,
-> >
-> > On Fri, Jan 18, 2013 at 02:30:21PM +0530, Praveen Paneri wrote:
-> >> Changes from v8:
-> >> Resending this patch series after rebasing to the latest usb-next branch.
-> >> Rewording inline comments for better readability.
-> >> Removed IS_ENABLED(CONFIG_OF) as pdev->dev.of_node is enough to check for dt support.
-> >> Using of_match_ptr to add of_match_table to platform_driver structure.
-> >> Removed unnecessary variables.
-> >
-> > trying applying these but it doesn't apply unfortunately.
-> >
-> 
-> Already present in 3.8.0 ? ;-)
+Dear Andrew Lunn,
 
-heh, my bad. For whatever reason it was still marked as unread.
+On Wed, 27 Feb 2013 08:03:33 +0100, Andrew Lunn wrote:
 
+> > in U-Boot. Gr??gory and I are using OpenBlocks AX3 based on the A0
+> > version of the silicon (so the message I copy/pasted above is *not*
+> > from our OpenBlocks, but a different Armada XP board). However,
+> > PlatHome has been shipping since some time B0 revisions. Maybe it
+> > could explain the difference we're seeing?
+> 
+> Hi Thomas
+> 
+> My machine is an A0.
+
+Hum, ok, so that doesn't explain the problem.
+
+> I know you recently found some issue with windows. Could that explain
+> something?
+
+No, the issue with the window was only that devices can only access the
+first 32 bits of the physical address space, so if there is a DRAM CS
+configured with a base address higher than 4 GB, then devices shouldn't
+configure a window to access this part of the DRAM, because it creates
+two overlapping windows (both starting at base 0x0, since in the device
+address decoding window registers, the base only has 32 bits, while it
+has 35 bits for the SDRAM address decoding registers). And the issue
+with window was that the devices were really not working at all. What
+we're seeing with the OpenBlocks is some instability: sometimes it
+boots, sometimes not.
+
+We're going to discuss this issue further with PlatHome.
+
+Thanks for reporting!
+
+Best regards,
+
+Thomas
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130227/5af5b783/attachment.sig>
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
