@@ -1,62 +1,79 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 27 Feb 2013 22:42:49 +0200
-Subject: [PATCH v10 6/8] usb: chipidea: imx: add internal vbus regulator
- control
-In-Reply-To: <CAB7JpEHq6rDS4=twUf7gito5zxinYiHZban77psKEQ962z0LYw@mail.gmail.com>
-References: <1361946799-29471-1-git-send-email-peter.chen@freescale.com>
- <1361946799-29471-7-git-send-email-peter.chen@freescale.com>
- <CAB7JpEHq6rDS4=twUf7gito5zxinYiHZban77psKEQ962z0LYw@mail.gmail.com>
-Message-ID: <20130227204249.GA2748@arwen.pp.htv.fi>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 27 Feb 2013 20:50:14 +0000
+Subject: [PATCH 03/12] dma: mxs-dma: move to generic device tree binding
+In-Reply-To: <1361978748-25281-4-git-send-email-shawn.guo@linaro.org>
+References: <1361978748-25281-1-git-send-email-shawn.guo@linaro.org>
+ <1361978748-25281-4-git-send-email-shawn.guo@linaro.org>
+Message-ID: <201302272050.14338.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 27, 2013 at 09:08:11PM +0200, Alexander Shishkin wrote:
-> On Feb 27, 2013 8:34 AM, "Peter Chen" <peter.chen@freescale.com> wrote:
-> >
-> > - For host, the vbus should always be on.
-> > - For otg, the vbus is off defaultly, the vbus needs to be
-> > turned on/off when usb role switches.
-> >
-> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> > ---
-> >  drivers/usb/chipidea/ci.h          |    2 +
-> >  drivers/usb/chipidea/ci13xxx_imx.c |   76
-> ++++++++++++++++++++++++++++--------
-> >  2 files changed, 61 insertions(+), 17 deletions(-)
-> >
-> > diff --git a/drivers/usb/chipidea/ci.h b/drivers/usb/chipidea/ci.h
-> > index 0bd17a5..5663092 100644
-> > --- a/drivers/usb/chipidea/ci.h
-> > +++ b/drivers/usb/chipidea/ci.h
-> > @@ -133,6 +133,7 @@ struct hw_bank {
-> >   * @id_event: indicates there is a id event, and handled at ci_otg_work
-> >   * @b_sess_valid_event: indicates there is a vbus event, and handled
-> >   * at ci_otg_work
-> > + * @reg_vbus: used to control internal vbus regulator
-> >   */
-> >  struct ci13xxx {
-> >         struct device                   *dev;
-> > @@ -172,6 +173,7 @@ struct ci13xxx {
-> >         struct usb_otg                  otg;
-> >         bool                            id_event;
-> >         bool                            b_sess_valid_event;
-> > +       struct regulator                *reg_vbus;
-> >  };
-> 
-> I suggest that this regulator be taken care of by either the platform code
-> or phy layer, it doesn't look like it really belongs in chipidea core. The
-> easiest way I guess would be to do something similar to the notify callback
-> in msm platform code.
+On Wednesday 27 February 2013, Shawn Guo wrote:
+> @@ -139,6 +140,9 @@ struct mxs_dma_engine {
+>  	struct dma_device		dma_device;
+>  	struct device_dma_parameters	dma_parms;
+>  	struct mxs_dma_chan		mxs_chans[MXS_DMA_CHANNELS];
+> +	struct platform_device		*pdev;
+> +	struct of_dma_filter_info	filter_info;
+> +	unsigned int			nr_channels;
+>  };
 
-I guess it would look better at the phy layer, but looks like we need
-another ->set_vbus() method to switch VBUS on/off.
+I don't think using of_dma_filter_info makes sense when we are not
+using the generic xlate function:
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130227/971b7741/attachment.sig>
+> @@ -665,8 +667,59 @@ err_out:
+>  	return ret;
+>  }
+>  
+> +struct mxs_dma_filter_param {
+> +	struct device_node *of_node;
+> +	unsigned int chan_id;
+> +};
+> +
+> +struct dma_chan *mxs_dma_xlate(struct of_phandle_args *dma_spec,
+> +			       struct of_dma *ofdma)
+> +{
+> +	struct mxs_dma_engine *mxs_dma = ofdma->of_dma_data;
+> +	struct of_dma_filter_info *info = &mxs_dma->filter_info;
+> +	struct mxs_dma_filter_param param;
+> +	int count = dma_spec->args_count;
+> +
+> +	if (!info || !info->filter_fn)
+> +		return NULL;
+> +
+> +	if (count != 1)
+> +		return NULL;
+> +
+> +	param.of_node = ofdma->of_node;
+> +	param.chan_id = dma_spec->args[0];
+> +
+> +	if (param.chan_id >= mxs_dma->nr_channels)
+> +		return NULL;
+> +
+> +	return dma_request_channel(info->dma_cap, info->filter_fn, &param);
+> +}
+> +
+> +static bool mxs_dma_filter_fn(struct dma_chan *chan, void *fn_param)
+
+You already know the value of info->filter_fn, it's always &mxs_dma_filter_fn,
+so if you reorder these two functions, you can pass it directly into
+dma_request_channel.
+
+> +	struct mxs_dma_filter_param *param = fn_param;
+> +	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
+> +	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
+> +	int chan_irq;
+> +
+> +	if (mxs_dma->dma_device.dev->of_node != param->of_node)
+> +		return false;
+> +
+> +	if (chan->chan_id != param->chan_id)
+> +		return false;
+
+It would be nice if we could just get a pointer to the right channel
+structure from the xlate() function, rather than having to walk the
+list of channels and trying each one. Your method is what everyone
+else is doing as well, so we can stick with it for now, but at some
+point I'd like to open up this discussion again.
+
+	Arnd
