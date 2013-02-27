@@ -1,119 +1,29 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Tue, 26 Feb 2013 19:07:36 -0600
-Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
-In-Reply-To: <512D4FC4.2060505@wwwdotorg.org>
-References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
- <1329321854-24490-4-git-send-email-b-cousson@ti.com>
- <4F44FA56.7020000@gmail.com> <4F44FC37.2000701@ti.com>
- <4F452484.5080503@gmail.com>
- <74CDBE0F657A3D45AFBB94109FB122FF17BD8BC6C1@HQMAIL01.nvidia.com>
- <4F47AD08.4030504@ti.com>
- <CAAwP0s0cB368R2mtbJpTZJreR-5GSRLfxC+8DJLo5nw3_OwBuA@mail.gmail.com>
- <512D39DA.7020306@ti.com> <512D3AB1.1080202@wwwdotorg.org>
- <512D3EC2.6050408@ti.com> <512D3FE6.1010300@wwwdotorg.org>
- <512D490B.70900@ti.com> <512D4FC4.2060505@wwwdotorg.org>
-Message-ID: <512D5C58.4090500@ti.com>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Wed, 27 Feb 2013 09:14:05 +0800
+Subject: [Suggestion] ARM:S5PV210: version merging compiling issue for
+ 'struct fimc_source_info'
+In-Reply-To: <512C855D.6090109@samsung.com>
+References: <511F50CF.90403@asianux.com>
+ <CAH9JG2WS5q4SR8zk5=OC32PHLZ2+ZYva7csyshG7oANacqbCuA@mail.gmail.com>
+ <512C5877.7090805@asianux.com> <512C855D.6090109@samsung.com>
+Message-ID: <512D5DDD.6060409@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 02/26/2013 06:13 PM, Stephen Warren wrote:
-> On 02/26/2013 04:45 PM, Jon Hunter wrote:
->>
->> On 02/26/2013 05:06 PM, Stephen Warren wrote:
->>> On 02/26/2013 04:01 PM, Jon Hunter wrote:
->>>>
->>>> On 02/26/2013 04:44 PM, Stephen Warren wrote:
->>>>> On 02/26/2013 03:40 PM, Jon Hunter wrote:
->>>>>>
->>>>>> On 02/26/2013 04:01 AM, Javier Martinez Canillas wrote:
->>>>>>
->>>>>> [snip]
->>>>>>
->>>>>>> I was wondering if the level/edge settings for gpios is working on OMAP.
->>>>>>>
->>>>>>> I'm adding DT support for an SMSC911x ethernet chip connected to the
->>>>>>> GPMC for an OMAP3 SoC based board.
->>>>>>>
->>>>>>> In the smsc911x driver probe function (smsc911x_drv_probe() in
->>>>>>> drivers/net/ethernet/smsc/smsc911x.c), a call to request_irq() with
->>>>>>> the flag IRQF_TRIGGER_LOW is needed because of the wiring on my board.
->>>>>>>
->>>>>>> Reading the gpio-omap.txt documentation it says that #interrupt-cells
->>>>>>> should be <2> and that a value of 8 is "active low level-sensitive".
->>>>>>>
->>>>>>> So I tried this:
->>>>>>>
->>>>>>> &gpmc {
->>>>>>> 	ethernet at 5,0 {
->>>>>>> 		pinctrl-names = "default";
->>>>>>> 		pinctrl-0 = <&smsc911x_pins>;
->>>>>>> 		compatible = "smsc,lan9221", "smsc,lan9115";
->>>>>>> 		reg = <5 0 0xff>; /* CS5 */
->>>>>>> 		interrupt-parent = <&gpio6>;
->>>>>>> 		interrupts = <16 8>; /* gpio line 176 */
->>>>>>> 		interrupt-names = "smsc911x irq";
->>>>>>> 		vmmc-supply = <&vddvario>;
->>>>>>> 		vmmc_aux-supply = <&vdd33a>;
->>>>>>> 		reg-io-width = <4>;
->>>>>>>
->>>>>>> 		smsc,save-mac-address;
->>>>>>>       };
->>>>>>> };
->>>>>>
->>>>>> Are you requesting the gpio anywhere? If not then this is not going to
->>>>>> work as-is. This was discussed fairly recently [1] and the conclusion
->>>>>> was that the gpio needs to be requested before we can use as an interrupt.
->>>>>
->>>>> That seems wrong; the GPIO/IRQ driver should handle this internally. The
->>>>> Ethernet driver shouldn't know/care whether the interrupt it's given is
->>>>> some form of dedicated interrupt or a GPIO-based interrupt, and even if
->>>>> it somehow did, there's no irq_to_gpio() any more, so the driver can't
->>>>> tell which GPIO ID it should request, unless it's given yet another
->>>>> property to represent this.
->>>>
->>>> I agree that ideally this should be handled internally. Did you read the
->>>> discussion on the thread that I referenced [1]? If you have any thoughts
->>>> we are open to ideas :-)
->>>>
->>>> Cheers
->>>> Jon
->>>>
->>>> [1] http://comments.gmane.org/gmane.linux.ports.arm.omap/92192
->>>
->>> Oh, when I clicked that link the first time, all I saw was the patch,
->>> not any discussion. I guess it must have timed out finding the other
->>> emails or something.
->>
->> Actually, I sent a slightly different link the 2nd time to ensure you
->> saw the thread. So my fault ;-)
->>
->>> I disagree that the GPIO needs to be requested, and that a custom DT
->>> property and associated code are needed for that; simply requesting the
->>> IRQ should be enough to make everything work.
->>>
->>> In the Tegra GPIO IRQ driver for example, the irq_set_type irq_chip op
->>> goes and configures the base GPIO HW to enable the pin as a GPIO, just
->>> like gpio_request() would. I imagine the OMAP driver can do whatever
->>> similar action it needs.
->>
->> Yes that is similar to what the patch in the thread was attempting to
->> do, but this got shot down.
->>
->> One issue I see is that by not calling gpio_request, then potentially
->> you could have someone request a gpio via gpio_request() and someone
->> trying to use it as an interrupt source via request_irq(). Now obviously
->> that represents a bug because there is only one physical gpio, but I
->> gather it is something we need to protect against.
+? 2013?02?26? 17:50, Sylwester Nawrocki ??:
+> No, the fix is not yet in linux-next. I has not been merged through the media
+> tree and it might take some time until it gets to Linus's tree now. You can use
+> one of following patches to fix this build break:
 > 
-> I'm not sure it's really that much of an issue, but presumably the
-> solution is for a combined GPIO+IRQ driver to simply call gpio_request
-> internally from within some irq_chip function. It looks like struct
-> irq_chip doesn't have a request/free, but perhaps they could be added to
-> solve this?
+> http://www.spinics.net/lists/linux-samsung-soc/msg16023.html
+> https://patchwork.kernel.org/patch/2143211
+> http://patchwork.linuxtv.org/patch/16892
 
-Yes I was wondering if we could do something like that. That would work,
-may be that's what we should propose.
+  thank you.
 
-Thanks
-Jon
+  :-)
+
+-- 
+Chen Gang
+
+Asianux Corporation
