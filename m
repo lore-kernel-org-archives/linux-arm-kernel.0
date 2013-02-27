@@ -1,49 +1,82 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Wed, 27 Feb 2013 14:21:54 -0800
-Subject: [RFC PATCH v2 0/4] Add support for LZ4-compressed kernel
-In-Reply-To: <20130227095139.GX17833@n2100.arm.linux.org.uk>
-References: <1361859870-15751-1-git-send-email-kyungsik.lee@lge.com>
- <512D1C12.4080109@oberhumer.com> <20130227073646.GA22333@Corona>
- <20130227095139.GX17833@n2100.arm.linux.org.uk>
-Message-ID: <20130227142154.f1f40048.akpm@linux-foundation.org>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Wed, 27 Feb 2013 17:16:09 -0600
+Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
+In-Reply-To: <CAAwP0s3rbExrSf-W325uCPfMO=Zk9LefRP0VD4JC1tg_sxS_gQ@mail.gmail.com>
+References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
+ <1329321854-24490-4-git-send-email-b-cousson@ti.com>
+ <4F44FA56.7020000@gmail.com> <4F44FC37.2000701@ti.com>
+ <4F452484.5080503@gmail.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF17BD8BC6C1@HQMAIL01.nvidia.com>
+ <4F47AD08.4030504@ti.com>
+ <CAAwP0s0cB368R2mtbJpTZJreR-5GSRLfxC+8DJLo5nw3_OwBuA@mail.gmail.com>
+ <512D39DA.7020306@ti.com> <512D3AB1.1080202@wwwdotorg.org>
+ <512D3EC2.6050408@ti.com> <512D3FE6.1010300@wwwdotorg.org>
+ <512D490B.70900@ti.com> <512D4FC4.2060505@wwwdotorg.org>
+ <512D5C58.4090500@ti.com>
+ <CAAwP0s3rbExrSf-W325uCPfMO=Zk9LefRP0VD4JC1tg_sxS_gQ@mail.gmail.com>
+Message-ID: <512E93B9.8020806@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 27 Feb 2013 09:51:39 +0000
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 
-> On Wed, Feb 27, 2013 at 04:36:47PM +0900, Kyungsik Lee wrote:
-> > Compiler: Linaro ARM gcc 4.6.2
-> > 2. ARMv7, 1.7GHz based board
-> >    Kernel: linux 3.7
-> >    Uncompressed Kernel Size: 14MB
-> >          Compressed Size  Decompression Speed
-> >     LZO  6.0MB            34.1MB/s            Old
-> >          ----------------------------------------
-> >          6.0MB            34.7MB/s            New
-> >          6.0MB            52.2MB/s(UA)
-> >     =============================================
-> >     LZ4  6.5MB            86.7MB/s
-> > UA: Unaligned memory Access support
+On 02/26/2013 09:57 PM, Javier Martinez Canillas wrote:
+
+[snip]
+
+> Something like that would definitely solve the GPIO request issue but
+> we still have the issue that the current OMAP GPIO controller binding
+> does not support #interrupt-cells = <2>.
 > 
-> That is pretty conclusive - it shows an 8% increase in image size vs a
-> 66% increase in decompression speed.  It will take a _lot_ to offset
-> that increase in decompression speed.
+> So, we can't pass the trigger type and level flags for an IRQ-GPIO
+> when using an GPIO controller as the interrupt-parent for a device
+> node.
 > 
-> So, what I think is that yes, we should accept LZ4 and drop LZO from
-> the kernel - the "fast but may not be small" compression title has
-> clearly been taken by LZ4.
-> 
-> Akpm - what's your thoughts?
+> Do you have any comments on that issue?
 
-It sounds like we should merge both.
+Can you elaborate a bit more on why you say this is not supported?
 
-I've sent Linus a little reminder for Markus's 3.9 pull request.  Let's
-get down and review and test this new code?
+I have been playing with this today on an omap board and if I set the
+#interrupt-cells = <2>, then I do see that irq_domain_xlate_onetwocell()
+is called and the irq number and flags read as expected. Following which
+I then see it will call the omap_irq_type() to set type. So AFAICT it works.
 
-David's review comments were useful.
+Please note I do see that when the SMC driver calls request_irq() in
+smc_drv_probe() it is also settings the trigger type to
+IRQ_TYPE_EDGE_RISING (default). So if you are setting to low-level
+sensitive in DT, then this is being overwritten. We could fix this by
+setting SMC_IRQ_FLAGS to -1 for OMAP.
 
-I'd like to also see a Kconfig patch which makes x86 and arm kernels
-default to the new LZ4 code.  Then I can sneak that patch into
-linux-next so the new code will get some testing.  If we don't do that,
-very few people will run it.
+In general we do need to fix the gpio binding for omap to default to
+#interrupt-cell = <2>, as this should work. However, before we can do
+that we need to fix the issue of ensuring the gpio module is enabled if
+being used as an interrupt source without having to call gpio_request()
+first.
+
+We should probably add the following patch as well to avoid any hangs if
+the bank is not enabled, when omap_irq_type is called.
+
+commit 5e298de564e09f5ca4148a9bc0ed5d16b4742f14
+Author: Jon Hunter <jon-hunter@ti.com>
+Date:   Wed Feb 27 17:14:11 2013 -0600
+
+    gpio/omap: warn if gpio bank is not enabled on setting irq type
+
+diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+index f1fbedb2..cbdc796 100644
+--- a/drivers/gpio/gpio-omap.c
++++ b/drivers/gpio/gpio-omap.c
+@@ -421,6 +421,9 @@ static int gpio_irq_type(struct irq_data *d,
+unsigned type)
+        int retval;
+        unsigned long flags;
+
++       if (WARN_ON(!bank->mod_usage))
++               return -EINVAL;
++
+ #ifdef CONFIG_ARCH_OMAP1
+        if (d->irq > IH_MPUIO_BASE)
+                gpio = OMAP_MPUIO(d->irq - IH_MPUIO_BASE);
+
+
+Cheers
+Jon
