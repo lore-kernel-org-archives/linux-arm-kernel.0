@@ -1,84 +1,117 @@
 From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 27 Feb 2013 13:27:10 +0100
-Subject: [PATCH 4/9] USB chipidea: ci13xxx-imx: create dynamic platformdata
+Date: Wed, 27 Feb 2013 13:27:15 +0100
+Subject: [PATCH 9/9] USB chipidea i.MX: use devm_usb_get_phy_by_phandle to get
+ phy
 In-Reply-To: <1361968035-18644-1-git-send-email-mkl@pengutronix.de>
 References: <1361968035-18644-1-git-send-email-mkl@pengutronix.de>
-Message-ID: <1361968035-18644-5-git-send-email-mkl@pengutronix.de>
+Message-ID: <1361968035-18644-10-git-send-email-mkl@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Michael Grzeschik <m.grzeschik@pengutronix.de>
+From: Sascha Hauer <s.hauer@pengutronix.de>
 
-This patch removes the limitation of having only one instance of the
-ci13xxx-imx platformdata and makes different configurations possible.
+This patch replaces the hand crafted code to retrieve the phy's phandle from
+the DT by the helper function devm_usb_get_phy_by_phandle() which has been
+added in commit:
 
+    "5d3c28b usb: otg: add device tree support to otg library"
+
+Reviewed-by: Kishon Vijay Abraham I <kishon@ti.com>
 Reviewed-by: Peter Chen <peter.chen@freescale.com>
-Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
 ---
- drivers/usb/chipidea/ci13xxx_imx.c |   25 +++++++++++++++----------
- 1 file changed, 15 insertions(+), 10 deletions(-)
+ drivers/usb/chipidea/ci13xxx_imx.c |   38 ++++++++++++++++--------------------
+ 1 file changed, 17 insertions(+), 21 deletions(-)
 
 diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
-index 8c29122..69024e0 100644
+index b598bb8..6e720ce 100644
 --- a/drivers/usb/chipidea/ci13xxx_imx.c
 +++ b/drivers/usb/chipidea/ci13xxx_imx.c
-@@ -85,17 +85,10 @@ EXPORT_SYMBOL_GPL(usbmisc_get_init_data);
+@@ -30,7 +30,6 @@
+ 	((struct usb_phy *)platform_get_drvdata(pdev))
  
- /* End of common functions shared by usbmisc drivers*/
- 
--static struct ci13xxx_platform_data ci13xxx_imx_platdata  = {
--	.name			= "ci13xxx_imx",
--	.flags			= CI13XXX_REQUIRE_TRANSCEIVER |
--				  CI13XXX_PULLUP_ON_VBUS |
--				  CI13XXX_DISABLE_STREAMING,
--	.capoffset		= DEF_CAPOFFSET,
--};
--
- static int ci13xxx_imx_probe(struct platform_device *pdev)
+ struct ci13xxx_imx_data {
+-	struct device_node *phy_np;
+ 	struct usb_phy *phy;
+ 	struct platform_device *ci_pdev;
+ 	struct clk *clk;
+@@ -90,12 +89,12 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
  {
  	struct ci13xxx_imx_data *data;
-+	struct ci13xxx_platform_data *pdata;
- 	struct platform_device *plat_ci, *phy_pdev;
- 	struct device_node *phy_np;
+ 	struct ci13xxx_platform_data *pdata;
+-	struct platform_device *plat_ci, *phy_pdev;
+-	struct device_node *phy_np;
++	struct platform_device *plat_ci;
  	struct resource *res;
-@@ -107,6 +100,18 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
- 		&& !usbmisc_ops)
- 		return -EPROBE_DEFER;
+ 	struct regulator *reg_vbus;
+ 	struct pinctrl *pinctrl;
+ 	int ret;
++	struct usb_phy *phy;
  
-+	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
-+	if (!pdata) {
-+		dev_err(&pdev->dev, "Failed to allocate CI13xxx-IMX pdata!\n");
-+		return -ENOMEM;
-+	}
-+
-+	pdata->name = "ci13xxx_imx";
-+	pdata->capoffset = DEF_CAPOFFSET;
-+	pdata->flags = CI13XXX_REQUIRE_TRANSCEIVER |
-+		       CI13XXX_PULLUP_ON_VBUS |
-+		       CI13XXX_DISABLE_STREAMING;
-+
- 	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
- 	if (!data) {
- 		dev_err(&pdev->dev, "Failed to allocate CI13xxx-IMX data!\n");
-@@ -168,7 +173,7 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
- 		reg_vbus = NULL;
+ 	if (of_find_property(pdev->dev.of_node, "fsl,usbmisc", NULL)
+ 		&& !usbmisc_ops)
+@@ -147,19 +146,20 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
+ 		return ret;
  	}
  
--	ci13xxx_imx_platdata.phy = data->phy;
-+	pdata->phy = data->phy;
+-	phy_np = of_parse_phandle(pdev->dev.of_node, "fsl,usbphy", 0);
+-	if (phy_np) {
+-		data->phy_np = phy_np;
+-		phy_pdev = of_find_device_by_node(phy_np);
+-		if (phy_pdev) {
+-			struct usb_phy *phy;
+-			phy = pdev_to_phy(phy_pdev);
+-			if (phy &&
+-			    try_module_get(phy_pdev->dev.driver->owner)) {
+-				usb_phy_init(phy);
+-				data->phy = phy;
+-			}
++	phy = devm_usb_get_phy_by_phandle(&pdev->dev, "fsl,usbphy", 0);
++	if (PTR_ERR(phy) == -EPROBE_DEFER) {
++		ret = -EPROBE_DEFER;
++		goto err_clk;
++	}
++
++	if (!IS_ERR(phy)) {
++		ret = usb_phy_init(phy);
++		if (ret) {
++			dev_err(&pdev->dev, "unable to init phy: %d\n", ret);
++			goto err_clk;
+ 		}
++
++		data->phy = phy;
+ 	}
  
- 	if (!pdev->dev.dma_mask) {
- 		pdev->dev.dma_mask = devm_kzalloc(&pdev->dev,
-@@ -193,7 +198,7 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
+ 	/* we only support host now, so enable vbus here */
+@@ -170,7 +170,7 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
+ 			dev_err(&pdev->dev,
+ 				"Failed to enable vbus regulator, err=%d\n",
+ 				ret);
+-			goto put_np;
++			goto err_clk;
+ 		}
+ 		data->reg_vbus = reg_vbus;
+ 	} else {
+@@ -222,9 +222,7 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
+ err:
+ 	if (reg_vbus)
+ 		regulator_disable(reg_vbus);
+-put_np:
+-	if (phy_np)
+-		of_node_put(phy_np);
++err_clk:
+ 	clk_disable_unprepare(data->clk);
+ 	return ret;
+ }
+@@ -244,8 +242,6 @@ static int ci13xxx_imx_remove(struct platform_device *pdev)
+ 		module_put(data->phy->dev->driver->owner);
+ 	}
  
- 	plat_ci = ci13xxx_add_device(&pdev->dev,
- 				pdev->resource, pdev->num_resources,
--				&ci13xxx_imx_platdata);
-+				pdata);
- 	if (IS_ERR(plat_ci)) {
- 		ret = PTR_ERR(plat_ci);
- 		dev_err(&pdev->dev,
+-	of_node_put(data->phy_np);
+-
+ 	clk_disable_unprepare(data->clk);
+ 
+ 	platform_set_drvdata(pdev, NULL);
 -- 
 1.7.10.4
