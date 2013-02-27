@@ -1,38 +1,67 @@
-From: js@sig21.net (Johannes Stezenbach)
-Date: Wed, 27 Feb 2013 11:20:53 +0100
-Subject: [RFC PATCH v2 0/4] Add support for LZ4-compressed kernel
-In-Reply-To: <20130227095139.GX17833@n2100.arm.linux.org.uk>
-References: <1361859870-15751-1-git-send-email-kyungsik.lee@lge.com>
- <512D1C12.4080109@oberhumer.com> <20130227073646.GA22333@Corona>
- <20130227095139.GX17833@n2100.arm.linux.org.uk>
-Message-ID: <20130227102053.GA24274@sig21.net>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Wed, 27 Feb 2013 11:23:47 +0100
+Subject: [PATCH 5/9] USB: chipidea: add PTW and PTS handling
+In-Reply-To: <87txpf9h8q.fsf@ashishki-desk.ger.corp.intel.com>
+References: <1359984275-24646-1-git-send-email-s.hauer@pengutronix.de>
+ <1359984275-24646-6-git-send-email-s.hauer@pengutronix.de>
+ <87txpf9h8q.fsf@ashishki-desk.ger.corp.intel.com>
+Message-ID: <512DDEB3.9090307@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 27, 2013 at 09:51:39AM +0000, Russell King - ARM Linux wrote:
-> On Wed, Feb 27, 2013 at 04:36:47PM +0900, Kyungsik Lee wrote:
-> > Compiler: Linaro ARM gcc 4.6.2
-> > 2. ARMv7, 1.7GHz based board
-> >    Kernel: linux 3.7
-> >    Uncompressed Kernel Size: 14MB
-> >          Compressed Size  Decompression Speed
-> >     LZO  6.0MB            34.1MB/s            Old
-> >          ----------------------------------------
-> >          6.0MB            34.7MB/s            New
-> >          6.0MB            52.2MB/s(UA)
-> >     =============================================
-> >     LZ4  6.5MB            86.7MB/s
-> > UA: Unaligned memory Access support
+On 02/14/2013 02:07 PM, Alexander Shishkin wrote:
+> Sascha Hauer <s.hauer@pengutronix.de> writes:
 > 
-> That is pretty conclusive - it shows an 8% increase in image size vs a
-> 66% increase in decompression speed.  It will take a _lot_ to offset
-> that increase in decompression speed.
+>> From: Michael Grzeschik <m.grzeschik@pengutronix.de>
+>>
+>> This patch makes it possible to configure the PTW and PTS bits inside
+>> the portsc register for host and device mode before the driver starts
+>> and the phy can be addressed as hardware implementation is designed.
+>>
+>> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+>> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+>> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+>> ---
+>>  .../devicetree/bindings/usb/ci13xxx-imx.txt        |    5 +++
+>>  drivers/usb/chipidea/bits.h                        |   14 ++++++-
+>>  drivers/usb/chipidea/ci13xxx_imx.c                 |    3 ++
+>>  drivers/usb/chipidea/core.c                        |   39 ++++++++++++++++++++
+>>  include/linux/usb/chipidea.h                       |    1 +
+>>  5 files changed, 61 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+>> index 5778b9c..dd42ccd 100644
+>> --- a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+>> +++ b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+>> @@ -5,6 +5,11 @@ Required properties:
+>>  - reg: Should contain registers location and length
+>>  - interrupts: Should contain controller interrupt
+>>  
+>> +Recommended properies:
+>> +- phy_type: the type of the phy connected to the core. Should be one
+>> +  of "utmi", "utmi_wide", "ulpi", "serial" or "hsic". Without this
+>> +  property the PORTSC register won't be touched
+>> +
 > 
-> So, what I think is that yes, we should accept LZ4 and drop LZO from
-> the kernel - the "fast but may not be small" compression title has
-> clearly been taken by LZ4.
+> Looks like this bit belongs to patch 3/9, where you're adding devicetree
+> hooks. Otherwise looks good.
 
-I think LZO may be used by squashfs, jffs2 and btrfs, thus you
-cannot drop it without breaking on disk storage formats.
+Nope. Patch 3/9 adds the device tree helper code. But this patch adds
+the functionality to the chipidea imx glue code, so the update of the
+devicetree docs belongs into this patch.
 
-Johannes
+Marc
+
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130227/196b967c/attachment.sig>
