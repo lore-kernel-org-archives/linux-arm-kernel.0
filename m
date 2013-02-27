@@ -1,117 +1,169 @@
 From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 27 Feb 2013 13:27:15 +0100
-Subject: [PATCH 9/9] USB chipidea i.MX: use devm_usb_get_phy_by_phandle to get
- phy
+Date: Wed, 27 Feb 2013 13:27:11 +0100
+Subject: [PATCH 5/9] USB chipidea: add PTW and PTS handling
 In-Reply-To: <1361968035-18644-1-git-send-email-mkl@pengutronix.de>
 References: <1361968035-18644-1-git-send-email-mkl@pengutronix.de>
-Message-ID: <1361968035-18644-10-git-send-email-mkl@pengutronix.de>
+Message-ID: <1361968035-18644-6-git-send-email-mkl@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sascha Hauer <s.hauer@pengutronix.de>
+From: Michael Grzeschik <m.grzeschik@pengutronix.de>
 
-This patch replaces the hand crafted code to retrieve the phy's phandle from
-the DT by the helper function devm_usb_get_phy_by_phandle() which has been
-added in commit:
+This patch makes it possible to configure the PTW and PTS bits inside
+the portsc register for host and device mode before the driver starts
+and the phy can be addressed as hardware implementation is designed.
 
-    "5d3c28b usb: otg: add device tree support to otg library"
-
-Reviewed-by: Kishon Vijay Abraham I <kishon@ti.com>
-Reviewed-by: Peter Chen <peter.chen@freescale.com>
+Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
 ---
- drivers/usb/chipidea/ci13xxx_imx.c |   38 ++++++++++++++++--------------------
- 1 file changed, 17 insertions(+), 21 deletions(-)
+ .../devicetree/bindings/usb/ci13xxx-imx.txt        |    5 +++
+ drivers/usb/chipidea/bits.h                        |   14 ++++++-
+ drivers/usb/chipidea/ci13xxx_imx.c                 |    3 ++
+ drivers/usb/chipidea/core.c                        |   39 ++++++++++++++++++++
+ include/linux/usb/chipidea.h                       |    1 +
+ 5 files changed, 61 insertions(+), 1 deletion(-)
 
+diff --git a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+index 5778b9c..dd42ccd 100644
+--- a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
++++ b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+@@ -5,6 +5,11 @@ Required properties:
+ - reg: Should contain registers location and length
+ - interrupts: Should contain controller interrupt
+ 
++Recommended properies:
++- phy_type: the type of the phy connected to the core. Should be one
++  of "utmi", "utmi_wide", "ulpi", "serial" or "hsic". Without this
++  property the PORTSC register won't be touched
++
+ Optional properties:
+ - fsl,usbphy: phandler of usb phy that connects to the only one port
+ - fsl,usbmisc: phandler of non-core register device, with one argument
+diff --git a/drivers/usb/chipidea/bits.h b/drivers/usb/chipidea/bits.h
+index 050de85..d8ffc2f 100644
+--- a/drivers/usb/chipidea/bits.h
++++ b/drivers/usb/chipidea/bits.h
+@@ -48,10 +48,22 @@
+ #define PORTSC_SUSP           BIT(7)
+ #define PORTSC_HSP            BIT(9)
+ #define PORTSC_PTC            (0x0FUL << 16)
++/* PTS and PTW for non lpm version only */
++#define PORTSC_PTS(d)         ((((d) & 0x3) << 30) | (((d) & 0x4) ? BIT(25) : 0))
++#define PORTSC_PTW            BIT(28)
+ 
+ /* DEVLC */
+ #define DEVLC_PSPD            (0x03UL << 25)
+-#define    DEVLC_PSPD_HS      (0x02UL << 25)
++#define DEVLC_PSPD_HS         (0x02UL << 25)
++#define DEVLC_PTW             BIT(27)
++#define DEVLC_STS             BIT(28)
++#define DEVLC_PTS(d)          (((d) & 0x7) << 29)
++
++/* Encoding for DEVLC_PTS and PORTSC_PTS */
++#define PTS_UTMI              0
++#define PTS_ULPI              2
++#define PTS_SERIAL            3
++#define PTS_HSIC              4
+ 
+ /* OTGSC */
+ #define OTGSC_IDPU	      BIT(5)
 diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
-index b598bb8..6e720ce 100644
+index 69024e0..ebc1148 100644
 --- a/drivers/usb/chipidea/ci13xxx_imx.c
 +++ b/drivers/usb/chipidea/ci13xxx_imx.c
-@@ -30,7 +30,6 @@
- 	((struct usb_phy *)platform_get_drvdata(pdev))
+@@ -21,6 +21,7 @@
+ #include <linux/clk.h>
+ #include <linux/regulator/consumer.h>
+ #include <linux/pinctrl/consumer.h>
++#include <linux/usb/of.h>
  
- struct ci13xxx_imx_data {
--	struct device_node *phy_np;
- 	struct usb_phy *phy;
- 	struct platform_device *ci_pdev;
- 	struct clk *clk;
-@@ -90,12 +89,12 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
- {
- 	struct ci13xxx_imx_data *data;
- 	struct ci13xxx_platform_data *pdata;
--	struct platform_device *plat_ci, *phy_pdev;
--	struct device_node *phy_np;
-+	struct platform_device *plat_ci;
- 	struct resource *res;
- 	struct regulator *reg_vbus;
- 	struct pinctrl *pinctrl;
- 	int ret;
-+	struct usb_phy *phy;
+ #include "ci.h"
+ #include "ci13xxx_imx.h"
+@@ -112,6 +113,8 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
+ 		       CI13XXX_PULLUP_ON_VBUS |
+ 		       CI13XXX_DISABLE_STREAMING;
  
- 	if (of_find_property(pdev->dev.of_node, "fsl,usbmisc", NULL)
- 		&& !usbmisc_ops)
-@@ -147,19 +146,20 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
- 		return ret;
- 	}
++	pdata->phy_mode = of_usb_get_phy_mode(pdev->dev.of_node);
++
+ 	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
+ 	if (!data) {
+ 		dev_err(&pdev->dev, "Failed to allocate CI13xxx-IMX data!\n");
+diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+index 57cae1f..04d68cb 100644
+--- a/drivers/usb/chipidea/core.c
++++ b/drivers/usb/chipidea/core.c
+@@ -67,6 +67,8 @@
+ #include <linux/usb/gadget.h>
+ #include <linux/usb/otg.h>
+ #include <linux/usb/chipidea.h>
++#include <linux/usb/of.h>
++#include <linux/phy.h>
  
--	phy_np = of_parse_phandle(pdev->dev.of_node, "fsl,usbphy", 0);
--	if (phy_np) {
--		data->phy_np = phy_np;
--		phy_pdev = of_find_device_by_node(phy_np);
--		if (phy_pdev) {
--			struct usb_phy *phy;
--			phy = pdev_to_phy(phy_pdev);
--			if (phy &&
--			    try_module_get(phy_pdev->dev.driver->owner)) {
--				usb_phy_init(phy);
--				data->phy = phy;
--			}
-+	phy = devm_usb_get_phy_by_phandle(&pdev->dev, "fsl,usbphy", 0);
-+	if (PTR_ERR(phy) == -EPROBE_DEFER) {
-+		ret = -EPROBE_DEFER;
-+		goto err_clk;
+ #include "ci.h"
+ #include "udc.h"
+@@ -211,6 +213,41 @@ static int hw_device_init(struct ci13xxx *ci, void __iomem *base)
+ 	return 0;
+ }
+ 
++static void hw_phymode_configure(struct ci13xxx *ci)
++{
++	u32 portsc, lpm;
++
++	switch (ci->platdata->phy_mode) {
++	case USBPHY_INTERFACE_MODE_UTMI:
++		portsc = PORTSC_PTS(PTS_UTMI);
++		lpm = DEVLC_PTS(PTS_UTMI);
++		break;
++	case USBPHY_INTERFACE_MODE_UTMIW:
++		portsc = PORTSC_PTS(PTS_UTMI) | PORTSC_PTW;
++		lpm = DEVLC_PTS(PTS_UTMI) | DEVLC_PTW;
++		break;
++	case USBPHY_INTERFACE_MODE_ULPI:
++		portsc = PORTSC_PTS(PTS_ULPI);
++		lpm = DEVLC_PTS(PTS_ULPI);
++		break;
++	case USBPHY_INTERFACE_MODE_SERIAL:
++		portsc = PORTSC_PTS(PTS_SERIAL);
++		lpm = DEVLC_PTS(PTS_SERIAL);
++		break;
++	case USBPHY_INTERFACE_MODE_HSIC:
++		portsc = PORTSC_PTS(PTS_HSIC);
++		lpm = DEVLC_PTS(PTS_HSIC);
++		break;
++	default:
++		return;
 +	}
 +
-+	if (!IS_ERR(phy)) {
-+		ret = usb_phy_init(phy);
-+		if (ret) {
-+			dev_err(&pdev->dev, "unable to init phy: %d\n", ret);
-+			goto err_clk;
- 		}
++	if (ci->hw_bank.lpm)
++		hw_write(ci, OP_DEVLC, DEVLC_PTS(7) | DEVLC_PTW, lpm);
++	else
++		hw_write(ci, OP_PORTSC, PORTSC_PTS(7) | PORTSC_PTW, portsc);
++}
 +
-+		data->phy = phy;
+ /**
+  * hw_device_reset: resets chip (execute without interruption)
+  * @ci: the controller
+@@ -476,6 +513,8 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+ 			: CI_ROLE_GADGET;
  	}
  
- 	/* we only support host now, so enable vbus here */
-@@ -170,7 +170,7 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
- 			dev_err(&pdev->dev,
- 				"Failed to enable vbus regulator, err=%d\n",
- 				ret);
--			goto put_np;
-+			goto err_clk;
- 		}
- 		data->reg_vbus = reg_vbus;
- 	} else {
-@@ -222,9 +222,7 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
- err:
- 	if (reg_vbus)
- 		regulator_disable(reg_vbus);
--put_np:
--	if (phy_np)
--		of_node_put(phy_np);
-+err_clk:
- 	clk_disable_unprepare(data->clk);
- 	return ret;
- }
-@@ -244,8 +242,6 @@ static int ci13xxx_imx_remove(struct platform_device *pdev)
- 		module_put(data->phy->dev->driver->owner);
- 	}
- 
--	of_node_put(data->phy_np);
--
- 	clk_disable_unprepare(data->clk);
- 
- 	platform_set_drvdata(pdev, NULL);
++	hw_phymode_configure(ci);
++
+ 	ret = ci_role_start(ci, ci->role);
+ 	if (ret) {
+ 		dev_err(dev, "can't start %s role\n", ci_role(ci)->name);
+diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
+index 544825d..1a2aa18 100644
+--- a/include/linux/usb/chipidea.h
++++ b/include/linux/usb/chipidea.h
+@@ -14,6 +14,7 @@ struct ci13xxx_platform_data {
+ 	uintptr_t	 capoffset;
+ 	unsigned	 power_budget;
+ 	struct usb_phy	*phy;
++	enum usb_phy_interface phy_mode;
+ 	unsigned long	 flags;
+ #define CI13XXX_REGS_SHARED		BIT(0)
+ #define CI13XXX_REQUIRE_TRANSCEIVER	BIT(1)
 -- 
 1.7.10.4
