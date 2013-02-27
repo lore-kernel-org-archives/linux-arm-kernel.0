@@ -1,90 +1,44 @@
-From: anish198519851985@gmail.com (anish singh)
-Date: Wed, 27 Feb 2013 18:28:07 +0530
-Subject: How to measure the RAM read/write performance
-In-Reply-To: <CAL7WMDc++dm0+2TxNbwwDB_xrqcLJWp2HTuTvqwrSXp3D-P2BA@mail.gmail.com>
-References: <CAL7WMDcM9XommwO+rYJa5doMVXrFv1Vptu-s9cqaWfVXgx-qVg@mail.gmail.com>
- <CAK7N6vrptC7yOrH=boskNQD27PA-PqT9oPVgWe4Fagk95r4s=g@mail.gmail.com>
- <CAL7WMDc++dm0+2TxNbwwDB_xrqcLJWp2HTuTvqwrSXp3D-P2BA@mail.gmail.com>
-Message-ID: <CAK7N6vqddKUbWTXGa3x4vY6S4iTXaEKbB_hK9bnGmebjudpbmA@mail.gmail.com>
+From: kyungsik.lee@lge.com (Kyungsik Lee)
+Date: Wed, 27 Feb 2013 22:23:58 +0900
+Subject: [RFC PATCH v2 0/4] Add support for LZ4-compressed kernel
+In-Reply-To: <20130227095139.GX17833@n2100.arm.linux.org.uk>
+References: <1361859870-15751-1-git-send-email-kyungsik.lee@lge.com>
+ <512D1C12.4080109@oberhumer.com> <20130227073646.GA22333@Corona>
+ <20130227095139.GX17833@n2100.arm.linux.org.uk>
+Message-ID: <20130227132358.GA25071@Corona>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 27, 2013 at 6:16 PM, sandeep kumar
-<coolsandyforyou@gmail.com> wrote:
->>Try below points:
->>1. I am not sure about snapdragon(is it Qualcomm?) but try
->>CONFIG_CPU_DCACHE_DISABLE.
-> I did that already, device is not booting. In our architecture cache is
-> tightly coupled with CPU.
-Should be discussed with Qualcomm guys here as to the reason
-why it doesn't boot up.
->
->>2. You are better off programming some DMA master to do large (and
->>uncached) reads/writes to RAM and timing that.
-> DMA is not a standard way, i suppose, as it depends on what I/O peripheral
-> we are doing the DMA.
-You are doing I/O to RAM so it should do what you want.
-CPU->DMA CONTROLLER->RAM
->
->>You should always add arm mailing list and please mention the chip set
->> details.
->>cat /proc/cpuinfo is a great way
-> Processor       : ARMv7 Processor rev 2 (v7l)
-> BogoMIPS        : 163.38
-> Features        : swp half thumb fastmult vfp edsp neon vfpv3 tls
-> CPU implementer : 0x51
-> CPU architecture: 7
-> CPU variant     : 0x1
-> CPU part        : 0x00f
-> CPU revision    : 2
->
-> Thanks
-> Sandeep
->
->
->
->
-> On Wed, Feb 27, 2013 at 5:37 PM, anish singh <anish198519851985@gmail.com>
-> wrote:
->>
->> On Tue, Feb 26, 2013 at 5:01 PM, sandeep kumar
->> <coolsandyforyou@gmail.com> wrote:
->> > Hi All
->> > In performance benchmark tools, When we profile read/write timings
->> > mostly,
->> > those read/writes are done to cache only.
->> >
->> > I want to measure my DDR(RAM chip) performance.
->> > So i want to make sure, every read/write should happen to DDR RAM chip
->> > only.
->> Try below points:
->> 1. I am not sure about snapdragon(is it Qualcomm?) but try
->> CONFIG_CPU_DCACHE_DISABLE.
->> 2. You are better off programming some DMA master to do large (and
->> uncached) reads/writes to RAM and timing that.
->>
->> However simple uncached LDR/STR from the CPU may not be a great
->> measure of RAM controller perf.
->>
->> You should always add arm mailing list and please mention the chip set
->> details.
->> cat /proc/cpuinfo is a great way
->> >
->> > How can i achieve this...Any ideas/suggestions...?
->> >
->> > --
->> > With regards,
->> > Sandeep Kumar Anantapalli,
->> >
->> > _______________________________________________
->> > Kernelnewbies mailing list
->> > Kernelnewbies at kernelnewbies.org
->> > http://lists.kernelnewbies.org/mailman/listinfo/kernelnewbies
->> >
->
->
->
->
-> --
-> With regards,
-> Sandeep Kumar Anantapalli,
+On Wed, Feb 27, 2013 at 09:51:39AM +0000, Russell King - ARM Linux wrote:
+> On Wed, Feb 27, 2013 at 04:36:47PM +0900, Kyungsik Lee wrote:
+> > Compiler: Linaro ARM gcc 4.6.2
+> > 2. ARMv7, 1.7GHz based board
+> >    Kernel: linux 3.7
+> >    Uncompressed Kernel Size: 14MB
+> >          Compressed Size  Decompression Speed
+> >     LZO  6.0MB            34.1MB/s            Old
+> >          ----------------------------------------
+> >          6.0MB            34.7MB/s            New
+> >          6.0MB            52.2MB/s(UA)
+> >     =============================================
+> >     LZ4  6.5MB            86.7MB/s
+> > UA: Unaligned memory Access support
+> 
+> That is pretty conclusive - it shows an 8% increase in image size vs a
+> 66% increase in decompression speed.  It will take a _lot_ to offset
+> that increase in decompression speed.
+> 
+> So, what I think is that yes, we should accept LZ4 and drop LZO from
+> the kernel - the "fast but may not be small" compression title has
+> clearly been taken by LZ4.
+
+I have read the comments regarding how many compressors the kernel
+should support and understand that it can not support all the
+compressors available.
+
+However, I don't think that LZO can be replaced by LZ4 in all the
+cases. The benchmark above shows only about improved decompression
+speed.
+
+Thanks,
+Kyungsik
