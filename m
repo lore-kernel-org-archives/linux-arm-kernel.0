@@ -1,118 +1,40 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Wed, 27 Feb 2013 14:33:16 +0800
-Subject: [PATCH v10 5/8] usb: chipidea: udc: retire the flag
- CI13_PULLUP_ON_VBUS
+Date: Wed, 27 Feb 2013 14:33:19 +0800
+Subject: [PATCH v10 8/8] usb: chipidea: imx: fix the error that using
+ uninitialized pointer
 In-Reply-To: <1361946799-29471-1-git-send-email-peter.chen@freescale.com>
 References: <1361946799-29471-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1361946799-29471-6-git-send-email-peter.chen@freescale.com>
+Message-ID: <1361946799-29471-9-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(change CI13XXX to CI13 to avoid junk email check)
-Now, we have handled vbus session in core driver when the
-vbus interrupt occurs, so our pullup operations are all
-according to vbus.
-Of cource, the software can still call .pullup when device connects
-to host if it wants to connect/disconnect with host.
+If the core's probe fails, the platform layer may not get core's
+private data, if the platform tries to use struct ci13xxx, it will
+use uninitialized pointer. Besides, if the core's probe fails,
+the platform layer should know it, and let its probe fail too.
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/chipidea/ci13xxx_imx.c |    1 -
- drivers/usb/chipidea/ci13xxx_msm.c |    1 -
- drivers/usb/chipidea/udc.c         |   23 ++++++++---------------
- include/linux/usb/chipidea.h       |    1 -
- 4 files changed, 8 insertions(+), 18 deletions(-)
+ drivers/usb/chipidea/ci13xxx_imx.c |    7 +++++++
+ 1 files changed, 7 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
-index 793fdba..3ed119e 100644
+index 5499cf8..720ea92 100644
 --- a/drivers/usb/chipidea/ci13xxx_imx.c
 +++ b/drivers/usb/chipidea/ci13xxx_imx.c
-@@ -109,7 +109,6 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
- 	pdata->name = "ci13xxx_imx";
- 	pdata->capoffset = DEF_CAPOFFSET;
- 	pdata->flags = CI13XXX_REQUIRE_TRANSCEIVER |
--		       CI13XXX_PULLUP_ON_VBUS |
- 		       CI13XXX_DISABLE_STREAMING | 
- 		       CI13XXX_REGS_SHARED;
+@@ -239,6 +239,13 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
+ 	platform_set_drvdata(pdev, data);
  
-diff --git a/drivers/usb/chipidea/ci13xxx_msm.c b/drivers/usb/chipidea/ci13xxx_msm.c
-index 7d16681..5755ee8 100644
---- a/drivers/usb/chipidea/ci13xxx_msm.c
-+++ b/drivers/usb/chipidea/ci13xxx_msm.c
-@@ -49,7 +49,6 @@ static struct ci13xxx_platform_data ci13xxx_msm_platdata = {
- 	.name			= "ci13xxx_msm",
- 	.flags			= CI13XXX_REGS_SHARED |
- 				  CI13XXX_REQUIRE_TRANSCEIVER |
--				  CI13XXX_PULLUP_ON_VBUS |
- 				  CI13XXX_DISABLE_STREAMING,
- 
- 	.notify_event		= ci13xxx_msm_notify_event,
-diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
-index 597ae64..b57b735 100644
---- a/drivers/usb/chipidea/udc.c
-+++ b/drivers/usb/chipidea/udc.c
-@@ -1360,9 +1360,6 @@ static int ci13xxx_vbus_session(struct usb_gadget *_gadget, int is_active)
- 	unsigned long flags;
- 	int gadget_ready = 0;
- 
--	if (!(ci->platdata->flags & CI13XXX_PULLUP_ON_VBUS))
--		return -EOPNOTSUPP;
--
- 	spin_lock_irqsave(&ci->lock, flags);
- 	ci->vbus_active = is_active;
- 	if (ci->driver)
-@@ -1426,8 +1423,7 @@ static int ci13xxx_pullup(struct usb_gadget *_gadget, int is_on)
- {
- 	struct ci13xxx *ci = container_of(_gadget, struct ci13xxx, gadget);
- 
--	if ((ci->platdata->flags & CI13XXX_PULLUP_ON_VBUS) &&
--			!ci->vbus_active)
-+	if (!ci->vbus_active)
- 		return -ENOTSUPP;
- 
- 	if (is_on)
-@@ -1551,14 +1547,12 @@ static int ci13xxx_start(struct usb_gadget *gadget,
- 
- 	ci->driver = driver;
- 	pm_runtime_get_sync(&ci->gadget.dev);
--	if (ci->platdata->flags & CI13XXX_PULLUP_ON_VBUS) {
--		if (ci->vbus_active) {
--			if (ci->platdata->flags & CI13XXX_REGS_SHARED)
--				hw_device_reset(ci, USBMODE_CM_DC);
--		} else {
--			pm_runtime_put_sync(&ci->gadget.dev);
--			goto done;
--		}
-+	if (ci->vbus_active) {
-+		if (ci->platdata->flags & CI13XXX_REGS_SHARED)
-+			hw_device_reset(ci, USBMODE_CM_DC);
-+	} else {
-+		pm_runtime_put_sync(&ci->gadget.dev);
-+		goto done;
- 	}
- 
- 	retval = hw_device_state(ci, ci->ep0out->qh.dma);
-@@ -1581,8 +1575,7 @@ static int ci13xxx_stop(struct usb_gadget *gadget,
- 
- 	spin_lock_irqsave(&ci->lock, flags);
- 
--	if (!(ci->platdata->flags & CI13XXX_PULLUP_ON_VBUS) ||
--			ci->vbus_active) {
-+	if (ci->vbus_active) {
- 		hw_device_state(ci, 0);
- 		if (ci->platdata->notify_event)
- 			ci->platdata->notify_event(ci,
-diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
-index b314647..d543e4a 100644
---- a/include/linux/usb/chipidea.h
-+++ b/include/linux/usb/chipidea.h
-@@ -18,7 +18,6 @@ struct ci13xxx_platform_data {
- 	unsigned long	 flags;
- #define CI13XXX_REGS_SHARED		BIT(0)
- #define CI13XXX_REQUIRE_TRANSCEIVER	BIT(1)
--#define CI13XXX_PULLUP_ON_VBUS		BIT(2)
- #define CI13XXX_DISABLE_STREAMING	BIT(3)
- 	enum usb_dr_mode	dr_mode;
- #define CI13XXX_CONTROLLER_RESET_EVENT		0
+ 	ci = platform_get_drvdata(plat_ci);
++
++	if (!ci) {
++		ret = -ENODEV;
++		dev_err(&pdev->dev, 
++			"some wrong at ci core's initialization\n");
++		goto err_clk;
++	}
+ 	/*
+ 	 * Internal vbus on/off policy
+ 	 * - Always on for host only function
 -- 
 1.7.0.4
