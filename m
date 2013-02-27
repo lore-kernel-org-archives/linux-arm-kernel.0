@@ -1,118 +1,59 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Wed, 27 Feb 2013 06:24:03 -0800
-Subject: [RFC/PATCH 1/5] context tracking: conditionalize guest support
- based on CONFIG_KVM
-In-Reply-To: <1361916782.1740.2.camel@leonhard> (Namhyung Kim's message of
- "Wed, 27 Feb 2013 07:13:02 +0900")
-References: <1361389302-11968-1-git-send-email-khilman@linaro.org>
- <1361389302-11968-2-git-send-email-khilman@linaro.org>
- <20130222132750.GE17948@somewhere.redhat.com>
- <87fw0izxe4.fsf@linaro.org> <1361916782.1740.2.camel@leonhard>
-Message-ID: <87621dygvw.fsf@linaro.org>
+From: augulis.darius@gmail.com (Darius Augulis)
+Date: Wed, 27 Feb 2013 16:43:22 +0200
+Subject: [PATCH v10 6/8] usb: chipidea: imx: add internal vbus regulator
+ control
+In-Reply-To: <20130227083610.GK8016@arwen.pp.htv.fi>
+References: <1361946799-29471-1-git-send-email-peter.chen@freescale.com>
+ <1361946799-29471-7-git-send-email-peter.chen@freescale.com>
+ <20130227075510.GB8016@arwen.pp.htv.fi>
+ <20130227080735.GH1906@pengutronix.de>
+ <20130227081313.GI20402@nchen-desktop>
+ <20130227083610.GK8016@arwen.pp.htv.fi>
+Message-ID: <CAEYLNCpNfNtpmGL-POaJ=3HJpnPnK9+vJvJ_g8_jZcmqqy=XRA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Namhyung Kim <namhyung@kernel.org> writes:
+Hi balbi,
 
-> 2013-02-26 (?), 11:29 -0800, Kevin Hilman:
->> Frederic Weisbecker <fweisbec@gmail.com> writes:
->> 
->> > On Wed, Feb 20, 2013 at 11:41:38AM -0800, Kevin Hilman wrote:
->> >> So that it can build on !KVM systems too.
->> >> 
->> >> Signed-off-by: Kevin Hilman <khilman@linaro.org>
->> >> ---
->> >>  kernel/context_tracking.c | 4 ++++
->> >>  1 file changed, 4 insertions(+)
->> >> 
->> >> diff --git a/kernel/context_tracking.c b/kernel/context_tracking.c
->> >> index 74f68f4..6fe96b1 100644
->> >> --- a/kernel/context_tracking.c
->> >> +++ b/kernel/context_tracking.c
->> >> @@ -1,5 +1,7 @@
->> >>  #include <linux/context_tracking.h>
->> >> +#ifdef CONFIG_KVM
->> >>  #include <linux/kvm_host.h>
->> >> +#endif
->> >
->> > The header should take care of the off-case, no need to ifdef its inclusion.
->> 
->> In their current form, the headers will not build on platforms without
->> KVM support.  For example, these platforms (like ARM) don't even have
->> <asm/kvm.h> or <asm/kvm_host.h>.
->> 
->> >>  #include <linux/rcupdate.h>
->> >>  #include <linux/sched.h>
->> >>  #include <linux/hardirq.h>
->> >> @@ -62,6 +64,7 @@ void user_exit(void)
->> >>  	local_irq_restore(flags);
->> >>  }
->> >>  
->> >> +#ifdef CONFIG_KVM
->> >>  void guest_enter(void)
->> >>  {
->> >>  	if (vtime_accounting_enabled())
->> >> @@ -79,6 +82,7 @@ void guest_exit(void)
->> >>  		__guest_exit();
->> >>  }
->> >>  EXPORT_SYMBOL_GPL(guest_exit);
->> >> +#endif
->> >
->> > Kvm might be built as a module so we can't actually do this unfortunately.
->> 
->> Ah, right.  How bout using 
->> 
->> #if defined(CONFIG_KVM) || defined(CONFIG_KVM_MODULE)
->> 
->> for both conditionals above?  Updated patch below.
+actually no. I don't work with this hardware any more and don't have
+free time to support it.
+Please feel free to remove it if it breaks other things.
+
+Darius.
+
+
+On Wed, Feb 27, 2013 at 10:36 AM, Felipe Balbi <balbi@ti.com> wrote:
+> Hi Darius,
 >
-> This is what IS_ENABLED(CONFIG_KVM) is for.
-
-Right, updated patch below.
-
-Kevin
-
-
->From 61e35f069a64c03a2bce348487d41072aeb9f36b Mon Sep 17 00:00:00 2001
-From: Kevin Hilman <khilman@linaro.org>
-Date: Thu, 14 Feb 2013 10:17:37 -0800
-Subject: [PATCH] context tracking: conditionalize guest support based on
- CONFIG_KVM
-
-So that it can build on !KVM systems too.
-
-Signed-off-by: Kevin Hilman <khilman@linaro.org>
----
- kernel/context_tracking.c | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/kernel/context_tracking.c b/kernel/context_tracking.c
-index 74f68f4..fda6cd6 100644
---- a/kernel/context_tracking.c
-+++ b/kernel/context_tracking.c
-@@ -1,5 +1,7 @@
- #include <linux/context_tracking.h>
-+#if IS_ENABLED(CONFIG_KVM)
- #include <linux/kvm_host.h>
-+#endif
- #include <linux/rcupdate.h>
- #include <linux/sched.h>
- #include <linux/hardirq.h>
-@@ -62,6 +64,7 @@ void user_exit(void)
- 	local_irq_restore(flags);
- }
- 
-+#if IS_ENABLED(CONFIG_KVM)
- void guest_enter(void)
- {
- 	if (vtime_accounting_enabled())
-@@ -79,6 +82,7 @@ void guest_exit(void)
- 		__guest_exit();
- }
- EXPORT_SYMBOL_GPL(guest_exit);
-+#endif
- 
- void context_tracking_task_switch(struct task_struct *prev,
- 			     struct task_struct *next)
--- 
-1.8.1.2
+> On Wed, Feb 27, 2013 at 04:13:14PM +0800, Peter Chen wrote:
+>> On Wed, Feb 27, 2013 at 09:07:35AM +0100, Sascha Hauer wrote:
+>> > On Wed, Feb 27, 2013 at 09:55:10AM +0200, Felipe Balbi wrote:
+>> > > Hi,
+>> > >
+>> > > On Wed, Feb 27, 2013 at 02:33:17PM +0800, Peter Chen wrote:
+>> > > > - For host, the vbus should always be on.
+>> > > > - For otg, the vbus is off defaultly, the vbus needs to be
+>> > > > turned on/off when usb role switches.
+>> > > >
+>> > > > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+>> > >
+>> > > one quick question, if chipidea already has an imx glue layer, can I
+>> > > delete the broken imx_udc ? It doesn't even compile and it's including
+>> > > headers which don't exist.
+>> >
+>> > This driver handles i.MX1. This one has a gadget only core which is not
+>> > chipidea compatible. You should ping Darius Augulis <augulis.darius@gmail.com>
+>> > if he is willing to put some love into the driver.
+>>
+>> Sascha is correct.
+>
+> do you plan to put any work on drivers/usb/gadget/imx_udc.c ? It doesn't
+> even compile since it includes headers which don't exist (and no,
+> simply removing the include doesn't help).
+>
+> If nobody is going to work on that driver, I'm thinking about scheduling
+> it for removal. We can't keep such drivers that nobody cares (and just
+> break tree compilation) around.
+>
+> --
+> balbi
