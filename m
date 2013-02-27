@@ -1,63 +1,58 @@
 From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Wed, 27 Feb 2013 17:29:57 +0100
-Subject: [PATCH 0/3] otg-for-v3.10-v1: separate phy code and add DT helper
-In-Reply-To: <1361974590-21237-1-git-send-email-mkl@pengutronix.de>
-References: <1361974590-21237-1-git-send-email-mkl@pengutronix.de>
-Message-ID: <20130227162957.GC10491@pengutronix.de>
+Date: Wed, 27 Feb 2013 17:31:27 +0100
+Subject: [PATCH 0/5] chipidea-for-v3.10-v1: USB chipidea: make use of
+ DT helpers in chipidea driver improve driver
+In-Reply-To: <1361974830-3853-1-git-send-email-mkl@pengutronix.de>
+References: <1361974830-3853-1-git-send-email-mkl@pengutronix.de>
+Message-ID: <20130227163127.GD10491@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 27, 2013 at 03:16:27PM +0100, Marc Kleine-Budde wrote:
+On Wed, Feb 27, 2013 at 03:20:25PM +0100, Marc Kleine-Budde wrote:
 > Hello,
 > 
-> this series depends on the bugfix patch "USB otg: use try_module_get in all
-> usb_get_phy functions and add missing module_put" (a.k.a tags/otg-for-v3.9-v1)
-> posted earlier and is inteded for v3.10. It separates the phy from the otg code
-> and adds DT helper functions. Further mxs-phy uses the new usb_add_phy_dev()
-> function to register it's phy.
+> this series depends on the series "[PATCH 0/3] otg-for-v3.10-v1: separate phy
+> code and add DT helper" (a.k.a. tags/otg-for-v3.10-v1) posted earlier and is
+> intended for v3.10. The chipidea driver is converted to make use of the DT
+> helper functions.
 > 
 > regards,
 > Marc
 > 
 > 
-> The following changes since commit 6bef020b4aebd7886281fb7fb37c788d5a365eea:
-> 
->   USB otg: use try_module_get in all usb_get_phy functions and add missing module_put (2013-02-27 12:53:15 +0100)
-> 
-> are available in the git repository at:
-> 
->   git://git.pengutronix.de/git/mkl/linux.git tags/otg-for-v3.10-v1
-> 
-> for you to fetch changes up to 8a4c9f8489b2fce9e7bf0eb43fdb160ab51adc2c:
+> The following changes since commit 8a4c9f8489b2fce9e7bf0eb43fdb160ab51adc2c:
 > 
 >   USB mxs-phy: Register phy with framework (2013-02-27 13:48:21 +0100)
 > 
+> are available in the git repository at:
+> 
+>   git://git.pengutronix.de/git/mkl/linux.git tags/chipidea-for-v3.10-v1
+> 
+> for you to fetch changes up to 5d837224ea36da50f3e744a65fb23af1fa0a480d:
+> 
+>   USB chipidea i.MX: use devm_usb_get_phy_by_phandle to get phy (2013-02-27 13:49:07 +0100)
+> 
 > ----------------------------------------------------------------
-> USB otg, phy: separate phy and add DT helper
+> USB chipidea: make use of DT helpers in chipidea driver
 > 
-> Move phy related code into separate file and add device tree helper functions.
+> Make use of DT helper functions for handling the dr_mode and phy_type property.
 > 
 > ----------------------------------------------------------------
-> Michael Grzeschik (1):
->       USB: add devicetree helpers for determining dr_mode and phy_type
+> Michael Grzeschik (2):
+>       USB chipidea: ci13xxx-imx: create dynamic platformdata
+>       USB chipidea: add PTW and PTS handling
 > 
-> Sascha Hauer (2):
->       USB: move bulk of otg/otg.c to phy/phy.c
->       USB mxs-phy: Register phy with framework
+> Sascha Hauer (3):
+>       USB chipidea: introduce dual role mode pdata flags
+>       USB chipidea i.MX: introduce dr_mode property
+>       USB chipidea i.MX: use devm_usb_get_phy_by_phandle to get phy
 > 
->  drivers/usb/otg/mxs-phy.c |    9 +
->  drivers/usb/otg/otg.c     |  427 -------------------------------------------
->  drivers/usb/phy/Makefile  |    2 +
->  drivers/usb/phy/of.c      |   47 +++++
->  drivers/usb/phy/phy.c     |  438 +++++++++++++++++++++++++++++++++++++++++++++
->  drivers/usb/usb-common.c  |   37 ++++
->  include/linux/usb/of.h    |   27 +++
->  include/linux/usb/otg.h   |    8 +
->  include/linux/usb/phy.h   |    9 +
->  9 files changed, 577 insertions(+), 427 deletions(-)
->  create mode 100644 drivers/usb/phy/of.c
->  create mode 100644 drivers/usb/phy/phy.c
->  create mode 100644 include/linux/usb/of.h
+>  .../devicetree/bindings/usb/ci13xxx-imx.txt        |    6 ++
+>  drivers/usb/chipidea/bits.h                        |   14 +++-
+>  drivers/usb/chipidea/ci13xxx_imx.c                 |   67 +++++++++++---------
+>  drivers/usb/chipidea/core.c                        |   61 ++++++++++++++++--
+>  include/linux/usb/chipidea.h                       |    3 +-
+>  5 files changed, 112 insertions(+), 39 deletions(-)
 > 
 > 
 > 
@@ -67,8 +62,8 @@ Hi,
 
 with this series plus
         otg-for-v3.9-v1: USB otg: fix usage of try_module_get() and module_put()
-        chipidea-for-v3.10-v1 : USB chipidea: make use of DT helpers in chipidea driver improve driver
-        v9: Add tested id switch and vbus connect detect support for Chipidea
+	otg-for-v3.10-v1: separate phy code and add DT helper
+	v9: Add tested id switch and vbus connect detect support for Chipidea
 
 and
 
