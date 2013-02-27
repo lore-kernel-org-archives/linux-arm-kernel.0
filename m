@@ -1,26 +1,163 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 27 Feb 2013 09:56:09 +0000
-Subject: [RFC PATCH v2 0/4] Add support for LZ4-compressed kernel
-In-Reply-To: <1361929234.1924.8.camel@joe-AO722>
-References: <1361859870-15751-1-git-send-email-kyungsik.lee@lge.com>
- <512D1C12.4080109@oberhumer.com>
- <alpine.LFD.2.03.1302261557220.1254@syhkavp.arg>
- <87fw0i7n6d.fsf@dell.be.48ers.dk>
- <20130226221027.GW17833@n2100.arm.linux.org.uk>
- <1361929234.1924.8.camel@joe-AO722>
-Message-ID: <20130227095609.GY17833@n2100.arm.linux.org.uk>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 27 Feb 2013 11:01:21 +0100
+Subject: [PATCH] clk: add si5351 i2c common clock driver
+In-Reply-To: <5123CF5B.9060804@gmail.com>
+References: <1360414772-12232-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <5123CF5B.9060804@gmail.com>
+Message-ID: <CABJ1b_TaQ=AXCM9KKW-hJ0Rgdd+759ia+9P=bdnYbA_HcHP1wQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 26, 2013 at 05:40:34PM -0800, Joe Perches wrote:
-> On Tue, 2013-02-26 at 22:10 +0000, Russell King - ARM Linux wrote:
-> > So... for a selected kernel version of a particular size, can we please
-> > have a comparison between the new LZO code and this LZ4 code, so that
-> > we can see whether it's worth updating the LZO code or replacing the
-> > LZO code with LZ4?
-> 
-> How could it be questionable that it's worth updating the LZO code?
+Daniel,
 
-Please read the comments against the previous posting of these patches
-where I first stated this argument - and with agreement from those
-following the thread.  The thread started on 26 Jan 2013.  Thanks.
+first of all sorry for the late answer but thanks for testing the driver.
+
+On 2/19/13, Daniel Mack <zonque@gmail.com> wrote:
+> Hi Sebastian,
+>
+> I did some more tests today and it took me a while to dig for the root
+> cause why things were not working for me in the first place - see below.
+>
+>
+> On 09.02.2013 13:59, Sebastian Hesselbarth wrote:
+>
+>> +==Example==
+>> +
+>> +/* 25MHz reference crystal */
+>> +ref25: ref25M {
+>> +	compatible = "fixed-clock";
+>> +	#clock-cells = <0>;
+>> +	clock-frequency = <25000000>;
+>> +};
+>> +
+>> +i2c-master-node {
+>> +
+>> +	/* Si5351a msop10 i2c clock generator */
+>> +	si5351a: clock-generator at 60 {
+>> +		compatible = "silabs,si5351a-msop";
+>> +		reg = <0x60>;
+>> +		#address-cells = <1>;
+>> +		#size-cells = <0>;
+>> +		#clock-cells = <1>;
+>> +
+>> +		/* connect xtal input to 25MHz reference */
+>> +		clocks = <&ref25>;
+>
+> As referred to in another thread, registering the ref25M clock that way
+> didn't suffice for me on my platform - but that's a different story.
+
+I guess "fixed-clock" isn't registered by OMAP's clock init code? I had
+to do this on dove, too. Actually, I will come back to clock initialization for
+dove later and was hoping that there will be some global way of registering
+core common clock drivers (or at least fixed-clock) until then.
+
+>> +static void si5351_read_parameters(struct si5351_driver_data *drvdata,
+>> +	unsigned char reg, struct si5351_parameters *params)
+>> +{
+>> +	unsigned char buf[SI5351_PARAMETERS_LENGTH];
+>
+> On a general note, I think you can use u8 instead of unsigned char all
+> over the place here, which will save you some indentation trouble.
+
+Ok, I guess I was deriving "unsigned char" usage from other clock drivers
+and never went to u8. But I ll reconsider using u8 when all issues are
+worked out.
+
+>> +static inline int _si5351_clkout_reparent(struct si5351_driver_data
+>> *drvdata,
+>> +				  unsigned char num, unsigned char parent)
+>> +{
+>> +	struct clk *pclk;
+>> +
+>> +	if (num > 8 ||
+>> +	    (drvdata->variant == SI5351_VARIANT_A3 && num > 3))
+>> +		return -EINVAL;
+>> +
+>> +	switch (parent) {
+>> +	case 0:
+>> +		pclk = drvdata->msynth[num].hw.clk;
+>> +		break;
+>> +	case 1:
+>> +		pclk = drvdata->msynth[0].hw.clk;
+>> +		if (num >= 4)
+>> +			pclk = drvdata->msynth[4].hw.clk;
+>> +		break;
+>> +	case 2:
+>> +		pclk = drvdata->xtal.clk;
+>> +		break;
+>> +	case 3:
+>> +		if (drvdata->variant != SI5351_VARIANT_C)
+>> +			return -EINVAL;
+>> +		pclk = drvdata->clkin.clk;
+>> +		break;
+>> +	default:
+>> +		return -EINVAL;
+>> +	}
+>> +	return clk_set_parent(drvdata->clkout[num].hw.clk, pclk);
+>> +}
+>
+> [...]
+>
+>> +static int si5351_clkout_set_parent(struct clk_hw *hw, u8 index)
+>> +{
+>> +	struct si5351_hw_data *hwdata =
+>> +		container_of(hw, struct si5351_hw_data, hw);
+>> +	unsigned val;
+>> +
+>> +	val = 0;
+>> +	hw->clk->flags &= ~CLK_SET_RATE_PARENT;
+>> +	switch (index) {
+>> +	case 0:
+>> +		hw->clk->flags |= CLK_SET_RATE_PARENT;
+>> +		val = SI5351_CLK_INPUT_MULTISYNTH_N;
+>> +		break;
+>
+> I fugured that _si5351_clkout_reparent() wouldn't actually call
+> ->set_parent() on the clock, which leads to the fact that
+> CLK_SET_RATE_PARENT is not set in the flags. That way, only the clkout
+> end leaf is actually supplied with a new rate, which leads to incorrect
+> effective clocks, depending on the current multisynth/pll configuration.
+
+Yeah, true. Unfortunately, _clkout_reparent() is more like a dirty hack to
+allow to reparent the clock output. At registration internal configuration of
+si5351 is not known and when I parse the DT for clock configuration I might
+have been already assigned to the same parent clk that you later explicitly
+configure.
+
+What I basically want for si5351 (or any other eeprom based programmable
+clock gen) is that stored configuration is not touched. But it can be changed
+after eeprom contents have been copied into device's sram - and this _is_
+mandatory for the si5351 that I use on CuBox where there is no useful config
+stored at all.
+
+Anyway, there still seem to be some more issues with doing it right on current
+common clk framwork - thanks for pointing it out.
+
+> The reason for this is in clk_set_parent() itself, which bails if the
+> parent is already set to the passed value:
+>
+> 	if (clk->parent == parent)
+> 		goto out;
+>
+> I fixed that for now by explicitly setting the clock's parent to NULL
+> before calling clk_set_parent() in _si5351_clkout_reparent(), so the
+> calbacks are triggered. But there might be a nicer way, for example to
+> factor out the CLK_SET_RATE_PARENT handling to some function called from
+> _si5351_clkout_reparent() or so.
+>
+> Anyway, with this hack in place along with the other details I mentioned
+> in my first mail, the driver seems to work for me now, which is great. I
+> will do more extensive tests later that week when I have access to
+> better scopes ...
+
+I am happy to hear that you can reproduce different frequencies successfully!
+
+But as you already pointed out before, it would be great to have some long-term
+jitter measurements. I hope the heuristic taken from the referenced Silicon Labs
+application note will still meet jitter requirements. Still, as stated
+on my initial post,
+the pll settings obtained for different frequencies differ from that
+the provided
+windows tool spits out.
+
+Sebastian
