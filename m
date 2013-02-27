@@ -1,57 +1,116 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 27 Feb 2013 08:16:28 -0300
-Subject: [PATCH] arm: plat-orion: fix address decoding when > 4GB is used
-In-Reply-To: <1361958575-2328-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1361958575-2328-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130227111627.GA2718@localhost>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 27 Feb 2013 12:22:20 +0100
+Subject: SMDKV210 support issue in kernel 3.8 (dma-pl330 and HDMI failed)
+In-Reply-To: <CAG17yqQ3d+3Uwpfo+_r0Jwm4TQXcSY-bcW4qRcygzjq=9qXvvA@mail.gmail.com>
+References: <51275DF7.4010600@gmail.com> <512D2780.3020103@gmail.com>
+ <CAG17yqQ3d+3Uwpfo+_r0Jwm4TQXcSY-bcW4qRcygzjq=9qXvvA@mail.gmail.com>
+Message-ID: <512DEC6C.60607@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 27, 2013 at 10:49:35AM +0100, Thomas Petazzoni wrote:
-> During the system initialization, the orion_setup_cpu_mbus_target()
-> function reads the SDRAM address decoding registers to find out how
-> many chip-selects of SDRAM have been enabled, and builds a small array
-> with one entry per chip-select. This array is then used by device
-> drivers (XOR, Ethernet, etc.) to configure their own address decoding
-> windows to the SDRAM.
+On 02/27/2013 11:51 AM, Inderpal Singh wrote:
+> On 27 February 2013 02:52, Sylwester Nawrocki
+> <sylvester.nawrocki@gmail.com> wrote:
+>> On 02/22/2013 01:00 PM, Lonsn wrote:
+>>>
+>>> Hi,
+>>> I have tested the kernel 3.8 with a SMDKV210 like board. But I failed
+>>> with dma-pl330 and HDMI driver.
+>>> For dma-pl330, kernel print:
+>>> dma-pl330 dma-pl330.0: PERIPH_ID 0x0, PCELL_ID 0x0 !
+>>> dma-pl330: probe of dma-pl330.0 failed with error -22
+>>> dma-pl330 dma-pl330.1: PERIPH_ID 0x0, PCELL_ID 0x0 !
+>>> dma-pl330: probe of dma-pl330.1 failed with error -22
+>>
+>>
+>> Maybe there is some issue with the PL330 DMA controller clocks and the
+>> read values are all 0 because the clocks are disabled ?
+>>
+>> It seems arch/arm/mach-s5pv210/clock.c might be missing "apb_pclk" clock
+>> supply names, which I suspect may be required after commits:
+>>
+>> commit 7c71b8eb268ee38235f7e924d943ea9d90e59469
+>> Author: Inderpal Singh <inderpal.singh@linaro.org>
+>> Date:   Fri Sep 7 12:14:48 2012 +0530
+>>
+>>     DMA: PL330: Remove redundant runtime_suspend/resume functions
+>>
+>>     The driver's  runtime_suspend/resume functions just disable/enable
+>>     the clock which is already being managed at AMBA bus level
+>>     runtime_suspend/resume functions.
+>>
+>>     Hence, remove the driver's runtime_suspend/resume functions.
+>>
+>>     Signed-off-by: Inderpal Singh <inderpal.singh@linaro.org>
+>>     Tested-by: Chander Kashyap <chander.kashyap@linaro.org>
+>>     Signed-off-by: Vinod Koul <vinod.koul@linux.intel.com>
+>>
+>> commit faf6fbc6f2ca3b34bf464a8bb079a998e571957c
+>> Author: Inderpal Singh <inderpal.singh@linaro.org>
+>> Date:   Fri Sep 7 12:14:47 2012 +0530
+>>
+>>     DMA: PL330: Remove controller clock enable/disable
+>>
+>>     The controller clock is being enabled/disabled in AMBA bus
+>>     infrastructre in probe/remove functions. Hence, its not required
+>>     at driver level probe/remove.
+>>
+>>     Signed-off-by: Inderpal Singh <inderpal.singh@linaro.org>
+>>     Tested-by: Chander Kashyap <chander.kashyap@linaro.org>
+>>     Signed-off-by: Vinod Koul <vinod.koul@linux.intel.com>
+>>
+>> I have added people who made related changes at Cc, hopefully they
+>> can provide some help in debugging this.
+>>
 > 
-> However, devices can only access the first 32 bits of the physical
-> memory. Even though LPAE is not supported for now, some Marvell boards
-> are not showing up with 8 GB of RAM, configured using two SDRAM
+> The mentioned patches just removed the redundant clock enable/disable
+> from the driver as clock is already being managed at amba bus level in
+> the same code path. As per my understanding the issue should come even
+> without these patches.
 
-Tiny nitpick:
+But were the clocks managed directly by the pl330 driver same as those
+managed at amba bus level ? The first patch as above removed chunk
 
-s/not/now
+@@ -2887,24 +2884,17 @@ pl330_probe(struct amba_device *adev, const struct
+amba_id *id)
+                goto probe_err1;
+        }
 
-> address decoding windows: the first covering the first 4 GB, the
-> second covering the last 4 GB. The array built by
-> orion_setup_cpu_mbus_target() has therefore two entries, and device
-> drivers try to set up two address decoding windows to the
-> SDRAM. However, in the device registers for the address decoding, the
-> base address is only 32 bits, so those two windows overlap each other,
-> and the devices do not work at all.
-> 
-> This patch makes sure that the array built by
-> orion_setup_cpu_mbus_target() only contains the SDRAM decoding windows
-> that correspond to the first 4 GB of the memory. To do that, it
-> ignores the SDRAM decoding windows for which the 3 low-order bits are
-> not zero (the 3 low-order bits of the base register are used to store
-> bits 32:35 of the base address, so they actually indicate whether the
-> base address is above 4 GB).
-> 
-> This patch allows the newly introduced armada-xp-gp board to properly
-> operate when it is mounted with more than 4 GB of RAM. Without that,
-> all devices doing DMA (for example XOR and Ethernet) do not work at
-> all.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+-       pdmac->clk = clk_get(&adev->dev, "dma");
+-       if (IS_ERR(pdmac->clk)) {
+-               dev_err(&adev->dev, "Cannot get operation clock.\n");
+-               ret = -EINVAL;
+-               goto probe_err2;
+-       }
+-
 
-On the Armada XP GP board, ethernet doesn't work at all without this patch.
+which suggest the driver was enabling directly "dma" clocks, defined at
+S5PV210 platform level as:
 
-Tested-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+        {
+                .name           = "dma",
+                .devname        = "dma-pl330.0",
+                .parent         = &clk_hclk_psys.clk,
+                .enable         = s5pv210_clk_ip0_ctrl,
+                .ctrlbit        = (1 << 3),
+        }, {
+                .name           = "dma",
+                .devname        = "dma-pl330.1",
+                .parent         = &clk_hclk_psys.clk,
+                .enable         = s5pv210_clk_ip0_ctrl,
+                .ctrlbit        = (1 << 4),
+        }, {
 
-Thanks,
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+And amba bus was getting only dummy clocks behind "apb_pclk" clock
+conn_id.
+
+> @Lonsn: Can you please test without these patches?
+
+I suspect reverting only patch
+DMA: PL330: Remove redundant runtime_suspend/resume functions
+with PM_RUNTIME enabled might fix the issue.
+
+--
+
+Regards,
+Sylwester
