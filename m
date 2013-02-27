@@ -1,45 +1,63 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 27 Feb 2013 08:04:09 -0600
-Subject: [PATCH v4 5/5] ARM: davinci: da850: override mmc DT node device
- name
-In-Reply-To: <1360909322-1858-6-git-send-email-prakash.pm@ti.com>
-References: <1360909322-1858-1-git-send-email-prakash.pm@ti.com>
- <1360909322-1858-6-git-send-email-prakash.pm@ti.com>
-Message-ID: <512E1259.5020903@gmail.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Wed, 27 Feb 2013 15:11:13 +0100
+Subject: [PATCH] USB otg: use try_module_get in all usb_get_phy functions and
+ add missing module_put
+In-Reply-To: <1361974273-17087-1-git-send-email-mkl@pengutronix.de>
+References: <1361974273-17087-1-git-send-email-mkl@pengutronix.de>
+Message-ID: <1361974273-17087-2-git-send-email-mkl@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/15/2013 12:22 AM, Manjunathappa, Prakash wrote:
-> Populate OF_DEV_AUXDATA with desired device name expected by
-> davinci_mmc driver. Without this clk_get of davinci_mmc DT driver
-> fails.
-> 
-> Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
-> Cc: linux-mmc at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> Cc: davinci-linux-open-source at linux.davincidsp.com
-> Cc: devicetree-discuss at lists.ozlabs.org
-> Cc: cjb at laptop.org
-> Cc: Sekhar Nori <nsekhar@ti.com>
-> ---
-> Since v2:
-> Rebased on top of v3.9/dt-2 branch of linux_davinci and reordered this patch.
-> 
->  arch/arm/mach-davinci/da8xx-dt.c |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
-> index 5404e92..2b740a9 100644
-> --- a/arch/arm/mach-davinci/da8xx-dt.c
-> +++ b/arch/arm/mach-davinci/da8xx-dt.c
-> @@ -40,6 +40,8 @@ static void __init da8xx_init_irq(void)
->  struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
->  	OF_DEV_AUXDATA("ti,davinci-i2c", 0x01c22000, "i2c_davinci.1", NULL),
->  	OF_DEV_AUXDATA("ti,davinci-wdt", 0x01c21000, "watchdog", NULL),
-> +	OF_DEV_AUXDATA("ti,davinci-mmc-da830", 0x01c40000, "davinci-mmc-da830.0",
-> +			NULL),
+In patch "5d3c28b usb: otg: add device tree support to otg library"
+devm_usb_get_phy_by_phandle() was added. It uses try_module_get() to lock the
+phy driver in memory. The corresponding module_put() is missing in that patch.
 
-If you only need clock lookup, just add a clkdev entry with the new name.
+This patch adds try_module_get() to usb_get_phy() and usb_get_phy_dev().
+Further the missing module_put() is added to usb_put_phy().
 
-Rob
+Reviewed-by: Kishon Vijay Abraham I <kishon@ti.com>
+Acked-by: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+---
+ drivers/usb/otg/otg.c |   10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/usb/otg/otg.c b/drivers/usb/otg/otg.c
+index e181439..2bd03d2 100644
+--- a/drivers/usb/otg/otg.c
++++ b/drivers/usb/otg/otg.c
+@@ -130,7 +130,7 @@ struct usb_phy *usb_get_phy(enum usb_phy_type type)
+ 	spin_lock_irqsave(&phy_lock, flags);
+ 
+ 	phy = __usb_find_phy(&phy_list, type);
+-	if (IS_ERR(phy)) {
++	if (IS_ERR(phy) || !try_module_get(phy->dev->driver->owner)) {
+ 		pr_err("unable to find transceiver of type %s\n",
+ 			usb_phy_type_string(type));
+ 		goto err0;
+@@ -228,7 +228,7 @@ struct usb_phy *usb_get_phy_dev(struct device *dev, u8 index)
+ 	spin_lock_irqsave(&phy_lock, flags);
+ 
+ 	phy = __usb_find_phy_dev(dev, &phy_bind_list, index);
+-	if (IS_ERR(phy)) {
++	if (IS_ERR(phy) || !try_module_get(phy->dev->driver->owner)) {
+ 		pr_err("unable to find transceiver\n");
+ 		goto err0;
+ 	}
+@@ -301,8 +301,12 @@ EXPORT_SYMBOL(devm_usb_put_phy);
+  */
+ void usb_put_phy(struct usb_phy *x)
+ {
+-	if (x)
++	if (x) {
++		struct module *owner = x->dev->driver->owner;
++
+ 		put_device(x->dev);
++		module_put(owner);
++	}
+ }
+ EXPORT_SYMBOL(usb_put_phy);
+ 
+-- 
+1.7.10.4
