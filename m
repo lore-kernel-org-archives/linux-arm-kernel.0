@@ -1,10 +1,8 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 27 Feb 2013 12:52:19 -0500 (EST)
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 27 Feb 2013 17:57:50 +0000
 Subject: [RFC PATCH v2 0/4] Add support for LZ4-compressed kernel
 In-Reply-To: <1361986787.20540.8.camel@joe-AO722>
-References: <1361859870-15751-1-git-send-email-kyungsik.lee@lge.com>
- <512D1C12.4080109@oberhumer.com>
- <alpine.LFD.2.03.1302261557220.1254@syhkavp.arg>
+References: <alpine.LFD.2.03.1302261557220.1254@syhkavp.arg>
  <87fw0i7n6d.fsf@dell.be.48ers.dk>
  <20130226221027.GW17833@n2100.arm.linux.org.uk>
  <1361929234.1924.8.camel@joe-AO722>
@@ -14,13 +12,46 @@ References: <1361859870-15751-1-git-send-email-kyungsik.lee@lge.com>
  <1361984688.2035.20.camel@joe-AO722>
  <alpine.LFD.2.03.1302271211360.1254@syhkavp.arg>
  <1361986787.20540.8.camel@joe-AO722>
-Message-ID: <alpine.LFD.2.03.1302271246440.1254@syhkavp.arg>
+Message-ID: <20130227175750.GD17833@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 27 Feb 2013, Joe Perches wrote:
-
+On Wed, Feb 27, 2013 at 09:39:47AM -0800, Joe Perches wrote:
 > On Wed, 2013-02-27 at 12:16 -0500, Nicolas Pitre wrote:
+> > On Wed, 27 Feb 2013, Joe Perches wrote:
+> > > On Wed, 2013-02-27 at 16:31 +0000, Russell King - ARM Linux wrote:
+> > > > On Wed, Feb 27, 2013 at 07:49:12AM -0800, Joe Perches wrote:
+> > > > > On Wed, 2013-02-27 at 09:56 +0000, Russell King - ARM Linux wrote:
+> > > > > > On Tue, Feb 26, 2013 at 05:40:34PM -0800, Joe Perches wrote:
+> > > > > > > On Tue, 2013-02-26 at 22:10 +0000, Russell King - ARM Linux wrote:
+> > > > > > > > So... for a selected kernel version of a particular size, can we please
+> > > > > > > > have a comparison between the new LZO code and this LZ4 code, so that
+> > > > > > > > we can see whether it's worth updating the LZO code or replacing the
+> > > > > > > > LZO code with LZ4?
+> > > > > > > 
+> > > > > > > How could it be questionable that it's worth updating the LZO code?
+> > > > > > 
+> > > > > > Please read the comments against the previous posting of these patches
+> > > > > > where I first stated this argument - and with agreement from those
+> > > > > > following the thread.  The thread started on 26 Jan 2013.  Thanks.
+> > > > > 
+> > > > > https://lkml.org/lkml/2013/1/29/145
+> > > > > 
+> > > > > I did not and do not see significant value in
+> > > > > adding LZ4 given Markus' LZO improvements.
+> > > > 
+> > > > Sorry, a 66% increase in decompression speed over the updated LZO code
+> > > > isn't "significant value" ?
+> > > 
+> > > We disagree.
+> > > 
+> > > > I'm curious - what in your mind qualifies "significant value" ?
+> > > 
+> > > faster boot time. smaller, faster overall code.
+> > 
+> > Sorry, but you certainly successfully got me confused, and probably 
+> > others as well.
+> > 
 > > RMK says that "66% increase in decompression speed over LZO" is 
 > > significant.  You apparently disagree with that.
 > 
@@ -31,19 +62,46 @@ On Wed, 27 Feb 2013, Joe Perches wrote:
 > 
 > There is apparently no speed increase for LZ4 over
 > the new LZO.
-> 
-> I believe Markus has shown comparison testing in
-> this very thread.
-> 
-> https://patchwork.kernel.org/patch/2187441/
 
-Right.
+Total claptrap.  I've no idea where you're getting your data from, but
+it's franky wrong and you're now being totally misleading to anyone
+else reading this thread.
 
-Can the new LZO code be merged by Linus now?  It has been sitting in 
-linux-next for quite some time.  Afterwards we could revisit lz4 
-worthiness without all the present confusion.
+I explicitly asked for a comparison of the _new_ LZO vs the LZ4 code,
+and this is what I received from Kyungsik Lee in this thread:
 
-BTW, I still wonder what that patch requiring ARM people approval is.
+	Compiler: Linaro ARM gcc 4.6.2
+	2. ARMv7, 1.7GHz based board
+	   Kernel: linux 3.7
+	   Uncompressed Kernel Size: 14MB
+	         Compressed Size  Decompression Speed
+	    LZO  6.0MB            34.1MB/s            Old
+	         ----------------------------------------
+	         6.0MB            34.7MB/s            New
+	         6.0MB            52.2MB/s(UA)
+	    =============================================
+	    LZ4  6.5MB            86.7MB/s
+	UA: Unaligned memory Access support
 
+And my statement of a "66% increase in speed" of LZ4 is comparing the
+_new_ LZO code with unaligned access with the LZ4 code.
 
-Nicolas
+Now, you refer to Markus' results - but Markus' results do not say what
+they're comparing - they don't say what the size of the compressed image
+is, nor what the size of the uncompressed image was.
+
+Now, Markus' results show a 42% increase in speed between the LZO-2012
+and LZO-2013-UA versions (do the calculation yourself - I'm sure you're
+capable of that?  If not, we can turn this into a maths lesson too).
+The above shows a 53% increase in speed between the existing LZO code
+and the new LZO code with unaligned accesses.
+
+_But_ the above shows an additional 66% increase between the new LZO
+code with unaligned accesses and LZ4.  Or, a whopping 150% increase
+in speed over the _existing_ LZO code.
+
+So please, stop stating what I have and have not reviewed.  Unlike you,
+I _have_ been following everything that's been said in this thread, and
+ - unlike you - I have analysed the figures put forward and drawn
+conclusions which are fully supported by the published data from them,
+and stated them - now many times.
