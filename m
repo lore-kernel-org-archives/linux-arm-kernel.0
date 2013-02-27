@@ -1,68 +1,22 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 27 Feb 2013 11:42:32 +0100
-Subject: [PATCH 6/9] USB chipidea: introduce dual role mode pdata flags
-In-Reply-To: <20130222020940.GB1026@nchen-desktop>
-References: <1359984275-24646-1-git-send-email-s.hauer@pengutronix.de>
- <1359984275-24646-7-git-send-email-s.hauer@pengutronix.de>
- <20130222020940.GB1026@nchen-desktop>
-Message-ID: <512DE318.4050607@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 27 Feb 2013 10:47:01 +0000
+Subject: [PATCH 0/4] time: dynamic irq affinity
+In-Reply-To: <512DA0EB.5000803@ti.com>
+References: <1361917047-29230-1-git-send-email-daniel.lezcano@linaro.org>
+ <512DA0EB.5000803@ti.com>
+Message-ID: <20130227104701.GZ17833@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/22/2013 03:09 AM, Peter Chen wrote:
-> On Mon, Feb 04, 2013 at 02:24:32PM +0100, Sascha Hauer wrote:
->> Even if a chipidea core is otg capable the board may not. This allows
->> to explicitly set the core to host/peripheral mode. Without these
->> flags the driver falls back to the old behaviour.
->>
->> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
->> ---
->>  drivers/usb/chipidea/core.c  |   21 +++++++++++++++------
->>  include/linux/usb/chipidea.h |    2 +-
->>  2 files changed, 16 insertions(+), 7 deletions(-)
->>
->> diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
->> index 04d68cb..c89f2aa 100644
->> --- a/drivers/usb/chipidea/core.c
->> +++ b/drivers/usb/chipidea/core.c
->> @@ -435,6 +435,7 @@ static int ci_hdrc_probe(struct platform_device *pdev)
->>  	struct resource	*res;
->>  	void __iomem	*base;
->>  	int		ret;
->> +	enum usb_dr_mode dr_mode;
->>  
->>  	if (!dev->platform_data) {
->>  		dev_err(dev, "platform data missing\n");
->> @@ -487,14 +488,22 @@ static int ci_hdrc_probe(struct platform_device *pdev)
->>  		return -ENODEV;
->>  	}
->>  
->> -	ret = ci_hdrc_gadget_init(ci);
->> -	if (ret)
->> -		dev_info(dev, "doesn't support gadget\n");
->> +	if (dr_mode == USB_DR_MODE_OTG || dr_mode == USB_DR_MODE_PERIPHERAL) {
-> 
-> Can we change "USB_DR_MODE_PERIPHERAL" to "USB_DR_MODE_GADGET", since we always
-> use gadget to stands for device or peripheral mode at code (like below
-> CI_ROLE_GADGET), it may make code uniform.
+On Wed, Feb 27, 2013 at 11:30:11AM +0530, Santosh Shilimkar wrote:
+> P.S: Time and again it proves that making the local timer wakeup
+> capable solves the issue.
 
-Peripheral mode seems to be the more official name compared to gadget. I
-vote for keeping peripheral in the DT and changing the chipidea to use
-peripheral instead of gadget (in a later patch(es)).
+Slightly different take: it proves that hardware people don't talk to
+software people about what they require to make an operating system
+work.  Hardware people think they understand that and go off and do
+their own thing, and expect software people to sort out their mess.
 
-Marc
-
-
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130227/539165de/attachment.sig>
+This happens all the time; there is no solution for it as long as
+companies view the creation of hardware as being entirely separate
+from software.
