@@ -1,82 +1,274 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Wed, 27 Feb 2013 17:16:09 -0600
-Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
-In-Reply-To: <CAAwP0s3rbExrSf-W325uCPfMO=Zk9LefRP0VD4JC1tg_sxS_gQ@mail.gmail.com>
-References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
- <1329321854-24490-4-git-send-email-b-cousson@ti.com>
- <4F44FA56.7020000@gmail.com> <4F44FC37.2000701@ti.com>
- <4F452484.5080503@gmail.com>
- <74CDBE0F657A3D45AFBB94109FB122FF17BD8BC6C1@HQMAIL01.nvidia.com>
- <4F47AD08.4030504@ti.com>
- <CAAwP0s0cB368R2mtbJpTZJreR-5GSRLfxC+8DJLo5nw3_OwBuA@mail.gmail.com>
- <512D39DA.7020306@ti.com> <512D3AB1.1080202@wwwdotorg.org>
- <512D3EC2.6050408@ti.com> <512D3FE6.1010300@wwwdotorg.org>
- <512D490B.70900@ti.com> <512D4FC4.2060505@wwwdotorg.org>
- <512D5C58.4090500@ti.com>
- <CAAwP0s3rbExrSf-W325uCPfMO=Zk9LefRP0VD4JC1tg_sxS_gQ@mail.gmail.com>
-Message-ID: <512E93B9.8020806@ti.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 27 Feb 2013 15:28:14 -0800
+Subject: [PATCHv2] ARM: Push selects for TWD/SCU into machine entries
+Message-ID: <1362007694-3419-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The TWD and SCU configs are selected by default as long as
+MSM_SCORPIONMP is false and/or MCT is false. Implementing the
+logic this way certainly saves lines in the Kconfig but it
+precludes those machines which select MSM_SCORPIONMP or MCT from
+participating in the single zImage effort because when those
+machines are combined with other SMP capable machines the TWD and
+SCU are no longer selected by default.
 
-On 02/26/2013 09:57 PM, Javier Martinez Canillas wrote:
+Push the select out to the machine entries so that we can compile
+these machines together and still select the appropriate configs.
 
-[snip]
+Cc: Barry Song <baohua.song@csr.com>
+Acked-by: David Brown <davidb@codeaurora.org>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Acked-by: Pawel Moll <pawel.moll@arm.com>
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: Shiraz Hashim <shiraz.hashim@st.com>
+Acked-by: Simon Horman <horms@verge.net.au>
+Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: Tony Lindgren <tony@atomide.com>
+Acked-by: Viresh Kumar <viresh.linux@gmail.com>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
 
-> Something like that would definitely solve the GPIO request issue but
-> we still have the issue that the current OMAP GPIO controller binding
-> does not support #interrupt-cells = <2>.
-> 
-> So, we can't pass the trigger type and level flags for an IRQ-GPIO
-> when using an GPIO controller as the interrupt-parent for a device
-> node.
-> 
-> Do you have any comments on that issue?
+Resending to collect some more acks.
 
-Can you elaborate a bit more on why you say this is not supported?
+ arch/arm/Kconfig               | 8 ++++++--
+ arch/arm/mach-exynos/Kconfig   | 2 ++
+ arch/arm/mach-highbank/Kconfig | 1 +
+ arch/arm/mach-imx/Kconfig      | 3 ++-
+ arch/arm/mach-msm/Kconfig      | 7 ++-----
+ arch/arm/mach-omap2/Kconfig    | 2 ++
+ arch/arm/mach-prima2/Kconfig   | 1 +
+ arch/arm/mach-realview/Kconfig | 8 ++++++++
+ arch/arm/mach-vexpress/Kconfig | 2 ++
+ arch/arm/plat-spear/Kconfig    | 2 ++
+ 10 files changed, 28 insertions(+), 8 deletions(-)
 
-I have been playing with this today on an omap board and if I set the
-#interrupt-cells = <2>, then I do see that irq_domain_xlate_onetwocell()
-is called and the irq number and flags read as expected. Following which
-I then see it will call the omap_irq_type() to set type. So AFAICT it works.
-
-Please note I do see that when the SMC driver calls request_irq() in
-smc_drv_probe() it is also settings the trigger type to
-IRQ_TYPE_EDGE_RISING (default). So if you are setting to low-level
-sensitive in DT, then this is being overwritten. We could fix this by
-setting SMC_IRQ_FLAGS to -1 for OMAP.
-
-In general we do need to fix the gpio binding for omap to default to
-#interrupt-cell = <2>, as this should work. However, before we can do
-that we need to fix the issue of ensuring the gpio module is enabled if
-being used as an interrupt source without having to call gpio_request()
-first.
-
-We should probably add the following patch as well to avoid any hangs if
-the bank is not enabled, when omap_irq_type is called.
-
-commit 5e298de564e09f5ca4148a9bc0ed5d16b4742f14
-Author: Jon Hunter <jon-hunter@ti.com>
-Date:   Wed Feb 27 17:14:11 2013 -0600
-
-    gpio/omap: warn if gpio bank is not enabled on setting irq type
-
-diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index f1fbedb2..cbdc796 100644
---- a/drivers/gpio/gpio-omap.c
-+++ b/drivers/gpio/gpio-omap.c
-@@ -421,6 +421,9 @@ static int gpio_irq_type(struct irq_data *d,
-unsigned type)
-        int retval;
-        unsigned long flags;
-
-+       if (WARN_ON(!bank->mod_usage))
-+               return -EINVAL;
-+
- #ifdef CONFIG_ARCH_OMAP1
-        if (d->irq > IH_MPUIO_BASE)
-                gpio = OMAP_MPUIO(d->irq - IH_MPUIO_BASE);
-
-
-Cheers
-Jon
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index dedf02b..8f5707b 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -672,6 +672,8 @@ config ARCH_TEGRA
+ 	select CLKSRC_OF
+ 	select COMMON_CLK
+ 	select GENERIC_CLOCKEVENTS
++	select HAVE_ARM_SCU if SMP
++	select HAVE_ARM_TWD if LOCAL_TIMERS
+ 	select HAVE_CLK
+ 	select HAVE_SMP
+ 	select MIGHT_HAVE_CACHE_L2X0
+@@ -718,6 +720,8 @@ config ARCH_SHMOBILE
+ 	bool "Renesas SH-Mobile / R-Mobile"
+ 	select CLKDEV_LOOKUP
+ 	select GENERIC_CLOCKEVENTS
++	select HAVE_ARM_SCU if SMP
++	select HAVE_ARM_TWD if LOCAL_TIMERS
+ 	select HAVE_CLK
+ 	select HAVE_MACH_CLKDEV
+ 	select HAVE_SMP
+@@ -910,6 +914,8 @@ config ARCH_U8500
+ 	select CLKDEV_LOOKUP
+ 	select CPU_V7
+ 	select GENERIC_CLOCKEVENTS
++	select HAVE_ARM_SCU if SMP
++	select HAVE_ARM_TWD if LOCAL_TIMERS
+ 	select HAVE_SMP
+ 	select MIGHT_HAVE_CACHE_L2X0
+ 	select SPARSE_IRQ
+@@ -1526,7 +1532,6 @@ config SMP
+ 	depends on GENERIC_CLOCKEVENTS
+ 	depends on HAVE_SMP
+ 	depends on MMU
+-	select HAVE_ARM_SCU if !ARCH_MSM_SCORPIONMP
+ 	select USE_GENERIC_SMP_HELPERS
+ 	help
+ 	  This enables support for systems with more than one CPU. If you have
+@@ -1650,7 +1655,6 @@ config LOCAL_TIMERS
+ 	bool "Use local timer interrupts"
+ 	depends on SMP
+ 	default y
+-	select HAVE_ARM_TWD if (!ARCH_MSM_SCORPIONMP && !EXYNOS4_MCT)
+ 	help
+ 	  Enable support for local timers on SMP platforms, rather then the
+ 	  legacy IPI broadcast method.  Local timers allows the system
+diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+index 70f94c8..54cf73e 100644
+--- a/arch/arm/mach-exynos/Kconfig
++++ b/arch/arm/mach-exynos/Kconfig
+@@ -14,6 +14,7 @@ menu "SAMSUNG EXYNOS SoCs Support"
+ config ARCH_EXYNOS4
+ 	bool "SAMSUNG EXYNOS4"
+ 	default y
++	select HAVE_ARM_SCU if SMP
+ 	select HAVE_SMP
+ 	select MIGHT_HAVE_CACHE_L2X0
+ 	help
+@@ -21,6 +22,7 @@ config ARCH_EXYNOS4
+ 
+ config ARCH_EXYNOS5
+ 	bool "SAMSUNG EXYNOS5"
++	select HAVE_ARM_SCU if SMP
+ 	select HAVE_SMP
+ 	help
+ 	  Samsung EXYNOS5 (Cortex-A15) SoC based systems
+diff --git a/arch/arm/mach-highbank/Kconfig b/arch/arm/mach-highbank/Kconfig
+index 44b12f9..cd9fcb1 100644
+--- a/arch/arm/mach-highbank/Kconfig
++++ b/arch/arm/mach-highbank/Kconfig
+@@ -12,6 +12,7 @@ config ARCH_HIGHBANK
+ 	select CPU_V7
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_ARM_SCU
++	select HAVE_ARM_TWD if LOCAL_TIMERS
+ 	select HAVE_SMP
+ 	select MAILBOX
+ 	select PL320_MBOX
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 4c9c6f9..2cc0dbd 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -811,7 +811,8 @@ config SOC_IMX6Q
+ 	select ARM_GIC
+ 	select COMMON_CLK
+ 	select CPU_V7
+-	select HAVE_ARM_SCU
++	select HAVE_ARM_SCU if SMP
++	select HAVE_ARM_TWD if LOCAL_TIMERS
+ 	select HAVE_CAN_FLEXCAN if CAN
+ 	select HAVE_IMX_GPC
+ 	select HAVE_IMX_MMDC
+diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
+index b619085..fceb093 100644
+--- a/arch/arm/mach-msm/Kconfig
++++ b/arch/arm/mach-msm/Kconfig
+@@ -44,10 +44,10 @@ endchoice
+ 
+ config ARCH_MSM8X60
+ 	bool "MSM8X60"
+-	select ARCH_MSM_SCORPIONMP
+ 	select ARM_GIC
+ 	select CPU_V7
+ 	select GPIO_MSM_V2
++	select HAVE_SMP
+ 	select MSM_GPIOMUX
+ 	select MSM_SCM if SMP
+ 	select MSM_V2_TLMM
+@@ -55,9 +55,9 @@ config ARCH_MSM8X60
+ 
+ config ARCH_MSM8960
+ 	bool "MSM8960"
+-	select ARCH_MSM_SCORPIONMP
+ 	select ARM_GIC
+ 	select CPU_V7
++	select HAVE_SMP
+ 	select MSM_GPIOMUX
+ 	select MSM_SCM if SMP
+ 	select MSM_V2_TLMM
+@@ -68,9 +68,6 @@ config MSM_HAS_DEBUG_UART_HS
+ 
+ config MSM_SOC_REV_A
+ 	bool
+-config  ARCH_MSM_SCORPIONMP
+-	bool
+-	select HAVE_SMP
+ 
+ config  ARCH_MSM_ARM11
+ 	bool
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index 49ac3df..a003110 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -87,6 +87,8 @@ config ARCH_OMAP4
+ 	select ARM_GIC
+ 	select CACHE_L2X0
+ 	select CPU_V7
++	select HAVE_ARM_SCU if SMP
++	select HAVE_ARM_TWD if LOCAL_TIMERS
+ 	select HAVE_SMP
+ 	select LOCAL_TIMERS if SMP
+ 	select OMAP_INTERCONNECT
+diff --git a/arch/arm/mach-prima2/Kconfig b/arch/arm/mach-prima2/Kconfig
+index 4f7379f..48dfd89 100644
+--- a/arch/arm/mach-prima2/Kconfig
++++ b/arch/arm/mach-prima2/Kconfig
+@@ -16,6 +16,7 @@ config ARCH_MARCO
+ 	default y
+ 	select ARM_GIC
+ 	select CPU_V7
++	select HAVE_ARM_SCU if SMP
+ 	select HAVE_SMP
+ 	select SMP_ON_UP
+ 	help
+diff --git a/arch/arm/mach-realview/Kconfig b/arch/arm/mach-realview/Kconfig
+index 14c1d47..d210c0f9 100644
+--- a/arch/arm/mach-realview/Kconfig
++++ b/arch/arm/mach-realview/Kconfig
+@@ -12,6 +12,8 @@ config REALVIEW_EB_A9MP
+ 	bool "Support Multicore Cortex-A9 Tile"
+ 	depends on MACH_REALVIEW_EB
+ 	select CPU_V7
++	select HAVE_ARM_SCU if SMP
++	select HAVE_ARM_TWD if LOCAL_TIMERS
+ 	select HAVE_SMP
+ 	select MIGHT_HAVE_CACHE_L2X0
+ 	help
+@@ -23,6 +25,8 @@ config REALVIEW_EB_ARM11MP
+ 	depends on MACH_REALVIEW_EB
+ 	select ARCH_HAS_BARRIERS if SMP
+ 	select CPU_V6K
++	select HAVE_ARM_SCU if SMP
++	select HAVE_ARM_TWD if LOCAL_TIMERS
+ 	select HAVE_SMP
+ 	select MIGHT_HAVE_CACHE_L2X0
+ 	help
+@@ -43,6 +47,8 @@ config MACH_REALVIEW_PB11MP
+ 	select ARCH_HAS_BARRIERS if SMP
+ 	select ARM_GIC
+ 	select CPU_V6K
++	select HAVE_ARM_SCU if SMP
++	select HAVE_ARM_TWD if LOCAL_TIMERS
+ 	select HAVE_PATA_PLATFORM
+ 	select HAVE_SMP
+ 	select MIGHT_HAVE_CACHE_L2X0
+@@ -85,6 +91,8 @@ config MACH_REALVIEW_PBX
+ 	bool "Support RealView(R) Platform Baseboard Explore"
+ 	select ARCH_SPARSEMEM_ENABLE if CPU_V7 && !REALVIEW_HIGH_PHYS_OFFSET
+ 	select ARM_GIC
++	select HAVE_ARM_SCU if SMP
++	select HAVE_ARM_TWD if LOCAL_TIMERS
+ 	select HAVE_PATA_PLATFORM
+ 	select HAVE_SMP
+ 	select MIGHT_HAVE_CACHE_L2X0
+diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
+index 52d315b..5e3a2d3 100644
+--- a/arch/arm/mach-vexpress/Kconfig
++++ b/arch/arm/mach-vexpress/Kconfig
+@@ -9,6 +9,8 @@ config ARCH_VEXPRESS
+ 	select COMMON_CLK_VERSATILE
+ 	select CPU_V7
+ 	select GENERIC_CLOCKEVENTS
++	select HAVE_ARM_SCU if SMP
++	select HAVE_ARM_TWD if LOCAL_TIMERS
+ 	select HAVE_CLK
+ 	select HAVE_PATA_PLATFORM
+ 	select HAVE_SMP
+diff --git a/arch/arm/plat-spear/Kconfig b/arch/arm/plat-spear/Kconfig
+index 739d016..439eead 100644
+--- a/arch/arm/plat-spear/Kconfig
++++ b/arch/arm/plat-spear/Kconfig
+@@ -14,6 +14,8 @@ config ARCH_SPEAR13XX
+ 	select ARM_GIC
+ 	select CPU_V7
+ 	select GPIO_SPEAR_SPICS
++	select HAVE_ARM_SCU if SMP
++	select HAVE_ARM_TWD if LOCAL_TIMERS
+ 	select HAVE_SMP
+ 	select MIGHT_HAVE_CACHE_L2X0
+ 	select PINCTRL
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
