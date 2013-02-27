@@ -1,63 +1,118 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 27 Feb 2013 15:21:41 +0100
-Subject: [PATCH 1/9] USB otg: use try_module_get in all usb_get_phy
- functions and add missing module_put
-In-Reply-To: <512E105F.9010803@pengutronix.de>
-References: <1361968035-18644-1-git-send-email-mkl@pengutronix.de>
- <1361968035-18644-2-git-send-email-mkl@pengutronix.de>
- <20130227123132.GM8016@arwen.pp.htv.fi> <512DFED3.7070701@pengutronix.de>
- <20130227124333.GQ8016@arwen.pp.htv.fi> <512E001D.6060004@pengutronix.de>
- <20130227124739.GR8016@arwen.pp.htv.fi> <512E0247.8070808@pengutronix.de>
- <20130227134219.GC23652@arwen.pp.htv.fi> <512E105F.9010803@pengutronix.de>
-Message-ID: <512E1675.7030700@pengutronix.de>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Wed, 27 Feb 2013 06:24:03 -0800
+Subject: [RFC/PATCH 1/5] context tracking: conditionalize guest support
+ based on CONFIG_KVM
+In-Reply-To: <1361916782.1740.2.camel@leonhard> (Namhyung Kim's message of
+ "Wed, 27 Feb 2013 07:13:02 +0900")
+References: <1361389302-11968-1-git-send-email-khilman@linaro.org>
+ <1361389302-11968-2-git-send-email-khilman@linaro.org>
+ <20130222132750.GE17948@somewhere.redhat.com>
+ <87fw0izxe4.fsf@linaro.org> <1361916782.1740.2.camel@leonhard>
+Message-ID: <87621dygvw.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/27/2013 02:55 PM, Marc Kleine-Budde wrote:
-> On 02/27/2013 02:42 PM, Felipe Balbi wrote:
->>> That'll be these 3 branches then:
->>>
->>> otg-for-v3.9 (bugfix for v3.9):
->>> 6bef020 USB otg: use try_module_get in all usb_get_phy functions and add missing module_put
->>>
->>> otg-for-v3.10 (depends on otg-for-v3.9):
->>> a0e17f5 USB: move bulk of otg/otg.c to phy/phy.c
->>> a6fc0d1 USB: add devicetree helpers for determining dr_mode and phy_type
->>> 8a4c9f8 USB mxs-phy: Register phy with framework
->>>
->>> chipidea-for-v3.10 (most patches depend on otg-for-v3.10):
->>> 15c930e USB chipidea: ci13xxx-imx: create dynamic platformdata
->>> 9466e85 USB chipidea: add PTW and PTS handling
->>> ad2cc0d USB chipidea: introduce dual role mode pdata flags
->>> 8e7f1bb USB chipidea i.MX: introduce dr_mode property
->>> 5d83722 USB chipidea i.MX: use devm_usb_get_phy_by_phandle to get phy
->>
->> sounds good to me, please make sure to always split your series like
->> this. You can't expect me (or any maintainer for that matter) to pick
->> patches to proper branches based on your commit logs alone.
->>
->> remeber that every single maintainer needs to handle hundreds of emails
->> a week (if not a day) and if patches are properly split and cleanly
->> mention if it's a bugfix or not, things will go wrong.
-> 
-> That was just a proposal. You'll find these series in your inbox in a
-> few minutes.
+Namhyung Kim <namhyung@kernel.org> writes:
 
-Done.
+> 2013-02-26 (?), 11:29 -0800, Kevin Hilman:
+>> Frederic Weisbecker <fweisbec@gmail.com> writes:
+>> 
+>> > On Wed, Feb 20, 2013 at 11:41:38AM -0800, Kevin Hilman wrote:
+>> >> So that it can build on !KVM systems too.
+>> >> 
+>> >> Signed-off-by: Kevin Hilman <khilman@linaro.org>
+>> >> ---
+>> >>  kernel/context_tracking.c | 4 ++++
+>> >>  1 file changed, 4 insertions(+)
+>> >> 
+>> >> diff --git a/kernel/context_tracking.c b/kernel/context_tracking.c
+>> >> index 74f68f4..6fe96b1 100644
+>> >> --- a/kernel/context_tracking.c
+>> >> +++ b/kernel/context_tracking.c
+>> >> @@ -1,5 +1,7 @@
+>> >>  #include <linux/context_tracking.h>
+>> >> +#ifdef CONFIG_KVM
+>> >>  #include <linux/kvm_host.h>
+>> >> +#endif
+>> >
+>> > The header should take care of the off-case, no need to ifdef its inclusion.
+>> 
+>> In their current form, the headers will not build on platforms without
+>> KVM support.  For example, these platforms (like ARM) don't even have
+>> <asm/kvm.h> or <asm/kvm_host.h>.
+>> 
+>> >>  #include <linux/rcupdate.h>
+>> >>  #include <linux/sched.h>
+>> >>  #include <linux/hardirq.h>
+>> >> @@ -62,6 +64,7 @@ void user_exit(void)
+>> >>  	local_irq_restore(flags);
+>> >>  }
+>> >>  
+>> >> +#ifdef CONFIG_KVM
+>> >>  void guest_enter(void)
+>> >>  {
+>> >>  	if (vtime_accounting_enabled())
+>> >> @@ -79,6 +82,7 @@ void guest_exit(void)
+>> >>  		__guest_exit();
+>> >>  }
+>> >>  EXPORT_SYMBOL_GPL(guest_exit);
+>> >> +#endif
+>> >
+>> > Kvm might be built as a module so we can't actually do this unfortunately.
+>> 
+>> Ah, right.  How bout using 
+>> 
+>> #if defined(CONFIG_KVM) || defined(CONFIG_KVM_MODULE)
+>> 
+>> for both conditionals above?  Updated patch below.
+>
+> This is what IS_ENABLED(CONFIG_KVM) is for.
 
-regards,
-Marc
+Right, updated patch below.
 
+Kevin
+
+
+>From 61e35f069a64c03a2bce348487d41072aeb9f36b Mon Sep 17 00:00:00 2001
+From: Kevin Hilman <khilman@linaro.org>
+Date: Thu, 14 Feb 2013 10:17:37 -0800
+Subject: [PATCH] context tracking: conditionalize guest support based on
+ CONFIG_KVM
+
+So that it can build on !KVM systems too.
+
+Signed-off-by: Kevin Hilman <khilman@linaro.org>
+---
+ kernel/context_tracking.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/kernel/context_tracking.c b/kernel/context_tracking.c
+index 74f68f4..fda6cd6 100644
+--- a/kernel/context_tracking.c
++++ b/kernel/context_tracking.c
+@@ -1,5 +1,7 @@
+ #include <linux/context_tracking.h>
++#if IS_ENABLED(CONFIG_KVM)
+ #include <linux/kvm_host.h>
++#endif
+ #include <linux/rcupdate.h>
+ #include <linux/sched.h>
+ #include <linux/hardirq.h>
+@@ -62,6 +64,7 @@ void user_exit(void)
+ 	local_irq_restore(flags);
+ }
+ 
++#if IS_ENABLED(CONFIG_KVM)
+ void guest_enter(void)
+ {
+ 	if (vtime_accounting_enabled())
+@@ -79,6 +82,7 @@ void guest_exit(void)
+ 		__guest_exit();
+ }
+ EXPORT_SYMBOL_GPL(guest_exit);
++#endif
+ 
+ void context_tracking_task_switch(struct task_struct *prev,
+ 			     struct task_struct *next)
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130227/e128f81e/attachment.sig>
+1.8.1.2
