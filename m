@@ -1,116 +1,66 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 27 Feb 2013 12:22:20 +0100
-Subject: SMDKV210 support issue in kernel 3.8 (dma-pl330 and HDMI failed)
-In-Reply-To: <CAG17yqQ3d+3Uwpfo+_r0Jwm4TQXcSY-bcW4qRcygzjq=9qXvvA@mail.gmail.com>
-References: <51275DF7.4010600@gmail.com> <512D2780.3020103@gmail.com>
- <CAG17yqQ3d+3Uwpfo+_r0Jwm4TQXcSY-bcW4qRcygzjq=9qXvvA@mail.gmail.com>
-Message-ID: <512DEC6C.60607@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 27 Feb 2013 11:22:23 +0000
+Subject: [PATCH] ARM: vfp: fix fpsid register subarchitecture field
+ mask width
+In-Reply-To: <512D634D.5010600@codeaurora.org>
+References: <1361520485-30269-1-git-send-email-sboyd@codeaurora.org>
+ <20130225172545.GO17833@n2100.arm.linux.org.uk>
+ <20130225200209.GP17833@n2100.arm.linux.org.uk>
+ <512D634D.5010600@codeaurora.org>
+Message-ID: <20130227112223.GA17833@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/27/2013 11:51 AM, Inderpal Singh wrote:
-> On 27 February 2013 02:52, Sylwester Nawrocki
-> <sylvester.nawrocki@gmail.com> wrote:
->> On 02/22/2013 01:00 PM, Lonsn wrote:
->>>
->>> Hi,
->>> I have tested the kernel 3.8 with a SMDKV210 like board. But I failed
->>> with dma-pl330 and HDMI driver.
->>> For dma-pl330, kernel print:
->>> dma-pl330 dma-pl330.0: PERIPH_ID 0x0, PCELL_ID 0x0 !
->>> dma-pl330: probe of dma-pl330.0 failed with error -22
->>> dma-pl330 dma-pl330.1: PERIPH_ID 0x0, PCELL_ID 0x0 !
->>> dma-pl330: probe of dma-pl330.1 failed with error -22
->>
->>
->> Maybe there is some issue with the PL330 DMA controller clocks and the
->> read values are all 0 because the clocks are disabled ?
->>
->> It seems arch/arm/mach-s5pv210/clock.c might be missing "apb_pclk" clock
->> supply names, which I suspect may be required after commits:
->>
->> commit 7c71b8eb268ee38235f7e924d943ea9d90e59469
->> Author: Inderpal Singh <inderpal.singh@linaro.org>
->> Date:   Fri Sep 7 12:14:48 2012 +0530
->>
->>     DMA: PL330: Remove redundant runtime_suspend/resume functions
->>
->>     The driver's  runtime_suspend/resume functions just disable/enable
->>     the clock which is already being managed at AMBA bus level
->>     runtime_suspend/resume functions.
->>
->>     Hence, remove the driver's runtime_suspend/resume functions.
->>
->>     Signed-off-by: Inderpal Singh <inderpal.singh@linaro.org>
->>     Tested-by: Chander Kashyap <chander.kashyap@linaro.org>
->>     Signed-off-by: Vinod Koul <vinod.koul@linux.intel.com>
->>
->> commit faf6fbc6f2ca3b34bf464a8bb079a998e571957c
->> Author: Inderpal Singh <inderpal.singh@linaro.org>
->> Date:   Fri Sep 7 12:14:47 2012 +0530
->>
->>     DMA: PL330: Remove controller clock enable/disable
->>
->>     The controller clock is being enabled/disabled in AMBA bus
->>     infrastructre in probe/remove functions. Hence, its not required
->>     at driver level probe/remove.
->>
->>     Signed-off-by: Inderpal Singh <inderpal.singh@linaro.org>
->>     Tested-by: Chander Kashyap <chander.kashyap@linaro.org>
->>     Signed-off-by: Vinod Koul <vinod.koul@linux.intel.com>
->>
->> I have added people who made related changes at Cc, hopefully they
->> can provide some help in debugging this.
->>
+On Tue, Feb 26, 2013 at 05:37:17PM -0800, Stephen Boyd wrote:
+> On 02/25/13 12:02, Russell King - ARM Linux wrote:
+> >
+> > This can of worms is getting bigger.  We have more problems with our
+> > handling of the different VFP versions, specifically the handling of
+> > the EX=0 DEX=0 case.
+> >
+> > VFP common subarch 3 defines the EX=0, DEX=0 encoding to mean one of
+> > the following conditions have been met:
+> >
+> > 1. an unallocated VFP instruction was encountered.
+> >
+> >    In other words, the VFP was the target of the co-processor instruction,
+> >    but the instruction is not a known VFP instruction encoding.  This
+> >    should raise an undefined instruction exception.
+> >
+> > 2. an allocated VFP instruction was encountered, but not handled in
+> >    hardware.
+> >
+> >    In other words, the instruction is a valid VFP instruction, but the
+> >    hardware has opted not to implement this instruction and wants
+> >    software to emulate it instead.
+> >
+> >    (Note: this can also be raised as EX=0, DEX=1 - implementation
+> >     defined!)
+> >
+> [snip]
+> >
+> > So, if EX or DEX is set, _or_ IXE is set, we pass control to VFP_bounce.
+> > This is problematical.
+> >
+> > (a) condition (2) above isn't correctly handled for common subarch v3 - it
+> >     is always treated as an undefined instruction, and will result in a
+> >     SIGILL being delivered.
+> >
+> [snip]
+> >
+> > Now, (a) is just bad behaviour - as we haven't had any reports of this
+> > yet, I suspect that no one has implemented VFP hardware with this
+> > behaviour yet.
 > 
-> The mentioned patches just removed the redundant clock enable/disable
-> from the driver as clock is already being managed at amba bus level in
-> the same code path. As per my understanding the issue should come even
-> without these patches.
+> I believe we ran into this a while ago and fixed it for our chips. We
+> never sent the patch upstream. Sorry.
+> 
+> https://www.codeaurora.org/gitweb/quic/la/?p=kernel/msm.git;a=commitdiff;h=00a13be874f230159a6b7f8cc9d0ff23bc1b7d05
 
-But were the clocks managed directly by the pl330 driver same as those
-managed at amba bus level ? The first patch as above removed chunk
+Yes, it looks like you did - because your short vector instructions are
+"allocated VFP instruction"s and your hardware response is to raise an
+exception with EX=0 DEX=0.
 
-@@ -2887,24 +2884,17 @@ pl330_probe(struct amba_device *adev, const struct
-amba_id *id)
-                goto probe_err1;
-        }
-
--       pdmac->clk = clk_get(&adev->dev, "dma");
--       if (IS_ERR(pdmac->clk)) {
--               dev_err(&adev->dev, "Cannot get operation clock.\n");
--               ret = -EINVAL;
--               goto probe_err2;
--       }
--
-
-which suggest the driver was enabling directly "dma" clocks, defined at
-S5PV210 platform level as:
-
-        {
-                .name           = "dma",
-                .devname        = "dma-pl330.0",
-                .parent         = &clk_hclk_psys.clk,
-                .enable         = s5pv210_clk_ip0_ctrl,
-                .ctrlbit        = (1 << 3),
-        }, {
-                .name           = "dma",
-                .devname        = "dma-pl330.1",
-                .parent         = &clk_hclk_psys.clk,
-                .enable         = s5pv210_clk_ip0_ctrl,
-                .ctrlbit        = (1 << 4),
-        }, {
-
-And amba bus was getting only dummy clocks behind "apb_pclk" clock
-conn_id.
-
-> @Lonsn: Can you please test without these patches?
-
-I suspect reverting only patch
-DMA: PL330: Remove redundant runtime_suspend/resume functions
-with PM_RUNTIME enabled might fix the issue.
-
---
-
-Regards,
-Sylwester
+As you've found out, with the VFPv2 exception handling that we have, that
+is interpreted as an undefined instruction, rather than an instruction
+which needs fixing up.
