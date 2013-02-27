@@ -1,79 +1,63 @@
 From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 27 Feb 2013 15:20:28 +0100
-Subject: [PATCH 3/5] USB chipidea: introduce dual role mode pdata flags
-In-Reply-To: <1361974830-3853-1-git-send-email-mkl@pengutronix.de>
-References: <1361974830-3853-1-git-send-email-mkl@pengutronix.de>
-Message-ID: <1361974830-3853-4-git-send-email-mkl@pengutronix.de>
+Date: Wed, 27 Feb 2013 15:21:41 +0100
+Subject: [PATCH 1/9] USB otg: use try_module_get in all usb_get_phy
+ functions and add missing module_put
+In-Reply-To: <512E105F.9010803@pengutronix.de>
+References: <1361968035-18644-1-git-send-email-mkl@pengutronix.de>
+ <1361968035-18644-2-git-send-email-mkl@pengutronix.de>
+ <20130227123132.GM8016@arwen.pp.htv.fi> <512DFED3.7070701@pengutronix.de>
+ <20130227124333.GQ8016@arwen.pp.htv.fi> <512E001D.6060004@pengutronix.de>
+ <20130227124739.GR8016@arwen.pp.htv.fi> <512E0247.8070808@pengutronix.de>
+ <20130227134219.GC23652@arwen.pp.htv.fi> <512E105F.9010803@pengutronix.de>
+Message-ID: <512E1675.7030700@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sascha Hauer <s.hauer@pengutronix.de>
+On 02/27/2013 02:55 PM, Marc Kleine-Budde wrote:
+> On 02/27/2013 02:42 PM, Felipe Balbi wrote:
+>>> That'll be these 3 branches then:
+>>>
+>>> otg-for-v3.9 (bugfix for v3.9):
+>>> 6bef020 USB otg: use try_module_get in all usb_get_phy functions and add missing module_put
+>>>
+>>> otg-for-v3.10 (depends on otg-for-v3.9):
+>>> a0e17f5 USB: move bulk of otg/otg.c to phy/phy.c
+>>> a6fc0d1 USB: add devicetree helpers for determining dr_mode and phy_type
+>>> 8a4c9f8 USB mxs-phy: Register phy with framework
+>>>
+>>> chipidea-for-v3.10 (most patches depend on otg-for-v3.10):
+>>> 15c930e USB chipidea: ci13xxx-imx: create dynamic platformdata
+>>> 9466e85 USB chipidea: add PTW and PTS handling
+>>> ad2cc0d USB chipidea: introduce dual role mode pdata flags
+>>> 8e7f1bb USB chipidea i.MX: introduce dr_mode property
+>>> 5d83722 USB chipidea i.MX: use devm_usb_get_phy_by_phandle to get phy
+>>
+>> sounds good to me, please make sure to always split your series like
+>> this. You can't expect me (or any maintainer for that matter) to pick
+>> patches to proper branches based on your commit logs alone.
+>>
+>> remeber that every single maintainer needs to handle hundreds of emails
+>> a week (if not a day) and if patches are properly split and cleanly
+>> mention if it's a bugfix or not, things will go wrong.
+> 
+> That was just a proposal. You'll find these series in your inbox in a
+> few minutes.
 
-Even if a chipidea core is otg capable the board may not. This allows
-to explicitly set the core to host/peripheral mode. Without these
-flags the driver falls back to the old behaviour.
+Done.
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
----
- drivers/usb/chipidea/core.c  |   22 ++++++++++++++++------
- include/linux/usb/chipidea.h |    2 +-
- 2 files changed, 17 insertions(+), 7 deletions(-)
+regards,
+Marc
 
-diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-index 04d68cb..ec27060 100644
---- a/drivers/usb/chipidea/core.c
-+++ b/drivers/usb/chipidea/core.c
-@@ -435,6 +435,7 @@ static int ci_hdrc_probe(struct platform_device *pdev)
- 	struct resource	*res;
- 	void __iomem	*base;
- 	int		ret;
-+	enum usb_dr_mode dr_mode;
- 
- 	if (!dev->platform_data) {
- 		dev_err(dev, "platform data missing\n");
-@@ -487,14 +488,23 @@ static int ci_hdrc_probe(struct platform_device *pdev)
- 		return -ENODEV;
- 	}
- 
-+	/* For now we treat dual-role as otg */
-+	dr_mode = ci->platdata->dr_mode;
-+	if (dr_mode == USB_DR_MODE_UNKNOWN || dr_mode == USB_DR_MODE_DUAL_ROLE)
-+		dr_mode = USB_DR_MODE_OTG;
-+
- 	/* initialize role(s) before the interrupt is requested */
--	ret = ci_hdrc_host_init(ci);
--	if (ret)
--		dev_info(dev, "doesn't support host\n");
-+	if (dr_mode == USB_DR_MODE_OTG || dr_mode == USB_DR_MODE_HOST) {
-+		ret = ci_hdrc_host_init(ci);
-+		if (ret)
-+			dev_info(dev, "doesn't support host\n");
-+	}
- 
--	ret = ci_hdrc_gadget_init(ci);
--	if (ret)
--		dev_info(dev, "doesn't support gadget\n");
-+	if (dr_mode == USB_DR_MODE_OTG || dr_mode == USB_DR_MODE_PERIPHERAL) {
-+		ret = ci_hdrc_gadget_init(ci);
-+		if (ret)
-+			dev_info(dev, "doesn't support gadget\n");
-+	}
- 
- 	if (!ci->roles[CI_ROLE_HOST] && !ci->roles[CI_ROLE_GADGET]) {
- 		dev_err(dev, "no supported roles\n");
-diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
-index 1a2aa18..b314647 100644
---- a/include/linux/usb/chipidea.h
-+++ b/include/linux/usb/chipidea.h
-@@ -20,7 +20,7 @@ struct ci13xxx_platform_data {
- #define CI13XXX_REQUIRE_TRANSCEIVER	BIT(1)
- #define CI13XXX_PULLUP_ON_VBUS		BIT(2)
- #define CI13XXX_DISABLE_STREAMING	BIT(3)
--
-+	enum usb_dr_mode	dr_mode;
- #define CI13XXX_CONTROLLER_RESET_EVENT		0
- #define CI13XXX_CONTROLLER_STOPPED_EVENT	1
- 	void	(*notify_event) (struct ci13xxx *ci, unsigned event);
 -- 
-1.7.10.4
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130227/e128f81e/attachment.sig>
