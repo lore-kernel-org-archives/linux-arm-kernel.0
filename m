@@ -1,70 +1,50 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Wed, 27 Feb 2013 08:46:23 +0800
-Subject: [PATCH Resend v5 11/16] spi/spi-atmel: correct 16 bits transfers with
- DMA
+Date: Wed, 27 Feb 2013 08:47:09 +0800
+Subject: [PATCH Resend v5 12/16] spi/spi-atmel: add pinctrl support for atmel
+ spi
 In-Reply-To: <1361925297-11854-1-git-send-email-wenyou.yang@atmel.com>
 References: <1361925297-11854-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1361925983-12481-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1361926029-12518-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Richard Genoud <richard.genoud@gmail.com>
-
-Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
 Cc: spi-devel-general at lists.sourceforge.net
 Cc: linux-kernel at vger.kernel.org
-[wenyou.yang at atmel.com: submit the patch]
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
 ---
- drivers/spi/spi-atmel.c |   17 +++++++++++------
- 1 file changed, 11 insertions(+), 6 deletions(-)
+ drivers/spi/spi-atmel.c |    8 ++++++++
+ 1 file changed, 8 insertions(+)
 
 diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-index 786a84b..00ca85f 100644
+index 00ca85f..0ed3e1a 100644
 --- a/drivers/spi/spi-atmel.c
 +++ b/drivers/spi/spi-atmel.c
-@@ -389,12 +389,18 @@ static inline int atmel_spi_xfer_can_be_chained(struct spi_transfer *xfer)
- }
+@@ -23,6 +23,7 @@
+ #include <linux/platform_data/atmel.h>
+ #include <linux/platform_data/dma-atmel.h>
+ #include <linux/of.h>
++#include <linux/pinctrl/consumer.h>
  
- static int atmel_spi_dma_slave_config(struct atmel_spi *as,
--				struct dma_slave_config *slave_config)
-+				struct dma_slave_config *slave_config,
-+				u8 bits_per_word)
- {
- 	int err = 0;
+ #include <asm/io.h>
+ #include <asm/gpio.h>
+@@ -1503,11 +1504,18 @@ static int atmel_spi_probe(struct platform_device *pdev)
+ 	int			ret;
+ 	struct spi_master	*master;
+ 	struct atmel_spi	*as;
++	struct pinctrl		*pinctrl;
  
--	slave_config->dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
--	slave_config->src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-+	if (bits_per_word > 8) {
-+		slave_config->dst_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
-+		slave_config->src_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
-+	} else {
-+		slave_config->dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-+		slave_config->src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
+ 	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (!regs)
+ 		return -ENXIO;
+ 
++	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
++	if (IS_ERR(pinctrl)) {
++		dev_err(&pdev->dev, "Failed to request pinctrl\n");
++		return PTR_ERR(pinctrl);
 +	}
- 
- 	slave_config->dst_addr = (dma_addr_t)as->phybase + SPI_TDR;
- 	slave_config->src_addr = (dma_addr_t)as->phybase + SPI_RDR;
-@@ -455,7 +461,7 @@ static int atmel_spi_configure_dma(struct atmel_spi *as)
- 		goto error;
- 	}
- 
--	err = atmel_spi_dma_slave_config(as, &slave_config);
-+	err = atmel_spi_dma_slave_config(as, &slave_config, 8);
- 	if (err)
- 		goto error;
- 
-@@ -589,10 +595,9 @@ static int atmel_spi_next_xfer_dma_submit(struct spi_master *master,
- 
- 	*plen = len;
- 
--	if (atmel_spi_dma_slave_config(as, &slave_config))
-+	if (atmel_spi_dma_slave_config(as, &slave_config, 8))
- 		goto err_exit;
- 
--
- 	/* Send both scatterlists */
- 	rxdesc = rxchan->device->device_prep_slave_sg(rxchan,
- 					&as->dma.sgrx,
++
+ 	irq = platform_get_irq(pdev, 0);
+ 	if (irq < 0)
+ 		return irq;
 -- 
 1.7.9.5
