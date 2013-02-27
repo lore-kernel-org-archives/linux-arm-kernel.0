@@ -1,14 +1,18 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Wed, 27 Feb 2013 08:41:28 +0800
-Subject: [PATCH Resend v5 05/16] spi/spi-atmel: call unmapping on transfers
- buffers
+Date: Wed, 27 Feb 2013 08:42:11 +0800
+Subject: [PATCH Resend v5 06/16] spi/spi-atmel: status information passed
+ through controller data
 In-Reply-To: <1361925297-11854-1-git-send-email-wenyou.yang@atmel.com>
 References: <1361925297-11854-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1361925688-12210-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1361925731-12246-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+The status of transfer is stored in controller data structure
+so that it can be used not only by atmel_spi_msg_done() function.
+This will be useful for upcoming dmaengine enabled driver.
 
 Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 Cc: spi-devel-general at lists.sourceforge.net
@@ -16,34 +20,66 @@ Cc: linux-kernel at vger.kernel.org
 [wenyou.yang at atmel.com: submit the patch]
 Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
 ---
- drivers/spi/spi-atmel.c |    8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+ drivers/spi/spi-atmel.c |   13 ++++++++-----
+ 1 file changed, 8 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-index c70142e..6ea41a7 100644
+index 6ea41a7..136ed8f 100644
 --- a/drivers/spi/spi-atmel.c
 +++ b/drivers/spi/spi-atmel.c
-@@ -1059,6 +1059,7 @@ static int atmel_spi_remove(struct platform_device *pdev)
- 	struct spi_master	*master = platform_get_drvdata(pdev);
- 	struct atmel_spi	*as = spi_master_get_devdata(master);
- 	struct spi_message	*msg;
-+	struct spi_transfer	*xfer;
+@@ -210,6 +210,7 @@ struct atmel_spi {
+ 	unsigned long		current_remaining_bytes;
+ 	struct spi_transfer	*next_transfer;
+ 	unsigned long		next_remaining_bytes;
++	int			done_status;
  
- 	/* reset the hardware and block queue progress */
- 	spin_lock_irq(&as->lock);
-@@ -1070,9 +1071,10 @@ static int atmel_spi_remove(struct platform_device *pdev)
+ 	void			*buffer;
+ 	dma_addr_t		buffer_dma;
+@@ -555,15 +556,15 @@ static void atmel_spi_dma_unmap_xfer(struct spi_master *master,
  
- 	/* Terminate remaining queued transfers */
- 	list_for_each_entry(msg, &as->queue, queue) {
--		/* REVISIT unmapping the dma is a NOP on ARM and AVR32
--		 * but we shouldn't depend on that...
--		 */
-+		list_for_each_entry(xfer, &msg->transfers, transfer_list) {
-+			if (!msg->is_dma_mapped)
-+				atmel_spi_dma_unmap_xfer(master, xfer);
-+		}
- 		msg->status = -ESHUTDOWN;
- 		msg->complete(msg->context);
- 	}
+ static void
+ atmel_spi_msg_done(struct spi_master *master, struct atmel_spi *as,
+-		struct spi_message *msg, int status, int stay)
++		struct spi_message *msg, int stay)
+ {
+-	if (!stay || status < 0)
++	if (!stay || as->done_status < 0)
+ 		cs_deactivate(as, msg->spi);
+ 	else
+ 		as->stay = msg->spi;
+ 
+ 	list_del(&msg->queue);
+-	msg->status = status;
++	msg->status = as->done_status;
+ 
+ 	dev_dbg(master->dev.parent,
+ 		"xfer complete: %u bytes transferred\n",
+@@ -575,6 +576,7 @@ atmel_spi_msg_done(struct spi_master *master, struct atmel_spi *as,
+ 
+ 	as->current_transfer = NULL;
+ 	as->next_transfer = NULL;
++	as->done_status = 0;
+ 
+ 	/* continue if needed */
+ 	if (list_empty(&as->queue) || as->stopping)
+@@ -652,7 +654,8 @@ atmel_spi_interrupt(int irq, void *dev_id)
+ 		/* Clear any overrun happening while cleaning up */
+ 		spi_readl(as, SR);
+ 
+-		atmel_spi_msg_done(master, as, msg, -EIO, 0);
++		as->done_status = -EIO;
++		atmel_spi_msg_done(master, as, msg, 0);
+ 	} else if (pending & (SPI_BIT(RXBUFF) | SPI_BIT(ENDRX))) {
+ 		ret = IRQ_HANDLED;
+ 
+@@ -670,7 +673,7 @@ atmel_spi_interrupt(int irq, void *dev_id)
+ 
+ 			if (atmel_spi_xfer_is_last(msg, xfer)) {
+ 				/* report completed message */
+-				atmel_spi_msg_done(master, as, msg, 0,
++				atmel_spi_msg_done(master, as, msg,
+ 						xfer->cs_change);
+ 			} else {
+ 				if (xfer->cs_change) {
 -- 
 1.7.9.5
