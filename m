@@ -1,98 +1,90 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 27 Feb 2013 08:03:33 +0100
-Subject: [PATCH 1/4] arm: mvebu: limit OpenBlocks AX3-4 to 1 GB of RAM
-In-Reply-To: <20130226162023.3d7b2ffc@skate>
-References: <20130104183139.20492204@skate> <50E71356.3030203@lunn.ch>
- <20130104190345.460151d1@skate>
- <50E9EE7A.1080301@free-electrons.com>
- <20130106235312.0839a879@skate> <20130107094747.GR3392@lunn.ch>
- <20130107110712.GT3392@lunn.ch> <20130107122613.64f4ace5@skate>
- <20130107113411.GV3392@lunn.ch> <20130226162023.3d7b2ffc@skate>
-Message-ID: <20130227070333.GK17242@lunn.ch>
+From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
+Date: Wed, 27 Feb 2013 07:10:40 +0000
+Subject: [PATCH v4 0/3] ASoC davinci/tlv320aic3x updates, fixes & DT
+ support
+In-Reply-To: <1359636786-7056-1-git-send-email-gururaja.hebbar@ti.com>
+References: <1359636786-7056-1-git-send-email-gururaja.hebbar@ti.com>
+Message-ID: <1BAFE6F6C881BF42822005164F1491C33EB76CE8@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 26, 2013 at 04:20:23PM +0100, Thomas Petazzoni wrote:
-> Dear Andrew Lunn,
+Mark,
+
+On Thu, Jan 31, 2013 at 18:23:03, Hebbar, Gururaja wrote:
+> 1. Convert tlv320aic3x mic bias to a supply widget and related machine driver
+> 2. Add DT support for Davinci machine platform
+> 3. Remove __dev* attributes
 > 
-> On Mon, 7 Jan 2013 12:34:11 +0100, Andrew Lunn wrote:
-> > > Image is also with an initramfs + appended DTB. My boot command is:
-> > > 
-> > > tftp 1000000 192.168.0.14:uImage.armada-xp-openblocks-ax3-4; bootm
-> > > 
-> > > So I'm loading to a different address than you.
-> > 
-> > Hi Thomas
-> > 
-> > Uboot tells me:
-> > 
-> > DRAM:   3 GB
-> >        CS 0: base 0x00000000 size  1 GB
-> >        CS 2: base 0x40000000 size  1 GB
-> >        CS 3: base 0x80000000 size  1 GB
-> >        Addresses 14M - 0M are saved for the U-Boot usage.
-> > 
-> > 1000000 would be towards the beginning of this area reserved for uboot.
-> > 
-> > Could you try moving to somewhere outside of the first 14Mbytes and
-> > see if that helps.
+> This patch-set is tested on Davinci platform (DA850 EVM). This series applies on
+> top of tag next-20130128 git tree
+> https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git
 > 
-> Jumping back on this old topic of the OpenBlocks AX3 not being stable
-> with 3 GB of RAM for Gr??gory and me, but being stable for you. Could
-> you check which revision of the Armada XP you have? Is it A0 or B0?
+> These patches cannot be tested directly on mainline kernel (DT based).
+> This is because dma is not yet completely ported to Davinci ASoC. I had to add
+> few hacks to get Audio working on Davinci DA850 platform.
 > 
-> I.e, check the message:
+> For reference, I have placed the entire working tree @
+> Tree :  https://github.com/ghebbar/linux.git
+> Branch : dev_next-20130128_davinci_asoc_dt_v3
+
+Only one patch out of the 3 is accepted.  I haven't received any review comments
+from anyone for the other 2.
+
+Kindly let me know if any further changes are required in the remaining changes 
+or if I have missed any of comments.
+
+If not, Could you please accept the remaining patch?
+
+Remaining patches
+ASoC: davinci: remove __dev* attributes [1]
+ASoC: davinci: machine: Add device tree binding [2]
+
+
+[1]
+http://lkml.org/lkml/2013/1/31/243
+
+
+[2]
+http://lkml.org/lkml/2013/1/31/244
+
+
+Regards, 
+Gururaja
+
 > 
->  SoC:   MV78460 B0
+> Changes in v4
+> 	 - updated pending machine driver to change in micbias -> supply widget
+> 	 - merge codec & machine driver change into a single commit
 > 
-> in U-Boot. Gr??gory and I are using OpenBlocks AX3 based on the A0
-> version of the silicon (so the message I copy/pasted above is *not*
-> from our OpenBlocks, but a different Armada XP board). However,
-> PlatHome has been shipping since some time B0 revisions. Maybe it could
-> explain the difference we're seeing?
-
-Hi Thomas
-
-My machine is an A0.
-
-U-Boot 2009.08 (Jul 27 2012 - 18:23:11)
-Plat'Home version: 1.1.1 (Base: Marvell BSP  2.2.3 NQ)
-
-U-Boot Addressing:
-       Code:            00600000:006BFFF0
-       BSS:             0070D6A0
-       Stack:           0x5fff70
-       PageTable:       0x8e0000
-       Heap address:    0x900000:0xe00000
-Board: OpenBlocks AX3
-SoC:   MV78260 A0
-       running 2 CPUs
-       Custom configuration
-CPU:   Marvell PJ4B (584) v7 (Rev 2) LE
-       CPU # 0
-       CPU @ 1333Mhz, L2 @ 667Mhz
-       DDR @ 667Mhz, TClock @ 250Mhz
-       DDR 64Bit Width, FastPath Memory Access
-       DDR ECC Disabled
-PEX 0.0(0): Detected No Link.
-PEX 0.1(1): Detected No Link.
-DRAM:   3 GB
-       CS 0: base 0x00000000 size  1 GB
-       CS 2: base 0x40000000 size  1 GB
-       CS 3: base 0x80000000 size  1 GB
-       Addresses 14M - 0M are saved for the U-Boot usage.
-Flash: 128 MB
-POST:  mac verify Eth0 PASSED Eth1 PASSED Eth2 PASSED Eth3 PASSED 
-FPU initialized to Run Fast Mode.
-USB 0: Host Mode
-USB 1: Host Mode
-USB 2: Device Mode
-Power Off External Interface
-Modules Detected:
-MMC:   MRVL_MMC: 0
-Net:   egiga0, egiga1, egiga2, egiga3
-
-I know you recently found some issue with windows. Could that explain
-something?
-
-       Andrew
+> Changes in v3
+> 	- drop mcasp pinctrl handler patch from series as it is now handled
+> 	  centrally.
+> 	- Convert tlv320aic3x mic bias to a supply widget and related machine
+> 	  driver
+> 	- remove __dev* attributes
+> 
+> Changes in v2
+> 	 - Remove reference to Linux & software details from DT binding
+> 
+> Hebbar Gururaja (2):
+>   ASoC: tlv320aic3x: Convert mic bias to a supply widget
+>   ASoC: davinci: remove __dev* attributes
+> 
+> Hebbar, Gururaja (1):
+>   ASoC: davinci: machine: Add device tree binding
+> 
+>  .../bindings/sound/davinci-evm-audio.txt           |   53 ++++++
+>  .../devicetree/bindings/sound/tlv320aic3x.txt      |    6 +
+>  include/sound/tlv320aic3x.h                        |   10 ++
+>  sound/soc/codecs/tlv320aic3x.c                     |   83 ++++++++-
+>  sound/soc/codecs/tlv320aic3x.h                     |    4 +
+>  sound/soc/davinci/davinci-evm.c                    |  185 +++++++++++++++++---
+>  sound/soc/omap/n810.c                              |    4 +-
+>  sound/soc/omap/rx51.c                              |    8 +-
+>  8 files changed, 318 insertions(+), 35 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/sound/davinci-evm-audio.txt
+> 
+> -- 
+> 1.7.9.5
+> 
+> 
