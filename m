@@ -1,55 +1,68 @@
-From: prakash.pm@ti.com (Manjunathappa, Prakash)
-Date: Wed, 27 Feb 2013 09:29:13 +0000
-Subject: [PATCH 4/4] ARM: davinci: da850-evm: add SPI flash support
-In-Reply-To: <512DC2E5.4080603@ti.com>
-References: <1361789050-637-1-git-send-email-prakash.pm@ti.com>
- <1361789050-637-5-git-send-email-prakash.pm@ti.com> <512DC2E5.4080603@ti.com>
-Message-ID: <A73F36158E33644199EB82C5EC81C7BC3EA47FC7@DBDE01.ent.ti.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 27 Feb 2013 10:49:35 +0100
+Subject: [PATCH] arm: plat-orion: fix address decoding when > 4GB is used
+Message-ID: <1361958575-2328-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 27, 2013 at 13:55:09, Nori, Sekhar wrote:
-> On 2/25/2013 4:14 PM, Manjunathappa, Prakash wrote:
-> > Enable m25p80 SPI flash support on da850-EVM. Also
-> > add partition information of SPI flash.
-> > 
-> > Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
-> > ---
-> >  arch/arm/boot/dts/da850-evm.dts |   40 +++++++++++++++++++++++++++++++++++++++
-> >  1 files changed, 40 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
-> > index 78c8e54..1a28d43 100644
-> > --- a/arch/arm/boot/dts/da850-evm.dts
-> > +++ b/arch/arm/boot/dts/da850-evm.dts
-> > @@ -46,6 +46,46 @@
-> >  			pinctrl-names = "default";
-> >  			pinctrl-0 = <&mmc0_pins>;
-> >  		};
-> > +		spi1: spi at 1f0e000 {
-> > +			status = "okay";
-> > +			pinctrl-names = "default";
-> > +			pinctrl-0 = <&spi1_pins>;
-> > +			flash: m25p80 at 0 {
-> > +				#address-cells = <1>;
-> > +				#size-cells = <1>;
-> > +				compatible = "m25p80";
-> 
-> Are you sure there is a m25p80 part on these boards? On my board using
-> this patch I get:
-> 
-> m25p80 spi32766.0: found m25p64, expected m25p80
-> 
+During the system initialization, the orion_setup_cpu_mbus_target()
+function reads the SDRAM address decoding registers to find out how
+many chip-selects of SDRAM have been enabled, and builds a small array
+with one entry per chip-select. This array is then used by device
+drivers (XOR, Ethernet, etc.) to configure their own address decoding
+windows to the SDRAM.
 
-On my board also I see this warning. Also there is mistake in filesystem
-partition information specified in this patch, will correct it in next
-version of patch.
+However, devices can only access the first 32 bits of the physical
+memory. Even though LPAE is not supported for now, some Marvell boards
+are not showing up with 8 GB of RAM, configured using two SDRAM
+address decoding windows: the first covering the first 4 GB, the
+second covering the last 4 GB. The array built by
+orion_setup_cpu_mbus_target() has therefore two entries, and device
+drivers try to set up two address decoding windows to the
+SDRAM. However, in the device registers for the address decoding, the
+base address is only 32 bits, so those two windows overlap each other,
+and the devices do not work at all.
 
-Thanks,
-Prakash
+This patch makes sure that the array built by
+orion_setup_cpu_mbus_target() only contains the SDRAM decoding windows
+that correspond to the first 4 GB of the memory. To do that, it
+ignores the SDRAM decoding windows for which the 3 low-order bits are
+not zero (the 3 low-order bits of the base register are used to store
+bits 32:35 of the base address, so they actually indicate whether the
+base address is above 4 GB).
 
-> I can access the flash just fine though.
-> 
-> Thanks,
-> Sekhar
-> 
+This patch allows the newly introduced armada-xp-gp board to properly
+operate when it is mounted with more than 4 GB of RAM. Without that,
+all devices doing DMA (for example XOR and Ethernet) do not work at
+all.
+
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+This patch should definitely be applied for 3.9. It may also be
+considered for 3.8, since other boards than the armada-xp-gp can be
+mounted with more than 4 GB of RAM.
+---
+ arch/arm/plat-orion/addr-map.c |    7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/plat-orion/addr-map.c b/arch/arm/plat-orion/addr-map.c
+index febe386..41a8363 100644
+--- a/arch/arm/plat-orion/addr-map.c
++++ b/arch/arm/plat-orion/addr-map.c
+@@ -157,9 +157,12 @@ void __init orion_setup_cpu_mbus_target(const struct orion_addr_map_cfg *cfg,
+ 		u32 size = readl(ddr_window_cpu_base + DDR_SIZE_CS_OFF(i));
+ 
+ 		/*
+-		 * Chip select enabled?
++		 * We only take care of entries for which the chip
++		 * select is enabled, and that don't have high base
++		 * address bits set (devices can only access the first
++		 * 32 bits of the memory).
+ 		 */
+-		if (size & 1) {
++		if ((size & 1) && !(base & 0x7)) {
+ 			struct mbus_dram_window *w;
+ 
+ 			w = &orion_mbus_dram_info.cs[cs++];
+-- 
+1.7.9.5
