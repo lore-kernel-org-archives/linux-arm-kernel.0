@@ -1,53 +1,58 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 27 Feb 2013 10:50:57 -0700
-Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
-In-Reply-To: <CAAwP0s3rbExrSf-W325uCPfMO=Zk9LefRP0VD4JC1tg_sxS_gQ@mail.gmail.com>
-References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
- <1329321854-24490-4-git-send-email-b-cousson@ti.com>
- <4F44FA56.7020000@gmail.com> <4F44FC37.2000701@ti.com>
- <4F452484.5080503@gmail.com>
- <74CDBE0F657A3D45AFBB94109FB122FF17BD8BC6C1@HQMAIL01.nvidia.com>
- <4F47AD08.4030504@ti.com>
- <CAAwP0s0cB368R2mtbJpTZJreR-5GSRLfxC+8DJLo5nw3_OwBuA@mail.gmail.com>
- <512D39DA.7020306@ti.com> <512D3AB1.1080202@wwwdotorg.org>
- <512D3EC2.6050408@ti.com> <512D3FE6.1010300@wwwdotorg.org>
- <512D490B.70900@ti.com> <512D4FC4.2060505@wwwdotorg.org>
- <512D5C58.4090500@ti.com>
- <CAAwP0s3rbExrSf-W325uCPfMO=Zk9LefRP0VD4JC1tg_sxS_gQ@mail.gmail.com>
-Message-ID: <512E4781.8050701@wwwdotorg.org>
+From: robertcnelson@gmail.com (Robert Nelson)
+Date: Wed, 27 Feb 2013 11:51:53 -0600
+Subject: [PATCH Resend v5 00/16] spi/spi-atmel: add dmaengine support for
+ atmel spi controller and to test the device tree support
+In-Reply-To: <1361925297-11854-1-git-send-email-wenyou.yang@atmel.com>
+References: <1361925297-11854-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <CAOCHtYhQsqhf1aBzh2giACMaeE0DXkcZm8qJ73rqn6njFcCaSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/26/2013 08:57 PM, Javier Martinez Canillas wrote:
-> On Wed, Feb 27, 2013 at 2:07 AM, Jon Hunter <jon-hunter@ti.com> wrote:
->>
->> On 02/26/2013 06:13 PM, Stephen Warren wrote:
->>> On 02/26/2013 04:45 PM, Jon Hunter wrote:
-...
->>>> One issue I see is that by not calling gpio_request, then potentially
->>>> you could have someone request a gpio via gpio_request() and someone
->>>> trying to use it as an interrupt source via request_irq(). Now obviously
->>>> that represents a bug because there is only one physical gpio, but I
->>>> gather it is something we need to protect against.
->>>
->>> I'm not sure it's really that much of an issue, but presumably the
->>> solution is for a combined GPIO+IRQ driver to simply call gpio_request
->>> internally from within some irq_chip function. It looks like struct
->>> irq_chip doesn't have a request/free, but perhaps they could be added to
->>> solve this?
->>
->> Yes I was wondering if we could do something like that. That would work,
->> may be that's what we should propose.
-> 
-> Something like that would definitely solve the GPIO request issue but
-> we still have the issue that the current OMAP GPIO controller binding
-> does not support #interrupt-cells = <2>.
+On Tue, Feb 26, 2013 at 6:34 PM, Wenyou Yang <wenyou.yang@atmel.com> wrote:
+> Hi All,
+>
+> This set of patches is to add dmaengine support for atmel spi and to test device tree support.
+>
+> The work is based on Nicolas and Richard's work.
+>
+> Because the Atmel DMA device tree support hasn't on mainline, to at91sam9x5ek and at91sam9n12ek
+> with dma support, it doesn't work on the dmaengine mode, only on PIO mode so far.
+>
+> It has been tested as below:
+>  1./tested on v3.8, by using mtd utils, "mount", "umount" and "cp" commands.
+>  2./tested on "spi/next" git tree after removing commit "spi: make sure all transfer has proper speed set".
+>  3./tested by using Documentation/spi/spidev_test.c on "/dev/spidev".
+>  4./tested on on at91sam9x5ek, at91sam9m10g45ek, at91sam9263ek and at91sam9g20ek boards
 
-The binding documentation in
-Documentation/devicetree/bindings/gpio/gpio-omap.txt indicates that it
-does. If this doesn't work in practice, it's a driver bug that can
-presumably be easily fixed. And no need to change any ABI definitions:-)
+Hi Wenyou,
 
-BTW, I notice in that binding document that the description of the two
-cells for #interrupt-cells is actually part of the description of the
-"interrupt-controller" property; it should be moved up one line really.
+Is this patchset missing another enablement patch? With v3.8.0 on the
+at91sam9g35ek (device tree boot) I'm getting..
+
+debian at arm:~$ dmesg | grep -i spi
+[    0.890625] atmel_spi f0000000.spi: version: 0x212
+[    0.890625] atmel_spi f0000000.spi: DMA channel not available,
+unable to use SPI
+[    0.898437] atmel_spi f0000000.spi: Atmel SPI Controller using PIO only
+[    0.906250] atmel_spi f0000000.spi: Atmel SPI Controller at
+0xf0000000 (irq 30)
+[    0.914062] atmel_spi f0000000.spi: master is unqueued, this is deprecated
+debian at arm:~$ ls /dev/spi*
+ls: cannot access /dev/spi*: No such file or directory
+
+.config for reference, encase i missed something obvious:
+https://github.com/RobertCNelson/armv5_devel/blob/v3.8.x-at91/patches/defconfig
+
+CONFIG_SPI=y
+# CONFIG_SPI_DEBUG is not set
+CONFIG_SPI_MASTER=y
+
+CONFIG_SPI_ATMEL=y
+
+CONFIG_SPI_SPIDEV=y
+
+Regards,
+
+-- 
+Robert Nelson
+http://www.rcn-ee.com/
