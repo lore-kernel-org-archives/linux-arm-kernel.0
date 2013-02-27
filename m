@@ -1,62 +1,52 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Wed, 27 Feb 2013 14:08:39 -0500
-Subject: [PATCH] usb: limit OMAP related USB options to OMAP2PLUS platforms
-Message-ID: <1361992119-2465-1-git-send-email-paul.gortmaker@windriver.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Wed, 27 Feb 2013 20:26:40 +0100
+Subject: [PATCH Resend v5 12/16] spi/spi-atmel: add pinctrl support for
+ atmel spi
+In-Reply-To: <1361926029-12518-1-git-send-email-wenyou.yang@atmel.com>
+References: <1361925297-11854-1-git-send-email-wenyou.yang@atmel.com>
+ <1361926029-12518-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <CAGhQ9VxPee+dPRPr0XdAd+fT=Ngcz=MAHdvZ3PkdUawk39oJTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit 57f6ce072e35770a63be0c5d5e82f90d8da7d665 ("usb: phy:
-add a new driver for usb3 phy") added the new Kconfig option
-OMAP_USB3, but it had no dependencies whatsoever, and hence
-became available across all arch/platforms.
+On 27 February 2013 01:47, Wenyou Yang <wenyou.yang@atmel.com> wrote:
+> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> Cc: spi-devel-general at lists.sourceforge.net
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  drivers/spi/spi-atmel.c |    8 ++++++++
+>  1 file changed, 8 insertions(+)
+>
+> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+> index 00ca85f..0ed3e1a 100644
+> --- a/drivers/spi/spi-atmel.c
+> +++ b/drivers/spi/spi-atmel.c
+> @@ -23,6 +23,7 @@
+>  #include <linux/platform_data/atmel.h>
+>  #include <linux/platform_data/dma-atmel.h>
+>  #include <linux/of.h>
+> +#include <linux/pinctrl/consumer.h>
+>
+>  #include <asm/io.h>
+>  #include <asm/gpio.h>
+> @@ -1503,11 +1504,18 @@ static int atmel_spi_probe(struct platform_device *pdev)
+>         int                     ret;
+>         struct spi_master       *master;
+>         struct atmel_spi        *as;
+> +       struct pinctrl          *pinctrl;
+>
+>         regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>         if (!regs)
+>                 return -ENXIO;
+>
+> +       pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
+> +       if (IS_ERR(pinctrl)) {
+> +               dev_err(&pdev->dev, "Failed to request pinctrl\n");
+> +               return PTR_ERR(pinctrl);
+> +       }
+> +
 
-Which presumably caused this to show up in x86 randconfig:
+This patch should be dropped since driver core will now do this for us.
 
-    warning: (USB_MUSB_HDRC && OMAP_USB3) selects \
-        OMAP_CONTROL_USB which has unmet direct \
-        dependencies (USB_SUPPORT && ARCH_OMAP2PLUS)
-
-Then commit 6992819feb39cb9adac72170555d957d07f869f2 ("usb: phy:
-fix Kconfig warning") was added.  However, this just deleted the
-ARCH_OMAP2PLUS dependency from OMAP_CONTROL_USB, further
-compounding the problem by opening up OMAP_CONTROL_USB to
-all arch/platforms as well.
-
-Here we revert the change of 6992819feb to restore the dependency,
-and add the same ARCH_OMAP2PLUS dependency to the new OMAP_USB3.
-
-Perhaps a more platform specific dependency could be chosen for
-OMAP_USB3, but at least this keeps it from bleeding out to other
-architectures and non-OMAP ARM platforms as it is currently doing.
-
-Cc: Felipe Balbi <balbi@ti.com>
-Cc: Kishon Vijay Abraham I <kishon@ti.com>
-Cc: Moiz Sonasath <m-sonasath@ti.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
----
- drivers/usb/phy/Kconfig | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/drivers/usb/phy/Kconfig b/drivers/usb/phy/Kconfig
-index 65217a5..40b8463 100644
---- a/drivers/usb/phy/Kconfig
-+++ b/drivers/usb/phy/Kconfig
-@@ -17,6 +17,7 @@ config OMAP_USB2
- 
- config OMAP_USB3
- 	tristate "OMAP USB3 PHY Driver"
-+	depends on ARCH_OMAP2PLUS
- 	select USB_OTG_UTILS
- 	select OMAP_CONTROL_USB
- 	help
-@@ -27,6 +28,7 @@ config OMAP_USB3
- 
- config OMAP_CONTROL_USB
- 	tristate "OMAP CONTROL USB Driver"
-+	depends on ARCH_OMAP2PLUS
- 	help
- 	  Enable this to add support for the USB part present in the control
- 	  module. This driver has API to power on the USB2 PHY and to write to
--- 
-1.8.1.2
+regards
+Joachim Eastwood
