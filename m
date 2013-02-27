@@ -1,63 +1,37 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 27 Feb 2013 12:16:55 -0500 (EST)
-Subject: [RFC PATCH v2 0/4] Add support for LZ4-compressed kernel
-In-Reply-To: <1361984688.2035.20.camel@joe-AO722>
-References: <1361859870-15751-1-git-send-email-kyungsik.lee@lge.com>
- <512D1C12.4080109@oberhumer.com>
- <alpine.LFD.2.03.1302261557220.1254@syhkavp.arg>
- <87fw0i7n6d.fsf@dell.be.48ers.dk>
- <20130226221027.GW17833@n2100.arm.linux.org.uk>
- <1361929234.1924.8.camel@joe-AO722>
- <20130227095609.GY17833@n2100.arm.linux.org.uk>
- <1361980152.2035.13.camel@joe-AO722>
- <20130227163118.GB17833@n2100.arm.linux.org.uk>
- <1361984688.2035.20.camel@joe-AO722>
-Message-ID: <alpine.LFD.2.03.1302271211360.1254@syhkavp.arg>
+From: Jonas.Oester@de.bosch.com (Oester Jonas (CM-AI/PJ-CF31))
+Date: Wed, 27 Feb 2013 18:10:16 +0100
+Subject: perf top running with 4 v7 cores (i.MX6q)?
+In-Reply-To: <512E1F18.3040807@de.bosch.com>
+References: <512E1F18.3040807@de.bosch.com>
+Message-ID: <294B28951EBE8146839AF99A61CB5FCE6DC3FC42D1@SI-MBX17.de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 27 Feb 2013, Joe Perches wrote:
-
-> On Wed, 2013-02-27 at 16:31 +0000, Russell King - ARM Linux wrote:
-> > On Wed, Feb 27, 2013 at 07:49:12AM -0800, Joe Perches wrote:
-> > > On Wed, 2013-02-27 at 09:56 +0000, Russell King - ARM Linux wrote:
-> > > > On Tue, Feb 26, 2013 at 05:40:34PM -0800, Joe Perches wrote:
-> > > > > On Tue, 2013-02-26 at 22:10 +0000, Russell King - ARM Linux wrote:
-> > > > > > So... for a selected kernel version of a particular size, can we please
-> > > > > > have a comparison between the new LZO code and this LZ4 code, so that
-> > > > > > we can see whether it's worth updating the LZO code or replacing the
-> > > > > > LZO code with LZ4?
-> > > > > 
-> > > > > How could it be questionable that it's worth updating the LZO code?
-> > > > 
-> > > > Please read the comments against the previous posting of these patches
-> > > > where I first stated this argument - and with agreement from those
-> > > > following the thread.  The thread started on 26 Jan 2013.  Thanks.
-> > > 
-> > > https://lkml.org/lkml/2013/1/29/145
-> > > 
-> > > I did not and do not see significant value in
-> > > adding LZ4 given Markus' LZO improvements.
-> > 
-> > Sorry, a 66% increase in decompression speed over the updated LZO code
-> > isn't "significant value" ?
+> has anybody running 'perf top' on a quad ARM v7 system with PMU enabled?
 > 
-> We disagree.
+> Running 'perf top' on a quad Cortex A9 based Freescale i.MX6 SabreLite
+> (maxcpus=4) with PMU enabled [1] and kernel 3.8 the system freezes
+> completely and after some time the system detects a RCU stall [2].
 > 
-> > I'm curious - what in your mind qualifies "significant value" ?
+> 'perf top' works well using only 1 core (maxcpus=1) on the same system.
 > 
-> faster boot time. smaller, faster overall code.
+> Any idea?
 
-Sorry, but you certainly successfully got me confused, and probably 
-others as well.
+One important difference between the i.MX6 and other processors may be that the 
+i.MX6 has one interrupt line for the PMUs of all the cores (the i.MX6 manual is terse here: 
+"Logical OR of Performance Unit interrupts" is all it has to say on the subject). Compare 
+this to e.g. a Tegra 30:
 
-RMK says that "66% increase in decompression speed over LZO" is 
-significant.  You apparently disagree with that.
+	pmu {
+		compatible = "arm,cortex-a9-pmu";
+		interrupts = <0 144 0x04
+			      0 145 0x04
+			      0 146 0x04
+			      0 147 0x04>;
+	};
 
-Then you say that faster boot time is significant.
+So, does the PMU driver support this IRQ wiring at all? Are there any other SoCs that have 
+*one* IRQ line for several PMUs? At least, I didn't find any by grepping for cortex-a9-pmu 
+in arch/arm/boot/dts.
 
-Again, can you (or anyone else) provide comprehensive test results in a 
-single email with both compression methods?
-
-
-Nicolas
+Jonas
