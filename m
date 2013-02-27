@@ -1,9 +1,9 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 27 Feb 2013 23:25:42 +0800
-Subject: [PATCH 06/12] i2c: i2c-mxs: move to use generic DMA helper
+Date: Wed, 27 Feb 2013 23:25:44 +0800
+Subject: [PATCH 08/12] serial: mxs-auart: move to use generic DMA helper
 In-Reply-To: <1361978748-25281-1-git-send-email-shawn.guo@linaro.org>
 References: <1361978748-25281-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1361978748-25281-7-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1361978748-25281-9-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,138 +12,154 @@ client devices only need to call dma_request_slave_channel() for
 requesting a DMA channel from dmaengine.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Cc: Wolfram Sang <w.sang@pengutronix.de>
-Cc: linux-i2c at vger.kernel.org
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: linux-serial at vger.kernel.org
 ---
- Documentation/devicetree/bindings/i2c/i2c-mxs.txt |   12 ++++---
- drivers/i2c/busses/i2c-mxs.c                      |   40 ++-------------------
- 2 files changed, 11 insertions(+), 41 deletions(-)
+ .../bindings/tty/serial/fsl-mxs-auart.txt          |   16 +++---
+ drivers/tty/serial/mxs-auart.c                     |   52 ++------------------
+ 2 files changed, 11 insertions(+), 57 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/i2c/i2c-mxs.txt b/Documentation/devicetree/bindings/i2c/i2c-mxs.txt
-index 7a3fe9e..c32f4e9 100644
---- a/Documentation/devicetree/bindings/i2c/i2c-mxs.txt
-+++ b/Documentation/devicetree/bindings/i2c/i2c-mxs.txt
-@@ -3,10 +3,13 @@
- Required properties:
- - compatible: Should be "fsl,<chip>-i2c"
- - reg: Should contain registers location and length
--- interrupts: Should contain ERROR and DMA interrupts
-+- interrupts: Should contain ERROR interrupt number
- - clock-frequency: Desired I2C bus clock frequency in Hz.
-                    Only 100000Hz and 400000Hz modes are supported.
--- fsl,i2c-dma-channel: APBX DMA channel for the I2C
+diff --git a/Documentation/devicetree/bindings/tty/serial/fsl-mxs-auart.txt b/Documentation/devicetree/bindings/tty/serial/fsl-mxs-auart.txt
+index 273a8d5..2c00ec6 100644
+--- a/Documentation/devicetree/bindings/tty/serial/fsl-mxs-auart.txt
++++ b/Documentation/devicetree/bindings/tty/serial/fsl-mxs-auart.txt
+@@ -5,20 +5,18 @@ Required properties:
+   imx23 and imx28.
+ - reg : Address and length of the register set for the device
+ - interrupts : Should contain the auart interrupt numbers
+-
+-Optional properties:
+-- fsl,auart-dma-channel : The DMA channels, the first is for RX, the other
+-		is for TX. If you add this property, it also means that you
+-		will enable the DMA support for the auart.
+-		Note: due to the hardware bug in imx23(see errata : 2836),
+-		only the imx28 can enable the DMA support for the auart.
 +- dmas: DMA specifier, consisting of a phandle to DMA controller node
-+  and I2C DMA channel ID.
++  and AUART DMA channel ID.
 +  Refer to dma.txt and fsl-mxs-dma.txt for details.
-+- dma-names: Must be "i2c".
++- dma-names: "rx" for RX channel, "tx" for TX channel.
  
- Examples:
- 
-@@ -15,7 +18,8 @@ i2c0: i2c at 80058000 {
- 	#size-cells = <0>;
- 	compatible = "fsl,imx28-i2c";
- 	reg = <0x80058000 2000>;
--	interrupts = <111 68>;
-+	interrupts = <111>;
- 	clock-frequency = <100000>;
--	fsl,i2c-dma-channel = <6>;
-+	dmas = <&dma_apbx 6>;
-+	dma-names = "i2c";
+ Example:
+ auart0: serial at 8006a000 {
+ 	compatible = "fsl,imx28-auart", "fsl,imx23-auart";
+ 	reg = <0x8006a000 0x2000>;
+-	interrupts = <112 70 71>;
+-	fsl,auart-dma-channel = <8 9>;
++	interrupts = <112>;
++	dmas = <&dma_apbx 8>, <&dma_apbx 9>;
++	dma-names = "rx", "tx";
  };
-diff --git a/drivers/i2c/busses/i2c-mxs.c b/drivers/i2c/busses/i2c-mxs.c
-index 22d8ad3..1f282df 100644
---- a/drivers/i2c/busses/i2c-mxs.c
-+++ b/drivers/i2c/busses/i2c-mxs.c
-@@ -31,7 +31,6 @@
- #include <linux/of_i2c.h>
+ 
+ Note: Each auart port should have an alias correctly numbered in "aliases"
+diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
+index d549fe1..269a27c 100644
+--- a/drivers/tty/serial/mxs-auart.c
++++ b/drivers/tty/serial/mxs-auart.c
+@@ -35,7 +35,7 @@
+ #include <linux/pinctrl/consumer.h>
+ #include <linux/of_device.h>
  #include <linux/dma-mapping.h>
- #include <linux/dmaengine.h>
 -#include <linux/fsl/mxs-dma.h>
++#include <linux/dmaengine.h>
  
- #define DRIVER_NAME "mxs-i2c"
+ #include <asm/cacheflush.h>
  
-@@ -113,9 +112,7 @@ struct mxs_i2c_dev {
- 	uint32_t timing1;
+@@ -148,11 +148,6 @@ struct mxs_auart_port {
+ 	struct device *dev;
  
- 	/* DMA support components */
--	int				dma_channel;
- 	struct dma_chan         	*dmach;
--	struct mxs_dma_data		dma_data;
- 	uint32_t			pio_data[2];
- 	uint32_t			addr_data;
- 	struct scatterlist		sg_io[2];
-@@ -518,21 +515,6 @@ static const struct i2c_algorithm mxs_i2c_algo = {
- 	.functionality = mxs_i2c_func,
- };
+ 	/* for DMA */
+-	struct mxs_dma_data dma_data;
+-	int dma_channel_rx, dma_channel_tx;
+-	int dma_irq_rx, dma_irq_tx;
+-	int dma_channel;
+-
+ 	struct scatterlist tx_sgl;
+ 	struct dma_chan	*tx_dma_chan;
+ 	void *tx_dma_buf;
+@@ -440,20 +435,6 @@ static u32 mxs_auart_get_mctrl(struct uart_port *u)
+ 	return mctrl;
+ }
  
--static bool mxs_i2c_dma_filter(struct dma_chan *chan, void *param)
+-static bool mxs_auart_dma_filter(struct dma_chan *chan, void *param)
 -{
--	struct mxs_i2c_dev *i2c = param;
+-	struct mxs_auart_port *s = param;
 -
 -	if (!mxs_dma_is_apbx(chan))
 -		return false;
 -
--	if (chan->chan_id != i2c->dma_channel)
--		return false;
--
--	chan->private = &i2c->dma_data;
--
--	return true;
+-	if (s->dma_channel == chan->chan_id) {
+-		chan->private = &s->dma_data;
+-		return true;
+-	}
+-	return false;
 -}
 -
- static void mxs_i2c_derive_timing(struct mxs_i2c_dev *i2c, int speed)
+ static int mxs_auart_dma_prep_rx(struct mxs_auart_port *s);
+ static void dma_rx_callback(void *arg)
  {
- 	/* The I2C block clock run at 24MHz */
-@@ -577,17 +559,6 @@ static int mxs_i2c_get_ofdata(struct mxs_i2c_dev *i2c)
- 	struct device_node *node = dev->of_node;
- 	int ret;
+@@ -545,21 +526,11 @@ static void mxs_auart_dma_exit(struct mxs_auart_port *s)
  
--	/*
--	 * TODO: This is a temporary solution and should be changed
--	 * to use generic DMA binding later when the helpers get in.
--	 */
--	ret = of_property_read_u32(node, "fsl,i2c-dma-channel",
--				   &i2c->dma_channel);
--	if (ret) {
--		dev_err(dev, "Failed to get DMA channel!\n");
--		return -ENODEV;
--	}
--
- 	ret = of_property_read_u32(node, "clock-frequency", &speed);
- 	if (ret) {
- 		dev_warn(dev, "No I2C speed selected, using 100kHz\n");
-@@ -607,8 +578,7 @@ static int mxs_i2c_probe(struct platform_device *pdev)
- 	struct pinctrl *pinctrl;
- 	struct resource *res;
- 	resource_size_t res_size;
--	int err, irq, dmairq;
+ static int mxs_auart_dma_init(struct mxs_auart_port *s)
+ {
 -	dma_cap_mask_t mask;
-+	int err, irq;
+-
+ 	if (auart_dma_enabled(s))
+ 		return 0;
  
- 	pinctrl = devm_pinctrl_get_select_default(dev);
- 	if (IS_ERR(pinctrl))
-@@ -620,9 +590,8 @@ static int mxs_i2c_probe(struct platform_device *pdev)
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	irq = platform_get_irq(pdev, 0);
--	dmairq = platform_get_irq(pdev, 1);
- 
--	if (!res || irq < 0 || dmairq < 0)
-+	if (!res || irq < 0)
- 		return -ENOENT;
- 
- 	res_size = resource_size(res);
-@@ -648,10 +617,7 @@ static int mxs_i2c_probe(struct platform_device *pdev)
- 	}
- 
- 	/* Setup the DMA */
+-	/* We do not get the right DMA channels. */
+-	if (s->dma_channel_rx == -1 || s->dma_channel_tx == -1)
+-		return -EINVAL;
+-
+ 	/* init for RX */
 -	dma_cap_zero(mask);
 -	dma_cap_set(DMA_SLAVE, mask);
--	i2c->dma_data.chan_irq = dmairq;
--	i2c->dmach = dma_request_channel(mask, mxs_i2c_dma_filter, i2c);
-+	i2c->dmach = dma_request_slave_channel(dev, "i2c");
- 	if (!i2c->dmach) {
- 		dev_err(dev, "Failed to request dma\n");
- 		return -ENODEV;
+-	s->dma_channel = s->dma_channel_rx;
+-	s->dma_data.chan_irq = s->dma_irq_rx;
+-	s->rx_dma_chan = dma_request_channel(mask, mxs_auart_dma_filter, s);
++	s->rx_dma_chan = dma_request_slave_channel(s->dev, "rx");
+ 	if (!s->rx_dma_chan)
+ 		goto err_out;
+ 	s->rx_dma_buf = kzalloc(UART_XMIT_SIZE, GFP_KERNEL | GFP_DMA);
+@@ -567,9 +538,7 @@ static int mxs_auart_dma_init(struct mxs_auart_port *s)
+ 		goto err_out;
+ 
+ 	/* init for TX */
+-	s->dma_channel = s->dma_channel_tx;
+-	s->dma_data.chan_irq = s->dma_irq_tx;
+-	s->tx_dma_chan = dma_request_channel(mask, mxs_auart_dma_filter, s);
++	s->tx_dma_chan = dma_request_slave_channel(s->dev, "tx");
+ 	if (!s->tx_dma_chan)
+ 		goto err_out;
+ 	s->tx_dma_buf = kzalloc(UART_XMIT_SIZE, GFP_KERNEL | GFP_DMA);
+@@ -1020,7 +989,6 @@ static int serial_mxs_probe_dt(struct mxs_auart_port *s,
+ 		struct platform_device *pdev)
+ {
+ 	struct device_node *np = pdev->dev.of_node;
+-	u32 dma_channel[2];
+ 	int ret;
+ 
+ 	if (!np)
+@@ -1034,20 +1002,8 @@ static int serial_mxs_probe_dt(struct mxs_auart_port *s,
+ 	}
+ 	s->port.line = ret;
+ 
+-	s->dma_irq_rx = platform_get_irq(pdev, 1);
+-	s->dma_irq_tx = platform_get_irq(pdev, 2);
++	s->flags |= MXS_AUART_DMA_CONFIG;
+ 
+-	ret = of_property_read_u32_array(np, "fsl,auart-dma-channel",
+-					dma_channel, 2);
+-	if (ret == 0) {
+-		s->dma_channel_rx = dma_channel[0];
+-		s->dma_channel_tx = dma_channel[1];
+-
+-		s->flags |= MXS_AUART_DMA_CONFIG;
+-	} else {
+-		s->dma_channel_rx = -1;
+-		s->dma_channel_tx = -1;
+-	}
+ 	return 0;
+ }
+ 
 -- 
 1.7.9.5
