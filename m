@@ -1,45 +1,98 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 27 Feb 2013 21:05:30 +0100
-Subject: [PATCH v2 3/3] crypto: sahara: Add device tree binding for
- SAHARA2.
-In-Reply-To: <1361961711-4603-4-git-send-email-javier.martin@vista-silicon.com>
-References: <1361961711-4603-1-git-send-email-javier.martin@vista-silicon.com>
- <1361961711-4603-4-git-send-email-javier.martin@vista-silicon.com>
-Message-ID: <20130227200530.GN1906@pengutronix.de>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Wed, 27 Feb 2013 14:13:10 -0600
+Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
+In-Reply-To: <CAAwP0s2rMpZXrbTzoU4J=nqdxku7UBrDehAPmtyrns3cn6WHAA@mail.gmail.com>
+References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
+ <1329321854-24490-4-git-send-email-b-cousson@ti.com>
+ <4F44FA56.7020000@gmail.com> <4F44FC37.2000701@ti.com>
+ <4F452484.5080503@gmail.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF17BD8BC6C1@HQMAIL01.nvidia.com>
+ <4F47AD08.4030504@ti.com>
+ <CAAwP0s0cB368R2mtbJpTZJreR-5GSRLfxC+8DJLo5nw3_OwBuA@mail.gmail.com>
+ <512D407C.6090006@ti.com>
+ <CAAwP0s2rMpZXrbTzoU4J=nqdxku7UBrDehAPmtyrns3cn6WHAA@mail.gmail.com>
+Message-ID: <512E68D6.4050906@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
 
-On Wed, Feb 27, 2013 at 11:41:51AM +0100, Javier Martin wrote:
+On 02/26/2013 09:47 PM, Javier Martinez Canillas wrote:
+> On Wed, Feb 27, 2013 at 12:08 AM, Jon Hunter <jon-hunter@ti.com> wrote:
+>>
+>> On 02/26/2013 04:01 AM, Javier Martinez Canillas wrote:
+>>
+>> [snip]
+>>
+>>> I was wondering if the level/edge settings for gpios is working on OMAP.
+>>>
+>>> I'm adding DT support for an SMSC911x ethernet chip connected to the
+>>> GPMC for an OMAP3 SoC based board.
+>>>
+>>> In the smsc911x driver probe function (smsc911x_drv_probe() in
+>>> drivers/net/ethernet/smsc/smsc911x.c), a call to request_irq() with
+>>> the flag IRQF_TRIGGER_LOW is needed because of the wiring on my board.
+>>>
+>>> Reading the gpio-omap.txt documentation it says that #interrupt-cells
+>>> should be <2> and that a value of 8 is "active low level-sensitive".
+>>>
+>>> So I tried this:
+>>>
+>>> &gpmc {
+>>>       ethernet at 5,0 {
+>>>               pinctrl-names = "default";
+>>>               pinctrl-0 = <&smsc911x_pins>;
+>>>               compatible = "smsc,lan9221", "smsc,lan9115";
+>>>               reg = <5 0 0xff>; /* CS5 */
+>>>               interrupt-parent = <&gpio6>;
+>>>               interrupts = <16 8>; /* gpio line 176 */
+>>>               interrupt-names = "smsc911x irq";
+>>>               vmmc-supply = <&vddvario>;
+>>>               vmmc_aux-supply = <&vdd33a>;
+>>>               reg-io-width = <4>;
+>>
+>> By the way, reg-io-width for omap does not look correct. The GPMC only
+>> supports 8-bit or 16-bit devices IIRC. I believe all my omap boards use
+>> 16-bit.
+>>
 > 
-> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
-> ---
->  .../devicetree/bindings/crypto/fsl-imx-sahara.txt  |   14 ++++++++++++++
->  1 file changed, 14 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/crypto/fsl-imx-sahara.txt
+> I thought that even when the GPMC was a 16-bit external memory
+> controller it could do some access adaptation to support 32-bit
+> devices.
+
+Right the GPMC itself may be able to translate 32-bit accesses into
+16-bit. However, I have not looked at the data sheet for the smsc parts
+to know what impact this would have on any register accesses in the smsc
+device.
+
+> By looking at the board files for others OMAP3 based boards
+> (board-{omap3evm,overo,zoom-debugboard}.c) most of them set the struct
+> omap_smsc911x_platform_data .flags member to SMSC911X_USE_32BIT.
+
+I see this too now. I was looking at the
+arch/arm/mach-omap2/gpmc-smc91x.c which has SMC91X_USE_16BIT and
+GPMC_CONFIG1_DEVICESIZE_16. So this is for a slightly different ethernet
+chip but same concept. Hopefully, someone knew what they were doing for
+those other boards!
+
+> And by looking at Documentation/devicetree/bindings/net/smsc911x.txt I
+> thought that the corresponding DT property for this flag was
+> "reg-io-width"
 > 
-> diff --git a/Documentation/devicetree/bindings/crypto/fsl-imx-sahara.txt b/Documentation/devicetree/bindings/crypto/fsl-imx-sahara.txt
-> new file mode 100644
-> index 0000000..44abf11
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/crypto/fsl-imx-sahara.txt
-> @@ -0,0 +1,14 @@
-> +* Freescale i.MX SAHARA Cryptographic Accelerator
-> +
-> +Required properties:
-> +- compatible : Should be "fsl,<soc>-sahara"
+> Anyway, I tried using both reg-io-width = <4> and reg-io-width = <2>.
+> The ethernet chip works with both of them and I don't see too much
+> difference in performance:
+> 
+> 16-bit
+> round-trip min/avg/max = 0.611/0.738/0.946 ms
+> 
+> 32-bit
+> round-trip min/avg/max = 0.519/0.690/0.976 ms
+> 
+> So, is your call ;-)
 
-Please add explicitly which SoCs are supported.
+While I can't argue with the fact it works, I would not be prepared to
+make that call without reviewing the documentation for the smsc and the
+driver.
 
-You can fold this patch into the driver patch. This way people reading
-the commit history have a direct cross link between the driver and the
-documentation.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Cheers
+Jon
