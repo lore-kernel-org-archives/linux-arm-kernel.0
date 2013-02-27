@@ -1,142 +1,158 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 27 Feb 2013 23:25:40 +0800
-Subject: [PATCH 04/12] mmc: mxs-mmc: move to use generic DMA helper
+Date: Wed, 27 Feb 2013 23:25:39 +0800
+Subject: [PATCH 03/12] dma: mxs-dma: move to generic device tree binding
 In-Reply-To: <1361978748-25281-1-git-send-email-shawn.guo@linaro.org>
 References: <1361978748-25281-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1361978748-25281-5-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1361978748-25281-4-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the generic DMA device tree helper supported by mxs-dma driver,
-client devices only need to call dma_request_slave_channel() for
-requesting a DMA channel from dmaengine.
+Update mxs-dma driver to adopt generic DMA device tree binding.  It
+calls of_dma_controller_register() with mxs specific of_dma_xlate to
+get the generic DMA device tree helper support.  Then DMA clients only
+need to call dma_request_slave_channel() for requesting a DMA channel
+from dmaengine.
 
-Since mxs is a DT only platform now, along with the changes, the non-DT
-case checking in probe function also gets cleaned up.
+The existing way of requesting channel, clients directly call
+dma_request_channel(), still work there, and will be removed after
+all mxs-dma clients get converted to generic DMA device tree helper.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Cc: Chris Ball <cjb@laptop.org>
-Cc: linux-mmc at vger.kernel.org
 ---
- Documentation/devicetree/bindings/mmc/mxs-mmc.txt |   12 ++++--
- drivers/mmc/host/mxs-mmc.c                        |   48 +++------------------
- 2 files changed, 13 insertions(+), 47 deletions(-)
+ drivers/dma/mxs-dma.c |   77 ++++++++++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 73 insertions(+), 4 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/mmc/mxs-mmc.txt b/Documentation/devicetree/bindings/mmc/mxs-mmc.txt
-index 54949f6..9f55d85 100644
---- a/Documentation/devicetree/bindings/mmc/mxs-mmc.txt
-+++ b/Documentation/devicetree/bindings/mmc/mxs-mmc.txt
-@@ -9,15 +9,19 @@ and the properties used by the mxsmmc driver.
- Required properties:
- - compatible: Should be "fsl,<chip>-mmc".  The supported chips include
-   imx23 and imx28.
--- interrupts: Should contain ERROR and DMA interrupts
--- fsl,ssp-dma-channel: APBH DMA channel for the SSP
-+- interrupts: Should contain ERROR interrupt number
-+- dmas: DMA specifier, consisting of a phandle to DMA controller node
-+  and SSP DMA channel ID.
-+  Refer to dma.txt and fsl-mxs-dma.txt for details.
-+- dma-names: Must be "ssp".
+diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
+index bb86f7f..4edf8e9 100644
+--- a/drivers/dma/mxs-dma.c
++++ b/drivers/dma/mxs-dma.c
+@@ -27,6 +27,7 @@
+ #include <linux/stmp_device.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
++#include <linux/of_dma.h>
  
- Examples:
+ #include <asm/irq.h>
  
- ssp0: ssp at 80010000 {
- 	compatible = "fsl,imx28-mmc";
- 	reg = <0x80010000 2000>;
--	interrupts = <96 82>;
--	fsl,ssp-dma-channel = <0>;
-+	interrupts = <96>;
-+	dmas = <&dma_apbh 0>;
-+	dma-names = "ssp";
- 	bus-width = <8>;
- };
-diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
-index 4efe302..83fe0ad 100644
---- a/drivers/mmc/host/mxs-mmc.c
-+++ b/drivers/mmc/host/mxs-mmc.c
-@@ -548,22 +548,6 @@ static const struct mmc_host_ops mxs_mmc_ops = {
- 	.enable_sdio_irq = mxs_mmc_enable_sdio_irq,
+@@ -139,6 +140,9 @@ struct mxs_dma_engine {
+ 	struct dma_device		dma_device;
+ 	struct device_dma_parameters	dma_parms;
+ 	struct mxs_dma_chan		mxs_chans[MXS_DMA_CHANNELS];
++	struct platform_device		*pdev;
++	struct of_dma_filter_info	filter_info;
++	unsigned int			nr_channels;
  };
  
--static bool mxs_mmc_dma_filter(struct dma_chan *chan, void *param)
--{
--	struct mxs_mmc_host *host = param;
--	struct mxs_ssp *ssp = &host->ssp;
--
--	if (!mxs_dma_is_apbh(chan))
--		return false;
--
--	if (chan->chan_id != ssp->dma_channel)
--		return false;
--
--	chan->private = &ssp->dma_data;
--
--	return true;
--}
--
- static struct platform_device_id mxs_ssp_ids[] = {
- 	{
- 		.name = "imx23-mmc",
-@@ -591,20 +575,17 @@ static int mxs_mmc_probe(struct platform_device *pdev)
- 	struct device_node *np = pdev->dev.of_node;
- 	struct mxs_mmc_host *host;
- 	struct mmc_host *mmc;
--	struct resource *iores, *dmares;
-+	struct resource *iores;
- 	struct pinctrl *pinctrl;
--	int ret = 0, irq_err, irq_dma;
--	dma_cap_mask_t mask;
-+	int ret = 0, irq_err;
- 	struct regulator *reg_vmmc;
- 	enum of_gpio_flags flags;
- 	struct mxs_ssp *ssp;
- 	u32 bus_width = 0;
+ struct mxs_dma_type {
+@@ -350,10 +354,8 @@ static int mxs_dma_alloc_chan_resources(struct dma_chan *chan)
+ 	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
+ 	int ret;
  
- 	iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	dmares = platform_get_resource(pdev, IORESOURCE_DMA, 0);
- 	irq_err = platform_get_irq(pdev, 0);
--	irq_dma = platform_get_irq(pdev, 1);
--	if (!iores || irq_err < 0 || irq_dma < 0)
-+	if (!iores || irq_err < 0)
- 		return -EINVAL;
+-	if (!data)
+-		return -EINVAL;
+-
+-	mxs_chan->chan_irq = data->chan_irq;
++	if (data)
++		mxs_chan->chan_irq = data->chan_irq;
  
- 	mmc = mmc_alloc_host(sizeof(struct mxs_mmc_host), &pdev->dev);
-@@ -620,23 +601,7 @@ static int mxs_mmc_probe(struct platform_device *pdev)
- 		goto out_mmc_free;
+ 	mxs_chan->ccw = dma_alloc_coherent(mxs_dma->dma_device.dev,
+ 				CCW_BLOCK_SIZE, &mxs_chan->ccw_phys,
+@@ -665,8 +667,59 @@ err_out:
+ 	return ret;
+ }
+ 
++struct mxs_dma_filter_param {
++	struct device_node *of_node;
++	unsigned int chan_id;
++};
++
++struct dma_chan *mxs_dma_xlate(struct of_phandle_args *dma_spec,
++			       struct of_dma *ofdma)
++{
++	struct mxs_dma_engine *mxs_dma = ofdma->of_dma_data;
++	struct of_dma_filter_info *info = &mxs_dma->filter_info;
++	struct mxs_dma_filter_param param;
++	int count = dma_spec->args_count;
++
++	if (!info || !info->filter_fn)
++		return NULL;
++
++	if (count != 1)
++		return NULL;
++
++	param.of_node = ofdma->of_node;
++	param.chan_id = dma_spec->args[0];
++
++	if (param.chan_id >= mxs_dma->nr_channels)
++		return NULL;
++
++	return dma_request_channel(info->dma_cap, info->filter_fn, &param);
++}
++
++static bool mxs_dma_filter_fn(struct dma_chan *chan, void *fn_param)
++{
++	struct mxs_dma_filter_param *param = fn_param;
++	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
++	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
++	int chan_irq;
++
++	if (mxs_dma->dma_device.dev->of_node != param->of_node)
++		return false;
++
++	if (chan->chan_id != param->chan_id)
++		return false;
++
++	chan_irq = platform_get_irq(mxs_dma->pdev, param->chan_id);
++	if (chan_irq < 0)
++		return false;
++
++	mxs_chan->chan_irq = chan_irq;
++
++	return true;
++}
++
+ static int __init mxs_dma_probe(struct platform_device *pdev)
+ {
++	struct device_node *np = pdev->dev.of_node;
+ 	const struct platform_device_id *id_entry;
+ 	const struct of_device_id *of_id;
+ 	const struct mxs_dma_type *dma_type;
+@@ -678,6 +731,12 @@ static int __init mxs_dma_probe(struct platform_device *pdev)
+ 	if (!mxs_dma)
+ 		return -ENOMEM;
+ 
++	ret = of_property_read_u32(np, "dma-channels", &mxs_dma->nr_channels);
++	if (ret) {
++		dev_err(&pdev->dev, "failed to read dma-channels\n");
++		return ret;
++	}
++
+ 	of_id = of_match_device(mxs_dma_dt_ids, &pdev->dev);
+ 	if (of_id)
+ 		id_entry = of_id->data;
+@@ -723,6 +782,7 @@ static int __init mxs_dma_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		return ret;
+ 
++	mxs_dma->pdev = pdev;
+ 	mxs_dma->dma_device.dev = &pdev->dev;
+ 
+ 	/* mxs_dma gets 65535 bytes maximum sg size */
+@@ -743,6 +803,15 @@ static int __init mxs_dma_probe(struct platform_device *pdev)
+ 		return ret;
  	}
  
--	if (np) {
--		ssp->devid = (enum mxs_ssp_id) of_id->data;
--		/*
--		 * TODO: This is a temporary solution and should be changed
--		 * to use generic DMA binding later when the helpers get in.
--		 */
--		ret = of_property_read_u32(np, "fsl,ssp-dma-channel",
--					   &ssp->dma_channel);
--		if (ret) {
--			dev_err(mmc_dev(host->mmc),
--				"failed to get dma channel\n");
--			goto out_mmc_free;
--		}
--	} else {
--		ssp->devid = pdev->id_entry->driver_data;
--		ssp->dma_channel = dmares->start;
--	}
-+	ssp->devid = (enum mxs_ssp_id) of_id->data;
++	mxs_dma->filter_info.dma_cap = mxs_dma->dma_device.cap_mask;
++	mxs_dma->filter_info.filter_fn = mxs_dma_filter_fn;
++	ret = of_dma_controller_register(np, mxs_dma_xlate, mxs_dma);
++	if (ret) {
++		dev_err(mxs_dma->dma_device.dev,
++			"failed to register controller\n");
++		dma_async_device_unregister(&mxs_dma->dma_device);
++	}
++
+ 	dev_info(mxs_dma->dma_device.dev, "initialized\n");
  
- 	host->mmc = mmc;
- 	host->sdio_irq_en = 0;
-@@ -666,10 +631,7 @@ static int mxs_mmc_probe(struct platform_device *pdev)
- 
- 	mxs_mmc_reset(host);
- 
--	dma_cap_zero(mask);
--	dma_cap_set(DMA_SLAVE, mask);
--	ssp->dma_data.chan_irq = irq_dma;
--	ssp->dmach = dma_request_channel(mask, mxs_mmc_dma_filter, host);
-+	ssp->dmach = dma_request_slave_channel(&pdev->dev, "ssp");
- 	if (!ssp->dmach) {
- 		dev_err(mmc_dev(host->mmc),
- 			"%s: failed to request dma\n", __func__);
+ 	return 0;
 -- 
 1.7.9.5
