@@ -1,59 +1,47 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 27 Feb 2013 14:55:43 +0100
-Subject: [PATCH 1/9] USB otg: use try_module_get in all usb_get_phy
- functions and add missing module_put
-In-Reply-To: <20130227134219.GC23652@arwen.pp.htv.fi>
-References: <1361968035-18644-1-git-send-email-mkl@pengutronix.de>
- <1361968035-18644-2-git-send-email-mkl@pengutronix.de>
- <20130227123132.GM8016@arwen.pp.htv.fi> <512DFED3.7070701@pengutronix.de>
- <20130227124333.GQ8016@arwen.pp.htv.fi> <512E001D.6060004@pengutronix.de>
- <20130227124739.GR8016@arwen.pp.htv.fi> <512E0247.8070808@pengutronix.de>
- <20130227134219.GC23652@arwen.pp.htv.fi>
-Message-ID: <512E105F.9010803@pengutronix.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 27 Feb 2013 08:00:08 -0600
+Subject: Multi-platform, and secure-only ARM errata workarounds
+In-Reply-To: <22709540.96uJddbx1U@fb07-iapwap2.physik.uni-giessen.de>
+References: <512BF81A.3080700@wwwdotorg.org>
+ <4928288.ie8EUukfVD@fb07-iapwap2.physik.uni-giessen.de>
+ <512CE533.6020005@wwwdotorg.org>
+ <22709540.96uJddbx1U@fb07-iapwap2.physik.uni-giessen.de>
+Message-ID: <512E1168.4080003@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/27/2013 02:42 PM, Felipe Balbi wrote:
->> That'll be these 3 branches then:
+On 02/27/2013 03:03 AM, Marc Dietrich wrote:
+> Am Dienstag, 26. Februar 2013, 09:39:15 schrieb Stephen Warren:
+>> On 02/26/2013 02:36 AM, Marc Dietrich wrote:
+>>> Am Montag, 25. Februar 2013, 16:47:38 schrieb Stephen Warren:
+>>>> ...
+>>>> Now, I can easily add those 3 errata workarounds to U-Boot, but that
+>>>> will require people to reflash their bootloader. This is probably
+>>>> acceptable for development/reference boards (although I'm sure people
+>>>> will find it annoying) but for re-purposed production boards (such as
+>>>> the Toshiba AC100 or various tablets) it will be impossible to update
+>>>> the factory bootloader. Switching to upstream U-Boot would currently
+>>>> lose some functionality, and significantly affect people's boot flow, so
+>>>> is likely unacceptable.
+>>>
+>>> personally, I have no problem to require a certain u-boot version for a
+>>> given kernel. From a distro point of view, you will likely update the
+>>> bootloader/kernel on a distro update anyway.
 >>
->> otg-for-v3.9 (bugfix for v3.9):
->> 6bef020 USB otg: use try_module_get in all usb_get_phy functions and add missing module_put
+>> So a distro will certainly update the kernel.
 >>
->> otg-for-v3.10 (depends on otg-for-v3.9):
->> a0e17f5 USB: move bulk of otg/otg.c to phy/phy.c
->> a6fc0d1 USB: add devicetree helpers for determining dr_mode and phy_type
->> 8a4c9f8 USB mxs-phy: Register phy with framework
->>
->> chipidea-for-v3.10 (most patches depend on otg-for-v3.10):
->> 15c930e USB chipidea: ci13xxx-imx: create dynamic platformdata
->> 9466e85 USB chipidea: add PTW and PTS handling
->> ad2cc0d USB chipidea: introduce dual role mode pdata flags
->> 8e7f1bb USB chipidea i.MX: introduce dr_mode property
->> 5d83722 USB chipidea i.MX: use devm_usb_get_phy_by_phandle to get phy
+>> But updating a bootloader would be very unusual, I believe.
 > 
-> sounds good to me, please make sure to always split your series like
-> this. You can't expect me (or any maintainer for that matter) to pick
-> patches to proper branches based on your commit logs alone.
-> 
-> remeber that every single maintainer needs to handle hundreds of emails
-> a week (if not a day) and if patches are properly split and cleanly
-> mention if it's a bugfix or not, things will go wrong.
+> mmh? Every time I update to a new distro release, the bootloader gets also 
+> updated - even on arm, e.g. ftp://ports.ubuntu.com/ubuntu-ports/pool/main/u/u-boot-linaro lists four version of uboot - one for each supported distro 
+> release. I know for closed embedded device this is different, but that's not 
+> our target.
 
-That was just a proposal. You'll find these series in your inbox in a
-few minutes.
+There is a package of u-boot bootloaders, but they are not installed by
+the OS. On ubuntu, installing a kernel only writes the boot.scr script.
+There is an assumption that u-boot will go and read this. So we already
+have some requirements on u-boot which would require at least a u-boot
+environment update. I guess updating the environment is easier than
+u-boot itself, but that probably depends on the platform.
 
-Marc
-
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130227/dfd974c4/attachment.sig>
+Rob
