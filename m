@@ -1,117 +1,79 @@
 From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 27 Feb 2013 15:20:30 +0100
-Subject: [PATCH 5/5] USB chipidea i.MX: use devm_usb_get_phy_by_phandle to get
- phy
+Date: Wed, 27 Feb 2013 15:20:28 +0100
+Subject: [PATCH 3/5] USB chipidea: introduce dual role mode pdata flags
 In-Reply-To: <1361974830-3853-1-git-send-email-mkl@pengutronix.de>
 References: <1361974830-3853-1-git-send-email-mkl@pengutronix.de>
-Message-ID: <1361974830-3853-6-git-send-email-mkl@pengutronix.de>
+Message-ID: <1361974830-3853-4-git-send-email-mkl@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sascha Hauer <s.hauer@pengutronix.de>
 
-This patch replaces the hand crafted code to retrieve the phy's phandle from
-the DT by the helper function devm_usb_get_phy_by_phandle() which has been
-added in commit:
+Even if a chipidea core is otg capable the board may not. This allows
+to explicitly set the core to host/peripheral mode. Without these
+flags the driver falls back to the old behaviour.
 
-    "5d3c28b usb: otg: add device tree support to otg library"
-
-Reviewed-by: Kishon Vijay Abraham I <kishon@ti.com>
-Reviewed-by: Peter Chen <peter.chen@freescale.com>
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
 ---
- drivers/usb/chipidea/ci13xxx_imx.c |   38 ++++++++++++++++--------------------
- 1 file changed, 17 insertions(+), 21 deletions(-)
+ drivers/usb/chipidea/core.c  |   22 ++++++++++++++++------
+ include/linux/usb/chipidea.h |    2 +-
+ 2 files changed, 17 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
-index b598bb8..6e720ce 100644
---- a/drivers/usb/chipidea/ci13xxx_imx.c
-+++ b/drivers/usb/chipidea/ci13xxx_imx.c
-@@ -30,7 +30,6 @@
- 	((struct usb_phy *)platform_get_drvdata(pdev))
+diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+index 04d68cb..ec27060 100644
+--- a/drivers/usb/chipidea/core.c
++++ b/drivers/usb/chipidea/core.c
+@@ -435,6 +435,7 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+ 	struct resource	*res;
+ 	void __iomem	*base;
+ 	int		ret;
++	enum usb_dr_mode dr_mode;
  
- struct ci13xxx_imx_data {
--	struct device_node *phy_np;
- 	struct usb_phy *phy;
- 	struct platform_device *ci_pdev;
- 	struct clk *clk;
-@@ -90,12 +89,12 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
- {
- 	struct ci13xxx_imx_data *data;
- 	struct ci13xxx_platform_data *pdata;
--	struct platform_device *plat_ci, *phy_pdev;
--	struct device_node *phy_np;
-+	struct platform_device *plat_ci;
- 	struct resource *res;
- 	struct regulator *reg_vbus;
- 	struct pinctrl *pinctrl;
- 	int ret;
-+	struct usb_phy *phy;
- 
- 	if (of_find_property(pdev->dev.of_node, "fsl,usbmisc", NULL)
- 		&& !usbmisc_ops)
-@@ -147,19 +146,20 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
- 		return ret;
+ 	if (!dev->platform_data) {
+ 		dev_err(dev, "platform data missing\n");
+@@ -487,14 +488,23 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+ 		return -ENODEV;
  	}
  
--	phy_np = of_parse_phandle(pdev->dev.of_node, "fsl,usbphy", 0);
--	if (phy_np) {
--		data->phy_np = phy_np;
--		phy_pdev = of_find_device_by_node(phy_np);
--		if (phy_pdev) {
--			struct usb_phy *phy;
--			phy = pdev_to_phy(phy_pdev);
--			if (phy &&
--			    try_module_get(phy_pdev->dev.driver->owner)) {
--				usb_phy_init(phy);
--				data->phy = phy;
--			}
-+	phy = devm_usb_get_phy_by_phandle(&pdev->dev, "fsl,usbphy", 0);
-+	if (PTR_ERR(phy) == -EPROBE_DEFER) {
-+		ret = -EPROBE_DEFER;
-+		goto err_clk;
++	/* For now we treat dual-role as otg */
++	dr_mode = ci->platdata->dr_mode;
++	if (dr_mode == USB_DR_MODE_UNKNOWN || dr_mode == USB_DR_MODE_DUAL_ROLE)
++		dr_mode = USB_DR_MODE_OTG;
++
+ 	/* initialize role(s) before the interrupt is requested */
+-	ret = ci_hdrc_host_init(ci);
+-	if (ret)
+-		dev_info(dev, "doesn't support host\n");
++	if (dr_mode == USB_DR_MODE_OTG || dr_mode == USB_DR_MODE_HOST) {
++		ret = ci_hdrc_host_init(ci);
++		if (ret)
++			dev_info(dev, "doesn't support host\n");
 +	}
-+
-+	if (!IS_ERR(phy)) {
-+		ret = usb_phy_init(phy);
-+		if (ret) {
-+			dev_err(&pdev->dev, "unable to init phy: %d\n", ret);
-+			goto err_clk;
- 		}
-+
-+		data->phy = phy;
- 	}
  
- 	/* we only support host now, so enable vbus here */
-@@ -170,7 +170,7 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
- 			dev_err(&pdev->dev,
- 				"Failed to enable vbus regulator, err=%d\n",
- 				ret);
--			goto put_np;
-+			goto err_clk;
- 		}
- 		data->reg_vbus = reg_vbus;
- 	} else {
-@@ -222,9 +222,7 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
- err:
- 	if (reg_vbus)
- 		regulator_disable(reg_vbus);
--put_np:
--	if (phy_np)
--		of_node_put(phy_np);
-+err_clk:
- 	clk_disable_unprepare(data->clk);
- 	return ret;
- }
-@@ -244,8 +242,6 @@ static int ci13xxx_imx_remove(struct platform_device *pdev)
- 		module_put(data->phy->dev->driver->owner);
- 	}
+-	ret = ci_hdrc_gadget_init(ci);
+-	if (ret)
+-		dev_info(dev, "doesn't support gadget\n");
++	if (dr_mode == USB_DR_MODE_OTG || dr_mode == USB_DR_MODE_PERIPHERAL) {
++		ret = ci_hdrc_gadget_init(ci);
++		if (ret)
++			dev_info(dev, "doesn't support gadget\n");
++	}
  
--	of_node_put(data->phy_np);
+ 	if (!ci->roles[CI_ROLE_HOST] && !ci->roles[CI_ROLE_GADGET]) {
+ 		dev_err(dev, "no supported roles\n");
+diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
+index 1a2aa18..b314647 100644
+--- a/include/linux/usb/chipidea.h
++++ b/include/linux/usb/chipidea.h
+@@ -20,7 +20,7 @@ struct ci13xxx_platform_data {
+ #define CI13XXX_REQUIRE_TRANSCEIVER	BIT(1)
+ #define CI13XXX_PULLUP_ON_VBUS		BIT(2)
+ #define CI13XXX_DISABLE_STREAMING	BIT(3)
 -
- 	clk_disable_unprepare(data->clk);
- 
- 	platform_set_drvdata(pdev, NULL);
++	enum usb_dr_mode	dr_mode;
+ #define CI13XXX_CONTROLLER_RESET_EVENT		0
+ #define CI13XXX_CONTROLLER_STOPPED_EVENT	1
+ 	void	(*notify_event) (struct ci13xxx *ci, unsigned event);
 -- 
 1.7.10.4
