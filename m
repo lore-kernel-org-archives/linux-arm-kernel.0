@@ -1,59 +1,79 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 27 Feb 2013 21:00:01 +0100
-Subject: [PATCH 2/3] ARM: dts: imx: replace magic number with pin
- function name
-In-Reply-To: <CAKGA1bmqdCiocc_O6hU3ym6uJ-bAjwKMNrt43Qs_dkjEGpX-KQ@mail.gmail.com>
-References: <1361344089-16804-1-git-send-email-shawn.guo@linaro.org>
- <1361344089-16804-3-git-send-email-shawn.guo@linaro.org>
- <51251A11.2030300@wwwdotorg.org>
- <CAKGA1bkHH1XC38_VM=QhDrr33uqqSbwe0n+GfXEPs43K_Do=CQ@mail.gmail.com>
- <20130221050247.GD17738@S2101-09.ap.freescale.net>
- <CAKGA1bn22xctSj_33HQsWwnVB=RO2OJ=eYvgRD-kF+PiQcnC4Q@mail.gmail.com>
- <20130222055203.GB27371@S2101-09.ap.freescale.net>
- <CAKGA1bmw+CzBDLHty1+L1VdeWLgkPpLSLpGKBJEeQj-ByyzicA@mail.gmail.com>
- <20130227074404.GD1906@pengutronix.de>
- <CAKGA1bmqdCiocc_O6hU3ym6uJ-bAjwKMNrt43Qs_dkjEGpX-KQ@mail.gmail.com>
-Message-ID: <20130227200001.GM1906@pengutronix.de>
+From: martinez.javier@gmail.com (Javier Martinez Canillas)
+Date: Wed, 27 Feb 2013 21:00:13 +0100
+Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
+In-Reply-To: <512E46BB.907@wwwdotorg.org>
+References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
+ <1329321854-24490-4-git-send-email-b-cousson@ti.com>
+ <4F44FA56.7020000@gmail.com>
+ <4F44FC37.2000701@ti.com> <4F452484.5080503@gmail.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF17BD8BC6C1@HQMAIL01.nvidia.com>
+ <4F47AD08.4030504@ti.com>
+ <CAAwP0s0cB368R2mtbJpTZJreR-5GSRLfxC+8DJLo5nw3_OwBuA@mail.gmail.com>
+ <512D39DA.7020306@ti.com>
+ <CAAwP0s3oNaALFfLvEQnZ1m90BXh5pF2_-8FUyi6pQMzb0_FSVQ@mail.gmail.com>
+ <512E46BB.907@wwwdotorg.org>
+Message-ID: <CAAwP0s03suVxJiD2yBfSxC1d7HgPPSEeRsArZH-EaMr7x6xWTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 27, 2013 at 12:16:20PM -0600, Matt Sealey wrote:
-> On Wed, Feb 27, 2013 at 1:44 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> > On Wed, Feb 27, 2013 at 12:51:56AM -0600, Matt Sealey wrote:
-> 
-> I do notice that, what I'm a little perturbed by is that it doesn't
-> seem to improve the situation (the amount of work required to use and
-> VERIFY the values in each macro - on the assumption that any of them
-> could be wrong and cross-check them with the schematics, the board
-> designer if necessary, and then put them in a device tree as known
-> working. Not all of the data files used in PCB design packages
-> actually match the docs anyway so there are some cross-checks against
-> yet another Freescale design database. If I asked someone here to go
-> find the pin settings for USDHC2 on a board we have, they would first
-> have to figure out which pad this was coming out of, go to the manual,
-> find the signals that exit on that pad, look at the IOMUX, cross check
-> it with some example code and the FSL IOMUX tool... pre-processing and
-> using macros doesn't make that any easier until we have a single,
-> fixed, totally verified and unchangeable set of macros which will
-> cover all the usual cases. If the intent is that we just glob in 2500
-> pin definitions at the start and "hope" that someone "eventually"
-> notices any errors.. this is not normal in embedded design.
+On Wed, Feb 27, 2013 at 6:47 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 02/26/2013 08:33 PM, Javier Martinez Canillas wrote:
+> ...
+>> Yes, I realized that requesting the gpio was necessary so what I did
+>> is to use the "regulator-fixed" optional property "gpio" and define
+>> the GPIO used as an IRQ in a regulator used by the SMSC chip. So, I
+>> have this on my board DT:
+>>
+>> vddvario: regulator-vddvario {
+>>       compatible = "regulator-fixed";
+>>       regulator-name = "vddvario";
+>>       regulator-always-on;
+>>       gpio = <&gpio6 16 8>;  /* gpio line 176 */
+>>       enable-active-high;
+>>       gpio-open-drain;
+>
+> While admittedly it's configured as open-drain, that will configure the
+> GPIO to be an output, whereas for usage as an interrupt, it really
+> should be configured as an input... Perhaps it makes no difference on
+> OMAP HW since the I/O paths are separate, but I can easily imagine HW
+> where this hack wouldn't work.
+>
+>>       regulator-boot-on;
+>> };
+>>
+>> &gpmc {
+>>       ethernet at 5,0 {
+>>               pinctrl-names = "default";
+>>               pinctrl-0 = <&smsc911x_pins>;
+>>               compatible = "smsc,lan9221", "smsc,lan9115";
+>>               reg = <5 0 0xff>;
+>>               interrupt-parent = <&gpio6>;
+>>               interrupts = <16 8>; /* gpio line 176 */
+>>               interrupt-names = "smsc911x irq";
+>>               vmmc-supply = <&vddvario>;
+>>               vmmc_aux-supply = <&vdd33a>;
+>>               reg-io-width = <4>;
+>>
+>>               smsc,save-mac-address;
+>>       };
+>> };
+>>
+>> That way a call to gpio_request_one() is made and the GPIO is requested.
+>>
+>> This look a little hack-ish for me but I've seen this in other
+>> DeviceTrees like omap4-sdp.dts so I thought it was a common DT
+>> pattern.
+>
+> Indeed; the GPIO is in no way a regulator, so while the above is fine
+> for testing, it's in no way a solution that can actually be used and
+> checked in.
 
-If the macro is unused then who cares about the bugs in it? If on the
-other hand it is used, then people will notice the bugs quite fast and
-will fix them. If you don't like the macros, then don't use them. If
-you have a better idea how the macros should look like, send patches.
+Yes, this is just a work-in-progress and is not meant to be taken as a
+patch submission.
 
-Please try and make your point in the amount of text I quoted above,
-preferably even shorter, because that's the maximum amount of text I
-think most people are willing to read per mail. The shorter you write
-the more people will read your mails up to the end and maybe react to
-it.
+I'm just doing some testing with DT and figuring out how much effort
+will take to have the same hardware support we currently with board
+files for IGEP boards.
 
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thanks a lot for your feedback and best regards,
+Javier
