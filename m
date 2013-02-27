@@ -1,193 +1,45 @@
-From: anilk4.v@gmail.com (Anil Kumar)
-Date: Wed, 27 Feb 2013 08:03:24 +0530
-Subject: FW: [PATCH V4] ARM: dts: add minimal DT support for DevKit8000.
-In-Reply-To: <F3DBB1B3EF102E4994C89758CFCA32412CC4E9@DBDE01.ent.ti.com>
-References: <F3DBB1B3EF102E4994C89758CFCA32412CC4E9@DBDE01.ent.ti.com>
-Message-ID: <CABYxbz5GyxYaHANgdpwBNaaR6tnu=6LJuUNSvL7DEzU=4CPHcA@mail.gmail.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Wed, 27 Feb 2013 10:35:52 +0800
+Subject: [PATCH 1/2] pinctrl: imx6q: add DTE pinctrl items for mx6q uart
+Message-ID: <1361932553-8218-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
->
-> DevKit8000 is a beagle board clone from Timll, sold by
-> armkits.com. The DevKit8000 has RS232 serial port, LCD, DVI-D,
-> S-Video, Ethernet, SD/MMC, keyboard, camera, SPI, I2C, USB and
-> JTAG interface.
->
-> This patch adds the basic DT support for devkit8000. At this time, Information
-> of twl4030 (PMIC), MMC1, I2C1 and leds are added.
->
-> Signed-off-by: Anil Kumar <anilk4.v@gmail.com>
-> Tested-by: Thomas Weber <thomas@tomweber.eu>
+This patch adds two DTE pinctrl items for UART in mx6q.
+  MX6Q_PAD_EIM_D27__UART2_RXD_DTE: set the RX/TX into DTE mode.
+  MX6Q_PAD_EIM_D29__UART2_RTS_DTE: set the RTS/CTS into DTE mode.
 
-Gentle Ping. As there are no review comments on this patch,
-Could you please pull this patch ?
+If the uart want to work in DTE mode and enable the hardware flow control,
+it must selects these two pinctrl items.
 
-Thanks,
-Anil
+Signed-off-by: Huang Shijie <b32955@freescale.com>
+---
+ .../bindings/pinctrl/fsl,imx6q-pinctrl.txt         |    2 ++
+ drivers/pinctrl/pinctrl-imx6q.c                    |    2 ++
+ 2 files changed, 4 insertions(+), 0 deletions(-)
 
-> ---
->  -This patch is based on top of kernel 3.8-rc5.
->
->  -Tested on Devkit8000.
->
-> For V4:
->  -Tiny nitpick.
->
-> For V3:
->  - Remove pin mux as done at device boot time by default.
->
-> For V2:
->  - Change model name as "TimLL OMAP3 Devkit8000"
->  - Change compatible as "timll,omap3-devkit8000"
->  - Doing i2c1 pinmux default with pinctrl-single driver instead of i2c1
->    driver probe time.
->
-> :100644 100644 5ebb44f... 22ebc76... M  arch/arm/boot/dts/Makefile
-> :000000 100644 0000000... 2e1463a... A  arch/arm/boot/dts/omap3-devkit8000.dts
-> :100644 100644 53cb380b.. ccecb76... M  arch/arm/mach-omap2/board-generic.c
->  arch/arm/boot/dts/Makefile             |    1 +
->  arch/arm/boot/dts/omap3-devkit8000.dts |  102 ++++++++++++++++++++++++++++++++
->  arch/arm/mach-omap2/board-generic.c    |    1 +
->  3 files changed, 104 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 5ebb44f..22ebc76 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -102,6 +102,7 @@ dtb-$(CONFIG_ARCH_MXS) += imx23-evk.dtb \
->         imx28-tx28.dtb
->  dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
->         omap3-beagle.dtb \
-> +       omap3-devkit8000.dtb \
->         omap3-beagle-xm.dtb \
->         omap3-evm.dtb \
->         omap3-tobi.dtb \
-> diff --git a/arch/arm/boot/dts/omap3-devkit8000.dts b/arch/arm/boot/dts/omap3-devkit8000.dts
-> new file mode 100644
-> index 0000000..2e1463a
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/omap3-devkit8000.dts
-> @@ -0,0 +1,102 @@
-> +/*
-> + * Author: Anil Kumar <anilk4.v@gmail.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +/dts-v1/;
-> +
-> +/include/ "omap3.dtsi"
-> +/ {
-> +       model = "TimLL OMAP3 Devkit8000";
-> +       compatible = "timll,omap3-devkit8000", "ti,omap3";
-> +
-> +       memory {
-> +               device_type = "memory";
-> +               reg = <0x80000000 0x10000000>;  /* 256 MB */
-> +       };
-> +
-> +       leds {
-> +               compatible = "gpio-leds";
-> +
-> +               heartbeat {
-> +                       label = "devkit8000::led1";
-> +                       gpios = <&gpio6 26 0>;  /* 186 -> LED1 */
-> +                       default-state = "on";
-> +                       linux,default-trigger = "heartbeat";
-> +               };
-> +
-> +               mmc {
-> +                       label = "devkit8000::led2";
-> +                       gpios = <&gpio6 3 0>;   /* 163 -> LED2 */
-> +                       default-state = "on";
-> +                       linux,default-trigger = "none";
-> +               };
-> +
-> +               usr {
-> +                       label = "devkit8000::led3";
-> +                       gpios = <&gpio6 4 0>;   /* 164 -> LED3 */
-> +                       default-state = "on";
-> +                       linux,default-trigger = "usr";
-> +                };
-> +       };
-> +};
-> +
-> +&i2c1 {
-> +       clock-frequency = <2600000>;
-> +
-> +       twl: twl at 48 {
-> +               reg = <0x48>;
-> +               interrupts = <7>;       /* SYS_NIRQ cascaded to intc */
-> +               interrupt-parent = <&intc>;
-> +       };
-> +};
-> +
-> +&i2c2 {
-> +       status = "disabled";
-> +};
-> +
-> +&i2c3 {
-> +       status = "disabled";
-> +};
-> +
-> +/include/ "twl4030.dtsi"
-> +
-> +&mmc1 {
-> +       vmmc-supply = <&vmmc1>;
-> +       vmmc_aux-supply = <&vsim>;
-> +       bus-width = <8>;
-> +};
-> +
-> +&mmc2 {
-> +       status = "disabled";
-> +};
-> +
-> +&mmc3 {
-> +       status = "disabled";
-> +};
-> +
-> +&wdt2 {
-> +       status = "disabled";
-> +};
-> +
-> +&mcbsp1 {
-> +       status = "disabled";
-> +};
-> +
-> +&mcbsp2 {
-> +       status = "disabled";
-> +};
-> +
-> +&mcbsp3 {
-> +       status = "disabled";
-> +};
-> +
-> +&mcbsp4 {
-> +       status = "disabled";
-> +};
-> +
-> +&mcbsp5 {
-> +       status = "disabled";
-> +};
-> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-> index 53cb380..ccecb76 100644
-> --- a/arch/arm/mach-omap2/board-generic.c
-> +++ b/arch/arm/mach-omap2/board-generic.c
-> @@ -110,6 +110,7 @@ MACHINE_END
->
->  static const char *omap3_gp_boards_compat[] __initdata = {
->         "ti,omap3-beagle",
-> +       "timll,omap3-devkit8000",
->         NULL,
->  };
->
-> --
-> 1.7.0.4
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/Documentation/devicetree/bindings/pinctrl/fsl,imx6q-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/fsl,imx6q-pinctrl.txt
+index a4119f6..91b8fa5 100644
+--- a/Documentation/devicetree/bindings/pinctrl/fsl,imx6q-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/fsl,imx6q-pinctrl.txt
+@@ -1628,3 +1628,5 @@ MX6Q_PAD_SD2_DAT3__SJC_DONE			1589
+ MX6Q_PAD_SD2_DAT3__ANATOP_TESTO_3		1590
+ MX6Q_PAD_ENET_RX_ER__ANATOP_USBOTG_ID		1591
+ MX6Q_PAD_GPIO_1__ANATOP_USBOTG_ID		1592
++MX6Q_PAD_EIM_D27__UART2_RXD_DTE			1593
++MX6Q_PAD_EIM_D29__UART2_RTS_DTE			1594
+diff --git a/drivers/pinctrl/pinctrl-imx6q.c b/drivers/pinctrl/pinctrl-imx6q.c
+index 663346b..7eaacfb 100644
+--- a/drivers/pinctrl/pinctrl-imx6q.c
++++ b/drivers/pinctrl/pinctrl-imx6q.c
+@@ -1952,6 +1952,8 @@ static struct imx_pin_reg imx6q_pin_regs[] = {
+ 	IMX_PIN_REG(MX6Q_PAD_SD2_DAT3, 0x0744, 0x035C, 7, 0x0000, 0), /* MX6Q_PAD_SD2_DAT3__ANATOP_TESTO_3 */
+ 	IMX_PIN_REG(MX6Q_PAD_ENET_RX_ER, 0x04EC, 0x01D8, 0, 0x0000, 0), /* MX6Q_PAD_ENET_RX_ER__ANATOP_USBOTG_ID */
+ 	IMX_PIN_REG(MX6Q_PAD_GPIO_1, 0x05F4, 0x0224, 3, 0x0000, 0), /* MX6Q_PAD_GPIO_1__ANATOP_USBOTG_ID */
++	IMX_PIN_REG(MX6Q_PAD_EIM_D27, 0x03D4, 0x00C0, 4, 0x0928, 0), /* MX6Q_PAD_EIM_D27__UART2_RXD_DTE */
++	IMX_PIN_REG(MX6Q_PAD_EIM_D29, 0x03DC, 0x00C8, 4, 0x0924, 0), /* MX6Q_PAD_EIM_D29__UART2_RTS_DTE */
+ };
+ 
+ /* Pad names for the pinmux subsystem */
+-- 
+1.7.1
