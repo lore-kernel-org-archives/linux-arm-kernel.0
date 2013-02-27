@@ -1,26 +1,26 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 27 Feb 2013 17:15:59 +0530
-Subject: [PATCH v4 1/5] ARM: davinci: mmc: derive version information
- from device name
-In-Reply-To: <1360909322-1858-2-git-send-email-prakash.pm@ti.com>
-References: <1360909322-1858-1-git-send-email-prakash.pm@ti.com>
- <1360909322-1858-2-git-send-email-prakash.pm@ti.com>
-Message-ID: <512DF1F7.6010508@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 27 Feb 2013 11:53:54 +0000
+Subject: [PATCH] arm64: fix padding computation in struct ucontext
+In-Reply-To: <mvmy5ebt3ol.fsf@hawking.suse.de>
+References: <mvmy5ebt3ol.fsf@hawking.suse.de>
+Message-ID: <20130227115354.GB2293@MacBook-Pro.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/15/2013 11:51 AM, Manjunathappa, Prakash wrote:
-> Remove specifying mmc controller IP version information via platform
-> data, instead specify device name so that driver derives it from
-> platform_device_id table. Also change the clock node name to match
-> the changed dev_id.
-> Tested on da850-evm to make sure driver loads without clk_get failures.
+On Tue, Feb 26, 2013 at 04:55:54PM +0000, Andreas Schwab wrote:
+> The expression to compute the padding needed to fill the uc_sigmask field
+> to 1024 bits actually computes the padding needed for 1080 bits.
+> Fortunately, due to the 16-byte alignment of the following field
+> (uc_mcontext) the definition in glibc contains enough bytes of padding
+> after uc_sigmask so that the overall offsets and size match in both
+> definitions.
 > 
-> Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
+> Signed-off-by: Andreas Schwab <schwab@suse.de>
 
-The patch looks good to me, but after this patch MMC/SD will be broken.
-I suggest merging this into 2/5. It makes little sense without those
-changes anyway.
+It looks like I messed the bits vs bytes. Luckily we have the 16-byte
+alignment of the last element in ucontext. I'll send the patch upstream.
 
-Thanks,
-Sekhar
+Thanks.
+
+-- 
+Catalin
