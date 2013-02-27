@@ -1,37 +1,47 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Wed, 27 Feb 2013 17:08:56 +0100
-Subject: [PATCH v3 3/3] leds: leds-pwm: Defer led_pwm_set() if PWM can
- sleep
-In-Reply-To: <20130130081728.GC13568@avionic-0098.mockup.avionic-design.de>
-References: <1359381659-24454-1-git-send-email-florian.vaussard@epfl.ch>
- <1359381659-24454-4-git-send-email-florian.vaussard@epfl.ch>
- <20130130081728.GC13568@avionic-0098.mockup.avionic-design.de>
-Message-ID: <512E2F98.6070404@epfl.ch>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Wed, 27 Feb 2013 08:21:46 -0800
+Subject: [PATCH] USB otg: use try_module_get in all usb_get_phy functions
+ and add missing module_put
+In-Reply-To: <1361974273-17087-2-git-send-email-mkl@pengutronix.de>
+References: <1361974273-17087-1-git-send-email-mkl@pengutronix.de>
+ <1361974273-17087-2-git-send-email-mkl@pengutronix.de>
+Message-ID: <20130227162146.GE21645@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bryan,
+On Wed, Feb 27, 2013 at 03:11:13PM +0100, Marc Kleine-Budde wrote:
+> In patch "5d3c28b usb: otg: add device tree support to otg library"
+> devm_usb_get_phy_by_phandle() was added. It uses try_module_get() to lock the
+> phy driver in memory. The corresponding module_put() is missing in that patch.
+> 
+> This patch adds try_module_get() to usb_get_phy() and usb_get_phy_dev().
+> Further the missing module_put() is added to usb_put_phy().
+> 
+> Reviewed-by: Kishon Vijay Abraham I <kishon@ti.com>
+> Acked-by: Felipe Balbi <balbi@ti.com>
+> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+> ---
+>  drivers/usb/otg/otg.c |   10 +++++++---
+>  1 file changed, 7 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/usb/otg/otg.c b/drivers/usb/otg/otg.c
+> index e181439..2bd03d2 100644
+> --- a/drivers/usb/otg/otg.c
+> +++ b/drivers/usb/otg/otg.c
+> @@ -130,7 +130,7 @@ struct usb_phy *usb_get_phy(enum usb_phy_type type)
+>  	spin_lock_irqsave(&phy_lock, flags);
+>  
+>  	phy = __usb_find_phy(&phy_list, type);
+> -	if (IS_ERR(phy)) {
+> +	if (IS_ERR(phy) || !try_module_get(phy->dev->driver->owner)) {
 
-On 01/30/2013 09:17 AM, Thierry Reding wrote:
-> On Mon, Jan 28, 2013 at 03:00:59PM +0100, Florian Vaussard wrote:
->> Call to led_pwm_set() can happen inside atomic context, like triggers.
->> If the PWM call can sleep, defer using a worker.
->>
->> Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
->> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
->> ---
->>   drivers/leds/leds-pwm.c |   50 +++++++++++++++++++++++++++++++++++++++-------
->>   1 files changed, 42 insertions(+), 8 deletions(-)
->
-> Bryan, I assume that you'll be taking this? It doesn't apply cleanly to
-> my tree, probably because of Peter's recent changes that you took
-> through your tree and Florian based his patches on top of that. The
-> conflict resolution should be trivial, though.
->
+Ugh, really?  We really are trying this type of module locking mess?
 
-It seems that this patch was not taken. Could you pull it, as the other
-part is already in linux-pwm? Or is there any show stopper?
+Why?  What is it solving?  What's wrong with having the module be able
+to be unloaded whenever it wants to?  No one should be doing that and
+expecting that their hardware would still work properly, right?
 
-Many thanks.
+I really don't like this type of thing, sorry.
 
-Florian
+greg k-h
