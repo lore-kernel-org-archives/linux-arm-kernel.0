@@ -1,44 +1,98 @@
-From: kyungsik.lee@lge.com (Kyungsik Lee)
-Date: Wed, 27 Feb 2013 22:23:58 +0900
-Subject: [RFC PATCH v2 0/4] Add support for LZ4-compressed kernel
-In-Reply-To: <20130227095139.GX17833@n2100.arm.linux.org.uk>
-References: <1361859870-15751-1-git-send-email-kyungsik.lee@lge.com>
- <512D1C12.4080109@oberhumer.com> <20130227073646.GA22333@Corona>
- <20130227095139.GX17833@n2100.arm.linux.org.uk>
-Message-ID: <20130227132358.GA25071@Corona>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 27 Feb 2013 15:42:19 +0200
+Subject: [PATCH 1/9] USB otg: use try_module_get in all usb_get_phy
+ functions and add missing module_put
+In-Reply-To: <512E0247.8070808@pengutronix.de>
+References: <1361968035-18644-1-git-send-email-mkl@pengutronix.de>
+ <1361968035-18644-2-git-send-email-mkl@pengutronix.de>
+ <20130227123132.GM8016@arwen.pp.htv.fi>
+ <512DFED3.7070701@pengutronix.de>
+ <20130227124333.GQ8016@arwen.pp.htv.fi>
+ <512E001D.6060004@pengutronix.de>
+ <20130227124739.GR8016@arwen.pp.htv.fi>
+ <512E0247.8070808@pengutronix.de>
+Message-ID: <20130227134219.GC23652@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 27, 2013 at 09:51:39AM +0000, Russell King - ARM Linux wrote:
-> On Wed, Feb 27, 2013 at 04:36:47PM +0900, Kyungsik Lee wrote:
-> > Compiler: Linaro ARM gcc 4.6.2
-> > 2. ARMv7, 1.7GHz based board
-> >    Kernel: linux 3.7
-> >    Uncompressed Kernel Size: 14MB
-> >          Compressed Size  Decompression Speed
-> >     LZO  6.0MB            34.1MB/s            Old
-> >          ----------------------------------------
-> >          6.0MB            34.7MB/s            New
-> >          6.0MB            52.2MB/s(UA)
-> >     =============================================
-> >     LZ4  6.5MB            86.7MB/s
-> > UA: Unaligned memory Access support
+Hi,
+
+On Wed, Feb 27, 2013 at 01:55:35PM +0100, Marc Kleine-Budde wrote:
+> On 02/27/2013 01:47 PM, Felipe Balbi wrote:
+> > On Wed, Feb 27, 2013 at 01:46:21PM +0100, Marc Kleine-Budde wrote:
+> >> On 02/27/2013 01:43 PM, Felipe Balbi wrote:
+> >>> Hi,
+> >>>
+> >>> On Wed, Feb 27, 2013 at 01:40:51PM +0100, Marc Kleine-Budde wrote:
+> >>>> On 02/27/2013 01:31 PM, Felipe Balbi wrote:
+> >>>>> On Wed, Feb 27, 2013 at 01:27:07PM +0100, Marc Kleine-Budde wrote:
+> >>>>>> In patch "5d3c28b usb: otg: add device tree support to otg library"
+> >>>>>> devm_usb_get_phy_by_phandle() was added. It uses try_module_get() to lock the
+> >>>>>> phy driver in memory. The corresponding module_put() is missing in that patch.
+> >>>>>>
+> >>>>>> This patch adds try_module_get() to usb_get_phy() and usb_get_phy_dev().
+> >>>>>> Further the missing module_put() is added to usb_put_phy().
+> >>>>>>
+> >>>>>> Reviewed-by: Kishon Vijay Abraham I <kishon@ti.com>
+> >>>>>> Acked-by: Felipe Balbi <balbi@ti.com>
+> >>>>>> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+> >>>>>> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+> >>>>>
+> >>>>> this one doesn't apply to my tree. What did you use as a base ?
+> >>>>
+> >>>> As stated in the cover letter: Greg's usb-next.
+> >>>>
+> >>>> git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/usb.git
+> >>>>
+> >>>> I'd really appreciate if this series goes into a single tree. So that
+> >>>> other chipidea developers can base their work on this.
+> >>>
+> >>> it eventually will all go through Greg's queue, but drivers/usb/phy and
+> >>> drivers/usb/otg/ needs to go through my tree so we avoid conflicts
+> >>> later, sorry.
+> >>
+> >> Oh - this is going to be complicated. I'll rip the series into 3 parts
+> >> and repost.
+> > 
+> > let's try like this:
+> > 
+> > drivers/usb/otg and drivers/usb/phy which don't create dependencies for
+> > chipidea and other patches which create dependencies.
+> > 
+> > Then we can figure out how to handle the dependencies.
+> > 
 > 
-> That is pretty conclusive - it shows an 8% increase in image size vs a
-> 66% increase in decompression speed.  It will take a _lot_ to offset
-> that increase in decompression speed.
+> That'll be these 3 branches then:
 > 
-> So, what I think is that yes, we should accept LZ4 and drop LZO from
-> the kernel - the "fast but may not be small" compression title has
-> clearly been taken by LZ4.
+> otg-for-v3.9 (bugfix for v3.9):
+> 6bef020 USB otg: use try_module_get in all usb_get_phy functions and add missing module_put
+> 
+> otg-for-v3.10 (depends on otg-for-v3.9):
+> a0e17f5 USB: move bulk of otg/otg.c to phy/phy.c
+> a6fc0d1 USB: add devicetree helpers for determining dr_mode and phy_type
+> 8a4c9f8 USB mxs-phy: Register phy with framework
+> 
+> chipidea-for-v3.10 (most patches depend on otg-for-v3.10):
+> 15c930e USB chipidea: ci13xxx-imx: create dynamic platformdata
+> 9466e85 USB chipidea: add PTW and PTS handling
+> ad2cc0d USB chipidea: introduce dual role mode pdata flags
+> 8e7f1bb USB chipidea i.MX: introduce dr_mode property
+> 5d83722 USB chipidea i.MX: use devm_usb_get_phy_by_phandle to get phy
 
-I have read the comments regarding how many compressors the kernel
-should support and understand that it can not support all the
-compressors available.
+sounds good to me, please make sure to always split your series like
+this. You can't expect me (or any maintainer for that matter) to pick
+patches to proper branches based on your commit logs alone.
 
-However, I don't think that LZO can be replaced by LZ4 in all the
-cases. The benchmark above shows only about improved decompression
-speed.
+remeber that every single maintainer needs to handle hundreds of emails
+a week (if not a day) and if patches are properly split and cleanly
+mention if it's a bugfix or not, things will go wrong.
 
-Thanks,
-Kyungsik
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130227/f12178d2/attachment.sig>
