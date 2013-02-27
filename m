@@ -1,44 +1,49 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 27 Feb 2013 11:01:09 +0530
-Subject: crypto: omap-sham, omap-aes and dma_request_slave_channel_compat()
-In-Reply-To: <20130226225205.GA13338@animalcreek.com>
-References: <512D00BE.8090204@canonical.com>
- <20130226225205.GA13338@animalcreek.com>
-Message-ID: <20130227053109.GA28537@intel.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 27 Feb 2013 11:30:11 +0530
+Subject: [PATCH 0/4] time: dynamic irq affinity
+In-Reply-To: <1361917047-29230-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1361917047-29230-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <512DA0EB.5000803@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 26, 2013 at 03:52:05PM -0700, Mark A. Greer wrote:
-> [CC'ing more people & lists.]
-> 
-> On Tue, Feb 26, 2013 at 11:36:46AM -0700, Tim Gardner wrote:
-> > Whats up with commits 0e87e73f4abe1ada69cf780fe2550c6361a1b53b and
-> > b4b87a934c30fb91cbdd18ae028acdc361e1cf0f. As far as I can tell,
-> > dma_request_slave_channel_compat() does not exist in 3.9 as of
-> > 52caa59ed335616c5254adff7911465a57ed9f14, nor does it exist in
-> > linux-next as of Feb 26. Am I just being dense ?
-> 
-> Yeah, order got a little messed up.  The problem is known and the
-> sub-thread talking about it starts about here:
-> 
-> 	http://www.spinics.net/lists/arm-kernel/msg225241.html
-> 
-> with the conclusion (AFAICT) that Vinod is to push it:
-> 
-> 	http://www.spinics.net/lists/arm-kernel/msg226062.html
-> 
-> > Reverting those 2 commits at least allows the compile complete.
-> 
-> When the dependencies are sorted out, will you revert the revert
-> or do I need to do something?
-Yes we had agreed that I will send it.
+On Wednesday 27 February 2013 03:47 AM, Daniel Lezcano wrote:
+> When a cpu goes to a deep idle state where its local timer is shutdown,
+> it notifies the time framework to use the broadcast timer instead.
+>
+> Unfortunately, the broadcast device could wake up any CPU, including an
+> idle one which is not concerned by the wake up at all.
+>
+> This implies, in the worst case, an idle CPU will wake up to send an IPI
+> to another idle cpu.
+>
+> This patch solves this by setting the irq affinity to the cpu concerned
+> by the nearest timer event, by this way, the CPU which is wake up is
+> guarantee to be the one concerned by the next event and we are safe with
+> unnecessary wakeup for another idle CPU.
+>
+> As the irq affinity is not supported by all the archs, a flag is needed
+> to specify which clocksource can handle it.
+>
+Not completely related to this series but there is another
+issue where this local timer not wakeup capable hurts. So
+far we are discussing only the timer related future events
+which are known and can be programmed with broadcast device.
 
-I have applied this one now, and will send second PULL request to Linus soon.
+But think of the scenario's where we need to send asynchronous
+IPIs to CPUs to do some work. e.g generic_exec_single().
+If the CPU which is suppose to be available after IPI call
+is in deep low power state, then the IPI(implemented on ARM)
+isn't effective. In CPU off idle modes, a GIC SGI will not wake
+the CPU and hence a special wakeup is needed to bring out
+those CPUs out of idle. This special wakeup is handled
+by broad-cast timer in case of CPUIDLE.
 
-Arnd,
-The second patch of dw_dmac you wnated to send me fails to apply for me. Can you
-either rebase or send with your updates with my ack?
+In short what I mean is, you need to have IPI which
+can wakeup CPUs from any deep idle power state to address
+above. Has anybody thought of this one ?
 
-Either ways let me know
---
-~Vinod
+Regards,
+Santosh
+P.S: Time and again it proves that making the local timer wakeup
+capable solves the issue.
