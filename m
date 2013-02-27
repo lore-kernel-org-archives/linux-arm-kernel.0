@@ -1,90 +1,90 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 27 Feb 2013 13:55:35 +0100
-Subject: [PATCH 1/9] USB otg: use try_module_get in all usb_get_phy
- functions and add missing module_put
-In-Reply-To: <20130227124739.GR8016@arwen.pp.htv.fi>
-References: <1361968035-18644-1-git-send-email-mkl@pengutronix.de>
- <1361968035-18644-2-git-send-email-mkl@pengutronix.de>
- <20130227123132.GM8016@arwen.pp.htv.fi> <512DFED3.7070701@pengutronix.de>
- <20130227124333.GQ8016@arwen.pp.htv.fi> <512E001D.6060004@pengutronix.de>
- <20130227124739.GR8016@arwen.pp.htv.fi>
-Message-ID: <512E0247.8070808@pengutronix.de>
+From: anish198519851985@gmail.com (anish singh)
+Date: Wed, 27 Feb 2013 18:28:07 +0530
+Subject: How to measure the RAM read/write performance
+In-Reply-To: <CAL7WMDc++dm0+2TxNbwwDB_xrqcLJWp2HTuTvqwrSXp3D-P2BA@mail.gmail.com>
+References: <CAL7WMDcM9XommwO+rYJa5doMVXrFv1Vptu-s9cqaWfVXgx-qVg@mail.gmail.com>
+ <CAK7N6vrptC7yOrH=boskNQD27PA-PqT9oPVgWe4Fagk95r4s=g@mail.gmail.com>
+ <CAL7WMDc++dm0+2TxNbwwDB_xrqcLJWp2HTuTvqwrSXp3D-P2BA@mail.gmail.com>
+Message-ID: <CAK7N6vqddKUbWTXGa3x4vY6S4iTXaEKbB_hK9bnGmebjudpbmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/27/2013 01:47 PM, Felipe Balbi wrote:
-> On Wed, Feb 27, 2013 at 01:46:21PM +0100, Marc Kleine-Budde wrote:
->> On 02/27/2013 01:43 PM, Felipe Balbi wrote:
->>> Hi,
->>>
->>> On Wed, Feb 27, 2013 at 01:40:51PM +0100, Marc Kleine-Budde wrote:
->>>> On 02/27/2013 01:31 PM, Felipe Balbi wrote:
->>>>> On Wed, Feb 27, 2013 at 01:27:07PM +0100, Marc Kleine-Budde wrote:
->>>>>> In patch "5d3c28b usb: otg: add device tree support to otg library"
->>>>>> devm_usb_get_phy_by_phandle() was added. It uses try_module_get() to lock the
->>>>>> phy driver in memory. The corresponding module_put() is missing in that patch.
->>>>>>
->>>>>> This patch adds try_module_get() to usb_get_phy() and usb_get_phy_dev().
->>>>>> Further the missing module_put() is added to usb_put_phy().
->>>>>>
->>>>>> Reviewed-by: Kishon Vijay Abraham I <kishon@ti.com>
->>>>>> Acked-by: Felipe Balbi <balbi@ti.com>
->>>>>> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
->>>>>> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
->>>>>
->>>>> this one doesn't apply to my tree. What did you use as a base ?
->>>>
->>>> As stated in the cover letter: Greg's usb-next.
->>>>
->>>> git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/usb.git
->>>>
->>>> I'd really appreciate if this series goes into a single tree. So that
->>>> other chipidea developers can base their work on this.
->>>
->>> it eventually will all go through Greg's queue, but drivers/usb/phy and
->>> drivers/usb/otg/ needs to go through my tree so we avoid conflicts
->>> later, sorry.
+On Wed, Feb 27, 2013 at 6:16 PM, sandeep kumar
+<coolsandyforyou@gmail.com> wrote:
+>>Try below points:
+>>1. I am not sure about snapdragon(is it Qualcomm?) but try
+>>CONFIG_CPU_DCACHE_DISABLE.
+> I did that already, device is not booting. In our architecture cache is
+> tightly coupled with CPU.
+Should be discussed with Qualcomm guys here as to the reason
+why it doesn't boot up.
+>
+>>2. You are better off programming some DMA master to do large (and
+>>uncached) reads/writes to RAM and timing that.
+> DMA is not a standard way, i suppose, as it depends on what I/O peripheral
+> we are doing the DMA.
+You are doing I/O to RAM so it should do what you want.
+CPU->DMA CONTROLLER->RAM
+>
+>>You should always add arm mailing list and please mention the chip set
+>> details.
+>>cat /proc/cpuinfo is a great way
+> Processor       : ARMv7 Processor rev 2 (v7l)
+> BogoMIPS        : 163.38
+> Features        : swp half thumb fastmult vfp edsp neon vfpv3 tls
+> CPU implementer : 0x51
+> CPU architecture: 7
+> CPU variant     : 0x1
+> CPU part        : 0x00f
+> CPU revision    : 2
+>
+> Thanks
+> Sandeep
+>
+>
+>
+>
+> On Wed, Feb 27, 2013 at 5:37 PM, anish singh <anish198519851985@gmail.com>
+> wrote:
 >>
->> Oh - this is going to be complicated. I'll rip the series into 3 parts
->> and repost.
-> 
-> let's try like this:
-> 
-> drivers/usb/otg and drivers/usb/phy which don't create dependencies for
-> chipidea and other patches which create dependencies.
-> 
-> Then we can figure out how to handle the dependencies.
-> 
-
-That'll be these 3 branches then:
-
-otg-for-v3.9 (bugfix for v3.9):
-6bef020 USB otg: use try_module_get in all usb_get_phy functions and add missing module_put
-
-otg-for-v3.10 (depends on otg-for-v3.9):
-a0e17f5 USB: move bulk of otg/otg.c to phy/phy.c
-a6fc0d1 USB: add devicetree helpers for determining dr_mode and phy_type
-8a4c9f8 USB mxs-phy: Register phy with framework
-
-chipidea-for-v3.10 (most patches depend on otg-for-v3.10):
-15c930e USB chipidea: ci13xxx-imx: create dynamic platformdata
-9466e85 USB chipidea: add PTW and PTS handling
-ad2cc0d USB chipidea: introduce dual role mode pdata flags
-8e7f1bb USB chipidea i.MX: introduce dr_mode property
-5d83722 USB chipidea i.MX: use devm_usb_get_phy_by_phandle to get phy
-
-Marc
-
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130227/9eec402d/attachment.sig>
+>> On Tue, Feb 26, 2013 at 5:01 PM, sandeep kumar
+>> <coolsandyforyou@gmail.com> wrote:
+>> > Hi All
+>> > In performance benchmark tools, When we profile read/write timings
+>> > mostly,
+>> > those read/writes are done to cache only.
+>> >
+>> > I want to measure my DDR(RAM chip) performance.
+>> > So i want to make sure, every read/write should happen to DDR RAM chip
+>> > only.
+>> Try below points:
+>> 1. I am not sure about snapdragon(is it Qualcomm?) but try
+>> CONFIG_CPU_DCACHE_DISABLE.
+>> 2. You are better off programming some DMA master to do large (and
+>> uncached) reads/writes to RAM and timing that.
+>>
+>> However simple uncached LDR/STR from the CPU may not be a great
+>> measure of RAM controller perf.
+>>
+>> You should always add arm mailing list and please mention the chip set
+>> details.
+>> cat /proc/cpuinfo is a great way
+>> >
+>> > How can i achieve this...Any ideas/suggestions...?
+>> >
+>> > --
+>> > With regards,
+>> > Sandeep Kumar Anantapalli,
+>> >
+>> > _______________________________________________
+>> > Kernelnewbies mailing list
+>> > Kernelnewbies at kernelnewbies.org
+>> > http://lists.kernelnewbies.org/mailman/listinfo/kernelnewbies
+>> >
+>
+>
+>
+>
+> --
+> With regards,
+> Sandeep Kumar Anantapalli,
