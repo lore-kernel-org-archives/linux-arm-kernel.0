@@ -1,34 +1,49 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Wed, 27 Feb 2013 10:27:42 +0800
-Subject: [PATCH V2 1/2] ARM: tegra: pmc: add specific compatible DT string for
- Tegra30 and Tegra114
-Message-ID: <1361932063-13263-1-git-send-email-josephl@nvidia.com>
+Date: Wed, 27 Feb 2013 10:27:43 +0800
+Subject: [PATCH V2 2/2] ARM: dts: tegra: fix the PMC compatible string
+In-Reply-To: <1361932063-13263-1-git-send-email-josephl@nvidia.com>
+References: <1361932063-13263-1-git-send-email-josephl@nvidia.com>
+Message-ID: <1361932063-13263-2-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The PMC HW is not 100% compatible across all Tegra series. We need to
-specify each of them in the DT match table.
+specify them in DT.
 
 Signed-off-by: Joseph Lo <josephl@nvidia.com>
 ---
 V2:
-* fix the typo and the chip order in DT match table
+* fix typo
 ---
- arch/arm/mach-tegra/pmc.c | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/boot/dts/tegra114.dtsi | 2 +-
+ arch/arm/boot/dts/tegra30.dtsi  | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/pmc.c b/arch/arm/mach-tegra/pmc.c
-index d4fdb5f..5d79d34 100644
---- a/arch/arm/mach-tegra/pmc.c
-+++ b/arch/arm/mach-tegra/pmc.c
-@@ -36,6 +36,8 @@ static inline void tegra_pmc_writel(u32 val, u32 reg)
+diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
+index 1dfaf28..e4ddedd 100644
+--- a/arch/arm/boot/dts/tegra114.dtsi
++++ b/arch/arm/boot/dts/tegra114.dtsi
+@@ -99,7 +99,7 @@
+ 	};
  
- #ifdef CONFIG_OF
- static const struct of_device_id matches[] __initconst = {
-+	{ .compatible = "nvidia,tegra114-pmc" },
-+	{ .compatible = "nvidia,tegra30-pmc" },
- 	{ .compatible = "nvidia,tegra20-pmc" },
- 	{ }
- };
+ 	pmc {
+-		compatible = "nvidia,tegra114-pmc", "nvidia,tegra30-pmc";
++		compatible = "nvidia,tegra114-pmc";
+ 		reg = <0x7000e400 0x400>;
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
+index 767803e..6ae82e7 100644
+--- a/arch/arm/boot/dts/tegra30.dtsi
++++ b/arch/arm/boot/dts/tegra30.dtsi
+@@ -422,7 +422,7 @@
+ 	};
+ 
+ 	pmc {
+-		compatible = "nvidia,tegra20-pmc", "nvidia,tegra30-pmc";
++		compatible = "nvidia,tegra30-pmc";
+ 		reg = <0x7000e400 0x400>;
+ 	};
+ 
 -- 
 1.8.1.1
