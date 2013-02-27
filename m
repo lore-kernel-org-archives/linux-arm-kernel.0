@@ -1,111 +1,288 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 26 Feb 2013 17:13:56 -0700
-Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
-In-Reply-To: <512D490B.70900@ti.com>
-References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
- <1329321854-24490-4-git-send-email-b-cousson@ti.com>
- <4F44FA56.7020000@gmail.com> <4F44FC37.2000701@ti.com>
- <4F452484.5080503@gmail.com>
- <74CDBE0F657A3D45AFBB94109FB122FF17BD8BC6C1@HQMAIL01.nvidia.com>
- <4F47AD08.4030504@ti.com>
- <CAAwP0s0cB368R2mtbJpTZJreR-5GSRLfxC+8DJLo5nw3_OwBuA@mail.gmail.com>
- <512D39DA.7020306@ti.com> <512D3AB1.1080202@wwwdotorg.org>
- <512D3EC2.6050408@ti.com> <512D3FE6.1010300@wwwdotorg.org>
- <512D490B.70900@ti.com>
-Message-ID: <512D4FC4.2060505@wwwdotorg.org>
+From: eag0628@gmail.com (Lai Jiangshan)
+Date: Wed, 27 Feb 2013 08:33:23 +0800
+Subject: [PATCH v6 04/46] percpu_rwlock: Implement the core design of
+ Per-CPU Reader-Writer Locks
+In-Reply-To: <512D0D67.9010609@linux.vnet.ibm.com>
+References: <20130218123714.26245.61816.stgit@srivatsabhat.in.ibm.com>
+ <20130218123856.26245.46705.stgit@srivatsabhat.in.ibm.com>
+ <CANN689F9S7c1M8+cEpz3tsxGF34+NTRBLvxgPUOtbvav5u+RRA@mail.gmail.com>
+ <5122551E.1080703@linux.vnet.ibm.com>
+ <51226B46.9080707@linux.vnet.ibm.com>
+ <CANN689FSxOz+0Cu7EG_yKD8ZE1OpT4kyT+ybLfXSqaifodJRpw@mail.gmail.com>
+ <51226F91.7000108@linux.vnet.ibm.com>
+ <CACvQF53bdh4_BxF0y1fnTVR+T2OmRc0jmWQYftsvx92-fg-Lug@mail.gmail.com>
+ <512BBAD8.8010006@linux.vnet.ibm.com>
+ <CACvQF51jCxk5jUqmhD=QBBtUsBkQWZzakacrKO4Gsk=w61rNwQ@mail.gmail.com>
+ <512C7A38.8060906@linux.vnet.ibm.com>
+ <CACvQF51RvhM8XNqu3-1OTQ=cZUZ=pAX+_zx0a29+W67N1X+BgQ@mail.gmail.com>
+ <512CC509.1050000@linux.vnet.ibm.com>
+ <CACvQF50UgiqPpDk3HCmV86zKSf6tPjqr0bZowfPEOJs0g0r0MQ@mail.gmail.com>
+ <512D0D67.9010609@linux.vnet.ibm.com>
+Message-ID: <CACvQF53ph2ixdM-otzetjM5cR+2kcZj6sckOp3TnzzA_x-EZ8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/26/2013 04:45 PM, Jon Hunter wrote:
-> 
-> On 02/26/2013 05:06 PM, Stephen Warren wrote:
->> On 02/26/2013 04:01 PM, Jon Hunter wrote:
+On Wed, Feb 27, 2013 at 3:30 AM, Srivatsa S. Bhat
+<srivatsa.bhat@linux.vnet.ibm.com> wrote:
+> On 02/26/2013 09:55 PM, Lai Jiangshan wrote:
+>> On Tue, Feb 26, 2013 at 10:22 PM, Srivatsa S. Bhat
+>> <srivatsa.bhat@linux.vnet.ibm.com> wrote:
 >>>
->>> On 02/26/2013 04:44 PM, Stephen Warren wrote:
->>>> On 02/26/2013 03:40 PM, Jon Hunter wrote:
+>>> Hi Lai,
+>>>
+>>> I'm really not convinced that piggy-backing on lglocks would help
+>>> us in any way. But still, let me try to address some of the points
+>>> you raised...
+>>>
+>>> On 02/26/2013 06:29 PM, Lai Jiangshan wrote:
+>>>> On Tue, Feb 26, 2013 at 5:02 PM, Srivatsa S. Bhat
+>>>> <srivatsa.bhat@linux.vnet.ibm.com> wrote:
+>>>>> On 02/26/2013 05:47 AM, Lai Jiangshan wrote:
+>>>>>> On Tue, Feb 26, 2013 at 3:26 AM, Srivatsa S. Bhat
+>>>>>> <srivatsa.bhat@linux.vnet.ibm.com> wrote:
+>>>>>>> Hi Lai,
+>>>>>>>
+>>>>>>> On 02/25/2013 09:23 PM, Lai Jiangshan wrote:
+>>>>>>>> Hi, Srivatsa,
+>>>>>>>>
+>>>>>>>> The target of the whole patchset is nice for me.
+>>>>>>>
+>>>>>>> Cool! Thanks :-)
+>>>>>>>
+>>>>> [...]
 >>>>>
->>>>> On 02/26/2013 04:01 AM, Javier Martinez Canillas wrote:
->>>>>
->>>>> [snip]
->>>>>
->>>>>> I was wondering if the level/edge settings for gpios is working on OMAP.
->>>>>>
->>>>>> I'm adding DT support for an SMSC911x ethernet chip connected to the
->>>>>> GPMC for an OMAP3 SoC based board.
->>>>>>
->>>>>> In the smsc911x driver probe function (smsc911x_drv_probe() in
->>>>>> drivers/net/ethernet/smsc/smsc911x.c), a call to request_irq() with
->>>>>> the flag IRQF_TRIGGER_LOW is needed because of the wiring on my board.
->>>>>>
->>>>>> Reading the gpio-omap.txt documentation it says that #interrupt-cells
->>>>>> should be <2> and that a value of 8 is "active low level-sensitive".
->>>>>>
->>>>>> So I tried this:
->>>>>>
->>>>>> &gpmc {
->>>>>> 	ethernet at 5,0 {
->>>>>> 		pinctrl-names = "default";
->>>>>> 		pinctrl-0 = <&smsc911x_pins>;
->>>>>> 		compatible = "smsc,lan9221", "smsc,lan9115";
->>>>>> 		reg = <5 0 0xff>; /* CS5 */
->>>>>> 		interrupt-parent = <&gpio6>;
->>>>>> 		interrupts = <16 8>; /* gpio line 176 */
->>>>>> 		interrupt-names = "smsc911x irq";
->>>>>> 		vmmc-supply = <&vddvario>;
->>>>>> 		vmmc_aux-supply = <&vdd33a>;
->>>>>> 		reg-io-width = <4>;
->>>>>>
->>>>>> 		smsc,save-mac-address;
->>>>>>       };
->>>>>> };
->>>>>
->>>>> Are you requesting the gpio anywhere? If not then this is not going to
->>>>> work as-is. This was discussed fairly recently [1] and the conclusion
->>>>> was that the gpio needs to be requested before we can use as an interrupt.
+>>>>> Unfortunately, I see quite a few issues with the code above. IIUC, the
+>>>>> writer and the reader both increment the same counters. So how will the
+>>>>> unlock() code in the reader path know when to unlock which of the locks?
 >>>>
->>>> That seems wrong; the GPIO/IRQ driver should handle this internally. The
->>>> Ethernet driver shouldn't know/care whether the interrupt it's given is
->>>> some form of dedicated interrupt or a GPIO-based interrupt, and even if
->>>> it somehow did, there's no irq_to_gpio() any more, so the driver can't
->>>> tell which GPIO ID it should request, unless it's given yet another
->>>> property to represent this.
+>>>> The same as your code, the reader(which nested in write C.S.) just dec
+>>>> the counters.
 >>>
->>> I agree that ideally this should be handled internally. Did you read the
->>> discussion on the thread that I referenced [1]? If you have any thoughts
->>> we are open to ideas :-)
->>>
->>> Cheers
->>> Jon
->>>
->>> [1] http://comments.gmane.org/gmane.linux.ports.arm.omap/92192
+>>> And that works fine in my case because the writer and the reader update
+>>> _two_ _different_ counters.
 >>
->> Oh, when I clicked that link the first time, all I saw was the patch,
->> not any discussion. I guess it must have timed out finding the other
->> emails or something.
-> 
-> Actually, I sent a slightly different link the 2nd time to ensure you
-> saw the thread. So my fault ;-)
-> 
->> I disagree that the GPIO needs to be requested, and that a custom DT
->> property and associated code are needed for that; simply requesting the
->> IRQ should be enough to make everything work.
+>> I can't find any magic in your code, they are the same counter.
 >>
->> In the Tegra GPIO IRQ driver for example, the irq_set_type irq_chip op
->> goes and configures the base GPIO HW to enable the pin as a GPIO, just
->> like gpio_request() would. I imagine the OMAP driver can do whatever
->> similar action it needs.
-> 
-> Yes that is similar to what the patch in the thread was attempting to
-> do, but this got shot down.
-> 
-> One issue I see is that by not calling gpio_request, then potentially
-> you could have someone request a gpio via gpio_request() and someone
-> trying to use it as an interrupt source via request_irq(). Now obviously
-> that represents a bug because there is only one physical gpio, but I
-> gather it is something we need to protect against.
+>>         /*
+>>          * It is desirable to allow the writer to acquire the percpu-rwlock
+>>          * for read (if necessary), without deadlocking or getting complaints
+>>          * from lockdep. To achieve that, just increment the reader_refcnt of
+>>          * this CPU - that way, any attempt by the writer to acquire the
+>>          * percpu-rwlock for read, will get treated as a case of nested percpu
+>>          * reader, which is safe, from a locking perspective.
+>>          */
+>>         this_cpu_inc(pcpu_rwlock->rw_state->reader_refcnt);
+>>
+>
+> Whoa! Hold on, were you really referring to _this_ increment when you said
+> that, in your patch you would increment the refcnt at the writer? Then I guess
+> there is a major disconnect in our conversations. (I had assumed that you were
+> referring to the update of writer_signal, and were just trying to have a single
+> refcnt instead of reader_refcnt and writer_signal).
 
-I'm not sure it's really that much of an issue, but presumably the
-solution is for a combined GPIO+IRQ driver to simply call gpio_request
-internally from within some irq_chip function. It looks like struct
-irq_chip doesn't have a request/free, but perhaps they could be added to
-solve this?
+https://github.com/laijs/linux/commit/53e5053d5b724bea7c538b11743d0f420d98f38d
+
+Sorry the name "fallback_reader_refcnt" misled you.
+
+>
+> So, please let me clarify things a bit here. Forget about the above increment
+> of reader_refcnt at the writer side. Its almost utterly insignificant for our
+> current discussion. We can simply replace it with a check as shown below, at
+> the reader side:
+>
+> void percpu_read_lock_irqsafe()
+> {
+>         if (current == active_writer)
+>                 return;
+>
+>         /* Rest of the code */
+> }
+>
+> Now, assuming that, in your patch, you were trying to use the per-cpu refcnt
+> to allow the writer to safely take the reader path, you can simply get rid of
+> that percpu-refcnt, as demonstrated above.
+>
+> So that would reduce your code to the following (after simplification):
+>
+> lg_rwlock_local_read_lock()
+> {
+>         if (current == active_writer)
+>                 return;
+>         if (arch_spin_trylock(per-cpu-spinlock))
+>                 return;
+>         read_lock(global-rwlock);
+> }
+>
+> Now, let us assume that hotplug is not happening, meaning, nobody is running
+> the writer side code. Now let's see what happens at the reader side in your
+> patch. As I mentioned earlier, the readers are _very_ frequent and can be in
+> very hot paths. And they also happen to be nested quite often.
+>
+> So, a non-nested reader acquires the per-cpu spinlock. Every subsequent nested
+> reader on that CPU has to acquire the global rwlock for read. Right there you
+> have 2 significant performance issues -
+> 1. Acquiring the (spin) lock is costly
+> 2. Acquiring the global rwlock causes cacheline bouncing, which hurts
+>    performance.
+>
+> And why do we care so much about performance here? Because, the existing
+> kernel does an efficient preempt_disable() here - which is an optimized
+> per-cpu counter increment. Replacing that with such heavy primitives on the
+> reader side can be very bad.
+>
+> Now, how does my patchset tackle this? My scheme just requires an increment
+> of a per-cpu refcnt (reader_refcnt) and memory barrier. Which is acceptable
+> from a performance-perspective, because IMHO its not horrendously worse than
+> a preempt_disable().
+>
+>>
+>>> If both of them update the same counter, there
+>>> will be a semantic clash - an increment of the counter can either mean that
+>>> a new writer became active, or it can also indicate a nested reader. A decrement
+>>> can also similarly have 2 meanings. And thus it will be difficult to decide
+>>> the right action to take, based on the value of the counter.
+>>>
+>>>>
+>>>>> (The counter-dropping-to-zero logic is not safe, since it can be updated
+>>>>> due to different reasons). And now that I look at it again, in the absence
+>>>>> of the writer, the reader is allowed to be recursive at the heavy cost of
+>>>>> taking the global rwlock for read, every 2nd time you nest (because the
+>>>>> spinlock is non-recursive).
+>>>>
+>>>> (I did not understand your comments of this part)
+>>>> nested reader is considered seldom.
+>>>
+>>> No, nested readers can be _quite_ frequent. Because, potentially all users
+>>> of preempt_disable() are readers - and its well-known how frequently we
+>>> nest preempt_disable(). As a simple example, any atomic reader who calls
+>>> smp_call_function() will become a nested reader, because smp_call_function()
+>>> itself is a reader. So reader nesting is expected to be quite frequent.
+>>>
+>>>> But if N(>=2) nested readers happen,
+>>>> the overhead is:
+>>>>     1 spin_try_lock() + 1 read_lock() + (N-1) __this_cpu_inc()
+>>>>
+>>>
+>>> In my patch, its just this_cpu_inc(). Note that these are _very_ hot paths.
+>>> So every bit of optimization that you can add is worthwhile.
+>>>
+>>> And your read_lock() is a _global_ lock - thus, it can lead to a lot of
+>>> cache-line bouncing. That's *exactly* why I have used per-cpu refcounts in
+>>> my synchronization scheme, to avoid taking the global rwlock as much as possible.
+>>>
+>>> Another important point to note is that, the overhead we are talking about
+>>> here, exists even when _not_ performing hotplug. And its the replacement to
+>>> the super-fast preempt_disable(). So its extremely important to consciously
+>>> minimize this overhead - else we'll end up slowing down the system significantly.
+>>>
+>>
+>> All I was considered is "nested reader is seldom", so I always
+>> fallback to rwlock when nested.
+>> If you like, I can add 6 lines of code, the overhead is
+>> 1 spin_try_lock()(fast path)  + N  __this_cpu_inc()
+>>
+>
+> I'm assuming that calculation is no longer valid, considering that
+> we just discussed how the per-cpu refcnt that you were using is quite
+> unnecessary and can be removed.
+>
+> IIUC, the overhead with your code, as per above discussion would be:
+> 1 spin_try_lock() [non-nested] + N read_lock(global_rwlock).
+
+https://github.com/laijs/linux/commit/46334544bb7961550b7065e015da76f6dab21f16
+
+Again, I'm so sorry the name "fallback_reader_refcnt" misled you.
+
+>
+> Note that I'm referring to the scenario when hotplug is _not_ happening
+> (ie., nobody is running writer side code).
+>
+>> The overhead of your code is
+>> 2 smp_mb() + N __this_cpu_inc()
+>>
+>
+> Right. And as you can see, this is much much better than the overhead
+> shown above.
+
+I will write a test to compare it to "1 spin_try_lock()(fast path)  +
+N  __this_cpu_inc()"
+
+>
+>> I don't see how much different.
+>>
+>>>>> Also, this lg_rwlock implementation uses 3
+>>>>> different data-structures - a per-cpu spinlock, a global rwlock and
+>>>>> a per-cpu refcnt, and its not immediately apparent why you need those many
+>>>>> or even those many varieties.
+>>>>
+>>>> data-structures is the same as yours.
+>>>> fallback_reader_refcnt <--> reader_refcnt
+>>>
+>>> This has semantic problems, as noted above.
+>>>
+>>>> per-cpu spinlock <--> write_signal
+>>>
+>>> Acquire/release of (spin) lock is costlier than inc/dec of a counter, IIUC.
+>>>
+>>>> fallback_rwlock  <---> global_rwlock
+>>>>
+>>>>> Also I see that this doesn't handle the
+>>>>> case of interrupt-handlers also being readers.
+>>>>
+>>>> handled. nested reader will see the ref or take the fallback_rwlock
+>>>>
+>>
+>> Sorry, _reentrance_ read_lock() will see the ref or take the fallback_rwlock
+>>
+>>>
+>>> I'm not referring to simple nested readers here, but interrupt handlers who
+>>> can act as readers. For starters, the arch_spin_trylock() is not safe when
+>>> interrupt handlers can also run the same code, right? You'll need to save
+>>> and restore interrupts at critical points in the code. Also, the __foo()
+>>> variants used to read/update the counters are not interrupt-safe.
+>>
+>> I must missed something.
+>>
+>> Could you elaborate more why arch_spin_trylock() is not safe when
+>> interrupt handlers can also run the same code?
+>>
+>> Could you elaborate more why __this_cpu_op variants is not
+>> interrupt-safe since they are always called paired.
+>>
+>
+> Take a look at include/linux/percpu.h. You'll note that __this_cpu_*
+> operations map to __this_cpu_generic_to_op(), which doesn't disable interrupts
+> while doing the update. Hence you can get inconsistent results if an interrupt
+> hits the CPU at that time and the interrupt handler tries to do the same thing.
+> In contrast, if you use this_cpu_inc() for example, interrupts are explicitly
+> disabled during the update and hence you won't get inconsistent results.
+
+
+xx_lock()/xx_unlock() are must called paired, if interrupts happens
+the value of the data is recovered after the interrupts return.
+
+the same reason, preempt_disable() itself it is not irqsafe,
+but preempt_disable()/preempt_enable() are called paired, so they are
+all irqsafe.
+
+>
+>>
+>>> And,
+>>> the unlock() code in the reader path is again going to be confused about
+>>> what to do when interrupt handlers interrupt regular readers, due to the
+>>> messed up refcount.
+>>
+>> I still can't understand.
+>>
+>
+> The primary reason _I_ was using the refcnt vs the reason _you_ were using the
+> refcnt, appears to be very different.  Maybe that's why the above statement
+> didn't make sense. In your case, IIUC, you can simply get rid of the refcnt
+> and replace it with the simple check I mentioned above. Whereas, I use
+> refcnts to keep the reader-side synchronization fast (and for reader-writer
+> communication).
+>
+>
+> Regards,
+> Srivatsa S. Bhat
+>
