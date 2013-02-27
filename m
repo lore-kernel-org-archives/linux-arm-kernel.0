@@ -1,22 +1,23 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 27 Feb 2013 10:47:01 +0000
-Subject: [PATCH 0/4] time: dynamic irq affinity
-In-Reply-To: <512DA0EB.5000803@ti.com>
-References: <1361917047-29230-1-git-send-email-daniel.lezcano@linaro.org>
- <512DA0EB.5000803@ti.com>
-Message-ID: <20130227104701.GZ17833@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 27 Feb 2013 11:47:30 +0100
+Subject: [PATCH v2 2/3] crypto: sahara: Add driver for SAHARA2 accelerator.
+In-Reply-To: <1361961711-4603-3-git-send-email-javier.martin@vista-silicon.com>
+References: <1361961711-4603-1-git-send-email-javier.martin@vista-silicon.com>
+ <1361961711-4603-3-git-send-email-javier.martin@vista-silicon.com>
+Message-ID: <10560881.xkCvi82rco@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 27, 2013 at 11:30:11AM +0530, Santosh Shilimkar wrote:
-> P.S: Time and again it proves that making the local timer wakeup
-> capable solves the issue.
+On Wednesday 27 February 2013 11:41:50 Javier Martin wrote:
+> SAHARA2 HW module is included in the i.MX27 SoC from
+> Freescale. It is capable of performing cipher algorithms
+> such as AES, 3DES..., hashing and RNG too.
+> 
+> This driver provides support for AES-CBC and AES-ECB
+> by now.
+> 
+> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
 
-Slightly different take: it proves that hardware people don't talk to
-software people about what they require to make an operating system
-work.  Hardware people think they understand that and go off and do
-their own thing, and expect software people to sort out their mess.
+Looks good,
 
-This happens all the time; there is no solution for it as long as
-companies view the creation of hardware as being entirely separate
-from software.
+Reviewed-by: Arnd Bergmann <arnd@arndb.de>
