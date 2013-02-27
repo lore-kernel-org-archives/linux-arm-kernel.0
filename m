@@ -1,29 +1,34 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 27 Feb 2013 13:57:07 +0530
-Subject: [PATCH 1/4] spi/davinci: fix module build error
-In-Reply-To: <1361789050-637-2-git-send-email-prakash.pm@ti.com>
-References: <1361789050-637-1-git-send-email-prakash.pm@ti.com>
- <1361789050-637-2-git-send-email-prakash.pm@ti.com>
-Message-ID: <512DC35B.20501@ti.com>
+From: gautamvivek1987@gmail.com (Vivek Gautam)
+Date: Wed, 27 Feb 2013 14:00:25 +0530
+Subject: [RESEND PATCH v9 0/2] usb: phy: samsung: Introducing usb phy
+ driver for samsung SoCs
+In-Reply-To: <20130227081521.GG8016@arwen.pp.htv.fi>
+References: <1358499623-13901-1-git-send-email-p.paneri@samsung.com>
+ <20130227081521.GG8016@arwen.pp.htv.fi>
+Message-ID: <CAFp+6iGx1z9BcE3nLTVvOMG6VWVuYhDuKm5wu3DtbL8M1pfUtg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/25/2013 4:14 PM, Manjunathappa, Prakash wrote:
-> Fix below module build error:
-> 
->   CC [M]  drivers/spi/spi-davinci.o
-> drivers/spi/spi-davinci.c:774:1: error: '__mod_of_device_table' aliased
-> to undefined symbol 'davini_spi_of_match'
-> drivers/spi/spi-davinci.c:774:1: error: '__mod_of_device_table' aliased
-> to undefined symbol 'davini_spi_of_match'
-> make[2]: *** [drivers/spi/spi-davinci.o] Error 1
-> make[1]: *** [drivers/spi] Error 2
-> make[1]: *** Waiting for unfinished jobs....
-> make: *** [drivers] Error 2
-> 
-> Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
+Hi Balbi,
 
-Acked-by: Sekhar Nori <nsekhar@ti.com>
 
-Thanks,
-Sekhar
+On Wed, Feb 27, 2013 at 1:45 PM, Felipe Balbi <balbi@ti.com> wrote:
+> Hi,
+>
+> On Fri, Jan 18, 2013 at 02:30:21PM +0530, Praveen Paneri wrote:
+>> Changes from v8:
+>> Resending this patch series after rebasing to the latest usb-next branch.
+>> Rewording inline comments for better readability.
+>> Removed IS_ENABLED(CONFIG_OF) as pdev->dev.of_node is enough to check for dt support.
+>> Using of_match_ptr to add of_match_table to platform_driver structure.
+>> Removed unnecessary variables.
+>
+> trying applying these but it doesn't apply unfortunately.
+>
+
+Already present in 3.8.0 ? ;-)
+
+
+-- 
+Thanks & Regards
+Vivek
