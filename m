@@ -1,40 +1,63 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 27 Feb 2013 17:14:10 +0000
-Subject: [PATCH 0/4] Convert highbank to use PSCI calls
-In-Reply-To: <512E0F79.6080301@gmail.com>
-References: <1361936528-25998-1-git-send-email-robherring2@gmail.com>
- <201302270858.20864.arnd@arndb.de> <512E0F79.6080301@gmail.com>
-Message-ID: <20130227171410.GC22286@mudshark.cambridge.arm.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 27 Feb 2013 12:16:55 -0500 (EST)
+Subject: [RFC PATCH v2 0/4] Add support for LZ4-compressed kernel
+In-Reply-To: <1361984688.2035.20.camel@joe-AO722>
+References: <1361859870-15751-1-git-send-email-kyungsik.lee@lge.com>
+ <512D1C12.4080109@oberhumer.com>
+ <alpine.LFD.2.03.1302261557220.1254@syhkavp.arg>
+ <87fw0i7n6d.fsf@dell.be.48ers.dk>
+ <20130226221027.GW17833@n2100.arm.linux.org.uk>
+ <1361929234.1924.8.camel@joe-AO722>
+ <20130227095609.GY17833@n2100.arm.linux.org.uk>
+ <1361980152.2035.13.camel@joe-AO722>
+ <20130227163118.GB17833@n2100.arm.linux.org.uk>
+ <1361984688.2035.20.camel@joe-AO722>
+Message-ID: <alpine.LFD.2.03.1302271211360.1254@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 27, 2013 at 01:51:53PM +0000, Rob Herring wrote:
-> On 02/27/2013 02:58 AM, Arnd Bergmann wrote:
-> >> This series converts highbank to use PSCI calls for secondary core boot,
-> >> hotplug, cpuidle, suspend/resume, reset, and poweroff. Doing this removes
-> >> about 200 lines of platform code (1/3 of it) and abstracts out the A9 and
-> >> A15 differences (some of which are not yet in place).
-> > 
-> > This looks pretty cool. Can you or Will comment on what is still left
-> > for the SMP ops that is actually required as platform specific code?
-> > 
-> > Specifically, I'm wondering if we could have a set of default smp_ops
-> > based on this that we could use with the default machine descriptor [1]
-> > and any platform that has SMP enabled but a NULL smp_ops pointer.
-> 
-> My smp code is exactly the same as mach-virt with this, but adds cpu_die
-> for hotplug. smp_secondary_init will go away with Catalin's series to
-> use notifiers for the gic secondary init. This leaves smp_boot_secondary.
-> 
-> We could move these remaining smp_ops to psci.c and create psci_smp_ops.
-> That probably needs to be after the gic notifier changes.
-> 
-> Your patch, psci smp ops, and converting the arch timers to use
-> OF_CLKSRC_DECLARE will eliminate mach-virt unless Will has more things
-> planned for it.
+On Wed, 27 Feb 2013, Joe Perches wrote:
 
-As long as we remain compatible with "linux,dummy-virt" then I'm not fussed
-what happens to the support code. I don't envisage adding anything else to
-it that can't live under drivers/ (e.g. new virtio devices).
+> On Wed, 2013-02-27 at 16:31 +0000, Russell King - ARM Linux wrote:
+> > On Wed, Feb 27, 2013 at 07:49:12AM -0800, Joe Perches wrote:
+> > > On Wed, 2013-02-27 at 09:56 +0000, Russell King - ARM Linux wrote:
+> > > > On Tue, Feb 26, 2013 at 05:40:34PM -0800, Joe Perches wrote:
+> > > > > On Tue, 2013-02-26 at 22:10 +0000, Russell King - ARM Linux wrote:
+> > > > > > So... for a selected kernel version of a particular size, can we please
+> > > > > > have a comparison between the new LZO code and this LZ4 code, so that
+> > > > > > we can see whether it's worth updating the LZO code or replacing the
+> > > > > > LZO code with LZ4?
+> > > > > 
+> > > > > How could it be questionable that it's worth updating the LZO code?
+> > > > 
+> > > > Please read the comments against the previous posting of these patches
+> > > > where I first stated this argument - and with agreement from those
+> > > > following the thread.  The thread started on 26 Jan 2013.  Thanks.
+> > > 
+> > > https://lkml.org/lkml/2013/1/29/145
+> > > 
+> > > I did not and do not see significant value in
+> > > adding LZ4 given Markus' LZO improvements.
+> > 
+> > Sorry, a 66% increase in decompression speed over the updated LZO code
+> > isn't "significant value" ?
+> 
+> We disagree.
+> 
+> > I'm curious - what in your mind qualifies "significant value" ?
+> 
+> faster boot time. smaller, faster overall code.
 
-Will
+Sorry, but you certainly successfully got me confused, and probably 
+others as well.
+
+RMK says that "66% increase in decompression speed over LZO" is 
+significant.  You apparently disagree with that.
+
+Then you say that faster boot time is significant.
+
+Again, can you (or anyone else) provide comprehensive test results in a 
+single email with both compression methods?
+
+
+Nicolas
