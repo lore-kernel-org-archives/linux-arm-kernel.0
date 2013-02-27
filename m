@@ -1,54 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 27 Feb 2013 16:31:18 +0000
-Subject: [RFC PATCH v2 0/4] Add support for LZ4-compressed kernel
-In-Reply-To: <1361980152.2035.13.camel@joe-AO722>
-References: <1361859870-15751-1-git-send-email-kyungsik.lee@lge.com>
- <512D1C12.4080109@oberhumer.com>
- <alpine.LFD.2.03.1302261557220.1254@syhkavp.arg>
- <87fw0i7n6d.fsf@dell.be.48ers.dk>
- <20130226221027.GW17833@n2100.arm.linux.org.uk>
- <1361929234.1924.8.camel@joe-AO722>
- <20130227095609.GY17833@n2100.arm.linux.org.uk>
- <1361980152.2035.13.camel@joe-AO722>
-Message-ID: <20130227163118.GB17833@n2100.arm.linux.org.uk>
+From: kim.phillips@freescale.com (Kim Phillips)
+Date: Wed, 27 Feb 2013 10:45:12 -0600
+Subject: [PATCH 2/3] dtc: import latest upstream dtc
+In-Reply-To: <1361934486.18483.5@driftwood>
+References: <1361928975-29395-1-git-send-email-kim.phillips@freescale.com>
+ <1361928975-29395-2-git-send-email-kim.phillips@freescale.com>
+ <1361934486.18483.5@driftwood>
+Message-ID: <20130227104512.c07c0ade0107aa7f4ec18217@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 27, 2013 at 07:49:12AM -0800, Joe Perches wrote:
-> On Wed, 2013-02-27 at 09:56 +0000, Russell King - ARM Linux wrote:
-> > On Tue, Feb 26, 2013 at 05:40:34PM -0800, Joe Perches wrote:
-> > > On Tue, 2013-02-26 at 22:10 +0000, Russell King - ARM Linux wrote:
-> > > > So... for a selected kernel version of a particular size, can we please
-> > > > have a comparison between the new LZO code and this LZ4 code, so that
-> > > > we can see whether it's worth updating the LZO code or replacing the
-> > > > LZO code with LZ4?
-> > > 
-> > > How could it be questionable that it's worth updating the LZO code?
-> > 
-> > Please read the comments against the previous posting of these patches
-> > where I first stated this argument - and with agreement from those
-> > following the thread.  The thread started on 26 Jan 2013.  Thanks.
+On Tue, 26 Feb 2013 21:08:06 -0600
+Rob Landley <rob@landley.net> wrote:
+
+> On 02/26/2013 07:36:14 PM, Kim Phillips wrote:
+> > This updates scripts/dtc to upstream dtc commit 27cdc1b
 > 
-> https://lkml.org/lkml/2013/1/29/145
+> There's an upstream for dts?
+
+dtc - the device tree compiler, yes.
+
+> > "Added license header to dtc/libfdt/fdt.h and libfdt_env.h"
+> > from git://git.jdl.com/software/dtc.git.
 > 
-> I did not and do not see significant value in
-> adding LZ4 given Markus' LZO improvements.
+> That git repository has a Documentation directory with for example  
+> "dts-format.txt" in it. My current linux git repository does not  
+> contain a file called dts-format.txt.
 
-Sorry, a 66% increase in decompression speed over the updated LZO code
-isn't "significant value" ?
+this patch isn't attempting to update dts-format.txt, or any other
+file that exists in the upstream dtc project that isn't present -
+and used - in the kernel.  The purpose of this patch is to update
+libfdt, which has in-kernel users.
 
-I'm curious - what in your mind qualifies "significant value" ?
-
-Maybe "significant value" is a patch which buggily involves converting
-all those "<n>" printk format strings in assembly files to KERN_* macros,
-thereby breaking those strings because you've not paid attention to what
-.asciz means?  (Yes, I've just cleaned that crap up after you...)
-
-> Why would the LZO code not be updated?
-
-I'm not saying that the LZO code should not be updated.  I'm saying that
-the kernel boot time decompressor is not a play ground for an ever
-increasing number of "my favourite compression method" crap.  We don't
-need four, five or even six compression methods there.  We just need
-three - a "fast but large", "small but slow" and "all round popular
-medium".
+Kim
