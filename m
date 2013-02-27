@@ -1,49 +1,71 @@
-From: marvin24@gmx.de (Marc Dietrich)
-Date: Wed, 27 Feb 2013 10:03:03 +0100
-Subject: Multi-platform, and secure-only ARM errata workarounds
-In-Reply-To: <512CE533.6020005@wwwdotorg.org>
-References: <512BF81A.3080700@wwwdotorg.org>
- <4928288.ie8EUukfVD@fb07-iapwap2.physik.uni-giessen.de>
- <512CE533.6020005@wwwdotorg.org>
-Message-ID: <22709540.96uJddbx1U@fb07-iapwap2.physik.uni-giessen.de>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Wed, 27 Feb 2013 10:22:00 +0100
+Subject: [PATCH 1/2] USB mxs-phy: Register phy with framework
+In-Reply-To: <20130227081017.GF8016@arwen.pp.htv.fi>
+References: <1359631937-26646-1-git-send-email-s.hauer@pengutronix.de>
+ <1359631937-26646-2-git-send-email-s.hauer@pengutronix.de>
+ <20130214103729.GC15537@arwen.pp.htv.fi>
+ <20130214162337.GU1906@pengutronix.de>
+ <20130214180011.GC25891@arwen.pp.htv.fi>
+ <20130214184354.GX1906@pengutronix.de>
+ <20130227081017.GF8016@arwen.pp.htv.fi>
+Message-ID: <512DD038.3040301@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 26. Februar 2013, 09:39:15 schrieb Stephen Warren:
-> On 02/26/2013 02:36 AM, Marc Dietrich wrote:
-> > Am Montag, 25. Februar 2013, 16:47:38 schrieb Stephen Warren:
-> >> ...
-> >> Now, I can easily add those 3 errata workarounds to U-Boot, but that
-> >> will require people to reflash their bootloader. This is probably
-> >> acceptable for development/reference boards (although I'm sure people
-> >> will find it annoying) but for re-purposed production boards (such as
-> >> the Toshiba AC100 or various tablets) it will be impossible to update
-> >> the factory bootloader. Switching to upstream U-Boot would currently
-> >> lose some functionality, and significantly affect people's boot flow, so
-> >> is likely unacceptable.
-> > 
-> > personally, I have no problem to require a certain u-boot version for a
-> > given kernel. From a distro point of view, you will likely update the
-> > bootloader/kernel on a distro update anyway.
+On 02/27/2013 09:10 AM, Felipe Balbi wrote:
+> On Thu, Feb 14, 2013 at 07:43:54PM +0100, Sascha Hauer wrote:
+>> On Thu, Feb 14, 2013 at 08:00:11PM +0200, Felipe Balbi wrote:
+>>> Hi,
+>>>
+>>> On Thu, Feb 14, 2013 at 05:23:37PM +0100, Sascha Hauer wrote:
+>>>> On Thu, Feb 14, 2013 at 12:37:29PM +0200, Felipe Balbi wrote:
+>>>>> Hi,
+>>>>>
+>>>>> On Thu, Jan 31, 2013 at 12:32:16PM +0100, Sascha Hauer wrote:
+>>>>>> We now have usb_add_phy_dev(), so use it to register with the framework
+>>>>>> to be able to find the phy from the USB driver.
+>>>>>>
+>>>>>> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+>>>>>
+>>>>> Sascha, are you taking this through your tree or you want me to queue it
+>>>>> up ?
+>>>>
+>>>> I would prefer if either you could take it or Alexander Shishkin along
+>>>> with the other patches in:
+>>>>
+>>>> [PATCH v4] USB: add devicetree helpers for determining dr_mode and phy_type
+>>>>
+>>>> Could you have a look at them? Alexander is asking for an ack for 1/9,
+>>>> 2/9, 3/9, 8/9. I just realized you are not on Cc for these. I could
+>>>> bounce you the patches in case you don't have them in your mailbox.
+>>>
+>>> Ok, I'll look at them, no need to bounce. You _do_ realize, however,
+>>> that Greg has already closed all his trees for v3.9, right ? So anything
+>>> from now on will be queued for v3.10.
+>>
+>> I'm fine with that. I'm just a bit insistent because the chipidea patches are
+>> floating around for half a year now. Once I have the warm feeling that
+>> the patches are handled I have time ;)
 > 
-> So a distro will certainly update the kernel.
-> 
-> But updating a bootloader would be very unusual, I believe.
+> I'm getting ready to queue patches but, when looking at this thread, it
+> seems like another version should've been sent. I'll skip this and look
+> at the other chipidea threads,
 
-mmh? Every time I update to a new distro release, the bootloader gets also 
-updated - even on arm, e.g. ftp://ports.ubuntu.com/ubuntu-ports/pool/main/u/u-boot-linaro lists four version of uboot - one for each supported distro 
-release. I know for closed embedded device this is different, but that's not 
-our target.
-
-> Also, I hope that upstream U-Boot is never going to support the bizarre
-> "Tegra partition table" cruft that our "fastboot" bootloader supports,
-> so you'll end up completely re-programming the flash (BCT, bootloader,
-> partition table, all filesystems) if you want to switch to U-Boot. That
-> seems like a fair chunk for the installer to own, but I guess if you're
-> comfortable with doing that, I won't complain.
-
-Yes, that a huge pile of work and people are working on this already. One the 
-other hand, why (if not for upgrade use) do we have u-boot support for all 
-these legacy boards?
+I'm currently rebasing Saschas patches to Greg's usb-net.
 
 Marc
+
+---
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130227/2b8b8b74/attachment.sig>
