@@ -1,43 +1,150 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 27 Feb 2013 23:00:36 +0100 (CET)
-Subject: [PATCH 0/4] time: dynamic irq affinity
-In-Reply-To: <20130227104701.GZ17833@n2100.arm.linux.org.uk>
-References: <1361917047-29230-1-git-send-email-daniel.lezcano@linaro.org>
- <512DA0EB.5000803@ti.com> <20130227104701.GZ17833@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.02.1302272243340.22263@ionos>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 27 Feb 2013 15:21:40 -0700
+Subject: [PATCH] pinctrl: gpio: vt8500: Add pin control driver for
+ Wondermedia SoCs
+In-Reply-To: <1360896534-20637-2-git-send-email-linux@prisktech.co.nz>
+References: <1360896534-20637-1-git-send-email-linux@prisktech.co.nz>
+ <1360896534-20637-2-git-send-email-linux@prisktech.co.nz>
+Message-ID: <512E86F4.6000909@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 27 Feb 2013, Russell King - ARM Linux wrote:
+On 02/14/2013 07:48 PM, Tony Prisk wrote:
 
-> On Wed, Feb 27, 2013 at 11:30:11AM +0530, Santosh Shilimkar wrote:
-> > P.S: Time and again it proves that making the local timer wakeup
-> > capable solves the issue.
-> 
-> Slightly different take: it proves that hardware people don't talk to
-> software people about what they require to make an operating system
-> work.  Hardware people think they understand that and go off and do
-> their own thing, and expect software people to sort out their mess.
-> 
-> This happens all the time; there is no solution for it as long as
-> companies view the creation of hardware as being entirely separate
-> from software.
+Sorry for the slow review.
 
-Amen!
+No patch description?
 
-We have seen the mess this kind of thinking creates on x86 already 10+
-years ago and we are still suffering.
+>  arch/arm/Kconfig                   |    4 +-
+>  arch/arm/boot/dts/wm8850-w70v2.dts |   15 +
+>  arch/arm/boot/dts/wm8850.dtsi      |    7 +-
+>  arch/arm/mach-vt8500/Kconfig       |    1 +
+>  drivers/pinctrl/Kconfig            |   10 +
+>  drivers/pinctrl/Makefile           |    2 +
+>  drivers/pinctrl/pinctrl-wm8850.c   |  166 +++++++++++
+>  drivers/pinctrl/pinctrl-wmt.c      |  565 ++++++++++++++++++++++++++++++++++++
+>  drivers/pinctrl/pinctrl-wmt.h      |   73 +++++
 
-As I said before, I really can't understand that ARM and the ARM SoC
-vendors insisted to repeat the same mistakes, which we kernel people
-have proven to be fatal already. It's even worse: they asked me what
-problems they should avoid before they went to implement them.
+No DT binding documentation?
 
-I can halfways understand the little kid who insists to burn his hand
-on the hot oven instead of listening to parental advice, but this kind
-of advisory resistance is either caused by abuse of secrect drugs or
-by living in a disconnected universe or both.
+It doesnt' seem a good idea to add the pinctrl driver and touch the
+various DT files in a single patch.
 
-Thanks,
 
-	tglx
+> diff --git a/arch/arm/boot/dts/wm8850.dtsi b/arch/arm/boot/dts/wm8850.dtsi
+
+> +/*
+>  		gpio: gpio-controller at d8110000 {
+>  			compatible = "wm,wm8650-gpio";
+>  			gpio-controller;
+>  			reg = <0xd8110000 0x10000>;
+>  			#gpio-cells = <3>;
+>  		};
+> +*/
+> +		pinmux: pinmux at d8110000 {
+> +			compatible = "wm,wm8850-gpio";
+> +			reg = <0xd8110000 0x10000>;
+> +		};
+
+If the old code is wrong, why not delete it? but the main change is just
+removing the GPIO-related properties - is the new driver no longer a
+GPIO provider, why?
+
+> diff --git a/arch/arm/mach-vt8500/Kconfig b/arch/arm/mach-vt8500/Kconfig
+
+> @@ -29,5 +29,6 @@ config ARCH_WM8850
+>  	depends on ARCH_MULTI_V7
+>  	select ARCH_VT8500
+>  	select CPU_V7
+> +	select PINCTRL
+
+Don't you want to select the specific pinctrl driver here too; is it
+actually useful for it to be optional?
+
+> diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
+
+> +config PINCTRL_WM8850
+> +	bool "Wondermedia WM8850 pin controller driver"
+> +	depends on ARCH_VT8500
+> +	select PINCTRL_WMT
+
+If this is user-visible, there should be a description.
+
+> diff --git a/drivers/pinctrl/pinctrl-wm8850.c b/drivers/pinctrl/pinctrl-wm8850.c
+
+> +/* Please keep sorted by bank/bit */
+> +#define WMT_PIN_EXTGPIO0	WMT_PIN(0, 0)
+> +#define WMT_PIN_EXTGPIO1	WMT_PIN(0, 1)
+...
+> +#define WMT_PIN_I2C2_SCL	WMT_PIN(5, 12)
+> +#define WMT_PIN_I2C2_SDA	WMT_PIN(5, 13)
+
+There are a lot of gaps in that list. Does the HW really not support pin
+muxing on the rest of the bits in the registers?
+
+> diff --git a/drivers/pinctrl/pinctrl-wmt.c b/drivers/pinctrl/pinctrl-wmt.c
+
+> +static int wmt_pmx_gpio_set_direction(struct pinctrl_dev *pctldev,
+> +				      struct pinctrl_gpio_range *range,
+> +				      unsigned offset,
+> +				      bool input)
+> +{
+> +	struct wmt_pinctrl_data *data = pinctrl_dev_get_drvdata(pctldev);
+> +#include <linux/pinctrl/consumer.h>
+
+That should be at the top of the file.
+
+> +	wmt_set_pinmux(data, (input ? WMT_FSEL_GPIO_IN : WMT_FSEL_GPIO_OUT),
+> +		       offset);
+
+Nit: The inner brackets are redundant.
+
+> +static int wmt_get_groups_count(struct pinctrl_dev *pctldev)
+> +{
+> +	struct wmt_pinctrl_data *data = pinctrl_dev_get_drvdata(pctldev);
+> +
+> +	return data->ngroups;
+> +}
+> +
+> +static const char *wmt_get_group_name(struct pinctrl_dev *pctldev,
+> +					 unsigned selector)
+> +{
+> +	struct wmt_pinctrl_data *data = pinctrl_dev_get_drvdata(pctldev);
+> +
+> +	return data->groups[selector];
+> +}
+
+Hmmm. Given there's a 1:1 mapping between pin names and group names, I
+wonder if this core driver shouldn't synthesize the array of group names
+from the array of pins instead of requiring the per-SoC driver to
+duplicate all the pin names in a group array.
+
+Of course, we should probably fix the pinctrl core to allow pin muxing
+on pins in addition to groups too. I keep feeling guilty about not
+having done that before.
+
+> +static int wmt_pctl_dt_node_to_map_pull(struct wmt_pinctrl_data *data,
+...
+> +	struct pinctrl_map *map = *maps;
+> +
+> +
+> +	if (pull > 2) {
+
+Nit: redundant blank line there.
+
+> +	configs[0] = 0;
+
+= pull;?
+
+> +static struct gpio_chip wmt_gpio_chip = {
+...
+> +	.can_sleep = 0,
+
+Nit: No need to set that; 0 is the default for any
+not-explicitly-initialized fields.
+
+> +int wmt_pinctrl_probe(struct platform_device *pdev,
+...
+> +	dev_info(&pdev->dev, "Pin controller initialized\n");
+
+Nit: I'm never really sure that's useful.
