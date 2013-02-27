@@ -1,29 +1,63 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Wed, 27 Feb 2013 09:14:05 +0800
-Subject: [Suggestion] ARM:S5PV210: version merging compiling issue for
- 'struct fimc_source_info'
-In-Reply-To: <512C855D.6090109@samsung.com>
-References: <511F50CF.90403@asianux.com>
- <CAH9JG2WS5q4SR8zk5=OC32PHLZ2+ZYva7csyshG7oANacqbCuA@mail.gmail.com>
- <512C5877.7090805@asianux.com> <512C855D.6090109@samsung.com>
-Message-ID: <512D5DDD.6060409@asianux.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 26 Feb 2013 17:37:17 -0800
+Subject: [PATCH] ARM: vfp: fix fpsid register subarchitecture field mask
+ width
+In-Reply-To: <20130225200209.GP17833@n2100.arm.linux.org.uk>
+References: <1361520485-30269-1-git-send-email-sboyd@codeaurora.org>
+ <20130225172545.GO17833@n2100.arm.linux.org.uk>
+ <20130225200209.GP17833@n2100.arm.linux.org.uk>
+Message-ID: <512D634D.5010600@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2013?02?26? 17:50, Sylwester Nawrocki ??:
-> No, the fix is not yet in linux-next. I has not been merged through the media
-> tree and it might take some time until it gets to Linus's tree now. You can use
-> one of following patches to fix this build break:
-> 
-> http://www.spinics.net/lists/linux-samsung-soc/msg16023.html
-> https://patchwork.kernel.org/patch/2143211
-> http://patchwork.linuxtv.org/patch/16892
+On 02/25/13 12:02, Russell King - ARM Linux wrote:
+>
+> This can of worms is getting bigger.  We have more problems with our
+> handling of the different VFP versions, specifically the handling of
+> the EX=0 DEX=0 case.
+>
+> VFP common subarch 3 defines the EX=0, DEX=0 encoding to mean one of
+> the following conditions have been met:
+>
+> 1. an unallocated VFP instruction was encountered.
+>
+>    In other words, the VFP was the target of the co-processor instruction,
+>    but the instruction is not a known VFP instruction encoding.  This
+>    should raise an undefined instruction exception.
+>
+> 2. an allocated VFP instruction was encountered, but not handled in
+>    hardware.
+>
+>    In other words, the instruction is a valid VFP instruction, but the
+>    hardware has opted not to implement this instruction and wants
+>    software to emulate it instead.
+>
+>    (Note: this can also be raised as EX=0, DEX=1 - implementation
+>     defined!)
+>
+[snip]
+>
+> So, if EX or DEX is set, _or_ IXE is set, we pass control to VFP_bounce.
+> This is problematical.
+>
+> (a) condition (2) above isn't correctly handled for common subarch v3 - it
+>     is always treated as an undefined instruction, and will result in a
+>     SIGILL being delivered.
+>
+[snip]
+>
+> Now, (a) is just bad behaviour - as we haven't had any reports of this
+> yet, I suspect that no one has implemented VFP hardware with this
+> behaviour yet.
 
-  thank you.
+I believe we ran into this a while ago and fixed it for our chips. We
+never sent the patch upstream. Sorry.
 
-  :-)
+https://www.codeaurora.org/gitweb/quic/la/?p=kernel/msm.git;a=commitdiff;h=00a13be874f230159a6b7f8cc9d0ff23bc1b7d05
+
+I'm looking into what our bits correspond to. Hopefully get back to you
+in 20 something hours.
 
 -- 
-Chen Gang
-
-Asianux Corporation
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
