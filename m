@@ -1,55 +1,29 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 27 Feb 2013 10:36:10 +0200
-Subject: [PATCH v10 6/8] usb: chipidea: imx: add internal vbus regulator
- control
-In-Reply-To: <20130227081313.GI20402@nchen-desktop>
-References: <1361946799-29471-1-git-send-email-peter.chen@freescale.com>
- <1361946799-29471-7-git-send-email-peter.chen@freescale.com>
- <20130227075510.GB8016@arwen.pp.htv.fi>
- <20130227080735.GH1906@pengutronix.de>
- <20130227081313.GI20402@nchen-desktop>
-Message-ID: <20130227083610.GK8016@arwen.pp.htv.fi>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 27 Feb 2013 14:09:57 +0530
+Subject: [PATCH 0/4] Enable SPI flash support on da850-evm DT kernel
+In-Reply-To: <1361789050-637-1-git-send-email-prakash.pm@ti.com>
+References: <1361789050-637-1-git-send-email-prakash.pm@ti.com>
+Message-ID: <512DC65D.7080603@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Darius,
-
-On Wed, Feb 27, 2013 at 04:13:14PM +0800, Peter Chen wrote:
-> On Wed, Feb 27, 2013 at 09:07:35AM +0100, Sascha Hauer wrote:
-> > On Wed, Feb 27, 2013 at 09:55:10AM +0200, Felipe Balbi wrote:
-> > > Hi,
-> > > 
-> > > On Wed, Feb 27, 2013 at 02:33:17PM +0800, Peter Chen wrote:
-> > > > - For host, the vbus should always be on.
-> > > > - For otg, the vbus is off defaultly, the vbus needs to be
-> > > > turned on/off when usb role switches.
-> > > > 
-> > > > Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> > > 
-> > > one quick question, if chipidea already has an imx glue layer, can I
-> > > delete the broken imx_udc ? It doesn't even compile and it's including
-> > > headers which don't exist.
-> > 
-> > This driver handles i.MX1. This one has a gadget only core which is not
-> > chipidea compatible. You should ping Darius Augulis <augulis.darius@gmail.com>
-> > if he is willing to put some love into the driver.
+On 2/25/2013 4:14 PM, Manjunathappa, Prakash wrote:
+> Patch enables support for m25p80 SPI flash support on
+> da850-EVM.
 > 
-> Sascha is correct.
+> Testing information:
+> da850-evm comes with partitions specified in DT blob.
+> Able to mount/umount and create/delete files on filesystem partition.
+> 
+> Depends on below patch in spi-next branch of git://git.secretlab.ca/git/linux-2.6.git.
+> "spi/davinci: add OF support for the spi controller"
+> 
+> Applies on top of below patch under community review:
+> http://www.mail-archive.com/davinci-linux-open-source at linux.davincidsp.com/msg25184.html
 
-do you plan to put any work on drivers/usb/gadget/imx_udc.c ? It doesn't
-even compile since it includes headers which don't exist (and no,
-simply removing the include doesn't help).
+The series looks good to me except a minor comment I gave on 4/4. Patch
+1/4 should be picked by Grant (ideally before v3.9-rc1). I will queue
+rest of patches for v3.10.
 
-If nobody is going to work on that driver, I'm thinking about scheduling
-it for removal. We can't keep such drivers that nobody cares (and just
-break tree compilation) around.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130227/34c39604/attachment.sig>
+Thanks,
+Sekhar
