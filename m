@@ -1,43 +1,75 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Wed, 27 Feb 2013 20:47:14 +0100
-Subject: [PATCH Resend v5 00/16] spi/spi-atmel: add dmaengine support for
- atmel spi controller and to test the device tree support
-In-Reply-To: <1361925297-11854-1-git-send-email-wenyou.yang@atmel.com>
-References: <1361925297-11854-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <CAGhQ9VymJxSRxDUUqzFgkOaY5tjmHe5kmeDtsrYQwMUwAAi0Dw@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 27 Feb 2013 21:51:12 +0200
+Subject: [PATCH] usb: limit OMAP related USB options to OMAP2PLUS platforms
+In-Reply-To: <1361992119-2465-1-git-send-email-paul.gortmaker@windriver.com>
+References: <1361992119-2465-1-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <20130227195046.GA2300@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 February 2013 01:34, Wenyou Yang <wenyou.yang@atmel.com> wrote:
-> Hi All,
->
-> This set of patches is to add dmaengine support for atmel spi and to test device tree support.
->
-> The work is based on Nicolas and Richard's work.
->
-> Because the Atmel DMA device tree support hasn't on mainline, to at91sam9x5ek and at91sam9n12ek
-> with dma support, it doesn't work on the dmaengine mode, only on PIO mode so far.
->
-> It has been tested as below:
->  1./tested on v3.8, by using mtd utils, "mount", "umount" and "cp" commands.
->  2./tested on "spi/next" git tree after removing commit "spi: make sure all transfer has proper speed set".
->  3./tested by using Documentation/spi/spidev_test.c on "/dev/spidev".
->  4./tested on on at91sam9x5ek, at91sam9m10g45ek, at91sam9263ek and at91sam9g20ek boards
->
-> It is based on v3.8.
+HI,
 
-Did a quick test on at91rm9200 and it still works:
-(DataFlash on SPI CS0 in HW mode)
+On Wed, Feb 27, 2013 at 02:08:39PM -0500, Paul Gortmaker wrote:
+> commit 57f6ce072e35770a63be0c5d5e82f90d8da7d665 ("usb: phy:
+> add a new driver for usb3 phy") added the new Kconfig option
+> OMAP_USB3, but it had no dependencies whatsoever, and hence
+> became available across all arch/platforms.
+> 
+> Which presumably caused this to show up in x86 randconfig:
+> 
+>     warning: (USB_MUSB_HDRC && OMAP_USB3) selects \
+>         OMAP_CONTROL_USB which has unmet direct \
+>         dependencies (USB_SUPPORT && ARCH_OMAP2PLUS)
+> 
+> Then commit 6992819feb39cb9adac72170555d957d07f869f2 ("usb: phy:
+> fix Kconfig warning") was added.  However, this just deleted the
+> ARCH_OMAP2PLUS dependency from OMAP_CONTROL_USB, further
+> compounding the problem by opening up OMAP_CONTROL_USB to
+> all arch/platforms as well.
+> 
+> Here we revert the change of 6992819feb to restore the dependency,
+> and add the same ARCH_OMAP2PLUS dependency to the new OMAP_USB3.
+> 
+> Perhaps a more platform specific dependency could be chosen for
+> OMAP_USB3, but at least this keeps it from bleeding out to other
+> architectures and non-OMAP ARM platforms as it is currently doing.
+> 
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: Kishon Vijay Abraham I <kishon@ti.com>
+> Cc: Moiz Sonasath <m-sonasath@ti.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+> ---
+>  drivers/usb/phy/Kconfig | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/drivers/usb/phy/Kconfig b/drivers/usb/phy/Kconfig
+> index 65217a5..40b8463 100644
+> --- a/drivers/usb/phy/Kconfig
+> +++ b/drivers/usb/phy/Kconfig
+> @@ -17,6 +17,7 @@ config OMAP_USB2
+>  
+>  config OMAP_USB3
+>  	tristate "OMAP USB3 PHY Driver"
+> +	depends on ARCH_OMAP2PLUS
+>  	select USB_OTG_UTILS
+>  	select OMAP_CONTROL_USB
+>  	help
+> @@ -27,6 +28,7 @@ config OMAP_USB3
+>  
+>  config OMAP_CONTROL_USB
+>  	tristate "OMAP CONTROL USB Driver"
+> +	depends on ARCH_OMAP2PLUS
 
-[    1.100000] atmel_spi fffe0000.spi: version: 0x0
-[    1.120000] atmel_spi fffe0000.spi: Atmel SPI Controller at
-0xfffe0000 (irq 23)
-[    1.130000] atmel_spi fffe0000.spi: master is unqueued, this is deprecated
-[    1.130000] mtd_dataflash spi32766.0: AT45DB642x (8448 KBytes)
-pagesize 1056 bytes (OTP)
+I rather not add dependencies here and fix the selections of
+OMAP_CONTROL_USB.
 
-so;
-Tested-by: Joachim Eastwood <manabian@gmail.com>
-
-regards
-Joachim Eastwood
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130227/3330317a/attachment.sig>
