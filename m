@@ -1,63 +1,50 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 26 Feb 2013 17:37:17 -0800
-Subject: [PATCH] ARM: vfp: fix fpsid register subarchitecture field mask
- width
-In-Reply-To: <20130225200209.GP17833@n2100.arm.linux.org.uk>
-References: <1361520485-30269-1-git-send-email-sboyd@codeaurora.org>
- <20130225172545.GO17833@n2100.arm.linux.org.uk>
- <20130225200209.GP17833@n2100.arm.linux.org.uk>
-Message-ID: <512D634D.5010600@codeaurora.org>
+From: kim.phillips@freescale.com (Kim Phillips)
+Date: Tue, 26 Feb 2013 19:36:13 -0600
+Subject: [PATCH 1/3] libfdt: add fdt type definitions in libfdt_env.h
+Message-ID: <1361928975-29395-1-git-send-email-kim.phillips@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/25/13 12:02, Russell King - ARM Linux wrote:
->
-> This can of worms is getting bigger.  We have more problems with our
-> handling of the different VFP versions, specifically the handling of
-> the EX=0 DEX=0 case.
->
-> VFP common subarch 3 defines the EX=0, DEX=0 encoding to mean one of
-> the following conditions have been met:
->
-> 1. an unallocated VFP instruction was encountered.
->
->    In other words, the VFP was the target of the co-processor instruction,
->    but the instruction is not a known VFP instruction encoding.  This
->    should raise an undefined instruction exception.
->
-> 2. an allocated VFP instruction was encountered, but not handled in
->    hardware.
->
->    In other words, the instruction is a valid VFP instruction, but the
->    hardware has opted not to implement this instruction and wants
->    software to emulate it instead.
->
->    (Note: this can also be raised as EX=0, DEX=1 - implementation
->     defined!)
->
-[snip]
->
-> So, if EX or DEX is set, _or_ IXE is set, we pass control to VFP_bounce.
-> This is problematical.
->
-> (a) condition (2) above isn't correctly handled for common subarch v3 - it
->     is always treated as an undefined instruction, and will result in a
->     SIGILL being delivered.
->
-[snip]
->
-> Now, (a) is just bad behaviour - as we haven't had any reports of this
-> yet, I suspect that no one has implemented VFP hardware with this
-> behaviour yet.
+in preparation for the forthcoming dtc update which adds fdt specific
+types: fdt{16,32,64}_t.
 
-I believe we ran into this a while ago and fixed it for our chips. We
-never sent the patch upstream. Sorry.
+Signed-off-by: Kim Phillips <kim.phillips@freescale.com>
+---
+ arch/arm/boot/compressed/libfdt_env.h | 4 ++++
+ include/linux/libfdt_env.h            | 6 ++++++
+ 2 files changed, 10 insertions(+)
 
-https://www.codeaurora.org/gitweb/quic/la/?p=kernel/msm.git;a=commitdiff;h=00a13be874f230159a6b7f8cc9d0ff23bc1b7d05
-
-I'm looking into what our bits correspond to. Hopefully get back to you
-in 20 something hours.
-
+diff --git a/arch/arm/boot/compressed/libfdt_env.h b/arch/arm/boot/compressed/libfdt_env.h
+index 1f4e718..17ae0f3 100644
+--- a/arch/arm/boot/compressed/libfdt_env.h
++++ b/arch/arm/boot/compressed/libfdt_env.h
+@@ -5,6 +5,10 @@
+ #include <linux/string.h>
+ #include <asm/byteorder.h>
+ 
++typedef __be16 fdt16_t;
++typedef __be32 fdt32_t;
++typedef __be64 fdt64_t;
++
+ #define fdt16_to_cpu(x)		be16_to_cpu(x)
+ #define cpu_to_fdt16(x)		cpu_to_be16(x)
+ #define fdt32_to_cpu(x)		be32_to_cpu(x)
+diff --git a/include/linux/libfdt_env.h b/include/linux/libfdt_env.h
+index 01508c7..da98097 100644
+--- a/include/linux/libfdt_env.h
++++ b/include/linux/libfdt_env.h
+@@ -5,6 +5,12 @@
+ 
+ #include <asm/byteorder.h>
+ 
++typedef __be16 fdt16_t;
++typedef __be32 fdt32_t;
++typedef __be64 fdt64_t;
++
++#define fdt16_to_cpu(x) be16_to_cpu(x)
++#define cpu_to_fdt16(x) cpu_to_be16(x)
+ #define fdt32_to_cpu(x) be32_to_cpu(x)
+ #define cpu_to_fdt32(x) cpu_to_be32(x)
+ #define fdt64_to_cpu(x) be64_to_cpu(x)
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+1.8.1.4
