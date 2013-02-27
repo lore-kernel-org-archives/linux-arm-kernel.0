@@ -1,51 +1,62 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 27 Feb 2013 20:36:04 +0000
-Subject: [PATCH 01/12] ARM: dts: add generic DMA device tree binding for
- mxs-dma
-In-Reply-To: <1361978748-25281-2-git-send-email-shawn.guo@linaro.org>
-References: <1361978748-25281-1-git-send-email-shawn.guo@linaro.org>
- <1361978748-25281-2-git-send-email-shawn.guo@linaro.org>
-Message-ID: <201302272036.05123.arnd@arndb.de>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 27 Feb 2013 22:42:49 +0200
+Subject: [PATCH v10 6/8] usb: chipidea: imx: add internal vbus regulator
+ control
+In-Reply-To: <CAB7JpEHq6rDS4=twUf7gito5zxinYiHZban77psKEQ962z0LYw@mail.gmail.com>
+References: <1361946799-29471-1-git-send-email-peter.chen@freescale.com>
+ <1361946799-29471-7-git-send-email-peter.chen@freescale.com>
+ <CAB7JpEHq6rDS4=twUf7gito5zxinYiHZban77psKEQ962z0LYw@mail.gmail.com>
+Message-ID: <20130227204249.GA2748@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 27 February 2013, Shawn Guo wrote:
-> Add generic DMA device tree binding for mxs-dma.  The changes include:
+On Wed, Feb 27, 2013 at 09:08:11PM +0200, Alexander Shishkin wrote:
+> On Feb 27, 2013 8:34 AM, "Peter Chen" <peter.chen@freescale.com> wrote:
+> >
+> > - For host, the vbus should always be on.
+> > - For otg, the vbus is off defaultly, the vbus needs to be
+> > turned on/off when usb role switches.
+> >
+> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> > ---
+> >  drivers/usb/chipidea/ci.h          |    2 +
+> >  drivers/usb/chipidea/ci13xxx_imx.c |   76
+> ++++++++++++++++++++++++++++--------
+> >  2 files changed, 61 insertions(+), 17 deletions(-)
+> >
+> > diff --git a/drivers/usb/chipidea/ci.h b/drivers/usb/chipidea/ci.h
+> > index 0bd17a5..5663092 100644
+> > --- a/drivers/usb/chipidea/ci.h
+> > +++ b/drivers/usb/chipidea/ci.h
+> > @@ -133,6 +133,7 @@ struct hw_bank {
+> >   * @id_event: indicates there is a id event, and handled at ci_otg_work
+> >   * @b_sess_valid_event: indicates there is a vbus event, and handled
+> >   * at ci_otg_work
+> > + * @reg_vbus: used to control internal vbus regulator
+> >   */
+> >  struct ci13xxx {
+> >         struct device                   *dev;
+> > @@ -172,6 +173,7 @@ struct ci13xxx {
+> >         struct usb_otg                  otg;
+> >         bool                            id_event;
+> >         bool                            b_sess_valid_event;
+> > +       struct regulator                *reg_vbus;
+> >  };
 > 
->  * Add channel interrupts into DMA controller nodes
->  * Add properties '#dma-cells' and 'dma-channels' for DMA controller nodes
->  * And properties 'dmas' and 'dma-names' for DMA client nodes
->  * Update mxs-dma device tree binding doc
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  .../devicetree/bindings/dma/fsl-mxs-dma.txt        |   49 +++++++++++++++--
->  arch/arm/boot/dts/imx23.dtsi                       |   42 +++++++++++++-
->  arch/arm/boot/dts/imx28.dtsi                       |   58 +++++++++++++++++++-
->  arch/arm/boot/dts/imx6qdl.dtsi                     |    8 ++-
->  4 files changed, 148 insertions(+), 9 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/dma/fsl-mxs-dma.txt b/Documentation/devicetree/bindings/dma/fsl-mxs-dma.txt
-> index ded0398..a4873e5 100644
-> --- a/Documentation/devicetree/bindings/dma/fsl-mxs-dma.txt
-> +++ b/Documentation/devicetree/bindings/dma/fsl-mxs-dma.txt
-> @@ -3,17 +3,58 @@
->  Required properties:
->  - compatible : Should be "fsl,<chip>-dma-apbh" or "fsl,<chip>-dma-apbx"
->  - reg : Should contain registers location and length
-> +- interrupts : Should contain the interrupt numbers of DMA channels.
-> +  If a channel is empty/reserved, 0 should be filled in place.
-> +- #dma-cells : Must be <1>.  The number cell specifies the channel ID.
-> +- dma-channels : Number of channels supported by the DMA controller
-> +
-> +Optional properties:
-> +- interrupt-names : Name of DMA channel interrupts
->  
+> I suggest that this regulator be taken care of by either the platform code
+> or phy layer, it doesn't look like it really belongs in chipidea core. The
+> easiest way I guess would be to do something similar to the notify callback
+> in msm platform code.
 
+I guess it would look better at the phy layer, but looks like we need
+another ->set_vbus() method to switch VBUS on/off.
 
-Looks good overall, just one small comment: The generic binding requires both
-"dma-channels" and "dma-requests" to be listed here. My understanding of this
-driver is that each channel is hardwired to one request, so you can mandate here
-that the two values must be the same.
-
-	Arnd
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130227/971b7741/attachment.sig>
