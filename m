@@ -1,79 +1,26 @@
-From: chao.xie@marvell.com (Chao Xie)
-Date: Tue, 26 Feb 2013 21:54:59 -0500
-Subject: [PATCH] ARM: gic: add irq_set_affinity to gic_arch_extn
-Message-ID: <1361933699-25779-1-git-send-email-chao.xie@marvell.com>
+From: rob@landley.net (Rob Landley)
+Date: Tue, 26 Feb 2013 21:08:06 -0600
+Subject: [PATCH 2/3] dtc: import latest upstream dtc
+In-Reply-To: <1361928975-29395-2-git-send-email-kim.phillips@freescale.com>
+ (from kim.phillips@freescale.com on Tue Feb 26 19:36:14 2013)
+References: <1361928975-29395-1-git-send-email-kim.phillips@freescale.com>
+ <1361928975-29395-2-git-send-email-kim.phillips@freescale.com>
+Message-ID: <1361934486.18483.5@driftwood>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-gic_arch_extn is used for ARCH specific interrupt controller.
-It has added the callbacks for irq_mask/irq_unamsk and so, but
-irq_set_affinity is not used.
-For SMP architecure, when both cores are powered off, the GIC may
-be powered off too. An external interrupt controller can be used
-as a logic to detect the interrupt and acknowledge power managment
-unitto wake up core.
-Because the irqs may be bound to different cors, when set irq
-affinity, the external interrupt controller should be set too. Then
-it can acknowledge the power managment unit to wake up correct core.
+On 02/26/2013 07:36:14 PM, Kim Phillips wrote:
+> This updates scripts/dtc to upstream dtc commit 27cdc1b
 
-Signed-off-by: Chao Xie <chao.xie@marvell.com>
----
- arch/arm/common/gic.c |   27 ++++++++++++++++++---------
- 1 files changed, 18 insertions(+), 9 deletions(-)
+There's an upstream for dts?
 
-diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
-index 36ae03a..49920a0 100644
---- a/arch/arm/common/gic.c
-+++ b/arch/arm/common/gic.c
-@@ -82,12 +82,15 @@ static u8 gic_cpu_map[NR_GIC_CPU_IF] __read_mostly;
-  * Default make them NULL.
-  */
- struct irq_chip gic_arch_extn = {
--	.irq_eoi	= NULL,
--	.irq_mask	= NULL,
--	.irq_unmask	= NULL,
--	.irq_retrigger	= NULL,
--	.irq_set_type	= NULL,
--	.irq_set_wake	= NULL,
-+	.irq_eoi		= NULL,
-+	.irq_mask		= NULL,
-+	.irq_unmask		= NULL,
-+	.irq_retrigger		= NULL,
-+	.irq_set_type		= NULL,
-+#ifdef CONFIG_SMP
-+	.irq_set_affinity	= NULL,
-+#endif
-+	.irq_set_wake		= NULL,
- };
- 
- #ifndef MAX_GIC_NR
-@@ -245,6 +248,7 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
- 	unsigned int shift = (gic_irq(d) % 4) * 8;
- 	unsigned int cpu = cpumask_any_and(mask_val, cpu_online_mask);
- 	u32 val, mask, bit;
-+	int ret = IRQ_SET_MASK_OK;
- 
- 	if (cpu >= NR_GIC_CPU_IF || cpu >= nr_cpu_ids)
- 		return -EINVAL;
-@@ -253,11 +257,16 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
- 	bit = gic_cpu_map[cpu] << shift;
- 
- 	raw_spin_lock(&irq_controller_lock);
--	val = readl_relaxed(reg) & ~mask;
--	writel_relaxed(val | bit, reg);
-+	if (gic_arch_extn.irq_set_affinity)
-+		ret = gic_arch_extn.irq_set_affinity(d, mask_val, force);
-+
-+	if (ret == IRQ_SET_MASK_OK) {
-+		val = readl_relaxed(reg) & ~mask;
-+		writel_relaxed(val | bit, reg);
-+	}
- 	raw_spin_unlock(&irq_controller_lock);
- 
--	return IRQ_SET_MASK_OK;
-+	return ret;
- }
- #endif
- 
--- 
-1.7.4.1
+> "Added license header to dtc/libfdt/fdt.h and libfdt_env.h"
+> from git://git.jdl.com/software/dtc.git.
+
+That git repository has a Documentation directory with for example  
+"dts-format.txt" in it. My current linux git repository does not  
+contain a file called dts-format.txt.
+
+Ummm... huh?
+
+Rob
