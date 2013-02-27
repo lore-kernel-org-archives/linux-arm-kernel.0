@@ -1,57 +1,55 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 27 Feb 2013 09:33:53 +0100
-Subject: [PATCH 1/4] arm: mvebu: limit OpenBlocks AX3-4 to 1 GB of RAM
-In-Reply-To: <20130227070333.GK17242@lunn.ch>
-References: <20130104183139.20492204@skate> <50E71356.3030203@lunn.ch>
- <20130104190345.460151d1@skate>
- <50E9EE7A.1080301@free-electrons.com>
- <20130106235312.0839a879@skate> <20130107094747.GR3392@lunn.ch>
- <20130107110712.GT3392@lunn.ch> <20130107122613.64f4ace5@skate>
- <20130107113411.GV3392@lunn.ch> <20130226162023.3d7b2ffc@skate>
- <20130227070333.GK17242@lunn.ch>
-Message-ID: <20130227093353.03e63046@skate>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 27 Feb 2013 10:36:10 +0200
+Subject: [PATCH v10 6/8] usb: chipidea: imx: add internal vbus regulator
+ control
+In-Reply-To: <20130227081313.GI20402@nchen-desktop>
+References: <1361946799-29471-1-git-send-email-peter.chen@freescale.com>
+ <1361946799-29471-7-git-send-email-peter.chen@freescale.com>
+ <20130227075510.GB8016@arwen.pp.htv.fi>
+ <20130227080735.GH1906@pengutronix.de>
+ <20130227081313.GI20402@nchen-desktop>
+Message-ID: <20130227083610.GK8016@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew Lunn,
+Hi Darius,
 
-On Wed, 27 Feb 2013 08:03:33 +0100, Andrew Lunn wrote:
-
-> > in U-Boot. Gr??gory and I are using OpenBlocks AX3 based on the A0
-> > version of the silicon (so the message I copy/pasted above is *not*
-> > from our OpenBlocks, but a different Armada XP board). However,
-> > PlatHome has been shipping since some time B0 revisions. Maybe it
-> > could explain the difference we're seeing?
+On Wed, Feb 27, 2013 at 04:13:14PM +0800, Peter Chen wrote:
+> On Wed, Feb 27, 2013 at 09:07:35AM +0100, Sascha Hauer wrote:
+> > On Wed, Feb 27, 2013 at 09:55:10AM +0200, Felipe Balbi wrote:
+> > > Hi,
+> > > 
+> > > On Wed, Feb 27, 2013 at 02:33:17PM +0800, Peter Chen wrote:
+> > > > - For host, the vbus should always be on.
+> > > > - For otg, the vbus is off defaultly, the vbus needs to be
+> > > > turned on/off when usb role switches.
+> > > > 
+> > > > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> > > 
+> > > one quick question, if chipidea already has an imx glue layer, can I
+> > > delete the broken imx_udc ? It doesn't even compile and it's including
+> > > headers which don't exist.
+> > 
+> > This driver handles i.MX1. This one has a gadget only core which is not
+> > chipidea compatible. You should ping Darius Augulis <augulis.darius@gmail.com>
+> > if he is willing to put some love into the driver.
 > 
-> Hi Thomas
-> 
-> My machine is an A0.
+> Sascha is correct.
 
-Hum, ok, so that doesn't explain the problem.
+do you plan to put any work on drivers/usb/gadget/imx_udc.c ? It doesn't
+even compile since it includes headers which don't exist (and no,
+simply removing the include doesn't help).
 
-> I know you recently found some issue with windows. Could that explain
-> something?
+If nobody is going to work on that driver, I'm thinking about scheduling
+it for removal. We can't keep such drivers that nobody cares (and just
+break tree compilation) around.
 
-No, the issue with the window was only that devices can only access the
-first 32 bits of the physical address space, so if there is a DRAM CS
-configured with a base address higher than 4 GB, then devices shouldn't
-configure a window to access this part of the DRAM, because it creates
-two overlapping windows (both starting at base 0x0, since in the device
-address decoding window registers, the base only has 32 bits, while it
-has 35 bits for the SDRAM address decoding registers). And the issue
-with window was that the devices were really not working at all. What
-we're seeing with the OpenBlocks is some instability: sometimes it
-boots, sometimes not.
-
-We're going to discuss this issue further with PlatHome.
-
-Thanks for reporting!
-
-Best regards,
-
-Thomas
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130227/34c39604/attachment.sig>
