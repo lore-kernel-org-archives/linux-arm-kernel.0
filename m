@@ -1,114 +1,57 @@
-From: walken@google.com (Michel Lespinasse)
-Date: Wed, 27 Feb 2013 19:11:34 +0800
-Subject: [PATCH v6 04/46] percpu_rwlock: Implement the core design of
- Per-CPU Reader-Writer Locks
-In-Reply-To: <512D0D67.9010609@linux.vnet.ibm.com>
-References: <20130218123714.26245.61816.stgit@srivatsabhat.in.ibm.com>
- <20130218123856.26245.46705.stgit@srivatsabhat.in.ibm.com>
- <CANN689F9S7c1M8+cEpz3tsxGF34+NTRBLvxgPUOtbvav5u+RRA@mail.gmail.com>
- <5122551E.1080703@linux.vnet.ibm.com>
- <51226B46.9080707@linux.vnet.ibm.com>
- <CANN689FSxOz+0Cu7EG_yKD8ZE1OpT4kyT+ybLfXSqaifodJRpw@mail.gmail.com>
- <51226F91.7000108@linux.vnet.ibm.com>
- <CACvQF53bdh4_BxF0y1fnTVR+T2OmRc0jmWQYftsvx92-fg-Lug@mail.gmail.com>
- <512BBAD8.8010006@linux.vnet.ibm.com>
- <CACvQF51jCxk5jUqmhD=QBBtUsBkQWZzakacrKO4Gsk=w61rNwQ@mail.gmail.com>
- <512C7A38.8060906@linux.vnet.ibm.com>
- <CACvQF51RvhM8XNqu3-1OTQ=cZUZ=pAX+_zx0a29+W67N1X+BgQ@mail.gmail.com>
- <512CC509.1050000@linux.vnet.ibm.com>
- <CACvQF50UgiqPpDk3HCmV86zKSf6tPjqr0bZowfPEOJs0g0r0MQ@mail.gmail.com>
- <512D0D67.9010609@linux.vnet.ibm.com>
-Message-ID: <CANN689FuuEb9wpV43DkTtgv6syvBYL-LQxByWznyAq8dkrhzBw@mail.gmail.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Wed, 27 Feb 2013 08:16:28 -0300
+Subject: [PATCH] arm: plat-orion: fix address decoding when > 4GB is used
+In-Reply-To: <1361958575-2328-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1361958575-2328-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20130227111627.GA2718@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Srivatsa,
+On Wed, Feb 27, 2013 at 10:49:35AM +0100, Thomas Petazzoni wrote:
+> During the system initialization, the orion_setup_cpu_mbus_target()
+> function reads the SDRAM address decoding registers to find out how
+> many chip-selects of SDRAM have been enabled, and builds a small array
+> with one entry per chip-select. This array is then used by device
+> drivers (XOR, Ethernet, etc.) to configure their own address decoding
+> windows to the SDRAM.
+> 
+> However, devices can only access the first 32 bits of the physical
+> memory. Even though LPAE is not supported for now, some Marvell boards
+> are not showing up with 8 GB of RAM, configured using two SDRAM
 
-I think there is some elegance in Lai's proposal of using a local
-trylock for the reader uncontended case and global rwlock to deal with
-the contended case without deadlocks. He apparently didn't realize
-initially that nested read locks are common, and he seems to have
-confused you because of that, but I think his proposal could be
-changed easily to account for that and result in short, easily
-understood code. What about the following:
+Tiny nitpick:
 
-- local_refcnt is a local lock count; it indicates how many recursive
-locks are taken using the local lglock
-- lglock is used by readers for local locking; it must be acquired
-before local_refcnt becomes nonzero and released after local_refcnt
-goes back to zero.
-- fallback_rwlock is used by readers for global locking; it is
-acquired when fallback_reader_refcnt is zero and the trylock fails on
-lglock
+s/not/now
 
-+void lg_rwlock_local_read_lock(struct lgrwlock *lgrw)
-+{
-+       preempt_disable();
-+
-+       if (__this_cpu_read(*lgrw->local_refcnt) ||
-+           arch_spin_trylock(this_cpu_ptr(lgrw->lglock->lock))) {
-+               __this_cpu_inc(*lgrw->local_refcnt);
-+
-rwlock_acquire_read(&lgrw->fallback_rwlock->lock_dep_map, 0, 0,
-_RET_IP_);
-+       } else {
-+               read_lock(&lgrw->fallback_rwlock);
-+       }
-+}
-+EXPORT_SYMBOL(lg_rwlock_local_read_lock);
-+
-+void lg_rwlock_local_read_unlock(struct lgrwlock *lgrw)
-+{
-+       if (likely(__this_cpu_read(*lgrw->local_refcnt))) {
-+               rwlock_release(&lgrw->fallback_rwlock->lock_dep_map,
-1, _RET_IP_);
-+               if (!__this_cpu_dec_return(*lgrw->local_refcnt))
-+                       arch_spin_unlock(this_cpu_ptr(lgrw->lglock->lock));
-+       } else {
-+               read_unlock(&lgrw->fallback_rwlock);
-+       }
-+
-+       preempt_enable();
-+}
-+EXPORT_SYMBOL(lg_rwlock_local_read_unlock);
-+
-+void lg_rwlock_global_write_lock(struct lgrwlock *lgrw)
-+{
-+       int i;
-+
-+       preempt_disable();
-+
-+       for_each_possible_cpu(i)
-+               arch_spin_lock(per_cpu_ptr(lgrw->lglock->lock, i));
-+       write_lock(&lgrw->fallback_rwlock);
-+}
-+EXPORT_SYMBOL(lg_rwlock_global_write_lock);
-+
-+void lg_rwlock_global_write_unlock(struct lgrwlock *lgrw)
-+{
-+       int i;
-+
-+       write_unlock(&lgrw->fallback_rwlock);
-+       for_each_possible_cpu(i)
-+               arch_spin_unlock(per_cpu_ptr(lgrw->lglock->lock, i));
-+
-+       preempt_enable();
-+}
-+EXPORT_SYMBOL(lg_rwlock_global_write_unlock);
+> address decoding windows: the first covering the first 4 GB, the
+> second covering the last 4 GB. The array built by
+> orion_setup_cpu_mbus_target() has therefore two entries, and device
+> drivers try to set up two address decoding windows to the
+> SDRAM. However, in the device registers for the address decoding, the
+> base address is only 32 bits, so those two windows overlap each other,
+> and the devices do not work at all.
+> 
+> This patch makes sure that the array built by
+> orion_setup_cpu_mbus_target() only contains the SDRAM decoding windows
+> that correspond to the first 4 GB of the memory. To do that, it
+> ignores the SDRAM decoding windows for which the 3 low-order bits are
+> not zero (the 3 low-order bits of the base register are used to store
+> bits 32:35 of the base address, so they actually indicate whether the
+> base address is above 4 GB).
+> 
+> This patch allows the newly introduced armada-xp-gp board to properly
+> operate when it is mounted with more than 4 GB of RAM. Without that,
+> all devices doing DMA (for example XOR and Ethernet) do not work at
+> all.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-This is to me relatively easier to understand than Srivatsa's
-proposal. Now I'm not sure who wins efficiency wise, but I think it
-should be relatively close as readers at least don't touch shared
-state in the uncontended case (even with some recursion going on).
+On the Armada XP GP board, ethernet doesn't work at all without this patch.
 
-There is an interesting case where lg_rwlock_local_read_lock could be
-interrupted after getting the local lglock but before incrementing
-local_refcnt to 1; if that happens any nested readers within that
-interrupt will have to take the global rwlock read side. I think this
-is perfectly acceptable as this should not be a common case though
-(and thus the global rwlock cache line probably wouldn't even bounce
-between cpus then).
+Tested-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 
+Thanks,
 -- 
-Michel "Walken" Lespinasse
-A program is never fully debugged until the last user dies.
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
