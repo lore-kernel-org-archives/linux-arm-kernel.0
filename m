@@ -1,37 +1,123 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Wed, 27 Feb 2013 10:28:03 +0800
-Subject: [PATCH V2 0/4] ARM: tegra114: bring up secondary CPU for SMP
-Message-ID: <1361932087-13372-1-git-send-email-josephl@nvidia.com>
+Date: Wed, 27 Feb 2013 10:28:04 +0800
+Subject: [PATCH V2 1/4] ARM: tegra: pmc: convert PMC driver to support DT only
+In-Reply-To: <1361932087-13372-1-git-send-email-josephl@nvidia.com>
+References: <1361932087-13372-1-git-send-email-josephl@nvidia.com>
+Message-ID: <1361932087-13372-2-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series bring up secondary CPU for Tegra114. Because we are going to
-support generic power domain later, the conventional powergate driver will
-be removed. So we add the CPU power on/off function in PMC driver first.
+The Tegra kernel only support boot from DT now. Clean up the PMC driver
+to support DT only, that includes:
 
-This series was dependent on the patches below.
-"ARM: tegra: don't unlock MMIO access to DBGLAR for working"
-"ARM: tegra: Fix unchecked return value"
-"ARM: tegra30: fix the logical detection of power on sequence of warm boot CPUs"
-"ARM: tegra: refactor tegra{20,30}_boot_secondary"
+* remove the ifdef of CONFIG_OF
+* replace the static mapping of PMC addr to map from DT
 
-And the V2 series below.
-"ARM: tegra: pmc: add specific compatible DT string for Tegra30 and Tegra114"
-"ARM: dts: tegra: fix the PMC compatible string"
-
+Signed-off-by: Joseph Lo <josephl@nvidia.com>
+---
 V2:
-* take care the comments from V1
+* removing the change from readl_relaxed back to readl, same with the
+  write function
+* adding a BUG() when there is no PMC node in DT
+* removeing the redundancy of_have_populated_dt() check
+---
+ arch/arm/mach-tegra/pmc.c | 54 ++++++++++++++++++++++-------------------------
+ 1 file changed, 25 insertions(+), 29 deletions(-)
 
-Joseph Lo (4):
-  ARM: tegra: pmc: convert PMC driver to support DT only
-  ARM: tegra: pmc: add power on function for secondary CPUs
-  ARM: tegra30: platsmp: replace the CPU power on function in PMC driver
-  ARM: tegra114: bring up secondary CPU for SMP
-
- arch/arm/mach-tegra/platsmp.c |  27 +++----
- arch/arm/mach-tegra/pmc.c     | 159 ++++++++++++++++++++++++++++++++++--------
- arch/arm/mach-tegra/pmc.h     |   4 ++
- 3 files changed, 148 insertions(+), 42 deletions(-)
-
+diff --git a/arch/arm/mach-tegra/pmc.c b/arch/arm/mach-tegra/pmc.c
+index 5d79d34..f7d63ab 100644
+--- a/arch/arm/mach-tegra/pmc.c
++++ b/arch/arm/mach-tegra/pmc.c
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (C) 2012 NVIDIA CORPORATION. All rights reserved.
++ * Copyright (C) 2012,2013 NVIDIA CORPORATION. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify it
+  * under the terms and conditions of the GNU General Public License,
+@@ -18,59 +18,55 @@
+ #include <linux/kernel.h>
+ #include <linux/io.h>
+ #include <linux/of.h>
+-
+-#include "iomap.h"
++#include <linux/of_address.h>
+ 
+ #define PMC_CTRL		0x0
+ #define PMC_CTRL_INTR_LOW	(1 << 17)
+ 
++static void __iomem *tegra_pmc_base;
++static bool tegra_pmc_invert_interrupt;
++
+ static inline u32 tegra_pmc_readl(u32 reg)
+ {
+-	return readl(IO_ADDRESS(TEGRA_PMC_BASE + reg));
++	return readl(tegra_pmc_base + reg);
+ }
+ 
+ static inline void tegra_pmc_writel(u32 val, u32 reg)
+ {
+-	writel(val, IO_ADDRESS(TEGRA_PMC_BASE + reg));
++	writel(val, (tegra_pmc_base + reg));
+ }
+ 
+-#ifdef CONFIG_OF
+ static const struct of_device_id matches[] __initconst = {
+ 	{ .compatible = "nvidia,tegra114-pmc" },
+ 	{ .compatible = "nvidia,tegra30-pmc" },
+ 	{ .compatible = "nvidia,tegra20-pmc" },
+ 	{ }
+ };
+-#endif
+ 
+-void __init tegra_pmc_init(void)
++static void tegra_pmc_parse_dt(void)
+ {
+-	/*
+-	 * For now, Harmony is the only board that uses the PMC, and it wants
+-	 * the signal inverted. Seaboard would too if it used the PMC.
+-	 * Hopefully by the time other boards want to use the PMC, everything
+-	 * will be device-tree, or they also want it inverted.
+-	 */
+-	bool invert_interrupt = true;
+-	u32 val;
+-
+-#ifdef CONFIG_OF
+-	if (of_have_populated_dt()) {
+-		struct device_node *np;
++	struct device_node *np;
+ 
+-		invert_interrupt = false;
++	np = of_find_matching_node(NULL, matches);
++	if (np) {
++		tegra_pmc_base = of_iomap(np, 0);
+ 
+-		np = of_find_matching_node(NULL, matches);
+-		if (np) {
+-			if (of_find_property(np, "nvidia,invert-interrupt",
+-						NULL))
+-				invert_interrupt = true;
+-		}
++		tegra_pmc_invert_interrupt = of_property_read_bool(np,
++					     "nvidia,invert-interrupt");
++	} else {
++		/* Should not be here, the PMC DT node should always exist. */
++		BUG();
+ 	}
+-#endif
++}
++
++void __init tegra_pmc_init(void)
++{
++	u32 val;
++
++	tegra_pmc_parse_dt();
+ 
+ 	val = tegra_pmc_readl(PMC_CTRL);
+-	if (invert_interrupt)
++	if (tegra_pmc_invert_interrupt)
+ 		val |= PMC_CTRL_INTR_LOW;
+ 	else
+ 		val &= ~PMC_CTRL_INTR_LOW;
 -- 
 1.8.1.1
