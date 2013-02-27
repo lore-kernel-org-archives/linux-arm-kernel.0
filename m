@@ -1,135 +1,55 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Wed, 27 Feb 2013 14:33:13 +0800
-Subject: [PATCH v10 2/8] usb: chipidea: add otg file
+Date: Wed, 27 Feb 2013 14:33:15 +0800
+Subject: [PATCH v10 4/8] usb: chipidea: udc: add pullup/pulldown dp at
+ hw_device_state
 In-Reply-To: <1361946799-29471-1-git-send-email-peter.chen@freescale.com>
 References: <1361946799-29471-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1361946799-29471-3-git-send-email-peter.chen@freescale.com>
+Message-ID: <1361946799-29471-5-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement struct usb_otg, In that way, calling otg_set_peripheral
-will not be failed at udc.c.
+- During the connect/disconnect host, we need to pullup
+and pulldown dp
+- Make sure the dp is not pullup until the vbus is on when
+flag CI13XXX_PULLUP_ON_VBUS is set
+- Using hw_device_state when set run/stop bit
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/chipidea/Makefile |    2 +-
- drivers/usb/chipidea/ci.h     |    2 +
- drivers/usb/chipidea/otg.c    |   60 +++++++++++++++++++++++++++++++++++++++++
- drivers/usb/chipidea/otg.h    |    6 ++++
- 4 files changed, 69 insertions(+), 1 deletions(-)
- create mode 100644 drivers/usb/chipidea/otg.c
- create mode 100644 drivers/usb/chipidea/otg.h
+ drivers/usb/chipidea/udc.c |   10 ++++++++--
+ 1 files changed, 8 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
-index d92ca32..11f513c 100644
---- a/drivers/usb/chipidea/Makefile
-+++ b/drivers/usb/chipidea/Makefile
-@@ -2,7 +2,7 @@ ccflags-$(CONFIG_USB_CHIPIDEA_DEBUG) := -DDEBUG
+diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
+index e82dae4..597ae64 100644
+--- a/drivers/usb/chipidea/udc.c
++++ b/drivers/usb/chipidea/udc.c
+@@ -91,8 +91,10 @@ static int hw_device_state(struct ci13xxx *ci, u32 dma)
+ 		/* interrupt, error, port change, reset, sleep/suspend */
+ 		hw_write(ci, OP_USBINTR, ~0,
+ 			     USBi_UI|USBi_UEI|USBi_PCI|USBi_URI|USBi_SLI);
++		hw_write(ci, OP_USBCMD, USBCMD_RS, USBCMD_RS);
+ 	} else {
+ 		hw_write(ci, OP_USBINTR, ~0, 0);
++		hw_write(ci, OP_USBCMD, USBCMD_RS, 0);
+ 	}
+ 	return 0;
+ }
+@@ -1424,10 +1426,14 @@ static int ci13xxx_pullup(struct usb_gadget *_gadget, int is_on)
+ {
+ 	struct ci13xxx *ci = container_of(_gadget, struct ci13xxx, gadget);
  
- obj-$(CONFIG_USB_CHIPIDEA)		+= ci_hdrc.o
++	if ((ci->platdata->flags & CI13XXX_PULLUP_ON_VBUS) &&
++			!ci->vbus_active)
++		return -ENOTSUPP;
++
+ 	if (is_on)
+-		hw_write(ci, OP_USBCMD, USBCMD_RS, USBCMD_RS);
++		hw_device_state(ci, ci->ep0out->qh.dma);
+ 	else
+-		hw_write(ci, OP_USBCMD, USBCMD_RS, 0);
++		hw_device_state(ci, 0);
  
--ci_hdrc-y				:= core.o
-+ci_hdrc-y				:= core.o otg.o
- ci_hdrc-$(CONFIG_USB_CHIPIDEA_UDC)	+= udc.o
- ci_hdrc-$(CONFIG_USB_CHIPIDEA_HOST)	+= host.o
- ci_hdrc-$(CONFIG_USB_CHIPIDEA_DEBUG)	+= debug.o
-diff --git a/drivers/usb/chipidea/ci.h b/drivers/usb/chipidea/ci.h
-index d738603..697e369 100644
---- a/drivers/usb/chipidea/ci.h
-+++ b/drivers/usb/chipidea/ci.h
-@@ -129,6 +129,7 @@ struct hw_bank {
-  * @vbus_active: is VBUS active
-  * @transceiver: pointer to USB PHY, if any
-  * @hcd: pointer to usb_hcd for ehci host driver
-+ * @otg: for otg support
-  */
- struct ci13xxx {
- 	struct device			*dev;
-@@ -164,6 +165,7 @@ struct ci13xxx {
- 	bool				global_phy;
- 	struct usb_phy			*transceiver;
- 	struct usb_hcd			*hcd;
-+	struct usb_otg      		otg;
- };
- 
- static inline struct ci_role_driver *ci_role(struct ci13xxx *ci)
-diff --git a/drivers/usb/chipidea/otg.c b/drivers/usb/chipidea/otg.c
-new file mode 100644
-index 0000000..7dea3b3
---- /dev/null
-+++ b/drivers/usb/chipidea/otg.c
-@@ -0,0 +1,60 @@
-+/*
-+ * otg.c - ChipIdea USB IP core OTG driver
-+ *
-+ * Copyright (C) 2012 Freescale Semiconductor, Inc.
-+ *
-+ * Author: Peter Chen
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/platform_device.h>
-+#include <linux/module.h>
-+#include <linux/io.h>
-+#include <linux/irq.h>
-+#include <linux/kernel.h>
-+#include <linux/slab.h>
-+#include <linux/usb/gadget.h>
-+#include <linux/usb/otg.h>
-+#include <linux/usb/chipidea.h>
-+
-+#include "ci.h"
-+#include "udc.h"
-+#include "bits.h"
-+#include "host.h"
-+#include "debug.h"
-+
-+static int ci_otg_set_peripheral(struct usb_otg *otg,
-+		struct usb_gadget *periph)
-+{
-+	otg->gadget = periph;
-+
-+	return 0;
-+}
-+
-+static int ci_otg_set_host(struct usb_otg *otg, struct usb_bus *host)
-+{
-+	otg->host = host;
-+
-+	return 0;
-+}
-+
-+/**
-+ * ci_hdrc_otg_init - initialize device related bits
-+ * ci: the controller
-+ *
-+ * This function create otg struct, if the device can switch between
-+ * device and host.
-+ */
-+int ci_hdrc_otg_init(struct ci13xxx *ci)
-+{
-+	/* Useless at current */
-+	ci->otg.set_peripheral = ci_otg_set_peripheral;
-+	ci->otg.set_host = ci_otg_set_host;
-+	if (!IS_ERR_OR_NULL(ci->transceiver))
-+		ci->transceiver->otg = &ci->otg;
-+
-+	return 0;
-+}
-diff --git a/drivers/usb/chipidea/otg.h b/drivers/usb/chipidea/otg.h
-new file mode 100644
-index 0000000..b4c6b3e
---- /dev/null
-+++ b/drivers/usb/chipidea/otg.h
-@@ -0,0 +1,6 @@
-+#ifndef __DRIVERS_USB_CHIPIDEA_OTG_H
-+#define __DRIVERS_USB_CHIPIDEA_OTG_H
-+
-+int ci_hdrc_otg_init(struct ci13xxx *ci);
-+
-+#endif /* __DRIVERS_USB_CHIPIDEA_OTG_H */
+ 	return 0;
+ }
 -- 
 1.7.0.4
