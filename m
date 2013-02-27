@@ -1,44 +1,45 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 26 Feb 2013 21:42:04 -0600
-Subject: [PATCH 0/4] Convert highbank to use PSCI calls
-Message-ID: <1361936528-25998-1-git-send-email-robherring2@gmail.com>
+Date: Tue, 26 Feb 2013 21:42:05 -0600
+Subject: [PATCH 1/4] ARM: highbank: clean-up some unused includes
+In-Reply-To: <1361936528-25998-1-git-send-email-robherring2@gmail.com>
+References: <1361936528-25998-1-git-send-email-robherring2@gmail.com>
+Message-ID: <1361936528-25998-2-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-This series converts highbank to use PSCI calls for secondary core boot,
-hotplug, cpuidle, suspend/resume, reset, and poweroff. Doing this removes
-about 200 lines of platform code (1/3 of it) and abstracts out the A9 and
-A15 differences (some of which are not yet in place).
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+---
+ arch/arm/mach-highbank/highbank.c |    4 ----
+ 1 file changed, 4 deletions(-)
 
-Will, I'm using the id field to specify system level events which are
-highbank specific. I worry that the id field will be abused for things
-that could be standardized. Having standard PSCI calls for reset and
-poweroff would avoid this for highbank.
-
-Rob
-
-Rob Herring (4):
-  ARM: highbank: clean-up some unused includes
-  dts: calxeda: add ARM PSCI binding
-  cpuidle: calxeda: add support to use PSCI calls
-  ARM: highbank: adapt to use ARM PSCI calls
-
- arch/arm/boot/dts/ecx-common.dtsi |    8 +++++
- arch/arm/mach-highbank/Kconfig    |    2 +-
- arch/arm/mach-highbank/Makefile   |    2 +-
- arch/arm/mach-highbank/core.h     |    3 --
- arch/arm/mach-highbank/highbank.c |   53 +++++------------------------
- arch/arm/mach-highbank/hotplug.c  |   12 +------
- arch/arm/mach-highbank/platsmp.c  |   42 ++++-------------------
- arch/arm/mach-highbank/pm.c       |   25 +++++---------
- arch/arm/mach-highbank/sysregs.h  |   67 ++++++-------------------------------
- arch/arm/mach-highbank/system.c   |   32 ------------------
- drivers/cpuidle/cpuidle-calxeda.c |   54 ++++--------------------------
- drivers/mailbox/pl320-ipc.c       |    2 +-
- 12 files changed, 53 insertions(+), 249 deletions(-)
- delete mode 100644 arch/arm/mach-highbank/system.c
-
+diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
+index a4f9f50..3a5e62c 100644
+--- a/arch/arm/mach-highbank/highbank.c
++++ b/arch/arm/mach-highbank/highbank.c
+@@ -17,14 +17,11 @@
+ #include <linux/clkdev.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/io.h>
+-#include <linux/irq.h>
+ #include <linux/irqchip.h>
+-#include <linux/irqdomain.h>
+ #include <linux/of.h>
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
+ #include <linux/of_address.h>
+-#include <linux/smp.h>
+ #include <linux/amba/bus.h>
+ #include <linux/clk-provider.h>
+ 
+@@ -38,7 +35,6 @@
+ #include <asm/hardware/cache-l2x0.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+-#include <asm/mach/time.h>
+ 
+ #include "core.h"
+ #include "sysregs.h"
 -- 
 1.7.10.4
