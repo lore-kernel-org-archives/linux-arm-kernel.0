@@ -1,222 +1,165 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 27 Feb 2013 20:49:26 -0800
-Subject: [PATCH 2/5] clk: notifier handler for dynamic voltage scaling
+Date: Wed, 27 Feb 2013 20:49:27 -0800
+Subject: [PATCH 3/5] cpufreq: omap: scale regulator from clk notifier
 In-Reply-To: <1362026969-11457-1-git-send-email-mturquette@linaro.org>
 References: <1362026969-11457-1-git-send-email-mturquette@linaro.org>
-Message-ID: <1362026969-11457-3-git-send-email-mturquette@linaro.org>
+Message-ID: <1362026969-11457-4-git-send-email-mturquette@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dynamic voltage and frequency scaling (dvfs) is a common power saving
-technique in many of today's modern processors.  This patch introduces a
-common clk rate-change notifier handler which scales voltage
-appropriately whenever clk_set_rate is called on an affected clock.
+This patch moves direct control of the MPU voltage regulator out of the
+cpufreq driver .target callback and instead uses the common dvfs clk
+rate-change notifier infrastructure.
 
-There are three prerequisites to using this feature:
-
-1) the affected clocks must be using the common clk framework
-2) voltage must be scaled using the regulator framework
-3) clock frequency and regulator voltage values must be paired via the
-OPP library
-
-If a platform or device meets these requirements then using the notifier
-handler is straightforward.  A struct device is used as the basis for
-performing initial look-ups for clocks via clk_get and regulators via
-regulator_get.  This means that notifiers are subscribed on a per-device
-basis and multiple devices can have notifiers subscribed to the same
-clock.  Put another way, the voltage chosen for a rail during a call to
-clk_set_rate is a function of the device, not the clock.
+Ideally it would be nice to reduce the .target callback for omap's
+cpufreq driver to a simple call to clk_set_rate.  For now there is still
+some other stuff needed there (jiffies per loop, rounding the rate, etc
+etc).
 
 Signed-off-by: Mike Turquette <mturquette@linaro.org>
 ---
- drivers/clk/Makefile |    1 +
- drivers/clk/dvfs.c   |  125 ++++++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/clk.h  |   27 ++++++++++-
- 3 files changed, 152 insertions(+), 1 deletion(-)
- create mode 100644 drivers/clk/dvfs.c
+ drivers/cpufreq/omap-cpufreq.c |   82 ++++++++++------------------------------
+ 1 file changed, 20 insertions(+), 62 deletions(-)
 
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index e73b1d6..e720b7c 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -7,6 +7,7 @@ obj-$(CONFIG_COMMON_CLK)	+= clk-fixed-factor.o
- obj-$(CONFIG_COMMON_CLK)	+= clk-fixed-rate.o
- obj-$(CONFIG_COMMON_CLK)	+= clk-gate.o
- obj-$(CONFIG_COMMON_CLK)	+= clk-mux.o
-+obj-$(CONFIG_COMMON_CLK)	+= dvfs.o
+diff --git a/drivers/cpufreq/omap-cpufreq.c b/drivers/cpufreq/omap-cpufreq.c
+index 1f3417a..6bec1c4 100644
+--- a/drivers/cpufreq/omap-cpufreq.c
++++ b/drivers/cpufreq/omap-cpufreq.c
+@@ -37,7 +37,7 @@ static struct cpufreq_frequency_table *freq_table;
+ static atomic_t freq_table_users = ATOMIC_INIT(0);
+ static struct clk *mpu_clk;
+ static struct device *mpu_dev;
+-static struct regulator *mpu_reg;
++static struct dvfs_info *di;
  
- # SoCs specific
- obj-$(CONFIG_ARCH_BCM2835)	+= clk-bcm2835.o
-diff --git a/drivers/clk/dvfs.c b/drivers/clk/dvfs.c
-new file mode 100644
-index 0000000..d916d0b
---- /dev/null
-+++ b/drivers/clk/dvfs.c
-@@ -0,0 +1,125 @@
-+/*
-+ * Copyright (C) 2011-2012 Linaro Ltd <mturquette@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * Helper functions for dynamic voltage & frequency transitions using
-+ * the OPP library.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/regulator/consumer.h>
-+#include <linux/opp.h>
-+#include <linux/device.h>
-+#include <linux/slab.h>
-+#include <linux/module.h>
-+
-+/*
-+ * XXX clk, regulator & tolerance should be stored in the OPP table?
-+ */
-+struct dvfs_info {
-+	struct device *dev;
-+	struct clk *clk;
-+	struct regulator *reg;
-+	int tol;
-+	struct notifier_block nb;
-+};
-+
-+#define to_dvfs_info(_nb) container_of(_nb, struct dvfs_info, nb)
-+
-+static int dvfs_clk_notifier_handler(struct notifier_block *nb,
-+		unsigned long flags, void *data)
-+{
-+	struct clk_notifier_data *cnd = data;
-+	struct dvfs_info *di = to_dvfs_info(nb);
-+	int ret, volt_new, volt_old;
-+	struct opp *opp;
-+
-+	volt_old = regulator_get_voltage(di->reg);
-+	rcu_read_lock();
-+	opp = opp_find_freq_floor(di->dev, &cnd->new_rate);
-+	volt_new = opp_get_voltage(opp);
-+	rcu_read_unlock();
-+
-+	/* scaling up?  scale voltage before frequency */
-+	if (flags & PRE_RATE_CHANGE && cnd->new_rate > cnd->old_rate) {
-+		dev_dbg(di->dev, "%s: %d mV --> %d mV\n",
-+				__func__, volt_old, volt_new);
-+
-+		ret = regulator_set_voltage_tol(di->reg, volt_new, di->tol);
-+
-+		if (ret) {
-+			dev_warn(di->dev, "%s: unable to scale voltage up.\n",
-+				 __func__);
-+			return notifier_from_errno(ret);
-+		}
-+	}
-+
-+	/* scaling down?  scale voltage after frequency */
-+	if (flags & POST_RATE_CHANGE && cnd->new_rate < cnd->old_rate) {
-+		dev_dbg(di->dev, "%s: %d mV --> %d mV\n",
-+				__func__, volt_old, volt_new);
-+
-+		ret = regulator_set_voltage_tol(di->reg, volt_new, di->tol);
-+
-+		if (ret) {
-+			dev_warn(di->dev, "%s: unable to scale voltage down.\n",
-+				 __func__);
-+			return notifier_from_errno(ret);
-+		}
-+	}
-+
-+	return NOTIFY_OK;
-+}
-+
-+struct dvfs_info *dvfs_clk_notifier_register(struct dvfs_info_init *dii)
-+{
-+	struct dvfs_info *di;
+ static int omap_verify_speed(struct cpufreq_policy *policy)
+ {
+@@ -62,10 +62,9 @@ static int omap_target(struct cpufreq_policy *policy,
+ 		       unsigned int relation)
+ {
+ 	unsigned int i;
+-	int r, ret = 0;
 +	int ret = 0;
-+
-+	if (!dii)
-+		return ERR_PTR(-EINVAL);
-+
-+	di = kzalloc(sizeof(struct dvfs_info), GFP_KERNEL);
-+	if (!di)
-+		return ERR_PTR(-ENOMEM);
-+
-+	di->dev = dii->dev;
-+	di->clk = clk_get(di->dev, dii->con_id);
-+	if (IS_ERR(di->clk)) {
-+		ret = -ENOMEM;
-+		goto err;
-+	}
-+
-+	di->reg = regulator_get(di->dev, dii->reg_id);
-+	if (IS_ERR(di->reg)) {
-+		ret = -ENOMEM;
-+		goto err;
-+	}
-+
-+	di->tol = dii->tol;
-+	di->nb.notifier_call = dvfs_clk_notifier_handler;
-+
-+	ret = clk_notifier_register(di->clk, &di->nb);
-+
-+	if (ret)
-+		goto err;
-+
-+	return di;
-+
-+err:
-+	kfree(di);
-+	return ERR_PTR(ret);
-+}
-+EXPORT_SYMBOL_GPL(dvfs_clk_notifier_register);
-+
-+void dvfs_clk_notifier_unregister(struct dvfs_info *di)
-+{
-+	clk_notifier_unregister(di->clk, &di->nb);
-+	clk_put(di->clk);
-+	regulator_put(di->reg);
-+	kfree(di);
-+}
-+EXPORT_SYMBOL_GPL(dvfs_clk_notifier_unregister);
-diff --git a/include/linux/clk.h b/include/linux/clk.h
-index b3ac22d..28d952f 100644
---- a/include/linux/clk.h
-+++ b/include/linux/clk.h
-@@ -78,9 +78,34 @@ struct clk_notifier_data {
- 	unsigned long		new_rate;
- };
+ 	struct cpufreq_freqs freqs;
+-	struct opp *opp;
+-	unsigned long freq, volt = 0, volt_old = 0, tol = 0;
++	unsigned long freq;
  
--int clk_notifier_register(struct clk *clk, struct notifier_block *nb);
-+/**
-+ * struct dvfs_info_init - data needs to initialize struct dvfs_info
-+ * @dev:	device related to this frequency-voltage pair
-+ * @con_id:	string name of clock connection
-+ * @reg_id:	string name of regulator
-+ * @tol:	voltage tolerance for this device
-+ *
-+ * Provides the data needed to register a common dvfs sequence in a clk
-+ * notifier handler.  The clk and regulator lookups are stored in a
-+ * private struct and the notifier handler is registered with the clk
-+ * framework with a call to dvfs_clk_notifier_register.
-+ *
-+ * FIXME stuffing @tol here is a hack.  It belongs in the opp table.
-+ * Maybe clk & regulator will also live in the opp table some day.
-+ */
-+struct dvfs_info_init {
-+	struct device *dev;
-+	const char *con_id;
-+	const char *reg_id;
-+	int tol;
-+};
+ 	if (!freq_table) {
+ 		dev_err(mpu_dev, "%s: cpu%d: no freq table!\n", __func__,
+@@ -109,50 +108,13 @@ static int omap_target(struct cpufreq_policy *policy,
+ 	}
+ 	freq = ret;
+ 
+-	if (mpu_reg) {
+-		opp = opp_find_freq_ceil(mpu_dev, &freq);
+-		if (IS_ERR(opp)) {
+-			dev_err(mpu_dev, "%s: unable to find MPU OPP for %d\n",
+-				__func__, freqs.new);
+-			return -EINVAL;
+-		}
+-		volt = opp_get_voltage(opp);
+-		tol = volt * OPP_TOLERANCE / 100;
+-		volt_old = regulator_get_voltage(mpu_reg);
+-	}
+-
+-	dev_dbg(mpu_dev, "cpufreq-omap: %u MHz, %ld mV --> %u MHz, %ld mV\n", 
+-		freqs.old / 1000, volt_old ? volt_old / 1000 : -1,
+-		freqs.new / 1000, volt ? volt / 1000 : -1);
+-
+-	/* scaling up?  scale voltage before frequency */
+-	if (mpu_reg && (freqs.new > freqs.old)) {
+-		r = regulator_set_voltage(mpu_reg, volt - tol, volt + tol);
+-		if (r < 0) {
+-			dev_warn(mpu_dev, "%s: unable to scale voltage up.\n",
+-				 __func__);
+-			freqs.new = freqs.old;
+-			goto done;
+-		}
+-	}
++	dev_dbg(mpu_dev, "cpufreq-omap: %u MHz --> %u MHz\n",
++			freqs.old / 1000, freqs.new / 1000); 
+ 
+ 	ret = clk_set_rate(mpu_clk, freqs.new * 1000);
+ 
+-	/* scaling down?  scale voltage after frequency */
+-	if (mpu_reg && (freqs.new < freqs.old)) {
+-		r = regulator_set_voltage(mpu_reg, volt - tol, volt + tol);
+-		if (r < 0) {
+-			dev_warn(mpu_dev, "%s: unable to scale voltage down.\n",
+-				 __func__);
+-			ret = clk_set_rate(mpu_clk, freqs.old * 1000);
+-			freqs.new = freqs.old;
+-			goto done;
+-		}
+-	}
+-
+ 	freqs.new = omap_getspeed(policy->cpu);
+ 
+-done:
+ 	/* notifiers */
+ 	for_each_cpu(i, policy->cpus) {
+ 		freqs.cpu = i;
+@@ -172,10 +134,6 @@ static int __cpuinit omap_cpu_init(struct cpufreq_policy *policy)
+ {
+ 	int result = 0;
+ 
+-	mpu_clk = clk_get(NULL, "cpufreq_ck");
+-	if (IS_ERR(mpu_clk))
+-		return PTR_ERR(mpu_clk);
+-
+ 	if (policy->cpu >= NR_CPUS) {
+ 		result = -EINVAL;
+ 		goto fail_ck;
+@@ -253,34 +211,34 @@ static struct cpufreq_driver omap_driver = {
+ 
+ static int __init omap_cpufreq_init(void)
+ {
++	struct dvfs_info_init dii;
 +
-+struct dvfs_info;
++	mpu_clk = clk_get(NULL, "cpufreq_ck");
++	if (IS_ERR(mpu_clk))
++		return PTR_ERR(mpu_clk);
++
+ 	mpu_dev = get_cpu_device(0);
+ 	if (!mpu_dev) {
+ 		pr_warning("%s: unable to get the mpu device\n", __func__);
+ 		return -EINVAL;
+ 	}
  
-+int clk_notifier_register(struct clk *clk, struct notifier_block *nb);
- int clk_notifier_unregister(struct clk *clk, struct notifier_block *nb);
-+struct dvfs_info *dvfs_clk_notifier_register(struct dvfs_info_init *dii);
-+void dvfs_clk_notifier_unregister(struct dvfs_info *di);
+-	mpu_reg = regulator_get(mpu_dev, "vcc");
+-	if (IS_ERR(mpu_reg)) {
+-		pr_warning("%s: unable to get MPU regulator\n", __func__);
+-		mpu_reg = NULL;
+-	} else {
+-		/* 
+-		 * Ensure physical regulator is present.
+-		 * (e.g. could be dummy regulator.)
+-		 */
+-		if (regulator_get_voltage(mpu_reg) < 0) {
+-			pr_warn("%s: physical regulator not present for MPU\n",
++	dii.dev = mpu_dev;
++	dii.con_id = "cpufreq_ck";
++	dii.reg_id = "vcc";
++	dii.tol = OPP_TOLERANCE;
++
++	di = dvfs_clk_notifier_register(&dii);
++	if (IS_ERR(di))
++		pr_warning("%s: failed to register dvfs clk notifier\n",
+ 				__func__);
+-			regulator_put(mpu_reg);
+-			mpu_reg = NULL;
+-		}
+-	}
  
- #endif
+ 	return cpufreq_register_driver(&omap_driver);
+ }
+ 
+ static void __exit omap_cpufreq_exit(void)
+ {
++	dvfs_clk_notifier_unregister(di);
+ 	cpufreq_unregister_driver(&omap_driver);
+ }
  
 -- 
 1.7.10.4
