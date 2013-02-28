@@ -1,98 +1,31 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Thu, 28 Feb 2013 15:19:24 +0800
-Subject: [PATCH 5/7] document: append hisilicon clock binding
+Date: Thu, 28 Feb 2013 15:19:26 +0800
+Subject: [PATCH 7/7] ARM: config: append arch hs into multi defconfig
 In-Reply-To: <1362035966-17628-1-git-send-email-haojian.zhuang@linaro.org>
 References: <1362035966-17628-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1362035966-17628-5-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1362035966-17628-7-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add hisilicon clock binding document for device tree.
+Append ARCH_HS (Hisilicon SoC) into multi_v7_defconfig.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 ---
- .../devicetree/bindings/clock/hisilicon.txt        |   73 ++++++++++++++++++++
- 1 file changed, 73 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/hisilicon.txt
+ arch/arm/configs/multi_v7_defconfig |    2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/clock/hisilicon.txt b/Documentation/devicetree/bindings/clock/hisilicon.txt
-new file mode 100644
-index 0000000..04fefc3
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/hisilicon.txt
-@@ -0,0 +1,73 @@
-+Device Tree Clock bindings for arch-vt8500
-+
-+This binding uses the common clock binding[1].
-+
-+[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-+
-+Required properties for mux clocks:
-+ - compatible : Shall be "hisilicon,hi3620-clk-mux".
-+ - clocks : shall be the input parent clock phandle for the clock. This should
-+	be the reference clock.
-+ - clock-output-names : shall be reference name.
-+ - #clock-cells : from common clock binding; shall be set to 0.
-+ - hisilicon,hi3620-mux : array of mux register offset & mask bits
-+
-+Required properties for Hi3620 gate clocks:
-+ - compatible : Shall be "hisilicon,hi3620-clk-gate".
-+ - clocks : shall be the input parent clock phandle for the clock. This should
-+	be the reference clock.
-+ - clock-output-names : shall be reference name.
-+ - #clock-cells : from common clock binding; shall be set to 0.
-+ - hisilicon,hi3620-clkgate : array of enable register offset & enable bit
-+ - hisilicon,hi3620-clkreset : array of reset register offset & enable bit
-+
-+Required properties for gate clocks:
-+ - compatible : Shall be "hisilicon,clk-gate".
-+ - clocks : shall be the input parent clock phandle for the clock. This should
-+	be the reference clock.
-+ - clock-output-names : shall be reference name.
-+ - #clock-cells : from common clock binding; shall be set to 0.
-+ - hisilicon,clkgate-inverted : bool value. True means that set-to-disable.
-+
-+Required properties for clock divider:
-+ - compatible : Shall be "hisilicon,clk-div-table".
-+ - clocks : shall be the input parent clock phandle for the clock. This should
-+	be the reference clock.
-+ - clock-output-names : shall be reference name.
-+ - #clock-cells : from common clock binding; shall be set to 0.
-+ - #hisilicon,clkdiv-table-cells : the number of parameters after phandle in
-+   hisilicon,clkdiv-table property.
-+ - hisilicon,clkdiv-table : list of value that are used to configure clock
-+   divider. They're value of phandle, index & divider value.
-+ - hisilicon,clkdiv : array of divider register offset & mask bits.
-+
-+Required properties for clock fixed factor divider:
-+ - compatible : Shall be "hisilicon,fixed-factor".
-+ - clocks : shall be the input parent clock phandle for the clock. This should
-+	be the reference clock.
-+ - clock-output-names : shall be reference name.
-+ - #clock-cells : from common clock binding; shall be set to 0.
-+ - hisilicon,fixed-factor : array of multiplier & divider.
-+
-+For example:
-+	timclk1: clkgate at 38 {
-+		compatible = "hisilicon,clk-gate";
-+		#clock-cells = <0>;
-+		clocks = <&refclk_timer1>;
-+		clock-output-names = "timclk1";
-+		hisilicon,clkgate-inverted;
-+		hisilicon,clkgate = <0 18>;
-+	};
-+
-+	dtable: clkdiv at 0 {
-+		#hisilicon,clkdiv-table-cells = <2>;
-+	};
-+
-+	div_cfgaxi: clkdiv at 2 {
-+		compatible = "hisilicon,clk-div-table";
-+		#clock-cells = <0>;
-+		clocks = <&div_shareaxi>;
-+		clock-output-names = "cfgAXI_div";
-+		hisilicon,clkdiv-table = <&dtable 0x01 2>;
-+		hisilicon,clkdiv = <0x100 0x60>;
-+	};
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index e31d442..dc1ad68 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -5,6 +5,8 @@ CONFIG_ARCH_MVEBU=y
+ CONFIG_MACH_ARMADA_370=y
+ CONFIG_MACH_ARMADA_XP=y
+ CONFIG_ARCH_HIGHBANK=y
++CONFIG_MACH_HI4511=y
++CONFIG_ARCH_HS=y
+ CONFIG_ARCH_SOCFPGA=y
+ CONFIG_ARCH_SUNXI=y
+ # CONFIG_ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA is not set
 -- 
 1.7.10.4
