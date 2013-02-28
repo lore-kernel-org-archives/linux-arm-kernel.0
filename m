@@ -1,132 +1,233 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 28 Feb 2013 09:29:30 -0500
-Subject: [BUG][arm-soc] kernel panic in boot on Openblocks with the
- latest kernel
-In-Reply-To: <20130228113419.GB5688@xps8300>
-References: <512F3BDA.6000208@hitachi.com>
- <20130228113419.GB5688@xps8300>
-Message-ID: <20130228142930.GQ23237@titan.lakedaemon.net>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 28 Feb 2013 08:40:05 -0600
+Subject: [PATCH] arm: omap: RX-51: ARM errata 430973 workaround
+In-Reply-To: <1362044548-5398-1-git-send-email-pali.rohar@gmail.com>
+References: <1362044548-5398-1-git-send-email-pali.rohar@gmail.com>
+Message-ID: <20130228144005.GA22544@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heikki,
+On 10:42-20130228, Pali Roh?r wrote:
+> Signed-off-by: Ivaylo Dimitrov <freemangordon@abv.bg>
+> Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
+> ---
+>  arch/arm/mach-omap2/Makefile            |    1 +
+>  arch/arm/mach-omap2/board-rx51-secure.c |   66 +++++++++++++++++++++++++++++++
+>  arch/arm/mach-omap2/board-rx51-secure.h |   36 +++++++++++++++++
+>  arch/arm/mach-omap2/board-rx51-smc.S    |   34 ++++++++++++++++
+>  arch/arm/mach-omap2/board-rx51.c        |    7 ++++
 
-On Thu, Feb 28, 2013 at 01:34:19PM +0200, Heikki Krogerus wrote:
-> Hi,
+Wondering if we can integrate these into 
+arch/arm/mach-omap2/omap-smc.S
+and
+arch/arm/mach-omap2/omap-secure.c
+on a quick look, it does seem there are commonalities.
+
+>  5 files changed, 144 insertions(+)
+>  create mode 100644 arch/arm/mach-omap2/board-rx51-secure.c
+>  create mode 100644 arch/arm/mach-omap2/board-rx51-secure.h
+>  create mode 100644 arch/arm/mach-omap2/board-rx51-smc.S
 > 
-> On Thu, Feb 28, 2013 at 08:13:30PM +0900, Masami Hiramatsu wrote:
-> > Hi,
-> > 
-> > I tried the latest "fixes" branch of arm-soc.git on OpenBlocks
-> > AX3 (Marvel Armada-XP) and got below kernel panic in boot sequence.
-> > It seems that we have an exception while cpu is in idle.
-> > 
-> > ----
-> > Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000200
-> > 
-> > Backtrace:
-> > [<c00113d4>] (dump_backtrace+0x0/0x110) from [<c04a7324>] (dump_stack+0x18/0x1c)
-> >  r6:ef2bcc00 r5:c06532b0 r4:ef2bcc00 r3:00000001
-> > [<c04a730c>] (dump_stack+0x0/0x1c) from [<c04a7434>] (panic+0x90/0x1ec)
-> > [<c04a73a4>] (panic+0x0/0x1ec) from [<c002613c>] (do_exit+0x500/0x960)
-> >  r3:ef2c0dc0 r2:ef2bcc00 r1:00000200 r0:c0584be1
-> >  r7:c063e040
-> > [<c0025c3c>] (do_exit+0x0/0x960) from [<c0026790>] (do_group_exit+0xa4/0xd0)
-> >  r7:000000f8
-> > [<c00266ec>] (do_group_exit+0x0/0xd0) from [<c00267d4>] (__wake_up_parent+0x0/0x28)
-> >  r7:000000f8 r6:0000003c r5:bee6bf14 r4:000703ae
-> > [<c00267bc>] (sys_exit_group+0x0/0x18) from [<c000d8c0>] (ret_fast_syscall+0x0/0x30)
-> > CPU0: stopping
-> > Backtrace:
-> > [<c00113d4>] (dump_backtrace+0x0/0x110) from [<c04a7324>] (dump_stack+0x18/0x1c)
-> >  r6:c063df48 r5:00000000 r4:c0688e98 r3:c064def4
-> > [<c04a730c>] (dump_stack+0x0/0x1c) from [<c00128f4>] (handle_IPI+0xc8/0x12c)
-> > [<c001282c>] (handle_IPI+0x0/0x12c) from [<c00085a0>]
-> > (armada_370_xp_handle_irq+0x98/0xb0)
-> >  r5:c0689070 r4:00000005
-> > [<c0008508>] (armada_370_xp_handle_irq+0x0/0xb0) from [<c04ae680>]
-> > (__irq_svc+0x40/0x50)
-> > Exception stack(0xc063df48 to 0xc063df90)
-> > df40:                   ffffffed 00000000 027ac000 60000013 c063c000 c0688c88
-> > df60: c04b5518 c2ddffc0 0000406a 562f5842 00000000 c063dfac c063df90 c063df90
-> > df80: c000e588 c000e590 60000013 ffffffff
-> > [<c000e4d8>] (cpu_idle+0x0/0x104) from [<c04a266c>] (rest_init+0x64/0x7c)
-> >  r6:c0625a50 r5:00000000 r4:c06450e0 r3:00000000
-> > [<c04a2608>] (rest_init+0x0/0x7c) from [<c05fb848>] (start_kernel+0x2d4/0x32c)
-> > [<c05fb574>] (start_kernel+0x0/0x32c) from [<00008074>] (0x8074)
-> > ----
-> > 
-> > And I found that this panic also happened on the latest linus tree.
-> > Git-bisect told me that the 8250 serial driver patch is the first bad
-> > commit.
-> > 
-> > serial: 8250_dw: Don't use UPF_FIXED_TYPE
-> > 
-> > 966c4e39b5f7f249d7bb4c409176c9e6c5d48025
-> 
-> I'm assuming this is the same issue Gregory already reported. Can you
-> try the attached diff, and tell if it fixes the issue?
-
-If you have a moment, could you put this into a formal patch and send to
-lakml?  If I could Gregory and Masami's Tested-by's on that, I'll queue
-it up for -rc1/2.
-
-thx,
-
-Jason.
-
-> 
-> Thanks,
-> 
+> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+> index 0ebbdd50..8eb4fb4 100644
+> --- a/arch/arm/mach-omap2/Makefile
+> +++ b/arch/arm/mach-omap2/Makefile
+> @@ -241,6 +241,7 @@ obj-$(CONFIG_MACH_NOKIA_RX51)		+= board-rx51.o sdram-nokia.o
+>  obj-$(CONFIG_MACH_NOKIA_RX51)		+= board-rx51-peripherals.o
+>  obj-$(CONFIG_MACH_NOKIA_RX51)		+= board-rx51-video.o
+>  obj-$(CONFIG_MACH_NOKIA_RX51)		+= board-rx51-camera.o
+> +obj-$(CONFIG_MACH_NOKIA_RX51)		+= board-rx51-smc.o board-rx51-secure.o
+>  obj-$(CONFIG_MACH_OMAP_ZOOM2)		+= board-zoom.o board-zoom-peripherals.o
+>  obj-$(CONFIG_MACH_OMAP_ZOOM2)		+= board-zoom-display.o
+>  obj-$(CONFIG_MACH_OMAP_ZOOM2)		+= board-zoom-debugboard.o
+> diff --git a/arch/arm/mach-omap2/board-rx51-secure.c b/arch/arm/mach-omap2/board-rx51-secure.c
+> new file mode 100644
+> index 0000000..361dc78
+> --- /dev/null
+> +++ b/arch/arm/mach-omap2/board-rx51-secure.c
+> @@ -0,0 +1,66 @@
+> +/*
+> + * RX51 Secure PPA API.
+> + *
+> + * Copyright (C) 2012 Ivaylo Dimitrov <freemangordon@abv.bg>
+> + *
+> + *
+> + * This program is free software,you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +#include <asm/cacheflush.h>
+> +
+> +#include "board-rx51-secure.h"
+> +
+> +/**
+> + * rx51_secure_dispatcher: Routine to dispatch secure PPA API calls
+> + * @idx: The PPA API index
+> + * @flag: The flag indicating criticality of operation
+> + * @nargs: Number of valid arguments out of four.
+> + * @arg1, arg2, arg3 args4: Parameters passed to secure API
+> + *
+> + * Return the non-zero error value on failure.
+> + */
+> +u32 rx51_secure_dispatcher(u32 idx, u32 flag, u32 nargs, u32 arg1, u32 arg2,
+> +			   u32 arg3, u32 arg4)
+> +{
+> +	u32 ret;
+> +	u32 param[5];
+> +
+> +	param[0] = nargs+1;
+> +	param[1] = arg1;
+> +	param[2] = arg2;
+> +	param[3] = arg3;
+> +	param[4] = arg4;
+> +
+> +	/*
+> +	 * Secure API needs physical address
+> +	 * pointer for the parameters
+> +	 */
+> +	flush_cache_all();
+> +	outer_clean_range(__pa(param), __pa(param + 5));
+> +	ret = rx51_ppa_smc(idx, flag, __pa(param));
+> +
+> +	return ret;
+> +}
+> +
+> +/**
+> + * rx51_secure_update_aux_cr: Routine to modify the contents of Auxiliary Control Register
+> + *  @set_bits: bits to set in ACR
+> + *  @clr_bits: bits to clear in ACR
+> + *
+> + * Return the non-zero error value on failure.
+> +*/
+> +u32 rx51_secure_update_aux_cr(u32 set_bits, u32 clear_bits)
+> +{
+> +	u32 acr;
+> +
+> +	/* Read ACR */
+> +	asm volatile ("mrc p15, 0, %0, c1, c0, 1" : "=r" (acr));
+> +	acr &= ~clear_bits;
+> +	acr |= set_bits;
+> +
+> +	return rx51_secure_dispatcher(RX51_PPA_WRITE_ACR,
+> +			       FLAG_START_CRITICAL,
+> +			       1,acr,0,0,0);
+> +}
+> diff --git a/arch/arm/mach-omap2/board-rx51-secure.h b/arch/arm/mach-omap2/board-rx51-secure.h
+> new file mode 100644
+> index 0000000..61c760b
+> --- /dev/null
+> +++ b/arch/arm/mach-omap2/board-rx51-secure.h
+> @@ -0,0 +1,36 @@
+> +/*
+> + * board-rx51-secure.h: OMAP Secure infrastructure header.
+> + *
+> + * Copyright (C) 2012 Ivaylo Dimitrov <freemangordon@abv.bg>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +#ifndef OMAP_RX51_SECURE_H
+> +#define OMAP_RX51_SECURE_H
+> +
+> +/* HAL API error codes */
+> +#define  API_HAL_RET_VALUE_OK           0x00
+> +#define  API_HAL_RET_VALUE_FAIL         0x01
+> +
+> +/* Secure HAL API flags */
+> +#define FLAG_START_CRITICAL             0x4
+> +#define FLAG_IRQFIQ_MASK                0x3
+> +#define FLAG_IRQ_ENABLE                 0x2
+> +#define FLAG_FIQ_ENABLE                 0x1
+> +#define NO_FLAG                         0x0
+> +
+> +/* Secure PPA(Primary Protected Application) APIs */
+> +#define RX51_PPA_L2_INVAL               40
+> +#define RX51_PPA_WRITE_ACR              42
+> +
+> +#ifndef __ASSEMBLER__
+> +
+> +extern u32 rx51_secure_dispatcher(u32 idx, u32 flag, u32 nargs,
+> +                                u32 arg1, u32 arg2, u32 arg3, u32 arg4);
+> +extern u32 rx51_ppa_smc(u32 id, u32 flag, u32 pargs);
+> +
+> +extern u32 rx51_secure_update_aux_cr(u32 set_bits, u32 clear_bits);
+> +#endif /* __ASSEMBLER__ */
+> +#endif /* OMAP_RX51_SECURE_H */
+> diff --git a/arch/arm/mach-omap2/board-rx51-smc.S b/arch/arm/mach-omap2/board-rx51-smc.S
+> new file mode 100644
+> index 0000000..70e2eb7
+> --- /dev/null
+> +++ b/arch/arm/mach-omap2/board-rx51-smc.S
+> @@ -0,0 +1,34 @@
+> +/*
+> + * RX51 secure APIs file.
+> + *
+> + * Copyright (C) 2012 Ivaylo Dimitrov <freemangordon@abv.bg>
+> + *
+> + *
+> + * This program is free software,you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/linkage.h>
+> +
+> +/**
+> + * u32 rx51_ppa_smc(u32 id, u32 flag, u32 pargs)
+> + * Low level common routine for secure HAL and PPA APIs.
+> + * @id: Secure Service ID
+> + * @flag: Flag to indicate the criticality of operation
+> + * @pargs: Physical address of parameter list starting
+> + *          with number of parametrs
+> + */
+> +ENTRY(rx51_ppa_smc)
+> +	.arch_extension sec
+> +	stmfd	sp!, {r4-r12, lr}
+> +	mov	r12, r0		@ Copy the secure service ID
+> +	mov	r3, r2		@ Copy the pointer to va_list in R3
+> +	mov	r2, r1		@ Copy the flags in R2
+> +	mov	r1, #0x0	@ Process ID - 0
+> +	mov	r6, #0xff	@ Indicate new Task call
+> +	dsb
+> +	dmb
+> +	smc	#1		@ call PPA service
+> +	ldmfd	sp!, {r4-r12, pc}
+> +ENDPROC(rx51_ppa_smc)
+> diff --git a/arch/arm/mach-omap2/board-rx51.c b/arch/arm/mach-omap2/board-rx51.c
+> index 92117a13..fd85081 100644
+> --- a/arch/arm/mach-omap2/board-rx51.c
+> +++ b/arch/arm/mach-omap2/board-rx51.c
+> @@ -31,6 +31,7 @@
+>  #include "gpmc.h"
+>  #include "pm.h"
+>  #include "sdram-nokia.h"
+> +#include "board-rx51-secure.h"
+>  
+>  #define RX51_GPIO_SLEEP_IND 162
+>  
+> @@ -103,6 +104,12 @@ static void __init rx51_init(void)
+>  	rx51_peripherals_init();
+>  	rx51_camera_init();
+>  
+> +#ifdef CONFIG_ARM_ERRATA_430973
+> +	printk(KERN_INFO "Enabling ARM errata 430973 workaround.\n");
+> +	/* set IBE to 1 */
+> +	rx51_secure_update_aux_cr(1 << 6, 0);
+> +#endif
+> +
+>  	/* Ensure SDRC pins are mux'd for self-refresh */
+>  	omap_mux_init_signal("sdrc_cke0", OMAP_PIN_OUTPUT);
+>  	omap_mux_init_signal("sdrc_cke1", OMAP_PIN_OUTPUT);
 > -- 
-> heikki
-
-> diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-> index 4e3e4a3..dcbbc1d 100644
-> --- a/arch/arm/boot/dts/armada-370-xp.dtsi
-> +++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-> @@ -54,7 +54,7 @@
->  				reg = <0xd0012000 0x100>;
->  				reg-shift = <2>;
->  				interrupts = <41>;
-> -				reg-io-width = <4>;
-> +				reg-io-width = <1>;
->  				status = "disabled";
->  		};
->  		serial at d0012100 {
-> @@ -62,7 +62,7 @@
->  				reg = <0xd0012100 0x100>;
->  				reg-shift = <2>;
->  				interrupts = <42>;
-> -				reg-io-width = <4>;
-> +				reg-io-width = <1>;
->  				status = "disabled";
->  		};
->  
-> diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-> index 1443949..ca00d83 100644
-> --- a/arch/arm/boot/dts/armada-xp.dtsi
-> +++ b/arch/arm/boot/dts/armada-xp.dtsi
-> @@ -46,7 +46,7 @@
->  				reg = <0xd0012200 0x100>;
->  				reg-shift = <2>;
->  				interrupts = <43>;
-> -				reg-io-width = <4>;
-> +				reg-io-width = <1>;
->  				status = "disabled";
->  		};
->  		serial at d0012300 {
-> @@ -54,7 +54,7 @@
->  				reg = <0xd0012300 0x100>;
->  				reg-shift = <2>;
->  				interrupts = <44>;
-> -				reg-io-width = <4>;
-> +				reg-io-width = <1>;
->  				status = "disabled";
->  		};
->  
-
+> 1.7.10.4
+> 
+> 
 > _______________________________________________
 > linux-arm-kernel mailing list
 > linux-arm-kernel at lists.infradead.org
 > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+Regards,
+Nishanth Menon
