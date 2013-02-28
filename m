@@ -1,87 +1,55 @@
-From: avinashphilip@ti.com (Philip, Avinash)
-Date: Thu, 28 Feb 2013 10:38:56 +0000
-Subject: [PATCH 06/14] ARM: OMAP2+: Convert NAND to use
- gpmc_cs_program_settings()
-In-Reply-To: <1361899842-30303-7-git-send-email-jon-hunter@ti.com>
-References: <1361899842-30303-1-git-send-email-jon-hunter@ti.com>
- <1361899842-30303-7-git-send-email-jon-hunter@ti.com>
-Message-ID: <518397C60809E147AF5323E0420B992E3EA8F235@DBDE01.ent.ti.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 28 Feb 2013 16:09:47 +0530
+Subject: [PATCH] ARM: davinci: da850 evm: update clock rate for UART 1/2
+ DT nodes
+In-Reply-To: <1361262734-8540-1-git-send-email-prakash.pm@ti.com>
+References: <1361262734-8540-1-git-send-email-prakash.pm@ti.com>
+Message-ID: <512F33F3.9070203@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 26, 2013 at 23:00:33, Hunter, Jon wrote:
-> Convert the OMAP2+ NAND code to use the gpmc_cs_program_settings()
-> function for configuring the various GPMC options instead of directly
-> programming the CONFIG1 register.
+Prakash,
+
+On 2/19/2013 2:02 PM, Manjunathappa, Prakash wrote:
+> DT kernel with latest of denx SPL U-boot boots with garbled UART
+> logs. This is because in U-boot UART2 gets sourced by PLL0_SYSCLK2
+> configured for 150MHz. But later in kernel UART2 gets mapped to
+> PLL1_SYSCLK2 and is configured for 132MHz not for 150MHz.
 > 
-> This moves the configuration of some GPMC options outside the
-> nand_gpmc_retime() because these options should only need to be set once
-> regardless of whether the gpmc timing is changing dynamically at runtime.
-> The programming of where the wait-pin is also moved slightly, but this
-> will not have any impact to existing devices as no boards are currently
-> setting the dev_ready variable.
+> PLL1 is configured for 264MHz to support mDDR on the EVM. That is
+> memory controller driving mDDR can be configured for 150MHz and
+> mDDR it self can operate at 132MHz.
 > 
-> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+> So override UART1 and UART2 DT node clock-frequency property with
+> rate available on da850 EVM.
+> 
+> Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
+
+How about dropping the clock-frequency attribute altogether? of_serial.c
+seems to be falling back on clk apis if frequency is not passed and that
+should make the kernel work with all versions of U-Boot.
+
+Thanks,
+Sekhar
+
 > ---
->  arch/arm/mach-omap2/gpmc-nand.c |   35 +++++++++++++++++++++++------------
->  1 file changed, 23 insertions(+), 12 deletions(-)
+>  arch/arm/boot/dts/da850-evm.dts |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
 > 
-> diff --git a/arch/arm/mach-omap2/gpmc-nand.c b/arch/arm/mach-omap2/gpmc-nand.c
-> index afc1e8c..4bdfea2 100644
-> --- a/arch/arm/mach-omap2/gpmc-nand.c
-> +++ b/arch/arm/mach-omap2/gpmc-nand.c
-> @@ -43,6 +43,10 @@ static struct platform_device gpmc_nand_device = {
->  	.resource	= gpmc_nand_resource,
->  };
->  
-> +static struct gpmc_settings nand_settings = {
-> +	.device_nand = true,
-> +};
-> +
-
-Is it possible to make it local variable?
-It would help GPMC to support NAND device on multiple chip select.
-
-Thanks
-Avinash
-
-...
-> @@ -140,11 +136,26 @@ int gpmc_nand_init(struct omap_nand_platform_data *gpmc_nand_data,
->  			dev_err(dev, "Unable to set gpmc timings: %d\n", err);
->  			return err;
->  		}
-> -	}
->  
-> -	/* Enable RD PIN Monitoring Reg */
-> -	if (gpmc_nand_data->dev_ready) {
-> -		gpmc_cs_configure(gpmc_nand_data->cs, GPMC_CONFIG_RDY_BSY, 1);
-> +		/* Enable RD PIN Monitoring Reg */
-> +		if (gpmc_nand_data->dev_ready) {
-> +			nand_settings.wait_on_read = true;
-> +			nand_settings.wait_on_write = true;
-> +		}
-> +
-> +		if (gpmc_nand_data->devsize == NAND_BUSWIDTH_16)
-> +			nand_settings.device_width = GPMC_DEVWIDTH_16BIT;
-> +		else
-> +			nand_settings.device_width = GPMC_DEVWIDTH_8BIT;
-> +
-> +		err = gpmc_cs_program_settings(gpmc_nand_data->cs,
-> +					       &nand_settings);
-> +		if (IS_ERR_VALUE(err))
-> +			goto out_free_cs;
-> +
-> +		err = gpmc_cs_configure(gpmc_nand_data->cs, GPMC_CONFIG_WP, 0);
-> +		if (IS_ERR_VALUE(err))
-> +			goto out_free_cs;
->  	}
->  
->  	gpmc_update_nand_reg(&gpmc_nand_data->reg, gpmc_nand_data->cs);
-> -- 
-> 1.7.10.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
+> index f712fb6..c359872 100644
+> --- a/arch/arm/boot/dts/da850-evm.dts
+> +++ b/arch/arm/boot/dts/da850-evm.dts
+> @@ -22,9 +22,11 @@
+>  			status = "okay";
+>  		};
+>  		serial1: serial at 1d0c000 {
+> +			clock-frequency = <132000000>;
+>  			status = "okay";
+>  		};
+>  		serial2: serial at 1d0d000 {
+> +			clock-frequency = <132000000>;
+>  			status = "okay";
+>  		};
+>  		rtc0: rtc at 1c23000 {
 > 
