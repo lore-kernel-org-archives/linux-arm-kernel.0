@@ -1,36 +1,45 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 28 Feb 2013 10:01:27 +0200
-Subject: [PATCH 3/3] USB mxs-phy: Register phy with framework
-In-Reply-To: <1361974590-21237-4-git-send-email-mkl@pengutronix.de>
-References: <1361974590-21237-1-git-send-email-mkl@pengutronix.de>
- <1361974590-21237-4-git-send-email-mkl@pengutronix.de>
-Message-ID: <20130228080127.GB6544@arwen.pp.htv.fi>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 28 Feb 2013 16:09:23 +0800
+Subject: [PATCH 09/12] ASoC: dmaengine_pcm: support use of generic DMA
+ helper
+In-Reply-To: <201302272102.40811.arnd@arndb.de>
+References: <1361978748-25281-1-git-send-email-shawn.guo@linaro.org>
+ <1361978748-25281-10-git-send-email-shawn.guo@linaro.org>
+ <201302272102.40811.arnd@arndb.de>
+Message-ID: <20130228080921.GF26106@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi,
-
-On Wed, Feb 27, 2013 at 03:16:30PM +0100, Marc Kleine-Budde wrote:
-> From: Sascha Hauer <s.hauer@pengutronix.de>
+On Wed, Feb 27, 2013 at 09:02:40PM +0000, Arnd Bergmann wrote:
+> On Wednesday 27 February 2013, Shawn Guo wrote:
+> > With generic DMA device tree binding and helper function
+> > dma_request_slave_channel() in place, dmaengine_pcm should support
+> > that in requesting DMA channel for users that support generic DMA
+> > device tree binding.
+> > 
+> > Instead of inventing a new API, it defines the parameters needed by
+> > dma_request_slave_channel() into struct snd_dma_channel_params,
+> > interprets filter_data into snd_dma_channel_params, and calls the
+> > helper in case that dmaengine_pcm users pass in a NULL filter_fn.
+> > 
+> > Then, dmaengine_pcm users can call snd_dmaengine_pcm_open() with NULL
+> > filter_fn and snd_dma_channel_params being filter_data to direct the
+> > API to request DMA channel using generic DMA helper.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> > Cc: alsa-devel at alsa-project.org
 > 
-> We now have usb_add_phy_dev(), so use it to register with the framework
-> to be able to find the phy from the USB driver.
+> I would actually prefer having a new API in the soc-dmaengine-pcm
+> module, like
 > 
-> Reviewed-by: Kishon Vijay Abraham I <kishon@ti.com>
-> Reviewed-by: Peter Chen <peter.chen@freescale.com>
-> Acked-by: Felipe Balbi <balbi@ti.com>
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+> static int dmaengine_pcm_request_slave_channel(struct dmaengine_pcm_runtime_data *prtd,
+> 						struct device *dev, const char *id);
+> 
+> For sound drivers that are fully converted to using DT, it would be
+> a more natural interface to use IMHO.
+> 
+Ok, let's do this.  While my patch saves a new API, it adds a new
+struct anyway, which I'm not happy with.
 
-any chance you can move away from {write,read}[bwl]_relaxed() so we can
-build this driver on other architectures ?
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130228/39aa4809/attachment.sig>
+Shawn
