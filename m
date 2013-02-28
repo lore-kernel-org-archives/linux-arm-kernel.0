@@ -1,68 +1,67 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Thu, 28 Feb 2013 12:07:48 +0100
-Subject: [PATCH v2 2/3] crypto: sahara: Add driver for SAHARA2 accelerator.
-In-Reply-To: <1361961711-4603-3-git-send-email-javier.martin@vista-silicon.com>
- (Javier Martin's message of "Wed, 27 Feb 2013 11:41:50 +0100")
-References: <1361961711-4603-1-git-send-email-javier.martin@vista-silicon.com>
- <1361961711-4603-3-git-send-email-javier.martin@vista-silicon.com>
-Message-ID: <87vc9chf23.fsf@lebrac.rtp-net.org>
+From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
+Date: Thu, 28 Feb 2013 20:13:30 +0900
+Subject: [BUG][arm-soc] kernel panic in boot on Openblocks with the latest
+ kernel
+Message-ID: <512F3BDA.6000208@hitachi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Javier Martin <javier.martin@vista-silicon.com> writes:
-
 Hi,
 
-> SAHARA2 HW module is included in the i.MX27 SoC from
-> Freescale. It is capable of performing cipher algorithms
-> such as AES, 3DES..., hashing and RNG too.
+I tried the latest "fixes" branch of arm-soc.git on OpenBlocks
+AX3 (Marvel Armada-XP) and got below kernel panic in boot sequence.
+It seems that we have an exception while cpu is in idle.
 
-The rmmod oops is gone with this version, thanks.
+----
+Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000200
 
->
-> This driver provides support for AES-CBC and AES-ECB
-> by now.
->
-> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
-> ---
->  drivers/crypto/Kconfig  |   10 +
->  drivers/crypto/Makefile |    1 +
->  drivers/crypto/sahara.c | 1070 +++++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 1081 insertions(+)
->  create mode 100644 drivers/crypto/sahara.c
->
-> diff --git a/drivers/crypto/Kconfig b/drivers/crypto/Kconfig
-> index 87ec4d0..7d73f5a 100644
-> --- a/drivers/crypto/Kconfig
-> +++ b/drivers/crypto/Kconfig
-> @@ -276,6 +276,16 @@ config CRYPTO_DEV_PICOXCELL
->  
->  	  Saying m here will build a module named pipcoxcell_crypto.
->  
-> +config CRYPTO_DEV_SAHARA
-> +	tristate "Support for SAHARA crypto accelerator"
-> +	depends on MACH_MX27 && EXPERIMENTAL && OF
+Backtrace:
+[<c00113d4>] (dump_backtrace+0x0/0x110) from [<c04a7324>] (dump_stack+0x18/0x1c)
+ r6:ef2bcc00 r5:c06532b0 r4:ef2bcc00 r3:00000001
+[<c04a730c>] (dump_stack+0x0/0x1c) from [<c04a7434>] (panic+0x90/0x1ec)
+[<c04a73a4>] (panic+0x0/0x1ec) from [<c002613c>] (do_exit+0x500/0x960)
+ r3:ef2c0dc0 r2:ef2bcc00 r1:00000200 r0:c0584be1
+ r7:c063e040
+[<c0025c3c>] (do_exit+0x0/0x960) from [<c0026790>] (do_group_exit+0xa4/0xd0)
+ r7:000000f8
+[<c00266ec>] (do_group_exit+0x0/0xd0) from [<c00267d4>] (__wake_up_parent+0x0/0x28)
+ r7:000000f8 r6:0000003c r5:bee6bf14 r4:000703ae
+[<c00267bc>] (sys_exit_group+0x0/0x18) from [<c000d8c0>] (ret_fast_syscall+0x0/0x30)
+CPU0: stopping
+Backtrace:
+[<c00113d4>] (dump_backtrace+0x0/0x110) from [<c04a7324>] (dump_stack+0x18/0x1c)
+ r6:c063df48 r5:00000000 r4:c0688e98 r3:c064def4
+[<c04a730c>] (dump_stack+0x0/0x1c) from [<c00128f4>] (handle_IPI+0xc8/0x12c)
+[<c001282c>] (handle_IPI+0x0/0x12c) from [<c00085a0>]
+(armada_370_xp_handle_irq+0x98/0xb0)
+ r5:c0689070 r4:00000005
+[<c0008508>] (armada_370_xp_handle_irq+0x0/0xb0) from [<c04ae680>]
+(__irq_svc+0x40/0x50)
+Exception stack(0xc063df48 to 0xc063df90)
+df40:                   ffffffed 00000000 027ac000 60000013 c063c000 c0688c88
+df60: c04b5518 c2ddffc0 0000406a 562f5842 00000000 c063dfac c063df90 c063df90
+df80: c000e588 c000e590 60000013 ffffffff
+[<c000e4d8>] (cpu_idle+0x0/0x104) from [<c04a266c>] (rest_init+0x64/0x7c)
+ r6:c0625a50 r5:00000000 r4:c06450e0 r3:00000000
+[<c04a2608>] (rest_init+0x0/0x7c) from [<c05fb848>] (start_kernel+0x2d4/0x32c)
+[<c05fb574>] (start_kernel+0x0/0x32c) from [<00008074>] (0x8074)
+----
 
-maybe switch to ARCH_MXC instead of MAC_MX27 ?
+And I found that this panic also happened on the latest linus tree.
+Git-bisect told me that the 8250 serial driver patch is the first bad
+commit.
 
-[...]
+serial: 8250_dw: Don't use UPF_FIXED_TYPE
 
-> +static struct platform_driver sahara_driver = {
-> +	.probe		= sahara_probe,
-> +	.remove		= __devexit_p(sahara_remove),
+966c4e39b5f7f249d7bb4c409176c9e6c5d48025
 
-Please remove the __devexit_p too.
-
-
-For information, you'll find below what I've changed to test the driver on my
-imx51. It's not perfect but it's enough for testing things.
+https://patchwork.kernel.org/patch/1958931/
 
 
-Arnaud
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: imx51-sahara.patch
-Type: text/x-diff
-Size: 5482 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130228/ba3ba53a/attachment-0001.bin>
+Thank you,
+
+-- 
+Masami HIRAMATSU
+IT Management Research Dept. Linux Technology Center
+Hitachi, Ltd., Yokohama Research Laboratory
+E-mail: masami.hiramatsu.pt at hitachi.com
