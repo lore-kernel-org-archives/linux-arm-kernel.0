@@ -1,88 +1,61 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Thu, 28 Feb 2013 11:11:20 +0800
-Subject: [PATCH v9 8/9] usb: chipidea: tell platform layer the ci core
- probe's result
-In-Reply-To: <20130227121238.GE8016@arwen.pp.htv.fi>
-References: <1361093083-22940-1-git-send-email-peter.chen@freescale.com>
- <1361093083-22940-9-git-send-email-peter.chen@freescale.com>
- <20130226094234.GC26189@arwen.pp.htv.fi>
- <20130227022202.GA20402@nchen-desktop>
- <20130227121238.GE8016@arwen.pp.htv.fi>
-Message-ID: <20130228031118.GA19387@nchen-desktop>
+Date: Thu, 28 Feb 2013 11:24:17 +0800
+Subject: [PATCH v10 8/8] usb: chipidea: imx: fix the error that using
+ uninitialized pointer
+In-Reply-To: <512DFE94.3010807@cogentembedded.com>
+References: <1361946799-29471-1-git-send-email-peter.chen@freescale.com>
+ <1361946799-29471-9-git-send-email-peter.chen@freescale.com>
+ <512DFE94.3010807@cogentembedded.com>
+Message-ID: <20130228032416.GB19387@nchen-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 27, 2013 at 02:12:38PM +0200, Felipe Balbi wrote:
-> Hi,
+On Wed, Feb 27, 2013 at 04:39:48PM +0400, Sergei Shtylyov wrote:
+> Hello.
 > 
-> On Wed, Feb 27, 2013 at 10:22:03AM +0800, Peter Chen wrote:
-> > On Tue, Feb 26, 2013 at 11:42:34AM +0200, Felipe Balbi wrote:
-> > > On Sun, Feb 17, 2013 at 05:24:42PM +0800, Peter Chen wrote:
-> > > > If the probe fails, the ci13xxx_add_device will not return error,
-> > > > (bus_probe_device doesn't has return value)
-> > > > therefore, the platform layer can't know whether core's probe
-> > > > is successful or not, if platform layer goes on using core's struct
-> > > > which is initialized at core's probe, the error will occur.
-> > > > 
-> > > > This error is showed when I only compile gadget, the host-only
-> > > > controller reports "no supported roles", and fails probe, but imx
-> > > > platform code doesn't know it, and goes on using core's private data.
-> > > > 
-> > > > Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> > > 
-> > > this just tells you that platform code shouldn't be using the driver
-> > > directly. passing probe_retval via platform_data is an abomination, fix
-> > > the real problem instead, whatever it is.
-> > 
-> > So you suggest the platform glue layer should not use core driver's data
-> > directly, eg, for your dwc3, the platform glue layer should not use
-> > struct dwc3 *dwc directly? 
+> On 27-02-2013 10:33, Peter Chen wrote:
 > 
-> yes, and it doesn't. Ever.
+> >If the core's probe fails, the platform layer may not get core's
+> >private data, if the platform tries to use struct ci13xxx, it will
+> >use uninitialized pointer. Besides, if the core's probe fails,
+> >the platform layer should know it, and let its probe fail too.
 > 
-> > At dwc3-exynos.c,  it has code "exynos->dwc3    = dwc3;", so the exynos
-> > platform code may will use struct dwc3 in future. Besides, if the dwc3
+> >Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> >---
+> >  drivers/usb/chipidea/ci13xxx_imx.c |    7 +++++++
+> >  1 files changed, 7 insertions(+), 0 deletions(-)
 > 
-> nonsense. That's a structure platform_device which was created by the
-> glue, it has nothing to do with struct dwc3. struct platform_device
-> belongs to the glue, but there's an easy way to prevent that by using
-> device_for_each_child() on your ->remove() method.
+> >diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
+> >index 5499cf8..720ea92 100644
+> >--- a/drivers/usb/chipidea/ci13xxx_imx.c
+> >+++ b/drivers/usb/chipidea/ci13xxx_imx.c
+> >@@ -239,6 +239,13 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
+> >  	platform_set_drvdata(pdev, data);
+> >
+> >  	ci = platform_get_drvdata(plat_ci);
+> >+
+> 
+>    No need for empty line here...
+> 
+> >+	if (!ci) {
+> >+		ret = -ENODEV;
+> >+		dev_err(&pdev->dev,
+> >+			"some wrong at ci core's initialization\n");
+> >+		goto err_clk;
+> >+	}
+> 
+>    It'd be better to put it here.
 
-Sorry, I just thought it may use platform_get_drvdata(exynos->dwc3) to
-get core data if exynos has special suspend/resume routine, and need
-to visit dwc3 register.
+Thanks.
 
 > 
-> wrong. There's no need for any notification at all. A driver failing to
-> probe is just normal life. DWC3 is releasing all resources it allocated,
-> but the glue still needs the clock, then that's just the way it is.
-
-Here, we just talk the controller core clk, if the core fails to probe, 
-any meaningful for platform layer still alive?
+> >  	/*
+> >  	 * Internal vbus on/off policy
+> >  	 * - Always on for host only function
 > 
-> There are many error messages which will tell the user that e.g. dwc3
-> failed to probe and user will just try again. If clocks are left
-> enabled, that's a bug in either core driver or glue layer which needs
-> fixing.
+> WBR, Sergei
 > 
-
-If the dwc3 core fails to probe, but controller core clk is still on, is it
-a valid case?
-
-> > core driver as there are many platform specific things, eg, special init/
-> > shutdown, suspend/resume, board layer gpio setting for vbus control (used
 > 
-> gpio handling should be done at board-file, that's a bug. You need to
-> add a fixed regulator which is toggled by a GPIO.
-
-I think I need to move vbus regulator from platform code to core code as we have
-struct otg at core data, and vbus operation is common operation.
-
-> 
-> -- 
-> balbi
-
-
 
 -- 
 
