@@ -1,135 +1,145 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 28 Feb 2013 14:49:03 -0600
-Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
-In-Reply-To: <CAAwP0s0ncaZx4F6KuLGihyrykRssyFtb5euCNRutriANH=z4Ng@mail.gmail.com>
-References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
- <1329321854-24490-4-git-send-email-b-cousson@ti.com>
- <4F44FA56.7020000@gmail.com> <4F44FC37.2000701@ti.com>
- <4F452484.5080503@gmail.com>
- <74CDBE0F657A3D45AFBB94109FB122FF17BD8BC6C1@HQMAIL01.nvidia.com>
- <4F47AD08.4030504@ti.com>
- <CAAwP0s0cB368R2mtbJpTZJreR-5GSRLfxC+8DJLo5nw3_OwBuA@mail.gmail.com>
- <512D39DA.7020306@ti.com> <512D3AB1.1080202@wwwdotorg.org>
- <512D3EC2.6050408@ti.com> <512D3FE6.1010300@wwwdotorg.org>
- <512D490B.70900@ti.com> <512D4FC4.2060505@wwwdotorg.org>
- <512D5C58.4090500@ti.com>
- <CAAwP0s3rbExrSf-W325uCPfMO=Zk9LefRP0VD4JC1tg_sxS_gQ@mail.gmail.com>
- <512E93B9.8020806@ti.com>
- <CAAwP0s0ncaZx4F6KuLGihyrykRssyFtb5euCNRutriANH=z4Ng@mail.gmail.com>
-Message-ID: <512FC2BF.3030106@ti.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Thu, 28 Feb 2013 13:46:08 -0800
+Subject: [PATCH 3/7] ARM: hs: add board support with device tree
+In-Reply-To: <1362035966-17628-3-git-send-email-haojian.zhuang@linaro.org>
+References: <1362035966-17628-1-git-send-email-haojian.zhuang@linaro.org>
+ <1362035966-17628-3-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <CAHTX3dLO6Waf7bT0Lo6AqmDQSKbt14pwjZzYzP5De8RR3btY9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+2013/2/27 Haojian Zhuang <haojian.zhuang@linaro.org>:
+> Add board support with device tree for Hisilicon Hi36xx/Hi37xx platform.
+>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> ---
+>  arch/arm/Kconfig          |    2 ++
+>  arch/arm/Makefile         |    1 +
+>  arch/arm/mach-hs/Kconfig  |   23 +++++++++++++
+>  arch/arm/mach-hs/Makefile |    5 +++
+>  arch/arm/mach-hs/hs-dt.c  |   83 +++++++++++++++++++++++++++++++++++++++++++++
+>  5 files changed, 114 insertions(+)
+>  create mode 100644 arch/arm/mach-hs/Kconfig
+>  create mode 100644 arch/arm/mach-hs/Makefile
+>  create mode 100644 arch/arm/mach-hs/hs-dt.c
+>
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index dedf02b..dfe70aa 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1055,6 +1055,8 @@ source "arch/arm/mach-h720x/Kconfig"
+>
+>  source "arch/arm/mach-highbank/Kconfig"
+>
+> +source "arch/arm/mach-hs/Kconfig"
+> +
+>  source "arch/arm/mach-integrator/Kconfig"
+>
+>  source "arch/arm/mach-iop32x/Kconfig"
+> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> index ee4605f..08a913b 100644
+> --- a/arch/arm/Makefile
+> +++ b/arch/arm/Makefile
+> @@ -149,6 +149,7 @@ machine-$(CONFIG_ARCH_EP93XX)               += ep93xx
+>  machine-$(CONFIG_ARCH_GEMINI)          += gemini
+>  machine-$(CONFIG_ARCH_H720X)           += h720x
+>  machine-$(CONFIG_ARCH_HIGHBANK)                += highbank
+> +machine-$(CONFIG_ARCH_HS)              += hs
+>  machine-$(CONFIG_ARCH_INTEGRATOR)      += integrator
+>  machine-$(CONFIG_ARCH_IOP13XX)         += iop13xx
+>  machine-$(CONFIG_ARCH_IOP32X)          += iop32x
+> diff --git a/arch/arm/mach-hs/Kconfig b/arch/arm/mach-hs/Kconfig
+> new file mode 100644
+> index 0000000..491c6da
+> --- /dev/null
+> +++ b/arch/arm/mach-hs/Kconfig
+> @@ -0,0 +1,23 @@
+> +config ARCH_HS
+> +       bool "Hisilicon Hi36xx/Hi37xx family" if ARCH_MULTI_V7
+> +       select ARM_AMBA
+> +       select ARM_GIC
+> +       select CACHE_L2X0
+> +       select CACHE_PL310
+> +       select PINCTRL
+> +       select PINCTRL_SINGLE
+> +       select SERIAL_AMBA_PL011
+> +       select SERIAL_AMBA_PL011_CONSOLE
+> +       help
+> +         Support for Hisilicon Hi36xx/Hi37xx processor family
+> +
+> +if ARCH_HS
+> +
+> +config MACH_HS_DT
+> +       bool "Hisilicon Development Board"
+> +       default y
+> +       help
+> +         Say 'Y' here if you want to support the Hisilicon Development
+> +         Board.
+> +
+> +endif
+> diff --git a/arch/arm/mach-hs/Makefile b/arch/arm/mach-hs/Makefile
+> new file mode 100644
+> index 0000000..d79ecb5
+> --- /dev/null
+> +++ b/arch/arm/mach-hs/Makefile
+> @@ -0,0 +1,5 @@
+> +#
+> +# Makefile for Hisilicon Hi36xx/Hi37xx processors line
+> +#
+> +
+> +obj-$(CONFIG_MACH_HS_DT)       += hs-dt.o
+> diff --git a/arch/arm/mach-hs/hs-dt.c b/arch/arm/mach-hs/hs-dt.c
+> new file mode 100644
+> index 0000000..813ebb0
+> --- /dev/null
+> +++ b/arch/arm/mach-hs/hs-dt.c
+> @@ -0,0 +1,83 @@
+> +/*
+> + * (Hisilicon's Hi36xx/Hi37xx SoC based) flattened device tree enabled machine
+> + *
+> + * Copyright (c) 2012-2013 Hisilicon Ltd.
+> + * Copyright (c) 2012-2013 Linaro Ltd.
+> + *
+> + * Author: Haojian Zhuang <haojian.zhuang@linaro.org>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> +*/
+> +
+> +#include <linux/clk.h>
+> +#include <linux/clkdev.h>
+> +#include <linux/irqchip.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_irq.h>
+> +#include <linux/of_platform.h>
+> +
+> +#include <asm/hardware/arm_timer.h>
+> +#include <asm/hardware/timer-sp.h>
+> +#include <asm/mach/arch.h>
+> +#include <asm/mach/map.h>
+> +#include <asm/mach/time.h>
+> +
+> +static struct of_device_id hs_timer_match[] __initdata = {
+> +       { .compatible = "arm,sp804", },
+> +       {}
+> +};
+> +
+> +static struct clk_lookup sp804_lookup = {
+> +       .dev_id = "sp804",
+> +       .clk    = NULL,
+> +};
+> +
+> +extern void __init hs_init_clocks(void);
 
-On 02/28/2013 06:17 AM, Javier Martinez Canillas wrote:
-> On Thu, Feb 28, 2013 at 12:16 AM, Jon Hunter <jon-hunter@ti.com> wrote:
->>
->> On 02/26/2013 09:57 PM, Javier Martinez Canillas wrote:
->>
->> [snip]
->>
->>> Something like that would definitely solve the GPIO request issue but
->>> we still have the issue that the current OMAP GPIO controller binding
->>> does not support #interrupt-cells = <2>.
->>>
->>> So, we can't pass the trigger type and level flags for an IRQ-GPIO
->>> when using an GPIO controller as the interrupt-parent for a device
->>> node.
->>>
->>> Do you have any comments on that issue?
->>
->> Can you elaborate a bit more on why you say this is not supported?
->>
->> I have been playing with this today on an omap board and if I set the
->> #interrupt-cells = <2>, then I do see that irq_domain_xlate_onetwocell()
->> is called and the irq number and flags read as expected. Following which
->> I then see it will call the omap_irq_type() to set type. So AFAICT it works.
->>
-> 
-> Yes, it does.
-> 
-> I (wrongly) assumed that it was not working since the GPIO OMAP
-> binding documentation says that #interrupt-cells should be <2> but all
-> OMAP2+ DTs use <1> instead. Also, when trying to change to <2> I had
-> the kernel hang.
-> 
-> But it was indeed that the GPIO bank was not enabled before calling
-> gpio_irq_type() and this made the kernel to hang. Your patch fixed the
-> issue and allowed me to find the cause.
-> 
-> The problem was that when using the DT hack of defining the GPIO in
-> the ethernet chip regulator,  the calls to
-> irq_domain_xlate_onetwocell() and gpio_irq_type() were made before the
-> call to gpio_request_one() so the GPIO bank was not enabled.
-> 
-> If gpio_request() is called in gpmc_probe_dt(), then the GPIO bank is
-> enabled and gpio_irq_type() succeeds.
-> 
-> So, it was just me being stupid and don't understanding the implementation.
+this shouldn't be in this file. Run checkpatch.pl on it.
 
-No problem. Glad we are on the same page :-)
+Thanks,
+Michal
 
->> Please note I do see that when the SMC driver calls request_irq() in
->> smc_drv_probe() it is also settings the trigger type to
->> IRQ_TYPE_EDGE_RISING (default). So if you are setting to low-level
->> sensitive in DT, then this is being overwritten. We could fix this by
->> setting SMC_IRQ_FLAGS to -1 for OMAP.
->>
-> 
-> Please note that I'm using a SMSC 911x chip and not a SMSC 91x, so the
-> driver is not smc91x but smc911x. It has the same behaviour though
-> (IRQ flags overwritten somehow), just to be sure that we are on the
-> same page.
-> 
-> I don't know if just setting SMC_IRQ_FLAGS to -1 will be enough to fix
-> the smc91x since request_irq() is just passing whatever value is in
-> irq_flags.
-> 
-> By looking at the two drivers (smc91x and smsc911x) it seems that the
-> only difference on how they manage the flags is that smc91x does:
-> 
-> unsigned long irq_flags = SMC_IRQ_FLAGS;
-> ...
->        if (irq_flags == -1 || ires->flags & IRQF_TRIGGER_MASK)
->                 irq_flags = ires->flags & IRQF_TRIGGER_MASK;
-> 
-> while smsc911x driver's probe function uses the flags from the
-> resource unconditionally:
-> 
-> irq_flags = irq_res->flags & IRQF_TRIGGER_MASK;
-> 
-> So, at the end both will set irq_flags to whatever is on the
-> IORESOURCE_IRQ struct resource flags member.
-
-Actually, that's not the case for smc91x. By default SMC_IRQ_FLAGS != -1
-(for omap) and so it will not set irq_flags to ires->flags &
-IRQF_TRIGGER_MASK. However, if I force irq_flags to be -1, then I see
-that irq_flags are to 0.
-
-> The real problem is irq_flags to be 0 instead of the value defined on
-> the second cell of the "interrupts" property.
-
-So the resource flags for each irq is set in
-of_irq_to_resource() which just does ...
-
-	r->start = r->end = irq;
-	r->flags = IORESOURCE_IRQ;
-	r->name = name ? name : dev->full_name;
-
-
-of_irq_to_resource() calls irq_to_parse_and_map() which eventually just
-calls irq_set_irq_type() but type/flags is not returned and not populated.
-
-I am wondering if this is intentional. The irq_type is being correctly
-configured by irq_set_irq_type() when of_irq_to_resource() is called. In
-the smc driver, if irq_flags are 0, then when request_irq() is called
-the trigger type will not be set again (which is ok). __setup_irq has
-the following ...
-
-	/* Setup the type (level, edge polarity) if configured: */
-	if (new->flags & IRQF_TRIGGER_MASK) {
-		ret = __irq_set_trigger(desc, irq,
-			new->flags & IRQF_TRIGGER_MASK);
-
-Cheers
-Jon
+-- 
+Michal Simek, Ing. (M.Eng)
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
