@@ -1,75 +1,43 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Wed, 27 Feb 2013 16:41:35 -0800
-Subject: [PATCH] USB otg: use try_module_get in all usb_get_phy functions
- and add missing module_put
-In-Reply-To: <512E3547.2000607@pengutronix.de>
-References: <1361974273-17087-1-git-send-email-mkl@pengutronix.de>
- <1361974273-17087-2-git-send-email-mkl@pengutronix.de>
- <20130227162146.GE21645@kroah.com>
- <512E3547.2000607@pengutronix.de>
-Message-ID: <20130228004135.GA3886@kroah.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 28 Feb 2013 10:01:29 +0800
+Subject: perf top running with 4 v7 cores (i.MX6q)?
+In-Reply-To: <294B28951EBE8146839AF99A61CB5FCE6DC3FC42D1@SI-MBX17.de.bosch.com>
+References: <512E1F18.3040807@de.bosch.com>
+ <294B28951EBE8146839AF99A61CB5FCE6DC3FC42D1@SI-MBX17.de.bosch.com>
+Message-ID: <20130228020126.GA25168@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 27, 2013 at 05:33:11PM +0100, Marc Kleine-Budde wrote:
-> On 02/27/2013 05:21 PM, Greg KH wrote:
-> > On Wed, Feb 27, 2013 at 03:11:13PM +0100, Marc Kleine-Budde wrote:
-> >> In patch "5d3c28b usb: otg: add device tree support to otg library"
-> >> devm_usb_get_phy_by_phandle() was added. It uses try_module_get() to lock the
-> >> phy driver in memory. The corresponding module_put() is missing in that patch.
-> >>
-> >> This patch adds try_module_get() to usb_get_phy() and usb_get_phy_dev().
-> >> Further the missing module_put() is added to usb_put_phy().
-> >>
-> >> Reviewed-by: Kishon Vijay Abraham I <kishon@ti.com>
-> >> Acked-by: Felipe Balbi <balbi@ti.com>
-> >> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
-> >> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
-> >> ---
-> >>  drivers/usb/otg/otg.c |   10 +++++++---
-> >>  1 file changed, 7 insertions(+), 3 deletions(-)
-> >>
-> >> diff --git a/drivers/usb/otg/otg.c b/drivers/usb/otg/otg.c
-> >> index e181439..2bd03d2 100644
-> >> --- a/drivers/usb/otg/otg.c
-> >> +++ b/drivers/usb/otg/otg.c
-> >> @@ -130,7 +130,7 @@ struct usb_phy *usb_get_phy(enum usb_phy_type type)
-> >>  	spin_lock_irqsave(&phy_lock, flags);
-> >>  
-> >>  	phy = __usb_find_phy(&phy_list, type);
-> >> -	if (IS_ERR(phy)) {
-> >> +	if (IS_ERR(phy) || !try_module_get(phy->dev->driver->owner)) {
+On Wed, Feb 27, 2013 at 06:10:16PM +0100, Oester Jonas (CM-AI/PJ-CF31) wrote:
+> > has anybody running 'perf top' on a quad ARM v7 system with PMU enabled?
 > > 
-> > Ugh, really?  We really are trying this type of module locking mess?
+> > Running 'perf top' on a quad Cortex A9 based Freescale i.MX6 SabreLite
+> > (maxcpus=4) with PMU enabled [1] and kernel 3.8 the system freezes
+> > completely and after some time the system detects a RCU stall [2].
 > > 
-> > Why?  What is it solving?  What's wrong with having the module be able
+> > 'perf top' works well using only 1 core (maxcpus=1) on the same system.
+> > 
+> > Any idea?
 > 
-> Without this patch, you can unload the phy module, while it is in use.
-> As the phy framework doesn't use any existing abstraction to handle phy
-> <-> user of phy pairing/unpairing (it's all open coded), any subsequent
-> use of the phy's callback will result in deref'ing bogus pointers.
-
-Then perhaps we should fix the open-coded-ness of the phy layer?
-
-> > to be unloaded whenever it wants to?  No one should be doing that and
-> > expecting that their hardware would still work properly, right?
+> One important difference between the i.MX6 and other processors may be that the 
+> i.MX6 has one interrupt line for the PMUs of all the cores (the i.MX6 manual is terse here: 
+> "Logical OR of Performance Unit interrupts" is all it has to say on the subject). Compare 
+> this to e.g. a Tegra 30:
 > 
-> Yes, but it should not result in an kernel oops.
-
-Agreed.
-
-> > I really don't like this type of thing, sorry.
+> 	pmu {
+> 		compatible = "arm,cortex-a9-pmu";
+> 		interrupts = <0 144 0x04
+> 			      0 145 0x04
+> 			      0 146 0x04
+> 			      0 147 0x04>;
+> 	};
 > 
-> Can you point Kishon and me to a better implementation?
+> So, does the PMU driver support this IRQ wiring at all? Are there any other SoCs that have 
+> *one* IRQ line for several PMUs? At least, I didn't find any by grepping for cortex-a9-pmu 
+> in arch/arm/boot/dts.
+> 
+There was some comment from Will [1] about it.
 
-Wasn't someone working on a "generic" phy layer for the kernel?  That
-should probably resolve this issue there.
+Shawn
 
-But in looking at this further, you are right, this is about the only
-way this can be solved now.  It is a pretty minor problem though.
-
-I'll wait for this to come in from Felipe into my trees.
-
-thanks,
-
-greg k-h
+[1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/181392/focus=181597
