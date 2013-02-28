@@ -1,42 +1,123 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 28 Feb 2013 12:52:20 +0000
-Subject: [PATCH] arm64: add support for uart earlyprintk
-In-Reply-To: <20130228121047.GF30747@arm.com>
-References: <1362049268-26822-1-git-send-email-apatel@apm.com>
- <512F40B9.6020105@arm.com> <20130228121047.GF30747@arm.com>
-Message-ID: <512F5304.4070006@arm.com>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Thu, 28 Feb 2013 20:55:26 +0800
+Subject: [PATCH 3/7] ARM: hs: add board support with device tree
+In-Reply-To: <201302281104.13885.arnd@arndb.de>
+References: <1362035966-17628-1-git-send-email-haojian.zhuang@linaro.org>
+ <1362035966-17628-3-git-send-email-haojian.zhuang@linaro.org>
+ <201302281104.13885.arnd@arndb.de>
+Message-ID: <CAD6h2NR2e0_MogO+PxGS8BrDT8OqzehrRzC-zoyvzjdk8vdLUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/02/13 12:10, Catalin Marinas wrote:
-> On Thu, Feb 28, 2013 at 11:34:17AM +0000, Marc Zyngier wrote:
->> On 28/02/13 11:01, Anup Patel wrote:
->>> +}
->>> +
->>> +/*
->>>   * PL011 single character TX.
->>>   */
->>>  static void pl011_printch(char ch)
->>> @@ -47,6 +62,7 @@ struct earlycon_match {
->>>  
->>>  static const struct earlycon_match earlycon_match[] __initconst = {
->>>  	{ .name = "pl011", .printch = pl011_printch, },
->>> +	{ .name = "uart", .printch = uart_printch, },
+On 28 February 2013 19:04, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 28 February 2013, Haojian Zhuang wrote:
+>> Add board support with device tree for Hisilicon Hi36xx/Hi37xx platform.
 >>
->> "uart" is way too generic. pl011 is an UART too, and I suspect most of
->> the backends that are going to be added here over time will be UARTs.
->>
->> "uart8250" would be a possibility (and actually consistent with the rest
->> of the kernel, see drivers/tty/serial/8250/8250_early.c.
-> 
-> I think it makes more sense to use the existing 8250_early.c driver. It
-> has more features than the simple earlyprintk implementation in the
-> 64-bit kernel (like parsing more parameters, initialising the UART). The
-> only difference is that the early_param is called "earlycon".
+>> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+>
+> Ah, nice and small ;-)
+>
+>>  arch/arm/Kconfig          |    2 ++
+>>  arch/arm/Makefile         |    1 +
+>>  arch/arm/mach-hs/Kconfig  |   23 +++++++++++++
+>>  arch/arm/mach-hs/Makefile |    5 +++
+>>  arch/arm/mach-hs/hs-dt.c  |   83 +++++++++++++++++++++++++++++++++++++++++++++
+>
+> Regarding the naming, I wonder if "hs" is unique enough for a platform name.
+> AFAIK, HiSilicon has a couple of independently developed SoC families,
+> so we might want to be a bit more specific here, e.g. mach-hi3xxx.
+>
+> Regarding the file name, I think the "-dt" postfix is redundant, when we
+> only support booting using DT. I would call this one the same thing as the
+> platform name, whichever we go with.
+>
+OK
 
-Indeed, this seems to be the best way, as it removes the need for this
-patch altogether.
+>> +config MACH_HS_DT
+>> +     bool "Hisilicon Development Board"
+>> +     default y
+>> +     help
+>> +       Say 'Y' here if you want to support the Hisilicon Development
+>> +       Board.
+>> +
+>> +endif
+>
+> I don't think we need this option. Let's just always build the file
+> when the platform is enabled, and build all .dtb files as well.
+>
+OK
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+>> +static struct clk_lookup sp804_lookup = {
+>> +     .dev_id = "sp804",
+>> +     .clk    = NULL,
+>> +};
+>
+> (adding Mike to Cc)
+>
+> Shouldn't the clk_lookup be automatic with a fully DT enabled platform now?
+>
+>> +extern void __init hs_init_clocks(void);
+>> +static void __init hs_timer_init(void)
+>> +{
+>> +     struct device_node *node = NULL;
+>> +     void __iomem *base;
+>> +     int irq;
+>> +
+>> +     hs_init_clocks();
+>> +
+>> +     node = of_find_matching_node(NULL, hs_timer_match);
+>> +     WARN_ON(!node);
+>> +     if (!node) {
+>> +             pr_err("Failed to find sp804 timer\n");
+>> +             return;
+>> +     }
+>> +     base = of_iomap(node, 0);
+>> +     WARN_ON(!base);
+>> +
+>> +     /* timer0 is used as clock event, and timer1 is clock source. */
+>> +     irq = irq_of_parse_and_map(node, 0);
+>> +     WARN_ON(!irq);
+>> +
+>> +     sp804_lookup.clk = of_clk_get(node, 0);
+>> +     clkdev_add(&sp804_lookup);
+>> +
+>> +     sp804_clocksource_and_sched_clock_init(base + TIMER_2_BASE, "timer1");
+>> +     sp804_clockevents_init(base, irq, "timer0");
+>> +}
+>
+> I think for the clocksource/clockevents driver, we should move
+> arch/arm/common/timer-sp.c to drivers/clocksource now and integrate
+> it into the automatic probing through clocksource_of_init().
+>
+Sounds good.
+
+>> +static void __init hs_init(void)
+>> +{
+>> +     of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+>> +}
+>> +
+>> +static const char *hs_compat[] __initdata = {
+>> +     "hisilicon,hi3620-hi4511",
+>> +     NULL,
+>> +};
+>> +
+>> +DT_MACHINE_START(HS_DT, "Hisilicon Hi36xx/Hi37xx (Flattened Device Tree)")
+>> +     /* Maintainer: Haojian Zhuang <haojian.zhuang@linaro.org> */
+>> +     .map_io         = debug_ll_io_init,
+>> +     .init_irq       = irqchip_init,
+>> +     .init_time      = hs_timer_init,
+>> +     .init_machine   = hs_init,
+>> +     .dt_compat      = hs_compat,
+>> +MACHINE_END
+>
+> This looks right at the moment, but I also have a patch to make it possible to drop the
+> irqchip_init, clocksource_of_init and hs_init() calls here, as they are all the
+> defaults. At that point, the platform would be essentially empty except for the
+> debug_ll_io_init part that is inherently platform specific.
+>
+>         Arnd
+
+Could you give me the link of your patch? I could rebase this patch.
+
+Regards
+Haojian
