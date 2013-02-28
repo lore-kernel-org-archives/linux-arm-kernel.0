@@ -1,32 +1,24 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Thu, 28 Feb 2013 21:04:15 +0100
-Subject: [PATCH 1/2] ARM: Tegra: Add clock entry for smp_twd clock
-In-Reply-To: <512F9F59.5030702@wwwdotorg.org>
-References: <1362037381-4730-1-git-send-email-pgaikwad@nvidia.com>
- <512F9F59.5030702@wwwdotorg.org>
-Message-ID: <20130228200415.GA17598@avionic-0098.mockup.avionic-design.de>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 28 Feb 2013 15:39:42 -0500 (EST)
+Subject: [PATCH 1/1 net-next] fec: net: put tx to napi poll function to
+ fix dead lock
+In-Reply-To: <1362023060-10277-1-git-send-email-Frank.Li@freescale.com>
+References: <1362023060-10277-1-git-send-email-Frank.Li@freescale.com>
+Message-ID: <20130228.153942.1205752844713252540.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 28, 2013 at 11:18:01AM -0700, Stephen Warren wrote:
-> On 02/28/2013 12:43 AM, Prashant Gaikwad wrote:
-> > As DT support for clocks and smp_twd is enabled, add clock entry
-> > for smp_twd clock to DT.
-> 
-> Is this a cleanup for 3.10, or a bug-fix for 3.9? Perhaps it solves the
-> "twd: clock not found" bug I reported?
+From: Frank Li <Frank.Li@freescale.com>
+Date: Thu, 28 Feb 2013 11:44:20 +0800
 
-Yes. This is pretty much identical to the patch I sent a few days ago
-before your patch that fixed the clock drivers to match the devicetree
-binding documentation.
+> +	int tx_pkts = fec_enet_tx(ndev);
+> +
+> +	if (tx_pkts)
+> +		return budget;
 
-The "clock not found" is exactly what this fixes.
+This isn't right, you don't want to finish the NAPI poll because
+TX work was done.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130228/6b14cd82/attachment.sig>
+Ignore the TX work for poll completion purposes, see
+drivers/net/ethernet/broadcom/tg3.c:tg3_poll_work() for
+example.
