@@ -1,55 +1,66 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 28 Feb 2013 16:28:33 +0800
-Subject: [PATCH 04/12] mmc: mxs-mmc: move to use generic DMA helper
-In-Reply-To: <201302272054.18829.arnd@arndb.de>
-References: <1361978748-25281-1-git-send-email-shawn.guo@linaro.org>
- <1361978748-25281-5-git-send-email-shawn.guo@linaro.org>
- <201302272054.18829.arnd@arndb.de>
-Message-ID: <20130228082831.GG26106@S2101-09.ap.freescale.net>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Thu, 28 Feb 2013 16:31:44 +0800
+Subject: [PATCH v9 8/9] usb: chipidea: tell platform layer the ci core
+ probe's result
+In-Reply-To: <20130228072617.GB6154@arwen.pp.htv.fi>
+References: <1361093083-22940-1-git-send-email-peter.chen@freescale.com>
+ <1361093083-22940-9-git-send-email-peter.chen@freescale.com>
+ <20130226094234.GC26189@arwen.pp.htv.fi>
+ <20130227022202.GA20402@nchen-desktop>
+ <20130227121238.GE8016@arwen.pp.htv.fi>
+ <20130228031118.GA19387@nchen-desktop>
+ <20130228072617.GB6154@arwen.pp.htv.fi>
+Message-ID: <20130228083143.GB19516@nchen-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 27, 2013 at 08:54:18PM +0000, Arnd Bergmann wrote:
-> On Wednesday 27 February 2013, Shawn Guo wrote:
-> >  Required properties:
-> >  - compatible: Should be "fsl,<chip>-mmc".  The supported chips include
-> >    imx23 and imx28.
-> > -- interrupts: Should contain ERROR and DMA interrupts
-> > -- fsl,ssp-dma-channel: APBH DMA channel for the SSP
-> > +- interrupts: Should contain ERROR interrupt number
-> > +- dmas: DMA specifier, consisting of a phandle to DMA controller node
-> > +  and SSP DMA channel ID.
-> > +  Refer to dma.txt and fsl-mxs-dma.txt for details.
+On Thu, Feb 28, 2013 at 09:26:17AM +0200, Felipe Balbi wrote:
+> Hi,
 > 
-> I wonder if we should leave support for old device trees files around,
-> at least for a while. Your patch removes a lot of unnecessary code if
-> we decide not to worry about backwards compatibility here, but I could
-> imagine that we see a few surprises here.
+> On Thu, Feb 28, 2013 at 11:11:20AM +0800, Peter Chen wrote:
+> > On Wed, Feb 27, 2013 at 02:12:38PM +0200, Felipe Balbi wrote:
+> > > Hi,
+> > > 
+> > > On Wed, Feb 27, 2013 at 10:22:03AM +0800, Peter Chen wrote:
+> > > > On Tue, Feb 26, 2013 at 11:42:34AM +0200, Felipe Balbi wrote:
+> > > > > On Sun, Feb 17, 2013 at 05:24:42PM +0800, Peter Chen wrote:
+> > > > > > If the probe fails, the ci13xxx_add_device will not return error,
+> > > > > > (bus_probe_device doesn't has return value)
+> > > > > > therefore, the platform layer can't know whether core's probe
+> > > > > > is successful or not, if platform layer goes on using core's struct
+> > > > > > which is initialized at core's probe, the error will occur.
+> > > > > > 
+> > > > > > This error is showed when I only compile gadget, the host-only
+> > > > > > controller reports "no supported roles", and fails probe, but imx
+> > > > > > platform code doesn't know it, and goes on using core's private data.
+> > > > > > 
+> > > > > > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> > > > > 
+> > > > > this just tells you that platform code shouldn't be using the driver
+> > > > > directly. passing probe_retval via platform_data is an abomination, fix
+> > > > > the real problem instead, whatever it is.
+> > > > 
+> > > > So you suggest the platform glue layer should not use core driver's data
+> > > > directly, eg, for your dwc3, the platform glue layer should not use
+> > > > struct dwc3 *dwc directly? 
+> > > 
+> > > yes, and it doesn't. Ever.
+> > > 
+> > 
+> > If the dwc3 core fails to probe, but controller core clk is still on, is it
+> > a valid case?
 > 
-I'm less concerned by that at this point.  Though platform mxs has been
-fully converted to device tree, device tree is still quite new for the
-platform.  The incompatible device tree should be acceptable,
-considering we have noticed that when adding the temporary DMA binding
-for client devices.
-
-/*
- * TODO: This is a temporary solution and should be changed
- * to use generic DMA binding later when the helper get in.
- */
-
-Unless we have these TODO remarks leave in the tree forever, we will
-break old device tree sooner or later anyway.  And I would have it
-happen sooner than later.
-
-And I would start thinking about maintaining the device tree
-compatibility for mxs after generic DMA binding adoption.
-
-> > +- dma-names: Must be "ssp".
+> of course not, but then again, core clk shouldn't be handled by glue
+> layer. You need to figure out who owns the clock, if it feeds DWC3 why
+> would you clk_get() and clk_prepare_enable() from glue ? Makes no sense.
 > 
-> I would prefer calling this "data" rather than "ssp". The name only
-> has local significance in the ssp device, so calling the channel
-> "ssp" seems wrong.
-> 
-Ok, will rename it per the use of the channel in the controller.
 
-Shawn
+Sorry? I can't find clk_prepare_enable at dwc3/core.c, but at dwc3 core, it
+try to access register at probe, unless platform layer open the clock, how
+can the core visit the core register.
+
+
+-- 
+
+Best Regards,
+Peter Chen
