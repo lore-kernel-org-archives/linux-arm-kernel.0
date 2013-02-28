@@ -1,89 +1,60 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 28 Feb 2013 11:20:31 -0700
-Subject: [PATCH V2] clk: Add composite clock type
-In-Reply-To: <512F0E2F.4000104@nvidia.com>
-References: <1359965482-29655-1-git-send-email-pgaikwad@nvidia.com>
- <2204463.8bhhYZbxqK@amdc1227> <5111C840.3000003@nvidia.com>
- <1405953.njFh3JJd1A@amdc1227> <512F0E2F.4000104@nvidia.com>
-Message-ID: <512F9FEF.4010304@wwwdotorg.org>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Thu, 28 Feb 2013 19:20:11 +0100
+Subject: [PATCH v6 04/46] percpu_rwlock: Implement the core design of
+ Per-CPU Reader-Writer Locks
+In-Reply-To: <20130228180007.GA3537@redhat.com>
+References: <CACvQF51jCxk5jUqmhD=QBBtUsBkQWZzakacrKO4Gsk=w61rNwQ@mail.gmail.com>
+ <512C7A38.8060906@linux.vnet.ibm.com>
+ <CACvQF51RvhM8XNqu3-1OTQ=cZUZ=pAX+_zx0a29+W67N1X+BgQ@mail.gmail.com>
+ <512CC509.1050000@linux.vnet.ibm.com>
+ <CACvQF50UgiqPpDk3HCmV86zKSf6tPjqr0bZowfPEOJs0g0r0MQ@mail.gmail.com>
+ <512D0D67.9010609@linux.vnet.ibm.com>
+ <CANN689FuuEb9wpV43DkTtgv6syvBYL-LQxByWznyAq8dkrhzBw@mail.gmail.com>
+ <20130227192551.GA8333@redhat.com>
+ <CANN689EhqoQAKALR7WhT3YrQh3=VDA2Dq3QX1yLuYU_gZAo_Tg@mail.gmail.com>
+ <20130228180007.GA3537@redhat.com>
+Message-ID: <20130228182011.GA4373@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/28/2013 12:58 AM, Prashant Gaikwad wrote:
-> On Wednesday 06 February 2013 03:36 PM, Tomasz Figa wrote:
->> On Wednesday 06 of February 2013 08:34:32 Prashant Gaikwad wrote:
->>> On Tuesday 05 February 2013 03:45 PM, Tomasz Figa wrote:
->>>> Hi Prashant,
->>>>
->>>> Thank you for your patch. Please see some comments inline.
->>>>
->>>> On Monday 04 of February 2013 13:41:22 Prashant Gaikwad wrote:
->>>>> Not all clocks are required to be decomposed into basic clock
->>>>> types but at the same time want to use the functionality
->>>>> provided by these basic clock types instead of duplicating.
->>>>>
->>>>> For example, Tegra SoC has ~100 clocks which can be decomposed
->>>>> into Mux -> Div -> Gate clock types making the clock count to
->>>>> ~300. Also, parent change operation can not be performed on gate
->>>>> clock which forces to use mux clock in driver if want to change
->>>>> the parent.
->>>>>
->>>>> Instead aggregate the basic clock types functionality into one
->>>>> clock and just use this clock for all operations. This clock
->>>>> type re-uses the functionality of basic clock types and not
->>>>> limited to basic clock types but any hardware-specific
->>>>> implementation.
+On 02/28, Oleg Nesterov wrote:
+> On 02/28, Michel Lespinasse wrote:
+> >
+> > On Thu, Feb 28, 2013 at 3:25 AM, Oleg Nesterov <oleg@redhat.com> wrote:
+> > > On 02/27, Michel Lespinasse wrote:
+> > >>
+> > >> +void lg_rwlock_local_read_lock(struct lgrwlock *lgrw)
+> > >> +{
+> > >> +       preempt_disable();
+> > >> +
+> > >> +       if (__this_cpu_read(*lgrw->local_refcnt) ||
+> > >> +           arch_spin_trylock(this_cpu_ptr(lgrw->lglock->lock))) {
+> > >> +               __this_cpu_inc(*lgrw->local_refcnt);
+> > >
+> > > Please look at __this_cpu_generic_to_op(). You need this_cpu_inc()
+> > > to avoid the race with irs. The same for _read_unlock.
+> >
+> > Hmmm, I was thinking that this was safe because while interrupts might
+> > modify local_refcnt to acquire a nested read lock, they are expected
+> > to release that lock as well which would set local_refcnt back to its
+> > original value ???
+>
+> Yes, yes, this is correct.
+>
+> I meant that (in general, x86 is fine) __this_cpu_inc() itself is not
+> irq-safe. It simply does "pcp += 1".
+>
+> this_cpu_inc() is fine, _this_cpu_generic_to_op() does cli/sti around.
 
->>>>> diff --git a/drivers/clk/clk-composite.c
+Just in case, it is not that I really understand why __this_cpu_inc() can
+race with irq in this particular case (given that irq handler should
+restore the counter).
 
->>>>> +static u8 clk_composite_get_parent(struct clk_hw *hw)
->>>>> +{
->>>>> +     struct clk_composite *composite = to_clk_composite(hw);
->>>>> +     const struct clk_ops *mux_ops = composite->mux_ops;
->>>>> +     struct clk_hw *mux_hw = composite->mux_hw;
->>>>> +
->>>>> +     mux_hw->clk = hw->clk;
->>>>
->>>> Why is this needed? Looks like this filed is already being initialized
->>>> in clk_register_composite.
->>>
->>> Some ops will get called during clk_init where this clk is not populated
->>> hence doing here. I have done it for all ops to make sure that any
->>> future change in clock framework don't break this clock.
->>> Now, why duplicate it in clk_register_composite? It is possible that
->>> none of these ops get called in clk_init.
->>> For example, recalc_rate is called during init and this ops is supported
->>> by div clock type, but what if div clock is not added.
->>>
->>> I hope this explains the need.
->>
->> Sorry, I don't understand your explanation.
->>
->> I have asked why mux_hw->clk field has to be reinitialized in all the
->> ops.
->>
->> In other words, is it even possible that this clk pointer changes since
->> calling clk_register from clk_register_composite and if yes, why?
-> 
-> Tomasz,
-> 
-> calling sequence is as
-> 
-> clk_register(struct clk_hw *hw)
->     clk_init(struct clk_hw *hw)
->         .
->         .
->         hw->clk = clk;
->         clk->ops.recalc_rate(hw) => clk_composite_recalc_rate(hw) =>
-> composite->div_ops.recalc_rate(div_hw) => clk_divider_recalc_rate(hw)
-> 
-> Now if clk_divider_recalc_rate tries to access clk from hw then it will
-> get NULL since this is not assigned yet and that is what I am doing in
-> clk_composite_recalc_rate.
-> 
-> I am doing it in all ops because I can not assume which one will get
-> called first and always. If in future something changes the calling
-> sequence in ccf framework then it will break this clock.
+So perhaps I am wrong again. The comments in include/linux/percpu.h look
+confusing to me, and I simply know nothing about !x86 architectures. But
+since, say, preempt_disable() doesn't do anything special then probably
+__this_cpu_inc() is fine too.
 
-Surely the CCF core should be taking care of this as part of
-clk_register() or clk_init()?
+In short: please ignore me ;)
+
+Oleg.
