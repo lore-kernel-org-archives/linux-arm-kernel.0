@@ -1,36 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 28 Feb 2013 22:26:12 +0000
-Subject: [PATCH v9 2/2] video: drm: exynos: Add pinctrl support to fimd
-In-Reply-To: <512FD44D.1070408@gmail.com>
-References: <1362024762-28406-1-git-send-email-vikas.sajjan@linaro.org>
- <1362024762-28406-3-git-send-email-vikas.sajjan@linaro.org>
- <512FD44D.1070408@gmail.com>
-Message-ID: <20130228222612.GE17833@n2100.arm.linux.org.uk>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 28 Feb 2013 14:54:49 -0800
+Subject: [GIT PULL 0/3] arm-soc: late changes for 3.9
+Message-ID: <1362092093-4839-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 28, 2013 at 11:03:57PM +0100, Sylwester Nawrocki wrote:
-> Please just use IS_ERR(), let's stop this IS_ERR_OR_NULL() insanity.
+Hi Linus,
 
-Yes, indeed.
+Here is a series of merge requests for arm-soc branches.
 
-On that topic (and off-topic for this thread, sorry) I've committed
-a set of patches to remove most users of IS_ERR_OR_NULL() from arch/arm.
-These are the last remaining ones there - and I don't want to see any
-more appearing:
+The first two are mostly normal changes, The OMAP changes came in late
+before the merge window opened, so we wanted to let them sit for a few
+more days in -next. The i.MX branch is a churny branch that I wanted to
+keep separate and not have other code depend on, and thus held it off
+to the second batch.
 
-arch/arm/plat-samsung/clock.c:	if (IS_ERR_OR_NULL(clk))
-arch/arm/plat-samsung/clock.c:	if (!IS_ERR_OR_NULL(clk) && clk->ops && clk->ops->round_rate)
-arch/arm/plat-samsung/clock.c:	if (IS_ERR_OR_NULL(clk))
-arch/arm/plat-samsung/clock.c:	if (IS_ERR_OR_NULL(clk) || IS_ERR_OR_NULL(parent))
-arch/arm/mach-imx/devices/platform-ipu-core.c:	if (IS_ERR_OR_NULL(imx_ipu_coredev))
-arch/arm/mach-imx/devices/platform-ipu-core.c:	if (IS_ERR_OR_NULL(imx_ipu_coredev))
-arch/arm/kernel/smp_twd.c:		 * We use IS_ERR_OR_NULL() here, because if the clock stubs
-arch/arm/kernel/smp_twd.c:		if (!IS_ERR_OR_NULL(twd_clk))
+Final two pull requests are for the same code. As Arnd describes in the
+tags, they are for a set of mvebu patches that depend on contents in
+the MMC tree. We had pulled in part of the MMC branch as a dependency,
+but unfortunately Chris Ball rebased it.
 
-They currently all legal uses of it - though I'm sure that the samsung
-clock uses can be reduced to just IS_ERR().  The IMX use looks "valid"
-in that imx_ipu_coredev really can be an error pointer (on failure) or
-NULL if the platform device hasn't yet been created.  The TWD one is
-explained in the comments in the code (if people had to write explanations
-for using IS_ERR_OR_NULL(), we'd probably have it used correctly!)
+We're giving you the choice of taking the rebased version, or a
+non-rebased-but-merged-and-fixed-up version to avoid dealing with the
+excessive conflicts. The rebased one has the obvious benefit of not
+having duplicate commits in the tree for the same changes, but, well,
+it's rebased. Actual tree contents is identical though.
+
+I've pushed a resolved branch for reference (late-branches-resolved)
+in case you want to compare conflict resolutions.
+
+
+Thanks,
+
+-Olof
