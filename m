@@ -1,60 +1,38 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 28 Feb 2013 10:02:01 -0600
-Subject: [PATCH 06/14] ARM: OMAP2+: Convert NAND to use
- gpmc_cs_program_settings()
-In-Reply-To: <518397C60809E147AF5323E0420B992E3EA8F235@DBDE01.ent.ti.com>
-References: <1361899842-30303-1-git-send-email-jon-hunter@ti.com>
- <1361899842-30303-7-git-send-email-jon-hunter@ti.com>
- <518397C60809E147AF5323E0420B992E3EA8F235@DBDE01.ent.ti.com>
-Message-ID: <512F7F79.4020900@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 28 Feb 2013 16:10:38 +0000
+Subject: [PATCH 0/4] Convert highbank to use PSCI calls
+In-Reply-To: <201302272025.19848.arnd@arndb.de>
+References: <1361936528-25998-1-git-send-email-robherring2@gmail.com>
+ <512E0F79.6080301@gmail.com>
+ <20130227171410.GC22286@mudshark.cambridge.arm.com>
+ <201302272025.19848.arnd@arndb.de>
+Message-ID: <20130228161038.GF32130@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 02/28/2013 04:38 AM, Philip, Avinash wrote:
-> On Tue, Feb 26, 2013 at 23:00:33, Hunter, Jon wrote:
->> Convert the OMAP2+ NAND code to use the gpmc_cs_program_settings()
->> function for configuring the various GPMC options instead of directly
->> programming the CONFIG1 register.
->>
->> This moves the configuration of some GPMC options outside the
->> nand_gpmc_retime() because these options should only need to be set once
->> regardless of whether the gpmc timing is changing dynamically at runtime.
->> The programming of where the wait-pin is also moved slightly, but this
->> will not have any impact to existing devices as no boards are currently
->> setting the dev_ready variable.
->>
->> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
->> ---
->>  arch/arm/mach-omap2/gpmc-nand.c |   35 +++++++++++++++++++++++------------
->>  1 file changed, 23 insertions(+), 12 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/gpmc-nand.c b/arch/arm/mach-omap2/gpmc-nand.c
->> index afc1e8c..4bdfea2 100644
->> --- a/arch/arm/mach-omap2/gpmc-nand.c
->> +++ b/arch/arm/mach-omap2/gpmc-nand.c
->> @@ -43,6 +43,10 @@ static struct platform_device gpmc_nand_device = {
->>  	.resource	= gpmc_nand_resource,
->>  };
->>  
->> +static struct gpmc_settings nand_settings = {
->> +	.device_nand = true,
->> +};
->> +
+On Wed, Feb 27, 2013 at 08:25:19PM +0000, Arnd Bergmann wrote:
+> On Wednesday 27 February 2013, Will Deacon wrote:
+> > As long as we remain compatible with "linux,dummy-virt" then I'm not fussed
+> > what happens to the support code. I don't envisage adding anything else to
+> > it that can't live under drivers/ (e.g. new virtio devices).
 > 
-> Is it possible to make it local variable?
-> It would help GPMC to support NAND device on multiple chip select.
+> The idea with my patch is that you don't actually have to check anything
+> against "linux,dummy-virt" or another top-level "compatible value.
 
-Well gpmc_nand_init() will be called for each NAND device and so I don't
-see why this would prevent supporting multiple NANDs on multiple
-chip-selects.
+Great, I've got no problem killing of the short-lived mach-virt then!
 
-Once migration to device-tree is complete we could definitely make it
-local as there will be no need for any static initialisations of the
-structure as all fields would be read from device-tree.
+> Basically any device tree would boot as long as all device you want to
+> use (including timer, irqchip, smp CPU setup method, ...) can be brought
+> up using the DT information. The SMP stuff is the only bit missing
+> right now, any other field of the machine_desc structure is already
+> optional with my patch, and if all fields are NULL, you can leave
+> out the entire structure. The best part of this is that an empty
+> machine_desc is exactly what we have on arm64, so any machine that
+> is supported on arm64 could also be supported on arch/arm without
+> any machine specific code.
 
-I can make it local now if that is preferred and seeing that will be the
-direction once we have migrated to device-tree, is does make sense.
+Keeping on the same topic: using a PSCI implementation as the default SMP
+ops would extend the arm/arm64 compatibility to SMP booting, as both are
+PSCI-capable.
 
-Cheers
-Jon
+Will
