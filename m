@@ -1,123 +1,86 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Thu, 28 Feb 2013 20:55:26 +0800
-Subject: [PATCH 3/7] ARM: hs: add board support with device tree
-In-Reply-To: <201302281104.13885.arnd@arndb.de>
-References: <1362035966-17628-1-git-send-email-haojian.zhuang@linaro.org>
- <1362035966-17628-3-git-send-email-haojian.zhuang@linaro.org>
- <201302281104.13885.arnd@arndb.de>
-Message-ID: <CAD6h2NR2e0_MogO+PxGS8BrDT8OqzehrRzC-zoyvzjdk8vdLUw@mail.gmail.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Thu, 28 Feb 2013 14:04:32 +0100
+Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
+In-Reply-To: <CACRpkdabXa8tXNeGRPntvY9cx4XWCa7XaEXHmVREeWN-x793ZA@mail.gmail.com>
+References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
+ <1329321854-24490-4-git-send-email-b-cousson@ti.com>
+ <CACRpkdabXa8tXNeGRPntvY9cx4XWCa7XaEXHmVREeWN-x793ZA@mail.gmail.com>
+Message-ID: <512F55E0.8050501@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 February 2013 19:04, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 28 February 2013, Haojian Zhuang wrote:
->> Add board support with device tree for Hisilicon Hi36xx/Hi37xx platform.
++ Jon who was brave enough to take over the OMAP GPIO  driver
++ New email address for Kevin since he is no longer at TI :-(.
+- Tarun that left TI but I don't have his new email
+
+Hi Linus,
+
+On 02/28/2013 12:41 AM, Linus Walleij wrote:
+> On Wed, Feb 15, 2012 at 5:04 PM, Benoit Cousson <b-cousson@ti.com> wrote:
+
+Gosh! That's pretty old stuff :-)
+
+>> @@ -52,7 +55,8 @@ struct gpio_bank {
+>>         struct list_head node;
+>>         void __iomem *base;
+>>         u16 irq;
+>> -       u16 virtual_irq_start;
+>> +       int irq_base;
+>> +       struct irq_domain *domain;
+> 
+> This seems wrong. IRQ domains are used to avoid keeping track of
+> irq base offsets. I would even say it's the whole point of irq domains.
+
+Well at that time, it was not the only point. We were trying to boot
+with DT, and for that irq_domain was mandatory. At the very same time,
+Grant was cleaning and consolidating the whole irq_domain
+infrastructure, and thus most of the following API were not really
+stabilized or even available.
+
+So, this idea was to avoid any regression while allowing DT boot... And
+obviously a lot of stuff happened since that good old time.
+
+>> @@ -669,7 +673,7 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+>>                 if (!isr)
+>>                         break;
 >>
->> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
->
-> Ah, nice and small ;-)
->
->>  arch/arm/Kconfig          |    2 ++
->>  arch/arm/Makefile         |    1 +
->>  arch/arm/mach-hs/Kconfig  |   23 +++++++++++++
->>  arch/arm/mach-hs/Makefile |    5 +++
->>  arch/arm/mach-hs/hs-dt.c  |   83 +++++++++++++++++++++++++++++++++++++++++++++
->
-> Regarding the naming, I wonder if "hs" is unique enough for a platform name.
-> AFAIK, HiSilicon has a couple of independently developed SoC families,
-> so we might want to be a bit more specific here, e.g. mach-hi3xxx.
->
-> Regarding the file name, I think the "-dt" postfix is redundant, when we
-> only support booting using DT. I would call this one the same thing as the
-> platform name, whichever we go with.
->
-OK
+>> -               gpio_irq = bank->virtual_irq_start;
+>> +               gpio_irqkhilman at ti.com = bank->irq_base;
+>>                 for (; isr != 0; isr >>= 1, gpio_irq++) {
+>>                         gpio_index = GPIO_INDEX(bank, irq_to_gpio(gpio_irq));
+>>
+> 
+> Use irq_find_mapping(irqdomain, hwirq) in this function.
+> 
+> 
+>> @@ -915,7 +919,7 @@ static int gpio_2irq(struct gpio_chip *chip, unsigned offset)
+>>         struct gpio_bank *bank;
+>>
+>>         bank = container_of(chip, struct gpio_bank, chip);
+>> -       return bank->virtual_irq_start + offset;
+>> +       return bank->irq_base + offset;
+> 
+> Use irq_create_mapping() in this function.
+> 
+>> +       bank->irq_base = irq_alloc_descs(-1, 0, bank->width, 0);
+>> +       if (bank->irq_base < 0) {
+>> +               dev_err(dev, "Couldn't allocate IRQ numbers\n");
+>> +               return -ENODEV;
+>> +       }
+>> +
+>> +       bank->domain = irq_domain_add_legacy(node, bank->width, bank->irq_base,
+>> +                                            0, &irq_domain_simple_ops, NULL);
+> 
+> Use irq_domain_add_simple() and the descs will be allocated for
+> you as part of the domain creation, when using a pre-fixed base.
 
->> +config MACH_HS_DT
->> +     bool "Hisilicon Development Board"
->> +     default y
->> +     help
->> +       Say 'Y' here if you want to support the Hisilicon Development
->> +       Board.
->> +
->> +endif
->
-> I don't think we need this option. Let's just always build the file
-> when the platform is enabled, and build all .dtb files as well.
->
-OK
+Funny, that API was removed while I was writing this patch, and is now
+back in town...
 
->> +static struct clk_lookup sp804_lookup = {
->> +     .dev_id = "sp804",
->> +     .clk    = NULL,
->> +};
->
-> (adding Mike to Cc)
->
-> Shouldn't the clk_lookup be automatic with a fully DT enabled platform now?
->
->> +extern void __init hs_init_clocks(void);
->> +static void __init hs_timer_init(void)
->> +{
->> +     struct device_node *node = NULL;
->> +     void __iomem *base;
->> +     int irq;
->> +
->> +     hs_init_clocks();
->> +
->> +     node = of_find_matching_node(NULL, hs_timer_match);
->> +     WARN_ON(!node);
->> +     if (!node) {
->> +             pr_err("Failed to find sp804 timer\n");
->> +             return;
->> +     }
->> +     base = of_iomap(node, 0);
->> +     WARN_ON(!base);
->> +
->> +     /* timer0 is used as clock event, and timer1 is clock source. */
->> +     irq = irq_of_parse_and_map(node, 0);
->> +     WARN_ON(!irq);
->> +
->> +     sp804_lookup.clk = of_clk_get(node, 0);
->> +     clkdev_add(&sp804_lookup);
->> +
->> +     sp804_clocksource_and_sched_clock_init(base + TIMER_2_BASE, "timer1");
->> +     sp804_clockevents_init(base, irq, "timer0");
->> +}
->
-> I think for the clocksource/clockevents driver, we should move
-> arch/arm/common/timer-sp.c to drivers/clocksource now and integrate
-> it into the automatic probing through clocksource_of_init().
->
-Sounds good.
+> If you fix this I suspect the device tree discussion also will fix
+> itself :-)
 
->> +static void __init hs_init(void)
->> +{
->> +     of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
->> +}
->> +
->> +static const char *hs_compat[] __initdata = {
->> +     "hisilicon,hi3620-hi4511",
->> +     NULL,
->> +};
->> +
->> +DT_MACHINE_START(HS_DT, "Hisilicon Hi36xx/Hi37xx (Flattened Device Tree)")
->> +     /* Maintainer: Haojian Zhuang <haojian.zhuang@linaro.org> */
->> +     .map_io         = debug_ll_io_init,
->> +     .init_irq       = irqchip_init,
->> +     .init_time      = hs_timer_init,
->> +     .init_machine   = hs_init,
->> +     .dt_compat      = hs_compat,
->> +MACHINE_END
->
-> This looks right at the moment, but I also have a patch to make it possible to drop the
-> irqchip_init, clocksource_of_init and hs_init() calls here, as they are all the
-> defaults. At that point, the platform would be essentially empty except for the
-> debug_ll_io_init part that is inherently platform specific.
->
->         Arnd
+Mmm, I hope it is the case, but I'm not sure it will be that easy :-)
 
-Could you give me the link of your patch? I could rebase this patch.
-
-Regards
-Haojian
+Thanks,
+Benoit
