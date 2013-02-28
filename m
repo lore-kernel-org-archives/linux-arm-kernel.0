@@ -1,53 +1,222 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 28 Feb 2013 16:21:28 +0530
-Subject: [PATCH v4 5/5] ARM: davinci: da850: override mmc DT node device
- name
-In-Reply-To: <512E1259.5020903@gmail.com>
-References: <1360909322-1858-1-git-send-email-prakash.pm@ti.com>
- <1360909322-1858-6-git-send-email-prakash.pm@ti.com>
- <512E1259.5020903@gmail.com>
-Message-ID: <512F36B0.9040907@ti.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Thu, 28 Feb 2013 11:52:29 +0100
+Subject: [PATCH 2/4] USB: add devicetree helpers for determining dr_mode and
+ phy_type
+In-Reply-To: <1362048751-4061-1-git-send-email-mkl@pengutronix.de>
+References: <1362048751-4061-1-git-send-email-mkl@pengutronix.de>
+Message-ID: <1362048751-4061-3-git-send-email-mkl@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+From: Michael Grzeschik <m.grzeschik@pengutronix.de>
 
-On 2/27/2013 7:34 PM, Rob Herring wrote:
-> On 02/15/2013 12:22 AM, Manjunathappa, Prakash wrote:
->> Populate OF_DEV_AUXDATA with desired device name expected by
->> davinci_mmc driver. Without this clk_get of davinci_mmc DT driver
->> fails.
->>
->> Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
->> Cc: linux-mmc at vger.kernel.org
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: linux-kernel at vger.kernel.org
->> Cc: davinci-linux-open-source at linux.davincidsp.com
->> Cc: devicetree-discuss at lists.ozlabs.org
->> Cc: cjb at laptop.org
->> Cc: Sekhar Nori <nsekhar@ti.com>
->> ---
->> Since v2:
->> Rebased on top of v3.9/dt-2 branch of linux_davinci and reordered this patch.
->>
->>  arch/arm/mach-davinci/da8xx-dt.c |    2 ++
->>  1 files changed, 2 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
->> index 5404e92..2b740a9 100644
->> --- a/arch/arm/mach-davinci/da8xx-dt.c
->> +++ b/arch/arm/mach-davinci/da8xx-dt.c
->> @@ -40,6 +40,8 @@ static void __init da8xx_init_irq(void)
->>  struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
->>  	OF_DEV_AUXDATA("ti,davinci-i2c", 0x01c22000, "i2c_davinci.1", NULL),
->>  	OF_DEV_AUXDATA("ti,davinci-wdt", 0x01c21000, "watchdog", NULL),
->> +	OF_DEV_AUXDATA("ti,davinci-mmc-da830", 0x01c40000, "davinci-mmc-da830.0",
->> +			NULL),
-> 
-> If you only need clock lookup, just add a clkdev entry with the new name.
+This adds two little devicetree helper functions for determining the dr_mode
+(host, peripheral, otg, dual-role) and phy_type (utmi, ulpi,...) from the
+devicetree.
 
-That would work, but wouldn't it be better to keep this here so it can
-all be dropped once clocks are converted to DT?
+Cc: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+---
+ drivers/usb/phy/Makefile |    1 +
+ drivers/usb/phy/of.c     |   47 ++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/usb/usb-common.c |   37 ++++++++++++++++++++++++++++++++++++
+ include/linux/usb/of.h   |   28 +++++++++++++++++++++++++++
+ include/linux/usb/otg.h  |    8 ++++++++
+ include/linux/usb/phy.h  |    9 +++++++++
+ 6 files changed, 130 insertions(+)
+ create mode 100644 drivers/usb/phy/of.c
+ create mode 100644 include/linux/usb/of.h
 
-Thanks,
-Sekhar
+diff --git a/drivers/usb/phy/Makefile b/drivers/usb/phy/Makefile
+index 9fa6327..e1be1e8 100644
+--- a/drivers/usb/phy/Makefile
++++ b/drivers/usb/phy/Makefile
+@@ -5,6 +5,7 @@
+ ccflags-$(CONFIG_USB_DEBUG) := -DDEBUG
+ 
+ obj-$(CONFIG_USB_OTG_UTILS)		+= phy.o
++obj-$(CONFIG_OF)			+= of.o
+ obj-$(CONFIG_OMAP_USB2)			+= omap-usb2.o
+ obj-$(CONFIG_OMAP_USB3)			+= omap-usb3.o
+ obj-$(CONFIG_OMAP_CONTROL_USB)		+= omap-control-usb.o
+diff --git a/drivers/usb/phy/of.c b/drivers/usb/phy/of.c
+new file mode 100644
+index 0000000..e6f3b74
+--- /dev/null
++++ b/drivers/usb/phy/of.c
+@@ -0,0 +1,47 @@
++/*
++ * USB of helper code
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/usb/of.h>
++#include <linux/usb/otg.h>
++
++static const char *usbphy_modes[] = {
++	[USBPHY_INTERFACE_MODE_UNKNOWN]	= "",
++	[USBPHY_INTERFACE_MODE_UTMI]	= "utmi",
++	[USBPHY_INTERFACE_MODE_UTMIW]	= "utmi_wide",
++	[USBPHY_INTERFACE_MODE_ULPI]	= "ulpi",
++	[USBPHY_INTERFACE_MODE_SERIAL]	= "serial",
++	[USBPHY_INTERFACE_MODE_HSIC]	= "hsic",
++};
++
++/**
++ * of_usb_get_phy_mode - Get phy mode for given device_node
++ * @np:	Pointer to the given device_node
++ *
++ * The function gets phy interface string from property 'phy_type',
++ * and returns the correspondig enum usb_phy_interface
++ */
++enum usb_phy_interface of_usb_get_phy_mode(struct device_node *np)
++{
++	const char *phy_type;
++	int err, i;
++
++	err = of_property_read_string(np, "phy_type", &phy_type);
++	if (err < 0)
++		return USBPHY_INTERFACE_MODE_UNKNOWN;
++
++	for (i = 0; i < ARRAY_SIZE(usbphy_modes); i++)
++		if (!strcmp(phy_type, usbphy_modes[i]))
++			return i;
++
++	return USBPHY_INTERFACE_MODE_UNKNOWN;
++}
++EXPORT_SYMBOL_GPL(of_usb_get_phy_mode);
+diff --git a/drivers/usb/usb-common.c b/drivers/usb/usb-common.c
+index d29503e..18b994b 100644
+--- a/drivers/usb/usb-common.c
++++ b/drivers/usb/usb-common.c
+@@ -14,6 +14,9 @@
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+ #include <linux/usb/ch9.h>
++#include <linux/of.h>
++#include <linux/usb/of.h>
++#include <linux/usb/otg.h>
+ 
+ const char *usb_speed_string(enum usb_device_speed speed)
+ {
+@@ -32,4 +35,38 @@ const char *usb_speed_string(enum usb_device_speed speed)
+ }
+ EXPORT_SYMBOL_GPL(usb_speed_string);
+ 
++#ifdef CONFIG_OF
++static const char *usb_dr_modes[] = {
++	[USB_DR_MODE_UNKNOWN]		= "",
++	[USB_DR_MODE_HOST]		= "host",
++	[USB_DR_MODE_PERIPHERAL]	= "peripheral",
++	[USB_DR_MODE_OTG]		= "otg",
++	[USB_DR_MODE_DUAL_ROLE]		= "dual-role",
++};
++
++/**
++ * of_usb_get_dr_mode - Get dual role mode for given device_node
++ * @np:	Pointer to the given device_node
++ *
++ * The function gets phy interface string from property 'dr_mode',
++ * and returns the correspondig enum usb_dr_mode
++ */
++enum usb_dr_mode of_usb_get_dr_mode(struct device_node *np)
++{
++	const char *dr_mode;
++	int err, i;
++
++	err = of_property_read_string(np, "dr_mode", &dr_mode);
++	if (err < 0)
++		return USB_DR_MODE_UNKNOWN;
++
++	for (i = 0; i < ARRAY_SIZE(usb_dr_modes); i++)
++		if (!strcmp(dr_mode, usb_dr_modes[i]))
++			return i;
++
++	return USB_DR_MODE_UNKNOWN;
++}
++EXPORT_SYMBOL_GPL(of_usb_get_dr_mode);
++#endif
++
+ MODULE_LICENSE("GPL");
+diff --git a/include/linux/usb/of.h b/include/linux/usb/of.h
+new file mode 100644
+index 0000000..fc98f68
+--- /dev/null
++++ b/include/linux/usb/of.h
+@@ -0,0 +1,28 @@
++/*
++ * OF helpers for usb devices.
++ *
++ * This file is released under the GPLv2
++ */
++
++#ifndef __LINUX_USB_OF_H
++#define __LINUX_USB_OF_H
++
++#include <linux/usb/phy.h>
++#include <linux/usb/otg.h>
++
++#ifdef CONFIG_OF
++enum usb_phy_interface of_usb_get_phy_mode(struct device_node *np);
++enum usb_dr_mode of_usb_get_dr_mode(struct device_node *np);
++#else
++static inline enum usb_phy_interface of_usb_get_phy_mode(struct device_node *np)
++{
++	return USBPHY_INTERFACE_MODE_UNKNOWN;
++}
++
++static inline enum usb_dr_mode of_usb_get_dr_mode(struct device_node *np)
++{
++	return USB_DR_MODE_UNKNOWN;
++}
++#endif
++
++#endif /* __LINUX_USB_OF_H */
+diff --git a/include/linux/usb/otg.h b/include/linux/usb/otg.h
+index e8a5fe8..6d90dff 100644
+--- a/include/linux/usb/otg.h
++++ b/include/linux/usb/otg.h
+@@ -99,4 +99,12 @@ otg_start_srp(struct usb_otg *otg)
+ /* for OTG controller drivers (and maybe other stuff) */
+ extern int usb_bus_start_enum(struct usb_bus *bus, unsigned port_num);
+ 
++enum usb_dr_mode {
++	USB_DR_MODE_UNKNOWN,
++	USB_DR_MODE_HOST,
++	USB_DR_MODE_PERIPHERAL,
++	USB_DR_MODE_OTG,
++	USB_DR_MODE_DUAL_ROLE,
++};
++
+ #endif /* __LINUX_USB_OTG_H */
+diff --git a/include/linux/usb/phy.h b/include/linux/usb/phy.h
+index 15847cb..5edddb1 100644
+--- a/include/linux/usb/phy.h
++++ b/include/linux/usb/phy.h
+@@ -12,6 +12,15 @@
+ #include <linux/notifier.h>
+ #include <linux/usb.h>
+ 
++enum usb_phy_interface {
++	USBPHY_INTERFACE_MODE_UNKNOWN,
++	USBPHY_INTERFACE_MODE_UTMI,
++	USBPHY_INTERFACE_MODE_UTMIW,
++	USBPHY_INTERFACE_MODE_ULPI,
++	USBPHY_INTERFACE_MODE_SERIAL,
++	USBPHY_INTERFACE_MODE_HSIC,
++};
++
+ enum usb_phy_events {
+ 	USB_EVENT_NONE,         /* no events or cable disconnected */
+ 	USB_EVENT_VBUS,         /* vbus valid event */
+-- 
+1.7.10.4
