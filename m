@@ -1,44 +1,90 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 28 Feb 2013 11:06:19 +0800
-Subject: [PATCH 2/3] ARM: dts: imx: replace magic number with pin
- function name
-In-Reply-To: <CAKGA1bmqdCiocc_O6hU3ym6uJ-bAjwKMNrt43Qs_dkjEGpX-KQ@mail.gmail.com>
-References: <1361344089-16804-1-git-send-email-shawn.guo@linaro.org>
- <1361344089-16804-3-git-send-email-shawn.guo@linaro.org>
- <51251A11.2030300@wwwdotorg.org>
- <CAKGA1bkHH1XC38_VM=QhDrr33uqqSbwe0n+GfXEPs43K_Do=CQ@mail.gmail.com>
- <20130221050247.GD17738@S2101-09.ap.freescale.net>
- <CAKGA1bn22xctSj_33HQsWwnVB=RO2OJ=eYvgRD-kF+PiQcnC4Q@mail.gmail.com>
- <20130222055203.GB27371@S2101-09.ap.freescale.net>
- <CAKGA1bmw+CzBDLHty1+L1VdeWLgkPpLSLpGKBJEeQj-ByyzicA@mail.gmail.com>
- <20130227074404.GD1906@pengutronix.de>
- <CAKGA1bmqdCiocc_O6hU3ym6uJ-bAjwKMNrt43Qs_dkjEGpX-KQ@mail.gmail.com>
-Message-ID: <20130228030616.GA26106@S2101-09.ap.freescale.net>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Thu, 28 Feb 2013 11:11:20 +0800
+Subject: [PATCH v9 8/9] usb: chipidea: tell platform layer the ci core
+ probe's result
+In-Reply-To: <20130227121238.GE8016@arwen.pp.htv.fi>
+References: <1361093083-22940-1-git-send-email-peter.chen@freescale.com>
+ <1361093083-22940-9-git-send-email-peter.chen@freescale.com>
+ <20130226094234.GC26189@arwen.pp.htv.fi>
+ <20130227022202.GA20402@nchen-desktop>
+ <20130227121238.GE8016@arwen.pp.htv.fi>
+Message-ID: <20130228031118.GA19387@nchen-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 27, 2013 at 12:16:20PM -0600, Matt Sealey wrote:
-> Shawn, I might be much happier about the patch if I knew for sure that it
+On Wed, Feb 27, 2013 at 02:12:38PM +0200, Felipe Balbi wrote:
+> Hi,
 > 
-> a) followed some Freescale design database export of pins vs. alt
-> modes and default mux settings
+> On Wed, Feb 27, 2013 at 10:22:03AM +0800, Peter Chen wrote:
+> > On Tue, Feb 26, 2013 at 11:42:34AM +0200, Felipe Balbi wrote:
+> > > On Sun, Feb 17, 2013 at 05:24:42PM +0800, Peter Chen wrote:
+> > > > If the probe fails, the ci13xxx_add_device will not return error,
+> > > > (bus_probe_device doesn't has return value)
+> > > > therefore, the platform layer can't know whether core's probe
+> > > > is successful or not, if platform layer goes on using core's struct
+> > > > which is initialized at core's probe, the error will occur.
+> > > > 
+> > > > This error is showed when I only compile gadget, the host-only
+> > > > controller reports "no supported roles", and fails probe, but imx
+> > > > platform code doesn't know it, and goes on using core's private data.
+> > > > 
+> > > > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> > > 
+> > > this just tells you that platform code shouldn't be using the driver
+> > > directly. passing probe_retval via platform_data is an abomination, fix
+> > > the real problem instead, whatever it is.
+> > 
+> > So you suggest the platform glue layer should not use core driver's data
+> > directly, eg, for your dwc3, the platform glue layer should not use
+> > struct dwc3 *dwc directly? 
+> 
+> yes, and it doesn't. Ever.
+> 
+> > At dwc3-exynos.c,  it has code "exynos->dwc3    = dwc3;", so the exynos
+> > platform code may will use struct dwc3 in future. Besides, if the dwc3
+> 
+> nonsense. That's a structure platform_device which was created by the
+> glue, it has nothing to do with struct dwc3. struct platform_device
+> belongs to the glue, but there's an easy way to prevent that by using
+> device_for_each_child() on your ->remove() method.
 
-This is the case today.
+Sorry, I just thought it may use platform_get_drvdata(exynos->dwc3) to
+get core data if exynos has special suspend/resume routine, and need
+to visit dwc3 register.
 
-> (this must exist because the manuals
-> and IOMUX tool data are generated from some XML files) and that
+> 
+> wrong. There's no need for any notification at all. A driver failing to
+> probe is just normal life. DWC3 is releasing all resources it allocated,
+> but the glue still needs the clock, then that's just the way it is.
 
-The problem seems to be that the ALT function names are a little
-inconsistent between XML files and design database.  I'm checking with
-design team right now to see how this happens, and ensure this will
-never happen again in the future.
+Here, we just talk the controller core clk, if the core fails to probe, 
+any meaningful for platform layer still alive?
+> 
+> There are many error messages which will tell the user that e.g. dwc3
+> failed to probe and user will just try again. If clocks are left
+> enabled, that's a bug in either core driver or glue layer which needs
+> fixing.
+> 
 
-And I will ensure the macro for later SoCs, e.g. imx6dl and imx6sl,
-will be consistent with Reference Manual.
+If the dwc3 core fails to probe, but controller core clk is still on, is it
+a valid case?
 
-> b) that data was available to generate the macros used in the binding.
+> > core driver as there are many platform specific things, eg, special init/
+> > shutdown, suspend/resume, board layer gpio setting for vbus control (used
+> 
+> gpio handling should be done at board-file, that's a bug. You need to
+> add a fixed regulator which is toggled by a GPIO.
 
-Ok.  I will check with IOMUX-tool people to see if we can have the data
-integrated and exported with the tool.
+I think I need to move vbus regulator from platform code to core code as we have
+struct otg at core data, and vbus operation is common operation.
 
-Shawn
+> 
+> -- 
+> balbi
+
+
+
+-- 
+
+Best Regards,
+Peter Chen
