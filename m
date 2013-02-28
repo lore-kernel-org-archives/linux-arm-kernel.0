@@ -1,165 +1,213 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 27 Feb 2013 20:49:27 -0800
-Subject: [PATCH 3/5] cpufreq: omap: scale regulator from clk notifier
+Date: Wed, 27 Feb 2013 20:49:28 -0800
+Subject: [PATCH 4/5] HACK: set_parent callback for OMAP4 non-core DPLLs
 In-Reply-To: <1362026969-11457-1-git-send-email-mturquette@linaro.org>
 References: <1362026969-11457-1-git-send-email-mturquette@linaro.org>
-Message-ID: <1362026969-11457-4-git-send-email-mturquette@linaro.org>
+Message-ID: <1362026969-11457-5-git-send-email-mturquette@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch moves direct control of the MPU voltage regulator out of the
-cpufreq driver .target callback and instead uses the common dvfs clk
-rate-change notifier infrastructure.
+This is a silly patch that demonstrates calling clk_set_parent from
+within a .set_rate callback, which itself was called by clk_set_rate.
+It may make your board burst into flames or otherwise void various
+warrantees.
 
-Ideally it would be nice to reduce the .target callback for omap's
-cpufreq driver to a simple call to clk_set_rate.  For now there is still
-some other stuff needed there (jiffies per loop, rounding the rate, etc
-etc).
+I do not suggest that the OMAP folks take this approach in unless they
+really want to.  Instead it was a way for me to increase code coverage
+while testing the reentrancy changes to the core clock framework.
 
-Signed-off-by: Mike Turquette <mturquette@linaro.org>
+Changes in this patch include removing __clk_prepare and __clk_unprepare
+from omap3_noncore_dpll_set_rate and using the (now reentrant)
+clk_prepare & clk_unprepare versions.  Most importantly this patch
+introduces omap3_noncore_dpll_set_parent and adds it to the clk_ops for
+all OMAP3+ DPLLs.
+
+The net gain is that on OMAP4 platforms it is now possible to call
+clk_set_parent(some_dpll_ck, ...) in order to change the PLL input from
+the reference clock to the bypass clock, and vice versa.
+
+omap3_noncore_dpll_set_rate is modified to call clk_set_parent when
+appropriate as a way to test reentrancy.
+
+Not-signed-off-by: Mike Turquette <mturquette@linaro.org>
 ---
- drivers/cpufreq/omap-cpufreq.c |   82 ++++++++++------------------------------
- 1 file changed, 20 insertions(+), 62 deletions(-)
+ arch/arm/mach-omap2/cclock44xx_data.c |    1 +
+ arch/arm/mach-omap2/clock.h           |    1 +
+ arch/arm/mach-omap2/dpll3xxx.c        |  107 +++++++++++++++++++++++++--------
+ 3 files changed, 84 insertions(+), 25 deletions(-)
 
-diff --git a/drivers/cpufreq/omap-cpufreq.c b/drivers/cpufreq/omap-cpufreq.c
-index 1f3417a..6bec1c4 100644
---- a/drivers/cpufreq/omap-cpufreq.c
-+++ b/drivers/cpufreq/omap-cpufreq.c
-@@ -37,7 +37,7 @@ static struct cpufreq_frequency_table *freq_table;
- static atomic_t freq_table_users = ATOMIC_INIT(0);
- static struct clk *mpu_clk;
- static struct device *mpu_dev;
--static struct regulator *mpu_reg;
-+static struct dvfs_info *di;
+diff --git a/arch/arm/mach-omap2/cclock44xx_data.c b/arch/arm/mach-omap2/cclock44xx_data.c
+index 5789a5e..df5da7f 100644
+--- a/arch/arm/mach-omap2/cclock44xx_data.c
++++ b/arch/arm/mach-omap2/cclock44xx_data.c
+@@ -386,6 +386,7 @@ static const struct clk_ops dpll_ck_ops = {
+ 	.round_rate	= &omap2_dpll_round_rate,
+ 	.set_rate	= &omap3_noncore_dpll_set_rate,
+ 	.get_parent	= &omap2_init_dpll_parent,
++	.set_parent	= &omap3_noncore_dpll_set_parent,
+ };
  
- static int omap_verify_speed(struct cpufreq_policy *policy)
- {
-@@ -62,10 +62,9 @@ static int omap_target(struct cpufreq_policy *policy,
- 		       unsigned int relation)
- {
- 	unsigned int i;
--	int r, ret = 0;
-+	int ret = 0;
- 	struct cpufreq_freqs freqs;
--	struct opp *opp;
--	unsigned long freq, volt = 0, volt_old = 0, tol = 0;
-+	unsigned long freq;
+ static struct clk_hw_omap dpll_iva_ck_hw = {
+diff --git a/arch/arm/mach-omap2/clock.h b/arch/arm/mach-omap2/clock.h
+index b402048..1cf43a5 100644
+--- a/arch/arm/mach-omap2/clock.h
++++ b/arch/arm/mach-omap2/clock.h
+@@ -367,6 +367,7 @@ long omap2_dpll_round_rate(struct clk_hw *hw, unsigned long target_rate,
+ unsigned long omap3_dpll_recalc(struct clk_hw *hw, unsigned long parent_rate);
+ int omap3_noncore_dpll_enable(struct clk_hw *hw);
+ void omap3_noncore_dpll_disable(struct clk_hw *hw);
++int omap3_noncore_dpll_set_parent(struct clk_hw *hw, u8 index);
+ int omap3_noncore_dpll_set_rate(struct clk_hw *hw, unsigned long rate,
+ 				unsigned long parent_rate);
+ u32 omap3_dpll_autoidle_read(struct clk_hw_omap *clk);
+diff --git a/arch/arm/mach-omap2/dpll3xxx.c b/arch/arm/mach-omap2/dpll3xxx.c
+index 0a02aab5..bae123e 100644
+--- a/arch/arm/mach-omap2/dpll3xxx.c
++++ b/arch/arm/mach-omap2/dpll3xxx.c
+@@ -450,6 +450,76 @@ void omap3_noncore_dpll_disable(struct clk_hw *hw)
+ 		clkdm_clk_disable(clk->clkdm, hw->clk);
+ }
  
- 	if (!freq_table) {
- 		dev_err(mpu_dev, "%s: cpu%d: no freq table!\n", __func__,
-@@ -109,50 +108,13 @@ static int omap_target(struct cpufreq_policy *policy,
- 	}
- 	freq = ret;
- 
--	if (mpu_reg) {
--		opp = opp_find_freq_ceil(mpu_dev, &freq);
--		if (IS_ERR(opp)) {
--			dev_err(mpu_dev, "%s: unable to find MPU OPP for %d\n",
--				__func__, freqs.new);
--			return -EINVAL;
--		}
--		volt = opp_get_voltage(opp);
--		tol = volt * OPP_TOLERANCE / 100;
--		volt_old = regulator_get_voltage(mpu_reg);
--	}
--
--	dev_dbg(mpu_dev, "cpufreq-omap: %u MHz, %ld mV --> %u MHz, %ld mV\n", 
--		freqs.old / 1000, volt_old ? volt_old / 1000 : -1,
--		freqs.new / 1000, volt ? volt / 1000 : -1);
--
--	/* scaling up?  scale voltage before frequency */
--	if (mpu_reg && (freqs.new > freqs.old)) {
--		r = regulator_set_voltage(mpu_reg, volt - tol, volt + tol);
--		if (r < 0) {
--			dev_warn(mpu_dev, "%s: unable to scale voltage up.\n",
--				 __func__);
--			freqs.new = freqs.old;
--			goto done;
--		}
--	}
-+	dev_dbg(mpu_dev, "cpufreq-omap: %u MHz --> %u MHz\n",
-+			freqs.old / 1000, freqs.new / 1000); 
- 
- 	ret = clk_set_rate(mpu_clk, freqs.new * 1000);
- 
--	/* scaling down?  scale voltage after frequency */
--	if (mpu_reg && (freqs.new < freqs.old)) {
--		r = regulator_set_voltage(mpu_reg, volt - tol, volt + tol);
--		if (r < 0) {
--			dev_warn(mpu_dev, "%s: unable to scale voltage down.\n",
--				 __func__);
--			ret = clk_set_rate(mpu_clk, freqs.old * 1000);
--			freqs.new = freqs.old;
--			goto done;
--		}
--	}
--
- 	freqs.new = omap_getspeed(policy->cpu);
- 
--done:
- 	/* notifiers */
- 	for_each_cpu(i, policy->cpus) {
- 		freqs.cpu = i;
-@@ -172,10 +134,6 @@ static int __cpuinit omap_cpu_init(struct cpufreq_policy *policy)
- {
- 	int result = 0;
- 
--	mpu_clk = clk_get(NULL, "cpufreq_ck");
--	if (IS_ERR(mpu_clk))
--		return PTR_ERR(mpu_clk);
--
- 	if (policy->cpu >= NR_CPUS) {
- 		result = -EINVAL;
- 		goto fail_ck;
-@@ -253,34 +211,34 @@ static struct cpufreq_driver omap_driver = {
- 
- static int __init omap_cpufreq_init(void)
- {
-+	struct dvfs_info_init dii;
++/* Non-CORE DPLL set parent code */
 +
-+	mpu_clk = clk_get(NULL, "cpufreq_ck");
-+	if (IS_ERR(mpu_clk))
-+		return PTR_ERR(mpu_clk);
++/**
++ * omap3_noncore_dpll_set_parent - set non-core DPLL input
++ * @hw: hardware object for this clock/dpll
++ * @index: parent to switch to in the array of possible parents
++ *
++ * Sets the input to the DPLL to either the reference clock or bypass
++ * clock.  Returns error code upon failure or 0 upon success.
++ */
++int omap3_noncore_dpll_set_parent(struct clk_hw *hw, u8 index)
++{
++	struct clk_hw_omap *clk = to_clk_hw_omap(hw);
++	u16 freqsel = 0;
++	struct dpll_data *dd;
++	int ret;
 +
- 	mpu_dev = get_cpu_device(0);
- 	if (!mpu_dev) {
- 		pr_warning("%s: unable to get the mpu device\n", __func__);
++	if (!hw)
++		return -EINVAL;
++
++	dd = clk->dpll_data;
++	if (!dd)
++		return -EINVAL;
++
++	clk_prepare(dd->clk_bypass);
++	clk_enable(dd->clk_bypass);
++	clk_prepare(dd->clk_ref);
++	clk_enable(dd->clk_ref);
++
++	/* FIXME hard coded magic numbers are gross */
++	switch (index) {
++		/* dpll input is the reference clock */
++		case 0:
++			if (dd->last_rounded_rate == 0)
++				return -EINVAL;
++
++			/* No freqsel on OMAP4 and OMAP3630 */
++			if (!cpu_is_omap44xx() && !cpu_is_omap3630()) {
++				freqsel = _omap3_dpll_compute_freqsel(clk,
++						dd->last_rounded_n);
++				WARN_ON(!freqsel);
++			}
++
++			pr_debug("%s: %s: set rate: locking rate to %lu.\n",
++					__func__, __clk_get_name(hw->clk), dd->last_rounded_rate);
++
++			ret = omap3_noncore_dpll_program(clk, freqsel);
++			break;
++
++		/* dpll input is the bypass clock */
++		case 1:
++			pr_debug("%s: %s: set rate: entering bypass.\n",
++					__func__, __clk_get_name(hw->clk));
++
++			ret = _omap3_noncore_dpll_bypass(clk);
++			break;
++
++		default:
++			pr_warn("%s: %s: set parent: invalid parent\n",
++					__func__, __clk_get_name(hw->clk));
++			return -EINVAL;
++	}
++
++	clk_disable(dd->clk_ref);
++	clk_unprepare(dd->clk_ref);
++	clk_disable(dd->clk_bypass);
++	clk_unprepare(dd->clk_bypass);
++
++	return 0;
++}
+ 
+ /* Non-CORE DPLL rate set code */
+ 
+@@ -468,7 +538,6 @@ int omap3_noncore_dpll_set_rate(struct clk_hw *hw, unsigned long rate,
+ 					unsigned long parent_rate)
+ {
+ 	struct clk_hw_omap *clk = to_clk_hw_omap(hw);
+-	struct clk *new_parent = NULL;
+ 	u16 freqsel = 0;
+ 	struct dpll_data *dd;
+ 	int ret;
+@@ -480,22 +549,18 @@ int omap3_noncore_dpll_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	if (!dd)
  		return -EINVAL;
+ 
+-	__clk_prepare(dd->clk_bypass);
++	clk_prepare(dd->clk_bypass);
+ 	clk_enable(dd->clk_bypass);
+-	__clk_prepare(dd->clk_ref);
++	clk_prepare(dd->clk_ref);
+ 	clk_enable(dd->clk_ref);
+ 
+-	if (__clk_get_rate(dd->clk_bypass) == rate &&
++	/* FIXME below block should call clk_set_parent */
++	if (clk_get_rate(dd->clk_bypass) == rate &&
+ 	    (dd->modes & (1 << DPLL_LOW_POWER_BYPASS))) {
+-		pr_debug("%s: %s: set rate: entering bypass.\n",
+-			 __func__, __clk_get_name(hw->clk));
+-
+-		ret = _omap3_noncore_dpll_bypass(clk);
+-		if (!ret)
+-			new_parent = dd->clk_bypass;
++		clk_set_parent(hw->clk, dd->clk_bypass);
+ 	} else {
+ 		if (dd->last_rounded_rate != rate)
+-			rate = __clk_round_rate(hw->clk, rate);
++			rate = clk_round_rate(hw->clk, rate);
+ 
+ 		if (dd->last_rounded_rate == 0)
+ 			return -EINVAL;
+@@ -510,24 +575,16 @@ int omap3_noncore_dpll_set_rate(struct clk_hw *hw, unsigned long rate,
+ 		pr_debug("%s: %s: set rate: locking rate to %lu.\n",
+ 			 __func__, __clk_get_name(hw->clk), rate);
+ 
+-		ret = omap3_noncore_dpll_program(clk, freqsel);
+-		if (!ret)
+-			new_parent = dd->clk_ref;
++		if (clk_get_parent(hw->clk) == dd->clk_bypass)
++			clk_set_parent(hw->clk, dd->clk_ref);
++		else
++			ret = omap3_noncore_dpll_program(clk, freqsel);
  	}
+-	/*
+-	* FIXME - this is all wrong.  common code handles reparenting and
+-	* migrating prepare/enable counts.  dplls should be a multiplexer
+-	* clock and this should be a set_parent operation so that all of that
+-	* stuff is inherited for free
+-	*/
+-
+-	if (!ret)
+-		__clk_reparent(hw->clk, new_parent);
  
--	mpu_reg = regulator_get(mpu_dev, "vcc");
--	if (IS_ERR(mpu_reg)) {
--		pr_warning("%s: unable to get MPU regulator\n", __func__);
--		mpu_reg = NULL;
--	} else {
--		/* 
--		 * Ensure physical regulator is present.
--		 * (e.g. could be dummy regulator.)
--		 */
--		if (regulator_get_voltage(mpu_reg) < 0) {
--			pr_warn("%s: physical regulator not present for MPU\n",
-+	dii.dev = mpu_dev;
-+	dii.con_id = "cpufreq_ck";
-+	dii.reg_id = "vcc";
-+	dii.tol = OPP_TOLERANCE;
-+
-+	di = dvfs_clk_notifier_register(&dii);
-+	if (IS_ERR(di))
-+		pr_warning("%s: failed to register dvfs clk notifier\n",
- 				__func__);
--			regulator_put(mpu_reg);
--			mpu_reg = NULL;
--		}
--	}
+ 	clk_disable(dd->clk_ref);
+-	__clk_unprepare(dd->clk_ref);
++	clk_unprepare(dd->clk_ref);
+ 	clk_disable(dd->clk_bypass);
+-	__clk_unprepare(dd->clk_bypass);
++	clk_unprepare(dd->clk_bypass);
  
- 	return cpufreq_register_driver(&omap_driver);
+ 	return 0;
  }
- 
- static void __exit omap_cpufreq_exit(void)
- {
-+	dvfs_clk_notifier_unregister(di);
- 	cpufreq_unregister_driver(&omap_driver);
- }
- 
 -- 
 1.7.10.4
