@@ -1,44 +1,53 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Thu, 28 Feb 2013 13:13:01 +0530
-Subject: [PATCH 2/2] clk: Tegra: Remove duplicate smp_twd clock
-In-Reply-To: <1362037381-4730-1-git-send-email-pgaikwad@nvidia.com>
-References: <1362037381-4730-1-git-send-email-pgaikwad@nvidia.com>
-Message-ID: <1362037381-4730-2-git-send-email-pgaikwad@nvidia.com>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Thu, 28 Feb 2013 08:51:14 +0100
+Subject: [PATCH v2 3/3] crypto: sahara: Add device tree binding for
+ SAHARA2.
+In-Reply-To: <20130227200530.GN1906@pengutronix.de>
+References: <1361961711-4603-1-git-send-email-javier.martin@vista-silicon.com>
+ <1361961711-4603-4-git-send-email-javier.martin@vista-silicon.com>
+ <20130227200530.GN1906@pengutronix.de>
+Message-ID: <CACKLOr3h8vNbZCV8HgL2EHtYxLPH+xmueM=JQa4MdRwDbSmiwg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove duplicate smp_twd clocks as these clocks are accessed using
-DT now.
+On 27 February 2013 21:05, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> Hi Javier,
+>
+> On Wed, Feb 27, 2013 at 11:41:51AM +0100, Javier Martin wrote:
+>>
+>> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
+>> ---
+>>  .../devicetree/bindings/crypto/fsl-imx-sahara.txt  |   14 ++++++++++++++
+>>  1 file changed, 14 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/crypto/fsl-imx-sahara.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/crypto/fsl-imx-sahara.txt b/Documentation/devicetree/bindings/crypto/fsl-imx-sahara.txt
+>> new file mode 100644
+>> index 0000000..44abf11
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/crypto/fsl-imx-sahara.txt
+>> @@ -0,0 +1,14 @@
+>> +* Freescale i.MX SAHARA Cryptographic Accelerator
+>> +
+>> +Required properties:
+>> +- compatible : Should be "fsl,<soc>-sahara"
+>
+> Please add explicitly which SoCs are supported.
+>
+> You can fold this patch into the driver patch. This way people reading
+> the commit history have a direct cross link between the driver and the
+> documentation.
 
-Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
----
- drivers/clk/tegra/clk-tegra20.c |    1 -
- drivers/clk/tegra/clk-tegra30.c |    1 -
- 2 files changed, 0 insertions(+), 2 deletions(-)
+OK Sascha. Thanks.
 
-diff --git a/drivers/clk/tegra/clk-tegra20.c b/drivers/clk/tegra/clk-tegra20.c
-index 143ce1f..1e2de73 100644
---- a/drivers/clk/tegra/clk-tegra20.c
-+++ b/drivers/clk/tegra/clk-tegra20.c
-@@ -1292,7 +1292,6 @@ static struct tegra_clk_duplicate tegra_clk_duplicates[] = {
- 	TEGRA_CLK_DUPLICATE(usbd,   "tegra-ehci.0", NULL),
- 	TEGRA_CLK_DUPLICATE(usbd,   "tegra-otg",    NULL),
- 	TEGRA_CLK_DUPLICATE(cclk,   NULL,           "cpu"),
--	TEGRA_CLK_DUPLICATE(twd,    "smp_twd",      NULL),
- 	TEGRA_CLK_DUPLICATE(clk_max, NULL, NULL), /* Must be the last entry */
- };
- 
-diff --git a/drivers/clk/tegra/clk-tegra30.c b/drivers/clk/tegra/clk-tegra30.c
-index 32c61cb..ba6f51b 100644
---- a/drivers/clk/tegra/clk-tegra30.c
-+++ b/drivers/clk/tegra/clk-tegra30.c
-@@ -1931,7 +1931,6 @@ static struct tegra_clk_duplicate tegra_clk_duplicates[] = {
- 	TEGRA_CLK_DUPLICATE(cml1, "tegra_sata_cml", NULL),
- 	TEGRA_CLK_DUPLICATE(cml0, "tegra_pcie", "cml"),
- 	TEGRA_CLK_DUPLICATE(pciex, "tegra_pcie", "pciex"),
--	TEGRA_CLK_DUPLICATE(twd, "smp_twd", NULL),
- 	TEGRA_CLK_DUPLICATE(vcp, "nvavp", "vcp"),
- 	TEGRA_CLK_DUPLICATE(clk_max, NULL, NULL), /* MUST be the last entry */
- };
+As we discussed previously it seems only i.MX27 is supported right now.
+
+
 -- 
-1.7.4.1
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
