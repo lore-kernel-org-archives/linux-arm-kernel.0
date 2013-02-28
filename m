@@ -1,31 +1,35 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Thu, 28 Feb 2013 15:19:26 +0800
-Subject: [PATCH 7/7] ARM: config: append arch hs into multi defconfig
-In-Reply-To: <1362035966-17628-1-git-send-email-haojian.zhuang@linaro.org>
-References: <1362035966-17628-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1362035966-17628-7-git-send-email-haojian.zhuang@linaro.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 28 Feb 2013 15:24:28 +0800
+Subject: [PATCH 03/12] dma: mxs-dma: move to generic device tree binding
+In-Reply-To: <201302272050.14338.arnd@arndb.de>
+References: <1361978748-25281-1-git-send-email-shawn.guo@linaro.org>
+ <1361978748-25281-4-git-send-email-shawn.guo@linaro.org>
+ <201302272050.14338.arnd@arndb.de>
+Message-ID: <20130228072426.GE26106@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Append ARCH_HS (Hisilicon SoC) into multi_v7_defconfig.
+On Wed, Feb 27, 2013 at 08:50:14PM +0000, Arnd Bergmann wrote:
+> On Wednesday 27 February 2013, Shawn Guo wrote:
+> > @@ -139,6 +140,9 @@ struct mxs_dma_engine {
+> >  	struct dma_device		dma_device;
+> >  	struct device_dma_parameters	dma_parms;
+> >  	struct mxs_dma_chan		mxs_chans[MXS_DMA_CHANNELS];
+> > +	struct platform_device		*pdev;
+> > +	struct of_dma_filter_info	filter_info;
+> > +	unsigned int			nr_channels;
+> >  };
+> 
+> I don't think using of_dma_filter_info makes sense when we are not
+> using the generic xlate function:
+...
+> > +static bool mxs_dma_filter_fn(struct dma_chan *chan, void *fn_param)
+> 
+> You already know the value of info->filter_fn, it's always &mxs_dma_filter_fn,
+> so if you reorder these two functions, you can pass it directly into
+> dma_request_channel.
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
----
- arch/arm/configs/multi_v7_defconfig |    2 ++
- 1 file changed, 2 insertions(+)
+Yeah, you're right.  I was blindly following the generic xlate example.
+Thanks for spotting this.  Will fix it.
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index e31d442..dc1ad68 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -5,6 +5,8 @@ CONFIG_ARCH_MVEBU=y
- CONFIG_MACH_ARMADA_370=y
- CONFIG_MACH_ARMADA_XP=y
- CONFIG_ARCH_HIGHBANK=y
-+CONFIG_MACH_HI4511=y
-+CONFIG_ARCH_HS=y
- CONFIG_ARCH_SOCFPGA=y
- CONFIG_ARCH_SUNXI=y
- # CONFIG_ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA is not set
--- 
-1.7.10.4
+Shawn
