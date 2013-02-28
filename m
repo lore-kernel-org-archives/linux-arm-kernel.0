@@ -1,48 +1,31 @@
-From: apatel@apm.com (Anup Patel)
-Date: Thu, 28 Feb 2013 19:41:17 +0530
-Subject: [PATCH] arm64: add support for uart earlyprintk
-In-Reply-To: <512F6395.9030302@gmail.com>
-References: <1362049268-26822-1-git-send-email-apatel@apm.com>
- <512F6395.9030302@gmail.com>
-Message-ID: <CAMwBHsbxizXxZRr0_R8gRgtB63Th0NuN8MLVre0o4ORgaFVfFQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 28 Feb 2013 14:17:05 +0000
+Subject: [PATCH 3/7] ARM: hs: add board support with device tree
+In-Reply-To: <CAD6h2NR2e0_MogO+PxGS8BrDT8OqzehrRzC-zoyvzjdk8vdLUw@mail.gmail.com>
+References: <1362035966-17628-1-git-send-email-haojian.zhuang@linaro.org>
+ <201302281104.13885.arnd@arndb.de>
+ <CAD6h2NR2e0_MogO+PxGS8BrDT8OqzehrRzC-zoyvzjdk8vdLUw@mail.gmail.com>
+Message-ID: <201302281417.05177.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 28, 2013 at 7:33 PM, Rob Herring <robherring2@gmail.com> wrote:
-> On 02/28/2013 05:01 AM, Anup Patel wrote:
->> Signed-off-by: Anup Patel <apatel@apm.com>
->> ---
->>  arch/arm64/kernel/early_printk.c |   16 ++++++++++++++++
->>  1 file changed, 16 insertions(+)
->
->
->> CONFIDENTIALITY NOTICE: This e-mail message, including any attachments,
->> is for the sole use of the intended recipient(s) and contains information
->> that is confidential and proprietary to Applied Micro Circuits Corporation or its subsidiaries.
->> It is to be used solely for the purpose of furthering the parties' business relationship.
->> All unauthorized review, use, disclosure or distribution is prohibited.
->> If you are not the intended recipient, please contact the sender by reply e-mail
->> and destroy all copies of the original message.
->>
->
-> Is this patch confidential or GPL? You can't submit patches with a
-> notice like this.
->
-> Rob
->
+On Thursday 28 February 2013, Haojian Zhuang wrote:
+> >
+> > This looks right at the moment, but I also have a patch to make it possible to drop the
+> > irqchip_init, clocksource_of_init and hs_init() calls here, as they are all the
+> > defaults. At that point, the platform would be essentially empty except for the
+> > debug_ll_io_init part that is inherently platform specific.
+> >
+> >         Arnd
+> 
+> Could you give me the link of your patch? I could rebase this patch.
 
-No this patch is not confidential. I am sending this patch with
-appropriate permissions from APM.
+I only posted an RFC so far, at
 
-Actually, we at APM cannot disable this footer (which is a default
-setting) so please ignore it.
+https://patchwork.kernel.org/patch/2074871/
 
-Regards,
-Anup
-CONFIDENTIALITY NOTICE: This e-mail message, including any attachments, 
-is for the sole use of the intended recipient(s) and contains information
-that is confidential and proprietary to Applied Micro Circuits Corporation or its subsidiaries. 
-It is to be used solely for the purpose of furthering the parties' business relationship. 
-All unauthorized review, use, disclosure or distribution is prohibited. 
-If you are not the intended recipient, please contact the sender by reply e-mail 
-and destroy all copies of the original message.
+It's probably easier for now if you ignore it. We will see how to stage
+things after the merge window, once we are putting both your patch and
+mine into arm-soc.
+
+	Arnd
