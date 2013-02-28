@@ -1,42 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 28 Feb 2013 10:50:21 +0000
-Subject: [PATCH 04/12] mmc: mxs-mmc: move to use generic DMA helper
-In-Reply-To: <20130228082831.GG26106@S2101-09.ap.freescale.net>
-References: <1361978748-25281-1-git-send-email-shawn.guo@linaro.org>
- <201302272054.18829.arnd@arndb.de>
- <20130228082831.GG26106@S2101-09.ap.freescale.net>
-Message-ID: <201302281050.21522.arnd@arndb.de>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 28 Feb 2013 16:21:28 +0530
+Subject: [PATCH v4 5/5] ARM: davinci: da850: override mmc DT node device
+ name
+In-Reply-To: <512E1259.5020903@gmail.com>
+References: <1360909322-1858-1-git-send-email-prakash.pm@ti.com>
+ <1360909322-1858-6-git-send-email-prakash.pm@ti.com>
+ <512E1259.5020903@gmail.com>
+Message-ID: <512F36B0.9040907@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 28 February 2013, Shawn Guo wrote:
-> On Wed, Feb 27, 2013 at 08:54:18PM +0000, Arnd Bergmann wrote:
-> > On Wednesday 27 February 2013, Shawn Guo wrote:
-> >
-> > I wonder if we should leave support for old device trees files around,
-> > at least for a while. Your patch removes a lot of unnecessary code if
-> > we decide not to worry about backwards compatibility here, but I could
-> > imagine that we see a few surprises here.
-> > 
-> I'm less concerned by that at this point.  Though platform mxs has been
-> fully converted to device tree, device tree is still quite new for the
-> platform.  The incompatible device tree should be acceptable,
-> considering we have noticed that when adding the temporary DMA binding
-> for client devices.
-> 
-> /*
->  * TODO: This is a temporary solution and should be changed
->  * to use generic DMA binding later when the helper get in.
->  */
-> 
-> Unless we have these TODO remarks leave in the tree forever, we will
-> break old device tree sooner or later anyway.  And I would have it
-> happen sooner than later.
-> 
-> And I would start thinking about maintaining the device tree
-> compatibility for mxs after generic DMA binding adoption.
+Hi Rob,
 
-Right. It's your decision anyway, and removing the code as early
-as possible has some advantages as well.
+On 2/27/2013 7:34 PM, Rob Herring wrote:
+> On 02/15/2013 12:22 AM, Manjunathappa, Prakash wrote:
+>> Populate OF_DEV_AUXDATA with desired device name expected by
+>> davinci_mmc driver. Without this clk_get of davinci_mmc DT driver
+>> fails.
+>>
+>> Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
+>> Cc: linux-mmc at vger.kernel.org
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Cc: linux-kernel at vger.kernel.org
+>> Cc: davinci-linux-open-source at linux.davincidsp.com
+>> Cc: devicetree-discuss at lists.ozlabs.org
+>> Cc: cjb at laptop.org
+>> Cc: Sekhar Nori <nsekhar@ti.com>
+>> ---
+>> Since v2:
+>> Rebased on top of v3.9/dt-2 branch of linux_davinci and reordered this patch.
+>>
+>>  arch/arm/mach-davinci/da8xx-dt.c |    2 ++
+>>  1 files changed, 2 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
+>> index 5404e92..2b740a9 100644
+>> --- a/arch/arm/mach-davinci/da8xx-dt.c
+>> +++ b/arch/arm/mach-davinci/da8xx-dt.c
+>> @@ -40,6 +40,8 @@ static void __init da8xx_init_irq(void)
+>>  struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
+>>  	OF_DEV_AUXDATA("ti,davinci-i2c", 0x01c22000, "i2c_davinci.1", NULL),
+>>  	OF_DEV_AUXDATA("ti,davinci-wdt", 0x01c21000, "watchdog", NULL),
+>> +	OF_DEV_AUXDATA("ti,davinci-mmc-da830", 0x01c40000, "davinci-mmc-da830.0",
+>> +			NULL),
+> 
+> If you only need clock lookup, just add a clkdev entry with the new name.
 
-	Arnd
+That would work, but wouldn't it be better to keep this here so it can
+all be dropped once clocks are converted to DT?
+
+Thanks,
+Sekhar
