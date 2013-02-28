@@ -1,110 +1,68 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 28 Feb 2013 11:04:13 +0000
-Subject: [PATCH 3/7] ARM: hs: add board support with device tree
-In-Reply-To: <1362035966-17628-3-git-send-email-haojian.zhuang@linaro.org>
-References: <1362035966-17628-1-git-send-email-haojian.zhuang@linaro.org>
- <1362035966-17628-3-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <201302281104.13885.arnd@arndb.de>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Thu, 28 Feb 2013 12:07:48 +0100
+Subject: [PATCH v2 2/3] crypto: sahara: Add driver for SAHARA2 accelerator.
+In-Reply-To: <1361961711-4603-3-git-send-email-javier.martin@vista-silicon.com>
+ (Javier Martin's message of "Wed, 27 Feb 2013 11:41:50 +0100")
+References: <1361961711-4603-1-git-send-email-javier.martin@vista-silicon.com>
+ <1361961711-4603-3-git-send-email-javier.martin@vista-silicon.com>
+Message-ID: <87vc9chf23.fsf@lebrac.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 28 February 2013, Haojian Zhuang wrote:
-> Add board support with device tree for Hisilicon Hi36xx/Hi37xx platform.
-> 
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+Javier Martin <javier.martin@vista-silicon.com> writes:
 
-Ah, nice and small ;-)
+Hi,
 
->  arch/arm/Kconfig          |    2 ++
->  arch/arm/Makefile         |    1 +
->  arch/arm/mach-hs/Kconfig  |   23 +++++++++++++
->  arch/arm/mach-hs/Makefile |    5 +++
->  arch/arm/mach-hs/hs-dt.c  |   83 +++++++++++++++++++++++++++++++++++++++++++++
+> SAHARA2 HW module is included in the i.MX27 SoC from
+> Freescale. It is capable of performing cipher algorithms
+> such as AES, 3DES..., hashing and RNG too.
 
-Regarding the naming, I wonder if "hs" is unique enough for a platform name.
-AFAIK, HiSilicon has a couple of independently developed SoC families,
-so we might want to be a bit more specific here, e.g. mach-hi3xxx.
+The rmmod oops is gone with this version, thanks.
 
-Regarding the file name, I think the "-dt" postfix is redundant, when we
-only support booting using DT. I would call this one the same thing as the
-platform name, whichever we go with.
+>
+> This driver provides support for AES-CBC and AES-ECB
+> by now.
+>
+> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
+> ---
+>  drivers/crypto/Kconfig  |   10 +
+>  drivers/crypto/Makefile |    1 +
+>  drivers/crypto/sahara.c | 1070 +++++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 1081 insertions(+)
+>  create mode 100644 drivers/crypto/sahara.c
+>
+> diff --git a/drivers/crypto/Kconfig b/drivers/crypto/Kconfig
+> index 87ec4d0..7d73f5a 100644
+> --- a/drivers/crypto/Kconfig
+> +++ b/drivers/crypto/Kconfig
+> @@ -276,6 +276,16 @@ config CRYPTO_DEV_PICOXCELL
+>  
+>  	  Saying m here will build a module named pipcoxcell_crypto.
+>  
+> +config CRYPTO_DEV_SAHARA
+> +	tristate "Support for SAHARA crypto accelerator"
+> +	depends on MACH_MX27 && EXPERIMENTAL && OF
 
-> +config MACH_HS_DT
-> +	bool "Hisilicon Development Board"
-> +	default y
-> +	help
-> +	  Say 'Y' here if you want to support the Hisilicon Development
-> +	  Board. 
-> +
-> +endif
+maybe switch to ARCH_MXC instead of MAC_MX27 ?
 
-I don't think we need this option. Let's just always build the file
-when the platform is enabled, and build all .dtb files as well.
+[...]
 
-> +static struct clk_lookup sp804_lookup = {
-> +	.dev_id	= "sp804",
-> +	.clk	= NULL,
-> +};
+> +static struct platform_driver sahara_driver = {
+> +	.probe		= sahara_probe,
+> +	.remove		= __devexit_p(sahara_remove),
 
-(adding Mike to Cc)
+Please remove the __devexit_p too.
 
-Shouldn't the clk_lookup be automatic with a fully DT enabled platform now?
 
-> +extern void __init hs_init_clocks(void);
-> +static void __init hs_timer_init(void)
-> +{
-> +	struct device_node *node = NULL;
-> +	void __iomem *base;
-> +	int irq;
-> +
-> +	hs_init_clocks();
-> +
-> +	node = of_find_matching_node(NULL, hs_timer_match);
-> +	WARN_ON(!node);
-> +	if (!node) {
-> +		pr_err("Failed to find sp804 timer\n");
-> +		return;
-> +	}
-> +	base = of_iomap(node, 0);
-> +	WARN_ON(!base);
-> +
-> +	/* timer0 is used as clock event, and timer1 is clock source. */
-> +	irq = irq_of_parse_and_map(node, 0);
-> +	WARN_ON(!irq);
-> +
-> +	sp804_lookup.clk = of_clk_get(node, 0);
-> +	clkdev_add(&sp804_lookup);
-> +
-> +	sp804_clocksource_and_sched_clock_init(base + TIMER_2_BASE, "timer1");
-> +	sp804_clockevents_init(base, irq, "timer0");
-> +}
+For information, you'll find below what I've changed to test the driver on my
+imx51. It's not perfect but it's enough for testing things.
 
-I think for the clocksource/clockevents driver, we should move
-arch/arm/common/timer-sp.c to drivers/clocksource now and integrate
-it into the automatic probing through clocksource_of_init().
 
-> +static void __init hs_init(void)
-> +{
-> +	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-> +}
-> +
-> +static const char *hs_compat[] __initdata = {
-> +	"hisilicon,hi3620-hi4511",
-> +	NULL,
-> +};
-> +
-> +DT_MACHINE_START(HS_DT, "Hisilicon Hi36xx/Hi37xx (Flattened Device Tree)")
-> +	/* Maintainer: Haojian Zhuang <haojian.zhuang@linaro.org> */
-> +	.map_io		= debug_ll_io_init,
-> +	.init_irq	= irqchip_init,
-> +	.init_time	= hs_timer_init,
-> +	.init_machine	= hs_init,
-> +	.dt_compat	= hs_compat,
-> +MACHINE_END
-
-This looks right at the moment, but I also have a patch to make it possible to drop the
-irqchip_init, clocksource_of_init and hs_init() calls here, as they are all the
-defaults. At that point, the platform would be essentially empty except for the
-debug_ll_io_init part that is inherently platform specific. 
-
-	Arnd
+Arnaud
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: imx51-sahara.patch
+Type: text/x-diff
+Size: 5482 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130228/ba3ba53a/attachment-0001.bin>
