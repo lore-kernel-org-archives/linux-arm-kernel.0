@@ -1,79 +1,56 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Thu, 28 Feb 2013 11:57:02 +0100
-Subject: [PATCH 3/5] USB chipidea: introduce dual role mode pdata flags
-In-Reply-To: <1362049024-11383-1-git-send-email-mkl@pengutronix.de>
-References: <1362049024-11383-1-git-send-email-mkl@pengutronix.de>
-Message-ID: <1362049024-11383-4-git-send-email-mkl@pengutronix.de>
+From: apatel@apm.com (Anup Patel)
+Date: Thu, 28 Feb 2013 16:31:08 +0530
+Subject: [PATCH] arm64: add support for uart earlyprintk
+Message-ID: <1362049268-26822-1-git-send-email-apatel@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sascha Hauer <s.hauer@pengutronix.de>
-
-Even if a chipidea core is otg capable the board may not. This allows
-to explicitly set the core to host/peripheral mode. Without these
-flags the driver falls back to the old behaviour.
-
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+Signed-off-by: Anup Patel <apatel@apm.com>
 ---
- drivers/usb/chipidea/core.c  |   22 ++++++++++++++++------
- include/linux/usb/chipidea.h |    2 +-
- 2 files changed, 17 insertions(+), 7 deletions(-)
+ arch/arm64/kernel/early_printk.c |   16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-index 04d68cb..ec27060 100644
---- a/drivers/usb/chipidea/core.c
-+++ b/drivers/usb/chipidea/core.c
-@@ -435,6 +435,7 @@ static int ci_hdrc_probe(struct platform_device *pdev)
- 	struct resource	*res;
- 	void __iomem	*base;
- 	int		ret;
-+	enum usb_dr_mode dr_mode;
+diff --git a/arch/arm64/kernel/early_printk.c b/arch/arm64/kernel/early_printk.c
+index 7e320a2..62953ed 100644
+--- a/arch/arm64/kernel/early_printk.c
++++ b/arch/arm64/kernel/early_printk.c
+@@ -29,6 +29,21 @@ static void __iomem *early_base;
+ static void (*printch)(char ch);
  
- 	if (!dev->platform_data) {
- 		dev_err(dev, "platform data missing\n");
-@@ -487,14 +488,23 @@ static int ci_hdrc_probe(struct platform_device *pdev)
- 		return -ENODEV;
- 	}
- 
-+	/* For now we treat dual-role as otg */
-+	dr_mode = ci->platdata->dr_mode;
-+	if (dr_mode == USB_DR_MODE_UNKNOWN || dr_mode == USB_DR_MODE_DUAL_ROLE)
-+		dr_mode = USB_DR_MODE_OTG;
+ /*
++ * UART (8250/16550) single character TX.
++ */
++static void uart_printch(char ch)
++{
++#define UART_LSR 	0x14
++#define UART_TX 	0x0
 +
- 	/* initialize role(s) before the interrupt is requested */
--	ret = ci_hdrc_host_init(ci);
--	if (ret)
--		dev_info(dev, "doesn't support host\n");
-+	if (dr_mode == USB_DR_MODE_OTG || dr_mode == USB_DR_MODE_HOST) {
-+		ret = ci_hdrc_host_init(ci);
-+		if (ret)
-+			dev_info(dev, "doesn't support host\n");
-+	}
++	while (!(readl_relaxed(early_base + UART_LSR) & 0x20))
++		;
++	writeb_relaxed(ch, early_base + UART_TX);
++	while (!(readl_relaxed(early_base + UART_LSR) & 0x20))
++		;
++}
++
++/*
+  * PL011 single character TX.
+  */
+ static void pl011_printch(char ch)
+@@ -47,6 +62,7 @@ struct earlycon_match {
  
--	ret = ci_hdrc_gadget_init(ci);
--	if (ret)
--		dev_info(dev, "doesn't support gadget\n");
-+	if (dr_mode == USB_DR_MODE_OTG || dr_mode == USB_DR_MODE_PERIPHERAL) {
-+		ret = ci_hdrc_gadget_init(ci);
-+		if (ret)
-+			dev_info(dev, "doesn't support gadget\n");
-+	}
+ static const struct earlycon_match earlycon_match[] __initconst = {
+ 	{ .name = "pl011", .printch = pl011_printch, },
++	{ .name = "uart", .printch = uart_printch, },
+ 	{}
+ };
  
- 	if (!ci->roles[CI_ROLE_HOST] && !ci->roles[CI_ROLE_GADGET]) {
- 		dev_err(dev, "no supported roles\n");
-diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
-index 1a2aa18..b314647 100644
---- a/include/linux/usb/chipidea.h
-+++ b/include/linux/usb/chipidea.h
-@@ -20,7 +20,7 @@ struct ci13xxx_platform_data {
- #define CI13XXX_REQUIRE_TRANSCEIVER	BIT(1)
- #define CI13XXX_PULLUP_ON_VBUS		BIT(2)
- #define CI13XXX_DISABLE_STREAMING	BIT(3)
--
-+	enum usb_dr_mode	dr_mode;
- #define CI13XXX_CONTROLLER_RESET_EVENT		0
- #define CI13XXX_CONTROLLER_STOPPED_EVENT	1
- 	void	(*notify_event) (struct ci13xxx *ci, unsigned event);
 -- 
-1.7.10.4
+1.7.9.5
+
+CONFIDENTIALITY NOTICE: This e-mail message, including any attachments, 
+is for the sole use of the intended recipient(s) and contains information
+that is confidential and proprietary to Applied Micro Circuits Corporation or its subsidiaries. 
+It is to be used solely for the purpose of furthering the parties' business relationship. 
+All unauthorized review, use, disclosure or distribution is prohibited. 
+If you are not the intended recipient, please contact the sender by reply e-mail 
+and destroy all copies of the original message.
