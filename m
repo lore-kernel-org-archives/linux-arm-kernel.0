@@ -1,65 +1,87 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Thu, 28 Feb 2013 07:54:59 +0100
-Subject: i.MX6Quad PMU irq handling (was: Re: [PATCH 0/9] ARM perf updates
- for 3.7)
-In-Reply-To: <5029ADDC.10908@gmail.com>
-References: <1344620195-22372-1-git-send-email-will.deacon@arm.com>
- <5028C4C9.6020002@gmail.com>
- <20120813093201.GB19113@mudshark.cambridge.arm.com>
- <5029ADDC.10908@gmail.com>
-Message-ID: <512EFF43.5010502@de.bosch.com>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Thu, 28 Feb 2013 15:19:20 +0800
+Subject: [PATCH 1/7] ARM: debug: support debug ll on hisilicon soc
+Message-ID: <1362035966-17628-1-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hui,
+Support UART0 debug ll on hisilicon Hi3620 SoC.
 
-On 14.08.2012 03:46, Hui Wang wrote:
-> Will Deacon wrote:
->> On Mon, Aug 13, 2012 at 10:11:37AM +0100, Hui Wang wrote:
->>   
->>> Hi Will Deacon,
->>>     
->> Hello,
->>
->>   
->>> For SMP platforms, each CPU core has an independent PMU, and each PMU 
->>> has a dedicated irq (SPI or PPI). Current perf subsystem framework only 
->>> supports each PMU to have a dedicated SPI irq, and it will support each 
->>> PMU to have a PPI irq (i have seen someone has sent out the patches), 
->>> but there is a situation the subsystem doesn't support yet, the 
->>> situation is multi PMUs share one same SPI irq, e.g. the i.MX6Quad CPU 
->>> has 4 cortex-a9 cores, each core has a PMU, all PMU irqs are routed 
->>> (ORed) to one SPI irq, do you know how to support this situation?
->>>     
->> That's what I like to call a braindead, broken system. Seriously, CPU PMU
->> interrupts *can only* be handled on the CPU which raised them -- ORing these
->> things together means ping-ponging the interrupt affinity around until we
->> find the right guy. There's also the fun case where multiple PMUs assert
->> simultaneously and I've even heard about platforms where they OR in the
->> bloody L2 PMU interrupt as well for good measure!
->>
->> If you have to support such a device, take a look at the ux500 code
->> (db8500_pmu_handler), but please take all of your profiling numbers with a
->> pinch of salt. For a quad-core processor, the numbers will probably be even
->> less accurate.
->>
->> Also, please go ahead and inflict sufficient injuries to your hardware guys
->> that they stop this madness!
->>   
-> Got it, thanks for the information, it is very useful.
+Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+---
+ arch/arm/Kconfig.debug             |   15 +++++++++++++++
+ arch/arm/include/debug/hisilicon.S |   30 ++++++++++++++++++++++++++++++
+ 2 files changed, 45 insertions(+)
+ create mode 100644 arch/arm/include/debug/hisilicon.S
 
-Above you mention the the i.MX6Quad CPU.
-
-Have you done any work/patches for the i.MX6Quad PMU to work with the 
-ORed PMU irq?
-
-Have you talked with the Freescale hardware guys "that they stop this 
-madness"?
-
-We are facing some issues using perf top on the i.MX6Quad:
-
-http://www.spinics.net/lists/arm-kernel/msg227042.html
-
-Many thanks and best regards
-
-dirk
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index acdddda..32958a6 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -240,6 +240,20 @@ choice
+ 		  Say Y here if you want kernel low-level debugging support
+ 		  on i.MX6Q.
+ 
++	config DEBUG_HI3620_UART
++		bool "Hisilicon HI3620 Debug UART"
++		depends on ARCH_HS
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on HI3620 UART.
++
++	config DEBUG_HI3716_UART
++		bool "Hisilicon Hi3716 Debug UART"
++		depends on ARCH_HS
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on HI3716 UART.
++
+ 	config DEBUG_MMP_UART2
+ 		bool "Kernel low-level debugging message via MMP UART2"
+ 		depends on ARCH_MMP
+@@ -589,6 +603,7 @@ config DEBUG_LL_INCLUDE
+ 				 DEBUG_IMX53_UART ||\
+ 				 DEBUG_IMX6Q_UART
+ 	default "debug/highbank.S" if DEBUG_HIGHBANK_UART
++	default "debug/hisilicon.S" if DEBUG_HI3620_UART || DEBUG_HI3716_UART
+ 	default "debug/mvebu.S" if DEBUG_MVEBU_UART
+ 	default "debug/omap2plus.S" if DEBUG_OMAP2PLUS_UART
+ 	default "debug/picoxcell.S" if DEBUG_PICOXCELL_UART
+diff --git a/arch/arm/include/debug/hisilicon.S b/arch/arm/include/debug/hisilicon.S
+new file mode 100644
+index 0000000..e719545
+--- /dev/null
++++ b/arch/arm/include/debug/hisilicon.S
+@@ -0,0 +1,30 @@
++/*
++ * Early serial output macro for Hisilicon SoC
++ *
++ * Copyright (C) 2012-2013 Linaro Ltd.
++ * Copyright (C) 2012-2013 Hisilicon Ltd.
++ *
++ * Haojian Zhuang <haojian.zhuang@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++#if defined(CONFIG_DEBUG_HI3620_UART)
++#define HS_UART_PHYS_BASE	0xfcb00000
++#define HS_UART_VIRT_BASE	0xfeb00000
++#elif defined(CONFIG_DEBUG_HI3716_UART)
++#define HS_UART_PHYS_BASE	0xf8b00000
++#define HS_UART_VIRT_BASE	0xfeb00000
++#endif
++
++#if defined(CONFIG_DEBUG_HI3620_UART) || defined(CONFIG_DEBUG_HI3716_UART)
++		.macro	addruart,rp,rv,tmp
++		ldr	\rp, =HS_UART_PHYS_BASE
++		ldr	\rv, =HS_UART_VIRT_BASE
++		.endm
++
++#include <asm/hardware/debug-pl01x.S>
++
++#endif
+-- 
+1.7.10.4
