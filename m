@@ -1,60 +1,36 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 27 Mar 2013 00:12:32 +0900
-Subject: [PATCH 1/3] pinctrl: exynos5440: fix probe failure due to missing
- pin-list in config nodes
-In-Reply-To: <1364310754-3692-1-git-send-email-kgene.kim@samsung.com>
-References: <1364310754-3692-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1364310754-3692-2-git-send-email-kgene.kim@samsung.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 1 Mar 2013 00:25:58 +0100
+Subject: [PATCH v3 0/2] Add automatic bus number support for i2c busses
+ with device tree
+In-Reply-To: <CAD=FV=WS5Vj74d-FNXCVpNsx6Nf-8+RC-WO29Z1XNmkEOYLxfQ@mail.gmail.com>
+References: <1360630085-26874-1-git-send-email-dianders@chromium.org>
+ <CAD=FV=WS5Vj74d-FNXCVpNsx6Nf-8+RC-WO29Z1XNmkEOYLxfQ@mail.gmail.com>
+Message-ID: <20130228232558.GA8180@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Abraham <thomas.ab@samsung.com>
 
-The property 'samsung,exynos5440-pins' is optional in configuration nodes
-which are included in the Exynos5440 pin-controller device node. Fix the
-incorrect failure in driver probe if 'samsung,exynos5440-pins' property
-is not found in the configuration nodes.
+> > Doug Anderson (2):
+> >   i2c-core: dt: Pick i2c bus number from i2c alias if present
+> >   i2c: pxa: Use i2c-core to get bus number now
+> >
+> >  drivers/i2c/busses/i2c-pxa.c | 20 ++++++++--------
+> >  drivers/i2c/i2c-core.c       | 54 ++++++++++++++++++++++++++++++++------------
+> >  2 files changed, 49 insertions(+), 25 deletions(-)
+> 
+> Is there anything else needed for this patch series?  It's been
+> hanging around for quite a while and it would be nice to see it land.
+> If you're waiting for additional acks or reviews I'll ask around and
+> see if I can get them...
 
-Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
----
- drivers/pinctrl/pinctrl-exynos5440.c |    9 ++++++---
- 1 files changed, 6 insertions(+), 3 deletions(-)
+Regarding patch 1, I was waiting for the idr changes to hit mainline.
+They are mainline now, but since the removal of MAX_IDR_MASK your patch
+doesn't apply anymore :( Can you rebase and retest, please? I'd like to
+get it into 3.9, still.
 
-diff --git a/drivers/pinctrl/pinctrl-exynos5440.c b/drivers/pinctrl/pinctrl-exynos5440.c
-index 1376eb7..96cb1e9 100644
---- a/drivers/pinctrl/pinctrl-exynos5440.c
-+++ b/drivers/pinctrl/pinctrl-exynos5440.c
-@@ -670,8 +670,10 @@ static int exynos5440_pinctrl_parse_dt(struct platform_device *pdev,
- 
- 		ret = exynos5440_pinctrl_parse_dt_pins(pdev, cfg_np,
- 					&pin_list, &npins);
--		if (ret)
--			return ret;
-+		if (ret) {
-+			gname = NULL;
-+			goto skip_to_pin_function;
-+		}
- 
- 		/* derive pin group name from the node name */
- 		gname = devm_kzalloc(dev, strlen(cfg_np->name) + GSUFFIX_LEN,
-@@ -687,6 +689,7 @@ static int exynos5440_pinctrl_parse_dt(struct platform_device *pdev,
- 		grp->num_pins = npins;
- 		grp++;
- 
-+skip_to_pin_function:
- 		ret = of_property_read_u32(cfg_np, "samsung,exynos5440-pin-function",
- 						&function);
- 		if (ret)
-@@ -709,7 +712,7 @@ static int exynos5440_pinctrl_parse_dt(struct platform_device *pdev,
- 			return -ENOMEM;
- 		}
- 		func->groups[0] = gname;
--		func->num_groups = 1;
-+		func->num_groups = gname ? 1 : 0;
- 		func->function = function;
- 		func++;
- 		func_idx++;
--- 
-1.7.4.4
+For patch 2, some Tested-by would be nice; but it will probably make it
+into my for-next somewhen after rc1 is out.
+
+Thanks,
+
+   Wolfram
