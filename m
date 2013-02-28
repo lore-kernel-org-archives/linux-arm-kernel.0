@@ -1,61 +1,31 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Thu, 28 Feb 2013 11:24:17 +0800
+Date: Thu, 28 Feb 2013 11:34:13 +0800
 Subject: [PATCH v10 8/8] usb: chipidea: imx: fix the error that using
  uninitialized pointer
-In-Reply-To: <512DFE94.3010807@cogentembedded.com>
+In-Reply-To: <CAB7JpEEuGP2Vo6HMZz30BZgiGQbBYqEVMRFEb7m0MbsC8oDjgQ@mail.gmail.com>
 References: <1361946799-29471-1-git-send-email-peter.chen@freescale.com>
  <1361946799-29471-9-git-send-email-peter.chen@freescale.com>
- <512DFE94.3010807@cogentembedded.com>
-Message-ID: <20130228032416.GB19387@nchen-desktop>
+ <CAB7JpEEuGP2Vo6HMZz30BZgiGQbBYqEVMRFEb7m0MbsC8oDjgQ@mail.gmail.com>
+Message-ID: <20130228033412.GC19387@nchen-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 27, 2013 at 04:39:48PM +0400, Sergei Shtylyov wrote:
-> Hello.
+On Wed, Feb 27, 2013 at 10:07:15PM +0200, Alexander Shishkin wrote:
+>    On Feb 27, 2013 8:34 AM, "Peter Chen" <peter.chen@freescale.com> wrote:
+>    >
+>    > If the core's probe fails, the platform layer may not get core's
 > 
-> On 27-02-2013 10:33, Peter Chen wrote:
-> 
-> >If the core's probe fails, the platform layer may not get core's
-> >private data, if the platform tries to use struct ci13xxx, it will
-> >use uninitialized pointer. Besides, if the core's probe fails,
-> >the platform layer should know it, and let its probe fail too.
-> 
-> >Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> >---
-> >  drivers/usb/chipidea/ci13xxx_imx.c |    7 +++++++
-> >  1 files changed, 7 insertions(+), 0 deletions(-)
-> 
-> >diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
-> >index 5499cf8..720ea92 100644
-> >--- a/drivers/usb/chipidea/ci13xxx_imx.c
-> >+++ b/drivers/usb/chipidea/ci13xxx_imx.c
-> >@@ -239,6 +239,13 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
-> >  	platform_set_drvdata(pdev, data);
-> >
-> >  	ci = platform_get_drvdata(plat_ci);
-> >+
-> 
->    No need for empty line here...
-> 
-> >+	if (!ci) {
-> >+		ret = -ENODEV;
-> >+		dev_err(&pdev->dev,
-> >+			"some wrong at ci core's initialization\n");
-> >+		goto err_clk;
-> >+	}
-> 
->    It'd be better to put it here.
+>    I think the question we should be asking ourselves here is, why does it
+>    fail?
 
-Thanks.
+I find this problem just make core probe fails as set dr_mode = "peripheral"
+with host-only controller, we should consider such user mistake.
 
-> 
-> >  	/*
-> >  	 * Internal vbus on/off policy
-> >  	 * - Always on for host only function
-> 
-> WBR, Sergei
-> 
-> 
+I can move vbus handling to core code as it is core thing to avoid this bug.
+But what's your suggestion of platform layer handling when core's probe
+fails?
+
+http://marc.info/?l=linux-usb&m=136202110302555&w=2
 
 -- 
 
