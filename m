@@ -1,45 +1,62 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 28 Feb 2013 16:09:23 +0800
-Subject: [PATCH 09/12] ASoC: dmaengine_pcm: support use of generic DMA
- helper
-In-Reply-To: <201302272102.40811.arnd@arndb.de>
-References: <1361978748-25281-1-git-send-email-shawn.guo@linaro.org>
- <1361978748-25281-10-git-send-email-shawn.guo@linaro.org>
- <201302272102.40811.arnd@arndb.de>
-Message-ID: <20130228080921.GF26106@S2101-09.ap.freescale.net>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Thu, 28 Feb 2013 16:24:47 +0800
+Subject: [PATCH v10 6/8] usb: chipidea: imx: add internal vbus
+ regulator control
+In-Reply-To: <20130228072946.GC6154@arwen.pp.htv.fi>
+References: <1361946799-29471-1-git-send-email-peter.chen@freescale.com>
+ <1361946799-29471-7-git-send-email-peter.chen@freescale.com>
+ <CAB7JpEHq6rDS4=twUf7gito5zxinYiHZban77psKEQ962z0LYw@mail.gmail.com>
+ <20130228060608.GD19387@nchen-desktop>
+ <20130228072946.GC6154@arwen.pp.htv.fi>
+Message-ID: <20130228082446.GA19516@nchen-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 27, 2013 at 09:02:40PM +0000, Arnd Bergmann wrote:
-> On Wednesday 27 February 2013, Shawn Guo wrote:
-> > With generic DMA device tree binding and helper function
-> > dma_request_slave_channel() in place, dmaengine_pcm should support
-> > that in requesting DMA channel for users that support generic DMA
-> > device tree binding.
+On Thu, Feb 28, 2013 at 09:29:46AM +0200, Felipe Balbi wrote:
+> On Thu, Feb 28, 2013 at 02:06:09PM +0800, Peter Chen wrote:
+> > On Wed, Feb 27, 2013 at 09:08:11PM +0200, Alexander Shishkin wrote:
+> > >    On Feb 27, 2013 8:34 AM, "Peter Chen" <peter.chen@freescale.com> wrote:
+> > >    >
+> > >    > - For host, the vbus should always be on.
+> > >    > - For otg, the vbus is off defaultly, the vbus needs to be
+> > >    > turned on/off when usb role switches.
+> > >    >
+> > >    > + * @reg_vbus: used to control internal vbus regulator
+> > >    >   */
+> > >    >  struct ci13xxx {
+> > >    >         struct device                   *dev;
+> > >    > @@ -172,6 +173,7 @@ struct ci13xxx {
+> > >    >         struct usb_otg                  otg;
+> > >    >         bool                            id_event;
+> > >    >         bool                            b_sess_valid_event;
+> > >    > +       struct regulator                *reg_vbus;
+> > >    >  };
+> > > 
+> > >    I suggest that this regulator be taken care of by either the platform code
+> > >    or phy layer, it doesn't look like it really belongs in chipidea core. The
+> > >    easiest way I guess would be to do something similar to the notify
+> > >    callback in msm platform code.
 > > 
-> > Instead of inventing a new API, it defines the parameters needed by
-> > dma_request_slave_channel() into struct snd_dma_channel_params,
-> > interprets filter_data into snd_dma_channel_params, and calls the
-> > helper in case that dmaengine_pcm users pass in a NULL filter_fn.
+> > VBUS operation is typical operation during the USB code, eg, we need
+> > to open vbus at Host mode, we need close/open vbus during host<->gadget
+> > switch.
 > > 
-> > Then, dmaengine_pcm users can call snd_dmaengine_pcm_open() with NULL
-> > filter_fn and snd_dma_channel_params being filter_data to direct the
-> > API to request DMA channel using generic DMA helper.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> > Cc: alsa-devel at alsa-project.org
+> > I suggest vbus regulator is specified at platform code, and assign it
+> > to ci core's pdata, like sasche's patch pdata->dr_mode and pdata->phy_mode.
 > 
-> I would actually prefer having a new API in the soc-dmaengine-pcm
-> module, like
-> 
-> static int dmaengine_pcm_request_slave_channel(struct dmaengine_pcm_runtime_data *prtd,
-> 						struct device *dev, const char *id);
-> 
-> For sound drivers that are fully converted to using DT, it would be
-> a more natural interface to use IMHO.
-> 
-Ok, let's do this.  While my patch saves a new API, it adds a new
-struct anyway, which I'm not happy with.
+> you don't need platform_data for it. From ci core probe try to get the
+> regulator, if it doesn't exist, ignore the error and continue anyways.
 
-Shawn
+The pdev of ci core is created by platform layer, at ci core probe, it
+can't get platform things unless it is passed from platform layer
+
+> 
+> -- 
+> balbi
+
+
+
+-- 
+
+Best Regards,
+Peter Chen
