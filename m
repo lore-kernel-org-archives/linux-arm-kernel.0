@@ -1,30 +1,72 @@
-From: mark.langsdorf@calxeda.com (Mark Langsdorf)
-Date: Thu, 28 Feb 2013 12:29:19 -0600
-Subject: [PATCH] mailbox, pl320-ipc: remove __init from probe function
-Message-ID: <1362076159-20426-1-git-send-email-mark.langsdorf@calxeda.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 28 Feb 2013 10:53:03 -0800
+Subject: [PATCH] arm/omap2: Fix build failures
+Message-ID: <1362077583-11184-1-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Avoids a section mismatch.
+Commit c1d1cd59 (omap_device: remove obsolete pm_lats and early_device code)
+changed the number of parameters to omap_device_build(), but did not fix all
+calling code correctly. This causes build failures with some configurations.
 
-Signed-off-by: Mark Langsdorf <mark.langsdorf@calxeda.com>
+arch/arm/mach-omap2/devices.c: In function 'omap_init_hdmi_audio':
+arch/arm/mach-omap2/devices.c:429:2: error: too many arguments to function 'omap_device_build'
+arch/arm/mach-omap2/omap_device.h:74:25: note: declared here
+make[2]: [arch/arm/mach-omap2/devices.o] Error 1 (ignored)
+arch/arm/mach-omap2/sr_device.c: In function 'sr_dev_init':
+arch/arm/mach-omap2/sr_device.c:155:2: error: too many arguments to function 'omap_device_build'
+arch/arm/mach-omap2/omap_device.h:74:25: note: declared here
+make[2]: [arch/arm/mach-omap2/sr_device.o] Error 1 (ignored)
+arch/arm/mach-omap2/am35xx-emac.c: In function 'omap_davinci_emac_dev_init':
+arch/arm/mach-omap2/am35xx-emac.c:66:6: error: too many arguments to function 'omap_device_build'
+arch/arm/mach-omap2/omap_device.h:74:25: note: declared here
+
+Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 ---
- drivers/mailbox/pl320-ipc.c |    3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ arch/arm/mach-omap2/am35xx-emac.c |    3 +--
+ arch/arm/mach-omap2/devices.c     |    2 +-
+ arch/arm/mach-omap2/sr_device.c   |    2 +-
+ 3 files changed, 3 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/mailbox/pl320-ipc.c b/drivers/mailbox/pl320-ipc.c
-index c45b3ae..d873cba 100644
---- a/drivers/mailbox/pl320-ipc.c
-+++ b/drivers/mailbox/pl320-ipc.c
-@@ -138,8 +138,7 @@ int pl320_ipc_unregister_notifier(struct notifier_block *nb)
- }
- EXPORT_SYMBOL_GPL(pl320_ipc_unregister_notifier);
- 
--static int __init pl320_probe(struct amba_device *adev,
--				const struct amba_id *id)
-+static int pl320_probe(struct amba_device *adev, const struct amba_id *id)
+diff --git a/arch/arm/mach-omap2/am35xx-emac.c b/arch/arm/mach-omap2/am35xx-emac.c
+index a00d391..25b79a2 100644
+--- a/arch/arm/mach-omap2/am35xx-emac.c
++++ b/arch/arm/mach-omap2/am35xx-emac.c
+@@ -62,8 +62,7 @@ static int __init omap_davinci_emac_dev_init(struct omap_hwmod *oh,
  {
- 	int ret;
+ 	struct platform_device *pdev;
  
+-	pdev = omap_device_build(oh->class->name, 0, oh, pdata, pdata_len,
+-				 false);
++	pdev = omap_device_build(oh->class->name, 0, oh, pdata, pdata_len);
+ 	if (IS_ERR(pdev)) {
+ 		WARN(1, "Can't build omap_device for %s:%s.\n",
+ 		     oh->class->name, oh->name);
+diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+index 142d9c6..1ec7f05 100644
+--- a/arch/arm/mach-omap2/devices.c
++++ b/arch/arm/mach-omap2/devices.c
+@@ -426,7 +426,7 @@ static void __init omap_init_hdmi_audio(void)
+ 		return;
+ 	}
+ 
+-	pdev = omap_device_build("omap-hdmi-audio-dai", -1, oh, NULL, 0, 0);
++	pdev = omap_device_build("omap-hdmi-audio-dai", -1, oh, NULL, 0);
+ 	WARN(IS_ERR(pdev),
+ 	     "Can't build omap_device for omap-hdmi-audio-dai.\n");
+ 
+diff --git a/arch/arm/mach-omap2/sr_device.c b/arch/arm/mach-omap2/sr_device.c
+index bb829e0..d7bc33f 100644
+--- a/arch/arm/mach-omap2/sr_device.c
++++ b/arch/arm/mach-omap2/sr_device.c
+@@ -152,7 +152,7 @@ static int __init sr_dev_init(struct omap_hwmod *oh, void *user)
+ 
+ 	sr_data->enable_on_init = sr_enable_on_init;
+ 
+-	pdev = omap_device_build(name, i, oh, sr_data, sizeof(*sr_data), 0);
++	pdev = omap_device_build(name, i, oh, sr_data, sizeof(*sr_data));
+ 	if (IS_ERR(pdev))
+ 		pr_warning("%s: Could not build omap_device for %s: %s.\n\n",
+ 			__func__, name, oh->name);
 -- 
-1.7.10.4
+1.7.9.7
