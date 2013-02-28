@@ -1,145 +1,75 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Thu, 28 Feb 2013 13:46:08 -0800
-Subject: [PATCH 3/7] ARM: hs: add board support with device tree
-In-Reply-To: <1362035966-17628-3-git-send-email-haojian.zhuang@linaro.org>
-References: <1362035966-17628-1-git-send-email-haojian.zhuang@linaro.org>
- <1362035966-17628-3-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <CAHTX3dLO6Waf7bT0Lo6AqmDQSKbt14pwjZzYzP5De8RR3btY9w@mail.gmail.com>
+From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
+Date: Thu, 28 Feb 2013 23:03:57 +0100
+Subject: [PATCH v9 2/2] video: drm: exynos: Add pinctrl support to fimd
+In-Reply-To: <1362024762-28406-3-git-send-email-vikas.sajjan@linaro.org>
+References: <1362024762-28406-1-git-send-email-vikas.sajjan@linaro.org>
+ <1362024762-28406-3-git-send-email-vikas.sajjan@linaro.org>
+Message-ID: <512FD44D.1070408@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/2/27 Haojian Zhuang <haojian.zhuang@linaro.org>:
-> Add board support with device tree for Hisilicon Hi36xx/Hi37xx platform.
+On 02/28/2013 05:12 AM, Vikas Sajjan wrote:
+> Adds support for pinctrl to drm fimd
 >
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> Signed-off-by: Leela Krishna Amudala<l.krishna@samsung.com>
+> Signed-off-by: Vikas Sajjan<vikas.sajjan@linaro.org>
 > ---
->  arch/arm/Kconfig          |    2 ++
->  arch/arm/Makefile         |    1 +
->  arch/arm/mach-hs/Kconfig  |   23 +++++++++++++
->  arch/arm/mach-hs/Makefile |    5 +++
->  arch/arm/mach-hs/hs-dt.c  |   83 +++++++++++++++++++++++++++++++++++++++++++++
->  5 files changed, 114 insertions(+)
->  create mode 100644 arch/arm/mach-hs/Kconfig
->  create mode 100644 arch/arm/mach-hs/Makefile
->  create mode 100644 arch/arm/mach-hs/hs-dt.c
+>   drivers/gpu/drm/exynos/exynos_drm_fimd.c |    9 +++++++++
+>   1 file changed, 9 insertions(+)
 >
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index dedf02b..dfe70aa 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1055,6 +1055,8 @@ source "arch/arm/mach-h720x/Kconfig"
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_fimd.c b/drivers/gpu/drm/exynos/exynos_drm_fimd.c
+> index e323cf9..21ada8d 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_fimd.c
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_fimd.c
+> @@ -19,6 +19,7 @@
+>   #include<linux/clk.h>
+>   #include<linux/of_device.h>
+>   #include<linux/pm_runtime.h>
+> +#include<linux/pinctrl/consumer.h>
 >
->  source "arch/arm/mach-highbank/Kconfig"
+>   #include<video/of_display_timing.h>
+>   #include<video/samsung_fimd.h>
+> @@ -879,6 +880,7 @@ static int fimd_probe(struct platform_device *pdev)
+>   	struct exynos_drm_fimd_pdata *pdata;
+>   	struct exynos_drm_panel_info *panel;
+>   	struct resource *res;
+> +	struct pinctrl *pctrl;
+>   	int win;
+>   	int ret = -EINVAL;
 >
-> +source "arch/arm/mach-hs/Kconfig"
-> +
->  source "arch/arm/mach-integrator/Kconfig"
->
->  source "arch/arm/mach-iop32x/Kconfig"
-> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-> index ee4605f..08a913b 100644
-> --- a/arch/arm/Makefile
-> +++ b/arch/arm/Makefile
-> @@ -149,6 +149,7 @@ machine-$(CONFIG_ARCH_EP93XX)               += ep93xx
->  machine-$(CONFIG_ARCH_GEMINI)          += gemini
->  machine-$(CONFIG_ARCH_H720X)           += h720x
->  machine-$(CONFIG_ARCH_HIGHBANK)                += highbank
-> +machine-$(CONFIG_ARCH_HS)              += hs
->  machine-$(CONFIG_ARCH_INTEGRATOR)      += integrator
->  machine-$(CONFIG_ARCH_IOP13XX)         += iop13xx
->  machine-$(CONFIG_ARCH_IOP32X)          += iop32x
-> diff --git a/arch/arm/mach-hs/Kconfig b/arch/arm/mach-hs/Kconfig
-> new file mode 100644
-> index 0000000..491c6da
-> --- /dev/null
-> +++ b/arch/arm/mach-hs/Kconfig
-> @@ -0,0 +1,23 @@
-> +config ARCH_HS
-> +       bool "Hisilicon Hi36xx/Hi37xx family" if ARCH_MULTI_V7
-> +       select ARM_AMBA
-> +       select ARM_GIC
-> +       select CACHE_L2X0
-> +       select CACHE_PL310
-> +       select PINCTRL
-> +       select PINCTRL_SINGLE
-> +       select SERIAL_AMBA_PL011
-> +       select SERIAL_AMBA_PL011_CONSOLE
-> +       help
-> +         Support for Hisilicon Hi36xx/Hi37xx processor family
-> +
-> +if ARCH_HS
-> +
-> +config MACH_HS_DT
-> +       bool "Hisilicon Development Board"
-> +       default y
-> +       help
-> +         Say 'Y' here if you want to support the Hisilicon Development
-> +         Board.
-> +
-> +endif
-> diff --git a/arch/arm/mach-hs/Makefile b/arch/arm/mach-hs/Makefile
-> new file mode 100644
-> index 0000000..d79ecb5
-> --- /dev/null
-> +++ b/arch/arm/mach-hs/Makefile
-> @@ -0,0 +1,5 @@
-> +#
-> +# Makefile for Hisilicon Hi36xx/Hi37xx processors line
-> +#
-> +
-> +obj-$(CONFIG_MACH_HS_DT)       += hs-dt.o
-> diff --git a/arch/arm/mach-hs/hs-dt.c b/arch/arm/mach-hs/hs-dt.c
-> new file mode 100644
-> index 0000000..813ebb0
-> --- /dev/null
-> +++ b/arch/arm/mach-hs/hs-dt.c
-> @@ -0,0 +1,83 @@
-> +/*
-> + * (Hisilicon's Hi36xx/Hi37xx SoC based) flattened device tree enabled machine
-> + *
-> + * Copyright (c) 2012-2013 Hisilicon Ltd.
-> + * Copyright (c) 2012-2013 Linaro Ltd.
-> + *
-> + * Author: Haojian Zhuang <haojian.zhuang@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
-> +
-> +#include <linux/clk.h>
-> +#include <linux/clkdev.h>
-> +#include <linux/irqchip.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/of_platform.h>
-> +
-> +#include <asm/hardware/arm_timer.h>
-> +#include <asm/hardware/timer-sp.h>
-> +#include <asm/mach/arch.h>
-> +#include <asm/mach/map.h>
-> +#include <asm/mach/time.h>
-> +
-> +static struct of_device_id hs_timer_match[] __initdata = {
-> +       { .compatible = "arm,sp804", },
-> +       {}
-> +};
-> +
-> +static struct clk_lookup sp804_lookup = {
-> +       .dev_id = "sp804",
-> +       .clk    = NULL,
-> +};
-> +
-> +extern void __init hs_init_clocks(void);
+> @@ -897,6 +899,13 @@ static int fimd_probe(struct platform_device *pdev)
+>   			DRM_ERROR("failed: of_get_fb_videomode() : %d\n", ret);
+>   			return ret;
+>   		}
+> +		pctrl = devm_pinctrl_get_select_default(dev);
+> +		if (IS_ERR_OR_NULL(pctrl)) {
+> +			DRM_ERROR("failed: devm_pinctrl_get_select_default():"
+> +				"%d\n", PTR_RET(pctrl));
+> +			return PTR_ERR(pctrl);
 
-this shouldn't be in this file. Run checkpatch.pl on it.
+In situations like this I really side attempts to remove IS_ERR_OR_NULL()
+macro from the kernel completely ([1], [2]). What is the value returned 
+from
+fimd_probe() when devm_pinctrl_get_select_default() returns NULL ?
 
-Thanks,
-Michal
+What header file have you added to use struct pinctrl in this driver ?
+Is this data structure fully declared there ? Are drivers supposed to
+dereference struct pinctrl at all ?
 
--- 
-Michal Simek, Ing. (M.Eng)
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+I believe original intention was to have the pinctrl handle as an opaque
+cookie, and as long as it is used with the pinctrl API only and tested
+for errors with *IS_ERR()*, everything should be fine. The pinctrl API
+should handle any NULL pointer as it returned it to a driver in the first
+place.
+
+Please just use IS_ERR(), let's stop this IS_ERR_OR_NULL() insanity.
+
+> +		}
+> +
+>   	} else {
+>   		pdata = pdev->dev.platform_data;
+>   		if (!pdata) {
+
+[1] 
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/140543.html
+[2] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg78030.html
