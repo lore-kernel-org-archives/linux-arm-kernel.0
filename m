@@ -1,33 +1,21 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Thu, 28 Feb 2013 11:34:13 +0800
-Subject: [PATCH v10 8/8] usb: chipidea: imx: fix the error that using
- uninitialized pointer
-In-Reply-To: <CAB7JpEEuGP2Vo6HMZz30BZgiGQbBYqEVMRFEb7m0MbsC8oDjgQ@mail.gmail.com>
-References: <1361946799-29471-1-git-send-email-peter.chen@freescale.com>
- <1361946799-29471-9-git-send-email-peter.chen@freescale.com>
- <CAB7JpEEuGP2Vo6HMZz30BZgiGQbBYqEVMRFEb7m0MbsC8oDjgQ@mail.gmail.com>
-Message-ID: <20130228033412.GC19387@nchen-desktop>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 28 Feb 2013 11:43:30 +0800
+Subject: [PATCH] ARM: mxs_defconfig: Make USB host functional again
+In-Reply-To: <1361984638-19725-1-git-send-email-festevam@gmail.com>
+References: <1361984638-19725-1-git-send-email-festevam@gmail.com>
+Message-ID: <20130228034328.GB26106@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 27, 2013 at 10:07:15PM +0200, Alexander Shishkin wrote:
->    On Feb 27, 2013 8:34 AM, "Peter Chen" <peter.chen@freescale.com> wrote:
->    >
->    > If the core's probe fails, the platform layer may not get core's
+On Wed, Feb 27, 2013 at 02:03:58PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
->    I think the question we should be asking ourselves here is, why does it
->    fail?
+> commit 09f6ffde2e (USB: EHCI: fix build error by making ChipIdea host a normal 
+> EHCI driver) introduced CONFIG_USB_EHCI_HCD as a dependency for USB_CHIPIDEA_HOST.
+> 
+> Select CONFIG_USB_EHCI_HCD, so that USB host can be functional again.
+> 
+> Cc: <stable@vger.kernel.org> # 3.8
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-I find this problem just make core probe fails as set dr_mode = "peripheral"
-with host-only controller, we should consider such user mistake.
-
-I can move vbus handling to core code as it is core thing to avoid this bug.
-But what's your suggestion of platform layer handling when core's probe
-fails?
-
-http://marc.info/?l=linux-usb&m=136202110302555&w=2
-
--- 
-
-Best Regards,
-Peter Chen
+Applied, thanks.
