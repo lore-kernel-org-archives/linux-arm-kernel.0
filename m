@@ -1,36 +1,35 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 28 Feb 2013 20:20:37 +0100
-Subject: [PATCH 00/12] ARM: mxs: move to generic DMA device tree binding
-In-Reply-To: <201302272105.37714.arnd@arndb.de>
-References: <1361978748-25281-1-git-send-email-shawn.guo@linaro.org>
- <201302272105.37714.arnd@arndb.de>
-Message-ID: <201302282020.38223.marex@denx.de>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 28 Feb 2013 11:37:09 -0800
+Subject: [PATCH] mfd: Fix AB8500 build failure if POWER_SUPPLY is not
+ configured
+Message-ID: <1362080229-27334-1-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Arnd Bergmann,
+ab8500-sysctrl.c fails to build if POWER_SUPPLY is not configured.
 
-> On Wednesday 27 February 2013, Shawn Guo wrote:
-> > The series converts mxs-dma and its clients to generic DMA device tree
-> > binding/helper.
-> > 
-> > Subsystem maintainers,
-> > 
-> > I need your ACKs to have the series go via arm-soc as a whole if the
-> > patches look good to you.
-> 
-> Great stuff!
-> 
-> I have a few smaller comments (my comments on patch 4 also apply to
-> a lot of the other ones), but I'm very happy with the conversion
-> overall.
-> 
-> 	Arnd
+drivers/built-in.o: In function `ab8500_power_off':
+drivers/mfd/ab8500-sysctrl.c:37: undefined reference to `power_supply_get_by_name'
+drivers/mfd/ab8500-sysctrl.c:53: undefined reference to `power_supply_get_by_name'
 
-So true, amazing stuff. I'm currently snowed by email, so I'll try reviewing 
-only from version 2 on.
+Select POWER_SUPPLY in Kconfig if AB8500_CORE is configured to fix the problem.
 
-Thanks!
+Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+---
+ drivers/mfd/Kconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-Best regards,
-Marek Vasut
+diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+index 671f5b1..d5511de 100644
+--- a/drivers/mfd/Kconfig
++++ b/drivers/mfd/Kconfig
+@@ -860,6 +860,7 @@ config AB8500_CORE
+ 	depends on GENERIC_HARDIRQS && ABX500_CORE && MFD_DB8500_PRCMU
+ 	select MFD_CORE
+ 	select IRQ_DOMAIN
++	select POWER_SUPPLY
+ 	help
+ 	  Select this option to enable access to AB8500 power management
+ 	  chip. This connects to U8500 either on the SSP/SPI bus (deprecated
+-- 
+1.7.9.7
