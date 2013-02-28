@@ -1,35 +1,36 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 28 Feb 2013 14:54:49 -0800
-Subject: [GIT PULL 0/3] arm-soc: late changes for 3.9
-Message-ID: <1362092093-4839-1-git-send-email-olof@lixom.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 28 Feb 2013 13:51:39 -0800
+Subject: [PATCH] arm/omap2: Fix build failures
+In-Reply-To: <1362077583-11184-1-git-send-email-linux@roeck-us.net>
+References: <1362077583-11184-1-git-send-email-linux@roeck-us.net>
+Message-ID: <20130228215138.GJ1622@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi,
 
-Here is a series of merge requests for arm-soc branches.
+* Guenter Roeck <linux@roeck-us.net> [130228 11:21]:
+> Commit c1d1cd59 (omap_device: remove obsolete pm_lats and early_device code)
+> changed the number of parameters to omap_device_build(), but did not fix all
+> calling code correctly. This causes build failures with some configurations.
+> 
+> arch/arm/mach-omap2/devices.c: In function 'omap_init_hdmi_audio':
+> arch/arm/mach-omap2/devices.c:429:2: error: too many arguments to function 'omap_device_build'
+> arch/arm/mach-omap2/omap_device.h:74:25: note: declared here
+> make[2]: [arch/arm/mach-omap2/devices.o] Error 1 (ignored)
+> arch/arm/mach-omap2/sr_device.c: In function 'sr_dev_init':
+> arch/arm/mach-omap2/sr_device.c:155:2: error: too many arguments to function 'omap_device_build'
+> arch/arm/mach-omap2/omap_device.h:74:25: note: declared here
+> make[2]: [arch/arm/mach-omap2/sr_device.o] Error 1 (ignored)
+> arch/arm/mach-omap2/am35xx-emac.c: In function 'omap_davinci_emac_dev_init':
+> arch/arm/mach-omap2/am35xx-emac.c:66:6: error: too many arguments to function 'omap_device_build'
+> arch/arm/mach-omap2/omap_device.h:74:25: note: declared here
 
-The first two are mostly normal changes, The OMAP changes came in late
-before the merge window opened, so we wanted to let them sit for a few
-more days in -next. The i.MX branch is a churny branch that I wanted to
-keep separate and not have other code depend on, and thus held it off
-to the second batch.
+Thanks, we already have a fix for this in linux next as
+commit 6efc3fe0 (ARM: OMAP2+: fix some omap_device_build() calls that
+aren't compiled by default). It seems that it will get sent today as
+part of the rest of the arm-soc late branches.
 
-Final two pull requests are for the same code. As Arnd describes in the
-tags, they are for a set of mvebu patches that depend on contents in
-the MMC tree. We had pulled in part of the MMC branch as a dependency,
-but unfortunately Chris Ball rebased it.
+Regards,
 
-We're giving you the choice of taking the rebased version, or a
-non-rebased-but-merged-and-fixed-up version to avoid dealing with the
-excessive conflicts. The rebased one has the obvious benefit of not
-having duplicate commits in the tree for the same changes, but, well,
-it's rebased. Actual tree contents is identical though.
-
-I've pushed a resolved branch for reference (late-branches-resolved)
-in case you want to compare conflict resolutions.
-
-
-Thanks,
-
--Olof
+Tony
