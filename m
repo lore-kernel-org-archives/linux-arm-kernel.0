@@ -1,78 +1,62 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 27 Feb 2013 20:49:29 -0800
-Subject: [PATCH 5/5] HACK: omap: opp: add fake 400MHz OPP to bypass MPU
-In-Reply-To: <1362026969-11457-1-git-send-email-mturquette@linaro.org>
-References: <1362026969-11457-1-git-send-email-mturquette@linaro.org>
-Message-ID: <1362026969-11457-6-git-send-email-mturquette@linaro.org>
+From: kyungsik.lee@lge.com (Kyungsik Lee)
+Date: Thu, 28 Feb 2013 14:22:48 +0900
+Subject: [RFC PATCH v2 2/4] lib: Add support for LZ4-compressed kernel
+In-Reply-To: <20130226140051.GX27541@twin.jikos.cz>
+References: <1361859870-15751-1-git-send-email-kyungsik.lee@lge.com>
+ <1361859870-15751-3-git-send-email-kyungsik.lee@lge.com>
+ <20130226140051.GX27541@twin.jikos.cz>
+Message-ID: <20130228052248.GA15148@Corona>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mike Turquette <mturquette@ti.com>
+On Tue, Feb 26, 2013 at 03:00:51PM +0100, David Sterba wrote:
+> On Tue, Feb 26, 2013 at 03:24:28PM +0900, Kyungsik Lee wrote:
+> > +config KERNEL_LZ4
+> > +	bool "LZ4"
+> > +	depends on HAVE_KERNEL_LZ4
+> > +	help
+> > +	  Its compression ratio is worse than LZO. The size of the kernel
+> > +	  is about 8% bigger than LZO. But the decompression speed is
+> > +	  faster than LZO.
+> > +
+> 
+> Can you please add a sentence what lz4 actually is before you start
+> comparing it with the current competitor(s)?
+Yes, I will update it.
 
-The following is another silly patch which was done to test calling
-clk_set_parent from within a call to clk_set_rate.  It may make your
-board burst into flames or otherwise void various warrantees.
+> > --- /dev/null
+> > +++ b/lib/decompress_unlz4.c
+> > @@ -0,0 +1,190 @@
+> > +#define LZ4_CHUNK_SIZE (8<<20)
+> 
+> Please use a less cryptic way of representing a value of 8 MB. Also,
+> this is a hardcoded value that must be used on the compressor side. It's
+> an upper limit, so anything below 8MB does not break decompresssion, but
+> this must be somehow checked or saved along in the binary stream. You
+> seem to use the lz4demo.c on the userspace side for compression, but
+> this is not a standard tool nor the output format is well-defined or
+> stabilized.
+Yes, It will be easy to parse and extract the meta information required
+for the kernel decompressor if output format is well-defined and
+standardized.
 
-This patch introduces a 400MHz OPP for the MPU, which happens to
-correspond to the bypass clk rate on the 4430 Panda board and 4460 Panda
-ES board, both using a 38.4MHz SYS_CLK oscillator rate.
+> For proper use I would like to see a commandline tool similar to
+> gzip/bzip2/lzop that can be packaged and shipped by distros, and the
+> output format defintion.
+> 
+> Yann has some ideas for the format
+> http://fastcompression.blogspot.cz/2012/04/file-container-format-for-lz4.html
+Actually, I would like to use a packaged tool by distros too.
+lz4demo is what I use for compressing the kernel so far.
+I name it lz4 in the patch.
 
-One may test this by using the cpufreq-userspace governor and executing:
-echo 400000 > /sys/devices/system/cpu/cpu0/cpufreq/scaling_setspeed
+> For kernel, the minimum of meta information is total compressed length,
+> total uncompressed length and chunk size. I don't know if the first two
+> aren't stored elsewhere in the generic kernel image headers, but chunk
+> size must be specified.
+Right, Currently the chunk size used in the kernel decompressor is the same
+as defined in lz4demo but it should have been provided as meta
+information.
 
-On Panda ES validation can be done via:
-$ find /debug/clk/ -iname "dpll_mpu_ck"
-/debug/clk/virt_38400000_ck/sys_clkin_ck/dpll_mpu_ck
-$ echo 400000 > scaling_setspeed
-$ find /debug/clk/ -iname "dpll_mpu_ck"
-/debug/clk/virt_38400000_ck/sys_clkin_ck/dpll_core_ck/dpll_core_x2_ck/dpll_core_m5x2_ck/div_mpu_hs_clk/dpll_mpu_ck
-$ cat /proc/cpuinfo
-...
-BogoMIPS        : 794.26
-...
-$ cat /sys/class/regulator/regulator.3/microvolts
-1200000
-
-Not-signed-off-by: Mike Turquette <mturquette@ti.com>
----
- arch/arm/mach-omap2/opp4xxx_data.c |   18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
-
-diff --git a/arch/arm/mach-omap2/opp4xxx_data.c b/arch/arm/mach-omap2/opp4xxx_data.c
-index d470b72..c7bccf7 100644
---- a/arch/arm/mach-omap2/opp4xxx_data.c
-+++ b/arch/arm/mach-omap2/opp4xxx_data.c
-@@ -67,6 +67,15 @@ struct omap_volt_data omap443x_vdd_core_volt_data[] = {
- static struct omap_opp_def __initdata omap443x_opp_def_list[] = {
- 	/* MPU OPP1 - OPP50 */
- 	OPP_INITIALIZER("mpu", true, 300000000, OMAP4430_VDD_MPU_OPP50_UV),
-+	/*
-+	 * MPU OPP1.5 - 400MHz - completely FAKE - not endorsed by TI
-+	 *
-+	 * DPLL_MPU is in Low Power Bypass driven by DPLL_CORE.  After
-+	 * transitioning to this OPP you can see the migration in debugfs:
-+	 * /d/clk/virt_38400000_ck/sys_clkin_ck/dpll_mpu_ck to
-+	 * /d/.../dpll_core_ck/dpll_core_x2_ck/dpll_core_m5x2_ck/div_mpu_hs_clk
-+	 */
-+	OPP_INITIALIZER("mpu", true, 400000000, 1100000),
- 	/* MPU OPP2 - OPP100 */
- 	OPP_INITIALIZER("mpu", true, 600000000, OMAP4430_VDD_MPU_OPP100_UV),
- 	/* MPU OPP3 - OPP-Turbo */
-@@ -126,6 +135,15 @@ struct omap_volt_data omap446x_vdd_core_volt_data[] = {
- static struct omap_opp_def __initdata omap446x_opp_def_list[] = {
- 	/* MPU OPP1 - OPP50 */
- 	OPP_INITIALIZER("mpu", true, 350000000, OMAP4460_VDD_MPU_OPP50_UV),
-+	/*
-+	 * MPU OPP1.5 - 400MHz - completely FAKE - not endorsed by TI
-+	 *
-+	 * DPLL_MPU is in Low Power Bypass driven by DPLL_CORE.  After
-+	 * transitioning to this OPP you can see the migration in debugfs:
-+	 * /d/clk/virt_38400000_ck/sys_clkin_ck/dpll_mpu_ck to
-+	 * /d/.../dpll_core_ck/dpll_core_x2_ck/dpll_core_m5x2_ck/div_mpu_hs_clk
-+	 */
-+	OPP_INITIALIZER("mpu", true, 400000000, 1100000),
- 	/* MPU OPP2 - OPP100 */
- 	OPP_INITIALIZER("mpu", true, 700000000, OMAP4460_VDD_MPU_OPP100_UV),
- 	/* MPU OPP3 - OPP-Turbo */
--- 
-1.7.10.4
+Thanks,
+Kyungsik
