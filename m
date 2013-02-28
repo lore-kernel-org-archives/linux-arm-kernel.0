@@ -1,447 +1,360 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 28 Feb 2013 09:54:46 +0530
-Subject: crypto: omap-sham, omap-aes and dma_request_slave_channel_compat()
-In-Reply-To: <201302272136.04100.arnd@arndb.de>
-References: <512D00BE.8090204@canonical.com>
- <20130226225205.GA13338@animalcreek.com>
- <20130227053109.GA28537@intel.com>
- <201302272136.04100.arnd@arndb.de>
-Message-ID: <20130228042446.GC28537@intel.com>
+From: Frank.Li@freescale.com (Frank Li)
+Date: Thu, 28 Feb 2013 11:44:20 +0800
+Subject: [PATCH 1/1 net-next] fec: net: put tx to napi poll function to fix
+ dead lock
+Message-ID: <1362023060-10277-1-git-send-email-Frank.Li@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 27, 2013 at 09:36:03PM +0000, Arnd Bergmann wrote:
-> On Wednesday 27 February 2013, Vinod Koul wrote:
-> > Yes we had agreed that I will send it.
-> > 
-> > I have applied this one now, and will send second PULL request to Linus soon.
-> > 
-> > Arnd,
-> > The second patch of dw_dmac you wnated to send me fails to apply for me. Can you
-> > either rebase or send with your updates with my ack?
-> 
-> I would prefer if you send the patch. I've rebased my patch on top of
-> today's upstream tree but could not see any difference to my previous
-> version. Anyway, here it is again.
-Thanks, I have applied and pushed it now :)
+up stack ndo_start_xmit already hold lock.
+fec_enet_start_xmit needn't spin lock.
+stat_xmit just update fep->cur_tx
+fec_enet_tx just update fep->dirty_tx
 
-I will send PULL to linus this evening...
+Reserve a empty bdb to check full or empty
+cur_tx == dirty_tx    means full
+cur_tx == dirty_tx +1 means empty
 
---
-~Vinod
-> 
-> 	Arnd
-> 
-> 8<----------
-> Subject: [PATCH] dmaengine: dw_dmac: move to generic DMA binding
-> 
-> The original device tree binding for this driver, from Viresh Kumar
-> unfortunately conflicted with the generic DMA binding, and did not allow
-> to completely seperate slave device configuration from the controller.
-> 
-> This is an attempt to replace it with an implementation of the generic
-> binding, but it is currently completely untested, because I do not have
-> any hardware with this particular controller.
-> 
-> The patch applies on top of the slave-dma tree, which contains both the base
-> support for the generic DMA binding, as well as the earlier attempt from
-> Viresh. Both of these are currently not merged upstream however.
-> 
-> This version incorporates feedback from Viresh Kumar, Andy Shevchenko
-> and Russell King.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> Acked-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-> Cc: Vinod Koul <vinod.koul@linux.intel.com>
-> Cc: devicetree-discuss at lists.ozlabs.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> 
-> diff --git a/Documentation/devicetree/bindings/dma/snps-dma.txt b/Documentation/devicetree/bindings/dma/snps-dma.txt
-> index 5bb3dfb..d58675e 100644
-> --- a/Documentation/devicetree/bindings/dma/snps-dma.txt
-> +++ b/Documentation/devicetree/bindings/dma/snps-dma.txt
-> @@ -3,59 +3,61 @@
->  Required properties:
->  - compatible: "snps,dma-spear1340"
->  - reg: Address range of the DMAC registers
-> -- interrupt-parent: Should be the phandle for the interrupt controller
-> -  that services interrupts for this device
->  - interrupt: Should contain the DMAC interrupt number
-> -- nr_channels: Number of channels supported by hardware
-> -- is_private: The device channels should be marked as private and not for by the
-> -  general purpose DMA channel allocator. False if not passed.
-> +- dma-channels: Number of channels supported by hardware
-> +- dma-requests: Number of DMA request lines supported, up to 16
-> +- dma-masters: Number of AHB masters supported by the controller
-> +- #dma-cells: must be <3>
->  - chan_allocation_order: order of allocation of channel, 0 (default): ascending,
->    1: descending
->  - chan_priority: priority of channels. 0 (default): increase from chan 0->n, 1:
->    increase from chan n->0
->  - block_size: Maximum block size supported by the controller
-> -- nr_masters: Number of AHB masters supported by the controller
->  - data_width: Maximum data width supported by hardware per AHB master
->    (0 - 8bits, 1 - 16bits, ..., 5 - 256bits)
-> -- slave_info:
-> -	- bus_id: name of this device channel, not just a device name since
-> -	  devices may have more than one channel e.g. "foo_tx". For using the
-> -	  dw_generic_filter(), slave drivers must pass exactly this string as
-> -	  param to filter function.
-> -	- cfg_hi: Platform-specific initializer for the CFG_HI register
-> -	- cfg_lo: Platform-specific initializer for the CFG_LO register
-> -	- src_master: src master for transfers on allocated channel.
-> -	- dst_master: dest master for transfers on allocated channel.
-> +
-> +
-> +Optional properties:
-> +- interrupt-parent: Should be the phandle for the interrupt controller
-> +  that services interrupts for this device
-> +- is_private: The device channels should be marked as private and not for by the
-> +  general purpose DMA channel allocator. False if not passed.
->  
->  Example:
->  
-> -	dma at fc000000 {
-> +	dmahost: dma at fc000000 {
->  		compatible = "snps,dma-spear1340";
->  		reg = <0xfc000000 0x1000>;
->  		interrupt-parent = <&vic1>;
->  		interrupts = <12>;
->  
-> -		nr_channels = <8>;
-> +		dma-channels = <8>;
-> +		dma-requests = <16>;
-> +		dma-masters = <2>;
-> +		#dma-cells = <3>;
->  		chan_allocation_order = <1>;
->  		chan_priority = <1>;
->  		block_size = <0xfff>;
-> -		nr_masters = <2>;
->  		data_width = <3 3 0 0>;
-> +	};
->  
-> -		slave_info {
-> -			uart0-tx {
-> -				bus_id = "uart0-tx";
-> -				cfg_hi = <0x4000>;	/* 0x8 << 11 */
-> -				cfg_lo = <0>;
-> -				src_master = <0>;
-> -				dst_master = <1>;
-> -			};
-> -			spi0-tx {
-> -				bus_id = "spi0-tx";
-> -				cfg_hi = <0x2000>;	/* 0x4 << 11 */
-> -				cfg_lo = <0>;
-> -				src_master = <0>;
-> -				dst_master = <0>;
-> -			};
-> -		};
-> +DMA clients connected to the Designware DMA controller must use the format
-> +described in the dma.txt file, using a four-cell specifier for each channel.
-> +The four cells in order are:
-> +
-> +1. A phandle pointing to the DMA controller
-> +2. The DMA request line number
-> +3. Source master for transfers on allocated channel
-> +4. Destination master for transfers on allocated channel
-> +
-> +Example:
-> +	
-> +	serial at e0000000 {
-> +		compatible = "arm,pl011", "arm,primecell";
-> +		reg = <0xe0000000 0x1000>;
-> +		interrupts = <0 35 0x4>;
-> +		status = "disabled";
-> +		dmas = <&dmahost 12 0 1>,
-> +			<&dmahost 13 0 1 0>;
-> +		dma-names = "rx", "rx";
->  	};
-> diff --git a/drivers/dma/dw_dmac.c b/drivers/dma/dw_dmac.c
-> index 51c3ea2..c599558 100644
-> --- a/drivers/dma/dw_dmac.c
-> +++ b/drivers/dma/dw_dmac.c
-> @@ -20,6 +20,7 @@
->  #include <linux/interrupt.h>
->  #include <linux/io.h>
->  #include <linux/of.h>
-> +#include <linux/of_dma.h>
->  #include <linux/mm.h>
->  #include <linux/module.h>
->  #include <linux/platform_device.h>
-> @@ -171,7 +172,13 @@ static void dwc_initialize(struct dw_dma_chan *dwc)
->  	if (dwc->initialized == true)
->  		return;
->  
-> -	if (dws) {
-> +	if (dws && dws->cfg_hi == ~0 && dws->cfg_lo == ~0) {
-> +		/* autoconfigure based on request line from DT */
-> +		if (dwc->direction == DMA_MEM_TO_DEV)
-> +			cfghi = DWC_CFGH_DST_PER(dwc->request_line);
-> +		else if (dwc->direction == DMA_DEV_TO_MEM)
-> +			cfghi = DWC_CFGH_SRC_PER(dwc->request_line);
-> +	} else if (dws) {
->  		/*
->  		 * We need controller-specific data to set up slave
->  		 * transfers.
-> @@ -1226,49 +1233,64 @@ static void dwc_free_chan_resources(struct dma_chan *chan)
->  	dev_vdbg(chan2dev(chan), "%s: done\n", __func__);
->  }
->  
-> -bool dw_dma_generic_filter(struct dma_chan *chan, void *param)
-> +struct dw_dma_filter_args {
-> +	struct dw_dma *dw;
-> +	unsigned int req;
-> +	unsigned int src;
-> +	unsigned int dst;
-> +};
-> +
-> +static bool dw_dma_generic_filter(struct dma_chan *chan, void *param)
->  {
-> +	struct dw_dma_chan *dwc = to_dw_dma_chan(chan);
->  	struct dw_dma *dw = to_dw_dma(chan->device);
-> -	static struct dw_dma *last_dw;
-> -	static char *last_bus_id;
-> -	int i = -1;
-> +	struct dw_dma_filter_args *fargs = param;
-> +	struct dw_dma_slave *dws = &dwc->slave;
->  
-> -	/*
-> -	 * dmaengine framework calls this routine for all channels of all dma
-> -	 * controller, until true is returned. If 'param' bus_id is not
-> -	 * registered with a dma controller (dw), then there is no need of
-> -	 * running below function for all channels of dw.
-> -	 *
-> -	 * This block of code does this by saving the parameters of last
-> -	 * failure. If dw and param are same, i.e. trying on same dw with
-> -	 * different channel, return false.
-> -	 */
-> -	if ((last_dw == dw) && (last_bus_id == param))
-> -		return false;
-> -	/*
-> -	 * Return true:
-> -	 * - If dw_dma's platform data is not filled with slave info, then all
-> -	 *   dma controllers are fine for transfer.
-> -	 * - Or if param is NULL
-> -	 */
-> -	if (!dw->sd || !param)
-> -		return true;
-> +	/* ensure the device matches our channel */
-> +        if (chan->device != &fargs->dw->dma)
-> +                return false;
->  
-> -	while (++i < dw->sd_count) {
-> -		if (!strcmp(dw->sd[i].bus_id, param)) {
-> -			chan->private = &dw->sd[i];
-> -			last_dw = NULL;
-> -			last_bus_id = NULL;
-> +	dws->dma_dev	= dw->dma.dev;
-> +	dws->cfg_hi	= ~0;
-> +	dws->cfg_lo	= ~0;
-> +	dws->src_master	= fargs->src;
-> +	dws->dst_master	= fargs->dst;
->  
-> -			return true;
-> -		}
-> -	}
-> +	dwc->request_line = fargs->req;
->  
-> -	last_dw = dw;
-> -	last_bus_id = param;
-> -	return false;
-> +	chan->private = dws;
-> +
-> +	return true;
-> +}
-> +
-> +static struct dma_chan *dw_dma_xlate(struct of_phandle_args *dma_spec,
-> +					 struct of_dma *ofdma)
-> +{
-> +	struct dw_dma *dw = ofdma->of_dma_data;
-> +	struct dw_dma_filter_args fargs = {
-> +		.dw = dw,
-> +	};
-> +	dma_cap_mask_t cap;
-> +
-> +	if (dma_spec->args_count != 3)
-> +		return NULL;
-> +
-> +	fargs.req = be32_to_cpup(dma_spec->args+0);
-> +	fargs.src = be32_to_cpup(dma_spec->args+1);
-> +	fargs.dst = be32_to_cpup(dma_spec->args+2);
-> +
-> +	if (WARN_ON(fargs.req >= DW_DMA_MAX_NR_REQUESTS ||
-> +		    fargs.src >= dw->nr_masters ||
-> +		    fargs.dst >= dw->nr_masters))
-> +		return NULL;
-> +
-> +	dma_cap_zero(cap);
-> +	dma_cap_set(DMA_SLAVE, cap);
-> +
-> +	/* TODO: there should be a simpler way to do this */
-> +	return dma_request_channel(cap, dw_dma_generic_filter, &fargs);
->  }
-> -EXPORT_SYMBOL(dw_dma_generic_filter);
->  
->  /* --------------------- Cyclic DMA API extensions -------------------- */
->  
-> @@ -1554,9 +1576,8 @@ static void dw_dma_off(struct dw_dma *dw)
->  static struct dw_dma_platform_data *
->  dw_dma_parse_dt(struct platform_device *pdev)
->  {
-> -	struct device_node *sn, *cn, *np = pdev->dev.of_node;
-> +	struct device_node *np = pdev->dev.of_node;
->  	struct dw_dma_platform_data *pdata;
-> -	struct dw_dma_slave *sd;
->  	u32 tmp, arr[4];
->  
->  	if (!np) {
-> @@ -1568,7 +1589,7 @@ dw_dma_parse_dt(struct platform_device *pdev)
->  	if (!pdata)
->  		return NULL;
->  
-> -	if (of_property_read_u32(np, "nr_channels", &pdata->nr_channels))
-> +	if (of_property_read_u32(np, "dma-channels", &pdata->nr_channels))
->  		return NULL;
->  
->  	if (of_property_read_bool(np, "is_private"))
-> @@ -1583,7 +1604,7 @@ dw_dma_parse_dt(struct platform_device *pdev)
->  	if (!of_property_read_u32(np, "block_size", &tmp))
->  		pdata->block_size = tmp;
->  
-> -	if (!of_property_read_u32(np, "nr_masters", &tmp)) {
-> +	if (!of_property_read_u32(np, "dma-masters", &tmp)) {
->  		if (tmp > 4)
->  			return NULL;
->  
-> @@ -1595,36 +1616,6 @@ dw_dma_parse_dt(struct platform_device *pdev)
->  		for (tmp = 0; tmp < pdata->nr_masters; tmp++)
->  			pdata->data_width[tmp] = arr[tmp];
->  
-> -	/* parse slave data */
-> -	sn = of_find_node_by_name(np, "slave_info");
-> -	if (!sn)
-> -		return pdata;
-> -
-> -	/* calculate number of slaves */
-> -	tmp = of_get_child_count(sn);
-> -	if (!tmp)
-> -		return NULL;
-> -
-> -	sd = devm_kzalloc(&pdev->dev, sizeof(*sd) * tmp, GFP_KERNEL);
-> -	if (!sd)
-> -		return NULL;
-> -
-> -	pdata->sd = sd;
-> -	pdata->sd_count = tmp;
-> -
-> -	for_each_child_of_node(sn, cn) {
-> -		sd->dma_dev = &pdev->dev;
-> -		of_property_read_string(cn, "bus_id", &sd->bus_id);
-> -		of_property_read_u32(cn, "cfg_hi", &sd->cfg_hi);
-> -		of_property_read_u32(cn, "cfg_lo", &sd->cfg_lo);
-> -		if (!of_property_read_u32(cn, "src_master", &tmp))
-> -			sd->src_master = tmp;
-> -
-> -		if (!of_property_read_u32(cn, "dst_master", &tmp))
-> -			sd->dst_master = tmp;
-> -		sd++;
-> -	}
-> -
->  	return pdata;
->  }
->  #else
-> @@ -1705,8 +1696,6 @@ static int dw_probe(struct platform_device *pdev)
->  	clk_prepare_enable(dw->clk);
->  
->  	dw->regs = regs;
-> -	dw->sd = pdata->sd;
-> -	dw->sd_count = pdata->sd_count;
->  
->  	/* get hardware configuration parameters */
->  	if (autocfg) {
-> @@ -1837,6 +1826,14 @@ static int dw_probe(struct platform_device *pdev)
->  
->  	dma_async_device_register(&dw->dma);
->  
-> +	if (pdev->dev.of_node) {
-> +		err = of_dma_controller_register(pdev->dev.of_node,
-> +						 dw_dma_xlate, dw);
-> +		if (err && err != -ENODEV)
-> +			dev_err(&pdev->dev,
-> +				"could not register of_dma_controller\n");
-> +	}
-> +
->  	return 0;
->  }
->  
-> @@ -1845,6 +1842,8 @@ static int dw_remove(struct platform_device *pdev)
->  	struct dw_dma		*dw = platform_get_drvdata(pdev);
->  	struct dw_dma_chan	*dwc, *_dwc;
->  
-> +	if (pdev->dev.of_node)
-> +		of_dma_controller_free(pdev->dev.of_node);
->  	dw_dma_off(dw);
->  	dma_async_device_unregister(&dw->dma);
->  
-> diff --git a/drivers/dma/dw_dmac_regs.h b/drivers/dma/dw_dmac_regs.h
-> index 88dd8eb..cf0ce5c 100644
-> --- a/drivers/dma/dw_dmac_regs.h
-> +++ b/drivers/dma/dw_dmac_regs.h
-> @@ -13,6 +13,7 @@
->  #include <linux/dw_dmac.h>
->  
->  #define DW_DMA_MAX_NR_CHANNELS	8
-> +#define DW_DMA_MAX_NR_REQUESTS	16
->  
->  /* flow controller */
->  enum dw_dma_fc {
-> @@ -211,6 +212,8 @@ struct dw_dma_chan {
->  	/* hardware configuration */
->  	unsigned int		block_size;
->  	bool			nollp;
-> +	unsigned int		request_line;
-> +	struct dw_dma_slave	slave;
->  
->  	/* configuration passed via DMA_SLAVE_CONFIG */
->  	struct dma_slave_config dma_sconfig;
-> @@ -239,10 +242,6 @@ struct dw_dma {
->  	struct tasklet_struct	tasklet;
->  	struct clk		*clk;
->  
-> -	/* slave information */
-> -	struct dw_dma_slave	*sd;
-> -	unsigned int		sd_count;
-> -
->  	u8			all_chan_mask;
->  
->  	/* hardware configuration */
-> diff --git a/include/linux/dw_dmac.h b/include/linux/dw_dmac.h
-> index 41766de..481ab23 100644
-> --- a/include/linux/dw_dmac.h
-> +++ b/include/linux/dw_dmac.h
-> @@ -27,7 +27,6 @@
->   */
->  struct dw_dma_slave {
->  	struct device		*dma_dev;
-> -	const char		*bus_id;
->  	u32			cfg_hi;
->  	u32			cfg_lo;
->  	u8			src_master;
-> @@ -60,9 +59,6 @@ struct dw_dma_platform_data {
->  	unsigned short	block_size;
->  	unsigned char	nr_masters;
->  	unsigned char	data_width[4];
-> -
-> -	struct dw_dma_slave *sd;
-> -	unsigned int sd_count;
->  };
->  
->  /* bursts size */
-> @@ -114,6 +110,5 @@ void dw_dma_cyclic_stop(struct dma_chan *chan);
->  dma_addr_t dw_dma_get_src_addr(struct dma_chan *chan);
->  
->  dma_addr_t dw_dma_get_dst_addr(struct dma_chan *chan);
-> -bool dw_dma_generic_filter(struct dma_chan *chan, void *param);
->  
->  #endif /* DW_DMAC_H */
+So needn't is_full variable.
+
+Fix spin lock deadlock
+=================================
+[ INFO: inconsistent lock state ]
+3.8.0-rc5+ #107 Not tainted
+---------------------------------
+inconsistent {HARDIRQ-ON-W} -> {IN-HARDIRQ-W} usage.
+ptp4l/615 [HC1[1]:SC0[0]:HE0:SE1] takes:
+ (&(&list->lock)->rlock#3){?.-...}, at: [<8042c3c4>] skb_queue_tail+0x20/0x50
+ {HARDIRQ-ON-W} state was registered at:
+ [<80067250>] mark_lock+0x154/0x4e8
+ [<800676f4>] mark_irqflags+0x110/0x1a4
+ [<80069208>] __lock_acquire+0x494/0x9c0
+ [<80069ce8>] lock_acquire+0x90/0xa4
+ [<80527ad0>] _raw_spin_lock_bh+0x44/0x54
+ [<804877e0>] first_packet_length+0x38/0x1f0
+ [<804879e4>] udp_poll+0x4c/0x5c
+ [<804231f8>] sock_poll+0x24/0x28
+ [<800d27f0>] do_poll.isra.10+0x120/0x254
+ [<800d36e4>] do_sys_poll+0x15c/0x1e8
+ [<800d3828>] sys_poll+0x60/0xc8
+ [<8000e780>] ret_fast_syscall+0x0/0x3c
+
+ *** DEADLOCK ***
+
+ 1 lock held by ptp4l/615:
+  #0:  (&(&fep->hw_lock)->rlock){-.-...}, at: [<80355f9c>] fec_enet_tx+0x24/0x268
+  stack backtrace:
+  Backtrace:
+  [<800121e0>] (dump_backtrace+0x0/0x10c) from [<80516210>] (dump_stack+0x18/0x1c)
+  r6:8063b1fc r5:bf38b2f8 r4:bf38b000 r3:bf38b000
+  [<805161f8>] (dump_stack+0x0/0x1c) from [<805189d0>] (print_usage_bug.part.34+0x164/0x1a4)
+  [<8051886c>] (print_usage_bug.part.34+0x0/0x1a4) from [<80518a88>] (print_usage_bug+0x78/0x88)
+  r8:80065664 r7:bf38b2f8 r6:00000002 r5:00000000 r4:bf38b000
+  [<80518a10>] (print_usage_bug+0x0/0x88) from [<80518b58>] (mark_lock_irq+0xc0/0x270)
+  r7:bf38b000 r6:00000002 r5:bf38b2f8 r4:00000000
+  [<80518a98>] (mark_lock_irq+0x0/0x270) from [<80067270>] (mark_lock+0x174/0x4e8)
+  [<800670fc>] (mark_lock+0x0/0x4e8) from [<80067744>] (mark_irqflags+0x160/0x1a4)
+  [<800675e4>] (mark_irqflags+0x0/0x1a4) from [<80069208>] (__lock_acquire+0x494/0x9c0)
+  r5:00000002 r4:bf38b2f8
+  [<80068d74>] (__lock_acquire+0x0/0x9c0) from [<80069ce8>] (lock_acquire+0x90/0xa4)
+  [<80069c58>] (lock_acquire+0x0/0xa4) from [<805278d8>] (_raw_spin_lock_irqsave+0x4c/0x60)
+  [<8052788c>] (_raw_spin_lock_irqsave+0x0/0x60) from [<8042c3c4>] (skb_queue_tail+0x20/0x50)
+  r6:bfbb2180 r5:bf1d0190 r4:bf1d0184
+  [<8042c3a4>] (skb_queue_tail+0x0/0x50) from [<8042c4cc>] (sock_queue_err_skb+0xd8/0x188)
+  r6:00000056 r5:bfbb2180 r4:bf1d0000 r3:00000000
+  [<8042c3f4>] (sock_queue_err_skb+0x0/0x188) from [<8042d15c>] (skb_tstamp_tx+0x70/0xa0)
+  r6:bf0dddb0 r5:bf1d0000 r4:bfbb2180 r3:00000004
+  [<8042d0ec>] (skb_tstamp_tx+0x0/0xa0) from [<803561d0>] (fec_enet_tx+0x258/0x268)
+  r6:c089d260 r5:00001c00 r4:bfbd0000
+  [<80355f78>] (fec_enet_tx+0x0/0x268) from [<803562cc>] (fec_enet_interrupt+0xec/0xf8)
+  [<803561e0>] (fec_enet_interrupt+0x0/0xf8) from [<8007d5b0>] (handle_irq_event_percpu+0x54/0x1a0)
+  [<8007d55c>] (handle_irq_event_percpu+0x0/0x1a0) from [<8007d740>] (handle_irq_event+0x44/0x64)
+  [<8007d6fc>] (handle_irq_event+0x0/0x64) from [<80080690>] (handle_fasteoi_irq+0xc4/0x15c)
+  r6:bf0dc000 r5:bf811290 r4:bf811240 r3:00000000
+  [<800805cc>] (handle_fasteoi_irq+0x0/0x15c) from [<8007ceec>] (generic_handle_irq+0x28/0x38)
+  r5:807130c8 r4:00000096
+  [<8007cec4>] (generic_handle_irq+0x0/0x38) from [<8000f16c>] (handle_IRQ+0x54/0xb4)
+  r4:8071d280 r3:00000180
+  [<8000f118>] (handle_IRQ+0x0/0xb4) from [<80008544>] (gic_handle_irq+0x30/0x64)
+  r8:8000e924 r7:f4000100 r6:bf0ddef8 r5:8071c974 r4:f400010c
+  r3:00000000
+  [<80008514>] (gic_handle_irq+0x0/0x64) from [<8000e2e4>] (__irq_svc+0x44/0x5c)
+  Exception stack(0xbf0ddef8 to 0xbf0ddf40)
+
+Signed-off-by: Frank Li <Frank.Li@freescale.com>
+---
+ drivers/net/ethernet/freescale/fec.c |  100 ++++++++++++++++++----------------
+ drivers/net/ethernet/freescale/fec.h |    3 -
+ 2 files changed, 52 insertions(+), 51 deletions(-)
+
+diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
+index 0fe68c4..d592965 100644
+--- a/drivers/net/ethernet/freescale/fec.c
++++ b/drivers/net/ethernet/freescale/fec.c
+@@ -246,14 +246,13 @@ fec_enet_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+ 	struct bufdesc *bdp;
+ 	void *bufaddr;
+ 	unsigned short	status;
+-	unsigned long flags;
++	unsigned int index;
+ 
+ 	if (!fep->link) {
+ 		/* Link is down or autonegotiation is in progress. */
+ 		return NETDEV_TX_BUSY;
+ 	}
+ 
+-	spin_lock_irqsave(&fep->hw_lock, flags);
+ 	/* Fill in a Tx ring entry */
+ 	bdp = fep->cur_tx;
+ 
+@@ -264,7 +263,6 @@ fec_enet_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+ 		 * This should not happen, since ndev->tbusy should be set.
+ 		 */
+ 		printk("%s: tx queue full!.\n", ndev->name);
+-		spin_unlock_irqrestore(&fep->hw_lock, flags);
+ 		return NETDEV_TX_BUSY;
+ 	}
+ 
+@@ -280,13 +278,13 @@ fec_enet_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+ 	 * 4-byte boundaries. Use bounce buffers to copy data
+ 	 * and get it aligned. Ugh.
+ 	 */
++	if (fep->bufdesc_ex)
++		index = (struct bufdesc_ex *)bdp -
++			(struct bufdesc_ex *)fep->tx_bd_base;
++	else
++		index = bdp - fep->tx_bd_base;
++
+ 	if (((unsigned long) bufaddr) & FEC_ALIGNMENT) {
+-		unsigned int index;
+-		if (fep->bufdesc_ex)
+-			index = (struct bufdesc_ex *)bdp -
+-				(struct bufdesc_ex *)fep->tx_bd_base;
+-		else
+-			index = bdp - fep->tx_bd_base;
+ 		memcpy(fep->tx_bounce[index], skb->data, skb->len);
+ 		bufaddr = fep->tx_bounce[index];
+ 	}
+@@ -300,10 +298,7 @@ fec_enet_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+ 		swap_buffer(bufaddr, skb->len);
+ 
+ 	/* Save skb pointer */
+-	fep->tx_skbuff[fep->skb_cur] = skb;
+-
+-	ndev->stats.tx_bytes += skb->len;
+-	fep->skb_cur = (fep->skb_cur+1) & TX_RING_MOD_MASK;
++	fep->tx_skbuff[index] = skb;
+ 
+ 	/* Push the data cache so the CPM does not get stale memory
+ 	 * data.
+@@ -331,26 +326,22 @@ fec_enet_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+ 			ebdp->cbd_esc = BD_ENET_TX_INT;
+ 		}
+ 	}
+-	/* Trigger transmission start */
+-	writel(0, fep->hwp + FEC_X_DES_ACTIVE);
+-
+ 	/* If this was the last BD in the ring, start at the beginning again. */
+ 	if (status & BD_ENET_TX_WRAP)
+ 		bdp = fep->tx_bd_base;
+ 	else
+ 		bdp = fec_enet_get_nextdesc(bdp, fep->bufdesc_ex);
+ 
+-	if (bdp == fep->dirty_tx) {
+-		fep->tx_full = 1;
++	fep->cur_tx = bdp;
++
++	if (fep->cur_tx == fep->dirty_tx)
+ 		netif_stop_queue(ndev);
+-	}
+ 
+-	fep->cur_tx = bdp;
++	/* Trigger transmission start */
++	writel(0, fep->hwp + FEC_X_DES_ACTIVE);
+ 
+ 	skb_tx_timestamp(skb);
+ 
+-	spin_unlock_irqrestore(&fep->hw_lock, flags);
+-
+ 	return NETDEV_TX_OK;
+ }
+ 
+@@ -406,11 +397,8 @@ fec_restart(struct net_device *ndev, int duplex)
+ 		writel((unsigned long)fep->bd_dma + sizeof(struct bufdesc)
+ 			* RX_RING_SIZE,	fep->hwp + FEC_X_DES_START);
+ 
+-	fep->dirty_tx = fep->cur_tx = fep->tx_bd_base;
+ 	fep->cur_rx = fep->rx_bd_base;
+ 
+-	/* Reset SKB transmit buffers. */
+-	fep->skb_cur = fep->skb_dirty = 0;
+ 	for (i = 0; i <= TX_RING_MOD_MASK; i++) {
+ 		if (fep->tx_skbuff[i]) {
+ 			dev_kfree_skb_any(fep->tx_skbuff[i]);
+@@ -566,27 +554,47 @@ fec_timeout(struct net_device *ndev)
+ 	netif_wake_queue(ndev);
+ }
+ 
+-static void
++static int
+ fec_enet_tx(struct net_device *ndev)
+ {
+ 	struct	fec_enet_private *fep;
+ 	struct bufdesc *bdp;
+ 	unsigned short status;
+ 	struct	sk_buff	*skb;
++	int	pkts = 0;
++	int	index = 0;
++
++	if (IS_ERR(ndev))
++		return 0;
+ 
+ 	fep = netdev_priv(ndev);
+-	spin_lock(&fep->hw_lock);
+ 	bdp = fep->dirty_tx;
+ 
++	/* get next bdp of dirty_tx */
++	if (bdp->cbd_sc & BD_ENET_TX_WRAP)
++		bdp = fep->tx_bd_base;
++	else
++		bdp = fec_enet_get_nextdesc(bdp, fep->bufdesc_ex);
++
+ 	while (((status = bdp->cbd_sc) & BD_ENET_TX_READY) == 0) {
+-		if (bdp == fep->cur_tx && fep->tx_full == 0)
++
++		/* current queue is empty */
++		if (bdp == fep->cur_tx)
+ 			break;
++		pkts++;
++
++		if (fep->bufdesc_ex)
++			index = (struct bufdesc_ex *)bdp -
++				(struct bufdesc_ex *)fep->tx_bd_base;
++		else
++			index = bdp - fep->tx_bd_base;
+ 
+ 		dma_unmap_single(&fep->pdev->dev, bdp->cbd_bufaddr,
+ 				FEC_ENET_TX_FRSIZE, DMA_TO_DEVICE);
+ 		bdp->cbd_bufaddr = 0;
+ 
+-		skb = fep->tx_skbuff[fep->skb_dirty];
++		skb = fep->tx_skbuff[index];
++
+ 		/* Check for errors. */
+ 		if (status & (BD_ENET_TX_HB | BD_ENET_TX_LC |
+ 				   BD_ENET_TX_RL | BD_ENET_TX_UN |
+@@ -631,8 +639,9 @@ fec_enet_tx(struct net_device *ndev)
+ 
+ 		/* Free the sk buffer associated with this last transmit */
+ 		dev_kfree_skb_any(skb);
+-		fep->tx_skbuff[fep->skb_dirty] = NULL;
+-		fep->skb_dirty = (fep->skb_dirty + 1) & TX_RING_MOD_MASK;
++		fep->tx_skbuff[index] = NULL;
++
++		fep->dirty_tx = bdp;
+ 
+ 		/* Update pointer to next buffer descriptor to be transmitted */
+ 		if (status & BD_ENET_TX_WRAP)
+@@ -642,14 +651,12 @@ fec_enet_tx(struct net_device *ndev)
+ 
+ 		/* Since we have freed up a buffer, the ring is no longer full
+ 		 */
+-		if (fep->tx_full) {
+-			fep->tx_full = 0;
++		if (fep->dirty_tx != fep->cur_tx) {
+ 			if (netif_queue_stopped(ndev))
+ 				netif_wake_queue(ndev);
+ 		}
+ 	}
+-	fep->dirty_tx = bdp;
+-	spin_unlock(&fep->hw_lock);
++	return pkts;
+ }
+ 
+ 
+@@ -816,7 +823,7 @@ fec_enet_interrupt(int irq, void *dev_id)
+ 		int_events = readl(fep->hwp + FEC_IEVENT);
+ 		writel(int_events, fep->hwp + FEC_IEVENT);
+ 
+-		if (int_events & FEC_ENET_RXF) {
++		if (int_events & (FEC_ENET_RXF | FEC_ENET_TXF)) {
+ 			ret = IRQ_HANDLED;
+ 
+ 			/* Disable the RX interrupt */
+@@ -827,15 +834,6 @@ fec_enet_interrupt(int irq, void *dev_id)
+ 			}
+ 		}
+ 
+-		/* Transmit OK, or non-fatal error. Update the buffer
+-		 * descriptors. FEC handles all errors, we just discover
+-		 * them as part of the transmit process.
+-		 */
+-		if (int_events & FEC_ENET_TXF) {
+-			ret = IRQ_HANDLED;
+-			fec_enet_tx(ndev);
+-		}
+-
+ 		if (int_events & FEC_ENET_MII) {
+ 			ret = IRQ_HANDLED;
+ 			complete(&fep->mdio_done);
+@@ -848,14 +846,18 @@ fec_enet_interrupt(int irq, void *dev_id)
+ static int fec_enet_rx_napi(struct napi_struct *napi, int budget)
+ {
+ 	struct net_device *ndev = napi->dev;
+-	int pkts = fec_enet_rx(ndev, budget);
++	int rx_pkts = fec_enet_rx(ndev, budget);
+ 	struct fec_enet_private *fep = netdev_priv(ndev);
++	int tx_pkts = fec_enet_tx(ndev);
++
++	if (tx_pkts)
++		return budget;
+ 
+-	if (pkts < budget) {
++	if (rx_pkts < budget) {
+ 		napi_complete(napi);
+ 		writel(FEC_DEFAULT_IMASK, fep->hwp + FEC_IMASK);
+ 	}
+-	return pkts;
++	return rx_pkts;
+ }
+ 
+ /* ------------------------------------------------------------------------- */
+@@ -1646,6 +1648,7 @@ static int fec_enet_init(struct net_device *ndev)
+ 
+ 	/* ...and the same for transmit */
+ 	bdp = fep->tx_bd_base;
++	fep->cur_tx = bdp;
+ 	for (i = 0; i < TX_RING_SIZE; i++) {
+ 
+ 		/* Initialize the BD for every fragment in the page. */
+@@ -1657,6 +1660,7 @@ static int fec_enet_init(struct net_device *ndev)
+ 	/* Set the last buffer to wrap */
+ 	bdp = fec_enet_get_prevdesc(bdp, fep->bufdesc_ex);
+ 	bdp->cbd_sc |= BD_SC_WRAP;
++	fep->dirty_tx = bdp;
+ 
+ 	fec_restart(ndev, 0);
+ 
+diff --git a/drivers/net/ethernet/freescale/fec.h b/drivers/net/ethernet/freescale/fec.h
+index 01579b8..c0f63be 100644
+--- a/drivers/net/ethernet/freescale/fec.h
++++ b/drivers/net/ethernet/freescale/fec.h
+@@ -214,8 +214,6 @@ struct fec_enet_private {
+ 	unsigned char *tx_bounce[TX_RING_SIZE];
+ 	struct	sk_buff *tx_skbuff[TX_RING_SIZE];
+ 	struct	sk_buff *rx_skbuff[RX_RING_SIZE];
+-	ushort	skb_cur;
+-	ushort	skb_dirty;
+ 
+ 	/* CPM dual port RAM relative addresses */
+ 	dma_addr_t	bd_dma;
+@@ -227,7 +225,6 @@ struct fec_enet_private {
+ 	/* The ring entries to be free()ed */
+ 	struct bufdesc	*dirty_tx;
+ 
+-	uint	tx_full;
+ 	/* hold while accessing the HW like ringbuffer for tx/rx but not MAC */
+ 	spinlock_t hw_lock;
+ 
+-- 
+1.7.1
