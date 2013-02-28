@@ -1,56 +1,49 @@
 From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Thu, 28 Feb 2013 11:56:59 +0100
-Subject: [PATCH 0/5] chipidea-for-v3.10-v2: USB chipidea: make use of DT
- helpers in chipidea driver improve driver
-Message-ID: <1362049024-11383-1-git-send-email-mkl@pengutronix.de>
+Date: Thu, 28 Feb 2013 11:57:03 +0100
+Subject: [PATCH 4/5] USB chipidea i.MX: introduce dr_mode property
+In-Reply-To: <1362049024-11383-1-git-send-email-mkl@pengutronix.de>
+References: <1362049024-11383-1-git-send-email-mkl@pengutronix.de>
+Message-ID: <1362049024-11383-5-git-send-email-mkl@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Sascha Hauer <s.hauer@pengutronix.de>
 
-this series depends on the series "[PATCH 0/3] otg-for-v3.10-v2: separate phy
-code and add DT helper" (a.k.a. tags/otg-for-v3.10-v2) posted earlier and is
-intended for v3.10. The chipidea driver is converted to make use of the DT
-helper functions.
+The dr_mode devicetree property allows to explicitly specify the
+host/peripheral/otg mode. This is necessary for boards without proper
+ID pin handling.
 
-No changes since v1, just rebased to otg-for-v3.10-v2, in case someone wants to
-pull it.
-
-regards,
-Marc
-
+Reviewed-by: Peter Chen <peter.chen@freescale.com>
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
 ---
+ Documentation/devicetree/bindings/usb/ci13xxx-imx.txt |    1 +
+ drivers/usb/chipidea/ci13xxx_imx.c                    |    1 +
+ 2 files changed, 2 insertions(+)
 
-The following changes since commit f5678b135967ea98256ee5df9a360b5769861d23:
-
-  USB mxs-phy: Register phy with framework (2013-02-28 11:36:45 +0100)
-
-are available in the git repository at:
-
-  git://git.pengutronix.de/git/mkl/linux.git tags/chipidea-for-v3.10-v2
-
-for you to fetch changes up to 11e56207b94d65f92acdee17c795753378c581c6:
-
-  USB chipidea i.MX: use devm_usb_get_phy_by_phandle to get phy (2013-02-28 11:36:48 +0100)
-
-----------------------------------------------------------------
-USB chipidea: make use of DT helpers in chipidea driver
-
-Make use of DT helper functions for handling the dr_mode and phy_type property.
-
-----------------------------------------------------------------
-Michael Grzeschik (2):
-      USB chipidea: ci13xxx-imx: create dynamic platformdata
-      USB chipidea: add PTW and PTS handling
-
-Sascha Hauer (3):
-      USB chipidea: introduce dual role mode pdata flags
-      USB chipidea i.MX: introduce dr_mode property
-      USB chipidea i.MX: use devm_usb_get_phy_by_phandle to get phy
-
- .../devicetree/bindings/usb/ci13xxx-imx.txt        |    6 ++
- drivers/usb/chipidea/bits.h                        |   14 +++-
- drivers/usb/chipidea/ci13xxx_imx.c                 |   67 +++++++++++---------
- drivers/usb/chipidea/core.c                        |   61 ++++++++++++++++--
- include/linux/usb/chipidea.h                       |    3 +-
- 5 files changed, 112 insertions(+), 39 deletions(-)
+diff --git a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+index dd42ccd..493a414 100644
+--- a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
++++ b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+@@ -9,6 +9,7 @@ Recommended properies:
+ - phy_type: the type of the phy connected to the core. Should be one
+   of "utmi", "utmi_wide", "ulpi", "serial" or "hsic". Without this
+   property the PORTSC register won't be touched
++- dr_mode: One of "host", "peripheral" or "otg". Defaults to "otg"
+ 
+ Optional properties:
+ - fsl,usbphy: phandler of usb phy that connects to the only one port
+diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
+index ebc1148..b598bb8 100644
+--- a/drivers/usb/chipidea/ci13xxx_imx.c
++++ b/drivers/usb/chipidea/ci13xxx_imx.c
+@@ -114,6 +114,7 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
+ 		       CI13XXX_DISABLE_STREAMING;
+ 
+ 	pdata->phy_mode = of_usb_get_phy_mode(pdev->dev.of_node);
++	pdata->dr_mode = of_usb_get_dr_mode(pdev->dev.of_node);
+ 
+ 	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
+ 	if (!data) {
+-- 
+1.7.10.4
