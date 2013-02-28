@@ -1,62 +1,77 @@
-From: kyungsik.lee@lge.com (Kyungsik Lee)
-Date: Thu, 28 Feb 2013 14:22:48 +0900
-Subject: [RFC PATCH v2 2/4] lib: Add support for LZ4-compressed kernel
-In-Reply-To: <20130226140051.GX27541@twin.jikos.cz>
-References: <1361859870-15751-1-git-send-email-kyungsik.lee@lge.com>
- <1361859870-15751-3-git-send-email-kyungsik.lee@lge.com>
- <20130226140051.GX27541@twin.jikos.cz>
-Message-ID: <20130228052248.GA15148@Corona>
+From: avinashphilip@ti.com (Philip, Avinash)
+Date: Thu, 28 Feb 2013 06:05:02 +0000
+Subject: [PATCH 04/14] ARM: OMAP2+: Add function for configuring GPMC
+ settings
+In-Reply-To: <1361899842-30303-5-git-send-email-jon-hunter@ti.com>
+References: <1361899842-30303-1-git-send-email-jon-hunter@ti.com>
+ <1361899842-30303-5-git-send-email-jon-hunter@ti.com>
+Message-ID: <518397C60809E147AF5323E0420B992E3EA8F007@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 26, 2013 at 03:00:51PM +0100, David Sterba wrote:
-> On Tue, Feb 26, 2013 at 03:24:28PM +0900, Kyungsik Lee wrote:
-> > +config KERNEL_LZ4
-> > +	bool "LZ4"
-> > +	depends on HAVE_KERNEL_LZ4
-> > +	help
-> > +	  Its compression ratio is worse than LZO. The size of the kernel
-> > +	  is about 8% bigger than LZO. But the decompression speed is
-> > +	  faster than LZO.
-> > +
+On Tue, Feb 26, 2013 at 23:00:31, Hunter, Jon wrote:
+> The GPMC has various different configuration options such as bus-width,
+> synchronous or asychronous mode selection, burst mode options etc.
+> Currently, there is no common function for configuring these options and
+> various devices set these options by either programming the GPMC CONFIG1
+> register directly or by calling gpmc_cs_configure() to set some of the
+> options.
 > 
-> Can you please add a sentence what lz4 actually is before you start
-> comparing it with the current competitor(s)?
-Yes, I will update it.
-
-> > --- /dev/null
-> > +++ b/lib/decompress_unlz4.c
-> > @@ -0,0 +1,190 @@
-> > +#define LZ4_CHUNK_SIZE (8<<20)
+> Add a new function for configuring all of the GPMC options. Having a common
+> function for configuring this options will simplify code and ease the
+> migration to device-tree.
 > 
-> Please use a less cryptic way of representing a value of 8 MB. Also,
-> this is a hardcoded value that must be used on the compressor side. It's
-> an upper limit, so anything below 8MB does not break decompresssion, but
-> this must be somehow checked or saved along in the binary stream. You
-> seem to use the lz4demo.c on the userspace side for compression, but
-> this is not a standard tool nor the output format is well-defined or
-> stabilized.
-Yes, It will be easy to parse and extract the meta information required
-for the kernel decompressor if output format is well-defined and
-standardized.
-
-> For proper use I would like to see a commandline tool similar to
-> gzip/bzip2/lzop that can be packaged and shipped by distros, and the
-> output format defintion.
+> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+> ---
+>  arch/arm/mach-omap2/gpmc.c |   65 ++++++++++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-omap2/gpmc.h |    6 ++++
+>  2 files changed, 71 insertions(+)
 > 
-> Yann has some ideas for the format
-> http://fastcompression.blogspot.cz/2012/04/file-container-format-for-lz4.html
-Actually, I would like to use a packaged tool by distros too.
-lz4demo is what I use for compressing the kernel so far.
-I name it lz4 in the patch.
+> diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+> index 465cac9..fb8dfd2 100644
+> --- a/arch/arm/mach-omap2/gpmc.c
+> +++ b/arch/arm/mach-omap2/gpmc.c
+> @@ -1137,6 +1137,71 @@ int gpmc_calc_timings(struct gpmc_timings *gpmc_t,
+>  	return 0;
+>  }
+>  
+> +int gpmc_cs_program_settings(int cs, struct gpmc_settings *p)
+> +{
+> +	u32 config1;
+> +
+> +	if ((!p->device_width) || (p->device_width > GPMC_DEVWIDTH_16BIT)) {
+> +		pr_err("%s: invalid width %d!", __func__, p->device_width);
+> +		return -EINVAL;
+> +	}
+> +
+> +	/* Address-data multiplexing not supported for NAND devices */
+> +	if (p->device_nand && p->mux_add_data) {
+> +		pr_err("%s: invalid configuration!\n", __func__);
+> +		return -EINVAL;
+> +	}
+> +
+> +	/* Page/burst mode supports lengths of 4, 8 and 16 bytes */
+> +	if (p->burst_read || p->burst_write) {
+> +		switch (p->burst_len) {
+> +		case GPMC_BURST_4:
+> +		case GPMC_BURST_8:
+> +		case GPMC_BURST_16:
+> +			break;
+> +		default:
+> +			pr_err("%s: invalid page/burst-length (%d)\n",
+> +			       __func__, p->burst_len);
+> +			return -EINVAL;
+> +		}
+> +	}
+> +
+> +	if ((p->wait_on_read || p->wait_on_write) &&
+> +	    (p->wait_pin > gpmc_nr_waitpins)) {
+> +		pr_err("%s: invalid wait-pin (%d)\n", __func__, p->wait_pin);
+> +		return -EINVAL;
+> +	}
+> +
+> +	config1 = GPMC_CONFIG1_DEVICESIZE((p->device_width - 1));
 
-> For kernel, the minimum of meta information is total compressed length,
-> total uncompressed length and chunk size. I don't know if the first two
-> aren't stored elsewhere in the generic kernel image headers, but chunk
-> size must be specified.
-Right, Currently the chunk size used in the kernel decompressor is the same
-as defined in lz4demo but it should have been provided as meta
-information.
-
-Thanks,
-Kyungsik
+Can you consider read_modify approach?
+Thanks
+Avinash 
