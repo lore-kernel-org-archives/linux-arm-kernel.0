@@ -1,83 +1,42 @@
-From: jason77.wang@gmail.com (Hui Wang)
-Date: Thu, 28 Feb 2013 15:38:45 +0800
-Subject: i.MX6Quad PMU irq handling
-In-Reply-To: <512EFF43.5010502@de.bosch.com>
-References: <1344620195-22372-1-git-send-email-will.deacon@arm.com>
- <5028C4C9.6020002@gmail.com>
- <20120813093201.GB19113@mudshark.cambridge.arm.com>
- <5029ADDC.10908@gmail.com> <512EFF43.5010502@de.bosch.com>
-Message-ID: <512F0985.306@gmail.com>
+From: pgaikwad@nvidia.com (Prashant Gaikwad)
+Date: Thu, 28 Feb 2013 13:13:00 +0530
+Subject: [PATCH 1/2] ARM: Tegra: Add clock entry for smp_twd clock
+Message-ID: <1362037381-4730-1-git-send-email-pgaikwad@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dirk Behme wrote:
-> Hi Hui,
->
-> On 14.08.2012 03:46, Hui Wang wrote:
->> Will Deacon wrote:
->>> On Mon, Aug 13, 2012 at 10:11:37AM +0100, Hui Wang wrote:
->>>  
->>>> Hi Will Deacon,
->>>>     
->>> Hello,
->>>
->>>  
->>>> For SMP platforms, each CPU core has an independent PMU, and each 
->>>> PMU has a dedicated irq (SPI or PPI). Current perf subsystem 
->>>> framework only supports each PMU to have a dedicated SPI irq, and 
->>>> it will support each PMU to have a PPI irq (i have seen someone has 
->>>> sent out the patches), but there is a situation the subsystem 
->>>> doesn't support yet, the situation is multi PMUs share one same SPI 
->>>> irq, e.g. the i.MX6Quad CPU has 4 cortex-a9 cores, each core has a 
->>>> PMU, all PMU irqs are routed (ORed) to one SPI irq, do you know how 
->>>> to support this situation?
->>>>     
->>> That's what I like to call a braindead, broken system. Seriously, 
->>> CPU PMU
->>> interrupts *can only* be handled on the CPU which raised them -- 
->>> ORing these
->>> things together means ping-ponging the interrupt affinity around 
->>> until we
->>> find the right guy. There's also the fun case where multiple PMUs 
->>> assert
->>> simultaneously and I've even heard about platforms where they OR in the
->>> bloody L2 PMU interrupt as well for good measure!
->>>
->>> If you have to support such a device, take a look at the ux500 code
->>> (db8500_pmu_handler), but please take all of your profiling numbers 
->>> with a
->>> pinch of salt. For a quad-core processor, the numbers will probably 
->>> be even
->>> less accurate.
->>>
->>> Also, please go ahead and inflict sufficient injuries to your 
->>> hardware guys
->>> that they stop this madness!
->>>   
->> Got it, thanks for the information, it is very useful.
->
-> Above you mention the the i.MX6Quad CPU.
->
-> Have you done any work/patches for the i.MX6Quad PMU to work with the 
-> ORed PMU irq?
-Not yet. i implement a pmu_handler similar to db8500_pmu_handler, but it 
-can't work stable on the imx6q. With the increasing number of cpu cores, 
-the situation is worse.
+As DT support for clocks and smp_twd is enabled, add clock entry
+for smp_twd clock to DT.
 
->
-> Have you talked with the Freescale hardware guys "that they stop this 
-> madness"?
-As Shawn said, this issue has been reported to FSL.
+Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
+---
+ arch/arm/boot/dts/tegra20.dtsi |    1 +
+ arch/arm/boot/dts/tegra30.dtsi |    1 +
+ 2 files changed, 2 insertions(+), 0 deletions(-)
 
-
-Regards,
-Hui.
->
-> We are facing some issues using perf top on the i.MX6Quad:
->
-> http://www.spinics.net/lists/arm-kernel/msg227042.html
->
-> Many thanks and best regards
->
-> dirk
->
+diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+index 9a42893..48d00a0 100644
+--- a/arch/arm/boot/dts/tegra20.dtsi
++++ b/arch/arm/boot/dts/tegra20.dtsi
+@@ -118,6 +118,7 @@
+ 		compatible = "arm,cortex-a9-twd-timer";
+ 		reg = <0x50040600 0x20>;
+ 		interrupts = <1 13 0x304>;
++		clocks = <&tegra_car 132>;
+ 	};
+ 
+ 	intc: interrupt-controller {
+diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
+index 767803e..9d87a3f 100644
+--- a/arch/arm/boot/dts/tegra30.dtsi
++++ b/arch/arm/boot/dts/tegra30.dtsi
+@@ -119,6 +119,7 @@
+ 		compatible = "arm,cortex-a9-twd-timer";
+ 		reg = <0x50040600 0x20>;
+ 		interrupts = <1 13 0xf04>;
++		clocks = <&tegra_car 214>;
+ 	};
+ 
+ 	intc: interrupt-controller {
+-- 
+1.7.4.1
