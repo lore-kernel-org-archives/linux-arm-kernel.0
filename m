@@ -1,86 +1,108 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Thu, 28 Feb 2013 14:04:32 +0100
-Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
-In-Reply-To: <CACRpkdabXa8tXNeGRPntvY9cx4XWCa7XaEXHmVREeWN-x793ZA@mail.gmail.com>
-References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
- <1329321854-24490-4-git-send-email-b-cousson@ti.com>
- <CACRpkdabXa8tXNeGRPntvY9cx4XWCa7XaEXHmVREeWN-x793ZA@mail.gmail.com>
-Message-ID: <512F55E0.8050501@ti.com>
+From: apatel@apm.com (Anup Patel)
+Date: Thu, 28 Feb 2013 19:26:16 +0530
+Subject: [PATCH] arm64: add support for uart earlyprintk
+In-Reply-To: <512F40B9.6020105@arm.com>
+References: <1362049268-26822-1-git-send-email-apatel@apm.com>
+ <512F40B9.6020105@arm.com>
+Message-ID: <CAMwBHsZugJ+tv9MH5J+WGpVNtNgJYdP8+pwufdDoDOQshTeALw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Jon who was brave enough to take over the OMAP GPIO  driver
-+ New email address for Kevin since he is no longer at TI :-(.
-- Tarun that left TI but I don't have his new email
+On Thu, Feb 28, 2013 at 5:04 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 28/02/13 11:01, Anup Patel wrote:
+>
+> Hi Anup,
+>
+>> Signed-off-by: Anup Patel <apatel@apm.com>
+>
+> A proper patch description would be nice.
+Oke will do.
 
-Hi Linus,
-
-On 02/28/2013 12:41 AM, Linus Walleij wrote:
-> On Wed, Feb 15, 2012 at 5:04 PM, Benoit Cousson <b-cousson@ti.com> wrote:
-
-Gosh! That's pretty old stuff :-)
-
->> @@ -52,7 +55,8 @@ struct gpio_bank {
->>         struct list_head node;
->>         void __iomem *base;
->>         u16 irq;
->> -       u16 virtual_irq_start;
->> +       int irq_base;
->> +       struct irq_domain *domain;
-> 
-> This seems wrong. IRQ domains are used to avoid keeping track of
-> irq base offsets. I would even say it's the whole point of irq domains.
-
-Well at that time, it was not the only point. We were trying to boot
-with DT, and for that irq_domain was mandatory. At the very same time,
-Grant was cleaning and consolidating the whole irq_domain
-infrastructure, and thus most of the following API were not really
-stabilized or even available.
-
-So, this idea was to avoid any regression while allowing DT boot... And
-obviously a lot of stuff happened since that good old time.
-
->> @@ -669,7 +673,7 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
->>                 if (!isr)
->>                         break;
+>
+>> ---
+>>  arch/arm64/kernel/early_printk.c |   16 ++++++++++++++++
+>>  1 file changed, 16 insertions(+)
 >>
->> -               gpio_irq = bank->virtual_irq_start;
->> +               gpio_irqkhilman at ti.com = bank->irq_base;
->>                 for (; isr != 0; isr >>= 1, gpio_irq++) {
->>                         gpio_index = GPIO_INDEX(bank, irq_to_gpio(gpio_irq));
+>> diff --git a/arch/arm64/kernel/early_printk.c b/arch/arm64/kernel/early_printk.c
+>> index 7e320a2..62953ed 100644
+>> --- a/arch/arm64/kernel/early_printk.c
+>> +++ b/arch/arm64/kernel/early_printk.c
+>> @@ -29,6 +29,21 @@ static void __iomem *early_base;
+>>  static void (*printch)(char ch);
 >>
-> 
-> Use irq_find_mapping(irqdomain, hwirq) in this function.
-> 
-> 
->> @@ -915,7 +919,7 @@ static int gpio_2irq(struct gpio_chip *chip, unsigned offset)
->>         struct gpio_bank *bank;
->>
->>         bank = container_of(chip, struct gpio_bank, chip);
->> -       return bank->virtual_irq_start + offset;
->> +       return bank->irq_base + offset;
-> 
-> Use irq_create_mapping() in this function.
-> 
->> +       bank->irq_base = irq_alloc_descs(-1, 0, bank->width, 0);
->> +       if (bank->irq_base < 0) {
->> +               dev_err(dev, "Couldn't allocate IRQ numbers\n");
->> +               return -ENODEV;
->> +       }
+>>  /*
+>> + * UART (8250/16550) single character TX.
+>> + */
+>> +static void uart_printch(char ch)
+>> +{
+>> +#define UART_LSR     0x14
+>> +#define UART_TX      0x0
+>
+> Please use the constants defined in include/uapi/linux/serial_reg.h,
+> together with the proper shifts.
+
+Yes, I am fine with reusing constants from serial_reg.h.
+Its just that I did not want to include entire header for 2 register accesses.
+
+>
 >> +
->> +       bank->domain = irq_domain_add_legacy(node, bank->width, bank->irq_base,
->> +                                            0, &irq_domain_simple_ops, NULL);
-> 
-> Use irq_domain_add_simple() and the descs will be allocated for
-> you as part of the domain creation, when using a pre-fixed base.
+>> +     while (!(readl_relaxed(early_base + UART_LSR) & 0x20))
+>> +             ;
+>
+> You may want to test both UART_LSR_TEMT and UART_LSR_THRE here.
 
-Funny, that API was removed while I was writing this patch, and is now
-back in town...
+We only need to check for empty space in Tx FIFO or Tx Holding Register hence
+a check on UART_LSR_THRE bit would suffice.
+(For more info,
+http://en.wikibooks.org/wiki/Serial_Programming/8250_UART_Programming)
 
-> If you fix this I suspect the device tree discussion also will fix
-> itself :-)
+>
+>> +     writeb_relaxed(ch, early_base + UART_TX);
+>> +     while (!(readl_relaxed(early_base + UART_LSR) & 0x20))
+>> +             ;
+>
+> Why do you have to wait again here? It should be enough to do in only
+> once when entering the function.
 
-Mmm, I hope it is the case, but I'm not sure it will be that easy :-)
+Yes, the second loop seems to be redundant.
+Its there because I tried to implement uart_printch() similar to
+pl011_printch().
 
-Thanks,
-Benoit
+>
+>> +}
+>> +
+>> +/*
+>>   * PL011 single character TX.
+>>   */
+>>  static void pl011_printch(char ch)
+>> @@ -47,6 +62,7 @@ struct earlycon_match {
+>>
+>>  static const struct earlycon_match earlycon_match[] __initconst = {
+>>       { .name = "pl011", .printch = pl011_printch, },
+>> +     { .name = "uart", .printch = uart_printch, },
+>
+> "uart" is way too generic. pl011 is an UART too, and I suspect most of
+> the backends that are going to be added here over time will be UARTs.
+>
+> "uart8250" would be a possibility (and actually consistent with the rest
+> of the kernel, see drivers/tty/serial/8250/8250_early.c.
+
+Actually, I was thinking of having earlyprintk=8250. What say ?
+
+>
+> Cheers,
+>
+>         M.
+> --
+> Jazz is not dead. It just smells funny...
+>
+
+Regards,
+Anup
+CONFIDENTIALITY NOTICE: This e-mail message, including any attachments, 
+is for the sole use of the intended recipient(s) and contains information
+that is confidential and proprietary to Applied Micro Circuits Corporation or its subsidiaries. 
+It is to be used solely for the purpose of furthering the parties' business relationship. 
+All unauthorized review, use, disclosure or distribution is prohibited. 
+If you are not the intended recipient, please contact the sender by reply e-mail 
+and destroy all copies of the original message.
