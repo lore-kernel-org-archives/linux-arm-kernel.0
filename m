@@ -1,501 +1,179 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Thu, 28 Feb 2013 15:19:21 +0800
-Subject: [PATCH 2/7] clk: hs: add clock support
+Date: Thu, 28 Feb 2013 15:19:22 +0800
+Subject: [PATCH 3/7] ARM: hs: add board support with device tree
 In-Reply-To: <1362035966-17628-1-git-send-email-haojian.zhuang@linaro.org>
 References: <1362035966-17628-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1362035966-17628-2-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1362035966-17628-3-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add clock support with device tree on Hisilicon SoC.
+Add board support with device tree for Hisilicon Hi36xx/Hi37xx platform.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 ---
- drivers/clk/Makefile |    1 +
- drivers/clk/clk-hs.c |  463 ++++++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 464 insertions(+)
- create mode 100644 drivers/clk/clk-hs.c
+ arch/arm/Kconfig          |    2 ++
+ arch/arm/Makefile         |    1 +
+ arch/arm/mach-hs/Kconfig  |   23 +++++++++++++
+ arch/arm/mach-hs/Makefile |    5 +++
+ arch/arm/mach-hs/hs-dt.c  |   83 +++++++++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 114 insertions(+)
+ create mode 100644 arch/arm/mach-hs/Kconfig
+ create mode 100644 arch/arm/mach-hs/Makefile
+ create mode 100644 arch/arm/mach-hs/hs-dt.c
 
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index 300d477..2d3a08d 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -12,6 +12,7 @@ obj-$(CONFIG_COMMON_CLK)	+= clk-mux.o
- obj-$(CONFIG_ARCH_BCM2835)	+= clk-bcm2835.o
- obj-$(CONFIG_ARCH_NOMADIK)	+= clk-nomadik.o
- obj-$(CONFIG_ARCH_HIGHBANK)	+= clk-highbank.o
-+obj-$(CONFIG_ARCH_HS)		+= clk-hs.o
- obj-$(CONFIG_ARCH_MXS)		+= mxs/
- obj-$(CONFIG_ARCH_SOCFPGA)	+= socfpga/
- obj-$(CONFIG_PLAT_SPEAR)	+= spear/
-diff --git a/drivers/clk/clk-hs.c b/drivers/clk/clk-hs.c
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index dedf02b..dfe70aa 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1055,6 +1055,8 @@ source "arch/arm/mach-h720x/Kconfig"
+ 
+ source "arch/arm/mach-highbank/Kconfig"
+ 
++source "arch/arm/mach-hs/Kconfig"
++
+ source "arch/arm/mach-integrator/Kconfig"
+ 
+ source "arch/arm/mach-iop32x/Kconfig"
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index ee4605f..08a913b 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -149,6 +149,7 @@ machine-$(CONFIG_ARCH_EP93XX)		+= ep93xx
+ machine-$(CONFIG_ARCH_GEMINI)		+= gemini
+ machine-$(CONFIG_ARCH_H720X)		+= h720x
+ machine-$(CONFIG_ARCH_HIGHBANK)		+= highbank
++machine-$(CONFIG_ARCH_HS)		+= hs
+ machine-$(CONFIG_ARCH_INTEGRATOR)	+= integrator
+ machine-$(CONFIG_ARCH_IOP13XX)		+= iop13xx
+ machine-$(CONFIG_ARCH_IOP32X)		+= iop32x
+diff --git a/arch/arm/mach-hs/Kconfig b/arch/arm/mach-hs/Kconfig
 new file mode 100644
-index 0000000..e802bf4
+index 0000000..491c6da
 --- /dev/null
-+++ b/drivers/clk/clk-hs.c
-@@ -0,0 +1,463 @@
++++ b/arch/arm/mach-hs/Kconfig
+@@ -0,0 +1,23 @@
++config ARCH_HS
++	bool "Hisilicon Hi36xx/Hi37xx family" if ARCH_MULTI_V7
++	select ARM_AMBA
++	select ARM_GIC
++	select CACHE_L2X0
++	select CACHE_PL310
++	select PINCTRL
++	select PINCTRL_SINGLE
++	select SERIAL_AMBA_PL011
++	select SERIAL_AMBA_PL011_CONSOLE
++	help
++	  Support for Hisilicon Hi36xx/Hi37xx processor family
++
++if ARCH_HS
++
++config MACH_HS_DT
++	bool "Hisilicon Development Board"
++	default y
++	help
++	  Say 'Y' here if you want to support the Hisilicon Development
++	  Board. 
++
++endif
+diff --git a/arch/arm/mach-hs/Makefile b/arch/arm/mach-hs/Makefile
+new file mode 100644
+index 0000000..d79ecb5
+--- /dev/null
++++ b/arch/arm/mach-hs/Makefile
+@@ -0,0 +1,5 @@
++#
++# Makefile for Hisilicon Hi36xx/Hi37xx processors line
++#
++
++obj-$(CONFIG_MACH_HS_DT)	+= hs-dt.o
+diff --git a/arch/arm/mach-hs/hs-dt.c b/arch/arm/mach-hs/hs-dt.c
+new file mode 100644
+index 0000000..813ebb0
+--- /dev/null
++++ b/arch/arm/mach-hs/hs-dt.c
+@@ -0,0 +1,83 @@
 +/*
-+ * Hisilicon clock driver
++ * (Hisilicon's Hi36xx/Hi37xx SoC based) flattened device tree enabled machine
 + *
-+ * Copyright (c) 2012-2013 Hisilicon Limited.
-+ * Copyright (c) 2012-2013 Linaro Limited.
++ * Copyright (c) 2012-2013 Hisilicon Ltd.
++ * Copyright (c) 2012-2013 Linaro Ltd.
 + *
 + * Author: Haojian Zhuang <haojian.zhuang@linaro.org>
-+ *	   Xin Li <li.xin@linaro.org>
 + *
 + * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along
-+ * with this program; if not, write to the Free Software Foundation, Inc.,
-+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-+ *
-+ */
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
 +
-+#include <linux/kernel.h>
-+#include <linux/clk-provider.h>
-+#include <linux/clk-private.h>
-+#include <linux/clkdev.h>
-+#include <linux/delay.h>
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_device.h>
-+#include <linux/slab.h>
 +#include <linux/clk.h>
++#include <linux/clkdev.h>
++#include <linux/irqchip.h>
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
++#include <linux/of_platform.h>
 +
-+#define HI3620_DISABLE_OFF		0x4
-+#define HI3620_STATUS_OFF		0x8
++#include <asm/hardware/arm_timer.h>
++#include <asm/hardware/timer-sp.h>
++#include <asm/mach/arch.h>
++#include <asm/mach/map.h>
++#include <asm/mach/time.h>
 +
-+struct hi3620_periclk {
-+	struct clk_hw	hw;
-+	void __iomem	*enable;	/* enable register */
-+	void __iomem	*reset;		/* reset register */
-+	u32		ebits;		/* bits in enable/disable register */
-+	u32		rbits;		/* bits in reset/unreset register */
-+	spinlock_t	*lock;
++static struct of_device_id hs_timer_match[] __initdata = {
++	{ .compatible = "arm,sp804", },
++	{}
 +};
 +
-+struct hi3620_muxclk {
-+	struct clk_hw	hw;
-+	void __iomem	*reg;		/* mux register */
-+	u8		shift;
-+	u8		width;
-+	u32		ebits;		/* enable bits in mux register */
-+	u32		mbits;		/* mask bits in mux register */
-+	spinlock_t	*lock;
++static struct clk_lookup sp804_lookup = {
++	.dev_id	= "sp804",
++	.clk	= NULL,
 +};
 +
-+struct hs_clk {
-+	void __iomem	*pmctrl;
-+	void __iomem	*sctrl;
-+	spinlock_t	lock;
-+};
-+
-+static struct hs_clk hs_clk;
-+
-+static int hi3620_clkgate_prepare(struct clk_hw *hw)
++extern void __init hs_init_clocks(void);
++static void __init hs_timer_init(void)
 +{
-+	struct hi3620_periclk *pclk;
-+	unsigned long flags = 0;
++	struct device_node *node = NULL;
++	void __iomem *base;
++	int irq;
 +
-+	pclk = container_of(hw, struct hi3620_periclk, hw);
++	hs_init_clocks();
 +
-+	if (pclk->lock)
-+		spin_lock_irqsave(pclk->lock, flags);
-+	writel_relaxed(pclk->ebits, pclk->enable + HI3620_DISABLE_OFF);
-+	writel_relaxed(pclk->rbits, pclk->reset + HI3620_DISABLE_OFF);
-+	readl_relaxed(pclk->reset + HI3620_STATUS_OFF);
-+	if (pclk->lock)
-+		spin_unlock_irqrestore(pclk->lock, flags);
-+	return 0;
-+}
-+
-+static int hi3620_clkgate_enable(struct clk_hw *hw)
-+{
-+	struct hi3620_periclk *pclk;
-+	unsigned long flags = 0;
-+
-+	pclk = container_of(hw, struct hi3620_periclk, hw);
-+	if (pclk->lock)
-+		spin_lock_irqsave(pclk->lock, flags);
-+	writel_relaxed(pclk->ebits, pclk->enable);
-+	readl_relaxed(pclk->enable + HI3620_STATUS_OFF);
-+	if (pclk->lock)
-+		spin_unlock_irqrestore(pclk->lock, flags);
-+	return 0;
-+}
-+
-+static void hi3620_clkgate_disable(struct clk_hw *hw)
-+{
-+	struct hi3620_periclk *pclk;
-+	unsigned long flags = 0;
-+
-+	pclk = container_of(hw, struct hi3620_periclk, hw);
-+	if (pclk->lock)
-+		spin_lock_irqsave(pclk->lock, flags);
-+	writel_relaxed(pclk->ebits, pclk->enable + HI3620_DISABLE_OFF);
-+	readl_relaxed(pclk->enable + HI3620_STATUS_OFF);
-+	if (pclk->lock)
-+		spin_unlock_irqrestore(pclk->lock, flags);
-+}
-+
-+static struct clk_ops hi3620_clkgate_ops = {
-+	.prepare	= hi3620_clkgate_prepare,
-+	.enable		= hi3620_clkgate_enable,
-+	.disable	= hi3620_clkgate_disable,
-+};
-+
-+static void __init hi3620_clkgate_setup(struct device_node *np)
-+{
-+	struct hi3620_periclk *pclk;
-+	struct clk_init_data *init;
-+	struct clk *clk;
-+	const char *clk_name, *name, **parent_names;
-+	u32 rdata[2], gdata[2];
-+
-+	if (!hs_clk.sctrl)
++	node = of_find_matching_node(NULL, hs_timer_match);
++	WARN_ON(!node);
++	if (!node) {
++		pr_err("Failed to find sp804 timer\n");
 +		return;
-+
-+	if (of_property_read_string(np, "clock-output-names", &clk_name))
-+		return;
-+	if (of_property_read_u32_array(np, "hisilicon,hi3620-clkreset",
-+				       &rdata[0], 2))
-+		return;
-+	if (of_property_read_u32_array(np, "hisilicon,hi3620-clkgate",
-+				       &gdata[0], 2))
-+		return;
-+	if (rdata[1] >= 32 || gdata[1] >= 32)
-+		return;
-+
-+	/* gate only has the fixed parent */
-+	parent_names = kzalloc(sizeof(char *), GFP_KERNEL);
-+	if (!parent_names)
-+		return;
-+	parent_names[0] = of_clk_get_parent_name(np, 0);
-+
-+	pclk = kzalloc(sizeof(*pclk), GFP_KERNEL);
-+	if (!pclk)
-+		goto err;
-+
-+	init = kzalloc(sizeof(*init), GFP_KERNEL);
-+	if (!init)
-+		goto err_pclk;
-+	init->name = kstrdup(clk_name, GFP_KERNEL);
-+	init->ops = &hi3620_clkgate_ops;
-+	init->flags = CLK_SET_RATE_PARENT;
-+	init->parent_names = parent_names;
-+	init->num_parents = 1;
-+
-+	pclk->reset = hs_clk.sctrl + rdata[0];
-+	pclk->rbits = 1 << rdata[1];
-+	pclk->enable = hs_clk.sctrl + gdata[0];
-+	pclk->ebits = 1 << gdata[1];
-+	pclk->lock = &hs_clk.lock;
-+	pclk->hw.init = init;
-+
-+	clk = clk_register(NULL, &pclk->hw);
-+	if (IS_ERR(clk))
-+		goto err_init;
-+	if (!of_property_read_string(np, "clock-names", &name))
-+		clk_register_clkdev(clk, name, NULL);
-+	of_clk_add_provider(np, of_clk_src_simple_get, clk);
-+	return;
-+err_init:
-+	kfree(init);
-+err_pclk:
-+	kfree(pclk);
-+err:
-+	kfree(parent_names);
-+}
-+
-+static u8 hi3620_clk_get_parent(struct clk_hw *hw)
-+{
-+	struct hi3620_muxclk *mclk;
-+	u32 data;
-+	unsigned long flags = 0;
-+
-+	mclk = container_of(hw, struct hi3620_muxclk, hw);
-+
-+	if (mclk->lock)
-+		spin_lock_irqsave(mclk->lock, flags);
-+
-+	data = readl_relaxed(mclk->reg) >> mclk->shift;
-+	data &= (1 << mclk->width) - 1;
-+
-+	if (mclk->lock)
-+		spin_unlock_irqrestore(mclk->lock, flags);
-+
-+	if (data >= __clk_get_num_parents(hw->clk))
-+		return -EINVAL;
-+
-+	return (u8)data;
-+}
-+
-+static int hi3620_clk_set_parent(struct clk_hw *hw, u8 index)
-+{
-+	struct hi3620_muxclk *mclk;
-+	u32 data;
-+	unsigned long flags = 0;
-+
-+	mclk = container_of(hw, struct hi3620_muxclk, hw);
-+
-+	if (mclk->lock)
-+		spin_lock_irqsave(mclk->lock, flags);
-+
-+	data = readl_relaxed(mclk->reg);
-+	data &= ~(((1 << mclk->width) - 1) << mclk->shift);
-+	data |= index << mclk->shift;
-+	writel_relaxed(data, mclk->reg);
-+	/* set mask enable bits */
-+	data |= mclk->mbits;
-+	writel_relaxed(data, mclk->reg);
-+
-+	if (mclk->lock)
-+		spin_unlock_irqrestore(mclk->lock, flags);
-+
-+	return 0;
-+}
-+
-+static struct clk_ops hi3620_clkmux_ops = {
-+	.get_parent	= hi3620_clk_get_parent,
-+	.set_parent	= hi3620_clk_set_parent,
-+};
-+
-+static void __init hi3620_clkmux_setup(struct device_node *np)
-+{
-+	struct hi3620_muxclk *mclk;
-+	struct clk_init_data *init;
-+	struct clk *clk;
-+	const char *clk_name, **parent_names;
-+	u32 rdata[2];
-+	u8 num_parents;
-+	int i;
-+
-+	if (!hs_clk.sctrl)
-+		return;
-+
-+	if (of_property_read_string(np, "clock-output-names", &clk_name))
-+		return;
-+	if (of_property_read_u32_array(np, "hisilicon,hi3620-clkmux",
-+				       &rdata[0], 2))
-+		return;
-+	/* get the count of items in mux */
-+	for (i = 0; ; i++) {
-+		/* parent's #clock-cells property is always 0 */
-+		if (!of_parse_phandle(np, "clocks", i))
-+			break;
 +	}
-+	parent_names = kzalloc(sizeof(char *) * i, GFP_KERNEL);
-+	if (!parent_names)
-+		return;
++	base = of_iomap(node, 0);
++	WARN_ON(!base);
 +
-+	for (num_parents = i, i = 0; i < num_parents; i++)
-+		parent_names[i] = of_clk_get_parent_name(np, i);
++	/* timer0 is used as clock event, and timer1 is clock source. */
++	irq = irq_of_parse_and_map(node, 0);
++	WARN_ON(!irq);
 +
-+	mclk = kzalloc(sizeof(*mclk), GFP_KERNEL);
-+	if (!mclk)
-+		goto err;
-+	init = kzalloc(sizeof(*init), GFP_KERNEL);
-+	if (!init)
-+		goto err_init;
-+	init->name = kstrdup(clk_name, GFP_KERNEL);
-+	init->ops = &hi3620_clkmux_ops;
-+	init->flags = CLK_SET_RATE_PARENT;
-+	init->parent_names = parent_names;
-+	init->num_parents = num_parents;
++	sp804_lookup.clk = of_clk_get(node, 0);
++	clkdev_add(&sp804_lookup);
 +
-+	mclk->reg = hs_clk.sctrl + rdata[0];
-+	/* enable_mask bits are in higher 16bits */
-+	mclk->mbits = rdata[1] << 16;
-+	mclk->shift = ffs(rdata[1]) - 1;
-+	mclk->width = fls(rdata[1]) - ffs(rdata[1]) + 1;
-+	mclk->lock = &hs_clk.lock;
-+	mclk->hw.init = init;
-+
-+	clk = clk_register(NULL, &mclk->hw);
-+	if (IS_ERR(clk))
-+		goto err_clk;
-+	of_clk_add_provider(np, of_clk_src_simple_get, clk);
-+
-+	return;
-+err_clk:
-+	kfree(init);
-+err_init:
-+	kfree(mclk);
-+err:
-+	kfree(parent_names);
++	sp804_clocksource_and_sched_clock_init(base + TIMER_2_BASE, "timer1");
++	sp804_clockevents_init(base, irq, "timer0");
 +}
 +
-+static void __init hs_clkgate_setup(struct device_node *np)
++static void __init hs_init(void)
 +{
-+	struct clk *clk;
-+	const char *clk_name, **parent_names, *name;
-+	unsigned long flags = 0;
-+	u32 data[2];
-+
-+	if (!hs_clk.sctrl)
-+		return;
-+	if (of_property_read_string(np, "clock-output-names", &clk_name))
-+		return;
-+	if (of_property_read_u32_array(np, "hisilicon,clkgate",
-+				       &data[0], 2))
-+		return;
-+	if (of_property_read_bool(np, "hisilicon,clkgate-inverted"))
-+		flags = CLK_GATE_SET_TO_DISABLE;
-+	/* gate only has the fixed parent */
-+	parent_names = kzalloc(sizeof(char *), GFP_KERNEL);
-+	if (!parent_names)
-+		return;
-+	parent_names[0] = of_clk_get_parent_name(np, 0);
-+
-+	clk = clk_register_gate(NULL, clk_name, parent_names[0], CLK_IS_BASIC,
-+				hs_clk.sctrl + data[0], (u8)data[1], flags,
-+				&hs_clk.lock);
-+	if (IS_ERR(clk))
-+		goto err;
-+	if (!of_property_read_string(np, "clock-names", &name))
-+		clk_register_clkdev(clk, name, NULL);
-+	of_clk_add_provider(np, of_clk_src_simple_get, clk);
-+	return;
-+err:
-+	kfree(parent_names);
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
 +}
 +
-+void __init hs_fixed_factor_clk_setup(struct device_node *np)
-+{
-+	struct clk *clk;
-+	const char *clk_name, **parent_names;
-+	u32 data[2];
-+
-+	if (of_property_read_string(np, "clock-output-names", &clk_name))
-+		return;
-+	if (of_property_read_u32_array(np, "hisilicon,fixed-factor",
-+				       data, 2))
-+		return ;
-+	/* gate only has the fixed parent */
-+	parent_names = kzalloc(sizeof(char *), GFP_KERNEL);
-+	if (!parent_names)
-+		return;
-+	parent_names[0] = of_clk_get_parent_name(np, 0);
-+
-+	clk = clk_register_fixed_factor(NULL, clk_name, parent_names[0],
-+					CLK_IS_BASIC, data[0], data[1]);
-+	if (IS_ERR(clk))
-+		goto err;
-+	of_clk_add_provider(np, of_clk_src_simple_get, clk);
-+	return;
-+err:
-+	kfree(parent_names);
-+}
-+
-+void __init hs_divider_clk_setup(struct device_node *np)
-+{
-+	struct clk *clk;
-+	const char *clk_name, **parent_names;
-+	struct clk_div_table *table;
-+	u8 shift, width;
-+	unsigned int table_num;
-+	int i;
-+	u32 data[2];
-+	const char *propname = "hisilicon,clkdiv-table";
-+	const char *cellname = "#hisilicon,clkdiv-table-cells";
-+	struct of_phandle_args div_table;
-+
-+	if (of_property_read_string(np, "clock-output-names", &clk_name))
-+		return;
-+	if (of_property_read_u32_array(np, "hisilicon,clkdiv",
-+				       &data[0], 2))
-+		return;
-+
-+	/*process the div_table*/
-+	for (i = 0; ; i++) {
-+		if (of_parse_phandle_with_args(np, propname, cellname,
-+					       i, &div_table))
-+			break;
-+	}
-+
-+	/*table ends with <0, 0>, so plus one to table_num*/
-+	table_num = i + 1;
-+
-+	table = kzalloc(sizeof(struct clk_div_table) * table_num, GFP_KERNEL);
-+	if (!table)
-+		return ;
-+
-+	for (i = 0; ; i++) {
-+		if (of_parse_phandle_with_args(np, propname, cellname,
-+					       i, &div_table))
-+			break;
-+
-+		table[i].val = div_table.args[0];
-+		table[i].div = div_table.args[1];
-+	}
-+
-+	shift = ffs(data[1]) - 1;
-+	width = fls(data[1]) - ffs(data[1]) + 1;
-+
-+	/* gate only has the fixed parent */
-+	parent_names = kzalloc(sizeof(char *), GFP_KERNEL);
-+	if (!parent_names)
-+		goto err;
-+	parent_names[0] = of_clk_get_parent_name(np, 0);
-+
-+	clk = clk_register_divider_table(NULL, clk_name, parent_names[0],
-+					 CLK_IS_BASIC, hs_clk.sctrl + data[0],
-+					 shift, width, 0,
-+					 table, &hs_clk.lock);
-+	if (IS_ERR(clk))
-+		goto err_par;
-+	of_clk_add_provider(np, of_clk_src_simple_get, clk);
-+	return;
-+err_par:
-+	kfree(parent_names);
-+err:
-+	kfree(table);
-+}
-+
-+static const __initconst struct of_device_id hs_clk_match[] = {
-+	{
-+		.compatible = "fixed-clock",
-+		.data = of_fixed_clk_setup,
-+	}, {
-+		.compatible = "hisilicon,hi3620-clk-mux",
-+		.data = hi3620_clkmux_setup,
-+	}, {
-+		.compatible = "hisilicon,hi3620-clk-gate",
-+		.data = hi3620_clkgate_setup,
-+	}, {
-+		.compatible = "hisilicon,clk-gate",
-+		.data = hs_clkgate_setup,
-+	}, {
-+		.compatible = "hisilicon,clk-div-table",
-+		.data = hs_divider_clk_setup,
-+	}, {
-+		.compatible = "hisilicon,clk-fixed-factor",
-+		.data = hs_fixed_factor_clk_setup,
-+	},
++static const char *hs_compat[] __initdata = {
++	"hisilicon,hi3620-hi4511",
++	NULL,
 +};
 +
-+void __init hs_init_clocks(void)
-+{
-+	struct device_node *node;
-+
-+	/*map pmctrl registers*/
-+	node = of_find_compatible_node(NULL, NULL, "hisilicon,pmctrl");
-+	hs_clk.pmctrl = of_iomap(node, 0);
-+	WARN_ON(!hs_clk.pmctrl);
-+
-+	node = of_find_compatible_node(NULL, NULL, "hisilicon,sctrl");
-+	hs_clk.sctrl = of_iomap(node, 0);
-+
-+	of_clk_init(hs_clk_match);
-+}
++DT_MACHINE_START(HS_DT, "Hisilicon Hi36xx/Hi37xx (Flattened Device Tree)")
++	/* Maintainer: Haojian Zhuang <haojian.zhuang@linaro.org> */
++	.map_io		= debug_ll_io_init,
++	.init_irq	= irqchip_init,
++	.init_time	= hs_timer_init,
++	.init_machine	= hs_init,
++	.dt_compat	= hs_compat,
++MACHINE_END
 -- 
 1.7.10.4
