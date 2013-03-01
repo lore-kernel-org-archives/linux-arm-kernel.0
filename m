@@ -1,13 +1,13 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 01 Mar 2013 10:54:55 +0100
+From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
+Date: Fri, 01 Mar 2013 19:12:29 +0900
 Subject: [PATCH] arm: mvebu: Reduce reg-io-width with UARTs
 In-Reply-To: <1362126969-32277-1-git-send-email-heikki.krogerus@linux.intel.com>
 References: <1362126969-32277-1-git-send-email-heikki.krogerus@linux.intel.com>
-Message-ID: <51307AEF.7090608@free-electrons.com>
+Message-ID: <51307F0D.6070108@hitachi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/01/2013 09:36 AM, Heikki Krogerus wrote:
+(2013/03/01 17:36), Heikki Krogerus wrote:
 > Setting the reg-io-width to 1 byte represents more accurate
 > description of the HW.
 > 
@@ -18,24 +18,19 @@ On 03/01/2013 09:36 AM, Heikki Krogerus wrote:
 > 32-bit value as the reg-io-width is set to 4-bytes. The
 > retuned value seems to contain bogus data for bits 31:8,
 > causing the issue.
-
-I have tested this patch on the Armada XP based board
-DB-MV784MP-GP, and it fixed the issue. I had few doubts
-on the fact it worked, but with this test you can add my:
-
-Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-and also my
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-as co-maintainer of the mvebu subsystem.
-
-Thanks for your patch.
-
 > 
 > Signed-off-by: Heikki Krogerus <heikki.krogerus@linux.intel.com>
 > Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
 > Cc: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
+
+I've tested this patch on Armada-XP based OpenBlocks AX3/4
+and fixed the issue.
+
+Tested-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
+
+Thank you!
+
+
 > ---
 >  arch/arm/boot/dts/armada-370-xp.dtsi |    4 ++--
 >  arch/arm/boot/dts/armada-xp.dtsi     |    4 ++--
@@ -89,7 +84,7 @@ Thanks for your patch.
 
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Masami HIRAMATSU
+IT Management Research Dept. Linux Technology Center
+Hitachi, Ltd., Yokohama Research Laboratory
+E-mail: masami.hiramatsu.pt at hitachi.com
