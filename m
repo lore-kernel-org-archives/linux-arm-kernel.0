@@ -1,263 +1,166 @@
-From: laijs@cn.fujitsu.com (Lai Jiangshan)
-Date: Sat, 02 Mar 2013 01:44:02 +0800
-Subject: [PATCH] lglock: add read-preference local-global rwlock
-In-Reply-To: <512E7879.20109@linux.vnet.ibm.com>
-References: <20130218123714.26245.61816.stgit@srivatsabhat.in.ibm.com>
- <20130218123856.26245.46705.stgit@srivatsabhat.in.ibm.com>
- <CANN689F9S7c1M8+cEpz3tsxGF34+NTRBLvxgPUOtbvav5u+RRA@mail.gmail.com>
- <5122551E.1080703@linux.vnet.ibm.com>	<51226B46.9080707@linux.vnet.ibm.com>
- <CANN689FSxOz+0Cu7EG_yKD8ZE1OpT4kyT+ybLfXSqaifodJRpw@mail.gmail.com>
- <51226F91.7000108@linux.vnet.ibm.com>
- <CACvQF53bdh4_BxF0y1fnTVR+T2OmRc0jmWQYftsvx92-fg-Lug@mail.gmail.com>
- <512BBAD8.8010006@linux.vnet.ibm.com>
- <CACvQF51jCxk5jUqmhD=QBBtUsBkQWZzakacrKO4Gsk=w61rNwQ@mail.gmail.com>
- <512C7A38.8060906@linux.vnet.ibm.com>
- <CACvQF51RvhM8XNqu3-1OTQ=cZUZ=pAX+_zx0a29+W67N1X+BgQ@mail.gmail.com>
- <512CC509.1050000@linux.vnet.ibm.com>
- <CACvQF50UgiqPpDk3HCmV86zKSf6tPjqr0bZowfPEOJs0g0r0MQ@mail.gmail.com>
- <512D0D67.9010609@linux.vnet.ibm.com>
- <CACvQF53ph2ixdM-otzetjM5cR+2kcZj6sckOp3TnzzA_x-EZ8w@mail.gmail.com>
- <512E7879.20109@linux.vnet.ibm.com>
-Message-ID: <5130E8E2.50206@cn.fujitsu.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 1 Mar 2013 11:43:00 -0600
+Subject: [PATCH 03/15] ARM: OMAP4+: PM: Consolidate and use OMAP4 PM code
+ for OMAP5
+In-Reply-To: <1362139864-9233-4-git-send-email-santosh.shilimkar@ti.com>
+References: <1362139864-9233-1-git-send-email-santosh.shilimkar@ti.com>
+ <1362139864-9233-4-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20130301174300.GA22220@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From c63f2be9a4cf7106a521dda169a0e14f8e4f7e3b Mon Sep 17 00:00:00 2001
-From: Lai Jiangshan <laijs@cn.fujitsu.com>
-Date: Mon, 25 Feb 2013 23:14:27 +0800
-Subject: [PATCH] lglock: add read-preference local-global rwlock
+On 17:40-20130301, Santosh Shilimkar wrote:
+> diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm_omap4plus.c
+> similarity index 74%
+> rename from arch/arm/mach-omap2/pm44xx.c
+> rename to arch/arm/mach-omap2/pm_omap4plus.c
+> index 1d03110..95d2712 100644
+> --- a/arch/arm/mach-omap2/pm44xx.c
+> +++ b/arch/arm/mach-omap2/pm_omap4plus.c
+> @@ -1,7 +1,7 @@
+>  /*
+> - * OMAP4 Power Management Routines
+> + * OMAP4PLUS Power Management Routines
+>   *
+> - * Copyright (C) 2010-2011 Texas Instruments, Inc.
+> + * Copyright (C) 2010-2013 Texas Instruments, Inc.
+>   * Rajendra Nayak <rnayak@ti.com>
+>   * Santosh Shilimkar <santosh.shilimkar@ti.com>
+>   *
+> @@ -125,55 +125,77 @@ static void omap_default_idle(void)
+>  }
+>  
+>  /**
+> - * omap4_pm_init - Init routine for OMAP4 PM
+> + * omap4_init_static_deps - Init static clkdm dependencies on OMAP4
+>   *
+> - * Initializes all powerdomain and clockdomain target states
+> - * and all PRCM settings.
+> + * The dynamic dependency between MPUSS -> MEMIF and
+> + * MPUSS -> L4_PER/L3_* and DUCATI -> L3_* doesn't work as
+> + * expected. The hardware recommendation is to enable static
+> + * dependencies for these to avoid system lock ups or random crashes.
+> + * The L4 wakeup depedency is added to workaround the OCP sync hardware
+> + * BUG with 32K synctimer which lead to incorrect timer value read
+> + * from the 32K counter. The BUG applies for GPTIMER1 and WDT2 which
+> + * are part of L4 wakeup clockdomain.
+>   */
+> -int __init omap4_pm_init(void)
+> +static inline int omap4_init_static_deps(void)
+>  {
+>  	int ret;
+> -	struct clockdomain *emif_clkdm, *mpuss_clkdm, *l3_1_clkdm;
+> -	struct clockdomain *ducati_clkdm, *l3_2_clkdm;
+> +	struct clockdomain *emif_clkdm, *mpuss_clkdm, *l3_1_clkdm, *l4wkup;
+> +	struct clockdomain *ducati_clkdm, *l3_2_clkdm, *l4_per_clkdm;
+>  
+> -	if (omap_rev() == OMAP4430_REV_ES1_0) {
+> -		WARN(1, "Power Management not supported on OMAP4430 ES1.0\n");
+> -		return -ENODEV;
+> -	}
+> -
+> -	pr_err("Power Management for TI OMAP4.\n");
+> -
+> -	ret = pwrdm_for_each(pwrdms_setup, NULL);
+> -	if (ret) {
+> -		pr_err("Failed to setup powerdomains\n");
+> -		goto err2;
+> -	}
+> -
+> -	/*
+> -	 * The dynamic dependency between MPUSS -> MEMIF and
+> -	 * MPUSS -> L4_PER/L3_* and DUCATI -> L3_* doesn't work as
+> -	 * expected. The hardware recommendation is to enable static
+> -	 * dependencies for these to avoid system lock ups or random crashes.
+> -	 */
+>  	mpuss_clkdm = clkdm_lookup("mpuss_clkdm");
+>  	emif_clkdm = clkdm_lookup("l3_emif_clkdm");
+>  	l3_1_clkdm = clkdm_lookup("l3_1_clkdm");
+>  	l3_2_clkdm = clkdm_lookup("l3_2_clkdm");
+> +	l4_per_clkdm = clkdm_lookup("l4_per_clkdm");
+> +	l4wkup = clkdm_lookup("l4_wkup_clkdm");
+These static dependencies now seems added for OMAP4?
+Sounds like a separate patch as it is not exactly what $subject claims.
+>  	ducati_clkdm = clkdm_lookup("ducati_clkdm");
+> -	if ((!mpuss_clkdm) || (!emif_clkdm) || (!l3_1_clkdm) ||
+> -		(!l3_2_clkdm) || (!ducati_clkdm))
+> -		goto err2;
+> +	if ((!mpuss_clkdm) || (!emif_clkdm) || (!l3_1_clkdm) || (!l4wkup) ||
+> +		(!l3_2_clkdm) || (!ducati_clkdm) || (!l4_per_clkdm))
+> +		return -EINVAL;
+>  
+>  	ret = clkdm_add_wkdep(mpuss_clkdm, emif_clkdm);
+>  	ret |= clkdm_add_wkdep(mpuss_clkdm, l3_1_clkdm);
+>  	ret |= clkdm_add_wkdep(mpuss_clkdm, l3_2_clkdm);
+> +	ret |= clkdm_add_wkdep(mpuss_clkdm, l4_per_clkdm);
+> +	ret |= clkdm_add_wkdep(mpuss_clkdm, l4wkup);
+>  	ret |= clkdm_add_wkdep(ducati_clkdm, l3_1_clkdm);
+>  	ret |= clkdm_add_wkdep(ducati_clkdm, l3_2_clkdm);
+>  	if (ret) {
+>  		pr_err("Failed to add MPUSS -> L3/EMIF/L4PER, DUCATI -> L3 wakeup dependency\n");
+> +	}
+> +
+> +	return ret;
+> +}
+> +
+> +/**
+> + * omap4_pm_init - Init routine for OMAP4+ devices
+> + *
+> + * Initializes all powerdomain and clockdomain target states
+> + * and all PRCM settings.
+> + */
+> +int __init omap4_pm_init(void)
+could we rename it as omap4plus_pm_init while we are at it?
+This will help differentiate at least functions which are omap4 only and
+ones which we reuse for omap4plus?
+> +{
+> +	int ret;
+> +
+> +	if (omap_rev() == OMAP4430_REV_ES1_0) {
+we have ID detection for OMAP5430_REV_ES1_0 in arch/arm/mach-omap2/id.c
+However, we do not support PM, so might as well use it to skip init?
+> +		WARN(1, "Power Management not supported on OMAP4430 ES1.0\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	pr_info("Power Management for TI OMAP4PLUS devices.\n");
+> +
+> +	ret = pwrdm_for_each(pwrdms_setup, NULL);
+> +	if (ret) {
+> +		pr_err("Failed to setup powerdomains.\n");
+>  		goto err2;
+>  	}
+>  
+> +	if (cpu_is_omap44xx()) {
+> +		ret = omap4_init_static_deps();
+> +		if (ret)
+> +			goto err2;
+> +	}
+> +
+>  	ret = omap4_mpuss_init();
+>  	if (ret) {
+>  		pr_err("Failed to initialise OMAP4 MPUSS\n");
+> @@ -186,10 +208,11 @@ int __init omap4_pm_init(void)
+>  	omap_pm_suspend = omap4_pm_suspend;
+>  #endif
+>  
+> -	/* Overwrite the default cpu_do_idle() */
+> +	/* Overwrite the default arch_idle() */
+>  	arm_pm_idle = omap_default_idle;
+>  
+> -	omap4_idle_init();
+> +	if (cpu_is_omap44xx())
+> +		omap4_idle_init();
+>  
+>  err2:
+>  	return ret;
+> diff --git a/arch/arm/mach-omap2/sleep44xx.S b/arch/arm/mach-omap2/sleep_omap4plus.S
+> similarity index 100%
+> rename from arch/arm/mach-omap2/sleep44xx.S
+> rename to arch/arm/mach-omap2/sleep_omap4plus.S
+> -- 
+> 1.7.9.5
 
-Current lglock is not read-preference, so it can't be used on some cases
-which read-preference rwlock can do. Example, get_cpu_online_atomic().
-
-Although we can use rwlock for these cases which needs read-preference.
-but it leads to unnecessary cache-line bouncing even when there are no
-writers present, which can slow down the system needlessly. It will be
-worse when we have a lot of CPUs, it is not scale.
-
-So we look forward to lglock. lglock is read-write-lock based on percpu locks,
-but it is not read-preference due to its underlining percpu locks.
-
-But what if we convert the percpu locks of lglock to use percpu rwlocks:
-
-         CPU 0                                CPU 1
-         ------                               ------
-1.    spin_lock(&random_lock);             read_lock(my_rwlock of CPU 1);
-2.    read_lock(my_rwlock of CPU 0);       spin_lock(&random_lock);
-
-Writer:
-         CPU 2:
-         ------
-      for_each_online_cpu(cpu)
-        write_lock(my_rwlock of 'cpu');
-
-
-Consider what happens if the writer begins his operation in between steps 1
-and 2 at the reader side. It becomes evident that we end up in a (previously
-non-existent) deadlock due to a circular locking dependency between the 3
-entities, like this:
-
-
-(holds              Waiting for
- random_lock) CPU 0 -------------> CPU 2  (holds my_rwlock of CPU 0
-                                               for write)
-               ^                   |
-               |                   |
-        Waiting|                   | Waiting
-          for  |                   |  for
-               |                   V
-                ------ CPU 1 <------
-
-                (holds my_rwlock of
-                 CPU 1 for read)
-
-
-So obviously this "straight-forward" way of implementing percpu rwlocks is
-deadlock-prone. So we can't implement read-preference local-global rwlock
-like this.
-
-
-The implement of this patch reuse current lglock as frontend to achieve
-local-read-lock, and reuse global fallback rwlock as backend to achieve
-read-preference, and use percpu reader counter to indicate 1) the depth
-of the nested reader lockes and 2) whether the outmost lock is percpu lock
-or fallback rwlock.
-
-The algorithm is simple, in the read site:
-If it is nested reader, just increase the counter
-If it is the outmost reader,
-	1) try to lock its cpu's lock of the frontend lglock.
-	   (reader count +=1 if success)
-	2) if the above step fails, read_lock(&fallback_rwlock).
-	   (reader count += FALLBACK_BASE + 1)
-
-Write site:
-Do the lg_global_lock() of the frontend lglock.
-And then write_lock(&fallback_rwlock).
-
-
-Prof:
-1) reader-writer exclusive:
-The two steps of write site finished, no reader. Vice-verse.
-
-2) read-preference:
-before write site lock finished acquired, read site at least
-wins at read_lock(&fallback_rwlock) for rwlock is read-preference.
-read-preference also implies nestable.
-
-3) read site functions are irqsafe(reentrance-safe)
-	If read site function is interrupted@any point and reenters read site
-again, reentranced read site will not be mislead by the first read site if the
-reader counter > 0, in this case, it means currently frontend(this cpu lock of
-lglock) or backend(fallback rwlock) lock is held, it is safe to act as
-nested reader.
-	if the reader counter=0, eentranced reader considers it is the
-outmost read site, and it always successes after the write side release the lock.
-(even the interrupted read-site has already hold the cpu lock of lglock
-or the fallback_rwlock).
-	And reentranced read site only calls arch_spin_trylock(), read_lock()
-and __this_cpu_op(), arch_spin_trylock(), read_lock() is already reentrance-safe.
-Although __this_cpu_op() is not reentrance-safe, but the value of the counter
-will be restored after the interrupted finished, so read site functions
-are still reentrance-safe.
-
-
-Performance:
-We only focus on the performance of the read site. this read site's fast path
-is just preempt_disable() + __this_cpu_read/inc() + arch_spin_trylock(),
-It has only one heavy memory operation. it will be expected fast.
-
-We test three locks.
-1) traditional rwlock WITHOUT remote competition nor cache-bouncing.(opt-rwlock)
-2) this lock(lgrwlock)
-3) V6 percpu-rwlock by "Srivatsa S. Bhat". (percpu-rwlock)
-   (https://lkml.org/lkml/2013/2/18/186)
-
-		nested=1(no nested)	nested=2	nested=4
-opt-rwlock	 517181			1009200		2010027
-lgrwlock	 452897			 700026		1201415
-percpu-rwlock	1192955			1451343		1951757
-
-The value is the time(nano-second) of 10000 times of the operations:
-{
-	read-lock
-	[nested read-lock]...
-	[nested read-unlock]...
-	read-unlock
-}
-If the way of this test is wrong nor bad, please correct me,
-the code of test is here: https://gist.github.com/laijs/5066159
-(i5 760, 64bit)
-
-Signed-off-by: Lai Jiangshan <laijs@cn.fujitsu.com>
----
- include/linux/lglock.h |   35 ++++++++++++++++++++++++++++++++
- kernel/lglock.c        |   52 ++++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 87 insertions(+), 0 deletions(-)
-
-diff --git a/include/linux/lglock.h b/include/linux/lglock.h
-index 0d24e93..afb22bd 100644
---- a/include/linux/lglock.h
-+++ b/include/linux/lglock.h
-@@ -67,4 +67,39 @@ void lg_local_unlock_cpu(struct lglock *lg, int cpu);
- void lg_global_lock(struct lglock *lg);
- void lg_global_unlock(struct lglock *lg);
- 
-+struct lgrwlock {
-+	unsigned long __percpu *reader_refcnt;
-+	struct lglock lglock;
-+	rwlock_t fallback_rwlock;
-+};
-+
-+#define __DEFINE_LGRWLOCK_PERCPU_DATA(name)				\
-+	static DEFINE_PER_CPU(arch_spinlock_t, name ## _lock)		\
-+	= __ARCH_SPIN_LOCK_UNLOCKED;					\
-+	static DEFINE_PER_CPU(unsigned long, name ## _refcnt);
-+
-+#define __LGRWLOCK_INIT(name)						\
-+	{								\
-+		.reader_refcnt = &name ## _refcnt,			\
-+		.lglock = { .lock = &name ## _lock },			\
-+		.fallback_rwlock = __RW_LOCK_UNLOCKED(name.fallback_rwlock)\
-+	}
-+
-+#define DEFINE_LGRWLOCK(name)						\
-+	__DEFINE_LGRWLOCK_PERCPU_DATA(name)				\
-+	struct lgrwlock name = __LGRWLOCK_INIT(name)
-+
-+#define DEFINE_STATIC_LGRWLOCK(name)					\
-+	__DEFINE_LGRWLOCK_PERCPU_DATA(name)				\
-+	static struct lgrwlock name = __LGRWLOCK_INIT(name)
-+
-+static inline void lg_rwlock_init(struct lgrwlock *lgrw, char *name)
-+{
-+	lg_lock_init(&lgrw->lglock, name);
-+}
-+
-+void lg_rwlock_local_read_lock(struct lgrwlock *lgrw);
-+void lg_rwlock_local_read_unlock(struct lgrwlock *lgrw);
-+void lg_rwlock_global_write_lock(struct lgrwlock *lgrw);
-+void lg_rwlock_global_write_unlock(struct lgrwlock *lgrw);
- #endif
-diff --git a/kernel/lglock.c b/kernel/lglock.c
-index 6535a66..6c60cf7 100644
---- a/kernel/lglock.c
-+++ b/kernel/lglock.c
-@@ -87,3 +87,55 @@ void lg_global_unlock(struct lglock *lg)
- 	preempt_enable();
- }
- EXPORT_SYMBOL(lg_global_unlock);
-+
-+#define FALLBACK_BASE	(1UL << 30)
-+
-+void lg_rwlock_local_read_lock(struct lgrwlock *lgrw)
-+{
-+	struct lglock *lg = &lgrw->lglock;
-+
-+	preempt_disable();
-+	rwlock_acquire_read(&lg->lock_dep_map, 0, 0, _RET_IP_);
-+	if (likely(!__this_cpu_read(*lgrw->reader_refcnt))) {
-+		if (!arch_spin_trylock(this_cpu_ptr(lg->lock))) {
-+			read_lock(&lgrw->fallback_rwlock);
-+			__this_cpu_add(*lgrw->reader_refcnt, FALLBACK_BASE);
-+		}
-+	}
-+
-+	__this_cpu_inc(*lgrw->reader_refcnt);
-+}
-+EXPORT_SYMBOL(lg_rwlock_local_read_lock);
-+
-+void lg_rwlock_local_read_unlock(struct lgrwlock *lgrw)
-+{
-+	switch (__this_cpu_dec_return(*lgrw->reader_refcnt)) {
-+	case 0:
-+		lg_local_unlock(&lgrw->lglock);
-+		return;
-+	case FALLBACK_BASE:
-+		__this_cpu_sub(*lgrw->reader_refcnt, FALLBACK_BASE);
-+		read_unlock(&lgrw->fallback_rwlock);
-+		break;
-+	default:
-+		break;
-+	}
-+
-+	rwlock_release(&lg->lock_dep_map, 1, _RET_IP_);
-+	preempt_enable();
-+}
-+EXPORT_SYMBOL(lg_rwlock_local_read_unlock);
-+
-+void lg_rwlock_global_write_lock(struct lgrwlock *lgrw)
-+{
-+	lg_global_lock(&lgrw->lglock);
-+	write_lock(&lgrw->fallback_rwlock);
-+}
-+EXPORT_SYMBOL(lg_rwlock_global_write_lock);
-+
-+void lg_rwlock_global_write_unlock(struct lgrwlock *lgrw)
-+{
-+	write_unlock(&lgrw->fallback_rwlock);
-+	lg_global_unlock(&lgrw->lglock);
-+}
-+EXPORT_SYMBOL(lg_rwlock_global_write_unlock);
 -- 
-1.7.7.6
+Regards,
+Nishanth Menon
