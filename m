@@ -1,30 +1,22 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 1 Mar 2013 13:53:27 +0100
-Subject: [PATCH v9 04/10] pinctrl: check pinctrl ready for gpio range
-In-Reply-To: <1361101376-3783-5-git-send-email-haojian.zhuang@linaro.org>
+Date: Fri, 1 Mar 2013 13:54:58 +0100
+Subject: [PATCH v9 05/10] gpio: pl061: bind pinctrl by gpio request
+In-Reply-To: <1361101376-3783-6-git-send-email-haojian.zhuang@linaro.org>
 References: <1361101376-3783-1-git-send-email-haojian.zhuang@linaro.org>
- <1361101376-3783-5-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <CACRpkda0Qt8qsJHGBCmRM1dRqhQSZcBY-ujCeKNJOpzvm2TraQ@mail.gmail.com>
+ <1361101376-3783-6-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <CACRpkdZbr_e8Jfdj5R7zmrgCYvcOyYu5AQu57XbYrHYKyzk=ag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Sun, Feb 17, 2013 at 12:42 PM, Haojian Zhuang
 <haojian.zhuang@linaro.org> wrote:
 
-> pinctrl_get_device_gpio_range() only checks whether a certain GPIO pin
-> is in gpio range. But maybe some GPIO pins don't have back-end pinctrl
-> interface, it means that these pins are always configured as GPIO
-> function. For example, gpio159 isn't related to back-end pinctrl device
-> in Hi3620 while other GPIO pins are related to back-end pinctrl device.
+> Add the pl061_gpio_request() to request pinctrl. Create the logic
+> between pl061 gpio driver and pinctrl (pinctrl-single) driver.
 >
-> Append pinctrl_ready_for_gpio_range() that is used to check whether
-> pinctrl device with GPIO range is ready. This function will be called
-> after pinctrl_get_device_gpio_range() fails.
->
-> If pinctrl device with GPIO range is found, it means that pinctrl device
-> is already launched and a certain GPIO pin just don't have back-end pinctrl
-> interface. Then pinctrl_request_gpio() shouldn't return -EPROBE_DEFER in
-> this case.
+> While a gpio pin is requested, it will request pinctrl driver to
+> set that pin with gpio function mode. So pinctrl driver should
+> append .gpio_request_enable() in pinmux_ops.
 >
 > Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 
