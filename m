@@ -1,31 +1,44 @@
-From: hechtb@gmail.com (Bastian Hecht)
-Date: Fri,  1 Mar 2013 11:45:31 -0600
-Subject: [PATCH 2/3] ARM: mach-shmobile: sh73a0: Add CMT DT name to clock list
-In-Reply-To: <1362159932-18533-1-git-send-email-hechtb+renesas@gmail.com>
-References: <1362159932-18533-1-git-send-email-hechtb+renesas@gmail.com>
-Message-ID: <1362159932-18533-3-git-send-email-hechtb+renesas@gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri,  1 Mar 2013 08:57:30 -0800
+Subject: [PATCH v4 0/2] Add automatic bus number support for i2c busses with
+ device tree
+In-Reply-To: <1360630085-26874-1-git-send-email-dianders@chromium.org>
+References: <1360630085-26874-1-git-send-email-dianders@chromium.org>
+Message-ID: <1362157052-16738-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds temporarily the alternative device name to the clock list
-that is used when booting via Device Tree setup.
+This was suggested by Mark Brown in response to a patch for adding
+this functionality only for the s3c2410 bus:
+  https://lkml.org/lkml/2012/11/20/681
 
-Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
----
- arch/arm/mach-shmobile/clock-sh73a0.c |    1 +
- 1 file changed, 1 insertion(+)
+I have also modified the i2c-pxa driver to use this new functionality.
+The i2c-pxa driver changes have only been compile-tested and are just
+for cleanup purposes.
 
-diff --git a/arch/arm/mach-shmobile/clock-sh73a0.c b/arch/arm/mach-shmobile/clock-sh73a0.c
-index 71843dd..4aed113 100644
---- a/arch/arm/mach-shmobile/clock-sh73a0.c
-+++ b/arch/arm/mach-shmobile/clock-sh73a0.c
-@@ -575,6 +575,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh-sci.4", &mstp_clks[MSTP200]), /* SCIFA4 */
- 	CLKDEV_DEV_ID("sh-sci.6", &mstp_clks[MSTP331]), /* SCIFA6 */
- 	CLKDEV_DEV_ID("sh_cmt.10", &mstp_clks[MSTP329]), /* CMT10 */
-+	CLKDEV_DEV_ID("e6138010.cmt", &mstp_clks[MSTP329]), /* CMT10 */
- 	CLKDEV_DEV_ID("sh_fsi2", &mstp_clks[MSTP328]), /* FSI */
- 	CLKDEV_DEV_ID("sh_irda.0", &mstp_clks[MSTP325]), /* IrDA */
- 	CLKDEV_DEV_ID("i2c-sh_mobile.1", &mstp_clks[MSTP323]), /* I2C1 */
+Changes in v4:
+- Rebased atop the removal of MAX_IDR_MASK.
+
+Changes in v3:
+- Addressed Wolfram's feedback; rebased atop idr-cleanup series.
+
+Changes in v2:
+- No longer tweak pdev->id as per Sylwester Nawrocki.
+- No longer add the dev ID to the adap.name.  Other drivers don't
+  include the device ID here and it doesn't make sense with
+  dynamically (or automatically) allocated IDs.
+- Use dev_name(&dev->dev) to register for the IRQ; this matches what
+  the i2c-s3c2410.c does and handles dynamically allocated IDs.
+- This change was only compile-tested (corgi_defconfig), since I don't
+  have access to a board that uses this driver.
+
+Doug Anderson (2):
+  i2c-core: dt: Pick i2c bus number from i2c alias if present
+  i2c: pxa: Use i2c-core to get bus number now
+
+ drivers/i2c/busses/i2c-pxa.c | 20 ++++++++----------
+ drivers/i2c/i2c-core.c       | 49 +++++++++++++++++++++++++++++++++-----------
+ 2 files changed, 46 insertions(+), 23 deletions(-)
+
 -- 
-1.7.9.5
+1.8.1.3
