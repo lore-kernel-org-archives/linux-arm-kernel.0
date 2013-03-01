@@ -1,34 +1,29 @@
-From: lznuaa@gmail.com (Frank Li)
-Date: Fri, 1 Mar 2013 11:05:57 +0800
-Subject: [PATCH 1/1 net-next] fec: net: put tx to napi poll function to
- fix dead lock
-In-Reply-To: <20130228.153942.1205752844713252540.davem@davemloft.net>
-References: <1362023060-10277-1-git-send-email-Frank.Li@freescale.com>
- <20130228.153942.1205752844713252540.davem@davemloft.net>
-Message-ID: <CAHrpEqQk7ZeKicAZMN=d6wksEPzWO0dCvqj6n6Gj+2GLFJuRaA@mail.gmail.com>
+From: viniciustinti@gmail.com (Vinicius Tinti)
+Date: Fri,  1 Mar 2013 01:25:52 -0300
+Subject: [PATCH 1/1] arm: remove extra semicolon in if statement
+Message-ID: <1362111952-8072-1-git-send-email-viniciustinti@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/3/1 David Miller <davem@davemloft.net>:
-> From: Frank Li <Frank.Li@freescale.com>
-> Date: Thu, 28 Feb 2013 11:44:20 +0800
->
->> +     int tx_pkts = fec_enet_tx(ndev);
->> +
->> +     if (tx_pkts)
->> +             return budget;
->
-> This isn't right, you don't want to finish the NAPI poll because
-> TX work was done.
->
-> Ignore the TX work for poll completion purposes, see
-> drivers/net/ethernet/broadcom/tg3.c:tg3_poll_work() for
-> example.
+Remove extra semicolon in perf_event.c if statement.
 
-I read tg3.c code. If I understand correct,
-just need remove below line
+Signed-off-by: Vinicius Tinti <viniciustinti@gmail.com>
+---
+ arch/arm/kernel/perf_event.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-    if (tx_pkts)
-             return budget;
-
-Is it ture?
+diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+index 31e0eb3..a892067 100644
+--- a/arch/arm/kernel/perf_event.c
++++ b/arch/arm/kernel/perf_event.c
+@@ -400,7 +400,7 @@ __hw_perf_event_init(struct perf_event *event)
+ 	}
+ 
+ 	if (event->group_leader != event) {
+-		if (validate_group(event) != 0);
++		if (validate_group(event) != 0)
+ 			return -EINVAL;
+ 	}
+ 
+-- 
+1.7.9.5
