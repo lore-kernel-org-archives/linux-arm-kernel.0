@@ -1,22 +1,30 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 1 Mar 2013 02:13:29 +0100
-Subject: [PATCH 3/4] ARM: nomadik: add dynamic irq flag to the timer
-In-Reply-To: <1361917047-29230-4-git-send-email-daniel.lezcano@linaro.org>
-References: <1361917047-29230-1-git-send-email-daniel.lezcano@linaro.org>
- <1361917047-29230-4-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <CACRpkda=i5cXSbYCyb0gH0OLKj7396qguup1nqgqn0m-S1x1wg@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 1 Mar 2013 09:14:04 +0800
+Subject: [PATCH 07/12] mtd: gpmi: move to use generic DMA helper
+In-Reply-To: <512F17B0.5080705@freescale.com>
+References: <1361978748-25281-1-git-send-email-shawn.guo@linaro.org>
+ <1361978748-25281-8-git-send-email-shawn.guo@linaro.org>
+ <512F17B0.5080705@freescale.com>
+Message-ID: <20130301011401.GA30499@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 26, 2013 at 11:17 PM, Daniel Lezcano
-<daniel.lezcano@linaro.org> wrote:
+On Thu, Feb 28, 2013 at 04:39:12PM +0800, Huang Shijie wrote:
+> ? 2013?02?27? 23:25, Shawn Guo ??:
+> > +++ b/Documentation/devicetree/bindings/mtd/gpmi-nand.txt
+> > @@ -7,10 +7,12 @@ Required properties:
+> >    - compatible : should be "fsl,<chip>-gpmi-nand"
+> >    - reg : should contain registers location and length for gpmi and bch.
+> >    - reg-names: Should contain the reg names "gpmi-nand" and "bch"
+> > -  - interrupts : The first is the DMA interrupt number for GPMI.
+> > -                 The second is the BCH interrupt number.
+> > -  - interrupt-names : The interrupt names "gpmi-dma", "bch";
+> > -  - fsl,gpmi-dma-channel : Should contain the dma channel it uses.
+> > +  - interrupts : BCH interrupt number.
+> > +  - interrupt-names : Should be "bch".
+> why split out the bch interrupt? It seems no use to do it.
+> 
+The real change here is to remove gpmi-dma interrupt, since we have all
+dma interrupts defined in dma controller node.
 
-> Add the dynamic irq affinity feature to the timer clock device.
->
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-
-Looks reasonable to me, sadly I do not fully grasp the patch set,
-Vincent+Rickard can you have a look at this?
-
-Yours,
-Linus Walleij
+Shawn
