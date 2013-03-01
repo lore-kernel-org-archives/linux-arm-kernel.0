@@ -1,22 +1,26 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 28 Feb 2013 17:41:48 -0800
-Subject: [PATCH v4 2/3] ARM: mach-shmobile: r8a7779: add SATA support
-In-Reply-To: <201302272339.15402.sergei.shtylyov@cogentembedded.com>
-References: <201302272339.15402.sergei.shtylyov@cogentembedded.com>
-Message-ID: <20130301014148.GB9232@quad.lixom.net>
+Date: Thu, 28 Feb 2013 17:47:13 -0800
+Subject: [PATCH] ARM: dts: remove generated .dtb files on clean
+In-Reply-To: <CAGo_u6qZwgGOugh3_F2pFvwM8ZAxU=Rsy7B2Lj6CjO+VG7GwXA@mail.gmail.com>
+References: <1358890049-26981-1-git-send-email-nm@ti.com>
+ <5108BDDD.60307@ti.com>
+ <CAGo_u6qZwgGOugh3_F2pFvwM8ZAxU=Rsy7B2Lj6CjO+VG7GwXA@mail.gmail.com>
+Message-ID: <CAOesGMgZ4VPnkn7ZuNPYeA9fv=ACwXy8-wr6L3ttVfPkRjaZnw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 27, 2013 at 11:39:14PM +0300, Sergei Shtylyov wrote:
-> From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-> 
-> Add SATA clock for r8a7779 SoC (for both device tree and usual cases). 
-> Register SATA controller as a "late" platform device on r8a7779 SoC.
+On Thu, Feb 28, 2013 at 5:35 PM, Nishanth Menon <nm@ti.com> wrote:
+> On Wed, Jan 30, 2013 at 12:29 AM, Santosh Shilimkar
+> <santosh.shilimkar@ti.com> wrote:
+>> Looping RMK, Arnd
+> Gentle query if we are still interested in this:
+> https://patchwork.kernel.org/patch/2020831/
+>
+> Looks like linux master still wont delete the dtbs on make clean etc..
+> I think leaving the stale dtbs
+> around could have it's set of user errors.
 
-Hi,
-
-If you have the a binding in the device tree (which you do through patch 1/3),
-then there's no reason to have a platform device for it.
+Applied to arm-soc fixes for 3.9.
 
 
 -Olof
