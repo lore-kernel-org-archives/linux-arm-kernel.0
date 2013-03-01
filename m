@@ -1,57 +1,38 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 1 Mar 2013 16:41:37 -0600
-Subject: omap: IORESOURCE_IRQ flags not set when defining a GPIO-IRQ from
- DT
-In-Reply-To: <20130301173001.GC30923@n2100.arm.linux.org.uk>
-References: <CAAwP0s3ZzGf+_diZiQ7DSfWj74Sh=E9F+j=4UGnw8meHDR2AZQ@mail.gmail.com>
- <20130301173001.GC30923@n2100.arm.linux.org.uk>
-Message-ID: <51312EA1.8000600@ti.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Fri, 1 Mar 2013 23:52:01 +0100
+Subject: [PATCH 0/2] gpio/omap: updates for v3.10
+In-Reply-To: <1362158568-1624-1-git-send-email-jon-hunter@ti.com>
+References: <1362158568-1624-1-git-send-email-jon-hunter@ti.com>
+Message-ID: <CABxcv=nvZNWDgKLwQ6RPJyMdsAF5zVpo8dEhvE4YVZETiScDcg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Mar 1, 2013 at 6:22 PM, Jon Hunter <jon-hunter@ti.com> wrote:
+> Summary of updates:
+> - Convert OMAP GPIO driver to use linear mapping for IRQ domains
+> - Avoid crashes seen if a gpio bank is not enabled when requesting an IRQ.
+>
+> Testing includes:
+> - Boot testing on OMAP5912 OSK, OMAP2420 H4, OMAP3430 SDP, OMAP4430 SDP
+>   and AM335x EVM.
+> - Verified that GPIO interrupts are working on OMAP5912 OSK, OMAP2420 H4,
+>   OMAP3430 SDP and OMAP4430 SDP by making sure networking was working
+>   correctly as these boards use a GPIO with the ethernet chips. Also
+>   checked /proc/interrupts to ensure GPIO interrupt counts are
+>   incrementing as expected.
+>
+> Jon Hunter (2):
+>   gpio/omap: convert gpio irq domain to linear mapping
+>   gpio/omap: warn if bank is not enabled on setting irq type
+>
+>  drivers/gpio/gpio-omap.c |   75 +++++++++++++++++++++-------------------------
+>  1 file changed, 34 insertions(+), 41 deletions(-)
+>
+> --
 
-On 03/01/2013 11:30 AM, Russell King - ARM Linux wrote:
-> On Fri, Mar 01, 2013 at 05:17:57PM +0100, Javier Martinez Canillas wrote:
->>>> unsigned long irq_flags = SMC_IRQ_FLAGS;
->>>> ...
->>>>        if (irq_flags == -1 || ires->flags & IRQF_TRIGGER_MASK)
->>>>                 irq_flags = ires->flags & IRQF_TRIGGER_MASK;
->>>>
->>>> while smsc911x driver's probe function uses the flags from the
->>>> resource unconditionally:
->>>>
->>>> irq_flags = irq_res->flags & IRQF_TRIGGER_MASK;
->>>>
->>>> So, at the end both will set irq_flags to whatever is on the
->>>> IORESOURCE_IRQ struct resource flags member.
->>>
->>> Actually, that's not the case for smc91x. By default SMC_IRQ_FLAGS != -1
->>> (for omap) and so it will not set irq_flags to ires->flags &
->>> IRQF_TRIGGER_MASK. However, if I force irq_flags to be -1, then I see
->>> that irq_flags are to 0.
-> 
-> smc91x is complicated by the fact that it started off life before there
-> was any possibility to pass IRQ flags through resources.  So we ended
-> up with smc91x.h containing _lots_ of platform specific data, and the
-> driver could only be built for one platform.
-> 
-> I fixed that by sorting out this IRQ passing method, and changing smc91x
-> to support both the fixed configuration, and the dynamic-through-IRQflags
-> method.
-> 
-> There is no reason for any other driver to support the fixed method; that
-> would be a completely backwards step.
+I've tested on a TI OMAP3 DM3735 board (IGEPv2) and the ethernet chip
+(which use a GPIO line as a IRQ) is working correctly too.
 
-Thanks for the history. For OMAP I see SMC_IRQ_FLAGS getting defined as
-follows in smc91x.h ...
+So, for both patches:
 
-#ifndef SMC_IRQ_FLAGS
-#define SMC_IRQ_FLAGS           IRQF_TRIGGER_RISING
-#endif
-
-And so for OMAP devices using smc91x, it is always being configured as
-rising-edge. So it would be good to move OMAP to use a dynamic
-configuration too.
-
-Cheers
-Jon
+Tested-by: Javier Martinez Canillas <javier@dowhile0.org>
