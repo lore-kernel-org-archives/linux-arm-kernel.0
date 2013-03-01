@@ -1,35 +1,66 @@
 From: hechtb@gmail.com (Bastian Hecht)
-Date: Fri,  1 Mar 2013 11:45:29 -0600
-Subject: [PATCH 0/3] Add OF support to CMT driver - bindings discussion
-Message-ID: <1362159932-18533-1-git-send-email-hechtb+renesas@gmail.com>
+Date: Fri,  1 Mar 2013 11:45:32 -0600
+Subject: [PATCH 3/3] ARM: mach-shmobile: sh73a0: Setup the timer device CMT10
+ using DT
+In-Reply-To: <1362159932-18533-1-git-send-email-hechtb+renesas@gmail.com>
+References: <1362159932-18533-1-git-send-email-hechtb+renesas@gmail.com>
+Message-ID: <1362159932-18533-4-git-send-email-hechtb+renesas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+We can now use the Device Tree for bringing up our timer device CMT10.
+We move it out of the DT devices list into the early_devices list by
+the non-reference board code. And we add the device to the
+kzm9g-reference .dts file.
 
-here in the CMT driver we currently can derive all neccessary hardware info from the device ID and channel ID (there are multiple CMT instances built into one SoC with multiple channels each). This seems like a very intuituve description to me.
+Not-yet-signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
+---
+I wonder if this should go to arch/arm/boot/dts/sh73a0.dtsi.
 
-If multiple register layouts appear we can add an (optional) regtype property and some parts of the driver need to be rewritten anyway. But the descriptiveness of device ID and channel ID should stay I think.
+The moving to the early_devices is a bit hackish - I will cook up a better
+patch when I know into which .dts(i) file things go.
 
-Will this work?
+ arch/arm/boot/dts/sh73a0-kzm9g-reference.dts |   11 +++++++++++
+ arch/arm/mach-shmobile/setup-sh73a0.c        |    2 +-
+ 2 files changed, 12 insertions(+), 1 deletion(-)
 
-In the patchset I have added the dts specification to sh73a0-kzm9g-reference.dts to test it. Does this belong to sh73a0.dtsi instead? I wonder because the clock is in the setup code, not board code.
-
-Thanks,
-
- Bastian
-
-
-Bastian Hecht (3):
-  clocksource: sh_cmt: Add Device Tree probing
-  ARM: mach-shmobile: sh73a0: Add CMT DT name to clock list
-  ARM: mach-shmobile: sh73a0: Setup the timer device CMT10 using DT
-
- arch/arm/boot/dts/sh73a0-kzm9g-reference.dts |   11 ++++
- arch/arm/mach-shmobile/clock-sh73a0.c        |    1 +
- arch/arm/mach-shmobile/setup-sh73a0.c        |    1 -
- drivers/clocksource/sh_cmt.c                 |   87 ++++++++++++++++++++++----
- 4 files changed, 86 insertions(+), 14 deletions(-)
-
+diff --git a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
+index 7fad4b9..fef12f0 100644
+--- a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
++++ b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
+@@ -69,6 +69,17 @@
+ 		toshiba,mmc-wrprotect-disable;
+ 		toshiba,mmc-has-idle-wait;
+ 	};
++
++	cmt at 0xe6138010 {
++		compatible = "renesas,cmt";
++		reg = <0xe6138010 0xc>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 65 0x4>;
++		renesas,timer-device-id = <1>;
++		renesas,timer-channel-id = <0>;
++		renesas,clocksource-rating = <125>;
++		renesas,clockevent-rating = <125>;
++	};
+ };
+ 
+ &mmcif {
+diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
+index 6259e07..b7fdec0 100644
+--- a/arch/arm/mach-shmobile/setup-sh73a0.c
++++ b/arch/arm/mach-shmobile/setup-sh73a0.c
+@@ -913,10 +913,10 @@ static struct platform_device *sh73a0_devices_dt[] __initdata = {
+ 	&scif6_device,
+ 	&scif7_device,
+ 	&scif8_device,
+-	&cmt10_device,
+ };
+ 
+ static struct platform_device *sh73a0_early_devices[] __initdata = {
++	&cmt10_device,
+ 	&tmu00_device,
+ 	&tmu01_device,
+ };
 -- 
 1.7.9.5
