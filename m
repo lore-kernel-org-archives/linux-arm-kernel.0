@@ -1,79 +1,68 @@
-From: avinashphilip@ti.com (Philip, Avinash)
-Date: Fri, 1 Mar 2013 05:40:31 +0000
-Subject: [PATCH 06/14] ARM: OMAP2+: Convert NAND to use
- gpmc_cs_program_settings()
-In-Reply-To: <512F7F79.4020900@ti.com>
-References: <1361899842-30303-1-git-send-email-jon-hunter@ti.com>
- <1361899842-30303-7-git-send-email-jon-hunter@ti.com>
- <518397C60809E147AF5323E0420B992E3EA8F235@DBDE01.ent.ti.com>
- <512F7F79.4020900@ti.com>
-Message-ID: <518397C60809E147AF5323E0420B992E3EA90C46@DBDE01.ent.ti.com>
+From: anup.patel@linaro.org (Anup Patel)
+Date: Fri,  1 Mar 2013 11:30:26 +0530
+Subject: [PATCH] arm64: add support for 8250/16550 earlyprintk
+Message-ID: <1362117626-2076-1-git-send-email-anup.patel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 28, 2013 at 21:32:01, Hunter, Jon wrote:
-> 
-> On 02/28/2013 04:38 AM, Philip, Avinash wrote:
-> > On Tue, Feb 26, 2013 at 23:00:33, Hunter, Jon wrote:
-> >> Convert the OMAP2+ NAND code to use the gpmc_cs_program_settings()
-> >> function for configuring the various GPMC options instead of directly
-> >> programming the CONFIG1 register.
-> >>
-> >> This moves the configuration of some GPMC options outside the
-> >> nand_gpmc_retime() because these options should only need to be set once
-> >> regardless of whether the gpmc timing is changing dynamically at runtime.
-> >> The programming of where the wait-pin is also moved slightly, but this
-> >> will not have any impact to existing devices as no boards are currently
-> >> setting the dev_ready variable.
-> >>
-> >> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-> >> ---
-> >>  arch/arm/mach-omap2/gpmc-nand.c |   35 +++++++++++++++++++++++------------
-> >>  1 file changed, 23 insertions(+), 12 deletions(-)
-> >>
-> >> diff --git a/arch/arm/mach-omap2/gpmc-nand.c b/arch/arm/mach-omap2/gpmc-nand.c
-> >> index afc1e8c..4bdfea2 100644
-> >> --- a/arch/arm/mach-omap2/gpmc-nand.c
-> >> +++ b/arch/arm/mach-omap2/gpmc-nand.c
-> >> @@ -43,6 +43,10 @@ static struct platform_device gpmc_nand_device = {
-> >>  	.resource	= gpmc_nand_resource,
-> >>  };
-> >>  
-> >> +static struct gpmc_settings nand_settings = {
-> >> +	.device_nand = true,
-> >> +};
-> >> +
-> > 
-> > Is it possible to make it local variable?
-> > It would help GPMC to support NAND device on multiple chip select.
-> 
-> Well gpmc_nand_init() will be called for each NAND device and so I don't
-> see why this would prevent supporting multiple NANDs on multiple
-> chip-selects.
+This patch adds support for using earlyprintk with 8250/16550 UART ports.
 
-Problem exactly lies here. Here platform device initialized as statically.
-So multiple requests will points to same platform device.
+The 8250/16550 UART can either have 8-bit or 32-bit aligned registers which is HW vendor dependent.
 
-Recently this issue raised in TI e2e forum and solution being proposed.
-Details can found from
-http://e2e.ti.com/support/arm/sitara_arm/f/791/p/246997/865379.aspx#865379
+Kernel args for 8-bit aligned regs: earlyprintk=uart8250-8bit,<phys_address>
 
-I doubt the same is the case for other GPMC client devices also.
+Kernel args for 32-bit aligned regs: earlyprintk=uart8250-16bit,<phys_address>
 
-> 
-> Once migration to device-tree is complete we could definitely make it
-> local as there will be no need for any static initialisations of the
-> structure as all fields would be read from device-tree.
-> 
-> I can make it local now if that is preferred and seeing that will be the
-> direction once we have migrated to device-tree, is does make sense.
+Signed-off-by: Anup Patel <anup.patel@linaro.org>
+---
+ arch/arm64/kernel/early_printk.c |   23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-As far as I understood, here usage of local variable won't break anything?
-If that is the case, better solution would be usage of local variable.
-
-Thanks
-Avinash
-> 
-> Cheers
-> Jon
-> 
+diff --git a/arch/arm64/kernel/early_printk.c b/arch/arm64/kernel/early_printk.c
+index 7e320a2..d57f300 100644
+--- a/arch/arm64/kernel/early_printk.c
++++ b/arch/arm64/kernel/early_printk.c
+@@ -24,11 +24,32 @@
+ #include <linux/io.h>
+ 
+ #include <linux/amba/serial.h>
++#include <uapi/linux/serial_reg.h>
+ 
+ static void __iomem *early_base;
+ static void (*printch)(char ch);
+ 
+ /*
++ * 8250/16550 (8-bit aligned registers) single character TX.
++ */
++static void uart8250_8bit_printch(char ch)
++{
++	while (!(readb_relaxed(early_base + UART_LSR) & UART_LSR_THRE))
++		;
++	writeb_relaxed(ch, early_base + UART_TX);
++}
++
++/*
++ * 8250/16550 (32-bit aligned registers) single character TX.
++ */
++static void uart8250_32bit_printch(char ch)
++{
++	while (!(readl_relaxed(early_base + (UART_LSR << 2)) & UART_LSR_THRE))
++		;
++	writel_relaxed(ch, early_base + (UART_TX << 2));
++}
++
++/*
+  * PL011 single character TX.
+  */
+ static void pl011_printch(char ch)
+@@ -47,6 +68,8 @@ struct earlycon_match {
+ 
+ static const struct earlycon_match earlycon_match[] __initconst = {
+ 	{ .name = "pl011", .printch = pl011_printch, },
++	{ .name = "uart8250-8bit", .printch = uart8250_8bit_printch, },
++	{ .name = "uart8250-32bit", .printch = uart8250_32bit_printch, },
+ 	{}
+ };
+ 
+-- 
+1.7.9.5
