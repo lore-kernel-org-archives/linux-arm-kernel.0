@@ -1,365 +1,121 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Fri,  1 Mar 2013 16:41:07 +0100
-Subject: [PATCH 2/2] video: imxfb: Add DT support
-In-Reply-To: <1362152467-27998-1-git-send-email-mpa@pengutronix.de>
-References: <1362152467-27998-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1362152467-27998-3-git-send-email-mpa@pengutronix.de>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Fri, 1 Mar 2013 09:43:37 -0600
+Subject: [PATCH 04/14] ARM: OMAP2+: Add function for configuring GPMC
+ settings
+In-Reply-To: <518397C60809E147AF5323E0420B992E3EA90C2F@DBDE01.ent.ti.com>
+References: <1361899842-30303-1-git-send-email-jon-hunter@ti.com>
+ <1361899842-30303-5-git-send-email-jon-hunter@ti.com>
+ <518397C60809E147AF5323E0420B992E3EA8F007@DBDE01.ent.ti.com>
+ <512F7D58.90706@ti.com> <512F9005.7040908@ti.com>
+ <518397C60809E147AF5323E0420B992E3EA90C2F@DBDE01.ent.ti.com>
+Message-ID: <5130CCA9.10905@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add devicetree support for imx framebuffer driver. It uses the generic
-display bindings and helper functions.
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
- .../devicetree/bindings/video/fsl,imx-fb.txt       |  30 ++++
- drivers/video/imxfb.c                              | 176 +++++++++++++++++----
- 2 files changed, 173 insertions(+), 33 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/video/fsl,imx-fb.txt
+On 02/28/2013 11:33 PM, Philip, Avinash wrote:
+> On Thu, Feb 28, 2013 at 22:42:37, Hunter, Jon wrote:
+>>
+>> On 02/28/2013 09:52 AM, Jon Hunter wrote:
+>>>
+>>> On 02/28/2013 12:05 AM, Philip, Avinash wrote:
+>>>> On Tue, Feb 26, 2013 at 23:00:31, Hunter, Jon wrote:
+>>>>> The GPMC has various different configuration options such as bus-width,
+>>>>> synchronous or asychronous mode selection, burst mode options etc.
+>>>>> Currently, there is no common function for configuring these options and
+>>>>> various devices set these options by either programming the GPMC CONFIG1
+>>>>> register directly or by calling gpmc_cs_configure() to set some of the
+>>>>> options.
+>>>>>
+>>>>> Add a new function for configuring all of the GPMC options. Having a common
+>>>>> function for configuring this options will simplify code and ease the
+>>>>> migration to device-tree.
+>>>>>
+>>>>> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+>>>>> ---
+>>>>>  arch/arm/mach-omap2/gpmc.c |   65 ++++++++++++++++++++++++++++++++++++++++++++
+>>>>>  arch/arm/mach-omap2/gpmc.h |    6 ++++
+>>>>>  2 files changed, 71 insertions(+)
+>>>>>
+>>>>> diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+>>>>> index 465cac9..fb8dfd2 100644
+>>>>> --- a/arch/arm/mach-omap2/gpmc.c
+>>>>> +++ b/arch/arm/mach-omap2/gpmc.c
+>>>>> @@ -1137,6 +1137,71 @@ int gpmc_calc_timings(struct gpmc_timings *gpmc_t,
+>>>>>  	return 0;
+>>>>>  }
+>>>>>  
+>>>>> +int gpmc_cs_program_settings(int cs, struct gpmc_settings *p)
+>>>>> +{
+>>>>> +	u32 config1;
+>>>>> +
+>>>>> +	if ((!p->device_width) || (p->device_width > GPMC_DEVWIDTH_16BIT)) {
+>>>>> +		pr_err("%s: invalid width %d!", __func__, p->device_width);
+>>>>> +		return -EINVAL;
+>>>>> +	}
+>>>>> +
+>>>>> +	/* Address-data multiplexing not supported for NAND devices */
+>>>>> +	if (p->device_nand && p->mux_add_data) {
+>>>>> +		pr_err("%s: invalid configuration!\n", __func__);
+>>>>> +		return -EINVAL;
+>>>>> +	}
+>>>>> +
+>>>>> +	/* Page/burst mode supports lengths of 4, 8 and 16 bytes */
+>>>>> +	if (p->burst_read || p->burst_write) {
+>>>>> +		switch (p->burst_len) {
+>>>>> +		case GPMC_BURST_4:
+>>>>> +		case GPMC_BURST_8:
+>>>>> +		case GPMC_BURST_16:
+>>>>> +			break;
+>>>>> +		default:
+>>>>> +			pr_err("%s: invalid page/burst-length (%d)\n",
+>>>>> +			       __func__, p->burst_len);
+>>>>> +			return -EINVAL;
+>>>>> +		}
+>>>>> +	}
+>>>>> +
+>>>>> +	if ((p->wait_on_read || p->wait_on_write) &&
+>>>>> +	    (p->wait_pin > gpmc_nr_waitpins)) {
+>>>>> +		pr_err("%s: invalid wait-pin (%d)\n", __func__, p->wait_pin);
+>>>>> +		return -EINVAL;
+>>>>> +	}
+>>>>> +
+>>>>> +	config1 = GPMC_CONFIG1_DEVICESIZE((p->device_width - 1));
+>>>>
+>>>> Can you consider read_modify approach?
+>>>
+>>> I was purposely trying to avoid that. The intent here is to program all
+>>> the settings and get away from any boot-loader dependencies. If we use a
+>>> read-modify approach then it will never be clear in the kernel what
+>>> should actually be programmed.
+>>
+>> By the way, it would be good to know what your motivation for this is.
+>>
+>> My goal is for all gpmc settings to eventually live in the DT blob and
+>> there be no dependency on the bootloader whatsoever. That may mean that
+>> settings are re-programmed again by the kernel but IMO that is best.
+> 
+> Yes I understood now and the right thing to do.
+> Suggested read modify approach because of some confusion as GPMC_CONFIG1 is already
+> modified in gpmc_cs_set_timings() and is called from omap2_nand_gpmc_retime().
+> So the data modified in gpmc_cs_set_timings() will lost (not significant)
+> May be better and cleaner solution is to remove GPMC_CONFIG1 modification in
+> gpmc_cs_set_timings() also.
 
-diff --git a/Documentation/devicetree/bindings/video/fsl,imx-fb.txt b/Documentation/devicetree/bindings/video/fsl,imx-fb.txt
-new file mode 100644
-index 0000000..fd88d26
---- /dev/null
-+++ b/Documentation/devicetree/bindings/video/fsl,imx-fb.txt
-@@ -0,0 +1,30 @@
-+Freescale imx21 Framebuffer
-+
-+This framebuffer driver supports chips imx1 and imx21.
-+
-+Required properties:
-+- compatible : "fsl,<chip>-fb"
-+- reg : Should contain 1 register ranges(address and length)
-+- interrupts : One interrupt of the fb dev
-+
-+Required nodes:
-+- display: a display node is required to initialize the lcd panel
-+	This should be in the board dts. See definition in
-+	Documentation/devicetree/bindings/video/via,vt8500-fb.txt
-+- default-mode: a videomode node as specified in
-+	Documentation/devicetree/bindings/video/via,vt8500-fb.txt
-+
-+Optional properties:
-+- pwmr: Address of pwmr register
-+- lscr1: Address of lscr1 register
-+- dmacr: Address of dmacr register
-+
-+Example:
-+
-+	imxfb: fb at 10021000 {
-+		compatible = "fsl,imx27-fb", "fsl,imx21-fb";
-+		interrupts = <61>;
-+		reg = <0x10021000 0x1000>;
-+		display = <&display0>;
-+		default-mode = <&mode0>;
-+	};
-diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
-index ef2b587..6f1b04c 100644
---- a/drivers/video/imxfb.c
-+++ b/drivers/video/imxfb.c
-@@ -32,6 +32,12 @@
- #include <linux/io.h>
- #include <linux/math64.h>
- #include <linux/uaccess.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+
-+#include <video/of_display_timing.h>
-+#include <video/of_videomode.h>
-+#include <video/videomode.h>
- 
- #include <linux/platform_data/video-imxfb.h>
- 
-@@ -120,7 +126,6 @@
- /* Used fb-mode. Can be set on kernel command line, therefore file-static. */
- static const char *fb_mode;
- 
--
- /*
-  * These are the bitfields for each
-  * display depth that we support.
-@@ -192,6 +197,19 @@ static struct platform_device_id imxfb_devtype[] = {
- };
- MODULE_DEVICE_TABLE(platform, imxfb_devtype);
- 
-+static struct of_device_id imxfb_of_dev_id[] = {
-+	{
-+		.compatible = "fsl,imx1-fb",
-+		.data = &imxfb_devtype[IMX1_FB],
-+	}, {
-+		.compatible = "fsl,imx21-fb",
-+		.data = &imxfb_devtype[IMX21_FB],
-+	}, {
-+		/* sentinel */
-+	}
-+};
-+MODULE_DEVICE_TABLE(of, imxfb_of_dev_id);
-+
- static inline int is_imx1_fb(struct imxfb_info *fbi)
- {
- 	return fbi->devtype == IMX1_FB;
-@@ -324,6 +342,9 @@ static const struct imx_fb_videomode *imxfb_find_mode(struct imxfb_info *fbi)
- 	struct imx_fb_videomode *m;
- 	int i;
- 
-+	if (!fb_mode)
-+		return &fbi->mode[0];
-+
- 	for (i = 0, m = &fbi->mode[0]; i < fbi->num_modes; i++, m++) {
- 		if (!strcmp(m->mode.name, fb_mode))
- 			return m;
-@@ -758,13 +779,13 @@ static int imxfb_resume(struct platform_device *dev)
- #define imxfb_resume	NULL
- #endif
- 
--static int __init imxfb_init_fbinfo(struct platform_device *pdev)
-+static int imxfb_init_fbinfo(struct platform_device *pdev)
- {
- 	struct imx_fb_platform_data *pdata = pdev->dev.platform_data;
- 	struct fb_info *info = dev_get_drvdata(&pdev->dev);
- 	struct imxfb_info *fbi = info->par;
--	struct imx_fb_videomode *m;
--	int i;
-+	struct device_node *np;
-+	int ret;
- 
- 	pr_debug("%s\n",__func__);
- 
-@@ -795,41 +816,93 @@ static int __init imxfb_init_fbinfo(struct platform_device *pdev)
- 	info->fbops			= &imxfb_ops;
- 	info->flags			= FBINFO_FLAG_DEFAULT |
- 					  FBINFO_READS_FAST;
--	info->var.grayscale		= pdata->cmap_greyscale;
--	fbi->cmap_inverse		= pdata->cmap_inverse;
--	fbi->cmap_static		= pdata->cmap_static;
--	fbi->lscr1			= pdata->lscr1;
--	fbi->dmacr			= pdata->dmacr;
--	fbi->pwmr			= pdata->pwmr;
--	fbi->lcd_power			= pdata->lcd_power;
--	fbi->backlight_power		= pdata->backlight_power;
--
--	for (i = 0, m = &pdata->mode[0]; i < pdata->num_modes; i++, m++)
--		info->fix.smem_len = max_t(size_t, info->fix.smem_len,
--				m->mode.xres * m->mode.yres * m->bpp / 8);
-+	if (pdata) {
-+		info->var.grayscale		= pdata->cmap_greyscale;
-+		fbi->cmap_inverse		= pdata->cmap_inverse;
-+		fbi->cmap_static		= pdata->cmap_static;
-+		fbi->lscr1			= pdata->lscr1;
-+		fbi->dmacr			= pdata->dmacr;
-+		fbi->pwmr			= pdata->pwmr;
-+		fbi->lcd_power			= pdata->lcd_power;
-+		fbi->backlight_power		= pdata->backlight_power;
-+	} else {
-+		np = pdev->dev.of_node;
-+		info->var.grayscale = of_property_read_bool(np,
-+						"cmap-greyscale");
-+		fbi->cmap_inverse = of_property_read_bool(np, "cmap-inverse");
-+		fbi->cmap_static = of_property_read_bool(np, "cmap-static");
-+
-+		ret = of_property_read_u32(np, "lscr1", &fbi->lscr1);
-+		if (ret)
-+			fbi->lscr1 = 0;
-+		ret = of_property_read_u32(np, "dmacr", &fbi->dmacr);
-+		if (ret)
-+			fbi->dmacr = 0;
-+		ret = of_property_read_u32(np, "pwmr", &fbi->pwmr);
-+		if (ret)
-+			fbi->pwmr = 0;
-+
-+		/* These two function pointers could be used by some specific
-+		 * platforms. */
-+		fbi->lcd_power = NULL;
-+		fbi->backlight_power = NULL;
-+	}
- 
- 	return 0;
- }
- 
--static int __init imxfb_probe(struct platform_device *pdev)
-+static int imxfb_of_read_mode(struct device_node *np,
-+		struct imx_fb_videomode *imxfb_mode)
-+{
-+	int ret;
-+	struct fb_videomode *of_mode = &imxfb_mode->mode;
-+	u32 bpp;
-+	u32 pcr;
-+
-+	ret = of_property_read_string(np, "model", &of_mode->name);
-+	if (ret)
-+		of_mode->name = NULL;
-+
-+	ret = of_get_fb_videomode(np, of_mode, OF_USE_NATIVE_MODE);
-+	if (ret)
-+		return ret;
-+
-+	ret = of_property_read_u32(np, "bpp", &bpp);
-+	ret |= of_property_read_u32(np, "pcr", &pcr);
-+
-+	if (ret)
-+		return ret;
-+
-+	if (bpp > 255)
-+		return -EINVAL;
-+
-+	imxfb_mode->bpp = bpp;
-+	imxfb_mode->pcr = pcr;
-+
-+	return ret;
-+}
-+
-+static int imxfb_probe(struct platform_device *pdev)
- {
- 	struct imxfb_info *fbi;
- 	struct fb_info *info;
- 	struct imx_fb_platform_data *pdata;
- 	struct resource *res;
-+	struct imx_fb_videomode *m;
-+	const struct of_device_id *of_id;
- 	int ret, i;
- 
- 	dev_info(&pdev->dev, "i.MX Framebuffer driver\n");
- 
-+	of_id = of_match_device(imxfb_of_dev_id, &pdev->dev);
-+	if (of_id)
-+		pdev->id_entry = of_id->data;
-+
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!res)
- 		return -ENODEV;
- 
- 	pdata = pdev->dev.platform_data;
--	if (!pdata) {
--		dev_err(&pdev->dev,"No platform_data available\n");
--		return -ENOMEM;
--	}
- 
- 	info = framebuffer_alloc(sizeof(struct imxfb_info), &pdev->dev);
- 	if (!info)
-@@ -837,15 +910,51 @@ static int __init imxfb_probe(struct platform_device *pdev)
- 
- 	fbi = info->par;
- 
--	if (!fb_mode)
--		fb_mode = pdata->mode[0].mode.name;
--
- 	platform_set_drvdata(pdev, info);
- 
- 	ret = imxfb_init_fbinfo(pdev);
- 	if (ret < 0)
- 		goto failed_init;
- 
-+	if (pdata) {
-+		if (!fb_mode)
-+			fb_mode = pdata->mode[0].mode.name;
-+
-+		fbi->mode = pdata->mode;
-+		fbi->num_modes = pdata->num_modes;
-+	} else {
-+		struct device_node *display_np;
-+		fb_mode = NULL;
-+
-+		display_np = of_parse_phandle(pdev->dev.of_node, "display", 0);
-+		if (!display_np) {
-+			dev_err(&pdev->dev, "No display defined in devicetree\n");
-+			ret = -EINVAL;
-+			goto failed_of_parse;
-+		}
-+
-+		/*
-+		 * imxfb does not support more modes, we choose only the native
-+		 * mode.
-+		 */
-+		fbi->num_modes = 1;
-+
-+		fbi->mode = devm_kzalloc(&pdev->dev,
-+				sizeof(struct imx_fb_videomode), GFP_KERNEL);
-+		if (!fbi->mode) {
-+			ret = -ENOMEM;
-+			goto failed_of_parse;
-+		}
-+
-+		ret = imxfb_of_read_mode(display_np, fbi->mode);
-+		if (ret)
-+			goto failed_of_parse;
-+	}
-+
-+	for (i = 0, m = &fbi->mode[0]; i < fbi->num_modes; i++, m++)
-+		info->fix.smem_len = max_t(size_t, info->fix.smem_len,
-+				m->mode.xres * m->mode.yres * m->bpp / 8);
-+
- 	res = request_mem_region(res->start, resource_size(res),
- 				DRIVER_NAME);
- 	if (!res) {
-@@ -878,7 +987,8 @@ static int __init imxfb_probe(struct platform_device *pdev)
- 		goto failed_ioremap;
- 	}
- 
--	if (!pdata->fixed_screen_cpu) {
-+	/* Seems not being used by anyone, so no support for oftree */
-+	if (!pdata || !pdata->fixed_screen_cpu) {
- 		fbi->map_size = PAGE_ALIGN(info->fix.smem_len);
- 		fbi->map_cpu = dma_alloc_writecombine(&pdev->dev,
- 				fbi->map_size, &fbi->map_dma, GFP_KERNEL);
-@@ -903,18 +1013,16 @@ static int __init imxfb_probe(struct platform_device *pdev)
- 		info->fix.smem_start = fbi->screen_dma;
- 	}
- 
--	if (pdata->init) {
-+	if (pdata && pdata->init) {
- 		ret = pdata->init(fbi->pdev);
- 		if (ret)
- 			goto failed_platform_init;
- 	}
- 
--	fbi->mode = pdata->mode;
--	fbi->num_modes = pdata->num_modes;
- 
- 	INIT_LIST_HEAD(&info->modelist);
--	for (i = 0; i < pdata->num_modes; i++)
--		fb_add_videomode(&pdata->mode[i].mode, &info->modelist);
-+	for (i = 0; i < fbi->num_modes; i++)
-+		fb_add_videomode(&fbi->mode[i].mode, &info->modelist);
- 
- 	/*
- 	 * This makes sure that our colour bitfield
-@@ -944,10 +1052,10 @@ static int __init imxfb_probe(struct platform_device *pdev)
- failed_register:
- 	fb_dealloc_cmap(&info->cmap);
- failed_cmap:
--	if (pdata->exit)
-+	if (pdata && pdata->exit)
- 		pdata->exit(fbi->pdev);
- failed_platform_init:
--	if (!pdata->fixed_screen_cpu)
-+	if (pdata && !pdata->fixed_screen_cpu)
- 		dma_free_writecombine(&pdev->dev,fbi->map_size,fbi->map_cpu,
- 			fbi->map_dma);
- failed_map:
-@@ -956,6 +1064,7 @@ failed_ioremap:
- failed_getclock:
- 	release_mem_region(res->start, resource_size(res));
- failed_req:
-+failed_of_parse:
- 	kfree(info->pseudo_palette);
- failed_init:
- 	platform_set_drvdata(pdev, NULL);
-@@ -980,7 +1089,7 @@ static int imxfb_remove(struct platform_device *pdev)
- 	unregister_framebuffer(info);
- 
- 	pdata = pdev->dev.platform_data;
--	if (pdata->exit)
-+	if (pdata && pdata->exit)
- 		pdata->exit(fbi->pdev);
- 
- 	fb_dealloc_cmap(&info->cmap);
-@@ -1009,6 +1118,7 @@ static struct platform_driver imxfb_driver = {
- 	.shutdown	= imxfb_shutdown,
- 	.driver		= {
- 		.name	= DRIVER_NAME,
-+		.of_match_table = imxfb_of_dev_id,
- 	},
- 	.id_table	= imxfb_devtype,
- };
--- 
-1.8.1.4
+Actually that is a good point. There are some timings in CONFIG1 that
+are not being configured in gpmc_cs_program_settings() but
+gpmc_cs_set_timings(). I had left it this way intentionally to keep
+timings together, which makes sense for where gpmc clock could change at
+run time. However, this means that gpmc_cs_program_settings() needs to
+be called before gpmc_cs_set_timings(). Really this is no different to
+how the code was before, because the code was writing directly to
+CONFIG1 and now we have a function.
+
+So the intent is for gpmc_cs_program_settings() to only be called once
+for a given device and then gpmc_cs_set_timings() be called whenever the
+timings need to be updated. May be I can updated the kernel-doc for
+gpmc_cs_program_settings() to reflect this. Let me know if you have any
+other concerns with this.
+
+Cheers
+Jon
