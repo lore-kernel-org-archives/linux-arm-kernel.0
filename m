@@ -1,139 +1,82 @@
-From: marek.belisko@gmail.com (Belisko Marek)
-Date: Fri, 1 Mar 2013 21:40:49 +0100
-Subject: [PATCH] arm/dts: Add basic support for gta04 (Openmoko next
- generation) board.
-In-Reply-To: <1359052445-18560-1-git-send-email-marek.belisko@open-nandra.com>
-References: <1359052445-18560-1-git-send-email-marek.belisko@open-nandra.com>
-Message-ID: <CAAfyv35SUNL81O95JC+7i3-=MmY=1PE7DG2Y=DD7k3oY4bSi0w@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 01 Mar 2013 12:48:32 -0800
+Subject: [PATCH 2/5] clk: notifier handler for dynamic voltage scaling
+In-Reply-To: <20130301182234.6210.63879@quantum>
+References: <1362026969-11457-1-git-send-email-mturquette@linaro.org>
+ <1362026969-11457-3-git-send-email-mturquette@linaro.org>
+ <1362130891.19498.12.camel@bilhuang-vm1> <20130301182234.6210.63879@quantum>
+Message-ID: <20130301204832.6210.40653@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping. Any objections to that patch?
+Quoting Mike Turquette (2013-03-01 10:22:34)
+> Quoting Bill Huang (2013-03-01 01:41:31)
+> > On Thu, 2013-02-28 at 12:49 +0800, Mike Turquette wrote:
+> > > Dynamic voltage and frequency scaling (dvfs) is a common power saving
+> > > technique in many of today's modern processors.  This patch introduces a
+> > > common clk rate-change notifier handler which scales voltage
+> > > appropriately whenever clk_set_rate is called on an affected clock.
+> > 
+> > I really think clk_enable and clk_disable should also be triggering
+> > notifier call and DVFS should act accordingly since there are cases
+> > drivers won't set clock rate but instead disable its clock directly, do
+> > you agree?
+> > > 
+> 
+> Hi Bill,
+> 
+> I'll think about this.  Perhaps a better solution would be to adapt
+> these drivers to runtime PM.  Then a call to runtime_pm_put() would
+> result in a call to clk_disable(...) and regulator_set_voltage(...).
+> 
+> There is no performance-based equivalent to runtime PM, which is one
+> reason why clk_set_rate is a likely entry point into dvfs.  But for
+> operations that have nice api's like runtime PM it would be better to
+> use those interfaces and not overload the clk.h api unnecessarily.
+> 
 
-On Thu, Jan 24, 2013 at 7:34 PM, Marek Belisko
-<marek.belisko@open-nandra.com> wrote:
-> Signed-off-by: Marek Belisko <marek.belisko@open-nandra.com>
-> ---
->  arch/arm/boot/dts/omap3-gta04.dts |   94 +++++++++++++++++++++++++++++++++++++
->  1 file changed, 94 insertions(+)
->  create mode 100644 arch/arm/boot/dts/omap3-gta04.dts
->
-> diff --git a/arch/arm/boot/dts/omap3-gta04.dts b/arch/arm/boot/dts/omap3-gta04.dts
-> new file mode 100644
-> index 0000000..9e7e3ec
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/omap3-gta04.dts
-> @@ -0,0 +1,94 @@
-> +/*
-> + * Copyright (C) 2013 Marek Belisko <marek.belisko@open-nandra.com>
-> + *
-> + * Based on omap3-beagle-xm.dts
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +/dts-v1/;
-> +
-> +/include/ "omap3.dtsi"
-> +
-> +/ {
-> +       model = "OMAP3 GTA04";
-> +       compatible = "ti,omap3-gta04", "ti,omap3";
-> +
-> +       memory {
-> +               device_type = "memory";
-> +               reg = <0x80000000 0x20000000>; /* 512 MB */
-> +       };
-> +
-> +       gpio-keys {
-> +               compatible = "gpio-keys";
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +               aux-button {
-> +                       label = "AUX";
-> +                       linux,code = <169>;
-> +                       gpios = <&gpio1 7 1>;
-> +                       gpio-key,wakeup;
-> +               };
-> +       };
-> +};
-> +
-> +&i2c1 {
-> +       clock-frequency = <2600000>;
-> +
-> +       twl: twl at 48 {
-> +               reg = <0x48>;
-> +               interrupts = <7>; /* SYS_NIRQ cascaded to intc */
-> +               interrupt-parent = <&intc>;
-> +       };
-> +};
-> +
-> +/include/ "twl4030.dtsi"
-> +
-> +&i2c2 {
-> +       clock-frequency = <400000>;
-> +       /* Pressure Sensor */
-> +       bmp085 at 77 {
-> +               compatible = "bosch,bmp085";
-> +               reg = <0x77>;
-> +       };
-> +
-> +       /* leds */
-> +       tca6507 at 45 {
-> +               compatible = "ti,tca6507";
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +               reg = <0x45>;
-> +
-> +               gta04_led0: red_aux at 0 {
-> +                       label = "gta04:red:aux";
-> +                       reg = <0x0>;
-> +               };
-> +
-> +               gta04_led1: green_aux at 1 {
-> +                       label = "gta04:green:aux";
-> +                       reg = <0x1>;
-> +               };
-> +
-> +               gta04_led3: red_power at 3 {
-> +                       label = "gta04:red:power";
-> +                       reg = <0x3>;
-> +                       linux,default-trigger = "default-on";
-> +               };
-> +
-> +               gta04_led4: green_power at 4 {
-> +                       label = "gta04:green:power";
-> +                       reg = <0x4>;
-> +               };
-> +       };
-> +};
-> +
-> +&i2c3 {
-> +       clock-frequency = <100000>;
-> +};
-> +
-> +&mmc1 {
-> +       vmmc-supply = <&vmmc1>;
-> +       bus-width = <4>;
-> +};
-> +
-> --
-> 1.7.10.4
->
+Bill,
+
+I wasn't thinking at all when I wrote this.  Trying to rush to the
+airport I guess...
+
+clk_enable() and clk_disable() must not sleep and all operations are
+done under a spinlock.  So this rules out most use of notifiers.  It is
+expected for some drivers to very aggressively enable/disable clocks in
+interrupt handlers so scaling voltage as a function of clk_{en|dis}able
+calls is also likely out of the question.
+
+Some platforms have chosen to implement voltage scaling in their
+.prepare callbacks.  I personally do not like this and still prefer
+drivers be adapted to runtime pm and let those callbacks handle voltage
+scaling along with clock handling.
 
 Regards,
+Mike
 
-marek
-
--- 
-as simple and primitive as possible
--------------------------------------------------
-Marek Belisko - OPEN-NANDRA
-Freelance Developer
-
-Ruska Nova Ves 219 | Presov, 08005 Slovak Republic
-Tel: +421 915 052 184
-skype: marekwhite
-twitter: #opennandra
-web: http://open-nandra.com
+> > > There are three prerequisites to using this feature:
+> > > 
+> > > 1) the affected clocks must be using the common clk framework
+> > > 2) voltage must be scaled using the regulator framework
+> > > 3) clock frequency and regulator voltage values must be paired via the
+> > > OPP library
+> > 
+> > Just a note, Tegra Core won't meet prerequisite #3 since each regulator
+> > voltage values is associated with clocks driving those many sub-HW
+> > blocks in it.
+> 
+> This patch isn't the one and only way to perform dvfs.  It is just a
+> helper function for registering notifier handlers for systems that meet
+> the above three requirements.  Even if you do not use the OPP library
+> there is no reason why you could not register your own rate-change
+> notifier handler to implement dvfs using whatever lookup-table you use
+> today.
+> 
+> And patches are welcome to extend the usefulness of this helper.  I'd
+> like as many people to benefit from this mechanism as possible.
+> 
+> At some point we should think hard about DT bindings for these operating
+> points...
+> 
+> Regards,
+> Mike
