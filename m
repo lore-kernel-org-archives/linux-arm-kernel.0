@@ -1,29 +1,45 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 1 Mar 2013 09:33:14 +0800
-Subject: [PATCH v2 0/3] Get rid of big array from imx pinctrl driver
-In-Reply-To: <CAOesGMjAzSt948+sKRNRzQ3T3F4fbvzBcXYXKmkwW_AAdmiMng@mail.gmail.com>
-References: <1361533888-18073-1-git-send-email-shawn.guo@linaro.org>
- <CAOesGMjAzSt948+sKRNRzQ3T3F4fbvzBcXYXKmkwW_AAdmiMng@mail.gmail.com>
-Message-ID: <20130301013313.GH26106@S2101-09.ap.freescale.net>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Fri, 1 Mar 2013 09:45:51 +0800
+Subject: [PATCH v9 8/9] usb: chipidea: tell platform layer the ci core
+ probe's result
+In-Reply-To: <20130228104559.GB22736@arwen.pp.htv.fi>
+References: <20130226094234.GC26189@arwen.pp.htv.fi>
+ <20130227022202.GA20402@nchen-desktop>
+ <20130227121238.GE8016@arwen.pp.htv.fi>
+ <20130228031118.GA19387@nchen-desktop>
+ <20130228072617.GB6154@arwen.pp.htv.fi>
+ <20130228083143.GB19516@nchen-desktop>
+ <20130228084933.GG6544@arwen.pp.htv.fi>
+ <871uc0yeau.fsf@ashishki-desk.ger.corp.intel.com>
+ <20130228100654.GC19516@nchen-desktop>
+ <20130228104559.GB22736@arwen.pp.htv.fi>
+Message-ID: <20130301014457.GB19324@nchen-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 28, 2013 at 05:24:21PM -0800, Olof Johansson wrote:
-> On Fri, Feb 22, 2013 at 3:51 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> > Changes since v1:
-> >  * Remove the absolute path of imxXX-pinfunc.h in binding doc
-> >  * Remove the pin id from PIN_FUNC_ID/macro
-> >
-> > Shawn Guo (3):
-> >   ARM: dts: imx: use pre-processor for device trees
-> >   ARM: dts: imx: replace magic number with pin function name
-> >   pinctrl: imx: move hard-coding data into device tree
+On Thu, Feb 28, 2013 at 12:45:59PM +0200, Felipe Balbi wrote:
+> Hi,
 > 
-> These patches were too large to make it out on any mailing list. I'm
-> guessing only the people who were recipients of them saw them.
+> On Thu, Feb 28, 2013 at 06:06:55PM +0800, Peter Chen wrote:
 > 
-> Please figure out a way to post your work in a way that it can be reviewed.
+> > For runtime pm disabled, we may had to add some ugly things, like
+> > notify core probe fail, and platform layer needs to handle this failed
+> > notify.
 > 
-Yeah, I will publish a branch after v3.9-rc1 is available.
+> Please stop talking about about "notify core probe fail" that will never
+> happen. Not today, not ever. Forget that idea.
 
-Shawn
+Of course, it is ugly way, I just thought if it will affect power, eg dvfs,
+bus freq if the usb clock is on. Maybe the user will find USB core init fails
+case causes runtime power rise, and fix the core init fail bug.
+
+> 
+> -- 
+> balbi
+
+
+
+-- 
+
+Best Regards,
+Peter Chen
