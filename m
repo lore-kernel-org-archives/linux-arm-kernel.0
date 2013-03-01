@@ -1,59 +1,38 @@
-From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Fri, 1 Mar 2013 10:51:26 -0800
-Subject: [PATCH RFC] arm: l2x0: Leverage power saving features
-Message-ID: <da92149b-159b-40e3-87b4-a0a448d1da8b@CO1EHSMHS031.ehs.local>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 1 Mar 2013 20:22:13 +0100
+Subject: [PATCH v4 1/2] i2c-core: dt: Pick i2c bus number from i2c alias
+ if present
+In-Reply-To: <1362157052-16738-2-git-send-email-dianders@chromium.org>
+References: <1360630085-26874-1-git-send-email-dianders@chromium.org>
+ <1362157052-16738-1-git-send-email-dianders@chromium.org>
+ <1362157052-16738-2-git-send-email-dianders@chromium.org>
+Message-ID: <20130301192212.GA379@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the 'dynamic clock stop' and 'standby mode' features in the
-l2x0 disable path.
+On Fri, Mar 01, 2013 at 08:57:31AM -0800, Doug Anderson wrote:
+> This allows you to get the equivalent functionality of
+> i2c_add_numbered_adapter() with all data in the device tree and no
+> special case code in your driver.  This is a common device tree
+> technique.
+> 
+> For quick reference, the FDT syntax for using an alias to provide an
+> ID looks like:
+>   aliases {
+>     i2c0 = &i2c_0;
+>     i2c1 = &i2c_1;
+>   };
+> 
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
 
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
----
-Hi,
+Thanks, applied. I'll try to get it into 3.9.
 
-we are currently implementing a suspend to RAM like low power mode for
-Zynq.
-The code for entering suspend looks like this:
-	outer_disable();                                                 
-        cpu_suspend(0, zynq_pm_suspend);                                 
-        outer_resume();
+> +	/* Handled by wrappers */
+> +	if (WARN_ON(adap->nr == -1))
+> +		return -EINVAL;
 
-In our low power guidelines we mention the pl310's standby and clock stop
-feature and that they should be enabled for low power modes. The question
-arising here now is: Does the outer_disable() make these features redundant,
-or does it make sense to add it like shown in this patch?
+I removed this check, though. We know our callers, all static.
 
-	Thanks,
-	S?ren
+Thanks,
 
- arch/arm/mm/cache-l2x0.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
-
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index c2f3739..3565df1 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -286,8 +286,20 @@ static void l2x0_flush_range(unsigned long start, unsigned long end)
- static void l2x0_disable(void)
- {
- 	unsigned long flags;
-+	unsigned long reg;
-+	u32 l2x0_revision;
- 
- 	raw_spin_lock_irqsave(&l2x0_lock, flags);
-+
-+	l2x0_revision = readl_relaxed(l2x0_base + L2X0_CACHE_ID) &
-+		L2X0_CACHE_ID_RTL_MASK;
-+
-+	if (l2x0_revision >= L2X0_CACHE_ID_RTL_R3P0) {
-+		reg = readl_relaxed(l2x0_base + L2X0_POWER_CTRL);
-+		reg |= L2X0_STNDBY_MODE_EN | L2X0_DYNAMIC_CLK_GATING_EN;
-+		writel_relaxed(reg, l2x0_base + L2X0_POWER_CTRL);
-+	}
-+
- 	__l2x0_flush_all();
- 	writel_relaxed(0, l2x0_base + L2X0_CTRL);
- 	dsb();
--- 
-1.8.1.3
+   Wolfram
