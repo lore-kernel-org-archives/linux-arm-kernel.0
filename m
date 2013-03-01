@@ -1,27 +1,69 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 28 Feb 2013 17:24:21 -0800
-Subject: [PATCH v2 0/3] Get rid of big array from imx pinctrl driver
-In-Reply-To: <1361533888-18073-1-git-send-email-shawn.guo@linaro.org>
-References: <1361533888-18073-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <CAOesGMjAzSt948+sKRNRzQ3T3F4fbvzBcXYXKmkwW_AAdmiMng@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 28 Feb 2013 19:35:36 -0600
+Subject: [PATCH] ARM: dts: remove generated .dtb files on clean
+In-Reply-To: <5108BDDD.60307@ti.com>
+References: <1358890049-26981-1-git-send-email-nm@ti.com>
+ <5108BDDD.60307@ti.com>
+Message-ID: <CAGo_u6qZwgGOugh3_F2pFvwM8ZAxU=Rsy7B2Lj6CjO+VG7GwXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 22, 2013 at 3:51 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> Changes since v1:
->  * Remove the absolute path of imxXX-pinfunc.h in binding doc
->  * Remove the pin id from PIN_FUNC_ID/macro
+On Wed, Jan 30, 2013 at 12:29 AM, Santosh Shilimkar
+<santosh.shilimkar@ti.com> wrote:
+> Looping RMK, Arnd
+Gentle query if we are still interested in this:
+https://patchwork.kernel.org/patch/2020831/
+
+Looks like linux master still wont delete the dtbs on make clean etc..
+I think leaving the stale dtbs
+around could have it's set of user errors.
+Regards,
+Nishanth Menon
+
 >
-> Shawn Guo (3):
->   ARM: dts: imx: use pre-processor for device trees
->   ARM: dts: imx: replace magic number with pin function name
->   pinctrl: imx: move hard-coding data into device tree
-
-These patches were too large to make it out on any mailing list. I'm
-guessing only the people who were recipients of them saw them.
-
-Please figure out a way to post your work in a way that it can be reviewed.
-
-
-
--Olof
+>
+> On Wednesday 23 January 2013 02:57 AM, Nishanth Menon wrote:
+>>
+>> commit 5f300acd8ae9f3d4585154370012ffc5c665330f
+>> (ARM: 7152/1: distclean: Remove generated .dtb files)
+>> ensured that dtbs were cleaned up when they were in
+>> arch/arm/boot.
+>> However, with the following commit:
+>> commit 499cd8298628eeabf0eb5eb6525d4faa0eec80d8
+>> (ARM: dt: change .dtb build rules to build in dts directory)
+>>
+>> make clean now leaves dtbs in arch/arm/boot/dts/
+>> untouched. Include dts directory so that clean-files rule
+>> from arch/arm/boot/dts/Makefile is invoked when make
+>> clean is done.
+>>
+>> Cc: Dirk Behme <dirk.behme@de.bosch.com>
+>> CC: Grant Likely <grant.likely@secretlab.ca>
+>>
+>> Signed-off-by: Nishanth Menon <nm@ti.com>
+>> ---
+>>   arch/arm/boot/Makefile |    2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
+>> index abfce28..3837f97 100644
+>> --- a/arch/arm/boot/Makefile
+>> +++ b/arch/arm/boot/Makefile
+>> @@ -115,4 +115,4 @@ i:
+>>         $(CONFIG_SHELL) $(srctree)/$(src)/install.sh $(KERNELRELEASE) \
+>>         $(obj)/Image System.map "$(INSTALL_PATH)"
+>>
+>> -subdir-            := bootp compressed
+>> +subdir-            := bootp compressed dts
+>>
+> Seems to be the valid fix for me.
+>
+> Regards,
+> Santosh
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
