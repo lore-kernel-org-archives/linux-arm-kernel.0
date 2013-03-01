@@ -1,36 +1,38 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 28 Feb 2013 13:51:39 -0800
-Subject: [PATCH] arm/omap2: Fix build failures
-In-Reply-To: <1362077583-11184-1-git-send-email-linux@roeck-us.net>
-References: <1362077583-11184-1-git-send-email-linux@roeck-us.net>
-Message-ID: <20130228215138.GJ1622@atomide.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Thu, 28 Feb 2013 18:42:14 -0600
+Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
+In-Reply-To: <CACRpkdbY1AQuJWvDaYQFoZbKwNAOGG-p3wjedEgifbSh=1kNmA@mail.gmail.com>
+References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
+ <1329321854-24490-4-git-send-email-b-cousson@ti.com>
+ <CACRpkdabXa8tXNeGRPntvY9cx4XWCa7XaEXHmVREeWN-x793ZA@mail.gmail.com>
+ <512F55E0.8050501@ti.com>
+ <CACRpkdbY1AQuJWvDaYQFoZbKwNAOGG-p3wjedEgifbSh=1kNmA@mail.gmail.com>
+Message-ID: <512FF966.9060806@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-* Guenter Roeck <linux@roeck-us.net> [130228 11:21]:
-> Commit c1d1cd59 (omap_device: remove obsolete pm_lats and early_device code)
-> changed the number of parameters to omap_device_build(), but did not fix all
-> calling code correctly. This causes build failures with some configurations.
+On 02/28/2013 06:09 PM, Linus Walleij wrote:
+> On Thu, Feb 28, 2013 at 2:04 PM, Benoit Cousson <b-cousson@ti.com> wrote:
 > 
-> arch/arm/mach-omap2/devices.c: In function 'omap_init_hdmi_audio':
-> arch/arm/mach-omap2/devices.c:429:2: error: too many arguments to function 'omap_device_build'
-> arch/arm/mach-omap2/omap_device.h:74:25: note: declared here
-> make[2]: [arch/arm/mach-omap2/devices.o] Error 1 (ignored)
-> arch/arm/mach-omap2/sr_device.c: In function 'sr_dev_init':
-> arch/arm/mach-omap2/sr_device.c:155:2: error: too many arguments to function 'omap_device_build'
-> arch/arm/mach-omap2/omap_device.h:74:25: note: declared here
-> make[2]: [arch/arm/mach-omap2/sr_device.o] Error 1 (ignored)
-> arch/arm/mach-omap2/am35xx-emac.c: In function 'omap_davinci_emac_dev_init':
-> arch/arm/mach-omap2/am35xx-emac.c:66:6: error: too many arguments to function 'omap_device_build'
-> arch/arm/mach-omap2/omap_device.h:74:25: note: declared here
+>> On 02/28/2013 12:41 AM, Linus Walleij wrote:
+>>> On Wed, Feb 15, 2012 at 5:04 PM, Benoit Cousson <b-cousson@ti.com> wrote:
+>>
+>> Gosh! That's pretty old stuff :-)
+> 
+> Hm yeah, haha :-)
+> 
+> I didn't notice that someone was replying in the thread for
+> some other reason (or maybe using the same subject and
+> confusing my gmail reader?).
+> 
+> Anyway, the basic idea is sound, so are you still working
+> on the patch? I remember discussing this with someone
+> in Denmark...
 
-Thanks, we already have a fix for this in linux next as
-commit 6efc3fe0 (ARM: OMAP2+: fix some omap_device_build() calls that
-aren't compiled by default). It seems that it will get sent today as
-part of the rest of the arm-soc late branches.
+That was me :-)
 
-Regards,
+I have the patch, I am testing and will send tomorrow for review.
 
-Tony
+Cheers
+Jon
