@@ -1,78 +1,31 @@
-From: srivatsa.bhat@linux.vnet.ibm.com (Srivatsa S. Bhat)
-Date: Sat, 02 Mar 2013 01:36:55 +0530
-Subject: [PATCH] lglock: add read-preference local-global rwlock
-In-Reply-To: <20130301175349.GC2481@mtj.dyndns.org>
-References: <512BBAD8.8010006@linux.vnet.ibm.com>
- <CACvQF51jCxk5jUqmhD=QBBtUsBkQWZzakacrKO4Gsk=w61rNwQ@mail.gmail.com>
- <512C7A38.8060906@linux.vnet.ibm.com>
- <CACvQF51RvhM8XNqu3-1OTQ=cZUZ=pAX+_zx0a29+W67N1X+BgQ@mail.gmail.com>
- <512CC509.1050000@linux.vnet.ibm.com>
- <CACvQF50UgiqPpDk3HCmV86zKSf6tPjqr0bZowfPEOJs0g0r0MQ@mail.gmail.com>
- <512D0D67.9010609@linux.vnet.ibm.com>
- <CACvQF53ph2ixdM-otzetjM5cR+2kcZj6sckOp3TnzzA_x-EZ8w@mail.gmail.com>
- <512E7879.20109@linux.vnet.ibm.com> <5130E8E2.50206@cn.fujitsu.com>
- <20130301175349.GC2481@mtj.dyndns.org>
-Message-ID: <51310A5F.1070001@linux.vnet.ibm.com>
+From: elezegarcia@gmail.com (Ezequiel Garcia)
+Date: Fri, 1 Mar 2013 17:11:51 -0300
+Subject: [PATCH 12/14] ARM: OMAP2+: Add additional GPMC timing parameters
+In-Reply-To: <1361899842-30303-13-git-send-email-jon-hunter@ti.com>
+References: <1361899842-30303-1-git-send-email-jon-hunter@ti.com>
+ <1361899842-30303-13-git-send-email-jon-hunter@ti.com>
+Message-ID: <CALF0-+VVmZHkRggN0Xj-6=gQ9Rm09qU4hKuLoD-iE6_jqPbm+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/01/2013 11:23 PM, Tejun Heo wrote:
-> Hey, guys and Oleg (yes, I'm singling you out ;p because you're that
-> awesome.)
-> 
-> On Sat, Mar 02, 2013 at 01:44:02AM +0800, Lai Jiangshan wrote:
->> Performance:
->> We only focus on the performance of the read site. this read site's fast path
->> is just preempt_disable() + __this_cpu_read/inc() + arch_spin_trylock(),
->> It has only one heavy memory operation. it will be expected fast.
->>
->> We test three locks.
->> 1) traditional rwlock WITHOUT remote competition nor cache-bouncing.(opt-rwlock)
->> 2) this lock(lgrwlock)
->> 3) V6 percpu-rwlock by "Srivatsa S. Bhat". (percpu-rwlock)
->>    (https://lkml.org/lkml/2013/2/18/186)
->>
->> 		nested=1(no nested)	nested=2	nested=4
->> opt-rwlock	 517181			1009200		2010027
->> lgrwlock	 452897			 700026		1201415
->> percpu-rwlock	1192955			1451343		1951757
-> 
-> On the first glance, the numbers look pretty good and I kinda really
-> like the fact that if this works out we don't have to introduce yet
-> another percpu synchronization construct and get to reuse lglock.
-> 
-> So, Oleg, can you please see whether you can find holes in this one?
-> 
-> Srivatsa, I know you spent a lot of time on percpu_rwlock but as you
-> wrote before Lai's work can be seen as continuation of yours, and if
-> we get to extend what's already there instead of introducing something
-> completely new, there's no reason not to
+Hi Jon,
 
-Yep, I agree!
-
-> (and my apologies for not
-> noticing the possibility of extending lglock before).
-
-No problem at all! You gave so many invaluable suggestions to make this
-whole thing work in the first place! Now, if we can reuse the existing
-stuff and extend it to what we want, then its just even better! :-)
-
->  So, if this can
-> work, it would be awesome if you guys can work together.
-
-Absolutely!
-
->  Lai might
-> not be very good at communicating in english yet but he's really good
-> at spotting patterns in complex code and playing with them.
+On Tue, Feb 26, 2013 at 2:30 PM, Jon Hunter <jon-hunter@ti.com> wrote:
+[...]
 >
+> +       if (!of_property_read_u32(np, "gpmc,bus-turnaround", &val))
+> +               gpmc_t->bus_turnaround = val;
+> +
 
-That sounds great! :-)
+AFAIK, you don't need to test if the property is defined.
+You can just read it straightforward, and if the property is not defined
+then nothing will be stored in your variable:
 
-I'll soon take a closer look at his code and the comparisons he posted,
-and work towards taking this effort forward.
+of_property_read_u32(np, "gpmc,bus-turnaround", &gpmc_t->bus_turnaround);
 
-Thank you very much!
+You can simplify *a lot* your patch with this, and I believe you could
+also clean
+existent code.
 
-Regards,
-Srivatsa S. Bhat
+-- 
+    Ezequiel
