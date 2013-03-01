@@ -1,31 +1,26 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri,  1 Mar 2013 09:42:33 -0300
-Subject: [PATCH] ARM: mxs_defconfig: Select watchdog driver
-Message-ID: <1362141754-11254-1-git-send-email-festevam@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 1 Mar 2013 13:43:56 +0100
+Subject: [PATCH v9 01/10] gpio: add gpio offset in gpio range cells
+ property
+In-Reply-To: <1361101376-3783-2-git-send-email-haojian.zhuang@linaro.org>
+References: <1361101376-3783-1-git-send-email-haojian.zhuang@linaro.org>
+ <1361101376-3783-2-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <CACRpkdZe97v4ecMWiCWJ=S7GGCi=de149PqXs25zy-1dQSp31g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On Sun, Feb 17, 2013 at 12:42 PM, Haojian Zhuang
+<haojian.zhuang@linaro.org> wrote:
 
-Select watchdog driver.
+> Add gpio offset into "gpio-range-cells" property. It's used to support
+> sparse pinctrl range in gpio chip.
+>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/configs/mxs_defconfig |    2 ++
- 1 file changed, 2 insertions(+)
+OK I have applied this to the pinctrl tree for v3.10 to keep all pinctrl changes
+together.
 
-diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
-index fbbc5bb..f662604 100644
---- a/arch/arm/configs/mxs_defconfig
-+++ b/arch/arm/configs/mxs_defconfig
-@@ -99,6 +99,8 @@ CONFIG_SPI_MXS=y
- CONFIG_DEBUG_GPIO=y
- CONFIG_GPIO_SYSFS=y
- # CONFIG_HWMON is not set
-+CONFIG_WATCHDOG=y
-+CONFIG_STMP3XXX_RTC_WATCHDOG=y
- CONFIG_REGULATOR=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
- CONFIG_FB=y
--- 
-1.7.9.5
+Thanks!
+Linus Walleij
