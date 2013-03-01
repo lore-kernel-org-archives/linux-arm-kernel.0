@@ -1,30 +1,29 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 1 Mar 2013 09:14:04 +0800
-Subject: [PATCH 07/12] mtd: gpmi: move to use generic DMA helper
-In-Reply-To: <512F17B0.5080705@freescale.com>
-References: <1361978748-25281-1-git-send-email-shawn.guo@linaro.org>
- <1361978748-25281-8-git-send-email-shawn.guo@linaro.org>
- <512F17B0.5080705@freescale.com>
-Message-ID: <20130301011401.GA30499@S2101-09.ap.freescale.net>
+Date: Fri, 1 Mar 2013 09:33:14 +0800
+Subject: [PATCH v2 0/3] Get rid of big array from imx pinctrl driver
+In-Reply-To: <CAOesGMjAzSt948+sKRNRzQ3T3F4fbvzBcXYXKmkwW_AAdmiMng@mail.gmail.com>
+References: <1361533888-18073-1-git-send-email-shawn.guo@linaro.org>
+ <CAOesGMjAzSt948+sKRNRzQ3T3F4fbvzBcXYXKmkwW_AAdmiMng@mail.gmail.com>
+Message-ID: <20130301013313.GH26106@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 28, 2013 at 04:39:12PM +0800, Huang Shijie wrote:
-> ? 2013?02?27? 23:25, Shawn Guo ??:
-> > +++ b/Documentation/devicetree/bindings/mtd/gpmi-nand.txt
-> > @@ -7,10 +7,12 @@ Required properties:
-> >    - compatible : should be "fsl,<chip>-gpmi-nand"
-> >    - reg : should contain registers location and length for gpmi and bch.
-> >    - reg-names: Should contain the reg names "gpmi-nand" and "bch"
-> > -  - interrupts : The first is the DMA interrupt number for GPMI.
-> > -                 The second is the BCH interrupt number.
-> > -  - interrupt-names : The interrupt names "gpmi-dma", "bch";
-> > -  - fsl,gpmi-dma-channel : Should contain the dma channel it uses.
-> > +  - interrupts : BCH interrupt number.
-> > +  - interrupt-names : Should be "bch".
-> why split out the bch interrupt? It seems no use to do it.
+On Thu, Feb 28, 2013 at 05:24:21PM -0800, Olof Johansson wrote:
+> On Fri, Feb 22, 2013 at 3:51 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> > Changes since v1:
+> >  * Remove the absolute path of imxXX-pinfunc.h in binding doc
+> >  * Remove the pin id from PIN_FUNC_ID/macro
+> >
+> > Shawn Guo (3):
+> >   ARM: dts: imx: use pre-processor for device trees
+> >   ARM: dts: imx: replace magic number with pin function name
+> >   pinctrl: imx: move hard-coding data into device tree
 > 
-The real change here is to remove gpmi-dma interrupt, since we have all
-dma interrupts defined in dma controller node.
+> These patches were too large to make it out on any mailing list. I'm
+> guessing only the people who were recipients of them saw them.
+> 
+> Please figure out a way to post your work in a way that it can be reviewed.
+> 
+Yeah, I will publish a branch after v3.9-rc1 is available.
 
 Shawn
