@@ -1,35 +1,22 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri,  1 Mar 2013 12:46:52 -0800
-Subject: [PATCH] ARM: Remove VFP debug spew
-Message-ID: <1362170812-31048-1-git-send-email-dianders@chromium.org>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 01 Mar 2013 15:58:59 -0500 (EST)
+Subject: [PATCH v2 1/1 net-next] fec: net: put tx to napi poll function
+ to fix dead lock
+In-Reply-To: <1362109034-25805-1-git-send-email-Frank.Li@freescale.com>
+References: <1362109034-25805-1-git-send-email-Frank.Li@freescale.com>
+Message-ID: <20130301.155859.2106303756469493825.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In commit e36815e2e4a2fb675207d8968bb68e22bc938328:
-  ARM: Fix broken commit 0cc41e4a21d43 corrupting kernel messages
+From: Frank Li <Frank.Li@freescale.com>
+Date: Fri, 1 Mar 2013 11:37:14 +0800
 
-...a "#define DEBUG" line was accidentally left in.  This has the side
-effect of spewing massive numbers of debug messages into the log at
-boot.  Remove the DEBUG define.
+> @@ -566,27 +554,47 @@ fec_timeout(struct net_device *ndev)
+>  	netif_wake_queue(ndev);
+>  }
+>  
+> -static void
+> +static int
+>  fec_enet_tx(struct net_device *ndev)
 
-Signed-off-by: Doug Anderson <dianders@chromium.org>
----
-Note: The commit in question is only on linux-next.
-
- arch/arm/vfp/vfphw.S | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/arch/arm/vfp/vfphw.S b/arch/arm/vfp/vfphw.S
-index 20c8dd7..8d10dc8 100644
---- a/arch/arm/vfp/vfphw.S
-+++ b/arch/arm/vfp/vfphw.S
-@@ -19,7 +19,6 @@
- #include <linux/kern_levels.h>
- #include "../kernel/entry-header.S"
- 
--#define DEBUG
- 	.macro	DBGSTR, str
- #ifdef DEBUG
- 	stmfd	sp!, {r0-r3, ip, lr}
--- 
-1.8.1.3
+The return value of this function is never tested, get rid of it.
