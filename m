@@ -1,30 +1,35 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 01 Mar 2013 09:46:24 +0100
-Subject: [PATCH V2] arm64: add support for 8250/16550 earlyprintk
-In-Reply-To: <1362127307-7986-1-git-send-email-anup.patel@linaro.org>
-References: <1362127307-7986-1-git-send-email-anup.patel@linaro.org>
-Message-ID: <8a607bb68e491a3733413acd5843cfc1@localhost>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Fri, 1 Mar 2013 09:56:39 +0100
+Subject: [PATCH 3/4] ARM: nomadik: add dynamic irq flag to the timer
+In-Reply-To: <CACRpkda=i5cXSbYCyb0gH0OLKj7396qguup1nqgqn0m-S1x1wg@mail.gmail.com>
+References: <1361917047-29230-1-git-send-email-daniel.lezcano@linaro.org>
+ <1361917047-29230-4-git-send-email-daniel.lezcano@linaro.org>
+ <CACRpkda=i5cXSbYCyb0gH0OLKj7396qguup1nqgqn0m-S1x1wg@mail.gmail.com>
+Message-ID: <CAKfTPtA=7pTPrwFHr61WiffXGv2Ztmaiji5q_vJpPj9XgyeZMg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri,  1 Mar 2013 14:11:47 +0530, Anup Patel <anup.patel@linaro.org>
-wrote:
-> This patch adds support for using earlyprintk with 8250/16550 UART
-ports.
-> 
-> The 8250/16550 UART can either have 8-bit or 32-bit aligned registers
-> which is HW vendor dependent.
-> 
-> Kernel args for 8-bit aligned regs:
-> earlyprintk=uart8250-8bit,<phys_address>
-> 
-> Kernel args for 32-bit aligned regs:
-> earlyprintk=uart8250-32bit,<phys_address>
-> 
-> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+On 1 March 2013 02:13, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Tue, Feb 26, 2013 at 11:17 PM, Daniel Lezcano
+> <daniel.lezcano@linaro.org> wrote:
+>
+>> Add the dynamic irq affinity feature to the timer clock device.
+>>
+>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>
+> Looks reasonable to me, sadly I do not fully grasp the patch set,
+> Vincent+Rickard can you have a look at this?
 
-Looks OK to me. FWIW:
+ux500 is able to trig the wake up on one CPU and let the other one in
+WFI. This patch will minimize the spurious wake up of CPU0 when CPU1
+is the target CPU of the broadcast timer. One main consequence is that
+we will not uselessly execute all the deferrable and newly idle
+activities on the CPU0 .
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
--- 
-Fast, cheap, reliable. Pick two.
+you can add my reviewed-by if you want
+
+Vincent
+
+>
+> Yours,
+> Linus Walleij
