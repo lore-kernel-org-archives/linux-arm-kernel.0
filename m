@@ -1,70 +1,162 @@
-From: T.Crueger@fh-trier.de (Till Crueger)
-Date: Fri, 01 Mar 2013 15:48:06 +0100
-Subject: Starting the kernel on Core1 of a Cortex-A9 system
-Message-ID: <5130BFA6.5020701@fh-trier.de>
+From: zonque@gmail.com (Daniel Mack)
+Date: Fri, 01 Mar 2013 16:01:27 +0100
+Subject: [PATCH] clk: add si5351 i2c common clock driver
+In-Reply-To: <CABJ1b_TaQ=AXCM9KKW-hJ0Rgdd+759ia+9P=bdnYbA_HcHP1wQ@mail.gmail.com>
+References: <1360414772-12232-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <5123CF5B.9060804@gmail.com>
+ <CABJ1b_TaQ=AXCM9KKW-hJ0Rgdd+759ia+9P=bdnYbA_HcHP1wQ@mail.gmail.com>
+Message-ID: <5130C2C7.30400@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
+Hi Sebastian,
 
-Hi,
+On 27.02.2013 11:01, Sebastian Hesselbarth wrote:
+> first of all sorry for the late answer but thanks for testing the driver.
+> 
+> On 2/19/13, Daniel Mack <zonque@gmail.com> wrote:
+>> Hi Sebastian,
+>>
+>> I did some more tests today and it took me a while to dig for the root
+>> cause why things were not working for me in the first place - see below.
+>>
+>>
+>> On 09.02.2013 13:59, Sebastian Hesselbarth wrote:
+>>
+>>> +==Example==
+>>> +
+>>> +/* 25MHz reference crystal */
+>>> +ref25: ref25M {
+>>> +	compatible = "fixed-clock";
+>>> +	#clock-cells = <0>;
+>>> +	clock-frequency = <25000000>;
+>>> +};
+>>> +
+>>> +i2c-master-node {
+>>> +
+>>> +	/* Si5351a msop10 i2c clock generator */
+>>> +	si5351a: clock-generator at 60 {
+>>> +		compatible = "silabs,si5351a-msop";
+>>> +		reg = <0x60>;
+>>> +		#address-cells = <1>;
+>>> +		#size-cells = <0>;
+>>> +		#clock-cells = <1>;
+>>> +
+>>> +		/* connect xtal input to 25MHz reference */
+>>> +		clocks = <&ref25>;
+>>
+>> As referred to in another thread, registering the ref25M clock that way
+>> didn't suffice for me on my platform - but that's a different story.
+> 
+> I guess "fixed-clock" isn't registered by OMAP's clock init code? I had
+> to do this on dove, too. Actually, I will come back to clock initialization for
+> dove later and was hoping that there will be some global way of registering
+> core common clock drivers (or at least fixed-clock) until then.
+> 
+>>> +static void si5351_read_parameters(struct si5351_driver_data *drvdata,
+>>> +	unsigned char reg, struct si5351_parameters *params)
+>>> +{
+>>> +	unsigned char buf[SI5351_PARAMETERS_LENGTH];
+>>
+>> On a general note, I think you can use u8 instead of unsigned char all
+>> over the place here, which will save you some indentation trouble.
+> 
+> Ok, I guess I was deriving "unsigned char" usage from other clock drivers
+> and never went to u8. But I ll reconsider using u8 when all issues are
+> worked out.
+> 
+>>> +static inline int _si5351_clkout_reparent(struct si5351_driver_data
+>>> *drvdata,
+>>> +				  unsigned char num, unsigned char parent)
+>>> +{
+>>> +	struct clk *pclk;
+>>> +
+>>> +	if (num > 8 ||
+>>> +	    (drvdata->variant == SI5351_VARIANT_A3 && num > 3))
+>>> +		return -EINVAL;
+>>> +
+>>> +	switch (parent) {
+>>> +	case 0:
+>>> +		pclk = drvdata->msynth[num].hw.clk;
+>>> +		break;
+>>> +	case 1:
+>>> +		pclk = drvdata->msynth[0].hw.clk;
+>>> +		if (num >= 4)
+>>> +			pclk = drvdata->msynth[4].hw.clk;
+>>> +		break;
+>>> +	case 2:
+>>> +		pclk = drvdata->xtal.clk;
+>>> +		break;
+>>> +	case 3:
+>>> +		if (drvdata->variant != SI5351_VARIANT_C)
+>>> +			return -EINVAL;
+>>> +		pclk = drvdata->clkin.clk;
+>>> +		break;
+>>> +	default:
+>>> +		return -EINVAL;
+>>> +	}
+>>> +	return clk_set_parent(drvdata->clkout[num].hw.clk, pclk);
+>>> +}
+>>
+>> [...]
+>>
+>>> +static int si5351_clkout_set_parent(struct clk_hw *hw, u8 index)
+>>> +{
+>>> +	struct si5351_hw_data *hwdata =
+>>> +		container_of(hw, struct si5351_hw_data, hw);
+>>> +	unsigned val;
+>>> +
+>>> +	val = 0;
+>>> +	hw->clk->flags &= ~CLK_SET_RATE_PARENT;
+>>> +	switch (index) {
+>>> +	case 0:
+>>> +		hw->clk->flags |= CLK_SET_RATE_PARENT;
+>>> +		val = SI5351_CLK_INPUT_MULTISYNTH_N;
+>>> +		break;
+>>
+>> I fugured that _si5351_clkout_reparent() wouldn't actually call
+>> ->set_parent() on the clock, which leads to the fact that
+>> CLK_SET_RATE_PARENT is not set in the flags. That way, only the clkout
+>> end leaf is actually supplied with a new rate, which leads to incorrect
+>> effective clocks, depending on the current multisynth/pll configuration.
+> 
+> Yeah, true. Unfortunately, _clkout_reparent() is more like a dirty hack to
+> allow to reparent the clock output. At registration internal configuration of
+> si5351 is not known and when I parse the DT for clock configuration I might
+> have been already assigned to the same parent clk that you later explicitly
+> configure.
 
-For some experimentation with multicore architecture I am currently
-trying to get a Linux system to run on Core1 of a OMAP44xx System
-(Pandaboard) instead of on Core0.
+Hmm, but then we need to either set the configuration on the chip to
+match the internal state of the driver, or tell the clock framework that
+the current state is not currently known (don't know if that's possible).
 
-So far I can get the system to run cleanly to run on core1 by manually
-starting the core1 from the bootloader and then starting the kernel on
-core1 instead of core0 (with max_cpus=1). However this only works if I
-use an uncompressed Linux image.
+> What I basically want for si5351 (or any other eeprom based programmable
+> clock gen) is that stored configuration is not touched. But it can be changed
+> after eeprom contents have been copied into device's sram - and this _is_
+> mandatory for the si5351 that I use on CuBox where there is no useful config
+> stored at all.
 
-If I try to use a compressed version of the image, the startup procedure
-fails shortly after the decompression while patching the physical to
-virtual translations. I had a look at the translation tables, and
-noticed they contain invalid addresses, which explains why the startup
-crashes at this point.
+Yes, same here. We set up the si5351 from the bootloader with some
+binary blob via i2c to bring some components to live before the kernel
+boots.
 
-Further debugging this problem I noticed that the correct addresses are
-written to memory during decompression, but are lost as soon as the MMU
-is turned of in the decompression code. I.e. I can see the correct
-addresses in the debugger while the MMU is active, but as soon as I it
-is turned of, the old adresses re-appear, as if they never were written
-back.
+> Anyway, there still seem to be some more issues with doing it right on current
+> common clk framwork - thanks for pointing it out.
 
-I had a close look at the code handling the MMU and I cannot find
-anything which should be core specific there, so I am a bit puzzeled by
-this behavior. I also already talked to Catalin Marinas who wrote the
-code in the first place, and he suggested that the ACTLR setting might
-be different (thanks for this hint). However I checked and this register
-is the same on both cores (SMP and FW set, all other flags not set).
+I'd be happy to test more versions if you have any.
 
-Does anybody have any other possible explanation why this behavior might
-be different on Core0 and Core1? The Bootloader (U-Boot) only runs on
-Core0 so there might be some initialization that is missing for Core1,
-but I cannot figure out which one.
+FWIW, attached is a patch for caching the 'prepared' states of the
+clocks. This fixes the 'scheduling while atomic' bug I described earlier
+in this thread. You can squash it into your patch if you want.
 
 
-Thank you for your time,
-  Till Crueger
 
-- -- 
-Dipl. Inform. Till Crueger
-
-Department of Computer Science
-Hochschule Trier ? Trier University of Applied Sciences
-Postfach 1826
-54208 Trier
-GERMANY
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v2.0.19 (GNU/Linux)
-Comment: Using GnuPG with Thunderbird - http://www.enigmail.net/
-
-iQEcBAEBAgAGBQJRML+mAAoJEMyqYnfSqLbVxjgH/0SI0WGI2nMyMSanhEr0m8nQ
-1YCcLooRJnDu9ltf40X1wAvPPbbHq3SZAZ9Y+/imZOqXIyuwMw/ru1fFp+gckQvX
-UHi00zup7CLjL1udnmFBUfFjE9kylafg/HuwTWOvBaOdmdsGAc/fdyvmLFC/io47
-ADuwD1LOhaLE1+mPQD567Z6LGpeSJQbIiI2/f32TmCc0dPL5aGN72EPVAvAMs2DD
-3Gqgxu+d6lGQvaHuQ0wR93T3/7L72Na3EvKee7xtjcu3gR4amqeT7w4Gk4mnrvuI
-krGCfsc1fRICaGsPv4G3x7hw56yO5MAqO2EB7nlPCll+TQ4m8Rkh3HSyeGKyxEw=
-=cZ+o
------END PGP SIGNATURE-----
+Thanks,
+Daniel
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-si5351-cache-prepared-bits-of-clocks.patch
+Type: text/x-patch
+Size: 4908 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130301/a0e2ee23/attachment.bin>
