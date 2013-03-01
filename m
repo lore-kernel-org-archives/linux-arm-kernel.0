@@ -1,68 +1,31 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 1 Mar 2013 09:15:08 +0000
-Subject: [PATCH 1/1] arm: remove extra semicolon in if statement
-In-Reply-To: <20130301083624.GI22886@pengutronix.de>
-References: <1362111952-8072-1-git-send-email-viniciustinti@gmail.com>
- <20130301083624.GI22886@pengutronix.de>
-Message-ID: <20130301091508.GB27385@e106331-lin.cambridge.arm.com>
+From: bilhuang@nvidia.com (Bill Huang)
+Date: Fri, 1 Mar 2013 01:41:31 -0800
+Subject: [PATCH 2/5] clk: notifier handler for dynamic voltage scaling
+In-Reply-To: <1362026969-11457-3-git-send-email-mturquette@linaro.org>
+References: <1362026969-11457-1-git-send-email-mturquette@linaro.org>
+ <1362026969-11457-3-git-send-email-mturquette@linaro.org>
+Message-ID: <1362130891.19498.12.camel@bilhuang-vm1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 01, 2013 at 08:36:24AM +0000, Uwe Kleine-K?nig wrote:
-> Hello,
-> 
-> On Fri, Mar 01, 2013 at 01:25:52AM -0300, Vinicius Tinti wrote:
-> > Remove extra semicolon in perf_event.c if statement.
-> The commit log sounds like a style fix, but your patch introduces a
-> semantical change. I suspect this patch fixes a real bug, you should
-> point that out here.
-> 
-> Best regards
-> Uwe
+On Thu, 2013-02-28 at 12:49 +0800, Mike Turquette wrote:
+> Dynamic voltage and frequency scaling (dvfs) is a common power saving
+> technique in many of today's modern processors.  This patch introduces a
+> common clk rate-change notifier handler which scales voltage
+> appropriately whenever clk_set_rate is called on an affected clock.
 
-It does fix a real bug, but Will already has a fix [1]. It's in rmk's patch
-tracking system as 7664/1.
-
-Thanks,
-Mark.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-February/151564.html
-
-> > 
-> > Signed-off-by: Vinicius Tinti <viniciustinti@gmail.com>
-> > ---
-> >  arch/arm/kernel/perf_event.c |    2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-> > index 31e0eb3..a892067 100644
-> > --- a/arch/arm/kernel/perf_event.c
-> > +++ b/arch/arm/kernel/perf_event.c
-> > @@ -400,7 +400,7 @@ __hw_perf_event_init(struct perf_event *event)
-> >  	}
-> >  
-> >  	if (event->group_leader != event) {
-> > -		if (validate_group(event) != 0);
-> > +		if (validate_group(event) != 0)
-> >  			return -EINVAL;
-> >  	}
-> >  
-> > -- 
-> > 1.7.9.5
-> > 
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> > 
+I really think clk_enable and clk_disable should also be triggering
+notifier call and DVFS should act accordingly since there are cases
+drivers won't set clock rate but instead disable its clock directly, do
+you agree?
 > 
-> -- 
-> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> There are three prerequisites to using this feature:
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+> 1) the affected clocks must be using the common clk framework
+> 2) voltage must be scaled using the regulator framework
+> 3) clock frequency and regulator voltage values must be paired via the
+> OPP library
+
+Just a note, Tegra Core won't meet prerequisite #3 since each regulator
+voltage values is associated with clocks driving those many sub-HW
+blocks in it.
