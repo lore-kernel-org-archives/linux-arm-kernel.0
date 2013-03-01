@@ -1,69 +1,51 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Fri, 1 Mar 2013 19:28:54 +0100
-Subject: [PATCH] lglock: add read-preference local-global rwlock
-In-Reply-To: <5130E8E2.50206@cn.fujitsu.com>
-References: <512BBAD8.8010006@linux.vnet.ibm.com>
- <CACvQF51jCxk5jUqmhD=QBBtUsBkQWZzakacrKO4Gsk=w61rNwQ@mail.gmail.com>
- <512C7A38.8060906@linux.vnet.ibm.com>
- <CACvQF51RvhM8XNqu3-1OTQ=cZUZ=pAX+_zx0a29+W67N1X+BgQ@mail.gmail.com>
- <512CC509.1050000@linux.vnet.ibm.com>
- <CACvQF50UgiqPpDk3HCmV86zKSf6tPjqr0bZowfPEOJs0g0r0MQ@mail.gmail.com>
- <512D0D67.9010609@linux.vnet.ibm.com>
- <CACvQF53ph2ixdM-otzetjM5cR+2kcZj6sckOp3TnzzA_x-EZ8w@mail.gmail.com>
- <512E7879.20109@linux.vnet.ibm.com> <5130E8E2.50206@cn.fujitsu.com>
-Message-ID: <20130301182854.GA3631@redhat.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri,  1 Mar 2013 11:32:24 -0700
+Subject: [PATCH 1/2] ARM: Tegra: Add clock entry for smp_twd clock
+Message-ID: <1362162745-21392-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lai, I didn't read this discussion except the code posted by Michel.
-I'll try to read this patch carefully later, but I'd like to ask
-a couple of questions.
+From: Prashant Gaikwad <pgaikwad@nvidia.com>
 
-This version looks more complex than Michel's, why? Just curious, I
-am trying to understand what I missed. See
-http://marc.info/?l=linux-kernel&m=136196350213593
+As DT support for clocks and smp_twd is enabled, add clock entry
+for smp_twd clock to DT.
 
-And I can't understand FALLBACK_BASE...
+This fixes the following error while booting the kernel:
+smp_twd: clock not found -2
 
-OK, suppose that CPU_0 does _write_unlock() and releases ->fallback_rwlock.
+Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
+[swarren: include kernel log spew that this fixes]
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+Arnd, Olof, these are fixes intended for 3.9.
 
-CPU_1 does _read_lock(), and ...
+ arch/arm/boot/dts/tegra20.dtsi |    1 +
+ arch/arm/boot/dts/tegra30.dtsi |    1 +
+ 2 files changed, 2 insertions(+)
 
-> +void lg_rwlock_local_read_lock(struct lgrwlock *lgrw)
-> +{
-> +	struct lglock *lg = &lgrw->lglock;
-> +
-> +	preempt_disable();
-> +	rwlock_acquire_read(&lg->lock_dep_map, 0, 0, _RET_IP_);
-> +	if (likely(!__this_cpu_read(*lgrw->reader_refcnt))) {
-> +		if (!arch_spin_trylock(this_cpu_ptr(lg->lock))) {
-
-_trylock() fails,
-
-> +			read_lock(&lgrw->fallback_rwlock);
-> +			__this_cpu_add(*lgrw->reader_refcnt, FALLBACK_BASE);
-
-so we take ->fallback_rwlock and ->reader_refcnt == FALLBACK_BASE.
-
-CPU_0 does lg_global_unlock(lgrw->lglock) and finishes _write_unlock().
-
-Interrupt handler on CPU_1 does _read_lock() notices ->reader_refcnt != 0
-and simply does this_cpu_inc(), so reader_refcnt == FALLBACK_BASE + 1.
-
-Then irq does _read_unlock(), and
-
-> +void lg_rwlock_local_read_unlock(struct lgrwlock *lgrw)
-> +{
-> +	switch (__this_cpu_dec_return(*lgrw->reader_refcnt)) {
-> +	case 0:
-> +		lg_local_unlock(&lgrw->lglock);
-> +		return;
-> +	case FALLBACK_BASE:
-> +		__this_cpu_sub(*lgrw->reader_refcnt, FALLBACK_BASE);
-> +		read_unlock(&lgrw->fallback_rwlock);
-
-hits this case?
-
-Doesn't look right, but most probably I missed something.
-
-Oleg.
+diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+index 9a42893..48d00a0 100644
+--- a/arch/arm/boot/dts/tegra20.dtsi
++++ b/arch/arm/boot/dts/tegra20.dtsi
+@@ -118,6 +118,7 @@
+ 		compatible = "arm,cortex-a9-twd-timer";
+ 		reg = <0x50040600 0x20>;
+ 		interrupts = <1 13 0x304>;
++		clocks = <&tegra_car 132>;
+ 	};
+ 
+ 	intc: interrupt-controller {
+diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
+index 767803e..9d87a3f 100644
+--- a/arch/arm/boot/dts/tegra30.dtsi
++++ b/arch/arm/boot/dts/tegra30.dtsi
+@@ -119,6 +119,7 @@
+ 		compatible = "arm,cortex-a9-twd-timer";
+ 		reg = <0x50040600 0x20>;
+ 		interrupts = <1 13 0xf04>;
++		clocks = <&tegra_car 214>;
+ 	};
+ 
+ 	intc: interrupt-controller {
+-- 
+1.7.10.4
