@@ -1,67 +1,107 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Fri, 1 Feb 2013 10:19:47 +0530
-Subject: [PATCH 2/7] clk: tegra: Use common of_clk_init() function
-In-Reply-To: <51020D94.4010509@wwwdotorg.org>
-References: <1357282858-2112-1-git-send-email-pgaikwad@nvidia.com>
- <1357282858-2112-2-git-send-email-pgaikwad@nvidia.com>
- <50E703A8.1080808@wwwdotorg.org> <50E793A0.4020702@nvidia.com>
- <20130124192043.10623.60751@quantum> <51018C55.6000709@wwwdotorg.org>
- <20130125005729.10623.61165@quantum> <51020D94.4010509@wwwdotorg.org>
-Message-ID: <510B496B.2030303@nvidia.com>
+From: avinashphilip@ti.com (Philip, Avinash)
+Date: Fri, 1 Mar 2013 05:33:39 +0000
+Subject: [PATCH 04/14] ARM: OMAP2+: Add function for configuring GPMC
+ settings
+In-Reply-To: <512F9005.7040908@ti.com>
+References: <1361899842-30303-1-git-send-email-jon-hunter@ti.com>
+ <1361899842-30303-5-git-send-email-jon-hunter@ti.com>
+ <518397C60809E147AF5323E0420B992E3EA8F007@DBDE01.ent.ti.com>
+ <512F7D58.90706@ti.com> <512F9005.7040908@ti.com>
+Message-ID: <518397C60809E147AF5323E0420B992E3EA90C2F@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 25 January 2013 10:14 AM, Stephen Warren wrote:
-> On 01/24/2013 04:57 PM, Mike Turquette wrote:
->> Quoting Stephen Warren (2013-01-24 11:32:37)
->>> On 01/24/2013 11:20 AM, Mike Turquette wrote:
->>>> Quoting Prashant Gaikwad (2013-01-04 18:44:48)
->>>>> On Friday 04 January 2013 10:00 PM, Stephen Warren wrote:
->>>>>> On 01/04/2013 12:00 AM, Prashant Gaikwad wrote:
->>>>>>> Use common of_clk_init() function for clocks initialization.
->>>>>>>    drivers/clk/tegra/clk-tegra20.c |    3 ++-
->>>>>>>    drivers/clk/tegra/clk-tegra30.c |    3 ++-
->>>>>> Oh, so this series is written assuming that the Tegra CCF rework is
->>>>>> already applied then? That makes the dependencies quite painful, since I
->>>>>> think we'll end up with the following order being needed:
->>>>>>
->>>>>> 1) clk: Add composite clock type
->>>>>>      -> This would usually go through the clk tree.
->>>>>> 2) The Tegra CCF rework series
->>>>>>      -> This must go through the Tegra tree due to lots of dependencies
->>>>>>      and merge conflicts with other Tegra patches.
->>>>>> 3) This series
->>>>>>      -> This would usually go through the clk tree.
->>>>>>
->>>>>> Is it possible to re-order the dependencies as (1) (3) (2), so that Mike
->>>>>> can apply (1) and (3) to the clock tree, then I can use the clk tree as
->>>>>> the basis for a branch in the Tegra tree to apply (2) and all the other
->>>>>> Tegra patches that will conflict with (2)?
->>>>> If Mike approves the concept and implementation in (1) and (3) then I
->>>>> will repost (2) and (3) with dependencies re-ordered.
->>>> Patch (1) still has some unaddressed comments, and is not a real
->>>> dependency for this series.
->>> I assume "Patch (1)" refers to the list of series a couple emails above,
->>> not the first patch in the series you're replying to; that threw me for
->>> a moment.
->>>
->>>> Since all of the patches have received their
->>>> Tested-by's then I propose to merge all patches from this series into
->>>> clk-next, which exception of patch 2/7 (the Tegra patch).
->>>>
->>>> This reduces your Tegra CCF conversion dependencies and you can role the
->>>> necessary of_clk_init change into your Tegra CCF conversion branch (it
->>>> has my implicit Ack and can be taken through your tree).
->>>>
->>>> Let me know if this is OK for you.
->>> OK, I'm happy to merge your clock tree into the Tegra tree and then
->>> apply 2/7 on top of the Tegra CCF work.
->> Hmm, maybe the clk tree needs to be a dependency branch of arm-soc
->> again, as it has in the past.  Would that help with any Tegra merge
->> pain?
-> Yes, I think that's what would end up happening if I merge the clk tree
-> into the Tegra tree anyway.
+On Thu, Feb 28, 2013 at 22:42:37, Hunter, Jon wrote:
+> 
+> On 02/28/2013 09:52 AM, Jon Hunter wrote:
+> > 
+> > On 02/28/2013 12:05 AM, Philip, Avinash wrote:
+> >> On Tue, Feb 26, 2013 at 23:00:31, Hunter, Jon wrote:
+> >>> The GPMC has various different configuration options such as bus-width,
+> >>> synchronous or asychronous mode selection, burst mode options etc.
+> >>> Currently, there is no common function for configuring these options and
+> >>> various devices set these options by either programming the GPMC CONFIG1
+> >>> register directly or by calling gpmc_cs_configure() to set some of the
+> >>> options.
+> >>>
+> >>> Add a new function for configuring all of the GPMC options. Having a common
+> >>> function for configuring this options will simplify code and ease the
+> >>> migration to device-tree.
+> >>>
+> >>> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+> >>> ---
+> >>>  arch/arm/mach-omap2/gpmc.c |   65 ++++++++++++++++++++++++++++++++++++++++++++
+> >>>  arch/arm/mach-omap2/gpmc.h |    6 ++++
+> >>>  2 files changed, 71 insertions(+)
+> >>>
+> >>> diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+> >>> index 465cac9..fb8dfd2 100644
+> >>> --- a/arch/arm/mach-omap2/gpmc.c
+> >>> +++ b/arch/arm/mach-omap2/gpmc.c
+> >>> @@ -1137,6 +1137,71 @@ int gpmc_calc_timings(struct gpmc_timings *gpmc_t,
+> >>>  	return 0;
+> >>>  }
+> >>>  
+> >>> +int gpmc_cs_program_settings(int cs, struct gpmc_settings *p)
+> >>> +{
+> >>> +	u32 config1;
+> >>> +
+> >>> +	if ((!p->device_width) || (p->device_width > GPMC_DEVWIDTH_16BIT)) {
+> >>> +		pr_err("%s: invalid width %d!", __func__, p->device_width);
+> >>> +		return -EINVAL;
+> >>> +	}
+> >>> +
+> >>> +	/* Address-data multiplexing not supported for NAND devices */
+> >>> +	if (p->device_nand && p->mux_add_data) {
+> >>> +		pr_err("%s: invalid configuration!\n", __func__);
+> >>> +		return -EINVAL;
+> >>> +	}
+> >>> +
+> >>> +	/* Page/burst mode supports lengths of 4, 8 and 16 bytes */
+> >>> +	if (p->burst_read || p->burst_write) {
+> >>> +		switch (p->burst_len) {
+> >>> +		case GPMC_BURST_4:
+> >>> +		case GPMC_BURST_8:
+> >>> +		case GPMC_BURST_16:
+> >>> +			break;
+> >>> +		default:
+> >>> +			pr_err("%s: invalid page/burst-length (%d)\n",
+> >>> +			       __func__, p->burst_len);
+> >>> +			return -EINVAL;
+> >>> +		}
+> >>> +	}
+> >>> +
+> >>> +	if ((p->wait_on_read || p->wait_on_write) &&
+> >>> +	    (p->wait_pin > gpmc_nr_waitpins)) {
+> >>> +		pr_err("%s: invalid wait-pin (%d)\n", __func__, p->wait_pin);
+> >>> +		return -EINVAL;
+> >>> +	}
+> >>> +
+> >>> +	config1 = GPMC_CONFIG1_DEVICESIZE((p->device_width - 1));
+> >>
+> >> Can you consider read_modify approach?
+> > 
+> > I was purposely trying to avoid that. The intent here is to program all
+> > the settings and get away from any boot-loader dependencies. If we use a
+> > read-modify approach then it will never be clear in the kernel what
+> > should actually be programmed.
+> 
+> By the way, it would be good to know what your motivation for this is.
+> 
+> My goal is for all gpmc settings to eventually live in the DT blob and
+> there be no dependency on the bootloader whatsoever. That may mean that
+> settings are re-programmed again by the kernel but IMO that is best.
 
-Hi Mike,
+Yes I understood now and the right thing to do.
+Suggested read modify approach because of some confusion as GPMC_CONFIG1 is already
+modified in gpmc_cs_set_timings() and is called from omap2_nand_gpmc_retime().
+So the data modified in gpmc_cs_set_timings() will lost (not significant)
+May be better and cleaner solution is to remove GPMC_CONFIG1 modification in
+gpmc_cs_set_timings() also.
 
-Have you merged these patches for 3.9?
+Thanks
+Avinash
+> 
+> Cheers
+> Jon
+> 
