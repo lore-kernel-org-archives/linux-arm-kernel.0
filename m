@@ -1,152 +1,68 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 1 Mar 2013 17:41:01 +0530
-Subject: [PATCH 12/15] ARM: OMAP4+: CPUidle: Cleanup idle driver for OMAP5
- support
+Date: Fri, 1 Mar 2013 17:41:04 +0530
+Subject: [PATCH 15/15] ARM: OMAP5: PM: handle device instance for for coldreset
 In-Reply-To: <1362139864-9233-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1362139864-9233-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1362139864-9233-13-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1362139864-9233-16-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The OMAP5 idle driver can re-use most of OMAP4 CPUidle driver
-implementation. Also the next derivative SOCs are going to re-use
-the MPUSS so, same driver with minor updates can be re-used.
+From: Nishanth Menon <nm@ti.com>
 
-Prepare the code so that its easier to add CPUidle support for
-OMAP5 devices.
+OMAP5 and OMAP4 have different device instance offsets.
 
+So to handle them properly, use a runtime detected instance offset
+Other bit offsets and register offsets remained constant.
+
+Creating a new function is not really worthwhile here as the logic
+will be replicated without much benefit.
+
+Signed-off-by: Nishanth Menon <nm@ti.com>
+santosh.shilimkar at ti.com: Refreshed patch against 3.8
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/mach-omap2/cpuidle44xx.c |   30 +++++++++++++++++-------------
- 1 file changed, 17 insertions(+), 13 deletions(-)
+ arch/arm/mach-omap2/prminst44xx.c |   10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle44xx.c
-index 9de47a7..df81243 100644
---- a/arch/arm/mach-omap2/cpuidle44xx.c
-+++ b/arch/arm/mach-omap2/cpuidle44xx.c
-@@ -1,7 +1,7 @@
- /*
-- * OMAP4 CPU idle Routines
-+ * OMAP4PLUS CPU idle Routines
-  *
-- * Copyright (C) 2011 Texas Instruments, Inc.
-+ * Copyright (C) 2011-2013 Texas Instruments, Inc.
-  * Santosh Shilimkar <santosh.shilimkar@ti.com>
-  * Rajendra Nayak <rnayak@ti.com>
-  *
-@@ -22,15 +22,16 @@
- #include "pm.h"
- #include "prm.h"
- #include "clockdomain.h"
+diff --git a/arch/arm/mach-omap2/prminst44xx.c b/arch/arm/mach-omap2/prminst44xx.c
+index c12320c..430fb1d 100644
+--- a/arch/arm/mach-omap2/prminst44xx.c
++++ b/arch/arm/mach-omap2/prminst44xx.c
+@@ -20,10 +20,12 @@
+ #include "common.h"
+ #include "prcm-common.h"
+ #include "prm44xx.h"
++#include "prm54xx.h"
+ #include "prminst44xx.h"
+ #include "prm-regbits-44xx.h"
+ #include "prcm44xx.h"
+ #include "prcm_mpu44xx.h"
 +#include "soc.h"
  
- /* Machine specific information */
--struct omap4_idle_statedata {
-+struct idle_statedata {
- 	u32 cpu_state;
- 	u32 mpu_logic_state;
- 	u32 mpu_state;
- };
+ static void __iomem *_prm_bases[OMAP4_MAX_PRCM_PARTITIONS];
  
--static struct omap4_idle_statedata omap4_idle_data[] = {
-+static struct idle_statedata omap4_idle_data[] = {
- 	{
- 		.cpu_state = PWRDM_POWER_ON,
- 		.mpu_state = PWRDM_POWER_ON,
-@@ -53,11 +54,12 @@ static struct clockdomain *cpu_clkdm[NR_CPUS];
- 
- static atomic_t abort_barrier;
- static bool cpu_done[NR_CPUS];
-+static struct idle_statedata *state_ptr;
- 
- /* Private functions */
- 
- /**
-- * omap4_enter_idle_coupled_[simple/coupled] - OMAP4 cpuidle entry functions
-+ * omap_enter_idle_[simple/coupled] - OMAP4PLUS cpuidle entry functions
-  * @dev: cpuidle device
-  * @drv: cpuidle driver
-  * @index: the index of state to be entered
-@@ -66,7 +68,7 @@ static bool cpu_done[NR_CPUS];
-  * specified low power state selected by the governor.
-  * Returns the amount of time spent in the low power state.
-  */
--static int omap4_enter_idle_simple(struct cpuidle_device *dev,
-+static int omap_enter_idle_simple(struct cpuidle_device *dev,
- 			struct cpuidle_driver *drv,
- 			int index)
+@@ -165,17 +167,19 @@ int omap4_prminst_deassert_hardreset(u8 shift, u8 part, s16 inst,
+ void omap4_prminst_global_warm_sw_reset(void)
  {
-@@ -74,11 +76,11 @@ static int omap4_enter_idle_simple(struct cpuidle_device *dev,
- 	return index;
+ 	u32 v;
++	s16 dev_inst = cpu_is_omap44xx() ? OMAP4430_PRM_DEVICE_INST :
++					   OMAP54XX_PRM_DEVICE_INST;
+ 
+ 	v = omap4_prminst_read_inst_reg(OMAP4430_PRM_PARTITION,
+-				    OMAP4430_PRM_DEVICE_INST,
++				    dev_inst,
+ 				    OMAP4_PRM_RSTCTRL_OFFSET);
+ 	v |= OMAP4430_RST_GLOBAL_WARM_SW_MASK;
+ 	omap4_prminst_write_inst_reg(v, OMAP4430_PRM_PARTITION,
+-				 OMAP4430_PRM_DEVICE_INST,
++				 dev_inst,
+ 				 OMAP4_PRM_RSTCTRL_OFFSET);
+ 
+ 	/* OCP barrier */
+ 	v = omap4_prminst_read_inst_reg(OMAP4430_PRM_PARTITION,
+-				    OMAP4430_PRM_DEVICE_INST,
++				    dev_inst,
+ 				    OMAP4_PRM_RSTCTRL_OFFSET);
  }
- 
--static int omap4_enter_idle_coupled(struct cpuidle_device *dev,
-+static int omap_enter_idle_coupled(struct cpuidle_device *dev,
- 			struct cpuidle_driver *drv,
- 			int index)
- {
--	struct omap4_idle_statedata *cx = &omap4_idle_data[index];
-+	struct idle_statedata *cx = state_ptr + index;
- 	int cpu_id = smp_processor_id();
- 
- 	/*
-@@ -167,7 +169,7 @@ static void omap_setup_broadcast_timer(void *arg)
- 	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ON, &cpu);
- }
- 
--static DEFINE_PER_CPU(struct cpuidle_device, omap4_idle_dev);
-+static DEFINE_PER_CPU(struct cpuidle_device, omap_idle_dev);
- 
- static struct cpuidle_driver omap4_idle_driver = {
- 	.name				= "omap4_idle",
-@@ -179,7 +181,7 @@ static struct cpuidle_driver omap4_idle_driver = {
- 			.exit_latency = 2 + 2,
- 			.target_residency = 5,
- 			.flags = CPUIDLE_FLAG_TIME_VALID,
--			.enter = omap4_enter_idle_simple,
-+			.enter = omap_enter_idle_simple,
- 			.name = "C1",
- 			.desc = "MPUSS ON"
- 		},
-@@ -188,7 +190,7 @@ static struct cpuidle_driver omap4_idle_driver = {
- 			.exit_latency = 328 + 440,
- 			.target_residency = 960,
- 			.flags = CPUIDLE_FLAG_TIME_VALID | CPUIDLE_FLAG_COUPLED,
--			.enter = omap4_enter_idle_coupled,
-+			.enter = omap_enter_idle_coupled,
- 			.name = "C2",
- 			.desc = "MPUSS CSWR",
- 		},
-@@ -197,7 +199,7 @@ static struct cpuidle_driver omap4_idle_driver = {
- 			.exit_latency = 460 + 518,
- 			.target_residency = 1100,
- 			.flags = CPUIDLE_FLAG_TIME_VALID | CPUIDLE_FLAG_COUPLED,
--			.enter = omap4_enter_idle_coupled,
-+			.enter = omap_enter_idle_coupled,
- 			.name = "C3",
- 			.desc = "MPUSS OSWR",
- 		},
-@@ -219,6 +221,7 @@ int __init omap4_idle_init(void)
- 	struct cpuidle_device *dev;
- 	unsigned int cpu_id = 0;
- 
-+	/* Configure the broadcast timer on each cpu */
- 	mpu_pd = pwrdm_lookup("mpu_pwrdm");
- 	cpu_pd[0] = pwrdm_lookup("cpu0_pwrdm");
- 	cpu_pd[1] = pwrdm_lookup("cpu1_pwrdm");
-@@ -234,11 +237,12 @@ int __init omap4_idle_init(void)
- 	on_each_cpu(omap_setup_broadcast_timer, NULL, 1);
- 
- 	for_each_cpu(cpu_id, cpu_online_mask) {
--		dev = &per_cpu(omap4_idle_dev, cpu_id);
-+		dev = &per_cpu(omap_idle_dev, cpu_id);
- 		dev->cpu = cpu_id;
- #ifdef CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED
- 		dev->coupled_cpus = *cpu_online_mask;
- #endif
-+		state_ptr = &omap4_idle_data[0];
- 		cpuidle_register_driver(&omap4_idle_driver);
- 
- 		if (cpuidle_register_device(dev)) {
 -- 
 1.7.9.5
