@@ -1,34 +1,60 @@
-From: rickard.andersson@stericsson.com (Rickard Andersson)
-Date: Fri, 1 Mar 2013 14:28:18 +0100
-Subject: [PATCH 3/4] ARM: nomadik: add dynamic irq flag to the timer
-In-Reply-To: <CAKfTPtA=7pTPrwFHr61WiffXGv2Ztmaiji5q_vJpPj9XgyeZMg@mail.gmail.com>
-References: <1361917047-29230-1-git-send-email-daniel.lezcano@linaro.org>	<1361917047-29230-4-git-send-email-daniel.lezcano@linaro.org>	<CACRpkda=i5cXSbYCyb0gH0OLKj7396qguup1nqgqn0m-S1x1wg@mail.gmail.com>
- <CAKfTPtA=7pTPrwFHr61WiffXGv2Ztmaiji5q_vJpPj9XgyeZMg@mail.gmail.com>
-Message-ID: <5130ACF2.6070005@stericsson.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 1 Mar 2013 07:50:01 -0600
+Subject: [PATCH 01/15] ARM: OMAP4+: PM: Consolidate MPU subsystem PM code
+ for re-use
+In-Reply-To: <1362139864-9233-2-git-send-email-santosh.shilimkar@ti.com>
+References: <1362139864-9233-1-git-send-email-santosh.shilimkar@ti.com>
+ <1362139864-9233-2-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20130301135001.GB20420@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/01/2013 09:56 AM, Vincent Guittot wrote:
-> On 1 March 2013 02:13, Linus Walleij<linus.walleij@linaro.org>  wrote:
->> On Tue, Feb 26, 2013 at 11:17 PM, Daniel Lezcano
->> <daniel.lezcano@linaro.org>  wrote:
->>
->>> Add the dynamic irq affinity feature to the timer clock device.
->>>
->>> Signed-off-by: Daniel Lezcano<daniel.lezcano@linaro.org>
->> Looks reasonable to me, sadly I do not fully grasp the patch set,
->> Vincent+Rickard can you have a look at this?
-> ux500 is able to trig the wake up on one CPU and let the other one in
-> WFI. This patch will minimize the spurious wake up of CPU0 when CPU1
-> is the target CPU of the broadcast timer. One main consequence is that
-> we will not uselessly execute all the deferrable and newly idle
-> activities on the CPU0 .
->
-> you can add my reviewed-by if you want
->
-> Vincent
->
-It looks ok to me as well.
-
-BR
-Rickard
+On 17:40-20130301, Santosh Shilimkar wrote:
+>  arch/arm/mach-omap2/omap-mpuss-lowpower.c |   56 +++++++++++++++++++++++------
+>  1 file changed, 45 insertions(+), 11 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+> index abdd0f6..ee8a1e4 100644
+> --- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+> +++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+> @@ -71,10 +71,37 @@ struct omap4_cpu_pm_info {
+>  	void (*secondary_startup)(void);
+>  };
+>  
+> +struct cpu_pm_ops {
+> +	int (*finish_suspend)(unsigned long cpu_state);
+> +	void (*resume)(void);
+> +	void (*scu_prepare)(unsigned int cpu_id, unsigned int cpu_state);
+> +};
+> +
+> +extern int omap4_finish_suspend(unsigned long cpu_state);
+> +extern void omap4_cpu_resume(void);
+> +
+>  static DEFINE_PER_CPU(struct omap4_cpu_pm_info, omap4_pm_info);
+>  static struct powerdomain *mpuss_pd;
+>  static void __iomem *sar_base;
+>  
+> +static int default_finish_suspend(unsigned long cpu_state)
+> +{
+> +	omap_do_wfi();
+> +	return 0;
+> +}
+> +
+> +static void dummy_cpu_resume(void)
+> +{}
+> +
+> +void dummy_scu_prepare(unsigned int cpu_id, unsigned int cpu_state)
+static?
+> +{}
+> +
+> +struct cpu_pm_ops omap_pm_ops = {
+> +	.finish_suspend		= default_finish_suspend,
+> +	.resume			= dummy_cpu_resume,
+> +	.scu_prepare		= dummy_scu_prepare,
+> +};
+> +
+Otherwise,
+Acked-by: Nishanth Menon <nm@ti.com>
+-- 
+Regards,
+Nishanth Menon
