@@ -1,38 +1,25 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 1 Mar 2013 20:22:13 +0100
-Subject: [PATCH v4 1/2] i2c-core: dt: Pick i2c bus number from i2c alias
- if present
-In-Reply-To: <1362157052-16738-2-git-send-email-dianders@chromium.org>
-References: <1360630085-26874-1-git-send-email-dianders@chromium.org>
- <1362157052-16738-1-git-send-email-dianders@chromium.org>
- <1362157052-16738-2-git-send-email-dianders@chromium.org>
-Message-ID: <20130301192212.GA379@the-dreams.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 01 Mar 2013 12:29:37 -0700
+Subject: [PATCH V3 2/4] ARM: tegra: pmc: add power on function for
+ secondary CPUs
+In-Reply-To: <1362123131-3339-2-git-send-email-josephl@nvidia.com>
+References: <1362123131-3339-1-git-send-email-josephl@nvidia.com>
+ <1362123131-3339-2-git-send-email-josephl@nvidia.com>
+Message-ID: <513101A1.7050007@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 01, 2013 at 08:57:31AM -0800, Doug Anderson wrote:
-> This allows you to get the equivalent functionality of
-> i2c_add_numbered_adapter() with all data in the device tree and no
-> special case code in your driver.  This is a common device tree
-> technique.
-> 
-> For quick reference, the FDT syntax for using an alias to provide an
-> ID looks like:
->   aliases {
->     i2c0 = &i2c_0;
->     i2c1 = &i2c_1;
->   };
-> 
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
+On 03/01/2013 12:32 AM, Joseph Lo wrote:
+> Adding the power on function for secondary CPUs in PMC driver, this can
+> help us to remove legacy powergate driver and add generic power domain
+> support later.
 
-Thanks, applied. I'll try to get it into 3.9.
+OK, I think these look good. I'll apply them for 3.10 when I can.
 
-> +	/* Handled by wrappers */
-> +	if (WARN_ON(adap->nr == -1))
-> +		return -EINVAL;
-
-I removed this check, though. We know our callers, all static.
-
-Thanks,
-
-   Wolfram
+Note: you reposted 2 out of 4 patches. It'd be best to repost all the
+patches in the series. While I understand that the other 2 didn't
+change, not reposting them makes it a bit harder to track down which
+patches fit together into a series, since I have to find some "V2" and
+some "V3" and stick them together. That said, given you've already
+posted the patches, there's no need to repost them again to fix them
+this time; just a note for next time.
