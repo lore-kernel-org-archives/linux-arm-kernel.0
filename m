@@ -1,29 +1,25 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 1 Mar 2013 01:37:05 +0100
-Subject: [PATCH v4 02/11] gpio: pxa: clean code with same variable name
-In-Reply-To: <CAD6h2NQy4LAoUkS=b301huXRJ_kyPcMxoC8E99dud7d-842=cw@mail.gmail.com>
-References: <1361290948-16669-1-git-send-email-haojian.zhuang@linaro.org>
- <1361290948-16669-3-git-send-email-haojian.zhuang@linaro.org>
- <512485C2.50504@compulab.co.il>
- <CAD6h2NQy4LAoUkS=b301huXRJ_kyPcMxoC8E99dud7d-842=cw@mail.gmail.com>
-Message-ID: <CACRpkdY8oZD7ethcUoJ8s1e+9Q5RALwgC-9C3qgA=K+qKQwn3Q@mail.gmail.com>
+Date: Fri, 1 Mar 2013 01:45:34 +0100
+Subject: [PATCH v2 2/3] ARM: dts: imx: replace magic number with pin
+ function name
+In-Reply-To: <1361533888-18073-3-git-send-email-shawn.guo@linaro.org>
+References: <1361533888-18073-1-git-send-email-shawn.guo@linaro.org>
+ <1361533888-18073-3-git-send-email-shawn.guo@linaro.org>
+Message-ID: <CACRpkdZOKrLy9-y4=vsayUt_PfVbYeN8mu5mnX2VUm60=JA=Cw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 20, 2013 at 3:17 PM, Haojian Zhuang
-<haojian.zhuang@linaro.org> wrote:
+On Fri, Feb 22, 2013 at 12:51 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
 
-> Linus,
-> Could you help to review these patches and give an Ack?
+> This turns the imx pin function number defined by binding document
+> into #define constants in header which can be used in dts and handled
+> by pre-processor to improve the readability of device tree sources.
+>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Acked-by: Dong Aisheng <dong.aisheng@linaro.org>
 
-Can you provide a changelog to what was changed in each
-patch for the various versions? Else I have to go back and
-check my own replies to see if comments have been taken into
-account.
-
-For example I asked if the of_property_read_bool() function
-could be used in a few places and this seems to have been
-ignored and now I want to know why.
+I agree and wanted this to be fixed all the time, so
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
 Yours,
 Linus Walleij
