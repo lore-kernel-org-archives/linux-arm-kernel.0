@@ -1,72 +1,51 @@
-From: heikki.krogerus@linux.intel.com (Heikki Krogerus)
-Date: Fri,  1 Mar 2013 10:36:09 +0200
-Subject: [PATCH] arm: mvebu: Reduce reg-io-width with UARTs
-Message-ID: <1362126969-32277-1-git-send-email-heikki.krogerus@linux.intel.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 1 Mar 2013 09:36:24 +0100
+Subject: [PATCH 1/1] arm: remove extra semicolon in if statement
+In-Reply-To: <1362111952-8072-1-git-send-email-viniciustinti@gmail.com>
+References: <1362111952-8072-1-git-send-email-viniciustinti@gmail.com>
+Message-ID: <20130301083624.GI22886@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Setting the reg-io-width to 1 byte represents more accurate
-description of the HW.
+Hello,
 
-This will fix an issue where UART driver causes kernel
-panic during bootup. Gregory CLEMENT traced the issue to
-autoconfig() in 8250.c, where the existence of FIFO is
-checked from UART_IIR register. The register is now read as
-32-bit value as the reg-io-width is set to 4-bytes. The
-retuned value seems to contain bogus data for bits 31:8,
-causing the issue.
+On Fri, Mar 01, 2013 at 01:25:52AM -0300, Vinicius Tinti wrote:
+> Remove extra semicolon in perf_event.c if statement.
+The commit log sounds like a style fix, but your patch introduces a
+semantical change. I suspect this patch fixes a real bug, you should
+point that out here.
 
-Signed-off-by: Heikki Krogerus <heikki.krogerus@linux.intel.com>
-Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Cc: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
----
- arch/arm/boot/dts/armada-370-xp.dtsi |    4 ++--
- arch/arm/boot/dts/armada-xp.dtsi     |    4 ++--
- 2 files changed, 4 insertions(+), 4 deletions(-)
+Best regards
+Uwe
+> 
+> Signed-off-by: Vinicius Tinti <viniciustinti@gmail.com>
+> ---
+>  arch/arm/kernel/perf_event.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+> index 31e0eb3..a892067 100644
+> --- a/arch/arm/kernel/perf_event.c
+> +++ b/arch/arm/kernel/perf_event.c
+> @@ -400,7 +400,7 @@ __hw_perf_event_init(struct perf_event *event)
+>  	}
+>  
+>  	if (event->group_leader != event) {
+> -		if (validate_group(event) != 0);
+> +		if (validate_group(event) != 0)
+>  			return -EINVAL;
+>  	}
+>  
+> -- 
+> 1.7.9.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
 
-diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-index 6f1acc7..99afca4 100644
---- a/arch/arm/boot/dts/armada-370-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-@@ -54,7 +54,7 @@
- 				reg = <0xd0012000 0x100>;
- 				reg-shift = <2>;
- 				interrupts = <41>;
--				reg-io-width = <4>;
-+				reg-io-width = <1>;
- 				status = "disabled";
- 		};
- 		serial at d0012100 {
-@@ -62,7 +62,7 @@
- 				reg = <0xd0012100 0x100>;
- 				reg-shift = <2>;
- 				interrupts = <42>;
--				reg-io-width = <4>;
-+				reg-io-width = <1>;
- 				status = "disabled";
- 		};
- 
-diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index 1443949..ca00d83 100644
---- a/arch/arm/boot/dts/armada-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -46,7 +46,7 @@
- 				reg = <0xd0012200 0x100>;
- 				reg-shift = <2>;
- 				interrupts = <43>;
--				reg-io-width = <4>;
-+				reg-io-width = <1>;
- 				status = "disabled";
- 		};
- 		serial at d0012300 {
-@@ -54,7 +54,7 @@
- 				reg = <0xd0012300 0x100>;
- 				reg-shift = <2>;
- 				interrupts = <44>;
--				reg-io-width = <4>;
-+				reg-io-width = <1>;
- 				status = "disabled";
- 		};
- 
 -- 
-1.7.10.4
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
