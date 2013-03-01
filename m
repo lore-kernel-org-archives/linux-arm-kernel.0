@@ -1,52 +1,28 @@
-From: Ying.Liu@freescale.com (Liu Ying)
-Date: Tue, 1 Jan 2013 11:21:15 +0800
-Subject: [PATCH v2 3/3] ARM i.MX51 babbage: Add keypad support
-In-Reply-To: <1357010475-7331-1-git-send-email-Ying.Liu@freescale.com>
-References: <1357010475-7331-1-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <1357010475-7331-3-git-send-email-Ying.Liu@freescale.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 28 Feb 2013 22:19:58 -0800
+Subject: [GIT PULL 0/3] arm-soc: late changes for 3.9
+In-Reply-To: <CA+55aFx2Cuuq2YW6mexxZ88TNm=FLYUYPzeLqN=y46oYxZJ3wQ@mail.gmail.com>
+References: <1362092093-4839-1-git-send-email-olof@lixom.net>
+ <CA+55aFx2Cuuq2YW6mexxZ88TNm=FLYUYPzeLqN=y46oYxZJ3wQ@mail.gmail.com>
+Message-ID: <CAOesGMiMWaEmPMJ2q2t9gsTa2gFZm_iwc6v9wO7htyPrOKNx=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The keypad is on the accessory board of i.MX51 babbage
-main board and is driven by Keypad Port(KPP) in SoC.
-The keymap is the same to i.MX25 3stack platform as
-the accessory board schematic tells that it is designed
-in this way.
+On Thu, Feb 28, 2013 at 8:18 PM, Linus Torvalds
+<torvalds@linux-foundation.org> wrote:
 
-Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
----
- arch/arm/boot/dts/imx51-babbage.dts |   22 ++++++++++++++++++++++
- 1 files changed, 22 insertions(+), 0 deletions(-)
+>> I've pushed a resolved branch for reference (late-branches-resolved)
+>> in case you want to compare conflict resolutions.
+>
+> So Arnd's tag talked about removing the stale gpio.h, but I think it
+> was the i2c.h that was now also stale. So I removed both - even though
+> technically, the merge should have left i2c.h since it was in both
+> parents. You should double-check that, but I don't see how that
+> <linux/i2c.h> could *possibly* be valid any more, and people had tried
+> (unsuccessfully) to remove it once already, so...
 
-diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
-index 567e7ee..a9bb799 100644
---- a/arch/arm/boot/dts/imx51-babbage.dts
-+++ b/arch/arm/boot/dts/imx51-babbage.dts
-@@ -281,3 +281,25 @@
- 		mux-ext-port = <3>;
- 	};
- };
-+
-+&kpp {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_kpp_1>;
-+	linux,keymap = <0x00000067	/* KEY_UP */
-+			0x0001006c	/* KEY_DOWN */
-+			0x00020072	/* KEY_VOLUMEDOWN */
-+			0x00030066	/* KEY_HOME */
-+			0x0100006a	/* KEY_RIGHT */
-+			0x01010069	/* KEY_LEFT */
-+			0x0102001c	/* KEY_ENTER */
-+			0x01030073	/* KEY_VOLUMEUP */
-+			0x02000040	/* KEY_F6 */
-+			0x02010042	/* KEY_F8 */
-+			0x02020043	/* KEY_F9 */
-+			0x02030044	/* KEY_F10 */
-+			0x0300003b	/* KEY_F1 */
-+			0x0301003c	/* KEY_F2 */
-+			0x0302003d	/* KEY_F3 */
-+			0x03030074>;	/* KEY_POWER */
-+	status = "okay";
-+};
--- 
-1.7.1
+The i2c include is definitely unnecessary since there's no
+i2c_board_info stuff left in the file. Thanks for catching that.
+
+
+-Olof
