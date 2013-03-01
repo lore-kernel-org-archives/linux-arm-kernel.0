@@ -1,26 +1,32 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 1 Mar 2013 14:04:28 +0100
-Subject: [PATCH v9 10/10] document: devicetree: bind pinconf with pin
- single
-In-Reply-To: <1361101376-3783-11-git-send-email-haojian.zhuang@linaro.org>
-References: <1361101376-3783-1-git-send-email-haojian.zhuang@linaro.org>
- <1361101376-3783-11-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <CACRpkdZAot38sAbnjh5W6ofy_+0Z_rk1Tqr_zjnmrWWq+oHjLA@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 1 Mar 2013 18:39:20 +0530
+Subject: [PATCH 15/15] ARM: OMAP5: PM: handle device instance for for
+ coldreset
+In-Reply-To: <20130301130430.GA19894@kahuna>
+References: <1362139864-9233-1-git-send-email-santosh.shilimkar@ti.com>
+ <1362139864-9233-16-git-send-email-santosh.shilimkar@ti.com>
+ <20130301130430.GA19894@kahuna>
+Message-ID: <5130A880.5080703@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 17, 2013 at 12:42 PM, Haojian Zhuang
-<haojian.zhuang@linaro.org> wrote:
-
-> From: Haojian Zhuang <haojian.zhuang@gmail.com>
->
-> Add comments with pinconf & gpio range in the document of
-> pinctrl-single.
->
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
-> Acked-by: Tony Lindgren <tony@atomide.com>
-
-Patch applied!
-
-Thanks,
-Linus Walleij
+On Friday 01 March 2013 06:34 PM, Nishanth Menon wrote:
+> $subject - warm reset
+> 
+ok
+> On 17:41-20130301, Santosh Shilimkar wrote:
+>> From: Nishanth Menon <nm@ti.com>
+>>
+>> OMAP5 and OMAP4 have different device instance offsets.
+>>
+>> So to handle them properly, use a runtime detected instance offset
+>> Other bit offsets and register offsets remained constant.
+>>
+>> Creating a new function is not really worthwhile here as the logic
+>> will be replicated without much benefit.
+>>
+>> Signed-off-by: Nishanth Menon <nm@ti.com>
+>> santosh.shilimkar at ti.com: Refreshed patch against 3.8
+> [santosh.shilimkar at ti.com: Refreshed patch against 3.8]
+> ?
+#include "soc.h" :)
