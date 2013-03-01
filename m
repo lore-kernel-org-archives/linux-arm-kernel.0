@@ -1,36 +1,25 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri, 1 Mar 2013 16:23:45 +0900
-Subject: [PATCH v4 2/3] ARM: mach-shmobile: r8a7779: add SATA support
-In-Reply-To: <20130301014148.GB9232@quad.lixom.net>
-References: <201302272339.15402.sergei.shtylyov@cogentembedded.com>
- <20130301014148.GB9232@quad.lixom.net>
-Message-ID: <20130301072345.GD14376@verge.net.au>
+Date: Fri, 1 Mar 2013 16:25:01 +0900
+Subject: [PATCH v4 0/3] R-Car SATA platform data
+In-Reply-To: <201302272332.51650.sergei.shtylyov@cogentembedded.com>
+References: <201302272332.51650.sergei.shtylyov@cogentembedded.com>
+Message-ID: <20130301072501.GE14376@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 28, 2013 at 05:41:48PM -0800, Olof Johansson wrote:
-> On Wed, Feb 27, 2013 at 11:39:14PM +0300, Sergei Shtylyov wrote:
-> > From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-> > 
-> > Add SATA clock for r8a7779 SoC (for both device tree and usual cases). 
-> > Register SATA controller as a "late" platform device on r8a7779 SoC.
+On Wed, Feb 27, 2013 at 11:32:51PM +0300, Sergei Shtylyov wrote:
+> Hello.
 > 
-> Hi,
+>    Here's the v4 of the set of now 3 patches (the driver itself has been merged
+> since) against the Simon Horman's renesas.git repo, 'next' branch:
 > 
-> If you have the a binding in the device tree (which you do through patch 1/3),
-> then there's no reason to have a platform device for it.
+> [1/3] ARM: mach-shmobile: r8a7779: SATA DT configuration
+> [2/3] ARM: mach-shmobile: r8a7779: add SATA support
+> [3/3] ARM: mach-shmobile: marzen: add SATA support
+> 
+> Patch changes since the initial posting are reported in the individual patches.
 
-Hi Olof,
-
-the DT exists but currently the marzen board brings up all
-of its devices using platform devices. Which if nothing else is
-internally consistent.
-
-I suppose it would be possible to add a call to
-r8a7779_add_standard_devices_dt() and have the board bring
-up this device using DT and the rest using platform drivers
-(until the drivers are migrated to DT).
-
-Would that be your preferred option?
-
-Magnus, how do you feel about this idea?
+Thanks. I have refreshed the topic/r-car-sata branch of the renesas tree
+accordingly. That branch still contains a copy of the "Add Renesas R-Car
+on-chip 3Gbps SATA controller driver." but it should disappear once I rebase
+(e.g. on v3.9-rc1).
