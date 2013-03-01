@@ -1,28 +1,69 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 01 Mar 2013 11:25:45 -0700
-Subject: [PATCH 1/2] ARM: Tegra: Add clock entry for smp_twd clock
-In-Reply-To: <20130228200415.GA17598@avionic-0098.mockup.avionic-design.de>
-References: <1362037381-4730-1-git-send-email-pgaikwad@nvidia.com>
- <512F9F59.5030702@wwwdotorg.org>
- <20130228200415.GA17598@avionic-0098.mockup.avionic-design.de>
-Message-ID: <5130F2A9.7000609@wwwdotorg.org>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Fri, 1 Mar 2013 19:28:54 +0100
+Subject: [PATCH] lglock: add read-preference local-global rwlock
+In-Reply-To: <5130E8E2.50206@cn.fujitsu.com>
+References: <512BBAD8.8010006@linux.vnet.ibm.com>
+ <CACvQF51jCxk5jUqmhD=QBBtUsBkQWZzakacrKO4Gsk=w61rNwQ@mail.gmail.com>
+ <512C7A38.8060906@linux.vnet.ibm.com>
+ <CACvQF51RvhM8XNqu3-1OTQ=cZUZ=pAX+_zx0a29+W67N1X+BgQ@mail.gmail.com>
+ <512CC509.1050000@linux.vnet.ibm.com>
+ <CACvQF50UgiqPpDk3HCmV86zKSf6tPjqr0bZowfPEOJs0g0r0MQ@mail.gmail.com>
+ <512D0D67.9010609@linux.vnet.ibm.com>
+ <CACvQF53ph2ixdM-otzetjM5cR+2kcZj6sckOp3TnzzA_x-EZ8w@mail.gmail.com>
+ <512E7879.20109@linux.vnet.ibm.com> <5130E8E2.50206@cn.fujitsu.com>
+Message-ID: <20130301182854.GA3631@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/28/2013 01:04 PM, Thierry Reding wrote:
-> On Thu, Feb 28, 2013 at 11:18:01AM -0700, Stephen Warren wrote:
->> On 02/28/2013 12:43 AM, Prashant Gaikwad wrote:
->>> As DT support for clocks and smp_twd is enabled, add clock
->>> entry for smp_twd clock to DT.
->> 
->> Is this a cleanup for 3.10, or a bug-fix for 3.9? Perhaps it
->> solves the "twd: clock not found" bug I reported?
-> 
-> Yes. This is pretty much identical to the patch I sent a few days
-> ago before your patch that fixed the clock drivers to match the
-> devicetree binding documentation.
-> 
-> The "clock not found" is exactly what this fixes.
+Lai, I didn't read this discussion except the code posted by Michel.
+I'll try to read this patch carefully later, but I'd like to ask
+a couple of questions.
 
-OK. I'll forward these patches to arm-soc as fixes for 3.9 then. I
-tested them and they work for me, on top of Linus' latest master.
+This version looks more complex than Michel's, why? Just curious, I
+am trying to understand what I missed. See
+http://marc.info/?l=linux-kernel&m=136196350213593
+
+And I can't understand FALLBACK_BASE...
+
+OK, suppose that CPU_0 does _write_unlock() and releases ->fallback_rwlock.
+
+CPU_1 does _read_lock(), and ...
+
+> +void lg_rwlock_local_read_lock(struct lgrwlock *lgrw)
+> +{
+> +	struct lglock *lg = &lgrw->lglock;
+> +
+> +	preempt_disable();
+> +	rwlock_acquire_read(&lg->lock_dep_map, 0, 0, _RET_IP_);
+> +	if (likely(!__this_cpu_read(*lgrw->reader_refcnt))) {
+> +		if (!arch_spin_trylock(this_cpu_ptr(lg->lock))) {
+
+_trylock() fails,
+
+> +			read_lock(&lgrw->fallback_rwlock);
+> +			__this_cpu_add(*lgrw->reader_refcnt, FALLBACK_BASE);
+
+so we take ->fallback_rwlock and ->reader_refcnt == FALLBACK_BASE.
+
+CPU_0 does lg_global_unlock(lgrw->lglock) and finishes _write_unlock().
+
+Interrupt handler on CPU_1 does _read_lock() notices ->reader_refcnt != 0
+and simply does this_cpu_inc(), so reader_refcnt == FALLBACK_BASE + 1.
+
+Then irq does _read_unlock(), and
+
+> +void lg_rwlock_local_read_unlock(struct lgrwlock *lgrw)
+> +{
+> +	switch (__this_cpu_dec_return(*lgrw->reader_refcnt)) {
+> +	case 0:
+> +		lg_local_unlock(&lgrw->lglock);
+> +		return;
+> +	case FALLBACK_BASE:
+> +		__this_cpu_sub(*lgrw->reader_refcnt, FALLBACK_BASE);
+> +		read_unlock(&lgrw->fallback_rwlock);
+
+hits this case?
+
+Doesn't look right, but most probably I missed something.
+
+Oleg.
