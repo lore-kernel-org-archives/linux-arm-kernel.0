@@ -1,31 +1,20 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 1 Mar 2013 18:23:22 +0800
-Subject: [PATCH 09/12] ASoC: dmaengine_pcm: support use of generic DMA
- helper
-In-Reply-To: <201302272102.40811.arnd@arndb.de>
-References: <1361978748-25281-1-git-send-email-shawn.guo@linaro.org>
- <1361978748-25281-10-git-send-email-shawn.guo@linaro.org>
- <201302272102.40811.arnd@arndb.de>
-Message-ID: <20130301102320.GV25302@opensource.wolfsonmicro.com>
+From: javier.martin@vista-silicon.com (Javier Martin)
+Date: Fri,  1 Mar 2013 12:37:51 +0100
+Subject: [PATCH v3 0/2] crypto: sahara: Add support for SAHARA in i.MX27.
+Message-ID: <1362137873-8827-1-git-send-email-javier.martin@vista-silicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 27, 2013 at 09:02:40PM +0000, Arnd Bergmann wrote:
+Hi,
+the following changes since v2:
+- Merge device tree binding with the driver code in the same patch.
+- Specify that currently, only i.MX27 is supported in device tree binding.
+- Replace MACH_MX27 by ARCH_MXC in Kconfig.
+- Remove __devexit_p from sahara_remove().
 
-> I would actually prefer having a new API in the soc-dmaengine-pcm
-> module, like
+I haven't finally included support for i.MX51 submitted by Arnaud.
+I'd rather it to be included in a separate patch later if you
+don't mind.
 
-> static int dmaengine_pcm_request_slave_channel(struct dmaengine_pcm_runtime_data *prtd,
-> 						struct device *dev, const char *id);
-
-> For sound drivers that are fully converted to using DT, it would be
-> a more natural interface to use IMHO.
-
-Yes, please.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130301/ddab8998/attachment.sig>
+[PATCH v3 1/2] i.MX27: Add clock support for SAHARA2.
+[PATCH v3 2/2] crypto: sahara: Add driver for SAHARA2 accelerator.
