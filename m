@@ -1,40 +1,17 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 1 Mar 2013 17:30:01 +0000
-Subject: omap: IORESOURCE_IRQ flags not set when defining a GPIO-IRQ
- from DT
-In-Reply-To: <CAAwP0s3ZzGf+_diZiQ7DSfWj74Sh=E9F+j=4UGnw8meHDR2AZQ@mail.gmail.com>
-References: <CAAwP0s3ZzGf+_diZiQ7DSfWj74Sh=E9F+j=4UGnw8meHDR2AZQ@mail.gmail.com>
-Message-ID: <20130301173001.GC30923@n2100.arm.linux.org.uk>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 01 Mar 2013 09:39:30 -0800
+Subject: [PATCH 0/2] gpio/omap: updates for v3.10
+In-Reply-To: <1362158568-1624-1-git-send-email-jon-hunter@ti.com> (Jon
+ Hunter's message of "Fri, 1 Mar 2013 11:22:46 -0600")
+References: <1362158568-1624-1-git-send-email-jon-hunter@ti.com>
+Message-ID: <874ngv2f59.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 01, 2013 at 05:17:57PM +0100, Javier Martinez Canillas wrote:
-> >> unsigned long irq_flags = SMC_IRQ_FLAGS;
-> >> ...
-> >>        if (irq_flags == -1 || ires->flags & IRQF_TRIGGER_MASK)
-> >>                 irq_flags = ires->flags & IRQF_TRIGGER_MASK;
-> >>
-> >> while smsc911x driver's probe function uses the flags from the
-> >> resource unconditionally:
-> >>
-> >> irq_flags = irq_res->flags & IRQF_TRIGGER_MASK;
-> >>
-> >> So, at the end both will set irq_flags to whatever is on the
-> >> IORESOURCE_IRQ struct resource flags member.
-> >
-> > Actually, that's not the case for smc91x. By default SMC_IRQ_FLAGS != -1
-> > (for omap) and so it will not set irq_flags to ires->flags &
-> > IRQF_TRIGGER_MASK. However, if I force irq_flags to be -1, then I see
-> > that irq_flags are to 0.
+Jon Hunter <jon-hunter@ti.com> writes:
 
-smc91x is complicated by the fact that it started off life before there
-was any possibility to pass IRQ flags through resources.  So we ended
-up with smc91x.h containing _lots_ of platform specific data, and the
-driver could only be built for one platform.
+> Summary of updates:
+> - Convert OMAP GPIO driver to use linear mapping for IRQ domains
+> - Avoid crashes seen if a gpio bank is not enabled when requesting an IRQ.
 
-I fixed that by sorting out this IRQ passing method, and changing smc91x
-to support both the fixed configuration, and the dynamic-through-IRQflags
-method.
-
-There is no reason for any other driver to support the fixed method; that
-would be a completely backwards step.
+Acked-by: Kevin Hilman <khilman@linaro.org>
