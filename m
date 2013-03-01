@@ -1,49 +1,70 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 1 Mar 2013 08:38:34 -0600
-Subject: [PATCH] arm: omap: RX-51: ARM errata 430973 workaround
-In-Reply-To: <517283541.62064.1362124023621.JavaMail.apache@mail81.abv.bg>
-References: <517283541.62064.1362124023621.JavaMail.apache@mail81.abv.bg>
-Message-ID: <CAGo_u6omQdSzpfthHNAU1UvgSvkgq3ZC6g1Ha9oi0nc9QJ71nA@mail.gmail.com>
+From: T.Crueger@fh-trier.de (Till Crueger)
+Date: Fri, 01 Mar 2013 15:48:06 +0100
+Subject: Starting the kernel on Core1 of a Cortex-A9 system
+Message-ID: <5130BFA6.5020701@fh-trier.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 1, 2013 at 1:47 AM, ?????? ???????? <freemangordon@abv.bg> wrote:
->
-> They look similar, but they are not equivalent :). The first major difference is here (code taken from omap-smc.S)
->
->> ENTRY(omap_smc2)
->>          stmfd   sp!, {r4-r12, lr}
->>          mov     r3, r2
->>          mov     r2, r1
->>          mov     r1, #0x0        @ Process ID
->>          mov     r6, #0xff
->>          mov     r12, #0x00      @ Secure Service ID
->
-> Always zero, while RX51 PPA expects a real value. I wonder if it is a bug, but anyway I don't see the id parameter (R0) used.
->
->>          mov     r7, #0
->>          mcr     p15, 0, r7, c7, c5, 6
->
-> According to ARM TRM, this is "Invalidate entire branch predictor array"(IIUC). NFC why it is needed here, but this will not work on RX-51 until IBE bit in ACR is set.
->
->>          dsb
->>          dmb
->>          smc     #0
->
-> RX-51 needs smc #1 ;)
->
->>          ldmfd   sp!, {r4-r12, pc}
->
->
-> The next major difference is that RX-51 expects parameter count passed in R3[0] to be the count of the remaining parameters +1, but omap_secure_dispatcher (in omap-secure.c) is passing the exact count of the remaining parameters.
->
-> I guess all of the above problems can be fixed/workarounded, but I wonder does it worth. Not to say that I don't have BB around to test if the code still works if I make changes to omap2-secure.c/omap-smc.S :)
->
->
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-Yep, that was my point - instead of introducing new functions,
-extending the existing functions to handle new requirements is better
-solution, IMHO.
+Hi,
 
-Regards,
-Nishanth Menon
+For some experimentation with multicore architecture I am currently
+trying to get a Linux system to run on Core1 of a OMAP44xx System
+(Pandaboard) instead of on Core0.
+
+So far I can get the system to run cleanly to run on core1 by manually
+starting the core1 from the bootloader and then starting the kernel on
+core1 instead of core0 (with max_cpus=1). However this only works if I
+use an uncompressed Linux image.
+
+If I try to use a compressed version of the image, the startup procedure
+fails shortly after the decompression while patching the physical to
+virtual translations. I had a look at the translation tables, and
+noticed they contain invalid addresses, which explains why the startup
+crashes at this point.
+
+Further debugging this problem I noticed that the correct addresses are
+written to memory during decompression, but are lost as soon as the MMU
+is turned of in the decompression code. I.e. I can see the correct
+addresses in the debugger while the MMU is active, but as soon as I it
+is turned of, the old adresses re-appear, as if they never were written
+back.
+
+I had a close look at the code handling the MMU and I cannot find
+anything which should be core specific there, so I am a bit puzzeled by
+this behavior. I also already talked to Catalin Marinas who wrote the
+code in the first place, and he suggested that the ACTLR setting might
+be different (thanks for this hint). However I checked and this register
+is the same on both cores (SMP and FW set, all other flags not set).
+
+Does anybody have any other possible explanation why this behavior might
+be different on Core0 and Core1? The Bootloader (U-Boot) only runs on
+Core0 so there might be some initialization that is missing for Core1,
+but I cannot figure out which one.
+
+
+Thank you for your time,
+  Till Crueger
+
+- -- 
+Dipl. Inform. Till Crueger
+
+Department of Computer Science
+Hochschule Trier ? Trier University of Applied Sciences
+Postfach 1826
+54208 Trier
+GERMANY
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v2.0.19 (GNU/Linux)
+Comment: Using GnuPG with Thunderbird - http://www.enigmail.net/
+
+iQEcBAEBAgAGBQJRML+mAAoJEMyqYnfSqLbVxjgH/0SI0WGI2nMyMSanhEr0m8nQ
+1YCcLooRJnDu9ltf40X1wAvPPbbHq3SZAZ9Y+/imZOqXIyuwMw/ru1fFp+gckQvX
+UHi00zup7CLjL1udnmFBUfFjE9kylafg/HuwTWOvBaOdmdsGAc/fdyvmLFC/io47
+ADuwD1LOhaLE1+mPQD567Z6LGpeSJQbIiI2/f32TmCc0dPL5aGN72EPVAvAMs2DD
+3Gqgxu+d6lGQvaHuQ0wR93T3/7L72Na3EvKee7xtjcu3gR4amqeT7w4Gk4mnrvuI
+krGCfsc1fRICaGsPv4G3x7hw56yO5MAqO2EB7nlPCll+TQ4m8Rkh3HSyeGKyxEw=
+=cZ+o
+-----END PGP SIGNATURE-----
