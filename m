@@ -1,61 +1,68 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 01 Mar 2013 10:22:34 -0800
-Subject: [PATCH 2/5] clk: notifier handler for dynamic voltage scaling
-In-Reply-To: <1362130891.19498.12.camel@bilhuang-vm1>
-References: <1362026969-11457-1-git-send-email-mturquette@linaro.org>
- <1362026969-11457-3-git-send-email-mturquette@linaro.org>
- <1362130891.19498.12.camel@bilhuang-vm1>
-Message-ID: <20130301182234.6210.63879@quantum>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 01 Mar 2013 11:24:54 -0700
+Subject: [PATCH] pinctrl: gpio: vt8500: Add pin control driver for
+ Wondermedia SoCs
+In-Reply-To: <1362032757.32211.10.camel@gitbox>
+References: <1360896534-20637-1-git-send-email-linux@prisktech.co.nz>
+ <1360896534-20637-2-git-send-email-linux@prisktech.co.nz>
+ <512E86F4.6000909@wwwdotorg.org> <1362032757.32211.10.camel@gitbox>
+Message-ID: <5130F276.8000904@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Bill Huang (2013-03-01 01:41:31)
-> On Thu, 2013-02-28 at 12:49 +0800, Mike Turquette wrote:
-> > Dynamic voltage and frequency scaling (dvfs) is a common power saving
-> > technique in many of today's modern processors.  This patch introduces a
-> > common clk rate-change notifier handler which scales voltage
-> > appropriately whenever clk_set_rate is called on an affected clock.
+On 02/27/2013 11:25 PM, Tony Prisk wrote:
+> Thanks for the review Stephen,
 > 
-> I really think clk_enable and clk_disable should also be triggering
-> notifier call and DVFS should act accordingly since there are cases
-> drivers won't set clock rate but instead disable its clock directly, do
-> you agree?
-> > 
-
-Hi Bill,
-
-I'll think about this.  Perhaps a better solution would be to adapt
-these drivers to runtime PM.  Then a call to runtime_pm_put() would
-result in a call to clk_disable(...) and regulator_set_voltage(...).
-
-There is no performance-based equivalent to runtime PM, which is one
-reason why clk_set_rate is a likely entry point into dvfs.  But for
-operations that have nice api's like runtime PM it would be better to
-use those interfaces and not overload the clk.h api unnecessarily.
-
-> > There are three prerequisites to using this feature:
-> > 
-> > 1) the affected clocks must be using the common clk framework
-> > 2) voltage must be scaled using the regulator framework
-> > 3) clock frequency and regulator voltage values must be paired via the
-> > OPP library
+> I have posted replies to most of your points/questions inline.
 > 
-> Just a note, Tegra Core won't meet prerequisite #3 since each regulator
-> voltage values is associated with clocks driving those many sub-HW
-> blocks in it.
+> The review was slightly more in-depth than I expected and as you
+> noticed, the patch is poor in quality. I was more 'testing the water'
+> that people were happy with the basic design of the code, rather than
+> the specifics as I have 4 SoC's worth of data to add, and didn't want to
+> have to redo it all if I had to make a data format change.
+> 
+> It seems that on the whole the design is ok, so I will post a proper
+> patch series for this to be reviewed (after addressing the issues you
+> pointed out).
 
-This patch isn't the one and only way to perform dvfs.  It is just a
-helper function for registering notifier handlers for systems that meet
-the above three requirements.  Even if you do not use the OPP library
-there is no reason why you could not register your own rate-change
-notifier handler to implement dvfs using whatever lookup-table you use
-today.
+Oh, OK. It might have been a good idea to mention this in the patch
+description, or have posted it as [PATCH RFC].
 
-And patches are welcome to extend the usefulness of this helper.  I'd
-like as many people to benefit from this mechanism as possible.
+>>> diff --git a/drivers/pinctrl/pinctrl-wm8850.c b/drivers/pinctrl/pinctrl-wm8850.c
+>>
+>>> +/* Please keep sorted by bank/bit */
+>>> +#define WMT_PIN_EXTGPIO0	WMT_PIN(0, 0)
+>>> +#define WMT_PIN_EXTGPIO1	WMT_PIN(0, 1)
+>> ...
+>>> +#define WMT_PIN_I2C2_SCL	WMT_PIN(5, 12)
+>>> +#define WMT_PIN_I2C2_SDA	WMT_PIN(5, 13)
+>>
+>> There are a lot of gaps in that list. Does the HW really not support pin
+>> muxing on the rest of the bits in the registers?
+>
+> Nobody who knows is willing to say :). Most of the code for Wondermedia
+> SoCs is based of the vendor source that has come out, and we therefore
+> only know what the vendor has included support for.
+> 
+> No doubt there will be other pins which have valid functions, but we
+> don't know what they are and don't have support for them at the moment.
+> The reason I went with the bank/pin encoding is so that if/when we add
+> other pins, it won't affect any pin numbering.
 
-At some point we should think hard about DT bindings for these operating
-points...
+Doing the pin numbering that way was a good choice.
 
-Regards,
-Mike
+So, there's an idea that when first defining a DT binding for HW, that
+binding should be complete and accurate, rather than being minimal, with
+a plan to incrementally expand it later. I would take that to mean that
+for a pinctrl binding, the list of pins/groups/function/config-options
+that the binding supports is complete. Obviously this isn't possible if
+there's no complete documentation for the HW:-(
+
+I hope this case will be allowed though, since any modifications to
+support new pins/groups/functions should be possible to add in a
+backwards-compatible way, especially with a forward-looking number
+scheme for the pins.
+
+We should consider this kind of issue if/when we actually implement
+stricter rules for modifications to DT bindings, so as not to disallow
+solving this problem.
