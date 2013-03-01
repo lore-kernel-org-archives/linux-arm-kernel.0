@@ -1,90 +1,26 @@
-From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
-Date: Fri, 01 Mar 2013 19:12:29 +0900
-Subject: [PATCH] arm: mvebu: Reduce reg-io-width with UARTs
-In-Reply-To: <1362126969-32277-1-git-send-email-heikki.krogerus@linux.intel.com>
-References: <1362126969-32277-1-git-send-email-heikki.krogerus@linux.intel.com>
-Message-ID: <51307F0D.6070108@hitachi.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 1 Mar 2013 10:21:32 +0000
+Subject: [PATCH V2] arm64: add support for 8250/16550 earlyprintk
+In-Reply-To: <1362127307-7986-1-git-send-email-anup.patel@linaro.org>
+References: <1362127307-7986-1-git-send-email-anup.patel@linaro.org>
+Message-ID: <20130301102132.GA1515@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(2013/03/01 17:36), Heikki Krogerus wrote:
-> Setting the reg-io-width to 1 byte represents more accurate
-> description of the HW.
+On Fri, Mar 01, 2013 at 08:41:47AM +0000, Anup Patel wrote:
+> This patch adds support for using earlyprintk with 8250/16550 UART
+> ports.
 > 
-> This will fix an issue where UART driver causes kernel
-> panic during bootup. Gregory CLEMENT traced the issue to
-> autoconfig() in 8250.c, where the existence of FIFO is
-> checked from UART_IIR register. The register is now read as
-> 32-bit value as the reg-io-width is set to 4-bytes. The
-> retuned value seems to contain bogus data for bits 31:8,
-> causing the issue.
+> The 8250/16550 UART can either have 8-bit or 32-bit aligned registers
+> which is HW vendor dependent.
 > 
-> Signed-off-by: Heikki Krogerus <heikki.krogerus@linux.intel.com>
-> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Cc: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
-
-I've tested this patch on Armada-XP based OpenBlocks AX3/4
-and fixed the issue.
-
-Tested-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
-
-Thank you!
-
-
-> ---
->  arch/arm/boot/dts/armada-370-xp.dtsi |    4 ++--
->  arch/arm/boot/dts/armada-xp.dtsi     |    4 ++--
->  2 files changed, 4 insertions(+), 4 deletions(-)
+> Kernel args for 8-bit aligned regs: earlyprintk=uart8250-8bit,<phys_address>
 > 
-> diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-> index 6f1acc7..99afca4 100644
-> --- a/arch/arm/boot/dts/armada-370-xp.dtsi
-> +++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-> @@ -54,7 +54,7 @@
->  				reg = <0xd0012000 0x100>;
->  				reg-shift = <2>;
->  				interrupts = <41>;
-> -				reg-io-width = <4>;
-> +				reg-io-width = <1>;
->  				status = "disabled";
->  		};
->  		serial at d0012100 {
-> @@ -62,7 +62,7 @@
->  				reg = <0xd0012100 0x100>;
->  				reg-shift = <2>;
->  				interrupts = <42>;
-> -				reg-io-width = <4>;
-> +				reg-io-width = <1>;
->  				status = "disabled";
->  		};
->  
-> diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-> index 1443949..ca00d83 100644
-> --- a/arch/arm/boot/dts/armada-xp.dtsi
-> +++ b/arch/arm/boot/dts/armada-xp.dtsi
-> @@ -46,7 +46,7 @@
->  				reg = <0xd0012200 0x100>;
->  				reg-shift = <2>;
->  				interrupts = <43>;
-> -				reg-io-width = <4>;
-> +				reg-io-width = <1>;
->  				status = "disabled";
->  		};
->  		serial at d0012300 {
-> @@ -54,7 +54,7 @@
->  				reg = <0xd0012300 0x100>;
->  				reg-shift = <2>;
->  				interrupts = <44>;
-> -				reg-io-width = <4>;
-> +				reg-io-width = <1>;
->  				status = "disabled";
->  		};
->  
+> Kernel args for 32-bit aligned regs: earlyprintk=uart8250-32bit,<phys_address>
 > 
+> Signed-off-by: Anup Patel <anup.patel@linaro.org>
 
+Thanks. I'll queue it for 3.10.
 
 -- 
-Masami HIRAMATSU
-IT Management Research Dept. Linux Technology Center
-Hitachi, Ltd., Yokohama Research Laboratory
-E-mail: masami.hiramatsu.pt at hitachi.com
+Catalin
