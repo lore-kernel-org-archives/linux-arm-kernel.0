@@ -1,38 +1,41 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 28 Feb 2013 18:42:14 -0600
-Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
-In-Reply-To: <CACRpkdbY1AQuJWvDaYQFoZbKwNAOGG-p3wjedEgifbSh=1kNmA@mail.gmail.com>
-References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
- <1329321854-24490-4-git-send-email-b-cousson@ti.com>
- <CACRpkdabXa8tXNeGRPntvY9cx4XWCa7XaEXHmVREeWN-x793ZA@mail.gmail.com>
- <512F55E0.8050501@ti.com>
- <CACRpkdbY1AQuJWvDaYQFoZbKwNAOGG-p3wjedEgifbSh=1kNmA@mail.gmail.com>
-Message-ID: <512FF966.9060806@ti.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 28 Feb 2013 16:55:36 -0800
+Subject: [PATCH v3 0/2] Add automatic bus number support for i2c busses
+ with device tree
+In-Reply-To: <20130228232558.GA8180@the-dreams.de>
+References: <1360630085-26874-1-git-send-email-dianders@chromium.org>
+ <CAD=FV=WS5Vj74d-FNXCVpNsx6Nf-8+RC-WO29Z1XNmkEOYLxfQ@mail.gmail.com>
+ <20130228232558.GA8180@the-dreams.de>
+Message-ID: <CAD=FV=XnhG_gM7mFLRHKt=j3a249QsbbgDb4cTCGa7297svVeQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Wolfram,
 
-On 02/28/2013 06:09 PM, Linus Walleij wrote:
-> On Thu, Feb 28, 2013 at 2:04 PM, Benoit Cousson <b-cousson@ti.com> wrote:
-> 
->> On 02/28/2013 12:41 AM, Linus Walleij wrote:
->>> On Wed, Feb 15, 2012 at 5:04 PM, Benoit Cousson <b-cousson@ti.com> wrote:
->>
->> Gosh! That's pretty old stuff :-)
-> 
-> Hm yeah, haha :-)
-> 
-> I didn't notice that someone was replying in the thread for
-> some other reason (or maybe using the same subject and
-> confusing my gmail reader?).
-> 
-> Anyway, the basic idea is sound, so are you still working
-> on the patch? I remember discussing this with someone
-> in Denmark...
+On Thu, Feb 28, 2013 at 3:25 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
+>
+> Regarding patch 1, I was waiting for the idr changes to hit mainline.
+> They are mainline now, but since the removal of MAX_IDR_MASK your patch
+> doesn't apply anymore :( Can you rebase and retest, please? I'd like to
+> get it into 3.9, still.
 
-That was me :-)
+Yes, I'll rebase/retest tomorrow.  I'll let you make the call between
+3.9 and 3.10.  Obviously I'd love to see it in 3.9 but I'm OK with
+either.  I was just hoping not to find out at the end of the 3.10
+cycle that it needs fixes and need to wait for 3.11.  I wanted to make
+sure all my ducks were in a row.  ;-)
 
-I have the patch, I am testing and will send tomorrow for review.
 
-Cheers
-Jon
+> For patch 2, some Tested-by would be nice; but it will probably make it
+> into my for-next somewhen after rc1 is out.
+
+I have no urgent need for patch 2 to land but it seemed nice to tidy
+up the pxa driver and I felt it was my obligation to post it together
+with patch set #1 (plus it's always nice to remove code).  Putting it
+into your for-next seems like a very good solution.  That gives people
+some time to test it and make sure it works for them.
+
+
+Thanks!
+
+-Doug
