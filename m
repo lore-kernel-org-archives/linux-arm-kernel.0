@@ -1,25 +1,40 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 28 Feb 2013 17:56:12 -0800
-Subject: [GIT PULL] sunXi dt additions for 3.9, take 2
-In-Reply-To: <512CDE04.2010401@free-electrons.com>
-References: <512CDE04.2010401@free-electrons.com>
-Message-ID: <20130301015612.GA11174@quad.lixom.net>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 28 Feb 2013 22:06:51 -0500 (EST)
+Subject: [PATCH 1/1 net-next] fec: net: put tx to napi poll function to
+ fix dead lock
+In-Reply-To: <CAHrpEqQk7ZeKicAZMN=d6wksEPzWO0dCvqj6n6Gj+2GLFJuRaA@mail.gmail.com>
+References: <1362023060-10277-1-git-send-email-Frank.Li@freescale.com>
+ <20130228.153942.1205752844713252540.davem@davemloft.net>
+ <CAHrpEqQk7ZeKicAZMN=d6wksEPzWO0dCvqj6n6Gj+2GLFJuRaA@mail.gmail.com>
+Message-ID: <20130228.220651.893690287619309792.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 26, 2013 at 05:08:36PM +0100, Maxime Ripard wrote:
-> Arnd, Olof,
+From: Frank Li <lznuaa@gmail.com>
+Date: Fri, 1 Mar 2013 11:05:57 +0800
+
+> 2013/3/1 David Miller <davem@davemloft.net>:
+>> From: Frank Li <Frank.Li@freescale.com>
+>> Date: Thu, 28 Feb 2013 11:44:20 +0800
+>>
+>>> +     int tx_pkts = fec_enet_tx(ndev);
+>>> +
+>>> +     if (tx_pkts)
+>>> +             return budget;
+>>
+>> This isn't right, you don't want to finish the NAPI poll because
+>> TX work was done.
+>>
+>> Ignore the TX work for poll completion purposes, see
+>> drivers/net/ethernet/broadcom/tg3.c:tg3_poll_work() for
+>> example.
 > 
-> Here is the second pull request for DT additions for 3.9, containing
-> the commits that were reverted, plus the missing commit that makes
-> everything build.
+> I read tg3.c code. If I understand correct,
+> just need remove below line
 > 
-> It depends on patches that were merged by LinusT and went through
-> LinusW pinctrl tree, during this merge window.
+>     if (tx_pkts)
+>              return budget;
+> 
+> Is it ture?
 
-Ok. I think in hindsight this might just as well have waited for 3.10, but
-given that we've gone back and forth on it a bit, I've pulled it into the
-fixes branch for 3.9.
-
-
--Olof
+Yes.
