@@ -1,26 +1,31 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 1 Mar 2013 10:21:32 +0000
-Subject: [PATCH V2] arm64: add support for 8250/16550 earlyprintk
-In-Reply-To: <1362127307-7986-1-git-send-email-anup.patel@linaro.org>
-References: <1362127307-7986-1-git-send-email-anup.patel@linaro.org>
-Message-ID: <20130301102132.GA1515@arm.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 1 Mar 2013 18:23:22 +0800
+Subject: [PATCH 09/12] ASoC: dmaengine_pcm: support use of generic DMA
+ helper
+In-Reply-To: <201302272102.40811.arnd@arndb.de>
+References: <1361978748-25281-1-git-send-email-shawn.guo@linaro.org>
+ <1361978748-25281-10-git-send-email-shawn.guo@linaro.org>
+ <201302272102.40811.arnd@arndb.de>
+Message-ID: <20130301102320.GV25302@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 01, 2013 at 08:41:47AM +0000, Anup Patel wrote:
-> This patch adds support for using earlyprintk with 8250/16550 UART
-> ports.
-> 
-> The 8250/16550 UART can either have 8-bit or 32-bit aligned registers
-> which is HW vendor dependent.
-> 
-> Kernel args for 8-bit aligned regs: earlyprintk=uart8250-8bit,<phys_address>
-> 
-> Kernel args for 32-bit aligned regs: earlyprintk=uart8250-32bit,<phys_address>
-> 
-> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+On Wed, Feb 27, 2013 at 09:02:40PM +0000, Arnd Bergmann wrote:
 
-Thanks. I'll queue it for 3.10.
+> I would actually prefer having a new API in the soc-dmaengine-pcm
+> module, like
 
--- 
-Catalin
+> static int dmaengine_pcm_request_slave_channel(struct dmaengine_pcm_runtime_data *prtd,
+> 						struct device *dev, const char *id);
+
+> For sound drivers that are fully converted to using DT, it would be
+> a more natural interface to use IMHO.
+
+Yes, please.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130301/ddab8998/attachment.sig>
