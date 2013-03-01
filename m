@@ -1,26 +1,28 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 1 Mar 2013 13:43:56 +0100
-Subject: [PATCH v9 01/10] gpio: add gpio offset in gpio range cells
- property
-In-Reply-To: <1361101376-3783-2-git-send-email-haojian.zhuang@linaro.org>
+Date: Fri, 1 Mar 2013 13:45:56 +0100
+Subject: [PATCH v9 02/10] gpio: fix wrong checking condition for gpio range
+In-Reply-To: <1361101376-3783-3-git-send-email-haojian.zhuang@linaro.org>
 References: <1361101376-3783-1-git-send-email-haojian.zhuang@linaro.org>
- <1361101376-3783-2-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <CACRpkdZe97v4ecMWiCWJ=S7GGCi=de149PqXs25zy-1dQSp31g@mail.gmail.com>
+ <1361101376-3783-3-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <CACRpkdaCR1FnBq_YYj15hfsGn-+V1XyvoNfjJ7fQUE=Yp2TCXg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Sun, Feb 17, 2013 at 12:42 PM, Haojian Zhuang
 <haojian.zhuang@linaro.org> wrote:
 
-> Add gpio offset into "gpio-range-cells" property. It's used to support
-> sparse pinctrl range in gpio chip.
+> If index++ calculates from 0, the checking condition of "while
+> (index++)" fails & it doesn't check any more. It doesn't follow
+> the loop that used at here.
+>
+> Replace it by endless loop at here. Then it keeps parsing
+> "gpio-ranges" property until it ends.
 >
 > Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
-OK I have applied this to the pinctrl tree for v3.10 to keep all pinctrl changes
-together.
+Patch applied to the fixes branch for the v3.9-rc series in
+my pinctrl tree.
 
-Thanks!
+Yours,
 Linus Walleij
