@@ -1,83 +1,59 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 1 Mar 2013 17:40:54 +0530
-Subject: [PATCH 05/15] ARM: OMAP5: PM: Enables ES2 PM mode by default
+Date: Fri, 1 Mar 2013 17:40:55 +0530
+Subject: [PATCH 06/15] ARM: OMAP5: PM: Enable Mercury retention mode on CPUx
+ powerdomains
 In-Reply-To: <1362139864-9233-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1362139864-9233-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1362139864-9233-6-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1362139864-9233-7-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enables MPUSS ES2 power management mode using ES2_PM_MODE in
-AMBA_IF_MODE register.
+In addition to the standard power-management technique, the OMAP5
+MPU subsystem also employs an SR3-APG (mercury) power management
+technology to reduce leakage.
 
-0x0: ES1 behavior, CPU cores would enter and exit OFF mode together. Broken
-0x1: ES2 behavior, CPU cores are allowed to enter/exit OFF mode independently.
-
-This is one time settings thanks to always ON domain.
+It allows for full logic and memories retention on MPU_C0 and MPU_C1 and
+is controlled by the PRCM_MPU.
 
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/mach-omap2/omap-secure.h    |    2 ++
- arch/arm/mach-omap2/omap-wakeupgen.c |   14 ++++++++++++++
- arch/arm/mach-omap2/omap-wakeupgen.h |    1 +
- 3 files changed, 17 insertions(+)
+ arch/arm/mach-omap2/omap-mpuss-lowpower.c |   17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/omap-secure.h b/arch/arm/mach-omap2/omap-secure.h
-index 0e72917..82b3c4c 100644
---- a/arch/arm/mach-omap2/omap-secure.h
-+++ b/arch/arm/mach-omap2/omap-secure.h
-@@ -42,6 +42,8 @@
- #define OMAP4_MON_L2X0_AUXCTRL_INDEX	0x109
- #define OMAP4_MON_L2X0_PREFETCH_INDEX	0x113
+diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+index bcd2efb..9fda96b 100644
+--- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
++++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+@@ -360,6 +360,20 @@ int __cpuinit omap4_hotplug_cpu(unsigned int cpu, unsigned int power_state)
  
-+#define OMAP5_MON_AMBA_IF_INDEX		0x108
+ 
+ /*
++ * Enable Mercury Fast HG retention mode by default.
++ */
++static void enable_mercury_retention_mode(void)
++{
++	u32 reg;
 +
- /* Secure PPA(Primary Protected Application) APIs */
- #define OMAP4_PPA_L2_POR_INDEX		0x23
- #define OMAP4_PPA_CPU_ACTRL_SMP_INDEX	0x25
-diff --git a/arch/arm/mach-omap2/omap-wakeupgen.c b/arch/arm/mach-omap2/omap-wakeupgen.c
-index 5d3b4f4..a7350dd 100644
---- a/arch/arm/mach-omap2/omap-wakeupgen.c
-+++ b/arch/arm/mach-omap2/omap-wakeupgen.c
-@@ -403,6 +403,7 @@ int __init omap_wakeupgen_init(void)
- {
- 	int i;
- 	unsigned int boot_cpu = smp_processor_id();
-+	u32 val;
- 
- 	/* Not supported on OMAP4 ES1.0 silicon */
- 	if (omap_rev() == OMAP4430_REV_ES1_0) {
-@@ -444,6 +445,19 @@ int __init omap_wakeupgen_init(void)
- 	for (i = 0; i < max_irqs; i++)
- 		irq_target_cpu[i] = boot_cpu;
- 
-+	/*
-+	 * Enables OMAP5 ES2 PM Mode using ES2_PM_MODE in AMBA_IF_MODE
-+	 * 0x0:	ES1 behavior, CPU cores would enter and exit OFF mode together.
-+	 * 0x1:	ES2 behavior, CPU cores are allowed to enter/exit OFF mode
-+	 * independently.
-+	 * This needs to be set one time thanks to always ON domain.
-+	 */
-+	if (soc_is_omap54xx()) {
-+		val = __raw_readl(wakeupgen_base + OMAP_AMBA_IF_MODE);
-+		val |= BIT(5);
-+		omap_smc1(OMAP5_MON_AMBA_IF_INDEX, val);
-+	}
++	reg = omap4_prcm_mpu_read_inst_reg(OMAP54XX_PRCM_MPU_DEVICE_INST,
++			OMAP54XX_PRCM_MPU_PRM_PSCON_COUNT_OFFSET);
++	reg |= BIT(24) | BIT(25);
++	omap4_prcm_mpu_write_inst_reg(reg, OMAP54XX_PRCM_MPU_DEVICE_INST,
++			OMAP54XX_PRCM_MPU_PRM_PSCON_COUNT_OFFSET);
++}
 +
- 	irq_hotplug_init();
- 	irq_pm_init();
++/*
+  * Initialise OMAP4 MPUSS
+  */
+ int __init omap4_mpuss_init(void)
+@@ -438,6 +452,9 @@ int __init omap4_mpuss_init(void)
+ 		cpu_context_offset = OMAP54XX_RM_CPU0_CPU0_CONTEXT_OFFSET;
+ 	}
  
-diff --git a/arch/arm/mach-omap2/omap-wakeupgen.h b/arch/arm/mach-omap2/omap-wakeupgen.h
-index b0fd16f..b3c8ecc 100644
---- a/arch/arm/mach-omap2/omap-wakeupgen.h
-+++ b/arch/arm/mach-omap2/omap-wakeupgen.h
-@@ -27,6 +27,7 @@
- #define OMAP_WKG_ENB_E_1			0x420
- #define OMAP_AUX_CORE_BOOT_0			0x800
- #define OMAP_AUX_CORE_BOOT_1			0x804
-+#define OMAP_AMBA_IF_MODE			0x80c
- #define OMAP_PTMSYNCREQ_MASK			0xc00
- #define OMAP_PTMSYNCREQ_EN			0xc04
- #define OMAP_TIMESTAMPCYCLELO			0xc08
++	if (soc_is_omap54xx())
++		enable_mercury_retention_mode();
++
+ 	return 0;
+ }
+ 
 -- 
 1.7.9.5
