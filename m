@@ -1,84 +1,83 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 1 Mar 2013 17:40:58 +0530
-Subject: [PATCH 09/15] ARM: OMAP4+: PM: Restore CPU power state to ON with
- clockdomain force wakeup method
+Date: Fri, 1 Mar 2013 17:41:00 +0530
+Subject: [PATCH 11/15] ARM: OMAP5: PM: Add L2 memory power down support
 In-Reply-To: <1362139864-9233-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1362139864-9233-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1362139864-9233-10-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1362139864-9233-12-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While waking up CPU from off state using clock domain force wakeup, restore
-the CPU power state to ON state before putting CPU clock domain under
-hardware control. Otherwise CPU wakeup might fail. The change is recommended\
-for all OMAP4+ devices though the PRCM weakness was observed on OMAP5
-devices first.
+When the entire MPUSS cluster is powered down in device off state, L2 cache
+memory looses it's content and hence while targetting such a state,
+l2 cache needs to be flushed to main memory.
 
-So update the code accordingly.
+Add the necessary low power code support for the same.
 
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/mach-omap2/cpuidle44xx.c |    1 +
- arch/arm/mach-omap2/omap-smp.c    |   12 ++++++++++--
- 2 files changed, 11 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/omap-secure.h     |    1 +
+ arch/arm/mach-omap2/sleep_omap4plus.S |   30 ++++++++++++++++++++++++++++++
+ 2 files changed, 31 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle44xx.c
-index 944e64a..9de47a7 100644
---- a/arch/arm/mach-omap2/cpuidle44xx.c
-+++ b/arch/arm/mach-omap2/cpuidle44xx.c
-@@ -131,6 +131,7 @@ static int omap4_enter_idle_coupled(struct cpuidle_device *dev,
- 	/* Wakeup CPU1 only if it is not offlined */
- 	if (dev->cpu == 0 && cpumask_test_cpu(1, cpu_online_mask)) {
- 		clkdm_wakeup(cpu_clkdm[1]);
-+		omap_set_pwrdm_state(cpu_pd[1], PWRDM_POWER_ON);
- 		clkdm_allow_idle(cpu_clkdm[1]);
- 	}
+diff --git a/arch/arm/mach-omap2/omap-secure.h b/arch/arm/mach-omap2/omap-secure.h
+index 1739468..a171a5a 100644
+--- a/arch/arm/mach-omap2/omap-secure.h
++++ b/arch/arm/mach-omap2/omap-secure.h
+@@ -47,6 +47,7 @@
+ #define OMAP4_MON_L2X0_PREFETCH_INDEX	0x113
+ #define OMAP5_MON_CACHES_CLEAN_INDEX	0x103
+ #define OMAP5_MON_AUX_CTRL_INDEX	0x107
++#define OMAP5_MON_L2AUX_CTRL_INDEX	0x104
  
-diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
-index 9711ecd..ba63b14 100644
---- a/arch/arm/mach-omap2/omap-smp.c
-+++ b/arch/arm/mach-omap2/omap-smp.c
-@@ -83,6 +83,7 @@ static int __cpuinit omap4_boot_secondary(unsigned int cpu, struct task_struct *
- {
- 	static struct clockdomain *cpu1_clkdm;
- 	static bool booted;
-+	static struct powerdomain *cpu1_pwrdm;
- 	void __iomem *base = omap_get_wakeupgen_base();
+ #define OMAP5_MON_AMBA_IF_INDEX		0x108
  
- 	/*
-@@ -102,8 +103,10 @@ static int __cpuinit omap4_boot_secondary(unsigned int cpu, struct task_struct *
- 	else
- 		__raw_writel(0x20, base + OMAP_AUX_CORE_BOOT_0);
+diff --git a/arch/arm/mach-omap2/sleep_omap4plus.S b/arch/arm/mach-omap2/sleep_omap4plus.S
+index f4874e5..ea318be 100644
+--- a/arch/arm/mach-omap2/sleep_omap4plus.S
++++ b/arch/arm/mach-omap2/sleep_omap4plus.S
+@@ -386,6 +386,27 @@ skip_secure_l1_clean_op:
+ 	isb
+ 	dsb
  
--	if (!cpu1_clkdm)
-+	if (!cpu1_clkdm && !cpu1_pwrdm) {
- 		cpu1_clkdm = clkdm_lookup("mpu1_clkdm");
-+		cpu1_pwrdm = pwrdm_lookup("cpu1_pwrdm");
-+	}
++	bl	omap4_get_sar_ram_base
++	mov	r8, r0
++	mrc	p15, 0, r5, c0, c0, 5		@ Read MPIDR
++	ands	r5, r5, #0x0f
++	ldreq	r0, [r8, #L2X0_SAVE_OFFSET0]	@ Retrieve L2 state
++	ldrne	r0, [r8, #L2X0_SAVE_OFFSET1]
++	cmp	r0, #3
++	bne	do_wfi
++	bl	omap4_get_sar_ram_base
++	ldr	r9, [r0, #OMAP_TYPE_OFFSET]
++	cmp	r9, #0x1			@ Check for HS device
++	bne	skip_secure_l2_clean_op
++	mov	r0, #1				@ Clean secure L2
++	stmfd   r13!, {r4-r12, r14}
++	ldr	r12, =OMAP5_MON_CACHES_CLEAN_INDEX
++	DO_SMC
++	ldmfd   r13!, {r4-r12, r14}
++skip_secure_l2_clean_op:
++	mov	r0, #2				@ Flush L2
++	bl	v7_flush_dcache_all
++
+ do_wfi:
+ 	bl	omap_do_wfi
  
- 	/*
- 	 * The SGI(Software Generated Interrupts) are not wakeup capable
-@@ -116,7 +119,7 @@ static int __cpuinit omap4_boot_secondary(unsigned int cpu, struct task_struct *
- 	 * Section :
- 	 *	4.3.4.2 Power States of CPU0 and CPU1
- 	 */
--	if (booted) {
-+	if (booted && cpu1_pwrdm && cpu1_clkdm) {
- 		/*
- 		 * GIC distributor control register has changed between
- 		 * CortexA9 r1pX and r2pX. The Control Register secure
-@@ -137,7 +140,12 @@ static int __cpuinit omap4_boot_secondary(unsigned int cpu, struct task_struct *
- 			gic_dist_disable();
- 		}
- 
-+		/*
-+		 * Ensure that CPU power state is set to ON to avoid CPU
-+		 * powerdomain transition on wfi
-+		 */
- 		clkdm_wakeup(cpu1_clkdm);
-+		omap_set_pwrdm_state(cpu1_pwrdm, PWRDM_POWER_ON);
- 		clkdm_allow_idle(cpu1_clkdm);
- 
- 		if (IS_PM44XX_ERRATUM(PM_OMAP4_ROM_SMP_BOOT_ERRATUM_GICD)) {
+@@ -427,6 +448,15 @@ ENTRY(omap5_cpu_resume)
+ 	dsb
+ 1:
+ #endif
++	mrc	p15, 1, r0, c15, c0, 0		@ Read L2 ACTLR
++	cmp	r0, #0x118			@ Check if it is already set
++	beq	skip_sec_l2
++	ldr	r0, =0x118			@ Setup L2 ACTLR = 0x118
++	ldr	r12, =OMAP5_MON_L2AUX_CTRL_INDEX
++	dsb
++	smc     #0
++	dsb
++skip_sec_l2:
+ 	b	cpu_resume			@ Jump to generic resume
+ ENDPROC(omap5_cpu_resume)
+ #endif
 -- 
 1.7.9.5
