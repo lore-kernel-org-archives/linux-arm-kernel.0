@@ -1,52 +1,46 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Fri, 1 Mar 2013 10:10:54 -0800
-Subject: [PATCH v6 04/46] percpu_rwlock: Implement the core design of
- Per-CPU Reader-Writer Locks
-In-Reply-To: <512E7879.20109@linux.vnet.ibm.com>
-References: <CACvQF53bdh4_BxF0y1fnTVR+T2OmRc0jmWQYftsvx92-fg-Lug@mail.gmail.com>
- <512BBAD8.8010006@linux.vnet.ibm.com>
- <CACvQF51jCxk5jUqmhD=QBBtUsBkQWZzakacrKO4Gsk=w61rNwQ@mail.gmail.com>
- <512C7A38.8060906@linux.vnet.ibm.com>
- <CACvQF51RvhM8XNqu3-1OTQ=cZUZ=pAX+_zx0a29+W67N1X+BgQ@mail.gmail.com>
- <512CC509.1050000@linux.vnet.ibm.com>
- <CACvQF50UgiqPpDk3HCmV86zKSf6tPjqr0bZowfPEOJs0g0r0MQ@mail.gmail.com>
- <512D0D67.9010609@linux.vnet.ibm.com>
- <CACvQF53ph2ixdM-otzetjM5cR+2kcZj6sckOp3TnzzA_x-EZ8w@mail.gmail.com>
- <512E7879.20109@linux.vnet.ibm.com>
-Message-ID: <20130301181054.GD2481@mtj.dyndns.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 01 Mar 2013 22:17:13 +0300
+Subject: [PATCH 3/3] ARM: mach-shmobile: sh73a0: Setup the timer device
+ CMT10 using DT
+In-Reply-To: <1362159932-18533-4-git-send-email-hechtb+renesas@gmail.com>
+References: <1362159932-18533-1-git-send-email-hechtb+renesas@gmail.com>
+ <1362159932-18533-4-git-send-email-hechtb+renesas@gmail.com>
+Message-ID: <5130FEB9.5000508@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, Srivatsa.
+Hello.
 
-On Thu, Feb 28, 2013 at 02:49:53AM +0530, Srivatsa S. Bhat wrote:
-> Don't get me wrong - I'll whole-heartedly acknowledge and appreciate if
-> _your_ code is better than mine. I just don't like the idea of somebody
-> plagiarizing my ideas/code (or even others' ideas for that matter).
-> However, I sincerely apologize in advance if I misunderstood/misjudged your
-> intentions; I just wanted to voice my concerns out loud at this point,
-> considering the bad feeling I got by looking at your responses collectively.
+On 03/01/2013 08:45 PM, Bastian Hecht wrote:
 
-Although I don't know Lai personally, from my experience working with
-him past several months on workqueue, I strongly doubt he has dark
-urterior intenions.  The biggest problem probably is that his
-communication in English isn't very fluent yet and thus doesn't carry
-the underlying intentions or tones very well and he tends to bombard
-patches in quick succession without much explanation inbetween (during
-3.8 cycle, I was receiving several workqueue patchsets days apart
-trying to solve the same problem with completely different approaches
-way before the discussion on the previous postings reach any kind of
-consensus).  A lot of that also probably comes from communication
-problems.
+> We can now use the Device Tree for bringing up our timer device CMT10.
+> We move it out of the DT devices list into the early_devices list by
+> the non-reference board code. And we add the device to the
+> kzm9g-reference .dts file.
+>
+> Not-yet-signed-off-by: Bastian Hecht<hechtb+renesas@gmail.com>
+> ---
+> I wonder if this should go to arch/arm/boot/dts/sh73a0.dtsi.
+>
+> The moving to the early_devices is a bit hackish - I will cook up a better
+> patch when I know into which .dts(i) file things go.
+>
+>   arch/arm/boot/dts/sh73a0-kzm9g-reference.dts |   11 +++++++++++
+>   arch/arm/mach-shmobile/setup-sh73a0.c        |    2 +-
+>   2 files changed, 12 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
+> index 7fad4b9..fef12f0 100644
+> --- a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
+> +++ b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
+> @@ -69,6 +69,17 @@
+>   		toshiba,mmc-wrprotect-disable;
+>   		toshiba,mmc-has-idle-wait;
+>   	};
+> +
+> +	cmt at 0xe6138010 {
+>    
 
-Anyways, I really don't think he's trying to take claim of your work.
-At least for now, you kinda need to speculate what he's trying to do
-and then confirm that back to him, but once you get used to that part,
-he's pretty nice to work with and I'm sure his communication will
-improve in time (I think it has gotten a lot better than only some
-months ago).
+     "0x" shouldn't be there, remove it please.
 
-Thanks!
-
--- 
-tejun
+WBR, Sergei
