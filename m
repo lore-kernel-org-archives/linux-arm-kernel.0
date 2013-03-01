@@ -1,25 +1,78 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 1 Mar 2013 16:25:01 +0900
-Subject: [PATCH v4 0/3] R-Car SATA platform data
-In-Reply-To: <201302272332.51650.sergei.shtylyov@cogentembedded.com>
-References: <201302272332.51650.sergei.shtylyov@cogentembedded.com>
-Message-ID: <20130301072501.GE14376@verge.net.au>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Fri, 01 Mar 2013 08:28:40 +0100
+Subject: [PATCH v2 2/3] crypto: sahara: Add driver for SAHARA2 accelerator.
+In-Reply-To: <CACKLOr0y6M4O82KRVWSny-wzwmZPGS3pOGkZtdgc1aynH94LRQ@mail.gmail.com>
+ (javier Martin's message of "Thu, 28 Feb 2013 15:08:13 +0100")
+References: <1361961711-4603-1-git-send-email-javier.martin@vista-silicon.com>
+ <1361961711-4603-3-git-send-email-javier.martin@vista-silicon.com>
+ <87vc9chf23.fsf@lebrac.rtp-net.org>
+ <CACKLOr0y6M4O82KRVWSny-wzwmZPGS3pOGkZtdgc1aynH94LRQ@mail.gmail.com>
+Message-ID: <87fw0fh93r.fsf@lebrac.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 27, 2013 at 11:32:51PM +0300, Sergei Shtylyov wrote:
-> Hello.
-> 
->    Here's the v4 of the set of now 3 patches (the driver itself has been merged
-> since) against the Simon Horman's renesas.git repo, 'next' branch:
-> 
-> [1/3] ARM: mach-shmobile: r8a7779: SATA DT configuration
-> [2/3] ARM: mach-shmobile: r8a7779: add SATA support
-> [3/3] ARM: mach-shmobile: marzen: add SATA support
-> 
-> Patch changes since the initial posting are reported in the individual patches.
+javier Martin <javier.martin@vista-silicon.com> writes:
 
-Thanks. I have refreshed the topic/r-car-sata branch of the renesas tree
-accordingly. That branch still contains a copy of the "Add Renesas R-Car
-on-chip 3Gbps SATA controller driver." but it should disappear once I rebase
-(e.g. on v3.9-rc1).
+Hi,
+
+> Hi Arnaud,
+>
+> On 28 February 2013 12:07, Arnaud Patard <arnaud.patard@rtp-net.org> wrote:
+>> Javier Martin <javier.martin@vista-silicon.com> writes:
+>>
+>> Hi,
+>>
+>>> SAHARA2 HW module is included in the i.MX27 SoC from
+>>> Freescale. It is capable of performing cipher algorithms
+>>> such as AES, 3DES..., hashing and RNG too.
+>>
+>> The rmmod oops is gone with this version, thanks.
+>>
+>>>
+>>> This driver provides support for AES-CBC and AES-ECB
+>>> by now.
+>>>
+>>> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
+>>> ---
+>>>  drivers/crypto/Kconfig  |   10 +
+>>>  drivers/crypto/Makefile |    1 +
+>>>  drivers/crypto/sahara.c | 1070 +++++++++++++++++++++++++++++++++++++++++++++++
+>>>  3 files changed, 1081 insertions(+)
+>>>  create mode 100644 drivers/crypto/sahara.c
+>>>
+>>> diff --git a/drivers/crypto/Kconfig b/drivers/crypto/Kconfig
+>>> index 87ec4d0..7d73f5a 100644
+>>> --- a/drivers/crypto/Kconfig
+>>> +++ b/drivers/crypto/Kconfig
+>>> @@ -276,6 +276,16 @@ config CRYPTO_DEV_PICOXCELL
+>>>
+>>>         Saying m here will build a module named pipcoxcell_crypto.
+>>>
+>>> +config CRYPTO_DEV_SAHARA
+>>> +     tristate "Support for SAHARA crypto accelerator"
+>>> +     depends on MACH_MX27 && EXPERIMENTAL && OF
+>>
+>> maybe switch to ARCH_MXC instead of MAC_MX27 ?
+>>
+>> [...]
+>>
+>>> +static struct platform_driver sahara_driver = {
+>>> +     .probe          = sahara_probe,
+>>> +     .remove         = __devexit_p(sahara_remove),
+>>
+>> Please remove the __devexit_p too.
+>>
+>>
+>> For information, you'll find below what I've changed to test the driver on my
+>> imx51. It's not perfect but it's enough for testing things.
+>>
+>>
+>
+> Since I have to send v3 anyway to comply with Sascha's request maybe
+> it would be worth to include  your changes to provide support for
+> i.mx51 too.
+
+If you feel like including my changes or something based on my changes
+in your v3, it's fine for me.
+
+Arnaud
