@@ -1,21 +1,31 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 1 Mar 2013 13:39:39 +0100
-Subject: [PATCH v2] pinctrl: Declare operation structures as const
-In-Reply-To: <1361006707-28981-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1361006707-28981-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <CACRpkdZwWWsZEiKJBYPALzsVMEzZVCD+Ax2VNhp6yT223EFbQA@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri,  1 Mar 2013 09:42:33 -0300
+Subject: [PATCH] ARM: mxs_defconfig: Select watchdog driver
+Message-ID: <1362141754-11254-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 16, 2013 at 10:25 AM, Laurent Pinchart
-<laurent.pinchart+renesas@ideasonboard.com> wrote:
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-> The pinconf, pinctrl and pinmux operation structures hold function
-> pointers that are never modified. Declare them as const.
->
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Select watchdog driver.
 
-Patch applied!
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/configs/mxs_defconfig |    2 ++
+ 1 file changed, 2 insertions(+)
 
-Thanks,
-Linus Walleij
+diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
+index fbbc5bb..f662604 100644
+--- a/arch/arm/configs/mxs_defconfig
++++ b/arch/arm/configs/mxs_defconfig
+@@ -99,6 +99,8 @@ CONFIG_SPI_MXS=y
+ CONFIG_DEBUG_GPIO=y
+ CONFIG_GPIO_SYSFS=y
+ # CONFIG_HWMON is not set
++CONFIG_WATCHDOG=y
++CONFIG_STMP3XXX_RTC_WATCHDOG=y
+ CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_FIXED_VOLTAGE=y
+ CONFIG_FB=y
+-- 
+1.7.9.5
