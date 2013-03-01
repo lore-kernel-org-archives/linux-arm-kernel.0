@@ -1,25 +1,28 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 1 Mar 2013 01:45:34 +0100
-Subject: [PATCH v2 2/3] ARM: dts: imx: replace magic number with pin
- function name
-In-Reply-To: <1361533888-18073-3-git-send-email-shawn.guo@linaro.org>
-References: <1361533888-18073-1-git-send-email-shawn.guo@linaro.org>
- <1361533888-18073-3-git-send-email-shawn.guo@linaro.org>
-Message-ID: <CACRpkdZOKrLy9-y4=vsayUt_PfVbYeN8mu5mnX2VUm60=JA=Cw@mail.gmail.com>
+Date: Fri, 1 Mar 2013 01:49:33 +0100
+Subject: [PATCH v5 00/12] enhance DT support on gpio pxa
+In-Reply-To: <1361764181-26647-1-git-send-email-haojian.zhuang@linaro.org>
+References: <1361764181-26647-1-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <CACRpkdYtKBMRsFgBEEhiAykKU28RrM1USuD4SiRcASvaNeDDrw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 22, 2013 at 12:51 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+On Mon, Feb 25, 2013 at 4:49 AM, Haojian Zhuang
+<haojian.zhuang@linaro.org> wrote:
 
-> This turns the imx pin function number defined by binding document
-> into #define constants in header which can be used in dts and handled
-> by pre-processor to improve the readability of device tree sources.
+> Changelog:
 >
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Acked-by: Dong Aisheng <dong.aisheng@linaro.org>
+> v5:
+> * Replace of_find_property() by of_property_read_bool().
+> * Rename __gpio_is_occupied() & __gpio_is_inverted().
+> * Avoid to use pxachip as variable name. Use chip instead.
 
-I agree and wanted this to be fixed all the time, so
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Bah I've been talking crap in my other comments. This series
+looks great. Acked-by: Linus Walleij <linus.walleij@linaro.org>
+for the entire series (but I have a comment on patch 12/12,
+even though I Ack it).
+
+Will you take this through the PXA tree?
 
 Yours,
 Linus Walleij
