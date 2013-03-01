@@ -1,22 +1,28 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 01 Mar 2013 15:58:59 -0500 (EST)
-Subject: [PATCH v2 1/1 net-next] fec: net: put tx to napi poll function
- to fix dead lock
-In-Reply-To: <1362109034-25805-1-git-send-email-Frank.Li@freescale.com>
-References: <1362109034-25805-1-git-send-email-Frank.Li@freescale.com>
-Message-ID: <20130301.155859.2106303756469493825.davem@davemloft.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 1 Mar 2013 13:07:58 -0800
+Subject: [PATCH 1/2] ARM: Tegra: Add clock entry for smp_twd clock
+In-Reply-To: <1362162745-21392-1-git-send-email-swarren@wwwdotorg.org>
+References: <1362162745-21392-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20130301210758.GA3921@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Frank Li <Frank.Li@freescale.com>
-Date: Fri, 1 Mar 2013 11:37:14 +0800
+On Fri, Mar 01, 2013 at 11:32:24AM -0700, Stephen Warren wrote:
+> From: Prashant Gaikwad <pgaikwad@nvidia.com>
+> 
+> As DT support for clocks and smp_twd is enabled, add clock entry
+> for smp_twd clock to DT.
+> 
+> This fixes the following error while booting the kernel:
+> smp_twd: clock not found -2
+> 
+> Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
+> [swarren: include kernel log spew that this fixes]
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+> Arnd, Olof, these are fixes intended for 3.9.
 
-> @@ -566,27 +554,47 @@ fec_timeout(struct net_device *ndev)
->  	netif_wake_queue(ndev);
->  }
->  
-> -static void
-> +static int
->  fec_enet_tx(struct net_device *ndev)
+Thanks, applied 1-2 to fixes.
 
-The return value of this function is never tested, get rid of it.
+
+-Olof
