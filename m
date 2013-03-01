@@ -1,31 +1,24 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 1 Mar 2013 01:09:19 +0100
-Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
-In-Reply-To: <512F55E0.8050501@ti.com>
-References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
- <1329321854-24490-4-git-send-email-b-cousson@ti.com>
- <CACRpkdabXa8tXNeGRPntvY9cx4XWCa7XaEXHmVREeWN-x793ZA@mail.gmail.com>
- <512F55E0.8050501@ti.com>
-Message-ID: <CACRpkdbY1AQuJWvDaYQFoZbKwNAOGG-p3wjedEgifbSh=1kNmA@mail.gmail.com>
+Date: Fri, 1 Mar 2013 01:33:09 +0100
+Subject: [PATCH v4 04/11] gpio: pxa: remove gpio_type
+In-Reply-To: <1361290948-16669-5-git-send-email-haojian.zhuang@linaro.org>
+References: <1361290948-16669-1-git-send-email-haojian.zhuang@linaro.org>
+ <1361290948-16669-5-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <CACRpkdZZ8V9RDTd6zzhM67A=ZRBt_1MCPfJNismqxBAVDPyW3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 28, 2013 at 2:04 PM, Benoit Cousson <b-cousson@ti.com> wrote:
+On Tue, Feb 19, 2013 at 5:22 PM, Haojian Zhuang
+<haojian.zhuang@linaro.org> wrote:
 
-> On 02/28/2013 12:41 AM, Linus Walleij wrote:
->> On Wed, Feb 15, 2012 at 5:04 PM, Benoit Cousson <b-cousson@ti.com> wrote:
+> Since gpio_type is used to check whether gafr register is valid. So
+> move it into platform data.
 >
-> Gosh! That's pretty old stuff :-)
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 
-Hm yeah, haha :-)
+Hm didn't I already ACK this? (hint, changelog maybe?)
 
-I didn't notice that someone was replying in the thread for
-some other reason (or maybe using the same subject and
-confusing my gmail reader?).
-
-Anyway, the basic idea is sound, so are you still working
-on the patch? I remember discussing this with someone
-in Denmark...
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
 Yours,
 Linus Walleij
