@@ -1,68 +1,49 @@
-From: anup.patel@linaro.org (Anup Patel)
-Date: Fri,  1 Mar 2013 11:30:26 +0530
-Subject: [PATCH] arm64: add support for 8250/16550 earlyprintk
-Message-ID: <1362117626-2076-1-git-send-email-anup.patel@linaro.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 1 Mar 2013 08:29:18 +0200
+Subject: [PATCH v9 8/9] usb: chipidea: tell platform layer the ci core
+ probe's result
+In-Reply-To: <20130301014457.GB19324@nchen-desktop>
+References: <20130227022202.GA20402@nchen-desktop>
+ <20130227121238.GE8016@arwen.pp.htv.fi>
+ <20130228031118.GA19387@nchen-desktop>
+ <20130228072617.GB6154@arwen.pp.htv.fi>
+ <20130228083143.GB19516@nchen-desktop>
+ <20130228084933.GG6544@arwen.pp.htv.fi>
+ <871uc0yeau.fsf@ashishki-desk.ger.corp.intel.com>
+ <20130228100654.GC19516@nchen-desktop>
+ <20130228104559.GB22736@arwen.pp.htv.fi>
+ <20130301014457.GB19324@nchen-desktop>
+Message-ID: <20130301062918.GC3120@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for using earlyprintk with 8250/16550 UART ports.
+On Fri, Mar 01, 2013 at 09:45:51AM +0800, Peter Chen wrote:
+> On Thu, Feb 28, 2013 at 12:45:59PM +0200, Felipe Balbi wrote:
+> > Hi,
+> > 
+> > On Thu, Feb 28, 2013 at 06:06:55PM +0800, Peter Chen wrote:
+> > 
+> > > For runtime pm disabled, we may had to add some ugly things, like
+> > > notify core probe fail, and platform layer needs to handle this failed
+> > > notify.
+> > 
+> > Please stop talking about about "notify core probe fail" that will never
+> > happen. Not today, not ever. Forget that idea.
+> 
+> Of course, it is ugly way, I just thought if it will affect power, eg dvfs,
+> bus freq if the usb clock is on. Maybe the user will find USB core init fails
+> case causes runtime power rise, and fix the core init fail bug.
 
-The 8250/16550 UART can either have 8-bit or 32-bit aligned registers which is HW vendor dependent.
+right, we need to fix the bug, but hiding it under some obscure way of
+passing return values back to glue layer isn't correct. We should fix
+the real issue, always, instead of hacking around buggy code.
 
-Kernel args for 8-bit aligned regs: earlyprintk=uart8250-8bit,<phys_address>
-
-Kernel args for 32-bit aligned regs: earlyprintk=uart8250-16bit,<phys_address>
-
-Signed-off-by: Anup Patel <anup.patel@linaro.org>
----
- arch/arm64/kernel/early_printk.c |   23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
-
-diff --git a/arch/arm64/kernel/early_printk.c b/arch/arm64/kernel/early_printk.c
-index 7e320a2..d57f300 100644
---- a/arch/arm64/kernel/early_printk.c
-+++ b/arch/arm64/kernel/early_printk.c
-@@ -24,11 +24,32 @@
- #include <linux/io.h>
- 
- #include <linux/amba/serial.h>
-+#include <uapi/linux/serial_reg.h>
- 
- static void __iomem *early_base;
- static void (*printch)(char ch);
- 
- /*
-+ * 8250/16550 (8-bit aligned registers) single character TX.
-+ */
-+static void uart8250_8bit_printch(char ch)
-+{
-+	while (!(readb_relaxed(early_base + UART_LSR) & UART_LSR_THRE))
-+		;
-+	writeb_relaxed(ch, early_base + UART_TX);
-+}
-+
-+/*
-+ * 8250/16550 (32-bit aligned registers) single character TX.
-+ */
-+static void uart8250_32bit_printch(char ch)
-+{
-+	while (!(readl_relaxed(early_base + (UART_LSR << 2)) & UART_LSR_THRE))
-+		;
-+	writel_relaxed(ch, early_base + (UART_TX << 2));
-+}
-+
-+/*
-  * PL011 single character TX.
-  */
- static void pl011_printch(char ch)
-@@ -47,6 +68,8 @@ struct earlycon_match {
- 
- static const struct earlycon_match earlycon_match[] __initconst = {
- 	{ .name = "pl011", .printch = pl011_printch, },
-+	{ .name = "uart8250-8bit", .printch = uart8250_8bit_printch, },
-+	{ .name = "uart8250-32bit", .printch = uart8250_32bit_printch, },
- 	{}
- };
- 
 -- 
-1.7.9.5
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130301/5a467e76/attachment.sig>
