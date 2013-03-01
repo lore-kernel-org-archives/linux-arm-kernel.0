@@ -1,47 +1,49 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Fri, 1 Mar 2013 14:56:45 +0100
-Subject: [PATCH v3 1/2] dma: imx-dma: Add oftree support
-In-Reply-To: <20130228063026.GC26106@S2101-09.ap.freescale.net>
-References: <1361543838-12604-1-git-send-email-mpa@pengutronix.de>
- <1361808255-17381-1-git-send-email-mpa@pengutronix.de>
- <20130228063026.GC26106@S2101-09.ap.freescale.net>
-Message-ID: <20130301135645.GA21700@pengutronix.de>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 1 Mar 2013 08:38:34 -0600
+Subject: [PATCH] arm: omap: RX-51: ARM errata 430973 workaround
+In-Reply-To: <517283541.62064.1362124023621.JavaMail.apache@mail81.abv.bg>
+References: <517283541.62064.1362124023621.JavaMail.apache@mail81.abv.bg>
+Message-ID: <CAGo_u6omQdSzpfthHNAU1UvgSvkgq3ZC6g1Ha9oi0nc9QJ71nA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 28, 2013 at 02:30:27PM +0800, Shawn Guo wrote:
-> On Mon, Feb 25, 2013 at 05:04:14PM +0100, Markus Pargmann wrote:
-> > Adding devicetree support for imx-dma driver. Use driver name for
-> > function 'imx_dma_is_general_purpose' because the devicename for
-> > devicetree initialized devices is different.
-> 
-> ...
-> 
-> > @@ -63,7 +66,8 @@ static inline int imx_dma_is_general_purpose(struct dma_chan *chan)
-> >  	return strstr(dev_name(chan->device->dev), "sdma") ||
-> >  		!strcmp(dev_name(chan->device->dev), "imx1-dma") ||
-> >  		!strcmp(dev_name(chan->device->dev), "imx21-dma") ||
-> > -		!strcmp(dev_name(chan->device->dev), "imx27-dma");
-> > +		!strcmp(dev_name(chan->device->dev), "imx27-dma") ||
-> > +		!strcmp(chan->device->dev->driver->name, "imx-dma");
-> >  }
-> 
-> So the function could just look like the following?
-> 
-> static inline int imx_dma_is_general_purpose(struct dma_chan *chan)
-> {
->         return !strcmp(chan->device->dev->driver->name, "imx-sdma") ||
->                 !strcmp(chan->device->dev->driver->name, "imx-dma");
-> }
+On Fri, Mar 1, 2013 at 1:47 AM, ?????? ???????? <freemangordon@abv.bg> wrote:
+>
+> They look similar, but they are not equivalent :). The first major difference is here (code taken from omap-smc.S)
+>
+>> ENTRY(omap_smc2)
+>>          stmfd   sp!, {r4-r12, lr}
+>>          mov     r3, r2
+>>          mov     r2, r1
+>>          mov     r1, #0x0        @ Process ID
+>>          mov     r6, #0xff
+>>          mov     r12, #0x00      @ Secure Service ID
+>
+> Always zero, while RX51 PPA expects a real value. I wonder if it is a bug, but anyway I don't see the id parameter (R0) used.
+>
+>>          mov     r7, #0
+>>          mcr     p15, 0, r7, c7, c5, 6
+>
+> According to ARM TRM, this is "Invalidate entire branch predictor array"(IIUC). NFC why it is needed here, but this will not work on RX-51 until IBE bit in ACR is set.
+>
+>>          dsb
+>>          dmb
+>>          smc     #0
+>
+> RX-51 needs smc #1 ;)
+>
+>>          ldmfd   sp!, {r4-r12, pc}
+>
+>
+> The next major difference is that RX-51 expects parameter count passed in R3[0] to be the count of the remaining parameters +1, but omap_secure_dispatcher (in omap-secure.c) is passing the exact count of the remaining parameters.
+>
+> I guess all of the above problems can be fixed/workarounded, but I wonder does it worth. Not to say that I don't have BB around to test if the code still works if I make changes to omap2-secure.c/omap-smc.S :)
+>
+>
 
-Yes. For imx-dma there is only imx1, imx21 and imx27 that use imx-dma
-driver. And the devicenames of imx-sdma are imx31-sdma and imx35-sdma,
-so all devices using imx-sdma match. I will change it for v4. Thanks
+Yep, that was my point - instead of introducing new functions,
+extending the existing functions to handle new requirements is better
+solution, IMHO.
 
-Markus
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards,
+Nishanth Menon
