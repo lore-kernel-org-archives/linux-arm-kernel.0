@@ -1,47 +1,59 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri,  1 Mar 2013 11:32:25 -0700
-Subject: [PATCH 2/2] clk: Tegra: Remove duplicate smp_twd clock
-In-Reply-To: <1362162745-21392-1-git-send-email-swarren@wwwdotorg.org>
-References: <1362162745-21392-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1362162745-21392-2-git-send-email-swarren@wwwdotorg.org>
+From: soren.brinkmann@xilinx.com (Soren Brinkmann)
+Date: Fri, 1 Mar 2013 10:51:26 -0800
+Subject: [PATCH RFC] arm: l2x0: Leverage power saving features
+Message-ID: <da92149b-159b-40e3-87b4-a0a448d1da8b@CO1EHSMHS031.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Prashant Gaikwad <pgaikwad@nvidia.com>
+Enable the 'dynamic clock stop' and 'standby mode' features in the
+l2x0 disable path.
 
-Remove duplicate smp_twd clocks as these clocks are accessed using
-DT now.
-
-Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
+Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 ---
- drivers/clk/tegra/clk-tegra20.c |    1 -
- drivers/clk/tegra/clk-tegra30.c |    1 -
- 2 files changed, 2 deletions(-)
+Hi,
 
-diff --git a/drivers/clk/tegra/clk-tegra20.c b/drivers/clk/tegra/clk-tegra20.c
-index 143ce1f..1e2de73 100644
---- a/drivers/clk/tegra/clk-tegra20.c
-+++ b/drivers/clk/tegra/clk-tegra20.c
-@@ -1292,7 +1292,6 @@ static struct tegra_clk_duplicate tegra_clk_duplicates[] = {
- 	TEGRA_CLK_DUPLICATE(usbd,   "tegra-ehci.0", NULL),
- 	TEGRA_CLK_DUPLICATE(usbd,   "tegra-otg",    NULL),
- 	TEGRA_CLK_DUPLICATE(cclk,   NULL,           "cpu"),
--	TEGRA_CLK_DUPLICATE(twd,    "smp_twd",      NULL),
- 	TEGRA_CLK_DUPLICATE(clk_max, NULL, NULL), /* Must be the last entry */
- };
+we are currently implementing a suspend to RAM like low power mode for
+Zynq.
+The code for entering suspend looks like this:
+	outer_disable();                                                 
+        cpu_suspend(0, zynq_pm_suspend);                                 
+        outer_resume();
+
+In our low power guidelines we mention the pl310's standby and clock stop
+feature and that they should be enabled for low power modes. The question
+arising here now is: Does the outer_disable() make these features redundant,
+or does it make sense to add it like shown in this patch?
+
+	Thanks,
+	S?ren
+
+ arch/arm/mm/cache-l2x0.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index c2f3739..3565df1 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -286,8 +286,20 @@ static void l2x0_flush_range(unsigned long start, unsigned long end)
+ static void l2x0_disable(void)
+ {
+ 	unsigned long flags;
++	unsigned long reg;
++	u32 l2x0_revision;
  
-diff --git a/drivers/clk/tegra/clk-tegra30.c b/drivers/clk/tegra/clk-tegra30.c
-index 32c61cb..ba6f51b 100644
---- a/drivers/clk/tegra/clk-tegra30.c
-+++ b/drivers/clk/tegra/clk-tegra30.c
-@@ -1931,7 +1931,6 @@ static struct tegra_clk_duplicate tegra_clk_duplicates[] = {
- 	TEGRA_CLK_DUPLICATE(cml1, "tegra_sata_cml", NULL),
- 	TEGRA_CLK_DUPLICATE(cml0, "tegra_pcie", "cml"),
- 	TEGRA_CLK_DUPLICATE(pciex, "tegra_pcie", "pciex"),
--	TEGRA_CLK_DUPLICATE(twd, "smp_twd", NULL),
- 	TEGRA_CLK_DUPLICATE(vcp, "nvavp", "vcp"),
- 	TEGRA_CLK_DUPLICATE(clk_max, NULL, NULL), /* MUST be the last entry */
- };
+ 	raw_spin_lock_irqsave(&l2x0_lock, flags);
++
++	l2x0_revision = readl_relaxed(l2x0_base + L2X0_CACHE_ID) &
++		L2X0_CACHE_ID_RTL_MASK;
++
++	if (l2x0_revision >= L2X0_CACHE_ID_RTL_R3P0) {
++		reg = readl_relaxed(l2x0_base + L2X0_POWER_CTRL);
++		reg |= L2X0_STNDBY_MODE_EN | L2X0_DYNAMIC_CLK_GATING_EN;
++		writel_relaxed(reg, l2x0_base + L2X0_POWER_CTRL);
++	}
++
+ 	__l2x0_flush_all();
+ 	writel_relaxed(0, l2x0_base + L2X0_CTRL);
+ 	dsb();
 -- 
-1.7.10.4
+1.8.1.3
