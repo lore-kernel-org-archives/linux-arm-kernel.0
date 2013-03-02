@@ -1,140 +1,101 @@
-From: martinez.javier@gmail.com (Javier Martinez Canillas)
-Date: Sat, 2 Mar 2013 02:52:53 +0100
-Subject: [PATCH] arm: dts: Add uart1 and uart2 to igep boards.
-In-Reply-To: <511E0807.8000200@ti.com>
-References: <1355326422-12357-1-git-send-email-matthias.bgg@gmail.com>
- <50C8AC3C.9020908@ti.com>
- <CABuKBeJsHCq98Pe-BwPajbQ+2OLQpwrbtVTJe=j9thPDQCCBrg@mail.gmail.com>
- <CAAwP0s01Jxh0f-T0sd5D980dZPcEV0J1KzjPbNHkrXLaKA3YUg@mail.gmail.com>
- <CABuKBeJsg_P=aDr0s9iVOD+7YTNoVUFQJCJymJyJ7NqXHUBzKQ@mail.gmail.com>
- <511E0807.8000200@ti.com>
-Message-ID: <CAAwP0s3bs=uqCRPgQiXQUnHq-6L61ayrP0WrXdJrNxNuGfmV0A@mail.gmail.com>
+From: bilhuang@nvidia.com (Bill Huang)
+Date: Fri, 1 Mar 2013 18:55:54 -0800
+Subject: [PATCH 2/5] clk: notifier handler for dynamic voltage scaling
+In-Reply-To: <20130301204832.6210.40653@quantum>
+References: <1362026969-11457-1-git-send-email-mturquette@linaro.org>
+ <1362026969-11457-3-git-send-email-mturquette@linaro.org>
+ <1362130891.19498.12.camel@bilhuang-vm1>
+ <20130301182234.6210.63879@quantum> <20130301204832.6210.40653@quantum>
+Message-ID: <1362192954.2407.26.camel@bilhuang-vm1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 15, 2013 at 11:03 AM, Cousson, Benoit <b-cousson@ti.com> wrote:
-> Hi Matthias,
->
->
-> On 2/15/2013 10:35 AM, Matthias Brugger wrote:
->>
->> 2013/1/26 Javier Martinez Canillas <martinez.javier@gmail.com>:
->>>
->>> On Sat, Jan 26, 2013 at 4:16 PM, Matthias Brugger
->>> <matthias.bgg@gmail.com>
->>> wrote:
->>>>
->>>> Hi Benoit,
->>>>
->>>> 2012/12/12 Benoit Cousson <b-cousson@ti.com>:
->>>>>
->>>>> Hi Matthias,
->>>>>
->>>>> On 12/12/2012 04:33 PM, Matthias Brugger wrote:
->>>>>>
->>>>>> This patch is a follow-up patch for Javier Martinez effort adding
->>>>>> initial
->>>>>> device tree support to IGEP technology devices. [1]
->>>>>>
->>>>>> It adds uart1 and uart2 bindings to the generic dtsi for the IGEP
->>>>>> boards.
->>>>>>
->>>>>> [1] http://www.spinics.net/lists/linux-omap/msg83409.html
->>>>>>
->>>>>> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
->>>>>> ---
->>>>>>   arch/arm/boot/dts/omap3-igep.dtsi |   24 ++++++++++++++++++++++++
->>>>>>   1 file changed, 24 insertions(+)
->>>>>>
->>>>>> diff --git a/arch/arm/boot/dts/omap3-igep.dtsi
->>>>>> b/arch/arm/boot/dts/omap3-igep.dtsi
->>>>>> index 125fe00..c02e3c0 100644
->>>>>> --- a/arch/arm/boot/dts/omap3-igep.dtsi
->>>>>> +++ b/arch/arm/boot/dts/omap3-igep.dtsi
->>>>>> @@ -27,6 +27,20 @@
->>>>>>   };
->>>>>>
->>>>>>   &omap3_pmx_core {
->>>>>> +     uart1_pins: pinmux_uart1_pins {
->>>>>> +             pinctrl-single,pins = <
->>>>>> +                     0x152 0x100     /* uart1_rx.uart1_rx INPUT |
->>>>>> MODE0
->>>>>> */
->>>>>> +                     0x14c 0         /* uart1_tx.uart1_tx OUTPUT |
->>>>>> MODE0 */
->>>>>> +             >;
->>>>>> +     };
->>>>>> +
->>>>>> +     uart2_pins: pinmux_uart2_pins {
->>>>>> +             pinctrl-single,pins = <
->>>>>> +                     0x14a 0x100     /* uart2_rx.uart2_rx INPUT |
->>>>>> MODE0
->>>>>> */
->>>>>> +                     0x148 0         /* uart2_tx.uart2_tx OUTPUT |
->>>>>> MODE0 */
->>>>>> +             >;
->>>>>> +     };
->>>>>> +
->>>>>>        uart3_pins: pinmux_uart3_pins {
->>>>>>                pinctrl-single,pins = <
->>>>>>                        0x16e 0x100     /* uart3_rx.uart3_rx INPUT |
->>>>>> MODE0
->>>>>> */
->>>>>> @@ -77,6 +91,16 @@
->>>>>>        status = "disabled";
->>>>>>   };
->>>>>>
->>>>>> +&uart1 {
->>>>>> +       pinctrl-names = "default";
->>>>>> +       pinctrl-0 = <&uart1_pins>;
->>>>>> +};
->>>>>> +
->>>>>> +&uart2 {
->>>>>> +       pinctrl-names = "default";
->>>>>> +       pinctrl-0 = <&uart2_pins>;
->>>>>> +};
->>>>>> +
->>>>>>   &uart3 {
->>>>>>          pinctrl-names = "default";
->>>>>>          pinctrl-0 = <&uart3_pins>;
->>>>>>
->>>>>
->>>>> That looks good to me. I'll apply it on top of javier's series for 3.9.
->>>>
->>>>
->>>> Can you pin-point me to the repository where this patches are in right
->>>> now? I tried to figure it out these days, but didn't found where to
->>>> clone the repository from.
->>>>
->>>> Thanks,
->>>> Matthias
->>>>
->>>
->>> Hi Matthias,
->>>
->>> OMAP DT tree is:
->>> git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git
->>
->>
->> Hi all,
->>
->> unfortunately I can't find the patch in this tree.
->
->
-> Sorry about that. I've never pushed the latest branch, and was busy the past
-> month. I'll refresh the branch with all the pending patches.
->
+On Sat, 2013-03-02 at 04:48 +0800, Mike Turquette wrote:
+> Quoting Mike Turquette (2013-03-01 10:22:34)
+> > Quoting Bill Huang (2013-03-01 01:41:31)
+> > > On Thu, 2013-02-28 at 12:49 +0800, Mike Turquette wrote:
+> > > > Dynamic voltage and frequency scaling (dvfs) is a common power saving
+> > > > technique in many of today's modern processors.  This patch introduces a
+> > > > common clk rate-change notifier handler which scales voltage
+> > > > appropriately whenever clk_set_rate is called on an affected clock.
+> > > 
+> > > I really think clk_enable and clk_disable should also be triggering
+> > > notifier call and DVFS should act accordingly since there are cases
+> > > drivers won't set clock rate but instead disable its clock directly, do
+> > > you agree?
+> > > > 
+> > 
+> > Hi Bill,
+> > 
+> > I'll think about this.  Perhaps a better solution would be to adapt
+> > these drivers to runtime PM.  Then a call to runtime_pm_put() would
+> > result in a call to clk_disable(...) and regulator_set_voltage(...).
+> > 
+> > There is no performance-based equivalent to runtime PM, which is one
+> > reason why clk_set_rate is a likely entry point into dvfs.  But for
+> > operations that have nice api's like runtime PM it would be better to
+> > use those interfaces and not overload the clk.h api unnecessarily.
+> > 
+> 
+> Bill,
+> 
+> I wasn't thinking at all when I wrote this.  Trying to rush to the
+> airport I guess...
+> 
+> clk_enable() and clk_disable() must not sleep and all operations are
+> done under a spinlock.  So this rules out most use of notifiers.  It is
+> expected for some drivers to very aggressively enable/disable clocks in
+> interrupt handlers so scaling voltage as a function of clk_{en|dis}able
+> calls is also likely out of the question.
+
+Yeah for those existing drivers to call enable/disable clocks in
+interrupt have ruled out this, I didn't think through when I was asking.
+> 
+> Some platforms have chosen to implement voltage scaling in their
+> .prepare callbacks.  I personally do not like this and still prefer
+> drivers be adapted to runtime pm and let those callbacks handle voltage
+> scaling along with clock handling.
+
+I think different SoC have different mechanisms or constraints on doing
+their DVFS, such as Tegra VDD_CORE rail, it supplies power to many
+devices and as a consequence each device do not have their own power
+rail to control, instead a central driver to handle/control this power
+rail is needed (to set voltage at the maximum of the requested voltage
+from all its sub-devices), so I'm wondering even if every drivers are
+doing DVFS through runtime pm, we're still having hole on knowing
+whether or not clocks of the interested devices are enabled/disabled at
+runtime, I'm not familiar with runtime pm and hence do not know if there
+is a mechanism to handle this, I'll study a bit. Thanks.
+> 
 > Regards,
-> Benoit
->
+> Mike
+> 
+> > > > There are three prerequisites to using this feature:
+> > > > 
+> > > > 1) the affected clocks must be using the common clk framework
+> > > > 2) voltage must be scaled using the regulator framework
+> > > > 3) clock frequency and regulator voltage values must be paired via the
+> > > > OPP library
+> > > 
+> > > Just a note, Tegra Core won't meet prerequisite #3 since each regulator
+> > > voltage values is associated with clocks driving those many sub-HW
+> > > blocks in it.
+> > 
+> > This patch isn't the one and only way to perform dvfs.  It is just a
+> > helper function for registering notifier handlers for systems that meet
+> > the above three requirements.  Even if you do not use the OPP library
+> > there is no reason why you could not register your own rate-change
+> > notifier handler to implement dvfs using whatever lookup-table you use
+> > today.
+> > 
+> > And patches are welcome to extend the usefulness of this helper.  I'd
+> > like as many people to benefit from this mechanism as possible.
 
-Hi Benoit,
-
-I realized that your for_3.9/dts branch has not landed in mainline yet
-and we are near to the end of the merge window.
-
-Are you still planing to include those changes for 3.9 or are you
-going to wait until the next release?
-
-Thanks a lot and best regards,
-Javier
+The extension is not so easy for us though since OPP library is assuming
+each device has a 1-1 mapping on its operating frequency and voltage.
+> > 
+> > At some point we should think hard about DT bindings for these operating
+> > points...
+> > 
+> > Regards,
+> > Mike
