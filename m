@@ -1,81 +1,23 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sat, 02 Mar 2013 22:27:10 +0000
-Subject: [PATCH v2 3/4] spi: s3c64xx: add dma maxburst size initialization
-In-Reply-To: <001b01ce10d3$e9f78620$bde69260$%kim@samsung.com>
-References: <001b01ce10d3$e9f78620$bde69260$%kim@samsung.com>
-Message-ID: <20130302222710.AE2143E2E65@localhost>
+Date: Sat, 02 Mar 2013 19:40:07 +0000
+Subject: [PATCH 2/2] gpio/omap: warn if bank is not enabled on setting irq
+ type
+In-Reply-To: <1362158568-1624-3-git-send-email-jon-hunter@ti.com>
+References: <1362158568-1624-1-git-send-email-jon-hunter@ti.com>
+ <1362158568-1624-3-git-send-email-jon-hunter@ti.com>
+Message-ID: <20130302194007.2307C3E1165@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 22 Feb 2013 17:09:18 +0900, Boojin Kim <boojin.kim@samsung.com> wrote:
-> This patch adds dma maxburst size initialization.
-> The maxburst should be set by MODE_CFGn.DMA_TYPE,
-> because the pl330 dma driver supports burst mode.
+On Fri, 1 Mar 2013 11:22:48 -0600, Jon Hunter <jon-hunter@ti.com> wrote:
+> For OMAP devices, if a gpio is being used as an interrupt source but has
+> not been requested by calling gpio_request(), a call to request_irq()
+> may cause the kernel hang because the gpio bank may be disabled and
+> hence the register access will fail. To prevent such hangs, test for
+> this case and warn if this is detected.
 > 
-> Signed-off-by: Hyeonkook Kim <hk619.kim@samsung.com>
+> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
-
-This series probably needs to be merged together through the arm-soc
-tree.
+Applied, thanks.
 
 g.
-
-> ---
->  drivers/spi/spi-s3c64xx.c |   18 ++++++++++++++++++
->  1 files changed, 18 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-> index e862ab8..5e6cafe 100644
-> --- a/drivers/spi/spi-s3c64xx.c
-> +++ b/drivers/spi/spi-s3c64xx.c
-> @@ -287,10 +287,20 @@ static void prepare_dma(struct s3c64xx_spi_dma_data *dma,
->  	struct s3c64xx_spi_driver_data *sdd;
->  	struct samsung_dma_prep info;
->  	struct samsung_dma_config config;
-> +	void __iomem *regs;
-> +	unsigned int mode_cfg;
-> 
->  	if (dma->direction == DMA_DEV_TO_MEM) {
->  		sdd = container_of((void *)dma,
->  			struct s3c64xx_spi_driver_data, rx_dma);
-> +
-> +		regs = sdd->regs;
-> +		mode_cfg = readl(regs + S3C64XX_SPI_MODE_CFG);
-> +		if (mode_cfg & S3C64XX_SPI_MODE_4BURST)
-> +			config.maxburst = 4;
-> +		else
-> +			config.maxburst = 1;
-> +
->  		config.direction = sdd->rx_dma.direction;
->  		config.fifo = sdd->sfr_start + S3C64XX_SPI_RX_DATA;
->  		config.width = sdd->cur_bpw / 8;
-> @@ -298,6 +308,14 @@ static void prepare_dma(struct s3c64xx_spi_dma_data *dma,
->  	} else {
->  		sdd = container_of((void *)dma,
->  			struct s3c64xx_spi_driver_data, tx_dma);
-> +
-> +		regs = sdd->regs;
-> +		mode_cfg = readl(regs + S3C64XX_SPI_MODE_CFG);
-> +		if (mode_cfg & S3C64XX_SPI_MODE_4BURST)
-> +			config.maxburst = 4;
-> +		else
-> +			config.maxburst = 1;
-> +
->  		config.direction =  sdd->tx_dma.direction;
->  		config.fifo = sdd->sfr_start + S3C64XX_SPI_TX_DATA;
->  		config.width = sdd->cur_bpw / 8;
-> --
-> 1.7.5.4
-> 
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
-
--- 
-Grant Likely, B.Sc, P.Eng.
-Secret Lab Technologies, Ltd.
