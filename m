@@ -1,117 +1,32 @@
-From: linuxzsc@gmail.com (Richard Zhao)
-Date: Sat, 2 Mar 2013 16:22:19 +0800
-Subject: [PATCH 2/5] clk: notifier handler for dynamic voltage scaling
-In-Reply-To: <1362192954.2407.26.camel@bilhuang-vm1>
-References: <1362026969-11457-1-git-send-email-mturquette@linaro.org>
- <1362026969-11457-3-git-send-email-mturquette@linaro.org>
- <1362130891.19498.12.camel@bilhuang-vm1>
- <20130301182234.6210.63879@quantum>
- <20130301204832.6210.40653@quantum>
- <1362192954.2407.26.camel@bilhuang-vm1>
-Message-ID: <20130302082216.GA4581@richard-laptop>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Sat,  2 Mar 2013 13:22:52 +0400
+Subject: [PATCH 2/4] ARM: s3c24xx: Removed unneeded dependency on CPU_S3C2410
+In-Reply-To: <1362216174-10478-1-git-send-email-shc_work@mail.ru>
+References: <1362216174-10478-1-git-send-email-shc_work@mail.ru>
+Message-ID: <1362216174-10478-2-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 01, 2013 at 06:55:54PM -0800, Bill Huang wrote:
-> On Sat, 2013-03-02 at 04:48 +0800, Mike Turquette wrote:
-> > Quoting Mike Turquette (2013-03-01 10:22:34)
-> > > Quoting Bill Huang (2013-03-01 01:41:31)
-> > > > On Thu, 2013-02-28 at 12:49 +0800, Mike Turquette wrote:
-> > > > > Dynamic voltage and frequency scaling (dvfs) is a common power saving
-> > > > > technique in many of today's modern processors.  This patch introduces a
-> > > > > common clk rate-change notifier handler which scales voltage
-> > > > > appropriately whenever clk_set_rate is called on an affected clock.
-> > > > 
-> > > > I really think clk_enable and clk_disable should also be triggering
-> > > > notifier call and DVFS should act accordingly since there are cases
-> > > > drivers won't set clock rate but instead disable its clock directly, do
-> > > > you agree?
-> > > > > 
-> > > 
-> > > Hi Bill,
-> > > 
-> > > I'll think about this.  Perhaps a better solution would be to adapt
-> > > these drivers to runtime PM.  Then a call to runtime_pm_put() would
-> > > result in a call to clk_disable(...) and regulator_set_voltage(...).
-> > > 
-> > > There is no performance-based equivalent to runtime PM, which is one
-> > > reason why clk_set_rate is a likely entry point into dvfs.  But for
-> > > operations that have nice api's like runtime PM it would be better to
-> > > use those interfaces and not overload the clk.h api unnecessarily.
-> > > 
-> > 
-> > Bill,
-> > 
-> > I wasn't thinking at all when I wrote this.  Trying to rush to the
-> > airport I guess...
-> > 
-> > clk_enable() and clk_disable() must not sleep and all operations are
-> > done under a spinlock.  So this rules out most use of notifiers.  It is
-> > expected for some drivers to very aggressively enable/disable clocks in
-> > interrupt handlers so scaling voltage as a function of clk_{en|dis}able
-> > calls is also likely out of the question.
-> 
-> Yeah for those existing drivers to call enable/disable clocks in
-> interrupt have ruled out this, I didn't think through when I was asking.
-> > 
-> > Some platforms have chosen to implement voltage scaling in their
-> > .prepare callbacks.  I personally do not like this and still prefer
-> > drivers be adapted to runtime pm and let those callbacks handle voltage
-> > scaling along with clock handling.
-Voltage scaling in clock notifiers seems similar. Clock and regulater
-embedded code into each other will cause things complicated.
-> 
-> I think different SoC have different mechanisms or constraints on doing
-> their DVFS, such as Tegra VDD_CORE rail, it supplies power to many
-> devices and as a consequence each device do not have their own power
-> rail to control, instead a central driver to handle/control this power
-> rail is needed (to set voltage at the maximum of the requested voltage
-> from all its sub-devices), so I'm wondering even if every drivers are
-> doing DVFS through runtime pm, we're still having hole on knowing
-> whether or not clocks of the interested devices are enabled/disabled at
-> runtime, I'm not familiar with runtime pm and hence do not know if there
-> is a mechanism to handle this, I'll study a bit. Thanks.
-> > 
-> > Regards,
-> > Mike
-> > 
-> > > > > There are three prerequisites to using this feature:
-> > > > > 
-> > > > > 1) the affected clocks must be using the common clk framework
-> > > > > 2) voltage must be scaled using the regulator framework
-> > > > > 3) clock frequency and regulator voltage values must be paired via the
-> > > > > OPP library
-> > > > 
-> > > > Just a note, Tegra Core won't meet prerequisite #3 since each regulator
-> > > > voltage values is associated with clocks driving those many sub-HW
-> > > > blocks in it.
-> > > 
-> > > This patch isn't the one and only way to perform dvfs.  It is just a
-> > > helper function for registering notifier handlers for systems that meet
-> > > the above three requirements.  Even if you do not use the OPP library
-> > > there is no reason why you could not register your own rate-change
-> > > notifier handler to implement dvfs using whatever lookup-table you use
-> > > today.
-> > > 
-> > > And patches are welcome to extend the usefulness of this helper.  I'd
-> > > like as many people to benefit from this mechanism as possible.
-> 
-> The extension is not so easy for us though since OPP library is assuming
-> each device has a 1-1 mapping on its operating frequency and voltage.
-Is there someone working on OPP clock/regulator sets support?
+S3C2410 boards are already under "if CPU_S3C2410" condition, so
+additional dependencies on this symbol can be removed.
 
-Thanks
-Richard
-> > > 
-> > > At some point we should think hard about DT bindings for these operating
-> > > points...
-> > > 
-> > > Regards,
-> > > Mike
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ arch/arm/mach-s3c24xx/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
+index 567d77b..dddb49b 100644
+--- a/arch/arm/mach-s3c24xx/Kconfig
++++ b/arch/arm/mach-s3c24xx/Kconfig
+@@ -229,7 +229,7 @@ if CPU_S3C2410
+ 
+ config S3C2410_CPUFREQ
+ 	bool
+-	depends on CPU_FREQ_S3C24XX && CPU_S3C2410
++	depends on CPU_FREQ_S3C24XX
+ 	select S3C2410_CPUFREQ_UTILS
+ 	help
+ 	  CPU Frequency scaling support for S3C2410
+-- 
+1.7.12.4
