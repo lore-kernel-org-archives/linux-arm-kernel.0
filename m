@@ -1,137 +1,132 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Sat, 02 Mar 2013 15:09:47 +0100
-Subject: Question about fixed-clock
-In-Reply-To: <5123B719.2080300@gmail.com>
-References: <5122BF88.1050007@gmail.com>
- <CAOMZO5BXVX8=QOV4+tN_w27ztSVkHAnOG2ifbS_Jpd=-cPnAdw@mail.gmail.com>
- <51234B8E.2000504@gmail.com> <20130219172246.11471.14635@quantum>
- <5123B719.2080300@gmail.com>
-Message-ID: <5132082B.3030409@gmail.com>
+From: lonsn2005@gmail.com (Lonsn)
+Date: Sat, 02 Mar 2013 22:56:38 +0800
+Subject: [PATCH] ARM: S5PV210: Fix PL330 DMA controller clkdev entries
+In-Reply-To: <1362227906-13921-1-git-send-email-s.nawrocki@samsung.com>
+References: <1362227906-13921-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <51321326.6050800@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi eyerone,
-
-On 19.02.2013 18:32, Daniel Mack wrote:
-> On 19.02.2013 18:22, Mike Turquette wrote:
->> > Quoting Daniel Mack (2013-02-19 01:53:18)
->>> >> Hi Fabio,
->>> >> Hi Afzal,
->>> >>
->>> >> On 19.02.2013 02:33, Fabio Estevam wrote:
->>>> >>> On Mon, Feb 18, 2013 at 8:55 PM, Daniel Mack <zonque@gmail.com> wrote:
->>>>> >>>> Hi,
->>>>> >>>>
->>>>> >>>> This might be a stupid question, but I'm somehow stuck here. I'm using a
->>>>> >>>> driver with the following DTS sub-node:
->>>>> >>>>
->>>>> >>>>         ref25: ref25M {
->>>>> >>>>                 compatible = "fixed-clock";
->>>>> >>>>                 #clock-cells = <0>;
->>>>> >>>>                 clock-frequency = <25000000>;
->>>>> >>>>         };
->>>>> >>>>
->>>>> >>>>         clock-generator at 0 {
->>>>> >>>>                                 /* ... */
->>>>> >>>>                                 #clock-cells = <1>;
->>>>> >>>>                                 clocks = <&ref25>;
->>>>> >>>>         }
->>>>> >>>>
->>>>> >>>> The device driver for clock-generator uses something like the following
->>>>> >>>> call to get its clock:
->>>>> >>>>
->>>>> >>>>         clk = of_clk_get(np, 0);
->>>>> >>>>
->>>>> >>>> but the return value is ERR_PTR(-ENOENT) and I also can't find this
->>>>> >>>> clock in the clk debugfs tree.
->>>>> >>>>
->>>>> >>>> This is on a OMAP/AM33xx device with kernel 3.8-rc7 plus the -next tips
->>>>> >>>> of arm-soc and omap, but with no other special clock options selected in
->>>>> >>>> the config. Is there anything I'm missing to correctly instantiate the
->>>>> >>>> dummy clock?
->>>> >>>
->>>> >>> Have you registered it with clk_register_fixed_rate() ?
->>>> >>>
->>>> >>> In imx we use imx_clk_fixed, which in turns call  clk_register_fixed_rate().
->>>> >>>
->>>> >>> Take a look at arch/arm/mach-imx/clk-imx51-imx53.c for a reference.
->>> >>
->>> >> Hmm no, I didn't do anything else than adding it to the DT in the first
->>> >> place, hoping that a driver will pick it up and add the clock for me.
->>> >> But it turns out that of_clk_init() is not called at all on my platform.
->>> >>
->>> >> I'm doing this now from omap_generic_init() and it works. If that's an
->>> >> appropriate place to call it, I can provide a patch.
->>> >>
->> > 
->> > You can provide a patch, but your example above is for a dummy clock,
->> > correct?
-> No, it's a real clock with a fixed frequency on the board, which feeds
-> another clock chip. I thought this is what fixed-clock is for, just like
-> what a fixed-regulator does? Or how would you describe such a thing in
-> DT, in order to use it as input to another device?
-> 
->> > It would be best to post your patch along with a real-world
->> > use for calling of_clk_init().
-> Not sure what you mean exactly, but the patch is attached. However, I
-> still think I lack some understanding here - the fact that compatible
-> strings have to be passed explicitly from generic code feels wrong.
-> 
-> 
-> Thanks,
-> Daniel
-> 
-> 
-> 0001-ARM-OMAP-generic-add-call-to-of_clk_init.patch
-> 
-> 
-> From 850120371830ffb5e2146aeb2d21c724d6ded09e Mon Sep 17 00:00:00 2001
-> From: Daniel Mack <zonque@gmail.com>
-> Date: Tue, 19 Feb 2013 12:05:25 +0100
-> Subject: [PATCH] ARM: OMAP: generic: add call to of_clk_init()
-> 
-> This is needed to instanciate fixed clocks in the DT.
-> 
-> Signed-off-by: Daniel Mack <zonque@gmail.com>
+? 2013/3/2 20:38, Sylwester Nawrocki ??:
+> Since the DMA controller clocks are managed at amba bus level,
+> the PL330 device clocks handling has been removed from the driver
+> in commit 7c71b8eb268ee38235f7e924d943ea9d90e59469
+> DMA: PL330: Remove redundant runtime_suspend/resume functions
+>
+> However, this left the S5PV210 platform with only clkdev entries
+> linking "apb_pclk" clock conn_id to a dummy clock, rather than
+> to corresponding platform PL330 DMAC clock.
+> As a result the DMA controller is now attempted to be used on
+> S5PV210 with the clock disabled and the driver fails with an
+> error:
+>
+> dma-pl330 dma-pl330.0: PERIPH_ID 0x0, PCELL_ID 0x0 !
+> dma-pl330: probe of dma-pl330.0 failed with error -22
+> dma-pl330 dma-pl330.1: PERIPH_ID 0x0, PCELL_ID 0x0 !
+> dma-pl330: probe of dma-pl330.1 failed with error -22
+>
+> Fix this by adding "apb_pclk" clkdev entries for the Peripheral
+> DMA controllers 0/1 and removing the dummy apb_pclk clock.
+>
+> Reported-by: Lonsn <lonsn2005@gmail.com>
+> Cc: Inderpal Singh <inderpal.singh@linaro.org>
+> Cc: Boojin Kim <boojin.kim@samsung.com>
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 > ---
->  arch/arm/mach-omap2/board-generic.c | 7 +++++++
->  1 file changed, 7 insertions(+)
-> 
-> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-> index 0274ff7..3580f16 100644
-> --- a/arch/arm/mach-omap2/board-generic.c
-> +++ b/arch/arm/mach-omap2/board-generic.c
-> @@ -15,6 +15,7 @@
->  #include <linux/of_irq.h>
->  #include <linux/of_platform.h>
->  #include <linux/irqdomain.h>
-> +#include <linux/clk-provider.h>
->  
->  #include <asm/mach/arch.h>
->  
-> @@ -35,6 +36,11 @@ static struct of_device_id omap_dt_match_table[] __initdata = {
->  	{ }
->  };
->  
-> +static const __initconst struct of_device_id clk_match[] = {
-> +	{ .compatible = "fixed-clock", .data = of_fixed_clk_setup, },
-> +	{}
+>
+> Lonsn, could you check if this patch solves the problem for you,
+> please ? Any Tested-by are welcome.
+> I didn't test this patch on any hardware yet. Once it is confirmed
+> I would resend it, also for stable kernels. It seems this issue is
+> present since v3.7.
+>
+Sylwester, I have tested this patch and confirmed it's OK in my S5PV210 
+platform.
+
+> Thanks.
+> ---
+>   arch/arm/mach-s5pv210/clock.c |   36 ++++++++++++++++++------------------
+>   1 files changed, 18 insertions(+), 18 deletions(-)
+>
+> diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
+> index fcdf52d..f051f53 100644
+> --- a/arch/arm/mach-s5pv210/clock.c
+> +++ b/arch/arm/mach-s5pv210/clock.c
+> @@ -214,11 +214,6 @@ static struct clk clk_pcmcdclk2 = {
+>   	.name		= "pcmcdclk",
+>   };
+>
+> -static struct clk dummy_apb_pclk = {
+> -	.name		= "apb_pclk",
+> -	.id		= -1,
+> -};
+> -
+>   static struct clk *clkset_vpllsrc_list[] = {
+>   	[0] = &clk_fin_vpll,
+>   	[1] = &clk_sclk_hdmi27m,
+> @@ -305,18 +300,6 @@ static struct clk_ops clk_fout_apll_ops = {
+>
+>   static struct clk init_clocks_off[] = {
+>   	{
+> -		.name		= "dma",
+> -		.devname	= "dma-pl330.0",
+> -		.parent		= &clk_hclk_psys.clk,
+> -		.enable		= s5pv210_clk_ip0_ctrl,
+> -		.ctrlbit	= (1 << 3),
+> -	}, {
+> -		.name		= "dma",
+> -		.devname	= "dma-pl330.1",
+> -		.parent		= &clk_hclk_psys.clk,
+> -		.enable		= s5pv210_clk_ip0_ctrl,
+> -		.ctrlbit	= (1 << 4),
+> -	}, {
+>   		.name		= "rot",
+>   		.parent		= &clk_hclk_dsys.clk,
+>   		.enable		= s5pv210_clk_ip0_ctrl,
+> @@ -573,6 +556,20 @@ static struct clk clk_hsmmc3 = {
+>   	.ctrlbit	= (1<<19),
+>   };
+>
+> +static struct clk clk_pdma0 = {
+> +	.name		= "pdma0",
+> +	.parent		= &clk_hclk_psys.clk,
+> +	.enable		= s5pv210_clk_ip0_ctrl,
+> +	.ctrlbit	= (1 << 3),
 > +};
 > +
->  static void __init omap_generic_init(void)
->  {
->  	omap_sdrc_init(NULL, NULL);
-> @@ -49,6 +55,7 @@ static void __init omap_generic_init(void)
->  		omap4_panda_display_init_of();
->  	else if (of_machine_is_compatible("ti,omap4-sdp"))
->  		omap_4430sdp_display_init_of();
-> +	of_clk_init(clk_match);
->  }
->  
->  #ifdef CONFIG_SOC_OMAP2420
-
-Any opinion about this approach?
-
-
-Thanks,
-Daniel
+> +static struct clk clk_pdma1 = {
+> +	.name		= "pdma1",
+> +	.parent		= &clk_hclk_psys.clk,
+> +	.enable		= s5pv210_clk_ip0_ctrl,
+> +	.ctrlbit	= (1 << 4),
+> +};
+> +
+>   static struct clk *clkset_uart_list[] = {
+>   	[6] = &clk_mout_mpll.clk,
+>   	[7] = &clk_mout_epll.clk,
+> @@ -1075,6 +1072,8 @@ static struct clk *clk_cdev[] = {
+>   	&clk_hsmmc1,
+>   	&clk_hsmmc2,
+>   	&clk_hsmmc3,
+> +	&clk_pdma0,
+> +	&clk_pdma1,
+>   };
+>
+>   /* Clock initialisation code */
+> @@ -1333,6 +1332,8 @@ static struct clk_lookup s5pv210_clk_lookup[] = {
+>   	CLKDEV_INIT(NULL, "spi_busclk0", &clk_p),
+>   	CLKDEV_INIT("s5pv210-spi.0", "spi_busclk1", &clk_sclk_spi0.clk),
+>   	CLKDEV_INIT("s5pv210-spi.1", "spi_busclk1", &clk_sclk_spi1.clk),
+> +	CLKDEV_INIT("dma-pl330.0", "apb_pclk", &clk_pdma0),
+> +	CLKDEV_INIT("dma-pl330.1", "apb_pclk", &clk_pdma1),
+>   };
+>
+>   void __init s5pv210_register_clocks(void)
+> @@ -1361,6 +1362,5 @@ void __init s5pv210_register_clocks(void)
+>   	for (ptr = 0; ptr < ARRAY_SIZE(clk_cdev); ptr++)
+>   		s3c_disable_clocks(clk_cdev[ptr], 1);
+>
+> -	s3c24xx_register_clock(&dummy_apb_pclk);
+>   	s3c_pwmclk_init();
+>   }
+>
