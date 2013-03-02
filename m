@@ -1,48 +1,56 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Sat, 2 Mar 2013 18:20:03 +0100
-Subject: [PATCH V2] lglock: add read-preference local-global rwlock
-In-Reply-To: <5131FB4C.7070408@cn.fujitsu.com>
-References: <CACvQF51RvhM8XNqu3-1OTQ=cZUZ=pAX+_zx0a29+W67N1X+BgQ@mail.gmail.com>
- <512CC509.1050000@linux.vnet.ibm.com>
- <CACvQF50UgiqPpDk3HCmV86zKSf6tPjqr0bZowfPEOJs0g0r0MQ@mail.gmail.com>
- <512D0D67.9010609@linux.vnet.ibm.com>
- <CACvQF53ph2ixdM-otzetjM5cR+2kcZj6sckOp3TnzzA_x-EZ8w@mail.gmail.com>
- <512E7879.20109@linux.vnet.ibm.com> <5130E8E2.50206@cn.fujitsu.com>
- <20130301182854.GA3631@redhat.com>
- <CANN689HEW=b5S93J27p+rBX-5m7jkW4FER=eHDCp7OgMaTWLPw@mail.gmail.com>
- <5131FB4C.7070408@cn.fujitsu.com>
-Message-ID: <20130302172003.GC29769@redhat.com>
+From: 26@suply.tk (Stone mosaic and Glass mosaic and Metal mosaic Supply)
+Date: Sat, 02 Mar 2013 19:42:17 +0000
+Subject: =?GB2312?B?U3RvbmUgbW9zYWljIGFuZCBHbGFzcyBtb3NhaWMgYW5kIE1ldGFsIG1vc2FpYyBTdXBwbA==?=
+ =?GB2312?B?edPrxPq5ss/twcvP4LLhoaM=?=
+Message-ID: <f46d042f9ef64468fb04d6f6526c@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/02, Lai Jiangshan wrote:
->
-> +void lg_rwlock_local_read_unlock(struct lgrwlock *lgrw)
-> +{
-> +	switch (__this_cpu_read(*lgrw->reader_refcnt)) {
-> +	case 1:
-> +		__this_cpu_write(*lgrw->reader_refcnt, 0);
-> +		lg_local_unlock(&lgrw->lglock);
-> +		return;
-> +	case FALLBACK_BASE:
-> +		__this_cpu_write(*lgrw->reader_refcnt, 0);
-> +		read_unlock(&lgrw->fallback_rwlock);
-> +		rwlock_release(&lg->lock_dep_map, 1, _RET_IP_);
+My dear friend,
 
-I guess "case 1:" should do rwlock_release() too.
 
-Otherwise, at first glance looks correct...
+How?s your business recently?
 
-However, I still think that FALLBACK_BASE only adds the unnecessary
-complications. But even if I am right this is subjective of course, please
-feel free to ignore.
 
-And btw, I am not sure about lg->lock_dep_map, perhaps we should use
-fallback_rwlock->dep_map ?
+We are writing to update you our new designs in 2013, we are special in  
+manufacturing and designing the mosaic tiles, including the marble stone  
+mosaic and glass mosaic and metal mosaic, ect.
 
-We need rwlock_acquire_read() even in the fast-path, and this acquire_read
-should be paired with rwlock_acquire() in _write_lock(), but it does
-spin_acquire(lg->lock_dep_map). Yes, currently this is the same (afaics)
-but perhaps fallback_rwlock->dep_map would be more clean.
 
-Oleg.
+With more than 10 years production and export experience, we have  
+successfully developed thousands of mosaic designs to meet the need of  
+different market! And we can also make it according to your own designs or  
+requirements!
+
+
+If you are interested in our mosaics, we would like to send you our  
+catalogue and pricelist for your reference, we are expecting your kind  
+prompt reply and feedback! Thanks in advance!
+
+
+
+---
+Thanks & best regards
+Sabrina Law
+General manager
+Mosaic Factory
+Add.: Foshan Guangdong China
+
+https://picasaweb.google.com/lh/sredir?uname=118029705211684659492&target=ALBUM&id=5850833430973612241&authkey=Gv1sRgCNnl8OS_6cezVw&invite=CLqjrPcG&feat=email
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130302/44aca853/attachment-0001.html>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: picasaweblogo-zh_CN.gif
+Type: image/gif
+Size: 1646 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130302/44aca853/attachment-0001.gif>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: email.jpg
+Type: image/jpeg
+Size: 7339 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130302/44aca853/attachment-0001.jpg>
