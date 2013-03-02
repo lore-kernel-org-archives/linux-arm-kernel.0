@@ -1,24 +1,25 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sat, 2 Mar 2013 11:58:28 +0800
-Subject: [PATCH -next] spi: fix return value check in ce4100_spi_probe()
-In-Reply-To: <CAPgLHd-PhE2igUQOeg90H98Ni55DwfYdp0D52uaBK0=J3M1V+g@mail.gmail.com>
-References: <CAPgLHd-PhE2igUQOeg90H98Ni55DwfYdp0D52uaBK0=J3M1V+g@mail.gmail.com>
-Message-ID: <20130302035825.GG6610@opensource.wolfsonmicro.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Sat, 2 Mar 2013 10:54:08 +0530
+Subject: [PATCH 1/2] gpio/omap: convert gpio irq domain to linear mapping
+In-Reply-To: <1362158568-1624-2-git-send-email-jon-hunter@ti.com>
+References: <1362158568-1624-1-git-send-email-jon-hunter@ti.com>
+ <1362158568-1624-2-git-send-email-jon-hunter@ti.com>
+Message-ID: <51318CF8.4020604@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 22, 2013 at 10:52:35AM +0800, Wei Yongjun wrote:
-> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+On Friday 01 March 2013 10:52 PM, Jon Hunter wrote:
+> Currently the OMAP GPIO driver uses a legacy mapping for the GPIO IRQ
+> domain. This is not necessary because we do not need to assign a
+> specific interrupt number to the GPIO IRQ domain. Therefore, convert
+> the OMAP GPIO driver to use a linear mapping instead.
 > 
-> In case of error, the function platform_device_register_full()
-> returns ERR_PTR() and never returns NULL. The NULL test in the
-> return value check should be replaced with IS_ERR().
-
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130302/74312f0b/attachment.sig>
+> Please note that this also allows to simplify the logic in the OMAP
+> gpio_irq_handler() routine, by using irq_find_mapping() to obtain the
+> virtual irq number from the GPIO bank and bank index.
+> 
+> Reported-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+> ---
+Cool.
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
