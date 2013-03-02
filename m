@@ -1,23 +1,34 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sat, 02 Mar 2013 23:17:37 +0000
-Subject: [PATCH 05/12] spi: mxs-spi: move to use generic DMA helper
-In-Reply-To: <1361978748-25281-6-git-send-email-shawn.guo@linaro.org>
-References: <1361978748-25281-1-git-send-email-shawn.guo@linaro.org>
- <1361978748-25281-6-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20130302231737.D2D743E36A2@localhost>
+Date: Sat, 02 Mar 2013 23:13:55 +0000
+Subject: [PATCH 0/4] Enable SPI flash support on da850-evm DT kernel
+In-Reply-To: <A73F36158E33644199EB82C5EC81C7BC3EA47FEF@DBDE01.ent.ti.com>
+References: <1361789050-637-1-git-send-email-prakash.pm@ti.com>
+ <512DC65D.7080603@ti.com>
+ <A73F36158E33644199EB82C5EC81C7BC3EA47FEF@DBDE01.ent.ti.com>
+Message-ID: <20130302231355.5CD2D3E34C9@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 27 Feb 2013 23:25:41 +0800, Shawn Guo <shawn.guo@linaro.org> wrote:
-> With the generic DMA device tree helper supported by mxs-dma driver,
-> client devices only need to call dma_request_slave_channel() for
-> requesting a DMA channel from dmaengine.
+On Wed, 27 Feb 2013 11:32:39 +0000, "Manjunathappa, Prakash" <prakash.pm@ti.com> wrote:
+> On Wed, Feb 27, 2013 at 14:09:57, Nori, Sekhar wrote:
+> > On 2/25/2013 4:14 PM, Manjunathappa, Prakash wrote:
+> > > Patch enables support for m25p80 SPI flash support on
+> > > da850-EVM.
+> > > 
+> > > Testing information:
+> > > da850-evm comes with partitions specified in DT blob.
+> > > Able to mount/umount and create/delete files on filesystem partition.
+> > > 
+> > > Depends on below patch in spi-next branch of git://git.secretlab.ca/git/linux-2.6.git.
+> > > "spi/davinci: add OF support for the spi controller"
+> > > 
 > 
-> Since mxs is a DT only platform now, along with the changes, the non-DT
-> case handling in probe function also gets removed.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: spi-devel-general at lists.sourceforge.net
+> Grant,
+> I could not find binding documentation changes submitted with above patch.
+> I checked in spi-next and linux-next.
 
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
+It must have been missed then. It happens sometimes. Can someone submit
+a fixup patch please?
+
+Thanks,
+g.
