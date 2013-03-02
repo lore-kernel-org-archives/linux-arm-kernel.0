@@ -1,45 +1,56 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Sat,  2 Mar 2013 11:10:13 +0100
-Subject: [PATCH 4/4][V2] ARM: timer-sp: Set dynamic irq affinity
-In-Reply-To: <1362219013-18173-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1362219013-18173-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1362219013-18173-5-git-send-email-daniel.lezcano@linaro.org>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Sat, 02 Mar 2013 09:52:12 +0000
+Subject: [PATCH v5 01/12] gpio: pxa: identify ed mask reg with platform
+ data
+In-Reply-To: <1361764181-26647-2-git-send-email-haojian.zhuang@linaro.org>
+References: <1361764181-26647-1-git-send-email-haojian.zhuang@linaro.org>
+ <1361764181-26647-2-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <20130302095212.1150C3E219B@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Viresh Kumar <viresh.kumar@linaro.org>
+On Mon, 25 Feb 2013 11:49:30 +0800, Haojian Zhuang <haojian.zhuang@linaro.org> wrote:
+> Avoid to judge whether edge mask register exists by CPU. Use platform
+> data to identify it instead. The gpio edge mask register exists in MMP
+> series SoC.
+> 
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 
-When a cpu goes to a deep idle state where its local timer is shutdown, it
-notifies the time frame work to use the broadcast timer instead.
+Hi Haojian,
 
-Unfortunately, the broadcast device could wake up any CPU, including an idle one
-which is not concerned by the wake up at all.
+I don't think patches like this are a good idea. The driver already
+knows the difference between different types of chips. Adding /more/
+platform data is making life worse, not better. The diffstat is evidence
+of that:
 
-This implies, in the worst case, an idle CPU will wake up to send an IPI to
-another idle cpu.
+>  10 files changed, 65 insertions(+), 1 deletion(-)
 
-This patch fixes this for ARM platforms using timer-sp, by setting
-CLOCK_EVT_FEAT_DYNIRQ feature.
+If you're looking to get rid of the pxa_gpio_nums() function, then a
+much better way to do it is to use a platform_device_id table and
+differentiate the type by the name. You can attach data to that table
+with the parameters for each chip. For example:
 
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
----
- arch/arm/common/timer-sp.c |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+struct pxa_gpio_id_data pxa_gpio_id_data[] = {
+	{ .count = 84, type = PXA25X_GPIO, },
+	{ .count = 89, type = PXA26X_GPIO, },
+	{ .count = 127, type = MMP_GPIO, },
+};
 
-diff --git a/arch/arm/common/timer-sp.c b/arch/arm/common/timer-sp.c
-index 9d2d3ba..ae3c0f9 100644
---- a/arch/arm/common/timer-sp.c
-+++ b/arch/arm/common/timer-sp.c
-@@ -158,7 +158,8 @@ static int sp804_set_next_event(unsigned long next,
- }
- 
- static struct clock_event_device sp804_clockevent = {
--	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
-+	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
-+		CLOCK_EVT_FEAT_DYNIRQ,
- 	.set_mode	= sp804_set_mode,
- 	.set_next_event	= sp804_set_next_event,
- 	.rating		= 300,
--- 
-1.7.9.5
+static const struct platform_device_id pxa_gpio_id_table[] = {
+	{ "pxa25x-gpio", (unsigned long) &pxa_gpio_id_data[0], },
+	{ "pxa65x-gpio", (unsigned long) &pxa_gpio_id_data[1], },
+	{ "mmp-gpio", (unsigned long) &pxa_gpio_id_data[2], },
+};
+
+static struct platform_driver pxa_gpio_driver = {
+	.probe = pxa_gpio_probe,
+	.driver = {
+		.name = "pxa-gpio",
+		.of_match_table = of_match_ptr(pxa_gpio_dt_ids),
+	},
+	.id_table = pxa_gpio_id_table,
+};
+
+And that same data table can be used in the of_match_table too.
+
+g.
