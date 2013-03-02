@@ -1,18 +1,25 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sat, 02 Mar 2013 22:23:40 +0000
-Subject: [PATCH v2 3/4] spi: s3c64xx: add dma maxburst size initialization
-In-Reply-To: <001b01ce10d3$e9f78620$bde69260$%kim@samsung.com>
-References: <001b01ce10d3$e9f78620$bde69260$%kim@samsung.com>
-Message-ID: <20130302222340.6C4E13E2499@localhost>
+Date: Sat, 02 Mar 2013 19:39:08 +0000
+Subject: [PATCH 1/2] gpio/omap: convert gpio irq domain to linear mapping
+In-Reply-To: <1362158568-1624-2-git-send-email-jon-hunter@ti.com>
+References: <1362158568-1624-1-git-send-email-jon-hunter@ti.com>
+ <1362158568-1624-2-git-send-email-jon-hunter@ti.com>
+Message-ID: <20130302193908.DCA413E10F3@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 22 Feb 2013 17:09:18 +0900, Boojin Kim <boojin.kim@samsung.com> wrote:
-> This patch adds dma maxburst size initialization.
-> The maxburst should be set by MODE_CFGn.DMA_TYPE,
-> because the pl330 dma driver supports burst mode.
+On Fri, 1 Mar 2013 11:22:47 -0600, Jon Hunter <jon-hunter@ti.com> wrote:
+> Currently the OMAP GPIO driver uses a legacy mapping for the GPIO IRQ
+> domain. This is not necessary because we do not need to assign a
+> specific interrupt number to the GPIO IRQ domain. Therefore, convert
+> the OMAP GPIO driver to use a linear mapping instead.
 > 
-> Signed-off-by: Hyeonkook Kim <hk619.kim@samsung.com>
+> Please note that this also allows to simplify the logic in the OMAP
+> gpio_irq_handler() routine, by using irq_find_mapping() to obtain the
+> virtual irq number from the GPIO bank and bank index.
+> 
+> Reported-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 
 Applied, thanks.
 
