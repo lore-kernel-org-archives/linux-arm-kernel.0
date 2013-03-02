@@ -1,94 +1,137 @@
-From: laijs@cn.fujitsu.com (Lai Jiangshan)
-Date: Sat, 02 Mar 2013 21:42:15 +0800
-Subject: [PATCH] lglock: add read-preference local-global rwlock
-In-Reply-To: <20130301182854.GA3631@redhat.com>
-References: <512BBAD8.8010006@linux.vnet.ibm.com>
- <CACvQF51jCxk5jUqmhD=QBBtUsBkQWZzakacrKO4Gsk=w61rNwQ@mail.gmail.com>
- <512C7A38.8060906@linux.vnet.ibm.com>
- <CACvQF51RvhM8XNqu3-1OTQ=cZUZ=pAX+_zx0a29+W67N1X+BgQ@mail.gmail.com>
- <512CC509.1050000@linux.vnet.ibm.com>
- <CACvQF50UgiqPpDk3HCmV86zKSf6tPjqr0bZowfPEOJs0g0r0MQ@mail.gmail.com>
- <512D0D67.9010609@linux.vnet.ibm.com>
- <CACvQF53ph2ixdM-otzetjM5cR+2kcZj6sckOp3TnzzA_x-EZ8w@mail.gmail.com>
- <512E7879.20109@linux.vnet.ibm.com> <5130E8E2.50206@cn.fujitsu.com>
- <20130301182854.GA3631@redhat.com>
-Message-ID: <513201B7.5070004@cn.fujitsu.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Sat, 02 Mar 2013 15:09:47 +0100
+Subject: Question about fixed-clock
+In-Reply-To: <5123B719.2080300@gmail.com>
+References: <5122BF88.1050007@gmail.com>
+ <CAOMZO5BXVX8=QOV4+tN_w27ztSVkHAnOG2ifbS_Jpd=-cPnAdw@mail.gmail.com>
+ <51234B8E.2000504@gmail.com> <20130219172246.11471.14635@quantum>
+ <5123B719.2080300@gmail.com>
+Message-ID: <5132082B.3030409@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/03/13 02:28, Oleg Nesterov wrote:
-> Lai, I didn't read this discussion except the code posted by Michel.
-> I'll try to read this patch carefully later, but I'd like to ask
-> a couple of questions.
-> 
-> This version looks more complex than Michel's, why? Just curious, I
-> am trying to understand what I missed. See
-> http://marc.info/?l=linux-kernel&m=136196350213593
+Hi eyerone,
 
-Michel changed my old draft version a little, his version is good enough for me.
-My new version tries to add a little better nestable support with only
-adding single __this_cpu_op() in _read_[un]lock().
+On 19.02.2013 18:32, Daniel Mack wrote:
+> On 19.02.2013 18:22, Mike Turquette wrote:
+>> > Quoting Daniel Mack (2013-02-19 01:53:18)
+>>> >> Hi Fabio,
+>>> >> Hi Afzal,
+>>> >>
+>>> >> On 19.02.2013 02:33, Fabio Estevam wrote:
+>>>> >>> On Mon, Feb 18, 2013 at 8:55 PM, Daniel Mack <zonque@gmail.com> wrote:
+>>>>> >>>> Hi,
+>>>>> >>>>
+>>>>> >>>> This might be a stupid question, but I'm somehow stuck here. I'm using a
+>>>>> >>>> driver with the following DTS sub-node:
+>>>>> >>>>
+>>>>> >>>>         ref25: ref25M {
+>>>>> >>>>                 compatible = "fixed-clock";
+>>>>> >>>>                 #clock-cells = <0>;
+>>>>> >>>>                 clock-frequency = <25000000>;
+>>>>> >>>>         };
+>>>>> >>>>
+>>>>> >>>>         clock-generator at 0 {
+>>>>> >>>>                                 /* ... */
+>>>>> >>>>                                 #clock-cells = <1>;
+>>>>> >>>>                                 clocks = <&ref25>;
+>>>>> >>>>         }
+>>>>> >>>>
+>>>>> >>>> The device driver for clock-generator uses something like the following
+>>>>> >>>> call to get its clock:
+>>>>> >>>>
+>>>>> >>>>         clk = of_clk_get(np, 0);
+>>>>> >>>>
+>>>>> >>>> but the return value is ERR_PTR(-ENOENT) and I also can't find this
+>>>>> >>>> clock in the clk debugfs tree.
+>>>>> >>>>
+>>>>> >>>> This is on a OMAP/AM33xx device with kernel 3.8-rc7 plus the -next tips
+>>>>> >>>> of arm-soc and omap, but with no other special clock options selected in
+>>>>> >>>> the config. Is there anything I'm missing to correctly instantiate the
+>>>>> >>>> dummy clock?
+>>>> >>>
+>>>> >>> Have you registered it with clk_register_fixed_rate() ?
+>>>> >>>
+>>>> >>> In imx we use imx_clk_fixed, which in turns call  clk_register_fixed_rate().
+>>>> >>>
+>>>> >>> Take a look at arch/arm/mach-imx/clk-imx51-imx53.c for a reference.
+>>> >>
+>>> >> Hmm no, I didn't do anything else than adding it to the DT in the first
+>>> >> place, hoping that a driver will pick it up and add the clock for me.
+>>> >> But it turns out that of_clk_init() is not called at all on my platform.
+>>> >>
+>>> >> I'm doing this now from omap_generic_init() and it works. If that's an
+>>> >> appropriate place to call it, I can provide a patch.
+>>> >>
+>> > 
+>> > You can provide a patch, but your example above is for a dummy clock,
+>> > correct?
+> No, it's a real clock with a fixed frequency on the board, which feeds
+> another clock chip. I thought this is what fixed-clock is for, just like
+> what a fixed-regulator does? Or how would you describe such a thing in
+> DT, in order to use it as input to another device?
+> 
+>> > It would be best to post your patch along with a real-world
+>> > use for calling of_clk_init().
+> Not sure what you mean exactly, but the patch is attached. However, I
+> still think I lack some understanding here - the fact that compatible
+> strings have to be passed explicitly from generic code feels wrong.
+> 
+> 
+> Thanks,
+> Daniel
+> 
+> 
+> 0001-ARM-OMAP-generic-add-call-to-of_clk_init.patch
+> 
+> 
+> From 850120371830ffb5e2146aeb2d21c724d6ded09e Mon Sep 17 00:00:00 2001
+> From: Daniel Mack <zonque@gmail.com>
+> Date: Tue, 19 Feb 2013 12:05:25 +0100
+> Subject: [PATCH] ARM: OMAP: generic: add call to of_clk_init()
+> 
+> This is needed to instanciate fixed clocks in the DT.
+> 
+> Signed-off-by: Daniel Mack <zonque@gmail.com>
+> ---
+>  arch/arm/mach-omap2/board-generic.c | 7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+> index 0274ff7..3580f16 100644
+> --- a/arch/arm/mach-omap2/board-generic.c
+> +++ b/arch/arm/mach-omap2/board-generic.c
+> @@ -15,6 +15,7 @@
+>  #include <linux/of_irq.h>
+>  #include <linux/of_platform.h>
+>  #include <linux/irqdomain.h>
+> +#include <linux/clk-provider.h>
+>  
+>  #include <asm/mach/arch.h>
+>  
+> @@ -35,6 +36,11 @@ static struct of_device_id omap_dt_match_table[] __initdata = {
+>  	{ }
+>  };
+>  
+> +static const __initconst struct of_device_id clk_match[] = {
+> +	{ .compatible = "fixed-clock", .data = of_fixed_clk_setup, },
+> +	{}
+> +};
+> +
+>  static void __init omap_generic_init(void)
+>  {
+>  	omap_sdrc_init(NULL, NULL);
+> @@ -49,6 +55,7 @@ static void __init omap_generic_init(void)
+>  		omap4_panda_display_init_of();
+>  	else if (of_machine_is_compatible("ti,omap4-sdp"))
+>  		omap_4430sdp_display_init_of();
+> +	of_clk_init(clk_match);
+>  }
+>  
+>  #ifdef CONFIG_SOC_OMAP2420
 
-> 
-> And I can't understand FALLBACK_BASE...
-> 
-> OK, suppose that CPU_0 does _write_unlock() and releases ->fallback_rwlock.
-> 
-> CPU_1 does _read_lock(), and ...
-> 
->> +void lg_rwlock_local_read_lock(struct lgrwlock *lgrw)
->> +{
->> +	struct lglock *lg = &lgrw->lglock;
->> +
->> +	preempt_disable();
->> +	rwlock_acquire_read(&lg->lock_dep_map, 0, 0, _RET_IP_);
->> +	if (likely(!__this_cpu_read(*lgrw->reader_refcnt))) {
->> +		if (!arch_spin_trylock(this_cpu_ptr(lg->lock))) {
-> 
-> _trylock() fails,
-> 
->> +			read_lock(&lgrw->fallback_rwlock);
->> +			__this_cpu_add(*lgrw->reader_refcnt, FALLBACK_BASE);
-> 
-> so we take ->fallback_rwlock and ->reader_refcnt == FALLBACK_BASE.
-> 
-> CPU_0 does lg_global_unlock(lgrw->lglock) and finishes _write_unlock().
-> 
-> Interrupt handler on CPU_1 does _read_lock() notices ->reader_refcnt != 0
-> and simply does this_cpu_inc(), so reader_refcnt == FALLBACK_BASE + 1.
-> 
-> Then irq does _read_unlock(), and
-> 
->> +void lg_rwlock_local_read_unlock(struct lgrwlock *lgrw)
->> +{
->> +	switch (__this_cpu_dec_return(*lgrw->reader_refcnt)) {
->> +	case 0:
->> +		lg_local_unlock(&lgrw->lglock);
->> +		return;
->> +	case FALLBACK_BASE:
->> +		__this_cpu_sub(*lgrw->reader_refcnt, FALLBACK_BASE);
->> +		read_unlock(&lgrw->fallback_rwlock);
-> 
-> hits this case?
-> 
-> Doesn't look right, but most probably I missed something.
+Any opinion about this approach?
 
-Your are right, I just realized that I had spit a code which should be atomic.
-
-I hope this patch(V2) can get more reviews.
-
-My first and many locking knowledge is learned from Paul.
-Paul, would you also review it?
 
 Thanks,
-Lai
-
-> 
-> Oleg.
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
-> 
+Daniel
