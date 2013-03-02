@@ -1,29 +1,61 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Sat, 02 Mar 2013 16:00:44 +0400
-Subject: =?UTF-8?B?UmVbMl06IFtQQVRDSCAxLzRdIEFSTTogczNjMjR4eDogUmVtb3ZlZCB1bm5l?=
- =?UTF-8?B?ZWRlZCBkZXBlbmRlbmN5IG9uIEFSQ0hfUzNDMjRYWCBmb3IgYm9hcmRz?=
-In-Reply-To: <201303021143.38390.arnd@arndb.de>
-References: <1362216174-10478-1-git-send-email-shc_work@mail.ru>
- <201303021143.38390.arnd@arndb.de>
-Message-ID: <1362225644.599345374@f82.mail.ru>
+From: walken@google.com (Michel Lespinasse)
+Date: Sat, 2 Mar 2013 20:13:17 +0800
+Subject: [PATCH] lglock: add read-preference local-global rwlock
+In-Reply-To: <20130301182854.GA3631@redhat.com>
+References: <512BBAD8.8010006@linux.vnet.ibm.com>
+ <CACvQF51jCxk5jUqmhD=QBBtUsBkQWZzakacrKO4Gsk=w61rNwQ@mail.gmail.com>
+ <512C7A38.8060906@linux.vnet.ibm.com>
+ <CACvQF51RvhM8XNqu3-1OTQ=cZUZ=pAX+_zx0a29+W67N1X+BgQ@mail.gmail.com>
+ <512CC509.1050000@linux.vnet.ibm.com>
+ <CACvQF50UgiqPpDk3HCmV86zKSf6tPjqr0bZowfPEOJs0g0r0MQ@mail.gmail.com>
+ <512D0D67.9010609@linux.vnet.ibm.com>
+ <CACvQF53ph2ixdM-otzetjM5cR+2kcZj6sckOp3TnzzA_x-EZ8w@mail.gmail.com>
+ <512E7879.20109@linux.vnet.ibm.com> <5130E8E2.50206@cn.fujitsu.com>
+ <20130301182854.GA3631@redhat.com>
+Message-ID: <CANN689HEW=b5S93J27p+rBX-5m7jkW4FER=eHDCp7OgMaTWLPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Saturday 02 March 2013, Alexander Shiyan wrote:
-> > Board options are already under "if ARCH_S3C24XX" condition, so
-> > additional dependencies on this symbol can be removed.
-> > 
-> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> 
-> Hi Alexander,
-> 
-> Is this just a cosmetic change that has no other consequences, or do you
-> have other follow-up patches that depend on patches 1-3?
+On Sat, Mar 2, 2013 at 2:28 AM, Oleg Nesterov <oleg@redhat.com> wrote:
+> Lai, I didn't read this discussion except the code posted by Michel.
+> I'll try to read this patch carefully later, but I'd like to ask
+> a couple of questions.
+>
+> This version looks more complex than Michel's, why? Just curious, I
+> am trying to understand what I missed. See
+> http://marc.info/?l=linux-kernel&m=136196350213593
 
-Hello Arnd.
-Nothing more yet. Perhaps I'll do a merging some parts of the code for
-different versions of the CPU into one unit and some future changes
-may remove some Kconfig symbols, so it is only initial Kconfig cleaning.
-Thanks.
+>From what I can see, my version used local_refcnt to count how many
+reentrant locks are represented by the fastpath lglock spinlock; Lai's
+version uses it to count how many reentrant locks are represented by
+either the fastpath lglock spinlock or the global rwlock, with
+FALLBACK_BASE being a bit thrown in so we can remember which of these
+locks was acquired. My version would be slower if it needs to take the
+slow path in a reentrant way, but I'm not sure it matters either :)
 
----
+> Interrupt handler on CPU_1 does _read_lock() notices ->reader_refcnt != 0
+> and simply does this_cpu_inc(), so reader_refcnt == FALLBACK_BASE + 1.
+>
+> Then irq does _read_unlock(), and
+>
+>> +void lg_rwlock_local_read_unlock(struct lgrwlock *lgrw)
+>> +{
+>> +     switch (__this_cpu_dec_return(*lgrw->reader_refcnt)) {
+>> +     case 0:
+>> +             lg_local_unlock(&lgrw->lglock);
+>> +             return;
+>> +     case FALLBACK_BASE:
+>> +             __this_cpu_sub(*lgrw->reader_refcnt, FALLBACK_BASE);
+>> +             read_unlock(&lgrw->fallback_rwlock);
+>
+> hits this case?
+>
+> Doesn't look right, but most probably I missed something.
+
+Good catch. I think this is easily fixed by setting reader_refcn
+directly to FALLBACK_BASE+1, instead of setting it to FALLBACK_BASE
+and then incrementing it to FALLBACK_BASE+1.
+
+-- 
+Michel "Walken" Lespinasse
+A program is never fully debugged until the last user dies.
