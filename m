@@ -1,298 +1,61 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 1 Mar 2013 18:25:42 -0600
-Subject: [PATCH 14/15] ARM: OMAP4+: CPUidle: Add OMAP5 idle driver support
-In-Reply-To: <1362139864-9233-15-git-send-email-santosh.shilimkar@ti.com>
-References: <1362139864-9233-1-git-send-email-santosh.shilimkar@ti.com>
- <1362139864-9233-15-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20130302002541.GB24537@kahuna>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Sat, 2 Mar 2013 08:58:52 +0800
+Subject: [GIT PULL] Device Tree fixes for v3.9
+In-Reply-To: <201303012319.28231.arnd@arndb.de>
+References: <CACRpkdai0PRbK-R_KfNqkkVuSNn97v9Za8Doq71Zb-xCHW+J1A@mail.gmail.com>
+ <201303012319.28231.arnd@arndb.de>
+Message-ID: <20130302005852.GA3106@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17:41-20130301, Santosh Shilimkar wrote:
-> The OMAP5 idle driver can re-use OMAP4 CPUidle driver implementation thanks
-> to compatible MPUSS design.
+On Fri, 01 Mar 2013, Arnd Bergmann wrote:
+
+> On Friday 01 March 2013, Linus Walleij wrote:
+> > Hi Olof, Arnd,
+> > 
+> > Here is a pull request for the Device Tree fixes for Ux500 in the v3.9 series.
+> > 
+> > Basically this should have come in earlier, but I failed at processing
+> > it in time
+> > for the merge window. t should have been this cycle's Ux500 DT topic branch.
+> > 
+> > As discussed I've started to funnel all Ux500 DT stuff through my ux500 tree
+> > in order to do some coordination and I became overloaded. So this patch set
+> > got stuck in the air. It was not trivial to push since this branch had a few
+> > conflicts with other branches. (There might have been a good way to solve
+> > that but I didn't come up with it in time.)
+> > 
+> > Basically how to handle it is your pick, in the old times I would have pushed
+> > it ASAP, maybe during -rc1, as it restores the Ux500 DT to a working state
+> > for the basic functionality (notably ethernet and MMC on the Snowball).
+> > 
+> > Please pull it in, for fixes or -next at your decision. As you can see the
+> > base is at Torvald's HEAD since all dependencies that conflicted with
+> > this branch is now there. If you want me to resend based on v3.9-rc1
+> > or so, just tell.
 > 
-> Though unlike OMAP4, on OMAP5 devices, MPUSS CSWR (Close Switch Retention)
-> power states can be achieved with respective power states on CPU0 and CPU1
-> power domain. This mode was broken on OMAP4 devices because of hardware
-> limitation. Also there is no CPU low power entry order requirement like
-> master CPU etc for CSWR C-state, which is icing on the cake. Code makes
-> use of voting scheme for cluster low power state to support MPUSS CSWR
-> C-state.
 > 
-> Supported OMAP5 CPUidle C-states:
->         C1 - CPU0 ON(WFI) + CPU1 ON(WFI) + MPUSS ON
->         C2 - CPU0 CSWR + CPU1 CSWR + MPUSS CSWR
->         C3 - CPU0 OFF + CPU1 Force OFF + MPUSS OSWR
- think you meant CPU1 OFF?
+> I'm still getting build errors even with those patches applied:
 > 
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
->  arch/arm/mach-omap2/Kconfig                        |    1 +
->  arch/arm/mach-omap2/Makefile                       |    4 +-
->  .../{cpuidle44xx.c => cpuidle_omap4plus.c}         |  103 +++++++++++++++++++-
->  arch/arm/mach-omap2/omap-mpuss-lowpower.c          |    7 +-
->  arch/arm/mach-omap2/pm_omap4plus.c                 |    2 +-
->  5 files changed, 110 insertions(+), 7 deletions(-)
->  rename arch/arm/mach-omap2/{cpuidle44xx.c => cpuidle_omap4plus.c} (70%)
-> 
-> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-> index 41b581f..2df91dc 100644
-> --- a/arch/arm/mach-omap2/Kconfig
-> +++ b/arch/arm/mach-omap2/Kconfig
-> @@ -82,6 +82,7 @@ config SOC_OMAP5
->  	select CPU_V7
->  	select HAVE_SMP
->  	select COMMON_CLK
-> +	select ARCH_NEEDS_CPU_IDLE_COUPLED
->  
->  comment "OMAP Core Type"
->  	depends on ARCH_OMAP2
-> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-> index 7c3c6b6..f6ff88f 100644
-> --- a/arch/arm/mach-omap2/Makefile
-> +++ b/arch/arm/mach-omap2/Makefile
-> @@ -97,8 +97,10 @@ endif
->  endif
->  
->  ifeq ($(CONFIG_CPU_IDLE),y)
-> +omap4plus-common-idle			= cpuidle_omap4plus.o
->  obj-$(CONFIG_ARCH_OMAP3)                += cpuidle34xx.o
-> -obj-$(CONFIG_ARCH_OMAP4)                += cpuidle44xx.o
-> +obj-$(CONFIG_ARCH_OMAP4)		+= $(omap4plus-common-idle)
-> +obj-$(CONFIG_SOC_OMAP5)			+= $(omap4plus-common-idle)
-nit pick: simpler to use cpuidle_omap4plus.o or do we expect more objs -
-like moving the idle_data to DTS or so?
->  endif
->  
->  # PRCM
-> diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle_omap4plus.c
-> similarity index 70%
-> rename from arch/arm/mach-omap2/cpuidle44xx.c
-> rename to arch/arm/mach-omap2/cpuidle_omap4plus.c
-> index 23286c1..8681fa6 100644
-> --- a/arch/arm/mach-omap2/cpuidle44xx.c
-> +++ b/arch/arm/mach-omap2/cpuidle_omap4plus.c
-> @@ -29,6 +29,7 @@ struct idle_statedata {
->  	u32 cpu_state;
->  	u32 mpu_logic_state;
->  	u32 mpu_state;
-> +	u32 mpu_state_vote;
->  };
->  
->  static struct idle_statedata omap4_idle_data[] = {
-> @@ -49,17 +50,36 @@ static struct idle_statedata omap4_idle_data[] = {
->  	},
->  };
->  
-> +static struct idle_statedata omap5_idle_data[] = {
-> +	{
-> +		.cpu_state = PWRDM_POWER_ON,
-> +		.mpu_state = PWRDM_POWER_ON,
-> +		.mpu_logic_state = PWRDM_POWER_RET,
-> +	},
-> +	{
-> +		.cpu_state = PWRDM_POWER_RET,
-CSWR I assume -> Documenting it helps? or we should introdce
-cpu_logic_state to be explicit?
-> +		.mpu_state = PWRDM_POWER_RET,
-> +		.mpu_logic_state = PWRDM_POWER_RET,
-> +	},
-> +	{
-> +		.cpu_state = PWRDM_POWER_OFF,
-CSWR I assume -> Documenting it helps?
-> +		.mpu_state = PWRDM_POWER_RET,
-> +		.mpu_logic_state = PWRDM_POWER_OFF,
-> +	},
-> +};
-> +
->  static struct powerdomain *mpu_pd, *cpu_pd[NR_CPUS];
->  static struct clockdomain *cpu_clkdm[NR_CPUS];
->  
->  static atomic_t abort_barrier;
->  static bool cpu_done[NR_CPUS];
->  static struct idle_statedata *state_ptr;
-> +static DEFINE_RAW_SPINLOCK(mpu_lock);
->  
->  /* Private functions */
->  
->  /**
-> - * omap_enter_idle_[simple/coupled] - OMAP4PLUS cpuidle entry functions
-> + * omap_enter_idle_[simple/smp/coupled] - OMAP4PLUS cpuidle entry functions
->   * @dev: cpuidle device
->   * @drv: cpuidle driver
->   * @index: the index of state to be entered
-> @@ -132,6 +152,8 @@ static int omap_enter_idle_coupled(struct cpuidle_device *dev,
->  
->  	/* Wakeup CPU1 only if it is not offlined */
->  	if (dev->cpu == 0 && cpumask_test_cpu(1, cpu_online_mask)) {
-> +		/* Restore MPU PD state post idle */
-> +		omap_set_pwrdm_state(mpu_pd, PWRDM_POWER_ON);
->  		clkdm_wakeup(cpu_clkdm[1]);
->  		omap_set_pwrdm_state(cpu_pd[1], PWRDM_POWER_ON);
->  		clkdm_allow_idle(cpu_clkdm[1]);
-> @@ -160,6 +182,37 @@ fail:
->  	return index;
->  }
->  
-> +static int omap_enter_idle_smp(struct cpuidle_device *dev,
-> +			struct cpuidle_driver *drv,
-> +			int index)
-> +{
-> +	struct idle_statedata *cx = state_ptr + index;
-> +	int cpu_id = smp_processor_id();
-> +	unsigned long flag;
-> +
-> +	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu_id);
-> +
-> +	raw_spin_lock_irqsave(&mpu_lock, flag);
-> +	cx->mpu_state_vote++;
-> +	if (cx->mpu_state_vote == num_online_cpus()) {
-> +		pwrdm_set_logic_retst(mpu_pd, cx->mpu_logic_state);
-> +		omap_set_pwrdm_state(mpu_pd, cx->mpu_state);
-> +	}
-> +	raw_spin_unlock_irqrestore(&mpu_lock, flag);
-> +
-> +	omap4_enter_lowpower(dev->cpu, cx->cpu_state);
-> +
-> +	raw_spin_lock_irqsave(&mpu_lock, flag);
-> +	if (cx->mpu_state_vote == num_online_cpus())
-> +		omap_set_pwrdm_state(mpu_pd, PWRDM_POWER_ON);
-> +	cx->mpu_state_vote--;
-> +	raw_spin_unlock_irqrestore(&mpu_lock, flag);
-> +
-> +	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu_id);
-> +
-> +	return index;
-> +}
-> +
->  /*
->   * For each cpu, setup the broadcast timer because local timers
->   * stops for the states above C1.
-> @@ -209,6 +262,43 @@ static struct cpuidle_driver omap4_idle_driver = {
->  	.safe_state_index = 0,
->  };
->  
-> +static struct cpuidle_driver omap5_idle_driver = {
-> +	.name				= "omap5_idle",
-> +	.owner				= THIS_MODULE,
-> +	.en_core_tk_irqen		= 1,
-> +	.states = {
-> +		{
-> +			/* C1 - CPU0 ON + CPU1 ON + MPU ON */
-we could move these to .desc
-> +			.exit_latency = 2 + 2,
-> +			.target_residency = 5,
-the obvious question on how these latencies were arrived at..
-> +			.flags = CPUIDLE_FLAG_TIME_VALID,
-> +			.enter = omap_enter_idle_simple,
-> +			.name = "C1",
-> +			.desc = "MPUSS ON"
-> +		},
-> +		{
-> +			/* C2 - CPU0 CSWR + CPU1 CSWR + MPU CSWR */
-we could move these to .desc
-> +			.exit_latency = 16 + 16,
-> +			.target_residency = 40,
-> +			.flags = CPUIDLE_FLAG_TIME_VALID,
-> +			.enter = omap_enter_idle_smp,
-> +			.name = "C2",
-> +			.desc = "MPUSS CSWR",
-> +		},
-> +		{
-> +			/* C3 - CPU0 OFF + CPU1 OFF + MPU OSWR */
-we could move these to .desc
-> +			.exit_latency = 460 + 518,
-> +			.target_residency = 1100,
-> +			.flags = CPUIDLE_FLAG_TIME_VALID | CPUIDLE_FLAG_COUPLED,
-> +			.enter = omap_enter_idle_coupled,
-> +			.name = "C3",
-> +			.desc = "MPUSS OSWR",
-> +		},
-> +	},
-> +	.state_count = ARRAY_SIZE(omap5_idle_data),
-> +	.safe_state_index = 0,
-> +};
-> +
->  /* Public functions */
->  
->  /**
-> @@ -220,7 +310,7 @@ static struct cpuidle_driver omap4_idle_driver = {
->  int __init omap4_idle_init(void)
->  {
->  	struct cpuidle_device *dev;
-> -	unsigned int cpu_id = 0;
-> +	unsigned cpu_id = 0;
->  
->  	/* Configure the broadcast timer on each cpu */
->  	mpu_pd = pwrdm_lookup("mpu_pwrdm");
-> @@ -243,8 +333,13 @@ int __init omap4_idle_init(void)
->  #ifdef CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED
->  		dev->coupled_cpus = *cpu_online_mask;
->  #endif
-> -		state_ptr = &omap4_idle_data[0];
-> -		cpuidle_register_driver(&omap4_idle_driver);
-> +		if (cpu_is_omap44xx()) {
-> +			state_ptr = &omap4_idle_data[0];
-> +			cpuidle_register_driver(&omap4_idle_driver);
-> +		} else if (soc_is_omap54xx()) {
-> +			state_ptr = &omap5_idle_data[0];
-> +			cpuidle_register_driver(&omap5_idle_driver);
-> +		}
-we'd be doing cpuidle_register_driver twice since it is within the
-for_each_cpu loop - we dont want to do that.
->  
->  		if (cpuidle_register_device(dev)) {
->  			pr_err("%s: CPUidle register failed\n", __func__);
-> diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-> index 5d32444..0ccb76e 100644
-> --- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-> +++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-> @@ -87,7 +87,7 @@ extern void omap5_cpu_resume(void);
->  static DEFINE_PER_CPU(struct omap4_cpu_pm_info, omap4_pm_info);
->  static struct powerdomain *mpuss_pd;
->  static void __iomem *sar_base;
-> -static u32 cpu_context_offset;
-> +static u32 cpu_context_offset, cpu_cswr_supported;
->  
->  static int default_finish_suspend(unsigned long cpu_state)
->  {
-> @@ -265,6 +265,10 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
->  		save_state = 1;
->  		break;
->  	case PWRDM_POWER_RET:
-> +		if (cpu_cswr_supported) {
-> +			save_state = 0;
-> +			break;
-> +		}
-ok, I guess this is the best we can do under the current circumstance
-where PWRDM_POWER_RET means either CSWR or OSWR!
->  	default:
->  		/*
->  		 * CPUx CSWR is invalid hardware state. Also CPUx OSWR
-> @@ -449,6 +453,7 @@ int __init omap4_mpuss_init(void)
->  		omap_pm_ops.resume = omap5_cpu_resume;
->  		cpu_context_offset = OMAP54XX_RM_CPU0_CPU0_CONTEXT_OFFSET;
->  		enable_mercury_retention_mode();
-> +		cpu_cswr_supported = 1;
->  	}
->  
->  	if (cpu_is_omap446x())
-> diff --git a/arch/arm/mach-omap2/pm_omap4plus.c b/arch/arm/mach-omap2/pm_omap4plus.c
-> index 4c37c47..d62edf5 100644
-> --- a/arch/arm/mach-omap2/pm_omap4plus.c
-> +++ b/arch/arm/mach-omap2/pm_omap4plus.c
-> @@ -241,7 +241,7 @@ int __init omap4_pm_init(void)
->  	/* Overwrite the default arch_idle() */
->  	arm_pm_idle = omap_default_idle;
->  
-> -	if (cpu_is_omap44xx())
-> +	if (cpu_is_omap44xx() || soc_is_omap54xx())
->  		omap4_idle_init();
->  
->  err2:
-otherwise, OK.
+> Warning (reg_format): "reg" property in /soc-u9500/prcmu at 80157000/ab8500 at 5 has invalid length (4 bytes) (#address-cells == 1, #size-cells == 1)
+> Warning (reg_format): "reg" property in /soc-u9500/prcmu at 80157000/ab8500 at 5 has invalid length (4 bytes) (#address-cells == 1, #size-cells == 1)
+> Warning (reg_format): "reg" property in /soc-u9500/prcmu at 80157000/ab8500 at 5 has invalid length (4 bytes) (#address-cells == 1, #size-cells == 1)
+> Warning (reg_format): "reg" property in /soc-u9500/prcmu at 80157000/ab8500 at 5 has invalid length (4 bytes) (#address-cells == 1, #size-cells == 1)
+
+These have been there since DT landed for the AB8500 - it's on my TODO
+to fix, but it's a really low priority.
+
+> drivers/built-in.o: In function `ab8500_power_off':
+> /git/arm-soc/drivers/mfd/ab8500-sysctrl.c:37: undefined reference to `power_supply_get_by_name'
+> /git/arm-soc/drivers/mfd/ab8500-sysctrl.c:53: undefined reference to `power_supply_get_by_name'
+> make[2]: *** [vmlinux] Error 1
+
+This has already been fixed.
+
+https://patchwork.kernel.org/patch/2163301/
 
 -- 
-Regards,
-Nishanth Menon
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
