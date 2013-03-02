@@ -1,186 +1,117 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sat, 2 Mar 2013 12:17:37 +0530
-Subject: [PATCH 14/15] ARM: OMAP4+: CPUidle: Add OMAP5 idle driver support
-In-Reply-To: <20130302002541.GB24537@kahuna>
-References: <1362139864-9233-1-git-send-email-santosh.shilimkar@ti.com>
- <1362139864-9233-15-git-send-email-santosh.shilimkar@ti.com>
- <20130302002541.GB24537@kahuna>
-Message-ID: <5131A089.9090103@ti.com>
+From: linuxzsc@gmail.com (Richard Zhao)
+Date: Sat, 2 Mar 2013 16:22:19 +0800
+Subject: [PATCH 2/5] clk: notifier handler for dynamic voltage scaling
+In-Reply-To: <1362192954.2407.26.camel@bilhuang-vm1>
+References: <1362026969-11457-1-git-send-email-mturquette@linaro.org>
+ <1362026969-11457-3-git-send-email-mturquette@linaro.org>
+ <1362130891.19498.12.camel@bilhuang-vm1>
+ <20130301182234.6210.63879@quantum>
+ <20130301204832.6210.40653@quantum>
+ <1362192954.2407.26.camel@bilhuang-vm1>
+Message-ID: <20130302082216.GA4581@richard-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 02 March 2013 05:55 AM, Nishanth Menon wrote:
-> On 17:41-20130301, Santosh Shilimkar wrote:
->> The OMAP5 idle driver can re-use OMAP4 CPUidle driver implementation thanks
->> to compatible MPUSS design.
->>
->> Though unlike OMAP4, on OMAP5 devices, MPUSS CSWR (Close Switch Retention)
->> power states can be achieved with respective power states on CPU0 and CPU1
->> power domain. This mode was broken on OMAP4 devices because of hardware
->> limitation. Also there is no CPU low power entry order requirement like
->> master CPU etc for CSWR C-state, which is icing on the cake. Code makes
->> use of voting scheme for cluster low power state to support MPUSS CSWR
->> C-state.
->>
->> Supported OMAP5 CPUidle C-states:
->>         C1 - CPU0 ON(WFI) + CPU1 ON(WFI) + MPUSS ON
->>         C2 - CPU0 CSWR + CPU1 CSWR + MPUSS CSWR
->>         C3 - CPU0 OFF + CPU1 Force OFF + MPUSS OSWR
->  think you meant CPU1 OFF?
-Yes.
->>
->> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> ---
->>  arch/arm/mach-omap2/Kconfig                        |    1 +
->>  arch/arm/mach-omap2/Makefile                       |    4 +-
->>  .../{cpuidle44xx.c => cpuidle_omap4plus.c}         |  103 +++++++++++++++++++-
->>  arch/arm/mach-omap2/omap-mpuss-lowpower.c          |    7 +-
->>  arch/arm/mach-omap2/pm_omap4plus.c                 |    2 +-
->>  5 files changed, 110 insertions(+), 7 deletions(-)
->>  rename arch/arm/mach-omap2/{cpuidle44xx.c => cpuidle_omap4plus.c} (70%)
->>
->> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
->> index 41b581f..2df91dc 100644
->> --- a/arch/arm/mach-omap2/Kconfig
->> +++ b/arch/arm/mach-omap2/Kconfig
->> @@ -82,6 +82,7 @@ config SOC_OMAP5
->>  	select CPU_V7
->>  	select HAVE_SMP
->>  	select COMMON_CLK
->> +	select ARCH_NEEDS_CPU_IDLE_COUPLED
->>  
->>  comment "OMAP Core Type"
->>  	depends on ARCH_OMAP2
->> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
->> index 7c3c6b6..f6ff88f 100644
->> --- a/arch/arm/mach-omap2/Makefile
->> +++ b/arch/arm/mach-omap2/Makefile
->> @@ -97,8 +97,10 @@ endif
->>  endif
->>  
->>  ifeq ($(CONFIG_CPU_IDLE),y)
->> +omap4plus-common-idle			= cpuidle_omap4plus.o
->>  obj-$(CONFIG_ARCH_OMAP3)                += cpuidle34xx.o
->> -obj-$(CONFIG_ARCH_OMAP4)                += cpuidle44xx.o
->> +obj-$(CONFIG_ARCH_OMAP4)		+= $(omap4plus-common-idle)
->> +obj-$(CONFIG_SOC_OMAP5)			+= $(omap4plus-common-idle)
-> nit pick: simpler to use cpuidle_omap4plus.o or do we expect more objs -
-> like moving the idle_data to DTS or so?
-No I haven't that on that path. Easy from maintenance point of view. common
-object and a label. Thats all.
+On Fri, Mar 01, 2013 at 06:55:54PM -0800, Bill Huang wrote:
+> On Sat, 2013-03-02 at 04:48 +0800, Mike Turquette wrote:
+> > Quoting Mike Turquette (2013-03-01 10:22:34)
+> > > Quoting Bill Huang (2013-03-01 01:41:31)
+> > > > On Thu, 2013-02-28 at 12:49 +0800, Mike Turquette wrote:
+> > > > > Dynamic voltage and frequency scaling (dvfs) is a common power saving
+> > > > > technique in many of today's modern processors.  This patch introduces a
+> > > > > common clk rate-change notifier handler which scales voltage
+> > > > > appropriately whenever clk_set_rate is called on an affected clock.
+> > > > 
+> > > > I really think clk_enable and clk_disable should also be triggering
+> > > > notifier call and DVFS should act accordingly since there are cases
+> > > > drivers won't set clock rate but instead disable its clock directly, do
+> > > > you agree?
+> > > > > 
+> > > 
+> > > Hi Bill,
+> > > 
+> > > I'll think about this.  Perhaps a better solution would be to adapt
+> > > these drivers to runtime PM.  Then a call to runtime_pm_put() would
+> > > result in a call to clk_disable(...) and regulator_set_voltage(...).
+> > > 
+> > > There is no performance-based equivalent to runtime PM, which is one
+> > > reason why clk_set_rate is a likely entry point into dvfs.  But for
+> > > operations that have nice api's like runtime PM it would be better to
+> > > use those interfaces and not overload the clk.h api unnecessarily.
+> > > 
+> > 
+> > Bill,
+> > 
+> > I wasn't thinking at all when I wrote this.  Trying to rush to the
+> > airport I guess...
+> > 
+> > clk_enable() and clk_disable() must not sleep and all operations are
+> > done under a spinlock.  So this rules out most use of notifiers.  It is
+> > expected for some drivers to very aggressively enable/disable clocks in
+> > interrupt handlers so scaling voltage as a function of clk_{en|dis}able
+> > calls is also likely out of the question.
+> 
+> Yeah for those existing drivers to call enable/disable clocks in
+> interrupt have ruled out this, I didn't think through when I was asking.
+> > 
+> > Some platforms have chosen to implement voltage scaling in their
+> > .prepare callbacks.  I personally do not like this and still prefer
+> > drivers be adapted to runtime pm and let those callbacks handle voltage
+> > scaling along with clock handling.
+Voltage scaling in clock notifiers seems similar. Clock and regulater
+embedded code into each other will cause things complicated.
+> 
+> I think different SoC have different mechanisms or constraints on doing
+> their DVFS, such as Tegra VDD_CORE rail, it supplies power to many
+> devices and as a consequence each device do not have their own power
+> rail to control, instead a central driver to handle/control this power
+> rail is needed (to set voltage at the maximum of the requested voltage
+> from all its sub-devices), so I'm wondering even if every drivers are
+> doing DVFS through runtime pm, we're still having hole on knowing
+> whether or not clocks of the interested devices are enabled/disabled at
+> runtime, I'm not familiar with runtime pm and hence do not know if there
+> is a mechanism to handle this, I'll study a bit. Thanks.
+> > 
+> > Regards,
+> > Mike
+> > 
+> > > > > There are three prerequisites to using this feature:
+> > > > > 
+> > > > > 1) the affected clocks must be using the common clk framework
+> > > > > 2) voltage must be scaled using the regulator framework
+> > > > > 3) clock frequency and regulator voltage values must be paired via the
+> > > > > OPP library
+> > > > 
+> > > > Just a note, Tegra Core won't meet prerequisite #3 since each regulator
+> > > > voltage values is associated with clocks driving those many sub-HW
+> > > > blocks in it.
+> > > 
+> > > This patch isn't the one and only way to perform dvfs.  It is just a
+> > > helper function for registering notifier handlers for systems that meet
+> > > the above three requirements.  Even if you do not use the OPP library
+> > > there is no reason why you could not register your own rate-change
+> > > notifier handler to implement dvfs using whatever lookup-table you use
+> > > today.
+> > > 
+> > > And patches are welcome to extend the usefulness of this helper.  I'd
+> > > like as many people to benefit from this mechanism as possible.
+> 
+> The extension is not so easy for us though since OPP library is assuming
+> each device has a 1-1 mapping on its operating frequency and voltage.
+Is there someone working on OPP clock/regulator sets support?
 
->>  endif
->>  
->>  # PRCM
->> diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle_omap4plus.c
->> similarity index 70%
->> rename from arch/arm/mach-omap2/cpuidle44xx.c
->> rename to arch/arm/mach-omap2/cpuidle_omap4plus.c
->> index 23286c1..8681fa6 100644
->> --- a/arch/arm/mach-omap2/cpuidle44xx.c
->> +++ b/arch/arm/mach-omap2/cpuidle_omap4plus.c
->> @@ -29,6 +29,7 @@ struct idle_statedata {
->>  	u32 cpu_state;
->>  	u32 mpu_logic_state;
->>  	u32 mpu_state;
->> +	u32 mpu_state_vote;
->>  };
->>  
->>  static struct idle_statedata omap4_idle_data[] = {
->> @@ -49,17 +50,36 @@ static struct idle_statedata omap4_idle_data[] = {
->>  	},
->>  };
->>  
->> +static struct idle_statedata omap5_idle_data[] = {
->> +	{
->> +		.cpu_state = PWRDM_POWER_ON,
->> +		.mpu_state = PWRDM_POWER_ON,
->> +		.mpu_logic_state = PWRDM_POWER_RET,
->> +	},
->> +	{
->> +		.cpu_state = PWRDM_POWER_RET,
-> CSWR I assume -> Documenting it helps? or we should introdce
-> cpu_logic_state to be explicit?
-Its is documented just below the table(desc). No need to add useless
-cpu_logic_state variable. This is part of the big C-state table.
-
-
->
-[..]
->>  /*
->>   * For each cpu, setup the broadcast timer because local timers
->>   * stops for the states above C1.
->> @@ -209,6 +262,43 @@ static struct cpuidle_driver omap4_idle_driver = {
->>  	.safe_state_index = 0,
->>  };
->>  
->> +static struct cpuidle_driver omap5_idle_driver = {
->> +	.name				= "omap5_idle",
->> +	.owner				= THIS_MODULE,
->> +	.en_core_tk_irqen		= 1,
->> +	.states = {
->> +		{
->> +			/* C1 - CPU0 ON + CPU1 ON + MPU ON */
-> we could move these to .desc
-That will be too much ... also above just for refence and understanding
-otherwise, CPU state is per CPU so we can't say CPU0 =x, and CPU1 = y in
-CPU0 C-state. I like the way .desc is today and would want to keep it that
-way.
-
->> +			.exit_latency = 2 + 2,
->> +			.target_residency = 5,
-> the obvious question on how these latencies were arrived at..
-Based on the internal measurements done only considering MPUSS
-C-state latencies.
-
-
->> @@ -243,8 +333,13 @@ int __init omap4_idle_init(void)
->>  #ifdef CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED
->>  		dev->coupled_cpus = *cpu_online_mask;
->>  #endif
->> -		state_ptr = &omap4_idle_data[0];
->> -		cpuidle_register_driver(&omap4_idle_driver);
->> +		if (cpu_is_omap44xx()) {
->> +			state_ptr = &omap4_idle_data[0];
->> +			cpuidle_register_driver(&omap4_idle_driver);
->> +		} else if (soc_is_omap54xx()) {
->> +			state_ptr = &omap5_idle_data[0];
->> +			cpuidle_register_driver(&omap5_idle_driver);
->> +		}
-> we'd be doing cpuidle_register_driver twice since it is within the
-> for_each_cpu loop - we dont want to do that.
-Yep. I will move that out of the loop though second registration is just
-a nop.
->>  
->>  		if (cpuidle_register_device(dev)) {
->>  			pr_err("%s: CPUidle register failed\n", __func__);
->> diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
->> index 5d32444..0ccb76e 100644
->> --- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
->> +++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
->> @@ -87,7 +87,7 @@ extern void omap5_cpu_resume(void);
->>  static DEFINE_PER_CPU(struct omap4_cpu_pm_info, omap4_pm_info);
->>  static struct powerdomain *mpuss_pd;
->>  static void __iomem *sar_base;
->> -static u32 cpu_context_offset;
->> +static u32 cpu_context_offset, cpu_cswr_supported;
->>  
->>  static int default_finish_suspend(unsigned long cpu_state)
->>  {
->> @@ -265,6 +265,10 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
->>  		save_state = 1;
->>  		break;
->>  	case PWRDM_POWER_RET:
->> +		if (cpu_cswr_supported) {
->> +			save_state = 0;
->> +			break;
->> +		}
-> ok, I guess this is the best we can do under the current circumstance
-> where PWRDM_POWER_RET means either CSWR or OSWR!
-The switch is for CPUx power states and hence there is no question of
-OSWR. CPUx OSWR = CPUx OFF hence CPUx OSWR isn't supported. This has been
-known from OMAP4 days. CPU RET isn't supported on OMAP4 and hence
-that variable is added.
-
-Regards,
-Santosh
+Thanks
+Richard
+> > > 
+> > > At some point we should think hard about DT bindings for these operating
+> > > points...
+> > > 
+> > > Regards,
+> > > Mike
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
