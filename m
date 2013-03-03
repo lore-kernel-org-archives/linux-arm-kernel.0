@@ -1,44 +1,47 @@
-From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Sun, 3 Mar 2013 02:08:49 +0100
-Subject: [PATCH v6 01/16] clk: samsung: add common clock framework helper
- functions for Samsung platforms
-In-Reply-To: <1361175686-19400-2-git-send-email-thomas.abraham@linaro.org>
-References: <1361175686-19400-1-git-send-email-thomas.abraham@linaro.org>
- <1361175686-19400-2-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <201303030208.49722.heiko@sntech.de>
+From: cesarb@cesarb.net (Cesar Eduardo Barros)
+Date: Sat,  2 Mar 2013 22:53:40 -0300
+Subject: [PATCH 02/14] MAINTAINERS: remove arch/arm/plat-nomadik/
+In-Reply-To: <1362275632-20242-1-git-send-email-cesarb@cesarb.net>
+References: <1362275632-20242-1-git-send-email-cesarb@cesarb.net>
+Message-ID: <1362275632-20242-3-git-send-email-cesarb@cesarb.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The files within that directory were moved to other places over the
+course of several commits. I only added the ones moved in the patch
+series which finally removed the directory; untangling the rest will
+take more work, since some seem to be shared with ux500.
 
-Am Montag, 18. Februar 2013, 09:21:11 schrieb Thomas Abraham:
-> All Samsung platforms include different types of clock including
-> fixed-rate, mux, divider and gate clock types. There are typically
-> hundreds of such clocks on each of the Samsung platforms. To enable
-> Samsung platforms to register these clocks using the common clock
-> framework, a bunch of utility functions are introduced here which simplify
-> the clock registration process. The clocks are usually statically
-> instantiated and registered with common clock framework.
-> 
-> Cc: Mike Turquette <mturquette@linaro.org>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Tested-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-> Tested-by: Tomasz Figa <t.figa@samsung.com>
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+In fact, the ARM/Ux500 ARM ARCHITECTURE block has patterns for files
+named "nomadik" too. The patterns in this pair of MAINTAINER blocks
+really need a review from the respective maintainters.
 
-I'm playing around with this on my s3c2416 platform and it works like a charm 
-for the most part - and the system already comes sort of up again :-) .
+Cc: Alessandro Rubini <rubini@unipv.it>
+Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: STEricsson <STEricsson_nomadik_linux@list.st.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Cesar Eduardo Barros <cesarb@cesarb.net>
+---
+ MAINTAINERS | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-So,
-Tested-by: Heiko Stuebner <heiko@sntech.de>
-
-
-But is there an easy way to define more than one alias? On the s3c2416 for 
-example the hsmmc hclk is the "hsmmc" io-clock, as well as the source for the 
-"mmc_busclk.0". Same for the "uart" pclk, that is also a baud clock source.
-
-
-Thanks
-Heiko
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 5b64aa5..3c074d5 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1009,8 +1009,11 @@ M:	STEricsson <STEricsson_nomadik_linux@list.st.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
+ F:	arch/arm/mach-nomadik/
+-F:	arch/arm/plat-nomadik/
++F:	drivers/clocksource/nomadik-mtu.c
+ F:	drivers/i2c/busses/i2c-nomadik.c
++F:	include/linux/platform_data/clocksource-nomadik-mtu.h
++F:	include/linux/platform_data/dma-ste-dma40.h
++F:	include/linux/platform_data/pinctrl-nomadik.h
+ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
+ 
+ ARM/OPENMOKO NEO FREERUNNER (GTA02) MACHINE SUPPORT
+-- 
+1.7.11.7
