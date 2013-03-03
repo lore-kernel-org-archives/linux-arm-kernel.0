@@ -1,201 +1,132 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sun, 3 Mar 2013 11:28:59 +0100
-Subject: [PATCH v5 02/16] spi/spi-atmel: detect the capabilities of SPI
- core by reading the VERSION register.
-In-Reply-To: <1361861289-30332-3-git-send-email-wenyou.yang@atmel.com>
-References: <1361861289-30332-1-git-send-email-wenyou.yang@atmel.com>
- <1361861289-30332-3-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <20130303102859.GN30595@game.jcrosoft.org>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Sun, 03 Mar 2013 02:54:24 -0800
+Subject: [PATCH 2/5] clk: notifier handler for dynamic voltage scaling
+In-Reply-To: <20130302082216.GA4581@richard-laptop>
+References: <1362026969-11457-1-git-send-email-mturquette@linaro.org>
+ <1362026969-11457-3-git-send-email-mturquette@linaro.org>
+ <1362130891.19498.12.camel@bilhuang-vm1>
+ <20130301182234.6210.63879@quantum> <20130301204832.6210.40653@quantum>
+ <1362192954.2407.26.camel@bilhuang-vm1>
+ <20130302082216.GA4581@richard-laptop>
+Message-ID: <20130303105424.6210.1196@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14:47 Tue 26 Feb     , Wenyou Yang wrote:
-> the "has_dma_support" needed for future use with dmaengine driver.
-> 
-> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> Cc: spi-devel-general at lists.sourceforge.net
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  drivers/spi/spi-atmel.c |   70 ++++++++++++++++++++++++++++++++++++++---------
->  1 file changed, 57 insertions(+), 13 deletions(-)
-> 
-> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-> index 5bf3786..a8e091b 100644
-> --- a/drivers/spi/spi-atmel.c
-> +++ b/drivers/spi/spi-atmel.c
-> @@ -39,6 +39,7 @@
->  #define SPI_CSR1				0x0034
->  #define SPI_CSR2				0x0038
->  #define SPI_CSR3				0x003c
-> +#define SPI_VERSION				0x00fc
->  #define SPI_RPR					0x0100
->  #define SPI_RCR					0x0104
->  #define SPI_TPR					0x0108
-> @@ -71,6 +72,8 @@
->  #define SPI_FDIV_SIZE				1
->  #define SPI_MODFDIS_OFFSET			4
->  #define SPI_MODFDIS_SIZE			1
-> +#define SPI_WDRBT_OFFSET			5
-> +#define SPI_WDRBT_SIZE				1
->  #define SPI_LLB_OFFSET				7
->  #define SPI_LLB_SIZE				1
->  #define SPI_PCS_OFFSET				16
-> @@ -180,6 +183,11 @@
->  #define spi_writel(port,reg,value) \
->  	__raw_writel((value), (port)->regs + SPI_##reg)
->  
-> +struct atmel_spi_caps {
-> +	bool	is_spi2;
-> +	bool	has_wdrbt;
-> +	bool	has_dma_support;
-> +};
->  
->  /*
->   * The core SPI transfer engine just talks to a register bank to set up
-> @@ -204,6 +212,8 @@ struct atmel_spi {
->  
->  	void			*buffer;
->  	dma_addr_t		buffer_dma;
-> +
-> +	struct atmel_spi_caps	caps;
->  };
->  
->  /* Controller-specific per-slave state */
-> @@ -222,14 +232,10 @@ struct atmel_spi_device {
->   *  - SPI_SR.TXEMPTY, SPI_SR.NSSR (and corresponding irqs)
->   *  - SPI_CSRx.CSAAT
->   *  - SPI_CSRx.SBCR allows faster clocking
-> - *
-> - * We can determine the controller version by reading the VERSION
-> - * register, but I haven't checked that it exists on all chips, and
-> - * this is cheaper anyway.
->   */
-> -static bool atmel_spi_is_v2(void)
-> +static bool atmel_spi_is_v2(struct atmel_spi *as)
->  {
-> -	return !cpu_is_at91rm9200();
-> +	return as->caps.is_spi2;
->  }
->  
->  /*
-> @@ -263,15 +269,20 @@ static void cs_activate(struct atmel_spi *as, struct spi_device *spi)
->  	unsigned active = spi->mode & SPI_CS_HIGH;
->  	u32 mr;
->  
-> -	if (atmel_spi_is_v2()) {
-> +	if (atmel_spi_is_v2(as)) {
->  		/*
->  		 * Always use CSR0. This ensures that the clock
->  		 * switches to the correct idle polarity before we
->  		 * toggle the CS.
->  		 */
->  		spi_writel(as, CSR0, asd->csr);
-> -		spi_writel(as, MR, SPI_BF(PCS, 0x0e) | SPI_BIT(MODFDIS)
-> +		if (as->caps.has_wdrbt) {
-> +			spi_writel(as, MR, SPI_BF(PCS, 0x0e) | SPI_BIT(WDRBT)
-> +				| SPI_BIT(MODFDIS) | SPI_BIT(MSTR));
-> +		} else {
-> +			spi_writel(as, MR, SPI_BF(PCS, 0x0e) | SPI_BIT(MODFDIS)
->  				| SPI_BIT(MSTR));
-> +		}
->  		mr = spi_readl(as, MR);
->  		gpio_set_value(asd->npcs_pin, active);
->  	} else {
-> @@ -318,7 +329,7 @@ static void cs_deactivate(struct atmel_spi *as, struct spi_device *spi)
->  			asd->npcs_pin, active ? " (low)" : "",
->  			mr);
->  
-> -	if (atmel_spi_is_v2() || spi->chip_select != 0)
-> +	if (atmel_spi_is_v2(as) || spi->chip_select != 0)
->  		gpio_set_value(asd->npcs_pin, !active);
->  }
->  
-> @@ -719,7 +730,7 @@ static int atmel_spi_setup(struct spi_device *spi)
->  	}
->  
->  	/* see notes above re chipselect */
-> -	if (!atmel_spi_is_v2()
-> +	if (!atmel_spi_is_v2(as)
->  			&& spi->chip_select == 0
->  			&& (spi->mode & SPI_CS_HIGH)) {
->  		dev_dbg(&spi->dev, "setup: can't be active-high\n");
-> @@ -728,7 +739,7 @@ static int atmel_spi_setup(struct spi_device *spi)
->  
->  	/* v1 chips start out at half the peripheral bus speed. */
->  	bus_hz = clk_get_rate(as->clk);
-> -	if (!atmel_spi_is_v2())
-> +	if (!atmel_spi_is_v2(as))
->  		bus_hz /= 2;
->  
->  	if (spi->max_speed_hz) {
-> @@ -804,7 +815,7 @@ static int atmel_spi_setup(struct spi_device *spi)
->  		"setup: %lu Hz bpw %u mode 0x%x -> csr%d %08x\n",
->  		bus_hz / scbr, bits, spi->mode, spi->chip_select, csr);
->  
-> -	if (!atmel_spi_is_v2())
-> +	if (!atmel_spi_is_v2(as))
->  		spi_writel(as, CSR0 + 4 * spi->chip_select, csr);
->  
->  	return 0;
-> @@ -910,6 +921,32 @@ static void atmel_spi_cleanup(struct spi_device *spi)
->  	kfree(asd);
->  }
->  
-> +static inline unsigned int atmel_get_version(struct atmel_spi *as)
-> +{
-> +	return spi_readl(as, VERSION) & 0x00000fff;
-> +}
-> +
-> +static void __init atmel_get_caps(struct atmel_spi *as)
-> +{
-> +	unsigned int version;
-> +
-> +	version = atmel_get_version(as);
-> +	dev_info(&as->pdev->dev, "version: 0x%x\n", version);
-> +
-> +	as->caps.is_spi2 = false;
-> +	as->caps.has_wdrbt = false;
-> +	as->caps.has_dma_support = false;
-> +
-> +	if (version > 0x121)
-> +		as->caps.is_spi2 = true;
-> +
-> +	if (version >= 0x210)
-> +		as->caps.has_wdrbt = true;
-> +
-> +	if (version >= 0x212)
-> +		as->caps.has_dma_support = true;
-use switch here
+Quoting Richard Zhao (2013-03-02 00:22:19)
+> On Fri, Mar 01, 2013 at 06:55:54PM -0800, Bill Huang wrote:
+> > On Sat, 2013-03-02 at 04:48 +0800, Mike Turquette wrote:
+> > > Quoting Mike Turquette (2013-03-01 10:22:34)
+> > > > Quoting Bill Huang (2013-03-01 01:41:31)
+> > > > > On Thu, 2013-02-28 at 12:49 +0800, Mike Turquette wrote:
+> > > > > > Dynamic voltage and frequency scaling (dvfs) is a common power saving
+> > > > > > technique in many of today's modern processors.  This patch introduces a
+> > > > > > common clk rate-change notifier handler which scales voltage
+> > > > > > appropriately whenever clk_set_rate is called on an affected clock.
+> > > > > 
+> > > > > I really think clk_enable and clk_disable should also be triggering
+> > > > > notifier call and DVFS should act accordingly since there are cases
+> > > > > drivers won't set clock rate but instead disable its clock directly, do
+> > > > > you agree?
+> > > > > > 
+> > > > 
+> > > > Hi Bill,
+> > > > 
+> > > > I'll think about this.  Perhaps a better solution would be to adapt
+> > > > these drivers to runtime PM.  Then a call to runtime_pm_put() would
+> > > > result in a call to clk_disable(...) and regulator_set_voltage(...).
+> > > > 
+> > > > There is no performance-based equivalent to runtime PM, which is one
+> > > > reason why clk_set_rate is a likely entry point into dvfs.  But for
+> > > > operations that have nice api's like runtime PM it would be better to
+> > > > use those interfaces and not overload the clk.h api unnecessarily.
+> > > > 
+> > > 
+> > > Bill,
+> > > 
+> > > I wasn't thinking at all when I wrote this.  Trying to rush to the
+> > > airport I guess...
+> > > 
+> > > clk_enable() and clk_disable() must not sleep and all operations are
+> > > done under a spinlock.  So this rules out most use of notifiers.  It is
+> > > expected for some drivers to very aggressively enable/disable clocks in
+> > > interrupt handlers so scaling voltage as a function of clk_{en|dis}able
+> > > calls is also likely out of the question.
+> > 
+> > Yeah for those existing drivers to call enable/disable clocks in
+> > interrupt have ruled out this, I didn't think through when I was asking.
+> > > 
+> > > Some platforms have chosen to implement voltage scaling in their
+> > > .prepare callbacks.  I personally do not like this and still prefer
+> > > drivers be adapted to runtime pm and let those callbacks handle voltage
+> > > scaling along with clock handling.
+> Voltage scaling in clock notifiers seems similar. Clock and regulater
+> embedded code into each other will cause things complicated.
 
-or filled struct
-> +}
-> +
->  /*-------------------------------------------------------------------------*/
->  
->  static int atmel_spi_probe(struct platform_device *pdev)
-> @@ -970,6 +1007,8 @@ static int atmel_spi_probe(struct platform_device *pdev)
->  	as->irq = irq;
->  	as->clk = clk;
->  
-> +	atmel_get_caps(as);
-> +
->  	ret = request_irq(irq, atmel_spi_interrupt, 0,
->  			dev_name(&pdev->dev), master);
->  	if (ret)
-> @@ -979,7 +1018,12 @@ static int atmel_spi_probe(struct platform_device *pdev)
->  	clk_enable(clk);
->  	spi_writel(as, CR, SPI_BIT(SWRST));
->  	spi_writel(as, CR, SPI_BIT(SWRST)); /* AT91SAM9263 Rev B workaround */
-> -	spi_writel(as, MR, SPI_BIT(MSTR) | SPI_BIT(MODFDIS));
-> +	if (as->caps.has_wdrbt) {
-> +		spi_writel(as, MR, SPI_BIT(WDRBT) | SPI_BIT(MODFDIS)
-> +				| SPI_BIT(MSTR));
-> +	} else {
-> +		spi_writel(as, MR, SPI_BIT(MSTR) | SPI_BIT(MODFDIS));
-> +	}
->  	spi_writel(as, PTCR, SPI_BIT(RXTDIS) | SPI_BIT(TXTDIS));
->  	spi_writel(as, CR, SPI_BIT(SPIEN));
->  
-> -- 
-> 1.7.9.5
+Hi Richard,
+
+Sorry, I do not follow the above statement.  Can you clarify what you
+mean?
+
+> > 
+> > I think different SoC have different mechanisms or constraints on doing
+> > their DVFS, such as Tegra VDD_CORE rail, it supplies power to many
+> > devices and as a consequence each device do not have their own power
+> > rail to control, instead a central driver to handle/control this power
+> > rail is needed (to set voltage at the maximum of the requested voltage
+> > from all its sub-devices), so I'm wondering even if every drivers are
+> > doing DVFS through runtime pm, we're still having hole on knowing
+> > whether or not clocks of the interested devices are enabled/disabled at
+> > runtime, I'm not familiar with runtime pm and hence do not know if there
+> > is a mechanism to handle this, I'll study a bit. Thanks.
+> > > 
+> > > Regards,
+> > > Mike
+> > > 
+> > > > > > There are three prerequisites to using this feature:
+> > > > > > 
+> > > > > > 1) the affected clocks must be using the common clk framework
+> > > > > > 2) voltage must be scaled using the regulator framework
+> > > > > > 3) clock frequency and regulator voltage values must be paired via the
+> > > > > > OPP library
+> > > > > 
+> > > > > Just a note, Tegra Core won't meet prerequisite #3 since each regulator
+> > > > > voltage values is associated with clocks driving those many sub-HW
+> > > > > blocks in it.
+> > > > 
+> > > > This patch isn't the one and only way to perform dvfs.  It is just a
+> > > > helper function for registering notifier handlers for systems that meet
+> > > > the above three requirements.  Even if you do not use the OPP library
+> > > > there is no reason why you could not register your own rate-change
+> > > > notifier handler to implement dvfs using whatever lookup-table you use
+> > > > today.
+> > > > 
+> > > > And patches are welcome to extend the usefulness of this helper.  I'd
+> > > > like as many people to benefit from this mechanism as possible.
+> > 
+> > The extension is not so easy for us though since OPP library is assuming
+> > each device has a 1-1 mapping on its operating frequency and voltage.
+> Is there someone working on OPP clock/regulator sets support?
 > 
+
+No, but I'm going to bring this up at LCA on Wednesday.  It would be
+nice to have some DT bindings for declaring operating points that tie
+clocks & regulators together.
+
+Regards,
+Mike
+
+> Thanks
+> Richard
+> > > > 
+> > > > At some point we should think hard about DT bindings for these operating
+> > > > points...
+> > > > 
+> > > > Regards,
+> > > > Mike
+> > 
+> > 
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
