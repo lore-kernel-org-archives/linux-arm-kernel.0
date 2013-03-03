@@ -1,183 +1,208 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Sun, 03 Mar 2013 13:48:12 +0100
-Subject: [PATCH v6 01/16] clk: samsung: add common clock framework helper
- functions for Samsung platforms
-In-Reply-To: <201303031309.01118.heiko@sntech.de>
-References: <1361175686-19400-1-git-send-email-thomas.abraham@linaro.org>
- <51333149.1060105@gmail.com> <2984153.Xctncej7hL@flatron>
- <201303031309.01118.heiko@sntech.de>
-Message-ID: <5133468C.4010001@gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sun, 03 Mar 2013 07:27:41 -0600
+Subject: [PATCH, RFC] default machine descriptor for multiplatform
+In-Reply-To: <1638002.UJ7zfj1Wn5@wuerfel>
+References: <20130131092024.GN2637@n2100.arm.linux.org.uk>
+ <20130131161823.GT2637@n2100.arm.linux.org.uk> <1731670.s76EGcEZ7m@wuerfel>
+ <1638002.UJ7zfj1Wn5@wuerfel>
+Message-ID: <51334FCD.7000201@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/03/2013 01:08 PM, Heiko St?bner wrote:
-> Am Sonntag, 3. M?rz 2013, 12:45:01 schrieb Tomasz Figa:
->> On Sunday 03 of March 2013 12:17:29 Sylwester Nawrocki wrote:
->>> On 03/03/2013 02:08 AM, Heiko St?bner wrote:
->>>> But is there an easy way to define more than one alias? On the s3c2416
->>>> for example the hsmmc hclk is the "hsmmc" io-clock, as well as the
->>>> source for the "mmc_busclk.0". Same for the "uart" pclk, that is also
->>>> a baud clock source.
->>>
->>> This driver currently provides for only one additional clkdev lookup
->>> entry per a platform clock. I pointed out this desing issue in the
->>> early version of the patch set. It's because a machine clock definition
->>> is coupled with a clock consumer definition. And IMO various
->>> samsung_clock_register_* functions should not have
->>> clk_register_clkdev() inside them. I.e. first step could be registering
->>> all machine clocks and in the second one clkdev lookup entries could be
->>> created. This is how most (all?) existing SoC clock drivers are
->>> working.
->>>
->>> But those multiple aliases are important only for machines with device
->>> tree support, aren't they ?
->>
->> I suppose you meant _without_ device tree support, right?
+On 01/31/2013 11:51 AM, Arnd Bergmann wrote:
+> This is what I think it would look like to do a default platform
+> with an empty machine descriptor on ARM. It makes the few required
+> entries in the descriptor optional by using the new irqchip_init()
+> and clocksource_of_init() functions as defaults, and adds
+> a fallback for the DT case to customize_machine to probe all
+> the default devices.
+> 
+> For the case that CONFIG_MULTIPLATFORM is enabled, it then
+> adds a machine descriptor that never matches any machine but
+> is used as a fallback if nothing else matches.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Yes, my mistake, sorry for the confusion.
+This breaks on !OF builds:
 
-> The aliases are only needed for the non-dt case. But as I think common clk
-> support will be a requirement for dt support in the future, similar to
-> pinctrl, without the correct handling of the aliases it will be hard to
-> incrementally convert the other platforms (i.e. s3c24xx before s3c2443, etc).
+arch/arm/kernel/setup.c:653:30: error: 'of_default_bus_match_table'
+undeclared (first use in this function)
+arch/arm/kernel/time.c:122:3: error: implicit declaration of function
+'clocksource_of_init' [-Werror=implicit-function-declaration]
 
-Yes, indeed. That's a very valid point to have the handling of the aliases
-implemented correctly, not assuming it will be needed temporarily only.
+And irqchip_init gives a linker error.
 
-> For the time being I've added my own register_alias function to Thomas' core
-> code, hijacking the clk_table for this - attached for reference below.
+All easily fixed, but what's your plan for this patch? I got patches for
+sp804, twd, and arch timers to use CLKSRC_OF and which can take
+advantage of this and remove the init_time machine ptrs.
 
-The patch looks good to me. It would make sense to handle all clkdev
-entries like this.
+Rob
 
->>> I hope this patch series gets merged early to linux-next in the 3.10
->>> cycle so the multiple accumulated fixup patches for this clock driver
->>> can be merged as well and issues like that you pointed out can be
->>> resolved with incremental patches.
->>
->> Yes, I hope so too.
->
-> me too. Following all this still out-of-tree stuff makes me dizzy :-)
-
-Yeah, especially that it is not always clear what tag the patch series
-are based of off. For a long patch series like these, touching the core
-subsystems, it would be nice to have a corresponding git tree so it is
-possible to actually use and test the patches without much trouble.
-
-> Heiko
->
->
-> diff --git a/drivers/clk/samsung/clk.c b/drivers/clk/samsung/clk.c
-> index d36cdd5..7f1b5bc 100644
-> --- a/drivers/clk/samsung/clk.c
-> +++ b/drivers/clk/samsung/clk.c
-> @@ -57,14 +57,15 @@ void __init samsung_clk_init(struct device_node *np, void __iomem *base,
->   		unsigned long nr_rdump)
->   {
->   	reg_base = base;
-> -	if (!np)
-> -		return;
->
-> -#ifdef CONFIG_OF
->   	clk_table = kzalloc(sizeof(struct clk *) * nr_clks, GFP_KERNEL);
->   	if (!clk_table)
->   		panic("could not allocate clock lookup table\n");
->
-> +	if (!np)
-> +		return;
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 3e3444e..8ff1d38 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -979,7 +979,6 @@ config ARCH_MULTI_V7
+>  	bool "ARMv7 based platforms (Cortex-A, PJ4, Krait)"
+>  	default y
+>  	select ARCH_MULTI_V6_V7
+> -	select ARCH_VEXPRESS
+>  	select CPU_V7
+>  
+>  config ARCH_MULTI_V6_V7
+> diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+> index 70f1bde..e6e34ba 100644
+> --- a/arch/arm/kernel/devtree.c
+> +++ b/arch/arm/kernel/devtree.c
+> @@ -180,6 +180,13 @@ struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
+>  	unsigned long dt_root;
+>  	const char *model;
+>  
+> +	if (IS_ENABLED(CONFIG_ARCH_MULTIPLATFORM)) {
+> +		DT_MACHINE_START(GENERIC_DT, "Generic DT based system")
+> +		MACHINE_END
 > +
-> +#ifdef CONFIG_OF
->   	clk_data.clks = clk_table;
->   	clk_data.clk_num = nr_clks;
->   	of_clk_add_provider(np, of_clk_src_onecell_get,&clk_data);
-> @@ -96,6 +97,46 @@ void samsung_clk_add_lookup(struct clk *clk, unsigned int id)
->   		clk_table[id] = clk;
->   }
->
-> +/* register a list of aliases */
-> +void __init samsung_clk_register_alias(struct samsung_clock_alias *list,
-> +					unsigned int nr_clk)
+> +		mdesc_best = (struct machine_desc *)&__mach_desc_GENERIC_DT;
+> +	}
+> +
+>  	if (!dt_phys)
+>  		return NULL;
+>  
+> @@ -199,7 +206,7 @@ struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
+>  			mdesc_score = score;
+>  		}
+>  	}
+> -	if (!mdesc_best) {
+> +	if (!mdesc_best && !IS_ENABLED(CONFIG_ARCH_MULTIPLATFORM)) {
+>  		const char *prop;
+>  		long size;
+>  
+> diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
+> index 8e4ef4c..df6f9a1 100644
+> --- a/arch/arm/kernel/irq.c
+> +++ b/arch/arm/kernel/irq.c
+> @@ -26,6 +26,7 @@
+>  #include <linux/ioport.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/irq.h>
+> +#include <linux/irqchip.h>
+>  #include <linux/random.h>
+>  #include <linux/smp.h>
+>  #include <linux/init.h>
+> @@ -114,7 +115,10 @@ EXPORT_SYMBOL_GPL(set_irq_flags);
+>  
+>  void __init init_IRQ(void)
+>  {
+> -	machine_desc->init_irq();
+> +	if (machine_desc->init_irq)
+> +		machine_desc->init_irq();
+> +	else
+> +		irqchip_init();
+>  }
+>  
+>  #ifdef CONFIG_MULTI_IRQ_HANDLER
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index 3f6cbb2..1d40c9d 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -18,6 +18,7 @@
+>  #include <linux/bootmem.h>
+>  #include <linux/seq_file.h>
+>  #include <linux/screen_info.h>
+> +#include <linux/of_platform.h>
+>  #include <linux/init.h>
+>  #include <linux/kexec.h>
+>  #include <linux/of_fdt.h>
+> @@ -640,9 +641,17 @@ struct screen_info screen_info = {
+>  
+>  static int __init customize_machine(void)
+>  {
+> -	/* customizes platform devices, or adds new ones */
+> +	/*
+> +	 * customizes platform devices, or adds new ones
+> +	 * On DT based machines, we fall back to populating the
+> +	 * machine from the device tree, if no callback is provided,
+> +	 * otherwise we would always need an init_machine callback.
+> +	 */
+>  	if (machine_desc->init_machine)
+>  		machine_desc->init_machine();
+> +	else
+> +		of_platform_populate(NULL, of_default_bus_match_table,
+> +					NULL, NULL);
+>  	return 0;
+>  }
+>  arch_initcall(customize_machine);
+> @@ -732,7 +741,7 @@ void __init setup_arch(char **cmdline_p)
+>  
+>  	setup_processor();
+>  	mdesc = setup_machine_fdt(__atags_pointer);
+> -	if (!mdesc)
+> +	if (!mdesc && __machine_arch_type != ~0)
+>  		mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
+>  	machine_desc = mdesc;
+>  	machine_name = mdesc->name;
+> diff --git a/arch/arm/kernel/time.c b/arch/arm/kernel/time.c
+> index 955d92d..abff4e9 100644
+> --- a/arch/arm/kernel/time.c
+> +++ b/arch/arm/kernel/time.c
+> @@ -22,6 +22,7 @@
+>  #include <linux/errno.h>
+>  #include <linux/profile.h>
+>  #include <linux/timer.h>
+> +#include <linux/clocksource.h>
+>  #include <linux/irq.h>
+>  
+>  #include <asm/thread_info.h>
+> @@ -115,6 +116,10 @@ int __init register_persistent_clock(clock_access_fn read_boot,
+>  
+>  void __init time_init(void)
+>  {
+> -	machine_desc->init_time();
+> +	if (machine_desc->init_time)
+> +		machine_desc->init_time();
+> +	else
+> +		clocksource_of_init();
+> +
+>  	sched_clock_postinit();
+>  }
+> diff --git a/drivers/irqchip/irqchip.c b/drivers/irqchip/irqchip.c
+> index f496afc..c5e7a45 100644
+> --- a/drivers/irqchip/irqchip.c
+> +++ b/drivers/irqchip/irqchip.c
+> @@ -24,7 +24,13 @@ irqchip_of_match_end __used __section(__irqchip_of_end);
+>  
+>  extern struct of_device_id __irqchip_begin[];
+>  
+> +#ifdef CONFIG_IRQCHIP
+>  void __init irqchip_init(void)
+>  {
+>  	of_irq_init(__irqchip_begin);
+>  }
+> +#else
+> +static inline void irqchip_init(void)
 > +{
-> +	struct clk *clk;
-> +	unsigned int idx, ret;
-> +
-> +	if (!clk_table) {
-> +		pr_err("%s: clock table missing\n", __func__);
-> +		return;
-> +	}
-> +
-> +	for (idx = 0; idx<  nr_clk; idx++, list++) {
-> +		if (!list->id) {
-> +			pr_err("%s: clock id missing for index %d\n", __func__,
-> +				idx);
-> +			continue;
-> +		}
-> +
-> +		clk = clk_table[list->id];
-> +		if (!clk) {
-> +			pr_err("%s: failed to find clock %d\n", __func__,
-> +				list->id);
-> +			continue;
-> +		}
-> +
-> +		/* register a clock lookup only if a clock alias is specified */
-> +		if (!list->alias) {
-> +			pr_err("%s: no alias defined for clock %d\n", __func__,
-> +			       list->id);
-
-I wouldn't print that error in general. It might be a clock with NULL 
-conn_id.
-It's not an error condition.
-
-> +			continue;
-> +		}
-> +
-> +		ret = clk_register_clkdev(clk, list->alias, list->dev_name);
-> +		if (ret)
-> +			pr_err("%s: failed to register lookup %s\n",
-> +					__func__, list->alias);
-> +	}
 > +}
-> +
->   /* register a list of fixed clocks */
->   void __init samsung_clk_register_fixed_rate(
->   		struct samsung_fixed_rate_clock *list, unsigned int nr_clk)
-> diff --git a/drivers/clk/samsung/clk.h b/drivers/clk/samsung/clk.h
-> index 175a9d0..8be9248 100644
-> --- a/drivers/clk/samsung/clk.h
-> +++ b/drivers/clk/samsung/clk.h
-> @@ -23,6 +23,25 @@
->   #include<mach/map.h>
->
->   /**
-> + * struct samsung_clock_alias: information about mux clock
-> + * @id: platform specific id of the clock.
-> + * @dev_name: name of the device to which this clock belongs.
-> + * @alias: optional clock alias name to be assigned to this clock.
-> + */
-> +struct samsung_clock_alias {
-> +	unsigned int		id;
-> +	const char		*dev_name;
-> +	const char		*alias;
-> +};
-> +
-> +#define ALIAS(_id, dname, a)	\
-> +	{							\
-> +		.id		= _id,				\
-> +		.dev_name	= dname,			\
-> +		.alias		= a,				\
-> +	}
-> +
-> +/**
->    * struct samsung_fixed_rate_clock: information about fixed-rate clock
->    * @id: platform specific id of the clock.
->    * @name: name of this fixed-rate clock.
-> @@ -260,6 +282,8 @@ extern void __init samsung_clk_of_register_fixed_ext(
->
->   extern void samsung_clk_add_lookup(struct clk *clk, unsigned int id);
->
-> +extern void samsung_clk_register_alias(struct samsung_clock_alias *list,
-> +		unsigned int nr_clk);
->   extern void __init samsung_clk_register_fixed_rate(
->   		struct samsung_fixed_rate_clock *clk_list, unsigned int nr_clk);
->   extern void __init samsung_clk_register_fixed_factor(
+> +#endif
+> diff --git a/include/linux/clocksource.h b/include/linux/clocksource.h
+> index 7944f14..b14d224 100644
+> --- a/include/linux/clocksource.h
+> +++ b/include/linux/clocksource.h
+> @@ -339,6 +339,10 @@ extern void clocksource_of_init(void);
+>  	static const struct of_device_id __clksrc_of_table_##name	\
+>  		__used __section(__clksrc_of_table)			\
+>  		 = { .compatible = compat, .data = fn };
+> +#else
+> +static inline void clocksource_of_init(void)
+> +{
+> +}
+>  #endif
+>  
+>  #endif /* _LINUX_CLOCKSOURCE_H */
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
