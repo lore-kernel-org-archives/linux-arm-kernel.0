@@ -1,63 +1,60 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Sun, 3 Mar 2013 18:40:56 +0100
-Subject: [PATCH V2] lglock: add read-preference local-global rwlock
-In-Reply-To: <20130302172003.GC29769@redhat.com>
-References: <512CC509.1050000@linux.vnet.ibm.com>
- <CACvQF50UgiqPpDk3HCmV86zKSf6tPjqr0bZowfPEOJs0g0r0MQ@mail.gmail.com>
- <512D0D67.9010609@linux.vnet.ibm.com>
- <CACvQF53ph2ixdM-otzetjM5cR+2kcZj6sckOp3TnzzA_x-EZ8w@mail.gmail.com>
- <512E7879.20109@linux.vnet.ibm.com> <5130E8E2.50206@cn.fujitsu.com>
- <20130301182854.GA3631@redhat.com>
- <CANN689HEW=b5S93J27p+rBX-5m7jkW4FER=eHDCp7OgMaTWLPw@mail.gmail.com>
- <5131FB4C.7070408@cn.fujitsu.com> <20130302172003.GC29769@redhat.com>
-Message-ID: <20130303174056.GA30176@redhat.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 3 Mar 2013 20:51:28 +0000
+Subject: drivers/dma/dw_dmac.c:1278:48: sparse: incorrect type in argument
+ 1 (different base types)
+In-Reply-To: <5133ae8b.eQXjkB7tQEqiUMck%fengguang.wu@intel.com>
+References: <5133ae8b.eQXjkB7tQEqiUMck%fengguang.wu@intel.com>
+Message-ID: <201303032051.28444.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/02, Oleg Nesterov wrote:
->
-> On 03/02, Lai Jiangshan wrote:
-> >
-> > +void lg_rwlock_local_read_unlock(struct lgrwlock *lgrw)
-> > +{
-> > +	switch (__this_cpu_read(*lgrw->reader_refcnt)) {
-> > +	case 1:
-> > +		__this_cpu_write(*lgrw->reader_refcnt, 0);
-> > +		lg_local_unlock(&lgrw->lglock);
-> > +		return;
-> > +	case FALLBACK_BASE:
-> > +		__this_cpu_write(*lgrw->reader_refcnt, 0);
-> > +		read_unlock(&lgrw->fallback_rwlock);
-> > +		rwlock_release(&lg->lock_dep_map, 1, _RET_IP_);
->
-> I guess "case 1:" should do rwlock_release() too.
->
-> Otherwise, at first glance looks correct...
->
-> However, I still think that FALLBACK_BASE only adds the unnecessary
-> complications. But even if I am right this is subjective of course, please
-> feel free to ignore.
+On Sunday 03 March 2013, kbuild test robot wrote:
+> >> drivers/dma/dw_dmac.c:1278:48: sparse: incorrect type in argument 1 (different base types)
+>    drivers/dma/dw_dmac.c:1278:48:    expected restricted __be32 const [usertype] *p
+>    drivers/dma/dw_dmac.c:1278:48:    got unsigned int *
+> >> drivers/dma/dw_dmac.c:1279:48: sparse: incorrect type in argument 1 (different base types)
+>    drivers/dma/dw_dmac.c:1279:48:    expected restricted __be32 const [usertype] *p
+>    drivers/dma/dw_dmac.c:1279:48:    got unsigned int *
+> >> drivers/dma/dw_dmac.c:1280:48: sparse: incorrect type in argument 1 (different base types)
+>    drivers/dma/dw_dmac.c:1280:48:    expected restricted __be32 const [usertype] *p
+>    drivers/dma/dw_dmac.c:1280:48:    got unsigned int *
+> 
 
-Yes, but...
+Cool, thanks for the notification! That is a real bug, the variables
+are already endian swapped at this point.
 
-> And btw, I am not sure about lg->lock_dep_map, perhaps we should use
-> fallback_rwlock->dep_map ?
->
-> We need rwlock_acquire_read() even in the fast-path, and this acquire_read
-> should be paired with rwlock_acquire() in _write_lock(), but it does
-> spin_acquire(lg->lock_dep_map). Yes, currently this is the same (afaics)
-> but perhaps fallback_rwlock->dep_map would be more clean.
+Fortunately, nothing is using that code at this moment, so we can fix
+this with no hurry.
 
-Please ignore this part.
+Vinod, could you apply this patch?
 
-I missed that lg_rwlock_global_write_lock() relies on lg_global_lock(),
-and I just noticed that it does rwlock_acquire(lg->lock_dep_map).
+	Arnd
 
-Hmm. But then I do not understand the lglock annotations. Obviously,
-rwlock_acquire_read() in lg_local_lock() can't even detect the simplest
-deadlock, say, lg_local_lock(LOCK) + lg_local_lock(LOCK). Not to mention
-spin_lock(X) + lg_local_lock(Y) vs lg_local_lock(Y) + spin_lock(X).
+8<-------
+Subject: [PATCH] dmaengine: dw_dma: fix endianess for DT xlate function
 
-OK, I understand that it is not easy to make these annotations correct...
+As reported by Wu Fengguang's build robot tracking sparse warnings, the
+dma_spec arguments in the dw_dma_xlate are already byte swapped on
+littl-endian platforms and must not get swapped again. This code is
+currently not used anywhere, but will be used in Linux 3.10 when the
+ARM SPEAr platform starts using the generic DMA DT binding.
 
-Oleg.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/drivers/dma/dw_dmac.c b/drivers/dma/dw_dmac.c
+index c599558..eb81ec9 100644
+--- a/drivers/dma/dw_dmac.c
++++ b/drivers/dma/dw_dmac.c
+@@ -1276,9 +1276,9 @@ static struct dma_chan *dw_dma_xlate(struct of_phandle_args *dma_spec,
+ 	if (dma_spec->args_count != 3)
+ 		return NULL;
+ 
+-	fargs.req = be32_to_cpup(dma_spec->args+0);
+-	fargs.src = be32_to_cpup(dma_spec->args+1);
+-	fargs.dst = be32_to_cpup(dma_spec->args+2);
++	fargs.req = dma_spec->args[0];
++	fargs.src = dma_spec->args[1];
++	fargs.dst = dma_spec->args[2];
+ 
+ 	if (WARN_ON(fargs.req >= DW_DMA_MAX_NR_REQUESTS ||
+ 		    fargs.src >= dw->nr_masters ||
