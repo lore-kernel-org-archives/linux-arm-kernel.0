@@ -1,45 +1,34 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sun, 03 Mar 2013 12:45:01 +0100
-Subject: [PATCH v6 01/16] clk: samsung: add common clock framework helper
- functions for Samsung platforms
-In-Reply-To: <51333149.1060105@gmail.com>
-References: <1361175686-19400-1-git-send-email-thomas.abraham@linaro.org>
- <201303030208.49722.heiko@sntech.de> <51333149.1060105@gmail.com>
-Message-ID: <2984153.Xctncej7hL@flatron>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 3 Mar 2013 11:47:43 +0000
+Subject: Fixing KVM/ARM breakage in mainline
+In-Reply-To: <20130225122117.GE12299@redhat.com>
+References: <512B5693.4000608@arm.com> <20130225122117.GE12299@redhat.com>
+Message-ID: <20130303114743.GH17833@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Feb 25, 2013 at 02:21:17PM +0200, Gleb Natapov wrote:
+> On Mon, Feb 25, 2013 at 12:18:27PM +0000, Marc Zyngier wrote:
+> > Russell, Marcelo, Gleb,
+> > 
+> > Commit 89f8833 (Merge tag 'kvm-3.9-1' of
+> > git://git.kernel.org/pub/scm/virt/kvm/kvm) broke KVM/ARM. Nothing
+> > fundamental, just annoying enough.
+> > 
+> > I've posted patches against next-20130215 some time ago:
+> > http://comments.gmane.org/gmane.comp.emulators.kvm.devel/105019
+> > 
+> > I've now created a branch based off mainline as of this morning, and
+> > containing these fixes:
+> > git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
+> > kvm-arm/core-3.9-rc1-fixes
+> > 
+> > Now the question is: who wants to merge this? The diffstat looks like this:
+> > 
+> I was going to merge it today.
 
-On Sunday 03 of March 2013 12:17:29 Sylwester Nawrocki wrote:
-> Hi,
-> 
-> On 03/03/2013 02:08 AM, Heiko St?bner wrote:
-> > But is there an easy way to define more than one alias? On the s3c2416
-> > for example the hsmmc hclk is the "hsmmc" io-clock, as well as the
-> > source for the "mmc_busclk.0". Same for the "uart" pclk, that is also
-> > a baud clock source.
-> This driver currently provides for only one additional clkdev lookup
-> entry per a platform clock. I pointed out this desing issue in the
-> early version of the patch set. It's because a machine clock definition
-> is coupled with a clock consumer definition. And IMO various
-> samsung_clock_register_* functions should not have
-> clk_register_clkdev() inside them. I.e. first step could be registering
-> all machine clocks and in the second one clkdev lookup entries could be
-> created. This is how most (all?) existing SoC clock drivers are
-> working.
-> 
-> But those multiple aliases are important only for machines with device
-> tree support, aren't they ?
+I notice that my randconfig build last night tripped over the:
 
-I suppose you meant _without_ device tree support, right?
+include/linux/kvm_host.h:333:34: error: 'KVM_USER_MEM_SLOTS' undeclared here (not in a function)
 
-> I hope this patch series gets merged early to linux-next in the 3.10
-> cycle so the multiple accumulated fixup patches for this clock driver
-> can be merged as well and issues like that you pointed out can be
-> resolved with incremental patches.
-
-Yes, I hope so too.
-
-Best regards,
-Tomasz
+error which Marc's patches fix.
