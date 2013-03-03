@@ -1,208 +1,81 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 03 Mar 2013 07:27:41 -0600
-Subject: [PATCH, RFC] default machine descriptor for multiplatform
-In-Reply-To: <1638002.UJ7zfj1Wn5@wuerfel>
-References: <20130131092024.GN2637@n2100.arm.linux.org.uk>
- <20130131161823.GT2637@n2100.arm.linux.org.uk> <1731670.s76EGcEZ7m@wuerfel>
- <1638002.UJ7zfj1Wn5@wuerfel>
-Message-ID: <51334FCD.7000201@gmail.com>
+From: linuxzsc@gmail.com (Richard Zhao)
+Date: Sun, 3 Mar 2013 21:27:52 +0800
+Subject: [PATCH 2/5] clk: notifier handler for dynamic voltage scaling
+In-Reply-To: <20130303105424.6210.1196@quantum>
+References: <1362026969-11457-1-git-send-email-mturquette@linaro.org>
+ <1362026969-11457-3-git-send-email-mturquette@linaro.org>
+ <1362130891.19498.12.camel@bilhuang-vm1>
+ <20130301182234.6210.63879@quantum>
+ <20130301204832.6210.40653@quantum>
+ <1362192954.2407.26.camel@bilhuang-vm1>
+ <20130302082216.GA4581@richard-laptop>
+ <20130303105424.6210.1196@quantum>
+Message-ID: <20130303132749.GA5887@richard-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/31/2013 11:51 AM, Arnd Bergmann wrote:
-> This is what I think it would look like to do a default platform
-> with an empty machine descriptor on ARM. It makes the few required
-> entries in the descriptor optional by using the new irqchip_init()
-> and clocksource_of_init() functions as defaults, and adds
-> a fallback for the DT case to customize_machine to probe all
-> the default devices.
-> 
-> For the case that CONFIG_MULTIPLATFORM is enabled, it then
-> adds a machine descriptor that never matches any machine but
-> is used as a fallback if nothing else matches.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Hi Mike,
 
-This breaks on !OF builds:
-
-arch/arm/kernel/setup.c:653:30: error: 'of_default_bus_match_table'
-undeclared (first use in this function)
-arch/arm/kernel/time.c:122:3: error: implicit declaration of function
-'clocksource_of_init' [-Werror=implicit-function-declaration]
-
-And irqchip_init gives a linker error.
-
-All easily fixed, but what's your plan for this patch? I got patches for
-sp804, twd, and arch timers to use CLKSRC_OF and which can take
-advantage of this and remove the init_time machine ptrs.
-
-Rob
-
+On Sun, Mar 03, 2013 at 02:54:24AM -0800, Mike Turquette wrote:
+> Quoting Richard Zhao (2013-03-02 00:22:19)
+> > On Fri, Mar 01, 2013 at 06:55:54PM -0800, Bill Huang wrote:
+> > > On Sat, 2013-03-02 at 04:48 +0800, Mike Turquette wrote:
+> > > > Quoting Mike Turquette (2013-03-01 10:22:34)
+> > > > > Quoting Bill Huang (2013-03-01 01:41:31)
+> > > > > > On Thu, 2013-02-28 at 12:49 +0800, Mike Turquette wrote:
+> > > > > > > Dynamic voltage and frequency scaling (dvfs) is a common power saving
+> > > > > > > technique in many of today's modern processors.  This patch introduces a
+> > > > > > > common clk rate-change notifier handler which scales voltage
+> > > > > > > appropriately whenever clk_set_rate is called on an affected clock.
+> > > > > > 
+> > > > > > I really think clk_enable and clk_disable should also be triggering
+> > > > > > notifier call and DVFS should act accordingly since there are cases
+> > > > > > drivers won't set clock rate but instead disable its clock directly, do
+> > > > > > you agree?
+> > > > > > > 
+> > > > > 
+> > > > > Hi Bill,
+> > > > > 
+> > > > > I'll think about this.  Perhaps a better solution would be to adapt
+> > > > > these drivers to runtime PM.  Then a call to runtime_pm_put() would
+> > > > > result in a call to clk_disable(...) and regulator_set_voltage(...).
+> > > > > 
+> > > > > There is no performance-based equivalent to runtime PM, which is one
+> > > > > reason why clk_set_rate is a likely entry point into dvfs.  But for
+> > > > > operations that have nice api's like runtime PM it would be better to
+> > > > > use those interfaces and not overload the clk.h api unnecessarily.
+> > > > > 
+> > > > 
+> > > > Bill,
+> > > > 
+> > > > I wasn't thinking at all when I wrote this.  Trying to rush to the
+> > > > airport I guess...
+> > > > 
+> > > > clk_enable() and clk_disable() must not sleep and all operations are
+> > > > done under a spinlock.  So this rules out most use of notifiers.  It is
+> > > > expected for some drivers to very aggressively enable/disable clocks in
+> > > > interrupt handlers so scaling voltage as a function of clk_{en|dis}able
+> > > > calls is also likely out of the question.
+> > > 
+> > > Yeah for those existing drivers to call enable/disable clocks in
+> > > interrupt have ruled out this, I didn't think through when I was asking.
+> > > > 
+> > > > Some platforms have chosen to implement voltage scaling in their
+> > > > .prepare callbacks.  I personally do not like this and still prefer
+> > > > drivers be adapted to runtime pm and let those callbacks handle voltage
+> > > > scaling along with clock handling.
+> > Voltage scaling in clock notifiers seems similar. Clock and regulater
+> > embedded code into each other will cause things complicated.
 > 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 3e3444e..8ff1d38 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -979,7 +979,6 @@ config ARCH_MULTI_V7
->  	bool "ARMv7 based platforms (Cortex-A, PJ4, Krait)"
->  	default y
->  	select ARCH_MULTI_V6_V7
-> -	select ARCH_VEXPRESS
->  	select CPU_V7
->  
->  config ARCH_MULTI_V6_V7
-> diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
-> index 70f1bde..e6e34ba 100644
-> --- a/arch/arm/kernel/devtree.c
-> +++ b/arch/arm/kernel/devtree.c
-> @@ -180,6 +180,13 @@ struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
->  	unsigned long dt_root;
->  	const char *model;
->  
-> +	if (IS_ENABLED(CONFIG_ARCH_MULTIPLATFORM)) {
-> +		DT_MACHINE_START(GENERIC_DT, "Generic DT based system")
-> +		MACHINE_END
-> +
-> +		mdesc_best = (struct machine_desc *)&__mach_desc_GENERIC_DT;
-> +	}
-> +
->  	if (!dt_phys)
->  		return NULL;
->  
-> @@ -199,7 +206,7 @@ struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
->  			mdesc_score = score;
->  		}
->  	}
-> -	if (!mdesc_best) {
-> +	if (!mdesc_best && !IS_ENABLED(CONFIG_ARCH_MULTIPLATFORM)) {
->  		const char *prop;
->  		long size;
->  
-> diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
-> index 8e4ef4c..df6f9a1 100644
-> --- a/arch/arm/kernel/irq.c
-> +++ b/arch/arm/kernel/irq.c
-> @@ -26,6 +26,7 @@
->  #include <linux/ioport.h>
->  #include <linux/interrupt.h>
->  #include <linux/irq.h>
-> +#include <linux/irqchip.h>
->  #include <linux/random.h>
->  #include <linux/smp.h>
->  #include <linux/init.h>
-> @@ -114,7 +115,10 @@ EXPORT_SYMBOL_GPL(set_irq_flags);
->  
->  void __init init_IRQ(void)
->  {
-> -	machine_desc->init_irq();
-> +	if (machine_desc->init_irq)
-> +		machine_desc->init_irq();
-> +	else
-> +		irqchip_init();
->  }
->  
->  #ifdef CONFIG_MULTI_IRQ_HANDLER
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index 3f6cbb2..1d40c9d 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -18,6 +18,7 @@
->  #include <linux/bootmem.h>
->  #include <linux/seq_file.h>
->  #include <linux/screen_info.h>
-> +#include <linux/of_platform.h>
->  #include <linux/init.h>
->  #include <linux/kexec.h>
->  #include <linux/of_fdt.h>
-> @@ -640,9 +641,17 @@ struct screen_info screen_info = {
->  
->  static int __init customize_machine(void)
->  {
-> -	/* customizes platform devices, or adds new ones */
-> +	/*
-> +	 * customizes platform devices, or adds new ones
-> +	 * On DT based machines, we fall back to populating the
-> +	 * machine from the device tree, if no callback is provided,
-> +	 * otherwise we would always need an init_machine callback.
-> +	 */
->  	if (machine_desc->init_machine)
->  		machine_desc->init_machine();
-> +	else
-> +		of_platform_populate(NULL, of_default_bus_match_table,
-> +					NULL, NULL);
->  	return 0;
->  }
->  arch_initcall(customize_machine);
-> @@ -732,7 +741,7 @@ void __init setup_arch(char **cmdline_p)
->  
->  	setup_processor();
->  	mdesc = setup_machine_fdt(__atags_pointer);
-> -	if (!mdesc)
-> +	if (!mdesc && __machine_arch_type != ~0)
->  		mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
->  	machine_desc = mdesc;
->  	machine_name = mdesc->name;
-> diff --git a/arch/arm/kernel/time.c b/arch/arm/kernel/time.c
-> index 955d92d..abff4e9 100644
-> --- a/arch/arm/kernel/time.c
-> +++ b/arch/arm/kernel/time.c
-> @@ -22,6 +22,7 @@
->  #include <linux/errno.h>
->  #include <linux/profile.h>
->  #include <linux/timer.h>
-> +#include <linux/clocksource.h>
->  #include <linux/irq.h>
->  
->  #include <asm/thread_info.h>
-> @@ -115,6 +116,10 @@ int __init register_persistent_clock(clock_access_fn read_boot,
->  
->  void __init time_init(void)
->  {
-> -	machine_desc->init_time();
-> +	if (machine_desc->init_time)
-> +		machine_desc->init_time();
-> +	else
-> +		clocksource_of_init();
-> +
->  	sched_clock_postinit();
->  }
-> diff --git a/drivers/irqchip/irqchip.c b/drivers/irqchip/irqchip.c
-> index f496afc..c5e7a45 100644
-> --- a/drivers/irqchip/irqchip.c
-> +++ b/drivers/irqchip/irqchip.c
-> @@ -24,7 +24,13 @@ irqchip_of_match_end __used __section(__irqchip_of_end);
->  
->  extern struct of_device_id __irqchip_begin[];
->  
-> +#ifdef CONFIG_IRQCHIP
->  void __init irqchip_init(void)
->  {
->  	of_irq_init(__irqchip_begin);
->  }
-> +#else
-> +static inline void irqchip_init(void)
-> +{
-> +}
-> +#endif
-> diff --git a/include/linux/clocksource.h b/include/linux/clocksource.h
-> index 7944f14..b14d224 100644
-> --- a/include/linux/clocksource.h
-> +++ b/include/linux/clocksource.h
-> @@ -339,6 +339,10 @@ extern void clocksource_of_init(void);
->  	static const struct of_device_id __clksrc_of_table_##name	\
->  		__used __section(__clksrc_of_table)			\
->  		 = { .compatible = compat, .data = fn };
-> +#else
-> +static inline void clocksource_of_init(void)
-> +{
-> +}
->  #endif
->  
->  #endif /* _LINUX_CLOCKSOURCE_H */
+> Hi Richard,
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+> Sorry, I do not follow the above statement.  Can you clarify what you
+> mean?
+As we have agreement that a operating point may have multiple clocks
+and regulators, this patch is impossible to support multi clocks. And
+it might mislead dvfs implementer to use clock notifier. It may be good
+to have unified api like dvfs_set_opp(opp), or drivers can handle clocks
+and regulators theirselves which is more flexible. What do you think?
+
+Thanks
+Richard
