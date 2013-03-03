@@ -1,75 +1,157 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Sun,  3 Mar 2013 23:01:44 +0800
-Subject: [PATCH] pinctrl: single: avoid to set read only object
-Message-ID: <1362322904-19570-1-git-send-email-haojian.zhuang@linaro.org>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Sun,  3 Mar 2013 20:22:06 +0400
+Subject: [PATCH] ARM: s3c24xx: Add special bus clock ratio mode support for
+ S3C2410A
+Message-ID: <1362327726-8193-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-drivers/pinctrl/pinctrl-single.c:1441:3: error: assignment of member
-?is_generic? in read-only object
-make[2]: *** [drivers/pinctrl/pinctrl-single.o] Error 1
+This patch adds a special bus clock ratio mode support (1:4:4) for
+S3C2410A CPU targets. This mode means that the HCLK and PCLK frequency
+is the same as the FCLK/4.
 
-Since pcs_pinconf_ops is changed to read only structure, probe()
-function can't set is_generic variable any more. So append new
-pcs_pinconf_generic_ops.
-
-Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- drivers/pinctrl/pinctrl-single.c |   27 +++++++++++++++++++++------
- 1 file changed, 21 insertions(+), 6 deletions(-)
+ arch/arm/mach-s3c24xx/cpufreq-s3c2410.c         | 36 ++++++++++++++-----------
+ arch/arm/mach-s3c24xx/include/mach/regs-clock.h |  1 +
+ arch/arm/mach-s3c24xx/include/mach/regs-gpio.h  |  1 +
+ arch/arm/mach-s3c24xx/s3c2410.c                 | 11 ++++++--
+ 4 files changed, 31 insertions(+), 18 deletions(-)
 
-diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
-index 4cdcf85..c80ffa8 100644
---- a/drivers/pinctrl/pinctrl-single.c
-+++ b/drivers/pinctrl/pinctrl-single.c
-@@ -734,6 +734,18 @@ static const struct pinconf_ops pcs_pinconf_ops = {
- 	.pin_config_dbg_show = pcs_pinconf_dbg_show,
- 	.pin_config_group_dbg_show = pcs_pinconf_group_dbg_show,
- 	.pin_config_config_dbg_show = pcs_pinconf_config_dbg_show,
-+	.is_generic = false,
-+};
-+
-+static const struct pinconf_ops pcs_pinconf_generic_ops = {
-+	.pin_config_get = pcs_pinconf_get,
-+	.pin_config_set = pcs_pinconf_set,
-+	.pin_config_group_get = pcs_pinconf_group_get,
-+	.pin_config_group_set = pcs_pinconf_group_set,
-+	.pin_config_dbg_show = pcs_pinconf_dbg_show,
-+	.pin_config_group_dbg_show = pcs_pinconf_group_dbg_show,
-+	.pin_config_config_dbg_show = pcs_pinconf_config_dbg_show,
-+	.is_generic = true,
- };
+diff --git a/arch/arm/mach-s3c24xx/cpufreq-s3c2410.c b/arch/arm/mach-s3c24xx/cpufreq-s3c2410.c
+index cfa0dd8..0890ab7 100644
+--- a/arch/arm/mach-s3c24xx/cpufreq-s3c2410.c
++++ b/arch/arm/mach-s3c24xx/cpufreq-s3c2410.c
+@@ -24,22 +24,25 @@
+ #include <asm/mach/map.h>
  
- /**
-@@ -1435,10 +1447,8 @@ static int pcs_probe(struct platform_device *pdev)
- 	pcs->desc.name = DRIVER_NAME;
- 	pcs->desc.pctlops = &pcs_pinctrl_ops;
- 	pcs->desc.pmxops = &pcs_pinmux_ops;
--	pcs->desc.confops = &pcs_pinconf_ops;
-+	pcs->desc.confops = match->data;
- 	pcs->desc.owner = THIS_MODULE;
--	if (match->data)
--		pcs_pinconf_ops.is_generic = true;
+ #include <mach/regs-clock.h>
++#include <mach/regs-gpio.h>
  
- 	ret = pcs_allocate_pin_table(pcs);
- 	if (ret < 0)
-@@ -1479,9 +1489,14 @@ static int pcs_remove(struct platform_device *pdev)
+ #include <plat/cpu.h>
+ #include <plat/clock.h>
+ #include <plat/cpu-freq-core.h>
+ 
+-/* Note, 2410A has an extra mode for 1:4:4 ratio, bit 2 of CLKDIV */
+-
+ static void s3c2410_cpufreq_setdivs(struct s3c_cpufreq_config *cfg)
+ {
+ 	u32 clkdiv = 0;
+ 
+-	if (cfg->divs.h_divisor == 2)
+-		clkdiv |= S3C2410_CLKDIVN_HDIVN;
++	if (cfg->divs.h_divisor == 4) {
++		clkdiv = S3C2410_CLKDIVN_HDIVN1;
++	} else {
++		if (cfg->divs.h_divisor == 2)
++			clkdiv = S3C2410_CLKDIVN_HDIVN;
+ 
+-	if (cfg->divs.p_divisor != cfg->divs.h_divisor)
+-		clkdiv |= S3C2410_CLKDIVN_PDIVN;
++		if (cfg->divs.p_divisor != cfg->divs.h_divisor)
++			clkdiv |= S3C2410_CLKDIVN_PDIVN;
++	}
+ 
+ 	__raw_writel(clkdiv, S3C2410_CLKDIVN);
  }
+@@ -48,27 +51,27 @@ static int s3c2410_cpufreq_calcdivs(struct s3c_cpufreq_config *cfg)
+ {
+ 	unsigned long hclk, fclk, pclk;
+ 	unsigned int hdiv, pdiv;
+-	unsigned long hclk_max;
  
- static struct of_device_id pcs_of_match[] = {
--	{ .compatible = "pinctrl-single", .data = (void *)false },
--	{ .compatible = "pinconf-single", .data = (void *)true },
--	{ },
-+	{
-+		.compatible = "pinctrl-single",
-+		.data = (void *)&pcs_pinconf_ops,
-+	}, {
-+		.compatible = "pinconf-single",
-+		.data = (void *)&pcs_pinconf_generic_ops,
-+       	}, {
-+	},
- };
- MODULE_DEVICE_TABLE(of, pcs_of_match);
+ 	fclk = cfg->freq.fclk;
+-	hclk_max = cfg->max.hclk;
+-
+-	cfg->freq.armclk = fclk;
+-
+-	s3c_freq_dbg("%s: fclk is %lu, max hclk %lu\n",
+-		      __func__, fclk, hclk_max);
+ 
+ 	hdiv = (fclk > cfg->max.hclk) ? 2 : 1;
+ 	hclk = fclk / hdiv;
++	pdiv = (hclk > cfg->max.pclk) ? 2 : 1;
++	pclk = hclk / pdiv;
++
++	if ((samsung_cpu_id == S3C2410_GSTATUS1_2410A) &&
++	    ((hclk > cfg->max.hclk) || (pclk > cfg->max.pclk))) {
++		hdiv = 4;
++		hclk = fclk / 4;
++		pdiv = 1;
++		pclk = fclk / 4;
++	}
+ 
+ 	if (hclk > cfg->max.hclk) {
+ 		s3c_freq_dbg("%s: hclk too big\n", __func__);
+ 		return -EINVAL;
+ 	}
+ 
+-	pdiv = (hclk > cfg->max.pclk) ? 2 : 1;
+-	pclk = hclk / pdiv;
+-
+ 	if (pclk > cfg->max.pclk) {
+ 		s3c_freq_dbg("%s: pclk too big\n", __func__);
+ 		return -EINVAL;
+@@ -77,6 +80,7 @@ static int s3c2410_cpufreq_calcdivs(struct s3c_cpufreq_config *cfg)
+ 	pdiv *= hdiv;
+ 
+ 	/* record the result */
++	cfg->freq.armclk = fclk;
+ 	cfg->divs.p_divisor = pdiv;
+ 	cfg->divs.h_divisor = hdiv;
+ 
+diff --git a/arch/arm/mach-s3c24xx/include/mach/regs-clock.h b/arch/arm/mach-s3c24xx/include/mach/regs-clock.h
+index 3415b60..15b707b 100644
+--- a/arch/arm/mach-s3c24xx/include/mach/regs-clock.h
++++ b/arch/arm/mach-s3c24xx/include/mach/regs-clock.h
+@@ -62,6 +62,7 @@
+ 
+ #define S3C2410_CLKDIVN_PDIVN	     (1<<0)
+ #define S3C2410_CLKDIVN_HDIVN	     (1<<1)
++#define S3C2410_CLKDIVN_HDIVN1	     (1<<2)
+ 
+ #define S3C2410_CLKSLOW_UCLK_OFF	(1<<7)
+ #define S3C2410_CLKSLOW_MPLL_OFF	(1<<5)
+diff --git a/arch/arm/mach-s3c24xx/include/mach/regs-gpio.h b/arch/arm/mach-s3c24xx/include/mach/regs-gpio.h
+index c2ef016..ff8ef6a 100644
+--- a/arch/arm/mach-s3c24xx/include/mach/regs-gpio.h
++++ b/arch/arm/mach-s3c24xx/include/mach/regs-gpio.h
+@@ -571,6 +571,7 @@
+ 
+ #define S3C2410_GSTATUS1_IDMASK	   (0xffff0000)
+ #define S3C2410_GSTATUS1_2410	   (0x32410000)
++#define S3C2410_GSTATUS1_2410A	   (0x32410002)
+ #define S3C2410_GSTATUS1_2412	   (0x32412001)
+ #define S3C2410_GSTATUS1_2416	   (0x32416003)
+ #define S3C2410_GSTATUS1_2440	   (0x32440000)
+diff --git a/arch/arm/mach-s3c24xx/s3c2410.c b/arch/arm/mach-s3c24xx/s3c2410.c
+index 9ebef95..c512dac 100644
+--- a/arch/arm/mach-s3c24xx/s3c2410.c
++++ b/arch/arm/mach-s3c24xx/s3c2410.c
+@@ -35,6 +35,7 @@
+ #include <plat/cpu-freq.h>
+ 
+ #include <mach/regs-clock.h>
++#include <mach/regs-gpio.h>
+ #include <plat/regs-serial.h>
+ 
+ #include <plat/s3c2410.h>
+@@ -104,8 +105,14 @@ void __init_or_cpufreq s3c2410_setup_clocks(void)
+ 
+ 	/* work out clock scalings */
+ 
+-	hclk = fclk / ((tmp & S3C2410_CLKDIVN_HDIVN) ? 2 : 1);
+-	pclk = hclk / ((tmp & S3C2410_CLKDIVN_PDIVN) ? 2 : 1);
++	if ((samsung_cpu_id == S3C2410_GSTATUS1_2410A) &&
++	    (tmp & S3C2410_CLKDIVN_HDIVN1)) {
++		hclk = fclk / 4;
++		pclk = fclk / 4;
++	} else {
++		hclk = fclk / ((tmp & S3C2410_CLKDIVN_HDIVN) ? 2 : 1);
++		pclk = hclk / ((tmp & S3C2410_CLKDIVN_PDIVN) ? 2 : 1);
++	}
+ 
+ 	/* print brieft summary of clocks, etc */
  
 -- 
-1.7.10.4
+1.7.12.4
