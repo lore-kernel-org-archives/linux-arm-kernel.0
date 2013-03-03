@@ -1,42 +1,70 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sat, 02 Mar 2013 20:05:24 +0000
-Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
-In-Reply-To: <512D3EC2.6050408@ti.com>
-References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
- <1329321854-24490-4-git-send-email-b-cousson@ti.com>
- <4F44FA56.7020000@gmail.com> <4F44FC37.2000701@ti.com>
- <4F452484.5080503@gmail.com>
- <74CDBE0F657A3D45AFBB94109FB122FF17BD8BC6C1@HQMAIL01.nvidia.com>
- <4F47AD08.4030504@ti.com>
- <CAAwP0s0cB368R2mtbJpTZJreR-5GSRLfxC+8DJLo5nw3_OwBuA@mail.gmail.com>
- <512D39DA.7020306@ti.com> <512D3AB1.1080202@wwwdotorg.org>
- <512D3EC2.6050408@ti.com>
-Message-ID: <20130302200524.D230F3E1571@localhost>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Sun, 3 Mar 2013 11:27:43 +0100
+Subject: [PATCH v5 01/16] spi/spi-atmel: fix master->num_chipselect
+ wrongly set.
+In-Reply-To: <1361861289-30332-2-git-send-email-wenyou.yang@atmel.com>
+References: <1361861289-30332-1-git-send-email-wenyou.yang@atmel.com>
+ <1361861289-30332-2-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <20130303102743.GM30595@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 26 Feb 2013 17:01:22 -0600, Jon Hunter <jon-hunter@ti.com> wrote:
+On 14:47 Tue 26 Feb     , Wenyou Yang wrote:
+> if the spi property "cs-gpios" is set as below:
 > 
-> On 02/26/2013 04:44 PM, Stephen Warren wrote:
-> > On 02/26/2013 03:40 PM, Jon Hunter wrote:
-> >> On 02/26/2013 04:01 AM, Javier Martinez Canillas wrote:
-> >> Are you requesting the gpio anywhere? If not then this is not going to
-> >> work as-is. This was discussed fairly recently [1] and the conclusion
-> >> was that the gpio needs to be requested before we can use as an interrupt.
-> > 
-> > That seems wrong; the GPIO/IRQ driver should handle this internally. The
-> > Ethernet driver shouldn't know/care whether the interrupt it's given is
-> > some form of dedicated interrupt or a GPIO-based interrupt, and even if
-> > it somehow did, there's no irq_to_gpio() any more, so the driver can't
-> > tell which GPIO ID it should request, unless it's given yet another
-> > property to represent this.
+> 	cs-gpios = <0>, <&pioC 11 0>, <0>, <0>;
 > 
-> I agree that ideally this should be handled internally. Did you read the
-> discussion on the thread that I referenced [1]? If you have any thoughts
-> we are open to ideas :-)
+> the master->num_chipselect will wrongly be set to 0,
+> and the spi fail to probe.
+> 
+> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> Cc: spi-devel-general at lists.sourceforge.net
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  drivers/spi/spi-atmel.c |    2 +-
+>  drivers/spi/spi.c       |    2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+> index ab34497..5bf3786 100644
+> --- a/drivers/spi/spi-atmel.c
+> +++ b/drivers/spi/spi-atmel.c
+> @@ -944,7 +944,7 @@ static int atmel_spi_probe(struct platform_device *pdev)
+>  
+>  	master->dev.of_node = pdev->dev.of_node;
+>  	master->bus_num = pdev->id;
+> -	master->num_chipselect = master->dev.of_node ? 0 : 4;
+> +	master->num_chipselect = 4;
+Nack
 
-I'm on an airplane right now, but I agree 100% with Stephen. I'll try to
-remember to go read that thread and respond, but this falls firmly in
-the its-a-bug category for me.  :-)
+we use 0 hardware gpio we only use the cs-gpio
 
-g.
+and you do not follow the binding
+
+it's
+	cs-gpios = < 0 0 0
+	 	    &pioC 11 0>;
+
+so the code work a expected
+
+Best Regards,
+J.
+>  	master->setup = atmel_spi_setup;
+>  	master->transfer = atmel_spi_transfer;
+>  	master->cleanup = atmel_spi_cleanup;
+> diff --git a/drivers/spi/spi.c b/drivers/spi/spi.c
+> index 19ee901..d88cbef 100644
+> --- a/drivers/spi/spi.c
+> +++ b/drivers/spi/spi.c
+> @@ -1070,7 +1070,7 @@ static int of_spi_register_master(struct spi_master *master)
+>  	master->num_chipselect = max(nb, master->num_chipselect);
+>  
+>  	if (nb < 1)
+> -		return 0;
+> +		nb = master->num_chipselect;
+>  
+>  	cs = devm_kzalloc(&master->dev,
+>  			  sizeof(int) * master->num_chipselect,
+> -- 
+> 1.7.9.5
+> 
