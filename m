@@ -1,157 +1,63 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sun,  3 Mar 2013 20:22:06 +0400
-Subject: [PATCH] ARM: s3c24xx: Add special bus clock ratio mode support for
- S3C2410A
-Message-ID: <1362327726-8193-1-git-send-email-shc_work@mail.ru>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Sun, 3 Mar 2013 18:40:56 +0100
+Subject: [PATCH V2] lglock: add read-preference local-global rwlock
+In-Reply-To: <20130302172003.GC29769@redhat.com>
+References: <512CC509.1050000@linux.vnet.ibm.com>
+ <CACvQF50UgiqPpDk3HCmV86zKSf6tPjqr0bZowfPEOJs0g0r0MQ@mail.gmail.com>
+ <512D0D67.9010609@linux.vnet.ibm.com>
+ <CACvQF53ph2ixdM-otzetjM5cR+2kcZj6sckOp3TnzzA_x-EZ8w@mail.gmail.com>
+ <512E7879.20109@linux.vnet.ibm.com> <5130E8E2.50206@cn.fujitsu.com>
+ <20130301182854.GA3631@redhat.com>
+ <CANN689HEW=b5S93J27p+rBX-5m7jkW4FER=eHDCp7OgMaTWLPw@mail.gmail.com>
+ <5131FB4C.7070408@cn.fujitsu.com> <20130302172003.GC29769@redhat.com>
+Message-ID: <20130303174056.GA30176@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a special bus clock ratio mode support (1:4:4) for
-S3C2410A CPU targets. This mode means that the HCLK and PCLK frequency
-is the same as the FCLK/4.
+On 03/02, Oleg Nesterov wrote:
+>
+> On 03/02, Lai Jiangshan wrote:
+> >
+> > +void lg_rwlock_local_read_unlock(struct lgrwlock *lgrw)
+> > +{
+> > +	switch (__this_cpu_read(*lgrw->reader_refcnt)) {
+> > +	case 1:
+> > +		__this_cpu_write(*lgrw->reader_refcnt, 0);
+> > +		lg_local_unlock(&lgrw->lglock);
+> > +		return;
+> > +	case FALLBACK_BASE:
+> > +		__this_cpu_write(*lgrw->reader_refcnt, 0);
+> > +		read_unlock(&lgrw->fallback_rwlock);
+> > +		rwlock_release(&lg->lock_dep_map, 1, _RET_IP_);
+>
+> I guess "case 1:" should do rwlock_release() too.
+>
+> Otherwise, at first glance looks correct...
+>
+> However, I still think that FALLBACK_BASE only adds the unnecessary
+> complications. But even if I am right this is subjective of course, please
+> feel free to ignore.
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- arch/arm/mach-s3c24xx/cpufreq-s3c2410.c         | 36 ++++++++++++++-----------
- arch/arm/mach-s3c24xx/include/mach/regs-clock.h |  1 +
- arch/arm/mach-s3c24xx/include/mach/regs-gpio.h  |  1 +
- arch/arm/mach-s3c24xx/s3c2410.c                 | 11 ++++++--
- 4 files changed, 31 insertions(+), 18 deletions(-)
+Yes, but...
 
-diff --git a/arch/arm/mach-s3c24xx/cpufreq-s3c2410.c b/arch/arm/mach-s3c24xx/cpufreq-s3c2410.c
-index cfa0dd8..0890ab7 100644
---- a/arch/arm/mach-s3c24xx/cpufreq-s3c2410.c
-+++ b/arch/arm/mach-s3c24xx/cpufreq-s3c2410.c
-@@ -24,22 +24,25 @@
- #include <asm/mach/map.h>
- 
- #include <mach/regs-clock.h>
-+#include <mach/regs-gpio.h>
- 
- #include <plat/cpu.h>
- #include <plat/clock.h>
- #include <plat/cpu-freq-core.h>
- 
--/* Note, 2410A has an extra mode for 1:4:4 ratio, bit 2 of CLKDIV */
--
- static void s3c2410_cpufreq_setdivs(struct s3c_cpufreq_config *cfg)
- {
- 	u32 clkdiv = 0;
- 
--	if (cfg->divs.h_divisor == 2)
--		clkdiv |= S3C2410_CLKDIVN_HDIVN;
-+	if (cfg->divs.h_divisor == 4) {
-+		clkdiv = S3C2410_CLKDIVN_HDIVN1;
-+	} else {
-+		if (cfg->divs.h_divisor == 2)
-+			clkdiv = S3C2410_CLKDIVN_HDIVN;
- 
--	if (cfg->divs.p_divisor != cfg->divs.h_divisor)
--		clkdiv |= S3C2410_CLKDIVN_PDIVN;
-+		if (cfg->divs.p_divisor != cfg->divs.h_divisor)
-+			clkdiv |= S3C2410_CLKDIVN_PDIVN;
-+	}
- 
- 	__raw_writel(clkdiv, S3C2410_CLKDIVN);
- }
-@@ -48,27 +51,27 @@ static int s3c2410_cpufreq_calcdivs(struct s3c_cpufreq_config *cfg)
- {
- 	unsigned long hclk, fclk, pclk;
- 	unsigned int hdiv, pdiv;
--	unsigned long hclk_max;
- 
- 	fclk = cfg->freq.fclk;
--	hclk_max = cfg->max.hclk;
--
--	cfg->freq.armclk = fclk;
--
--	s3c_freq_dbg("%s: fclk is %lu, max hclk %lu\n",
--		      __func__, fclk, hclk_max);
- 
- 	hdiv = (fclk > cfg->max.hclk) ? 2 : 1;
- 	hclk = fclk / hdiv;
-+	pdiv = (hclk > cfg->max.pclk) ? 2 : 1;
-+	pclk = hclk / pdiv;
-+
-+	if ((samsung_cpu_id == S3C2410_GSTATUS1_2410A) &&
-+	    ((hclk > cfg->max.hclk) || (pclk > cfg->max.pclk))) {
-+		hdiv = 4;
-+		hclk = fclk / 4;
-+		pdiv = 1;
-+		pclk = fclk / 4;
-+	}
- 
- 	if (hclk > cfg->max.hclk) {
- 		s3c_freq_dbg("%s: hclk too big\n", __func__);
- 		return -EINVAL;
- 	}
- 
--	pdiv = (hclk > cfg->max.pclk) ? 2 : 1;
--	pclk = hclk / pdiv;
--
- 	if (pclk > cfg->max.pclk) {
- 		s3c_freq_dbg("%s: pclk too big\n", __func__);
- 		return -EINVAL;
-@@ -77,6 +80,7 @@ static int s3c2410_cpufreq_calcdivs(struct s3c_cpufreq_config *cfg)
- 	pdiv *= hdiv;
- 
- 	/* record the result */
-+	cfg->freq.armclk = fclk;
- 	cfg->divs.p_divisor = pdiv;
- 	cfg->divs.h_divisor = hdiv;
- 
-diff --git a/arch/arm/mach-s3c24xx/include/mach/regs-clock.h b/arch/arm/mach-s3c24xx/include/mach/regs-clock.h
-index 3415b60..15b707b 100644
---- a/arch/arm/mach-s3c24xx/include/mach/regs-clock.h
-+++ b/arch/arm/mach-s3c24xx/include/mach/regs-clock.h
-@@ -62,6 +62,7 @@
- 
- #define S3C2410_CLKDIVN_PDIVN	     (1<<0)
- #define S3C2410_CLKDIVN_HDIVN	     (1<<1)
-+#define S3C2410_CLKDIVN_HDIVN1	     (1<<2)
- 
- #define S3C2410_CLKSLOW_UCLK_OFF	(1<<7)
- #define S3C2410_CLKSLOW_MPLL_OFF	(1<<5)
-diff --git a/arch/arm/mach-s3c24xx/include/mach/regs-gpio.h b/arch/arm/mach-s3c24xx/include/mach/regs-gpio.h
-index c2ef016..ff8ef6a 100644
---- a/arch/arm/mach-s3c24xx/include/mach/regs-gpio.h
-+++ b/arch/arm/mach-s3c24xx/include/mach/regs-gpio.h
-@@ -571,6 +571,7 @@
- 
- #define S3C2410_GSTATUS1_IDMASK	   (0xffff0000)
- #define S3C2410_GSTATUS1_2410	   (0x32410000)
-+#define S3C2410_GSTATUS1_2410A	   (0x32410002)
- #define S3C2410_GSTATUS1_2412	   (0x32412001)
- #define S3C2410_GSTATUS1_2416	   (0x32416003)
- #define S3C2410_GSTATUS1_2440	   (0x32440000)
-diff --git a/arch/arm/mach-s3c24xx/s3c2410.c b/arch/arm/mach-s3c24xx/s3c2410.c
-index 9ebef95..c512dac 100644
---- a/arch/arm/mach-s3c24xx/s3c2410.c
-+++ b/arch/arm/mach-s3c24xx/s3c2410.c
-@@ -35,6 +35,7 @@
- #include <plat/cpu-freq.h>
- 
- #include <mach/regs-clock.h>
-+#include <mach/regs-gpio.h>
- #include <plat/regs-serial.h>
- 
- #include <plat/s3c2410.h>
-@@ -104,8 +105,14 @@ void __init_or_cpufreq s3c2410_setup_clocks(void)
- 
- 	/* work out clock scalings */
- 
--	hclk = fclk / ((tmp & S3C2410_CLKDIVN_HDIVN) ? 2 : 1);
--	pclk = hclk / ((tmp & S3C2410_CLKDIVN_PDIVN) ? 2 : 1);
-+	if ((samsung_cpu_id == S3C2410_GSTATUS1_2410A) &&
-+	    (tmp & S3C2410_CLKDIVN_HDIVN1)) {
-+		hclk = fclk / 4;
-+		pclk = fclk / 4;
-+	} else {
-+		hclk = fclk / ((tmp & S3C2410_CLKDIVN_HDIVN) ? 2 : 1);
-+		pclk = hclk / ((tmp & S3C2410_CLKDIVN_PDIVN) ? 2 : 1);
-+	}
- 
- 	/* print brieft summary of clocks, etc */
- 
--- 
-1.7.12.4
+> And btw, I am not sure about lg->lock_dep_map, perhaps we should use
+> fallback_rwlock->dep_map ?
+>
+> We need rwlock_acquire_read() even in the fast-path, and this acquire_read
+> should be paired with rwlock_acquire() in _write_lock(), but it does
+> spin_acquire(lg->lock_dep_map). Yes, currently this is the same (afaics)
+> but perhaps fallback_rwlock->dep_map would be more clean.
+
+Please ignore this part.
+
+I missed that lg_rwlock_global_write_lock() relies on lg_global_lock(),
+and I just noticed that it does rwlock_acquire(lg->lock_dep_map).
+
+Hmm. But then I do not understand the lglock annotations. Obviously,
+rwlock_acquire_read() in lg_local_lock() can't even detect the simplest
+deadlock, say, lg_local_lock(LOCK) + lg_local_lock(LOCK). Not to mention
+spin_lock(X) + lg_local_lock(Y) vs lg_local_lock(Y) + spin_lock(X).
+
+OK, I understand that it is not easy to make these annotations correct...
+
+Oleg.
