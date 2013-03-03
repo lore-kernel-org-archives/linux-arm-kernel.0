@@ -1,47 +1,41 @@
-From: gleb@redhat.com (Gleb Natapov)
-Date: Sun, 3 Mar 2013 13:53:18 +0200
-Subject: Fixing KVM/ARM breakage in mainline
-In-Reply-To: <20130303114743.GH17833@n2100.arm.linux.org.uk>
-References: <512B5693.4000608@arm.com> <20130225122117.GE12299@redhat.com>
- <20130303114743.GH17833@n2100.arm.linux.org.uk>
-Message-ID: <20130303115318.GA18298@redhat.com>
+From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
+Date: Sun, 03 Mar 2013 12:59:03 +0100
+Subject: [PATCH v6 01/16] clk: samsung: add common clock framework helper
+ functions for Samsung platforms
+In-Reply-To: <51333149.1060105@gmail.com>
+References: <1361175686-19400-1-git-send-email-thomas.abraham@linaro.org>
+ <1361175686-19400-2-git-send-email-thomas.abraham@linaro.org>
+ <201303030208.49722.heiko@sntech.de> <51333149.1060105@gmail.com>
+Message-ID: <51333B07.7050106@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 03, 2013 at 11:47:43AM +0000, Russell King - ARM Linux wrote:
-> On Mon, Feb 25, 2013 at 02:21:17PM +0200, Gleb Natapov wrote:
-> > On Mon, Feb 25, 2013 at 12:18:27PM +0000, Marc Zyngier wrote:
-> > > Russell, Marcelo, Gleb,
-> > > 
-> > > Commit 89f8833 (Merge tag 'kvm-3.9-1' of
-> > > git://git.kernel.org/pub/scm/virt/kvm/kvm) broke KVM/ARM. Nothing
-> > > fundamental, just annoying enough.
-> > > 
-> > > I've posted patches against next-20130215 some time ago:
-> > > http://comments.gmane.org/gmane.comp.emulators.kvm.devel/105019
-> > > 
-> > > I've now created a branch based off mainline as of this morning, and
-> > > containing these fixes:
-> > > git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
-> > > kvm-arm/core-3.9-rc1-fixes
-> > > 
-> > > Now the question is: who wants to merge this? The diffstat looks like this:
-> > > 
-> > I was going to merge it today.
-> 
-> I notice that my randconfig build last night tripped over the:
-> 
-> include/linux/kvm_host.h:333:34: error: 'KVM_USER_MEM_SLOTS' undeclared here (not in a function)
-> 
-> error which Marc's patches fix.
-The patches that were send to the kvm mailing list are in Linus tree for
-quite a while now:
+On 03/03/2013 12:17 PM, Sylwester Nawrocki wrote:
+> On 03/03/2013 02:08 AM, Heiko St?bner wrote:
+>> But is there an easy way to define more than one alias? On the s3c2416
+>> for
+>> example the hsmmc hclk is the "hsmmc" io-clock, as well as the source
+>> for the
+>> "mmc_busclk.0". Same for the "uart" pclk, that is also a baud clock
+>> source.
+[...]
+> But those multiple aliases are important only for machines with device
+                                                              ^^^^^
+Sorry, this should have read "without". Also please note that due to
+representing original struct clk_clksrc objects (mux + div + gate clock)
+with separate primitive clocks device drivers may not work as before
+where clk_{set/get}_parent() was called. I.e. a separate consumer clock
+id needs to be used to control a clock mux. Hmm, however this issue
+doesn't affect anything on s3c24xx, since such composite clocks have
+been introduced only starting from s3c64xx.
 
-3b8cd8a015f3db85624c0fdb591956aed7f61b65 ARM: KVM: fix compilation after removal of user_alloc from struct kvm_memory
-2b5e1e474fd7b0f2540a052d15465ba953dd30b1 ARM: KVM: Rename KVM_MEMORY_SLOTS -> KVM_USER_MEM_SLOTS
-bef103aa7dd75121f66848d91f6b6179d40c1a71 ARM: KVM: fix kvm_arch_{prepare,commit}_memory_region
+I guess to create multiple aliases now a new helper function could be
+created that takes as an argument a clock index (as in enum exynos4_clks)
+and adds a clkdev lookup entry to a matched clk object. Probably it
+wouldn't be difficult to rework the driver to be registering all clkdev
+entries like this.
 
-Are there additional patches that I missed?
+Do you have your source tree in any public git available ? ;) Perhaps
+I could find a time to adjust and try it with s3c2440 based board.
 
---
-			Gleb.
+> tree support, aren't they ?
