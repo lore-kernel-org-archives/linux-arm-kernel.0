@@ -1,132 +1,38 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Sun, 03 Mar 2013 02:54:24 -0800
-Subject: [PATCH 2/5] clk: notifier handler for dynamic voltage scaling
-In-Reply-To: <20130302082216.GA4581@richard-laptop>
-References: <1362026969-11457-1-git-send-email-mturquette@linaro.org>
- <1362026969-11457-3-git-send-email-mturquette@linaro.org>
- <1362130891.19498.12.camel@bilhuang-vm1>
- <20130301182234.6210.63879@quantum> <20130301204832.6210.40653@quantum>
- <1362192954.2407.26.camel@bilhuang-vm1>
- <20130302082216.GA4581@richard-laptop>
-Message-ID: <20130303105424.6210.1196@quantum>
+From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
+Date: Sun, 03 Mar 2013 12:17:29 +0100
+Subject: [PATCH v6 01/16] clk: samsung: add common clock framework helper
+ functions for Samsung platforms
+In-Reply-To: <201303030208.49722.heiko@sntech.de>
+References: <1361175686-19400-1-git-send-email-thomas.abraham@linaro.org>
+ <1361175686-19400-2-git-send-email-thomas.abraham@linaro.org>
+ <201303030208.49722.heiko@sntech.de>
+Message-ID: <51333149.1060105@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Richard Zhao (2013-03-02 00:22:19)
-> On Fri, Mar 01, 2013 at 06:55:54PM -0800, Bill Huang wrote:
-> > On Sat, 2013-03-02 at 04:48 +0800, Mike Turquette wrote:
-> > > Quoting Mike Turquette (2013-03-01 10:22:34)
-> > > > Quoting Bill Huang (2013-03-01 01:41:31)
-> > > > > On Thu, 2013-02-28 at 12:49 +0800, Mike Turquette wrote:
-> > > > > > Dynamic voltage and frequency scaling (dvfs) is a common power saving
-> > > > > > technique in many of today's modern processors.  This patch introduces a
-> > > > > > common clk rate-change notifier handler which scales voltage
-> > > > > > appropriately whenever clk_set_rate is called on an affected clock.
-> > > > > 
-> > > > > I really think clk_enable and clk_disable should also be triggering
-> > > > > notifier call and DVFS should act accordingly since there are cases
-> > > > > drivers won't set clock rate but instead disable its clock directly, do
-> > > > > you agree?
-> > > > > > 
-> > > > 
-> > > > Hi Bill,
-> > > > 
-> > > > I'll think about this.  Perhaps a better solution would be to adapt
-> > > > these drivers to runtime PM.  Then a call to runtime_pm_put() would
-> > > > result in a call to clk_disable(...) and regulator_set_voltage(...).
-> > > > 
-> > > > There is no performance-based equivalent to runtime PM, which is one
-> > > > reason why clk_set_rate is a likely entry point into dvfs.  But for
-> > > > operations that have nice api's like runtime PM it would be better to
-> > > > use those interfaces and not overload the clk.h api unnecessarily.
-> > > > 
-> > > 
-> > > Bill,
-> > > 
-> > > I wasn't thinking at all when I wrote this.  Trying to rush to the
-> > > airport I guess...
-> > > 
-> > > clk_enable() and clk_disable() must not sleep and all operations are
-> > > done under a spinlock.  So this rules out most use of notifiers.  It is
-> > > expected for some drivers to very aggressively enable/disable clocks in
-> > > interrupt handlers so scaling voltage as a function of clk_{en|dis}able
-> > > calls is also likely out of the question.
-> > 
-> > Yeah for those existing drivers to call enable/disable clocks in
-> > interrupt have ruled out this, I didn't think through when I was asking.
-> > > 
-> > > Some platforms have chosen to implement voltage scaling in their
-> > > .prepare callbacks.  I personally do not like this and still prefer
-> > > drivers be adapted to runtime pm and let those callbacks handle voltage
-> > > scaling along with clock handling.
-> Voltage scaling in clock notifiers seems similar. Clock and regulater
-> embedded code into each other will cause things complicated.
+Hi,
 
-Hi Richard,
+On 03/03/2013 02:08 AM, Heiko St?bner wrote:
+> But is there an easy way to define more than one alias? On the s3c2416 for
+> example the hsmmc hclk is the "hsmmc" io-clock, as well as the source for the
+> "mmc_busclk.0". Same for the "uart" pclk, that is also a baud clock source.
 
-Sorry, I do not follow the above statement.  Can you clarify what you
-mean?
+This driver currently provides for only one additional clkdev lookup entry
+per a platform clock. I pointed out this desing issue in the early version
+of the patch set. It's because a machine clock definition is coupled with
+a clock consumer definition. And IMO various samsung_clock_register_*
+functions should not have clk_register_clkdev() inside them. I.e. first
+step could be registering all machine clocks and in the second one clkdev
+lookup entries could be created. This is how most (all?) existing SoC
+clock drivers are working.
 
-> > 
-> > I think different SoC have different mechanisms or constraints on doing
-> > their DVFS, such as Tegra VDD_CORE rail, it supplies power to many
-> > devices and as a consequence each device do not have their own power
-> > rail to control, instead a central driver to handle/control this power
-> > rail is needed (to set voltage at the maximum of the requested voltage
-> > from all its sub-devices), so I'm wondering even if every drivers are
-> > doing DVFS through runtime pm, we're still having hole on knowing
-> > whether or not clocks of the interested devices are enabled/disabled at
-> > runtime, I'm not familiar with runtime pm and hence do not know if there
-> > is a mechanism to handle this, I'll study a bit. Thanks.
-> > > 
-> > > Regards,
-> > > Mike
-> > > 
-> > > > > > There are three prerequisites to using this feature:
-> > > > > > 
-> > > > > > 1) the affected clocks must be using the common clk framework
-> > > > > > 2) voltage must be scaled using the regulator framework
-> > > > > > 3) clock frequency and regulator voltage values must be paired via the
-> > > > > > OPP library
-> > > > > 
-> > > > > Just a note, Tegra Core won't meet prerequisite #3 since each regulator
-> > > > > voltage values is associated with clocks driving those many sub-HW
-> > > > > blocks in it.
-> > > > 
-> > > > This patch isn't the one and only way to perform dvfs.  It is just a
-> > > > helper function for registering notifier handlers for systems that meet
-> > > > the above three requirements.  Even if you do not use the OPP library
-> > > > there is no reason why you could not register your own rate-change
-> > > > notifier handler to implement dvfs using whatever lookup-table you use
-> > > > today.
-> > > > 
-> > > > And patches are welcome to extend the usefulness of this helper.  I'd
-> > > > like as many people to benefit from this mechanism as possible.
-> > 
-> > The extension is not so easy for us though since OPP library is assuming
-> > each device has a 1-1 mapping on its operating frequency and voltage.
-> Is there someone working on OPP clock/regulator sets support?
-> 
+But those multiple aliases are important only for machines with device
+tree support, aren't they ?
 
-No, but I'm going to bring this up at LCA on Wednesday.  It would be
-nice to have some DT bindings for declaring operating points that tie
-clocks & regulators together.
+I hope this patch series gets merged early to linux-next in the 3.10
+cycle so the multiple accumulated fixup patches for this clock driver
+can be merged as well and issues like that you pointed out can be
+resolved with incremental patches.
 
 Regards,
-Mike
-
-> Thanks
-> Richard
-> > > > 
-> > > > At some point we should think hard about DT bindings for these operating
-> > > > points...
-> > > > 
-> > > > Regards,
-> > > > Mike
-> > 
-> > 
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Sylwester
