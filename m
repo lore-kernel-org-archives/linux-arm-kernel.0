@@ -1,30 +1,47 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 4 Mar 2013 13:15:57 +0100
-Subject: [PATCH] arm: mxs: Update mxs_defconfig
-In-Reply-To: <20130304010749.GA30431@S2101-09.ap.freescale.net>
-References: <1356055651-27145-1-git-send-email-marex@denx.de>
- <201303032228.26070.marex@denx.de>
- <20130304010749.GA30431@S2101-09.ap.freescale.net>
-Message-ID: <201303041315.57256.marex@denx.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 04 Mar 2013 21:57:38 +0900
+Subject: [PATCH 03/14] MAINTAINERS: remove arch/arm/plat-s3c24xx/
+In-Reply-To: <1362275632-20242-4-git-send-email-cesarb@cesarb.net>
+References: <1362275632-20242-1-git-send-email-cesarb@cesarb.net>
+ <1362275632-20242-4-git-send-email-cesarb@cesarb.net>
+Message-ID: <007f01ce18d7$d94ab430$8be01c90$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Shawn Guo,
-
-> On Sun, Mar 03, 2013 at 10:28:25PM +0100, Marek Vasut wrote:
-> > Dear Shawn Guo,
-> > 
-> > > On Thu, Jan 17, 2013 at 02:22:50AM +0100, Marek Vasut wrote:
-> > > > Do you think this can be made a stable matter for 3.7 ? It's a
-> > > > defconfig update afterall and it help a great deal.
-> > > 
-> > > No, I don't think so.  Sorry.
-> > 
-> > Was this patch ever applied? I can't find it in 3.8 nor in -next :-(
+Cesar Eduardo Barros wrote:
 > 
-> Isn't it on mainline right now as 77d168a (ARM: mxs: Update mxs_defconfig)?
+> This directory was removed by commit 09ec1d7 (ARM: S3C24XX: Remove
+> plat-s3c24xx directory in arch/arm/).
+> 
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
 
-So it's a 3.9 matter then ?
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 
-Best regards,
-Marek Vasut
+Thanks.
+
+- Kukjin
+
+> Cc: Ben Dooks <ben-linux@fluff.org>
+> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-samsung-soc at vger.kernel.org
+> Signed-off-by: Cesar Eduardo Barros <cesarb@cesarb.net>
+> ---
+>  MAINTAINERS | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 3c074d5..5af82f9 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1119,7 +1119,6 @@ L:	linux-samsung-soc at vger.kernel.org (moderated
+> for non-subscribers)
+>  W:	http://www.fluff.org/ben/linux/
+>  S:	Maintained
+>  F:	arch/arm/plat-samsung/
+> -F:	arch/arm/plat-s3c24xx/
+>  F:	arch/arm/mach-s3c24*/
+>  F:	arch/arm/mach-s3c64xx/
+>  F:	drivers/*/*s3c2410*
+> --
+> 1.7.11.7
