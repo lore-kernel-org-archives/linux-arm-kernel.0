@@ -1,39 +1,43 @@
-From: mporter@ti.com (Matt Porter)
-Date: Mon,  4 Mar 2013 11:52:57 -0500
-Subject: [PATCH] arm: davinci: fix edma dmaengine induced null pointer
- dereference on da830
-Message-ID: <1362415977-12829-1-git-send-email-mporter@ti.com>
+From: hechtb@gmail.com (Bastian Hecht)
+Date: Mon,  4 Mar 2013 18:54:04 +0100
+Subject: [PATCH] Core Standby Mode and caches
+Message-ID: <1362419645-3116-1-git-send-email-hechtb+renesas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds additional error checking to the private edma api implementation
-to catch the case where the edma_alloc_slot() has an invalid controller
-parameter. The edma dmaengine wrapper driver relies on this condition
-being handled in order to avoid setting up a second edma dmaengine
-instance on DA830.
+Hello,
 
-Verfied using a DA850 with the second EDMA controller platform instance
-removed to simulate a DA830 which only has a single EDMA controller.
+here a patch that adds Core Standby Mode.
+The code as it is works fine, but still I've got a question:
 
-Reported-by: Tomas Novotny <tomas@novotny.cz>
-Signed-off-by: Matt Porter <mporter@ti.com>
-Cc: stable at kernel.org
----
- arch/arm/mach-davinci/dma.c |    2 ++
- 1 file changed, 2 insertions(+)
+The datasheet of the r8a7740 states that caches are kept in a standby state.
+Still I have to issue a outer_flush_all() to flush the L2 before sleeping. If
+I don't do it the SoC hangs or sometimes jumps to the boot code
+Booting Linux on physical CPU 0x0...
 
-diff --git a/arch/arm/mach-davinci/dma.c b/arch/arm/mach-davinci/dma.c
-index a685e97..f9eb836 100644
---- a/arch/arm/mach-davinci/dma.c
-+++ b/arch/arm/mach-davinci/dma.c
-@@ -747,6 +747,8 @@ int edma_alloc_slot(unsigned ctlr, int slot)
- 		slot = EDMA_CHAN_SLOT(slot);
- 
- 	if (slot < 0) {
-+		if (!edma_cc[ctlr])
-+			return -EINVAL;
- 		slot = edma_cc[ctlr]->num_channels;
- 		for (;;) {
- 			slot = find_next_zero_bit(edma_cc[ctlr]->edma_inuse,
+Do we have an explanation for that? Do we want one? Do we need one?
+
+Further this is the dozenth incarnation of v7_invalidate_l1. I don't want to
+compile in headsmp.S as this is a uniprocessor system. On the other hand I'm a
+bit reluctant to be the one moving it into the general ARM code base - doing
+something wrong there would raise eternal hatred of many people.
+
+
+The patch is based on topic/all+next (a9043db17d02119bcda8a33414e7526961a7cee5)
+
+Cheers,
+
+ Bastian
+
+Bastian Hecht (1):
+  ARM: shmobile: r8a7740: Add CPU Core Standby Mode
+
+ arch/arm/mach-shmobile/Makefile              |    2 +-
+ arch/arm/mach-shmobile/include/mach/common.h |    1 +
+ arch/arm/mach-shmobile/pm-r8a7740.c          |   63 +++++++++++++++++++++-
+ arch/arm/mach-shmobile/sleep-r8a7740.S       |   75 ++++++++++++++++++++++++++
+ 4 files changed, 138 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/mach-shmobile/sleep-r8a7740.S
+
 -- 
 1.7.9.5
