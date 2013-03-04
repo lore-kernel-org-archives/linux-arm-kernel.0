@@ -1,74 +1,56 @@
-From: prakash.pm@ti.com (Manjunathappa, Prakash)
-Date: Mon, 4 Mar 2013 18:29:15 +0530
-Subject: [PATCH v2 4/4] ARM: davinci: da850-evm: add SPI flash support
-In-Reply-To: <1362401955-9616-1-git-send-email-prakash.pm@ti.com>
-References: <1362401955-9616-1-git-send-email-prakash.pm@ti.com>
-Message-ID: <1362401955-9616-5-git-send-email-prakash.pm@ti.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 04 Mar 2013 22:00:39 +0900
+Subject: [PATCH] ARM: S5PV210: Fix PL330 DMA controller clkdev entries
+In-Reply-To: <51321326.6050800@gmail.com>
+References: <1362227906-13921-1-git-send-email-s.nawrocki@samsung.com>
+ <51321326.6050800@gmail.com>
+Message-ID: <008001ce18d8$451527e0$cf3f77a0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable m25p64 SPI flash support on da850-EVM. Also
-add partition information of SPI flash.
+Lonsn wrote:
+> 
+> ? 2013/3/2 20:38, Sylwester Nawrocki ??:
+> > Since the DMA controller clocks are managed at amba bus level,
+> > the PL330 device clocks handling has been removed from the driver
+> > in commit 7c71b8eb268ee38235f7e924d943ea9d90e59469
+> > DMA: PL330: Remove redundant runtime_suspend/resume functions
+> >
+> > However, this left the S5PV210 platform with only clkdev entries
+> > linking "apb_pclk" clock conn_id to a dummy clock, rather than
+> > to corresponding platform PL330 DMAC clock.
+> > As a result the DMA controller is now attempted to be used on
+> > S5PV210 with the clock disabled and the driver fails with an
+> > error:
+> >
+> > dma-pl330 dma-pl330.0: PERIPH_ID 0x0, PCELL_ID 0x0 !
+> > dma-pl330: probe of dma-pl330.0 failed with error -22
+> > dma-pl330 dma-pl330.1: PERIPH_ID 0x0, PCELL_ID 0x0 !
+> > dma-pl330: probe of dma-pl330.1 failed with error -22
+> >
+> > Fix this by adding "apb_pclk" clkdev entries for the Peripheral
+> > DMA controllers 0/1 and removing the dummy apb_pclk clock.
+> >
+> > Reported-by: Lonsn <lonsn2005@gmail.com>
+> > Cc: Inderpal Singh <inderpal.singh@linaro.org>
+> > Cc: Boojin Kim <boojin.kim@samsung.com>
+> > Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> > ---
+> >
+> > Lonsn, could you check if this patch solves the problem for you,
+> > please ? Any Tested-by are welcome.
+> > I didn't test this patch on any hardware yet. Once it is confirmed
+> > I would resend it, also for stable kernels. It seems this issue is
+> > present since v3.7.
+> >
+> Sylwester, I have tested this patch and confirmed it's OK in my S5PV210
+> platform.
+> 
 
-Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
----
-Since v1:
-Look for m25p64 instead of m25p80.
-Corrected the filesystem partition information.
+Looks good to me, applied into -fixes.
 
- arch/arm/boot/dts/da850-evm.dts |   40 +++++++++++++++++++++++++++++++++++++++
- 1 files changed, 40 insertions(+), 0 deletions(-)
+Sylwester, why did you want to re-send this patch?
 
-diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
-index c359872..3306d82 100644
---- a/arch/arm/boot/dts/da850-evm.dts
-+++ b/arch/arm/boot/dts/da850-evm.dts
-@@ -41,6 +41,46 @@
- 		wdt: wdt at 1c21000 {
- 			status = "okay";
- 		};
-+		spi1: spi at 1f0e000 {
-+			status = "okay";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&spi1_pins>;
-+			flash: m25p80 at 0 {
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				compatible = "m25p64";
-+				spi-max-frequency = <30000000>;
-+				reg = <0>;
-+				partition at 0 {
-+					label = "U-Boot-SPL";
-+					reg = <0x00000000 0x00010000>;
-+					read-only;
-+				};
-+				partition at 1 {
-+					label = "U-Boot";
-+					reg = <0x00010000 0x00080000>;
-+					read-only;
-+				};
-+				partition at 2 {
-+					label = "U-Boot-Env";
-+					reg = <0x00090000 0x00010000>;
-+					read-only;
-+				};
-+				partition at 3 {
-+					label = "Kernel";
-+					reg = <0x000a0000 0x00280000>;
-+				};
-+				partition at 4 {
-+					label = "Filesystem";
-+					reg = <0x00320000 0x00400000>;
-+				};
-+				partition at 5 {
-+					label = "MAC-Address";
-+					reg = <0x00720000 0x00010000>;
-+					read-only;
-+				};
-+			};
-+		};
- 	};
- 	nand_cs3 at 62000000 {
- 		status = "okay";
--- 
-1.7.4.1
+Thanks.
+
+- Kukjin
