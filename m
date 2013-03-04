@@ -1,42 +1,22 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 4 Mar 2013 11:17:18 +0800
-Subject: [PATCH 1/3] ARM: dts: imx28-evk: Enable touchscreen support
-In-Reply-To: <1360337803-19858-1-git-send-email-festevam@gmail.com>
-References: <1360337803-19858-1-git-send-email-festevam@gmail.com>
-Message-ID: <20130304031716.GC30431@S2101-09.ap.freescale.net>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Mon, 4 Mar 2013 13:09:37 +0900
+Subject: [PATCH 1/3] clocksource: sh_cmt: Add Device Tree probing
+In-Reply-To: <1362159932-18533-2-git-send-email-hechtb+renesas@gmail.com>
+References: <1362159932-18533-1-git-send-email-hechtb+renesas@gmail.com>
+ <1362159932-18533-2-git-send-email-hechtb+renesas@gmail.com>
+Message-ID: <20130304040935.GC26475@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 08, 2013 at 01:36:41PM -0200, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
+On Fri, Mar 01, 2013 at 11:45:30AM -0600, Bastian Hecht wrote:
+> We add the capabilty to probe SH CMT timer devices using Device Tree
+> setup.
 > 
-> Provide 'lradc-touchscreen-wires' property to the LRADC driver, so that 
-> touchscreen can be functional.
+> We can deduce former platform data by the device IDs and channel
+> IDs of our timer instances, so we choose this more intuitive info as our
+> DT properties.
 > 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  arch/arm/boot/dts/imx28-evk.dts |    1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
-> index 2da316e..5960578 100644
-> --- a/arch/arm/boot/dts/imx28-evk.dts
-> +++ b/arch/arm/boot/dts/imx28-evk.dts
-> @@ -155,6 +155,7 @@
->  			};
->  
->  			lradc at 80050000 {
-> +				fsl,lradc-touchscreen-wires = <4>;
-
-I do not understand why.  But it seems to me that applying the patch on
-top of v3.9-rc1 results in a silent audio playback on my imx28-evk
-board.  Can you confirm that on your side?
-
-Shawn
-
->  				status = "okay";
->  			};
->  
-> -- 
-> 1.7.9.5
-> 
+I wonder if it makes more sense to attempt to create a more generalized
+binding, as what you have here is pretty much uniform for all of
+CMT/TMU/MTU2. Perhaps having a general sh-timer binding would be cleaner,
+while letting each timer plug the compatible string it cares about.
