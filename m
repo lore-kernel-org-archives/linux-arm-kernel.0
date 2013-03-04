@@ -1,93 +1,75 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 4 Mar 2013 16:24:17 +0200
-Subject: [V8 PATCH 02/16] usb: gadget: mv_udc: use PHY driver for udc
-In-Reply-To: <1361419646-9052-3-git-send-email-chao.xie@marvell.com>
-References: <1361419646-9052-1-git-send-email-chao.xie@marvell.com>
- <1361419646-9052-3-git-send-email-chao.xie@marvell.com>
-Message-ID: <20130304142417.GH3397@arwen.pp.htv.fi>
+From: gerlando.falauto@keymile.com (Gerlando Falauto)
+Date: Mon, 04 Mar 2013 15:28:14 +0100
+Subject: [PATCH] genirq: move mask_cache into struct irq_chip_type
+In-Reply-To: <CAMAG_ee8YBvDsdQ2zNfn-7qdyTmVYBVb8xykMMv4pg8tEswJgg@mail.gmail.com>
+References: <20110720234537.GD16297@kw.sim.vm.gnt>
+ <1311295758-27493-1-git-send-email-simon@sequanux.org>
+ <CAMAG_edBy1kjmEGDD76-C5T0xtha9YxMFJ6B3D8A5kHBwQ1PMQ@mail.gmail.com>
+ <20110726153930.GG16297@kw.sim.vm.gnt>
+ <CAMAG_ee8YBvDsdQ2zNfn-7qdyTmVYBVb8xykMMv4pg8tEswJgg@mail.gmail.com>
+Message-ID: <5134AF7E.5010605@keymile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 20, 2013 at 11:07:12PM -0500, Chao Xie wrote:
-> Originaly, udc driver will call the callbacks in platform data
-> for PHY initialization and shut down.
-> With PHY driver, it will call the APIs provided by PHY driver
-> for PHY initialization and shut down. It removes the callbacks
-> in platform data, and at same time it removes one block in the
-> way of enabling device tree for udc driver.
-> 
-> Signed-off-by: Chao Xie <chao.xie@marvell.com>
-> ---
->  drivers/usb/gadget/mv_udc.h      |    2 +-
->  drivers/usb/gadget/mv_udc_core.c |   45 ++++++++++++++-----------------------
->  2 files changed, 18 insertions(+), 29 deletions(-)
-> 
-> diff --git a/drivers/usb/gadget/mv_udc.h b/drivers/usb/gadget/mv_udc.h
-> index 9073436..f339df4 100644
-> --- a/drivers/usb/gadget/mv_udc.h
-> +++ b/drivers/usb/gadget/mv_udc.h
-> @@ -180,7 +180,6 @@ struct mv_udc {
->  
->  	struct mv_cap_regs __iomem	*cap_regs;
->  	struct mv_op_regs __iomem	*op_regs;
-> -	void __iomem                    *phy_regs;
->  	unsigned int			max_eps;
->  	struct mv_dqh			*ep_dqh;
->  	size_t				ep_dqh_size;
-> @@ -217,6 +216,7 @@ struct mv_udc {
->  	struct work_struct	vbus_work;
->  	struct workqueue_struct *qwork;
->  
-> +	struct usb_phy		*phy;
->  	struct usb_phy		*transceiver;
->  
->  	struct mv_usb_platform_data     *pdata;
-> diff --git a/drivers/usb/gadget/mv_udc_core.c b/drivers/usb/gadget/mv_udc_core.c
-> index c8cf959..4876d2f 100644
-> --- a/drivers/usb/gadget/mv_udc_core.c
-> +++ b/drivers/usb/gadget/mv_udc_core.c
-> @@ -35,6 +35,7 @@
->  #include <linux/platform_device.h>
->  #include <linux/clk.h>
->  #include <linux/platform_data/mv_usb.h>
-> +#include <linux/usb/mv_usb2.h>
->  #include <asm/unaligned.h>
->  
->  #include "mv_udc.h"
-> @@ -1121,15 +1122,14 @@ static int mv_udc_enable_internal(struct mv_udc *udc)
->  
->  	dev_dbg(&udc->dev->dev, "enable udc\n");
->  	udc_clock_enable(udc);
-> -	if (udc->pdata->phy_init) {
-> -		retval = udc->pdata->phy_init(udc->phy_regs);
-> -		if (retval) {
-> -			dev_err(&udc->dev->dev,
-> -				"init phy error %d\n", retval);
-> -			udc_clock_disable(udc);
-> -			return retval;
-> -		}
+Hi everyone,
 
-dude, you really don't test your patches, do you ? Your previous patch
-removed ->phy_init(), ->phy_deinit() and ->private_init() from your
-platform_data.
+I know this issue is from two years ago...
 
-Are you seriously telling me you didn't compile test your patches ?
+On 07/27/2011 10:45 AM, saeed bishara wrote:
+> On Tue, Jul 26, 2011 at 6:39 PM, Simon Guinot <simon@sequanux.org> wrote:
+>> Hi Saeed,
+>>
+>> On Tue, Jul 26, 2011 at 05:35:50PM +0300, saeed bishara wrote:
+>>> On Fri, Jul 22, 2011 at 3:49 AM, Simon Guinot <simon@sequanux.org> wrote:
+>>>> From: Simon Guinot <sguinot@lacie.com>
+>>>>
+>>>> This fixes a regression introduced by e59347a
+>>>> "arm: orion: Use generic irq chip".
+>>>>
+>>>> The same interrupt mask cache (stored within struct irq_chip_generic)
+>>>> is shared between all the irq_chip_type instances. As each irq_chip_type
+>>>> can use a distinct mask register, share a single mask cache is not
+>>>> correct. This bug affects Orion SoCs, which have separate mask registers
+>>>> for edge and level interrupts.
+>>>>
+>>>> This patch move mask_cache from struct irq_chip_generic into struct
+>>>> irq_chip_type. Note that the interrupt support for Samsung SoCs is also
+>>>> slightly affected.
+>>> The patch looks to fix the issue with orion, but it seems that it
+>>> won't work for SoC with multiple irq_chip_type that use one mask
+>>> register.
+>>
+>> Yes indeed, but does such SoCs exists ? I mean that the only supported
+>> SoC using multiple irq_chip_type (for now) is Orion.
+> thats right, but as you code is generic, we should find some way to
+> fix it or to prevent such devices to use this generic code.
+>   What is the most
+>> generic case for edge/level interrupts ? shared or separated mask
+>> registers ?
+> orion gpios use separate mask.
+>>
+>> If Orion is the specific case, maybe we could provide a dedicated
+>> irq_mask() handler instead of using the generic one. It would be a
+>> little sad.
+> I personally prefer this method, along with getting rid off the
+> multiple irq_chip_types, my main consideration in this case is
+> performance.
+> the irq_gc_mask_clr_bit/irq_gc_ack_set_bit/irq_gc_unmask_enable_reg
+> are critical since it get called for every (level) interrupt, and it
+> would be great if you optimize those functions,
+> I think you better do the following:
+> 1. use pre-calculated offsets instead using  gc->reg_base + cur_regs(d)->ack.
+> 2. put all hot variables (lock, mask/ack/eoi register offset) in the
+> same cache line if possible.
+>
+> regards
+> saeed
 
-Rewrite your series again and make sure that each and every patch
-compiles and works on its own. You shouldn't cause any regressions or
-build breaks or build warnings while converting this driver.
+I ran into the same problem (currently running 3.0.40)... but it looks 
+like this patch was never applied anywhere.
+I also quickly scanned the log between now and then and could not find 
+any reference to this problem. Was a fix ever committed or we still have 
+this regression?
 
-I won't review the rest of this series and I'm purging it from my TODO
-list.
-
-cheers
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130304/be03f1ea/attachment.sig>
+Thanks a lot!
+Gerlando
