@@ -1,26 +1,116 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 4 Mar 2013 09:07:51 +0800
-Subject: [PATCH] arm: mxs: Update mxs_defconfig
-In-Reply-To: <201303032228.26070.marex@denx.de>
-References: <1356055651-27145-1-git-send-email-marex@denx.de>
- <201301170222.51048.marex@denx.de>
- <20130117021240.GD26179@S2101-09.ap.freescale.net>
- <201303032228.26070.marex@denx.de>
-Message-ID: <20130304010749.GA30431@S2101-09.ap.freescale.net>
+From: omycle@gmail.com (Li Haifeng)
+Date: Mon, 4 Mar 2013 09:54:26 +0800
+Subject: [PATCH] mm: Fixup the condition whether the page cache is free
+Message-ID: <CAFNq8R7tq9kvD9LyhZJ-Cj0kexQfDsPhB4iQYyZ9s9+8Jo82QA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 03, 2013 at 10:28:25PM +0100, Marek Vasut wrote:
-> Dear Shawn Guo,
-> 
-> > On Thu, Jan 17, 2013 at 02:22:50AM +0100, Marek Vasut wrote:
-> > > Do you think this can be made a stable matter for 3.7 ? It's a defconfig
-> > > update afterall and it help a great deal.
-> > 
-> > No, I don't think so.  Sorry.
-> 
-> Was this patch ever applied? I can't find it in 3.8 nor in -next :-(
+When a page cache is to reclaim, we should to decide whether the page
+cache is free.
+IMO, the condition whether a page cache is free should be 3 in page
+frame reclaiming. The reason lists as below.
 
-Isn't it on mainline right now as 77d168a (ARM: mxs: Update mxs_defconfig)?
+When page is allocated, the page->_count is 1(code fragment is code-1 ).
+And when the page is allocated for reading files from extern disk, the
+page->_count will increment 1 by page_cache_get() in
+add_to_page_cache_locked()(code fragment is code-2). When the page is to
+reclaim, the isolated LRU list also increase the page->_count(code
+fragment is code-3).
 
-Shawn
+According above reasons, when the file page is freeable, the
+page->_count should be 3 instead of 2.
+
+<code-1>
+buffered_rmqueue ->prep_new_page->set_page_refcounted:
+24 /*
+25  * Turn a non-refcounted page (->_count == 0) into refcounted with
+26  * a count of one.
+27  */
+28 static inline void set_page_refcounted(struct page *page)
+29 {
+30         VM_BUG_ON(PageTail(page));
+31         VM_BUG_ON(atomic_read(&page->_count));
+32         set_page_count(page, 1);
+33 }
+
+<code-2>
+do_generic_file_read ->add_to_page_cache_lru-> add_to_page_cache->
+add_to_page_cache_locked:
+int add_to_page_cache_locked(struct page *page, struct address_space
+*mapping,
+                pgoff_t offset, gfp_t gfp_mask)
+{
+?
+           page_cache_get(page);
+                page->mapping = mapping;
+                page->index = offset;
+
+                spin_lock_irq(&mapping->tree_lock);
+                error = radix_tree_insert(&mapping->page_tree, offset,
+page);
+                if (likely(!error)) {
+                        mapping->nrpages++;
+                        __inc_zone_page_state(page, NR_FILE_PAGES);
+                        spin_unlock_irq(&mapping->tree_lock);
+?
+}
+<code-3>
+static noinline_for_stack unsigned long
+shrink_inactive_list(unsigned long nr_to_scan, struct mem_cgroup_zone
+*mz,
+                     struct scan_control *sc, int priority, int file)
+{
+?
+       nr_taken = isolate_lru_pages(nr_to_scan, mz, &page_list,
+&nr_scanned,
+                                     sc, isolate_mode, 0, file);
+?
+	   nr_reclaimed = shrink_page_list(&page_list, mz, sc, priority,
+                                                &nr_dirty,
+&nr_writeback);
+}
+Remarks for code-3:
+isolate_lru_pages() will call get_page_unless_zero() ultimately to
+increase the page->_count by 1.
+And shrink_page_list() will call is_page_cache_freeable() finally to
+check whether the page cache is free.
+
+>From 59b25b5e0163dcb120d913b570c1b8b5b0c47c5d Mon Sep 17 00:00:00 2001
+From: Haifeng Li <hfli@marvell.com>
+Date: Mon, 4 Mar 2013 09:42:53 +0800
+Subject: [PATCH] mm: Fixup the condition whether the page cache is free
+
+When a page is allocated, its reference is 1. If the page is
+inserted into page cache tree, the referenced also should be
+increased by 1. In reclaiming routine, it also referenced by
+isolated list. So here, the condition whether the page is free
+should be 3.
+
+Signed-off-by: Haifeng Li <omycle@gmail.com>
+---
+ mm/vmscan.c |    9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/mm/vmscan.c b/mm/vmscan.c
+index 6759993..b588378 100644
+--- a/mm/vmscan.c
++++ b/mm/vmscan.c
+@@ -400,11 +400,12 @@ static void reset_reclaim_mode(struct scan_control *sc)
+ static inline int is_page_cache_freeable(struct page *page)
+ {
+        /*
+-        * A freeable page cache page is referenced only by the caller
+-        * that isolated the page, the page cache radix tree and
+-        * optional buffer heads at page->private.
++        * A freeable page cache page, _count of which is
++        * initialized by 1. And it is also referenced only
++        * by the caller that isolated the page, the page cache
++        * radix tree and optional buffer heads at page->private.
+         */
+-       return page_count(page) - page_has_private(page) == 2;
++       return page_count(page) - page_has_private(page) == 3;
+ }
+
+ static int may_write_to_queue(struct backing_dev_info *bdi,
+--
+1.7.9.5
