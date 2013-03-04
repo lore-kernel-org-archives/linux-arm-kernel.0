@@ -1,44 +1,91 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon,  4 Mar 2013 15:21:39 -0800
-Subject: [PATCH] ARM: proc: Add Krait proc info
-Message-ID: <1362439299-29617-1-git-send-email-sboyd@codeaurora.org>
+Date: Mon, 04 Mar 2013 15:50:22 -0800
+Subject: [PATCH 8/8] ARM: smp: Remove local timer API
+In-Reply-To: <20130225134041.GA22785@e106331-lin.cambridge.arm.com>
+References: <1361518039-16663-1-git-send-email-sboyd@codeaurora.org>
+ <1361518039-16663-9-git-send-email-sboyd@codeaurora.org>
+ <20130222111545.GA15020@e106331-lin.cambridge.arm.com>
+ <20130222162458.GA19670@linux-sh.org>
+ <20130225134041.GA22785@e106331-lin.cambridge.arm.com>
+Message-ID: <5135333E.6030305@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stepan Moskovchenko <stepanm@codeaurora.org>
+On 02/25/13 05:40, Mark Rutland wrote:
+> I've had a quick go at writing a generic timer driver. I've not had a chance to
+> test it, and there are a couple of things that are up for discussion (e.g. what
+> should the rating be) but I think we want something very close to this.
+>
 
-Add processor info for the Qualcomm, Inc. Krait family of
-processors, to use the generic ARMv7 initialisation
-procedure but explicitly enable the IDIV hardware
-capability flag.
+This looks good to me. I only have some minor comments. What's the plan
+for merging? Get tglx to take this and provide a stable branch and then
+base my patches off that and get these patches taken through arm-soc?
 
-Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/mm/proc-v7.S |   10 ++++++++++
- 1 file changed, 10 insertions(+)
+> diff --git a/drivers/clocksource/dummy_timer.c b/drivers/clocksource/dummy_timer.c
+> new file mode 100644
+> index 0000000..bdaba34
+> --- /dev/null
+> +++ b/drivers/clocksource/dummy_timer.c
+> @@ -0,0 +1,67 @@
+> +/*
+> + *  linux/drivers/clocksource/dummy_timer.c
+> + *
+> + *  Copyright (C) 2013 ARM Ltd.
+> + *  All Rights Reserved
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +#include <linux/clockchips.h>
+> +#include <linux/cpu.h>
+> +#include <linux/init.h>
+> +#include <linux/percpu.h>
+> +
+> +DEFINE_PER_CPU(struct clock_event_device, dummy_evt);
 
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index 3a3c015..81adeb3 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -434,6 +434,16 @@ __v7_ca15mp_proc_info:
- 	.size	__v7_ca15mp_proc_info, . - __v7_ca15mp_proc_info
- 
- 	/*
-+	 * Qualcomm Inc. Krait processors.
-+	 */
-+	.type	__krait_proc_info, #object
-+__krait_proc_info:
-+	.long	0x510f0400		@ Required ID value
-+	.long	0xff0ffc00		@ Mask for ID
-+	__v7_proc __v7_setup, hwcaps = HWCAP_IDIV
-+	.size	__krait_proc_info, . - __krait_proc_info
-+
-+	/*
- 	 * Match any ARMv7 processor core.
- 	 */
- 	.type	__v7_proc_info, #object
+static?
+
+> +
+> +static void dummy_set_mode(enum clock_event_mode mode,
+> +			   struct clock_event_device *evt)
+> +{
+> +	/*
+> +	 * Core clockevents code will call this when exchanging timer devices.
+> +	 * We don't need to do anything here.
+> +	 */
+> +}
+> +
+> +static void __cpuinit dummy_setup(void)
+> +{
+> +	int cpu = smp_processor_id();
+> +	struct clock_event_device *evt = &per_cpu(dummy_evt, cpu);
+
+Can we use __this_cpu_ptr()? I wonder if that makes the code generation
+better or worse. I didn't do it in my 8/8 patch because I wanted the
+code to be the same before and after to show code movement.
+
+> +
+> +	evt->name	= "dummy timer";
+> +	evt->features	= CLOCK_EVT_FEAT_PERIODIC |
+> +			  CLOCK_EVT_FEAT_ONESHOT |
+> +			  CLOCK_EVT_FEAT_DUMMY;
+> +	evt->rating	= 100;
+> +	evt->set_mode	= dummy_set_mode;
+> +	evt->cpumask	= cpumask_of(cpu);
+> +
+> +	clockevents_register_device(evt);
+> +}
+> +
+> +static int __cpuinit dummy_cpu_notify(struct notifier_block *self,
+> +				      unsigned long action, void *hcpu)
+> +{
+> +	if ((action & ~CPU_TASKS_FROZEN) == CPU_STARTING)
+> +		dummy_setup();
+
+There are already two dummy_setup() functions. Perhaps we can
+s/dummy/dummy_broadcast/ throughout this file?
+
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
 hosted by The Linux Foundation
