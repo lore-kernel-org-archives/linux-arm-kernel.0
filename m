@@ -1,46 +1,74 @@
-From: dong.aisheng@linaro.org (Dong Aisheng)
-Date: Mon, 4 Mar 2013 10:18:53 +0800
-Subject: [PATCH 2/2] pinctrl: imx: use pin_func_ids to search the pinctrl
- item.
-In-Reply-To: <CACRpkdYO5UN=t_nu1XQmBAjH6zWZRgnOY2zSQeO2K=ERrUPQCg@mail.gmail.com>
-References: <1361932553-8218-1-git-send-email-b32955@freescale.com>
- <1361932553-8218-2-git-send-email-b32955@freescale.com>
- <CACRpkdYO5UN=t_nu1XQmBAjH6zWZRgnOY2zSQeO2K=ERrUPQCg@mail.gmail.com>
-Message-ID: <CAP1dx+xB0O2zouDcjmv3uO1Nk3EGytmAxn18tEO7EzXJOWoh8w@mail.gmail.com>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Mon,  4 Mar 2013 10:40:06 +0800
+Subject: [PATCH] pinctrl: core: add dependence of GPIOLIB
+Message-ID: <1362364806-23076-1-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+In file included from drivers/pinctrl/core.c:30:0:
+include/asm-generic/gpio.h: In function 'gpio_get_value_cansleep':
+include/asm-generic/gpio.h:270:2: error: implicit declaration of
+function '__gpio_get_value' [-Werror=implicit-function-declaration]
+include/asm-generic/gpio.h: In function 'gpio_set_value_cansleep':
+include/asm-generic/gpio.h:276:2: error: implicit declaration of
+function '__gpio_set_value' [-Werror=implicit-function-declaration]
+drivers/pinctrl/core.c: In function 'pinctrl_ready_for_gpio_range':
+drivers/pinctrl/core.c:297:9: error: implicit declaration of function
+'gpio_to_chip' [-Werror=implicit-function-declaration]
+drivers/pinctrl/core.c:297:27: warning: initialization makes pointer
+from integer without a cast [enabled by default]
+drivers/pinctrl/core.c:304:45: error: dereferencing pointer to
+incomplete type
+drivers/pinctrl/core.c:305:26: error: dereferencing pointer to
+incomplete type
+drivers/pinctrl/core.c:305:39: error: dereferencing pointer to
+incomplete type
+cc1: some warnings being treated as errors
+make[2]: *** [drivers/pinctrl/core.o] Error 1
+make[1]: *** [drivers/pinctrl] Error 2
+make[1]: *** Waiting for unfinished jobs....
 
-On 1 March 2013 21:07, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Wed, Feb 27, 2013 at 3:35 AM, Huang Shijie <b32955@freescale.com> wrote:
->
->> The uart may works in DTE mode or DCE mode. The customer can sets the different
->> modes by the pinctrl. But the pinctrl items for DTE or DCE may share the
->> same Pad id, such as:
->>   MX6Q_PAD_EIM_D27__UART2_RXD_DTE and MX6Q_PAD_EIM_D27__WEIM_WEIM_D_27
->>   share the same MX6Q_PAD_EIM_D27 pad id.
->>
->> The current code only search the pinctrl items by pad id. So if there two
->> pinctrl items shares the same pad id, the current code only use the first one,
->> even you tell the system to use the second one in the DTS file.
->>
->> This patch adds a new field pin_func_ids to imx_pin_group{}, and uses the
->> pin_func_ids as the index to search the pinctrl items. In this way, we can
->> avoid the issue.
->>
->> Signed-off-by: Huang Shijie <b32955@freescale.com>
->
-> Dong/Shawn: what about this patch?
->
+It's caused by CONFIG_GPIOLIB isn't enabled for some platform. So
+add the dependence on pinctrl_ready_for_gpio_range().
 
-We do not need this patch anymore since we've changed the binding a bit.
+Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+---
+ drivers/pinctrl/core.c |    8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-Regards
-Dong Aisheng
-
-> The patches anyway has to be merged through the i.MX tree I think,
-> if there is a huge movement in these files currently.
->
-> Yours,
-> Linus Walleij
+diff --git a/drivers/pinctrl/core.c b/drivers/pinctrl/core.c
+index f8a632d..a969947 100644
+--- a/drivers/pinctrl/core.c
++++ b/drivers/pinctrl/core.c
+@@ -27,7 +27,11 @@
+ #include <linux/pinctrl/consumer.h>
+ #include <linux/pinctrl/pinctrl.h>
+ #include <linux/pinctrl/machine.h>
++
++#ifdef CONFIG_GPIOLIB
+ #include <asm-generic/gpio.h>
++#endif
++
+ #include "core.h"
+ #include "devicetree.h"
+ #include "pinmux.h"
+@@ -290,6 +294,7 @@ pinctrl_match_gpio_range(struct pinctrl_dev *pctldev, unsigned gpio)
+  * certain GPIO pin doesn't have back-end pinctrl device. If the return value
+  * is false, it means that pinctrl device may not be ready.
+  */
++#ifdef CONFIG_GPIOLIB
+ static bool pinctrl_ready_for_gpio_range(unsigned gpio)
+ {
+ 	struct pinctrl_dev *pctldev;
+@@ -309,6 +314,9 @@ static bool pinctrl_ready_for_gpio_range(unsigned gpio)
+ 	}
+ 	return false;
+ }
++#else
++static bool pinctrl_ready_for_gpio_range(unsigned gpio) { return true; }
++#endif
+ 
+ /**
+  * pinctrl_get_device_gpio_range() - find device for GPIO range
+-- 
+1.7.10.4
