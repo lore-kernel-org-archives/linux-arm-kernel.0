@@ -1,64 +1,81 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 04 Mar 2013 10:03:31 -0700
-Subject: [PATCH v4 2/8] reset: Add reset controller API
-In-Reply-To: <1362386007.4988.34.camel@pizza.hi.pengutronix.de>
-References: <1361878774-6382-1-git-send-email-p.zabel@pengutronix.de>
- <1361878774-6382-3-git-send-email-p.zabel@pengutronix.de>
- <513108F8.30902@wwwdotorg.org>
- <1362386007.4988.34.camel@pizza.hi.pengutronix.de>
-Message-ID: <5134D3E3.9000308@wwwdotorg.org>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Mon, 4 Mar 2013 11:06:12 -0600
+Subject: [PATCH 1/2] gpio/omap: convert gpio irq domain to linear mapping
+In-Reply-To: <20130302114742.GA9965@arwen.pp.htv.fi>
+References: <1362158568-1624-1-git-send-email-jon-hunter@ti.com>
+ <1362158568-1624-2-git-send-email-jon-hunter@ti.com>
+ <20130302114742.GA9965@arwen.pp.htv.fi>
+Message-ID: <5134D484.8070307@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/04/2013 01:33 AM, Philipp Zabel wrote:
-> Hi Stephen,
-> 
-> Am Freitag, den 01.03.2013, 13:00 -0700 schrieb Stephen Warren:
->> On 02/26/2013 04:39 AM, Philipp Zabel wrote:
->>> This adds a simple API for devices to request being reset
->>> by separate reset controller hardware and implements the
->>> reset signal device tree binding.
->>
->>> diff --git a/drivers/reset/core.c b/drivers/reset/core.c
->>
->>> +int of_reset_simple_xlate(struct reset_controller_dev *rcdev,
->>> +			  const struct of_phandle_args *reset_spec, u32 *flags)
->>> +{
->>> +	if (WARN_ON(reset_spec->args_count < rcdev->of_reset_n_cells))
->>> +		return -EINVAL;
->>
->> Would != make more sense than < ?
-> 
-> I copied this from of_gpio_simple_xlate, because the parsing will work
-> if args_count > of_reset_n_cells. In this case the device tree contains
-> a #reset-cells larger than what the reset controller driver expects.
-> Is this reason enough to assume the whole reset_spec is invalid?
 
-Well, there's certainly something unexpected going on; what are those
-extra cells expected to mean? I'd tend to make that an error myself to
-avoid unexpected symptoms. I'd tend to want to make the same change to
-of_gpio_simple_xlate().
-
->>> +
->>> +	if (reset_spec->args[0] >= rcdev->nr_resets)
->>> +		return -EINVAL;
->>> +
->>> +	if (flags)
->>> +		*flags = reset_spec->args[1];
+On 03/02/2013 05:48 AM, Felipe Balbi wrote:
+> On Fri, Mar 01, 2013 at 11:22:47AM -0600, Jon Hunter wrote:
+>> Currently the OMAP GPIO driver uses a legacy mapping for the GPIO IRQ
+>> domain. This is not necessary because we do not need to assign a
+>> specific interrupt number to the GPIO IRQ domain. Therefore, convert
+>> the OMAP GPIO driver to use a linear mapping instead.
 >>
->> if (flags)
->>     if (reset_spec->args_count > 1)
->>         *flags = reset_spec->args[1];
->>     else
->>         *flags = 0;
+>> Please note that this also allows to simplify the logic in the OMAP
+>> gpio_irq_handler() routine, by using irq_find_mapping() to obtain the
+>> virtual irq number from the GPIO bank and bank index.
 >>
->> ?
+>> Reported-by: Linus Walleij <linus.walleij@linaro.org>
+>> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 > 
-> In gpiolib, of_get_named_gpio_flags clears the flags, so that the xlate
-> implementations don't have to do it. The core doesn't use the flags, so
-> this is not a problem. I don't see the need for
-> of_get_named_reset_flags, since the reset consumer drivers shouldn't
-> care for those. Maybe it would be better to remove the flags parameter
-> from the xlate function altogether.
+> Reviewed-by: Felipe Balbi <balbi@ti.com>
+> 
+> Just one suggestion below for a later patch.
+> 
+>> @@ -680,7 +686,7 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+>>  {
+>>  	void __iomem *isr_reg = NULL;
+>>  	u32 isr;
+>> -	unsigned int gpio_irq, gpio_index;
+>> +	unsigned int i;
+>>  	struct gpio_bank *bank;
+>>  	int unmasked = 0;
+>>  	struct irq_chip *chip = irq_desc_get_chip(desc);
+>> @@ -721,15 +727,10 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+>>  		if (!isr)
+>>  			break;
+>>  
+>> -		gpio_irq = bank->irq_base;
+>> -		for (; isr != 0; isr >>= 1, gpio_irq++) {
+>> -			int gpio = irq_to_gpio(bank, gpio_irq);
+>> -
+>> +		for (i = 0; isr != 0; isr >>= 1, i++) {
+>>  			if (!(isr & 1))
+>>  				continue;
+> 
+> this will iterate over all 32 GPIOs, a better way to handle this would
+> be to have something like:
 
-Yes, since there are no flags, removing the parameter makes most sense.
+Worse case, if only bit 31 was set then I agree this is not that
+efficient. Or even if one bit is set. However, the loop itself will
+iterate while isr != 0 so not always over each bit. No different to the
+existing code.
+
+> while (isr) {
+> 	unsigned long bit = __ffs(isr);
+>
+> 	/* clear this bit */
+> 	isr &= ~bit;
+> 
+> 	generic_handle_irq(irq_find_mapping(bank->domain, bit);
+> }
+> 
+> this way you will only iterate the amount of bits enabled in the isr
+> register.
+
+Definitely cleaner but I am wondering which approach would be more
+efficient from an instruction standpoint. This could definitely be much
+more efficient if there is only a couple bits set.
+
+> ps: completely untested ;-)
+
+No problem. Thanks for the inputs.
+
+Cheers
+Jon
