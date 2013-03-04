@@ -1,41 +1,64 @@
-From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
-Date: Mon,  4 Mar 2013 13:51:07 +0900
-Subject: [RFC PATCH] ARM: mm: disable kmap_high_get() for SMP
-Message-ID: <1362372667-953-1-git-send-email-iamjoonsoo.kim@lge.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 4 Mar 2013 10:22:57 +0530
+Subject: drivers/dma/dw_dmac.c:1278:48: sparse: incorrect type in
+ argument 1 (different base types)
+In-Reply-To: <201303032051.28444.arnd@arndb.de>
+References: <5133ae8b.eQXjkB7tQEqiUMck%fengguang.wu@intel.com>
+ <201303032051.28444.arnd@arndb.de>
+Message-ID: <20130304045257.GC22513@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With SMP and enabling kmap_high_get(), it makes users of kmap_atomic()
-sequential ordered, because kmap_high_get() use global kmap_lock().
-It is not welcome situation, so turn off this optimization for SMP.
-
-Cc: Nicolas Pitre <nico@linaro.org>
-Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
-
-diff --git a/arch/arm/include/asm/highmem.h b/arch/arm/include/asm/highmem.h
-index 8c5e828..82fea0f 100644
---- a/arch/arm/include/asm/highmem.h
-+++ b/arch/arm/include/asm/highmem.h
-@@ -26,15 +26,13 @@ extern void kunmap_high(struct page *page);
-  * The reason for kmap_high_get() is to ensure that the currently kmap'd
-  * page usage count does not decrease to zero while we're using its
-  * existing virtual mapping in an atomic context.  With a VIVT cache this
-- * is essential to do, but with a VIPT cache this is only an optimization
-- * so not to pay the price of establishing a second mapping if an existing
-- * one can be used.  However, on platforms without hardware TLB maintenance
-- * broadcast, we simply cannot use ARCH_NEEDS_KMAP_HIGH_GET at all since
-- * the locking involved must also disable IRQs which is incompatible with
-- * the IPI mechanism used by global TLB operations.
-+ * is essential to do, but with a VIPT cache this is only an optimization.
-+ * With SMP and enabling kmap_high_get(), it makes users of kmap_atomic()
-+ * sequential ordered, because kmap_high_get() use global kmap_lock().
-+ * It is not welcome situation, so turn off this optimization for SMP.
-  */
- #define ARCH_NEEDS_KMAP_HIGH_GET
--#if defined(CONFIG_SMP) && defined(CONFIG_CPU_TLB_V6)
-+#if defined(CONFIG_SMP)
- #undef ARCH_NEEDS_KMAP_HIGH_GET
- #if defined(CONFIG_HIGHMEM) && defined(CONFIG_CPU_CACHE_VIVT)
- #error "The sum of features in your kernel config cannot be supported together"
--- 
-1.7.9.5
+On Sun, Mar 03, 2013 at 08:51:28PM +0000, Arnd Bergmann wrote:
+> On Sunday 03 March 2013, kbuild test robot wrote:
+> > >> drivers/dma/dw_dmac.c:1278:48: sparse: incorrect type in argument 1 (different base types)
+> >    drivers/dma/dw_dmac.c:1278:48:    expected restricted __be32 const [usertype] *p
+> >    drivers/dma/dw_dmac.c:1278:48:    got unsigned int *
+> > >> drivers/dma/dw_dmac.c:1279:48: sparse: incorrect type in argument 1 (different base types)
+> >    drivers/dma/dw_dmac.c:1279:48:    expected restricted __be32 const [usertype] *p
+> >    drivers/dma/dw_dmac.c:1279:48:    got unsigned int *
+> > >> drivers/dma/dw_dmac.c:1280:48: sparse: incorrect type in argument 1 (different base types)
+> >    drivers/dma/dw_dmac.c:1280:48:    expected restricted __be32 const [usertype] *p
+> >    drivers/dma/dw_dmac.c:1280:48:    got unsigned int *
+> > 
+> 
+> Cool, thanks for the notification! That is a real bug, the variables
+> are already endian swapped at this point.
+> 
+> Fortunately, nothing is using that code at this moment, so we can fix
+> this with no hurry.
+> 
+> Vinod, could you apply this patch?
+Done, applied to fixes. Will send to Linus before I leave for vacation on Thu.
+Updated change log with reported-by & typo fix
+> 
+> 	Arnd
+> 
+> 8<-------
+> Subject: [PATCH] dmaengine: dw_dma: fix endianess for DT xlate function
+> 
+> As reported by Wu Fengguang's build robot tracking sparse warnings, the
+> dma_spec arguments in the dw_dma_xlate are already byte swapped on
+> littl-endian platforms and must not get swapped again. This code is
+> currently not used anywhere, but will be used in Linux 3.10 when the
+> ARM SPEAr platform starts using the generic DMA DT binding.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> diff --git a/drivers/dma/dw_dmac.c b/drivers/dma/dw_dmac.c
+> index c599558..eb81ec9 100644
+> --- a/drivers/dma/dw_dmac.c
+> +++ b/drivers/dma/dw_dmac.c
+> @@ -1276,9 +1276,9 @@ static struct dma_chan *dw_dma_xlate(struct of_phandle_args *dma_spec,
+>  	if (dma_spec->args_count != 3)
+>  		return NULL;
+>  
+> -	fargs.req = be32_to_cpup(dma_spec->args+0);
+> -	fargs.src = be32_to_cpup(dma_spec->args+1);
+> -	fargs.dst = be32_to_cpup(dma_spec->args+2);
+> +	fargs.req = dma_spec->args[0];
+> +	fargs.src = dma_spec->args[1];
+> +	fargs.dst = dma_spec->args[2];
+>  
+>  	if (WARN_ON(fargs.req >= DW_DMA_MAX_NR_REQUESTS ||
+>  		    fargs.src >= dw->nr_masters ||
