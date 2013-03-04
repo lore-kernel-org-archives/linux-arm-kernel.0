@@ -1,135 +1,50 @@
-From: hvaibhav@ti.com (hvaibhav at ti.com)
-Date: Mon, 4 Mar 2013 17:05:56 +0530
-Subject: [RFC PATCH 2/3] ARM: AM33XX: hwmod: Add hwmod data for debugSS
-In-Reply-To: <hvaibhav@ti.com>
-References: <hvaibhav@ti.com>
-Message-ID: <1362396957-30113-3-git-send-email-hvaibhav@ti.com>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Mon, 4 Mar 2013 19:39:28 +0800
+Subject: [PATCH 00/10] ARM: tegra: add platform suspend support
+Message-ID: <1362397168-5345-1-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vaibhav Hiremath <hvaibhav@ti.com>
+This series introduces a basic functionality for Tegra to support the
+platform suspend and resume.
 
-In the original hwmod data file, DebugSS entry was disabled,
-since we didn't (and do not) have SW to control it.
+Verified on Seaboard and Cardhu.
 
-This patch enables it back with right data, as now we will
-have control through command line argument "omap_debugss_en".
+Joseph Lo (10):
+  gpio: tegra: add gpio wakeup source handling
+  ARM: tegra: irq: add wake up handling
+  ARM: tegra: get power management configurations for PMC from DT
+  ARM: tegra: pm: add platform suspend support
+  ARM: dt: tegra: add bindings of power management configurations for
+    PMC
+  ARM: dts: tegra: add the PM configurations of PMC
+  ARM: dts: tegra: add power gpio keys to DT
+  ARM: dts: tegra: whistler: add wakeup source for KBC
+  ARM: dts: tegra: add non-removable and keep-power-in-suspend property
+    for MMC
+  ARM: tegra: config: defconfig update
 
-Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-Cc: Kevin Hilman <khilman@linaro.org>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/omap_hwmod_33xx_data.c |   69 +++++++++++++++++++---------
- 1 files changed, 47 insertions(+), 22 deletions(-)
+ .../bindings/arm/tegra/nvidia,tegra20-pmc.txt      |  45 +++++++-
+ arch/arm/boot/dts/tegra20-harmony.dts              |  17 +++
+ arch/arm/boot/dts/tegra20-paz00.dts                |   8 ++
+ arch/arm/boot/dts/tegra20-seaboard.dts             |   8 ++
+ arch/arm/boot/dts/tegra20-trimslice.dts            |  20 ++++
+ arch/arm/boot/dts/tegra20-ventana.dts              |  19 +++
+ arch/arm/boot/dts/tegra20-whistler.dts             |  10 ++
+ arch/arm/boot/dts/tegra30-beaver.dts               |   8 ++
+ arch/arm/boot/dts/tegra30-cardhu-a02.dts           |   1 +
+ arch/arm/boot/dts/tegra30-cardhu-a04.dts           |   1 +
+ arch/arm/boot/dts/tegra30-cardhu.dtsi              |   8 ++
+ arch/arm/configs/tegra_defconfig                   |   1 +
+ arch/arm/mach-tegra/common.c                       |   3 +
+ arch/arm/mach-tegra/irq.c                          |  95 ++++++++++++++-
+ arch/arm/mach-tegra/irq.h                          |   6 +
+ arch/arm/mach-tegra/pm.c                           |  75 ++++++++++++
+ arch/arm/mach-tegra/pm.h                           |   2 +
+ arch/arm/mach-tegra/pmc.c                          | 128 +++++++++++++++++++++
+ arch/arm/mach-tegra/pmc.h                          |  16 +++
+ drivers/gpio/gpio-tegra.c                          |  21 +++-
+ 20 files changed, 488 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-index 50da58c..e2a0ed0 100644
---- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-@@ -415,7 +415,6 @@ static struct omap_hwmod am33xx_adc_tsc_hwmod = {
-  *
-  *    - cEFUSE (doesn't fall under any ocp_if)
-  *    - clkdiv32k
-- *    - debugss
-  *    - ocmc ram
-  *    - ocp watch point
-  *    - aes0
-@@ -462,27 +461,6 @@ static struct omap_hwmod am33xx_clkdiv32k_hwmod = {
- 	},
- };
-
--/*
-- * 'debugss' class
-- * debug sub system
-- */
--static struct omap_hwmod_class am33xx_debugss_hwmod_class = {
--	.name		= "debugss",
--};
--
--static struct omap_hwmod am33xx_debugss_hwmod = {
--	.name		= "debugss",
--	.class		= &am33xx_debugss_hwmod_class,
--	.clkdm_name	= "l3_aon_clkdm",
--	.main_clk	= "debugss_ick",
--	.prcm		= {
--		.omap4	= {
--			.clkctrl_offs	= AM33XX_CM_WKUP_DEBUGSS_CLKCTRL_OFFSET,
--			.modulemode	= MODULEMODE_SWCTRL,
--		},
--	},
--};
--
- /* ocmcram */
- static struct omap_hwmod_class am33xx_ocmcram_hwmod_class = {
- 	.name = "ocmcram",
-@@ -572,6 +550,34 @@ static struct omap_hwmod am33xx_sha0_hwmod = {
-
- #endif
-
-+/*
-+ * 'debugss' class
-+ * debug sub system
-+ */
-+static struct omap_hwmod_opt_clk debugss_opt_clks[] = {
-+	{ .role = "dbg_sysclk", .clk = "dbg_sysclk_ck" },
-+	{ .role = "dbg_clka", .clk = "dbg_clka_ck" },
-+};
-+
-+static struct omap_hwmod_class am33xx_debugss_hwmod_class = {
-+	.name		= "debugss",
-+};
-+
-+static struct omap_hwmod am33xx_debugss_hwmod = {
-+	.name		= "debugss",
-+	.class		= &am33xx_debugss_hwmod_class,
-+	.clkdm_name	= "l3_aon_clkdm",
-+	.main_clk	= "trace_clk_div_ck",
-+	.prcm		= {
-+		.omap4	= {
-+			.clkctrl_offs	= AM33XX_CM_WKUP_DEBUGSS_CLKCTRL_OFFSET,
-+			.modulemode	= MODULEMODE_SWCTRL,
-+		},
-+	},
-+	.opt_clks	= debugss_opt_clks,
-+	.opt_clks_cnt	= ARRAY_SIZE(debugss_opt_clks),
-+};
-+
- /* 'smartreflex' class */
- static struct omap_hwmod_class am33xx_smartreflex_hwmod_class = {
- 	.name		= "smartreflex",
-@@ -2291,6 +2297,24 @@ static struct omap_hwmod_ocp_if am33xx_l3_main__gfx = {
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
-
-+/* l3_main -> debugss */
-+static struct omap_hwmod_addr_space am33xx_debugss_addrs[] = {
-+	{
-+		.pa_start	= 0x4b000000,
-+		.pa_end		= 0x4b000000 + SZ_16M - 1,
-+		.flags		= ADDR_TYPE_RT
-+	},
-+	{ }
-+};
-+
-+static struct omap_hwmod_ocp_if am33xx_l3_main__debugss = {
-+	.master		= &am33xx_l3_main_hwmod,
-+	.slave		= &am33xx_debugss_hwmod,
-+	.clk		= "dpll_core_m4_ck",
-+	.addr		= am33xx_debugss_addrs,
-+	.user		= OCP_USER_MPU,
-+};
-+
- /* l4 wkup -> smartreflex0 */
- static struct omap_hwmod_addr_space am33xx_smartreflex0_addrs[] = {
- 	{
-@@ -3360,6 +3384,7 @@ static struct omap_hwmod_ocp_if *am33xx_hwmod_ocp_ifs[] __initdata = {
- 	&am33xx_pruss__l3_main,
- 	&am33xx_wkup_m3__l4_wkup,
- 	&am33xx_gfx__l3_main,
-+	&am33xx_l3_main__debugss,
- 	&am33xx_l4_wkup__wkup_m3,
- 	&am33xx_l4_wkup__control,
- 	&am33xx_l4_wkup__smartreflex0,
---
-1.7.0.4
+-- 
+1.8.1.1
