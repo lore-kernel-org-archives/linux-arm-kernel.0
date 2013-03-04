@@ -1,82 +1,33 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 4 Mar 2013 11:44:54 -0800
-Subject: [PATCH] pinctrl: single: avoid to set read only object
-In-Reply-To: <1362322904-19570-1-git-send-email-haojian.zhuang@linaro.org>
-References: <1362322904-19570-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <20130304194454.GW11806@atomide.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 4 Mar 2013 22:19:50 +0200
+Subject: [PATCH 1/2] arm: omap2: mux: fix debugfs file permission
+In-Reply-To: <20130304191830.GV11806@atomide.com>
+References: <1361269464-20263-1-git-send-email-balbi@ti.com>
+ <20130304191830.GV11806@atomide.com>
+Message-ID: <20130304201950.GA18315@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Haojian Zhuang <haojian.zhuang@linaro.org> [130303 07:05]:
-> drivers/pinctrl/pinctrl-single.c:1441:3: error: assignment of member
-> ?is_generic? in read-only object
-> make[2]: *** [drivers/pinctrl/pinctrl-single.o] Error 1
+On Mon, Mar 04, 2013 at 11:18:31AM -0800, Tony Lindgren wrote:
+> * Felipe Balbi <balbi@ti.com> [130219 02:28]:
+> > OMAP's debugfs interface creates one file
+> > for each signal in the mux table, such file
+> > provides a read method but didn't provide
+> > read permission. Fix it.
+> > 
+> > Signed-off-by: Felipe Balbi <balbi@ti.com>
 > 
-> Since pcs_pinconf_ops is changed to read only structure, probe()
-> function can't set is_generic variable any more. So append new
-> pcs_pinconf_generic_ops.
-> 
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> Heh indeed, although read still seems to work without it.
+> Applying into omap-for-v3.9/fixes.
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+root can always read, I guess.
 
-> ---
->  drivers/pinctrl/pinctrl-single.c |   27 +++++++++++++++++++++------
->  1 file changed, 21 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
-> index 4cdcf85..c80ffa8 100644
-> --- a/drivers/pinctrl/pinctrl-single.c
-> +++ b/drivers/pinctrl/pinctrl-single.c
-> @@ -734,6 +734,18 @@ static const struct pinconf_ops pcs_pinconf_ops = {
->  	.pin_config_dbg_show = pcs_pinconf_dbg_show,
->  	.pin_config_group_dbg_show = pcs_pinconf_group_dbg_show,
->  	.pin_config_config_dbg_show = pcs_pinconf_config_dbg_show,
-> +	.is_generic = false,
-> +};
-> +
-> +static const struct pinconf_ops pcs_pinconf_generic_ops = {
-> +	.pin_config_get = pcs_pinconf_get,
-> +	.pin_config_set = pcs_pinconf_set,
-> +	.pin_config_group_get = pcs_pinconf_group_get,
-> +	.pin_config_group_set = pcs_pinconf_group_set,
-> +	.pin_config_dbg_show = pcs_pinconf_dbg_show,
-> +	.pin_config_group_dbg_show = pcs_pinconf_group_dbg_show,
-> +	.pin_config_config_dbg_show = pcs_pinconf_config_dbg_show,
-> +	.is_generic = true,
->  };
->  
->  /**
-> @@ -1435,10 +1447,8 @@ static int pcs_probe(struct platform_device *pdev)
->  	pcs->desc.name = DRIVER_NAME;
->  	pcs->desc.pctlops = &pcs_pinctrl_ops;
->  	pcs->desc.pmxops = &pcs_pinmux_ops;
-> -	pcs->desc.confops = &pcs_pinconf_ops;
-> +	pcs->desc.confops = match->data;
->  	pcs->desc.owner = THIS_MODULE;
-> -	if (match->data)
-> -		pcs_pinconf_ops.is_generic = true;
->  
->  	ret = pcs_allocate_pin_table(pcs);
->  	if (ret < 0)
-> @@ -1479,9 +1489,14 @@ static int pcs_remove(struct platform_device *pdev)
->  }
->  
->  static struct of_device_id pcs_of_match[] = {
-> -	{ .compatible = "pinctrl-single", .data = (void *)false },
-> -	{ .compatible = "pinconf-single", .data = (void *)true },
-> -	{ },
-> +	{
-> +		.compatible = "pinctrl-single",
-> +		.data = (void *)&pcs_pinconf_ops,
-> +	}, {
-> +		.compatible = "pinconf-single",
-> +		.data = (void *)&pcs_pinconf_generic_ops,
-> +       	}, {
-> +	},
->  };
->  MODULE_DEVICE_TABLE(of, pcs_of_match);
->  
-> -- 
-> 1.7.10.4
-> 
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130304/4b75fd5b/attachment-0001.sig>
