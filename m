@@ -1,39 +1,61 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 4 Mar 2013 13:13:04 +0200
-Subject: [PATCH v10 6/8] usb: chipidea: imx: add internal vbus regulator
- control
-In-Reply-To: <CAEYLNCpNfNtpmGL-POaJ=3HJpnPnK9+vJvJ_g8_jZcmqqy=XRA@mail.gmail.com>
-References: <1361946799-29471-1-git-send-email-peter.chen@freescale.com>
- <1361946799-29471-7-git-send-email-peter.chen@freescale.com>
- <20130227075510.GB8016@arwen.pp.htv.fi>
- <20130227080735.GH1906@pengutronix.de>
- <20130227081313.GI20402@nchen-desktop>
- <20130227083610.GK8016@arwen.pp.htv.fi>
- <CAEYLNCpNfNtpmGL-POaJ=3HJpnPnK9+vJvJ_g8_jZcmqqy=XRA@mail.gmail.com>
-Message-ID: <20130304111304.GB3397@arwen.pp.htv.fi>
+From: hvaibhav@ti.com (hvaibhav at ti.com)
+Date: Mon, 4 Mar 2013 17:05:54 +0530
+Subject: [RFC PATCH 0/3] ARM: OMAP2+: Add command line parameter for debugSS
+ module control
+In-Reply-To: <hvaibhav@ti.com>
+References: <hvaibhav@ti.com>
+Message-ID: <1362396957-30113-1-git-send-email-hvaibhav@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+From: Vaibhav Hiremath <hvaibhav@ti.com>
 
-On Wed, Feb 27, 2013 at 04:43:22PM +0200, Darius Augulis wrote:
-> Hi balbi,
-> 
-> actually no. I don't work with this hardware any more and don't have
-> free time to support it.
-> Please feel free to remove it if it breaks other things.
+Currently there is no clean mechanism to control debugSS module and
+you have to always keep clocks enabled, either,
 
-since nobody seems to care about imx_udc and it's currently even
-including unexistent headers, I'll schedule it for removal on v3.11
-(skipping v3.10 to give time for people to complain). Is that alright
-with you ?
+    - By enabling it during boot as part of clk_init function
+      (post common-clock migration).
+    Or
+    - By having HWMOD_INIT_NO_IDLE flag in hwmod data
+      (Joel submitted patch for AM335x earlier).
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130304/6fff7238/attachment.sig>
+Based on the discussion with Kevin H,
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg81771.html
+
+This patch introduces new kernel parameter "omap_debugss_en",
+which will allow user to control debugSS module enable/disable
+part during boot-time.
+
+In case of OMAP3, the debugSS is part of EMU domain and
+is currently controlled by clock tree alone.
+
+In case of OMAP4, the debugSS is part of EMU domain and
+is currently controlled by clock tree, as MODULEMODE_SWCTRL
+is not defined for hwmod.
+
+In case of AM335x, the debugSS is in wakeup domain and is currently
+controlled through hwmod alone. Currently we keep it always enabled.
+
+Testing:
+	- Tested on AM335x based EVM and BeagleBone platform
+
+	  As required, without this flag the debugSS module will be disabled
+	  during kernel boot.
+
+OMAP (2/3/4) may require some changes from clock/hwmod perspective
+in order to use this new parameter.
+I am still looking into OMAP spec and this RFC version of patch-series
+is to get comments or opinion from list.
+
+Vaibhav Hiremath (3):
+  ARM: AM33XX: clock: Add debugSS clock nodes to clock tree
+  ARM: AM33XX: hwmod: Add hwmod data for debugSS
+  ARM: OMAP2+: Add command line parameter for debugSS module control
+
+ Documentation/kernel-parameters.txt        |    3 +
+ arch/arm/mach-omap2/Makefile               |    2 +-
+ arch/arm/mach-omap2/cclock33xx_data.c      |   47 +++++++++++++++--
+ arch/arm/mach-omap2/debugss.c              |   80 ++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c |   69 ++++++++++++++++--------
+ 5 files changed, 173 insertions(+), 28 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/debugss.c
