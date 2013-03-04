@@ -1,198 +1,155 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Mon, 4 Mar 2013 19:39:57 +0800
-Subject: [PATCH 02/10] ARM: tegra: irq: add wake up handling
-Message-ID: <1362397197-5522-1-git-send-email-josephl@nvidia.com>
+Date: Mon, 4 Mar 2013 19:40:07 +0800
+Subject: [PATCH 03/10] ARM: tegra: get power management configurations for PMC
+ from DT
+Message-ID: <1362397207-5597-1-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the wake up handling for legacy irq controller, and using
-IRQCHIP_MASK_ON_SUSPEND for wake irq handling.
-
-Based on the work by:
-Varun Wadekar <vwadekar@nvidia.com>
+If the system supports deep sleep mode (i.e. suspend), it should have
+the power management configuration for PMC in the DT under the sub-node
+of PMC. Different system may have different configurations, it should
+be parsed from DT.
 
 Signed-off-by: Joseph Lo <josephl@nvidia.com>
 ---
- arch/arm/mach-tegra/common.c |  2 +
- arch/arm/mach-tegra/irq.c    | 95 +++++++++++++++++++++++++++++++++++++++++++-
- arch/arm/mach-tegra/irq.h    |  6 +++
- 3 files changed, 102 insertions(+), 1 deletion(-)
+ arch/arm/mach-tegra/pmc.c | 83 +++++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-tegra/pmc.h |  8 +++++
+ 2 files changed, 91 insertions(+)
 
-diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
-index f0315c9..bc7268a 100644
---- a/arch/arm/mach-tegra/common.c
-+++ b/arch/arm/mach-tegra/common.c
-@@ -33,6 +33,7 @@
- #include "common.h"
- #include "fuse.h"
- #include "iomap.h"
-+#include "irq.h"
- #include "pmc.h"
- #include "apbio.h"
- #include "sleep.h"
-@@ -63,6 +64,7 @@ void __init tegra_dt_init_irq(void)
- 	tegra_clocks_init();
- 	tegra_init_irq();
- 	irqchip_init();
-+	tegra_legacy_irq_syscore_init();
- }
- #endif
- 
-diff --git a/arch/arm/mach-tegra/irq.c b/arch/arm/mach-tegra/irq.c
-index 1952e82..efa85ef 100644
---- a/arch/arm/mach-tegra/irq.c
-+++ b/arch/arm/mach-tegra/irq.c
-@@ -4,7 +4,7 @@
-  * Author:
-  *	Colin Cross <ccross@android.com>
-  *
-- * Copyright (C) 2010, NVIDIA Corporation
-+ * Copyright (C) 2010,2013, NVIDIA Corporation
-  *
-  * This software is licensed under the terms of the GNU General Public
-  * License version 2, as published by the Free Software Foundation, and
-@@ -23,6 +23,7 @@
- #include <linux/io.h>
+diff --git a/arch/arm/mach-tegra/pmc.c b/arch/arm/mach-tegra/pmc.c
+index b30e921..f30c660 100644
+--- a/arch/arm/mach-tegra/pmc.c
++++ b/arch/arm/mach-tegra/pmc.c
+@@ -20,6 +20,8 @@
  #include <linux/of.h>
- #include <linux/irqchip/arm-gic.h>
-+#include <linux/syscore_ops.h>
+ #include <linux/of_address.h>
  
- #include "board.h"
- #include "iomap.h"
-@@ -43,6 +44,7 @@
- #define ICTLR_COP_IEP_CLASS	0x3c
- 
- #define FIRST_LEGACY_IRQ 32
-+#define TEGRA_MAX_NUM_ICTLRS	5
- 
- #define SGI_MASK 0xFFFF
- 
-@@ -56,6 +58,15 @@ static void __iomem *ictlr_reg_base[] = {
- 	IO_ADDRESS(TEGRA_QUINARY_ICTLR_BASE),
- };
- 
-+#ifdef CONFIG_PM_SLEEP
-+static u32 cop_ier[TEGRA_MAX_NUM_ICTLRS];
-+static u32 cop_iep[TEGRA_MAX_NUM_ICTLRS];
-+static u32 cpu_ier[TEGRA_MAX_NUM_ICTLRS];
-+static u32 cpu_iep[TEGRA_MAX_NUM_ICTLRS];
++#include "pmc.h"
 +
-+static u32 ictlr_wake_mask[TEGRA_MAX_NUM_ICTLRS];
-+#endif
+ #define PMC_CTRL			0x0
+ #define PMC_CTRL_INTR_LOW		(1 << 17)
+ #define PMC_PWRGATE_TOGGLE		0x30
+@@ -44,6 +46,22 @@ static DEFINE_SPINLOCK(tegra_powergate_lock);
+ static void __iomem *tegra_pmc_base;
+ static bool tegra_pmc_invert_interrupt;
+ 
++struct pmc_pm_data {
++	unsigned long cpu_good_time;	/* CPU power good time in uS */
++	unsigned long cpu_off_time;	/* CPU power off time in uS */
++	unsigned long core_osc_time;	/* Core power good osc time in uS */
++	unsigned long core_pmu_time;	/* Core power good pmu time in uS */
++	unsigned long core_off_time;	/* Core power off time in uS */
++	bool corereq_high;		/* Core power request active-high */
++	bool sysclkreq_high;		/* System clock request active-high */
++	bool combined_req;		/* Combined pwr req for CPU & Core */
++	bool cpu_pwr_good_en;		/* CPU power good signal is enabled */
++	u32 lp0_vec_phy_addr;		/* The phy addr of LP0 warm boot code */
++	u32 lp0_vec_size;		/* The size of LP0 warm boot code */
++	enum tegra_suspend_mode suspend_mode;
++};
++static struct pmc_pm_data pmc_pm_data;
 +
- bool tegra_pending_sgi(void)
+ static inline u32 tegra_pmc_readl(u32 reg)
  {
- 	u32 pending_set;
-@@ -125,6 +136,86 @@ static int tegra_retrigger(struct irq_data *d)
- 	return 1;
+ 	return readl(tegra_pmc_base + reg);
+@@ -143,6 +161,10 @@ static const struct of_device_id matches[] __initconst = {
+ static void tegra_pmc_parse_dt(void)
+ {
+ 	struct device_node *np;
++	u32 prop;
++	enum tegra_suspend_mode suspend_mode;
++	u32 core_good_time[2] = {0, 0};
++	u32 lp0_vec[2] = {0, 0};
+ 
+ 	np = of_find_matching_node(NULL, matches);
+ 	BUG_ON(!np);
+@@ -151,6 +173,67 @@ static void tegra_pmc_parse_dt(void)
+ 
+ 	tegra_pmc_invert_interrupt = of_property_read_bool(np,
+ 				     "nvidia,invert-interrupt");
++
++	/* Grabbing the power management configurations */
++	if (of_property_read_u32(np, "nvidia,suspend-mode", &prop)) {
++		suspend_mode = TEGRA_SUSPEND_NONE;
++	} else {
++		switch (prop) {
++		case 0:
++			suspend_mode = TEGRA_SUSPEND_LP0;
++			break;
++		case 1:
++			suspend_mode = TEGRA_SUSPEND_LP1;
++			break;
++		case 2:
++			suspend_mode = TEGRA_SUSPEND_LP2;
++			break;
++		default:
++			suspend_mode = TEGRA_SUSPEND_NONE;
++			break;
++		}
++	}
++
++	if (of_property_read_u32(np, "nvidia,cpu-pwr-good-time", &prop))
++		suspend_mode = TEGRA_SUSPEND_NONE;
++	pmc_pm_data.cpu_good_time = prop;
++
++	if (of_property_read_u32(np, "nvidia,cpu-pwr-off-time", &prop))
++		suspend_mode = TEGRA_SUSPEND_NONE;
++	pmc_pm_data.cpu_off_time = prop;
++
++	if (of_property_read_u32_array(np, "nvidia,core-pwr-good-time",
++			core_good_time, ARRAY_SIZE(core_good_time)))
++		suspend_mode = TEGRA_SUSPEND_NONE;
++	pmc_pm_data.core_osc_time = core_good_time[0];
++	pmc_pm_data.core_pmu_time = core_good_time[1];
++
++	if (of_property_read_u32(np, "nvidia,core-pwr-off-time",
++				 &prop))
++		suspend_mode = TEGRA_SUSPEND_NONE;
++	pmc_pm_data.core_off_time = prop;
++
++	pmc_pm_data.corereq_high = of_property_read_bool(np,
++				"nvidia,core-power-req-active-high");
++
++	pmc_pm_data.sysclkreq_high = of_property_read_bool(np,
++				"nvidia,sys-clock-req-active-high");
++
++	pmc_pm_data.combined_req = of_property_read_bool(np,
++				"nvidia,combined-power-req");
++
++	pmc_pm_data.cpu_pwr_good_en = of_property_read_bool(np,
++				"nvidia,cpu-pwr-good-en");
++
++	if (of_property_read_u32_array(np, "nvidia,lp0-vec", lp0_vec,
++				       ARRAY_SIZE(lp0_vec)))
++		if (suspend_mode == TEGRA_SUSPEND_LP0)
++			suspend_mode = TEGRA_SUSPEND_LP1;
++
++	pmc_pm_data.lp0_vec_phy_addr = lp0_vec[0];
++	pmc_pm_data.lp0_vec_size = lp0_vec[1];
++
++	pmc_pm_data.suspend_mode = suspend_mode;
  }
  
-+#ifdef CONFIG_PM_SLEEP
-+static int tegra_set_wake(struct irq_data *d, unsigned int enable)
-+{
-+	u32 irq = d->irq;
-+	u32 index, mask;
-+
-+	BUG_ON(irq < FIRST_LEGACY_IRQ ||
-+	       irq >= FIRST_LEGACY_IRQ + num_ictlrs * 32);
-+
-+	index = ((irq - FIRST_LEGACY_IRQ) / 32);
-+	mask = BIT((irq - FIRST_LEGACY_IRQ) % 32);
-+	if (enable)
-+		ictlr_wake_mask[index] |= mask;
-+	else
-+		ictlr_wake_mask[index] &= ~mask;
-+
-+	return 0;
-+}
-+
-+static int tegra_legacy_irq_suspend(void)
-+{
-+	unsigned long flags;
-+	int i;
-+
-+	local_irq_save(flags);
-+	for (i = 0; i < num_ictlrs; i++) {
-+		void __iomem *ictlr = ictlr_reg_base[i];
-+		/* Save interrupt state */
-+		cpu_ier[i] = readl_relaxed(ictlr + ICTLR_CPU_IER);
-+		cpu_iep[i] = readl_relaxed(ictlr + ICTLR_CPU_IEP_CLASS);
-+		cop_ier[i] = readl_relaxed(ictlr + ICTLR_COP_IER);
-+		cop_iep[i] = readl_relaxed(ictlr + ICTLR_COP_IEP_CLASS);
-+
-+		/* Disable COP interrupts */
-+		writel_relaxed(~0ul, ictlr + ICTLR_COP_IER_CLR);
-+
-+		/* Disable CPU interrupts */
-+		writel_relaxed(~0ul, ictlr + ICTLR_CPU_IER_CLR);
-+
-+		/* Enable the wakeup sources of ictlr */
-+		writel_relaxed(ictlr_wake_mask[i], ictlr + ICTLR_CPU_IER_SET);
-+	}
-+	local_irq_restore(flags);
-+
-+	return 0;
-+}
-+
-+static void tegra_legacy_irq_resume(void)
-+{
-+	unsigned long flags;
-+	int i;
-+
-+	local_irq_save(flags);
-+	for (i = 0; i < num_ictlrs; i++) {
-+		void __iomem *ictlr = ictlr_reg_base[i];
-+		writel_relaxed(cpu_iep[i], ictlr + ICTLR_CPU_IEP_CLASS);
-+		writel_relaxed(~0ul, ictlr + ICTLR_CPU_IER_CLR);
-+		writel_relaxed(cpu_ier[i], ictlr + ICTLR_CPU_IER_SET);
-+		writel_relaxed(cop_iep[i], ictlr + ICTLR_COP_IEP_CLASS);
-+		writel_relaxed(~0ul, ictlr + ICTLR_COP_IER_CLR);
-+		writel_relaxed(cop_ier[i], ictlr + ICTLR_COP_IER_SET);
-+	}
-+	local_irq_restore(flags);
-+}
-+
-+static struct syscore_ops tegra_legacy_irq_syscore_ops = {
-+	.suspend = tegra_legacy_irq_suspend,
-+	.resume = tegra_legacy_irq_resume,
+ void __init tegra_pmc_init(void)
+diff --git a/arch/arm/mach-tegra/pmc.h b/arch/arm/mach-tegra/pmc.h
+index 7d44710..1c4b4de 100644
+--- a/arch/arm/mach-tegra/pmc.h
++++ b/arch/arm/mach-tegra/pmc.h
+@@ -18,6 +18,14 @@
+ #ifndef __MACH_TEGRA_PMC_H
+ #define __MACH_TEGRA_PMC_H
+ 
++enum tegra_suspend_mode {
++	TEGRA_SUSPEND_NONE = 0,
++	TEGRA_SUSPEND_LP2,	/* CPU voltage off */
++	TEGRA_SUSPEND_LP1,	/* CPU voltage off, DRAM self-refresh */
++	TEGRA_SUSPEND_LP0,      /* CPU + core voltage off, DRAM self-refresh */
++	TEGRA_MAX_SUSPEND_MODE,
 +};
 +
-+int tegra_legacy_irq_syscore_init(void)
-+{
-+	register_syscore_ops(&tegra_legacy_irq_syscore_ops);
-+
-+	return 0;
-+}
-+#else
-+#define tegra_set_wake NULL
-+#endif
-+
- void __init tegra_init_irq(void)
- {
- 	int i;
-@@ -150,6 +241,8 @@ void __init tegra_init_irq(void)
- 	gic_arch_extn.irq_mask = tegra_mask;
- 	gic_arch_extn.irq_unmask = tegra_unmask;
- 	gic_arch_extn.irq_retrigger = tegra_retrigger;
-+	gic_arch_extn.irq_set_wake = tegra_set_wake;
-+	gic_arch_extn.flags = IRQCHIP_MASK_ON_SUSPEND;
- 
- 	/*
- 	 * Check if there is a devicetree present, since the GIC will be
-diff --git a/arch/arm/mach-tegra/irq.h b/arch/arm/mach-tegra/irq.h
-index 5142649..bc05ce5 100644
---- a/arch/arm/mach-tegra/irq.h
-+++ b/arch/arm/mach-tegra/irq.h
-@@ -19,4 +19,10 @@
- 
- bool tegra_pending_sgi(void);
- 
-+#ifdef CONFIG_PM_SLEEP
-+int tegra_legacy_irq_syscore_init(void);
-+#else
-+static inline int tegra_legacy_irq_syscore_init(void) { return 0; }
-+#endif
-+
- #endif
+ bool tegra_pmc_cpu_is_powered(int cpuid);
+ int tegra_pmc_cpu_power_on(int cpuid);
+ int tegra_pmc_cpu_remove_clamping(int cpuid);
 -- 
 1.8.1.1
