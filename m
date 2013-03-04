@@ -1,47 +1,43 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 4 Mar 2013 11:18:31 -0800
-Subject: [PATCH 1/2] arm: omap2: mux: fix debugfs file permission
-In-Reply-To: <1361269464-20263-1-git-send-email-balbi@ti.com>
-References: <1361269464-20263-1-git-send-email-balbi@ti.com>
-Message-ID: <20130304191830.GV11806@atomide.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Mon, 4 Mar 2013 13:25:32 -0600
+Subject: [PATCH v3 0/8] ARM: omap2: GPMC cleanup
+In-Reply-To: <20130304185259.GQ11806@atomide.com>
+References: <1360696944-3371-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130304185259.GQ11806@atomide.com>
+Message-ID: <5134F52C.1010300@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [130219 02:28]:
-> OMAP's debugfs interface creates one file
-> for each signal in the mux table, such file
-> provides a read method but didn't provide
-> read permission. Fix it.
+
+On 03/04/2013 12:53 PM, Tony Lindgren wrote:
+> * Ezequiel Garcia <ezequiel.garcia@free-electrons.com> [130212 11:26]:
+>> This patchset is v3 of the small cleanup consisting in:
+>>  * mark some functions as 'static' when appropriate
+>>  * remove an unused function from gpmc.c
+>>  * improve error messages when a CS request fails
+>>  * migrate to dev_err and dev_warn
+>>
+>> Changes from v2:
+>>  * add a commit message to some trivial patches,
+>>    that omitted it due to author's laziness.
+>>
+>> Changes from v1:
+>>  * fix gpmc_cs_reserved to return a boolean instead
+>>    of an integer error code
+>>  * add a new patch to the patchset cleaning redundant checks
+>>
+>> It has been tested on a IGEP v2 board with OneNAND,
+>> which means the gpmc-nand patch is tested by compilation only.
+>>
+>> Altough this patchset is almost trivial,
+>> any feedback or testing is more than welcome.
+>>
+>> Thanks to Jon Hunter for his kind review!
 > 
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> Looks good to me. Jon, can you please queue all the GPMC related
+> patches into one pull request around -rc2 time assuming no more
+> comments? 
 
-Heh indeed, although read still seems to work without it.
-Applying into omap-for-v3.9/fixes.
+Yes will do.
 
-Regards,
-
-Tony
-
-> ---
->  arch/arm/mach-omap2/mux.c | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/mux.c b/arch/arm/mach-omap2/mux.c
-> index 6a217c9..03fa4f4 100644
-> --- a/arch/arm/mach-omap2/mux.c
-> +++ b/arch/arm/mach-omap2/mux.c
-> @@ -739,8 +739,9 @@ static void __init omap_mux_dbg_create_entry(
->  	list_for_each_entry(e, &partition->muxmodes, node) {
->  		struct omap_mux *m = &e->mux;
->  
-> -		(void)debugfs_create_file(m->muxnames[0], S_IWUSR, mux_dbg_dir,
-> -					  m, &omap_mux_dbg_signal_fops);
-> +		(void)debugfs_create_file(m->muxnames[0], S_IWUSR | S_IRUGO,
-> +					  mux_dbg_dir, m,
-> +					  &omap_mux_dbg_signal_fops);
->  	}
->  }
->  
-> -- 
-> 1.8.1.rc1.5.g7e0651a
-> 
+Jon
