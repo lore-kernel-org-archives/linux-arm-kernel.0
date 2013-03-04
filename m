@@ -1,61 +1,67 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 04 Mar 2013 10:22:19 -0700
-Subject: [PATCH 6/9] ARM: tegra: use pre-processor for all device trees
-In-Reply-To: <20130304084416.0D7653E20E9@localhost>
-References: <1360791198-29462-1-git-send-email-swarren@wwwdotorg.org>
- <1360791198-29462-7-git-send-email-swarren@wwwdotorg.org>
- <20130304084416.0D7653E20E9@localhost>
-Message-ID: <5134D84B.8070908@wwwdotorg.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 4 Mar 2013 09:33:26 -0800
+Subject: [PATCH] ARM: OMAP2+: Fix broken gpmc support
+In-Reply-To: <1361195859-5949-1-git-send-email-jon-hunter@ti.com>
+References: <1361195859-5949-1-git-send-email-jon-hunter@ti.com>
+Message-ID: <20130304173326.GJ11806@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/04/2013 01:44 AM, Grant Likely wrote:
-> On Wed, 13 Feb 2013 14:33:15 -0700, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> From: Stephen Warren <swarren@nvidia.com>
->>
->> This enables a C pre-processor pass on all Tegra device trees. This
->> allows future use of #defines and header files in order to define names
->> for various constants, such as the IDs and flags in GPIO specifiers.
->> Use of those features will increase the readability of the device tree
->> files.
->>
->> Signed-off-by: Stephen Warren <swarren@nvidia.com>
->> ---
->>  arch/arm/boot/dts/tegra114-dalmore.dts      |   21 -
->>  arch/arm/boot/dts/tegra114-dalmore.dtsp     |   21 +
+* Jon Hunter <jon-hunter@ti.com> [130218 06:01]:
+> Commit "ARM: OMAP2+: Prevent potential crash if GPMC probe fails" added
+> code to ensure that GPMC chip-selects could not be requested until the
+> device probe was successful. The chip-selects should have been
+> unreserved at the end of the probe function, but the code to unreserve
+> them appears to have ended up in the gpmc_calc_timings() function and
+> hence, this is causing problems requesting chip-selects. Fix this merge
+> error by unreserving the chip-selects at the end of the probe, but
+> before we call the gpmc child probe functions (for device-tree) which
+> request a chip-select.
 > 
-> Two comments;
-> 1) Use '-M' when posting patches that rename files, it makes for a much
->    smaller diff.  :-)
-
-Yes, I forgot this:-( I reposted just this patch with -M IIRC (but maybe
-I don't!)
-
-> 2) Now that I see this patch, it's rather striking that .dtsp and .dtsip
->    are horible extensions (so are .dts and .dtsi for that matter, but
->    this just kicks it up a notch). Can we not do something better?
+> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+> Tested-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> Tested-by: Philip Avinash <avinashphilip@ti.com>
+> Tested-by: Grazvydas Ignotas <notasas@gmail.com>
+> ---
 > 
-> Can we do something else here; First, does the old style /include/
-> directives cause any problems existing .dts files? I know it won't work
-> if a /include/'ed file uses a #include statement, but the other way
-> around should be fine. Can we instead move the entire tree over to
-> building with the CPP enabled? Overall it will be less horribleness for
-> the end user.
+> Tony, GPMC support is completely broken in linux-next without this fix
+> and a few people now are reporting this problem. Can we get this fix
+> merged?
 
-I think syntactically, now that the *.dtsp->*.dtb rule uses gcc -x
-assembler-with-cpp, the only issue would be *.dts that have a # in the
-very first column. That's probably rare enough that we can ignore the
-issue. A quick grep certainly shows this isn't an issue with any file in
-arch/*/boot/dts in the kernel tree right now.
+Thanks applying now into omap-for-v3.9-rc1/fixes. Sorry for the delay,
+looks like I should have applied this earlier.
 
-The main reason I didn't go down this route is that dependencies don't
-work, at least with the kbuild rules as currently implemented. The
-reason is that with /include/, dependencies are emitted by dtc, and with
-#include, dependencies are emitted by cpp. Currently, the *.dts->*.dtb
-rules only look at the dtc-emitted dependencies, and the *.dtsp->*.dtb
-rules only look at the cpp-emitted dependencies.
+Regards,
 
-The solution here would be to augment the dtc+cpp rule to merge together
-the two sets of dependencies in a post-processing step. This might be
-easy; I'd have to look at the existing dependency post-processing script
-to see if it already handles a case like this.
+Tony
+ 
+>  arch/arm/mach-omap2/gpmc.c |    6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+> index 1adb2d4..1e8bcb4 100644
+> --- a/arch/arm/mach-omap2/gpmc.c
+> +++ b/arch/arm/mach-omap2/gpmc.c
+> @@ -1125,9 +1125,6 @@ int gpmc_calc_timings(struct gpmc_timings *gpmc_t,
+>  	/* TODO: remove, see function definition */
+>  	gpmc_convert_ps_to_ns(gpmc_t);
+>  
+> -	/* Now the GPMC is initialised, unreserve the chip-selects */
+> -	gpmc_cs_map = 0;
+> -
+>  	return 0;
+>  }
+>  
+> @@ -1388,6 +1385,9 @@ static int gpmc_probe(struct platform_device *pdev)
+>  	if (IS_ERR_VALUE(gpmc_setup_irq()))
+>  		dev_warn(gpmc_dev, "gpmc_setup_irq failed\n");
+>  
+> +	/* Now the GPMC is initialised, unreserve the chip-selects */
+> +	gpmc_cs_map = 0;
+> +
+>  	rc = gpmc_probe_dt(pdev);
+>  	if (rc < 0) {
+>  		clk_disable_unprepare(gpmc_l3_clk);
+> -- 
+> 1.7.10.4
+> 
