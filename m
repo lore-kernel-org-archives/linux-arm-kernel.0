@@ -1,231 +1,160 @@
-From: hechtb@gmail.com (Bastian Hecht)
-Date: Mon,  4 Mar 2013 18:54:05 +0100
-Subject: [PATCH] ARM: shmobile: r8a7740: Add CPU Core Standby Mode
-In-Reply-To: <1362419645-3116-1-git-send-email-hechtb+renesas@gmail.com>
-References: <1362419645-3116-1-git-send-email-hechtb+renesas@gmail.com>
-Message-ID: <1362419645-3116-2-git-send-email-hechtb+renesas@gmail.com>
+From: mporter@ti.com (Matt Porter)
+Date: Mon, 4 Mar 2013 11:56:20 -0500
+Subject: EDMA and kernel panic (null pointer) on da830
+In-Reply-To: <f369c80662414daf9acb0dddb19d8d07@DFLE72.ent.ti.com>
+References: <20130218163940.380e4a42@pcnovotny-t.fit.vutbr.cz>
+ <512350B8.8020301@ti.com>
+ <f369c80662414daf9acb0dddb19d8d07@DFLE72.ent.ti.com>
+Message-ID: <20130304165620.GE6209@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In system CPU core standby mode, the cache in the system CPU enters RAM standby
-state and the power supply to the system CPU logic is turned off. The on-chip
-peripheral modules in the system block continue to operate in sleep mode.
+On Tue, Feb 19, 2013 at 11:37:25AM +0000, Tomas Novotny wrote:
+> On Tue, 19 Feb 2013 15:45:20 +0530, Sekhar Nori <nsekhar@ti.com> wrote:
+> > + LAKML and Matt
+> > 
+> > On 2/18/2013 9:09 PM, Tomas Novotny wrote:
+> > > 	Hi all,
+> > > 
+> > > I'm working on custom board based on AM1707, which is quite similar to
+> > > EVM. Board file is derived from board-da830-evm.c.
+> > > 	I'm unable to boot because of null pointer access in edma after
+> > > upgrading linux-davinci to v3.7-davinci1. The DMA was working in 3.3
+> > > on my board.
+> > > 	The pointer is accessed in the arch/arm/mach-davinci/dma.c in
+> > > function edma_alloc_slot on the line 750:
+> > > slot = edma_cc[ctlr]->num_channels;
+> > > 	The problem is, that allocation is performed also with ctlr =
+> > > 1, which shouldn't (?) be done on AM1707, as there is only one channel
+> > > controller.
+> > > 	I can see the problem on v3.7-davinci1 and latest commit
+> > > (c03f8ea25) in the linux-davinci. I don't have EVM now, so I can't
+> > > check untouched v3.7-davinci1. But changes are done only in the board
+> > > file and DMA related code is the same.
+> > > 	Is anybody here, who has similar issue? Or is it working for
+> > > anybody here on the da830?
+> > > 	If you want, I can post more information. For beginning, kernel
+> > > log is attached.
+> > > 	Thanks and best regards,
+> > > 
+> > > 	Stoupa
+> > > 
+> > > DEBUG switched on in dma.c; added own print of pointer in the
+> > > edma_alloc_slot:
+> > > Booting Linux on physical CPU 0x0
+> > > Linux version 3.8.0-rc7-08807-g00c74d8-dirty (tom at pcnovotny-t) (gcc version 4.6.3 (Sourcery CodeBench Lite 2012.03-57) ) #118 PREEM...
+> > > CPU: ARM926EJ-S [41069265] revision 5 (ARMv5TEJ), cr=00053177
+> > > CPU: VIVT data cache, VIVT instruction cache
+> > > Machine: ELKO EP iNELS Central Unit 3
+> > > bootconsole [earlycon0] enabled
+> > > Memory policy: ECC disabled, Data cache writeback
+> > > DaVinci da830/omap-l137 rev2.0 variant 0x9
+> > > On node 0 totalpages: 16384
+> > > free_area_init_node: node 0, pgdat c038e0e0, node_mem_map c03ac000
+> > >   DMA zone: 128 pages used for memmap
+> > >   DMA zone: 0 pages reserved
+> > >   DMA zone: 16256 pages, LIFO batch:3
+> > > pcpu-alloc: s0 r0 d32768 u32768 alloc=1*32768
+> > > pcpu-alloc: [0] 0 
+> > > Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 16256
+> > > Kernel command line: console=ttyS1,115200n8 noinitrd rw rootwait rootfstype=jffs2 root=mtd3 mtdparts=davinci_nand.1:128k(u-boot_env)ro...
+> > > PID hash table entries: 256 (order: -2, 1024 bytes)
+> > > Dentry cache hash table entries: 8192 (order: 3, 32768 bytes)
+> > > Inode-cache hash table entries: 4096 (order: 2, 16384 bytes)
+> > > __ex_table already sorted, skipping sort
+> > > Memory: 64MB = 64MB total
+> > > Memory: 61168k/61168k available, 4368k reserved, 0K highmem
+> > > Virtual kernel memory layout:
+> > >     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
+> > >     fixmap  : 0xfff00000 - 0xfffe0000   ( 896 kB)
+> > >     vmalloc : 0xc4800000 - 0xff000000   ( 936 MB)
+> > >     lowmem  : 0xc0000000 - 0xc4000000   (  64 MB)
+> > >       .text : 0xc0008000 - 0xc03441c8   (3313 kB)
+> > >       .init : 0xc0345000 - 0xc0365e00   ( 132 kB)
+> > >       .data : 0xc0366000 - 0xc038eb60   ( 163 kB)
+> > >        .bss : 0xc038eb60 - 0xc03ab578   ( 115 kB)
+> > > SLUB: Genslabs=13, HWalign=32, Order=0-3, MinObjects=0, CPUs=1, Nodes=1
+> > > NR_IRQS:245
+> > > sched_clock: 32 bits at 24MHz, resolution 41ns, wraps every 178956ms
+> > > Calibrating delay loop... 148.88 BogoMIPS (lpj=744448)
+> > > pid_max: default: 32768 minimum: 301
+> > > Mount-cache hash table entries: 512
+> > > CPU: Testing write buffer coherency: ok
+> > > Setting up static identity map for 0xc02af890 - 0xc02af8cc
+> > > DaVinci: 128 gpio irqs
+> > > NET: Registered protocol family 16
+> > > DMA: preallocated 256 KiB pool for atomic coherent allocations
+> > > edma edma: DMA REG BASE ADDR=fec00000
+> > > bio: create slab <bio-0> at 0
+> > > EDMA: edma_alloc_slot: edma_cc[ctlr]: c3847000
+> > > edma-dma-engine edma-dma-engine.0: TI EDMA DMA engine driver
+> > > EDMA: edma_alloc_slot: edma_cc[ctlr]:   (null)
+> > > Unable to handle kernel NULL pointer dereference at virtual address 00000000
+> > > pgd = c0004000
+> > > [00000000] *pgd=00000000
+> > > Internal error: Oops: 5 [#1] PREEMPT ARM
+> > > CPU: 0    Not tainted  (3.8.0-rc7-08807-g00c74d8-dirty #118)
+> > > PC is at edma_alloc_slot+0x8c/0xf4
+> > > LR is at edma_alloc_slot+0x84/0xf4
+> > > pc : [<c0013ac4>]    lr : [<c0013abc>]    psr: 60000053
+> > > sp : c3823e40  ip : 00000001  fp : 00000000
+> > > r10: c034520c  r9 : c0365b9c  r8 : c0383908
+> > > r7 : c038ee54  r6 : c038ee54  r5 : 00000001  r4 : c386af10
+> > > r3 : c3822000  r2 : 00000001  r1 : 00000000  r0 : 00000000                             
+> > > Flags: nZCv  IRQs on  FIQs off  Mode SVC_32  ISA ARM  Segment kernel                   
+> > > Control: 0005317f  Table: c0004000  DAC: 00000017                                      
+> > > Process swapper (pid: 1, stack limit = 0xc38221b8)                                     
+> > > Stack: (0xc3823e40 to 0xc3824000)                                                      
+> > > 3e40: 00000000 c386af10 c386af00 c387a010 00000000 c019c2b8 c03a6590 20000053
+> > > 3e60: c386af10 00000000 c0383908 c0365b9c c034520c c01b7520 c01b750c c01b65c4
+> > > 3e80: c386af10 c01b67e0 00000000 00000000 c03a656c c01b5028 c381f068 c385d5d4
+> > > 3ea0: c386af44 c386af10 c386af10 c01b630c c386af10 c0384290 c386af10 c01b5258
+> > > 3ec0: c386af10 c386af18 c03841d0 c01b38bc 00000000 00000000 00000000 c0172c74
+> > > 3ee0: c3823f08 c386af00 c386af10 c386af00 c386af10 00000000 c038eb60 00000043
+> > > 3f00: c0365b9c c034520c 00000000 c01b7c6c 00000000 c386af00 c019c5dc c038eb60
+> > > 3f20: 00000043 c01b80d4 00000000 c03a5b9c 00000000 c019c614 c3823f48 00000000
+> > > 3f40: c019c5dc c03457e4 00000004 00000004 c0376608 c035d070 00000004 c035d074
+> > > 3f60: 00000004 c035d054 c038eb60 00000043 c0365b9c c03459a8 00000004 00000004
+> > > 3f80: c034520c c003e5a0 00000000 c02a9370 00000000 00000000 00000000 00000000
+> > > 3fa0: 00000000 c02a9378 00000000 c00092d0 00000000 00000000 00000000 00000000
+> > > 3fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+> > > 3fe0: 00000000 00000000 00000000 00000000 00000013 00000000 e3d181c2 3474dcfc
+> > > [<c0013ac4>] (edma_alloc_slot+0x8c/0xf4) from [<c019c2b8>] (edma_probe+0x34/0x254)
+> > > [<c019c2b8>] (edma_probe+0x34/0x254) from [<c01b7520>] (platform_drv_probe+0x14/0x18)
+> > > [<c01b7520>] (platform_drv_probe+0x14/0x18) from [<c01b65c4>] (driver_probe_device+0x78/0x204)
+> > > [<c01b65c4>] (driver_probe_device+0x78/0x204) from [<c01b5028>] (bus_for_each_drv+0x60/0x88)
+> > > [<c01b5028>] (bus_for_each_drv+0x60/0x88) from [<c01b630c>] (device_attach+0x80/0x98)
+> > > [<c01b630c>] (device_attach+0x80/0x98) from [<c01b5258>] (bus_probe_device+0x84/0xa8)
+> > > [<c01b5258>] (bus_probe_device+0x84/0xa8) from [<c01b38bc>] (device_add+0x534/0x600)
+> > > [<c01b38bc>] (device_add+0x534/0x600) from [<c01b7c6c>] (platform_device_add+0x100/0x2b4)
+> > > [<c01b7c6c>] (platform_device_add+0x100/0x2b4) from [<c01b80d4>] (platform_device_register_full+0xcc/0xf4)
+> > > [<c01b80d4>] (platform_device_register_full+0xcc/0xf4) from [<c019c614>] (edma_init+0x38/0x88)
+> > > [<c019c614>] (edma_init+0x38/0x88) from [<c03457e4>] (do_one_initcall+0x94/0x16c)
+> > > [<c03457e4>] (do_one_initcall+0x94/0x16c) from [<c03459a8>] (kernel_init_freeable+0xec/0x1b4)
+> > > [<c03459a8>] (kernel_init_freeable+0xec/0x1b4) from [<c02a9378>] (kernel_init+0x8/0xe4)
+> > > [<c02a9378>] (kernel_init+0x8/0xe4) from [<c00092d0>] (ret_from_fork+0x14/0x24)
+> > > Code: e7962105 eb0a5be7 e7960105 e1a07006 (e5904000) 
+> > > ---[ end trace c4da3ea0506c5146 ]---
+> > > Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
+> > 
+> > So this seems to be coming because of an incorrect assumption in
+> > drivers/dma/edma.c that all DA8XX devices have two channel controllers
+> > where as only the DA850 has two and DA830 has one. The right fix seems
+> > to be to actually start using platform device probe mechanism for DMA
+> > engine instead of bypassing it.
+> >
+> > Matt, can you fix this?
+> > 
+> > Tomas, You can check that the crash goes away if you define EDMA_CTLRS
+> > to 1 all the time in drivers/dma/edma.c (of course this will break da850).
+> 
+> Yes, it's "fixed" with it, thanks a lot. If there will be a patch for
+> it, I will test it.
 
-We use this mode as the suspend-to-memory mechanism.
+Hi Tomas,
 
-Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
----
- arch/arm/mach-shmobile/Makefile              |    2 +-
- arch/arm/mach-shmobile/include/mach/common.h |    1 +
- arch/arm/mach-shmobile/pm-r8a7740.c          |   63 ++++++++++++++++++-
- arch/arm/mach-shmobile/sleep-r8a7740.S       |   83 ++++++++++++++++++++++++++
- 4 files changed, 146 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm/mach-shmobile/sleep-r8a7740.S
+I copied you and Sekhar on a fix. I don't have a DA830 here but simulated
+it by disabling the second EDMA CC on DA850 and verifed that it fixes
+the reported issue here. Let me know how it works for you.
 
-diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index c621edf..1206a6d 100644
---- a/arch/arm/mach-shmobile/Makefile
-+++ b/arch/arm/mach-shmobile/Makefile
-@@ -27,7 +27,7 @@ obj-$(CONFIG_SUSPEND)		+= suspend.o
- obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
- obj-$(CONFIG_ARCH_SHMOBILE)	+= pm-rmobile.o
- obj-$(CONFIG_ARCH_SH7372)	+= pm-sh7372.o sleep-sh7372.o
--obj-$(CONFIG_ARCH_R8A7740)	+= pm-r8a7740.o
-+obj-$(CONFIG_ARCH_R8A7740)	+= pm-r8a7740.o sleep-r8a7740.o
- obj-$(CONFIG_ARCH_R8A7779)	+= pm-r8a7779.o
- obj-$(CONFIG_ARCH_SH73A0)	+= pm-sh73a0.o
- 
-diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
-index c401c8d..b8960a2 100644
---- a/arch/arm/mach-shmobile/include/mach/common.h
-+++ b/arch/arm/mach-shmobile/include/mach/common.h
-@@ -57,6 +57,7 @@ extern void r8a7740_add_standard_devices(void);
- extern void r8a7740_clock_init(u8 md_ck);
- extern void r8a7740_pinmux_init(void);
- extern void r8a7740_pm_init(void);
-+extern void r8a7740_resume_core_standby(void);
- 
- extern void r8a7779_init_delay(void);
- extern void r8a7779_init_irq(void);
-diff --git a/arch/arm/mach-shmobile/pm-r8a7740.c b/arch/arm/mach-shmobile/pm-r8a7740.c
-index 40b87aa..ee3d713 100644
---- a/arch/arm/mach-shmobile/pm-r8a7740.c
-+++ b/arch/arm/mach-shmobile/pm-r8a7740.c
-@@ -10,9 +10,29 @@
-  */
- #include <linux/console.h>
- #include <linux/suspend.h>
-+#include <asm/io.h>
-+#include <asm/suspend.h>
-+#include <asm/cacheflush.h>
-+#include <asm/hardware/cache-l2x0.h>
- #include <mach/pm-rmobile.h>
- #include <mach/common.h>
- 
-+/* CPGA */
-+#define SYSTBCR IOMEM(0xe6150024)
-+
-+/* SYSC */
-+#define STBCHR IOMEM(0xe6180000)
-+#define STBCHRB IOMEM(0xe6180040)
-+#define SBAR IOMEM(0xe6180020)
-+#define SRSTFR IOMEM(0xe61800B4)
-+
-+/* SRSTFR flags */
-+#define RAMST	(1 << 19)
-+#define RCLNKA	(1 << 7)
-+#define RCPRES	(1 << 5)
-+#define RCWD1	(1 << 4)
-+#define RPF	(1 << 0)
-+
- #ifdef CONFIG_PM
- static int r8a7740_pd_a4s_suspend(void)
- {
-@@ -62,15 +82,54 @@ void __init r8a7740_init_pm_domains(void)
- #endif /* CONFIG_PM */
- 
- #ifdef CONFIG_SUSPEND
--static int r8a7740_enter_suspend(suspend_state_t suspend_state)
-+static void r8a7740_set_reset_vector(unsigned long address)
-+{
-+	__raw_writel(address, SBAR);
-+}
-+
-+static int r8a7740_do_idle_core_standby(unsigned long unused)
- {
-+#ifdef CONFIG_CACHE_L2X0
-+	/*
-+	 * cpu_suspend() guarantees that all data made it to the L2.
-+	 * Flush it out now.
-+	 */
-+	outer_flush_all();
-+#endif
- 	cpu_do_idle();
- 	return 0;
- }
- 
-+static int r8a7740_enter_core_standby(suspend_state_t suspend_state)
-+{
-+	u32 reg32;
-+
-+	r8a7740_set_reset_vector(__pa(r8a7740_resume_core_standby));
-+
-+	/* clear all flags that lead to a cold boot */
-+	__raw_writel(~(RAMST | RCLNKA | RCPRES | RCWD1 | RPF), SRSTFR);
-+	/* indicate warm boot */
-+	__raw_writel(0x80000000, STBCHRB);
-+	/* clear other flags checked by internal ROM boot loader */
-+	__raw_writel(0x00000000, STBCHR);
-+
-+	/* set the System CPU Core Standby flag */
-+	reg32 = readl(SYSTBCR);
-+	reg32 |= (1 << 4);
-+	writel(reg32, SYSTBCR);
-+
-+	cpu_suspend(0, r8a7740_do_idle_core_standby);
-+
-+	/* Clear the flag so that other WFI instructions don't get affected */
-+	reg32 &= ~(1 << 4);
-+	writel(reg32, SYSTBCR);
-+
-+	return 0;
-+}
-+
- static void r8a7740_suspend_init(void)
- {
--	shmobile_suspend_ops.enter = r8a7740_enter_suspend;
-+	shmobile_suspend_ops.enter = r8a7740_enter_core_standby;
- }
- #else
- static void r8a7740_suspend_init(void) {}
-diff --git a/arch/arm/mach-shmobile/sleep-r8a7740.S b/arch/arm/mach-shmobile/sleep-r8a7740.S
-new file mode 100644
-index 0000000..7a2608f
---- /dev/null
-+++ b/arch/arm/mach-shmobile/sleep-r8a7740.S
-@@ -0,0 +1,83 @@
-+/*
-+ * Low level sleep code for the SoC r8a7740
-+ *
-+ * Copyright (C) 2013 Bastian Hecht
-+ *
-+ * This file is subject to the terms and conditions of the GNU General Public
-+ * License.  See the file "COPYING" in the main directory of this archive
-+ * for more details.
-+ */
-+
-+#include <linux/linkage.h>
-+#include <linux/init.h>
-+#include <asm/memory.h>
-+#include <asm/hardware/cache-l2x0.h>
-+
-+#if defined(CONFIG_SUSPEND)
-+/*
-+ * The secondary kernel init calls v7_flush_dcache_all before it enables
-+ * the L1; however, the L1 comes out of reset in an undefined state, so
-+ * the clean + invalidate performed by v7_flush_dcache_all causes a bunch
-+ * of cache lines with uninitialized data and uninitialized tags to get
-+ * written out to memory, which does really unpleasant things to the main
-+ * processor.  We fix this by performing an invalidate, rather than a
-+ * clean + invalidate, before jumping into the kernel.
-+ *
-+ * This funciton is cloned from arch/arm/mach-tegra/headsmp.S
-+ */
-+	.section ".text.head", "ax"
-+ENTRY(v7_invalidate_l1)
-+	mov	r0, #0
-+	mcr	p15, 0, r0, c7, c5, 0	@ invalidate I cache
-+	mcr	p15, 2, r0, c0, c0, 0
-+	mrc	p15, 1, r0, c0, c0, 0
-+
-+	ldr	r1, =0x7fff
-+	and	r2, r1, r0, lsr #13
-+
-+	ldr	r1, =0x3ff
-+
-+	and	r3, r1, r0, lsr #3	@ NumWays - 1
-+	add	r2, r2, #1		@ NumSets
-+
-+	and	r0, r0, #0x7
-+	add	r0, r0, #4	@ SetShift
-+
-+	clz	r1, r3		@ WayShift
-+	add	r4, r3, #1	@ NumWays
-+1:	sub	r2, r2, #1	@ NumSets--
-+	mov	r3, r4		@ Temp = NumWays
-+2:	subs	r3, r3, #1	@ Temp--
-+	mov	r5, r3, lsl r1
-+	mov	r6, r2, lsl r0
-+	orr	r5, r5, r6	@ Reg = (Temp<<WayShift)|(NumSets<<SetShift)
-+	mcr	p15, 0, r5, c7, c6, 2
-+	bgt	2b
-+	cmp	r2, #0
-+	bgt	1b
-+	dsb
-+	isb
-+	mov	pc, lr
-+ENDPROC(v7_invalidate_l1)
-+
-+	.text
-+ENTRY(v7_cpu_resume)
-+	bl	v7_invalidate_l1
-+	b	cpu_resume
-+ENDPROC(v7_cpu_resume)
-+
-+/*
-+ * The entry point of a warm reboot, used by wakeup scenarios
-+ *
-+ * The CPU jumps in this case to (0xfffff000 & SBAR), so we need
-+ * to align this function properly.
-+ * We use a long jump into the text segment and use the physical
-+ * address as the MMU is still turned off.
-+ */
-+	.align	12
-+	.text
-+ENTRY(r8a7740_resume_core_standby)
-+	ldr	pc, 1f
-+1:	.long	v7_cpu_resume - PAGE_OFFSET + PLAT_PHYS_OFFSET
-+ENDPROC(r8a7740_resume_core_standby)
-+#endif
--- 
-1.7.9.5
+-Matt
