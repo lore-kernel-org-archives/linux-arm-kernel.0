@@ -1,48 +1,119 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Mon, 4 Mar 2013 11:08:24 +0100
-Subject: [PATCH 00/40] Power: AB8500: Internal development push
-In-Reply-To: <20130302233335.GA25293@lizard.sbx05280.losalca.wayport.net>
-References: <1360932310-30065-1-git-send-email-lee.jones@linaro.org>
- <20130302233335.GA25293@lizard.sbx05280.losalca.wayport.net>
-Message-ID: <20130304100824.GB15384@sortiz-mobl>
+From: lexa@cfotr.com (lexa)
+Date: Mon, 04 Mar 2013 14:24:10 +0400
+Subject: Debugging missing interrupts
+In-Reply-To: <512C118D.4060105@atmel.com>
+References: <1361777691.4640.34.camel@localhost>
+ <512B1AE6.6070903@atmel.com> <1361781448.4640.49.camel@localhost>
+ <512B2D2D.5000206@atmel.com> <1361790127.4640.58.camel@localhost>
+ <512C118D.4060105@atmel.com>
+Message-ID: <1362392650.11465.49.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anton,
-
-On Sat, Mar 02, 2013 at 03:33:35PM -0800, Anton Vorontsov wrote:
-> Hello Lee,
+On Tue, 2013-02-26 at 09:36 +0800, Bo Shen wrote:
+> On 2/25/2013 19:02, lexa wrote:
+> >>>> Which command do you use for recording? (it will give sample rate,
+> >>>> format, and etc)
+> >>
+> >> any information for this?
+> > I tried:
+> > arecord -r 8000 -f S16_LE
+> > arecord -r 8000 -f U8
+> > arecord -r 48000 -f S16_LE
+> > arecord -r 48000 -f U8
 > 
-> On Fri, Feb 15, 2013 at 12:44:30PM +0000, Lee Jones wrote:
-> > This is the 3rd and final instalment of the push to synchronise
-> > the ABx500 Battery Management series of internal development patches
-> > due for Mainline.
-> > 
-> > This patch-set submission is for reviewing purposes only. Please
-> > don't apply patches directly from this patch-set, as there are some
-> > interdependencies with another patch-set due for the MFD tree. We
-> > can chat about how to over-come this at a later date.
+> only these, without "-t wav record.wav" or anything else?
+
+Only this commands, without any additional options. Recorded data
+forwarded to my terminal and i don't see anything except wav header.
+
 > 
-> It looks so much better than the initial series! Frankly, I couldn't find
-> anything utterly wrong with it. :-)  (I did notice a couple of cosmetic
-> issues, but considering the amount of work and patches needed rebasing, it
-> would be insane of me to ask fixing these. :-)
+> >> Please enable the kernel debug information, this will give out necessary
+> >> register information for debugging. Please also provide it for analysis
+> >> your problem.
+> >>
+> >
+> > Which registers should i watch ? I suppose all registers which configure
+> > SSC controller, but maybe someone what else ?
 > 
-> So, I can easily merge it, as long as MFD part is either Acked or handled
-> somehow else. 
-I can Ack the MFD parts, they look good to me. And then you can take the whole
-thing through your tree, but I'd prefer you to do so by pulling the branch Lee
-prepared for us. I want to avoid conflicts this way.
+> May be you misunderstanding. I mean you enable the kernel debug 
+> information, the driver will automatically print the register setting 
+> for each step operation.
+> 
+> You can go through the driver, there are many pr_debug which give the 
+> necessary information.
 
-> But I do want to merge the drivers/power/ part via battery
-> tree -- the part is quite large and thus prone to conflicts if someone
-> asks me to merge a patch that would touch the same lines.
-Certainly. I will only take the MFD parts of it through Lee's branch.
-Conflicts will be avoided this way.
+I enable debugging in ssc driver and tried execute some commands:
 
-Cheers,
-Samuel.
 
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+# arecord -f dat -t wav record.wav
+Recording WAVE 'record.wav' : Signed 16 bit Little Endian, Rate 48000 Hz, Stereo
+[   73.500000] atmel_ssc_startup: SSC_SR=0x12
+[   73.520000] atmel_ssc_hw_params: RCMR=00010721 RFMR=0000008f TCMR=00010702 TF MR=0000008f
+[   73.530000] atmel_ssc_dai: Starting clock
+[   73.540000] atmel_ssc_dai,hw_params: SSC initialized
+[   73.540000] receive enabled SSC_SR=0x0002040c
+Aborted by signal Interrupt...
+[   79.650000] atmel_ssc_shutdown: receive disabled SSC_SR=0x0000040c
+[   79.650000] atmel_ssc_dau: Stopping clock signal Interrupt...
+
+
+# aplay -f dat  test.dat
+[   92.040000] atmel_ssc_startup: SSC_SR=0x12
+Playing raw data 'test.dat' : Signed 16 bit Little Endian, Rate 48000 Hz, Stereo
+[   92.060000] atmel_ssc_hw_params: RCMR=00010721 RFMR=0000008f TCMR=00010702 TFMR=0000008f
+[   92.070000] atmel_ssc_dai: Starting clock
+[   92.080000] atmel_ssc_dai,hw_params: SSC initialized
+[   92.080000] transmit enabled SSC_SR=0x0001040f
+[   92.210000] atmel_ssc_shutdown: transmit disabled SSC_SR=0x00010403
+[   92.210000] atmel_ssc_dau: Stopping clock
+
+# arecord -r 8000 -f S16_LE -t wav record.wav
+[  139.770000] atmel_ssc_startup: SSC_SR=0x0
+Recording WAVE 'record.wav' : Signed 16 bit Little Endian, Rate 8000 Hz, Mono
+[  139.790000] atmel_ssc_hw_params: RCMR=00010421 RFMR=0000008f TCMR=00010402 TFMR=0000008f
+[  139.800000] atmel_ssc_dai: Starting clock
+[  139.800000] atmel_ssc_dai,hw_params: SSC initialized
+[  139.810000] receive enabled SSC_SR=0x000204c0
+Aborted by signal Interrupt...
+[  141.260000] atmel_ssc_shutdown: receive disabled SSC_SR=0x00000400
+[  141.270000] atmel_ssc_dau: Stopping clock
+
+# aplay  -r 8000 -f S16_LE test.dat 
+[  154.710000] atmel_ssc_startup: SSC_SR=0x0
+Playing raw data 'test.dat' : Signed 16 bit Little Endian, Rate 8000 Hz, Mono
+[  154.730000] atmel_ssc_hw_params: RCMR=00010421 RFMR=0000008f TCMR=00010402 TFMR=0000008f
+[  154.740000] atmel_ssc_dai: Starting clock
+[  154.750000] atmel_ssc_dai,hw_params: SSC initialized
+[  154.750000] transmit enabled SSC_SR=0x0001040f
+Aborted by signal Interrupt...
+[  155.580000] atmel_ssc_shutdown: transmit disabled SSC_SR=0x00000403
+[  155.580000] atmel_ssc_dau: Stopping clock
+
+
+# arecord -r 8000 -f S16_LE -c 2 -t wav record.wav
+[  176.880000] atmel_ssc_startup: SSC_SR=0x0
+Recording WAVE 'record.wav' : Signed 16 bit Little Endian, Rate 8000 Hz, Stereo
+[  176.900000] atmel_ssc_hw_params: RCMR=00010721 RFMR=0000008f TCMR=00010702 TFMR=0000008f
+[  176.900000] atmel_ssc_dai: Starting clock
+[  176.910000] atmel_ssc_dai,hw_params: SSC initialized
+[  176.920000] receive enabled SSC_SR=0x000204c0
+Aborted by signal Interrupt...
+[  177.800000] atmel_ssc_shutdown: receive disabled SSC_SR=0x00000400
+[  177.810000] atmel_ssc_dau: Stopping clock
+
+
+# aplay -r 8000 -f S16_LE -c 2 test.dat
+[  193.380000] atmel_ssc_startup: SSC_SR=0x0
+Playing raw data 'test.dat' : Signed 16 bit Little Endian, Rate 8000 Hz, Stereo
+[  193.400000] atmel_ssc_hw_params: RCMR=00010721 RFMR=0000008f TCMR=00010702 TFMR=0000008f
+[  193.410000] atmel_ssc_dai: Starting clock
+[  193.410000] atmel_ssc_dai,hw_params: SSC initialized
+[  193.420000] transmit enabled SSC_SR=0x0001040f
+[  193.920000] atmel_ssc_shutdown: transmit disabled SSC_SR=0x00010403
+[  193.930000] atmel_ssc_dau: Stopping clock
+
+
+aplay works fine, but arecord writes nothing except wav header.
+
+P.S. Sorry for my slow response.
