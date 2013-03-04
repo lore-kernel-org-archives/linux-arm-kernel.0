@@ -1,31 +1,27 @@
-From: prakash.pm@ti.com (Manjunathappa, Prakash)
-Date: Mon, 4 Mar 2013 18:29:14 +0530
-Subject: [PATCH v2 3/4] ARM: davinci: da850: override SPI DT node device name
-In-Reply-To: <1362401955-9616-1-git-send-email-prakash.pm@ti.com>
-References: <1362401955-9616-1-git-send-email-prakash.pm@ti.com>
-Message-ID: <1362401955-9616-4-git-send-email-prakash.pm@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 4 Mar 2013 12:58:38 +0000
+Subject: [PATCH] DMA: PL330: Add check if device tree compatible
+In-Reply-To: <1362374943-29312-1-git-send-email-padma.v@samsung.com>
+References: <1362374943-29312-1-git-send-email-padma.v@samsung.com>
+Message-ID: <201303041258.39222.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Populate OF_DEV_AUXDATA with desired device name expected by spi-davinci
-driver. Without this clk_get of spi-davinci DT driver fails.
+On Monday 04 March 2013, Padmavathi Venna wrote:
+> +
+> +       if (adev->dev.of_node) {
+> +               ret = of_dma_controller_register(adev->dev.of_node,
+> +                                        of_dma_pl330_xlate, pdmac);
+> +               if (ret) {
+> +                       dev_err(&adev->dev,
+> +                       "unable to register DMA to the generic DT DMA helpers\n");
+> +                       goto probe_err4;
+> +               }
+>         }
 
-Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
----
- arch/arm/mach-davinci/da8xx-dt.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+Hmm, when I did the same thing in dw_dma, Andy commented that this should
+not be a failure at all, since the device is still usable. Could we
+instead make of_dma_controller_register return silently when it
+gets a NULL of_node?
 
-diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
-index 5404e92..05f142a 100644
---- a/arch/arm/mach-davinci/da8xx-dt.c
-+++ b/arch/arm/mach-davinci/da8xx-dt.c
-@@ -40,6 +40,7 @@ static void __init da8xx_init_irq(void)
- struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("ti,davinci-i2c", 0x01c22000, "i2c_davinci.1", NULL),
- 	OF_DEV_AUXDATA("ti,davinci-wdt", 0x01c21000, "watchdog", NULL),
-+	OF_DEV_AUXDATA("ti,da8xx-spi", 0x01f0e000, "spi_davinci.1", NULL),
- 	{}
- };
- 
--- 
-1.7.4.1
+	Arnd
