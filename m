@@ -1,209 +1,31 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon,  4 Mar 2013 14:06:31 -0800
-Subject: [PATCH] ARM: msm: Concentrate defconfig on DT supported devices
-Message-ID: <1362434791-22494-1-git-send-email-sboyd@codeaurora.org>
+From: mporter@ti.com (Matt Porter)
+Date: Mon, 4 Mar 2013 17:12:51 -0500
+Subject: [PATCH v7 01/10] ARM: davinci: move private EDMA API to arm/common
+In-Reply-To: <e92425fefcc04bb4ab739ec8d4e82672@DLEE74.ent.ti.com>
+References: <1359742975-10421-1-git-send-email-mporter@ti.com>
+ <1359742975-10421-2-git-send-email-mporter@ti.com>
+ <511673E1.7000908@ti.com>
+ <e92425fefcc04bb4ab739ec8d4e82672@DLEE74.ent.ti.com>
+Message-ID: <20130304221251.GG6209@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make msm_defconfig more focused on DT devices, i.e. MSM8660 and
-MSM8960. This will encourage us to focus our efforts on the
-devicetree-ification of mach-msm, and help us catch build errors
-quicker.
+On Sat, Feb 09, 2013 at 08:08:50PM +0000, Russell King wrote:
+> On Sat, Feb 09, 2013 at 09:35:53PM +0530, Sekhar Nori wrote:
+> > On 2/1/2013 11:52 PM, Matt Porter wrote:
+> > > +	ret = of_address_to_resource(node, 1, &res);
+> > 
+> > of_address_to_resource() needs <linux/of_address.h>
+> > 
+> > > +	if (IS_ERR_VALUE(ret))
+> > 
+> > This needs <linux/err.h>
+> 
+> More importantly, is this the correct way to check for errors from
+> of_address_to_resource() ?  Grepping the source shows that either less
+> than 0 or non-zero are the commonly used conditions here.
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
+Yes, it's not correct. Fixed to check for non-zero/zero in the two cases
+where of_address_to_resource() is used.
 
-This is a dump of my 8660/8960 defconfig with most of the kernel hacking
-options stripped out.
-
- arch/arm/configs/msm_defconfig |  153 ++++++++++++++++++++++++++++------------
- 1 file changed, 108 insertions(+), 45 deletions(-)
-
-diff --git a/arch/arm/configs/msm_defconfig b/arch/arm/configs/msm_defconfig
-index 2b8f7af..3a5e519 100644
---- a/arch/arm/configs/msm_defconfig
-+++ b/arch/arm/configs/msm_defconfig
-@@ -1,72 +1,135 @@
--CONFIG_EXPERIMENTAL=y
-+CONFIG_SYSVIPC=y
-+CONFIG_NO_HZ=y
-+CONFIG_HIGH_RES_TIMERS=y
- CONFIG_IKCONFIG=y
- CONFIG_IKCONFIG_PROC=y
- CONFIG_BLK_DEV_INITRD=y
--CONFIG_SLAB=y
--# CONFIG_BLK_DEV_BSG is not set
--# CONFIG_IOSCHED_DEADLINE is not set
--# CONFIG_IOSCHED_CFQ is not set
-+CONFIG_SYSCTL_SYSCALL=y
-+CONFIG_KALLSYMS_ALL=y
-+CONFIG_EMBEDDED=y
-+# CONFIG_SLUB_DEBUG is not set
-+# CONFIG_COMPAT_BRK is not set
-+CONFIG_PROFILING=y
-+CONFIG_OPROFILE=y
-+CONFIG_KPROBES=y
-+CONFIG_MODULES=y
-+CONFIG_MODULE_UNLOAD=y
-+CONFIG_MODULE_FORCE_UNLOAD=y
-+CONFIG_MODVERSIONS=y
-+CONFIG_PARTITION_ADVANCED=y
- CONFIG_ARCH_MSM=y
--CONFIG_MACH_HALIBUT=y
--CONFIG_NO_HZ=y
--CONFIG_HIGH_RES_TIMERS=y
-+CONFIG_ARCH_MSM8X60=y
-+CONFIG_ARCH_MSM8960=y
-+CONFIG_SMP=y
- CONFIG_PREEMPT=y
- CONFIG_AEABI=y
--# CONFIG_OABI_COMPAT is not set
--CONFIG_ZBOOT_ROM_TEXT=0x0
--CONFIG_ZBOOT_ROM_BSS=0x0
--CONFIG_CMDLINE="mem=64M console=ttyMSM,115200n8"
--CONFIG_PM=y
-+CONFIG_HIGHMEM=y
-+CONFIG_HIGHPTE=y
-+CONFIG_CLEANCACHE=y
-+CONFIG_CC_STACKPROTECTOR=y
-+CONFIG_ARM_APPENDED_DTB=y
-+CONFIG_ARM_ATAG_DTB_COMPAT=y
-+CONFIG_AUTO_ZRELADDR=y
-+CONFIG_VFP=y
-+CONFIG_NEON=y
-+# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
- CONFIG_NET=y
-+CONFIG_PACKET=y
- CONFIG_UNIX=y
- CONFIG_INET=y
-+CONFIG_IP_ADVANCED_ROUTER=y
-+CONFIG_IP_MULTIPLE_TABLES=y
-+CONFIG_IP_ROUTE_VERBOSE=y
-+CONFIG_IP_PNP=y
-+CONFIG_IP_PNP_DHCP=y
- # CONFIG_INET_XFRM_MODE_TRANSPORT is not set
- # CONFIG_INET_XFRM_MODE_TUNNEL is not set
- # CONFIG_INET_XFRM_MODE_BEET is not set
--# CONFIG_INET_DIAG is not set
-+# CONFIG_INET_LRO is not set
- # CONFIG_IPV6 is not set
--CONFIG_MTD=y
--CONFIG_MTD_PARTITIONS=y
--CONFIG_MTD_CMDLINE_PARTS=y
--CONFIG_MTD_CHAR=y
--CONFIG_MTD_BLOCK=y
-+CONFIG_CFG80211=y
-+CONFIG_RFKILL=y
-+CONFIG_BLK_DEV_LOOP=y
-+CONFIG_BLK_DEV_RAM=y
-+CONFIG_SCSI=y
-+CONFIG_SCSI_TGT=y
-+CONFIG_BLK_DEV_SD=y
-+CONFIG_CHR_DEV_SG=y
-+CONFIG_CHR_DEV_SCH=y
-+CONFIG_SCSI_MULTI_LUN=y
-+CONFIG_SCSI_CONSTANTS=y
-+CONFIG_SCSI_LOGGING=y
-+CONFIG_SCSI_SCAN_ASYNC=y
- CONFIG_NETDEVICES=y
- CONFIG_DUMMY=y
--CONFIG_NET_ETHERNET=y
--CONFIG_SMC91X=y
--CONFIG_PPP=y
--CONFIG_PPP_ASYNC=y
--CONFIG_PPP_DEFLATE=y
--CONFIG_PPP_BSDCOMP=y
--# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
-+CONFIG_PHYLIB=y
-+CONFIG_SLIP=y
-+CONFIG_SLIP_COMPRESSED=y
-+CONFIG_SLIP_MODE_SLIP6=y
-+CONFIG_USB_USBNET=y
-+# CONFIG_USB_NET_AX8817X is not set
-+# CONFIG_USB_NET_ZAURUS is not set
- CONFIG_INPUT_EVDEV=y
- # CONFIG_KEYBOARD_ATKBD is not set
--# CONFIG_INPUT_MOUSE is not set
-+# CONFIG_MOUSE_PS2 is not set
-+CONFIG_INPUT_JOYSTICK=y
- CONFIG_INPUT_TOUCHSCREEN=y
- CONFIG_INPUT_MISC=y
--# CONFIG_SERIO is not set
--CONFIG_VT_HW_CONSOLE_BINDING=y
-+CONFIG_INPUT_UINPUT=y
-+CONFIG_SERIO_LIBPS2=y
-+# CONFIG_LEGACY_PTYS is not set
- CONFIG_SERIAL_MSM=y
- CONFIG_SERIAL_MSM_CONSOLE=y
--# CONFIG_LEGACY_PTYS is not set
--# CONFIG_HW_RANDOM is not set
-+CONFIG_HW_RANDOM=y
- CONFIG_I2C=y
--# CONFIG_HWMON is not set
--CONFIG_VIDEO_OUTPUT_CONTROL=y
-+CONFIG_I2C_CHARDEV=y
-+CONFIG_SPI=y
-+CONFIG_DEBUG_GPIO=y
-+CONFIG_GPIO_SYSFS=y
-+CONFIG_POWER_SUPPLY=y
-+CONFIG_THERMAL=y
-+CONFIG_REGULATOR=y
-+CONFIG_MEDIA_SUPPORT=y
- CONFIG_FB=y
--CONFIG_FB_MODE_HELPERS=y
--CONFIG_FB_TILEBLITTING=y
--CONFIG_FB_MSM=y
--# CONFIG_VGA_CONSOLE is not set
--CONFIG_FRAMEBUFFER_CONSOLE=y
-+CONFIG_SOUND=y
-+CONFIG_SND=y
-+CONFIG_SND_DYNAMIC_MINORS=y
-+# CONFIG_SND_ARM is not set
-+# CONFIG_SND_SPI is not set
-+# CONFIG_SND_USB is not set
-+CONFIG_SND_SOC=y
-+CONFIG_HID_BATTERY_STRENGTH=y
-+CONFIG_USB=y
-+CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
-+CONFIG_USB_MON=y
-+CONFIG_USB_EHCI_HCD=y
-+CONFIG_USB_EHCI_MSM=y
-+CONFIG_USB_ACM=y
-+CONFIG_USB_SERIAL=y
-+CONFIG_USB_GADGET=y
-+CONFIG_USB_GADGET_DEBUG_FILES=y
-+CONFIG_USB_GADGET_VBUS_DRAW=500
- CONFIG_NEW_LEDS=y
--CONFIG_LEDS_CLASS=y
--CONFIG_INOTIFY=y
-+CONFIG_RTC_CLASS=y
-+CONFIG_STAGING=y
-+CONFIG_MSM_IOMMU=y
-+CONFIG_EXT2_FS=y
-+CONFIG_EXT2_FS_XATTR=y
-+CONFIG_EXT3_FS=y
-+# CONFIG_EXT3_DEFAULTS_TO_ORDERED is not set
-+CONFIG_EXT4_FS=y
-+CONFIG_FUSE_FS=y
-+CONFIG_VFAT_FS=y
- CONFIG_TMPFS=y
-+CONFIG_NFS_FS=y
-+CONFIG_NFS_V3_ACL=y
-+CONFIG_NFS_V4=y
-+CONFIG_CIFS=y
-+CONFIG_PRINTK_TIME=y
- CONFIG_MAGIC_SYSRQ=y
--CONFIG_DEBUG_KERNEL=y
--CONFIG_SCHEDSTATS=y
--CONFIG_DEBUG_MUTEXES=y
--CONFIG_DEBUG_SPINLOCK_SLEEP=y
-+CONFIG_LOCKUP_DETECTOR=y
-+# CONFIG_DETECT_HUNG_TASK is not set
-+# CONFIG_SCHED_DEBUG is not set
-+CONFIG_TIMER_STATS=y
- CONFIG_DEBUG_INFO=y
--CONFIG_DEBUG_LL=y
-+CONFIG_DYNAMIC_DEBUG=y
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+-Matt
