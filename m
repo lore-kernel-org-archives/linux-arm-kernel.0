@@ -1,51 +1,39 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Mon, 4 Mar 2013 11:58:06 +0100
-Subject: [PATCH v3 3/3] leds: leds-pwm: Defer led_pwm_set() if PWM can
- sleep
-In-Reply-To: <51347B06.8090604@epfl.ch>
-References: <1359381659-24454-1-git-send-email-florian.vaussard@epfl.ch>
- <1359381659-24454-4-git-send-email-florian.vaussard@epfl.ch>
- <20130130081728.GC13568@avionic-0098.mockup.avionic-design.de>
- <512E2F98.6070404@epfl.ch> <51347B06.8090604@epfl.ch>
-Message-ID: <20130304105806.GA28735@avionic-0098.mockup.avionic-design.de>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 4 Mar 2013 13:13:04 +0200
+Subject: [PATCH v10 6/8] usb: chipidea: imx: add internal vbus regulator
+ control
+In-Reply-To: <CAEYLNCpNfNtpmGL-POaJ=3HJpnPnK9+vJvJ_g8_jZcmqqy=XRA@mail.gmail.com>
+References: <1361946799-29471-1-git-send-email-peter.chen@freescale.com>
+ <1361946799-29471-7-git-send-email-peter.chen@freescale.com>
+ <20130227075510.GB8016@arwen.pp.htv.fi>
+ <20130227080735.GH1906@pengutronix.de>
+ <20130227081313.GI20402@nchen-desktop>
+ <20130227083610.GK8016@arwen.pp.htv.fi>
+ <CAEYLNCpNfNtpmGL-POaJ=3HJpnPnK9+vJvJ_g8_jZcmqqy=XRA@mail.gmail.com>
+Message-ID: <20130304111304.GB3397@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 04, 2013 at 11:44:22AM +0100, Florian Vaussard wrote:
-> Hi Bryan, Richard,
-> 
-> >On 01/30/2013 09:17 AM, Thierry Reding wrote:
-> >>On Mon, Jan 28, 2013 at 03:00:59PM +0100, Florian Vaussard wrote:
-> >>>Call to led_pwm_set() can happen inside atomic context, like triggers.
-> >>>If the PWM call can sleep, defer using a worker.
-> >>>
-> >>>Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> >>>Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
-> >>>---
-> >>>  drivers/leds/leds-pwm.c |   50
-> >>>+++++++++++++++++++++++++++++++++++++++-------
-> >>>  1 files changed, 42 insertions(+), 8 deletions(-)
-> >>
-> >>Bryan, I assume that you'll be taking this? It doesn't apply cleanly to
-> >>my tree, probably because of Peter's recent changes that you took
-> >>through your tree and Florian based his patches on top of that. The
-> >>conflict resolution should be trivial, though.
-> >>
-> >
-> >It seems that this patch was not taken. Could you pull it, as the other
-> >part is already in linux-pwm? Or is there any show stopper?
-> >
-> 
-> Ping? Who should merge this?
+Hi Greg,
 
-I assume Bryan will take it through the LED tree? Patches 1 & 2 went
-into v3.9-rc1 through the PWM tree.
+On Wed, Feb 27, 2013 at 04:43:22PM +0200, Darius Augulis wrote:
+> Hi balbi,
+> 
+> actually no. I don't work with this hardware any more and don't have
+> free time to support it.
+> Please feel free to remove it if it breaks other things.
 
-Thierry
+since nobody seems to care about imx_udc and it's currently even
+including unexistent headers, I'll schedule it for removal on v3.11
+(skipping v3.10 to give time for people to complain). Is that alright
+with you ?
+
+-- 
+balbi
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: not available
+Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130304/d8be0d3b/attachment.sig>
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130304/6fff7238/attachment.sig>
