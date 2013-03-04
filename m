@@ -1,129 +1,48 @@
-From: avinashphilip@ti.com (Philip, Avinash)
-Date: Mon, 4 Mar 2013 10:05:41 +0000
-Subject: [PATCH 04/14] ARM: OMAP2+: Add function for configuring GPMC
- settings
-In-Reply-To: <5130CCA9.10905@ti.com>
-References: <1361899842-30303-1-git-send-email-jon-hunter@ti.com>
- <1361899842-30303-5-git-send-email-jon-hunter@ti.com>
- <518397C60809E147AF5323E0420B992E3EA8F007@DBDE01.ent.ti.com>
- <512F7D58.90706@ti.com> <512F9005.7040908@ti.com>
- <518397C60809E147AF5323E0420B992E3EA90C2F@DBDE01.ent.ti.com>
- <5130CCA9.10905@ti.com>
-Message-ID: <518397C60809E147AF5323E0420B992E3EA91D17@DBDE01.ent.ti.com>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Mon, 4 Mar 2013 11:08:24 +0100
+Subject: [PATCH 00/40] Power: AB8500: Internal development push
+In-Reply-To: <20130302233335.GA25293@lizard.sbx05280.losalca.wayport.net>
+References: <1360932310-30065-1-git-send-email-lee.jones@linaro.org>
+ <20130302233335.GA25293@lizard.sbx05280.losalca.wayport.net>
+Message-ID: <20130304100824.GB15384@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 01, 2013 at 21:13:37, Hunter, Jon wrote:
+Hi Anton,
+
+On Sat, Mar 02, 2013 at 03:33:35PM -0800, Anton Vorontsov wrote:
+> Hello Lee,
 > 
-> On 02/28/2013 11:33 PM, Philip, Avinash wrote:
-> > On Thu, Feb 28, 2013 at 22:42:37, Hunter, Jon wrote:
-> >>
-> >> On 02/28/2013 09:52 AM, Jon Hunter wrote:
-> >>>
-> >>> On 02/28/2013 12:05 AM, Philip, Avinash wrote:
-> >>>> On Tue, Feb 26, 2013 at 23:00:31, Hunter, Jon wrote:
-> >>>>> The GPMC has various different configuration options such as bus-width,
-> >>>>> synchronous or asychronous mode selection, burst mode options etc.
-> >>>>> Currently, there is no common function for configuring these options and
-> >>>>> various devices set these options by either programming the GPMC CONFIG1
-> >>>>> register directly or by calling gpmc_cs_configure() to set some of the
-> >>>>> options.
-> >>>>>
-> >>>>> Add a new function for configuring all of the GPMC options. Having a common
-> >>>>> function for configuring this options will simplify code and ease the
-> >>>>> migration to device-tree.
-> >>>>>
-> >>>>> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-> >>>>> ---
-> >>>>>  arch/arm/mach-omap2/gpmc.c |   65 ++++++++++++++++++++++++++++++++++++++++++++
-> >>>>>  arch/arm/mach-omap2/gpmc.h |    6 ++++
-> >>>>>  2 files changed, 71 insertions(+)
-> >>>>>
-> >>>>> diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-> >>>>> index 465cac9..fb8dfd2 100644
-> >>>>> --- a/arch/arm/mach-omap2/gpmc.c
-> >>>>> +++ b/arch/arm/mach-omap2/gpmc.c
-> >>>>> @@ -1137,6 +1137,71 @@ int gpmc_calc_timings(struct gpmc_timings *gpmc_t,
-> >>>>>  	return 0;
-> >>>>>  }
-> >>>>>  
-> >>>>> +int gpmc_cs_program_settings(int cs, struct gpmc_settings *p)
-> >>>>> +{
-> >>>>> +	u32 config1;
-> >>>>> +
-> >>>>> +	if ((!p->device_width) || (p->device_width > GPMC_DEVWIDTH_16BIT)) {
-> >>>>> +		pr_err("%s: invalid width %d!", __func__, p->device_width);
-> >>>>> +		return -EINVAL;
-> >>>>> +	}
-> >>>>> +
-> >>>>> +	/* Address-data multiplexing not supported for NAND devices */
-> >>>>> +	if (p->device_nand && p->mux_add_data) {
-> >>>>> +		pr_err("%s: invalid configuration!\n", __func__);
-> >>>>> +		return -EINVAL;
-> >>>>> +	}
-> >>>>> +
-> >>>>> +	/* Page/burst mode supports lengths of 4, 8 and 16 bytes */
-> >>>>> +	if (p->burst_read || p->burst_write) {
-> >>>>> +		switch (p->burst_len) {
-> >>>>> +		case GPMC_BURST_4:
-> >>>>> +		case GPMC_BURST_8:
-> >>>>> +		case GPMC_BURST_16:
-> >>>>> +			break;
-> >>>>> +		default:
-> >>>>> +			pr_err("%s: invalid page/burst-length (%d)\n",
-> >>>>> +			       __func__, p->burst_len);
-> >>>>> +			return -EINVAL;
-> >>>>> +		}
-> >>>>> +	}
-> >>>>> +
-> >>>>> +	if ((p->wait_on_read || p->wait_on_write) &&
-> >>>>> +	    (p->wait_pin > gpmc_nr_waitpins)) {
-> >>>>> +		pr_err("%s: invalid wait-pin (%d)\n", __func__, p->wait_pin);
-> >>>>> +		return -EINVAL;
-> >>>>> +	}
-> >>>>> +
-> >>>>> +	config1 = GPMC_CONFIG1_DEVICESIZE((p->device_width - 1));
-> >>>>
-> >>>> Can you consider read_modify approach?
-> >>>
-> >>> I was purposely trying to avoid that. The intent here is to program all
-> >>> the settings and get away from any boot-loader dependencies. If we use a
-> >>> read-modify approach then it will never be clear in the kernel what
-> >>> should actually be programmed.
-> >>
-> >> By the way, it would be good to know what your motivation for this is.
-> >>
-> >> My goal is for all gpmc settings to eventually live in the DT blob and
-> >> there be no dependency on the bootloader whatsoever. That may mean that
-> >> settings are re-programmed again by the kernel but IMO that is best.
+> On Fri, Feb 15, 2013 at 12:44:30PM +0000, Lee Jones wrote:
+> > This is the 3rd and final instalment of the push to synchronise
+> > the ABx500 Battery Management series of internal development patches
+> > due for Mainline.
 > > 
-> > Yes I understood now and the right thing to do.
-> > Suggested read modify approach because of some confusion as GPMC_CONFIG1 is already
-> > modified in gpmc_cs_set_timings() and is called from omap2_nand_gpmc_retime().
-> > So the data modified in gpmc_cs_set_timings() will lost (not significant)
-> > May be better and cleaner solution is to remove GPMC_CONFIG1 modification in
-> > gpmc_cs_set_timings() also.
+> > This patch-set submission is for reviewing purposes only. Please
+> > don't apply patches directly from this patch-set, as there are some
+> > interdependencies with another patch-set due for the MFD tree. We
+> > can chat about how to over-come this at a later date.
 > 
-> Actually that is a good point. There are some timings in CONFIG1 that
-> are not being configured in gpmc_cs_program_settings() but
-> gpmc_cs_set_timings(). I had left it this way intentionally to keep
-> timings together, which makes sense for where gpmc clock could change at
-> run time. However, this means that gpmc_cs_program_settings() needs to
-> be called before gpmc_cs_set_timings(). Really this is no different to
-> how the code was before, because the code was writing directly to
-> CONFIG1 and now we have a function.
+> It looks so much better than the initial series! Frankly, I couldn't find
+> anything utterly wrong with it. :-)  (I did notice a couple of cosmetic
+> issues, but considering the amount of work and patches needed rebasing, it
+> would be insane of me to ask fixing these. :-)
 > 
-> So the intent is for gpmc_cs_program_settings() to only be called once
-> for a given device and then gpmc_cs_set_timings() be called whenever the
-> timings need to be updated. May be I can updated the kernel-doc for
-> gpmc_cs_program_settings() to reflect this. Let me know if you have any
-> other concerns with this.
+> So, I can easily merge it, as long as MFD part is either Acked or handled
+> somehow else. 
+I can Ack the MFD parts, they look good to me. And then you can take the whole
+thing through your tree, but I'd prefer you to do so by pulling the branch Lee
+prepared for us. I want to avoid conflicts this way.
 
-Fine enough.
+> But I do want to merge the drivers/power/ part via battery
+> tree -- the part is quite large and thus prone to conflicts if someone
+> asks me to merge a patch that would touch the same lines.
+Certainly. I will only take the MFD parts of it through Lee's branch.
+Conflicts will be avoided this way.
 
-Thanks
-Avinash
-> 
-> Cheers
-> Jon
-> 
+Cheers,
+Samuel.
+
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
