@@ -1,31 +1,24 @@
-From: mporter@ti.com (Matt Porter)
-Date: Mon, 4 Mar 2013 17:12:51 -0500
-Subject: [PATCH v7 01/10] ARM: davinci: move private EDMA API to arm/common
-In-Reply-To: <e92425fefcc04bb4ab739ec8d4e82672@DLEE74.ent.ti.com>
-References: <1359742975-10421-1-git-send-email-mporter@ti.com>
- <1359742975-10421-2-git-send-email-mporter@ti.com>
- <511673E1.7000908@ti.com>
- <e92425fefcc04bb4ab739ec8d4e82672@DLEE74.ent.ti.com>
-Message-ID: <20130304221251.GG6209@beef>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon,  4 Mar 2013 14:43:01 -0800
+Subject: [PATCH 0/2] Call tracing/debug code in VFP preempt code
+Message-ID: <1362436983-28988-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 09, 2013 at 08:08:50PM +0000, Russell King wrote:
-> On Sat, Feb 09, 2013 at 09:35:53PM +0530, Sekhar Nori wrote:
-> > On 2/1/2013 11:52 PM, Matt Porter wrote:
-> > > +	ret = of_address_to_resource(node, 1, &res);
-> > 
-> > of_address_to_resource() needs <linux/of_address.h>
-> > 
-> > > +	if (IS_ERR_VALUE(ret))
-> > 
-> > This needs <linux/err.h>
-> 
-> More importantly, is this the correct way to check for errors from
-> of_address_to_resource() ?  Grepping the source shows that either less
-> than 0 or non-zero are the commonly used conditions here.
+The VFP preempt enable/disable code doesn't call into the tracers
+and also doesn't participate in the preempt debugging code. This
+patchset fixes that by making calls to the C functions from assembly
+when appropriate.
 
-Yes, it's not correct. Fixed to check for non-zero/zero in the two cases
-where of_address_to_resource() is used.
+Stephen Boyd (2):
+  ARM: Consolidate preempt enable/disable assembly into macros
+  ARM: Enable tracing around vfp preemption enable/disable
 
--Matt
+ arch/arm/kernel/entry-header.S | 31 +++++++++++++++++++++++++++++++
+ arch/arm/vfp/entry.S           | 20 +++-----------------
+ arch/arm/vfp/vfphw.S           | 14 ++------------
+ 3 files changed, 36 insertions(+), 29 deletions(-)
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
