@@ -1,135 +1,129 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 4 Mar 2013 10:03:09 +0000
-Subject: [PATCH 1/3] clocksource: sh_cmt: Add Device Tree probing
-In-Reply-To: <1362159932-18533-2-git-send-email-hechtb+renesas@gmail.com>
-References: <1362159932-18533-1-git-send-email-hechtb+renesas@gmail.com>
- <1362159932-18533-2-git-send-email-hechtb+renesas@gmail.com>
-Message-ID: <20130304100309.GA30747@e106331-lin.cambridge.arm.com>
+From: avinashphilip@ti.com (Philip, Avinash)
+Date: Mon, 4 Mar 2013 10:05:41 +0000
+Subject: [PATCH 04/14] ARM: OMAP2+: Add function for configuring GPMC
+ settings
+In-Reply-To: <5130CCA9.10905@ti.com>
+References: <1361899842-30303-1-git-send-email-jon-hunter@ti.com>
+ <1361899842-30303-5-git-send-email-jon-hunter@ti.com>
+ <518397C60809E147AF5323E0420B992E3EA8F007@DBDE01.ent.ti.com>
+ <512F7D58.90706@ti.com> <512F9005.7040908@ti.com>
+ <518397C60809E147AF5323E0420B992E3EA90C2F@DBDE01.ent.ti.com>
+ <5130CCA9.10905@ti.com>
+Message-ID: <518397C60809E147AF5323E0420B992E3EA91D17@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-I have a couple of comments on the binding and the way it's parsed.
-
-On Fri, Mar 01, 2013 at 05:45:30PM +0000, Bastian Hecht wrote:
-> We add the capabilty to probe SH CMT timer devices using Device Tree
-> setup.
+On Fri, Mar 01, 2013 at 21:13:37, Hunter, Jon wrote:
 > 
-> We can deduce former platform data by the device IDs and channel
-> IDs of our timer instances, so we choose this more intuitive info as our
-> DT properties.
+> On 02/28/2013 11:33 PM, Philip, Avinash wrote:
+> > On Thu, Feb 28, 2013 at 22:42:37, Hunter, Jon wrote:
+> >>
+> >> On 02/28/2013 09:52 AM, Jon Hunter wrote:
+> >>>
+> >>> On 02/28/2013 12:05 AM, Philip, Avinash wrote:
+> >>>> On Tue, Feb 26, 2013 at 23:00:31, Hunter, Jon wrote:
+> >>>>> The GPMC has various different configuration options such as bus-width,
+> >>>>> synchronous or asychronous mode selection, burst mode options etc.
+> >>>>> Currently, there is no common function for configuring these options and
+> >>>>> various devices set these options by either programming the GPMC CONFIG1
+> >>>>> register directly or by calling gpmc_cs_configure() to set some of the
+> >>>>> options.
+> >>>>>
+> >>>>> Add a new function for configuring all of the GPMC options. Having a common
+> >>>>> function for configuring this options will simplify code and ease the
+> >>>>> migration to device-tree.
+> >>>>>
+> >>>>> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+> >>>>> ---
+> >>>>>  arch/arm/mach-omap2/gpmc.c |   65 ++++++++++++++++++++++++++++++++++++++++++++
+> >>>>>  arch/arm/mach-omap2/gpmc.h |    6 ++++
+> >>>>>  2 files changed, 71 insertions(+)
+> >>>>>
+> >>>>> diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+> >>>>> index 465cac9..fb8dfd2 100644
+> >>>>> --- a/arch/arm/mach-omap2/gpmc.c
+> >>>>> +++ b/arch/arm/mach-omap2/gpmc.c
+> >>>>> @@ -1137,6 +1137,71 @@ int gpmc_calc_timings(struct gpmc_timings *gpmc_t,
+> >>>>>  	return 0;
+> >>>>>  }
+> >>>>>  
+> >>>>> +int gpmc_cs_program_settings(int cs, struct gpmc_settings *p)
+> >>>>> +{
+> >>>>> +	u32 config1;
+> >>>>> +
+> >>>>> +	if ((!p->device_width) || (p->device_width > GPMC_DEVWIDTH_16BIT)) {
+> >>>>> +		pr_err("%s: invalid width %d!", __func__, p->device_width);
+> >>>>> +		return -EINVAL;
+> >>>>> +	}
+> >>>>> +
+> >>>>> +	/* Address-data multiplexing not supported for NAND devices */
+> >>>>> +	if (p->device_nand && p->mux_add_data) {
+> >>>>> +		pr_err("%s: invalid configuration!\n", __func__);
+> >>>>> +		return -EINVAL;
+> >>>>> +	}
+> >>>>> +
+> >>>>> +	/* Page/burst mode supports lengths of 4, 8 and 16 bytes */
+> >>>>> +	if (p->burst_read || p->burst_write) {
+> >>>>> +		switch (p->burst_len) {
+> >>>>> +		case GPMC_BURST_4:
+> >>>>> +		case GPMC_BURST_8:
+> >>>>> +		case GPMC_BURST_16:
+> >>>>> +			break;
+> >>>>> +		default:
+> >>>>> +			pr_err("%s: invalid page/burst-length (%d)\n",
+> >>>>> +			       __func__, p->burst_len);
+> >>>>> +			return -EINVAL;
+> >>>>> +		}
+> >>>>> +	}
+> >>>>> +
+> >>>>> +	if ((p->wait_on_read || p->wait_on_write) &&
+> >>>>> +	    (p->wait_pin > gpmc_nr_waitpins)) {
+> >>>>> +		pr_err("%s: invalid wait-pin (%d)\n", __func__, p->wait_pin);
+> >>>>> +		return -EINVAL;
+> >>>>> +	}
+> >>>>> +
+> >>>>> +	config1 = GPMC_CONFIG1_DEVICESIZE((p->device_width - 1));
+> >>>>
+> >>>> Can you consider read_modify approach?
+> >>>
+> >>> I was purposely trying to avoid that. The intent here is to program all
+> >>> the settings and get away from any boot-loader dependencies. If we use a
+> >>> read-modify approach then it will never be clear in the kernel what
+> >>> should actually be programmed.
+> >>
+> >> By the way, it would be good to know what your motivation for this is.
+> >>
+> >> My goal is for all gpmc settings to eventually live in the DT blob and
+> >> there be no dependency on the bootloader whatsoever. That may mean that
+> >> settings are re-programmed again by the kernel but IMO that is best.
+> > 
+> > Yes I understood now and the right thing to do.
+> > Suggested read modify approach because of some confusion as GPMC_CONFIG1 is already
+> > modified in gpmc_cs_set_timings() and is called from omap2_nand_gpmc_retime().
+> > So the data modified in gpmc_cs_set_timings() will lost (not significant)
+> > May be better and cleaner solution is to remove GPMC_CONFIG1 modification in
+> > gpmc_cs_set_timings() also.
 > 
-> Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
-> ---
->  .../bindings/timer/renesas,sh-cmt-timer.txt        |   21 +++++
->  drivers/clocksource/sh_cmt.c                       |   94 +++++++++++++++++---
->  2 files changed, 102 insertions(+), 13 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/timer/renesas,sh-cmt-timer.txt
+> Actually that is a good point. There are some timings in CONFIG1 that
+> are not being configured in gpmc_cs_program_settings() but
+> gpmc_cs_set_timings(). I had left it this way intentionally to keep
+> timings together, which makes sense for where gpmc clock could change at
+> run time. However, this means that gpmc_cs_program_settings() needs to
+> be called before gpmc_cs_set_timings(). Really this is no different to
+> how the code was before, because the code was writing directly to
+> CONFIG1 and now we have a function.
 > 
-> diff --git a/Documentation/devicetree/bindings/timer/renesas,sh-cmt-timer.txt b/Documentation/devicetree/bindings/timer/renesas,sh-cmt-timer.txt
-> new file mode 100644
-> index 0000000..e5ad808
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/timer/renesas,sh-cmt-timer.txt
-> @@ -0,0 +1,21 @@
-> +* Renesas SH Mobile Compare Match Timer
-> +
-> +Required properties:
-> +- compatible : Should be "renesas,cmt"
-> +- reg : Address and length of the register set for the device
-> +- interrupts : Timer IRQ
-> +- renesas,timer-device-id : The ID of the timer device
-> +- renesas,timer-channel-id : The channel ID of the timer device
+> So the intent is for gpmc_cs_program_settings() to only be called once
+> for a given device and then gpmc_cs_set_timings() be called whenever the
+> timings need to be updated. May be I can updated the kernel-doc for
+> gpmc_cs_program_settings() to reflect this. Let me know if you have any
+> other concerns with this.
 
-I'm not familiar with this hardware. Could you give me a basic idea of how it's
-structured?
+Fine enough.
 
-Does the device have a single timer that this describes, or does the device
-have multiple timers, and this selects which one to use?
-
-> +
-> +Example for CMT10 of the R8A7740 SoC:
-> +
-> +	cmt at 0xe6138010 {
-> +		compatible = "renesas,cmt";
-> +		interrupt-parent = <&intca>;
-> +		reg = <0xe6138010 0xc>;
-> +		interrupts = <0x0b00>;
-> +		renesas,timer-device-id = <1>;
-> +		renesas,timer-channel-id = <0>;
-> +		renesas,clocksource-rating = <150>;
-> +		renesas,clockevent-rating = <150>;
-
-I'm not sure these last two are describing the hardware as such, they look like
-Linux implementation details. Do these really need to be in the binding?
-
-[...]
-
-> +static struct sh_timer_config *sh_cmt_parse_dt(struct device *dev)
-> +{
-> +	struct sh_timer_config *cfg;
-> +	struct device_node *np = dev->of_node;
-> +	const __be32 *prop;
-> +	int timer_id, channel_id;
-> +
-> +	cfg = devm_kzalloc(dev, sizeof(struct sh_timer_config), GFP_KERNEL);
-> +	if (!cfg) {
-> +		dev_err(dev, "failed to allocate DT config data\n");
-> +		return NULL;
-> +	}
-> +
-> +	prop = of_get_property(np, "renesas,timer-device-id", NULL);
-> +	if (!prop) {
-> +		dev_err(dev, "device id missing\n");
-> +		return NULL;
-> +	}
-> +	timer_id = be32_to_cpup(prop);
-
-You can use of_property_read_u32 here, e.g.
-
-if (!of_property_read_u32(np, "renesas,timer-device-id", &timer_id) {
-	dev_err(dev, "device id missing\n");
-	return NULL;
-}
-
-> +
-> +	prop = of_get_property(np, "renesas,timer-channel-id", NULL);
-> +	if (!prop) {
-> +		dev_err(dev, "channel id missing\n");
-> +		return NULL;
-> +	}
-> +	channel_id = be32_to_cpup(prop);
-
-You can use of_property_read_u32 here too.
-
-I assume there's a sensible range of channel_id values that could be checked
-before it's used in a calculation below.
-
-> +
-> +	if (timer_id >= ARRAY_SIZE(sh_timer_offset_multiplier)) {
-> +		dev_err(dev, "unsupported timer id\n");
-> +		return NULL;
-> +	}
-> +
-> +	cfg->channel_offset = sh_timer_offset_multiplier[timer_id] *
-> +							(channel_id + 1);
-> +	cfg->timer_bit = channel_id;
-> +
-> +	prop = of_get_property(np, "renesas,clocksource-rating", NULL);
-> +	if (prop)
-> +		cfg->clocksource_rating = be32_to_cpup(prop);
-
-You can use of_property_read_u32 here too.
-
-> +
-> +	prop = of_get_property(np, "renesas,clockevent-rating", NULL);
-> +	if (prop)
-> +		cfg->clockevent_rating = be32_to_cpup(prop);
-
-And here.
-
-[...]
-
-Thanks,
-Mark.
+Thanks
+Avinash
+> 
+> Cheers
+> Jon
+> 
