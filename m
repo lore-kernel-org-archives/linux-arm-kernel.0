@@ -1,43 +1,82 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Mon, 4 Mar 2013 13:25:32 -0600
-Subject: [PATCH v3 0/8] ARM: omap2: GPMC cleanup
-In-Reply-To: <20130304185259.GQ11806@atomide.com>
-References: <1360696944-3371-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130304185259.GQ11806@atomide.com>
-Message-ID: <5134F52C.1010300@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 4 Mar 2013 11:44:54 -0800
+Subject: [PATCH] pinctrl: single: avoid to set read only object
+In-Reply-To: <1362322904-19570-1-git-send-email-haojian.zhuang@linaro.org>
+References: <1362322904-19570-1-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <20130304194454.GW11806@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 03/04/2013 12:53 PM, Tony Lindgren wrote:
-> * Ezequiel Garcia <ezequiel.garcia@free-electrons.com> [130212 11:26]:
->> This patchset is v3 of the small cleanup consisting in:
->>  * mark some functions as 'static' when appropriate
->>  * remove an unused function from gpmc.c
->>  * improve error messages when a CS request fails
->>  * migrate to dev_err and dev_warn
->>
->> Changes from v2:
->>  * add a commit message to some trivial patches,
->>    that omitted it due to author's laziness.
->>
->> Changes from v1:
->>  * fix gpmc_cs_reserved to return a boolean instead
->>    of an integer error code
->>  * add a new patch to the patchset cleaning redundant checks
->>
->> It has been tested on a IGEP v2 board with OneNAND,
->> which means the gpmc-nand patch is tested by compilation only.
->>
->> Altough this patchset is almost trivial,
->> any feedback or testing is more than welcome.
->>
->> Thanks to Jon Hunter for his kind review!
+* Haojian Zhuang <haojian.zhuang@linaro.org> [130303 07:05]:
+> drivers/pinctrl/pinctrl-single.c:1441:3: error: assignment of member
+> ?is_generic? in read-only object
+> make[2]: *** [drivers/pinctrl/pinctrl-single.o] Error 1
 > 
-> Looks good to me. Jon, can you please queue all the GPMC related
-> patches into one pull request around -rc2 time assuming no more
-> comments? 
+> Since pcs_pinconf_ops is changed to read only structure, probe()
+> function can't set is_generic variable any more. So append new
+> pcs_pinconf_generic_ops.
+> 
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 
-Yes will do.
+Acked-by: Tony Lindgren <tony@atomide.com>
 
-Jon
+> ---
+>  drivers/pinctrl/pinctrl-single.c |   27 +++++++++++++++++++++------
+>  1 file changed, 21 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
+> index 4cdcf85..c80ffa8 100644
+> --- a/drivers/pinctrl/pinctrl-single.c
+> +++ b/drivers/pinctrl/pinctrl-single.c
+> @@ -734,6 +734,18 @@ static const struct pinconf_ops pcs_pinconf_ops = {
+>  	.pin_config_dbg_show = pcs_pinconf_dbg_show,
+>  	.pin_config_group_dbg_show = pcs_pinconf_group_dbg_show,
+>  	.pin_config_config_dbg_show = pcs_pinconf_config_dbg_show,
+> +	.is_generic = false,
+> +};
+> +
+> +static const struct pinconf_ops pcs_pinconf_generic_ops = {
+> +	.pin_config_get = pcs_pinconf_get,
+> +	.pin_config_set = pcs_pinconf_set,
+> +	.pin_config_group_get = pcs_pinconf_group_get,
+> +	.pin_config_group_set = pcs_pinconf_group_set,
+> +	.pin_config_dbg_show = pcs_pinconf_dbg_show,
+> +	.pin_config_group_dbg_show = pcs_pinconf_group_dbg_show,
+> +	.pin_config_config_dbg_show = pcs_pinconf_config_dbg_show,
+> +	.is_generic = true,
+>  };
+>  
+>  /**
+> @@ -1435,10 +1447,8 @@ static int pcs_probe(struct platform_device *pdev)
+>  	pcs->desc.name = DRIVER_NAME;
+>  	pcs->desc.pctlops = &pcs_pinctrl_ops;
+>  	pcs->desc.pmxops = &pcs_pinmux_ops;
+> -	pcs->desc.confops = &pcs_pinconf_ops;
+> +	pcs->desc.confops = match->data;
+>  	pcs->desc.owner = THIS_MODULE;
+> -	if (match->data)
+> -		pcs_pinconf_ops.is_generic = true;
+>  
+>  	ret = pcs_allocate_pin_table(pcs);
+>  	if (ret < 0)
+> @@ -1479,9 +1489,14 @@ static int pcs_remove(struct platform_device *pdev)
+>  }
+>  
+>  static struct of_device_id pcs_of_match[] = {
+> -	{ .compatible = "pinctrl-single", .data = (void *)false },
+> -	{ .compatible = "pinconf-single", .data = (void *)true },
+> -	{ },
+> +	{
+> +		.compatible = "pinctrl-single",
+> +		.data = (void *)&pcs_pinconf_ops,
+> +	}, {
+> +		.compatible = "pinconf-single",
+> +		.data = (void *)&pcs_pinconf_generic_ops,
+> +       	}, {
+> +	},
+>  };
+>  MODULE_DEVICE_TABLE(of, pcs_of_match);
+>  
+> -- 
+> 1.7.10.4
+> 
