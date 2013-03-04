@@ -1,44 +1,80 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Mon, 4 Mar 2013 12:19:10 -0600
-Subject: [PATCH 11/14] ARM: OMAP2+: Add device-tree support for NOR flash
-In-Reply-To: <5134DF2A.4050209@ti.com>
-References: <1361899842-30303-1-git-send-email-jon-hunter@ti.com>
- <1361899842-30303-12-git-send-email-jon-hunter@ti.com>
- <CALF0-+V3A-fL7q2nPRmcgnFKmzRt8KwSLuzrwzyyce6MqHjVpw@mail.gmail.com>
- <5134DF2A.4050209@ti.com>
-Message-ID: <5134E59E.1000507@ti.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 4 Mar 2013 12:21:01 -0600
+Subject: [PATCH 03/15] ARM: OMAP4+: PM: Consolidate and use OMAP4 PM code
+ for OMAP5
+In-Reply-To: <51319189.1060302@ti.com>
+References: <1362139864-9233-1-git-send-email-santosh.shilimkar@ti.com>
+ <1362139864-9233-4-git-send-email-santosh.shilimkar@ti.com>
+ <20130301174300.GA22220@kahuna> <51319189.1060302@ti.com>
+Message-ID: <20130304182101.GB14860@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 03/04/2013 11:51 AM, Jon Hunter wrote:
+On 11:13-20130302, Santosh Shilimkar wrote:
+> On Friday 01 March 2013 11:13 PM, Nishanth Menon wrote:
+> > On 17:40-20130301, Santosh Shilimkar wrote:
+> >> diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm_omap4plus.c
+> >> similarity index 74%
+[..]
+> >>  	mpuss_clkdm = clkdm_lookup("mpuss_clkdm");
+> >>  	emif_clkdm = clkdm_lookup("l3_emif_clkdm");
+> >>  	l3_1_clkdm = clkdm_lookup("l3_1_clkdm");
+> >>  	l3_2_clkdm = clkdm_lookup("l3_2_clkdm");
+> >> +	l4_per_clkdm = clkdm_lookup("l4_per_clkdm");
+> >> +	l4wkup = clkdm_lookup("l4_wkup_clkdm");
+> > These static dependencies now seems added for OMAP4?
+> > Sounds like a separate patch as it is not exactly what $subject claims.
+> >>  	ducati_clkdm = clkdm_lookup("ducati_clkdm");
+> These are accidently added. I have removed these two in another series.
+> Will remove this one from the patch.
+Thanks.
 > 
-> On 03/04/2013 05:57 AM, Ezequiel Garcia wrote:
->> Hi Jon,
->>
->> On Tue, Feb 26, 2013 at 2:30 PM, Jon Hunter <jon-hunter@ti.com> wrote:
->>> +
->>> +Example:
->>> +
->>> +gpmc: gpmc at 6e000000 {
->>> +       compatible = "ti,omap3430-gpmc", "simple-bus";
->>
->> I'm concern about using simple-bus, and I'm not entirely sure this will work.
->>
->> AFAIK, you can't correlate a parent-child relationship in the device tree
->> to the order in which drivers will be probed,
->> so it's only a matter of coincidence if this is working for you right now.
+> >> -	if ((!mpuss_clkdm) || (!emif_clkdm) || (!l3_1_clkdm) ||
+> >> -		(!l3_2_clkdm) || (!ducati_clkdm))
+> >> -		goto err2;
+> >> +	if ((!mpuss_clkdm) || (!emif_clkdm) || (!l3_1_clkdm) || (!l4wkup) ||
+> >> +		(!l3_2_clkdm) || (!ducati_clkdm) || (!l4_per_clkdm))
+> >> +		return -EINVAL;
+> >>  
+> >>  	ret = clkdm_add_wkdep(mpuss_clkdm, emif_clkdm);
+> >>  	ret |= clkdm_add_wkdep(mpuss_clkdm, l3_1_clkdm);
+> >>  	ret |= clkdm_add_wkdep(mpuss_clkdm, l3_2_clkdm);
+> >> +	ret |= clkdm_add_wkdep(mpuss_clkdm, l4_per_clkdm);
+> >> +	ret |= clkdm_add_wkdep(mpuss_clkdm, l4wkup);
+> >>  	ret |= clkdm_add_wkdep(ducati_clkdm, l3_1_clkdm);
+> >>  	ret |= clkdm_add_wkdep(ducati_clkdm, l3_2_clkdm);
+> >>  	if (ret) {
+> >>  		pr_err("Failed to add MPUSS -> L3/EMIF/L4PER, DUCATI -> L3 wakeup dependency\n");
+> >> +	}
+> >> +
+> >> +	return ret;
+> >> +}
+> >> +
+> >> +/**
+> >> + * omap4_pm_init - Init routine for OMAP4+ devices
+> >> + *
+> >> + * Initializes all powerdomain and clockdomain target states
+> >> + * and all PRCM settings.
+> >> + */
+> >> +int __init omap4_pm_init(void)
+> > could we rename it as omap4plus_pm_init while we are at it?
+> > This will help differentiate at least functions which are omap4 only and
+> > ones which we reuse for omap4plus?
+> Not needed. That way we have to rename all our omap2_* varients to
+> omap2plus. omap4_* is assumed to be omap4 and onwards just like
+> omap2_*
+hmm true.. :(
 > 
-> Ummm, I am not sure I am convinced. Have you looked at
-> of_platform_bus_create() which creates the devices? It is clearly
-> creating the child devices after creating the parent device.
-
-Sorry you said order by which drivers are probed. Yes I would agree that
-you cannot control the order drivers are probed, but just the order
-devices are registered.
-
-However, I don't see this as being a device-tree specific issue. Even
-when not using device-tree you would need to ensure that probing the
-parent happens before the child for the GPMC.
-
-Jon
+> >> +{
+> >> +	int ret;
+> >> +
+> >> +	if (omap_rev() == OMAP4430_REV_ES1_0) {
+> > we have ID detection for OMAP5430_REV_ES1_0 in arch/arm/mach-omap2/id.c
+> > However, we do not support PM, so might as well use it to skip init?
+> Well the plan is to remove OMAP5 ES1.0 completely so no need to add
+> more checks. As already mentioned ES1.0 is not going to be supported
+> in mainline kernel.
+OK.
+-- 
+Regards,
+Nishanth Menon
