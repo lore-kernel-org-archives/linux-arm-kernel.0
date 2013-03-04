@@ -1,42 +1,60 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 4 Mar 2013 08:53:06 +0100
-Subject: [PATCH v3 1/2] i.MX27: Add clock support for SAHARA2.
-In-Reply-To: <1362137873-8827-2-git-send-email-javier.martin@vista-silicon.com>
-References: <1362137873-8827-1-git-send-email-javier.martin@vista-silicon.com>
- <1362137873-8827-2-git-send-email-javier.martin@vista-silicon.com>
-Message-ID: <20130304075306.GA1906@pengutronix.de>
+From: Frank.Li@freescale.com (Frank Li)
+Date: Mon, 4 Mar 2013 14:52:38 +0800
+Subject: [PATCH 1/1] net: fec: fix build error in no MXC platform
+Message-ID: <1362379958-12972-1-git-send-email-Frank.Li@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 01, 2013 at 12:37:52PM +0100, Javier Martin wrote:
-> 
-> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
-> ---
->  arch/arm/mach-imx/clk-imx27.c |    2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
-> index 4c1d1e4..0b9664a 100644
-> --- a/arch/arm/mach-imx/clk-imx27.c
-> +++ b/arch/arm/mach-imx/clk-imx27.c
-> @@ -253,6 +253,8 @@ int __init mx27_clocks_init(unsigned long fref)
->  	clk_register_clkdev(clk[nfc_baud_gate], NULL, "imx27-nand.0");
->  	clk_register_clkdev(clk[vpu_baud_gate], "per", "coda-imx27.0");
->  	clk_register_clkdev(clk[vpu_ahb_gate], "ahb", "coda-imx27.0");
-> +	clk_register_clkdev(clk[sahara_ahb_gate], "ahb", "sahara-imx27.0");
-> +	clk_register_clkdev(clk[sahara_ipg_gate], "ipg", "sahara-imx27.0");
+build error cause by
+Commit ff43da86c69d76a726ffe7d1666148960dc1d108
+("NET: FEC: dynamtic check DMA desc buff type")
 
-One of the first patches I want to push upstream for the next merge
-window is this one:
+drivers/net/ethernet/freescale/fec.c: In function ?fec_enet_get_nextdesc?:
+drivers/net/ethernet/freescale/fec.c:215:18: error: invalid use of undefined type ?struct bufdesc_ex?
+drivers/net/ethernet/freescale/fec.c: In function ?fec_enet_get_prevdesc?:
+drivers/net/ethernet/freescale/fec.c:224:18: error: invalid use of undefined type ?struct bufdesc_ex?
+drivers/net/ethernet/freescale/fec.c: In function ?fec_enet_start_xmit?:
+drivers/net/ethernet/freescale/fec.c:286:37: error: arithmetic on pointer to an incomplete type
+drivers/net/ethernet/freescale/fec.c:287:13: error: arithmetic on pointer to an incomplete type
+drivers/net/ethernet/freescale/fec.c:324:7: error: dereferencing pointer to incomplete type etc....
 
-https://patchwork.kernel.org/patch/1817741/
+Signed-off-by: Frank Li <Frank.Li@freescale.com>
+---
+ drivers/net/ethernet/freescale/fec.h |   15 +++++++--------
+ 1 files changed, 7 insertions(+), 8 deletions(-)
 
-So the change above becomes unnecessary
-
-Sascha
-
+diff --git a/drivers/net/ethernet/freescale/fec.h b/drivers/net/ethernet/freescale/fec.h
+index 01579b8..a53150c 100644
+--- a/drivers/net/ethernet/freescale/fec.h
++++ b/drivers/net/ethernet/freescale/fec.h
+@@ -97,6 +97,13 @@ struct bufdesc {
+ 	unsigned short cbd_sc;	/* Control and status info */
+ 	unsigned long cbd_bufaddr;	/* Buffer address */
+ };
++#else
++struct bufdesc {
++	unsigned short	cbd_sc;			/* Control and status info */
++	unsigned short	cbd_datlen;		/* Data length */
++	unsigned long	cbd_bufaddr;		/* Buffer address */
++};
++#endif
+ 
+ struct bufdesc_ex {
+ 	struct bufdesc desc;
+@@ -107,14 +114,6 @@ struct bufdesc_ex {
+ 	unsigned short res0[4];
+ };
+ 
+-#else
+-struct bufdesc {
+-	unsigned short	cbd_sc;			/* Control and status info */
+-	unsigned short	cbd_datlen;		/* Data length */
+-	unsigned long	cbd_bufaddr;		/* Buffer address */
+-};
+-#endif
+-
+ /*
+  *	The following definitions courtesy of commproc.h, which where
+  *	Copyright (c) 1997 Dan Malek (dmalek at jlc.net).
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.1
