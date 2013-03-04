@@ -1,172 +1,79 @@
-From: heiko@sntech.de (Heiko =?iso-8859-15?q?St=FCbner?=)
-Date: Mon, 4 Mar 2013 15:03:43 +0100
-Subject: [PATCH] i2c: s3c24xx: allow device core to setup default pin
- configuration
-In-Reply-To: <1362404573-30406-1-git-send-email-thomas.abraham@linaro.org>
-References: <1362404573-30406-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <201303041503.44459.heiko@sntech.de>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Mon,  4 Mar 2013 15:05:46 +0100
+Subject: [PATCH 7/9] rtc: stmp3xxx: Re-enable active alarm
+In-Reply-To: <1362405948-12992-1-git-send-email-s.trumtrar@pengutronix.de>
+References: <1362405948-12992-1-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <1362405948-12992-8-git-send-email-s.trumtrar@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+If an alarm is set and the system rebooted, the alarm does not get re-enabled,
+although it may still be valid (i.e. in the future).
 
-Am Montag, 4. M?rz 2013, 14:42:53 schrieb Thomas Abraham:
-> With device core now able to setup the default pin configuration,
-> the call to devm_pinctrl_get_select_default can be removed. And
-> the pin configuration code based on the deprecated Samsung specific
-> gpio bindings is also removed.
-> 
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> ---
-> 
-> Hi Heiko, Tomasz,
-> 
-> We have to make a choice on the path forward for pinctrl support
-> on Samsung platforms. We have three cases to deal with.
-> 
-> A. Samsung platforms without DT support.
-> B. Samsung platforms with DT support using old Samsung specific
->    gpio bindings for pin-configuration (s3c24xx and s3x64xx).
-> C. Samsung platforms with DT support using using pinctrl based
->    pin-configurations (Exynos4 and Exynos5).
-> 
-> For [A], we just let the platform specific callbacks handle the
-> pin setup. For [B] and [C], based on Linus Walleij's pin grab
-> by device core patch and subsequent discussions with him on the
-> mailing list, would it be acceptable that we discontinue support
-> for [B] in Samsung SoC device drivers. This will impact your
-> current DT work on s3c24xx and s3c64xx platforms. Pinctrl is
-> inevitable and we have to migrate to it. Instead of workarounds
-> to maintain support for [B], it might be better that we migrate
-> s3c24xx and s3c64xx platforms to pinctrl.
-> 
-> Please do let us know your opinion on this.
+The sysfs representation of wakealarms prevents overwriting active alarms. One
+needs to instead write a 0 first and then the new value. Therefore an alarm is
+considered active if
+	wakealarm != 0 && wakealarm > now
 
-As discusses in the other thread, I'm in favor of going forward this way and 
-not to invest unnecessary energy in keeping the non-pinctrl stuff alive.
+To preserve this information over a reboot, the alarm needs to be re-written
+on startup, if it is still valid. This leads to all flags being reactivated
+and interrupts reenabled.
 
-Pinctrl for at least the s3c2416 [0] is already on my playground-wishlist, but 
-I'm still in the process of getting to know it.
+Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+---
+ drivers/rtc/rtc-stmp3xxx.c |   26 +++++++++++++++++++-------
+ 1 file changed, 19 insertions(+), 7 deletions(-)
 
-So for this patch:
-Acked-by: Heiko Stuebner <heiko@sntech.de>
-
-
-Heiko
-
-
-[0] in contrast to what the gpio-samsung driver implies, the s3c24xx pin banks 
-are not uniform between SoCs, making this more difficult still :-)
-
-
->  drivers/i2c/busses/i2c-s3c2410.c |   67
-> +------------------------------------- 1 files changed, 1 insertions(+),
-> 66 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-s3c2410.c
-> b/drivers/i2c/busses/i2c-s3c2410.c index f6b880b..703272c 100644
-> --- a/drivers/i2c/busses/i2c-s3c2410.c
-> +++ b/drivers/i2c/busses/i2c-s3c2410.c
-> @@ -37,8 +37,6 @@
->  #include <linux/slab.h>
->  #include <linux/io.h>
->  #include <linux/of_i2c.h>
-> -#include <linux/of_gpio.h>
-> -#include <linux/pinctrl/consumer.h>
-> 
->  #include <asm/irq.h>
-> 
-> @@ -84,8 +82,6 @@ struct s3c24xx_i2c {
->  	struct i2c_adapter	adap;
-> 
->  	struct s3c2410_platform_i2c	*pdata;
-> -	int			gpios[2];
-> -	struct pinctrl          *pctrl;
->  #ifdef CONFIG_CPU_FREQ
->  	struct notifier_block	freq_transition;
->  #endif
-> @@ -856,57 +852,6 @@ static inline void
-> s3c24xx_i2c_deregister_cpufreq(struct s3c24xx_i2c *i2c) }
->  #endif
-> 
-> -#ifdef CONFIG_OF
-> -static int s3c24xx_i2c_parse_dt_gpio(struct s3c24xx_i2c *i2c)
-> -{
-> -	int idx, gpio, ret;
-> -
-> -	if (i2c->quirks & QUIRK_NO_GPIO)
-> -		return 0;
-> -
-> -	for (idx = 0; idx < 2; idx++) {
-> -		gpio = of_get_gpio(i2c->dev->of_node, idx);
-> -		if (!gpio_is_valid(gpio)) {
-> -			dev_err(i2c->dev, "invalid gpio[%d]: %d\n", idx, gpio);
-> -			goto free_gpio;
-> -		}
-> -		i2c->gpios[idx] = gpio;
-> -
-> -		ret = gpio_request(gpio, "i2c-bus");
-> -		if (ret) {
-> -			dev_err(i2c->dev, "gpio [%d] request failed\n", gpio);
-> -			goto free_gpio;
-> -		}
-> -	}
-> -	return 0;
-> -
-> -free_gpio:
-> -	while (--idx >= 0)
-> -		gpio_free(i2c->gpios[idx]);
-> -	return -EINVAL;
-> -}
-> -
-> -static void s3c24xx_i2c_dt_gpio_free(struct s3c24xx_i2c *i2c)
-> -{
-> -	unsigned int idx;
-> -
-> -	if (i2c->quirks & QUIRK_NO_GPIO)
-> -		return;
-> -
-> -	for (idx = 0; idx < 2; idx++)
-> -		gpio_free(i2c->gpios[idx]);
-> -}
-> -#else
-> -static int s3c24xx_i2c_parse_dt_gpio(struct s3c24xx_i2c *i2c)
-> -{
-> -	return 0;
-> -}
-> -
-> -static void s3c24xx_i2c_dt_gpio_free(struct s3c24xx_i2c *i2c)
-> -{
-> -}
-> -#endif
-> -
->  /* s3c24xx_i2c_init
->   *
->   * initialise the controller, set the IO lines and frequency
-> @@ -1054,15 +999,9 @@ static int s3c24xx_i2c_probe(struct platform_device
-> *pdev) i2c->adap.algo_data = i2c;
->  	i2c->adap.dev.parent = &pdev->dev;
-> 
-> -	i2c->pctrl = devm_pinctrl_get_select_default(i2c->dev);
-> -
->  	/* inititalise the i2c gpio lines */
-> -
-> -	if (i2c->pdata->cfg_gpio) {
-> +	if (i2c->pdata->cfg_gpio)
->  		i2c->pdata->cfg_gpio(to_platform_device(i2c->dev));
-> -	} else if (IS_ERR(i2c->pctrl) && s3c24xx_i2c_parse_dt_gpio(i2c)) {
-> -		return -EINVAL;
-> -	}
-> 
->  	/* initialise the i2c controller */
-> 
-> @@ -1140,10 +1079,6 @@ static int s3c24xx_i2c_remove(struct platform_device
-> *pdev) i2c_del_adapter(&i2c->adap);
-> 
->  	clk_disable_unprepare(i2c->clk);
-> -
-> -	if (pdev->dev.of_node && IS_ERR(i2c->pctrl))
-> -		s3c24xx_i2c_dt_gpio_free(i2c);
-> -
->  	return 0;
->  }
+diff --git a/drivers/rtc/rtc-stmp3xxx.c b/drivers/rtc/rtc-stmp3xxx.c
+index 16b45c8..f31ac76 100644
+--- a/drivers/rtc/rtc-stmp3xxx.c
++++ b/drivers/rtc/rtc-stmp3xxx.c
+@@ -242,27 +242,39 @@ static int stmp3xxx_alarm_irq_enable(struct device *dev, unsigned int enabled)
+ 				rtc_data->io + STMP3XXX_RTC_PERSISTENT0_CLR);
+ 		writel(STMP3XXX_RTC_CTRL_ALARM_IRQ_EN,
+ 				rtc_data->io + STMP3XXX_RTC_CTRL_CLR);
++		writel(0, rtc_data->io + STMP3XXX_RTC_ALARM);
+ 	}
+ 	return 0;
+ }
+ 
+-static int stmp3xxx_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alm)
++static int stmp3xxx_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alm)
+ {
++	unsigned long t;
+ 	struct stmp3xxx_rtc_data *rtc_data = dev_get_drvdata(dev);
+ 
+-	rtc_time_to_tm(readl(rtc_data->io + STMP3XXX_RTC_ALARM), &alm->time);
++	rtc_tm_to_time(&alm->time, &t);
++	writel(t, rtc_data->io + STMP3XXX_RTC_ALARM);
++
++	stmp3xxx_alarm_irq_enable(dev, alm->enabled);
++
+ 	return 0;
+ }
+ 
+-static int stmp3xxx_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alm)
++static int stmp3xxx_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alm)
+ {
+-	unsigned long t;
+ 	struct stmp3xxx_rtc_data *rtc_data = dev_get_drvdata(dev);
++	struct rtc_time now;
++	u32 alarm = readl(rtc_data->io + STMP3XXX_RTC_ALARM);
+ 
+-	rtc_tm_to_time(&alm->time, &t);
+-	writel(t, rtc_data->io + STMP3XXX_RTC_ALARM);
++	rtc_time_to_tm(alarm, &alm->time);
+ 
+-	stmp3xxx_alarm_irq_enable(dev, alm->enabled);
++	stmp3xxx_rtc_gettime(dev, &now);
++	if (rtc_tm_to_ktime(now).tv64 < rtc_tm_to_ktime(alm->time).tv64) {
++		alm->enabled = 1;
++		stmp3xxx_rtc_set_alarm(dev, alm);
++	} else {
++		alm->enabled = 0;
++	}
+ 
+ 	return 0;
+ }
+-- 
+1.7.10.4
