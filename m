@@ -1,33 +1,82 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon,  4 Mar 2013 15:08:26 -0800
-Subject: [PATCH/RESEND 2/4] mmc: msm_sdcc: Remove unnecessary include
+Date: Mon,  4 Mar 2013 15:08:28 -0800
+Subject: [PATCH/RESEND 4/4] ARM: msm: Remove unused cpu.h header file
 In-Reply-To: <1362438508-26614-1-git-send-email-sboyd@codeaurora.org>
 References: <1362438508-26614-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1362438508-26614-3-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1362438508-26614-5-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver has no reason to include msm_iomap.h. Remove it so
-that we can remove msm_iomap.h from include/mach in the near future.
+This header file is no longer used now that the msm timer.c and
+the gpio driver have been made more runtime aware. Remove the
+header file so no future users pop-up.
 
-Acked-by: Chris Ball <cjb@laptop.org>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/mmc/host/msm_sdcc.c |    1 -
- 1 file changed, 1 deletion(-)
+ arch/arm/mach-msm/include/mach/cpu.h |   54 ----------------------------------
+ 1 file changed, 54 deletions(-)
+ delete mode 100644 arch/arm/mach-msm/include/mach/cpu.h
 
-diff --git a/drivers/mmc/host/msm_sdcc.c b/drivers/mmc/host/msm_sdcc.c
-index 7c0af0e..0ee4a57 100644
---- a/drivers/mmc/host/msm_sdcc.c
-+++ b/drivers/mmc/host/msm_sdcc.c
-@@ -43,7 +43,6 @@
- #include <asm/sizes.h>
- 
- #include <linux/platform_data/mmc-msm_sdcc.h>
--#include <mach/msm_iomap.h>
- #include <mach/dma.h>
- #include <mach/clk.h>
- 
+diff --git a/arch/arm/mach-msm/include/mach/cpu.h b/arch/arm/mach-msm/include/mach/cpu.h
+deleted file mode 100644
+index a9481b0..0000000
+--- a/arch/arm/mach-msm/include/mach/cpu.h
++++ /dev/null
+@@ -1,54 +0,0 @@
+-/* Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 and
+- * only version 2 as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+- * 02110-1301, USA.
+- */
+-
+-#ifndef __ARCH_ARM_MACH_MSM_CPU_H__
+-#define __ARCH_ARM_MACH_MSM_CPU_H__
+-
+-/* TODO: For now, only one CPU can be compiled at a time. */
+-
+-#define cpu_is_msm7x01()	0
+-#define cpu_is_msm7x30()	0
+-#define cpu_is_qsd8x50()	0
+-#define cpu_is_msm8x60()	0
+-#define cpu_is_msm8960()	0
+-
+-#ifdef CONFIG_ARCH_MSM7X00A
+-# undef cpu_is_msm7x01
+-# define cpu_is_msm7x01()	1
+-#endif
+-
+-#ifdef CONFIG_ARCH_MSM7X30
+-# undef cpu_is_msm7x30
+-# define cpu_is_msm7x30()	1
+-#endif
+-
+-#ifdef CONFIG_ARCH_QSD8X50
+-# undef cpu_is_qsd8x50
+-# define cpu_is_qsd8x50()	1
+-#endif
+-
+-#ifdef CONFIG_ARCH_MSM8X60
+-# undef cpu_is_msm8x60
+-# define cpu_is_msm8x60()	1
+-#endif
+-
+-#ifdef CONFIG_ARCH_MSM8960
+-# undef cpu_is_msm8960
+-# define cpu_is_msm8960()	1
+-#endif
+-
+-#endif
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
