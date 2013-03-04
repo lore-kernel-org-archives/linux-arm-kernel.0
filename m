@@ -1,36 +1,30 @@
-From: elezegarcia@gmail.com (Ezequiel Garcia)
-Date: Mon, 4 Mar 2013 08:57:51 -0300
-Subject: [PATCH 11/14] ARM: OMAP2+: Add device-tree support for NOR flash
-In-Reply-To: <1361899842-30303-12-git-send-email-jon-hunter@ti.com>
-References: <1361899842-30303-1-git-send-email-jon-hunter@ti.com>
- <1361899842-30303-12-git-send-email-jon-hunter@ti.com>
-Message-ID: <CALF0-+V3A-fL7q2nPRmcgnFKmzRt8KwSLuzrwzyyce6MqHjVpw@mail.gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 4 Mar 2013 13:15:57 +0100
+Subject: [PATCH] arm: mxs: Update mxs_defconfig
+In-Reply-To: <20130304010749.GA30431@S2101-09.ap.freescale.net>
+References: <1356055651-27145-1-git-send-email-marex@denx.de>
+ <201303032228.26070.marex@denx.de>
+ <20130304010749.GA30431@S2101-09.ap.freescale.net>
+Message-ID: <201303041315.57256.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
+Dear Shawn Guo,
 
-On Tue, Feb 26, 2013 at 2:30 PM, Jon Hunter <jon-hunter@ti.com> wrote:
-> +
-> +Example:
-> +
-> +gpmc: gpmc at 6e000000 {
-> +       compatible = "ti,omap3430-gpmc", "simple-bus";
+> On Sun, Mar 03, 2013 at 10:28:25PM +0100, Marek Vasut wrote:
+> > Dear Shawn Guo,
+> > 
+> > > On Thu, Jan 17, 2013 at 02:22:50AM +0100, Marek Vasut wrote:
+> > > > Do you think this can be made a stable matter for 3.7 ? It's a
+> > > > defconfig update afterall and it help a great deal.
+> > > 
+> > > No, I don't think so.  Sorry.
+> > 
+> > Was this patch ever applied? I can't find it in 3.8 nor in -next :-(
+> 
+> Isn't it on mainline right now as 77d168a (ARM: mxs: Update mxs_defconfig)?
 
-I'm concern about using simple-bus, and I'm not entirely sure this will work.
+So it's a 3.9 matter then ?
 
-AFAIK, you can't correlate a parent-child relationship in the device tree
-to the order in which drivers will be probed,
-so it's only a matter of coincidence if this is working for you right now.
-The GPMC code is in "arch/arm/mach-omap2", is located *before* the mtd code
-in the Makefile, and thus the GPMC driver loads *before* the MTD code.
-
-Morevore, I believe that when we move GPMC from arch/arm/mach-omap2
-to drivers/memory where it should be, this 'simple-bus' will stop
-working properly.
-
-Of course, I can be wrong, but I think you will have to find some other way
-to initialize the GPMC's childs.
-
--- 
-    Ezequiel
+Best regards,
+Marek Vasut
