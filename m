@@ -1,44 +1,51 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Mon, 4 Mar 2013 11:16:01 +0200
-Subject: Multi-platform, and secure-only ARM errata workarounds
-In-Reply-To: <20130304063436.GB27241@tbergstrom-lnx.Nvidia.com>
-References: <512BF81A.3080700@wwwdotorg.org> <201302261023.26939.arnd@arndb.de>
- <20130226113538.GS17833@n2100.arm.linux.org.uk>
- <512CF87A.4090404@wwwdotorg.org>
- <20130226181114.GU17833@n2100.arm.linux.org.uk>
- <5130E757.6090500@wwwdotorg.org>
- <20130304063436.GB27241@tbergstrom-lnx.Nvidia.com>
-Message-ID: <20130304091600.GC27241@tbergstrom-lnx.Nvidia.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 04 Mar 2013 16:34:56 +0800
+Subject: [PATCH 1/9] ARM: dt: add header to define GPIO flags
+In-Reply-To: <1360791198-29462-2-git-send-email-swarren@wwwdotorg.org>
+References: <1360791198-29462-1-git-send-email-swarren@wwwdotorg.org>
+ <1360791198-29462-2-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20130304083457.0D4333E206B@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 04, 2013 at 07:34:36AM +0100, Peter De Schrijver wrote:
-> On Fri, Mar 01, 2013 at 06:37:27PM +0100, Stephen Warren wrote:
+On Wed, 13 Feb 2013 14:33:10 -0700, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> From: Stephen Warren <swarren@nvidia.com>
 > 
-> ...
+> Many GPIO device tree bindings use the same flags. Create a header to
+> define those.
 > 
-> > Since some of the bits that enable WARs are banked per CPU, the WAR
-> > needs to be enabled by code running on each individual CPU, each time
-> > it's powered on. When a secure monitor exists, the CPU will boot through
-> > it (at least on Tegra, there is a single register that defines the boot
-> > vector for all CPUs; I don't know if that fact is ARM-architectural or
-> > not), so the secure monitor can apply the WAR if needed. However, when
-> > there is no secure monitor and the kernel runs in secure world, the
-> > kernel would have to apply those WARs, since the only code that runs is
-> > in the kernel.
-> > 
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+>  arch/arm/boot/dts/gpio.h |   10 ++++++++++
+>  1 file changed, 10 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/gpio.h
 > 
-> The boot vector register is Tegra specific. At least on OMAP all cores boot
-> from ROM afaik.
+> diff --git a/arch/arm/boot/dts/gpio.h b/arch/arm/boot/dts/gpio.h
+> new file mode 100644
+> index 0000000..4c9da69
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/gpio.h
 
-Nicolas Pitre suggested a slightly different solution to me:
+Stephen, you know better than this. This is common code. Don't put it
+under arch/arm.
 
-1) Handle CPU0 errata WARs in the bootloader
-2) Indicate in device tree if linux is booting in secude mode or non-secure
-   mode.
-3) Use this information in the kernel to decide how to apply the WARs for
-   secondary core bringup and after powerungating.
+g.
 
-Cheers,
+> @@ -0,0 +1,10 @@
+> +/*
+> + * This header provides constants for most GPIO bindings.
+> + *
+> + * Most GPIO bindings include a flags cell as part of the GPIO specifier.
+> + * In most cases, the format of the flags cell uses the standard values
+> + * defined in this header.
+> + */
+> +
+> +#define GPIO_ACTIVE_HIGH 0
+> +#define GPIO_ACTIVE_LOW 1
+> -- 
+> 1.7.10.4
+> 
 
-Peter.
+-- 
+Grant Likely, B.Sc, P.Eng.
+Secret Lab Technologies, Ltd.
