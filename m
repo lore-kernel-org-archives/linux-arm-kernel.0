@@ -1,44 +1,44 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon,  4 Mar 2013 15:15:37 -0800
-Subject: [PATCH] ARM: perf: Fix section mismatch on armpmu_init()
-Message-ID: <1362438937-28143-1-git-send-email-sboyd@codeaurora.org>
+Date: Mon,  4 Mar 2013 15:21:39 -0800
+Subject: [PATCH] ARM: proc: Add Krait proc info
+Message-ID: <1362439299-29617-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-WARNING: vmlinux.o(.text+0xfb80): Section mismatch in reference
-from the function armpmu_register() to the function
-.init.text:armpmu_init()
-The function armpmu_register() references
-the function __init armpmu_init().
-This is often because armpmu_register lacks a __init
-annotation or the annotation of armpmu_init is wrong.
+From: Stepan Moskovchenko <stepanm@codeaurora.org>
 
-Just drop the __init marking on armpmu_init() because
-armpmu_register() no longer has an __init marking.
+Add processor info for the Qualcomm, Inc. Krait family of
+processors, to use the generic ARMv7 initialisation
+procedure but explicitly enable the IDIV hardware
+capability flag.
 
+Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
+ arch/arm/mm/proc-v7.S |   10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-I doubt anyone is actually experiencing any problems because this
-driver probes before kernel init is over. But the warning is a bit
-annoying.
-
- arch/arm/kernel/perf_event.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-index 31e0eb3..32081ad 100644
---- a/arch/arm/kernel/perf_event.c
-+++ b/arch/arm/kernel/perf_event.c
-@@ -484,7 +484,7 @@ const struct dev_pm_ops armpmu_dev_pm_ops = {
- 	SET_RUNTIME_PM_OPS(armpmu_runtime_suspend, armpmu_runtime_resume, NULL)
- };
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index 3a3c015..81adeb3 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -434,6 +434,16 @@ __v7_ca15mp_proc_info:
+ 	.size	__v7_ca15mp_proc_info, . - __v7_ca15mp_proc_info
  
--static void __init armpmu_init(struct arm_pmu *armpmu)
-+static void armpmu_init(struct arm_pmu *armpmu)
- {
- 	atomic_set(&armpmu->active_events, 0);
- 	mutex_init(&armpmu->reserve_mutex);
+ 	/*
++	 * Qualcomm Inc. Krait processors.
++	 */
++	.type	__krait_proc_info, #object
++__krait_proc_info:
++	.long	0x510f0400		@ Required ID value
++	.long	0xff0ffc00		@ Mask for ID
++	__v7_proc __v7_setup, hwcaps = HWCAP_IDIV
++	.size	__krait_proc_info, . - __krait_proc_info
++
++	/*
+ 	 * Match any ARMv7 processor core.
+ 	 */
+ 	.type	__v7_proc_info, #object
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
