@@ -1,62 +1,39 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon,  4 Mar 2013 14:43:03 -0800
-Subject: [PATCH 2/2] ARM: Enable tracing around vfp preemption enable/disable
-In-Reply-To: <1362436983-28988-1-git-send-email-sboyd@codeaurora.org>
-References: <1362436983-28988-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1362436983-28988-3-git-send-email-sboyd@codeaurora.org>
+Date: Mon,  4 Mar 2013 15:08:24 -0800
+Subject: [PATCH/RESEND 0/4] Trim down mach includes in MSM drivers
+Message-ID: <1362438508-26614-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The VFP code enables and disables preemption but doesn't call
-into the tracer except for in the VFP bounce code to say that
-preemption has been enabled again. Trace the preemption disable
-and enable calls made in assembly so that we can accurately
-measure how long preemption is disabled while handling VFP
-exceptions.
+This patch series trims the usage of mach includes in MSM 
+drivers. In particular it targets the msm_iomap.h header
+file and completely removes the cpu.h header file. After
+this series we only have one driver using the msm_iomap.h file
+outside of mach-msm. Once that driver is moved to be
+a platform device we can make msm_iomap.h private to mach-msm.
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/kernel/entry-header.S | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+Stephen Boyd (4):
+  ARM: msm: Move dma.h #defines that are private to dma.c
+  mmc: msm_sdcc: Remove unnecessary include
+  gpio: Make gpio-msm-v1 into a platform driver
+  ARM: msm: Remove unused cpu.h header file
 
-diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
-index 130e6a6..75bcb18 100644
---- a/arch/arm/kernel/entry-header.S
-+++ b/arch/arm/kernel/entry-header.S
-@@ -165,19 +165,33 @@
- 
- 	.macro preempt_enable_no_resched, tsk, cnt
- #ifdef CONFIG_PREEMPT_COUNT
-+#if defined(CONFIG_DEBUG_PREEMPT) || defined(CONFIG_PREEMPT_TRACER)
-+	stmdb   sp!, {r0-r3, ip, lr}
-+	mov	r0, #1
-+	bl	sub_preempt_count
-+	ldmia	sp!, {r0-r3, ip, lr}
-+#else
- 	get_thread_info	\tsk
- 	ldr	\cnt, [\tsk, #TI_PREEMPT]	@ get preempt count
- 	sub	\cnt, \cnt, #1			@ decrement it
- 	str	\cnt, [\tsk, #TI_PREEMPT]
- #endif
-+#endif
- 	.endm
- 
- 	.macro preempt_disable, tsk, cnt
- #ifdef CONFIG_PREEMPT_COUNT
-+#if defined(CONFIG_DEBUG_PREEMPT) || defined(CONFIG_PREEMPT_TRACER)
-+	stmdb   sp!, {r0-r3, ip, lr}
-+	mov	r0, #1
-+	bl	add_preempt_count
-+	ldmia	sp!, {r0-r3, ip, lr}
-+#else
- 	ldr	\cnt, [\tsk, #TI_PREEMPT]	@ get preempt count
- 	add	\cnt, \cnt, #1			@ increment it
- 	str	\cnt, [\tsk, #TI_PREEMPT]
- #endif
-+#endif
- 	.endm
- 
- /*
+ arch/arm/mach-msm/board-halibut.c    |    1 +
+ arch/arm/mach-msm/board-msm7x30.c    |    1 +
+ arch/arm/mach-msm/board-qsd8x50.c    |    1 +
+ arch/arm/mach-msm/board-trout.c      |    1 +
+ arch/arm/mach-msm/devices-msm7x00.c  |   31 +++++
+ arch/arm/mach-msm/devices-msm7x30.c  |   31 +++++
+ arch/arm/mach-msm/devices-qsd8x50.c  |   31 +++++
+ arch/arm/mach-msm/devices.h          |    4 +
+ arch/arm/mach-msm/dma.c              |   26 ++++
+ arch/arm/mach-msm/include/mach/cpu.h |   54 ---------
+ arch/arm/mach-msm/include/mach/dma.h |   26 ----
+ drivers/gpio/gpio-msm-v1.c           |  220 +++++++++++++++++++++++-----------
+ drivers/mmc/host/msm_sdcc.c          |    1 -
+ 13 files changed, 276 insertions(+), 152 deletions(-)
+ delete mode 100644 arch/arm/mach-msm/include/mach/cpu.h
+
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
