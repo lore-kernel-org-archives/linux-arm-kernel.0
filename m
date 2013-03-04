@@ -1,45 +1,97 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 4 Mar 2013 10:26:25 +0530
-Subject: [PATCH] DMA: PL330: allow submitting 2 requests at a time
-In-Reply-To: <1360752194-6506-1-git-send-email-jaswinder.singh@linaro.org>
-References: <1360752194-6506-1-git-send-email-jaswinder.singh@linaro.org>
-Message-ID: <20130304045625.GD22513@intel.com>
+From: padma.v@samsung.com (Padmavathi Venna)
+Date: Mon, 04 Mar 2013 10:59:03 +0530
+Subject: [PATCH] DMA: PL330: Add check if device tree compatible
+Message-ID: <1362374943-29312-1-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 13, 2013 at 04:13:14PM +0530, Jassi Brar wrote:
-> Fix the logic to allow mc programming of second transfer after first
-> has been done, by removing immediate return upon success and iterating
-> until we detect QFull or DMAC dying.
-> 
-> Reported-by: Alvaro Moran <dirac3000@gmail.com>
-> Tested-by: Alvaro Moran <dirac3000@gmail.com>
-> Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
-Applied, thanks
+This patch register the dma controller with generic dma helpers only
+in DT case. This also adds some extra error handling in the driver.
 
-> ---
->  drivers/dma/pl330.c |    3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
-> 
-> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-> index 80680ee..c1a867e 100644
-> --- a/drivers/dma/pl330.c
-> +++ b/drivers/dma/pl330.c
-> @@ -2282,13 +2282,12 @@ static inline void fill_queue(struct dma_pl330_chan *pch)
->  
->  		/* If already submitted */
->  		if (desc->status == BUSY)
-> -			break;
-> +			continue;
->  
->  		ret = pl330_submit_req(pch->pl330_chid,
->  						&desc->req);
->  		if (!ret) {
->  			desc->status = BUSY;
-> -			break;
->  		} else if (ret == -EAGAIN) {
->  			/* QFull or DMAC Dying */
->  			break;
-> -- 
-> 1.7.10.4
-> 
+Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+Reported-by: Sachin Kamat <sachin.kamat@linaro.org>
+---
+
+Based on Vinod Koul next branch
+
+ drivers/dma/pl330.c |   41 ++++++++++++++++++++++++++++++-----------
+ 1 files changed, 30 insertions(+), 11 deletions(-)
+
+diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+index 7181531..bdad8de 100644
+--- a/drivers/dma/pl330.c
++++ b/drivers/dma/pl330.c
+@@ -2882,7 +2882,7 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+ {
+ 	struct dma_pl330_platdata *pdat;
+ 	struct dma_pl330_dmac *pdmac;
+-	struct dma_pl330_chan *pch;
++	struct dma_pl330_chan *pch, *_p;
+ 	struct pl330_info *pi;
+ 	struct dma_device *pd;
+ 	struct resource *res;
+@@ -2984,7 +2984,17 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+ 	ret = dma_async_device_register(pd);
+ 	if (ret) {
+ 		dev_err(&adev->dev, "unable to register DMAC\n");
+-		goto probe_err2;
++		goto probe_err3;
++	}
++
++	if (adev->dev.of_node) {
++		ret = of_dma_controller_register(adev->dev.of_node,
++					 of_dma_pl330_xlate, pdmac);
++		if (ret) {
++			dev_err(&adev->dev,
++			"unable to register DMA to the generic DT DMA helpers\n");
++			goto probe_err4;
++		}
+ 	}
+ 
+ 	dev_info(&adev->dev,
+@@ -2995,16 +3005,23 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+ 		pi->pcfg.data_bus_width / 8, pi->pcfg.num_chan,
+ 		pi->pcfg.num_peri, pi->pcfg.num_events);
+ 
+-	ret = of_dma_controller_register(adev->dev.of_node,
+-					 of_dma_pl330_xlate, pdmac);
+-	if (ret) {
+-		dev_err(&adev->dev,
+-		"unable to register DMA to the generic DT DMA helpers\n");
+-		goto probe_err2;
+-	}
+-
+ 	return 0;
++probe_err4:
++	dma_async_device_unregister(pd);
++probe_err3:
++	amba_set_drvdata(adev, NULL);
+ 
++	/* Idle the DMAC */
++	list_for_each_entry_safe(pch, _p, &pdmac->ddma.channels,
++			chan.device_node) {
++
++		/* Remove the channel */
++		list_del(&pch->chan.device_node);
++
++		/* Flush the channel */
++		pl330_control(&pch->chan, DMA_TERMINATE_ALL, 0);
++		pl330_free_chan_resources(&pch->chan);
++	}
+ probe_err2:
+ 	pl330_del(pi);
+ probe_err1:
+@@ -3023,8 +3040,10 @@ static int pl330_remove(struct amba_device *adev)
+ 	if (!pdmac)
+ 		return 0;
+ 
+-	of_dma_controller_free(adev->dev.of_node);
++	if (adev->dev.of_node)
++		of_dma_controller_free(adev->dev.of_node);
+ 
++	dma_async_device_unregister(&pdmac->ddma);
+ 	amba_set_drvdata(adev, NULL);
+ 
+ 	/* Idle the DMAC */
+-- 
+1.7.4.4
