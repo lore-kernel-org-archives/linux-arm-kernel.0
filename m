@@ -1,60 +1,128 @@
-From: Frank.Li@freescale.com (Frank Li)
-Date: Mon, 4 Mar 2013 14:52:38 +0800
-Subject: [PATCH 1/1] net: fec: fix build error in no MXC platform
-Message-ID: <1362379958-12972-1-git-send-email-Frank.Li@freescale.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 04 Mar 2013 09:33:27 +0100
+Subject: [PATCH v4 2/8] reset: Add reset controller API
+In-Reply-To: <513108F8.30902@wwwdotorg.org>
+References: <1361878774-6382-1-git-send-email-p.zabel@pengutronix.de>
+ <1361878774-6382-3-git-send-email-p.zabel@pengutronix.de>
+ <513108F8.30902@wwwdotorg.org>
+Message-ID: <1362386007.4988.34.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-build error cause by
-Commit ff43da86c69d76a726ffe7d1666148960dc1d108
-("NET: FEC: dynamtic check DMA desc buff type")
+Hi Stephen,
 
-drivers/net/ethernet/freescale/fec.c: In function ?fec_enet_get_nextdesc?:
-drivers/net/ethernet/freescale/fec.c:215:18: error: invalid use of undefined type ?struct bufdesc_ex?
-drivers/net/ethernet/freescale/fec.c: In function ?fec_enet_get_prevdesc?:
-drivers/net/ethernet/freescale/fec.c:224:18: error: invalid use of undefined type ?struct bufdesc_ex?
-drivers/net/ethernet/freescale/fec.c: In function ?fec_enet_start_xmit?:
-drivers/net/ethernet/freescale/fec.c:286:37: error: arithmetic on pointer to an incomplete type
-drivers/net/ethernet/freescale/fec.c:287:13: error: arithmetic on pointer to an incomplete type
-drivers/net/ethernet/freescale/fec.c:324:7: error: dereferencing pointer to incomplete type etc....
+Am Freitag, den 01.03.2013, 13:00 -0700 schrieb Stephen Warren:
+> On 02/26/2013 04:39 AM, Philipp Zabel wrote:
+> > This adds a simple API for devices to request being reset
+> > by separate reset controller hardware and implements the
+> > reset signal device tree binding.
+> 
+> > diff --git a/drivers/reset/core.c b/drivers/reset/core.c
+> 
+> > +int of_reset_simple_xlate(struct reset_controller_dev *rcdev,
+> > +			  const struct of_phandle_args *reset_spec, u32 *flags)
+> > +{
+> > +	if (WARN_ON(reset_spec->args_count < rcdev->of_reset_n_cells))
+> > +		return -EINVAL;
+> 
+> Would != make more sense than < ?
 
-Signed-off-by: Frank Li <Frank.Li@freescale.com>
----
- drivers/net/ethernet/freescale/fec.h |   15 +++++++--------
- 1 files changed, 7 insertions(+), 8 deletions(-)
+I copied this from of_gpio_simple_xlate, because the parsing will work
+if args_count > of_reset_n_cells. In this case the device tree contains
+a #reset-cells larger than what the reset controller driver expects.
+Is this reason enough to assume the whole reset_spec is invalid?
 
-diff --git a/drivers/net/ethernet/freescale/fec.h b/drivers/net/ethernet/freescale/fec.h
-index 01579b8..a53150c 100644
---- a/drivers/net/ethernet/freescale/fec.h
-+++ b/drivers/net/ethernet/freescale/fec.h
-@@ -97,6 +97,13 @@ struct bufdesc {
- 	unsigned short cbd_sc;	/* Control and status info */
- 	unsigned long cbd_bufaddr;	/* Buffer address */
- };
-+#else
-+struct bufdesc {
-+	unsigned short	cbd_sc;			/* Control and status info */
-+	unsigned short	cbd_datlen;		/* Data length */
-+	unsigned long	cbd_bufaddr;		/* Buffer address */
-+};
-+#endif
- 
- struct bufdesc_ex {
- 	struct bufdesc desc;
-@@ -107,14 +114,6 @@ struct bufdesc_ex {
- 	unsigned short res0[4];
- };
- 
--#else
--struct bufdesc {
--	unsigned short	cbd_sc;			/* Control and status info */
--	unsigned short	cbd_datlen;		/* Data length */
--	unsigned long	cbd_bufaddr;		/* Buffer address */
--};
--#endif
--
- /*
-  *	The following definitions courtesy of commproc.h, which where
-  *	Copyright (c) 1997 Dan Malek (dmalek at jlc.net).
--- 
-1.7.1
+> > +
+> > +	if (reset_spec->args[0] >= rcdev->nr_resets)
+> > +		return -EINVAL;
+> > +
+> > +	if (flags)
+> > +		*flags = reset_spec->args[1];
+> 
+> if (flags)
+>     if (reset_spec->args_count > 1)
+>         *flags = reset_spec->args[1];
+>     else
+>         *flags = 0;
+> 
+> ?
+
+In gpiolib, of_get_named_gpio_flags clears the flags, so that the xlate
+implementations don't have to do it. The core doesn't use the flags, so
+this is not a problem. I don't see the need for
+of_get_named_reset_flags, since the reset consumer drivers shouldn't
+care for those. Maybe it would be better to remove the flags parameter
+from the xlate function altogether.
+
+> > +struct reset_control *reset_control_get(struct device *dev, const char *id)
+> ...
+> > +	mutex_lock(&reset_controller_list_mutex);
+> > +	rcdev = NULL;
+> > +	list_for_each_entry(r, &reset_controller_list, list) {
+> > +		if (args.np == r->of_node) {
+> > +			rcdev = r;
+> > +			break;
+> > +		}
+> > +	}
+> > +	mutex_unlock(&reset_controller_list_mutex);
+> 
+> At this point, rcdev could be removed from that list, and perhaps even
+> start to point at free'd memory.
+
+I'll move the unlock down.
+
+> > +	of_node_put(args.np);
+> > +
+> > +	if (!rcdev)
+> > +		return ERR_PTR(-ENODEV);
+> > +
+> > +	rstc_id = rcdev->of_xlate(rcdev, &args, NULL);
+> > +	if (rstc_id < 0)
+> > +		return ERR_PTR(rstc_id);
+> > +
+> > +	try_module_get(rcdev->owner);
+> 
+> What about error-handling here?
+>
+> I think you want to drop reset_controller_list_mutex only after the call
+> to try_module_get()?
+
+I will.
+
+> > +static int devm_reset_control_match(struct device *dev, void *res, void *data)
+> > +{
+> > +	struct reset_control **rstc = res;
+> > +	if (!rstc || !*rstc) {
+> > +		WARN_ON(!rstc || !*rstc);
+> 
+> I think you can if (WARN_ON(...)).
+
+Yes.
+
+> I'm not sure if the error-checks are quite right though;
+> reset_control_get always returns an error-pointer for errors, never
+> NULL, so the pointer can't ever be NULL. If it somehow was (e.g. client
+> usage error), then that NULL pointer would never match anything, so the
+> error-check still wouldn't be useful.
+
+The void *res parameter of dr_match_t is given the data field of struct
+devres (dr->data) when called by devres_release. A few subsystems do the
+same check, so I figured there could be other devres managed resources
+that could have dr->data == NULL. Looking at devres.c again, this
+doesn't really seem to be the case. I'll drop it.
+
+> I'm not sure why this is a ** here; below in devm_reset_control_put()
+> you pass a just a *; are you expected to pass &rstc there instead?
+
+dr->data is filled in and returned by devres_alloc in
+devm_reset_control_get and contains a struct reset_control **ptr.
+So that should be right, but ...
+
+reset_control_get right now always allocates a new struct reset_control,
+instead of keeping them around in a list and just returning a new
+reference for already existing reset_controls, which kind of defeats the
+purpose of the above. The idea was that drivers sharing a reset line
+should also use the same struct reset_control.
+
+thanks
+Philipp
