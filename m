@@ -1,28 +1,47 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 04 Mar 2013 14:15:44 -0500 (EST)
-Subject: [PATCH 1/1] net: fec: fix build error in no MXC platform
-In-Reply-To: <1362379958-12972-1-git-send-email-Frank.Li@freescale.com>
-References: <1362379958-12972-1-git-send-email-Frank.Li@freescale.com>
-Message-ID: <20130304.141544.1354907717393768867.davem@davemloft.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 4 Mar 2013 11:18:31 -0800
+Subject: [PATCH 1/2] arm: omap2: mux: fix debugfs file permission
+In-Reply-To: <1361269464-20263-1-git-send-email-balbi@ti.com>
+References: <1361269464-20263-1-git-send-email-balbi@ti.com>
+Message-ID: <20130304191830.GV11806@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Frank Li <Frank.Li@freescale.com>
-Date: Mon, 4 Mar 2013 14:52:38 +0800
-
-> build error cause by
-> Commit ff43da86c69d76a726ffe7d1666148960dc1d108
-> ("NET: FEC: dynamtic check DMA desc buff type")
+* Felipe Balbi <balbi@ti.com> [130219 02:28]:
+> OMAP's debugfs interface creates one file
+> for each signal in the mux table, such file
+> provides a read method but didn't provide
+> read permission. Fix it.
 > 
-> drivers/net/ethernet/freescale/fec.c: In function ?fec_enet_get_nextdesc?:
-> drivers/net/ethernet/freescale/fec.c:215:18: error: invalid use of undefined type ?struct bufdesc_ex?
-> drivers/net/ethernet/freescale/fec.c: In function ?fec_enet_get_prevdesc?:
-> drivers/net/ethernet/freescale/fec.c:224:18: error: invalid use of undefined type ?struct bufdesc_ex?
-> drivers/net/ethernet/freescale/fec.c: In function ?fec_enet_start_xmit?:
-> drivers/net/ethernet/freescale/fec.c:286:37: error: arithmetic on pointer to an incomplete type
-> drivers/net/ethernet/freescale/fec.c:287:13: error: arithmetic on pointer to an incomplete type
-> drivers/net/ethernet/freescale/fec.c:324:7: error: dereferencing pointer to incomplete type etc....
-> 
-> Signed-off-by: Frank Li <Frank.Li@freescale.com>
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
 
-Applied.
+Heh indeed, although read still seems to work without it.
+Applying into omap-for-v3.9/fixes.
+
+Regards,
+
+Tony
+
+> ---
+>  arch/arm/mach-omap2/mux.c | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/mux.c b/arch/arm/mach-omap2/mux.c
+> index 6a217c9..03fa4f4 100644
+> --- a/arch/arm/mach-omap2/mux.c
+> +++ b/arch/arm/mach-omap2/mux.c
+> @@ -739,8 +739,9 @@ static void __init omap_mux_dbg_create_entry(
+>  	list_for_each_entry(e, &partition->muxmodes, node) {
+>  		struct omap_mux *m = &e->mux;
+>  
+> -		(void)debugfs_create_file(m->muxnames[0], S_IWUSR, mux_dbg_dir,
+> -					  m, &omap_mux_dbg_signal_fops);
+> +		(void)debugfs_create_file(m->muxnames[0], S_IWUSR | S_IRUGO,
+> +					  mux_dbg_dir, m,
+> +					  &omap_mux_dbg_signal_fops);
+>  	}
+>  }
+>  
+> -- 
+> 1.8.1.rc1.5.g7e0651a
+> 
