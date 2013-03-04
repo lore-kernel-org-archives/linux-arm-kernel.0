@@ -1,23 +1,20 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 4 Mar 2013 20:32:50 +0000
-Subject: [PATCH] ARM: OMAP1: Fix build related to kgdb.h no longer
- including serial_8250.h
-In-Reply-To: <20130304190238.GU11806@atomide.com>
-References: <20130211224600.GB4801@atomide.com>
- <20130304190238.GU11806@atomide.com>
-Message-ID: <201303042032.50856.arnd@arndb.de>
+Date: Mon, 4 Mar 2013 20:34:43 +0000
+Subject: Latest randconfig build errors
+In-Reply-To: <20130304095136.GI17833@n2100.arm.linux.org.uk>
+References: <20130304095136.GI17833@n2100.arm.linux.org.uk>
+Message-ID: <201303042034.43833.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 04 March 2013, Tony Lindgren wrote:
-> > Arnd & Olof, can you please apply this to your non-critical fixes
-> > or some other branch that gets merged early on during the merge
-> > window?
+On Monday 04 March 2013, Russell King - ARM Linux wrote:
+
+> Versatile randconfig:
 > 
-> I'll apply this into omap-for-v3.9-rc1/fixes.
+> ERROR: "irq_domain_add_simple" [drivers/gpio/gpio-em.ko] undefined!
 > 
 
-I totally missed this one from you, and I have a couple more such
-fixes for OMAP1 (and others) that I'll try to send out ASAP.
+I'm pretty sure I submitted a patch for this one before. I'll go looking
+for it. IIRC the solution was to export that symbol.
 
 	Arnd
