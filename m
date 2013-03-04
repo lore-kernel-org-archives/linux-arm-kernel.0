@@ -1,38 +1,26 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Mon, 4 Mar 2013 08:57:14 +0800
-Subject: [PATCH v5 00/12] enhance DT support on gpio pxa
-In-Reply-To: <CACRpkdYtKBMRsFgBEEhiAykKU28RrM1USuD4SiRcASvaNeDDrw@mail.gmail.com>
-References: <1361764181-26647-1-git-send-email-haojian.zhuang@linaro.org>
- <CACRpkdYtKBMRsFgBEEhiAykKU28RrM1USuD4SiRcASvaNeDDrw@mail.gmail.com>
-Message-ID: <CAD6h2NRGQ8h8FPWbPSDMre7C5j4Zgu97RbMNwEcuShrEdME+aw@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 4 Mar 2013 09:07:51 +0800
+Subject: [PATCH] arm: mxs: Update mxs_defconfig
+In-Reply-To: <201303032228.26070.marex@denx.de>
+References: <1356055651-27145-1-git-send-email-marex@denx.de>
+ <201301170222.51048.marex@denx.de>
+ <20130117021240.GD26179@S2101-09.ap.freescale.net>
+ <201303032228.26070.marex@denx.de>
+Message-ID: <20130304010749.GA30431@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 March 2013 08:49, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Mon, Feb 25, 2013 at 4:49 AM, Haojian Zhuang
-> <haojian.zhuang@linaro.org> wrote:
->
->> Changelog:
->>
->> v5:
->> * Replace of_find_property() by of_property_read_bool().
->> * Rename __gpio_is_occupied() & __gpio_is_inverted().
->> * Avoid to use pxachip as variable name. Use chip instead.
->
-> Bah I've been talking crap in my other comments. This series
-> looks great. Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> for the entire series (but I have a comment on patch 12/12,
-> even though I Ack it).
->
-> Will you take this through the PXA tree?
->
-> Yours,
-> Linus Walleij
+On Sun, Mar 03, 2013 at 10:28:25PM +0100, Marek Vasut wrote:
+> Dear Shawn Guo,
+> 
+> > On Thu, Jan 17, 2013 at 02:22:50AM +0100, Marek Vasut wrote:
+> > > Do you think this can be made a stable matter for 3.7 ? It's a defconfig
+> > > update afterall and it help a great deal.
+> > 
+> > No, I don't think so.  Sorry.
+> 
+> Was this patch ever applied? I can't find it in 3.8 nor in -next :-(
 
-Since Grant has some comments on the platform data usage,
-I'll give out the v6 later.
+Isn't it on mainline right now as 77d168a (ARM: mxs: Update mxs_defconfig)?
 
-By the way, I'll take it through the PXA tree.
-
-Regards
-Haojian
+Shawn
