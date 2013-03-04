@@ -1,87 +1,40 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 4 Mar 2013 19:11:59 +0200
-Subject: [PATCH 1/2] gpio/omap: convert gpio irq domain to linear mapping
-In-Reply-To: <5134D484.8070307@ti.com>
-References: <1362158568-1624-1-git-send-email-jon-hunter@ti.com>
- <1362158568-1624-2-git-send-email-jon-hunter@ti.com>
- <20130302114742.GA9965@arwen.pp.htv.fi> <5134D484.8070307@ti.com>
-Message-ID: <20130304171159.GB14507@arwen.pp.htv.fi>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 04 Mar 2013 10:13:57 -0700
+Subject: [PATCH 1/9] ARM: dt: add header to define GPIO flags
+In-Reply-To: <20130304083457.0D4333E206B@localhost>
+References: <1360791198-29462-1-git-send-email-swarren@wwwdotorg.org>
+ <1360791198-29462-2-git-send-email-swarren@wwwdotorg.org>
+ <20130304083457.0D4333E206B@localhost>
+Message-ID: <5134D655.9070608@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 04, 2013 at 11:06:12AM -0600, Jon Hunter wrote:
+On 03/04/2013 01:34 AM, Grant Likely wrote:
+> On Wed, 13 Feb 2013 14:33:10 -0700, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> From: Stephen Warren <swarren@nvidia.com>
+>>
+>> Many GPIO device tree bindings use the same flags. Create a header to
+>> define those.
+>>
+>> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+>> ---
+>>  arch/arm/boot/dts/gpio.h |   10 ++++++++++
+>>  1 file changed, 10 insertions(+)
+>>  create mode 100644 arch/arm/boot/dts/gpio.h
+>>
+>> diff --git a/arch/arm/boot/dts/gpio.h b/arch/arm/boot/dts/gpio.h
+>> new file mode 100644
+>> index 0000000..4c9da69
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/gpio.h
 > 
-> On 03/02/2013 05:48 AM, Felipe Balbi wrote:
-> > On Fri, Mar 01, 2013 at 11:22:47AM -0600, Jon Hunter wrote:
-> >> Currently the OMAP GPIO driver uses a legacy mapping for the GPIO IRQ
-> >> domain. This is not necessary because we do not need to assign a
-> >> specific interrupt number to the GPIO IRQ domain. Therefore, convert
-> >> the OMAP GPIO driver to use a linear mapping instead.
-> >>
-> >> Please note that this also allows to simplify the logic in the OMAP
-> >> gpio_irq_handler() routine, by using irq_find_mapping() to obtain the
-> >> virtual irq number from the GPIO bank and bank index.
-> >>
-> >> Reported-by: Linus Walleij <linus.walleij@linaro.org>
-> >> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-> > 
-> > Reviewed-by: Felipe Balbi <balbi@ti.com>
-> > 
-> > Just one suggestion below for a later patch.
-> > 
-> >> @@ -680,7 +686,7 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
-> >>  {
-> >>  	void __iomem *isr_reg = NULL;
-> >>  	u32 isr;
-> >> -	unsigned int gpio_irq, gpio_index;
-> >> +	unsigned int i;
-> >>  	struct gpio_bank *bank;
-> >>  	int unmasked = 0;
-> >>  	struct irq_chip *chip = irq_desc_get_chip(desc);
-> >> @@ -721,15 +727,10 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
-> >>  		if (!isr)
-> >>  			break;
-> >>  
-> >> -		gpio_irq = bank->irq_base;
-> >> -		for (; isr != 0; isr >>= 1, gpio_irq++) {
-> >> -			int gpio = irq_to_gpio(bank, gpio_irq);
-> >> -
-> >> +		for (i = 0; isr != 0; isr >>= 1, i++) {
-> >>  			if (!(isr & 1))
-> >>  				continue;
-> > 
-> > this will iterate over all 32 GPIOs, a better way to handle this would
-> > be to have something like:
-> 
-> Worse case, if only bit 31 was set then I agree this is not that
-> efficient. Or even if one bit is set. However, the loop itself will
-> iterate while isr != 0 so not always over each bit. No different to the
-> existing code.
-> 
-> > while (isr) {
-> > 	unsigned long bit = __ffs(isr);
-> >
-> > 	/* clear this bit */
-> > 	isr &= ~bit;
-> > 
-> > 	generic_handle_irq(irq_find_mapping(bank->domain, bit);
-> > }
-> > 
-> > this way you will only iterate the amount of bits enabled in the isr
-> > register.
-> 
-> Definitely cleaner but I am wondering which approach would be more
-> efficient from an instruction standpoint. This could definitely be much
-> more efficient if there is only a couple bits set.
+> Stephen, you know better than this. This is common code. Don't put it
+> under arch/arm.
 
-__ffs() is done with CLZ instruction, so it's pretty fast.
+In V2 of the patch which modifies the dtc+cpp include path:
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130304/4ca672d8/attachment.sig>
+https://lists.ozlabs.org/pipermail/devicetree-discuss/2013-February/028591.html
+
+... I have moved the common headers to top-level include/dt-bindings, so
+it is shared across all arch. I didn't repost all the changes to the *.h
+and *.dts* files yet; I was waiting for any comments on the patch above.
