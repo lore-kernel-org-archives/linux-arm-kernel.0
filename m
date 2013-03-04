@@ -1,56 +1,87 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 04 Mar 2013 10:08:27 -0700
-Subject: Multi-platform, and secure-only ARM errata workarounds
-In-Reply-To: <20130304091600.GC27241@tbergstrom-lnx.Nvidia.com>
-References: <512BF81A.3080700@wwwdotorg.org> <201302261023.26939.arnd@arndb.de>
- <20130226113538.GS17833@n2100.arm.linux.org.uk>
- <512CF87A.4090404@wwwdotorg.org>
- <20130226181114.GU17833@n2100.arm.linux.org.uk>
- <5130E757.6090500@wwwdotorg.org>
- <20130304063436.GB27241@tbergstrom-lnx.Nvidia.com>
- <20130304091600.GC27241@tbergstrom-lnx.Nvidia.com>
-Message-ID: <5134D50B.8060001@wwwdotorg.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 4 Mar 2013 19:11:59 +0200
+Subject: [PATCH 1/2] gpio/omap: convert gpio irq domain to linear mapping
+In-Reply-To: <5134D484.8070307@ti.com>
+References: <1362158568-1624-1-git-send-email-jon-hunter@ti.com>
+ <1362158568-1624-2-git-send-email-jon-hunter@ti.com>
+ <20130302114742.GA9965@arwen.pp.htv.fi> <5134D484.8070307@ti.com>
+Message-ID: <20130304171159.GB14507@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/04/2013 02:16 AM, Peter De Schrijver wrote:
-> On Mon, Mar 04, 2013 at 07:34:36AM +0100, Peter De Schrijver wrote:
->> On Fri, Mar 01, 2013 at 06:37:27PM +0100, Stephen Warren wrote:
->>
->> ...
->>
->>> Since some of the bits that enable WARs are banked per CPU, the WAR
->>> needs to be enabled by code running on each individual CPU, each time
->>> it's powered on. When a secure monitor exists, the CPU will boot through
->>> it (at least on Tegra, there is a single register that defines the boot
->>> vector for all CPUs; I don't know if that fact is ARM-architectural or
->>> not), so the secure monitor can apply the WAR if needed. However, when
->>> there is no secure monitor and the kernel runs in secure world, the
->>> kernel would have to apply those WARs, since the only code that runs is
->>> in the kernel.
->>>
->>
->> The boot vector register is Tegra specific. At least on OMAP all cores boot
->> from ROM afaik.
+On Mon, Mar 04, 2013 at 11:06:12AM -0600, Jon Hunter wrote:
 > 
-> Nicolas Pitre suggested a slightly different solution to me:
+> On 03/02/2013 05:48 AM, Felipe Balbi wrote:
+> > On Fri, Mar 01, 2013 at 11:22:47AM -0600, Jon Hunter wrote:
+> >> Currently the OMAP GPIO driver uses a legacy mapping for the GPIO IRQ
+> >> domain. This is not necessary because we do not need to assign a
+> >> specific interrupt number to the GPIO IRQ domain. Therefore, convert
+> >> the OMAP GPIO driver to use a linear mapping instead.
+> >>
+> >> Please note that this also allows to simplify the logic in the OMAP
+> >> gpio_irq_handler() routine, by using irq_find_mapping() to obtain the
+> >> virtual irq number from the GPIO bank and bank index.
+> >>
+> >> Reported-by: Linus Walleij <linus.walleij@linaro.org>
+> >> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+> > 
+> > Reviewed-by: Felipe Balbi <balbi@ti.com>
+> > 
+> > Just one suggestion below for a later patch.
+> > 
+> >> @@ -680,7 +686,7 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+> >>  {
+> >>  	void __iomem *isr_reg = NULL;
+> >>  	u32 isr;
+> >> -	unsigned int gpio_irq, gpio_index;
+> >> +	unsigned int i;
+> >>  	struct gpio_bank *bank;
+> >>  	int unmasked = 0;
+> >>  	struct irq_chip *chip = irq_desc_get_chip(desc);
+> >> @@ -721,15 +727,10 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+> >>  		if (!isr)
+> >>  			break;
+> >>  
+> >> -		gpio_irq = bank->irq_base;
+> >> -		for (; isr != 0; isr >>= 1, gpio_irq++) {
+> >> -			int gpio = irq_to_gpio(bank, gpio_irq);
+> >> -
+> >> +		for (i = 0; isr != 0; isr >>= 1, i++) {
+> >>  			if (!(isr & 1))
+> >>  				continue;
+> > 
+> > this will iterate over all 32 GPIOs, a better way to handle this would
+> > be to have something like:
 > 
-> 1) Handle CPU0 errata WARs in the bootloader
+> Worse case, if only bit 31 was set then I agree this is not that
+> efficient. Or even if one bit is set. However, the loop itself will
+> iterate while isr != 0 so not always over each bit. No different to the
+> existing code.
+> 
+> > while (isr) {
+> > 	unsigned long bit = __ffs(isr);
+> >
+> > 	/* clear this bit */
+> > 	isr &= ~bit;
+> > 
+> > 	generic_handle_irq(irq_find_mapping(bank->domain, bit);
+> > }
+> > 
+> > this way you will only iterate the amount of bits enabled in the isr
+> > register.
+> 
+> Definitely cleaner but I am wondering which approach would be more
+> efficient from an instruction standpoint. This could definitely be much
+> more efficient if there is only a couple bits set.
 
-OK - there's not much choice here, and I've posted a patch for this for
-Tegra U-Boot already.
+__ffs() is done with CLZ instruction, so it's pretty fast.
 
-> 2) Indicate in device tree if linux is booting in secude mode or non-secure
->    mode.
-> 3) Use this information in the kernel to decide how to apply the WARs for
->    secondary core bringup and after powerungating.
-
-Hmmm. That seems like a lot of overhead to avoid duplicating roughly 8
-assembly instructions per Tegra version. Also, some/all of the WARs in
-question probably need to be applied very early by assembly code, e.g.
-before MMU is re-enabled, so I think you'd end up parsing DT from
-assembly again, which would be painful. I tend to think just including
-the code in the kernel's SoC-specific reset handler is simplest, and
-even with the slight duplication, probably most maintainable. I've
-written a patch for this for Tegra already, which I hope to post later
-today, depending on testing and what other stuff I get side-tracked on.
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130304/4ca672d8/attachment.sig>
