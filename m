@@ -1,59 +1,148 @@
 From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Mon,  4 Mar 2013 15:05:48 +0100
-Subject: [PATCH 9/9] rtc: stmp3xxx: Replace wait_time function
+Date: Mon,  4 Mar 2013 15:05:43 +0100
+Subject: [PATCH 4/9] MXS/i.MX28: there is more than one way to clock the RTC
 In-Reply-To: <1362405948-12992-1-git-send-email-s.trumtrar@pengutronix.de>
 References: <1362405948-12992-1-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <1362405948-12992-10-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <1362405948-12992-5-git-send-email-s.trumtrar@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace the wait_time function with the more generic wait_copy_ctrl function.
+From: Juergen Beisert <jbe@pengutronix.de>
 
+Reflect the possibilities via device tree and configure the RTC correctly
+
+Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
 Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
 ---
- drivers/rtc/rtc-stmp3xxx.c |   18 ++++--------------
- 1 file changed, 4 insertions(+), 14 deletions(-)
+ arch/arm/boot/dts/imx28.dtsi |    2 ++
+ drivers/rtc/rtc-stmp3xxx.c   |   76 ++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 78 insertions(+)
 
+diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+index dcd0844..d89af79 100644
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -818,6 +818,8 @@
+ 				compatible = "fsl,imx28-rtc", "fsl,stmp3xxx-rtc";
+ 				reg = <0x80056000 0x2000>;
+ 				interrupts = <29>;
++				clocks = <&clks 65>, <&clks 40> ;
++				clock-names = "32k", "24m";
+ 			};
+ 
+ 			i2c0: i2c at 80058000 {
 diff --git a/drivers/rtc/rtc-stmp3xxx.c b/drivers/rtc/rtc-stmp3xxx.c
-index be4fd78..35a92cd 100644
+index 7311292..fb4b823 100644
 --- a/drivers/rtc/rtc-stmp3xxx.c
 +++ b/drivers/rtc/rtc-stmp3xxx.c
-@@ -172,24 +172,13 @@ static inline void stmp3xxx_wait_copy_ctrl(const struct stmp3xxx_rtc_data *rtc_d
- 			pr_warn("possible data loss of rtc shadow registers\n");
+@@ -21,6 +21,7 @@
+ #include <linux/module.h>
+ #include <linux/io.h>
+ #include <linux/init.h>
++#include <linux/clk.h>
+ #include <linux/platform_device.h>
+ #include <linux/interrupt.h>
+ #include <linux/rtc.h>
+@@ -176,11 +177,55 @@ static irqreturn_t stmp3xxx_rtc_interrupt(int irq, void *dev_id)
+ 	return IRQ_NONE;
  }
  
--static void stmp3xxx_wait_time(struct stmp3xxx_rtc_data *rtc_data)
--{
--	/*
--	 * The datasheet doesn't say which way round the
--	 * NEW_REGS/STALE_REGS bitfields go. In fact it's 0x1=P0,
--	 * 0x2=P1, .., 0x20=P5, 0x40=ALARM, 0x80=SECONDS
--	 */
--	while (readl(rtc_data->io + STMP3XXX_RTC_STAT) &
--			(0x80 << STMP3XXX_RTC_STAT_STALE_SHIFT))
--		cpu_relax();
--}
--
- /* Time read/write */
- static int stmp3xxx_rtc_gettime(struct device *dev, struct rtc_time *rtc_tm)
++/*
++ * To keep the energy consumption low, keep only
++ * the really used oscillator running when the power is down
++ */
++static void stmp3xxx_alarm_keep_oscillator(const struct stmp3xxx_rtc_data *rtc_data)
++{
++	switch (rtc_data->clk_src) {
++	case MXS_OSC_24M:
++		/* keep the 24 MHz oscillator running even in power down */
++		writel(STMP3XXX_RTC_PERSISTENT0_XTAL32_FREQ | /* 24 MHz / 750 */
++			STMP3XXX_RTC_PERSISTENT0_XTAL24MHZ_PWRUP,
++			rtc_data->io + STMP3XXX_RTC_PERSISTENT0_SET);
++		writel(STMP3XXX_RTC_PERSISTENT0_XTAL32KHZ_PWRUP |
++			STMP3XXX_RTC_PERSISTENT0_CLOCKSOURCE,
++			rtc_data->io + STMP3XXX_RTC_PERSISTENT0_CLR);
++		break;
++	case MXS_OSC_32K:
++		/* keep the 32 kHz oscillator running even in power down */
++		writel(STMP3XXX_RTC_PERSISTENT0_XTAL32_FREQ | /* 32 kHz */
++			STMP3XXX_RTC_PERSISTENT0_XTAL32KHZ_PWRUP |
++			STMP3XXX_RTC_PERSISTENT0_CLOCKSOURCE,
++			rtc_data->io + STMP3XXX_RTC_PERSISTENT0_SET);
++		writel(STMP3XXX_RTC_PERSISTENT0_XTAL24MHZ_PWRUP,
++			rtc_data->io + STMP3XXX_RTC_PERSISTENT0_CLR);
++		break;
++	case MXS_OSC_32K768:
++		/* keep the 32 kHz oscillator running even in power down */
++		writel(STMP3XXX_RTC_PERSISTENT0_XTAL32KHZ_PWRUP |
++			STMP3XXX_RTC_PERSISTENT0_CLOCKSOURCE,
++			rtc_data->io + STMP3XXX_RTC_PERSISTENT0_SET);
++		writel(STMP3XXX_RTC_PERSISTENT0_XTAL32_FREQ | /* 32.768 kHz */
++			STMP3XXX_RTC_PERSISTENT0_XTAL24MHZ_PWRUP,
++			rtc_data->io + STMP3XXX_RTC_PERSISTENT0_CLR);
++		break;
++	case MXS_UNKNOWN:
++	default:
++		break;
++	}
++}
++
+ static int stmp3xxx_alarm_irq_enable(struct device *dev, unsigned int enabled)
  {
  	struct stmp3xxx_rtc_data *rtc_data = dev_get_drvdata(dev);
  
--	stmp3xxx_wait_time(rtc_data);
-+	stmp3xxx_wait_copy_ctrl(rtc_data, STMP3XXX_RTC_STAT_STALE_SHIFT,
-+				STMP3XXX_RTC_STAT_SEC_MASK);
- 	rtc_time_to_tm(readl(rtc_data->io + STMP3XXX_RTC_SECONDS), rtc_tm);
- 	return 0;
- }
-@@ -199,7 +188,8 @@ static int stmp3xxx_rtc_set_mmss(struct device *dev, unsigned long t)
- 	struct stmp3xxx_rtc_data *rtc_data = dev_get_drvdata(dev);
++	stmp3xxx_alarm_keep_oscillator(rtc_data);
++
+ 	if (enabled) {
++		writel(STMP3XXX_RTC_PERSISTENT0_ALARM_WAKE, /* to be able to sleep */
++			rtc_data->io + STMP3XXX_RTC_PERSISTENT0_CLR);
+ 		writel(STMP3XXX_RTC_PERSISTENT0_ALARM_EN |
+ 				STMP3XXX_RTC_PERSISTENT0_ALARM_WAKE_EN,
+ 				rtc_data->io + STMP3XXX_RTC_PERSISTENT0_SET);
+@@ -248,6 +293,8 @@ static int stmp3xxx_rtc_probe(struct platform_device *pdev)
+ {
+ 	struct stmp3xxx_rtc_data *rtc_data;
+ 	struct resource *r;
++	struct clk *clk;
++	unsigned long rate;
+ 	int err;
  
- 	writel(t, rtc_data->io + STMP3XXX_RTC_SECONDS);
--	stmp3xxx_wait_time(rtc_data);
-+	stmp3xxx_wait_copy_ctrl(rtc_data, STMP3XXX_RTC_STAT_NEW_SHIFT,
-+				STMP3XXX_RTC_STAT_SEC_MASK);
- 	return 0;
- }
+ 	rtc_data = kzalloc(sizeof *rtc_data, GFP_KERNEL);
+@@ -280,6 +327,35 @@ static int stmp3xxx_rtc_probe(struct platform_device *pdev)
+ 	platform_set_drvdata(pdev, rtc_data);
  
+ 	mxs_reset_block(rtc_data->io);
++
++	/*
++	 * configure the RTC to provide the correct time
++	 */
++	clk = clk_get(&pdev->dev, "32k");
++	if (IS_ERR(clk)) {
++		/* just a fall back */
++		dev_warn(&pdev->dev, "RTC's input clock undefined\n");
++		rtc_data->clk_src = MXS_OSC_24M;
++	} else {
++		rate = clk_get_rate(clk);
++		if (rate == 0) {
++			/* no dedicated external crystal */
++			rtc_data->clk_src = MXS_OSC_24M;
++			dev_info(&pdev->dev, "Using 24 MHz as RTC's clock\n");
++		} else if (rate == 32000) {
++			rtc_data->clk_src = MXS_OSC_32K;
++			dev_info(&pdev->dev, "Using 32.0 kHz as RTC's clock\n");
++		} else if (rate == 32768) {
++			rtc_data->clk_src = MXS_OSC_32K768;
++			dev_info(&pdev->dev, "Using 32.768 kHz as RTC's clock\n");
++		} else
++			dev_warn(&pdev->dev,
++				"Cannot init the RTC's clock source\n");
++	}
++
++	/* basically configure the RTC's input clock */
++	stmp3xxx_alarm_keep_oscillator(rtc_data);
++
+ 	writel(STMP3XXX_RTC_PERSISTENT0_ALARM_EN |
+ 			STMP3XXX_RTC_PERSISTENT0_ALARM_WAKE_EN |
+ 			STMP3XXX_RTC_PERSISTENT0_ALARM_WAKE,
 -- 
 1.7.10.4
