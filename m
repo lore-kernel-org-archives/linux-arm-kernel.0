@@ -1,47 +1,46 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 04 Mar 2013 21:57:38 +0900
-Subject: [PATCH 03/14] MAINTAINERS: remove arch/arm/plat-s3c24xx/
-In-Reply-To: <1362275632-20242-4-git-send-email-cesarb@cesarb.net>
-References: <1362275632-20242-1-git-send-email-cesarb@cesarb.net>
- <1362275632-20242-4-git-send-email-cesarb@cesarb.net>
-Message-ID: <007f01ce18d7$d94ab430$8be01c90$%kim@samsung.com>
+From: prakash.pm@ti.com (Manjunathappa, Prakash)
+Date: Mon, 4 Mar 2013 18:29:11 +0530
+Subject: [PATCH v2 0/4] Enable SPI flash support on da850-evm DT kernel
+Message-ID: <1362401955-9616-1-git-send-email-prakash.pm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cesar Eduardo Barros wrote:
-> 
-> This directory was removed by commit 09ec1d7 (ARM: S3C24XX: Remove
-> plat-s3c24xx directory in arch/arm/).
-> 
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
+Patch enables support for m25p64 SPI flash support on
+da850-EVM.
 
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+Testing information:
+da850-evm comes with partitions specified in DT blob.
+Able to mount/umount and create/delete files on filesystem partition.
 
-Thanks.
+Depends on below patch in spi-next branch of git://git.secretlab.ca/git/linux-2.6.git.
+"spi/davinci: add OF support for the spi controller"
 
-- Kukjin
+Applies on top of v3.9/dt-2 branch of linux_davinci tree:
+git://gitorious.org/linux-davinci/linux-davinci.git
 
-> Cc: Ben Dooks <ben-linux@fluff.org>
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-samsung-soc at vger.kernel.org
-> Signed-off-by: Cesar Eduardo Barros <cesarb@cesarb.net>
-> ---
->  MAINTAINERS | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 3c074d5..5af82f9 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -1119,7 +1119,6 @@ L:	linux-samsung-soc at vger.kernel.org (moderated
-> for non-subscribers)
->  W:	http://www.fluff.org/ben/linux/
->  S:	Maintained
->  F:	arch/arm/plat-samsung/
-> -F:	arch/arm/plat-s3c24xx/
->  F:	arch/arm/mach-s3c24*/
->  F:	arch/arm/mach-s3c64xx/
->  F:	drivers/*/*s3c2410*
-> --
-> 1.7.11.7
+Since v1:
+Look for m25p64 instead of m25p80 flash chip and correct partition information.
+
+Dropping below accepted patch:
+"spi/davinci: fix module build error"
+
+Considered below missed out patch:
+spi/davinci: add DT binding documentation
+
+Manjunathappa, Prakash (3):
+  ARM: davinci: da850: add SPI1 DT node
+  ARM: davinci: da850: override SPI DT node device name
+  ARM: davinci: da850-evm: add SPI flash support
+
+Murali Karicheri (1):
+  spi/davinci: add DT binding documentation
+
+ .../devicetree/bindings/spi/spi-davinci.txt        |   51 ++++++++++++++++++++
+ arch/arm/boot/dts/da850-evm.dts                    |   40 +++++++++++++++
+ arch/arm/boot/dts/da850.dtsi                       |   18 +++++++
+ arch/arm/mach-davinci/da8xx-dt.c                   |    1 +
+ 4 files changed, 110 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/spi/spi-davinci.txt
+
+-- 
+1.7.4.1
