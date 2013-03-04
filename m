@@ -1,58 +1,33 @@
 From: hechtb@gmail.com (Bastian Hecht)
-Date: Mon, 4 Mar 2013 16:46:51 +0100
-Subject: [PATCH 3/3] ARM: mach-shmobile: sh73a0: Setup the timer device
- CMT10 using DT
-In-Reply-To: <5130FEB9.5000508@cogentembedded.com>
+Date: Mon, 4 Mar 2013 16:51:23 +0100
+Subject: [PATCH 1/3] clocksource: sh_cmt: Add Device Tree probing
+In-Reply-To: <20130304040935.GC26475@linux-sh.org>
 References: <1362159932-18533-1-git-send-email-hechtb+renesas@gmail.com>
- <1362159932-18533-4-git-send-email-hechtb+renesas@gmail.com>
- <5130FEB9.5000508@cogentembedded.com>
-Message-ID: <CABYn4sxkaGzyL7qtaQCKp6Qy=ExOR+5cLgvWS8pL_gQeZKgKtQ@mail.gmail.com>
+ <1362159932-18533-2-git-send-email-hechtb+renesas@gmail.com>
+ <20130304040935.GC26475@linux-sh.org>
+Message-ID: <CABYn4sz=daKATegpFDrCBJTcJ0g1-mNavX2toaFhbDUhcgR++w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Paul,
 
-2013/3/1 Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>:
-> Hello.
->
->
-> On 03/01/2013 08:45 PM, Bastian Hecht wrote:
->
->> We can now use the Device Tree for bringing up our timer device CMT10.
->> We move it out of the DT devices list into the early_devices list by
->> the non-reference board code. And we add the device to the
->> kzm9g-reference .dts file.
+2013/3/4 Paul Mundt <lethal@linux-sh.org>:
+> On Fri, Mar 01, 2013 at 11:45:30AM -0600, Bastian Hecht wrote:
+>> We add the capabilty to probe SH CMT timer devices using Device Tree
+>> setup.
 >>
->> Not-yet-signed-off-by: Bastian Hecht<hechtb+renesas@gmail.com>
->> ---
->> I wonder if this should go to arch/arm/boot/dts/sh73a0.dtsi.
+>> We can deduce former platform data by the device IDs and channel
+>> IDs of our timer instances, so we choose this more intuitive info as our
+>> DT properties.
 >>
->> The moving to the early_devices is a bit hackish - I will cook up a better
->> patch when I know into which .dts(i) file things go.
->>
->>   arch/arm/boot/dts/sh73a0-kzm9g-reference.dts |   11 +++++++++++
->>   arch/arm/mach-shmobile/setup-sh73a0.c        |    2 +-
->>   2 files changed, 12 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
->> b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
->> index 7fad4b9..fef12f0 100644
->> --- a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
->> +++ b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
->> @@ -69,6 +69,17 @@
->>                 toshiba,mmc-wrprotect-disable;
->>                 toshiba,mmc-has-idle-wait;
->>         };
->> +
->> +       cmt at 0xe6138010 {
->>
->
->
->     "0x" shouldn't be there, remove it please.
->
-> WBR, Sergei
->
+> I wonder if it makes more sense to attempt to create a more generalized
+> binding, as what you have here is pretty much uniform for all of
+> CMT/TMU/MTU2. Perhaps having a general sh-timer binding would be cleaner,
+> while letting each timer plug the compatible string it cares about.
 
-Thanks for pointing out this one. Fixed it in another patchset as well.
+Yes that sounds good. I'll have a look at the various timers and see
+if I can come up with something good.
 
-Bastian
+Thanks,
+
+ Bastian
