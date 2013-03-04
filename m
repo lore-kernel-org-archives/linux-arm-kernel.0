@@ -1,26 +1,74 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 4 Mar 2013 12:37:42 +0800
-Subject: drivers/dma/dw_dmac.c:1278:48: sparse: incorrect type in argument
- 1 (different base types)
-In-Reply-To: <201303032051.28444.arnd@arndb.de>
-References: <5133ae8b.eQXjkB7tQEqiUMck%fengguang.wu@intel.com>
- <201303032051.28444.arnd@arndb.de>
-Message-ID: <CAOh2x=nEGOFbVgVKdNYNfaH_XPZYQ=aMrd076CFXj2_y54NogA@mail.gmail.com>
+From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
+Date: Mon,  4 Mar 2013 13:50:09 +0900
+Subject: [PATCH] ARM: mm: clean-up in order to reduce to call kmap_high_get()
+Message-ID: <1362372609-877-1-git-send-email-iamjoonsoo.kim@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 4, 2013 at 4:51 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> Subject: [PATCH] dmaengine: dw_dma: fix endianess for DT xlate function
->
-> As reported by Wu Fengguang's build robot tracking sparse warnings, the
-> dma_spec arguments in the dw_dma_xlate are already byte swapped on
-> littl-endian platforms and must not get swapped again. This code is
+In kmap_atomic(), kmap_high_get() is invoked for checking already
+mapped area. In __flush_dcache_page() and dma_cache_maint_page(),
+we explicitly call kmap_high_get() before kmap_atomic()
+when cache_is_vipt(), so kmap_high_get() can be invoked twice.
+This is useless operation, so remove one.
 
-s/littl/little
+Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
 
-> currently not used anywhere, but will be used in Linux 3.10 when the
-> ARM SPEAr platform starts using the generic DMA DT binding.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index c7e3759..b7711be 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -822,16 +822,16 @@ static void dma_cache_maint_page(struct page *page, unsigned long offset,
+ 		if (PageHighMem(page)) {
+ 			if (len + offset > PAGE_SIZE)
+ 				len = PAGE_SIZE - offset;
+-			vaddr = kmap_high_get(page);
+-			if (vaddr) {
+-				vaddr += offset;
+-				op(vaddr, len, dir);
+-				kunmap_high(page);
+-			} else if (cache_is_vipt()) {
+-				/* unmapped pages might still be cached */
++			if (cache_is_vipt()) {
+ 				vaddr = kmap_atomic(page);
+ 				op(vaddr + offset, len, dir);
+ 				kunmap_atomic(vaddr);
++			} else {
++				vaddr = kmap_high_get(page);
++				if (vaddr) {
++					op(vaddr + offset, len, dir);
++					kunmap_high(page);
++				}
+ 			}
+ 		} else {
+ 			vaddr = page_address(page) + offset;
+diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+index 1c8f7f5..e6a03d0 100644
+--- a/arch/arm/mm/flush.c
++++ b/arch/arm/mm/flush.c
+@@ -170,15 +170,18 @@ void __flush_dcache_page(struct address_space *mapping, struct page *page)
+ 	if (!PageHighMem(page)) {
+ 		__cpuc_flush_dcache_area(page_address(page), PAGE_SIZE);
+ 	} else {
+-		void *addr = kmap_high_get(page);
+-		if (addr) {
+-			__cpuc_flush_dcache_area(addr, PAGE_SIZE);
+-			kunmap_high(page);
+-		} else if (cache_is_vipt()) {
+-			/* unmapped pages might still be cached */
++		void *addr;
++
++		if (cache_is_vipt()) {
+ 			addr = kmap_atomic(page);
+ 			__cpuc_flush_dcache_area(addr, PAGE_SIZE);
+ 			kunmap_atomic(addr);
++		} else {
++			addr = kmap_high_get(page);
++			if (addr) {
++				__cpuc_flush_dcache_area(addr, PAGE_SIZE);
++				kunmap_high(page);
++			}
+ 		}
+ 	}
+ 
+-- 
+1.7.9.5
