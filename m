@@ -1,27 +1,28 @@
 From: davem@davemloft.net (David Miller)
-Date: Mon, 04 Mar 2013 14:15:07 -0500 (EST)
-Subject: [PATCH v3 1/1 net-next] net: fec: put tx to napi poll function
- to fix dead lock
-In-Reply-To: <1362368065-5809-1-git-send-email-Frank.Li@freescale.com>
-References: <1362368065-5809-1-git-send-email-Frank.Li@freescale.com>
-Message-ID: <20130304.141507.1100300683952317840.davem@davemloft.net>
+Date: Mon, 04 Mar 2013 14:15:44 -0500 (EST)
+Subject: [PATCH 1/1] net: fec: fix build error in no MXC platform
+In-Reply-To: <1362379958-12972-1-git-send-email-Frank.Li@freescale.com>
+References: <1362379958-12972-1-git-send-email-Frank.Li@freescale.com>
+Message-ID: <20130304.141544.1354907717393768867.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Frank Li <Frank.Li@freescale.com>
-Date: Mon, 4 Mar 2013 11:34:25 +0800
+Date: Mon, 4 Mar 2013 14:52:38 +0800
 
-> up stack ndo_start_xmit already hold lock.
-> fec_enet_start_xmit needn't spin lock.
-> stat_xmit just update fep->cur_tx
-> fec_enet_tx just update fep->dirty_tx
+> build error cause by
+> Commit ff43da86c69d76a726ffe7d1666148960dc1d108
+> ("NET: FEC: dynamtic check DMA desc buff type")
 > 
-> Reserve a empty bdb to check full or empty
-> cur_tx == dirty_tx    means full
-> cur_tx == dirty_tx +1 means empty
+> drivers/net/ethernet/freescale/fec.c: In function ?fec_enet_get_nextdesc?:
+> drivers/net/ethernet/freescale/fec.c:215:18: error: invalid use of undefined type ?struct bufdesc_ex?
+> drivers/net/ethernet/freescale/fec.c: In function ?fec_enet_get_prevdesc?:
+> drivers/net/ethernet/freescale/fec.c:224:18: error: invalid use of undefined type ?struct bufdesc_ex?
+> drivers/net/ethernet/freescale/fec.c: In function ?fec_enet_start_xmit?:
+> drivers/net/ethernet/freescale/fec.c:286:37: error: arithmetic on pointer to an incomplete type
+> drivers/net/ethernet/freescale/fec.c:287:13: error: arithmetic on pointer to an incomplete type
+> drivers/net/ethernet/freescale/fec.c:324:7: error: dereferencing pointer to incomplete type etc....
 > 
-> So needn't is_full variable.
- ...
 > Signed-off-by: Frank Li <Frank.Li@freescale.com>
 
 Applied.
