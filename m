@@ -1,27 +1,72 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 4 Mar 2013 08:36:33 +0100
-Subject: [PATCH] mfd: Fix AB8500 build failure if POWER_SUPPLY is not
- configured
-In-Reply-To: <1362080229-27334-1-git-send-email-linux@roeck-us.net>
-References: <1362080229-27334-1-git-send-email-linux@roeck-us.net>
-Message-ID: <CACRpkdbir4Ogwp8zcWP9wrAutbepJnNkT3Jfpubf2T0481rRTw@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 4 Mar 2013 08:48:51 +0100
+Subject: [PATCH 2/2] video: imxfb: Add DT support
+In-Reply-To: <1362152467-27998-3-git-send-email-mpa@pengutronix.de>
+References: <1362152467-27998-1-git-send-email-mpa@pengutronix.de>
+ <1362152467-27998-3-git-send-email-mpa@pengutronix.de>
+Message-ID: <20130304074851.GZ1906@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 28, 2013 at 8:37 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+On Fri, Mar 01, 2013 at 04:41:07PM +0100, Markus Pargmann wrote:
+> Add devicetree support for imx framebuffer driver. It uses the generic
+> display bindings and helper functions.
+> 
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> ---
+>  .../devicetree/bindings/video/fsl,imx-fb.txt       |  30 ++++
+>  drivers/video/imxfb.c                              | 176 +++++++++++++++++----
+>  2 files changed, 173 insertions(+), 33 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/video/fsl,imx-fb.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/video/fsl,imx-fb.txt b/Documentation/devicetree/bindings/video/fsl,imx-fb.txt
+> new file mode 100644
+> index 0000000..fd88d26
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/video/fsl,imx-fb.txt
+> @@ -0,0 +1,30 @@
+> +Freescale imx21 Framebuffer
+> +
+> +This framebuffer driver supports chips imx1 and imx21.
+> +
+> +Required properties:
+> +- compatible : "fsl,<chip>-fb"
+> +- reg : Should contain 1 register ranges(address and length)
+> +- interrupts : One interrupt of the fb dev
+> +
+> +Required nodes:
+> +- display: a display node is required to initialize the lcd panel
+> +	This should be in the board dts. See definition in
+> +	Documentation/devicetree/bindings/video/via,vt8500-fb.txt
+> +- default-mode: a videomode node as specified in
+> +	Documentation/devicetree/bindings/video/via,vt8500-fb.txt
 
-> ab8500-sysctrl.c fails to build if POWER_SUPPLY is not configured.
->
-> drivers/built-in.o: In function `ab8500_power_off':
-> drivers/mfd/ab8500-sysctrl.c:37: undefined reference to `power_supply_get_by_name'
-> drivers/mfd/ab8500-sysctrl.c:53: undefined reference to `power_supply_get_by_name'
->
-> Select POWER_SUPPLY in Kconfig if AB8500_CORE is configured to fix the problem.
->
-> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+Since the of_videomode helpers didn't add a binding in itself, they
+don't have a binding description in Documentation/devicetree/.
+It's forseeable that drivers will use this binding in the near
+future, so we should probably add a separate Documentation file
+for it instead of referencing some driver which already implements
+the binding.
 
-It appears an identical patch was already submitted in feb 19:
-https://patchwork.kernel.org/patch/2163301/
+> +
+> +Optional properties:
+> +- pwmr: Address of pwmr register
 
-Yours,
-Linus Walleij
+This describes the imxfb internal PWM controller. Please drop this for
+now or add a proper PWM driver for it.
+
+> +- lscr1: Address of lscr1 register
+> +- dmacr: Address of dmacr register
+
+I think we shouldn't expose these to the devicetree. With platform_data
+this hasn't been nice, but ok. With devicetree this becomes an API, so
+we should think of something better. Can't we make up sensible values
+during runtime?
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
