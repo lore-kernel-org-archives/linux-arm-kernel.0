@@ -1,72 +1,27 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 4 Mar 2013 11:02:39 -0800
-Subject: [PATCH] ARM: OMAP1: Fix build related to kgdb.h no longer
- including serial_8250.h
-In-Reply-To: <20130211224600.GB4801@atomide.com>
-References: <20130211224600.GB4801@atomide.com>
-Message-ID: <20130304190238.GU11806@atomide.com>
+From: davem@davemloft.net (David Miller)
+Date: Mon, 04 Mar 2013 14:15:07 -0500 (EST)
+Subject: [PATCH v3 1/1 net-next] net: fec: put tx to napi poll function
+ to fix dead lock
+In-Reply-To: <1362368065-5809-1-git-send-email-Frank.Li@freescale.com>
+References: <1362368065-5809-1-git-send-email-Frank.Li@freescale.com>
+Message-ID: <20130304.141507.1100300683952317840.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [130211 14:49]:
-> Commit 16559ae4 (kgdb: remove #include <linux/serial_8250.h> from kgdb.h)
-> had a side effect of breaking omap1_defconfig build as some headers
-> were included indirectly:
-> 
-> arch/arm/mach-omap1/board-h2.c:249: error: ?INT_KEYBOARD? undeclared here (not in a function)
-> ...
-> 
-> This worked earlier as linux/serial_8250.h included linux/serial_core.h,
-> via linux/serial_8250.h from linux/kgdb.h. Fix this by including the
-> necessary headers directly.
-> 
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> 
-> ---
-> 
-> Arnd & Olof, can you please apply this to your non-critical fixes
-> or some other branch that gets merged early on during the merge
-> window?
+From: Frank Li <Frank.Li@freescale.com>
+Date: Mon, 4 Mar 2013 11:34:25 +0800
 
-I'll apply this into omap-for-v3.9-rc1/fixes.
+> up stack ndo_start_xmit already hold lock.
+> fec_enet_start_xmit needn't spin lock.
+> stat_xmit just update fep->cur_tx
+> fec_enet_tx just update fep->dirty_tx
+> 
+> Reserve a empty bdb to check full or empty
+> cur_tx == dirty_tx    means full
+> cur_tx == dirty_tx +1 means empty
+> 
+> So needn't is_full variable.
+ ...
+> Signed-off-by: Frank Li <Frank.Li@freescale.com>
 
-Tony
- 
-> --- a/arch/arm/mach-omap1/common.h
-> +++ b/arch/arm/mach-omap1/common.h
-> @@ -31,6 +31,8 @@
->  
->  #include <plat/i2c.h>
->  
-> +#include <mach/irqs.h>
-> +
->  #if defined(CONFIG_ARCH_OMAP730) || defined(CONFIG_ARCH_OMAP850)
->  void omap7xx_map_io(void);
->  #else
-> --- a/drivers/video/omap/lcd_ams_delta.c
-> +++ b/drivers/video/omap/lcd_ams_delta.c
-> @@ -27,6 +27,7 @@
->  #include <linux/lcd.h>
->  #include <linux/gpio.h>
->  
-> +#include <mach/hardware.h>
->  #include <mach/board-ams-delta.h>
->  
->  #include "omapfb.h"
-> --- a/drivers/video/omap/lcd_osk.c
-> +++ b/drivers/video/omap/lcd_osk.c
-> @@ -24,7 +24,10 @@
->  #include <linux/platform_device.h>
->  
->  #include <asm/gpio.h>
-> +
-> +#include <mach/hardware.h>
->  #include <mach/mux.h>
-> +
->  #include "omapfb.h"
->  
->  static int osk_panel_init(struct lcd_panel *panel, struct omapfb_device *fbdev)
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Applied.
