@@ -1,90 +1,110 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Mon, 4 Mar 2013 16:44:54 +0100
-Subject: [PATCH] genirq: move mask_cache into struct irq_chip_type
-In-Reply-To: <5134AF7E.5010605@keymile.com>
-References: <20110720234537.GD16297@kw.sim.vm.gnt>
- <1311295758-27493-1-git-send-email-simon@sequanux.org>
- <CAMAG_edBy1kjmEGDD76-C5T0xtha9YxMFJ6B3D8A5kHBwQ1PMQ@mail.gmail.com>
- <20110726153930.GG16297@kw.sim.vm.gnt>
- <CAMAG_ee8YBvDsdQ2zNfn-7qdyTmVYBVb8xykMMv4pg8tEswJgg@mail.gmail.com>
- <5134AF7E.5010605@keymile.com>
-Message-ID: <20130304154454.GG21620@kw.sim.vm.gnt>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 04 Mar 2013 17:20:49 +0100
+Subject: [PATCH v4 1/3] serial: sh-sci: Add OF support
+In-Reply-To: <1362414054-23092-1-git-send-email-hechtb+renesas@gmail.com>
+References: <1362414054-23092-1-git-send-email-hechtb+renesas@gmail.com>
+Message-ID: <5345836.ZO7uU35cQD@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 04, 2013 at 03:28:14PM +0100, Gerlando Falauto wrote:
-> Hi everyone,
-> 
-> I know this issue is from two years ago...
-> 
-> On 07/27/2011 10:45 AM, saeed bishara wrote:
-> >On Tue, Jul 26, 2011 at 6:39 PM, Simon Guinot <simon@sequanux.org> wrote:
-> >>Hi Saeed,
-> >>
-> >>On Tue, Jul 26, 2011 at 05:35:50PM +0300, saeed bishara wrote:
-> >>>On Fri, Jul 22, 2011 at 3:49 AM, Simon Guinot <simon@sequanux.org> wrote:
-> >>>>From: Simon Guinot <sguinot@lacie.com>
-> >>>>
-> >>>>This fixes a regression introduced by e59347a
-> >>>>"arm: orion: Use generic irq chip".
-> >>>>
-> >>>>The same interrupt mask cache (stored within struct irq_chip_generic)
-> >>>>is shared between all the irq_chip_type instances. As each irq_chip_type
-> >>>>can use a distinct mask register, share a single mask cache is not
-> >>>>correct. This bug affects Orion SoCs, which have separate mask registers
-> >>>>for edge and level interrupts.
-> >>>>
-> >>>>This patch move mask_cache from struct irq_chip_generic into struct
-> >>>>irq_chip_type. Note that the interrupt support for Samsung SoCs is also
-> >>>>slightly affected.
-> >>>The patch looks to fix the issue with orion, but it seems that it
-> >>>won't work for SoC with multiple irq_chip_type that use one mask
-> >>>register.
-> >>
-> >>Yes indeed, but does such SoCs exists ? I mean that the only supported
-> >>SoC using multiple irq_chip_type (for now) is Orion.
-> >thats right, but as you code is generic, we should find some way to
-> >fix it or to prevent such devices to use this generic code.
-> >  What is the most
-> >>generic case for edge/level interrupts ? shared or separated mask
-> >>registers ?
-> >orion gpios use separate mask.
-> >>
-> >>If Orion is the specific case, maybe we could provide a dedicated
-> >>irq_mask() handler instead of using the generic one. It would be a
-> >>little sad.
-> >I personally prefer this method, along with getting rid off the
-> >multiple irq_chip_types, my main consideration in this case is
-> >performance.
-> >the irq_gc_mask_clr_bit/irq_gc_ack_set_bit/irq_gc_unmask_enable_reg
-> >are critical since it get called for every (level) interrupt, and it
-> >would be great if you optimize those functions,
-> >I think you better do the following:
-> >1. use pre-calculated offsets instead using  gc->reg_base + cur_regs(d)->ack.
-> >2. put all hot variables (lock, mask/ack/eoi register offset) in the
-> >same cache line if possible.
-> >
-> >regards
-> >saeed
-> 
-> I ran into the same problem (currently running 3.0.40)... but it
-> looks like this patch was never applied anywhere.
-> I also quickly scanned the log between now and then and could not
-> find any reference to this problem. Was a fix ever committed or we
-> still have this regression?
+On Monday 04 March 2013 17:20:52 Bastian Hecht wrote:
+> diff --git a/Documentation/devicetree/bindings/tty/serial/renesas,sci-serial.txt b/Documentation/devicetree/bindings/tty/serial/renesas,sci-serial.txt
+> new file mode 100644
+> index 0000000..6ad1adf
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/tty/serial/renesas,sci-serial.txt
+> @@ -0,0 +1,53 @@
+> +* Renesas SH-Mobile Serial Communication Interface
+> +
+> +Required properties:
+> +- compatible : Should be "renesas,sci-<port type>-uart", where <port type> may be
+> +  SCI, SCIF, IRDA, SCIFA or SCIFB.
 
-Hi Gerlando,
+Why capital letters here? Maybe just list
 
-AFAIK this issue is still here. I include the current Orion maintainers
-in the Cc list.
+	"renesas,sci-uart", "renesas,scif-uart", ...
 
-Regards,
+> +- reg : Address and length of the register set for the device
+> +- interrupts : Should contain the following IRQs: ERI, RXI, TXI and BRI.
 
-Simon
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130304/0fabd282/attachment-0001.sig>
+You probably want to require the "interrupt-names" property as well
+then.
+
+> +- cell-index : The device id.
+> +- renesas,scscr : Should contain a bitfield used by the Serial Control Register.
+> +  b7 = SCSCR_TIE
+> +  b6 = SCSCR_RIE
+> +  b5 = SCSCR_TE
+> +  b4 = SCSCR_RE
+> +  b3 = SCSCR_REIE
+> +  b2 = SCSCR_TOIE
+> +  b1 = SCSCR_CKE1
+> +  b0 = SCSCR_CKE0
+> +- renesas,scbrr-algo-id : Algorithm ID for the Bit Rate Register
+> +  1 = SCBRR_ALGO_1 ((clk + 16 * bps) / (16 * bps) - 1)
+> +  2 = SCBRR_ALGO_2 ((clk + 16 * bps) / (32 * bps) - 1)
+> +  3 = SCBRR_ALGO_3 (((clk * 2) + 16 * bps) / (16 * bps) - 1)
+> +  4 = SCBRR_ALGO_4 (((clk * 2) + 16 * bps) / (32 * bps) - 1)
+> +  5 = SCBRR_ALGO_5 (((clk * 1000 / 32) / bps) - 1)
+
+Maybe replace this with a "clock-frequency" property? This may
+be what the registers contain, but it is not very readable.
+
+> +Optional properties:
+> +- renesas,autoconf : Set if device is capable of auto configuration
+> +- renesas,regtype : Overwrite the register layout. In most cases you can rely
+> +  on auto-probing (omit this property or set to 0) but some legacy devices
+> +  use a non-default register layout. Possible layouts are
+> +  0 = SCIx_PROBE_REGTYPE (default)
+> +  1 = SCIx_SCI_REGTYPE
+> +  2 = SCIx_IRDA_REGTYPE
+> +  3 = SCIx_SCIFA_REGTYPE
+> +  4 = SCIx_SCIFB_REGTYPE
+> +  5 = SCIx_SH2_SCIF_FIFODATA_REGTYPE
+> +  6 = SCIx_SH3_SCIF_REGTYPE
+> +  7 = SCIx_SH4_SCIF_REGTYPE
+> +  8 = SCIx_SH4_SCIF_NO_SCSPTR_REGTYPE
+> +  9 = SCIx_SH4_SCIF_FIFODATA_REGTYPE
+> + 10 = SCIx_SH7705_SCIF_REGTYPE
+
+Why do you keep these separate from the "compatible" property?
+By definition, the register layout is already determined by
+"compatible".
+
+> +#ifdef CONFIG_OF
+> +static const struct of_device_id of_sci_match[] = {
+> +	{ .compatible = "renesas,sci-SCI-uart",
+> +		.data = (void *)PORT_SCI },
+> +	{ .compatible = "renesas,sci-SCIF-uart",
+> +		.data = (void *)PORT_SCIF },
+> +	{ .compatible = "renesas,sci-IRDA-uart",
+> +		.data = (void *)PORT_IRDA },
+> +	{ .compatible = "renesas,sci-SCIFA-uart",
+> +		.data = (void *)PORT_SCIFA },
+> +	{ .compatible = "renesas,sci-SCIFB-uart",
+> +		.data = (void *)PORT_SCIFB },
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, of_sci_match);
+> +
+> +static struct plat_sci_port *sci_parse_dt(struct platform_device *pdev,
+> +								int *dev_id)
+> +{
+> +	struct plat_sci_port *p;
+> +	struct device_node *np = pdev->dev.of_node;
+> +	const struct of_device_id *match;
+> +	struct resource *res;
+> +	const __be32 *prop;
+> +	int i, irq, val;
+> +
+
+You can remove the #ifdef by replacing it with 
+
+	if (!IS_ENABLED(CONFIG_OF) || !np)
+		return NULL;
+
+here. This gives better compile time coverage and more readable code.
+
+Otherwise looks very nice!
+
+	Arnd
