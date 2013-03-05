@@ -1,155 +1,68 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  5 Mar 2013 03:47:23 +0000
-Subject: [PATCH 07/29] arm64: KVM: architecture specific MMU backend
-In-Reply-To: <1362455265-24165-1-git-send-email-marc.zyngier@arm.com>
-References: <1362455265-24165-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1362455265-24165-8-git-send-email-marc.zyngier@arm.com>
+From: ian.campbell@citrix.com (Ian Campbell)
+Date: Tue, 5 Mar 2013 03:45:24 +0000
+Subject: [PATCH LINUX v5] xen: event channel arrays are xen_ulong_t and
+ not unsigned long
+In-Reply-To: <20130305030436.GA18040@mudshark.cambridge.arm.com>
+References: <1361285327.1051.115.camel@zakaz.uk.xensource.com>
+ <1361360886-2956-1-git-send-email-ian.campbell@citrix.com>
+ <51340ACD.70904@gmail.com>
+ <20130305030436.GA18040@mudshark.cambridge.arm.com>
+Message-ID: <1362455124.8941.19.camel@hastur.hellion.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the arm64 specific MMU backend:
-- HYP/kernel VA offset
-- S2 4/64kB definitions
-- S2 page table populating and flushing
-- icache cleaning
+On Tue, 2013-03-05 at 03:04 +0000, Will Deacon wrote:
+> Hi guys,
+> 
+> On Mon, Mar 04, 2013 at 02:45:33AM +0000, Rob Herring wrote:
+> > On 02/20/2013 05:48 AM, Ian Campbell wrote:
+> > > On ARM we want these to be the same size on 32- and 64-bit.
+> > > 
+> > > This is an ABI change on ARM. X86 does not change.
+> > > 
+> > > Signed-off-by: Ian Campbell <ian.campbell@citrix.com>
+> > > Cc: Jan Beulich <JBeulich@suse.com>
+> > > Cc: Keir (Xen.org) <keir@xen.org>
+> > > Cc: Tim Deegan <tim@xen.org>
+> > > Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > > Cc: linux-arm-kernel at lists.infradead.org
+> > > Cc: xen-devel at lists.xen.org
+> > > Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+> 
+> [...]
+> 
+> > I'm seeing some some build failures on randconfig builds with this change:
+> > 
+> > /tmp/ccJaIZOW.s: Assembler messages:
+> > /tmp/ccJaIZOW.s:831: Error: even register required -- `ldrexd r5,r6,[r4]'
+> > 
+> > This is with ubuntu 12.04 cross compiler (gcc version 4.6.3
+> > (Ubuntu/Linaro 4.6.3-1ubuntu5)).
+> > 
+> > This register restriction is on ARM, but not Thumb builds. Comparing
+> > this to atomic64_cmpxchg, I don't see how to fix this. Perhaps Will or
+> > Nico have thoughts.
+> 
+> [...]
+> 
+> > > +	asm volatile("@ xchg_xen_ulong\n"
+> > > +		"1:     ldrexd  %0, %H0, [%3]\n"
+> > > +		"       strexd  %1, %2, %H2, [%3]\n"
+> > > +		"       teq     %1, #0\n"
+> > > +		"       bne     1b"
+> > > +		: "=&r" (oldval), "=&r" (tmp)
+> > > +		: "r" (val), "r" (ptr)
+> > > +		: "memory", "cc");
+> 
+> I also can't immediately see why GCC would allocate oldval to an odd base
+> register. Can you share your .config please?
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/include/asm/kvm_mmu.h | 126 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 126 insertions(+)
- create mode 100644 arch/arm64/include/asm/kvm_mmu.h
+I fixed something along these lines before v5 of this patch, although I
+must confess I don't recall what it was that I changed (and looking at
+the older versions of the patch isn't giving me any clues). I can't
+reproduce it now though :-(
 
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-new file mode 100644
-index 0000000..2975627
---- /dev/null
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -0,0 +1,126 @@
-+/*
-+ * Copyright (C) 2012 - ARM Ltd
-+ * Author: Marc Zyngier <marc.zyngier@arm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#ifndef __ARM64_KVM_MMU_H__
-+#define __ARM64_KVM_MMU_H__
-+
-+#include <asm/page.h>
-+#include <asm/memory.h>
-+
-+/*
-+ * As we only have the TTBR0_EL2 register, we cannot express
-+ * "negative" addresses. This makes it impossible to directly share
-+ * mappings with the kernel.
-+ *
-+ * Instead, give the HYP mode its own VA region at a fixed offset from
-+ * the kernel by just masking the top bits (which are all ones for a
-+ * kernel address).
-+ */
-+#define HYP_PAGE_OFFSET_SHIFT	VA_BITS
-+#define HYP_PAGE_OFFSET_MASK	((UL(1) << HYP_PAGE_OFFSET_SHIFT) - 1)
-+#define HYP_PAGE_OFFSET		(PAGE_OFFSET & HYP_PAGE_OFFSET_MASK)
-+
-+#ifdef __ASSEMBLY__
-+
-+/*
-+ * Convert a kernel VA into a HYP VA.
-+ * reg: VA to be converted.
-+ */
-+.macro kern_hyp_va	reg
-+	and	\reg, \reg, #HYP_PAGE_OFFSET_MASK
-+.endm
-+
-+#else
-+
-+#include <asm/cacheflush.h>
-+#include "idmap.h"
-+
-+#define KERN_TO_HYP(kva)	((unsigned long)kva - PAGE_OFFSET + HYP_PAGE_OFFSET)
-+
-+/*
-+ * Align KVM with the kernel's view of physical memory. Should be
-+ * 40bit IPA, with PGD being 8kB aligned.
-+ */
-+#define KVM_PHYS_SHIFT	PHYS_MASK_SHIFT
-+#define KVM_PHYS_SIZE	(1UL << KVM_PHYS_SHIFT)
-+#define KVM_PHYS_MASK	(KVM_PHYS_SIZE - 1UL)
-+
-+#ifdef CONFIG_ARM64_64K_PAGES
-+#define PAGE_LEVELS	2
-+#define BITS_PER_LEVEL	13
-+#else  /* 4kB pages */
-+#define PAGE_LEVELS	3
-+#define BITS_PER_LEVEL	9
-+#endif
-+
-+/* Make sure we get the right size, and thus the right alignment */
-+#define BITS_PER_S2_PGD (KVM_PHYS_SHIFT - (PAGE_LEVELS - 1) * BITS_PER_LEVEL - PAGE_SHIFT)
-+#define PTRS_PER_S2_PGD (1 << max(BITS_PER_LEVEL, BITS_PER_S2_PGD))
-+#define S2_PGD_ORDER	get_order(PTRS_PER_S2_PGD * sizeof(pgd_t))
-+#define S2_PGD_SIZE	(1 << S2_PGD_ORDER)
-+
-+int create_hyp_mappings(void *from, void *to);
-+int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
-+void free_hyp_pmds(void);
-+
-+int kvm_alloc_stage2_pgd(struct kvm *kvm);
-+void kvm_free_stage2_pgd(struct kvm *kvm);
-+int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
-+			  phys_addr_t pa, unsigned long size);
-+
-+int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run);
-+
-+void kvm_mmu_free_memory_caches(struct kvm_vcpu *vcpu);
-+
-+phys_addr_t kvm_mmu_get_httbr(void);
-+int kvm_mmu_init(void);
-+void kvm_clear_hyp_idmap(void);
-+
-+#define	kvm_set_pte(ptep, pte)		set_pte(ptep, pte)
-+
-+static inline bool kvm_is_write_fault(unsigned long esr)
-+{
-+	unsigned long esr_ec = esr >> ESR_EL2_EC_SHIFT;
-+
-+	if (esr_ec == ESR_EL2_EC_IABT)
-+		return false;
-+
-+	if ((esr & ESR_EL2_ISV) && !(esr & ESR_EL2_WNR))
-+		return false;
-+
-+	return true;
-+}
-+
-+static inline void kvm_clean_pgd(pgd_t *pgd) {}
-+static inline void kvm_clean_pmd_entry(pmd_t *pmd) {}
-+static inline void kvm_clean_pte(pte_t *pte) {}
-+
-+static inline void kvm_set_s2pte_writable(pte_t *pte)
-+{
-+	pte_val(*pte) |= PTE_S2_RDWR;
-+}
-+
-+struct kvm;
-+
-+static inline void coherent_icache_guest_page(struct kvm *kvm, gfn_t gfn)
-+{
-+	unsigned long hva = gfn_to_hva(kvm, gfn);
-+	flush_icache_range(hva, hva + PAGE_SIZE);
-+}
-+
-+#endif /* __ASSEMBLY__ */
-+#endif /* __ARM64_KVM_MMU_H__ */
--- 
-1.7.12.4
+I'm using the 4.6.3 cross compiler from kernel.org:
+ftp://ftp.kernel.org/pub/tools/crosstool/files/bin/x86_64/4.6.3/
+
+Ian.
