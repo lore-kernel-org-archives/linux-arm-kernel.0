@@ -1,17 +1,30 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 05 Mar 2013 11:57:40 -0700
-Subject: [PATCH 06/10] ARM: dts: tegra: add the PM configurations of PMC
-In-Reply-To: <1362397259-5888-1-git-send-email-josephl@nvidia.com>
-References: <1362397259-5888-1-git-send-email-josephl@nvidia.com>
-Message-ID: <51364024.3070203@wwwdotorg.org>
+From: davidb@codeaurora.org (David Brown)
+Date: Tue, 05 Mar 2013 11:04:57 -0800
+Subject: [PATCH 5/8] ARM: MSM: Divorce msm_timer from local timer API
+In-Reply-To: <1361518039-16663-6-git-send-email-sboyd@codeaurora.org> (Stephen
+ Boyd's message of "Thu, 21 Feb 2013 23:27:16 -0800")
+References: <1361518039-16663-1-git-send-email-sboyd@codeaurora.org>
+ <1361518039-16663-6-git-send-email-sboyd@codeaurora.org>
+Message-ID: <8yad2vd1xd2.fsf@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/04/2013 04:40 AM, Joseph Lo wrote:
-> Adding the PM configuration of PMC when the platform support suspend
-> function.
+Stephen Boyd <sboyd@codeaurora.org> writes:
 
-I think this patch should come after the current patch 9/10. The reason
-is that this patch enables system suspend using LP2 mode on the boards,
-yet patches 8/10 and 9/10 are required for system suspend to operate
-correctly.
+> Separate the msm_timer from the local timer API. This will allow
+> us to remove ARM local timer support in the near future and gets
+> us closer to moving this driver to drivers/clocksource.
+>
+> Cc: David Brown <davidb@codeaurora.org>
+> Cc: Daniel Walker <dwalker@fifo99.com>
+> Cc: Bryan Huntsman <bryanh@codeaurora.org>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  arch/arm/mach-msm/timer.c | 125 +++++++++++++++++++++++++---------------------
+
+Acked-by: David Brown <davidb@codeaurora.org>
+
+-- 
+sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
