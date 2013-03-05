@@ -1,133 +1,107 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  5 Mar 2013 03:47:44 +0000
-Subject: [PATCH 28/29] arm64: KVM: 32bit guest fault injection
+Date: Tue,  5 Mar 2013 03:47:45 +0000
+Subject: [PATCH 29/29] arm64: KVM: enable initialization of a 32bit vcpu
 In-Reply-To: <1362455265-24165-1-git-send-email-marc.zyngier@arm.com>
 References: <1362455265-24165-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1362455265-24165-29-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1362455265-24165-30-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add fault injection capability for 32bit guests.
+Wire the init of a 32bit vcpu by allowing 32bit modes in pstate,
+and providing sensible defaults out of reset state.
+
+This feature is of course conditionned by the presence of 32bit
+capability on the physical CPU.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/inject_fault.c | 79 ++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 78 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/kvm_host.h |  2 +-
+ arch/arm64/include/uapi/asm/kvm.h |  1 +
+ arch/arm64/kvm/guest.c            |  6 ++++++
+ arch/arm64/kvm/reset.c            | 22 +++++++++++++++++++++-
+ 4 files changed, 29 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
-index 80b245f..85a4548 100644
---- a/arch/arm64/kvm/inject_fault.c
-+++ b/arch/arm64/kvm/inject_fault.c
-@@ -1,5 +1,5 @@
- /*
-- * Fault injection for 64bit guests.
-+ * Fault injection for both 32 and 64bit guests.
-  *
-  * Copyright (C) 2012 - ARM Ltd
-  * Author: Marc Zyngier <marc.zyngier@arm.com>
-@@ -24,6 +24,74 @@
- #include <linux/kvm_host.h>
- #include <asm/kvm_emulate.h>
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 24dc8d7..0f17cfe 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -34,7 +34,7 @@
+ #include <asm/kvm_vgic.h>
+ #include <asm/kvm_arch_timer.h>
  
-+static void prepare_fault32(struct kvm_vcpu *vcpu, u32 mode, u32 vect_offset)
+-#define KVM_VCPU_MAX_FEATURES 1
++#define KVM_VCPU_MAX_FEATURES 2
+ 
+ /* We don't currently support large pages. */
+ #define KVM_HPAGE_GFN_SHIFT(x)	0
+diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+index f9c269e..813427f 100644
+--- a/arch/arm64/include/uapi/asm/kvm.h
++++ b/arch/arm64/include/uapi/asm/kvm.h
+@@ -70,6 +70,7 @@ struct kvm_regs {
+ #define KVM_VGIC_V2_CPU_SIZE		0x2000
+ 
+ #define KVM_ARM_VCPU_POWER_OFF		0 /* CPU is started in OFF state */
++#define KVM_ARM_VCPU_EL1_32BIT		1 /* CPU running a 32bit VM */
+ 
+ struct kvm_vcpu_init {
+ 	__u32 target;
+diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+index 2a8aaf8..123703d 100644
+--- a/arch/arm64/kvm/guest.c
++++ b/arch/arm64/kvm/guest.c
+@@ -84,6 +84,12 @@ static int set_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+ 	if (off == KVM_REG_ARM_CORE_REG(regs.pstate)) {
+ 		unsigned long mode = val & COMPAT_PSR_MODE_MASK;
+ 		switch (mode) {
++		case COMPAT_PSR_MODE_USR:
++		case COMPAT_PSR_MODE_FIQ:
++		case COMPAT_PSR_MODE_IRQ:
++		case COMPAT_PSR_MODE_SVC:
++		case COMPAT_PSR_MODE_ABT:
++		case COMPAT_PSR_MODE_UND:
+ 		case PSR_MODE_EL0t:
+ 		case PSR_MODE_EL1t:
+ 		case PSR_MODE_EL1h:
+diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+index 3ac2f20..411659e 100644
+--- a/arch/arm64/kvm/reset.c
++++ b/arch/arm64/kvm/reset.c
+@@ -35,6 +35,19 @@ static struct kvm_regs default_regs_reset = {
+ 	.regs.pstate = PSR_MODE_EL1h | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT,
+ };
+ 
++static struct kvm_regs default_regs_reset32 = {
++	.regs.pstate = (COMPAT_PSR_MODE_SVC | COMPAT_PSR_A_BIT |
++			COMPAT_PSR_I_BIT | COMPAT_PSR_F_BIT),
++};
++
++static bool cpu_has_32bit_el1(void)
 +{
-+	unsigned long cpsr;
-+	unsigned long new_spsr_value = *vcpu_cpsr(vcpu);
-+	bool is_thumb = (new_spsr_value & COMPAT_PSR_T_BIT);
-+	u32 return_offset = (is_thumb) ? 4 : 0;
-+	u32 sctlr = vcpu->arch.cp15[c1_SCTLR];
++	u64 pfr0;
 +
-+	cpsr = mode | COMPAT_PSR_I_BIT;
-+
-+	if (sctlr & (1 << 30))
-+		cpsr |= COMPAT_PSR_T_BIT;
-+	if (sctlr & (1 << 25))
-+		cpsr |= COMPAT_PSR_E_BIT;
-+
-+	*vcpu_cpsr(vcpu) = cpsr;
-+
-+	/* Note: These now point to the banked copies */
-+	*vcpu_spsr(vcpu) = new_spsr_value;
-+	*vcpu_reg(vcpu, 14) = *vcpu_pc(vcpu) + return_offset;
-+
-+	/* Branch to exception vector */
-+	if (sctlr & (1 << 13))
-+		vect_offset += 0xffff0000;
-+	else /* always have security exceptions */
-+		vect_offset += vcpu->arch.cp15[c12_VBAR];
-+
-+	*vcpu_pc(vcpu) = vect_offset;
++	pfr0 = read_cpuid(ID_AA64PFR0_EL1);
++	return !!(pfr0 & 0x20);
 +}
 +
-+static void inject_undef32(struct kvm_vcpu *vcpu)
-+{
-+	prepare_fault32(vcpu, COMPAT_PSR_MODE_UND, 4);
-+}
-+
-+/*
-+ * Modelled after TakeDataAbortException() and TakePrefetchAbortException
-+ * pseudocode.
-+ */
-+static void inject_abt32(struct kvm_vcpu *vcpu, bool is_pabt,
-+			 unsigned long addr)
-+{
-+	u32 vect_offset;
-+	u32 *far, *fsr;
-+	bool is_lpae;
-+
-+	if (is_pabt) {
-+		vect_offset = 12;
-+		far = &vcpu->arch.cp15[c6_IFAR];
-+		fsr = &vcpu->arch.cp15[c5_IFSR];
-+	} else { /* !iabt */
-+		vect_offset = 16;
-+		far = &vcpu->arch.cp15[c6_DFAR];
-+		fsr = &vcpu->arch.cp15[c5_DFSR];
-+	}
-+
-+	prepare_fault32(vcpu, COMPAT_PSR_MODE_ABT | COMPAT_PSR_A_BIT, vect_offset);
-+
-+	*far = addr;
-+
-+	/* Always give debug fault for now - should give guest a clue */
-+	is_lpae = (vcpu->arch.cp15[c2_TTBCR] >> 31);
-+	if (is_lpae)
-+		*fsr = 1 << 9 | 0x22;
-+	else
-+		*fsr = 2;
-+}
-+
- static void inject_abt64(struct kvm_vcpu *vcpu, bool is_iabt, unsigned long addr)
- {
- 	unsigned long cpsr = *vcpu_cpsr(vcpu);
-@@ -89,6 +157,9 @@ static void inject_undef64(struct kvm_vcpu *vcpu)
-  */
- void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr)
- {
-+	if (!(vcpu->arch.hcr_el2 & HCR_RW))
-+		inject_abt32(vcpu, false, addr);
-+
- 	inject_abt64(vcpu, false, addr);
- }
+ /**
+  * kvm_reset_vcpu - sets core registers and sys_regs to reset value
+  * @vcpu: The VCPU pointer
+@@ -49,7 +62,14 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
  
-@@ -102,6 +173,9 @@ void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr)
-  */
- void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr)
- {
-+	if (!(vcpu->arch.hcr_el2 & HCR_RW))
-+		inject_abt32(vcpu, true, addr);
-+
- 	inject_abt64(vcpu, true, addr);
- }
+ 	switch (vcpu->arch.target) {
+ 	default:
+-		cpu_reset = &default_regs_reset;
++		if (test_bit(KVM_ARM_VCPU_EL1_32BIT, vcpu->arch.features)) {
++			if (!cpu_has_32bit_el1())
++				return -EINVAL;
++			cpu_reset = &default_regs_reset32;
++			vcpu->arch.hcr_el2 &= ~HCR_RW;
++		} else {
++			cpu_reset = &default_regs_reset;
++		}
+ 		break;
+ 	}
  
-@@ -113,5 +187,8 @@ void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr)
-  */
- void kvm_inject_undefined(struct kvm_vcpu *vcpu)
- {
-+	if (!(vcpu->arch.hcr_el2 & HCR_RW))
-+		inject_undef32(vcpu);
-+
- 	inject_undef64(vcpu);
- }
 -- 
 1.7.12.4
