@@ -1,136 +1,245 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue,  5 Mar 2013 18:42:31 +0100
-Subject: [PATCH 21/23] ARM: exynos: hack to disable private clock code
+Date: Tue,  5 Mar 2013 18:42:30 +0100
+Subject: [PATCH 20/23] ARM: exynos: prepare for sparse IRQ
 In-Reply-To: <1362505353-8873-1-git-send-email-arnd@arndb.de>
 References: <1362505353-8873-1-git-send-email-arnd@arndb.de>
-Message-ID: <1362505353-8873-22-git-send-email-arnd@arndb.de>
+Message-ID: <1362505353-8873-21-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Multiplatform kernels rely on the common clock implementation,
-which conflicts with Samsung's own implementation of the same
-interface. This disables all code that provides or requires
-the nonstandard version.
+When we enable CONFIG_SPARSE_IRQ, we have to set the
+value of NR_IRQS in the machine_desc for legacy IRQ
+domains, and any file referring to the number of
+interrupts or a specific number must include the
+mach/irqs.h header file explicitly.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-exynos/Makefile        | 2 ++
- arch/arm/mach-exynos/common.c        | 6 ++++++
- arch/arm/plat-samsung/clock-clksrc.c | 3 +++
- arch/arm/plat-samsung/s5p-clock.c    | 3 +++
- drivers/cpufreq/Kconfig.arm          | 4 +++-
- drivers/devfreq/Kconfig              | 1 +
- 6 files changed, 18 insertions(+), 1 deletion(-)
+ arch/arm/mach-exynos/dev-uart.c          | 1 +
+ arch/arm/mach-exynos/include/mach/irqs.h | 5 ++++-
+ arch/arm/mach-exynos/mach-armlex4210.c   | 2 ++
+ arch/arm/mach-exynos/mach-exynos4-dt.c   | 2 ++
+ arch/arm/mach-exynos/mach-exynos5-dt.c   | 2 ++
+ arch/arm/mach-exynos/mach-nuri.c         | 2 ++
+ arch/arm/mach-exynos/mach-origen.c       | 2 ++
+ arch/arm/mach-exynos/mach-smdk4x12.c     | 2 ++
+ arch/arm/mach-exynos/mach-smdkv310.c     | 3 +++
+ arch/arm/plat-samsung/irq-vic-timer.c    | 1 +
+ arch/arm/plat-samsung/pm.c               | 1 +
+ arch/arm/plat-samsung/s5p-irq.c          | 1 +
+ 12 files changed, 23 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
-index 435757e..b0dcf7d 100644
---- a/arch/arm/mach-exynos/Makefile
-+++ b/arch/arm/mach-exynos/Makefile
-@@ -13,10 +13,12 @@ obj-				:=
- # Core
+diff --git a/arch/arm/mach-exynos/dev-uart.c b/arch/arm/mach-exynos/dev-uart.c
+index 7c42f4b..c48aff0 100644
+--- a/arch/arm/mach-exynos/dev-uart.c
++++ b/arch/arm/mach-exynos/dev-uart.c
+@@ -20,6 +20,7 @@
+ #include <asm/mach/irq.h>
+ #include <mach/hardware.h>
+ #include <mach/map.h>
++#include <mach/irqs.h>
  
- obj-$(CONFIG_ARCH_EXYNOS)	+= common.o
-+ifdef CONFIG_SAMSUNG_CLOCK
- obj-$(CONFIG_ARCH_EXYNOS4)	+= clock-exynos4.o
- obj-$(CONFIG_CPU_EXYNOS4210)	+= clock-exynos4210.o
- obj-$(CONFIG_SOC_EXYNOS4212)	+= clock-exynos4212.o
- obj-$(CONFIG_SOC_EXYNOS5250)	+= clock-exynos5.o
-+endif
+ #include <plat/devs.h>
  
- obj-$(CONFIG_PM)		+= pm.o
- obj-$(CONFIG_PM_GENERIC_DOMAINS) += pm_domains.o
-diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-index 4b4526d..504d50e 100644
---- a/arch/arm/mach-exynos/common.c
-+++ b/arch/arm/mach-exynos/common.c
-@@ -404,6 +404,9 @@ static void __init exynos5_map_io(void)
+diff --git a/arch/arm/mach-exynos/include/mach/irqs.h b/arch/arm/mach-exynos/include/mach/irqs.h
+index 1f4dc35..8bd5dde 100644
+--- a/arch/arm/mach-exynos/include/mach/irqs.h
++++ b/arch/arm/mach-exynos/include/mach/irqs.h
+@@ -466,7 +466,10 @@
+ #define IRQ_TIMER_BASE			(IRQ_GPIO_END + 64)
  
- static void __init exynos4_init_clocks(int xtal)
- {
-+	if (!IS_ENABLED(CONFIG_SAMSUNG_CLOCK))
-+		return;
-+
- 	printk(KERN_DEBUG "%s: initializing clocks\n", __func__);
+ /* Set the default NR_IRQS */
++#define EXYNOS_NR_IRQS			(IRQ_TIMER_BASE + IRQ_TIMER_COUNT)
  
- 	s3c24xx_register_baseclocks(xtal);
-@@ -425,6 +428,9 @@ static void __init exynos5440_map_io(void)
+-#define NR_IRQS				(IRQ_TIMER_BASE + IRQ_TIMER_COUNT)
++#ifndef CONFIG_SPARSE_IRQ
++#define NR_IRQS				EXYNOS_NR_IRQS
++#endif
  
- static void __init exynos5_init_clocks(int xtal)
- {
-+	if (!IS_ENABLED(CONFIG_SAMSUNG_CLOCK))
-+		return;
-+
- 	printk(KERN_DEBUG "%s: initializing clocks\n", __func__);
+ #endif /* __ASM_ARCH_IRQS_H */
+diff --git a/arch/arm/mach-exynos/mach-armlex4210.c b/arch/arm/mach-exynos/mach-armlex4210.c
+index 685f291..cb95992 100644
+--- a/arch/arm/mach-exynos/mach-armlex4210.c
++++ b/arch/arm/mach-exynos/mach-armlex4210.c
+@@ -25,6 +25,7 @@
+ #include <plat/regs-srom.h>
+ #include <plat/sdhci.h>
  
- 	/* EXYNOS5440 can support only common clock framework */
-diff --git a/arch/arm/plat-samsung/clock-clksrc.c b/arch/arm/plat-samsung/clock-clksrc.c
-index 786a410..094fde9 100644
---- a/arch/arm/plat-samsung/clock-clksrc.c
-+++ b/arch/arm/plat-samsung/clock-clksrc.c
-@@ -179,6 +179,9 @@ void __init s3c_register_clksrc(struct clksrc_clk *clksrc, int size)
- {
- 	int ret;
++#include <mach/irqs.h>
+ #include <mach/map.h>
  
-+	if (!IS_ENABLED(CONFIG_SAMSUNG_CLOCK))
-+		return;
-+
- 	for (; size > 0; size--, clksrc++) {
- 		if (!clksrc->reg_div.reg && !clksrc->reg_src.reg)
- 			printk(KERN_ERR "%s: clock %s has no registers set\n",
-diff --git a/arch/arm/plat-samsung/s5p-clock.c b/arch/arm/plat-samsung/s5p-clock.c
-index 48a1599..0e22618 100644
---- a/arch/arm/plat-samsung/s5p-clock.c
-+++ b/arch/arm/plat-samsung/s5p-clock.c
-@@ -286,6 +286,9 @@ void __init s5p_register_clocks(unsigned long xtal_freq)
- {
- 	int ret;
+ #include "common.h"
+@@ -197,6 +198,7 @@ static void __init armlex4210_machine_init(void)
+ MACHINE_START(ARMLEX4210, "ARMLEX4210")
+ 	/* Maintainer: Alim Akhtar <alim.akhtar@samsung.com> */
+ 	.atag_offset	= 0x100,
++	.nr_irqs	= EXYNOS_NR_IRQS,
+ 	.smp		= smp_ops(exynos_smp_ops),
+ 	.init_irq	= exynos4_init_irq,
+ 	.map_io		= armlex4210_map_io,
+diff --git a/arch/arm/mach-exynos/mach-exynos4-dt.c b/arch/arm/mach-exynos/mach-exynos4-dt.c
+index 3358088..55aa611 100644
+--- a/arch/arm/mach-exynos/mach-exynos4-dt.c
++++ b/arch/arm/mach-exynos/mach-exynos4-dt.c
+@@ -16,6 +16,7 @@
  
-+	if (!IS_ENABLED(CONFIG_SAMSUNG_CLOCK))
-+		return;
-+
- 	clk_ext_xtal_mux.rate = xtal_freq;
+ #include <asm/mach/arch.h>
+ #include <mach/map.h>
++#include <mach/irqs.h>
  
- 	ret = s3c24xx_register_clocks(s5p_clks, ARRAY_SIZE(s5p_clks));
-diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-index 030ddf6..b6fb4fa 100644
---- a/drivers/cpufreq/Kconfig.arm
-+++ b/drivers/cpufreq/Kconfig.arm
-@@ -51,7 +51,7 @@ config ARM_S5PV210_CPUFREQ
+ #include <plat/cpu.h>
+ #include <plat/regs-serial.h>
+@@ -137,6 +138,7 @@ static char const *exynos4_dt_compat[] __initdata = {
  
- config ARM_EXYNOS_CPUFREQ
- 	bool "SAMSUNG EXYNOS SoCs"
--	depends on ARCH_EXYNOS
-+	depends on ARCH_EXYNOS && SAMSUNG_CLOCK
- 	default y
- 	help
- 	  This adds the CPUFreq driver common part for Samsung
-@@ -59,6 +59,7 @@ config ARM_EXYNOS_CPUFREQ
+ DT_MACHINE_START(EXYNOS4210_DT, "Samsung Exynos4 (Flattened Device Tree)")
+ 	/* Maintainer: Thomas Abraham <thomas.abraham@linaro.org> */
++	.nr_irqs	= EXYNOS_NR_IRQS,
+ 	.smp		= smp_ops(exynos_smp_ops),
+ 	.init_irq	= exynos4_init_irq,
+ 	.map_io		= exynos4_dt_map_io,
+diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
+index acaeb14..c674e7f 100644
+--- a/arch/arm/mach-exynos/mach-exynos5-dt.c
++++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
+@@ -17,6 +17,7 @@
  
- 	  If in doubt, say N.
+ #include <asm/mach/arch.h>
+ #include <mach/map.h>
++#include <mach/irqs.h>
+ #include <mach/regs-pmu.h>
  
-+if ARM_EXYNOS_CPUFREQ
- config ARM_EXYNOS4210_CPUFREQ
- 	def_bool CPU_EXYNOS4210
- 	help
-@@ -76,6 +77,7 @@ config ARM_EXYNOS5250_CPUFREQ
- 	help
- 	  This adds the CPUFreq driver for Samsung EXYNOS5250
- 	  SoC.
-+endif
+ #include <plat/cpu.h>
+@@ -211,6 +212,7 @@ static void __init exynos5_reserve(void)
  
- config ARM_KIRKWOOD_CPUFREQ
- 	def_bool ARCH_KIRKWOOD && OF
-diff --git a/drivers/devfreq/Kconfig b/drivers/devfreq/Kconfig
-index 0f079be..d4f9a24 100644
---- a/drivers/devfreq/Kconfig
-+++ b/drivers/devfreq/Kconfig
-@@ -68,6 +68,7 @@ comment "DEVFREQ Drivers"
- config ARM_EXYNOS4_BUS_DEVFREQ
- 	bool "ARM Exynos4210/4212/4412 Memory Bus DEVFREQ Driver"
- 	depends on CPU_EXYNOS4210 || CPU_EXYNOS4212 || CPU_EXYNOS4412
-+	depends on SAMSUNG_CLOCK
- 	select ARCH_HAS_OPP
- 	select DEVFREQ_GOV_SIMPLE_ONDEMAND
- 	help
+ DT_MACHINE_START(EXYNOS5_DT, "SAMSUNG EXYNOS5 (Flattened Device Tree)")
+ 	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
++	.nr_irqs	= EXYNOS_NR_IRQS,
+ 	.init_irq	= exynos5_init_irq,
+ 	.smp		= smp_ops(exynos_smp_ops),
+ 	.map_io		= exynos5_dt_map_io,
+diff --git a/arch/arm/mach-exynos/mach-nuri.c b/arch/arm/mach-exynos/mach-nuri.c
+index 1ea7973..fee0885 100644
+--- a/arch/arm/mach-exynos/mach-nuri.c
++++ b/arch/arm/mach-exynos/mach-nuri.c
+@@ -53,6 +53,7 @@
+ #include <plat/fimc-core.h>
+ #include <plat/camport.h>
+ 
++#include <mach/irqs.h>
+ #include <mach/map.h>
+ 
+ #include "common.h"
+@@ -1375,6 +1376,7 @@ static void __init nuri_machine_init(void)
+ MACHINE_START(NURI, "NURI")
+ 	/* Maintainer: Kyungmin Park <kyungmin.park@samsung.com> */
+ 	.atag_offset	= 0x100,
++	.nr_irqs	= EXYNOS_NR_IRQS,
+ 	.smp		= smp_ops(exynos_smp_ops),
+ 	.init_irq	= exynos4_init_irq,
+ 	.map_io		= nuri_map_io,
+diff --git a/arch/arm/mach-exynos/mach-origen.c b/arch/arm/mach-exynos/mach-origen.c
+index 579d2d1..d1849d1 100644
+--- a/arch/arm/mach-exynos/mach-origen.c
++++ b/arch/arm/mach-exynos/mach-origen.c
+@@ -46,6 +46,7 @@
+ #include <plat/hdmi.h>
+ 
+ #include <mach/map.h>
++#include <mach/irqs.h>
+ 
+ #include <drm/exynos_drm.h>
+ #include "common.h"
+@@ -810,6 +811,7 @@ static void __init origen_machine_init(void)
+ MACHINE_START(ORIGEN, "ORIGEN")
+ 	/* Maintainer: JeongHyeon Kim <jhkim@insignal.co.kr> */
+ 	.atag_offset	= 0x100,
++	.nr_irqs	= EXYNOS_NR_IRQS,
+ 	.smp		= smp_ops(exynos_smp_ops),
+ 	.init_irq	= exynos4_init_irq,
+ 	.map_io		= origen_map_io,
+diff --git a/arch/arm/mach-exynos/mach-smdk4x12.c b/arch/arm/mach-exynos/mach-smdk4x12.c
+index fe61496..46c7fc7 100644
+--- a/arch/arm/mach-exynos/mach-smdk4x12.c
++++ b/arch/arm/mach-exynos/mach-smdk4x12.c
+@@ -39,6 +39,7 @@
+ #include <plat/regs-serial.h>
+ #include <plat/sdhci.h>
+ 
++#include <mach/irqs.h>
+ #include <mach/map.h>
+ 
+ #include <drm/exynos_drm.h>
+@@ -385,6 +386,7 @@ MACHINE_START(SMDK4412, "SMDK4412")
+ 	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
+ 	/* Maintainer: Changhwan Youn <chaos.youn@samsung.com> */
+ 	.atag_offset	= 0x100,
++	.nr_irqs	= EXYNOS_NR_IRQS,
+ 	.smp		= smp_ops(exynos_smp_ops),
+ 	.init_irq	= exynos4_init_irq,
+ 	.map_io		= smdk4x12_map_io,
+diff --git a/arch/arm/mach-exynos/mach-smdkv310.c b/arch/arm/mach-exynos/mach-smdkv310.c
+index d716729..5187687 100644
+--- a/arch/arm/mach-exynos/mach-smdkv310.c
++++ b/arch/arm/mach-exynos/mach-smdkv310.c
+@@ -43,6 +43,7 @@
+ #include <plat/clock.h>
+ #include <plat/hdmi.h>
+ 
++#include <mach/irqs.h>
+ #include <mach/map.h>
+ 
+ #include <drm/exynos_drm.h>
+@@ -419,6 +420,7 @@ MACHINE_START(SMDKV310, "SMDKV310")
+ 	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
+ 	/* Maintainer: Changhwan Youn <chaos.youn@samsung.com> */
+ 	.atag_offset	= 0x100,
++	.nr_irqs	= EXYNOS_NR_IRQS,
+ 	.smp		= smp_ops(exynos_smp_ops),
+ 	.init_irq	= exynos4_init_irq,
+ 	.map_io		= smdkv310_map_io,
+@@ -431,6 +433,7 @@ MACHINE_END
+ MACHINE_START(SMDKC210, "SMDKC210")
+ 	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
+ 	.atag_offset	= 0x100,
++	.nr_irqs	= EXYNOS_NR_IRQS,
+ 	.smp		= smp_ops(exynos_smp_ops),
+ 	.init_irq	= exynos4_init_irq,
+ 	.map_io		= smdkv310_map_io,
+diff --git a/arch/arm/plat-samsung/irq-vic-timer.c b/arch/arm/plat-samsung/irq-vic-timer.c
+index f980cf3..1113066 100644
+--- a/arch/arm/plat-samsung/irq-vic-timer.c
++++ b/arch/arm/plat-samsung/irq-vic-timer.c
+@@ -19,6 +19,7 @@
+ #include <linux/io.h>
+ 
+ #include <mach/map.h>
++#include <mach/irqs.h>
+ #include <plat/cpu.h>
+ #include <plat/irq-vic-timer.h>
+ #include <plat/regs-timer.h>
+diff --git a/arch/arm/plat-samsung/pm.c b/arch/arm/plat-samsung/pm.c
+index 002b147..53210ec 100644
+--- a/arch/arm/plat-samsung/pm.c
++++ b/arch/arm/plat-samsung/pm.c
+@@ -27,6 +27,7 @@
+ #include <plat/regs-serial.h>
+ #include <mach/regs-clock.h>
+ #include <mach/regs-irq.h>
++#include <mach/irqs.h>
+ #include <asm/irq.h>
+ 
+ #include <plat/pm.h>
+diff --git a/arch/arm/plat-samsung/s5p-irq.c b/arch/arm/plat-samsung/s5p-irq.c
+index 103e371..ff1a760 100644
+--- a/arch/arm/plat-samsung/s5p-irq.c
++++ b/arch/arm/plat-samsung/s5p-irq.c
+@@ -15,6 +15,7 @@
+ #include <linux/io.h>
+ #include <linux/irqchip/arm-vic.h>
+ 
++#include <mach/irqs.h>
+ #include <mach/map.h>
+ #include <plat/regs-timer.h>
+ #include <plat/cpu.h>
 -- 
 1.8.1.2
