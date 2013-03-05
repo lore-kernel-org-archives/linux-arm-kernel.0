@@ -1,111 +1,115 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon,  4 Mar 2013 17:05:56 -0700
-Subject: [PATCH 1/2] ARM: tegra: add CPU errata WARs to Tegra reset handler
-Message-ID: <1362441957-22050-1-git-send-email-swarren@wwwdotorg.org>
+Date: Mon,  4 Mar 2013 17:05:57 -0700
+Subject: [PATCH 2/2] ARM: tegra: remove save/restore of CPU diag register
+In-Reply-To: <1362441957-22050-1-git-send-email-swarren@wwwdotorg.org>
+References: <1362441957-22050-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1362441957-22050-2-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Stephen Warren <swarren@nvidia.com>
 
-The CPU cores in Tegra contain some errata. Workarounds must be applied
-for these every time a CPU boots. Implement those workarounds directly
-in the Tegra-specific CPU reset vector.
+Prior to this change, {save,restore}_cpu_arch_register() collaborated to
+maintain the value of the CPU diagnostic register across power cycles.
+This was required to maintain any CPU errata workaround enable bits in
+that register. However, now that the Tegra reset vector code always
+enables all required workarounds, there is no need to save and restore
+the diagnostic register; it is always explicitly programmed in the
+required manner.
 
-Many of these workarounds duplicate code in the core ARM kernel.
+Hence, remove the save/restore logic.
 
-However, the core ARM kernel cannot enable those workarounds when
-building a multi-platform kernel, since they require writing to secure-
-only registers, and a multi-platform kernel often does not run in secure
-mode, and also cannot generically/architecturally detect whether it is
-running in secure mode, and hence cannot either unconditionally or
-conditionally apply these workarounds.
+This has the advantage that the kernel always directly controls the value
+of this register every boot, rather than relying on a bootloader or other
+kernel code having previously written the correct value into it. This
+makes CPU0 (which was previously saved/restored) and CPUn (which should
+have been set up by the reset vector) be controlled in exactly the same
+way, which is easier to debug/find/...
 
-Instead, the workarounds must be applied in architecture-specific reset
-code, which is able to have more direct knowledge of the secure/normal
-state. On Tegra, we will be able to detect this using a non-architected
-register in the future, although we currently assume the kernel runs only
-in secure mode. Other SoCs may never run the kernel in secure mode, and
-hence always rely on a secure monitor to enable the workarounds, and
-hence never implement them in the kernel.
+In particular, when converting Tegra to a multi-platform kernel, the CPU0
+diagnostic register value initially comes from the bootloader. Most Tegra
+bootloaders don't yet enable all required CPU bug workarounds. The
+previous commit updates the kernel to do so on any CPU power cycle.
+However, the save/restore code ends up over-writing the value with the
+old bootloader-driven value instead of the now more-likely-to-be-correct
+kernel value!
+
+Even irrespective of multi-platform conversion, this change limits the
+kernel's exposure to any WARs the bootloader didn't enable for CPU0: on
+the very first LP2 transition (CPU power-saving which power-cycles the
+CPU), the correct value will be enabled.
 
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- arch/arm/mach-tegra/reset-handler.S |   45 ++++++++++++++++++++++++++++++-----
- 1 file changed, 39 insertions(+), 6 deletions(-)
+ arch/arm/mach-tegra/cpuidle-tegra30.c |    4 ----
+ arch/arm/mach-tegra/pm.c              |   19 -------------------
+ 2 files changed, 23 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/reset-handler.S b/arch/arm/mach-tegra/reset-handler.S
-index 54382ce..ff7b45c 100644
---- a/arch/arm/mach-tegra/reset-handler.S
-+++ b/arch/arm/mach-tegra/reset-handler.S
-@@ -99,6 +99,8 @@ ENTRY(__tegra_cpu_reset_handler_start)
-  *
-  * Register usage within the reset handler:
-  *
-+ *      Others: scratch
-+ *      R6  = SoC ID << 8
-  *      R7  = CPU present (to the OS) mask
-  *      R8  = CPU in LP1 state mask
-  *      R9  = CPU in LP2 state mask
-@@ -114,6 +116,40 @@ ENTRY(__tegra_cpu_reset_handler_start)
- ENTRY(__tegra_cpu_reset_handler)
+diff --git a/arch/arm/mach-tegra/cpuidle-tegra30.c b/arch/arm/mach-tegra/cpuidle-tegra30.c
+index 8b50cf4..80445ed 100644
+--- a/arch/arm/mach-tegra/cpuidle-tegra30.c
++++ b/arch/arm/mach-tegra/cpuidle-tegra30.c
+@@ -102,12 +102,8 @@ static bool tegra30_cpu_core_power_down(struct cpuidle_device *dev,
  
- 	cpsid	aif, 0x13			@ SVC mode, interrupts disabled
-+
-+	mov32	r6, TEGRA_APB_MISC_BASE
-+	ldr	r6, [r6, #APB_MISC_GP_HIDREV]
-+	and	r6, r6, #0xff00
-+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
-+t20_check:
-+	cmp	r6, #(0x20 << 8)
-+	bne	after_t20_check
-+t20_errata:
-+	# Tegra20 is a Cortex-A9 r1p1
-+	mrc	p15, 0, r0, c1, c0, 0   @ read system control register
-+	orr	r0, r0, #1 << 14        @ erratum 716044
-+	mcr	p15, 0, r0, c1, c0, 0   @ write system control register
-+	mrc	p15, 0, r0, c15, c0, 1  @ read diagnostic register
-+	orr	r0, r0, #1 << 4         @ erratum 742230
-+	orr	r0, r0, #1 << 11        @ erratum 751472
-+	mcr	p15, 0, r0, c15, c0, 1  @ write diagnostic register
-+	b	after_errata
-+after_t20_check:
-+#endif
-+#ifdef CONFIG_ARCH_TEGRA_3x_SOC
-+t30_check:
-+	cmp	r6, #(0x30 << 8)
-+	bne	after_t30_check
-+t30_errata:
-+	# Tegra30 is a Cortex-A9 r2p9
-+	mrc	p15, 0, r0, c15, c0, 1  @ read diagnostic register
-+	orr	r0, r0, #1 << 6         @ erratum 743622
-+	orr	r0, r0, #1 << 11        @ erratum 751472
-+	mcr	p15, 0, r0, c15, c0, 1  @ write diagnostic register
-+	b	after_errata
-+after_t30_check:
-+#endif
-+after_errata:
- 	mrc	p15, 0, r10, c0, c0, 5		@ MPIDR
- 	and	r10, r10, #0x3			@ R10 = CPU number
- 	mov	r11, #1
-@@ -129,16 +165,13 @@ ENTRY(__tegra_cpu_reset_handler)
+ 	smp_wmb();
  
- #ifdef CONFIG_ARCH_TEGRA_2x_SOC
- 	/* Are we on Tegra20? */
--	mov32	r6, TEGRA_APB_MISC_BASE
--	ldr	r0, [r6, #APB_MISC_GP_HIDREV]
--	and	r0, r0, #0xff00
--	cmp	r0, #(0x20 << 8)
-+	cmp	r6, #(0x20 << 8)
- 	bne	1f
- 	/* If not CPU0, don't let CPU0 reset CPU1 now that CPU1 is coming up. */
--	mov32	r6, TEGRA_PMC_BASE
-+	mov32	r5, TEGRA_PMC_BASE
- 	mov	r0, #0
- 	cmp	r10, #0
--	strne	r0, [r6, #PMC_SCRATCH41]
-+	strne	r0, [r5, #PMC_SCRATCH41]
- 1:
- #endif
+-	save_cpu_arch_register();
+-
+ 	cpu_suspend(0, tegra30_sleep_cpu_secondary_finish);
  
+-	restore_cpu_arch_register();
+-
+ 	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &dev->cpu);
+ 
+ 	return true;
+diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c
+index 523604d..0494f73 100644
+--- a/arch/arm/mach-tegra/pm.c
++++ b/arch/arm/mach-tegra/pm.c
+@@ -46,26 +46,11 @@
+ #define PMC_CPUPWROFF_TIMER	0xcc
+ 
+ #ifdef CONFIG_PM_SLEEP
+-static unsigned int g_diag_reg;
+ static DEFINE_SPINLOCK(tegra_lp2_lock);
+ static void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
+ static struct clk *tegra_pclk;
+ void (*tegra_tear_down_cpu)(void);
+ 
+-void save_cpu_arch_register(void)
+-{
+-	/* read diagnostic register */
+-	asm("mrc p15, 0, %0, c15, c0, 1" : "=r"(g_diag_reg) : : "cc");
+-	return;
+-}
+-
+-void restore_cpu_arch_register(void)
+-{
+-	/* write diagnostic register */
+-	asm("mcr p15, 0, %0, c15, c0, 1" : : "r"(g_diag_reg) : "cc");
+-	return;
+-}
+-
+ static void set_power_timers(unsigned long us_on, unsigned long us_off)
+ {
+ 	unsigned long long ticks;
+@@ -119,8 +104,6 @@ static void restore_cpu_complex(void)
+ 	tegra_cpu_clock_resume();
+ 
+ 	flowctrl_cpu_suspend_exit(cpu);
+-
+-	restore_cpu_arch_register();
+ }
+ 
+ /*
+@@ -145,8 +128,6 @@ static void suspend_cpu_complex(void)
+ 	tegra_cpu_clock_suspend();
+ 
+ 	flowctrl_cpu_suspend_enter(cpu);
+-
+-	save_cpu_arch_register();
+ }
+ 
+ void tegra_clear_cpu_in_lp2(int phy_cpu_id)
 -- 
 1.7.10.4
