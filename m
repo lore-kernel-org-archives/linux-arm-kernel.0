@@ -1,24 +1,41 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 5 Mar 2013 13:11:31 -0300
-Subject: [PATCH 1/3] ARM: dts: imx28-evk: Enable touchscreen support
-In-Reply-To: <CAOMZO5Bvh5Pc1_2j7_c0+kSA7iT3UFk-dn_tyY9AxhaUtpmiPQ@mail.gmail.com>
-References: <1360337803-19858-1-git-send-email-festevam@gmail.com>
- <20130304031716.GC30431@S2101-09.ap.freescale.net>
- <CAOMZO5BL5Y-N+-kJN83eh74ZU74qPwFujxzxALr3KAp4Z0XXtg@mail.gmail.com>
- <20130305142059.GB26075@S2101-09.ap.freescale.net>
- <CAOMZO5AyL3fFSKBUAUY-p-x5rRtuA8La3ZbYhoQrECVyo57bAA@mail.gmail.com>
- <CAOMZO5Bvh5Pc1_2j7_c0+kSA7iT3UFk-dn_tyY9AxhaUtpmiPQ@mail.gmail.com>
-Message-ID: <CAOMZO5ApSbSQV=akKfoqvcjEmRXoTeE2sNQ0YqK9K+DhePm8sw@mail.gmail.com>
+From: hpa@zytor.com (H. Peter Anvin)
+Date: Tue, 05 Mar 2013 08:13:06 -0800
+Subject: [PATCH v3 -next 5/5] Kconfig: Make x86 and arm kernels default to
+ the LZ4-compressed
+In-Reply-To: <1362484056-9778-6-git-send-email-kyungsik.lee@lge.com>
+References: <1362484056-9778-1-git-send-email-kyungsik.lee@lge.com>
+ <1362484056-9778-6-git-send-email-kyungsik.lee@lge.com>
+Message-ID: <951ecce5-9669-4d1e-97db-1d1946e83eb4@email.android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 5, 2013 at 11:25 AM, Fabio Estevam <festevam@gmail.com> wrote:
-> On Tue, Mar 5, 2013 at 11:21 AM, Fabio Estevam <festevam@gmail.com> wrote:
->
->> Reverting ad76fda7 fixes the issue. Will send a patch shortly.
->
-> Sorry, this is not true. Will investigate more.
+I'm ok with this only if the patch is clearly marked LINUS DO NOT MERGE.
 
-Interesting that when I run 3.9.0-rc1-next-20130305 from my home
-network and I don't get any issues with
-audio playback + touchscreen.
+Kyungsik Lee <kyungsik.lee@lge.com> wrote:
+
+>This patch makes x86 and arm kernels default to the LZ4-compressed
+>to test new LZ4 code in the linux-next. This is requested by
+>Andrew Morton.
+>
+>Signed-off-by: Kyungsik Lee <kyungsik.lee@lge.com>
+>---
+> init/Kconfig | 2 +-
+> 1 file changed, 1 insertion(+), 1 deletion(-)
+>
+>diff --git a/init/Kconfig b/init/Kconfig
+>index fc8eb1f..de3cb00 100644
+>--- a/init/Kconfig
+>+++ b/init/Kconfig
+>@@ -138,7 +138,7 @@ config HAVE_KERNEL_LZ4
+> 
+> choice
+> 	prompt "Kernel compression mode"
+>-	default KERNEL_GZIP
+>+	default KERNEL_LZ4
+>	depends on HAVE_KERNEL_GZIP || HAVE_KERNEL_BZIP2 || HAVE_KERNEL_LZMA
+>|| HAVE_KERNEL_XZ || HAVE_KERNEL_LZO || HAVE_KERNEL_LZ4
+> 	help
+> 	  The linux kernel is a kind of self-extracting executable.
+
+-- 
+Sent from my mobile phone. Please excuse brevity and lack of formatting.
