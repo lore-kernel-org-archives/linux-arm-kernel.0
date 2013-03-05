@@ -1,50 +1,61 @@
-From: laijs@cn.fujitsu.com (Lai Jiangshan)
-Date: Tue, 05 Mar 2013 23:54:40 +0800
-Subject: [PATCH] lglock: add read-preference local-global rwlock
-In-Reply-To: <20130302170656.GB29769@redhat.com>
-References: <512C7A38.8060906@linux.vnet.ibm.com>
- <CACvQF51RvhM8XNqu3-1OTQ=cZUZ=pAX+_zx0a29+W67N1X+BgQ@mail.gmail.com>
- <512CC509.1050000@linux.vnet.ibm.com>
- <CACvQF50UgiqPpDk3HCmV86zKSf6tPjqr0bZowfPEOJs0g0r0MQ@mail.gmail.com>
- <512D0D67.9010609@linux.vnet.ibm.com>
- <CACvQF53ph2ixdM-otzetjM5cR+2kcZj6sckOp3TnzzA_x-EZ8w@mail.gmail.com>
- <512E7879.20109@linux.vnet.ibm.com> <5130E8E2.50206@cn.fujitsu.com>
- <20130301182854.GA3631@redhat.com>
- <CANN689HEW=b5S93J27p+rBX-5m7jkW4FER=eHDCp7OgMaTWLPw@mail.gmail.com>
- <20130302170656.GB29769@redhat.com>
-Message-ID: <51361540.3060603@cn.fujitsu.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 5 Mar 2013 08:26:17 -0800
+Subject: [PATCH] ARM: OMAP: RX-51: add missing USB phy binding
+In-Reply-To: <5135DA02.8070801@ti.com>
+References: <1362481780-11018-1-git-send-email-aaro.koskinen@iki.fi>
+ <20130305113618.GB19290@arwen.pp.htv.fi> <5135DA02.8070801@ti.com>
+Message-ID: <20130305162616.GA11806@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/03/13 01:06, Oleg Nesterov wrote:
-> On 03/02, Michel Lespinasse wrote:
->>
->> My version would be slower if it needs to take the
->> slow path in a reentrant way, but I'm not sure it matters either :)
+* kishon <kishon@ti.com> [130305 03:46]:
+> On Tuesday 05 March 2013 05:06 PM, Felipe Balbi wrote:
+> >On Tue, Mar 05, 2013 at 01:09:40PM +0200, Aaro Koskinen wrote:
+> >>Commit 51482be9 (ARM: OMAP: USB: Add phy binding information) forgot to
+> >>add phy binding for RX-51, and as a result USB does not work anymore on
+> >>3.9-rc1. Add the missing binding.
+> >>
+> >>Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+> >
+> >Acked-by: Felipe Balbi <balbi@ti.com>
+> Reviewed-by: Kishon Vijay Abraham I <kishon@ti.com>
+
+Thanks, applying into omap-for-v3.9-rc1/fixes.
+
+Regards,
+
+Tony
+
+> >>---
+> >>  arch/arm/mach-omap2/board-rx51.c |    2 ++
+> >>  1 file changed, 2 insertions(+)
+> >>
+> >>diff --git a/arch/arm/mach-omap2/board-rx51.c b/arch/arm/mach-omap2/board-rx51.c
+> >>index f7c4616..d2ea68e 100644
+> >>--- a/arch/arm/mach-omap2/board-rx51.c
+> >>+++ b/arch/arm/mach-omap2/board-rx51.c
+> >>@@ -17,6 +17,7 @@
+> >>  #include <linux/io.h>
+> >>  #include <linux/gpio.h>
+> >>  #include <linux/leds.h>
+> >>+#include <linux/usb/phy.h>
+> >>  #include <linux/usb/musb.h>
+> >>  #include <linux/platform_data/spi-omap2-mcspi.h>
+> >>
+> >>@@ -98,6 +99,7 @@ static void __init rx51_init(void)
+> >>  	sdrc_params = nokia_get_sdram_timings();
+> >>  	omap_sdrc_init(sdrc_params, sdrc_params);
+> >>
+> >>+	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
+> >>  	usb_musb_init(&musb_board_data);
+> >>  	rx51_peripherals_init();
+> >>
+> >>--
+> >>1.7.10.4
+> >>
+> >>--
+> >>To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> >>the body of a message to majordomo at vger.kernel.org
+> >>More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> >
 > 
-> I'd say, this doesn't matter at all, simply because this can only happen
-> if we race with the active writer.
-> 
-
-It can also happen when interrupted. (still very rarely)
-
-arch_spin_trylock()
-	------->interrupted,
-		__this_cpu_read() returns 0.
-		arch_spin_trylock() fails
-		slowpath, any nested will be slowpath too.
-		...
-		..._read_unlock()
-	<-------interrupt
-__this_cpu_inc()
-....
-
-
-I saw get_online_cpu_atomic() is called very frequent.
-And the above thing happens in one CPU rarely, but how often it
-happens in the whole system if we have 4096 CPUs?
-(I worries to much. I tend to remove FALLBACK_BASE now, we should
-add it only after we proved we needed it, this part is not proved)
-
-Thanks,
-Lai
