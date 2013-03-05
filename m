@@ -1,54 +1,37 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  5 Mar 2013 03:47:31 +0000
-Subject: [PATCH 15/29] arm64: KVM: hypervisor initialization code
+Date: Tue,  5 Mar 2013 03:47:28 +0000
+Subject: [PATCH 12/29] arm64: KVM: kvm_arch and kvm_vcpu_arch definitions
 In-Reply-To: <1362455265-24165-1-git-send-email-marc.zyngier@arm.com>
 References: <1362455265-24165-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1362455265-24165-16-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1362455265-24165-13-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide EL2 with page tables and stack, and set the vectors
-to point to the full blown world-switch code.
+Provide the architecture dependent structures for VM and
+vcpu abstractions.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_host.h | 11 +++++
- arch/arm64/kvm/hyp-init.S         | 89 +++++++++++++++++++++++++++++++++++++++
- 2 files changed, 100 insertions(+)
- create mode 100644 arch/arm64/kvm/hyp-init.S
+ arch/arm64/include/asm/kvm_host.h | 178 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 178 insertions(+)
+ create mode 100644 arch/arm64/include/asm/kvm_host.h
 
 diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index d1095d1..85e706b 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -175,4 +175,15 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
- int kvm_perf_init(void);
- int kvm_perf_teardown(void);
- 
-+static inline void __cpu_init_hyp_mode(unsigned long long pgd_ptr,
-+				       unsigned long hyp_stack_ptr,
-+				       unsigned long vector_ptr)
-+{
-+	/*
-+	 * Call initialization code, and switch to the full blown
-+	 * HYP code.
-+	 */
-+	kvm_call_hyp((void *)pgd_ptr, hyp_stack_ptr, vector_ptr);
-+}
-+
- #endif /* __ARM64_KVM_HOST_H__ */
-diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
 new file mode 100644
-index 0000000..c881cac
+index 0000000..d1095d1
 --- /dev/null
-+++ b/arch/arm64/kvm/hyp-init.S
-@@ -0,0 +1,89 @@
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -0,0 +1,178 @@
 +/*
 + * Copyright (C) 2012 - ARM Ltd
 + * Author: Marc Zyngier <marc.zyngier@arm.com>
 + *
++ * Derived from arch/arm/include/asm/kvm_host.h:
++ * Copyright (C) 2012 - Virtual Open Systems and Columbia University
++ * Author: Christoffer Dall <c.dall@virtualopensystems.com>
++ *
 + * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License, version 2, as
++ * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
 + *
 + * This program is distributed in the hope that it will be useful,
@@ -60,77 +43,162 @@ index 0000000..c881cac
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+#include <linux/linkage.h>
++#ifndef __ARM64_KVM_HOST_H__
++#define __ARM64_KVM_HOST_H__
 +
-+#include <asm/assembler.h>
-+#include <asm/kvm_arm.h>
-+#include <asm/kvm_mmu.h>
++#include <asm/kvm.h>
++#include <asm/kvm_asm.h>
++#include <asm/kvm_mmio.h>
 +
-+	.text
-+	.pushsection	.hyp.idmap.text, "ax"
++#define KVM_MAX_VCPUS 4
++#define KVM_USER_MEM_SLOTS 32
++#define KVM_PRIVATE_MEM_SLOTS 4
++#define KVM_COALESCED_MMIO_PAGE_OFFSET 1
 +
-+	.align	11
++#include <asm/kvm_vgic.h>
++#include <asm/kvm_arch_timer.h>
 +
-+__kvm_hyp_init:
-+	.global	__kvm_hyp_init
++#define KVM_VCPU_MAX_FEATURES 0
 +
-+ENTRY(__kvm_hyp_init_vector)
-+	ventry	__invalid		// Synchronous EL2t
-+	ventry	__invalid		// IRQ EL2t
-+	ventry	__invalid		// FIQ EL2t
-+	ventry	__invalid		// Error EL2t
++/* We don't currently support large pages. */
++#define KVM_HPAGE_GFN_SHIFT(x)	0
++#define KVM_NR_PAGE_SIZES	1
++#define KVM_PAGES_PER_HPAGE(x)	(1UL<<31)
 +
-+	ventry	__invalid		// Synchronous EL2h
-+	ventry	__invalid		// IRQ EL2h
-+	ventry	__invalid		// FIQ EL2h
-+	ventry	__invalid		// Error EL2h
++struct kvm_vcpu;
++int kvm_target_cpu(void);
++int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
 +
-+	ventry	__do_hyp_init		// Synchronous 64-bit EL1
-+	ventry	__invalid		// IRQ 64-bit EL1
-+	ventry	__invalid		// FIQ 64-bit EL1
-+	ventry	__invalid		// Error 64-bit EL1
++struct kvm_arch {
++	/* The VMID generation used for the virt. memory system */
++	u64    vmid_gen;
++	u32    vmid;
 +
-+	ventry	__invalid		// Synchronous 32-bit EL1
-+	ventry	__invalid		// IRQ 32-bit EL1
-+	ventry	__invalid		// FIQ 32-bit EL1
-+	ventry	__invalid		// Error 32-bit EL1
-+ENDPROC(__kvm_hyp_init_vector)
++	/* 1-level 2nd stage table and lock */
++	spinlock_t pgd_lock;
++	pgd_t *pgd;
 +
-+__invalid:
-+	b	.
++	/* VTTBR value associated with above pgd and vmid */
++	u64    vttbr;
++
++	/* Interrupt controller */
++	struct vgic_dist	vgic;
++
++	/* Timer */
++	struct arch_timer_kvm	timer;
++};
++
++#define KVM_NR_MEM_OBJS     40
++
++/*
++ * We don't want allocation failures within the mmu code, so we preallocate
++ * enough memory for a single page fault in a cache.
++ */
++struct kvm_mmu_memory_cache {
++	int nobjs;
++	void *objects[KVM_NR_MEM_OBJS];
++};
++
++struct kvm_vcpu_fault_info {
++	u32 esr_el2;		/* Hyp Syndrom Register */
++	u64 far_el2;		/* Hyp Fault Address Register */
++	u64 hpfar_el2;		/* Hyp IPA Fault Address Register */
++};
++
++typedef struct user_fpsimd_state kvm_kernel_vfp_t;
++
++struct kvm_vcpu_arch {
++	struct kvm_regs regs;
++	u64 sys_regs[NR_SYS_REGS];
++
++	/* HYP configuration */
++	u64 hcr_el2;
++
++	/* Exception Information */
++	struct kvm_vcpu_fault_info fault;
++
++	/* Floating point registers (VFP and Advanced SIMD/NEON) */
++	kvm_kernel_vfp_t vfp_guest;
++	kvm_kernel_vfp_t *vfp_host;
++
++	/* VGIC state */
++	struct vgic_cpu vgic_cpu;
++	struct arch_timer_cpu timer_cpu;
 +
 +	/*
-+	 * x0: HYP pgd
-+	 * x1: HYP stack
-+	 * x2: HYP vectors
++	 * Anything that is not used directly from assembly code goes
++	 * here.
 +	 */
-+__do_hyp_init:
++	/* dcache set/way operation pending */
++	int last_pcpu;
++	cpumask_t require_dcache_flush;
 +
-+	msr	ttbr0_el2, x0
-+	kern_hyp_va	x1
-+	mov	sp, x1
-+	kern_hyp_va	x2
-+	msr	vbar_el2, x2
++	/* Don't run the guest */
++	bool pause;
 +
-+	mrs	x0, tcr_el1
-+	ldr	x1, =TCR_EL2_MASK
-+	and	x0, x0, x1
-+	ldr	x1, =TCR_EL2_FLAGS
-+	orr	x0, x0, x1
-+	msr	tcr_el2, x0
++	/* IO related fields */
++	struct kvm_decode mmio_decode;
 +
-+	ldr	x0, =VTCR_EL2_FLAGS
-+	msr	vtcr_el2, x0
++	/* Interrupt related fields */
++	u64 irq_lines;		/* IRQ and FIQ levels */
 +
-+	mrs	x0, mair_el1
-+	msr	mair_el2, x0
-+	isb
++	/* Cache some mmu pages needed inside spinlock regions */
++	struct kvm_mmu_memory_cache mmu_page_cache;
 +
-+	mov	x0, #SCTLR_EL2_FLAGS
-+	msr	sctlr_el2, x0
++	/* Target CPU and feature flags */
++	u32 target;
++	DECLARE_BITMAP(features, KVM_VCPU_MAX_FEATURES);
 +
-+	eret
++	/* Detect first run of a vcpu */
++	bool has_run_once;
++};
 +
-+	.popsection
++struct kvm_vm_stat {
++	u32 remote_tlb_flush;
++};
++
++struct kvm_vcpu_stat {
++	u32 halt_wakeup;
++};
++
++struct kvm_vcpu_init;
++int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
++			const struct kvm_vcpu_init *init);
++unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu);
++int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *indices);
++struct kvm_one_reg;
++int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
++int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
++
++#define KVM_ARCH_WANT_MMU_NOTIFIER
++struct kvm;
++int kvm_unmap_hva(struct kvm *kvm, unsigned long hva);
++int kvm_unmap_hva_range(struct kvm *kvm,
++			unsigned long start, unsigned long end);
++void kvm_set_spte_hva(struct kvm *kvm, unsigned long hva, pte_t pte);
++
++/* We do not have shadow page tables, hence the empty hooks */
++static inline int kvm_age_hva(struct kvm *kvm, unsigned long hva)
++{
++	return 0;
++}
++
++static inline int kvm_test_age_hva(struct kvm *kvm, unsigned long hva)
++{
++	return 0;
++}
++
++struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
++struct kvm_vcpu __percpu **kvm_get_running_vcpus(void);
++
++u64 kvm_call_hyp(void *hypfn, ...);
++
++int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
++		int exception_index);
++
++int kvm_perf_init(void);
++int kvm_perf_teardown(void);
++
++#endif /* __ARM64_KVM_HOST_H__ */
 -- 
 1.7.12.4
