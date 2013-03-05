@@ -1,26 +1,18 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  5 Mar 2013 02:43:16 +0000
-Subject: [PATCH 22/29] ARM: KVM: fix address validation for HYP mappings
+Date: Tue,  5 Mar 2013 02:43:19 +0000
+Subject: [PATCH 25/29] ARM: KVM: fix fault_ipa computing
 In-Reply-To: <1362451403-23460-1-git-send-email-marc.zyngier@arm.com>
 References: <1362451403-23460-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1362451403-23460-23-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1362451403-23460-26-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-__create_hyp_mappings() performs some kind of address validation before
-creating the mapping, by verifying that the start address is above
-PAGE_OFFSET.
+The ARM ARM says that HPFAR reports bits [39:12] of the faulting
+IPA, and we need to complement it with the bottom 12 bits of the
+faulting VA.
 
-This check is not completely correct for kernel memory (the upper
-boundary has to be checked as well so we do not end up with highmem
-pages), and wrong for IO mappings (the mapping must exist in the vmalloc
-region).
-
-Fix this by using the proper predicates (virt_addr_valid and
-is_vmalloc_addr), which also work correctly on ARM64 (where the vmalloc
-region is below PAGE_OFFSET).
-
-Also change the BUG_ON() into a less agressive error return.
+This is always 12 bits, irrespective of the page size. Makes it
+clearer in the code.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
@@ -28,24 +20,24 @@ Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
  1 file changed, 7 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index ead6b16..ec14269 100644
+index 71d15bc..f601e6f 100644
 --- a/arch/arm/kvm/mmu.c
 +++ b/arch/arm/kvm/mmu.c
-@@ -200,8 +200,13 @@ static int __create_hyp_mappings(void *from, void *to, unsigned long *pfn_base)
- 	unsigned long addr, next;
- 	int err = 0;
+@@ -614,8 +614,13 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 			goto out_unlock;
+ 		}
  
--	BUG_ON(start > end);
--	if (start < PAGE_OFFSET)
-+	if (start >= end)
-+		return -EINVAL;
-+	/* Check for a valid kernel memory mapping */
-+	if (!pfn_base && (!virt_addr_valid(from) || !virt_addr_valid(to - 1)))
-+		return -EINVAL;
-+	/* Check for a valid kernel IO mapping */
-+	if (pfn_base && (!is_vmalloc_addr(from) || !is_vmalloc_addr(to - 1)))
- 		return -EINVAL;
- 
- 	mutex_lock(&kvm_hyp_pgd_mutex);
+-		/* Adjust page offset */
+-		fault_ipa |= kvm_vcpu_get_hfar(vcpu) & ~PAGE_MASK;
++		/*
++		 * The IPA is reported as [MAX:12], so we need to
++		 * complement it with the bottom 12 bits from the
++		 * faulting VA. This is always 12 bits, irrespective
++		 * of the page size.
++		 */
++		fault_ipa |= kvm_vcpu_get_hfar(vcpu) & ((1 << 12) - 1);
+ 		ret = io_mem_abort(vcpu, run, fault_ipa);
+ 		goto out_unlock;
+ 	}
 -- 
 1.7.12.4
