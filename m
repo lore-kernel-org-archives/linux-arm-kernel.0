@@ -1,131 +1,215 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  5 Mar 2013 03:47:17 +0000
-Subject: [PATCH 01/29] arm64: KVM: define HYP and Stage-2 translation page
- flags
+Date: Tue,  5 Mar 2013 03:47:18 +0000
+Subject: [PATCH 02/29] arm64: KVM: HYP mode idmap support
 In-Reply-To: <1362455265-24165-1-git-send-email-marc.zyngier@arm.com>
 References: <1362455265-24165-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1362455265-24165-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1362455265-24165-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add HYP and S2 page flags, for both normal and device memory.
+Add the necessary infrastructure for identity-mapped HYP page
+tables. Idmap-ed code must be in the ".hyp.idmap.text" linker
+section.
+
+The rest of the HYP ends up in ".hyp.text".
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/pgtable-hwdef.h | 13 +++++++++++++
- arch/arm64/include/asm/pgtable.h       | 13 +++++++++++++
- arch/arm64/mm/mmu.c                    |  6 +++++-
- 3 files changed, 31 insertions(+), 1 deletion(-)
+ arch/arm64/kernel/vmlinux.lds.S |  10 +++
+ arch/arm64/kvm/idmap.c          | 141 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/kvm/idmap.h          |   8 +++
+ 3 files changed, 159 insertions(+)
+ create mode 100644 arch/arm64/kvm/idmap.c
+ create mode 100644 arch/arm64/kvm/idmap.h
 
-diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
-index 75fd13d..acb4ee5 100644
---- a/arch/arm64/include/asm/pgtable-hwdef.h
-+++ b/arch/arm64/include/asm/pgtable-hwdef.h
-@@ -35,6 +35,7 @@
- /*
-  * Section
-  */
-+#define PMD_SECT_USER		(_AT(pteval_t, 1) << 6)		/* AP[1] */
- #define PMD_SECT_S		(_AT(pmdval_t, 3) << 8)
- #define PMD_SECT_AF		(_AT(pmdval_t, 1) << 10)
- #define PMD_SECT_NG		(_AT(pmdval_t, 1) << 11)
-@@ -68,6 +69,18 @@
- #define PTE_ATTRINDX_MASK	(_AT(pteval_t, 7) << 2)
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index 3fae2be..51b87c3 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -17,6 +17,15 @@ ENTRY(stext)
  
- /*
-+ * 2nd stage PTE definitions
+ jiffies = jiffies_64;
+ 
++#define HYPERVISOR_TEXT					\
++	ALIGN_FUNCTION();				\
++	VMLINUX_SYMBOL(__hyp_idmap_text_start) = .;	\
++	*(.hyp.idmap.text)				\
++	VMLINUX_SYMBOL(__hyp_idmap_text_end) = .;	\
++	VMLINUX_SYMBOL(__hyp_text_start) = .;		\
++	*(.hyp.text)					\
++	VMLINUX_SYMBOL(__hyp_text_end) = .;
++
+ SECTIONS
+ {
+ 	/*
+@@ -49,6 +58,7 @@ SECTIONS
+ 			TEXT_TEXT
+ 			SCHED_TEXT
+ 			LOCK_TEXT
++			HYPERVISOR_TEXT
+ 			*(.fixup)
+ 			*(.gnu.warning)
+ 		. = ALIGN(16);
+diff --git a/arch/arm64/kvm/idmap.c b/arch/arm64/kvm/idmap.c
+new file mode 100644
+index 0000000..68a55d4
+--- /dev/null
++++ b/arch/arm64/kvm/idmap.c
+@@ -0,0 +1,141 @@
++/*
++ * Copyright (C) 2012 - ARM Ltd
++ * Author: Marc Zyngier <marc.zyngier@arm.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+#define PTE_S2_RDONLY		 (_AT(pteval_t, 1) << 6)   /* HAP[1]   */
-+#define PTE_S2_RDWR		 (_AT(pteval_t, 2) << 6)   /* HAP[2:1] */
++
++#include <linux/module.h>
++#include <linux/kernel.h>
++#include <linux/slab.h>
++
++#include <asm/cputype.h>
++#include <asm/pgalloc.h>
++#include <asm/pgtable.h>
++#include <asm/sections.h>
++#include <asm/virt.h>
++
++#include "idmap.h"
++
++pgd_t *hyp_pgd;
 +
 +/*
-+ * EL2/HYP PTE/PMD definitions
++ * We always use a 2-level mapping for hyp-idmap:
++ * - Section mapped for 4kB pages
++ * - Page mapped for 64kB pages
 + */
-+#define PMD_HYP			PMD_SECT_USER
-+#define PTE_HYP			PTE_USER
++#ifdef CONFIG_ARM64_64K_PAGES
++static void idmap_add_pte(pmd_t *pmd, unsigned long addr, unsigned long end)
++{
++	struct page *page;
++	pte_t *pte;
++	unsigned long next;
++
++	if (pmd_none(*pmd)) {
++		pte = pte_alloc_one_kernel(NULL, addr);
++		if (!pte) {
++			pr_warning("Failed to allocate identity pte.\n");
++			return;
++		}
++		pmd_populate_kernel(NULL, pmd, pte);
++	}
++
++	pte = pte_offset_kernel(pmd, addr);
++
++	do {
++		page = phys_to_page(addr);
++		next = (addr & PAGE_MASK) + PAGE_SIZE;
++		set_pte(pte, mk_pte(page, PAGE_HYP));
++	} while (pte++, addr = next, addr < end);
++}
++#else
++#define HYP_SECT_PROT	(PMD_TYPE_SECT | PMD_SECT_AF | \
++			 PMD_ATTRINDX(MT_NORMAL) | PMD_HYP)
 +
 +/*
-  * 40-bit physical address supported.
-  */
- #define PHYS_MASK_SHIFT		(40)
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index e333a24..11c608a 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -60,6 +60,7 @@ extern void __pgd_error(const char *file, int line, unsigned long val);
- #define _PAGE_DEFAULT		PTE_TYPE_PAGE | PTE_AF
- 
- extern pgprot_t pgprot_default;
-+extern pgprot_t	pgprot_device;
- 
- #define __pgprot_modify(prot,mask,bits) \
- 	__pgprot((pgprot_val(prot) & ~(mask)) | (bits))
-@@ -76,6 +77,12 @@ extern pgprot_t pgprot_default;
- #define PAGE_KERNEL		_MOD_PROT(pgprot_default, PTE_PXN | PTE_UXN | PTE_DIRTY)
- #define PAGE_KERNEL_EXEC	_MOD_PROT(pgprot_default, PTE_UXN | PTE_DIRTY)
- 
-+#define PAGE_HYP		_MOD_PROT(pgprot_default, PTE_HYP)
-+#define PAGE_HYP_DEVICE		_MOD_PROT(pgprot_device, PTE_HYP)
++ * For 4kB pages, we use a section to perform the identity mapping,
++ * hence the direct call to __pmd_populate().
++ */
++static void idmap_add_pte(pmd_t *pmd, unsigned long addr, unsigned long end)
++{
++	__pmd_populate(pmd, addr & PMD_MASK, HYP_SECT_PROT);
++}
++#endif
 +
-+#define PAGE_S2			_MOD_PROT(pgprot_default, PTE_USER | PTE_S2_RDONLY)
-+#define PAGE_S2_DEVICE		_MOD_PROT(pgprot_device, PTE_USER | PTE_S2_RDWR)
++static void idmap_add_pmd(pud_t *pud, unsigned long addr, unsigned long end)
++{
++	pmd_t *pmd;
++	unsigned long next;
 +
- #define __PAGE_NONE		__pgprot(((_PAGE_DEFAULT) & ~PTE_TYPE_MASK) | PTE_PROT_NONE)
- #define __PAGE_SHARED		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN)
- #define __PAGE_SHARED_EXEC	__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN)
-@@ -197,6 +204,12 @@ extern pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
- 
- #define pmd_bad(pmd)		(!(pmd_val(pmd) & 2))
- 
-+#define pmd_table(pmd)		((pmd_val(pmd) & PMD_TYPE_MASK) == \
-+				 PMD_TYPE_TABLE)
-+#define pmd_sect(pmd)		((pmd_val(pmd) & PMD_TYPE_MASK) == \
-+				 PMD_TYPE_SECT)
++	if (pud_none_or_clear_bad(pud)) {
++		pmd = pmd_alloc_one(NULL, addr);
++		if (!pmd) {
++			pr_warning("Failed to allocate identity pmd.\n");
++			return;
++		}
++		pud_populate(NULL, pud, pmd);
++	}
 +
++	pmd = pmd_offset(pud, addr);
 +
- static inline void set_pmd(pmd_t *pmdp, pmd_t pmd)
- {
- 	*pmdp = pmd;
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 224b44a..df03aea 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -44,6 +44,7 @@ struct page *empty_zero_page;
- EXPORT_SYMBOL(empty_zero_page);
- 
- pgprot_t pgprot_default;
-+pgprot_t pgprot_device;
- EXPORT_SYMBOL(pgprot_default);
- 
- static pmdval_t prot_sect_kernel;
-@@ -127,10 +128,11 @@ early_param("cachepolicy", early_cachepolicy);
-  */
- static void __init init_mem_pgprot(void)
- {
--	pteval_t default_pgprot;
-+	pteval_t default_pgprot, device_pgprot;
- 	int i;
- 
- 	default_pgprot = PTE_ATTRINDX(MT_NORMAL);
-+	device_pgprot = PTE_ATTRINDX(MT_DEVICE_nGnRE) | PTE_PXN | PTE_UXN;
- 	prot_sect_kernel = PMD_TYPE_SECT | PMD_SECT_AF | PMD_ATTRINDX(MT_NORMAL);
- 
- #ifdef CONFIG_SMP
-@@ -138,6 +140,7 @@ static void __init init_mem_pgprot(void)
- 	 * Mark memory with the "shared" attribute for SMP systems
- 	 */
- 	default_pgprot |= PTE_SHARED;
-+	device_pgprot |= PTE_SHARED;
- 	prot_sect_kernel |= PMD_SECT_S;
- #endif
- 
-@@ -147,6 +150,7 @@ static void __init init_mem_pgprot(void)
- 	}
- 
- 	pgprot_default = __pgprot(PTE_TYPE_PAGE | PTE_AF | default_pgprot);
-+	pgprot_device = __pgprot(PTE_TYPE_PAGE | PTE_AF | device_pgprot);
- }
- 
- pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
++	do {
++		next = pmd_addr_end(addr, end);
++		idmap_add_pte(pmd, addr, next);
++	} while (pmd++, addr = next, addr != end);
++}
++
++static void idmap_add_pud(pgd_t *pgd, unsigned long addr, unsigned long end)
++{
++	pud_t *pud = pud_offset(pgd, addr);
++	unsigned long next;
++
++	do {
++		next = pud_addr_end(addr, end);
++		idmap_add_pmd(pud, addr, next);
++	} while (pud++, addr = next, addr != end);
++}
++
++extern char  __hyp_idmap_text_start[], __hyp_idmap_text_end[];
++
++static int __init hyp_idmap_setup(void)
++{
++	unsigned long addr, end;
++	unsigned long next;
++	pgd_t *pgd;
++
++	if (!is_hyp_mode_available()) {
++		hyp_pgd = NULL;
++		return 0;
++	}
++
++	hyp_pgd = pgd_alloc(NULL);
++	if (!hyp_pgd)
++		return -ENOMEM;
++
++	addr = virt_to_phys(__hyp_idmap_text_start);
++	end = virt_to_phys(__hyp_idmap_text_end);
++
++	pr_info("Setting up static HYP identity map for 0x%lx - 0x%lx\n",
++		addr, end);
++
++	pgd = hyp_pgd + pgd_index(addr);
++	do {
++		next = pgd_addr_end(addr, end);
++		idmap_add_pud(pgd, addr, next);
++	} while (pgd++, addr = next, addr != end);
++
++	dsb();
++
++	return 0;
++}
++early_initcall(hyp_idmap_setup);
+diff --git a/arch/arm64/kvm/idmap.h b/arch/arm64/kvm/idmap.h
+new file mode 100644
+index 0000000..fcb130f
+--- /dev/null
++++ b/arch/arm64/kvm/idmap.h
+@@ -0,0 +1,8 @@
++#ifndef __KVM_IDMAP_H
++#define __KVM_IDMAP_H
++
++#include <asm/pgtable.h>
++
++extern pgd_t *hyp_pgd;
++
++#endif	/* __KVM_IDMAP_H */
 -- 
 1.7.12.4
