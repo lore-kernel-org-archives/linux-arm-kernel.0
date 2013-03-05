@@ -1,85 +1,74 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 05 Mar 2013 11:45:37 -0700
-Subject: [PATCH 04/10] ARM: tegra: pm: add platform suspend support
-In-Reply-To: <1362397218-5675-1-git-send-email-josephl@nvidia.com>
-References: <1362397218-5675-1-git-send-email-josephl@nvidia.com>
-Message-ID: <51363D51.6000908@wwwdotorg.org>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Tue, 05 Mar 2013 19:51:06 +0100
+Subject: [PATCH] ARM: EXYNOS: remove EXYNOS_DEV_SYSMMU entirely
+Message-ID: <1362509466.16460.108.camel@x61.thuisdomein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/04/2013 04:40 AM, Joseph Lo wrote:
-> Adding suspend to ram support for Tegra platform. There are three suspend
+Commit 25e9d28d927d2e1731df53f60cde53d75bcb7c36 ("ARM: EXYNOS: remove
+system mmu initialization from exynos tree") removed the Kconfig symbol
+EXYNOS_DEV_SYSMMU. Remove its last traces too.
 
-nit: s/ram/RAM/
+Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+---
+0) Untested.
 
-> mode for Tegra. The difference were below.
+1) Please note that this patch changes the dependencies of EXYNOS_IOMMU
+(it removed a dependency that could never be met). That's probably what
+needs to be done but some specific review is needed here.
 
-Does this patch work for all 3 upstream Tegras, or just Tegra20 (or 20+30?).
+ arch/arm/mach-exynos/Kconfig | 4 ----
+ drivers/iommu/Kconfig        | 2 +-
+ 2 files changed, 1 insertion(+), 5 deletions(-)
 
-> diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
-
-> +	tegra_init_suspend();
-
-That call isn't ifdef'd on anything ...
-
-> diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c
-
-> +static void tegra_suspend_enter_lp2(void)
-> +{
-> +	tegra_set_cpu_in_lp2(0);
-> +}
-> +
-> +static void tegra_suspend_exit_lp2(void)
-> +{
-> +	tegra_clear_cpu_in_lp2(0);
-> +}
-
-Are those two functions going to get larger? If not, why not just call
-tegra_{set,clear}_cpu_in_lp2() from tegra_suspend_enter()?
-
-Note: I realized that the LP0/LP1 functions might be larger, and feel
-free to make them separate functions when they're implemented, but if
-those two functions specifically are always going to be a single line,
-then there's little point in separating them out, is there?
-
-> +void __init tegra_init_suspend(void)
-...
->  #endif
-
-... but this function is only implemented inside an ifdef ...
-
-> diff --git a/arch/arm/mach-tegra/pm.h b/arch/arm/mach-tegra/pm.h
-
-> +void tegra_init_suspend(void);
-
-... and no dummy inline is provided if the ifdef isn't defined.
-
-So, turning off whatever that ifdef is would cause a build error.
-
-> diff --git a/arch/arm/mach-tegra/pmc.c b/arch/arm/mach-tegra/pmc.c
-
-> +unsigned long tegra_pmc_get_cpu_timer(void)
-...
-> +unsigned long tegra_pmc_get_cpu_off_timer(void)
-
-I think you want to make those return u32, since the values they return
-should be u32 to match DT cell type.
-
-> +void tegra_pmc_pm_set(enum tegra_suspend_mode mode)
-> +{
-> +	u32 reg;
-> +
-> +	reg = tegra_pmc_readl(PMC_CTRL);
-> +	reg |= TEGRA_POWER_CPU_PWRREQ_OE;
-> +	reg &= ~TEGRA_POWER_EFFECT_LP0;
-> +
-> +	tegra_pmc_writel(reg, PMC_CTRL);
-> +}
-
-The "mode" parameter doesn't seem to be used here.
-
-One overall comment: tegra_suspend_enter() only supports LP2 so far, but
-I don't see a check anywhere (e.g. tegra_init_suspend() or
-tegra_pmc_parse_dt()) which prevents suspend from being initialized if
-the user requested some other type, or on SoCs where even LP2 isn't
-supported yet (e.g. Tegra114).
+diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+index 70f94c8..6c2bdc3 100644
+--- a/arch/arm/mach-exynos/Kconfig
++++ b/arch/arm/mach-exynos/Kconfig
+@@ -200,7 +200,6 @@ config MACH_SMDKV310
+ 	select EXYNOS4_SETUP_USB_PHY
+ 	select EXYNOS_DEV_DMA
+ 	select EXYNOS_DEV_DRM
+-	select EXYNOS_DEV_SYSMMU
+ 	select S3C24XX_PWM
+ 	select S3C_DEV_HSMMC
+ 	select S3C_DEV_HSMMC1
+@@ -254,7 +253,6 @@ config MACH_UNIVERSAL_C210
+ 	select EXYNOS4_SETUP_USB_PHY
+ 	select EXYNOS_DEV_DMA
+ 	select EXYNOS_DEV_DRM
+-	select EXYNOS_DEV_SYSMMU
+ 	select HAVE_SCHED_CLOCK
+ 	select S3C_DEV_HSMMC
+ 	select S3C_DEV_HSMMC2
+@@ -331,7 +329,6 @@ config MACH_ORIGEN
+ 	select EXYNOS4_SETUP_USB_PHY
+ 	select EXYNOS_DEV_DMA
+ 	select EXYNOS_DEV_DRM
+-	select EXYNOS_DEV_SYSMMU
+ 	select S3C24XX_PWM
+ 	select S3C_DEV_HSMMC
+ 	select S3C_DEV_HSMMC2
+@@ -367,7 +364,6 @@ config MACH_SMDK4212
+ 	select EXYNOS4_SETUP_USB_PHY
+ 	select EXYNOS_DEV_DMA
+ 	select EXYNOS_DEV_DRM
+-	select EXYNOS_DEV_SYSMMU
+ 	select S3C24XX_PWM
+ 	select S3C_DEV_HSMMC2
+ 	select S3C_DEV_HSMMC3
+diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+index 5c514d07..c520c20 100644
+--- a/drivers/iommu/Kconfig
++++ b/drivers/iommu/Kconfig
+@@ -168,7 +168,7 @@ config TEGRA_IOMMU_SMMU
+ 
+ config EXYNOS_IOMMU
+ 	bool "Exynos IOMMU Support"
+-	depends on ARCH_EXYNOS && EXYNOS_DEV_SYSMMU
++	depends on ARCH_EXYNOS
+ 	select IOMMU_API
+ 	help
+ 	  Support for the IOMMU(System MMU) of Samsung Exynos application
+-- 
+1.7.11.7
