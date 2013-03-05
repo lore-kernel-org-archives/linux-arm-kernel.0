@@ -1,47 +1,51 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 05 Mar 2013 20:48:28 +0100
-Subject: [GIT PULL] sunXi dt additions for 3.9, take 2
-In-Reply-To: <CAOesGMi5+hNL1aOPhJ3LEv+QjiVDVHE5s+uWvGrZ_64gYf0p8Q@mail.gmail.com>
-References: <512CDE04.2010401@free-electrons.com>
- <20130301015612.GA11174@quad.lixom.net>
- <CAOesGMi5+hNL1aOPhJ3LEv+QjiVDVHE5s+uWvGrZ_64gYf0p8Q@mail.gmail.com>
-Message-ID: <51364C0C.2090108@free-electrons.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Tue, 5 Mar 2013 12:04:28 -0800
+Subject: RFC: Zynq Clock Controller
+Message-ID: <37032699-343e-485c-80e0-9b23e3706c58@VA3EHSMHS013.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+Hi,
 
-Le 05/03/2013 02:17, Olof Johansson a ?crit :
-> On Thu, Feb 28, 2013 at 5:56 PM, Olof Johansson <olof@lixom.net> wrote:
->> On Tue, Feb 26, 2013 at 05:08:36PM +0100, Maxime Ripard wrote:
->>> Arnd, Olof,
->>>
->>> Here is the second pull request for DT additions for 3.9, containing
->>> the commits that were reverted, plus the missing commit that makes
->>> everything build.
->>>
->>> It depends on patches that were merged by LinusT and went through
->>> LinusW pinctrl tree, during this merge window.
->>
->> Ok. I think in hindsight this might just as well have waited for 3.10, but
->> given that we've gone back and forth on it a bit, I've pulled it into the
->> fixes branch for 3.9.
-> 
-> So, I wasn't able to get the fixes pull request that I was going to
-> bundle this with sent out in time for -rc1.
-> 
-> I can either stage this for 3.10 as it is, or if you prefer to sit on
-> it a bit and add more stuff and send it in with another branch later.
-> Let me know what you prefer and I'll stage it accordingly.
+As you know, I'm reviewing Zynq's clock implementation and try to find a way to go forward. It looks like most archs contain all clocks within a clock controller block which provides all the output clocks which are then used by device drivers etc. E.g. the Tegra CAR.
 
-I guess you can drop them then, I'll submit them as part as a new pull
-request for 3.10.
+I do also see some benefits of this approach:
+ - The DT description should never change even when the clock tree and/or functionality within the controller changes (assuming all required outputs are present)
+ - the controller can handle more sophisticated clock operations, which go beyond the simple enable/disable the device drivers are doing
 
-Thanks,
-Maxime
+For this reasons, I'd like to propose moving Zynq into the same direction. I.e. adding a clock controller with the following DT description (details may change but the general idea should become clear):
+	clkc: clkc {
+                #clock-cells = <1>;
+                compatible = "xlnx,ps7-clkc";
+                ps_clk_frequency = <33333333>;	# board x-tal
+                # optional props
+                gem0_emio_clk_freq = <125000000>;
+                gem1_emio_clk_freq = <50000000>;
+                can_mio_clk_freq_xx = <1234>; # this is possible 54 times with xx = 00..53
+        };
 
--- 
-Maxime Ripard, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+For the PLLs we can use Josh's implementation and extend it where needed. For everything else we can then use the clock primitives instead of using custom implementations, I think. The node should be a subnode to Zynq's SLCR.
+
+Currently I have identified the following output clocks:
+        armpll, ddrpll, iopll,
+        cpu_6or4x, cpu_3or2x, cpu_2x, cpu_1x,
+        ddr2x, ddr3x, dci,
+        lqspi, smc, pcap, gem0, gem1, fclk0, fclk1, fclk2, fclk3, can0, can1,
+        sdio0, sdio1, uart0, uart1, spi0, spi1,
+        dma_aper, usb0_aper, usb1_aper, gem0_aper, gem1_aper,
+        sdio0_aper, sdio1_aper, spi0_aper, spi1_aper, can0_aper, can1_aper,
+        i2c0_aper, i2c1_aper, uart0_aper, uart1_aper, gpio_aper, lqspi_aper,
+        smc_aper
+
+
+Clock consumers would work as described in the clock bindings:
+	consumer: zynq_dummy_peripheral {
+	        compatible = "xlnx,foobar";
+	        clocks = <&clkc 69>;
+	};
+
+
+Is this an acceptable solution? Does anybody see issues or has other feedback?
+
+	Thanks,
+	S?ren
