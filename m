@@ -1,57 +1,34 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 4 Mar 2013 17:05:35 -0800
-Subject: [PATCH v4 2/3] ARM: mach-shmobile: r8a7779: add SATA support
-In-Reply-To: <20130305002653.GA9439@verge.net.au>
-References: <201302272339.15402.sergei.shtylyov@cogentembedded.com>
- <20130301014148.GB9232@quad.lixom.net>
- <20130301072345.GD14376@verge.net.au>
- <20130305002653.GA9439@verge.net.au>
-Message-ID: <CAOesGMhGE25gjgdPp-FfCSA57=+SX_2xcry9s=Ln5n5ZbWsU9Q@mail.gmail.com>
+Date: Mon, 4 Mar 2013 17:17:37 -0800
+Subject: [GIT PULL] sunXi dt additions for 3.9, take 2
+In-Reply-To: <20130301015612.GA11174@quad.lixom.net>
+References: <512CDE04.2010401@free-electrons.com>
+ <20130301015612.GA11174@quad.lixom.net>
+Message-ID: <CAOesGMi5+hNL1aOPhJ3LEv+QjiVDVHE5s+uWvGrZ_64gYf0p8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 4, 2013 at 4:26 PM, Simon Horman <horms@verge.net.au> wrote:
-> On Fri, Mar 01, 2013 at 04:23:45PM +0900, Simon Horman wrote:
->> On Thu, Feb 28, 2013 at 05:41:48PM -0800, Olof Johansson wrote:
->> > On Wed, Feb 27, 2013 at 11:39:14PM +0300, Sergei Shtylyov wrote:
->> > > From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
->> > >
->> > > Add SATA clock for r8a7779 SoC (for both device tree and usual cases).
->> > > Register SATA controller as a "late" platform device on r8a7779 SoC.
->> >
->> > Hi,
->> >
->> > If you have the a binding in the device tree (which you do through patch 1/3),
->> > then there's no reason to have a platform device for it.
+On Thu, Feb 28, 2013 at 5:56 PM, Olof Johansson <olof@lixom.net> wrote:
+> On Tue, Feb 26, 2013 at 05:08:36PM +0100, Maxime Ripard wrote:
+>> Arnd, Olof,
 >>
->> Hi Olof,
+>> Here is the second pull request for DT additions for 3.9, containing
+>> the commits that were reverted, plus the missing commit that makes
+>> everything build.
 >>
->> the DT exists but currently the marzen board brings up all
->> of its devices using platform devices. Which if nothing else is
->> internally consistent.
->>
->> I suppose it would be possible to add a call to
->> r8a7779_add_standard_devices_dt() and have the board bring
->> up this device using DT and the rest using platform drivers
->> (until the drivers are migrated to DT).
->>
->> Would that be your preferred option?
->>
->> Magnus, how do you feel about this idea?
+>> It depends on patches that were merged by LinusT and went through
+>> LinusW pinctrl tree, during this merge window.
 >
-> Ping.
+> Ok. I think in hindsight this might just as well have waited for 3.10, but
+> given that we've gone back and forth on it a bit, I've pulled it into the
+> fixes branch for 3.9.
 
-Sorry, I know the ping wasn't directed at me, but I didn't reply yet either. :)
+So, I wasn't able to get the fixes pull request that I was going to
+bundle this with sent out in time for -rc1.
 
-This is generally the right migration model for platforms that have
-some regular platform devices today; register what isn't yet DT
-enabled through the old ways, but also probe device tree for the
-devices that are described there.
-
-You might need AUXDATA tables to get clock names right (since device
-names are different) until you have clock bindings, that's what other
-platforms have done as well. Over time you can migrate away from it
-and switch to only DT.
+I can either stage this for 3.10 as it is, or if you prefer to sit on
+it a bit and add more stuff and send it in with another branch later.
+Let me know what you prefer and I'll stage it accordingly.
 
 
 -Olof
