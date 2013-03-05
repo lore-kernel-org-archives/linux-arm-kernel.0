@@ -1,58 +1,58 @@
-From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
-Date: Wed, 6 Mar 2013 08:49:32 +0900
-Subject: [PATCH v3 3/3] ARM: dts: Add sbs-battery for exynos5250-snow
-In-Reply-To: <1360957573-864-3-git-send-email-dianders@chromium.org>
-References: <1360887677-20758-1-git-send-email-dianders@chromium.org>
- <1360957573-864-1-git-send-email-dianders@chromium.org>
- <1360957573-864-3-git-send-email-dianders@chromium.org>
-Message-ID: <CAHfPSqDH3kk0t6RV1Mja+L4my+iNqkHcBgcJ9HmcT6XnBQpkmA@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 05 Mar 2013 16:52:02 -0700
+Subject: [REPOST PATCH 0/2] Table lookup for mux clock type
+In-Reply-To: <51367625.2090405@wwwdotorg.org>
+References: <1361545358-22721-1-git-send-email-pdeschrijver@nvidia.com>
+ <51367625.2090405@wwwdotorg.org>
+Message-ID: <51368522.90700@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 February 2013 04:46, Doug Anderson <dianders@chromium.org> wrote:
-> Now that we have i2c-arbitrator in place on bus 4 we can add the
-> sbs-battery driver.  Future devices will be added onto bus 4 once
-> drivers are in good shape.
->
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
-Tested-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
-The patchset v3 is tested on snow with test case which uses i2c-4 from both
-EC and AP side continuously for a more than a couple of minutes
-> ---
-> Changes in v3: None
-> Changes in v2: None
->
->  arch/arm/boot/dts/exynos5250-snow.dts | 6 ++++++
->  1 file changed, 6 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
-> index d2d4b48..2127386 100644
-> --- a/arch/arm/boot/dts/exynos5250-snow.dts
-> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
-> @@ -51,6 +51,12 @@
->                         reg = <0>;
->                         #address-cells = <1>;
->                         #size-cells = <0>;
-> +
-> +                       battery: sbs-battery at b {
-> +                               compatible = "sbs,sbs-battery";
-> +                               reg = <0xb>;
-> +                               sbs,poll-retry-count = <1>;
-> +                       };
->                 };
->         };
->
-> --
-> 1.8.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+On 03/05/2013 03:48 PM, Stephen Warren wrote:
+> On 02/22/2013 08:02 AM, Peter De Schrijver wrote:
+>> This patchset adds a table lookup feature to the mux clock type. This will
+>> be used by the forthcoming Tegra114 clock implementation. Also instead of
+>> a fixed field width, a mask is used. This is because Tegra114 has some muxes
+>> where the parent selector is spread over several bitfields. The second patch
+>> adapts the tegra periph clock implementation which uses struct clk_mux
+>> directly.
+>>
+>> --
+>>
+>> Mike,
+>>
+>> This patch is a dependency for the Tegra114 CCF implementation. Could you
+>> review it and merge on a topic branch so Stephen can pull it in to verify
+>> the integration?
+> 
+> Peter, does this repost you resolve the issue I pointed out at:
+> http://www.spinics.net/lists/arm-kernel/msg220873.html
 
+Indeed, I just tested applying patch 1/2 and the build is broken without
+patch 2/2.
 
+Can you either rework the patches to maintain bisectability, or squash
+the two together?
 
---
-Shine bright,
-(: Nav :)
+> 
+> To quote:
+> 
+>>>> Just a quick note on patch dependencies here:
+>>>>
+>>>> Patch 1/2 can presumably be taken through the clk tree whenever Mike is
+>>>> OK with it.
+>>>>
+>>>> Patch 2/2 depends on patches in the Tegra tree for 3.9. Since patch 2/2
+>>>> is useful mostly for the Tegra114 clock driver, and I don't imagine that
+>>>> will get posted/merged in time for 3.9, it's probably easiest to just
+>>>> take patch 2/2 for 3.10 along with the Tegra114 clock driver. Also, I
+>>>> imagine there won't be any more clk/Tegra tree dependencies in 3.10, so
+>>>> patch 2/2 and the Tegra114 clk driver patches can likely go through the
+>>>> clk tree itself for 3.10.
+>>>
+>>> No. Because 1/2 changes struct clk_mux and the tegra peripheral clock type 
+>>> uses struct clk_mux directly, 2/2 needs to be applied together with 1/2, even
+>>> if the new functionality is not yet used.
+>>
+>> Oh, then they can't be two separate patches then, or "git bisect" won't
+>> work. I guess it's best to wait for 3.10 for this:-(
