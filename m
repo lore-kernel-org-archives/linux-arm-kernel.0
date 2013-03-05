@@ -1,35 +1,44 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  5 Mar 2013 02:43:20 +0000
-Subject: [PATCH 26/29] ARM: KVM: vgic: decouple alignment restriction from
- page size
+Date: Tue,  5 Mar 2013 02:43:21 +0000
+Subject: [PATCH 27/29] ARM: KVM: move include of asm/idmap.h to kvm_mmu.h
 In-Reply-To: <1362451403-23460-1-git-send-email-marc.zyngier@arm.com>
 References: <1362451403-23460-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1362451403-23460-27-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1362451403-23460-28-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The virtual GIC is supposed to be 4kB aligned. On a 64kB page
-system, comparing the alignment to PAGE_SIZE is wrong.
-
-Use SZ_4K instead.
+Since the arm64 code doesn't have a global asm/idmap.h file, move
+the inclusion to asm/kvm_mmu.h.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kvm/vgic.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/include/asm/kvm_mmu.h | 1 +
+ arch/arm/kvm/mmu.c             | 1 -
+ 2 files changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/kvm/vgic.c b/arch/arm/kvm/vgic.c
-index c9a1731..161d5c1 100644
---- a/arch/arm/kvm/vgic.c
-+++ b/arch/arm/kvm/vgic.c
-@@ -1484,7 +1484,7 @@ int kvm_vgic_set_addr(struct kvm *kvm, unsigned long type, u64 addr)
- 	if (addr & ~KVM_PHYS_MASK)
- 		return -E2BIG;
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index 3c71a1d..970f3b5 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -21,6 +21,7 @@
  
--	if (addr & ~PAGE_MASK)
-+	if (addr & (SZ_4K - 1))
- 		return -EINVAL;
+ #include <asm/cacheflush.h>
+ #include <asm/pgalloc.h>
++#include <asm/idmap.h>
  
- 	mutex_lock(&kvm->lock);
+ /*
+  * We directly use the kernel VA for the HYP, as we can directly share
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index f601e6f..b694f58 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -20,7 +20,6 @@
+ #include <linux/kvm_host.h>
+ #include <linux/io.h>
+ #include <trace/events/kvm.h>
+-#include <asm/idmap.h>
+ #include <asm/pgalloc.h>
+ #include <asm/cacheflush.h>
+ #include <asm/kvm_arm.h>
 -- 
 1.7.12.4
