@@ -1,70 +1,81 @@
-From: elezegarcia@gmail.com (Ezequiel Garcia)
-Date: Tue, 5 Mar 2013 14:43:11 -0300
-Subject: [PATCH 11/14] ARM: OMAP2+: Add device-tree support for NOR flash
-In-Reply-To: <51362BAB.10403@ti.com>
-References: <1361899842-30303-1-git-send-email-jon-hunter@ti.com>
- <1361899842-30303-12-git-send-email-jon-hunter@ti.com>
- <51360271.1030302@mimc.co.uk> <51360562.20309@ti.com>
- <51361B46.507@mimc.co.uk> <51362BAB.10403@ti.com>
-Message-ID: <CALF0-+WnOWRD=sXNh_2hJutwxzrs22c97jKLiJa8Xjc=xaESpA@mail.gmail.com>
+From: srivatsa.bhat@linux.vnet.ibm.com (Srivatsa S. Bhat)
+Date: Tue, 05 Mar 2013 23:25:05 +0530
+Subject: [PATCH V2] lglock: add read-preference local-global rwlock
+In-Reply-To: <5136123C.3040508@cn.fujitsu.com>
+References: <512BBAD8.8010006@linux.vnet.ibm.com>
+ <CACvQF51jCxk5jUqmhD=QBBtUsBkQWZzakacrKO4Gsk=w61rNwQ@mail.gmail.com>
+ <512C7A38.8060906@linux.vnet.ibm.com>
+ <CACvQF51RvhM8XNqu3-1OTQ=cZUZ=pAX+_zx0a29+W67N1X+BgQ@mail.gmail.com>
+ <512CC509.1050000@linux.vnet.ibm.com>
+ <CACvQF50UgiqPpDk3HCmV86zKSf6tPjqr0bZowfPEOJs0g0r0MQ@mail.gmail.com>
+ <512D0D67.9010609@linux.vnet.ibm.com>
+ <CACvQF53ph2ixdM-otzetjM5cR+2kcZj6sckOp3TnzzA_x-EZ8w@mail.gmail.com>
+ <512E7879.20109@linux.vnet.ibm.com>	<5130E8E2.50206@cn.fujitsu.com>
+ <20130301182854.GA3631@redhat.com>
+ <CANN689HEW=b5S93J27p+rBX-5m7jkW4FER=eHDCp7OgMaTWLPw@mail.gmail.com>
+ <5131FB4C.7070408@cn.fujitsu.com> <513232B6.9060905@linux.vnet.ibm.com>
+ <5136123C.3040508@cn.fujitsu.com>
+Message-ID: <51363179.2030109@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
+On 03/05/2013 09:11 PM, Lai Jiangshan wrote:
+> On 03/03/13 01:11, Srivatsa S. Bhat wrote:
+>> On 03/02/2013 06:44 PM, Lai Jiangshan wrote:
+>>> From 345a7a75c314ff567be48983e0892bc69c4452e7 Mon Sep 17 00:00:00 2001
+>>> From: Lai Jiangshan <laijs@cn.fujitsu.com>
+>>> Date: Sat, 2 Mar 2013 20:33:14 +0800
+>>> Subject: [PATCH] lglock: add read-preference local-global rwlock
+>>>
+>>> Current lglock is not read-preference, so it can't be used on some cases
+>>> which read-preference rwlock can do. Example, get_cpu_online_atomic().
+>>>
+>> [...]
+>>> diff --git a/kernel/lglock.c b/kernel/lglock.c
+>>> index 6535a66..52e9b2c 100644
+>>> --- a/kernel/lglock.c
+>>> +++ b/kernel/lglock.c
+>>> @@ -87,3 +87,71 @@ void lg_global_unlock(struct lglock *lg)
+>>>  	preempt_enable();
+>>>  }
+>>>  EXPORT_SYMBOL(lg_global_unlock);
+>>> +
+>>> +#define FALLBACK_BASE	(1UL << 30)
+>>> +
+>>> +void lg_rwlock_local_read_lock(struct lgrwlock *lgrw)
+>>> +{
+>>> +	struct lglock *lg = &lgrw->lglock;
+>>> +
+>>> +	preempt_disable();
+>>> +	if (likely(!__this_cpu_read(*lgrw->reader_refcnt))) {
+>>> +		rwlock_acquire_read(&lg->lock_dep_map, 0, 0, _RET_IP_);
+>>> +		if (unlikely(!arch_spin_trylock(this_cpu_ptr(lg->lock)))) {
+>>> +			read_lock(&lgrw->fallback_rwlock);
+>>> +			__this_cpu_write(*lgrw->reader_refcnt, FALLBACK_BASE);
+>>> +			return;
+>>> +		}
+>>> +	}
+>>> +
+>>> +	__this_cpu_inc(*lgrw->reader_refcnt);
+>>> +}
+>>> +EXPORT_SYMBOL(lg_rwlock_local_read_lock);
+>>> +
+>>> +void lg_rwlock_local_read_unlock(struct lgrwlock *lgrw)
+>>> +{
+>>> +	switch (__this_cpu_read(*lgrw->reader_refcnt)) {
+>>> +	case 1:
+>>> +		__this_cpu_write(*lgrw->reader_refcnt, 0);
+>>> +		lg_local_unlock(&lgrw->lglock);
+>>> +		return;
+>>
+>> This should be a break, instead of a return, right?
+>> Otherwise, there will be a preempt imbalance...
+> 
+> 
+> "lockdep" and "preempt" are handled in lg_local_unlock(&lgrw->lglock);
+> 
 
-On Tue, Mar 5, 2013 at 2:30 PM, Jon Hunter <jon-hunter@ti.com> wrote:
->
-> This really highlights a weakness in the GPMC driver, particularly
-> for NOR, where the child device can only be probed once the parent
-> is probed. I don't see this as being DT specific issue, because
-> even on older OMAP boards we always registered the NOR flash device
-> independently of the GPMC device. So we have always been susceptible to
-> this problem AFAICT.
->
-> This is admittedly a hack, but I am curious if you add the pinctrl
-> properties to the NOR node, if this would also defer the probe on the
-> NOR device?
->
-> Ideally it would be great to defer the probing of the child until the
-> parent has been probed successfully.
->
+Ah, ok.. I had missed that.
 
-This seems related to the probing parent-child ordering probing
-I pointed out in a previous mail, isn't it?
-(which by the way, I'll answer when I can gather some more convincing
-feedback).
-
-I don't have OMAP NOR boards, so I'm not entirely familiar to the
-way GPMC registers the NOR device. However, by looking
-into board-flash.c:board_nor_init() function, it seems to me that:
-
-1. first we request the CS with gpmc_cs_request() and
-2. later we register the NOR device explicitly with
-    platform_device_register().
-
-So, unless I'm missing something, we force the NOR device
-to be probed *after* the GPMC device.
-
-This is definitely the way NAND, OneNAND is handled.
-
-On the otherside, by using 'simple-bus' you create your devices
-first, when the whole device-tree is parsed and later the drivers
-are probed at module_initcall time.
-
-So, AFAIK, this problem is DT specific.
-
-On the other side, when you say we should defer the probing
-of the child. Do you mean changing something in physmap/NAND/etc. drivers?
-
-Please keep in mind, I have nothing against using simple-bus,
-since it's a very clean solution. It's just that it seems to me it will
-be problematic.
-Moreover, the fix shouldn't be too complicated (still working on this).
-
-I'll try to post my Device Bus driver soon (similar to GPMC)
-and also I'll try to answer the previous discussion with some
-information on why I think this won't work.
-
-(I hope I'm not making too much noise with this)
--- 
-    Ezequiel
+Regards,
+Srivatsa S. Bhat
