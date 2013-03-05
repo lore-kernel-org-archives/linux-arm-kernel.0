@@ -1,432 +1,202 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue,  5 Mar 2013 18:42:18 +0100
-Subject: [PATCH 08/23] mmc: sdhci-s3c: remove platform dependencies
+Date: Tue,  5 Mar 2013 18:42:32 +0100
+Subject: [PATCH 22/23] ARM: exynos: work around missing gpio code on
+ multiplatform
 In-Reply-To: <1362505353-8873-1-git-send-email-arnd@arndb.de>
 References: <1362505353-8873-1-git-send-email-arnd@arndb.de>
-Message-ID: <1362505353-8873-9-git-send-email-arnd@arndb.de>
+Message-ID: <1362505353-8873-23-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-plat/regs-sdhci.h is not used anywhere but in the sdhci-s3c
-driver, so it can become a local file there and all other
-inclusions removed.
+With CONFIG_ARCH_MULTIPLATFORM, we can no longer have
+our own mach/gpio.h included by the kernel-wide linux/gpio.h
+header, and disabling the gpio-samsung driver means we cannot
+use any of the private interfaces. This patch disables
+all code referring to the driver and gets things to build
+again, but surely breaks a lot of stuff in the process.
 
-plat/sdhci.h is used only to define the platform devices,
-and with the exception of the platform_data structure not
-needed by the driver, so we can split out the platform_data
-definition instead and leave the rest to platform code.
+Thomas Abraham alrady has a proper set of patches to
+address this.
+
+Do not apply.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-exynos/setup-sdhci-gpio.c         |  2 +-
- arch/arm/mach-s5pc100/setup-sdhci-gpio.c        |  1 -
- arch/arm/mach-s5pv210/setup-sdhci-gpio.c        |  1 -
- arch/arm/plat-samsung/include/plat/regs-sdhci.h | 87 -------------------------
- arch/arm/plat-samsung/include/plat/sdhci.h      | 56 +---------------
- drivers/mmc/host/Kconfig                        |  2 +-
- drivers/mmc/host/sdhci-s3c-regs.h               | 87 +++++++++++++++++++++++++
- drivers/mmc/host/sdhci-s3c.c                    |  5 +-
- include/linux/platform_data/mmc-sdhci-s3c.h     | 56 ++++++++++++++++
- 9 files changed, 148 insertions(+), 149 deletions(-)
- delete mode 100644 arch/arm/plat-samsung/include/plat/regs-sdhci.h
- create mode 100644 drivers/mmc/host/sdhci-s3c-regs.h
- create mode 100644 include/linux/platform_data/mmc-sdhci-s3c.h
+ arch/arm/mach-exynos/Makefile                  | 2 ++
+ arch/arm/mach-exynos/common.c                  | 3 +++
+ arch/arm/mach-exynos/dev-audio.c               | 1 +
+ arch/arm/mach-exynos/include/mach/gpio.h       | 2 ++
+ arch/arm/mach-exynos/mach-armlex4210.c         | 1 +
+ arch/arm/mach-exynos/mach-origen.c             | 1 +
+ arch/arm/mach-exynos/setup-i2c0.c              | 3 ++-
+ arch/arm/mach-s3c64xx/include/mach/gpio.h      | 4 ++++
+ arch/arm/plat-samsung/include/plat/gpio-core.h | 3 +++
+ arch/arm/plat-samsung/pm-gpio.c                | 1 +
+ drivers/gpio/Makefile                          | 2 +-
+ 11 files changed, 21 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/setup-sdhci-gpio.c b/arch/arm/mach-exynos/setup-sdhci-gpio.c
-index e8d08bf..d5b98c8 100644
---- a/arch/arm/mach-exynos/setup-sdhci-gpio.c
-+++ b/arch/arm/mach-exynos/setup-sdhci-gpio.c
-@@ -19,8 +19,8 @@
- #include <linux/mmc/host.h>
- #include <linux/mmc/card.h>
+diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
+index b0dcf7d..e2f1742 100644
+--- a/arch/arm/mach-exynos/Makefile
++++ b/arch/arm/mach-exynos/Makefile
+@@ -50,7 +50,9 @@ obj-$(CONFIG_MACH_EXYNOS5_DT)		+= mach-exynos5-dt.o
+ # device support
+ 
+ obj-y					+= dev-uart.o
++ifdef CONFIG_ARCH_EXYNOS_SINGLE
+ obj-$(CONFIG_ARCH_EXYNOS4)		+= dev-audio.o
++endif
+ obj-$(CONFIG_EXYNOS4_DEV_AHCI)		+= dev-ahci.o
+ obj-$(CONFIG_EXYNOS_DEV_DMA)		+= dma.o
+ obj-$(CONFIG_EXYNOS4_DEV_USB_OHCI)	+= dev-ohci.o
+diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+index 504d50e..59607b5 100644
+--- a/arch/arm/mach-exynos/common.c
++++ b/arch/arm/mach-exynos/common.c
+@@ -37,6 +37,7 @@
+ #include <mach/regs-irq.h>
+ #include <mach/regs-pmu.h>
+ #include <mach/regs-gpio.h>
++#include <mach/gpio.h>
+ 
+ #include <plat/cpu.h>
+ #include <plat/clock.h>
+@@ -745,10 +746,12 @@ static int exynos_irq_eint_set_type(struct irq_data *data, unsigned int type)
+ 	__raw_writel(ctrl, EINT_CON(exynos_eint_base, data->irq));
+ 	spin_unlock(&eint_lock);
+ 
++#ifdef CONFIG_ARCH_EXYNOS_SINGLE
+ 	if (soc_is_exynos5250())
+ 		s3c_gpio_cfgpin(exynos5_irq_to_gpio(data->irq), S3C_GPIO_SFN(0xf));
+ 	else
+ 		s3c_gpio_cfgpin(exynos4_irq_to_gpio(data->irq), S3C_GPIO_SFN(0xf));
++#endif
+ 
+ 	return 0;
+ }
+diff --git a/arch/arm/mach-exynos/dev-audio.c b/arch/arm/mach-exynos/dev-audio.c
+index c662c89..25b173b 100644
+--- a/arch/arm/mach-exynos/dev-audio.c
++++ b/arch/arm/mach-exynos/dev-audio.c
+@@ -21,6 +21,7 @@
+ #include <mach/map.h>
+ #include <mach/dma.h>
+ #include <mach/irqs.h>
++#include <mach/gpio.h>
+ 
+ #define EXYNOS4_AUDSS_INT_MEM	(0x03000000)
+ 
+diff --git a/arch/arm/mach-exynos/include/mach/gpio.h b/arch/arm/mach-exynos/include/mach/gpio.h
+index eb24f1e..88c6d26 100644
+--- a/arch/arm/mach-exynos/include/mach/gpio.h
++++ b/arch/arm/mach-exynos/include/mach/gpio.h
+@@ -284,6 +284,8 @@ enum exynos5_gpio_number {
+ 
+ /* define the number of gpios */
+ 
++#ifdef CONFIG_MACH_EXYNOS_SINGLE
+ #define ARCH_NR_GPIOS		(CONFIG_SAMSUNG_GPIO_EXTRA + S3C_GPIO_END)
++#endif
+ 
+ #endif /* __ASM_ARCH_GPIO_H */
+diff --git a/arch/arm/mach-exynos/mach-armlex4210.c b/arch/arm/mach-exynos/mach-armlex4210.c
+index cb95992..2a8e7c1 100644
+--- a/arch/arm/mach-exynos/mach-armlex4210.c
++++ b/arch/arm/mach-exynos/mach-armlex4210.c
+@@ -27,6 +27,7 @@
+ 
+ #include <mach/irqs.h>
+ #include <mach/map.h>
++#include <mach/gpio.h>
+ 
+ #include "common.h"
+ 
+diff --git a/arch/arm/mach-exynos/mach-origen.c b/arch/arm/mach-exynos/mach-origen.c
+index d1849d1..72650e2 100644
+--- a/arch/arm/mach-exynos/mach-origen.c
++++ b/arch/arm/mach-exynos/mach-origen.c
+@@ -47,6 +47,7 @@
+ 
+ #include <mach/map.h>
+ #include <mach/irqs.h>
++#include <mach/gpio.h>
+ 
+ #include <drm/exynos_drm.h>
+ #include "common.h"
+diff --git a/arch/arm/mach-exynos/setup-i2c0.c b/arch/arm/mach-exynos/setup-i2c0.c
+index e2d9dfb..95acd62 100644
+--- a/arch/arm/mach-exynos/setup-i2c0.c
++++ b/arch/arm/mach-exynos/setup-i2c0.c
+@@ -17,10 +17,11 @@ struct platform_device; /* don't need the contents */
+ #include <linux/platform_data/i2c-s3c2410.h>
+ #include <plat/gpio-cfg.h>
+ #include <plat/cpu.h>
++#include <mach/gpio.h>
+ 
+ void s3c_i2c0_cfg_gpio(struct platform_device *dev)
+ {
+-	if (soc_is_exynos5250() || soc_is_exynos5440())
++	if (soc_is_exynos5250() || soc_is_exynos5440() || !IS_ENABLED(CONFIG_ARCH_EXYNOS_SINGLE))
+ 		/* will be implemented with gpio function */
+ 		return;
+ 
+diff --git a/arch/arm/mach-s3c64xx/include/mach/gpio.h b/arch/arm/mach-s3c64xx/include/mach/gpio.h
+index 8b540c4..95be5b5 100644
+--- a/arch/arm/mach-s3c64xx/include/mach/gpio.h
++++ b/arch/arm/mach-s3c64xx/include/mach/gpio.h
+@@ -11,6 +11,8 @@
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software Foundation.
+ */
++#ifndef __MACH_GPIO_H
++#define __MACH_GPIO_H
+ 
+ /* GPIO bank sizes */
+ #define S3C64XX_GPIO_A_NR	(8)
+@@ -91,3 +93,5 @@ enum s3c_gpio_number {
+ #define BOARD_NR_GPIOS	(16 + CONFIG_SAMSUNG_GPIO_EXTRA)
+ 
+ #define ARCH_NR_GPIOS	(GPIO_BOARD_START + BOARD_NR_GPIOS)
++
++#endif /* __MACH_GPIO_H */
+diff --git a/arch/arm/plat-samsung/include/plat/gpio-core.h b/arch/arm/plat-samsung/include/plat/gpio-core.h
+index cf5aae5..103a958 100644
+--- a/arch/arm/plat-samsung/include/plat/gpio-core.h
++++ b/arch/arm/plat-samsung/include/plat/gpio-core.h
+@@ -101,6 +101,9 @@ extern struct samsung_gpio_chip *s3c_gpios[S3C_GPIO_END];
+ 
+ static inline struct samsung_gpio_chip *samsung_gpiolib_getchip(unsigned int chip)
+ {
++	if (!IS_ENABLED(CONFIG_ARCH_EXYNOS_SINGLE))
++		return NULL;
++
+ 	return (chip < S3C_GPIO_END) ? s3c_gpios[chip] : NULL;
+ }
+ #else
+diff --git a/arch/arm/plat-samsung/pm-gpio.c b/arch/arm/plat-samsung/pm-gpio.c
+index c2ff92c..b24c159 100644
+--- a/arch/arm/plat-samsung/pm-gpio.c
++++ b/arch/arm/plat-samsung/pm-gpio.c
+@@ -19,6 +19,7 @@
+ #include <linux/io.h>
+ #include <linux/gpio.h>
  
 +#include <mach/gpio.h>
- #include <plat/gpio-cfg.h>
--#include <plat/regs-sdhci.h>
- #include <plat/sdhci.h>
+ #include <plat/gpio-core.h>
+ #include <plat/pm.h>
  
- void exynos4_setup_sdhci0_cfg_gpio(struct platform_device *dev, int width)
-diff --git a/arch/arm/mach-s5pc100/setup-sdhci-gpio.c b/arch/arm/mach-s5pc100/setup-sdhci-gpio.c
-index 03c02d0..6010c03 100644
---- a/arch/arm/mach-s5pc100/setup-sdhci-gpio.c
-+++ b/arch/arm/mach-s5pc100/setup-sdhci-gpio.c
-@@ -19,7 +19,6 @@
- #include <linux/mmc/card.h>
- 
- #include <plat/gpio-cfg.h>
--#include <plat/regs-sdhci.h>
- #include <plat/sdhci.h>
- 
- void s5pc100_setup_sdhci0_cfg_gpio(struct platform_device *dev, int width)
-diff --git a/arch/arm/mach-s5pv210/setup-sdhci-gpio.c b/arch/arm/mach-s5pv210/setup-sdhci-gpio.c
-index 3e3ac05..0512ada 100644
---- a/arch/arm/mach-s5pv210/setup-sdhci-gpio.c
-+++ b/arch/arm/mach-s5pv210/setup-sdhci-gpio.c
-@@ -20,7 +20,6 @@
- #include <linux/mmc/card.h>
- 
- #include <plat/gpio-cfg.h>
--#include <plat/regs-sdhci.h>
- #include <plat/sdhci.h>
- 
- void s5pv210_setup_sdhci0_cfg_gpio(struct platform_device *dev, int width)
-diff --git a/arch/arm/plat-samsung/include/plat/regs-sdhci.h b/arch/arm/plat-samsung/include/plat/regs-sdhci.h
-deleted file mode 100644
-index e34049a..0000000
---- a/arch/arm/plat-samsung/include/plat/regs-sdhci.h
-+++ /dev/null
-@@ -1,87 +0,0 @@
--/* linux/arch/arm/plat-s3c/include/plat/regs-sdhci.h
-- *
-- * Copyright 2008 Openmoko, Inc.
-- * Copyright 2008 Simtec Electronics
-- *	http://armlinux.simtec.co.uk/
-- *	Ben Dooks <ben@simtec.co.uk>
-- *
-- * S3C Platform - SDHCI (HSMMC) register definitions
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
--*/
--
--#ifndef __PLAT_S3C_SDHCI_REGS_H
--#define __PLAT_S3C_SDHCI_REGS_H __FILE__
--
--#define S3C_SDHCI_CONTROL2			(0x80)
--#define S3C_SDHCI_CONTROL3			(0x84)
--#define S3C64XX_SDHCI_CONTROL4			(0x8C)
--
--#define S3C64XX_SDHCI_CTRL2_ENSTAASYNCCLR	(1 << 31)
--#define S3C64XX_SDHCI_CTRL2_ENCMDCNFMSK		(1 << 30)
--#define S3C_SDHCI_CTRL2_CDINVRXD3		(1 << 29)
--#define S3C_SDHCI_CTRL2_SLCARDOUT		(1 << 28)
--
--#define S3C_SDHCI_CTRL2_FLTCLKSEL_MASK		(0xf << 24)
--#define S3C_SDHCI_CTRL2_FLTCLKSEL_SHIFT		(24)
--#define S3C_SDHCI_CTRL2_FLTCLKSEL(_x)		((_x) << 24)
--
--#define S3C_SDHCI_CTRL2_LVLDAT_MASK		(0xff << 16)
--#define S3C_SDHCI_CTRL2_LVLDAT_SHIFT		(16)
--#define S3C_SDHCI_CTRL2_LVLDAT(_x)		((_x) << 16)
--
--#define S3C_SDHCI_CTRL2_ENFBCLKTX		(1 << 15)
--#define S3C_SDHCI_CTRL2_ENFBCLKRX		(1 << 14)
--#define S3C_SDHCI_CTRL2_SDCDSEL			(1 << 13)
--#define S3C_SDHCI_CTRL2_SDSIGPC			(1 << 12)
--#define S3C_SDHCI_CTRL2_ENBUSYCHKTXSTART	(1 << 11)
--
--#define S3C_SDHCI_CTRL2_DFCNT_MASK		(0x3 << 9)
--#define S3C_SDHCI_CTRL2_DFCNT_SHIFT		(9)
--#define S3C_SDHCI_CTRL2_DFCNT_NONE		(0x0 << 9)
--#define S3C_SDHCI_CTRL2_DFCNT_4SDCLK		(0x1 << 9)
--#define S3C_SDHCI_CTRL2_DFCNT_16SDCLK		(0x2 << 9)
--#define S3C_SDHCI_CTRL2_DFCNT_64SDCLK		(0x3 << 9)
--
--#define S3C_SDHCI_CTRL2_ENCLKOUTHOLD		(1 << 8)
--#define S3C_SDHCI_CTRL2_RWAITMODE		(1 << 7)
--#define S3C_SDHCI_CTRL2_DISBUFRD		(1 << 6)
--#define S3C_SDHCI_CTRL2_SELBASECLK_MASK		(0x3 << 4)
--#define S3C_SDHCI_CTRL2_SELBASECLK_SHIFT	(4)
--#define S3C_SDHCI_CTRL2_PWRSYNC			(1 << 3)
--#define S3C_SDHCI_CTRL2_ENCLKOUTMSKCON		(1 << 1)
--#define S3C_SDHCI_CTRL2_HWINITFIN		(1 << 0)
--
--#define S3C_SDHCI_CTRL3_FCSEL3			(1 << 31)
--#define S3C_SDHCI_CTRL3_FCSEL2			(1 << 23)
--#define S3C_SDHCI_CTRL3_FCSEL1			(1 << 15)
--#define S3C_SDHCI_CTRL3_FCSEL0			(1 << 7)
--
--#define S3C_SDHCI_CTRL3_FIA3_MASK		(0x7f << 24)
--#define S3C_SDHCI_CTRL3_FIA3_SHIFT		(24)
--#define S3C_SDHCI_CTRL3_FIA3(_x)		((_x) << 24)
--
--#define S3C_SDHCI_CTRL3_FIA2_MASK		(0x7f << 16)
--#define S3C_SDHCI_CTRL3_FIA2_SHIFT		(16)
--#define S3C_SDHCI_CTRL3_FIA2(_x)		((_x) << 16)
--
--#define S3C_SDHCI_CTRL3_FIA1_MASK		(0x7f << 8)
--#define S3C_SDHCI_CTRL3_FIA1_SHIFT		(8)
--#define S3C_SDHCI_CTRL3_FIA1(_x)		((_x) << 8)
--
--#define S3C_SDHCI_CTRL3_FIA0_MASK		(0x7f << 0)
--#define S3C_SDHCI_CTRL3_FIA0_SHIFT		(0)
--#define S3C_SDHCI_CTRL3_FIA0(_x)		((_x) << 0)
--
--#define S3C64XX_SDHCI_CONTROL4_DRIVE_MASK	(0x3 << 16)
--#define S3C64XX_SDHCI_CONTROL4_DRIVE_SHIFT	(16)
--#define S3C64XX_SDHCI_CONTROL4_DRIVE_2mA	(0x0 << 16)
--#define S3C64XX_SDHCI_CONTROL4_DRIVE_4mA	(0x1 << 16)
--#define S3C64XX_SDHCI_CONTROL4_DRIVE_7mA	(0x2 << 16)
--#define S3C64XX_SDHCI_CONTROL4_DRIVE_9mA	(0x3 << 16)
--
--#define S3C64XX_SDHCI_CONTROL4_BUSY		(1)
--
--#endif /* __PLAT_S3C_SDHCI_REGS_H */
-diff --git a/arch/arm/plat-samsung/include/plat/sdhci.h b/arch/arm/plat-samsung/include/plat/sdhci.h
-index 9b87f38..1e0aab0 100644
---- a/arch/arm/plat-samsung/include/plat/sdhci.h
-+++ b/arch/arm/plat-samsung/include/plat/sdhci.h
-@@ -18,62 +18,9 @@
- #ifndef __PLAT_S3C_SDHCI_H
- #define __PLAT_S3C_SDHCI_H __FILE__
- 
-+#include <linux/platform_data/mmc-sdhci-s3c.h>
- #include <plat/devs.h>
- 
--struct platform_device;
--struct mmc_host;
--struct mmc_card;
--struct mmc_ios;
--
--enum cd_types {
--	S3C_SDHCI_CD_INTERNAL,	/* use mmc internal CD line */
--	S3C_SDHCI_CD_EXTERNAL,	/* use external callback */
--	S3C_SDHCI_CD_GPIO,	/* use external gpio pin for CD line */
--	S3C_SDHCI_CD_NONE,	/* no CD line, use polling to detect card */
--	S3C_SDHCI_CD_PERMANENT,	/* no CD line, card permanently wired to host */
--};
--
--/**
-- * struct s3c_sdhci_platdata() - Platform device data for Samsung SDHCI
-- * @max_width: The maximum number of data bits supported.
-- * @host_caps: Standard MMC host capabilities bit field.
-- * @host_caps2: The second standard MMC host capabilities bit field.
-- * @cd_type: Type of Card Detection method (see cd_types enum above)
-- * @ext_cd_init: Initialize external card detect subsystem. Called on
-- *		 sdhci-s3c driver probe when cd_type == S3C_SDHCI_CD_EXTERNAL.
-- *		 notify_func argument is a callback to the sdhci-s3c driver
-- *		 that triggers the card detection event. Callback arguments:
-- *		 dev is pointer to platform device of the host controller,
-- *		 state is new state of the card (0 - removed, 1 - inserted).
-- * @ext_cd_cleanup: Cleanup external card detect subsystem. Called on
-- *		 sdhci-s3c driver remove when cd_type == S3C_SDHCI_CD_EXTERNAL.
-- *		 notify_func argument is the same callback as for ext_cd_init.
-- * @ext_cd_gpio: gpio pin used for external CD line, valid only if
-- *		 cd_type == S3C_SDHCI_CD_GPIO
-- * @ext_cd_gpio_invert: invert values for external CD gpio line
-- * @cfg_gpio: Configure the GPIO for a specific card bit-width
-- *
-- * Initialisation data specific to either the machine or the platform
-- * for the device driver to use or call-back when configuring gpio or
-- * card speed information.
--*/
--struct s3c_sdhci_platdata {
--	unsigned int	max_width;
--	unsigned int	host_caps;
--	unsigned int	host_caps2;
--	unsigned int	pm_caps;
--	enum cd_types	cd_type;
--
--	int		ext_cd_gpio;
--	bool		ext_cd_gpio_invert;
--	int	(*ext_cd_init)(void (*notify_func)(struct platform_device *,
--						   int state));
--	int	(*ext_cd_cleanup)(void (*notify_func)(struct platform_device *,
--						      int state));
--
--	void	(*cfg_gpio)(struct platform_device *dev, int width);
--};
--
- /* s3c_sdhci_set_platdata() - common helper for setting SDHCI platform data
-  * @pd: The default platform data for this device.
-  * @set: Pointer to the platform data to fill in.
-@@ -378,5 +325,4 @@ static inline void s3c_sdhci_setname(int id, char *name)
- 		break;
- 	}
- }
--
- #endif /* __PLAT_S3C_SDHCI_H */
-diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-index d88219e..d054744 100644
---- a/drivers/mmc/host/Kconfig
-+++ b/drivers/mmc/host/Kconfig
-@@ -180,7 +180,7 @@ config MMC_SDHCI_TEGRA
- 
- config MMC_SDHCI_S3C
- 	tristate "SDHCI support on Samsung S3C SoC"
--	depends on MMC_SDHCI && PLAT_SAMSUNG
-+	depends on MMC_SDHCI && PLAT_SAMSUNG_SINGLE
- 	help
- 	  This selects the Secure Digital Host Controller Interface (SDHCI)
- 	  often referrered to as the HSMMC block in some of the Samsung S3C
-diff --git a/drivers/mmc/host/sdhci-s3c-regs.h b/drivers/mmc/host/sdhci-s3c-regs.h
-new file mode 100644
-index 0000000..e34049a
---- /dev/null
-+++ b/drivers/mmc/host/sdhci-s3c-regs.h
-@@ -0,0 +1,87 @@
-+/* linux/arch/arm/plat-s3c/include/plat/regs-sdhci.h
-+ *
-+ * Copyright 2008 Openmoko, Inc.
-+ * Copyright 2008 Simtec Electronics
-+ *	http://armlinux.simtec.co.uk/
-+ *	Ben Dooks <ben@simtec.co.uk>
-+ *
-+ * S3C Platform - SDHCI (HSMMC) register definitions
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+#ifndef __PLAT_S3C_SDHCI_REGS_H
-+#define __PLAT_S3C_SDHCI_REGS_H __FILE__
-+
-+#define S3C_SDHCI_CONTROL2			(0x80)
-+#define S3C_SDHCI_CONTROL3			(0x84)
-+#define S3C64XX_SDHCI_CONTROL4			(0x8C)
-+
-+#define S3C64XX_SDHCI_CTRL2_ENSTAASYNCCLR	(1 << 31)
-+#define S3C64XX_SDHCI_CTRL2_ENCMDCNFMSK		(1 << 30)
-+#define S3C_SDHCI_CTRL2_CDINVRXD3		(1 << 29)
-+#define S3C_SDHCI_CTRL2_SLCARDOUT		(1 << 28)
-+
-+#define S3C_SDHCI_CTRL2_FLTCLKSEL_MASK		(0xf << 24)
-+#define S3C_SDHCI_CTRL2_FLTCLKSEL_SHIFT		(24)
-+#define S3C_SDHCI_CTRL2_FLTCLKSEL(_x)		((_x) << 24)
-+
-+#define S3C_SDHCI_CTRL2_LVLDAT_MASK		(0xff << 16)
-+#define S3C_SDHCI_CTRL2_LVLDAT_SHIFT		(16)
-+#define S3C_SDHCI_CTRL2_LVLDAT(_x)		((_x) << 16)
-+
-+#define S3C_SDHCI_CTRL2_ENFBCLKTX		(1 << 15)
-+#define S3C_SDHCI_CTRL2_ENFBCLKRX		(1 << 14)
-+#define S3C_SDHCI_CTRL2_SDCDSEL			(1 << 13)
-+#define S3C_SDHCI_CTRL2_SDSIGPC			(1 << 12)
-+#define S3C_SDHCI_CTRL2_ENBUSYCHKTXSTART	(1 << 11)
-+
-+#define S3C_SDHCI_CTRL2_DFCNT_MASK		(0x3 << 9)
-+#define S3C_SDHCI_CTRL2_DFCNT_SHIFT		(9)
-+#define S3C_SDHCI_CTRL2_DFCNT_NONE		(0x0 << 9)
-+#define S3C_SDHCI_CTRL2_DFCNT_4SDCLK		(0x1 << 9)
-+#define S3C_SDHCI_CTRL2_DFCNT_16SDCLK		(0x2 << 9)
-+#define S3C_SDHCI_CTRL2_DFCNT_64SDCLK		(0x3 << 9)
-+
-+#define S3C_SDHCI_CTRL2_ENCLKOUTHOLD		(1 << 8)
-+#define S3C_SDHCI_CTRL2_RWAITMODE		(1 << 7)
-+#define S3C_SDHCI_CTRL2_DISBUFRD		(1 << 6)
-+#define S3C_SDHCI_CTRL2_SELBASECLK_MASK		(0x3 << 4)
-+#define S3C_SDHCI_CTRL2_SELBASECLK_SHIFT	(4)
-+#define S3C_SDHCI_CTRL2_PWRSYNC			(1 << 3)
-+#define S3C_SDHCI_CTRL2_ENCLKOUTMSKCON		(1 << 1)
-+#define S3C_SDHCI_CTRL2_HWINITFIN		(1 << 0)
-+
-+#define S3C_SDHCI_CTRL3_FCSEL3			(1 << 31)
-+#define S3C_SDHCI_CTRL3_FCSEL2			(1 << 23)
-+#define S3C_SDHCI_CTRL3_FCSEL1			(1 << 15)
-+#define S3C_SDHCI_CTRL3_FCSEL0			(1 << 7)
-+
-+#define S3C_SDHCI_CTRL3_FIA3_MASK		(0x7f << 24)
-+#define S3C_SDHCI_CTRL3_FIA3_SHIFT		(24)
-+#define S3C_SDHCI_CTRL3_FIA3(_x)		((_x) << 24)
-+
-+#define S3C_SDHCI_CTRL3_FIA2_MASK		(0x7f << 16)
-+#define S3C_SDHCI_CTRL3_FIA2_SHIFT		(16)
-+#define S3C_SDHCI_CTRL3_FIA2(_x)		((_x) << 16)
-+
-+#define S3C_SDHCI_CTRL3_FIA1_MASK		(0x7f << 8)
-+#define S3C_SDHCI_CTRL3_FIA1_SHIFT		(8)
-+#define S3C_SDHCI_CTRL3_FIA1(_x)		((_x) << 8)
-+
-+#define S3C_SDHCI_CTRL3_FIA0_MASK		(0x7f << 0)
-+#define S3C_SDHCI_CTRL3_FIA0_SHIFT		(0)
-+#define S3C_SDHCI_CTRL3_FIA0(_x)		((_x) << 0)
-+
-+#define S3C64XX_SDHCI_CONTROL4_DRIVE_MASK	(0x3 << 16)
-+#define S3C64XX_SDHCI_CONTROL4_DRIVE_SHIFT	(16)
-+#define S3C64XX_SDHCI_CONTROL4_DRIVE_2mA	(0x0 << 16)
-+#define S3C64XX_SDHCI_CONTROL4_DRIVE_4mA	(0x1 << 16)
-+#define S3C64XX_SDHCI_CONTROL4_DRIVE_7mA	(0x2 << 16)
-+#define S3C64XX_SDHCI_CONTROL4_DRIVE_9mA	(0x3 << 16)
-+
-+#define S3C64XX_SDHCI_CONTROL4_BUSY		(1)
-+
-+#endif /* __PLAT_S3C_SDHCI_REGS_H */
-diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
-index 7363efe..e4f52b5 100644
---- a/drivers/mmc/host/sdhci-s3c.c
-+++ b/drivers/mmc/host/sdhci-s3c.c
-@@ -15,6 +15,7 @@
- #include <linux/delay.h>
- #include <linux/dma-mapping.h>
- #include <linux/platform_device.h>
-+#include <linux/platform_data/mmc-sdhci-s3c.h>
- #include <linux/slab.h>
- #include <linux/clk.h>
- #include <linux/io.h>
-@@ -28,9 +29,7 @@
- 
- #include <linux/mmc/host.h>
- 
--#include <plat/sdhci.h>
--#include <plat/regs-sdhci.h>
--
-+#include "sdhci-s3c-regs.h"
- #include "sdhci.h"
- 
- #define MAX_BUS_CLK	(4)
-diff --git a/include/linux/platform_data/mmc-sdhci-s3c.h b/include/linux/platform_data/mmc-sdhci-s3c.h
-new file mode 100644
-index 0000000..249f023
---- /dev/null
-+++ b/include/linux/platform_data/mmc-sdhci-s3c.h
-@@ -0,0 +1,56 @@
-+#ifndef __PLATFORM_DATA_SDHCI_S3C_H
-+#define __PLATFORM_DATA_SDHCI_S3C_H
-+
-+struct platform_device;
-+
-+enum cd_types {
-+	S3C_SDHCI_CD_INTERNAL,	/* use mmc internal CD line */
-+	S3C_SDHCI_CD_EXTERNAL,	/* use external callback */
-+	S3C_SDHCI_CD_GPIO,	/* use external gpio pin for CD line */
-+	S3C_SDHCI_CD_NONE,	/* no CD line, use polling to detect card */
-+	S3C_SDHCI_CD_PERMANENT,	/* no CD line, card permanently wired to host */
-+};
-+
-+/**
-+ * struct s3c_sdhci_platdata() - Platform device data for Samsung SDHCI
-+ * @max_width: The maximum number of data bits supported.
-+ * @host_caps: Standard MMC host capabilities bit field.
-+ * @host_caps2: The second standard MMC host capabilities bit field.
-+ * @cd_type: Type of Card Detection method (see cd_types enum above)
-+ * @ext_cd_init: Initialize external card detect subsystem. Called on
-+ *		 sdhci-s3c driver probe when cd_type == S3C_SDHCI_CD_EXTERNAL.
-+ *		 notify_func argument is a callback to the sdhci-s3c driver
-+ *		 that triggers the card detection event. Callback arguments:
-+ *		 dev is pointer to platform device of the host controller,
-+ *		 state is new state of the card (0 - removed, 1 - inserted).
-+ * @ext_cd_cleanup: Cleanup external card detect subsystem. Called on
-+ *		 sdhci-s3c driver remove when cd_type == S3C_SDHCI_CD_EXTERNAL.
-+ *		 notify_func argument is the same callback as for ext_cd_init.
-+ * @ext_cd_gpio: gpio pin used for external CD line, valid only if
-+ *		 cd_type == S3C_SDHCI_CD_GPIO
-+ * @ext_cd_gpio_invert: invert values for external CD gpio line
-+ * @cfg_gpio: Configure the GPIO for a specific card bit-width
-+ *
-+ * Initialisation data specific to either the machine or the platform
-+ * for the device driver to use or call-back when configuring gpio or
-+ * card speed information.
-+*/
-+struct s3c_sdhci_platdata {
-+	unsigned int	max_width;
-+	unsigned int	host_caps;
-+	unsigned int	host_caps2;
-+	unsigned int	pm_caps;
-+	enum cd_types	cd_type;
-+
-+	int		ext_cd_gpio;
-+	bool		ext_cd_gpio_invert;
-+	int	(*ext_cd_init)(void (*notify_func)(struct platform_device *,
-+						   int state));
-+	int	(*ext_cd_cleanup)(void (*notify_func)(struct platform_device *,
-+						      int state));
-+
-+	void	(*cfg_gpio)(struct platform_device *dev, int width);
-+};
-+
-+
-+#endif /* __PLATFORM_DATA_SDHCI_S3C_H */
+diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
+index 22e07bc..91ed0f9 100644
+--- a/drivers/gpio/Makefile
++++ b/drivers/gpio/Makefile
+@@ -57,7 +57,7 @@ obj-$(CONFIG_GPIO_PL061)	+= gpio-pl061.o
+ obj-$(CONFIG_GPIO_PXA)		+= gpio-pxa.o
+ obj-$(CONFIG_GPIO_RC5T583)	+= gpio-rc5t583.o
+ obj-$(CONFIG_GPIO_RDC321X)	+= gpio-rdc321x.o
+-obj-$(CONFIG_PLAT_SAMSUNG)	+= gpio-samsung.o
++obj-$(CONFIG_PLAT_SAMSUNG_SINGLE) += gpio-samsung.o
+ obj-$(CONFIG_ARCH_SA1100)	+= gpio-sa1100.o
+ obj-$(CONFIG_GPIO_SCH)		+= gpio-sch.o
+ obj-$(CONFIG_GPIO_SODAVILLE)	+= gpio-sodaville.o
 -- 
 1.8.1.2
