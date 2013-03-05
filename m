@@ -1,25 +1,82 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 5 Mar 2013 11:21:54 -0300
-Subject: [PATCH 1/3] ARM: dts: imx28-evk: Enable touchscreen support
-In-Reply-To: <20130305142059.GB26075@S2101-09.ap.freescale.net>
-References: <1360337803-19858-1-git-send-email-festevam@gmail.com>
- <20130304031716.GC30431@S2101-09.ap.freescale.net>
- <CAOMZO5BL5Y-N+-kJN83eh74ZU74qPwFujxzxALr3KAp4Z0XXtg@mail.gmail.com>
- <20130305142059.GB26075@S2101-09.ap.freescale.net>
-Message-ID: <CAOMZO5AyL3fFSKBUAUY-p-x5rRtuA8La3ZbYhoQrECVyo57bAA@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 5 Mar 2013 22:23:26 +0800 (HKT)
+Subject: [PATCH] ARM: mm: clean-up in order to reduce to call
+ kmap_high_get()
+In-Reply-To: <1362372609-877-1-git-send-email-iamjoonsoo.kim@lge.com>
+References: <1362372609-877-1-git-send-email-iamjoonsoo.kim@lge.com>
+Message-ID: <alpine.LFD.2.03.1303052221010.28820@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 5, 2013 at 11:21 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Tue, Mar 05, 2013 at 11:07:55AM -0300, Fabio Estevam wrote:
->> On Mon, Mar 4, 2013 at 12:17 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
->>
->> > I do not understand why.  But it seems to me that applying the patch on
->> > top of v3.9-rc1 results in a silent audio playback on my imx28-evk
->> > board.  Can you confirm that on your side?
->>
->> Just tested and I confirm I see the same issue here on 3.9-rc1.
->>
-> Ok, I drop both patches for now.
+On Mon, 4 Mar 2013, Joonsoo Kim wrote:
 
-Reverting ad76fda7 fixes the issue. Will send a patch shortly.
+> In kmap_atomic(), kmap_high_get() is invoked for checking already
+> mapped area. In __flush_dcache_page() and dma_cache_maint_page(),
+> we explicitly call kmap_high_get() before kmap_atomic()
+> when cache_is_vipt(), so kmap_high_get() can be invoked twice.
+> This is useless operation, so remove one.
+> 
+> Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+
+Acked-by: Nicolas Pitre <nico@linaro.org>
+
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index c7e3759..b7711be 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -822,16 +822,16 @@ static void dma_cache_maint_page(struct page *page, unsigned long offset,
+>  		if (PageHighMem(page)) {
+>  			if (len + offset > PAGE_SIZE)
+>  				len = PAGE_SIZE - offset;
+> -			vaddr = kmap_high_get(page);
+> -			if (vaddr) {
+> -				vaddr += offset;
+> -				op(vaddr, len, dir);
+> -				kunmap_high(page);
+> -			} else if (cache_is_vipt()) {
+> -				/* unmapped pages might still be cached */
+> +			if (cache_is_vipt()) {
+>  				vaddr = kmap_atomic(page);
+>  				op(vaddr + offset, len, dir);
+>  				kunmap_atomic(vaddr);
+> +			} else {
+> +				vaddr = kmap_high_get(page);
+> +				if (vaddr) {
+> +					op(vaddr + offset, len, dir);
+> +					kunmap_high(page);
+> +				}
+>  			}
+>  		} else {
+>  			vaddr = page_address(page) + offset;
+> diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+> index 1c8f7f5..e6a03d0 100644
+> --- a/arch/arm/mm/flush.c
+> +++ b/arch/arm/mm/flush.c
+> @@ -170,15 +170,18 @@ void __flush_dcache_page(struct address_space *mapping, struct page *page)
+>  	if (!PageHighMem(page)) {
+>  		__cpuc_flush_dcache_area(page_address(page), PAGE_SIZE);
+>  	} else {
+> -		void *addr = kmap_high_get(page);
+> -		if (addr) {
+> -			__cpuc_flush_dcache_area(addr, PAGE_SIZE);
+> -			kunmap_high(page);
+> -		} else if (cache_is_vipt()) {
+> -			/* unmapped pages might still be cached */
+> +		void *addr;
+> +
+> +		if (cache_is_vipt()) {
+>  			addr = kmap_atomic(page);
+>  			__cpuc_flush_dcache_area(addr, PAGE_SIZE);
+>  			kunmap_atomic(addr);
+> +		} else {
+> +			addr = kmap_high_get(page);
+> +			if (addr) {
+> +				__cpuc_flush_dcache_area(addr, PAGE_SIZE);
+> +				kunmap_high(page);
+> +			}
+>  		}
+>  	}
+>  
+> -- 
+> 1.7.9.5
+> 
