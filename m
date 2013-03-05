@@ -1,38 +1,38 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 5 Mar 2013 20:07:03 +0530
-Subject: [PATCH v2 8/8] ARM: dts: omap5: add dwc3 core dt data
+Date: Tue, 5 Mar 2013 20:06:57 +0530
+Subject: [PATCH v2 2/8] ARM: dts: omap: Add omap-usb2 dt data
 In-Reply-To: <1362494223-14151-1-git-send-email-kishon@ti.com>
 References: <1362494223-14151-1-git-send-email-kishon@ti.com>
-Message-ID: <1362494223-14151-9-git-send-email-kishon@ti.com>
+Message-ID: <1362494223-14151-3-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add dwc3 core dt data as a subnode to dwc3 omap glue data in omap5 dt
-data file. The information for the entered data node is available @
-Documentation/devicetree/bindings/usb/dwc3.txt
+Add omap-usb2 data node in omap4 device tree file. Since omap-usb2 is
+connected to ocp2scp, omap-usb2 dt data is added as a child node
+of ocp2scp. The information about this data node is availabe @
+Documentation/devicetree/bindings/usb/usb-phy.txt
 
+Acked-by: Felipe Balbi <balbi@ti.com>
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- arch/arm/boot/dts/omap5.dtsi |    7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/boot/dts/omap4.dtsi |    5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index c4eb2ec..24dd69f 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -514,6 +514,13 @@
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index ffc7352..c829d7e 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -438,6 +438,11 @@
  			#size-cells = <1>;
- 			utmi-mode = <2>;
  			ranges;
-+			dwc3 at 4a030000 {
-+				compatible = "synopsys,dwc3";
-+				reg = <0x4a030000 0x1000>;
-+				interrupts = <0 92 4>;
-+				usb-phy = <&usb2_phy>, <&usb3_phy>;
-+				tx-fifo-resize;
+ 			ti,hwmods = "ocp2scp_usb_phy";
++			usb2_phy: usb2phy at 4a0ad080 {
++				compatible = "ti,omap-usb2";
++				reg = <0x4a0ad080 0x58>;
++				ctrl-module = <&omap_control_usb>;
 +			};
  		};
  
- 		ocp2scp {
+ 		timer1: timer at 4a318000 {
 -- 
 1.7.10.4
