@@ -1,31 +1,43 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Tue, 5 Mar 2013 15:08:45 -0800
-Subject: [PATCH v3 -next 5/5] Kconfig: Make x86 and arm kernels default
- to the LZ4-compressed
-In-Reply-To: <5135DF44.2040806@openwrt.org>
-References: <1362484056-9778-1-git-send-email-kyungsik.lee@lge.com>
- <1362484056-9778-6-git-send-email-kyungsik.lee@lge.com>
- <5135DF44.2040806@openwrt.org>
-Message-ID: <20130305150845.0d19a2875d39dac5d03b4b62@linux-foundation.org>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Tue, 5 Mar 2013 17:12:21 -0600
+Subject: [PATCH 2/2] Arm: socfpga: pl330: Add #dma-cells for generic dma
+ binding support
+In-Reply-To: <1362375268-29405-2-git-send-email-padma.v@samsung.com>
+References: <1362375268-29405-1-git-send-email-padma.v@samsung.com>
+ <1362375268-29405-2-git-send-email-padma.v@samsung.com>
+Message-ID: <1362525141.8920.8.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 05 Mar 2013 13:04:20 +0100 Florian Fainelli <florian@openwrt.org> wrote:
-
-> Hello,
+On Mon, 2013-03-04 at 11:04 +0530, Padmavathi Venna wrote:
+> This patch adds #dma-cells property to PL330 DMA controller nodes for
+> supporting generic dma dt bindings on SOCFPGA platform. #dma-channels
+> and #dma-requests are not required now but added in advance.
 > 
-> On 03/05/2013 12:47 PM, Kyungsik Lee wrote:
-> > This patch makes x86 and arm kernels default to the LZ4-compressed
-> > to test new LZ4 code in the linux-next. This is requested by
-> > Andrew Morton.
+> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+> ---
 > 
-> I do not think making this the default is good idea, because the lz4demo 
-> utility that you need to actually compress the kernel (used in patch 2) 
-> is not installed nor available by default on most systems, while gzip 
-> is.
+> Based on Torvalds tree
+> 
+>  arch/arm/boot/dts/socfpga.dtsi |    3 +++
+>  1 files changed, 3 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+> index 936d230..7e8769b 100644
+> --- a/arch/arm/boot/dts/socfpga.dtsi
+> +++ b/arch/arm/boot/dts/socfpga.dtsi
+> @@ -75,6 +75,9 @@
+>  				compatible = "arm,pl330", "arm,primecell";
+>  				reg = <0xffe01000 0x1000>;
+>  				interrupts = <0 180 4>;
+> +				#dma-cells = <1>;
+> +				#dma-channels = <8>;
+> +				#dma-requests = <32>;
 
-Yes, that's a showstopper even for linux-next.  What a shame.
+Acked-by: Dinh Nguyen <dinguyen@altera.com?
 
-It means this code will walk into mainline with practically zero
-third-party testing.  Oh well, the risk is minor.  If it breaks, people
-can switch back to gzip easily enough.
+Thanks..
+Dinh
+>  			};
+>  		};
+>  
