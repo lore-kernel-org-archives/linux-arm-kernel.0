@@ -1,82 +1,42 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 5 Mar 2013 22:23:26 +0800 (HKT)
-Subject: [PATCH] ARM: mm: clean-up in order to reduce to call
- kmap_high_get()
-In-Reply-To: <1362372609-877-1-git-send-email-iamjoonsoo.kim@lge.com>
-References: <1362372609-877-1-git-send-email-iamjoonsoo.kim@lge.com>
-Message-ID: <alpine.LFD.2.03.1303052221010.28820@syhkavp.arg>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 5 Mar 2013 19:54:32 +0530
+Subject: Latest randconfig build errors
+In-Reply-To: <20130304095136.GI17833@n2100.arm.linux.org.uk>
+References: <20130304095136.GI17833@n2100.arm.linux.org.uk>
+Message-ID: <51360020.4050503@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 4 Mar 2013, Joonsoo Kim wrote:
-
-> In kmap_atomic(), kmap_high_get() is invoked for checking already
-> mapped area. In __flush_dcache_page() and dma_cache_maint_page(),
-> we explicitly call kmap_high_get() before kmap_atomic()
-> when cache_is_vipt(), so kmap_high_get() can be invoked twice.
-> This is useless operation, so remove one.
+On 3/4/2013 3:21 PM, Russell King - ARM Linux wrote:
+> Last nights automated ARM build found the following errors with randconfig.
 > 
-> Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
-
-Acked-by: Nicolas Pitre <nico@linaro.org>
-
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index c7e3759..b7711be 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -822,16 +822,16 @@ static void dma_cache_maint_page(struct page *page, unsigned long offset,
->  		if (PageHighMem(page)) {
->  			if (len + offset > PAGE_SIZE)
->  				len = PAGE_SIZE - offset;
-> -			vaddr = kmap_high_get(page);
-> -			if (vaddr) {
-> -				vaddr += offset;
-> -				op(vaddr, len, dir);
-> -				kunmap_high(page);
-> -			} else if (cache_is_vipt()) {
-> -				/* unmapped pages might still be cached */
-> +			if (cache_is_vipt()) {
->  				vaddr = kmap_atomic(page);
->  				op(vaddr + offset, len, dir);
->  				kunmap_atomic(vaddr);
-> +			} else {
-> +				vaddr = kmap_high_get(page);
-> +				if (vaddr) {
-> +					op(vaddr + offset, len, dir);
-> +					kunmap_high(page);
-> +				}
->  			}
->  		} else {
->  			vaddr = page_address(page) + offset;
-> diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
-> index 1c8f7f5..e6a03d0 100644
-> --- a/arch/arm/mm/flush.c
-> +++ b/arch/arm/mm/flush.c
-> @@ -170,15 +170,18 @@ void __flush_dcache_page(struct address_space *mapping, struct page *page)
->  	if (!PageHighMem(page)) {
->  		__cpuc_flush_dcache_area(page_address(page), PAGE_SIZE);
->  	} else {
-> -		void *addr = kmap_high_get(page);
-> -		if (addr) {
-> -			__cpuc_flush_dcache_area(addr, PAGE_SIZE);
-> -			kunmap_high(page);
-> -		} else if (cache_is_vipt()) {
-> -			/* unmapped pages might still be cached */
-> +		void *addr;
-> +
-> +		if (cache_is_vipt()) {
->  			addr = kmap_atomic(page);
->  			__cpuc_flush_dcache_area(addr, PAGE_SIZE);
->  			kunmap_atomic(addr);
-> +		} else {
-> +			addr = kmap_high_get(page);
-> +			if (addr) {
-> +				__cpuc_flush_dcache_area(addr, PAGE_SIZE);
-> +				kunmap_high(page);
-> +			}
->  		}
->  	}
->  
-> -- 
-> 1.7.9.5
+> All information as usual at http://www.arm.linux.org.uk/developer/build/
 > 
+> 
+> Versatile randconfig:
+> 
+> ERROR: "irq_domain_add_simple" [drivers/gpio/gpio-em.ko] undefined!
+> 
+> OMAP4430 randconfig:
+
+> The last three are caused by incorrect use of 'select':
+> 
+> warning: (MACH_OMAP_ZOOM2 && MACH_OMAP_ZOOM3 && MWAVE) selects SERIAL_8250 which has unmet direct dependencies (TTY && HAS_IOMEM && GENERIC_HARDIRQS)
+> warning: (USB_MUSB_HDRC) selects TWL4030_USB which has unmet direct dependencies (USB_SUPPORT && (USB || USB_GADGET) && TWL4030_CORE && REGULATOR_TWL4030 && USB_MUSB_OMAP2PLUS)
+> warning: (USB_MUSB_HDRC) selects TWL6030_USB which has unmet direct dependencies (USB_SUPPORT && (USB || USB_GADGET) && TWL4030_CORE && OMAP_USB2 && USB_MUSB_OMAP2PLUS)
+> warning: (MACH_OMAP_ZOOM2 && MACH_OMAP_ZOOM3) selects SERIAL_8250_CONSOLE which has unmet direct dependencies (TTY && HAS_IOMEM && GENERIC_HARDIRQS && SERIAL_8250=y)
+> warning: (MACH_OMAP_ZOOM2 && MACH_OMAP_ZOOM3) selects SERIAL_CORE_CONSOLE which has unmet direct dependencies (TTY && HAS_IOMEM && GENERIC_HARDIRQS)
+> warning: (VIDEO_DM6446_CCDC && VIDEO_DM355_CCDC && VIDEO_ISIF && VIDEO_DAVINCI_VPBE_DISPLAY) selects VIDEO_VPSS_SYSTEM which has unmet direct dependencies (MEDIA_SUPPORT && V4L_PLATFORM_DRIVERS && ARCH_DAVINCI)
+> warning: (MACH_OMAP_ZOOM2 && MACH_OMAP_ZOOM3 && MWAVE) selects SERIAL_8250 which has unmet direct dependencies (TTY && HAS_IOMEM && GENERIC_HARDIRQS)
+> warning: (USB_MUSB_HDRC) selects TWL4030_USB which has unmet direct dependencies (USB_SUPPORT && (USB || USB_GADGET) && TWL4030_CORE && OMAP_USB2 && USB_MUSB_OMAP2PLUS)
+> warning: (MACH_OMAP_ZOOM2 && MACH_OMAP_ZOOM3) selects SERIAL_8250_CONSOLE which has unmet direct dependencies (TTY && HAS_IOMEM && GENERIC_HARDIRQS && SERIAL_8250=y)
+> warning: (MACH_OMAP_ZOOM2 && MACH_OMAP_ZOOM3) selects SERIAL_CORE_CONSOLE which has unmet direct dependencies (TTY && HAS_IOMEM && GENERIC_HARDIRQS)
+> warning: (VIDEO_DM6446_CCDC && VIDEO_DM355_CCDC && VIDEO_ISIF && VIDEO_DAVINCI_VPBE_DISPLAY) selects VIDEO_VPSS_SYSTEM which has unmet direct dependencies (MEDIA_SUPPORT && V4L_PLATFORM_DRIVERS && ARCH_DAVINCI)
+
+I submitted a patch to the media guys for the DaVinci media driver
+related issues.
+
+http://linux.davincidsp.com/pipermail/davinci-linux-open-source/2013-March/026559.html
+
+Thanks,
+Sekhar
