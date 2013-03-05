@@ -1,103 +1,93 @@
-From: ian.campbell@citrix.com (Ian Campbell)
-Date: Tue, 5 Mar 2013 03:56:41 +0000
-Subject: [PATCH LINUX v5] xen: event channel arrays are xen_ulong_t and
- not unsigned long
-In-Reply-To: <51340ACD.70904@gmail.com>
-References: <1361285327.1051.115.camel@zakaz.uk.xensource.com>
- <1361360886-2956-1-git-send-email-ian.campbell@citrix.com>
- <51340ACD.70904@gmail.com>
-Message-ID: <1362455801.8941.24.camel@hastur.hellion.org.uk>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Tue, 5 Mar 2013 13:33:30 +0900
+Subject: [PATCH v4 2/3] ARM: mach-shmobile: r8a7779: add SATA support
+In-Reply-To: <20130305020529.GH16128@verge.net.au>
+References: <201302272339.15402.sergei.shtylyov@cogentembedded.com>
+ <20130301014148.GB9232@quad.lixom.net>
+ <20130301072345.GD14376@verge.net.au>
+ <CANqRtoR2kZ2+GfVqPc0EbO2+4AFvvXtugQAyZX1RC3=qRT2HEA@mail.gmail.com>
+ <20130305020529.GH16128@verge.net.au>
+Message-ID: <CANqRtoSRiY5KXyhfhuu55fSNJN-ocvUFWqEAeH5H2+Mna-SQ9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > diff --git a/arch/arm/include/asm/xen/events.h b/arch/arm/include/asm/xen/events.h
-> > index 94b4e90..5c27696 100644
-> > --- a/arch/arm/include/asm/xen/events.h
-> > +++ b/arch/arm/include/asm/xen/events.h
-> > @@ -15,4 +15,26 @@ static inline int xen_irqs_disabled(struct pt_regs *regs)
-> >  	return raw_irqs_disabled_flags(regs->ARM_cpsr);
-> >  }
-> >  
-> > +/*
-> > + * We cannot use xchg because it does not support 8-byte
-> > + * values. However it is safe to use {ldr,dtd}exd directly because all
-> > + * platforms which Xen can run on support those instructions.
-> 
-> Why does atomic64_cmpxchg not work here?
+On Tue, Mar 5, 2013 at 11:05 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Tue, Mar 05, 2013 at 10:28:09AM +0900, Magnus Damm wrote:
+>> Hi Simon
+>>
+>> On Fri, Mar 1, 2013 at 4:23 PM, Simon Horman <horms@verge.net.au> wrote:
+>> > On Thu, Feb 28, 2013 at 05:41:48PM -0800, Olof Johansson wrote:
+>> >> On Wed, Feb 27, 2013 at 11:39:14PM +0300, Sergei Shtylyov wrote:
+>> >> > From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+>> >> >
+>> >> > Add SATA clock for r8a7779 SoC (for both device tree and usual cases).
+>> >> > Register SATA controller as a "late" platform device on r8a7779 SoC.
+>> >>
+>> >> Hi,
+>> >>
+>> >> If you have the a binding in the device tree (which you do through patch 1/3),
+>> >> then there's no reason to have a platform device for it.
+>> >
+>> > Hi Olof,
+>> >
+>> > the DT exists but currently the marzen board brings up all
+>> > of its devices using platform devices. Which if nothing else is
+>> > internally consistent.
+>> >
+>> > I suppose it would be possible to add a call to
+>> > r8a7779_add_standard_devices_dt() and have the board bring
+>> > up this device using DT and the rest using platform drivers
+>> > (until the drivers are migrated to DT).
+>> >
+>> > Would that be your preferred option?
+>> >
+>> > Magnus, how do you feel about this idea?
+>>
+>> I fail to see the upside I'm afraid.
+>>
+>> I believe the best way forward is for us to keep on following the same
+>> style as we have done so far. So for drivers they should begin by
+>> interfacing as regular platform devices drivers and then add DT
+>> support incrementally. This allows us to try out things in a non-ABI
+>> kind of way and it also allows us to add support for various hardware
+>> feature that do not yet support DT like in the case of DMA Engine.
+>> With platform devices we can also use the driver with the SH
+>> architecture.
+>
+> Sure, but in this case the DT bindings are set (by virtue of having been
+> merged) and it is my understanding that they offer the same features as
+> the platform device.
 
-Just that we don't want/need the cmp aspect, we don't mind if an extra
-bit gets set as we read the value, so long as we atomically read and set
-to zero.
+And if we want to add an experimental feature, how do you suggest we proceed?
 
-> > + */
-> > +static inline xen_ulong_t xchg_xen_ulong(xen_ulong_t *ptr, xen_ulong_t val)
-> > +{
-> > +	xen_ulong_t oldval;
-> > +	unsigned int tmp;
-> > +
-> > +	wmb();
-> 
-> Based on atomic64_cmpxchg implementation, you could use smp_mb here
-> which avoids an outer cache flush.
+> As it is a new device driver I lean towards Olof's suggestion.
+>
+>> You can of course do some mixed DT and platform device support on a
+>> board-level, but I don't really see what would be good about it.
+>> Actually, I believe that will just make things overly complicated
+>> without giving us the possibility to try out certain experimental
+>> features with platform-device-only interface.
+>
+> I think that what would be good about it is:
+>
+> * The DT code would be exercised by people using the default board file.
+> * The platform device would not need to be added.
 
-Good point.
+Sure. It is however just a couple of lines of data. Also, this
+bypasses the idea of the -reference boards, but hey.
 
-> > +	asm volatile("@ xchg_xen_ulong\n"
-> > +		"1:     ldrexd  %0, %H0, [%3]\n"
-> > +		"       strexd  %1, %2, %H2, [%3]\n"
-> > +		"       teq     %1, #0\n"
-> > +		"       bne     1b"
-> > +		: "=&r" (oldval), "=&r" (tmp)
-> > +		: "r" (val), "r" (ptr)
-> > +		: "memory", "cc");
-> 
-> And a smp_mb is needed here.
+>> Of course Simon, if you prefer to follow your proposal above then go
+>> ahead. However, please consider the case when this code will be back
+>> ported to LTSI-3.4.
+>
+> With regards to backporting, the platform driver patch still exists
+> (e.g. on the ML) so it can be used for backporting as needed.
 
-I think for the specific caller which we have here it isn't strictly
-necessary, but for generic correctness I think you are right.
+And then there will be different code paths in the back port and in
+the upstream code.
 
-Thanks for reviewing.
+Well, well.
 
-Konrad, IIRC you have already picked this up (and sent to Linus?) so an
-incremental fix is required? See below.
+Thanks,
 
-Ian.
-
-8<------------------------------------
-
->From 4ed928274dad4c3ed610e769b2ae11eb2d1ea433 Mon Sep 17 00:00:00 2001
-From: Ian Campbell <ijc@hellion.org.uk>
-Date: Tue, 5 Mar 2013 03:37:23 +0000
-Subject: [PATCH] arm: xen: correct barriers in xchg_xen_ulong
-
-We can use an smp_wmb rather than a wmb here and we also need one after the
-exchange. Spotted by Rob Herring.
-
-Signed-off-by: Ian Campbell <ijc@hellion.org.uk>
----
- arch/arm/include/asm/xen/events.h |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/include/asm/xen/events.h b/arch/arm/include/asm/xen/events.h
-index 5c27696..0e1f59e 100644
---- a/arch/arm/include/asm/xen/events.h
-+++ b/arch/arm/include/asm/xen/events.h
-@@ -25,7 +25,7 @@ static inline xen_ulong_t xchg_xen_ulong(xen_ulong_t *ptr, xen_ulong_t val)
- 	xen_ulong_t oldval;
- 	unsigned int tmp;
- 
--	wmb();
-+	smp_wmb();
- 	asm volatile("@ xchg_xen_ulong\n"
- 		"1:     ldrexd  %0, %H0, [%3]\n"
- 		"       strexd  %1, %2, %H2, [%3]\n"
-@@ -34,6 +34,7 @@ static inline xen_ulong_t xchg_xen_ulong(xen_ulong_t *ptr, xen_ulong_t val)
- 		: "=&r" (oldval), "=&r" (tmp)
- 		: "r" (val), "r" (ptr)
- 		: "memory", "cc");
-+	smp_wmb();
- 	return oldval;
- }
- 
--- 
-1.7.10.4
+/ magnus
