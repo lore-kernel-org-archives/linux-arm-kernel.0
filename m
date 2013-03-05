@@ -1,70 +1,21 @@
-From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Tue, 5 Mar 2013 09:04:52 -0500
-Subject: [PATCH LINUX v5] xen: event channel arrays are xen_ulong_t and
- not unsigned long
-In-Reply-To: <1362455801.8941.24.camel@hastur.hellion.org.uk>
-References: <1361285327.1051.115.camel@zakaz.uk.xensource.com>
- <1361360886-2956-1-git-send-email-ian.campbell@citrix.com>
- <51340ACD.70904@gmail.com>
- <1362455801.8941.24.camel@hastur.hellion.org.uk>
-Message-ID: <20130305140452.GE2589@phenom.dumpdata.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 5 Mar 2013 11:07:55 -0300
+Subject: [PATCH 1/3] ARM: dts: imx28-evk: Enable touchscreen support
+In-Reply-To: <20130304031716.GC30431@S2101-09.ap.freescale.net>
+References: <1360337803-19858-1-git-send-email-festevam@gmail.com>
+ <20130304031716.GC30431@S2101-09.ap.freescale.net>
+Message-ID: <CAOMZO5BL5Y-N+-kJN83eh74ZU74qPwFujxzxALr3KAp4Z0XXtg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 05, 2013 at 03:56:41AM +0000, Ian Campbell wrote:
-> > > diff --git a/arch/arm/include/asm/xen/events.h b/arch/arm/include/asm/xen/events.h
-> > > index 94b4e90..5c27696 100644
-> > > --- a/arch/arm/include/asm/xen/events.h
-> > > +++ b/arch/arm/include/asm/xen/events.h
-> > > @@ -15,4 +15,26 @@ static inline int xen_irqs_disabled(struct pt_regs *regs)
-> > >  	return raw_irqs_disabled_flags(regs->ARM_cpsr);
-> > >  }
-> > >  
-> > > +/*
-> > > + * We cannot use xchg because it does not support 8-byte
-> > > + * values. However it is safe to use {ldr,dtd}exd directly because all
-> > > + * platforms which Xen can run on support those instructions.
-> > 
-> > Why does atomic64_cmpxchg not work here?
-> 
-> Just that we don't want/need the cmp aspect, we don't mind if an extra
-> bit gets set as we read the value, so long as we atomically read and set
-> to zero.
-> 
-> > > + */
-> > > +static inline xen_ulong_t xchg_xen_ulong(xen_ulong_t *ptr, xen_ulong_t val)
-> > > +{
-> > > +	xen_ulong_t oldval;
-> > > +	unsigned int tmp;
-> > > +
-> > > +	wmb();
-> > 
-> > Based on atomic64_cmpxchg implementation, you could use smp_mb here
-> > which avoids an outer cache flush.
-> 
-> Good point.
-> 
-> > > +	asm volatile("@ xchg_xen_ulong\n"
-> > > +		"1:     ldrexd  %0, %H0, [%3]\n"
-> > > +		"       strexd  %1, %2, %H2, [%3]\n"
-> > > +		"       teq     %1, #0\n"
-> > > +		"       bne     1b"
-> > > +		: "=&r" (oldval), "=&r" (tmp)
-> > > +		: "r" (val), "r" (ptr)
-> > > +		: "memory", "cc");
-> > 
-> > And a smp_mb is needed here.
-> 
-> I think for the specific caller which we have here it isn't strictly
-> necessary, but for generic correctness I think you are right.
-> 
-> Thanks for reviewing.
-> 
-> Konrad, IIRC you have already picked this up (and sent to Linus?) so an
+On Mon, Mar 4, 2013 at 12:17 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
 
-Yes.
-> incremental fix is required? See below.
+> I do not understand why.  But it seems to me that applying the patch on
+> top of v3.9-rc1 results in a silent audio playback on my imx28-evk
+> board.  Can you confirm that on your side?
 
-Why don't I wait a bit and wait until you are back from conferences and
-can post a nice series that fixes the smp_wmb() and also the atomic one
-and has been run-time tested with Xen on ARM.
+Just tested and I confirm I see the same issue here on 3.9-rc1.
+
+However, when applying the touchscreen support on top of 3.8 (from
+this tree https://github.com/Freescale/linux-mainline/commits/patches-3.8
+) both touch and audio work as expected.
