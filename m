@@ -1,35 +1,33 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  5 Mar 2013 03:47:26 +0000
-Subject: [PATCH 10/29] arm64: KVM: Cortex-A57 specific system registers
- handling
+Date: Tue,  5 Mar 2013 03:47:27 +0000
+Subject: [PATCH 11/29] arm64: KVM: virtual CPU reset
 In-Reply-To: <1362455265-24165-1-git-send-email-marc.zyngier@arm.com>
 References: <1362455265-24165-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1362455265-24165-11-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1362455265-24165-12-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the support code for Cortex-A57 specific system registers.
+Provide the reset code for a virtual CPU booted in 64bit mode.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/sys_regs_a57.c | 96 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 96 insertions(+)
- create mode 100644 arch/arm64/kvm/sys_regs_a57.c
+ arch/arm64/kvm/reset.c | 63 ++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 63 insertions(+)
+ create mode 100644 arch/arm64/kvm/reset.c
 
-diff --git a/arch/arm64/kvm/sys_regs_a57.c b/arch/arm64/kvm/sys_regs_a57.c
+diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
 new file mode 100644
-index 0000000..dcc88fe
+index 0000000..3ac2f20
 --- /dev/null
-+++ b/arch/arm64/kvm/sys_regs_a57.c
-@@ -0,0 +1,96 @@
++++ b/arch/arm64/kvm/reset.c
+@@ -0,0 +1,63 @@
 +/*
 + * Copyright (C) 2012 - ARM Ltd
 + * Author: Marc Zyngier <marc.zyngier@arm.com>
 + *
-+ * Based on arch/arm/kvm/coproc_a15.c:
++ * Derived from arch/arm/kvm/reset.c
 + * Copyright (C) 2012 - Virtual Open Systems and Columbia University
-+ * Authors: Rusty Russell <rusty@rustcorp.au>
-+ *          Christoffer Dall <c.dall@virtualopensystems.com>
++ * Author: Christoffer Dall <c.dall@virtualopensystems.com>
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License, version 2, as
@@ -43,80 +41,48 @@ index 0000000..dcc88fe
 + * You should have received a copy of the GNU General Public License
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
++
++#include <linux/errno.h>
 +#include <linux/kvm_host.h>
++#include <linux/kvm.h>
++
 +#include <asm/cputype.h>
++#include <asm/ptrace.h>
 +#include <asm/kvm_arm.h>
-+#include <asm/kvm_asm.h>
-+#include <asm/kvm_host.h>
-+#include <asm/kvm_emulate.h>
 +#include <asm/kvm_coproc.h>
-+#include <linux/init.h>
-+
-+#include "sys_regs.h"
-+
-+#define MPIDR_EL1_AFF0_MASK	0xff
-+
-+static void reset_mpidr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
-+{
-+	/*
-+	 * Simply map the vcpu_id into the Aff0 field of the MPIDR.
-+	 */
-+	vcpu->arch.sys_regs[MPIDR_EL1] = (1 << 31) | (vcpu->vcpu_id & MPIDR_EL1_AFF0_MASK);
-+}
-+
-+static bool access_actlr(struct kvm_vcpu *vcpu,
-+			 const struct sys_reg_params *p,
-+			 const struct sys_reg_desc *r)
-+{
-+	if (p->is_write)
-+		return ignore_write(vcpu, p);
-+
-+	*vcpu_reg(vcpu, p->Rt) = vcpu->arch.sys_regs[ACTLR_EL1];
-+	return true;
-+}
-+
-+static void reset_actlr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
-+{
-+	u64 actlr;
-+
-+	asm volatile("mrs %0, actlr_el1\n" : "=r" (actlr));
-+	vcpu->arch.sys_regs[ACTLR_EL1] = actlr;
-+}
 +
 +/*
-+ * A57-specific sys-reg registers.
-+ * Important: Must be sorted ascending by Op0, Op1, CRn, CRm, Op2
++ * ARMv8 Reset Values
 + */
-+static const struct sys_reg_desc a57_sys_regs[] = {
-+	{ Op0(0b11), Op1(0b000), CRn(0b0000), CRm(0b0000), Op2(0b101), /* MPIDR_EL1 */
-+	  NULL, reset_mpidr, MPIDR_EL1 },
-+	{ Op0(0b11), Op1(0b000), CRn(0b0001), CRm(0b0000), Op2(0b000), /* SCTLR_EL1 */
-+	  NULL, reset_val, SCTLR_EL1, 0x00C50078 },
-+	{ Op0(0b11), Op1(0b000), CRn(0b0001), CRm(0b0000), Op2(0b001), /* ACTLR_EL1 */
-+	  access_actlr, reset_actlr, ACTLR_EL1 },
-+	{ Op0(0b11), Op1(0b000), CRn(0b0001), CRm(0b0000), Op2(0b010), /* CPACR_EL1 */
-+	  NULL, reset_val, CPACR_EL1, 0 },
++static struct kvm_regs default_regs_reset = {
++	.regs.pstate = PSR_MODE_EL1h | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT,
 +};
 +
-+static struct kvm_sys_reg_target_table a57_target_table = {
-+	.target = KVM_ARM_TARGET_CORTEX_A57,
-+	.table64 = {
-+		.table = a57_sys_regs,
-+		.num = ARRAY_SIZE(a57_sys_regs),
-+	},
-+};
-+
-+static int __init sys_reg_a57_init(void)
++/**
++ * kvm_reset_vcpu - sets core registers and sys_regs to reset value
++ * @vcpu: The VCPU pointer
++ *
++ * This function finds the right table above and sets the registers on
++ * the virtual CPU struct to their architectually defined reset
++ * values.
++ */
++int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
 +{
-+	unsigned int i;
++	struct kvm_regs *cpu_reset;
 +
-+	for (i = 1; i < ARRAY_SIZE(a57_sys_regs); i++)
-+		BUG_ON(cmp_sys_reg(&a57_sys_regs[i-1],
-+			       &a57_sys_regs[i]) >= 0);
++	switch (vcpu->arch.target) {
++	default:
++		cpu_reset = &default_regs_reset;
++		break;
++	}
 +
-+	kvm_register_target_sys_reg_table(&a57_target_table);
++	/* Reset core registers */
++	memcpy(&vcpu->arch.regs, cpu_reset, sizeof(vcpu->arch.regs));
++
++	/* Reset system registers */
++	kvm_reset_sys_regs(vcpu);
++
 +	return 0;
 +}
-+late_initcall(sys_reg_a57_init);
 -- 
 1.7.12.4
