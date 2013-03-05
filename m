@@ -1,94 +1,61 @@
 From: mporter@ti.com (Matt Porter)
-Date: Tue,  5 Mar 2013 15:53:13 -0500
-Subject: [PATCH v8 7/9] spi: omap2-mcspi: convert to
- dma_request_slave_channel_compat()
+Date: Tue,  5 Mar 2013 15:53:14 -0500
+Subject: [PATCH v8 8/9] spi: omap2-mcspi: add generic DMA request support to
+ the DT binding
 In-Reply-To: <1362516795-6346-1-git-send-email-mporter@ti.com>
 References: <1362516795-6346-1-git-send-email-mporter@ti.com>
-Message-ID: <1362516795-6346-8-git-send-email-mporter@ti.com>
+Message-ID: <1362516795-6346-9-git-send-email-mporter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert dmaengine channel requests to use
-dma_request_slave_channel_compat(). This supports the DT case of
-platforms requiring channel selection from either the OMAP DMA or
-the EDMA engine. AM33xx only boots from DT and is the only user
-implementing EDMA so in the !DT case we can default to the OMAP DMA
-filter.
+The binding definition is based on the generic DMA request binding
 
 Signed-off-by: Matt Porter <mporter@ti.com>
-Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 ---
- drivers/spi/spi-omap2-mcspi.c |   27 ++++++++++++++++++++-------
- 1 file changed, 20 insertions(+), 7 deletions(-)
+ Documentation/devicetree/bindings/spi/omap-spi.txt |   27 +++++++++++++++++++-
+ 1 file changed, 26 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/spi/spi-omap2-mcspi.c b/drivers/spi/spi-omap2-mcspi.c
-index 893c3d7..38d0915 100644
---- a/drivers/spi/spi-omap2-mcspi.c
-+++ b/drivers/spi/spi-omap2-mcspi.c
-@@ -102,6 +102,9 @@ struct omap2_mcspi_dma {
+diff --git a/Documentation/devicetree/bindings/spi/omap-spi.txt b/Documentation/devicetree/bindings/spi/omap-spi.txt
+index 938809c..4c85c4c 100644
+--- a/Documentation/devicetree/bindings/spi/omap-spi.txt
++++ b/Documentation/devicetree/bindings/spi/omap-spi.txt
+@@ -10,7 +10,18 @@ Required properties:
+ 			  input. The default is D0 as input and
+ 			  D1 as output.
  
- 	struct completion dma_tx_completion;
- 	struct completion dma_rx_completion;
+-Example:
++Optional properties:
++- dmas: List of DMA specifiers with the controller specific format
++	as described in the generic DMA client binding. A tx and rx
++	specifier is required for each chip select.
++- dma-names: List of DMA request names. These strings correspond
++	1:1 with the DMA specifiers listed in dmas. The string naming
++	is to be "rxN" and "txN" for RX and TX requests,
++	respectively, where N equals the chip select number.
 +
-+	char dma_rx_ch_name[14];
-+	char dma_tx_ch_name[14];
++Examples:
++
++[hwmod populated DMA resources]
+ 
+ mcspi1: mcspi at 1 {
+     #address-cells = <1>;
+@@ -20,3 +31,17 @@ mcspi1: mcspi at 1 {
+     ti,spi-num-cs = <4>;
  };
  
- /* use PIO for small transfers, avoiding DMA setup/teardown overhead and
-@@ -822,14 +825,23 @@ static int omap2_mcspi_request_dma(struct spi_device *spi)
- 	dma_cap_zero(mask);
- 	dma_cap_set(DMA_SLAVE, mask);
- 	sig = mcspi_dma->dma_rx_sync_dev;
--	mcspi_dma->dma_rx = dma_request_channel(mask, omap_dma_filter_fn, &sig);
++[generic DMA request binding]
 +
-+	mcspi_dma->dma_rx =
-+		dma_request_slave_channel_compat(mask, omap_dma_filter_fn,
-+						 &sig, &master->dev,
-+						 mcspi_dma->dma_rx_ch_name);
-+
- 	if (!mcspi_dma->dma_rx) {
- 		dev_err(&spi->dev, "no RX DMA engine channel for McSPI\n");
- 		return -EAGAIN;
- 	}
- 
- 	sig = mcspi_dma->dma_tx_sync_dev;
--	mcspi_dma->dma_tx = dma_request_channel(mask, omap_dma_filter_fn, &sig);
-+	mcspi_dma->dma_tx =
-+		dma_request_slave_channel_compat(mask, omap_dma_filter_fn,
-+						 &sig, &master->dev,
-+						 mcspi_dma->dma_tx_ch_name);
-+
- 	if (!mcspi_dma->dma_tx) {
- 		dev_err(&spi->dev, "no TX DMA engine channel for McSPI\n");
- 		dma_release_channel(mcspi_dma->dma_rx);
-@@ -1240,12 +1252,13 @@ static int omap2_mcspi_probe(struct platform_device *pdev)
- 		goto free_master;
- 
- 	for (i = 0; i < master->num_chipselect; i++) {
--		char dma_ch_name[14];
-+		char *dma_rx_ch_name = mcspi->dma_channels[i].dma_rx_ch_name;
-+		char *dma_tx_ch_name = mcspi->dma_channels[i].dma_tx_ch_name;
- 		struct resource *dma_res;
- 
--		sprintf(dma_ch_name, "rx%d", i);
-+		sprintf(dma_rx_ch_name, "rx%d", i);
- 		dma_res = platform_get_resource_byname(pdev, IORESOURCE_DMA,
--				dma_ch_name);
-+				dma_rx_ch_name);
- 		if (!dma_res) {
- 			dev_dbg(&pdev->dev, "cannot get DMA RX channel\n");
- 			status = -ENODEV;
-@@ -1253,9 +1266,9 @@ static int omap2_mcspi_probe(struct platform_device *pdev)
- 		}
- 
- 		mcspi->dma_channels[i].dma_rx_sync_dev = dma_res->start;
--		sprintf(dma_ch_name, "tx%d", i);
-+		sprintf(dma_tx_ch_name, "tx%d", i);
- 		dma_res = platform_get_resource_byname(pdev, IORESOURCE_DMA,
--				dma_ch_name);
-+				dma_tx_ch_name);
- 		if (!dma_res) {
- 			dev_dbg(&pdev->dev, "cannot get DMA TX channel\n");
- 			status = -ENODEV;
++mcspi1: mcspi at 1 {
++    #address-cells = <1>;
++    #size-cells = <0>;
++    compatible = "ti,omap4-mcspi";
++    ti,hwmods = "mcspi1";
++    ti,spi-num-cs = <2>;
++    dmas = <&edma 42
++	    &edma 43
++	    &edma 44
++	    &edma 45>;
++    dma-names = "tx0", "rx0", "tx1", "rx1";
++};
 -- 
 1.7.9.5
