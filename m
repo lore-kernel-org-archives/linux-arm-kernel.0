@@ -1,74 +1,53 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Tue, 05 Mar 2013 19:51:06 +0100
-Subject: [PATCH] ARM: EXYNOS: remove EXYNOS_DEV_SYSMMU entirely
-Message-ID: <1362509466.16460.108.camel@x61.thuisdomein>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 05 Mar 2013 11:54:31 -0700
+Subject: [PATCH 05/10] ARM: dt: tegra: add bindings of power management
+ configurations for PMC
+In-Reply-To: <1362397241-5786-1-git-send-email-josephl@nvidia.com>
+References: <1362397241-5786-1-git-send-email-josephl@nvidia.com>
+Message-ID: <51363F67.8040200@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 25e9d28d927d2e1731df53f60cde53d75bcb7c36 ("ARM: EXYNOS: remove
-system mmu initialization from exynos tree") removed the Kconfig symbol
-EXYNOS_DEV_SYSMMU. Remove its last traces too.
+On 03/04/2013 04:40 AM, Joseph Lo wrote:
+> The PMC mostly controls the entry and exit of the system from different
+> sleep modes. Different platform or system may have different configurations.
+> The power management configurations of PMC is represented as some properties.
+> The system needs to define the properties when the system supports deep sleep
+> mode (i.e. suspend).
 
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
----
-0) Untested.
+One overall question here: For LP0, the idea is that the bootloader
+provides the AVP boot code, puts it in RAM, passes the address to the
+kernel, which then arranges for that code to be executed when the system
+resumes from LP0. Why does the bootloader have to provide the code? Why
+can't the AVP code simply be part of the kernel, just like e.g. the main
+CPU's hotplug/secondary-power-on/power-saving reset vector is part of
+the kernel? If we did that, it'd remove any need for bootloader support
+for LP0 - the kernel would manage it entirely internally. That seems
+much simpler.
 
-1) Please note that this patch changes the dependencies of EXYNOS_IOMMU
-(it removed a dependency that could never be met). That's probably what
-needs to be done but some specific review is needed here.
+> diff --git a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
 
- arch/arm/mach-exynos/Kconfig | 4 ----
- drivers/iommu/Kconfig        | 2 +-
- 2 files changed, 1 insertion(+), 5 deletions(-)
+> +Optional properties:
+...
+> +  2 (LP2): CPU voltage off
 
-diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-index 70f94c8..6c2bdc3 100644
---- a/arch/arm/mach-exynos/Kconfig
-+++ b/arch/arm/mach-exynos/Kconfig
-@@ -200,7 +200,6 @@ config MACH_SMDKV310
- 	select EXYNOS4_SETUP_USB_PHY
- 	select EXYNOS_DEV_DMA
- 	select EXYNOS_DEV_DRM
--	select EXYNOS_DEV_SYSMMU
- 	select S3C24XX_PWM
- 	select S3C_DEV_HSMMC
- 	select S3C_DEV_HSMMC1
-@@ -254,7 +253,6 @@ config MACH_UNIVERSAL_C210
- 	select EXYNOS4_SETUP_USB_PHY
- 	select EXYNOS_DEV_DMA
- 	select EXYNOS_DEV_DRM
--	select EXYNOS_DEV_SYSMMU
- 	select HAVE_SCHED_CLOCK
- 	select S3C_DEV_HSMMC
- 	select S3C_DEV_HSMMC2
-@@ -331,7 +329,6 @@ config MACH_ORIGEN
- 	select EXYNOS4_SETUP_USB_PHY
- 	select EXYNOS_DEV_DMA
- 	select EXYNOS_DEV_DRM
--	select EXYNOS_DEV_SYSMMU
- 	select S3C24XX_PWM
- 	select S3C_DEV_HSMMC
- 	select S3C_DEV_HSMMC2
-@@ -367,7 +364,6 @@ config MACH_SMDK4212
- 	select EXYNOS4_SETUP_USB_PHY
- 	select EXYNOS_DEV_DMA
- 	select EXYNOS_DEV_DRM
--	select EXYNOS_DEV_SYSMMU
- 	select S3C24XX_PWM
- 	select S3C_DEV_HSMMC2
- 	select S3C_DEV_HSMMC3
-diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-index 5c514d07..c520c20 100644
---- a/drivers/iommu/Kconfig
-+++ b/drivers/iommu/Kconfig
-@@ -168,7 +168,7 @@ config TEGRA_IOMMU_SMMU
- 
- config EXYNOS_IOMMU
- 	bool "Exynos IOMMU Support"
--	depends on ARCH_EXYNOS && EXYNOS_DEV_SYSMMU
-+	depends on ARCH_EXYNOS
- 	select IOMMU_API
- 	help
- 	  Support for the IOMMU(System MMU) of Samsung Exynos application
--- 
-1.7.11.7
+I would create a new section here, with title something like:
+
+Required properties when nvidia,suspend-mode is specified:
+
+> +- nvidia,cpu-pwr-good-time : CPU power good time in uS. If not present, the
+> +  suspend function will be disabled as default.
+
+Then, for many of these properties, you can remove the text "If not
+present, the suspend function will be disabled as default.", since it's
+implicit given that these properties are required.
+
+> +Required properties when nvidia,suspend-mode=<0>:
+> +- nvidia,lp0-vec : <start length> Starting address and length of LP0 vector
+...
+> +  bring up CPU0 for resuming the system. If the suspend mode is LP0, then
+> +  this property is must to have.
+
+Again, you can remove "If the suspend mode is LP0, then this property is
+must to have.", since the property is already in a section named
+"Required properties ...".
