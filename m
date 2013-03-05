@@ -1,107 +1,103 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  5 Mar 2013 03:47:45 +0000
-Subject: [PATCH 29/29] arm64: KVM: enable initialization of a 32bit vcpu
-In-Reply-To: <1362455265-24165-1-git-send-email-marc.zyngier@arm.com>
-References: <1362455265-24165-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1362455265-24165-30-git-send-email-marc.zyngier@arm.com>
+From: ian.campbell@citrix.com (Ian Campbell)
+Date: Tue, 5 Mar 2013 03:56:41 +0000
+Subject: [PATCH LINUX v5] xen: event channel arrays are xen_ulong_t and
+ not unsigned long
+In-Reply-To: <51340ACD.70904@gmail.com>
+References: <1361285327.1051.115.camel@zakaz.uk.xensource.com>
+ <1361360886-2956-1-git-send-email-ian.campbell@citrix.com>
+ <51340ACD.70904@gmail.com>
+Message-ID: <1362455801.8941.24.camel@hastur.hellion.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wire the init of a 32bit vcpu by allowing 32bit modes in pstate,
-and providing sensible defaults out of reset state.
+> > diff --git a/arch/arm/include/asm/xen/events.h b/arch/arm/include/asm/xen/events.h
+> > index 94b4e90..5c27696 100644
+> > --- a/arch/arm/include/asm/xen/events.h
+> > +++ b/arch/arm/include/asm/xen/events.h
+> > @@ -15,4 +15,26 @@ static inline int xen_irqs_disabled(struct pt_regs *regs)
+> >  	return raw_irqs_disabled_flags(regs->ARM_cpsr);
+> >  }
+> >  
+> > +/*
+> > + * We cannot use xchg because it does not support 8-byte
+> > + * values. However it is safe to use {ldr,dtd}exd directly because all
+> > + * platforms which Xen can run on support those instructions.
+> 
+> Why does atomic64_cmpxchg not work here?
 
-This feature is of course conditionned by the presence of 32bit
-capability on the physical CPU.
+Just that we don't want/need the cmp aspect, we don't mind if an extra
+bit gets set as we read the value, so long as we atomically read and set
+to zero.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> > + */
+> > +static inline xen_ulong_t xchg_xen_ulong(xen_ulong_t *ptr, xen_ulong_t val)
+> > +{
+> > +	xen_ulong_t oldval;
+> > +	unsigned int tmp;
+> > +
+> > +	wmb();
+> 
+> Based on atomic64_cmpxchg implementation, you could use smp_mb here
+> which avoids an outer cache flush.
+
+Good point.
+
+> > +	asm volatile("@ xchg_xen_ulong\n"
+> > +		"1:     ldrexd  %0, %H0, [%3]\n"
+> > +		"       strexd  %1, %2, %H2, [%3]\n"
+> > +		"       teq     %1, #0\n"
+> > +		"       bne     1b"
+> > +		: "=&r" (oldval), "=&r" (tmp)
+> > +		: "r" (val), "r" (ptr)
+> > +		: "memory", "cc");
+> 
+> And a smp_mb is needed here.
+
+I think for the specific caller which we have here it isn't strictly
+necessary, but for generic correctness I think you are right.
+
+Thanks for reviewing.
+
+Konrad, IIRC you have already picked this up (and sent to Linus?) so an
+incremental fix is required? See below.
+
+Ian.
+
+8<------------------------------------
+
+>From 4ed928274dad4c3ed610e769b2ae11eb2d1ea433 Mon Sep 17 00:00:00 2001
+From: Ian Campbell <ijc@hellion.org.uk>
+Date: Tue, 5 Mar 2013 03:37:23 +0000
+Subject: [PATCH] arm: xen: correct barriers in xchg_xen_ulong
+
+We can use an smp_wmb rather than a wmb here and we also need one after the
+exchange. Spotted by Rob Herring.
+
+Signed-off-by: Ian Campbell <ijc@hellion.org.uk>
 ---
- arch/arm64/include/asm/kvm_host.h |  2 +-
- arch/arm64/include/uapi/asm/kvm.h |  1 +
- arch/arm64/kvm/guest.c            |  6 ++++++
- arch/arm64/kvm/reset.c            | 22 +++++++++++++++++++++-
- 4 files changed, 29 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/xen/events.h |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 24dc8d7..0f17cfe 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -34,7 +34,7 @@
- #include <asm/kvm_vgic.h>
- #include <asm/kvm_arch_timer.h>
+diff --git a/arch/arm/include/asm/xen/events.h b/arch/arm/include/asm/xen/events.h
+index 5c27696..0e1f59e 100644
+--- a/arch/arm/include/asm/xen/events.h
++++ b/arch/arm/include/asm/xen/events.h
+@@ -25,7 +25,7 @@ static inline xen_ulong_t xchg_xen_ulong(xen_ulong_t *ptr, xen_ulong_t val)
+ 	xen_ulong_t oldval;
+ 	unsigned int tmp;
  
--#define KVM_VCPU_MAX_FEATURES 1
-+#define KVM_VCPU_MAX_FEATURES 2
- 
- /* We don't currently support large pages. */
- #define KVM_HPAGE_GFN_SHIFT(x)	0
-diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-index f9c269e..813427f 100644
---- a/arch/arm64/include/uapi/asm/kvm.h
-+++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -70,6 +70,7 @@ struct kvm_regs {
- #define KVM_VGIC_V2_CPU_SIZE		0x2000
- 
- #define KVM_ARM_VCPU_POWER_OFF		0 /* CPU is started in OFF state */
-+#define KVM_ARM_VCPU_EL1_32BIT		1 /* CPU running a 32bit VM */
- 
- struct kvm_vcpu_init {
- 	__u32 target;
-diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-index 2a8aaf8..123703d 100644
---- a/arch/arm64/kvm/guest.c
-+++ b/arch/arm64/kvm/guest.c
-@@ -84,6 +84,12 @@ static int set_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
- 	if (off == KVM_REG_ARM_CORE_REG(regs.pstate)) {
- 		unsigned long mode = val & COMPAT_PSR_MODE_MASK;
- 		switch (mode) {
-+		case COMPAT_PSR_MODE_USR:
-+		case COMPAT_PSR_MODE_FIQ:
-+		case COMPAT_PSR_MODE_IRQ:
-+		case COMPAT_PSR_MODE_SVC:
-+		case COMPAT_PSR_MODE_ABT:
-+		case COMPAT_PSR_MODE_UND:
- 		case PSR_MODE_EL0t:
- 		case PSR_MODE_EL1t:
- 		case PSR_MODE_EL1h:
-diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-index 3ac2f20..411659e 100644
---- a/arch/arm64/kvm/reset.c
-+++ b/arch/arm64/kvm/reset.c
-@@ -35,6 +35,19 @@ static struct kvm_regs default_regs_reset = {
- 	.regs.pstate = PSR_MODE_EL1h | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT,
- };
- 
-+static struct kvm_regs default_regs_reset32 = {
-+	.regs.pstate = (COMPAT_PSR_MODE_SVC | COMPAT_PSR_A_BIT |
-+			COMPAT_PSR_I_BIT | COMPAT_PSR_F_BIT),
-+};
-+
-+static bool cpu_has_32bit_el1(void)
-+{
-+	u64 pfr0;
-+
-+	pfr0 = read_cpuid(ID_AA64PFR0_EL1);
-+	return !!(pfr0 & 0x20);
-+}
-+
- /**
-  * kvm_reset_vcpu - sets core registers and sys_regs to reset value
-  * @vcpu: The VCPU pointer
-@@ -49,7 +62,14 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
- 
- 	switch (vcpu->arch.target) {
- 	default:
--		cpu_reset = &default_regs_reset;
-+		if (test_bit(KVM_ARM_VCPU_EL1_32BIT, vcpu->arch.features)) {
-+			if (!cpu_has_32bit_el1())
-+				return -EINVAL;
-+			cpu_reset = &default_regs_reset32;
-+			vcpu->arch.hcr_el2 &= ~HCR_RW;
-+		} else {
-+			cpu_reset = &default_regs_reset;
-+		}
- 		break;
- 	}
+-	wmb();
++	smp_wmb();
+ 	asm volatile("@ xchg_xen_ulong\n"
+ 		"1:     ldrexd  %0, %H0, [%3]\n"
+ 		"       strexd  %1, %2, %H2, [%3]\n"
+@@ -34,6 +34,7 @@ static inline xen_ulong_t xchg_xen_ulong(xen_ulong_t *ptr, xen_ulong_t val)
+ 		: "=&r" (oldval), "=&r" (tmp)
+ 		: "r" (val), "r" (ptr)
+ 		: "memory", "cc");
++	smp_wmb();
+ 	return oldval;
+ }
  
 -- 
-1.7.12.4
+1.7.10.4
