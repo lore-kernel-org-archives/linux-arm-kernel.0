@@ -1,191 +1,201 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue,  5 Mar 2013 18:42:17 +0100
-Subject: [PATCH 07/23] i2c: s3c2410: make header file local
-In-Reply-To: <1362505353-8873-1-git-send-email-arnd@arndb.de>
-References: <1362505353-8873-1-git-send-email-arnd@arndb.de>
-Message-ID: <1362505353-8873-8-git-send-email-arnd@arndb.de>
+Date: Tue,  5 Mar 2013 18:42:10 +0100
+Subject: [PATCH 00/23] RFC: exynos multiplatform support
+Message-ID: <1362505353-8873-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No other file in the kernel besides i2c-s3c2410.c uses
-the current plat/regs-iic.h, so we can simply move the
-header file to live in the same directory as the driver,
-as a preparation to multiplatform builds.
+Hi everyone,
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/mach-s3c24xx/mach-rx1950.c           |  1 -
- arch/arm/plat-samsung/devs.c                  |  1 -
- arch/arm/plat-samsung/include/plat/regs-iic.h | 56 ---------------------------
- drivers/i2c/busses/i2c-s3c2410.c              |  3 +-
- drivers/i2c/busses/i2c-s3c2410.h              | 56 +++++++++++++++++++++++++++
- 5 files changed, 58 insertions(+), 59 deletions(-)
+Although I'm not present at the Linaro Connect hacking
+sessions, I am participating remotely and have tried
+hacking on multiplatform support for Exynos. This patch
+set is far from complete, but I think the patches
+can be useful anyway.
+
+The series gets increasingly fishy towards the end,
+and we should probably not apply any of the last nine
+patches as-is, nor do I expect everything to work, since
+I have not tested them at all.
+
+With this patch set, we can build mach-exynos as part
+of a multiplatform kernel, with the following caveats:
+
+* Only DT based boards are supported
+* Moving to common-clk breaks things including cpufreq
+  and others. Thomas is working on a patch for this
+* We disable the gpio implementation, which also breaks
+  stuff, but Thomas has a patch already
+* Using the generic DMA engine API in SPI and ASoC
+  means they no longer work on S3C
+* I did not like the solution for the UART driver, but
+  could also not think of a better one.
+* The FB_S3C, S3C2410_WATCHDOG and S3C_ADC drivers
+  are left as an exercise to the reader, they are
+  currently disabled with multiplatform
+* sparsemem support is not available on multiplatform
+
+The patches are based on v3.9-rc1 and I have pushed
+the git branch to
+
+git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git testing/exynos-multiplatform
+
+I have not yet added subsystem maintainers to Cc on the
+patches, I'd like to coordinate with the other people
+involved first, so see if they already have patches
+for the same drivers.
+
+	Arnd
+
+Arnd Bergmann (23):
+  ARM: exynos: introduce EXYNOS_ATAGS symbol
+  irqchip: exynos: remove dependency on mach/irqs.h
+  tty: serial/samsung: prepare for common clock API
+  tty: serial/samsung: make register definitions global
+  tty: serial/samsung: fix modular build
+  ARM: exynos: move debug-macro.S to include/debug/
+  i2c: s3c2410: make header file local
+  mmc: sdhci-s3c: remove platform dependencies
+  usb: exynos: do not include plat/usb-phy.h
+  [media] exynos: remove unnecessary header inclusions
+  video/exynos: remove unnecessary header inclusions
+  thermal/exynos: remove unnecessary header inclusions
+  mtd: onenand/samsung: make regs-onenand.h file local
+  rtc: s3c: make header file local
+  spi: s3c64xx: move to generic dmaengine API
+  pwm: samsung: repair the worst MMIO abuses
+  ASoC: samsung: move plat/ headers to local directory
+  ASoC: samsung: convert to dmaengine API
+  ASoC: samsung: use irq resource for idma
+  ARM: exynos: prepare for sparse IRQ
+  ARM: exynos: hack to disable private clock code
+  ARM: exynos: work around missing gpio code on multiplatform
+  ARM: exynos: experimental multiplatform support
+
+ arch/arm/Kconfig                                  |  11 +-
+ arch/arm/Kconfig.debug                            |   8 +
+ arch/arm/include/debug/exynos.S                   |  39 +++
+ arch/arm/include/debug/samsung.S                  |  87 +++++++
+ arch/arm/mach-exynos/Kconfig                      |  36 ++-
+ arch/arm/mach-exynos/Makefile                     |   5 +
+ arch/arm/mach-exynos/common.c                     |  14 +-
+ arch/arm/mach-exynos/common.h                     |   2 +-
+ arch/arm/mach-exynos/dev-audio.c                  |   1 +
+ arch/arm/mach-exynos/dev-uart.c                   |   1 +
+ arch/arm/mach-exynos/include/mach/debug-macro.S   |  39 ---
+ arch/arm/mach-exynos/include/mach/gpio.h          |   2 +
+ arch/arm/mach-exynos/include/mach/irqs.h          |   5 +-
+ arch/arm/mach-exynos/mach-armlex4210.c            |   3 +
+ arch/arm/mach-exynos/mach-exynos4-dt.c            |   2 +
+ arch/arm/mach-exynos/mach-exynos5-dt.c            |   2 +
+ arch/arm/mach-exynos/mach-nuri.c                  |   2 +
+ arch/arm/mach-exynos/mach-origen.c                |   3 +
+ arch/arm/mach-exynos/mach-smdk4x12.c              |   2 +
+ arch/arm/mach-exynos/mach-smdkv310.c              |   3 +
+ arch/arm/mach-exynos/setup-i2c0.c                 |   3 +-
+ arch/arm/mach-exynos/setup-sdhci-gpio.c           |   2 +-
+ arch/arm/mach-exynos/setup-usb-phy.c              |   8 +-
+ arch/arm/mach-s3c24xx/clock-s3c2440.c             |   5 +
+ arch/arm/mach-s3c24xx/common.c                    |   5 +
+ arch/arm/mach-s3c24xx/dma-s3c2410.c               |   2 -
+ arch/arm/mach-s3c24xx/dma-s3c2412.c               |   2 -
+ arch/arm/mach-s3c24xx/dma-s3c2440.c               |   2 -
+ arch/arm/mach-s3c24xx/dma-s3c2443.c               |   2 -
+ arch/arm/mach-s3c24xx/include/mach/debug-macro.S  |   2 +-
+ arch/arm/mach-s3c24xx/mach-rx1950.c               |   1 -
+ arch/arm/mach-s3c64xx/include/mach/debug-macro.S  |   2 +-
+ arch/arm/mach-s3c64xx/include/mach/gpio.h         |   4 +
+ arch/arm/mach-s3c64xx/setup-usb-phy.c             |   4 +-
+ arch/arm/mach-s5p64x0/include/mach/debug-macro.S  |   2 +-
+ arch/arm/mach-s5pc100/include/mach/debug-macro.S  |   2 +-
+ arch/arm/mach-s5pc100/setup-sdhci-gpio.c          |   1 -
+ arch/arm/mach-s5pv210/include/mach/debug-macro.S  |   2 +-
+ arch/arm/mach-s5pv210/setup-sdhci-gpio.c          |   1 -
+ arch/arm/mach-s5pv210/setup-usb-phy.c             |   4 +-
+ arch/arm/plat-samsung/Kconfig                     |   5 +
+ arch/arm/plat-samsung/Makefile                    |   3 +
+ arch/arm/plat-samsung/clock-clksrc.c              |   3 +
+ arch/arm/plat-samsung/devs.c                      |  17 +-
+ arch/arm/plat-samsung/include/plat/debug-macro.S  |  87 -------
+ arch/arm/plat-samsung/include/plat/gpio-core.h    |   3 +
+ arch/arm/plat-samsung/include/plat/regs-ac97.h    |  67 -----
+ arch/arm/plat-samsung/include/plat/regs-iic.h     |  56 -----
+ arch/arm/plat-samsung/include/plat/regs-iis.h     |  70 ------
+ arch/arm/plat-samsung/include/plat/regs-onenand.h |  63 -----
+ arch/arm/plat-samsung/include/plat/regs-rtc.h     |  71 ------
+ arch/arm/plat-samsung/include/plat/regs-sdhci.h   |  87 -------
+ arch/arm/plat-samsung/include/plat/regs-serial.h  | 282 +---------------------
+ arch/arm/plat-samsung/include/plat/sdhci.h        |  56 +----
+ arch/arm/plat-samsung/include/plat/usb-phy.h      |   5 +-
+ arch/arm/plat-samsung/irq-vic-timer.c             |   1 +
+ arch/arm/plat-samsung/pm-gpio.c                   |   1 +
+ arch/arm/plat-samsung/pm.c                        |   1 +
+ arch/arm/plat-samsung/s5p-clock.c                 |   3 +
+ arch/arm/plat-samsung/s5p-irq.c                   |   1 +
+ drivers/cpufreq/Kconfig.arm                       |   4 +-
+ drivers/devfreq/Kconfig                           |   1 +
+ drivers/gpio/Makefile                             |   2 +-
+ drivers/i2c/busses/i2c-s3c2410.c                  |   3 +-
+ drivers/i2c/busses/i2c-s3c2410.h                  |  56 +++++
+ drivers/irqchip/exynos-combiner.c                 | 113 +++++----
+ drivers/media/platform/exynos-gsc/gsc-regs.c      |   1 -
+ drivers/media/platform/s5p-tv/sii9234_drv.c       |   3 -
+ drivers/mmc/host/Kconfig                          |   2 +-
+ drivers/mmc/host/sdhci-s3c-regs.h                 |  87 +++++++
+ drivers/mmc/host/sdhci-s3c.c                      |   5 +-
+ drivers/mtd/onenand/samsung.c                     |   4 +-
+ drivers/mtd/onenand/samsung.h                     |  61 +++++
+ drivers/pwm/pwm-samsung.c                         |  60 +++--
+ drivers/rtc/rtc-s3c.c                             |   3 +-
+ drivers/rtc/rtc-s3c.h                             |  70 ++++++
+ drivers/spi/spi-s3c64xx.c                         | 107 ++++----
+ drivers/thermal/exynos_thermal.c                  |   2 -
+ drivers/tty/serial/samsung.c                      |  17 +-
+ drivers/tty/serial/samsung.h                      |   4 +-
+ drivers/usb/host/ehci-s5p.c                       |   1 -
+ drivers/usb/host/ohci-exynos.c                    |   1 -
+ drivers/video/Kconfig                             |   2 +-
+ drivers/video/exynos/exynos_mipi_dsi.c            |   2 -
+ drivers/video/exynos/exynos_mipi_dsi_common.c     |   2 -
+ drivers/video/exynos/exynos_mipi_dsi_lowlevel.c   |   2 -
+ drivers/watchdog/Kconfig                          |   1 +
+ include/linux/platform_data/mmc-sdhci-s3c.h       |  56 +++++
+ include/linux/platform_data/spi-s3c64xx.h         |   3 +
+ include/linux/serial_s3c.h                        | 260 ++++++++++++++++++++
+ sound/soc/samsung/ac97.c                          |  17 +-
+ sound/soc/samsung/dma.c                           | 104 ++++----
+ sound/soc/samsung/dma.h                           |   4 +-
+ sound/soc/samsung/h1940_uda1380.c                 |   2 +-
+ sound/soc/samsung/i2s.c                           |   9 +-
+ sound/soc/samsung/idma.c                          |  10 +-
+ sound/soc/samsung/neo1973_wm8753.c                |   2 +-
+ sound/soc/samsung/pcm.c                           |  13 -
+ sound/soc/samsung/regs-ac97.h                     |  67 +++++
+ sound/soc/samsung/regs-iis.h                      |  70 ++++++
+ sound/soc/samsung/rx1950_uda1380.c                |   2 +-
+ sound/soc/samsung/s3c2412-i2s.c                   |  10 -
+ sound/soc/samsung/s3c24xx-i2s.c                   |  12 +-
+ sound/soc/samsung/s3c24xx_uda134x.c               |   2 +-
+ sound/soc/samsung/spdif.c                         |   6 -
+ 105 files changed, 1262 insertions(+), 1208 deletions(-)
+ create mode 100644 arch/arm/include/debug/exynos.S
+ create mode 100644 arch/arm/include/debug/samsung.S
+ delete mode 100644 arch/arm/mach-exynos/include/mach/debug-macro.S
+ delete mode 100644 arch/arm/plat-samsung/include/plat/debug-macro.S
+ delete mode 100644 arch/arm/plat-samsung/include/plat/regs-ac97.h
  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-iic.h
+ delete mode 100644 arch/arm/plat-samsung/include/plat/regs-iis.h
+ delete mode 100644 arch/arm/plat-samsung/include/plat/regs-onenand.h
+ delete mode 100644 arch/arm/plat-samsung/include/plat/regs-rtc.h
+ delete mode 100644 arch/arm/plat-samsung/include/plat/regs-sdhci.h
  create mode 100644 drivers/i2c/busses/i2c-s3c2410.h
+ create mode 100644 drivers/mmc/host/sdhci-s3c-regs.h
+ create mode 100644 drivers/mtd/onenand/samsung.h
+ create mode 100644 drivers/rtc/rtc-s3c.h
+ create mode 100644 include/linux/platform_data/mmc-sdhci-s3c.h
+ create mode 100644 include/linux/serial_s3c.h
+ create mode 100644 sound/soc/samsung/regs-ac97.h
+ create mode 100644 sound/soc/samsung/regs-iis.h
 
-diff --git a/arch/arm/mach-s3c24xx/mach-rx1950.c b/arch/arm/mach-s3c24xx/mach-rx1950.c
-index 1f9ba2a..43f3ac5 100644
---- a/arch/arm/mach-s3c24xx/mach-rx1950.c
-+++ b/arch/arm/mach-s3c24xx/mach-rx1950.c
-@@ -56,7 +56,6 @@
- #include <plat/cpu.h>
- #include <plat/devs.h>
- #include <plat/pm.h>
--#include <plat/regs-iic.h>
- #include <plat/regs-serial.h>
- 
- #include "common.h"
-diff --git a/arch/arm/plat-samsung/devs.c b/arch/arm/plat-samsung/devs.c
-index 51afedd..76209c9 100644
---- a/arch/arm/plat-samsung/devs.c
-+++ b/arch/arm/plat-samsung/devs.c
-@@ -62,7 +62,6 @@
- #include <linux/platform_data/usb-s3c2410_udc.h>
- #include <linux/platform_data/usb-ohci-s3c2410.h>
- #include <plat/usb-phy.h>
--#include <plat/regs-iic.h>
- #include <plat/regs-serial.h>
- #include <plat/regs-spi.h>
- #include <linux/platform_data/spi-s3c64xx.h>
-diff --git a/arch/arm/plat-samsung/include/plat/regs-iic.h b/arch/arm/plat-samsung/include/plat/regs-iic.h
-deleted file mode 100644
-index 2f7c17d..0000000
---- a/arch/arm/plat-samsung/include/plat/regs-iic.h
-+++ /dev/null
-@@ -1,56 +0,0 @@
--/* arch/arm/mach-s3c2410/include/mach/regs-iic.h
-- *
-- * Copyright (c) 2004 Simtec Electronics <linux@simtec.co.uk>
-- *		http://www.simtec.co.uk/products/SWLINUX/
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * S3C2410 I2C Controller
--*/
--
--#ifndef __ASM_ARCH_REGS_IIC_H
--#define __ASM_ARCH_REGS_IIC_H __FILE__
--
--/* see s3c2410x user guide, v1.1, section 9 (p447) for more info */
--
--#define S3C2410_IICREG(x) (x)
--
--#define S3C2410_IICCON    S3C2410_IICREG(0x00)
--#define S3C2410_IICSTAT   S3C2410_IICREG(0x04)
--#define S3C2410_IICADD    S3C2410_IICREG(0x08)
--#define S3C2410_IICDS     S3C2410_IICREG(0x0C)
--#define S3C2440_IICLC	  S3C2410_IICREG(0x10)
--
--#define S3C2410_IICCON_ACKEN		(1<<7)
--#define S3C2410_IICCON_TXDIV_16		(0<<6)
--#define S3C2410_IICCON_TXDIV_512	(1<<6)
--#define S3C2410_IICCON_IRQEN		(1<<5)
--#define S3C2410_IICCON_IRQPEND		(1<<4)
--#define S3C2410_IICCON_SCALE(x)		((x)&15)
--#define S3C2410_IICCON_SCALEMASK	(0xf)
--
--#define S3C2410_IICSTAT_MASTER_RX	(2<<6)
--#define S3C2410_IICSTAT_MASTER_TX	(3<<6)
--#define S3C2410_IICSTAT_SLAVE_RX	(0<<6)
--#define S3C2410_IICSTAT_SLAVE_TX	(1<<6)
--#define S3C2410_IICSTAT_MODEMASK	(3<<6)
--
--#define S3C2410_IICSTAT_START		(1<<5)
--#define S3C2410_IICSTAT_BUSBUSY		(1<<5)
--#define S3C2410_IICSTAT_TXRXEN		(1<<4)
--#define S3C2410_IICSTAT_ARBITR		(1<<3)
--#define S3C2410_IICSTAT_ASSLAVE		(1<<2)
--#define S3C2410_IICSTAT_ADDR0		(1<<1)
--#define S3C2410_IICSTAT_LASTBIT		(1<<0)
--
--#define S3C2410_IICLC_SDA_DELAY0	(0 << 0)
--#define S3C2410_IICLC_SDA_DELAY5	(1 << 0)
--#define S3C2410_IICLC_SDA_DELAY10	(2 << 0)
--#define S3C2410_IICLC_SDA_DELAY15	(3 << 0)
--#define S3C2410_IICLC_SDA_DELAY_MASK	(3 << 0)
--
--#define S3C2410_IICLC_FILTER_ON		(1<<2)
--
--#endif /* __ASM_ARCH_REGS_IIC_H */
-diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
-index f6b880b..d042ad0 100644
---- a/drivers/i2c/busses/i2c-s3c2410.c
-+++ b/drivers/i2c/busses/i2c-s3c2410.c
-@@ -42,9 +42,10 @@
- 
- #include <asm/irq.h>
- 
--#include <plat/regs-iic.h>
- #include <linux/platform_data/i2c-s3c2410.h>
- 
-+#include "i2c-s3c2410.h"
-+
- /* Treat S3C2410 as baseline hardware, anything else is supported via quirks */
- #define QUIRK_S3C2440		(1 << 0)
- #define QUIRK_HDMIPHY		(1 << 1)
-diff --git a/drivers/i2c/busses/i2c-s3c2410.h b/drivers/i2c/busses/i2c-s3c2410.h
-new file mode 100644
-index 0000000..2f7c17d
---- /dev/null
-+++ b/drivers/i2c/busses/i2c-s3c2410.h
-@@ -0,0 +1,56 @@
-+/* arch/arm/mach-s3c2410/include/mach/regs-iic.h
-+ *
-+ * Copyright (c) 2004 Simtec Electronics <linux@simtec.co.uk>
-+ *		http://www.simtec.co.uk/products/SWLINUX/
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * S3C2410 I2C Controller
-+*/
-+
-+#ifndef __ASM_ARCH_REGS_IIC_H
-+#define __ASM_ARCH_REGS_IIC_H __FILE__
-+
-+/* see s3c2410x user guide, v1.1, section 9 (p447) for more info */
-+
-+#define S3C2410_IICREG(x) (x)
-+
-+#define S3C2410_IICCON    S3C2410_IICREG(0x00)
-+#define S3C2410_IICSTAT   S3C2410_IICREG(0x04)
-+#define S3C2410_IICADD    S3C2410_IICREG(0x08)
-+#define S3C2410_IICDS     S3C2410_IICREG(0x0C)
-+#define S3C2440_IICLC	  S3C2410_IICREG(0x10)
-+
-+#define S3C2410_IICCON_ACKEN		(1<<7)
-+#define S3C2410_IICCON_TXDIV_16		(0<<6)
-+#define S3C2410_IICCON_TXDIV_512	(1<<6)
-+#define S3C2410_IICCON_IRQEN		(1<<5)
-+#define S3C2410_IICCON_IRQPEND		(1<<4)
-+#define S3C2410_IICCON_SCALE(x)		((x)&15)
-+#define S3C2410_IICCON_SCALEMASK	(0xf)
-+
-+#define S3C2410_IICSTAT_MASTER_RX	(2<<6)
-+#define S3C2410_IICSTAT_MASTER_TX	(3<<6)
-+#define S3C2410_IICSTAT_SLAVE_RX	(0<<6)
-+#define S3C2410_IICSTAT_SLAVE_TX	(1<<6)
-+#define S3C2410_IICSTAT_MODEMASK	(3<<6)
-+
-+#define S3C2410_IICSTAT_START		(1<<5)
-+#define S3C2410_IICSTAT_BUSBUSY		(1<<5)
-+#define S3C2410_IICSTAT_TXRXEN		(1<<4)
-+#define S3C2410_IICSTAT_ARBITR		(1<<3)
-+#define S3C2410_IICSTAT_ASSLAVE		(1<<2)
-+#define S3C2410_IICSTAT_ADDR0		(1<<1)
-+#define S3C2410_IICSTAT_LASTBIT		(1<<0)
-+
-+#define S3C2410_IICLC_SDA_DELAY0	(0 << 0)
-+#define S3C2410_IICLC_SDA_DELAY5	(1 << 0)
-+#define S3C2410_IICLC_SDA_DELAY10	(2 << 0)
-+#define S3C2410_IICLC_SDA_DELAY15	(3 << 0)
-+#define S3C2410_IICLC_SDA_DELAY_MASK	(3 << 0)
-+
-+#define S3C2410_IICLC_FILTER_ON		(1<<2)
-+
-+#endif /* __ASM_ARCH_REGS_IIC_H */
 -- 
 1.8.1.2
