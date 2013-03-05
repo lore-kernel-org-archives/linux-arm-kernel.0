@@ -1,29 +1,35 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  5 Mar 2013 03:47:20 +0000
-Subject: [PATCH 04/29] arm64: KVM: system register definitions for 64bit guests
+Date: Tue,  5 Mar 2013 03:47:21 +0000
+Subject: [PATCH 05/29] arm64: KVM: Basic ESR_EL2 helpers and vcpu register
+ access
 In-Reply-To: <1362455265-24165-1-git-send-email-marc.zyngier@arm.com>
 References: <1362455265-24165-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1362455265-24165-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1362455265-24165-6-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the saved/restored registers for 64bit guests.
+Implements helpers for dealing with the EL2 syndrome register as
+well as accessing the vcpu registers.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_asm.h | 68 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 68 insertions(+)
- create mode 100644 arch/arm64/include/asm/kvm_asm.h
+ arch/arm64/include/asm/kvm_emulate.h | 159 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 159 insertions(+)
+ create mode 100644 arch/arm64/include/asm/kvm_emulate.h
 
-diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
 new file mode 100644
-index 0000000..851fee5
+index 0000000..16a343b
 --- /dev/null
-+++ b/arch/arm64/include/asm/kvm_asm.h
-@@ -0,0 +1,68 @@
++++ b/arch/arm64/include/asm/kvm_emulate.h
+@@ -0,0 +1,159 @@
 +/*
 + * Copyright (C) 2012 - ARM Ltd
 + * Author: Marc Zyngier <marc.zyngier@arm.com>
++ *
++ * Derived from arch/arm/include/kvm_emulate.h
++ * Copyright (C) 2012 - Virtual Open Systems and Columbia University
++ * Author: Christoffer Dall <c.dall@virtualopensystems.com>
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
@@ -38,56 +44,143 @@ index 0000000..851fee5
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+#ifndef __ARM_KVM_ASM_H__
-+#define __ARM_KVM_ASM_H__
++#ifndef __ARM64_KVM_EMULATE_H__
++#define __ARM64_KVM_EMULATE_H__
 +
-+/*
-+ * 0 is reserved as an invalid value.
-+ * Order *must* be kept in sync with the hyp switch code.
-+ */
-+#define	MPIDR_EL1	1	/* MultiProcessor Affinity Register */
-+#define	CSSELR_EL1	2	/* Cache Size Selection Register */
-+#define	SCTLR_EL1	3	/* System Control Register */
-+#define	ACTLR_EL1	4	/* Auxilliary Control Register */
-+#define	CPACR_EL1	5	/* Coprocessor Access Control */
-+#define	TTBR0_EL1	6	/* Translation Table Base Register 0 */
-+#define	TTBR1_EL1	7	/* Translation Table Base Register 1 */
-+#define	TCR_EL1		8	/* Translation Control Register */
-+#define	ESR_EL1		9	/* Exception Syndrome Register */
-+#define	AFSR0_EL1	10	/* Auxilary Fault Status Register 0 */
-+#define	AFSR1_EL1	11	/* Auxilary Fault Status Register 1 */
-+#define	FAR_EL1		12	/* Fault Address Register */
-+#define	MAIR_EL1	13	/* Memory Attribute Indirection Register */
-+#define	VBAR_EL1	14	/* Vector Base Address Register */
-+#define	CONTEXTIDR_EL1	15	/* Context ID Register */
-+#define	TPIDR_EL0	16	/* Thread ID, User R/W */
-+#define	TPIDRRO_EL0	17	/* Thread ID, User R/O */
-+#define	TPIDR_EL1	18	/* Thread ID, Privileged */
-+#define	AMAIR_EL1	19	/* Aux Memory Attribute Indirection Register */
-+#define	CNTKCTL_EL1	20	/* Timer Control Register (EL1) */
-+#define	NR_SYS_REGS	21
++#include <linux/kvm_host.h>
++#include <asm/kvm_asm.h>
++#include <asm/kvm_arm.h>
++#include <asm/kvm_mmio.h>
++#include <asm/ptrace.h>
 +
-+#define ARM_EXCEPTION_IRQ	  0
-+#define ARM_EXCEPTION_TRAP	  1
++void kvm_inject_undefined(struct kvm_vcpu *vcpu);
++void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr);
++void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr);
 +
-+#ifndef __ASSEMBLY__
-+struct kvm;
-+struct kvm_vcpu;
++static inline unsigned long *vcpu_pc(struct kvm_vcpu *vcpu)
++{
++	return (unsigned long *)&vcpu->arch.regs.regs.pc;
++}
 +
-+extern char __kvm_hyp_init[];
-+extern char __kvm_hyp_init_end[];
++static inline unsigned long *vcpu_cpsr(struct kvm_vcpu *vcpu)
++{
++	return (unsigned long *)&vcpu->arch.regs.regs.pstate;
++}
 +
-+extern char __kvm_hyp_vector[];
++static inline bool vcpu_mode_is_32bit(struct kvm_vcpu *vcpu)
++{
++	return false;	/* 32bit? Bahhh... */
++}
 +
-+extern char __kvm_hyp_code_start[];
-+extern char __kvm_hyp_code_end[];
++static inline bool kvm_condition_valid(struct kvm_vcpu *vcpu)
++{
++	return true;	/* No conditionals on arm64 */
++}
 +
-+extern void __kvm_flush_vm_context(void);
-+extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
++static inline void kvm_skip_instr(struct kvm_vcpu *vcpu, bool is_wide_instr)
++{
++	*vcpu_pc(vcpu) += 4;
++}
 +
-+extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
-+#endif
++static inline void vcpu_set_thumb(struct kvm_vcpu *vcpu)
++{
++}
 +
-+#endif /* __ARM_KVM_ASM_H__ */
++static inline unsigned long *vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num)
++{
++	return (unsigned long *)&vcpu->arch.regs.regs.regs[reg_num];
++
++}
++
++/* Get vcpu SPSR for current mode */
++static inline unsigned long *vcpu_spsr(struct kvm_vcpu *vcpu)
++{
++	return &vcpu->arch.regs.spsr[KVM_SPSR_EL1];
++}
++
++static inline bool kvm_vcpu_reg_is_pc(struct kvm_vcpu *vcpu, int reg)
++{
++	return false;
++}
++
++static inline bool vcpu_mode_priv(struct kvm_vcpu *vcpu)
++{
++	u32 mode = *vcpu_cpsr(vcpu) & PSR_MODE_MASK;
++
++	return mode != PSR_MODE_EL0t;
++}
++
++static inline u32 kvm_vcpu_get_hsr(struct kvm_vcpu *vcpu)
++{
++	return vcpu->arch.fault.esr_el2;
++}
++
++static inline unsigned long kvm_vcpu_get_hfar(struct kvm_vcpu *vcpu)
++{
++	return vcpu->arch.fault.far_el2;
++}
++
++static inline phys_addr_t kvm_vcpu_get_fault_ipa(struct kvm_vcpu *vcpu)
++{
++	return ((phys_addr_t)vcpu->arch.fault.hpfar_el2 & HPFAR_MASK) << 8;
++}
++
++static inline bool kvm_vcpu_dabt_isvalid(struct kvm_vcpu *vcpu)
++{
++	return !!(kvm_vcpu_get_hsr(vcpu) & ESR_EL2_ISV);
++}
++
++static inline bool kvm_vcpu_dabt_iswrite(struct kvm_vcpu *vcpu)
++{
++	return !!(kvm_vcpu_get_hsr(vcpu) & ESR_EL2_WNR);
++}
++
++static inline bool kvm_vcpu_dabt_issext(struct kvm_vcpu *vcpu)
++{
++	return !!(kvm_vcpu_get_hsr(vcpu) & ESR_EL2_SSE);
++}
++
++static inline int kvm_vcpu_dabt_get_rd(struct kvm_vcpu *vcpu)
++{
++	return (kvm_vcpu_get_hsr(vcpu) & ESR_EL2_SRT_MASK) >> ESR_EL2_SRT_SHIFT;
++}
++
++static inline bool kvm_vcpu_dabt_isextabt(struct kvm_vcpu *vcpu)
++{
++	return !!(kvm_vcpu_get_hsr(vcpu) & ESR_EL2_EA);
++}
++
++static inline bool kvm_vcpu_dabt_iss1tw(struct kvm_vcpu *vcpu)
++{
++	return !!(kvm_vcpu_get_hsr(vcpu) & ESR_EL2_S1PTW);
++}
++
++static inline int kvm_vcpu_dabt_get_as(struct kvm_vcpu *vcpu)
++{
++	return 1 << ((kvm_vcpu_get_hsr(vcpu) & ESR_EL2_SAS) >> ESR_EL2_SAS_SHIFT);
++}
++
++/* This one is not specific to Data Abort */
++static inline bool kvm_vcpu_trap_il_is32bit(struct kvm_vcpu *vcpu)
++{
++	return !!(kvm_vcpu_get_hsr(vcpu) & ESR_EL2_IL);
++}
++
++static inline u8 kvm_vcpu_trap_get_class(struct kvm_vcpu *vcpu)
++{
++	return kvm_vcpu_get_hsr(vcpu) >> ESR_EL2_EC_SHIFT;
++}
++
++static inline bool kvm_vcpu_trap_is_iabt(struct kvm_vcpu *vcpu)
++{
++	return kvm_vcpu_trap_get_class(vcpu) == ESR_EL2_EC_IABT;
++}
++
++static inline u8 kvm_vcpu_trap_get_fault(struct kvm_vcpu *vcpu)
++{
++	return kvm_vcpu_get_hsr(vcpu) & ESR_EL2_FSC_TYPE;
++}
++
++#endif /* __ARM64_KVM_EMULATE_H__ */
 -- 
 1.7.12.4
