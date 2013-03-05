@@ -1,37 +1,51 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 04 Mar 2013 18:55:01 -0800
-Subject: [PATCH] ARM: perf: Fix section mismatch on armpmu_init()
-In-Reply-To: <20130305024338.GA17735@mudshark.cambridge.arm.com>
-References: <1362438937-28143-1-git-send-email-sboyd@codeaurora.org>
- <20130305024338.GA17735@mudshark.cambridge.arm.com>
-Message-ID: <51355E85.7010804@codeaurora.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue,  5 Mar 2013 02:43:16 +0000
+Subject: [PATCH 22/29] ARM: KVM: fix address validation for HYP mappings
+In-Reply-To: <1362451403-23460-1-git-send-email-marc.zyngier@arm.com>
+References: <1362451403-23460-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1362451403-23460-23-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/04/13 18:43, Will Deacon wrote:
-> On Mon, Mar 04, 2013 at 11:15:37PM +0000, Stephen Boyd wrote:
->> WARNING: vmlinux.o(.text+0xfb80): Section mismatch in reference
->> from the function armpmu_register() to the function
->> .init.text:armpmu_init()
->> The function armpmu_register() references
->> the function __init armpmu_init().
->> This is often because armpmu_register lacks a __init
->> annotation or the annotation of armpmu_init is wrong.
->>
->> Just drop the __init marking on armpmu_init() because
->> armpmu_register() no longer has an __init marking.
->>
->> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> Cheers Stephen:
->
->   Acked-by: Will Deacon <will.deacon@arm.com>
->
-> Can you put this into the patch system please?
->
->
+__create_hyp_mappings() performs some kind of address validation before
+creating the mapping, by verifying that the start address is above
+PAGE_OFFSET.
 
-Thanks.  7667/1
+This check is not completely correct for kernel memory (the upper
+boundary has to be checked as well so we do not end up with highmem
+pages), and wrong for IO mappings (the mapping must exist in the vmalloc
+region).
 
+Fix this by using the proper predicates (virt_addr_valid and
+is_vmalloc_addr), which also work correctly on ARM64 (where the vmalloc
+region is below PAGE_OFFSET).
+
+Also change the BUG_ON() into a less agressive error return.
+
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/kvm/mmu.c | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index ead6b16..ec14269 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -200,8 +200,13 @@ static int __create_hyp_mappings(void *from, void *to, unsigned long *pfn_base)
+ 	unsigned long addr, next;
+ 	int err = 0;
+ 
+-	BUG_ON(start > end);
+-	if (start < PAGE_OFFSET)
++	if (start >= end)
++		return -EINVAL;
++	/* Check for a valid kernel memory mapping */
++	if (!pfn_base && (!virt_addr_valid(from) || !virt_addr_valid(to - 1)))
++		return -EINVAL;
++	/* Check for a valid kernel IO mapping */
++	if (pfn_base && (!is_vmalloc_addr(from) || !is_vmalloc_addr(to - 1)))
+ 		return -EINVAL;
+ 
+ 	mutex_lock(&kvm_hyp_pgd_mutex);
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+1.7.12.4
