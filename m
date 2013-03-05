@@ -1,76 +1,242 @@
-From: mpfj-list@mimc.co.uk (Mark Jackson)
-Date: Tue, 05 Mar 2013 16:20:22 +0000
-Subject: [PATCH 11/14] ARM: OMAP2+: Add device-tree support for NOR flash
-In-Reply-To: <51360562.20309@ti.com>
-References: <1361899842-30303-1-git-send-email-jon-hunter@ti.com>
- <1361899842-30303-12-git-send-email-jon-hunter@ti.com>
- <51360271.1030302@mimc.co.uk> <51360562.20309@ti.com>
-Message-ID: <51361B46.507@mimc.co.uk>
+From: laijs@cn.fujitsu.com (Lai Jiangshan)
+Date: Wed, 06 Mar 2013 00:25:21 +0800
+Subject: [PATCH v6 04/46] percpu_rwlock: Implement the core design of
+ Per-CPU Reader-Writer Locks
+In-Reply-To: <513105DD.8010908@linux.vnet.ibm.com>
+References: <20130218123714.26245.61816.stgit@srivatsabhat.in.ibm.com>
+ <20130218123856.26245.46705.stgit@srivatsabhat.in.ibm.com>
+ <CANN689F9S7c1M8+cEpz3tsxGF34+NTRBLvxgPUOtbvav5u+RRA@mail.gmail.com>
+ <5122551E.1080703@linux.vnet.ibm.com>	<51226B46.9080707@linux.vnet.ibm.com>
+ <CANN689FSxOz+0Cu7EG_yKD8ZE1OpT4kyT+ybLfXSqaifodJRpw@mail.gmail.com>
+ <51226F91.7000108@linux.vnet.ibm.com>
+ <CACvQF53bdh4_BxF0y1fnTVR+T2OmRc0jmWQYftsvx92-fg-Lug@mail.gmail.com>
+ <512BBAD8.8010006@linux.vnet.ibm.com>
+ <CACvQF51jCxk5jUqmhD=QBBtUsBkQWZzakacrKO4Gsk=w61rNwQ@mail.gmail.com>
+ <512C7A38.8060906@linux.vnet.ibm.com>
+ <CACvQF51RvhM8XNqu3-1OTQ=cZUZ=pAX+_zx0a29+W67N1X+BgQ@mail.gmail.com>
+ <512CC509.1050000@linux.vnet.ibm.com>
+ <CACvQF50UgiqPpDk3HCmV86zKSf6tPjqr0bZowfPEOJs0g0r0MQ@mail.gmail.com>
+ <512D0D67.9010609@linux.vnet.ibm.com>
+ <CACvQF53ph2ixdM-otzetjM5cR+2kcZj6sckOp3TnzzA_x-EZ8w@mail.gmail.com>
+ <512E7879.20109@linux.vnet.ibm.com> <5130EA6B.6030901@cn.fujitsu.com>
+ <513105DD.8010908@linux.vnet.ibm.com>
+Message-ID: <51361C71.5060502@cn.fujitsu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/03/13 14:46, Jon Hunter wrote:
-> 
-> On 03/05/2013 08:34 AM, Mark Jackson wrote:
->> On 26/02/13 17:30, Jon Hunter wrote:
->>> NOR flash is not currently supported when booting with device-tree
->>> on OMAP2+ devices. Add support to detect and configure NOR devices
->>> when booting with device-tree.
+On 02/03/13 03:47, Srivatsa S. Bhat wrote:
+> On 03/01/2013 11:20 PM, Lai Jiangshan wrote:
+>> On 28/02/13 05:19, Srivatsa S. Bhat wrote:
+>>> On 02/27/2013 06:03 AM, Lai Jiangshan wrote:
+>>>> On Wed, Feb 27, 2013 at 3:30 AM, Srivatsa S. Bhat
+>>>> <srivatsa.bhat@linux.vnet.ibm.com> wrote:
+>>>>> On 02/26/2013 09:55 PM, Lai Jiangshan wrote:
+>>>>>> On Tue, Feb 26, 2013 at 10:22 PM, Srivatsa S. Bhat
+>>>>>> <srivatsa.bhat@linux.vnet.ibm.com> wrote:
+>>>>>>>
+>>>>>>> Hi Lai,
+>>>>>>>
+>>>>>>> I'm really not convinced that piggy-backing on lglocks would help
+>>>>>>> us in any way. But still, let me try to address some of the points
+>>>>>>> you raised...
+>>>>>>>
+>>>>>>> On 02/26/2013 06:29 PM, Lai Jiangshan wrote:
+>>>>>>>> On Tue, Feb 26, 2013 at 5:02 PM, Srivatsa S. Bhat
+>>>>>>>> <srivatsa.bhat@linux.vnet.ibm.com> wrote:
+>>>>>>>>> On 02/26/2013 05:47 AM, Lai Jiangshan wrote:
+>>>>>>>>>> On Tue, Feb 26, 2013 at 3:26 AM, Srivatsa S. Bhat
+>>>>>>>>>> <srivatsa.bhat@linux.vnet.ibm.com> wrote:
+>>>>>>>>>>> Hi Lai,
+>>>>>>>>>>>
+>>>>>>>>>>> On 02/25/2013 09:23 PM, Lai Jiangshan wrote:
+>>>>>>>>>>>> Hi, Srivatsa,
+>>>>>>>>>>>>
+>>>>>>>>>>>> The target of the whole patchset is nice for me.
+>>>>>>>>>>>
+>>>>>>>>>>> Cool! Thanks :-)
+>>>>>>>>>>>
+>>>>>>>>> [...]
+>>>>>>>>>
+>>>>>>>>> Unfortunately, I see quite a few issues with the code above. IIUC, the
+>>>>>>>>> writer and the reader both increment the same counters. So how will the
+>>>>>>>>> unlock() code in the reader path know when to unlock which of the locks?
+>>>>>>>>
+>>>>>>>> The same as your code, the reader(which nested in write C.S.) just dec
+>>>>>>>> the counters.
+>>>>>>>
+>>>>>>> And that works fine in my case because the writer and the reader update
+>>>>>>> _two_ _different_ counters.
+>>>>>>
+>>>>>> I can't find any magic in your code, they are the same counter.
+>>>>>>
+>>>>>>         /*
+>>>>>>          * It is desirable to allow the writer to acquire the percpu-rwlock
+>>>>>>          * for read (if necessary), without deadlocking or getting complaints
+>>>>>>          * from lockdep. To achieve that, just increment the reader_refcnt of
+>>>>>>          * this CPU - that way, any attempt by the writer to acquire the
+>>>>>>          * percpu-rwlock for read, will get treated as a case of nested percpu
+>>>>>>          * reader, which is safe, from a locking perspective.
+>>>>>>          */
+>>>>>>         this_cpu_inc(pcpu_rwlock->rw_state->reader_refcnt);
+>>>>>>
+>>>>>
+>>>>> Whoa! Hold on, were you really referring to _this_ increment when you said
+>>>>> that, in your patch you would increment the refcnt at the writer? Then I guess
+>>>>> there is a major disconnect in our conversations. (I had assumed that you were
+>>>>> referring to the update of writer_signal, and were just trying to have a single
+>>>>> refcnt instead of reader_refcnt and writer_signal).
+>>>>
+>>>> https://github.com/laijs/linux/commit/53e5053d5b724bea7c538b11743d0f420d98f38d
+>>>>
+>>>> Sorry the name "fallback_reader_refcnt" misled you.
+>>>>
+>>> [...]
 >>>
->>> Add documentation for the TI GPMC NOR binding.
+>>>>>> All I was considered is "nested reader is seldom", so I always
+>>>>>> fallback to rwlock when nested.
+>>>>>> If you like, I can add 6 lines of code, the overhead is
+>>>>>> 1 spin_try_lock()(fast path)  + N  __this_cpu_inc()
+>>>>>>
+>>>>>
+>>>>> I'm assuming that calculation is no longer valid, considering that
+>>>>> we just discussed how the per-cpu refcnt that you were using is quite
+>>>>> unnecessary and can be removed.
+>>>>>
+>>>>> IIUC, the overhead with your code, as per above discussion would be:
+>>>>> 1 spin_try_lock() [non-nested] + N read_lock(global_rwlock).
+>>>>
+>>>> https://github.com/laijs/linux/commit/46334544bb7961550b7065e015da76f6dab21f16
+>>>>
+>>>> Again, I'm so sorry the name "fallback_reader_refcnt" misled you.
+>>>>
 >>>
->>> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+>>> At this juncture I really have to admit that I don't understand your
+>>> intentions at all. What are you really trying to prove? Without giving
+>>> a single good reason why my code is inferior, why are you even bringing
+>>> up the discussion about a complete rewrite of the synchronization code?
+>>> http://article.gmane.org/gmane.linux.kernel.cross-arch/17103
+>>> http://article.gmane.org/gmane.linux.power-management.general/31345
+>>>
+>>> I'm beginning to add 2 + 2 together based on the kinds of questions you
+>>> have been asking...
+>>>
+>>> You posted a patch in this thread and started a discussion around it without
+>>> even establishing a strong reason to do so. Now you point me to your git
+>>> tree where your patches have even more traces of ideas being borrowed from
+>>> my patchset (apart from my own ideas/code, there are traces of others' ideas
+>>> being borrowed too - for example, it was Oleg who originally proposed the
+>>> idea of splitting up the counter into 2 parts and I'm seeing that it is
+>>> slowly crawling into your code with no sign of appropriate credits).
+>>> http://article.gmane.org/gmane.linux.network/260288
+>>>
+>>> And in reply to my mail pointing out the performance implications of the
+>>> global read_lock at the reader side in your code, you said you'll come up
+>>> with a comparison between that and my patchset.
+>>> http://article.gmane.org/gmane.linux.network/260288
+>>> The issue has been well-documented in my patch description of patch 4.
+>>> http://article.gmane.org/gmane.linux.kernel/1443258
+>>>
+>>> Are you really trying to pit bits and pieces of my own ideas/versions
+>>> against one another and claiming them as your own?
+>>>
+>>> You projected the work involved in handling the locking issues pertaining
+>>> to CPU_DYING notifiers etc as a TODO, despite the fact that I had explicitly
+>>> noted in my cover letter that I had audited and taken care of all of them.
+>>> http://article.gmane.org/gmane.linux.documentation/9727
+>>> http://article.gmane.org/gmane.linux.documentation/9520
+>>>
+>>> You failed to acknowledge (on purpose?) that I had done a tree-wide
+>>> conversion despite the fact that you were replying to the very thread which
+>>> had the 46 patches which did exactly that (and I had also mentioned it
+>>> explicitly in my cover letter).
+>>> http://article.gmane.org/gmane.linux.documentation/9727
+>>> http://article.gmane.org/gmane.linux.documentation/9520
+>>>
+>>> You then started probing more and more about the technique I used to do
+>>> the tree-wide conversion.
+>>> http://article.gmane.org/gmane.linux.kernel.cross-arch/17111
+>>>
+>>> You also retorted saying you did go through my patch descriptions, so
+>>> its not like you have missed reading them.
+>>> http://article.gmane.org/gmane.linux.power-management.general/31345
+>>>
+>>> Each of these when considered individually, might appear like innocuous and
+>>> honest attempts at evaluating my code. But when put together, I'm beginning
+>>> to sense a whole different angle to it altogether, as if you are trying
+>>> to spin your own patch series, complete with the locking framework _and_
+>>> the tree-wide conversion, heavily borrowed from mine. At the beginning of
+>>> this discussion, I predicted that the lglock version that you are proposing
+>>> would end up being either less efficient than my version or look very similar
+>>> to my version. http://article.gmane.org/gmane.linux.kernel/1447139
+>>>
+>>> I thought it was just the former till now, but its not hard to see how it
+>>> is getting closer to becoming the latter too. So yeah, I'm not amused.
+>>>
+>>> Maybe (and hopefully) you are just trying out different ideas on your own,
+>>> and I'm just being paranoid. I really hope that is the case. If you are just
+>>> trying to review my code, then please stop sending patches with borrowed ideas
+>>> with your sole Signed-off-by, and purposefully ignoring the work already done
+>>> in my patchset, because it is really starting to look suspicious, at least
+>>> to me.
+>>>
+>>> Don't get me wrong - I'll whole-heartedly acknowledge and appreciate if
+>>> _your_ code is better than mine. I just don't like the idea of somebody
+>>> plagiarizing my ideas/code (or even others' ideas for that matter).
+>>> However, I sincerely apologize in advance if I misunderstood/misjudged your
+>>> intentions; I just wanted to voice my concerns out loud at this point,
+>>> considering the bad feeling I got by looking at your responses collectively.
+>>>
 >>
->> I'm trying to test this series, and am unable get my NOR device recognised.
+>> Hi, Srivatsa
 >>
->> If I remove all reference to NOR (and keep only my NAND device definition), then
->> everything seems to boot fine (so I'm assuming I've got at least the basics of
->> the patch set working).
+>> I'm sorry, big apology to you.
+>> I'm bad in communication and I did be wrong.
+>> I tended to improve the codes but in false direction.
 >>
->> My GPMC tree looks like this:-
-
-<snip>
-
->> 	nor at 1,0 {
->> 		reg = <3 0x00000000 0x04000000>;
->> 		compatible = "cfi-flash";
->> 		linux,mtd-name = "spansion,s29gl064n90t";
->> 		bank-width = <2>;
->>
->> 		gpmc,device-width = <1>;
 > 
-> Only bank-width should be necessary for NOR (per the binding
-> documentation). However, if you do specify both, then they should match.
-> Do you have two 8-bits devices? If so may be I need to update the
-> documentation to make it clear this is the total width of all devices
-> for a given chip-select.
-
-No ... that was wrong, so I've fixed that.
-
-<snip>
-
->> Booting with this NOR device produces the following oops:-
->>
->> [    0.000000] Booting Linux on physical CPU 0x0
->> [    0.000000] Linux version 3.9.0-rc1-12191-ga00d6d1-dirty (mpfj at mpfj-nanobone) (gcc version 4.5.4 (Buildroot 2012.11) ) #33 Tue Mar 5 13:08:25 GMT 2013
->> [    0.000000] CPU: ARMv7 Processor [413fc082] revision 2 (ARMv7), cr=10c53c7d
-
-<snip>
-
->> [    0.236730] omap-gpmc 50000000.gpmc: could not find pctldev for node /pinmux at 44e10800/gpmc_pins, deferring probe
->> [    0.236781] platform 50000000.gpmc: Driver omap-gpmc requests probe deferral
+> OK, in that case, I'm extremely sorry too, for jumping on you like that.
+> I hope you'll forgive me for the uneasiness it caused.
 > 
-> This look like your problem. I would figure out why this is failing and
-> try again.
+> Now that I understand that you were simply trying to help, I would like to
+> express my gratitude for your time, effort and inputs in improving the design
+> of the stop-machine replacement.
+> 
+> I'm looking forward to working with you on this as well as future endeavours,
+> so I sincerely hope that we can put this unfortunate incident behind us and
+> collaborate effectively with renewed mutual trust and good-will.
+> 
+> Thank you very much!
+> 
 
-Hmmmm ... I get this even when I've no NOR device defined and the board boots up fine.
+Hi, Srivatsa,
 
-But I can see in physmap_of.c that the device gets registered without any call to
-devm_pinctrl_get_select_default() and hence no probe deferring takes place is the
-pinctrl device hasn't yet been started (which it hasn't).
+I'm sorry again, I delayed your works.
 
-Does probe deferral need adding to physmap_of.c, or should the pinctrl device really
-be registered sooner ?
+I have some thinkings about the way how to get this work done.
 
-Cheers
-Mark J.
+First step: (2~3 patches)
+Use preempt_disable() to implement get_online_cpu_atomic(), and add lockdep for it.
+
+Second step:
+Conversion patches.
+
+We can send the patchset of the above steps at first.
+{
+It does not change any behavior of the kernel.
+and it is annotation(instead of direct preempt_diable() without comments sometimes),
+so I expected they can be merged very early.
+}
+
+Third step:
+After all people confide the conversion patches covered all cases and cpuhotplug site is ready for it,
+we will implement get_online_cpu_atomic() via locks and remove stop_machine() from cpuhotplug.
+
+Any thought?
+
+Thanks,
+Lai
+
+If I have time, I will help you for the patches of the first step.
+(I was assigned bad job in office-time, I can only do kernel-dev work in night.)
+
+And for step2, I will write a checklist or spatch-script.
