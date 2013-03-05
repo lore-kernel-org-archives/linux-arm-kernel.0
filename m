@@ -1,100 +1,90 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue,  5 Mar 2013 23:16:45 +0100
-Subject: [PATCH 5/9] ARM: omap1: add back missing includes
+Date: Tue,  5 Mar 2013 23:16:46 +0100
+Subject: [PATCH 6/9] [media] ir-rx51: fix clock API related build issues
 In-Reply-To: <1362521809-22989-1-git-send-email-arnd@arndb.de>
 References: <1362521809-22989-1-git-send-email-arnd@arndb.de>
-Message-ID: <1362521809-22989-6-git-send-email-arnd@arndb.de>
+Message-ID: <1362521809-22989-7-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The recent reorganization of OMAP header files caused a couple of
-files that used to be implicitly included now missing from OMAP1.
-This adds explicit inclusions of mach/irqs.h and mach/hardware.h
-in all files that need them for an OMAP1 allyesconfig build.
+OMAP1 no longer provides its own clock interfaces since patch
+a135eaae52 "ARM: OMAP: remove plat/clock.h". This is great, but
+we now have to convert the ir-rx51 driver to use the generic
+interface from linux/clk.h.
+
+The driver also uses the omap_dm_timer_get_fclk() function,
+which is not exported for OMAP1, so we have to move the
+definition out of the OMAP2 specific section.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
+Cc: Timo Kokkonen <timo.t.kokkonen@iki.fi>
 Cc: Tony Lindgren <tony@atomide.com>
-Cc: linux-omap at vger.kernel.org
+Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: linux-media at vger.kernel.org
 ---
- arch/arm/mach-omap1/board-fsample.c  | 1 +
- arch/arm/mach-omap1/board-h2.c       | 1 +
- arch/arm/mach-omap1/board-perseus2.c | 1 +
- arch/arm/mach-omap1/board-sx1.c      | 1 +
- drivers/video/omap/lcd_ams_delta.c   | 1 +
- drivers/video/omap/lcd_osk.c         | 1 +
- 6 files changed, 6 insertions(+)
+ arch/arm/plat-omap/dmtimer.c | 16 ++++++++--------
+ drivers/media/rc/ir-rx51.c   |  4 ++--
+ 2 files changed, 10 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/mach-omap1/board-fsample.c b/arch/arm/mach-omap1/board-fsample.c
-index 702d580..512b33a 100644
---- a/arch/arm/mach-omap1/board-fsample.c
-+++ b/arch/arm/mach-omap1/board-fsample.c
-@@ -33,6 +33,7 @@
- #include <linux/platform_data/keypad-omap.h>
+diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
+index a0daa2f..ea133e5 100644
+--- a/arch/arm/plat-omap/dmtimer.c
++++ b/arch/arm/plat-omap/dmtimer.c
+@@ -333,6 +333,14 @@ int omap_dm_timer_get_irq(struct omap_dm_timer *timer)
+ }
+ EXPORT_SYMBOL_GPL(omap_dm_timer_get_irq);
  
++struct clk *omap_dm_timer_get_fclk(struct omap_dm_timer *timer)
++{
++	if (timer)
++		return timer->fclk;
++	return NULL;
++}
++EXPORT_SYMBOL_GPL(omap_dm_timer_get_fclk);
++
+ #if defined(CONFIG_ARCH_OMAP1)
  #include <mach/hardware.h>
-+#include <mach/irqs.h>
+ /**
+@@ -371,14 +379,6 @@ EXPORT_SYMBOL_GPL(omap_dm_timer_modify_idlect_mask);
  
- #include "iomap.h"
- #include "common.h"
-diff --git a/arch/arm/mach-omap1/board-h2.c b/arch/arm/mach-omap1/board-h2.c
-index 0dac3d2..99ee4d7 100644
---- a/arch/arm/mach-omap1/board-h2.c
-+++ b/arch/arm/mach-omap1/board-h2.c
-@@ -47,6 +47,7 @@
+ #else
  
- #include <mach/hardware.h>
- #include <mach/usb.h>
-+#include <mach/irqs.h>
+-struct clk *omap_dm_timer_get_fclk(struct omap_dm_timer *timer)
+-{
+-	if (timer)
+-		return timer->fclk;
+-	return NULL;
+-}
+-EXPORT_SYMBOL_GPL(omap_dm_timer_get_fclk);
+-
+ __u32 omap_dm_timer_modify_idlect_mask(__u32 inputmask)
+ {
+ 	BUG();
+diff --git a/drivers/media/rc/ir-rx51.c b/drivers/media/rc/ir-rx51.c
+index 8ead492..d1364a1 100644
+--- a/drivers/media/rc/ir-rx51.c
++++ b/drivers/media/rc/ir-rx51.c
+@@ -25,9 +25,9 @@
+ #include <linux/platform_device.h>
+ #include <linux/sched.h>
+ #include <linux/wait.h>
++#include <linux/clk.h>
  
- #include "common.h"
- #include "board-h2.h"
-diff --git a/arch/arm/mach-omap1/board-perseus2.c b/arch/arm/mach-omap1/board-perseus2.c
-index 8b2f712..403efcc 100644
---- a/arch/arm/mach-omap1/board-perseus2.c
-+++ b/arch/arm/mach-omap1/board-perseus2.c
-@@ -31,6 +31,7 @@
- #include <mach/tc.h>
- #include <mach/mux.h>
- #include <mach/flash.h>
-+#include <mach/irqs.h>
+ #include <plat/dmtimer.h>
+-#include <plat/clock.h>
  
- #include <mach/hardware.h>
+ #include <media/lirc.h>
+ #include <media/lirc_dev.h>
+@@ -209,7 +209,7 @@ static int lirc_rx51_init_port(struct lirc_rx51 *lirc_rx51)
+ 	}
  
-diff --git a/arch/arm/mach-omap1/board-sx1.c b/arch/arm/mach-omap1/board-sx1.c
-index 9732a98..b31e77c 100644
---- a/arch/arm/mach-omap1/board-sx1.c
-+++ b/arch/arm/mach-omap1/board-sx1.c
-@@ -43,6 +43,7 @@
+ 	clk_fclk = omap_dm_timer_get_fclk(lirc_rx51->pwm_timer);
+-	lirc_rx51->fclk_khz = clk_fclk->rate / 1000;
++	lirc_rx51->fclk_khz = clk_get_rate(clk_fclk) / 1000;
  
- #include <mach/hardware.h>
- #include <mach/usb.h>
-+#include <mach/irqs.h>
+ 	return 0;
  
- #include "common.h"
- #include "dma.h"
-diff --git a/drivers/video/omap/lcd_ams_delta.c b/drivers/video/omap/lcd_ams_delta.c
-index ed4cad8..7539276 100644
---- a/drivers/video/omap/lcd_ams_delta.c
-+++ b/drivers/video/omap/lcd_ams_delta.c
-@@ -28,6 +28,7 @@
- #include <linux/gpio.h>
- 
- #include <mach/board-ams-delta.h>
-+#include <mach/hardware.h>
- 
- #include "omapfb.h"
- 
-diff --git a/drivers/video/omap/lcd_osk.c b/drivers/video/omap/lcd_osk.c
-index 3aa62da..cad2338 100644
---- a/drivers/video/omap/lcd_osk.c
-+++ b/drivers/video/omap/lcd_osk.c
-@@ -25,6 +25,7 @@
- 
- #include <asm/gpio.h>
- #include <mach/mux.h>
-+#include <mach/hardware.h>
- #include "omapfb.h"
- 
- static int osk_panel_init(struct lcd_panel *panel, struct omapfb_device *fbdev)
 -- 
 1.8.1.2
