@@ -1,65 +1,40 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 5 Mar 2013 10:28:09 +0900
-Subject: [PATCH v4 2/3] ARM: mach-shmobile: r8a7779: add SATA support
-In-Reply-To: <20130301072345.GD14376@verge.net.au>
-References: <201302272339.15402.sergei.shtylyov@cogentembedded.com>
- <20130301014148.GB9232@quad.lixom.net>
- <20130301072345.GD14376@verge.net.au>
-Message-ID: <CANqRtoR2kZ2+GfVqPc0EbO2+4AFvvXtugQAyZX1RC3=qRT2HEA@mail.gmail.com>
+From: walken@google.com (Michel Lespinasse)
+Date: Mon, 4 Mar 2013 17:37:09 -0800
+Subject: [PATCH V2] lglock: add read-preference local-global rwlock
+In-Reply-To: <20130303174056.GA30176@redhat.com>
+References: <512CC509.1050000@linux.vnet.ibm.com>
+ <CACvQF50UgiqPpDk3HCmV86zKSf6tPjqr0bZowfPEOJs0g0r0MQ@mail.gmail.com>
+ <512D0D67.9010609@linux.vnet.ibm.com>
+ <CACvQF53ph2ixdM-otzetjM5cR+2kcZj6sckOp3TnzzA_x-EZ8w@mail.gmail.com>
+ <512E7879.20109@linux.vnet.ibm.com> <5130E8E2.50206@cn.fujitsu.com>
+ <20130301182854.GA3631@redhat.com>
+ <CANN689HEW=b5S93J27p+rBX-5m7jkW4FER=eHDCp7OgMaTWLPw@mail.gmail.com>
+ <5131FB4C.7070408@cn.fujitsu.com>
+ <20130302172003.GC29769@redhat.com>
+ <20130303174056.GA30176@redhat.com>
+Message-ID: <CANN689F6RHCtDAiBGu=n60UKUEE5Ld50gkwS3rNdE2GN2+v3nA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon
+On Sun, Mar 3, 2013 at 9:40 AM, Oleg Nesterov <oleg@redhat.com> wrote:
+>> However, I still think that FALLBACK_BASE only adds the unnecessary
+>> complications. But even if I am right this is subjective of course, please
+>> feel free to ignore.
 
-On Fri, Mar 1, 2013 at 4:23 PM, Simon Horman <horms@verge.net.au> wrote:
-> On Thu, Feb 28, 2013 at 05:41:48PM -0800, Olof Johansson wrote:
->> On Wed, Feb 27, 2013 at 11:39:14PM +0300, Sergei Shtylyov wrote:
->> > From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
->> >
->> > Add SATA clock for r8a7779 SoC (for both device tree and usual cases).
->> > Register SATA controller as a "late" platform device on r8a7779 SoC.
->>
->> Hi,
->>
->> If you have the a binding in the device tree (which you do through patch 1/3),
->> then there's no reason to have a platform device for it.
+Would it help if I sent out that version (without FALLBACK_BASE) as a
+formal proposal ?
+
+> Hmm. But then I do not understand the lglock annotations. Obviously,
+> rwlock_acquire_read() in lg_local_lock() can't even detect the simplest
+> deadlock, say, lg_local_lock(LOCK) + lg_local_lock(LOCK). Not to mention
+> spin_lock(X) + lg_local_lock(Y) vs lg_local_lock(Y) + spin_lock(X).
 >
-> Hi Olof,
->
-> the DT exists but currently the marzen board brings up all
-> of its devices using platform devices. Which if nothing else is
-> internally consistent.
->
-> I suppose it would be possible to add a call to
-> r8a7779_add_standard_devices_dt() and have the board bring
-> up this device using DT and the rest using platform drivers
-> (until the drivers are migrated to DT).
->
-> Would that be your preferred option?
->
-> Magnus, how do you feel about this idea?
+> OK, I understand that it is not easy to make these annotations correct...
 
-I fail to see the upside I'm afraid.
+I am going to send out a proposal to fix the existing lglock
+annotations and detect the two cases you noticed. It's actually not
+that hard :)
 
-I believe the best way forward is for us to keep on following the same
-style as we have done so far. So for drivers they should begin by
-interfacing as regular platform devices drivers and then add DT
-support incrementally. This allows us to try out things in a non-ABI
-kind of way and it also allows us to add support for various hardware
-feature that do not yet support DT like in the case of DMA Engine.
-With platform devices we can also use the driver with the SH
-architecture.
-
-You can of course do some mixed DT and platform device support on a
-board-level, but I don't really see what would be good about it.
-Actually, I believe that will just make things overly complicated
-without giving us the possibility to try out certain experimental
-features with platform-device-only interface.
-
-Of course Simon, if you prefer to follow your proposal above then go
-ahead. However, please consider the case when this code will be back
-ported to LTSI-3.4.
-
-Thanks,
-
-/ magnus
+-- 
+Michel "Walken" Lespinasse
+A program is never fully debugged until the last user dies.
