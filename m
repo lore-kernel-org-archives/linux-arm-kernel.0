@@ -1,21 +1,54 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 5 Mar 2013 11:15:04 +0100 (CET)
-Subject: [PATCH] genirq: move mask_cache into struct irq_chip_type
-In-Reply-To: <20130304154454.GG21620@kw.sim.vm.gnt>
-References: <20110720234537.GD16297@kw.sim.vm.gnt>
- <1311295758-27493-1-git-send-email-simon@sequanux.org>
- <CAMAG_edBy1kjmEGDD76-C5T0xtha9YxMFJ6B3D8A5kHBwQ1PMQ@mail.gmail.com>
- <20110726153930.GG16297@kw.sim.vm.gnt>
- <CAMAG_ee8YBvDsdQ2zNfn-7qdyTmVYBVb8xykMMv4pg8tEswJgg@mail.gmail.com>
- <5134AF7E.5010605@keymile.com> <20130304154454.GG21620@kw.sim.vm.gnt>
-Message-ID: <alpine.LFD.2.02.1303051114370.22263@ionos>
+From: padma.kvr@gmail.com (Padma Venkat)
+Date: Tue, 5 Mar 2013 15:49:48 +0530
+Subject: [PATCH] ARM: dts: Modify SPI nodes according generic DMA DT
+ bindings
+In-Reply-To: <CAK9yfHwmjwN4ceCQ719Y2DY9keTEX8mt65bHkoHcTTRJc5p9rA@mail.gmail.com>
+References: <1362477862-352-1-git-send-email-padma.v@samsung.com>
+ <CAK9yfHwmjwN4ceCQ719Y2DY9keTEX8mt65bHkoHcTTRJc5p9rA@mail.gmail.com>
+Message-ID: <CAAgF-BfUZOrXjY1demxMnWz3B+eR2VFKf4FGKBNhB7G=hR3UZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 4 Mar 2013, Simon Guinot wrote:
-> On Mon, Mar 04, 2013 at 03:28:14PM +0100, Gerlando Falauto wrote:
-> 
-> AFAIK this issue is still here. I include the current Orion maintainers
-> in the Cc list.
+On Tue, Mar 5, 2013 at 3:36 PM, Sachin Kamat <sachin.kamat@linaro.org> wrote:
+> On 5 March 2013 15:34, Padmavathi Venna <padma.v@samsung.com> wrote:
+>> This patch removes custom way of adding spi dma channels and
+>> adds according to new generic DMA DT bindings on samsung exynos4
+>> and exynos5440 platforms.
+>>
+>> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+>> ---
+>>  arch/arm/boot/dts/exynos4.dtsi    |   15 +++++++++------
+>>  arch/arm/boot/dts/exynos5440.dtsi |    5 +++--
+>>  2 files changed, 12 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+>> index 1a62bcf..2449651 100644
+>> --- a/arch/arm/boot/dts/exynos4.dtsi
+>> +++ b/arch/arm/boot/dts/exynos4.dtsi
+>> @@ -235,8 +235,9 @@
+>>                 compatible = "samsung,exynos4210-spi";
+>>                 reg = <0x13920000 0x100>;
+>>                 interrupts = <0 66 0>;
+>> -               tx-dma-channel = <&pdma0 7>; /* preliminary */
+>> -               rx-dma-channel = <&pdma0 6>; /* preliminary */
+>> +               dmas = <&pdma0 7
+>> +                       &pdma0 6>;
+>> +               dma-names = "tx", "rx";
+>>                 #address-cells = <1>;
+>>                 #size-cells = <0>;
+>>                 status = "disabled";
+>> @@ -246,8 +247,9 @@
+>>                 compatible = "samsung,exynos4210-spi";
+>>                 reg = <0x13930000 0x100>;
+>>                 interrupts = <0 67 0>;
+>> -               tx-dma-channel = <&pdma1 7>; /* preliminary */
+>> -               rx-dma-channel = <&pdma1 6>; /* preliminary */
+>> +               dmas = <&pdma0 7
+>> +                       &pdma0 6>;
+>
+> Shouldn't these be pdma1 as was earlier?
 
-Can you please resend the patch?
+Oops, It's my mistake. Will repost this.
+
+Thanks
+Padma
