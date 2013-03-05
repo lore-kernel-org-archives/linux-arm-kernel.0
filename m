@@ -1,32 +1,71 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 5 Mar 2013 21:54:22 +0000
-Subject: [PATCH 00/23] RFC: exynos multiplatform support
-In-Reply-To: <201303052124.04101.arnd@arndb.de>
-References: <1362505353-8873-1-git-send-email-arnd@arndb.de>
- <201303052150.24947.heiko@sntech.de> <201303052124.04101.arnd@arndb.de>
-Message-ID: <201303052154.22857.arnd@arndb.de>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 05 Mar 2013 14:03:10 -0800
+Subject: [PATCH] ARM: proc: Add Krait proc info
+In-Reply-To: <20130305083421.GA19391@mudshark.cambridge.arm.com>
+References: <1362439299-29617-1-git-send-email-sboyd@codeaurora.org>
+ <20130305083421.GA19391@mudshark.cambridge.arm.com>
+Message-ID: <51366B9E.7010502@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 05 March 2013, Arnd Bergmann wrote:
-> The s3c64xx_dma code is also interesting because
-> it has both an implementation of the s3c_dma interface in
-> arch/arm/mach-s3c64xx/dma.c and one using the generic interface in
-> drivers/dma/amba-pl08x.c. 
+On 03/05/13 00:34, Will Deacon wrote:
+> Hi Stephen, Stepan,
+>
+> On Mon, Mar 04, 2013 at 11:21:39PM +0000, Stephen Boyd wrote:
+>> From: Stepan Moskovchenko <stepanm@codeaurora.org>
+>>
+>> Add processor info for the Qualcomm, Inc. Krait family of
+>> processors, to use the generic ARMv7 initialisation
+>> procedure but explicitly enable the IDIV hardware
+>> capability flag.
+>>
+>> Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
+>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>> ---
+>>  arch/arm/mm/proc-v7.S |   10 ++++++++++
+>>  1 file changed, 10 insertions(+)
+>>
+>> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+>> index 3a3c015..81adeb3 100644
+>> --- a/arch/arm/mm/proc-v7.S
+>> +++ b/arch/arm/mm/proc-v7.S
+>> @@ -434,6 +434,16 @@ __v7_ca15mp_proc_info:
+>>  	.size	__v7_ca15mp_proc_info, . - __v7_ca15mp_proc_info
+>>  
+>>  	/*
+>> +	 * Qualcomm Inc. Krait processors.
+>> +	 */
+>> +	.type	__krait_proc_info, #object
+>> +__krait_proc_info:
+>> +	.long	0x510f0400		@ Required ID value
+>> +	.long	0xff0ffc00		@ Mask for ID
+>> +	__v7_proc __v7_setup, hwcaps = HWCAP_IDIV
+> I was looking at this the other day and wondered whether we could set
+> HWCAP_IDIV in __v7_setup, depending on ID_ISAR0[27:24]. I can't immediately
+> think why that would be difficult, but similarly there may well be a reason
+> why we assign it like this.
+>
+> Fancy taking a look?
 
-This actually brings me to an interesting idea: the s3c64xx SPI driver
-is used with the regular dmaengine API and pl330 on S5P and Exynos,
-but with the s3c-dma interface and pl080 on S3C64xx.
+Ok I'll take a look. Should we be masking out HWCAP_IDIVT on
+!CONFIG_ARM_THUMB configurations?
 
-If we just convert S3C64xx to use the pl080 dmaengine driver
-instead, we can apply my SPI patch without breaking anything.
+----8<-----
 
-We still need a solution for the ASoC drivers, but they are
-not as essential. We could probably move the wrapper files
-from plat-samsung/*dma*.c to sounds/soc/samsung when that becomes
-the only remaining user.
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 3f6cbb2..e2c8bbf 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -484,7 +484,7 @@ static void __init setup_processor(void)
+                 list->elf_name, ENDIANNESS);
+        elf_hwcap = list->elf_hwcap;
+ #ifndef CONFIG_ARM_THUMB
+-       elf_hwcap &= ~HWCAP_THUMB;
++       elf_hwcap &= ~(HWCAP_THUMB | HWCAP_IDIVT);
+ #endif
+ 
+        feat_v6_fixup();
 
-There is also drivers/mmc/host/s3cmci.c, which uses the s3c-dma
-interface, but it is only used on s3c24xx, not s3c64xx or later.
-
-	Arnd
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
