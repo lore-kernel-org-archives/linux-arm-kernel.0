@@ -1,181 +1,50 @@
-From: liuj97@gmail.com (Jiang Liu)
-Date: Tue,  5 Mar 2013 22:54:46 +0800
-Subject: [RFC PATCH v1 03/33] mm/ARM: use common help functions to free
- reserved pages
-In-Reply-To: <1362495317-32682-1-git-send-email-jiang.liu@huawei.com>
-References: <1362495317-32682-1-git-send-email-jiang.liu@huawei.com>
-Message-ID: <1362495317-32682-4-git-send-email-jiang.liu@huawei.com>
+From: kishon@ti.com (kishon)
+Date: Tue, 5 Mar 2013 20:33:18 +0530
+Subject: [PATCH v2 7/8] ARM: dts: omap5: add dwc3 omap dt data
+In-Reply-To: <51360436.6050409@cogentembedded.com>
+References: <1362494223-14151-1-git-send-email-kishon@ti.com>
+ <1362494223-14151-8-git-send-email-kishon@ti.com>
+ <51360436.6050409@cogentembedded.com>
+Message-ID: <51360936.7050009@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use common help functions to free reserved pages.
+Hi,
 
-Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- arch/arm/mm/init.c   |   48 ++++++++++++++++--------------------------------
- arch/arm64/mm/init.c |   26 ++------------------------
- 2 files changed, 18 insertions(+), 56 deletions(-)
+On Tuesday 05 March 2013 08:11 PM, Sergei Shtylyov wrote:
+> Hello.
+>
+> On 05-03-2013 18:37, Kishon Vijay Abraham I wrote:
+>
+>> Add dwc3 omap glue data to the omap5 dt data file. The information about
+>> the dt node added here is available @
+>> Documentation/devicetree/bindings/usb/omap-usb.txt
+>
+>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>> ---
+>>   arch/arm/boot/dts/omap5.dtsi |   11 +++++++++++
+>>   1 file changed, 11 insertions(+)
+>
+>> diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+>> index bd73257..c4eb2ec 100644
+>> --- a/arch/arm/boot/dts/omap5.dtsi
+>> +++ b/arch/arm/boot/dts/omap5.dtsi
+>> @@ -505,6 +505,17 @@
+>>               ti,type = <2>;
+>>           };
+>>
+>> +        omap_dwc3 at 4a020000 {
+>> +            compatible = "ti,dwc3";
+>> +            ti,hwmods = "usb_otg_ss";
+>> +            reg = <0x4a020000 0x1000>;
+>> +            interrupts = <0 93 4>;
+>> +            #address-cells = <1>;
+>> +            #size-cells = <1>;
+>
+>    Why the above two props? You don't seem to have the subnodes...
 
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index ad722f1..40a5bc2 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -424,24 +424,6 @@ void __init bootmem_init(void)
- 	max_pfn = max_high - PHYS_PFN_OFFSET;
- }
- 
--static inline int free_area(unsigned long pfn, unsigned long end, char *s)
--{
--	unsigned int pages = 0, size = (end - pfn) << (PAGE_SHIFT - 10);
--
--	for (; pfn < end; pfn++) {
--		struct page *page = pfn_to_page(pfn);
--		ClearPageReserved(page);
--		init_page_count(page);
--		__free_page(page);
--		pages++;
--	}
--
--	if (size && s)
--		printk(KERN_INFO "Freeing %s memory: %dK\n", s, size);
--
--	return pages;
--}
--
- /*
-  * Poison init memory with an undefined instruction (ARM) or a branch to an
-  * undefined instruction (Thumb).
-@@ -534,6 +516,16 @@ static void __init free_unused_memmap(struct meminfo *mi)
- #endif
- }
- 
-+#ifdef CONFIG_HIGHMEM
-+static inline void free_area_high(unsigned long pfn, unsigned long end)
-+{
-+	for (; pfn < end; pfn++) {
-+		__free_reserved_page(pfn_to_page(pfn));
-+		totalhigh_pages++;
-+	}
-+}
-+#endif
-+
- static void __init free_highpages(void)
- {
- #ifdef CONFIG_HIGHMEM
-@@ -569,8 +561,7 @@ static void __init free_highpages(void)
- 			if (res_end > end)
- 				res_end = end;
- 			if (res_start != start)
--				totalhigh_pages += free_area(start, res_start,
--							     NULL);
-+				free_area_high(start, res_start);
- 			start = res_end;
- 			if (start == end)
- 				break;
-@@ -578,7 +569,7 @@ static void __init free_highpages(void)
- 
- 		/* And now free anything which remains */
- 		if (start < end)
--			totalhigh_pages += free_area(start, end, NULL);
-+			free_area_high(start, end);
- 	}
- 	totalram_pages += totalhigh_pages;
- #endif
-@@ -609,8 +600,7 @@ void __init mem_init(void)
- 
- #ifdef CONFIG_SA1111
- 	/* now that our DMA memory is actually so designated, we can free it */
--	totalram_pages += free_area(PHYS_PFN_OFFSET,
--				    __phys_to_pfn(__pa(swapper_pg_dir)), NULL);
-+	free_reserved_area(__va(PHYS_PFN_OFFSET), swapper_pg_dir, 0, NULL);
- #endif
- 
- 	free_highpages();
-@@ -738,16 +728,12 @@ void free_initmem(void)
- 	extern char __tcm_start, __tcm_end;
- 
- 	poison_init_mem(&__tcm_start, &__tcm_end - &__tcm_start);
--	totalram_pages += free_area(__phys_to_pfn(__pa(&__tcm_start)),
--				    __phys_to_pfn(__pa(&__tcm_end)),
--				    "TCM link");
-+	free_reserved_area(&__tcm_start, &__tcm_end, 0, "TCM link");
- #endif
- 
- 	poison_init_mem(__init_begin, __init_end - __init_begin);
- 	if (!machine_is_integrator() && !machine_is_cintegrator())
--		totalram_pages += free_area(__phys_to_pfn(__pa(__init_begin)),
--					    __phys_to_pfn(__pa(__init_end)),
--					    "init");
-+		free_initmem_default(0);
- }
- 
- #ifdef CONFIG_BLK_DEV_INITRD
-@@ -758,9 +744,7 @@ void free_initrd_mem(unsigned long start, unsigned long end)
- {
- 	if (!keep_initrd) {
- 		poison_init_mem((void *)start, PAGE_ALIGN(end) - start);
--		totalram_pages += free_area(__phys_to_pfn(__pa(start)),
--					    __phys_to_pfn(__pa(end)),
--					    "initrd");
-+		free_reserved_area(start, end, 0, "initrd");
- 	}
- }
- 
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 800aac3..f497ca7 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -197,24 +197,6 @@ void __init bootmem_init(void)
- 	max_pfn = max_low_pfn = max;
- }
- 
--static inline int free_area(unsigned long pfn, unsigned long end, char *s)
--{
--	unsigned int pages = 0, size = (end - pfn) << (PAGE_SHIFT - 10);
--
--	for (; pfn < end; pfn++) {
--		struct page *page = pfn_to_page(pfn);
--		ClearPageReserved(page);
--		init_page_count(page);
--		__free_page(page);
--		pages++;
--	}
--
--	if (size && s)
--		pr_info("Freeing %s memory: %dK\n", s, size);
--
--	return pages;
--}
--
- /*
-  * Poison init memory with an undefined instruction (0x0).
-  */
-@@ -405,9 +387,7 @@ void __init mem_init(void)
- void free_initmem(void)
- {
- 	poison_init_mem(__init_begin, __init_end - __init_begin);
--	totalram_pages += free_area(__phys_to_pfn(__pa(__init_begin)),
--				    __phys_to_pfn(__pa(__init_end)),
--				    "init");
-+	free_initmem_default(0);
- }
- 
- #ifdef CONFIG_BLK_DEV_INITRD
-@@ -418,9 +398,7 @@ void free_initrd_mem(unsigned long start, unsigned long end)
- {
- 	if (!keep_initrd) {
- 		poison_init_mem((void *)start, PAGE_ALIGN(end) - start);
--		totalram_pages += free_area(__phys_to_pfn(__pa(start)),
--					    __phys_to_pfn(__pa(end)),
--					    "initrd");
-+		free_reserved_area(start, end, 0, "initrd");
- 	}
- }
- 
--- 
-1.7.9.5
+It's added in the next patch. Ok, Felipe has already pointed out to 
+merge the two patches.
+
+Thanks
+Kishon
