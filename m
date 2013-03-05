@@ -1,27 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 5 Mar 2013 22:43:00 +0000
-Subject: [PATCH 00/23] RFC: exynos multiplatform support
-In-Reply-To: <201303052325.13143.heiko@sntech.de>
-References: <1362505353-8873-1-git-send-email-arnd@arndb.de>
- <201303052154.22857.arnd@arndb.de> <201303052325.13143.heiko@sntech.de>
-Message-ID: <201303052243.00681.arnd@arndb.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 05 Mar 2013 15:48:05 -0700
+Subject: [REPOST PATCH 0/2] Table lookup for mux clock type
+In-Reply-To: <1361545358-22721-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1361545358-22721-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <51367625.2090405@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 05 March 2013, Heiko St?bner wrote:
-> Am Dienstag, 5. M?rz 2013, 22:54:22 schrieb Arnd Bergmann:
-> > On Tuesday 05 March 2013, Arnd Bergmann wrote:
+On 02/22/2013 08:02 AM, Peter De Schrijver wrote:
+> This patchset adds a table lookup feature to the mux clock type. This will
+> be used by the forthcoming Tegra114 clock implementation. Also instead of
+> a fixed field width, a mask is used. This is because Tegra114 has some muxes
+> where the parent selector is spread over several bitfields. The second patch
+> adapts the tegra periph clock implementation which uses struct clk_mux
+> directly.
 > 
-> > We still need a solution for the ASoC drivers, but they are
-> > not as essential. We could probably move the wrapper files
-> > from plat-samsung/*dma*.c to sounds/soc/samsung when that becomes
-> > the only remaining user.
+> --
 > 
-> In ASoC there is also a clear distinction between the different SoC
-> generations. SND_SAMSUNG_I2S /_PCM /_AC97 ... is only used by newer SoCs
-> while SND_S3C24XX_I2S and SND_S3C_I2SV2_SOC is used by the legacy SoCs.
+> Mike,
+> 
+> This patch is a dependency for the Tegra114 CCF implementation. Could you
+> review it and merge on a topic branch so Stephen can pull it in to verify
+> the integration?
 
-Well, the only file that really needs to get changed is dma.c, which
-seems to be used by both the old and the new drivers.
+Peter, does this repost you resolve the issue I pointed out at:
+http://www.spinics.net/lists/arm-kernel/msg220873.html
 
-	Arnd
+To quote:
+
+>>> Just a quick note on patch dependencies here:
+>>>
+>>> Patch 1/2 can presumably be taken through the clk tree whenever Mike is
+>>> OK with it.
+>>>
+>>> Patch 2/2 depends on patches in the Tegra tree for 3.9. Since patch 2/2
+>>> is useful mostly for the Tegra114 clock driver, and I don't imagine that
+>>> will get posted/merged in time for 3.9, it's probably easiest to just
+>>> take patch 2/2 for 3.10 along with the Tegra114 clock driver. Also, I
+>>> imagine there won't be any more clk/Tegra tree dependencies in 3.10, so
+>>> patch 2/2 and the Tegra114 clk driver patches can likely go through the
+>>> clk tree itself for 3.10.
+>> 
+>> No. Because 1/2 changes struct clk_mux and the tegra peripheral clock type 
+>> uses struct clk_mux directly, 2/2 needs to be applied together with 1/2, even
+>> if the new functionality is not yet used.
+> 
+> Oh, then they can't be two separate patches then, or "git bisect" won't
+> work. I guess it's best to wait for 3.10 for this:-(
