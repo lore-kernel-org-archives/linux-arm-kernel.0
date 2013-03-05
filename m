@@ -1,75 +1,94 @@
 From: mporter@ti.com (Matt Porter)
-Date: Tue,  5 Mar 2013 15:53:11 -0500
-Subject: [PATCH v8 5/9] dmaengine: edma: Add TI EDMA device tree binding
+Date: Tue,  5 Mar 2013 15:53:13 -0500
+Subject: [PATCH v8 7/9] spi: omap2-mcspi: convert to
+ dma_request_slave_channel_compat()
 In-Reply-To: <1362516795-6346-1-git-send-email-mporter@ti.com>
 References: <1362516795-6346-1-git-send-email-mporter@ti.com>
-Message-ID: <1362516795-6346-6-git-send-email-mporter@ti.com>
+Message-ID: <1362516795-6346-8-git-send-email-mporter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The binding definition is based on the generic DMA controller
-binding.
+Convert dmaengine channel requests to use
+dma_request_slave_channel_compat(). This supports the DT case of
+platforms requiring channel selection from either the OMAP DMA or
+the EDMA engine. AM33xx only boots from DT and is the only user
+implementing EDMA so in the !DT case we can default to the OMAP DMA
+filter.
 
 Signed-off-by: Matt Porter <mporter@ti.com>
+Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 ---
- Documentation/devicetree/bindings/dma/ti-edma.txt |   49 +++++++++++++++++++++
- 1 file changed, 49 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/dma/ti-edma.txt
+ drivers/spi/spi-omap2-mcspi.c |   27 ++++++++++++++++++++-------
+ 1 file changed, 20 insertions(+), 7 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/dma/ti-edma.txt b/Documentation/devicetree/bindings/dma/ti-edma.txt
-new file mode 100644
-index 0000000..075a60e3
---- /dev/null
-+++ b/Documentation/devicetree/bindings/dma/ti-edma.txt
-@@ -0,0 +1,49 @@
-+TI EDMA
+diff --git a/drivers/spi/spi-omap2-mcspi.c b/drivers/spi/spi-omap2-mcspi.c
+index 893c3d7..38d0915 100644
+--- a/drivers/spi/spi-omap2-mcspi.c
++++ b/drivers/spi/spi-omap2-mcspi.c
+@@ -102,6 +102,9 @@ struct omap2_mcspi_dma {
+ 
+ 	struct completion dma_tx_completion;
+ 	struct completion dma_rx_completion;
 +
-+Required properties:
-+- compatible : "ti,edma3"
-+- ti,hwmods: Name of the hwmods associated to the EDMA
-+- ti,edma-regions: Number of regions
-+- ti,edma-slots: Number of slots
-+- ti,edma-queue-tc-map: List of transfer control to queue mappings
-+- ti,edma-queue-priority-map: List of queue priority mappings
-+- ti,edma-default-queue: Default queue value
++	char dma_rx_ch_name[14];
++	char dma_tx_ch_name[14];
+ };
+ 
+ /* use PIO for small transfers, avoiding DMA setup/teardown overhead and
+@@ -822,14 +825,23 @@ static int omap2_mcspi_request_dma(struct spi_device *spi)
+ 	dma_cap_zero(mask);
+ 	dma_cap_set(DMA_SLAVE, mask);
+ 	sig = mcspi_dma->dma_rx_sync_dev;
+-	mcspi_dma->dma_rx = dma_request_channel(mask, omap_dma_filter_fn, &sig);
 +
-+Optional properties:
-+- ti,edma-reserved-channels: List of reserved channel regions
-+- ti,edma-reserved-slots: List of reserved slot regions
-+- ti,edma-xbar-event-map: Crossbar event to channel map
++	mcspi_dma->dma_rx =
++		dma_request_slave_channel_compat(mask, omap_dma_filter_fn,
++						 &sig, &master->dev,
++						 mcspi_dma->dma_rx_ch_name);
 +
-+Example:
+ 	if (!mcspi_dma->dma_rx) {
+ 		dev_err(&spi->dev, "no RX DMA engine channel for McSPI\n");
+ 		return -EAGAIN;
+ 	}
+ 
+ 	sig = mcspi_dma->dma_tx_sync_dev;
+-	mcspi_dma->dma_tx = dma_request_channel(mask, omap_dma_filter_fn, &sig);
++	mcspi_dma->dma_tx =
++		dma_request_slave_channel_compat(mask, omap_dma_filter_fn,
++						 &sig, &master->dev,
++						 mcspi_dma->dma_tx_ch_name);
 +
-+edma: edma at 49000000 {
-+	reg = <0x49000000 0x10000>;
-+	interrupt-parent = <&intc>;
-+	interrupts = <12 13 14>;
-+	compatible = "ti,edma3";
-+	ti,hwmods = "tpcc", "tptc0", "tptc1", "tptc2";
-+	#dma-cells = <1>;
-+	dma-channels = <64>;
-+	ti,edma-regions = <4>;
-+	ti,edma-slots = <256>;
-+	ti,edma-reserved-channels = <0  2
-+				     14 2
-+				     26 6
-+				     48 4
-+				     56 8>;
-+	ti,edma-reserved-slots = <0  2
-+				  14 2
-+				  26 6
-+				  48 4
-+				  56 8
-+				  64 127>;
-+	ti,edma-queue-tc-map = <0 0
-+				1 1
-+				2 2>;
-+	ti,edma-queue-priority-map = <0 0
-+				      1 1
-+				      2 2>;
-+	ti,edma-default-queue = <0>;
-+	ti,edma-xbar-event-map = <1 12
-+				  2 13>;
-+};
+ 	if (!mcspi_dma->dma_tx) {
+ 		dev_err(&spi->dev, "no TX DMA engine channel for McSPI\n");
+ 		dma_release_channel(mcspi_dma->dma_rx);
+@@ -1240,12 +1252,13 @@ static int omap2_mcspi_probe(struct platform_device *pdev)
+ 		goto free_master;
+ 
+ 	for (i = 0; i < master->num_chipselect; i++) {
+-		char dma_ch_name[14];
++		char *dma_rx_ch_name = mcspi->dma_channels[i].dma_rx_ch_name;
++		char *dma_tx_ch_name = mcspi->dma_channels[i].dma_tx_ch_name;
+ 		struct resource *dma_res;
+ 
+-		sprintf(dma_ch_name, "rx%d", i);
++		sprintf(dma_rx_ch_name, "rx%d", i);
+ 		dma_res = platform_get_resource_byname(pdev, IORESOURCE_DMA,
+-				dma_ch_name);
++				dma_rx_ch_name);
+ 		if (!dma_res) {
+ 			dev_dbg(&pdev->dev, "cannot get DMA RX channel\n");
+ 			status = -ENODEV;
+@@ -1253,9 +1266,9 @@ static int omap2_mcspi_probe(struct platform_device *pdev)
+ 		}
+ 
+ 		mcspi->dma_channels[i].dma_rx_sync_dev = dma_res->start;
+-		sprintf(dma_ch_name, "tx%d", i);
++		sprintf(dma_tx_ch_name, "tx%d", i);
+ 		dma_res = platform_get_resource_byname(pdev, IORESOURCE_DMA,
+-				dma_ch_name);
++				dma_tx_ch_name);
+ 		if (!dma_res) {
+ 			dev_dbg(&pdev->dev, "cannot get DMA TX channel\n");
+ 			status = -ENODEV;
 -- 
 1.7.9.5
