@@ -1,73 +1,143 @@
-From: prakash.pm@ti.com (Manjunathappa, Prakash)
-Date: Tue, 5 Mar 2013 12:56:20 +0000
-Subject: [PATCH v2 1/4] spi/davinci: add DT binding documentation
-In-Reply-To: <6918845.dALXSKksQd@wuerfel>
-References: <1362401955-9616-1-git-send-email-prakash.pm@ti.com>
- <1362401955-9616-2-git-send-email-prakash.pm@ti.com>
- <6918845.dALXSKksQd@wuerfel>
-Message-ID: <A73F36158E33644199EB82C5EC81C7BC3EA4854E@DBDE01.ent.ti.com>
+From: hechtb@gmail.com (Bastian Hecht)
+Date: Tue, 5 Mar 2013 13:58:13 +0100
+Subject: [PATCH v4 1/3] serial: sh-sci: Add OF support
+In-Reply-To: <5345836.ZO7uU35cQD@wuerfel>
+References: <1362414054-23092-1-git-send-email-hechtb+renesas@gmail.com>
+ <5345836.ZO7uU35cQD@wuerfel>
+Message-ID: <CABYn4sxYRbmEe27WKE-FbTZ3_SM+APaYqHJ1=Zrk8_a5czxZaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd,
 
-On Mon, Mar 04, 2013 at 21:59:16, Arnd Bergmann wrote:
-> On Monday 04 March 2013 18:29:12 Manjunathappa, Prakash wrote:
-> > diff --git a/Documentation/devicetree/bindings/spi/spi-davinci.txt b/Documentation/devicetree/bindings/spi/spi-davinci.txt
-> > new file mode 100644
-> > index 0000000..a62d7a8
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/spi/spi-davinci.txt
-> > @@ -0,0 +1,51 @@
-> > +Davinci SPI controller device bindings
-> > +
-> > +Required properties:
-> > +- #address-cells: number of cells required to define a chip select
-> > +	address on the SPI bus. Should be set to 1.
-> > +- #size-cells: should be zero.
-> > +- compatible:
-> > +	- "ti,dm644x-spi" for SPI used similar to that on DM644x SoC family
-> > +	- "ti,da8xx-spi" for SPI used similar to that on DA8xx SoC family
-> 
-> In general, you should avoid wildcards in "compatible" properties.
-> Better use the number of the first chip that introduced the specific
-> version of the device.
-> 
+thanks for having a look at it.
 
-Correct, will accommodate this change.
+2013/3/4 Arnd Bergmann <arnd@arndb.de>:
+> On Monday 04 March 2013 17:20:52 Bastian Hecht wrote:
+>> diff --git a/Documentation/devicetree/bindings/tty/serial/renesas,sci-serial.txt b/Documentation/devicetree/bindings/tty/serial/renesas,sci-serial.txt
+>> new file mode 100644
+>> index 0000000..6ad1adf
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/tty/serial/renesas,sci-serial.txt
+>> @@ -0,0 +1,53 @@
+>> +* Renesas SH-Mobile Serial Communication Interface
+>> +
+>> +Required properties:
+>> +- compatible : Should be "renesas,sci-<port type>-uart", where <port type> may be
+>> +  SCI, SCIF, IRDA, SCIFA or SCIFB.
+>
+> Why capital letters here? Maybe just list
+>
+>         "renesas,sci-uart", "renesas,scif-uart", ...
 
-> > +- reg: Offset and length of SPI controller register space
-> > +- num-cs: Number of chip selects
-> > +- ti,davinci-spi-intr-line: interrupt line used to connect the SPI
-> > +	IP to the interrupt controller withn the SoC. Possible values
-> > +	are 0 and 1. Manual says one of the two possible interrupt
-> > +	lines can be tied to the interrupt controller. Set this
-> > +	based on a specifc SoC configuration.
-> > +- interrupts: interrupt number offset at the irq parent
-> 
-> I would not call this an "offset". It is an interrupt descriptor
-> which may be something other than a simple number.
-> 
+Yes - changed.
 
-I am planning to drop from this documentation as it is common property.
+>> +- reg : Address and length of the register set for the device
+>> +- interrupts : Should contain the following IRQs: ERI, RXI, TXI and BRI.
+>
+> You probably want to require the "interrupt-names" property as well
+> then.
 
-> Unfortunately, there is no way to provide an "invalid" interrupt,
-> otherwise you could just list both interrupts, out of which at
-> least one should be valid, and drop the ti,davinci-spi-intr-line
-> property.
-> 
+I added the interrupt-names property but still enforce the ordering in
+the binding specs.
+Don't know if we want the extra overhead to scan for strings or just
+take a certain order for granted.
+If we want to change it to parsing, it would be better to switch
+completely to platform_get_irq_byname() and change all the current
+platform code, else we will produce code overhead.
 
-This is different from interrupt number, this is used to specifies out
-of 2 lines from SPI IP which is tied to INTC. Some discussion about it:
-https://lkml.org/lkml/2012/11/16/404
-	
-> One thing you could do instead though is to use the "interrupt-names"
-> property to define "irq0" and "irq1" interrupts, and in the
-> implementation use the first one you find.
-> 
+>> +- cell-index : The device id.
+>> +- renesas,scscr : Should contain a bitfield used by the Serial Control Register.
+>> +  b7 = SCSCR_TIE
+>> +  b6 = SCSCR_RIE
+>> +  b5 = SCSCR_TE
+>> +  b4 = SCSCR_RE
+>> +  b3 = SCSCR_REIE
+>> +  b2 = SCSCR_TOIE
+>> +  b1 = SCSCR_CKE1
+>> +  b0 = SCSCR_CKE0
+>> +- renesas,scbrr-algo-id : Algorithm ID for the Bit Rate Register
+>> +  1 = SCBRR_ALGO_1 ((clk + 16 * bps) / (16 * bps) - 1)
+>> +  2 = SCBRR_ALGO_2 ((clk + 16 * bps) / (32 * bps) - 1)
+>> +  3 = SCBRR_ALGO_3 (((clk * 2) + 16 * bps) / (16 * bps) - 1)
+>> +  4 = SCBRR_ALGO_4 (((clk * 2) + 16 * bps) / (32 * bps) - 1)
+>> +  5 = SCBRR_ALGO_5 (((clk * 1000 / 32) / bps) - 1)
+>
+> Maybe replace this with a "clock-frequency" property? This may
+> be what the registers contain, but it is not very readable.
 
-In IP specification it is mentioned as spi-intr-line, I prefer to retain this
-property as davinci-spi-intr-line.
+Hmm... do you want a frequency in absolute terms? And then calculate
+the best SCBRR value for it?
+I'm unsure about this, either you must exactly hit it or accept
+tolerances? As something in between I renamed the property to
+"renesas,clock-algorithm", but I don't know if this is what you want.
 
-Thanks,
-Prakash
+>> +Optional properties:
+>> +- renesas,autoconf : Set if device is capable of auto configuration
+>> +- renesas,regtype : Overwrite the register layout. In most cases you can rely
+>> +  on auto-probing (omit this property or set to 0) but some legacy devices
+>> +  use a non-default register layout. Possible layouts are
+>> +  0 = SCIx_PROBE_REGTYPE (default)
+>> +  1 = SCIx_SCI_REGTYPE
+>> +  2 = SCIx_IRDA_REGTYPE
+>> +  3 = SCIx_SCIFA_REGTYPE
+>> +  4 = SCIx_SCIFB_REGTYPE
+>> +  5 = SCIx_SH2_SCIF_FIFODATA_REGTYPE
+>> +  6 = SCIx_SH3_SCIF_REGTYPE
+>> +  7 = SCIx_SH4_SCIF_REGTYPE
+>> +  8 = SCIx_SH4_SCIF_NO_SCSPTR_REGTYPE
+>> +  9 = SCIx_SH4_SCIF_FIFODATA_REGTYPE
+>> + 10 = SCIx_SH7705_SCIF_REGTYPE
+>
+> Why do you keep these separate from the "compatible" property?
+> By definition, the register layout is already determined by
+> "compatible".
+
+Ok, I've melted the register type and port type (defined in
+include/uapi/linux/serial_core.h) definition into the compatible
+property. Looks good!
+
+>> +#ifdef CONFIG_OF
+>> +static const struct of_device_id of_sci_match[] = {
+>> +     { .compatible = "renesas,sci-SCI-uart",
+>> +             .data = (void *)PORT_SCI },
+>> +     { .compatible = "renesas,sci-SCIF-uart",
+>> +             .data = (void *)PORT_SCIF },
+>> +     { .compatible = "renesas,sci-IRDA-uart",
+>> +             .data = (void *)PORT_IRDA },
+>> +     { .compatible = "renesas,sci-SCIFA-uart",
+>> +             .data = (void *)PORT_SCIFA },
+>> +     { .compatible = "renesas,sci-SCIFB-uart",
+>> +             .data = (void *)PORT_SCIFB },
+>> +     {},
+>> +};
+>> +MODULE_DEVICE_TABLE(of, of_sci_match);
+>> +
+>> +static struct plat_sci_port *sci_parse_dt(struct platform_device *pdev,
+>> +                                                             int *dev_id)
+>> +{
+>> +     struct plat_sci_port *p;
+>> +     struct device_node *np = pdev->dev.of_node;
+>> +     const struct of_device_id *match;
+>> +     struct resource *res;
+>> +     const __be32 *prop;
+>> +     int i, irq, val;
+>> +
+>
+> You can remove the #ifdef by replacing it with
+>
+>         if (!IS_ENABLED(CONFIG_OF) || !np)
+>                 return NULL;
+>
+> here. This gives better compile time coverage and more readable code.
+
+Alright, done!
+
+> Otherwise looks very nice!
+
+Cheers!
+
+ Bastian
+
+
+>         Arnd
