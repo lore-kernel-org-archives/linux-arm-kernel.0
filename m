@@ -1,39 +1,78 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Tue, 05 Mar 2013 21:17:17 +0100
-Subject: [PATCH v2] ARM: dove: drop "select COMMON_CLK_DOVE"
-In-Reply-To: <51363A9E.6090507@gmail.com>
-References: <1362476098.16460.65.camel@x61.thuisdomein>
- <51363A9E.6090507@gmail.com>
-Message-ID: <1362514637.16460.117.camel@x61.thuisdomein>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 5 Mar 2013 21:40:09 +0100 (CET)
+Subject: [PATCH 2/4][V2] time : set broadcast irq affinity
+In-Reply-To: <1362219013-18173-3-git-send-email-daniel.lezcano@linaro.org>
+References: <1362219013-18173-1-git-send-email-daniel.lezcano@linaro.org>
+ <1362219013-18173-3-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <alpine.LFD.2.02.1303052135080.22263@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 5b03df9ace680d7cdd34a69dfd85ca5f74159d18 ("ARM: dove: switch to
-DT clock providers") added "select COMMON_CLK_DOVE" to Marvell Dove's
-Kconfig entry. But there's no Kconfig symbol COMMON_CLK_DOVE, which
-makes this select statement a nop. It's probably a leftover of some
-experimental code that never hit mainline. Drop it.
+On Sat, 2 Mar 2013, Daniel Lezcano wrote:
+> When a cpu goes to a deep idle state where its local timer is shutdown,
+> it notifies the time frame work to use the broadcast timer instead.
+> 
+> Unfortunately, the broadcast device could wake up any CPU, including an
+> idle one which is not concerned by the wake up at all.
+> 
+> This implies, in the worst case, an idle CPU will wake up to send an IPI
+> to another idle cpu.
+> 
+> This patch solves this by setting the irq affinity to the cpu concerned
+> by the nearest timer event, by this way, the CPU which is wake up is
+> guarantee to be the one concerned by the next event and we are safe with
+> unnecessary wakeup for another idle CPU.
+> 
+> As the irq affinity is not supported by all the archs, a flag is needed
+> to specify which clocksource can handle it : CLOCK_EVT_FEAT_DYNIRQ
+> 
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> ---
+>  include/linux/clockchips.h   |    5 +++++
+>  kernel/time/tick-broadcast.c |   40 +++++++++++++++++++++++++++++++++-------
+>  2 files changed, 38 insertions(+), 7 deletions(-)
+> 
+> diff --git a/include/linux/clockchips.h b/include/linux/clockchips.h
+> index 6634652..c93e2a6 100644
+> --- a/include/linux/clockchips.h
+> +++ b/include/linux/clockchips.h
+> @@ -55,6 +55,11 @@ enum clock_event_nofitiers {
+>  #define CLOCK_EVT_FEAT_C3STOP		0x000008
+>  #define CLOCK_EVT_FEAT_DUMMY		0x000010
+>  
+> +/*
+> + * Clock event device can set its irq affinity dynamically
+> + */
+> +#define CLOCK_EVT_FEAT_DYNIRQ		0x000020
+> +
+>  /**
+>   * struct clock_event_device - clock event device descriptor
+>   * @event_handler:	Assigned by the framework to be called by the low
+> diff --git a/kernel/time/tick-broadcast.c b/kernel/time/tick-broadcast.c
+> index 6197ac0..9ca8ff5 100644
+> --- a/kernel/time/tick-broadcast.c
+> +++ b/kernel/time/tick-broadcast.c
+> @@ -406,13 +406,37 @@ struct cpumask *tick_get_broadcast_oneshot_mask(void)
+>  	return to_cpumask(tick_broadcast_oneshot_mask);
+>  }
+>  
+> -static int tick_broadcast_set_event(struct clock_event_device *bc,
+> +/*
+> + * Set broadcast interrupt affinity
+> + */
+> +static void tick_broadcast_set_affinity(struct clock_event_device *bc,
+> +					const struct cpumask *cpumask)
+> +{
+> +	if (!(bc->features & CLOCK_EVT_FEAT_DYNIRQ))
+> +		return;
+> +
+> +	if (cpumask_equal(bc->cpumask, cpumask))
+> +		return;
+> +
+> +	bc->cpumask = cpumask;
 
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
----
-0) v2: Sebastian suggested to drop this select entirely.
+This breaks with CONFIG_CPUMASK_OFFSTACK=y. cpumask_copy() is your friend!
 
-1) Still untested.
+Thanks,
 
- arch/arm/Kconfig | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 5b71469..0c990b7 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -556,7 +556,6 @@ config ARCH_IXP4XX
- config ARCH_DOVE
- 	bool "Marvell Dove"
- 	select ARCH_REQUIRE_GPIOLIB
--	select COMMON_CLK_DOVE
- 	select CPU_V7
- 	select GENERIC_CLOCKEVENTS
- 	select MIGHT_HAVE_PCI
--- 
-1.7.11.7
+	tglx
