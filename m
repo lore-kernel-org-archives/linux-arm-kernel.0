@@ -1,37 +1,38 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  5 Mar 2013 03:47:21 +0000
-Subject: [PATCH 05/29] arm64: KVM: Basic ESR_EL2 helpers and vcpu register
- access
+Date: Tue,  5 Mar 2013 03:47:22 +0000
+Subject: [PATCH 06/29] arm64: KVM: fault injection into a guest
 In-Reply-To: <1362455265-24165-1-git-send-email-marc.zyngier@arm.com>
 References: <1362455265-24165-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1362455265-24165-6-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1362455265-24165-7-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implements helpers for dealing with the EL2 syndrome register as
-well as accessing the vcpu registers.
+Implement the injection of a fault (undefined, data abort or
+prefetch abort) into a 64bit guest.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_emulate.h | 159 +++++++++++++++++++++++++++++++++++
- 1 file changed, 159 insertions(+)
- create mode 100644 arch/arm64/include/asm/kvm_emulate.h
+ arch/arm64/kvm/inject_fault.c | 117 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 117 insertions(+)
+ create mode 100644 arch/arm64/kvm/inject_fault.c
 
-diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
 new file mode 100644
-index 0000000..16a343b
+index 0000000..80b245f
 --- /dev/null
-+++ b/arch/arm64/include/asm/kvm_emulate.h
-@@ -0,0 +1,159 @@
++++ b/arch/arm64/kvm/inject_fault.c
+@@ -0,0 +1,117 @@
 +/*
++ * Fault injection for 64bit guests.
++ *
 + * Copyright (C) 2012 - ARM Ltd
 + * Author: Marc Zyngier <marc.zyngier@arm.com>
 + *
-+ * Derived from arch/arm/include/kvm_emulate.h
++ * Based on arch/arm/kvm/emulate.c
 + * Copyright (C) 2012 - Virtual Open Systems and Columbia University
 + * Author: Christoffer Dall <c.dall@virtualopensystems.com>
 + *
-+ * This program is free software; you can redistribute it and/or modify
++ * This program is free software: you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
 + *
@@ -44,143 +45,99 @@ index 0000000..16a343b
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+#ifndef __ARM64_KVM_EMULATE_H__
-+#define __ARM64_KVM_EMULATE_H__
-+
 +#include <linux/kvm_host.h>
-+#include <asm/kvm_asm.h>
-+#include <asm/kvm_arm.h>
-+#include <asm/kvm_mmio.h>
-+#include <asm/ptrace.h>
++#include <asm/kvm_emulate.h>
 +
-+void kvm_inject_undefined(struct kvm_vcpu *vcpu);
-+void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr);
-+void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr);
-+
-+static inline unsigned long *vcpu_pc(struct kvm_vcpu *vcpu)
++static void inject_abt64(struct kvm_vcpu *vcpu, bool is_iabt, unsigned long addr)
 +{
-+	return (unsigned long *)&vcpu->arch.regs.regs.pc;
++	unsigned long cpsr = *vcpu_cpsr(vcpu);
++	int is_aarch32;
++	u32 esr = 0;
++
++	is_aarch32 = vcpu_mode_is_32bit(vcpu);
++
++	*vcpu_spsr(vcpu) = cpsr;
++	vcpu->arch.regs.elr_el1 = *vcpu_pc(vcpu);
++
++	*vcpu_cpsr(vcpu) = PSR_MODE_EL1h | PSR_A_BIT | PSR_F_BIT | PSR_I_BIT;
++	*vcpu_pc(vcpu) = vcpu->arch.sys_regs[VBAR_EL1] + 0x200;
++
++	vcpu->arch.sys_regs[FAR_EL1] = addr;
++
++	/*
++	 * Build an {i,d}abort, depending on the level and the
++	 * instruction set. Report an external synchronous abort.
++	 */
++	if (kvm_vcpu_trap_il_is32bit(vcpu))
++		esr |= (1 << 25);
++
++	if (is_aarch32 || (cpsr & PSR_MODE_MASK) == PSR_MODE_EL0t)
++		esr |= (0x20 << 26);
++	else
++		esr |= (0x21 << 26);
++
++	if (!is_iabt)
++		esr |= (1 << 28);
++
++	vcpu->arch.sys_regs[ESR_EL1] = esr | 0x10;
 +}
 +
-+static inline unsigned long *vcpu_cpsr(struct kvm_vcpu *vcpu)
++static void inject_undef64(struct kvm_vcpu *vcpu)
 +{
-+	return (unsigned long *)&vcpu->arch.regs.regs.pstate;
++	unsigned long cpsr = *vcpu_cpsr(vcpu);
++	u32 esr = 0;
++
++	*vcpu_spsr(vcpu) = cpsr;
++	vcpu->arch.regs.elr_el1 = *vcpu_pc(vcpu);
++
++	*vcpu_cpsr(vcpu) = PSR_MODE_EL1h | PSR_F_BIT | PSR_I_BIT;
++	*vcpu_pc(vcpu) = vcpu->arch.sys_regs[VBAR_EL1] + 0x200;
++
++	/*
++	 * Build an unknown exception, depending on the instruction
++	 * set.
++	 */
++	if (kvm_vcpu_trap_il_is32bit(vcpu))
++		esr |= (1 << 25);
++
++	vcpu->arch.sys_regs[ESR_EL1] = esr;
 +}
 +
-+static inline bool vcpu_mode_is_32bit(struct kvm_vcpu *vcpu)
++/**
++ * kvm_inject_dabt - inject a data abort into the guest
++ * @vcpu: The VCPU to receive the undefined exception
++ * @addr: The address to report in the DFAR
++ *
++ * It is assumed that this code is called from the VCPU thread and that the
++ * VCPU therefore is not currently executing guest code.
++ */
++void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr)
 +{
-+	return false;	/* 32bit? Bahhh... */
++	inject_abt64(vcpu, false, addr);
 +}
 +
-+static inline bool kvm_condition_valid(struct kvm_vcpu *vcpu)
++/**
++ * kvm_inject_pabt - inject a prefetch abort into the guest
++ * @vcpu: The VCPU to receive the undefined exception
++ * @addr: The address to report in the DFAR
++ *
++ * It is assumed that this code is called from the VCPU thread and that the
++ * VCPU therefore is not currently executing guest code.
++ */
++void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr)
 +{
-+	return true;	/* No conditionals on arm64 */
++	inject_abt64(vcpu, true, addr);
 +}
 +
-+static inline void kvm_skip_instr(struct kvm_vcpu *vcpu, bool is_wide_instr)
++/**
++ * kvm_inject_undefined - inject a undefined instruction into the guest
++ *
++ * It is assumed that this code is called from the VCPU thread and that the
++ * VCPU therefore is not currently executing guest code.
++ */
++void kvm_inject_undefined(struct kvm_vcpu *vcpu)
 +{
-+	*vcpu_pc(vcpu) += 4;
++	inject_undef64(vcpu);
 +}
-+
-+static inline void vcpu_set_thumb(struct kvm_vcpu *vcpu)
-+{
-+}
-+
-+static inline unsigned long *vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num)
-+{
-+	return (unsigned long *)&vcpu->arch.regs.regs.regs[reg_num];
-+
-+}
-+
-+/* Get vcpu SPSR for current mode */
-+static inline unsigned long *vcpu_spsr(struct kvm_vcpu *vcpu)
-+{
-+	return &vcpu->arch.regs.spsr[KVM_SPSR_EL1];
-+}
-+
-+static inline bool kvm_vcpu_reg_is_pc(struct kvm_vcpu *vcpu, int reg)
-+{
-+	return false;
-+}
-+
-+static inline bool vcpu_mode_priv(struct kvm_vcpu *vcpu)
-+{
-+	u32 mode = *vcpu_cpsr(vcpu) & PSR_MODE_MASK;
-+
-+	return mode != PSR_MODE_EL0t;
-+}
-+
-+static inline u32 kvm_vcpu_get_hsr(struct kvm_vcpu *vcpu)
-+{
-+	return vcpu->arch.fault.esr_el2;
-+}
-+
-+static inline unsigned long kvm_vcpu_get_hfar(struct kvm_vcpu *vcpu)
-+{
-+	return vcpu->arch.fault.far_el2;
-+}
-+
-+static inline phys_addr_t kvm_vcpu_get_fault_ipa(struct kvm_vcpu *vcpu)
-+{
-+	return ((phys_addr_t)vcpu->arch.fault.hpfar_el2 & HPFAR_MASK) << 8;
-+}
-+
-+static inline bool kvm_vcpu_dabt_isvalid(struct kvm_vcpu *vcpu)
-+{
-+	return !!(kvm_vcpu_get_hsr(vcpu) & ESR_EL2_ISV);
-+}
-+
-+static inline bool kvm_vcpu_dabt_iswrite(struct kvm_vcpu *vcpu)
-+{
-+	return !!(kvm_vcpu_get_hsr(vcpu) & ESR_EL2_WNR);
-+}
-+
-+static inline bool kvm_vcpu_dabt_issext(struct kvm_vcpu *vcpu)
-+{
-+	return !!(kvm_vcpu_get_hsr(vcpu) & ESR_EL2_SSE);
-+}
-+
-+static inline int kvm_vcpu_dabt_get_rd(struct kvm_vcpu *vcpu)
-+{
-+	return (kvm_vcpu_get_hsr(vcpu) & ESR_EL2_SRT_MASK) >> ESR_EL2_SRT_SHIFT;
-+}
-+
-+static inline bool kvm_vcpu_dabt_isextabt(struct kvm_vcpu *vcpu)
-+{
-+	return !!(kvm_vcpu_get_hsr(vcpu) & ESR_EL2_EA);
-+}
-+
-+static inline bool kvm_vcpu_dabt_iss1tw(struct kvm_vcpu *vcpu)
-+{
-+	return !!(kvm_vcpu_get_hsr(vcpu) & ESR_EL2_S1PTW);
-+}
-+
-+static inline int kvm_vcpu_dabt_get_as(struct kvm_vcpu *vcpu)
-+{
-+	return 1 << ((kvm_vcpu_get_hsr(vcpu) & ESR_EL2_SAS) >> ESR_EL2_SAS_SHIFT);
-+}
-+
-+/* This one is not specific to Data Abort */
-+static inline bool kvm_vcpu_trap_il_is32bit(struct kvm_vcpu *vcpu)
-+{
-+	return !!(kvm_vcpu_get_hsr(vcpu) & ESR_EL2_IL);
-+}
-+
-+static inline u8 kvm_vcpu_trap_get_class(struct kvm_vcpu *vcpu)
-+{
-+	return kvm_vcpu_get_hsr(vcpu) >> ESR_EL2_EC_SHIFT;
-+}
-+
-+static inline bool kvm_vcpu_trap_is_iabt(struct kvm_vcpu *vcpu)
-+{
-+	return kvm_vcpu_trap_get_class(vcpu) == ESR_EL2_EC_IABT;
-+}
-+
-+static inline u8 kvm_vcpu_trap_get_fault(struct kvm_vcpu *vcpu)
-+{
-+	return kvm_vcpu_get_hsr(vcpu) & ESR_EL2_FSC_TYPE;
-+}
-+
-+#endif /* __ARM64_KVM_EMULATE_H__ */
 -- 
 1.7.12.4
