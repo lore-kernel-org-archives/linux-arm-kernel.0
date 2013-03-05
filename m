@@ -1,136 +1,136 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  5 Mar 2013 03:47:37 +0000
-Subject: [PATCH 21/29] arm64: KVM: Build system integration
+Date: Tue,  5 Mar 2013 03:47:36 +0000
+Subject: [PATCH 20/29] arm64: KVM: PSCI implementation
 In-Reply-To: <1362455265-24165-1-git-send-email-marc.zyngier@arm.com>
 References: <1362455265-24165-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1362455265-24165-22-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1362455265-24165-21-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Wire the PSCI backend into the exit handling code.
+
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/Kconfig      |  2 ++
- arch/arm64/Makefile     |  2 +-
- arch/arm64/kvm/Kconfig  | 59 +++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm64/kvm/Makefile | 18 +++++++++++++++
- 4 files changed, 80 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/kvm/Kconfig
- create mode 100644 arch/arm64/kvm/Makefile
+ arch/arm64/include/asm/kvm_host.h |  2 +-
+ arch/arm64/include/asm/kvm_psci.h | 23 +++++++++++++++++++++++
+ arch/arm64/include/uapi/asm/kvm.h | 16 ++++++++++++++++
+ arch/arm64/kvm/handle_exit.c      | 16 +++++++---------
+ 4 files changed, 47 insertions(+), 10 deletions(-)
+ create mode 100644 arch/arm64/include/asm/kvm_psci.h
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 536611a..cff688b 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -241,6 +241,8 @@ source "drivers/Kconfig"
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 85e706b..68558ac 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -34,7 +34,7 @@
+ #include <asm/kvm_vgic.h>
+ #include <asm/kvm_arch_timer.h>
  
- source "fs/Kconfig"
+-#define KVM_VCPU_MAX_FEATURES 0
++#define KVM_VCPU_MAX_FEATURES 1
  
-+source "arch/arm64/kvm/Kconfig"
-+
- source "arch/arm64/Kconfig.debug"
- 
- source "security/Kconfig"
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index c95c5cb..ae89e63 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -36,7 +36,7 @@ TEXT_OFFSET := 0x00080000
- 
- export	TEXT_OFFSET GZFLAGS
- 
--core-y		+= arch/arm64/kernel/ arch/arm64/mm/
-+core-y		+= arch/arm64/kernel/ arch/arm64/mm/ arch/arm64/kvm/
- libs-y		:= arch/arm64/lib/ $(libs-y)
- libs-y		+= $(LIBGCC)
- 
-diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+ /* We don't currently support large pages. */
+ #define KVM_HPAGE_GFN_SHIFT(x)	0
+diff --git a/arch/arm64/include/asm/kvm_psci.h b/arch/arm64/include/asm/kvm_psci.h
 new file mode 100644
-index 0000000..a76be8b
+index 0000000..d96f054
 --- /dev/null
-+++ b/arch/arm64/kvm/Kconfig
-@@ -0,0 +1,59 @@
-+#
-+# KVM configuration
-+#
++++ b/arch/arm64/include/asm/kvm_psci.h
+@@ -0,0 +1,23 @@
++/*
++ * Copyright (C) 2012 - ARM Ltd
++ * Author: Marc Zyngier <marc.zyngier@arm.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
 +
-+source "virt/kvm/Kconfig"
++#ifndef __ARM64_KVM_PSCI_H__
++#define __ARM64_KVM_PSCI_H__
 +
-+menuconfig VIRTUALIZATION
-+	bool "Virtualization"
-+	---help---
-+	  Say Y here to get to see options for using your Linux host to run
-+	  other operating systems inside virtual machines (guests).
-+	  This option alone does not add any kernel code.
++bool kvm_psci_call(struct kvm_vcpu *vcpu);
 +
-+	  If you say N, all options in this submenu will be skipped and
-+	  disabled.
++#endif /* __ARM64_KVM_PSCI_H__ */
+diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+index fffeb11..24c8318 100644
+--- a/arch/arm64/include/uapi/asm/kvm.h
++++ b/arch/arm64/include/uapi/asm/kvm.h
+@@ -64,6 +64,8 @@ struct kvm_regs {
+ #define KVM_VGIC_V2_DIST_SIZE		0x1000
+ #define KVM_VGIC_V2_CPU_SIZE		0x2000
+ 
++#define KVM_ARM_VCPU_POWER_OFF		0 /* CPU is started in OFF state */
 +
-+if VIRTUALIZATION
+ struct kvm_vcpu_init {
+ 	__u32 target;
+ 	__u32 features[7];
+@@ -163,6 +165,20 @@ struct kvm_arch_memory_slot {
+ /* Highest supported SPI, from VGIC_NR_IRQS */
+ #define KVM_ARM_IRQ_GIC_MAX		127
+ 
++/* PSCI interface */
++#define KVM_PSCI_FN_BASE		0x95c1ba5e
++#define KVM_PSCI_FN(n)			(KVM_PSCI_FN_BASE + (n))
 +
-+config KVM
-+	bool "Kernel-based Virtual Machine (KVM) support"
-+	select PREEMPT_NOTIFIERS
-+	select ANON_INODES
-+	select KVM_MMIO
-+	select KVM_ARM_HOST
-+	select KVM_ARM_VGIC
-+	select KVM_ARM_TIMER
-+	---help---
-+	  Support hosting virtualized guest machines.
++#define KVM_PSCI_FN_CPU_SUSPEND		KVM_PSCI_FN(0)
++#define KVM_PSCI_FN_CPU_OFF		KVM_PSCI_FN(1)
++#define KVM_PSCI_FN_CPU_ON		KVM_PSCI_FN(2)
++#define KVM_PSCI_FN_MIGRATE		KVM_PSCI_FN(3)
 +
-+	  This module provides access to the hardware capabilities through
-+	  a character device node named /dev/kvm.
++#define KVM_PSCI_RET_SUCCESS		0
++#define KVM_PSCI_RET_NI			((unsigned long)-1)
++#define KVM_PSCI_RET_INVAL		((unsigned long)-2)
++#define KVM_PSCI_RET_DENIED		((unsigned long)-3)
 +
-+	  If unsure, say N.
+ #endif
+ 
+ #endif /* __ARM_KVM_H__ */
+diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+index 0e1fa4e..fa38230 100644
+--- a/arch/arm64/kvm/handle_exit.c
++++ b/arch/arm64/kvm/handle_exit.c
+@@ -24,26 +24,24 @@
+ #include <asm/kvm_emulate.h>
+ #include <asm/kvm_coproc.h>
+ #include <asm/kvm_mmu.h>
++#include <asm/kvm_psci.h>
+ 
+ typedef int (*exit_handle_fn)(struct kvm_vcpu *, struct kvm_run *);
+ 
+ static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ {
+-	/*
+-	 * Guest called HVC instruction:
+-	 * Let it know we don't want that by injecting an undefined exception.
+-	 */
+-	kvm_debug("hvc: %x (at %08lx)", kvm_vcpu_get_hsr(vcpu) & ((1 << 16) - 1),
+-		  *vcpu_pc(vcpu));
+-	kvm_debug("         HSR: %8x", kvm_vcpu_get_hsr(vcpu));
++	if (kvm_psci_call(vcpu))
++		return 1;
 +
-+config KVM_ARM_HOST
-+	bool
-+	depends on KVM
-+	depends on MMU
-+	select	MMU_NOTIFIER
-+	---help---
-+	  Provides host support for ARM processors.
+ 	kvm_inject_undefined(vcpu);
+ 	return 1;
+ }
+ 
+ static int handle_smc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ {
+-	/* We don't support SMC; don't do that. */
+-	kvm_debug("smc:@%08lx", *vcpu_pc(vcpu));
++	if (kvm_psci_call(vcpu))
++		return 1;
 +
-+config KVM_ARM_VGIC
-+        bool
-+	depends on KVM_ARM_HOST && OF
-+	select HAVE_KVM_IRQCHIP
-+	---help---
-+	  Adds support for a hardware assisted, in-kernel GIC emulation.
-+
-+config KVM_ARM_TIMER
-+        bool
-+	depends on KVM_ARM_VGIC
-+	select HAVE_KVM_IRQCHIP
-+	---help---
-+	  Adds support for the Architected Timers in virtual machines
-+
-+source drivers/virtio/Kconfig
-+
-+endif # VIRTUALIZATION
-diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
-new file mode 100644
-index 0000000..14ba38d
---- /dev/null
-+++ b/arch/arm64/kvm/Makefile
-@@ -0,0 +1,18 @@
-+#
-+# Makefile for Kernel-based Virtual Machine module
-+#
-+
-+ccflags-y += -Ivirt/kvm -Iarch/arm64/kvm
-+CFLAGS_arm.o := -I.
-+CFLAGS_mmu.o := -I.
-+
-+obj-$(CONFIG_KVM_ARM_HOST) += $(addprefix ../../../virt/kvm/, kvm_main.o coalesced_mmio.o)
-+
-+obj-$(CONFIG_KVM_ARM_HOST) += $(addprefix ../../../arch/arm/kvm/, arm.o mmu.o mmio.o psci.o perf.o)
-+
-+obj-$(CONFIG_KVM_ARM_HOST) += inject_fault.o
-+obj-$(CONFIG_KVM_ARM_HOST) += hyp.o hyp-init.o handle_exit.o idmap.o
-+obj-$(CONFIG_KVM_ARM_HOST) += guest.o reset.o sys_regs.o sys_regs_a57.o
-+
-+obj-$(CONFIG_KVM_ARM_VGIC) += $(addprefix ../../../arch/arm/kvm/, vgic.o)
-+obj-$(CONFIG_KVM_ARM_TIMER) += $(addprefix ../../../arch/arm/kvm/, arch_timer.o)
+ 	kvm_inject_undefined(vcpu);
+ 	return 1;
+ }
 -- 
 1.7.12.4
