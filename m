@@ -1,43 +1,26 @@
-From: dinguyen@altera.com (Dinh Nguyen)
-Date: Tue, 5 Mar 2013 17:12:21 -0600
-Subject: [PATCH 2/2] Arm: socfpga: pl330: Add #dma-cells for generic dma
- binding support
-In-Reply-To: <1362375268-29405-2-git-send-email-padma.v@samsung.com>
-References: <1362375268-29405-1-git-send-email-padma.v@samsung.com>
- <1362375268-29405-2-git-send-email-padma.v@samsung.com>
-Message-ID: <1362525141.8920.8.camel@linux-builds1>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 5 Mar 2013 23:12:29 +0000
+Subject: My git tree, and tsinghua.edu.cn
+Message-ID: <20130305231229.GM17833@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-03-04 at 11:04 +0530, Padmavathi Venna wrote:
-> This patch adds #dma-cells property to PL330 DMA controller nodes for
-> supporting generic dma dt bindings on SOCFPGA platform. #dma-channels
-> and #dma-requests are not required now but added in advance.
-> 
-> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
-> ---
-> 
-> Based on Torvalds tree
-> 
->  arch/arm/boot/dts/socfpga.dtsi |    3 +++
->  1 files changed, 3 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-> index 936d230..7e8769b 100644
-> --- a/arch/arm/boot/dts/socfpga.dtsi
-> +++ b/arch/arm/boot/dts/socfpga.dtsi
-> @@ -75,6 +75,9 @@
->  				compatible = "arm,pl330", "arm,primecell";
->  				reg = <0xffe01000 0x1000>;
->  				interrupts = <0 180 4>;
-> +				#dma-cells = <1>;
-> +				#dma-channels = <8>;
-> +				#dma-requests = <32>;
+I've just blocked access from a Chinese IP to my git tree this evening.
+Why?
 
-Acked-by: Dinh Nguyen <dinguyen@altera.com?
+It seems someone has decided it's a good idea to poll my git tree from
+anything between once a minute and once every few minutes - constantly,
+24 hours a day.
 
-Thanks..
-Dinh
->  			};
->  		};
->  
+Now, it's not like I push updates to the git tree anywhere near that
+frequency - once an hour is probably the minimum sensible interval.
+So, while not really a problem, it's a horrid waste of resources.
+
+However, as the machine threw a disk last night, this kind of sillyness
+is something we don't need at the moment.  So, if you're at tsinghua.edu.cn
+and you find you can no longer pull my git tree, you now know why.
+
+Please increase your polling period, and send me a mail to remove the
+block.
+
+Thanks.
