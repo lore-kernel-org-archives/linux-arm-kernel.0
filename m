@@ -1,23 +1,27 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 5 Mar 2013 22:37:05 +0000
-Subject: [PATCH 1/2] ARM: exynos: pl330: Add #dma-cells for generic dma
- binding support
-In-Reply-To: <1362375268-29405-1-git-send-email-padma.v@samsung.com>
-References: <1362375268-29405-1-git-send-email-padma.v@samsung.com>
-Message-ID: <201303052237.05910.arnd@arndb.de>
+Date: Tue, 5 Mar 2013 22:43:00 +0000
+Subject: [PATCH 00/23] RFC: exynos multiplatform support
+In-Reply-To: <201303052325.13143.heiko@sntech.de>
+References: <1362505353-8873-1-git-send-email-arnd@arndb.de>
+ <201303052154.22857.arnd@arndb.de> <201303052325.13143.heiko@sntech.de>
+Message-ID: <201303052243.00681.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 04 March 2013, Padmavathi Venna wrote:
+On Tuesday 05 March 2013, Heiko St?bner wrote:
+> Am Dienstag, 5. M?rz 2013, 22:54:22 schrieb Arnd Bergmann:
+> > On Tuesday 05 March 2013, Arnd Bergmann wrote:
 > 
-> This patch adds #dma-cells property to PL330 DMA controller
-> nodes for supporting generic dma dt bindings on samsung exynos
-> platforms. #dma-channels and #dma-requests are not required now
-> but added in advance.
+> > We still need a solution for the ASoC drivers, but they are
+> > not as essential. We could probably move the wrapper files
+> > from plat-samsung/*dma*.c to sounds/soc/samsung when that becomes
+> > the only remaining user.
 > 
-> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+> In ASoC there is also a clear distinction between the different SoC
+> generations. SND_SAMSUNG_I2S /_PCM /_AC97 ... is only used by newer SoCs
+> while SND_S3C24XX_I2S and SND_S3C_I2SV2_SOC is used by the legacy SoCs.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Well, the only file that really needs to get changed is dma.c, which
+seems to be used by both the old and the new drivers.
 
-Should we apply these directly to the arm-soc fixes branch, or wait
-until they come back from the Samsung subarchitecture tree?
+	Arnd
