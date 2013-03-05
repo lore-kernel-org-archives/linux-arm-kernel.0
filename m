@@ -1,152 +1,74 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 5 Mar 2013 09:28:49 +0000
-Subject: [RFCv2 0/2] Representing interrupt affinity in devicetree
-In-Reply-To: <20130304025115.05D413E17F8@localhost>
-References: <1355417368-6861-1-git-send-email-mark.rutland@arm.com>
- <20130304025115.05D413E17F8@localhost>
-Message-ID: <20130305092849.GA15661@e106331-lin.cambridge.arm.com>
+From: ian.campbell@citrix.com (Ian Campbell)
+Date: Tue, 5 Mar 2013 09:29:57 +0000
+Subject: [PATCH LINUX v5] xen: event channel arrays are xen_ulong_t and
+ not unsigned long
+In-Reply-To: <20130305080845.GA19097@mudshark.cambridge.arm.com>
+References: <1361285327.1051.115.camel@zakaz.uk.xensource.com>
+ <1361360886-2956-1-git-send-email-ian.campbell@citrix.com>
+ <51340ACD.70904@gmail.com>
+ <20130305030436.GA18040@mudshark.cambridge.arm.com>
+ <513596F2.1000701@gmail.com>
+ <20130305080845.GA19097@mudshark.cambridge.arm.com>
+Message-ID: <1362475797.8941.67.camel@hastur.hellion.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 04, 2013 at 02:51:14AM +0000, Grant Likely wrote:
-> On Thu, 13 Dec 2012 16:49:26 +0000, Mark Rutland <mark.rutland@arm.com> wrote:
-> > [This is an updated version of my previous RFC, which can be found at
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2012-October/128205.html]
-> > 
-> > Current devicetree bindings for devices which use cpu-affine shared interrupts
-> > assume that interrupts are listed in ascending order of physical cpu id
-> > (MPIDR.Aff{2,1,0}). This is problematic for drivers because:
-> > 
-> > (1) The driver must convert each physical id to a logical id for the purpose of
-> >     managing interrupts.
-> > 
-> > (2) In multi-cluster systems the physical ids are not necessarily contiguous,
-> >     and drivers cannot simply iterate over ids from 0 to NR_CPUS.
-> > 
-> > (3) It is not possible to specify sets of interrupts which are wired to a
-> >     subset of cpus (i.e. clusters) not starting at physical id 0, as we can't
-> >     specify which cpu to start from, and can't skip cpus. This makes it
-> >     impossible to represent some devices (e.g. cpu PMUs) which may not exist
-> >     in the first cluster.
-> > 
-> > (4) Some devices may either be wired with PPIs or SPIs. It is not possible to
-> >     differentiate the two cases in general from the interrupts list (e.g. when
-> >     a device has multiple PPIs wired to all cpus).
-> > 
-> > To represent the general case, we require a mechanism to describe the cpu
-> > affinity of a device, and a consistent way to map each interrupt to a cpu (or
-> > set of cpus). So far, the only workable mechanism I've been able to come up
-> > with is the following:
-> > 
-> > In addition to the interrupts list we add an optional 'interrupts-affinity'
-> > list which describes how to map an interrupt to cpu(s). Each interrupt would
-> > have a corresponding element in the interrupts-affinity list.
-> > 
-> > Each element consists of a pair of cells specifying how to test if a cpu is
-> > affine. This test specification consists of a most significant affinity level
-> > to match, and values for the MPIDR affinity bits down to this level. Each pair
-> > of cells has the form:
-> > 
-> >     < N 0x00AABBCC >
-> >        \   \ \ \ \__ MPIDR.Aff0
-> >         \   \ \ \___ MPIDR.Aff1
-> >          \   \ \____ MPIDR.Aff2
-> >           \   \_____ [must be zero]
-> >            \________ level-specifier
-> > 
-> > The level-specifier is in the range [0-3]. When the value is 3, MPIDR affinity
-> > levels 2,1,0 are ignored, and thus all cpus are matched. When the value is 0,
-> > levels 2,1,0 must all be matched for a cpu to be considered affine. Affinity
-> > bits which are not to be matched should be set to zero.
-> > 
-> > In practice, use of the binding would look something like:
-> > 
-> > > device at 0 {
-> > > 	compatible = "example,example-affine-device";
-> > > 	interrupts = <0 130 4>,
-> > > 	             <0 131 4>,
-> > > 	             <1 12 4>;
-> > > 	interrupts-affinity = <0 0x00000000>,
-> > >	                      <0 0x00000001>,
-> > > 	                      <1 0x00000100>;
-> > > };
-> > 
-> > To request/free interrupts, drivers would walk over all interrupts, and request
-> > the affine cpu(s), which can be automatically mapped to logical ids by common
-> > code. This fixes issues 1, 2, and 3. 4 is partially solved, in that we know
-> > whether an interrupt is targeted at a single cpu or multiple cpus (i.e.
-> > whether it's an SPI or a PPI), but we can't differentiate multiple interrupts
-> > targeted at the same cpu. We could solve this with an additional
-> > "interrupt-names" property, or something of that sort.
-> > 
-> > The following patches implement common code that could be used by drivers to
-> > deal with this affinity information, allowing drivers to extract a (logical)
-> > cpumask specifying the affinity of each interrupt, and additional information
-> > specifying whether an interrupt targets multiple cpus.
-> > 
-> > The patches are based on rmk's for-next branch.
-> > 
-> > Any thoughts?
-> 
-> Hi Mark,
+On Tue, 2013-03-05 at 08:08 +0000, Will Deacon wrote:
+> Cheers Rob, that was enough to reproduce for me. The problem is likely that
+> CONFIG_AEABI=n, so the ABI doesn't actually mandate even base registers for
+> 64-bit values in registers.
 
-Hi,
+Me too.
 
-> 
-> I could use some more context for how this will be used. Do device
-> drivers need to be aware of which CPU can handle an interrupt for a
-> device, or is it the sort of thing that can be done in the background
-> when an irq is requested? What are some examples of device drivers using
-> this interface.
+> Ian -- this would be fixed if you used our atomic64 routines instead of
+> inventing your own :)
 
-The main users I can think of for this would be PMUs in multi-cluster systems,
-where we may have differing PMUs in each cluster. The driver for each needs to
-know the set of CPUs it's handling, and which CPU each interrupt is affine to.
+I looked and couldn't see an existing 64 bit xchg, was I looking in the
+wrong place? Ah, wait, I see atomic64_xchg now. But that needs an
+atomic64_t while I have a xen_ulong_t (which == 64 bits on ARM). This is
+a kernel<->hypervisor ABI so I can't just change it to an atomic64_t. I
+suppose I could cast (see below, untested) but that seems rather icky.
 
-With the above binding scheme, we'd describe the A15x2 A7x3 CoreTile's PMUs
-something like:
+Ian.
 
-pmu_a15s {
-	compatible = "arm,cortex-a15-pmu";
-	interrupts = <0 68 4>,
-	             <0 69 4>;
-	interrupts-affinity = <0 0x0>,
-	                      <0 0x1>;
-};
-
-pmu_a7s {
-	compatible = arm,cortex-a7-pmu";
-	interrupts = <0 128 4>,
-	             <0 129 4>,
-	             <0 130 4>;
-	interrupts-affinity = <0 0x100>,
-	                      <0 0x101>,
-	                      <0 0x102>;
-};
-
-> 
-> Part of the reason why I ask is I see a new function for parsing the
-> affinity, but no code that links it into the existing irq
-> infrastructure. Would this need to be called automatically when a DT
-> interrupt is parsed? Or when the irq is requested? Some guidance would
-> help me here.
-
-I envisage that each driver that requires this information would request it
-manually when parsing the dt, and storing what it needs in an appropriate
-datastructure. For PMUs this could be something like:
-
-struct irq_affinity {
-	cpumask_t mask;
-	int irq;
-} interrupt_data[];
-
-When setting up or tearing down interrupts, each CPU can find which
-interrupt(s) it needs, and whether it's a PPI or SPI by iterating over the list
-and checking against a cpumask, and perform the appropriate steps to setup or
-teardown.
-
-Other devices may need affinity information (e.g. which CPUs are connected to
-the ACE ports on CCI) and can be handled by a similar binding.
-
-Thanks,
-Mark.
+diff --git a/arch/arm/include/asm/xen/events.h b/arch/arm/include/asm/xen/events.h
+index 0e1f59e..e86a1b3 100644
+--- a/arch/arm/include/asm/xen/events.h
++++ b/arch/arm/include/asm/xen/events.h
+@@ -2,6 +2,7 @@
+ #define _ASM_ARM_XEN_EVENTS_H
+ 
+ #include <asm/ptrace.h>
++#include <asm/atomic.h>
+ 
+ enum ipi_vector {
+ 	XEN_PLACEHOLDER_VECTOR,
+@@ -15,27 +16,6 @@ static inline int xen_irqs_disabled(struct pt_regs *regs)
+ 	return raw_irqs_disabled_flags(regs->ARM_cpsr);
+ }
+ 
+-/*
+- * We cannot use xchg because it does not support 8-byte
+- * values. However it is safe to use {ldr,dtd}exd directly because all
+- * platforms which Xen can run on support those instructions.
+- */
+-static inline xen_ulong_t xchg_xen_ulong(xen_ulong_t *ptr, xen_ulong_t val)
+-{
+-	xen_ulong_t oldval;
+-	unsigned int tmp;
+-
+-	smp_wmb();
+-	asm volatile("@ xchg_xen_ulong\n"
+-		"1:     ldrexd  %0, %H0, [%3]\n"
+-		"       strexd  %1, %2, %H2, [%3]\n"
+-		"       teq     %1, #0\n"
+-		"       bne     1b"
+-		: "=&r" (oldval), "=&r" (tmp)
+-		: "r" (val), "r" (ptr)
+-		: "memory", "cc");
+-	smp_wmb();
+-	return oldval;
+-}
++#define xchg_xen_ulong(ptr, val) atomic64_xchg((atomic64_t *)(ptr), (val))
+ 
+ #endif /* _ASM_ARM_XEN_EVENTS_H */
