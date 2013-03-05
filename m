@@ -1,49 +1,39 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 05 Mar 2013 23:12:31 +0100
-Subject: [PATCH 00/23] RFC: exynos multiplatform support
-In-Reply-To: <201303052154.22857.arnd@arndb.de>
-References: <1362505353-8873-1-git-send-email-arnd@arndb.de>
- <201303052124.04101.arnd@arndb.de> <201303052154.22857.arnd@arndb.de>
-Message-ID: <681263925.o7yR7PPoHR@flatron>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue,  5 Mar 2013 23:16:43 +0100
+Subject: [PATCH 3/9] mfd: remove __exit_p annotation for twl4030_madc_remove
+In-Reply-To: <1362521809-22989-1-git-send-email-arnd@arndb.de>
+References: <1362521809-22989-1-git-send-email-arnd@arndb.de>
+Message-ID: <1362521809-22989-4-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 05 of March 2013 21:54:22 Arnd Bergmann wrote:
-> On Tuesday 05 March 2013, Arnd Bergmann wrote:
-> > The s3c64xx_dma code is also interesting because
-> > it has both an implementation of the s3c_dma interface in
-> > arch/arm/mach-s3c64xx/dma.c and one using the generic interface in
-> > drivers/dma/amba-pl08x.c.
-> 
-> This actually brings me to an interesting idea: the s3c64xx SPI driver
-> is used with the regular dmaengine API and pl330 on S5P and Exynos,
-> but with the s3c-dma interface and pl080 on S3C64xx.
-> 
-> If we just convert S3C64xx to use the pl080 dmaengine driver
-> instead, we can apply my SPI patch without breaking anything.
+4740f73fe5 "mfd: remove use of __devexit" removed the __devexit annotation
+on the twl4030_madc_remove function, but left an __exit_p() present on the
+pointer to this function. Using __exit_p was as wrong with the devexit in
+place as it is now, but now we get a gcc warning about an unused function.
 
-AFAIR, the PL080 in S3C64xx is a slightly customized variant and requires 
-some modifications to the driver. However I'm saying this only based on 
-what I remember from the past, as I haven't checked current version of the 
-driver yet, so it's possible that it has been modified already.
+In order for the twl4030_madc_remove to work correctly in built-in code, we
+have to remove the __exit_p.
 
-I believe I will eventually have to take a look at it anyway, as it's a 
-necessary step towards S3C64xx DT support.
+Cc: Bill Pemberton <wfp5p@virginia.edu>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/mfd/twl4030-madc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Best regards,
-Tomasz
-
-> We still need a solution for the ASoC drivers, but they are
-> not as essential. We could probably move the wrapper files
-> from plat-samsung/*dma*.c to sounds/soc/samsung when that becomes
-> the only remaining user.
-> 
-> There is also drivers/mmc/host/s3cmci.c, which uses the s3c-dma
-> interface, but it is only used on s3c24xx, not s3c64xx or later.
-> 
-> 	Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe
-> linux-samsung-soc" in the body of a message to
-> majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/drivers/mfd/twl4030-madc.c b/drivers/mfd/twl4030-madc.c
+index 88ff9dc..942b666 100644
+--- a/drivers/mfd/twl4030-madc.c
++++ b/drivers/mfd/twl4030-madc.c
+@@ -800,7 +800,7 @@ static int twl4030_madc_remove(struct platform_device *pdev)
+ 
+ static struct platform_driver twl4030_madc_driver = {
+ 	.probe = twl4030_madc_probe,
+-	.remove = __exit_p(twl4030_madc_remove),
++	.remove = twl4030_madc_remove,
+ 	.driver = {
+ 		   .name = "twl4030_madc",
+ 		   .owner = THIS_MODULE,
+-- 
+1.8.1.2
