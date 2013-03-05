@@ -1,78 +1,38 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 5 Mar 2013 21:40:09 +0100 (CET)
-Subject: [PATCH 2/4][V2] time : set broadcast irq affinity
-In-Reply-To: <1362219013-18173-3-git-send-email-daniel.lezcano@linaro.org>
-References: <1362219013-18173-1-git-send-email-daniel.lezcano@linaro.org>
- <1362219013-18173-3-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <alpine.LFD.2.02.1303052135080.22263@ionos>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Tue, 05 Mar 2013 21:43:42 +0100
+Subject: [PATCH] arm64: Do not select GENERIC_HARDIRQS_NO_DEPRECATED
+Message-ID: <1362516222.16460.121.camel@x61.thuisdomein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2 Mar 2013, Daniel Lezcano wrote:
-> When a cpu goes to a deep idle state where its local timer is shutdown,
-> it notifies the time frame work to use the broadcast timer instead.
-> 
-> Unfortunately, the broadcast device could wake up any CPU, including an
-> idle one which is not concerned by the wake up at all.
-> 
-> This implies, in the worst case, an idle CPU will wake up to send an IPI
-> to another idle cpu.
-> 
-> This patch solves this by setting the irq affinity to the cpu concerned
-> by the nearest timer event, by this way, the CPU which is wake up is
-> guarantee to be the one concerned by the next event and we are safe with
-> unnecessary wakeup for another idle CPU.
-> 
-> As the irq affinity is not supported by all the archs, a flag is needed
-> to specify which clocksource can handle it : CLOCK_EVT_FEAT_DYNIRQ
-> 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> ---
->  include/linux/clockchips.h   |    5 +++++
->  kernel/time/tick-broadcast.c |   40 +++++++++++++++++++++++++++++++++-------
->  2 files changed, 38 insertions(+), 7 deletions(-)
-> 
-> diff --git a/include/linux/clockchips.h b/include/linux/clockchips.h
-> index 6634652..c93e2a6 100644
-> --- a/include/linux/clockchips.h
-> +++ b/include/linux/clockchips.h
-> @@ -55,6 +55,11 @@ enum clock_event_nofitiers {
->  #define CLOCK_EVT_FEAT_C3STOP		0x000008
->  #define CLOCK_EVT_FEAT_DUMMY		0x000010
->  
-> +/*
-> + * Clock event device can set its irq affinity dynamically
-> + */
-> +#define CLOCK_EVT_FEAT_DYNIRQ		0x000020
-> +
->  /**
->   * struct clock_event_device - clock event device descriptor
->   * @event_handler:	Assigned by the framework to be called by the low
-> diff --git a/kernel/time/tick-broadcast.c b/kernel/time/tick-broadcast.c
-> index 6197ac0..9ca8ff5 100644
-> --- a/kernel/time/tick-broadcast.c
-> +++ b/kernel/time/tick-broadcast.c
-> @@ -406,13 +406,37 @@ struct cpumask *tick_get_broadcast_oneshot_mask(void)
->  	return to_cpumask(tick_broadcast_oneshot_mask);
->  }
->  
-> -static int tick_broadcast_set_event(struct clock_event_device *bc,
-> +/*
-> + * Set broadcast interrupt affinity
-> + */
-> +static void tick_broadcast_set_affinity(struct clock_event_device *bc,
-> +					const struct cpumask *cpumask)
-> +{
-> +	if (!(bc->features & CLOCK_EVT_FEAT_DYNIRQ))
-> +		return;
-> +
-> +	if (cpumask_equal(bc->cpumask, cpumask))
-> +		return;
-> +
-> +	bc->cpumask = cpumask;
+Config option GENERIC_HARDIRQS_NO_DEPRECATED was removed in commit
+78c89825649a9a5ed526c507603196f467d781a5 ("genirq: Remove the now obsolete
+config options and select statements"), but the select was accidentally
+reintroduced in commit 8c2c3df31e3b87cb5348e48776c366ebd1dc5a7a ("arm64:
+Build infrastructure").
 
-This breaks with CONFIG_CPUMASK_OFFSTACK=y. cpumask_copy() is your friend!
+Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+---
+0) Untested.
 
-Thanks,
+1) Commit explanation inspired by commit
+2c7d1644406748d7c5da7b9db3c5080296af55bf ("sparc: Do not select
+GENERIC_HARDIRQS_NO_DEPRECATED").
 
-	tglx
+ arch/arm64/Kconfig | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index fd70a68..9b6d19f 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -9,7 +9,6 @@ config ARM64
+ 	select CLONE_BACKWARDS
+ 	select COMMON_CLK
+ 	select GENERIC_CLOCKEVENTS
+-	select GENERIC_HARDIRQS_NO_DEPRECATED
+ 	select GENERIC_IOMAP
+ 	select GENERIC_IRQ_PROBE
+ 	select GENERIC_IRQ_SHOW
+-- 
+1.7.11.7
