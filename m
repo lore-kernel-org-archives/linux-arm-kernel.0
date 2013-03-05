@@ -1,101 +1,69 @@
-From: laijs@cn.fujitsu.com (Lai Jiangshan)
-Date: Tue, 05 Mar 2013 23:41:48 +0800
-Subject: [PATCH V2] lglock: add read-preference local-global rwlock
-In-Reply-To: <513232B6.9060905@linux.vnet.ibm.com>
-References: <512BBAD8.8010006@linux.vnet.ibm.com>
- <CACvQF51jCxk5jUqmhD=QBBtUsBkQWZzakacrKO4Gsk=w61rNwQ@mail.gmail.com>
- <512C7A38.8060906@linux.vnet.ibm.com>
- <CACvQF51RvhM8XNqu3-1OTQ=cZUZ=pAX+_zx0a29+W67N1X+BgQ@mail.gmail.com>
- <512CC509.1050000@linux.vnet.ibm.com>
- <CACvQF50UgiqPpDk3HCmV86zKSf6tPjqr0bZowfPEOJs0g0r0MQ@mail.gmail.com>
- <512D0D67.9010609@linux.vnet.ibm.com>
- <CACvQF53ph2ixdM-otzetjM5cR+2kcZj6sckOp3TnzzA_x-EZ8w@mail.gmail.com>
- <512E7879.20109@linux.vnet.ibm.com>	<5130E8E2.50206@cn.fujitsu.com>
- <20130301182854.GA3631@redhat.com>
- <CANN689HEW=b5S93J27p+rBX-5m7jkW4FER=eHDCp7OgMaTWLPw@mail.gmail.com>
- <5131FB4C.7070408@cn.fujitsu.com> <513232B6.9060905@linux.vnet.ibm.com>
-Message-ID: <5136123C.3040508@cn.fujitsu.com>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Tue,  5 Mar 2013 17:54:48 +0200
+Subject: [PATCH] ARM: iop3xx: move IOP3XX_PERIPHERAL_VIRT_BASE
+Message-ID: <1362498888-24949-1-git-send-email-aaro.koskinen@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/03/13 01:11, Srivatsa S. Bhat wrote:
-> On 03/02/2013 06:44 PM, Lai Jiangshan wrote:
->> From 345a7a75c314ff567be48983e0892bc69c4452e7 Mon Sep 17 00:00:00 2001
->> From: Lai Jiangshan <laijs@cn.fujitsu.com>
->> Date: Sat, 2 Mar 2013 20:33:14 +0800
->> Subject: [PATCH] lglock: add read-preference local-global rwlock
->>
->> Current lglock is not read-preference, so it can't be used on some cases
->> which read-preference rwlock can do. Example, get_cpu_online_atomic().
->>
-> [...]
->> diff --git a/kernel/lglock.c b/kernel/lglock.c
->> index 6535a66..52e9b2c 100644
->> --- a/kernel/lglock.c
->> +++ b/kernel/lglock.c
->> @@ -87,3 +87,71 @@ void lg_global_unlock(struct lglock *lg)
->>  	preempt_enable();
->>  }
->>  EXPORT_SYMBOL(lg_global_unlock);
->> +
->> +#define FALLBACK_BASE	(1UL << 30)
->> +
->> +void lg_rwlock_local_read_lock(struct lgrwlock *lgrw)
->> +{
->> +	struct lglock *lg = &lgrw->lglock;
->> +
->> +	preempt_disable();
->> +	if (likely(!__this_cpu_read(*lgrw->reader_refcnt))) {
->> +		rwlock_acquire_read(&lg->lock_dep_map, 0, 0, _RET_IP_);
->> +		if (unlikely(!arch_spin_trylock(this_cpu_ptr(lg->lock)))) {
->> +			read_lock(&lgrw->fallback_rwlock);
->> +			__this_cpu_write(*lgrw->reader_refcnt, FALLBACK_BASE);
->> +			return;
->> +		}
->> +	}
->> +
->> +	__this_cpu_inc(*lgrw->reader_refcnt);
->> +}
->> +EXPORT_SYMBOL(lg_rwlock_local_read_lock);
->> +
->> +void lg_rwlock_local_read_unlock(struct lgrwlock *lgrw)
->> +{
->> +	switch (__this_cpu_read(*lgrw->reader_refcnt)) {
->> +	case 1:
->> +		__this_cpu_write(*lgrw->reader_refcnt, 0);
->> +		lg_local_unlock(&lgrw->lglock);
->> +		return;
-> 
-> This should be a break, instead of a return, right?
-> Otherwise, there will be a preempt imbalance...
+Currently IOP3XX_PERIPHERAL_VIRT_BASE conflicts with PCI_IO_VIRT_BASE:
 
+					address         size
+	PCI_IO_VIRT_BASE                0xfee00000      0x200000
+	IOP3XX_PERIPHERAL_VIRT_BASE     0xfeffe000      0x2000
 
-"lockdep" and "preempt" are handled in lg_local_unlock(&lgrw->lglock);
+Fix by moving IOP3XX_PERIPHERAL_VIRT_BASE below PCI_IO_VIRT_BASE.
 
-Thanks,
-Lai
+The patch fixes the following kernel panic with 3.9-rc1 on iop3xx boards:
 
-> 
->> +	case FALLBACK_BASE:
->> +		__this_cpu_write(*lgrw->reader_refcnt, 0);
->> +		read_unlock(&lgrw->fallback_rwlock);
->> +		rwlock_release(&lg->lock_dep_map, 1, _RET_IP_);
->> +		break;
->> +	default:
->> +		__this_cpu_dec(*lgrw->reader_refcnt);
->> +		break;
->> +	}
->> +
->> +	preempt_enable();
->> +}
-> 
-> 
-> Regards,
-> Srivatsa S. Bhat
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
-> 
+[    0.000000] Booting Linux on physical CPU 0x0
+[    0.000000] Initializing cgroup subsys cpu
+[    0.000000] Linux version 3.9.0-rc1-iop32x (aaro at blackmetal) (gcc version 4.7.2 (GCC) ) #20 PREEMPT Tue Mar 5 16:44:36 EET 2013
+[    0.000000] bootconsole [earlycon0] enabled
+[    0.000000] ------------[ cut here ]------------
+[    0.000000] kernel BUG at mm/vmalloc.c:1145!
+[    0.000000] Internal error: Oops - BUG: 0 [#1] PREEMPT ARM
+[    0.000000] Modules linked in:
+[    0.000000] CPU: 0    Not tainted  (3.9.0-rc1-iop32x #20)
+[    0.000000] PC is at vm_area_add_early+0x4c/0x88
+[    0.000000] LR is at add_static_vm_early+0x14/0x68
+[    0.000000] pc : [<c03e74a8>]    lr : [<c03e1c40>]    psr: 800000d3
+[    0.000000] sp : c03ffee4  ip : dfffdf88  fp : c03ffef4
+[    0.000000] r10: 00000002  r9 : 000000cf  r8 : 00000653
+[    0.000000] r7 : c040eca8  r6 : c03e2408  r5 : dfffdf60  r4 : 00200000
+[    0.000000] r3 : dfffdfd8  r2 : feffe000  r1 : ff000000  r0 : dfffdf60
+[    0.000000] Flags: Nzcv  IRQs off  FIQs off  Mode SVC_32  ISA ARM  Segment kernel
+[    0.000000] Control: 0000397f  Table: a0004000  DAC: 00000017
+[    0.000000] Process swapper (pid: 0, stack limit = 0xc03fe1b8)
+[    0.000000] Stack: (0xc03ffee4 to 0xc0400000)
+[    0.000000] fee0:          00200000 c03fff0c c03ffef8 c03e1c40 c03e7468 00200000 fee00000
+[    0.000000] ff00: c03fff2c c03fff10 c03e23e4 c03e1c38 feffe000 c0408ee4 ff000000 c0408f04
+[    0.000000] ff20: c03fff3c c03fff30 c03e2434 c03e23b4 c03fff84 c03fff40 c03e2c94 c03e2414
+[    0.000000] ff40: c03f8878 c03f6410 ffff0000 000bffff 00001000 00000008 c03fff84 c03f6410
+[    0.000000] ff60: c04227e8 c03fffd4 a0008000 c03f8878 69052e30 c02f96eb c03fffbc c03fff88
+[    0.000000] ff80: c03e044c c03e268c 00000000 0000397f c0385130 00000001 ffffffff c03f8874
+[    0.000000] ffa0: dfffffff a0004000 69052e30 a03f61a0 c03ffff4 c03fffc0 c03dd5cc c03e0184
+[    0.000000] ffc0: 00000000 00000000 00000000 00000000 00000000 c03f8878 0000397d c040601c
+[    0.000000] ffe0: c03f8874 c0408674 00000000 c03ffff8 a0008040 c03dd558 00000000 00000000
+[    0.000000] Backtrace:
+[    0.000000] [<c03e745c>] (vm_area_add_early+0x0/0x88) from [<c03e1c40>] (add_static_vm_early+0x14/0x68)
+
+Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+---
+ arch/arm/include/asm/hardware/iop3xx.h |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/include/asm/hardware/iop3xx.h b/arch/arm/include/asm/hardware/iop3xx.h
+index 02fe2fb..ed94b1a 100644
+--- a/arch/arm/include/asm/hardware/iop3xx.h
++++ b/arch/arm/include/asm/hardware/iop3xx.h
+@@ -37,7 +37,7 @@ extern int iop3xx_get_init_atu(void);
+  * IOP3XX processor registers
+  */
+ #define IOP3XX_PERIPHERAL_PHYS_BASE	0xffffe000
+-#define IOP3XX_PERIPHERAL_VIRT_BASE	0xfeffe000
++#define IOP3XX_PERIPHERAL_VIRT_BASE	0xfedfe000
+ #define IOP3XX_PERIPHERAL_SIZE		0x00002000
+ #define IOP3XX_PERIPHERAL_UPPER_PA (IOP3XX_PERIPHERAL_PHYS_BASE +\
+ 					IOP3XX_PERIPHERAL_SIZE - 1)
+-- 
+1.7.10.4
