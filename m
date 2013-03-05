@@ -1,107 +1,57 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Tue,  5 Mar 2013 18:30:07 +0100
-Subject: [PATCH v2 1/2] imxfb: Set alpha value of the framebuffer
-In-Reply-To: <1362504608-15839-1-git-send-email-mpa@pengutronix.de>
-References: <1362504608-15839-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1362504608-15839-2-git-send-email-mpa@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue,  5 Mar 2013 18:42:11 +0100
+Subject: [PATCH 01/23] ARM: exynos: introduce EXYNOS_ATAGS symbol
+In-Reply-To: <1362505353-8873-1-git-send-email-arnd@arndb.de>
+References: <1362505353-8873-1-git-send-email-arnd@arndb.de>
+Message-ID: <1362505353-8873-2-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christian Hemp <c.hemp@phytec.de>
+As a preparation for multiplatform support, this introduces
+a new Kconfig symbol to split the ATAGS based EXYNOS platforms
+from the DT based ones. Turning off CONFIG_EXYNOS_ATAGS disables
+all platforms that are not yet converted to DT, and we can
+have code that relies on DT checking for this symbol being
+disabled.
 
-Based on Sascha Hauer's patch i.MX27 clock: Do not disable lcd clocks during
-startup.
-This patch gives a interface to chance the alphavalue of the framebuffer.
-
-Signed-off-by: Christian Hemp <c.hemp@phytec.de>
-
-rebased to 3.7
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/video/imxfb.c                     | 35 +++++++++++++++++++++++++++++++
- include/linux/platform_data/video-imxfb.h |  3 +++
- 2 files changed, 38 insertions(+)
+ arch/arm/mach-exynos/Kconfig | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
-index 0abf2bf..ef2b587 100644
---- a/drivers/video/imxfb.c
-+++ b/drivers/video/imxfb.c
-@@ -31,6 +31,7 @@
- #include <linux/dma-mapping.h>
- #include <linux/io.h>
- #include <linux/math64.h>
-+#include <linux/uaccess.h>
+diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+index 70f94c8..3291a72 100644
+--- a/arch/arm/mach-exynos/Kconfig
++++ b/arch/arm/mach-exynos/Kconfig
+@@ -176,7 +176,20 @@ config EXYNOS_SETUP_SPI
+ 	help
+ 	  Common setup code for SPI GPIO configurations.
  
- #include <linux/platform_data/video-imxfb.h>
- 
-@@ -112,6 +113,10 @@
- #define LCDISR_EOF	(1<<1)
- #define LCDISR_BOF	(1<<0)
- 
-+#define LCDC_LGWCR	0x64
-+#define LGWCR_GWAV(alpha)	(((alpha) & 0xff) << 24)
-+#define LGWCR_GWE	(1 << 22)
 +
- /* Used fb-mode. Can be set on kernel command line, therefore file-static. */
- static const char *fb_mode;
- 
-@@ -610,6 +615,35 @@ static int imxfb_blank(int blank, struct fb_info *info)
- 	return 0;
- }
- 
-+static int imxfb_ioctl(struct fb_info *info, unsigned int cmd,
-+			unsigned long arg)
-+{
-+	struct imxfb_info *fbi = info->par;
-+	int alpha, ret = 0;
-+	unsigned int tmp;
++config EXYNOS_ATAGS
++	bool "ATAGS based boot for EXYNOS (deprecated)"
++	depends on ARCH_EXYNOS_SINGLE
++	depends on ATAGS
++	default y
++	help
++	  The EXYNOS platform is moving towards being completely probed
++	  through device tree. This enables support for board files using
++	  the traditional ATAGS boot format.
++	  Note that this option is not available for multiplatform builds.
 +
-+	switch (cmd) {
-+	case IMXFB_ALPHA:
-+		if (get_user(alpha, (int __user *)arg)) {
-+			ret = -EFAULT;
-+		} else {
-+			tmp = readl(fbi->regs + LCDC_LGWCR);
-+			tmp &= ~LGWCR_GWAV(0xff);
-+			tmp |= LGWCR_GWAV(alpha);
-+			if (!alpha)
-+				tmp &= ~LGWCR_GWE;
-+			else
-+				tmp |= LGWCR_GWE;
-+			writel(tmp , fbi->regs + LCDC_LGWCR);
-+		}
-+		break;
-+	default:
-+		ret = -EINVAL;
-+	}
-+
-+	return ret;
-+}
-+
- static struct fb_ops imxfb_ops = {
- 	.owner		= THIS_MODULE,
- 	.fb_check_var	= imxfb_check_var,
-@@ -619,6 +653,7 @@ static struct fb_ops imxfb_ops = {
- 	.fb_copyarea	= cfb_copyarea,
- 	.fb_imageblit	= cfb_imageblit,
- 	.fb_blank	= imxfb_blank,
-+	.fb_ioctl	= imxfb_ioctl,
- };
+ # machine support
++if EXYNOS_ATAGS
  
- /*
-diff --git a/include/linux/platform_data/video-imxfb.h b/include/linux/platform_data/video-imxfb.h
-index 9de8f06..ce3875f 100644
---- a/include/linux/platform_data/video-imxfb.h
-+++ b/include/linux/platform_data/video-imxfb.h
-@@ -51,6 +51,9 @@
- #define DMACR_HM(x)	(((x) & 0xf) << 16)
- #define DMACR_TM(x)	((x) & 0xf)
+ if ARCH_EXYNOS4
  
-+#define IMXFB_IOW(num, dtype)	_IOW('I', num, dtype)
-+#define IMXFB_ALPHA		IMXFB_IOW(31, int)
+@@ -400,6 +413,8 @@ config MACH_SMDK4412
+ 	  Machine support for Samsung SMDK4412
+ endif
+ 
++endif
 +
- struct imx_fb_videomode {
- 	struct fb_videomode mode;
- 	u32 pcr;
+ comment "Flattened Device Tree based board for EXYNOS SoCs"
+ 
+ config MACH_EXYNOS4_DT
 -- 
-1.8.1.4
+1.8.1.2
