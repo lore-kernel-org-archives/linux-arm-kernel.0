@@ -1,93 +1,45 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 5 Mar 2013 19:19:02 +0000
-Subject: [PATCH 00/23] RFC: exynos multiplatform support
-In-Reply-To: <1579361.FL4RHMlS27@amdc1227>
-References: <1362505353-8873-1-git-send-email-arnd@arndb.de>
- <1579361.FL4RHMlS27@amdc1227>
-Message-ID: <201303051919.02638.arnd@arndb.de>
+Date: Tue, 5 Mar 2013 19:22:02 +0000
+Subject: [PATCH v4 3/3] ARM: mach-shmobile: r8a7740: Setup the serial
+ devices using DT
+In-Reply-To: <CABYn4sx=bC6JwicbVgRnmwdu=6DuW5GFgdG25a-Wow1Jn9M-bQ@mail.gmail.com>
+References: <1362414054-23092-1-git-send-email-hechtb+renesas@gmail.com>
+ <2835497.S76YK1KMLM@wuerfel>
+ <CABYn4sx=bC6JwicbVgRnmwdu=6DuW5GFgdG25a-Wow1Jn9M-bQ@mail.gmail.com>
+Message-ID: <201303051922.02455.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 05 March 2013, Tomasz Figa wrote:
-> > 
-> > With this patch set, we can build mach-exynos as part
-> > of a multiplatform kernel, with the following caveats:
-> > 
-> > * Only DT based boards are supported
+On Tuesday 05 March 2013, Bastian Hecht wrote:
+> 2013/3/4 Arnd Bergmann <arnd@arndb.de>:
+> > On Monday 04 March 2013 17:20:54 Bastian Hecht wrote:
+> >>
+> >> +       sci at e6c40000 {
+> >> +               compatible = "renesas,sci-SCIFA-uart";
+> >> +               interrupt-parent = <&intca>;
+> >> +               reg = <0xe6c40000 0x100>;
+> >> +               interrupts = <0x0c00>, <0x0c00>, <0x0c00>, <0x0c00>;
+> >> +               cell-index = <0>;
+> >> +               renesas,scscr = <0x30>;
+> >> +               renesas,scbrr-algo-id = <4>;
+> >> +               renesas,autoconf;
+> >> +       };
+> >
+> > The default name for a uart is "serial", I would recommend sticking to
+> > that by convention. You may also want to add an "aliases" node
+> > somewhere, to define which port should get which logical device number
+> > on a given board.
 > 
-> As far as I'm aware, there are plans to drop non-DT Exynos support. Kgene 
-> should know more on this.
+> Switched to "...-serial".
 
-Yes, that was my understanding as well. It might not actually be too 
-hard to get multiplatform working with the ATAGS based board files
-(we do that on some of the other platforms), but there is probably
-no reason to try hard.
- 
-> > * Moving to common-clk breaks things including cpufreq
-> >   and others. Thomas is working on a patch for this
+I actually meant the name, not the "compatible" value. For compatible, either
+version is fine with me. What I think you should change though is renaming
+"sci at e6c40000" to "serial at e6c40000".
+
+> About the aliases: Would I need to add that now, or can we postpone that?
 > 
-> We have several patches internally for fixing things up to run correclty with 
-> common-clk. I'll see if we can post some patches.
 
-Ok, excellent.
-
-> > * We disable the gpio implementation, which also breaks
-> >   stuff, but Thomas has a patch already
-> 
-> The legacy GPIO code is needed only for non-DT case. DT-case uses the new 
-> pinctrl-samsung driver, which is (AFAIK) multiplatform-aware.
-
-Please have a closer look at the "ARM: exynos: work around missing gpio
-code on multiplatform" patch, I think there a few files I had to touch
-that actually rely on the legacy gpio code:
-
-* the pm-gpio.c file
-* the s3c_i2c0_cfg_gpio function
-* the eint irqchip
-
-If none of these are needed for DT-based systems, we should probably
-build that code conditionally based on the CONFIG_EXYNOS_ATAGS symbol
-I introduced.
-
-> > * sparsemem support is not available on multiplatform
-> 
-> There was some discussion some time ago whether we really need sparsemem on 
-> Exynos. If I remember correctly, it turned out that we don't. So this is not 
-> really an issue.
-
-Ok, good.
- 
-> > Arnd Bergmann (23):
-> >   ARM: exynos: introduce EXYNOS_ATAGS symbol
-> >   irqchip: exynos: remove dependency on mach/irqs.h
-> >   tty: serial/samsung: prepare for common clock API
-> >   tty: serial/samsung: make register definitions global
-> >   tty: serial/samsung: fix modular build
-> >   ARM: exynos: move debug-macro.S to include/debug/
-> >   i2c: s3c2410: make header file local
-> >   mmc: sdhci-s3c: remove platform dependencies
-> >   usb: exynos: do not include plat/usb-phy.h
-> >   [media] exynos: remove unnecessary header inclusions
-> >   video/exynos: remove unnecessary header inclusions
-> >   thermal/exynos: remove unnecessary header inclusions
-> >   mtd: onenand/samsung: make regs-onenand.h file local
-> >   rtc: s3c: make header file local
-> >   spi: s3c64xx: move to generic dmaengine API
-> >   pwm: samsung: repair the worst MMIO abuses
-> 
-> I'm currently working (in my free time) on a series of cleanup patches 
-> sanitizing Samsung PWM code for S3C64xx and S5PV210 DT (and multiplatform) 
-> support.
-
-Ah, nice.
-
-> On those platforms it is a bit more complex case as there are two blocks of 
-> code that access the same hardware - samsung-time (using two PWM channels for 
-> clocksource and clock events) and pwm-samsung.
-> 
-> Hopefully, I will have some patches ready soon.
-
-How are you planning to solve this? Do you want to have a combined driver that
-registers both a clocksource and a pwm?
+No hurry for that. It's just a feature that comes in very handy, but not
+all platforms implement it.
 
 	Arnd
