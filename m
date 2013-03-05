@@ -1,36 +1,23 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Tue, 05 Mar 2013 10:34:58 +0100
-Subject: [PATCH] ARM: dove: Fix typo "COMMON_CLK_DOVE"
-Message-ID: <1362476098.16460.65.camel@x61.thuisdomein>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 5 Mar 2013 17:36:12 +0800 (HKT)
+Subject: [RFC PATCH] ARM: mm: disable kmap_high_get() for SMP
+In-Reply-To: <1362372667-953-1-git-send-email-iamjoonsoo.kim@lge.com>
+References: <1362372667-953-1-git-send-email-iamjoonsoo.kim@lge.com>
+Message-ID: <alpine.LFD.2.03.1303051642110.28820@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 5b03df9ace680d7cdd34a69dfd85ca5f74159d18 ("ARM: dove: switch to
-DT clock providers") added "select COMMON_CLK_DOVE" to Marvell Dove's
-Kconfig entry. But there's no Kconfig symbol COMMON_CLK_DOVE, which
-makes this select statement a nop. Since the Marvell Dove code includes
-<linux/clk-provider.h> we can assume that this entry needs to select
-COMMON_CLK instead.
+On Mon, 4 Mar 2013, Joonsoo Kim wrote:
 
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
----
-Untested.
+> With SMP and enabling kmap_high_get(), it makes users of kmap_atomic()
+> sequential ordered, because kmap_high_get() use global kmap_lock().
+> It is not welcome situation, so turn off this optimization for SMP.
 
- arch/arm/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I'm not sure I understand the problem.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 5b71469..31acce7 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -556,7 +556,7 @@ config ARCH_IXP4XX
- config ARCH_DOVE
- 	bool "Marvell Dove"
- 	select ARCH_REQUIRE_GPIOLIB
--	select COMMON_CLK_DOVE
-+	select COMMON_CLK
- 	select CPU_V7
- 	select GENERIC_CLOCKEVENTS
- 	select MIGHT_HAVE_PCI
--- 
-1.7.11.7
+The lock taken by kmap_high_get() is released right away before that 
+function returns and therefore this is not actually serializing 
+anything.
+
+
+Nicolas
