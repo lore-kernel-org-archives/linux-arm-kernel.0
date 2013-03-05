@@ -1,181 +1,136 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue,  5 Mar 2013 18:42:26 +0100
-Subject: [PATCH 16/23] pwm: samsung: repair the worst MMIO abuses
+Date: Tue,  5 Mar 2013 18:42:31 +0100
+Subject: [PATCH 21/23] ARM: exynos: hack to disable private clock code
 In-Reply-To: <1362505353-8873-1-git-send-email-arnd@arndb.de>
 References: <1362505353-8873-1-git-send-email-arnd@arndb.de>
-Message-ID: <1362505353-8873-17-git-send-email-arnd@arndb.de>
+Message-ID: <1362505353-8873-22-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Samsung PWM driver uses "magic" pointers that are mapped
-at boot time to point its MMIO registers. This fails horribly
-with a multiplatform kernel, which can not rely on platform
-specific header files to contain the right values, aside from
-this being a really bad idea in general.
-
-This changes the driver to at least pass an __iomem token
-around in the device structure to dereference that. Fixing
-the platform code is much harder, so we'll leave that
-until we have a DT binding for pwm-samsung, which may require
-other changes in this area. Since we are already touching
-every MMIO accessor in this driver, let's also use the
-proper readl_relaxed variant rather than __raw_readl.
+Multiplatform kernels rely on the common clock implementation,
+which conflicts with Samsung's own implementation of the same
+interface. This disables all code that provides or requires
+the nonstandard version.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/pwm/pwm-samsung.c | 60 +++++++++++++++++++++++++++++++++--------------
- 1 file changed, 42 insertions(+), 18 deletions(-)
+ arch/arm/mach-exynos/Makefile        | 2 ++
+ arch/arm/mach-exynos/common.c        | 6 ++++++
+ arch/arm/plat-samsung/clock-clksrc.c | 3 +++
+ arch/arm/plat-samsung/s5p-clock.c    | 3 +++
+ drivers/cpufreq/Kconfig.arm          | 4 +++-
+ drivers/devfreq/Kconfig              | 1 +
+ 6 files changed, 18 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/pwm/pwm-samsung.c b/drivers/pwm/pwm-samsung.c
-index 5207e6c..9d7234d 100644
---- a/drivers/pwm/pwm-samsung.c
-+++ b/drivers/pwm/pwm-samsung.c
-@@ -22,9 +22,25 @@
- #include <linux/io.h>
- #include <linux/pwm.h>
+diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
+index 435757e..b0dcf7d 100644
+--- a/arch/arm/mach-exynos/Makefile
++++ b/arch/arm/mach-exynos/Makefile
+@@ -13,10 +13,12 @@ obj-				:=
+ # Core
  
--#include <mach/map.h>
-+#ifndef CONFIG_ARCH_MULTIPLATFORM
-+/*
-+ * This is gross: the platform maps the timer at a fixed
-+ * virtual address and expects us to use that address
-+ * rather than a proper resource. This should get done properly
-+ * when we get a DT binding for this driver.
-+ */
-+#include <plat/map-base.h>
-+static inline void dummy(void)
-+{
-+	BUILD_BUG_ON(S3C_VA_TIMER != IOMEM(0xf6300000));
-+}
-+#else
-+#define S3C_VA_TIMER IOMEM(0xf6300000);
-+#endif
+ obj-$(CONFIG_ARCH_EXYNOS)	+= common.o
++ifdef CONFIG_SAMSUNG_CLOCK
+ obj-$(CONFIG_ARCH_EXYNOS4)	+= clock-exynos4.o
+ obj-$(CONFIG_CPU_EXYNOS4210)	+= clock-exynos4210.o
+ obj-$(CONFIG_SOC_EXYNOS4212)	+= clock-exynos4212.o
+ obj-$(CONFIG_SOC_EXYNOS5250)	+= clock-exynos5.o
++endif
  
--#include <plat/regs-timer.h>
-+#define S3C2410_TCON		8
-+#define S3C2410_TCNTB(tmr)	(0x0c + (tmr)*0x0c + 0x00)
-+#define S3C2410_TCMPB(tmr)	(0x0c + (tmr)*0x0c + 0x04)
+ obj-$(CONFIG_PM)		+= pm.o
+ obj-$(CONFIG_PM_GENERIC_DOMAINS) += pm_domains.o
+diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+index 4b4526d..504d50e 100644
+--- a/arch/arm/mach-exynos/common.c
++++ b/arch/arm/mach-exynos/common.c
+@@ -404,6 +404,9 @@ static void __init exynos5_map_io(void)
  
- struct s3c_chip {
- 	struct platform_device	*pdev;
-@@ -38,6 +54,7 @@ struct s3c_chip {
+ static void __init exynos4_init_clocks(int xtal)
+ {
++	if (!IS_ENABLED(CONFIG_SAMSUNG_CLOCK))
++		return;
++
+ 	printk(KERN_DEBUG "%s: initializing clocks\n", __func__);
  
- 	unsigned char		 tcon_base;
- 	unsigned char		 pwm_id;
-+	void __iomem		*base;
- 	struct pwm_chip		 chip;
- };
+ 	s3c24xx_register_baseclocks(xtal);
+@@ -425,6 +428,9 @@ static void __init exynos5440_map_io(void)
  
-@@ -65,9 +82,9 @@ static int s3c_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
+ static void __init exynos5_init_clocks(int xtal)
+ {
++	if (!IS_ENABLED(CONFIG_SAMSUNG_CLOCK))
++		return;
++
+ 	printk(KERN_DEBUG "%s: initializing clocks\n", __func__);
  
- 	local_irq_save(flags);
- 
--	tcon = __raw_readl(S3C2410_TCON);
-+	tcon = readl_relaxed(s3c->base + S3C2410_TCON);
- 	tcon |= pwm_tcon_start(s3c);
--	__raw_writel(tcon, S3C2410_TCON);
-+	writel_relaxed(tcon, s3c->base + S3C2410_TCON);
- 
- 	local_irq_restore(flags);
- 
-@@ -82,9 +99,9 @@ static void s3c_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
- 
- 	local_irq_save(flags);
- 
--	tcon = __raw_readl(S3C2410_TCON);
-+	tcon = readl_relaxed(s3c->base + S3C2410_TCON);
- 	tcon &= ~pwm_tcon_start(s3c);
--	__raw_writel(tcon, S3C2410_TCON);
-+	writel_relaxed(tcon, s3c->base + S3C2410_TCON);
- 
- 	local_irq_restore(flags);
- }
-@@ -133,8 +150,8 @@ static int s3c_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
- 	/* The TCMP and TCNT can be read without a lock, they're not
- 	 * shared between the timers. */
- 
--	tcmp = __raw_readl(S3C2410_TCMPB(s3c->pwm_id));
--	tcnt = __raw_readl(S3C2410_TCNTB(s3c->pwm_id));
-+	tcmp = readl_relaxed(s3c->base + S3C2410_TCMPB(s3c->pwm_id));
-+	tcnt = readl_relaxed(s3c->base + S3C2410_TCNTB(s3c->pwm_id));
- 
- 	period = NS_IN_HZ / period_ns;
- 
-@@ -177,16 +194,16 @@ static int s3c_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
- 
- 	local_irq_save(flags);
- 
--	__raw_writel(tcmp, S3C2410_TCMPB(s3c->pwm_id));
--	__raw_writel(tcnt, S3C2410_TCNTB(s3c->pwm_id));
-+	writel_relaxed(tcmp, s3c->base + S3C2410_TCMPB(s3c->pwm_id));
-+	writel_relaxed(tcnt, s3c->base + S3C2410_TCNTB(s3c->pwm_id));
- 
--	tcon = __raw_readl(S3C2410_TCON);
-+	tcon = readl_relaxed(s3c->base + S3C2410_TCON);
- 	tcon |= pwm_tcon_manulupdate(s3c);
- 	tcon |= pwm_tcon_autoreload(s3c);
--	__raw_writel(tcon, S3C2410_TCON);
-+	writel_relaxed(tcon, s3c->base + S3C2410_TCON);
- 
- 	tcon &= ~pwm_tcon_manulupdate(s3c);
--	__raw_writel(tcon, S3C2410_TCON);
-+	writel_relaxed(tcon, s3c->base + S3C2410_TCON);
- 
- 	local_irq_restore(flags);
- 
-@@ -207,6 +224,7 @@ static int s3c_pwm_probe(struct platform_device *pdev)
- 	unsigned long flags;
- 	unsigned long tcon;
- 	unsigned int id = pdev->id;
-+	struct resource *res;
+ 	/* EXYNOS5440 can support only common clock framework */
+diff --git a/arch/arm/plat-samsung/clock-clksrc.c b/arch/arm/plat-samsung/clock-clksrc.c
+index 786a410..094fde9 100644
+--- a/arch/arm/plat-samsung/clock-clksrc.c
++++ b/arch/arm/plat-samsung/clock-clksrc.c
+@@ -179,6 +179,9 @@ void __init s3c_register_clksrc(struct clksrc_clk *clksrc, int size)
+ {
  	int ret;
  
- 	if (id == 4) {
-@@ -220,6 +238,12 @@ static int s3c_pwm_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 	}
- 
-+	/* try to get a proper base address, fall back to S3C_VA_TIMER */
-+	s3c->base = S3C_VA_TIMER;
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (res)
-+		s3c->base = devm_ioremap(dev, res->start, resource_size(res));
++	if (!IS_ENABLED(CONFIG_SAMSUNG_CLOCK))
++		return;
 +
- 	/* calculate base of control bits in TCON */
- 	s3c->tcon_base = id == 0 ? 0 : (id * 4) + 4;
- 	s3c->pwm_id = id;
-@@ -245,9 +269,9 @@ static int s3c_pwm_probe(struct platform_device *pdev)
+ 	for (; size > 0; size--, clksrc++) {
+ 		if (!clksrc->reg_div.reg && !clksrc->reg_src.reg)
+ 			printk(KERN_ERR "%s: clock %s has no registers set\n",
+diff --git a/arch/arm/plat-samsung/s5p-clock.c b/arch/arm/plat-samsung/s5p-clock.c
+index 48a1599..0e22618 100644
+--- a/arch/arm/plat-samsung/s5p-clock.c
++++ b/arch/arm/plat-samsung/s5p-clock.c
+@@ -286,6 +286,9 @@ void __init s5p_register_clocks(unsigned long xtal_freq)
+ {
+ 	int ret;
  
- 	local_irq_save(flags);
++	if (!IS_ENABLED(CONFIG_SAMSUNG_CLOCK))
++		return;
++
+ 	clk_ext_xtal_mux.rate = xtal_freq;
  
--	tcon = __raw_readl(S3C2410_TCON);
-+	tcon = readl_relaxed(s3c->base + S3C2410_TCON);
- 	tcon |= pwm_tcon_invert(s3c);
--	__raw_writel(tcon, S3C2410_TCON);
-+	writel_relaxed(tcon, s3c->base + S3C2410_TCON);
+ 	ret = s3c24xx_register_clocks(s5p_clks, ARRAY_SIZE(s5p_clks));
+diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+index 030ddf6..b6fb4fa 100644
+--- a/drivers/cpufreq/Kconfig.arm
++++ b/drivers/cpufreq/Kconfig.arm
+@@ -51,7 +51,7 @@ config ARM_S5PV210_CPUFREQ
  
- 	local_irq_restore(flags);
+ config ARM_EXYNOS_CPUFREQ
+ 	bool "SAMSUNG EXYNOS SoCs"
+-	depends on ARCH_EXYNOS
++	depends on ARCH_EXYNOS && SAMSUNG_CLOCK
+ 	default y
+ 	help
+ 	  This adds the CPUFreq driver common part for Samsung
+@@ -59,6 +59,7 @@ config ARM_EXYNOS_CPUFREQ
  
-@@ -258,7 +282,7 @@ static int s3c_pwm_probe(struct platform_device *pdev)
- 	}
+ 	  If in doubt, say N.
  
- 	pwm_dbg(s3c, "config bits %02x\n",
--		(__raw_readl(S3C2410_TCON) >> s3c->tcon_base) & 0x0f);
-+		(readl_relaxed(s3c->base + S3C2410_TCON) >> s3c->tcon_base) & 0x0f);
++if ARM_EXYNOS_CPUFREQ
+ config ARM_EXYNOS4210_CPUFREQ
+ 	def_bool CPU_EXYNOS4210
+ 	help
+@@ -76,6 +77,7 @@ config ARM_EXYNOS5250_CPUFREQ
+ 	help
+ 	  This adds the CPUFreq driver for Samsung EXYNOS5250
+ 	  SoC.
++endif
  
- 	dev_info(dev, "tin at %lu, tdiv at %lu, tin=%sclk, base %d\n",
- 		 clk_get_rate(s3c->clk),
-@@ -310,9 +334,9 @@ static int s3c_pwm_resume(struct platform_device *pdev)
- 	unsigned long tcon;
- 
- 	/* Restore invertion */
--	tcon = __raw_readl(S3C2410_TCON);
-+	tcon = readl_relaxed(s3c->base + S3C2410_TCON);
- 	tcon |= pwm_tcon_invert(s3c);
--	__raw_writel(tcon, S3C2410_TCON);
-+	writel_relaxed(tcon, s3c->base + S3C2410_TCON);
- 
- 	return 0;
- }
+ config ARM_KIRKWOOD_CPUFREQ
+ 	def_bool ARCH_KIRKWOOD && OF
+diff --git a/drivers/devfreq/Kconfig b/drivers/devfreq/Kconfig
+index 0f079be..d4f9a24 100644
+--- a/drivers/devfreq/Kconfig
++++ b/drivers/devfreq/Kconfig
+@@ -68,6 +68,7 @@ comment "DEVFREQ Drivers"
+ config ARM_EXYNOS4_BUS_DEVFREQ
+ 	bool "ARM Exynos4210/4212/4412 Memory Bus DEVFREQ Driver"
+ 	depends on CPU_EXYNOS4210 || CPU_EXYNOS4212 || CPU_EXYNOS4412
++	depends on SAMSUNG_CLOCK
+ 	select ARCH_HAS_OPP
+ 	select DEVFREQ_GOV_SIMPLE_ONDEMAND
+ 	help
 -- 
 1.8.1.2
