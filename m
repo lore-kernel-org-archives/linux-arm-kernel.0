@@ -1,51 +1,39 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Tue, 5 Mar 2013 12:04:28 -0800
-Subject: RFC: Zynq Clock Controller
-Message-ID: <37032699-343e-485c-80e0-9b23e3706c58@VA3EHSMHS013.ehs.local>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Tue, 05 Mar 2013 21:17:17 +0100
+Subject: [PATCH v2] ARM: dove: drop "select COMMON_CLK_DOVE"
+In-Reply-To: <51363A9E.6090507@gmail.com>
+References: <1362476098.16460.65.camel@x61.thuisdomein>
+ <51363A9E.6090507@gmail.com>
+Message-ID: <1362514637.16460.117.camel@x61.thuisdomein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Commit 5b03df9ace680d7cdd34a69dfd85ca5f74159d18 ("ARM: dove: switch to
+DT clock providers") added "select COMMON_CLK_DOVE" to Marvell Dove's
+Kconfig entry. But there's no Kconfig symbol COMMON_CLK_DOVE, which
+makes this select statement a nop. It's probably a leftover of some
+experimental code that never hit mainline. Drop it.
 
-As you know, I'm reviewing Zynq's clock implementation and try to find a way to go forward. It looks like most archs contain all clocks within a clock controller block which provides all the output clocks which are then used by device drivers etc. E.g. the Tegra CAR.
+Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+---
+0) v2: Sebastian suggested to drop this select entirely.
 
-I do also see some benefits of this approach:
- - The DT description should never change even when the clock tree and/or functionality within the controller changes (assuming all required outputs are present)
- - the controller can handle more sophisticated clock operations, which go beyond the simple enable/disable the device drivers are doing
+1) Still untested.
 
-For this reasons, I'd like to propose moving Zynq into the same direction. I.e. adding a clock controller with the following DT description (details may change but the general idea should become clear):
-	clkc: clkc {
-                #clock-cells = <1>;
-                compatible = "xlnx,ps7-clkc";
-                ps_clk_frequency = <33333333>;	# board x-tal
-                # optional props
-                gem0_emio_clk_freq = <125000000>;
-                gem1_emio_clk_freq = <50000000>;
-                can_mio_clk_freq_xx = <1234>; # this is possible 54 times with xx = 00..53
-        };
+ arch/arm/Kconfig | 1 -
+ 1 file changed, 1 deletion(-)
 
-For the PLLs we can use Josh's implementation and extend it where needed. For everything else we can then use the clock primitives instead of using custom implementations, I think. The node should be a subnode to Zynq's SLCR.
-
-Currently I have identified the following output clocks:
-        armpll, ddrpll, iopll,
-        cpu_6or4x, cpu_3or2x, cpu_2x, cpu_1x,
-        ddr2x, ddr3x, dci,
-        lqspi, smc, pcap, gem0, gem1, fclk0, fclk1, fclk2, fclk3, can0, can1,
-        sdio0, sdio1, uart0, uart1, spi0, spi1,
-        dma_aper, usb0_aper, usb1_aper, gem0_aper, gem1_aper,
-        sdio0_aper, sdio1_aper, spi0_aper, spi1_aper, can0_aper, can1_aper,
-        i2c0_aper, i2c1_aper, uart0_aper, uart1_aper, gpio_aper, lqspi_aper,
-        smc_aper
-
-
-Clock consumers would work as described in the clock bindings:
-	consumer: zynq_dummy_peripheral {
-	        compatible = "xlnx,foobar";
-	        clocks = <&clkc 69>;
-	};
-
-
-Is this an acceptable solution? Does anybody see issues or has other feedback?
-
-	Thanks,
-	S?ren
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 5b71469..0c990b7 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -556,7 +556,6 @@ config ARCH_IXP4XX
+ config ARCH_DOVE
+ 	bool "Marvell Dove"
+ 	select ARCH_REQUIRE_GPIOLIB
+-	select COMMON_CLK_DOVE
+ 	select CPU_V7
+ 	select GENERIC_CLOCKEVENTS
+ 	select MIGHT_HAVE_PCI
+-- 
+1.7.11.7
