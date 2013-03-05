@@ -1,37 +1,34 @@
-From: csd@broadcom.com (Christian Daudt)
-Date: Tue, 5 Mar 2013 14:56:12 -0800
-Subject: [PATCH] ARM: bcm281xx: Add L2 cache enable code
-In-Reply-To: <51363770.5060201@wwwdotorg.org>
-References: <1362451632-18806-1-git-send-email-csd@broadcom.com>
- <51363770.5060201@wwwdotorg.org>
-Message-ID: <5136780C.7030801@broadcom.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Tue, 5 Mar 2013 15:06:16 -0800
+Subject: [PATCH v3 -next 0/5] Add support for LZ4-compressed kernel
+In-Reply-To: <1362484056-9778-1-git-send-email-kyungsik.lee@lge.com>
+References: <1362484056-9778-1-git-send-email-kyungsik.lee@lge.com>
+Message-ID: <20130305150616.cb737f9b217b8c82051b2ccb@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-03-05 10:20 AM, Stephen Warren wrote:
-> On 03/04/2013 07:47 PM, Christian Daudt wrote:
->> - Adds a module to provide calls into secure monitor mode
->> - Uses this module to make secure monitor calls to enable L2 cache.
->> diff --git a/Documentation/devicetree/bindings/misc/smc.txt b/Documentation/devicetree/bindings/misc/smc.txt
->> +Example:
->> +	smc at 0x3404c000 {
->> +		compatible = "bcm,kona-smc";
-> Both here in this example, and ...
->
->> diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
->> +	smc at 0x3404c000 {
->> +		compatible = "bcm,kona-smc";
-> Here in the actual .dts file, you should include the specific ID of the
-> SoC too, so that if there are Soc-specific bugs, the compatible property
-> that's required to determine this is present from the start. In other words,
->
-> compatible = "bcm,bcm11351-smc", "bcm,kona-smc";
->
-> (which SoC ID you use in the example is arbitrary, but it may as well
-> match the .dts file you're editing in the patch).
->
+On Tue,  5 Mar 2013 20:47:31 +0900 Kyungsik Lee <kyungsik.lee@lge.com> wrote:
 
-ok. done.
+> This is the third version. In this version, Some codes are fixed
+> and more description and note are added. I would like to thank David Sterba
+> for his review.
+> 
+> The Last patch[5/5] of the patch set is for making x86 and arm default to
+> LZ4-compressed for testing the LZ4 code in the linux-next.
+> It was requested by Andrew Morton in the patch set v2.
+> 
+> Currently, A preliminary version of LZ4 de/compression tool is supported.
+> However, It is expected that we will have a tool with more features
+> once its format is finished.
 
-  thanks,
-    csd
+What happened to the changelog?  The earlier version at least had some
+rudimentary benchmarking results, but now we don't even have that. 
+
+Someone should prepare the information explaining why we added this to
+Linux, and I'd prefer that person be you rather than me!  Certainly it
+should include performance measurements - both speed and space.  Also
+it should capture our thinking regarding all the other decompressors,
+explaining why we view it as acceptable to add yet another one.
+
+Please, put yourself in the position of someone reading these commits
+in 2017 wondering "why did they merge this".  We should tell them.
