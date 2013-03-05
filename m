@@ -1,52 +1,49 @@
-From: hechtb@gmail.com (Bastian Hecht)
-Date: Tue, 5 Mar 2013 14:47:17 +0100
-Subject: [PATCH v4 3/3] ARM: mach-shmobile: r8a7740: Setup the serial
- devices using DT
-In-Reply-To: <5135F647.8050002@cogentembedded.com>
-References: <1362414054-23092-1-git-send-email-hechtb+renesas@gmail.com>
- <1362414054-23092-3-git-send-email-hechtb+renesas@gmail.com>
- <2835497.S76YK1KMLM@wuerfel>
- <CABYn4sx=bC6JwicbVgRnmwdu=6DuW5GFgdG25a-Wow1Jn9M-bQ@mail.gmail.com>
- <5135F647.8050002@cogentembedded.com>
-Message-ID: <CABYn4swottJ6knJXfHntJuWJ9rzrC7kA-47TaKJRG0mh+u+Pig@mail.gmail.com>
+From: dirk.behme@gmail.com (Dirk Behme)
+Date: Tue, 05 Mar 2013 14:50:06 +0100
+Subject: [PATCH] [RFC] arm: fix memset-related crashes caused by recent
+ GCC (4.7.2) optimizations
+In-Reply-To: <20130212163645.GI4123@mudshark.cambridge.arm.com>
+References: <1359793988-6881-1-git-send-email-ivan.djelic@parrot.com>
+ <20130211184114.GP9801@mudshark.cambridge.arm.com>
+ <20130211194225.GK29329@parrot.com>
+ <20130212140008.GB4123@mudshark.cambridge.arm.com>
+ <20130212155801.GQ17833@n2100.arm.linux.org.uk>
+ <20130212163645.GI4123@mudshark.cambridge.arm.com>
+Message-ID: <5135F80E.3070307@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/3/5 Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>:
-> Hello.
+On 12.02.2013 17:36, Will Deacon wrote:
+> On Tue, Feb 12, 2013 at 03:58:01PM +0000, Russell King - ARM Linux wrote:
+>> On Tue, Feb 12, 2013 at 02:00:08PM +0000, Will Deacon wrote:
+>>> Interesting... the GCC documentation also states that ffreestanding implies
+>>> fno-builtin, so memset and co shouldn't be targetted for this sort of
+>>> optimisation by GCC. Have you observed this problem even when passing this
+>>> option?
+>>
+>> Rather than wondering whether we should be using -ffreestanding or not
+>> (which, x86 people have strongly resisted) I suggest that we just fix
+>> our memset() implementation to be compliant.
+>>
+>> The reason it's not compliant is that I saw no reason for it to be
+>> compliant back in the gcc 2.7.x days, and it's persisted like that for
+>> the last 19-ish years.  If GCC is now making use of the return value,
+>> then we need to fix that and undo the "optimization" in our string.h.
+>>
+>> So let's just bite the bullet, make the asm memset() compliant, and
+>> clean up string.h.
 >
->
-> On 05-03-2013 17:00, Bastian Hecht wrote:
->
->>>> +       sci at e6c40000 {
->>>> +               compatible = "renesas,sci-SCIFA-uart";
->>>> +               interrupt-parent = <&intca>;
->>>> +               reg = <0xe6c40000 0x100>;
->>>> +               interrupts = <0x0c00>, <0x0c00>, <0x0c00>, <0x0c00>;
->>>> +               cell-index = <0>;
->>>> +               renesas,scscr = <0x30>;
->>>> +               renesas,scbrr-algo-id = <4>;
->>>> +               renesas,autoconf;
->>>> +       };
->>>
->>>
->>> The default name for a uart is "serial", I would recommend sticking to
->>> that by convention. You may also want to add an "aliases" node
->>> somewhere, to define which port should get which logical device number
->>> on a given board.
->
->
->> Switched to "...-serial".
->
->
->    I think he was talking about the node name, not "compatible" property.
+> That would be the ideal thing to do, because it allows the compiler to
+> optimise around these functions, however it does mean we need to check/fix
+> *all* of the string functions at least (if we don't pass -fno-builtin then
+> any builtin function is up for optimisation, including strcpy etc).
 
-Ah sure! I'll wait for responses to v5 and will change it around in v6.
+Do we already have an agreed solution for this issue anywhere, now?
 
-Thanks,
+It seems some people hit by this issue are about to import Ivan's v2 
+patch. Which doesn't seem to be the final fix, though, if I read the 
+history of this thread correctly?
 
- Bastian
+Many thanks
 
-
-> WBR, Sergei
->
+Dirk
