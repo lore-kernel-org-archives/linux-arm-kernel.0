@@ -1,42 +1,18 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 5 Mar 2013 19:54:32 +0530
-Subject: Latest randconfig build errors
-In-Reply-To: <20130304095136.GI17833@n2100.arm.linux.org.uk>
-References: <20130304095136.GI17833@n2100.arm.linux.org.uk>
-Message-ID: <51360020.4050503@ti.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 5 Mar 2013 11:25:13 -0300
+Subject: [PATCH 1/3] ARM: dts: imx28-evk: Enable touchscreen support
+In-Reply-To: <CAOMZO5AyL3fFSKBUAUY-p-x5rRtuA8La3ZbYhoQrECVyo57bAA@mail.gmail.com>
+References: <1360337803-19858-1-git-send-email-festevam@gmail.com>
+ <20130304031716.GC30431@S2101-09.ap.freescale.net>
+ <CAOMZO5BL5Y-N+-kJN83eh74ZU74qPwFujxzxALr3KAp4Z0XXtg@mail.gmail.com>
+ <20130305142059.GB26075@S2101-09.ap.freescale.net>
+ <CAOMZO5AyL3fFSKBUAUY-p-x5rRtuA8La3ZbYhoQrECVyo57bAA@mail.gmail.com>
+Message-ID: <CAOMZO5Bvh5Pc1_2j7_c0+kSA7iT3UFk-dn_tyY9AxhaUtpmiPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/4/2013 3:21 PM, Russell King - ARM Linux wrote:
-> Last nights automated ARM build found the following errors with randconfig.
-> 
-> All information as usual at http://www.arm.linux.org.uk/developer/build/
-> 
-> 
-> Versatile randconfig:
-> 
-> ERROR: "irq_domain_add_simple" [drivers/gpio/gpio-em.ko] undefined!
-> 
-> OMAP4430 randconfig:
+On Tue, Mar 5, 2013 at 11:21 AM, Fabio Estevam <festevam@gmail.com> wrote:
 
-> The last three are caused by incorrect use of 'select':
-> 
-> warning: (MACH_OMAP_ZOOM2 && MACH_OMAP_ZOOM3 && MWAVE) selects SERIAL_8250 which has unmet direct dependencies (TTY && HAS_IOMEM && GENERIC_HARDIRQS)
-> warning: (USB_MUSB_HDRC) selects TWL4030_USB which has unmet direct dependencies (USB_SUPPORT && (USB || USB_GADGET) && TWL4030_CORE && REGULATOR_TWL4030 && USB_MUSB_OMAP2PLUS)
-> warning: (USB_MUSB_HDRC) selects TWL6030_USB which has unmet direct dependencies (USB_SUPPORT && (USB || USB_GADGET) && TWL4030_CORE && OMAP_USB2 && USB_MUSB_OMAP2PLUS)
-> warning: (MACH_OMAP_ZOOM2 && MACH_OMAP_ZOOM3) selects SERIAL_8250_CONSOLE which has unmet direct dependencies (TTY && HAS_IOMEM && GENERIC_HARDIRQS && SERIAL_8250=y)
-> warning: (MACH_OMAP_ZOOM2 && MACH_OMAP_ZOOM3) selects SERIAL_CORE_CONSOLE which has unmet direct dependencies (TTY && HAS_IOMEM && GENERIC_HARDIRQS)
-> warning: (VIDEO_DM6446_CCDC && VIDEO_DM355_CCDC && VIDEO_ISIF && VIDEO_DAVINCI_VPBE_DISPLAY) selects VIDEO_VPSS_SYSTEM which has unmet direct dependencies (MEDIA_SUPPORT && V4L_PLATFORM_DRIVERS && ARCH_DAVINCI)
-> warning: (MACH_OMAP_ZOOM2 && MACH_OMAP_ZOOM3 && MWAVE) selects SERIAL_8250 which has unmet direct dependencies (TTY && HAS_IOMEM && GENERIC_HARDIRQS)
-> warning: (USB_MUSB_HDRC) selects TWL4030_USB which has unmet direct dependencies (USB_SUPPORT && (USB || USB_GADGET) && TWL4030_CORE && OMAP_USB2 && USB_MUSB_OMAP2PLUS)
-> warning: (MACH_OMAP_ZOOM2 && MACH_OMAP_ZOOM3) selects SERIAL_8250_CONSOLE which has unmet direct dependencies (TTY && HAS_IOMEM && GENERIC_HARDIRQS && SERIAL_8250=y)
-> warning: (MACH_OMAP_ZOOM2 && MACH_OMAP_ZOOM3) selects SERIAL_CORE_CONSOLE which has unmet direct dependencies (TTY && HAS_IOMEM && GENERIC_HARDIRQS)
-> warning: (VIDEO_DM6446_CCDC && VIDEO_DM355_CCDC && VIDEO_ISIF && VIDEO_DAVINCI_VPBE_DISPLAY) selects VIDEO_VPSS_SYSTEM which has unmet direct dependencies (MEDIA_SUPPORT && V4L_PLATFORM_DRIVERS && ARCH_DAVINCI)
+> Reverting ad76fda7 fixes the issue. Will send a patch shortly.
 
-I submitted a patch to the media guys for the DaVinci media driver
-related issues.
-
-http://linux.davincidsp.com/pipermail/davinci-linux-open-source/2013-March/026559.html
-
-Thanks,
-Sekhar
+Sorry, this is not true. Will investigate more.
