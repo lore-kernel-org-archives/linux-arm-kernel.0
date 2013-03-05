@@ -1,244 +1,79 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 05 Mar 2013 19:28:01 +0100
-Subject: [PATCH 00/23] RFC: exynos multiplatform support
-In-Reply-To: <1362505353-8873-1-git-send-email-arnd@arndb.de>
-References: <1362505353-8873-1-git-send-email-arnd@arndb.de>
-Message-ID: <1579361.FL4RHMlS27@amdc1227>
+From: srivatsa.bhat@linux.vnet.ibm.com (Srivatsa S. Bhat)
+Date: Tue, 05 Mar 2013 23:57:44 +0530
+Subject: [PATCH v6 04/46] percpu_rwlock: Implement the core design of
+ Per-CPU Reader-Writer Locks
+In-Reply-To: <51361C71.5060502@cn.fujitsu.com>
+References: <20130218123714.26245.61816.stgit@srivatsabhat.in.ibm.com>
+ <CANN689F9S7c1M8+cEpz3tsxGF34+NTRBLvxgPUOtbvav5u+RRA@mail.gmail.com>
+ <5122551E.1080703@linux.vnet.ibm.com>	<51226B46.9080707@linux.vnet.ibm.com>
+ <CANN689FSxOz+0Cu7EG_yKD8ZE1OpT4kyT+ybLfXSqaifodJRpw@mail.gmail.com>
+ <51226F91.7000108@linux.vnet.ibm.com>
+ <CACvQF53bdh4_BxF0y1fnTVR+T2OmRc0jmWQYftsvx92-fg-Lug@mail.gmail.com>
+ <512BBAD8.8010006@linux.vnet.ibm.com>
+ <CACvQF51jCxk5jUqmhD=QBBtUsBkQWZzakacrKO4Gsk=w61rNwQ@mail.gmail.com>
+ <512C7A38.8060906@linux.vnet.ibm.com>
+ <CACvQF51RvhM8XNqu3-1OTQ=cZUZ=pAX+_zx0a29+W67N1X+BgQ@mail.gmail.com>
+ <512CC509.1050000@linux.vnet.ibm.com>
+ <CACvQF50UgiqPpDk3HCmV86zKSf6tPjqr0bZowfPEOJs0g0r0MQ@mail.gmail.com>
+ <512D0D67.9010609@linux.vnet.ibm.com>
+ <CACvQF53ph2ixdM-otzetjM5cR+2kcZj6sckOp3TnzzA_x-EZ8w@mail.gmail.com>
+ <512E7879.20109@linux.vnet.ibm.com> <5130EA6B.6030901@cn.fujitsu.com>
+ <513105DD.8010908@linux.vnet.ibm.com> <51361C71.5060502@cn.fujitsu.com>
+Message-ID: <51363920.3040906@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi Lai,
 
-First of all, thanks for your great effort on making Exynos multiplatform-
-friendly.
-
-I have added my two cents inline.
-
-On Tuesday 05 of March 2013 18:42:10 Arnd Bergmann wrote:
-> Hi everyone,
+On 03/05/2013 09:55 PM, Lai Jiangshan wrote:
+> Hi, Srivatsa,
 > 
-> Although I'm not present at the Linaro Connect hacking
-> sessions, I am participating remotely and have tried
-> hacking on multiplatform support for Exynos. This patch
-> set is far from complete, but I think the patches
-> can be useful anyway.
+> I'm sorry again, I delayed your works.
+>
+
+No, you didn't :-) I have been busy with some internal work lately,
+so I haven't been able to go through the recent discussions and
+review the new code carefully.. I'll get to it as soon as I can.
+ 
+> I have some thinkings about the way how to get this work done.
 > 
-> The series gets increasingly fishy towards the end,
-> and we should probably not apply any of the last nine
-> patches as-is, nor do I expect everything to work, since
-> I have not tested them at all.
+> First step: (2~3 patches)
+> Use preempt_disable() to implement get_online_cpu_atomic(), and add lockdep for it.
 > 
-> With this patch set, we can build mach-exynos as part
-> of a multiplatform kernel, with the following caveats:
+> Second step:
+> Conversion patches.
 > 
-> * Only DT based boards are supported
-
-As far as I'm aware, there are plans to drop non-DT Exynos support. Kgene 
-should know more on this.
-
-> * Moving to common-clk breaks things including cpufreq
->   and others. Thomas is working on a patch for this
-
-We have several patches internally for fixing things up to run correclty with 
-common-clk. I'll see if we can post some patches.
-
-> * We disable the gpio implementation, which also breaks
->   stuff, but Thomas has a patch already
-
-The legacy GPIO code is needed only for non-DT case. DT-case uses the new 
-pinctrl-samsung driver, which is (AFAIK) multiplatform-aware.
-
-> * Using the generic DMA engine API in SPI and ASoC
->   means they no longer work on S3C
-> * I did not like the solution for the UART driver, but
->   could also not think of a better one.
-> * The FB_S3C, S3C2410_WATCHDOG and S3C_ADC drivers
->   are left as an exercise to the reader, they are
->   currently disabled with multiplatform
-> * sparsemem support is not available on multiplatform
-
-There was some discussion some time ago whether we really need sparsemem on 
-Exynos. If I remember correctly, it turned out that we don't. So this is not 
-really an issue.
-
-> The patches are based on v3.9-rc1 and I have pushed
-> the git branch to
+> We can send the patchset of the above steps at first.
+> {
+> It does not change any behavior of the kernel.
+> and it is annotation(instead of direct preempt_diable() without comments sometimes),
+> so I expected they can be merged very early.
+> }
 > 
-> git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
-> testing/exynos-multiplatform
+> Third step:
+> After all people confide the conversion patches covered all cases and cpuhotplug site is ready for it,
+> we will implement get_online_cpu_atomic() via locks and remove stop_machine() from cpuhotplug.
 > 
-> I have not yet added subsystem maintainers to Cc on the
-> patches, I'd like to coordinate with the other people
-> involved first, so see if they already have patches
-> for the same drivers.
+> Any thought?
 > 
-> 	Arnd
+
+That sounds like a good plan. It might involve slightly more churn
+than just directly changing the locking scheme, but it is safer.
+And the extra churn is anyway limited only to the implementation of
+get/put_online_cpus_atomic().. so that should be fine IMHO.
+
 > 
-> Arnd Bergmann (23):
->   ARM: exynos: introduce EXYNOS_ATAGS symbol
->   irqchip: exynos: remove dependency on mach/irqs.h
->   tty: serial/samsung: prepare for common clock API
->   tty: serial/samsung: make register definitions global
->   tty: serial/samsung: fix modular build
->   ARM: exynos: move debug-macro.S to include/debug/
->   i2c: s3c2410: make header file local
->   mmc: sdhci-s3c: remove platform dependencies
->   usb: exynos: do not include plat/usb-phy.h
->   [media] exynos: remove unnecessary header inclusions
->   video/exynos: remove unnecessary header inclusions
->   thermal/exynos: remove unnecessary header inclusions
->   mtd: onenand/samsung: make regs-onenand.h file local
->   rtc: s3c: make header file local
->   spi: s3c64xx: move to generic dmaengine API
->   pwm: samsung: repair the worst MMIO abuses
-
-I'm currently working (in my free time) on a series of cleanup patches 
-sanitizing Samsung PWM code for S3C64xx and S5PV210 DT (and multiplatform) 
-support.
-
-On those platforms it is a bit more complex case as there are two blocks of 
-code that access the same hardware - samsung-time (using two PWM channels for 
-clocksource and clock events) and pwm-samsung.
-
-Hopefully, I will have some patches ready soon.
-
-Best regards,
--- 
-Tomasz Figa
-Samsung Poland R&D Center
-SW Solution Development, Kernel and System Framework
-
->   ASoC: samsung: move plat/ headers to local directory
->   ASoC: samsung: convert to dmaengine API
->   ASoC: samsung: use irq resource for idma
->   ARM: exynos: prepare for sparse IRQ
->   ARM: exynos: hack to disable private clock code
->   ARM: exynos: work around missing gpio code on multiplatform
->   ARM: exynos: experimental multiplatform support
+> If I have time, I will help you for the patches of the first step.
+> (I was assigned bad job in office-time, I can only do kernel-dev work in night.)
 > 
->  arch/arm/Kconfig                                  |  11 +-
->  arch/arm/Kconfig.debug                            |   8 +
->  arch/arm/include/debug/exynos.S                   |  39 +++
->  arch/arm/include/debug/samsung.S                  |  87 +++++++
->  arch/arm/mach-exynos/Kconfig                      |  36 ++-
->  arch/arm/mach-exynos/Makefile                     |   5 +
->  arch/arm/mach-exynos/common.c                     |  14 +-
->  arch/arm/mach-exynos/common.h                     |   2 +-
->  arch/arm/mach-exynos/dev-audio.c                  |   1 +
->  arch/arm/mach-exynos/dev-uart.c                   |   1 +
->  arch/arm/mach-exynos/include/mach/debug-macro.S   |  39 ---
->  arch/arm/mach-exynos/include/mach/gpio.h          |   2 +
->  arch/arm/mach-exynos/include/mach/irqs.h          |   5 +-
->  arch/arm/mach-exynos/mach-armlex4210.c            |   3 +
->  arch/arm/mach-exynos/mach-exynos4-dt.c            |   2 +
->  arch/arm/mach-exynos/mach-exynos5-dt.c            |   2 +
->  arch/arm/mach-exynos/mach-nuri.c                  |   2 +
->  arch/arm/mach-exynos/mach-origen.c                |   3 +
->  arch/arm/mach-exynos/mach-smdk4x12.c              |   2 +
->  arch/arm/mach-exynos/mach-smdkv310.c              |   3 +
->  arch/arm/mach-exynos/setup-i2c0.c                 |   3 +-
->  arch/arm/mach-exynos/setup-sdhci-gpio.c           |   2 +-
->  arch/arm/mach-exynos/setup-usb-phy.c              |   8 +-
->  arch/arm/mach-s3c24xx/clock-s3c2440.c             |   5 +
->  arch/arm/mach-s3c24xx/common.c                    |   5 +
->  arch/arm/mach-s3c24xx/dma-s3c2410.c               |   2 -
->  arch/arm/mach-s3c24xx/dma-s3c2412.c               |   2 -
->  arch/arm/mach-s3c24xx/dma-s3c2440.c               |   2 -
->  arch/arm/mach-s3c24xx/dma-s3c2443.c               |   2 -
->  arch/arm/mach-s3c24xx/include/mach/debug-macro.S  |   2 +-
->  arch/arm/mach-s3c24xx/mach-rx1950.c               |   1 -
->  arch/arm/mach-s3c64xx/include/mach/debug-macro.S  |   2 +-
->  arch/arm/mach-s3c64xx/include/mach/gpio.h         |   4 +
->  arch/arm/mach-s3c64xx/setup-usb-phy.c             |   4 +-
->  arch/arm/mach-s5p64x0/include/mach/debug-macro.S  |   2 +-
->  arch/arm/mach-s5pc100/include/mach/debug-macro.S  |   2 +-
->  arch/arm/mach-s5pc100/setup-sdhci-gpio.c          |   1 -
->  arch/arm/mach-s5pv210/include/mach/debug-macro.S  |   2 +-
->  arch/arm/mach-s5pv210/setup-sdhci-gpio.c          |   1 -
->  arch/arm/mach-s5pv210/setup-usb-phy.c             |   4 +-
->  arch/arm/plat-samsung/Kconfig                     |   5 +
->  arch/arm/plat-samsung/Makefile                    |   3 +
->  arch/arm/plat-samsung/clock-clksrc.c              |   3 +
->  arch/arm/plat-samsung/devs.c                      |  17 +-
->  arch/arm/plat-samsung/include/plat/debug-macro.S  |  87 -------
->  arch/arm/plat-samsung/include/plat/gpio-core.h    |   3 +
->  arch/arm/plat-samsung/include/plat/regs-ac97.h    |  67 -----
->  arch/arm/plat-samsung/include/plat/regs-iic.h     |  56 -----
->  arch/arm/plat-samsung/include/plat/regs-iis.h     |  70 ------
->  arch/arm/plat-samsung/include/plat/regs-onenand.h |  63 -----
->  arch/arm/plat-samsung/include/plat/regs-rtc.h     |  71 ------
->  arch/arm/plat-samsung/include/plat/regs-sdhci.h   |  87 -------
->  arch/arm/plat-samsung/include/plat/regs-serial.h  | 282
-> +--------------------- arch/arm/plat-samsung/include/plat/sdhci.h        | 
-> 56 +----
->  arch/arm/plat-samsung/include/plat/usb-phy.h      |   5 +-
->  arch/arm/plat-samsung/irq-vic-timer.c             |   1 +
->  arch/arm/plat-samsung/pm-gpio.c                   |   1 +
->  arch/arm/plat-samsung/pm.c                        |   1 +
->  arch/arm/plat-samsung/s5p-clock.c                 |   3 +
->  arch/arm/plat-samsung/s5p-irq.c                   |   1 +
->  drivers/cpufreq/Kconfig.arm                       |   4 +-
->  drivers/devfreq/Kconfig                           |   1 +
->  drivers/gpio/Makefile                             |   2 +-
->  drivers/i2c/busses/i2c-s3c2410.c                  |   3 +-
->  drivers/i2c/busses/i2c-s3c2410.h                  |  56 +++++
->  drivers/irqchip/exynos-combiner.c                 | 113 +++++----
->  drivers/media/platform/exynos-gsc/gsc-regs.c      |   1 -
->  drivers/media/platform/s5p-tv/sii9234_drv.c       |   3 -
->  drivers/mmc/host/Kconfig                          |   2 +-
->  drivers/mmc/host/sdhci-s3c-regs.h                 |  87 +++++++
->  drivers/mmc/host/sdhci-s3c.c                      |   5 +-
->  drivers/mtd/onenand/samsung.c                     |   4 +-
->  drivers/mtd/onenand/samsung.h                     |  61 +++++
->  drivers/pwm/pwm-samsung.c                         |  60 +++--
->  drivers/rtc/rtc-s3c.c                             |   3 +-
->  drivers/rtc/rtc-s3c.h                             |  70 ++++++
->  drivers/spi/spi-s3c64xx.c                         | 107 ++++----
->  drivers/thermal/exynos_thermal.c                  |   2 -
->  drivers/tty/serial/samsung.c                      |  17 +-
->  drivers/tty/serial/samsung.h                      |   4 +-
->  drivers/usb/host/ehci-s5p.c                       |   1 -
->  drivers/usb/host/ohci-exynos.c                    |   1 -
->  drivers/video/Kconfig                             |   2 +-
->  drivers/video/exynos/exynos_mipi_dsi.c            |   2 -
->  drivers/video/exynos/exynos_mipi_dsi_common.c     |   2 -
->  drivers/video/exynos/exynos_mipi_dsi_lowlevel.c   |   2 -
->  drivers/watchdog/Kconfig                          |   1 +
->  include/linux/platform_data/mmc-sdhci-s3c.h       |  56 +++++
->  include/linux/platform_data/spi-s3c64xx.h         |   3 +
->  include/linux/serial_s3c.h                        | 260
-> ++++++++++++++++++++ sound/soc/samsung/ac97.c                          | 
-> 17 +-
->  sound/soc/samsung/dma.c                           | 104 ++++----
->  sound/soc/samsung/dma.h                           |   4 +-
->  sound/soc/samsung/h1940_uda1380.c                 |   2 +-
->  sound/soc/samsung/i2s.c                           |   9 +-
->  sound/soc/samsung/idma.c                          |  10 +-
->  sound/soc/samsung/neo1973_wm8753.c                |   2 +-
->  sound/soc/samsung/pcm.c                           |  13 -
->  sound/soc/samsung/regs-ac97.h                     |  67 +++++
->  sound/soc/samsung/regs-iis.h                      |  70 ++++++
->  sound/soc/samsung/rx1950_uda1380.c                |   2 +-
->  sound/soc/samsung/s3c2412-i2s.c                   |  10 -
->  sound/soc/samsung/s3c24xx-i2s.c                   |  12 +-
->  sound/soc/samsung/s3c24xx_uda134x.c               |   2 +-
->  sound/soc/samsung/spdif.c                         |   6 -
->  105 files changed, 1262 insertions(+), 1208 deletions(-)
->  create mode 100644 arch/arm/include/debug/exynos.S
->  create mode 100644 arch/arm/include/debug/samsung.S
->  delete mode 100644 arch/arm/mach-exynos/include/mach/debug-macro.S
->  delete mode 100644 arch/arm/plat-samsung/include/plat/debug-macro.S
->  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-ac97.h
->  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-iic.h
->  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-iis.h
->  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-onenand.h
->  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-rtc.h
->  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-sdhci.h
->  create mode 100644 drivers/i2c/busses/i2c-s3c2410.h
->  create mode 100644 drivers/mmc/host/sdhci-s3c-regs.h
->  create mode 100644 drivers/mtd/onenand/samsung.h
->  create mode 100644 drivers/rtc/rtc-s3c.h
->  create mode 100644 include/linux/platform_data/mmc-sdhci-s3c.h
->  create mode 100644 include/linux/serial_s3c.h
->  create mode 100644 sound/soc/samsung/regs-ac97.h
->  create mode 100644 sound/soc/samsung/regs-iis.h
+> And for step2, I will write a checklist or spatch-script.
+> 
+
+Do look at the conversion already done in this v6 as well. In
+addition to that, we will have to account for the new kernel
+code that went in recently.
+
+I'll get back to working on the above mentioned aspects soon.
+
+Regards,
+Srivatsa S. Bhat
