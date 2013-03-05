@@ -1,90 +1,37 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue,  5 Mar 2013 23:16:46 +0100
-Subject: [PATCH 6/9] [media] ir-rx51: fix clock API related build issues
+Date: Tue,  5 Mar 2013 23:16:48 +0100
+Subject: [PATCH 8/9] iommu: OMAP: build only on OMAP2+
 In-Reply-To: <1362521809-22989-1-git-send-email-arnd@arndb.de>
 References: <1362521809-22989-1-git-send-email-arnd@arndb.de>
-Message-ID: <1362521809-22989-7-git-send-email-arnd@arndb.de>
+Message-ID: <1362521809-22989-9-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP1 no longer provides its own clock interfaces since patch
-a135eaae52 "ARM: OMAP: remove plat/clock.h". This is great, but
-we now have to convert the ir-rx51 driver to use the generic
-interface from linux/clk.h.
-
-The driver also uses the omap_dm_timer_get_fclk() function,
-which is not exported for OMAP1, so we have to move the
-definition out of the OMAP2 specific section.
+The OMAP IOMMU driver intentionally fails to build on OMAP1
+platforms, so we should not allow enabling it there.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
-Cc: Timo Kokkonen <timo.t.kokkonen@iki.fi>
+Cc: Joerg Roedel <joro@8bytes.org>
+Cc: iommu at lists.linux-foundation.org
+Cc: Ohad Ben-Cohen <ohad@wizery.com>
 Cc: Tony Lindgren <tony@atomide.com>
-Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: linux-media at vger.kernel.org
+Cc: Omar Ramirez Luna <omar.luna@linaro.org>
 ---
- arch/arm/plat-omap/dmtimer.c | 16 ++++++++--------
- drivers/media/rc/ir-rx51.c   |  4 ++--
- 2 files changed, 10 insertions(+), 10 deletions(-)
+ drivers/iommu/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
-index a0daa2f..ea133e5 100644
---- a/arch/arm/plat-omap/dmtimer.c
-+++ b/arch/arm/plat-omap/dmtimer.c
-@@ -333,6 +333,14 @@ int omap_dm_timer_get_irq(struct omap_dm_timer *timer)
- }
- EXPORT_SYMBOL_GPL(omap_dm_timer_get_irq);
+diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+index 5c514d07..c332fb9 100644
+--- a/drivers/iommu/Kconfig
++++ b/drivers/iommu/Kconfig
+@@ -130,7 +130,7 @@ config IRQ_REMAP
+ # OMAP IOMMU support
+ config OMAP_IOMMU
+ 	bool "OMAP IOMMU Support"
+-	depends on ARCH_OMAP
++	depends on ARCH_OMAP2PLUS
+ 	select IOMMU_API
  
-+struct clk *omap_dm_timer_get_fclk(struct omap_dm_timer *timer)
-+{
-+	if (timer)
-+		return timer->fclk;
-+	return NULL;
-+}
-+EXPORT_SYMBOL_GPL(omap_dm_timer_get_fclk);
-+
- #if defined(CONFIG_ARCH_OMAP1)
- #include <mach/hardware.h>
- /**
-@@ -371,14 +379,6 @@ EXPORT_SYMBOL_GPL(omap_dm_timer_modify_idlect_mask);
- 
- #else
- 
--struct clk *omap_dm_timer_get_fclk(struct omap_dm_timer *timer)
--{
--	if (timer)
--		return timer->fclk;
--	return NULL;
--}
--EXPORT_SYMBOL_GPL(omap_dm_timer_get_fclk);
--
- __u32 omap_dm_timer_modify_idlect_mask(__u32 inputmask)
- {
- 	BUG();
-diff --git a/drivers/media/rc/ir-rx51.c b/drivers/media/rc/ir-rx51.c
-index 8ead492..d1364a1 100644
---- a/drivers/media/rc/ir-rx51.c
-+++ b/drivers/media/rc/ir-rx51.c
-@@ -25,9 +25,9 @@
- #include <linux/platform_device.h>
- #include <linux/sched.h>
- #include <linux/wait.h>
-+#include <linux/clk.h>
- 
- #include <plat/dmtimer.h>
--#include <plat/clock.h>
- 
- #include <media/lirc.h>
- #include <media/lirc_dev.h>
-@@ -209,7 +209,7 @@ static int lirc_rx51_init_port(struct lirc_rx51 *lirc_rx51)
- 	}
- 
- 	clk_fclk = omap_dm_timer_get_fclk(lirc_rx51->pwm_timer);
--	lirc_rx51->fclk_khz = clk_fclk->rate / 1000;
-+	lirc_rx51->fclk_khz = clk_get_rate(clk_fclk) / 1000;
- 
- 	return 0;
- 
+ config OMAP_IOVMM
 -- 
 1.8.1.2
