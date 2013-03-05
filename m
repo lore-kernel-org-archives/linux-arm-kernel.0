@@ -1,62 +1,34 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 5 Mar 2013 19:28:50 +0000
-Subject: [PATCH v5] serial: sh-sci: Add OF support - incremental
-In-Reply-To: <1362490239-17848-1-git-send-email-hechtb+renesas@gmail.com>
-References: <1362490239-17848-1-git-send-email-hechtb+renesas@gmail.com>
-Message-ID: <201303051928.50331.arnd@arndb.de>
+Date: Tue, 5 Mar 2013 19:32:41 +0000
+Subject: [PATCH v2 1/4] spi/davinci: add DT binding documentation
+In-Reply-To: <A73F36158E33644199EB82C5EC81C7BC3EA4854E@DBDE01.ent.ti.com>
+References: <1362401955-9616-1-git-send-email-prakash.pm@ti.com>
+ <6918845.dALXSKksQd@wuerfel>
+ <A73F36158E33644199EB82C5EC81C7BC3EA4854E@DBDE01.ent.ti.com>
+Message-ID: <201303051932.41327.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 05 March 2013, Bastian Hecht wrote:
-> This is an incremental patch to the "[PATCH v4 1/3] serial: sh-sci: Add
-> OF support" implementing suggestions from Arnd.
+On Tuesday 05 March 2013, Manjunathappa, Prakash wrote:
+> On Mon, Mar 04, 2013 at 21:59:16, Arnd Bergmann wrote:
+> > On Monday 04 March 2013 18:29:12 Manjunathappa, Prakash wrote:
+> > > +- reg: Offset and length of SPI controller register space
+> > > +- num-cs: Number of chip selects
+> > > +- ti,davinci-spi-intr-line: interrupt line used to connect the SPI
+> > > +	IP to the interrupt controller withn the SoC. Possible values
+> > > +	are 0 and 1. Manual says one of the two possible interrupt
+> > > +	lines can be tied to the interrupt controller. Set this
+> > > +	based on a specifc SoC configuration.
+> > > +- interrupts: interrupt number offset at the irq parent
+> > 
+> > I would not call this an "offset". It is an interrupt descriptor
+> > which may be something other than a simple number.
+> > 
 > 
-> - The compatible pattern has been reworked to include devices with
->   legacy register sets.
-> - DT property interrupt-names added
-> - Renamed renesas,scbrr-algo-id into renesas,clock-algorithm
-> - Replaced #ifdef CONFIG_OF with
->   +       if (!IS_ENABLED(CONFIG_OF) || !np)
->   +                               return NULL;
-> 
-> I opted to show the changes in an incremental patch as it may be easier
-> to follow the changes and as Paul has the v3 already in his repo.
+> I am planning to drop from this documentation as it is common property.
 
-Ok, makes sense.
+I think it makese sense to document the fact that there should be exactly
+one interrupt listed in the interrupts property, especially since the
+hardware has two outputs.
 
-> -	sci at 0xe6c50000 {
-> -		compatible = "renesas,sci-SCIFA-uart";
-> +	sci at e6c50000 {
-> +		compatible = "renesas,sci-scifa-serial";
-
-As mentioned, I meant the name to be changed, not the compatible value.
-
-> +	{ .compatible = "renesas,sci-sci-serial",
-> +		.data = (void *)SCIx_SCI_REGTYPE },
-> +	{ .compatible = "renesas,sci-scif-serial",
-> +		.data = (void *)SCIx_SH4_SCIF_REGTYPE, },
-> +	{ .compatible = "renesas,sci-irda-serial",
-> +		.data = (void *)SCIx_IRDA_REGTYPE },
-> +	{ .compatible = "renesas,sci-scifa-serial",
-> +		.data = (void *)SCIx_SCIFA_REGTYPE },
-> +	{ .compatible = "renesas,sci-scifb-serial",
-> +		.data = (void *)SCIx_SCIFB_REGTYPE },
-> +	{ .compatible = "renesas,sci-sh2_scif_fifodata-serial",
-> +		.data = (void *)SCIx_SH2_SCIF_FIFODATA_REGTYPE },
-> +	{ .compatible = "renesas,sci-sh3_scif-serial",
-> +		.data = (void *)SCIx_SH3_SCIF_REGTYPE },
-> +	{ .compatible = "renesas,sci-sh4_scif-serial",
-> +		.data = (void *)SCIx_SH4_SCIF_REGTYPE },
-> +	{ .compatible = "renesas,sci-sh4_scif_no_scsptr-serial",
-> +		.data = (void *)SCIx_SH4_SCIF_NO_SCSPTR_REGTYPE },
-> +	{ .compatible = "renesas,sci-sh4_scif_fifodata-serial",
-> +		.data = (void *)SCIx_SH4_SCIF_FIFODATA_REGTYPE },
-> +	{ .compatible = "renesas,sci-sh7705_scif-serial",
-> +		.data = (void *)SCIx_SH7705_SCIF_REGTYPE },
->  	{},
-
-Ah nice, it's not even more complex than before.
-
-Looks good,
-
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+	Arnd
