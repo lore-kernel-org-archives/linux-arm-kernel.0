@@ -1,26 +1,63 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 5 Mar 2013 22:21:03 +0000
-Subject: [PATCH 00/23] RFC: exynos multiplatform support
-In-Reply-To: <681263925.o7yR7PPoHR@flatron>
-References: <1362505353-8873-1-git-send-email-arnd@arndb.de>
- <201303052154.22857.arnd@arndb.de> <681263925.o7yR7PPoHR@flatron>
-Message-ID: <201303052221.03250.arnd@arndb.de>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 6 Mar 2013 00:22:24 +0200
+Subject: [PATCH 4/9] usb: gadget: fix omap_udc build errors
+In-Reply-To: <1362521809-22989-5-git-send-email-arnd@arndb.de>
+References: <1362521809-22989-1-git-send-email-arnd@arndb.de>
+ <1362521809-22989-5-git-send-email-arnd@arndb.de>
+Message-ID: <20130305222224.GA26278@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 05 March 2013, Tomasz Figa wrote:
-> AFAIR, the PL080 in S3C64xx is a slightly customized variant and requires 
-> some modifications to the driver. However I'm saying this only based on 
-> what I remember from the past, as I haven't checked current version of the 
-> driver yet, so it's possible that it has been modified already.
+Hi,
+
+On Tue, Mar 05, 2013 at 11:16:44PM +0100, Arnd Bergmann wrote:
+> 1bf0cf6040 "usb: gadget: omap_udc: convert to udc_start/udc_stop"
+> made some trivial changes but was missing a ';' character.
 > 
-> I believe I will eventually have to take a look at it anyway, as it's a 
-> necessary step towards S3C64xx DT support.
+> 8c4cc00552 "ARM: OMAP1: DMA: Moving OMAP1 DMA channel definitions
+> to mach-omap1" added a definition for OMAP_DMA_USB_W2FC_TX0 to
+> the driver while making the header file it was defined in
+> unavailable for drivers, but this driver actually needs
+> OMAP_DMA_USB_W2FC_RX0 as well.
+> 
+> Both changes appear trivial, so let's add the missing semicolon
+> and the macro definition.
+> 
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  drivers/usb/gadget/omap_udc.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/usb/gadget/omap_udc.c b/drivers/usb/gadget/omap_udc.c
+> index 06be85c..f844565 100644
+> --- a/drivers/usb/gadget/omap_udc.c
+> +++ b/drivers/usb/gadget/omap_udc.c
+> @@ -62,6 +62,7 @@
+>  #define	DRIVER_VERSION	"4 October 2004"
+>  
+>  #define OMAP_DMA_USB_W2FC_TX0		29
+> +#define OMAP_DMA_USB_W2FC_RX0		26
+>  
+>  /*
+>   * The OMAP UDC needs _very_ early endpoint setup:  before enabling the
+> @@ -1310,7 +1311,7 @@ static int omap_pullup(struct usb_gadget *gadget, int is_on)
+>  }
+>  
+>  static int omap_udc_start(struct usb_gadget *g,
+> -		struct usb_gadget_driver *driver)
+> +		struct usb_gadget_driver *driver);
 
-Ok. Let me know if you need any help adding DT support to the pl08x driver.
-It would be nice to have that for SPEAr, Versatile and lpce32xx as well.
+good catch, thanks. I'll queue it for v3.6-rc3. Make sure to Cc
+linux-usb for anything under drivers/usb/ though
 
-All three currently have full DT support except for the DMA binding,
-since the common code for that was only added in 3.9-rc1.
-
-	Arnd
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130306/773d75f5/attachment.sig>
