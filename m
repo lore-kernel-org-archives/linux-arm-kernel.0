@@ -1,44 +1,37 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 5 Mar 2013 20:07:01 +0530
-Subject: [PATCH v2 6/8] ARM: dts: omap5: Add omap-usb3 and omap-usb2 dt data
+Date: Tue, 5 Mar 2013 20:07:00 +0530
+Subject: [PATCH v2 5/8] ARM: dts: omap5: Add ocp2scp data
 In-Reply-To: <1362494223-14151-1-git-send-email-kishon@ti.com>
 References: <1362494223-14151-1-git-send-email-kishon@ti.com>
-Message-ID: <1362494223-14151-7-git-send-email-kishon@ti.com>
+Message-ID: <1362494223-14151-6-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add omap-usb3 and omap-usb2 data node in omap5 device tree file.
-The information for the node added here is available @
-Documentation/devicetree/bindings/usb/usb-phy.txt
+Add ocp2scp data node in omap5 device tree file. The information for
+the node added here can be found @
+Documentation/devicetree/bindings/bus/omap-ocp2scp.txt
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- arch/arm/boot/dts/omap5.dtsi |   14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm/boot/dts/omap5.dtsi |    8 ++++++++
+ 1 file changed, 8 insertions(+)
 
 diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index 230b779..bd73257 100644
+index c937500..230b779 100644
 --- a/arch/arm/boot/dts/omap5.dtsi
 +++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -511,6 +511,20 @@
- 			#size-cells = <1>;
- 			ranges;
- 			ti,hwmods = "ocp2scp1";
-+			usb2_phy: usb2phy at 4a084000 {
-+				compatible = "ti,omap-usb2";
-+				reg = <0x4a084000 0x7c>;
-+				ctrl-module = <&omap_control_usb>;
-+			};
-+
-+			usb3_phy: usb3phy at 4a084400 {
-+				compatible = "ti,omap-usb3";
-+				reg = <0x4a084400 0x80>,
-+				      <0x4a084800 0x64>,
-+				      <0x4a084c00 0x40>;
-+				reg-names = "phy_rx", "phy_tx", "pll_ctrl";
-+				ctrl-module = <&omap_control_usb>;
-+			};
+@@ -504,5 +504,13 @@
+ 			reg-names = "control_dev_conf", "phy_power_usb";
+ 			ti,type = <2>;
  		};
++
++		ocp2scp {
++			compatible = "ti,omap-ocp2scp";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++			ti,hwmods = "ocp2scp1";
++		};
  	};
  };
 -- 
