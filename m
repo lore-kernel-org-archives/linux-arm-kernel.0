@@ -1,61 +1,46 @@
 From: mporter@ti.com (Matt Porter)
-Date: Tue,  5 Mar 2013 15:53:14 -0500
-Subject: [PATCH v8 8/9] spi: omap2-mcspi: add generic DMA request support to
- the DT binding
+Date: Tue,  5 Mar 2013 15:53:15 -0500
+Subject: [PATCH v8 9/9] ARM: dts: add AM33XX SPI DMA support
 In-Reply-To: <1362516795-6346-1-git-send-email-mporter@ti.com>
 References: <1362516795-6346-1-git-send-email-mporter@ti.com>
-Message-ID: <1362516795-6346-9-git-send-email-mporter@ti.com>
+Message-ID: <1362516795-6346-10-git-send-email-mporter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The binding definition is based on the generic DMA request binding
+Adds DMA resources to the AM33XX SPI nodes.
 
 Signed-off-by: Matt Porter <mporter@ti.com>
 ---
- Documentation/devicetree/bindings/spi/omap-spi.txt |   27 +++++++++++++++++++-
- 1 file changed, 26 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/am33xx.dtsi |   10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/spi/omap-spi.txt b/Documentation/devicetree/bindings/spi/omap-spi.txt
-index 938809c..4c85c4c 100644
---- a/Documentation/devicetree/bindings/spi/omap-spi.txt
-+++ b/Documentation/devicetree/bindings/spi/omap-spi.txt
-@@ -10,7 +10,18 @@ Required properties:
- 			  input. The default is D0 as input and
- 			  D1 as output.
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index aaf44122..a13d710 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -328,6 +328,11 @@
+ 			interrupt = <65>;
+ 			ti,spi-num-cs = <2>;
+ 			ti,hwmods = "spi0";
++			dmas = <&edma 16
++				&edma 17
++				&edma 18
++				&edma 19>;
++			dma-names = "tx0", "rx0", "tx1", "rx1";
+ 			status = "disabled";
+ 		};
  
--Example:
-+Optional properties:
-+- dmas: List of DMA specifiers with the controller specific format
-+	as described in the generic DMA client binding. A tx and rx
-+	specifier is required for each chip select.
-+- dma-names: List of DMA request names. These strings correspond
-+	1:1 with the DMA specifiers listed in dmas. The string naming
-+	is to be "rxN" and "txN" for RX and TX requests,
-+	respectively, where N equals the chip select number.
-+
-+Examples:
-+
-+[hwmod populated DMA resources]
+@@ -339,6 +344,11 @@
+ 			interrupt = <125>;
+ 			ti,spi-num-cs = <2>;
+ 			ti,hwmods = "spi1";
++			dmas = <&edma 42
++				&edma 43
++				&edma 44
++				&edma 45>;
++			dma-names = "tx0", "rx0", "tx1", "rx1";
+ 			status = "disabled";
+ 		};
  
- mcspi1: mcspi at 1 {
-     #address-cells = <1>;
-@@ -20,3 +31,17 @@ mcspi1: mcspi at 1 {
-     ti,spi-num-cs = <4>;
- };
- 
-+[generic DMA request binding]
-+
-+mcspi1: mcspi at 1 {
-+    #address-cells = <1>;
-+    #size-cells = <0>;
-+    compatible = "ti,omap4-mcspi";
-+    ti,hwmods = "mcspi1";
-+    ti,spi-num-cs = <2>;
-+    dmas = <&edma 42
-+	    &edma 43
-+	    &edma 44
-+	    &edma 45>;
-+    dma-names = "tx0", "rx0", "tx1", "rx1";
-+};
 -- 
 1.7.9.5
