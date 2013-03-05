@@ -1,49 +1,88 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 5 Mar 2013 08:34:21 +0000
-Subject: [PATCH] ARM: proc: Add Krait proc info
-In-Reply-To: <1362439299-29617-1-git-send-email-sboyd@codeaurora.org>
-References: <1362439299-29617-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20130305083421.GA19391@mudshark.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 5 Mar 2013 09:01:12 +0000
+Subject: [PATCH] ARM: bcm281xx: Add L2 cache enable code
+In-Reply-To: <1362451632-18806-1-git-send-email-csd@broadcom.com>
+References: <1362451632-18806-1-git-send-email-csd@broadcom.com>
+Message-ID: <201303050901.12317.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen, Stepan,
+On Tuesday 05 March 2013, Christian Daudt wrote:
 
-On Mon, Mar 04, 2013 at 11:21:39PM +0000, Stephen Boyd wrote:
-> From: Stepan Moskovchenko <stepanm@codeaurora.org>
-> 
-> Add processor info for the Qualcomm, Inc. Krait family of
-> processors, to use the generic ARMv7 initialisation
-> procedure but explicitly enable the IDIV hardware
-> capability flag.
-> 
-> Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  arch/arm/mm/proc-v7.S |   10 ++++++++++
->  1 file changed, 10 insertions(+)
-> 
-> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-> index 3a3c015..81adeb3 100644
-> --- a/arch/arm/mm/proc-v7.S
-> +++ b/arch/arm/mm/proc-v7.S
-> @@ -434,6 +434,16 @@ __v7_ca15mp_proc_info:
->  	.size	__v7_ca15mp_proc_info, . - __v7_ca15mp_proc_info
->  
->  	/*
-> +	 * Qualcomm Inc. Krait processors.
+> diff --git a/Documentation/devicetree/bindings/misc/smc.txt b/Documentation/devicetree/bindings/misc/smc.txt
+> new file mode 100644
+> index 0000000..cd8c729
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/misc/smc.txt
+> @@ -0,0 +1,14 @@
+> +Broadcom Secure Monitor Bounce buffer
+> +-----------------------------------------------------
+> +This binding defines the location of the bounce buffer
+> +used for non-secure to secure communications.
+> +
+> +Required properties:
+> +- compatible : "bcm,kona-smc"
+> +- reg : Location and size of bounce buffer
+> +
+> +Example:
+> +	smc at 0x3404c000 {
+> +		compatible = "bcm,kona-smc";
+> +		reg = <0x3404c000 0x400>; //1 KiB in SRAM
+> +	};
+
+For other firmware interfaces like this, we tend to list the specific commands
+that the firmware understands. If you think there might be different versions
+to consider, you might want to model this like
+
+Documentation/devicetree/bindings/arm/psci.txt
+> diff --git a/arch/arm/mach-bcm/bcm_kona_smc_asm.S b/arch/arm/mach-bcm/bcm_kona_smc_asm.S
+> new file mode 100644
+> index 0000000..a160848
+> --- /dev/null
+> +++ b/arch/arm/mach-bcm/bcm_kona_smc_asm.S
+> +/*
+> + * int bcm_kona_smc_asm(u32 service_id, u32 buffer_addr)
+> + */
+> +
+> +ENTRY(bcm_kona_smc_asm)
+> +	stmfd	sp!, {r4-r12, lr}
+> +	mov	r4, r0		@ service_id
+> +	mov	r5, #3		@ Keep IRQ and FIQ off in SM
+
+Why not just use an inline assembly?
+
+> +#ifdef CONFIG_CACHE_L2X0
+> +static int __init kona_l2_cache_init(void)
+> +{
+> +	/*
+> +	 * Currently there is no SSAPI for setting the L2 cache aux register,
+> +	 * so the default value (0x1e050000) applies.
 > +	 */
-> +	.type	__krait_proc_info, #object
-> +__krait_proc_info:
-> +	.long	0x510f0400		@ Required ID value
-> +	.long	0xff0ffc00		@ Mask for ID
-> +	__v7_proc __v7_setup, hwcaps = HWCAP_IDIV
+> +	bcm_kona_smc(SSAPI_ENABLE_L2_CACHE, 0, 0, 0, 0);
 
-I was looking at this the other day and wondered whether we could set
-HWCAP_IDIV in __v7_setup, depending on ID_ISAR0[27:24]. I can't immediately
-think why that would be difficult, but similarly there may well be a reason
-why we assign it like this.
+This can be written in a nicer way as
 
-Fancy taking a look?
+static int __init kona_l2_cache_init(void)
+{
+	if (!IS_ENABLED(CONFIG_CACHE_L2X0))
+		return 0;
+	...
+}
 
-Will
+To remove the need for the #ifdef.
+
+> +static void __init init_irq(void)
+> +{
+> +	irqchip_init();
+> +	bcm_kona_smc_init();
+> +
+> +#ifdef CONFIG_CACHE_L2X0
+> +	kona_l2_cache_init();
+> +#endif /* CONFIG_CACHE_L2X0 */
+> +}
+
+Why are you calling bcm_kona_smc_init() and kona_l2_cache_init() from init_irq()?
+
+It seems completely unrelated to interrupt handling.
+
+	Arnd
