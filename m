@@ -1,38 +1,31 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Tue,  5 Mar 2013 13:09:40 +0200
-Subject: [PATCH] ARM: OMAP: RX-51: add missing USB phy binding
-Message-ID: <1362481780-11018-1-git-send-email-aaro.koskinen@iki.fi>
+From: prakash.pm@ti.com (Manjunathappa, Prakash)
+Date: Tue, 5 Mar 2013 11:24:48 +0000
+Subject: [PATCH v4 1/5] ARM: davinci: mmc: derive version information
+ from device name
+In-Reply-To: <512DF1F7.6010508@ti.com>
+References: <1360909322-1858-1-git-send-email-prakash.pm@ti.com>
+ <1360909322-1858-2-git-send-email-prakash.pm@ti.com>
+ <512DF1F7.6010508@ti.com>
+Message-ID: <A73F36158E33644199EB82C5EC81C7BC3EA484F0@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 51482be9 (ARM: OMAP: USB: Add phy binding information) forgot to
-add phy binding for RX-51, and as a result USB does not work anymore on
-3.9-rc1. Add the missing binding.
+On Wed, Feb 27, 2013 at 17:15:59, Nori, Sekhar wrote:
+> On 2/15/2013 11:51 AM, Manjunathappa, Prakash wrote:
+> > Remove specifying mmc controller IP version information via platform
+> > data, instead specify device name so that driver derives it from
+> > platform_device_id table. Also change the clock node name to match
+> > the changed dev_id.
+> > Tested on da850-evm to make sure driver loads without clk_get failures.
+> > 
+> > Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
+> 
+> The patch looks good to me, but after this patch MMC/SD will be broken.
+> I suggest merging this into 2/5. It makes little sense without those
+> changes anyway.
+> 
 
-Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
----
- arch/arm/mach-omap2/board-rx51.c |    2 ++
- 1 file changed, 2 insertions(+)
+Ok I will merge this with 2/5.
 
-diff --git a/arch/arm/mach-omap2/board-rx51.c b/arch/arm/mach-omap2/board-rx51.c
-index f7c4616..d2ea68e 100644
---- a/arch/arm/mach-omap2/board-rx51.c
-+++ b/arch/arm/mach-omap2/board-rx51.c
-@@ -17,6 +17,7 @@
- #include <linux/io.h>
- #include <linux/gpio.h>
- #include <linux/leds.h>
-+#include <linux/usb/phy.h>
- #include <linux/usb/musb.h>
- #include <linux/platform_data/spi-omap2-mcspi.h>
- 
-@@ -98,6 +99,7 @@ static void __init rx51_init(void)
- 	sdrc_params = nokia_get_sdram_timings();
- 	omap_sdrc_init(sdrc_params, sdrc_params);
- 
-+	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
- 	usb_musb_init(&musb_board_data);
- 	rx51_peripherals_init();
- 
--- 
-1.7.10.4
+Thanks,
+Prakash 
