@@ -1,123 +1,59 @@
-From: prakash.pm@ti.com (Manjunathappa, Prakash)
-Date: Tue, 5 Mar 2013 11:24:43 +0000
-Subject: [PATCH v4 3/5] mmc: davinci_mmc: add DT support
-In-Reply-To: <512DF16F.50702@ti.com>
-References: <1360909322-1858-1-git-send-email-prakash.pm@ti.com>
- <1360909322-1858-4-git-send-email-prakash.pm@ti.com> <512DF16F.50702@ti.com>
-Message-ID: <A73F36158E33644199EB82C5EC81C7BC3EA484E9@DBDE01.ent.ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 5 Mar 2013 13:36:18 +0200
+Subject: [PATCH] ARM: OMAP: RX-51: add missing USB phy binding
+In-Reply-To: <1362481780-11018-1-git-send-email-aaro.koskinen@iki.fi>
+References: <1362481780-11018-1-git-send-email-aaro.koskinen@iki.fi>
+Message-ID: <20130305113618.GB19290@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sekhar,
-
-On Wed, Feb 27, 2013 at 17:13:43, Nori, Sekhar wrote:
-> On 2/15/2013 11:52 AM, Manjunathappa, Prakash wrote:
-> > Adds device tree support for davinci_mmc. Also add binding documentation.
-> > As of now in non-dma PIO mode and without GPIO card_detect/write_protect
-> > option because of dependencies on EDMA and GPIO module DT support.
-> > 
-> > Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
-> > Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-> > Cc: linux-mmc at vger.kernel.org
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Cc: davinci-linux-open-source at linux.davincidsp.com
-> > Cc: devicetree-discuss at lists.ozlabs.org
-> > Cc: cjb at laptop.org
-> > Cc: Sekhar Nori <nsekhar@ti.com>
-> > Cc: mporter at ti.com
+On Tue, Mar 05, 2013 at 01:09:40PM +0200, Aaro Koskinen wrote:
+> Commit 51482be9 (ARM: OMAP: USB: Add phy binding information) forgot to
+> add phy binding for RX-51, and as a result USB does not work anymore on
+> 3.9-rc1. Add the missing binding.
 > 
-> > diff --git a/drivers/mmc/host/davinci_mmc.c b/drivers/mmc/host/davinci_mmc.c
-> > index 874dc60..6b08b9a 100644
-> > --- a/drivers/mmc/host/davinci_mmc.c
-> > +++ b/drivers/mmc/host/davinci_mmc.c
-> > @@ -34,6 +34,8 @@
-> >  #include <linux/dma-mapping.h>
-> >  #include <linux/edma.h>
-> >  #include <linux/mmc/mmc.h>
-> > +#include <linux/of.h>
-> > +#include <linux/of_device.h>
-> >  
-> >  #include <linux/platform_data/mmc-davinci.h>
-> >  
-> > @@ -1156,6 +1158,7 @@ static void __init init_mmcsd_host(struct mmc_davinci_host *host)
-> >  
-> >  	mmc_davinci_reset_ctrl(host, 0);
-> >  }
-> > +
-> 
-> Stray line addition.
-> 
+> Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
 
-I will fix this.
+Acked-by: Felipe Balbi <balbi@ti.com>
 
-> >  static struct platform_device_id davinci_mmc_devtype[] = {
-> >  	{
-> >  		.name	= "davinci-mmc-dm355",
-> > @@ -1168,9 +1171,63 @@ static struct platform_device_id davinci_mmc_devtype[] = {
-> >  };
-> >  MODULE_DEVICE_TABLE(platform, davinci_mmc_devtype);
-> >  
-> > -static int __init davinci_mmcsd_probe(struct platform_device *pdev)
-> > +static const struct of_device_id davinci_mmc_dt_ids[] = {
-> > +	{
-> > +		.compatible = "ti,davinci-mmc-dm355",
-> > +		.data = &davinci_mmc_devtype[MMC_CTLR_VERSION_1],
-> > +	},
-> > +	{
-> > +		.compatible = "ti,davinci-mmc-da830",
-> > +		.data = &davinci_mmc_devtype[MMC_CTLR_VERSION_2],
-> > +	},
-> > +	{},
-> > +};
-> > +MODULE_DEVICE_TABLE(of, davinci_mmc_dt_ids);
-> > +
-> > +static struct davinci_mmc_config
-> > +	*mmc_parse_pdata(struct platform_device *pdev)
-> >  {
-> > +	struct device_node *np;
-> >  	struct davinci_mmc_config *pdata = pdev->dev.platform_data;
-> > +	const struct of_device_id *match =
-> > +		of_match_device(of_match_ptr(davinci_mmc_dt_ids), &pdev->dev);
-> > +	u32 data;
-> > +
-> > +	np = pdev->dev.of_node;
-> > +	if (!np)
-> > +		return pdata;
-> > +
-> > +	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
-> > +	if (!pdata) {
-> > +		dev_err(&pdev->dev, "Failed to allocate memory for struct davinci_mmc_config\n");
-> > +		goto nodata;
+> ---
+>  arch/arm/mach-omap2/board-rx51.c |    2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> devm_kzalloc() returns NULL on error so you will end up returning
-> success in this case.
+> diff --git a/arch/arm/mach-omap2/board-rx51.c b/arch/arm/mach-omap2/board-rx51.c
+> index f7c4616..d2ea68e 100644
+> --- a/arch/arm/mach-omap2/board-rx51.c
+> +++ b/arch/arm/mach-omap2/board-rx51.c
+> @@ -17,6 +17,7 @@
+>  #include <linux/io.h>
+>  #include <linux/gpio.h>
+>  #include <linux/leds.h>
+> +#include <linux/usb/phy.h>
+>  #include <linux/usb/musb.h>
+>  #include <linux/platform_data/spi-omap2-mcspi.h>
+>  
+> @@ -98,6 +99,7 @@ static void __init rx51_init(void)
+>  	sdrc_params = nokia_get_sdram_timings();
+>  	omap_sdrc_init(sdrc_params, sdrc_params);
+>  
+> +	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
+>  	usb_musb_init(&musb_board_data);
+>  	rx51_peripherals_init();
+>  
+> -- 
+> 1.7.10.4
 > 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-Returns NULL on failure, caller is checking on NULL for failures.
-
-        pdata = mmc_parse_pdata(pdev);
-        if (pdata == NULL) {
-                dev_err(&pdev->dev, "Can not get platform data\n");
-                return -ENOENT;
-        }
-
-> > +	}
-> > +
-> > +	if (match)
-> > +		pdev->id_entry = match->data;
-> > +
-> > +	of_property_read_u32(np, "max-frequency", &pdata->max_freq);
-> > +	if (!pdata->max_freq)
-> > +		dev_info(&pdev->dev, "'max-frequency' property not specified, defaulting to 25MHz\n");
-> 
-> 
-> of_property_read_u32() returns error on failure. pdata->max_freq is not
-> guaranteed to be zero in case of error. See comments atop
-> of_property_read_u32_array().
-> 
-
-As pdata is from kzalloc, max_freq will remain NULL in case of_property_read_u32_array fails.
-It makes sense to check for return value, I agree to change this.
-
-Thanks,
-Prakash
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130305/e19e9ba6/attachment.sig>
