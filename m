@@ -1,201 +1,140 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue,  5 Mar 2013 18:42:10 +0100
-Subject: [PATCH 00/23] RFC: exynos multiplatform support
-Message-ID: <1362505353-8873-1-git-send-email-arnd@arndb.de>
+Date: Tue,  5 Mar 2013 18:42:19 +0100
+Subject: [PATCH 09/23] usb: exynos: do not include plat/usb-phy.h
+In-Reply-To: <1362505353-8873-1-git-send-email-arnd@arndb.de>
+References: <1362505353-8873-1-git-send-email-arnd@arndb.de>
+Message-ID: <1362505353-8873-10-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+The definitions have moved to include/linux/usb/samsung-usb-phy.h,
+and plat/usb-phy.h is unavailable from drivers in a multiplatform
+configuration.
 
-Although I'm not present at the Linaro Connect hacking
-sessions, I am participating remotely and have tried
-hacking on multiplatform support for Exynos. This patch
-set is far from complete, but I think the patches
-can be useful anyway.
+Also fix up the plat/usb-phy.h header file to use the definitions
+from the new header instead of providing a separate copy.
 
-The series gets increasingly fishy towards the end,
-and we should probably not apply any of the last nine
-patches as-is, nor do I expect everything to work, since
-I have not tested them at all.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/mach-exynos/setup-usb-phy.c         | 8 ++++----
+ arch/arm/mach-s3c64xx/setup-usb-phy.c        | 4 ++--
+ arch/arm/mach-s5pv210/setup-usb-phy.c        | 4 ++--
+ arch/arm/plat-samsung/include/plat/usb-phy.h | 5 +----
+ drivers/usb/host/ehci-s5p.c                  | 1 -
+ drivers/usb/host/ohci-exynos.c               | 1 -
+ 6 files changed, 9 insertions(+), 14 deletions(-)
 
-With this patch set, we can build mach-exynos as part
-of a multiplatform kernel, with the following caveats:
-
-* Only DT based boards are supported
-* Moving to common-clk breaks things including cpufreq
-  and others. Thomas is working on a patch for this
-* We disable the gpio implementation, which also breaks
-  stuff, but Thomas has a patch already
-* Using the generic DMA engine API in SPI and ASoC
-  means they no longer work on S3C
-* I did not like the solution for the UART driver, but
-  could also not think of a better one.
-* The FB_S3C, S3C2410_WATCHDOG and S3C_ADC drivers
-  are left as an exercise to the reader, they are
-  currently disabled with multiplatform
-* sparsemem support is not available on multiplatform
-
-The patches are based on v3.9-rc1 and I have pushed
-the git branch to
-
-git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git testing/exynos-multiplatform
-
-I have not yet added subsystem maintainers to Cc on the
-patches, I'd like to coordinate with the other people
-involved first, so see if they already have patches
-for the same drivers.
-
-	Arnd
-
-Arnd Bergmann (23):
-  ARM: exynos: introduce EXYNOS_ATAGS symbol
-  irqchip: exynos: remove dependency on mach/irqs.h
-  tty: serial/samsung: prepare for common clock API
-  tty: serial/samsung: make register definitions global
-  tty: serial/samsung: fix modular build
-  ARM: exynos: move debug-macro.S to include/debug/
-  i2c: s3c2410: make header file local
-  mmc: sdhci-s3c: remove platform dependencies
-  usb: exynos: do not include plat/usb-phy.h
-  [media] exynos: remove unnecessary header inclusions
-  video/exynos: remove unnecessary header inclusions
-  thermal/exynos: remove unnecessary header inclusions
-  mtd: onenand/samsung: make regs-onenand.h file local
-  rtc: s3c: make header file local
-  spi: s3c64xx: move to generic dmaengine API
-  pwm: samsung: repair the worst MMIO abuses
-  ASoC: samsung: move plat/ headers to local directory
-  ASoC: samsung: convert to dmaengine API
-  ASoC: samsung: use irq resource for idma
-  ARM: exynos: prepare for sparse IRQ
-  ARM: exynos: hack to disable private clock code
-  ARM: exynos: work around missing gpio code on multiplatform
-  ARM: exynos: experimental multiplatform support
-
- arch/arm/Kconfig                                  |  11 +-
- arch/arm/Kconfig.debug                            |   8 +
- arch/arm/include/debug/exynos.S                   |  39 +++
- arch/arm/include/debug/samsung.S                  |  87 +++++++
- arch/arm/mach-exynos/Kconfig                      |  36 ++-
- arch/arm/mach-exynos/Makefile                     |   5 +
- arch/arm/mach-exynos/common.c                     |  14 +-
- arch/arm/mach-exynos/common.h                     |   2 +-
- arch/arm/mach-exynos/dev-audio.c                  |   1 +
- arch/arm/mach-exynos/dev-uart.c                   |   1 +
- arch/arm/mach-exynos/include/mach/debug-macro.S   |  39 ---
- arch/arm/mach-exynos/include/mach/gpio.h          |   2 +
- arch/arm/mach-exynos/include/mach/irqs.h          |   5 +-
- arch/arm/mach-exynos/mach-armlex4210.c            |   3 +
- arch/arm/mach-exynos/mach-exynos4-dt.c            |   2 +
- arch/arm/mach-exynos/mach-exynos5-dt.c            |   2 +
- arch/arm/mach-exynos/mach-nuri.c                  |   2 +
- arch/arm/mach-exynos/mach-origen.c                |   3 +
- arch/arm/mach-exynos/mach-smdk4x12.c              |   2 +
- arch/arm/mach-exynos/mach-smdkv310.c              |   3 +
- arch/arm/mach-exynos/setup-i2c0.c                 |   3 +-
- arch/arm/mach-exynos/setup-sdhci-gpio.c           |   2 +-
- arch/arm/mach-exynos/setup-usb-phy.c              |   8 +-
- arch/arm/mach-s3c24xx/clock-s3c2440.c             |   5 +
- arch/arm/mach-s3c24xx/common.c                    |   5 +
- arch/arm/mach-s3c24xx/dma-s3c2410.c               |   2 -
- arch/arm/mach-s3c24xx/dma-s3c2412.c               |   2 -
- arch/arm/mach-s3c24xx/dma-s3c2440.c               |   2 -
- arch/arm/mach-s3c24xx/dma-s3c2443.c               |   2 -
- arch/arm/mach-s3c24xx/include/mach/debug-macro.S  |   2 +-
- arch/arm/mach-s3c24xx/mach-rx1950.c               |   1 -
- arch/arm/mach-s3c64xx/include/mach/debug-macro.S  |   2 +-
- arch/arm/mach-s3c64xx/include/mach/gpio.h         |   4 +
- arch/arm/mach-s3c64xx/setup-usb-phy.c             |   4 +-
- arch/arm/mach-s5p64x0/include/mach/debug-macro.S  |   2 +-
- arch/arm/mach-s5pc100/include/mach/debug-macro.S  |   2 +-
- arch/arm/mach-s5pc100/setup-sdhci-gpio.c          |   1 -
- arch/arm/mach-s5pv210/include/mach/debug-macro.S  |   2 +-
- arch/arm/mach-s5pv210/setup-sdhci-gpio.c          |   1 -
- arch/arm/mach-s5pv210/setup-usb-phy.c             |   4 +-
- arch/arm/plat-samsung/Kconfig                     |   5 +
- arch/arm/plat-samsung/Makefile                    |   3 +
- arch/arm/plat-samsung/clock-clksrc.c              |   3 +
- arch/arm/plat-samsung/devs.c                      |  17 +-
- arch/arm/plat-samsung/include/plat/debug-macro.S  |  87 -------
- arch/arm/plat-samsung/include/plat/gpio-core.h    |   3 +
- arch/arm/plat-samsung/include/plat/regs-ac97.h    |  67 -----
- arch/arm/plat-samsung/include/plat/regs-iic.h     |  56 -----
- arch/arm/plat-samsung/include/plat/regs-iis.h     |  70 ------
- arch/arm/plat-samsung/include/plat/regs-onenand.h |  63 -----
- arch/arm/plat-samsung/include/plat/regs-rtc.h     |  71 ------
- arch/arm/plat-samsung/include/plat/regs-sdhci.h   |  87 -------
- arch/arm/plat-samsung/include/plat/regs-serial.h  | 282 +---------------------
- arch/arm/plat-samsung/include/plat/sdhci.h        |  56 +----
- arch/arm/plat-samsung/include/plat/usb-phy.h      |   5 +-
- arch/arm/plat-samsung/irq-vic-timer.c             |   1 +
- arch/arm/plat-samsung/pm-gpio.c                   |   1 +
- arch/arm/plat-samsung/pm.c                        |   1 +
- arch/arm/plat-samsung/s5p-clock.c                 |   3 +
- arch/arm/plat-samsung/s5p-irq.c                   |   1 +
- drivers/cpufreq/Kconfig.arm                       |   4 +-
- drivers/devfreq/Kconfig                           |   1 +
- drivers/gpio/Makefile                             |   2 +-
- drivers/i2c/busses/i2c-s3c2410.c                  |   3 +-
- drivers/i2c/busses/i2c-s3c2410.h                  |  56 +++++
- drivers/irqchip/exynos-combiner.c                 | 113 +++++----
- drivers/media/platform/exynos-gsc/gsc-regs.c      |   1 -
- drivers/media/platform/s5p-tv/sii9234_drv.c       |   3 -
- drivers/mmc/host/Kconfig                          |   2 +-
- drivers/mmc/host/sdhci-s3c-regs.h                 |  87 +++++++
- drivers/mmc/host/sdhci-s3c.c                      |   5 +-
- drivers/mtd/onenand/samsung.c                     |   4 +-
- drivers/mtd/onenand/samsung.h                     |  61 +++++
- drivers/pwm/pwm-samsung.c                         |  60 +++--
- drivers/rtc/rtc-s3c.c                             |   3 +-
- drivers/rtc/rtc-s3c.h                             |  70 ++++++
- drivers/spi/spi-s3c64xx.c                         | 107 ++++----
- drivers/thermal/exynos_thermal.c                  |   2 -
- drivers/tty/serial/samsung.c                      |  17 +-
- drivers/tty/serial/samsung.h                      |   4 +-
- drivers/usb/host/ehci-s5p.c                       |   1 -
- drivers/usb/host/ohci-exynos.c                    |   1 -
- drivers/video/Kconfig                             |   2 +-
- drivers/video/exynos/exynos_mipi_dsi.c            |   2 -
- drivers/video/exynos/exynos_mipi_dsi_common.c     |   2 -
- drivers/video/exynos/exynos_mipi_dsi_lowlevel.c   |   2 -
- drivers/watchdog/Kconfig                          |   1 +
- include/linux/platform_data/mmc-sdhci-s3c.h       |  56 +++++
- include/linux/platform_data/spi-s3c64xx.h         |   3 +
- include/linux/serial_s3c.h                        | 260 ++++++++++++++++++++
- sound/soc/samsung/ac97.c                          |  17 +-
- sound/soc/samsung/dma.c                           | 104 ++++----
- sound/soc/samsung/dma.h                           |   4 +-
- sound/soc/samsung/h1940_uda1380.c                 |   2 +-
- sound/soc/samsung/i2s.c                           |   9 +-
- sound/soc/samsung/idma.c                          |  10 +-
- sound/soc/samsung/neo1973_wm8753.c                |   2 +-
- sound/soc/samsung/pcm.c                           |  13 -
- sound/soc/samsung/regs-ac97.h                     |  67 +++++
- sound/soc/samsung/regs-iis.h                      |  70 ++++++
- sound/soc/samsung/rx1950_uda1380.c                |   2 +-
- sound/soc/samsung/s3c2412-i2s.c                   |  10 -
- sound/soc/samsung/s3c24xx-i2s.c                   |  12 +-
- sound/soc/samsung/s3c24xx_uda134x.c               |   2 +-
- sound/soc/samsung/spdif.c                         |   6 -
- 105 files changed, 1262 insertions(+), 1208 deletions(-)
- create mode 100644 arch/arm/include/debug/exynos.S
- create mode 100644 arch/arm/include/debug/samsung.S
- delete mode 100644 arch/arm/mach-exynos/include/mach/debug-macro.S
- delete mode 100644 arch/arm/plat-samsung/include/plat/debug-macro.S
- delete mode 100644 arch/arm/plat-samsung/include/plat/regs-ac97.h
- delete mode 100644 arch/arm/plat-samsung/include/plat/regs-iic.h
- delete mode 100644 arch/arm/plat-samsung/include/plat/regs-iis.h
- delete mode 100644 arch/arm/plat-samsung/include/plat/regs-onenand.h
- delete mode 100644 arch/arm/plat-samsung/include/plat/regs-rtc.h
- delete mode 100644 arch/arm/plat-samsung/include/plat/regs-sdhci.h
- create mode 100644 drivers/i2c/busses/i2c-s3c2410.h
- create mode 100644 drivers/mmc/host/sdhci-s3c-regs.h
- create mode 100644 drivers/mtd/onenand/samsung.h
- create mode 100644 drivers/rtc/rtc-s3c.h
- create mode 100644 include/linux/platform_data/mmc-sdhci-s3c.h
- create mode 100644 include/linux/serial_s3c.h
- create mode 100644 sound/soc/samsung/regs-ac97.h
- create mode 100644 sound/soc/samsung/regs-iis.h
-
+diff --git a/arch/arm/mach-exynos/setup-usb-phy.c b/arch/arm/mach-exynos/setup-usb-phy.c
+index b81cc56..6af4066 100644
+--- a/arch/arm/mach-exynos/setup-usb-phy.c
++++ b/arch/arm/mach-exynos/setup-usb-phy.c
+@@ -204,9 +204,9 @@ static int exynos4210_usb_phy1_exit(struct platform_device *pdev)
+ 
+ int s5p_usb_phy_init(struct platform_device *pdev, int type)
+ {
+-	if (type == S5P_USB_PHY_DEVICE)
++	if (type == USB_PHY_TYPE_DEVICE)
+ 		return exynos4210_usb_phy0_init(pdev);
+-	else if (type == S5P_USB_PHY_HOST)
++	else if (type == USB_PHY_TYPE_HOST)
+ 		return exynos4210_usb_phy1_init(pdev);
+ 
+ 	return -EINVAL;
+@@ -214,9 +214,9 @@ int s5p_usb_phy_init(struct platform_device *pdev, int type)
+ 
+ int s5p_usb_phy_exit(struct platform_device *pdev, int type)
+ {
+-	if (type == S5P_USB_PHY_DEVICE)
++	if (type == USB_PHY_TYPE_DEVICE)
+ 		return exynos4210_usb_phy0_exit(pdev);
+-	else if (type == S5P_USB_PHY_HOST)
++	else if (type == USB_PHY_TYPE_HOST)
+ 		return exynos4210_usb_phy1_exit(pdev);
+ 
+ 	return -EINVAL;
+diff --git a/arch/arm/mach-s3c64xx/setup-usb-phy.c b/arch/arm/mach-s3c64xx/setup-usb-phy.c
+index c8174d9..ca960bd 100644
+--- a/arch/arm/mach-s3c64xx/setup-usb-phy.c
++++ b/arch/arm/mach-s3c64xx/setup-usb-phy.c
+@@ -76,7 +76,7 @@ static int s3c_usb_otgphy_exit(struct platform_device *pdev)
+ 
+ int s5p_usb_phy_init(struct platform_device *pdev, int type)
+ {
+-	if (type == S5P_USB_PHY_DEVICE)
++	if (type == USB_PHY_TYPE_DEVICE)
+ 		return s3c_usb_otgphy_init(pdev);
+ 
+ 	return -EINVAL;
+@@ -84,7 +84,7 @@ int s5p_usb_phy_init(struct platform_device *pdev, int type)
+ 
+ int s5p_usb_phy_exit(struct platform_device *pdev, int type)
+ {
+-	if (type == S5P_USB_PHY_DEVICE)
++	if (type == USB_PHY_TYPE_DEVICE)
+ 		return s3c_usb_otgphy_exit(pdev);
+ 
+ 	return -EINVAL;
+diff --git a/arch/arm/mach-s5pv210/setup-usb-phy.c b/arch/arm/mach-s5pv210/setup-usb-phy.c
+index 356a090..b2ee533 100644
+--- a/arch/arm/mach-s5pv210/setup-usb-phy.c
++++ b/arch/arm/mach-s5pv210/setup-usb-phy.c
+@@ -80,7 +80,7 @@ static int s5pv210_usb_otgphy_exit(struct platform_device *pdev)
+ 
+ int s5p_usb_phy_init(struct platform_device *pdev, int type)
+ {
+-	if (type == S5P_USB_PHY_DEVICE)
++	if (type == USB_PHY_TYPE_DEVICE)
+ 		return s5pv210_usb_otgphy_init(pdev);
+ 
+ 	return -EINVAL;
+@@ -88,7 +88,7 @@ int s5p_usb_phy_init(struct platform_device *pdev, int type)
+ 
+ int s5p_usb_phy_exit(struct platform_device *pdev, int type)
+ {
+-	if (type == S5P_USB_PHY_DEVICE)
++	if (type == USB_PHY_TYPE_DEVICE)
+ 		return s5pv210_usb_otgphy_exit(pdev);
+ 
+ 	return -EINVAL;
+diff --git a/arch/arm/plat-samsung/include/plat/usb-phy.h b/arch/arm/plat-samsung/include/plat/usb-phy.h
+index 959bcdb..ab34dfa 100644
+--- a/arch/arm/plat-samsung/include/plat/usb-phy.h
++++ b/arch/arm/plat-samsung/include/plat/usb-phy.h
+@@ -11,10 +11,7 @@
+ #ifndef __PLAT_SAMSUNG_USB_PHY_H
+ #define __PLAT_SAMSUNG_USB_PHY_H __FILE__
+ 
+-enum s5p_usb_phy_type {
+-	S5P_USB_PHY_DEVICE,
+-	S5P_USB_PHY_HOST,
+-};
++#include <linux/usb/samsung_usb_phy.h>
+ 
+ extern int s5p_usb_phy_init(struct platform_device *pdev, int type);
+ extern int s5p_usb_phy_exit(struct platform_device *pdev, int type);
+diff --git a/drivers/usb/host/ehci-s5p.c b/drivers/usb/host/ehci-s5p.c
+index 20ebf6a..7dc9c15 100644
+--- a/drivers/usb/host/ehci-s5p.c
++++ b/drivers/usb/host/ehci-s5p.c
+@@ -19,7 +19,6 @@
+ #include <linux/platform_data/usb-ehci-s5p.h>
+ #include <linux/usb/phy.h>
+ #include <linux/usb/samsung_usb_phy.h>
+-#include <plat/usb-phy.h>
+ 
+ #define EHCI_INSNREG00(base)			(base + 0x90)
+ #define EHCI_INSNREG00_ENA_INCR16		(0x1 << 25)
+diff --git a/drivers/usb/host/ohci-exynos.c b/drivers/usb/host/ohci-exynos.c
+index e3b7e85..b5b5977 100644
+--- a/drivers/usb/host/ohci-exynos.c
++++ b/drivers/usb/host/ohci-exynos.c
+@@ -17,7 +17,6 @@
+ #include <linux/platform_data/usb-exynos.h>
+ #include <linux/usb/phy.h>
+ #include <linux/usb/samsung_usb_phy.h>
+-#include <plat/usb-phy.h>
+ 
+ struct exynos_ohci_hcd {
+ 	struct device *dev;
 -- 
 1.8.1.2
