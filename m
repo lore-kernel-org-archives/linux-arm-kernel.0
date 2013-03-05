@@ -1,63 +1,47 @@
-From: mporter@ti.com (Matt Porter)
-Date: Tue, 5 Mar 2013 09:53:11 -0500
-Subject: [PATCH] arm: davinci: fix edma dmaengine induced null pointer
- dereference on da830
-In-Reply-To: <2e772fcfec654eeaa548ea62f928bdd6@DFLE73.ent.ti.com>
-References: <1362415977-12829-1-git-send-email-mporter@ti.com>
- <2e772fcfec654eeaa548ea62f928bdd6@DFLE73.ent.ti.com>
-Message-ID: <20130305145311.GI6209@beef>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 05 Mar 2013 08:56:23 -0600
+Subject: [PATCH] dma: of-dma: return error when 'dma-cells' not found
+In-Reply-To: <1859273.NY466Orvuh@wuerfel>
+References: <1362475531-32260-1-git-send-email-padma.v@samsung.com>
+ <5135BE58.4040105@gmail.com> <1859273.NY466Orvuh@wuerfel>
+Message-ID: <51360797.6000007@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 05, 2013 at 06:43:41AM +0000, Sekhar Nori wrote:
-> Hi Matt,
+On 03/05/2013 04:15 AM, Arnd Bergmann wrote:
+> On Tuesday 05 March 2013 03:43:52 Rob Herring wrote:
+>> On 03/05/2013 03:25 AM, Padmavathi Venna wrote:
+>>> This patch returns error when 'dma-cells' property not found
+>>> in the corresponding device node. With out this change there
+>>> is a crash in the generic dma incompatible platforms.
+>>>
+>>> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+>>
+>> NAK.
+>>
+>> #dma-cells should be optional. It is not needed for platforms supporting
+>> memory to memory transfers only and should therefore be optional. You
+>> cannot assume the dtb can be updated and kernel changes need to work
+>> with old dtbs. I've submitted patches to address this and fix the crash:
+>>
+>> https://lists.ozlabs.org/pipermail/devicetree-discuss/2013-February/028769.html
 > 
-> I dropped the copy to stable folks since they dont want to be involved
-> in patch reviews of this kind.
-> 
-> On 3/4/2013 10:22 PM, Matt Porter wrote:
-> > This adds additional error checking to the private edma api implementation
-> > to catch the case where the edma_alloc_slot() has an invalid controller
-> > parameter. The edma dmaengine wrapper driver relies on this condition
-> > being handled in order to avoid setting up a second edma dmaengine
-> > instance on DA830.
-> > 
-> > Verfied using a DA850 with the second EDMA controller platform instance
-> > removed to simulate a DA830 which only has a single EDMA controller.
-> > 
-> > Reported-by: Tomas Novotny <tomas@novotny.cz>
-> > Signed-off-by: Matt Porter <mporter@ti.com>
-> > Cc: stable at kernel.org
-> 
-> This should be stable at vger.kernel.org per
-> Documentation/stable_kernel_rules.txt. Also, I think it is better to
-> request the back port only from v3.7.x+ since the bug is important only
-> after drivers/dma/edma.c was merged. So:
-> 
-> Cc: stable at vger.kernel.org # v3.7.x+
+> Why would you call of_dma_controller_register() for a dma
+> engine that does not support slave channels, when that is the
+> only purpose of that interface?
 
-Agreed. Had the two year old email in my macros. Will update to
-reflect 3.7.x+ only.
+Well maybe then that function should be allowed to fail without erroring
+out. I just fixed it a the line that failed. Doing be32_to_cpup directly
+on a function return that can be NULL is not correct either.
 
-> >  arch/arm/mach-davinci/dma.c |    2 ++
-> >  1 file changed, 2 insertions(+)
-> > 
-> > diff --git a/arch/arm/mach-davinci/dma.c b/arch/arm/mach-davinci/dma.c
-> > index a685e97..f9eb836 100644
-> > --- a/arch/arm/mach-davinci/dma.c
-> > +++ b/arch/arm/mach-davinci/dma.c
-> > @@ -747,6 +747,8 @@ int edma_alloc_slot(unsigned ctlr, int slot)
-> >  		slot = EDMA_CHAN_SLOT(slot);
-> >  
-> >  	if (slot < 0) {
-> > +		if (!edma_cc[ctlr])
-> > +			return -EINVAL;
-> 
-> Shouldn't such a check be done outside of the if() since there is an
-> 'else if' later which also accesses edma_cc[ctlr]
+> Note that the binding defines #dma-cells as required, and it
+> does not make any sense otherwise.
 
-Yeah, as it turns out I also separately added the correct version
-of this in the am33xx dmaengine series as it was an issue there.
-I will correct this in v2.
+The 2nd patch I submitted changes that. It does not make sense to
+require it if you have no requests and hence will never have a phandle
+reference in a slave device. The simple fact is that the pl330 had an
+existing binding that worked for the memory to memory only case and
+kernel changes broke this. Kernel changes should not break existing
+device-trees.
 
--Matt
+Rob
