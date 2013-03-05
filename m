@@ -1,45 +1,53 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Tue, 5 Mar 2013 17:42:46 +0100
-Subject: [PATCH v4 1/2] dma: imx-dma: Add oftree support
-In-Reply-To: <201303022212.38322.arnd@arndb.de>
-References: <1362243213-29399-1-git-send-email-mpa@pengutronix.de>
- <1362243213-29399-2-git-send-email-mpa@pengutronix.de>
- <201303022212.38322.arnd@arndb.de>
-Message-ID: <20130305164246.GB11656@pengutronix.de>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Tue, 5 Mar 2013 17:41:06 +0100
+Subject: [PATCH V2] lglock: add read-preference local-global rwlock
+In-Reply-To: <51360ED1.3030104@cn.fujitsu.com>
+References: <CACvQF50UgiqPpDk3HCmV86zKSf6tPjqr0bZowfPEOJs0g0r0MQ@mail.gmail.com>
+ <512D0D67.9010609@linux.vnet.ibm.com>
+ <CACvQF53ph2ixdM-otzetjM5cR+2kcZj6sckOp3TnzzA_x-EZ8w@mail.gmail.com>
+ <512E7879.20109@linux.vnet.ibm.com> <5130E8E2.50206@cn.fujitsu.com>
+ <20130301182854.GA3631@redhat.com>
+ <CANN689HEW=b5S93J27p+rBX-5m7jkW4FER=eHDCp7OgMaTWLPw@mail.gmail.com>
+ <5131FB4C.7070408@cn.fujitsu.com> <20130302172003.GC29769@redhat.com>
+ <51360ED1.3030104@cn.fujitsu.com>
+Message-ID: <20130305164106.GA4329@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 02, 2013 at 10:12:38PM +0000, Arnd Bergmann wrote:
-> On Saturday 02 March 2013, Markus Pargmann wrote:
-> > Adding devicetree support for imx-dma driver. Use driver name for
-> > function 'imx_dma_is_general_purpose' because the devicename for
-> > devicetree initialized devices is different.
->  
-> Just one small comment this time:
-> 
-> > @@ -734,8 +757,9 @@ static int imxdma_alloc_chan_resources(struct dma_chan *chan)
-> >  	struct imxdma_channel *imxdmac = to_imxdma_chan(chan);
-> >  	struct imx_dma_data *data = chan->private;
-> >  
-> > -	if (data != NULL)
-> > +	if (data != NULL) {
-> >  		imxdmac->dma_request = data->dma_request;
-> > +	}
-> >  
-> >  	while (imxdmac->descs_allocated < IMXDMA_MAX_CHAN_DESCRIPTORS) {
-> >  		struct imxdma_desc *desc;
-> 
-> I assume that this change wasn't meant to be in here.
+On 03/05, Lai Jiangshan wrote:
+>
+> On 03/03/13 01:20, Oleg Nesterov wrote:
+> > On 03/02, Lai Jiangshan wrote:
+> >>
+> >> +void lg_rwlock_local_read_unlock(struct lgrwlock *lgrw)
+> >> +{
+> >> +	switch (__this_cpu_read(*lgrw->reader_refcnt)) {
+> >> +	case 1:
+> >> +		__this_cpu_write(*lgrw->reader_refcnt, 0);
+> >> +		lg_local_unlock(&lgrw->lglock);
+> >> +		return;
+> >> +	case FALLBACK_BASE:
+> >> +		__this_cpu_write(*lgrw->reader_refcnt, 0);
+> >> +		read_unlock(&lgrw->fallback_rwlock);
+> >> +		rwlock_release(&lg->lock_dep_map, 1, _RET_IP_);
+> >
+> > I guess "case 1:" should do rwlock_release() too.
+>
+> Already do it in "lg_local_unlock(&lgrw->lglock);" before it returns.
+> (I like reuse old code)
 
-Yes exactly. I actually saw that before sending and removed it, but
-I obviously forgot to create the patch again ;).
+Yes, I was wrong thanks. Another case when I didn't notice that you
+re-use the regular lg_ code...
 
-Regards
+> > We need rwlock_acquire_read() even in the fast-path, and this acquire_read
+> > should be paired with rwlock_acquire() in _write_lock(), but it does
+> > spin_acquire(lg->lock_dep_map). Yes, currently this is the same (afaics)
+> > but perhaps fallback_rwlock->dep_map would be more clean.
+>
+> I can't tell which one is better. I try to use fallback_rwlock->dep_map later.
 
-Markus
+I am not sure which one should be better too, please check.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Again, I forgot that _write_lock/unlock use lg_global_*() code.
+
+Oleg.
