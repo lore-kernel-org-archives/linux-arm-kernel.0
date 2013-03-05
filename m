@@ -1,69 +1,54 @@
-From: laijs@cn.fujitsu.com (Lai Jiangshan)
-Date: Tue, 05 Mar 2013 23:27:13 +0800
-Subject: [PATCH V2] lglock: add read-preference local-global rwlock
-In-Reply-To: <20130302172003.GC29769@redhat.com>
-References: <CACvQF51RvhM8XNqu3-1OTQ=cZUZ=pAX+_zx0a29+W67N1X+BgQ@mail.gmail.com>
- <512CC509.1050000@linux.vnet.ibm.com>
- <CACvQF50UgiqPpDk3HCmV86zKSf6tPjqr0bZowfPEOJs0g0r0MQ@mail.gmail.com>
- <512D0D67.9010609@linux.vnet.ibm.com>
- <CACvQF53ph2ixdM-otzetjM5cR+2kcZj6sckOp3TnzzA_x-EZ8w@mail.gmail.com>
- <512E7879.20109@linux.vnet.ibm.com> <5130E8E2.50206@cn.fujitsu.com>
- <20130301182854.GA3631@redhat.com>
- <CANN689HEW=b5S93J27p+rBX-5m7jkW4FER=eHDCp7OgMaTWLPw@mail.gmail.com>
- <5131FB4C.7070408@cn.fujitsu.com> <20130302172003.GC29769@redhat.com>
-Message-ID: <51360ED1.3030104@cn.fujitsu.com>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Tue, 05 Mar 2013 16:39:22 +0100
+Subject: [PATCH v3 3/3] leds: leds-pwm: Defer led_pwm_set() if PWM can
+ sleep
+In-Reply-To: <20130304105806.GA28735@avionic-0098.mockup.avionic-design.de>
+References: <1359381659-24454-1-git-send-email-florian.vaussard@epfl.ch>
+ <1359381659-24454-4-git-send-email-florian.vaussard@epfl.ch>
+ <20130130081728.GC13568@avionic-0098.mockup.avionic-design.de>
+ <512E2F98.6070404@epfl.ch> <51347B06.8090604@epfl.ch>
+ <20130304105806.GA28735@avionic-0098.mockup.avionic-design.de>
+Message-ID: <513611AA.30304@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/03/13 01:20, Oleg Nesterov wrote:
-> On 03/02, Lai Jiangshan wrote:
+
+On 03/04/2013 11:58 AM, Thierry Reding wrote:
+> On Mon, Mar 04, 2013 at 11:44:22AM +0100, Florian Vaussard wrote:
+>> Hi Bryan, Richard,
 >>
->> +void lg_rwlock_local_read_unlock(struct lgrwlock *lgrw)
->> +{
->> +	switch (__this_cpu_read(*lgrw->reader_refcnt)) {
->> +	case 1:
->> +		__this_cpu_write(*lgrw->reader_refcnt, 0);
->> +		lg_local_unlock(&lgrw->lglock);
->> +		return;
->> +	case FALLBACK_BASE:
->> +		__this_cpu_write(*lgrw->reader_refcnt, 0);
->> +		read_unlock(&lgrw->fallback_rwlock);
->> +		rwlock_release(&lg->lock_dep_map, 1, _RET_IP_);
-> 
-> I guess "case 1:" should do rwlock_release() too.
+>>> On 01/30/2013 09:17 AM, Thierry Reding wrote:
+>>>> On Mon, Jan 28, 2013 at 03:00:59PM +0100, Florian Vaussard wrote:
+>>>>> Call to led_pwm_set() can happen inside atomic context, like triggers.
+>>>>> If the PWM call can sleep, defer using a worker.
+>>>>>
+>>>>> Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
+>>>>> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+>>>>> ---
+>>>>>   drivers/leds/leds-pwm.c |   50
+>>>>> +++++++++++++++++++++++++++++++++++++++-------
+>>>>>   1 files changed, 42 insertions(+), 8 deletions(-)
+>>>>
+>>>> Bryan, I assume that you'll be taking this? It doesn't apply cleanly to
+>>>> my tree, probably because of Peter's recent changes that you took
+>>>> through your tree and Florian based his patches on top of that. The
+>>>> conflict resolution should be trivial, though.
+>>>>
+>>>
+>>> It seems that this patch was not taken. Could you pull it, as the other
+>>> part is already in linux-pwm? Or is there any show stopper?
+>>>
+>>
+>> Ping? Who should merge this?
+>
+> I assume Bryan will take it through the LED tree? Patches 1 & 2 went
+> into v3.9-rc1 through the PWM tree.
+>
 
-Already do it in "lg_local_unlock(&lgrw->lglock);" before it returns.
-(I like reuse old code)
+This was also my assumption, but I never got the feedback from Brian on 
+this patch.
+The crach is still there, and the patch missed the merge window :)
 
-> 
-> Otherwise, at first glance looks correct...
-> 
-> However, I still think that FALLBACK_BASE only adds the unnecessary
-> complications. But even if I am right this is subjective of course, please
-> feel free to ignore.
+Cheers,
 
-OK, I kill FALLBACK_BASE in later patch.
-
-> 
-> And btw, I am not sure about lg->lock_dep_map, perhaps we should use
-> fallback_rwlock->dep_map ?
-
-Use either one is OK.
-
-> 
-> We need rwlock_acquire_read() even in the fast-path, and this acquire_read
-> should be paired with rwlock_acquire() in _write_lock(), but it does
-> spin_acquire(lg->lock_dep_map). Yes, currently this is the same (afaics)
-> but perhaps fallback_rwlock->dep_map would be more clean.
-> 
-
-I can't tell which one is better. I try to use fallback_rwlock->dep_map later.
-
-> Oleg.
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
-> 
+Florian
