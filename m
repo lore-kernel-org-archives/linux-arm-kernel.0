@@ -1,30 +1,44 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 5 Mar 2013 02:43:39 +0000
-Subject: [PATCH] ARM: perf: Fix section mismatch on armpmu_init()
-In-Reply-To: <1362438937-28143-1-git-send-email-sboyd@codeaurora.org>
-References: <1362438937-28143-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20130305024338.GA17735@mudshark.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue,  5 Mar 2013 02:42:57 +0000
+Subject: [PATCH 03/29] ARM: KVM: abstract HSR_ISV away
+In-Reply-To: <1362451403-23460-1-git-send-email-marc.zyngier@arm.com>
+References: <1362451403-23460-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1362451403-23460-4-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 04, 2013 at 11:15:37PM +0000, Stephen Boyd wrote:
-> WARNING: vmlinux.o(.text+0xfb80): Section mismatch in reference
-> from the function armpmu_register() to the function
-> .init.text:armpmu_init()
-> The function armpmu_register() references
-> the function __init armpmu_init().
-> This is often because armpmu_register lacks a __init
-> annotation or the annotation of armpmu_init is wrong.
-> 
-> Just drop the __init marking on armpmu_init() because
-> armpmu_register() no longer has an __init marking.
-> 
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/include/asm/kvm_emulate.h | 5 +++++
+ arch/arm/kvm/mmio.c                | 2 +-
+ 2 files changed, 6 insertions(+), 1 deletion(-)
 
-Cheers Stephen:
-
-  Acked-by: Will Deacon <will.deacon@arm.com>
-
-Can you put this into the patch system please?
-
-Will
+diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
+index 3c01988..9531535 100644
+--- a/arch/arm/include/asm/kvm_emulate.h
++++ b/arch/arm/include/asm/kvm_emulate.h
+@@ -90,4 +90,9 @@ static inline unsigned long kvm_vcpu_get_hyp_pc(struct kvm_vcpu *vcpu)
+ 	return vcpu->arch.fault.hyp_pc;
+ }
+ 
++static inline bool kvm_vcpu_dabt_isvalid(struct kvm_vcpu *vcpu)
++{
++	return !!(kvm_vcpu_get_hsr(vcpu) & HSR_ISV);
++}
++
+ #endif /* __ARM_KVM_EMULATE_H__ */
+diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
+index ce63f39..41f96e9 100644
+--- a/arch/arm/kvm/mmio.c
++++ b/arch/arm/kvm/mmio.c
+@@ -130,7 +130,7 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 	 * space do its magic.
+ 	 */
+ 
+-	if (kvm_vcpu_get_hsr(vcpu) & HSR_ISV) {
++	if (kvm_vcpu_dabt_isvalid(vcpu)) {
+ 		ret = decode_hsr(vcpu, fault_ipa, &mmio);
+ 		if (ret)
+ 			return ret;
+-- 
+1.7.12.4
