@@ -1,88 +1,181 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue,  5 Mar 2013 18:42:29 +0100
-Subject: [PATCH 19/23] ASoC: samsung: use irq resource for idma
+Date: Tue,  5 Mar 2013 18:42:26 +0100
+Subject: [PATCH 16/23] pwm: samsung: repair the worst MMIO abuses
 In-Reply-To: <1362505353-8873-1-git-send-email-arnd@arndb.de>
 References: <1362505353-8873-1-git-send-email-arnd@arndb.de>
-Message-ID: <1362505353-8873-20-git-send-email-arnd@arndb.de>
+Message-ID: <1362505353-8873-17-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With multiplatform kernels, we cannot use hardwired IRQ
-numbers in device drivers. This changes the idma driver
-to use a proper resource, like all other drivers do.
+The Samsung PWM driver uses "magic" pointers that are mapped
+at boot time to point its MMIO registers. This fails horribly
+with a multiplatform kernel, which can not rely on platform
+specific header files to contain the right values, aside from
+this being a really bad idea in general.
+
+This changes the driver to at least pass an __iomem token
+around in the device structure to dereference that. Fixing
+the platform code is much harder, so we'll leave that
+until we have a DT binding for pwm-samsung, which may require
+other changes in this area. Since we are already touching
+every MMIO accessor in this driver, let's also use the
+proper readl_relaxed variant rather than __raw_readl.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/plat-samsung/devs.c |  6 ++++++
- sound/soc/samsung/idma.c     | 10 ++++++++--
- 2 files changed, 14 insertions(+), 2 deletions(-)
+ drivers/pwm/pwm-samsung.c | 60 +++++++++++++++++++++++++++++++++--------------
+ 1 file changed, 42 insertions(+), 18 deletions(-)
 
-diff --git a/arch/arm/plat-samsung/devs.c b/arch/arm/plat-samsung/devs.c
-index 58fb02a..ec912e4 100644
---- a/arch/arm/plat-samsung/devs.c
-+++ b/arch/arm/plat-samsung/devs.c
-@@ -146,14 +146,20 @@ struct platform_device s3c_device_camif = {
+diff --git a/drivers/pwm/pwm-samsung.c b/drivers/pwm/pwm-samsung.c
+index 5207e6c..9d7234d 100644
+--- a/drivers/pwm/pwm-samsung.c
++++ b/drivers/pwm/pwm-samsung.c
+@@ -22,9 +22,25 @@
+ #include <linux/io.h>
+ #include <linux/pwm.h>
  
- /* ASOC DMA */
- 
-+#ifdef CONFIG_PLAT_S5P 
-+static struct resource samsung_asoc_idma_resource = DEFINE_RES_IRQ(IRQ_I2S0);
-+
- struct platform_device samsung_asoc_idma = {
- 	.name		= "samsung-idma",
- 	.id		= -1,
-+	.num_resources	= 1,
-+	.resource	= &samsung_asoc_idma_resource,
- 	.dev		= {
- 		.dma_mask		= &samsung_device_dma_mask,
- 		.coherent_dma_mask	= DMA_BIT_MASK(32),
- 	}
- };
+-#include <mach/map.h>
++#ifndef CONFIG_ARCH_MULTIPLATFORM
++/*
++ * This is gross: the platform maps the timer at a fixed
++ * virtual address and expects us to use that address
++ * rather than a proper resource. This should get done properly
++ * when we get a DT binding for this driver.
++ */
++#include <plat/map-base.h>
++static inline void dummy(void)
++{
++	BUILD_BUG_ON(S3C_VA_TIMER != IOMEM(0xf6300000));
++}
++#else
++#define S3C_VA_TIMER IOMEM(0xf6300000);
 +#endif
  
- /* FB */
+-#include <plat/regs-timer.h>
++#define S3C2410_TCON		8
++#define S3C2410_TCNTB(tmr)	(0x0c + (tmr)*0x0c + 0x00)
++#define S3C2410_TCMPB(tmr)	(0x0c + (tmr)*0x0c + 0x04)
  
-diff --git a/sound/soc/samsung/idma.c b/sound/soc/samsung/idma.c
-index a07950b..f36a541 100644
---- a/sound/soc/samsung/idma.c
-+++ b/sound/soc/samsung/idma.c
-@@ -68,6 +68,8 @@ static struct idma_info {
- 	dma_addr_t	lp_tx_addr;
- } idma;
+ struct s3c_chip {
+ 	struct platform_device	*pdev;
+@@ -38,6 +54,7 @@ struct s3c_chip {
  
-+static int idma_irq;
-+
- static void idma_getpos(dma_addr_t *src)
- {
- 	*src = idma.lp_tx_addr +
-@@ -305,7 +307,7 @@ static int idma_open(struct snd_pcm_substream *substream)
- 	if (prtd == NULL)
- 		return -ENOMEM;
+ 	unsigned char		 tcon_base;
+ 	unsigned char		 pwm_id;
++	void __iomem		*base;
+ 	struct pwm_chip		 chip;
+ };
  
--	ret = request_irq(IRQ_I2S0, iis_irq, 0, "i2s", prtd);
-+	ret = request_irq(idma_irq, iis_irq, 0, "i2s", prtd);
- 	if (ret < 0) {
- 		pr_err("fail to claim i2s irq , ret = %d\n", ret);
- 		kfree(prtd);
-@@ -324,7 +326,7 @@ static int idma_close(struct snd_pcm_substream *substream)
- 	struct snd_pcm_runtime *runtime = substream->runtime;
- 	struct idma_ctrl *prtd = runtime->private_data;
+@@ -65,9 +82,9 @@ static int s3c_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
  
--	free_irq(IRQ_I2S0, prtd);
-+	free_irq(idma_irq, prtd);
+ 	local_irq_save(flags);
  
- 	if (!prtd)
- 		pr_err("idma_close called with prtd == NULL\n");
-@@ -418,6 +420,10 @@ static struct snd_soc_platform_driver asoc_idma_platform = {
+-	tcon = __raw_readl(S3C2410_TCON);
++	tcon = readl_relaxed(s3c->base + S3C2410_TCON);
+ 	tcon |= pwm_tcon_start(s3c);
+-	__raw_writel(tcon, S3C2410_TCON);
++	writel_relaxed(tcon, s3c->base + S3C2410_TCON);
  
- static int asoc_idma_platform_probe(struct platform_device *pdev)
- {
-+	idma_irq = platform_get_irq(pdev, 0);
-+	if (idma_irq < 0)
-+		return idma_irq;
-+
- 	return snd_soc_register_platform(&pdev->dev, &asoc_idma_platform);
+ 	local_irq_restore(flags);
+ 
+@@ -82,9 +99,9 @@ static void s3c_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+ 
+ 	local_irq_save(flags);
+ 
+-	tcon = __raw_readl(S3C2410_TCON);
++	tcon = readl_relaxed(s3c->base + S3C2410_TCON);
+ 	tcon &= ~pwm_tcon_start(s3c);
+-	__raw_writel(tcon, S3C2410_TCON);
++	writel_relaxed(tcon, s3c->base + S3C2410_TCON);
+ 
+ 	local_irq_restore(flags);
  }
+@@ -133,8 +150,8 @@ static int s3c_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+ 	/* The TCMP and TCNT can be read without a lock, they're not
+ 	 * shared between the timers. */
  
+-	tcmp = __raw_readl(S3C2410_TCMPB(s3c->pwm_id));
+-	tcnt = __raw_readl(S3C2410_TCNTB(s3c->pwm_id));
++	tcmp = readl_relaxed(s3c->base + S3C2410_TCMPB(s3c->pwm_id));
++	tcnt = readl_relaxed(s3c->base + S3C2410_TCNTB(s3c->pwm_id));
+ 
+ 	period = NS_IN_HZ / period_ns;
+ 
+@@ -177,16 +194,16 @@ static int s3c_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+ 
+ 	local_irq_save(flags);
+ 
+-	__raw_writel(tcmp, S3C2410_TCMPB(s3c->pwm_id));
+-	__raw_writel(tcnt, S3C2410_TCNTB(s3c->pwm_id));
++	writel_relaxed(tcmp, s3c->base + S3C2410_TCMPB(s3c->pwm_id));
++	writel_relaxed(tcnt, s3c->base + S3C2410_TCNTB(s3c->pwm_id));
+ 
+-	tcon = __raw_readl(S3C2410_TCON);
++	tcon = readl_relaxed(s3c->base + S3C2410_TCON);
+ 	tcon |= pwm_tcon_manulupdate(s3c);
+ 	tcon |= pwm_tcon_autoreload(s3c);
+-	__raw_writel(tcon, S3C2410_TCON);
++	writel_relaxed(tcon, s3c->base + S3C2410_TCON);
+ 
+ 	tcon &= ~pwm_tcon_manulupdate(s3c);
+-	__raw_writel(tcon, S3C2410_TCON);
++	writel_relaxed(tcon, s3c->base + S3C2410_TCON);
+ 
+ 	local_irq_restore(flags);
+ 
+@@ -207,6 +224,7 @@ static int s3c_pwm_probe(struct platform_device *pdev)
+ 	unsigned long flags;
+ 	unsigned long tcon;
+ 	unsigned int id = pdev->id;
++	struct resource *res;
+ 	int ret;
+ 
+ 	if (id == 4) {
+@@ -220,6 +238,12 @@ static int s3c_pwm_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 	}
+ 
++	/* try to get a proper base address, fall back to S3C_VA_TIMER */
++	s3c->base = S3C_VA_TIMER;
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (res)
++		s3c->base = devm_ioremap(dev, res->start, resource_size(res));
++
+ 	/* calculate base of control bits in TCON */
+ 	s3c->tcon_base = id == 0 ? 0 : (id * 4) + 4;
+ 	s3c->pwm_id = id;
+@@ -245,9 +269,9 @@ static int s3c_pwm_probe(struct platform_device *pdev)
+ 
+ 	local_irq_save(flags);
+ 
+-	tcon = __raw_readl(S3C2410_TCON);
++	tcon = readl_relaxed(s3c->base + S3C2410_TCON);
+ 	tcon |= pwm_tcon_invert(s3c);
+-	__raw_writel(tcon, S3C2410_TCON);
++	writel_relaxed(tcon, s3c->base + S3C2410_TCON);
+ 
+ 	local_irq_restore(flags);
+ 
+@@ -258,7 +282,7 @@ static int s3c_pwm_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	pwm_dbg(s3c, "config bits %02x\n",
+-		(__raw_readl(S3C2410_TCON) >> s3c->tcon_base) & 0x0f);
++		(readl_relaxed(s3c->base + S3C2410_TCON) >> s3c->tcon_base) & 0x0f);
+ 
+ 	dev_info(dev, "tin at %lu, tdiv at %lu, tin=%sclk, base %d\n",
+ 		 clk_get_rate(s3c->clk),
+@@ -310,9 +334,9 @@ static int s3c_pwm_resume(struct platform_device *pdev)
+ 	unsigned long tcon;
+ 
+ 	/* Restore invertion */
+-	tcon = __raw_readl(S3C2410_TCON);
++	tcon = readl_relaxed(s3c->base + S3C2410_TCON);
+ 	tcon |= pwm_tcon_invert(s3c);
+-	__raw_writel(tcon, S3C2410_TCON);
++	writel_relaxed(tcon, s3c->base + S3C2410_TCON);
+ 
+ 	return 0;
+ }
 -- 
 1.8.1.2
