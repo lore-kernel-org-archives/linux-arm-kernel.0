@@ -1,100 +1,42 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 5 Mar 2013 22:37:27 +0800
-Subject: [PATCH v3 09/12] ASoC: dmaengine_pcm: add
- snd_dmaengine_generic_pcm_open()
-In-Reply-To: <1362486244-24593-10-git-send-email-shawn.guo@linaro.org>
-References: <1362486244-24593-10-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1362494247-28909-1-git-send-email-shawn.guo@linaro.org>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 5 Mar 2013 20:07:02 +0530
+Subject: [PATCH v2 7/8] ARM: dts: omap5: add dwc3 omap dt data
+In-Reply-To: <1362494223-14151-1-git-send-email-kishon@ti.com>
+References: <1362494223-14151-1-git-send-email-kishon@ti.com>
+Message-ID: <1362494223-14151-8-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With generic DMA device tree binding and helper function
-dma_request_slave_channel() in place, dmaengine_pcm should support
-that in requesting DMA channel for users that support generic DMA
-device tree binding.
+Add dwc3 omap glue data to the omap5 dt data file. The information about
+the dt node added here is available @
+Documentation/devicetree/bindings/usb/omap-usb.txt
 
-Add a new API snd_dmaengine_generic_pcm_open() as the variant of
-snd_dmaengine_pcm_open().  It takes DMA client struct device pointer
-and slave channel name as arguments and calls generic DMA helper
-dma_request_slave_channel() to request DMA channel from dmaengine.
-
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Cc: alsa-devel at alsa-project.org
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
-Changes since v2:
- - Drop 'const' from argument 'name' to fix the warning below.
+ arch/arm/boot/dts/omap5.dtsi |   11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-sound/soc/soc-dmaengine-pcm.c: In function 'snd_dmaengine_generic_pcm_open':
-sound/soc/soc-dmaengine-pcm.c:333:2: warning: passing argument 2 of 'dma_request_slave_channel' discards 'const' qualifier from pointer target type [enabled by default]
-include/linux/dmaengine.h:971:18: note: expected 'char *' but argument is of type 'const char *'
-
- include/sound/dmaengine_pcm.h |    2 ++
- sound/soc/soc-dmaengine-pcm.c |   39 +++++++++++++++++++++++++++++++++++++++
- 2 files changed, 41 insertions(+)
-
-diff --git a/include/sound/dmaengine_pcm.h b/include/sound/dmaengine_pcm.h
-index b877334..394272b 100644
---- a/include/sound/dmaengine_pcm.h
-+++ b/include/sound/dmaengine_pcm.h
-@@ -43,6 +43,8 @@ snd_pcm_uframes_t snd_dmaengine_pcm_pointer_no_residue(struct snd_pcm_substream
+diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+index bd73257..c4eb2ec 100644
+--- a/arch/arm/boot/dts/omap5.dtsi
++++ b/arch/arm/boot/dts/omap5.dtsi
+@@ -505,6 +505,17 @@
+ 			ti,type = <2>;
+ 		};
  
- int snd_dmaengine_pcm_open(struct snd_pcm_substream *substream,
- 	dma_filter_fn filter_fn, void *filter_data);
-+int snd_dmaengine_generic_pcm_open(struct snd_pcm_substream *substream,
-+				   struct device *dev, char *name);
- int snd_dmaengine_pcm_close(struct snd_pcm_substream *substream);
- 
- struct dma_chan *snd_dmaengine_pcm_get_chan(struct snd_pcm_substream *substream);
-diff --git a/sound/soc/soc-dmaengine-pcm.c b/sound/soc/soc-dmaengine-pcm.c
-index 111b7d92..e9d9897 100644
---- a/sound/soc/soc-dmaengine-pcm.c
-+++ b/sound/soc/soc-dmaengine-pcm.c
-@@ -304,6 +304,45 @@ int snd_dmaengine_pcm_open(struct snd_pcm_substream *substream,
- EXPORT_SYMBOL_GPL(snd_dmaengine_pcm_open);
- 
- /**
-+ * snd_dmaengine_generic_pcm_open - Open a dmaengine based PCM substream
-+ * @substream: PCM substream
-+ * @dev: pointer to DMA client device structure
-+ * @name: DMA slave channel name
-+ *
-+ * Returns 0 on success, a negative error code otherwise.
-+ *
-+ * This function is a variant of snd_dmaengine_pcm_open(). It takes different
-+ * parameters and calls generic DMA helper dma_request_slave_channel() to
-+ * request a DMA channel from dmaengine.
-+ */
-+int snd_dmaengine_generic_pcm_open(struct snd_pcm_substream *substream,
-+				   struct device *dev, char *name)
-+{
-+	struct dmaengine_pcm_runtime_data *prtd;
-+	int ret;
++		omap_dwc3 at 4a020000 {
++			compatible = "ti,dwc3";
++			ti,hwmods = "usb_otg_ss";
++			reg = <0x4a020000 0x1000>;
++			interrupts = <0 93 4>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			utmi-mode = <2>;
++			ranges;
++		};
 +
-+	ret = snd_pcm_hw_constraint_integer(substream->runtime,
-+					    SNDRV_PCM_HW_PARAM_PERIODS);
-+	if (ret < 0)
-+		return ret;
-+
-+	prtd = kzalloc(sizeof(*prtd), GFP_KERNEL);
-+	if (!prtd)
-+		return -ENOMEM;
-+
-+	prtd->dma_chan = dma_request_slave_channel(dev, name);
-+	if (!prtd->dma_chan) {
-+		kfree(prtd);
-+		return -ENXIO;
-+	}
-+
-+	substream->runtime->private_data = prtd;
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(snd_dmaengine_generic_pcm_open);
-+
-+/**
-  * snd_dmaengine_pcm_close - Close a dmaengine based PCM substream
-  * @substream: PCM substream
-  */
+ 		ocp2scp {
+ 			compatible = "ti,omap-ocp2scp";
+ 			#address-cells = <1>;
 -- 
-1.7.9.5
+1.7.10.4
