@@ -1,68 +1,60 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue,  5 Mar 2013 18:42:13 +0100
-Subject: [PATCH 03/23] tty: serial/samsung: prepare for common clock API
+Date: Tue,  5 Mar 2013 18:42:15 +0100
+Subject: [PATCH 05/23] tty: serial/samsung: fix modular build
 In-Reply-To: <1362505353-8873-1-git-send-email-arnd@arndb.de>
 References: <1362505353-8873-1-git-send-email-arnd@arndb.de>
-Message-ID: <1362505353-8873-4-git-send-email-arnd@arndb.de>
+Message-ID: <1362505353-8873-6-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the common clock interface, there is no way to
-provide the "clock_source" sysfs attribute for the
-samsung serial ports. Given that this file was
-purely informational and had fixed contents, we have
-reason to believe that no user space programs
-were relying on it.
-
-The sysfs file is not documented in the ABI docs.
+There are a few bugs in the samsung serial driver when
+built as a loadable module, which makes the console
+code unavailable, as well as giving no access to
+the 'printascii' early debug function. This adds
+the appropriate compile time conditionals.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/tty/serial/samsung.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ drivers/tty/serial/samsung.c | 4 ++--
+ drivers/tty/serial/samsung.h | 4 +++-
+ 2 files changed, 5 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
-index 2769a38..603f3f3 100644
+index 729a60d..a3277ca 100644
 --- a/drivers/tty/serial/samsung.c
 +++ b/drivers/tty/serial/samsung.c
-@@ -1179,6 +1179,7 @@ static int s3c24xx_serial_init_port(struct s3c24xx_uart_port *ourport,
- 	return 0;
- }
+@@ -894,7 +894,7 @@ console_initcall(s3c24xx_serial_console_init);
+ #define S3C24XX_SERIAL_CONSOLE NULL
+ #endif
  
-+#ifdef CONFIG_SAMSUNG_CLOCK
- static ssize_t s3c24xx_serial_show_clksrc(struct device *dev,
- 					  struct device_attribute *attr,
- 					  char *buf)
-@@ -1194,7 +1195,7 @@ static ssize_t s3c24xx_serial_show_clksrc(struct device *dev,
- }
+-#ifdef CONFIG_CONSOLE_POLL
++#if defined(CONFIG_SERIAL_SAMSUNG_CONSOLE) && defined(CONFIG_CONSOLE_POLL)
+ static int s3c24xx_serial_get_poll_char(struct uart_port *port);
+ static void s3c24xx_serial_put_poll_char(struct uart_port *port,
+ 			 unsigned char c);
+@@ -918,7 +918,7 @@ static struct uart_ops s3c24xx_serial_ops = {
+ 	.request_port	= s3c24xx_serial_request_port,
+ 	.config_port	= s3c24xx_serial_config_port,
+ 	.verify_port	= s3c24xx_serial_verify_port,
+-#ifdef CONFIG_CONSOLE_POLL
++#if defined(CONFIG_SERIAL_SAMSUNG_CONSOLE) && defined(CONFIG_CONSOLE_POLL)
+ 	.poll_get_char = s3c24xx_serial_get_poll_char,
+ 	.poll_put_char = s3c24xx_serial_put_poll_char,
+ #endif
+diff --git a/drivers/tty/serial/samsung.h b/drivers/tty/serial/samsung.h
+index 1a4bca3..00a499e 100644
+--- a/drivers/tty/serial/samsung.h
++++ b/drivers/tty/serial/samsung.h
+@@ -76,7 +76,9 @@ struct s3c24xx_uart_port {
+ #define wr_regb(port, reg, val) __raw_writeb(val, portaddr(port, reg))
+ #define wr_regl(port, reg, val) __raw_writel(val, portaddr(port, reg))
  
- static DEVICE_ATTR(clock_source, S_IRUGO, s3c24xx_serial_show_clksrc, NULL);
--
-+#endif
+-#ifdef CONFIG_SERIAL_SAMSUNG_DEBUG
++#if defined(CONFIG_SERIAL_SAMSUNG_DEBUG) && \
++    defined(CONFIG_DEBUG_LL) && \
++    !defined(MODULE)
  
- /* Device driver serial port probe */
- 
-@@ -1252,9 +1253,11 @@ static int s3c24xx_serial_probe(struct platform_device *pdev)
- 	uart_add_one_port(&s3c24xx_uart_drv, &ourport->port);
- 	platform_set_drvdata(pdev, &ourport->port);
- 
-+#ifdef CONFIG_SAMSUNG_CLOCK
- 	ret = device_create_file(&pdev->dev, &dev_attr_clock_source);
- 	if (ret < 0)
- 		dev_err(&pdev->dev, "failed to add clock source attr.\n");
-+#endif
- 
- 	ret = s3c24xx_serial_cpufreq_register(ourport);
- 	if (ret < 0)
-@@ -1272,7 +1275,9 @@ static int s3c24xx_serial_remove(struct platform_device *dev)
- 
- 	if (port) {
- 		s3c24xx_serial_cpufreq_deregister(to_ourport(port));
-+#ifdef CONFIG_SAMSUNG_CLOCK
- 		device_remove_file(&dev->dev, &dev_attr_clock_source);
-+#endif
- 		uart_remove_one_port(&s3c24xx_uart_drv, port);
- 	}
+ extern void printascii(const char *);
  
 -- 
 1.8.1.2
