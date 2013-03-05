@@ -1,67 +1,74 @@
-From: msb@chromium.org (Mandeep Singh Baines)
-Date: Tue, 5 Mar 2013 07:59:17 -0800
-Subject: v3.9-rc1: [BUG: swapper/1 still has locks held!]
-In-Reply-To: <20130305152041.GA23742@S2101-09.ap.freescale.net>
-References: <20130304025206.GB30431@S2101-09.ap.freescale.net>
- <20130305152041.GA23742@S2101-09.ap.freescale.net>
-Message-ID: <CACBanvptu-S_THoq8noh-BHUNYUROAa5UJgTohtnAMvfozsGhw@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 5 Mar 2013 16:10:43 +0000 (UTC)
+Subject: OMAP baseline test results for v3.8
+In-Reply-To: <alpine.DEB.2.00.1303041619500.23192@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1303041619500.23192@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.00.1303051558001.14763@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 5, 2013 at 7:20 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Mon, Mar 04, 2013 at 10:52:10AM +0800, Shawn Guo wrote:
->> I'm running v3.9-rc1 kernel on an ARM platform (i.MX28) with
->> arch/arm/mxs_defconfig and getting the following BUG warning.
->>
-> git bisect points me to the commit 6aa9707 (lockdep: check that no locks
-> held at freeze time).
->
+On Mon, 4 Mar 2013, Paul Walmsley wrote:
 
-Hi,
+> Here are some basic OMAP test results for Linux v3.8.
+> Logs and other details at:
+> 
+>     http://www.pwsan.com/omap/testlogs/test_v3.8/20130218214403/
 
-Thanks for reporting this.
+And here's the bloat data, which I usually try to append to the previous 
+report.
 
-The discussion about this is happening here:
 
-https://lkml.org/lkml/2013/3/4/221
+Boot-time memory difference
+(delta in bytes from test_v3.7 (29594404d7fe73cd80eaa4ee8c43dcc53970c60e))
+  avail  rsrvd   high  freed  board          kconfig
+   212k  -212k      .   -12k  2420n800       n800_only_a
+  -188k   188k      .     8k  2430sdp        omap2plus_defconfig
+  -188k   188k      .     8k  3517evm        omap2plus_defconfig
+  -188k   188k      .     8k  3530es3beagle  omap2plus_defconfig
+ 12100k -12100k      .     8k  3730beaglexm   omap2plus_defconfig
+  -188k   188k      .     8k  37xxevm        omap2plus_defconfig
+ 16196k -16196k      .     8k  4430es2panda   omap2plus_defconfig
+ 32592k -32592k      .     8k  4460pandaes    omap2plus_defconfig
+   -88k    88k      .      .  5912osk        omap1_defconfig
+ -100768k -30304k      .  -192k  am335xbone     am33xx_only
 
-Regards,
-Mandeep
+Some remarkable changes in the 3730 Beagle XM, 4430ES2 Panda, and 4460 
+Panda ES runtime memory consumption figures.
 
-> Shawn
->
->> [    5.681034] =====================================
->> [    5.685885] [ BUG: swapper/1 still has locks held! ]
->> [    5.690885] 3.9.0-rc1 #774 Not tainted
->> [    5.694734] -------------------------------------
->> [    5.699475] 2 locks held by swapper/1:
->> [    5.703323]  #0:  (&sig->cred_guard_mutex){+.+.+.}, at: [<c00d20e0>] prepare_bprm_creds+0x28/0x64
->> [    5.712326]  #1:  (&type->i_mutex_dir_key){+.+.+.}, at: [<c00d5350>] lookup_slow+0x2c/0xa0
->> [    5.720966]
->> [    5.720966] stack backtrace:
->> [    5.725528] [<c0013c78>] (unwind_backtrace+0x0/0xf0) from [<c0426f94>] (rpc_wait_bit_killable+0x94/0xb4)
->> [    5.735184] [<c0426f94>] (rpc_wait_bit_killable+0x94/0xb4) from [<c044684c>] (__wait_on_bit+0x74/0xb8)
->> [    5.744645] [<c044684c>] (__wait_on_bit+0x74/0xb8) from [<c04468f4>] (out_of_line_wait_on_bit+0x64/0x70)
->> [    5.754278] [<c04468f4>] (out_of_line_wait_on_bit+0x64/0x70) from [<c0427e38>] (__rpc_execute+0xf4/0x370)
->> [    5.763991] [<c0427e38>] (__rpc_execute+0xf4/0x370) from [<c042124c>] (rpc_run_task+0xa4/0xb0)
->> [    5.772660] [<c042124c>] (rpc_run_task+0xa4/0xb0) from [<c0421350>] (rpc_call_sync+0x40/0xac)
->> [    5.781335] [<c0421350>] (rpc_call_sync+0x40/0xac) from [<c01c2e08>] (nfs3_rpc_wrapper.constprop.6+0x58/0xdc)
->> [    5.791406] [<c01c2e08>] (nfs3_rpc_wrapper.constprop.6+0x58/0xdc) from [<c01c2fbc>] (nfs3_proc_lookup+0x88/0xf4)
->> [    5.801751] [<c01c2fbc>] (nfs3_proc_lookup+0x88/0xf4) from [<c01b282c>] (nfs_lookup+0xe8/0x18c)
->> [    5.810659] [<c01b282c>] (nfs_lookup+0xe8/0x18c) from [<c00d49f8>] (lookup_real+0x20/0x50)
->> [    5.819097] [<c00d49f8>] (lookup_real+0x20/0x50) from [<c00d5314>] (__lookup_hash+0x34/0x44)
->> [    5.827696] [<c00d5314>] (__lookup_hash+0x34/0x44) from [<c00d5360>] (lookup_slow+0x3c/0xa0)
->> [    5.836297] [<c00d5360>] (lookup_slow+0x3c/0xa0) from [<c00d61bc>] (link_path_walk+0x2a4/0x848)
->> [    5.845144] [<c00d61bc>] (link_path_walk+0x2a4/0x848) from [<c00d9204>] (path_openat+0x278/0x444)
->> [    5.854176] [<c00d9204>] (path_openat+0x278/0x444) from [<c00d96cc>] (do_filp_open+0x2c/0x80)
->> [    5.862755] [<c00d96cc>] (do_filp_open+0x2c/0x80) from [<c00d12fc>] (open_exec+0x30/0x10c)
->> [    5.871166] [<c00d12fc>] (open_exec+0x30/0x10c) from [<c00d232c>] (do_execve+0x1b8/0x4c4)
->> [    5.879500] [<c00d232c>] (do_execve+0x1b8/0x4c4) from [<c0440b54>] (kernel_init+0x80/0xe4)
->> [    5.887963] [<c0440b54>] (kernel_init+0x80/0xe4) from [<c000e9c8>] (ret_from_fork+0x14/0x2c)
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->> Please read the FAQ at  http://www.tux.org/lkml/
->
+The AM33xx delta is spurious and is due to the fact that none of the 
+v3.8-rc/v3.8 kernels have booted in my appended device tree scenario for 
+AM33xx.  This previously worked with v3.7-rc.
+
+
+vmlinux object size
+(delta in bytes from test_v3.7 (29594404d7fe73cd80eaa4ee8c43dcc53970c60e)):
+   text     data      bss    total  kernel
++476081   +12728    +3904  +492713  am33xx_only
+-180478    -9360   -30332  -220170  n800_multi_omap2xxx
+-178466   -11512   -30300  -220278  n800_only_a
+ +89769    +1048     +164   +90981  omap1_defconfig
+ +89946    +1632     +132   +91710  omap1_defconfig_1510innovator_only
+ +88997    +1464     +164   +90625  omap1_defconfig_5912osk_only
++172883   +22832     +904  +196619  omap2plus_defconfig
++120690   +14080     +112  +134882  omap2plus_defconfig_2430sdp_only
++178467   +23072     +904  +202443  omap2plus_defconfig_cpupm
++172839   +25904     +904  +199647  omap2plus_defconfig_no_pm
++135978   +13672     +776  +150426  omap2plus_defconfig_omap2_4_only
++169593   +45416     +904  +215913  omap2plus_defconfig_omap3_4_only
+ +76120   +19916    -3032   +93004  rmk_omap3430_ldp_allnoconfig
++102197   +16132      -48  +118281  rmk_omap3430_ldp_oldconfig
+ +76120   +19916    -3032   +93004  rmk_omap4430_sdp_allnoconfig
+ +91359    +7040     +196   +98595  rmk_omap4430_sdp_oldconfig
+
+The N800 data can be ignored.  They are colored by the radical changes to 
+the Kconfig that are necessary to keep a mainline kernel booting on it, 
+due to its bootloader's 2MiB kernel size limit.
+
+In my view, the notable change here is the ~200KB size increase for 
+omap2plus_defconfig.  I'd guess that much of this is due to the common 
+clock framework conversion.  Even OMAP1 registered a ~90KB size increase.  
+By comparison, again for OMAP1: v3.5->v3.6 saw a 52KB size increase, 
+v3.6->v3.7 saw a 65KB increase.
+
+
+- Paul
