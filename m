@@ -1,120 +1,131 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  5 Mar 2013 03:47:16 +0000
-Subject: [PATCH 00/29] Port of KVM to arm64
-Message-ID: <1362455265-24165-1-git-send-email-marc.zyngier@arm.com>
+Date: Tue,  5 Mar 2013 03:47:17 +0000
+Subject: [PATCH 01/29] arm64: KVM: define HYP and Stage-2 translation page
+ flags
+In-Reply-To: <1362455265-24165-1-git-send-email-marc.zyngier@arm.com>
+References: <1362455265-24165-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1362455265-24165-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series contains the implementation of KVM for arm64. It depends
-on the "pre-arm64 rework" series I posted earlier, as well as on the
-tiny perf patch sent just after.
+Add HYP and S2 page flags, for both normal and device memory.
 
-The code is unsurprisingly extremely similar to the KVM/arm code, and
-a lot of it is actually shared with the 32bit version. Some of the
-include files are duplicated though (I'm definitely willing to fix
-that).
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/include/asm/pgtable-hwdef.h | 13 +++++++++++++
+ arch/arm64/include/asm/pgtable.h       | 13 +++++++++++++
+ arch/arm64/mm/mmu.c                    |  6 +++++-
+ 3 files changed, 31 insertions(+), 1 deletion(-)
 
-In terms of features:
-- Support for 4k and 64k pages
-- Support for 32bit and 64bit guests
-- PSCI support for SMP booting
-
-As we do not have a 64bit QEMU port, it has been tested using kvmtool
-(support has already been merged).
-
-Marc Zyngier (29):
-  arm64: KVM: define HYP and Stage-2 translation page flags
-  arm64: KVM: HYP mode idmap support
-  arm64: KVM: EL2 register definitions
-  arm64: KVM: system register definitions for 64bit guests
-  arm64: KVM: Basic ESR_EL2 helpers and vcpu register access
-  arm64: KVM: fault injection into a guest
-  arm64: KVM: architecture specific MMU backend
-  arm64: KVM: user space interface
-  arm64: KVM: system register handling
-  arm64: KVM: Cortex-A57 specific system registers handling
-  arm64: KVM: virtual CPU reset
-  arm64: KVM: kvm_arch and kvm_vcpu_arch definitions
-  arm64: KVM: MMIO access backend
-  arm64: KVM: guest one-reg interface
-  arm64: KVM: hypervisor initialization code
-  arm64: KVM: HYP mode world switch implementation
-  arm64: KVM: Exit handling
-  arm64: KVM: Plug the VGIC
-  arm64: KVM: Plug the arch timer
-  arm64: KVM: PSCI implementation
-  arm64: KVM: Build system integration
-  arm64: KVM: define 32bit specific registers
-  arm64: KVM: 32bit GP register access
-  arm64: KVM: 32bit conditional execution emulation
-  arm64: KVM: 32bit handling of coprocessor traps
-  arm64: KVM: 32bit coprocessor access for Cortex-A57
-  arm64: KVM: 32bit specific register world switch
-  arm64: KVM: 32bit guest fault injection
-  arm64: KVM: enable initialization of a 32bit vcpu
-
- arch/arm/kvm/arch_timer.c               |    1 +
- arch/arm64/Kconfig                      |    2 +
- arch/arm64/Makefile                     |    2 +-
- arch/arm64/include/asm/kvm_arch_timer.h |   58 ++
- arch/arm64/include/asm/kvm_arm.h        |  243 +++++++
- arch/arm64/include/asm/kvm_asm.h        |  104 +++
- arch/arm64/include/asm/kvm_coproc.h     |   56 ++
- arch/arm64/include/asm/kvm_emulate.h    |  181 +++++
- arch/arm64/include/asm/kvm_host.h       |  192 ++++++
- arch/arm64/include/asm/kvm_mmio.h       |   59 ++
- arch/arm64/include/asm/kvm_mmu.h        |  126 ++++
- arch/arm64/include/asm/kvm_psci.h       |   23 +
- arch/arm64/include/asm/kvm_vgic.h       |  156 +++++
- arch/arm64/include/asm/pgtable-hwdef.h  |   13 +
- arch/arm64/include/asm/pgtable.h        |   13 +
- arch/arm64/include/uapi/asm/kvm.h       |  190 ++++++
- arch/arm64/kernel/asm-offsets.c         |   33 +
- arch/arm64/kernel/vmlinux.lds.S         |   10 +
- arch/arm64/kvm/Kconfig                  |   59 ++
- arch/arm64/kvm/Makefile                 |   18 +
- arch/arm64/kvm/emulate.c                |  154 +++++
- arch/arm64/kvm/guest.c                  |  246 +++++++
- arch/arm64/kvm/handle_exit.c            |  124 ++++
- arch/arm64/kvm/hyp-init.S               |   89 +++
- arch/arm64/kvm/hyp.S                    |  826 +++++++++++++++++++++++
- arch/arm64/kvm/idmap.c                  |  141 ++++
- arch/arm64/kvm/idmap.h                  |    8 +
- arch/arm64/kvm/inject_fault.c           |  194 ++++++
- arch/arm64/kvm/regmap.c                 |  168 +++++
- arch/arm64/kvm/reset.c                  |   83 +++
- arch/arm64/kvm/sys_regs.c               | 1113 +++++++++++++++++++++++++++++++
- arch/arm64/kvm/sys_regs.h               |  141 ++++
- arch/arm64/kvm/sys_regs_a57.c           |  118 ++++
- arch/arm64/mm/mmu.c                     |    6 +-
- include/uapi/linux/kvm.h                |    1 +
- 35 files changed, 4949 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm64/include/asm/kvm_arch_timer.h
- create mode 100644 arch/arm64/include/asm/kvm_arm.h
- create mode 100644 arch/arm64/include/asm/kvm_asm.h
- create mode 100644 arch/arm64/include/asm/kvm_coproc.h
- create mode 100644 arch/arm64/include/asm/kvm_emulate.h
- create mode 100644 arch/arm64/include/asm/kvm_host.h
- create mode 100644 arch/arm64/include/asm/kvm_mmio.h
- create mode 100644 arch/arm64/include/asm/kvm_mmu.h
- create mode 100644 arch/arm64/include/asm/kvm_psci.h
- create mode 100644 arch/arm64/include/asm/kvm_vgic.h
- create mode 100644 arch/arm64/include/uapi/asm/kvm.h
- create mode 100644 arch/arm64/kvm/Kconfig
- create mode 100644 arch/arm64/kvm/Makefile
- create mode 100644 arch/arm64/kvm/emulate.c
- create mode 100644 arch/arm64/kvm/guest.c
- create mode 100644 arch/arm64/kvm/handle_exit.c
- create mode 100644 arch/arm64/kvm/hyp-init.S
- create mode 100644 arch/arm64/kvm/hyp.S
- create mode 100644 arch/arm64/kvm/idmap.c
- create mode 100644 arch/arm64/kvm/idmap.h
- create mode 100644 arch/arm64/kvm/inject_fault.c
- create mode 100644 arch/arm64/kvm/regmap.c
- create mode 100644 arch/arm64/kvm/reset.c
- create mode 100644 arch/arm64/kvm/sys_regs.c
- create mode 100644 arch/arm64/kvm/sys_regs.h
- create mode 100644 arch/arm64/kvm/sys_regs_a57.c
-
+diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
+index 75fd13d..acb4ee5 100644
+--- a/arch/arm64/include/asm/pgtable-hwdef.h
++++ b/arch/arm64/include/asm/pgtable-hwdef.h
+@@ -35,6 +35,7 @@
+ /*
+  * Section
+  */
++#define PMD_SECT_USER		(_AT(pteval_t, 1) << 6)		/* AP[1] */
+ #define PMD_SECT_S		(_AT(pmdval_t, 3) << 8)
+ #define PMD_SECT_AF		(_AT(pmdval_t, 1) << 10)
+ #define PMD_SECT_NG		(_AT(pmdval_t, 1) << 11)
+@@ -68,6 +69,18 @@
+ #define PTE_ATTRINDX_MASK	(_AT(pteval_t, 7) << 2)
+ 
+ /*
++ * 2nd stage PTE definitions
++ */
++#define PTE_S2_RDONLY		 (_AT(pteval_t, 1) << 6)   /* HAP[1]   */
++#define PTE_S2_RDWR		 (_AT(pteval_t, 2) << 6)   /* HAP[2:1] */
++
++/*
++ * EL2/HYP PTE/PMD definitions
++ */
++#define PMD_HYP			PMD_SECT_USER
++#define PTE_HYP			PTE_USER
++
++/*
+  * 40-bit physical address supported.
+  */
+ #define PHYS_MASK_SHIFT		(40)
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index e333a24..11c608a 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -60,6 +60,7 @@ extern void __pgd_error(const char *file, int line, unsigned long val);
+ #define _PAGE_DEFAULT		PTE_TYPE_PAGE | PTE_AF
+ 
+ extern pgprot_t pgprot_default;
++extern pgprot_t	pgprot_device;
+ 
+ #define __pgprot_modify(prot,mask,bits) \
+ 	__pgprot((pgprot_val(prot) & ~(mask)) | (bits))
+@@ -76,6 +77,12 @@ extern pgprot_t pgprot_default;
+ #define PAGE_KERNEL		_MOD_PROT(pgprot_default, PTE_PXN | PTE_UXN | PTE_DIRTY)
+ #define PAGE_KERNEL_EXEC	_MOD_PROT(pgprot_default, PTE_UXN | PTE_DIRTY)
+ 
++#define PAGE_HYP		_MOD_PROT(pgprot_default, PTE_HYP)
++#define PAGE_HYP_DEVICE		_MOD_PROT(pgprot_device, PTE_HYP)
++
++#define PAGE_S2			_MOD_PROT(pgprot_default, PTE_USER | PTE_S2_RDONLY)
++#define PAGE_S2_DEVICE		_MOD_PROT(pgprot_device, PTE_USER | PTE_S2_RDWR)
++
+ #define __PAGE_NONE		__pgprot(((_PAGE_DEFAULT) & ~PTE_TYPE_MASK) | PTE_PROT_NONE)
+ #define __PAGE_SHARED		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN)
+ #define __PAGE_SHARED_EXEC	__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN)
+@@ -197,6 +204,12 @@ extern pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
+ 
+ #define pmd_bad(pmd)		(!(pmd_val(pmd) & 2))
+ 
++#define pmd_table(pmd)		((pmd_val(pmd) & PMD_TYPE_MASK) == \
++				 PMD_TYPE_TABLE)
++#define pmd_sect(pmd)		((pmd_val(pmd) & PMD_TYPE_MASK) == \
++				 PMD_TYPE_SECT)
++
++
+ static inline void set_pmd(pmd_t *pmdp, pmd_t pmd)
+ {
+ 	*pmdp = pmd;
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 224b44a..df03aea 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -44,6 +44,7 @@ struct page *empty_zero_page;
+ EXPORT_SYMBOL(empty_zero_page);
+ 
+ pgprot_t pgprot_default;
++pgprot_t pgprot_device;
+ EXPORT_SYMBOL(pgprot_default);
+ 
+ static pmdval_t prot_sect_kernel;
+@@ -127,10 +128,11 @@ early_param("cachepolicy", early_cachepolicy);
+  */
+ static void __init init_mem_pgprot(void)
+ {
+-	pteval_t default_pgprot;
++	pteval_t default_pgprot, device_pgprot;
+ 	int i;
+ 
+ 	default_pgprot = PTE_ATTRINDX(MT_NORMAL);
++	device_pgprot = PTE_ATTRINDX(MT_DEVICE_nGnRE) | PTE_PXN | PTE_UXN;
+ 	prot_sect_kernel = PMD_TYPE_SECT | PMD_SECT_AF | PMD_ATTRINDX(MT_NORMAL);
+ 
+ #ifdef CONFIG_SMP
+@@ -138,6 +140,7 @@ static void __init init_mem_pgprot(void)
+ 	 * Mark memory with the "shared" attribute for SMP systems
+ 	 */
+ 	default_pgprot |= PTE_SHARED;
++	device_pgprot |= PTE_SHARED;
+ 	prot_sect_kernel |= PMD_SECT_S;
+ #endif
+ 
+@@ -147,6 +150,7 @@ static void __init init_mem_pgprot(void)
+ 	}
+ 
+ 	pgprot_default = __pgprot(PTE_TYPE_PAGE | PTE_AF | default_pgprot);
++	pgprot_device = __pgprot(PTE_TYPE_PAGE | PTE_AF | device_pgprot);
+ }
+ 
+ pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
 -- 
 1.7.12.4
