@@ -1,49 +1,55 @@
-From: javier.martin@vista-silicon.com (javier Martin)
-Date: Tue, 5 Mar 2013 08:48:19 +0100
-Subject: [PATCH v3 1/2] i.MX27: Add clock support for SAHARA2.
-In-Reply-To: <20130304075306.GA1906@pengutronix.de>
-References: <1362137873-8827-1-git-send-email-javier.martin@vista-silicon.com>
- <1362137873-8827-2-git-send-email-javier.martin@vista-silicon.com>
- <20130304075306.GA1906@pengutronix.de>
-Message-ID: <CACKLOr2kuWXMreEFA4wqyYVRNnPwmEoHPM2+V+tN5P_1bQ+iJQ@mail.gmail.com>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Tue, 5 Mar 2013 09:02:52 +0100
+Subject: [PATCH 6/9] rtc: stmp3xxx: add sysfs entries for persistent regs
+In-Reply-To: <CACxGe6swW-UDH1cUw1D8P+gyhDC8nDZur-A_m_NBfeRUxcg9Jw@mail.gmail.com>
+References: <1362405948-12992-1-git-send-email-s.trumtrar@pengutronix.de>
+ <1362405948-12992-7-git-send-email-s.trumtrar@pengutronix.de>
+ <CACxGe6swW-UDH1cUw1D8P+gyhDC8nDZur-A_m_NBfeRUxcg9Jw@mail.gmail.com>
+Message-ID: <20130305080252.GA7042@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+Hi Grant!
 
-On 4 March 2013 08:53, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> On Fri, Mar 01, 2013 at 12:37:52PM +0100, Javier Martin wrote:
->>
->> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
->> ---
->>  arch/arm/mach-imx/clk-imx27.c |    2 ++
->>  1 file changed, 2 insertions(+)
->>
->> diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
->> index 4c1d1e4..0b9664a 100644
->> --- a/arch/arm/mach-imx/clk-imx27.c
->> +++ b/arch/arm/mach-imx/clk-imx27.c
->> @@ -253,6 +253,8 @@ int __init mx27_clocks_init(unsigned long fref)
->>       clk_register_clkdev(clk[nfc_baud_gate], NULL, "imx27-nand.0");
->>       clk_register_clkdev(clk[vpu_baud_gate], "per", "coda-imx27.0");
->>       clk_register_clkdev(clk[vpu_ahb_gate], "ahb", "coda-imx27.0");
->> +     clk_register_clkdev(clk[sahara_ahb_gate], "ahb", "sahara-imx27.0");
->> +     clk_register_clkdev(clk[sahara_ipg_gate], "ipg", "sahara-imx27.0");
->
-> One of the first patches I want to push upstream for the next merge
-> window is this one:
->
-> https://patchwork.kernel.org/patch/1817741/
->
-> So the change above becomes unnecessary
+On Mon, Mar 04, 2013 at 11:14:54PM +0800, Grant Likely wrote:
+> On Mon, Mar 4, 2013 at 10:05 PM, Steffen Trumtrar
+> <s.trumtrar@pengutronix.de> wrote:
+> > The persistent registers 1-5 are completely software defined. To have access
+> > from userspace, export them via sysfs.
+> >
+> > Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> 
+> Hi Steffen,
+> 
+> A few comments on this. First and foremost, any additions to the
+> kernel sysfs interface must be accompanied with documentation in
+> Documentation/ABI/. Second, adding attributes to an existing device
 
-Very good. Then this patch can be safely dropped.
+Okay. I forgot that and will add it in the next version.
+
+> that has already been registered is almost guaranteed to be wrong. The
+> attributes need to be added all at the same time so they are available
+> immediately when the new device uevent is issued by the kernel.
+> 
+> Instead, the correct thing to do is add an attribute_group to the
+> child device before the device gets registered. See the 'attributes'
+> section of Documentation/driver-model/device.txt to see how to do
+> this.
+> 
+> (I also see that the rtc core code is doing the wrong thing here also.
+> rtc_sysfs_add_device(), rtc_sysfs_add_device() should also be replaced
+> with an attribute group so that the sysfs files get added
+> automatically; but that is outside the scope of this patch)
+> 
+
+Hm, I modeled it after other rtcs and the rtc_sysfs. Seems that I have to
+rework this.
+
+Thanks,
+Steffen
 
 -- 
-Javier Martin
-Vista Silicon S.L.
-CDTUC - FASE C - Oficina S-345
-Avda de los Castros s/n
-39005- Santander. Cantabria. Spain
-+34 942 25 32 60
-www.vista-silicon.com
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
