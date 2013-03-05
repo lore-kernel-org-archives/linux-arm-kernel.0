@@ -1,221 +1,147 @@
-From: heiko@sntech.de (Heiko =?iso-8859-15?q?St=FCbner?=)
-Date: Tue, 5 Mar 2013 21:50:24 +0100
-Subject: [PATCH 00/23] RFC: exynos multiplatform support
-In-Reply-To: <1362505353-8873-1-git-send-email-arnd@arndb.de>
-References: <1362505353-8873-1-git-send-email-arnd@arndb.de>
-Message-ID: <201303052150.24947.heiko@sntech.de>
+From: mporter@ti.com (Matt Porter)
+Date: Tue,  5 Mar 2013 15:53:06 -0500
+Subject: [PATCH v8 0/9] DMA Engine support for AM33XX
+Message-ID: <1362516795-6346-1-git-send-email-mporter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 5. M?rz 2013, 18:42:10 schrieb Arnd Bergmann:
-> Hi everyone,
-> 
-> Although I'm not present at the Linaro Connect hacking
-> sessions, I am participating remotely and have tried
-> hacking on multiplatform support for Exynos. This patch
-> set is far from complete, but I think the patches
-> can be useful anyway.
-> 
-> The series gets increasingly fishy towards the end,
-> and we should probably not apply any of the last nine
-> patches as-is, nor do I expect everything to work, since
-> I have not tested them at all.
-> 
-> With this patch set, we can build mach-exynos as part
-> of a multiplatform kernel, with the following caveats:
-> 
-> * Only DT based boards are supported
-> * Moving to common-clk breaks things including cpufreq
->   and others. Thomas is working on a patch for this
-> * We disable the gpio implementation, which also breaks
->   stuff, but Thomas has a patch already
-> * Using the generic DMA engine API in SPI and ASoC
->   means they no longer work on S3C
+Changes since v7:
+	- Dropped dmaengine compat() patch. It is upstream.
+	- Submitted edma_alloc_slot() error checking bug fix separately,
+	  now a dependency
+	- Fixed bisect issues due to 3/10 hunks that went into 1/10
+	- Fixed incorrect IS_ERRVALUE() use in 3/10
 
-If I remember correctly Kgene mentioning some time back, that someone was 
-working on converting the s3c dma to dmaengine, but I never heard anything 
-more about it.
+Changes since v6:
+	- Converted edma_of_read_*() to wrappers around of_property_read_*()
+	- Fixed wording on the omap-spi generic DMA properties
+	- Added comment/check to clarify that the driver only supports
+	  a single EDMA instance when booting from DT
 
-So personally I would be grateful, for people not breaking my devices :-) .
+Changes since v5:
+	- Dropped mmc portion and moved it to a separate series
+	- Incorporate corrected version of dma_request_slave_channel_compat()
+	- Fix #defines and enablement of TI_PRIV_EDMA option
 
+Changes since v4:
+	- Fixed debug section mismatch in private edma api [01/14]
+	- Respun format-patch to catch the platform_data/edma.h rename [01/14]
+	- Removed address/size-cells from the EDMA binding [05/14]
 
-On an unrelated note, exists some sort of documentation for creating dmaengine 
-drivers somewhere? Documentation/* seems to always be only targetted at device 
-driver writers and my own DMA knowledge is still stuck at the theoretical 
-level they teach in generic operating-systems university courses.
+Changes since v3:
+	- Rebased on 3.8-rc3
+	- No longer an RFC
+	- Fixed bugs in DT/pdata parsing reported by Vaibhav Bedia
+	- Restored all the Davinci pdata to const
+	- Removed max_segs hack in favor of using dma_get_channel_caps()
+	- Fixed extra parens, __raw_* accessors and, ioremap error checks
+	  in xbar handling
+	- Removed excess license info in platform_data/edma.h
+	- Removed unneeded reserved channels data for AM33xx
+	- Removed test-specific pinmuxing from dts files
+	- Adjusted mmc1 node to be disabled by default in the dtsi
 
+Changes since v2:
+	- Rebased on 3.7-rc1
+	- Fixed bug in DT/pdata parsing first found by Gururaja
+	  that turned out to be masked by some toolchains
+	- Dropped unused mach-omap2/devices.c hsmmc patch
+	- Added AM33XX crossbar DMA event mux support
+	- Added am335x-evm support
 
-Heiko
- 
+Changes since v1:
+	- Rebased on top of mainline from 12250d8
+	- Dropped the feature removal schedule patch
+	- Implemented dma_request_slave_channel_compat() and
+	  converted the mmc and spi drivers to use it
+	- Dropped unneeded #address-cells and #size-cells from
+	  EDMA DT support
+	- Moved private EDMA header to linux/platform_data/ and
+	  removed some unneeded definitions
+	- Fixed parsing of optional properties
 
-> * I did not like the solution for the UART driver, but
->   could also not think of a better one.
-> * The FB_S3C, S3C2410_WATCHDOG and S3C_ADC drivers
->   are left as an exercise to the reader, they are
->   currently disabled with multiplatform
-> * sparsemem support is not available on multiplatform
-> 
-> The patches are based on v3.9-rc1 and I have pushed
-> the git branch to
-> 
-> git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
-> testing/exynos-multiplatform
-> 
-> I have not yet added subsystem maintainers to Cc on the
-> patches, I'd like to coordinate with the other people
-> involved first, so see if they already have patches
-> for the same drivers.
-> 
-> 	Arnd
-> 
-> Arnd Bergmann (23):
->   ARM: exynos: introduce EXYNOS_ATAGS symbol
->   irqchip: exynos: remove dependency on mach/irqs.h
->   tty: serial/samsung: prepare for common clock API
->   tty: serial/samsung: make register definitions global
->   tty: serial/samsung: fix modular build
->   ARM: exynos: move debug-macro.S to include/debug/
->   i2c: s3c2410: make header file local
->   mmc: sdhci-s3c: remove platform dependencies
->   usb: exynos: do not include plat/usb-phy.h
->   [media] exynos: remove unnecessary header inclusions
->   video/exynos: remove unnecessary header inclusions
->   thermal/exynos: remove unnecessary header inclusions
->   mtd: onenand/samsung: make regs-onenand.h file local
->   rtc: s3c: make header file local
->   spi: s3c64xx: move to generic dmaengine API
->   pwm: samsung: repair the worst MMIO abuses
->   ASoC: samsung: move plat/ headers to local directory
->   ASoC: samsung: convert to dmaengine API
->   ASoC: samsung: use irq resource for idma
->   ARM: exynos: prepare for sparse IRQ
->   ARM: exynos: hack to disable private clock code
->   ARM: exynos: work around missing gpio code on multiplatform
->   ARM: exynos: experimental multiplatform support
-> 
->  arch/arm/Kconfig                                  |  11 +-
->  arch/arm/Kconfig.debug                            |   8 +
->  arch/arm/include/debug/exynos.S                   |  39 +++
->  arch/arm/include/debug/samsung.S                  |  87 +++++++
->  arch/arm/mach-exynos/Kconfig                      |  36 ++-
->  arch/arm/mach-exynos/Makefile                     |   5 +
->  arch/arm/mach-exynos/common.c                     |  14 +-
->  arch/arm/mach-exynos/common.h                     |   2 +-
->  arch/arm/mach-exynos/dev-audio.c                  |   1 +
->  arch/arm/mach-exynos/dev-uart.c                   |   1 +
->  arch/arm/mach-exynos/include/mach/debug-macro.S   |  39 ---
->  arch/arm/mach-exynos/include/mach/gpio.h          |   2 +
->  arch/arm/mach-exynos/include/mach/irqs.h          |   5 +-
->  arch/arm/mach-exynos/mach-armlex4210.c            |   3 +
->  arch/arm/mach-exynos/mach-exynos4-dt.c            |   2 +
->  arch/arm/mach-exynos/mach-exynos5-dt.c            |   2 +
->  arch/arm/mach-exynos/mach-nuri.c                  |   2 +
->  arch/arm/mach-exynos/mach-origen.c                |   3 +
->  arch/arm/mach-exynos/mach-smdk4x12.c              |   2 +
->  arch/arm/mach-exynos/mach-smdkv310.c              |   3 +
->  arch/arm/mach-exynos/setup-i2c0.c                 |   3 +-
->  arch/arm/mach-exynos/setup-sdhci-gpio.c           |   2 +-
->  arch/arm/mach-exynos/setup-usb-phy.c              |   8 +-
->  arch/arm/mach-s3c24xx/clock-s3c2440.c             |   5 +
->  arch/arm/mach-s3c24xx/common.c                    |   5 +
->  arch/arm/mach-s3c24xx/dma-s3c2410.c               |   2 -
->  arch/arm/mach-s3c24xx/dma-s3c2412.c               |   2 -
->  arch/arm/mach-s3c24xx/dma-s3c2440.c               |   2 -
->  arch/arm/mach-s3c24xx/dma-s3c2443.c               |   2 -
->  arch/arm/mach-s3c24xx/include/mach/debug-macro.S  |   2 +-
->  arch/arm/mach-s3c24xx/mach-rx1950.c               |   1 -
->  arch/arm/mach-s3c64xx/include/mach/debug-macro.S  |   2 +-
->  arch/arm/mach-s3c64xx/include/mach/gpio.h         |   4 +
->  arch/arm/mach-s3c64xx/setup-usb-phy.c             |   4 +-
->  arch/arm/mach-s5p64x0/include/mach/debug-macro.S  |   2 +-
->  arch/arm/mach-s5pc100/include/mach/debug-macro.S  |   2 +-
->  arch/arm/mach-s5pc100/setup-sdhci-gpio.c          |   1 -
->  arch/arm/mach-s5pv210/include/mach/debug-macro.S  |   2 +-
->  arch/arm/mach-s5pv210/setup-sdhci-gpio.c          |   1 -
->  arch/arm/mach-s5pv210/setup-usb-phy.c             |   4 +-
->  arch/arm/plat-samsung/Kconfig                     |   5 +
->  arch/arm/plat-samsung/Makefile                    |   3 +
->  arch/arm/plat-samsung/clock-clksrc.c              |   3 +
->  arch/arm/plat-samsung/devs.c                      |  17 +-
->  arch/arm/plat-samsung/include/plat/debug-macro.S  |  87 -------
->  arch/arm/plat-samsung/include/plat/gpio-core.h    |   3 +
->  arch/arm/plat-samsung/include/plat/regs-ac97.h    |  67 -----
->  arch/arm/plat-samsung/include/plat/regs-iic.h     |  56 -----
->  arch/arm/plat-samsung/include/plat/regs-iis.h     |  70 ------
->  arch/arm/plat-samsung/include/plat/regs-onenand.h |  63 -----
->  arch/arm/plat-samsung/include/plat/regs-rtc.h     |  71 ------
->  arch/arm/plat-samsung/include/plat/regs-sdhci.h   |  87 -------
->  arch/arm/plat-samsung/include/plat/regs-serial.h  | 282
-> +--------------------- arch/arm/plat-samsung/include/plat/sdhci.h        |
->  56 +----
->  arch/arm/plat-samsung/include/plat/usb-phy.h      |   5 +-
->  arch/arm/plat-samsung/irq-vic-timer.c             |   1 +
->  arch/arm/plat-samsung/pm-gpio.c                   |   1 +
->  arch/arm/plat-samsung/pm.c                        |   1 +
->  arch/arm/plat-samsung/s5p-clock.c                 |   3 +
->  arch/arm/plat-samsung/s5p-irq.c                   |   1 +
->  drivers/cpufreq/Kconfig.arm                       |   4 +-
->  drivers/devfreq/Kconfig                           |   1 +
->  drivers/gpio/Makefile                             |   2 +-
->  drivers/i2c/busses/i2c-s3c2410.c                  |   3 +-
->  drivers/i2c/busses/i2c-s3c2410.h                  |  56 +++++
->  drivers/irqchip/exynos-combiner.c                 | 113 +++++----
->  drivers/media/platform/exynos-gsc/gsc-regs.c      |   1 -
->  drivers/media/platform/s5p-tv/sii9234_drv.c       |   3 -
->  drivers/mmc/host/Kconfig                          |   2 +-
->  drivers/mmc/host/sdhci-s3c-regs.h                 |  87 +++++++
->  drivers/mmc/host/sdhci-s3c.c                      |   5 +-
->  drivers/mtd/onenand/samsung.c                     |   4 +-
->  drivers/mtd/onenand/samsung.h                     |  61 +++++
->  drivers/pwm/pwm-samsung.c                         |  60 +++--
->  drivers/rtc/rtc-s3c.c                             |   3 +-
->  drivers/rtc/rtc-s3c.h                             |  70 ++++++
->  drivers/spi/spi-s3c64xx.c                         | 107 ++++----
->  drivers/thermal/exynos_thermal.c                  |   2 -
->  drivers/tty/serial/samsung.c                      |  17 +-
->  drivers/tty/serial/samsung.h                      |   4 +-
->  drivers/usb/host/ehci-s5p.c                       |   1 -
->  drivers/usb/host/ohci-exynos.c                    |   1 -
->  drivers/video/Kconfig                             |   2 +-
->  drivers/video/exynos/exynos_mipi_dsi.c            |   2 -
->  drivers/video/exynos/exynos_mipi_dsi_common.c     |   2 -
->  drivers/video/exynos/exynos_mipi_dsi_lowlevel.c   |   2 -
->  drivers/watchdog/Kconfig                          |   1 +
->  include/linux/platform_data/mmc-sdhci-s3c.h       |  56 +++++
->  include/linux/platform_data/spi-s3c64xx.h         |   3 +
->  include/linux/serial_s3c.h                        | 260
-> ++++++++++++++++++++ sound/soc/samsung/ac97.c                          | 
-> 17 +-
->  sound/soc/samsung/dma.c                           | 104 ++++----
->  sound/soc/samsung/dma.h                           |   4 +-
->  sound/soc/samsung/h1940_uda1380.c                 |   2 +-
->  sound/soc/samsung/i2s.c                           |   9 +-
->  sound/soc/samsung/idma.c                          |  10 +-
->  sound/soc/samsung/neo1973_wm8753.c                |   2 +-
->  sound/soc/samsung/pcm.c                           |  13 -
->  sound/soc/samsung/regs-ac97.h                     |  67 +++++
->  sound/soc/samsung/regs-iis.h                      |  70 ++++++
->  sound/soc/samsung/rx1950_uda1380.c                |   2 +-
->  sound/soc/samsung/s3c2412-i2s.c                   |  10 -
->  sound/soc/samsung/s3c24xx-i2s.c                   |  12 +-
->  sound/soc/samsung/s3c24xx_uda134x.c               |   2 +-
->  sound/soc/samsung/spdif.c                         |   6 -
->  105 files changed, 1262 insertions(+), 1208 deletions(-)
->  create mode 100644 arch/arm/include/debug/exynos.S
->  create mode 100644 arch/arm/include/debug/samsung.S
->  delete mode 100644 arch/arm/mach-exynos/include/mach/debug-macro.S
->  delete mode 100644 arch/arm/plat-samsung/include/plat/debug-macro.S
->  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-ac97.h
->  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-iic.h
->  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-iis.h
->  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-onenand.h
->  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-rtc.h
->  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-sdhci.h
->  create mode 100644 drivers/i2c/busses/i2c-s3c2410.h
->  create mode 100644 drivers/mmc/host/sdhci-s3c-regs.h
->  create mode 100644 drivers/mtd/onenand/samsung.h
->  create mode 100644 drivers/rtc/rtc-s3c.h
->  create mode 100644 include/linux/platform_data/mmc-sdhci-s3c.h
->  create mode 100644 include/linux/serial_s3c.h
->  create mode 100644 sound/soc/samsung/regs-ac97.h
->  create mode 100644 sound/soc/samsung/regs-iis.h
+This series adds DMA Engine support for AM33xx, which uses
+an EDMA DMAC. The EDMA DMAC has been previously supported by only
+a private API implementation (much like the situation with OMAP
+DMA) found on the DaVinci family of SoCs.
+
+The series applies on top of 3.9-rc1 and the following patches:
+
+	- edma private api error check fix from 
+	  http://www.spinics.net/lists/arm-kernel/msg227886.html
+
+The approach taken is similar to how OMAP DMA is being converted to
+DMA Engine support. With the functional EDMA private API already
+existing in mach-davinci/dma.c, we first move that to an ARM common
+area so it can be shared. Adding DT and runtime PM support to the
+private EDMA API implementation allows it to run on AM33xx. AM33xx
+*only* boots using DT so we leverage Jon's generic DT DMA helpers to
+register EDMA DMAC with the of_dma framework and then add support
+for calling the dma_request_slave_channel() API to both the mmc
+and spi drivers.
+
+With this series both BeagleBone and the AM335x EVM have working
+SPI DMA support (and MMC support with the separate MMC series).
+
+This is tested on BeagleBone with a SPI framebuffer driver and MMC
+rootfs. A trivial gpio DMA event misc driver was used to test the
+crossbar DMA event support. It is also tested on the AM335x EVM
+with the onboard SPI flash and MMC rootfs. The branch at
+https://github.com/ohporter/linux/tree/edma-dmaengine-am33xx-v7
+has the complete series, dependencies, and some test
+drivers/defconfigs. Note that MMC can only be tested with a
+separate MMC dmaengine/DT series applied.
+
+Regression testing was done on AM180x-EVM (which also makes use
+of the EDMA dmaengine driver and the EDMA private API) using SD,
+SPI flash, and the onboard audio supported by the ASoC Davinci
+driver. Regression testing was also done on a BeagleBoard xM
+booting from the legacy board file using MMC rootfs.
+
+Matt Porter (9):
+  ARM: davinci: move private EDMA API to arm/common
+  ARM: edma: remove unused transfer controller handlers
+  ARM: edma: add AM33XX support to the private EDMA API
+  dmaengine: edma: enable build for AM33XX
+  dmaengine: edma: Add TI EDMA device tree binding
+  ARM: dts: add AM33XX EDMA support
+  spi: omap2-mcspi: convert to dma_request_slave_channel_compat()
+  spi: omap2-mcspi: add generic DMA request support to the DT binding
+  ARM: dts: add AM33XX SPI DMA support
+
+ Documentation/devicetree/bindings/dma/ti-edma.txt  |   49 +++
+ Documentation/devicetree/bindings/spi/omap-spi.txt |   27 +-
+ arch/arm/Kconfig                                   |    1 +
+ arch/arm/boot/dts/am33xx.dtsi                      |   30 ++
+ arch/arm/common/Kconfig                            |    3 +
+ arch/arm/common/Makefile                           |    1 +
+ arch/arm/{mach-davinci/dma.c => common/edma.c}     |  339 +++++++++++++++++---
+ arch/arm/mach-davinci/Makefile                     |    2 +-
+ arch/arm/mach-davinci/board-tnetv107x-evm.c        |    2 +-
+ arch/arm/mach-davinci/davinci.h                    |    2 +-
+ arch/arm/mach-davinci/devices-tnetv107x.c          |    2 +-
+ arch/arm/mach-davinci/devices.c                    |    6 +-
+ arch/arm/mach-davinci/dm355.c                      |    2 +-
+ arch/arm/mach-davinci/dm365.c                      |    2 +-
+ arch/arm/mach-davinci/dm644x.c                     |    2 +-
+ arch/arm/mach-davinci/dm646x.c                     |    2 +-
+ arch/arm/mach-davinci/include/mach/da8xx.h         |    2 +-
+ arch/arm/mach-omap2/Kconfig                        |    1 +
+ drivers/dma/Kconfig                                |    2 +-
+ drivers/dma/edma.c                                 |    2 +-
+ drivers/mmc/host/davinci_mmc.c                     |    1 +
+ drivers/spi/spi-omap2-mcspi.c                      |   27 +-
+ include/linux/mfd/davinci_voicecodec.h             |    3 +-
+ .../mach => include/linux/platform_data}/edma.h    |   90 +-----
+ include/linux/platform_data/spi-davinci.h          |    2 +-
+ sound/soc/davinci/davinci-evm.c                    |    1 +
+ sound/soc/davinci/davinci-pcm.c                    |    1 +
+ sound/soc/davinci/davinci-pcm.h                    |    2 +-
+ sound/soc/davinci/davinci-sffsdr.c                 |    5 +-
+ 29 files changed, 451 insertions(+), 160 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/dma/ti-edma.txt
+ rename arch/arm/{mach-davinci/dma.c => common/edma.c} (86%)
+ rename {arch/arm/mach-davinci/include/mach => include/linux/platform_data}/edma.h (59%)
+
+-- 
+1.7.9.5
