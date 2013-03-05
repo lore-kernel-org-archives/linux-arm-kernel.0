@@ -1,32 +1,29 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 5 Mar 2013 22:27:33 +0000
-Subject: [PATCH 5/9] ARM: omap1: add back missing includes
-In-Reply-To: <1362521809-22989-6-git-send-email-arnd@arndb.de>
-References: <1362521809-22989-1-git-send-email-arnd@arndb.de>
- <1362521809-22989-6-git-send-email-arnd@arndb.de>
-Message-ID: <201303052227.33430.arnd@arndb.de>
+Date: Tue, 5 Mar 2013 22:28:24 +0000
+Subject: [GIT PULL] omap fixes for v3.9-rc1
+In-Reply-To: <20130305172313.GB11806@atomide.com>
+References: <20130305172313.GB11806@atomide.com>
+Message-ID: <201303052228.24821.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 05 March 2013, Arnd Bergmann wrote:
-> The recent reorganization of OMAP header files caused a couple of
-> files that used to be implicitly included now missing from OMAP1.
-> This adds explicit inclusions of mach/irqs.h and mach/hardware.h
-> in all files that need them for an OMAP1 allyesconfig build.
+On Tuesday 05 March 2013, Tony Lindgren wrote:
+> The following changes since commit 6dbe51c251a327e012439c4772097a13df43c5b8:
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: linux-omap at vger.kernel.org
-> ---
->  arch/arm/mach-omap1/board-fsample.c  | 1 +
->  arch/arm/mach-omap1/board-h2.c       | 1 +
->  arch/arm/mach-omap1/board-perseus2.c | 1 +
->  arch/arm/mach-omap1/board-sx1.c      | 1 +
->  drivers/video/omap/lcd_ams_delta.c   | 1 +
->  drivers/video/omap/lcd_osk.c         | 1 +
->  6 files changed, 6 insertions(+)
+>   Linux 3.9-rc1 (2013-03-03 15:11:05 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.9-rc1/fixes-signed
+> 
+> for you to fetch changes up to b0ad0995e92fdf6b25056da76c906c51bb06d6a5:
+> 
+>   ARM: OMAP: RX-51: add missing USB phy binding (2013-03-05 08:24:56 -0800)
+> 
+> ----------------------------------------------------------------
+> Fix few regressions, omap3 pm init with device tree, and some
+> issues with the legacy mux code.
 
-I saw that Tony has already addressed the latter two changes, but
-did not see a fix for the four board files.
+Pulled into fixes branch, thanks!
 
 	Arnd
