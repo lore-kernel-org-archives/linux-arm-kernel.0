@@ -1,59 +1,49 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Tue, 5 Mar 2013 09:40:47 +0200
-Subject: Multi-platform, and secure-only ARM errata workarounds
-In-Reply-To: <5134D50B.8060001@wwwdotorg.org>
-References: <512BF81A.3080700@wwwdotorg.org> <201302261023.26939.arnd@arndb.de>
- <20130226113538.GS17833@n2100.arm.linux.org.uk>
- <512CF87A.4090404@wwwdotorg.org>
- <20130226181114.GU17833@n2100.arm.linux.org.uk>
- <5130E757.6090500@wwwdotorg.org>
- <20130304063436.GB27241@tbergstrom-lnx.Nvidia.com>
- <20130304091600.GC27241@tbergstrom-lnx.Nvidia.com>
- <5134D50B.8060001@wwwdotorg.org>
-Message-ID: <20130305074047.GH27241@tbergstrom-lnx.Nvidia.com>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Tue, 5 Mar 2013 08:48:19 +0100
+Subject: [PATCH v3 1/2] i.MX27: Add clock support for SAHARA2.
+In-Reply-To: <20130304075306.GA1906@pengutronix.de>
+References: <1362137873-8827-1-git-send-email-javier.martin@vista-silicon.com>
+ <1362137873-8827-2-git-send-email-javier.martin@vista-silicon.com>
+ <20130304075306.GA1906@pengutronix.de>
+Message-ID: <CACKLOr2kuWXMreEFA4wqyYVRNnPwmEoHPM2+V+tN5P_1bQ+iJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 04, 2013 at 06:08:27PM +0100, Stephen Warren wrote:
-> On 03/04/2013 02:16 AM, Peter De Schrijver wrote:
-> > On Mon, Mar 04, 2013 at 07:34:36AM +0100, Peter De Schrijver wrote:
-> >> On Fri, Mar 01, 2013 at 06:37:27PM +0100, Stephen Warren wrote:
-> >>
+Hi Sascha,
 
-...
+On 4 March 2013 08:53, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> On Fri, Mar 01, 2013 at 12:37:52PM +0100, Javier Martin wrote:
+>>
+>> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
+>> ---
+>>  arch/arm/mach-imx/clk-imx27.c |    2 ++
+>>  1 file changed, 2 insertions(+)
+>>
+>> diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
+>> index 4c1d1e4..0b9664a 100644
+>> --- a/arch/arm/mach-imx/clk-imx27.c
+>> +++ b/arch/arm/mach-imx/clk-imx27.c
+>> @@ -253,6 +253,8 @@ int __init mx27_clocks_init(unsigned long fref)
+>>       clk_register_clkdev(clk[nfc_baud_gate], NULL, "imx27-nand.0");
+>>       clk_register_clkdev(clk[vpu_baud_gate], "per", "coda-imx27.0");
+>>       clk_register_clkdev(clk[vpu_ahb_gate], "ahb", "coda-imx27.0");
+>> +     clk_register_clkdev(clk[sahara_ahb_gate], "ahb", "sahara-imx27.0");
+>> +     clk_register_clkdev(clk[sahara_ipg_gate], "ipg", "sahara-imx27.0");
+>
+> One of the first patches I want to push upstream for the next merge
+> window is this one:
+>
+> https://patchwork.kernel.org/patch/1817741/
+>
+> So the change above becomes unnecessary
 
-> > 1) Handle CPU0 errata WARs in the bootloader
-> 
-> OK - there's not much choice here, and I've posted a patch for this for
-> Tegra U-Boot already.
-> 
-> > 2) Indicate in device tree if linux is booting in secude mode or non-secure
-> >    mode.
-> > 3) Use this information in the kernel to decide how to apply the WARs for
-> >    secondary core bringup and after powerungating.
-> 
-> Hmmm. That seems like a lot of overhead to avoid duplicating roughly 8
-> assembly instructions per Tegra version. Also, some/all of the WARs in
+Very good. Then this patch can be safely dropped.
 
-Unfortunately we can't write to the diag register if we are in non-secure
-mode. So unless we never want to support running in non-secure mode, we will
-need to make the distinction somehow and use a different method for non-secure
-mode. Or assume the secure OS has applied the WARs. I'm afraid existing secure
-OS implementations for Tegra don't work that way though. They just offer an
-SMC which allows the kernel to read and write the diag register.
-
-> question probably need to be applied very early by assembly code, e.g.
-> before MMU is re-enabled, so I think you'd end up parsing DT from
-> assembly again, which would be painful. I tend to think just including
-> the code in the kernel's SoC-specific reset handler is simplest, and
-> even with the slight duplication, probably most maintainable. I've
-> written a patch for this for Tegra already, which I hope to post later
-> today, depending on testing and what other stuff I get side-tracked on.
-
-No. We could just set a flag in __tegra_cpu_reset_handler_data based on the
-info in DT or use a different reset handler. DT is parsed before bringing up
-secondary CPUs, so this approach should work I think.
-
-Cheers,
-
-Peter.
+-- 
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
