@@ -1,114 +1,133 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  5 Mar 2013 03:47:43 +0000
-Subject: [PATCH 27/29] arm64: KVM: 32bit specific register world switch
+Date: Tue,  5 Mar 2013 03:47:44 +0000
+Subject: [PATCH 28/29] arm64: KVM: 32bit guest fault injection
 In-Reply-To: <1362455265-24165-1-git-send-email-marc.zyngier@arm.com>
 References: <1362455265-24165-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1362455265-24165-28-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1362455265-24165-29-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow registers specific to 32bit guests to be saved/restored
-during the world switch.
+Add fault injection capability for 32bit guests.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/hyp.S | 70 ++++++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 70 insertions(+)
+ arch/arm64/kvm/inject_fault.c | 79 ++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 78 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-index cd7506d..1d4b0a7 100644
---- a/arch/arm64/kvm/hyp.S
-+++ b/arch/arm64/kvm/hyp.S
-@@ -312,6 +312,74 @@ __kvm_hyp_code_start:
- 	load_sysregs
- .endm
+diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
+index 80b245f..85a4548 100644
+--- a/arch/arm64/kvm/inject_fault.c
++++ b/arch/arm64/kvm/inject_fault.c
+@@ -1,5 +1,5 @@
+ /*
+- * Fault injection for 64bit guests.
++ * Fault injection for both 32 and 64bit guests.
+  *
+  * Copyright (C) 2012 - ARM Ltd
+  * Author: Marc Zyngier <marc.zyngier@arm.com>
+@@ -24,6 +24,74 @@
+ #include <linux/kvm_host.h>
+ #include <asm/kvm_emulate.h>
  
-+.macro skip_32bit_state tmp, target
-+	// Skip 32bit state if not needed
-+	mrs	\tmp, hcr_el2
-+	tbnz	\tmp, #HCR_RW_SHIFT, \target
-+.endm
++static void prepare_fault32(struct kvm_vcpu *vcpu, u32 mode, u32 vect_offset)
++{
++	unsigned long cpsr;
++	unsigned long new_spsr_value = *vcpu_cpsr(vcpu);
++	bool is_thumb = (new_spsr_value & COMPAT_PSR_T_BIT);
++	u32 return_offset = (is_thumb) ? 4 : 0;
++	u32 sctlr = vcpu->arch.cp15[c1_SCTLR];
 +
-+.macro skip_tee_state tmp, target
-+	// Skip ThumbEE state if not needed
-+	mrs	\tmp, id_pfr0_el1
-+	tbz	\tmp, #12, \target
-+.endm
++	cpsr = mode | COMPAT_PSR_I_BIT;
 +
-+.macro save_guest_32bit_state
-+	skip_32bit_state x2, 1f
++	if (sctlr & (1 << 30))
++		cpsr |= COMPAT_PSR_T_BIT;
++	if (sctlr & (1 << 25))
++		cpsr |= COMPAT_PSR_E_BIT;
 +
-+	add	x2, x0, #SPSR_OFFSET(KVM_SPSR_ABT)
-+	mrs	x4, spsr_abt
-+	mrs	x5, spsr_und
-+	mrs	x6, spsr_irq
-+	mrs	x7, spsr_fiq
-+	stp	x4, x5, [x2], #16
-+	stp	x6, x7, [x2]
++	*vcpu_cpsr(vcpu) = cpsr;
 +
-+	add	x2, x0, #SYSREG_OFFSET(DACR32_EL2)
-+	mrs	x4, dacr32_el2
-+	mrs	x5, ifsr32_el2
-+	mrs	x6, fpexc32_el2
-+	mrs	x7, dbgvcr32_el2
-+	stp	x4, x5, [x2], #16
-+	stp	x6, x7, [x2]
++	/* Note: These now point to the banked copies */
++	*vcpu_spsr(vcpu) = new_spsr_value;
++	*vcpu_reg(vcpu, 14) = *vcpu_pc(vcpu) + return_offset;
 +
-+	skip_tee_state x8, 1f
++	/* Branch to exception vector */
++	if (sctlr & (1 << 13))
++		vect_offset += 0xffff0000;
++	else /* always have security exceptions */
++		vect_offset += vcpu->arch.cp15[c12_VBAR];
 +
-+	add	x2, x0, #SYSREG_OFFSET(TEECR32_EL1)
-+	mrs	x4, teecr32_el1
-+	mrs	x5, teehbr32_el1
-+	stp	x4, x5, [x2]
-+1:
-+.endm
++	*vcpu_pc(vcpu) = vect_offset;
++}
 +
-+.macro restore_guest_32bit_state
-+	skip_32bit_state x2, 1f
++static void inject_undef32(struct kvm_vcpu *vcpu)
++{
++	prepare_fault32(vcpu, COMPAT_PSR_MODE_UND, 4);
++}
 +
-+	add	x2, x0, #SPSR_OFFSET(KVM_SPSR_ABT)
-+	ldp	x4, x5, [x2], #16
-+	ldp	x6, x7, [x2]
-+	msr	spsr_abt, x4
-+	msr	spsr_und, x5
-+	msr	spsr_irq, x6
-+	msr	spsr_fiq, x7
++/*
++ * Modelled after TakeDataAbortException() and TakePrefetchAbortException
++ * pseudocode.
++ */
++static void inject_abt32(struct kvm_vcpu *vcpu, bool is_pabt,
++			 unsigned long addr)
++{
++	u32 vect_offset;
++	u32 *far, *fsr;
++	bool is_lpae;
 +
-+	add	x2, x0, #SYSREG_OFFSET(DACR32_EL2)
-+	ldp	x4, x5, [x2], #16
-+	ldp	x6, x7, [x2]
-+	msr	dacr32_el2, x4
-+	msr	ifsr32_el2, x5
-+	msr	fpexc32_el2, x6
-+	msr	dbgvcr32_el2, x7
++	if (is_pabt) {
++		vect_offset = 12;
++		far = &vcpu->arch.cp15[c6_IFAR];
++		fsr = &vcpu->arch.cp15[c5_IFSR];
++	} else { /* !iabt */
++		vect_offset = 16;
++		far = &vcpu->arch.cp15[c6_DFAR];
++		fsr = &vcpu->arch.cp15[c5_DFSR];
++	}
 +
-+	skip_tee_state x8, 1f
++	prepare_fault32(vcpu, COMPAT_PSR_MODE_ABT | COMPAT_PSR_A_BIT, vect_offset);
 +
-+	add	x2, x0, #SYSREG_OFFSET(TEECR32_EL1)
-+	ldp	x4, x5, [x2]
-+	msr	teecr32_el1, x4
-+	msr	teehbr32_el1, x5
-+1:
-+.endm
++	*far = addr;
 +
- .macro activate_traps
- 	ldr	x2, [x0, #VCPU_IRQ_LINES]
- 	ldr	x1, [x0, #VCPU_HCR_EL2]
-@@ -513,6 +581,7 @@ ENTRY(__kvm_vcpu_run)
- 	restore_timer_state
- 	restore_guest_sysregs
- 	restore_guest_fpsimd
-+	restore_guest_32bit_state
- 	restore_guest_regs
++	/* Always give debug fault for now - should give guest a clue */
++	is_lpae = (vcpu->arch.cp15[c2_TTBCR] >> 31);
++	if (is_lpae)
++		*fsr = 1 << 9 | 0x22;
++	else
++		*fsr = 2;
++}
++
+ static void inject_abt64(struct kvm_vcpu *vcpu, bool is_iabt, unsigned long addr)
+ {
+ 	unsigned long cpsr = *vcpu_cpsr(vcpu);
+@@ -89,6 +157,9 @@ static void inject_undef64(struct kvm_vcpu *vcpu)
+  */
+ void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr)
+ {
++	if (!(vcpu->arch.hcr_el2 & HCR_RW))
++		inject_abt32(vcpu, false, addr);
++
+ 	inject_abt64(vcpu, false, addr);
+ }
  
- 	// That's it, no more messing around.
-@@ -523,6 +592,7 @@ __kvm_vcpu_return:
- 	// Assume x0 is the vcpu pointer, x1 the return code
- 	// Guest's x0-x3 are on the stack
- 	save_guest_regs
-+	save_guest_32bit_state
- 	save_guest_fpsimd
- 	save_guest_sysregs
- 	save_timer_state
+@@ -102,6 +173,9 @@ void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr)
+  */
+ void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr)
+ {
++	if (!(vcpu->arch.hcr_el2 & HCR_RW))
++		inject_abt32(vcpu, true, addr);
++
+ 	inject_abt64(vcpu, true, addr);
+ }
+ 
+@@ -113,5 +187,8 @@ void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr)
+  */
+ void kvm_inject_undefined(struct kvm_vcpu *vcpu)
+ {
++	if (!(vcpu->arch.hcr_el2 & HCR_RW))
++		inject_undef32(vcpu);
++
+ 	inject_undef64(vcpu);
+ }
 -- 
 1.7.12.4
