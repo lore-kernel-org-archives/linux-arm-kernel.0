@@ -1,63 +1,53 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 6 Mar 2013 00:22:24 +0200
-Subject: [PATCH 4/9] usb: gadget: fix omap_udc build errors
-In-Reply-To: <1362521809-22989-5-git-send-email-arnd@arndb.de>
-References: <1362521809-22989-1-git-send-email-arnd@arndb.de>
- <1362521809-22989-5-git-send-email-arnd@arndb.de>
-Message-ID: <20130305222224.GA26278@arwen.pp.htv.fi>
+From: heiko@sntech.de (Heiko =?iso-8859-15?q?St=FCbner?=)
+Date: Tue, 5 Mar 2013 23:25:12 +0100
+Subject: [PATCH 00/23] RFC: exynos multiplatform support
+In-Reply-To: <201303052154.22857.arnd@arndb.de>
+References: <1362505353-8873-1-git-send-email-arnd@arndb.de>
+ <201303052124.04101.arnd@arndb.de> <201303052154.22857.arnd@arndb.de>
+Message-ID: <201303052325.13143.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Am Dienstag, 5. M?rz 2013, 22:54:22 schrieb Arnd Bergmann:
+> On Tuesday 05 March 2013, Arnd Bergmann wrote:
+> > The s3c64xx_dma code is also interesting because
+> > it has both an implementation of the s3c_dma interface in
+> > arch/arm/mach-s3c64xx/dma.c and one using the generic interface in
+> > drivers/dma/amba-pl08x.c.
+> 
+> This actually brings me to an interesting idea: the s3c64xx SPI driver
+> is used with the regular dmaengine API and pl330 on S5P and Exynos,
+> but with the s3c-dma interface and pl080 on S3C64xx.
+>
+> If we just convert S3C64xx to use the pl080 dmaengine driver
+> instead, we can apply my SPI patch without breaking anything.
 
-On Tue, Mar 05, 2013 at 11:16:44PM +0100, Arnd Bergmann wrote:
-> 1bf0cf6040 "usb: gadget: omap_udc: convert to udc_start/udc_stop"
-> made some trivial changes but was missing a ';' character.
-> 
-> 8c4cc00552 "ARM: OMAP1: DMA: Moving OMAP1 DMA channel definitions
-> to mach-omap1" added a definition for OMAP_DMA_USB_W2FC_TX0 to
-> the driver while making the header file it was defined in
-> unavailable for drivers, but this driver actually needs
-> OMAP_DMA_USB_W2FC_RX0 as well.
-> 
-> Both changes appear trivial, so let's add the missing semicolon
-> and the macro definition.
-> 
-> Cc: Felipe Balbi <balbi@ti.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  drivers/usb/gadget/omap_udc.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/usb/gadget/omap_udc.c b/drivers/usb/gadget/omap_udc.c
-> index 06be85c..f844565 100644
-> --- a/drivers/usb/gadget/omap_udc.c
-> +++ b/drivers/usb/gadget/omap_udc.c
-> @@ -62,6 +62,7 @@
->  #define	DRIVER_VERSION	"4 October 2004"
->  
->  #define OMAP_DMA_USB_W2FC_TX0		29
-> +#define OMAP_DMA_USB_W2FC_RX0		26
->  
->  /*
->   * The OMAP UDC needs _very_ early endpoint setup:  before enabling the
-> @@ -1310,7 +1311,7 @@ static int omap_pullup(struct usb_gadget *gadget, int is_on)
->  }
->  
->  static int omap_udc_start(struct usb_gadget *g,
-> -		struct usb_gadget_driver *driver)
-> +		struct usb_gadget_driver *driver);
+The S3C24XX starting from S3C2443 (including S3C2416 and S3C2450) also use the
+s3c64xx-spi driver.
 
-good catch, thanks. I'll queue it for v3.6-rc3. Make sure to Cc
-linux-usb for anything under drivers/usb/ though
+My argument has of course the problem of me seemingly being the only user of
+it currently and it being stuff not in mainline yet [0] :-) .
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130306/773d75f5/attachment.sig>
+But on the other hand, it's no use anyway staying attached to old cruft, so
+it also wouldn't be a problem to go your way. I'll just try to come up with
+a dmaengine driver for s3c24xx after common-clk and pinctrl ;-) .
+
+
+[0] https://github.com/mmind/linux-es600/blob/topic/es600-devel/arch/arm/mach-
+s3c24xx/mach-as090.c#L138
+
+
+> We still need a solution for the ASoC drivers, but they are
+> not as essential. We could probably move the wrapper files
+> from plat-samsung/*dma*.c to sounds/soc/samsung when that becomes
+> the only remaining user.
+
+In ASoC there is also a clear distinction between the different SoC
+generations. SND_SAMSUNG_I2S /_PCM /_AC97 ... is only used by newer SoCs
+while SND_S3C24XX_I2S and SND_S3C_I2SV2_SOC is used by the legacy SoCs.
+
+Of course "my subarch" is bitten again, as it's using the new sound
+interface, but the same as above applies.
+
+
+Heiko
