@@ -1,55 +1,31 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Tue, 5 Mar 2013 09:02:52 +0100
-Subject: [PATCH 6/9] rtc: stmp3xxx: add sysfs entries for persistent regs
-In-Reply-To: <CACxGe6swW-UDH1cUw1D8P+gyhDC8nDZur-A_m_NBfeRUxcg9Jw@mail.gmail.com>
-References: <1362405948-12992-1-git-send-email-s.trumtrar@pengutronix.de>
- <1362405948-12992-7-git-send-email-s.trumtrar@pengutronix.de>
- <CACxGe6swW-UDH1cUw1D8P+gyhDC8nDZur-A_m_NBfeRUxcg9Jw@mail.gmail.com>
-Message-ID: <20130305080252.GA7042@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 5 Mar 2013 08:08:45 +0000
+Subject: [PATCH LINUX v5] xen: event channel arrays are xen_ulong_t and
+ not unsigned long
+In-Reply-To: <513596F2.1000701@gmail.com>
+References: <1361285327.1051.115.camel@zakaz.uk.xensource.com>
+ <1361360886-2956-1-git-send-email-ian.campbell@citrix.com>
+ <51340ACD.70904@gmail.com>
+ <20130305030436.GA18040@mudshark.cambridge.arm.com>
+ <513596F2.1000701@gmail.com>
+Message-ID: <20130305080845.GA19097@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grant!
-
-On Mon, Mar 04, 2013 at 11:14:54PM +0800, Grant Likely wrote:
-> On Mon, Mar 4, 2013 at 10:05 PM, Steffen Trumtrar
-> <s.trumtrar@pengutronix.de> wrote:
-> > The persistent registers 1-5 are completely software defined. To have access
-> > from userspace, export them via sysfs.
+On Tue, Mar 05, 2013 at 06:55:46AM +0000, Rob Herring wrote:
+> > I also can't immediately see why GCC would allocate oldval to an odd base
+> > register. Can you share your .config please?
 > >
-> > Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
 > 
-> Hi Steffen,
-> 
-> A few comments on this. First and foremost, any additions to the
-> kernel sysfs interface must be accompanied with documentation in
-> Documentation/ABI/. Second, adding attributes to an existing device
+> Here's a config:
 
-Okay. I forgot that and will add it in the next version.
+[...]
 
-> that has already been registered is almost guaranteed to be wrong. The
-> attributes need to be added all at the same time so they are available
-> immediately when the new device uevent is issued by the kernel.
-> 
-> Instead, the correct thing to do is add an attribute_group to the
-> child device before the device gets registered. See the 'attributes'
-> section of Documentation/driver-model/device.txt to see how to do
-> this.
-> 
-> (I also see that the rtc core code is doing the wrong thing here also.
-> rtc_sysfs_add_device(), rtc_sysfs_add_device() should also be replaced
-> with an attribute group so that the sysfs files get added
-> automatically; but that is outside the scope of this patch)
-> 
+Cheers Rob, that was enough to reproduce for me. The problem is likely that
+CONFIG_AEABI=n, so the ABI doesn't actually mandate even base registers for
+64-bit values in registers.
 
-Hm, I modeled it after other rtcs and the rtc_sysfs. Seems that I have to
-rework this.
+Ian -- this would be fixed if you used our atomic64 routines instead of
+inventing your own :)
 
-Thanks,
-Steffen
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Will
