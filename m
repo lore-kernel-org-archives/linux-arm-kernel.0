@@ -1,29 +1,24 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 5 Mar 2013 22:28:24 +0000
-Subject: [GIT PULL] omap fixes for v3.9-rc1
-In-Reply-To: <20130305172313.GB11806@atomide.com>
-References: <20130305172313.GB11806@atomide.com>
-Message-ID: <201303052228.24821.arnd@arndb.de>
+Date: Tue, 5 Mar 2013 22:31:00 +0000
+Subject: [PATCH] ARM: SPEAr13xx: Fix typo "ARCH_HAVE_CPUFREQ"
+In-Reply-To: <CAOh2x=m5r-yz993==vo-ezJttqN8XyXNqUsOYmv43EULOF_Pbw@mail.gmail.com>
+References: <1362474819.16460.63.camel@x61.thuisdomein>
+ <CAOh2x=m5r-yz993==vo-ezJttqN8XyXNqUsOYmv43EULOF_Pbw@mail.gmail.com>
+Message-ID: <201303052231.01143.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 05 March 2013, Tony Lindgren wrote:
-> The following changes since commit 6dbe51c251a327e012439c4772097a13df43c5b8:
+On Tuesday 05 March 2013, Viresh Kumar wrote:
+> On Tue, Mar 5, 2013 at 5:13 PM, Paul Bolle <pebolle@tiscali.nl> wrote:
+> > Do what commit f12a500e4adcc0961803e54b5ed1e74275d399f1
+> > ("ARM: SPEAr13xx: Enable CONFIG_ARCH_HAS_CPUFREQ") wanted to do.
+> >
+> > Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
 > 
->   Linux 3.9-rc1 (2013-03-03 15:11:05 -0800)
+> Ahh such stupid mistake.
 > 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.9-rc1/fixes-signed
-> 
-> for you to fetch changes up to b0ad0995e92fdf6b25056da76c906c51bb06d6a5:
-> 
->   ARM: OMAP: RX-51: add missing USB phy binding (2013-03-05 08:24:56 -0800)
-> 
-> ----------------------------------------------------------------
-> Fix few regressions, omap3 pm init with device tree, and some
-> issues with the legacy mux code.
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-Pulled into fixes branch, thanks!
+Applied in fixes branch, thanks!
 
 	Arnd
