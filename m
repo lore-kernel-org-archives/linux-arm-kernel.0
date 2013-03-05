@@ -1,43 +1,85 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 05 Mar 2013 10:45:11 -0800
-Subject: [PATCH 8/8] ARM: smp: Remove local timer API
-In-Reply-To: <20130305110239.GC15661@e106331-lin.cambridge.arm.com>
-References: <1361518039-16663-1-git-send-email-sboyd@codeaurora.org>
- <1361518039-16663-9-git-send-email-sboyd@codeaurora.org>
- <20130222111545.GA15020@e106331-lin.cambridge.arm.com>
- <20130222162458.GA19670@linux-sh.org>
- <20130225134041.GA22785@e106331-lin.cambridge.arm.com>
- <5135333E.6030305@codeaurora.org>
- <20130305110239.GC15661@e106331-lin.cambridge.arm.com>
-Message-ID: <51363D37.1090107@codeaurora.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 05 Mar 2013 11:45:37 -0700
+Subject: [PATCH 04/10] ARM: tegra: pm: add platform suspend support
+In-Reply-To: <1362397218-5675-1-git-send-email-josephl@nvidia.com>
+References: <1362397218-5675-1-git-send-email-josephl@nvidia.com>
+Message-ID: <51363D51.6000908@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/05/13 03:02, Mark Rutland wrote:
->
->>> +
->>> +static void dummy_set_mode(enum clock_event_mode mode,
->>> +			   struct clock_event_device *evt)
->>> +{
->>> +	/*
->>> +	 * Core clockevents code will call this when exchanging timer devices.
->>> +	 * We don't need to do anything here.
->>> +	 */
->>> +}
->>> +
->>> +static void __cpuinit dummy_setup(void)
->>> +{
->>> +	int cpu = smp_processor_id();
->>> +	struct clock_event_device *evt = &per_cpu(dummy_evt, cpu);
->> Can we use __this_cpu_ptr()? I wonder if that makes the code generation
->> better or worse. I didn't do it in my 8/8 patch because I wanted the
->> code to be the same before and after to show code movement.
-> I did that originally, but thought as I needed the cpu value for the mask
-> anyway that there wasn't much point. I'm not that good at reading generated
-> assembly, so I can't really say if either's better.
+On 03/04/2013 04:40 AM, Joseph Lo wrote:
+> Adding suspend to ram support for Tegra platform. There are three suspend
 
-It looks to be two instructions shorter.
+nit: s/ram/RAM/
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+> mode for Tegra. The difference were below.
+
+Does this patch work for all 3 upstream Tegras, or just Tegra20 (or 20+30?).
+
+> diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
+
+> +	tegra_init_suspend();
+
+That call isn't ifdef'd on anything ...
+
+> diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c
+
+> +static void tegra_suspend_enter_lp2(void)
+> +{
+> +	tegra_set_cpu_in_lp2(0);
+> +}
+> +
+> +static void tegra_suspend_exit_lp2(void)
+> +{
+> +	tegra_clear_cpu_in_lp2(0);
+> +}
+
+Are those two functions going to get larger? If not, why not just call
+tegra_{set,clear}_cpu_in_lp2() from tegra_suspend_enter()?
+
+Note: I realized that the LP0/LP1 functions might be larger, and feel
+free to make them separate functions when they're implemented, but if
+those two functions specifically are always going to be a single line,
+then there's little point in separating them out, is there?
+
+> +void __init tegra_init_suspend(void)
+...
+>  #endif
+
+... but this function is only implemented inside an ifdef ...
+
+> diff --git a/arch/arm/mach-tegra/pm.h b/arch/arm/mach-tegra/pm.h
+
+> +void tegra_init_suspend(void);
+
+... and no dummy inline is provided if the ifdef isn't defined.
+
+So, turning off whatever that ifdef is would cause a build error.
+
+> diff --git a/arch/arm/mach-tegra/pmc.c b/arch/arm/mach-tegra/pmc.c
+
+> +unsigned long tegra_pmc_get_cpu_timer(void)
+...
+> +unsigned long tegra_pmc_get_cpu_off_timer(void)
+
+I think you want to make those return u32, since the values they return
+should be u32 to match DT cell type.
+
+> +void tegra_pmc_pm_set(enum tegra_suspend_mode mode)
+> +{
+> +	u32 reg;
+> +
+> +	reg = tegra_pmc_readl(PMC_CTRL);
+> +	reg |= TEGRA_POWER_CPU_PWRREQ_OE;
+> +	reg &= ~TEGRA_POWER_EFFECT_LP0;
+> +
+> +	tegra_pmc_writel(reg, PMC_CTRL);
+> +}
+
+The "mode" parameter doesn't seem to be used here.
+
+One overall comment: tegra_suspend_enter() only supports LP2 so far, but
+I don't see a check anywhere (e.g. tegra_init_suspend() or
+tegra_pmc_parse_dt()) which prevents suspend from being initialized if
+the user requested some other type, or on SoCs where even LP2 isn't
+supported yet (e.g. Tegra114).
