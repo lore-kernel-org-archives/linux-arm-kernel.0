@@ -1,66 +1,57 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue,  5 Mar 2013 23:16:40 +0100
-Subject: [PATCH 0/9] fixes for ARM build regressions in 3.9-rc1
-Message-ID: <1362521809-22989-1-git-send-email-arnd@arndb.de>
+Date: Tue,  5 Mar 2013 23:16:42 +0100
+Subject: [PATCH 2/9] Revert parts of "hlist: drop the node parameter from
+ iterators"
+In-Reply-To: <1362521809-22989-1-git-send-email-arnd@arndb.de>
+References: <1362521809-22989-1-git-send-email-arnd@arndb.de>
+Message-ID: <1362521809-22989-3-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the result of my my build tests on 3.9-rc1, mostly bugs
-that I had not caught before the merge window, or where the fix
-for some reason has not yet made it in.
+commit b67bfe0d42 "hlist: drop the node parameter from iterators"
+did a lot of nice changes but also contains two small hunks that
+seem to have slipped in accidentally and have no apparent
+connection to the intent of the patch.
 
-I hope the subsystem maintainers can take care of applying these,
-for the arch/arm/mach-* patches I can either apply them directly
-to the arm-soc tree with an Ack or do a round-trip through
-the platform maintainer tree. I think Tony already has some of
-the OMAP1 fixes, so we should try not to duplicate them.
+This reverts the two extraneous changes.
 
-	Arnd
-
-Arnd Bergmann (9):
-  clk: vt8500: Fix "fix device clock divisor calculations"
-  Revert parts of "hlist: drop the node parameter from iterators"
-  mfd: remove __exit_p annotation for twl4030_madc_remove
-  usb: gadget: fix omap_udc build errors
-  ARM: omap1: add back missing includes
-  [media] ir-rx51: fix clock API related build issues
-  [media] s5p-fimc: fix s5pv210 build
-  iommu: OMAP: build only on OMAP2+
-  ARM: spear3xx: Use correct pl080 header file
-
- arch/arm/mach-omap1/board-fsample.c  |  1 +
- arch/arm/mach-omap1/board-h2.c       |  1 +
- arch/arm/mach-omap1/board-perseus2.c |  1 +
- arch/arm/mach-omap1/board-sx1.c      |  1 +
- arch/arm/mach-s5pv210/mach-goni.c    |  2 +-
- arch/arm/mach-spear3xx/spear3xx.c    |  2 +-
- arch/arm/plat-omap/dmtimer.c         | 16 ++++++++--------
- drivers/clk/clk-vt8500.c             |  2 +-
- drivers/iommu/Kconfig                |  2 +-
- drivers/media/rc/ir-rx51.c           |  4 ++--
- drivers/mfd/twl4030-madc.c           |  2 +-
- drivers/usb/gadget/omap_udc.c        |  3 ++-
- drivers/video/omap/lcd_ams_delta.c   |  1 +
- drivers/video/omap/lcd_osk.c         |  1 +
- kernel/smpboot.c                     |  2 +-
- net/9p/trans_virtio.c                |  2 +-
- 16 files changed, 25 insertions(+), 18 deletions(-)
-
+Cc: Peter Senna Tschudin <peter.senna@gmail.com>
+Cc: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+Cc: Sasha Levin <sasha.levin@oracle.com>
 Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: Bill Pemberton <wfp5p@virginia.edu>
-Cc: Felipe Balbi <balbi@ti.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Joerg Roedel <joro@8bytes.org>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
-Cc: Mike Turquette <mturquette@linaro.org>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Tony Prisk <linux@prisktech.co.nz>
-Cc: Viresh Kumar <viresh.kumar@linaro.org>
-Cc: iommu at lists.linux-foundation.org
-Cc: linux-media at vger.kernel.org
-Cc: linux-omap at vger.kernel.org
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Rusty Russell <rusty@rustcorp.com.au>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ kernel/smpboot.c      | 2 +-
+ net/9p/trans_virtio.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-
+diff --git a/kernel/smpboot.c b/kernel/smpboot.c
+index b9bde57..d4abac2 100644
+--- a/kernel/smpboot.c
++++ b/kernel/smpboot.c
+@@ -131,7 +131,7 @@ static int smpboot_thread_fn(void *data)
+ 			continue;
+ 		}
+ 
+-		//BUG_ON(td->cpu != smp_processor_id());
++		BUG_ON(td->cpu != smp_processor_id());
+ 
+ 		/* Check for state change setup */
+ 		switch (td->status) {
+diff --git a/net/9p/trans_virtio.c b/net/9p/trans_virtio.c
+index 74dea37..de2e950 100644
+--- a/net/9p/trans_virtio.c
++++ b/net/9p/trans_virtio.c
+@@ -655,7 +655,7 @@ static struct p9_trans_module p9_virtio_trans = {
+ 	.create = p9_virtio_create,
+ 	.close = p9_virtio_close,
+ 	.request = p9_virtio_request,
+-	//.zc_request = p9_virtio_zc_request,
++	.zc_request = p9_virtio_zc_request,
+ 	.cancel = p9_virtio_cancel,
+ 	/*
+ 	 * We leave one entry for input and one entry for response
 -- 
 1.8.1.2
