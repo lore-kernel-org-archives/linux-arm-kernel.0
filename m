@@ -1,24 +1,59 @@
-From: ian.campbell@citrix.com (Ian Campbell)
-Date: Tue, 5 Mar 2013 07:03:51 +0000
-Subject: [PATCH LINUX v5] xen: event channel arrays are xen_ulong_t and
- not unsigned long
-In-Reply-To: <513596F2.1000701@gmail.com>
-References: <1361285327.1051.115.camel@zakaz.uk.xensource.com>
- <1361360886-2956-1-git-send-email-ian.campbell@citrix.com>
- <51340ACD.70904@gmail.com>
- <20130305030436.GA18040@mudshark.cambridge.arm.com>
- <513596F2.1000701@gmail.com>
-Message-ID: <1362467031.8941.51.camel@hastur.hellion.org.uk>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Tue, 5 Mar 2013 09:40:47 +0200
+Subject: Multi-platform, and secure-only ARM errata workarounds
+In-Reply-To: <5134D50B.8060001@wwwdotorg.org>
+References: <512BF81A.3080700@wwwdotorg.org> <201302261023.26939.arnd@arndb.de>
+ <20130226113538.GS17833@n2100.arm.linux.org.uk>
+ <512CF87A.4090404@wwwdotorg.org>
+ <20130226181114.GU17833@n2100.arm.linux.org.uk>
+ <5130E757.6090500@wwwdotorg.org>
+ <20130304063436.GB27241@tbergstrom-lnx.Nvidia.com>
+ <20130304091600.GC27241@tbergstrom-lnx.Nvidia.com>
+ <5134D50B.8060001@wwwdotorg.org>
+Message-ID: <20130305074047.GH27241@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-03-05 at 06:55 +0000, Rob Herring wrote:
-> Here's a config:
+On Mon, Mar 04, 2013 at 06:08:27PM +0100, Stephen Warren wrote:
+> On 03/04/2013 02:16 AM, Peter De Schrijver wrote:
+> > On Mon, Mar 04, 2013 at 07:34:36AM +0100, Peter De Schrijver wrote:
+> >> On Fri, Mar 01, 2013 at 06:37:27PM +0100, Stephen Warren wrote:
+> >>
 
-Was it truncated? oldconfig is asking a ton of questions, far more than
-I would expect for something like variance between our HEADs etc.
+...
 
-If I just answer the default to all the questions then I get a .config
-with Xen on etc, but I still don't see the issue.
+> > 1) Handle CPU0 errata WARs in the bootloader
+> 
+> OK - there's not much choice here, and I've posted a patch for this for
+> Tegra U-Boot already.
+> 
+> > 2) Indicate in device tree if linux is booting in secude mode or non-secure
+> >    mode.
+> > 3) Use this information in the kernel to decide how to apply the WARs for
+> >    secondary core bringup and after powerungating.
+> 
+> Hmmm. That seems like a lot of overhead to avoid duplicating roughly 8
+> assembly instructions per Tegra version. Also, some/all of the WARs in
 
-Ian.
+Unfortunately we can't write to the diag register if we are in non-secure
+mode. So unless we never want to support running in non-secure mode, we will
+need to make the distinction somehow and use a different method for non-secure
+mode. Or assume the secure OS has applied the WARs. I'm afraid existing secure
+OS implementations for Tegra don't work that way though. They just offer an
+SMC which allows the kernel to read and write the diag register.
+
+> question probably need to be applied very early by assembly code, e.g.
+> before MMU is re-enabled, so I think you'd end up parsing DT from
+> assembly again, which would be painful. I tend to think just including
+> the code in the kernel's SoC-specific reset handler is simplest, and
+> even with the slight duplication, probably most maintainable. I've
+> written a patch for this for Tegra already, which I hope to post later
+> today, depending on testing and what other stuff I get side-tracked on.
+
+No. We could just set a flag in __tegra_cpu_reset_handler_data based on the
+info in DT or use a different reset handler. DT is parsed before bringing up
+secondary CPUs, so this approach should work I think.
+
+Cheers,
+
+Peter.
