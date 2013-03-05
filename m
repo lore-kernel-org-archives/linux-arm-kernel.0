@@ -1,46 +1,307 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 5 Mar 2013 21:24:03 +0000
-Subject: [PATCH 00/23] RFC: exynos multiplatform support
-In-Reply-To: <201303052150.24947.heiko@sntech.de>
-References: <1362505353-8873-1-git-send-email-arnd@arndb.de>
- <201303052150.24947.heiko@sntech.de>
-Message-ID: <201303052124.04101.arnd@arndb.de>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Tue, 5 Mar 2013 15:34:36 -0600
+Subject: [PATCH 11/14] ARM: OMAP2+: Add device-tree support for NOR flash
+In-Reply-To: <51362BAB.10403@ti.com>
+References: <1361899842-30303-1-git-send-email-jon-hunter@ti.com>
+ <1361899842-30303-12-git-send-email-jon-hunter@ti.com>
+ <51360271.1030302@mimc.co.uk> <51360562.20309@ti.com>
+ <51361B46.507@mimc.co.uk> <51362BAB.10403@ti.com>
+Message-ID: <513664EC.2050508@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 05 March 2013, Heiko St?bner wrote:
-> If I remember correctly Kgene mentioning some time back, that someone was 
-> working on converting the s3c dma to dmaengine, but I never heard anything 
-> more about it.
 
-Ok, let's see if we can find out what happened to that.
+On 03/05/2013 11:30 AM, Jon Hunter wrote:
+> On 03/05/2013 10:20 AM, Mark Jackson wrote:
 
-> So personally I would be grateful, for people not breaking my devices :-) .
+[snip]
 
-I'm sure we can find a way. It's also clear that the current s3c_dma
-does not have a bright future.
+>> But I can see in physmap_of.c that the device gets registered without any call to
+>> devm_pinctrl_get_select_default() and hence no probe deferring takes place is the
+>> pinctrl device hasn't yet been started (which it hasn't).
+>>
+>> Does probe deferral need adding to physmap_of.c, or should the pinctrl device really
+>> be registered sooner ?
+> 
+> I see, so the pinctrl driver is not getting probed until later.
 
-> On an unrelated note, exists some sort of documentation for creating dmaengine 
-> drivers somewhere? Documentation/* seems to always be only targetted at device 
-> driver writers and my own DMA knowledge is still stuck at the theoretical 
-> level they teach in generic operating-systems university courses.
+Can you give this version of the patch a go? I have re-worked the patch
+so the NOR device will only be registered after the GPMC probe completes.
 
-I think we only have Documentation/dmaengine.txt, which is targetted at
-people using the dmaengine API, not at someone writing a driver.
+By the way, with this version you should remove "simple-bus" from your
+gpmc node compatible strings. I now call of_platform_device_create() to
+create the child device during the GPMC probe. I think that this is a
+safer approach.
 
-I have only limited experience myself, but I know that it comes down
-to filling the operations of a struct dma_device. A slight complication
-is that the dmaengine interface handles both memory-to-memory transfers
-and slave device transfers (the slave being the device that you are
-talking to), and you have to know which parts are relevant for your
-use case. You probably only need the slave interface, but it can seem
-like it's bolted to the side of the original API.
+Cheers
+Jon
 
-drivers/dma/mxs-dma.c looks like a reasonable driver that one can
-use as an example. The s3c64xx_dma code is also interesting because
-it has both an implementation of the s3c_dma interface in
-arch/arm/mach-s3c64xx/dma.c and one using the generic interface in
-drivers/dma/amba-pl08x.c. The latter also implements a "virtual
-channel" concept that you probably don't need.
+>From 278ef0ac538da720fc15896ad6c3666e0f518633 Mon Sep 17 00:00:00 2001
+From: Jon Hunter <jon-hunter@ti.com>
+Date: Fri, 8 Feb 2013 16:46:13 -0600
+Subject: [PATCH] ARM: OMAP2+: Add device-tree support for NOR flash
 
-	Arnd
+NOR flash is not currently supported when booting with device-tree
+on OMAP2+ devices. Add support to detect and configure NOR devices
+when booting with device-tree.
+
+Add documentation for the TI GPMC NOR binding.
+
+Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+---
+ Documentation/devicetree/bindings/mtd/gpmc-nor.txt |   98 +++++++++++++++++
+ arch/arm/mach-omap2/gpmc.c                         |  113 ++++++++++++++++++++
+ 2 files changed, 211 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mtd/gpmc-nor.txt
+
+diff --git a/Documentation/devicetree/bindings/mtd/gpmc-nor.txt b/Documentation/devicetree/bindings/mtd/gpmc-nor.txt
+new file mode 100644
+index 0000000..8c638fc
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mtd/gpmc-nor.txt
+@@ -0,0 +1,98 @@
++Device tree bindings for NOR flash connect to TI GPMC
++
++NOR flash connected to the TI GPMC (found on OMAP boards) are represented as
++child nodes of the GPMC controller with a name of "nor".
++
++All timing relevant properties as well as generic GPMC child properties are
++explained in a separate documents. Please refer to
++Documentation/devicetree/bindings/bus/ti-gpmc.txt
++
++Required properties:
++- bank-width: 		Width of NOR flash in bytes. GPMC supports 8-bit and
++			16-bit devices and so must be either 1 or 2 bytes.
++- compatible:		Documentation/devicetree/bindings/mtd/mtd-physmap.txt
++- gpmc,cs-on:		Chip-select assertion time
++- gpmc,cs-rd-off:	Chip-select de-assertion time for reads
++- gpmc,cs-wr-off:	Chip-select de-assertion time for writes
++- gpmc,oe-on:		Output-enable assertion time
++- gpmc,oe-off		Output-enable de-assertion time
++- gpmc,we-on:		Write-enable assertion time
++- gpmc,we-off:		Write-enable de-assertion time
++- gpmc,access:		Start cycle to first data capture (read access)
++- gpmc,rd-cycle:	Total read cycle time
++- gpmc,wr-cycle:	Total write cycle time
++- linux,mtd-name:	Documentation/devicetree/bindings/mtd/mtd-physmap.txt
++- reg:			Chip-select, base address (relative to chip-select)
++			and size of NOR flash. Note that base address will be
++			typically 0 as this is the start of the chip-select.
++
++Optional properties:
++- gpmc,XXX		Additional GPMC timings and settings parameters. See
++			Documentation/devicetree/bindings/bus/ti-gpmc.txt
++
++Optional properties for partiton table parsing:
++- #address-cells: should be set to 1
++- #size-cells: should be set to 1
++
++Example:
++
++gpmc: gpmc at 6e000000 {
++	compatible = "ti,omap3430-gpmc", "simple-bus";
++	ti,hwmods = "gpmc";
++	reg = <0x6e000000 0x1000>;
++	interrupts = <20>;
++	gpmc,num-cs = <8>;
++	gpmc,num-waitpins = <4>;
++	#address-cells = <2>;
++	#size-cells = <1>;
++
++	ranges = <0 0 0x10000000 0x08000000>;
++
++	nor at 0,0 {
++		compatible = "cfi-flash";
++		linux,mtd-name= "intel,pf48f6000m0y1be";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		reg = <0 0 0x08000000>;
++		bank-width = <2>;
++
++		gpmc,mux-add-data;
++		gpmc,cs-on = <0>;
++		gpmc,cs-rd-off = <186>;
++		gpmc,cs-wr-off = <186>;
++		gpmc,adv-on = <12>;
++		gpmc,adv-rd-off = <48>;
++		gpmc,adv-wr-off = <48>;
++		gpmc,oe-on = <54>;
++		gpmc,oe-off = <168>;
++		gpmc,we-on = <54>;
++		gpmc,we-off = <168>;
++		gpmc,rd-cycle = <186>;
++		gpmc,wr-cycle = <186>;
++		gpmc,access = <114>;
++		gpmc,page-burst-access = <6>;
++		gpmc,bus-turnaround = <12>;
++		gpmc,cycle2cycle-delay = <18>;
++		gpmc,wr-data-mux-bus = <90>;
++		gpmc,wr-access = <186>;
++		gpmc,cycle2cycle-samecsen;
++		gpmc,cycle2cycle-diffcsen;
++
++		partition at 0 {
++			label = "bootloader-nor";
++			reg = <0 0x40000>;
++		};
++		partition at 0x40000 {
++			label = "params-nor";
++			reg = <0x40000 0x40000>;
++		};
++		partition at 0x80000 {
++			label = "kernel-nor";
++			reg = <0x80000 0x200000>;
++		};
++		partition at 0x280000 {
++			label = "filesystem-nor";
++			reg = <0x240000 0x7d80000>;
++		};
++	};
++};
+diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+index e822d2b..c217a38 100644
+--- a/arch/arm/mach-omap2/gpmc.c
++++ b/arch/arm/mach-omap2/gpmc.c
+@@ -26,6 +26,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/platform_device.h>
+ #include <linux/of.h>
++#include <linux/of_address.h>
+ #include <linux/of_mtd.h>
+ #include <linux/of_device.h>
+ #include <linux/mtd/nand.h>
+@@ -513,6 +514,37 @@ static int gpmc_cs_delete_mem(int cs)
+ 	return r;
+ }
+ 
++/**
++ * gpmc_cs_remap - remaps a chip-select physical base address
++ * @cs:		chip-select to remap
++ * @base:	physical base address to re-map chip-select to
++ *
++ * Re-maps a chip-select to a new physical base address specified by
++ * "base". Returns 0 on success and appropriate negative error code
++ * on failure.
++ */
++static int gpmc_cs_remap(int cs, u32 base)
++{
++	int ret;
++	u32 old_base, size;
++
++	if (cs > GPMC_CS_NUM)
++		return -ENODEV;
++	gpmc_cs_get_memconf(cs, &old_base, &size);
++	if (base == old_base)
++		return 0;
++	gpmc_cs_disable_mem(cs);
++	ret = gpmc_cs_delete_mem(cs);
++	if (IS_ERR_VALUE(ret))
++		return ret;
++	ret = gpmc_cs_insert_mem(cs, base, size);
++	if (IS_ERR_VALUE(ret))
++		return ret;
++	gpmc_cs_enable_mem(cs, base, size);
++
++	return 0;
++}
++
+ int gpmc_cs_request(int cs, unsigned long size, unsigned long *base)
+ {
+ 	struct resource *res = &gpmc_cs_mem[cs];
+@@ -1391,6 +1423,78 @@ static int gpmc_probe_onenand_child(struct platform_device *pdev,
+ }
+ #endif
+ 
++/**
++ * gpmc_probe_nor_child - configures the gpmc for a nor device
++ * @pdev:	pointer to gpmc platform device
++ * @child:	pointer to device-tree node for nor device
++ *
++ * Allocates and configures a GPMC chip-select for a NOR flash device.
++ * Returns 0 on success and appropriate negative error code on failure.
++ */
++static int gpmc_probe_nor_child(struct platform_device *pdev,
++				struct device_node *child)
++{
++	struct gpmc_settings gpmc_s;
++	struct gpmc_timings gpmc_t;
++	struct resource res;
++	unsigned long base;
++	int ret, cs;
++
++	if (of_property_read_u32(child, "reg", &cs) < 0) {
++		dev_err(&pdev->dev, "%s has no 'reg' property\n",
++			child->full_name);
++		return -ENODEV;
++	}
++
++	if (of_address_to_resource(child, 0, &res)) {
++		dev_err(&pdev->dev, "%s has malformed 'reg' property\n",
++			child->full_name);
++		return -ENODEV;
++	}
++
++	ret = gpmc_cs_request(cs, res.end - res.start, &base);
++	if (IS_ERR_VALUE(ret)) {
++		dev_err(&pdev->dev, "cannot request GPMC CS %d\n", cs);
++		return ret;
++	}
++
++	/*
++	 * FIXME: gpmc_cs_request() will map the CS to an arbitary
++	 * location in the gpmc address space. When booting with
++	 * device-tree we want the NOR flash to be mapped to the
++	 * location specified in the device-tree blob. So remap the
++	 * CS to this location. Once DT migration is complete should
++	 * just make gpmc_cs_request() map a specific address.
++	 */
++	ret = gpmc_cs_remap(cs, res.start);
++	if (IS_ERR_VALUE(ret)) {
++		dev_err(&pdev->dev, "cannot remap GPMC CS %d to 0x%x\n",
++			cs, res.start);
++		goto err1;
++	}
++
++	gpmc_read_settings_dt(child, &gpmc_s);
++
++	ret = of_property_read_u32(child, "bank-width", &gpmc_s.device_width);
++	if (IS_ERR_VALUE(ret))
++		goto err1;
++
++	ret = gpmc_cs_program_settings(cs, &gpmc_s);
++	if (IS_ERR_VALUE(ret))
++		goto err1;
++
++	gpmc_read_timings_dt(child, &gpmc_t);
++	gpmc_cs_set_timings(cs, &gpmc_t);
++
++	of_platform_device_create(child, NULL, &pdev->dev);
++
++	return 0;
++err1:
++	gpmc_cs_free(cs);
++
++	return ret;
++}
++
+ static int gpmc_probe_dt(struct platform_device *pdev)
+ {
+ 	int ret;
+@@ -1424,6 +1528,15 @@ static int gpmc_probe_dt(struct platform_device *pdev)
+ 			return ret;
+ 		}
+ 	}
++
++	for_each_node_by_name(child, "nor") {
++		ret = gpmc_probe_nor_child(pdev, child);
++		if (ret < 0) {
++			of_node_put(child);
++			return ret;
++		}
++	}
++
+ 	return 0;
+ }
+ #else
+-- 
+1.7.10.4
