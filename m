@@ -1,34 +1,31 @@
 From: akpm@linux-foundation.org (Andrew Morton)
-Date: Tue, 5 Mar 2013 15:06:16 -0800
-Subject: [PATCH v3 -next 0/5] Add support for LZ4-compressed kernel
-In-Reply-To: <1362484056-9778-1-git-send-email-kyungsik.lee@lge.com>
+Date: Tue, 5 Mar 2013 15:08:45 -0800
+Subject: [PATCH v3 -next 5/5] Kconfig: Make x86 and arm kernels default
+ to the LZ4-compressed
+In-Reply-To: <5135DF44.2040806@openwrt.org>
 References: <1362484056-9778-1-git-send-email-kyungsik.lee@lge.com>
-Message-ID: <20130305150616.cb737f9b217b8c82051b2ccb@linux-foundation.org>
+ <1362484056-9778-6-git-send-email-kyungsik.lee@lge.com>
+ <5135DF44.2040806@openwrt.org>
+Message-ID: <20130305150845.0d19a2875d39dac5d03b4b62@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue,  5 Mar 2013 20:47:31 +0900 Kyungsik Lee <kyungsik.lee@lge.com> wrote:
+On Tue, 05 Mar 2013 13:04:20 +0100 Florian Fainelli <florian@openwrt.org> wrote:
 
-> This is the third version. In this version, Some codes are fixed
-> and more description and note are added. I would like to thank David Sterba
-> for his review.
+> Hello,
 > 
-> The Last patch[5/5] of the patch set is for making x86 and arm default to
-> LZ4-compressed for testing the LZ4 code in the linux-next.
-> It was requested by Andrew Morton in the patch set v2.
+> On 03/05/2013 12:47 PM, Kyungsik Lee wrote:
+> > This patch makes x86 and arm kernels default to the LZ4-compressed
+> > to test new LZ4 code in the linux-next. This is requested by
+> > Andrew Morton.
 > 
-> Currently, A preliminary version of LZ4 de/compression tool is supported.
-> However, It is expected that we will have a tool with more features
-> once its format is finished.
+> I do not think making this the default is good idea, because the lz4demo 
+> utility that you need to actually compress the kernel (used in patch 2) 
+> is not installed nor available by default on most systems, while gzip 
+> is.
 
-What happened to the changelog?  The earlier version at least had some
-rudimentary benchmarking results, but now we don't even have that. 
+Yes, that's a showstopper even for linux-next.  What a shame.
 
-Someone should prepare the information explaining why we added this to
-Linux, and I'd prefer that person be you rather than me!  Certainly it
-should include performance measurements - both speed and space.  Also
-it should capture our thinking regarding all the other decompressors,
-explaining why we view it as acceptable to add yet another one.
-
-Please, put yourself in the position of someone reading these commits
-in 2017 wondering "why did they merge this".  We should tell them.
+It means this code will walk into mainline with practically zero
+third-party testing.  Oh well, the risk is minor.  If it breaks, people
+can switch back to gzip easily enough.
