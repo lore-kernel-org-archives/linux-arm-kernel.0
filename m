@@ -1,18 +1,47 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 5 Mar 2013 17:19:03 +0800
-Subject: [PATCH] ARM: SPEAr13xx: Fix typo "ARCH_HAVE_CPUFREQ"
-In-Reply-To: <1362474819.16460.63.camel@x61.thuisdomein>
-References: <1362474819.16460.63.camel@x61.thuisdomein>
-Message-ID: <CAOh2x=m5r-yz993==vo-ezJttqN8XyXNqUsOYmv43EULOF_Pbw@mail.gmail.com>
+From: padma.v@samsung.com (Padmavathi Venna)
+Date: Tue, 05 Mar 2013 14:55:30 +0530
+Subject: [PATCH] dma: of-dma: return error when 'dma-cells' not found
+Message-ID: <1362475531-32260-1-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 5, 2013 at 5:13 PM, Paul Bolle <pebolle@tiscali.nl> wrote:
-> Do what commit f12a500e4adcc0961803e54b5ed1e74275d399f1
-> ("ARM: SPEAr13xx: Enable CONFIG_ARCH_HAS_CPUFREQ") wanted to do.
->
-> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+This patch returns error when 'dma-cells' property not found
+in the corresponding device node. With out this change there
+is a crash in the generic dma incompatible platforms.
 
-Ahh such stupid mistake.
+Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+---
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Based on Vinod Koul next branch.
+
+ drivers/dma/of-dma.c |    8 +++++++-
+ 1 files changed, 7 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/dma/of-dma.c b/drivers/dma/of-dma.c
+index 69d04d2..46aca0d 100644
+--- a/drivers/dma/of-dma.c
++++ b/drivers/dma/of-dma.c
+@@ -92,6 +92,7 @@ int of_dma_controller_register(struct device_node *np,
+ 				void *data)
+ {
+ 	struct of_dma	*ofdma;
++	const	 __be32 *ip;
+ 	int		nbcells;
+ 
+ 	if (!np || !of_dma_xlate) {
+@@ -103,7 +104,12 @@ int of_dma_controller_register(struct device_node *np,
+ 	if (!ofdma)
+ 		return -ENOMEM;
+ 
+-	nbcells = be32_to_cpup(of_get_property(np, "#dma-cells", NULL));
++	ip = of_get_property(np, "#dma-cells", NULL);
++	if (!ip)
++		return -ENXIO;
++
++	nbcells = be32_to_cpup(ip);
++
+ 	if (!nbcells) {
+ 		pr_err("%s: #dma-cells property is missing or invalid\n",
+ 		       __func__);
+-- 
+1.7.4.4
