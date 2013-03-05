@@ -1,44 +1,28 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  5 Mar 2013 03:47:36 +0000
-Subject: [PATCH 20/29] arm64: KVM: PSCI implementation
+Date: Tue,  5 Mar 2013 03:47:34 +0000
+Subject: [PATCH 18/29] arm64: KVM: Plug the VGIC
 In-Reply-To: <1362455265-24165-1-git-send-email-marc.zyngier@arm.com>
 References: <1362455265-24165-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1362455265-24165-21-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1362455265-24165-19-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wire the PSCI backend into the exit handling code.
+Shouldn't be needed - a complete duplicate from arch/arm.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_host.h |  2 +-
- arch/arm64/include/asm/kvm_psci.h | 23 +++++++++++++++++++++++
- arch/arm64/include/uapi/asm/kvm.h | 16 ++++++++++++++++
- arch/arm64/kvm/handle_exit.c      | 16 +++++++---------
- 4 files changed, 47 insertions(+), 10 deletions(-)
- create mode 100644 arch/arm64/include/asm/kvm_psci.h
+ arch/arm64/include/asm/kvm_vgic.h | 156 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 156 insertions(+)
+ create mode 100644 arch/arm64/include/asm/kvm_vgic.h
 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 85e706b..68558ac 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -34,7 +34,7 @@
- #include <asm/kvm_vgic.h>
- #include <asm/kvm_arch_timer.h>
- 
--#define KVM_VCPU_MAX_FEATURES 0
-+#define KVM_VCPU_MAX_FEATURES 1
- 
- /* We don't currently support large pages. */
- #define KVM_HPAGE_GFN_SHIFT(x)	0
-diff --git a/arch/arm64/include/asm/kvm_psci.h b/arch/arm64/include/asm/kvm_psci.h
+diff --git a/arch/arm64/include/asm/kvm_vgic.h b/arch/arm64/include/asm/kvm_vgic.h
 new file mode 100644
-index 0000000..d96f054
+index 0000000..f353f22
 --- /dev/null
-+++ b/arch/arm64/include/asm/kvm_psci.h
-@@ -0,0 +1,23 @@
++++ b/arch/arm64/include/asm/kvm_vgic.h
+@@ -0,0 +1,156 @@
 +/*
-+ * Copyright (C) 2012 - ARM Ltd
++ * Copyright (C) 2012 ARM Ltd.
 + * Author: Marc Zyngier <marc.zyngier@arm.com>
 + *
 + * This program is free software; you can redistribute it and/or modify
@@ -54,83 +38,144 @@ index 0000000..d96f054
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+#ifndef __ARM64_KVM_PSCI_H__
-+#define __ARM64_KVM_PSCI_H__
++#ifndef __ARM64_KVM_VGIC_H
++#define __ARM64_KVM_VGIC_H
 +
-+bool kvm_psci_call(struct kvm_vcpu *vcpu);
++#include <linux/kernel.h>
++#include <linux/kvm.h>
++#include <linux/irqreturn.h>
++#include <linux/spinlock.h>
++#include <linux/types.h>
++#include <linux/irqchip/arm-gic.h>
 +
-+#endif /* __ARM64_KVM_PSCI_H__ */
-diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-index fffeb11..24c8318 100644
---- a/arch/arm64/include/uapi/asm/kvm.h
-+++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -64,6 +64,8 @@ struct kvm_regs {
- #define KVM_VGIC_V2_DIST_SIZE		0x1000
- #define KVM_VGIC_V2_CPU_SIZE		0x2000
- 
-+#define KVM_ARM_VCPU_POWER_OFF		0 /* CPU is started in OFF state */
++#define VGIC_NR_IRQS		128
++#define VGIC_NR_SGIS		16
++#define VGIC_NR_PPIS		16
++#define VGIC_NR_PRIVATE_IRQS	(VGIC_NR_SGIS + VGIC_NR_PPIS)
++#define VGIC_NR_SHARED_IRQS	(VGIC_NR_IRQS - VGIC_NR_PRIVATE_IRQS)
++#define VGIC_MAX_CPUS		KVM_MAX_VCPUS
 +
- struct kvm_vcpu_init {
- 	__u32 target;
- 	__u32 features[7];
-@@ -163,6 +165,20 @@ struct kvm_arch_memory_slot {
- /* Highest supported SPI, from VGIC_NR_IRQS */
- #define KVM_ARM_IRQ_GIC_MAX		127
- 
-+/* PSCI interface */
-+#define KVM_PSCI_FN_BASE		0x95c1ba5e
-+#define KVM_PSCI_FN(n)			(KVM_PSCI_FN_BASE + (n))
++/* Sanity checks... */
++#if (VGIC_MAX_CPUS > 8)
++#error	Invalid number of CPU interfaces
++#endif
 +
-+#define KVM_PSCI_FN_CPU_SUSPEND		KVM_PSCI_FN(0)
-+#define KVM_PSCI_FN_CPU_OFF		KVM_PSCI_FN(1)
-+#define KVM_PSCI_FN_CPU_ON		KVM_PSCI_FN(2)
-+#define KVM_PSCI_FN_MIGRATE		KVM_PSCI_FN(3)
++#if (VGIC_NR_IRQS & 31)
++#error "VGIC_NR_IRQS must be a multiple of 32"
++#endif
 +
-+#define KVM_PSCI_RET_SUCCESS		0
-+#define KVM_PSCI_RET_NI			((unsigned long)-1)
-+#define KVM_PSCI_RET_INVAL		((unsigned long)-2)
-+#define KVM_PSCI_RET_DENIED		((unsigned long)-3)
++#if (VGIC_NR_IRQS > 1024)
++#error "VGIC_NR_IRQS must be <= 1024"
++#endif
 +
- #endif
- 
- #endif /* __ARM_KVM_H__ */
-diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-index 0e1fa4e..fa38230 100644
---- a/arch/arm64/kvm/handle_exit.c
-+++ b/arch/arm64/kvm/handle_exit.c
-@@ -24,26 +24,24 @@
- #include <asm/kvm_emulate.h>
- #include <asm/kvm_coproc.h>
- #include <asm/kvm_mmu.h>
-+#include <asm/kvm_psci.h>
- 
- typedef int (*exit_handle_fn)(struct kvm_vcpu *, struct kvm_run *);
- 
- static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
- {
--	/*
--	 * Guest called HVC instruction:
--	 * Let it know we don't want that by injecting an undefined exception.
--	 */
--	kvm_debug("hvc: %x (at %08lx)", kvm_vcpu_get_hsr(vcpu) & ((1 << 16) - 1),
--		  *vcpu_pc(vcpu));
--	kvm_debug("         HSR: %8x", kvm_vcpu_get_hsr(vcpu));
-+	if (kvm_psci_call(vcpu))
-+		return 1;
++/*
++ * The GIC distributor registers describing interrupts have two parts:
++ * - 32 per-CPU interrupts (SGI + PPI)
++ * - a bunch of shared interrupts (SPI)
++ */
++struct vgic_bitmap {
++	union {
++		u32 reg[VGIC_NR_PRIVATE_IRQS / 32];
++		DECLARE_BITMAP(reg_ul, VGIC_NR_PRIVATE_IRQS);
++	} percpu[VGIC_MAX_CPUS];
++	union {
++		u32 reg[VGIC_NR_SHARED_IRQS / 32];
++		DECLARE_BITMAP(reg_ul, VGIC_NR_SHARED_IRQS);
++	} shared;
++};
 +
- 	kvm_inject_undefined(vcpu);
- 	return 1;
- }
- 
- static int handle_smc(struct kvm_vcpu *vcpu, struct kvm_run *run)
- {
--	/* We don't support SMC; don't do that. */
--	kvm_debug("smc:@%08lx", *vcpu_pc(vcpu));
-+	if (kvm_psci_call(vcpu))
-+		return 1;
++struct vgic_bytemap {
++	u32 percpu[VGIC_MAX_CPUS][VGIC_NR_PRIVATE_IRQS / 4];
++	u32 shared[VGIC_NR_SHARED_IRQS  / 4];
++};
 +
- 	kvm_inject_undefined(vcpu);
- 	return 1;
- }
++struct vgic_dist {
++	spinlock_t		lock;
++	bool			ready;
++
++	/* Virtual control interface mapping */
++	void __iomem		*vctrl_base;
++
++	/* Distributor and vcpu interface mapping in the guest */
++	phys_addr_t		vgic_dist_base;
++	phys_addr_t		vgic_cpu_base;
++
++	/* Distributor enabled */
++	u32			enabled;
++
++	/* Interrupt enabled (one bit per IRQ) */
++	struct vgic_bitmap	irq_enabled;
++
++	/* Interrupt 'pin' level */
++	struct vgic_bitmap	irq_state;
++
++	/* Level-triggered interrupt in progress */
++	struct vgic_bitmap	irq_active;
++
++	/* Interrupt priority. Not used yet. */
++	struct vgic_bytemap	irq_priority;
++
++	/* Level/edge triggered */
++	struct vgic_bitmap	irq_cfg;
++
++	/* Source CPU per SGI and target CPU */
++	u8			irq_sgi_sources[VGIC_MAX_CPUS][16];
++
++	/* Target CPU for each IRQ */
++	u8			irq_spi_cpu[VGIC_NR_SHARED_IRQS];
++	struct vgic_bitmap	irq_spi_target[VGIC_MAX_CPUS];
++
++	/* Bitmap indicating which CPU has something pending */
++	unsigned long		irq_pending_on_cpu;
++};
++
++struct vgic_cpu {
++	/* per IRQ to LR mapping */
++	u8		vgic_irq_lr_map[VGIC_NR_IRQS];
++
++	/* Pending interrupts on this VCPU */
++	DECLARE_BITMAP(	pending_percpu, VGIC_NR_PRIVATE_IRQS);
++	DECLARE_BITMAP(	pending_shared, VGIC_NR_SHARED_IRQS);
++
++	/* Bitmap of used/free list registers */
++	DECLARE_BITMAP(	lr_used, 64);
++
++	/* Number of list registers on this CPU */
++	int		nr_lr;
++
++	/* CPU vif control registers for world switch */
++	u32		vgic_hcr;
++	u32		vgic_vmcr;
++	u32		vgic_misr;	/* Saved only */
++	u32		vgic_eisr[2];	/* Saved only */
++	u32		vgic_elrsr[2];	/* Saved only */
++	u32		vgic_apr;
++	u32		vgic_lr[64];	/* A15 has only 4... */
++};
++
++#define LR_EMPTY	0xff
++
++struct kvm;
++struct kvm_vcpu;
++struct kvm_run;
++struct kvm_exit_mmio;
++
++int kvm_vgic_set_addr(struct kvm *kvm, unsigned long type, u64 addr);
++int kvm_vgic_hyp_init(void);
++int kvm_vgic_init(struct kvm *kvm);
++int kvm_vgic_create(struct kvm *kvm);
++int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu);
++void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu);
++void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu);
++int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
++			bool level);
++int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
++bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
++		      struct kvm_exit_mmio *mmio);
++
++#define irqchip_in_kernel(k)	(!!((k)->arch.vgic.vctrl_base))
++#define vgic_initialized(k)	((k)->arch.vgic.ready)
++
++#endif
 -- 
 1.7.12.4
