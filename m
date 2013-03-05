@@ -1,52 +1,92 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Tue, 5 Mar 2013 17:35:22 +0100
-Subject: [PATCH] lglock: add read-preference local-global rwlock
-In-Reply-To: <51361540.3060603@cn.fujitsu.com>
-References: <512CC509.1050000@linux.vnet.ibm.com>
- <CACvQF50UgiqPpDk3HCmV86zKSf6tPjqr0bZowfPEOJs0g0r0MQ@mail.gmail.com>
- <512D0D67.9010609@linux.vnet.ibm.com>
- <CACvQF53ph2ixdM-otzetjM5cR+2kcZj6sckOp3TnzzA_x-EZ8w@mail.gmail.com>
- <512E7879.20109@linux.vnet.ibm.com> <5130E8E2.50206@cn.fujitsu.com>
- <20130301182854.GA3631@redhat.com>
- <CANN689HEW=b5S93J27p+rBX-5m7jkW4FER=eHDCp7OgMaTWLPw@mail.gmail.com>
- <20130302170656.GB29769@redhat.com> <51361540.3060603@cn.fujitsu.com>
-Message-ID: <20130305163522.GA4179@redhat.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Tue, 5 Mar 2013 17:40:14 +0100
+Subject: [PATCH 2/2] video: imxfb: Add DT support
+In-Reply-To: <20130304074851.GZ1906@pengutronix.de>
+References: <1362152467-27998-1-git-send-email-mpa@pengutronix.de>
+ <1362152467-27998-3-git-send-email-mpa@pengutronix.de>
+ <20130304074851.GZ1906@pengutronix.de>
+Message-ID: <20130305164014.GA11656@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/05, Lai Jiangshan wrote:
->
-> On 03/03/13 01:06, Oleg Nesterov wrote:
-> > On 03/02, Michel Lespinasse wrote:
-> >>
-> >> My version would be slower if it needs to take the
-> >> slow path in a reentrant way, but I'm not sure it matters either :)
-> >
-> > I'd say, this doesn't matter at all, simply because this can only happen
-> > if we race with the active writer.
->
-> It can also happen when interrupted. (still very rarely)
->
-> arch_spin_trylock()
-> 	------->interrupted,
-> 		__this_cpu_read() returns 0.
-> 		arch_spin_trylock() fails
-> 		slowpath, any nested will be slowpath too.
-> 		...
-> 		..._read_unlock()
-> 	<-------interrupt
-> __this_cpu_inc()
-> ....
+On Mon, Mar 04, 2013 at 08:48:51AM +0100, Sascha Hauer wrote:
+> On Fri, Mar 01, 2013 at 04:41:07PM +0100, Markus Pargmann wrote:
+> > Add devicetree support for imx framebuffer driver. It uses the generic
+> > display bindings and helper functions.
+> > 
+> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> > ---
+> >  .../devicetree/bindings/video/fsl,imx-fb.txt       |  30 ++++
+> >  drivers/video/imxfb.c                              | 176 +++++++++++++++++----
+> >  2 files changed, 173 insertions(+), 33 deletions(-)
+> >  create mode 100644 Documentation/devicetree/bindings/video/fsl,imx-fb.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/video/fsl,imx-fb.txt b/Documentation/devicetree/bindings/video/fsl,imx-fb.txt
+> > new file mode 100644
+> > index 0000000..fd88d26
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/video/fsl,imx-fb.txt
+> > @@ -0,0 +1,30 @@
+> > +Freescale imx21 Framebuffer
+> > +
+> > +This framebuffer driver supports chips imx1 and imx21.
+> > +
+> > +Required properties:
+> > +- compatible : "fsl,<chip>-fb"
+> > +- reg : Should contain 1 register ranges(address and length)
+> > +- interrupts : One interrupt of the fb dev
+> > +
+> > +Required nodes:
+> > +- display: a display node is required to initialize the lcd panel
+> > +	This should be in the board dts. See definition in
+> > +	Documentation/devicetree/bindings/video/via,vt8500-fb.txt
+> > +- default-mode: a videomode node as specified in
+> > +	Documentation/devicetree/bindings/video/via,vt8500-fb.txt
+> 
+> Since the of_videomode helpers didn't add a binding in itself, they
+> don't have a binding description in Documentation/devicetree/.
+> It's forseeable that drivers will use this binding in the near
+> future, so we should probably add a separate Documentation file
+> for it instead of referencing some driver which already implements
+> the binding.
 
-Yes sure. Or it can take the local lock after we already take the global
-fallback_lock.
+I checked again, there is a binding description at
+Documentation/devicetree/bindings/video/display-timing.txt . I replaced
+the reference to the other driver. That was actually from a previous
+version of this patch.
 
-But the same can happen with FALLBACK_BASE, just because we need to take
-a lock (local or global) first, then increment the counter.
+> 
+> > +
+> > +Optional properties:
+> > +- pwmr: Address of pwmr register
+> 
+> This describes the imxfb internal PWM controller. Please drop this for
+> now or add a proper PWM driver for it.
 
-> (I worries to much. I tend to remove FALLBACK_BASE now, we should
-> add it only after we proved we needed it, this part is not proved)
+Okay, removed.
 
-Agreed, great ;)
+> 
+> > +- lscr1: Address of lscr1 register
+> > +- dmacr: Address of dmacr register
+> 
+> I think we shouldn't expose these to the devicetree. With platform_data
+> this hasn't been nice, but ok. With devicetree this becomes an API, so
+> we should think of something better. Can't we make up sensible values
+> during runtime?
 
-Oleg.
+I checked the definitions of the platform-data. It seems that all
+definitions use the same lscr1 value. So I simply droped that property
+and introduced a default value.
+For pwmr1 exist two different values, one for eukrea boards and another
+for all other boards, so I added two defaults here. The different value
+can be selected by setting a bool property 'dmacr-eukrea'.
+
+Regards,
+
+Markus
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
