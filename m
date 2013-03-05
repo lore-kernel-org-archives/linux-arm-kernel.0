@@ -1,31 +1,32 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  5 Mar 2013 03:47:30 +0000
-Subject: [PATCH 14/29] arm64: KVM: guest one-reg interface
+Date: Tue,  5 Mar 2013 03:47:33 +0000
+Subject: [PATCH 17/29] arm64: KVM: Exit handling
 In-Reply-To: <1362455265-24165-1-git-send-email-marc.zyngier@arm.com>
 References: <1362455265-24165-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1362455265-24165-15-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1362455265-24165-18-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let userspace play with the guest registers.
+Handle the exit of a VM, decoding the exit reason from HYP mode
+and calling the corresponding handler.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/guest.c | 240 +++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 240 insertions(+)
- create mode 100644 arch/arm64/kvm/guest.c
+ arch/arm64/kvm/handle_exit.c | 119 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 119 insertions(+)
+ create mode 100644 arch/arm64/kvm/handle_exit.c
 
-diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
 new file mode 100644
-index 0000000..2a8aaf8
+index 0000000..0e1fa4e
 --- /dev/null
-+++ b/arch/arm64/kvm/guest.c
-@@ -0,0 +1,240 @@
++++ b/arch/arm64/kvm/handle_exit.c
+@@ -0,0 +1,119 @@
 +/*
 + * Copyright (C) 2012 - ARM Ltd
 + * Author: Marc Zyngier <marc.zyngier@arm.com>
 + *
-+ * Derived from arch/arm/kvm/guest.c:
++ * Derived from arch/arm/kvm/handle_exit.c:
 + * Copyright (C) 2012 - Virtual Open Systems and Columbia University
 + * Author: Christoffer Dall <c.dall@virtualopensystems.com>
 + *
@@ -42,224 +43,103 @@ index 0000000..2a8aaf8
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+#include <linux/errno.h>
-+#include <linux/err.h>
++#include <linux/kvm.h>
 +#include <linux/kvm_host.h>
-+#include <linux/module.h>
-+#include <linux/vmalloc.h>
-+#include <linux/fs.h>
-+#include <asm/cputype.h>
-+#include <asm/uaccess.h>
-+#include <asm/kvm.h>
-+#include <asm/kvm_asm.h>
 +#include <asm/kvm_emulate.h>
 +#include <asm/kvm_coproc.h>
++#include <asm/kvm_mmu.h>
 +
-+struct kvm_stats_debugfs_item debugfs_entries[] = {
-+	{ NULL }
++typedef int (*exit_handle_fn)(struct kvm_vcpu *, struct kvm_run *);
++
++static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
++{
++	/*
++	 * Guest called HVC instruction:
++	 * Let it know we don't want that by injecting an undefined exception.
++	 */
++	kvm_debug("hvc: %x (at %08lx)", kvm_vcpu_get_hsr(vcpu) & ((1 << 16) - 1),
++		  *vcpu_pc(vcpu));
++	kvm_debug("         HSR: %8x", kvm_vcpu_get_hsr(vcpu));
++	kvm_inject_undefined(vcpu);
++	return 1;
++}
++
++static int handle_smc(struct kvm_vcpu *vcpu, struct kvm_run *run)
++{
++	/* We don't support SMC; don't do that. */
++	kvm_debug("smc:@%08lx", *vcpu_pc(vcpu));
++	kvm_inject_undefined(vcpu);
++	return 1;
++}
++
++/**
++ * kvm_handle_wfi - handle a wait-for-interrupts instruction executed by a guest
++ * @vcpu:	the vcpu pointer
++ *
++ * Simply call kvm_vcpu_block(), which will halt execution of
++ * world-switches and schedule other host processes until there is an
++ * incoming IRQ or FIQ to the VM.
++ */
++static int kvm_handle_wfi(struct kvm_vcpu *vcpu, struct kvm_run *run)
++{
++	kvm_vcpu_block(vcpu);
++	return 1;
++}
++
++static exit_handle_fn arm_exit_handlers[] = {
++	[ESR_EL2_EC_WFI]	= kvm_handle_wfi,
++	[ESR_EL2_EC_HVC64]	= handle_hvc,
++	[ESR_EL2_EC_SMC64]	= handle_smc,
++	[ESR_EL2_EC_SYS64]	= kvm_handle_sys_reg,
++	[ESR_EL2_EC_IABT]	= kvm_handle_guest_abort,
++	[ESR_EL2_EC_DABT]	= kvm_handle_guest_abort,
 +};
 +
-+int kvm_arch_vcpu_setup(struct kvm_vcpu *vcpu)
++static exit_handle_fn kvm_get_exit_handler(struct kvm_vcpu *vcpu)
 +{
-+	vcpu->arch.hcr_el2 = HCR_GUEST_FLAGS;
-+	return 0;
++	u8 hsr_ec = kvm_vcpu_trap_get_class(vcpu);
++
++	if (hsr_ec >= ARRAY_SIZE(arm_exit_handlers) ||
++	    !arm_exit_handlers[hsr_ec]) {
++		kvm_err("Unkown exception class: hsr: %#08x\n",
++			(unsigned int)kvm_vcpu_get_hsr(vcpu));
++		BUG();
++	}
++
++	return arm_exit_handlers[hsr_ec];
 +}
 +
-+static u64 core_reg_offset_from_id(u64 id)
++/*
++ * Return > 0 to return to guest, < 0 on error, 0 (and set exit_reason) on
++ * proper exit to userspace.
++ */
++int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
++		       int exception_index)
 +{
-+	return id & ~(KVM_REG_ARCH_MASK | KVM_REG_SIZE_MASK | KVM_REG_ARM_CORE);
-+}
++	exit_handle_fn exit_handler;
 +
-+static int get_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-+{
-+	unsigned long __user *uaddr = (unsigned long __user *)(unsigned long)reg->addr;
-+	struct kvm_regs *regs = &vcpu->arch.regs;
-+	u64 off;
-+
-+	if (KVM_REG_SIZE(reg->id) != sizeof(unsigned long))
-+		return -ENOENT;
-+
-+	/* Our ID is an index into the kvm_regs struct. */
-+	off = core_reg_offset_from_id(reg->id);
-+	if (off >= sizeof(*regs) / KVM_REG_SIZE(reg->id))
-+		return -ENOENT;
-+
-+	return put_user(((unsigned long *)regs)[off], uaddr);
-+}
-+
-+static int set_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-+{
-+	unsigned long __user *uaddr = (unsigned long __user *)(unsigned long)reg->addr;
-+	struct kvm_regs *regs = &vcpu->arch.regs;
-+	u64 off, val;
-+
-+	if (KVM_REG_SIZE(reg->id) != sizeof(unsigned long))
-+		return -ENOENT;
-+
-+	/* Our ID is an index into the kvm_regs struct. */
-+	off = core_reg_offset_from_id(reg->id);
-+	if (off >= sizeof(*regs) / KVM_REG_SIZE(reg->id))
-+		return -ENOENT;
-+
-+	if (get_user(val, uaddr) != 0)
-+		return -EFAULT;
-+
-+	if (off == KVM_REG_ARM_CORE_REG(regs.pstate)) {
-+		unsigned long mode = val & COMPAT_PSR_MODE_MASK;
-+		switch (mode) {
-+		case PSR_MODE_EL0t:
-+		case PSR_MODE_EL1t:
-+		case PSR_MODE_EL1h:
-+			break;
-+		default:
-+			return -EINVAL;
++	switch (exception_index) {
++	case ARM_EXCEPTION_IRQ:
++		return 1;
++	case ARM_EXCEPTION_TRAP:
++		/*
++		 * See ARM ARM B1.14.1: "Hyp traps on instructions
++		 * that fail their condition code check"
++		 */
++		if (!kvm_condition_valid(vcpu)) {
++			kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
++			return 1;
 +		}
-+	}
 +
-+	((unsigned long *)regs)[off] = val;
-+	return 0;
-+}
++		exit_handler = kvm_get_exit_handler(vcpu);
 +
-+int kvm_arch_vcpu_ioctl_get_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
-+{
-+	return -EINVAL;
-+}
-+
-+int kvm_arch_vcpu_ioctl_set_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
-+{
-+	return -EINVAL;
-+}
-+
-+static unsigned long num_core_regs(void)
-+{
-+	return sizeof(struct kvm_regs) / sizeof(unsigned long);
-+}
-+
-+/**
-+ * kvm_arm_num_regs - how many registers do we present via KVM_GET_ONE_REG
-+ *
-+ * This is for all registers.
-+ */
-+unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu)
-+{
-+	return num_core_regs() + kvm_arm_num_sys_reg_descs(vcpu);
-+}
-+
-+/**
-+ * kvm_arm_copy_reg_indices - get indices of all registers.
-+ *
-+ * We do core registers right here, then we apppend system regs.
-+ */
-+int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
-+{
-+	unsigned int i;
-+	const u64 core_reg = KVM_REG_ARM64 | KVM_REG_SIZE_U64 | KVM_REG_ARM_CORE;
-+
-+	for (i = 0; i < sizeof(struct kvm_regs)/sizeof(unsigned long); i++) {
-+		if (put_user(core_reg | i, uindices))
-+			return -EFAULT;
-+		uindices++;
-+	}
-+
-+	return kvm_arm_copy_sys_reg_indices(vcpu, uindices);
-+}
-+
-+int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-+{
-+	/* We currently use nothing arch-specific in upper 32 bits */
-+	if ((reg->id & ~KVM_REG_SIZE_MASK) >> 32 != KVM_REG_ARM64 >> 32)
-+		return -EINVAL;
-+
-+	/* Register group 16 means we want a core register. */
-+	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
-+		return get_core_reg(vcpu, reg);
-+
-+	return kvm_arm_sys_reg_get_reg(vcpu, reg);
-+}
-+
-+int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-+{
-+	/* We currently use nothing arch-specific in upper 32 bits */
-+	if ((reg->id & ~KVM_REG_SIZE_MASK) >> 32 != KVM_REG_ARM64 >> 32)
-+		return -EINVAL;
-+
-+	/* Register group 16 means we set a core register. */
-+	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
-+		return set_core_reg(vcpu, reg);
-+
-+	return kvm_arm_sys_reg_set_reg(vcpu, reg);
-+}
-+
-+int kvm_arch_vcpu_ioctl_get_sregs(struct kvm_vcpu *vcpu,
-+				  struct kvm_sregs *sregs)
-+{
-+	return -EINVAL;
-+}
-+
-+int kvm_arch_vcpu_ioctl_set_sregs(struct kvm_vcpu *vcpu,
-+				  struct kvm_sregs *sregs)
-+{
-+	return -EINVAL;
-+}
-+
-+int __attribute_const__ kvm_target_cpu(void)
-+{
-+	unsigned long implementor = read_cpuid_implementor();
-+	unsigned long part_number = read_cpuid_part_number();
-+
-+	if (implementor != ARM_CPU_IMP_ARM)
-+		return -EINVAL;
-+
-+	switch (part_number) {
-+	case ARM_CPU_PART_AEM_V8:
-+	case ARM_CPU_PART_FOUNDATION:
-+		/* Treat the models just as an A57 for the time being */
-+	case ARM_CPU_PART_CORTEX_A57:
-+		return KVM_ARM_TARGET_CORTEX_A57;
++		return exit_handler(vcpu, run);
 +	default:
-+		return -EINVAL;
++		kvm_pr_unimpl("Unsupported exception type: %d",
++			      exception_index);
++		run->exit_reason = KVM_EXIT_INTERNAL_ERROR;
++		return 0;
 +	}
-+}
-+
-+int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
-+			const struct kvm_vcpu_init *init)
-+{
-+	unsigned int i;
-+
-+	/* We can only do a cortex A57 for now. */
-+	if (init->target != kvm_target_cpu())
-+		return -EINVAL;
-+
-+	vcpu->arch.target = init->target;
-+	bitmap_zero(vcpu->arch.features, KVM_VCPU_MAX_FEATURES);
-+
-+	/* -ENOENT for unknown features, -EINVAL for invalid combinations. */
-+	for (i = 0; i < sizeof(init->features)*8; i++) {
-+		if (init->features[i / 32] & (1 << (i % 32))) {
-+			if (i >= KVM_VCPU_MAX_FEATURES)
-+				return -ENOENT;
-+			set_bit(i, vcpu->arch.features);
-+		}
-+	}
-+
-+	/* Now we know what it is, we can reset it. */
-+	return kvm_reset_vcpu(vcpu);
-+}
-+
-+int kvm_arch_vcpu_ioctl_get_fpu(struct kvm_vcpu *vcpu, struct kvm_fpu *fpu)
-+{
-+	return -EINVAL;
-+}
-+
-+int kvm_arch_vcpu_ioctl_set_fpu(struct kvm_vcpu *vcpu, struct kvm_fpu *fpu)
-+{
-+	return -EINVAL;
-+}
-+
-+int kvm_arch_vcpu_ioctl_translate(struct kvm_vcpu *vcpu,
-+				  struct kvm_translation *tr)
-+{
-+	return -EINVAL;
 +}
 -- 
 1.7.12.4
