@@ -1,271 +1,651 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue,  5 Mar 2013 18:42:12 +0100
-Subject: [PATCH 02/23] irqchip: exynos: remove dependency on mach/irqs.h
+Date: Tue,  5 Mar 2013 18:42:14 +0100
+Subject: [PATCH 04/23] tty: serial/samsung: make register definitions global
 In-Reply-To: <1362505353-8873-1-git-send-email-arnd@arndb.de>
 References: <1362505353-8873-1-git-send-email-arnd@arndb.de>
-Message-ID: <1362505353-8873-3-git-send-email-arnd@arndb.de>
+Message-ID: <1362505353-8873-5-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As a preparation for multiplatform, this changes the exynos
-"combiner" irqchip to no longer make any assumptions about
-using specific IRQ numbers or the number of combiners in the
-system.
+The registers for the Samsung S3C serial port are currently defined in
+the platform specific arch/arm/plat-samsung/include/plat/regs-serial.h
+file, which is not visible to multiplatform capable drivers.
 
-For this, we have to revert to always initializing the combiner
-explicitly from architecture code, rather than using the new
-irqchip_init function as we should. The problem is the
-dependency on the IRQ base value for the combiner, which is
-currently hardcoded in the mach/irqs.h file. Once that file
-becomes unused, we can move to irqchip_init again.
+Unfortunately, it is not possible to move the file into a more local
+place as we should normally try to, because the same registers
+may be used in one of four places:
 
-Getting rid of the dependency on the number of combiners
-actually cleans up the code, because we also remove the
-global combiner_data array and pass dynamically allocated
-pointers through the irq domain instead.
+* In the driver itself
+* In platform-independent ARM code for early debug output
+* In platform_data definitions
+* In the Samsung platform power management code
+
+I have also found no way to logically split out a platform_data
+file, other than possibly move everything into
+include/linux/platform_data, which also felt wrong. The only
+part of this file that makes sense to keep specific to the s3c24xx
+platform are the virtual and physical addresses defined here,
+which are needed in no other location.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-exynos/common.c     |   5 +-
- arch/arm/mach-exynos/common.h     |   2 +-
- drivers/irqchip/exynos-combiner.c | 113 ++++++++++++++++++++------------------
- 3 files changed, 64 insertions(+), 56 deletions(-)
+ arch/arm/mach-s3c24xx/clock-s3c2440.c            |   5 +
+ arch/arm/mach-s3c24xx/common.c                   |   5 +
+ arch/arm/plat-samsung/include/plat/regs-serial.h | 282 +----------------------
+ drivers/tty/serial/samsung.c                     |   6 +-
+ include/linux/serial_s3c.h                       | 260 +++++++++++++++++++++
+ 5 files changed, 274 insertions(+), 284 deletions(-)
+ create mode 100644 include/linux/serial_s3c.h
 
-diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-index d63d399..4b4526d 100644
---- a/arch/arm/mach-exynos/common.c
-+++ b/arch/arm/mach-exynos/common.c
-@@ -443,6 +443,7 @@ static void __init exynos5_init_clocks(int xtal)
- 
- void __init exynos4_init_irq(void)
- {
-+	struct device_node *dn;
- 	unsigned int gic_bank_offset;
- 
- 	gic_bank_offset = soc_is_exynos4412() ? 0x4000 : 0x8000;
-@@ -454,8 +455,8 @@ void __init exynos4_init_irq(void)
- 		irqchip_init();
- #endif
- 
--	if (!of_have_populated_dt())
--		combiner_init(S5P_VA_COMBINER_BASE, NULL);
-+	dn = of_find_compatible_node(NULL, NULL, "samsung,exynos4210-combiner");
-+	combiner_init(S5P_VA_COMBINER_BASE, COMBINER_IRQ(0, 0), dn);
- 
- 	/*
- 	 * The parameters of s5p_init_irq() are for VIC init.
-diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-index 9339bb8..ed96450 100644
---- a/arch/arm/mach-exynos/common.h
-+++ b/arch/arm/mach-exynos/common.h
-@@ -61,7 +61,7 @@ void exynos4212_register_clocks(void);
- #endif
- 
- struct device_node;
--void combiner_init(void __iomem *combiner_base, struct device_node *np);
-+void combiner_init(void __iomem *combiner_base, int irq_base, struct device_node *np);
- 
- extern struct smp_operations exynos_smp_ops;
- 
-diff --git a/drivers/irqchip/exynos-combiner.c b/drivers/irqchip/exynos-combiner.c
-index 04d86a9..1276d4e 100644
---- a/drivers/irqchip/exynos-combiner.c
-+++ b/drivers/irqchip/exynos-combiner.c
-@@ -15,9 +15,13 @@
- #include <linux/irqdomain.h>
- #include <linux/of_address.h>
- #include <linux/of_irq.h>
--#include <asm/mach/irq.h>
-+#include <linux/slab.h>
- 
-+#ifdef CONFIG_EXYNOS_ATAGS
- #include <plat/cpu.h>
-+#endif
-+
-+#include <asm/mach/irq.h>
- 
- #include "irqchip.h"
- 
-@@ -25,6 +29,8 @@
- #define COMBINER_ENABLE_CLEAR	0x4
- #define COMBINER_INT_STATUS	0xC
- 
-+#define IRQ_IN_COMBINER		8
-+
- static DEFINE_SPINLOCK(irq_controller_lock);
- 
- struct combiner_chip_data {
-@@ -33,9 +39,6 @@ struct combiner_chip_data {
- 	void __iomem *base;
+diff --git a/arch/arm/mach-s3c24xx/clock-s3c2440.c b/arch/arm/mach-s3c24xx/clock-s3c2440.c
+index 04b87ec..1069b56 100644
+--- a/arch/arm/mach-s3c24xx/clock-s3c2440.c
++++ b/arch/arm/mach-s3c24xx/clock-s3c2440.c
+@@ -123,6 +123,11 @@ static struct clk s3c2440_clk_ac97 = {
+ 	.ctrlbit	= S3C2440_CLKCON_AC97,
  };
  
--static struct irq_domain *combiner_irq_domain;
--static struct combiner_chip_data combiner_data[MAX_COMBINER_NR];
--
- static inline void __iomem *combiner_base(struct irq_data *data)
- {
- 	struct combiner_chip_data *combiner_data =
-@@ -93,35 +96,6 @@ static struct irq_chip combiner_chip = {
- 	.irq_unmask	= combiner_unmask_irq,
- };
- 
--static void __init combiner_cascade_irq(unsigned int combiner_nr, unsigned int irq)
--{
--	unsigned int max_nr;
--
--	if (soc_is_exynos5250())
--		max_nr = EXYNOS5_MAX_COMBINER_NR;
--	else
--		max_nr = EXYNOS4_MAX_COMBINER_NR;
--
--	if (combiner_nr >= max_nr)
--		BUG();
--	if (irq_set_handler_data(irq, &combiner_data[combiner_nr]) != 0)
--		BUG();
--	irq_set_chained_handler(irq, combiner_handle_cascade_irq);
--}
--
--static void __init combiner_init_one(unsigned int combiner_nr,
--				     void __iomem *base)
--{
--	combiner_data[combiner_nr].base = base;
--	combiner_data[combiner_nr].irq_offset = irq_find_mapping(
--		combiner_irq_domain, combiner_nr * MAX_IRQ_IN_COMBINER);
--	combiner_data[combiner_nr].irq_mask = 0xff << ((combiner_nr % 4) << 3);
--
--	/* Disable all interrupts */
--	__raw_writel(combiner_data[combiner_nr].irq_mask,
--		     base + COMBINER_ENABLE_CLEAR);
--}
--
- #ifdef CONFIG_OF
- static int combiner_irq_domain_xlate(struct irq_domain *d,
- 				     struct device_node *controller,
-@@ -135,7 +109,7 @@ static int combiner_irq_domain_xlate(struct irq_domain *d,
- 	if (intsize < 2)
- 		return -EINVAL;
- 
--	*out_hwirq = intspec[0] * MAX_IRQ_IN_COMBINER + intspec[1];
-+	*out_hwirq = intspec[0] * IRQ_IN_COMBINER + intspec[1];
- 	*out_type = 0;
- 
- 	return 0;
-@@ -154,6 +128,8 @@ static int combiner_irq_domain_xlate(struct irq_domain *d,
- static int combiner_irq_domain_map(struct irq_domain *d, unsigned int irq,
- 				   irq_hw_number_t hw)
- {
-+	struct combiner_chip_data *combiner_data = d->host_data;
++#define S3C24XX_VA_UART0      (S3C_VA_UART)
++#define S3C24XX_VA_UART1      (S3C_VA_UART + 0x4000 )
++#define S3C24XX_VA_UART2      (S3C_VA_UART + 0x8000 )
++#define S3C24XX_VA_UART3      (S3C_VA_UART + 0xC000 )
 +
- 	irq_set_chip_and_handler(irq, &combiner_chip, handle_level_irq);
- 	irq_set_chip_data(irq, &combiner_data[hw >> 3]);
- 	set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
-@@ -167,49 +143,80 @@ static struct irq_domain_ops combiner_irq_domain_ops = {
- };
- 
- void __init combiner_init(void __iomem *combiner_base,
-+			  int plat_irq_base,
- 			  struct device_node *np)
+ static unsigned long  s3c2440_fclk_n_getrate(struct clk *clk)
  {
- 	int i, irq, irq_base;
- 	unsigned int max_nr, nr_irq;
-+	struct irq_domain *domain;
-+	struct combiner_chip_data *combiner_data;
+ 	unsigned long ucon0, ucon1, ucon2, divisor;
+diff --git a/arch/arm/mach-s3c24xx/common.c b/arch/arm/mach-s3c24xx/common.c
+index 6bcf87f..92e6094 100644
+--- a/arch/arm/mach-s3c24xx/common.c
++++ b/arch/arm/mach-s3c24xx/common.c
+@@ -239,6 +239,11 @@ void __init s3c24xx_init_io(struct map_desc *mach_desc, int size)
  
--	if (np) {
--		if (of_property_read_u32(np, "samsung,combiner-nr", &max_nr)) {
--			pr_warning("%s: number of combiners not specified, "
--				"setting default as %d.\n",
--				__func__, EXYNOS4_MAX_COMBINER_NR);
--			max_nr = EXYNOS4_MAX_COMBINER_NR;
--		}
--	} else {
-+	max_nr = 0;
-+	if (of_property_read_u32(np, "samsung,combiner-nr", &max_nr)) {
-+#ifdef CONFIG_EXYNOS_ATAGS
- 		max_nr = soc_is_exynos5250() ? EXYNOS5_MAX_COMBINER_NR :
--						EXYNOS4_MAX_COMBINER_NR;
-+					       EXYNOS4_MAX_COMBINER_NR;
-+		pr_warning("%s: number of combiners not specified, "
-+			   "setting default as %d.\n", __func__, max_nr);
+ /* Serial port registrations */
+ 
++#define S3C2410_PA_UART0      (S3C24XX_PA_UART)
++#define S3C2410_PA_UART1      (S3C24XX_PA_UART + 0x4000 )
++#define S3C2410_PA_UART2      (S3C24XX_PA_UART + 0x8000 )
++#define S3C2443_PA_UART3      (S3C24XX_PA_UART + 0xC000 )
++
+ static struct resource s3c2410_uart0_resource[] = {
+ 	[0] = DEFINE_RES_MEM(S3C2410_PA_UART0, SZ_16K),
+ 	[1] = DEFINE_RES_NAMED(IRQ_S3CUART_RX0, \
+diff --git a/arch/arm/plat-samsung/include/plat/regs-serial.h b/arch/arm/plat-samsung/include/plat/regs-serial.h
+index 29c26a8..f05f2af 100644
+--- a/arch/arm/plat-samsung/include/plat/regs-serial.h
++++ b/arch/arm/plat-samsung/include/plat/regs-serial.h
+@@ -1,281 +1 @@
+-/* arch/arm/plat-samsung/include/plat/regs-serial.h
+- *
+- *  From linux/include/asm-arm/hardware/serial_s3c2410.h
+- *
+- *  Internal header file for Samsung S3C2410 serial ports (UART0-2)
+- *
+- *  Copyright (C) 2002 Shane Nay (shane at minirl.com)
+- *
+- *  Additional defines, Copyright 2003 Simtec Electronics (linux at simtec.co.uk)
+- *
+- *  Adapted from:
+- *
+- *  Internal header file for MX1ADS serial ports (UART1 & 2)
+- *
+- *  Copyright (C) 2002 Shane Nay (shane at minirl.com)
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+-*/
+-
+-#ifndef __ASM_ARM_REGS_SERIAL_H
+-#define __ASM_ARM_REGS_SERIAL_H
+-
+-#define S3C24XX_VA_UART0      (S3C_VA_UART)
+-#define S3C24XX_VA_UART1      (S3C_VA_UART + 0x4000 )
+-#define S3C24XX_VA_UART2      (S3C_VA_UART + 0x8000 )
+-#define S3C24XX_VA_UART3      (S3C_VA_UART + 0xC000 )
+-
+-#define S3C2410_PA_UART0      (S3C24XX_PA_UART)
+-#define S3C2410_PA_UART1      (S3C24XX_PA_UART + 0x4000 )
+-#define S3C2410_PA_UART2      (S3C24XX_PA_UART + 0x8000 )
+-#define S3C2443_PA_UART3      (S3C24XX_PA_UART + 0xC000 )
+-
+-#define S3C2410_URXH	  (0x24)
+-#define S3C2410_UTXH	  (0x20)
+-#define S3C2410_ULCON	  (0x00)
+-#define S3C2410_UCON	  (0x04)
+-#define S3C2410_UFCON	  (0x08)
+-#define S3C2410_UMCON	  (0x0C)
+-#define S3C2410_UBRDIV	  (0x28)
+-#define S3C2410_UTRSTAT	  (0x10)
+-#define S3C2410_UERSTAT	  (0x14)
+-#define S3C2410_UFSTAT	  (0x18)
+-#define S3C2410_UMSTAT	  (0x1C)
+-
+-#define S3C2410_LCON_CFGMASK	  ((0xF<<3)|(0x3))
+-
+-#define S3C2410_LCON_CS5	  (0x0)
+-#define S3C2410_LCON_CS6	  (0x1)
+-#define S3C2410_LCON_CS7	  (0x2)
+-#define S3C2410_LCON_CS8	  (0x3)
+-#define S3C2410_LCON_CSMASK	  (0x3)
+-
+-#define S3C2410_LCON_PNONE	  (0x0)
+-#define S3C2410_LCON_PEVEN	  (0x5 << 3)
+-#define S3C2410_LCON_PODD	  (0x4 << 3)
+-#define S3C2410_LCON_PMASK	  (0x7 << 3)
+-
+-#define S3C2410_LCON_STOPB	  (1<<2)
+-#define S3C2410_LCON_IRM          (1<<6)
+-
+-#define S3C2440_UCON_CLKMASK	  (3<<10)
+-#define S3C2440_UCON_CLKSHIFT	  (10)
+-#define S3C2440_UCON_PCLK	  (0<<10)
+-#define S3C2440_UCON_UCLK	  (1<<10)
+-#define S3C2440_UCON_PCLK2	  (2<<10)
+-#define S3C2440_UCON_FCLK	  (3<<10)
+-#define S3C2443_UCON_EPLL	  (3<<10)
+-
+-#define S3C6400_UCON_CLKMASK	(3<<10)
+-#define S3C6400_UCON_CLKSHIFT	(10)
+-#define S3C6400_UCON_PCLK	(0<<10)
+-#define S3C6400_UCON_PCLK2	(2<<10)
+-#define S3C6400_UCON_UCLK0	(1<<10)
+-#define S3C6400_UCON_UCLK1	(3<<10)
+-
+-#define S3C2440_UCON2_FCLK_EN	  (1<<15)
+-#define S3C2440_UCON0_DIVMASK	  (15 << 12)
+-#define S3C2440_UCON1_DIVMASK	  (15 << 12)
+-#define S3C2440_UCON2_DIVMASK	  (7 << 12)
+-#define S3C2440_UCON_DIVSHIFT	  (12)
+-
+-#define S3C2412_UCON_CLKMASK	(3<<10)
+-#define S3C2412_UCON_CLKSHIFT	(10)
+-#define S3C2412_UCON_UCLK	(1<<10)
+-#define S3C2412_UCON_USYSCLK	(3<<10)
+-#define S3C2412_UCON_PCLK	(0<<10)
+-#define S3C2412_UCON_PCLK2	(2<<10)
+-
+-#define S3C2410_UCON_CLKMASK	(1 << 10)
+-#define S3C2410_UCON_CLKSHIFT	(10)
+-#define S3C2410_UCON_UCLK	  (1<<10)
+-#define S3C2410_UCON_SBREAK	  (1<<4)
+-
+-#define S3C2410_UCON_TXILEVEL	  (1<<9)
+-#define S3C2410_UCON_RXILEVEL	  (1<<8)
+-#define S3C2410_UCON_TXIRQMODE	  (1<<2)
+-#define S3C2410_UCON_RXIRQMODE	  (1<<0)
+-#define S3C2410_UCON_RXFIFO_TOI	  (1<<7)
+-#define S3C2443_UCON_RXERR_IRQEN  (1<<6)
+-#define S3C2443_UCON_LOOPBACK	  (1<<5)
+-
+-#define S3C2410_UCON_DEFAULT	  (S3C2410_UCON_TXILEVEL  | \
+-				   S3C2410_UCON_RXILEVEL  | \
+-				   S3C2410_UCON_TXIRQMODE | \
+-				   S3C2410_UCON_RXIRQMODE | \
+-				   S3C2410_UCON_RXFIFO_TOI)
+-
+-#define S3C2410_UFCON_FIFOMODE	  (1<<0)
+-#define S3C2410_UFCON_TXTRIG0	  (0<<6)
+-#define S3C2410_UFCON_RXTRIG8	  (1<<4)
+-#define S3C2410_UFCON_RXTRIG12	  (2<<4)
+-
+-/* S3C2440 FIFO trigger levels */
+-#define S3C2440_UFCON_RXTRIG1	  (0<<4)
+-#define S3C2440_UFCON_RXTRIG8	  (1<<4)
+-#define S3C2440_UFCON_RXTRIG16	  (2<<4)
+-#define S3C2440_UFCON_RXTRIG32	  (3<<4)
+-
+-#define S3C2440_UFCON_TXTRIG0	  (0<<6)
+-#define S3C2440_UFCON_TXTRIG16	  (1<<6)
+-#define S3C2440_UFCON_TXTRIG32	  (2<<6)
+-#define S3C2440_UFCON_TXTRIG48	  (3<<6)
+-
+-#define S3C2410_UFCON_RESETBOTH	  (3<<1)
+-#define S3C2410_UFCON_RESETTX	  (1<<2)
+-#define S3C2410_UFCON_RESETRX	  (1<<1)
+-
+-#define S3C2410_UFCON_DEFAULT	  (S3C2410_UFCON_FIFOMODE | \
+-				   S3C2410_UFCON_TXTRIG0  | \
+-				   S3C2410_UFCON_RXTRIG8 )
+-
+-#define	S3C2410_UMCOM_AFC	  (1<<4)
+-#define	S3C2410_UMCOM_RTS_LOW	  (1<<0)
+-
+-#define S3C2412_UMCON_AFC_63	(0<<5)		/* same as s3c2443 */
+-#define S3C2412_UMCON_AFC_56	(1<<5)
+-#define S3C2412_UMCON_AFC_48	(2<<5)
+-#define S3C2412_UMCON_AFC_40	(3<<5)
+-#define S3C2412_UMCON_AFC_32	(4<<5)
+-#define S3C2412_UMCON_AFC_24	(5<<5)
+-#define S3C2412_UMCON_AFC_16	(6<<5)
+-#define S3C2412_UMCON_AFC_8	(7<<5)
+-
+-#define S3C2410_UFSTAT_TXFULL	  (1<<9)
+-#define S3C2410_UFSTAT_RXFULL	  (1<<8)
+-#define S3C2410_UFSTAT_TXMASK	  (15<<4)
+-#define S3C2410_UFSTAT_TXSHIFT	  (4)
+-#define S3C2410_UFSTAT_RXMASK	  (15<<0)
+-#define S3C2410_UFSTAT_RXSHIFT	  (0)
+-
+-/* UFSTAT S3C2443 same as S3C2440 */
+-#define S3C2440_UFSTAT_TXFULL	  (1<<14)
+-#define S3C2440_UFSTAT_RXFULL	  (1<<6)
+-#define S3C2440_UFSTAT_TXSHIFT	  (8)
+-#define S3C2440_UFSTAT_RXSHIFT	  (0)
+-#define S3C2440_UFSTAT_TXMASK	  (63<<8)
+-#define S3C2440_UFSTAT_RXMASK	  (63)
+-
+-#define S3C2410_UTRSTAT_TXE	  (1<<2)
+-#define S3C2410_UTRSTAT_TXFE	  (1<<1)
+-#define S3C2410_UTRSTAT_RXDR	  (1<<0)
+-
+-#define S3C2410_UERSTAT_OVERRUN	  (1<<0)
+-#define S3C2410_UERSTAT_FRAME	  (1<<2)
+-#define S3C2410_UERSTAT_BREAK	  (1<<3)
+-#define S3C2443_UERSTAT_PARITY	  (1<<1)
+-
+-#define S3C2410_UERSTAT_ANY	  (S3C2410_UERSTAT_OVERRUN | \
+-				   S3C2410_UERSTAT_FRAME | \
+-				   S3C2410_UERSTAT_BREAK)
+-
+-#define S3C2410_UMSTAT_CTS	  (1<<0)
+-#define S3C2410_UMSTAT_DeltaCTS	  (1<<2)
+-
+-#define S3C2443_DIVSLOT		  (0x2C)
+-
+-/* S3C64XX interrupt registers. */
+-#define S3C64XX_UINTP		0x30
+-#define S3C64XX_UINTSP		0x34
+-#define S3C64XX_UINTM		0x38
+-
+-#define S3C64XX_UINTM_RXD	(0)
+-#define S3C64XX_UINTM_TXD	(2)
+-#define S3C64XX_UINTM_RXD_MSK	(1 << S3C64XX_UINTM_RXD)
+-#define S3C64XX_UINTM_TXD_MSK	(1 << S3C64XX_UINTM_TXD)
+-
+-/* Following are specific to S5PV210 */
+-#define S5PV210_UCON_CLKMASK	(1<<10)
+-#define S5PV210_UCON_CLKSHIFT	(10)
+-#define S5PV210_UCON_PCLK	(0<<10)
+-#define S5PV210_UCON_UCLK	(1<<10)
+-
+-#define S5PV210_UFCON_TXTRIG0	(0<<8)
+-#define S5PV210_UFCON_TXTRIG4	(1<<8)
+-#define S5PV210_UFCON_TXTRIG8	(2<<8)
+-#define S5PV210_UFCON_TXTRIG16	(3<<8)
+-#define S5PV210_UFCON_TXTRIG32	(4<<8)
+-#define S5PV210_UFCON_TXTRIG64	(5<<8)
+-#define S5PV210_UFCON_TXTRIG128 (6<<8)
+-#define S5PV210_UFCON_TXTRIG256 (7<<8)
+-
+-#define S5PV210_UFCON_RXTRIG1	(0<<4)
+-#define S5PV210_UFCON_RXTRIG4	(1<<4)
+-#define S5PV210_UFCON_RXTRIG8	(2<<4)
+-#define S5PV210_UFCON_RXTRIG16	(3<<4)
+-#define S5PV210_UFCON_RXTRIG32	(4<<4)
+-#define S5PV210_UFCON_RXTRIG64	(5<<4)
+-#define S5PV210_UFCON_RXTRIG128	(6<<4)
+-#define S5PV210_UFCON_RXTRIG256	(7<<4)
+-
+-#define S5PV210_UFSTAT_TXFULL	(1<<24)
+-#define S5PV210_UFSTAT_RXFULL	(1<<8)
+-#define S5PV210_UFSTAT_TXMASK	(255<<16)
+-#define S5PV210_UFSTAT_TXSHIFT	(16)
+-#define S5PV210_UFSTAT_RXMASK	(255<<0)
+-#define S5PV210_UFSTAT_RXSHIFT	(0)
+-
+-#define S3C2410_UCON_CLKSEL0	(1 << 0)
+-#define S3C2410_UCON_CLKSEL1	(1 << 1)
+-#define S3C2410_UCON_CLKSEL2	(1 << 2)
+-#define S3C2410_UCON_CLKSEL3	(1 << 3)
+-
+-/* Default values for s5pv210 UCON and UFCON uart registers */
+-#define S5PV210_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
+-				 S3C2410_UCON_RXILEVEL |	\
+-				 S3C2410_UCON_TXIRQMODE |	\
+-				 S3C2410_UCON_RXIRQMODE |	\
+-				 S3C2410_UCON_RXFIFO_TOI |	\
+-				 S3C2443_UCON_RXERR_IRQEN)
+-
+-#define S5PV210_UFCON_DEFAULT	(S3C2410_UFCON_FIFOMODE |	\
+-				 S5PV210_UFCON_TXTRIG4 |	\
+-				 S5PV210_UFCON_RXTRIG4)
+-
+-#ifndef __ASSEMBLY__
+-
+-/* configuration structure for per-machine configurations for the
+- * serial port
+- *
+- * the pointer is setup by the machine specific initialisation from the
+- * arch/arm/mach-s3c2410/ directory.
+-*/
+-
+-struct s3c2410_uartcfg {
+-	unsigned char	   hwport;	 /* hardware port number */
+-	unsigned char	   unused;
+-	unsigned short	   flags;
+-	upf_t		   uart_flags;	 /* default uart flags */
+-	unsigned int	   clk_sel;
+-
+-	unsigned int	   has_fracval;
+-
+-	unsigned long	   ucon;	 /* value of ucon for port */
+-	unsigned long	   ulcon;	 /* value of ulcon for port */
+-	unsigned long	   ufcon;	 /* value of ufcon for port */
+-};
+-
+-/* s3c24xx_uart_devs
+- *
+- * this is exported from the core as we cannot use driver_register(),
+- * or platform_add_device() before the console_initcall()
+-*/
+-
+-extern struct platform_device *s3c24xx_uart_devs[4];
+-
+-#endif /* __ASSEMBLY__ */
+-
+-#endif /* __ASM_ARM_REGS_SERIAL_H */
+-
++#include <linux/serial_s3c.h>
+diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
+index 603f3f3..729a60d 100644
+--- a/drivers/tty/serial/samsung.c
++++ b/drivers/tty/serial/samsung.c
+@@ -39,6 +39,7 @@
+ #include <linux/tty_flip.h>
+ #include <linux/serial_core.h>
+ #include <linux/serial.h>
++#include <linux/serial_s3c.h>
+ #include <linux/delay.h>
+ #include <linux/clk.h>
+ #include <linux/cpufreq.h>
+@@ -46,10 +47,9 @@
+ 
+ #include <asm/irq.h>
+ 
+-#include <mach/hardware.h>
+-
+-#include <plat/regs-serial.h>
++#ifdef CONFIG_SAMSUNG_CLOCK
+ #include <plat/clock.h>
 +#endif
- 	}
--	nr_irq = max_nr * MAX_IRQ_IN_COMBINER;
-+	if (!max_nr)
-+		return;
-+
-+	nr_irq = max_nr * IRQ_IN_COMBINER;
  
--	irq_base = irq_alloc_descs(COMBINER_IRQ(0, 0), 1, nr_irq, 0);
-+	irq_base = irq_alloc_descs(plat_irq_base, 1, nr_irq, 0);
- 	if (IS_ERR_VALUE(irq_base)) {
--		irq_base = COMBINER_IRQ(0, 0);
-+		irq_base = plat_irq_base;
- 		pr_warning("%s: irq desc alloc failed. Continuing with %d as linux irq base\n", __func__, irq_base);
- 	}
+ #include "samsung.h"
  
--	combiner_irq_domain = irq_domain_add_legacy(np, nr_irq, irq_base, 0,
--				&combiner_irq_domain_ops, &combiner_data);
--	if (WARN_ON(!combiner_irq_domain)) {
-+	combiner_data = kcalloc(max_nr, sizeof *combiner_data, GFP_KERNEL);
-+	if (WARN_ON(!combiner_data)) {
-+		pr_warning("%s: combiner data alloc failed\n", __func__);
-+		return;
-+	}
-+
-+	domain = irq_domain_add_legacy(np, nr_irq, irq_base, 0,
-+				&combiner_irq_domain_ops, combiner_data);
-+	if (WARN_ON(!domain)) {
- 		pr_warning("%s: irq domain init failed\n", __func__);
- 		return;
- 	}
- 
- 	for (i = 0; i < max_nr; i++) {
--		combiner_init_one(i, combiner_base + (i >> 2) * 0x10);
-+		struct combiner_chip_data *data = &combiner_data[i];
-+
-+		data->base = combiner_base + (i >> 2) * 0x10;
-+		data->irq_offset = irq_find_mapping(domain,
-+				   i * IRQ_IN_COMBINER);
-+		data->irq_mask = 0xff << ((i % 4) << 3);
-+
-+		/* Disable all interrupts */
-+		__raw_writel(data->irq_mask,
-+			     data->base + COMBINER_ENABLE_CLEAR);
-+
-+#ifdef CONFIG_EXYNOS_ATAGS
- 		irq = IRQ_SPI(i);
-+#else
-+		irq = 0;
-+#endif
- #ifdef CONFIG_OF
- 		if (np)
- 			irq = irq_of_parse_and_map(np, i);
- #endif
--		combiner_cascade_irq(i, irq);
-+		if (irq_set_handler_data(irq, &combiner_data[i]) != 0)
-+			BUG();
-+		irq_set_chained_handler(irq, combiner_handle_cascade_irq);
- 	}
- }
- 
--#ifdef CONFIG_OF
-+#ifdef CONFIG_EXYNOS_IRQDOMAIN_CONVERSION_COMPLETE
+diff --git a/include/linux/serial_s3c.h b/include/linux/serial_s3c.h
+new file mode 100644
+index 0000000..907d9d1
+--- /dev/null
++++ b/include/linux/serial_s3c.h
+@@ -0,0 +1,260 @@
 +/*
-+ * we can only renable this one after all hardcoded IRQ numbers
-+ * are gone from DT booted systems and we can allow picking
-+ * an arbitrary irq_base.
-+ */ 
- static int __init combiner_of_init(struct device_node *np,
- 				   struct device_node *parent)
- {
-@@ -221,7 +228,7 @@ static int __init combiner_of_init(struct device_node *np,
- 		return -ENXIO;
- 	}
- 
--	combiner_init(combiner_base, np);
-+	combiner_init(combiner_base, -1, np);
- 
- 	return 0;
- }
++ *  Internal header file for Samsung S3C2410 serial ports (UART0-2)
++ *
++ *  Copyright (C) 2002 Shane Nay (shane at minirl.com)
++ *
++ *  Additional defines, Copyright 2003 Simtec Electronics (linux at simtec.co.uk)
++ *
++ *  Adapted from:
++ *
++ *  Internal header file for MX1ADS serial ports (UART1 & 2)
++ *
++ *  Copyright (C) 2002 Shane Nay (shane at minirl.com)
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++*/
++
++#ifndef __ASM_ARM_REGS_SERIAL_H
++#define __ASM_ARM_REGS_SERIAL_H
++
++#define S3C2410_URXH	  (0x24)
++#define S3C2410_UTXH	  (0x20)
++#define S3C2410_ULCON	  (0x00)
++#define S3C2410_UCON	  (0x04)
++#define S3C2410_UFCON	  (0x08)
++#define S3C2410_UMCON	  (0x0C)
++#define S3C2410_UBRDIV	  (0x28)
++#define S3C2410_UTRSTAT	  (0x10)
++#define S3C2410_UERSTAT	  (0x14)
++#define S3C2410_UFSTAT	  (0x18)
++#define S3C2410_UMSTAT	  (0x1C)
++
++#define S3C2410_LCON_CFGMASK	  ((0xF<<3)|(0x3))
++
++#define S3C2410_LCON_CS5	  (0x0)
++#define S3C2410_LCON_CS6	  (0x1)
++#define S3C2410_LCON_CS7	  (0x2)
++#define S3C2410_LCON_CS8	  (0x3)
++#define S3C2410_LCON_CSMASK	  (0x3)
++
++#define S3C2410_LCON_PNONE	  (0x0)
++#define S3C2410_LCON_PEVEN	  (0x5 << 3)
++#define S3C2410_LCON_PODD	  (0x4 << 3)
++#define S3C2410_LCON_PMASK	  (0x7 << 3)
++
++#define S3C2410_LCON_STOPB	  (1<<2)
++#define S3C2410_LCON_IRM          (1<<6)
++
++#define S3C2440_UCON_CLKMASK	  (3<<10)
++#define S3C2440_UCON_CLKSHIFT	  (10)
++#define S3C2440_UCON_PCLK	  (0<<10)
++#define S3C2440_UCON_UCLK	  (1<<10)
++#define S3C2440_UCON_PCLK2	  (2<<10)
++#define S3C2440_UCON_FCLK	  (3<<10)
++#define S3C2443_UCON_EPLL	  (3<<10)
++
++#define S3C6400_UCON_CLKMASK	(3<<10)
++#define S3C6400_UCON_CLKSHIFT	(10)
++#define S3C6400_UCON_PCLK	(0<<10)
++#define S3C6400_UCON_PCLK2	(2<<10)
++#define S3C6400_UCON_UCLK0	(1<<10)
++#define S3C6400_UCON_UCLK1	(3<<10)
++
++#define S3C2440_UCON2_FCLK_EN	  (1<<15)
++#define S3C2440_UCON0_DIVMASK	  (15 << 12)
++#define S3C2440_UCON1_DIVMASK	  (15 << 12)
++#define S3C2440_UCON2_DIVMASK	  (7 << 12)
++#define S3C2440_UCON_DIVSHIFT	  (12)
++
++#define S3C2412_UCON_CLKMASK	(3<<10)
++#define S3C2412_UCON_CLKSHIFT	(10)
++#define S3C2412_UCON_UCLK	(1<<10)
++#define S3C2412_UCON_USYSCLK	(3<<10)
++#define S3C2412_UCON_PCLK	(0<<10)
++#define S3C2412_UCON_PCLK2	(2<<10)
++
++#define S3C2410_UCON_CLKMASK	(1 << 10)
++#define S3C2410_UCON_CLKSHIFT	(10)
++#define S3C2410_UCON_UCLK	  (1<<10)
++#define S3C2410_UCON_SBREAK	  (1<<4)
++
++#define S3C2410_UCON_TXILEVEL	  (1<<9)
++#define S3C2410_UCON_RXILEVEL	  (1<<8)
++#define S3C2410_UCON_TXIRQMODE	  (1<<2)
++#define S3C2410_UCON_RXIRQMODE	  (1<<0)
++#define S3C2410_UCON_RXFIFO_TOI	  (1<<7)
++#define S3C2443_UCON_RXERR_IRQEN  (1<<6)
++#define S3C2443_UCON_LOOPBACK	  (1<<5)
++
++#define S3C2410_UCON_DEFAULT	  (S3C2410_UCON_TXILEVEL  | \
++				   S3C2410_UCON_RXILEVEL  | \
++				   S3C2410_UCON_TXIRQMODE | \
++				   S3C2410_UCON_RXIRQMODE | \
++				   S3C2410_UCON_RXFIFO_TOI)
++
++#define S3C2410_UFCON_FIFOMODE	  (1<<0)
++#define S3C2410_UFCON_TXTRIG0	  (0<<6)
++#define S3C2410_UFCON_RXTRIG8	  (1<<4)
++#define S3C2410_UFCON_RXTRIG12	  (2<<4)
++
++/* S3C2440 FIFO trigger levels */
++#define S3C2440_UFCON_RXTRIG1	  (0<<4)
++#define S3C2440_UFCON_RXTRIG8	  (1<<4)
++#define S3C2440_UFCON_RXTRIG16	  (2<<4)
++#define S3C2440_UFCON_RXTRIG32	  (3<<4)
++
++#define S3C2440_UFCON_TXTRIG0	  (0<<6)
++#define S3C2440_UFCON_TXTRIG16	  (1<<6)
++#define S3C2440_UFCON_TXTRIG32	  (2<<6)
++#define S3C2440_UFCON_TXTRIG48	  (3<<6)
++
++#define S3C2410_UFCON_RESETBOTH	  (3<<1)
++#define S3C2410_UFCON_RESETTX	  (1<<2)
++#define S3C2410_UFCON_RESETRX	  (1<<1)
++
++#define S3C2410_UFCON_DEFAULT	  (S3C2410_UFCON_FIFOMODE | \
++				   S3C2410_UFCON_TXTRIG0  | \
++				   S3C2410_UFCON_RXTRIG8 )
++
++#define	S3C2410_UMCOM_AFC	  (1<<4)
++#define	S3C2410_UMCOM_RTS_LOW	  (1<<0)
++
++#define S3C2412_UMCON_AFC_63	(0<<5)		/* same as s3c2443 */
++#define S3C2412_UMCON_AFC_56	(1<<5)
++#define S3C2412_UMCON_AFC_48	(2<<5)
++#define S3C2412_UMCON_AFC_40	(3<<5)
++#define S3C2412_UMCON_AFC_32	(4<<5)
++#define S3C2412_UMCON_AFC_24	(5<<5)
++#define S3C2412_UMCON_AFC_16	(6<<5)
++#define S3C2412_UMCON_AFC_8	(7<<5)
++
++#define S3C2410_UFSTAT_TXFULL	  (1<<9)
++#define S3C2410_UFSTAT_RXFULL	  (1<<8)
++#define S3C2410_UFSTAT_TXMASK	  (15<<4)
++#define S3C2410_UFSTAT_TXSHIFT	  (4)
++#define S3C2410_UFSTAT_RXMASK	  (15<<0)
++#define S3C2410_UFSTAT_RXSHIFT	  (0)
++
++/* UFSTAT S3C2443 same as S3C2440 */
++#define S3C2440_UFSTAT_TXFULL	  (1<<14)
++#define S3C2440_UFSTAT_RXFULL	  (1<<6)
++#define S3C2440_UFSTAT_TXSHIFT	  (8)
++#define S3C2440_UFSTAT_RXSHIFT	  (0)
++#define S3C2440_UFSTAT_TXMASK	  (63<<8)
++#define S3C2440_UFSTAT_RXMASK	  (63)
++
++#define S3C2410_UTRSTAT_TXE	  (1<<2)
++#define S3C2410_UTRSTAT_TXFE	  (1<<1)
++#define S3C2410_UTRSTAT_RXDR	  (1<<0)
++
++#define S3C2410_UERSTAT_OVERRUN	  (1<<0)
++#define S3C2410_UERSTAT_FRAME	  (1<<2)
++#define S3C2410_UERSTAT_BREAK	  (1<<3)
++#define S3C2443_UERSTAT_PARITY	  (1<<1)
++
++#define S3C2410_UERSTAT_ANY	  (S3C2410_UERSTAT_OVERRUN | \
++				   S3C2410_UERSTAT_FRAME | \
++				   S3C2410_UERSTAT_BREAK)
++
++#define S3C2410_UMSTAT_CTS	  (1<<0)
++#define S3C2410_UMSTAT_DeltaCTS	  (1<<2)
++
++#define S3C2443_DIVSLOT		  (0x2C)
++
++/* S3C64XX interrupt registers. */
++#define S3C64XX_UINTP		0x30
++#define S3C64XX_UINTSP		0x34
++#define S3C64XX_UINTM		0x38
++
++#define S3C64XX_UINTM_RXD	(0)
++#define S3C64XX_UINTM_TXD	(2)
++#define S3C64XX_UINTM_RXD_MSK	(1 << S3C64XX_UINTM_RXD)
++#define S3C64XX_UINTM_TXD_MSK	(1 << S3C64XX_UINTM_TXD)
++
++/* Following are specific to S5PV210 */
++#define S5PV210_UCON_CLKMASK	(1<<10)
++#define S5PV210_UCON_CLKSHIFT	(10)
++#define S5PV210_UCON_PCLK	(0<<10)
++#define S5PV210_UCON_UCLK	(1<<10)
++
++#define S5PV210_UFCON_TXTRIG0	(0<<8)
++#define S5PV210_UFCON_TXTRIG4	(1<<8)
++#define S5PV210_UFCON_TXTRIG8	(2<<8)
++#define S5PV210_UFCON_TXTRIG16	(3<<8)
++#define S5PV210_UFCON_TXTRIG32	(4<<8)
++#define S5PV210_UFCON_TXTRIG64	(5<<8)
++#define S5PV210_UFCON_TXTRIG128 (6<<8)
++#define S5PV210_UFCON_TXTRIG256 (7<<8)
++
++#define S5PV210_UFCON_RXTRIG1	(0<<4)
++#define S5PV210_UFCON_RXTRIG4	(1<<4)
++#define S5PV210_UFCON_RXTRIG8	(2<<4)
++#define S5PV210_UFCON_RXTRIG16	(3<<4)
++#define S5PV210_UFCON_RXTRIG32	(4<<4)
++#define S5PV210_UFCON_RXTRIG64	(5<<4)
++#define S5PV210_UFCON_RXTRIG128	(6<<4)
++#define S5PV210_UFCON_RXTRIG256	(7<<4)
++
++#define S5PV210_UFSTAT_TXFULL	(1<<24)
++#define S5PV210_UFSTAT_RXFULL	(1<<8)
++#define S5PV210_UFSTAT_TXMASK	(255<<16)
++#define S5PV210_UFSTAT_TXSHIFT	(16)
++#define S5PV210_UFSTAT_RXMASK	(255<<0)
++#define S5PV210_UFSTAT_RXSHIFT	(0)
++
++#define S3C2410_UCON_CLKSEL0	(1 << 0)
++#define S3C2410_UCON_CLKSEL1	(1 << 1)
++#define S3C2410_UCON_CLKSEL2	(1 << 2)
++#define S3C2410_UCON_CLKSEL3	(1 << 3)
++
++/* Default values for s5pv210 UCON and UFCON uart registers */
++#define S5PV210_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
++				 S3C2410_UCON_RXILEVEL |	\
++				 S3C2410_UCON_TXIRQMODE |	\
++				 S3C2410_UCON_RXIRQMODE |	\
++				 S3C2410_UCON_RXFIFO_TOI |	\
++				 S3C2443_UCON_RXERR_IRQEN)
++
++#define S5PV210_UFCON_DEFAULT	(S3C2410_UFCON_FIFOMODE |	\
++				 S5PV210_UFCON_TXTRIG4 |	\
++				 S5PV210_UFCON_RXTRIG4)
++
++#ifndef __ASSEMBLY__
++
++/* configuration structure for per-machine configurations for the
++ * serial port
++ *
++ * the pointer is setup by the machine specific initialisation from the
++ * arch/arm/mach-s3c2410/ directory.
++*/
++
++struct s3c2410_uartcfg {
++	unsigned char	   hwport;	 /* hardware port number */
++	unsigned char	   unused;
++	unsigned short	   flags;
++	upf_t		   uart_flags;	 /* default uart flags */
++	unsigned int	   clk_sel;
++
++	unsigned int	   has_fracval;
++
++	unsigned long	   ucon;	 /* value of ucon for port */
++	unsigned long	   ulcon;	 /* value of ulcon for port */
++	unsigned long	   ufcon;	 /* value of ufcon for port */
++};
++
++#endif /* __ASSEMBLY__ */
++
++#endif /* __ASM_ARM_REGS_SERIAL_H */
++
 -- 
 1.8.1.2
