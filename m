@@ -1,46 +1,52 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue,  5 Mar 2013 16:13:35 +0100
-Subject: [PATCH] ARM: mxs: cfa10049: Fix fb initialisation function
-Message-ID: <1362496415-6986-1-git-send-email-maxime.ripard@free-electrons.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 5 Mar 2013 23:20:44 +0800
+Subject: v3.9-rc1: [BUG: swapper/1 still has locks held!]
+In-Reply-To: <20130304025206.GB30431@S2101-09.ap.freescale.net>
+References: <20130304025206.GB30431@S2101-09.ap.freescale.net>
+Message-ID: <20130305152041.GA23742@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 1fe42740 ("ARM: dts: mxs: Add the LCD to the 10049 board") seem
-to have been applied with some fuzzyness, and the framebuffer
-initialisation code for the CFA-10049 ended up in the CFA-10037
-initialisation function.
+On Mon, Mar 04, 2013 at 10:52:10AM +0800, Shawn Guo wrote:
+> I'm running v3.9-rc1 kernel on an ARM platform (i.MX28) with
+> arch/arm/mxs_defconfig and getting the following BUG warning.
+> 
+git bisect points me to the commit 6aa9707 (lockdep: check that no locks
+held at freeze time).
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/mach-mxs/mach-mxs.c |   10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+Shawn
 
-diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
-index 0521867..3218f1f 100644
---- a/arch/arm/mach-mxs/mach-mxs.c
-+++ b/arch/arm/mach-mxs/mach-mxs.c
-@@ -402,17 +402,17 @@ static void __init cfa10049_init(void)
- {
- 	enable_clk_enet_out();
- 	update_fec_mac_prop(OUI_CRYSTALFONTZ);
-+
-+	mxsfb_pdata.mode_list = cfa10049_video_modes;
-+	mxsfb_pdata.mode_count = ARRAY_SIZE(cfa10049_video_modes);
-+	mxsfb_pdata.default_bpp = 32;
-+	mxsfb_pdata.ld_intf_width = STMLCDIF_18BIT;
- }
- 
- static void __init cfa10037_init(void)
- {
- 	enable_clk_enet_out();
- 	update_fec_mac_prop(OUI_CRYSTALFONTZ);
--
--	mxsfb_pdata.mode_list = cfa10049_video_modes;
--	mxsfb_pdata.mode_count = ARRAY_SIZE(cfa10049_video_modes);
--	mxsfb_pdata.default_bpp = 32;
--	mxsfb_pdata.ld_intf_width = STMLCDIF_18BIT;
- }
- 
- static void __init apf28_init(void)
--- 
-1.7.10.4
+> [    5.681034] =====================================
+> [    5.685885] [ BUG: swapper/1 still has locks held! ]
+> [    5.690885] 3.9.0-rc1 #774 Not tainted
+> [    5.694734] -------------------------------------
+> [    5.699475] 2 locks held by swapper/1:
+> [    5.703323]  #0:  (&sig->cred_guard_mutex){+.+.+.}, at: [<c00d20e0>] prepare_bprm_creds+0x28/0x64
+> [    5.712326]  #1:  (&type->i_mutex_dir_key){+.+.+.}, at: [<c00d5350>] lookup_slow+0x2c/0xa0
+> [    5.720966]
+> [    5.720966] stack backtrace:
+> [    5.725528] [<c0013c78>] (unwind_backtrace+0x0/0xf0) from [<c0426f94>] (rpc_wait_bit_killable+0x94/0xb4)
+> [    5.735184] [<c0426f94>] (rpc_wait_bit_killable+0x94/0xb4) from [<c044684c>] (__wait_on_bit+0x74/0xb8)
+> [    5.744645] [<c044684c>] (__wait_on_bit+0x74/0xb8) from [<c04468f4>] (out_of_line_wait_on_bit+0x64/0x70)
+> [    5.754278] [<c04468f4>] (out_of_line_wait_on_bit+0x64/0x70) from [<c0427e38>] (__rpc_execute+0xf4/0x370)
+> [    5.763991] [<c0427e38>] (__rpc_execute+0xf4/0x370) from [<c042124c>] (rpc_run_task+0xa4/0xb0)
+> [    5.772660] [<c042124c>] (rpc_run_task+0xa4/0xb0) from [<c0421350>] (rpc_call_sync+0x40/0xac)
+> [    5.781335] [<c0421350>] (rpc_call_sync+0x40/0xac) from [<c01c2e08>] (nfs3_rpc_wrapper.constprop.6+0x58/0xdc)
+> [    5.791406] [<c01c2e08>] (nfs3_rpc_wrapper.constprop.6+0x58/0xdc) from [<c01c2fbc>] (nfs3_proc_lookup+0x88/0xf4)
+> [    5.801751] [<c01c2fbc>] (nfs3_proc_lookup+0x88/0xf4) from [<c01b282c>] (nfs_lookup+0xe8/0x18c)
+> [    5.810659] [<c01b282c>] (nfs_lookup+0xe8/0x18c) from [<c00d49f8>] (lookup_real+0x20/0x50)
+> [    5.819097] [<c00d49f8>] (lookup_real+0x20/0x50) from [<c00d5314>] (__lookup_hash+0x34/0x44)
+> [    5.827696] [<c00d5314>] (__lookup_hash+0x34/0x44) from [<c00d5360>] (lookup_slow+0x3c/0xa0)
+> [    5.836297] [<c00d5360>] (lookup_slow+0x3c/0xa0) from [<c00d61bc>] (link_path_walk+0x2a4/0x848)
+> [    5.845144] [<c00d61bc>] (link_path_walk+0x2a4/0x848) from [<c00d9204>] (path_openat+0x278/0x444)
+> [    5.854176] [<c00d9204>] (path_openat+0x278/0x444) from [<c00d96cc>] (do_filp_open+0x2c/0x80)
+> [    5.862755] [<c00d96cc>] (do_filp_open+0x2c/0x80) from [<c00d12fc>] (open_exec+0x30/0x10c)
+> [    5.871166] [<c00d12fc>] (open_exec+0x30/0x10c) from [<c00d232c>] (do_execve+0x1b8/0x4c4)
+> [    5.879500] [<c00d232c>] (do_execve+0x1b8/0x4c4) from [<c0440b54>] (kernel_init+0x80/0xe4)
+> [    5.887963] [<c0440b54>] (kernel_init+0x80/0xe4) from [<c000e9c8>] (ret_from_fork+0x14/0x2c)
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
