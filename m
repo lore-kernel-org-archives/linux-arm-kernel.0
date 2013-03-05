@@ -1,47 +1,35 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Tue, 5 Mar 2013 15:36:48 +0530
-Subject: [PATCH] ARM: dts: Modify SPI nodes according generic DMA DT
- bindings
-In-Reply-To: <1362477862-352-1-git-send-email-padma.v@samsung.com>
-References: <1362477862-352-1-git-send-email-padma.v@samsung.com>
-Message-ID: <CAK9yfHwmjwN4ceCQ719Y2DY9keTEX8mt65bHkoHcTTRJc5p9rA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 05 Mar 2013 11:15:41 +0100
+Subject: [PATCH] dma: of-dma: return error when 'dma-cells' not found
+In-Reply-To: <5135BE58.4040105@gmail.com>
+References: <1362475531-32260-1-git-send-email-padma.v@samsung.com>
+ <5135BE58.4040105@gmail.com>
+Message-ID: <1859273.NY466Orvuh@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 March 2013 15:34, Padmavathi Venna <padma.v@samsung.com> wrote:
-> This patch removes custom way of adding spi dma channels and
-> adds according to new generic DMA DT bindings on samsung exynos4
-> and exynos5440 platforms.
->
-> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos4.dtsi    |   15 +++++++++------
->  arch/arm/boot/dts/exynos5440.dtsi |    5 +++--
->  2 files changed, 12 insertions(+), 8 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
-> index 1a62bcf..2449651 100644
-> --- a/arch/arm/boot/dts/exynos4.dtsi
-> +++ b/arch/arm/boot/dts/exynos4.dtsi
-> @@ -235,8 +235,9 @@
->                 compatible = "samsung,exynos4210-spi";
->                 reg = <0x13920000 0x100>;
->                 interrupts = <0 66 0>;
-> -               tx-dma-channel = <&pdma0 7>; /* preliminary */
-> -               rx-dma-channel = <&pdma0 6>; /* preliminary */
-> +               dmas = <&pdma0 7
-> +                       &pdma0 6>;
-> +               dma-names = "tx", "rx";
->                 #address-cells = <1>;
->                 #size-cells = <0>;
->                 status = "disabled";
-> @@ -246,8 +247,9 @@
->                 compatible = "samsung,exynos4210-spi";
->                 reg = <0x13930000 0x100>;
->                 interrupts = <0 67 0>;
-> -               tx-dma-channel = <&pdma1 7>; /* preliminary */
-> -               rx-dma-channel = <&pdma1 6>; /* preliminary */
-> +               dmas = <&pdma0 7
-> +                       &pdma0 6>;
+On Tuesday 05 March 2013 03:43:52 Rob Herring wrote:
+> On 03/05/2013 03:25 AM, Padmavathi Venna wrote:
+> > This patch returns error when 'dma-cells' property not found
+> > in the corresponding device node. With out this change there
+> > is a crash in the generic dma incompatible platforms.
+> > 
+> > Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+> 
+> NAK.
+> 
+> #dma-cells should be optional. It is not needed for platforms supporting
+> memory to memory transfers only and should therefore be optional. You
+> cannot assume the dtb can be updated and kernel changes need to work
+> with old dtbs. I've submitted patches to address this and fix the crash:
+> 
+> https://lists.ozlabs.org/pipermail/devicetree-discuss/2013-February/028769.html
 
-Shouldn't these be pdma1 as was earlier?
+Why would you call of_dma_controller_register() for a dma
+engine that does not support slave channels, when that is the
+only purpose of that interface?
+
+Note that the binding defines #dma-cells as required, and it
+does not make any sense otherwise.
+
+	Arnd
