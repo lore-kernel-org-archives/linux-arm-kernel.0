@@ -1,58 +1,143 @@
-From: prakash.pm@ti.com (Manjunathappa, Prakash)
-Date: Tue, 5 Mar 2013 13:45:46 +0000
-Subject: [PATCH v2 1/4] spi/davinci: add DT binding documentation
-In-Reply-To: <5135F316.6030007@ti.com>
-References: <1362401955-9616-1-git-send-email-prakash.pm@ti.com>
- <1362401955-9616-2-git-send-email-prakash.pm@ti.com>
- <6918845.dALXSKksQd@wuerfel>
- <A73F36158E33644199EB82C5EC81C7BC3EA4854E@DBDE01.ent.ti.com>
- <5135F316.6030007@ti.com>
-Message-ID: <A73F36158E33644199EB82C5EC81C7BC3EA4856F@DBDE01.ent.ti.com>
+From: alvaro.moran@parrot.com (Alvaro Moran)
+Date: Tue, 5 Mar 2013 14:43:35 +0100
+Subject: [PATCH 1/1] DMA: PL330: No latency implementation of cyclic transfers
+In-Reply-To: <y>
+References: <y>
+Message-ID: <1362491015-14298-1-git-send-email-alvaro.moran@parrot.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 05, 2013 at 18:58:54, Nori, Sekhar wrote:
-> 
-> 
-> On 3/5/2013 6:26 PM, Manjunathappa, Prakash wrote:
-> > Hi Arnd,
-> > 
-> > On Mon, Mar 04, 2013 at 21:59:16, Arnd Bergmann wrote:
-> >> On Monday 04 March 2013 18:29:12 Manjunathappa, Prakash wrote:
-> >>> diff --git a/Documentation/devicetree/bindings/spi/spi-davinci.txt b/Documentation/devicetree/bindings/spi/spi-davinci.txt
-> >>> new file mode 100644
-> >>> index 0000000..a62d7a8
-> >>> --- /dev/null
-> >>> +++ b/Documentation/devicetree/bindings/spi/spi-davinci.txt
-> >>> @@ -0,0 +1,51 @@
-> >>> +Davinci SPI controller device bindings
-> >>> +
-> >>> +Required properties:
-> >>> +- #address-cells: number of cells required to define a chip select
-> >>> +	address on the SPI bus. Should be set to 1.
-> >>> +- #size-cells: should be zero.
-> >>> +- compatible:
-> >>> +	- "ti,dm644x-spi" for SPI used similar to that on DM644x SoC family
-> >>> +	- "ti,da8xx-spi" for SPI used similar to that on DA8xx SoC family
-> >>
-> >> In general, you should avoid wildcards in "compatible" properties.
-> >> Better use the number of the first chip that introduced the specific
-> >> version of the device.
-> >>
-> > 
-> > Correct, will accommodate this change.
-> 
-> But note that this patch is just documenting bindings already accepted
-> and part of kernel. You probably need another patch which fixes the
-> incorrect bindings and this one can then document in fixed bindings.
-> 
+So far the cyclic implementation was limited to recycling over submitted
+requests. This patch uses the total buffer length and the period length
+to define a set of periods. A microcode with a "loop forever" instruction
+is then generated to have the DMA constantly running. (If there is enough
+space to generate the microcode).
+This removes the latency between each period transferred, since the
+period callback is executed at the same time as the copy of the next
+period goes on.
 
-Correct Sekhar I meant the same. I will have patch for driver to accommodate
-above change and a patch for missing binding document.
+Signed-off-by: Alvaro Moran <alvaro.moran@parrot.com>
+---
+ drivers/dma/pl330.c |   64 ++++++++++++++++++++++++++++++++++++++++++++++-----
+ 1 file changed, 58 insertions(+), 6 deletions(-)
 
-Thanks,
-Prakash
-
-> Thanks,
-> Sekhar
-> 
+diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+index 7181531..e8d494e 100644
+--- a/drivers/dma/pl330.c
++++ b/drivers/dma/pl330.c
+@@ -367,6 +367,8 @@ struct pl330_xfer {
+ 	 * The last xfer in the req must point to NULL.
+ 	 */
+ 	struct pl330_xfer *next;
++	/* Number of periods to execute in cyclic mode */
++	u32 periods;
+ };
+ 
+ /* The xfer callbacks are made with one of these arguments. */
+@@ -1439,6 +1441,42 @@ static inline int _setup_xfer(unsigned dry_run, u8 buf[],
+ 	return off;
+ }
+ 
++static inline int _setup_xfer_cyclic(unsigned dry_run, u8 buf[],
++		const struct _xfer_spec *pxs, int ev)
++{
++	struct pl330_xfer *x = pxs->x;
++	int off = 0;
++	int lfe, i;
++	struct _arg_LPEND lpend;
++
++	/* Mark loop forever start */
++	lfe = off;
++
++	/* DMAMOV SAR, x->src_addr */
++	off += _emit_MOV(dry_run, &buf[off], SAR, x->src_addr);
++	/* DMAMOV DAR, x->dst_addr */
++	off += _emit_MOV(dry_run, &buf[off], DAR, x->dst_addr);
++
++	/* Setup Loop(s) */
++	for (i = 0; i < x->periods; i++) {
++		off += _setup_loops(dry_run, &buf[off], pxs);
++
++		/* Signal event */
++		off += _emit_SEV(dry_run, &buf[off], ev);
++	}
++
++	lpend.cond = ALWAYS;
++	lpend.forever = true;
++	lpend.loop = 1;
++	lpend.bjump = off - lfe;
++	off = _emit_LPEND(dry_run, &buf[off], &lpend);
++
++	/* It shold never go here, it's just for security */
++	off = _emit_END(dry_run, &buf[off]);
++
++	return off;
++}
++
+ /*
+  * A req is a sequence of one or more xfer units.
+  * Returns the number of bytes taken to setup the MC for the req.
+@@ -1463,7 +1501,12 @@ static int _setup_req(unsigned dry_run, struct pl330_thread *thrd,
+ 			return -EINVAL;
+ 
+ 		pxs->x = x;
+-		off += _setup_xfer(dry_run, &buf[off], pxs);
++		if (x->periods) {
++			off += _setup_xfer_cyclic(dry_run, &buf[off], pxs,
++					thrd->ev);
++			return off;
++		} else
++			off += _setup_xfer(dry_run, &buf[off], pxs);
+ 
+ 		x = x->next;
+ 	} while (x);
+@@ -1757,12 +1800,13 @@ static int pl330_update(const struct pl330_info *pi)
+ 
+ 			/* Detach the req */
+ 			rqdone = thrd->req[active].r;
+-			thrd->req[active].r = NULL;
+-
+-			mark_free(thrd, active);
++			if (!rqdone->x->periods) {
++				thrd->req[active].r = NULL;
+ 
+-			/* Get going again ASAP */
+-			_start(thrd);
++				mark_free(thrd, active);
++				/* Get going again ASAP */
++				_start(thrd);
++			}
+ 
+ 			/* For now, just make a list of callbacks to be done */
+ 			list_add_tail(&rqdone->rqd, &pl330->req_done);
+@@ -2652,6 +2696,7 @@ static inline void fill_px(struct pl330_xfer *px,
+ 	px->bytes = len;
+ 	px->dst_addr = dst;
+ 	px->src_addr = src;
++	px->periods = 0;
+ }
+ 
+ static struct dma_pl330_desc *
+@@ -2721,6 +2766,11 @@ static struct dma_async_tx_descriptor *pl330_prep_dma_cyclic(
+ 			__func__, __LINE__);
+ 		return NULL;
+ 	}
++	if (len % period_len) {
++		dev_err(pch->dmac->pif.dev, "%s:%d Invalid period %d for cycle length %d\n",
++			__func__, __LINE__, period_len, len);
++		return NULL;
++	}
+ 
+ 	switch (direction) {
+ 	case DMA_MEM_TO_DEV:
+@@ -2749,6 +2799,8 @@ static struct dma_async_tx_descriptor *pl330_prep_dma_cyclic(
+ 	pch->cyclic = true;
+ 
+ 	fill_px(&desc->px, dst, src, period_len);
++	/* Set number of periods */
++	desc->px.periods = len / period_len;
+ 
+ 	return &desc->txd;
+ }
+-- 
+1.7.10.4
