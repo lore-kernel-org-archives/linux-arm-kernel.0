@@ -1,48 +1,27 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 05 Mar 2013 19:34:06 +0100
-Subject: [PATCH] ARM: dove: Fix typo "COMMON_CLK_DOVE"
-In-Reply-To: <1362476098.16460.65.camel@x61.thuisdomein>
-References: <1362476098.16460.65.camel@x61.thuisdomein>
-Message-ID: <51363A9E.6090507@gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 05 Mar 2013 11:41:17 -0700
+Subject: [PATCH 03/10] ARM: tegra: get power management configurations
+ for PMC from DT
+In-Reply-To: <1362397207-5597-1-git-send-email-josephl@nvidia.com>
+References: <1362397207-5597-1-git-send-email-josephl@nvidia.com>
+Message-ID: <51363C4D.9090702@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/05/2013 10:34 AM, Paul Bolle wrote:
-> Commit 5b03df9ace680d7cdd34a69dfd85ca5f74159d18 ("ARM: dove: switch to
-> DT clock providers") added "select COMMON_CLK_DOVE" to Marvell Dove's
-> Kconfig entry. But there's no Kconfig symbol COMMON_CLK_DOVE, which
-> makes this select statement a nop. Since the Marvell Dove code includes
-> <linux/clk-provider.h>  we can assume that this entry needs to select
-> COMMON_CLK instead.
->
-> Signed-off-by: Paul Bolle<pebolle@tiscali.nl>
-> ---
-> Untested.
->
->   arch/arm/Kconfig | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 5b71469..31acce7 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -556,7 +556,7 @@ config ARCH_IXP4XX
->   config ARCH_DOVE
->   	bool "Marvell Dove"
->   	select ARCH_REQUIRE_GPIOLIB
-> -	select COMMON_CLK_DOVE
-> +	select COMMON_CLK
->   	select CPU_V7
->   	select GENERIC_CLOCKEVENTS
->   	select MIGHT_HAVE_PCI
+On 03/04/2013 04:40 AM, Joseph Lo wrote:
+> If the system supports deep sleep mode (i.e. suspend), it should have
+> the power management configuration for PMC in the DT under the sub-node
+> of PMC. Different system may have different configurations, it should
+> be parsed from DT.
 
-Paul,
+> diff --git a/arch/arm/mach-tegra/pmc.c b/arch/arm/mach-tegra/pmc.c
 
-thanks for the patch but I guess COMMON_CLK_DOVE is a left-over
-from early DT experiments with Dove. It should just be removed
-from arm/Kconfig.
+> +struct pmc_pm_data {
+> +	unsigned long cpu_good_time;	/* CPU power good time in uS */
+> +	unsigned long cpu_off_time;	/* CPU power off time in uS */
+> +	unsigned long core_osc_time;	/* Core power good osc time in uS */
+> +	unsigned long core_pmu_time;	/* Core power good pmu time in uS */
+> +	unsigned long core_off_time;	/* Core power off time in uS */
 
-Thanks for pointing it out, and it would be great to update
-your patch accordingly.
-
-Sebastian
+Since those values are all coming from DT, shouldn't they be u32 to
+match the DT cell type?
