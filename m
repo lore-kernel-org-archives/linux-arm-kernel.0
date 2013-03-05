@@ -1,44 +1,75 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Tue,  5 Mar 2013 10:55:04 +0100
-Subject: [PATCH] arm: mvebu: enable the USB ports on Armada 370 Reference
- Design board
-Message-ID: <1362477304-22143-1-git-send-email-florian@openwrt.org>
+From: padma.v@samsung.com (Padmavathi Venna)
+Date: Tue, 05 Mar 2013 15:34:22 +0530
+Subject: [PATCH] ARM: dts: Modify SPI nodes according generic DMA DT bindings
+Message-ID: <1362477862-352-1-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch modifies the Armada 370 Reference Design DTS file to enable
-support for the two USB ports found on this board.
+This patch removes custom way of adding spi dma channels and
+adds according to new generic DMA DT bindings on samsung exynos4
+and exynos5440 platforms.
 
-Signed-off-by: Florian Fainelli <florian@openwrt.org>
+Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
 ---
-Jason,
+ arch/arm/boot/dts/exynos4.dtsi    |   15 +++++++++------
+ arch/arm/boot/dts/exynos5440.dtsi |    5 +++--
+ 2 files changed, 12 insertions(+), 8 deletions(-)
 
-Since this board was added after USB support was added to Marvell
-Armada XP/370, I would appreciate if you could fold this into a
-pull request for 3.9-rc2 for instance.
-
-Thanks!
-
- arch/arm/boot/dts/armada-370-rd.dts |    8 ++++++++
- 1 file changed, 8 insertions(+)
-
-diff --git a/arch/arm/boot/dts/armada-370-rd.dts b/arch/arm/boot/dts/armada-370-rd.dts
-index f8e4855..070bba4 100644
---- a/arch/arm/boot/dts/armada-370-rd.dts
-+++ b/arch/arm/boot/dts/armada-370-rd.dts
-@@ -64,5 +64,13 @@
- 			status = "okay";
- 			/* No CD or WP GPIOs */
- 		};
-+
-+		usb at d0050000 {
-+			status = "okay";
-+		};
-+
-+		usb at d0051000 {
-+			status = "okay";
-+		};
+diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+index 1a62bcf..2449651 100644
+--- a/arch/arm/boot/dts/exynos4.dtsi
++++ b/arch/arm/boot/dts/exynos4.dtsi
+@@ -235,8 +235,9 @@
+ 		compatible = "samsung,exynos4210-spi";
+ 		reg = <0x13920000 0x100>;
+ 		interrupts = <0 66 0>;
+-		tx-dma-channel = <&pdma0 7>; /* preliminary */
+-		rx-dma-channel = <&pdma0 6>; /* preliminary */
++		dmas = <&pdma0 7
++			&pdma0 6>;
++		dma-names = "tx", "rx";
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 		status = "disabled";
+@@ -246,8 +247,9 @@
+ 		compatible = "samsung,exynos4210-spi";
+ 		reg = <0x13930000 0x100>;
+ 		interrupts = <0 67 0>;
+-		tx-dma-channel = <&pdma1 7>; /* preliminary */
+-		rx-dma-channel = <&pdma1 6>; /* preliminary */
++		dmas = <&pdma0 7
++			&pdma0 6>;
++		dma-names = "tx", "rx";
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 		status = "disabled";
+@@ -257,8 +259,9 @@
+ 		compatible = "samsung,exynos4210-spi";
+ 		reg = <0x13940000 0x100>;
+ 		interrupts = <0 68 0>;
+-		tx-dma-channel = <&pdma0 9>; /* preliminary */
+-		rx-dma-channel = <&pdma0 8>; /* preliminary */
++		dmas = <&pdma0 9
++			&pdma0 8>;
++		dma-names = "tx", "rx";
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 		status = "disabled";
+diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
+index 9a99755..31a3626 100644
+--- a/arch/arm/boot/dts/exynos5440.dtsi
++++ b/arch/arm/boot/dts/exynos5440.dtsi
+@@ -79,8 +79,9 @@
+ 		compatible = "samsung,exynos4210-spi";
+ 		reg = <0xD0000 0x1000>;
+ 		interrupts = <0 4 0>;
+-		tx-dma-channel = <&pdma0 5>; /* preliminary */
+-		rx-dma-channel = <&pdma0 4>; /* preliminary */
++		dmas = <&pdma0 5
++			&pdma0 4>;
++		dma-names = "tx", "rx";
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
  	};
- };
 -- 
-1.7.10.4
+1.7.4.4
