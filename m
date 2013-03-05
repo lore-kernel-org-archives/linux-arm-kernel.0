@@ -1,34 +1,42 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  5 Mar 2013 03:47:33 +0000
-Subject: [PATCH 17/29] arm64: KVM: Exit handling
+Date: Tue,  5 Mar 2013 03:47:35 +0000
+Subject: [PATCH 19/29] arm64: KVM: Plug the arch timer
 In-Reply-To: <1362455265-24165-1-git-send-email-marc.zyngier@arm.com>
 References: <1362455265-24165-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1362455265-24165-18-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1362455265-24165-20-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Handle the exit of a VM, decoding the exit reason from HYP mode
-and calling the corresponding handler.
+Shouldn't be needed - a complete duplicate from arch/arm.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/handle_exit.c | 119 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 119 insertions(+)
- create mode 100644 arch/arm64/kvm/handle_exit.c
+ arch/arm/kvm/arch_timer.c               |  1 +
+ arch/arm64/include/asm/kvm_arch_timer.h | 58 +++++++++++++++++++++++++++++++++
+ 2 files changed, 59 insertions(+)
+ create mode 100644 arch/arm64/include/asm/kvm_arch_timer.h
 
-diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+diff --git a/arch/arm/kvm/arch_timer.c b/arch/arm/kvm/arch_timer.c
+index 6ac938d..ca04a99 100644
+--- a/arch/arm/kvm/arch_timer.c
++++ b/arch/arm/kvm/arch_timer.c
+@@ -194,6 +194,7 @@ static struct notifier_block kvm_timer_cpu_nb = {
+ 
+ static const struct of_device_id arch_timer_of_match[] = {
+ 	{ .compatible	= "arm,armv7-timer",	},
++	{ .compatible	= "arm,armv8-timer",	},
+ 	{},
+ };
+ 
+diff --git a/arch/arm64/include/asm/kvm_arch_timer.h b/arch/arm64/include/asm/kvm_arch_timer.h
 new file mode 100644
-index 0000000..0e1fa4e
+index 0000000..eb02273
 --- /dev/null
-+++ b/arch/arm64/kvm/handle_exit.c
-@@ -0,0 +1,119 @@
++++ b/arch/arm64/include/asm/kvm_arch_timer.h
+@@ -0,0 +1,58 @@
 +/*
-+ * Copyright (C) 2012 - ARM Ltd
++ * Copyright (C) 2012 ARM Ltd.
 + * Author: Marc Zyngier <marc.zyngier@arm.com>
-+ *
-+ * Derived from arch/arm/kvm/handle_exit.c:
-+ * Copyright (C) 2012 - Virtual Open Systems and Columbia University
-+ * Author: Christoffer Dall <c.dall@virtualopensystems.com>
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
@@ -43,103 +51,46 @@ index 0000000..0e1fa4e
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+#include <linux/kvm.h>
-+#include <linux/kvm_host.h>
-+#include <asm/kvm_emulate.h>
-+#include <asm/kvm_coproc.h>
-+#include <asm/kvm_mmu.h>
++#ifndef __ARM64_KVM_ARCH_TIMER_H
++#define __ARM64_KVM_ARCH_TIMER_H
 +
-+typedef int (*exit_handle_fn)(struct kvm_vcpu *, struct kvm_run *);
++#include <linux/clocksource.h>
++#include <linux/hrtimer.h>
++#include <linux/workqueue.h>
 +
-+static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
-+{
-+	/*
-+	 * Guest called HVC instruction:
-+	 * Let it know we don't want that by injecting an undefined exception.
-+	 */
-+	kvm_debug("hvc: %x (at %08lx)", kvm_vcpu_get_hsr(vcpu) & ((1 << 16) - 1),
-+		  *vcpu_pc(vcpu));
-+	kvm_debug("         HSR: %8x", kvm_vcpu_get_hsr(vcpu));
-+	kvm_inject_undefined(vcpu);
-+	return 1;
-+}
++struct arch_timer_kvm {
++	/* Is the timer enabled */
++	bool			enabled;
 +
-+static int handle_smc(struct kvm_vcpu *vcpu, struct kvm_run *run)
-+{
-+	/* We don't support SMC; don't do that. */
-+	kvm_debug("smc:@%08lx", *vcpu_pc(vcpu));
-+	kvm_inject_undefined(vcpu);
-+	return 1;
-+}
-+
-+/**
-+ * kvm_handle_wfi - handle a wait-for-interrupts instruction executed by a guest
-+ * @vcpu:	the vcpu pointer
-+ *
-+ * Simply call kvm_vcpu_block(), which will halt execution of
-+ * world-switches and schedule other host processes until there is an
-+ * incoming IRQ or FIQ to the VM.
-+ */
-+static int kvm_handle_wfi(struct kvm_vcpu *vcpu, struct kvm_run *run)
-+{
-+	kvm_vcpu_block(vcpu);
-+	return 1;
-+}
-+
-+static exit_handle_fn arm_exit_handlers[] = {
-+	[ESR_EL2_EC_WFI]	= kvm_handle_wfi,
-+	[ESR_EL2_EC_HVC64]	= handle_hvc,
-+	[ESR_EL2_EC_SMC64]	= handle_smc,
-+	[ESR_EL2_EC_SYS64]	= kvm_handle_sys_reg,
-+	[ESR_EL2_EC_IABT]	= kvm_handle_guest_abort,
-+	[ESR_EL2_EC_DABT]	= kvm_handle_guest_abort,
++	/* Virtual offset, restored only */
++	cycle_t			cntvoff;
 +};
 +
-+static exit_handle_fn kvm_get_exit_handler(struct kvm_vcpu *vcpu)
-+{
-+	u8 hsr_ec = kvm_vcpu_trap_get_class(vcpu);
++struct arch_timer_cpu {
++	/* Background timer used when the guest is not running */
++	struct hrtimer			timer;
 +
-+	if (hsr_ec >= ARRAY_SIZE(arm_exit_handlers) ||
-+	    !arm_exit_handlers[hsr_ec]) {
-+		kvm_err("Unkown exception class: hsr: %#08x\n",
-+			(unsigned int)kvm_vcpu_get_hsr(vcpu));
-+		BUG();
-+	}
++	/* Work queued with the above timer expires */
++	struct work_struct		expired;
 +
-+	return arm_exit_handlers[hsr_ec];
-+}
++	/* Background timer active */
++	bool				armed;
 +
-+/*
-+ * Return > 0 to return to guest, < 0 on error, 0 (and set exit_reason) on
-+ * proper exit to userspace.
-+ */
-+int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
-+		       int exception_index)
-+{
-+	exit_handle_fn exit_handler;
++	/* Timer IRQ */
++	const struct kvm_irq_level	*irq;
 +
-+	switch (exception_index) {
-+	case ARM_EXCEPTION_IRQ:
-+		return 1;
-+	case ARM_EXCEPTION_TRAP:
-+		/*
-+		 * See ARM ARM B1.14.1: "Hyp traps on instructions
-+		 * that fail their condition code check"
-+		 */
-+		if (!kvm_condition_valid(vcpu)) {
-+			kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
-+			return 1;
-+		}
++	/* Registers: control register, timer value */
++	u32				cntv_ctl;	/* Saved/restored */
++	cycle_t				cntv_cval;	/* Saved/restored */
++};
 +
-+		exit_handler = kvm_get_exit_handler(vcpu);
++int kvm_timer_hyp_init(void);
++int kvm_timer_init(struct kvm *kvm);
++void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu);
++void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu);
++void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu);
++void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu);
 +
-+		return exit_handler(vcpu, run);
-+	default:
-+		kvm_pr_unimpl("Unsupported exception type: %d",
-+			      exception_index);
-+		run->exit_reason = KVM_EXIT_INTERNAL_ERROR;
-+		return 0;
-+	}
-+}
++#endif
 -- 
 1.7.12.4
