@@ -1,54 +1,101 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Tue, 05 Mar 2013 16:39:22 +0100
-Subject: [PATCH v3 3/3] leds: leds-pwm: Defer led_pwm_set() if PWM can
- sleep
-In-Reply-To: <20130304105806.GA28735@avionic-0098.mockup.avionic-design.de>
-References: <1359381659-24454-1-git-send-email-florian.vaussard@epfl.ch>
- <1359381659-24454-4-git-send-email-florian.vaussard@epfl.ch>
- <20130130081728.GC13568@avionic-0098.mockup.avionic-design.de>
- <512E2F98.6070404@epfl.ch> <51347B06.8090604@epfl.ch>
- <20130304105806.GA28735@avionic-0098.mockup.avionic-design.de>
-Message-ID: <513611AA.30304@epfl.ch>
+From: laijs@cn.fujitsu.com (Lai Jiangshan)
+Date: Tue, 05 Mar 2013 23:41:48 +0800
+Subject: [PATCH V2] lglock: add read-preference local-global rwlock
+In-Reply-To: <513232B6.9060905@linux.vnet.ibm.com>
+References: <512BBAD8.8010006@linux.vnet.ibm.com>
+ <CACvQF51jCxk5jUqmhD=QBBtUsBkQWZzakacrKO4Gsk=w61rNwQ@mail.gmail.com>
+ <512C7A38.8060906@linux.vnet.ibm.com>
+ <CACvQF51RvhM8XNqu3-1OTQ=cZUZ=pAX+_zx0a29+W67N1X+BgQ@mail.gmail.com>
+ <512CC509.1050000@linux.vnet.ibm.com>
+ <CACvQF50UgiqPpDk3HCmV86zKSf6tPjqr0bZowfPEOJs0g0r0MQ@mail.gmail.com>
+ <512D0D67.9010609@linux.vnet.ibm.com>
+ <CACvQF53ph2ixdM-otzetjM5cR+2kcZj6sckOp3TnzzA_x-EZ8w@mail.gmail.com>
+ <512E7879.20109@linux.vnet.ibm.com>	<5130E8E2.50206@cn.fujitsu.com>
+ <20130301182854.GA3631@redhat.com>
+ <CANN689HEW=b5S93J27p+rBX-5m7jkW4FER=eHDCp7OgMaTWLPw@mail.gmail.com>
+ <5131FB4C.7070408@cn.fujitsu.com> <513232B6.9060905@linux.vnet.ibm.com>
+Message-ID: <5136123C.3040508@cn.fujitsu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 03/04/2013 11:58 AM, Thierry Reding wrote:
-> On Mon, Mar 04, 2013 at 11:44:22AM +0100, Florian Vaussard wrote:
->> Hi Bryan, Richard,
+On 03/03/13 01:11, Srivatsa S. Bhat wrote:
+> On 03/02/2013 06:44 PM, Lai Jiangshan wrote:
+>> From 345a7a75c314ff567be48983e0892bc69c4452e7 Mon Sep 17 00:00:00 2001
+>> From: Lai Jiangshan <laijs@cn.fujitsu.com>
+>> Date: Sat, 2 Mar 2013 20:33:14 +0800
+>> Subject: [PATCH] lglock: add read-preference local-global rwlock
 >>
->>> On 01/30/2013 09:17 AM, Thierry Reding wrote:
->>>> On Mon, Jan 28, 2013 at 03:00:59PM +0100, Florian Vaussard wrote:
->>>>> Call to led_pwm_set() can happen inside atomic context, like triggers.
->>>>> If the PWM call can sleep, defer using a worker.
->>>>>
->>>>> Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
->>>>> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
->>>>> ---
->>>>>   drivers/leds/leds-pwm.c |   50
->>>>> +++++++++++++++++++++++++++++++++++++++-------
->>>>>   1 files changed, 42 insertions(+), 8 deletions(-)
->>>>
->>>> Bryan, I assume that you'll be taking this? It doesn't apply cleanly to
->>>> my tree, probably because of Peter's recent changes that you took
->>>> through your tree and Florian based his patches on top of that. The
->>>> conflict resolution should be trivial, though.
->>>>
->>>
->>> It seems that this patch was not taken. Could you pull it, as the other
->>> part is already in linux-pwm? Or is there any show stopper?
->>>
+>> Current lglock is not read-preference, so it can't be used on some cases
+>> which read-preference rwlock can do. Example, get_cpu_online_atomic().
 >>
->> Ping? Who should merge this?
->
-> I assume Bryan will take it through the LED tree? Patches 1 & 2 went
-> into v3.9-rc1 through the PWM tree.
->
+> [...]
+>> diff --git a/kernel/lglock.c b/kernel/lglock.c
+>> index 6535a66..52e9b2c 100644
+>> --- a/kernel/lglock.c
+>> +++ b/kernel/lglock.c
+>> @@ -87,3 +87,71 @@ void lg_global_unlock(struct lglock *lg)
+>>  	preempt_enable();
+>>  }
+>>  EXPORT_SYMBOL(lg_global_unlock);
+>> +
+>> +#define FALLBACK_BASE	(1UL << 30)
+>> +
+>> +void lg_rwlock_local_read_lock(struct lgrwlock *lgrw)
+>> +{
+>> +	struct lglock *lg = &lgrw->lglock;
+>> +
+>> +	preempt_disable();
+>> +	if (likely(!__this_cpu_read(*lgrw->reader_refcnt))) {
+>> +		rwlock_acquire_read(&lg->lock_dep_map, 0, 0, _RET_IP_);
+>> +		if (unlikely(!arch_spin_trylock(this_cpu_ptr(lg->lock)))) {
+>> +			read_lock(&lgrw->fallback_rwlock);
+>> +			__this_cpu_write(*lgrw->reader_refcnt, FALLBACK_BASE);
+>> +			return;
+>> +		}
+>> +	}
+>> +
+>> +	__this_cpu_inc(*lgrw->reader_refcnt);
+>> +}
+>> +EXPORT_SYMBOL(lg_rwlock_local_read_lock);
+>> +
+>> +void lg_rwlock_local_read_unlock(struct lgrwlock *lgrw)
+>> +{
+>> +	switch (__this_cpu_read(*lgrw->reader_refcnt)) {
+>> +	case 1:
+>> +		__this_cpu_write(*lgrw->reader_refcnt, 0);
+>> +		lg_local_unlock(&lgrw->lglock);
+>> +		return;
+> 
+> This should be a break, instead of a return, right?
+> Otherwise, there will be a preempt imbalance...
 
-This was also my assumption, but I never got the feedback from Brian on 
-this patch.
-The crach is still there, and the patch missed the merge window :)
 
-Cheers,
+"lockdep" and "preempt" are handled in lg_local_unlock(&lgrw->lglock);
 
-Florian
+Thanks,
+Lai
+
+> 
+>> +	case FALLBACK_BASE:
+>> +		__this_cpu_write(*lgrw->reader_refcnt, 0);
+>> +		read_unlock(&lgrw->fallback_rwlock);
+>> +		rwlock_release(&lg->lock_dep_map, 1, _RET_IP_);
+>> +		break;
+>> +	default:
+>> +		__this_cpu_dec(*lgrw->reader_refcnt);
+>> +		break;
+>> +	}
+>> +
+>> +	preempt_enable();
+>> +}
+> 
+> 
+> Regards,
+> Srivatsa S. Bhat
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+> 
