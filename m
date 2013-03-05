@@ -1,101 +1,37 @@
 From: csd@broadcom.com (Christian Daudt)
-Date: Tue, 5 Mar 2013 14:54:51 -0800
+Date: Tue, 5 Mar 2013 14:56:12 -0800
 Subject: [PATCH] ARM: bcm281xx: Add L2 cache enable code
-In-Reply-To: <201303050901.12317.arnd@arndb.de>
+In-Reply-To: <51363770.5060201@wwwdotorg.org>
 References: <1362451632-18806-1-git-send-email-csd@broadcom.com>
- <201303050901.12317.arnd@arndb.de>
-Message-ID: <513677BB.9010309@broadcom.com>
+ <51363770.5060201@wwwdotorg.org>
+Message-ID: <5136780C.7030801@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-03-05 01:01 AM, Arnd Bergmann wrote:
-> On Tuesday 05 March 2013, Christian Daudt wrote:
->
+On 13-03-05 10:20 AM, Stephen Warren wrote:
+> On 03/04/2013 07:47 PM, Christian Daudt wrote:
+>> - Adds a module to provide calls into secure monitor mode
+>> - Uses this module to make secure monitor calls to enable L2 cache.
 >> diff --git a/Documentation/devicetree/bindings/misc/smc.txt b/Documentation/devicetree/bindings/misc/smc.txt
->> new file mode 100644
->> index 0000000..cd8c729
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/misc/smc.txt
->> @@ -0,0 +1,14 @@
->> +Broadcom Secure Monitor Bounce buffer
->> +-----------------------------------------------------
->> +This binding defines the location of the bounce buffer
->> +used for non-secure to secure communications.
->> +
->> +Required properties:
->> +- compatible : "bcm,kona-smc"
->> +- reg : Location and size of bounce buffer
->> +
 >> +Example:
 >> +	smc at 0x3404c000 {
 >> +		compatible = "bcm,kona-smc";
->> +		reg = <0x3404c000 0x400>; //1 KiB in SRAM
->> +	};
-> For other firmware interfaces like this, we tend to list the specific commands
-> that the firmware understands. If you think there might be different versions
-> to consider, you might want to model this like
+> Both here in this example, and ...
 >
-> Documentation/devicetree/bindings/arm/psci.txt
-This interface is stable and in shipping products at this time, and so 
-the api will remain constant.
+>> diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
+>> +	smc at 0x3404c000 {
+>> +		compatible = "bcm,kona-smc";
+> Here in the actual .dts file, you should include the specific ID of the
+> SoC too, so that if there are Soc-specific bugs, the compatible property
+> that's required to determine this is present from the start. In other words,
+>
+> compatible = "bcm,bcm11351-smc", "bcm,kona-smc";
+>
+> (which SoC ID you use in the example is arbitrary, but it may as well
+> match the .dts file you're editing in the patch).
+>
 
->> diff --git a/arch/arm/mach-bcm/bcm_kona_smc_asm.S b/arch/arm/mach-bcm/bcm_kona_smc_asm.S
->> new file mode 100644
->> index 0000000..a160848
->> --- /dev/null
->> +++ b/arch/arm/mach-bcm/bcm_kona_smc_asm.S
->> +/*
->> + * int bcm_kona_smc_asm(u32 service_id, u32 buffer_addr)
->> + */
->> +
->> +ENTRY(bcm_kona_smc_asm)
->> +	stmfd	sp!, {r4-r12, lr}
->> +	mov	r4, r0		@ service_id
->> +	mov	r5, #3		@ Keep IRQ and FIQ off in SM
-> Why not just use an inline assembly?
-We ran into problems with some gcc versions messing up the 
-"arch_extension sec" when passing it to the assembler, so we broke it 
-out to its own .S file following the example of omap and highbank. I 
-suspect that they did it for the same reason.
-
->
->> +#ifdef CONFIG_CACHE_L2X0
->> +static int __init kona_l2_cache_init(void)
->> +{
->> +	/*
->> +	 * Currently there is no SSAPI for setting the L2 cache aux register,
->> +	 * so the default value (0x1e050000) applies.
->> +	 */
->> +	bcm_kona_smc(SSAPI_ENABLE_L2_CACHE, 0, 0, 0, 0);
-> This can be written in a nicer way as
->
-> static int __init kona_l2_cache_init(void)
-> {
-> 	if (!IS_ENABLED(CONFIG_CACHE_L2X0))
-> 		return 0;
-> 	...
-> }
->
-> To remove the need for the #ifdef.
 ok. done.
-
->> +static void __init init_irq(void)
->> +{
->> +	irqchip_init();
->> +	bcm_kona_smc_init();
->> +
->> +#ifdef CONFIG_CACHE_L2X0
->> +	kona_l2_cache_init();
->> +#endif /* CONFIG_CACHE_L2X0 */
->> +}
-> Why are you calling bcm_kona_smc_init() and kona_l2_cache_init() from init_irq()?
->
-> It seems completely unrelated to interrupt handling.
->
-It was originally in init_machine section but I was told that that was 
-too late and init_irq would be better, and I saw that highbank also has 
-it in init_irq. I agree that it is unrelated to irq - is there a better 
-place to put this in ?
 
   thanks,
     csd
