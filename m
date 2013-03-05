@@ -1,38 +1,51 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue,  5 Mar 2013 23:16:49 +0100
-Subject: [PATCH 9/9] ARM: spear3xx: Use correct pl080 header file
+Date: Tue,  5 Mar 2013 23:16:44 +0100
+Subject: [PATCH 4/9] usb: gadget: fix omap_udc build errors
 In-Reply-To: <1362521809-22989-1-git-send-email-arnd@arndb.de>
 References: <1362521809-22989-1-git-send-email-arnd@arndb.de>
-Message-ID: <1362521809-22989-10-git-send-email-arnd@arndb.de>
+Message-ID: <1362521809-22989-5-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The definitions have move around recently, causing build errors
-in spear3xx for all configurations:
+1bf0cf6040 "usb: gadget: omap_udc: convert to udc_start/udc_stop"
+made some trivial changes but was missing a ';' character.
 
-spear3xx.c:47:5: error: 'PL080_BSIZE_16' undeclared here (not in a function)
-spear3xx.c:47:23: error: 'PL080_CONTROL_SB_SIZE_SHIFT' undeclared here (not in a function)
-spear3xx.c:48:22: error: 'PL080_CONTROL_DB_SIZE_SHIFT' undeclared here (not in a function)
+8c4cc00552 "ARM: OMAP1: DMA: Moving OMAP1 DMA channel definitions
+to mach-omap1" added a definition for OMAP_DMA_USB_W2FC_TX0 to
+the driver while making the header file it was defined in
+unavailable for drivers, but this driver actually needs
+OMAP_DMA_USB_W2FC_RX0 as well.
 
+Both changes appear trivial, so let's add the missing semicolon
+and the macro definition.
+
+Cc: Felipe Balbi <balbi@ti.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Alessandro Rubini <rubini@gnudd.com>
-Cc: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- arch/arm/mach-spear3xx/spear3xx.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/usb/gadget/omap_udc.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
-index f9d754f..d2b3937 100644
---- a/arch/arm/mach-spear3xx/spear3xx.c
-+++ b/arch/arm/mach-spear3xx/spear3xx.c
-@@ -14,7 +14,7 @@
- #define pr_fmt(fmt) "SPEAr3xx: " fmt
+diff --git a/drivers/usb/gadget/omap_udc.c b/drivers/usb/gadget/omap_udc.c
+index 06be85c..f844565 100644
+--- a/drivers/usb/gadget/omap_udc.c
++++ b/drivers/usb/gadget/omap_udc.c
+@@ -62,6 +62,7 @@
+ #define	DRIVER_VERSION	"4 October 2004"
  
- #include <linux/amba/pl022.h>
--#include <linux/amba/pl08x.h>
-+#include <linux/amba/pl080.h>
- #include <linux/io.h>
- #include <plat/pl080.h>
- #include <mach/generic.h>
+ #define OMAP_DMA_USB_W2FC_TX0		29
++#define OMAP_DMA_USB_W2FC_RX0		26
+ 
+ /*
+  * The OMAP UDC needs _very_ early endpoint setup:  before enabling the
+@@ -1310,7 +1311,7 @@ static int omap_pullup(struct usb_gadget *gadget, int is_on)
+ }
+ 
+ static int omap_udc_start(struct usb_gadget *g,
+-		struct usb_gadget_driver *driver)
++		struct usb_gadget_driver *driver);
+ static int omap_udc_stop(struct usb_gadget *g,
+ 		struct usb_gadget_driver *driver);
+ 
 -- 
 1.8.1.2
