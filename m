@@ -1,62 +1,193 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue,  5 Mar 2013 18:42:21 +0100
-Subject: [PATCH 11/23] video/exynos: remove unnecessary header inclusions
+Date: Tue,  5 Mar 2013 18:42:24 +0100
+Subject: [PATCH 14/23] rtc: s3c: make header file local
 In-Reply-To: <1362505353-8873-1-git-send-email-arnd@arndb.de>
 References: <1362505353-8873-1-git-send-email-arnd@arndb.de>
-Message-ID: <1362505353-8873-12-git-send-email-arnd@arndb.de>
+Message-ID: <1362505353-8873-15-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In multiplatform configurations, we cannot include headers
-provided by only the exynos platform. Fortunately a number
-of drivers that include those headers do not actually need
-them, so we can just remove the inclusions.
+Nothing outside of the rtc driver includes plat/regs-rtc.h,
+so we can simply move the file into the same directory,
+which allows us to build the file as platform-independent
+code.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/video/exynos/exynos_mipi_dsi.c          | 2 --
- drivers/video/exynos/exynos_mipi_dsi_common.c   | 2 --
- drivers/video/exynos/exynos_mipi_dsi_lowlevel.c | 2 --
- 3 files changed, 6 deletions(-)
+ arch/arm/plat-samsung/include/plat/regs-rtc.h | 71 ---------------------------
+ drivers/rtc/rtc-s3c.c                         |  3 +-
+ drivers/rtc/rtc-s3c.h                         | 70 ++++++++++++++++++++++++++
+ 3 files changed, 71 insertions(+), 73 deletions(-)
+ delete mode 100644 arch/arm/plat-samsung/include/plat/regs-rtc.h
+ create mode 100644 drivers/rtc/rtc-s3c.h
 
-diff --git a/drivers/video/exynos/exynos_mipi_dsi.c b/drivers/video/exynos/exynos_mipi_dsi.c
-index fac7df6..3dd43ca 100644
---- a/drivers/video/exynos/exynos_mipi_dsi.c
-+++ b/drivers/video/exynos/exynos_mipi_dsi.c
-@@ -35,8 +35,6 @@
- 
- #include <video/exynos_mipi_dsim.h>
- 
--#include <plat/fb.h>
+diff --git a/arch/arm/plat-samsung/include/plat/regs-rtc.h b/arch/arm/plat-samsung/include/plat/regs-rtc.h
+deleted file mode 100644
+index 0f8263e..0000000
+--- a/arch/arm/plat-samsung/include/plat/regs-rtc.h
++++ /dev/null
+@@ -1,71 +0,0 @@
+-/* arch/arm/mach-s3c2410/include/mach/regs-rtc.h
+- *
+- * Copyright (c) 2003 Simtec Electronics <linux@simtec.co.uk>
+- *		      http://www.simtec.co.uk/products/SWLINUX/
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * S3C2410 Internal RTC register definition
+-*/
 -
- #include "exynos_mipi_dsi_common.h"
- #include "exynos_mipi_dsi_lowlevel.h"
- 
-diff --git a/drivers/video/exynos/exynos_mipi_dsi_common.c b/drivers/video/exynos/exynos_mipi_dsi_common.c
-index c70cb89..520fc9b 100644
---- a/drivers/video/exynos/exynos_mipi_dsi_common.c
-+++ b/drivers/video/exynos/exynos_mipi_dsi_common.c
-@@ -31,8 +31,6 @@
- #include <video/mipi_display.h>
- #include <video/exynos_mipi_dsim.h>
- 
--#include <mach/map.h>
+-#ifndef __ASM_ARCH_REGS_RTC_H
+-#define __ASM_ARCH_REGS_RTC_H __FILE__
 -
- #include "exynos_mipi_dsi_regs.h"
- #include "exynos_mipi_dsi_lowlevel.h"
- #include "exynos_mipi_dsi_common.h"
-diff --git a/drivers/video/exynos/exynos_mipi_dsi_lowlevel.c b/drivers/video/exynos/exynos_mipi_dsi_lowlevel.c
-index 95cb99a..15c5abd 100644
---- a/drivers/video/exynos/exynos_mipi_dsi_lowlevel.c
-+++ b/drivers/video/exynos/exynos_mipi_dsi_lowlevel.c
-@@ -26,8 +26,6 @@
- 
- #include <video/exynos_mipi_dsim.h>
- 
--#include <mach/map.h>
+-#define S3C2410_RTCREG(x) (x)
+-#define S3C2410_INTP		S3C2410_RTCREG(0x30)
+-#define S3C2410_INTP_ALM	(1 << 1)
+-#define S3C2410_INTP_TIC	(1 << 0)
 -
- #include "exynos_mipi_dsi_regs.h"
+-#define S3C2410_RTCCON		S3C2410_RTCREG(0x40)
+-#define S3C2410_RTCCON_RTCEN	(1 << 0)
+-#define S3C2410_RTCCON_CNTSEL	(1 << 2)
+-#define S3C2410_RTCCON_CLKRST	(1 << 3)
+-#define S3C2443_RTCCON_TICSEL	(1 << 4)
+-#define S3C64XX_RTCCON_TICEN	(1 << 8)
+-
+-#define S3C2410_TICNT		S3C2410_RTCREG(0x44)
+-#define S3C2410_TICNT_ENABLE	(1 << 7)
+-
+-/* S3C2443: tick count is 15 bit wide
+- * TICNT[6:0] contains upper 7 bits
+- * TICNT1[7:0] contains lower 8 bits
+- */
+-#define S3C2443_TICNT_PART(x)	((x & 0x7f00) >> 8)
+-#define S3C2443_TICNT1		S3C2410_RTCREG(0x4C)
+-#define S3C2443_TICNT1_PART(x)	(x & 0xff)
+-
+-/* S3C2416: tick count is 32 bit wide
+- * TICNT[6:0] contains bits [14:8]
+- * TICNT1[7:0] contains lower 8 bits
+- * TICNT2[16:0] contains upper 17 bits
+- */
+-#define S3C2416_TICNT2		S3C2410_RTCREG(0x48)
+-#define S3C2416_TICNT2_PART(x)	((x & 0xffff8000) >> 15)
+-
+-#define S3C2410_RTCALM		S3C2410_RTCREG(0x50)
+-#define S3C2410_RTCALM_ALMEN	(1 << 6)
+-#define S3C2410_RTCALM_YEAREN	(1 << 5)
+-#define S3C2410_RTCALM_MONEN	(1 << 4)
+-#define S3C2410_RTCALM_DAYEN	(1 << 3)
+-#define S3C2410_RTCALM_HOUREN	(1 << 2)
+-#define S3C2410_RTCALM_MINEN	(1 << 1)
+-#define S3C2410_RTCALM_SECEN	(1 << 0)
+-
+-#define S3C2410_ALMSEC		S3C2410_RTCREG(0x54)
+-#define S3C2410_ALMMIN		S3C2410_RTCREG(0x58)
+-#define S3C2410_ALMHOUR		S3C2410_RTCREG(0x5c)
+-
+-#define S3C2410_ALMDATE		S3C2410_RTCREG(0x60)
+-#define S3C2410_ALMMON		S3C2410_RTCREG(0x64)
+-#define S3C2410_ALMYEAR		S3C2410_RTCREG(0x68)
+-
+-#define S3C2410_RTCSEC		S3C2410_RTCREG(0x70)
+-#define S3C2410_RTCMIN		S3C2410_RTCREG(0x74)
+-#define S3C2410_RTCHOUR		S3C2410_RTCREG(0x78)
+-#define S3C2410_RTCDATE		S3C2410_RTCREG(0x7c)
+-#define S3C2410_RTCMON		S3C2410_RTCREG(0x84)
+-#define S3C2410_RTCYEAR		S3C2410_RTCREG(0x88)
+-
+-#endif /* __ASM_ARCH_REGS_RTC_H */
+diff --git a/drivers/rtc/rtc-s3c.c b/drivers/rtc/rtc-s3c.c
+index fb994e9..7995f79 100644
+--- a/drivers/rtc/rtc-s3c.c
++++ b/drivers/rtc/rtc-s3c.c
+@@ -29,9 +29,8 @@
+ #include <linux/uaccess.h>
+ #include <linux/io.h>
  
- void exynos_mipi_dsi_func_reset(struct mipi_dsim_device *dsim)
+-#include <mach/hardware.h>
+ #include <asm/irq.h>
+-#include <plat/regs-rtc.h>
++#include "rtc-s3c.h"
+ 
+ enum s3c_cpu_type {
+ 	TYPE_S3C2410,
+diff --git a/drivers/rtc/rtc-s3c.h b/drivers/rtc/rtc-s3c.h
+new file mode 100644
+index 0000000..004b61a
+--- /dev/null
++++ b/drivers/rtc/rtc-s3c.h
+@@ -0,0 +1,70 @@
++/*
++ * Copyright (c) 2003 Simtec Electronics <linux@simtec.co.uk>
++ *		      http://www.simtec.co.uk/products/SWLINUX/
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * S3C2410 Internal RTC register definition
++*/
++
++#ifndef __ASM_ARCH_REGS_RTC_H
++#define __ASM_ARCH_REGS_RTC_H __FILE__
++
++#define S3C2410_RTCREG(x) (x)
++#define S3C2410_INTP		S3C2410_RTCREG(0x30)
++#define S3C2410_INTP_ALM	(1 << 1)
++#define S3C2410_INTP_TIC	(1 << 0)
++
++#define S3C2410_RTCCON		S3C2410_RTCREG(0x40)
++#define S3C2410_RTCCON_RTCEN	(1 << 0)
++#define S3C2410_RTCCON_CNTSEL	(1 << 2)
++#define S3C2410_RTCCON_CLKRST	(1 << 3)
++#define S3C2443_RTCCON_TICSEL	(1 << 4)
++#define S3C64XX_RTCCON_TICEN	(1 << 8)
++
++#define S3C2410_TICNT		S3C2410_RTCREG(0x44)
++#define S3C2410_TICNT_ENABLE	(1 << 7)
++
++/* S3C2443: tick count is 15 bit wide
++ * TICNT[6:0] contains upper 7 bits
++ * TICNT1[7:0] contains lower 8 bits
++ */
++#define S3C2443_TICNT_PART(x)	((x & 0x7f00) >> 8)
++#define S3C2443_TICNT1		S3C2410_RTCREG(0x4C)
++#define S3C2443_TICNT1_PART(x)	(x & 0xff)
++
++/* S3C2416: tick count is 32 bit wide
++ * TICNT[6:0] contains bits [14:8]
++ * TICNT1[7:0] contains lower 8 bits
++ * TICNT2[16:0] contains upper 17 bits
++ */
++#define S3C2416_TICNT2		S3C2410_RTCREG(0x48)
++#define S3C2416_TICNT2_PART(x)	((x & 0xffff8000) >> 15)
++
++#define S3C2410_RTCALM		S3C2410_RTCREG(0x50)
++#define S3C2410_RTCALM_ALMEN	(1 << 6)
++#define S3C2410_RTCALM_YEAREN	(1 << 5)
++#define S3C2410_RTCALM_MONEN	(1 << 4)
++#define S3C2410_RTCALM_DAYEN	(1 << 3)
++#define S3C2410_RTCALM_HOUREN	(1 << 2)
++#define S3C2410_RTCALM_MINEN	(1 << 1)
++#define S3C2410_RTCALM_SECEN	(1 << 0)
++
++#define S3C2410_ALMSEC		S3C2410_RTCREG(0x54)
++#define S3C2410_ALMMIN		S3C2410_RTCREG(0x58)
++#define S3C2410_ALMHOUR		S3C2410_RTCREG(0x5c)
++
++#define S3C2410_ALMDATE		S3C2410_RTCREG(0x60)
++#define S3C2410_ALMMON		S3C2410_RTCREG(0x64)
++#define S3C2410_ALMYEAR		S3C2410_RTCREG(0x68)
++
++#define S3C2410_RTCSEC		S3C2410_RTCREG(0x70)
++#define S3C2410_RTCMIN		S3C2410_RTCREG(0x74)
++#define S3C2410_RTCHOUR		S3C2410_RTCREG(0x78)
++#define S3C2410_RTCDATE		S3C2410_RTCREG(0x7c)
++#define S3C2410_RTCMON		S3C2410_RTCREG(0x84)
++#define S3C2410_RTCYEAR		S3C2410_RTCREG(0x88)
++
++#endif /* __ASM_ARCH_REGS_RTC_H */
 -- 
 1.8.1.2
