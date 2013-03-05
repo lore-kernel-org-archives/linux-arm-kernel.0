@@ -1,45 +1,88 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Tue, 5 Mar 2013 19:02:31 +0100
-Subject: [PATCH] ARM: dove: Fix typo "COMMON_CLK_DOVE"
-In-Reply-To: <20130305140025.GO23237@titan.lakedaemon.net>
-References: <1362476098.16460.65.camel@x61.thuisdomein>
- <20130305140025.GO23237@titan.lakedaemon.net>
-Message-ID: <20130305190232.0b1a5e29@armhf>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue,  5 Mar 2013 11:06:37 -0700
+Subject: [PATCH V2 REPOST] kbuild: create an "include chroot" for DT bindings
+Message-ID: <1362506797-21905-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 5 Mar 2013 09:00:25 -0500
-Jason Cooper <jason@lakedaemon.net> wrote:
+From: Stephen Warren <swarren@nvidia.com>
 
-> On Tue, Mar 05, 2013 at 10:34:58AM +0100, Paul Bolle wrote:
-> > Commit 5b03df9ace680d7cdd34a69dfd85ca5f74159d18 ("ARM: dove: switch to
-> > DT clock providers") added "select COMMON_CLK_DOVE" to Marvell Dove's
-> > Kconfig entry. But there's no Kconfig symbol COMMON_CLK_DOVE, which
-> > makes this select statement a nop. Since the Marvell Dove code includes
-> > <linux/clk-provider.h> we can assume that this entry needs to select
-> > COMMON_CLK instead.
-> > 
-> > Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
-> > ---
-> > Untested.
-> > 
-> >  arch/arm/Kconfig | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)  
-> 
-> Nice catch, thanks for the patch.  Sebastian, could you test this and
-> report back?
+The recent dtc+cpp support allows header files and C pre-processor
+defines/macros to be used when compiling device tree files. These
+headers will typically define various constants that are part of the
+device tree bindings.
 
-I also have a Cubox and I generated a kernel 3.9-rc1 for it (not tested
-yet).
+The original patch which set up the dtc+cpp include path only considered
+using those headers from device tree files. However, most are also
+useful for kernel code which needs to interpret the device tree.
 
-The .config contains CONFIG_COMMON_CLK=y naturally because MACH_DOVE
-selects PLAT_ORION_LEGACY which selects PLAT_ORION which selects
-COMMON_CLK.
+In both the DT files and the kernel, I'd like to include the DT-related
+headers in the same way, for example, <dt-bindings/gpio/tegra-gpio.h>.
+That will simplify any text which discusses the DT header locations.
 
-So, "select COMMON_CLK" is not needed in ARCH_DOVE.
+Creating a <dt-bindings/> for kernel source to use is as simple as
+placing files into include/dt-bindings/.
 
-BTW, why is there a PLAT_ORION_LEGACY?
+However, when compiling DT files, the include path should be restricted
+so that only the dt-bindings path is available; arbitrary kernel headers
+shouldn't be exposed. For this reason, create a specific include
+directory for use by dtc+cpp, and symlink dt-bindings from there to the
+actual location of include/dt-bindings/. For want of a better location,
+place this "include chroot" into the existing dts/ directory.
 
+arch/*/boot/dts/include/dt-bindings -> ../../../../../include/dt-bindings
+
+Some headers used by device tree files may not be useful to the kernel;
+they may be used simply to aid in constructing the DT file (e.g. macros
+to create a node), but not define any information that the kernel needs
+to share. These may be placed directly into arch/*/boot/dts/ along with
+the DT files themselves.
+
+Cc: Hiroshi Doyu <hdoyu@nvidia.com>
+Acked-by: Michal Marek <mmarek@suse.cz>
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+Grant, Rob,
+
+This is a pre-requisite for people to convert their *.dts files to use
+cpp, and hence is likely to be useful for a number of ARM subarch trees.
+Perhaps this patch can be placed into a standalone topic branch in the
+DT repo so we can all merge it. Assuming this patch is OK, I would also
+repost the patches that create common headers defining IRQ, and GPIO
+flags, which would place files into the new include/dt-bindings
+directory.
+
+v2:
+* Leave arch/*/boot/dts in dtc include path, for any headers that are
+  only included by *.dts and don't need to be shared by the kernel.
+* Fix pathname in commit description.
+---
+ arch/arm/boot/dts/include/dt-bindings |    1 +
+ scripts/Makefile.lib                  |    2 +-
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+ create mode 120000 arch/arm/boot/dts/include/dt-bindings
+
+diff --git a/arch/arm/boot/dts/include/dt-bindings b/arch/arm/boot/dts/include/dt-bindings
+new file mode 120000
+index 0000000..08c00e4
+--- /dev/null
++++ b/arch/arm/boot/dts/include/dt-bindings
+@@ -0,0 +1 @@
++../../../../../include/dt-bindings
+\ No newline at end of file
+diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
+index 07125e6..af35521 100644
+--- a/scripts/Makefile.lib
++++ b/scripts/Makefile.lib
+@@ -158,7 +158,7 @@ ld_flags       = $(LDFLAGS) $(ldflags-y)
+ 
+ dtc_cpp_flags  = -Wp,-MD,$(depfile) -nostdinc                            \
+ 		 -I$(srctree)/arch/$(SRCARCH)/boot/dts                   \
+-		 -I$(srctree)/arch/$(SRCARCH)/include/dts                \
++		 -I$(srctree)/arch/$(SRCARCH)/boot/dts/include           \
+ 		 -undef -D__DTS__
+ 
+ # Finds the multi-part object the current object will be linked into
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+1.7.10.4
