@@ -1,41 +1,64 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Wed, 06 Mar 2013 10:57:52 +0100
-Subject: [PATCH v3 -next 5/5] Kconfig: Make x86 and arm kernels default
- to the LZ4-compressed
-In-Reply-To: <20130305150845.0d19a2875d39dac5d03b4b62@linux-foundation.org>
-References: <1362484056-9778-1-git-send-email-kyungsik.lee@lge.com>
- <1362484056-9778-6-git-send-email-kyungsik.lee@lge.com>
- <5135DF44.2040806@openwrt.org>
- <20130305150845.0d19a2875d39dac5d03b4b62@linux-foundation.org>
-Message-ID: <51371320.6000002@openwrt.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 6 Mar 2013 12:11:46 +0200
+Subject: [PATCH v11 8/9] usb: chipidea: imx: add getting vbus regulator
+ code
+In-Reply-To: <1362563800-16673-9-git-send-email-peter.chen@freescale.com>
+References: <1362563800-16673-1-git-send-email-peter.chen@freescale.com>
+ <1362563800-16673-9-git-send-email-peter.chen@freescale.com>
+Message-ID: <20130306101146.GM28587@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/06/2013 12:08 AM, Andrew Morton wrote:
-> On Tue, 05 Mar 2013 13:04:20 +0100 Florian Fainelli <florian@openwrt.org> wrote:
->
->> Hello,
->>
->> On 03/05/2013 12:47 PM, Kyungsik Lee wrote:
->>> This patch makes x86 and arm kernels default to the LZ4-compressed
->>> to test new LZ4 code in the linux-next. This is requested by
->>> Andrew Morton.
->>
->> I do not think making this the default is good idea, because the lz4demo
->> utility that you need to actually compress the kernel (used in patch 2)
->> is not installed nor available by default on most systems, while gzip
->> is.
->
-> Yes, that's a showstopper even for linux-next.  What a shame.
->
-> It means this code will walk into mainline with practically zero
-> third-party testing.  Oh well, the risk is minor.  If it breaks, people
-> can switch back to gzip easily enough.
+Hi,
 
-If we want to have more coverage, how about importing the lz4demo 
-utility source code to tools/lz4/, and change scripts/Makefile.lib to 
-point at it? Once the lz4 utilities have reached a broader audience and 
-are available with most distributions, we could revert back to assuming 
-this utility can be found in PATH.
---
-Florian
+On Wed, Mar 06, 2013 at 05:56:39PM +0800, Peter Chen wrote:
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> ---
+>  drivers/usb/chipidea/ci13xxx_imx.c |   28 +++++-----------------------
+>  1 files changed, 5 insertions(+), 23 deletions(-)
+> 
+> diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
+> index 3ed119e..b2d8350 100644
+> --- a/drivers/usb/chipidea/ci13xxx_imx.c
+> +++ b/drivers/usb/chipidea/ci13xxx_imx.c
+> @@ -33,7 +33,6 @@ struct ci13xxx_imx_data {
+>  	struct usb_phy *phy;
+>  	struct platform_device *ci_pdev;
+>  	struct clk *clk;
+> -	struct regulator *reg_vbus;
+>  };
+>  
+>  static const struct usbmisc_ops *usbmisc_ops;
+> @@ -163,20 +162,9 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
+>  		data->phy = phy;
+>  	}
+>  
+> -	/* we only support host now, so enable vbus here */
+>  	reg_vbus = devm_regulator_get(&pdev->dev, "vbus");
+> -	if (!IS_ERR(reg_vbus)) {
+> -		ret = regulator_enable(reg_vbus);
+> -		if (ret) {
+> -			dev_err(&pdev->dev,
+> -				"Failed to enable vbus regulator, err=%d\n",
+> -				ret);
+> -			goto err_clk;
+> -		}
+> -		data->reg_vbus = reg_vbus;
+> -	} else {
+> -		reg_vbus = NULL;
+> -	}
+> +	if (!IS_ERR(reg_vbus))
+> +		pdata->reg_vbus = reg_vbus;
+
+what you're doing here is wrong. chipidea core should be the one calling
+devm_regulator_get().
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130306/14b1c271/attachment.sig>
