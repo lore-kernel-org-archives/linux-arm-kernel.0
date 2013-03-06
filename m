@@ -1,69 +1,87 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 05 Mar 2013 21:20:32 -0800
-Subject: [PATCH] ARM: proc: Add Krait proc info
-In-Reply-To: <51366B9E.7010502@codeaurora.org>
-References: <1362439299-29617-1-git-send-email-sboyd@codeaurora.org>
- <20130305083421.GA19391@mudshark.cambridge.arm.com>
- <51366B9E.7010502@codeaurora.org>
-Message-ID: <5136D220.5090904@codeaurora.org>
+From: omycle@gmail.com (Li Haifeng)
+Date: Wed, 6 Mar 2013 13:34:09 +0800
+Subject: Should a swapped out page be deleted from swap cache?
+In-Reply-To: <51241B66.7080004@gmail.com>
+References: <CAFNq8R4UYvygk8+X+NZgyGjgU5vBsEv1UM6MiUxah6iW8=0HrQ@mail.gmail.com>
+ <alpine.LNX.2.00.1302180939200.2246@eggly.anvils>
+ <512338A6.1030602@gmail.com>
+ <alpine.LNX.2.00.1302191050330.2248@eggly.anvils>
+ <51241B66.7080004@gmail.com>
+Message-ID: <CAFNq8R5ni4jKRsHJLyGiNPcj4epz8q5zva_0XEJrL1-uVZHb9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/05/13 14:03, Stephen Boyd wrote:
-> On 03/05/13 00:34, Will Deacon wrote:
->> Hi Stephen, Stepan,
+2013/2/20 Ric Mason <ric.masonn@gmail.com>:
+>
+> Hi Hugh,
+>
+>
+> On 02/20/2013 02:56 AM, Hugh Dickins wrote:
 >>
->> On Mon, Mar 04, 2013 at 11:21:39PM +0000, Stephen Boyd wrote:
->>> From: Stepan Moskovchenko <stepanm@codeaurora.org>
+>> On Tue, 19 Feb 2013, Ric Mason wrote:
 >>>
->>> Add processor info for the Qualcomm, Inc. Krait family of
->>> processors, to use the generic ARMv7 initialisation
->>> procedure but explicitly enable the IDIV hardware
->>> capability flag.
->>>
->>> Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
->>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
->>> ---
->>>  arch/arm/mm/proc-v7.S |   10 ++++++++++
->>>  1 file changed, 10 insertions(+)
->>>
->>> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
->>> index 3a3c015..81adeb3 100644
->>> --- a/arch/arm/mm/proc-v7.S
->>> +++ b/arch/arm/mm/proc-v7.S
->>> @@ -434,6 +434,16 @@ __v7_ca15mp_proc_info:
->>>  	.size	__v7_ca15mp_proc_info, . - __v7_ca15mp_proc_info
->>>  
->>>  	/*
->>> +	 * Qualcomm Inc. Krait processors.
->>> +	 */
->>> +	.type	__krait_proc_info, #object
->>> +__krait_proc_info:
->>> +	.long	0x510f0400		@ Required ID value
->>> +	.long	0xff0ffc00		@ Mask for ID
->>> +	__v7_proc __v7_setup, hwcaps = HWCAP_IDIV
->> I was looking at this the other day and wondered whether we could set
->> HWCAP_IDIV in __v7_setup, depending on ID_ISAR0[27:24]. I can't immediately
->> think why that would be difficult, but similarly there may well be a reason
->> why we assign it like this.
+>>> There is a call of try_to_free_swap in function swap_writepage, if
+>>> swap_writepage is call from shrink_page_list path, PageSwapCache(page) ==
+>>> trure, PageWriteback(page) maybe false, page_swapcount(page) == 0, then
+>>> will
+>>> delete the page from swap cache and free swap slot, where I miss?
 >>
->> Fancy taking a look?
-> Ok I'll take a look. 
+>> That's correct.  PageWriteback is sure to be false there.  page_swapcount
+>> usually won't be 0 there, but sometimes it will be, and in that case we
+>> do want to delete from swap cache and free the swap slot.
+>
+>
+> 1) If PageSwapCache(page)  == true, PageWriteback(page) == false,
+> page_swapcount(page) == 0  in swap_writepage(shrink_page_list path), then
+> will delete the page from swap cache and free swap slot, in function
+> swap_writepage:
+>
+> if (try_to_free_swap(page)) {
+>     unlock_page(page);
+>     goto out;
+> }
+> writeback will not execute, that's wrong. Where I miss?
 
-Hmm. I wonder if we did it this way because between version B and C of
-DDI0406 the definition of those bits changed.
+when the page is deleted from swap cache and corresponding swap slot
+is free, the page is set dirty. The dirty page won't be reclaimed. It
+is not wrong.
 
-In DDI0406B we have
+corresponding path lists as below.
+when swap_writepage() is called by pageout() in shrink_page_list().
+pageout() will return PAGE_SUCCESS. For PAGE_SUCCESS, when
+PageDirty(page) is true, this reclaiming page will be keeped in the
+inactive LRU list.
+shrink_page_list()
+{
+...
+ 904                         switch (pageout(page, mapping, sc)) {
+ 905                         case PAGE_KEEP:
+ 906                                 nr_congested++;
+ 907                                 goto keep_locked;
+ 908                         case PAGE_ACTIVATE:
+ 909                                 goto activate_locked;
+ 910                         case PAGE_SUCCESS:
+ 911                                 if (PageWriteback(page))
+ 912                                         goto keep_lumpy;
+ 913                                 if (PageDirty(page))
+ 914                                         goto keep;
+...}
 
-    0 - no support
-    1 - support
+>
+> 2) In the function pageout, page will be set PG_Reclaim flag, since this
+> flag is set, end_swap_bio_write->end_page_writeback:
+> if (TestClearPageReclaim(page))
+>      rotate_reclaimable_page(page);
+> it means that page will be add to the tail of lru list, page is clean
+> anonymous page this time and will be reclaim to buddy system soon, correct?
+correct
+> If is correct, what is the meaning of rotate here?
 
-and in DDI0406C we have
+Rotating here is to add the page to the tail of inactive LRU list. So
+this page will be reclaimed ASAP while reclaiming.
 
-    0 - no support
-    1 - support in Thumb
-    2 - support in Thumb and ARM
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+>
+>>
+>> Hugh
+>
+>
