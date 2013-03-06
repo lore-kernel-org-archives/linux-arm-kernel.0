@@ -1,73 +1,78 @@
-From: lethal@linux-sh.org (Paul Mundt)
-Date: Wed, 6 Mar 2013 10:06:16 +0900
-Subject: [PATCH 1/3] clocksource: sh_cmt: Add Device Tree probing
-In-Reply-To: <20130305094305.GB15661@e106331-lin.cambridge.arm.com>
-References: <1362159932-18533-1-git-send-email-hechtb+renesas@gmail.com>
- <1362159932-18533-2-git-send-email-hechtb+renesas@gmail.com>
- <20130304100309.GA30747@e106331-lin.cambridge.arm.com>
- <CABYn4sxHmr5YLpK5DWxjb0hwmgXP=HbmAy+=HNX9UY6mywCWgw@mail.gmail.com>
- <20130305094305.GB15661@e106331-lin.cambridge.arm.com>
-Message-ID: <20130306010615.GG14275@linux-sh.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 5 Mar 2013 17:09:53 -0800
+Subject: [PATCH 6/9] [media] ir-rx51: fix clock API related build issues
+In-Reply-To: <20130305212351.4993d8c6@redhat.com>
+References: <1362521809-22989-1-git-send-email-arnd@arndb.de>
+ <1362521809-22989-7-git-send-email-arnd@arndb.de>
+ <20130305212351.4993d8c6@redhat.com>
+Message-ID: <20130306010952.GJ11806@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 05, 2013 at 09:43:05AM +0000, Mark Rutland wrote:
-> Hi again,
+* Mauro Carvalho Chehab <mchehab@redhat.com> [130305 16:28]:
+> Em Tue,  5 Mar 2013 23:16:46 +0100
+> Arnd Bergmann <arnd@arndb.de> escreveu:
 > 
-> > >> diff --git a/Documentation/devicetree/bindings/timer/renesas,sh-cmt-timer.txt b/Documentation/devicetree/bindings/timer/renesas,sh-cmt-timer.txt
-> > >> new file mode 100644
-> > >> index 0000000..e5ad808
-> > >> --- /dev/null
-> > >> +++ b/Documentation/devicetree/bindings/timer/renesas,sh-cmt-timer.txt
-> > >> @@ -0,0 +1,21 @@
-> > >> +* Renesas SH Mobile Compare Match Timer
-> > >> +
-> > >> +Required properties:
-> > >> +- compatible : Should be "renesas,cmt"
-> > >> +- reg : Address and length of the register set for the device
-> > >> +- interrupts : Timer IRQ
-> > >> +- renesas,timer-device-id : The ID of the timer device
-> > >> +- renesas,timer-channel-id : The channel ID of the timer device
-> > >
-> > > I'm not familiar with this hardware. Could you give me a basic idea of how it's
-> > > structured?
-> > >
-> > > Does the device have a single timer that this describes, or does the device
-> > > have multiple timers, and this selects which one to use?
+> > OMAP1 no longer provides its own clock interfaces since patch
+> > a135eaae52 "ARM: OMAP: remove plat/clock.h". This is great, but
+> > we now have to convert the ir-rx51 driver to use the generic
+> > interface from linux/clk.h.
 > > 
-> > The CMT timer is built into various SoCs from Renesas, often multiple
-> > instances of it. Each timer instance has 6 channels. You can select if
-> > they are driven by the main clock or the real time clock (the SoCs
-> > include an SH core for data processing) and can use different subscale
-> > modes. It features free running mode and can fire events. The clock
-> > has up to 48 bits to count. It has a DMA channel and wires enabling
-> > the device to be a wakeup source. Hmm don't know what to add more.
-> > It's a timer - you can check for overflows, read the counter and so
-> > on.
+> > The driver also uses the omap_dm_timer_get_fclk() function,
+> > which is not exported for OMAP1, so we have to move the
+> > definition out of the OMAP2 specific section.
+> > 
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
 > 
-> Unless I've misunderstood, couldn't Linux choose one timer to use completely
-> arbitrarily?
-> 
-> Why do we need to describe which one to use?
-> 
-Many of these CPUs have multiple timer blocks (CMT, TMU, MTU2) that sit
-in different power domains, so there is often a desire to prioritize one
-over another, as it will determine which sleep states are available to
-us. Beyond that, many of these channels have special behavioural
-constraints (only certain channels being useable by the PWM block for
-example, as well as mux issues (certain channels will be tied up with
-functions we care less about than others).
+> From my side:
+> Acked-by: Mauro Carvalho Chehab <mchehab@redhat.com>
 
-We have traditionally registered all of the available timer channels as
-platform devices, and then left it to the clocksource/event rating to
-determine which to use for what. This was based on the assumption that
-later on we would do some work on the clockevents layer to dynamically
-allocate the other channels that weren't being used for anything, but
-this never happened, and most users managed to get away with simply
-adopting hrtimers instead.
+There's just one issue, this driver most likely only needed on
+rx51 board.. So I suggest we just mark the driver depends on
+ARCH_OMAP2PLUS and let's drop this patch.
 
-Perhaps the rating is not a detail we want to expose, but we are still
-going to need some facility for defining whether a given timer is
-suitable for a clocksource/clockevent or not. We also can't really encode
-the rating information in the driver itself, as the placement of the
-block is wholly SoC dependent.
+This driver is already disabled for ARCH_MULTIPLATFORM
+as we need to move dmtimer.c to drivers and have some minimal
+include/linux/timer-omap.h for it.
+ 
+> > --- a/arch/arm/plat-omap/dmtimer.c
+> > +++ b/arch/arm/plat-omap/dmtimer.c
+> > @@ -333,6 +333,14 @@ int omap_dm_timer_get_irq(struct omap_dm_timer *timer)
+> >  }
+> >  EXPORT_SYMBOL_GPL(omap_dm_timer_get_irq);
+> >  
+> > +struct clk *omap_dm_timer_get_fclk(struct omap_dm_timer *timer)
+> > +{
+> > +	if (timer)
+> > +		return timer->fclk;
+> > +	return NULL;
+> > +}
+> > +EXPORT_SYMBOL_GPL(omap_dm_timer_get_fclk);
+> > +
+> >  #if defined(CONFIG_ARCH_OMAP1)
+> >  #include <mach/hardware.h>
+> >  /**
+> > @@ -371,14 +379,6 @@ EXPORT_SYMBOL_GPL(omap_dm_timer_modify_idlect_mask);
+> >  
+> >  #else
+> >  
+> > -struct clk *omap_dm_timer_get_fclk(struct omap_dm_timer *timer)
+> > -{
+> > -	if (timer)
+> > -		return timer->fclk;
+> > -	return NULL;
+> > -}
+> > -EXPORT_SYMBOL_GPL(omap_dm_timer_get_fclk);
+> > -
+> >  __u32 omap_dm_timer_modify_idlect_mask(__u32 inputmask)
+> >  {
+> >  	BUG();
+
+Then omap_dm_timer_get_fclk() won't work on omap1 as there's no
+separate functional clock. We probably should not even export
+this function eventually when things are fixed up.
+
+Regards,
+
+Tony
