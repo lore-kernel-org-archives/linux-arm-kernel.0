@@ -1,106 +1,36 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed,  6 Mar 2013 11:28:33 -0700
-Subject: [PATCH V2 2/6] ARM: tegra: fix sort order of USB PHY nodes
-In-Reply-To: <1362594517-22099-1-git-send-email-swarren@wwwdotorg.org>
-References: <1362594517-22099-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1362594517-22099-2-git-send-email-swarren@wwwdotorg.org>
+Date: Wed,  6 Mar 2013 11:28:32 -0700
+Subject: [PATCH V2 1/6] ARM: tegra: device tree whitespace cleanup
+Message-ID: <1362594517-22099-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Stephen Warren <swarren@nvidia.com>
 
-The USB PHY nodes are all grouped together rather than being sorted based
-on reg address like all other nodes fix this.
-
-I apologize for the churn; I should have noticed this during review of the
-patches that caused this.
+Remove white-space from empty line; triggers checkpatch.
 
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- arch/arm/boot/dts/tegra20.dtsi |   50 ++++++++++++++++++++--------------------
- 1 file changed, 25 insertions(+), 25 deletions(-)
+Patches 3 and later in his series depends on the kbuild-related series I
+just posted to rework the dtc+cpp logic. I hope to apply them to the Tegra
+tree after merging the previous series from the arm-soc topic branch.
+Patches 1 and 2 are just cleanup that the others depend on.
+
+ arch/arm/boot/dts/tegra20.dtsi |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
-index ab9402a..7708975 100644
+index 48d00a0..ab9402a 100644
 --- a/arch/arm/boot/dts/tegra20.dtsi
 +++ b/arch/arm/boot/dts/tegra20.dtsi
-@@ -438,31 +438,6 @@
- 		#size-cells = <0>;
+@@ -208,7 +208,7 @@
+ 		compatible = "nvidia,tegra20-das";
+ 		reg = <0x70000c00 0x80>;
  	};
- 
--	phy1: usb-phy at c5000400 {
--		compatible = "nvidia,tegra20-usb-phy";
--		reg = <0xc5000400 0x3c00>;
--		phy_type = "utmi";
--		nvidia,has-legacy-mode;
--		clocks = <&tegra_car 22>, <&tegra_car 127>;
--		clock-names = "phy", "pll_u";
--	};
--
--	phy2: usb-phy at c5004400 {
--		compatible = "nvidia,tegra20-usb-phy";
--		reg = <0xc5004400 0x3c00>;
--		phy_type = "ulpi";
--		clocks = <&tegra_car 94>, <&tegra_car 127>;
--		clock-names = "phy", "pll_u";
--	};
--
--	phy3: usb-phy at c5008400 {
--		compatible = "nvidia,tegra20-usb-phy";
--		reg = <0xc5008400 0x3C00>;
--		phy_type = "utmi";
--		clocks = <&tegra_car 22>, <&tegra_car 127>;
--		clock-names = "phy", "pll_u";
--	};
--
- 	usb at c5000000 {
- 		compatible = "nvidia,tegra20-ehci", "usb-ehci";
- 		reg = <0xc5000000 0x4000>;
-@@ -475,6 +450,15 @@
- 		status = "disabled";
- 	};
- 
-+	phy1: usb-phy at c5000400 {
-+		compatible = "nvidia,tegra20-usb-phy";
-+		reg = <0xc5000400 0x3c00>;
-+		phy_type = "utmi";
-+		nvidia,has-legacy-mode;
-+		clocks = <&tegra_car 22>, <&tegra_car 127>;
-+		clock-names = "phy", "pll_u";
-+	};
+-	
 +
- 	usb at c5004000 {
- 		compatible = "nvidia,tegra20-ehci", "usb-ehci";
- 		reg = <0xc5004000 0x4000>;
-@@ -485,6 +469,14 @@
- 		status = "disabled";
- 	};
- 
-+	phy2: usb-phy at c5004400 {
-+		compatible = "nvidia,tegra20-usb-phy";
-+		reg = <0xc5004400 0x3c00>;
-+		phy_type = "ulpi";
-+		clocks = <&tegra_car 94>, <&tegra_car 127>;
-+		clock-names = "phy", "pll_u";
-+	};
-+
- 	usb at c5008000 {
- 		compatible = "nvidia,tegra20-ehci", "usb-ehci";
- 		reg = <0xc5008000 0x4000>;
-@@ -495,6 +487,14 @@
- 		status = "disabled";
- 	};
- 
-+	phy3: usb-phy at c5008400 {
-+		compatible = "nvidia,tegra20-usb-phy";
-+		reg = <0xc5008400 0x3c00>;
-+		phy_type = "utmi";
-+		clocks = <&tegra_car 22>, <&tegra_car 127>;
-+		clock-names = "phy", "pll_u";
-+	};
-+
- 	sdhci at c8000000 {
- 		compatible = "nvidia,tegra20-sdhci";
- 		reg = <0xc8000000 0x200>;
+ 	tegra_ac97: ac97 {
+ 		compatible = "nvidia,tegra20-ac97";
+ 		reg = <0x70002000 0x200>;
 -- 
 1.7.10.4
