@@ -1,46 +1,41 @@
-From: kyungsik.lee@lge.com (Kyungsik Lee)
-Date: Wed, 6 Mar 2013 15:15:05 +0900
-Subject: [PATCH v3 -next 0/5] Add support for LZ4-compressed kernel
-In-Reply-To: <20130305150616.cb737f9b217b8c82051b2ccb@linux-foundation.org>
-References: <1362484056-9778-1-git-send-email-kyungsik.lee@lge.com>
- <20130305150616.cb737f9b217b8c82051b2ccb@linux-foundation.org>
-Message-ID: <20130306061505.GA4979@Corona>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 6 Mar 2013 14:21:53 +0800
+Subject: [PATCH V2 1/4] cpufreq: exynos: Adding cpufreq driver for
+ exynos5440
+In-Reply-To: <CADGdYn7RXks+Xvv__NeKu8o9ZsaEp15F6zDMtL158tFcKkxxEw@mail.gmail.com>
+References: <1362216854-6633-1-git-send-email-amit.daniel@samsung.com>
+ <CAKohpomHoDSNVyc21VVif8BrDKyZ=fSeCnWCZjDHL+64Bo+dgg@mail.gmail.com>
+ <CADGdYn7RXks+Xvv__NeKu8o9ZsaEp15F6zDMtL158tFcKkxxEw@mail.gmail.com>
+Message-ID: <CAKohpon6w6i0X4wJRE-FG8bfYMk2aMVCa6pOgbBwWPHy=Dttwg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 05, 2013 at 03:06:16PM -0800, Andrew Morton wrote:
-> On Tue,  5 Mar 2013 20:47:31 +0900 Kyungsik Lee <kyungsik.lee@lge.com> wrote:
-> 
-> > This is the third version. In this version, Some codes are fixed
-> > and more description and note are added. I would like to thank David Sterba
-> > for his review.
-> > 
-> > The Last patch[5/5] of the patch set is for making x86 and arm default to
-> > LZ4-compressed for testing the LZ4 code in the linux-next.
-> > It was requested by Andrew Morton in the patch set v2.
-> > 
-> > Currently, A preliminary version of LZ4 de/compression tool is supported.
-> > However, It is expected that we will have a tool with more features
-> > once its format is finished.
-> 
-> What happened to the changelog?  The earlier version at least had some
-> rudimentary benchmarking results, but now we don't even have that. 
-> 
-> Someone should prepare the information explaining why we added this to
-> Linux, and I'd prefer that person be you rather than me!  Certainly it
-> should include performance measurements - both speed and space.  Also
-> it should capture our thinking regarding all the other decompressors,
-> explaining why we view it as acceptable to add yet another one.
-Sorry, It will have all the information you mentioned. I can reply to
-this thread if you want.
+On 6 March 2013 13:35, amit kachhap <amit.kachhap@gmail.com> wrote:
+> On Tue, Mar 5, 2013 at 6:48 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
 
-Or I might need another patch(v4). I have one thing to be confirmed
-regarding LZ4 format. One of the patch set needs to be fixed
-if there is a change. After that I can include the information
-in the changelog.
+>>> +static void exynos_cpufreq_work(struct work_struct *work)
+>>> +{
+>>> +       unsigned int cur_pstate, index;
+>>> +       struct cpufreq_policy *policy = cpufreq_cpu_get(0); /* boot CPU */
+>>> +       struct cpufreq_frequency_table *freq_table = dvfs_info->freq_table;
+>>> +
+>>> +       if (policy == NULL)
+>>> +               goto skip_work;
+>>
+>> How can that be true? And if it can be, you will miss POSTCHANGE notifications
+>> too.
+> This skip of POSTCHANGE notifications is needed in one case where
+> bootup frequency does not match with any elements of cpufreq table and
+> hence I simply assign the highest frequency. Also cpufreq driver is
+> not registered at this point.
 
-> Please, put yourself in the position of someone reading these commits
-> in 2017 wondering "why did they merge this".  We should tell them.
+I will keep a variable for that then, otherwise its misleading... So keep a
+variable like cpufreq_enabled for it and set it to 1 as soon as this first
+interrupt is gone... keep it in unlikely() too.
 
-Thanks,
-Kyungsik
+>>> +       dvfs_info = kzalloc(sizeof(struct exynos_dvfs_data), GFP_KERNEL);
+>>
+>> sizeof(*dvfs_info) ??
+> Isn't both same?
+
+You need to read Documentation/CodingStyle.
