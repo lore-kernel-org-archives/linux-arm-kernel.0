@@ -1,64 +1,59 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 6 Mar 2013 12:11:46 +0200
-Subject: [PATCH v11 8/9] usb: chipidea: imx: add getting vbus regulator
- code
-In-Reply-To: <1362563800-16673-9-git-send-email-peter.chen@freescale.com>
-References: <1362563800-16673-1-git-send-email-peter.chen@freescale.com>
- <1362563800-16673-9-git-send-email-peter.chen@freescale.com>
-Message-ID: <20130306101146.GM28587@arwen.pp.htv.fi>
+From: hechtb@gmail.com (Bastian Hecht)
+Date: Wed, 6 Mar 2013 11:19:12 +0100
+Subject: [PATCH v4 1/3] serial: sh-sci: Add OF support
+In-Reply-To: <20130306005009.GF14275@linux-sh.org>
+References: <1362414054-23092-1-git-send-email-hechtb+renesas@gmail.com>
+ <5345836.ZO7uU35cQD@wuerfel>
+ <CABYn4sxYRbmEe27WKE-FbTZ3_SM+APaYqHJ1=Zrk8_a5czxZaQ@mail.gmail.com>
+ <201303051926.25655.arnd@arndb.de>
+ <20130306005009.GF14275@linux-sh.org>
+Message-ID: <CABYn4szirgE7jy=49qCR3BuYd9jsWXJ=DrXeCqyuyGP0S2quiQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi all,
 
-On Wed, Mar 06, 2013 at 05:56:39PM +0800, Peter Chen wrote:
-> Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> ---
->  drivers/usb/chipidea/ci13xxx_imx.c |   28 +++++-----------------------
->  1 files changed, 5 insertions(+), 23 deletions(-)
-> 
-> diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
-> index 3ed119e..b2d8350 100644
-> --- a/drivers/usb/chipidea/ci13xxx_imx.c
-> +++ b/drivers/usb/chipidea/ci13xxx_imx.c
-> @@ -33,7 +33,6 @@ struct ci13xxx_imx_data {
->  	struct usb_phy *phy;
->  	struct platform_device *ci_pdev;
->  	struct clk *clk;
-> -	struct regulator *reg_vbus;
->  };
->  
->  static const struct usbmisc_ops *usbmisc_ops;
-> @@ -163,20 +162,9 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
->  		data->phy = phy;
->  	}
->  
-> -	/* we only support host now, so enable vbus here */
->  	reg_vbus = devm_regulator_get(&pdev->dev, "vbus");
-> -	if (!IS_ERR(reg_vbus)) {
-> -		ret = regulator_enable(reg_vbus);
-> -		if (ret) {
-> -			dev_err(&pdev->dev,
-> -				"Failed to enable vbus regulator, err=%d\n",
-> -				ret);
-> -			goto err_clk;
-> -		}
-> -		data->reg_vbus = reg_vbus;
-> -	} else {
-> -		reg_vbus = NULL;
-> -	}
-> +	if (!IS_ERR(reg_vbus))
-> +		pdata->reg_vbus = reg_vbus;
+2013/3/6 Paul Mundt <lethal@linux-sh.org>:
+> On Tue, Mar 05, 2013 at 07:26:25PM +0000, Arnd Bergmann wrote:
+>> On Tuesday 05 March 2013, Bastian Hecht wrote:
+>> > >> +- renesas,scbrr-algo-id : Algorithm ID for the Bit Rate Register
+>> > >> +  1 = SCBRR_ALGO_1 ((clk + 16 * bps) / (16 * bps) - 1)
+>> > >> +  2 = SCBRR_ALGO_2 ((clk + 16 * bps) / (32 * bps) - 1)
+>> > >> +  3 = SCBRR_ALGO_3 (((clk * 2) + 16 * bps) / (16 * bps) - 1)
+>> > >> +  4 = SCBRR_ALGO_4 (((clk * 2) + 16 * bps) / (32 * bps) - 1)
+>> > >> +  5 = SCBRR_ALGO_5 (((clk * 1000 / 32) / bps) - 1)
+>> > >
+>> > > Maybe replace this with a "clock-frequency" property? This may
+>> > > be what the registers contain, but it is not very readable.
+>> >
+>> > Hmm... do you want a frequency in absolute terms? And then calculate
+>> > the best SCBRR value for it?
+>> > I'm unsure about this, either you must exactly hit it or accept
+>> > tolerances? As something in between I renamed the property to
+>> > "renesas,clock-algorithm", but I don't know if this is what you want.
+>>
+>> I meant the absolute frequency in HZ, since that is what we do
+>> for the 8250 uart and other devices, but only if that is sufficient
+>> for your device.
+>>
+> No, we still need to figure out how to generate that baud rate, whether
+> it needs an internal or external clock for driving the rate, etc. The
+> frequency in and of itself doesn't provide this information, and various
+> parts use different algorithms for factoring the baud rate generator,
+> even varying across otherwise identical ports. It's unfortunately not
+> possible to infer anything about the SCBRR algorithm from port type or
+> specified baud rate.
+>
+> The algorithm IDs here are wholly arbitrary anyways, but are the
+> variations I came up with from roughly 60-70 different CPUs.
 
-what you're doing here is wrong. chipidea core should be the one calling
-devm_regulator_get().
+So if we stick with the notion of the algrithm ID everything is settled now.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130306/14b1c271/attachment.sig>
+I will prepare a v6 that I will post as the whole patchset and an
+additional incremental patch 1/3 from v3 to v6 for Paul's repo. Then
+we can see if the SCBRR thing needs further discussion and if the rest
+of the patchset is final.
+
+Thanks to you all,
+
+ Bastian
