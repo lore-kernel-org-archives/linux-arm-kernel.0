@@ -1,34 +1,27 @@
-From: elezegarcia@gmail.com (Ezequiel Garcia)
-Date: Wed, 6 Mar 2013 08:58:45 -0300
-Subject: [PATCH 11/14] ARM: OMAP2+: Add device-tree support for NOR flash
-In-Reply-To: <513664EC.2050508@ti.com>
-References: <1361899842-30303-1-git-send-email-jon-hunter@ti.com>
- <1361899842-30303-12-git-send-email-jon-hunter@ti.com>
- <51360271.1030302@mimc.co.uk> <51360562.20309@ti.com>
- <51361B46.507@mimc.co.uk> <51362BAB.10403@ti.com>
- <513664EC.2050508@ti.com>
-Message-ID: <CALF0-+VeU9tGy-dKgmVg1pT0z0ghJBSsughV7kzT5nX7u=9BhA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 6 Mar 2013 12:01:59 +0000
+Subject: [PATCH 18/23] ASoC: samsung: convert to dmaengine API
+In-Reply-To: <CAAgF-Bd=b721r_hiJKGDhw1AqRKC8bNkLh6f9ipcGdFtkM62vQ@mail.gmail.com>
+References: <1362505353-8873-1-git-send-email-arnd@arndb.de>
+ <1362505353-8873-19-git-send-email-arnd@arndb.de>
+ <CAAgF-Bd=b721r_hiJKGDhw1AqRKC8bNkLh6f9ipcGdFtkM62vQ@mail.gmail.com>
+Message-ID: <201303061201.59414.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jon,
+On Wednesday 06 March 2013, Padma Venkat wrote:
 
-On Tue, Mar 5, 2013 at 6:34 PM, Jon Hunter <jon-hunter@ti.com> wrote:
->
-> By the way, with this version you should remove "simple-bus" from your
-> gpmc node compatible strings. I now call of_platform_device_create() to
-> create the child device during the GPMC probe. I think that this is a
-> safer approach.
->
+> > +               if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+> > +                       config.direction = DMA_MEM_TO_DEV;
+> > +                       config.dst_addr = prtd->params->dma_size;
+> > +                       config.dst_addr_width = prtd->params->dma_addr;
+> 
+> dma_addr and dma_size got interchanged.
 
-FWIW, using of_platform_device_create() works for my driver.
-It seems as simple as using a compatible 'simple-bus',
-with the advantage that it allows to create and probe the
-child device from its parent.
+Ok, fixed.
 
-I'll submit this driver by the end of this week, in case you want
-to take a look at it.
+> Except the above one I tested this patch on 5250. It's working fine.
 
-Thanks a lot,
--- 
-    Ezequiel
+Thanks a lot for testing this!
+
+	Arnd
