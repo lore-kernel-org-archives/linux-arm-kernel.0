@@ -1,45 +1,30 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 6 Mar 2013 17:41:59 +0100
-Subject: [PATCH v3 09/12] ASoC: dmaengine_pcm: add
- snd_dmaengine_generic_pcm_open()
-In-Reply-To: <20130306051131.GB1828@S2100-06.ap.freescale.net>
-References: <1362486244-24593-10-git-send-email-shawn.guo@linaro.org>
- <201303060028.18625.marex@denx.de>
- <20130306051131.GB1828@S2100-06.ap.freescale.net>
-Message-ID: <201303061741.59436.marex@denx.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed,  6 Mar 2013 17:44:08 +0100
+Subject: [PATCH 0/2] Add support for the Solomon SSD1306 OLED Controller
+Message-ID: <1362588251-1824-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Shawn Guo,
+Hi,
 
-> On Wed, Mar 06, 2013 at 12:28:18AM +0100, Marek Vasut wrote:
-> > Hi Shawn,
-> > 
-> > > With generic DMA device tree binding and helper function
-> > > dma_request_slave_channel() in place, dmaengine_pcm should support
-> > > that in requesting DMA channel for users that support generic DMA
-> > > device tree binding.
-> > > 
-> > > Add a new API snd_dmaengine_generic_pcm_open() as the variant of
-> > > snd_dmaengine_pcm_open().  It takes DMA client struct device pointer
-> > > and slave channel name as arguments and calls generic DMA helper
-> > > dma_request_slave_channel() to request DMA channel from dmaengine.
-> > > 
-> > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > > Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> > > Cc: alsa-devel at alsa-project.org
-> > > ---
-> > > 
-> > > Changes since v2:
-> > >  - Drop 'const' from argument 'name' to fix the warning below.
-> > 
-> > [...]
-> > 
-> > v3 changelog missing ;-) What did you adjust here please?
-> 
-> The "Changes since v2" means v3 changelog.
+This patchset adds the needed bits to the ssd1307fb driver to support the
+very similar Solomon SSD1306 controller.
 
-Bah, it was too late then, sorry.
+Since the SSD1307 has been replaced by the SSD1306 in the latest CFA-10036
+production samples, we also need to change the device tree accordingly.
 
-Best regards,
-Marek Vasut
+Thanks,
+Maxime
+
+Maxime Ripard (2):
+  video: ssd1307fb: Add support for SSD1306 OLED controller
+  ARM: dts: cfa10036: Change the OLED display to SSD1306
+
+ .../devicetree/bindings/video/ssd1307fb.txt        |   10 +-
+ arch/arm/boot/dts/imx28-cfa10036.dts               |   14 +-
+ arch/arm/boot/dts/imx28-cfa10049.dts               |    4 +-
+ drivers/video/ssd1307fb.c                          |  267 ++++++++++++++------
+ 4 files changed, 210 insertions(+), 85 deletions(-)
+
+-- 
+1.7.10.4
