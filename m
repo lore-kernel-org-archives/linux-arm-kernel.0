@@ -1,58 +1,33 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 05 Mar 2013 16:52:02 -0700
-Subject: [REPOST PATCH 0/2] Table lookup for mux clock type
-In-Reply-To: <51367625.2090405@wwwdotorg.org>
-References: <1361545358-22721-1-git-send-email-pdeschrijver@nvidia.com>
- <51367625.2090405@wwwdotorg.org>
-Message-ID: <51368522.90700@wwwdotorg.org>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Wed, 06 Mar 2013 09:22:14 +0900
+Subject: [PATCH 00/04] ARM: shmobile: TWD update
+Message-ID: <20130306002214.5430.43766.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/05/2013 03:48 PM, Stephen Warren wrote:
-> On 02/22/2013 08:02 AM, Peter De Schrijver wrote:
->> This patchset adds a table lookup feature to the mux clock type. This will
->> be used by the forthcoming Tegra114 clock implementation. Also instead of
->> a fixed field width, a mask is used. This is because Tegra114 has some muxes
->> where the parent selector is spread over several bitfields. The second patch
->> adapts the tegra periph clock implementation which uses struct clk_mux
->> directly.
->>
->> --
->>
->> Mike,
->>
->> This patch is a dependency for the Tegra114 CCF implementation. Could you
->> review it and merge on a topic branch so Stephen can pull it in to verify
->> the integration?
-> 
-> Peter, does this repost you resolve the issue I pointed out at:
-> http://www.spinics.net/lists/arm-kernel/msg220873.html
+ARM: shmobile: TWD update 
+[PATCH 01/04] ARM: shmobile: Register DT TWD from timer.c 
+[PATCH 02/04] ARM: shmobile: Add EMEV2 specific timer_init
+[PATCH 03/04] ARM: shmobile: Add EMEV2 TWD support
+[PATCH 04/04] ARM: shmobile: Remove r8a7779_register_twd() from common.
 
-Indeed, I just tested applying patch 1/2 and the build is broken without
-patch 2/2.
+These patches are the first attempt to update the state of
+mach-shmobile TWD support. Patch 01/04 adds shared mach-shmobile
+code to allow TWD support via DT, patch 02/04 and 03/04 add TWD
+support to EMEV2 and the KZM9D board. Finally patch 04/04 removes
+unnecessary forward declaration.
 
-Can you either rework the patches to maintain bisectability, or squash
-the two together?
+Signed-off-by: Magnus Damm <damm@opensource.se>
+---
 
-> 
-> To quote:
-> 
->>>> Just a quick note on patch dependencies here:
->>>>
->>>> Patch 1/2 can presumably be taken through the clk tree whenever Mike is
->>>> OK with it.
->>>>
->>>> Patch 2/2 depends on patches in the Tegra tree for 3.9. Since patch 2/2
->>>> is useful mostly for the Tegra114 clock driver, and I don't imagine that
->>>> will get posted/merged in time for 3.9, it's probably easiest to just
->>>> take patch 2/2 for 3.10 along with the Tegra114 clock driver. Also, I
->>>> imagine there won't be any more clk/Tegra tree dependencies in 3.10, so
->>>> patch 2/2 and the Tegra114 clk driver patches can likely go through the
->>>> clk tree itself for 3.10.
->>>
->>> No. Because 1/2 changes struct clk_mux and the tegra peripheral clock type 
->>> uses struct clk_mux directly, 2/2 needs to be applied together with 1/2, even
->>> if the new functionality is not yet used.
->>
->> Oh, then they can't be two separate patches then, or "git bisect" won't
->> work. I guess it's best to wait for 3.10 for this:-(
+ Written against -next in renesas.git.
+
+ arch/arm/boot/dts/emev2.dtsi                 |    6 ++++++
+ arch/arm/mach-shmobile/board-kzm9d.c         |    2 +-
+ arch/arm/mach-shmobile/clock-emev2.c         |    5 ++++-
+ arch/arm/mach-shmobile/include/mach/common.h |    2 --
+ arch/arm/mach-shmobile/include/mach/emev2.h  |    1 +
+ arch/arm/mach-shmobile/setup-emev2.c         |   12 ++++++++++--
+ arch/arm/mach-shmobile/smp-emev2.c           |    9 +++++++++
+ arch/arm/mach-shmobile/timer.c               |    1 +
+ 8 files changed, 32 insertions(+), 6 deletions(-)
