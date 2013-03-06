@@ -1,46 +1,99 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 6 Mar 2013 06:31:03 +0000
-Subject: [PATCH] ARM: bcm281xx: Add L2 cache enable code
-In-Reply-To: <513677BB.9010309@broadcom.com>
-References: <1362451632-18806-1-git-send-email-csd@broadcom.com>
- <201303050901.12317.arnd@arndb.de> <513677BB.9010309@broadcom.com>
-Message-ID: <201303060631.03782.arnd@arndb.de>
+From: kyungsik.lee@lge.com (Kyungsik Lee)
+Date: Wed, 6 Mar 2013 15:37:38 +0900
+Subject: [PATCH v3 -next 4/5] x86: Add support for LZ4-compressed kernel
+In-Reply-To: <18eb6ca7-6993-40e9-a58d-116e1f6c37f6@email.android.com>
+References: <1362484056-9778-1-git-send-email-kyungsik.lee@lge.com>
+ <1362484056-9778-5-git-send-email-kyungsik.lee@lge.com>
+ <18eb6ca7-6993-40e9-a58d-116e1f6c37f6@email.android.com>
+Message-ID: <20130306063738.GB4979@Corona>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 05 March 2013, Christian Daudt wrote:
-> On 13-03-05 01:01 AM, Arnd Bergmann wrote:
-> > On Tuesday 05 March 2013, Christian Daudt wrote:
-> > For other firmware interfaces like this, we tend to list the specific commands
-> > that the firmware understands. If you think there might be different versions
-> > to consider, you might want to model this like
+On Tue, Mar 05, 2013 at 08:13:38AM -0800, H. Peter Anvin wrote:
+> Please add the new magic to Documentation/x86/boot.txt as well.
+
+Ok, I will update it as soon as the patch set is stabilized.
+
+Thanks,
+Kyungsik
+
+> >This patch integrates the LZ4 decompression code to the x86 pre-boot
+> >code.
+> >And it depends on two patchs below
 > >
-> > Documentation/devicetree/bindings/arm/psci.txt
-> This interface is stable and in shipping products at this time, and so 
-> the api will remain constant.
-
-But what about future products? Wouldn't they be able to extend the
-current interface in a compatible way?
-
-> >> +static void __init init_irq(void)
-> >> +{
-> >> +	irqchip_init();
-> >> +	bcm_kona_smc_init();
-> >> +
-> >> +#ifdef CONFIG_CACHE_L2X0
-> >> +	kona_l2_cache_init();
-> >> +#endif /* CONFIG_CACHE_L2X0 */
-> >> +}
-> > Why are you calling bcm_kona_smc_init() and kona_l2_cache_init() from init_irq()?
+> >lib: Add support for LZ4-compressed kernel
+> >decompressor: Add LZ4 decompressor module
 > >
-> > It seems completely unrelated to interrupt handling.
+> >Signed-off-by: Kyungsik Lee <kyungsik.lee@lge.com>
+> >---
+> > arch/x86/Kconfig                  | 1 +
+> > arch/x86/boot/compressed/Makefile | 5 ++++-
+> > arch/x86/boot/compressed/misc.c   | 4 ++++
+> > 3 files changed, 9 insertions(+), 1 deletion(-)
 > >
-> It was originally in init_machine section but I was told that that was 
-> too late and init_irq would be better, and I saw that highbank also has 
-> it in init_irq. I agree that it is unrelated to irq - is there a better 
-> place to put this in ?
-
-IMHO the later the better. Do you know what issues were caused  by having it
-in init_machine?
-
-	Arnd
+> >diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+> >index 225543b..ab916fd 100644
+> >--- a/arch/x86/Kconfig
+> >+++ b/arch/x86/Kconfig
+> >@@ -63,6 +63,7 @@ config X86
+> > 	select HAVE_KERNEL_LZMA
+> > 	select HAVE_KERNEL_XZ
+> > 	select HAVE_KERNEL_LZO
+> >+	select HAVE_KERNEL_LZ4
+> > 	select HAVE_HW_BREAKPOINT
+> > 	select HAVE_MIXED_BREAKPOINTS_REGS
+> > 	select PERF_EVENTS
+> >diff --git a/arch/x86/boot/compressed/Makefile
+> >b/arch/x86/boot/compressed/Makefile
+> >index 8a84501..c275db5 100644
+> >--- a/arch/x86/boot/compressed/Makefile
+> >+++ b/arch/x86/boot/compressed/Makefile
+> >@@ -4,7 +4,7 @@
+> > # create a compressed vmlinux image from the original vmlinux
+> > #
+> > 
+> >-targets := vmlinux.lds vmlinux vmlinux.bin vmlinux.bin.gz
+> >vmlinux.bin.bz2 vmlinux.bin.lzma vmlinux.bin.xz vmlinux.bin.lzo
+> >head_$(BITS).o misc.o string.o cmdline.o early_serial_console.o piggy.o
+> >+targets := vmlinux.lds vmlinux vmlinux.bin vmlinux.bin.gz
+> >vmlinux.bin.bz2 vmlinux.bin.lzma vmlinux.bin.xz vmlinux.bin.lzo
+> >vmlinux.bin.lz4 head_$(BITS).o misc.o string.o cmdline.o
+> >early_serial_console.o piggy.o
+> > 
+> > KBUILD_CFLAGS := -m$(BITS) -D__KERNEL__ $(LINUX_INCLUDE) -O2
+> > KBUILD_CFLAGS += -fno-strict-aliasing -fPIC
+> >@@ -64,12 +64,15 @@ $(obj)/vmlinux.bin.xz: $(vmlinux.bin.all-y) FORCE
+> > 	$(call if_changed,xzkern)
+> > $(obj)/vmlinux.bin.lzo: $(vmlinux.bin.all-y) FORCE
+> > 	$(call if_changed,lzo)
+> >+$(obj)/vmlinux.bin.lz4: $(vmlinux.bin.all-y) FORCE
+> >+	$(call if_changed,lz4)
+> > 
+> > suffix-$(CONFIG_KERNEL_GZIP)	:= gz
+> > suffix-$(CONFIG_KERNEL_BZIP2)	:= bz2
+> > suffix-$(CONFIG_KERNEL_LZMA)	:= lzma
+> > suffix-$(CONFIG_KERNEL_XZ)	:= xz
+> > suffix-$(CONFIG_KERNEL_LZO) 	:= lzo
+> >+suffix-$(CONFIG_KERNEL_LZ4) 	:= lz4
+> > 
+> > quiet_cmd_mkpiggy = MKPIGGY $@
+> >       cmd_mkpiggy = $(obj)/mkpiggy $< > $@ || ( rm -f $@ ; false )
+> >diff --git a/arch/x86/boot/compressed/misc.c
+> >b/arch/x86/boot/compressed/misc.c
+> >index 88f7ff6..166a0a8 100644
+> >--- a/arch/x86/boot/compressed/misc.c
+> >+++ b/arch/x86/boot/compressed/misc.c
+> >@@ -145,6 +145,10 @@ static int lines, cols;
+> > #include "../../../../lib/decompress_unlzo.c"
+> > #endif
+> > 
+> >+#ifdef CONFIG_KERNEL_LZ4
+> >+#include "../../../../lib/decompress_unlz4.c"
+> >+#endif
+> >+
+> > static void scroll(void)
+> > {
+> > 	int i;
+> 
+> -- 
+> Sent from my mobile phone. Please excuse brevity and lack of formatting.
