@@ -1,30 +1,43 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Wed, 6 Mar 2013 15:43:32 +0200
-Subject: v3.9-rc1: swapper/0 [ INFO: possible circular locking dependency
- detected ]
-In-Reply-To: <51371B5E.1000508@free-electrons.com>
-References: <51371B5E.1000508@free-electrons.com>
-Message-ID: <CAB7JpEHJdKeOhkME-6mMdPY6VyTQwFvM33+gxg4X9ZpQv1=6RQ@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed,  6 Mar 2013 14:43:37 +0100
+Subject: [PATCH 01/10] arm: plat-orion: only build addr-map.c when needed
+In-Reply-To: <1362577426-12804-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1362577426-12804-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1362577426-12804-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 March 2013 12:33, Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-> Hi,
->
-> Just noticed this in 3.9-rc1 on an iMX28 (ARM) board with a config
-> based on mxs_defconfig. I'm using the patchset "Add tested id switch
-> and vbus connect detect support for Chipidea" from Peter Chen in its
-> 10th version [1], rebased on top of 3.9-rc1, but since this doesn't
-> modify the locks present in the udc_irq function, I think the problem
-> is elsewhere.
+For now, addr-map.c is needed by all 5 Marvell EBU
+sub-architectures. However, we are going to introduce the orion-mbus
+driver, which will replace the address decoding code from
+addr-map.c. In order to ease the migration process, we will do that
+one sub-architecture at a time, which will require us to remove the
+compilation of addr-map.c one sub-architecture at a time.
 
->From a quick look at the current chipidea code, I don't see any place
-where we might try to take cdev->lock under ci->lock. I should have a
-better look at Peter's patchset to see if it can trigger that. Peter,
-have you seen anything like that with your code?
-Is this easy to trigger (I would assume it is)? Can you post the
-contents of "events" debug file in sysfs?
+Therefore, we split the unconditional obj-y inclusion of addr-map.c
+into 5 conditionals obj-$(CONFIG_...) lines, one per sub-architecture.
 
-Thanks,
---
-Alex
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/plat-orion/Makefile |    6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/plat-orion/Makefile b/arch/arm/plat-orion/Makefile
+index a82cecb..ad97400 100644
+--- a/arch/arm/plat-orion/Makefile
++++ b/arch/arm/plat-orion/Makefile
+@@ -3,7 +3,11 @@
+ #
+ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include
+ 
+-obj-y                             += addr-map.o
++obj-$(CONFIG_ARCH_MVEBU)          += addr-map.o
++obj-$(CONFIG_ARCH_KIRKWOOD)       += addr-map.o
++obj-$(CONFIG_ARCH_DOVE)           += addr-map.o
++obj-$(CONFIG_ARCH_ORION5X)        += addr-map.o
++obj-$(CONFIG_ARCH_MV78XX0)        += addr-map.o
+ 
+ orion-gpio-$(CONFIG_GENERIC_GPIO) += gpio.o
+ obj-$(CONFIG_PLAT_ORION_LEGACY)   += irq.o pcie.o time.o common.o mpp.o
+-- 
+1.7.9.5
