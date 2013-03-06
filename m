@@ -1,99 +1,100 @@
-From: kyungsik.lee@lge.com (Kyungsik Lee)
-Date: Wed, 6 Mar 2013 15:37:38 +0900
-Subject: [PATCH v3 -next 4/5] x86: Add support for LZ4-compressed kernel
-In-Reply-To: <18eb6ca7-6993-40e9-a58d-116e1f6c37f6@email.android.com>
-References: <1362484056-9778-1-git-send-email-kyungsik.lee@lge.com>
- <1362484056-9778-5-git-send-email-kyungsik.lee@lge.com>
- <18eb6ca7-6993-40e9-a58d-116e1f6c37f6@email.android.com>
-Message-ID: <20130306063738.GB4979@Corona>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 06 Mar 2013 00:55:34 -0600
+Subject: [PATCH V2 REPOST] kbuild: create an "include chroot" for DT
+ bindings
+In-Reply-To: <1362506797-21905-1-git-send-email-swarren@wwwdotorg.org>
+References: <1362506797-21905-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <5136E866.20008@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 05, 2013 at 08:13:38AM -0800, H. Peter Anvin wrote:
-> Please add the new magic to Documentation/x86/boot.txt as well.
-
-Ok, I will update it as soon as the patch set is stabilized.
-
-Thanks,
-Kyungsik
-
-> >This patch integrates the LZ4 decompression code to the x86 pre-boot
-> >code.
-> >And it depends on two patchs below
-> >
-> >lib: Add support for LZ4-compressed kernel
-> >decompressor: Add LZ4 decompressor module
-> >
-> >Signed-off-by: Kyungsik Lee <kyungsik.lee@lge.com>
-> >---
-> > arch/x86/Kconfig                  | 1 +
-> > arch/x86/boot/compressed/Makefile | 5 ++++-
-> > arch/x86/boot/compressed/misc.c   | 4 ++++
-> > 3 files changed, 9 insertions(+), 1 deletion(-)
-> >
-> >diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-> >index 225543b..ab916fd 100644
-> >--- a/arch/x86/Kconfig
-> >+++ b/arch/x86/Kconfig
-> >@@ -63,6 +63,7 @@ config X86
-> > 	select HAVE_KERNEL_LZMA
-> > 	select HAVE_KERNEL_XZ
-> > 	select HAVE_KERNEL_LZO
-> >+	select HAVE_KERNEL_LZ4
-> > 	select HAVE_HW_BREAKPOINT
-> > 	select HAVE_MIXED_BREAKPOINTS_REGS
-> > 	select PERF_EVENTS
-> >diff --git a/arch/x86/boot/compressed/Makefile
-> >b/arch/x86/boot/compressed/Makefile
-> >index 8a84501..c275db5 100644
-> >--- a/arch/x86/boot/compressed/Makefile
-> >+++ b/arch/x86/boot/compressed/Makefile
-> >@@ -4,7 +4,7 @@
-> > # create a compressed vmlinux image from the original vmlinux
-> > #
-> > 
-> >-targets := vmlinux.lds vmlinux vmlinux.bin vmlinux.bin.gz
-> >vmlinux.bin.bz2 vmlinux.bin.lzma vmlinux.bin.xz vmlinux.bin.lzo
-> >head_$(BITS).o misc.o string.o cmdline.o early_serial_console.o piggy.o
-> >+targets := vmlinux.lds vmlinux vmlinux.bin vmlinux.bin.gz
-> >vmlinux.bin.bz2 vmlinux.bin.lzma vmlinux.bin.xz vmlinux.bin.lzo
-> >vmlinux.bin.lz4 head_$(BITS).o misc.o string.o cmdline.o
-> >early_serial_console.o piggy.o
-> > 
-> > KBUILD_CFLAGS := -m$(BITS) -D__KERNEL__ $(LINUX_INCLUDE) -O2
-> > KBUILD_CFLAGS += -fno-strict-aliasing -fPIC
-> >@@ -64,12 +64,15 @@ $(obj)/vmlinux.bin.xz: $(vmlinux.bin.all-y) FORCE
-> > 	$(call if_changed,xzkern)
-> > $(obj)/vmlinux.bin.lzo: $(vmlinux.bin.all-y) FORCE
-> > 	$(call if_changed,lzo)
-> >+$(obj)/vmlinux.bin.lz4: $(vmlinux.bin.all-y) FORCE
-> >+	$(call if_changed,lz4)
-> > 
-> > suffix-$(CONFIG_KERNEL_GZIP)	:= gz
-> > suffix-$(CONFIG_KERNEL_BZIP2)	:= bz2
-> > suffix-$(CONFIG_KERNEL_LZMA)	:= lzma
-> > suffix-$(CONFIG_KERNEL_XZ)	:= xz
-> > suffix-$(CONFIG_KERNEL_LZO) 	:= lzo
-> >+suffix-$(CONFIG_KERNEL_LZ4) 	:= lz4
-> > 
-> > quiet_cmd_mkpiggy = MKPIGGY $@
-> >       cmd_mkpiggy = $(obj)/mkpiggy $< > $@ || ( rm -f $@ ; false )
-> >diff --git a/arch/x86/boot/compressed/misc.c
-> >b/arch/x86/boot/compressed/misc.c
-> >index 88f7ff6..166a0a8 100644
-> >--- a/arch/x86/boot/compressed/misc.c
-> >+++ b/arch/x86/boot/compressed/misc.c
-> >@@ -145,6 +145,10 @@ static int lines, cols;
-> > #include "../../../../lib/decompress_unlzo.c"
-> > #endif
-> > 
-> >+#ifdef CONFIG_KERNEL_LZ4
-> >+#include "../../../../lib/decompress_unlz4.c"
-> >+#endif
-> >+
-> > static void scroll(void)
-> > {
-> > 	int i;
+On 03/05/2013 12:06 PM, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
 > 
-> -- 
-> Sent from my mobile phone. Please excuse brevity and lack of formatting.
+> The recent dtc+cpp support allows header files and C pre-processor
+> defines/macros to be used when compiling device tree files. These
+> headers will typically define various constants that are part of the
+> device tree bindings.
+> 
+> The original patch which set up the dtc+cpp include path only considered
+> using those headers from device tree files. However, most are also
+> useful for kernel code which needs to interpret the device tree.
+> 
+> In both the DT files and the kernel, I'd like to include the DT-related
+> headers in the same way, for example, <dt-bindings/gpio/tegra-gpio.h>.
+> That will simplify any text which discusses the DT header locations.
+> 
+> Creating a <dt-bindings/> for kernel source to use is as simple as
+> placing files into include/dt-bindings/.
+> 
+> However, when compiling DT files, the include path should be restricted
+> so that only the dt-bindings path is available; arbitrary kernel headers
+> shouldn't be exposed. For this reason, create a specific include
+> directory for use by dtc+cpp, and symlink dt-bindings from there to the
+> actual location of include/dt-bindings/. For want of a better location,
+> place this "include chroot" into the existing dts/ directory.
+> 
+> arch/*/boot/dts/include/dt-bindings -> ../../../../../include/dt-bindings
+> 
+> Some headers used by device tree files may not be useful to the kernel;
+> they may be used simply to aid in constructing the DT file (e.g. macros
+> to create a node), but not define any information that the kernel needs
+> to share. These may be placed directly into arch/*/boot/dts/ along with
+> the DT files themselves.
+> 
+> Cc: Hiroshi Doyu <hdoyu@nvidia.com>
+> Acked-by: Michal Marek <mmarek@suse.cz>
+> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+> Grant, Rob,
+> 
+> This is a pre-requisite for people to convert their *.dts files to use
+> cpp, and hence is likely to be useful for a number of ARM subarch trees.
+> Perhaps this patch can be placed into a standalone topic branch in the
+> DT repo so we can all merge it. Assuming this patch is OK, I would also
+> repost the patches that create common headers defining IRQ, and GPIO
+> flags, which would place files into the new include/dt-bindings
+> directory.
+
+This looks fine to me. As all these will all be arm-soc branches with
+the dependency, it probably makes more sense for Arnd/Olof to apply this
+and create the branch for this single patch.
+
+Acked-by: Rob Herring <rob.herring@calxeda.com>
+
+Rob
+
+> 
+> v2:
+> * Leave arch/*/boot/dts in dtc include path, for any headers that are
+>   only included by *.dts and don't need to be shared by the kernel.
+> * Fix pathname in commit description.
+> ---
+>  arch/arm/boot/dts/include/dt-bindings |    1 +
+>  scripts/Makefile.lib                  |    2 +-
+>  2 files changed, 2 insertions(+), 1 deletion(-)
+>  create mode 120000 arch/arm/boot/dts/include/dt-bindings
+> 
+> diff --git a/arch/arm/boot/dts/include/dt-bindings b/arch/arm/boot/dts/include/dt-bindings
+> new file mode 120000
+> index 0000000..08c00e4
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/include/dt-bindings
+> @@ -0,0 +1 @@
+> +../../../../../include/dt-bindings
+> \ No newline at end of file
+> diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
+> index 07125e6..af35521 100644
+> --- a/scripts/Makefile.lib
+> +++ b/scripts/Makefile.lib
+> @@ -158,7 +158,7 @@ ld_flags       = $(LDFLAGS) $(ldflags-y)
+>  
+>  dtc_cpp_flags  = -Wp,-MD,$(depfile) -nostdinc                            \
+>  		 -I$(srctree)/arch/$(SRCARCH)/boot/dts                   \
+> -		 -I$(srctree)/arch/$(SRCARCH)/include/dts                \
+> +		 -I$(srctree)/arch/$(SRCARCH)/boot/dts/include           \
+>  		 -undef -D__DTS__
+>  
+>  # Finds the multi-part object the current object will be linked into
+> 
