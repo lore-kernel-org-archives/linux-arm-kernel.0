@@ -1,47 +1,60 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 06 Mar 2013 15:11:05 +0100
-Subject: v3.9-rc1: swapper/0 [ INFO: possible circular locking dependency
- detected ]
-In-Reply-To: <CAB7JpEHJdKeOhkME-6mMdPY6VyTQwFvM33+gxg4X9ZpQv1=6RQ@mail.gmail.com>
-References: <51371B5E.1000508@free-electrons.com>
- <CAB7JpEHJdKeOhkME-6mMdPY6VyTQwFvM33+gxg4X9ZpQv1=6RQ@mail.gmail.com>
-Message-ID: <51374E79.9050408@free-electrons.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Wed, 6 Mar 2013 23:01:12 +0800
+Subject: [GIT PULL] ARM: CSR: minor fixes for 3.9-rc1
+Message-ID: <CAGsJ_4zyW+jVwDZDTb3TwY9TL+pmub4KGP6K0pgwToa-M2kXxQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexander,
+Hi Olof, Arnd,
 
-Thanks for your reply.
+The following changes since commit 6dbe51c251a327e012439c4772097a13df43c5b8:
 
-Le 06/03/2013 14:43, Alexander Shishkin a ?crit :
-> On 6 March 2013 12:33, Maxime Ripard 
-> <maxime.ripard@free-electrons.com> wrote:
->> Just noticed this in 3.9-rc1 on an iMX28 (ARM) board with a config
->>  based on mxs_defconfig. I'm using the patchset "Add tested id 
->> switch and vbus connect detect support for Chipidea" from Peter 
->> Chen in its 10th version [1], rebased on top of 3.9-rc1, but since 
->> this doesn't modify the locks present in the udc_irq function, I 
->> think the problem is elsewhere.
-> 
-> From a quick look at the current chipidea code, I don't see any place
-> where we might try to take cdev->lock under ci->lock. I should have a
-> better look at Peter's patchset to see if it can trigger that.
+  Linux 3.9-rc1 (2013-03-03 15:11:05 -0800)
 
-And from a quick git blame on top of Peter patches, it seems like
-udc_irq has been left untouched by his patches.
+are available in the git repository at:
+  git://gitorious.org/sirfprima2-kernel/sirfprima2-kernel.git sirf/fixes
 
-> Peter, have you seen anything like that with your code? Is this easy
->  to trigger (I would assume it is)?
+Barry Song (1):
+      ARM: prima2: fix a checkpatch issue
 
-Quite easy yes, just plug a usb cable in gadget mode.
+Syam Sidhardhan (1):
+      ARM: prima2: Replace include linux/module.h with linux/export.h
 
-> Can you post the contents of "events" debug file in sysfs?
+ arch/arm/mach-prima2/common.c |    4 ++--
+ arch/arm/mach-prima2/pm.c     |    2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-http://code.bulix.org/64liql-83101
+-----
+
+diff --git a/arch/arm/mach-prima2/common.c b/arch/arm/mach-prima2/common.c
+index 2d57aa4..2ed5007 100644
+--- a/arch/arm/mach-prima2/common.c
++++ b/arch/arm/mach-prima2/common.c
+@@ -39,8 +39,8 @@ static __init void sirfsoc_map_io(void)
+
+ #ifdef CONFIG_ARCH_PRIMA2
+ static const char *prima2_dt_match[] __initdata = {
+-       "sirf,prima2",
+-       NULL
++	"sirf,prima2",
++	NULL
+ };
+
+ DT_MACHINE_START(PRIMA2_DT, "Generic PRIMA2 (Flattened Device Tree)")
+diff --git a/arch/arm/mach-prima2/pm.c b/arch/arm/mach-prima2/pm.c
+index 9936c18..f7e347e 100644
+--- a/arch/arm/mach-prima2/pm.c
++++ b/arch/arm/mach-prima2/pm.c
+@@ -9,7 +9,7 @@
+ #include <linux/kernel.h>
+ #include <linux/suspend.h>
+ #include <linux/slab.h>
+-#include <linux/module.h>
++#include <linux/export.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+ #include <linux/of_device.h>
 
 
--- 
-Maxime Ripard, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Thanks
+barry
