@@ -1,59 +1,47 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 6 Mar 2013 14:58:59 +0100
-Subject: [PATCH 05/10] arm: mach-mvebu: convert to use mvebu-mbus driver
-In-Reply-To: <1362577426-12804-6-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1362577426-12804-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1362577426-12804-6-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130306145859.56cc0f93@skate>
+From: mporter@ti.com (Matt Porter)
+Date: Wed, 6 Mar 2013 09:01:30 -0500
+Subject: [PATCH v8 6/9] ARM: dts: add AM33XX EDMA support
+In-Reply-To: <a02b3a2e7dff42b0814bb6fa603068ba@DFLE73.ent.ti.com>
+References: <1362516795-6346-1-git-send-email-mporter@ti.com>
+ <1362516795-6346-7-git-send-email-mporter@ti.com>
+ <a02b3a2e7dff42b0814bb6fa603068ba@DFLE73.ent.ti.com>
+Message-ID: <20130306140130.GL6209@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Wed,  6 Mar 2013 14:43:41 +0100, Thomas Petazzoni wrote:
-> The changes needed to migrate the mach-mvebu (Armada 370 and Armada
-> XP) to the mvebu-mbus driver are fairly minimal, since not many
-> devices currently supported on those SoCs use address decoding
-> windows. The only one being the BootROM window, used to bring up
-> secondary CPUs.
+On Wed, Mar 06, 2013 at 04:19:58AM +0000, Kumar, Anil wrote:
+> Hi,
 > 
-> However, this BootROM window needed for SMP brings an important
-> requirement: the mvebu-mbus driver must be initialized at the
-> ->early_init() time, otherwise the BootROM window cannot be setup
-> early enough to be ready before the secondary CPUs are started.
+> On Wed, Mar 06, 2013 at 02:23:12, Porter, Matt wrote:
+> > Adds AM33XX EDMA support to the am33xx.dtsi as documented in
+> > Documentation/devicetree/bindings/dma/ti-edma.txt
+> > 
+> > Signed-off-by: Matt Porter <mporter@ti.com>
+> > ---
+> >  arch/arm/boot/dts/am33xx.dtsi |   20 ++++++++++++++++++++
+> >  1 file changed, 20 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+> > index 0957645..aaf44122 100644
+> > --- a/arch/arm/boot/dts/am33xx.dtsi
+> > +++ b/arch/arm/boot/dts/am33xx.dtsi
+> > @@ -87,6 +87,26 @@
+> >  			reg = <0x48200000 0x1000>;
+> >  		};
+> >  
+> > +		edma: edma at 49000000 {
+> > +			compatible = "ti,edma3";
+> > +			ti,hwmods = "tpcc", "tptc0", "tptc1", "tptc2";
+> > +			reg =	<0x49000000 0x10000>,
+> > +				<0x44e10f90 0x10>;
+> > +			interrupt-parent = <&intc>;
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Is it really need of "interrupt-parent = <&intc>" here ?
+> as this property is already with root node.  
+> I am taking reference of 3.9-rc1
 
-Of course, a v1 can't be good...
+You're correct. It's inherited from the parent node so I'll drop it out.
+I also noted that the cpsw node has this wrong so I'll send a patch to
+address that separately.
 
-> diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-> index 8188d13..e46955b 100644
-> --- a/arch/arm/boot/dts/armada-370.dtsi
-> +++ b/arch/arm/boot/dts/armada-370.dtsi
-> @@ -39,6 +39,9 @@
->  	};
->  
->  	soc {
-> +		compatible = "marvell,armadaxp-mbus", "simple-bus";
-
-This should be armada370-mbus.
-
-
-> diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
-> index 1c6fbf4..481a5ba 100644
-> --- a/drivers/bus/mvebu-mbus.c
-> +++ b/drivers/bus/mvebu-mbus.c
-
-And all this shouldn't have been there, but instead should have gone
-into 04/10. That's a rebase -i mistake.
-
-Ignore this patch series, I'll resend a v2 that fixes this problem.
-
-Sorry for the noise,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+-Matt
