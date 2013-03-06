@@ -1,80 +1,75 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed,  6 Mar 2013 11:23:33 +0100
-Subject: [PATCH 1/4] arm: mvebu: Reduce reg-io-width with UARTs
+Date: Wed,  6 Mar 2013 11:23:34 +0100
+Subject: [PATCH 2/4] arm: plat-orion: fix address decoding when > 4GB is used
 In-Reply-To: <1362565416-15718-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1362565416-15718-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1362565416-15718-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1362565416-15718-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Heikki Krogerus <heikki.krogerus@linux.intel.com>
+During the system initialization, the orion_setup_cpu_mbus_target()
+function reads the SDRAM address decoding registers to find out how
+many chip-selects of SDRAM have been enabled, and builds a small array
+with one entry per chip-select. This array is then used by device
+drivers (XOR, Ethernet, etc.) to configure their own address decoding
+windows to the SDRAM.
 
-Setting the reg-io-width to 1 byte represents more accurate
-description of the HW.
+However, devices can only access the first 32 bits of the physical
+memory. Even though LPAE is not supported for now, some Marvell boards
+are now showing up with 8 GB of RAM, configured using two SDRAM
+address decoding windows: the first covering the first 4 GB, the
+second covering the last 4 GB. The array built by
+orion_setup_cpu_mbus_target() has therefore two entries, and device
+drivers try to set up two address decoding windows to the
+SDRAM. However, in the device registers for the address decoding, the
+base address is only 32 bits, so those two windows overlap each other,
+and the devices do not work at all.
 
-This will fix an issue where UART driver causes kernel
-panic during bootup. Gregory CLEMENT traced the issue to
-autoconfig() in 8250.c, where the existence of FIFO is
-checked from UART_IIR register. The register is now read as
-32-bit value as the reg-io-width is set to 4-bytes. The
-retuned value seems to contain bogus data for bits 31:8,
-causing the issue.
+This patch makes sure that the array built by
+orion_setup_cpu_mbus_target() only contains the SDRAM decoding windows
+that correspond to the first 4 GB of the memory. To do that, it
+ignores the SDRAM decoding windows for which the 4 low-order bits are
+not zero (the 4 low-order bits of the base register are used to store
+bits 32:35 of the base address, so they actually indicate whether the
+base address is above 4 GB).
 
-Signed-off-by: Heikki Krogerus <heikki.krogerus@linux.intel.com>
-Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Cc: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
-Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Tested-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
-Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+This patch allows the newly introduced armada-xp-gp board to properly
+operate when it is mounted with more than 4 GB of RAM. Without that,
+all devices doing DMA (for example XOR and Ethernet) do not work at
+all.
+
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-370-xp.dtsi |    4 ++--
- arch/arm/boot/dts/armada-xp.dtsi     |    4 ++--
- 2 files changed, 4 insertions(+), 4 deletions(-)
+This is a slightly updated version compared to the one sent on
+February 27th on LAKML. The earlier version was looking at the three
+low-order bits, but in fact there are four low-order bits to encode
+the high bits of the base address. So the mask was changed from 0x7 to
+0xF.
 
-diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-index 6f1acc7..99afca4 100644
---- a/arch/arm/boot/dts/armada-370-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-@@ -54,7 +54,7 @@
- 				reg = <0xd0012000 0x100>;
- 				reg-shift = <2>;
- 				interrupts = <41>;
--				reg-io-width = <4>;
-+				reg-io-width = <1>;
- 				status = "disabled";
- 		};
- 		serial at d0012100 {
-@@ -62,7 +62,7 @@
- 				reg = <0xd0012100 0x100>;
- 				reg-shift = <2>;
- 				interrupts = <42>;
--				reg-io-width = <4>;
-+				reg-io-width = <1>;
- 				status = "disabled";
- 		};
+Since I've changed the patch, I haven't kept the Tested-by from Lior
+Amsalem, Gr?gory Clement and Ezequiel Garcia.
+---
+ arch/arm/plat-orion/addr-map.c |    7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/plat-orion/addr-map.c b/arch/arm/plat-orion/addr-map.c
+index febe386..807ac8e 100644
+--- a/arch/arm/plat-orion/addr-map.c
++++ b/arch/arm/plat-orion/addr-map.c
+@@ -157,9 +157,12 @@ void __init orion_setup_cpu_mbus_target(const struct orion_addr_map_cfg *cfg,
+ 		u32 size = readl(ddr_window_cpu_base + DDR_SIZE_CS_OFF(i));
  
-diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index 1443949..ca00d83 100644
---- a/arch/arm/boot/dts/armada-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -46,7 +46,7 @@
- 				reg = <0xd0012200 0x100>;
- 				reg-shift = <2>;
- 				interrupts = <43>;
--				reg-io-width = <4>;
-+				reg-io-width = <1>;
- 				status = "disabled";
- 		};
- 		serial at d0012300 {
-@@ -54,7 +54,7 @@
- 				reg = <0xd0012300 0x100>;
- 				reg-shift = <2>;
- 				interrupts = <44>;
--				reg-io-width = <4>;
-+				reg-io-width = <1>;
- 				status = "disabled";
- 		};
+ 		/*
+-		 * Chip select enabled?
++		 * We only take care of entries for which the chip
++		 * select is enabled, and that don't have high base
++		 * address bits set (devices can only access the first
++		 * 32 bits of the memory).
+ 		 */
+-		if (size & 1) {
++		if ((size & 1) && !(base & 0xF)) {
+ 			struct mbus_dram_window *w;
  
+ 			w = &orion_mbus_dram_info.cs[cs++];
 -- 
 1.7.9.5
