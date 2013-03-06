@@ -1,63 +1,90 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed,  6 Mar 2013 14:43:45 +0100
-Subject: [PATCH 09/10] arm: mach-mv78xx0: convert to use the mvebu-mbus driver
+Date: Wed,  6 Mar 2013 14:43:43 +0100
+Subject: [PATCH 07/10] arm: mach-dove: convert to use mvebu-mbus driver
 In-Reply-To: <1362577426-12804-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1362577426-12804-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1362577426-12804-10-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1362577426-12804-8-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit convers the mach-mv78xx0 sub-architecture to use the
-mvebu-mbus driver. mv78xx0 has not been converted to the Device Tree
-yet, so we simply have to call mvebu_mbus_init() in the ->init_early()
-function, and modify the PCIe code so that it uses the new functions
-provided by mvebu-mbus to create the needed PCIe windows.
+This commit migrates the mach-dove platforms to use the mvebu-mbus
+driver and therefore removes the Dove-specific addr-map code.
+
+In order to do this, we have to introduce a separate
+dove_dt_init_early() function. It continues to be quite similar to
+dove_init_early(), except that it does a DT-based initialization of
+the mvebu-mbus driver. On the other hand, the dove_init_early()
+function does a legacy initialization of the mvebu-mbus driver (which
+will be removed once all boards have been migrated to the Device
+Tree).
+
+The address decoding windows are now registered in the
+dove_setup_cpu_wins() function. It is worth noting that the four PCIe
+address decoding windows will ultimately no longer have to be
+registered here: it will be done automatically by the PCIe driver once
+Dove has been migrated to use the upcoming mvebu PCIe driver.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
- arch/arm/Kconfig                             |    1 +
- arch/arm/mach-mv78xx0/Makefile               |    2 +-
- arch/arm/mach-mv78xx0/addr-map.c             |   93 --------------------------
- arch/arm/mach-mv78xx0/common.c               |   10 ++-
- arch/arm/mach-mv78xx0/include/mach/mv78xx0.h |    8 ++-
- arch/arm/mach-mv78xx0/pcie.c                 |   21 +++---
- arch/arm/plat-orion/Makefile                 |    2 -
- include/linux/mbus.h                         |    3 +
- 8 files changed, 32 insertions(+), 108 deletions(-)
- delete mode 100644 arch/arm/mach-mv78xx0/addr-map.c
+ arch/arm/Kconfig                       |    1 +
+ arch/arm/boot/dts/dove.dtsi            |    3 +-
+ arch/arm/mach-dove/Makefile            |    2 +-
+ arch/arm/mach-dove/addr-map.c          |  125 --------------------------------
+ arch/arm/mach-dove/board-dt.c          |   13 +++-
+ arch/arm/mach-dove/common.c            |   39 +++++++++-
+ arch/arm/mach-dove/common.h            |    2 +-
+ arch/arm/mach-dove/include/mach/dove.h |    5 ++
+ arch/arm/plat-orion/Makefile           |    1 -
+ 9 files changed, 59 insertions(+), 132 deletions(-)
+ delete mode 100644 arch/arm/mach-dove/addr-map.c
 
 diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index e8caf60..882f8a8 100644
+index 544767b..d18a141 100644
 --- a/arch/arm/Kconfig
 +++ b/arch/arm/Kconfig
-@@ -590,6 +590,7 @@ config ARCH_MV78XX0
- 	select GENERIC_CLOCKEVENTS
- 	select PCI
+@@ -564,6 +564,7 @@ config ARCH_DOVE
+ 	select PINCTRL_DOVE
  	select PLAT_ORION_LEGACY
+ 	select USB_ARCH_HAS_EHCI
 +	select MVEBU_MBUS
  	help
- 	  Support for the following Marvell MV78xx0 series SoCs:
- 	  MV781x0, MV782x0.
-diff --git a/arch/arm/mach-mv78xx0/Makefile b/arch/arm/mach-mv78xx0/Makefile
-index 67a13f9..7cd0463 100644
---- a/arch/arm/mach-mv78xx0/Makefile
-+++ b/arch/arm/mach-mv78xx0/Makefile
+ 	  Support for the Marvell Dove SoC 88AP510
+ 
+diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
+index 67dbe20..6ed3b2b 100644
+--- a/arch/arm/boot/dts/dove.dtsi
++++ b/arch/arm/boot/dts/dove.dtsi
+@@ -11,7 +11,8 @@
+ 	};
+ 
+ 	soc at f1000000 {
+-		compatible = "simple-bus";
++		compatible = "marvell,dove-mbus", "simple-bus";
++		reg = <0xf1002000 0x80>, <0xf1800100 0x8>;
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		interrupt-parent = <&intc>;
+diff --git a/arch/arm/mach-dove/Makefile b/arch/arm/mach-dove/Makefile
+index 3f0a858..4d9d2ff 100644
+--- a/arch/arm/mach-dove/Makefile
++++ b/arch/arm/mach-dove/Makefile
 @@ -1,4 +1,4 @@
--obj-y				+= common.o addr-map.o mpp.o irq.o pcie.o
-+obj-y				+= common.o mpp.o irq.o pcie.o
- obj-$(CONFIG_MACH_DB78X00_BP)	+= db78x00-bp-setup.o
- obj-$(CONFIG_MACH_RD78X00_MASA)	+= rd78x00-masa-setup.o
- obj-$(CONFIG_MACH_TERASTATION_WXL) += buffalo-wxl-setup.o
-diff --git a/arch/arm/mach-mv78xx0/addr-map.c b/arch/arm/mach-mv78xx0/addr-map.c
+-obj-y				+= common.o addr-map.o irq.o
++obj-y				+= common.o irq.o
+ obj-$(CONFIG_DOVE_LEGACY)	+= mpp.o
+ obj-$(CONFIG_PCI)		+= pcie.o
+ obj-$(CONFIG_MACH_DOVE_DB)	+= dove-db-setup.o
+diff --git a/arch/arm/mach-dove/addr-map.c b/arch/arm/mach-dove/addr-map.c
 deleted file mode 100644
-index 26e9876..0000000
---- a/arch/arm/mach-mv78xx0/addr-map.c
+index 2a06c01..0000000
+--- a/arch/arm/mach-dove/addr-map.c
 +++ /dev/null
-@@ -1,93 +0,0 @@
+@@ -1,125 +0,0 @@
 -/*
-- * arch/arm/mach-mv78xx0/addr-map.c
+- * arch/arm/mach-dove/addr-map.c
 - *
-- * Address map functions for Marvell MV78xx0 SoCs
+- * Address map functions for Marvell Dove 88AP510 SoC
 - *
 - * This file is licensed under the terms of the GNU General Public
 - * License version 2.  This program is licensed "as is" without any
@@ -68,220 +95,276 @@ index 26e9876..0000000
 -#include <linux/init.h>
 -#include <linux/mbus.h>
 -#include <linux/io.h>
+-#include <asm/mach/arch.h>
+-#include <asm/setup.h>
+-#include <mach/dove.h>
 -#include <plat/addr-map.h>
--#include <mach/mv78xx0.h>
 -#include "common.h"
 -
 -/*
 - * Generic Address Decode Windows bit settings
 - */
--#define TARGET_DEV_BUS		1
--#define TARGET_PCIE0		4
--#define TARGET_PCIE1		8
--#define TARGET_PCIE(i)		((i) ? TARGET_PCIE1 : TARGET_PCIE0)
--#define ATTR_DEV_SPI_ROM	0x1f
--#define ATTR_DEV_BOOT		0x2f
--#define ATTR_DEV_CS3		0x37
--#define ATTR_DEV_CS2		0x3b
--#define ATTR_DEV_CS1		0x3d
--#define ATTR_DEV_CS0		0x3e
--#define ATTR_PCIE_IO(l)		(0xf0 & ~(0x10 << (l)))
--#define ATTR_PCIE_MEM(l)	(0xf8 & ~(0x10 << (l)))
+-#define TARGET_DDR		0x0
+-#define TARGET_BOOTROM		0x1
+-#define TARGET_CESA		0x3
+-#define TARGET_PCIE0		0x4
+-#define TARGET_PCIE1		0x8
+-#define TARGET_SCRATCHPAD	0xd
 -
--/*
-- * CPU Address Decode Windows registers
-- */
--#define WIN0_OFF(n)		(BRIDGE_VIRT_BASE + 0x0000 + ((n) << 4))
--#define WIN8_OFF(n)		(BRIDGE_VIRT_BASE + 0x0900 + (((n) - 8) << 4))
+-#define ATTR_CESA		0x01
+-#define ATTR_BOOTROM		0xfd
+-#define ATTR_DEV_SPI0_ROM	0xfe
+-#define ATTR_DEV_SPI1_ROM	0xfb
+-#define ATTR_PCIE_IO		0xe0
+-#define ATTR_PCIE_MEM		0xe8
+-#define ATTR_SCRATCHPAD		0x0
 -
--static void __init __iomem *win_cfg_base(const struct orion_addr_map_cfg *cfg, int win)
+-static inline void __iomem *ddr_map_sc(int i)
 -{
--	/*
--	 * Find the control register base address for this window.
--	 *
--	 * BRIDGE_VIRT_BASE points to the right (CPU0's or CPU1's)
--	 * MBUS bridge depending on which CPU core we're running on,
--	 * so we don't need to take that into account here.
--	 */
--
--	return (win < 8) ? WIN0_OFF(win) : WIN8_OFF(win);
+-	return (void __iomem *)(DOVE_MC_VIRT_BASE + 0x100 + ((i) << 4));
 -}
 -
 -/*
 - * Description of the windows needed by the platform code
 - */
--static struct orion_addr_map_cfg addr_map_cfg __initdata = {
--	.num_wins = 14,
--	.remappable_wins = 8,
--	.win_cfg_base = win_cfg_base,
+-static struct __initdata orion_addr_map_cfg addr_map_cfg = {
+-	.num_wins = 8,
+-	.remappable_wins = 4,
+-	.bridge_virt_base = BRIDGE_VIRT_BASE,
 -};
 -
--void __init mv78xx0_setup_cpu_mbus(void)
+-static const struct __initdata orion_addr_map_info addr_map_info[] = {
+-	/*
+-	 * Windows for PCIe IO+MEM space.
+-	 */
+-	{ 0, DOVE_PCIE0_IO_PHYS_BASE, DOVE_PCIE0_IO_SIZE,
+-	  TARGET_PCIE0, ATTR_PCIE_IO, DOVE_PCIE0_IO_BUS_BASE
+-	},
+-	{ 1, DOVE_PCIE1_IO_PHYS_BASE, DOVE_PCIE1_IO_SIZE,
+-	  TARGET_PCIE1, ATTR_PCIE_IO, DOVE_PCIE1_IO_BUS_BASE
+-	},
+-	{ 2, DOVE_PCIE0_MEM_PHYS_BASE, DOVE_PCIE0_MEM_SIZE,
+-	  TARGET_PCIE0, ATTR_PCIE_MEM, -1
+-	},
+-	{ 3, DOVE_PCIE1_MEM_PHYS_BASE, DOVE_PCIE1_MEM_SIZE,
+-	  TARGET_PCIE1, ATTR_PCIE_MEM, -1
+-	},
+-	/*
+-	 * Window for CESA engine.
+-	 */
+-	{ 4, DOVE_CESA_PHYS_BASE, DOVE_CESA_SIZE,
+-	  TARGET_CESA, ATTR_CESA, -1
+-	},
+-	/*
+-	 * Window to the BootROM for Standby and Sleep Resume
+-	 */
+-	{ 5, DOVE_BOOTROM_PHYS_BASE, DOVE_BOOTROM_SIZE,
+-	  TARGET_BOOTROM, ATTR_BOOTROM, -1
+-	},
+-	/*
+-	 * Window to the PMU Scratch Pad space
+-	 */
+-	{ 6, DOVE_SCRATCHPAD_PHYS_BASE, DOVE_SCRATCHPAD_SIZE,
+-	  TARGET_SCRATCHPAD, ATTR_SCRATCHPAD, -1
+-	},
+-	/* End marker */
+-	{ -1, 0, 0, 0, 0, 0 }
+-};
+-
+-void __init dove_setup_cpu_mbus(void)
 -{
+-	int i;
+-	int cs;
+-
 -	/*
 -	 * Disable, clear and configure windows.
 -	 */
--	orion_config_wins(&addr_map_cfg, NULL);
+-	orion_config_wins(&addr_map_cfg, addr_map_info);
 -
 -	/*
 -	 * Setup MBUS dram target info.
 -	 */
--	if (mv78xx0_core_index() == 0)
--		orion_setup_cpu_mbus_target(&addr_map_cfg,
--					    (void __iomem *) DDR_WINDOW_CPU0_BASE);
--	else
--		orion_setup_cpu_mbus_target(&addr_map_cfg,
--					    (void __iomem *) DDR_WINDOW_CPU1_BASE);
--}
+-	orion_mbus_dram_info.mbus_dram_target_id = TARGET_DDR;
 -
--void __init mv78xx0_setup_pcie_io_win(int window, u32 base, u32 size,
--				      int maj, int min)
--{
--	orion_setup_cpu_win(&addr_map_cfg, window, base, size,
--			    TARGET_PCIE(maj), ATTR_PCIE_IO(min), 0);
--}
+-	for (i = 0, cs = 0; i < 2; i++) {
+-		u32 map = readl(ddr_map_sc(i));
 -
--void __init mv78xx0_setup_pcie_mem_win(int window, u32 base, u32 size,
--				       int maj, int min)
--{
--	orion_setup_cpu_win(&addr_map_cfg, window, base, size,
--			    TARGET_PCIE(maj), ATTR_PCIE_MEM(min), -1);
--}
-diff --git a/arch/arm/mach-mv78xx0/common.c b/arch/arm/mach-mv78xx0/common.c
-index 0efa144..f69113c 100644
---- a/arch/arm/mach-mv78xx0/common.c
-+++ b/arch/arm/mach-mv78xx0/common.c
-@@ -334,6 +334,14 @@ void __init mv78xx0_uart3_init(void)
- void __init mv78xx0_init_early(void)
- {
- 	orion_time_set_base(TIMER_VIRT_BASE);
-+	if (mv78xx0_core_index() == 0)
-+		mvebu_mbus_init("marvell,mv78xx0-mbus",
-+				BRIDGE_WINS_BASE, BRIDGE_WINS_SZ,
-+				DDR_WINDOW_CPU0_BASE, DDR_WINDOW_CPU_SZ);
-+	else
-+		mvebu_mbus_init("marvell,mv78xx0-mbus",
-+				BRIDGE_WINS_BASE, BRIDGE_WINS_SZ,
-+				DDR_WINDOW_CPU1_BASE, DDR_WINDOW_CPU_SZ);
- }
- 
- void __init_refok mv78xx0_timer_init(void)
-@@ -397,8 +405,6 @@ void __init mv78xx0_init(void)
- 	printk("HCLK = %dMHz, ", (hclk + 499999) / 1000000);
- 	printk("TCLK = %dMHz\n", (get_tclk() + 499999) / 1000000);
- 
--	mv78xx0_setup_cpu_mbus();
+-		/*
+-		 * Chip select enabled?
+-		 */
+-		if (map & 1) {
+-			struct mbus_dram_window *w;
 -
- #ifdef CONFIG_CACHE_FEROCEON_L2
- 	feroceon_l2_init(is_l2_writethrough());
- #endif
-diff --git a/arch/arm/mach-mv78xx0/include/mach/mv78xx0.h b/arch/arm/mach-mv78xx0/include/mach/mv78xx0.h
-index 46200a1..bddf2be 100644
---- a/arch/arm/mach-mv78xx0/include/mach/mv78xx0.h
-+++ b/arch/arm/mach-mv78xx0/include/mach/mv78xx0.h
-@@ -60,13 +60,17 @@
-  */
- #define BRIDGE_VIRT_BASE	(MV78XX0_CORE_REGS_VIRT_BASE)
- #define BRIDGE_PHYS_BASE	(MV78XX0_CORE_REGS_PHYS_BASE)
-+#define  BRIDGE_WINS_BASE       (BRIDGE_PHYS_BASE)
-+#define  BRIDGE_WINS_SZ         (0xA000)
- 
- /*
-  * Register Map
-  */
- #define DDR_VIRT_BASE		(MV78XX0_REGS_VIRT_BASE + 0x00000)
--#define  DDR_WINDOW_CPU0_BASE	(DDR_VIRT_BASE + 0x1500)
--#define  DDR_WINDOW_CPU1_BASE	(DDR_VIRT_BASE + 0x1570)
-+#define DDR_PHYS_BASE           (MV78XX0_REGS_PHYS_BASE + 0x00000)
-+#define  DDR_WINDOW_CPU0_BASE	(DDR_PHYS_BASE + 0x1500)
-+#define  DDR_WINDOW_CPU1_BASE	(DDR_PHYS_BASE + 0x1570)
-+#define  DDR_WINDOW_CPU_SZ      (0x20)
- 
- #define DEV_BUS_PHYS_BASE	(MV78XX0_REGS_PHYS_BASE + 0x10000)
- #define DEV_BUS_VIRT_BASE	(MV78XX0_REGS_VIRT_BASE + 0x10000)
-diff --git a/arch/arm/mach-mv78xx0/pcie.c b/arch/arm/mach-mv78xx0/pcie.c
-index ee8c0b5..dc26a65 100644
---- a/arch/arm/mach-mv78xx0/pcie.c
-+++ b/arch/arm/mach-mv78xx0/pcie.c
-@@ -10,11 +10,11 @@
- 
- #include <linux/kernel.h>
- #include <linux/pci.h>
-+#include <linux/mbus.h>
- #include <video/vga.h>
- #include <asm/irq.h>
- #include <asm/mach/pci.h>
- #include <plat/pcie.h>
--#include <plat/addr-map.h>
- #include <mach/mv78xx0.h>
+-			w = &orion_mbus_dram_info.cs[cs++];
+-			w->cs_index = i;
+-			w->mbus_attr = 0; /* CS address decoding done inside */
+-					  /* the DDR controller, no need to  */
+-					  /* provide attributes */
+-			w->base = map & 0xff800000;
+-			w->size = 0x100000 << (((map & 0x000f0000) >> 16) - 4);
+-		}
+-	}
+-	orion_mbus_dram_info.num_cs = cs;
+-}
+diff --git a/arch/arm/mach-dove/board-dt.c b/arch/arm/mach-dove/board-dt.c
+index fbde1dd..10fef8a 100644
+--- a/arch/arm/mach-dove/board-dt.c
++++ b/arch/arm/mach-dove/board-dt.c
+@@ -16,9 +16,12 @@
+ #include <linux/platform_data/usb-ehci-orion.h>
+ #include <asm/hardware/cache-tauros2.h>
+ #include <asm/mach/arch.h>
++#include <asm/mach/map.h>
+ #include <mach/pm.h>
++#include <mach/bridge-regs.h>
+ #include <plat/common.h>
+ #include <plat/irq.h>
++#include <plat/time.h>
  #include "common.h"
  
-@@ -54,7 +54,6 @@ static void __init mv78xx0_pcie_preinit(void)
- 	int i;
- 	u32 size_each;
- 	u32 start;
--	int win = 0;
- 
- 	pcie_io_space.name = "PCIe I/O Space";
- 	pcie_io_space.start = MV78XX0_PCIE_IO_PHYS_BASE(0);
-@@ -72,6 +71,7 @@ static void __init mv78xx0_pcie_preinit(void)
- 	start = MV78XX0_PCIE_MEM_PHYS_BASE;
- 	for (i = 0; i < num_pcie_ports; i++) {
- 		struct pcie_port *pp = pcie_port + i;
-+		char winname[MVEBU_MBUS_MAX_WINNAME_SZ];
- 
- 		snprintf(pp->mem_space_name, sizeof(pp->mem_space_name),
- 			"PCIe %d.%d MEM", pp->maj, pp->min);
-@@ -85,12 +85,17 @@ static void __init mv78xx0_pcie_preinit(void)
- 		if (request_resource(&iomem_resource, &pp->res))
- 			panic("can't allocate PCIe MEM sub-space");
- 
--		mv78xx0_setup_pcie_mem_win(win + i + 8, pp->res.start,
--					   resource_size(&pp->res),
--					   pp->maj, pp->min);
--
--		mv78xx0_setup_pcie_io_win(win + i, i * SZ_64K, SZ_64K,
--					  pp->maj, pp->min);
-+		snprintf(winname, sizeof(winname), "pcie%d.%d",
-+			 pp->maj, pp->min);
-+
-+		mvebu_mbus_add_window_remap_flags(winname,
-+						  pp->res.start,
-+						  resource_size(&pp->res),
-+						  MVEBU_MBUS_NO_REMAP,
-+						  MVEBU_MBUS_PCI_MEM);
-+		mvebu_mbus_add_window_remap_flags(winname,
-+						  i * SZ_64K, SZ_64K,
-+						  0, MVEBU_MBUS_PCI_IO);
- 	}
+ /*
+@@ -53,6 +56,12 @@ static void __init dove_of_clk_init(void)
+ 	dove_legacy_clk_init();
  }
  
++static void __init dove_dt_init_early(void)
++{
++	orion_time_set_base(TIMER_VIRT_BASE);
++	mvebu_mbus_dt_init();
++}
++
+ static struct mv643xx_eth_platform_data dove_dt_ge00_data = {
+ 	.phy_addr = MV643XX_ETH_PHY_ADDR_DEFAULT,
+ };
+@@ -64,7 +73,7 @@ static void __init dove_dt_init(void)
+ #ifdef CONFIG_CACHE_TAUROS2
+ 	tauros2_init(0);
+ #endif
+-	dove_setup_cpu_mbus();
++	dove_setup_cpu_wins();
+ 
+ 	/* Setup root of clk tree */
+ 	dove_of_clk_init();
+@@ -83,7 +92,7 @@ static const char * const dove_dt_board_compat[] = {
+ 
+ DT_MACHINE_START(DOVE_DT, "Marvell Dove (Flattened Device Tree)")
+ 	.map_io		= dove_map_io,
+-	.init_early	= dove_init_early,
++	.init_early	= dove_dt_init_early,
+ 	.init_irq	= orion_dt_init_irq,
+ 	.init_time	= dove_timer_init,
+ 	.init_machine	= dove_dt_init,
+diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
+index c6b3b2b..e2b5da0 100644
+--- a/arch/arm/mach-dove/common.c
++++ b/arch/arm/mach-dove/common.c
+@@ -224,6 +224,9 @@ void __init dove_i2c_init(void)
+ void __init dove_init_early(void)
+ {
+ 	orion_time_set_base(TIMER_VIRT_BASE);
++	mvebu_mbus_init("marvell,dove-mbus",
++			BRIDGE_WINS_BASE, BRIDGE_WINS_SZ,
++			DOVE_MC_WINS_BASE, DOVE_MC_WINS_SZ);
+ }
+ 
+ static int __init dove_find_tclk(void)
+@@ -326,6 +329,40 @@ void __init dove_sdio1_init(void)
+ 	platform_device_register(&dove_sdio1);
+ }
+ 
++void __init dove_setup_cpu_wins(void)
++{
++	/*
++	 * The PCIe windows will no longer be statically allocated
++	 * here once Dove is migrated to the pci-mvebu driver.
++	 */
++	mvebu_mbus_add_window_remap_flags("pcie0.0",
++					  DOVE_PCIE0_IO_PHYS_BASE,
++					  DOVE_PCIE0_IO_SIZE,
++					  DOVE_PCIE0_IO_BUS_BASE,
++					  MVEBU_MBUS_PCI_IO);
++	mvebu_mbus_add_window_remap_flags("pcie1.0",
++					  DOVE_PCIE1_IO_PHYS_BASE,
++					  DOVE_PCIE1_IO_SIZE,
++					  DOVE_PCIE1_IO_BUS_BASE,
++					  MVEBU_MBUS_PCI_IO);
++	mvebu_mbus_add_window_remap_flags("pcie0.0",
++					  DOVE_PCIE0_MEM_PHYS_BASE,
++					  DOVE_PCIE0_MEM_SIZE,
++					  MVEBU_MBUS_NO_REMAP,
++					  MVEBU_MBUS_PCI_MEM);
++	mvebu_mbus_add_window_remap_flags("pcie1.0",
++					  DOVE_PCIE1_MEM_PHYS_BASE,
++					  DOVE_PCIE1_MEM_SIZE,
++					  MVEBU_MBUS_NO_REMAP,
++					  MVEBU_MBUS_PCI_MEM);
++	mvebu_mbus_add_window("cesa", DOVE_CESA_PHYS_BASE,
++			      DOVE_CESA_SIZE);
++	mvebu_mbus_add_window("bootrom", DOVE_BOOTROM_PHYS_BASE,
++			      DOVE_BOOTROM_SIZE);
++	mvebu_mbus_add_window("scratchpad", DOVE_SCRATCHPAD_PHYS_BASE,
++			      DOVE_SCRATCHPAD_SIZE);
++}
++
+ void __init dove_init(void)
+ {
+ 	pr_info("Dove 88AP510 SoC, TCLK = %d MHz.\n",
+@@ -334,7 +371,7 @@ void __init dove_init(void)
+ #ifdef CONFIG_CACHE_TAUROS2
+ 	tauros2_init(0);
+ #endif
+-	dove_setup_cpu_mbus();
++	dove_setup_cpu_wins();
+ 
+ 	/* Setup root of clk tree */
+ 	dove_clk_init();
+diff --git a/arch/arm/mach-dove/common.h b/arch/arm/mach-dove/common.h
+index ee59fba..e863479 100644
+--- a/arch/arm/mach-dove/common.h
++++ b/arch/arm/mach-dove/common.h
+@@ -23,7 +23,7 @@ void dove_map_io(void);
+ void dove_init(void);
+ void dove_init_early(void);
+ void dove_init_irq(void);
+-void dove_setup_cpu_mbus(void);
++void dove_setup_cpu_wins(void);
+ void dove_ge00_init(struct mv643xx_eth_platform_data *eth_data);
+ void dove_sata_init(struct mv_sata_platform_data *sata_data);
+ #ifdef CONFIG_PCI
+diff --git a/arch/arm/mach-dove/include/mach/dove.h b/arch/arm/mach-dove/include/mach/dove.h
+index 661725e..0c4b35f 100644
+--- a/arch/arm/mach-dove/include/mach/dove.h
++++ b/arch/arm/mach-dove/include/mach/dove.h
+@@ -77,6 +77,8 @@
+ /* North-South Bridge */
+ #define BRIDGE_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE + 0x20000)
+ #define BRIDGE_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE + 0x20000)
++#define  BRIDGE_WINS_BASE       (BRIDGE_PHYS_BASE)
++#define  BRIDGE_WINS_SZ         (0x80)
+ 
+ /* Cryptographic Engine */
+ #define DOVE_CRYPT_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE + 0x30000)
+@@ -168,6 +170,9 @@
+ #define  DOVE_SSP_CLOCK_ENABLE		(1 << 1)
+ #define  DOVE_SSP_BPB_CLOCK_SRC_SSP	(1 << 11)
+ /* Memory Controller */
++#define DOVE_MC_PHYS_BASE       (DOVE_NB_REGS_PHYS_BASE + 0x00000)
++#define  DOVE_MC_WINS_BASE      (DOVE_MC_PHYS_BASE + 0x100)
++#define  DOVE_MC_WINS_SZ        (0x8)
+ #define DOVE_MC_VIRT_BASE	(DOVE_NB_REGS_VIRT_BASE + 0x00000)
+ 
+ /* LCD Controller */
 diff --git a/arch/arm/plat-orion/Makefile b/arch/arm/plat-orion/Makefile
-index 09711cd..2eca54b 100644
+index 58db16d..9fd843e 100644
 --- a/arch/arm/plat-orion/Makefile
 +++ b/arch/arm/plat-orion/Makefile
-@@ -3,8 +3,6 @@
+@@ -3,7 +3,6 @@
  #
  ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include
  
--obj-$(CONFIG_ARCH_MV78XX0)        += addr-map.o
--
- orion-gpio-$(CONFIG_GENERIC_GPIO) += gpio.o
- obj-$(CONFIG_PLAT_ORION_LEGACY)   += irq.o pcie.o time.o common.o mpp.o
- obj-$(CONFIG_PLAT_ORION_LEGACY)   += $(orion-gpio-y)
-diff --git a/include/linux/mbus.h b/include/linux/mbus.h
-index 1f80425..a93c62b 100644
---- a/include/linux/mbus.h
-+++ b/include/linux/mbus.h
-@@ -43,6 +43,9 @@ struct mbus_dram_target_info
-  */
- #define MVEBU_MBUS_NO_REMAP (0xffffffff)
+-obj-$(CONFIG_ARCH_DOVE)           += addr-map.o
+ obj-$(CONFIG_ARCH_ORION5X)        += addr-map.o
+ obj-$(CONFIG_ARCH_MV78XX0)        += addr-map.o
  
-+/* Maximum size of a mbus window name */
-+#define MVEBU_MBUS_MAX_WINNAME_SZ 32
-+
- /*
-  * The Marvell mbus is to be found only on SOCs from the Orion family
-  * at the moment.  Provide a dummy stub for other architectures.
 -- 
 1.7.9.5
