@@ -1,35 +1,79 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 6 Mar 2013 08:03:22 +0000
-Subject: [PATCH] ARM: gemini: fix build errors
-In-Reply-To: <1362543813-7324-1-git-send-email-linus.walleij@linaro.org>
-References: <1362543813-7324-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <201303060803.22442.arnd@arndb.de>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 6 Mar 2013 10:05:47 +0200
+Subject: [PATCH 4/9] usb: gadget: fix omap_udc build errors
+In-Reply-To: <20130306004425.GA28448@kroah.com>
+References: <1362521809-22989-1-git-send-email-arnd@arndb.de>
+ <1362521809-22989-5-git-send-email-arnd@arndb.de>
+ <20130305222224.GA26278@arwen.pp.htv.fi>
+ <20130306004425.GA28448@kroah.com>
+Message-ID: <20130306080546.GC28587@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 06 March 2013, Linus Walleij wrote:
-> The Gemini machine has seen some bitrot, here is a patch to make
-> it build again.
+Hi,
+
+On Wed, Mar 06, 2013 at 08:44:25AM +0800, Greg Kroah-Hartman wrote:
+> On Wed, Mar 06, 2013 at 12:22:24AM +0200, Felipe Balbi wrote:
+> > Hi,
+> > 
+> > On Tue, Mar 05, 2013 at 11:16:44PM +0100, Arnd Bergmann wrote:
+> > > 1bf0cf6040 "usb: gadget: omap_udc: convert to udc_start/udc_stop"
+> > > made some trivial changes but was missing a ';' character.
+> > > 
+> > > 8c4cc00552 "ARM: OMAP1: DMA: Moving OMAP1 DMA channel definitions
+> > > to mach-omap1" added a definition for OMAP_DMA_USB_W2FC_TX0 to
+> > > the driver while making the header file it was defined in
+> > > unavailable for drivers, but this driver actually needs
+> > > OMAP_DMA_USB_W2FC_RX0 as well.
+> > > 
+> > > Both changes appear trivial, so let's add the missing semicolon
+> > > and the macro definition.
+> > > 
+> > > Cc: Felipe Balbi <balbi@ti.com>
+> > > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > > ---
+> > >  drivers/usb/gadget/omap_udc.c | 3 ++-
+> > >  1 file changed, 2 insertions(+), 1 deletion(-)
+> > > 
+> > > diff --git a/drivers/usb/gadget/omap_udc.c b/drivers/usb/gadget/omap_udc.c
+> > > index 06be85c..f844565 100644
+> > > --- a/drivers/usb/gadget/omap_udc.c
+> > > +++ b/drivers/usb/gadget/omap_udc.c
+> > > @@ -62,6 +62,7 @@
+> > >  #define	DRIVER_VERSION	"4 October 2004"
+> > >  
+> > >  #define OMAP_DMA_USB_W2FC_TX0		29
+> > > +#define OMAP_DMA_USB_W2FC_RX0		26
+> > >  
+> > >  /*
+> > >   * The OMAP UDC needs _very_ early endpoint setup:  before enabling the
+> > > @@ -1310,7 +1311,7 @@ static int omap_pullup(struct usb_gadget *gadget, int is_on)
+> > >  }
+> > >  
+> > >  static int omap_udc_start(struct usb_gadget *g,
+> > > -		struct usb_gadget_driver *driver)
+> > > +		struct usb_gadget_driver *driver);
+> > 
+> > good catch, thanks. I'll queue it for v3.6-rc3. Make sure to Cc
+> > linux-usb for anything under drivers/usb/ though
 > 
-> Cc: Roel Kluin <roel.kluin@gmail.com>
-> Cc: Paulius Zaleckas <paulius.zaleckas@gmail.com>
-> Cc: Imre Kaloz <kaloz@openwrt.org>
-> Cc: Janos Laube <janos.dev@gmail.com>
-> Cc: Hans Ulli Kroll <ulli.kroll@googlemail.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ARM SoC maintainers: please apply this patch directly to the
-> fixes.
-> 
-> I notice that nobody seems to care when Gemini breaks. Shall I
-> post a patch deleting this machine? Users raise your hands.
+> I think you mean 3.9 :)
 
-I posted a patch to delete it last time around, and got a couple
-of Acks, but in the end didn't submit it a second time for 3.9,
-so I did not put it in either.
+right
 
-I'd say we put your patch into 3.9 (or the identical patch that
-I sent back then), and remove gemini and fa526 in 3.10 unless
-any active users show up.
+> I can take this patch right now, if you ack it.
 
-	Arnd
+ok thanks:
+
+Acked-by: Felipe Balbi <balbi@ti.com>
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130306/361e1fe6/attachment-0001.sig>
