@@ -1,996 +1,287 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed,  6 Mar 2013 14:43:40 +0100
-Subject: [PATCH 04/10] bus: introduce an Marvell EBU MBus driver
+Date: Wed,  6 Mar 2013 14:43:45 +0100
+Subject: [PATCH 09/10] arm: mach-mv78xx0: convert to use the mvebu-mbus driver
 In-Reply-To: <1362577426-12804-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1362577426-12804-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1362577426-12804-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1362577426-12804-10-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Marvell EBU SoCs have a configurable physical address space
-layout: the physical ranges of memory used to address PCI(e)
-interfaces, NOR flashes, SRAM and various other types of memory are
-configurable by software, through a mechanism of so-called 'address
-decoding windows'.
-
-This new driver mvebu-mbus consolidates the existing code to address
-the configuration of these memory ranges, which is spread into
-mach-mvebu, mach-orion5x, mach-mv78xx0, mach-dove and mach-kirkwood.
-
-Following patches convert each Marvell EBU SoC family to use this
-driver, therefore removing the old code that was configuring the
-address decoding windows.
-
-It is worth mentioning that the MVEBU_MBUS Kconfig option is
-intentionally added as a blind option. The new driver implements and
-exports the mv_mbus_dram_info() function, which is used by various
-Marvell drivers throughout the tree to get access to window
-configuration parameters that they require. This function is also
-implemented in arch/arm/plat-orion/addr-map.c, which ultimately gets
-removed at the end of this patch series. So, in order to preserve
-bisectability, we want to ensure that *either* this new driver, *or*
-the legacy code in plat-orion/addr-map.c gets compiled in.
-
-By making MVEBU_MBUS a blind option, we are sure that only a platform
-that does 'select MVEBU_MBUS' will get this new driver compiled
-in. Therefore, throughout the next patches that convert the Marvell
-sub-architectures one after the other to this new driver, we add the
-'select MVEBU_MBUS' and also ensure to remove plat-orion/addr-map.c
-from the build for this specific sub-architecture. This ensures that
-bisectability is preserved.
+This commit convers the mach-mv78xx0 sub-architecture to use the
+mvebu-mbus driver. mv78xx0 has not been converted to the Device Tree
+yet, so we simply have to call mvebu_mbus_init() in the ->init_early()
+function, and modify the PCIe code so that it uses the new functions
+provided by mvebu-mbus to create the needed PCIe windows.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- .../devicetree/bindings/arm/mvebu-mbus.txt         |   39 +
- drivers/bus/Kconfig                                |    7 +
- drivers/bus/Makefile                               |    1 +
- drivers/bus/mvebu-mbus.c                           |  821 ++++++++++++++++++++
- include/linux/mbus.h                               |   25 +-
- 5 files changed, 892 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/arm/mvebu-mbus.txt
- create mode 100644 drivers/bus/mvebu-mbus.c
+ arch/arm/Kconfig                             |    1 +
+ arch/arm/mach-mv78xx0/Makefile               |    2 +-
+ arch/arm/mach-mv78xx0/addr-map.c             |   93 --------------------------
+ arch/arm/mach-mv78xx0/common.c               |   10 ++-
+ arch/arm/mach-mv78xx0/include/mach/mv78xx0.h |    8 ++-
+ arch/arm/mach-mv78xx0/pcie.c                 |   21 +++---
+ arch/arm/plat-orion/Makefile                 |    2 -
+ include/linux/mbus.h                         |    3 +
+ 8 files changed, 32 insertions(+), 108 deletions(-)
+ delete mode 100644 arch/arm/mach-mv78xx0/addr-map.c
 
-diff --git a/Documentation/devicetree/bindings/arm/mvebu-mbus.txt b/Documentation/devicetree/bindings/arm/mvebu-mbus.txt
-new file mode 100644
-index 0000000..9f4220f
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/mvebu-mbus.txt
-@@ -0,0 +1,39 @@
-+MVEBU MBUS driver
-+-----------------
-+
-+This is the Device Tree binding documentation for the mvebu-mbus
-+driver, that takes care of configuration the CPU-side address decoding
-+windows that allows to access the SDRAM and the devices. This driver
-+is used on all Marvell EBU SoCs (Armada 370/XP, Dove, Kirkwood,
-+Orion5x and MV78xx0).
-+
-+Required properties:
-+
-+- compatible: one of:
-+  - marvell,armada370-mbus
-+  - marvell,armadaxp-mbus
-+  - marvell,kirkwood-mbus
-+  - marvell,dove-mbus
-+  - marvell,orion5x-88f5281-mbus
-+  - marvell,orion5x-88f5182-mbus
-+  - marvell,orion5x-88f5181-mbus
-+  - marvell,orion5x-88f6183-mbus
-+  - marvell,mv78xx0-mbus
-+
-+- reg: should contain two sets of register ranges.
-+  - first range describing the registers used to configure the MBus
-+    address decoding windows.
-+  - second range describing the registers used to configure the SDRAM
-+    address decoding windows.
-+
-+Example:
-+
-+ 	soc at f1000000 {
-+		compatible = "marvell,dove-mbus", "simple-bus";
-+		reg = <0xf10020000 0x80>, <0xf1800100 0x8>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+
-+		[... devices on mbus ...]
-+
-+	};
-diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
-index 0f51ed6..b05ecab 100644
---- a/drivers/bus/Kconfig
-+++ b/drivers/bus/Kconfig
-@@ -4,6 +4,13 @@
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index e8caf60..882f8a8 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -590,6 +590,7 @@ config ARCH_MV78XX0
+ 	select GENERIC_CLOCKEVENTS
+ 	select PCI
+ 	select PLAT_ORION_LEGACY
++	select MVEBU_MBUS
+ 	help
+ 	  Support for the following Marvell MV78xx0 series SoCs:
+ 	  MV781x0, MV782x0.
+diff --git a/arch/arm/mach-mv78xx0/Makefile b/arch/arm/mach-mv78xx0/Makefile
+index 67a13f9..7cd0463 100644
+--- a/arch/arm/mach-mv78xx0/Makefile
++++ b/arch/arm/mach-mv78xx0/Makefile
+@@ -1,4 +1,4 @@
+-obj-y				+= common.o addr-map.o mpp.o irq.o pcie.o
++obj-y				+= common.o mpp.o irq.o pcie.o
+ obj-$(CONFIG_MACH_DB78X00_BP)	+= db78x00-bp-setup.o
+ obj-$(CONFIG_MACH_RD78X00_MASA)	+= rd78x00-masa-setup.o
+ obj-$(CONFIG_MACH_TERASTATION_WXL) += buffalo-wxl-setup.o
+diff --git a/arch/arm/mach-mv78xx0/addr-map.c b/arch/arm/mach-mv78xx0/addr-map.c
+deleted file mode 100644
+index 26e9876..0000000
+--- a/arch/arm/mach-mv78xx0/addr-map.c
++++ /dev/null
+@@ -1,93 +0,0 @@
+-/*
+- * arch/arm/mach-mv78xx0/addr-map.c
+- *
+- * Address map functions for Marvell MV78xx0 SoCs
+- *
+- * This file is licensed under the terms of the GNU General Public
+- * License version 2.  This program is licensed "as is" without any
+- * warranty of any kind, whether express or implied.
+- */
+-
+-#include <linux/kernel.h>
+-#include <linux/init.h>
+-#include <linux/mbus.h>
+-#include <linux/io.h>
+-#include <plat/addr-map.h>
+-#include <mach/mv78xx0.h>
+-#include "common.h"
+-
+-/*
+- * Generic Address Decode Windows bit settings
+- */
+-#define TARGET_DEV_BUS		1
+-#define TARGET_PCIE0		4
+-#define TARGET_PCIE1		8
+-#define TARGET_PCIE(i)		((i) ? TARGET_PCIE1 : TARGET_PCIE0)
+-#define ATTR_DEV_SPI_ROM	0x1f
+-#define ATTR_DEV_BOOT		0x2f
+-#define ATTR_DEV_CS3		0x37
+-#define ATTR_DEV_CS2		0x3b
+-#define ATTR_DEV_CS1		0x3d
+-#define ATTR_DEV_CS0		0x3e
+-#define ATTR_PCIE_IO(l)		(0xf0 & ~(0x10 << (l)))
+-#define ATTR_PCIE_MEM(l)	(0xf8 & ~(0x10 << (l)))
+-
+-/*
+- * CPU Address Decode Windows registers
+- */
+-#define WIN0_OFF(n)		(BRIDGE_VIRT_BASE + 0x0000 + ((n) << 4))
+-#define WIN8_OFF(n)		(BRIDGE_VIRT_BASE + 0x0900 + (((n) - 8) << 4))
+-
+-static void __init __iomem *win_cfg_base(const struct orion_addr_map_cfg *cfg, int win)
+-{
+-	/*
+-	 * Find the control register base address for this window.
+-	 *
+-	 * BRIDGE_VIRT_BASE points to the right (CPU0's or CPU1's)
+-	 * MBUS bridge depending on which CPU core we're running on,
+-	 * so we don't need to take that into account here.
+-	 */
+-
+-	return (win < 8) ? WIN0_OFF(win) : WIN8_OFF(win);
+-}
+-
+-/*
+- * Description of the windows needed by the platform code
+- */
+-static struct orion_addr_map_cfg addr_map_cfg __initdata = {
+-	.num_wins = 14,
+-	.remappable_wins = 8,
+-	.win_cfg_base = win_cfg_base,
+-};
+-
+-void __init mv78xx0_setup_cpu_mbus(void)
+-{
+-	/*
+-	 * Disable, clear and configure windows.
+-	 */
+-	orion_config_wins(&addr_map_cfg, NULL);
+-
+-	/*
+-	 * Setup MBUS dram target info.
+-	 */
+-	if (mv78xx0_core_index() == 0)
+-		orion_setup_cpu_mbus_target(&addr_map_cfg,
+-					    (void __iomem *) DDR_WINDOW_CPU0_BASE);
+-	else
+-		orion_setup_cpu_mbus_target(&addr_map_cfg,
+-					    (void __iomem *) DDR_WINDOW_CPU1_BASE);
+-}
+-
+-void __init mv78xx0_setup_pcie_io_win(int window, u32 base, u32 size,
+-				      int maj, int min)
+-{
+-	orion_setup_cpu_win(&addr_map_cfg, window, base, size,
+-			    TARGET_PCIE(maj), ATTR_PCIE_IO(min), 0);
+-}
+-
+-void __init mv78xx0_setup_pcie_mem_win(int window, u32 base, u32 size,
+-				       int maj, int min)
+-{
+-	orion_setup_cpu_win(&addr_map_cfg, window, base, size,
+-			    TARGET_PCIE(maj), ATTR_PCIE_MEM(min), -1);
+-}
+diff --git a/arch/arm/mach-mv78xx0/common.c b/arch/arm/mach-mv78xx0/common.c
+index 0efa144..f69113c 100644
+--- a/arch/arm/mach-mv78xx0/common.c
++++ b/arch/arm/mach-mv78xx0/common.c
+@@ -334,6 +334,14 @@ void __init mv78xx0_uart3_init(void)
+ void __init mv78xx0_init_early(void)
+ {
+ 	orion_time_set_base(TIMER_VIRT_BASE);
++	if (mv78xx0_core_index() == 0)
++		mvebu_mbus_init("marvell,mv78xx0-mbus",
++				BRIDGE_WINS_BASE, BRIDGE_WINS_SZ,
++				DDR_WINDOW_CPU0_BASE, DDR_WINDOW_CPU_SZ);
++	else
++		mvebu_mbus_init("marvell,mv78xx0-mbus",
++				BRIDGE_WINS_BASE, BRIDGE_WINS_SZ,
++				DDR_WINDOW_CPU1_BASE, DDR_WINDOW_CPU_SZ);
+ }
  
- menu "Bus devices"
+ void __init_refok mv78xx0_timer_init(void)
+@@ -397,8 +405,6 @@ void __init mv78xx0_init(void)
+ 	printk("HCLK = %dMHz, ", (hclk + 499999) / 1000000);
+ 	printk("TCLK = %dMHz\n", (get_tclk() + 499999) / 1000000);
  
-+config MVEBU_MBUS
-+	bool
-+	depends on PLAT_ORION
-+	help
-+	  Driver needed for the MBus configuration on Marvell EBU SoCs
-+	  (Kirkwood, Dove, Orion5x, MV78XX0 and Armada 370/XP).
-+
- config OMAP_OCP2SCP
- 	tristate "OMAP OCP2SCP DRIVER"
- 	depends on ARCH_OMAP2PLUS
-diff --git a/drivers/bus/Makefile b/drivers/bus/Makefile
-index 45d997c..3c7b53c 100644
---- a/drivers/bus/Makefile
-+++ b/drivers/bus/Makefile
-@@ -2,6 +2,7 @@
- # Makefile for the bus drivers.
- #
+-	mv78xx0_setup_cpu_mbus();
+-
+ #ifdef CONFIG_CACHE_FEROCEON_L2
+ 	feroceon_l2_init(is_l2_writethrough());
+ #endif
+diff --git a/arch/arm/mach-mv78xx0/include/mach/mv78xx0.h b/arch/arm/mach-mv78xx0/include/mach/mv78xx0.h
+index 46200a1..bddf2be 100644
+--- a/arch/arm/mach-mv78xx0/include/mach/mv78xx0.h
++++ b/arch/arm/mach-mv78xx0/include/mach/mv78xx0.h
+@@ -60,13 +60,17 @@
+  */
+ #define BRIDGE_VIRT_BASE	(MV78XX0_CORE_REGS_VIRT_BASE)
+ #define BRIDGE_PHYS_BASE	(MV78XX0_CORE_REGS_PHYS_BASE)
++#define  BRIDGE_WINS_BASE       (BRIDGE_PHYS_BASE)
++#define  BRIDGE_WINS_SZ         (0xA000)
  
-+obj-$(CONFIG_MVEBU_MBUS) += mvebu-mbus.o
- obj-$(CONFIG_OMAP_OCP2SCP)	+= omap-ocp2scp.o
+ /*
+  * Register Map
+  */
+ #define DDR_VIRT_BASE		(MV78XX0_REGS_VIRT_BASE + 0x00000)
+-#define  DDR_WINDOW_CPU0_BASE	(DDR_VIRT_BASE + 0x1500)
+-#define  DDR_WINDOW_CPU1_BASE	(DDR_VIRT_BASE + 0x1570)
++#define DDR_PHYS_BASE           (MV78XX0_REGS_PHYS_BASE + 0x00000)
++#define  DDR_WINDOW_CPU0_BASE	(DDR_PHYS_BASE + 0x1500)
++#define  DDR_WINDOW_CPU1_BASE	(DDR_PHYS_BASE + 0x1570)
++#define  DDR_WINDOW_CPU_SZ      (0x20)
  
- # Interconnect bus driver for OMAP SoCs.
-diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
-new file mode 100644
-index 0000000..1c6fbf4
---- /dev/null
-+++ b/drivers/bus/mvebu-mbus.c
-@@ -0,0 +1,821 @@
-+/*
-+ * Address map functions for Marvell EBU SoCs (Kirkwood, Armada
-+ * 370/XP, Dove, Orion5x and MV78xx0)
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/init.h>
+ #define DEV_BUS_PHYS_BASE	(MV78XX0_REGS_PHYS_BASE + 0x10000)
+ #define DEV_BUS_VIRT_BASE	(MV78XX0_REGS_VIRT_BASE + 0x10000)
+diff --git a/arch/arm/mach-mv78xx0/pcie.c b/arch/arm/mach-mv78xx0/pcie.c
+index ee8c0b5..dc26a65 100644
+--- a/arch/arm/mach-mv78xx0/pcie.c
++++ b/arch/arm/mach-mv78xx0/pcie.c
+@@ -10,11 +10,11 @@
+ 
+ #include <linux/kernel.h>
+ #include <linux/pci.h>
 +#include <linux/mbus.h>
-+#include <linux/io.h>
-+#include <linux/ioport.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/debugfs.h>
-+
-+/*
-+ * DDR target is the same on all platforms.
-+ */
-+#define TARGET_DDR		0
-+
-+/*
-+ * CPU Address Decode Windows registers
-+ */
-+#define WIN_CTRL_OFF		0x0000
-+#define   WIN_CTRL_ENABLE       BIT(0)
-+#define   WIN_CTRL_TGT_MASK     0xf0
-+#define   WIN_CTRL_TGT_SHIFT    4
-+#define   WIN_CTRL_ATTR_MASK    0xff00
-+#define   WIN_CTRL_ATTR_SHIFT   8
-+#define   WIN_CTRL_SIZE_MASK    0xffff0000
-+#define   WIN_CTRL_SIZE_SHIFT   16
-+#define WIN_BASE_OFF		0x0004
-+#define   WIN_BASE_LOW          0xffff0000
-+#define   WIN_BASE_HIGH         0xf
-+#define WIN_REMAP_LO_OFF	0x0008
-+#define   WIN_REMAP_LOW         0xffff0000
-+#define WIN_REMAP_HI_OFF	0x000c
-+
-+#define ATTR_HW_COHERENCY	(0x1 << 4)
-+
-+#define DDR_BASE_CS_OFF(n)	(0x0000 + ((n) << 3))
-+#define  DDR_BASE_CS_HIGH_MASK  0xf
-+#define  DDR_BASE_CS_LOW_MASK   0xff000000
-+#define DDR_SIZE_CS_OFF(n)	(0x0004 + ((n) << 3))
-+#define  DDR_SIZE_ENABLED       BIT(0)
-+#define  DDR_SIZE_CS_MASK       0x1c
-+#define  DDR_SIZE_CS_SHIFT      2
-+#define  DDR_SIZE_MASK          0xff000000
-+
-+#define DOVE_DDR_BASE_CS_OFF(n) ((n) << 4)
-+
-+struct mvebu_mbus_mapping {
-+	const char *name;
-+	u8 target;
-+	u8 attr;
-+	u8 attrmask;
-+};
-+
-+/*
-+ * Masks used for the 'attrmask' field of mvebu_mbus_mapping. They
-+ * allow to get the real attribute value, discarding the special bits
-+ * used to select a PCI MEM region or a PCI WA region. This allows the
-+ * debugfs code to reverse-match the name of a device from its
-+ * target/attr values.
-+ *
-+ * For all devices except PCI, all bits of 'attr' must be
-+ * considered. For most SoCs, only bit 3 should be ignored (it allows
-+ * to select between PCI MEM and PCI I/O). On Orion5x however, there
-+ * is the special bit 5 to select a PCI WA region.
-+ */
-+#define MAPDEF_NOMASK       0xff
-+#define MAPDEF_PCIMASK      0xf7
-+#define MAPDEF_ORIONPCIMASK 0xd7
-+
-+/* Macro used to define one mvebu_mbus_mapping entry */
-+#define MAPDEF(__n, __t, __a, __m) \
-+	{ .name = __n, .target = __t, .attr = __a, .attrmask = __m }
-+
-+struct mvebu_mbus_state;
-+
-+struct mvebu_mbus_soc_data {
-+	unsigned int num_wins;
-+	unsigned int num_remappable_wins;
-+	unsigned int (*win_cfg_offset)(const int win);
-+	void (*setup_cpu_target)(struct mvebu_mbus_state *s);
-+	const struct mvebu_mbus_mapping *map;
-+};
-+
-+struct mvebu_mbus_state {
-+	void __iomem *mbuswins_base;
-+	void __iomem *sdramwins_base;
-+	struct dentry *debugfs_root;
-+	struct dentry *debugfs_sdram;
-+	struct dentry *debugfs_devs;
-+	const struct mvebu_mbus_soc_data *soc;
-+	int hw_io_coherency;
-+};
-+
-+static struct mvebu_mbus_state mbus_state;
-+
-+static struct mbus_dram_target_info mvebu_mbus_dram_info;
-+const struct mbus_dram_target_info *mv_mbus_dram_info(void)
-+{
-+	return &mvebu_mbus_dram_info;
-+}
-+EXPORT_SYMBOL_GPL(mv_mbus_dram_info);
-+
-+/*
-+ * Functions to manipulate the address decoding windows
-+ */
-+
-+static void mvebu_mbus_read_window(struct mvebu_mbus_state *mbus,
-+				   int win, int *enabled, u64 *base,
-+				   u32 *size, u8 *target, u8 *attr,
-+				   u64 *remap)
-+{
-+	void __iomem *addr = mbus->mbuswins_base +
-+		mbus->soc->win_cfg_offset(win);
-+	u32 basereg = readl(addr + WIN_BASE_OFF);
-+	u32 ctrlreg = readl(addr + WIN_CTRL_OFF);
-+
-+	if (!(ctrlreg & WIN_CTRL_ENABLE)) {
-+		*enabled = 0;
-+		return;
-+	}
-+
-+	*enabled = 1;
-+	*base = ((u64)basereg & WIN_BASE_HIGH) << 32;
-+	*base |= (basereg & WIN_BASE_LOW);
-+	*size = (ctrlreg | ~WIN_CTRL_SIZE_MASK) + 1;
-+
-+	if (target)
-+		*target = (ctrlreg & WIN_CTRL_TGT_MASK) >> WIN_CTRL_TGT_SHIFT;
-+
-+	if (attr)
-+		*attr = (ctrlreg & WIN_CTRL_ATTR_MASK) >> WIN_CTRL_ATTR_SHIFT;
-+
-+	if (remap) {
-+		if (win < mbus->soc->num_remappable_wins) {
-+			u32 remap_low = readl(addr + WIN_REMAP_LO_OFF);
-+			u32 remap_hi  = readl(addr + WIN_REMAP_HI_OFF);
-+			*remap = ((u64)remap_hi << 32) | remap_low;
-+		} else
-+			*remap = 0;
-+	}
-+}
-+
-+static void mvebu_mbus_disable_window(struct mvebu_mbus_state *mbus,
-+				      int win)
-+{
-+	void __iomem *addr;
-+
-+	addr = mbus->mbuswins_base + mbus->soc->win_cfg_offset(win);
-+
-+	writel(0, addr + WIN_BASE_OFF);
-+	writel(0, addr + WIN_CTRL_OFF);
-+	if (win < mbus->soc->num_remappable_wins) {
-+		writel(0, addr + WIN_REMAP_LO_OFF);
-+		writel(0, addr + WIN_REMAP_HI_OFF);
-+	}
-+}
-+
-+/* Checks whether the given window number is available */
-+static int mvebu_mbus_window_is_free(struct mvebu_mbus_state *mbus,
-+				     const int win)
-+{
-+	void __iomem *addr = mbus->mbuswins_base +
-+		mbus->soc->win_cfg_offset(win);
-+	u32 ctrl = readl(addr + WIN_CTRL_OFF);
-+	return !(ctrl & WIN_CTRL_ENABLE);
-+}
-+
-+/*
-+ * Checks whether the given (base, base+size) area doesn't overlap an
-+ * existing region
-+ */
-+static int mvebu_mbus_window_conflicts(struct mvebu_mbus_state *mbus,
-+				       phys_addr_t base, size_t size,
-+				       u8 target, u8 attr)
-+{
-+	u64 end = (u64)base + size;
-+	int win;
-+
-+	for (win = 0; win < mbus->soc->num_wins; win++) {
-+		u64 wbase, wend;
-+		u32 wsize;
-+		u8 wtarget, wattr;
-+		int enabled;
-+
-+		mvebu_mbus_read_window(mbus, win,
-+				       &enabled, &wbase, &wsize,
-+				       &wtarget, &wattr, NULL);
-+
-+		if (!enabled)
-+			continue;
-+
-+		wend = wbase + wsize;
-+
-+		/*
-+		 * Check if the current window overlaps with the
-+		 * proposed physical range
-+		 */
-+		if ((u64)base < wend && end > wbase)
-+			return 0;
-+
-+		/*
-+		 * Check if target/attribute conflicts
-+		 */
-+		if (target == wtarget && attr == wattr)
-+			return 0;
-+	}
-+
-+	return 1;
-+}
-+
-+static int mvebu_mbus_find_window(struct mvebu_mbus_state *mbus,
-+				  phys_addr_t base, size_t size)
-+{
-+	int win;
-+
-+	for (win = 0; win < mbus->soc->num_wins; win++) {
-+		u64 wbase;
-+		u32 wsize;
-+		int enabled;
-+
-+		mvebu_mbus_read_window(mbus, win,
-+				       &enabled, &wbase, &wsize,
-+				       NULL, NULL, NULL);
-+
-+		if (!enabled)
-+			continue;
-+
-+		if (base == wbase && size == wsize)
-+			return win;
-+	}
-+
-+	return -ENODEV;
-+}
-+
-+static int mvebu_mbus_setup_window(struct mvebu_mbus_state *mbus,
-+				   int win, phys_addr_t base, size_t size,
-+				   phys_addr_t remap, u8 target,
-+				   u8 attr)
-+{
-+	void __iomem *addr = mbus->mbuswins_base +
-+		mbus->soc->win_cfg_offset(win);
-+	u32 ctrl, remap_addr;
-+
-+	ctrl = ((size - 1) & WIN_CTRL_SIZE_MASK) |
-+		(attr << WIN_CTRL_ATTR_SHIFT)    |
-+		(target << WIN_CTRL_TGT_SHIFT)   |
-+		WIN_CTRL_ENABLE;
-+
-+	writel(base & WIN_BASE_LOW, addr + WIN_BASE_OFF);
-+	writel(ctrl, addr + WIN_CTRL_OFF);
-+	if (win < mbus->soc->num_remappable_wins) {
-+		if (remap == MVEBU_MBUS_NO_REMAP)
-+			remap_addr = base;
-+		else
-+			remap_addr = remap;
-+		writel(remap_addr & WIN_REMAP_LOW, addr + WIN_REMAP_LO_OFF);
-+		writel(0, addr + WIN_REMAP_HI_OFF);
-+	}
-+
-+	return 0;
-+}
-+
-+static int mvebu_mbus_alloc_window(struct mvebu_mbus_state *mbus,
-+				   phys_addr_t base, size_t size,
-+				   phys_addr_t remap, u8 target,
-+				   u8 attr)
-+{
-+	int win;
-+
-+	if (remap == MVEBU_MBUS_NO_REMAP) {
-+		for (win = mbus->soc->num_remappable_wins;
-+		     win < mbus->soc->num_wins; win++)
-+			if (mvebu_mbus_window_is_free(mbus, win))
-+				return mvebu_mbus_setup_window(mbus, win, base,
-+							       size, remap,
-+							       target, attr);
-+	}
-+
-+
-+	for (win = 0; win < mbus->soc->num_wins; win++)
-+		if (mvebu_mbus_window_is_free(mbus, win))
-+			return mvebu_mbus_setup_window(mbus, win, base, size,
-+						       remap, target, attr);
-+
-+	return -ENOMEM;
-+}
-+
-+/*
-+ * Debugfs debugging
-+ */
-+
-+static int sdram_debug_show(struct seq_file *seq, void *v)
-+{
-+	struct mvebu_mbus_state *mbus = &mbus_state;
-+	int i;
-+
-+	for (i = 0; i < 4; i++) {
-+		u32 basereg = readl(mbus->sdramwins_base + DDR_BASE_CS_OFF(i));
-+		u32 sizereg = readl(mbus->sdramwins_base + DDR_SIZE_CS_OFF(i));
-+		u64 base;
-+		u32 size;
-+
-+		if (!(sizereg & DDR_SIZE_ENABLED)) {
-+			seq_printf(seq, "[%d] disabled\n", i);
-+			continue;
-+		}
-+
-+		base = ((u64)basereg & DDR_BASE_CS_HIGH_MASK) << 32;
-+		base |= basereg & DDR_BASE_CS_LOW_MASK;
-+		size = sizereg & DDR_SIZE_MASK;
-+
-+		seq_printf(seq, "[%d] %016llx - 0x%016llx : cs%d\n",
-+			   i, (unsigned long long)base,
-+			   (unsigned long long)base + size,
-+			   (size & DDR_SIZE_CS_MASK) >> DDR_SIZE_CS_SHIFT);
-+	}
-+
-+	return 0;
-+}
-+
-+static int sdram_debug_open(struct inode *inode, struct file *file)
-+{
-+	return single_open(file, sdram_debug_show, inode->i_private);
-+}
-+
-+static const struct file_operations sdram_debug_fops = {
-+	.open = sdram_debug_open,
-+	.read = seq_read,
-+	.llseek = seq_lseek,
-+	.release = single_release,
-+};
-+
-+static int devs_debug_show(struct seq_file *seq, void *v)
-+{
-+	struct mvebu_mbus_state *mbus = &mbus_state;
-+	int win;
-+
-+	for (win = 0; win < mbus->soc->num_wins; win++) {
-+		u64 wbase, wremap;
-+		u32 wsize;
-+		u8 wtarget, wattr;
-+		int enabled, i;
-+		const char *name;
-+
-+		mvebu_mbus_read_window(mbus, win,
-+				       &enabled, &wbase, &wsize,
-+				       &wtarget, &wattr, &wremap);
-+
-+		if (!enabled) {
-+			seq_printf(seq, "[%02d] disabled\n", win);
-+			continue;
-+		}
-+
-+
-+		for (i = 0; mbus->soc->map[i].name; i++)
-+			if (mbus->soc->map[i].target == wtarget &&
-+			    mbus->soc->map[i].attr ==
-+			    (wattr & mbus->soc->map[i].attrmask))
-+				break;
-+
-+		name = mbus->soc->map[i].name ?: "unknown";
-+
-+		seq_printf(seq, "[%02d] %016llx - %016llx : %s",
-+			   win, (unsigned long long)wbase,
-+			   (unsigned long long)(wbase + wsize), name);
-+
-+		if (win < mbus->soc->num_remappable_wins) {
-+			seq_printf(seq, " (remap %016llx)\n",
-+				   (unsigned long long)wremap);
-+		} else
-+			seq_printf(seq, "\n");
-+	}
-+
-+	return 0;
-+}
-+
-+static int devs_debug_open(struct inode *inode, struct file *file)
-+{
-+	return single_open(file, devs_debug_show, inode->i_private);
-+}
-+
-+static const struct file_operations devs_debug_fops = {
-+	.open = devs_debug_open,
-+	.read = seq_read,
-+	.llseek = seq_lseek,
-+	.release = single_release,
-+};
-+
-+/*
-+ * SoC-specific functions and definitions
-+ */
-+
-+static unsigned int orion_mbus_win_offset(int win)
-+{
-+	return win << 4;
-+}
-+
-+static unsigned int armada_370_xp_mbus_win_offset(int win)
-+{
-+	/* The register layout is a bit annoying and the below code
-+	 * tries to cope with it.
-+	 * - At offset 0x0, there are the registers for the first 8
-+	 *   windows, with 4 registers of 32 bits per window (ctrl,
-+	 *   base, remap low, remap high)
-+	 * - Then at offset 0x80, there is a hole of 0x10 bytes for
-+	 *   the internal registers base address and internal units
-+	 *   sync barrier register.
-+	 * - Then@offset 0x90, there the registers for 12
-+	 *   windows, with only 2 registers of 32 bits per window
-+	 *   (ctrl, base).
-+	 */
-+	if (win < 8)
-+		return win << 4;
-+	else
-+		return 0x90 + ((win - 8) << 3);
-+}
-+
-+static unsigned int mv78xx0_mbus_win_offset(int win)
-+{
-+	if (win < 8)
-+		return win << 4;
-+	else
-+		return 0x900 + ((win - 8) << 4);
-+}
-+
-+static void __init
-+mvebu_mbus_default_setup_cpu_target(struct mvebu_mbus_state *mbus)
-+{
-+	int i;
-+	int cs;
-+
-+	mvebu_mbus_dram_info.mbus_dram_target_id = TARGET_DDR;
-+
-+	for (i = 0, cs = 0; i < 4; i++) {
-+		u32 base = readl(mbus->sdramwins_base + DDR_BASE_CS_OFF(i));
-+		u32 size = readl(mbus->sdramwins_base + DDR_SIZE_CS_OFF(i));
-+
-+		/*
-+		 * We only take care of entries for which the chip
-+		 * select is enabled, and that don't have high base
-+		 * address bits set (devices can only access the first
-+		 * 32 bits of the memory).
-+		 */
-+		if ((size & DDR_SIZE_ENABLED) &&
-+		    !(base & DDR_BASE_CS_HIGH_MASK)) {
-+			struct mbus_dram_window *w;
-+
-+			w = &mvebu_mbus_dram_info.cs[cs++];
-+			w->cs_index = i;
-+			w->mbus_attr = 0xf & ~(1 << i);
-+			if (mbus->hw_io_coherency)
-+				w->mbus_attr |= ATTR_HW_COHERENCY;
-+			w->base = base & DDR_BASE_CS_LOW_MASK;
-+			w->size = (size | ~DDR_SIZE_MASK) + 1;
-+		}
-+	}
-+	mvebu_mbus_dram_info.num_cs = cs;
-+}
-+
-+static void __init
-+mvebu_mbus_dove_setup_cpu_target(struct mvebu_mbus_state *mbus)
-+{
-+	int i;
-+	int cs;
-+
-+	mvebu_mbus_dram_info.mbus_dram_target_id = TARGET_DDR;
-+
-+	for (i = 0, cs = 0; i < 2; i++) {
-+		u32 map = readl(mbus->sdramwins_base + DOVE_DDR_BASE_CS_OFF(i));
-+
-+		/*
-+		 * Chip select enabled?
-+		 */
-+		if (map & 1) {
-+			struct mbus_dram_window *w;
-+
-+			w = &mvebu_mbus_dram_info.cs[cs++];
-+			w->cs_index = i;
-+			w->mbus_attr = 0; /* CS address decoding done inside */
-+					  /* the DDR controller, no need to  */
-+					  /* provide attributes */
-+			w->base = map & 0xff800000;
-+			w->size = 0x100000 << (((map & 0x000f0000) >> 16) - 4);
-+		}
-+	}
-+
-+	mvebu_mbus_dram_info.num_cs = cs;
-+}
-+
-+static const struct mvebu_mbus_mapping armada_370_map[] = {
-+	MAPDEF("bootrom",     1, 0xe0, MAPDEF_NOMASK),
-+	MAPDEF("devbus-boot", 1, 0x2f, MAPDEF_NOMASK),
-+	MAPDEF("devbus-cs0",  1, 0x3e, MAPDEF_NOMASK),
-+	MAPDEF("devbus-cs1",  1, 0x3d, MAPDEF_NOMASK),
-+	MAPDEF("devbus-cs2",  1, 0x3b, MAPDEF_NOMASK),
-+	MAPDEF("devbus-cs3",  1, 0x37, MAPDEF_NOMASK),
-+	MAPDEF("pcie0.0",     4, 0xe0, MAPDEF_PCIMASK),
-+	MAPDEF("pcie1.0",     8, 0xe0, MAPDEF_PCIMASK),
-+	{},
-+};
-+
-+static const struct mvebu_mbus_soc_data armada_370_mbus_data = {
-+	.num_wins            = 20,
-+	.num_remappable_wins = 8,
-+	.win_cfg_offset      = armada_370_xp_mbus_win_offset,
-+	.setup_cpu_target    = mvebu_mbus_default_setup_cpu_target,
-+	.map                 = armada_370_map,
-+};
-+
-+static const struct mvebu_mbus_mapping armada_xp_map[] = {
-+	MAPDEF("bootrom",     1, 0x1d, MAPDEF_NOMASK),
-+	MAPDEF("devbus-boot", 1, 0x2f, MAPDEF_NOMASK),
-+	MAPDEF("devbus-cs0",  1, 0x3e, MAPDEF_NOMASK),
-+	MAPDEF("devbus-cs1",  1, 0x3d, MAPDEF_NOMASK),
-+	MAPDEF("devbus-cs2",  1, 0x3b, MAPDEF_NOMASK),
-+	MAPDEF("devbus-cs3",  1, 0x37, MAPDEF_NOMASK),
-+	MAPDEF("pcie0.0",     4, 0xe0, MAPDEF_PCIMASK),
-+	MAPDEF("pcie0.1",     4, 0xd0, MAPDEF_PCIMASK),
-+	MAPDEF("pcie0.2",     4, 0xb0, MAPDEF_PCIMASK),
-+	MAPDEF("pcie0.3",     4, 0x70, MAPDEF_PCIMASK),
-+	MAPDEF("pcie1.0",     8, 0xe0, MAPDEF_PCIMASK),
-+	MAPDEF("pcie1.1",     8, 0xd0, MAPDEF_PCIMASK),
-+	MAPDEF("pcie1.2",     8, 0xb0, MAPDEF_PCIMASK),
-+	MAPDEF("pcie1.3",     8, 0x70, MAPDEF_PCIMASK),
-+	MAPDEF("pcie2.0",     4, 0xf0, MAPDEF_PCIMASK),
-+	MAPDEF("pcie3.0",     8, 0xf0, MAPDEF_PCIMASK),
-+	{},
-+};
-+
-+static const struct mvebu_mbus_soc_data armada_xp_mbus_data = {
-+	.num_wins            = 20,
-+	.num_remappable_wins = 8,
-+	.win_cfg_offset      = armada_370_xp_mbus_win_offset,
-+	.setup_cpu_target    = mvebu_mbus_default_setup_cpu_target,
-+	.map                 = armada_xp_map,
-+};
-+
-+static const struct mvebu_mbus_mapping kirkwood_map[] = {
-+	MAPDEF("pcie0.0", 4, 0xe0, MAPDEF_PCIMASK),
-+	MAPDEF("pcie1.0", 8, 0xe0, MAPDEF_PCIMASK),
-+	MAPDEF("sram",    3, 0x01, MAPDEF_NOMASK),
-+	MAPDEF("nand",    1, 0x2f, MAPDEF_NOMASK),
-+	{},
-+};
-+
-+static const struct mvebu_mbus_soc_data kirkwood_mbus_data = {
-+	.num_wins            = 8,
-+	.num_remappable_wins = 4,
-+	.win_cfg_offset      = orion_mbus_win_offset,
-+	.setup_cpu_target    = mvebu_mbus_default_setup_cpu_target,
-+	.map                 = kirkwood_map,
-+};
-+
-+static const struct mvebu_mbus_mapping dove_map[] = {
-+	MAPDEF("pcie0.0",    0x4, 0xe0, MAPDEF_PCIMASK),
-+	MAPDEF("pcie1.0",    0x8, 0xe0, MAPDEF_PCIMASK),
-+	MAPDEF("cesa",       0x3, 0x01, MAPDEF_NOMASK),
-+	MAPDEF("bootrom",    0x1, 0xfd, MAPDEF_NOMASK),
-+	MAPDEF("scratchpad", 0xd, 0x0, MAPDEF_NOMASK),
-+	{},
-+};
-+
-+static const struct mvebu_mbus_soc_data dove_mbus_data = {
-+	.num_wins            = 8,
-+	.num_remappable_wins = 4,
-+	.win_cfg_offset      = orion_mbus_win_offset,
-+	.setup_cpu_target    = mvebu_mbus_dove_setup_cpu_target,
-+	.map                 = dove_map,
-+};
-+
-+static const struct mvebu_mbus_mapping orion5x_map[] = {
-+	MAPDEF("pcie0.0",     4, 0x51, MAPDEF_ORIONPCIMASK),
-+	MAPDEF("pci0.0",      3, 0x51, MAPDEF_ORIONPCIMASK),
-+	MAPDEF("devbus-boot", 1, 0x0f, MAPDEF_NOMASK),
-+	MAPDEF("devbus-cs0",  1, 0x1e, MAPDEF_NOMASK),
-+	MAPDEF("devbus-cs1",  1, 0x1d, MAPDEF_NOMASK),
-+	MAPDEF("devbus-cs2",  1, 0x1b, MAPDEF_NOMASK),
-+	MAPDEF("sram",        0, 0x00, MAPDEF_NOMASK),
-+	{},
-+};
-+
-+/*
-+ * Some variants of Orion5x have 4 remappable windows, some other have
-+ * only two of them.
-+ */
-+static const struct mvebu_mbus_soc_data orion5x_4win_mbus_data = {
-+	.num_wins            = 8,
-+	.num_remappable_wins = 4,
-+	.win_cfg_offset      = orion_mbus_win_offset,
-+	.setup_cpu_target    = mvebu_mbus_default_setup_cpu_target,
-+	.map                 = orion5x_map,
-+};
-+
-+static const struct mvebu_mbus_soc_data orion5x_2win_mbus_data = {
-+	.num_wins            = 8,
-+	.num_remappable_wins = 2,
-+	.win_cfg_offset      = orion_mbus_win_offset,
-+	.setup_cpu_target    = mvebu_mbus_default_setup_cpu_target,
-+	.map                 = orion5x_map,
-+};
-+
-+static const struct mvebu_mbus_mapping mv78xx0_map[] = {
-+	MAPDEF("pcie0.0", 4, 0xe0, MAPDEF_PCIMASK),
-+	MAPDEF("pcie0.1", 4, 0xd0, MAPDEF_PCIMASK),
-+	MAPDEF("pcie0.2", 4, 0xb0, MAPDEF_PCIMASK),
-+	MAPDEF("pcie0.3", 4, 0x70, MAPDEF_PCIMASK),
-+	MAPDEF("pcie1.0", 8, 0xe0, MAPDEF_PCIMASK),
-+	MAPDEF("pcie1.1", 8, 0xd0, MAPDEF_PCIMASK),
-+	MAPDEF("pcie1.2", 8, 0xb0, MAPDEF_PCIMASK),
-+	MAPDEF("pcie1.3", 8, 0x70, MAPDEF_PCIMASK),
-+	MAPDEF("pcie2.0", 4, 0xf0, MAPDEF_PCIMASK),
-+	MAPDEF("pcie3.0", 8, 0xf0, MAPDEF_PCIMASK),
-+	{},
-+};
-+
-+static const struct mvebu_mbus_soc_data mv78xx0_mbus_data = {
-+	.num_wins            = 14,
-+	.num_remappable_wins = 8,
-+	.win_cfg_offset      = mv78xx0_mbus_win_offset,
-+	.setup_cpu_target    = mvebu_mbus_default_setup_cpu_target,
-+	.map                 = mv78xx0_map,
-+};
-+
-+static const struct of_device_id of_mvebu_mbus_ids[] = {
-+	{ .compatible = "marvell,armada370-mbus",
-+	  .data = &armada_370_mbus_data, },
-+	{ .compatible = "marvell,armadaxp-mbus",
-+	  .data = &armada_xp_mbus_data, },
-+	{ .compatible = "marvell,kirkwood-mbus",
-+	  .data = &kirkwood_mbus_data, },
-+	{ .compatible = "marvell,dove-mbus",
-+	  .data = &dove_mbus_data, },
-+	{ .compatible = "marvell,orion5x-88f5281-mbus",
-+	  .data = &orion5x_4win_mbus_data, },
-+	{ .compatible = "marvell,orion5x-88f5182-mbus",
-+	  .data = &orion5x_2win_mbus_data, },
-+	{ .compatible = "marvell,orion5x-88f5181-mbus",
-+	  .data = &orion5x_2win_mbus_data, },
-+	{ .compatible = "marvell,orion5x-88f6183-mbus",
-+	  .data = &orion5x_4win_mbus_data, },
-+	{ .compatible = "marvell,mv78xx0-mbus",
-+	  .data = &mv78xx0_mbus_data, },
-+	{ },
-+};
-+
-+/*
-+ * Public API of the driver
-+ */
-+int mvebu_mbus_add_window_remap_flags(const char *devname, phys_addr_t base,
-+				      size_t size, phys_addr_t remap,
-+				      unsigned int flags)
-+{
-+	struct mvebu_mbus_state *s = &mbus_state;
-+	u8 target, attr;
-+	int i;
-+
-+	if (!s->soc->map)
-+		return -ENODEV;
-+
-+	for (i = 0; s->soc->map[i].name; i++)
-+		if (!strcmp(s->soc->map[i].name, devname))
-+			break;
-+
-+	if (!s->soc->map[i].name) {
-+		pr_err("mvebu-mbus: unknown device '%s'\n", devname);
-+		return -ENODEV;
-+	}
-+
-+	target = s->soc->map[i].target;
-+	attr   = s->soc->map[i].attr;
-+
-+	if (flags == MVEBU_MBUS_PCI_MEM)
-+		attr |= 0x8;
-+	else if (flags == MVEBU_MBUS_PCI_WA)
-+		attr |= 0x28;
-+
-+	if (!mvebu_mbus_window_conflicts(s, base, size, target, attr)) {
-+		pr_err("mvebu-mbus: cannot add window '%s', conflicts with another window\n",
-+		       devname);
-+		return -EINVAL;
-+	}
-+
-+	return mvebu_mbus_alloc_window(s, base, size, remap, target, attr);
-+
-+}
-+
-+int mvebu_mbus_add_window(const char *devname, phys_addr_t base, size_t size)
-+{
-+	return mvebu_mbus_add_window_remap_flags(devname, base, size,
-+						 MVEBU_MBUS_NO_REMAP, 0);
-+}
-+
-+int mvebu_mbus_del_window(phys_addr_t base, size_t size)
-+{
-+	int win;
-+
-+	win = mvebu_mbus_find_window(&mbus_state, base, size);
-+	if (win < 0)
-+		return win;
-+
-+	mvebu_mbus_disable_window(&mbus_state, win);
-+	return 0;
-+}
-+
-+static __init int mvebu_mbus_debugfs_init(void)
-+{
-+	struct mvebu_mbus_state *s = &mbus_state;
-+
-+	/*
-+	 * If no base has been initialized, doesn't make sense to
-+	 * register the debugfs entries. We may be on a multiplatform
-+	 * kernel that isn't running a Marvell EBU SoC.
-+	 */
-+	if (!s->mbuswins_base)
-+		return 0;
-+
-+	s->debugfs_root = debugfs_create_dir("mvebu-mbus", NULL);
-+	if (s->debugfs_root) {
-+		s->debugfs_sdram = debugfs_create_file("sdram", S_IRUGO,
-+						       s->debugfs_root, NULL,
-+						       &sdram_debug_fops);
-+		s->debugfs_devs = debugfs_create_file("devices", S_IRUGO,
-+						      s->debugfs_root, NULL,
-+						      &devs_debug_fops);
-+	}
-+
-+	return 0;
-+}
-+fs_initcall(mvebu_mbus_debugfs_init);
-+
-+static int __init mvebu_mbus_common_init(struct mvebu_mbus_state *mbus,
-+					 phys_addr_t mbuswins_base,
-+					 size_t mbuswins_size,
-+					 phys_addr_t sdramwins_base,
-+					 size_t sdramwins_size)
-+{
-+	int win;
-+
-+	mbus->mbuswins_base = ioremap(mbuswins_base, mbuswins_size);
-+	if (!mbus->mbuswins_base)
-+		return -ENOMEM;
-+
-+	mbus->sdramwins_base = ioremap(sdramwins_base, sdramwins_size);
-+	if (!mbus->sdramwins_base) {
-+		iounmap(mbus_state.mbuswins_base);
-+		return -ENOMEM;
-+	}
-+
-+	for (win = 0; win < mbus->soc->num_wins; win++)
-+		mvebu_mbus_disable_window(mbus, win);
-+
-+	mbus_state.soc->setup_cpu_target(mbus);
-+
-+	return 0;
-+}
-+
-+int __init mvebu_mbus_init(const char *soc, phys_addr_t mbuswins_phys_base,
-+			   size_t mbuswins_size,
-+			   phys_addr_t sdramwins_phys_base,
-+			   size_t sdramwins_size)
-+{
-+	const struct of_device_id *of_id;
-+
-+	for (of_id = of_mvebu_mbus_ids; of_id->compatible; of_id++)
-+		if (!strcmp(of_id->compatible, soc))
-+			break;
-+
-+	if (!of_id->compatible) {
-+		pr_err("mvebu-mbus: could not find a matching SoC family\n");
-+		return -ENODEV;
-+	}
-+
-+	mbus_state.soc = of_id->data;
-+
-+	return mvebu_mbus_common_init(&mbus_state,
-+				      mbuswins_phys_base, mbuswins_size,
-+				      sdramwins_phys_base, sdramwins_size);
-+}
-+
-+#ifdef CONFIG_OF
-+int __init mvebu_mbus_dt_init(void)
-+{
-+	struct resource mbuswins_res, sdramwins_res;
-+	struct device_node *np;
-+	const struct of_device_id *of_id;
-+
-+	np = of_find_matching_node(NULL, of_mvebu_mbus_ids);
-+	if (!np) {
-+		pr_err("mvebu-mbus: could not find a matching SoC family\n");
-+		return -ENODEV;
-+	}
-+
-+	of_id = of_match_node(of_mvebu_mbus_ids, np);
-+	mbus_state.soc = of_id->data;
-+
-+	if (of_address_to_resource(np, 0, &mbuswins_res)) {
-+		pr_err("%s: cannot get MBUS register address\n", __func__);
-+		return -EINVAL;
-+	}
-+
-+	if (of_address_to_resource(np, 1, &sdramwins_res)) {
-+		pr_err("%s: cannot get SDRAM register address\n", __func__);
-+		return -EINVAL;
-+	}
-+
-+	return mvebu_mbus_common_init(&mbus_state,
-+				      mbuswins_res.start,
-+				      resource_size(&mbuswins_res),
-+				      sdramwins_res.start,
-+				      resource_size(&sdramwins_res));
-+}
-+#endif
+ #include <video/vga.h>
+ #include <asm/irq.h>
+ #include <asm/mach/pci.h>
+ #include <plat/pcie.h>
+-#include <plat/addr-map.h>
+ #include <mach/mv78xx0.h>
+ #include "common.h"
+ 
+@@ -54,7 +54,6 @@ static void __init mv78xx0_pcie_preinit(void)
+ 	int i;
+ 	u32 size_each;
+ 	u32 start;
+-	int win = 0;
+ 
+ 	pcie_io_space.name = "PCIe I/O Space";
+ 	pcie_io_space.start = MV78XX0_PCIE_IO_PHYS_BASE(0);
+@@ -72,6 +71,7 @@ static void __init mv78xx0_pcie_preinit(void)
+ 	start = MV78XX0_PCIE_MEM_PHYS_BASE;
+ 	for (i = 0; i < num_pcie_ports; i++) {
+ 		struct pcie_port *pp = pcie_port + i;
++		char winname[MVEBU_MBUS_MAX_WINNAME_SZ];
+ 
+ 		snprintf(pp->mem_space_name, sizeof(pp->mem_space_name),
+ 			"PCIe %d.%d MEM", pp->maj, pp->min);
+@@ -85,12 +85,17 @@ static void __init mv78xx0_pcie_preinit(void)
+ 		if (request_resource(&iomem_resource, &pp->res))
+ 			panic("can't allocate PCIe MEM sub-space");
+ 
+-		mv78xx0_setup_pcie_mem_win(win + i + 8, pp->res.start,
+-					   resource_size(&pp->res),
+-					   pp->maj, pp->min);
+-
+-		mv78xx0_setup_pcie_io_win(win + i, i * SZ_64K, SZ_64K,
+-					  pp->maj, pp->min);
++		snprintf(winname, sizeof(winname), "pcie%d.%d",
++			 pp->maj, pp->min);
++
++		mvebu_mbus_add_window_remap_flags(winname,
++						  pp->res.start,
++						  resource_size(&pp->res),
++						  MVEBU_MBUS_NO_REMAP,
++						  MVEBU_MBUS_PCI_MEM);
++		mvebu_mbus_add_window_remap_flags(winname,
++						  i * SZ_64K, SZ_64K,
++						  0, MVEBU_MBUS_PCI_IO);
+ 	}
+ }
+ 
+diff --git a/arch/arm/plat-orion/Makefile b/arch/arm/plat-orion/Makefile
+index 09711cd..2eca54b 100644
+--- a/arch/arm/plat-orion/Makefile
++++ b/arch/arm/plat-orion/Makefile
+@@ -3,8 +3,6 @@
+ #
+ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include
+ 
+-obj-$(CONFIG_ARCH_MV78XX0)        += addr-map.o
+-
+ orion-gpio-$(CONFIG_GENERIC_GPIO) += gpio.o
+ obj-$(CONFIG_PLAT_ORION_LEGACY)   += irq.o pcie.o time.o common.o mpp.o
+ obj-$(CONFIG_PLAT_ORION_LEGACY)   += $(orion-gpio-y)
 diff --git a/include/linux/mbus.h b/include/linux/mbus.h
-index efa1a6d..1f80425 100644
+index 1f80425..a93c62b 100644
 --- a/include/linux/mbus.h
 +++ b/include/linux/mbus.h
-@@ -32,6 +32,17 @@ struct mbus_dram_target_info
- 	} cs[4];
- };
+@@ -43,6 +43,9 @@ struct mbus_dram_target_info
+  */
+ #define MVEBU_MBUS_NO_REMAP (0xffffffff)
  
-+/* Flags for PCI/PCIe address decoding regions */
-+#define MVEBU_MBUS_PCI_IO  0x1
-+#define MVEBU_MBUS_PCI_MEM 0x2
-+#define MVEBU_MBUS_PCI_WA  0x3
-+
-+/*
-+ * Magic value that explicits that we don't need a remapping-capable
-+ * address decoding window.
-+ */
-+#define MVEBU_MBUS_NO_REMAP (0xffffffff)
++/* Maximum size of a mbus window name */
++#define MVEBU_MBUS_MAX_WINNAME_SZ 32
 +
  /*
   * The Marvell mbus is to be found only on SOCs from the Orion family
   * at the moment.  Provide a dummy stub for other architectures.
-@@ -44,4 +55,16 @@ static inline const struct mbus_dram_target_info *mv_mbus_dram_info(void)
- 	return NULL;
- }
- #endif
--#endif
-+
-+int mvebu_mbus_add_window_remap_flags(const char *devname, phys_addr_t base,
-+				      size_t size, phys_addr_t remap,
-+				      unsigned int flags);
-+int mvebu_mbus_add_window(const char *devname, phys_addr_t base,
-+			  size_t size);
-+int mvebu_mbus_del_window(phys_addr_t base, size_t size);
-+int mvebu_mbus_init(const char *soc, phys_addr_t mbus_phys_base,
-+		    size_t mbus_size, phys_addr_t sdram_phys_base,
-+		    size_t sdram_size);
-+int mvebu_mbus_dt_init(void);
-+
-+#endif /* __LINUX_MBUS_H */
 -- 
 1.7.9.5
