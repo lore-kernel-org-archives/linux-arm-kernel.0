@@ -1,36 +1,289 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed,  6 Mar 2013 11:28:32 -0700
-Subject: [PATCH V2 1/6] ARM: tegra: device tree whitespace cleanup
-Message-ID: <1362594517-22099-1-git-send-email-swarren@wwwdotorg.org>
+Date: Wed,  6 Mar 2013 11:28:34 -0700
+Subject: [PATCH V2 3/6] ARM: tegra: use #include for all device trees
+In-Reply-To: <1362594517-22099-1-git-send-email-swarren@wwwdotorg.org>
+References: <1362594517-22099-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1362594517-22099-3-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Stephen Warren <swarren@nvidia.com>
 
-Remove white-space from empty line; triggers checkpatch.
+Replace /include/ (dtc) with #include (C pre-processor) for all Tegra DT
+files, so that gcc -E handles the entire include tree, and hence any of
+those files can #include some other file e.g. for constant definitions.
+
+This allows future use of #defines and header files in order to define
+names for various constants, such as the IDs and flags in GPIO
+specifiers. Use of those features will increase the readability of the
+device tree files.
 
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
-Patches 3 and later in his series depends on the kbuild-related series I
-just posted to rework the dtc+cpp logic. I hope to apply them to the Tegra
-tree after merging the previous series from the arm-soc topic branch.
-Patches 1 and 2 are just cleanup that the others depend on.
+v2: Just change the include syntax. Don't rename any files.
+---
+ arch/arm/boot/dts/tegra114-dalmore.dts     |    2 +-
+ arch/arm/boot/dts/tegra114-pluto.dts       |    2 +-
+ arch/arm/boot/dts/tegra114.dtsi            |    2 +-
+ arch/arm/boot/dts/tegra20-colibri-512.dtsi |    2 +-
+ arch/arm/boot/dts/tegra20-harmony.dts      |    2 +-
+ arch/arm/boot/dts/tegra20-iris-512.dts     |    2 +-
+ arch/arm/boot/dts/tegra20-medcom-wide.dts  |    2 +-
+ arch/arm/boot/dts/tegra20-paz00.dts        |    2 +-
+ arch/arm/boot/dts/tegra20-plutux.dts       |    2 +-
+ arch/arm/boot/dts/tegra20-seaboard.dts     |    2 +-
+ arch/arm/boot/dts/tegra20-tamonten.dtsi    |    2 +-
+ arch/arm/boot/dts/tegra20-tec.dts          |    2 +-
+ arch/arm/boot/dts/tegra20-trimslice.dts    |    2 +-
+ arch/arm/boot/dts/tegra20-ventana.dts      |    2 +-
+ arch/arm/boot/dts/tegra20-whistler.dts     |    2 +-
+ arch/arm/boot/dts/tegra20.dtsi             |    2 +-
+ arch/arm/boot/dts/tegra30-beaver.dts       |    2 +-
+ arch/arm/boot/dts/tegra30-cardhu-a02.dts   |    2 +-
+ arch/arm/boot/dts/tegra30-cardhu-a04.dts   |    2 +-
+ arch/arm/boot/dts/tegra30-cardhu.dtsi      |    2 +-
+ arch/arm/boot/dts/tegra30.dtsi             |    2 +-
+ 21 files changed, 21 insertions(+), 21 deletions(-)
 
- arch/arm/boot/dts/tegra20.dtsi |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
+diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
+index a30aca6..62cd1b2 100644
+--- a/arch/arm/boot/dts/tegra114-dalmore.dts
++++ b/arch/arm/boot/dts/tegra114-dalmore.dts
+@@ -1,6 +1,6 @@
+ /dts-v1/;
+ 
+-/include/ "tegra114.dtsi"
++#include "tegra114.dtsi"
+ 
+ / {
+ 	model = "NVIDIA Tegra114 Dalmore evaluation board";
+diff --git a/arch/arm/boot/dts/tegra114-pluto.dts b/arch/arm/boot/dts/tegra114-pluto.dts
+index 9bea8f5..9e95cb3 100644
+--- a/arch/arm/boot/dts/tegra114-pluto.dts
++++ b/arch/arm/boot/dts/tegra114-pluto.dts
+@@ -1,6 +1,6 @@
+ /dts-v1/;
+ 
+-/include/ "tegra114.dtsi"
++#include "tegra114.dtsi"
+ 
+ / {
+ 	model = "NVIDIA Tegra114 Pluto evaluation board";
+diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
+index 1dfaf28..d2150f0 100644
+--- a/arch/arm/boot/dts/tegra114.dtsi
++++ b/arch/arm/boot/dts/tegra114.dtsi
+@@ -1,4 +1,4 @@
+-/include/ "skeleton.dtsi"
++#include "skeleton.dtsi"
+ 
+ / {
+ 	compatible = "nvidia,tegra114";
+diff --git a/arch/arm/boot/dts/tegra20-colibri-512.dtsi b/arch/arm/boot/dts/tegra20-colibri-512.dtsi
+index 4441620..d77252c 100644
+--- a/arch/arm/boot/dts/tegra20-colibri-512.dtsi
++++ b/arch/arm/boot/dts/tegra20-colibri-512.dtsi
+@@ -1,4 +1,4 @@
+-/include/ "tegra20.dtsi"
++#include "tegra20.dtsi"
+ 
+ / {
+ 	model = "Toradex Colibri T20 512MB";
+diff --git a/arch/arm/boot/dts/tegra20-harmony.dts b/arch/arm/boot/dts/tegra20-harmony.dts
+index 61d027f..a4d0d78 100644
+--- a/arch/arm/boot/dts/tegra20-harmony.dts
++++ b/arch/arm/boot/dts/tegra20-harmony.dts
+@@ -1,6 +1,6 @@
+ /dts-v1/;
+ 
+-/include/ "tegra20.dtsi"
++#include "tegra20.dtsi"
+ 
+ / {
+ 	model = "NVIDIA Tegra20 Harmony evaluation board";
+diff --git a/arch/arm/boot/dts/tegra20-iris-512.dts b/arch/arm/boot/dts/tegra20-iris-512.dts
+index 52f1103..248f7ea 100644
+--- a/arch/arm/boot/dts/tegra20-iris-512.dts
++++ b/arch/arm/boot/dts/tegra20-iris-512.dts
+@@ -1,6 +1,6 @@
+ /dts-v1/;
+ 
+-/include/ "tegra20-colibri-512.dtsi"
++#include "tegra20-colibri-512.dtsi"
+ 
+ / {
+ 	model = "Toradex Colibri T20 512MB on Iris";
+diff --git a/arch/arm/boot/dts/tegra20-medcom-wide.dts b/arch/arm/boot/dts/tegra20-medcom-wide.dts
+index a2d6d65..10aa386 100644
+--- a/arch/arm/boot/dts/tegra20-medcom-wide.dts
++++ b/arch/arm/boot/dts/tegra20-medcom-wide.dts
+@@ -1,6 +1,6 @@
+ /dts-v1/;
+ 
+-/include/ "tegra20-tamonten.dtsi"
++#include "tegra20-tamonten.dtsi"
+ 
+ / {
+ 	model = "Avionic Design Medcom-Wide board";
+diff --git a/arch/arm/boot/dts/tegra20-paz00.dts b/arch/arm/boot/dts/tegra20-paz00.dts
+index 54d6fce..13a2118 100644
+--- a/arch/arm/boot/dts/tegra20-paz00.dts
++++ b/arch/arm/boot/dts/tegra20-paz00.dts
+@@ -1,6 +1,6 @@
+ /dts-v1/;
+ 
+-/include/ "tegra20.dtsi"
++#include "tegra20.dtsi"
+ 
+ / {
+ 	model = "Toshiba AC100 / Dynabook AZ";
+diff --git a/arch/arm/boot/dts/tegra20-plutux.dts b/arch/arm/boot/dts/tegra20-plutux.dts
+index 2894800..eca914e 100644
+--- a/arch/arm/boot/dts/tegra20-plutux.dts
++++ b/arch/arm/boot/dts/tegra20-plutux.dts
+@@ -1,6 +1,6 @@
+ /dts-v1/;
+ 
+-/include/ "tegra20-tamonten.dtsi"
++#include "tegra20-tamonten.dtsi"
+ 
+ / {
+ 	model = "Avionic Design Plutux board";
+diff --git a/arch/arm/boot/dts/tegra20-seaboard.dts b/arch/arm/boot/dts/tegra20-seaboard.dts
+index 37b3a57..74716c9 100644
+--- a/arch/arm/boot/dts/tegra20-seaboard.dts
++++ b/arch/arm/boot/dts/tegra20-seaboard.dts
+@@ -1,6 +1,6 @@
+ /dts-v1/;
+ 
+-/include/ "tegra20.dtsi"
++#include "tegra20.dtsi"
+ 
+ / {
+ 	model = "NVIDIA Seaboard";
+diff --git a/arch/arm/boot/dts/tegra20-tamonten.dtsi b/arch/arm/boot/dts/tegra20-tamonten.dtsi
+index 4766aba..855f65d 100644
+--- a/arch/arm/boot/dts/tegra20-tamonten.dtsi
++++ b/arch/arm/boot/dts/tegra20-tamonten.dtsi
+@@ -1,4 +1,4 @@
+-/include/ "tegra20.dtsi"
++#include "tegra20.dtsi"
+ 
+ / {
+ 	model = "Avionic Design Tamonten SOM";
+diff --git a/arch/arm/boot/dts/tegra20-tec.dts b/arch/arm/boot/dts/tegra20-tec.dts
+index 402b210..aaca293 100644
+--- a/arch/arm/boot/dts/tegra20-tec.dts
++++ b/arch/arm/boot/dts/tegra20-tec.dts
+@@ -1,6 +1,6 @@
+ /dts-v1/;
+ 
+-/include/ "tegra20-tamonten.dtsi"
++#include "tegra20-tamonten.dtsi"
+ 
+ / {
+ 	model = "Avionic Design Tamonten Evaluation Carrier";
+diff --git a/arch/arm/boot/dts/tegra20-trimslice.dts b/arch/arm/boot/dts/tegra20-trimslice.dts
+index 5d79e4f..af2a874 100644
+--- a/arch/arm/boot/dts/tegra20-trimslice.dts
++++ b/arch/arm/boot/dts/tegra20-trimslice.dts
+@@ -1,6 +1,6 @@
+ /dts-v1/;
+ 
+-/include/ "tegra20.dtsi"
++#include "tegra20.dtsi"
+ 
+ / {
+ 	model = "Compulab TrimSlice board";
+diff --git a/arch/arm/boot/dts/tegra20-ventana.dts b/arch/arm/boot/dts/tegra20-ventana.dts
+index 425c890..b5251db 100644
+--- a/arch/arm/boot/dts/tegra20-ventana.dts
++++ b/arch/arm/boot/dts/tegra20-ventana.dts
+@@ -1,6 +1,6 @@
+ /dts-v1/;
+ 
+-/include/ "tegra20.dtsi"
++#include "tegra20.dtsi"
+ 
+ / {
+ 	model = "NVIDIA Tegra20 Ventana evaluation board";
+diff --git a/arch/arm/boot/dts/tegra20-whistler.dts b/arch/arm/boot/dts/tegra20-whistler.dts
+index ea57c0f..f1d92c1 100644
+--- a/arch/arm/boot/dts/tegra20-whistler.dts
++++ b/arch/arm/boot/dts/tegra20-whistler.dts
+@@ -1,6 +1,6 @@
+ /dts-v1/;
+ 
+-/include/ "tegra20.dtsi"
++#include "tegra20.dtsi"
+ 
+ / {
+ 	model = "NVIDIA Tegra20 Whistler evaluation board";
 diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
-index 48d00a0..ab9402a 100644
+index 7708975..0bff930 100644
 --- a/arch/arm/boot/dts/tegra20.dtsi
 +++ b/arch/arm/boot/dts/tegra20.dtsi
-@@ -208,7 +208,7 @@
- 		compatible = "nvidia,tegra20-das";
- 		reg = <0x70000c00 0x80>;
- 	};
--	
-+
- 	tegra_ac97: ac97 {
- 		compatible = "nvidia,tegra20-ac97";
- 		reg = <0x70002000 0x200>;
+@@ -1,4 +1,4 @@
+-/include/ "skeleton.dtsi"
++#include "skeleton.dtsi"
+ 
+ / {
+ 	compatible = "nvidia,tegra20";
+diff --git a/arch/arm/boot/dts/tegra30-beaver.dts b/arch/arm/boot/dts/tegra30-beaver.dts
+index 8ff2ff2..89b46c1 100644
+--- a/arch/arm/boot/dts/tegra30-beaver.dts
++++ b/arch/arm/boot/dts/tegra30-beaver.dts
+@@ -1,6 +1,6 @@
+ /dts-v1/;
+ 
+-/include/ "tegra30.dtsi"
++#include "tegra30.dtsi"
+ 
+ / {
+ 	model = "NVIDIA Tegra30 Beaver evaluation board";
+diff --git a/arch/arm/boot/dts/tegra30-cardhu-a02.dts b/arch/arm/boot/dts/tegra30-cardhu-a02.dts
+index adc88aa..814359e 100644
+--- a/arch/arm/boot/dts/tegra30-cardhu-a02.dts
++++ b/arch/arm/boot/dts/tegra30-cardhu-a02.dts
+@@ -1,6 +1,6 @@
+ /dts-v1/;
+ 
+-/include/ "tegra30-cardhu.dtsi"
++#include "tegra30-cardhu.dtsi"
+ 
+ /* This dts file support the cardhu A02 version of board */
+ 
+diff --git a/arch/arm/boot/dts/tegra30-cardhu-a04.dts b/arch/arm/boot/dts/tegra30-cardhu-a04.dts
+index 08163e1..4ac31ec 100644
+--- a/arch/arm/boot/dts/tegra30-cardhu-a04.dts
++++ b/arch/arm/boot/dts/tegra30-cardhu-a04.dts
+@@ -1,6 +1,6 @@
+ /dts-v1/;
+ 
+-/include/ "tegra30-cardhu.dtsi"
++#include "tegra30-cardhu.dtsi"
+ 
+ /* This dts file support the cardhu A04 and later versions of board */
+ 
+diff --git a/arch/arm/boot/dts/tegra30-cardhu.dtsi b/arch/arm/boot/dts/tegra30-cardhu.dtsi
+index 1749927..51a24cc 100644
+--- a/arch/arm/boot/dts/tegra30-cardhu.dtsi
++++ b/arch/arm/boot/dts/tegra30-cardhu.dtsi
+@@ -1,4 +1,4 @@
+-/include/ "tegra30.dtsi"
++#include "tegra30.dtsi"
+ 
+ /**
+  * This file contains common DT entry for all fab version of Cardhu.
+diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
+index 9d87a3f..f474b6e 100644
+--- a/arch/arm/boot/dts/tegra30.dtsi
++++ b/arch/arm/boot/dts/tegra30.dtsi
+@@ -1,4 +1,4 @@
+-/include/ "skeleton.dtsi"
++#include "skeleton.dtsi"
+ 
+ / {
+ 	compatible = "nvidia,tegra30";
 -- 
 1.7.10.4
