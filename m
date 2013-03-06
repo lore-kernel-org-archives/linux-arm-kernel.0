@@ -1,26 +1,53 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 7 Mar 2013 07:09:47 +0800
-Subject: [PATCH] cpufreq: ARM big LITTLE: Add generic cpufreq driver and
- its DT glue
-In-Reply-To: <20130306172517.GT17833@n2100.arm.linux.org.uk>
-References: <f20e3c5e822c4bd28a3b71264d73143cc1f850b0.1362458878.git.viresh.kumar@linaro.org>
- <20130305105251.GL17833@n2100.arm.linux.org.uk>
- <CAKohponef2XNN2i8Dn7aBnzcdJeCmuGrmN3HjaBUZvBHkNSLKQ@mail.gmail.com>
- <20130306172517.GT17833@n2100.arm.linux.org.uk>
-Message-ID: <CAKohpo=CZFsj5jQ37rSNtb0A7jX3iZcTqShYwXbGCB=PSjJgeA@mail.gmail.com>
+From: AChew@nvidia.com (Andrew Chew)
+Date: Wed, 6 Mar 2013 15:20:00 -0800
+Subject: [PATCH] clk: tegra: provide dummy cpu car ops
+In-Reply-To: <1360853581-9756-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1360853581-9756-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <643E69AA4436674C8F39DCC2C05F7638629CA50C97@HQMAIL03.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 March 2013 01:25, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> On Wed, Mar 06, 2013 at 12:38:36AM +0800, Viresh Kumar wrote:
->> So how does below fix look to you?
->
-> Much better, but I think you want a better device name than just "clusterN".
+> Subject: [PATCH] clk: tegra: provide dummy cpu car ops
+> 
+> tegra_boot_secondary() relies on some of the car ops. This means having an
+> uninitialized tegra_cpu_car_ops will lead to an early boot panic.
+> Providing a dummy struct avoids this and makes adding Tegra114 clock
+> support in a bisectable way a lot easier.
+> 
+> --
+> 
+> Stephen,
+> 
+> Should this be a separate patch or should I make this part of new release of
+> the Tegra114 clock series?
+> 
+> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+> ---
+>  drivers/clk/tegra/clk.c |    3 ++-
+>  1 files changed, 2 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/clk/tegra/clk.c b/drivers/clk/tegra/clk.c index
+> a603b9a..f6c141f 100644
+> --- a/drivers/clk/tegra/clk.c
+> +++ b/drivers/clk/tegra/clk.c
+> @@ -22,7 +22,8 @@
+>  #include "clk.h"
+> 
+>  /* Global data of Tegra CPU CAR ops */
+> -struct tegra_cpu_car_ops *tegra_cpu_car_ops;
 
-I will try to find some other name, maybe cpu-cluster (as what you suggested
-initially).
+Sorry for bringing this up so late...
+Shouldn't the above be "struct tegra_cpu_car_ops tegra_cpu_car_ops;"?
 
-> Also, please get rid of that "default n" - n is the default default default
-> default default default.... there's no need to specify it. :)
-
-Ok :)
+> +static struct tegra_cpu_car_ops *dummy_car_ops; struct
+> +tegra_cpu_car_ops *tegra_cpu_car_ops = &dummy_car_ops;
+> 
+>  void __init tegra_init_dup_clks(struct tegra_clk_duplicate *dup_list,
+>  				struct clk *clks[], int clk_max)
+> --
+> 1.7.7.rc0.72.g4b5ea.dirty
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in the
+> body of a message to majordomo at vger.kernel.org More majordomo info at
+> http://vger.kernel.org/majordomo-info.html
