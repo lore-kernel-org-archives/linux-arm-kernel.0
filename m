@@ -1,98 +1,106 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 06 Mar 2013 23:57:51 +0100
-Subject: [PATCH 00/23] RFC: exynos multiplatform support
-In-Reply-To: <20130306123426.GB17079@avionic-0098.mockup.avionic-design.de>
-References: <1362505353-8873-1-git-send-email-arnd@arndb.de>
- <201303061050.42451.arnd@arndb.de>
- <20130306123426.GB17079@avionic-0098.mockup.avionic-design.de>
-Message-ID: <6522816.XSG9RTSW3x@flatron>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 6 Mar 2013 16:04:12 -0700
+Subject: [PATCH 04/10] bus: introduce an Marvell EBU MBus driver
+In-Reply-To: <20130306222712.GP23237@titan.lakedaemon.net>
+References: <1362577426-12804-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1362577426-12804-5-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130306190821.GA4689@obsidianresearch.com>
+ <20130306202710.15a6aa2c@skate>
+ <20130306202447.GA4916@obsidianresearch.com>
+ <20130306214036.62fc93b9@skate>
+ <20130306215031.GB4916@obsidianresearch.com>
+ <20130306222712.GP23237@titan.lakedaemon.net>
+Message-ID: <20130306230412.GA5870@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 06 of March 2013 13:34:26 Thierry Reding wrote:
-> On Wed, Mar 06, 2013 at 10:50:42AM +0000, Arnd Bergmann wrote:
-> > On Tuesday 05 March 2013, Tomasz Figa wrote:
-> > > On Tuesday 05 of March 2013 19:19:02 Arnd Bergmann wrote:
-> > > > If none of these are needed for DT-based systems, we should
-> > > > probably
-> > > > build that code conditionally based on the CONFIG_EXYNOS_ATAGS
-> > > > symbol
-> > > > I introduced.
+On Wed, Mar 06, 2013 at 05:27:12PM -0500, Jason Cooper wrote:
+> On Wed, Mar 06, 2013 at 02:50:31PM -0700, Jason Gunthorpe wrote:
+> > On Wed, Mar 06, 2013 at 09:40:36PM +0100, Thomas Petazzoni wrote:
+> ...
+> > > Again, I don't see the point of making the DT binding more complex than
+> > > the one being proposed here, and you haven't given any really
+> > > compelling arguments except that it is not to your taste. I believe
+> > > we're reaching a point where things start to be a matter of taste, and
+> > > so unless you're writing the code and doing the work yourself, you also
+> > > have to accept that other people might have different visions of how
+> > > things should be handled, and therefore have different tastes.
 > > > 
-> > > Yes, none of them are needed for DT-based systems.
+> > > How can we make progress on this, in a *reasonable* way?
 > > 
-> > Ah, good. I'll try to make more code conditional then.
+> > Well, as you say, we've pretty much completed presenting arguments for
+> > each view on this subject, so it is really up to the gatekeepers of
+> > the stable DT 'ABI' to decide on how they want this all to look in the
+> > end, IMHO.
 > > 
-> > > > How are you planning to solve this? Do you want to have a combined
-> > > > driver that registers both a clocksource and a pwm?
-> > > 
-> > > Let's start with a quick introduction to the s3c-pwm hardware. Each
-> > > channel has its own timer value, compare and reload value registers,
-> > > so
-> > > they don't need any extra locking. However there are additional
-> > > shared
-> > > configuration registers, containing things such as start and reload
-> > > bits for all channels, prescaler and main divisor values, etc.
-> > > Those registers needs synchronization.
-> > > 
-> > > Now there are several possible approaches:
-> > > 
-> > > 1) A brute force one - two separate drivers, based on the fact that
-> > > the
-> > > 
-> > >    clocksource driver will be used only on uniprocessor systems, so
-> > >    a simple _irqsave when accessing a shared register in both will
-> > >    guarantee correct synchronization.
-> > > 
-> > > 2) Two separate drivers with some synchronized shared code accessing
-> > > 
-> > >    registers (_start, _stop, _set_reload, _set_prescaler,
-> > >    _set_divisor,
-> > >    etc.; all using a shared spinlock).
-> > > 
-> > > 3) Single driver registering PWM channels, clocksource and clock
-> > > event
-> > > 
-> > >    device. This does not seem like a bad idea, since the whole code
-> > >    for
-> > >    configuration of the PWM block would reside in one location and
-> > >    there
-> > >    would be no redundancy. However there is a question where such
-> > >    driver
-> > >    should be placed - drivers/clocksource, drivers/pwm, or maybe
-> > >    somewhere
-> > >    else?
-> > > 
-> > > Personally I wanted to go with first option, which would require
-> > > least
-> > > amount of changes to existing code, at a cost of some code
-> > > duplication
-> > > (but some PWM code is duplicated already).
-> > 
-> > I would prefer option 3. That is also easier to implement with a
-> > straightforward DT binding that defines a single node with the clock
-> > registers. The location doesn't have an obvious answer, but I would
-> > probably put them into drivers/clocksource if the PWM maintainer
-> > agrees.
-> > 
-> > Option 2 would probably come down to having a trivial MFD driver
-> > exposing a regmap. You can probably reuse drivers/mfd/syscon.c for
-> > this and make the node compatible with "syscon" to designate the
-> > clock registers as a system-wide resource, making the other device
-> > nodes register-less.
-> I think option 2 is the standard method if one hardware block provides
-> several logical devices. I find it to be a pretty nice solution to this
-> problem. We also have precedent in the PWM subsystem. The TWL chips for
-> instance use it to create a platform device which is later driven by a
-> PWM driver.
+> > Jason C/Andrew L/Arnd?
+> 
+> I'm inclined to agree with Thomas.  Since the the first Kirkwood DT
+> board was added to the tree, it's been pounded into me that DT
+> *describes hardware*.  Not how random bootloader X happened to configure
+> it.
 
-I prefer this option over 3), because current driver files could be easily 
-reused (just cleaned up and moved into appropriate directories), which 
-would minimize the amount of needed changes.
+I'm not sure this is what we are discussing, certainly it isn't what I
+was talking about...
 
-Another reason for having two separate drivers is that on Exynos SoCs the 
-PWM block is not used for timers at all, just for PWM outputs, so the 
-whole part responsible for clocksource would be useless.
+The discussion was around the SOC specific tables in the driver and if
+they should be in DT or C code. These tables very much describe the
+hardware, and are copied from similar tables in the Marvell manuals.
 
-Best regards,
-Tomasz
+For instance I repeated this idea:
+
+   ranges =<MAPDEF(1, 0xe0, MAPDEF_NOMASK)  0xFE000000  0x10000 // boot rom
+            MAPDEF(1, 0x3f, MAPDEF_NOMASK)  0xFD000000  0x10000 // devbus-boot
+            MAPDEF(1, 0xxx, MAPDEF_NOMASK)  0xFF000000  0x10000 // internal-regs
+             [..]
+
+At the stanza of MBUS driver's bus. Each line represents a MBUS target
+(this is a physical HW IP block). The MAPDEF is a SOC specific 'target
+id' that is currently living in tables in the driver. This value is
+directly compatible with the mbus window register and is defined by
+Marvell. The 2nd number is the CPU base address of that window, and
+the last is the size.
+
+Per OF conventions the base address should be the value the bootloader
+left it at - but that is not important, the value could be 0. A
+dynamic MBUS driver would go through each item in the ranges, find
+an address range and program a window with the MAPDEF from the DT. It
+would then write the base address back into the DT (at runtime!) so
+that the entire DT remains conistent with the current state of the
+hardware.
+
+An initial implementation without dynamic address allocation would
+just have the mbus driver directly use the 2nd value as the base
+address.
+
+The attraction to this model is that the association of later DT
+stanza's to MBUS targets is extremely clear:
+
+       nor@0 {
+          compatible = 'linux mtd nor driver';
+          regs = <MAPDEF(1, 0xab, MAPDEF_NOMASK) 0x10000>;
+      }
+
+We can now tell directly that 'linux mtd nor driver' is behind MBUS
+target 0xab, and the OF code already knows the base for this MBUS
+target from the ranges property, as modified by the MBUS driver. The
+MBUS driver also knows which targets to configure windows for
+immediately at boot without having to consult internal tables. Plus we
+don't need to modify the NOR driver to call out to MBUS window
+functions to fetch an address.
+
+There are a few other variants on how to do this in DT, but they all
+come down to modeling the MBUS target using a ranges property and
+having the mbus driver adjust the range mapping at runtime.
+
+> At this point, we have at least a few release cycles to shake out a
+> standard DT binding for Marvell SoCs.  Currently, not a single product
+> ships with a DT-enabled bootloader.  Not even the development boards
+> created by Marvell.  So I'm fine with Thomas' bindings as they stand
+> *and* fine with adjusting them over the next few releases as needed.
+
+I think this is a fine idea. Thomas's driver is a much better starting
+place to do stuff like the above!
+
+Regards,
+Jason
