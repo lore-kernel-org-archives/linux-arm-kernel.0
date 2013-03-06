@@ -1,100 +1,56 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 06 Mar 2013 00:55:34 -0600
-Subject: [PATCH V2 REPOST] kbuild: create an "include chroot" for DT
- bindings
-In-Reply-To: <1362506797-21905-1-git-send-email-swarren@wwwdotorg.org>
-References: <1362506797-21905-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <5136E866.20008@gmail.com>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Wed, 6 Mar 2013 08:05:49 +0100
+Subject: [PATCH] [RFC] arm: fix memset-related crashes caused by recent
+ GCC (4.7.2) optimizations
+In-Reply-To: <20130306014255.GA20971@mudshark.cambridge.arm.com>
+References: <1359793988-6881-1-git-send-email-ivan.djelic@parrot.com>
+ <20130211184114.GP9801@mudshark.cambridge.arm.com>
+ <20130211194225.GK29329@parrot.com>
+ <20130212140008.GB4123@mudshark.cambridge.arm.com>
+ <20130212155801.GQ17833@n2100.arm.linux.org.uk>
+ <20130212163645.GI4123@mudshark.cambridge.arm.com>
+ <5135F80E.3070307@gmail.com>
+ <20130306014255.GA20971@mudshark.cambridge.arm.com>
+Message-ID: <5136EACD.4090706@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/05/2013 12:06 PM, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
+On 06.03.2013 02:42, Will Deacon wrote:
+> Hi Dirk,
 > 
-> The recent dtc+cpp support allows header files and C pre-processor
-> defines/macros to be used when compiling device tree files. These
-> headers will typically define various constants that are part of the
-> device tree bindings.
+> On Tue, Mar 05, 2013 at 01:50:06PM +0000, Dirk Behme wrote:
+>> On 12.02.2013 17:36, Will Deacon wrote:
+>>> On Tue, Feb 12, 2013 at 03:58:01PM +0000, Russell King - ARM Linux wrote:
+>>>> On Tue, Feb 12, 2013 at 02:00:08PM +0000, Will Deacon wrote:
+>>>>> Interesting... the GCC documentation also states that ffreestanding implies
+>>>>> fno-builtin, so memset and co shouldn't be targetted for this sort of
+>>>>> optimisation by GCC. Have you observed this problem even when passing this
+>>>>> option?
+>>>> Rather than wondering whether we should be using -ffreestanding or not
+>>>> (which, x86 people have strongly resisted) I suggest that we just fix
+>>>> our memset() implementation to be compliant.
+>>>>
+>>>> The reason it's not compliant is that I saw no reason for it to be
+>>>> compliant back in the gcc 2.7.x days, and it's persisted like that for
+>>>> the last 19-ish years.  If GCC is now making use of the return value,
+>>>> then we need to fix that and undo the "optimization" in our string.h.
+>>>>
+>>>> So let's just bite the bullet, make the asm memset() compliant, and
+>>>> clean up string.h.
+>>> That would be the ideal thing to do, because it allows the compiler to
+>>> optimise around these functions, however it does mean we need to check/fix
+>>> *all* of the string functions at least (if we don't pass -fno-builtin then
+>>> any builtin function is up for optimisation, including strcpy etc).
+>> Do we already have an agreed solution for this issue anywhere, now?
 > 
-> The original patch which set up the dtc+cpp include path only considered
-> using those headers from device tree files. However, most are also
-> useful for kernel code which needs to interpret the device tree.
-> 
-> In both the DT files and the kernel, I'd like to include the DT-related
-> headers in the same way, for example, <dt-bindings/gpio/tegra-gpio.h>.
-> That will simplify any text which discusses the DT header locations.
-> 
-> Creating a <dt-bindings/> for kernel source to use is as simple as
-> placing files into include/dt-bindings/.
-> 
-> However, when compiling DT files, the include path should be restricted
-> so that only the dt-bindings path is available; arbitrary kernel headers
-> shouldn't be exposed. For this reason, create a specific include
-> directory for use by dtc+cpp, and symlink dt-bindings from there to the
-> actual location of include/dt-bindings/. For want of a better location,
-> place this "include chroot" into the existing dts/ directory.
-> 
-> arch/*/boot/dts/include/dt-bindings -> ../../../../../include/dt-bindings
-> 
-> Some headers used by device tree files may not be useful to the kernel;
-> they may be used simply to aid in constructing the DT file (e.g. macros
-> to create a node), but not define any information that the kernel needs
-> to share. These may be placed directly into arch/*/boot/dts/ along with
-> the DT files themselves.
-> 
-> Cc: Hiroshi Doyu <hdoyu@nvidia.com>
-> Acked-by: Michal Marek <mmarek@suse.cz>
-> Acked-by: Shawn Guo <shawn.guo@linaro.org>
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
-> Grant, Rob,
-> 
-> This is a pre-requisite for people to convert their *.dts files to use
-> cpp, and hence is likely to be useful for a number of ARM subarch trees.
-> Perhaps this patch can be placed into a standalone topic branch in the
-> DT repo so we can all merge it. Assuming this patch is OK, I would also
-> repost the patches that create common headers defining IRQ, and GPIO
-> flags, which would place files into the new include/dt-bindings
-> directory.
+> I thought that the conclusion was to go with Ivan's suggestion since memset
+> is the only function which doesn't follow what the compiler expects.
 
-This looks fine to me. As all these will all be arm-soc branches with
-the dependency, it probably makes more sense for Arnd/Olof to apply this
-and create the branch for this single patch.
+Ok, thanks! :)
 
-Acked-by: Rob Herring <rob.herring@calxeda.com>
+Could we get Ivan's v2 patch integrated or at least sent to the patch 
+system, then, please?
 
-Rob
+Many thanks,
 
-> 
-> v2:
-> * Leave arch/*/boot/dts in dtc include path, for any headers that are
->   only included by *.dts and don't need to be shared by the kernel.
-> * Fix pathname in commit description.
-> ---
->  arch/arm/boot/dts/include/dt-bindings |    1 +
->  scripts/Makefile.lib                  |    2 +-
->  2 files changed, 2 insertions(+), 1 deletion(-)
->  create mode 120000 arch/arm/boot/dts/include/dt-bindings
-> 
-> diff --git a/arch/arm/boot/dts/include/dt-bindings b/arch/arm/boot/dts/include/dt-bindings
-> new file mode 120000
-> index 0000000..08c00e4
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/include/dt-bindings
-> @@ -0,0 +1 @@
-> +../../../../../include/dt-bindings
-> \ No newline at end of file
-> diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
-> index 07125e6..af35521 100644
-> --- a/scripts/Makefile.lib
-> +++ b/scripts/Makefile.lib
-> @@ -158,7 +158,7 @@ ld_flags       = $(LDFLAGS) $(ldflags-y)
->  
->  dtc_cpp_flags  = -Wp,-MD,$(depfile) -nostdinc                            \
->  		 -I$(srctree)/arch/$(SRCARCH)/boot/dts                   \
-> -		 -I$(srctree)/arch/$(SRCARCH)/include/dts                \
-> +		 -I$(srctree)/arch/$(SRCARCH)/boot/dts/include           \
->  		 -undef -D__DTS__
->  
->  # Finds the multi-part object the current object will be linked into
-> 
+Dirk
