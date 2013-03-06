@@ -1,96 +1,67 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 6 Mar 2013 10:48:08 +0100 (CET)
-Subject: [PATCH 2/4][V2] time : set broadcast irq affinity
-In-Reply-To: <51370C09.5020301@linaro.org>
-References: <1362219013-18173-1-git-send-email-daniel.lezcano@linaro.org>
- <1362219013-18173-3-git-send-email-daniel.lezcano@linaro.org>
- <alpine.LFD.2.02.1303052135080.22263@ionos> <51370C09.5020301@linaro.org>
-Message-ID: <alpine.LFD.2.02.1303061047240.22263@ionos>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 6 Mar 2013 10:50:09 +0100
+Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
+In-Reply-To: <201302131037.02464.arnd@arndb.de>
+References: <1360686546-24277-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201302130929.21326.arnd@arndb.de> <20130213104051.07bcffe0@skate>
+ <201302131037.02464.arnd@arndb.de>
+Message-ID: <20130306105009.1ed18a87@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 6 Mar 2013, Daniel Lezcano wrote:
-> On 03/05/2013 09:40 PM, Thomas Gleixner wrote:
-> > On Sat, 2 Mar 2013, Daniel Lezcano wrote:
-> >> When a cpu goes to a deep idle state where its local timer is shutdown,
-> >> it notifies the time frame work to use the broadcast timer instead.
-> >>
-> >> Unfortunately, the broadcast device could wake up any CPU, including an
-> >> idle one which is not concerned by the wake up at all.
-> >>
-> >> This implies, in the worst case, an idle CPU will wake up to send an IPI
-> >> to another idle cpu.
-> >>
-> >> This patch solves this by setting the irq affinity to the cpu concerned
-> >> by the nearest timer event, by this way, the CPU which is wake up is
-> >> guarantee to be the one concerned by the next event and we are safe with
-> >> unnecessary wakeup for another idle CPU.
-> >>
-> >> As the irq affinity is not supported by all the archs, a flag is needed
-> >> to specify which clocksource can handle it : CLOCK_EVT_FEAT_DYNIRQ
-> >>
-> >> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> >> ---
-> >>  include/linux/clockchips.h   |    5 +++++
-> >>  kernel/time/tick-broadcast.c |   40 +++++++++++++++++++++++++++++++++-------
-> >>  2 files changed, 38 insertions(+), 7 deletions(-)
-> >>
-> >> diff --git a/include/linux/clockchips.h b/include/linux/clockchips.h
-> >> index 6634652..c93e2a6 100644
-> >> --- a/include/linux/clockchips.h
-> >> +++ b/include/linux/clockchips.h
-> >> @@ -55,6 +55,11 @@ enum clock_event_nofitiers {
-> >>  #define CLOCK_EVT_FEAT_C3STOP		0x000008
-> >>  #define CLOCK_EVT_FEAT_DUMMY		0x000010
-> >>  
-> >> +/*
-> >> + * Clock event device can set its irq affinity dynamically
-> >> + */
-> >> +#define CLOCK_EVT_FEAT_DYNIRQ		0x000020
-> >> +
-> >>  /**
-> >>   * struct clock_event_device - clock event device descriptor
-> >>   * @event_handler:	Assigned by the framework to be called by the low
-> >> diff --git a/kernel/time/tick-broadcast.c b/kernel/time/tick-broadcast.c
-> >> index 6197ac0..9ca8ff5 100644
-> >> --- a/kernel/time/tick-broadcast.c
-> >> +++ b/kernel/time/tick-broadcast.c
-> >> @@ -406,13 +406,37 @@ struct cpumask *tick_get_broadcast_oneshot_mask(void)
-> >>  	return to_cpumask(tick_broadcast_oneshot_mask);
-> >>  }
-> >>  
-> >> -static int tick_broadcast_set_event(struct clock_event_device *bc,
-> >> +/*
-> >> + * Set broadcast interrupt affinity
-> >> + */
-> >> +static void tick_broadcast_set_affinity(struct clock_event_device *bc,
-> >> +					const struct cpumask *cpumask)
-> >> +{
-> >> +	if (!(bc->features & CLOCK_EVT_FEAT_DYNIRQ))
-> >> +		return;
-> >> +
-> >> +	if (cpumask_equal(bc->cpumask, cpumask))
-> >> +		return;
-> >> +
-> >> +	bc->cpumask = cpumask;
-> > 
-> > This breaks with CONFIG_CPUMASK_OFFSTACK=y. cpumask_copy() is your friend!
-> 
-> This instruction copies the pointer, not the cpumask content.
-> 
-> bc->cpumask is defined as a const struct cpumask * and is used to copy a
-> cpumask pointer not the content.
-> 
-> The cpumask parameter is a pointer to a global cpumask provided by the
-> cpumask_of macro.
-> 
-> But to be in the safe side, I compiled tested with
-> CONFIG_CPUMASK_OFFSTACK=y without problem.
-> 
-> Did I missed something ?
+Dear Arnd Bergmann,
 
-No, I misinterpreted the patch. Assigning a pointer is safe. 
+On Wed, 13 Feb 2013 10:37:02 +0000, Arnd Bergmann wrote:
+
+> Yes, of course. And the ranges property tells you how to turn the
+> first address space into the second address space. So the above
+> property defines that the PCI bus I/O space range from 0 to 0x10000
+> gets converted into the host MMIO range 0xc0000000 to 0xc0010000 on
+> the host, and the PCI bus memory space range from 0 to 0x08000000
+> gets converted to the host MMIO range 0xc1000000 to 0xc9000000.
+> 
+> The output of your of_pci_process_ranges() function is the host MMIO
+> range, not the range in the bus address space, so it has to be
+> IORESOURCE_MEM.
+
+I am sorry, but I don't get how this can work. My code currently relies
+on the DT encoding one I/O resource and one MEM resource to find which
+is one to use.
+
+Right now, in the ranges property of my DT, I have:
+
+          0x81000000 0 0          0xc0000000 0 0x00010000   /* downstream I/O */
+          0x82000000 0 0          0xc1000000 0 0x08000000>; /* non-prefetchable memory */
+
+And the code parsing this does:
+
+        /* Get the I/O and memory ranges from DT */
+        while ((range = of_pci_process_ranges(np, &res, range)) != NULL) {
+                if (resource_type(&res) == IORESOURCE_IO) {
+                        memcpy(&pcie->io, &res, sizeof(res));
+                        memcpy(&pcie->realio, &res, sizeof(res));
+                        pcie->io.name = "I/O";
+                        pcie->realio.start &= 0xFFFFF;
+                        pcie->realio.end   &= 0xFFFFF;
+                }
+                if (resource_type(&res) == IORESOURCE_MEM) {
+                        memcpy(&pcie->mem, &res, sizeof(res));
+                        pcie->mem.name = "MEM";
+                }
+        }
+
+As you can see, it relies on one of the two ranges being for I/O
+(address starts with 0x81), and another range being for MEM (address
+starts with 0x82).
+
+If I make both ranges start with 0x82, how can my code differentiate
+between the range used for I/O and the range used for MEM?
 
 Thanks,
 
-	tglx
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
