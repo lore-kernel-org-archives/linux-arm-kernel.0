@@ -1,41 +1,98 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 6 Mar 2013 14:21:53 +0800
-Subject: [PATCH V2 1/4] cpufreq: exynos: Adding cpufreq driver for
- exynos5440
-In-Reply-To: <CADGdYn7RXks+Xvv__NeKu8o9ZsaEp15F6zDMtL158tFcKkxxEw@mail.gmail.com>
-References: <1362216854-6633-1-git-send-email-amit.daniel@samsung.com>
- <CAKohpomHoDSNVyc21VVif8BrDKyZ=fSeCnWCZjDHL+64Bo+dgg@mail.gmail.com>
- <CADGdYn7RXks+Xvv__NeKu8o9ZsaEp15F6zDMtL158tFcKkxxEw@mail.gmail.com>
-Message-ID: <CAKohpon6w6i0X4wJRE-FG8bfYMk2aMVCa6pOgbBwWPHy=Dttwg@mail.gmail.com>
+From: timo.t.kokkonen@iki.fi (Timo Kokkonen)
+Date: Wed, 6 Mar 2013 08:22:18 +0200
+Subject: [PATCH 6/9] [media] ir-rx51: fix clock API related build issues
+In-Reply-To: <20130306010952.GJ11806@atomide.com>
+References: <1362521809-22989-1-git-send-email-arnd@arndb.de>
+ <1362521809-22989-7-git-send-email-arnd@arndb.de>
+ <20130305212351.4993d8c6@redhat.com>
+ <20130306010952.GJ11806@atomide.com>
+Message-ID: <20130306062218.GA1638@itanic.dhcp.inet.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 March 2013 13:35, amit kachhap <amit.kachhap@gmail.com> wrote:
-> On Tue, Mar 5, 2013 at 6:48 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+On 03.05 2013 17:09:53, Tony Lindgren wrote:
+> * Mauro Carvalho Chehab <mchehab@redhat.com> [130305 16:28]:
+> > Em Tue,  5 Mar 2013 23:16:46 +0100
+> > Arnd Bergmann <arnd@arndb.de> escreveu:
+> > 
+> > > OMAP1 no longer provides its own clock interfaces since patch
+> > > a135eaae52 "ARM: OMAP: remove plat/clock.h". This is great, but
+> > > we now have to convert the ir-rx51 driver to use the generic
+> > > interface from linux/clk.h.
+> > > 
+> > > The driver also uses the omap_dm_timer_get_fclk() function,
+> > > which is not exported for OMAP1, so we have to move the
+> > > definition out of the OMAP2 specific section.
+> > > 
+> > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > > Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
+> > 
+> > From my side:
+> > Acked-by: Mauro Carvalho Chehab <mchehab@redhat.com>
+> 
+> There's just one issue, this driver most likely only needed on
+> rx51 board.. So I suggest we just mark the driver depends on
+> ARCH_OMAP2PLUS and let's drop this patch.
+> 
+> This driver is already disabled for ARCH_MULTIPLATFORM
+> as we need to move dmtimer.c to drivers and have some minimal
+> include/linux/timer-omap.h for it.
+>  
 
->>> +static void exynos_cpufreq_work(struct work_struct *work)
->>> +{
->>> +       unsigned int cur_pstate, index;
->>> +       struct cpufreq_policy *policy = cpufreq_cpu_get(0); /* boot CPU */
->>> +       struct cpufreq_frequency_table *freq_table = dvfs_info->freq_table;
->>> +
->>> +       if (policy == NULL)
->>> +               goto skip_work;
->>
->> How can that be true? And if it can be, you will miss POSTCHANGE notifications
->> too.
-> This skip of POSTCHANGE notifications is needed in one case where
-> bootup frequency does not match with any elements of cpufreq table and
-> hence I simply assign the highest frequency. Also cpufreq driver is
-> not registered at this point.
+I've also had this cunning plan that if or when the PWM subsystem
+starts supporting the PWM output in OMAP3, I could convert this driver
+to generate the IR carrier wave through the PWM subsystem and then use
+HR timers to generate the pulses. I think that's much better approach
+than trying to depend on interfaces that are not easily
+available. Should be possible, but I haven't proven yet that it will
+work :)
 
-I will keep a variable for that then, otherwise its misleading... So keep a
-variable like cpufreq_enabled for it and set it to 1 as soon as this first
-interrupt is gone... keep it in unlikely() too.
+Unfortunately I haven't got into executing on that plan yet. In
+addition to the challenge of scheduling some of my free time for doing
+this, my RX51 device is not enumerating the USB with the latest kernel
+and I haven't figured out that yet. And because of that, I haven't
+been able to get my user space running over nfsroot setup I've been
+using..
 
->>> +       dvfs_info = kzalloc(sizeof(struct exynos_dvfs_data), GFP_KERNEL);
->>
->> sizeof(*dvfs_info) ??
-> Isn't both same?
+-Timo
 
-You need to read Documentation/CodingStyle.
+> > > --- a/arch/arm/plat-omap/dmtimer.c
+> > > +++ b/arch/arm/plat-omap/dmtimer.c
+> > > @@ -333,6 +333,14 @@ int omap_dm_timer_get_irq(struct omap_dm_timer *timer)
+> > >  }
+> > >  EXPORT_SYMBOL_GPL(omap_dm_timer_get_irq);
+> > >  
+> > > +struct clk *omap_dm_timer_get_fclk(struct omap_dm_timer *timer)
+> > > +{
+> > > +	if (timer)
+> > > +		return timer->fclk;
+> > > +	return NULL;
+> > > +}
+> > > +EXPORT_SYMBOL_GPL(omap_dm_timer_get_fclk);
+> > > +
+> > >  #if defined(CONFIG_ARCH_OMAP1)
+> > >  #include <mach/hardware.h>
+> > >  /**
+> > > @@ -371,14 +379,6 @@ EXPORT_SYMBOL_GPL(omap_dm_timer_modify_idlect_mask);
+> > >  
+> > >  #else
+> > >  
+> > > -struct clk *omap_dm_timer_get_fclk(struct omap_dm_timer *timer)
+> > > -{
+> > > -	if (timer)
+> > > -		return timer->fclk;
+> > > -	return NULL;
+> > > -}
+> > > -EXPORT_SYMBOL_GPL(omap_dm_timer_get_fclk);
+> > > -
+> > >  __u32 omap_dm_timer_modify_idlect_mask(__u32 inputmask)
+> > >  {
+> > >  	BUG();
+> 
+> Then omap_dm_timer_get_fclk() won't work on omap1 as there's no
+> separate functional clock. We probably should not even export
+> this function eventually when things are fixed up.
+> 
+> Regards,
+> 
+> Tony
