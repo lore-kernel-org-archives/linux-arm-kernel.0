@@ -1,67 +1,50 @@
-From: dirk.behme@gmail.com (Dirk Behme)
-Date: Wed, 06 Mar 2013 18:38:06 +0100
-Subject: [PATCH] [RFC] arm: fix memset-related crashes caused by recent
- GCC (4.7.2) optimizations
-In-Reply-To: <20130306171110.GQ17833@n2100.arm.linux.org.uk>
-References: <1359793988-6881-1-git-send-email-ivan.djelic@parrot.com>
- <20130211184114.GP9801@mudshark.cambridge.arm.com>
- <20130211194225.GK29329@parrot.com>
- <20130212140008.GB4123@mudshark.cambridge.arm.com>
- <20130212155801.GQ17833@n2100.arm.linux.org.uk>
- <20130212163645.GI4123@mudshark.cambridge.arm.com>
- <5135F80E.3070307@gmail.com> <20130306171110.GQ17833@n2100.arm.linux.org.uk>
-Message-ID: <51377EFE.3070801@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 6 Mar 2013 09:44:36 -0800
+Subject: [PATCH 5/9] ARM: omap1: add back missing includes
+In-Reply-To: <201303061123.30789.arnd@arndb.de>
+References: <1362521809-22989-1-git-send-email-arnd@arndb.de>
+ <201303052227.33430.arnd@arndb.de>
+ <20130306005951.GH11806@atomide.com>
+ <201303061123.30789.arnd@arndb.de>
+Message-ID: <20130306174435.GO11806@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 06.03.2013 18:11, schrieb Russell King - ARM Linux:
-> On Tue, Mar 05, 2013 at 02:50:06PM +0100, Dirk Behme wrote:
->> On 12.02.2013 17:36, Will Deacon wrote:
->>> On Tue, Feb 12, 2013 at 03:58:01PM +0000, Russell King - ARM Linux wrote:
->>>> On Tue, Feb 12, 2013 at 02:00:08PM +0000, Will Deacon wrote:
->>>>> Interesting... the GCC documentation also states that ffreestanding implies
->>>>> fno-builtin, so memset and co shouldn't be targetted for this sort of
->>>>> optimisation by GCC. Have you observed this problem even when passing this
->>>>> option?
->>>>
->>>> Rather than wondering whether we should be using -ffreestanding or not
->>>> (which, x86 people have strongly resisted) I suggest that we just fix
->>>> our memset() implementation to be compliant.
->>>>
->>>> The reason it's not compliant is that I saw no reason for it to be
->>>> compliant back in the gcc 2.7.x days, and it's persisted like that for
->>>> the last 19-ish years.  If GCC is now making use of the return value,
->>>> then we need to fix that and undo the "optimization" in our string.h.
->>>>
->>>> So let's just bite the bullet, make the asm memset() compliant, and
->>>> clean up string.h.
->>>
->>> That would be the ideal thing to do, because it allows the compiler to
->>> optimise around these functions, however it does mean we need to check/fix
->>> *all* of the string functions at least (if we don't pass -fno-builtin then
->>> any builtin function is up for optimisation, including strcpy etc).
->>
->> Do we already have an agreed solution for this issue anywhere, now?
->
-> No idea.  I've stated above what I think should happen.  Where's the
-> disagreement?
+* Arnd Bergmann <arnd@arndb.de> [130306 03:27]:
+> On Wednesday 06 March 2013, Tony Lindgren wrote:
+> > * Arnd Bergmann <arnd@arndb.de> [130305 14:31]:
+> > > On Tuesday 05 March 2013, Arnd Bergmann wrote:
+> > > > The recent reorganization of OMAP header files caused a couple of
+> > > > files that used to be implicitly included now missing from OMAP1.
+> > > > This adds explicit inclusions of mach/irqs.h and mach/hardware.h
+> > > > in all files that need them for an OMAP1 allyesconfig build.
+> > > > 
+> > > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > > > Cc: Tony Lindgren <tony@atomide.com>
+> > > > Cc: linux-omap at vger.kernel.org
+> > > > ---
+> > > >  arch/arm/mach-omap1/board-fsample.c  | 1 +
+> > > >  arch/arm/mach-omap1/board-h2.c       | 1 +
+> > > >  arch/arm/mach-omap1/board-perseus2.c | 1 +
+> > > >  arch/arm/mach-omap1/board-sx1.c      | 1 +
+> > > >  drivers/video/omap/lcd_ams_delta.c   | 1 +
+> > > >  drivers/video/omap/lcd_osk.c         | 1 +
+> > > >  6 files changed, 6 insertions(+)
+> > > 
+> > > I saw that Tony has already addressed the latter two changes, but
+> > > did not see a fix for the four board files.
+> > 
+> > Hmm I wonder why I have not seen the board-*.c related ones?
+> > 
+> > Anyways thanks for fixing those:
+> > 
+> > Acked-by: Tony Lindgren <tony@atomide.com>
+> 
+> Actually I cannot reproduce them myself now, I think I'll just drop
+> the patch for now, but will remember your Ack if the problem comes
+> back. The patch would be needed if we decide to use SPARSE_IRQ on
+> OMAP1.
 
-I'm not sure if there even is a disagreement ;)
+OK sounds good to me.
 
-I've asked because it seems that Ivan's v2 patch [1] isn't applied 
-anywhere, yet. This let me to the impression that this might not be 
-the final ('agreed') fix and that something still has to be done.
-
-Will's answer to my question [2] sounds like Ivan's v2 patch [1] is 
-the final solution, though. If this is correct, what stops us from 
-applying [1]?
-
-Sorry if I misunderstood anything.
-
-Thanks
-
-Dirk
-
-[1] http://www.spinics.net/lists/arm-kernel/msg224019.html
-
-[2] http://www.spinics.net/lists/arm-kernel/msg228036.html
+Tony
