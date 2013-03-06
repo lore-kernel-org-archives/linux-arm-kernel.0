@@ -1,83 +1,47 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Wed, 6 Mar 2013 15:09:07 +0100
-Subject: [PATCH] arm: omap: RX-51: ARM errata 430973 workaround
-In-Reply-To: <20130304185806.GS11806@atomide.com>
-References: <517283541.62064.1362124023621.JavaMail.apache@mail81.abv.bg>
- <CAGo_u6omQdSzpfthHNAU1UvgSvkgq3ZC6g1Ha9oi0nc9QJ71nA@mail.gmail.com>
- <20130304185806.GS11806@atomide.com>
-Message-ID: <201303061509.07905@pali>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 06 Mar 2013 15:11:05 +0100
+Subject: v3.9-rc1: swapper/0 [ INFO: possible circular locking dependency
+ detected ]
+In-Reply-To: <CAB7JpEHJdKeOhkME-6mMdPY6VyTQwFvM33+gxg4X9ZpQv1=6RQ@mail.gmail.com>
+References: <51371B5E.1000508@free-electrons.com>
+ <CAB7JpEHJdKeOhkME-6mMdPY6VyTQwFvM33+gxg4X9ZpQv1=6RQ@mail.gmail.com>
+Message-ID: <51374E79.9050408@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 04 March 2013 19:58:06 Tony Lindgren wrote:
-> * Nishanth Menon <nm@ti.com> [130301 06:42]:
-> > On Fri, Mar 1, 2013 at 1:47 AM, ?????? ???????? 
-<freemangordon@abv.bg> wrote:
-> > > They look similar, but they are not equivalent :). The
-> > > first major difference is here (code taken from
-> > > omap-smc.S)
-> > > 
-> > >> ENTRY(omap_smc2)
-> > >> 
-> > >>          stmfd   sp!, {r4-r12, lr}
-> > >>          mov     r3, r2
-> > >>          mov     r2, r1
-> > >>          mov     r1, #0x0        @ Process ID
-> > >>          mov     r6, #0xff
-> > >>          mov     r12, #0x00      @ Secure Service ID
-> > > 
-> > > Always zero, while RX51 PPA expects a real value. I wonder
-> > > if it is a bug, but anyway I don't see the id parameter
-> > > (R0) used.
-> > > 
-> > >>          mov     r7, #0
-> > >>          mcr     p15, 0, r7, c7, c5, 6
-> > > 
-> > > According to ARM TRM, this is "Invalidate entire branch
-> > > predictor array"(IIUC). NFC why it is needed here, but
-> > > this will not work on RX-51 until IBE bit in ACR is set.
-> > > 
-> > >>          dsb
-> > >>          dmb
-> > >>          smc     #0
-> > > 
-> > > RX-51 needs smc #1 ;)
-> > > 
-> > >>          ldmfd   sp!, {r4-r12, pc}
-> > > 
-> > > The next major difference is that RX-51 expects parameter
-> > > count passed in R3[0] to be the count of the remaining
-> > > parameters +1, but omap_secure_dispatcher (in
-> > > omap-secure.c) is passing the exact count of the
-> > > remaining parameters.
-> > > 
-> > > I guess all of the above problems can be
-> > > fixed/workarounded, but I wonder does it worth. Not to
-> > > say that I don't have BB around to test if the code still
-> > > works if I make changes to omap2-secure.c/omap-smc.S :)
-> > 
-> > Yep, that was my point - instead of introducing new
-> > functions, extending the existing functions to handle new
-> > requirements is better solution, IMHO.
-> 
-> I think there have been patches posted for ARM generic SMC
-> handling. Might be worth looking at those a bit and see if
-> this can be made generic. I think only the SMC call numbering
-> is different for various SoCs?
-> 
-> Regards,
-> 
-> Tony
+Hi Alexander,
 
-Hi Tony, where are patches for ARM generic SMC handling?
+Thanks for your reply.
+
+Le 06/03/2013 14:43, Alexander Shishkin a ?crit :
+> On 6 March 2013 12:33, Maxime Ripard 
+> <maxime.ripard@free-electrons.com> wrote:
+>> Just noticed this in 3.9-rc1 on an iMX28 (ARM) board with a config
+>>  based on mxs_defconfig. I'm using the patchset "Add tested id 
+>> switch and vbus connect detect support for Chipidea" from Peter 
+>> Chen in its 10th version [1], rebased on top of 3.9-rc1, but since 
+>> this doesn't modify the locks present in the udc_irq function, I 
+>> think the problem is elsewhere.
+> 
+> From a quick look at the current chipidea code, I don't see any place
+> where we might try to take cdev->lock under ci->lock. I should have a
+> better look at Peter's patchset to see if it can trigger that.
+
+And from a quick git blame on top of Peter patches, it seems like
+udc_irq has been left untouched by his patches.
+
+> Peter, have you seen anything like that with your code? Is this easy
+>  to trigger (I would assume it is)?
+
+Quite easy yes, just plug a usb cable in gadget mode.
+
+> Can you post the contents of "events" debug file in sysfs?
+
+http://code.bulix.org/64liql-83101
+
 
 -- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130306/42c9aa94/attachment.sig>
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
