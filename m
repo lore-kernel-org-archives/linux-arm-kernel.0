@@ -1,43 +1,61 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed,  6 Mar 2013 16:29:23 +0100
-Subject: [PATCH 1/5] ARM: sunxi: dt: Use clocks property instead of
- clock-frequency for the UARTs
+Date: Wed,  6 Mar 2013 16:29:24 +0100
+Subject: [PATCH 2/5] ARM: sunxi: dt: Move uart0 to sun4i-a10.dtsi
 In-Reply-To: <1362583767-13862-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1362583767-13862-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1362583767-13862-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1362583767-13862-3-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 0bbeb3c3 ("of serial port driver - add clk_get_rate() support") made
-possible to use directly a clock phandle instead of a raw frequency
-specified in the clock frequency attribute, so let's use it.
+The UART0 is only available on the Allwinner A10 SoCs, and not on the
+A13, so move the uart0 node to sun4i-a10.dtsi.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sunxi.dtsi |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/sun4i-a10.dtsi |   10 ++++++++++
+ arch/arm/boot/dts/sunxi.dtsi     |   10 ----------
+ 2 files changed, 10 insertions(+), 10 deletions(-)
 
+diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+index 03d2b53..703e7cb 100644
+--- a/arch/arm/boot/dts/sun4i-a10.dtsi
++++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+@@ -47,5 +47,15 @@
+ 				allwinner,pull = <0>;
+ 			};
+ 		};
++
++		uart0: uart at 01c28000 {
++			compatible = "snps,dw-apb-uart";
++			reg = <0x01c28000 0x400>;
++			interrupts = <1>;
++			reg-shift = <2>;
++			reg-io-width = <4>;
++			clocks = <&osc>;
++			status = "disabled";
++		};
+ 	};
+ };
 diff --git a/arch/arm/boot/dts/sunxi.dtsi b/arch/arm/boot/dts/sunxi.dtsi
-index 8b36abe..791c02a 100644
+index 791c02a..4f78ef7 100644
 --- a/arch/arm/boot/dts/sunxi.dtsi
 +++ b/arch/arm/boot/dts/sunxi.dtsi
-@@ -65,7 +65,7 @@
- 			interrupts = <1>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clock-frequency = <24000000>;
-+			clocks = <&osc>;
- 			status = "disabled";
+@@ -59,16 +59,6 @@
+ 			#interrupt-cells = <1>;
  		};
  
-@@ -75,7 +75,7 @@
- 			interrupts = <2>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clock-frequency = <24000000>;
-+			clocks = <&osc>;
- 			status = "disabled";
- 		};
- 	};
+-		uart0: uart at 01c28000 {
+-			compatible = "snps,dw-apb-uart";
+-			reg = <0x01c28000 0x400>;
+-			interrupts = <1>;
+-			reg-shift = <2>;
+-			reg-io-width = <4>;
+-			clocks = <&osc>;
+-			status = "disabled";
+-		};
+-
+ 		uart1: uart at 01c28400 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c28400 0x400>;
 -- 
 1.7.10.4
