@@ -1,37 +1,69 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 07 Mar 2013 02:28:57 +0300
-Subject: [PATCH v4 0/3] R-Car SATA platform data
-In-Reply-To: <20130301072501.GE14376@verge.net.au>
-References: <201302272332.51650.sergei.shtylyov@cogentembedded.com>
- <20130301072501.GE14376@verge.net.au>
-Message-ID: <5137D139.9010304@cogentembedded.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 06 Mar 2013 15:32:36 -0700
+Subject: 3.9-rc1 regression in arm dtb build
+In-Reply-To: <20130306193332.GA6022@amd.pavel.ucw.cz>
+References: <20130306193332.GA6022@amd.pavel.ucw.cz>
+Message-ID: <5137C404.9060902@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 03/06/2013 12:33 PM, Pavel Machek wrote:
+> Hi!
+> 
+> Commit
+> 
+> commit 499cd8298628eeabf0eb5eb6525d4faa0eec80d8
+> Author: Grant Likely <grant.likely@secretlab.ca>
+> Date:   Tue Nov 27 16:29:11 2012 -0700
+> 
+>     The current rules have the .dtb files build in a different
+>     directory
+>     from the .dts files. The only reason for this is that it was what
+>     PowerPC has done historically. This patch changes ARM to use the
+> generic dtb rule which builds .dtb files in the same directory as the
+> source .dts.
+> 
+> --
+> 
+> Moves dtb files from arch/arm/boot/ to arch/arm/boot/dtb. That causes
+> several problems:
+> 
+> 1) it is inconsistent with 3.8, making switching between 3.9-rc1 and
+> 3.8 tricky
 
-On 03/01/2013 10:25 AM, Simon Horman wrote:
+It's pretty easy to locate the DTB by automatically looking in
+arch/*/boot/dts first, then if the file doesn't exist there, looking in
+arch/*/boot instead as a legacy fallback.
 
->
->> Hello.
->>
->>     Here's the v4 of the set of now 3 patches (the driver itself has been merged
->> since) against the Simon Horman's renesas.git repo, 'next' branch:
->>
->> [1/3] ARM: mach-shmobile: r8a7779: SATA DT configuration
->> [2/3] ARM: mach-shmobile: r8a7779: add SATA support
->> [3/3] ARM: mach-shmobile: marzen: add SATA support
->>
->> Patch changes since the initial posting are reported in the individual patches.
-> Thanks. I have refreshed the topic/r-car-sata branch of the renesas tree
-> accordingly. That branch still contains a copy of the "Add Renesas R-Car
-> on-chip 3Gbps SATA controller driver." but it should disappear once I rebase
-> (e.g. on v3.9-rc1).
+> 2) what is worse, it is very easy to do stuff like
+> 
+>    make socfpga_cyclone5.dtb
+> 
+>    and you end up with success, but stale file in arch/arm/boot, where
+>    your scripts expect it.
+> 
+>    (There are some attempts to rm stale files in Makefiles; they don't
+>    work in above case).
 
-    I see you have finally merged my patches to your 'next' branch, thanks.
-However, you've also merged Morimoto-san's patch to change from gic_spi()
-to gic_iid(), and I thought I'd recast patch 2/3 to make it use 
-gic_iid() too.
-How do we do now, do I need to send a new patch to convert to gic_iid()?
+I guess moving the rm into cmd_dtc rather than the "dtbs" rule would
+solve that.
 
-WBR, Sergei
+> 3) it is now incosistent between powerpc and arm.
+
+True. PPC's DTB-handling is a little more complex than most, so wasn't
+converted along with this patch. It'd be nice to finish the conversion
+and make PPC pick up this change too.
+
+> 4) device tree _binary_ files are now output in device tree _source_
+> directory
+
+Isn't that true for almost all object files? One of the motivators for
+the move was that binaries were being built in a different directory to
+the source, which is quite odd.
+
+> (Sorry for noticing this earlier).
+> 
+> I believe the commit should be simply reverted. Reasons to move dtbs
+> around are not good enough.
+> 									Pavel
+> 
