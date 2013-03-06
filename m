@@ -1,126 +1,290 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 6 Mar 2013 13:29:16 +0200
-Subject: [PATCH v11 6/9] usb: chipidea: add vbus regulator control
-In-Reply-To: <1362563800-16673-7-git-send-email-peter.chen@freescale.com>
-References: <1362563800-16673-1-git-send-email-peter.chen@freescale.com>
- <1362563800-16673-7-git-send-email-peter.chen@freescale.com>
-Message-ID: <20130306112916.GT28587@arwen.pp.htv.fi>
+From: hechtb@gmail.com (Bastian Hecht)
+Date: Wed,  6 Mar 2013 12:30:35 +0100
+Subject: [PATCH v6 1/3] serial: sh-sci: Add OF support
+Message-ID: <1362569437-11133-1-git-send-email-hechtb+renesas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+We add the capabilty to probe Renesas SCI devices using Device Tree setup.
 
-On Wed, Mar 06, 2013 at 05:56:37PM +0800, Peter Chen wrote:
-> For boards which have board level vbus control (eg, gpio), we
-> need to operation vbus according to below rules:
-> - For host, the vbus should always be on.
-> - For otg, the vbus needs to be turned on/off when usb role switches.
-> 
-> We put vbus operation to host as host is the only vbus user,
-> When we are at host mode, the vbus is on, when we are not at
-> host mode, vbus should be off.
-> 
-> Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> ---
->  drivers/usb/chipidea/ci.h    |    2 ++
->  drivers/usb/chipidea/core.c  |   24 ++++++++----------------
->  drivers/usb/chipidea/host.c  |   23 ++++++++++++++++++++++-
->  include/linux/usb/chipidea.h |    1 +
->  4 files changed, 33 insertions(+), 17 deletions(-)
-> 
-> diff --git a/drivers/usb/chipidea/ci.h b/drivers/usb/chipidea/ci.h
-> index a3777a1..8826cdb 100644
-> --- a/drivers/usb/chipidea/ci.h
-> +++ b/drivers/usb/chipidea/ci.h
-> @@ -133,6 +133,7 @@ struct hw_bank {
->   * @id_event: indicates there is a id event, and handled at ci_otg_work
->   * @b_sess_valid_event: indicates there is a vbus event, and handled
->   * at ci_otg_work
-> + * @reg_vbus: used to control internal vbus regulator
->   */
->  struct ci13xxx {
->  	struct device			*dev;
-> @@ -172,6 +173,7 @@ struct ci13xxx {
->  	struct usb_otg      		otg;
->  	bool				id_event;
->  	bool				b_sess_valid_event;
-> +	struct regulator		*reg_vbus;
->  };
->  
->  static inline struct ci_role_driver *ci_role(struct ci13xxx *ci)
-> diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-> index c563e17..e0ff335 100644
-> --- a/drivers/usb/chipidea/core.c
-> +++ b/drivers/usb/chipidea/core.c
-> @@ -63,6 +63,7 @@
->  #include <linux/kernel.h>
->  #include <linux/slab.h>
->  #include <linux/pm_runtime.h>
-> +#include <linux/regulator/consumer.h>
->  #include <linux/usb/ch9.h>
->  #include <linux/usb/gadget.h>
->  #include <linux/usb/otg.h>
-> @@ -364,17 +365,10 @@ static void ci_handle_id_switch(struct ci13xxx *ci)
->  		hw_device_reset(ci, USBMODE_CM_IDLE);
->  
->  		/* 2. Turn on/off vbus according to coming role */
-> -		if (role == CI_ROLE_GADGET) {
-> -			otg_set_vbus(&ci->otg, false);
-> +		if (role == CI_ROLE_GADGET)
->  			/* wait vbus lower than OTGSC_BSV */
->  			hw_wait_reg(ci, OP_OTGSC, OTGSC_BSV, 0,
->  					CI_VBUS_STABLE_TIMEOUT);
-> -		} else if (role == CI_ROLE_HOST) {
-> -			otg_set_vbus(&ci->otg, true);
-> -			/* wait vbus higher than OTGSC_AVV */
-> -			hw_wait_reg(ci, OP_OTGSC, OTGSC_AVV, OTGSC_AVV,
-> -					CI_VBUS_STABLE_TIMEOUT);
-> -		}
->  
->  		/* 3. Begin the new role */
->  		ci_role_start(ci, role);
-> @@ -416,17 +410,14 @@ static void ci_delayed_work(struct work_struct *work)
->  	struct delayed_work *dwork = to_delayed_work(work);
->  	struct ci13xxx *ci = container_of(dwork, struct ci13xxx, dwork);
->  
-> +	/*
-> +	 * If it is gadget mode, the vbus operation should be done like below:
-> +	 * 1. Enable vbus detect
-> +	 * 2. If it has already connected to host, notify udc
-> +	 */
->  	if (ci->role == CI_ROLE_GADGET) {
-> -		/*
-> -		 * if it is device mode:
-> -		 * - Enable vbus detect
-> -		 * - If it has already connected to host, notify udc
-> -		 */
->  		ci_enable_otg_interrupt(ci, OTGSC_BSVIE);
->  		ci_handle_vbus_change(ci);
-> -	} else if (ci->is_otg && (ci->role == CI_ROLE_HOST)) {
-> -		/* USB Device at the MicroB to A cable */
-> -		otg_set_vbus(&ci->otg, true);
->  	}
->  }
->  
-> @@ -603,6 +594,7 @@ static int ci_hdrc_probe(struct platform_device *pdev)
->  
->  	ci->dev = dev;
->  	ci->platdata = dev->platform_data;
-> +	ci->reg_vbus = ci->platdata->reg_vbus;
+Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
+Reviewed-by: Paul Mundt <lethal@linux-sh.org>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+---
+v6:
+putting it all together: I posted v5 as an incremental patch - here
+the full version based on Simon Horman's tree topic/intc-of.
 
-nak, teach ci_hdrc_probe() how to get its own regulator.
+I will post another incremental version as well.
 
->  	if (ci->platdata->phy)
->  		ci->transceiver = ci->platdata->phy;
+- rename sci at xxxxxxxx to serial at xxxxxxxx
+- stick to scbrr-algorithm
 
-this should happen for PHYs as well btw.
+ .../bindings/tty/serial/renesas,sci-serial.txt     |   47 +++++++
+ drivers/tty/serial/sh-sci.c                        |  146 +++++++++++++++++++-
+ include/linux/serial_sci.h                         |    4 +
+ 3 files changed, 193 insertions(+), 4 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/tty/serial/renesas,sci-serial.txt
 
+diff --git a/Documentation/devicetree/bindings/tty/serial/renesas,sci-serial.txt b/Documentation/devicetree/bindings/tty/serial/renesas,sci-serial.txt
+new file mode 100644
+index 0000000..d80039e
+--- /dev/null
++++ b/Documentation/devicetree/bindings/tty/serial/renesas,sci-serial.txt
+@@ -0,0 +1,47 @@
++* Renesas SH-Mobile Serial Communication Interface
++
++Required properties:
++- compatible : Should be "renesas,sci-<port type>-uart", where <port type> is
++  "sci", "scif", "irda", "scifa", "scifb"
++  or for legacy devices
++  "sh2_scif_fifodata", "sh3_scif", "sh4_scif", "sh4_scif_no_scsptr",
++  "sh4_scif_fifodata", "sh7705_scif".
++- reg : Address and length of the register set for the device
++- interrupts : Should contain the following IRQs in this order:
++	ERI: receive-error interrupt
++	RXI: receive-FIFO-data-full interrupt
++	TXI: transmit-FIFO-data-empty interrupt
++	BRI: break reception interrupt
++- interrupt-names: The IRQ names "eri", "rxi", "txi" and "bri".
++- cell-index : The device id.
++- renesas,scscr : Should contain a bitfield used by the Serial Control Register.
++  b7 = SCSCR_TIE
++  b6 = SCSCR_RIE
++  b5 = SCSCR_TE
++  b4 = SCSCR_RE
++  b3 = SCSCR_REIE
++  b2 = SCSCR_TOIE
++  b1 = SCSCR_CKE1
++  b0 = SCSCR_CKE0
++- renesas,scbrr-algorithm : Choose an algorithm ID for the baud rate generator.
++  1 = SCBRR_ALGO_1 ((clk + 16 * bps) / (16 * bps) - 1)
++  2 = SCBRR_ALGO_2 ((clk + 16 * bps) / (32 * bps) - 1)
++  3 = SCBRR_ALGO_3 (((clk * 2) + 16 * bps) / (16 * bps) - 1)
++  4 = SCBRR_ALGO_4 (((clk * 2) + 16 * bps) / (32 * bps) - 1)
++  5 = SCBRR_ALGO_5 (((clk * 1000 / 32) / bps) - 1)
++
++Optional properties:
++- renesas,autoconf : Set if device is capable of auto configuration.
++
++Example:
++	serial at e6c50000 {
++		compatible = "renesas,sci-scifa-uart";
++		interrupt-parent = <&intca>;
++		reg = <0xe6c50000 0x100>;
++		interrupts = <0x0c20>, <0x0c20>, <0x0c20>, <0x0c20>;
++		interrupt-names = "eri", "rxi", "txi", "bri";
++		cell-index = <1>;
++		renesas,scscr = <0x30>;
++		renesas,scbrr-algorithm = <4>;
++		renesas,autoconf;
++	};
+diff --git a/drivers/tty/serial/sh-sci.c b/drivers/tty/serial/sh-sci.c
+index 6147756..03bb740 100644
+--- a/drivers/tty/serial/sh-sci.c
++++ b/drivers/tty/serial/sh-sci.c
+@@ -52,6 +52,7 @@
+ #include <linux/scatterlist.h>
+ #include <linux/slab.h>
+ #include <linux/gpio.h>
++#include <linux/of.h>
+ 
+ #ifdef CONFIG_SUPERH
+ #include <asm/sh_bios.h>
+@@ -2353,6 +2354,131 @@ static int sci_remove(struct platform_device *dev)
+ 	return 0;
+ }
+ 
++static const struct of_device_id of_sci_match[] = {
++	{ .compatible = "renesas,sci-sci-uart",
++		.data = (void *)SCIx_SCI_REGTYPE },
++	{ .compatible = "renesas,sci-scif-uart",
++		.data = (void *)SCIx_SH4_SCIF_REGTYPE, },
++	{ .compatible = "renesas,sci-irda-uart",
++		.data = (void *)SCIx_IRDA_REGTYPE },
++	{ .compatible = "renesas,sci-scifa-uart",
++		.data = (void *)SCIx_SCIFA_REGTYPE },
++	{ .compatible = "renesas,sci-scifb-uart",
++		.data = (void *)SCIx_SCIFB_REGTYPE },
++	{ .compatible = "renesas,sci-sh2_scif_fifodata-uart",
++		.data = (void *)SCIx_SH2_SCIF_FIFODATA_REGTYPE },
++	{ .compatible = "renesas,sci-sh3_scif-uart",
++		.data = (void *)SCIx_SH3_SCIF_REGTYPE },
++	{ .compatible = "renesas,sci-sh4_scif-uart",
++		.data = (void *)SCIx_SH4_SCIF_REGTYPE },
++	{ .compatible = "renesas,sci-sh4_scif_no_scsptr-uart",
++		.data = (void *)SCIx_SH4_SCIF_NO_SCSPTR_REGTYPE },
++	{ .compatible = "renesas,sci-sh4_scif_fifodata-uart",
++		.data = (void *)SCIx_SH4_SCIF_FIFODATA_REGTYPE },
++	{ .compatible = "renesas,sci-sh7705_scif-uart",
++		.data = (void *)SCIx_SH7705_SCIF_REGTYPE },
++	{},
++};
++MODULE_DEVICE_TABLE(of, of_sci_match);
++
++static struct plat_sci_port *sci_parse_dt(struct platform_device *pdev,
++								int *dev_id)
++{
++	struct plat_sci_port *p;
++	struct device_node *np = pdev->dev.of_node;
++	const struct of_device_id *match;
++	struct resource *res;
++	const __be32 *prop;
++	int i, irq, val;
++
++	if (!IS_ENABLED(CONFIG_OF) || !np)
++		return NULL;
++
++	match = of_match_node(of_sci_match, pdev->dev.of_node);
++	if (!match || !match->data) {
++		dev_err(&pdev->dev, "OF match error\n");
++		return NULL;
++	}
++
++	p = devm_kzalloc(&pdev->dev, sizeof(struct plat_sci_port), GFP_KERNEL);
++	if (!p) {
++		dev_err(&pdev->dev, "failed to allocate DT config data\n");
++		return NULL;
++	}
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res) {
++		dev_err(&pdev->dev, "failed to get I/O memory\n");
++		return NULL;
++	}
++	p->mapbase = res->start;
++
++	for (i = 0; i < SCIx_NR_IRQS; i++) {
++		irq = platform_get_irq(pdev, i);
++		if (irq < 0) {
++			dev_err(&pdev->dev, "failed to get irq data %d\n", i);
++			return NULL;
++		}
++		p->irqs[i] = irq;
++	}
++
++	prop = of_get_property(np, "cell-index", NULL);
++	if (!prop) {
++		dev_err(&pdev->dev, "required DT prop cell-index missing\n");
++		return NULL;
++	}
++	*dev_id = be32_to_cpup(prop);
++
++	prop = of_get_property(np, "renesas,scscr", NULL);
++	if (!prop) {
++		dev_err(&pdev->dev, "required DT prop scscr missing\n");
++		return NULL;
++	}
++	p->scscr = be32_to_cpup(prop);
++
++	prop = of_get_property(np, "renesas,scbrr-algorithm", NULL);
++	if (!prop) {
++		dev_err(&pdev->dev, "required DT prop scbrr-algorithm missing\n");
++		return NULL;
++	}
++	val = be32_to_cpup(prop);
++	if (val <= SCBRR_ALGO_INVALID || val >= SCBRR_NR_ALGOS) {
++		dev_err(&pdev->dev, "DT prop clock-algorithm out of range\n");
++		return NULL;
++	}
++	p->scbrr_algo_id = val;
++
++	p->flags = UPF_IOREMAP;
++	if (of_get_property(np, "renesas,autoconf", NULL))
++		p->flags |= UPF_BOOT_AUTOCONF;
++
++	p->regtype = (unsigned int)match->data;
++
++	switch (p->regtype) {
++	case SCIx_SCI_REGTYPE:
++		p->type = PORT_SCI;
++		break;
++	case SCIx_SH4_SCIF_REGTYPE:
++		p->type = PORT_SCIF;
++		break;
++	case SCIx_IRDA_REGTYPE:
++		p->type = PORT_IRDA;
++		break;
++	case SCIx_SCIFA_REGTYPE:
++		p->type = PORT_SCIFA;
++		break;
++	case SCIx_SCIFB_REGTYPE:
++		p->type = PORT_SCIFB;
++		break;
++	default:
++		/* legacy register sets default to PORT_SCIF */
++		p->type = PORT_SCIF;
++		break;
++	}
++
++	return p;
++}
++
+ static int sci_probe_single(struct platform_device *dev,
+ 				      unsigned int index,
+ 				      struct plat_sci_port *p,
+@@ -2385,9 +2511,9 @@ static int sci_probe_single(struct platform_device *dev,
+ 
+ static int sci_probe(struct platform_device *dev)
+ {
+-	struct plat_sci_port *p = dev->dev.platform_data;
+-	struct sci_port *sp = &sci_ports[dev->id];
+-	int ret;
++	struct plat_sci_port *p;
++	struct sci_port *sp;
++	int ret, dev_id = dev->id;
+ 
+ 	/*
+ 	 * If we've come here via earlyprintk initialization, head off to
+@@ -2397,9 +2523,20 @@ static int sci_probe(struct platform_device *dev)
+ 	if (is_early_platform_device(dev))
+ 		return sci_probe_earlyprintk(dev);
+ 
++	if (dev->dev.of_node)
++		p = sci_parse_dt(dev, &dev_id);
++	else
++		p = dev->dev.platform_data;
++
++	if (!p) {
++		dev_err(&dev->dev, "no setup data supplied\n");
++		return -EINVAL;
++	}
++
++	sp = &sci_ports[dev_id];
+ 	platform_set_drvdata(dev, sp);
+ 
+-	ret = sci_probe_single(dev, dev->id, p, sp);
++	ret = sci_probe_single(dev, dev_id, p, sp);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -2451,6 +2588,7 @@ static struct platform_driver sci_driver = {
+ 		.name	= "sh-sci",
+ 		.owner	= THIS_MODULE,
+ 		.pm	= &sci_dev_pm_ops,
++		.of_match_table = of_match_ptr(of_sci_match),
+ 	},
+ };
+ 
+diff --git a/include/linux/serial_sci.h b/include/linux/serial_sci.h
+index eb763ad..857eec4 100644
+--- a/include/linux/serial_sci.h
++++ b/include/linux/serial_sci.h
+@@ -11,11 +11,15 @@
+ #define SCIx_NOT_SUPPORTED	(-1)
+ 
+ enum {
++	SCBRR_ALGO_INVALID,
++
+ 	SCBRR_ALGO_1,		/* ((clk + 16 * bps) / (16 * bps) - 1) */
+ 	SCBRR_ALGO_2,		/* ((clk + 16 * bps) / (32 * bps) - 1) */
+ 	SCBRR_ALGO_3,		/* (((clk * 2) + 16 * bps) / (16 * bps) - 1) */
+ 	SCBRR_ALGO_4,		/* (((clk * 2) + 16 * bps) / (32 * bps) - 1) */
+ 	SCBRR_ALGO_5,		/* (((clk * 1000 / 32) / bps) - 1) */
++
++	SCBRR_NR_ALGOS,
+ };
+ 
+ #define SCSCR_TIE	(1 << 7)
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130306/dc8a4ed3/attachment.sig>
+1.7.9.5
