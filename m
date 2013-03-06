@@ -1,91 +1,90 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed,  6 Mar 2013 18:00:01 +0100
-Subject: [PATCH 06/10] arm: mach-kirkwood: convert to use mvebu-mbus driver
+Date: Wed,  6 Mar 2013 18:00:02 +0100
+Subject: [PATCH 07/10] arm: mach-dove: convert to use mvebu-mbus driver
 In-Reply-To: <1362589205-4726-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1362589205-4726-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1362589205-4726-7-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1362589205-4726-8-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit migrates the mach-kirkwood platforms to use the mvebu-mbus
-driver and therefore removes the Kirkwood-specific addr-map code.
+This commit migrates the mach-dove platforms to use the mvebu-mbus
+driver and therefore removes the Dove-specific addr-map code.
 
 In order to do this, we have to introduce a separate
-kirkwood_dt_init_early() function. It continues to be quite similar to
-kirkwood_init_early(), except that it does a DT-based initialization
-of the mvebu-mbus driver. On the other hand, the kirkwood_init_early()
+dove_dt_init_early() function. It continues to be quite similar to
+dove_init_early(), except that it does a DT-based initialization of
+the mvebu-mbus driver. On the other hand, the dove_init_early()
 function does a legacy initialization of the mvebu-mbus driver (which
 will be removed once all boards have been migrated to the Device
 Tree).
 
 The address decoding windows are now registered in the
-kirkwood_setup_wins() function. It is worth noting that the four PCIe
+dove_setup_cpu_wins() function. It is worth noting that the four PCIe
 address decoding windows will ultimately no longer have to be
 registered here: it will be done automatically by the PCIe driver once
-Kirkwood has been migrated to use the upcoming mvebu PCIe driver.
+Dove has been migrated to use the upcoming mvebu PCIe driver.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
- arch/arm/Kconfig                               |    1 +
- arch/arm/boot/dts/kirkwood.dtsi                |    3 +-
- arch/arm/mach-kirkwood/Makefile                |    2 +-
- arch/arm/mach-kirkwood/addr-map.c              |   91 ------------------------
- arch/arm/mach-kirkwood/board-dt.c              |   19 ++++-
- arch/arm/mach-kirkwood/common.c                |   38 +++++++++-
- arch/arm/mach-kirkwood/common.h                |    2 +-
- arch/arm/mach-kirkwood/include/mach/kirkwood.h |    7 +-
- arch/arm/mach-kirkwood/pcie.c                  |    1 -
- arch/arm/plat-orion/Makefile                   |    1 -
- 10 files changed, 63 insertions(+), 102 deletions(-)
- delete mode 100644 arch/arm/mach-kirkwood/addr-map.c
+ arch/arm/Kconfig                       |    1 +
+ arch/arm/boot/dts/dove.dtsi            |    3 +-
+ arch/arm/mach-dove/Makefile            |    2 +-
+ arch/arm/mach-dove/addr-map.c          |  125 --------------------------------
+ arch/arm/mach-dove/board-dt.c          |   13 +++-
+ arch/arm/mach-dove/common.c            |   39 +++++++++-
+ arch/arm/mach-dove/common.h            |    2 +-
+ arch/arm/mach-dove/include/mach/dove.h |    5 ++
+ arch/arm/plat-orion/Makefile           |    1 -
+ 9 files changed, 59 insertions(+), 132 deletions(-)
+ delete mode 100644 arch/arm/mach-dove/addr-map.c
 
 diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 5b71469..544767b 100644
+index 544767b..d18a141 100644
 --- a/arch/arm/Kconfig
 +++ b/arch/arm/Kconfig
-@@ -577,6 +577,7 @@ config ARCH_KIRKWOOD
- 	select PINCTRL
- 	select PINCTRL_KIRKWOOD
+@@ -564,6 +564,7 @@ config ARCH_DOVE
+ 	select PINCTRL_DOVE
  	select PLAT_ORION_LEGACY
+ 	select USB_ARCH_HAS_EHCI
 +	select MVEBU_MBUS
  	help
- 	  Support for the following Marvell Kirkwood series SoCs:
- 	  88F6180, 88F6192 and 88F6281.
-diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
-index 2c738d9..54aa4c9 100644
---- a/arch/arm/boot/dts/kirkwood.dtsi
-+++ b/arch/arm/boot/dts/kirkwood.dtsi
-@@ -17,7 +17,8 @@
+ 	  Support for the Marvell Dove SoC 88AP510
+ 
+diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
+index 67dbe20..8e5db7c 100644
+--- a/arch/arm/boot/dts/dove.dtsi
++++ b/arch/arm/boot/dts/dove.dtsi
+@@ -11,7 +11,8 @@
  	};
  
- 	ocp at f1000000 {
+ 	soc at f1000000 {
 -		compatible = "simple-bus";
-+		compatible = "marvell,kirkwood-mbus", "simple-bus";
-+		reg = <0xf1020000 0x80>, <0xf1001500 0x20>;
- 		ranges = <0x00000000 0xf1000000 0x4000000
- 		          0xf5000000 0xf5000000 0x0000400>;
++		compatible = "marvell,dove-mbus", "simple-bus";
++		reg = <0xf1020000 0x80>, <0xf1800100 0x8>;
  		#address-cells = <1>;
-diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
-index 4cc4bee..d805f80 100644
---- a/arch/arm/mach-kirkwood/Makefile
-+++ b/arch/arm/mach-kirkwood/Makefile
+ 		#size-cells = <1>;
+ 		interrupt-parent = <&intc>;
+diff --git a/arch/arm/mach-dove/Makefile b/arch/arm/mach-dove/Makefile
+index 3f0a858..4d9d2ff 100644
+--- a/arch/arm/mach-dove/Makefile
++++ b/arch/arm/mach-dove/Makefile
 @@ -1,4 +1,4 @@
--obj-y				+= common.o addr-map.o irq.o pcie.o mpp.o
-+obj-y				+= common.o irq.o pcie.o mpp.o
- 
- obj-$(CONFIG_MACH_DB88F6281_BP)		+= db88f6281-bp-setup.o
- obj-$(CONFIG_MACH_RD88F6192_NAS)	+= rd88f6192-nas-setup.o
-diff --git a/arch/arm/mach-kirkwood/addr-map.c b/arch/arm/mach-kirkwood/addr-map.c
+-obj-y				+= common.o addr-map.o irq.o
++obj-y				+= common.o irq.o
+ obj-$(CONFIG_DOVE_LEGACY)	+= mpp.o
+ obj-$(CONFIG_PCI)		+= pcie.o
+ obj-$(CONFIG_MACH_DOVE_DB)	+= dove-db-setup.o
+diff --git a/arch/arm/mach-dove/addr-map.c b/arch/arm/mach-dove/addr-map.c
 deleted file mode 100644
-index 8f0d162..0000000
---- a/arch/arm/mach-kirkwood/addr-map.c
+index 2a06c01..0000000
+--- a/arch/arm/mach-dove/addr-map.c
 +++ /dev/null
-@@ -1,91 +0,0 @@
+@@ -1,125 +0,0 @@
 -/*
-- * arch/arm/mach-kirkwood/addr-map.c
+- * arch/arm/mach-dove/addr-map.c
 - *
-- * Address map functions for Marvell Kirkwood SoCs
+- * Address map functions for Marvell Dove 88AP510 SoC
 - *
 - * This file is licensed under the terms of the GNU General Public
 - * License version 2.  This program is licensed "as is" without any
@@ -96,28 +95,34 @@ index 8f0d162..0000000
 -#include <linux/init.h>
 -#include <linux/mbus.h>
 -#include <linux/io.h>
--#include <mach/hardware.h>
+-#include <asm/mach/arch.h>
+-#include <asm/setup.h>
+-#include <mach/dove.h>
 -#include <plat/addr-map.h>
 -#include "common.h"
 -
 -/*
 - * Generic Address Decode Windows bit settings
 - */
--#define TARGET_DEV_BUS		1
--#define TARGET_SRAM		3
--#define TARGET_PCIE		4
--#define ATTR_DEV_SPI_ROM	0x1e
--#define ATTR_DEV_BOOT		0x1d
--#define ATTR_DEV_NAND		0x2f
--#define ATTR_DEV_CS3		0x37
--#define ATTR_DEV_CS2		0x3b
--#define ATTR_DEV_CS1		0x3d
--#define ATTR_DEV_CS0		0x3e
+-#define TARGET_DDR		0x0
+-#define TARGET_BOOTROM		0x1
+-#define TARGET_CESA		0x3
+-#define TARGET_PCIE0		0x4
+-#define TARGET_PCIE1		0x8
+-#define TARGET_SCRATCHPAD	0xd
+-
+-#define ATTR_CESA		0x01
+-#define ATTR_BOOTROM		0xfd
+-#define ATTR_DEV_SPI0_ROM	0xfe
+-#define ATTR_DEV_SPI1_ROM	0xfb
 -#define ATTR_PCIE_IO		0xe0
 -#define ATTR_PCIE_MEM		0xe8
--#define ATTR_PCIE1_IO		0xd0
--#define ATTR_PCIE1_MEM		0xd8
--#define ATTR_SRAM		0x01
+-#define ATTR_SCRATCHPAD		0x0
+-
+-static inline void __iomem *ddr_map_sc(int i)
+-{
+-	return (void __iomem *)(DOVE_MC_VIRT_BASE + 0x100 + ((i) << 4));
+-}
 -
 -/*
 - * Description of the windows needed by the platform code
@@ -132,36 +137,45 @@ index 8f0d162..0000000
 -	/*
 -	 * Windows for PCIe IO+MEM space.
 -	 */
--	{ 0, KIRKWOOD_PCIE_IO_PHYS_BASE, KIRKWOOD_PCIE_IO_SIZE,
--	  TARGET_PCIE, ATTR_PCIE_IO, KIRKWOOD_PCIE_IO_BUS_BASE
+-	{ 0, DOVE_PCIE0_IO_PHYS_BASE, DOVE_PCIE0_IO_SIZE,
+-	  TARGET_PCIE0, ATTR_PCIE_IO, DOVE_PCIE0_IO_BUS_BASE
 -	},
--	{ 1, KIRKWOOD_PCIE_MEM_PHYS_BASE, KIRKWOOD_PCIE_MEM_SIZE,
--	  TARGET_PCIE, ATTR_PCIE_MEM, KIRKWOOD_PCIE_MEM_BUS_BASE
+-	{ 1, DOVE_PCIE1_IO_PHYS_BASE, DOVE_PCIE1_IO_SIZE,
+-	  TARGET_PCIE1, ATTR_PCIE_IO, DOVE_PCIE1_IO_BUS_BASE
 -	},
--	{ 2, KIRKWOOD_PCIE1_IO_PHYS_BASE, KIRKWOOD_PCIE1_IO_SIZE,
--	  TARGET_PCIE, ATTR_PCIE1_IO, KIRKWOOD_PCIE1_IO_BUS_BASE
+-	{ 2, DOVE_PCIE0_MEM_PHYS_BASE, DOVE_PCIE0_MEM_SIZE,
+-	  TARGET_PCIE0, ATTR_PCIE_MEM, -1
 -	},
--	{ 3, KIRKWOOD_PCIE1_MEM_PHYS_BASE, KIRKWOOD_PCIE1_MEM_SIZE,
--	  TARGET_PCIE, ATTR_PCIE1_MEM, KIRKWOOD_PCIE1_MEM_BUS_BASE
--	},
--	/*
--	 * Window for NAND controller.
--	 */
--	{ 4, KIRKWOOD_NAND_MEM_PHYS_BASE, KIRKWOOD_NAND_MEM_SIZE,
--	  TARGET_DEV_BUS, ATTR_DEV_NAND, -1
+-	{ 3, DOVE_PCIE1_MEM_PHYS_BASE, DOVE_PCIE1_MEM_SIZE,
+-	  TARGET_PCIE1, ATTR_PCIE_MEM, -1
 -	},
 -	/*
--	 * Window for SRAM.
+-	 * Window for CESA engine.
 -	 */
--	{ 5, KIRKWOOD_SRAM_PHYS_BASE, KIRKWOOD_SRAM_SIZE,
--	  TARGET_SRAM, ATTR_SRAM, -1
+-	{ 4, DOVE_CESA_PHYS_BASE, DOVE_CESA_SIZE,
+-	  TARGET_CESA, ATTR_CESA, -1
+-	},
+-	/*
+-	 * Window to the BootROM for Standby and Sleep Resume
+-	 */
+-	{ 5, DOVE_BOOTROM_PHYS_BASE, DOVE_BOOTROM_SIZE,
+-	  TARGET_BOOTROM, ATTR_BOOTROM, -1
+-	},
+-	/*
+-	 * Window to the PMU Scratch Pad space
+-	 */
+-	{ 6, DOVE_SCRATCHPAD_PHYS_BASE, DOVE_SCRATCHPAD_SIZE,
+-	  TARGET_SCRATCHPAD, ATTR_SCRATCHPAD, -1
 -	},
 -	/* End marker */
 -	{ -1, 0, 0, 0, 0, 0 }
 -};
 -
--void __init kirkwood_setup_cpu_mbus(void)
+-void __init dove_setup_cpu_mbus(void)
 -{
+-	int i;
+-	int cs;
+-
 -	/*
 -	 * Disable, clear and configure windows.
 -	 */
@@ -170,197 +184,187 @@ index 8f0d162..0000000
 -	/*
 -	 * Setup MBUS dram target info.
 -	 */
--	orion_setup_cpu_mbus_target(&addr_map_cfg,
--				    (void __iomem *) DDR_WINDOW_CPU_BASE);
+-	orion_mbus_dram_info.mbus_dram_target_id = TARGET_DDR;
+-
+-	for (i = 0, cs = 0; i < 2; i++) {
+-		u32 map = readl(ddr_map_sc(i));
+-
+-		/*
+-		 * Chip select enabled?
+-		 */
+-		if (map & 1) {
+-			struct mbus_dram_window *w;
+-
+-			w = &orion_mbus_dram_info.cs[cs++];
+-			w->cs_index = i;
+-			w->mbus_attr = 0; /* CS address decoding done inside */
+-					  /* the DDR controller, no need to  */
+-					  /* provide attributes */
+-			w->base = map & 0xff800000;
+-			w->size = 0x100000 << (((map & 0x000f0000) >> 16) - 4);
+-		}
+-	}
+-	orion_mbus_dram_info.num_cs = cs;
 -}
-diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-index 2e73e9d..2aeb018 100644
---- a/arch/arm/mach-kirkwood/board-dt.c
-+++ b/arch/arm/mach-kirkwood/board-dt.c
-@@ -17,12 +17,14 @@
- #include <linux/clk-provider.h>
- #include <linux/clk/mvebu.h>
- #include <linux/kexec.h>
-+#include <linux/dma-mapping.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
- #include <mach/bridge-regs.h>
+diff --git a/arch/arm/mach-dove/board-dt.c b/arch/arm/mach-dove/board-dt.c
+index fbde1dd..10fef8a 100644
+--- a/arch/arm/mach-dove/board-dt.c
++++ b/arch/arm/mach-dove/board-dt.c
+@@ -16,9 +16,12 @@
  #include <linux/platform_data/usb-ehci-orion.h>
- #include <plat/irq.h>
+ #include <asm/hardware/cache-tauros2.h>
+ #include <asm/mach/arch.h>
++#include <asm/mach/map.h>
+ #include <mach/pm.h>
++#include <mach/bridge-regs.h>
  #include <plat/common.h>
+ #include <plat/irq.h>
 +#include <plat/time.h>
  #include "common.h"
  
- static struct of_device_id kirkwood_dt_match_table[] __initdata = {
-@@ -70,6 +72,19 @@ static void __init kirkwood_of_clk_init(void)
- 	kirkwood_legacy_clk_init();
+ /*
+@@ -53,6 +56,12 @@ static void __init dove_of_clk_init(void)
+ 	dove_legacy_clk_init();
  }
  
-+static void __init kirkwood_dt_init_early(void)
++static void __init dove_dt_init_early(void)
 +{
 +	orion_time_set_base(TIMER_VIRT_BASE);
-+
-+	/*
-+	 * Some Kirkwood devices allocate their coherent buffers from atomic
-+	 * context. Increase size of atomic coherent pool to make sure such
-+	 * the allocations won't fail.
-+	 */
-+	init_dma_coherent_pool_size(SZ_1M);
 +	mvebu_mbus_dt_init();
 +}
 +
- static void __init kirkwood_dt_init(void)
- {
- 	pr_info("Kirkwood: %s, TCLK=%d.\n", kirkwood_id(), kirkwood_tclk);
-@@ -82,7 +97,7 @@ static void __init kirkwood_dt_init(void)
- 	 */
- 	writel(readl(CPU_CONFIG) & ~CPU_CONFIG_ERROR_PROP, CPU_CONFIG);
+ static struct mv643xx_eth_platform_data dove_dt_ge00_data = {
+ 	.phy_addr = MV643XX_ETH_PHY_ADDR_DEFAULT,
+ };
+@@ -64,7 +73,7 @@ static void __init dove_dt_init(void)
+ #ifdef CONFIG_CACHE_TAUROS2
+ 	tauros2_init(0);
+ #endif
+-	dove_setup_cpu_mbus();
++	dove_setup_cpu_wins();
  
--	kirkwood_setup_cpu_mbus();
-+	kirkwood_setup_wins();
+ 	/* Setup root of clk tree */
+ 	dove_of_clk_init();
+@@ -83,7 +92,7 @@ static const char * const dove_dt_board_compat[] = {
  
- 	kirkwood_l2_init();
- 
-@@ -175,7 +190,7 @@ static const char * const kirkwood_dt_board_compat[] = {
- DT_MACHINE_START(KIRKWOOD_DT, "Marvell Kirkwood (Flattened Device Tree)")
- 	/* Maintainer: Jason Cooper <jason@lakedaemon.net> */
- 	.map_io		= kirkwood_map_io,
--	.init_early	= kirkwood_init_early,
-+	.init_early	= kirkwood_dt_init_early,
+ DT_MACHINE_START(DOVE_DT, "Marvell Dove (Flattened Device Tree)")
+ 	.map_io		= dove_map_io,
+-	.init_early	= dove_init_early,
++	.init_early	= dove_dt_init_early,
  	.init_irq	= orion_dt_init_irq,
- 	.init_time	= kirkwood_timer_init,
- 	.init_machine	= kirkwood_dt_init,
-diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
-index 49792a0..c2cae69 100644
---- a/arch/arm/mach-kirkwood/common.c
-+++ b/arch/arm/mach-kirkwood/common.c
-@@ -33,7 +33,6 @@
- #include <linux/platform_data/usb-ehci-orion.h>
- #include <plat/common.h>
- #include <plat/time.h>
--#include <plat/addr-map.h>
- #include <linux/platform_data/dma-mv_xor.h>
- #include "common.h"
- 
-@@ -535,6 +534,9 @@ void __init kirkwood_init_early(void)
- 	 * the allocations won't fail.
- 	 */
- 	init_dma_coherent_pool_size(SZ_1M);
-+	mvebu_mbus_init("marvell,kirkwood-mbus",
+ 	.init_time	= dove_timer_init,
+ 	.init_machine	= dove_dt_init,
+diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
+index c6b3b2b..e2b5da0 100644
+--- a/arch/arm/mach-dove/common.c
++++ b/arch/arm/mach-dove/common.c
+@@ -224,6 +224,9 @@ void __init dove_i2c_init(void)
+ void __init dove_init_early(void)
+ {
+ 	orion_time_set_base(TIMER_VIRT_BASE);
++	mvebu_mbus_init("marvell,dove-mbus",
 +			BRIDGE_WINS_BASE, BRIDGE_WINS_SZ,
-+			DDR_WINDOW_CPU_BASE, DDR_WINDOW_CPU_SZ);
++			DOVE_MC_WINS_BASE, DOVE_MC_WINS_SZ);
  }
  
- int kirkwood_tclk;
-@@ -650,6 +652,38 @@ char * __init kirkwood_id(void)
- 	}
+ static int __init dove_find_tclk(void)
+@@ -326,6 +329,40 @@ void __init dove_sdio1_init(void)
+ 	platform_device_register(&dove_sdio1);
  }
  
-+void __init kirkwood_setup_wins(void)
++void __init dove_setup_cpu_wins(void)
 +{
 +	/*
 +	 * The PCIe windows will no longer be statically allocated
-+	 * here once Kirkwood is migrated to the pci-mvebu driver.
++	 * here once Dove is migrated to the pci-mvebu driver.
 +	 */
 +	mvebu_mbus_add_window_remap_flags("pcie0.0",
-+					  KIRKWOOD_PCIE_IO_PHYS_BASE,
-+					  KIRKWOOD_PCIE_IO_SIZE,
-+					  KIRKWOOD_PCIE_IO_BUS_BASE,
++					  DOVE_PCIE0_IO_PHYS_BASE,
++					  DOVE_PCIE0_IO_SIZE,
++					  DOVE_PCIE0_IO_BUS_BASE,
++					  MVEBU_MBUS_PCI_IO);
++	mvebu_mbus_add_window_remap_flags("pcie1.0",
++					  DOVE_PCIE1_IO_PHYS_BASE,
++					  DOVE_PCIE1_IO_SIZE,
++					  DOVE_PCIE1_IO_BUS_BASE,
 +					  MVEBU_MBUS_PCI_IO);
 +	mvebu_mbus_add_window_remap_flags("pcie0.0",
-+					  KIRKWOOD_PCIE_MEM_PHYS_BASE,
-+					  KIRKWOOD_PCIE_MEM_SIZE,
++					  DOVE_PCIE0_MEM_PHYS_BASE,
++					  DOVE_PCIE0_MEM_SIZE,
 +					  MVEBU_MBUS_NO_REMAP,
 +					  MVEBU_MBUS_PCI_MEM);
 +	mvebu_mbus_add_window_remap_flags("pcie1.0",
-+					  KIRKWOOD_PCIE1_IO_PHYS_BASE,
-+					  KIRKWOOD_PCIE1_IO_SIZE,
-+					  KIRKWOOD_PCIE1_IO_BUS_BASE,
-+					  MVEBU_MBUS_PCI_IO);
-+	mvebu_mbus_add_window_remap_flags("pcie1.0",
-+					  KIRKWOOD_PCIE1_MEM_PHYS_BASE,
-+					  KIRKWOOD_PCIE1_MEM_SIZE,
++					  DOVE_PCIE1_MEM_PHYS_BASE,
++					  DOVE_PCIE1_MEM_SIZE,
 +					  MVEBU_MBUS_NO_REMAP,
 +					  MVEBU_MBUS_PCI_MEM);
-+	mvebu_mbus_add_window("nand", KIRKWOOD_NAND_MEM_PHYS_BASE,
-+			      KIRKWOOD_NAND_MEM_SIZE);
-+	mvebu_mbus_add_window("sram", KIRKWOOD_SRAM_PHYS_BASE,
-+			      KIRKWOOD_SRAM_SIZE);
++	mvebu_mbus_add_window("cesa", DOVE_CESA_PHYS_BASE,
++			      DOVE_CESA_SIZE);
++	mvebu_mbus_add_window("bootrom", DOVE_BOOTROM_PHYS_BASE,
++			      DOVE_BOOTROM_SIZE);
++	mvebu_mbus_add_window("scratchpad", DOVE_SCRATCHPAD_PHYS_BASE,
++			      DOVE_SCRATCHPAD_SIZE);
 +}
 +
- void __init kirkwood_l2_init(void)
+ void __init dove_init(void)
  {
- #ifdef CONFIG_CACHE_FEROCEON_L2
-@@ -675,7 +709,7 @@ void __init kirkwood_init(void)
- 	 */
- 	writel(readl(CPU_CONFIG) & ~CPU_CONFIG_ERROR_PROP, CPU_CONFIG);
+ 	pr_info("Dove 88AP510 SoC, TCLK = %d MHz.\n",
+@@ -334,7 +371,7 @@ void __init dove_init(void)
+ #ifdef CONFIG_CACHE_TAUROS2
+ 	tauros2_init(0);
+ #endif
+-	dove_setup_cpu_mbus();
++	dove_setup_cpu_wins();
  
--	kirkwood_setup_cpu_mbus();
-+	kirkwood_setup_wins();
- 
- 	kirkwood_l2_init();
- 
-diff --git a/arch/arm/mach-kirkwood/common.h b/arch/arm/mach-kirkwood/common.h
-index 5ed7056..e24f743 100644
---- a/arch/arm/mach-kirkwood/common.h
-+++ b/arch/arm/mach-kirkwood/common.h
-@@ -30,7 +30,7 @@ void kirkwood_init(void);
- void kirkwood_init_early(void);
- void kirkwood_init_irq(void);
- 
--void kirkwood_setup_cpu_mbus(void);
-+void kirkwood_setup_wins(void);
- 
- void kirkwood_enable_pcie(void);
- void kirkwood_pcie_id(u32 *dev, u32 *rev);
-diff --git a/arch/arm/mach-kirkwood/include/mach/kirkwood.h b/arch/arm/mach-kirkwood/include/mach/kirkwood.h
-index a05563a..92976ce 100644
---- a/arch/arm/mach-kirkwood/include/mach/kirkwood.h
-+++ b/arch/arm/mach-kirkwood/include/mach/kirkwood.h
-@@ -60,8 +60,9 @@
-  * Register Map
-  */
- #define DDR_VIRT_BASE		(KIRKWOOD_REGS_VIRT_BASE + 0x00000)
--#define DDR_PHYS_BASE		(KIRKWOOD_REGS_PHYS_BASE + 0x00000)
--#define  DDR_WINDOW_CPU_BASE	(DDR_VIRT_BASE + 0x1500)
-+#define DDR_PHYS_BASE           (KIRKWOOD_REGS_PHYS_BASE + 0x00000)
-+#define  DDR_WINDOW_CPU_BASE    (DDR_PHYS_BASE + 0x1500)
-+#define  DDR_WINDOW_CPU_SZ      (0x20)
- #define DDR_OPERATION_BASE	(DDR_PHYS_BASE + 0x1418)
- 
- #define DEV_BUS_PHYS_BASE	(KIRKWOOD_REGS_PHYS_BASE + 0x10000)
-@@ -80,6 +81,8 @@
- 
- #define BRIDGE_VIRT_BASE	(KIRKWOOD_REGS_VIRT_BASE + 0x20000)
- #define BRIDGE_PHYS_BASE	(KIRKWOOD_REGS_PHYS_BASE + 0x20000)
+ 	/* Setup root of clk tree */
+ 	dove_clk_init();
+diff --git a/arch/arm/mach-dove/common.h b/arch/arm/mach-dove/common.h
+index ee59fba..e863479 100644
+--- a/arch/arm/mach-dove/common.h
++++ b/arch/arm/mach-dove/common.h
+@@ -23,7 +23,7 @@ void dove_map_io(void);
+ void dove_init(void);
+ void dove_init_early(void);
+ void dove_init_irq(void);
+-void dove_setup_cpu_mbus(void);
++void dove_setup_cpu_wins(void);
+ void dove_ge00_init(struct mv643xx_eth_platform_data *eth_data);
+ void dove_sata_init(struct mv_sata_platform_data *sata_data);
+ #ifdef CONFIG_PCI
+diff --git a/arch/arm/mach-dove/include/mach/dove.h b/arch/arm/mach-dove/include/mach/dove.h
+index 661725e..0c4b35f 100644
+--- a/arch/arm/mach-dove/include/mach/dove.h
++++ b/arch/arm/mach-dove/include/mach/dove.h
+@@ -77,6 +77,8 @@
+ /* North-South Bridge */
+ #define BRIDGE_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE + 0x20000)
+ #define BRIDGE_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE + 0x20000)
 +#define  BRIDGE_WINS_BASE       (BRIDGE_PHYS_BASE)
 +#define  BRIDGE_WINS_SZ         (0x80)
  
- #define CRYPTO_PHYS_BASE	(KIRKWOOD_REGS_PHYS_BASE + 0x30000)
+ /* Cryptographic Engine */
+ #define DOVE_CRYPT_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE + 0x30000)
+@@ -168,6 +170,9 @@
+ #define  DOVE_SSP_CLOCK_ENABLE		(1 << 1)
+ #define  DOVE_SSP_BPB_CLOCK_SRC_SSP	(1 << 11)
+ /* Memory Controller */
++#define DOVE_MC_PHYS_BASE       (DOVE_NB_REGS_PHYS_BASE + 0x00000)
++#define  DOVE_MC_WINS_BASE      (DOVE_MC_PHYS_BASE + 0x100)
++#define  DOVE_MC_WINS_SZ        (0x8)
+ #define DOVE_MC_VIRT_BASE	(DOVE_NB_REGS_VIRT_BASE + 0x00000)
  
-diff --git a/arch/arm/mach-kirkwood/pcie.c b/arch/arm/mach-kirkwood/pcie.c
-index d96ad4c..7f43e6c 100644
---- a/arch/arm/mach-kirkwood/pcie.c
-+++ b/arch/arm/mach-kirkwood/pcie.c
-@@ -17,7 +17,6 @@
- #include <asm/mach/pci.h>
- #include <plat/pcie.h>
- #include <mach/bridge-regs.h>
--#include <plat/addr-map.h>
- #include "common.h"
- 
- static void kirkwood_enable_pcie_clk(const char *port)
+ /* LCD Controller */
 diff --git a/arch/arm/plat-orion/Makefile b/arch/arm/plat-orion/Makefile
-index 6cfc89f..58db16d 100644
+index 58db16d..9fd843e 100644
 --- a/arch/arm/plat-orion/Makefile
 +++ b/arch/arm/plat-orion/Makefile
 @@ -3,7 +3,6 @@
  #
  ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include
  
--obj-$(CONFIG_ARCH_KIRKWOOD)       += addr-map.o
- obj-$(CONFIG_ARCH_DOVE)           += addr-map.o
+-obj-$(CONFIG_ARCH_DOVE)           += addr-map.o
  obj-$(CONFIG_ARCH_ORION5X)        += addr-map.o
  obj-$(CONFIG_ARCH_MV78XX0)        += addr-map.o
+ 
 -- 
 1.7.9.5
