@@ -1,87 +1,30 @@
-From: omycle@gmail.com (Li Haifeng)
-Date: Wed, 6 Mar 2013 13:34:09 +0800
-Subject: Should a swapped out page be deleted from swap cache?
-In-Reply-To: <51241B66.7080004@gmail.com>
-References: <CAFNq8R4UYvygk8+X+NZgyGjgU5vBsEv1UM6MiUxah6iW8=0HrQ@mail.gmail.com>
- <alpine.LNX.2.00.1302180939200.2246@eggly.anvils>
- <512338A6.1030602@gmail.com>
- <alpine.LNX.2.00.1302191050330.2248@eggly.anvils>
- <51241B66.7080004@gmail.com>
-Message-ID: <CAFNq8R5ni4jKRsHJLyGiNPcj4epz8q5zva_0XEJrL1-uVZHb9w@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 6 Mar 2013 13:10:34 +0800
+Subject: [PATCH v2 01/12] ARM: dts: add generic DMA device tree binding
+ for mxs-dma
+In-Reply-To: <201303051938.29660.arnd@arndb.de>
+References: <1362486244-24593-1-git-send-email-shawn.guo@linaro.org>
+ <1362486244-24593-2-git-send-email-shawn.guo@linaro.org>
+ <201303051938.29660.arnd@arndb.de>
+Message-ID: <20130306051032.GA1828@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/2/20 Ric Mason <ric.masonn@gmail.com>:
->
-> Hi Hugh,
->
->
-> On 02/20/2013 02:56 AM, Hugh Dickins wrote:
->>
->> On Tue, 19 Feb 2013, Ric Mason wrote:
->>>
->>> There is a call of try_to_free_swap in function swap_writepage, if
->>> swap_writepage is call from shrink_page_list path, PageSwapCache(page) ==
->>> trure, PageWriteback(page) maybe false, page_swapcount(page) == 0, then
->>> will
->>> delete the page from swap cache and free swap slot, where I miss?
->>
->> That's correct.  PageWriteback is sure to be false there.  page_swapcount
->> usually won't be 0 there, but sometimes it will be, and in that case we
->> do want to delete from swap cache and free the swap slot.
->
->
-> 1) If PageSwapCache(page)  == true, PageWriteback(page) == false,
-> page_swapcount(page) == 0  in swap_writepage(shrink_page_list path), then
-> will delete the page from swap cache and free swap slot, in function
-> swap_writepage:
->
-> if (try_to_free_swap(page)) {
->     unlock_page(page);
->     goto out;
-> }
-> writeback will not execute, that's wrong. Where I miss?
+On Tue, Mar 05, 2013 at 07:38:29PM +0000, Arnd Bergmann wrote:
+> On Tuesday 05 March 2013, Shawn Guo wrote:
+> >                                  <&clks 150>, <&clks 149>;
+> >                         clock-names = "gpmi_io", "gpmi_apb", "gpmi_bch",
+> >                                       "gpmi_bch_apb", "per1_bch";
+> > +                       dmas = <&dma_apbh 0>;
+> > +                       dma-names = "gpmi";
+> >                         fsl,gpmi-dma-channel = <0>;
+> >                         status = "disabled";
+> 
+> Looks like a small bug:
+> 
+> In patch "[PATCH v2 07/12] mtd: gpmi: move to use generic DMA helper" you require the
+> dma-names property for this device to be "rx-tx", not "gpmi".
+> 
+Dammit.  I missed this one.  Thanks for spotting it.  Fixed.
 
-when the page is deleted from swap cache and corresponding swap slot
-is free, the page is set dirty. The dirty page won't be reclaimed. It
-is not wrong.
-
-corresponding path lists as below.
-when swap_writepage() is called by pageout() in shrink_page_list().
-pageout() will return PAGE_SUCCESS. For PAGE_SUCCESS, when
-PageDirty(page) is true, this reclaiming page will be keeped in the
-inactive LRU list.
-shrink_page_list()
-{
-...
- 904                         switch (pageout(page, mapping, sc)) {
- 905                         case PAGE_KEEP:
- 906                                 nr_congested++;
- 907                                 goto keep_locked;
- 908                         case PAGE_ACTIVATE:
- 909                                 goto activate_locked;
- 910                         case PAGE_SUCCESS:
- 911                                 if (PageWriteback(page))
- 912                                         goto keep_lumpy;
- 913                                 if (PageDirty(page))
- 914                                         goto keep;
-...}
-
->
-> 2) In the function pageout, page will be set PG_Reclaim flag, since this
-> flag is set, end_swap_bio_write->end_page_writeback:
-> if (TestClearPageReclaim(page))
->      rotate_reclaimable_page(page);
-> it means that page will be add to the tail of lru list, page is clean
-> anonymous page this time and will be reclaim to buddy system soon, correct?
-correct
-> If is correct, what is the meaning of rotate here?
-
-Rotating here is to add the page to the tail of inactive LRU list. So
-this page will be reclaimed ASAP while reclaiming.
-
->
->>
->> Hugh
->
->
+Shawn
