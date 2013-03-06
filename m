@@ -1,57 +1,41 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 6 Mar 2013 16:19:30 +0100 (CET)
-Subject: [PATCH] genirq: move mask_cache into struct irq_chip_type
-In-Reply-To: <20130306132944.GJ21620@kw.sim.vm.gnt>
-References: <20110720234537.GD16297@kw.sim.vm.gnt>
- <1311295758-27493-1-git-send-email-simon@sequanux.org>
- <CAMAG_edBy1kjmEGDD76-C5T0xtha9YxMFJ6B3D8A5kHBwQ1PMQ@mail.gmail.com>
- <20110726153930.GG16297@kw.sim.vm.gnt>
- <CAMAG_ee8YBvDsdQ2zNfn-7qdyTmVYBVb8xykMMv4pg8tEswJgg@mail.gmail.com>
- <5134AF7E.5010605@keymile.com> <20130304154454.GG21620@kw.sim.vm.gnt>
- <alpine.LFD.2.02.1303051114370.22263@ionos>
- <20130306132944.GJ21620@kw.sim.vm.gnt>
-Message-ID: <alpine.LFD.2.02.1303061518160.22263@ionos>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Thu, 7 Mar 2013 00:29:03 +0900
+Subject: [PATCH v6 1/3] serial: sh-sci: Add OF support
+In-Reply-To: <2479902.R2JaqaE7dT@avalon>
+References: <1362569437-11133-1-git-send-email-hechtb+renesas@gmail.com>
+ <9335181.JoypQftkI4@avalon> <2479902.R2JaqaE7dT@avalon>
+Message-ID: <20130306152857.GJ14275@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 6 Mar 2013, Simon Guinot wrote:
-
-> On Tue, Mar 05, 2013 at 11:15:04AM +0100, Thomas Gleixner wrote:
-> > On Mon, 4 Mar 2013, Simon Guinot wrote:
-> > > On Mon, Mar 04, 2013 at 03:28:14PM +0100, Gerlando Falauto wrote:
-> > > 
-> > > AFAIK this issue is still here. I include the current Orion maintainers
-> > > in the Cc list.
+On Wed, Mar 06, 2013 at 01:25:16PM +0100, Laurent Pinchart wrote:
+> On Wednesday 06 March 2013 13:10:55 Laurent Pinchart wrote:
+> > On Wednesday 06 March 2013 12:30:35 Bastian Hecht wrote:
+> > > +- renesas,scbrr-algorithm : Choose an algorithm ID for the baud rate
+> > > generator.
+> > > +  1 = SCBRR_ALGO_1 ((clk + 16 * bps) / (16 * bps) - 1)
+> > > +  2 = SCBRR_ALGO_2 ((clk + 16 * bps) / (32 * bps) - 1)
+> > > +  3 = SCBRR_ALGO_3 (((clk * 2) + 16 * bps) / (16 * bps) - 1)
+> > > +  4 = SCBRR_ALGO_4 (((clk * 2) + 16 * bps) / (32 * bps) - 1)
+> > > +  5 = SCBRR_ALGO_5 (((clk * 1000 / 32) / bps) - 1)
 > > 
-> > Can you please resend the patch?
+> > Isn't it a property specific to our implementation of the driver instead of
+> > a hardware property ? How is one supposed to select the right algorithm ?
 > 
-> Hi Thomas,
+> I realize I haven't expressed myself very clearly here. What I mean is that 
+> expressing how the baud rate generator works internally using an algorithm ID 
+> is pretty specific to the Linux driver.
 > 
-> Do you agree with the original patch concept: moving mask_cache from
-> struct irq_chip_generic into struct irq_chip_type ?
-
-Not really. See below.
- 
-> This allows to handle the irq_chips which have separate mask registers
-> for the edge and level interrupts. At the time of this patch, this was
-> the only existing case.
+> I assume that, for a given serial port on a given SoC, the algorithm that 
+> matches the baud rate generator hardware implementation needs to be selected. 
+> Can't this information be inferred from the compatible string and port number 
+> ?
 > 
-> Saeed objected that the patch was not correct because this was breaking
-> "hypothetic" devices with multiple irq_chip_type and a single mask
-> register.
-
-Not so hypothetic. There _are_ irq controllers out there which use the
-same mask register for both level and edge type irqs.
-
-> The other option was to provide some dedicated irq_mask handlers for the
-> Orion irq chip.
-
-I'd rather refactor the core code so it uses a pointer to the
-mask_cache. The default would be to let it point to gc->mask_cache and
-optionally let it point to ct->mask_cache. We'd need to store the flag
-in the gc struct so we can redirect the pointer to the ct->mask_cache
-in irq_setup_alt_chip().
-
-Thanks,
-
-	tglx
+Now that we have split things out in to regtype for the compat string we
+may be able to get away with selecting defaults that match the regtype
+and drop it from the binding (assuming all future parts remain relatively
+sane), but it would still complicate things if we were to ever do DT
+support for legacy CPUs. It's not enough to tie to the port type, as
+there are plenty of cases where the port type uses a non-standard algo on
+some CPU subtypes (although things are pretty consistent for the arm side
+so far).
