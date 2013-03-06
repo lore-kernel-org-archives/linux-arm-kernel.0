@@ -1,34 +1,85 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Wed, 06 Mar 2013 16:48:31 +0530
-Subject: [PATCH v2 2/3] gpio: samsung: skip gpiolib registration if pinctrl
- support is enabled for exynos5250
-In-Reply-To: <1362568712-13586-1-git-send-email-thomas.abraham@linaro.org>
-References: <1362568712-13586-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1362568712-13586-3-git-send-email-thomas.abraham@linaro.org>
+From: ric.masonn@gmail.com (Ric Mason)
+Date: Wed, 06 Mar 2013 19:04:10 +0800
+Subject: Should a swapped out page be deleted from swap cache?
+In-Reply-To: <CAFNq8R5ni4jKRsHJLyGiNPcj4epz8q5zva_0XEJrL1-uVZHb9w@mail.gmail.com>
+References: <CAFNq8R4UYvygk8+X+NZgyGjgU5vBsEv1UM6MiUxah6iW8=0HrQ@mail.gmail.com>
+ <alpine.LNX.2.00.1302180939200.2246@eggly.anvils>
+ <512338A6.1030602@gmail.com>
+ <alpine.LNX.2.00.1302191050330.2248@eggly.anvils>
+ <51241B66.7080004@gmail.com>
+ <CAFNq8R5ni4jKRsHJLyGiNPcj4epz8q5zva_0XEJrL1-uVZHb9w@mail.gmail.com>
+Message-ID: <513722AA.2030001@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Skip exynos5250 gpiolib registration if pinctrl support for exynos5250
-is enabled.
+On 03/06/2013 01:34 PM, Li Haifeng wrote:
+> 2013/2/20 Ric Mason <ric.masonn@gmail.com>:
+>> Hi Hugh,
+>>
+>>
+>> On 02/20/2013 02:56 AM, Hugh Dickins wrote:
+>>> On Tue, 19 Feb 2013, Ric Mason wrote:
+>>>> There is a call of try_to_free_swap in function swap_writepage, if
+>>>> swap_writepage is call from shrink_page_list path, PageSwapCache(page) ==
+>>>> trure, PageWriteback(page) maybe false, page_swapcount(page) == 0, then
+>>>> will
+>>>> delete the page from swap cache and free swap slot, where I miss?
+>>> That's correct.  PageWriteback is sure to be false there.  page_swapcount
+>>> usually won't be 0 there, but sometimes it will be, and in that case we
+>>> do want to delete from swap cache and free the swap slot.
+>>
+>> 1) If PageSwapCache(page)  == true, PageWriteback(page) == false,
+>> page_swapcount(page) == 0  in swap_writepage(shrink_page_list path), then
+>> will delete the page from swap cache and free swap slot, in function
+>> swap_writepage:
+>>
+>> if (try_to_free_swap(page)) {
+>>      unlock_page(page);
+>>      goto out;
+>> }
+>> writeback will not execute, that's wrong. Where I miss?
+> when the page is deleted from swap cache and corresponding swap slot
+> is free, the page is set dirty. The dirty page won't be reclaimed. It
+> is not wrong.
 
-Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/gpio/gpio-samsung.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+I don't think so. For dirty pages, there are two steps: 1)writeback 
+2)reclaim. Since PageSwapCache(page) == true && PageWriteback(page) == 
+false && page_swapcount(page) == 0 in swap_writeback(), 
+try_to_free_swap() will return true and writeback will be skip. Then how 
+can step one be executed?
 
-diff --git a/drivers/gpio/gpio-samsung.c b/drivers/gpio/gpio-samsung.c
-index b3643ff..49b4292 100644
---- a/drivers/gpio/gpio-samsung.c
-+++ b/drivers/gpio/gpio-samsung.c
-@@ -3024,6 +3024,7 @@ static __init int samsung_gpiolib_init(void)
- 	static const struct of_device_id exynos_pinctrl_ids[] = {
- 		{ .compatible = "samsung,exynos4210-pinctrl", },
- 		{ .compatible = "samsung,exynos4x12-pinctrl", },
-+		{ .compatible = "samsung,exynos5250-pinctrl", },
- 		{ .compatible = "samsung,exynos5440-pinctrl", },
- 	};
- 	for_each_matching_node(pctrl_np, exynos_pinctrl_ids)
--- 
-1.6.6.rc2
+>
+> corresponding path lists as below.
+> when swap_writepage() is called by pageout() in shrink_page_list().
+> pageout() will return PAGE_SUCCESS. For PAGE_SUCCESS, when
+> PageDirty(page) is true, this reclaiming page will be keeped in the
+> inactive LRU list.
+> shrink_page_list()
+> {
+> ...
+>   904                         switch (pageout(page, mapping, sc)) {
+>   905                         case PAGE_KEEP:
+>   906                                 nr_congested++;
+>   907                                 goto keep_locked;
+>   908                         case PAGE_ACTIVATE:
+>   909                                 goto activate_locked;
+>   910                         case PAGE_SUCCESS:
+>   911                                 if (PageWriteback(page))
+>   912                                         goto keep_lumpy;
+>   913                                 if (PageDirty(page))
+>   914                                         goto keep;
+> ...}
+>
+>> 2) In the function pageout, page will be set PG_Reclaim flag, since this
+>> flag is set, end_swap_bio_write->end_page_writeback:
+>> if (TestClearPageReclaim(page))
+>>       rotate_reclaimable_page(page);
+>> it means that page will be add to the tail of lru list, page is clean
+>> anonymous page this time and will be reclaim to buddy system soon, correct?
+> correct
+>> If is correct, what is the meaning of rotate here?
+> Rotating here is to add the page to the tail of inactive LRU list. So
+> this page will be reclaimed ASAP while reclaiming.
+>
+>>> Hugh
+>>
