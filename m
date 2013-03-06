@@ -1,46 +1,29 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Wed, 06 Mar 2013 11:53:51 +0100
-Subject: [PATCH] ARM: drop "select HAVE_SCHED_CLOCK"
-Message-ID: <1362567231.16460.175.camel@x61.thuisdomein>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Wed, 06 Mar 2013 16:48:29 +0530
+Subject: [PATCH v2 0/3] pinctrl: exynos: add support for Samsung's Exynos5250
+Message-ID: <1362568712-13586-1-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Kconfig symbol HAVE_SCHED_CLOCK got removed in v3.4, with commit
-6905a65879b51d326396e63dfea40861a30bc17f ("ARM: Make the sched_clock
-framework mandatory"). Drop the last two select statements for that
-symbol too. They're useless now.
+Changes since v1:
+- Change the compatible string from "samsung,pinctrl-exynos5250" to
+  "samsung,exynos5250-pinctrl".
+- Rebased to v3.9-rc1
 
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
----
-Tested with "git grep" only.
+This patch series add pinctrl driver support for Samsung's Exynos5250 SoC.
+The first patch adds the required Exynos5250 SoC specific data which is
+used by the Samsung pinctrl driver to setup the pinctrl/pinmux/eint
+controllers. The second and third patches skips the wakeup interrupt and
+gpiolib registration if the pinctrl support is enabled for Exynos5250.
 
- arch/arm/Kconfig             | 1 -
- arch/arm/mach-exynos/Kconfig | 1 -
- 2 files changed, 2 deletions(-)
+Thomas Abraham (3):
+  pinctrl: exynos: add exynos5250 SoC specific data
+  gpio: samsung: skip gpiolib registration if pinctrl support is enabled for exynos5250
+  arm: exynos: skip wakeup interrupt registration for exynos5250 if pinctrl is enabled
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 0c990b7..2530799 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1172,7 +1172,6 @@ config PLAT_VERSATILE
- config ARM_TIMER_SP804
- 	bool
- 	select CLKSRC_MMIO
--	select HAVE_SCHED_CLOCK
- 
- source arch/arm/mm/Kconfig
- 
-diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-index 068aeb5..acfdbcf 100644
---- a/arch/arm/mach-exynos/Kconfig
-+++ b/arch/arm/mach-exynos/Kconfig
-@@ -253,7 +253,6 @@ config MACH_UNIVERSAL_C210
- 	select EXYNOS4_SETUP_USB_PHY
- 	select EXYNOS_DEV_DMA
- 	select EXYNOS_DEV_DRM
--	select HAVE_SCHED_CLOCK
- 	select S3C_DEV_HSMMC
- 	select S3C_DEV_HSMMC2
- 	select S3C_DEV_HSMMC3
--- 
-1.7.11.7
+ arch/arm/mach-exynos/common.c     |    1 +
+ drivers/gpio/gpio-samsung.c       |    1 +
+ drivers/pinctrl/pinctrl-exynos.c  |  108 +++++++++++++++++++++++++++++++++++++
+ drivers/pinctrl/pinctrl-samsung.c |    2 +
+ drivers/pinctrl/pinctrl-samsung.h |    1 +
+ 5 files changed, 113 insertions(+), 0 deletions(-)
