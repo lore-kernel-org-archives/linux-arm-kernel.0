@@ -1,52 +1,39 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed,  6 Mar 2013 11:23:03 -0700
-Subject: [PATCH 7/7] ARM: dt: create a DT header for the GIC
-In-Reply-To: <1362594183-21523-1-git-send-email-swarren@wwwdotorg.org>
-References: <1362594183-21523-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1362594183-21523-7-git-send-email-swarren@wwwdotorg.org>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 6 Mar 2013 11:23:57 -0700
+Subject: [PATCH 05/32] lib: devres: don't enclose pcim_*() functions in
+ CONFIG_HAS_IOPORT
+In-Reply-To: <22387327.428751362559215433.JavaMail.weblogic@epml07>
+References: <22387327.428751362559215433.JavaMail.weblogic@epml07>
+Message-ID: <20130306182357.GB2433@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+On Wed, Mar 06, 2013 at 08:40:26AM +0000, Jingoo Han wrote:
 
-The ARM GIC binding defines a few custom cells and flags for its IRQ
-specifier. Provide names for those.
+> Yes, I am developing a PCIe driver for Samsung Exynos SoCs.
+> Also, 2 days ago, I submitted the PCIe driver.
+> 
+> http://www.spinics.net/lists/linux-pci/msg20548.html
+> http://www.spinics.net/lists/linux-pci/msg20549.html
+> 
+> If someone look at my code, it will be very helpful.
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
-v2: Moved header. Added include guard.
----
- include/dt-bindings/interrupt-controller/arm-gic.h |   22 ++++++++++++++++++++
- 1 file changed, 22 insertions(+)
- create mode 100644 include/dt-bindings/interrupt-controller/arm-gic.h
+I took a quick peek at your DT bindings and I think they are way off
+base. You need to read the thread(s) related to the new Armada and
+Tegra drivers. Your bindings should look closer to them. 
 
-diff --git a/include/dt-bindings/interrupt-controller/arm-gic.h b/include/dt-bindings/interrupt-controller/arm-gic.h
-new file mode 100644
-index 0000000..1ea1b70
---- /dev/null
-+++ b/include/dt-bindings/interrupt-controller/arm-gic.h
-@@ -0,0 +1,22 @@
-+/*
-+ * This header provides constants for the ARM GIC.
-+ */
-+
-+#ifndef _DT_BINDINGS_INTERRUPT_CONTROLLER_ARM_GIC_H
-+#define _DT_BINDINGS_INTERRUPT_CONTROLLER_ARM_GIC_H
-+
-+#include <dt-bindings/interrupt-controller/irq.h>
-+
-+/* interrupt specific cell 0 */
-+
-+#define GIC_SPI 0
-+#define GIC_PPI 1
-+
-+/*
-+ * Interrupt specifier cell 2.
-+ * The flaggs in irq.h are valid, plus those below.
-+ */
-+#define GIC_CPU_MASK_RAW(x) ((x) << 8)
-+#define GIC_CPU_MASK_SIMPLE(num) GIC_CPU_MASK_RAW((1 << (num)) - 1)
-+
-+#endif
--- 
-1.7.10.4
+You need to have DT bindings that follow the OF PCI requirements.
+
+You need to determine if your hardware follows the PCI-SIG
+requirements and includes a root port bridge config space, this will
+guide if you need to use seperate PCI domains and DT stanzas, or if a
+single domain and stanza should be used.
+
+Please include lspci output in future commit messages
+
+If you CC me the next time you post these patches I may be able to try
+and help a bit, but lets start a new thread for that sort of
+discussion. :)
+
+Regards,
+Jason
