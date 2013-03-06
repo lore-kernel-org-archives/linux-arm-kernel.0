@@ -1,43 +1,65 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed,  6 Mar 2013 17:59:56 +0100
-Subject: [PATCH 01/10] arm: plat-orion: only build addr-map.c when needed
+Date: Wed,  6 Mar 2013 17:59:57 +0100
+Subject: [PATCH 02/10] arm: plat-orion: use mv_mbus_dram_info() in PCIe code
 In-Reply-To: <1362589205-4726-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1362589205-4726-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1362589205-4726-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1362589205-4726-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For now, addr-map.c is needed by all 5 Marvell EBU
-sub-architectures. However, we are going to introduce the orion-mbus
-driver, which will replace the address decoding code from
-addr-map.c. In order to ease the migration process, we will do that
-one sub-architecture at a time, which will require us to remove the
-compilation of addr-map.c one sub-architecture at a time.
+The PCIe code was directly accessing the orion_mbus_dram_info
+structure to get access to a description of the SDRAM chip selects in
+order to configure the PCIe -> SDRAM address decoding
+windows.
 
-Therefore, we split the unconditional obj-y inclusion of addr-map.c
-into 5 conditionals obj-$(CONFIG_...) lines, one per sub-architecture.
+However, with the introduction of the orion-mbus driver, we are going
+to remove this global structure and instead leave only the exported
+mv_mbus_dram_info() function to access this description of the SDRAM
+chip selects. Therefore, we simply switch to using this API.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/plat-orion/Makefile |    6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ arch/arm/plat-orion/pcie.c |   10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/plat-orion/Makefile b/arch/arm/plat-orion/Makefile
-index a82cecb..ad97400 100644
---- a/arch/arm/plat-orion/Makefile
-+++ b/arch/arm/plat-orion/Makefile
-@@ -3,7 +3,11 @@
- #
- ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include
+diff --git a/arch/arm/plat-orion/pcie.c b/arch/arm/plat-orion/pcie.c
+index f20a321..8b8c06d 100644
+--- a/arch/arm/plat-orion/pcie.c
++++ b/arch/arm/plat-orion/pcie.c
+@@ -120,12 +120,14 @@ void __init orion_pcie_reset(void __iomem *base)
+  * BAR[0,2] -> disabled, BAR[1] -> covers all DRAM banks
+  * WIN[0-3] -> DRAM bank[0-3]
+  */
+-static void __init orion_pcie_setup_wins(void __iomem *base,
+-					 struct mbus_dram_target_info *dram)
++static void __init orion_pcie_setup_wins(void __iomem *base)
+ {
++	const struct mbus_dram_target_info *dram;
+ 	u32 size;
+ 	int i;
  
--obj-y                             += addr-map.o
-+obj-$(CONFIG_ARCH_MVEBU)          += addr-map.o
-+obj-$(CONFIG_ARCH_KIRKWOOD)       += addr-map.o
-+obj-$(CONFIG_ARCH_DOVE)           += addr-map.o
-+obj-$(CONFIG_ARCH_ORION5X)        += addr-map.o
-+obj-$(CONFIG_ARCH_MV78XX0)        += addr-map.o
++	dram = mv_mbus_dram_info();
++
+ 	/*
+ 	 * First, disable and clear BARs and windows.
+ 	 */
+@@ -150,7 +152,7 @@ static void __init orion_pcie_setup_wins(void __iomem *base,
+ 	 */
+ 	size = 0;
+ 	for (i = 0; i < dram->num_cs; i++) {
+-		struct mbus_dram_window *cs = dram->cs + i;
++		const struct mbus_dram_window *cs = dram->cs + i;
  
- orion-gpio-$(CONFIG_GENERIC_GPIO) += gpio.o
- obj-$(CONFIG_PLAT_ORION_LEGACY)   += irq.o pcie.o time.o common.o mpp.o
+ 		writel(cs->base & 0xffff0000, base + PCIE_WIN04_BASE_OFF(i));
+ 		writel(0, base + PCIE_WIN04_REMAP_OFF(i));
+@@ -184,7 +186,7 @@ void __init orion_pcie_setup(void __iomem *base)
+ 	/*
+ 	 * Point PCIe unit MBUS decode windows to DRAM space.
+ 	 */
+-	orion_pcie_setup_wins(base, &orion_mbus_dram_info);
++	orion_pcie_setup_wins(base);
+ 
+ 	/*
+ 	 * Master + slave enable.
 -- 
 1.7.9.5
