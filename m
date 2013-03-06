@@ -1,79 +1,106 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Wed, 6 Mar 2013 13:34:26 +0100
-Subject: [PATCH 00/23] RFC: exynos multiplatform support
-In-Reply-To: <201303061050.42451.arnd@arndb.de>
-References: <1362505353-8873-1-git-send-email-arnd@arndb.de>
- <201303051919.02638.arnd@arndb.de> <1781901.cQ9rKScpd8@flatron>
- <201303061050.42451.arnd@arndb.de>
-Message-ID: <20130306123426.GB17079@avionic-0098.mockup.avionic-design.de>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 06 Mar 2013 13:35:05 +0100
+Subject: [PATCH 2/4][V2] time : set broadcast irq affinity
+In-Reply-To: <alpine.LFD.2.02.1303061047240.22263@ionos>
+References: <1362219013-18173-1-git-send-email-daniel.lezcano@linaro.org>
+ <1362219013-18173-3-git-send-email-daniel.lezcano@linaro.org>
+ <alpine.LFD.2.02.1303052135080.22263@ionos> <51370C09.5020301@linaro.org>
+ <alpine.LFD.2.02.1303061047240.22263@ionos>
+Message-ID: <513737F9.2080805@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 06, 2013 at 10:50:42AM +0000, Arnd Bergmann wrote:
-> On Tuesday 05 March 2013, Tomasz Figa wrote:
-> > On Tuesday 05 of March 2013 19:19:02 Arnd Bergmann wrote:
+On 03/06/2013 10:48 AM, Thomas Gleixner wrote:
+> On Wed, 6 Mar 2013, Daniel Lezcano wrote:
+>> On 03/05/2013 09:40 PM, Thomas Gleixner wrote:
+>>> On Sat, 2 Mar 2013, Daniel Lezcano wrote:
+>>>> When a cpu goes to a deep idle state where its local timer is shutdown,
+>>>> it notifies the time frame work to use the broadcast timer instead.
+>>>>
+>>>> Unfortunately, the broadcast device could wake up any CPU, including an
+>>>> idle one which is not concerned by the wake up at all.
+>>>>
+>>>> This implies, in the worst case, an idle CPU will wake up to send an IPI
+>>>> to another idle cpu.
+>>>>
+>>>> This patch solves this by setting the irq affinity to the cpu concerned
+>>>> by the nearest timer event, by this way, the CPU which is wake up is
+>>>> guarantee to be the one concerned by the next event and we are safe with
+>>>> unnecessary wakeup for another idle CPU.
+>>>>
+>>>> As the irq affinity is not supported by all the archs, a flag is needed
+>>>> to specify which clocksource can handle it : CLOCK_EVT_FEAT_DYNIRQ
+>>>>
+>>>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>>>> ---
+>>>>  include/linux/clockchips.h   |    5 +++++
+>>>>  kernel/time/tick-broadcast.c |   40 +++++++++++++++++++++++++++++++++-------
+>>>>  2 files changed, 38 insertions(+), 7 deletions(-)
+>>>>
+>>>> diff --git a/include/linux/clockchips.h b/include/linux/clockchips.h
+>>>> index 6634652..c93e2a6 100644
+>>>> --- a/include/linux/clockchips.h
+>>>> +++ b/include/linux/clockchips.h
+>>>> @@ -55,6 +55,11 @@ enum clock_event_nofitiers {
+>>>>  #define CLOCK_EVT_FEAT_C3STOP		0x000008
+>>>>  #define CLOCK_EVT_FEAT_DUMMY		0x000010
+>>>>  
+>>>> +/*
+>>>> + * Clock event device can set its irq affinity dynamically
+>>>> + */
+>>>> +#define CLOCK_EVT_FEAT_DYNIRQ		0x000020
+>>>> +
+>>>>  /**
+>>>>   * struct clock_event_device - clock event device descriptor
+>>>>   * @event_handler:	Assigned by the framework to be called by the low
+>>>> diff --git a/kernel/time/tick-broadcast.c b/kernel/time/tick-broadcast.c
+>>>> index 6197ac0..9ca8ff5 100644
+>>>> --- a/kernel/time/tick-broadcast.c
+>>>> +++ b/kernel/time/tick-broadcast.c
+>>>> @@ -406,13 +406,37 @@ struct cpumask *tick_get_broadcast_oneshot_mask(void)
+>>>>  	return to_cpumask(tick_broadcast_oneshot_mask);
+>>>>  }
+>>>>  
+>>>> -static int tick_broadcast_set_event(struct clock_event_device *bc,
+>>>> +/*
+>>>> + * Set broadcast interrupt affinity
+>>>> + */
+>>>> +static void tick_broadcast_set_affinity(struct clock_event_device *bc,
+>>>> +					const struct cpumask *cpumask)
+>>>> +{
+>>>> +	if (!(bc->features & CLOCK_EVT_FEAT_DYNIRQ))
+>>>> +		return;
+>>>> +
+>>>> +	if (cpumask_equal(bc->cpumask, cpumask))
+>>>> +		return;
+>>>> +
+>>>> +	bc->cpumask = cpumask;
+>>>
+>>> This breaks with CONFIG_CPUMASK_OFFSTACK=y. cpumask_copy() is your friend!
+>>
+>> This instruction copies the pointer, not the cpumask content.
+>>
+>> bc->cpumask is defined as a const struct cpumask * and is used to copy a
+>> cpumask pointer not the content.
+>>
+>> The cpumask parameter is a pointer to a global cpumask provided by the
+>> cpumask_of macro.
+>>
+>> But to be in the safe side, I compiled tested with
+>> CONFIG_CPUMASK_OFFSTACK=y without problem.
+>>
+>> Did I missed something ?
 > 
-> > > If none of these are needed for DT-based systems, we should probably
-> > > build that code conditionally based on the CONFIG_EXYNOS_ATAGS symbol
-> > > I introduced.
-> > 
-> > Yes, none of them are needed for DT-based systems.
-> 
-> Ah, good. I'll try to make more code conditional then.
->  
-> > > How are you planning to solve this? Do you want to have a combined
-> > > driver that registers both a clocksource and a pwm?
-> > 
-> > Let's start with a quick introduction to the s3c-pwm hardware. Each 
-> > channel has its own timer value, compare and reload value registers, so 
-> > they don't need any extra locking. However there are additional shared 
-> > configuration registers, containing things such as start and reload bits 
-> > for all channels, prescaler and main divisor values, etc. Those registers 
-> > needs synchronization.
-> > 
-> > Now there are several possible approaches:
-> > 
-> > 1) A brute force one - two separate drivers, based on the fact that the
-> >    clocksource driver will be used only on uniprocessor systems, so
-> >    a simple _irqsave when accessing a shared register in both will 
-> >    guarantee correct synchronization.
-> > 
-> > 2) Two separate drivers with some synchronized shared code accessing 
-> >    registers (_start, _stop, _set_reload, _set_prescaler, _set_divisor, 
-> >    etc.; all using a shared spinlock).
-> > 
-> > 3) Single driver registering PWM channels, clocksource and clock event 
-> >    device. This does not seem like a bad idea, since the whole code for 
-> >    configuration of the PWM block would reside in one location and there 
-> >    would be no redundancy. However there is a question where such driver 
-> >    should be placed - drivers/clocksource, drivers/pwm, or maybe somewhere 
-> >    else?
-> > 
-> > Personally I wanted to go with first option, which would require least 
-> > amount of changes to existing code, at a cost of some code duplication 
-> > (but some PWM code is duplicated already).
-> 
-> I would prefer option 3. That is also easier to implement with a straightforward
-> DT binding that defines a single node with the clock registers. The location
-> doesn't have an obvious answer, but I would probably put them into
-> drivers/clocksource if the PWM maintainer agrees.
-> 
-> Option 2 would probably come down to having a trivial MFD driver exposing
-> a regmap. You can probably reuse drivers/mfd/syscon.c for this and make
-> the node compatible with "syscon" to designate the clock registers as
-> a system-wide resource, making the other device nodes register-less.
+> No, I misinterpreted the patch. Assigning a pointer is safe. 
 
-I think option 2 is the standard method if one hardware block provides
-several logical devices. I find it to be a pretty nice solution to this
-problem. We also have precedent in the PWM subsystem. The TWL chips for
-instance use it to create a platform device which is later driven by a
-PWM driver.
+Ok, thanks anyway for reviewing the patch.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130306/fdd76f07/attachment.sig>
+Do you think it is acceptable for upstreaming ?
+
+  -- Daniel
+
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
