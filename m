@@ -1,347 +1,175 @@
-From: hechtb@gmail.com (Bastian Hecht)
-Date: Wed,  6 Mar 2013 12:30:37 +0100
-Subject: [PATCH v6 3/3] ARM: mach-shmobile: r8a7740: Setup the serial devices
- using DT
-In-Reply-To: <1362569437-11133-1-git-send-email-hechtb+renesas@gmail.com>
-References: <1362569437-11133-1-git-send-email-hechtb+renesas@gmail.com>
-Message-ID: <1362569437-11133-3-git-send-email-hechtb+renesas@gmail.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Wed, 06 Mar 2013 17:25:51 +0530
+Subject: [PATCH] ASoC: samsung: let device core setup the default pin
+ configuration
+Message-ID: <1362570951-14403-1-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We can now use the Device Tree for bringing up our serial devices on
-the SoC r8a7740.
+With device core now able to setup the default pin configuration,
+the pin configuration code based on the deprecated Samsung specific
+gpio bindings in i2s driver is removed.
 
-We remove the power domain association. We will move the info into the
-DT setup as soon as we have support for it. For now this is fine as we
-use the power domain governor "pm_domain_always_on_gov" for A3SP.
-
-Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
+Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 ---
- arch/arm/boot/dts/r8a7740.dtsi         |  108 +++++++++++++++++++
- arch/arm/mach-shmobile/setup-r8a7740.c |  180 --------------------------------
- 2 files changed, 108 insertions(+), 180 deletions(-)
+ .../devicetree/bindings/sound/samsung-i2s.txt      |   30 +--------
+ sound/soc/samsung/i2s.c                            |   67 +------------------
+ 2 files changed, 8 insertions(+), 89 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
-index 82faf52..049e54b 100644
---- a/arch/arm/boot/dts/r8a7740.dtsi
-+++ b/arch/arm/boot/dts/r8a7740.dtsi
-@@ -767,4 +767,112 @@
- 		gpio-controller;
- 		#gpio-cells = <2>;
- 	};
-+
-+	serial at e6c40000 {
-+		compatible = "renesas,sci-scifa-uart";
-+		interrupt-parent = <&intca>;
-+		reg = <0xe6c40000 0x100>;
-+		interrupts = <0x0c00>, <0x0c00>, <0x0c00>, <0x0c00>;
-+		interrupt-names = "eri", "rxi", "txi", "bri";
-+		cell-index = <0>;
-+		renesas,scscr = <0x30>;
-+		renesas,scbrr-algorithm = <4>;
-+		renesas,autoconf;
-+	};
-+
-+	serial at e6c50000 {
-+		compatible = "renesas,sci-scifa-uart";
-+		interrupt-parent = <&intca>;
-+		reg = <0xe6c50000 0x100>;
-+		interrupts = <0x0c20>, <0x0c20>, <0x0c20>, <0x0c20>;
-+		interrupt-names = "eri", "rxi", "txi", "bri";
-+		cell-index = <1>;
-+		renesas,scscr = <0x30>;
-+		renesas,scbrr-algorithm = <4>;
-+		renesas,autoconf;
-+	};
-+
-+	serial at e6c60000 {
-+		compatible = "renesas,sci-scifa-uart";
-+		interrupt-parent = <&intca>;
-+		reg = <0xe6c60000 0x100>;
-+		interrupts = <0x0c40>, <0x0c40>, <0x0c40>, <0x0c40>;
-+		interrupt-names = "eri", "rxi", "txi", "bri";
-+		cell-index = <2>;
-+		renesas,scscr = <0x30>;
-+		renesas,scbrr-algorithm = <4>;
-+		renesas,autoconf;
-+	};
-+
-+	serial at e6c70000 {
-+		compatible = "renesas,sci-scifa-uart";
-+		interrupt-parent = <&intca>;
-+		reg = <0xe6c70000 0x100>;
-+		interrupts = <0x0c60>, <0x0c60>, <0x0c60>, <0x0c60>;
-+		interrupt-names = "eri", "rxi", "txi", "bri";
-+		cell-index = <3>;
-+		renesas,scscr = <0x30>;
-+		renesas,scbrr-algorithm = <4>;
-+		renesas,autoconf;
-+	};
-+
-+	serial at e6c80000 {
-+		compatible = "renesas,sci-scifa-uart";
-+		interrupt-parent = <&intca>;
-+		reg = <0xe6c80000 0x100>;
-+		interrupts = <0x0d20>, <0x0d20>, <0x0d20>, <0x0d20>;
-+		interrupt-names = "eri", "rxi", "txi", "bri";
-+		cell-index = <4>;
-+		renesas,scscr = <0x30>;
-+		renesas,scbrr-algorithm = <4>;
-+		renesas,autoconf;
-+	};
-+
-+	serial at e6cb0000 {
-+		compatible = "renesas,sci-scifa-uart";
-+		interrupt-parent = <&intca>;
-+		reg = <0xe6cb0000 0x100>;
-+		interrupts = <0x0d40>, <0x0d40>, <0x0d40>, <0x0d40>;
-+		interrupt-names = "eri", "rxi", "txi", "bri";
-+		cell-index = <5>;
-+		renesas,scscr = <0x30>;
-+		renesas,scbrr-algorithm = <4>;
-+		renesas,autoconf;
-+	};
-+
-+	serial at e6cc0000 {
-+		compatible = "renesas,sci-scifa-uart";
-+		interrupt-parent = <&intca>;
-+		reg = <0xe6cc0000 0x100>;
-+		interrupts = <0x04c0>, <0x04c0>, <0x04c0>, <0x04c0>;
-+		interrupt-names = "eri", "rxi", "txi", "bri";
-+		cell-index = <6>;
-+		renesas,scscr = <0x30>;
-+		renesas,scbrr-algorithm = <4>;
-+		renesas,autoconf;
-+	};
-+
-+	serial at 0xe6cd0000 {
-+		compatible = "renesas,sci-scifa-uart";
-+		interrupt-parent = <&intca>;
-+		reg = <0xe6cd0000 0x100>;
-+		interrupts = <0x04e0>, <0x04e0>, <0x04e0>, <0x04e0>;
-+		interrupt-names = "eri", "rxi", "txi", "bri";
-+		cell-index = <7>;
-+		renesas,scscr = <0x30>;
-+		renesas,scbrr-algorithm = <4>;
-+		renesas,autoconf;
-+	};
-+
-+	serial at e6c30000 {
-+		compatible = "renesas,sci-scifb-uart";
-+		interrupt-parent = <&intca>;
-+		reg = <0xe6c30000 0x100>;
-+		interrupts = <0x0d60>, <0x0d60>, <0x0d60>, <0x0d60>;
-+		interrupt-names = "eri", "rxi", "txi", "bri";
-+		cell-index = <8>;
-+		renesas,scscr = <0x30>;
-+		renesas,scbrr-algorithm = <4>;
-+		renesas,autoconf;
-+	};
- };
-diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
-index f35e7c2..5a563cd 100644
---- a/arch/arm/mach-shmobile/setup-r8a7740.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7740.c
-@@ -93,168 +93,6 @@ void __init r8a7740_pinmux_init(void)
- 	platform_device_register(&r8a7740_pfc_device);
- }
+diff --git a/Documentation/devicetree/bindings/sound/samsung-i2s.txt b/Documentation/devicetree/bindings/sound/samsung-i2s.txt
+index 3070046..1db65e5 100644
+--- a/Documentation/devicetree/bindings/sound/samsung-i2s.txt
++++ b/Documentation/devicetree/bindings/sound/samsung-i2s.txt
+@@ -20,23 +20,11 @@ Optional SoC Specific Properties:
+   then this flag is enabled.
+ - samsung,idma-addr: Internal DMA register base address of the audio
+   sub system(used in secondary sound source).
+-
+-Required Board Specific Properties:
+-
+-- gpios: The gpio specifier for data out,data in, LRCLK, CDCLK and SCLK
+-  interface lines. The format of the gpio specifier depends on the gpio
+-  controller.
+-  The syntax of samsung gpio specifier is
+-	<[phandle of the gpio controller node]
+-	 [pin number within the gpio controller]
+-	 [mux function]
+-	 [flags and pull up/down]
+-	 [drive strength]>
++- pinctrl-0: Should specify pin control groups used for this controller.
++- pinctrl-names: Should contain only one value - "default".
  
--/* SCIFA0 */
--static struct plat_sci_port scif0_platform_data = {
--	.mapbase	= 0xe6c40000,
--	.flags		= UPF_BOOT_AUTOCONF,
--	.scscr		= SCSCR_RE | SCSCR_TE,
--	.scbrr_algo_id	= SCBRR_ALGO_4,
--	.type		= PORT_SCIFA,
--	.irqs		= SCIx_IRQ_MUXED(evt2irq(0x0c00)),
+ Example:
+ 
+-- SoC Specific Portion:
+-
+ i2s at 03830000 {
+ 	compatible = "samsung,i2s-v5";
+ 	reg = <0x03830000 0x100>;
+@@ -48,16 +36,6 @@ i2s at 03830000 {
+ 	samsung,supports-rstclr;
+ 	samsung,supports-secdai;
+ 	samsung,idma-addr = <0x03000000>;
 -};
 -
--static struct platform_device scif0_device = {
--	.name		= "sh-sci",
--	.id		= 0,
--	.dev		= {
--		.platform_data	= &scif0_platform_data,
--	},
--};
+-- Board Specific Portion:
 -
--/* SCIFA1 */
--static struct plat_sci_port scif1_platform_data = {
--	.mapbase	= 0xe6c50000,
--	.flags		= UPF_BOOT_AUTOCONF,
--	.scscr		= SCSCR_RE | SCSCR_TE,
--	.scbrr_algo_id	= SCBRR_ALGO_4,
--	.type		= PORT_SCIFA,
--	.irqs		= SCIx_IRQ_MUXED(evt2irq(0x0c20)),
--};
--
--static struct platform_device scif1_device = {
--	.name		= "sh-sci",
--	.id		= 1,
--	.dev		= {
--		.platform_data	= &scif1_platform_data,
--	},
--};
--
--/* SCIFA2 */
--static struct plat_sci_port scif2_platform_data = {
--	.mapbase	= 0xe6c60000,
--	.flags		= UPF_BOOT_AUTOCONF,
--	.scscr		= SCSCR_RE | SCSCR_TE,
--	.scbrr_algo_id	= SCBRR_ALGO_4,
--	.type		= PORT_SCIFA,
--	.irqs		= SCIx_IRQ_MUXED(evt2irq(0x0c40)),
--};
--
--static struct platform_device scif2_device = {
--	.name		= "sh-sci",
--	.id		= 2,
--	.dev		= {
--		.platform_data	= &scif2_platform_data,
--	},
--};
--
--/* SCIFA3 */
--static struct plat_sci_port scif3_platform_data = {
--	.mapbase	= 0xe6c70000,
--	.flags		= UPF_BOOT_AUTOCONF,
--	.scscr		= SCSCR_RE | SCSCR_TE,
--	.scbrr_algo_id	= SCBRR_ALGO_4,
--	.type		= PORT_SCIFA,
--	.irqs		= SCIx_IRQ_MUXED(evt2irq(0x0c60)),
--};
--
--static struct platform_device scif3_device = {
--	.name		= "sh-sci",
--	.id		= 3,
--	.dev		= {
--		.platform_data	= &scif3_platform_data,
--	},
--};
--
--/* SCIFA4 */
--static struct plat_sci_port scif4_platform_data = {
--	.mapbase	= 0xe6c80000,
--	.flags		= UPF_BOOT_AUTOCONF,
--	.scscr		= SCSCR_RE | SCSCR_TE,
--	.scbrr_algo_id	= SCBRR_ALGO_4,
--	.type		= PORT_SCIFA,
--	.irqs		= SCIx_IRQ_MUXED(evt2irq(0x0d20)),
--};
--
--static struct platform_device scif4_device = {
--	.name		= "sh-sci",
--	.id		= 4,
--	.dev		= {
--		.platform_data	= &scif4_platform_data,
--	},
--};
--
--/* SCIFA5 */
--static struct plat_sci_port scif5_platform_data = {
--	.mapbase	= 0xe6cb0000,
--	.flags		= UPF_BOOT_AUTOCONF,
--	.scscr		= SCSCR_RE | SCSCR_TE,
--	.scbrr_algo_id	= SCBRR_ALGO_4,
--	.type		= PORT_SCIFA,
--	.irqs		= SCIx_IRQ_MUXED(evt2irq(0x0d40)),
--};
--
--static struct platform_device scif5_device = {
--	.name		= "sh-sci",
--	.id		= 5,
--	.dev		= {
--		.platform_data	= &scif5_platform_data,
--	},
--};
--
--/* SCIFA6 */
--static struct plat_sci_port scif6_platform_data = {
--	.mapbase	= 0xe6cc0000,
--	.flags		= UPF_BOOT_AUTOCONF,
--	.scscr		= SCSCR_RE | SCSCR_TE,
--	.scbrr_algo_id	= SCBRR_ALGO_4,
--	.type		= PORT_SCIFA,
--	.irqs		= SCIx_IRQ_MUXED(evt2irq(0x04c0)),
--};
--
--static struct platform_device scif6_device = {
--	.name		= "sh-sci",
--	.id		= 6,
--	.dev		= {
--		.platform_data	= &scif6_platform_data,
--	},
--};
--
--/* SCIFA7 */
--static struct plat_sci_port scif7_platform_data = {
--	.mapbase	= 0xe6cd0000,
--	.flags		= UPF_BOOT_AUTOCONF,
--	.scscr		= SCSCR_RE | SCSCR_TE,
--	.scbrr_algo_id	= SCBRR_ALGO_4,
--	.type		= PORT_SCIFA,
--	.irqs		= SCIx_IRQ_MUXED(evt2irq(0x04e0)),
--};
--
--static struct platform_device scif7_device = {
--	.name		= "sh-sci",
--	.id		= 7,
--	.dev		= {
--		.platform_data	= &scif7_platform_data,
--	},
--};
--
--/* SCIFB */
--static struct plat_sci_port scifb_platform_data = {
--	.mapbase	= 0xe6c30000,
--	.flags		= UPF_BOOT_AUTOCONF,
--	.scscr		= SCSCR_RE | SCSCR_TE,
--	.scbrr_algo_id	= SCBRR_ALGO_4,
--	.type		= PORT_SCIFB,
--	.irqs		= SCIx_IRQ_MUXED(evt2irq(0x0d60)),
--};
--
--static struct platform_device scifb_device = {
--	.name		= "sh-sci",
--	.id		= 8,
--	.dev		= {
--		.platform_data	= &scifb_platform_data,
--	},
--};
--
- /* CMT */
- static struct sh_timer_config cmt10_platform_data = {
- 	.name = "CMT10",
-@@ -379,15 +217,6 @@ static struct platform_device tmu02_device = {
+-i2s at 03830000 {
+-	gpios = <&gpz 0 2 0 0>, /* I2S_0_SCLK */
+-		<&gpz 1 2 0 0>, /* I2S_0_CDCLK */
+-		<&gpz 2 2 0 0>, /* I2S_0_LRCK */
+-		<&gpz 3 2 0 0>, /* I2S_0_SDI */
+-		<&gpz 4 2 0 0>, /* I2S_0_SDO[1] */
+-		<&gpz 5 2 0 0>, /* I2S_0_SDO[2] */
+-		<&gpz 6 2 0 0>; /* I2S_0_SDO[3] */
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2s0_bus>;
+ };
+diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
+index d7231e3..f982a83 100644
+--- a/sound/soc/samsung/i2s.c
++++ b/sound/soc/samsung/i2s.c
+@@ -16,7 +16,6 @@
+ #include <linux/io.h>
+ #include <linux/module.h>
+ #include <linux/of.h>
+-#include <linux/of_gpio.h>
+ #include <linux/pm_runtime.h>
+ 
+ #include <sound/soc.h>
+@@ -79,7 +78,6 @@ struct i2s_dai {
+ 	u32	suspend_i2smod;
+ 	u32	suspend_i2scon;
+ 	u32	suspend_i2spsr;
+-	unsigned long gpios[7];	/* i2s gpio line numbers */
  };
  
- static struct platform_device *r8a7740_devices_dt[] __initdata = {
--	&scif0_device,
--	&scif1_device,
--	&scif2_device,
--	&scif3_device,
--	&scif4_device,
--	&scif5_device,
--	&scif6_device,
--	&scif7_device,
--	&scifb_device,
- 	&cmt10_device,
- 	&tmu00_device,
- 	&tmu01_device,
-@@ -812,15 +641,6 @@ void __init r8a7740_add_standard_devices(void)
- 
- 	/* add devices to PM domain  */
- 
--	rmobile_add_device_to_domain("A3SP",	&scif0_device);
--	rmobile_add_device_to_domain("A3SP",	&scif1_device);
--	rmobile_add_device_to_domain("A3SP",	&scif2_device);
--	rmobile_add_device_to_domain("A3SP",	&scif3_device);
--	rmobile_add_device_to_domain("A3SP",	&scif4_device);
--	rmobile_add_device_to_domain("A3SP",	&scif5_device);
--	rmobile_add_device_to_domain("A3SP",	&scif6_device);
--	rmobile_add_device_to_domain("A3SP",	&scif7_device);
--	rmobile_add_device_to_domain("A3SP",	&scifb_device);
- 	rmobile_add_device_to_domain("A3SP",	&i2c1_device);
+ /* Lock for cross i/f checks */
+@@ -1009,52 +1007,6 @@ static struct i2s_dai *i2s_alloc_dai(struct platform_device *pdev, bool sec)
+ 	return i2s;
  }
  
+-#ifdef CONFIG_OF
+-static int samsung_i2s_parse_dt_gpio(struct i2s_dai *i2s)
+-{
+-	struct device *dev = &i2s->pdev->dev;
+-	int index, gpio, ret;
+-
+-	for (index = 0; index < 7; index++) {
+-		gpio = of_get_gpio(dev->of_node, index);
+-		if (!gpio_is_valid(gpio)) {
+-			dev_err(dev, "invalid gpio[%d]: %d\n", index, gpio);
+-			goto free_gpio;
+-		}
+-
+-		ret = gpio_request(gpio, dev_name(dev));
+-		if (ret) {
+-			dev_err(dev, "gpio [%d] request failed\n", gpio);
+-			goto free_gpio;
+-		}
+-		i2s->gpios[index] = gpio;
+-	}
+-	return 0;
+-
+-free_gpio:
+-	while (--index >= 0)
+-		gpio_free(i2s->gpios[index]);
+-	return -EINVAL;
+-}
+-
+-static void samsung_i2s_dt_gpio_free(struct i2s_dai *i2s)
+-{
+-	unsigned int index;
+-	for (index = 0; index < 7; index++)
+-		gpio_free(i2s->gpios[index]);
+-}
+-#else
+-static int samsung_i2s_parse_dt_gpio(struct i2s_dai *dai)
+-{
+-	return -EINVAL;
+-}
+-
+-static void samsung_i2s_dt_gpio_free(struct i2s_dai *dai)
+-{
+-}
+-
+-#endif
+-
+ static const struct of_device_id exynos_i2s_match[];
+ 
+ static inline int samsung_i2s_get_driver_data(struct platform_device *pdev)
+@@ -1223,18 +1175,10 @@ static int samsung_i2s_probe(struct platform_device *pdev)
+ 		pri_dai->sec_dai = sec_dai;
+ 	}
+ 
+-	if (np) {
+-		if (samsung_i2s_parse_dt_gpio(pri_dai)) {
+-			dev_err(&pdev->dev, "Unable to configure gpio\n");
+-			ret = -EINVAL;
+-			goto err;
+-		}
+-	} else {
+-		if (i2s_pdata->cfg_gpio && i2s_pdata->cfg_gpio(pdev)) {
+-			dev_err(&pdev->dev, "Unable to configure gpio\n");
+-			ret = -EINVAL;
+-			goto err;
+-		}
++	if (i2s_pdata->cfg_gpio && i2s_pdata->cfg_gpio(pdev)) {
++		dev_err(&pdev->dev, "Unable to configure gpio\n");
++		ret = -EINVAL;
++		goto err;
+ 	}
+ 
+ 	snd_soc_register_dai(&pri_dai->pdev->dev, &pri_dai->i2s_dai_drv);
+@@ -1259,9 +1203,6 @@ static int samsung_i2s_remove(struct platform_device *pdev)
+ 	i2s = dev_get_drvdata(&pdev->dev);
+ 	other = i2s->pri_dai ? : i2s->sec_dai;
+ 
+-	if (!i2s_pdata->cfg_gpio && pdev->dev.of_node)
+-		samsung_i2s_dt_gpio_free(i2s->pri_dai);
+-
+ 	if (other) {
+ 		other->pri_dai = NULL;
+ 		other->sec_dai = NULL;
 -- 
-1.7.9.5
+1.6.6.rc2
