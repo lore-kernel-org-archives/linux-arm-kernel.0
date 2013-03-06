@@ -1,43 +1,51 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 06 Mar 2013 16:42:53 -0700
-Subject: [PATCH] clk: tegra: provide dummy cpu car ops
-In-Reply-To: <643E69AA4436674C8F39DCC2C05F7638629CA50C97@HQMAIL03.nvidia.com>
-References: <1360853581-9756-1-git-send-email-pdeschrijver@nvidia.com>
- <643E69AA4436674C8F39DCC2C05F7638629CA50C97@HQMAIL03.nvidia.com>
-Message-ID: <5137D47D.6030105@wwwdotorg.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 07 Mar 2013 08:48:25 +0900
+Subject: [PATCH 7/9] [media] s5p-fimc: fix s5pv210 build
+In-Reply-To: <1362521809-22989-8-git-send-email-arnd@arndb.de>
+References: <1362521809-22989-1-git-send-email-arnd@arndb.de>
+ <1362521809-22989-8-git-send-email-arnd@arndb.de>
+Message-ID: <013101ce1ac5$17e9f090$47bdd1b0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/06/2013 04:20 PM, Andrew Chew wrote:
->> Subject: [PATCH] clk: tegra: provide dummy cpu car ops
->>
->> tegra_boot_secondary() relies on some of the car ops. This means having an
->> uninitialized tegra_cpu_car_ops will lead to an early boot panic.
->> Providing a dummy struct avoids this and makes adding Tegra114 clock
->> support in a bisectable way a lot easier.
->>
->> --
->>
->> Stephen,
->>
->> Should this be a separate patch or should I make this part of new release of
->> the Tegra114 clock series?
-
-I'm not sure if I answered this. Peter, I intend to apply this patch to
-a branch right before the CCF, so there's no explicit need to include it
-in the series, although if you do, that's fine.
-
->> diff --git a/drivers/clk/tegra/clk.c b/drivers/clk/tegra/clk.c index
-
->>  /* Global data of Tegra CPU CAR ops */
->> -struct tegra_cpu_car_ops *tegra_cpu_car_ops;
+Arnd Bergmann wrote:
 > 
-> Sorry for bringing this up so late...
-> Shouldn't the above be "struct tegra_cpu_car_ops tegra_cpu_car_ops;"?
+> 56bc911 "[media] s5p-fimc: Redefine platform data structure for fimc-is"
+> changed the bus_type member of struct fimc_source_info treewide, but
+> got one instance wrong in mach-s5pv210, which was evidently not
+> even build tested.
 > 
->> +static struct tegra_cpu_car_ops *dummy_car_ops; struct
->> +tegra_cpu_car_ops *tegra_cpu_car_ops = &dummy_car_ops;
+> This adds the missing change to get s5pv210_defconfig to build again.
+> Applies on the Mauro's media tree.
+> 
+I'm fine if this can be fixed soon.
 
-No, the value is used as a pointer in include/linux/clk/tegra.h, e.g.:
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Cc: Kyungmin Park <kyungmin.park@samsung.com>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
 
-tegra_cpu_car_ops->wait_for_reset(cpu);
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+
+> Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
+> ---
+>  arch/arm/mach-s5pv210/mach-goni.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-s5pv210/mach-goni.c b/arch/arm/mach-
+> s5pv210/mach-goni.c
+> index 3a38f7b..e373de4 100644
+> --- a/arch/arm/mach-s5pv210/mach-goni.c
+> +++ b/arch/arm/mach-s5pv210/mach-goni.c
+> @@ -845,7 +845,7 @@ static struct fimc_source_info goni_camera_sensors[]
+> = {
+>  		.mux_id		= 0,
+>  		.flags		= V4L2_MBUS_PCLK_SAMPLE_FALLING |
+>  				  V4L2_MBUS_VSYNC_ACTIVE_LOW,
+> -		.bus_type	= FIMC_BUS_TYPE_ITU_601,
+> +		.fimc_bus_type	= FIMC_BUS_TYPE_ITU_601,
+>  		.board_info	= &noon010pc30_board_info,
+>  		.i2c_bus_num	= 0,
+>  		.clk_frequency	= 16000000UL,
+> --
+> 1.8.1.2
