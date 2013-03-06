@@ -1,53 +1,41 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue,  5 Mar 2013 19:50:20 -0700
-Subject: [PATCH 1/2] ARM: bcm2835: add SPI device to DT
-Message-ID: <1362538221-19296-1-git-send-email-swarren@wwwdotorg.org>
+Date: Tue,  5 Mar 2013 19:50:21 -0700
+Subject: [PATCH 2/2] ARM: bcm2835: defconfig update
+In-Reply-To: <1362538221-19296-1-git-send-email-swarren@wwwdotorg.org>
+References: <1362538221-19296-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1362538221-19296-2-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The BCM2835 has a single instance of the "SPI0"-type SPI master
-controller. Instantiate it in the SoC .dtsi file, Don't enable it in
-the Raspberry Pi board .dts file, since we have no idea what is actually
-connected, and hence no idea what to set the bus clock rate to.
+Enable the new SPI controller driver.
 
 Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
 ---
- arch/arm/boot/dts/bcm2835.dtsi |   17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ arch/arm/configs/bcm2835_defconfig |    6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
-index 7e0481e..1b88cea 100644
---- a/arch/arm/boot/dts/bcm2835.dtsi
-+++ b/arch/arm/boot/dts/bcm2835.dtsi
-@@ -64,6 +64,16 @@
- 			#interrupt-cells = <2>;
- 		};
- 
-+		spi: spi at 20204000 {
-+			compatible = "brcm,bcm2835-spi";
-+			reg = <0x7e204000 0x1000>;
-+			interrupts = <2 22>;
-+			clocks = <&clk_spi>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
- 		i2c0: i2c at 20205000 {
- 			compatible = "brcm,bcm2835-i2c";
- 			reg = <0x7e205000 0x1000>;
-@@ -107,5 +117,12 @@
- 			#clock-cells = <0>;
- 			clock-frequency = <250000000>;
- 		};
-+
-+		clk_spi: spi {
-+			compatible = "fixed-clock";
-+			reg = <2>;
-+			#clock-cells = <0>;
-+			clock-frequency = <250000000>;
-+		};
- 	};
- };
+diff --git a/arch/arm/configs/bcm2835_defconfig b/arch/arm/configs/bcm2835_defconfig
+index af472e4..297921d 100644
+--- a/arch/arm/configs/bcm2835_defconfig
++++ b/arch/arm/configs/bcm2835_defconfig
+@@ -63,6 +63,8 @@ CONFIG_TTY_PRINTK=y
+ CONFIG_I2C=y
+ CONFIG_I2C_CHARDEV=y
+ CONFIG_I2C_BCM2835=y
++CONFIG_SPI=y
++CONFIG_SPI_BCM2835=y
+ CONFIG_GPIO_SYSFS=y
+ # CONFIG_HWMON is not set
+ # CONFIG_USB_SUPPORT is not set
+@@ -108,9 +110,5 @@ CONFIG_TEST_KSTRTOX=y
+ CONFIG_STRICT_DEVMEM=y
+ CONFIG_DEBUG_LL=y
+ CONFIG_EARLY_PRINTK=y
+-# CONFIG_XZ_DEC_X86 is not set
+-# CONFIG_XZ_DEC_POWERPC is not set
+-# CONFIG_XZ_DEC_IA64 is not set
+ # CONFIG_XZ_DEC_ARM is not set
+ # CONFIG_XZ_DEC_ARMTHUMB is not set
+-# CONFIG_XZ_DEC_SPARC is not set
 -- 
 1.7.10.4
