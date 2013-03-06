@@ -1,74 +1,81 @@
-From: infoonline_agent4@nokiamail.com (infoonline_agent4 at nokiamail.com)
-Date: Wed, 6 Mar 2013 09:45:44 -0800 (PST)
-Subject: Invitation: EURO CHECK Loan Limited Offers Loan At 2% RATE Apply
- Now!!!
-Message-ID: <1610970181.1981637.1362591944625.JavaMail.zimbra@store3.c30.cal.bf1.yahoo.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 6 Mar 2013 09:51:21 -0800
+Subject: [PATCH] arm: omap: RX-51: ARM errata 430973 workaround
+In-Reply-To: <201303061509.07905@pali>
+References: <517283541.62064.1362124023621.JavaMail.apache@mail81.abv.bg>
+ <CAGo_u6omQdSzpfthHNAU1UvgSvkgq3ZC6g1Ha9oi0nc9QJ71nA@mail.gmail.com>
+ <20130304185806.GS11806@atomide.com> <201303061509.07905@pali>
+Message-ID: <20130306175120.GP11806@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-YAHOO! CALENDAR - YOU'RE INVITED!
+* Pali Roh?r <pali.rohar@gmail.com> [130306 06:13]:
+> On Monday 04 March 2013 19:58:06 Tony Lindgren wrote:
+> > * Nishanth Menon <nm@ti.com> [130301 06:42]:
+> > > On Fri, Mar 1, 2013 at 1:47 AM, ?????? ???????? 
+> <freemangordon@abv.bg> wrote:
+> > > > They look similar, but they are not equivalent :). The
+> > > > first major difference is here (code taken from
+> > > > omap-smc.S)
+> > > > 
+> > > >> ENTRY(omap_smc2)
+> > > >> 
+> > > >>          stmfd   sp!, {r4-r12, lr}
+> > > >>          mov     r3, r2
+> > > >>          mov     r2, r1
+> > > >>          mov     r1, #0x0        @ Process ID
+> > > >>          mov     r6, #0xff
+> > > >>          mov     r12, #0x00      @ Secure Service ID
+> > > > 
+> > > > Always zero, while RX51 PPA expects a real value. I wonder
+> > > > if it is a bug, but anyway I don't see the id parameter
+> > > > (R0) used.
+> > > > 
+> > > >>          mov     r7, #0
+> > > >>          mcr     p15, 0, r7, c7, c5, 6
+> > > > 
+> > > > According to ARM TRM, this is "Invalidate entire branch
+> > > > predictor array"(IIUC). NFC why it is needed here, but
+> > > > this will not work on RX-51 until IBE bit in ACR is set.
+> > > > 
+> > > >>          dsb
+> > > >>          dmb
+> > > >>          smc     #0
+> > > > 
+> > > > RX-51 needs smc #1 ;)
+> > > > 
+> > > >>          ldmfd   sp!, {r4-r12, pc}
+> > > > 
+> > > > The next major difference is that RX-51 expects parameter
+> > > > count passed in R3[0] to be the count of the remaining
+> > > > parameters +1, but omap_secure_dispatcher (in
+> > > > omap-secure.c) is passing the exact count of the
+> > > > remaining parameters.
+> > > > 
+> > > > I guess all of the above problems can be
+> > > > fixed/workarounded, but I wonder does it worth. Not to
+> > > > say that I don't have BB around to test if the code still
+> > > > works if I make changes to omap2-secure.c/omap-smc.S :)
+> > > 
+> > > Yep, that was my point - instead of introducing new
+> > > functions, extending the existing functions to handle new
+> > > requirements is better solution, IMHO.
+> > 
+> > I think there have been patches posted for ARM generic SMC
+> > handling. Might be worth looking at those a bit and see if
+> > this can be made generic. I think only the SMC call numbering
+> > is different for various SoCs?
+> > 
+> > Regards,
+> > 
+> > Tony
+> 
+> Hi Tony, where are patches for ARM generic SMC handling?
 
-infoonline_agent4 at nokiamail.com has sent an invitation:
+Sorry don't have the link available, but I recall seeing some patch
+on linux-arm-kernel within past six months that added a generic
+smc function.. Or maybe I was dreaming or something.
 
-EURO CHECK Loan Limited Offers Loan At 2% RATE Apply Now!!!
+Regards,
 
-When:
-Wednesday, March 6, 2013 6:30p - 7:30p (GMT+00:00)
-
-EURO CHECK Loan Limited Offers Loan At 2% RATE Apply Now!!!
-
-
-Dear Esteemed Customer,
-
-
-EURO CHECK Loan Limited, specializes in arranging loan of any amounts, longer repayment terms. We offer Business loan, Home loan, Personal loan, Car loan, Student loan, Dept. Consolidation, Loan for Business start. Do you have a small or big project to finance? up and Business Expansion, Real Estate and Mortgages all at 2% interest rate for applicants of all credit types. 
-
-
-The service we offer is quick and stress free. Our Priority is your total Satisfaction! Our goal is that you enjoy the service we provide from start to conclusion. Interested new applicant should reply to ( info_eurocheck at globomail.com ) to contact Administrative Director for more informations: Mr. Manfred Holzer.
-
-
-Sincerely,
-Ms.Ellody.
-
-
-Phone/SmS: +33 751 226 934/+33-753 404 777
-Fax: + 33 160 54177 42
-Address: 88 Boulevard De l?H?pital
-75013 Paris ? France
-www.euro-check.co.uk
-
-*~*~*~*~*~*~*~*~*~*
-RSVP Now!
-http://calendar.yahoo.com/infoonline_agent4 at nokiamail.com/rsvp?e=linux-arm-kernel at lists.infradead.org&uid=0f587097-1ec2-4856-a92b-9734002c9292&tk=zZrJHfb4Q58V.gI_JKxDZwaLDGU-&hh=SPb1ZNr7j8ZjPv43HEm0jstJKbs-
-
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130306/33e9c8f3/attachment-0001.html>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: image2
-Type: image/gif
-Size: 733 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130306/33e9c8f3/attachment-0002.gif>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: image3
-Type: image/gif
-Size: 1820 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130306/33e9c8f3/attachment-0003.gif>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: meeting.ics
-Type: text/calendar
-Size: 3988 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130306/33e9c8f3/attachment-0001.ics>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: invite.ics
-Type: application/ics
-Size: 3988 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130306/33e9c8f3/attachment-0001.bin>
+Tony
