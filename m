@@ -1,42 +1,35 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Wed, 6 Mar 2013 09:52:11 +0200
-Subject: [REPOST PATCH 0/2] Table lookup for mux clock type
-In-Reply-To: <51368522.90700@wwwdotorg.org>
-References: <1361545358-22721-1-git-send-email-pdeschrijver@nvidia.com>
- <51367625.2090405@wwwdotorg.org> <51368522.90700@wwwdotorg.org>
-Message-ID: <20130306075211.GM27241@tbergstrom-lnx.Nvidia.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 6 Mar 2013 08:03:22 +0000
+Subject: [PATCH] ARM: gemini: fix build errors
+In-Reply-To: <1362543813-7324-1-git-send-email-linus.walleij@linaro.org>
+References: <1362543813-7324-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <201303060803.22442.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 06, 2013 at 12:52:02AM +0100, Stephen Warren wrote:
-> On 03/05/2013 03:48 PM, Stephen Warren wrote:
-> > On 02/22/2013 08:02 AM, Peter De Schrijver wrote:
-> >> This patchset adds a table lookup feature to the mux clock type. This will
-> >> be used by the forthcoming Tegra114 clock implementation. Also instead of
-> >> a fixed field width, a mask is used. This is because Tegra114 has some muxes
-> >> where the parent selector is spread over several bitfields. The second patch
-> >> adapts the tegra periph clock implementation which uses struct clk_mux
-> >> directly.
-> >>
-> >> --
-> >>
-> >> Mike,
-> >>
-> >> This patch is a dependency for the Tegra114 CCF implementation. Could you
-> >> review it and merge on a topic branch so Stephen can pull it in to verify
-> >> the integration?
-> > 
-> > Peter, does this repost you resolve the issue I pointed out at:
-> > http://www.spinics.net/lists/arm-kernel/msg220873.html
+On Wednesday 06 March 2013, Linus Walleij wrote:
+> The Gemini machine has seen some bitrot, here is a patch to make
+> it build again.
 > 
-> Indeed, I just tested applying patch 1/2 and the build is broken without
-> patch 2/2.
+> Cc: Roel Kluin <roel.kluin@gmail.com>
+> Cc: Paulius Zaleckas <paulius.zaleckas@gmail.com>
+> Cc: Imre Kaloz <kaloz@openwrt.org>
+> Cc: Janos Laube <janos.dev@gmail.com>
+> Cc: Hans Ulli Kroll <ulli.kroll@googlemail.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ARM SoC maintainers: please apply this patch directly to the
+> fixes.
 > 
-> Can you either rework the patches to maintain bisectability, or squash
-> the two together?
+> I notice that nobody seems to care when Gemini breaks. Shall I
+> post a patch deleting this machine? Users raise your hands.
 
-Will squash them together.
+I posted a patch to delete it last time around, and got a couple
+of Acks, but in the end didn't submit it a second time for 3.9,
+so I did not put it in either.
 
-Cheers,
+I'd say we put your patch into 3.9 (or the identical patch that
+I sent back then), and remove gemini and fa526 in 3.10 unless
+any active users show up.
 
-Peter.
+	Arnd
