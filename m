@@ -1,92 +1,106 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 6 Mar 2013 11:26:22 +0200
-Subject: [V8 PATCH 01/16] usb: phy: mv_usb2: add PHY driver for marvell
- usb2 controller
-In-Reply-To: <CADApbeiMFUEs62Su7GzdDBMp+n3eMErvmqytfD0zO7x-ZJ5g-A@mail.gmail.com>
-References: <1361419646-9052-1-git-send-email-chao.xie@marvell.com>
- <1361419646-9052-2-git-send-email-chao.xie@marvell.com>
- <20130304142143.GG3397@arwen.pp.htv.fi>
- <CADApbeigW=1fQtUZmLMX8H2+0RiiBFjcSBNojQRSZbCa_ORZVw@mail.gmail.com>
- <20130305110457.GF7899@arwen.pp.htv.fi>
- <CADApbeg1KfW4xW=YQcqOwgyaOfes=Nu=9pmtxWgazW23vYS9yw@mail.gmail.com>
- <20130306081044.GD28587@arwen.pp.htv.fi>
- <CADApbej6kscrCYu=hD177tVGGsMTBw2kE+G8PRpVR_5AsJ38tw@mail.gmail.com>
- <20130306085313.GH28587@arwen.pp.htv.fi>
- <CADApbeiMFUEs62Su7GzdDBMp+n3eMErvmqytfD0zO7x-ZJ5g-A@mail.gmail.com>
-Message-ID: <20130306092622.GK28587@arwen.pp.htv.fi>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 06 Mar 2013 10:27:37 +0100
+Subject: [PATCH 2/4][V2] time : set broadcast irq affinity
+In-Reply-To: <alpine.LFD.2.02.1303052135080.22263@ionos>
+References: <1362219013-18173-1-git-send-email-daniel.lezcano@linaro.org>
+ <1362219013-18173-3-git-send-email-daniel.lezcano@linaro.org>
+ <alpine.LFD.2.02.1303052135080.22263@ionos>
+Message-ID: <51370C09.5020301@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 06, 2013 at 05:02:28PM +0800, Chao Xie wrote:
-> On Wed, Mar 6, 2013 at 4:53 PM, Felipe Balbi <balbi@ti.com> wrote:
-> > On Wed, Mar 06, 2013 at 04:24:58PM +0800, Chao Xie wrote:
-> >> On Wed, Mar 6, 2013 at 4:10 PM, Felipe Balbi <balbi@ti.com> wrote:
-> >> > Hi,
-> >> >
-> >> > On Wed, Mar 06, 2013 at 10:11:41AM +0800, Chao Xie wrote:
-> >> >> 3. For the revison register. It exists in some SOCes(pxa168), but for
-> >> >> some SOCes, the register dispears(pxa910, armada610). These SOCes are
-> >> >> developed by different desgin teams, and it need to be enhanced, but
-> >> >> for current products i have to use the device_id to detect the PHY
-> >> >> controller.
-> >> >
-> >> > fair enough, make sure to add a comment to the driver about this so
-> >> > grumpy maintainers stop complaining ;-)
-> >> >
-> >> >> 4. For the mutex and refcount. The "USB controller" includes two
-> >> >> blocks - the udc and ehci. In fact they will not be used at same time,
-> >> >> but for some SOCes it duplicates the ehci block. It means that the
-> >> >> SOCes have two or more ehci blocks. The added ehci blocks depend on
-> >> >> the PHY to be initialized, and they can be used at same time as the
-> >> >> "USB controller". That is the reason i add mutex and refcount for phy
-> >> >> driver.
-> >> >
-> >> > alright, let's add refcounting to the generic PHY layer then.
-> >> >
-> >> >> 5. For the clock name. Can you describe it in details? For clkdev, if
-> >> >> it want to find the clock, it still depends on the dev_name and
-> >> >> con_id.
-> >> >
-> >> > right, the idea of clkdev is that you associate a clock provider with
-> >> > its consumer by means of dev_name. Then you can fetch the clock from
-> >> > driver with any name you want. Which means if you do you clkdev properly
-> >> > you could:
-> >> >
-> >> > clk_get(dev, "clk1");
-> >> > clk_get(dev, "clk2");
-> >> > ...
-> >> >
-> >> > and so on.
-> >> >
-> >>
-> >> It is same as what i think.
-> >> The clock numbers and names are depent of SOCes, i do not want to fix
-> >
-> > no, they're not dependent on anything, not if you use clkdev correctly.
-> >
+On 03/05/2013 09:40 PM, Thomas Gleixner wrote:
+> On Sat, 2 Mar 2013, Daniel Lezcano wrote:
+>> When a cpu goes to a deep idle state where its local timer is shutdown,
+>> it notifies the time frame work to use the broadcast timer instead.
+>>
+>> Unfortunately, the broadcast device could wake up any CPU, including an
+>> idle one which is not concerned by the wake up at all.
+>>
+>> This implies, in the worst case, an idle CPU will wake up to send an IPI
+>> to another idle cpu.
+>>
+>> This patch solves this by setting the irq affinity to the cpu concerned
+>> by the nearest timer event, by this way, the CPU which is wake up is
+>> guarantee to be the one concerned by the next event and we are safe with
+>> unnecessary wakeup for another idle CPU.
+>>
+>> As the irq affinity is not supported by all the archs, a flag is needed
+>> to specify which clocksource can handle it : CLOCK_EVT_FEAT_DYNIRQ
+>>
+>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> ---
+>>  include/linux/clockchips.h   |    5 +++++
+>>  kernel/time/tick-broadcast.c |   40 +++++++++++++++++++++++++++++++++-------
+>>  2 files changed, 38 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/include/linux/clockchips.h b/include/linux/clockchips.h
+>> index 6634652..c93e2a6 100644
+>> --- a/include/linux/clockchips.h
+>> +++ b/include/linux/clockchips.h
+>> @@ -55,6 +55,11 @@ enum clock_event_nofitiers {
+>>  #define CLOCK_EVT_FEAT_C3STOP		0x000008
+>>  #define CLOCK_EVT_FEAT_DUMMY		0x000010
+>>  
+>> +/*
+>> + * Clock event device can set its irq affinity dynamically
+>> + */
+>> +#define CLOCK_EVT_FEAT_DYNIRQ		0x000020
+>> +
+>>  /**
+>>   * struct clock_event_device - clock event device descriptor
+>>   * @event_handler:	Assigned by the framework to be called by the low
+>> diff --git a/kernel/time/tick-broadcast.c b/kernel/time/tick-broadcast.c
+>> index 6197ac0..9ca8ff5 100644
+>> --- a/kernel/time/tick-broadcast.c
+>> +++ b/kernel/time/tick-broadcast.c
+>> @@ -406,13 +406,37 @@ struct cpumask *tick_get_broadcast_oneshot_mask(void)
+>>  	return to_cpumask(tick_broadcast_oneshot_mask);
+>>  }
+>>  
+>> -static int tick_broadcast_set_event(struct clock_event_device *bc,
+>> +/*
+>> + * Set broadcast interrupt affinity
+>> + */
+>> +static void tick_broadcast_set_affinity(struct clock_event_device *bc,
+>> +					const struct cpumask *cpumask)
+>> +{
+>> +	if (!(bc->features & CLOCK_EVT_FEAT_DYNIRQ))
+>> +		return;
+>> +
+>> +	if (cpumask_equal(bc->cpumask, cpumask))
+>> +		return;
+>> +
+>> +	bc->cpumask = cpumask;
 > 
-> So
-> 1. Does it mean that all SOCes clock driver should define same names
-> such as "clk1", "clk2"?
+> This breaks with CONFIG_CPUMASK_OFFSTACK=y. cpumask_copy() is your friend!
 
-clk1, clk2, clk3 were just examples. Ideally you would have more
-meaningfull names like "fck" for functional clock.
+This instruction copies the pointer, not the cpumask content.
 
-> 2. Does it mean that if driver failed at clk_get, the probing will not
-> stop because this SOC may define this clock?
+bc->cpumask is defined as a const struct cpumask * and is used to copy a
+cpumask pointer not the content.
 
-that depends on how you write your driver. If platform A has 3 clocks
-and platform B has only 2 you have two options:
+The cpumask parameter is a pointer to a global cpumask provided by the
+cpumask_of macro.
 
-a) make the third clock optional by not bailing out if clk_get() fails
-b) define a dummy no-op clock node to satisfy the third clock.
+But to be in the safe side, I compiled tested with
+CONFIG_CPUMASK_OFFSTACK=y without problem.
+
+Did I missed something ?
+
+Thanks
+  -- Daniel
+
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130306/0317a612/attachment-0001.sig>
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
