@@ -1,31 +1,43 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed,  6 Mar 2013 16:29:22 +0100
-Subject: [PATCH 0/5] Extend UART support for Allwinner SoCs
-Message-ID: <1362583767-13862-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Wed,  6 Mar 2013 16:29:23 +0100
+Subject: [PATCH 1/5] ARM: sunxi: dt: Use clocks property instead of
+ clock-frequency for the UARTs
+In-Reply-To: <1362583767-13862-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1362583767-13862-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1362583767-13862-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Commit 0bbeb3c3 ("of serial port driver - add clk_get_rate() support") made
+possible to use directly a clock phandle instead of a raw frequency
+specified in the clock frequency attribute, so let's use it.
 
-This patchset reworks a bit the UART support that is found in the DT
-for Allwinner SoCs, which was quite limited until now.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/boot/dts/sunxi.dtsi |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-It first switches to using the clocks property, then rework a bit the
-DTSI to have only the UART available in the A10 and the A13 (the A10
-has 8 UARTs, while A13 has only the uart1 and uart3).
-
-Maxime Ripard (5):
-  ARM: sunxi: dt: Use clocks property instead of clock-frequency for
-    the UARTs
-  ARM: sunxi: dt: Move uart0 to sun4i-a10.dtsi
-  ARM: sunxi: dt: Add uart3 dt node
-  ARM: sunxi: dt: Add A10 UARTs to the dtsi.
-  ARM: sunxi: hackberry: Add UART muxing
-
- arch/arm/boot/dts/sun4i-a10-hackberry.dts |    2 +
- arch/arm/boot/dts/sun4i-a10.dtsi          |   61 +++++++++++++++++++++++++++++
- arch/arm/boot/dts/sunxi.dtsi              |   14 +++----
- 3 files changed, 70 insertions(+), 7 deletions(-)
-
+diff --git a/arch/arm/boot/dts/sunxi.dtsi b/arch/arm/boot/dts/sunxi.dtsi
+index 8b36abe..791c02a 100644
+--- a/arch/arm/boot/dts/sunxi.dtsi
++++ b/arch/arm/boot/dts/sunxi.dtsi
+@@ -65,7 +65,7 @@
+ 			interrupts = <1>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+-			clock-frequency = <24000000>;
++			clocks = <&osc>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -75,7 +75,7 @@
+ 			interrupts = <2>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+-			clock-frequency = <24000000>;
++			clocks = <&osc>;
+ 			status = "disabled";
+ 		};
+ 	};
 -- 
 1.7.10.4
