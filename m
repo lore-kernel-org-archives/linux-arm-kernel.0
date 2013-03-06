@@ -1,39 +1,55 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed, 6 Mar 2013 11:23:57 -0700
-Subject: [PATCH 05/32] lib: devres: don't enclose pcim_*() functions in
- CONFIG_HAS_IOPORT
-In-Reply-To: <22387327.428751362559215433.JavaMail.weblogic@epml07>
-References: <22387327.428751362559215433.JavaMail.weblogic@epml07>
-Message-ID: <20130306182357.GB2433@obsidianresearch.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 6 Mar 2013 19:24:06 +0100
+Subject: [PATCH 3/3] arm: kirkwood: add support for Init button on
+ OpenBlocks A6
+In-Reply-To: <1362587021-32762-4-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1362587021-32762-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1362587021-32762-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20130306182406.GG3904@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 06, 2013 at 08:40:26AM +0000, Jingoo Han wrote:
-
-> Yes, I am developing a PCIe driver for Samsung Exynos SoCs.
-> Also, 2 days ago, I submitted the PCIe driver.
+On Wed, Mar 06, 2013 at 05:23:41PM +0100, Thomas Petazzoni wrote:
+> The Kirkwood-based PlatHome OpenBlocks A6 board has an Init button
+> connected to MPP pin 38. This commit adds support for this button.
 > 
-> http://www.spinics.net/lists/linux-pci/msg20548.html
-> http://www.spinics.net/lists/linux-pci/msg20549.html
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/kirkwood-openblocks_a6.dts |   14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
 > 
-> If someone look at my code, it will be very helpful.
+> diff --git a/arch/arm/boot/dts/kirkwood-openblocks_a6.dts b/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
+> index 0488d6a..7ac831e 100644
+> --- a/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
+> +++ b/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
+> @@ -172,4 +172,18 @@
+>  			gpios = <&gpio1 11 1>;
+>  		};
+>          };
+> +
+> +	gpio_keys {
+> +		compatible = "gpio-keys";
+> +		pinctrl-0 = <&pmx_gpio_init>;
+> +		pinctrl-names = "default";
 
-I took a quick peek at your DT bindings and I think they are way off
-base. You need to read the thread(s) related to the new Armada and
-Tegra drivers. Your bindings should look closer to them. 
+Hi Thomas
 
-You need to have DT bindings that follow the OF PCI requirements.
+I know i'm repeating myself.....
 
-You need to determine if your hardware follows the PCI-SIG
-requirements and includes a root port bridge config space, this will
-guide if you need to use seperate PCI domains and DT stanzas, or if a
-single domain and stanza should be used.
+pinctrl* are not needed.
 
-Please include lspci output in future commit messages
+    Andrew
 
-If you CC me the next time you post these patches I may be able to try
-and help a bit, but lets start a new thread for that sort of
-discussion. :)
-
-Regards,
-Jason
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		button at 1 {
+> +			label = "Init Button";
+> +			linux,code = <116>;
+> +			gpios = <&gpio1 6 0>;
+> +		};
+> +	};
+>  };
+> -- 
+> 1.7.9.5
+> 
