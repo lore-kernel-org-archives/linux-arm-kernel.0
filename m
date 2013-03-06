@@ -1,63 +1,44 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 6 Mar 2013 08:44:25 +0800
-Subject: [PATCH 4/9] usb: gadget: fix omap_udc build errors
-In-Reply-To: <20130305222224.GA26278@arwen.pp.htv.fi>
-References: <1362521809-22989-1-git-send-email-arnd@arndb.de>
- <1362521809-22989-5-git-send-email-arnd@arndb.de>
- <20130305222224.GA26278@arwen.pp.htv.fi>
-Message-ID: <20130306004425.GA28448@kroah.com>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Wed, 6 Mar 2013 09:50:10 +0900
+Subject: [PATCH v4 1/3] serial: sh-sci: Add OF support
+In-Reply-To: <201303051926.25655.arnd@arndb.de>
+References: <1362414054-23092-1-git-send-email-hechtb+renesas@gmail.com>
+ <5345836.ZO7uU35cQD@wuerfel>
+ <CABYn4sxYRbmEe27WKE-FbTZ3_SM+APaYqHJ1=Zrk8_a5czxZaQ@mail.gmail.com>
+ <201303051926.25655.arnd@arndb.de>
+Message-ID: <20130306005009.GF14275@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 06, 2013 at 12:22:24AM +0200, Felipe Balbi wrote:
-> Hi,
+On Tue, Mar 05, 2013 at 07:26:25PM +0000, Arnd Bergmann wrote:
+> On Tuesday 05 March 2013, Bastian Hecht wrote:
+> > >> +- renesas,scbrr-algo-id : Algorithm ID for the Bit Rate Register
+> > >> +  1 = SCBRR_ALGO_1 ((clk + 16 * bps) / (16 * bps) - 1)
+> > >> +  2 = SCBRR_ALGO_2 ((clk + 16 * bps) / (32 * bps) - 1)
+> > >> +  3 = SCBRR_ALGO_3 (((clk * 2) + 16 * bps) / (16 * bps) - 1)
+> > >> +  4 = SCBRR_ALGO_4 (((clk * 2) + 16 * bps) / (32 * bps) - 1)
+> > >> +  5 = SCBRR_ALGO_5 (((clk * 1000 / 32) / bps) - 1)
+> > >
+> > > Maybe replace this with a "clock-frequency" property? This may
+> > > be what the registers contain, but it is not very readable.
+> > 
+> > Hmm... do you want a frequency in absolute terms? And then calculate
+> > the best SCBRR value for it?
+> > I'm unsure about this, either you must exactly hit it or accept
+> > tolerances? As something in between I renamed the property to
+> > "renesas,clock-algorithm", but I don't know if this is what you want.
 > 
-> On Tue, Mar 05, 2013 at 11:16:44PM +0100, Arnd Bergmann wrote:
-> > 1bf0cf6040 "usb: gadget: omap_udc: convert to udc_start/udc_stop"
-> > made some trivial changes but was missing a ';' character.
-> > 
-> > 8c4cc00552 "ARM: OMAP1: DMA: Moving OMAP1 DMA channel definitions
-> > to mach-omap1" added a definition for OMAP_DMA_USB_W2FC_TX0 to
-> > the driver while making the header file it was defined in
-> > unavailable for drivers, but this driver actually needs
-> > OMAP_DMA_USB_W2FC_RX0 as well.
-> > 
-> > Both changes appear trivial, so let's add the missing semicolon
-> > and the macro definition.
-> > 
-> > Cc: Felipe Balbi <balbi@ti.com>
-> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > ---
-> >  drivers/usb/gadget/omap_udc.c | 3 ++-
-> >  1 file changed, 2 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/usb/gadget/omap_udc.c b/drivers/usb/gadget/omap_udc.c
-> > index 06be85c..f844565 100644
-> > --- a/drivers/usb/gadget/omap_udc.c
-> > +++ b/drivers/usb/gadget/omap_udc.c
-> > @@ -62,6 +62,7 @@
-> >  #define	DRIVER_VERSION	"4 October 2004"
-> >  
-> >  #define OMAP_DMA_USB_W2FC_TX0		29
-> > +#define OMAP_DMA_USB_W2FC_RX0		26
-> >  
-> >  /*
-> >   * The OMAP UDC needs _very_ early endpoint setup:  before enabling the
-> > @@ -1310,7 +1311,7 @@ static int omap_pullup(struct usb_gadget *gadget, int is_on)
-> >  }
-> >  
-> >  static int omap_udc_start(struct usb_gadget *g,
-> > -		struct usb_gadget_driver *driver)
-> > +		struct usb_gadget_driver *driver);
+> I meant the absolute frequency in HZ, since that is what we do
+> for the 8250 uart and other devices, but only if that is sufficient
+> for your device.
 > 
-> good catch, thanks. I'll queue it for v3.6-rc3. Make sure to Cc
-> linux-usb for anything under drivers/usb/ though
+No, we still need to figure out how to generate that baud rate, whether
+it needs an internal or external clock for driving the rate, etc. The
+frequency in and of itself doesn't provide this information, and various
+parts use different algorithms for factoring the baud rate generator,
+even varying across otherwise identical ports. It's unfortunately not
+possible to infer anything about the SCBRR algorithm from port type or
+specified baud rate.
 
-I think you mean 3.9 :)
-
-I can take this patch right now, if you ack it.
-
-thanks,
-
-greg k-h
+The algorithm IDs here are wholly arbitrary anyways, but are the
+variations I came up with from roughly 60-70 different CPUs.
