@@ -1,59 +1,73 @@
-From: simon.jeons@gmail.com (Simon Jeons)
-Date: Wed, 06 Mar 2013 09:04:55 +0800
-Subject: [PATCH] mm: Fixup the condition whether the page cache is free
-In-Reply-To: <20130304150937.GB23767@cmpxchg.org>
-References: <CAFNq8R7tq9kvD9LyhZJ-Cj0kexQfDsPhB4iQYyZ9s9+8Jo82QA@mail.gmail.com>
- <20130304150937.GB23767@cmpxchg.org>
-Message-ID: <51369637.6030705@gmail.com>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Wed, 6 Mar 2013 10:06:16 +0900
+Subject: [PATCH 1/3] clocksource: sh_cmt: Add Device Tree probing
+In-Reply-To: <20130305094305.GB15661@e106331-lin.cambridge.arm.com>
+References: <1362159932-18533-1-git-send-email-hechtb+renesas@gmail.com>
+ <1362159932-18533-2-git-send-email-hechtb+renesas@gmail.com>
+ <20130304100309.GA30747@e106331-lin.cambridge.arm.com>
+ <CABYn4sxHmr5YLpK5DWxjb0hwmgXP=HbmAy+=HNX9UY6mywCWgw@mail.gmail.com>
+ <20130305094305.GB15661@e106331-lin.cambridge.arm.com>
+Message-ID: <20130306010615.GG14275@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Johannes,
-On 03/04/2013 11:09 PM, Johannes Weiner wrote:
-> On Mon, Mar 04, 2013 at 09:54:26AM +0800, Li Haifeng wrote:
->> When a page cache is to reclaim, we should to decide whether the page
->> cache is free.
->> IMO, the condition whether a page cache is free should be 3 in page
->> frame reclaiming. The reason lists as below.
->>
->> When page is allocated, the page->_count is 1(code fragment is code-1 ).
->> And when the page is allocated for reading files from extern disk, the
->> page->_count will increment 1 by page_cache_get() in
->> add_to_page_cache_locked()(code fragment is code-2). When the page is to
->> reclaim, the isolated LRU list also increase the page->_count(code
->> fragment is code-3).
-> The page count is initialized to 1, but that does not stay with the
-> object.  It's a reference that is passed to the allocating task, which
-> drops it again when it's done with the page.  I.e. the pattern is like
-> this:
->
-> instantiation:
-> page = page_cache_alloc()	/* instantiator reference -> 1 */
-> add_to_page_cache(page, mapping, offset)
->    get_page(page)		/* page cache reference -> 2 */
-> lru_cache_add(page)
->    get_page(page)		/* pagevec reference -> 3 */
-> /* ...initiate read, write, associate buffers, ... */
-> page_cache_release(page)	/* drop instantiator reference -> 2 + private */
->
-> reclaim:
-> lru_add_drain()
->    page_cache_release(page)	/* drop pagevec reference -> 1 + private */
+On Tue, Mar 05, 2013 at 09:43:05AM +0000, Mark Rutland wrote:
+> Hi again,
+> 
+> > >> diff --git a/Documentation/devicetree/bindings/timer/renesas,sh-cmt-timer.txt b/Documentation/devicetree/bindings/timer/renesas,sh-cmt-timer.txt
+> > >> new file mode 100644
+> > >> index 0000000..e5ad808
+> > >> --- /dev/null
+> > >> +++ b/Documentation/devicetree/bindings/timer/renesas,sh-cmt-timer.txt
+> > >> @@ -0,0 +1,21 @@
+> > >> +* Renesas SH Mobile Compare Match Timer
+> > >> +
+> > >> +Required properties:
+> > >> +- compatible : Should be "renesas,cmt"
+> > >> +- reg : Address and length of the register set for the device
+> > >> +- interrupts : Timer IRQ
+> > >> +- renesas,timer-device-id : The ID of the timer device
+> > >> +- renesas,timer-channel-id : The channel ID of the timer device
+> > >
+> > > I'm not familiar with this hardware. Could you give me a basic idea of how it's
+> > > structured?
+> > >
+> > > Does the device have a single timer that this describes, or does the device
+> > > have multiple timers, and this selects which one to use?
+> > 
+> > The CMT timer is built into various SoCs from Renesas, often multiple
+> > instances of it. Each timer instance has 6 channels. You can select if
+> > they are driven by the main clock or the real time clock (the SoCs
+> > include an SH core for data processing) and can use different subscale
+> > modes. It features free running mode and can fire events. The clock
+> > has up to 48 bits to count. It has a DMA channel and wires enabling
+> > the device to be a wakeup source. Hmm don't know what to add more.
+> > It's a timer - you can check for overflows, read the counter and so
+> > on.
+> 
+> Unless I've misunderstood, couldn't Linux choose one timer to use completely
+> arbitrarily?
+> 
+> Why do we need to describe which one to use?
+> 
+Many of these CPUs have multiple timer blocks (CMT, TMU, MTU2) that sit
+in different power domains, so there is often a desire to prioritize one
+over another, as it will determine which sleep states are available to
+us. Beyond that, many of these channels have special behavioural
+constraints (only certain channels being useable by the PWM block for
+example, as well as mux issues (certain channels will be tied up with
+functions we care less about than others).
 
-IIUC, when add page to lru will lead to add to pagevec firstly, and 
-pagevec will take one reference, so if lru will take over the reference 
-taken by pagevec when page transmit from pagevec to lru? or just drop 
-the reference and lru will not take reference for page?
+We have traditionally registered all of the available timer channels as
+platform devices, and then left it to the clocksource/event rating to
+determine which to use for what. This was based on the assumption that
+later on we would do some work on the clockevents layer to dynamically
+allocate the other channels that weren't being used for anything, but
+this never happened, and most users managed to get away with simply
+adopting hrtimers instead.
 
-> __isolate_lru_page(page)
->    page_cache_get(page)		/* reclaim reference -> 2 + private */
-> is_page_cache_freeable(page)
-> try_to_free_buffers()		/* drop buffer ref -> 2 */
-> __remove_mapping()		/* drop page cache and isolator ref -> 0 */
-> free_hot_cold_page()
->
-> --
-> To unsubscribe, send a message with 'unsubscribe linux-mm' in
-> the body to majordomo at kvack.org.  For more info on Linux MM,
-> see: http://www.linux-mm.org/ .
-> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
+Perhaps the rating is not a detail we want to expose, but we are still
+going to need some facility for defining whether a given timer is
+suitable for a clocksource/clockevent or not. We also can't really encode
+the rating information in the driver itself, as the placement of the
+block is wholly SoC dependent.
