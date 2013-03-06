@@ -1,34 +1,69 @@
-From: padma.kvr@gmail.com (Padma Venkat)
-Date: Wed, 6 Mar 2013 10:43:37 +0530
-Subject: [PATCH 1/2] ARM: exynos: pl330: Add #dma-cells for generic dma
- binding support
-In-Reply-To: <201303052237.05910.arnd@arndb.de>
-References: <1362375268-29405-1-git-send-email-padma.v@samsung.com>
- <201303052237.05910.arnd@arndb.de>
-Message-ID: <CAAgF-Bf+rqiFUaBD=aRqry6-2z4o0Ao2L2YRm8bu1x98TfPPyg@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 05 Mar 2013 21:20:32 -0800
+Subject: [PATCH] ARM: proc: Add Krait proc info
+In-Reply-To: <51366B9E.7010502@codeaurora.org>
+References: <1362439299-29617-1-git-send-email-sboyd@codeaurora.org>
+ <20130305083421.GA19391@mudshark.cambridge.arm.com>
+ <51366B9E.7010502@codeaurora.org>
+Message-ID: <5136D220.5090904@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 6, 2013 at 4:07 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 04 March 2013, Padmavathi Venna wrote:
+On 03/05/13 14:03, Stephen Boyd wrote:
+> On 03/05/13 00:34, Will Deacon wrote:
+>> Hi Stephen, Stepan,
 >>
->> This patch adds #dma-cells property to PL330 DMA controller
->> nodes for supporting generic dma dt bindings on samsung exynos
->> platforms. #dma-channels and #dma-requests are not required now
->> but added in advance.
+>> On Mon, Mar 04, 2013 at 11:21:39PM +0000, Stephen Boyd wrote:
+>>> From: Stepan Moskovchenko <stepanm@codeaurora.org>
+>>>
+>>> Add processor info for the Qualcomm, Inc. Krait family of
+>>> processors, to use the generic ARMv7 initialisation
+>>> procedure but explicitly enable the IDIV hardware
+>>> capability flag.
+>>>
+>>> Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
+>>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>>> ---
+>>>  arch/arm/mm/proc-v7.S |   10 ++++++++++
+>>>  1 file changed, 10 insertions(+)
+>>>
+>>> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+>>> index 3a3c015..81adeb3 100644
+>>> --- a/arch/arm/mm/proc-v7.S
+>>> +++ b/arch/arm/mm/proc-v7.S
+>>> @@ -434,6 +434,16 @@ __v7_ca15mp_proc_info:
+>>>  	.size	__v7_ca15mp_proc_info, . - __v7_ca15mp_proc_info
+>>>  
+>>>  	/*
+>>> +	 * Qualcomm Inc. Krait processors.
+>>> +	 */
+>>> +	.type	__krait_proc_info, #object
+>>> +__krait_proc_info:
+>>> +	.long	0x510f0400		@ Required ID value
+>>> +	.long	0xff0ffc00		@ Mask for ID
+>>> +	__v7_proc __v7_setup, hwcaps = HWCAP_IDIV
+>> I was looking at this the other day and wondered whether we could set
+>> HWCAP_IDIV in __v7_setup, depending on ID_ISAR0[27:24]. I can't immediately
+>> think why that would be difficult, but similarly there may well be a reason
+>> why we assign it like this.
 >>
->> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
->
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
->
-> Should we apply these directly to the arm-soc fixes branch, or wait
-> until they come back from the Samsung subarchitecture tree?
+>> Fancy taking a look?
+> Ok I'll take a look. 
 
-Hmm, If Kukjin can take in 3.9 rc2 it's better to go via Samsung tree.
+Hmm. I wonder if we did it this way because between version B and C of
+DDI0406 the definition of those bits changed.
 
-Kukjin,
+In DDI0406B we have
 
-Can you please take this patch in 3.9 rc2 ?
+    0 - no support
+    1 - support
 
-Thanks
-Padma
+and in DDI0406C we have
+
+    0 - no support
+    1 - support in Thumb
+    2 - support in Thumb and ARM
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
