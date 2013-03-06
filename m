@@ -1,14 +1,15 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 06 Mar 2013 14:29:43 -0700
-Subject: [PATCH 1/3] ARM: tegra: Fix unchecked return value
-In-Reply-To: <1361514267-12111-1-git-send-email-josephl@nvidia.com>
-References: <1361514267-12111-1-git-send-email-josephl@nvidia.com>
-Message-ID: <5137B547.4040904@wwwdotorg.org>
+Date: Wed, 06 Mar 2013 14:45:59 -0700
+Subject: [PATCH V2 1/2] ARM: tegra: pmc: add specific compatible DT string
+ for Tegra30 and Tegra114
+In-Reply-To: <1361932063-13263-1-git-send-email-josephl@nvidia.com>
+References: <1361932063-13263-1-git-send-email-josephl@nvidia.com>
+Message-ID: <5137B917.20803@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/21/2013 11:24 PM, Joseph Lo wrote:
-> Check a return value for tegra_powergate_remove_clamping().
+On 02/26/2013 07:27 PM, Joseph Lo wrote:
+> The PMC HW is not 100% compatible across all Tegra series. We need to
+> specify each of them in the DT match table.
 
-I have applied patches 1/3 and 2/3 to Tegra's for-3.10/fixes, and 3/3 to
-Tegra's for-3.10/cleanup branches.
+I have applied these two patches to Tegra's for-3.10/cleanup branch.
