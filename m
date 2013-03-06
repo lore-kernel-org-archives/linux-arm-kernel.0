@@ -1,102 +1,28 @@
-From: mchehab@redhat.com (Mauro Carvalho Chehab)
-Date: Tue, 5 Mar 2013 21:23:51 -0300
-Subject: [PATCH 6/9] [media] ir-rx51: fix clock API related build issues
-In-Reply-To: <1362521809-22989-7-git-send-email-arnd@arndb.de>
-References: <1362521809-22989-1-git-send-email-arnd@arndb.de>
- <1362521809-22989-7-git-send-email-arnd@arndb.de>
-Message-ID: <20130305212351.4993d8c6@redhat.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 6 Mar 2013 00:26:15 +0000
+Subject: [PATCH] ARM: proc: Add Krait proc info
+In-Reply-To: <51366B9E.7010502@codeaurora.org>
+References: <1362439299-29617-1-git-send-email-sboyd@codeaurora.org>
+ <20130305083421.GA19391@mudshark.cambridge.arm.com>
+ <51366B9E.7010502@codeaurora.org>
+Message-ID: <20130306002615.GA20530@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Tue,  5 Mar 2013 23:16:46 +0100
-Arnd Bergmann <arnd@arndb.de> escreveu:
-
-> OMAP1 no longer provides its own clock interfaces since patch
-> a135eaae52 "ARM: OMAP: remove plat/clock.h". This is great, but
-> we now have to convert the ir-rx51 driver to use the generic
-> interface from linux/clk.h.
+On Tue, Mar 05, 2013 at 10:03:10PM +0000, Stephen Boyd wrote:
+> On 03/05/13 00:34, Will Deacon wrote:
+> > I was looking at this the other day and wondered whether we could set
+> > HWCAP_IDIV in __v7_setup, depending on ID_ISAR0[27:24]. I can't immediately
+> > think why that would be difficult, but similarly there may well be a reason
+> > why we assign it like this.
+> >
+> > Fancy taking a look?
 > 
-> The driver also uses the omap_dm_timer_get_fclk() function,
-> which is not exported for OMAP1, so we have to move the
-> definition out of the OMAP2 specific section.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
+> Ok I'll take a look. Should we be masking out HWCAP_IDIVT on
+> !CONFIG_ARM_THUMB configurations?
 
->From my side:
-Acked-by: Mauro Carvalho Chehab <mchehab@redhat.com>
+Yes, that's not a bad idea. It makes the IDIV* caps follow what we do for
+the others (vfp etc) by only advertising support if the relevant CONFIG
+options are selected.
 
-> Cc: Timo Kokkonen <timo.t.kokkonen@iki.fi>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: linux-media at vger.kernel.org
-> ---
->  arch/arm/plat-omap/dmtimer.c | 16 ++++++++--------
->  drivers/media/rc/ir-rx51.c   |  4 ++--
->  2 files changed, 10 insertions(+), 10 deletions(-)
-> 
-> diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
-> index a0daa2f..ea133e5 100644
-> --- a/arch/arm/plat-omap/dmtimer.c
-> +++ b/arch/arm/plat-omap/dmtimer.c
-> @@ -333,6 +333,14 @@ int omap_dm_timer_get_irq(struct omap_dm_timer *timer)
->  }
->  EXPORT_SYMBOL_GPL(omap_dm_timer_get_irq);
->  
-> +struct clk *omap_dm_timer_get_fclk(struct omap_dm_timer *timer)
-> +{
-> +	if (timer)
-> +		return timer->fclk;
-> +	return NULL;
-> +}
-> +EXPORT_SYMBOL_GPL(omap_dm_timer_get_fclk);
-> +
->  #if defined(CONFIG_ARCH_OMAP1)
->  #include <mach/hardware.h>
->  /**
-> @@ -371,14 +379,6 @@ EXPORT_SYMBOL_GPL(omap_dm_timer_modify_idlect_mask);
->  
->  #else
->  
-> -struct clk *omap_dm_timer_get_fclk(struct omap_dm_timer *timer)
-> -{
-> -	if (timer)
-> -		return timer->fclk;
-> -	return NULL;
-> -}
-> -EXPORT_SYMBOL_GPL(omap_dm_timer_get_fclk);
-> -
->  __u32 omap_dm_timer_modify_idlect_mask(__u32 inputmask)
->  {
->  	BUG();
-> diff --git a/drivers/media/rc/ir-rx51.c b/drivers/media/rc/ir-rx51.c
-> index 8ead492..d1364a1 100644
-> --- a/drivers/media/rc/ir-rx51.c
-> +++ b/drivers/media/rc/ir-rx51.c
-> @@ -25,9 +25,9 @@
->  #include <linux/platform_device.h>
->  #include <linux/sched.h>
->  #include <linux/wait.h>
-> +#include <linux/clk.h>
->  
->  #include <plat/dmtimer.h>
-> -#include <plat/clock.h>
->  
->  #include <media/lirc.h>
->  #include <media/lirc_dev.h>
-> @@ -209,7 +209,7 @@ static int lirc_rx51_init_port(struct lirc_rx51 *lirc_rx51)
->  	}
->  
->  	clk_fclk = omap_dm_timer_get_fclk(lirc_rx51->pwm_timer);
-> -	lirc_rx51->fclk_khz = clk_fclk->rate / 1000;
-> +	lirc_rx51->fclk_khz = clk_get_rate(clk_fclk) / 1000;
->  
->  	return 0;
->  
-
-
--- 
-
-Cheers,
-Mauro
+Will
