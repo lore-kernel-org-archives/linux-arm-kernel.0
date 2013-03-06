@@ -1,24 +1,30 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 6 Mar 2013 19:37:43 +0800
+From: heiko@sntech.de (Heiko =?iso-8859-15?q?St=FCbner?=)
+Date: Wed, 6 Mar 2013 12:42:09 +0100
 Subject: [PATCH] ASoC: samsung: let device core setup the default pin
  configuration
-In-Reply-To: <1362570951-14403-1-git-send-email-thomas.abraham@linaro.org>
+In-Reply-To: <20130306113741.GA19556@opensource.wolfsonmicro.com>
 References: <1362570951-14403-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <20130306113741.GA19556@opensource.wolfsonmicro.com>
+ <20130306113741.GA19556@opensource.wolfsonmicro.com>
+Message-ID: <201303061242.09978.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 06, 2013 at 05:25:51PM +0530, Thomas Abraham wrote:
+Am Mittwoch, 6. M?rz 2013, 12:37:43 schrieb Mark Brown:
+> On Wed, Mar 06, 2013 at 05:25:51PM +0530, Thomas Abraham wrote:
+> > With device core now able to setup the default pin configuration,
+> > the pin configuration code based on the deprecated Samsung specific
+> > gpio bindings in i2s driver is removed.
+> 
+> There's rather a lot of non-DT Samsung platforms...
 
-> With device core now able to setup the default pin configuration,
-> the pin configuration code based on the deprecated Samsung specific
-> gpio bindings in i2s driver is removed.
+I think the real non-dt platforms won't be affected.
 
-There's rather a lot of non-DT Samsung platforms...
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130306/34705c92/attachment.sig>
++       if (i2s_pdata->cfg_gpio && i2s_pdata->cfg_gpio(pdev)) {
++               dev_err(&pdev->dev, "Unable to configure gpio\n");
++               ret = -EINVAL;
++               goto err;
+
+is still there for them.
+
+What is going away is the deprecated non-pinctrl way to setup the pins on dt 
+platforms.
