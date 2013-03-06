@@ -1,80 +1,179 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Wed, 6 Mar 2013 17:56:38 +0800
-Subject: [PATCH v11 7/9] usb: chipidea: delete the delayed work
+Date: Wed, 6 Mar 2013 17:56:37 +0800
+Subject: [PATCH v11 6/9] usb: chipidea: add vbus regulator control
 In-Reply-To: <1362563800-16673-1-git-send-email-peter.chen@freescale.com>
 References: <1362563800-16673-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1362563800-16673-8-git-send-email-peter.chen@freescale.com>
+Message-ID: <1362563800-16673-7-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After moving vbus operation to host, we no matter need to delayed operation.
-But, the connection notification to gadget is needed as gadget's start
-is only enable vbus operation, but it doesn't need to delayed.
+For boards which have board level vbus control (eg, gpio), we
+need to operation vbus according to below rules:
+- For host, the vbus should always be on.
+- For otg, the vbus needs to be turned on/off when usb role switches.
+
+We put vbus operation to host as host is the only vbus user,
+When we are at host mode, the vbus is on, when we are not at
+host mode, vbus should be off.
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/chipidea/ci.h   |    1 -
- drivers/usb/chipidea/core.c |   22 +++-------------------
- 2 files changed, 3 insertions(+), 20 deletions(-)
+ drivers/usb/chipidea/ci.h    |    2 ++
+ drivers/usb/chipidea/core.c  |   24 ++++++++----------------
+ drivers/usb/chipidea/host.c  |   23 ++++++++++++++++++++++-
+ include/linux/usb/chipidea.h |    1 +
+ 4 files changed, 33 insertions(+), 17 deletions(-)
 
 diff --git a/drivers/usb/chipidea/ci.h b/drivers/usb/chipidea/ci.h
-index 8826cdb..35ca5ee 100644
+index a3777a1..8826cdb 100644
 --- a/drivers/usb/chipidea/ci.h
 +++ b/drivers/usb/chipidea/ci.h
-@@ -144,7 +144,6 @@ struct ci13xxx {
- 	enum ci_role			role;
- 	bool				is_otg;
- 	struct work_struct		work;
--	struct delayed_work		dwork;
- 	struct workqueue_struct		*wq;
+@@ -133,6 +133,7 @@ struct hw_bank {
+  * @id_event: indicates there is a id event, and handled at ci_otg_work
+  * @b_sess_valid_event: indicates there is a vbus event, and handled
+  * at ci_otg_work
++ * @reg_vbus: used to control internal vbus regulator
+  */
+ struct ci13xxx {
+ 	struct device			*dev;
+@@ -172,6 +173,7 @@ struct ci13xxx {
+ 	struct usb_otg      		otg;
+ 	bool				id_event;
+ 	bool				b_sess_valid_event;
++	struct regulator		*reg_vbus;
+ };
  
- 	struct dma_pool			*qh_pool;
+ static inline struct ci_role_driver *ci_role(struct ci13xxx *ci)
 diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-index e0ff335..464e075 100644
+index c563e17..e0ff335 100644
 --- a/drivers/usb/chipidea/core.c
 +++ b/drivers/usb/chipidea/core.c
-@@ -405,22 +405,6 @@ static void ci_otg_work(struct work_struct *work)
- 	enable_irq(ci->irq);
+@@ -63,6 +63,7 @@
+ #include <linux/kernel.h>
+ #include <linux/slab.h>
+ #include <linux/pm_runtime.h>
++#include <linux/regulator/consumer.h>
+ #include <linux/usb/ch9.h>
+ #include <linux/usb/gadget.h>
+ #include <linux/usb/otg.h>
+@@ -364,17 +365,10 @@ static void ci_handle_id_switch(struct ci13xxx *ci)
+ 		hw_device_reset(ci, USBMODE_CM_IDLE);
+ 
+ 		/* 2. Turn on/off vbus according to coming role */
+-		if (role == CI_ROLE_GADGET) {
+-			otg_set_vbus(&ci->otg, false);
++		if (role == CI_ROLE_GADGET)
+ 			/* wait vbus lower than OTGSC_BSV */
+ 			hw_wait_reg(ci, OP_OTGSC, OTGSC_BSV, 0,
+ 					CI_VBUS_STABLE_TIMEOUT);
+-		} else if (role == CI_ROLE_HOST) {
+-			otg_set_vbus(&ci->otg, true);
+-			/* wait vbus higher than OTGSC_AVV */
+-			hw_wait_reg(ci, OP_OTGSC, OTGSC_AVV, OTGSC_AVV,
+-					CI_VBUS_STABLE_TIMEOUT);
+-		}
+ 
+ 		/* 3. Begin the new role */
+ 		ci_role_start(ci, role);
+@@ -416,17 +410,14 @@ static void ci_delayed_work(struct work_struct *work)
+ 	struct delayed_work *dwork = to_delayed_work(work);
+ 	struct ci13xxx *ci = container_of(dwork, struct ci13xxx, dwork);
+ 
++	/*
++	 * If it is gadget mode, the vbus operation should be done like below:
++	 * 1. Enable vbus detect
++	 * 2. If it has already connected to host, notify udc
++	 */
+ 	if (ci->role == CI_ROLE_GADGET) {
+-		/*
+-		 * if it is device mode:
+-		 * - Enable vbus detect
+-		 * - If it has already connected to host, notify udc
+-		 */
+ 		ci_enable_otg_interrupt(ci, OTGSC_BSVIE);
+ 		ci_handle_vbus_change(ci);
+-	} else if (ci->is_otg && (ci->role == CI_ROLE_HOST)) {
+-		/* USB Device at the MicroB to A cable */
+-		otg_set_vbus(&ci->otg, true);
+ 	}
  }
  
--static void ci_delayed_work(struct work_struct *work)
--{
--	struct delayed_work *dwork = to_delayed_work(work);
--	struct ci13xxx *ci = container_of(dwork, struct ci13xxx, dwork);
--
--	/*
--	 * If it is gadget mode, the vbus operation should be done like below:
--	 * 1. Enable vbus detect
--	 * 2. If it has already connected to host, notify udc
--	 */
--	if (ci->role == CI_ROLE_GADGET) {
--		ci_enable_otg_interrupt(ci, OTGSC_BSVIE);
--		ci_handle_vbus_change(ci);
--	}
--}
--
- static inline void ci_role_destroy(struct ci13xxx *ci)
- {
- 	ci_hdrc_gadget_destroy(ci);
-@@ -615,7 +599,6 @@ static int ci_hdrc_probe(struct platform_device *pdev)
- 	}
+@@ -603,6 +594,7 @@ static int ci_hdrc_probe(struct platform_device *pdev)
  
- 	INIT_WORK(&ci->work, ci_otg_work);
--	INIT_DELAYED_WORK(&ci->dwork, ci_delayed_work);
- 	ci->wq = create_singlethread_workqueue("ci_otg");
- 	if (!ci->wq) {
- 		dev_err(dev, "can't create workqueue\n");
-@@ -678,8 +661,9 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+ 	ci->dev = dev;
+ 	ci->platdata = dev->platform_data;
++	ci->reg_vbus = ci->platdata->reg_vbus;
+ 	if (ci->platdata->phy)
+ 		ci->transceiver = ci->platdata->phy;
+ 	else
+diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
+index ead3158..8efbd44 100644
+--- a/drivers/usb/chipidea/host.c
++++ b/drivers/usb/chipidea/host.c
+@@ -21,6 +21,7 @@
+ 
+ #include <linux/kernel.h>
+ #include <linux/io.h>
++#include <linux/regulator/consumer.h>
+ #include <linux/usb.h>
+ #include <linux/usb/hcd.h>
+ #include <linux/usb/chipidea.h>
+@@ -64,9 +65,19 @@ static int host_start(struct ci13xxx *ci)
+ 	ehci->caps = ci->hw_bank.cap;
+ 	ehci->has_hostpc = ci->hw_bank.lpm;
+ 
++	if (ci->reg_vbus) {
++		ret = regulator_enable(ci->reg_vbus);
++		if (ret) {
++			dev_err(ci->dev,
++				"Failed to enable vbus regulator, ret=%d\n",
++				ret);
++			goto put_hcd;
++		}
++	}
++
+ 	ret = usb_add_hcd(hcd, 0, 0);
  	if (ret)
- 		goto free_irq;
+-		usb_put_hcd(hcd);
++		goto disable_reg;
+ 	else
+ 		ci->hcd = hcd;
  
--	/* Defer some operations */
--	queue_delayed_work(ci->wq, &ci->dwork, msecs_to_jiffies(200));
-+	/* If it is connected to host, tell gadget the connection */
-+	if (ci->role == CI_ROLE_GADGET)
-+		ci_handle_vbus_change(ci);
+@@ -74,6 +85,14 @@ static int host_start(struct ci13xxx *ci)
+ 		hw_write(ci, OP_USBMODE, USBMODE_CI_SDIS, USBMODE_CI_SDIS);
  
  	return ret;
++
++disable_reg:
++	if (ci->reg_vbus)
++		regulator_disable(ci->reg_vbus);
++put_hcd:
++	usb_put_hcd(hcd);
++
++	return ret;
+ }
  
+ static void host_stop(struct ci13xxx *ci)
+@@ -82,6 +101,8 @@ static void host_stop(struct ci13xxx *ci)
+ 
+ 	usb_remove_hcd(hcd);
+ 	usb_put_hcd(hcd);
++	if (ci->reg_vbus)
++		regulator_disable(ci->reg_vbus);
+ }
+ 
+ int ci_hdrc_host_init(struct ci13xxx *ci)
+diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
+index d543e4a..1430403 100644
+--- a/include/linux/usb/chipidea.h
++++ b/include/linux/usb/chipidea.h
+@@ -23,6 +23,7 @@ struct ci13xxx_platform_data {
+ #define CI13XXX_CONTROLLER_RESET_EVENT		0
+ #define CI13XXX_CONTROLLER_STOPPED_EVENT	1
+ 	void	(*notify_event) (struct ci13xxx *ci, unsigned event);
++	struct regulator *reg_vbus;
+ };
+ 
+ /* Default offset of capability registers */
 -- 
 1.7.0.4
