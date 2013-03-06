@@ -1,93 +1,59 @@
-From: hechtb@gmail.com (Bastian Hecht)
-Date: Wed, 6 Mar 2013 14:44:57 +0100
-Subject: [PATCH 1/3] clocksource: sh_cmt: Add Device Tree probing
-In-Reply-To: <20130306010615.GG14275@linux-sh.org>
-References: <1362159932-18533-1-git-send-email-hechtb+renesas@gmail.com>
- <1362159932-18533-2-git-send-email-hechtb+renesas@gmail.com>
- <20130304100309.GA30747@e106331-lin.cambridge.arm.com>
- <CABYn4sxHmr5YLpK5DWxjb0hwmgXP=HbmAy+=HNX9UY6mywCWgw@mail.gmail.com>
- <20130305094305.GB15661@e106331-lin.cambridge.arm.com>
- <20130306010615.GG14275@linux-sh.org>
-Message-ID: <CABYn4sygeF_EYr-Tt9NaHBs2hedv3qq=6VES5v6GU=p71kahww@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 6 Mar 2013 14:58:59 +0100
+Subject: [PATCH 05/10] arm: mach-mvebu: convert to use mvebu-mbus driver
+In-Reply-To: <1362577426-12804-6-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1362577426-12804-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1362577426-12804-6-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20130306145859.56cc0f93@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul, hi Mark,
+Hello,
 
-2013/3/6 Paul Mundt <lethal@linux-sh.org>:
-> On Tue, Mar 05, 2013 at 09:43:05AM +0000, Mark Rutland wrote:
->> Hi again,
->>
->> > >> diff --git a/Documentation/devicetree/bindings/timer/renesas,sh-cmt-timer.txt b/Documentation/devicetree/bindings/timer/renesas,sh-cmt-timer.txt
->> > >> new file mode 100644
->> > >> index 0000000..e5ad808
->> > >> --- /dev/null
->> > >> +++ b/Documentation/devicetree/bindings/timer/renesas,sh-cmt-timer.txt
->> > >> @@ -0,0 +1,21 @@
->> > >> +* Renesas SH Mobile Compare Match Timer
->> > >> +
->> > >> +Required properties:
->> > >> +- compatible : Should be "renesas,cmt"
->> > >> +- reg : Address and length of the register set for the device
->> > >> +- interrupts : Timer IRQ
->> > >> +- renesas,timer-device-id : The ID of the timer device
->> > >> +- renesas,timer-channel-id : The channel ID of the timer device
->> > >
->> > > I'm not familiar with this hardware. Could you give me a basic idea of how it's
->> > > structured?
->> > >
->> > > Does the device have a single timer that this describes, or does the device
->> > > have multiple timers, and this selects which one to use?
->> >
->> > The CMT timer is built into various SoCs from Renesas, often multiple
->> > instances of it. Each timer instance has 6 channels. You can select if
->> > they are driven by the main clock or the real time clock (the SoCs
->> > include an SH core for data processing) and can use different subscale
->> > modes. It features free running mode and can fire events. The clock
->> > has up to 48 bits to count. It has a DMA channel and wires enabling
->> > the device to be a wakeup source. Hmm don't know what to add more.
->> > It's a timer - you can check for overflows, read the counter and so
->> > on.
->>
->> Unless I've misunderstood, couldn't Linux choose one timer to use completely
->> arbitrarily?
->>
->> Why do we need to describe which one to use?
->>
-> Many of these CPUs have multiple timer blocks (CMT, TMU, MTU2) that sit
-> in different power domains, so there is often a desire to prioritize one
-> over another, as it will determine which sleep states are available to
-> us. Beyond that, many of these channels have special behavioural
-> constraints (only certain channels being useable by the PWM block for
-> example, as well as mux issues (certain channels will be tied up with
-> functions we care less about than others).
->
-> We have traditionally registered all of the available timer channels as
-> platform devices, and then left it to the clocksource/event rating to
-> determine which to use for what. This was based on the assumption that
-> later on we would do some work on the clockevents layer to dynamically
-> allocate the other channels that weren't being used for anything, but
-> this never happened, and most users managed to get away with simply
-> adopting hrtimers instead.
->
-> Perhaps the rating is not a detail we want to expose, but we are still
-> going to need some facility for defining whether a given timer is
-> suitable for a clocksource/clockevent or not. We also can't really encode
-> the rating information in the driver itself, as the placement of the
-> block is wholly SoC dependent.
+On Wed,  6 Mar 2013 14:43:41 +0100, Thomas Petazzoni wrote:
+> The changes needed to migrate the mach-mvebu (Armada 370 and Armada
+> XP) to the mvebu-mbus driver are fairly minimal, since not many
+> devices currently supported on those SoCs use address decoding
+> windows. The only one being the BootROM window, used to bring up
+> secondary CPUs.
+> 
+> However, this BootROM window needed for SMP brings an important
+> requirement: the mvebu-mbus driver must be initialized at the
+> ->early_init() time, otherwise the BootROM window cannot be setup
+> early enough to be ready before the secondary CPUs are started.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-Thanks for the explanation. Given this situation I wonder if we can
-add the optional properties:
-renesas,source-quality : The viability to use this device as a free
-running clock
-renesas,event-quality : Th viability to use this device as an event generator
+Of course, a v1 can't be good...
 
-Maybe let it run from 0-10 or from 0-255 and explain the situation in
-the bindings.
-I mean the environmental circumstances of the device are not really a
-property of the device itself, but it doesn't need much imagination to
-see it like that.
+> diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+> index 8188d13..e46955b 100644
+> --- a/arch/arm/boot/dts/armada-370.dtsi
+> +++ b/arch/arm/boot/dts/armada-370.dtsi
+> @@ -39,6 +39,9 @@
+>  	};
+>  
+>  	soc {
+> +		compatible = "marvell,armadaxp-mbus", "simple-bus";
 
-Thanks,
+This should be armada370-mbus.
 
- Bastian
+
+> diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
+> index 1c6fbf4..481a5ba 100644
+> --- a/drivers/bus/mvebu-mbus.c
+> +++ b/drivers/bus/mvebu-mbus.c
+
+And all this shouldn't have been there, but instead should have gone
+into 04/10. That's a rebase -i mistake.
+
+Ignore this patch series, I'll resend a v2 that fixes this problem.
+
+Sorry for the noise,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
