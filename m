@@ -1,65 +1,58 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed,  6 Mar 2013 17:59:57 +0100
-Subject: [PATCH 02/10] arm: plat-orion: use mv_mbus_dram_info() in PCIe code
+Date: Wed,  6 Mar 2013 17:59:58 +0100
+Subject: [PATCH 03/10] arm: mach-orion5x: use mv_mbus_dram_info() in PCI code
 In-Reply-To: <1362589205-4726-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1362589205-4726-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1362589205-4726-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1362589205-4726-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PCIe code was directly accessing the orion_mbus_dram_info
-structure to get access to a description of the SDRAM chip selects in
-order to configure the PCIe -> SDRAM address decoding
-windows.
+The PCI code was directly accessing the orion_mbus_dram_info structure
+to get access to a description of the SDRAM chip selects in order to
+configure the PCIe -> SDRAM address decoding windows.
 
-However, with the introduction of the orion-mbus driver, we are going
+However, with the introduction of the mvebu-mbus driver, we are going
 to remove this global structure and instead leave only the exported
 mv_mbus_dram_info() function to access this description of the SDRAM
 chip selects. Therefore, we simply switch to using this API.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/plat-orion/pcie.c |   10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
+ arch/arm/mach-orion5x/pci.c |    7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/plat-orion/pcie.c b/arch/arm/plat-orion/pcie.c
-index f20a321..8b8c06d 100644
---- a/arch/arm/plat-orion/pcie.c
-+++ b/arch/arm/plat-orion/pcie.c
-@@ -120,12 +120,14 @@ void __init orion_pcie_reset(void __iomem *base)
-  * BAR[0,2] -> disabled, BAR[1] -> covers all DRAM banks
-  * WIN[0-3] -> DRAM bank[0-3]
-  */
--static void __init orion_pcie_setup_wins(void __iomem *base,
--					 struct mbus_dram_target_info *dram)
-+static void __init orion_pcie_setup_wins(void __iomem *base)
- {
-+	const struct mbus_dram_target_info *dram;
- 	u32 size;
- 	int i;
+diff --git a/arch/arm/mach-orion5x/pci.c b/arch/arm/mach-orion5x/pci.c
+index d9c7c3b..973db98 100644
+--- a/arch/arm/mach-orion5x/pci.c
++++ b/arch/arm/mach-orion5x/pci.c
+@@ -402,8 +402,9 @@ static void __init orion5x_pci_master_slave_enable(void)
+ 	orion5x_pci_hw_wr_conf(bus_nr, 0, func, reg, 4, val | 0x7);
+ }
  
-+	dram = mv_mbus_dram_info();
-+
- 	/*
- 	 * First, disable and clear BARs and windows.
- 	 */
-@@ -150,7 +152,7 @@ static void __init orion_pcie_setup_wins(void __iomem *base,
- 	 */
- 	size = 0;
+-static void __init orion5x_setup_pci_wins(struct mbus_dram_target_info *dram)
++static void __init orion5x_setup_pci_wins(void)
+ {
++	const struct mbus_dram_target_info *dram = mv_mbus_dram_info();
+ 	u32 win_enable;
+ 	int bus;
+ 	int i;
+@@ -420,7 +421,7 @@ static void __init orion5x_setup_pci_wins(struct mbus_dram_target_info *dram)
+ 	bus = orion5x_pci_local_bus_nr();
+ 
  	for (i = 0; i < dram->num_cs; i++) {
 -		struct mbus_dram_window *cs = dram->cs + i;
 +		const struct mbus_dram_window *cs = dram->cs + i;
- 
- 		writel(cs->base & 0xffff0000, base + PCIE_WIN04_BASE_OFF(i));
- 		writel(0, base + PCIE_WIN04_REMAP_OFF(i));
-@@ -184,7 +186,7 @@ void __init orion_pcie_setup(void __iomem *base)
+ 		u32 func = PCI_CONF_FUNC_BAR_CS(cs->cs_index);
+ 		u32 reg;
+ 		u32 val;
+@@ -467,7 +468,7 @@ static int __init pci_setup(struct pci_sys_data *sys)
  	/*
- 	 * Point PCIe unit MBUS decode windows to DRAM space.
+ 	 * Point PCI unit MBUS decode windows to DRAM space.
  	 */
--	orion_pcie_setup_wins(base, &orion_mbus_dram_info);
-+	orion_pcie_setup_wins(base);
+-	orion5x_setup_pci_wins(&orion_mbus_dram_info);
++	orion5x_setup_pci_wins();
  
  	/*
- 	 * Master + slave enable.
+ 	 * Master + Slave enable
 -- 
 1.7.9.5
