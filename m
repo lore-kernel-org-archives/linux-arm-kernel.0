@@ -1,71 +1,70 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Wed, 6 Mar 2013 10:14:01 +0200
-Subject: Multi-platform, and secure-only ARM errata workarounds
-In-Reply-To: <513624AA.4090207@wwwdotorg.org>
-References: <201302261023.26939.arnd@arndb.de>
- <20130226113538.GS17833@n2100.arm.linux.org.uk>
- <512CF87A.4090404@wwwdotorg.org>
- <20130226181114.GU17833@n2100.arm.linux.org.uk>
- <5130E757.6090500@wwwdotorg.org>
- <20130304063436.GB27241@tbergstrom-lnx.Nvidia.com>
- <20130304091600.GC27241@tbergstrom-lnx.Nvidia.com>
- <5134D50B.8060001@wwwdotorg.org>
- <20130305074047.GH27241@tbergstrom-lnx.Nvidia.com>
- <513624AA.4090207@wwwdotorg.org>
-Message-ID: <20130306081401.GN27241@tbergstrom-lnx.Nvidia.com>
+From: xiechao.mail@gmail.com (Chao Xie)
+Date: Wed, 6 Mar 2013 16:24:58 +0800
+Subject: [V8 PATCH 01/16] usb: phy: mv_usb2: add PHY driver for marvell
+ usb2 controller
+In-Reply-To: <20130306081044.GD28587@arwen.pp.htv.fi>
+References: <1361419646-9052-1-git-send-email-chao.xie@marvell.com>
+ <1361419646-9052-2-git-send-email-chao.xie@marvell.com>
+ <20130304142143.GG3397@arwen.pp.htv.fi>
+ <CADApbeigW=1fQtUZmLMX8H2+0RiiBFjcSBNojQRSZbCa_ORZVw@mail.gmail.com>
+ <20130305110457.GF7899@arwen.pp.htv.fi>
+ <CADApbeg1KfW4xW=YQcqOwgyaOfes=Nu=9pmtxWgazW23vYS9yw@mail.gmail.com>
+ <20130306081044.GD28587@arwen.pp.htv.fi>
+Message-ID: <CADApbej6kscrCYu=hD177tVGGsMTBw2kE+G8PRpVR_5AsJ38tw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 05, 2013 at 06:00:26PM +0100, Stephen Warren wrote:
-> On 03/05/2013 12:40 AM, Peter De Schrijver wrote:
-> > On Mon, Mar 04, 2013 at 06:08:27PM +0100, Stephen Warren wrote:
-> >> On 03/04/2013 02:16 AM, Peter De Schrijver wrote:
-> >>> On Mon, Mar 04, 2013 at 07:34:36AM +0100, Peter De Schrijver wrote:
-> >>>> On Fri, Mar 01, 2013 at 06:37:27PM +0100, Stephen Warren wrote:
-> >>>>
+On Wed, Mar 6, 2013 at 4:10 PM, Felipe Balbi <balbi@ti.com> wrote:
+> Hi,
+>
+> On Wed, Mar 06, 2013 at 10:11:41AM +0800, Chao Xie wrote:
+>> 3. For the revison register. It exists in some SOCes(pxa168), but for
+>> some SOCes, the register dispears(pxa910, armada610). These SOCes are
+>> developed by different desgin teams, and it need to be enhanced, but
+>> for current products i have to use the device_id to detect the PHY
+>> controller.
+>
+> fair enough, make sure to add a comment to the driver about this so
+> grumpy maintainers stop complaining ;-)
+>
+>> 4. For the mutex and refcount. The "USB controller" includes two
+>> blocks - the udc and ehci. In fact they will not be used at same time,
+>> but for some SOCes it duplicates the ehci block. It means that the
+>> SOCes have two or more ehci blocks. The added ehci blocks depend on
+>> the PHY to be initialized, and they can be used at same time as the
+>> "USB controller". That is the reason i add mutex and refcount for phy
+>> driver.
+>
+> alright, let's add refcounting to the generic PHY layer then.
+>
+>> 5. For the clock name. Can you describe it in details? For clkdev, if
+>> it want to find the clock, it still depends on the dev_name and
+>> con_id.
+>
+> right, the idea of clkdev is that you associate a clock provider with
+> its consumer by means of dev_name. Then you can fetch the clock from
+> driver with any name you want. Which means if you do you clkdev properly
+> you could:
+>
+> clk_get(dev, "clk1");
+> clk_get(dev, "clk2");
+> ...
+>
+> and so on.
+>
 
-> > Unfortunately we can't write to the diag register if we are in non-secure
-> > mode. So unless we never want to support running in non-secure mode, we will
-> > need to make the distinction somehow and use a different method for non-secure
-> > mode. Or assume the secure OS has applied the WARs.
-> 
-> Yes. The secure OS really has to have enabled the appropriate WARs
-> before jumping into the kernel's reset vector. If/when we support the
-> upstream kernel running on Tegra in non-secure mode, the plan was to use
-> a Tegra-specific mechanism to detect secure-vs-normal mode in the Tegra
-> reset vector, and skip the application of secure-only WARs based on that.
-> 
+It is same as what i think.
+The clock numbers and names are depent of SOCes, i do not want to fix
+it in ther driver. So i use pdata to pass the clknum and clk names
+"clk1", "clk2" and so on.
+in the driver, i use
+devm_clk_get(&pdev->dev, pdata->clkname[i]);
+Do you think it is acceptable?
 
-Ok. If we have such a mechanism, that works too ofcourse. I was under the
-impression there is no way to know if you're running in secure mode
-or non-secure mode.
+When device tree for clock framework are supported, the things get
+easier, and it is my next step.
 
-> > I'm afraid existing secure
-> > OS implementations for Tegra don't work that way though. They just offer an
-> > SMC which allows the kernel to read and write the diag register.
-> 
-> I had a downstream discussion about this, and Bo Yan said someone had
-> verified this was working correctly for at least for some WARs on some
-> CPUs and for the one particular secure OS we're using.
-> 
-
-Ok. That should be good enough indeed.
-
-> I think it's reasonable to require a fixed secure OS (i.e. one that
-> correctly enables any required WARs) be used with any upstream kernel,
-> since running in normal world would be a new feature that we'd be
-> supporting.
-> 
-
-Sure. But it would be nice if we can support existing systems which have a
-secure OS we can't change.
-
-> An SMC to read/write the diag register sounds the opposite of secure...
-> 
-
-GP OMAP devices provide this, but then again they aren't meant to be secure
-even though they run linx in non-secure mode...
-
-Cheers,
-
-Peter.
+> good luck
+>
+> --
+> balbi
