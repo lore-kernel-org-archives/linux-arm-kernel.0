@@ -1,66 +1,37 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 6 Mar 2013 17:27:12 -0500
-Subject: [PATCH 04/10] bus: introduce an Marvell EBU MBus driver
-In-Reply-To: <20130306215031.GB4916@obsidianresearch.com>
-References: <1362577426-12804-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1362577426-12804-5-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130306190821.GA4689@obsidianresearch.com>
- <20130306202710.15a6aa2c@skate>
- <20130306202447.GA4916@obsidianresearch.com>
- <20130306214036.62fc93b9@skate>
- <20130306215031.GB4916@obsidianresearch.com>
-Message-ID: <20130306222712.GP23237@titan.lakedaemon.net>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 07 Mar 2013 02:28:57 +0300
+Subject: [PATCH v4 0/3] R-Car SATA platform data
+In-Reply-To: <20130301072501.GE14376@verge.net.au>
+References: <201302272332.51650.sergei.shtylyov@cogentembedded.com>
+ <20130301072501.GE14376@verge.net.au>
+Message-ID: <5137D139.9010304@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 06, 2013 at 02:50:31PM -0700, Jason Gunthorpe wrote:
-> On Wed, Mar 06, 2013 at 09:40:36PM +0100, Thomas Petazzoni wrote:
-...
-> > Again, I don't see the point of making the DT binding more complex than
-> > the one being proposed here, and you haven't given any really
-> > compelling arguments except that it is not to your taste. I believe
-> > we're reaching a point where things start to be a matter of taste, and
-> > so unless you're writing the code and doing the work yourself, you also
-> > have to accept that other people might have different visions of how
-> > things should be handled, and therefore have different tastes.
-> > 
-> > How can we make progress on this, in a *reasonable* way?
-> 
-> Well, as you say, we've pretty much completed presenting arguments for
-> each view on this subject, so it is really up to the gatekeepers of
-> the stable DT 'ABI' to decide on how they want this all to look in the
-> end, IMHO.
-> 
-> Jason C/Andrew L/Arnd?
+Hello.
 
-I'm inclined to agree with Thomas.  Since the the first Kirkwood DT
-board was added to the tree, it's been pounded into me that DT
-*describes hardware*.  Not how random bootloader X happened to configure
-it.
+On 03/01/2013 10:25 AM, Simon Horman wrote:
 
-However, we also have the example of local-mac-address.  Which is
-describing how the hardware is *configured* to present a consistent id
-to a network (from bootloader to kernel to userspace).  This is
-certainly a valid deviation from the rule.
+>
+>> Hello.
+>>
+>>     Here's the v4 of the set of now 3 patches (the driver itself has been merged
+>> since) against the Simon Horman's renesas.git repo, 'next' branch:
+>>
+>> [1/3] ARM: mach-shmobile: r8a7779: SATA DT configuration
+>> [2/3] ARM: mach-shmobile: r8a7779: add SATA support
+>> [3/3] ARM: mach-shmobile: marzen: add SATA support
+>>
+>> Patch changes since the initial posting are reported in the individual patches.
+> Thanks. I have refreshed the topic/r-car-sata branch of the renesas tree
+> accordingly. That branch still contains a copy of the "Add Renesas R-Car
+> on-chip 3Gbps SATA controller driver." but it should disappear once I rebase
+> (e.g. on v3.9-rc1).
 
-If a bootloader setup some windows before handing off control to the
-kernel (keep in mind, this could be *BSD, windows, BeOS, etc), is there
-any /need/ to keep that configuration?
+    I see you have finally merged my patches to your 'next' branch, thanks.
+However, you've also merged Morimoto-san's patch to change from gic_spi()
+to gic_iid(), and I thought I'd recast patch 2/3 to make it use 
+gic_iid() too.
+How do we do now, do I need to send a new patch to convert to gic_iid()?
 
-If we are to include Jason's suggestion, I think it should be listed as
-optional properties typically inserted at boot by the bootloader as an
-FYI.  And, for Thomas' sanity, presented as a future patch on top of
-current work. ;-)
-
-At this point, we have at least a few release cycles to shake out a
-standard DT binding for Marvell SoCs.  Currently, not a single product
-ships with a DT-enabled bootloader.  Not even the development boards
-created by Marvell.  So I'm fine with Thomas' bindings as they stand
-*and* fine with adjusting them over the next few releases as needed.
-
-It'll be a different story once products start being released with
-DT-enabled bootloaders.
-
-thx,
-
-Jason.
+WBR, Sergei
