@@ -1,50 +1,74 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 6 Mar 2013 09:44:36 -0800
-Subject: [PATCH 5/9] ARM: omap1: add back missing includes
-In-Reply-To: <201303061123.30789.arnd@arndb.de>
-References: <1362521809-22989-1-git-send-email-arnd@arndb.de>
- <201303052227.33430.arnd@arndb.de>
- <20130306005951.GH11806@atomide.com>
- <201303061123.30789.arnd@arndb.de>
-Message-ID: <20130306174435.GO11806@atomide.com>
+From: infoonline_agent4@nokiamail.com (infoonline_agent4 at nokiamail.com)
+Date: Wed, 6 Mar 2013 09:45:44 -0800 (PST)
+Subject: Invitation: EURO CHECK Loan Limited Offers Loan At 2% RATE Apply
+ Now!!!
+Message-ID: <1610970181.1981637.1362591944625.JavaMail.zimbra@store3.c30.cal.bf1.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [130306 03:27]:
-> On Wednesday 06 March 2013, Tony Lindgren wrote:
-> > * Arnd Bergmann <arnd@arndb.de> [130305 14:31]:
-> > > On Tuesday 05 March 2013, Arnd Bergmann wrote:
-> > > > The recent reorganization of OMAP header files caused a couple of
-> > > > files that used to be implicitly included now missing from OMAP1.
-> > > > This adds explicit inclusions of mach/irqs.h and mach/hardware.h
-> > > > in all files that need them for an OMAP1 allyesconfig build.
-> > > > 
-> > > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > > > Cc: Tony Lindgren <tony@atomide.com>
-> > > > Cc: linux-omap at vger.kernel.org
-> > > > ---
-> > > >  arch/arm/mach-omap1/board-fsample.c  | 1 +
-> > > >  arch/arm/mach-omap1/board-h2.c       | 1 +
-> > > >  arch/arm/mach-omap1/board-perseus2.c | 1 +
-> > > >  arch/arm/mach-omap1/board-sx1.c      | 1 +
-> > > >  drivers/video/omap/lcd_ams_delta.c   | 1 +
-> > > >  drivers/video/omap/lcd_osk.c         | 1 +
-> > > >  6 files changed, 6 insertions(+)
-> > > 
-> > > I saw that Tony has already addressed the latter two changes, but
-> > > did not see a fix for the four board files.
-> > 
-> > Hmm I wonder why I have not seen the board-*.c related ones?
-> > 
-> > Anyways thanks for fixing those:
-> > 
-> > Acked-by: Tony Lindgren <tony@atomide.com>
-> 
-> Actually I cannot reproduce them myself now, I think I'll just drop
-> the patch for now, but will remember your Ack if the problem comes
-> back. The patch would be needed if we decide to use SPARSE_IRQ on
-> OMAP1.
+YAHOO! CALENDAR - YOU'RE INVITED!
 
-OK sounds good to me.
+infoonline_agent4 at nokiamail.com has sent an invitation:
 
-Tony
+EURO CHECK Loan Limited Offers Loan At 2% RATE Apply Now!!!
+
+When:
+Wednesday, March 6, 2013 6:30p - 7:30p (GMT+00:00)
+
+EURO CHECK Loan Limited Offers Loan At 2% RATE Apply Now!!!
+
+
+Dear Esteemed Customer,
+
+
+EURO CHECK Loan Limited, specializes in arranging loan of any amounts, longer repayment terms. We offer Business loan, Home loan, Personal loan, Car loan, Student loan, Dept. Consolidation, Loan for Business start. Do you have a small or big project to finance? up and Business Expansion, Real Estate and Mortgages all at 2% interest rate for applicants of all credit types. 
+
+
+The service we offer is quick and stress free. Our Priority is your total Satisfaction! Our goal is that you enjoy the service we provide from start to conclusion. Interested new applicant should reply to ( info_eurocheck at globomail.com ) to contact Administrative Director for more informations: Mr. Manfred Holzer.
+
+
+Sincerely,
+Ms.Ellody.
+
+
+Phone/SmS: +33 751 226 934/+33-753 404 777
+Fax: + 33 160 54177 42
+Address: 88 Boulevard De l?H?pital
+75013 Paris ? France
+www.euro-check.co.uk
+
+*~*~*~*~*~*~*~*~*~*
+RSVP Now!
+http://calendar.yahoo.com/infoonline_agent4 at nokiamail.com/rsvp?e=linux-arm-kernel at lists.infradead.org&uid=0f587097-1ec2-4856-a92b-9734002c9292&tk=zZrJHfb4Q58V.gI_JKxDZwaLDGU-&hh=SPb1ZNr7j8ZjPv43HEm0jstJKbs-
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130306/33e9c8f3/attachment-0001.html>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: image2
+Type: image/gif
+Size: 733 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130306/33e9c8f3/attachment-0002.gif>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: image3
+Type: image/gif
+Size: 1820 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130306/33e9c8f3/attachment-0003.gif>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: meeting.ics
+Type: text/calendar
+Size: 3988 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130306/33e9c8f3/attachment-0001.ics>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: invite.ics
+Type: application/ics
+Size: 3988 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130306/33e9c8f3/attachment-0001.bin>
