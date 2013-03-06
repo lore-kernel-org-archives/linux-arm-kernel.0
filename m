@@ -1,47 +1,80 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed,  6 Mar 2013 11:23:32 +0100
-Subject: [GIT PULL 3.9] Various fixes for Marvell EBU platforms
-Message-ID: <1362565416-15718-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Wed,  6 Mar 2013 11:23:33 +0100
+Subject: [PATCH 1/4] arm: mvebu: Reduce reg-io-width with UARTs
+In-Reply-To: <1362565416-15718-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1362565416-15718-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1362565416-15718-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason, Andrew, Greg,
+From: Heikki Krogerus <heikki.krogerus@linux.intel.com>
 
-Here are four fixes for Marvell EBU platforms. The first fix is very
-important, without it, all Armada 370/XP platforms are broken. The
-second fix is important as well because it makes the Armada XP GP
-platform actually usable (without it, the platform boots, but no
-network, no XOR, almost nothing works). The two other patches are
-minor DT fixes.
+Setting the reg-io-width to 1 byte represents more accurate
+description of the HW.
 
-Thanks.
+This will fix an issue where UART driver causes kernel
+panic during bootup. Gregory CLEMENT traced the issue to
+autoconfig() in 8250.c, where the existence of FIFO is
+checked from UART_IIR register. The register is now read as
+32-bit value as the reg-io-width is set to 4-bytes. The
+retuned value seems to contain bogus data for bits 31:8,
+causing the issue.
 
-The following changes since commit 6dbe51c251a327e012439c4772097a13df43c5b8:
+Signed-off-by: Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Cc: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
+Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Tested-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
+Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/boot/dts/armada-370-xp.dtsi |    4 ++--
+ arch/arm/boot/dts/armada-xp.dtsi     |    4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-  Linux 3.9-rc1 (2013-03-03 15:11:05 -0800)
-
-are available in the git repository at:
-
-  git at github.com:MISL-EBU-System-SW/mainline-public.git tags/marvell-3.9-fixes-tag
-
-for you to fetch changes up to 6e025ae424c90febf2d0ad4368f0e5cba8b46f77:
-
-  arm: mach-orion5x: fix typo in compatible string of a .dts file (2013-03-06 10:32:59 +0100)
-
-----------------------------------------------------------------
-Various small fixes for Marvell EBU platforms, intended for 3.9.
-
-----------------------------------------------------------------
-Heikki Krogerus (1):
-      arm: mvebu: Reduce reg-io-width with UARTs
-
-Thomas Petazzoni (3):
-      arm: plat-orion: fix address decoding when > 4GB is used
-      arm: mvebu: fix address-cells in mpic DT node
-      arm: mach-orion5x: fix typo in compatible string of a .dts file
-
- arch/arm/boot/dts/armada-370-xp.dtsi               |    5 ++---
- arch/arm/boot/dts/armada-xp.dtsi                   |    4 ++--
- .../dts/orion5x-lacie-ethernet-disk-mini-v2.dts    |    2 +-
- arch/arm/plat-orion/addr-map.c                     |    7 +++++--
- 4 files changed, 10 insertions(+), 8 deletions(-)
+diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+index 6f1acc7..99afca4 100644
+--- a/arch/arm/boot/dts/armada-370-xp.dtsi
++++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+@@ -54,7 +54,7 @@
+ 				reg = <0xd0012000 0x100>;
+ 				reg-shift = <2>;
+ 				interrupts = <41>;
+-				reg-io-width = <4>;
++				reg-io-width = <1>;
+ 				status = "disabled";
+ 		};
+ 		serial at d0012100 {
+@@ -62,7 +62,7 @@
+ 				reg = <0xd0012100 0x100>;
+ 				reg-shift = <2>;
+ 				interrupts = <42>;
+-				reg-io-width = <4>;
++				reg-io-width = <1>;
+ 				status = "disabled";
+ 		};
+ 
+diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+index 1443949..ca00d83 100644
+--- a/arch/arm/boot/dts/armada-xp.dtsi
++++ b/arch/arm/boot/dts/armada-xp.dtsi
+@@ -46,7 +46,7 @@
+ 				reg = <0xd0012200 0x100>;
+ 				reg-shift = <2>;
+ 				interrupts = <43>;
+-				reg-io-width = <4>;
++				reg-io-width = <1>;
+ 				status = "disabled";
+ 		};
+ 		serial at d0012300 {
+@@ -54,7 +54,7 @@
+ 				reg = <0xd0012300 0x100>;
+ 				reg-shift = <2>;
+ 				interrupts = <44>;
+-				reg-io-width = <4>;
++				reg-io-width = <1>;
+ 				status = "disabled";
+ 		};
+ 
+-- 
+1.7.9.5
