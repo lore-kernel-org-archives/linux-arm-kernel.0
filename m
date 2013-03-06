@@ -1,111 +1,153 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 6 Mar 2013 19:21:31 +0100
-Subject: [PATCH 1/3] arm: kirkwood: affect pins to their devices on
- OpenBlocks A6
-In-Reply-To: <1362587021-32762-2-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1362587021-32762-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1362587021-32762-2-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130306182131.GF3904@lunn.ch>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed,  6 Mar 2013 11:22:58 -0700
+Subject: [PATCH 2/7] kbuild: fixdep: support concatenated dep files
+In-Reply-To: <1362594183-21523-1-git-send-email-swarren@wwwdotorg.org>
+References: <1362594183-21523-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1362594183-21523-2-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 06, 2013 at 05:23:39PM +0100, Thomas Petazzoni wrote:
-> The pinctrl configuration done for the Kirkwood-based OpenBlocks A6
-> board was somewhat strange: all pins for all devices were selected
-> through "hogs", i.e as pins of the pinctrl device. Even though it
-> works, it isn't the proper way of doing things: pins should preferably
-> be associated to whatever device they belong to.
+From: Stephen Warren <swarren@nvidia.com>
 
-Hi Thomas
+The current use-case for fixdep is: a source file is run through a single
+processing step, which creates a single dependency file as a side-effect,
+which fixdep transforms into the file used by the kernel build process.
 
-Being able to add pinctrl nodes to the device is new. I think it was
-added in 3.8. Before then each device driver had to explicitly request
-its pins and most didn't, so hogs was the way to do it. Now the core
-driver code gets the pins. So i would not say it is odd, just
-outdated. It would be nice to change the comment to reflect this.
+In order to transparently run the C pre-processor on device-tree files,
+we wish to run both gcc -E and dtc on a source file in a single rule.
+This generates two dependency files, which must be transformed together
+into the file used by the kernel build process. This change modifies
+fixdep so it can process the concatenation of multiple separate input
+dependency files, and produce a correct unified output.
 
-> Therefore, this patch moves the selection of pin muxing of the
-> relevant pins to the UART nodes, the I2C node, the NAND node and the
-> gpio-leds node.
+The code changes have the slight benefit of transforming the loop in
+parse_dep_file() into more of a lexer/tokenizer, with the loop body being
+more of a parser. Previously, some of this logic was mixed together
+before the loop. I also added some comments, which I hope are useful.
 
-For gpio-leds, see the comment i just made for the next patch.
+Benchmarking shows that on a cross-compiled ARM tegra_defconfig build,
+there is less than 0.5 seconds speed decrease with this change, on top
+of a build time of ~2m24s. This is probably within the noise.
 
-Otherwise this look O.K.
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ scripts/basic/fixdep.c |   93 +++++++++++++++++++++++++++++++-----------------
+ 1 file changed, 61 insertions(+), 32 deletions(-)
 
-	  Andrew
-
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  arch/arm/boot/dts/kirkwood-openblocks_a6.dts |   19 +++++++++++++------
->  1 file changed, 13 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/kirkwood-openblocks_a6.dts b/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
-> index ede7fe0d..087681d 100644
-> --- a/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
-> +++ b/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
-> @@ -19,17 +19,23 @@
->  	ocp at f1000000 {
->  		serial at 12000 {
->  			clock-frequency = <200000000>;
-> +			pinctrl-0 = <&pmx_uart0>;
-> +			pinctrl-names = "default";
->  			status = "ok";
->  		};
->  
->  		serial at 12100 {
->  			clock-frequency = <200000000>;
-> +			pinctrl-0 = <&pmx_uart1>;
-> +			pinctrl-names = "default";
->  			status = "ok";
->  		};
->  
->  		nand at 3000000 {
->  			chip-delay = <25>;
->  			status = "okay";
-> +			pinctrl-0 = <&pmx_nand>;
-> +			pinctrl-names = "default";
->  
->  			partition at 0 {
->  				label = "uboot";
-> @@ -69,6 +75,8 @@
->  
->  		i2c at 11100 {
->  			status = "okay";
-> +			pinctrl-0 = <&pmx_twsi1>;
-> +			pinctrl-names = "default";
->  
->  			s35390a: s35390a at 30 {
->  				compatible = "s35390a";
-> @@ -77,16 +85,12 @@
->  		};
->  
->  		pinctrl: pinctrl at 10000 {
-> -			pinctrl-0 = < &pmx_nand &pmx_uart0
-> -				&pmx_uart1 &pmx_twsi1
-> -				&pmx_dip_sw0 &pmx_dip_sw1
-> +			pinctrl-0 = <&pmx_dip_sw0 &pmx_dip_sw1
->  				&pmx_dip_sw2 &pmx_dip_sw3
->  				&pmx_gpio_0 &pmx_gpio_1
->  				&pmx_gpio_2 &pmx_gpio_3
->  				&pmx_gpio_4 &pmx_gpio_5
-> -				&pmx_gpio_6 &pmx_gpio_7
-> -				&pmx_led_red &pmx_led_green
-> -				&pmx_led_yellow >;
-> +				&pmx_gpio_6 &pmx_gpio_7>;
->  			pinctrl-names = "default";
->  
->  			pmx_uart0: pmx-uart0 {
-> @@ -195,6 +199,9 @@
->  
->  	gpio-leds {
->  		compatible = "gpio-leds";
-> +		pinctrl-0 = <&pmx_led_red &pmx_led_green
-> +				&pmx_led_yellow>;
-> +		pinctrl-names = "default";
->  
->  		led-red {
->  			label = "obsa6:red:stat";
-> -- 
-> 1.7.9.5
-> 
+diff --git a/scripts/basic/fixdep.c b/scripts/basic/fixdep.c
+index 7f6425e..078fe1d 100644
+--- a/scripts/basic/fixdep.c
++++ b/scripts/basic/fixdep.c
+@@ -320,49 +320,78 @@ static void parse_dep_file(void *map, size_t len)
+ 	char *end = m + len;
+ 	char *p;
+ 	char s[PATH_MAX];
+-	int first;
+-
+-	p = strchr(m, ':');
+-	if (!p) {
+-		fprintf(stderr, "fixdep: parse error\n");
+-		exit(1);
+-	}
+-	memcpy(s, m, p-m); s[p-m] = 0;
+-	m = p+1;
++	int is_target;
++	int saw_any_target = 0;
++	int is_first_dep = 0;
+ 
+ 	clear_config();
+ 
+-	first = 1;
+ 	while (m < end) {
++		/* Skip any "white space" */
+ 		while (m < end && (*m == ' ' || *m == '\\' || *m == '\n'))
+ 			m++;
++		/* Find next "white space" */
+ 		p = m;
+-		while (p < end && *p != ' ') p++;
+-		if (p == end) {
+-			do p--; while (!isalnum(*p));
++		while (p < end && *p != ' ' && *p != '\\' && *p != '\n')
+ 			p++;
++		/* Is the token we found a target name? */
++		is_target = (*(p-1) == ':');
++		/* Don't write any target names into the dependency file */
++		if (is_target) {
++			/* The /next/ file is the first dependency */
++			is_first_dep = 1;
++		} else {
++			/* Save this token/filename */
++			memcpy(s, m, p-m);
++			s[p - m] = 0;
++
++			/* Ignore certain dependencies */
++			if (strrcmp(s, "include/generated/autoconf.h") &&
++			    strrcmp(s, "arch/um/include/uml-config.h") &&
++			    strrcmp(s, "include/linux/kconfig.h") &&
++			    strrcmp(s, ".ver")) {
++				/*
++				 * Do not list the source file as dependency,
++				 * so that kbuild is not confused if a .c file
++				 * is rewritten into .S or vice versa. Storing
++				 * it in source_* is needed for modpost to
++				 * compute srcversions.
++				 */
++				if (is_first_dep) {
++					/*
++					 * If processing the concatenation of
++					 * multiple dependency files, only
++					 * process the first target name, which
++					 * will be the original source name,
++					 * and ignore any other target names,
++					 * which will be intermediate temporary
++					 * files.
++					 */
++					if (!saw_any_target) {
++						saw_any_target = 1;
++						printf("source_%s := %s\n\n",
++							target, s);
++						printf("deps_%s := \\\n",
++							target);
++					}
++					is_first_dep = 0;
++				} else
++					printf("  %s \\\n", s);
++				do_config_file(s);
++			}
+ 		}
+-		memcpy(s, m, p-m); s[p-m] = 0;
+-		if (strrcmp(s, "include/generated/autoconf.h") &&
+-		    strrcmp(s, "arch/um/include/uml-config.h") &&
+-		    strrcmp(s, "include/linux/kconfig.h") &&
+-		    strrcmp(s, ".ver")) {
+-			/*
+-			 * Do not list the source file as dependency, so that
+-			 * kbuild is not confused if a .c file is rewritten
+-			 * into .S or vice versa. Storing it in source_* is
+-			 * needed for modpost to compute srcversions.
+-			 */
+-			if (first) {
+-				printf("source_%s := %s\n\n", target, s);
+-				printf("deps_%s := \\\n", target);
+-			} else
+-				printf("  %s \\\n", s);
+-			do_config_file(s);
+-		}
+-		first = 0;
++		/*
++		 * Start searching for next token immediately after the first
++		 * "whitespace" character that follows this token.
++		 */
+ 		m = p + 1;
+ 	}
++
++	if (!saw_any_target) {
++		fprintf(stderr, "fixdep: parse error; no targets found\n");
++		exit(1);
++	}
++
+ 	printf("\n%s: $(deps_%s)\n\n", target, target);
+ 	printf("$(deps_%s):\n", target);
+ }
+-- 
+1.7.10.4
