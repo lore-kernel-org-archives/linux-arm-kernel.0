@@ -1,44 +1,38 @@
-From: lethal@linux-sh.org (Paul Mundt)
-Date: Wed, 6 Mar 2013 09:50:10 +0900
-Subject: [PATCH v4 1/3] serial: sh-sci: Add OF support
-In-Reply-To: <201303051926.25655.arnd@arndb.de>
-References: <1362414054-23092-1-git-send-email-hechtb+renesas@gmail.com>
- <5345836.ZO7uU35cQD@wuerfel>
- <CABYn4sxYRbmEe27WKE-FbTZ3_SM+APaYqHJ1=Zrk8_a5czxZaQ@mail.gmail.com>
- <201303051926.25655.arnd@arndb.de>
-Message-ID: <20130306005009.GF14275@linux-sh.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 5 Mar 2013 16:59:52 -0800
+Subject: [PATCH 5/9] ARM: omap1: add back missing includes
+In-Reply-To: <201303052227.33430.arnd@arndb.de>
+References: <1362521809-22989-1-git-send-email-arnd@arndb.de>
+ <1362521809-22989-6-git-send-email-arnd@arndb.de>
+ <201303052227.33430.arnd@arndb.de>
+Message-ID: <20130306005951.GH11806@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 05, 2013 at 07:26:25PM +0000, Arnd Bergmann wrote:
-> On Tuesday 05 March 2013, Bastian Hecht wrote:
-> > >> +- renesas,scbrr-algo-id : Algorithm ID for the Bit Rate Register
-> > >> +  1 = SCBRR_ALGO_1 ((clk + 16 * bps) / (16 * bps) - 1)
-> > >> +  2 = SCBRR_ALGO_2 ((clk + 16 * bps) / (32 * bps) - 1)
-> > >> +  3 = SCBRR_ALGO_3 (((clk * 2) + 16 * bps) / (16 * bps) - 1)
-> > >> +  4 = SCBRR_ALGO_4 (((clk * 2) + 16 * bps) / (32 * bps) - 1)
-> > >> +  5 = SCBRR_ALGO_5 (((clk * 1000 / 32) / bps) - 1)
-> > >
-> > > Maybe replace this with a "clock-frequency" property? This may
-> > > be what the registers contain, but it is not very readable.
+* Arnd Bergmann <arnd@arndb.de> [130305 14:31]:
+> On Tuesday 05 March 2013, Arnd Bergmann wrote:
+> > The recent reorganization of OMAP header files caused a couple of
+> > files that used to be implicitly included now missing from OMAP1.
+> > This adds explicit inclusions of mach/irqs.h and mach/hardware.h
+> > in all files that need them for an OMAP1 allyesconfig build.
 > > 
-> > Hmm... do you want a frequency in absolute terms? And then calculate
-> > the best SCBRR value for it?
-> > I'm unsure about this, either you must exactly hit it or accept
-> > tolerances? As something in between I renamed the property to
-> > "renesas,clock-algorithm", but I don't know if this is what you want.
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Tony Lindgren <tony@atomide.com>
+> > Cc: linux-omap at vger.kernel.org
+> > ---
+> >  arch/arm/mach-omap1/board-fsample.c  | 1 +
+> >  arch/arm/mach-omap1/board-h2.c       | 1 +
+> >  arch/arm/mach-omap1/board-perseus2.c | 1 +
+> >  arch/arm/mach-omap1/board-sx1.c      | 1 +
+> >  drivers/video/omap/lcd_ams_delta.c   | 1 +
+> >  drivers/video/omap/lcd_osk.c         | 1 +
+> >  6 files changed, 6 insertions(+)
 > 
-> I meant the absolute frequency in HZ, since that is what we do
-> for the 8250 uart and other devices, but only if that is sufficient
-> for your device.
-> 
-No, we still need to figure out how to generate that baud rate, whether
-it needs an internal or external clock for driving the rate, etc. The
-frequency in and of itself doesn't provide this information, and various
-parts use different algorithms for factoring the baud rate generator,
-even varying across otherwise identical ports. It's unfortunately not
-possible to infer anything about the SCBRR algorithm from port type or
-specified baud rate.
+> I saw that Tony has already addressed the latter two changes, but
+> did not see a fix for the four board files.
 
-The algorithm IDs here are wholly arbitrary anyways, but are the
-variations I came up with from roughly 60-70 different CPUs.
+Hmm I wonder why I have not seen the board-*.c related ones?
+
+Anyways thanks for fixing those:
+
+Acked-by: Tony Lindgren <tony@atomide.com>
