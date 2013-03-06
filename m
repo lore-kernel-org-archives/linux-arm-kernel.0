@@ -1,67 +1,148 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 06 Mar 2013 09:14:38 -0700
-Subject: [PATCH V2 REPOST] kbuild: create an "include chroot" for DT
- bindings
-In-Reply-To: <5136E866.20008@gmail.com>
-References: <1362506797-21905-1-git-send-email-swarren@wwwdotorg.org>
- <5136E866.20008@gmail.com>
-Message-ID: <51376B6E.2060806@wwwdotorg.org>
+From: mporter@ti.com (Matt Porter)
+Date: Wed,  6 Mar 2013 11:15:30 -0500
+Subject: [PATCH v9 0/9] DMA Engine support for AM33XX
+Message-ID: <1362586540-10393-1-git-send-email-mporter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/05/2013 11:55 PM, Rob Herring wrote:
-> On 03/05/2013 12:06 PM, Stephen Warren wrote:
->> From: Stephen Warren <swarren@nvidia.com>
->>
->> The recent dtc+cpp support allows header files and C pre-processor
->> defines/macros to be used when compiling device tree files. These
->> headers will typically define various constants that are part of the
->> device tree bindings.
->>
->> The original patch which set up the dtc+cpp include path only considered
->> using those headers from device tree files. However, most are also
->> useful for kernel code which needs to interpret the device tree.
->>
->> In both the DT files and the kernel, I'd like to include the DT-related
->> headers in the same way, for example, <dt-bindings/gpio/tegra-gpio.h>.
->> That will simplify any text which discusses the DT header locations.
->>
->> Creating a <dt-bindings/> for kernel source to use is as simple as
->> placing files into include/dt-bindings/.
->>
->> However, when compiling DT files, the include path should be restricted
->> so that only the dt-bindings path is available; arbitrary kernel headers
->> shouldn't be exposed. For this reason, create a specific include
->> directory for use by dtc+cpp, and symlink dt-bindings from there to the
->> actual location of include/dt-bindings/. For want of a better location,
->> place this "include chroot" into the existing dts/ directory.
->>
->> arch/*/boot/dts/include/dt-bindings -> ../../../../../include/dt-bindings
->>
->> Some headers used by device tree files may not be useful to the kernel;
->> they may be used simply to aid in constructing the DT file (e.g. macros
->> to create a node), but not define any information that the kernel needs
->> to share. These may be placed directly into arch/*/boot/dts/ along with
->> the DT files themselves.
->>
->> Cc: Hiroshi Doyu <hdoyu@nvidia.com>
->> Acked-by: Michal Marek <mmarek@suse.cz>
->> Acked-by: Shawn Guo <shawn.guo@linaro.org>
->> Signed-off-by: Stephen Warren <swarren@nvidia.com>
->> ---
->> Grant, Rob,
->>
->> This is a pre-requisite for people to convert their *.dts files to use
->> cpp, and hence is likely to be useful for a number of ARM subarch trees.
->> Perhaps this patch can be placed into a standalone topic branch in the
->> DT repo so we can all merge it. Assuming this patch is OK, I would also
->> repost the patches that create common headers defining IRQ, and GPIO
->> flags, which would place files into the new include/dt-bindings
->> directory.
-> 
-> This looks fine to me. As all these will all be arm-soc branches with
-> the dependency, it probably makes more sense for Arnd/Olof to apply this
-> and create the branch for this single patch.
+Changes since v8:
+	- Removed edma node interrupt-parent property, it is inherited
 
-OK, that'd work fine for me too. I expect that arm-soc branch would also
-include the few patches to create some common headers, once I repost.
+Changes since v7:
+	- Dropped dmaengine compat() patch. It is upstream.
+	- Submitted edma_alloc_slot() error checking bug fix separately,
+	  now a dependency
+	- Fixed bisect issues due to 3/10 hunks that went into 1/10
+	- Fixed incorrect IS_ERRVALUE() use in 3/10
+
+Changes since v6:
+	- Converted edma_of_read_*() to wrappers around of_property_read_*()
+	- Fixed wording on the omap-spi generic DMA properties
+	- Added comment/check to clarify that the driver only supports
+	  a single EDMA instance when booting from DT
+
+Changes since v5:
+	- Dropped mmc portion and moved it to a separate series
+	- Incorporate corrected version of dma_request_slave_channel_compat()
+	- Fix #defines and enablement of TI_PRIV_EDMA option
+
+Changes since v4:
+	- Fixed debug section mismatch in private edma api [01/14]
+	- Respun format-patch to catch the platform_data/edma.h rename [01/14]
+	- Removed address/size-cells from the EDMA binding [05/14]
+
+Changes since v3:
+	- Rebased on 3.8-rc3
+	- No longer an RFC
+	- Fixed bugs in DT/pdata parsing reported by Vaibhav Bedia
+	- Restored all the Davinci pdata to const
+	- Removed max_segs hack in favor of using dma_get_channel_caps()
+	- Fixed extra parens, __raw_* accessors and, ioremap error checks
+	  in xbar handling
+	- Removed excess license info in platform_data/edma.h
+	- Removed unneeded reserved channels data for AM33xx
+	- Removed test-specific pinmuxing from dts files
+	- Adjusted mmc1 node to be disabled by default in the dtsi
+
+Changes since v2:
+	- Rebased on 3.7-rc1
+	- Fixed bug in DT/pdata parsing first found by Gururaja
+	  that turned out to be masked by some toolchains
+	- Dropped unused mach-omap2/devices.c hsmmc patch
+	- Added AM33XX crossbar DMA event mux support
+	- Added am335x-evm support
+
+Changes since v1:
+	- Rebased on top of mainline from 12250d8
+	- Dropped the feature removal schedule patch
+	- Implemented dma_request_slave_channel_compat() and
+	  converted the mmc and spi drivers to use it
+	- Dropped unneeded #address-cells and #size-cells from
+	  EDMA DT support
+	- Moved private EDMA header to linux/platform_data/ and
+	  removed some unneeded definitions
+	- Fixed parsing of optional properties
+
+This series adds DMA Engine support for AM33xx, which uses
+an EDMA DMAC. The EDMA DMAC has been previously supported by only
+a private API implementation (much like the situation with OMAP
+DMA) found on the DaVinci family of SoCs.
+
+The series applies on top of 3.9-rc1 and the following patches:
+
+	- edma private api error check fix from 
+	  http://www.spinics.net/lists/arm-kernel/msg227886.html
+
+The approach taken is similar to how OMAP DMA is being converted to
+DMA Engine support. With the functional EDMA private API already
+existing in mach-davinci/dma.c, we first move that to an ARM common
+area so it can be shared. Adding DT and runtime PM support to the
+private EDMA API implementation allows it to run on AM33xx. AM33xx
+*only* boots using DT so the upstream generic DT DMA helpers are
+leveraged to register EDMA DMAC with the of_dma framework. SPI (and
+MMC in a separate series) are supported using the upstream
+dma_request_slave_channel_compat() dmaengine call that allows
+compatibility with !DT platforms.
+
+With this series both BeagleBone and the AM335x EVM have working
+SPI DMA support (and MMC support with the separate MMC series).
+
+This is tested on BeagleBone with a SPI framebuffer driver and MMC
+rootfs. A trivial gpio DMA event misc driver was used to test the
+crossbar DMA event support. It is also tested on the AM335x EVM
+with the onboard SPI flash and MMC rootfs. Note that MMC can only
+be tested with a separate MMC dmaengine/DT series applied.
+
+Regression testing was done on AM180x-EVM (which also makes use
+of the EDMA dmaengine driver and the EDMA private API) using SD,
+SPI flash, and the onboard audio supported by the ASoC Davinci
+driver. Regression testing was also done on a BeagleBoard xM
+booting from the legacy board file using MMC rootfs.
+
+Matt Porter (9):
+  ARM: davinci: move private EDMA API to arm/common
+  ARM: edma: remove unused transfer controller handlers
+  ARM: edma: add AM33XX support to the private EDMA API
+  dmaengine: edma: enable build for AM33XX
+  dmaengine: edma: Add TI EDMA device tree binding
+  ARM: dts: add AM33XX EDMA support
+  spi: omap2-mcspi: convert to dma_request_slave_channel_compat()
+  spi: omap2-mcspi: add generic DMA request support to the DT binding
+  ARM: dts: add AM33XX SPI DMA support
+
+ Documentation/devicetree/bindings/dma/ti-edma.txt  |   49 +++
+ Documentation/devicetree/bindings/spi/omap-spi.txt |   27 +-
+ arch/arm/Kconfig                                   |    1 +
+ arch/arm/boot/dts/am33xx.dtsi                      |   29 ++
+ arch/arm/common/Kconfig                            |    3 +
+ arch/arm/common/Makefile                           |    1 +
+ arch/arm/{mach-davinci/dma.c => common/edma.c}     |  339 +++++++++++++++++---
+ arch/arm/mach-davinci/Makefile                     |    2 +-
+ arch/arm/mach-davinci/board-tnetv107x-evm.c        |    2 +-
+ arch/arm/mach-davinci/davinci.h                    |    2 +-
+ arch/arm/mach-davinci/devices-tnetv107x.c          |    2 +-
+ arch/arm/mach-davinci/devices.c                    |    6 +-
+ arch/arm/mach-davinci/dm355.c                      |    2 +-
+ arch/arm/mach-davinci/dm365.c                      |    2 +-
+ arch/arm/mach-davinci/dm644x.c                     |    2 +-
+ arch/arm/mach-davinci/dm646x.c                     |    2 +-
+ arch/arm/mach-davinci/include/mach/da8xx.h         |    2 +-
+ arch/arm/mach-omap2/Kconfig                        |    1 +
+ drivers/dma/Kconfig                                |    2 +-
+ drivers/dma/edma.c                                 |    2 +-
+ drivers/mmc/host/davinci_mmc.c                     |    1 +
+ drivers/spi/spi-omap2-mcspi.c                      |   27 +-
+ include/linux/mfd/davinci_voicecodec.h             |    3 +-
+ .../mach => include/linux/platform_data}/edma.h    |   90 +-----
+ include/linux/platform_data/spi-davinci.h          |    2 +-
+ sound/soc/davinci/davinci-evm.c                    |    1 +
+ sound/soc/davinci/davinci-pcm.c                    |    1 +
+ sound/soc/davinci/davinci-pcm.h                    |    2 +-
+ sound/soc/davinci/davinci-sffsdr.c                 |    5 +-
+ 29 files changed, 450 insertions(+), 160 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/dma/ti-edma.txt
+ rename arch/arm/{mach-davinci/dma.c => common/edma.c} (86%)
+ rename {arch/arm/mach-davinci/include/mach => include/linux/platform_data}/edma.h (59%)
+
+-- 
+1.7.9.5
