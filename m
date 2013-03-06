@@ -1,24 +1,34 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Wed, 6 Mar 2013 17:22:11 +0530
-Subject: [PATCH] ASoC: samsung: let device core setup the default pin
- configuration
-In-Reply-To: <20130306114918.GB19556@opensource.wolfsonmicro.com>
-References: <1362570951-14403-1-git-send-email-thomas.abraham@linaro.org>
- <20130306113741.GA19556@opensource.wolfsonmicro.com>
- <201303061242.09978.heiko@sntech.de>
- <20130306114918.GB19556@opensource.wolfsonmicro.com>
-Message-ID: <CAJuYYwS29ToJ+-1S4G+K=3W1C1TRxLcfPrE=rC_OE4fHyWSc5g@mail.gmail.com>
+From: elezegarcia@gmail.com (Ezequiel Garcia)
+Date: Wed, 6 Mar 2013 08:58:45 -0300
+Subject: [PATCH 11/14] ARM: OMAP2+: Add device-tree support for NOR flash
+In-Reply-To: <513664EC.2050508@ti.com>
+References: <1361899842-30303-1-git-send-email-jon-hunter@ti.com>
+ <1361899842-30303-12-git-send-email-jon-hunter@ti.com>
+ <51360271.1030302@mimc.co.uk> <51360562.20309@ti.com>
+ <51361B46.507@mimc.co.uk> <51362BAB.10403@ti.com>
+ <513664EC.2050508@ti.com>
+Message-ID: <CALF0-+VeU9tGy-dKgmVg1pT0z0ghJBSsughV7kzT5nX7u=9BhA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 March 2013 17:19, Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
-> On Wed, Mar 06, 2013 at 12:42:09PM +0100, Heiko St?bner wrote:
->
->> What is going away is the deprecated non-pinctrl way to setup the pins on dt
->> platforms.
->
-> OK, can we have a changelog improvement please?  I didn't read the patch
-> properly because the changelog said it would break my primary
-> development system.
+Jon,
 
-Ok. I will repost again with additional details in the changelog.
+On Tue, Mar 5, 2013 at 6:34 PM, Jon Hunter <jon-hunter@ti.com> wrote:
+>
+> By the way, with this version you should remove "simple-bus" from your
+> gpmc node compatible strings. I now call of_platform_device_create() to
+> create the child device during the GPMC probe. I think that this is a
+> safer approach.
+>
+
+FWIW, using of_platform_device_create() works for my driver.
+It seems as simple as using a compatible 'simple-bus',
+with the advantage that it allows to create and probe the
+child device from its parent.
+
+I'll submit this driver by the end of this week, in case you want
+to take a look at it.
+
+Thanks a lot,
+-- 
+    Ezequiel
