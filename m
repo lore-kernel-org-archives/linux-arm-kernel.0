@@ -1,33 +1,49 @@
-From: elezegarcia@gmail.com (Ezequiel Garcia)
-Date: Wed, 6 Mar 2013 13:54:15 -0300
-Subject: [PATCH 11/14] ARM: OMAP2+: Add device-tree support for NOR flash
-In-Reply-To: <51377300.3040809@ti.com>
-References: <1361899842-30303-1-git-send-email-jon-hunter@ti.com>
- <1361899842-30303-12-git-send-email-jon-hunter@ti.com>
- <51360271.1030302@mimc.co.uk> <51360562.20309@ti.com>
- <51361B46.507@mimc.co.uk> <51362BAB.10403@ti.com>
- <513664EC.2050508@ti.com>
- <CALF0-+VeU9tGy-dKgmVg1pT0z0ghJBSsughV7kzT5nX7u=9BhA@mail.gmail.com>
- <51377300.3040809@ti.com>
-Message-ID: <CALF0-+W_soY9-ZLO3eS7pTXUTKtcuygJeXkJ3As9U-gkdzabCg@mail.gmail.com>
+From: tomas@novotny.cz (Tomas Novotny)
+Date: Wed, 6 Mar 2013 17:57:53 +0100
+Subject: [PATCH v2] arm: davinci: fix edma dmaengine induced null
+ pointer dereference on da830
+In-Reply-To: <1362499102-16468-1-git-send-email-mporter@ti.com>
+References: <1362499102-16468-1-git-send-email-mporter@ti.com>
+Message-ID: <20130306175753.14f74f31@pcnovotny-t.fit.vutbr.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 6, 2013 at 1:46 PM, Jon Hunter <jon-hunter@ti.com> wrote:
->
-> On 03/06/2013 05:58 AM, Ezequiel Garcia wrote:
->> I'll submit this driver by the end of this week, in case you want
->> to take a look at it.
->
-> Ok, but this is not for omap right?
->
+On Tue,  5 Mar 2013 10:58:22 -0500
+Matt Porter <mporter@ti.com> wrote:
 
-No, this is a new driver for a memory controller that's available on
-some Marvell SoC. It will be located in drivers/memory/.
+> This adds additional error checking to the private edma api implementation
+> to catch the case where the edma_alloc_slot() has an invalid controller
+> parameter. The edma dmaengine wrapper driver relies on this condition
+> being handled in order to avoid setting up a second edma dmaengine
+> instance on DA830.
+> 
+> Verfied using a DA850 with the second EDMA controller platform instance
+> removed to simulate a DA830 which only has a single EDMA controller.
+> 
+> Reported-by: Tomas Novotny <tomas@novotny.cz>
+> Signed-off-by: Matt Porter <mporter@ti.com>
+> Cc: stable at vger.kernel.org # v3.7.x+
+> ---
+> v2: Move error check out of conditional to catch all cases
+> 
+>  arch/arm/mach-davinci/dma.c |    3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/arch/arm/mach-davinci/dma.c b/arch/arm/mach-davinci/dma.c
+> index a685e97..45b7c71 100644
+> --- a/arch/arm/mach-davinci/dma.c
+> +++ b/arch/arm/mach-davinci/dma.c
+> @@ -743,6 +743,9 @@ EXPORT_SYMBOL(edma_free_channel);
+>   */
+>  int edma_alloc_slot(unsigned ctlr, int slot)
+>  {
+> +	if (!edma_cc[ctlr])
+> +		return -EINVAL;
+> +
+>  	if (slot >= 0)
+>  		slot = EDMA_CHAN_SLOT(slot);
+>  
 
-I don't have any omap boards with a NOR device to test this,
-but the discussion and the patches were really helpful!
+On the TI AM1707 based custom board:
 
-Thanks,
--- 
-    Ezequiel
+Tested-by: Tomas Novotny <tomas@novotny.cz>
