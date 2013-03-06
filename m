@@ -1,75 +1,27 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Wed, 06 Mar 2013 17:34:21 +0530
-Subject: [PATCH] mmc: dwmmc: let device core setup the default pin
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 6 Mar 2013 19:49:20 +0800
+Subject: [PATCH] ASoC: samsung: let device core setup the default pin
  configuration
-Message-ID: <1362571461-14570-1-git-send-email-thomas.abraham@linaro.org>
+In-Reply-To: <201303061242.09978.heiko@sntech.de>
+References: <1362570951-14403-1-git-send-email-thomas.abraham@linaro.org>
+ <20130306113741.GA19556@opensource.wolfsonmicro.com>
+ <201303061242.09978.heiko@sntech.de>
+Message-ID: <20130306114918.GB19556@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With device core now able to setup the default pin configuration,
-the pin configuration code based on the deprecated Samsung specific
-gpio bindings is removed.
+On Wed, Mar 06, 2013 at 12:42:09PM +0100, Heiko St?bner wrote:
 
-Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
----
- drivers/mmc/host/dw_mmc-exynos.c |   38 --------------------------------------
- 1 files changed, 0 insertions(+), 38 deletions(-)
+> What is going away is the deprecated non-pinctrl way to setup the pins on dt 
+> platforms.
 
-diff --git a/drivers/mmc/host/dw_mmc-exynos.c b/drivers/mmc/host/dw_mmc-exynos.c
-index 72fd0f2..467d043 100644
---- a/drivers/mmc/host/dw_mmc-exynos.c
-+++ b/drivers/mmc/host/dw_mmc-exynos.c
-@@ -152,43 +152,6 @@ static int dw_mci_exynos_parse_dt(struct dw_mci *host)
- 	return 0;
- }
- 
--static int dw_mci_exynos_setup_bus(struct dw_mci *host,
--				struct device_node *slot_np, u8 bus_width)
--{
--	int idx, gpio, ret;
--
--	if (!slot_np)
--		return -EINVAL;
--
--	/* cmd + clock + bus-width pins */
--	for (idx = 0; idx < NUM_PINS(bus_width); idx++) {
--		gpio = of_get_gpio(slot_np, idx);
--		if (!gpio_is_valid(gpio)) {
--			dev_err(host->dev, "invalid gpio: %d\n", gpio);
--			return -EINVAL;
--		}
--
--		ret = devm_gpio_request(host->dev, gpio, "dw-mci-bus");
--		if (ret) {
--			dev_err(host->dev, "gpio [%d] request failed\n", gpio);
--			return -EBUSY;
--		}
--	}
--
--	if (host->pdata->quirks & DW_MCI_QUIRK_BROKEN_CARD_DETECTION)
--		return 0;
--
--	gpio = of_get_named_gpio(slot_np, "samsung,cd-pinmux-gpio", 0);
--	if (gpio_is_valid(gpio)) {
--		if (devm_gpio_request(host->dev, gpio, "dw-mci-cd"))
--			dev_err(host->dev, "gpio [%d] request failed\n", gpio);
--	} else {
--		dev_info(host->dev, "cd gpio not available");
--	}
--
--	return 0;
--}
--
- /* Exynos5250 controller specific capabilities */
- static unsigned long exynos5250_dwmmc_caps[4] = {
- 	MMC_CAP_UHS_DDR50 | MMC_CAP_1_8V_DDR |
-@@ -205,7 +168,6 @@ static const struct dw_mci_drv_data exynos5250_drv_data = {
- 	.prepare_command	= dw_mci_exynos_prepare_command,
- 	.set_ios		= dw_mci_exynos_set_ios,
- 	.parse_dt		= dw_mci_exynos_parse_dt,
--	.setup_bus		= dw_mci_exynos_setup_bus,
- };
- 
- static const struct of_device_id dw_mci_exynos_match[] = {
--- 
-1.6.6.rc2
+OK, can we have a changelog improvement please?  I didn't read the patch
+properly because the changelog said it would break my primary
+development system.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130306/d381082e/attachment.sig>
