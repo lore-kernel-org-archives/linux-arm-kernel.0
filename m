@@ -1,21 +1,59 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 5 Mar 2013 17:01:07 -0800
-Subject: [PATCH 3/9] mfd: remove __exit_p annotation for
- twl4030_madc_remove
-In-Reply-To: <1362521809-22989-4-git-send-email-arnd@arndb.de>
-References: <1362521809-22989-1-git-send-email-arnd@arndb.de>
- <1362521809-22989-4-git-send-email-arnd@arndb.de>
-Message-ID: <20130306010107.GI11806@atomide.com>
+From: simon.jeons@gmail.com (Simon Jeons)
+Date: Wed, 06 Mar 2013 09:04:55 +0800
+Subject: [PATCH] mm: Fixup the condition whether the page cache is free
+In-Reply-To: <20130304150937.GB23767@cmpxchg.org>
+References: <CAFNq8R7tq9kvD9LyhZJ-Cj0kexQfDsPhB4iQYyZ9s9+8Jo82QA@mail.gmail.com>
+ <20130304150937.GB23767@cmpxchg.org>
+Message-ID: <51369637.6030705@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [130305 14:23]:
-> 4740f73fe5 "mfd: remove use of __devexit" removed the __devexit annotation
-> on the twl4030_madc_remove function, but left an __exit_p() present on the
-> pointer to this function. Using __exit_p was as wrong with the devexit in
-> place as it is now, but now we get a gcc warning about an unused function.
-> 
-> In order for the twl4030_madc_remove to work correctly in built-in code, we
-> have to remove the __exit_p.
+Hi Johannes,
+On 03/04/2013 11:09 PM, Johannes Weiner wrote:
+> On Mon, Mar 04, 2013 at 09:54:26AM +0800, Li Haifeng wrote:
+>> When a page cache is to reclaim, we should to decide whether the page
+>> cache is free.
+>> IMO, the condition whether a page cache is free should be 3 in page
+>> frame reclaiming. The reason lists as below.
+>>
+>> When page is allocated, the page->_count is 1(code fragment is code-1 ).
+>> And when the page is allocated for reading files from extern disk, the
+>> page->_count will increment 1 by page_cache_get() in
+>> add_to_page_cache_locked()(code fragment is code-2). When the page is to
+>> reclaim, the isolated LRU list also increase the page->_count(code
+>> fragment is code-3).
+> The page count is initialized to 1, but that does not stay with the
+> object.  It's a reference that is passed to the allocating task, which
+> drops it again when it's done with the page.  I.e. the pattern is like
+> this:
+>
+> instantiation:
+> page = page_cache_alloc()	/* instantiator reference -> 1 */
+> add_to_page_cache(page, mapping, offset)
+>    get_page(page)		/* page cache reference -> 2 */
+> lru_cache_add(page)
+>    get_page(page)		/* pagevec reference -> 3 */
+> /* ...initiate read, write, associate buffers, ... */
+> page_cache_release(page)	/* drop instantiator reference -> 2 + private */
+>
+> reclaim:
+> lru_add_drain()
+>    page_cache_release(page)	/* drop pagevec reference -> 1 + private */
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+IIUC, when add page to lru will lead to add to pagevec firstly, and 
+pagevec will take one reference, so if lru will take over the reference 
+taken by pagevec when page transmit from pagevec to lru? or just drop 
+the reference and lru will not take reference for page?
+
+> __isolate_lru_page(page)
+>    page_cache_get(page)		/* reclaim reference -> 2 + private */
+> is_page_cache_freeable(page)
+> try_to_free_buffers()		/* drop buffer ref -> 2 */
+> __remove_mapping()		/* drop page cache and isolator ref -> 0 */
+> free_hot_cold_page()
+>
+> --
+> To unsubscribe, send a message with 'unsubscribe linux-mm' in
+> the body to majordomo at kvack.org.  For more info on Linux MM,
+> see: http://www.linux-mm.org/ .
+> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
