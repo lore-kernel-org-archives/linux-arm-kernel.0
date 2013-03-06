@@ -1,31 +1,102 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 06 Mar 2013 09:22:53 +0900
-Subject: [PATCH 04/04] ARM: shmobile: Remove r8a7779_register_twd() from
- common.h
-In-Reply-To: <20130306002214.5430.43766.sendpatchset@w520>
-References: <20130306002214.5430.43766.sendpatchset@w520>
-Message-ID: <20130306002253.5430.18137.sendpatchset@w520>
+From: mchehab@redhat.com (Mauro Carvalho Chehab)
+Date: Tue, 5 Mar 2013 21:23:51 -0300
+Subject: [PATCH 6/9] [media] ir-rx51: fix clock API related build issues
+In-Reply-To: <1362521809-22989-7-git-send-email-arnd@arndb.de>
+References: <1362521809-22989-1-git-send-email-arnd@arndb.de>
+ <1362521809-22989-7-git-send-email-arnd@arndb.de>
+Message-ID: <20130305212351.4993d8c6@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+Em Tue,  5 Mar 2013 23:16:46 +0100
+Arnd Bergmann <arnd@arndb.de> escreveu:
 
-Remove unnecessary r8a7779_register_twd() from common.h
+> OMAP1 no longer provides its own clock interfaces since patch
+> a135eaae52 "ARM: OMAP: remove plat/clock.h". This is great, but
+> we now have to convert the ir-rx51 driver to use the generic
+> interface from linux/clk.h.
+> 
+> The driver also uses the omap_dm_timer_get_fclk() function,
+> which is not exported for OMAP1, so we have to move the
+> definition out of the OMAP2 specific section.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
+>From my side:
+Acked-by: Mauro Carvalho Chehab <mchehab@redhat.com>
 
- arch/arm/mach-shmobile/include/mach/common.h |    2 --
- 1 file changed, 2 deletions(-)
+> Cc: Timo Kokkonen <timo.t.kokkonen@iki.fi>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: linux-media at vger.kernel.org
+> ---
+>  arch/arm/plat-omap/dmtimer.c | 16 ++++++++--------
+>  drivers/media/rc/ir-rx51.c   |  4 ++--
+>  2 files changed, 10 insertions(+), 10 deletions(-)
+> 
+> diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
+> index a0daa2f..ea133e5 100644
+> --- a/arch/arm/plat-omap/dmtimer.c
+> +++ b/arch/arm/plat-omap/dmtimer.c
+> @@ -333,6 +333,14 @@ int omap_dm_timer_get_irq(struct omap_dm_timer *timer)
+>  }
+>  EXPORT_SYMBOL_GPL(omap_dm_timer_get_irq);
+>  
+> +struct clk *omap_dm_timer_get_fclk(struct omap_dm_timer *timer)
+> +{
+> +	if (timer)
+> +		return timer->fclk;
+> +	return NULL;
+> +}
+> +EXPORT_SYMBOL_GPL(omap_dm_timer_get_fclk);
+> +
+>  #if defined(CONFIG_ARCH_OMAP1)
+>  #include <mach/hardware.h>
+>  /**
+> @@ -371,14 +379,6 @@ EXPORT_SYMBOL_GPL(omap_dm_timer_modify_idlect_mask);
+>  
+>  #else
+>  
+> -struct clk *omap_dm_timer_get_fclk(struct omap_dm_timer *timer)
+> -{
+> -	if (timer)
+> -		return timer->fclk;
+> -	return NULL;
+> -}
+> -EXPORT_SYMBOL_GPL(omap_dm_timer_get_fclk);
+> -
+>  __u32 omap_dm_timer_modify_idlect_mask(__u32 inputmask)
+>  {
+>  	BUG();
+> diff --git a/drivers/media/rc/ir-rx51.c b/drivers/media/rc/ir-rx51.c
+> index 8ead492..d1364a1 100644
+> --- a/drivers/media/rc/ir-rx51.c
+> +++ b/drivers/media/rc/ir-rx51.c
+> @@ -25,9 +25,9 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/sched.h>
+>  #include <linux/wait.h>
+> +#include <linux/clk.h>
+>  
+>  #include <plat/dmtimer.h>
+> -#include <plat/clock.h>
+>  
+>  #include <media/lirc.h>
+>  #include <media/lirc_dev.h>
+> @@ -209,7 +209,7 @@ static int lirc_rx51_init_port(struct lirc_rx51 *lirc_rx51)
+>  	}
+>  
+>  	clk_fclk = omap_dm_timer_get_fclk(lirc_rx51->pwm_timer);
+> -	lirc_rx51->fclk_khz = clk_fclk->rate / 1000;
+> +	lirc_rx51->fclk_khz = clk_get_rate(clk_fclk) / 1000;
+>  
+>  	return 0;
+>  
 
---- 0001/arch/arm/mach-shmobile/include/mach/common.h
-+++ work/arch/arm/mach-shmobile/include/mach/common.h	2013-03-05 18:38:07.000000000 +0900
-@@ -71,8 +71,6 @@ extern void r8a7779_pinmux_init(void);
- extern void r8a7779_pm_init(void);
- extern void r8a7740_meram_workaround(void);
- 
--extern void r8a7779_register_twd(void);
--
- #ifdef CONFIG_SUSPEND
- int shmobile_suspend_init(void);
- #else
+
+-- 
+
+Cheers,
+Mauro
