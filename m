@@ -1,28 +1,63 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 6 Mar 2013 00:26:15 +0000
-Subject: [PATCH] ARM: proc: Add Krait proc info
-In-Reply-To: <51366B9E.7010502@codeaurora.org>
-References: <1362439299-29617-1-git-send-email-sboyd@codeaurora.org>
- <20130305083421.GA19391@mudshark.cambridge.arm.com>
- <51366B9E.7010502@codeaurora.org>
-Message-ID: <20130306002615.GA20530@mudshark.cambridge.arm.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 6 Mar 2013 08:44:25 +0800
+Subject: [PATCH 4/9] usb: gadget: fix omap_udc build errors
+In-Reply-To: <20130305222224.GA26278@arwen.pp.htv.fi>
+References: <1362521809-22989-1-git-send-email-arnd@arndb.de>
+ <1362521809-22989-5-git-send-email-arnd@arndb.de>
+ <20130305222224.GA26278@arwen.pp.htv.fi>
+Message-ID: <20130306004425.GA28448@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 05, 2013 at 10:03:10PM +0000, Stephen Boyd wrote:
-> On 03/05/13 00:34, Will Deacon wrote:
-> > I was looking at this the other day and wondered whether we could set
-> > HWCAP_IDIV in __v7_setup, depending on ID_ISAR0[27:24]. I can't immediately
-> > think why that would be difficult, but similarly there may well be a reason
-> > why we assign it like this.
-> >
-> > Fancy taking a look?
+On Wed, Mar 06, 2013 at 12:22:24AM +0200, Felipe Balbi wrote:
+> Hi,
 > 
-> Ok I'll take a look. Should we be masking out HWCAP_IDIVT on
-> !CONFIG_ARM_THUMB configurations?
+> On Tue, Mar 05, 2013 at 11:16:44PM +0100, Arnd Bergmann wrote:
+> > 1bf0cf6040 "usb: gadget: omap_udc: convert to udc_start/udc_stop"
+> > made some trivial changes but was missing a ';' character.
+> > 
+> > 8c4cc00552 "ARM: OMAP1: DMA: Moving OMAP1 DMA channel definitions
+> > to mach-omap1" added a definition for OMAP_DMA_USB_W2FC_TX0 to
+> > the driver while making the header file it was defined in
+> > unavailable for drivers, but this driver actually needs
+> > OMAP_DMA_USB_W2FC_RX0 as well.
+> > 
+> > Both changes appear trivial, so let's add the missing semicolon
+> > and the macro definition.
+> > 
+> > Cc: Felipe Balbi <balbi@ti.com>
+> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > ---
+> >  drivers/usb/gadget/omap_udc.c | 3 ++-
+> >  1 file changed, 2 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/usb/gadget/omap_udc.c b/drivers/usb/gadget/omap_udc.c
+> > index 06be85c..f844565 100644
+> > --- a/drivers/usb/gadget/omap_udc.c
+> > +++ b/drivers/usb/gadget/omap_udc.c
+> > @@ -62,6 +62,7 @@
+> >  #define	DRIVER_VERSION	"4 October 2004"
+> >  
+> >  #define OMAP_DMA_USB_W2FC_TX0		29
+> > +#define OMAP_DMA_USB_W2FC_RX0		26
+> >  
+> >  /*
+> >   * The OMAP UDC needs _very_ early endpoint setup:  before enabling the
+> > @@ -1310,7 +1311,7 @@ static int omap_pullup(struct usb_gadget *gadget, int is_on)
+> >  }
+> >  
+> >  static int omap_udc_start(struct usb_gadget *g,
+> > -		struct usb_gadget_driver *driver)
+> > +		struct usb_gadget_driver *driver);
+> 
+> good catch, thanks. I'll queue it for v3.6-rc3. Make sure to Cc
+> linux-usb for anything under drivers/usb/ though
 
-Yes, that's not a bad idea. It makes the IDIV* caps follow what we do for
-the others (vfp etc) by only advertising support if the relevant CONFIG
-options are selected.
+I think you mean 3.9 :)
 
-Will
+I can take this patch right now, if you ack it.
+
+thanks,
+
+greg k-h
