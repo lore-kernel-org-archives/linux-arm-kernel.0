@@ -1,27 +1,43 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 6 Mar 2013 19:49:20 +0800
-Subject: [PATCH] ASoC: samsung: let device core setup the default pin
- configuration
-In-Reply-To: <201303061242.09978.heiko@sntech.de>
-References: <1362570951-14403-1-git-send-email-thomas.abraham@linaro.org>
- <20130306113741.GA19556@opensource.wolfsonmicro.com>
- <201303061242.09978.heiko@sntech.de>
-Message-ID: <20130306114918.GB19556@opensource.wolfsonmicro.com>
+From: jlu@pengutronix.de (Jan =?ISO-8859-1?Q?L=FCbbe?=)
+Date: Wed, 06 Mar 2013 12:51:21 +0100
+Subject: RFC: Zynq Clock Controller
+In-Reply-To: <37032699-343e-485c-80e0-9b23e3706c58@VA3EHSMHS013.ehs.local>
+References: <37032699-343e-485c-80e0-9b23e3706c58@VA3EHSMHS013.ehs.local>
+Message-ID: <1362570681.5269.98.camel@coredoba.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 06, 2013 at 12:42:09PM +0100, Heiko St?bner wrote:
+Hi S?ren,
 
-> What is going away is the deprecated non-pinctrl way to setup the pins on dt 
-> platforms.
+On Tue, 2013-03-05 at 12:04 -0800, S?ren Brinkmann wrote:
+> For this reasons, I'd like to propose moving Zynq into the same
+> direction. I.e. adding a clock controller with the following DT
+> description (details may change but the general idea should become
+> clear):
+> 	clkc: clkc {
+>                 #clock-cells = <1>;
+>                 compatible = "xlnx,ps7-clkc";
+>                 ps_clk_frequency = <33333333>;	# board x-tal
+>                 # optional props
+>                 gem0_emio_clk_freq = <125000000>;
+>                 gem1_emio_clk_freq = <50000000>;
+>                 can_mio_clk_freq_xx = <1234>; # this is possible 54 times with xx = 00..53
+>         };
 
-OK, can we have a changelog improvement please?  I didn't read the patch
-properly because the changelog said it would break my primary
-development system.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130306/d381082e/attachment.sig>
+The clock controller should only contain properties for input frequency
+(which can obviously not be calculated at run-time).
+
+Are the gem*, can* properties inputs? If they are actually outputs, the
+corresponding frequencies should be requested by the clock consumers and
+not hard-coded in DT.
+
+Please keep in mind that DT properties use dashes instead of
+underscores.
+
+Best regards,
+Jan
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
