@@ -1,175 +1,219 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Wed, 06 Mar 2013 17:25:51 +0530
-Subject: [PATCH] ASoC: samsung: let device core setup the default pin
- configuration
-Message-ID: <1362570951-14403-1-git-send-email-thomas.abraham@linaro.org>
+From: hechtb@gmail.com (Bastian Hecht)
+Date: Wed,  6 Mar 2013 12:36:46 +0100
+Subject: [PATCH] serial: sh-sci: OF support finishing
+Message-ID: <1362569806-11431-1-git-send-email-hechtb+renesas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With device core now able to setup the default pin configuration,
-the pin configuration code based on the deprecated Samsung specific
-gpio bindings in i2s driver is removed.
+This is the diff between v3 and v6 of the "serial: sh-sci: Add OF
+support" patch. Among other minor changes this includes
 
-Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+- Reworked compatible property
+- Added interrupt-names property
+
+Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 ---
- .../devicetree/bindings/sound/samsung-i2s.txt      |   30 +--------
- sound/soc/samsung/i2s.c                            |   67 +------------------
- 2 files changed, 8 insertions(+), 89 deletions(-)
+This is based on git://github.com/pmundt/linux-sh.git branch sh/serial-of.
 
-diff --git a/Documentation/devicetree/bindings/sound/samsung-i2s.txt b/Documentation/devicetree/bindings/sound/samsung-i2s.txt
-index 3070046..1db65e5 100644
---- a/Documentation/devicetree/bindings/sound/samsung-i2s.txt
-+++ b/Documentation/devicetree/bindings/sound/samsung-i2s.txt
-@@ -20,23 +20,11 @@ Optional SoC Specific Properties:
-   then this flag is enabled.
- - samsung,idma-addr: Internal DMA register base address of the audio
-   sub system(used in secondary sound source).
+ .../bindings/tty/serial/renesas,sci-serial.txt     |   40 ++++------
+ drivers/tty/serial/sh-sci.c                        |   81 ++++++++++++--------
+ 2 files changed, 67 insertions(+), 54 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/tty/serial/renesas,sci-serial.txt b/Documentation/devicetree/bindings/tty/serial/renesas,sci-serial.txt
+index 6ad1adf..d80039e 100644
+--- a/Documentation/devicetree/bindings/tty/serial/renesas,sci-serial.txt
++++ b/Documentation/devicetree/bindings/tty/serial/renesas,sci-serial.txt
+@@ -1,10 +1,18 @@
+ * Renesas SH-Mobile Serial Communication Interface
+ 
+ Required properties:
+-- compatible : Should be "renesas,sci-<port type>-uart", where <port type> may be
+-  SCI, SCIF, IRDA, SCIFA or SCIFB.
++- compatible : Should be "renesas,sci-<port type>-uart", where <port type> is
++  "sci", "scif", "irda", "scifa", "scifb"
++  or for legacy devices
++  "sh2_scif_fifodata", "sh3_scif", "sh4_scif", "sh4_scif_no_scsptr",
++  "sh4_scif_fifodata", "sh7705_scif".
+ - reg : Address and length of the register set for the device
+-- interrupts : Should contain the following IRQs: ERI, RXI, TXI and BRI.
++- interrupts : Should contain the following IRQs in this order:
++	ERI: receive-error interrupt
++	RXI: receive-FIFO-data-full interrupt
++	TXI: transmit-FIFO-data-empty interrupt
++	BRI: break reception interrupt
++- interrupt-names: The IRQ names "eri", "rxi", "txi" and "bri".
+ - cell-index : The device id.
+ - renesas,scscr : Should contain a bitfield used by the Serial Control Register.
+   b7 = SCSCR_TIE
+@@ -15,7 +23,7 @@ Required properties:
+   b2 = SCSCR_TOIE
+   b1 = SCSCR_CKE1
+   b0 = SCSCR_CKE0
+-- renesas,scbrr-algo-id : Algorithm ID for the Bit Rate Register
++- renesas,scbrr-algorithm : Choose an algorithm ID for the baud rate generator.
+   1 = SCBRR_ALGO_1 ((clk + 16 * bps) / (16 * bps) - 1)
+   2 = SCBRR_ALGO_2 ((clk + 16 * bps) / (32 * bps) - 1)
+   3 = SCBRR_ALGO_3 (((clk * 2) + 16 * bps) / (16 * bps) - 1)
+@@ -23,31 +31,17 @@ Required properties:
+   5 = SCBRR_ALGO_5 (((clk * 1000 / 32) / bps) - 1)
+ 
+ Optional properties:
+-- renesas,autoconf : Set if device is capable of auto configuration
+-- renesas,regtype : Overwrite the register layout. In most cases you can rely
+-  on auto-probing (omit this property or set to 0) but some legacy devices
+-  use a non-default register layout. Possible layouts are
+-  0 = SCIx_PROBE_REGTYPE (default)
+-  1 = SCIx_SCI_REGTYPE
+-  2 = SCIx_IRDA_REGTYPE
+-  3 = SCIx_SCIFA_REGTYPE
+-  4 = SCIx_SCIFB_REGTYPE
+-  5 = SCIx_SH2_SCIF_FIFODATA_REGTYPE
+-  6 = SCIx_SH3_SCIF_REGTYPE
+-  7 = SCIx_SH4_SCIF_REGTYPE
+-  8 = SCIx_SH4_SCIF_NO_SCSPTR_REGTYPE
+-  9 = SCIx_SH4_SCIF_FIFODATA_REGTYPE
+- 10 = SCIx_SH7705_SCIF_REGTYPE
 -
--Required Board Specific Properties:
--
--- gpios: The gpio specifier for data out,data in, LRCLK, CDCLK and SCLK
--  interface lines. The format of the gpio specifier depends on the gpio
--  controller.
--  The syntax of samsung gpio specifier is
--	<[phandle of the gpio controller node]
--	 [pin number within the gpio controller]
--	 [mux function]
--	 [flags and pull up/down]
--	 [drive strength]>
-+- pinctrl-0: Should specify pin control groups used for this controller.
-+- pinctrl-names: Should contain only one value - "default".
++- renesas,autoconf : Set if device is capable of auto configuration.
  
  Example:
- 
--- SoC Specific Portion:
--
- i2s at 03830000 {
- 	compatible = "samsung,i2s-v5";
- 	reg = <0x03830000 0x100>;
-@@ -48,16 +36,6 @@ i2s at 03830000 {
- 	samsung,supports-rstclr;
- 	samsung,supports-secdai;
- 	samsung,idma-addr = <0x03000000>;
--};
--
--- Board Specific Portion:
--
--i2s at 03830000 {
--	gpios = <&gpz 0 2 0 0>, /* I2S_0_SCLK */
--		<&gpz 1 2 0 0>, /* I2S_0_CDCLK */
--		<&gpz 2 2 0 0>, /* I2S_0_LRCK */
--		<&gpz 3 2 0 0>, /* I2S_0_SDI */
--		<&gpz 4 2 0 0>, /* I2S_0_SDO[1] */
--		<&gpz 5 2 0 0>, /* I2S_0_SDO[2] */
--		<&gpz 6 2 0 0>; /* I2S_0_SDO[3] */
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2s0_bus>;
- };
-diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
-index d7231e3..f982a83 100644
---- a/sound/soc/samsung/i2s.c
-+++ b/sound/soc/samsung/i2s.c
-@@ -16,7 +16,6 @@
- #include <linux/io.h>
- #include <linux/module.h>
- #include <linux/of.h>
--#include <linux/of_gpio.h>
- #include <linux/pm_runtime.h>
- 
- #include <sound/soc.h>
-@@ -79,7 +78,6 @@ struct i2s_dai {
- 	u32	suspend_i2smod;
- 	u32	suspend_i2scon;
- 	u32	suspend_i2spsr;
--	unsigned long gpios[7];	/* i2s gpio line numbers */
- };
- 
- /* Lock for cross i/f checks */
-@@ -1009,52 +1007,6 @@ static struct i2s_dai *i2s_alloc_dai(struct platform_device *pdev, bool sec)
- 	return i2s;
+-	sci at 0xe6c50000 {
+-		compatible = "renesas,sci-SCIFA-uart";
++	serial at e6c50000 {
++		compatible = "renesas,sci-scifa-uart";
+ 		interrupt-parent = <&intca>;
+ 		reg = <0xe6c50000 0x100>;
+ 		interrupts = <0x0c20>, <0x0c20>, <0x0c20>, <0x0c20>;
++		interrupt-names = "eri", "rxi", "txi", "bri";
+ 		cell-index = <1>;
+ 		renesas,scscr = <0x30>;
+-		renesas,scbrr-algo-id = <4>;
++		renesas,scbrr-algorithm = <4>;
+ 		renesas,autoconf;
+ 	};
+diff --git a/drivers/tty/serial/sh-sci.c b/drivers/tty/serial/sh-sci.c
+index e3847cc..f1343d2 100644
+--- a/drivers/tty/serial/sh-sci.c
++++ b/drivers/tty/serial/sh-sci.c
+@@ -2352,18 +2352,29 @@ static int sci_remove(struct platform_device *dev)
+ 	return 0;
  }
  
 -#ifdef CONFIG_OF
--static int samsung_i2s_parse_dt_gpio(struct i2s_dai *i2s)
--{
--	struct device *dev = &i2s->pdev->dev;
--	int index, gpio, ret;
--
--	for (index = 0; index < 7; index++) {
--		gpio = of_get_gpio(dev->of_node, index);
--		if (!gpio_is_valid(gpio)) {
--			dev_err(dev, "invalid gpio[%d]: %d\n", index, gpio);
--			goto free_gpio;
+ static const struct of_device_id of_sci_match[] = {
+-	{ .compatible = "renesas,sci-SCI-uart",
+-		.data = (void *)PORT_SCI },
+-	{ .compatible = "renesas,sci-SCIF-uart",
+-		.data = (void *)PORT_SCIF },
+-	{ .compatible = "renesas,sci-IRDA-uart",
+-		.data = (void *)PORT_IRDA },
+-	{ .compatible = "renesas,sci-SCIFA-uart",
+-		.data = (void *)PORT_SCIFA },
+-	{ .compatible = "renesas,sci-SCIFB-uart",
+-		.data = (void *)PORT_SCIFB },
++	{ .compatible = "renesas,sci-sci-uart",
++		.data = (void *)SCIx_SCI_REGTYPE },
++	{ .compatible = "renesas,sci-scif-uart",
++		.data = (void *)SCIx_SH4_SCIF_REGTYPE, },
++	{ .compatible = "renesas,sci-irda-uart",
++		.data = (void *)SCIx_IRDA_REGTYPE },
++	{ .compatible = "renesas,sci-scifa-uart",
++		.data = (void *)SCIx_SCIFA_REGTYPE },
++	{ .compatible = "renesas,sci-scifb-uart",
++		.data = (void *)SCIx_SCIFB_REGTYPE },
++	{ .compatible = "renesas,sci-sh2_scif_fifodata-uart",
++		.data = (void *)SCIx_SH2_SCIF_FIFODATA_REGTYPE },
++	{ .compatible = "renesas,sci-sh3_scif-uart",
++		.data = (void *)SCIx_SH3_SCIF_REGTYPE },
++	{ .compatible = "renesas,sci-sh4_scif-uart",
++		.data = (void *)SCIx_SH4_SCIF_REGTYPE },
++	{ .compatible = "renesas,sci-sh4_scif_no_scsptr-uart",
++		.data = (void *)SCIx_SH4_SCIF_NO_SCSPTR_REGTYPE },
++	{ .compatible = "renesas,sci-sh4_scif_fifodata-uart",
++		.data = (void *)SCIx_SH4_SCIF_FIFODATA_REGTYPE },
++	{ .compatible = "renesas,sci-sh7705_scif-uart",
++		.data = (void *)SCIx_SH7705_SCIF_REGTYPE },
+ 	{},
+ };
+ MODULE_DEVICE_TABLE(of, of_sci_match);
+@@ -2378,6 +2389,9 @@ static struct plat_sci_port *sci_parse_dt(struct platform_device *pdev,
+ 	const __be32 *prop;
+ 	int i, irq, val;
+ 
++	if (!IS_ENABLED(CONFIG_OF) || !np)
++		return NULL;
++
+ 	match = of_match_node(of_sci_match, pdev->dev.of_node);
+ 	if (!match || !match->data) {
+ 		dev_err(&pdev->dev, "OF match error\n");
+@@ -2420,14 +2434,14 @@ static struct plat_sci_port *sci_parse_dt(struct platform_device *pdev,
+ 	}
+ 	p->scscr = be32_to_cpup(prop);
+ 
+-	prop = of_get_property(np, "renesas,scbrr-algo-id", NULL);
++	prop = of_get_property(np, "renesas,scbrr-algorithm", NULL);
+ 	if (!prop) {
+-		dev_err(&pdev->dev, "required DT prop scbrr-algo-id missing\n");
++		dev_err(&pdev->dev, "required DT prop scbrr-algorithm missing\n");
+ 		return NULL;
+ 	}
+ 	val = be32_to_cpup(prop);
+ 	if (val <= SCBRR_ALGO_INVALID || val >= SCBRR_NR_ALGOS) {
+-		dev_err(&pdev->dev, "DT prop scbrr-algo-id out of range\n");
++		dev_err(&pdev->dev, "DT prop clock-algorithm out of range\n");
+ 		return NULL;
+ 	}
+ 	p->scbrr_algo_id = val;
+@@ -2436,27 +2450,32 @@ static struct plat_sci_port *sci_parse_dt(struct platform_device *pdev,
+ 	if (of_get_property(np, "renesas,autoconf", NULL))
+ 		p->flags |= UPF_BOOT_AUTOCONF;
+ 
+-	prop = of_get_property(np, "renesas,regtype", NULL);
+-	if (prop) {
+-		val = be32_to_cpup(prop);
+-		if (val < SCIx_PROBE_REGTYPE || val >= SCIx_NR_REGTYPES) {
+-			dev_err(&pdev->dev, "DT prop regtype out of range\n");
+-			return NULL;
 -		}
--
--		ret = gpio_request(gpio, dev_name(dev));
--		if (ret) {
--			dev_err(dev, "gpio [%d] request failed\n", gpio);
--			goto free_gpio;
--		}
--		i2s->gpios[index] = gpio;
+-		p->regtype = val;
 -	}
--	return 0;
--
--free_gpio:
--	while (--index >= 0)
--		gpio_free(i2s->gpios[index]);
--	return -EINVAL;
--}
--
--static void samsung_i2s_dt_gpio_free(struct i2s_dai *i2s)
--{
--	unsigned int index;
--	for (index = 0; index < 7; index++)
--		gpio_free(i2s->gpios[index]);
--}
++	p->regtype = (unsigned int)match->data;
+ 
+-	p->type = (unsigned int)match->data;
++	switch (p->regtype) {
++	case SCIx_SCI_REGTYPE:
++		p->type = PORT_SCI;
++		break;
++	case SCIx_SH4_SCIF_REGTYPE:
++		p->type = PORT_SCIF;
++		break;
++	case SCIx_IRDA_REGTYPE:
++		p->type = PORT_IRDA;
++		break;
++	case SCIx_SCIFA_REGTYPE:
++		p->type = PORT_SCIFA;
++		break;
++	case SCIx_SCIFB_REGTYPE:
++		p->type = PORT_SCIFB;
++		break;
++	default:
++		/* legacy register sets default to PORT_SCIF */
++		p->type = PORT_SCIF;
++		break;
++	}
+ 
+ 	return p;
+ }
 -#else
--static int samsung_i2s_parse_dt_gpio(struct i2s_dai *dai)
+-static struct plat_sci_port *sci_parse_dt(struct platform_device *pdev,
+-								int *dev_id)
 -{
--	return -EINVAL;
+-	return NULL;
 -}
--
--static void samsung_i2s_dt_gpio_free(struct i2s_dai *dai)
--{
--}
--
--#endif
--
- static const struct of_device_id exynos_i2s_match[];
+-#endif /* CONFIG_OF */
  
- static inline int samsung_i2s_get_driver_data(struct platform_device *pdev)
-@@ -1223,18 +1175,10 @@ static int samsung_i2s_probe(struct platform_device *pdev)
- 		pri_dai->sec_dai = sec_dai;
- 	}
- 
--	if (np) {
--		if (samsung_i2s_parse_dt_gpio(pri_dai)) {
--			dev_err(&pdev->dev, "Unable to configure gpio\n");
--			ret = -EINVAL;
--			goto err;
--		}
--	} else {
--		if (i2s_pdata->cfg_gpio && i2s_pdata->cfg_gpio(pdev)) {
--			dev_err(&pdev->dev, "Unable to configure gpio\n");
--			ret = -EINVAL;
--			goto err;
--		}
-+	if (i2s_pdata->cfg_gpio && i2s_pdata->cfg_gpio(pdev)) {
-+		dev_err(&pdev->dev, "Unable to configure gpio\n");
-+		ret = -EINVAL;
-+		goto err;
- 	}
- 
- 	snd_soc_register_dai(&pri_dai->pdev->dev, &pri_dai->i2s_dai_drv);
-@@ -1259,9 +1203,6 @@ static int samsung_i2s_remove(struct platform_device *pdev)
- 	i2s = dev_get_drvdata(&pdev->dev);
- 	other = i2s->pri_dai ? : i2s->sec_dai;
- 
--	if (!i2s_pdata->cfg_gpio && pdev->dev.of_node)
--		samsung_i2s_dt_gpio_free(i2s->pri_dai);
--
- 	if (other) {
- 		other->pri_dai = NULL;
- 		other->sec_dai = NULL;
+ static int sci_probe_single(struct platform_device *dev,
+ 				      unsigned int index,
 -- 
-1.6.6.rc2
+1.7.9.5
