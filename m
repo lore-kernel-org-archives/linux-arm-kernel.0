@@ -1,94 +1,28 @@
-From: mporter@ti.com (Matt Porter)
-Date: Wed,  6 Mar 2013 11:15:37 -0500
-Subject: [PATCH v9 7/9] spi: omap2-mcspi: convert to
- dma_request_slave_channel_compat()
-In-Reply-To: <1362586540-10393-1-git-send-email-mporter@ti.com>
-References: <1362586540-10393-1-git-send-email-mporter@ti.com>
-Message-ID: <1362586540-10393-8-git-send-email-mporter@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 06 Mar 2013 09:18:26 -0700
+Subject: Multi-platform, and secure-only ARM errata workarounds
+In-Reply-To: <20130306081401.GN27241@tbergstrom-lnx.Nvidia.com>
+References: <201302261023.26939.arnd@arndb.de>
+ <20130226113538.GS17833@n2100.arm.linux.org.uk>
+ <512CF87A.4090404@wwwdotorg.org>
+ <20130226181114.GU17833@n2100.arm.linux.org.uk>
+ <5130E757.6090500@wwwdotorg.org>
+ <20130304063436.GB27241@tbergstrom-lnx.Nvidia.com>
+ <20130304091600.GC27241@tbergstrom-lnx.Nvidia.com>
+ <5134D50B.8060001@wwwdotorg.org>
+ <20130305074047.GH27241@tbergstrom-lnx.Nvidia.com>
+ <513624AA.4090207@wwwdotorg.org>
+ <20130306081401.GN27241@tbergstrom-lnx.Nvidia.com>
+Message-ID: <51376C52.8050007@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert dmaengine channel requests to use
-dma_request_slave_channel_compat(). This supports the DT case of
-platforms requiring channel selection from either the OMAP DMA or
-the EDMA engine. AM33xx only boots from DT and is the only user
-implementing EDMA so in the !DT case we can default to the OMAP DMA
-filter.
+On 03/06/2013 01:14 AM, Peter De Schrijver wrote:
+...
+> I was under the
+> impression there is no way to know if you're running in secure mode
+> or non-secure mode.
 
-Signed-off-by: Matt Porter <mporter@ti.com>
-Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
- drivers/spi/spi-omap2-mcspi.c |   27 ++++++++++++++++++++-------
- 1 file changed, 20 insertions(+), 7 deletions(-)
-
-diff --git a/drivers/spi/spi-omap2-mcspi.c b/drivers/spi/spi-omap2-mcspi.c
-index 893c3d7..38d0915 100644
---- a/drivers/spi/spi-omap2-mcspi.c
-+++ b/drivers/spi/spi-omap2-mcspi.c
-@@ -102,6 +102,9 @@ struct omap2_mcspi_dma {
- 
- 	struct completion dma_tx_completion;
- 	struct completion dma_rx_completion;
-+
-+	char dma_rx_ch_name[14];
-+	char dma_tx_ch_name[14];
- };
- 
- /* use PIO for small transfers, avoiding DMA setup/teardown overhead and
-@@ -822,14 +825,23 @@ static int omap2_mcspi_request_dma(struct spi_device *spi)
- 	dma_cap_zero(mask);
- 	dma_cap_set(DMA_SLAVE, mask);
- 	sig = mcspi_dma->dma_rx_sync_dev;
--	mcspi_dma->dma_rx = dma_request_channel(mask, omap_dma_filter_fn, &sig);
-+
-+	mcspi_dma->dma_rx =
-+		dma_request_slave_channel_compat(mask, omap_dma_filter_fn,
-+						 &sig, &master->dev,
-+						 mcspi_dma->dma_rx_ch_name);
-+
- 	if (!mcspi_dma->dma_rx) {
- 		dev_err(&spi->dev, "no RX DMA engine channel for McSPI\n");
- 		return -EAGAIN;
- 	}
- 
- 	sig = mcspi_dma->dma_tx_sync_dev;
--	mcspi_dma->dma_tx = dma_request_channel(mask, omap_dma_filter_fn, &sig);
-+	mcspi_dma->dma_tx =
-+		dma_request_slave_channel_compat(mask, omap_dma_filter_fn,
-+						 &sig, &master->dev,
-+						 mcspi_dma->dma_tx_ch_name);
-+
- 	if (!mcspi_dma->dma_tx) {
- 		dev_err(&spi->dev, "no TX DMA engine channel for McSPI\n");
- 		dma_release_channel(mcspi_dma->dma_rx);
-@@ -1240,12 +1252,13 @@ static int omap2_mcspi_probe(struct platform_device *pdev)
- 		goto free_master;
- 
- 	for (i = 0; i < master->num_chipselect; i++) {
--		char dma_ch_name[14];
-+		char *dma_rx_ch_name = mcspi->dma_channels[i].dma_rx_ch_name;
-+		char *dma_tx_ch_name = mcspi->dma_channels[i].dma_tx_ch_name;
- 		struct resource *dma_res;
- 
--		sprintf(dma_ch_name, "rx%d", i);
-+		sprintf(dma_rx_ch_name, "rx%d", i);
- 		dma_res = platform_get_resource_byname(pdev, IORESOURCE_DMA,
--				dma_ch_name);
-+				dma_rx_ch_name);
- 		if (!dma_res) {
- 			dev_dbg(&pdev->dev, "cannot get DMA RX channel\n");
- 			status = -ENODEV;
-@@ -1253,9 +1266,9 @@ static int omap2_mcspi_probe(struct platform_device *pdev)
- 		}
- 
- 		mcspi->dma_channels[i].dma_rx_sync_dev = dma_res->start;
--		sprintf(dma_ch_name, "tx%d", i);
-+		sprintf(dma_tx_ch_name, "tx%d", i);
- 		dma_res = platform_get_resource_byname(pdev, IORESOURCE_DMA,
--				dma_ch_name);
-+				dma_tx_ch_name);
- 		if (!dma_res) {
- 			dev_dbg(&pdev->dev, "cannot get DMA TX channel\n");
- 			status = -ENODEV;
--- 
-1.7.9.5
+There's no ARM-architected way. Given Tegra's implementation, there are
+apparently some registers that behave differently that we can use (e.g.
+read value values in secure mode, 0xffffffff in non-secure etc.)
