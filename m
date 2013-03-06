@@ -1,60 +1,42 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Wed, 6 Mar 2013 23:01:12 +0800
-Subject: [GIT PULL] ARM: CSR: minor fixes for 3.9-rc1
-Message-ID: <CAGsJ_4zyW+jVwDZDTb3TwY9TL+pmub4KGP6K0pgwToa-M2kXxQ@mail.gmail.com>
+From: csd@broadcom.com (Christian Daudt)
+Date: Wed, 6 Mar 2013 07:05:16 -0800
+Subject: [PATCH] ARM: bcm281xx: Add L2 cache enable code
+In-Reply-To: <201303061128.57127.arnd@arndb.de>
+References: <1362451632-18806-1-git-send-email-csd@broadcom.com>
+ <201303060631.03782.arnd@arndb.de> <5136F816.2070909@broadcom.com>
+ <201303061128.57127.arnd@arndb.de>
+Message-ID: <51375B2C.2000005@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Arnd,
+On 13-03-06 03:28 AM, Arnd Bergmann wrote:
+>>>> It was originally in init_machine section but I was told that that was
+>>>> too late and init_irq would be better, and I saw that highbank also has
+>>>> it in init_irq. I agree that it is unrelated to irq - is there a better
+>>>> place to put this in ?
+>>> IMHO the later the better. Do you know what issues were caused  by having it
+>>> in init_machine?
+>> This is some feedback I got a while back:
+>> "From kernel 3.4 on-wards i think ( if i remember correctly) cache sync
+>> might be called before your board_init function and you might have to do
+>> this in init_irq. "
+>>
+>> I just looked through where l2x0_of_init is currently called and here's
+>> the list:
+>> early_initcall (exynos4, omap2, sirf, ux500)
+>> init_irq (highbank, imx6q)
+>> init_machine (socfpga, v2m_dt_init)
+>>
+>> so seems to be everywhere :) So I can move it back to init_machineif
+>> that's where itshould be.
+> Hmm, let's try to solve this another time, I don't think there is an easy
+> answer. Maybe we really need a common entry point for the cache
+> controller setup, or move it completely out of platform specific code
+> for the case where it can be probed from DT.
+>
+> Thanks for doing the research!
+>
+So for the time being should it stay in init_irq or init_machine ?
 
-The following changes since commit 6dbe51c251a327e012439c4772097a13df43c5b8:
-
-  Linux 3.9-rc1 (2013-03-03 15:11:05 -0800)
-
-are available in the git repository at:
-  git://gitorious.org/sirfprima2-kernel/sirfprima2-kernel.git sirf/fixes
-
-Barry Song (1):
-      ARM: prima2: fix a checkpatch issue
-
-Syam Sidhardhan (1):
-      ARM: prima2: Replace include linux/module.h with linux/export.h
-
- arch/arm/mach-prima2/common.c |    4 ++--
- arch/arm/mach-prima2/pm.c     |    2 +-
- 2 files changed, 3 insertions(+), 3 deletions(-)
-
------
-
-diff --git a/arch/arm/mach-prima2/common.c b/arch/arm/mach-prima2/common.c
-index 2d57aa4..2ed5007 100644
---- a/arch/arm/mach-prima2/common.c
-+++ b/arch/arm/mach-prima2/common.c
-@@ -39,8 +39,8 @@ static __init void sirfsoc_map_io(void)
-
- #ifdef CONFIG_ARCH_PRIMA2
- static const char *prima2_dt_match[] __initdata = {
--       "sirf,prima2",
--       NULL
-+	"sirf,prima2",
-+	NULL
- };
-
- DT_MACHINE_START(PRIMA2_DT, "Generic PRIMA2 (Flattened Device Tree)")
-diff --git a/arch/arm/mach-prima2/pm.c b/arch/arm/mach-prima2/pm.c
-index 9936c18..f7e347e 100644
---- a/arch/arm/mach-prima2/pm.c
-+++ b/arch/arm/mach-prima2/pm.c
-@@ -9,7 +9,7 @@
- #include <linux/kernel.h>
- #include <linux/suspend.h>
- #include <linux/slab.h>
--#include <linux/module.h>
-+#include <linux/export.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/of_device.h>
-
-
-Thanks
-barry
+   Thanks,
+    csd
