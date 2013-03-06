@@ -1,106 +1,63 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 06 Mar 2013 13:35:05 +0100
-Subject: [PATCH 2/4][V2] time : set broadcast irq affinity
-In-Reply-To: <alpine.LFD.2.02.1303061047240.22263@ionos>
-References: <1362219013-18173-1-git-send-email-daniel.lezcano@linaro.org>
- <1362219013-18173-3-git-send-email-daniel.lezcano@linaro.org>
- <alpine.LFD.2.02.1303052135080.22263@ionos> <51370C09.5020301@linaro.org>
- <alpine.LFD.2.02.1303061047240.22263@ionos>
-Message-ID: <513737F9.2080805@linaro.org>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Wed, 6 Mar 2013 14:27:44 +0100
+Subject: [PATCH 6/9] rtc: stmp3xxx: add sysfs entries for persistent regs
+In-Reply-To: <20130305080252.GA7042@pengutronix.de>
+References: <1362405948-12992-1-git-send-email-s.trumtrar@pengutronix.de>
+ <1362405948-12992-7-git-send-email-s.trumtrar@pengutronix.de>
+ <CACxGe6swW-UDH1cUw1D8P+gyhDC8nDZur-A_m_NBfeRUxcg9Jw@mail.gmail.com>
+ <20130305080252.GA7042@pengutronix.de>
+Message-ID: <20130306132744.GC13810@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/06/2013 10:48 AM, Thomas Gleixner wrote:
-> On Wed, 6 Mar 2013, Daniel Lezcano wrote:
->> On 03/05/2013 09:40 PM, Thomas Gleixner wrote:
->>> On Sat, 2 Mar 2013, Daniel Lezcano wrote:
->>>> When a cpu goes to a deep idle state where its local timer is shutdown,
->>>> it notifies the time frame work to use the broadcast timer instead.
->>>>
->>>> Unfortunately, the broadcast device could wake up any CPU, including an
->>>> idle one which is not concerned by the wake up at all.
->>>>
->>>> This implies, in the worst case, an idle CPU will wake up to send an IPI
->>>> to another idle cpu.
->>>>
->>>> This patch solves this by setting the irq affinity to the cpu concerned
->>>> by the nearest timer event, by this way, the CPU which is wake up is
->>>> guarantee to be the one concerned by the next event and we are safe with
->>>> unnecessary wakeup for another idle CPU.
->>>>
->>>> As the irq affinity is not supported by all the archs, a flag is needed
->>>> to specify which clocksource can handle it : CLOCK_EVT_FEAT_DYNIRQ
->>>>
->>>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->>>> ---
->>>>  include/linux/clockchips.h   |    5 +++++
->>>>  kernel/time/tick-broadcast.c |   40 +++++++++++++++++++++++++++++++++-------
->>>>  2 files changed, 38 insertions(+), 7 deletions(-)
->>>>
->>>> diff --git a/include/linux/clockchips.h b/include/linux/clockchips.h
->>>> index 6634652..c93e2a6 100644
->>>> --- a/include/linux/clockchips.h
->>>> +++ b/include/linux/clockchips.h
->>>> @@ -55,6 +55,11 @@ enum clock_event_nofitiers {
->>>>  #define CLOCK_EVT_FEAT_C3STOP		0x000008
->>>>  #define CLOCK_EVT_FEAT_DUMMY		0x000010
->>>>  
->>>> +/*
->>>> + * Clock event device can set its irq affinity dynamically
->>>> + */
->>>> +#define CLOCK_EVT_FEAT_DYNIRQ		0x000020
->>>> +
->>>>  /**
->>>>   * struct clock_event_device - clock event device descriptor
->>>>   * @event_handler:	Assigned by the framework to be called by the low
->>>> diff --git a/kernel/time/tick-broadcast.c b/kernel/time/tick-broadcast.c
->>>> index 6197ac0..9ca8ff5 100644
->>>> --- a/kernel/time/tick-broadcast.c
->>>> +++ b/kernel/time/tick-broadcast.c
->>>> @@ -406,13 +406,37 @@ struct cpumask *tick_get_broadcast_oneshot_mask(void)
->>>>  	return to_cpumask(tick_broadcast_oneshot_mask);
->>>>  }
->>>>  
->>>> -static int tick_broadcast_set_event(struct clock_event_device *bc,
->>>> +/*
->>>> + * Set broadcast interrupt affinity
->>>> + */
->>>> +static void tick_broadcast_set_affinity(struct clock_event_device *bc,
->>>> +					const struct cpumask *cpumask)
->>>> +{
->>>> +	if (!(bc->features & CLOCK_EVT_FEAT_DYNIRQ))
->>>> +		return;
->>>> +
->>>> +	if (cpumask_equal(bc->cpumask, cpumask))
->>>> +		return;
->>>> +
->>>> +	bc->cpumask = cpumask;
->>>
->>> This breaks with CONFIG_CPUMASK_OFFSTACK=y. cpumask_copy() is your friend!
->>
->> This instruction copies the pointer, not the cpumask content.
->>
->> bc->cpumask is defined as a const struct cpumask * and is used to copy a
->> cpumask pointer not the content.
->>
->> The cpumask parameter is a pointer to a global cpumask provided by the
->> cpumask_of macro.
->>
->> But to be in the safe side, I compiled tested with
->> CONFIG_CPUMASK_OFFSTACK=y without problem.
->>
->> Did I missed something ?
+On Tue, Mar 05, 2013 at 09:02:52AM +0100, Steffen Trumtrar wrote:
+> Hi Grant!
 > 
-> No, I misinterpreted the patch. Assigning a pointer is safe. 
+> On Mon, Mar 04, 2013 at 11:14:54PM +0800, Grant Likely wrote:
+> > On Mon, Mar 4, 2013 at 10:05 PM, Steffen Trumtrar
+> > <s.trumtrar@pengutronix.de> wrote:
+> > > The persistent registers 1-5 are completely software defined. To have access
+> > > from userspace, export them via sysfs.
+> > >
+> > > Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> > 
+> > Hi Steffen,
+> > 
+> > A few comments on this. First and foremost, any additions to the
+> > kernel sysfs interface must be accompanied with documentation in
+> > Documentation/ABI/. Second, adding attributes to an existing device
+> 
+> Okay. I forgot that and will add it in the next version.
+> 
+> > that has already been registered is almost guaranteed to be wrong. The
+> > attributes need to be added all at the same time so they are available
+> > immediately when the new device uevent is issued by the kernel.
+> > 
+> > Instead, the correct thing to do is add an attribute_group to the
+> > child device before the device gets registered. See the 'attributes'
+> > section of Documentation/driver-model/device.txt to see how to do
+> > this.
+> > 
+> > (I also see that the rtc core code is doing the wrong thing here also.
+> > rtc_sysfs_add_device(), rtc_sysfs_add_device() should also be replaced
+> > with an attribute group so that the sysfs files get added
+> > automatically; but that is outside the scope of this patch)
+> > 
+> 
+> Hm, I modeled it after other rtcs and the rtc_sysfs. Seems that I have to
+> rework this.
 
-Ok, thanks anyway for reviewing the patch.
+Okay. Wait. I looked at it again. What I want to do is adding the persistent
+registers as a binary-attribute. Basically having nvram like other rtcs.
+Is that even possible with attribute group? Would I add the attr inside the
+bin_attribute to the group then?
+Or is it wrong to add these regs as binary?
 
-Do you think it is acceptable for upstreaming ?
+Thanks,
+Steffen
 
-  -- Daniel
-
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
