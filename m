@@ -1,36 +1,49 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 07 Mar 2013 13:50:54 -0700
-Subject: 3.9-rc1 regression in arm dtb build
-In-Reply-To: <20130307144506.GB7344@amd.pavel.ucw.cz>
-References: <20130306193332.GA6022@amd.pavel.ucw.cz>
- <5137C404.9060902@wwwdotorg.org> <20130307144506.GB7344@amd.pavel.ucw.cz>
-Message-ID: <5138FDAE.8060202@wwwdotorg.org>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu,  7 Mar 2013 22:26:27 +0100
+Subject: [PATCH 2/9] console: switch to kfifo_dump_str
+In-Reply-To: <1362691594-32286-1-git-send-email-plagnioj@jcrosoft.com>
+References: <20130307212523.GK4401@game.jcrosoft.org>
+ <1362691594-32286-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1362691594-32286-2-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/07/2013 07:45 AM, Pavel Machek wrote:
-> Hi!
->>> commit 499cd8298628eeabf0eb5eb6525d4faa0eec80d8
->>> Author: Grant Likely <grant.likely@secretlab.ca>
->>> Date:   Tue Nov 27 16:29:11 2012 -0700
-> ...
->>> 1) it is inconsistent with 3.8, making switching between 3.9-rc1 and
->>> 3.8 tricky
->>
->> It's pretty easy to locate the DTB by automatically looking in
->> arch/*/boot/dts first, then if the file doesn't exist there, looking in
->> arch/*/boot instead as a legacy fallback.
-> 
-> Unfortunately, that does not work. See 2) below. Stale files even
-> survive "make clean".
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+---
+ common/console.c |    9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
-Oh right. I guess it works fine when having built 3.7 and then building
-3.8, since you'd look in the new location first and only fall back to
-the old location if missing. However, if you then switch back to 3.7 to
-test something, I guess that doesn't work so well.
-
-I tend to always build the dtbs target, so I wasn't affected by this.
-And, often run "git clean -f -d -x" too.
-
-Grant, what's your call on this issue; should I/you look into ways to
-clean the files better, or do you want to revert this?
+diff --git a/common/console.c b/common/console.c
+index beb37bd..243d402 100644
+--- a/common/console.c
++++ b/common/console.c
+@@ -55,6 +55,11 @@ static struct kfifo __console_output_fifo;
+ static struct kfifo *console_input_fifo = &__console_input_fifo;
+ static struct kfifo *console_output_fifo = &__console_output_fifo;
+ 
++static void console_output_dump(unsigned char ch)
++{
++	console_putc(CONSOLE_STDOUT, ch);
++}
++
+ static int console_std_set(struct device_d *dev, struct param_d *param,
+ 		const char *val)
+ {
+@@ -86,14 +91,12 @@ static int console_std_set(struct device_d *dev, struct param_d *param,
+ 	dev_param_set_generic(dev, param, active);
+ 
+ 	if (initialized < CONSOLE_INIT_FULL) {
+-		char ch;
+ 		initialized = CONSOLE_INIT_FULL;
+ 		PUTS_LL("Switch to console [");
+ 		PUTS_LL(dev_name(dev));
+ 		PUTS_LL("]\n");
+ 		barebox_banner();
+-		while (kfifo_getc(console_output_fifo, &ch) == 0)
+-			console_putc(CONSOLE_STDOUT, ch);
++		kfifo_dump_str(console_output_fifo, console_output_dump);
+ 	}
+ 
+ 	return 0;
+-- 
+1.7.10.4
