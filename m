@@ -1,19 +1,74 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 08 Mar 2013 01:53:19 +0300
-Subject: [PATCH 1/9] kfifo: introduce kfifo_dump_str to dump the fifo
-In-Reply-To: <1362691594-32286-1-git-send-email-plagnioj@jcrosoft.com>
-References: <20130307212523.GK4401@game.jcrosoft.org>
- <1362691594-32286-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <51391A5F.1070209@cogentembedded.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Thu, 7 Mar 2013 22:56:54 +0100 (CET)
+Subject: [PATCH V2] cpufreq: ARM big LITTLE: Add generic cpufreq driver
+ and its DT glue
+In-Reply-To: <6cba8f153cfd4b0d3075a34a6dfe287bdec2eb06.1362676407.git.viresh.kumar@linaro.org>
+References: <6cba8f153cfd4b0d3075a34a6dfe287bdec2eb06.1362676407.git.viresh.kumar@linaro.org>
+Message-ID: <Pine.LNX.4.64.1303072248560.20470@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi Viresh
 
-On 03/08/2013 12:26 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+On Fri, 8 Mar 2013, Viresh Kumar wrote:
 
-> This will allow to implement a dmesg mecanism in barebox
+> big LITTLE is ARM's new Architecture focussing power/performance needs of modern
+> world. More information about big LITTLE can be found here:
+> 
+> http://www.arm.com/products/processors/technologies/biglittleprocessing.php
+> http://lwn.net/Articles/481055/
+> 
+> In order to keep cpufreq support for all big LITTLE platforms simple/generic,
+> this patch tries to add a generic cpufreq driver layer for all big LITTLE
+> platforms.
 
-    s/mecanism/mechanism/. And why post barebox patches here?
+I like generic drivers :) cpufreq-cpu0 is yet another such generic 
+(cpufreq) driver. Now, comparing the functionality of the two:
 
-WBR, Sergei
+[snip]
+
+> +/* Set clock frequency */
+> +static int bL_cpufreq_set_target(struct cpufreq_policy *policy,
+> +		unsigned int target_freq, unsigned int relation)
+> +{
+> +	struct cpufreq_freqs freqs;
+> +	u32 cpu = policy->cpu, freq_tab_idx, cur_cluster;
+> +	int ret = 0;
+> +
+> +	cur_cluster = cpu_to_cluster(policy->cpu);
+> +
+> +	freqs.old = bL_cpufreq_get(policy->cpu);
+> +
+> +	/* Determine valid target frequency using freq_table */
+> +	cpufreq_frequency_table_target(policy, freq_table[cur_cluster],
+> +			target_freq, relation, &freq_tab_idx);
+> +	freqs.new = freq_table[cur_cluster][freq_tab_idx].frequency;
+> +
+> +	freqs.cpu = policy->cpu;
+> +
+> +	pr_debug("%s: cpu: %d, cluster: %d, oldfreq: %d, target freq: %d, new freq: %d\n",
+> +			__func__, cpu, cur_cluster, freqs.old, target_freq,
+> +			freqs.new);
+> +
+> +	if (freqs.old == freqs.new)
+> +		return 0;
+> +
+> +	for_each_cpu(freqs.cpu, policy->cpus)
+> +		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+> +
+> +	ret = clk_set_rate(clk[cur_cluster], freqs.new * 1000);
+
+we see, that this driver "only" switches CPU clock frequencies. Whereas 
+the cpufreq-cpu0 driver also manipulates a regulator (if available) 
+directly. I understand, power-saving is also an important consideration 
+for big.LITTLE systems. So, I presume, you plan to implement voltage 
+switching in cpufreq notifiers? Now, my question is: is this (notifier) 
+actually the preferred method and the cpufreq-cpu0 driver is doing it 
+"wrongly?"
+
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
