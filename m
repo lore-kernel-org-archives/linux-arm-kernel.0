@@ -1,66 +1,44 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Thu, 7 Mar 2013 11:28:00 +0800
-Subject: [PATCH v6 03/16] spi/spi-atmel: add support transfer on CS1, 2, 3,
- not only on CS0
+Date: Thu, 7 Mar 2013 11:28:33 +0800
+Subject: [PATCH v6 04/16] spi/spi-atmel: add physical base address
 In-Reply-To: <1362626715-6549-1-git-send-email-wenyou.yang@atmel.com>
 References: <1362626715-6549-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1362626880-6703-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1362626913-6741-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+From: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+Needed for future use with dmaengine enabled driver.
+
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 Cc: spi-devel-general at lists.sourceforge.net
 Cc: linux-kernel at vger.kernel.org
+[wenyou.yang at atmel.com: submit the patch]
+Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
 ---
- drivers/spi/spi-atmel.c |   25 ++++++++++++-------------
- 1 file changed, 12 insertions(+), 13 deletions(-)
+ drivers/spi/spi-atmel.c |    2 ++
+ 1 file changed, 2 insertions(+)
 
 diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-index 8724157..e05aa8c 100644
+index e05aa8c..ce9c894 100644
 --- a/drivers/spi/spi-atmel.c
 +++ b/drivers/spi/spi-atmel.c
-@@ -255,11 +255,6 @@ static bool atmel_spi_is_v2(struct atmel_spi *as)
-  * Master on Chip Select 0.")  No workaround exists for that ... so for
-  * nCS0 on that chip, we (a) don't use the GPIO, (b) can't support CS_HIGH,
-  * and (c) will trigger that first erratum in some cases.
-- *
-- * TODO: Test if the atmel_spi_is_v2() branch below works on
-- * AT91RM9200 if we use some other register than CSR0. However, don't
-- * do this unconditionally since AP7000 has an errata where the BITS
-- * field in CSR0 overrides all other CSRs.
-  */
+@@ -196,6 +196,7 @@ struct atmel_spi_caps {
+ struct atmel_spi {
+ 	spinlock_t		lock;
  
- static void cs_activate(struct atmel_spi *as, struct spi_device *spi)
-@@ -269,18 +264,22 @@ static void cs_activate(struct atmel_spi *as, struct spi_device *spi)
- 	u32 mr;
++	resource_size_t		phybase;
+ 	void __iomem		*regs;
+ 	int			irq;
+ 	struct clk		*clk;
+@@ -993,6 +994,7 @@ static int atmel_spi_probe(struct platform_device *pdev)
+ 	as->regs = ioremap(regs->start, resource_size(regs));
+ 	if (!as->regs)
+ 		goto out_free_buffer;
++	as->phybase = regs->start;
+ 	as->irq = irq;
+ 	as->clk = clk;
  
- 	if (atmel_spi_is_v2(as)) {
--		/*
--		 * Always use CSR0. This ensures that the clock
--		 * switches to the correct idle polarity before we
--		 * toggle the CS.
-+		spi_writel(as, CSR0 + 4 * spi->chip_select, asd->csr);
-+		/* For the low SPI version, there is a issue that PDC transfer
-+		 * on CS1,2,3 needs SPI_CSR0.BITS config as SPI_CSR1,2,3.BITS
- 		 */
- 		spi_writel(as, CSR0, asd->csr);
- 		if (as->caps.has_wdrbt) {
--			spi_writel(as, MR, SPI_BF(PCS, 0x0e) | SPI_BIT(WDRBT)
--				| SPI_BIT(MODFDIS) | SPI_BIT(MSTR));
-+			spi_writel(as, MR,
-+					SPI_BF(PCS, ~(0x01 << spi->chip_select))
-+					| SPI_BIT(WDRBT)
-+					| SPI_BIT(MODFDIS)
-+					| SPI_BIT(MSTR));
- 		} else {
--			spi_writel(as, MR, SPI_BF(PCS, 0x0e) | SPI_BIT(MODFDIS)
--				| SPI_BIT(MSTR));
-+			spi_writel(as, MR,
-+					SPI_BF(PCS, ~(0x01 << spi->chip_select))
-+					| SPI_BIT(MODFDIS)
-+					| SPI_BIT(MSTR));
- 		}
- 		mr = spi_readl(as, MR);
- 		gpio_set_value(asd->npcs_pin, active);
 -- 
 1.7.9.5
