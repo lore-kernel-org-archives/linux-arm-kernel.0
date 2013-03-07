@@ -1,188 +1,197 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed,  6 Mar 2013 16:03:59 -0800
-Subject: [PATCH 03/10] ARM: smp_twd: Divorce smp_twd from local timer API
+Date: Wed,  6 Mar 2013 16:04:02 -0800
+Subject: [PATCH 06/10] ARM: PRIMA2: Divorce timer-marco from local timer API
 In-Reply-To: <1362614646-24113-1-git-send-email-sboyd@codeaurora.org>
 References: <1362614646-24113-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1362614646-24113-4-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1362614646-24113-7-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Separate the smp_twd timers from the local timer API. This will
-allow us to remove ARM local timer support in the near future and
-gets us closer to moving this driver to drivers/clocksource.
+Separate the marco local timers from the local timer API. This
+will allow us to remove ARM local timer support in the near future
+and gets us closer to moving this driver to drivers/clocksource.
 
-Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Barry Song <baohua.song@csr.com>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/Kconfig          |  2 +-
- arch/arm/kernel/smp_twd.c | 48 +++++++++++++++++++++++++++++++----------------
- 2 files changed, 33 insertions(+), 17 deletions(-)
+ arch/arm/mach-prima2/timer-marco.c | 98 ++++++++++++++++++++------------------
+ 1 file changed, 52 insertions(+), 46 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 5b71469..5ad2ccf 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1527,6 +1527,7 @@ config SMP
- 	depends on HAVE_SMP
- 	depends on MMU
- 	select HAVE_ARM_SCU if !ARCH_MSM_SCORPIONMP
-+	select HAVE_ARM_TWD if (!ARCH_MSM_SCORPIONMP && !EXYNOS4_MCT)
- 	select USE_GENERIC_SMP_HELPERS
- 	help
- 	  This enables support for systems with more than one CPU. If you have
-@@ -1650,7 +1651,6 @@ config LOCAL_TIMERS
- 	bool "Use local timer interrupts"
- 	depends on SMP
- 	default y
--	select HAVE_ARM_TWD if (!ARCH_MSM_SCORPIONMP && !EXYNOS4_MCT)
- 	help
- 	  Enable support for local timers on SMP platforms, rather then the
- 	  legacy IPI broadcast method.  Local timers allows the system
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index c092115..2439843 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -11,6 +11,7 @@
- #include <linux/init.h>
- #include <linux/kernel.h>
- #include <linux/clk.h>
+diff --git a/arch/arm/mach-prima2/timer-marco.c b/arch/arm/mach-prima2/timer-marco.c
+index f4eea2e..d54aac2 100644
+--- a/arch/arm/mach-prima2/timer-marco.c
++++ b/arch/arm/mach-prima2/timer-marco.c
+@@ -10,6 +10,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/clockchips.h>
+ #include <linux/clocksource.h>
 +#include <linux/cpu.h>
- #include <linux/delay.h>
- #include <linux/device.h>
- #include <linux/err.h>
-@@ -23,7 +24,6 @@
+ #include <linux/bitops.h>
+ #include <linux/irq.h>
+ #include <linux/clk.h>
+@@ -18,7 +19,6 @@
+ #include <linux/of_irq.h>
  #include <linux/of_address.h>
- 
- #include <asm/smp_twd.h>
+ #include <asm/sched_clock.h>
 -#include <asm/localtimer.h>
+ #include <asm/mach/time.h>
  
- /* set up by the platform code */
- static void __iomem *twd_base;
-@@ -32,7 +32,7 @@ static struct clk *twd_clk;
- static unsigned long twd_timer_rate;
- static DEFINE_PER_CPU(bool, percpu_setup_called);
- 
--static struct clock_event_device __percpu **twd_evt;
-+static struct clock_event_device __percpu *twd_evt;
- static int twd_ppi;
- 
- static void twd_set_mode(enum clock_event_mode mode,
-@@ -105,7 +105,7 @@ static void twd_update_frequency(void *new_rate)
- {
- 	twd_timer_rate = *((unsigned long *) new_rate);
- 
--	clockevents_update_freq(*__this_cpu_ptr(twd_evt), twd_timer_rate);
-+	clockevents_update_freq(__this_cpu_ptr(twd_evt), twd_timer_rate);
+ #include "common.h"
+@@ -154,13 +154,7 @@ static void sirfsoc_clocksource_resume(struct clocksource *cs)
+ 		BIT(1) | BIT(0), sirfsoc_timer_base + SIRFSOC_TIMER_64COUNTER_CTRL);
  }
  
- static int twd_rate_change(struct notifier_block *nb,
-@@ -131,7 +131,7 @@ static struct notifier_block twd_clk_nb = {
+-static struct clock_event_device sirfsoc_clockevent = {
+-	.name = "sirfsoc_clockevent",
+-	.rating = 200,
+-	.features = CLOCK_EVT_FEAT_ONESHOT,
+-	.set_mode = sirfsoc_timer_set_mode,
+-	.set_next_event = sirfsoc_timer_set_next_event,
+-};
++static struct clock_event_device __percpu *sirfsoc_clockevent;
  
- static int twd_clk_init(void)
- {
--	if (twd_evt && *__this_cpu_ptr(twd_evt) && !IS_ERR(twd_clk))
-+	if (twd_evt && __this_cpu_ptr(twd_evt) && !IS_ERR(twd_clk))
- 		return clk_notifier_register(twd_clk, &twd_clk_nb);
+ static struct clocksource sirfsoc_clocksource = {
+ 	.name = "sirfsoc_clocksource",
+@@ -176,11 +170,8 @@ static struct irqaction sirfsoc_timer_irq = {
+ 	.name = "sirfsoc_timer0",
+ 	.flags = IRQF_TIMER | IRQF_NOBALANCING,
+ 	.handler = sirfsoc_timer_interrupt,
+-	.dev_id = &sirfsoc_clockevent,
+ };
  
- 	return 0;
-@@ -150,7 +150,7 @@ static void twd_update_frequency(void *data)
- {
- 	twd_timer_rate = clk_get_rate(twd_clk);
- 
--	clockevents_update_freq(*__this_cpu_ptr(twd_evt), twd_timer_rate);
-+	clockevents_update_freq(__this_cpu_ptr(twd_evt), twd_timer_rate);
- }
- 
- static int twd_cpufreq_transition(struct notifier_block *nb,
-@@ -176,7 +176,7 @@ static struct notifier_block twd_cpufreq_nb = {
- 
- static int twd_cpufreq_init(void)
- {
--	if (twd_evt && *__this_cpu_ptr(twd_evt) && !IS_ERR(twd_clk))
-+	if (twd_evt && __this_cpu_ptr(twd_evt) && !IS_ERR(twd_clk))
- 		return cpufreq_register_notifier(&twd_cpufreq_nb,
- 			CPUFREQ_TRANSITION_NOTIFIER);
- 
-@@ -266,7 +266,6 @@ static void twd_get_clock(struct device_node *np)
-  */
- static int __cpuinit twd_timer_setup(struct clock_event_device *clk)
- {
--	struct clock_event_device **this_cpu_clk;
- 	int cpu = smp_processor_id();
- 
- 	/*
-@@ -275,7 +274,7 @@ static int __cpuinit twd_timer_setup(struct clock_event_device *clk)
- 	 */
- 	if (per_cpu(percpu_setup_called, cpu)) {
- 		__raw_writel(0, twd_base + TWD_TIMER_CONTROL);
--		clockevents_register_device(*__this_cpu_ptr(twd_evt));
-+		clockevents_register_device(__this_cpu_ptr(twd_evt));
- 		enable_percpu_irq(clk->irq, 0);
- 		return 0;
- 	}
-@@ -296,9 +295,7 @@ static int __cpuinit twd_timer_setup(struct clock_event_device *clk)
- 	clk->set_mode = twd_set_mode;
- 	clk->set_next_event = twd_set_next_event;
- 	clk->irq = twd_ppi;
+-#ifdef CONFIG_LOCAL_TIMERS
 -
--	this_cpu_clk = __this_cpu_ptr(twd_evt);
--	*this_cpu_clk = clk;
-+	clk->cpumask = cpumask_of(cpu);
+ static struct irqaction sirfsoc_timer1_irq = {
+ 	.name = "sirfsoc_timer1",
+ 	.flags = IRQF_TIMER | IRQF_NOBALANCING,
+@@ -189,56 +180,75 @@ static struct irqaction sirfsoc_timer1_irq = {
  
- 	clockevents_config_and_register(clk, twd_timer_rate,
- 					0xf, 0xffffffff);
-@@ -307,16 +304,32 @@ static int __cpuinit twd_timer_setup(struct clock_event_device *clk)
+ static int __cpuinit sirfsoc_local_timer_setup(struct clock_event_device *ce)
+ {
+-	/* Use existing clock_event for cpu 0 */
+-	if (!smp_processor_id())
+-		return 0;
++	int cpu = smp_processor_id();
++	struct irqaction *action;
++
++	if (cpu == 0)
++		action = &sirfsoc_timer_irq;
++	else
++		action = &sirfsoc_timer1_irq;
+ 
+-	ce->irq = sirfsoc_timer1_irq.irq;
++	ce->irq = action->irq;
+ 	ce->name = "local_timer";
+-	ce->features = sirfsoc_clockevent.features;
+-	ce->rating = sirfsoc_clockevent.rating;
++	ce->features = CLOCK_EVT_FEAT_ONESHOT;
++	ce->rating = 200;
+ 	ce->set_mode = sirfsoc_timer_set_mode;
+ 	ce->set_next_event = sirfsoc_timer_set_next_event;
+-	ce->shift = sirfsoc_clockevent.shift;
+-	ce->mult = sirfsoc_clockevent.mult;
+-	ce->max_delta_ns = sirfsoc_clockevent.max_delta_ns;
+-	ce->min_delta_ns = sirfsoc_clockevent.min_delta_ns;
++	clockevents_calc_mult_shift(ce, CLOCK_TICK_RATE, 60);
++	ce->max_delta_ns = clockevent_delta2ns(-2, ce);
++	ce->min_delta_ns = clockevent_delta2ns(2, ce);
++	ce->cpumask = cpumask_of(cpu);
+ 
+-	sirfsoc_timer1_irq.dev_id = ce;
+-	BUG_ON(setup_irq(ce->irq, &sirfsoc_timer1_irq));
+-	irq_set_affinity(sirfsoc_timer1_irq.irq, cpumask_of(1));
++	action->dev_id = ce;
++	BUG_ON(setup_irq(ce->irq, action));
++	irq_set_affinity(action->irq, cpumask_of(cpu));
+ 
+ 	clockevents_register_device(ce);
  	return 0;
  }
  
--static struct local_timer_ops twd_lt_ops __cpuinitdata = {
--	.setup	= twd_timer_setup,
--	.stop	= twd_timer_stop,
-+static int __cpuinit twd_timer_cpu_notify(struct notifier_block *self,
+-static void sirfsoc_local_timer_stop(struct clock_event_device *ce)
++static void __cpuinit sirfsoc_local_timer_stop(struct clock_event_device *ce)
+ {
++	int cpu = smp_processor_id();
++
+ 	sirfsoc_timer_count_disable(1);
+ 
+-	remove_irq(sirfsoc_timer1_irq.irq, &sirfsoc_timer1_irq);
++	if (cpu == 0)
++		remove_irq(sirfsoc_timer_irq.irq, &sirfsoc_timer_irq);
++	else
++		remove_irq(sirfsoc_timer1_irq.irq, &sirfsoc_timer1_irq);
++}
++
++static int __cpuinit sirfsoc_cpu_notify(struct notifier_block *self,
 +					   unsigned long action, void *hcpu)
 +{
-+	struct clock_event_device *evt = this_cpu_ptr(twd_evt);
++	struct clock_event_device *evt = this_cpu_ptr(sirfsoc_clockevent);
 +
 +	switch (action & ~CPU_TASKS_FROZEN) {
 +	case CPU_STARTING:
-+		twd_timer_setup(evt);
++		sirfsoc_local_timer_setup(evt);
 +		break;
 +	case CPU_DYING:
-+		twd_timer_stop(evt);
++		sirfsoc_local_timer_stop(evt);
 +		break;
 +	}
 +
 +	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block twd_timer_cpu_nb __cpuinitdata = {
-+	.notifier_call = twd_timer_cpu_notify,
+ }
+ 
+-static struct local_timer_ops sirfsoc_local_timer_ops __cpuinitdata = {
+-	.setup	= sirfsoc_local_timer_setup,
+-	.stop	= sirfsoc_local_timer_stop,
++static struct notifier_block sirfsoc_cpu_nb __cpuinitdata = {
++	.notifier_call = sirfsoc_cpu_notify,
  };
+-#endif /* CONFIG_LOCAL_TIMERS */
  
- static int __init twd_local_timer_common_register(struct device_node *np)
+ static void __init sirfsoc_clockevent_init(void)
  {
- 	int err;
- 
--	twd_evt = alloc_percpu(struct clock_event_device *);
-+	twd_evt = alloc_percpu(struct clock_event_device);
- 	if (!twd_evt) {
- 		err = -ENOMEM;
- 		goto out_free;
-@@ -328,10 +341,13 @@ static int __init twd_local_timer_common_register(struct device_node *np)
- 		goto out_free;
- 	}
- 
--	err = local_timer_register(&twd_lt_ops);
-+	err = register_cpu_notifier(&twd_timer_cpu_nb);
- 	if (err)
- 		goto out_irq;
- 
-+	/* Immediately configure the timer on the boot CPU */
-+	twd_timer_setup(this_cpu_ptr(twd_evt));
+-	clockevents_calc_mult_shift(&sirfsoc_clockevent, CLOCK_TICK_RATE, 60);
+-
+-	sirfsoc_clockevent.max_delta_ns =
+-		clockevent_delta2ns(-2, &sirfsoc_clockevent);
+-	sirfsoc_clockevent.min_delta_ns =
+-		clockevent_delta2ns(2, &sirfsoc_clockevent);
+-
+-	sirfsoc_clockevent.cpumask = cpumask_of(0);
+-	clockevents_register_device(&sirfsoc_clockevent);
+-#ifdef CONFIG_LOCAL_TIMERS
+-	local_timer_register(&sirfsoc_local_timer_ops);
+-#endif
++	sirfsoc_clockevent = alloc_percpu(struct clock_event_device);
++	BUG_ON(!sirfsoc_clockevent);
 +
- 	twd_get_clock(np);
++	BUG_ON(register_cpu_notifier(&sirfsoc_cpu_nb));
++
++	/* Immediately configure the timer on the boot CPU */
++	sirfsoc_local_timer_setup(this_cpu_ptr(sirfsoc_clockevent));
+ }
  
- 	return 0;
+ /* initialize the kernel jiffy timer source */
+@@ -281,8 +291,6 @@ void __init sirfsoc_marco_timer_init(void)
+ 
+ 	BUG_ON(clocksource_register_hz(&sirfsoc_clocksource, CLOCK_TICK_RATE));
+ 
+-	BUG_ON(setup_irq(sirfsoc_timer_irq.irq, &sirfsoc_timer_irq));
+-
+ 	sirfsoc_clockevent_init();
+ }
+ 
+@@ -306,11 +314,9 @@ static void __init sirfsoc_of_timer_map(void)
+ 	if (!sirfsoc_timer_irq.irq)
+ 		panic("No irq passed for timer0 via DT\n");
+ 
+-#ifdef CONFIG_LOCAL_TIMERS
+ 	sirfsoc_timer1_irq.irq = irq_of_parse_and_map(np, 1);
+ 	if (!sirfsoc_timer1_irq.irq)
+ 		panic("No irq passed for timer1 via DT\n");
+-#endif
+ 
+ 	of_node_put(np);
+ }
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
