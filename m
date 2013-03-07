@@ -1,85 +1,85 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Thu, 7 Mar 2013 20:48:30 +0100
-Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
-In-Reply-To: <20130307174955.GC20840@obsidianresearch.com>
-References: <1360686546-24277-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1360686546-24277-25-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130212223511.GB31555@obsidianresearch.com>
- <20130306105441.4d24033e@skate>
- <20130306121118.GA17079@avionic-0098.mockup.avionic-design.de>
- <20130306180946.GA2433@obsidianresearch.com>
- <20130307080832.GD3451@avionic-0098.mockup.avionic-design.de>
- <20130307174955.GC20840@obsidianresearch.com>
-Message-ID: <20130307194830.GA1811@avionic-0098.mockup.avionic-design.de>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Thu, 7 Mar 2013 12:55:41 -0700
+Subject: [PATCH 04/10] bus: introduce an Marvell EBU MBus driver
+In-Reply-To: <20130307201133.42a6c44b@skate>
+References: <1362577426-12804-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130306202710.15a6aa2c@skate>
+ <20130306202447.GA4916@obsidianresearch.com>
+ <201303070337.43288.arnd@arndb.de> <20130307115817.3b3cad20@skate>
+ <20130307173736.GA20840@obsidianresearch.com>
+ <20130307201133.42a6c44b@skate>
+Message-ID: <20130307195541.GA20695@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 07, 2013 at 10:49:55AM -0700, Jason Gunthorpe wrote:
-> On Thu, Mar 07, 2013 at 09:08:32AM +0100, Thierry Reding wrote:
-[...]
-> > > Both have various problems, but I think I prefer the first one as it
-> > > doesn't conflate the contoller registers and host apertures in a
-> > > single ranges..
-> > 
-> > I think a better alternative would be (and this matches what Thomas has
-> > said elsewhere) to use something like the first alternative but move the
-> > regs property into the pcie at 0,X nodes. That would save us from having to
-> > index a property in the parent. At least from a DT point of view I find
-> > that to be a more consistent representation.
-> 
-> You are thinking a new property 'host-controller-regs' or the like?
+On Thu, Mar 07, 2013 at 08:11:33PM +0100, Thomas Petazzoni wrote:
 
-Well, something shorter would be nice, but that's the general idea, yes.
-As I mentioned before, for Tegra these registers aren't actually any
-controller specific registers but rather a window to access the PCI
-configuration space for the root ports.
+>> The reason for this is quite simply to avoid this ugly boiler plate in
+>> every mbus driver:
 
-Going via the FPCI mapping of the configuration space doesn't generate
-transactions on bus 0, which is why there are extra windows for each
-root port. That's why I was arguing about reusing the reg property in
-the first place because it actually represents the configuration space.
+> Come on "ugly" ? It's three line of basic set up code, and it avoids
+> hard-coding base addresses in the Device Tree. Not having hard-coded
 
-But this is likely to be unique to Tegra and Marvell hardware doesn't
-behave this way, but instead needs the registers for a different
-purpose. Something like host-controller-regs might be more appropriate.
+It is ugly because it doesn't belong in a device driver, it is bus
+specific setup code and leaking it out of the bus abstraction is bad.
 
-> > However that would probably not work out-of-the-box with the current OF
-> > core because of_address_to_resource() won't know how to find the new
-> > property. The assigned-addresses alternative seems to be the only one
-> > that would work on the current OF core and achieve proper address
-> > translation. But it doesn't seem like a good solution either since it
-> > repurposes the meaning of the property and therefore isn't any better
-> > than encoding the same information in the reg property.
-> 
-> Except that reg is specifically not supposed to be handling CPU bus
-> addresses and assigned-addresses is.
-> 
-> Adding a hidden non-standard BAR to model the hidden non-standard
-> memory region associated with the bridge is a stretch, but it is not a
-> very big stretch...
-> 
-> In any event, regs should not be used, and something needs to be
-> decided!
+> With your idea, the guy writing the board .dts file will have to think
+> about what is the layout of the physical address space to find where
+> to map his FPGA or its big NOR.
 
-I don't think assigned-addresses is a good fit either. The PCI binding
-document is equally specific about it as it is about the reg property.
-So in my opinion a separate property would be a better choice. The only
-big obstacle is that it needs to be somehow hooked up with the OF core
-so that proper address translation can be performed.
+Bear in mind that an optimal allocator that doesn't leave any address
+space holes and considers the power-of-two size restriction is midly
+complex.
 
-One possible solution that wouldn't be too hard to implement is to
-provide a new function (say of_get_named_address()) similar to
-of_get_address() which doesn't get the name of the register property
-from the struct of_bus but from a parameter and call that function from
-another new function similar to of_address_to_resource() that also gets
-the property name from a parameter. I can't think of a better name for
-the latter than of_named_address_to_resource(), which is rather long.
+Building an optimal allocator is actually impossible if each device
+driver does its own allocate_resources - you have to call
+allocate_resources in the right order to get an optimal placement
+(usually sorted from largest to smallest alignment)
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130307/44e758d7/attachment-0001.sig>
+Address allocation/assignment is bus specific nonsense and does not
+belong in device drivers.
+
+> I know you're proposing to make things dynamic by having the mbus
+> driver patch the Device Tree once the driver figures out an available
+> range to map a given device. But that doesn't make any sense: why write
+> in the DT something that will anyway be overwritten later on?
+
+Simply because the DT is supposed to have the address map for the
+elements it describes. An OF node in the DT is expected to resolve
+back to the the correct CPU address,
+
+Stuff in the kernel depends on it, eg the sysfs names are constructed
+using the address map:
+
+$ ls -l /sys/bus/platform/devices/
+lrwxrwxrwx    1 root     root            0 Mar  7 19:43 f1010078.thermal -> ../../../devices/platform/internal.0/f1010078.thermal
+lrwxrwxrwx    1 root     root            0 Mar  7 19:43 f1010100.gpio -> ../../../devices/platform/internal.0/f1010100.gpio
+lrwxrwxrwx    1 root     root            0 Mar  7 19:43 f1010140.gpio -> ../../../devices/platform/internal.0/f1010140.gpio
+[..]
+
+So if you don't have correct address mapping through the DT then
+addressing used by the core OF code is wrong, and the mechanism it
+uses to avoid name conflicts is broken. Subtle Badness!
+
+The 'DT must describe the hardware' litany is 90% correct but misses
+that a critical function of DT is to describe the *address map*.
+
+So you need to leave a placeholder in the DT for the right value to
+get stuffed in. Ranges is a logical place to do that. You can't do it in
+the device driver because it that is too late. It must be done before
+calling of_populate... - ie by the mbus driver, and the mbus driver
+cannot be a simple-bus, like Arnd alluded to.
+
+As far as the placeholder goes, the driver could could ignore it
+completely, or try to use it as a default - falling back to dynamic,
+and maybe interpret 0/-1 as 'do dynamic always'.
+
+> Adding description of windows in the Device Tree can be added later on,
+> in a completely DT backward compatible way, and the mvebu-devbus driver
+> can be adjusted accordingly.
+
+Hmm.. You could make a new DT that is compatible with an older kernel,
+but once the mvebu_mbus_add_window is moved into the mbus driver it
+would require an updated DT.
+
+Jason
