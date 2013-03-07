@@ -1,27 +1,58 @@
-From: mporter@ti.com (Matt Porter)
-Date: Thu, 7 Mar 2013 09:51:12 -0500
-Subject: [PATCH 2/2] ARM: dts: add AM33XX MMC support
-In-Reply-To: <20130307144656.GR6209@beef>
-References: <1362629799-22485-1-git-send-email-mporter@ti.com>
- <1362629799-22485-3-git-send-email-mporter@ti.com>
- <41fde401c8e646689123d7c6d3a2dffc@DLEE71.ent.ti.com>
- <20130307141235.GQ6209@beef>
- <79CD15C6BA57404B839C016229A409A83EC20C57@DBDE01.ent.ti.com>
- <20130307144656.GR6209@beef>
-Message-ID: <20130307145112.GS6209@beef>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 7 Mar 2013 15:51:06 +0100
+Subject: [PATCH 00/16] big.LITTLE low-level CPU and cluster power
+ management
+In-Reply-To: <alpine.LFD.2.03.1303071753280.28820@syhkavp.arg>
+References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
+ <20130307082721.GB28982@xo-6d-61-c0.localdomain>
+ <alpine.LFD.2.03.1303071701330.28820@syhkavp.arg>
+ <20130307094017.GA6337@amd.pavel.ucw.cz>
+ <alpine.LFD.2.03.1303071753280.28820@syhkavp.arg>
+Message-ID: <20130307145106.GA7451@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 07, 2013 at 09:46:56AM -0500, Matt Porter wrote:
-> On Thu, Mar 07, 2013 at 02:39:55PM +0000, Vaibhav Hiremath wrote:
-> > 2. And MMC rootFS mount is __not__ working for me.
+Hi!
+
+> > > > I'd say:
+> > > > 
+> > > > * expose all 8 cores.
+> > > 
+> > > You may do that now.  However the resulting power efficiency is far from 
+> > > optimal.
 > > 
-> > 3. I get following error message - 
+> > Really? Assuming the lwn article is accurate, it will be exactly the
+> > same.
 > > 
-> > [    2.118207] omap_hsmmc mmc.3: unable to obtain RX DMA engine channel 25
+> > I propose exposing all 8 cores, then keeping 4 of them offline in
+> > normal operation. This should have characteristics of your solution,
+> > except that cpu does not change unexpectedly under the pinned tasks.
+> > 
+> > > > * as long as scheduler is not ready, you can offline "the other" set of cores...
+> > > > 	/sys/.../cpu/..../online
+> > > 
+> > > You may do that now also.  But system performance is far from optimal.
+> > 
+> > Really? Do the offlining from the cpufreq code, and solution will be
+> > equivalent to yours, except the hacks.
 > 
-> See below, you don't have CONFIG_EDMA on most likely.
+> No it is not equivalent.  Offlining a CPU is a fairly heavy operation in 
+> Linux and you don't want to do that multiple times per second for 
+> example.  Whereas the switcher "hack" is similar to a context switch in 
+> terms of software complexity.
 
-That's CONFIG_TI_EDMA, of course.
+Well, why not. Logically, you _are_ saving state, offlining, onlining,
+and restoring state, multiple times per second, already. Fast
+offline/online benefits everyone... 
 
--Matt
+As for the hacks... what does /proc/cpuinfo show on your system? What
+happens when process requests binding to specific cpu? I fear that
+switching hack is easy now, but will have unnice impact on unexpected
+places.
+
+BTW I guess this should be discussed on linux-kernel, not on the arm
+list.
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
