@@ -1,160 +1,68 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 7 Mar 2013 14:48:26 +0800
-Subject: [PATCH 4/9] MXS/i.MX28: there is more than one way to clock the
- RTC
-In-Reply-To: <1362405948-12992-5-git-send-email-s.trumtrar@pengutronix.de>
-References: <1362405948-12992-1-git-send-email-s.trumtrar@pengutronix.de>
- <1362405948-12992-5-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <20130307064824.GD5372@S2101-09.ap.freescale.net>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Thu, 7 Mar 2013 07:51:30 +0100
+Subject: [PATCH V4] ARM: dts: add minimal DT support for DevKit8000.
+In-Reply-To: <20130306175313.GQ11806@atomide.com>
+References: <F3DBB1B3EF102E4994C89758CFCA32412CC4E9@DBDE01.ent.ti.com>
+ <CABYxbz5GyxYaHANgdpwBNaaR6tnu=6LJuUNSvL7DEzU=4CPHcA@mail.gmail.com>
+ <F3DBB1B3EF102E4994C89758CFCA32412CC74F@DBDE01.ent.ti.com>
+ <CABYxbz62JrMB95p5i9iu2G=B4ETXLrYbLsyFEFR5F+WVD6YNnQ@mail.gmail.com>
+ <20130306175313.GQ11806@atomide.com>
+Message-ID: <513838F2.60101@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 04, 2013 at 03:05:43PM +0100, Steffen Trumtrar wrote:
-> From: Juergen Beisert <jbe@pengutronix.de>
+Hi,
+
+On 03/06/2013 06:53 PM, Tony Lindgren wrote:
+> * Anil Kumar <anilk4.v@gmail.com> [130305 18:40]:
+>> Hi Tony,
+>>
+>>>> From: linux-arm-kernel [mailto:linux-arm-kernel-
+>>>> bounces at lists.infradead.org] On Behalf Of Anil Kumar
+>>>> Sent: Wednesday, February 27, 2013 8:03 AM
+>>>> To: devicetree-discuss at lists.ozlabs.org; linux-omap at vger.kernel.org;
+>>>> linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+>>>> Cc: linux at arm.linux.org.uk; Cousson, Benoit; Tony Lindgren; Grant
+>>>> Likely; Anil Kumar; thomas at tomweber.eu
+>>>> Subject: Re: FW: [PATCH V4] ARM: dts: add minimal DT support for
+>>>> DevKit8000.
+>>>>
+>>>> Hi,
+>>>>>
+>>>>> DevKit8000 is a beagle board clone from Timll, sold by
+>>>>> armkits.com. The DevKit8000 has RS232 serial port, LCD, DVI-D,
+>>>>> S-Video, Ethernet, SD/MMC, keyboard, camera, SPI, I2C, USB and
+>>>>> JTAG interface.
+>>>>>
+>>>>> This patch adds the basic DT support for devkit8000. At this time,
+>>>> Information
+>>>>> of twl4030 (PMIC), MMC1, I2C1 and leds are added.
+>>>>>
+>>>>> Signed-off-by: Anil Kumar <anilk4.v@gmail.com>
+>>>>> Tested-by: Thomas Weber <thomas@tomweber.eu>
+>>>>
+>>>> Gentle Ping. As there are no review comments on this patch,
+>>>> Could you please pull this patch ?
+>>
+>> Gentle Ping.
+>>
+>> This patch also got Reviewed-by: Manish Badarkhe <badarkhe.manish@gmail.com>
+>> and as patch "ARM: dts: omap3-devkit8000: Enable audio support"  has already got
+>> "Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>" but it is on the
+>> top of this patch.
+>> So, Could you please pull this patch in one of your omap branch? or
+>> you want me to
+>> do rebase this patch on top of v3.9-rc1 ?
 > 
-> Reflect the possibilities via device tree and configure the RTC correctly
-> 
-> Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
-> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> ---
->  arch/arm/boot/dts/imx28.dtsi |    2 ++
->  drivers/rtc/rtc-stmp3xxx.c   |   76 ++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 78 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-> index dcd0844..d89af79 100644
-> --- a/arch/arm/boot/dts/imx28.dtsi
-> +++ b/arch/arm/boot/dts/imx28.dtsi
-> @@ -818,6 +818,8 @@
->  				compatible = "fsl,imx28-rtc", "fsl,stmp3xxx-rtc";
->  				reg = <0x80056000 0x2000>;
->  				interrupts = <29>;
-> +				clocks = <&clks 65>, <&clks 40> ;
-> +				clock-names = "32k", "24m";
+> Let's wait for Benoit to queue it as he has a bunch of .dts changes already
+> applied. Too bad we missed v3.9 merge window for those, but hopefully
+> we can get them queued early for v3.10.
 
-The changes should be in some mxs/arch patch.
+Yep, sorry for having missed 3.9, I was a little bit sick at the wrong
+moment :-(
 
->  			};
->  
->  			i2c0: i2c at 80058000 {
-> diff --git a/drivers/rtc/rtc-stmp3xxx.c b/drivers/rtc/rtc-stmp3xxx.c
-> index 7311292..fb4b823 100644
-> --- a/drivers/rtc/rtc-stmp3xxx.c
-> +++ b/drivers/rtc/rtc-stmp3xxx.c
-> @@ -21,6 +21,7 @@
->  #include <linux/module.h>
->  #include <linux/io.h>
->  #include <linux/init.h>
-> +#include <linux/clk.h>
->  #include <linux/platform_device.h>
->  #include <linux/interrupt.h>
->  #include <linux/rtc.h>
-> @@ -176,11 +177,55 @@ static irqreturn_t stmp3xxx_rtc_interrupt(int irq, void *dev_id)
->  	return IRQ_NONE;
->  }
->  
-> +/*
-> + * To keep the energy consumption low, keep only
-> + * the really used oscillator running when the power is down
-> + */
-> +static void stmp3xxx_alarm_keep_oscillator(const struct stmp3xxx_rtc_data *rtc_data)
-> +{
-> +	switch (rtc_data->clk_src) {
-> +	case MXS_OSC_24M:
-> +		/* keep the 24 MHz oscillator running even in power down */
-> +		writel(STMP3XXX_RTC_PERSISTENT0_XTAL32_FREQ | /* 24 MHz / 750 */
-> +			STMP3XXX_RTC_PERSISTENT0_XTAL24MHZ_PWRUP,
-> +			rtc_data->io + STMP3XXX_RTC_PERSISTENT0_SET);
-> +		writel(STMP3XXX_RTC_PERSISTENT0_XTAL32KHZ_PWRUP |
-> +			STMP3XXX_RTC_PERSISTENT0_CLOCKSOURCE,
-> +			rtc_data->io + STMP3XXX_RTC_PERSISTENT0_CLR);
-> +		break;
-> +	case MXS_OSC_32K:
-> +		/* keep the 32 kHz oscillator running even in power down */
-> +		writel(STMP3XXX_RTC_PERSISTENT0_XTAL32_FREQ | /* 32 kHz */
-> +			STMP3XXX_RTC_PERSISTENT0_XTAL32KHZ_PWRUP |
-> +			STMP3XXX_RTC_PERSISTENT0_CLOCKSOURCE,
-> +			rtc_data->io + STMP3XXX_RTC_PERSISTENT0_SET);
-> +		writel(STMP3XXX_RTC_PERSISTENT0_XTAL24MHZ_PWRUP,
-> +			rtc_data->io + STMP3XXX_RTC_PERSISTENT0_CLR);
-> +		break;
-> +	case MXS_OSC_32K768:
-> +		/* keep the 32 kHz oscillator running even in power down */
-> +		writel(STMP3XXX_RTC_PERSISTENT0_XTAL32KHZ_PWRUP |
-> +			STMP3XXX_RTC_PERSISTENT0_CLOCKSOURCE,
-> +			rtc_data->io + STMP3XXX_RTC_PERSISTENT0_SET);
-> +		writel(STMP3XXX_RTC_PERSISTENT0_XTAL32_FREQ | /* 32.768 kHz */
-> +			STMP3XXX_RTC_PERSISTENT0_XTAL24MHZ_PWRUP,
-> +			rtc_data->io + STMP3XXX_RTC_PERSISTENT0_CLR);
-> +		break;
-> +	case MXS_UNKNOWN:
-> +	default:
-> +		break;
-> +	}
-> +}
-> +
->  static int stmp3xxx_alarm_irq_enable(struct device *dev, unsigned int enabled)
->  {
->  	struct stmp3xxx_rtc_data *rtc_data = dev_get_drvdata(dev);
->  
-> +	stmp3xxx_alarm_keep_oscillator(rtc_data);
-> +
->  	if (enabled) {
-> +		writel(STMP3XXX_RTC_PERSISTENT0_ALARM_WAKE, /* to be able to sleep */
-> +			rtc_data->io + STMP3XXX_RTC_PERSISTENT0_CLR);
->  		writel(STMP3XXX_RTC_PERSISTENT0_ALARM_EN |
->  				STMP3XXX_RTC_PERSISTENT0_ALARM_WAKE_EN,
->  				rtc_data->io + STMP3XXX_RTC_PERSISTENT0_SET);
-> @@ -248,6 +293,8 @@ static int stmp3xxx_rtc_probe(struct platform_device *pdev)
->  {
->  	struct stmp3xxx_rtc_data *rtc_data;
->  	struct resource *r;
-> +	struct clk *clk;
-> +	unsigned long rate;
->  	int err;
->  
->  	rtc_data = kzalloc(sizeof *rtc_data, GFP_KERNEL);
-> @@ -280,6 +327,35 @@ static int stmp3xxx_rtc_probe(struct platform_device *pdev)
->  	platform_set_drvdata(pdev, rtc_data);
->  
->  	mxs_reset_block(rtc_data->io);
-> +
-> +	/*
-> +	 * configure the RTC to provide the correct time
-> +	 */
-> +	clk = clk_get(&pdev->dev, "32k");
+I'm starting queuing the pending patches, and should have enough to push
+to you just after Linaro Connect.
 
-devm_clk_get
-
-Shawn
-
-> +	if (IS_ERR(clk)) {
-> +		/* just a fall back */
-> +		dev_warn(&pdev->dev, "RTC's input clock undefined\n");
-> +		rtc_data->clk_src = MXS_OSC_24M;
-> +	} else {
-> +		rate = clk_get_rate(clk);
-> +		if (rate == 0) {
-> +			/* no dedicated external crystal */
-> +			rtc_data->clk_src = MXS_OSC_24M;
-> +			dev_info(&pdev->dev, "Using 24 MHz as RTC's clock\n");
-> +		} else if (rate == 32000) {
-> +			rtc_data->clk_src = MXS_OSC_32K;
-> +			dev_info(&pdev->dev, "Using 32.0 kHz as RTC's clock\n");
-> +		} else if (rate == 32768) {
-> +			rtc_data->clk_src = MXS_OSC_32K768;
-> +			dev_info(&pdev->dev, "Using 32.768 kHz as RTC's clock\n");
-> +		} else
-> +			dev_warn(&pdev->dev,
-> +				"Cannot init the RTC's clock source\n");
-> +	}
-> +
-> +	/* basically configure the RTC's input clock */
-> +	stmp3xxx_alarm_keep_oscillator(rtc_data);
-> +
->  	writel(STMP3XXX_RTC_PERSISTENT0_ALARM_EN |
->  			STMP3XXX_RTC_PERSISTENT0_ALARM_WAKE_EN |
->  			STMP3XXX_RTC_PERSISTENT0_ALARM_WAKE,
-> -- 
-> 1.7.10.4
-> 
+Regards,
+Benoit
