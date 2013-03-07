@@ -1,41 +1,54 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu, 7 Mar 2013 09:30:42 +0800
-Subject: [PATCH 3/6] ssbi: Fix exit mismatch in remove function
-In-Reply-To: <1362616187-21089-4-git-send-email-davidb@codeaurora.org>
-References: <1362616187-21089-1-git-send-email-davidb@codeaurora.org>
- <1362616187-21089-4-git-send-email-davidb@codeaurora.org>
-Message-ID: <20130307013042.GB2910@kroah.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 07 Mar 2013 10:44:30 +0900
+Subject: [PATCH v6 01/16] clk: samsung: add common clock framework helper
+ functions for Samsung platforms
+In-Reply-To: <2984153.Xctncej7hL@flatron>
+References: <1361175686-19400-1-git-send-email-thomas.abraham@linaro.org>
+ <201303030208.49722.heiko@sntech.de> <51333149.1060105@gmail.com>
+ <2984153.Xctncej7hL@flatron>
+Message-ID: <015a01ce1ad5$4f89a4e0$ee9ceea0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 06, 2013 at 04:29:44PM -0800, David Brown wrote:
-> msm_ssbi_remove is referenced with __exit_p, but not declared with
-> __exit.  This causes a warning when the driver is not built as a
-> module:
+Tomasz Figa wrote:
 > 
-> drivers/ssbi/ssbi.c:341:23: warning: 'msm_ssbi_remove' defined but not used [-Wunused-function]
+> Hi,
 > 
-> Fix by adding the __exit declaration to the function.
+> On Sunday 03 of March 2013 12:17:29 Sylwester Nawrocki wrote:
+> > Hi,
+> >
+> > On 03/03/2013 02:08 AM, Heiko St?bner wrote:
+> > > But is there an easy way to define more than one alias? On the s3c2416
+> > > for example the hsmmc hclk is the "hsmmc" io-clock, as well as the
+> > > source for the "mmc_busclk.0". Same for the "uart" pclk, that is also
+> > > a baud clock source.
+> > This driver currently provides for only one additional clkdev lookup
+> > entry per a platform clock. I pointed out this desing issue in the
+> > early version of the patch set. It's because a machine clock definition
+> > is coupled with a clock consumer definition. And IMO various
+> > samsung_clock_register_* functions should not have
+> > clk_register_clkdev() inside them. I.e. first step could be registering
+> > all machine clocks and in the second one clkdev lookup entries could be
+> > created. This is how most (all?) existing SoC clock drivers are
+> > working.
+> >
+> > But those multiple aliases are important only for machines with device
+> > tree support, aren't they ?
 > 
-> Signed-off-by: David Brown <davidb@codeaurora.org>
-> ---
->  drivers/ssbi/ssbi.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> I suppose you meant _without_ device tree support, right?
 > 
-> diff --git a/drivers/ssbi/ssbi.c b/drivers/ssbi/ssbi.c
-> index 86d8416..4d503da 100644
-> --- a/drivers/ssbi/ssbi.c
-> +++ b/drivers/ssbi/ssbi.c
-> @@ -337,7 +337,7 @@ err_get_mem_res:
->  	return ret;
->  }
->  
-> -static int msm_ssbi_remove(struct platform_device *pdev)
-> +static int __exit msm_ssbi_remove(struct platform_device *pdev)
+> > I hope this patch series gets merged early to linux-next in the 3.10
+> > cycle so the multiple accumulated fixup patches for this clock driver
+> > can be merged as well and issues like that you pointed out can be
+> > resolved with incremental patches.
+> 
+> Yes, I hope so too.
+>
+Yes, I will in this weekend.
 
-No, remove the __exit_p marking instead, unless you want your kernel to
-be oopsed :)
+Note, I will modify [07/16] for universal_c210 as per Kyungmin's request,
+I'm not sure about universal_c210 though.
 
-thanks,
+Thanks.
 
-greg k-h
+- Kukjin
