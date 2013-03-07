@@ -1,56 +1,37 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed, 6 Mar 2013 23:35:13 -0700
-Subject: [PATCH 04/10] bus: introduce an Marvell EBU MBus driver
-In-Reply-To: <201303070337.43288.arnd@arndb.de>
-References: <1362577426-12804-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130306202710.15a6aa2c@skate>
- <20130306202447.GA4916@obsidianresearch.com>
- <201303070337.43288.arnd@arndb.de>
-Message-ID: <20130307063513.GA31330@obsidianresearch.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 7 Mar 2013 14:37:30 +0800 (HKT)
+Subject: ARM: 7653/2: do not scale loops_per_jiffy when using a constant
+ delay clock
+In-Reply-To: <20130307033221.GC25137@mudshark.cambridge.arm.com>
+References: <20130306022308.GA21539@mudshark.cambridge.arm.com>
+ <20130306183751.GV17833@n2100.arm.linux.org.uk>
+ <20130307033221.GC25137@mudshark.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.03.1303071417260.28820@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 07, 2013 at 03:37:43AM +0000, Arnd Bergmann wrote:
+On Thu, 7 Mar 2013, Will Deacon wrote:
 
-> Yes. We can even use the index of the "ranges" property to refer directly
-> to the number of the window, so ranges replaces the kernel internal
-> struct mvebu_mbus_mapping.
+> On the topic of this patch: I still think that we should revert it and
+> require cpufreq drivers to pass CPUFREQ_CONST_LOOPS in their flags (I guess
+> the cpu0 platform data may need extending to take some flags).
 
-I think we are thinking the same thing, but, s/index/bus address/ and
-s/number of the window/target id/ ?
+I must disagree.  The constness here is a property of the timer source 
+used to implement one of the udelay() providers.  Constness has no 
+relation with cpufreq which may or may not impact a given udelay 
+implementation.
 
-> I would also suggest not making the mbus compatible with "simple_bus", but
-> instead probing /only/ the mbus device at bootup, which can then set
-> up the hardware based on the ranges property and then call
-> of_platform_populate on its children.
+> Longer term, we might want to assess the binding between timer-based 
+> delays and loops_per_jiffy, but that's an entirely new problem.
 
-Yeah, something is needed to make startup ordering work. Things like
-the timer and main interrupt controller live behind the special
-internal regs window, so in a perfect world finding the timer would
-automatically setup the enclosing bus structures ...
+Actually I do think that the lpj should always be scaled regardless, as 
+this has meaning only for a CPU loop.  This is even more important if 
+there is the possibility for switching between different 
+implementations. The local timer based udelay implementation should 
+simply never factor in lpj into its delay evaluation.
 
-> > I certainly agree with this. If it wasn't for the idea that the DT is
-> > a stable ABI and thus must be perfect from the start, I wouldn't have
-> > mentioned any of this right now, making fine tuning adjustments as a
-> > follow on seems better to me.
-> > 
-> > It is absolutely way too much work to try and fix everything in one
-> > go! I would be happy to see your patch go in as-is, but mildly unhappy
-> > to see us stuck with this DT layout forever...
-> > 
-> > Especially since I really want to see your PCI stuff go in ....
-> 
-> I basically agree with everything you write in this mail, Jason, and
-> I was about to make exactly the same comments myself.
-> 
-> Getting the binding right is certainly a priority here, but I also think
-> that we don't need to rush the code to use that binding (although having
-> the code work would make me more comfortable thinking that the binding
-> actually works).
+So the current patch is a stop gap to fix the problem today.  When 
+something better is proposed we can remove this fix.
 
-Do you think Jason C's notion to take it as is and then be OK with
-altering the binding later pending agreement is acceptable for now? I
-agree with Thomas that this is too much to ask just to get
-the already huge Marvell PCI-E patchset into mainline.
 
-Jason
+Nicolas
