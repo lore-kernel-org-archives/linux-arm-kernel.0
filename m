@@ -1,173 +1,27 @@
-From: Sandeep@freescale.com (Sandeep Singh)
-Date: Thu, 7 Mar 2013 16:57:47 +0530
-Subject: [PATCH 3/4] TDM Device Tree entries for various Freescale Platforms
-In-Reply-To: <1362655668-26721-1-git-send-email-Sandeep@freescale.com>
-References: <1362655668-26721-1-git-send-email-Sandeep@freescale.com>
-Message-ID: <1362655668-26721-3-git-send-email-Sandeep@freescale.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Thu, 07 Mar 2013 12:40:55 +0100
+Subject: [PATCH] ARM: EXYNOS: change HAVE_SAMSUNG_KEYPAD to
+ KEYBOARD_SAMSUNG
+In-Reply-To: <014b01ce1acf$63ada580$2b08f080$%kim@samsung.com>
+References: <1362566365.16460.173.camel@x61.thuisdomein>
+ <014b01ce1acf$63ada580$2b08f080$%kim@samsung.com>
+Message-ID: <1362656455.5994.13.camel@x61.thuisdomein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-P1010RDB, P1020RDB, P1020MBG-PC, P1022DS, P1020RDB-PC and P1024RDB
+On Thu, 2013-03-07 at 10:02 +0900, Kukjin Kim wrote:
+> BTW, just to use only 8~12 digits of commit ID, "Commit 6b5ab4f4" is
+> enough instead of full commit ID.
 
-In this Patch:
- 1. TDM node included in <silicon>.dtsi files.
- 2. Disabled TDM in 36bit configurations because of limitations
-    in TDM hardware block, details mentioned below.
+I used to do that but now I actually prefer to use 40 hex character
+strings.
 
-Details of 36bit h/w limitaion:
- ---------------------------------
-TDM DMAC IP does not support more than 32b address. To address memory regions
-more than 4GB, 4 bits of address were provided in GUTs, which are appended to
-txns initiated by TDM DMAC. These 4 bits are appended irrespective of the
-region addressed. When TDM works in DMA mode, the DMA need to access DDR as
-well as TDM FIFO in CCSR space. So this poses a restriction that if memory
-region above 4GB need to be accessed, CCSR space should also be mapped into
-that 4GB region.
-In this case DDR is at at first 4G (starting from 0) and CCSR is at
- different 4G (0xfffe00000), hence the issue.
+Sure, they're ugly, but so are strings of 10, or 12 hex characters. But
+they're easier to use (I can just copy/paste them from the output of,
+say, "git log"), I do not have to worry about uniqueness, ever (some
+commits now already need at least 8 characters), and some git web
+interfaces automagically linkify 40 character hex strings in commit
+explanations (which is quite nice).
 
-Signed-off-by: Sandeep Singh <Sandeep@freescale.com>
-Signed-off-by: Poonam Aggrwal <poonam.aggrwal@freescale.com>
----
- arch/powerpc/boot/dts/fsl/p1010si-post.dtsi |    3 ++-
- arch/powerpc/boot/dts/fsl/p1020si-post.dtsi |    1 +
- arch/powerpc/boot/dts/fsl/p1022si-post.dtsi |    1 +
- arch/powerpc/boot/dts/p1010rdb_36b.dts      |    3 +++
- arch/powerpc/boot/dts/p1020mbg-pc_36b.dts   |    3 +++
- arch/powerpc/boot/dts/p1020rdb-pc_36b.dts   |    3 +++
- arch/powerpc/boot/dts/p1020rdb_36b.dts      |    3 +++
- arch/powerpc/boot/dts/p1022ds_36b.dts       |    3 +++
- arch/powerpc/boot/dts/p1024rdb_36b.dts      |    3 +++
- 9 files changed, 22 insertions(+), 1 deletions(-)
 
-diff --git a/arch/powerpc/boot/dts/fsl/p1010si-post.dtsi b/arch/powerpc/boot/dts/fsl/p1010si-post.dtsi
-index 0bde9ee..15c74a2 100644
---- a/arch/powerpc/boot/dts/fsl/p1010si-post.dtsi
-+++ b/arch/powerpc/boot/dts/fsl/p1010si-post.dtsi
-@@ -1,7 +1,7 @@
- /*
-  * P1010/P1014 Silicon/SoC Device Tree Source (post include)
-  *
-- * Copyright 2011 Freescale Semiconductor Inc.
-+ * Copyright 2011-2012 Freescale Semiconductor Inc.
-  *
-  * Redistribution and use in source and binary forms, with or without
-  * modification, are permitted provided that the following conditions are met:
-@@ -132,6 +132,7 @@
- /include/ "pq3-gpio-0.dtsi"
- /include/ "pq3-sata2-0.dtsi"
- /include/ "pq3-sata2-1.dtsi"
-+/include/ "pq3-tdm1.0-0.dtsi"
- 
- 	can0: can at 1c000 {
- 		compatible = "fsl,p1010-flexcan";
-diff --git a/arch/powerpc/boot/dts/fsl/p1020si-post.dtsi b/arch/powerpc/boot/dts/fsl/p1020si-post.dtsi
-index 68cc5e7..684f664 100644
---- a/arch/powerpc/boot/dts/fsl/p1020si-post.dtsi
-+++ b/arch/powerpc/boot/dts/fsl/p1020si-post.dtsi
-@@ -131,6 +131,7 @@
- 	};
- 
- /include/ "pq3-gpio-0.dtsi"
-+/include/ "pq3-tdm1.0-0.dtsi"
- 
- 	L2: l2-cache-controller at 20000 {
- 		compatible = "fsl,p1020-l2-cache-controller";
-diff --git a/arch/powerpc/boot/dts/fsl/p1022si-post.dtsi b/arch/powerpc/boot/dts/fsl/p1022si-post.dtsi
-index 06216b8..4016e45 100644
---- a/arch/powerpc/boot/dts/fsl/p1022si-post.dtsi
-+++ b/arch/powerpc/boot/dts/fsl/p1022si-post.dtsi
-@@ -190,6 +190,7 @@
- 		fsl,fifo-depth = <15>;
- 	};
- 
-+/include/ "pq3-tdm1.0-0.dtsi"
- /include/ "pq3-sata2-0.dtsi"
- /include/ "pq3-sata2-1.dtsi"
- 
-diff --git a/arch/powerpc/boot/dts/p1010rdb_36b.dts b/arch/powerpc/boot/dts/p1010rdb_36b.dts
-index 64776f4..e159b42 100644
---- a/arch/powerpc/boot/dts/p1010rdb_36b.dts
-+++ b/arch/powerpc/boot/dts/p1010rdb_36b.dts
-@@ -52,6 +52,9 @@
- 
- 	board_soc: soc: soc at fffe00000 {
- 		ranges = <0x0 0xf 0xffe00000 0x100000>;
-+		tdm at 16000 {
-+			status = "disabled";
-+		};
- 	};
- 
- 	pci0: pcie at fffe09000 {
-diff --git a/arch/powerpc/boot/dts/p1020mbg-pc_36b.dts b/arch/powerpc/boot/dts/p1020mbg-pc_36b.dts
-index 9e9f401..416e1a7 100644
---- a/arch/powerpc/boot/dts/p1020mbg-pc_36b.dts
-+++ b/arch/powerpc/boot/dts/p1020mbg-pc_36b.dts
-@@ -52,6 +52,9 @@
- 
- 	soc: soc at fffe00000 {
- 		ranges = <0x0 0xf 0xffe00000 0x100000>;
-+		tdm at 16000 {
-+			status = "disabled";
-+		};
- 	};
- 
- 	pci0: pcie at fffe09000 {
-diff --git a/arch/powerpc/boot/dts/p1020rdb-pc_36b.dts b/arch/powerpc/boot/dts/p1020rdb-pc_36b.dts
-index 5237da7..a1861d6 100644
---- a/arch/powerpc/boot/dts/p1020rdb-pc_36b.dts
-+++ b/arch/powerpc/boot/dts/p1020rdb-pc_36b.dts
-@@ -53,6 +53,9 @@
- 
- 	soc: soc at fffe00000 {
- 		ranges = <0x0 0xf 0xffe00000 0x100000>;
-+		tdm at 16000 {
-+			status = "disabled";
-+		};
- 	};
- 
- 	pci0: pcie at fffe09000 {
-diff --git a/arch/powerpc/boot/dts/p1020rdb_36b.dts b/arch/powerpc/boot/dts/p1020rdb_36b.dts
-index bdbdb60..7bac196 100644
---- a/arch/powerpc/boot/dts/p1020rdb_36b.dts
-+++ b/arch/powerpc/boot/dts/p1020rdb_36b.dts
-@@ -29,6 +29,9 @@
- 
- 	board_soc: soc: soc at fffe00000 {
- 		ranges = <0x0 0xf 0xffe00000 0x100000>;
-+		tdm at 16000 {
-+			status = "disabled";
-+		};
- 	};
- 
- 	pci0: pcie at fffe09000 {
-diff --git a/arch/powerpc/boot/dts/p1022ds_36b.dts b/arch/powerpc/boot/dts/p1022ds_36b.dts
-index f7aacce..024ea40 100644
---- a/arch/powerpc/boot/dts/p1022ds_36b.dts
-+++ b/arch/powerpc/boot/dts/p1022ds_36b.dts
-@@ -51,6 +51,9 @@
- 
- 	board_soc: soc: soc at fffe00000 {
- 		ranges = <0x0 0xf 0xffe00000 0x100000>;
-+		tdm at 16000 {
-+			status = "disabled";
-+		};
- 	};
- 
- 	pci0: pcie at fffe09000 {
-diff --git a/arch/powerpc/boot/dts/p1024rdb_36b.dts b/arch/powerpc/boot/dts/p1024rdb_36b.dts
-index 3656825..b113229 100644
---- a/arch/powerpc/boot/dts/p1024rdb_36b.dts
-+++ b/arch/powerpc/boot/dts/p1024rdb_36b.dts
-@@ -49,6 +49,9 @@
- 
- 	soc: soc at fffe00000 {
- 		ranges = <0x0 0xf 0xffe00000 0x100000>;
-+		tdm at 16000 {
-+			status = "disabled";
-+		};
- 	};
- 
- 	pci0: pcie at fffe09000 {
--- 
-1.7.6.GIT
+Paul Bolle
