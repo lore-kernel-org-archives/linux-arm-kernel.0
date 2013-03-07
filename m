@@ -1,173 +1,107 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Thu, 7 Mar 2013 11:35:00 +0800
-Subject: [PATCH v6 14/16] ARM: dts: add spi nodes for atmel SoC
-In-Reply-To: <1362626715-6549-1-git-send-email-wenyou.yang@atmel.com>
-References: <1362626715-6549-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1362627300-9479-1-git-send-email-wenyou.yang@atmel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 7 Mar 2013 03:37:43 +0000
+Subject: [PATCH 04/10] bus: introduce an Marvell EBU MBus driver
+In-Reply-To: <20130306202447.GA4916@obsidianresearch.com>
+References: <1362577426-12804-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130306202710.15a6aa2c@skate> <20130306202447.GA4916@obsidianresearch.com>
+Message-ID: <201303070337.43288.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Richard Genoud <richard.genoud@gmail.com>
+On Wednesday 06 March 2013, Jason Gunthorpe wrote:
+> On Wed, Mar 06, 2013 at 08:27:10PM +0100, Thomas Petazzoni wrote:
 
-Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
-[wenyou.yang at atmel.com: add spi nodes for sam9260, sam9263, sam9g45 and sam9n12]
-[wenyou.yang at atmel.com: remove spi property "cs-gpios" to the board dts files]
-[wenyou.yang at atmel.com: submit the patch]
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-Cc: linux at arm.linux.org.uk
-Cc: linux-kernel at vger.kernel.org
----
- arch/arm/boot/dts/at91sam9260.dtsi |   18 ++++++++++++++++++
- arch/arm/boot/dts/at91sam9263.dtsi |   18 ++++++++++++++++++
- arch/arm/boot/dts/at91sam9g45.dtsi |   18 ++++++++++++++++++
- arch/arm/boot/dts/at91sam9n12.dtsi |   18 ++++++++++++++++++
- arch/arm/boot/dts/at91sam9x5.dtsi  |   18 ++++++++++++++++++
- 5 files changed, 90 insertions(+)
+> Part of the point of all this DT stuff is to give HW designers some
+> reasonable flexability in their HW design without requiring code
+> changes to Linux to boot it. So if Marvell makes a new Armada varient
+> that re-uses all the same pre existing IP, just with different mbus
+> targets, they should be able to make Linux run on it simply by writing
+> a SOC specific firmware and DT.
 
-diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
-index cb7bcc5..6e31dc8 100644
---- a/arch/arm/boot/dts/at91sam9260.dtsi
-+++ b/arch/arm/boot/dts/at91sam9260.dtsi
-@@ -471,6 +471,24 @@
- 				status = "disabled";
- 			};
+Agreed. Further, the device tree should accurately describe the mapping
+of addresses, and we have a lot of infrastructure to do exactly that.
+
+> > Also, I don't believe that windows should be described in the Device
+> > Tree. My long term plan is rather to make the allocation of the base
+> > address of each window entirely dynamic, because there is absolutely no
+> > reason for those addresses to be fixed in stone in the Device Tree.
+> 
+> How will that work? Device tree necessarily must have CPU addresses
+> for the things it describes. Today we have the problem that those
+> addresses must match the values hard coded into Linux, ie DT is
+> describing what Linux expects, not what the HW provides..
+
+Exactly.
+
+> This idea that Linux should setup windows on its own has moved away
+> from what OF was intended for, I'm not sure there is an overarching
+> plan on how to handle those cases - but hardcoding addresses in Linux
+> and then requiring the DT to match them exactly certainly seems wrong.
+> 
+> As for dynamic allocation, they way to do it via DT is through the
+> ranges property, similar to how I noted. The DT can be modified
+> in-memory, so a dyanmic mbus driver would ignore the CPU target
+> address in the ranges, select its own CPU address and then update the
+> in-memory DT with the corrected value. Everything else would then work
+> properly.
+
+Yes. We can even use the index of the "ranges" property to refer directly
+to the number of the window, so ranges replaces the kernel internal
+struct mvebu_mbus_mapping.
+
+I would also suggest not making the mbus compatible with "simple_bus", but
+instead probing /only/ the mbus device at bootup, which can then set
+up the hardware based on the ranges property and then call
+of_platform_populate on its children.
+
+> > > > + * Some variants of Orion5x have 4 remappable windows, some other have
+> > > > + * only two of them.
+> > > > + */
+> > > > +static const struct mvebu_mbus_soc_data orion5x_4win_mbus_data = {
+> > > > +	.num_wins            = 8,
+> > > > +	.num_remappable_wins = 4,
+> > > 
+> > > These values also seem like something worth reading from the DT as
+> > > well.. See above for an idea.
+> > 
+> > No: there will anyway be different functions to be called depending on
+> > the SoC family. So the driver will anyway have to have different
+> > compatible strings for the different SoC families, because we can't
+> > put
+> 
+> Well I wrote the 'mbus_win_offset' function concept with DT lists:
+> 
+> >    windows = <0 1 2 3 4>;
+> >    remappable-windows = <7 8 9>;
+> >    internal-window = 5;
+> 
+> And the two varients of the SDRAM function still have to exist, but
+> would be best handled by separating the SDRAM description from the
+> MBUS description in DT - they are orthogonal concepts.
+
+*nod*
  
-+			spi0: spi at fffc8000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "atmel,at91rm9200-spi";
-+				reg = <0xfffc8000 0x200>;
-+				interrupts = <12 4 3>;
-+				status = "disabled";
-+			};
-+
-+			spi1: spi at fffcc000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "atmel,at91rm9200-spi";
-+				reg = <0xfffcc000 0x200>;
-+				interrupts = <13 4 3>;
-+				status = "disabled";
-+			};
-+
- 			adc0: adc at fffe0000 {
- 				compatible = "atmel,at91sam9260-adc";
- 				reg = <0xfffe0000 0x100>;
-diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
-index 271d4de..6c6d9ae 100644
---- a/arch/arm/boot/dts/at91sam9263.dtsi
-+++ b/arch/arm/boot/dts/at91sam9263.dtsi
-@@ -462,6 +462,24 @@
- 				reg = <0xfffffd40 0x10>;
- 				status = "disabled";
- 			};
-+
-+			spi0: spi at fffa4000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "atmel,at91rm9200-spi";
-+				reg = <0xfffa4000 0x200>;
-+				interrupts = <14 4 3>;
-+				status = "disabled";
-+			};
-+
-+			spi1: spi at fffa8000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "atmel,at91rm9200-spi";
-+				reg = <0xfffa8000 0x200>;
-+				interrupts = <15 4 3>;
-+				status = "disabled";
-+			};
- 		};
- 
- 		nand0: nand at 40000000 {
-diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-index 6b1d4ca..e085b8a 100644
---- a/arch/arm/boot/dts/at91sam9g45.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-@@ -531,6 +531,24 @@
- 				reg = <0xfffffd40 0x10>;
- 				status = "disabled";
- 			};
-+
-+			spi0: spi at fffa4000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "atmel,at91rm9200-spi";
-+				reg = <0xfffa4000 0x200>;
-+				interrupts = <14 4 3>;
-+				status = "disabled";
-+			};
-+
-+			spi1: spi at fffa8000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "atmel,at91rm9200-spi";
-+				reg = <0xfffa8000 0x200>;
-+				interrupts = <15 4 3>;
-+				status = "disabled";
-+			};
- 		};
- 
- 		nand0: nand at 40000000 {
-diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
-index 7750f98..f3f87ef3 100644
---- a/arch/arm/boot/dts/at91sam9n12.dtsi
-+++ b/arch/arm/boot/dts/at91sam9n12.dtsi
-@@ -373,6 +373,24 @@
- 				#size-cells = <0>;
- 				status = "disabled";
- 			};
-+
-+			spi0: spi at f0000000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "atmel,at91rm9200-spi";
-+				reg = <0xf0000000 0x100>;
-+				interrupts = <13 4 3>;
-+				status = "disabled";
-+			};
-+
-+			spi1: spi at f0004000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "atmel,at91rm9200-spi";
-+				reg = <0xf0004000 0x100>;
-+				interrupts = <14 4 3>;
-+				status = "disabled";
-+			};
- 		};
- 
- 		nand0: nand at 40000000 {
-diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-index aa98e64..83a4889 100644
---- a/arch/arm/boot/dts/at91sam9x5.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-@@ -505,6 +505,24 @@
- 					trigger-value = <0x6>;
- 				};
- 			};
-+
-+			spi0: spi at f0000000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "atmel,at91rm9200-spi";
-+				reg = <0xf0000000 0x100>;
-+				interrupts = <13 4 3>;
-+				status = "disabled";
-+			};
-+
-+			spi1: spi at f0004000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "atmel,at91rm9200-spi";
-+				reg = <0xf0004000 0x100>;
-+				interrupts = <14 4 3>;
-+				status = "disabled";
-+			};
- 		};
- 
- 		nand0: nand at 40000000 {
--- 
-1.7.9.5
+> > No, I also have a temporary disagreement: I think what you're asking is
+> > way too far away from the current code. I've already been asked to
+> > make
+> 
+> I certainly agree with this. If it wasn't for the idea that the DT is
+> a stable ABI and thus must be perfect from the start, I wouldn't have
+> mentioned any of this right now, making fine tuning adjustments as a
+> follow on seems better to me.
+> 
+> It is absolutely way too much work to try and fix everything in one
+> go! I would be happy to see your patch go in as-is, but mildly unhappy
+> to see us stuck with this DT layout forever...
+> 
+> Especially since I really want to see your PCI stuff go in ....
+
+I basically agree with everything you write in this mail, Jason, and
+I was about to make exactly the same comments myself.
+
+Getting the binding right is certainly a priority here, but I also think
+that we don't need to rush the code to use that binding (although having
+the code work would make me more comfortable thinking that the binding
+actually works).
+
+	Arnd
