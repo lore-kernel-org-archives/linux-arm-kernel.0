@@ -1,45 +1,44 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 7 Mar 2013 17:53:33 +0100
-Subject: [PATCH 5/5] ARM: mvebu: Update defconfig to select Device Bus
- (memory-controller) support
-In-Reply-To: <1362660865-2755-6-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1362660865-2755-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1362660865-2755-6-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20130307175333.1a0e6541@skate>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 7 Mar 2013 04:20:55 +0100
+Subject: [PATCH v4 0/3] R-Car SATA platform data
+In-Reply-To: <5137D139.9010304@cogentembedded.com>
+References: <201302272332.51650.sergei.shtylyov@cogentembedded.com>
+ <20130301072501.GE14376@verge.net.au>
+ <5137D139.9010304@cogentembedded.com>
+Message-ID: <20130307032055.GI9499@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Ezequiel Garcia,
-
-On Thu,  7 Mar 2013 09:54:25 -0300, Ezequiel Garcia wrote:
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
->  arch/arm/configs/mvebu_defconfig |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
+On Thu, Mar 07, 2013 at 02:28:57AM +0300, Sergei Shtylyov wrote:
+> Hello.
 > 
-> diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
-> index 2ec8119..70a65f9 100644
-> --- a/arch/arm/configs/mvebu_defconfig
-> +++ b/arch/arm/configs/mvebu_defconfig
-> @@ -65,6 +65,8 @@ CONFIG_RTC_DRV_S35390A=y
->  CONFIG_RTC_DRV_MV=y
->  CONFIG_DMADEVICES=y
->  CONFIG_MV_XOR=y
-> +CONFIG_MEMORY=y
-> +CONFIG_MVEBU_DEVBUS=y
->  # CONFIG_IOMMU_SUPPORT is not set
->  CONFIG_EXT2_FS=y
->  CONFIG_EXT3_FS=y
+> On 03/01/2013 10:25 AM, Simon Horman wrote:
+> 
+> >
+> >>Hello.
+> >>
+> >>    Here's the v4 of the set of now 3 patches (the driver itself has been merged
+> >>since) against the Simon Horman's renesas.git repo, 'next' branch:
+> >>
+> >>[1/3] ARM: mach-shmobile: r8a7779: SATA DT configuration
+> >>[2/3] ARM: mach-shmobile: r8a7779: add SATA support
+> >>[3/3] ARM: mach-shmobile: marzen: add SATA support
+> >>
+> >>Patch changes since the initial posting are reported in the individual patches.
+> >Thanks. I have refreshed the topic/r-car-sata branch of the renesas tree
+> >accordingly. That branch still contains a copy of the "Add Renesas R-Car
+> >on-chip 3Gbps SATA controller driver." but it should disappear once I rebase
+> >(e.g. on v3.9-rc1).
+> 
+>    I see you have finally merged my patches to your 'next' branch, thanks.
+> However, you've also merged Morimoto-san's patch to change from gic_spi()
+> to gic_iid(), and I thought I'd recast patch 2/3 to make it use
+> gic_iid() too.
 
-I think it would be great if you also selected the relevant MTD drivers
-to enable access to the NOR flashes available in the Armada XP GP and
-PlatHome OpenBlocks AX3 boards.
+Sorry for messing that up.
 
-Best regards,
+> How do we do now, do I need to send a new patch to convert to gic_iid()?
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Yes, I think it would be best if you sent an incremental patch.
+
+Sorry once again for the mix-up.
