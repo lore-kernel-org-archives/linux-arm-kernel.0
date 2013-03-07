@@ -1,51 +1,37 @@
-From: hechtb@gmail.com (Bastian Hecht)
-Date: Thu, 7 Mar 2013 11:26:29 +0100
-Subject: [PATCH v6 1/3] serial: sh-sci: Add OF support
-In-Reply-To: <9335181.JoypQftkI4@avalon>
-References: <1362569437-11133-1-git-send-email-hechtb+renesas@gmail.com>
- <9335181.JoypQftkI4@avalon>
-Message-ID: <CABYn4sz_5vEzXba0Y7iXKBbGhfGwY2cd8fn30mUQ0GQcbGTG+w@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 7 Mar 2013 11:30:16 +0100
+Subject: [PATCH 2/4] arm: plat-orion: fix address decoding when > 4GB is
+ used
+In-Reply-To: <20130307003022.GQ23237@titan.lakedaemon.net>
+References: <1362565416-15718-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1362565416-15718-3-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130307003022.GQ23237@titan.lakedaemon.net>
+Message-ID: <20130307113016.6bbf5a7b@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+Dear Jason Cooper,
 
->> +- renesas,scscr : Should contain a bitfield used by the Serial Control
->> Register.
->> +  b7 = SCSCR_TIE
->> +  b6 = SCSCR_RIE
->> +  b5 = SCSCR_TE
->> +  b4 = SCSCR_RE
->> +  b3 = SCSCR_REIE
->> +  b2 = SCSCR_TOIE
->> +  b1 = SCSCR_CKE1
->> +  b0 = SCSCR_CKE0
->
-> What is that for exactly ?
+On Wed, 6 Mar 2013 19:30:22 -0500, Jason Cooper wrote:
 
-What I can see from 3 different datasheets (sh7372, sh73a0, r8a7740)
-the first 2 bits differ in meaning.
+> > Since I've changed the patch, I haven't kept the Tested-by from Lior
+> > Amsalem, Gr?gory Clement and Ezequiel Garcia.
+> 
+> Then please don't send this as part of a pull-request.  Threading it
+> under a pull-request implies that it is ready to be applied, causing
+> most reviewers/testers to ignore the email.  Please have Lior,
+> Gr?gory, and Ezequiel retest and report back.
 
-On r8a7740 it depends: In asynchronous mode the first 2 bits CKE0/1
-define whether you want to use an external clock to drive the baud
-generator or if you want to use the internal SUB clock. If you use the
-SUB clock you can further define if you want to use a subscaled SUB
-clock in the SCSMR register. In synchronous mode you must rely on the
-internal clock for the baud generator and can select if the SCK pin is
-used as clock input or output.
+I believe it is ready to be applied. The change I've done from the
+version tested by others is minor, and I'm quite convinced that the
+change is OK. If the change had been more significant, I would for sure
+not have sent this as a pull request.
 
-On sh73a0 and sh7372 it's used to control the output clock SCK (set it
-to high impedance or actually output a clock when in sychronous mode)
+Best regards,
 
-Bit 2 and 3 don't exist in my datasheets.
-
-The other bits define under which conditions you receive interrupts
-(send FIFO empty, receive FIFO full) and which bits you need to start
-transfers (one bit to start sending, one receiving). The bits 8 to 31
-are used to set up DMA transfers and various interrupt events like
-error status and finish transfers. I haven't included them as they are
-not used in the driver.
-
-Thanks,
-
-Bastian
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
