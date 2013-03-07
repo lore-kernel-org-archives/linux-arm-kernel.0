@@ -1,93 +1,39 @@
-From: tgih.jun@samsung.com (Seungwon Jeon)
-Date: Thu, 07 Mar 2013 20:02:10 +0900
-Subject: [PATCH] mmc: dwmmc: let device core setup the default pin
- configuration
-In-Reply-To: <1362571461-14570-1-git-send-email-thomas.abraham@linaro.org>
-References: <1362571461-14570-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <000e01ce1b23$375166d0$a5f43470$%jun@samsung.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 7 Mar 2013 16:08:01 +0530
+Subject: [PATCH] dma: Remove erroneous __exit and __exit_p() references
+In-Reply-To: <20130307094735.GG13370@intel.com>
+References: <1361318824-22287-1-git-send-email-maxin.john@gmail.com>
+ <CACRpkdZamOCWHWMcFYRqQDKJARZOCEP_eSNPNaxSgHfAn2wmEw@mail.gmail.com>
+ <CAMhs6YwC+Lx0Vt=w2MoQV08on+rB1zidGCsNHRqcst8KBrb2XQ@mail.gmail.com>
+ <20130307094735.GG13370@intel.com>
+Message-ID: <20130307103801.GH13370@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On Thu, Mar 07, 2013 at 03:17:35PM +0530, Vinod Koul wrote:
+> On Thu, Mar 07, 2013 at 10:17:40AM +0100, Maxin B. John wrote:
+> > Hi,
+> > 
+> > On Fri, Feb 22, 2013 at 7:29 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> > > On Wed, Feb 20, 2013 at 1:07 AM,  <maxin.john@gmail.com> wrote:
+> > >
+> > >> From: "Maxin B. John" <maxin.john@enea.com>
+> > >>
+> > >> Removing the annotation with __exit and referencing with __exit_p()
+> > >> present in dma driver module remove hooks.
+> > >>
+> > >> Part of the __devexit and __devexit_p() purge.
+> > >>
+> > >> Signed-off-by: Maxin B. John <maxin.john@enea.com>
+> > >
+> > > Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> > 
+> > Gentle ping...
+> ???
+> 
+> Its already in my -next
+Sorry, I have confused with your other patch, applying now...
 
-On Wednesday, March 06, 2013, Thomas Abraham wrote:
-> With device core now able to setup the default pin configuration,
-> the pin configuration code based on the deprecated Samsung specific
-> gpio bindings is removed.
-
-'setup_bus' callback is still useful in dw_mci_drv_data?
-Considering the purpose, it would be good to remove.
-And, could you change commit prefix for consistency?
-dwmmc -> dw_mmc
-
-Thanks,
-Seungwon Jeon
-> 
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> ---
->  drivers/mmc/host/dw_mmc-exynos.c |   38 --------------------------------------
->  1 files changed, 0 insertions(+), 38 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/dw_mmc-exynos.c b/drivers/mmc/host/dw_mmc-exynos.c
-> index 72fd0f2..467d043 100644
-> --- a/drivers/mmc/host/dw_mmc-exynos.c
-> +++ b/drivers/mmc/host/dw_mmc-exynos.c
-> @@ -152,43 +152,6 @@ static int dw_mci_exynos_parse_dt(struct dw_mci *host)
->  	return 0;
->  }
-> 
-> -static int dw_mci_exynos_setup_bus(struct dw_mci *host,
-> -				struct device_node *slot_np, u8 bus_width)
-> -{
-> -	int idx, gpio, ret;
-> -
-> -	if (!slot_np)
-> -		return -EINVAL;
-> -
-> -	/* cmd + clock + bus-width pins */
-> -	for (idx = 0; idx < NUM_PINS(bus_width); idx++) {
-> -		gpio = of_get_gpio(slot_np, idx);
-> -		if (!gpio_is_valid(gpio)) {
-> -			dev_err(host->dev, "invalid gpio: %d\n", gpio);
-> -			return -EINVAL;
-> -		}
-> -
-> -		ret = devm_gpio_request(host->dev, gpio, "dw-mci-bus");
-> -		if (ret) {
-> -			dev_err(host->dev, "gpio [%d] request failed\n", gpio);
-> -			return -EBUSY;
-> -		}
-> -	}
-> -
-> -	if (host->pdata->quirks & DW_MCI_QUIRK_BROKEN_CARD_DETECTION)
-> -		return 0;
-> -
-> -	gpio = of_get_named_gpio(slot_np, "samsung,cd-pinmux-gpio", 0);
-> -	if (gpio_is_valid(gpio)) {
-> -		if (devm_gpio_request(host->dev, gpio, "dw-mci-cd"))
-> -			dev_err(host->dev, "gpio [%d] request failed\n", gpio);
-> -	} else {
-> -		dev_info(host->dev, "cd gpio not available");
-> -	}
-> -
-> -	return 0;
-> -}
-> -
->  /* Exynos5250 controller specific capabilities */
->  static unsigned long exynos5250_dwmmc_caps[4] = {
->  	MMC_CAP_UHS_DDR50 | MMC_CAP_1_8V_DDR |
-> @@ -205,7 +168,6 @@ static const struct dw_mci_drv_data exynos5250_drv_data = {
->  	.prepare_command	= dw_mci_exynos_prepare_command,
->  	.set_ios		= dw_mci_exynos_set_ios,
->  	.parse_dt		= dw_mci_exynos_parse_dt,
-> -	.setup_bus		= dw_mci_exynos_setup_bus,
->  };
-> 
->  static const struct of_device_id dw_mci_exynos_match[] = {
-> --
-> 1.6.6.rc2
 > 
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> ~Vinod
