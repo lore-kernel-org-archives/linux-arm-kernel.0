@@ -1,41 +1,42 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 07 Mar 2013 10:14:19 +0900
-Subject: [PATCH] ARM: S3C24XX: drop "select MACH_N35"
-In-Reply-To: <20130307005206.GZ17833@n2100.arm.linux.org.uk>
-References: <1362609234.28137.2.camel@x61.thuisdomein>
- <013a01ce1ac7$11b287d0$35179770$%kim@samsung.com>
- <1362615081.28137.5.camel@x61.thuisdomein>
- <014601ce1acd$bc63d480$352b7d80$%kim@samsung.com>
- <20130307005206.GZ17833@n2100.arm.linux.org.uk>
-Message-ID: <015001ce1ad1$185e66d0$491b3470$%kim@samsung.com>
+Date: Thu, 07 Mar 2013 10:31:03 +0900
+Subject: [PATCH 1/2] ARM: exynos: pl330: Add #dma-cells for generic dma
+ binding support
+In-Reply-To: <CAAgF-Bf+rqiFUaBD=aRqry6-2z4o0Ao2L2YRm8bu1x98TfPPyg@mail.gmail.com>
+References: <1362375268-29405-1-git-send-email-padma.v@samsung.com>
+ <201303052237.05910.arnd@arndb.de>
+ <CAAgF-Bf+rqiFUaBD=aRqry6-2z4o0Ao2L2YRm8bu1x98TfPPyg@mail.gmail.com>
+Message-ID: <015901ce1ad3$6ea43540$4bec9fc0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
+Padma Venkat wrote:
 > 
-> On Thu, Mar 07, 2013 at 09:50:17AM +0900, Kukjin Kim wrote:
-> > Paul Bolle wrote:
-> > >
-> > > On Thu, 2013-03-07 at 09:02 +0900, Kukjin Kim wrote:
-> > >
-> > > > BTW, so the machine type can be removed at arch/arm/tools/mach-types
-> as
-> > > well.
-> > >
-> > > Well, that file has a big comment on top, containing the line:
-> > >     Please do not send patches to this file; it is automatically
-> > > generated!
-> > >
-> > > So I didn't dare to touch it.
-> > >
-> > Yeah, I know.
+> On Wed, Mar 6, 2013 at 4:07 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Monday 04 March 2013, Padmavathi Venna wrote:
+> >>
+> >> This patch adds #dma-cells property to PL330 DMA controller
+> >> nodes for supporting generic dma dt bindings on samsung exynos
+> >> platforms. #dma-channels and #dma-requests are not required now
+> >> but added in advance.
+> >>
+> >> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
 > >
-> > It will be handled by Russell King :-)
+> > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> >
+> > Should we apply these directly to the arm-soc fixes branch, or wait
+> > until they come back from the Samsung subarchitecture tree?
 > 
-> And deleting entries from it is pointless if they've ever been in the
-> kernel.
+> Hmm, If Kukjin can take in 3.9 rc2 it's better to go via Samsung tree.
+> 
+> Kukjin,
+> 
+> Can you please take this patch in 3.9 rc2 ?
+> 
+Sure, I will.
 
-OK, I see and agree.
+BTW, Arnd, I'm not sure second one(socfpga.dtsi) can be handled in samsung
+tree.
 
 Thanks.
 
