@@ -1,34 +1,45 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 7 Mar 2013 07:22:55 +0100
-Subject: [PATCH 2/3] arm: kirkwood: factor pinmux descriptors for
- OpenBlocks A6
-In-Reply-To: <20130306201646.179fce69@skate>
-References: <1362587021-32762-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1362587021-32762-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130306181648.GE3904@lunn.ch> <20130306201646.179fce69@skate>
-Message-ID: <20130307062255.GH3904@lunn.ch>
+From: manishv.b@ti.com (Vishwanathrao Badarkhe, Manish)
+Date: Thu, 7 Mar 2013 11:56:19 +0530
+Subject: [RESEND 0/2] davinci: Add device tree data for tps6507x.
+Message-ID: <1362637581-12673-1-git-send-email-manishv.b@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 06, 2013 at 08:16:46PM +0100, Thomas Petazzoni wrote:
-> Dear Andrew Lunn,
-> 
-> On Wed, 6 Mar 2013 19:16:48 +0100, Andrew Lunn wrote:
-> 
-> > There is no need to pinmux gpio pins at all. The pinctrl driver does
-> > it when the gpio driver requests the pins.
-> 
-> Right, that's true. I knew about this, but since the pinmux
-> configuration was made explicit for those GPIOs, I thought the original
-> author(s) of this .dts did this intentionally. For example, it somewhat
-> documents the 8 GPIOs that are available in the bottom connector of the
-> OpenBlocks A6. They are not tied to anyway particular device, so they
-> wouldn't appear anywhere in the DT. Ditto for the DIP switch GPIOs. Do
-> you also want those to be removed from the DT?
+Add device tree data for regulator via tps6507x mfd device 
+in da850-evm.
+Applies on top of v3.9-rc1 of linus tree.
 
-Hi Thomas
+Tested on da850-evm device.
 
-Good point. They are not required, but don't harm. So yes, leave them
-there for documentation purposes.
+Test procedure followed as below:
+Once device boots up, issue command as:
 
-      Andrew
+$for reg in /sys/class/regulator/*; do echo $reg `cat $reg/name`
+ `cat $reg/state` `cat $reg/microvolts`; done
+
+This command will print all available regulators with its name,
+status (enabled/disabled) and voltages(in microvolts) like as below:
+/sys/class/regulator/regulator.1 VDCDC1_3.3V enabled 3300000
+/sys/class/regulator/regulator.2 VDCDC2_3.3V enabled 3300000
+/sys/class/regulator/regulator.3 VDCDC3_1.2V enabled 1200000
+/sys/class/regulator/regulator.4 LDO1_1.8V enabled 1800000
+/sys/class/regulator/regulator.5 LDO2_1.2V enabled 1200000
+
+Note: Some of patches in this series are already accepted and 
+residing in v3.9-rc1 kernel. These patches are as follows:
+
+1. mfd: tps6507x: add device-tree support.
+2. regulator: tps6507x: add device tree support. 
+3. ARM: davinci: da850: add DT node for I2C0. 
+
+Vishwanathrao Badarkhe, Manish (2):
+  ARM: regulator: add tps6507x device tree data
+  ARM: davinci: da850: add tps6507x regulator DT data
+
+ arch/arm/boot/dts/da850-evm.dts |   63 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/tps6507x.dtsi |   47 +++++++++++++++++++++++++++++
+ 2 files changed, 110 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/boot/dts/tps6507x.dtsi
+
+-- 
+1.7.4.1
