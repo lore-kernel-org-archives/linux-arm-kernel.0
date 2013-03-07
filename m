@@ -1,38 +1,30 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu,  7 Mar 2013 22:26:29 +0100
-Subject: [PATCH 4/9] startup: switch to pr_xxx
+Date: Thu,  7 Mar 2013 22:26:30 +0100
+Subject: [PATCH 5/9] at91: clock switch to pr_info
 In-Reply-To: <1362691594-32286-1-git-send-email-plagnioj@jcrosoft.com>
 References: <20130307212523.GK4401@game.jcrosoft.org>
  <1362691594-32286-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <1362691594-32286-4-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1362691594-32286-5-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 ---
- common/startup.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-at91/clock.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/common/startup.c b/common/startup.c
-index 52a8996..e49cc4c 100644
---- a/common/startup.c
-+++ b/common/startup.c
-@@ -105,14 +105,14 @@ void __noreturn start_barebox(void)
+diff --git a/arch/arm/mach-at91/clock.c b/arch/arm/mach-at91/clock.c
+index 2dde632..296f5d5 100644
+--- a/arch/arm/mach-at91/clock.c
++++ b/arch/arm/mach-at91/clock.c
+@@ -756,7 +756,7 @@ static int at91_clock_display(void)
+ 	if (pll_overclock)
+ 		pr_info("Clocks: PLLA overclocked, %ld MHz\n", plla.rate_hz / 1000000);
  
- 	for (initcall = __barebox_initcalls_start;
- 			initcall < __barebox_initcalls_end; initcall++) {
--		debug("initcall-> %pS\n", *initcall);
-+		pr_debug("initcall-> %pS\n", *initcall);
- 		result = (*initcall)();
- 		if (result)
- 			pr_err("initcall %pS failed: %s\n", *initcall,
- 					strerror(-result));
- 	}
- 
--	debug("initcalls done\n");
-+	pr_debug("initcalls done\n");
- 
- 	if (IS_ENABLED(CONFIG_ENV_HANDLING)) {
- 		int ret;
+-	printf("Clocks: CPU %u MHz, master %u MHz, main %u.%03u MHz\n",
++	pr_info("Clocks: CPU %u MHz, master %u MHz, main %u.%03u MHz\n",
+ 		cpu_freq / 1000000, (unsigned) mck.rate_hz / 1000000,
+ 		(unsigned) main_clk.rate_hz / 1000000,
+ 		((unsigned) main_clk.rate_hz % 1000000) / 1000);
 -- 
 1.7.10.4
