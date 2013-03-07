@@ -1,48 +1,45 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 7 Mar 2013 15:34:18 +0800
-Subject: [PATCH v2 1/3] ARM: dts: imx6q: Add pinctrl for ecspi3
-In-Reply-To: <1362636010-17367-2-git-send-email-xobs@kosagi.com>
-References: <1362636010-17367-1-git-send-email-xobs@kosagi.com>
- <1362636010-17367-2-git-send-email-xobs@kosagi.com>
-Message-ID: <20130307073415.GE5372@S2101-09.ap.freescale.net>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 7 Mar 2013 09:34:34 +0200
+Subject: [PATCH] ARM: OMAP1: fix omap_udc registration
+In-Reply-To: <1362608605-26611-1-git-send-email-aaro.koskinen@iki.fi>
+References: <1362608605-26611-1-git-send-email-aaro.koskinen@iki.fi>
+Message-ID: <20130307073434.GB9171@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 07, 2013 at 06:00:08AM +0000, Sean Cross wrote:
-> Add a group of pins to allow ecspi3 to be used on imx6q.
-
-All 3 patches look good.  But you forgot adding your sign-off.
-I added the following line and applied the patches this time.
-
-Signed-off-by: Sean Cross <xobs@kosagi.com>
-
-Shawn
-
+On Thu, Mar 07, 2013 at 12:23:25AM +0200, Aaro Koskinen wrote:
+> omap_udc platform device is not registered properly anymore:
+> CONFIG_USB_GADGET_OMAP was deleted by 193ab2a6 (usb: gadget: allow
+> multiple gadgets to be built) already in v3.1.
+> 
+> Fix by using CONFIG_USB_OMAP instead. Tested on Nokia 770 by checking
+> that omap_udc is probed & working properly when built as a module.
+> 
+> Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
 > ---
->  arch/arm/boot/dts/imx6q.dtsip |   10 ++++++++++
->  1 file changed, 10 insertions(+)
+>  arch/arm/mach-omap1/include/mach/usb.h |    2 +-
+>  arch/arm/mach-omap1/usb.c              |    6 +++---
+>  2 files changed, 4 insertions(+), 4 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/imx6q.dtsip b/arch/arm/boot/dts/imx6q.dtsip
-> index 749c5c4..f318678 100644
-> --- a/arch/arm/boot/dts/imx6q.dtsip
-> +++ b/arch/arm/boot/dts/imx6q.dtsip
-> @@ -97,6 +97,16 @@
->  					};
->  				};
->  
-> +				ecspi3 {
-> +					pinctrl_ecspi3_1: ecspi3grp-1 {
-> +						fsl,pins = <
-> +							MX6Q_PAD_DISP0_DAT2__ECSPI3_MISO 0x100b1
-> +							MX6Q_PAD_DISP0_DAT1__ECSPI3_MOSI 0x100b1
-> +							MX6Q_PAD_DISP0_DAT0__ECSPI3_SCLK 0x100b1
-> +						>;
-> +					};
-> +				};
-> +
->  				enet {
->  					pinctrl_enet_1: enetgrp-1 {
->  						fsl,pins = <
-> -- 
-> 1.7.9.5
-> 
+> diff --git a/arch/arm/mach-omap1/include/mach/usb.h b/arch/arm/mach-omap1/include/mach/usb.h
+> index 753cd5c..8b2150e 100644
+> --- a/arch/arm/mach-omap1/include/mach/usb.h
+> +++ b/arch/arm/mach-omap1/include/mach/usb.h
+> @@ -2,7 +2,7 @@
+>   * FIXME correct answer depends on hmc_mode,
+>   * as does (on omap1) any nonzero value for config->otg port number
+>   */
+> -#ifdef	CONFIG_USB_GADGET_OMAP
+> +#if defined(CONFIG_USB_OMAP) || defined(CONFIG_USB_OMAP_MODULE)
+
+could use IS_ENABLED()
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130307/928db90a/attachment.sig>
