@@ -1,50 +1,158 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Wed, 06 Mar 2013 21:21:54 -0800
-Subject: [PATCH 3/6] ssbi: Fix exit mismatch in remove function
-In-Reply-To: <20130307013042.GB2910@kroah.com> (Greg Kroah-Hartman's message
- of "Thu, 7 Mar 2013 09:30:42 +0800")
-References: <1362616187-21089-1-git-send-email-davidb@codeaurora.org>
- <1362616187-21089-4-git-send-email-davidb@codeaurora.org>
- <20130307013042.GB2910@kroah.com>
-Message-ID: <8yaobevvl71.fsf@huya.qualcomm.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Thu, 7 Mar 2013 05:29:24 +0000
+Subject: [PATCH 2/2] ARM: dts: add AM33XX MMC support
+In-Reply-To: <1362629799-22485-3-git-send-email-mporter@ti.com>
+References: <1362629799-22485-1-git-send-email-mporter@ti.com>
+ <1362629799-22485-3-git-send-email-mporter@ti.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EC20028@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greg Kroah-Hartman <gregkh@linuxfoundation.org> writes:
+> -----Original Message-----
+> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> owner at vger.kernel.org] On Behalf Of Porter, Matt
+> Sent: Thursday, March 07, 2013 9:47 AM
+> To: Krishnamoorthy, Balaji T; Chris Ball; Cousson, Benoit; Tony
+> Lindgren; Russell King
+> Cc: Devicetree Discuss; Linux ARM Kernel List; Linux OMAP List; Linux
+> Kernel Mailing List; Linux MMC List
+> Subject: [PATCH 2/2] ARM: dts: add AM33XX MMC support
+> 
+> Adds AM33XX MMC support for am335x-bone, am335x-evm, and
+> am335x-evmsk.
+> 
+> Signed-off-by: Matt Porter <mporter@ti.com>
+> Acked-by: Tony Lindgren <tony@atomide.com>
+> ---
+>  arch/arm/boot/dts/am335x-bone.dts  |    7 +++++++
+>  arch/arm/boot/dts/am335x-evm.dts   |    7 +++++++
+>  arch/arm/boot/dts/am335x-evmsk.dts |    7 +++++++
+>  arch/arm/boot/dts/am33xx.dtsi      |   28 ++++++++++++++++++++++++++++
+>  4 files changed, 49 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/am335x-bone.dts
+> b/arch/arm/boot/dts/am335x-bone.dts
+> index 11b240c..a154ce0 100644
+> --- a/arch/arm/boot/dts/am335x-bone.dts
+> +++ b/arch/arm/boot/dts/am335x-bone.dts
+> @@ -120,6 +120,8 @@
+>  		};
+> 
+>  		ldo3_reg: regulator at 5 {
+> +			regulator-min-microvolt = <1800000>;
+> +			regulator-max-microvolt = <3300000>;
+>  			regulator-always-on;
+>  		};
+> 
+> @@ -136,3 +138,8 @@
+>  &cpsw_emac1 {
+>  	phy_id = <&davinci_mdio>, <1>;
+>  };
+> +
+> +&mmc1 {
+> +	status = "okay";
+> +	vmmc-supply = <&ldo3_reg>;
+> +};
+> diff --git a/arch/arm/boot/dts/am335x-evm.dts
+> b/arch/arm/boot/dts/am335x-evm.dts
+> index d649644..2907da6 100644
+> --- a/arch/arm/boot/dts/am335x-evm.dts
+> +++ b/arch/arm/boot/dts/am335x-evm.dts
+> @@ -232,6 +232,8 @@
+>  		};
+> 
+>  		vmmc_reg: regulator at 12 {
+> +			regulator-min-microvolt = <1800000>;
+> +			regulator-max-microvolt = <3300000>;
+>  			regulator-always-on;
+>  		};
+>  	};
+> @@ -244,3 +246,8 @@
+>  &cpsw_emac1 {
+>  	phy_id = <&davinci_mdio>, <1>;
+>  };
+> +
+> +&mmc1 {
+> +	status = "okay";
+> +	vmmc-supply = <&vmmc_reg>;
+> +};
+> diff --git a/arch/arm/boot/dts/am335x-evmsk.dts
+> b/arch/arm/boot/dts/am335x-evmsk.dts
+> index f5a6162..f050c46 100644
+> --- a/arch/arm/boot/dts/am335x-evmsk.dts
+> +++ b/arch/arm/boot/dts/am335x-evmsk.dts
+> @@ -244,7 +244,14 @@
+>  		};
+> 
+>  		vmmc_reg: regulator at 12 {
+> +			regulator-min-microvolt = <1800000>;
+> +			regulator-max-microvolt = <3300000>;
+>  			regulator-always-on;
+>  		};
+>  	};
+>  };
+> +
+> +&mmc1 {
+> +	status = "okay";
+> +	vmmc-supply = <&vmmc_reg>;
+> +};
+> diff --git a/arch/arm/boot/dts/am33xx.dtsi
+> b/arch/arm/boot/dts/am33xx.dtsi
+> index c3c781a..e029eea 100644
+> --- a/arch/arm/boot/dts/am33xx.dtsi
+> +++ b/arch/arm/boot/dts/am33xx.dtsi
+> @@ -234,6 +234,34 @@
+>  			status = "disabled";
+>  		};
+> 
+> +		mmc1: mmc at 48060000 {
+> +			compatible = "ti,omap3-hsmmc";
+> +			ti,hwmods = "mmc1";
+> +			ti,dual-volt;
+> +			ti,needs-special-reset;
+> +			dmas = <&edma 24
+> +				&edma 25>;
+> +			dma-names = "tx", "rx";
+> +			status = "disabled";
+> +		};
+> +
+> +		mmc2: mmc at 481d8000 {
+> +			compatible = "ti,omap3-hsmmc";
+> +			ti,hwmods = "mmc2";
+> +			ti,needs-special-reset;
+> +			dmas = <&edma 2
+> +				&edma 3>;
+> +			dma-names = "tx", "rx";
+> +			status = "disabled";
+> +		};
+> +
+> +		mmc3: mmc at 47810000 {
+> +			compatible = "ti,omap3-hsmmc";
+> +			ti,hwmods = "mmc3";
+> +			ti,needs-special-reset;
+> +			status = "disabled";
+> +		};
+Any specific reason why you did not add edma entry here as well?
 
-> On Wed, Mar 06, 2013 at 04:29:44PM -0800, David Brown wrote:
->> msm_ssbi_remove is referenced with __exit_p, but not declared with
->> __exit.  This causes a warning when the driver is not built as a
->> module:
->> 
->> drivers/ssbi/ssbi.c:341:23: warning: 'msm_ssbi_remove' defined but not used [-Wunused-function]
->> 
->> Fix by adding the __exit declaration to the function.
->> 
->> Signed-off-by: David Brown <davidb@codeaurora.org>
->> ---
->>  drivers/ssbi/ssbi.c | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->> 
->> diff --git a/drivers/ssbi/ssbi.c b/drivers/ssbi/ssbi.c
->> index 86d8416..4d503da 100644
->> --- a/drivers/ssbi/ssbi.c
->> +++ b/drivers/ssbi/ssbi.c
->> @@ -337,7 +337,7 @@ err_get_mem_res:
->>  	return ret;
->>  }
->>  
->> -static int msm_ssbi_remove(struct platform_device *pdev)
->> +static int __exit msm_ssbi_remove(struct platform_device *pdev)
->
-> No, remove the __exit_p marking instead, unless you want your kernel to
-> be oopsed :)
+Also, I wonder why "interrupt" property is not coming here, I understand
+That hwmod is filling the gap here; but I would still recommend you to complete
+The DT node, as we only support DT boot.
 
-Thanks.  Oopsing is not fun.
+I will test the whole patch series today and update you.
 
-David
+Thanks,
+Vaibhav
 
--- 
-sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+
+> +
+>  		wdt2: wdt at 44e35000 {
+>  			compatible = "ti,omap3-wdt";
+>  			ti,hwmods = "wd_timer2";
+> --
+> 1.7.9.5
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap"
+> in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
