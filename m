@@ -1,105 +1,23 @@
-From: ivan.djelic@parrot.com (Ivan Djelic)
-Date: Thu, 7 Mar 2013 09:13:56 +0100
-Subject: [PATCH v2] arm: fix memset-related crashes caused by recent GCC
- (4.7.2) optimizations
-In-Reply-To: <513795C5.4050608@gmail.com>
-References: <1360587435-28386-1-git-send-email-ivan.djelic@parrot.com>
- <513795C5.4050608@gmail.com>
-Message-ID: <20130307081356.GA4160@parrot.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 7 Mar 2013 09:14:56 +0100
+Subject: [PATCH] ASoC: samsung: let device core setup the default pin
+ configuration
+In-Reply-To: <1362570951-14403-1-git-send-email-thomas.abraham@linaro.org>
+References: <1362570951-14403-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <CACRpkdYF7ed-+Qkw_+N2rHzOv1njkGLew+7wcSYsOGvooeAVCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 06, 2013 at 07:15:17PM +0000, Dirk Behme wrote:
-> Am 11.02.2013 13:57, schrieb Ivan Djelic:
-> > Recent GCC versions (e.g. GCC-4.7.2) perform optimizations based on
-> > assumptions about the implementation of memset and similar functions.
-> > The current ARM optimized memset code does not return the value of
-> > its first argument, as is usually expected from standard implementations.
-> >
-> > For instance in the following function:
-> >
-> > void debug_mutex_lock_common(struct mutex *lock, struct mutex_waiter *waiter)
-> > {
-> > 	memset(waiter, MUTEX_DEBUG_INIT, sizeof(*waiter));
-> > 	waiter->magic = waiter;
-> > 	INIT_LIST_HEAD(&waiter->list);
-> > }
-> >
-> > compiled as:
-> >
-> > 800554d0 <debug_mutex_lock_common>:
-> > 800554d0:       e92d4008        push    {r3, lr}
-> > 800554d4:       e1a00001        mov     r0, r1
-> > 800554d8:       e3a02010        mov     r2, #16 ; 0x10
-> > 800554dc:       e3a01011        mov     r1, #17 ; 0x11
-> > 800554e0:       eb04426e        bl      80165ea0 <memset>
-> > 800554e4:       e1a03000        mov     r3, r0
-> > 800554e8:       e583000c        str     r0, [r3, #12]
-> > 800554ec:       e5830000        str     r0, [r3]
-> > 800554f0:       e5830004        str     r0, [r3, #4]
-> > 800554f4:       e8bd8008        pop     {r3, pc}
-> >
-> > GCC assumes memset returns the value of pointer 'waiter' in register r0; causing
-> > register/memory corruptions.
-> >
-> > This patch fixes the return value of the assembly version of memset.
-> > It adds a 'mov' instruction and merges an additional load+store into
-> > existing load/store instructions.
-> > For ease of review, here is a breakdown of the patch into 4 simple steps:
-> >
-> > Step 1
-> > ======
-> > Perform the following substitutions:
-> > ip -> r8, then
-> > r0 -> ip,
-> > and insert 'mov ip, r0' as the first statement of the function.
-> > At this point, we have a memset() implementation returning the proper result,
-> > but corrupting r8 on some paths (the ones that were using ip).
-> >
-> > Step 2
-> > ======
-> > Make sure r8 is saved and restored when (! CALGN(1)+0) == 1:
-> >
-> > save r8:
-> > -       str     lr, [sp, #-4]!
-> > +       stmfd   sp!, {r8, lr}
-> >
-> > and restore r8 on both exit paths:
-> > -       ldmeqfd sp!, {pc}               @ Now <64 bytes to go.
-> > +       ldmeqfd sp!, {r8, pc}           @ Now <64 bytes to go.
-> > (...)
-> >          tst     r2, #16
-> >          stmneia ip!, {r1, r3, r8, lr}
-> > -       ldr     lr, [sp], #4
-> > +       ldmfd   sp!, {r8, lr}
-> >
-> > Step 3
-> > ======
-> > Make sure r8 is saved and restored when (! CALGN(1)+0) == 0:
-> >
-> > save r8:
-> > -       stmfd   sp!, {r4-r7, lr}
-> > +       stmfd   sp!, {r4-r8, lr}
-> >
-> > and restore r8 on both exit paths:
-> >          bgt     3b
-> > -       ldmeqfd sp!, {r4-r7, pc}
-> > +       ldmeqfd sp!, {r4-r8, pc}
-> > (...)
-> >          tst     r2, #16
-> >          stmneia ip!, {r4-r7}
-> > -       ldmfd   sp!, {r4-r7, lr}
-> > +       ldmfd   sp!, {r4-r8, lr}
-> >
-> > Step 4
-> > ======
-> > Rewrite register list "r4-r7, r8" as "r4-r8".
-> >
-> > Signed-off-by: Ivan Djelic <ivan.djelic@parrot.com>
-> > Reviewed-by: Nicolas Pitre <nico@linaro.org>
-> 
-> Sent as 7668/1 to rmk's patch system.
+On Wed, Mar 6, 2013 at 12:55 PM, Thomas Abraham
+<thomas.abraham@linaro.org> wrote:
 
-OK, thanks a lot !
---
-Ivan
+> With device core now able to setup the default pin configuration,
+> the pin configuration code based on the deprecated Samsung specific
+> gpio bindings in i2s driver is removed.
+>
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+Yours,
+Linus Walleij
