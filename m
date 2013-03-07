@@ -1,52 +1,54 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 7 Mar 2013 14:08:42 +0100
-Subject: [PULL PATCH 0/3] ARM: at91: Kconfig cleanup for prepare add of
- Cortex-A5 Sama5
-Message-ID: <20130307130842.GA4590@game.jcrosoft.org>
+From: andreas.fenkart@streamunlimited.com (Andreas Fenkart)
+Date: Thu,  7 Mar 2013 14:13:27 +0100
+Subject: [PATCH] ARM: OMAP2+: am33xx: preserve JTAG clock aka debugss_ick.
+Message-ID: <1362662007-13782-2-git-send-email-andreas.fenkart@streamunlimited.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI,
+This fixes JTAG support on am33xx.
 
-	The folowing patch serie
+Signed-off-by: Andreas Fenkart <andreas.fenkart@streamunlimited.com>
+---
+ arch/arm/Kconfig.debug                |    6 ++++++
+ arch/arm/mach-omap2/cclock33xx_data.c |   11 ++++++++---
+ 2 files changed, 14 insertions(+), 3 deletions(-)
 
-	move the non dt Kconfig to Kconfig.non_dt as they are plan for removal
-
-	and update the Kconfig scheme to simplify the adding of the up comming
-	Cortex-A5 SAMA5D3x series
-
-please pull
-The following changes since commit 6dbe51c251a327e012439c4772097a13df43c5b8:
-
-  Linux 3.9-rc1 (2013-03-03 15:11:05 -0800)
-
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git delivery/at91_3.9_dt_cleanup
-
-for you to fetch changes up to 8ca98913f4b4e0b38d4442551d63681f4fdd0224:
-
-  ARM: at91: renamme rm9200 dt file (2013-03-07 20:20:41 +0800)
-
-----------------------------------------------------------------
-Jean-Christophe PLAGNIOL-VILLARD (3):
-      ARM: at91: move non DT Kconfig to Kconfig.non_dt
-      ARM: at91: rename board-dt to more specific name board-dt-sam9
-      ARM: at91: renamme rm9200 dt file
-
- arch/arm/configs/at91_dt_defconfig                          |    2 +-
- arch/arm/configs/at91sam9260_defconfig                      |    2 +-
- arch/arm/configs/at91sam9g20_defconfig                      |    2 +-
- arch/arm/configs/at91sam9g45_defconfig                      |    2 +-
- arch/arm/mach-at91/Kconfig                                  |  398 ++-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
- arch/arm/mach-at91/Kconfig.non_dt                           |  399 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-at91/Makefile                                 |    4 +--
- arch/arm/mach-at91/{board-rm9200-dt.c => board-dt-rm9200.c} |    0
- arch/arm/mach-at91/{board-dt.c => board-dt-sam9.c}          |    0
- 9 files changed, 407 insertions(+), 402 deletions(-)
- create mode 100644 arch/arm/mach-at91/Kconfig.non_dt
- rename arch/arm/mach-at91/{board-rm9200-dt.c => board-dt-rm9200.c} (100%)
- rename arch/arm/mach-at91/{board-dt.c => board-dt-sam9.c} (100%)
-
-Best Regards,
-J.
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index acdddda..8120940 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -632,4 +632,10 @@ config PID_IN_CONTEXTIDR
+ 	  additional instructions during context switch. Say Y here only if you
+ 	  are planning to use hardware trace tools with this kernel.
+ 
++config JTAG
++	bool "Enable JTAG clock"
++	depends on SOC_AM33XX
++	help
++	  Enable or keep JTAG clock enabled
++
+ endmenu
+diff --git a/arch/arm/mach-omap2/cclock33xx_data.c b/arch/arm/mach-omap2/cclock33xx_data.c
+index 476b820..b7470de 100644
+--- a/arch/arm/mach-omap2/cclock33xx_data.c
++++ b/arch/arm/mach-omap2/cclock33xx_data.c
+@@ -429,9 +429,14 @@ DEFINE_STRUCT_CLK(smartreflex1_fck, dpll_core_ck_parents, clk_ops_null);
+  *     - usbotg_fck (its additional clock and not really a modulemode)
+  *     - ieee5000
+  */
+-DEFINE_CLK_GATE(debugss_ick, "dpll_core_m4_ck", &dpll_core_m4_ck, 0x0,
+-		AM33XX_CM_WKUP_DEBUGSS_CLKCTRL, AM33XX_MODULEMODE_SWCTRL_SHIFT,
+-		0x0, NULL);
++#ifdef CONFIG_JTAG
++#define DEBUGSS_FLAGS CLK_IGNORE_UNUSED
++#else
++#define DEBUGSS_FLAGS 0x0
++#endif
++DEFINE_CLK_GATE(debugss_ick, "dpll_core_m4_ck", &dpll_core_m4_ck,
++		DEBUGSS_FLAGS, AM33XX_CM_WKUP_DEBUGSS_CLKCTRL,
++		AM33XX_MODULEMODE_SWCTRL_SHIFT, 0x0, NULL);
+ 
+ DEFINE_CLK_GATE(mmu_fck, "dpll_core_m4_ck", &dpll_core_m4_ck, 0x0,
+ 		AM33XX_CM_GFX_MMUDATA_CLKCTRL, AM33XX_MODULEMODE_SWCTRL_SHIFT,
+-- 
+1.7.10.4
