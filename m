@@ -1,79 +1,66 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 06 Mar 2013 17:04:33 -0700
-Subject: [PATCH] clk: tegra: provide dummy cpu car ops
-In-Reply-To: <643E69AA4436674C8F39DCC2C05F7638629CA50CC0@HQMAIL03.nvidia.com>
-References: <1360853581-9756-1-git-send-email-pdeschrijver@nvidia.com>
- <643E69AA4436674C8F39DCC2C05F7638629CA50C97@HQMAIL03.nvidia.com>
- <5137D47D.6030105@wwwdotorg.org>
- <643E69AA4436674C8F39DCC2C05F7638629CA50CC0@HQMAIL03.nvidia.com>
-Message-ID: <5137D991.7080808@wwwdotorg.org>
+From: cdall@cs.columbia.edu (Christoffer Dall)
+Date: Wed, 6 Mar 2013 16:11:05 -0800
+Subject: [kvmarm] [PATCH 00/29] ARM: KVM: pre-arm64 KVM/arm rework
+In-Reply-To: <1362451403-23460-1-git-send-email-marc.zyngier@arm.com>
+References: <1362451403-23460-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20130307001105.GA23427@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/06/2013 04:59 PM, Andrew Chew wrote:
->> From: linux-tegra-owner at vger.kernel.org [mailto:linux-tegra-
->> owner at vger.kernel.org] On Behalf Of Stephen Warren
->> Sent: Wednesday, March 06, 2013 3:43 PM
->> To: Andrew Chew
->> Cc: Peter De Schrijver; linux-tegra at vger.kernel.org; linux-arm-
->> kernel at lists.infradead.org; Stephen Warren; Prashant Gaikwad; Mike
->> Turquette; linux-kernel at vger.kernel.org
->> Subject: Re: [PATCH] clk: tegra: provide dummy cpu car ops
->>
->> On 03/06/2013 04:20 PM, Andrew Chew wrote:
->>>> Subject: [PATCH] clk: tegra: provide dummy cpu car ops
->>>>
->>>> tegra_boot_secondary() relies on some of the car ops. This means
->>>> having an uninitialized tegra_cpu_car_ops will lead to an early boot panic.
->>>> Providing a dummy struct avoids this and makes adding Tegra114 clock
->>>> support in a bisectable way a lot easier.
->>>>
->>>> --
->>>>
->>>> Stephen,
->>>>
->>>> Should this be a separate patch or should I make this part of new
->>>> release of the Tegra114 clock series?
->>
->> I'm not sure if I answered this. Peter, I intend to apply this patch to a branch
->> right before the CCF, so there's no explicit need to include it in the series,
->> although if you do, that's fine.
->>
->>>> diff --git a/drivers/clk/tegra/clk.c b/drivers/clk/tegra/clk.c index
->>
->>>>  /* Global data of Tegra CPU CAR ops */ -struct tegra_cpu_car_ops
->>>> *tegra_cpu_car_ops;
->>>
->>> Sorry for bringing this up so late...
->>> Shouldn't the above be "struct tegra_cpu_car_ops tegra_cpu_car_ops;"?
->>>
->>>> +static struct tegra_cpu_car_ops *dummy_car_ops; struct
->>>> +tegra_cpu_car_ops *tegra_cpu_car_ops = &dummy_car_ops;
->>
->> No, the value is used as a pointer in include/linux/clk/tegra.h, e.g.:
->>
->> tegra_cpu_car_ops->wait_for_reset(cpu);
+On Tue, Mar 05, 2013 at 02:42:54AM +0000, Marc Zyngier wrote:
+> This patch series is reworking KVM/arm in order to prepare the code
+> to be shared with the upcoming KVM/arm64.
 > 
-> Yeah, I get that tegra_cpu_car_ops is a pointer to an ops table.  It seems
-> to me that what's happening above is that tegra_cpu_car_ops is getting
-> assigned a pointer to a pointer that's supposed to point to an instance of
-> struct tegra_cpu_car_ops (but it really points to NULL as far as I can tell).
-> In any case, dummy_car_ops never actually gets instantiated.
+> Nothing major here, just a lot of accessors, small cleanups and fixes
+> to make the code useable on arm64.
 > 
-> I assume the intention is for dummy_car_ops to be an instance of
-> struct tegra_cpu_car_ops, but with all of its members zero'd.
+> This code has been tested on VE-TC2 and arm64 models. As always,
+> comments are most welcome.
+> 
+> Marc Zyngier (29):
+>   ARM: KVM: convert GP registers from u32 to unsigned long
+>   ARM: KVM: abstract fault register accesses
+>   ARM: KVM: abstract HSR_ISV away
+>   ARM: KVM: abstract HSR_WNR away
+>   ARM: KVM: abstract HSR_SSE away
+>   ARM: KVM: abstract HSR_SRT_{MASK,SHIFT} away
+>   ARM: KVM: abstract external abort detection away
+>   ARM: KVM: abstract S1TW abort detection away
+>   ARM: KVM: abstract SAS decoding away
+>   ARM: KVM: abstract IL decoding away
+>   ARM: KVM: abstract exception class decoding away
+>   ARM: KVM: abstract fault decoding away
+>   ARM: KVM: abstract HSR_EC_IABT away
+>   ARM: KVM: move kvm_condition_valid to emulate.c
+>   ARM: KVM: move exit handler selection to a separate file
+>   ARM: KVM: move kvm_handle_wfi to handle_exit.c
+>   ARM: KVM: abstract most MMU operations
+>   ARM: KVM: remove superfluous include from kvm_vgic.h
+>   ARM: KVM: move hyp init to kvm_host.h
+>   ARM: KVM: use kvm_kernel_vfp_t as an abstract type for VFP containers
+>   ARM: KVM: allow HYP mappings to be at an offset from kernel mappings
+>   ARM: KVM: fix address validation for HYP mappings
 
-Oh right, I guess your comment was about the line after where you wrote
-it rather than the line before.
+These ones were already applied?
 
-So, you mean:
+See https://github.com/columbia/linux-kvm-arm/tree/kvm-arm-fixes
 
-static struct tegra_cpu_car_ops *dummy_car_ops;
-struct tegra_cpu_car_ops *tegra_cpu_car_ops = &dummy_car_ops;
+>   ARM: KVM: sanitize freeing of HYP page tables
 
-should be instead:
+applied
 
-static struct tegra_cpu_car_ops dummy_car_ops;
-struct tegra_cpu_car_ops *tegra_cpu_car_ops = &dummy_car_ops;
+>   ARM: KVM: move kvm_target_cpu to guest.c
+>   ARM: KVM: fix fault_ipa computing
+>   ARM: KVM: vgic: decouple alignment restriction from page size
+>   ARM: KVM: move include of asm/idmap.h to kvm_mmu.h
+>   ARM: KVM: change kvm_tlb_flush_vmid to kvm_tlb_flush_vmid_ipa
 
-Yes, you're right.
+These ones were also already applied.
+
+>   ARM: KVM: Fix length of mmio access
+
+applied.
+
+I will send a pull request to kvm/master for these ones.
+
+-Christoffer
