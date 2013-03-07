@@ -1,86 +1,79 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Thu, 7 Mar 2013 11:33:12 +0100
-Subject: [kvmarm] [PATCH 04/29] arm64: KVM: system register definitions
- for 64bit guests
-In-Reply-To: <1362455265-24165-5-git-send-email-marc.zyngier@arm.com>
-References: <1362455265-24165-1-git-send-email-marc.zyngier@arm.com>
- <1362455265-24165-5-git-send-email-marc.zyngier@arm.com>
-Message-ID: <39149D17-D998-413F-AB9C-A76E95483BED@suse.de>
+From: js1304@gmail.com (JoonSoo Kim)
+Date: Thu, 7 Mar 2013 19:35:51 +0900
+Subject: [RFC PATCH] ARM: mm: disable kmap_high_get() for SMP
+In-Reply-To: <alpine.LFD.2.03.1303071721540.28820@syhkavp.arg>
+References: <1362372667-953-1-git-send-email-iamjoonsoo.kim@lge.com>
+ <alpine.LFD.2.03.1303051642110.28820@syhkavp.arg>
+ <20130307081258.GA14839@lge.com>
+ <alpine.LFD.2.03.1303071721540.28820@syhkavp.arg>
+Message-ID: <CAAmzW4NjefPV7tryvySfLXPy6Zcz3BLTvfxD=UnTKCqrRB3voQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+2013/3/7 Nicolas Pitre <nicolas.pitre@linaro.org>:
+> On Thu, 7 Mar 2013, Joonsoo Kim wrote:
+>
+>> Hello, Nicolas.
+>>
+>> On Tue, Mar 05, 2013 at 05:36:12PM +0800, Nicolas Pitre wrote:
+>> > On Mon, 4 Mar 2013, Joonsoo Kim wrote:
+>> >
+>> > > With SMP and enabling kmap_high_get(), it makes users of kmap_atomic()
+>> > > sequential ordered, because kmap_high_get() use global kmap_lock().
+>> > > It is not welcome situation, so turn off this optimization for SMP.
+>> >
+>> > I'm not sure I understand the problem.
+>> >
+>> > The lock taken by kmap_high_get() is released right away before that
+>> > function returns and therefore this is not actually serializing
+>> > anything.
+>>
+>> Yes, you understand what I want to say correctly.
+>> Sorry for bad explanation.
+>>
+>> Following is reasons why I send this patch with RFC tag.
+>>
+>> If we have more cpus, performance degration is possible although
+>> it is very short time to holding the lock in kmap_high_get().
+>>
+>> And kmap has maximum 512 entries(512 * 4K = 2M) and some mobile devices
+>> has 2G memory(highmem 1G>), so probability for finding matched entry
+>> is approximately < 1/512. This probability can be more decreasing
+>> for device which have more memory. So I think that waste time to find
+>> matched entry is more than saved time.
+>>
+>> Above is my humble opinion, so please let me know what I am missing.
+>
+> Please look at the kmap_high_get() code again.  It performs no
+> searching at all.  What it does is:
 
-On 05.03.2013, at 04:47, Marc Zyngier wrote:
+If page is not highmem, it may be already filtered in kmap_atomic().
+So we only consider highmem page.
 
-> Define the saved/restored registers for 64bit guests.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
-> arch/arm64/include/asm/kvm_asm.h | 68 ++++++++++++++++++++++++++++++++++++++++
-> 1 file changed, 68 insertions(+)
-> create mode 100644 arch/arm64/include/asm/kvm_asm.h
-> 
-> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-> new file mode 100644
-> index 0000000..851fee5
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/kvm_asm.h
-> @@ -0,0 +1,68 @@
-> +/*
-> + * Copyright (C) 2012 - ARM Ltd
-> + * Author: Marc Zyngier <marc.zyngier@arm.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#ifndef __ARM_KVM_ASM_H__
-> +#define __ARM_KVM_ASM_H__
-> +
-> +/*
-> + * 0 is reserved as an invalid value.
-> + * Order *must* be kept in sync with the hyp switch code.
-> + */
-> +#define	MPIDR_EL1	1	/* MultiProcessor Affinity Register */
-> +#define	CSSELR_EL1	2	/* Cache Size Selection Register */
-> +#define	SCTLR_EL1	3	/* System Control Register */
-> +#define	ACTLR_EL1	4	/* Auxilliary Control Register */
-> +#define	CPACR_EL1	5	/* Coprocessor Access Control */
-> +#define	TTBR0_EL1	6	/* Translation Table Base Register 0 */
-> +#define	TTBR1_EL1	7	/* Translation Table Base Register 1 */
-> +#define	TCR_EL1		8	/* Translation Control Register */
-> +#define	ESR_EL1		9	/* Exception Syndrome Register */
-> +#define	AFSR0_EL1	10	/* Auxilary Fault Status Register 0 */
-> +#define	AFSR1_EL1	11	/* Auxilary Fault Status Register 1 */
-> +#define	FAR_EL1		12	/* Fault Address Register */
-> +#define	MAIR_EL1	13	/* Memory Attribute Indirection Register */
-> +#define	VBAR_EL1	14	/* Vector Base Address Register */
-> +#define	CONTEXTIDR_EL1	15	/* Context ID Register */
-> +#define	TPIDR_EL0	16	/* Thread ID, User R/W */
-> +#define	TPIDRRO_EL0	17	/* Thread ID, User R/O */
-> +#define	TPIDR_EL1	18	/* Thread ID, Privileged */
-> +#define	AMAIR_EL1	19	/* Aux Memory Attribute Indirection Register */
-> +#define	CNTKCTL_EL1	20	/* Timer Control Register (EL1) */
-> +#define	NR_SYS_REGS	21
+For highmem page, it perform searching.
+In kmap_high_get(), page_address() is called.
+In page_address(), it hash PA and iterate a list for this hashed value.
 
-These are internal representations of the system registers. Keeping everything strictly linear is quite cumbersome, why not let the compiler do this for you?
+And another advantage of disabling ARCH_NEEDS_KMAP_HIGH_GET is
+that kmap(), kunmap() works without irq disabled.
 
-enum kvm_sysreg_id {
-    MPIDR_EL1 = 1,
-    ...
-    NR_SYS_REGS
-}
+Thanks.
 
-That way gcc automatically counts the IDs up for you. You eliminate a potential source of breakage (duplicate IDs) and the code is even easier to read ;).
-
-
-Alex
+> - lock the kmap array against concurrent changes
+>
+> - if the given page is not highmem, unlock and return NULL
+>
+> - otherwise increment that page reference count, unlock, and return the
+>   mapped address for that page.
+>
+> There is almost zero cost to this function, independently of the number
+> of kmap entries, whereas it does save much bigger costs elsewhere when
+> it is successful.
+>
+>
+> Nicolas
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
