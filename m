@@ -1,15 +1,15 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 07 Mar 2013 11:23:25 +0900
-Subject: [GIT PULL 1/5] Samsung cleanup-s3c for v3.10
-Message-ID: <016601ce1ada$bf9ad0b0$3ed07210$%kim@samsung.com>
+Date: Thu, 07 Mar 2013 11:23:32 +0900
+Subject: [GIT PULL 2/5] Samsung cleanup-s5p for v3.10
+Message-ID: <016701ce1ada$c35e6860$4a1b3920$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+Arnd, Olof,
 
-Here is cleanup for s3c stuff.
+Here is small cleanup for s5p stuff.
 
-This is including cleanup soc specific header files and plat/irqs.h.
+This is including useless ifdef.
 
 If any problems, please let me know.
 
@@ -28,71 +28,17 @@ The following changes since commit 6dbe51c251a327e012439c4772097a13df43c5b8:
 are available in the git repository at:
 
   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-next/cleanup-s3c
+next/cleanup-s5p
 
-for you to fetch changes up to 7488335dcf382574c47fb27fcbad3f04a9841db6:
+for you to fetch changes up to eb50cd0b2a083950457bf68241a9f040972b6908:
 
-  ARM: S3C24XX: cleanup the included soc init functions in common.h (2013-03-05
-10:42:48 +0900)
+  ARM: S5PV210: remove useless ifdef in common.h (2013-03-05 18:37:10 +0900)
 
 ----------------------------------------------------------------
-Heiko Stuebner (3):
-      ARM: S3C24XX: remove plat/irq.h in plat-samsung
-      ARM: S3C24XX: move plat-samsung/s3c24XX headers to local common.h
-      ARM: S3C24XX: cleanup the included soc init functions in common.h
-
 Kukjin Kim (2):
-      mmc: s3cmci: moved mach/regs-sdi.h into s3cmci device driver
-      ARM: S3C24XX: plat/common-smdk.h local
+      ARM: S5PC100: remove useless ifdef in common.h
+      ARM: S5PV210: remove useless ifdef in common.h
 
- arch/arm/mach-s3c24xx/bast-irq.c                   |    2 -
- arch/arm/mach-s3c24xx/clock-s3c2410.c              |    1 -
- arch/arm/mach-s3c24xx/clock-s3c2412.c              |    1 -
- arch/arm/mach-s3c24xx/clock-s3c2416.c              |    1 -
- arch/arm/mach-s3c24xx/clock-s3c2443.c              |    1 -
- arch/arm/mach-s3c24xx/common-smdk.c                |    3 +-
- .../include/plat => mach-s3c24xx}/common-smdk.h    |    3 +-
- arch/arm/mach-s3c24xx/common.c                     |    7 +-
- arch/arm/mach-s3c24xx/common.h                     |   90 +++++++++++++-
- arch/arm/mach-s3c24xx/dma-s3c2410.c                |    1 -
- arch/arm/mach-s3c24xx/dma-s3c2412.c                |    1 -
- arch/arm/mach-s3c24xx/dma-s3c2440.c                |    1 -
- arch/arm/mach-s3c24xx/dma-s3c2443.c                |    1 -
- arch/arm/mach-s3c24xx/include/mach/regs-sdi.h      |  127 --------------------
- arch/arm/mach-s3c24xx/irq-pm.c                     |    7 +-
- arch/arm/mach-s3c24xx/irq.c                        |    8 +-
- arch/arm/mach-s3c24xx/mach-jive.c                  |    2 +-
- arch/arm/mach-s3c24xx/mach-n30.c                   |    1 -
- arch/arm/mach-s3c24xx/mach-nexcoder.c              |    2 -
- arch/arm/mach-s3c24xx/mach-otom.c                  |    1 -
- arch/arm/mach-s3c24xx/mach-qt2410.c                |    2 +-
- arch/arm/mach-s3c24xx/mach-smdk2410.c              |    3 +-
- arch/arm/mach-s3c24xx/mach-smdk2413.c              |    5 +-
- arch/arm/mach-s3c24xx/mach-smdk2416.c              |    4 +-
- arch/arm/mach-s3c24xx/mach-smdk2440.c              |    5 +-
- arch/arm/mach-s3c24xx/mach-smdk2443.c              |    5 +-
- arch/arm/mach-s3c24xx/mach-vstms.c                 |    3 +-
- arch/arm/mach-s3c24xx/pm-s3c2412.c                 |    1 -
- arch/arm/mach-s3c24xx/s3c2410.c                    |    1 -
- arch/arm/mach-s3c24xx/s3c2412.c                    |    1 -
- arch/arm/mach-s3c24xx/s3c2416.c                    |    1 -
- arch/arm/mach-s3c24xx/s3c2440.c                    |    1 -
- arch/arm/mach-s3c24xx/s3c2442.c                    |    1 -
- arch/arm/mach-s3c24xx/s3c2443.c                    |    1 -
- arch/arm/mach-s3c24xx/s3c244x.c                    |    2 -
- arch/arm/plat-samsung/include/plat/irq.h           |  116 ------------------
- arch/arm/plat-samsung/include/plat/s3c2410.h       |   31 -----
- arch/arm/plat-samsung/include/plat/s3c2412.h       |   32 -----
- arch/arm/plat-samsung/include/plat/s3c2416.h       |   37 ------
- arch/arm/plat-samsung/include/plat/s3c2443.h       |   36 ------
- arch/arm/plat-samsung/include/plat/s3c244x.h       |   42 -------
- drivers/mmc/host/s3cmci.c                          |   83 ++++++++++++-
- 42 files changed, 194 insertions(+), 480 deletions(-)
- rename arch/arm/{plat-samsung/include/plat => mach-s3c24xx}/common-smdk.h (86%)
- delete mode 100644 arch/arm/mach-s3c24xx/include/mach/regs-sdi.h
- delete mode 100644 arch/arm/plat-samsung/include/plat/irq.h
- delete mode 100644 arch/arm/plat-samsung/include/plat/s3c2410.h
- delete mode 100644 arch/arm/plat-samsung/include/plat/s3c2412.h
- delete mode 100644 arch/arm/plat-samsung/include/plat/s3c2416.h
- delete mode 100644 arch/arm/plat-samsung/include/plat/s3c2443.h
- delete mode 100644 arch/arm/plat-samsung/include/plat/s3c244x.h
+ arch/arm/mach-s5pc100/common.h |    9 ---------
+ arch/arm/mach-s5pv210/common.h |    9 ---------
+ 2 files changed, 18 deletions(-)
