@@ -1,36 +1,46 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 7 Mar 2013 09:27:21 +0100
-Subject: [PATCH 00/16] big.LITTLE low-level CPU and cluster power
- management
-In-Reply-To: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 7 Mar 2013 16:57:22 +0800 (HKT)
+Subject: [PATCH 01/16] ARM: b.L: secondary kernel entry code
+In-Reply-To: <20130307073717.GA28982@xo-6d-61-c0.localdomain>
 References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <20130307082721.GB28982@xo-6d-61-c0.localdomain>
+ <1357777251-13541-2-git-send-email-nicolas.pitre@linaro.org>
+ <20130307073717.GA28982@xo-6d-61-c0.localdomain>
+Message-ID: <alpine.LFD.2.03.1303071652050.28820@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Thu, 7 Mar 2013, Pavel Machek wrote:
 
-> Review comments are welcome!
+> Hi!
 > 
-> [*] General design information on the b.L switcher can be found here:
->     http://lwn.net/Articles/481055/
->     However the code is only accessible to Linaro members for the
->     time being.
+> > --- a/arch/arm/Kconfig
+> > +++ b/arch/arm/Kconfig
+> > @@ -1579,6 +1579,12 @@ config HAVE_ARM_TWD
+> >  	help
+> >  	  This options enables support for the ARM timer and watchdog unit
+> >  
+> > +config BIG_LITTLE
+> > +	bool "big.LITTLE support (Experimental)"
+> > +	depends on CPU_V7 && SMP && EXPERIMENTAL
+> > +	help
+> > +	  This option enables support for the big.LITTLE architecture.
+> > +
+> 
+> Perhaps few lines of what big.LITTLE is would be nice here?
 
-Assuming the lwn article is accurate:
+I'd invite you to look at the latest series posted on the list.  This 
+patch is obsolete.
 
-Hmm. So we have hw capable of running 8 cores, and then we introduce strange
-switching code, because "scheduler is not ready". Sounds like a bad idea.
+> It is that "few high-performance cores + few low-power cores" on chip, right?
 
-I'd say:
+Right.
 
-* expose all 8 cores.
+> BTW... is it possible/good idea to run all the cores at the same time for 
+> max performance? From descriptions I understood that is not normally done
+> and I'd like to understand why....
 
-* as long as scheduler is not ready, you can offline "the other" set of cores...
-	/sys/.../cpu/..../online
+It can be done.  But then the scheduler needs to be smarter about which 
+task is put on which core.
 
-That way, I suspect scheduler will be fixed rather quickly.
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+
+Nicolas
