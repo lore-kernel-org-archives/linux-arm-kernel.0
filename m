@@ -1,34 +1,49 @@
-From: ian.campbell@citrix.com (Ian Campbell)
-Date: Thu, 7 Mar 2013 07:17:42 +0000
-Subject: [PATCH LINUX v5] xen: event channel arrays are xen_ulong_t and
- not unsigned long
-In-Reply-To: <20130307031707.GA25137@mudshark.cambridge.arm.com>
-References: <1361285327.1051.115.camel@zakaz.uk.xensource.com>
- <1361360886-2956-1-git-send-email-ian.campbell@citrix.com>
- <51340ACD.70904@gmail.com>
- <20130305030436.GA18040@mudshark.cambridge.arm.com>
- <513596F2.1000701@gmail.com>
- <20130305080845.GA19097@mudshark.cambridge.arm.com>
- <1362475797.8941.67.camel@hastur.hellion.org.uk>
- <20130307031707.GA25137@mudshark.cambridge.arm.com>
-Message-ID: <1362640662.8941.141.camel@hastur.hellion.org.uk>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Thu, 7 Mar 2013 08:22:03 +0100
+Subject: [PATCH 00/23] RFC: exynos multiplatform support
+In-Reply-To: <201303070302.46593.arnd@arndb.de>
+References: <1362505353-8873-1-git-send-email-arnd@arndb.de>
+ <201303061050.42451.arnd@arndb.de>
+ <20130306123426.GB17079@avionic-0098.mockup.avionic-design.de>
+ <201303070302.46593.arnd@arndb.de>
+Message-ID: <20130307072203.GC3451@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-03-07 at 03:17 +0000, Will Deacon wrote:
-> > I looked and couldn't see an existing 64 bit xchg, was I looking in the
-> > wrong place? Ah, wait, I see atomic64_xchg now. But that needs an
-> > atomic64_t while I have a xen_ulong_t (which == 64 bits on ARM). This is
-> > a kernel<->hypervisor ABI so I can't just change it to an atomic64_t. I
-> > suppose I could cast (see below, untested) but that seems rather icky.
+On Thu, Mar 07, 2013 at 03:02:46AM +0000, Arnd Bergmann wrote:
+> On Wednesday 06 March 2013, Thierry Reding wrote:
+> > > Option 2 would probably come down to having a trivial MFD driver exposing
+> > > a regmap. You can probably reuse drivers/mfd/syscon.c for this and make
+> > > the node compatible with "syscon" to designate the clock registers as
+> > > a system-wide resource, making the other device nodes register-less.
+> > 
+> > I think option 2 is the standard method if one hardware block provides
+> > several logical devices. I find it to be a pretty nice solution to this
+> > problem. We also have precedent in the PWM subsystem. The TWL chips for
+> > instance use it to create a platform device which is later driven by a
+> > PWM driver.
 > 
-> You can play some container_of tricks, like we do in cmpxchg64 to get this
-> right. Alternatively, we could look at an xchg8 implementation which some
-> other architectures have (although they seem to be 64-bit machines).
+> One difference though is that the TWL chip is a heterogenous MFD that has
+> a lot of different sub-devices, where in case of Exynos the timer device
+> has a set of identical units, each of which can be used either as a PWM or
+> as a clocksource or other timer.
 
-I went with the container of trick + appropriate Kconfig depends and
-sent a patch out a couple of seconds ago.
+I didn't know that. However I still making this an MFD driver is a good
+fit because it'll move the logic of defining the mode of each unit is
+kept in a parent driver which can instantiate the proper child devices
+for the corresponding subsystems.
 
-Thanks for your help/advice!
+One big disadvantage of this approach is that if this is continued there
+is a risk that MFD will turn into a dump for all kinds of devices that
+provide more than a single service.
 
-Ian.
+So if people prefer option 3 I'm fine with it as well.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130307/44a92c5e/attachment.sig>
