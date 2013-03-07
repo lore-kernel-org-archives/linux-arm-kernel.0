@@ -1,213 +1,79 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed,  6 Mar 2013 16:04:06 -0800
-Subject: [PATCH 10/10] ARM: smp: Remove local timer API
-In-Reply-To: <1362614646-24113-1-git-send-email-sboyd@codeaurora.org>
-References: <1362614646-24113-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1362614646-24113-11-git-send-email-sboyd@codeaurora.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 06 Mar 2013 17:04:33 -0700
+Subject: [PATCH] clk: tegra: provide dummy cpu car ops
+In-Reply-To: <643E69AA4436674C8F39DCC2C05F7638629CA50CC0@HQMAIL03.nvidia.com>
+References: <1360853581-9756-1-git-send-email-pdeschrijver@nvidia.com>
+ <643E69AA4436674C8F39DCC2C05F7638629CA50C97@HQMAIL03.nvidia.com>
+ <5137D47D.6030105@wwwdotorg.org>
+ <643E69AA4436674C8F39DCC2C05F7638629CA50CC0@HQMAIL03.nvidia.com>
+Message-ID: <5137D991.7080808@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are no more users of this API, remove it.
+On 03/06/2013 04:59 PM, Andrew Chew wrote:
+>> From: linux-tegra-owner at vger.kernel.org [mailto:linux-tegra-
+>> owner at vger.kernel.org] On Behalf Of Stephen Warren
+>> Sent: Wednesday, March 06, 2013 3:43 PM
+>> To: Andrew Chew
+>> Cc: Peter De Schrijver; linux-tegra at vger.kernel.org; linux-arm-
+>> kernel at lists.infradead.org; Stephen Warren; Prashant Gaikwad; Mike
+>> Turquette; linux-kernel at vger.kernel.org
+>> Subject: Re: [PATCH] clk: tegra: provide dummy cpu car ops
+>>
+>> On 03/06/2013 04:20 PM, Andrew Chew wrote:
+>>>> Subject: [PATCH] clk: tegra: provide dummy cpu car ops
+>>>>
+>>>> tegra_boot_secondary() relies on some of the car ops. This means
+>>>> having an uninitialized tegra_cpu_car_ops will lead to an early boot panic.
+>>>> Providing a dummy struct avoids this and makes adding Tegra114 clock
+>>>> support in a bisectable way a lot easier.
+>>>>
+>>>> --
+>>>>
+>>>> Stephen,
+>>>>
+>>>> Should this be a separate patch or should I make this part of new
+>>>> release of the Tegra114 clock series?
+>>
+>> I'm not sure if I answered this. Peter, I intend to apply this patch to a branch
+>> right before the CCF, so there's no explicit need to include it in the series,
+>> although if you do, that's fine.
+>>
+>>>> diff --git a/drivers/clk/tegra/clk.c b/drivers/clk/tegra/clk.c index
+>>
+>>>>  /* Global data of Tegra CPU CAR ops */ -struct tegra_cpu_car_ops
+>>>> *tegra_cpu_car_ops;
+>>>
+>>> Sorry for bringing this up so late...
+>>> Shouldn't the above be "struct tegra_cpu_car_ops tegra_cpu_car_ops;"?
+>>>
+>>>> +static struct tegra_cpu_car_ops *dummy_car_ops; struct
+>>>> +tegra_cpu_car_ops *tegra_cpu_car_ops = &dummy_car_ops;
+>>
+>> No, the value is used as a pointer in include/linux/clk/tegra.h, e.g.:
+>>
+>> tegra_cpu_car_ops->wait_for_reset(cpu);
+> 
+> Yeah, I get that tegra_cpu_car_ops is a pointer to an ops table.  It seems
+> to me that what's happening above is that tegra_cpu_car_ops is getting
+> assigned a pointer to a pointer that's supposed to point to an instance of
+> struct tegra_cpu_car_ops (but it really points to NULL as far as I can tell).
+> In any case, dummy_car_ops never actually gets instantiated.
+> 
+> I assume the intention is for dummy_car_ops to be an instance of
+> struct tegra_cpu_car_ops, but with all of its members zero'd.
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/Kconfig                  | 10 ------
- arch/arm/include/asm/localtimer.h | 34 -------------------
- arch/arm/kernel/smp.c             | 69 ---------------------------------------
- 3 files changed, 113 deletions(-)
- delete mode 100644 arch/arm/include/asm/localtimer.h
+Oh right, I guess your comment was about the line after where you wrote
+it rather than the line before.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 5ad2ccf..f1a4c57 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1647,16 +1647,6 @@ config ARM_PSCI
- 	  0022A ("Power State Coordination Interface System Software on
- 	  ARM processors").
- 
--config LOCAL_TIMERS
--	bool "Use local timer interrupts"
--	depends on SMP
--	default y
--	help
--	  Enable support for local timers on SMP platforms, rather then the
--	  legacy IPI broadcast method.  Local timers allows the system
--	  accounting to be spread across the timer interval, preventing a
--	  "thundering herd" at every timer tick.
--
- config ARCH_NR_GPIO
- 	int
- 	default 1024 if ARCH_SHMOBILE || ARCH_TEGRA
-diff --git a/arch/arm/include/asm/localtimer.h b/arch/arm/include/asm/localtimer.h
-deleted file mode 100644
-index f77ffc1..0000000
---- a/arch/arm/include/asm/localtimer.h
-+++ /dev/null
-@@ -1,34 +0,0 @@
--/*
-- *  arch/arm/include/asm/localtimer.h
-- *
-- *  Copyright (C) 2004-2005 ARM Ltd.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--#ifndef __ASM_ARM_LOCALTIMER_H
--#define __ASM_ARM_LOCALTIMER_H
--
--#include <linux/errno.h>
--
--struct clock_event_device;
--
--struct local_timer_ops {
--	int  (*setup)(struct clock_event_device *);
--	void (*stop)(struct clock_event_device *);
--};
--
--#ifdef CONFIG_LOCAL_TIMERS
--/*
-- * Register a local timer driver
-- */
--int local_timer_register(struct local_timer_ops *);
--#else
--static inline int local_timer_register(struct local_timer_ops *ops)
--{
--	return -ENXIO;
--}
--#endif
--
--#endif
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index e4f3669..a6a07ff 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -41,7 +41,6 @@
- #include <asm/sections.h>
- #include <asm/tlbflush.h>
- #include <asm/ptrace.h>
--#include <asm/localtimer.h>
- #include <asm/smp_plat.h>
- #include <asm/virt.h>
- #include <asm/mach/arch.h>
-@@ -133,8 +132,6 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
- }
- 
- #ifdef CONFIG_HOTPLUG_CPU
--static void percpu_timer_stop(void);
--
- static int platform_cpu_kill(unsigned int cpu)
- {
- 	if (smp_ops.cpu_kill)
-@@ -178,11 +175,6 @@ int __cpuinit __cpu_disable(void)
- 	migrate_irqs();
- 
- 	/*
--	 * Stop the local timer for this CPU.
--	 */
--	percpu_timer_stop();
--
--	/*
- 	 * Flush user cache and TLB mappings, and then remove this CPU
- 	 * from the vm mask set of all processes.
- 	 *
-@@ -269,8 +261,6 @@ static void __cpuinit smp_store_cpu_info(unsigned int cpuid)
- 	store_cpu_topology(cpuid);
- }
- 
--static void percpu_timer_setup(void);
--
- /*
-  * This is the secondary CPU boot entry.  We're using this CPUs
-  * idle thread stack, but a set of temporary page tables.
-@@ -324,11 +314,6 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
- 	set_cpu_online(cpu, true);
- 	complete(&cpu_running);
- 
--	/*
--	 * Setup the percpu timer for this CPU.
--	 */
--	percpu_timer_setup();
--
- 	local_irq_enable();
- 	local_fiq_enable();
- 
-@@ -375,12 +360,6 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
- 		max_cpus = ncores;
- 	if (ncores > 1 && max_cpus) {
- 		/*
--		 * Enable the local timer or broadcast device for the
--		 * boot CPU, but only if we have more than one CPU.
--		 */
--		percpu_timer_setup();
--
--		/*
- 		 * Initialise the present map, which describes the set of CPUs
- 		 * actually populated at the present time. A platform should
- 		 * re-initialize the map in the platforms smp_prepare_cpus()
-@@ -456,11 +435,6 @@ u64 smp_irq_stat_cpu(unsigned int cpu)
- 	return sum;
- }
- 
--/*
-- * Timer (local or broadcast) support
-- */
--static DEFINE_PER_CPU(struct clock_event_device, percpu_clockevent);
--
- #ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
- void tick_broadcast(const struct cpumask *mask)
- {
-@@ -468,49 +442,6 @@ void tick_broadcast(const struct cpumask *mask)
- }
- #endif
- 
--static struct local_timer_ops *lt_ops;
--
--#ifdef CONFIG_LOCAL_TIMERS
--int local_timer_register(struct local_timer_ops *ops)
--{
--	if (!is_smp() || !setup_max_cpus)
--		return -ENXIO;
--
--	if (lt_ops)
--		return -EBUSY;
--
--	lt_ops = ops;
--	return 0;
--}
--#endif
--
--static void __cpuinit percpu_timer_setup(void)
--{
--	unsigned int cpu = smp_processor_id();
--	struct clock_event_device *evt = &per_cpu(percpu_clockevent, cpu);
--
--	evt->cpumask = cpumask_of(cpu);
--
--	if (lt_ops)
--		lt_ops->setup(evt);
--}
--
--#ifdef CONFIG_HOTPLUG_CPU
--/*
-- * The generic clock events code purposely does not stop the local timer
-- * on CPU_DEAD/CPU_DEAD_FROZEN hotplug events, so we have to do it
-- * manually here.
-- */
--static void percpu_timer_stop(void)
--{
--	unsigned int cpu = smp_processor_id();
--	struct clock_event_device *evt = &per_cpu(percpu_clockevent, cpu);
--
--	if (lt_ops)
--		lt_ops->stop(evt);
--}
--#endif
--
- static DEFINE_RAW_SPINLOCK(stop_lock);
- 
- /*
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+So, you mean:
+
+static struct tegra_cpu_car_ops *dummy_car_ops;
+struct tegra_cpu_car_ops *tegra_cpu_car_ops = &dummy_car_ops;
+
+should be instead:
+
+static struct tegra_cpu_car_ops dummy_car_ops;
+struct tegra_cpu_car_ops *tegra_cpu_car_ops = &dummy_car_ops;
+
+Yes, you're right.
