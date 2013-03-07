@@ -1,30 +1,40 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu,  7 Mar 2013 22:26:34 +0100
-Subject: [PATCH 9/9] barebox_banner: switch to pr_info
-In-Reply-To: <1362691594-32286-1-git-send-email-plagnioj@jcrosoft.com>
-References: <20130307212523.GK4401@game.jcrosoft.org>
- <1362691594-32286-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <1362691594-32286-9-git-send-email-plagnioj@jcrosoft.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 07 Mar 2013 13:41:44 -0800
+Subject: [PATCH 01/10] clocksource: add generic dummy timer driver
+In-Reply-To: <alpine.LFD.2.02.1303071457300.22263@ionos>
+References: <1362614646-24113-1-git-send-email-sboyd@codeaurora.org>
+ <1362614646-24113-2-git-send-email-sboyd@codeaurora.org>
+ <alpine.LFD.2.02.1303071457300.22263@ionos>
+Message-ID: <51390998.3090303@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
----
- common/version.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+On 03/07/13 06:00, Thomas Gleixner wrote:
+> On Wed, 6 Mar 2013, Stephen Boyd wrote:
+>
+>> +static int __init dummy_timer_register(void)
+>> +{
+>> +	int err = register_cpu_notifier(&dummy_timer_cpu_nb);
+>> +	if (err)
+>> +		return err;
+>> +
+>> +	/* We won't get a call on the boot CPU, so register immediately */
+>> +	dummy_timer_setup();
+>> +
+>> +	return 0;
+>> +}
+>> +device_initcall(dummy_timer_register);
+> Are you sure that you want that to be installed unconditionally? What
+> about multi-platform kernels?
+>
 
-diff --git a/common/version.c b/common/version.c
-index 22e111a..d33f4d0 100644
---- a/common/version.c
-+++ b/common/version.c
-@@ -16,6 +16,6 @@ void barebox_banner (void)
- 	if (!board)
- 		board = CONFIG_BOARDINFO;
- 
--	printf("\n\n%s\n\n", version_string);
--	printf("Board: %s\n", board);
-+	pr_info("\n\n%s\n\n", version_string);
-+	pr_info("Board: %s\n", board);
- }
+A dummy timer is already installed unconditionally on devices with an
+arm architected timer, so if this is breaking something then those
+devices have been broken in the 3.9 merge window. I suppose we may need
+to make the rating even lower if there is somebody using a clockevent
+with a rating below 100. My grep of the tree shows 125 as the lowest,
+but perhaps we want to set the rating to 1 to be safe?
+
 -- 
-1.7.10.4
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
