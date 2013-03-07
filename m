@@ -1,45 +1,73 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 7 Mar 2013 13:26:23 +0000
-Subject: [PATCH] ARM: mm: clean-up in order to reduce to call
- kmap_high_get()
-In-Reply-To: <1362372609-877-1-git-send-email-iamjoonsoo.kim@lge.com>
-References: <1362372609-877-1-git-send-email-iamjoonsoo.kim@lge.com>
-Message-ID: <20130307132623.GG17833@n2100.arm.linux.org.uk>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Thu,  7 Mar 2013 15:30:12 +0200
+Subject: [PATCH v2] ARM: OMAP1: fix omap_udc registration
+Message-ID: <1362663013-28794-1-git-send-email-aaro.koskinen@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 04, 2013 at 01:50:09PM +0900, Joonsoo Kim wrote:
-> In kmap_atomic(), kmap_high_get() is invoked for checking already
-> mapped area. In __flush_dcache_page() and dma_cache_maint_page(),
-> we explicitly call kmap_high_get() before kmap_atomic()
-> when cache_is_vipt(), so kmap_high_get() can be invoked twice.
-> This is useless operation, so remove one.
-> 
-> Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
-> 
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index c7e3759..b7711be 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -822,16 +822,16 @@ static void dma_cache_maint_page(struct page *page, unsigned long offset,
->  		if (PageHighMem(page)) {
->  			if (len + offset > PAGE_SIZE)
->  				len = PAGE_SIZE - offset;
-> -			vaddr = kmap_high_get(page);
-> -			if (vaddr) {
-> -				vaddr += offset;
-> -				op(vaddr, len, dir);
-> -				kunmap_high(page);
-> -			} else if (cache_is_vipt()) {
-> -				/* unmapped pages might still be cached */
-> +			if (cache_is_vipt()) {
+omap_udc platform device is not registered properly anymore:
+CONFIG_USB_GADGET_OMAP was deleted by 193ab2a6 (usb: gadget: allow
+multiple gadgets to be built) already in v3.1.
 
-This should be:
-			if (cache_is_vipt_nonaliasing())
+Fix by using CONFIG_USB_OMAP instead. Tested on Nokia 770 by checking
+that omap_udc is probed & working properly when built as a module.
 
-to make it _explicit_ that this technique is only for non-aliasing VIPT
-caches (this doesn't work on any other of our cache types.)  Yes, I
-know we don't support highmem with VIPT aliasing caches - but still,
-we should ensure that this is self-documented in this code.
+Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+---
 
-Same for arch/arm/mm/flush.c
+	Patch history:
+
+	v2: use IS_ENABLED()
+
+	v1: http://marc.info/?t=136260886600006&r=1&w=2
+
+ arch/arm/mach-omap1/include/mach/usb.h |    2 +-
+ arch/arm/mach-omap1/usb.c              |    6 +++---
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-omap1/include/mach/usb.h b/arch/arm/mach-omap1/include/mach/usb.h
+index 753cd5c..45e5ac7 100644
+--- a/arch/arm/mach-omap1/include/mach/usb.h
++++ b/arch/arm/mach-omap1/include/mach/usb.h
+@@ -2,7 +2,7 @@
+  * FIXME correct answer depends on hmc_mode,
+  * as does (on omap1) any nonzero value for config->otg port number
+  */
+-#ifdef	CONFIG_USB_GADGET_OMAP
++#if IS_ENABLED(CONFIG_USB_OMAP)
+ #define	is_usb0_device(config)	1
+ #else
+ #define	is_usb0_device(config)	0
+diff --git a/arch/arm/mach-omap1/usb.c b/arch/arm/mach-omap1/usb.c
+index 1a1db59..4118db5 100644
+--- a/arch/arm/mach-omap1/usb.c
++++ b/arch/arm/mach-omap1/usb.c
+@@ -123,7 +123,7 @@ omap_otg_init(struct omap_usb_config *config)
+ 	syscon = omap_readl(OTG_SYSCON_1);
+ 	syscon |= HST_IDLE_EN|DEV_IDLE_EN|OTG_IDLE_EN;
+ 
+-#ifdef	CONFIG_USB_GADGET_OMAP
++#if IS_ENABLED(CONFIG_USB_OMAP)
+ 	if (config->otg || config->register_dev) {
+ 		struct platform_device *udc_device = config->udc_device;
+ 		int status;
+@@ -169,7 +169,7 @@ omap_otg_init(struct omap_usb_config *config)
+ void omap_otg_init(struct omap_usb_config *config) {}
+ #endif
+ 
+-#ifdef	CONFIG_USB_GADGET_OMAP
++#if IS_ENABLED(CONFIG_USB_OMAP)
+ 
+ static struct resource udc_resources[] = {
+ 	/* order is significant! */
+@@ -600,7 +600,7 @@ static void __init omap_1510_usb_init(struct omap_usb_config *config)
+ 	while (!(omap_readw(ULPD_DPLL_CTRL) & DPLL_LOCK))
+ 		cpu_relax();
+ 
+-#ifdef	CONFIG_USB_GADGET_OMAP
++#if IS_ENABLED(CONFIG_USB_OMAP)
+ 	if (config->register_dev) {
+ 		int status;
+ 
+-- 
+1.7.10.4
