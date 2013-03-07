@@ -1,148 +1,71 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 7 Mar 2013 20:11:33 +0100
-Subject: [PATCH 04/10] bus: introduce an Marvell EBU MBus driver
-In-Reply-To: <20130307173736.GA20840@obsidianresearch.com>
-References: <1362577426-12804-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130306202710.15a6aa2c@skate>
- <20130306202447.GA4916@obsidianresearch.com>
- <201303070337.43288.arnd@arndb.de> <20130307115817.3b3cad20@skate>
- <20130307173736.GA20840@obsidianresearch.com>
-Message-ID: <20130307201133.42a6c44b@skate>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Thu, 7 Mar 2013 11:11:44 -0800
+Subject: RFC: Zynq Clock Controller
+In-Reply-To: <51385FA3.8080105@metafoo.de>
+References: <37032699-343e-485c-80e0-9b23e3706c58@VA3EHSMHS013.ehs.local>
+ <1362570681.5269.98.camel@coredoba.hi.pengutronix.de>
+ <f288874c-d0ae-4581-8d0f-2b9abe4d3117@CO9EHSMHS002.ehs.local>
+ <51385FA3.8080105@metafoo.de>
+Message-ID: <2a91857c-473f-4f92-b2b1-e7ac4679b72a@AM1EHSMHS007.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Gunthorpe,
-
-On Thu, 7 Mar 2013 10:37:36 -0700, Jason Gunthorpe wrote:
-> On Thu, Mar 07, 2013 at 11:58:17AM +0100, Thomas Petazzoni wrote:
-> 
-> > Please always think about this PCIe use case when proposing any sort of
-> > solution about address decoding windows. Any solution that doesn't take
-> > into account the dynamic nature of PCIe windows is simply useless.
-> 
-> PCIe is not a problem, it continues to use the dynamic interface!
-> 
-> This is all about how do you connect the DT stanzas that are already
-> in the DT to the dynamic window mbus system - and you do that via
-> ranges. The ranges only need to cover the needs of the static elements
-> of the DT - they do not need to extend beyond to fully dynamic
-> elements like PCI-E - those cases are *totally* different and must be
-> handled in code.
-
-I still don't see why devices like NOR and PCIe shouldn't be handled in
-the same way.
-
-> The reason for this is quite simply to avoid this ugly boiler plate in
-> every mbus driver:
-
-Come on "ugly" ? It's three line of basic set up code, and it avoids
-hard-coding base addresses in the Device Tree. Not having hard-coded
-base addresses is very nice for users porting Linux to new boards using
-Marvell SoCs: they don't have to worry about deciding which base
-address to use. A given board may have a huge NOR, some other board may
-have gazillions of PCIe devices with large memory space requirements,
-some other board might have a FPGA requiring a large physical memory
-mapping.
-
-With your idea, the guy writing the board .dts file will have to think
-about what is the layout of the physical address space to find where
-to map his FPGA or its big NOR.
-
-With the really dynamic idea I'm proposing, the guy doesn't have to
-worry at all about the base address.
-
-I know you're proposing to make things dynamic by having the mbus
-driver patch the Device Tree once the driver figures out an available
-range to map a given device. But that doesn't make any sense: why write
-in the DT something that will anyway be overwritten later on?
-
-> > 	struct resource nor_resource;
+On Thu, Mar 07, 2013 at 10:36:35AM +0100, Lars-Peter Clausen wrote:
+> On 03/06/2013 06:27 PM, S?ren Brinkmann wrote:
+> > Hi Jan,
+> >  
+> > what a small world. Good to hear from you.
 > > 
-> > 	/* Get the size of the NOR from DT */
-> > 	of_address_to_resource(np, 0, &nor_resource);
-> > 
-> > 	/* Find an available physical range to map the NOR */
-> > 	allocate_resource(&iomem_res, &nor_resource,
-> > 			  resource_size(&nor_resource),
-> > 			  0, 0, 0, NULL, NULL);
-> > 
-> > 	/* Create the address decoding window */
-> > 	mvebu_mbus_add_window(nor, nor_resource.start,
-> > 			      resource_size(&nor_resource));
-> > 
+> > On Wed, Mar 06, 2013 at 12:51:21PM +0100, Jan L?bbe wrote:
+> >> Hi S?ren,
+> >>
+> >> On Tue, 2013-03-05 at 12:04 -0800, S?ren Brinkmann wrote:
+> >>> For this reasons, I'd like to propose moving Zynq into the same
+> >>> direction. I.e. adding a clock controller with the following DT
+> >>> description (details may change but the general idea should become
+> >>> clear):
+> >>> 	clkc: clkc {
+> >>>                 #clock-cells = <1>;
+> >>>                 compatible = "xlnx,ps7-clkc";
+> >>>                 ps_clk_frequency = <33333333>;	# board x-tal
+> >>>                 # optional props
+> >>>                 gem0_emio_clk_freq = <125000000>;
+> >>>                 gem1_emio_clk_freq = <50000000>;
+> >>>                 can_mio_clk_freq_xx = <1234>; # this is possible 54 times with xx = 00..53
+> >>>         };
 > 
-> Not only does this violate encapsulate principles, it breaks the DT
-> modeling because there is no place in the DT that has the base
-> address!!
+> I definitely prefer the way it is right now in upstream, where we have one
+> dt node per clock. It is more descriptive and also more extensible. And you
+> also don't have to remember the clock index, and can use the phandle
+> directly instead.
+The problems I see with that are:
+ - with the clock controller we can model the clock tree as we need without changing the DT all the time
+ - w/o a clock controller there is no block which has knowledge of the whole clock tree (unless we parse the DT), and could conduct reparent operations and similar
+ - once the clock controller is properly defined the clock connection should be contained in a dtsi which never changes. So, regarding remembering outputs, I don't see a problem. I rather see issues with having a pile of clocks described in the DT. I have currently 44 outputs proposed, and to model the whole tree a lot of more clocks are used (I started modeling everything with the clock primitives and removed custom clock implementations, except for the PLLs). Having all those in the DT does not really help, IMHO.
 
-But why the *heck* do we care about having the base address in the DT.
-We don't care *at all*.
-
-The base address is *NOT* a description of the hardware, because it is
-completely configurable. Therefore, there is no need to have it in the
-Device Tree.
-
-In my opinion, the Device Tree should describe the informations that
-the software cannot "guess" by looking at the hardware.
-
-> The PCI system allocates and assigns BAR prior to probing the driver -
-> that is the Linux convention. The mbus driver needs to do the same
-> thing. The window must be setup prior to calling a child's probe, and
-> the DT must be correct at that time.
 > 
-> > It really strikes me that in the name of the Device Tree, we would have
-> > to hardcode in stone things that are inherently dynamic.
+> >>
+> >> The clock controller should only contain properties for input frequency
+> >> (which can obviously not be calculated at run-time).
+> >>
+> >> Are the gem*, can* properties inputs? If they are actually outputs, the
+> >> corresponding frequencies should be requested by the clock consumers and
+> >> not hard-coded in DT.
+> > They are inputs. GEM and CAN have the option to be clocked through (E)MIO pins, i.e. some external clock input which cannot be derived from ps_clk like all other clocks. I plan to register a fixed rate, root clock for each of those properties, if present.
 > 
-> What do you mean? The suggestion is to describe all in-DT elements
-> with a ranges like this:
-> 
-> >    ranges =<MAPDEF(1, 0xe0, MAPDEF_NOMASK)  0xFE000000  0x10000
-> 
-> Which directly models the HW MBUS system. The target-id is set in
-> stone by the SOC, the window size is based on what is described in the
-> DT - so there is no need for it to be smaller/larger, and the base
-> address can be run-time altered to the true window base by the mbus
-> driver.
-> 
-> There is nothing inherently dynamic that is set in stone. The base
-> address *is not set in stone* - it is just refactored out of the
-> individual stanzas and placed into a single common place that is easy
-> to find pragmatically.
-> 
-> This is not about PCI-E - PCI-E continues to use the full dynamic
-> interface, nothing major changes there.
+> If it is a static external input clock use a "fixed-clock" dt node to
+> describe it. This also has the advantage that is is also possible to use a
+> non-static clock.
+I thought about this too, and it's probably a valid use-case.
 
-I still continue to believe that it's a matter of taste, and where you
-put the boundary between what should be described in the Device Tree
-and what should not.
+What comes to my mind to support this would be:
+ - clocks and clock-names properties to the controller
+ - those two properties hold a list of available external clock sources
 
-> > Would it be possible to agree that this driver is a first step that
-> > consolidates the existing address decoding code, which doesn't prevent
-> > further improvements, and get the driver code merged in this current
-> > state (of course, after fixing all the bugs, issues, that will be
-> > discovered during review and testing) ?
-> 
-> I continue to agree with this.
+ e.g:
+ 	clocks = <&foo>, <&bar 2>, <&foobar 0>;
+	clock-names = "can_emio_clk_44", "gem1_emio_clk", "can_emio_clk_00";
 
-Thanks.
+ Then the clock controller would go through the possible clock names trying a 'clk_get(NULL, "gem0_emio_clk"', etc. making available connections.
 
-> However, I think Ezequiel's driver should be held up pending a
-> decision if mvebu_mbus_add_window is appropriate for it to call.
-
-It is appropriate for it to call, because it's the only and correct way
-to set up an address decoding window with the mvebu-mbus driver, just
-like it is the only and correct way that will be used by the PCIe
-driver.
-
-Adding description of windows in the Device Tree can be added later on,
-in a completely DT backward compatible way, and the mvebu-devbus driver
-can be adjusted accordingly.
-
-Thanks,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+ 	S?ren
