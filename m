@@ -1,49 +1,60 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu,  7 Mar 2013 22:58:08 +0100
-Subject: [PATCH 02/11] console: switch to kfifo_dump_str
-In-Reply-To: <1362693497-2964-1-git-send-email-plagnioj@jcrosoft.com>
+Date: Thu,  7 Mar 2013 22:58:07 +0100
+Subject: [PATCH 01/11] kfifo: introduce kfifo_dump_str to dump the fifo
+In-Reply-To: <20130307215402.GA32347@game.jcrosoft.org>
 References: <20130307215402.GA32347@game.jcrosoft.org>
- <1362693497-2964-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <1362693497-2964-2-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1362693497-2964-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This will allow to implement a dmesg mecanism in barebox
+
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 ---
- common/console.c |    9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+ include/kfifo.h |    2 ++
+ lib/kfifo.c     |   21 +++++++++++++++++++++
+ 2 files changed, 23 insertions(+)
 
-diff --git a/common/console.c b/common/console.c
-index beb37bd..243d402 100644
---- a/common/console.c
-+++ b/common/console.c
-@@ -55,6 +55,11 @@ static struct kfifo __console_output_fifo;
- static struct kfifo *console_input_fifo = &__console_input_fifo;
- static struct kfifo *console_output_fifo = &__console_output_fifo;
+diff --git a/include/kfifo.h b/include/kfifo.h
+index 25880f4..9dbbe0d 100644
+--- a/include/kfifo.h
++++ b/include/kfifo.h
+@@ -74,5 +74,7 @@ static inline unsigned int kfifo_len(struct kfifo *fifo)
+ void kfifo_putc(struct kfifo *fifo, unsigned char c);
+ unsigned int kfifo_getc(struct kfifo *fifo, unsigned char *c);
  
-+static void console_output_dump(unsigned char ch)
-+{
-+	console_putc(CONSOLE_STDOUT, ch);
-+}
++void kfifo_dump_str(struct kfifo *fifo, void (*dump)(unsigned char c));
 +
- static int console_std_set(struct device_d *dev, struct param_d *param,
- 		const char *val)
- {
-@@ -86,14 +91,12 @@ static int console_std_set(struct device_d *dev, struct param_d *param,
- 	dev_param_set_generic(dev, param, active);
+ #endif
  
- 	if (initialized < CONSOLE_INIT_FULL) {
--		char ch;
- 		initialized = CONSOLE_INIT_FULL;
- 		PUTS_LL("Switch to console [");
- 		PUTS_LL(dev_name(dev));
- 		PUTS_LL("]\n");
- 		barebox_banner();
--		while (kfifo_getc(console_output_fifo, &ch) == 0)
--			console_putc(CONSOLE_STDOUT, ch);
-+		kfifo_dump_str(console_output_fifo, console_output_dump);
- 	}
- 
+diff --git a/lib/kfifo.c b/lib/kfifo.c
+index afd3894..7892aed 100644
+--- a/lib/kfifo.c
++++ b/lib/kfifo.c
+@@ -154,3 +154,24 @@ unsigned int kfifo_getc(struct kfifo *fifo, unsigned char *c)
  	return 0;
+ }
+ 
++void kfifo_dump_str(struct kfifo *fifo, void (*dump)(unsigned char c))
++{
++	int i;
++	unsigned char *c;
++	unsigned int l;
++	unsigned int len;
++
++	len = fifo->in - fifo->out;
++
++	/* first get the data from fifo->out until the end of the buffer */
++	l = min(len, fifo->size - (fifo->out & (fifo->size - 1)));
++	c = fifo->buffer + (fifo->out & (fifo->size - 1));
++	for (i = 0; i < l; i++)
++		dump(c[i]);
++
++	/* then get the rest (if any) from the beginning of the buffer */
++	c = fifo->buffer;
++	l = len - l;
++	for (i = 0; i < l; i++)
++		dump(c[i]);
++}
 -- 
 1.7.10.4
