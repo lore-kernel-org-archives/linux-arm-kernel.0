@@ -1,37 +1,39 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 7 Mar 2013 10:33:19 +0800
-Subject: [PATCH v3 09/12] ASoC: dmaengine_pcm: add
- snd_dmaengine_generic_pcm_open()
-In-Reply-To: <20130306171333.GR17833@n2100.arm.linux.org.uk>
-References: <1362486244-24593-10-git-send-email-shawn.guo@linaro.org>
- <1362494247-28909-1-git-send-email-shawn.guo@linaro.org>
- <20130306171333.GR17833@n2100.arm.linux.org.uk>
-Message-ID: <20130307023316.GA22554@opensource.wolfsonmicro.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 7 Mar 2013 03:35:45 +0100
+Subject: [PATCH 02/14] MAINTAINERS: remove arch/arm/plat-nomadik/
+In-Reply-To: <1362275632-20242-3-git-send-email-cesarb@cesarb.net>
+References: <1362275632-20242-1-git-send-email-cesarb@cesarb.net>
+ <1362275632-20242-3-git-send-email-cesarb@cesarb.net>
+Message-ID: <CACRpkdZ4he9BFCJ3ta59ZUsNZ=F88o8iR_y5B5Rk=EgrfZVZsg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 06, 2013 at 05:13:33PM +0000, Russell King - ARM Linux wrote:
+On Sun, Mar 3, 2013 at 2:53 AM, Cesar Eduardo Barros <cesarb@cesarb.net> wrote:
 
-> This purpetuates the brain-dead behaviour of the existing ASoC DMA
-> engine layer, which makes it unsuitable for platforms with special DMA
-> memory requirements.
+> The files within that directory were moved to other places over the
+> course of several commits. I only added the ones moved in the patch
+> series which finally removed the directory; untangling the rest will
+> take more work, since some seem to be shared with ux500.
+>
+> In fact, the ARM/Ux500 ARM ARCHITECTURE block has patterns for files
+> named "nomadik" too. The patterns in this pair of MAINTAINER blocks
+> really need a review from the respective maintainters.
+>
+> Cc: Alessandro Rubini <rubini@unipv.it>
+> Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: STEricsson <STEricsson_nomadik_linux@list.st.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Cesar Eduardo Barros <cesarb@cesarb.net>
 
-> The problem is that the DMA mask to be used for allocating DMA-able
-> memory is the DMA engine struct device, not the struct device associated
-> with the ASoC device.
+Thanks for doing this Cesar!
 
-> I got this right in my ASoC generic DMA engine layer.  Converting this
-> layer is far from trivial though, and as my test platform has now become
-> my entire network firewall, I'm not doing any testing on that anymore.
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
-Could you go into more detail here please?  Looking at the code I'm not
-seeing any allocations done by the library code at all, the allocations
-are all done by the individual platform DMA drivers so I don't see
-anything stopping them doing what they need.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130307/0bb5bfe6/attachment.sig>
+The reason some drivers are named "Nomadik" is that that
+platform was the first using that IP block, but in some cases
+like drivers/i2c/busses/i2c-nomadik.c the original platform has
+not yet been migrated to it.
+
+Yours,
+Linus Walleij
