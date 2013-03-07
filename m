@@ -1,50 +1,125 @@
 From: mporter@ti.com (Matt Porter)
-Date: Wed,  6 Mar 2013 23:16:38 -0500
-Subject: [PATCH 1/2] mmc: omap_hsmmc: set max_segs based on dma engine limits
+Date: Wed,  6 Mar 2013 23:16:39 -0500
+Subject: [PATCH 2/2] ARM: dts: add AM33XX MMC support
 In-Reply-To: <1362629799-22485-1-git-send-email-mporter@ti.com>
 References: <1362629799-22485-1-git-send-email-mporter@ti.com>
-Message-ID: <1362629799-22485-2-git-send-email-mporter@ti.com>
+Message-ID: <1362629799-22485-3-git-send-email-mporter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The EDMA DMAC has a hardware limitation that prevents supporting
-scatter gather lists with any number of segments. The DMA Engine
-API reports the maximum number of segments a channel can support
-via the optional dma_get_slave_sg_limits() API. If the max_nr_segs
-limit is present, the value is used to configure mmc->max_segs
-appropriately.
+Adds AM33XX MMC support for am335x-bone, am335x-evm, and
+am335x-evmsk.
 
 Signed-off-by: Matt Porter <mporter@ti.com>
 Acked-by: Tony Lindgren <tony@atomide.com>
 ---
- drivers/mmc/host/omap_hsmmc.c |    8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/am335x-bone.dts  |    7 +++++++
+ arch/arm/boot/dts/am335x-evm.dts   |    7 +++++++
+ arch/arm/boot/dts/am335x-evmsk.dts |    7 +++++++
+ arch/arm/boot/dts/am33xx.dtsi      |   28 ++++++++++++++++++++++++++++
+ 4 files changed, 49 insertions(+)
 
-diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index e79b12d..f74d2ef 100644
---- a/drivers/mmc/host/omap_hsmmc.c
-+++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -1769,6 +1769,7 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
- 	const struct of_device_id *match;
- 	dma_cap_mask_t mask;
- 	unsigned tx_req, rx_req;
-+	struct dma_slave_sg_limits *dma_sg_limits;
- 	struct pinctrl *pinctrl;
+diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
+index 11b240c..a154ce0 100644
+--- a/arch/arm/boot/dts/am335x-bone.dts
++++ b/arch/arm/boot/dts/am335x-bone.dts
+@@ -120,6 +120,8 @@
+ 		};
  
- 	match = of_match_device(of_match_ptr(omap_mmc_of_match), &pdev->dev);
-@@ -1935,6 +1936,13 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
- 		goto err_irq;
- 	}
+ 		ldo3_reg: regulator at 5 {
++			regulator-min-microvolt = <1800000>;
++			regulator-max-microvolt = <3300000>;
+ 			regulator-always-on;
+ 		};
  
-+	/* Some DMA Engines only handle a limited number of SG segments */
-+	dma_sg_limits = dma_get_slave_sg_limits(host->rx_chan,
-+						DMA_SLAVE_BUSWIDTH_4_BYTES,
-+						mmc->max_blk_size / 4);
-+	if (dma_sg_limits && dma_sg_limits->max_seg_nr)
-+		mmc->max_segs = dma_sg_limits->max_seg_nr;
+@@ -136,3 +138,8 @@
+ &cpsw_emac1 {
+ 	phy_id = <&davinci_mdio>, <1>;
+ };
 +
- 	/* Request IRQ for MMC operations */
- 	ret = request_irq(host->irq, omap_hsmmc_irq, 0,
- 			mmc_hostname(mmc), host);
++&mmc1 {
++	status = "okay";
++	vmmc-supply = <&ldo3_reg>;
++};
+diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
+index d649644..2907da6 100644
+--- a/arch/arm/boot/dts/am335x-evm.dts
++++ b/arch/arm/boot/dts/am335x-evm.dts
+@@ -232,6 +232,8 @@
+ 		};
+ 
+ 		vmmc_reg: regulator at 12 {
++			regulator-min-microvolt = <1800000>;
++			regulator-max-microvolt = <3300000>;
+ 			regulator-always-on;
+ 		};
+ 	};
+@@ -244,3 +246,8 @@
+ &cpsw_emac1 {
+ 	phy_id = <&davinci_mdio>, <1>;
+ };
++
++&mmc1 {
++	status = "okay";
++	vmmc-supply = <&vmmc_reg>;
++};
+diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
+index f5a6162..f050c46 100644
+--- a/arch/arm/boot/dts/am335x-evmsk.dts
++++ b/arch/arm/boot/dts/am335x-evmsk.dts
+@@ -244,7 +244,14 @@
+ 		};
+ 
+ 		vmmc_reg: regulator at 12 {
++			regulator-min-microvolt = <1800000>;
++			regulator-max-microvolt = <3300000>;
+ 			regulator-always-on;
+ 		};
+ 	};
+ };
++
++&mmc1 {
++	status = "okay";
++	vmmc-supply = <&vmmc_reg>;
++};
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index c3c781a..e029eea 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -234,6 +234,34 @@
+ 			status = "disabled";
+ 		};
+ 
++		mmc1: mmc at 48060000 {
++			compatible = "ti,omap3-hsmmc";
++			ti,hwmods = "mmc1";
++			ti,dual-volt;
++			ti,needs-special-reset;
++			dmas = <&edma 24
++				&edma 25>;
++			dma-names = "tx", "rx";
++			status = "disabled";
++		};
++
++		mmc2: mmc at 481d8000 {
++			compatible = "ti,omap3-hsmmc";
++			ti,hwmods = "mmc2";
++			ti,needs-special-reset;
++			dmas = <&edma 2
++				&edma 3>;
++			dma-names = "tx", "rx";
++			status = "disabled";
++		};
++
++		mmc3: mmc at 47810000 {
++			compatible = "ti,omap3-hsmmc";
++			ti,hwmods = "mmc3";
++			ti,needs-special-reset;
++			status = "disabled";
++		};
++
+ 		wdt2: wdt at 44e35000 {
+ 			compatible = "ti,omap3-wdt";
+ 			ti,hwmods = "wd_timer2";
 -- 
 1.7.9.5
