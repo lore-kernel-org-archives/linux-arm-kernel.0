@@ -1,164 +1,24 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Thu, 7 Mar 2013 10:09:03 +0200
-Subject: [PATCH 08/29] arm64: KVM: user space interface
-In-Reply-To: <1362455265-24165-9-git-send-email-marc.zyngier@arm.com>
-References: <1362455265-24165-1-git-send-email-marc.zyngier@arm.com>
- <1362455265-24165-9-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20130307080903.GA3819@redhat.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 7 Mar 2013 09:09:58 +0100
+Subject: [PATCH] mmc: sdhci-s3c: let device core setup the default pin
+ configuration
+In-Reply-To: <1362569776-13932-1-git-send-email-thomas.abraham@linaro.org>
+References: <1362569776-13932-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <CACRpkdY-RVAXxc2TqDcczhCLGDC8d401ucuCCDzRb+Ha9apr8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 05, 2013 at 03:47:24AM +0000, Marc Zyngier wrote:
-> Provide the kvm.h file that defines the user space visible
-> interface.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/include/uapi/asm/kvm.h | 112 ++++++++++++++++++++++++++++++++++++++
->  1 file changed, 112 insertions(+)
->  create mode 100644 arch/arm64/include/uapi/asm/kvm.h
-> 
-> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-> new file mode 100644
-> index 0000000..f5525f1
-> --- /dev/null
-> +++ b/arch/arm64/include/uapi/asm/kvm.h
-> @@ -0,0 +1,112 @@
-> +/*
-> + * Copyright (C) 2012 - ARM Ltd
-> + * Author: Marc Zyngier <marc.zyngier@arm.com>
-> + *
-> + * Derived from arch/arm/include/uapi/asm/kvm.h:
-> + * Copyright (C) 2012 - Virtual Open Systems and Columbia University
-> + * Author: Christoffer Dall <c.dall@virtualopensystems.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#ifndef __ARM_KVM_H__
-> +#define __ARM_KVM_H__
-> +
-> +#define KVM_SPSR_EL1	0
-> +#define KVM_NR_SPSR	1
-> +
-> +#ifndef __ASSEMBLY__
-> +#include <asm/types.h>
-> +#include <asm/ptrace.h>
-> +
-> +#define __KVM_HAVE_GUEST_DEBUG
-> +#define __KVM_HAVE_IRQ_LINE
-> +
-> +#define KVM_REG_SIZE(id)						\
-> +	(1U << (((id) & KVM_REG_SIZE_MASK) >> KVM_REG_SIZE_SHIFT))
-> +
-> +struct kvm_regs {
-> +	struct user_pt_regs regs;	/* sp = sp_el0 */
-> +
-> +	unsigned long	sp_el1;
-> +	unsigned long	elr_el1;
-> +
-> +	unsigned long	spsr[KVM_NR_SPSR];
-> +};
-> +
+On Wed, Mar 6, 2013 at 12:36 PM, Thomas Abraham
+<thomas.abraham@linaro.org> wrote:
 
-Using long in uapi is generally a mistake: with gcc it has
-different size depending on whether you build in 64 and 32 bit mode.
-I think it is better to make it __u64.
+> With device core now able to setup the default pin configuration,
+> the call to devm_pinctrl_get_select_default can be removed. And
+> the pin configuration code based on the deprecated Samsung specific
+> gpio bindings is also removed.
+>
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 
-> +/* Supported Processor Types */
-> +#define KVM_ARM_TARGET_CORTEX_A57	0
-> +#define KVM_ARM_NUM_TARGETS		1
-> +
-> +/* KVM_ARM_SET_DEVICE_ADDR ioctl id encoding */
-> +#define KVM_ARM_DEVICE_TYPE_SHIFT	0
-> +#define KVM_ARM_DEVICE_TYPE_MASK	(0xffff << KVM_ARM_DEVICE_TYPE_SHIFT)
-> +#define KVM_ARM_DEVICE_ID_SHIFT		16
-> +#define KVM_ARM_DEVICE_ID_MASK		(0xffff << KVM_ARM_DEVICE_ID_SHIFT)
-> +
-> +/* Supported device IDs */
-> +#define KVM_ARM_DEVICE_VGIC_V2		0
-> +
-> +/* Supported VGIC address types  */
-> +#define KVM_VGIC_V2_ADDR_TYPE_DIST	0
-> +#define KVM_VGIC_V2_ADDR_TYPE_CPU	1
-> +
-> +#define KVM_VGIC_V2_DIST_SIZE		0x1000
-> +#define KVM_VGIC_V2_CPU_SIZE		0x2000
-> +
-> +struct kvm_vcpu_init {
-> +	__u32 target;
-> +	__u32 features[7];
-> +};
-> +
-> +struct kvm_sregs {
-> +};
-> +
-> +struct kvm_fpu {
-> +};
-> +
-> +struct kvm_guest_debug_arch {
-> +};
-> +
-> +struct kvm_debug_exit_arch {
-> +};
-> +
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-This is a problem too: structure alignment is different
-in -m32 versus -m64 modes, which will affect the offset of
-the following fields. I think it's best to add a "padding"
-field in there, and size it to multiple of 8 bytes.
-
-I think the same is a good idea for other empty stuctures,
-since otherwise the padding is implicit and
-not initialized by gcc, and it is hard not too leak
-info to userspace when you copy these structures out.
-
-And, it'll be handy if you want to extend the structures
-down the line.
-
-> +struct kvm_sync_regs {
-> +};
-> +
-> +struct kvm_arch_memory_slot {
-> +};
-> +
-> +/* KVM_IRQ_LINE irq field index values */
-> +#define KVM_ARM_IRQ_TYPE_SHIFT		24
-> +#define KVM_ARM_IRQ_TYPE_MASK		0xff
-> +#define KVM_ARM_IRQ_VCPU_SHIFT		16
-> +#define KVM_ARM_IRQ_VCPU_MASK		0xff
-> +#define KVM_ARM_IRQ_NUM_SHIFT		0
-> +#define KVM_ARM_IRQ_NUM_MASK		0xffff
-> +
-> +/* irq_type field */
-> +#define KVM_ARM_IRQ_TYPE_CPU		0
-> +#define KVM_ARM_IRQ_TYPE_SPI		1
-> +#define KVM_ARM_IRQ_TYPE_PPI		2
-> +
-> +/* out-of-kernel GIC cpu interrupt injection irq_number field */
-> +#define KVM_ARM_IRQ_CPU_IRQ		0
-> +#define KVM_ARM_IRQ_CPU_FIQ		1
-> +
-> +/* Highest supported SPI, from VGIC_NR_IRQS */
-> +#define KVM_ARM_IRQ_GIC_MAX		127
-> +
-> +#endif
-> +
-> +#endif /* __ARM_KVM_H__ */
-> -- 
-> 1.7.12.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe kvm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Yours,
+Linus Walleij
