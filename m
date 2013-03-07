@@ -1,40 +1,41 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 07 Mar 2013 13:41:44 -0800
-Subject: [PATCH 01/10] clocksource: add generic dummy timer driver
-In-Reply-To: <alpine.LFD.2.02.1303071457300.22263@ionos>
-References: <1362614646-24113-1-git-send-email-sboyd@codeaurora.org>
- <1362614646-24113-2-git-send-email-sboyd@codeaurora.org>
- <alpine.LFD.2.02.1303071457300.22263@ionos>
-Message-ID: <51390998.3090303@codeaurora.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 08 Mar 2013 01:50:40 +0300
+Subject: [PATCH 6/9] meminfo: switch to pr_xxx
+In-Reply-To: <1362691594-32286-6-git-send-email-plagnioj@jcrosoft.com>
+References: <20130307212523.GK4401@game.jcrosoft.org>
+ <1362691594-32286-1-git-send-email-plagnioj@jcrosoft.com>
+ <1362691594-32286-6-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <513919C0.1040803@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/07/13 06:00, Thomas Gleixner wrote:
-> On Wed, 6 Mar 2013, Stephen Boyd wrote:
->
->> +static int __init dummy_timer_register(void)
->> +{
->> +	int err = register_cpu_notifier(&dummy_timer_cpu_nb);
->> +	if (err)
->> +		return err;
->> +
->> +	/* We won't get a call on the boot CPU, so register immediately */
->> +	dummy_timer_setup();
->> +
->> +	return 0;
->> +}
->> +device_initcall(dummy_timer_register);
-> Are you sure that you want that to be installed unconditionally? What
-> about multi-platform kernels?
->
+Hello.
 
-A dummy timer is already installed unconditionally on devices with an
-arm architected timer, so if this is breaking something then those
-devices have been broken in the 3.9 merge window. I suppose we may need
-to make the rating even lower if there is somebody using a clockevent
-with a rating below 100. My grep of the tree shows 125 as the lowest,
-but perhaps we want to set the rating to 1 to be safe?
+On 03/08/2013 12:26 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> ---
+>   common/meminfo.c |    6 +++---
+>   1 file changed, 3 insertions(+), 3 deletions(-)
+
+    Hm, this patch must be for U-Boot, not Linux. :-)
+
+> diff --git a/common/meminfo.c b/common/meminfo.c
+> index 5e3ff71..45733da 100644
+> --- a/common/meminfo.c
+> +++ b/common/meminfo.c
+> @@ -10,9 +10,9 @@ static int display_meminfo(void)
+>   	ulong mend   = mem_malloc_end();
+>   	ulong msize  = mend - mstart + 1;
+>   
+> -	debug("barebox code: 0x%p -> 0x%p\n", _stext, _etext - 1);
+> -	debug("bss segment:  0x%p -> 0x%p\n", __bss_start, __bss_stop - 1);
+> -	printf("malloc space: 0x%08lx -> 0x%08lx (size %s)\n",
+> +	pr_debug("barebox code: 0x%p -> 0x%p\n", _stext, _etext - 1);
+> +	pr_debug("bss segment:  0x%p -> 0x%p\n", __bss_start, __bss_stop - 1);
+> +	pr_info("malloc space: 0x%08lx -> 0x%08lx (size %s)\n",
+>   		mstart, mend, size_human_readable(msize));
+
+    I'm not sure these pr_*() macros exist in U-Boot (or barebox?).
+
+WBR, Sergei
