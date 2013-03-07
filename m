@@ -1,22 +1,43 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Thu, 07 Mar 2013 01:11:21 +0100
-Subject: [PATCH] ARM: S3C24XX: drop "select MACH_N35"
-In-Reply-To: <013a01ce1ac7$11b287d0$35179770$%kim@samsung.com>
-References: <1362609234.28137.2.camel@x61.thuisdomein>
- <013a01ce1ac7$11b287d0$35179770$%kim@samsung.com>
-Message-ID: <1362615081.28137.5.camel@x61.thuisdomein>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 07 Mar 2013 09:11:44 +0900
+Subject: [PATCH v2 0/3] pinctrl: exynos: add support for Samsung's
+ Exynos5250
+In-Reply-To: <1362568712-13586-1-git-send-email-thomas.abraham@linaro.org>
+References: <1362568712-13586-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <014101ce1ac8$5a4e8600$0eeb9200$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-03-07 at 09:02 +0900, Kukjin Kim wrote:
+Thomas Abraham wrote:
+> 
+> Changes since v1:
+> - Change the compatible string from "samsung,pinctrl-exynos5250" to
+>   "samsung,exynos5250-pinctrl".
+> - Rebased to v3.9-rc1
+> 
 
-> BTW, so the machine type can be removed at arch/arm/tools/mach-types as well.
+Thomas, this stuff is already in my tree for v3.10, and above changes
+included in there. Do you want to replace with this patches?
 
-Well, that file has a big comment on top, containing the line:
-    Please do not send patches to this file; it is automatically
-generated!
+- Kukjin
 
-So I didn't dare to touch it.
-
-
-Paul Bolle
+> This patch series add pinctrl driver support for Samsung's Exynos5250 SoC.
+> The first patch adds the required Exynos5250 SoC specific data which is
+> used by the Samsung pinctrl driver to setup the pinctrl/pinmux/eint
+> controllers. The second and third patches skips the wakeup interrupt and
+> gpiolib registration if the pinctrl support is enabled for Exynos5250.
+> 
+> Thomas Abraham (3):
+>   pinctrl: exynos: add exynos5250 SoC specific data
+>   gpio: samsung: skip gpiolib registration if pinctrl support is enabled
+> for exynos5250
+>   arm: exynos: skip wakeup interrupt registration for exynos5250 if
+> pinctrl is enabled
+> 
+>  arch/arm/mach-exynos/common.c     |    1 +
+>  drivers/gpio/gpio-samsung.c       |    1 +
+>  drivers/pinctrl/pinctrl-exynos.c  |  108
+> +++++++++++++++++++++++++++++++++++++
+>  drivers/pinctrl/pinctrl-samsung.c |    2 +
+>  drivers/pinctrl/pinctrl-samsung.h |    1 +
+>  5 files changed, 113 insertions(+), 0 deletions(-)
