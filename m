@@ -1,62 +1,39 @@
-From: amit.daniel@samsung.com (Amit Daniel Kachhap)
-Date: Thu,  7 Mar 2013 09:43:47 +0530
-Subject: [PATCH V3 4/4] dts: Add cpufreq controller node for Exynos5440 SoC
-In-Reply-To: <1362629627-10012-1-git-send-email-amit.daniel@samsung.com>
-References: <1362629627-10012-1-git-send-email-amit.daniel@samsung.com>
-Message-ID: <1362629627-10012-4-git-send-email-amit.daniel@samsung.com>
+From: mporter@ti.com (Matt Porter)
+Date: Wed,  6 Mar 2013 23:16:37 -0500
+Subject: [PATCH 0/2] AM33xx mmc support
+Message-ID: <1362629799-22485-1-git-send-email-mporter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add cpufreq controller device node for Exynos5440 SoC for passing
-parameters like controller base address, interrupt and cpufreq
-table. This node is added outside cpu0 as this driver is now a platform
-driver and a new device structure is needed.
+This series enable MMC support on AM33xx platforms. Support for
+platforms incorporating the EDMA DMAC is added using the
+dma_get_slave_sg_limits() api. AM33xx DTS supported is added for
+Beaglebone, AM335x-EVM, and AM335x-EVMSK.
 
-Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
----
-Changes in V3:
-* Moved the DT node outside cpu0 node as the driver is now a platform
-  driver.
+These patches were split out from the v5 version of the AM33xx
+DMA series and split from the generic DT/dmanegine omap_hsmmc
+changes.
 
- arch/arm/boot/dts/exynos5440.dtsi      |   12 ++++++++++++
- arch/arm/mach-exynos/mach-exynos5-dt.c |    2 ++
- 2 files changed, 14 insertions(+), 0 deletions(-)
+The series has the following dependencies:
+	- edma private api error check fix
+	  http://www.spinics.net/lists/arm-kernel/msg227886.html
+	- DMA Engine support for AM33XX
+	  http://www.spinics.net/lists/linux-omap/msg87634.html
+	- omap_hsmmc DT DMA Client support
+	  http://www.spinics.net/lists/linux-omap/msg87623.html
+	- dmaengine: add slave sg transfer limits api
+	  https://lkml.org/lkml/2013/3/6/462
 
-diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
-index 5f3562a..4b29a5a 100644
---- a/arch/arm/boot/dts/exynos5440.dtsi
-+++ b/arch/arm/boot/dts/exynos5440.dtsi
-@@ -63,6 +63,18 @@
- 
- 	};
- 
-+	cpufreq at 160000 {
-+		compatible = "samsung,exynos5440-cpufreq";
-+		reg = <0x160000 0x1000>;
-+		interrupts = <0 57 0>;
-+		operating-points = <
-+				/* KHZ	  uV */
-+				1200000 1025000
-+				1000000 975000
-+				800000  925000
-+		>;
-+	};
-+
- 	serial at B0000 {
- 		compatible = "samsung,exynos4210-uart";
- 		reg = <0xB0000 0x1000>;
-diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
-index acaeb14..0a446c4 100644
---- a/arch/arm/mach-exynos/mach-exynos5-dt.c
-+++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
-@@ -145,6 +145,8 @@ static const struct of_dev_auxdata exynos5250_auxdata_lookup[] __initconst = {
- static const struct of_dev_auxdata exynos5440_auxdata_lookup[] __initconst = {
- 	OF_DEV_AUXDATA("samsung,exynos4210-uart", EXYNOS5440_PA_UART0,
- 				"exynos4210-uart.0", NULL),
-+	OF_DEV_AUXDATA("samsung,exynos5440-cpufreq", 0x160000,
-+				"exynos5440-cpufreq", NULL),
- 	{},
- };
- 
+Matt Porter (2):
+  mmc: omap_hsmmc: set max_segs based on dma engine limits
+  ARM: dts: add AM33XX MMC support
+
+ arch/arm/boot/dts/am335x-bone.dts  |    7 +++++++
+ arch/arm/boot/dts/am335x-evm.dts   |    7 +++++++
+ arch/arm/boot/dts/am335x-evmsk.dts |    7 +++++++
+ arch/arm/boot/dts/am33xx.dtsi      |   28 ++++++++++++++++++++++++++++
+ drivers/mmc/host/omap_hsmmc.c      |    8 ++++++++
+ 5 files changed, 57 insertions(+)
+
 -- 
-1.7.1
+1.7.9.5
