@@ -1,50 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 7 Mar 2013 03:50:24 +0000
-Subject: [PATCH 04/10] bus: introduce an Marvell EBU MBus driver
-In-Reply-To: <20130306214036.62fc93b9@skate>
-References: <1362577426-12804-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130306202447.GA4916@obsidianresearch.com> <20130306214036.62fc93b9@skate>
-Message-ID: <201303070350.25083.arnd@arndb.de>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Thu, 7 Mar 2013 12:00:14 +0800
+Subject: [RFC PATCH] ARM: keep __my_cpu_offset consistent with generic one
+In-Reply-To: <20130307034454.GE25137@mudshark.cambridge.arm.com>
+References: <1362624468-5451-1-git-send-email-tom.leiming@gmail.com>
+ <20130307034454.GE25137@mudshark.cambridge.arm.com>
+Message-ID: <CACVXFVOcacLS82Mw1uMmC=VhYPkzqzdHnXa93QqZjAOz2gfM3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 06 March 2013, Thomas Petazzoni wrote:
-> I don't follow you. For the moment we have to say in the DT, I have a
-> NOR of 16 MB, and it's mapped at 0xCD000000. This 0xCD000000 is
-> completely useless: the NOR driver or whatever driver sets up the NOR
-> can do an allocate_resource(), which returns an available fragment of
-> the physical address space, and create the address decoding window at
-> this address.
-> 
-> The base address of address decoding windows is not a description of
-> the hardware. Those base addresses can be dynamically allocated during
-> the probing of devices.
+Hi,
 
-I think you just described precisely why the binding that Jason has suggested
-is able to describe what the hardware does, while the binding you proposed
-cannot do that.
+On Thu, Mar 7, 2013 at 11:44 AM, Will Deacon <will.deacon@arm.com> wrote:
+>
+> For the record, can you include a backtrace or something please? The
 
-If we want to dynamically assign the address of the NOR flash, we need a
-way to describe the hardware address that we want to remap to a CPU
-visible logical address using MBUS.
+lock_release_holdtime() will access percpu variable, so every lock
+release may trigger the hang if CONFIG_LOCK_STAT is enabled,
+and there are many lock acquire/release before setup_arch.
 
-When each device behind MBUS has its own bus space in hardware, a ranges
-property is exactly what we should use to describe how that bus space
-is mapped into the parent bus that is visible to the CPU. The ranges
-property that is passed by the boot loader can describe how the address
-is currently configured at boot time, or how you would like the kernel
-to configure it to get a sensible system view. But if you want to
-dynamically remap it in MBUS, that should /not/ require changing the
-"reg" property of the device, because the device itself does not change,
-only the mapping changes.
+No detailed backtrace since only early_printk can work at that time.
 
-There is a little deficiency here in the way that Linux probes the
-platform devices: We allocate a "struct resource" at the time the
-platform_device is created, and that resource will be incorrect if
-we remap the window. However, I think it's easy enough to work around
-that by using 'of_iomap' in drivers that are children of the MBUS and
-can get remapped, rather than using 'devm_ioremap_resource'. Platform
-devices are Linux specific implementation detail that should not
-impact the DT binding in this case.
+> description makes it sounds like a caller bug, so it would be good to
+> document a valid user of per-cpu before cpu_init().
 
-	Arnd
+OK, I will add the document: lockdep will use percpu variable
+before cpu_init() called inside setup_arch().
+
+Thanks,
+-- 
+Ming Lei
