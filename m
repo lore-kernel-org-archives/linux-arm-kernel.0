@@ -1,43 +1,24 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 7 Mar 2013 09:08:13 +0100
-Subject: [PATCH 2/3] arm: kirkwood: factor pinmux descriptors for
- OpenBlocks A6
-In-Reply-To: <20130307062255.GH3904@lunn.ch>
-References: <1362587021-32762-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1362587021-32762-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130306181648.GE3904@lunn.ch> <20130306201646.179fce69@skate>
- <20130307062255.GH3904@lunn.ch>
-Message-ID: <20130307090813.231548e6@skate>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 7 Mar 2013 09:08:31 +0100
+Subject: [PATCH v2 1/3] pinctrl: exynos: add exynos5250 SoC specific data
+In-Reply-To: <1362568712-13586-2-git-send-email-thomas.abraham@linaro.org>
+References: <1362568712-13586-1-git-send-email-thomas.abraham@linaro.org>
+ <1362568712-13586-2-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <CACRpkdZ37FutKzwSSF7w425Nh=jPUU-FXf48HPs3oUXO9sJ0oA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew Lunn,
+On Wed, Mar 6, 2013 at 12:18 PM, Thomas Abraham
+<thomas.abraham@linaro.org> wrote:
 
-On Thu, 7 Mar 2013 07:22:55 +0100, Andrew Lunn wrote:
+> Add Samsung Exynos5250 SoC specific data to enable pinctrl support for
+> all platforms based on Exynos5250.
+>
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-> > Right, that's true. I knew about this, but since the pinmux
-> > configuration was made explicit for those GPIOs, I thought the original
-> > author(s) of this .dts did this intentionally. For example, it somewhat
-> > documents the 8 GPIOs that are available in the bottom connector of the
-> > OpenBlocks A6. They are not tied to anyway particular device, so they
-> > wouldn't appear anywhere in the DT. Ditto for the DIP switch GPIOs. Do
-> > you also want those to be removed from the DT?
-> 
-> Hi Thomas
-> 
-> Good point. They are not required, but don't harm. So yes, leave them
-> there for documentation purposes.
+So shall I merge these three patches to the pinctrl tree or not?
 
-So I keep the GPIO muxing for the external GPIOs and the DIP switch
-GPIOs, but the one that are "claimed" by another device (like gpio-leds
-or gpio-keys), I should remove the muxing? I'm fine with that, just
-want to confirm the choice.
-
-Thanks!
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Yours,
+Linus Walleij
