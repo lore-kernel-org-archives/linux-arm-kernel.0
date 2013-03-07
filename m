@@ -1,36 +1,68 @@
-From: xobs@kosagi.com (Sean Cross)
-Date: Thu,  7 Mar 2013 06:00:10 +0000
-Subject: [PATCH v2 3/3] ARM: dts: imx6q: Add pinctrl for audmix on AUD3
-In-Reply-To: <1362636010-17367-1-git-send-email-xobs@kosagi.com>
-References: <1362636010-17367-1-git-send-email-xobs@kosagi.com>
-Message-ID: <1362636010-17367-4-git-send-email-xobs@kosagi.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Thu, 7 Mar 2013 14:01:17 +0800
+Subject: [PATCH 1/6] platform-drivers: msm: add single-wire serial bus
+ interface (SSBI) driver
+In-Reply-To: <8yawqtjvl8y.fsf@huya.qualcomm.com>
+References: <1362616187-21089-1-git-send-email-davidb@codeaurora.org>
+ <1362616187-21089-2-git-send-email-davidb@codeaurora.org>
+ <20130307013008.GA2910@kroah.com>
+ <8yawqtjvl8y.fsf@huya.qualcomm.com>
+Message-ID: <20130307060117.GA31687@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow AUD3 to be used as audio output from the audmux block.
----
- arch/arm/boot/dts/imx6q.dtsip |    9 +++++++++
- 1 file changed, 9 insertions(+)
+On Wed, Mar 06, 2013 at 09:20:45PM -0800, David Brown wrote:
+> Greg Kroah-Hartman <gregkh@linuxfoundation.org> writes:
+> 
+> > On Wed, Mar 06, 2013 at 04:29:42PM -0800, David Brown wrote:
+> >> +menu "Qualcomm MSM SSBI bus support"
+> >> +	depends on ARCH_MSM
+> >
+> > Why?
+> 
+> In the sense that ARCH_MSM are the only devices that ever were, or ever
+> will be made with this device.  It doesn't strictly depend on it, but do
+> we want to clutter the config for everything else.
 
-diff --git a/arch/arm/boot/dts/imx6q.dtsip b/arch/arm/boot/dts/imx6q.dtsip
-index 1b1f80b..dbc4b46 100644
---- a/arch/arm/boot/dts/imx6q.dtsip
-+++ b/arch/arm/boot/dts/imx6q.dtsip
-@@ -85,6 +85,15 @@
- 							MX6Q_PAD_SD2_DAT1__AUDMUX_AUD4_TXFS 0x80000000
- 						>;
- 					};
-+
-+					pinctrl_audmux_2: audmux-2 {
-+						fsl,pins = <
-+							MX6Q_PAD_CSI0_DAT7__AUDMUX_AUD3_RXD  0x80000000
-+							MX6Q_PAD_CSI0_DAT4__AUDMUX_AUD3_TXC  0x80000000
-+							MX6Q_PAD_CSI0_DAT5__AUDMUX_AUD3_TXD  0x80000000
-+							MX6Q_PAD_CSI0_DAT6__AUDMUX_AUD3_TXFS 0x80000000
-+						>;
-+					};
- 				};
- 
- 				ecspi1 {
--- 
-1.7.9.5
+It's not "clutter".  You want me to build this on other platforms, to
+catch api and other types of build breakages.  This is the way for
+almost all Linux drivers.
+
+> >> +config MSM_SSBI
+> >> +	bool "Qualcomm Single-wire Serial Bus Interface (SSBI)"
+> >
+> > Why can't this be a module?
+> 
+> Without this device, the PMIC drivers won't work, regulators can't be
+> turned on, and most of the other devices won't work.  I can try if it
+> can still be made a module, and it might be good at exercising the
+> deferred probe mechanism.
+
+If the PMIC drivers are dependant on the symbols in this module, there
+should not be any problems, right?
+
+> So, a deeper question.  I've resent this driver with minimal change.
+> I've also made some other changes as patches afterwards.  Do we want
+> these squashed into a single patch, or the initial one (not authored by
+> me) followed by updates?
+
+To preserve the authorship, you might want to fix this stuff with
+follow-on patches.  As long as the original patch can build properly.
+
+> >> +static struct platform_driver msm_ssbi_driver = {
+> >> +	.probe		= msm_ssbi_probe,
+> >> +	.remove		= __exit_p(msm_ssbi_remove),
+> >
+> > You just oopsed if someone unbound your device from the driver from
+> > userspace.  Not good.
+> 
+> I did catch this one in a later patch :-)  I can clean it up in the
+> driver, though, since it looks like some more work needs to go into
+> this.
+
+Yes, but it's very close, fix this all up and resend your series and all
+should be fine.
+
+Nice job,
+
+greg k-h
