@@ -1,80 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 7 Mar 2013 13:34:21 +0000
-Subject: [PATCH 1/4] Device tree entry for Freescale TDM controller
-In-Reply-To: <1362655668-26721-1-git-send-email-Sandeep@freescale.com>
-References: <1362655668-26721-1-git-send-email-Sandeep@freescale.com>
-Message-ID: <20130307133421.GA4977@n2100.arm.linux.org.uk>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 7 Mar 2013 19:05:19 +0530
+Subject: [PATCH v3 6/7] ARM: dts: omap5: Add omap-usb3 and omap-usb2 dt data
+In-Reply-To: <1362663320-23799-1-git-send-email-kishon@ti.com>
+References: <1362663320-23799-1-git-send-email-kishon@ti.com>
+Message-ID: <1362663320-23799-7-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I know I'm probably missing something... but... why are these patches
-copied to the ARM list?  They appear to be PowerPC patches.
+Add omap-usb3 and omap-usb2 data node in omap5 device tree file.
+The information for the node added here is available @
+Documentation/devicetree/bindings/usb/usb-phy.txt
 
-On Thu, Mar 07, 2013 at 04:57:45PM +0530, Sandeep Singh wrote:
-> Added dtsi file for Freescale TDM controller.
-> This controller is available on many Freescale SOCs like MPC8315, P1020, P1010,
-> P1022 and P1024
-> Signed-off-by: Sandeep Singh <Sandeep@freescale.com>
-> Signed-off-by: Poonam Aggrwal <poonam.aggrwal@freescale.com>
-> ---
->  arch/powerpc/boot/dts/fsl/pq3-tdm1.0-0.dtsi |   42 +++++++++++++++++++++++++++
->  1 files changed, 42 insertions(+), 0 deletions(-)
->  create mode 100644 arch/powerpc/boot/dts/fsl/pq3-tdm1.0-0.dtsi
-> 
-> diff --git a/arch/powerpc/boot/dts/fsl/pq3-tdm1.0-0.dtsi b/arch/powerpc/boot/dts/fsl/pq3-tdm1.0-0.dtsi
-> new file mode 100644
-> index 0000000..e89f637
-> --- /dev/null
-> +++ b/arch/powerpc/boot/dts/fsl/pq3-tdm1.0-0.dtsi
-> @@ -0,0 +1,42 @@
-> +/*
-> + * PQ3 TDM device tree stub [ controller @ offset 0x16000 ]
-> + *
-> + * Copyright 2012 Freescale Semiconductor Inc.
-> + *
-> + * Redistribution and use in source and binary forms, with or without
-> + * modification, are permitted provided that the following conditions are met:
-> + *     * Redistributions of source code must retain the above copyright
-> + *       notice, this list of conditions and the following disclaimer.
-> + *     * Redistributions in binary form must reproduce the above copyright
-> + *       notice, this list of conditions and the following disclaimer in the
-> + *       documentation and/or other materials provided with the distribution.
-> + *     * Neither the name of Freescale Semiconductor nor the
-> + *       names of its contributors may be used to endorse or promote products
-> + *       derived from this software without specific prior written permission.
-> + *
-> + *
-> + * ALTERNATIVELY, this software may be distributed under the terms of the
-> + * GNU General Public License ("GPL") as published by the Free Software
-> + * Foundation, either version 2 of that License or (at your option) any
-> + * later version.
-> + *
-> + * THIS SOFTWARE IS PROVIDED BY Freescale Semiconductor ``AS IS'' AND ANY
-> + * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-> + * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-> + * DISCLAIMED. IN NO EVENT SHALL Freescale Semiconductor BE LIABLE FOR ANY
-> + * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-> + * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-> + * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-> + * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-> + * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-> + * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-> + */
-> +
-> +tdm at 16000 {
-> +	compatible = "fsl,tdm1.0";
-> +	reg = <0x16000 0x200 0x2c000 0x2000>;
-> +	clock-frequency = <0>;
-> +	tdm_tx_clk = <2048000>;
-> +	interrupts = <62 8 0 0>;
-> +	fsl,max-time-slots = <128>;
-> +};
-> -- 
-> 1.7.6.GIT
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ arch/arm/boot/dts/omap5.dtsi |   14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
+
+diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+index 230b779..bd73257 100644
+--- a/arch/arm/boot/dts/omap5.dtsi
++++ b/arch/arm/boot/dts/omap5.dtsi
+@@ -511,6 +511,20 @@
+ 			#size-cells = <1>;
+ 			ranges;
+ 			ti,hwmods = "ocp2scp1";
++			usb2_phy: usb2phy at 4a084000 {
++				compatible = "ti,omap-usb2";
++				reg = <0x4a084000 0x7c>;
++				ctrl-module = <&omap_control_usb>;
++			};
++
++			usb3_phy: usb3phy at 4a084400 {
++				compatible = "ti,omap-usb3";
++				reg = <0x4a084400 0x80>,
++				      <0x4a084800 0x64>,
++				      <0x4a084c00 0x40>;
++				reg-names = "phy_rx", "phy_tx", "pll_ctrl";
++				ctrl-module = <&omap_control_usb>;
++			};
+ 		};
+ 	};
+ };
+-- 
+1.7.10.4
