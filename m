@@ -1,103 +1,93 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Thu, 7 Mar 2013 18:59:53 +0800
-Subject: [PATCH 04/10] ARM: tegra: pm: add platform suspend support
-In-Reply-To: <51363D51.6000908@wwwdotorg.org>
-References: <1362397218-5675-1-git-send-email-josephl@nvidia.com>
- <51363D51.6000908@wwwdotorg.org>
-Message-ID: <1362653993.1890.13.camel@jlo-ubuntu-64.nvidia.com>
+From: tgih.jun@samsung.com (Seungwon Jeon)
+Date: Thu, 07 Mar 2013 20:02:10 +0900
+Subject: [PATCH] mmc: dwmmc: let device core setup the default pin
+ configuration
+In-Reply-To: <1362571461-14570-1-git-send-email-thomas.abraham@linaro.org>
+References: <1362571461-14570-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <000e01ce1b23$375166d0$a5f43470$%jun@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-03-06 at 02:45 +0800, Stephen Warren wrote:
-> On 03/04/2013 04:40 AM, Joseph Lo wrote:
-> > Adding suspend to ram support for Tegra platform. There are three suspend
-> 
-> nit: s/ram/RAM/
-> 
-> > mode for Tegra. The difference were below.
-> 
-> Does this patch work for all 3 upstream Tegras, or just Tegra20 (or 20+30?).
-> 
-Only for Tegra20 and 30 now. The Tegra114's support need to wait for cpu
-suspend function first.
+Hi Thomas,
 
-> > diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
-> 
-> > +	tegra_init_suspend();
-> 
-> That call isn't ifdef'd on anything ...
-> 
-Will fix.
+On Wednesday, March 06, 2013, Thomas Abraham wrote:
+> With device core now able to setup the default pin configuration,
+> the pin configuration code based on the deprecated Samsung specific
+> gpio bindings is removed.
 
-> > diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c
-> 
-> > +static void tegra_suspend_enter_lp2(void)
-> > +{
-> > +	tegra_set_cpu_in_lp2(0);
-> > +}
-> > +
-> > +static void tegra_suspend_exit_lp2(void)
-> > +{
-> > +	tegra_clear_cpu_in_lp2(0);
-> > +}
-> 
-> Are those two functions going to get larger? If not, why not just call
-> tegra_{set,clear}_cpu_in_lp2() from tegra_suspend_enter()?
-> 
-> Note: I realized that the LP0/LP1 functions might be larger, and feel
-> free to make them separate functions when they're implemented, but if
-> those two functions specifically are always going to be a single line,
-> then there's little point in separating them out, is there?
-> 
-No, just like you said for LP2 suspend it only just need to call
-tegra_{set,clear}_cpu_in_lp2(). So I will follow your suggestion.
-Thanks.
-
-> > +void __init tegra_init_suspend(void)
-> ...
-> >  #endif
-> 
-> ... but this function is only implemented inside an ifdef ...
-> 
-> > diff --git a/arch/arm/mach-tegra/pm.h b/arch/arm/mach-tegra/pm.h
-> 
-> > +void tegra_init_suspend(void);
-> 
-> ... and no dummy inline is provided if the ifdef isn't defined.
-> 
-> So, turning off whatever that ifdef is would cause a build error.
-> 
-> > diff --git a/arch/arm/mach-tegra/pmc.c b/arch/arm/mach-tegra/pmc.c
-> 
-> > +unsigned long tegra_pmc_get_cpu_timer(void)
-> ...
-> > +unsigned long tegra_pmc_get_cpu_off_timer(void)
-> 
-> I think you want to make those return u32, since the values they return
-> should be u32 to match DT cell type.
-> 
-Will fix.
-
-> > +void tegra_pmc_pm_set(enum tegra_suspend_mode mode)
-> > +{
-> > +	u32 reg;
-> > +
-> > +	reg = tegra_pmc_readl(PMC_CTRL);
-> > +	reg |= TEGRA_POWER_CPU_PWRREQ_OE;
-> > +	reg &= ~TEGRA_POWER_EFFECT_LP0;
-> > +
-> > +	tegra_pmc_writel(reg, PMC_CTRL);
-> > +}
-> 
-> The "mode" parameter doesn't seem to be used here.
-> 
-> One overall comment: tegra_suspend_enter() only supports LP2 so far, but
-> I don't see a check anywhere (e.g. tegra_init_suspend() or
-> tegra_pmc_parse_dt()) which prevents suspend from being initialized if
-> the user requested some other type, or on SoCs where even LP2 isn't
-> supported yet (e.g. Tegra114).
-
-OK. Will remove now.
+'setup_bus' callback is still useful in dw_mci_drv_data?
+Considering the purpose, it would be good to remove.
+And, could you change commit prefix for consistency?
+dwmmc -> dw_mmc
 
 Thanks,
-Joseph
+Seungwon Jeon
+> 
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> ---
+>  drivers/mmc/host/dw_mmc-exynos.c |   38 --------------------------------------
+>  1 files changed, 0 insertions(+), 38 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/dw_mmc-exynos.c b/drivers/mmc/host/dw_mmc-exynos.c
+> index 72fd0f2..467d043 100644
+> --- a/drivers/mmc/host/dw_mmc-exynos.c
+> +++ b/drivers/mmc/host/dw_mmc-exynos.c
+> @@ -152,43 +152,6 @@ static int dw_mci_exynos_parse_dt(struct dw_mci *host)
+>  	return 0;
+>  }
+> 
+> -static int dw_mci_exynos_setup_bus(struct dw_mci *host,
+> -				struct device_node *slot_np, u8 bus_width)
+> -{
+> -	int idx, gpio, ret;
+> -
+> -	if (!slot_np)
+> -		return -EINVAL;
+> -
+> -	/* cmd + clock + bus-width pins */
+> -	for (idx = 0; idx < NUM_PINS(bus_width); idx++) {
+> -		gpio = of_get_gpio(slot_np, idx);
+> -		if (!gpio_is_valid(gpio)) {
+> -			dev_err(host->dev, "invalid gpio: %d\n", gpio);
+> -			return -EINVAL;
+> -		}
+> -
+> -		ret = devm_gpio_request(host->dev, gpio, "dw-mci-bus");
+> -		if (ret) {
+> -			dev_err(host->dev, "gpio [%d] request failed\n", gpio);
+> -			return -EBUSY;
+> -		}
+> -	}
+> -
+> -	if (host->pdata->quirks & DW_MCI_QUIRK_BROKEN_CARD_DETECTION)
+> -		return 0;
+> -
+> -	gpio = of_get_named_gpio(slot_np, "samsung,cd-pinmux-gpio", 0);
+> -	if (gpio_is_valid(gpio)) {
+> -		if (devm_gpio_request(host->dev, gpio, "dw-mci-cd"))
+> -			dev_err(host->dev, "gpio [%d] request failed\n", gpio);
+> -	} else {
+> -		dev_info(host->dev, "cd gpio not available");
+> -	}
+> -
+> -	return 0;
+> -}
+> -
+>  /* Exynos5250 controller specific capabilities */
+>  static unsigned long exynos5250_dwmmc_caps[4] = {
+>  	MMC_CAP_UHS_DDR50 | MMC_CAP_1_8V_DDR |
+> @@ -205,7 +168,6 @@ static const struct dw_mci_drv_data exynos5250_drv_data = {
+>  	.prepare_command	= dw_mci_exynos_prepare_command,
+>  	.set_ios		= dw_mci_exynos_set_ios,
+>  	.parse_dt		= dw_mci_exynos_parse_dt,
+> -	.setup_bus		= dw_mci_exynos_setup_bus,
+>  };
+> 
+>  static const struct of_device_id dw_mci_exynos_match[] = {
+> --
+> 1.6.6.rc2
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
