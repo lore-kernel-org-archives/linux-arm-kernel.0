@@ -1,51 +1,51 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu, 7 Mar 2013 07:25:50 -0300
-Subject: [PATCH 2/4] arm: plat-orion: fix address decoding when > 4GB is
- used
-In-Reply-To: <1362565416-15718-3-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1362565416-15718-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1362565416-15718-3-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130307102549.GC24110@localhost>
+From: hechtb@gmail.com (Bastian Hecht)
+Date: Thu, 7 Mar 2013 11:26:29 +0100
+Subject: [PATCH v6 1/3] serial: sh-sci: Add OF support
+In-Reply-To: <9335181.JoypQftkI4@avalon>
+References: <1362569437-11133-1-git-send-email-hechtb+renesas@gmail.com>
+ <9335181.JoypQftkI4@avalon>
+Message-ID: <CABYn4sz_5vEzXba0Y7iXKBbGhfGwY2cd8fn30mUQ0GQcbGTG+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 06, 2013 at 11:23:34AM +0100, Thomas Petazzoni wrote:
-> During the system initialization, the orion_setup_cpu_mbus_target()
-> function reads the SDRAM address decoding registers to find out how
-> many chip-selects of SDRAM have been enabled, and builds a small array
-> with one entry per chip-select. This array is then used by device
-> drivers (XOR, Ethernet, etc.) to configure their own address decoding
-> windows to the SDRAM.
-> 
-> However, devices can only access the first 32 bits of the physical
-> memory. Even though LPAE is not supported for now, some Marvell boards
-> are now showing up with 8 GB of RAM, configured using two SDRAM
-> address decoding windows: the first covering the first 4 GB, the
-> second covering the last 4 GB. The array built by
-> orion_setup_cpu_mbus_target() has therefore two entries, and device
-> drivers try to set up two address decoding windows to the
-> SDRAM. However, in the device registers for the address decoding, the
-> base address is only 32 bits, so those two windows overlap each other,
-> and the devices do not work at all.
-> 
-> This patch makes sure that the array built by
-> orion_setup_cpu_mbus_target() only contains the SDRAM decoding windows
-> that correspond to the first 4 GB of the memory. To do that, it
-> ignores the SDRAM decoding windows for which the 4 low-order bits are
-> not zero (the 4 low-order bits of the base register are used to store
-> bits 32:35 of the base address, so they actually indicate whether the
-> base address is above 4 GB).
-> 
-> This patch allows the newly introduced armada-xp-gp board to properly
-> operate when it is mounted with more than 4 GB of RAM. Without that,
-> all devices doing DMA (for example XOR and Ethernet) do not work at
-> all.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Hi Laurent,
 
-Tested-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+>> +- renesas,scscr : Should contain a bitfield used by the Serial Control
+>> Register.
+>> +  b7 = SCSCR_TIE
+>> +  b6 = SCSCR_RIE
+>> +  b5 = SCSCR_TE
+>> +  b4 = SCSCR_RE
+>> +  b3 = SCSCR_REIE
+>> +  b2 = SCSCR_TOIE
+>> +  b1 = SCSCR_CKE1
+>> +  b0 = SCSCR_CKE0
+>
+> What is that for exactly ?
 
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+What I can see from 3 different datasheets (sh7372, sh73a0, r8a7740)
+the first 2 bits differ in meaning.
+
+On r8a7740 it depends: In asynchronous mode the first 2 bits CKE0/1
+define whether you want to use an external clock to drive the baud
+generator or if you want to use the internal SUB clock. If you use the
+SUB clock you can further define if you want to use a subscaled SUB
+clock in the SCSMR register. In synchronous mode you must rely on the
+internal clock for the baud generator and can select if the SCK pin is
+used as clock input or output.
+
+On sh73a0 and sh7372 it's used to control the output clock SCK (set it
+to high impedance or actually output a clock when in sychronous mode)
+
+Bit 2 and 3 don't exist in my datasheets.
+
+The other bits define under which conditions you receive interrupts
+(send FIFO empty, receive FIFO full) and which bits you need to start
+transfers (one bit to start sending, one receiving). The bits 8 to 31
+are used to set up DMA transfers and various interrupt events like
+error status and finish transfers. I haven't included them as they are
+not used in the driver.
+
+Thanks,
+
+Bastian
