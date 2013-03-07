@@ -1,34 +1,30 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 07 Mar 2013 20:08:20 +0900
-Subject: [PATCH] ARM: S5PV210: Fix PL330 DMA controller clkdev entries
-In-Reply-To: <5134A78A.9050709@samsung.com>
-References: <1362227906-13921-1-git-send-email-s.nawrocki@samsung.com>
- <51321326.6050800@gmail.com> <008001ce18d8$451527e0$cf3f77a0$%kim@samsung.com>
- <5134A78A.9050709@samsung.com>
-Message-ID: <021101ce1b24$13dfcdd0$3b9f6970$%kim@samsung.com>
+Date: Thu, 07 Mar 2013 20:09:31 +0900
+Subject: [PATCH v2 1/3] pinctrl: exynos: add exynos5250 SoC specific data
+In-Reply-To: <CACRpkdZ37FutKzwSSF7w425Nh=jPUU-FXf48HPs3oUXO9sJ0oA@mail.gmail.com>
+References: <1362568712-13586-1-git-send-email-thomas.abraham@linaro.org>
+ <1362568712-13586-2-git-send-email-thomas.abraham@linaro.org>
+ <CACRpkdZ37FutKzwSSF7w425Nh=jPUU-FXf48HPs3oUXO9sJ0oA@mail.gmail.com>
+Message-ID: <021201ce1b24$3e46e810$bad4b830$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sylwester Nawrocki wrote:
+Linus Walleij wrote:
 > 
-> On 03/04/2013 02:00 PM, Kukjin Kim wrote:
-> > Looks good to me, applied into -fixes.
+> On Wed, Mar 6, 2013 at 12:18 PM, Thomas Abraham
+> <thomas.abraham@linaro.org> wrote:
+> 
+> > Add Samsung Exynos5250 SoC specific data to enable pinctrl support for
+> > all platforms based on Exynos5250.
 > >
-> > Sylwester, why did you want to re-send this patch?
+> > Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> > Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+> > Acked-by: Linus Walleij <linus.walleij@linaro.org>
 > 
-> Only to add
+> So shall I merge these three patches to the pinctrl tree or not?
 > 
-> Tested-by: Lonsn <lonsn2005@gmail.com>
-> Cc: stable at vger.kernel.org # 3.7
-> 
-> tags, and any other in case someone else tests the patch.
-> 
-> I think we would need this fix for stable 3.7 as well.
-> 
-> Thanks for applying it.
-> 
-I already added above when I applied ;-)
+Hi Linus, this series is already in Samsung tree with your ack.
 
-Thanks for your confirmation.
+Thanks.
 
 - Kukjin
