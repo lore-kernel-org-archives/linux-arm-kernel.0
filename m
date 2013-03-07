@@ -1,68 +1,61 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed,  6 Mar 2013 16:03:56 -0800
-Subject: [PATCHv2 0/10] Remove ARM local timer API
-Message-ID: <1362614646-24113-1-git-send-email-sboyd@codeaurora.org>
+Date: Wed,  6 Mar 2013 16:03:58 -0800
+Subject: [PATCH 02/10] ARM: smp: Remove duplicate dummy timer implementation
+In-Reply-To: <1362614646-24113-1-git-send-email-sboyd@codeaurora.org>
+References: <1362614646-24113-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1362614646-24113-3-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In light of Mark Rutland's recent work on divorcing the ARM architected
-timers from the ARM local timer API and introducing a generic arch hook for
-broadcast it seems that we should remove the local timer API entirely.
-Doing so will reduce the architecture dependencies of our timer drivers,
-reduce code in ARM core, and simplify timer drivers because they no longer
-go through an architecture layer that is essentially a hotplug notifier.
+Drop ARM's version of the dummy timer now that we have a generic
+implementation in drivers/clocksource.
 
-Previous attempts have been made[1] unsuccessfully. I'm hoping this can
-be accepted now so that we can clean up the timer drivers that are
-used in both UP and SMP situations. Right now these drivers have to ignore
-the timer setup callback on the boot CPU to avoid registering clockevents
-twice. This is not very symmetric and causes convuluted code that does
-the same thing in two places.
+Cc: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ arch/arm/kernel/smp.c | 22 ++--------------------
+ 1 file changed, 2 insertions(+), 20 deletions(-)
 
-Patches based on v3.9-rc1. Mostly compile tested as I don't
-have access to the hardware.
-
-[1] http://article.gmane.org/gmane.linux.ports.arm.kernel/145705
-
-Note: A hotplug notifier is used by both x86 for the apb_timer (see 
-apbt_cpuhp_notify) and by metag (see arch_timer_cpu_notify in
-metag_generic.c) so this is not new.
-
-Changes since v1:
- * Picked up Mark's generic dummy timer driver
- * Split out omap changes into new patch
-
-Mark Rutland (1):
-  clocksource: add generic dummy timer driver
-
-Stephen Boyd (9):
-  ARM: smp: Remove duplicate dummy timer implementation
-  ARM: smp_twd: Divorce smp_twd from local timer API
-  ARM: OMAP2+: Divorce from local timer API
-  ARM: EXYNOS4: Divorce mct from local timer API
-  ARM: PRIMA2: Divorce timer-marco from local timer API
-  ARM: msm: Divorce msm_timer from local timer API
-  clocksource: time-armada-370-xp: Fix sparse warning
-  clocksource: time-armada-370-xp: Divorce from local timer API
-  ARM: smp: Remove local timer API
-
- arch/arm/Kconfig                         |  12 +--
- arch/arm/include/asm/localtimer.h        |  34 ---------
- arch/arm/kernel/smp.c                    |  87 ---------------------
- arch/arm/kernel/smp_twd.c                |  48 ++++++++----
- arch/arm/mach-exynos/mct.c               |  53 +++++++++----
- arch/arm/mach-msm/timer.c                | 125 +++++++++++++++++--------------
- arch/arm/mach-omap2/Kconfig              |   1 -
- arch/arm/mach-omap2/timer.c              |   7 --
- arch/arm/mach-prima2/timer-marco.c       |  98 ++++++++++++------------
- drivers/clocksource/Makefile             |   1 +
- drivers/clocksource/dummy_timer.c        |  67 +++++++++++++++++
- drivers/clocksource/time-armada-370-xp.c |  88 ++++++++++------------
- include/linux/time-armada-370-xp.h       |   4 +-
- 13 files changed, 298 insertions(+), 327 deletions(-)
- delete mode 100644 arch/arm/include/asm/localtimer.h
- create mode 100644 drivers/clocksource/dummy_timer.c
-
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 1bdfd87..e4f3669 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -468,24 +468,6 @@ void tick_broadcast(const struct cpumask *mask)
+ }
+ #endif
+ 
+-static void broadcast_timer_set_mode(enum clock_event_mode mode,
+-	struct clock_event_device *evt)
+-{
+-}
+-
+-static void __cpuinit broadcast_timer_setup(struct clock_event_device *evt)
+-{
+-	evt->name	= "dummy_timer";
+-	evt->features	= CLOCK_EVT_FEAT_ONESHOT |
+-			  CLOCK_EVT_FEAT_PERIODIC |
+-			  CLOCK_EVT_FEAT_DUMMY;
+-	evt->rating	= 400;
+-	evt->mult	= 1;
+-	evt->set_mode	= broadcast_timer_set_mode;
+-
+-	clockevents_register_device(evt);
+-}
+-
+ static struct local_timer_ops *lt_ops;
+ 
+ #ifdef CONFIG_LOCAL_TIMERS
+@@ -509,8 +491,8 @@ static void __cpuinit percpu_timer_setup(void)
+ 
+ 	evt->cpumask = cpumask_of(cpu);
+ 
+-	if (!lt_ops || lt_ops->setup(evt))
+-		broadcast_timer_setup(evt);
++	if (lt_ops)
++		lt_ops->setup(evt);
+ }
+ 
+ #ifdef CONFIG_HOTPLUG_CPU
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
