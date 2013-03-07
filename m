@@ -1,41 +1,37 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 7 Mar 2013 04:25:28 +0100
-Subject: [PATCH 2/2] pinctrl: imx: use pin_func_ids to search the pinctrl
- item.
-In-Reply-To: <CAP1dx+xB0O2zouDcjmv3uO1Nk3EGytmAxn18tEO7EzXJOWoh8w@mail.gmail.com>
-References: <1361932553-8218-1-git-send-email-b32955@freescale.com>
- <1361932553-8218-2-git-send-email-b32955@freescale.com>
- <CACRpkdYO5UN=t_nu1XQmBAjH6zWZRgnOY2zSQeO2K=ERrUPQCg@mail.gmail.com>
- <CAP1dx+xB0O2zouDcjmv3uO1Nk3EGytmAxn18tEO7EzXJOWoh8w@mail.gmail.com>
-Message-ID: <CACRpkdYwyB1zC+ZgrJyiAnfEuH758f4q3J6LG-LT=WV25E9sRQ@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 07 Mar 2013 12:26:29 +0900
+Subject: [PATCH v2 0/3] pinctrl: exynos: add support for Samsung's
+ Exynos5250
+In-Reply-To: <CAJuYYwS9+ZV43QaweUmqh_qFffT1fytM7G9WVbVWdi=hFjvpaw@mail.gmail.com>
+References: <1362568712-13586-1-git-send-email-thomas.abraham@linaro.org>
+ <014101ce1ac8$5a4e8600$0eeb9200$%kim@samsung.com>
+ <CAJuYYwS9+ZV43QaweUmqh_qFffT1fytM7G9WVbVWdi=hFjvpaw@mail.gmail.com>
+Message-ID: <017b01ce1ae3$8f0486e0$ad0d94a0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 4, 2013 at 3:18 AM, Dong Aisheng <dong.aisheng@linaro.org> wrote:
-> On 1 March 2013 21:07, Linus Walleij <linus.walleij@linaro.org> wrote:
->> On Wed, Feb 27, 2013 at 3:35 AM, Huang Shijie <b32955@freescale.com> wrote:
->>
->>> The uart may works in DTE mode or DCE mode. The customer can sets the different
->>> modes by the pinctrl. But the pinctrl items for DTE or DCE may share the
->>> same Pad id, such as:
->>>   MX6Q_PAD_EIM_D27__UART2_RXD_DTE and MX6Q_PAD_EIM_D27__WEIM_WEIM_D_27
->>>   share the same MX6Q_PAD_EIM_D27 pad id.
->>>
->>> The current code only search the pinctrl items by pad id. So if there two
->>> pinctrl items shares the same pad id, the current code only use the first one,
->>> even you tell the system to use the second one in the DTS file.
->>>
->>> This patch adds a new field pin_func_ids to imx_pin_group{}, and uses the
->>> pin_func_ids as the index to search the pinctrl items. In this way, we can
->>> avoid the issue.
->>>
->>> Signed-off-by: Huang Shijie <b32955@freescale.com>
->>
->> Dong/Shawn: what about this patch?
->
-> We do not need this patch anymore since we've changed the binding a bit.
+Thomas Abraham wrote:
+> 
+> On 7 March 2013 05:41, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> > Thomas Abraham wrote:
+> >>
+> >> Changes since v1:
+> >> - Change the compatible string from "samsung,pinctrl-exynos5250" to
+> >>   "samsung,exynos5250-pinctrl".
+> >> - Rebased to v3.9-rc1
+> >>
+> >
+> > Thomas, this stuff is already in my tree for v3.10, and above changes
+> > included in there. Do you want to replace with this patches?
+> 
+> Dear Mr. Kim,
+> 
+> The v2 version includes one fix for the compatilble string. It changes
+> the compatible string from "samsung,pinctrl-exynos5250" to
+> "samsung,exynos5250-pinctrl". So could you pick this v2 series instead
+> of the series which you have already merged.
+> 
 
-OK ignoring this then.
+Hey, probably, you didn't check my tree. As I said, already changed/fixed.
 
-Yours,
-Linus Walleij
+- Kukjin
