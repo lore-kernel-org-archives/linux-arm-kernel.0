@@ -1,79 +1,56 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 7 Mar 2013 14:33:40 +0800
-Subject: [PATCH 2/9] MXS/i.MX28: add the possibility to define the
- external RTC crystal
-In-Reply-To: <1362405948-12992-3-git-send-email-s.trumtrar@pengutronix.de>
-References: <1362405948-12992-1-git-send-email-s.trumtrar@pengutronix.de>
- <1362405948-12992-3-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <20130307063337.GB5372@S2101-09.ap.freescale.net>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 6 Mar 2013 23:35:13 -0700
+Subject: [PATCH 04/10] bus: introduce an Marvell EBU MBus driver
+In-Reply-To: <201303070337.43288.arnd@arndb.de>
+References: <1362577426-12804-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130306202710.15a6aa2c@skate>
+ <20130306202447.GA4916@obsidianresearch.com>
+ <201303070337.43288.arnd@arndb.de>
+Message-ID: <20130307063513.GA31330@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 04, 2013 at 03:05:41PM +0100, Steffen Trumtrar wrote:
-> From: Juergen Beisert <jbe@pengutronix.de>
+On Thu, Mar 07, 2013 at 03:37:43AM +0000, Arnd Bergmann wrote:
+
+> Yes. We can even use the index of the "ranges" property to refer directly
+> to the number of the window, so ranges replaces the kernel internal
+> struct mvebu_mbus_mapping.
+
+I think we are thinking the same thing, but, s/index/bus address/ and
+s/number of the window/target id/ ?
+
+> I would also suggest not making the mbus compatible with "simple_bus", but
+> instead probing /only/ the mbus device at bootup, which can then set
+> up the hardware based on the ranges property and then call
+> of_platform_populate on its children.
+
+Yeah, something is needed to make startup ordering work. Things like
+the timer and main interrupt controller live behind the special
+internal regs window, so in a perfect world finding the timer would
+automatically setup the enclosing bus structures ...
+
+> > I certainly agree with this. If it wasn't for the idea that the DT is
+> > a stable ABI and thus must be perfect from the start, I wouldn't have
+> > mentioned any of this right now, making fine tuning adjustments as a
+> > follow on seems better to me.
+> > 
+> > It is absolutely way too much work to try and fix everything in one
+> > go! I would be happy to see your patch go in as-is, but mildly unhappy
+> > to see us stuck with this DT layout forever...
+> > 
+> > Especially since I really want to see your PCI stuff go in ....
 > 
-> Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
-
-You should have your SoB added here.
-
-> ---
->  arch/arm/boot/dts/imx28.dtsi |    6 ++++++
->  drivers/clk/mxs/clk-imx28.c  |    4 +++-
->  2 files changed, 9 insertions(+), 1 deletion(-)
+> I basically agree with everything you write in this mail, Jason, and
+> I was about to make exactly the same comments myself.
 > 
-> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-> index 958bd10..dcd0844 100644
-> --- a/arch/arm/boot/dts/imx28.dtsi
-> +++ b/arch/arm/boot/dts/imx28.dtsi
-> @@ -41,6 +41,12 @@
->  		#address-cells = <1>;
->  		#size-cells = <0>;
->  
-> +		osc32k: rtc_oscillator {
+> Getting the binding right is certainly a priority here, but I also think
+> that we don't need to rush the code to use that binding (although having
+> the code work would make me more comfortable thinking that the binding
+> actually works).
 
-Please use "-" than "_" in node name.
+Do you think Jason C's notion to take it as is and then be OK with
+altering the binding later pending agreement is acceptable for now? I
+agree with Thomas that this is too much to ask just to get
+the already huge Marvell PCI-E patchset into mainline.
 
-> +			compatible = "fsl,mxs-rtc", "fixed-clock";
-
-I would suggest drop "fsl,mxs-rtc" here, and ...
-
-> +			#clock-cells = <0>;
-> +			clock-frequency = <0>;
-> +		};
-> +
->  		osc24m: system_oscillator {
->  			compatible = "fsl,mxs-system", "fixed-clock";
->  			#clock-cells = <0>;
-> diff --git a/drivers/clk/mxs/clk-imx28.c b/drivers/clk/mxs/clk-imx28.c
-> index 01048b5..a910d72 100644
-> --- a/drivers/clk/mxs/clk-imx28.c
-> +++ b/drivers/clk/mxs/clk-imx28.c
-> @@ -141,7 +141,7 @@ enum imx28_clk {
->  	clk32k_div, rtc, lradc, spdif_div, clk32k, pwm, uart, ssp0,
->  	ssp1, ssp2, ssp3, gpmi, spdif, emi, saif0, saif1, lcdif, etm,
->  	fec, can0, can1, usb0, usb1, usb0_phy, usb1_phy, enet_out,
-> -	clk_max
-> +	rtc_32k, clk_max
-
-Number it in binding doc.
-
->  };
->  
->  static struct clk *clks[clk_max];
-> @@ -167,6 +167,8 @@ int __init mx28_clocks_init(void)
->  
->  		if (of_device_is_compatible(np, "fsl,mxs-system"))
->  			clks[ref_xtal] = mxs_clk_fixed("ref_xtal", rate);
-> +		else if (of_device_is_compatible(np, "fsl,mxs-rtc"))
-
-... use node name to match, so that we can save a custom compatible.
-
-Shawn
-
-> +			clks[rtc_32k] = mxs_clk_fixed("rtc32k", rate);
->  	}
->  
->  	/* if not set, guess their frequency */
-> -- 
-> 1.7.10.4
-> 
+Jason
