@@ -1,54 +1,30 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 07 Mar 2013 10:44:30 +0900
-Subject: [PATCH v6 01/16] clk: samsung: add common clock framework helper
- functions for Samsung platforms
-In-Reply-To: <2984153.Xctncej7hL@flatron>
-References: <1361175686-19400-1-git-send-email-thomas.abraham@linaro.org>
- <201303030208.49722.heiko@sntech.de> <51333149.1060105@gmail.com>
- <2984153.Xctncej7hL@flatron>
-Message-ID: <015a01ce1ad5$4f89a4e0$ee9ceea0$%kim@samsung.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 7 Mar 2013 09:46:16 +0800
+Subject: [PATCH] cpufreq: ARM big LITTLE: Add generic cpufreq driver and
+ its DT glue
+In-Reply-To: <CAHLZz11PR6E7-yhrxwRi=HWo9tWByH5FUArDqfXQh6N0C_x0tQ@mail.gmail.com>
+References: <f20e3c5e822c4bd28a3b71264d73143cc1f850b0.1362458878.git.viresh.kumar@linaro.org>
+ <20130305105251.GL17833@n2100.arm.linux.org.uk>
+ <CAKohpo=cBkHZnSa8ZsM=k7RRN+RZDXFUWDM82EXXBSQcM-8Vhw@mail.gmail.com>
+ <CAHLZz11PR6E7-yhrxwRi=HWo9tWByH5FUArDqfXQh6N0C_x0tQ@mail.gmail.com>
+Message-ID: <CAKohponduoxw8KoWtCzfYgthXGmi=8=ydR4dzQOy--PXcPFfWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz Figa wrote:
-> 
-> Hi,
-> 
-> On Sunday 03 of March 2013 12:17:29 Sylwester Nawrocki wrote:
-> > Hi,
-> >
-> > On 03/03/2013 02:08 AM, Heiko St?bner wrote:
-> > > But is there an easy way to define more than one alias? On the s3c2416
-> > > for example the hsmmc hclk is the "hsmmc" io-clock, as well as the
-> > > source for the "mmc_busclk.0". Same for the "uart" pclk, that is also
-> > > a baud clock source.
-> > This driver currently provides for only one additional clkdev lookup
-> > entry per a platform clock. I pointed out this desing issue in the
-> > early version of the patch set. It's because a machine clock definition
-> > is coupled with a clock consumer definition. And IMO various
-> > samsung_clock_register_* functions should not have
-> > clk_register_clkdev() inside them. I.e. first step could be registering
-> > all machine clocks and in the second one clkdev lookup entries could be
-> > created. This is how most (all?) existing SoC clock drivers are
-> > working.
-> >
-> > But those multiple aliases are important only for machines with device
-> > tree support, aren't they ?
-> 
-> I suppose you meant _without_ device tree support, right?
-> 
-> > I hope this patch series gets merged early to linux-next in the 3.10
-> > cycle so the multiple accumulated fixup patches for this clock driver
-> > can be merged as well and issues like that you pointed out can be
-> > resolved with incremental patches.
-> 
-> Yes, I hope so too.
+On 7 March 2013 08:49, Harvey Harrison <harvey.harrison@gmail.com> wrote:
+> On Wed, Mar 6, 2013 at 4:32 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
 >
-Yes, I will in this weekend.
+>>         clk[cluster] = clk_get_sys(name, NULL);
+>> -       if (!IS_ERR(clk[cluster])) {
+>> +       if (!IS_ERR_OR_NULL(clk[cluster])) {
+>>                 pr_debug("%s: clk: %p & freq table: %p, cluster: %d\n",
+>>                                 __func__, clk[cluster], freq_table[cluster],
+>>                                 cluster);
+>
+>
+> You seem pretty attached to IS_ERR_OR_NULL here.
 
-Note, I will modify [07/16] for universal_c210 as per Kyungmin's request,
-I'm not sure about universal_c210 though.
-
-Thanks.
-
-- Kukjin
+Haha. Not really. I just wanted to get more logical conclusion out. Please check
+the other mail (where i would reply to Russell), which might have more
+discussion
+around this.
