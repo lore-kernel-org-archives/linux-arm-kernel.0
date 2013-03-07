@@ -1,44 +1,38 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 7 Mar 2013 19:05:19 +0530
-Subject: [PATCH v3 6/7] ARM: dts: omap5: Add omap-usb3 and omap-usb2 dt data
+Date: Thu, 7 Mar 2013 19:05:17 +0530
+Subject: [PATCH v3 4/7] ARM: dts: omap5: Add omap control usb data
 In-Reply-To: <1362663320-23799-1-git-send-email-kishon@ti.com>
 References: <1362663320-23799-1-git-send-email-kishon@ti.com>
-Message-ID: <1362663320-23799-7-git-send-email-kishon@ti.com>
+Message-ID: <1362663320-23799-5-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add omap-usb3 and omap-usb2 data node in omap5 device tree file.
-The information for the node added here is available @
-Documentation/devicetree/bindings/usb/usb-phy.txt
+Add omap control usb data in omap5 device tree file. This will have the
+register address of registers to power on the USB2 PHY and USB3 PHY. The
+information for the node added here is available in
+Documentation/devicetree/bindings/usb/omap-usb.txt
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- arch/arm/boot/dts/omap5.dtsi |   14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm/boot/dts/omap5.dtsi |    8 ++++++++
+ 1 file changed, 8 insertions(+)
 
 diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index 230b779..bd73257 100644
+index 790bb2a..c937500 100644
 --- a/arch/arm/boot/dts/omap5.dtsi
 +++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -511,6 +511,20 @@
- 			#size-cells = <1>;
- 			ranges;
- 			ti,hwmods = "ocp2scp1";
-+			usb2_phy: usb2phy at 4a084000 {
-+				compatible = "ti,omap-usb2";
-+				reg = <0x4a084000 0x7c>;
-+				ctrl-module = <&omap_control_usb>;
-+			};
-+
-+			usb3_phy: usb3phy at 4a084400 {
-+				compatible = "ti,omap-usb3";
-+				reg = <0x4a084400 0x80>,
-+				      <0x4a084800 0x64>,
-+				      <0x4a084c00 0x40>;
-+				reg-names = "phy_rx", "phy_tx", "pll_ctrl";
-+				ctrl-module = <&omap_control_usb>;
-+			};
+@@ -496,5 +496,13 @@
+ 			hw-caps-ll-interface;
+ 			hw-caps-temp-alert;
  		};
++
++		omap_control_usb: omap-control-usb at 4a002300 {
++			compatible = "ti,omap-control-usb";
++			reg = <0x4a002300 0x4>,
++			      <0x4a002370 0x4>;
++			reg-names = "control_dev_conf", "phy_power_usb";
++			ti,type = <2>;
++		};
  	};
  };
 -- 
