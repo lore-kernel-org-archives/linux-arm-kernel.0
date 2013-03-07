@@ -1,36 +1,38 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 7 Mar 2013 17:31:23 +0800
-Subject: [PATCH v3 09/12] ASoC: dmaengine_pcm: add
- snd_dmaengine_generic_pcm_open()
-In-Reply-To: <20130307091804.GA17833@n2100.arm.linux.org.uk>
-References: <1362486244-24593-10-git-send-email-shawn.guo@linaro.org>
- <1362494247-28909-1-git-send-email-shawn.guo@linaro.org>
- <20130306171333.GR17833@n2100.arm.linux.org.uk>
- <20130307023316.GA22554@opensource.wolfsonmicro.com>
- <20130307091804.GA17833@n2100.arm.linux.org.uk>
-Message-ID: <20130307093117.GB14315@opensource.wolfsonmicro.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 7 Mar 2013 09:32:02 +0000
+Subject: [PATCH] ARM: S3C24XX: drop "select MACH_N35"
+In-Reply-To: <015001ce1ad1$185e66d0$491b3470$%kim@samsung.com>
+References: <1362609234.28137.2.camel@x61.thuisdomein>
+ <013a01ce1ac7$11b287d0$35179770$%kim@samsung.com>
+ <1362615081.28137.5.camel@x61.thuisdomein>
+ <014601ce1acd$bc63d480$352b7d80$%kim@samsung.com>
+ <20130307005206.GZ17833@n2100.arm.linux.org.uk>
+ <015001ce1ad1$185e66d0$491b3470$%kim@samsung.com>
+Message-ID: <20130307093202.GC17833@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 07, 2013 at 09:18:04AM +0000, Russell King - ARM Linux wrote:
-> On Thu, Mar 07, 2013 at 10:33:19AM +0800, Mark Brown wrote:
+On Thu, Mar 07, 2013 at 10:14:19AM +0900, Kukjin Kim wrote:
+> Russell King - ARM Linux wrote:
+> > And deleting entries from it is pointless if they've ever been in the
+> > kernel.
+> 
+> OK, I see and agree.
 
-> > Could you go into more detail here please?  Looking at the code I'm not
-> > seeing any allocations done by the library code at all, the allocations
-> > are all done by the individual platform DMA drivers so I don't see
-> > anything stopping them doing what they need.
+The issue is that the database system "locks" an entry into the file as
+soon as support is merged into mainline for the platform.  The reason
+for this is that as soon as the support gets merged into a kernel verison,
+that symbol is then referenced.
 
-> I don't know what else you require apart from the description above.  Isn't
-> it rather obvious that you can't preallocate the ALSA buffer against the
-> DMA engine device if you can only obtain the DMA engine device in the open
-> function?
+If anyone goes to the website to download a new copy of the file, it then
+must continue to contain that symbol because they may be using the file
+with any kernel version - maybe a version of the kernel with your platform
+support in - and maybe they're using something that references the
+generated ID/macros from your entry.
 
-The bit I'm missing is why this is particularly hard to change, it
-doesn't seem like a massive refactoring and there's not many users.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130307/4c3d78f0/attachment.sig>
+Updates to the file in the mainline kernel are merely re-downloads of the
+file from the website and committed.
+
+So, deleting entries once used in mainline is extremely problematical.  If
+someone commits such a patch, my next update from the website/database to
+the file will put it back.  Hence the problem.
