@@ -1,37 +1,51 @@
-From: mstowe@redhat.com (Myron Stowe)
-Date: Thu, 07 Mar 2013 09:11:01 -0700
-Subject: 2013 Linux Plumbers PCI Microconference proposal call for participaton
-Message-ID: <1362672661.2276.3.camel@zim.stowe>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 7 Mar 2013 17:11:51 +0100 (CET)
+Subject: [BUG] ARM Architected timers appear broken in 3.9-rc1
+In-Reply-To: <20130307152619.GA24366@e106331-lin.cambridge.arm.com>
+References: <1362654289.3323.18.camel@linaro1.home>
+ <20130307152619.GA24366@e106331-lin.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.02.1303071710230.22263@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All:
+On Thu, 7 Mar 2013, Mark Rutland wrote:
+> From: Mark Rutland <mark.rutland@arm.com>
+> Date: Thu, 7 Mar 2013 15:09:24 +0000
+> Subject: [PATCH] clockevents: don't allow dummy broadcast timers
+> 
+> Currently tick_check_broadcast_device doesn't reject clock_event_devices
+> with CLOCK_EVT_FEAT_DUMMY, and may select them in preference to real
+> hardware if they have a higher rating value. In this situation, the
+> dummy timer is responsible for broadcasting to itself, and the core
+> clockevents code may attempt to call non-existent callbacks for
+> programming the dummy, eventually leading to a panic.
 
-Bjorn and I would like to chair a PCI subsystem focused microconference
-as part of this year's Linux Plumbers conference but first we need to
-find out if there is enough interest and material that needs covered
-( http://wiki.linuxplumbersconf.org/2013:topics ).
-
-Please respond to this invitation by submitting presentation or
-discussion proposals that you would be willing to cover for
-consideration (just respond to this mail on the linux-pci list).  You
-should also feel free to submit ideas as proposals for others to cover.
-
-If approved by the program committee we will give precedence to
-proposals that bring up current issues that need attention, help, or
-resolution.  We would like for the majority of the microconference to be
-"working session discussions" in which a current issue in the PCI
-subsystem's space that needs solving is introduced and then opened up
-for live discussion by attendees - much like what took place last year.
-
-As a possible aid towards promoting topics for submissions we have
-listed a few candidates that seem to meet the criteria in the
-microconference proposals wiki located at
-http://wiki.linuxplumbersconf.org/2013:pci_subsystem
-
-
-Please feel free to forward this invitation on to any others, or
-relevant lists, that seem appropriate.
-
-Thanks,
-Bjorn Helgaas and Myron Stowe 
+Sigh, yes. I so wish, that this whole broadcast business would go
+away.
+ 
+> This patch makes tick_check_broadcast_device always reject dummy timers,
+> preventing this problem.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> ---
+>  kernel/time/tick-broadcast.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/kernel/time/tick-broadcast.c b/kernel/time/tick-broadcast.c
+> index 2fb8cb8..7f32fe0 100644
+> --- a/kernel/time/tick-broadcast.c
+> +++ b/kernel/time/tick-broadcast.c
+> @@ -67,7 +67,8 @@ static void tick_broadcast_start_periodic(struct clock_event_device *bc)
+>   */
+>  int tick_check_broadcast_device(struct clock_event_device *dev)
+>  {
+> -	if ((tick_broadcast_device.evtdev &&
+> +	if ((dev->features & CLOCK_EVT_FEAT_DUMMY) ||
+> +	    (tick_broadcast_device.evtdev &&
+>  	     tick_broadcast_device.evtdev->rating >= dev->rating) ||
+>  	     (dev->features & CLOCK_EVT_FEAT_C3STOP))
+>  		return 0;
+> -- 
+> 1.8.1.1
+> 
+> 
