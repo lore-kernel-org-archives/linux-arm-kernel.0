@@ -1,41 +1,55 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 7 Mar 2013 15:35:34 +0530
-Subject: [PATCH 1/6] platform-drivers: msm: add single-wire serial bus
- interface (SSBI) driver
-In-Reply-To: <20130307060117.GA31687@kroah.com>
-References: <1362616187-21089-1-git-send-email-davidb@codeaurora.org>
- <1362616187-21089-2-git-send-email-davidb@codeaurora.org>
- <20130307013008.GA2910@kroah.com> <8yawqtjvl8y.fsf@huya.qualcomm.com>
- <20130307060117.GA31687@kroah.com>
-Message-ID: <5138666E.6090201@ti.com>
+From: amery@geeks.cl (Alejandro Mery)
+Date: Thu, 07 Mar 2013 11:09:59 +0100
+Subject: [PATCH] ARM: sunxi: dt: Add support for the Miniand Mini X-plus
+In-Reply-To: <1362583127-25726-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1362583127-25726-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <51386777.5040109@geeks.cl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/7/2013 11:31 AM, Greg Kroah-Hartman wrote:
-> On Wed, Mar 06, 2013 at 09:20:45PM -0800, David Brown wrote:
->> Greg Kroah-Hartman <gregkh@linuxfoundation.org> writes:
->>
->>> On Wed, Mar 06, 2013 at 04:29:42PM -0800, David Brown wrote:
->>>> +menu "Qualcomm MSM SSBI bus support"
->>>> +	depends on ARCH_MSM
->>>
->>> Why?
->>
->> In the sense that ARCH_MSM are the only devices that ever were, or ever
->> will be made with this device.  It doesn't strictly depend on it, but do
->> we want to clutter the config for everything else.
-> 
-> It's not "clutter".  You want me to build this on other platforms, to
-> catch api and other types of build breakages.  This is the way for
-> almost all Linux drivers.
 
-Not having a depends on helps build coverage, but I have seen
-objections to showing up irrelevant configurations to users (of x86 for
-example). See one here from Linus for OMAP_OCP2SCP
+On 06/03/13 16:18, Maxime Ripard wrote:
+> This board comes with an Allwinner A10, two external USB ports, a SD
+> Card reader, 1GB of RAM, the usual video connectors and an onboard wifi
+> chip.
+>
+> Of course, the support is quite minimal for now...
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>   arch/arm/boot/dts/sun4i-a10-mini-xplus.dts |   30 ++++++++++++++++++++++++++++
+>   1 file changed, 30 insertions(+)
+>   create mode 100644 arch/arm/boot/dts/sun4i-a10-mini-xplus.dts
+>
+> diff --git a/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts b/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts
+> new file mode 100644
+> index 0000000..635e135
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts
+> @@ -0,0 +1,30 @@
+> +/*
+> + * Copyright 2012 Maxime Ripard
+> + *
+> + * Maxime Ripard <maxime.ripard@free-electrons.com>
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +/dts-v1/;
+> +/include/ "sun4i-a10.dtsi"
+> +
+> +/ {
+> +	model = "Miniand Mini X-Plus";
+> +	compatible = "miniand,mini-xplus", "allwinner,sun4i-a10";
 
-http://lkml.indiana.edu/hypermail/linux/kernel/1210.0/00785.html
+Hi, I just wanted to mention that Miniand is just a reseller. This 
+device is made by PineRiver <http://pineriver.cn/> and most commonly 
+available rebranded by "Jesurun" than miniand.
 
-If this case is different, I am not sure why.
-
-Thanks,
-Sekhar
+cheers,
+Alejandro Mery
