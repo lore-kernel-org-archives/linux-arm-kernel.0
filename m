@@ -1,33 +1,50 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 8 Mar 2013 02:31:03 +0300
-Subject: [PATCH] ARM: shmobile: R8A7779: use gic_iid() in SATA IRQ resource
-Message-ID: <201303080231.04149.sergei.shtylyov@cogentembedded.com>
+From: mgr@pengutronix.de (Michael Grzeschik)
+Date: Thu, 7 Mar 2013 23:54:03 +0100
+Subject: [PATCH v4 0/6] support other fsl SoCs with usbmisc + small fixes
+In-Reply-To: <87ip6mor1e.fsf@ashishki-desk.ger.corp.intel.com>
+References: <1354033021-10585-1-git-send-email-m.grzeschik@pengutronix.de>
+ <20121128025217.GC18593@nchen-desktop>
+ <87ip6mor1e.fsf@ashishki-desk.ger.corp.intel.com>
+Message-ID: <20130307225403.GI29785@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit "ARM: shmobile: r8a7779: use gic_iid macro" switched R8A7779 platform
-devices to using gic_iid() macro instead of gic_spi() but commit "ARM: mach-
-shmobile: r8a7779: add SATA support" added another use of gic_spi(). Convert
-the SATA IRQ resource to using gic_iid().
+Hey Alex,
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+On Thu, Jan 24, 2013 at 11:42:53AM +0200, Alexander Shishkin wrote:
+> Peter Chen <peter.chen@freescale.com> writes:
+> 
+> > On Tue, Nov 27, 2012 at 05:16:55PM +0100, Michael Grzeschik wrote:
+> >> Nearly every SoC from Freescale has this non-core usb registers. This series
+> >> adds support for more users of this driver.
+> >> 
+> >> This series is based on Peter Chen's work. Its needed to merge his master branch
+> >> before applying this series:
+> >> 
+> >> https://github.com/hzpeterchen/linux-usb.git
+> >
+> > I have tested it at i.mx6q sabrelite board, it works good.
+> >
+> > I have pushed your commit to my git, please cc me
+> > your coming chipidea patches, thanks.
+> >
+> > Alex, please add:
+> >
+> > Reviewed-by: Peter Chen <peter.chen@freescale.com>
+> > Tested-by: Peter Chen <peter.chen@freescale.com>
+> 
+> Looks good, queueing this one for submission.
 
----
-This patch is atop of the 'next' branch of Simon Horman's renesas.git.
+Now that you have your git-tree [1], could you queue that for
+submission?
 
- arch/arm/mach-shmobile/setup-r8a7779.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+[1] git://github.com/virtuoso/linux-ci.git ci-for-greg
 
-Index: renesas/arch/arm/mach-shmobile/setup-r8a7779.c
-===================================================================
---- renesas.orig/arch/arm/mach-shmobile/setup-r8a7779.c
-+++ renesas/arch/arm/mach-shmobile/setup-r8a7779.c
-@@ -331,7 +331,7 @@ static struct resource sata_resources[] 
- 		.flags	= IORESOURCE_MEM,
- 	},
- 	[1] = {
--		.start	= gic_spi(100),
-+		.start	= gic_iid(0x84),
- 		.flags	= IORESOURCE_IRQ,
- 	},
- };
+Regards,
+Michael
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
