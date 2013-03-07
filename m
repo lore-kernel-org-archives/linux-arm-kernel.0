@@ -1,68 +1,24 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu, 7 Mar 2013 14:01:17 +0800
-Subject: [PATCH 1/6] platform-drivers: msm: add single-wire serial bus
- interface (SSBI) driver
-In-Reply-To: <8yawqtjvl8y.fsf@huya.qualcomm.com>
-References: <1362616187-21089-1-git-send-email-davidb@codeaurora.org>
- <1362616187-21089-2-git-send-email-davidb@codeaurora.org>
- <20130307013008.GA2910@kroah.com>
- <8yawqtjvl8y.fsf@huya.qualcomm.com>
-Message-ID: <20130307060117.GA31687@kroah.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 7 Mar 2013 07:16:24 +0100
+Subject: [PATCH] i2c: s3c24xx: allow device core to setup default pin
+ configuration
+In-Reply-To: <1362404573-30406-1-git-send-email-thomas.abraham@linaro.org>
+References: <1362404573-30406-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <CACRpkdbyrecX=4sDsUDfGDErS_MeR22vmB7p_PA-TsfoE6runA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 06, 2013 at 09:20:45PM -0800, David Brown wrote:
-> Greg Kroah-Hartman <gregkh@linuxfoundation.org> writes:
-> 
-> > On Wed, Mar 06, 2013 at 04:29:42PM -0800, David Brown wrote:
-> >> +menu "Qualcomm MSM SSBI bus support"
-> >> +	depends on ARCH_MSM
-> >
-> > Why?
-> 
-> In the sense that ARCH_MSM are the only devices that ever were, or ever
-> will be made with this device.  It doesn't strictly depend on it, but do
-> we want to clutter the config for everything else.
+On Mon, Mar 4, 2013 at 2:42 PM, Thomas Abraham
+<thomas.abraham@linaro.org> wrote:
 
-It's not "clutter".  You want me to build this on other platforms, to
-catch api and other types of build breakages.  This is the way for
-almost all Linux drivers.
+> With device core now able to setup the default pin configuration,
+> the call to devm_pinctrl_get_select_default can be removed. And
+> the pin configuration code based on the deprecated Samsung specific
+> gpio bindings is also removed.
+>
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 
-> >> +config MSM_SSBI
-> >> +	bool "Qualcomm Single-wire Serial Bus Interface (SSBI)"
-> >
-> > Why can't this be a module?
-> 
-> Without this device, the PMIC drivers won't work, regulators can't be
-> turned on, and most of the other devices won't work.  I can try if it
-> can still be made a module, and it might be good at exercising the
-> deferred probe mechanism.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-If the PMIC drivers are dependant on the symbols in this module, there
-should not be any problems, right?
-
-> So, a deeper question.  I've resent this driver with minimal change.
-> I've also made some other changes as patches afterwards.  Do we want
-> these squashed into a single patch, or the initial one (not authored by
-> me) followed by updates?
-
-To preserve the authorship, you might want to fix this stuff with
-follow-on patches.  As long as the original patch can build properly.
-
-> >> +static struct platform_driver msm_ssbi_driver = {
-> >> +	.probe		= msm_ssbi_probe,
-> >> +	.remove		= __exit_p(msm_ssbi_remove),
-> >
-> > You just oopsed if someone unbound your device from the driver from
-> > userspace.  Not good.
-> 
-> I did catch this one in a later patch :-)  I can clean it up in the
-> driver, though, since it looks like some more work needs to go into
-> this.
-
-Yes, but it's very close, fix this all up and resend your series and all
-should be fine.
-
-Nice job,
-
-greg k-h
+Yours,
+Linus Walleij
