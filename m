@@ -1,30 +1,39 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu,  7 Mar 2013 09:54:25 -0300
-Subject: [PATCH 5/5] ARM: mvebu: Update defconfig to select Device Bus
- (memory-controller) support
-In-Reply-To: <1362660865-2755-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1362660865-2755-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1362660865-2755-6-git-send-email-ezequiel.garcia@free-electrons.com>
+From: elezegarcia@gmail.com (Ezequiel Garcia)
+Date: Thu, 7 Mar 2013 10:02:27 -0300
+Subject: [PATCH 11/14] ARM: OMAP2+: Add device-tree support for NOR flash
+In-Reply-To: <CALF0-+W_soY9-ZLO3eS7pTXUTKtcuygJeXkJ3As9U-gkdzabCg@mail.gmail.com>
+References: <1361899842-30303-1-git-send-email-jon-hunter@ti.com>
+ <1361899842-30303-12-git-send-email-jon-hunter@ti.com>
+ <51360271.1030302@mimc.co.uk> <51360562.20309@ti.com>
+ <51361B46.507@mimc.co.uk> <51362BAB.10403@ti.com>
+ <513664EC.2050508@ti.com>
+ <CALF0-+VeU9tGy-dKgmVg1pT0z0ghJBSsughV7kzT5nX7u=9BhA@mail.gmail.com>
+ <51377300.3040809@ti.com>
+ <CALF0-+W_soY9-ZLO3eS7pTXUTKtcuygJeXkJ3As9U-gkdzabCg@mail.gmail.com>
+Message-ID: <CALF0-+VaX8i5E8ggh3=NaLfAJm2gMOv2Ssk9-RXb07h1+nPqEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
- arch/arm/configs/mvebu_defconfig |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+On Wed, Mar 6, 2013 at 1:54 PM, Ezequiel Garcia <elezegarcia@gmail.com> wrote:
+> On Wed, Mar 6, 2013 at 1:46 PM, Jon Hunter <jon-hunter@ti.com> wrote:
+>>
+>> On 03/06/2013 05:58 AM, Ezequiel Garcia wrote:
+>>> I'll submit this driver by the end of this week, in case you want
+>>> to take a look at it.
+>>
+>> Ok, but this is not for omap right?
+>>
+>
+> No, this is a new driver for a memory controller that's available on
+> some Marvell SoC. It will be located in drivers/memory/.
+>
 
-diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
-index 2ec8119..70a65f9 100644
---- a/arch/arm/configs/mvebu_defconfig
-+++ b/arch/arm/configs/mvebu_defconfig
-@@ -65,6 +65,8 @@ CONFIG_RTC_DRV_S35390A=y
- CONFIG_RTC_DRV_MV=y
- CONFIG_DMADEVICES=y
- CONFIG_MV_XOR=y
-+CONFIG_MEMORY=y
-+CONFIG_MVEBU_DEVBUS=y
- # CONFIG_IOMMU_SUPPORT is not set
- CONFIG_EXT2_FS=y
- CONFIG_EXT3_FS=y
+Slightly OT: if anyone wants to see the memory-controller driver
+for mvebu platforms, I just posted in lakml.
+
+It's this patchset:
+
+"[PATCH 0/5] Device Bus support for Marvell EBU SoC"
+
 -- 
-1.7.8.6
+    Ezequiel
