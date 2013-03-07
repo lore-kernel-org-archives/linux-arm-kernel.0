@@ -1,79 +1,102 @@
-From: js1304@gmail.com (JoonSoo Kim)
-Date: Thu, 7 Mar 2013 19:35:51 +0900
-Subject: [RFC PATCH] ARM: mm: disable kmap_high_get() for SMP
-In-Reply-To: <alpine.LFD.2.03.1303071721540.28820@syhkavp.arg>
-References: <1362372667-953-1-git-send-email-iamjoonsoo.kim@lge.com>
- <alpine.LFD.2.03.1303051642110.28820@syhkavp.arg>
- <20130307081258.GA14839@lge.com>
- <alpine.LFD.2.03.1303071721540.28820@syhkavp.arg>
-Message-ID: <CAAmzW4NjefPV7tryvySfLXPy6Zcz3BLTvfxD=UnTKCqrRB3voQ@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 7 Mar 2013 11:39:17 +0100
+Subject: [PATCH 04/10] bus: introduce an Marvell EBU MBus driver
+In-Reply-To: <20130306230412.GA5870@obsidianresearch.com>
+References: <1362577426-12804-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1362577426-12804-5-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130306190821.GA4689@obsidianresearch.com>
+ <20130306202710.15a6aa2c@skate>
+ <20130306202447.GA4916@obsidianresearch.com>
+ <20130306214036.62fc93b9@skate>
+ <20130306215031.GB4916@obsidianresearch.com>
+ <20130306222712.GP23237@titan.lakedaemon.net>
+ <20130306230412.GA5870@obsidianresearch.com>
+Message-ID: <20130307113917.0b751a75@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/3/7 Nicolas Pitre <nicolas.pitre@linaro.org>:
-> On Thu, 7 Mar 2013, Joonsoo Kim wrote:
->
->> Hello, Nicolas.
->>
->> On Tue, Mar 05, 2013 at 05:36:12PM +0800, Nicolas Pitre wrote:
->> > On Mon, 4 Mar 2013, Joonsoo Kim wrote:
->> >
->> > > With SMP and enabling kmap_high_get(), it makes users of kmap_atomic()
->> > > sequential ordered, because kmap_high_get() use global kmap_lock().
->> > > It is not welcome situation, so turn off this optimization for SMP.
->> >
->> > I'm not sure I understand the problem.
->> >
->> > The lock taken by kmap_high_get() is released right away before that
->> > function returns and therefore this is not actually serializing
->> > anything.
->>
->> Yes, you understand what I want to say correctly.
->> Sorry for bad explanation.
->>
->> Following is reasons why I send this patch with RFC tag.
->>
->> If we have more cpus, performance degration is possible although
->> it is very short time to holding the lock in kmap_high_get().
->>
->> And kmap has maximum 512 entries(512 * 4K = 2M) and some mobile devices
->> has 2G memory(highmem 1G>), so probability for finding matched entry
->> is approximately < 1/512. This probability can be more decreasing
->> for device which have more memory. So I think that waste time to find
->> matched entry is more than saved time.
->>
->> Above is my humble opinion, so please let me know what I am missing.
->
-> Please look at the kmap_high_get() code again.  It performs no
-> searching at all.  What it does is:
+Dear Jason Gunthorpe,
 
-If page is not highmem, it may be already filtered in kmap_atomic().
-So we only consider highmem page.
+On Wed, 6 Mar 2013 16:04:12 -0700, Jason Gunthorpe wrote:
 
-For highmem page, it perform searching.
-In kmap_high_get(), page_address() is called.
-In page_address(), it hash PA and iterate a list for this hashed value.
+> I'm not sure this is what we are discussing, certainly it isn't what I
+> was talking about...
+> 
+> The discussion was around the SOC specific tables in the driver and if
+> they should be in DT or C code. These tables very much describe the
+> hardware, and are copied from similar tables in the Marvell manuals.
+> 
+> For instance I repeated this idea:
+> 
+>    ranges =<MAPDEF(1, 0xe0, MAPDEF_NOMASK)  0xFE000000  0x10000 // boot rom
+>             MAPDEF(1, 0x3f, MAPDEF_NOMASK)  0xFD000000  0x10000 // devbus-boot
+>             MAPDEF(1, 0xxx, MAPDEF_NOMASK)  0xFF000000  0x10000 // internal-regs
+>              [..]
 
-And another advantage of disabling ARCH_NEEDS_KMAP_HIGH_GET is
-that kmap(), kunmap() works without irq disabled.
+This doesn't work for PCIe interfaces. The PCIe windows cannot be
+described in the DT, because they are inherently dynamic, and depend on
+which PCIe devices are plugged into the PCIe slots, and how much I/O
+and memory space each of those devices require.
 
-Thanks.
+This means that regardless of what you think, *some* windows will have
+to be created dynamically during the system initialization, and we will
+*not* be able to describe all windows in the Device Tree.
 
-> - lock the kmap array against concurrent changes
->
-> - if the given page is not highmem, unlock and return NULL
->
-> - otherwise increment that page reference count, unlock, and return the
->   mapped address for that page.
->
-> There is almost zero cost to this function, independently of the number
-> of kmap entries, whereas it does save much bigger costs elsewhere when
-> it is successful.
->
->
-> Nicolas
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+And to me, it seems completely stupid to have some windows defined
+statically in the Device Tree, and some other windows set up
+dynamically when the system initializes.
+
+> At the stanza of MBUS driver's bus. Each line represents a MBUS target
+> (this is a physical HW IP block). The MAPDEF is a SOC specific 'target
+> id' that is currently living in tables in the driver. This value is
+> directly compatible with the mbus window register and is defined by
+> Marvell. The 2nd number is the CPU base address of that window, and
+> the last is the size.
+
+Please explain how you handle PCIe windows.
+
+> Per OF conventions the base address should be the value the bootloader
+> left it at - but that is not important, the value could be 0. A
+> dynamic MBUS driver would go through each item in the ranges, find
+> an address range and program a window with the MAPDEF from the DT. It
+> would then write the base address back into the DT (at runtime!) so
+> that the entire DT remains conistent with the current state of the
+> hardware.
+
+Why the heck would the kernel need to rewrite the DT ?
+
+Just like a driver does an ioremap() to create a virtual -> physical
+mapping, the driver can just as well do mvebu_mbus_add_window() to
+create a physical -> device mapping. It doesn't have to be hardcoded
+into the Device Tree.
+
+> An initial implementation without dynamic address allocation would
+> just have the mbus driver directly use the 2nd value as the base
+> address.
+> 
+> The attraction to this model is that the association of later DT
+> stanza's to MBUS targets is extremely clear:
+> 
+>        nor at 0 {
+>           compatible = 'linux mtd nor driver';
+>           regs = <MAPDEF(1, 0xab, MAPDEF_NOMASK) 0x10000>;
+>       }
+> 
+> We can now tell directly that 'linux mtd nor driver' is behind MBUS
+> target 0xab, and the OF code already knows the base for this MBUS
+> target from the ranges property, as modified by the MBUS driver. The
+> MBUS driver also knows which targets to configure windows for
+> immediately at boot without having to consult internal tables. Plus we
+> don't need to modify the NOR driver to call out to MBUS window
+> functions to fetch an address.
+
+Please take the PCIe example instead. Thanks.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
