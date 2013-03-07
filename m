@@ -1,29 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 7 Mar 2013 08:10:41 -0800
-Subject: [PATCH V4] ARM: dts: add minimal DT support for DevKit8000.
-In-Reply-To: <513838F2.60101@ti.com>
-References: <F3DBB1B3EF102E4994C89758CFCA32412CC4E9@DBDE01.ent.ti.com>
- <CABYxbz5GyxYaHANgdpwBNaaR6tnu=6LJuUNSvL7DEzU=4CPHcA@mail.gmail.com>
- <F3DBB1B3EF102E4994C89758CFCA32412CC74F@DBDE01.ent.ti.com>
- <CABYxbz62JrMB95p5i9iu2G=B4ETXLrYbLsyFEFR5F+WVD6YNnQ@mail.gmail.com>
- <20130306175313.GQ11806@atomide.com> <513838F2.60101@ti.com>
-Message-ID: <20130307161041.GV11806@atomide.com>
+From: mstowe@redhat.com (Myron Stowe)
+Date: Thu, 07 Mar 2013 09:11:01 -0700
+Subject: 2013 Linux Plumbers PCI Microconference proposal call for participaton
+Message-ID: <1362672661.2276.3.camel@zim.stowe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Benoit Cousson <b-cousson@ti.com> [130306 22:55]:
-> 
-> Yep, sorry for having missed 3.9, I was a little bit sick at the wrong
-> moment :-(
+All:
 
-Well that just proves the .dts files can be merged totally independent
-of the rest of the patches ;)
+Bjorn and I would like to chair a PCI subsystem focused microconference
+as part of this year's Linux Plumbers conference but first we need to
+find out if there is enough interest and material that needs covered
+( http://wiki.linuxplumbersconf.org/2013:topics ).
 
-> I'm starting queuing the pending patches, and should have enough to push
-> to you just after Linaro Connect.
+Please respond to this invitation by submitting presentation or
+discussion proposals that you would be willing to cover for
+consideration (just respond to this mail on the linux-pci list).  You
+should also feel free to submit ideas as proposals for others to cover.
 
-OK sounds good.
+If approved by the program committee we will give precedence to
+proposals that bring up current issues that need attention, help, or
+resolution.  We would like for the majority of the microconference to be
+"working session discussions" in which a current issue in the PCI
+subsystem's space that needs solving is introduced and then opened up
+for live discussion by attendees - much like what took place last year.
 
-Regards,
+As a possible aid towards promoting topics for submissions we have
+listed a few candidates that seem to meet the criteria in the
+microconference proposals wiki located at
+http://wiki.linuxplumbersconf.org/2013:pci_subsystem
 
-Tony
+
+Please feel free to forward this invitation on to any others, or
+relevant lists, that seem appropriate.
+
+Thanks,
+Bjorn Helgaas and Myron Stowe 
