@@ -1,68 +1,39 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Thu, 7 Mar 2013 07:51:30 +0100
-Subject: [PATCH V4] ARM: dts: add minimal DT support for DevKit8000.
-In-Reply-To: <20130306175313.GQ11806@atomide.com>
-References: <F3DBB1B3EF102E4994C89758CFCA32412CC4E9@DBDE01.ent.ti.com>
- <CABYxbz5GyxYaHANgdpwBNaaR6tnu=6LJuUNSvL7DEzU=4CPHcA@mail.gmail.com>
- <F3DBB1B3EF102E4994C89758CFCA32412CC74F@DBDE01.ent.ti.com>
- <CABYxbz62JrMB95p5i9iu2G=B4ETXLrYbLsyFEFR5F+WVD6YNnQ@mail.gmail.com>
- <20130306175313.GQ11806@atomide.com>
-Message-ID: <513838F2.60101@ti.com>
+From: rusty@rustcorp.com.au (Rusty Russell)
+Date: Thu, 07 Mar 2013 16:51:23 +1100
+Subject: [patch 2/7] tick: Convert broadcast cpu bitmaps to cpumask_var_t
+In-Reply-To: <20130306111537.366394000@linutronix.de>
+References: <20130306111351.883117670@linutronix.de>
+ <20130306111537.366394000@linutronix.de>
+Message-ID: <874ngnycys.fsf@rustcorp.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Thomas Gleixner <tglx@linutronix.de> writes:
+> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Rusty Russell <rusty@rustcorp.com.au>
+> ---
+>  kernel/time/tick-broadcast.c |   86 +++++++++++++++++++++----------------------
+>  kernel/time/tick-common.c    |    1 
+>  kernel/time/tick-internal.h  |    3 +
+>  3 files changed, 46 insertions(+), 44 deletions(-)
+>
+> Index: tip/kernel/time/tick-broadcast.c
+> ===================================================================
+> --- tip.orig/kernel/time/tick-broadcast.c
+> +++ tip/kernel/time/tick-broadcast.c
+> @@ -28,9 +28,8 @@
+>   */
+>  
+>  static struct tick_device tick_broadcast_device;
+> -/* FIXME: Use cpumask_var_t. */
+> -static DECLARE_BITMAP(tick_broadcast_mask, NR_CPUS);
+> -static DECLARE_BITMAP(tmpmask, NR_CPUS);
+> +static cpumask_var_t tick_broadcast_mask;
+> +static cpumask_var_t tmpmask;
+>  static DEFINE_RAW_SPINLOCK(tick_broadcast_lock);
+>  static int tick_broadcast_force;
 
-On 03/06/2013 06:53 PM, Tony Lindgren wrote:
-> * Anil Kumar <anilk4.v@gmail.com> [130305 18:40]:
->> Hi Tony,
->>
->>>> From: linux-arm-kernel [mailto:linux-arm-kernel-
->>>> bounces at lists.infradead.org] On Behalf Of Anil Kumar
->>>> Sent: Wednesday, February 27, 2013 8:03 AM
->>>> To: devicetree-discuss at lists.ozlabs.org; linux-omap at vger.kernel.org;
->>>> linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
->>>> Cc: linux at arm.linux.org.uk; Cousson, Benoit; Tony Lindgren; Grant
->>>> Likely; Anil Kumar; thomas at tomweber.eu
->>>> Subject: Re: FW: [PATCH V4] ARM: dts: add minimal DT support for
->>>> DevKit8000.
->>>>
->>>> Hi,
->>>>>
->>>>> DevKit8000 is a beagle board clone from Timll, sold by
->>>>> armkits.com. The DevKit8000 has RS232 serial port, LCD, DVI-D,
->>>>> S-Video, Ethernet, SD/MMC, keyboard, camera, SPI, I2C, USB and
->>>>> JTAG interface.
->>>>>
->>>>> This patch adds the basic DT support for devkit8000. At this time,
->>>> Information
->>>>> of twl4030 (PMIC), MMC1, I2C1 and leds are added.
->>>>>
->>>>> Signed-off-by: Anil Kumar <anilk4.v@gmail.com>
->>>>> Tested-by: Thomas Weber <thomas@tomweber.eu>
->>>>
->>>> Gentle Ping. As there are no review comments on this patch,
->>>> Could you please pull this patch ?
->>
->> Gentle Ping.
->>
->> This patch also got Reviewed-by: Manish Badarkhe <badarkhe.manish@gmail.com>
->> and as patch "ARM: dts: omap3-devkit8000: Enable audio support"  has already got
->> "Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>" but it is on the
->> top of this patch.
->> So, Could you please pull this patch in one of your omap branch? or
->> you want me to
->> do rebase this patch on top of v3.9-rc1 ?
-> 
-> Let's wait for Benoit to queue it as he has a bunch of .dts changes already
-> applied. Too bad we missed v3.9 merge window for those, but hopefully
-> we can get them queued early for v3.10.
+Thanks, this is a nice cleanup.
 
-Yep, sorry for having missed 3.9, I was a little bit sick at the wrong
-moment :-(
-
-I'm starting queuing the pending patches, and should have enough to push
-to you just after Linaro Connect.
-
-Regards,
-Benoit
+Cheers,
+Rusty.
