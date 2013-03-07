@@ -1,139 +1,164 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Thu, 7 Mar 2013 16:08:44 +0800
-Subject: v3.9-rc1: swapper/0  [ INFO: possible circular locking
- dependency detected ]
-In-Reply-To: <51371B5E.1000508@free-electrons.com>
-References: <51371B5E.1000508@free-electrons.com>
-Message-ID: <20130307080843.GG20470@nchen-desktop>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Thu, 7 Mar 2013 10:09:03 +0200
+Subject: [PATCH 08/29] arm64: KVM: user space interface
+In-Reply-To: <1362455265-24165-9-git-send-email-marc.zyngier@arm.com>
+References: <1362455265-24165-1-git-send-email-marc.zyngier@arm.com>
+ <1362455265-24165-9-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20130307080903.GA3819@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 06, 2013 at 11:33:02AM +0100, Maxime Ripard wrote:
-> Hi,
+On Tue, Mar 05, 2013 at 03:47:24AM +0000, Marc Zyngier wrote:
+> Provide the kvm.h file that defines the user space visible
+> interface.
 > 
-> Just noticed this in 3.9-rc1 on an iMX28 (ARM) board with a config
-> based on mxs_defconfig. I'm using the patchset "Add tested id switch
-> and vbus connect detect support for Chipidea" from Peter Chen in its
-> 10th version [1], rebased on top of 3.9-rc1, but since this doesn't
-> modify the locks present in the udc_irq function, I think the problem
-> is elsewhere.
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/include/uapi/asm/kvm.h | 112 ++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 112 insertions(+)
+>  create mode 100644 arch/arm64/include/uapi/asm/kvm.h
 > 
-> Please let me know if you have any questions,
-> Thanks,
-> Maxime
-> 
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-February/151837.html
-> 
-> 
-> [    1.893905] ======================================================
-> [    1.900097] [ INFO: possible circular locking dependency detected ]
-> [    1.906381] 3.9.0-rc1-00024-g39231ac #475 Not tainted
-> [    1.911441] -------------------------------------------------------
-> [    1.917716] swapper/0 is trying to acquire lock:
-> [    1.922341]  (&(&ci->lock)->rlock){-.....}, at: [<c02580fc>] ep_enable+0x20/0x25c
-> [    1.929935] 
-> [    1.929935] but task is already holding lock:
-> [    1.935782]  (&(&cdev->lock)->rlock){-.....}, at: [<c025e46c>] composite_setup+0x384/0xee8
-> [    1.944124] 
-> [    1.944124] which lock already depends on the new lock.
-> [    1.944124] 
-> [    1.952319] 
-> [    1.952319] the existing dependency chain (in reverse order) is:
-> [    1.959813] 
-> -> #1 (&(&cdev->lock)->rlock){-.....}:
-> [    1.964829]        [<c005adb0>] lock_acquire+0x98/0x104
-> [    1.970106]        [<c0375c28>] _raw_spin_lock_irqsave+0x3c/0x50
-> [    1.976152]        [<c025d960>] composite_disconnect+0x1c/0x5c
-> [    1.982016]        [<c02591c0>] udc_irq+0x6d8/0xbe8
-> [    1.986930]        [<c02571fc>] ci_irq+0x9c/0x108
-> [    1.991667]        [<c0067214>] handle_irq_event_percpu+0x5c/0x268
-> [    1.997896]        [<c006745c>] handle_irq_event+0x3c/0x5c
-> [    2.003417]        [<c00696c0>] handle_level_irq+0x8c/0xe8
-> [    2.008933]        [<c0066af4>] generic_handle_irq+0x20/0x30
-> [    2.014627]        [<c000fb8c>] handle_IRQ+0x30/0x84
-> [    2.019633]        [<c00086f0>] icoll_handle_irq+0x30/0x44
-> [    2.025148]        [<c000e8e4>] __irq_svc+0x44/0x54
-> [    2.030058]        [<c000fd58>] cpu_idle+0x60/0xec
-> [    2.034884]        [<c04e970c>] start_kernel+0x260/0x2a0
-> [    2.040237]        [<40008040>] 0x40008040
-> [    2.044364] 
-> -> #0 (&(&ci->lock)->rlock){-.....}:
-> [    2.049210]        [<c005a284>] __lock_acquire+0x14e8/0x1b18
-> [    2.054906]        [<c005adb0>] lock_acquire+0x98/0x104
-> [    2.060164]        [<c0375c28>] _raw_spin_lock_irqsave+0x3c/0x50
-> [    2.066202]        [<c02580fc>] ep_enable+0x20/0x25c
-> [    2.071207]        [<c02629d0>] gether_connect+0x34/0x1c0
-> [    2.076643]        [<c0262db0>] eem_set_alt+0x70/0xcc
-> [    2.081723]        [<c025eb54>] composite_setup+0xa6c/0xee8
-> [    2.087325]        [<c0259244>] udc_irq+0x75c/0xbe8
-> [    2.092237]        [<c02571fc>] ci_irq+0x9c/0x108
-> [    2.096973]        [<c0067214>] handle_irq_event_percpu+0x5c/0x268
-> [    2.103194]        [<c006745c>] handle_irq_event+0x3c/0x5c
-> [    2.108717]        [<c00696c0>] handle_level_irq+0x8c/0xe8
-> [    2.114234]        [<c0066af4>] generic_handle_irq+0x20/0x30
-> [    2.119926]        [<c000fb8c>] handle_IRQ+0x30/0x84
-> [    2.124929]        [<c00086f0>] icoll_handle_irq+0x30/0x44
-> [    2.130445]        [<c000e8e4>] __irq_svc+0x44/0x54
-> [    2.135353]        [<c000fd58>] cpu_idle+0x60/0xec
-> [    2.140176]        [<c04e970c>] start_kernel+0x260/0x2a0
-> [    2.145521]        [<40008040>] 0x40008040
-> [    2.149645] 
-> [    2.149645] other info that might help us debug this:
-> [    2.149645] 
-> [    2.157667]  Possible unsafe locking scenario:
-> [    2.157667] 
-> [    2.163598]        CPU0                    CPU1
-> [    2.168134]        ----                    ----
-> [    2.172667]   lock(&(&cdev->lock)->rlock);
-> [    2.176790]                                lock(&(&ci->lock)->rlock);
-> [    2.183255]                                lock(&(&cdev->lock)->rlock);
-> [    2.189893]   lock(&(&ci->lock)->rlock);
+> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+> new file mode 100644
+> index 0000000..f5525f1
+> --- /dev/null
+> +++ b/arch/arm64/include/uapi/asm/kvm.h
+> @@ -0,0 +1,112 @@
+> +/*
+> + * Copyright (C) 2012 - ARM Ltd
+> + * Author: Marc Zyngier <marc.zyngier@arm.com>
+> + *
+> + * Derived from arch/arm/include/uapi/asm/kvm.h:
+> + * Copyright (C) 2012 - Virtual Open Systems and Columbia University
+> + * Author: Christoffer Dall <c.dall@virtualopensystems.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#ifndef __ARM_KVM_H__
+> +#define __ARM_KVM_H__
+> +
+> +#define KVM_SPSR_EL1	0
+> +#define KVM_NR_SPSR	1
+> +
+> +#ifndef __ASSEMBLY__
+> +#include <asm/types.h>
+> +#include <asm/ptrace.h>
+> +
+> +#define __KVM_HAVE_GUEST_DEBUG
+> +#define __KVM_HAVE_IRQ_LINE
+> +
+> +#define KVM_REG_SIZE(id)						\
+> +	(1U << (((id) & KVM_REG_SIZE_MASK) >> KVM_REG_SIZE_SHIFT))
+> +
+> +struct kvm_regs {
+> +	struct user_pt_regs regs;	/* sp = sp_el0 */
+> +
+> +	unsigned long	sp_el1;
+> +	unsigned long	elr_el1;
+> +
+> +	unsigned long	spsr[KVM_NR_SPSR];
+> +};
+> +
 
-The precondition of above is the chipidea interrupt can be re-entered.
-But as far as I know, the same interrupt can't be re-entered at current
-system.
+Using long in uapi is generally a mistake: with gcc it has
+different size depending on whether you build in 64 and 32 bit mode.
+I think it is better to make it __u64.
 
+> +/* Supported Processor Types */
+> +#define KVM_ARM_TARGET_CORTEX_A57	0
+> +#define KVM_ARM_NUM_TARGETS		1
+> +
+> +/* KVM_ARM_SET_DEVICE_ADDR ioctl id encoding */
+> +#define KVM_ARM_DEVICE_TYPE_SHIFT	0
+> +#define KVM_ARM_DEVICE_TYPE_MASK	(0xffff << KVM_ARM_DEVICE_TYPE_SHIFT)
+> +#define KVM_ARM_DEVICE_ID_SHIFT		16
+> +#define KVM_ARM_DEVICE_ID_MASK		(0xffff << KVM_ARM_DEVICE_ID_SHIFT)
+> +
+> +/* Supported device IDs */
+> +#define KVM_ARM_DEVICE_VGIC_V2		0
+> +
+> +/* Supported VGIC address types  */
+> +#define KVM_VGIC_V2_ADDR_TYPE_DIST	0
+> +#define KVM_VGIC_V2_ADDR_TYPE_CPU	1
+> +
+> +#define KVM_VGIC_V2_DIST_SIZE		0x1000
+> +#define KVM_VGIC_V2_CPU_SIZE		0x2000
+> +
+> +struct kvm_vcpu_init {
+> +	__u32 target;
+> +	__u32 features[7];
+> +};
+> +
+> +struct kvm_sregs {
+> +};
+> +
+> +struct kvm_fpu {
+> +};
+> +
+> +struct kvm_guest_debug_arch {
+> +};
+> +
+> +struct kvm_debug_exit_arch {
+> +};
+> +
 
-> [    2.193842] 
-> [    2.193842]  *** DEADLOCK ***
-> [    2.193842] 
-> [    2.199782] 1 lock held by swapper/0:
-> [    2.203451]  #0:  (&(&cdev->lock)->rlock){-.....}, at: [<c025e46c>] composite_setup+0x384/0xee8
-> [    2.212231] 
-> [    2.212231] stack backtrace:
-> [    2.216663] [<c0014120>] (unwind_backtrace+0x0/0xf0) from [<c0370078>] (print_circular_bug+0x25c/0x2a8)
-> [    2.226112] [<c0370078>] (print_circular_bug+0x25c/0x2a8) from [<c005a284>] (__lock_acquire+0x14e8/0x1b18)
-> [    2.235813] [<c005a284>] (__lock_acquire+0x14e8/0x1b18) from [<c005adb0>] (lock_acquire+0x98/0x104)
-> [    2.244904] [<c005adb0>] (lock_acquire+0x98/0x104) from [<c0375c28>] (_raw_spin_lock_irqsave+0x3c/0x50)
-> [    2.254347] [<c0375c28>] (_raw_spin_lock_irqsave+0x3c/0x50) from [<c02580fc>] (ep_enable+0x20/0x25c)
-> [    2.263527] [<c02580fc>] (ep_enable+0x20/0x25c) from [<c02629d0>] (gether_connect+0x34/0x1c0)
-> [    2.272094] [<c02629d0>] (gether_connect+0x34/0x1c0) from [<c0262db0>] (eem_set_alt+0x70/0xcc)
-> [    2.280744] [<c0262db0>] (eem_set_alt+0x70/0xcc) from [<c025eb54>] (composite_setup+0xa6c/0xee8)
-> [    2.289572] [<c025eb54>] (composite_setup+0xa6c/0xee8) from [<c0259244>] (udc_irq+0x75c/0xbe8)
-> [    2.298226] [<c0259244>] (udc_irq+0x75c/0xbe8) from [<c02571fc>] (ci_irq+0x9c/0x108)
-> [    2.306026] [<c02571fc>] (ci_irq+0x9c/0x108) from [<c0067214>] (handle_irq_event_percpu+0x5c/0x268)
-> [    2.315119] [<c0067214>] (handle_irq_event_percpu+0x5c/0x268) from [<c006745c>] (handle_irq_event+0x3c/0x5c)
-> [    2.324986] [<c006745c>] (handle_irq_event+0x3c/0x5c) from [<c00696c0>] (handle_level_irq+0x8c/0xe8)
-> [    2.334159] [<c00696c0>] (handle_level_irq+0x8c/0xe8) from [<c0066af4>] (generic_handle_irq+0x20/0x30)
-> [    2.343516] [<c0066af4>] (generic_handle_irq+0x20/0x30) from [<c000fb8c>] (handle_IRQ+0x30/0x84)
-> [    2.352342] [<c000fb8c>] (handle_IRQ+0x30/0x84) from [<c00086f0>] (icoll_handle_irq+0x30/0x44)
-> [    2.360991] [<c00086f0>] (icoll_handle_irq+0x30/0x44) from [<c000e8e4>] (__irq_svc+0x44/0x54)
-> [    2.369531] Exception stack(0xc050df68 to 0xc050dfb0)
-> [    2.374612] df60:                   00000001 00000001 00000000 20000013 c050c000 c05476e8
-> [    2.382819] df80: c050c000 c050c000 c05476e8 41069265 40504270 00000000 600000d3 c050dfb0
-> [    2.391015] dfa0: c005b708 c000fd58 20000013 ffffffff
-> [    2.396110] [<c000e8e4>] (__irq_svc+0x44/0x54) from [<c000fd58>] (cpu_idle+0x60/0xec)
-> [    2.403990] [<c000fd58>] (cpu_idle+0x60/0xec) from [<c04e970c>] (start_kernel+0x260/0x2a0)
-> [    2.412291] [<c04e970c>] (start_kernel+0x260/0x2a0) from [<40008040>] (0x40008040)
-> 
+This is a problem too: structure alignment is different
+in -m32 versus -m64 modes, which will affect the offset of
+the following fields. I think it's best to add a "padding"
+field in there, and size it to multiple of 8 bytes.
+
+I think the same is a good idea for other empty stuctures,
+since otherwise the padding is implicit and
+not initialized by gcc, and it is hard not too leak
+info to userspace when you copy these structures out.
+
+And, it'll be handy if you want to extend the structures
+down the line.
+
+> +struct kvm_sync_regs {
+> +};
+> +
+> +struct kvm_arch_memory_slot {
+> +};
+> +
+> +/* KVM_IRQ_LINE irq field index values */
+> +#define KVM_ARM_IRQ_TYPE_SHIFT		24
+> +#define KVM_ARM_IRQ_TYPE_MASK		0xff
+> +#define KVM_ARM_IRQ_VCPU_SHIFT		16
+> +#define KVM_ARM_IRQ_VCPU_MASK		0xff
+> +#define KVM_ARM_IRQ_NUM_SHIFT		0
+> +#define KVM_ARM_IRQ_NUM_MASK		0xffff
+> +
+> +/* irq_type field */
+> +#define KVM_ARM_IRQ_TYPE_CPU		0
+> +#define KVM_ARM_IRQ_TYPE_SPI		1
+> +#define KVM_ARM_IRQ_TYPE_PPI		2
+> +
+> +/* out-of-kernel GIC cpu interrupt injection irq_number field */
+> +#define KVM_ARM_IRQ_CPU_IRQ		0
+> +#define KVM_ARM_IRQ_CPU_FIQ		1
+> +
+> +/* Highest supported SPI, from VGIC_NR_IRQS */
+> +#define KVM_ARM_IRQ_GIC_MAX		127
+> +
+> +#endif
+> +
+> +#endif /* __ARM_KVM_H__ */
 > -- 
-> Maxime Ripard, Free Electrons
-> Kernel, drivers, real-time and embedded Linux
-> development, consulting, training and support.
-> http://free-electrons.com
+> 1.7.12.4
 > 
-
--- 
-
-Best Regards,
-Peter Chen
+> --
+> To unsubscribe from this list: send the line "unsubscribe kvm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
