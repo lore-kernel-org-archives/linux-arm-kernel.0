@@ -1,35 +1,44 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 7 Mar 2013 15:17:35 +0530
-Subject: [PATCH] dma: Remove erroneous __exit and __exit_p() references
-In-Reply-To: <CAMhs6YwC+Lx0Vt=w2MoQV08on+rB1zidGCsNHRqcst8KBrb2XQ@mail.gmail.com>
-References: <1361318824-22287-1-git-send-email-maxin.john@gmail.com>
- <CACRpkdZamOCWHWMcFYRqQDKJARZOCEP_eSNPNaxSgHfAn2wmEw@mail.gmail.com>
- <CAMhs6YwC+Lx0Vt=w2MoQV08on+rB1zidGCsNHRqcst8KBrb2XQ@mail.gmail.com>
-Message-ID: <20130307094735.GG13370@intel.com>
+From: 4@infoc.tk (Video card photo Supply)
+Date: Thu, 07 Mar 2013 10:19:36 +0000
+Subject: =?GB2312?B?VmlkZW8gY2FyZCBwaG90byBTdXBwbHnT68T6ubLP7cHLz+Cy4aGj?=
+Message-ID: <047d7b15ab17298d7c04d7530b9e@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 07, 2013 at 10:17:40AM +0100, Maxin B. John wrote:
-> Hi,
-> 
-> On Fri, Feb 22, 2013 at 7:29 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> > On Wed, Feb 20, 2013 at 1:07 AM,  <maxin.john@gmail.com> wrote:
-> >
-> >> From: "Maxin B. John" <maxin.john@enea.com>
-> >>
-> >> Removing the annotation with __exit and referencing with __exit_p()
-> >> present in dma driver module remove hooks.
-> >>
-> >> Part of the __devexit and __devexit_p() purge.
-> >>
-> >> Signed-off-by: Maxin B. John <maxin.john@enea.com>
-> >
-> > Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> Gentle ping...
-???
+Dear Sir or Madam,
+Electronics Co.,Ltd here.
+We specialize in electronic devices field with full experience and we have  
+100 % confidence in our technology and quality.
+Now our hot seller is video card ?
 
-Its already in my -next
+Video card is a digital product just like a Mp4 with a printing paper to  
+cover it . You can design the artwork of the paper , and put the video you  
+prefer into it . Usually we used the video card for business promotion or  
+as the gift to your customers or friends .
 
---
-~Vinod
+If any interest, feel free to contact me.
+Best regards,
+
+Cherry
+Sales Specialist
+
+ELECTRONIC LIMITED
+
+https://picasaweb.google.com/lh/sredir?uname=109708651216670561004&target=ALBUM&id=5852543851793028353&authkey=Gv1sRgCKOSlOXk5Nm1-QE&invite=CIbA4aMK&feat=email
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130307/d5d95cef/attachment.html>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: picasaweblogo-zh_CN.gif
+Type: image/gif
+Size: 1646 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130307/d5d95cef/attachment.gif>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: email.jpg
+Type: image/jpeg
+Size: 5118 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130307/d5d95cef/attachment.jpg>
