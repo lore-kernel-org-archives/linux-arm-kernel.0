@@ -1,49 +1,34 @@
 From: davidb@codeaurora.org (David Brown)
-Date: Thu, 07 Mar 2013 10:45:19 -0800
+Date: Thu, 07 Mar 2013 10:50:40 -0800
 Subject: [PATCH 1/6] platform-drivers: msm: add single-wire serial bus
  interface (SSBI) driver
-In-Reply-To: <5138666E.6090201@ti.com> (Sekhar Nori's message of "Thu, 7 Mar
- 2013 15:35:34 +0530")
+In-Reply-To: <20130307060117.GA31687@kroah.com> (Greg Kroah-Hartman's message
+ of "Thu, 7 Mar 2013 14:01:17 +0800")
 References: <1362616187-21089-1-git-send-email-davidb@codeaurora.org>
  <1362616187-21089-2-git-send-email-davidb@codeaurora.org>
  <20130307013008.GA2910@kroah.com> <8yawqtjvl8y.fsf@huya.qualcomm.com>
- <20130307060117.GA31687@kroah.com> <5138666E.6090201@ti.com>
-Message-ID: <8yak3pjuk00.fsf@huya.qualcomm.com>
+ <20130307060117.GA31687@kroah.com>
+Message-ID: <8yafw07ujr3.fsf@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sekhar Nori <nsekhar@ti.com> writes:
+Greg Kroah-Hartman <gregkh@linuxfoundation.org> writes:
 
-> On 3/7/2013 11:31 AM, Greg Kroah-Hartman wrote:
->> On Wed, Mar 06, 2013 at 09:20:45PM -0800, David Brown wrote:
->>> Greg Kroah-Hartman <gregkh@linuxfoundation.org> writes:
->>>
->>>> On Wed, Mar 06, 2013 at 04:29:42PM -0800, David Brown wrote:
->>>>> +menu "Qualcomm MSM SSBI bus support"
->>>>> +	depends on ARCH_MSM
->>>>
->>>> Why?
->>>
->>> In the sense that ARCH_MSM are the only devices that ever were, or ever
->>> will be made with this device.  It doesn't strictly depend on it, but do
->>> we want to clutter the config for everything else.
->> 
->> It's not "clutter".  You want me to build this on other platforms, to
->> catch api and other types of build breakages.  This is the way for
->> almost all Linux drivers.
+>> Without this device, the PMIC drivers won't work, regulators can't be
+>> turned on, and most of the other devices won't work.  I can try if it
+>> can still be made a module, and it might be good at exercising the
+>> deferred probe mechanism.
 >
-> Not having a depends on helps build coverage, but I have seen
-> objections to showing up irrelevant configurations to users (of x86 for
-> example). See one here from Linus for OMAP_OCP2SCP
->
-> http://lkml.indiana.edu/hypermail/linux/kernel/1210.0/00785.html
->
-> If this case is different, I am not sure why.
+> If the PMIC drivers are dependant on the symbols in this module, there
+> should not be any problems, right?
 
-This was, in fact, the reason I put the dependency there.  I found it a
-little annoying being asked about a bunch of OMAP devices when building
-the x86 kernel.  At least they weren't cancer curing options (default
-y).
+The PMIC drivers directly will be, but the users of gpios/irqs and
+regulators coming from the PMIC will only depend on the generic APIs for
+this.  In theory, the deferred probe should handle this, and it might
+be useful for testing.
+
+I can allow it to be a module, although I don't picture that really
+being a useful configuration.
 
 David
 
