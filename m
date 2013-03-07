@@ -1,64 +1,85 @@
-From: cdall@cs.columbia.edu (Christoffer Dall)
-Date: Thu, 7 Mar 2013 11:25:42 -0800
-Subject: [kvmarm] [GIT PULL v2] KVM/ARM Fixes for 3.9-rc1
-In-Reply-To: <20130307190900.GB15854@amt.cnet>
-References: <CAEDV+gLpqG0GxbCDoUqO2fdwpqLeEd_psaaFWzm2Xi829-zUTQ@mail.gmail.com>
- <f3db22097ee303991fccc64bbf863dd6@localhost>
- <CAEDV+g+ATCr3Hd+VjwLW7tgbJ9Cq4eaC49ZFO-1jB=grAVR49w@mail.gmail.com>
- <fd46d1c4746530d6c705dba843c848ea@localhost>
- <20130307190900.GB15854@amt.cnet>
-Message-ID: <CAEDV+gL8gfqY05fqNRCKX642K9ZZihGrYe0DbxDu5hQWGRKsDA@mail.gmail.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Thu, 7 Mar 2013 20:48:30 +0100
+Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
+In-Reply-To: <20130307174955.GC20840@obsidianresearch.com>
+References: <1360686546-24277-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1360686546-24277-25-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130212223511.GB31555@obsidianresearch.com>
+ <20130306105441.4d24033e@skate>
+ <20130306121118.GA17079@avionic-0098.mockup.avionic-design.de>
+ <20130306180946.GA2433@obsidianresearch.com>
+ <20130307080832.GD3451@avionic-0098.mockup.avionic-design.de>
+ <20130307174955.GC20840@obsidianresearch.com>
+Message-ID: <20130307194830.GA1811@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 7, 2013 at 11:09 AM, Marcelo Tosatti <mtosatti@redhat.com> wrote:
-> On Thu, Mar 07, 2013 at 07:57:23AM +0100, Marc Zyngier wrote:
->> On Wed, 6 Mar 2013 20:40:00 -0800, Christoffer Dall
->> <cdall@cs.columbia.edu>
->> wrote:
->> > On Wed, Mar 6, 2013 at 7:54 PM, Marc Zyngier <marc.zyngier@arm.com>
->> wrote:
->> >> On Wed, 6 Mar 2013 16:31:48 -0800, Christoffer Dall
->> >> <cdall@cs.columbia.edu>
->> >> wrote:
->> >>
->> >> Hi Christoffer,
->> >>
->> >>>
->> >>> Please pull these KVM/ARM fixes mostly centered around preparation for
->> >>> Marc's ARMv8 KVM work.
->> >>
->> >> Can we please hold on that for a while? asm-offset.c is usually a
->> >> candidate for merge conflicts as people start pushing patches post
->> merge
->> >> window, and it would make sense to see what is happening in that space.
->> >>
->> > Sure, when would you see this happen exactly?
->>
->> Usually, by -rc5 we have a pretty good idea of what is going in. Also,
->> putting things into -next is a good way to detect potential problems.
->>
->> Oh, and keeping linux-arm-kernel into the loop. Most ARM developers don't
->> follow the KVM lists.
->>
->>         M.
->
-> Mark, can you please be more verbose on the reason for this request?
->
-> Christoffer, patches which are not causing merge conflicts can be
-> integrated (note that the merge window exists so that development code
-> can sit on a development branch and be tested before integration).
->
-> After the merge window has closed, patches whose purpose is to stabilize
-> the code base are supposed to be integrated, and development code queued
-> for the next merge window.
->
+On Thu, Mar 07, 2013 at 10:49:55AM -0700, Jason Gunthorpe wrote:
+> On Thu, Mar 07, 2013 at 09:08:32AM +0100, Thierry Reding wrote:
+[...]
+> > > Both have various problems, but I think I prefer the first one as it
+> > > doesn't conflate the contoller registers and host apertures in a
+> > > single ranges..
+> > 
+> > I think a better alternative would be (and this matches what Thomas has
+> > said elsewhere) to use something like the first alternative but move the
+> > regs property into the pcie at 0,X nodes. That would save us from having to
+> > index a property in the parent. At least from a DT point of view I find
+> > that to be a more consistent representation.
+> 
+> You are thinking a new property 'host-controller-regs' or the like?
 
-Understood and agreed. Since the patches I sent a pull request for
-fixes code (although not bugs) and are trivial and would not cause
-breakage, I think they should be merged into kvm/master.  This is
-anyhow going to be a judgement call in the future, and I can certainly
-adjust my evaluations as we go along in the future, but I don't see
-the harm in honoring this pull request.
+Well, something shorter would be nice, but that's the general idea, yes.
+As I mentioned before, for Tegra these registers aren't actually any
+controller specific registers but rather a window to access the PCI
+configuration space for the root ports.
 
--Christoffer
+Going via the FPCI mapping of the configuration space doesn't generate
+transactions on bus 0, which is why there are extra windows for each
+root port. That's why I was arguing about reusing the reg property in
+the first place because it actually represents the configuration space.
+
+But this is likely to be unique to Tegra and Marvell hardware doesn't
+behave this way, but instead needs the registers for a different
+purpose. Something like host-controller-regs might be more appropriate.
+
+> > However that would probably not work out-of-the-box with the current OF
+> > core because of_address_to_resource() won't know how to find the new
+> > property. The assigned-addresses alternative seems to be the only one
+> > that would work on the current OF core and achieve proper address
+> > translation. But it doesn't seem like a good solution either since it
+> > repurposes the meaning of the property and therefore isn't any better
+> > than encoding the same information in the reg property.
+> 
+> Except that reg is specifically not supposed to be handling CPU bus
+> addresses and assigned-addresses is.
+> 
+> Adding a hidden non-standard BAR to model the hidden non-standard
+> memory region associated with the bridge is a stretch, but it is not a
+> very big stretch...
+> 
+> In any event, regs should not be used, and something needs to be
+> decided!
+
+I don't think assigned-addresses is a good fit either. The PCI binding
+document is equally specific about it as it is about the reg property.
+So in my opinion a separate property would be a better choice. The only
+big obstacle is that it needs to be somehow hooked up with the OF core
+so that proper address translation can be performed.
+
+One possible solution that wouldn't be too hard to implement is to
+provide a new function (say of_get_named_address()) similar to
+of_get_address() which doesn't get the name of the register property
+from the struct of_bus but from a parameter and call that function from
+another new function similar to of_address_to_resource() that also gets
+the property name from a parameter. I can't think of a better name for
+the latter than of_named_address_to_resource(), which is rather long.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130307/44e758d7/attachment-0001.sig>
