@@ -1,85 +1,99 @@
-From: vipulkumar.samar@st.com (Vipul Kumar Samar)
-Date: Thu, 7 Mar 2013 12:35:24 +0530
-Subject: [PATCH] clk:SPEAr1340: Correct parent clock configuration
-Message-ID: <9c65c93de3e7269bfc6e31bcdddc2ecd64338761.1362639296.git.vipulkumar.samar@st.com>
+From: ian.campbell@citrix.com (Ian Campbell)
+Date: Thu,  7 Mar 2013 07:17:25 +0000
+Subject: [PATCH] xen: arm: mandate EABI and use generic atomic operations.
+Message-ID: <1362640645-26564-1-git-send-email-ian.campbell@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch corrects wrongly configured parent clock for following
-devices:
+Rob Herring has observed that c81611c4e96f "xen: event channel arrays are
+xen_ulong_t and not unsigned long" introduced a compile failure when building
+without CONFIG_AEABI:
 
-   * Video enc/decoder
-   * Video ip
-   * Pin control
-   * ACP
-   * camx
+/tmp/ccJaIZOW.s: Assembler messages:
+/tmp/ccJaIZOW.s:831: Error: even register required -- `ldrexd r5,r6,[r4]'
 
-Signed-off-by: Vipul Kumar Samar <vipulkumar.samar@st.com>
-Reviewed-by: Shiraz Hashim <shiraz.hashim@st.com>
+Will Deacon pointed out that this is because OABI does not require even base
+registers for 64-bit values. We can avoid this by simply using the existing
+atomic64_xchg operation and the same containerof trick as used by the cmpxchg
+macros. However since this code is used on memory which is shared with the
+hypervisor we require proper atomic instructions and cannot use the generic
+atomic64 callbacks (which are based on spinlocks), therefore add a dependency
+on !GENERIC_ATOMIC64. Since we already depend on !CPU_V6 there isn't much
+downside to this.
+
+While thinking about this we also observed that OABI has different struct
+alignment requirements to EABI, which is a problem for hypercall argument
+structs which are shared with the hypervisor and which must be in EABI layout.
+Since I don't expect people to want to run OABI kernels on Xen depend on
+CONFIG_AEABI explicitly too (although it also happens to be enforced by the
+!GENERIC_ATOMIC64 requirement too).
+
+Signed-off-by: Ian Campbell <ian.campbell@citrix.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Rob Herring <robherring2@gmail.com>
+Cc: Stefano Stabellini <Stefano.Stabellini@eu.citrix.com>
+Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 ---
- drivers/clk/spear/spear1340_clock.c |   18 +++++++++---------
- 1 files changed, 9 insertions(+), 9 deletions(-)
+ arch/arm/Kconfig                  |    3 ++-
+ arch/arm/include/asm/xen/events.h |   25 ++++---------------------
+ 2 files changed, 6 insertions(+), 22 deletions(-)
 
-diff --git a/drivers/clk/spear/spear1340_clock.c b/drivers/clk/spear/spear1340_clock.c
-index 82abea3..35e7e26 100644
---- a/drivers/clk/spear/spear1340_clock.c
-+++ b/drivers/clk/spear/spear1340_clock.c
-@@ -960,47 +960,47 @@ void __init spear1340_clk_init(void)
- 			SPEAR1340_SPDIF_IN_CLK_ENB, 0, &_lock);
- 	clk_register_clkdev(clk, NULL, "d0100000.spdif-in");
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 5b71469..be632ba 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1887,8 +1887,9 @@ config XEN_DOM0
  
--	clk = clk_register_gate(NULL, "acp_clk", "acp_mclk", 0,
-+	clk = clk_register_gate(NULL, "acp_clk", "ahb_clk", 0,
- 			SPEAR1340_PERIP2_CLK_ENB, SPEAR1340_ACP_CLK_ENB, 0,
- 			&_lock);
- 	clk_register_clkdev(clk, NULL, "acp_clk");
+ config XEN
+ 	bool "Xen guest support on ARM (EXPERIMENTAL)"
+-	depends on ARM && OF
++	depends on ARM && AEABI && OF
+ 	depends on CPU_V7 && !CPU_V6
++	depends on !GENERIC_ATOMIC64
+ 	help
+ 	  Say Y if you want to run Linux in a Virtual Machine on Xen on ARM.
  
--	clk = clk_register_gate(NULL, "plgpio_clk", "plgpio_mclk", 0,
-+	clk = clk_register_gate(NULL, "plgpio_clk", "ahb_clk", 0,
- 			SPEAR1340_PERIP3_CLK_ENB, SPEAR1340_PLGPIO_CLK_ENB, 0,
- 			&_lock);
- 	clk_register_clkdev(clk, NULL, "e2800000.gpio");
+diff --git a/arch/arm/include/asm/xen/events.h b/arch/arm/include/asm/xen/events.h
+index 5c27696..8b1f37b 100644
+--- a/arch/arm/include/asm/xen/events.h
++++ b/arch/arm/include/asm/xen/events.h
+@@ -2,6 +2,7 @@
+ #define _ASM_ARM_XEN_EVENTS_H
  
--	clk = clk_register_gate(NULL, "video_dec_clk", "video_dec_mclk", 0,
-+	clk = clk_register_gate(NULL, "video_dec_clk", "ahb_clk", 0,
- 			SPEAR1340_PERIP3_CLK_ENB, SPEAR1340_VIDEO_DEC_CLK_ENB,
- 			0, &_lock);
- 	clk_register_clkdev(clk, NULL, "video_dec");
+ #include <asm/ptrace.h>
++#include <asm/atomic.h>
  
--	clk = clk_register_gate(NULL, "video_enc_clk", "video_enc_mclk", 0,
-+	clk = clk_register_gate(NULL, "video_enc_clk", "ahb_clk", 0,
- 			SPEAR1340_PERIP3_CLK_ENB, SPEAR1340_VIDEO_ENC_CLK_ENB,
- 			0, &_lock);
- 	clk_register_clkdev(clk, NULL, "video_enc");
+ enum ipi_vector {
+ 	XEN_PLACEHOLDER_VECTOR,
+@@ -15,26 +16,8 @@ static inline int xen_irqs_disabled(struct pt_regs *regs)
+ 	return raw_irqs_disabled_flags(regs->ARM_cpsr);
+ }
  
--	clk = clk_register_gate(NULL, "video_in_clk", "video_in_mclk", 0,
-+	clk = clk_register_gate(NULL, "video_in_clk", "ahb_clk", 0,
- 			SPEAR1340_PERIP3_CLK_ENB, SPEAR1340_VIDEO_IN_CLK_ENB, 0,
- 			&_lock);
- 	clk_register_clkdev(clk, NULL, "spear_vip");
+-/*
+- * We cannot use xchg because it does not support 8-byte
+- * values. However it is safe to use {ldr,dtd}exd directly because all
+- * platforms which Xen can run on support those instructions.
+- */
+-static inline xen_ulong_t xchg_xen_ulong(xen_ulong_t *ptr, xen_ulong_t val)
+-{
+-	xen_ulong_t oldval;
+-	unsigned int tmp;
+-
+-	wmb();
+-	asm volatile("@ xchg_xen_ulong\n"
+-		"1:     ldrexd  %0, %H0, [%3]\n"
+-		"       strexd  %1, %2, %H2, [%3]\n"
+-		"       teq     %1, #0\n"
+-		"       bne     1b"
+-		: "=&r" (oldval), "=&r" (tmp)
+-		: "r" (val), "r" (ptr)
+-		: "memory", "cc");
+-	return oldval;
+-}
++#define xchg_xen_ulong(ptr, val) atomic64_xchg(container_of((ptr),	\
++							    atomic64_t,	\
++							    counter), (val))
  
--	clk = clk_register_gate(NULL, "cam0_clk", "cam0_mclk", 0,
-+	clk = clk_register_gate(NULL, "cam0_clk", "ahb_clk", 0,
- 			SPEAR1340_PERIP3_CLK_ENB, SPEAR1340_CAM0_CLK_ENB, 0,
- 			&_lock);
- 	clk_register_clkdev(clk, NULL, "d0200000.cam0");
- 
--	clk = clk_register_gate(NULL, "cam1_clk", "cam1_mclk", 0,
-+	clk = clk_register_gate(NULL, "cam1_clk", "ahb_clk", 0,
- 			SPEAR1340_PERIP3_CLK_ENB, SPEAR1340_CAM1_CLK_ENB, 0,
- 			&_lock);
- 	clk_register_clkdev(clk, NULL, "d0300000.cam1");
- 
--	clk = clk_register_gate(NULL, "cam2_clk", "cam2_mclk", 0,
-+	clk = clk_register_gate(NULL, "cam2_clk", "ahb_clk", 0,
- 			SPEAR1340_PERIP3_CLK_ENB, SPEAR1340_CAM2_CLK_ENB, 0,
- 			&_lock);
- 	clk_register_clkdev(clk, NULL, "d0400000.cam2");
- 
--	clk = clk_register_gate(NULL, "cam3_clk", "cam3_mclk", 0,
-+	clk = clk_register_gate(NULL, "cam3_clk", "ahb_clk", 0,
- 			SPEAR1340_PERIP3_CLK_ENB, SPEAR1340_CAM3_CLK_ENB, 0,
- 			&_lock);
- 	clk_register_clkdev(clk, NULL, "d0500000.cam3");
+ #endif /* _ASM_ARM_XEN_EVENTS_H */
 -- 
-1.7.3.4
+1.7.10.4
