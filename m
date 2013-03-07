@@ -1,44 +1,40 @@
-From: 4@infoc.tk (Video card photo Supply)
-Date: Thu, 07 Mar 2013 10:19:36 +0000
-Subject: =?GB2312?B?VmlkZW8gY2FyZCBwaG90byBTdXBwbHnT68T6ubLP7cHLz+Cy4aGj?=
-Message-ID: <047d7b15ab17298d7c04d7530b9e@google.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 07 Mar 2013 11:24:47 +0100
+Subject: v3.9-rc1: swapper/0 [ INFO: possible circular locking dependency
+ detected ]
+In-Reply-To: <20130307080843.GG20470@nchen-desktop>
+References: <51371B5E.1000508@free-electrons.com>
+ <20130307080843.GG20470@nchen-desktop>
+Message-ID: <51386AEF.5090703@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Sir or Madam,
-Electronics Co.,Ltd here.
-We specialize in electronic devices field with full experience and we have  
-100 % confidence in our technology and quality.
-Now our hot seller is video card ?
+Hi Peter,
 
-Video card is a digital product just like a Mp4 with a printing paper to  
-cover it . You can design the artwork of the paper , and put the video you  
-prefer into it . Usually we used the video card for business promotion or  
-as the gift to your customers or friends .
+Le 07/03/2013 09:08, Peter Chen a ?crit :
+> On Wed, Mar 06, 2013 at 11:33:02AM +0100, Maxime Ripard wrote:
+>> [    2.149645] other info that might help us debug this:
+>> [    2.149645] 
+>> [    2.157667]  Possible unsafe locking scenario:
+>> [    2.157667] 
+>> [    2.163598]        CPU0                    CPU1
+>> [    2.168134]        ----                    ----
+>> [    2.172667]   lock(&(&cdev->lock)->rlock);
+>> [    2.176790]                                lock(&(&ci->lock)->rlock);
+>> [    2.183255]                                lock(&(&cdev->lock)->rlock);
+>> [    2.189893]   lock(&(&ci->lock)->rlock);
+> 
+> The precondition of above is the chipidea interrupt can be re-entered.
+> But as far as I know, the same interrupt can't be re-entered at current
+> system.
 
-If any interest, feel free to contact me.
-Best regards,
+Yes, it seems to work quite fine anyway, but I'm not sure simply
+ignoring this would be the right answer.
 
-Cherry
-Sales Specialist
+Maxime
 
-ELECTRONIC LIMITED
-
-https://picasaweb.google.com/lh/sredir?uname=109708651216670561004&target=ALBUM&id=5852543851793028353&authkey=Gv1sRgCKOSlOXk5Nm1-QE&invite=CIbA4aMK&feat=email
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130307/d5d95cef/attachment.html>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: picasaweblogo-zh_CN.gif
-Type: image/gif
-Size: 1646 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130307/d5d95cef/attachment.gif>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: email.jpg
-Type: image/jpeg
-Size: 5118 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130307/d5d95cef/attachment.jpg>
+-- 
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
