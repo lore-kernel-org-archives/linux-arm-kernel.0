@@ -1,56 +1,74 @@
-From: levipearson@gmail.com (Levi Pearson)
-Date: Thu, 7 Mar 2013 13:37:06 -0700
-Subject: omap4 pandaboard: clock input for TiWi module inactive
-Message-ID: <CAEYbN3QotnnAUU=7c7=r1sHDnZ5VhgNfXfP6ANf3+ssCzmEa=A@mail.gmail.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Thu, 7 Mar 2013 13:47:45 -0700
+Subject: [PATCH 04/10] bus: introduce an Marvell EBU MBus driver
+In-Reply-To: <20130307212854.24be187f@skate>
+References: <1362577426-12804-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130306202710.15a6aa2c@skate>
+ <20130306202447.GA4916@obsidianresearch.com>
+ <201303070337.43288.arnd@arndb.de> <20130307115817.3b3cad20@skate>
+ <20130307173736.GA20840@obsidianresearch.com>
+ <20130307201133.42a6c44b@skate>
+ <20130307195541.GA20695@obsidianresearch.com>
+ <20130307212854.24be187f@skate>
+Message-ID: <20130307204745.GA23385@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I recently upgraded from a 3.4 kernel to a 3.8 kernel and found that
-the drivers for the functionality provided by the TiWi module on the
-pandaboard (Bluetooth, WiFI, etc.) could no longer probe the device.
-After some investigation, it turned out that the TiWi clock is
-provided by the twl6030 PMIC chip.
+On Thu, Mar 07, 2013 at 09:28:54PM +0100, Thomas Petazzoni wrote:
+> Dear Jason Gunthorpe,
+> 
+> On Thu, 7 Mar 2013 12:55:41 -0700, Jason Gunthorpe wrote:
+> 
+> > > Adding description of windows in the Device Tree can be added later on,
+> > > in a completely DT backward compatible way, and the mvebu-devbus driver
+> > > can be adjusted accordingly.
+> > 
+> > Hmm.. You could make a new DT that is compatible with an older kernel,
+> > but once the mvebu_mbus_add_window is moved into the mbus driver it
+> > would require an updated DT.
+> 
+> So what is your proposal that preserves non-DT compatibility? As I
+> already said multiple times, we still have non-DT platforms around, and
+> we can leave them on the side on this topic, so we have to have a
+> solution that keeps non-DT compatibility for the moment.
 
-The clock output of the twl6030 was first enabled via these commits:
+Well, I'd keep it basically the same as we have now..
 
-https://patchwork.kernel.org/patch/546381/
-https://patchwork.kernel.org/patch/546401/
+Non-DT platforms call into the mbus driver via code to create windows
+before creating the platform device that will use the window. Use a
+fixed address, or dynamic allocation, it doesn't matter. Pass the
+resulting address in through the struct resource during platform
+device register. This would be done in the same place as today, in the
+non-DT board specific file.
 
-Since most of the functionality of the TWL6030 is power regulation and
-the clock is enabled via a similar mechanism to the power outputs, the
-clock was added as a 'pseudo-regulator' to
-drivers/regulator/twl-regulator.c.
+Critically, the window is setup and address selected prior to the
+platform device add and driver probe. In both the DT and non-DT case
+the struct resource associated with the platform device is correct.
 
-Some time later, a series of commits removed the clock functionality
-from twl-regulator.c, apparently due to being out-of-place in the
-Device Tree listings or something.
+Something like this randomly choosen example.
 
-The first of these is recorded here: https://lkml.org/lkml/2012/6/4/330
-The next two just clean up the code that was orphaned by the previous:
- e76ab829 "regulator: twl: Remove references to the twl4030 regulator"
- 029dd3ce "regulator: twl: Remove another unused variable warning"
+static struct platform_device kirkwood_nand_flash = {
+        .name           = "orion_nand",
+        .id             = -1,
+        .dev            = {
+                .platform_data  = &kirkwood_nand_data,
+        },
+        .resource       = &kirkwood_nand_resource,
+        .num_resources  = 1,
+};
 
-Luciano Cuelho, who maintains the driver for the WiFi portion of the
-TiWi modules, reported the resulting breakage some time later on the
-LKML: https://lkml.org/lkml/2012/11/15/72
+void __init kirkwood_nand_init(struct mtd_partition *parts, int nr_parts,
+                               int chip_delay)
+{
+        kirkwood_nand_data.parts = parts;
+        kirkwood_nand_data.nr_parts = nr_parts;
+        kirkwood_nand_data.chip_delay = chip_delay;
++	mbus_assign_resource_window(&kirkwood_nand_flash.resource,
++  	                            MAPDEF(...));
+        platform_device_register(&kirkwood_nand_flash);
+}
 
-Despite the protestation of Mark Brown that his code removal wasn't
-the cause of the problem, reverting his changes does indeed enable the
-clock.  However, it also seems to be the case that there ought to be a
-better home for the clock than twl-regulator.c.  At the time of the
-previous discussion, it wasn't clear if the framework was in place to
-support a clock driver for the twl6030's clock, but it seems like the
-support exists now, since there's a clock driver for the twl6030's
-companion, the twl6040 audio chip.
+That should work for all the non-DT support cases in the kernel today?
 
-So: Is there any chance of simply reverting the 3 commits that broke
-the clock?  I have done this locally, but I hate to see pandaboard
-support in the mainstream kernel continue to be broken in this way.
-
-If for whatever reason the commits cannot be reverted, would creating
-a driver like drivers/clk/clk-twl6040.c that enabled the twl6030's
-clock output be a suitable alternative?  I'd be willing to take a stab
-at writing it if there's not something like that in the works already.
-
----
-Levi Pearson
+Regards,
+Jason
