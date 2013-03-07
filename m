@@ -1,49 +1,38 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 07 Mar 2013 11:23:58 +0900
-Subject: [GIT PULL 5/5] Samsung pinctrl-exynos5250 for v3.10
-Message-ID: <016a01ce1ada$d34dd850$79e988f0$%kim@samsung.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 7 Mar 2013 10:29:54 +0800
+Subject: [PATCH] cpufreq: ARM big LITTLE: Add generic cpufreq driver and
+ its DT glue
+In-Reply-To: <CAOesGMiOBxEHVgkr=K_4JVQ6+0Swy1uRmHaS8QwRxTJKs3J2Ow@mail.gmail.com>
+References: <f20e3c5e822c4bd28a3b71264d73143cc1f850b0.1362458878.git.viresh.kumar@linaro.org>
+ <20130307014657.GA7426@quad.lixom.net>
+ <CAOesGMiOBxEHVgkr=K_4JVQ6+0Swy1uRmHaS8QwRxTJKs3J2Ow@mail.gmail.com>
+Message-ID: <CAKohpo=sF3nEnA4Jgr3gx-vxJTeqp6P1JmoiU=tN-bS6VJQ4Fw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+On 7 March 2013 09:50, Olof Johansson <olof@lixom.net> wrote:
+> On Wed, Mar 6, 2013 at 5:46 PM, Olof Johansson <olof@lixom.net> wrote:
+>
+>> This binding makes no sense to me. It needs to be substantially better
+>> documented, not just a couple of sentences that people that understand
+>> bit.LITTLE thoroughly can make sense of.
+>>
+>> It also duplicates the cpu binding. I suspect this should instead be done
+>> through additions of the cpu bindings instead of duplication. So this needs to
+>> be substantially reworked.
 
-Here is support pinctrl-exynos5250 and that already got ack from Linus Walliej.
+Actually, i wasn't getting in new bindings for cpu/cluster for big
+LITTLE but was
+just trying to get bindings for getting freq-table for cpufreq driver.
 
-If any problems, please let me know.
+Lorenzo (cc'd) actually has a patch for getting the bindings in and he
+is looking
+to send them soon. I know these can change after some review and the plan was
+i will fix cpufreq bindings again once that patch is in. We don't have
+any mainlined
+hardware for it for now and so it wouldn't break anything.
 
-Thanks.
+> Also, _ALWAYS_ cc devicetree-discuss on new bindings. get_maintainer
+> tells you to do so.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
-
-The following changes since commit 6dbe51c251a327e012439c4772097a13df43c5b8:
-
-  Linux 3.9-rc1 (2013-03-03 15:11:05 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-next/pinctrl-exynos
-
-for you to fetch changes up to 97916777d6904e24b86eac77da58ef7cb09d539d:
-
-  ARM: EXYNOS: skip wakeup interrupt registration for exynos5250 if pinctrl is
-enabled (2013-03-05 20:59:12 +0900)
-
-----------------------------------------------------------------
-Thomas Abraham (3):
-      pinctrl: exynos: add exynos5250 SoC specific data
-      gpio: samsung: skip gpiolib registration if pinctrl support is enabled for
-exynos5250
-      ARM: EXYNOS: skip wakeup interrupt registration for exynos5250 if pinctrl
-is enabled
-
- arch/arm/mach-exynos/common.c     |    1 +
- drivers/gpio/gpio-samsung.c       |    1 +
- drivers/pinctrl/pinctrl-exynos.c  |  108 +++++++++++++++++++++++++++++++++++++
- drivers/pinctrl/pinctrl-samsung.c |    2 +
- drivers/pinctrl/pinctrl-samsung.h |    1 +
- 5 files changed, 113 insertions(+)
+I knew it and i messed up with it. Will surely take care of it next time.
