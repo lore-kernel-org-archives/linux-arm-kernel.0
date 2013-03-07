@@ -1,41 +1,158 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 07 Mar 2013 09:02:33 +0900
-Subject: [PATCH] ARM: S3C24XX: drop "select MACH_N35"
-In-Reply-To: <1362609234.28137.2.camel@x61.thuisdomein>
-References: <1362609234.28137.2.camel@x61.thuisdomein>
-Message-ID: <013a01ce1ac7$11b287d0$35179770$%kim@samsung.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed,  6 Mar 2013 16:04:01 -0800
+Subject: [PATCH 05/10] ARM: EXYNOS4: Divorce mct from local timer API
+In-Reply-To: <1362614646-24113-1-git-send-email-sboyd@codeaurora.org>
+References: <1362614646-24113-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1362614646-24113-6-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul Bolle wrote:
-> 
-> The unused Kconfig symbol MACH_N35 was removed in commit
-> 85fd6d63bf2927b9da7ab1b0d46723bfdb13808c ("ARM: S3C2410: move
-> mach-s3c2410/* into mach-s3c24xx/"). But there is still one (pointless)
-> select statement for that symbol. Drop it.
-> 
-> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
-> ---
->  arch/arm/mach-s3c24xx/Kconfig | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
-> index 37f513d..7361b9d 100644
-> --- a/arch/arm/mach-s3c24xx/Kconfig
-> +++ b/arch/arm/mach-s3c24xx/Kconfig
-> @@ -320,7 +320,6 @@ config PM_H1940
-> 
->  config MACH_N30
->  	bool "Acer N30 family"
-> -	select MACH_N35
->  	select S3C_DEV_NAND
->  	select S3C_DEV_USB_HOST
->  	help
-> --
-> 1.7.11.7
+Separate the mct local timers from the local timer API. This will
+allow us to remove ARM local timer support in the near future and
+gets us closer to moving this driver to drivers/clocksource.
 
-Yes, right. Applied, thanks.
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ arch/arm/mach-exynos/mct.c | 53 ++++++++++++++++++++++++++++++++--------------
+ 1 file changed, 37 insertions(+), 16 deletions(-)
 
-BTW, so the machine type can be removed at arch/arm/tools/mach-types as well.
-
-- Kukjin
+diff --git a/arch/arm/mach-exynos/mct.c b/arch/arm/mach-exynos/mct.c
+index c9d6650..5a9a73f 100644
+--- a/arch/arm/mach-exynos/mct.c
++++ b/arch/arm/mach-exynos/mct.c
+@@ -16,13 +16,13 @@
+ #include <linux/err.h>
+ #include <linux/clk.h>
+ #include <linux/clockchips.h>
++#include <linux/cpu.h>
+ #include <linux/platform_device.h>
+ #include <linux/delay.h>
+ #include <linux/percpu.h>
+ #include <linux/of.h>
+ 
+ #include <asm/arch_timer.h>
+-#include <asm/localtimer.h>
+ 
+ #include <plat/cpu.h>
+ 
+@@ -42,7 +42,7 @@ static unsigned long clk_rate;
+ static unsigned int mct_int_type;
+ 
+ struct mct_clock_event_device {
+-	struct clock_event_device *evt;
++	struct clock_event_device evt;
+ 	void __iomem *base;
+ 	char name[10];
+ };
+@@ -264,8 +264,6 @@ static void exynos4_clockevent_init(void)
+ 		setup_irq(EXYNOS4_IRQ_MCT_G0, &mct_comp_event_irq);
+ }
+ 
+-#ifdef CONFIG_LOCAL_TIMERS
+-
+ static DEFINE_PER_CPU(struct mct_clock_event_device, percpu_mct_tick);
+ 
+ /* Clock event handling */
+@@ -338,7 +336,7 @@ static inline void exynos4_tick_set_mode(enum clock_event_mode mode,
+ 
+ static int exynos4_mct_tick_clear(struct mct_clock_event_device *mevt)
+ {
+-	struct clock_event_device *evt = mevt->evt;
++	struct clock_event_device *evt = &mevt->evt;
+ 
+ 	/*
+ 	 * This is for supporting oneshot mode.
+@@ -360,7 +358,7 @@ static int exynos4_mct_tick_clear(struct mct_clock_event_device *mevt)
+ static irqreturn_t exynos4_mct_tick_isr(int irq, void *dev_id)
+ {
+ 	struct mct_clock_event_device *mevt = dev_id;
+-	struct clock_event_device *evt = mevt->evt;
++	struct clock_event_device *evt = &mevt->evt;
+ 
+ 	exynos4_mct_tick_clear(mevt);
+ 
+@@ -388,7 +386,6 @@ static int __cpuinit exynos4_local_timer_setup(struct clock_event_device *evt)
+ 	int mct_lx_irq;
+ 
+ 	mevt = this_cpu_ptr(&percpu_mct_tick);
+-	mevt->evt = evt;
+ 
+ 	mevt->base = EXYNOS4_MCT_L_BASE(cpu);
+ 	sprintf(mevt->name, "mct_tick%d", cpu);
+@@ -426,7 +423,7 @@ static int __cpuinit exynos4_local_timer_setup(struct clock_event_device *evt)
+ 	return 0;
+ }
+ 
+-static void exynos4_local_timer_stop(struct clock_event_device *evt)
++static void __cpuinit exynos4_local_timer_stop(struct clock_event_device *evt)
+ {
+ 	unsigned int cpu = smp_processor_id();
+ 	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
+@@ -439,22 +436,38 @@ static void exynos4_local_timer_stop(struct clock_event_device *evt)
+ 		disable_percpu_irq(EXYNOS_IRQ_MCT_LOCALTIMER);
+ }
+ 
+-static struct local_timer_ops exynos4_mct_tick_ops __cpuinitdata = {
+-	.setup	= exynos4_local_timer_setup,
+-	.stop	= exynos4_local_timer_stop,
++static int __cpuinit exynos4_mct_cpu_notify(struct notifier_block *self,
++					   unsigned long action, void *hcpu)
++{
++	struct mct_clock_event_device *mevt = this_cpu_ptr(&percpu_mct_tick);
++	struct clock_event_device *evt = &mevt->evt;
++
++	switch (action & ~CPU_TASKS_FROZEN) {
++	case CPU_STARTING:
++		exynos4_local_timer_setup(evt);
++		break;
++	case CPU_DYING:
++		exynos4_local_timer_stop(evt);
++		break;
++	}
++
++	return NOTIFY_OK;
++}
++
++static struct notifier_block exynos4_mct_cpu_nb __cpuinitdata = {
++	.notifier_call = exynos4_mct_cpu_notify,
+ };
+-#endif /* CONFIG_LOCAL_TIMERS */
+ 
+ static void __init exynos4_timer_resources(void)
+ {
++	int err;
++	struct mct_clock_event_device *mevt = this_cpu_ptr(&percpu_mct_tick);
+ 	struct clk *mct_clk;
+ 	mct_clk = clk_get(NULL, "xtal");
+ 
+ 	clk_rate = clk_get_rate(mct_clk);
+ 
+-#ifdef CONFIG_LOCAL_TIMERS
+ 	if (mct_int_type == MCT_INT_PPI) {
+-		int err;
+ 
+ 		err = request_percpu_irq(EXYNOS_IRQ_MCT_LOCALTIMER,
+ 					 exynos4_mct_tick_isr, "MCT",
+@@ -463,8 +476,16 @@ static void __init exynos4_timer_resources(void)
+ 		     EXYNOS_IRQ_MCT_LOCALTIMER, err);
+ 	}
+ 
+-	local_timer_register(&exynos4_mct_tick_ops);
+-#endif /* CONFIG_LOCAL_TIMERS */
++	err = register_cpu_notifier(&exynos4_mct_cpu_nb);
++	if (err)
++		goto out_irq;
++
++	/* Immediately configure the timer on the boot CPU */
++	exynos4_local_timer_setup(&mevt->evt);
++	return;
++
++out_irq:
++	free_percpu_irq(EXYNOS_IRQ_MCT_LOCALTIMER, &percpu_mct_tick);
+ }
+ 
+ void __init exynos4_timer_init(void)
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
