@@ -1,55 +1,35 @@
-From: amery@geeks.cl (Alejandro Mery)
-Date: Thu, 07 Mar 2013 11:09:59 +0100
-Subject: [PATCH] ARM: sunxi: dt: Add support for the Miniand Mini X-plus
-In-Reply-To: <1362583127-25726-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1362583127-25726-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <51386777.5040109@geeks.cl>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 7 Mar 2013 15:17:35 +0530
+Subject: [PATCH] dma: Remove erroneous __exit and __exit_p() references
+In-Reply-To: <CAMhs6YwC+Lx0Vt=w2MoQV08on+rB1zidGCsNHRqcst8KBrb2XQ@mail.gmail.com>
+References: <1361318824-22287-1-git-send-email-maxin.john@gmail.com>
+ <CACRpkdZamOCWHWMcFYRqQDKJARZOCEP_eSNPNaxSgHfAn2wmEw@mail.gmail.com>
+ <CAMhs6YwC+Lx0Vt=w2MoQV08on+rB1zidGCsNHRqcst8KBrb2XQ@mail.gmail.com>
+Message-ID: <20130307094735.GG13370@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Mar 07, 2013 at 10:17:40AM +0100, Maxin B. John wrote:
+> Hi,
+> 
+> On Fri, Feb 22, 2013 at 7:29 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> > On Wed, Feb 20, 2013 at 1:07 AM,  <maxin.john@gmail.com> wrote:
+> >
+> >> From: "Maxin B. John" <maxin.john@enea.com>
+> >>
+> >> Removing the annotation with __exit and referencing with __exit_p()
+> >> present in dma driver module remove hooks.
+> >>
+> >> Part of the __devexit and __devexit_p() purge.
+> >>
+> >> Signed-off-by: Maxin B. John <maxin.john@enea.com>
+> >
+> > Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> Gentle ping...
+???
 
-On 06/03/13 16:18, Maxime Ripard wrote:
-> This board comes with an Allwinner A10, two external USB ports, a SD
-> Card reader, 1GB of RAM, the usual video connectors and an onboard wifi
-> chip.
->
-> Of course, the support is quite minimal for now...
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->   arch/arm/boot/dts/sun4i-a10-mini-xplus.dts |   30 ++++++++++++++++++++++++++++
->   1 file changed, 30 insertions(+)
->   create mode 100644 arch/arm/boot/dts/sun4i-a10-mini-xplus.dts
->
-> diff --git a/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts b/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts
-> new file mode 100644
-> index 0000000..635e135
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts
-> @@ -0,0 +1,30 @@
-> +/*
-> + * Copyright 2012 Maxime Ripard
-> + *
-> + * Maxime Ripard <maxime.ripard@free-electrons.com>
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +/dts-v1/;
-> +/include/ "sun4i-a10.dtsi"
-> +
-> +/ {
-> +	model = "Miniand Mini X-Plus";
-> +	compatible = "miniand,mini-xplus", "allwinner,sun4i-a10";
+Its already in my -next
 
-Hi, I just wanted to mention that Miniand is just a reseller. This 
-device is made by PineRiver <http://pineriver.cn/> and most commonly 
-available rebranded by "Jesurun" than miniand.
-
-cheers,
-Alejandro Mery
+--
+~Vinod
