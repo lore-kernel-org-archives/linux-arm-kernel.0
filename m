@@ -1,119 +1,56 @@
-From: mporter@ti.com (Matt Porter)
-Date: Thu, 7 Mar 2013 10:04:08 -0500
-Subject: [PATCH 2/2] ARM: dts: add AM33XX MMC support
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EC20CCA@DBDE01.ent.ti.com>
-References: <1362629799-22485-1-git-send-email-mporter@ti.com>
- <1362629799-22485-3-git-send-email-mporter@ti.com>
- <41fde401c8e646689123d7c6d3a2dffc@DLEE71.ent.ti.com>
- <20130307141235.GQ6209@beef>
- <79CD15C6BA57404B839C016229A409A83EC20C57@DBDE01.ent.ti.com>
- <20130307144656.GR6209@beef>
- <79CD15C6BA57404B839C016229A409A83EC20CCA@DBDE01.ent.ti.com>
-Message-ID: <20130307150408.GU6209@beef>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 7 Mar 2013 16:11:38 +0100
+Subject: [GIT PULL] preparation patches for Cortex-M3
+Message-ID: <20130307151138.GI15375@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 07, 2013 at 02:59:42PM +0000, Vaibhav Hiremath wrote:
-> 
-> > -----Original Message-----
-> > From: Hiremath, Vaibhav
-> > Sent: Thursday, March 07, 2013 8:24 PM
-> > To: Porter, Matt
-> > Cc: Linux OMAP List; Russell King; Krishnamoorthy, Balaji T; Devicetree
-> > Discuss; Linux MMC List; Linux Kernel Mailing List; Chris Ball; Linux
-> > ARM Kernel List
-> > Subject: RE: [PATCH 2/2] ARM: dts: add AM33XX MMC support
-> > 
-> > > -----Original Message-----
-> > > From: Matt Porter [mailto:ohiomdp at gmail.com] On Behalf Of Porter,
-> > Matt
-> > > Sent: Thursday, March 07, 2013 8:17 PM
-> > > To: Hiremath, Vaibhav
-> > > Cc: Linux OMAP List; Russell King; Krishnamoorthy, Balaji T;
-> > Devicetree
-> > > Discuss; Linux MMC List; Linux Kernel Mailing List; Chris Ball; Linux
-> > > ARM Kernel List
-> > > Subject: Re: [PATCH 2/2] ARM: dts: add AM33XX MMC support
-> > >
-> > > On Thu, Mar 07, 2013 at 02:39:55PM +0000, Vaibhav Hiremath wrote:
-> > > >
-> > > > > -----Original Message-----
-> > > > > From: Matt Porter [mailto:ohiomdp at gmail.com] On Behalf Of Porter,
-> > > Matt
-> > > > > Sent: Thursday, March 07, 2013 7:43 PM
-> > > > > To: Hiremath, Vaibhav
-> > > > > Cc: Krishnamoorthy, Balaji T; Chris Ball; Cousson, Benoit; Tony
-> > > > > Lindgren; Russell King; Devicetree Discuss; Linux ARM Kernel
-> > List;
-> > > > > Linux OMAP List; Linux Kernel Mailing List; Linux MMC List
-> > > > > Subject: Re: [PATCH 2/2] ARM: dts: add AM33XX MMC support
-> > > > >
-> > > > > On Thu, Mar 07, 2013 at 05:29:24AM +0000, Vaibhav Hiremath wrote:
-> > > > > > > -----Original Message-----
-> > > > > > > From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
-> > > > > > > owner at vger.kernel.org] On Behalf Of Porter, Matt
-> > > > > > > Sent: Thursday, March 07, 2013 9:47 AM
-> > > > > > > To: Krishnamoorthy, Balaji T; Chris Ball; Cousson, Benoit;
-> > Tony
-> > > > > > > Lindgren; Russell King
-> > > > > > > Cc: Devicetree Discuss; Linux ARM Kernel List; Linux OMAP
-> > List;
-> > > > > Linux
-> > > > > > > Kernel Mailing List; Linux MMC List
-> > > > > > > Subject: [PATCH 2/2] ARM: dts: add AM33XX MMC support
-> > > > > > >
-> <snip>
-> > 
-> > I believe you meant "CONFIG_TI_EDMA" right?
-> > 
-> > Yes, I just enabled it and the result is still same.
-> > 
-> > 
-> > 
-> > [root at arago /]# dmesg | grep -ir mmc
-> > [    0.506844] vmmc: 1800 <--> 3300 mV at 3300 mV
-> > [    0.506970] vmmc: supplied by vbat
-> > [root at arago /]#
-> > [root at arago /]#
-> > [root at arago /]# dmesg | grep -ir dma
-> > [    0.217063] DMA: preallocated 256 KiB pool for atomic coherent
-> > allocations
-> > [    0.236321] platform 49000000.edma: alias fck already exists
-> > [    0.236360] platform 49000000.edma: alias fck already exists
-> > [    0.236381] platform 49000000.edma: alias fck already exists
-> > [    0.370705] edma-dma-engine edma-dma-engine.0: TI EDMA DMA engine
-> > driver
-> > [    0.445156] omap-dma-engine omap-dma-engine: OMAP DMA engine driver
-> > [root at arago /]#
-> > [root at arago /]#
-> > 
-> > 
-> I have applied below patches from your recent post
-> 
-> 
-> [2/2] ARM: dts: add AM33XX MMC support 	
-> [1/2] mmc: omap_hsmmc: set max_segs based on dma engine limits 	
-> [v4,3/3] mmc: davinci: get SG segment limits with dma_get_slave_sg_limits()
-> [v4,2/3] dma: edma: add device_slave_sg_limits() support 
-> [v4,1/3] dmaengine: add dma_get_slave_sg_limits()
-> [v9,9/9] ARM: dts: add AM33XX SPI DMA support
-> [v9,8/9] spi: omap2-mcspi: add generic DMA request support to the DT binding
-> [v9,7/9] spi: omap2-mcspi: convert to dma_request_slave_channel_compat() 
-> [v9,6/9] ARM: dts: add AM33XX EDMA support 
-> [v9,5/9] dmaengine: edma: Add TI EDMA device tree binding
-> [v9,4/9] dmaengine: edma: enable build for AM33XX
-> [v9,3/9] ARM: edma: add AM33XX support to the private EDMA API
-> [v9,2/9] ARM: edma: remove unused transfer controller handlers
-> [v9,1/9] ARM: davinci: move private EDMA API to arm/common
-> [v3,2/2] mmc: omap_hsmmc: add generic DMA request support to the DT binding
-> [v3,1/2] mmc: omap_hsmmc: convert to dma_request_slave_channel_compat()
-> 
-> 
-> 
-> Am I missing anything here?
+Hello Russell,
 
-Yes, you missed the
-http://www.spinics.net/lists/arm-kernel/msg227886.html dependency
-mentioned first in the cover letter.
+the following changes since commit 949db153b6466c6f7cad5a427ecea94985927311:
 
--Matt
+  Linux 3.8-rc5 (2013-01-25 11:57:28 -0800)
+
+are available in the git repository at:
+
+  git://git.pengutronix.de/git/ukl/linux.git for-next
+
+for you to fetch changes up to 6ebd4d038dbb626a43d87db3007e71f92f49d7b3:
+
+  ARM: stub out read_cpuid and read_cpuid_ext for CPU_CP15=n (2013-01-31 21:44:48 +0100)
+
+These are in next since next-20130213 without any problem reports.
+
+I currently base my Cortex-M3 stuff on top of these. The complete series
+still has some problems though that I have to debug first. I'd be glad
+if you'd pull at least this series for 3.10.
+
+Thanks
+Uwe
+
+----------------------------------------------------------------
+Uwe Kleine-K?nig (5):
+      ARM: make cr_alignment read-only #ifndef CONFIG_CPU_CP15
+      ARM: let CPUs not being able to run in ARM mode enter in THUMB mode
+      ARM: sync comments about available data abort models with the code
+      ARM: use read_cpuid_id() instead of read_cpuid(CPUID_ID)
+      ARM: stub out read_cpuid and read_cpuid_ext for CPU_CP15=n
+
+ arch/arm/Kconfig               |  3 ++-
+ arch/arm/include/asm/cp15.h    | 16 +++++++++++++++-
+ arch/arm/include/asm/cputype.h | 31 +++++++++++++++++++++++++++----
+ arch/arm/include/asm/glue-df.h | 20 ++++++++++----------
+ arch/arm/kernel/head-common.S  |  9 +++++++--
+ arch/arm/kernel/head-nommu.S   |  8 +++++++-
+ arch/arm/kernel/setup.c        |  2 +-
+ arch/arm/kernel/smp_scu.c      |  2 +-
+ arch/arm/mach-omap2/id.c       |  4 ++--
+ arch/arm/mach-omap2/omap-smp.c |  2 +-
+ arch/arm/mm/Kconfig            |  9 ++++++++-
+ arch/arm/mm/alignment.c        |  2 ++
+ arch/arm/mm/mmu.c              | 17 +++++++++++++++++
+ 13 files changed, 100 insertions(+), 25 deletions(-)
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
