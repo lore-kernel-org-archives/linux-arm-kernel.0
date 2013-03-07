@@ -1,60 +1,52 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 7 Mar 2013 17:36:15 +0800 (HKT)
-Subject: [RFC PATCH] ARM: mm: disable kmap_high_get() for SMP
-In-Reply-To: <20130307081258.GA14839@lge.com>
-References: <1362372667-953-1-git-send-email-iamjoonsoo.kim@lge.com>
- <alpine.LFD.2.03.1303051642110.28820@syhkavp.arg>
- <20130307081258.GA14839@lge.com>
-Message-ID: <alpine.LFD.2.03.1303071721540.28820@syhkavp.arg>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 7 Mar 2013 10:40:17 +0100
+Subject: [PATCH 00/16] big.LITTLE low-level CPU and cluster power
+ management
+In-Reply-To: <alpine.LFD.2.03.1303071701330.28820@syhkavp.arg>
+References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
+ <20130307082721.GB28982@xo-6d-61-c0.localdomain>
+ <alpine.LFD.2.03.1303071701330.28820@syhkavp.arg>
+Message-ID: <20130307094017.GA6337@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 7 Mar 2013, Joonsoo Kim wrote:
+Hi!
 
-> Hello, Nicolas.
-> 
-> On Tue, Mar 05, 2013 at 05:36:12PM +0800, Nicolas Pitre wrote:
-> > On Mon, 4 Mar 2013, Joonsoo Kim wrote:
+> > > Review comments are welcome!
+> > > 
+> > > [*] General design information on the b.L switcher can be found here:
+> > >     http://lwn.net/Articles/481055/
+> > >     However the code is only accessible to Linaro members for the
+> > >     time being.
 > > 
-> > > With SMP and enabling kmap_high_get(), it makes users of kmap_atomic()
-> > > sequential ordered, because kmap_high_get() use global kmap_lock().
-> > > It is not welcome situation, so turn off this optimization for SMP.
+> > Assuming the lwn article is accurate:
 > > 
-> > I'm not sure I understand the problem.
+> > Hmm. So we have hw capable of running 8 cores, and then we introduce strange
+> > switching code, because "scheduler is not ready". Sounds like a bad idea.
 > > 
-> > The lock taken by kmap_high_get() is released right away before that 
-> > function returns and therefore this is not actually serializing 
-> > anything.
+> > I'd say:
+> > 
+> > * expose all 8 cores.
 > 
-> Yes, you understand what I want to say correctly.
-> Sorry for bad explanation.
+> You may do that now.  However the resulting power efficiency is far from 
+> optimal.
+
+Really? Assuming the lwn article is accurate, it will be exactly the
+same.
+
+I propose exposing all 8 cores, then keeping 4 of them offline in
+normal operation. This should have characteristics of your solution,
+except that cpu does not change unexpectedly under the pinned tasks.
+
+> > * as long as scheduler is not ready, you can offline "the other" set of cores...
+> > 	/sys/.../cpu/..../online
 > 
-> Following is reasons why I send this patch with RFC tag.
-> 
-> If we have more cpus, performance degration is possible although
-> it is very short time to holding the lock in kmap_high_get().
-> 
-> And kmap has maximum 512 entries(512 * 4K = 2M) and some mobile devices 
-> has 2G memory(highmem 1G>), so probability for finding matched entry
-> is approximately < 1/512. This probability can be more decreasing
-> for device which have more memory. So I think that waste time to find
-> matched entry is more than saved time.
-> 
-> Above is my humble opinion, so please let me know what I am missing.
+> You may do that now also.  But system performance is far from optimal.
 
-Please look at the kmap_high_get() code again.  It performs no 
-searching at all.  What it does is:
+Really? Do the offlining from the cpufreq code, and solution will be
+equivalent to yours, except the hacks.
+								Pavel
 
-- lock the kmap array against concurrent changes
-
-- if the given page is not highmem, unlock and return NULL
-
-- otherwise increment that page reference count, unlock, and return the 
-  mapped address for that page.
-
-There is almost zero cost to this function, independently of the number 
-of kmap entries, whereas it does save much bigger costs elsewhere when 
-it is successful.
-
-
-Nicolas
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
