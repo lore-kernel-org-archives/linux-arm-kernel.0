@@ -1,31 +1,164 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 7 Mar 2013 15:00:08 +0100 (CET)
-Subject: [PATCH 01/10] clocksource: add generic dummy timer driver
-In-Reply-To: <1362614646-24113-2-git-send-email-sboyd@codeaurora.org>
-References: <1362614646-24113-1-git-send-email-sboyd@codeaurora.org>
- <1362614646-24113-2-git-send-email-sboyd@codeaurora.org>
-Message-ID: <alpine.LFD.2.02.1303071457300.22263@ionos>
+From: mporter@ti.com (Matt Porter)
+Date: Thu, 7 Mar 2013 09:12:35 -0500
+Subject: [PATCH 2/2] ARM: dts: add AM33XX MMC support
+In-Reply-To: <41fde401c8e646689123d7c6d3a2dffc@DLEE71.ent.ti.com>
+References: <1362629799-22485-1-git-send-email-mporter@ti.com>
+ <1362629799-22485-3-git-send-email-mporter@ti.com>
+ <41fde401c8e646689123d7c6d3a2dffc@DLEE71.ent.ti.com>
+Message-ID: <20130307141235.GQ6209@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 6 Mar 2013, Stephen Boyd wrote:
+On Thu, Mar 07, 2013 at 05:29:24AM +0000, Vaibhav Hiremath wrote:
+> > -----Original Message-----
+> > From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> > owner at vger.kernel.org] On Behalf Of Porter, Matt
+> > Sent: Thursday, March 07, 2013 9:47 AM
+> > To: Krishnamoorthy, Balaji T; Chris Ball; Cousson, Benoit; Tony
+> > Lindgren; Russell King
+> > Cc: Devicetree Discuss; Linux ARM Kernel List; Linux OMAP List; Linux
+> > Kernel Mailing List; Linux MMC List
+> > Subject: [PATCH 2/2] ARM: dts: add AM33XX MMC support
+> > 
+> > Adds AM33XX MMC support for am335x-bone, am335x-evm, and
+> > am335x-evmsk.
+> > 
+> > Signed-off-by: Matt Porter <mporter@ti.com>
+> > Acked-by: Tony Lindgren <tony@atomide.com>
+> > ---
+> >  arch/arm/boot/dts/am335x-bone.dts  |    7 +++++++
+> >  arch/arm/boot/dts/am335x-evm.dts   |    7 +++++++
+> >  arch/arm/boot/dts/am335x-evmsk.dts |    7 +++++++
+> >  arch/arm/boot/dts/am33xx.dtsi      |   28 ++++++++++++++++++++++++++++
+> >  4 files changed, 49 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/am335x-bone.dts
+> > b/arch/arm/boot/dts/am335x-bone.dts
+> > index 11b240c..a154ce0 100644
+> > --- a/arch/arm/boot/dts/am335x-bone.dts
+> > +++ b/arch/arm/boot/dts/am335x-bone.dts
+> > @@ -120,6 +120,8 @@
+> >  		};
+> > 
+> >  		ldo3_reg: regulator at 5 {
+> > +			regulator-min-microvolt = <1800000>;
+> > +			regulator-max-microvolt = <3300000>;
+> >  			regulator-always-on;
+> >  		};
+> > 
+> > @@ -136,3 +138,8 @@
+> >  &cpsw_emac1 {
+> >  	phy_id = <&davinci_mdio>, <1>;
+> >  };
+> > +
+> > +&mmc1 {
+> > +	status = "okay";
+> > +	vmmc-supply = <&ldo3_reg>;
+> > +};
+> > diff --git a/arch/arm/boot/dts/am335x-evm.dts
+> > b/arch/arm/boot/dts/am335x-evm.dts
+> > index d649644..2907da6 100644
+> > --- a/arch/arm/boot/dts/am335x-evm.dts
+> > +++ b/arch/arm/boot/dts/am335x-evm.dts
+> > @@ -232,6 +232,8 @@
+> >  		};
+> > 
+> >  		vmmc_reg: regulator at 12 {
+> > +			regulator-min-microvolt = <1800000>;
+> > +			regulator-max-microvolt = <3300000>;
+> >  			regulator-always-on;
+> >  		};
+> >  	};
+> > @@ -244,3 +246,8 @@
+> >  &cpsw_emac1 {
+> >  	phy_id = <&davinci_mdio>, <1>;
+> >  };
+> > +
+> > +&mmc1 {
+> > +	status = "okay";
+> > +	vmmc-supply = <&vmmc_reg>;
+> > +};
+> > diff --git a/arch/arm/boot/dts/am335x-evmsk.dts
+> > b/arch/arm/boot/dts/am335x-evmsk.dts
+> > index f5a6162..f050c46 100644
+> > --- a/arch/arm/boot/dts/am335x-evmsk.dts
+> > +++ b/arch/arm/boot/dts/am335x-evmsk.dts
+> > @@ -244,7 +244,14 @@
+> >  		};
+> > 
+> >  		vmmc_reg: regulator at 12 {
+> > +			regulator-min-microvolt = <1800000>;
+> > +			regulator-max-microvolt = <3300000>;
+> >  			regulator-always-on;
+> >  		};
+> >  	};
+> >  };
+> > +
+> > +&mmc1 {
+> > +	status = "okay";
+> > +	vmmc-supply = <&vmmc_reg>;
+> > +};
+> > diff --git a/arch/arm/boot/dts/am33xx.dtsi
+> > b/arch/arm/boot/dts/am33xx.dtsi
+> > index c3c781a..e029eea 100644
+> > --- a/arch/arm/boot/dts/am33xx.dtsi
+> > +++ b/arch/arm/boot/dts/am33xx.dtsi
+> > @@ -234,6 +234,34 @@
+> >  			status = "disabled";
+> >  		};
+> > 
+> > +		mmc1: mmc at 48060000 {
+> > +			compatible = "ti,omap3-hsmmc";
+> > +			ti,hwmods = "mmc1";
+> > +			ti,dual-volt;
+> > +			ti,needs-special-reset;
+> > +			dmas = <&edma 24
+> > +				&edma 25>;
+> > +			dma-names = "tx", "rx";
+> > +			status = "disabled";
+> > +		};
+> > +
+> > +		mmc2: mmc at 481d8000 {
+> > +			compatible = "ti,omap3-hsmmc";
+> > +			ti,hwmods = "mmc2";
+> > +			ti,needs-special-reset;
+> > +			dmas = <&edma 2
+> > +				&edma 3>;
+> > +			dma-names = "tx", "rx";
+> > +			status = "disabled";
+> > +		};
+> > +
+> > +		mmc3: mmc at 47810000 {
+> > +			compatible = "ti,omap3-hsmmc";
+> > +			ti,hwmods = "mmc3";
+> > +			ti,needs-special-reset;
+> > +			status = "disabled";
+> > +		};
+> Any specific reason why you did not add edma entry here as well?
 
-> +static int __init dummy_timer_register(void)
-> +{
-> +	int err = register_cpu_notifier(&dummy_timer_cpu_nb);
-> +	if (err)
-> +		return err;
-> +
-> +	/* We won't get a call on the boot CPU, so register immediately */
-> +	dummy_timer_setup();
-> +
-> +	return 0;
-> +}
-> +device_initcall(dummy_timer_register);
+Yes, I've answered this one before and I think this illustrates a need
+for a comment in the .dtsi. mmc3 edma event are on the crossbar and so
+the event that will be mapped is system-specific. Since Luca is still
+working on DT support for WiLink, there's no way to show an example of
+how this is used upstream as that's the only in-kernel user.
 
-Are you sure that you want that to be installed unconditionally? What
-about multi-platform kernels?
+I have a test driver I've cited in the postings that shows how the
+crossbar is configured via the board .dts. It doesn't belong in the
+.dtsi, however, in this case. When WiLink DT support is ready we can
+have an entry in the am335x-evmsk.dts that shows this case.
 
-Thanks,
+> Also, I wonder why "interrupt" property is not coming here, I understand
+> That hwmod is filling the gap here; but I would still recommend you to complete
+> The DT node, as we only support DT boot.
 
-	tglx
+Yeah, I only added needed properties so as to not confuse people as to
+where the interrupt resources are coming from. If you feel strongly
+about this I don't have a problem with adding unused data in the dts.
+I suppose this will help clear things to have a switch away from using
+the hwmod data.
+
+> I will test the whole patch series today and update you.
+
+Thanks.
+
+-Matt
