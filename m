@@ -1,39 +1,74 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 7 Mar 2013 03:35:45 +0100
-Subject: [PATCH 02/14] MAINTAINERS: remove arch/arm/plat-nomadik/
-In-Reply-To: <1362275632-20242-3-git-send-email-cesarb@cesarb.net>
-References: <1362275632-20242-1-git-send-email-cesarb@cesarb.net>
- <1362275632-20242-3-git-send-email-cesarb@cesarb.net>
-Message-ID: <CACRpkdZ4he9BFCJ3ta59ZUsNZ=F88o8iR_y5B5Rk=EgrfZVZsg@mail.gmail.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Thu, 7 Mar 2013 10:36:13 +0800
+Subject: [PATCH v11 4/9] usb: chipidea: udc: add pullup/pulldown dp at
+ hw_device_state
+In-Reply-To: <20130306112633.GS28587@arwen.pp.htv.fi>
+References: <1362563800-16673-1-git-send-email-peter.chen@freescale.com>
+ <1362563800-16673-5-git-send-email-peter.chen@freescale.com>
+ <20130306112633.GS28587@arwen.pp.htv.fi>
+Message-ID: <20130307023612.GC20470@nchen-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 3, 2013 at 2:53 AM, Cesar Eduardo Barros <cesarb@cesarb.net> wrote:
+On Wed, Mar 06, 2013 at 01:26:33PM +0200, Felipe Balbi wrote:
+> Hi,
+> 
+> On Wed, Mar 06, 2013 at 05:56:35PM +0800, Peter Chen wrote:
+> > - During the connect/disconnect host, we need to pullup
+> > and pulldown dp
+> > - Make sure the dp is not pullup until the vbus is on when
+> > flag CI13XXX_PULLUP_ON_VBUS is set
+> > - Using hw_device_state when set run/stop bit
+> > 
+> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> > ---
+> >  drivers/usb/chipidea/udc.c |   10 ++++++++--
+> >  1 files changed, 8 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
+> > index e82dae4..70f9f2d 100644
+> > --- a/drivers/usb/chipidea/udc.c
+> > +++ b/drivers/usb/chipidea/udc.c
+> > @@ -91,8 +91,10 @@ static int hw_device_state(struct ci13xxx *ci, u32 dma)
+> >  		/* interrupt, error, port change, reset, sleep/suspend */
+> >  		hw_write(ci, OP_USBINTR, ~0,
+> >  			     USBi_UI|USBi_UEI|USBi_PCI|USBi_URI|USBi_SLI);
+> > +		hw_write(ci, OP_USBCMD, USBCMD_RS, USBCMD_RS);
+> >  	} else {
+> >  		hw_write(ci, OP_USBINTR, ~0, 0);
+> > +		hw_write(ci, OP_USBCMD, USBCMD_RS, 0);
+> 
+> this patch doesn't make sense to me. What will happen is that you will
+> be enabling pullups when vbus_session() gets called and this might not
+> be what gadget driver wants.
+> 
+> You don't want to fiddle with that yourself since I'm changing the
+> framework so that gadget driver will always request pullups to be
+> enabled.
 
-> The files within that directory were moved to other places over the
-> course of several commits. I only added the ones moved in the patch
-> series which finally removed the directory; untangling the rest will
-> take more work, since some seem to be shared with ux500.
->
-> In fact, the ARM/Ux500 ARM ARCHITECTURE block has patterns for files
-> named "nomadik" too. The patterns in this pair of MAINTAINER blocks
-> really need a review from the respective maintainters.
->
-> Cc: Alessandro Rubini <rubini@unipv.it>
-> Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: STEricsson <STEricsson_nomadik_linux@list.st.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Cesar Eduardo Barros <cesarb@cesarb.net>
+Hi Felipe,
 
-Thanks for doing this Cesar!
+Do you think pullup dp without vbus is a valid operation?
+Current udc core code makes that possible.
+But I think current your udc core code (add pullup after loading gadget)
+make benefit for udc driver who has not vbus operation.
 
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+For chipidea driver:
 
-The reason some drivers are named "Nomadik" is that that
-platform was the first using that IP block, but in some cases
-like drivers/i2c/busses/i2c-nomadik.c the original platform has
-not yet been migrated to it.
+- If vbus is there before load gadget module, the pullup dp is done by udc
+core code.
+- If vbus is not there before load gadget module, the pullup will be done
+when the vbus is there.
 
-Yours,
-Linus Walleij
+> 
+> Alex, I don't think this patch is correct
+> 
+> -- 
+> balbi
+
+
+
+-- 
+
+Best Regards,
+Peter Chen
