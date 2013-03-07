@@ -1,51 +1,33 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 7 Mar 2013 17:11:51 +0100 (CET)
-Subject: [BUG] ARM Architected timers appear broken in 3.9-rc1
-In-Reply-To: <20130307152619.GA24366@e106331-lin.cambridge.arm.com>
-References: <1362654289.3323.18.camel@linaro1.home>
- <20130307152619.GA24366@e106331-lin.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.02.1303071710230.22263@ionos>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 7 Mar 2013 08:36:32 -0800
+Subject: [PATCH] pinctrl: single: avoid to set read only object
+In-Reply-To: <CAD6h2NQNhDQfmcUih7Xs9+J8PFiRrHpTAUZb5B0+35bc6bu54w@mail.gmail.com>
+References: <1362322904-19570-1-git-send-email-haojian.zhuang@linaro.org>
+ <CACRpkdb-PP+BPhYZhLPnuuww5Lg2YevgvviZP4mS4XpGHAi8og@mail.gmail.com>
+ <CAD6h2NQNhDQfmcUih7Xs9+J8PFiRrHpTAUZb5B0+35bc6bu54w@mail.gmail.com>
+Message-ID: <20130307163631.GA11806@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 7 Mar 2013, Mark Rutland wrote:
-> From: Mark Rutland <mark.rutland@arm.com>
-> Date: Thu, 7 Mar 2013 15:09:24 +0000
-> Subject: [PATCH] clockevents: don't allow dummy broadcast timers
+* Haojian Zhuang <haojian.zhuang@linaro.org> [130307 07:42]:
+> On 7 March 2013 15:48, Linus Walleij <linus.walleij@linaro.org> wrote:
+> > On Sun, Mar 3, 2013 at 4:01 PM, Haojian Zhuang
+> > <haojian.zhuang@linaro.org> wrote:
+> >
+> >> drivers/pinctrl/pinctrl-single.c:1441:3: error: assignment of member
+> >> ?is_generic? in read-only object
+> >> make[2]: *** [drivers/pinctrl/pinctrl-single.o] Error 1
+> >>
+> >> Since pcs_pinconf_ops is changed to read only structure, probe()
+> >> function can't set is_generic variable any more. So append new
+> >> pcs_pinconf_generic_ops.
+> >>
+> >> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> >
+> > Isn't this fixed by Axel's much simpler patch?
 > 
-> Currently tick_check_broadcast_device doesn't reject clock_event_devices
-> with CLOCK_EVT_FEAT_DUMMY, and may select them in preference to real
-> hardware if they have a higher rating value. In this situation, the
-> dummy timer is responsible for broadcasting to itself, and the core
-> clockevents code may attempt to call non-existent callbacks for
-> programming the dummy, eventually leading to a panic.
+> Yes, I prefer to use Axel's fix.
 
-Sigh, yes. I so wish, that this whole broadcast business would go
-away.
- 
-> This patch makes tick_check_broadcast_device always reject dummy timers,
-> preventing this problem.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> ---
->  kernel/time/tick-broadcast.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/kernel/time/tick-broadcast.c b/kernel/time/tick-broadcast.c
-> index 2fb8cb8..7f32fe0 100644
-> --- a/kernel/time/tick-broadcast.c
-> +++ b/kernel/time/tick-broadcast.c
-> @@ -67,7 +67,8 @@ static void tick_broadcast_start_periodic(struct clock_event_device *bc)
->   */
->  int tick_check_broadcast_device(struct clock_event_device *dev)
->  {
-> -	if ((tick_broadcast_device.evtdev &&
-> +	if ((dev->features & CLOCK_EVT_FEAT_DUMMY) ||
-> +	    (tick_broadcast_device.evtdev &&
->  	     tick_broadcast_device.evtdev->rating >= dev->rating) ||
->  	     (dev->features & CLOCK_EVT_FEAT_C3STOP))
->  		return 0;
-> -- 
-> 1.8.1.1
-> 
-> 
+Yes that's better.
+
+Tony
