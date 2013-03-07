@@ -1,37 +1,43 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 7 Mar 2013 11:30:16 +0100
-Subject: [PATCH 2/4] arm: plat-orion: fix address decoding when > 4GB is
- used
-In-Reply-To: <20130307003022.GQ23237@titan.lakedaemon.net>
-References: <1362565416-15718-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1362565416-15718-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130307003022.GQ23237@titan.lakedaemon.net>
-Message-ID: <20130307113016.6bbf5a7b@skate>
+From: maxin.john@gmail.com (Maxin B. John)
+Date: Thu, 7 Mar 2013 11:31:02 +0100
+Subject: [PATCH] dma: Remove erroneous __exit and __exit_p() references
+In-Reply-To: <20130307094735.GG13370@intel.com>
+References: <1361318824-22287-1-git-send-email-maxin.john@gmail.com>
+ <CACRpkdZamOCWHWMcFYRqQDKJARZOCEP_eSNPNaxSgHfAn2wmEw@mail.gmail.com>
+ <CAMhs6YwC+Lx0Vt=w2MoQV08on+rB1zidGCsNHRqcst8KBrb2XQ@mail.gmail.com>
+ <20130307094735.GG13370@intel.com>
+Message-ID: <CAMhs6Yw12NvB1VUYUZq48jtSHMpx-jCyGyi-U0vQ_5eNE3_mjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Cooper,
+Hi Vinod,
 
-On Wed, 6 Mar 2013 19:30:22 -0500, Jason Cooper wrote:
+On Thu, Mar 7, 2013 at 10:47 AM, Vinod Koul <vinod.koul@intel.com> wrote:
+> On Thu, Mar 07, 2013 at 10:17:40AM +0100, Maxin B. John wrote:
+>> Hi,
+>>
+>> On Fri, Feb 22, 2013 at 7:29 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>> > On Wed, Feb 20, 2013 at 1:07 AM,  <maxin.john@gmail.com> wrote:
+>> >
+>> >> From: "Maxin B. John" <maxin.john@enea.com>
+>> >>
+>> >> Removing the annotation with __exit and referencing with __exit_p()
+>> >> present in dma driver module remove hooks.
+>> >>
+>> >> Part of the __devexit and __devexit_p() purge.
+>> >>
+>> >> Signed-off-by: Maxin B. John <maxin.john@enea.com>
+>> >
+>> > Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>>
+>> Gentle ping...
+> ???
+>
+> Its already in my -next
+In that case, sorry for creating confusion. I was under the impression
+that only the patch titled "dma: timb_dma: Fix compiler warning" was
+accepted in "-next".
 
-> > Since I've changed the patch, I haven't kept the Tested-by from Lior
-> > Amsalem, Gr?gory Clement and Ezequiel Garcia.
-> 
-> Then please don't send this as part of a pull-request.  Threading it
-> under a pull-request implies that it is ready to be applied, causing
-> most reviewers/testers to ignore the email.  Please have Lior,
-> Gr?gory, and Ezequiel retest and report back.
-
-I believe it is ready to be applied. The change I've done from the
-version tested by others is minor, and I'm quite convinced that the
-change is OK. If the change had been more significant, I would for sure
-not have sent this as a pull request.
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> ~Vinod
+Warm Regards,
+Maxin
