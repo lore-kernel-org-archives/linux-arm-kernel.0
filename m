@@ -1,67 +1,45 @@
-From: ian@slimlogic.co.uk (Ian Lartey)
-Date: Thu, 07 Mar 2013 13:23:47 +0000
-Subject: [PATCH v8 0/12] Palmas Updates
-In-Reply-To: <1362662276-20792-1-git-send-email-ian@slimlogic.co.uk>
-References: <1362662276-20792-1-git-send-email-ian@slimlogic.co.uk>
-Message-ID: <513894E3.1070206@slimlogic.co.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 7 Mar 2013 13:26:23 +0000
+Subject: [PATCH] ARM: mm: clean-up in order to reduce to call
+ kmap_high_get()
+In-Reply-To: <1362372609-877-1-git-send-email-iamjoonsoo.kim@lge.com>
+References: <1362372609-877-1-git-send-email-iamjoonsoo.kim@lge.com>
+Message-ID: <20130307132623.GG17833@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds to the support for the Palmas iseries of PMIC chips.
+On Mon, Mar 04, 2013 at 01:50:09PM +0900, Joonsoo Kim wrote:
+> In kmap_atomic(), kmap_high_get() is invoked for checking already
+> mapped area. In __flush_dcache_page() and dma_cache_maint_page(),
+> we explicitly call kmap_high_get() before kmap_atomic()
+> when cache_is_vipt(), so kmap_high_get() can be invoked twice.
+> This is useless operation, so remove one.
+> 
+> Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+> 
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index c7e3759..b7711be 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -822,16 +822,16 @@ static void dma_cache_maint_page(struct page *page, unsigned long offset,
+>  		if (PageHighMem(page)) {
+>  			if (len + offset > PAGE_SIZE)
+>  				len = PAGE_SIZE - offset;
+> -			vaddr = kmap_high_get(page);
+> -			if (vaddr) {
+> -				vaddr += offset;
+> -				op(vaddr, len, dir);
+> -				kunmap_high(page);
+> -			} else if (cache_is_vipt()) {
+> -				/* unmapped pages might still be cached */
+> +			if (cache_is_vipt()) {
 
-Some of the patches have previously been submitted individually.
-The DT bindings doc has been added first due to comments that it was 
-missing.
+This should be:
+			if (cache_is_vipt_nonaliasing())
 
-Patches based on linux-next-20130306
+to make it _explicit_ that this technique is only for non-aliasing VIPT
+caches (this doesn't work on any other of our cache types.)  Yes, I
+know we don't support highmem with VIPT aliasing caches - but still,
+we should ensure that this is self-documented in this code.
 
-mfd: DT bindings for the palmas family MFD
-mfd: palmas: is_palmas_charger needed by multiple driv
-mfd: palmas add variant and OTP detection
-regulator: palmas correct dt parsing
-watchdog: add Palmas Watchdog support
-watchdog: Kconfig for Palmas watchdog
-gpio: palmas: add in GPIO support for palmas charger
-gpio: palmas: Enable DT support for palmas gpio
-leds: Add support for Palmas LEDs
-leds: Kconfig for Palmas LEDs
-clk: add a clock driver for palmas
-clk: Kconfig for Palmas clock driver
-
-  .../devicetree/bindings/clock/palmas-clk.txt       |   25 +
-  .../devicetree/bindings/gpio/gpio-palmas.txt       |   21 +
-  .../devicetree/bindings/input/palmas-pwrbutton.txt |   22 +
-  .../devicetree/bindings/leds/leds-palmas.txt       |   35 ++
-  Documentation/devicetree/bindings/mfd/palmas.txt   |   70 +++
-  .../devicetree/bindings/regulator/palmas-pmic.txt  |  168 ++++++
-  .../devicetree/bindings/rtc/palmas-rtc.txt         |   22 +
-  .../devicetree/bindings/watchdog/palmas-wdt.txt    |   22 +
-  drivers/clk/Kconfig                                |    8 +
-  drivers/clk/Makefile                               |    1 +
-  drivers/clk/clk-palmas.c                           |  268 ++++++++++
-  drivers/gpio/gpio-palmas.c                         |   90 +++-
-  drivers/leds/Kconfig                               |    9 +
-  drivers/leds/Makefile                              |    1 +
-  drivers/leds/leds-palmas.c                         |  560 
-++++++++++++++++++++
-  drivers/mfd/palmas.c                               |  103 +++-
-  drivers/regulator/palmas-regulator.c               |   36 +-
-  drivers/watchdog/Kconfig                           |    8 +
-  drivers/watchdog/Makefile                          |    1 +
-  drivers/watchdog/palmas_wdt.c                      |  170 ++++++
-  include/linux/mfd/palmas.h                         |  119 ++++-
-  21 files changed, 1703 insertions(+), 56 deletions(-)
-  create mode 100644 Documentation/devicetree/bindings/clock/palmas-clk.txt
-  create mode 100644 Documentation/devicetree/bindings/gpio/gpio-palmas.txt
-  create mode 100644 
-Documentation/devicetree/bindings/input/palmas-pwrbutton.txt
-  create mode 100644 Documentation/devicetree/bindings/leds/leds-palmas.txt
-  create mode 100644 Documentation/devicetree/bindings/mfd/palmas.txt
-  create mode 100644 
-Documentation/devicetree/bindings/regulator/palmas-pmic.txt
-  create mode 100644 Documentation/devicetree/bindings/rtc/palmas-rtc.txt
-  create mode 100644 
-Documentation/devicetree/bindings/watchdog/palmas-wdt.txt
-  create mode 100644 drivers/clk/clk-palmas.c
-  create mode 100644 drivers/leds/leds-palmas.c
-  create mode 100644 drivers/watchdog/palmas_wdt.c
+Same for arch/arm/mm/flush.c
