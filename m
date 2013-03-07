@@ -1,49 +1,60 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Thu, 7 Mar 2013 15:05:58 +0530
-Subject: [PATCH 1/1] clk: tegra: Fix periph_clk_to_bit macro
-In-Reply-To: <5137BC29.2030909@wwwdotorg.org>
-References: <1362606444-19970-1-git-send-email-achew@nvidia.com>
- <5137BC29.2030909@wwwdotorg.org>
-Message-ID: <51385F7E.9050503@nvidia.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 7 Mar 2013 17:36:15 +0800 (HKT)
+Subject: [RFC PATCH] ARM: mm: disable kmap_high_get() for SMP
+In-Reply-To: <20130307081258.GA14839@lge.com>
+References: <1362372667-953-1-git-send-email-iamjoonsoo.kim@lge.com>
+ <alpine.LFD.2.03.1303051642110.28820@syhkavp.arg>
+ <20130307081258.GA14839@lge.com>
+Message-ID: <alpine.LFD.2.03.1303071721540.28820@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 07 March 2013 03:29 AM, Stephen Warren wrote:
-> On 03/06/2013 02:47 PM, Andrew Chew wrote:
->> The parameter name should be "gate", not "periph".  This worked, however,
->> because it happens that everywhere periph_clk_to_bit is called, "gate" was
->> in the local scope.
-> Peter, Prashant, can I get an ack/reviewed-by please?
+On Thu, 7 Mar 2013, Joonsoo Kim wrote:
 
-Thanks for the fix!!
+> Hello, Nicolas.
+> 
+> On Tue, Mar 05, 2013 at 05:36:12PM +0800, Nicolas Pitre wrote:
+> > On Mon, 4 Mar 2013, Joonsoo Kim wrote:
+> > 
+> > > With SMP and enabling kmap_high_get(), it makes users of kmap_atomic()
+> > > sequential ordered, because kmap_high_get() use global kmap_lock().
+> > > It is not welcome situation, so turn off this optimization for SMP.
+> > 
+> > I'm not sure I understand the problem.
+> > 
+> > The lock taken by kmap_high_get() is released right away before that 
+> > function returns and therefore this is not actually serializing 
+> > anything.
+> 
+> Yes, you understand what I want to say correctly.
+> Sorry for bad explanation.
+> 
+> Following is reasons why I send this patch with RFC tag.
+> 
+> If we have more cpus, performance degration is possible although
+> it is very short time to holding the lock in kmap_high_get().
+> 
+> And kmap has maximum 512 entries(512 * 4K = 2M) and some mobile devices 
+> has 2G memory(highmem 1G>), so probability for finding matched entry
+> is approximately < 1/512. This probability can be more decreasing
+> for device which have more memory. So I think that waste time to find
+> matched entry is more than saved time.
+> 
+> Above is my humble opinion, so please let me know what I am missing.
 
-Reviewed-by: Prashant Gaikwad <pgaikwad@nvidia.com>
+Please look at the kmap_high_get() code again.  It performs no 
+searching at all.  What it does is:
 
-> Note: I'm also CC'ing Mike and the LAKML mailing list; common clock
-> driver changes should be sent to Mike as CCF maintainer, and any
-> ARM-related changes should typically get sent to LAKML in the absence of
-> any other specific subsystem list.
->
->> Signed-off-by: Yen Lin <yelin@nvidia.com>
->> Signed-off-by: Andrew Chew <achew@nvidia.com>
->> ---
->>   drivers/clk/tegra/clk-periph-gate.c |    2 +-
->>   1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/clk/tegra/clk-periph-gate.c b/drivers/clk/tegra/clk-periph-gate.c
->> index 6dd5332..d87e1ce 100644
->> --- a/drivers/clk/tegra/clk-periph-gate.c
->> +++ b/drivers/clk/tegra/clk-periph-gate.c
->> @@ -41,7 +41,7 @@ static DEFINE_SPINLOCK(periph_ref_lock);
->>   #define write_rst_clr(val, gate) \
->>   	writel_relaxed(val, gate->clk_base + (gate->regs->rst_clr_reg))
->>   
->> -#define periph_clk_to_bit(periph) (1 << (gate->clk_num % 32))
->> +#define periph_clk_to_bit(gate) (1 << (gate->clk_num % 32))
->>   
->>   /* Peripheral gate clock ops */
->>   static int clk_periph_is_enabled(struct clk_hw *hw)
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+- lock the kmap array against concurrent changes
+
+- if the given page is not highmem, unlock and return NULL
+
+- otherwise increment that page reference count, unlock, and return the 
+  mapped address for that page.
+
+There is almost zero cost to this function, independently of the number 
+of kmap entries, whereas it does save much bigger costs elsewhere when 
+it is successful.
+
+
+Nicolas
