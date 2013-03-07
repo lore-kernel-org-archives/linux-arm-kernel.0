@@ -1,54 +1,56 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 07 Mar 2013 13:43:33 -0700
-Subject: [PATCH 03/10] ARM: tegra: get power management configurations
- for PMC from DT
-In-Reply-To: <1362653181.1890.3.camel@jlo-ubuntu-64.nvidia.com>
-References: <1362397207-5597-1-git-send-email-josephl@nvidia.com>
- <51363A95.8090000@wwwdotorg.org>
- <1362653181.1890.3.camel@jlo-ubuntu-64.nvidia.com>
-Message-ID: <5138FBF5.8010900@wwwdotorg.org>
+From: levipearson@gmail.com (Levi Pearson)
+Date: Thu, 7 Mar 2013 13:37:06 -0700
+Subject: omap4 pandaboard: clock input for TiWi module inactive
+Message-ID: <CAEYbN3QotnnAUU=7c7=r1sHDnZ5VhgNfXfP6ANf3+ssCzmEa=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/07/2013 03:46 AM, Joseph Lo wrote:
-> On Wed, 2013-03-06 at 02:33 +0800, Stephen Warren wrote:
->> On 03/04/2013 04:40 AM, Joseph Lo wrote:
->>> If the system supports deep sleep mode (i.e. suspend), it should have
->>> the power management configuration for PMC in the DT under the sub-node
->>> of PMC. Different system may have different configurations, it should
->>> be parsed from DT.
->>
->>> diff --git a/arch/arm/mach-tegra/pmc.c b/arch/arm/mach-tegra/pmc.c
->>
->>> @@ -143,6 +161,10 @@ static const struct of_device_id matches[] __initconst = {
->>>  static void tegra_pmc_parse_dt(void)
->>>  {
->>>  	struct device_node *np;
->>> +	u32 prop;
->>> +	enum tegra_suspend_mode suspend_mode;
->>> +	u32 core_good_time[2] = {0, 0};
->>> +	u32 lp0_vec[2] = {0, 0};
->>>  
->>>  	np = of_find_matching_node(NULL, matches);
->>>  	BUG_ON(!np);
->>
->> This files doesn't look like that; the BUG_ON() isn't present upstream.
->> yet. So, this series depends on some other patches not yet applied. You
->> need to explicitly document your patch dependencies somewhere. Hopefully
->> I can work it out...
->>
-> Sorry for that.
-> 
->> The DT binding documentation patch (5/10) should be squashed into this
->> patch; both document and implement the bindings in the same patch.
-> 
-> IIRC, you asked me to separate the binding documentation and
-> implementation into two different patch in internal review. Should I
-> squash these two now? (I can do that, just want to confirm.)
+I recently upgraded from a 3.4 kernel to a 3.8 kernel and found that
+the drivers for the functionality provided by the TiWi module on the
+pandaboard (Bluetooth, WiFI, etc.) could no longer probe the device.
+After some investigation, it turned out that the TiWi clock is
+provided by the twl6030 PMIC chip.
 
-I don't remember and can't find the history. I /think/ the DT binding
-doc was in the same patch as the change to *.dts, and I'd asked for it
-to be separated from that. It's typical to write/edit the DT binding
-document in the same patch as the driver changes though. Or sometimes, a
-separate patch, but earlier in the sequence than the driver code which
-implements it. So yes squash please.
+The clock output of the twl6030 was first enabled via these commits:
+
+https://patchwork.kernel.org/patch/546381/
+https://patchwork.kernel.org/patch/546401/
+
+Since most of the functionality of the TWL6030 is power regulation and
+the clock is enabled via a similar mechanism to the power outputs, the
+clock was added as a 'pseudo-regulator' to
+drivers/regulator/twl-regulator.c.
+
+Some time later, a series of commits removed the clock functionality
+from twl-regulator.c, apparently due to being out-of-place in the
+Device Tree listings or something.
+
+The first of these is recorded here: https://lkml.org/lkml/2012/6/4/330
+The next two just clean up the code that was orphaned by the previous:
+ e76ab829 "regulator: twl: Remove references to the twl4030 regulator"
+ 029dd3ce "regulator: twl: Remove another unused variable warning"
+
+Luciano Cuelho, who maintains the driver for the WiFi portion of the
+TiWi modules, reported the resulting breakage some time later on the
+LKML: https://lkml.org/lkml/2012/11/15/72
+
+Despite the protestation of Mark Brown that his code removal wasn't
+the cause of the problem, reverting his changes does indeed enable the
+clock.  However, it also seems to be the case that there ought to be a
+better home for the clock than twl-regulator.c.  At the time of the
+previous discussion, it wasn't clear if the framework was in place to
+support a clock driver for the twl6030's clock, but it seems like the
+support exists now, since there's a clock driver for the twl6030's
+companion, the twl6040 audio chip.
+
+So: Is there any chance of simply reverting the 3 commits that broke
+the clock?  I have done this locally, but I hate to see pandaboard
+support in the mainstream kernel continue to be broken in this way.
+
+If for whatever reason the commits cannot be reverted, would creating
+a driver like drivers/clk/clk-twl6040.c that enabled the twl6030's
+clock output be a suitable alternative?  I'd be willing to take a stab
+at writing it if there's not something like that in the works already.
+
+---
+Levi Pearson
