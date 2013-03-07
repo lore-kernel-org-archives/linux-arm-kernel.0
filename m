@@ -1,52 +1,85 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 7 Mar 2013 03:32:21 +0000
-Subject: ARM: 7653/2: do not scale loops_per_jiffy when using a constant
- delay clock
-In-Reply-To: <20130306183751.GV17833@n2100.arm.linux.org.uk>
-References: <20130306022308.GA21539@mudshark.cambridge.arm.com>
- <20130306183751.GV17833@n2100.arm.linux.org.uk>
-Message-ID: <20130307033221.GC25137@mudshark.cambridge.arm.com>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Thu, 7 Mar 2013 11:29:55 +0800
+Subject: [PATCH v6 06/16] spi/spi-atmel: status information passed through
+ controller data
+In-Reply-To: <1362626715-6549-1-git-send-email-wenyou.yang@atmel.com>
+References: <1362626715-6549-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1362626995-6814-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi guys,
+From: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-On Wed, Mar 06, 2013 at 06:37:51PM +0000, Russell King - ARM Linux wrote:
-> On Wed, Mar 06, 2013 at 02:23:08AM +0000, Will Deacon wrote:
-> > I notice that commit 70264367a243 ("ARM: 7653/2: do not scale loops_per_jiffy
-> > when using a constant delay clock") is in mainline, but I'm not sure whether
-> > it's the right fix. Unfortunately, I failed to find it in the list archives,
-> > so I couldn't repy to the original patch.
-> 
-> Sigh.  Here we go again.  I've said this many times.  Patches need to be
-> sent to the mailing list *before* they're sent to the patch system.  Not
-> just the complex ones.  ALL PATCHES including those which look like simple
-> fixes.
-> 
-> The reason being is that if someone wants to comment on the patch, they
-> can.  For exactly the kind of reason that Will brings up above.  You may
-> think your fix is obvious and the right solution, but someone else in this
-> complex ecosystem may have a case where your otherwise perfect solution
-> doesn't work.
+The status of transfer is stored in controller data structure
+so that it can be used not only by atmel_spi_msg_done() function.
+This will be useful for upcoming dmaengine enabled driver.
 
-I've just spoken to Nico in person about this, so it's probably worthwhile
-mentioning something here in an attempt to clear things up.
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: spi-devel-general at lists.sourceforge.net
+Cc: linux-kernel at vger.kernel.org
+[wenyou.yang at atmel.com: submit the patch]
+Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+---
+ drivers/spi/spi-atmel.c |   13 ++++++++-----
+ 1 file changed, 8 insertions(+), 5 deletions(-)
 
-It turns out that the problem which the patch in question tries to solve was
-originally fixed by somebody in ARM and discussed off-list (which explains
-the acks on the final patch). However, this got stuck in code review for a
-disproportionally large amount of time, until Nico admittedly lost his rag;
-writing his own patch and putting it straight into the patch system.
-
-Of course, this still isn't the right way to get patches into mainline and
-the points Russell makes above are completely correct. I wonder if we could
-extend the patch system to reject patches automatically if they don't appear
-in the linux-arm-kernel archives?
-
-On the topic of this patch: I still think that we should revert it and
-require cpufreq drivers to pass CPUFREQ_CONST_LOOPS in their flags (I guess
-the cpu0 platform data may need extending to take some flags). Longer
-term, we might want to assess the binding between timer-based delays and
-loops_per_jiffy, but that's an entirely new problem.
-
-Will
+diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+index 2f61a80..5c91408 100644
+--- a/drivers/spi/spi-atmel.c
++++ b/drivers/spi/spi-atmel.c
+@@ -209,6 +209,7 @@ struct atmel_spi {
+ 	unsigned long		current_remaining_bytes;
+ 	struct spi_transfer	*next_transfer;
+ 	unsigned long		next_remaining_bytes;
++	int			done_status;
+ 
+ 	void			*buffer;
+ 	dma_addr_t		buffer_dma;
+@@ -554,15 +555,15 @@ static void atmel_spi_dma_unmap_xfer(struct spi_master *master,
+ 
+ static void
+ atmel_spi_msg_done(struct spi_master *master, struct atmel_spi *as,
+-		struct spi_message *msg, int status, int stay)
++		struct spi_message *msg, int stay)
+ {
+-	if (!stay || status < 0)
++	if (!stay || as->done_status < 0)
+ 		cs_deactivate(as, msg->spi);
+ 	else
+ 		as->stay = msg->spi;
+ 
+ 	list_del(&msg->queue);
+-	msg->status = status;
++	msg->status = as->done_status;
+ 
+ 	dev_dbg(master->dev.parent,
+ 		"xfer complete: %u bytes transferred\n",
+@@ -574,6 +575,7 @@ atmel_spi_msg_done(struct spi_master *master, struct atmel_spi *as,
+ 
+ 	as->current_transfer = NULL;
+ 	as->next_transfer = NULL;
++	as->done_status = 0;
+ 
+ 	/* continue if needed */
+ 	if (list_empty(&as->queue) || as->stopping)
+@@ -651,7 +653,8 @@ atmel_spi_interrupt(int irq, void *dev_id)
+ 		/* Clear any overrun happening while cleaning up */
+ 		spi_readl(as, SR);
+ 
+-		atmel_spi_msg_done(master, as, msg, -EIO, 0);
++		as->done_status = -EIO;
++		atmel_spi_msg_done(master, as, msg, 0);
+ 	} else if (pending & (SPI_BIT(RXBUFF) | SPI_BIT(ENDRX))) {
+ 		ret = IRQ_HANDLED;
+ 
+@@ -669,7 +672,7 @@ atmel_spi_interrupt(int irq, void *dev_id)
+ 
+ 			if (atmel_spi_xfer_is_last(msg, xfer)) {
+ 				/* report completed message */
+-				atmel_spi_msg_done(master, as, msg, 0,
++				atmel_spi_msg_done(master, as, msg,
+ 						xfer->cs_change);
+ 			} else {
+ 				if (xfer->cs_change) {
+-- 
+1.7.9.5
