@@ -1,82 +1,165 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 7 Mar 2013 15:26:19 +0000
-Subject: [BUG] ARM Architected timers appear broken in 3.9-rc1
-In-Reply-To: <1362654289.3323.18.camel@linaro1.home>
-References: <1362654289.3323.18.camel@linaro1.home>
-Message-ID: <20130307152619.GA24366@e106331-lin.cambridge.arm.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Thu, 07 Mar 2013 16:28:00 +0100
+Subject: [PATCH V3 1/4] cpufreq: exynos: Adding cpufreq driver for
+ exynos5440
+In-Reply-To: <1362629627-10012-1-git-send-email-amit.daniel@samsung.com>
+References: <1362629627-10012-1-git-send-email-amit.daniel@samsung.com>
+Message-ID: <5138B200.7060906@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 07, 2013 at 11:04:49AM +0000, Jon Medhurst (Tixy) wrote:
-> Hi Mark
+On 03/07/2013 05:13 AM, Amit Daniel Kachhap wrote:
+> +/* Register definations */
 
-Hi,
+s/definations/definitions
 
-> 
-> When booting Versatile Express TC2 I am getting a null pointer
-> dereference which appears to be related to the recent changes in
-> architected timer support. 
-> 
-> The interesting part of the call stack is below (the full log is
-> attached). It shows that whilst entering CPU idle the code is calling
-> the NULL set_next_event function on the dummy timer setup by
-> broadcast_timer_setup.
+> +#define XMU_DVFS_CTRL		0x0060
+> +#define XMU_PMU_P0_7		0x0064
+> +#define XMU_C0_3_PSTATE		0x0090
+> +#define XMU_P_LIMIT		0x00A0
+> +#define XMU_P_STATUS		0x00A4
+> +#define XMU_PMUEVTEN		0x00D0
+> +#define XMU_PMUIRQEN		0x00D4
+> +#define XMU_PMUIRQ		0x00D8
 
-As you say, we're calling the NULL set_next_event on the dummy timer,
-because the dummy is registered as the broadcast device, which makes no
-sense (as that means it's responsible for broadcasting to itself).
+Keeping all hex numbers lower case might be a good idea.
 
-As far as I can see, the issue is that the dummy timer has a higher
-rating (400) than the sp804 (300) that would otherwise be used as the
-broadcast source, and tick_check_broadcast_device does not reject clocks
-with CLOCK_EVT_FEAT_DUMMY (which should *never* be used as a broadcast
-source). 
+> +
+> +/* PMU mask and shift definations */
+> +#define P_VALUE_MASK		0x7
+> +
+> +#define XMU_DVFS_CTRL_EN_SHIFT	0
+> +
+> +#define P0_7_CPUCLKDEV_SHIFT	21
+> +#define P0_7_CPUCLKDEV_MASK	0x7
+> +#define P0_7_ATBCLKDEV_SHIFT	18
+> +#define P0_7_ATBCLKDEV_MASK	0x7
+> +#define P0_7_CSCLKDEV_SHIFT	15
+> +#define P0_7_CSCLKDEV_MASK	0x7
+> +#define P0_7_CPUEMA_SHIFT	28
+> +#define P0_7_CPUEMA_MASK	0xf
+> +#define P0_7_L2EMA_SHIFT	24
+> +#define P0_7_L2EMA_MASK	0xf
+...
+> +static int exynos_cpufreq_probe(struct platform_device *pdev)
+> +{
+> +	int ret = -EINVAL;
+> +	struct device_node *np;
+> +	struct resource res;
+> +
+> +	np =  of_find_compatible_node(NULL, NULL, "samsung,exynos5440-cpufreq");
+> +	if (!np)
+> +		return -ENODEV;
+> +
+> +	dvfs_info = devm_kzalloc(&pdev->dev, sizeof(*dvfs_info), GFP_KERNEL);
+> +	if (!dvfs_info) {
+> +		ret = -ENOMEM;
+> +		goto err_put_node;
+> +	}
+> +
+> +	dvfs_info->dev = &pdev->dev;
+> +	dvfs_info->dev->of_node = np;
+> +
+> +	ret = of_address_to_resource(np, 0, &res);
+> +	if (ret)
+> +		goto err_put_node;
+> +
+> +	dvfs_info->base = devm_ioremap(dvfs_info->dev, res.start,
 
-Giving the dummy timer a lower rating than the sp804 would prevent this,
-but it might make more sense to do something like the below and
-explicitly prevent dummy timers from being registered as broadcast
-sources (this seems to work for me with your kernel, though I hit an
-unrelated BUG() later due to bL_platform_power_ops *power_ops not being
-set).
+There is a devm_ioremap_resource() function that has been introduced
+recently. It could simplify this code a bit and is preferred over
+devm_ioremap().
 
-Thomas, what do you think?
+> +					resource_size(&res));
+> +	if (!dvfs_info->base) {
+> +		pr_err("No cpufreq memory map found\n");
+> +		ret = -ENODEV;
+> +		goto err_put_node;
+> +	}
+> +
+> +	dvfs_info->irq = irq_of_parse_and_map(np, 0);
+> +	if (dvfs_info->irq == 0) {
+> +		pr_err("No cpufreq irq found\n");
 
-Thanks,
-Mark.
----->8----
->From 7432019cdfea9b2808e3b04489cd71a89266ca8f Mon Sep 17 00:00:00 2001
-From: Mark Rutland <mark.rutland@arm.com>
-Date: Thu, 7 Mar 2013 15:09:24 +0000
-Subject: [PATCH] clockevents: don't allow dummy broadcast timers
+Wouldn't dev_err() be more appropriate here ?
 
-Currently tick_check_broadcast_device doesn't reject clock_event_devices
-with CLOCK_EVT_FEAT_DUMMY, and may select them in preference to real
-hardware if they have a higher rating value. In this situation, the
-dummy timer is responsible for broadcasting to itself, and the core
-clockevents code may attempt to call non-existent callbacks for
-programming the dummy, eventually leading to a panic.
+> +		ret = -ENODEV;
+> +		goto err_put_node;
+> +	}
+> +
+> +	ret = of_init_opp_table(dvfs_info->dev);
+> +	if (ret) {
+> +		pr_err("failed to init OPP table: %d\n", ret);
+> +		goto err_put_node;
+> +	}
+> +
+> +	ret = opp_init_cpufreq_table(dvfs_info->dev, &dvfs_info->freq_table);
+> +	if (ret) {
+> +		pr_err("failed to init cpufreq table: %d\n", ret);
+> +		goto err_put_node;
+> +	}
+> +	dvfs_info->freq_count = opp_get_opp_count(dvfs_info->dev);
+> +	exynos_sort_descend_freq_table();
+> +
+> +	if (of_property_read_u32(np, "clock-latency", &dvfs_info->latency))
+> +		dvfs_info->latency = DEF_TRANS_LATENCY;
+> +
+> +	dvfs_info->cpu_clk = devm_clk_get(dvfs_info->dev, "armclk");
+> +	if (IS_ERR_OR_NULL(dvfs_info->cpu_clk)) {
 
-This patch makes tick_check_broadcast_device always reject dummy timers,
-preventing this problem.
+devm_clk_get() return value needs to be checked with IS_ERR(),
+not IS_ERR_OR_NULL().
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
----
- kernel/time/tick-broadcast.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+> +		pr_err("Failed to get cpu clock\n");
+> +		ret = PTR_ERR(dvfs_info->cpu_clk);
+> +		goto err_free_table;
+> +	}
+> +
+> +	dvfs_info->cur_frequency = clk_get_rate(dvfs_info->cpu_clk);
+> +	if (!dvfs_info->cur_frequency) {
+> +		pr_err("Failed to get clock rate\n");
+> +		ret = -EINVAL;
+> +		goto err_free_table;
+> +	}
+> +	dvfs_info->cur_frequency /= 1000;
+> +
+> +	INIT_WORK(&dvfs_info->irq_work, exynos_cpufreq_work);
+> +	if (devm_request_irq(dvfs_info->dev, dvfs_info->irq, exynos_cpufreq_irq,
+> +				IRQF_TRIGGER_NONE, CPUFREQ_NAME, dvfs_info)) {
+> +		pr_err("Failed to register IRQ\n");
+> +		ret = -ENODEV;
+> +		goto err_free_table;
+> +	}
+> +
+> +	ret = init_div_table();
+> +	if (ret) {
+> +		pr_err("Failed to initialise div table\n");
+> +		goto err_free_table;
+> +	}
+> +
+> +	exynos_enable_dvfs();
+> +	ret = cpufreq_register_driver(&exynos_driver);
+> +	if (ret) {
+> +		pr_err("%s: failed to register cpufreq driver\n", __func__);
+> +		goto err_free_table;
+> +	}
+> +
+> +	of_node_put(np);
+> +	dvfs_info->dvfs_enable = true;
+> +	pr_info("exynos5440 DVFS initialized.\n");
 
-diff --git a/kernel/time/tick-broadcast.c b/kernel/time/tick-broadcast.c
-index 2fb8cb8..7f32fe0 100644
---- a/kernel/time/tick-broadcast.c
-+++ b/kernel/time/tick-broadcast.c
-@@ -67,7 +67,8 @@ static void tick_broadcast_start_periodic(struct clock_event_device *bc)
-  */
- int tick_check_broadcast_device(struct clock_event_device *dev)
- {
--	if ((tick_broadcast_device.evtdev &&
-+	if ((dev->features & CLOCK_EVT_FEAT_DUMMY) ||
-+	    (tick_broadcast_device.evtdev &&
- 	     tick_broadcast_device.evtdev->rating >= dev->rating) ||
- 	     (dev->features & CLOCK_EVT_FEAT_C3STOP))
- 		return 0;
--- 
-1.8.1.1
+dev_info() ?
+
+> +	return 0;
+> +
+> +err_free_table:
+> +	opp_free_cpufreq_table(dvfs_info->dev, &dvfs_info->freq_table);
+> +err_put_node:
+> +	of_node_put(np);
+> +	pr_err("%s: failed initialization\n", __func__);
+
+Is this really needed ? This failure will be logged by the driver core
+anyway.
+
+> +	return ret;
+> +
