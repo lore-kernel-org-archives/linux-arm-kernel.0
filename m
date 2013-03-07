@@ -1,39 +1,38 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu,  7 Mar 2013 22:26:32 +0100
-Subject: [PATCH 7/9] net/console: switch to pr_xxx
+Date: Thu,  7 Mar 2013 22:26:29 +0100
+Subject: [PATCH 4/9] startup: switch to pr_xxx
 In-Reply-To: <1362691594-32286-1-git-send-email-plagnioj@jcrosoft.com>
 References: <20130307212523.GK4401@game.jcrosoft.org>
  <1362691594-32286-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <1362691594-32286-7-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1362691594-32286-4-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 ---
- net/netconsole.c |    4 ++--
+ common/startup.c |    4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/net/netconsole.c b/net/netconsole.c
-index 7d0f3f4..8db8356 100644
---- a/net/netconsole.c
-+++ b/net/netconsole.c
-@@ -185,7 +185,7 @@ static int netconsole_init(void)
+diff --git a/common/startup.c b/common/startup.c
+index 52a8996..e49cc4c 100644
+--- a/common/startup.c
++++ b/common/startup.c
+@@ -105,14 +105,14 @@ void __noreturn start_barebox(void)
  
- 	ret = console_register(cdev);
- 	if (ret) {
--		printf("netconsole: registering failed with %s\n", strerror(-ret));
-+		pr_err("netconsole: registering failed with %s\n", strerror(-ret));
- 		kfree(priv);
- 		return ret;
+ 	for (initcall = __barebox_initcalls_start;
+ 			initcall < __barebox_initcalls_end; initcall++) {
+-		debug("initcall-> %pS\n", *initcall);
++		pr_debug("initcall-> %pS\n", *initcall);
+ 		result = (*initcall)();
+ 		if (result)
+ 			pr_err("initcall %pS failed: %s\n", *initcall,
+ 					strerror(-result));
  	}
-@@ -194,7 +194,7 @@ static int netconsole_init(void)
- 	dev_add_param(&cdev->class_dev, "port", nc_port_set, NULL, 0);
- 	dev_set_param(&cdev->class_dev, "port", "6666");
  
--	printf("registered netconsole as %s%d\n", cdev->class_dev.name, cdev->class_dev.id);
-+	pr_info("registered netconsole as %s%d\n", cdev->class_dev.name, cdev->class_dev.id);
+-	debug("initcalls done\n");
++	pr_debug("initcalls done\n");
  
- 	return 0;
- }
+ 	if (IS_ENABLED(CONFIG_ENV_HANDLING)) {
+ 		int ret;
 -- 
 1.7.10.4
