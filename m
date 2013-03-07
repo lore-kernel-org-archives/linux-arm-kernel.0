@@ -1,56 +1,84 @@
-From: simon.jeons@gmail.com (Simon Jeons)
-Date: Thu, 07 Mar 2013 09:05:56 +0800
-Subject: [PATCH] mm: Fixup the condition whether the page cache is free
-In-Reply-To: <20130306194703.GA1953@cmpxchg.org>
-References: <CAFNq8R7tq9kvD9LyhZJ-Cj0kexQfDsPhB4iQYyZ9s9+8Jo82QA@mail.gmail.com>
- <20130304150937.GB23767@cmpxchg.org> <51369637.6030705@gmail.com>
- <20130306194703.GA1953@cmpxchg.org>
-Message-ID: <5137E7F4.1060509@gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 07 Mar 2013 10:12:52 +0900
+Subject: [PATCH] ARM: EXYNOS: remove EXYNOS_DEV_SYSMMU entirely
+In-Reply-To: <1362509466.16460.108.camel@x61.thuisdomein>
+References: <1362509466.16460.108.camel@x61.thuisdomein>
+Message-ID: <014f01ce1ad0$e4432b10$acc98130$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Johannes,
-On 03/07/2013 03:47 AM, Johannes Weiner wrote:
-> On Wed, Mar 06, 2013 at 09:04:55AM +0800, Simon Jeons wrote:
->> Hi Johannes,
->> On 03/04/2013 11:09 PM, Johannes Weiner wrote:
->>> On Mon, Mar 04, 2013 at 09:54:26AM +0800, Li Haifeng wrote:
->>>> When a page cache is to reclaim, we should to decide whether the page
->>>> cache is free.
->>>> IMO, the condition whether a page cache is free should be 3 in page
->>>> frame reclaiming. The reason lists as below.
->>>>
->>>> When page is allocated, the page->_count is 1(code fragment is code-1 ).
->>>> And when the page is allocated for reading files from extern disk, the
->>>> page->_count will increment 1 by page_cache_get() in
->>>> add_to_page_cache_locked()(code fragment is code-2). When the page is to
->>>> reclaim, the isolated LRU list also increase the page->_count(code
->>>> fragment is code-3).
->>> The page count is initialized to 1, but that does not stay with the
->>> object.  It's a reference that is passed to the allocating task, which
->>> drops it again when it's done with the page.  I.e. the pattern is like
->>> this:
->>>
->>> instantiation:
->>> page = page_cache_alloc()	/* instantiator reference -> 1 */
->>> add_to_page_cache(page, mapping, offset)
->>>    get_page(page)		/* page cache reference -> 2 */
->>> lru_cache_add(page)
->>>    get_page(page)		/* pagevec reference -> 3 */
->>> /* ...initiate read, write, associate buffers, ... */
->>> page_cache_release(page)	/* drop instantiator reference -> 2 + private */
->>>
->>> reclaim:
->>> lru_add_drain()
->>>    page_cache_release(page)	/* drop pagevec reference -> 1 + private */
->> IIUC, when add page to lru will lead to add to pagevec firstly, and
->> pagevec will take one reference, so if lru will take over the
->> reference taken by pagevec when page transmit from pagevec to lru?
->> or just drop the reference and lru will not take reference for page?
-> The LRU does not hold a reference, it would not make sense.  The
-> pagevec only needs one because it would be awkward to remove a
-> concurrently freed page out of a pagevec, but unlinking a page from
-> the LRU is easy.  See mm/swap.c::__page_cache_release() and friends.
+Paul Bolle wrote:
+> 
+> Commit 25e9d28d927d2e1731df53f60cde53d75bcb7c36 ("ARM: EXYNOS: remove
+> system mmu initialization from exynos tree") removed the Kconfig symbol
+> EXYNOS_DEV_SYSMMU. Remove its last traces too.
+> 
+> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+> ---
+> 0) Untested.
+> 
+> 1) Please note that this patch changes the dependencies of EXYNOS_IOMMU
+> (it removed a dependency that could never be met). That's probably what
+> needs to be done but some specific review is needed here.
+> 
+>  arch/arm/mach-exynos/Kconfig | 4 ----
+>  drivers/iommu/Kconfig        | 2 +-
+>  2 files changed, 1 insertion(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+> index 70f94c8..6c2bdc3 100644
+> --- a/arch/arm/mach-exynos/Kconfig
+> +++ b/arch/arm/mach-exynos/Kconfig
+> @@ -200,7 +200,6 @@ config MACH_SMDKV310
+>  	select EXYNOS4_SETUP_USB_PHY
+>  	select EXYNOS_DEV_DMA
+>  	select EXYNOS_DEV_DRM
+> -	select EXYNOS_DEV_SYSMMU
+>  	select S3C24XX_PWM
+>  	select S3C_DEV_HSMMC
+>  	select S3C_DEV_HSMMC1
+> @@ -254,7 +253,6 @@ config MACH_UNIVERSAL_C210
+>  	select EXYNOS4_SETUP_USB_PHY
+>  	select EXYNOS_DEV_DMA
+>  	select EXYNOS_DEV_DRM
+> -	select EXYNOS_DEV_SYSMMU
+>  	select HAVE_SCHED_CLOCK
+>  	select S3C_DEV_HSMMC
+>  	select S3C_DEV_HSMMC2
+> @@ -331,7 +329,6 @@ config MACH_ORIGEN
+>  	select EXYNOS4_SETUP_USB_PHY
+>  	select EXYNOS_DEV_DMA
+>  	select EXYNOS_DEV_DRM
+> -	select EXYNOS_DEV_SYSMMU
+>  	select S3C24XX_PWM
+>  	select S3C_DEV_HSMMC
+>  	select S3C_DEV_HSMMC2
+> @@ -367,7 +364,6 @@ config MACH_SMDK4212
+>  	select EXYNOS4_SETUP_USB_PHY
+>  	select EXYNOS_DEV_DMA
+>  	select EXYNOS_DEV_DRM
+> -	select EXYNOS_DEV_SYSMMU
+>  	select S3C24XX_PWM
+>  	select S3C_DEV_HSMMC2
+>  	select S3C_DEV_HSMMC3
+> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+> index 5c514d07..c520c20 100644
+> --- a/drivers/iommu/Kconfig
+> +++ b/drivers/iommu/Kconfig
+> @@ -168,7 +168,7 @@ config TEGRA_IOMMU_SMMU
+> 
+>  config EXYNOS_IOMMU
+>  	bool "Exynos IOMMU Support"
+> -	depends on ARCH_EXYNOS && EXYNOS_DEV_SYSMMU
+> +	depends on ARCH_EXYNOS
+>  	select IOMMU_API
+>  	help
+>  	  Support for the IOMMU(System MMU) of Samsung Exynos application
+> --
+> 1.7.11.7
 
-Since pagevec is per cpu, when can remove a concurrently freed page out 
-of a pagevec happen?
+Actually, to update iommu for exynos is on-going. And as I know, it will be done this time for v3.10 by KyongHo Cho, so it would be better to handle this cleanup with that at the same time.
+
+Thanks.
+
+- Kukjin
