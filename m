@@ -1,38 +1,37 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 7 Mar 2013 10:29:54 +0800
-Subject: [PATCH] cpufreq: ARM big LITTLE: Add generic cpufreq driver and
- its DT glue
-In-Reply-To: <CAOesGMiOBxEHVgkr=K_4JVQ6+0Swy1uRmHaS8QwRxTJKs3J2Ow@mail.gmail.com>
-References: <f20e3c5e822c4bd28a3b71264d73143cc1f850b0.1362458878.git.viresh.kumar@linaro.org>
- <20130307014657.GA7426@quad.lixom.net>
- <CAOesGMiOBxEHVgkr=K_4JVQ6+0Swy1uRmHaS8QwRxTJKs3J2Ow@mail.gmail.com>
-Message-ID: <CAKohpo=sF3nEnA4Jgr3gx-vxJTeqp6P1JmoiU=tN-bS6VJQ4Fw@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 7 Mar 2013 10:33:19 +0800
+Subject: [PATCH v3 09/12] ASoC: dmaengine_pcm: add
+ snd_dmaengine_generic_pcm_open()
+In-Reply-To: <20130306171333.GR17833@n2100.arm.linux.org.uk>
+References: <1362486244-24593-10-git-send-email-shawn.guo@linaro.org>
+ <1362494247-28909-1-git-send-email-shawn.guo@linaro.org>
+ <20130306171333.GR17833@n2100.arm.linux.org.uk>
+Message-ID: <20130307023316.GA22554@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 March 2013 09:50, Olof Johansson <olof@lixom.net> wrote:
-> On Wed, Mar 6, 2013 at 5:46 PM, Olof Johansson <olof@lixom.net> wrote:
->
->> This binding makes no sense to me. It needs to be substantially better
->> documented, not just a couple of sentences that people that understand
->> bit.LITTLE thoroughly can make sense of.
->>
->> It also duplicates the cpu binding. I suspect this should instead be done
->> through additions of the cpu bindings instead of duplication. So this needs to
->> be substantially reworked.
+On Wed, Mar 06, 2013 at 05:13:33PM +0000, Russell King - ARM Linux wrote:
 
-Actually, i wasn't getting in new bindings for cpu/cluster for big
-LITTLE but was
-just trying to get bindings for getting freq-table for cpufreq driver.
+> This purpetuates the brain-dead behaviour of the existing ASoC DMA
+> engine layer, which makes it unsuitable for platforms with special DMA
+> memory requirements.
 
-Lorenzo (cc'd) actually has a patch for getting the bindings in and he
-is looking
-to send them soon. I know these can change after some review and the plan was
-i will fix cpufreq bindings again once that patch is in. We don't have
-any mainlined
-hardware for it for now and so it wouldn't break anything.
+> The problem is that the DMA mask to be used for allocating DMA-able
+> memory is the DMA engine struct device, not the struct device associated
+> with the ASoC device.
 
-> Also, _ALWAYS_ cc devicetree-discuss on new bindings. get_maintainer
-> tells you to do so.
+> I got this right in my ASoC generic DMA engine layer.  Converting this
+> layer is far from trivial though, and as my test platform has now become
+> my entire network firewall, I'm not doing any testing on that anymore.
 
-I knew it and i messed up with it. Will surely take care of it next time.
+Could you go into more detail here please?  Looking at the code I'm not
+seeing any allocations done by the library code at all, the allocations
+are all done by the individual platform DMA drivers so I don't see
+anything stopping them doing what they need.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130307/0bb5bfe6/attachment.sig>
