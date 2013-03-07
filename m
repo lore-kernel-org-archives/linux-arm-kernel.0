@@ -1,30 +1,166 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 7 Mar 2013 15:37:36 +0000
-Subject: [PATCH V3 1/4] cpufreq: exynos: Adding cpufreq driver for
- exynos5440
-In-Reply-To: <5138B200.7060906@samsung.com>
-References: <1362629627-10012-1-git-send-email-amit.daniel@samsung.com>
- <5138B200.7060906@samsung.com>
-Message-ID: <20130307153736.GC4977@n2100.arm.linux.org.uk>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Thu, 7 Mar 2013 15:50:01 +0000
+Subject: [PATCH 2/2] ARM: dts: add AM33XX MMC support
+In-Reply-To: <20130307150408.GU6209@beef>
+References: <1362629799-22485-1-git-send-email-mporter@ti.com>
+ <1362629799-22485-3-git-send-email-mporter@ti.com>
+ <41fde401c8e646689123d7c6d3a2dffc@DLEE71.ent.ti.com>
+ <20130307141235.GQ6209@beef>
+ <79CD15C6BA57404B839C016229A409A83EC20C57@DBDE01.ent.ti.com>
+ <20130307144656.GR6209@beef>
+ <79CD15C6BA57404B839C016229A409A83EC20CCA@DBDE01.ent.ti.com>
+ <20130307150408.GU6209@beef>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EC20D27@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 07, 2013 at 04:28:00PM +0100, Sylwester Nawrocki wrote:
-> On 03/07/2013 05:13 AM, Amit Daniel Kachhap wrote:
-> > +	dvfs_info->cpu_clk = devm_clk_get(dvfs_info->dev, "armclk");
-> > +	if (IS_ERR_OR_NULL(dvfs_info->cpu_clk)) {
-> 
-> devm_clk_get() return value needs to be checked with IS_ERR(),
-> not IS_ERR_OR_NULL().
-> 
-> > +		pr_err("Failed to get cpu clock\n");
-> > +		ret = PTR_ERR(dvfs_info->cpu_clk);
-> > +		goto err_free_table;
 
-Amit, to illustrate why this is wrong, consider this:
-1. Set cpu_clk to NULL.
-2. Realise IS_ERR_OR_NULL(NULL) is true.
-3. What is the value of PTR_ERR(NULL) ?
-4. What effect does that have when you jump to err_free_table ?
-5. What value is returned from this function in that case ?
-6. What does that return value mean to the driver core ?
+> -----Original Message-----
+> From: Matt Porter [mailto:ohiomdp at gmail.com] On Behalf Of Porter, Matt
+> Sent: Thursday, March 07, 2013 8:34 PM
+> To: Hiremath, Vaibhav
+> Cc: Chris Ball; Russell King; Krishnamoorthy, Balaji T; Devicetree
+> Discuss; Linux MMC List; Linux Kernel Mailing List; Linux OMAP List;
+> Linux ARM Kernel List
+> Subject: Re: [PATCH 2/2] ARM: dts: add AM33XX MMC support
+> 
+> On Thu, Mar 07, 2013 at 02:59:42PM +0000, Vaibhav Hiremath wrote:
+> >
+> > > -----Original Message-----
+> > > From: Hiremath, Vaibhav
+> > > Sent: Thursday, March 07, 2013 8:24 PM
+> > > To: Porter, Matt
+> > > Cc: Linux OMAP List; Russell King; Krishnamoorthy, Balaji T;
+> Devicetree
+> > > Discuss; Linux MMC List; Linux Kernel Mailing List; Chris Ball;
+> Linux
+> > > ARM Kernel List
+> > > Subject: RE: [PATCH 2/2] ARM: dts: add AM33XX MMC support
+> > >
+> > > > -----Original Message-----
+> > > > From: Matt Porter [mailto:ohiomdp at gmail.com] On Behalf Of Porter,
+> > > Matt
+> > > > Sent: Thursday, March 07, 2013 8:17 PM
+> > > > To: Hiremath, Vaibhav
+> > > > Cc: Linux OMAP List; Russell King; Krishnamoorthy, Balaji T;
+> > > Devicetree
+> > > > Discuss; Linux MMC List; Linux Kernel Mailing List; Chris Ball;
+> Linux
+> > > > ARM Kernel List
+> > > > Subject: Re: [PATCH 2/2] ARM: dts: add AM33XX MMC support
+> > > >
+> > > > On Thu, Mar 07, 2013 at 02:39:55PM +0000, Vaibhav Hiremath wrote:
+> > > > >
+> > > > > > -----Original Message-----
+> > > > > > From: Matt Porter [mailto:ohiomdp at gmail.com] On Behalf Of
+> Porter,
+> > > > Matt
+> > > > > > Sent: Thursday, March 07, 2013 7:43 PM
+> > > > > > To: Hiremath, Vaibhav
+> > > > > > Cc: Krishnamoorthy, Balaji T; Chris Ball; Cousson, Benoit;
+> Tony
+> > > > > > Lindgren; Russell King; Devicetree Discuss; Linux ARM Kernel
+> > > List;
+> > > > > > Linux OMAP List; Linux Kernel Mailing List; Linux MMC List
+> > > > > > Subject: Re: [PATCH 2/2] ARM: dts: add AM33XX MMC support
+> > > > > >
+> > > > > > On Thu, Mar 07, 2013 at 05:29:24AM +0000, Vaibhav Hiremath
+> wrote:
+> > > > > > > > -----Original Message-----
+> > > > > > > > From: linux-omap-owner at vger.kernel.org [mailto:linux-
+> omap-
+> > > > > > > > owner at vger.kernel.org] On Behalf Of Porter, Matt
+> > > > > > > > Sent: Thursday, March 07, 2013 9:47 AM
+> > > > > > > > To: Krishnamoorthy, Balaji T; Chris Ball; Cousson,
+> Benoit;
+> > > Tony
+> > > > > > > > Lindgren; Russell King
+> > > > > > > > Cc: Devicetree Discuss; Linux ARM Kernel List; Linux OMAP
+> > > List;
+> > > > > > Linux
+> > > > > > > > Kernel Mailing List; Linux MMC List
+> > > > > > > > Subject: [PATCH 2/2] ARM: dts: add AM33XX MMC support
+> > > > > > > >
+> > <snip>
+> > >
+> > > I believe you meant "CONFIG_TI_EDMA" right?
+> > >
+> > > Yes, I just enabled it and the result is still same.
+> > >
+> > >
+> > >
+> > > [root at arago /]# dmesg | grep -ir mmc
+> > > [    0.506844] vmmc: 1800 <--> 3300 mV at 3300 mV
+> > > [    0.506970] vmmc: supplied by vbat
+> > > [root at arago /]#
+> > > [root at arago /]#
+> > > [root at arago /]# dmesg | grep -ir dma
+> > > [    0.217063] DMA: preallocated 256 KiB pool for atomic coherent
+> > > allocations
+> > > [    0.236321] platform 49000000.edma: alias fck already exists
+> > > [    0.236360] platform 49000000.edma: alias fck already exists
+> > > [    0.236381] platform 49000000.edma: alias fck already exists
+> > > [    0.370705] edma-dma-engine edma-dma-engine.0: TI EDMA DMA
+> engine
+> > > driver
+> > > [    0.445156] omap-dma-engine omap-dma-engine: OMAP DMA engine
+> driver
+> > > [root at arago /]#
+> > > [root at arago /]#
+> > >
+> > >
+> > I have applied below patches from your recent post
+> >
+> >
+> > [2/2] ARM: dts: add AM33XX MMC support
+> > [1/2] mmc: omap_hsmmc: set max_segs based on dma engine limits
+> > [v4,3/3] mmc: davinci: get SG segment limits with
+> dma_get_slave_sg_limits()
+> > [v4,2/3] dma: edma: add device_slave_sg_limits() support
+> > [v4,1/3] dmaengine: add dma_get_slave_sg_limits()
+> > [v9,9/9] ARM: dts: add AM33XX SPI DMA support
+> > [v9,8/9] spi: omap2-mcspi: add generic DMA request support to the DT
+> binding
+> > [v9,7/9] spi: omap2-mcspi: convert to
+> dma_request_slave_channel_compat()
+> > [v9,6/9] ARM: dts: add AM33XX EDMA support
+> > [v9,5/9] dmaengine: edma: Add TI EDMA device tree binding
+> > [v9,4/9] dmaengine: edma: enable build for AM33XX
+> > [v9,3/9] ARM: edma: add AM33XX support to the private EDMA API
+> > [v9,2/9] ARM: edma: remove unused transfer controller handlers
+> > [v9,1/9] ARM: davinci: move private EDMA API to arm/common
+> > [v3,2/2] mmc: omap_hsmmc: add generic DMA request support to the DT
+> binding
+> > [v3,1/2] mmc: omap_hsmmc: convert to
+> dma_request_slave_channel_compat()
+> >
+> >
+> >
+> > Am I missing anything here?
+> 
+> Yes, you missed the
+> http://www.spinics.net/lists/arm-kernel/msg227886.html dependency
+> mentioned first in the cover letter.
+> 
+
+Matt, I manually edited the file with above patch and result is still the same.
+Can you point me to branch where you have tested MMC code?
+
+
+
+diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+index 8c3b1fa..e68ac38 100644
+--- a/arch/arm/common/edma.c
++++ b/arch/arm/common/edma.c
+@@ -730,6 +730,9 @@ EXPORT_SYMBOL(edma_free_channel);
+  */
+ int edma_alloc_slot(unsigned ctlr, int slot)
+ {
++       if (!edma_cc[ctlr])
++               return -EINVAL;
++
+        if (slot >= 0)
+                slot = EDMA_CHAN_SLOT(slot);
+
+Thanks,
+Vaibhav
