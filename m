@@ -1,56 +1,54 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Thu, 7 Mar 2013 16:05:16 -0700
-Subject: [PATCH 04/10] bus: introduce an Marvell EBU MBus driver
-In-Reply-To: <20130307222004.GA2450@localhost>
-References: <1362577426-12804-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1362577426-12804-5-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130306190821.GA4689@obsidianresearch.com>
- <20130306202710.15a6aa2c@skate>
- <20130306202447.GA4916@obsidianresearch.com>
- <20130306214036.62fc93b9@skate>
- <20130306215031.GB4916@obsidianresearch.com>
- <20130306222712.GP23237@titan.lakedaemon.net>
- <20130306230412.GA5870@obsidianresearch.com>
- <20130307222004.GA2450@localhost>
-Message-ID: <20130307230516.GA28975@obsidianresearch.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Thu, 7 Mar 2013 17:14:09 -0600
+Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
+In-Reply-To: <20130302200524.D230F3E1571@localhost>
+References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
+ <1329321854-24490-4-git-send-email-b-cousson@ti.com>
+ <4F44FA56.7020000@gmail.com> <4F44FC37.2000701@ti.com>
+ <4F452484.5080503@gmail.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF17BD8BC6C1@HQMAIL01.nvidia.com>
+ <4F47AD08.4030504@ti.com>
+ <CAAwP0s0cB368R2mtbJpTZJreR-5GSRLfxC+8DJLo5nw3_OwBuA@mail.gmail.com>
+ <512D39DA.7020306@ti.com> <512D3AB1.1080202@wwwdotorg.org>
+ <512D3EC2.6050408@ti.com> <20130302200524.D230F3E1571@localhost>
+Message-ID: <51391F41.5000303@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 07, 2013 at 07:20:05PM -0300, Ezequiel Garcia wrote:
-> Now that the Device Bus driver is posted I think we have a nice example
-> on how address decoding windows would be allocated through the mbus
-> driver, *without* touching the child driver (i.e. NOR driver).
 
-No, that isn't the case. Your device bus driver *is* the child driver,
-and you have touched it by adding mbus window code :)
+On 03/02/2013 02:05 PM, Grant Likely wrote:
+> On Tue, 26 Feb 2013 17:01:22 -0600, Jon Hunter <jon-hunter@ti.com> wrote:
+>>
+>> On 02/26/2013 04:44 PM, Stephen Warren wrote:
+>>> On 02/26/2013 03:40 PM, Jon Hunter wrote:
+>>>> On 02/26/2013 04:01 AM, Javier Martinez Canillas wrote:
+>>>> Are you requesting the gpio anywhere? If not then this is not going to
+>>>> work as-is. This was discussed fairly recently [1] and the conclusion
+>>>> was that the gpio needs to be requested before we can use as an interrupt.
+>>>
+>>> That seems wrong; the GPIO/IRQ driver should handle this internally. The
+>>> Ethernet driver shouldn't know/care whether the interrupt it's given is
+>>> some form of dedicated interrupt or a GPIO-based interrupt, and even if
+>>> it somehow did, there's no irq_to_gpio() any more, so the driver can't
+>>> tell which GPIO ID it should request, unless it's given yet another
+>>> property to represent this.
+>>
+>> I agree that ideally this should be handled internally. Did you read the
+>> discussion on the thread that I referenced [1]? If you have any thoughts
+>> we are open to ideas :-)
+> 
+> I'm on an airplane right now, but I agree 100% with Stephen. I'll try to
+> remember to go read that thread and respond, but this falls firmly in
+> the its-a-bug category for me.  :-)
 
-In fact, looking at what you've done - with the DTs you've proposed
-your driver does *nothing* but make a call to the mbus driver to setup
-the windows for its children. Without timing parameters from the DT the
-driver does nothing else!
+Grant, did you have chance to review the thread [1]?
 
-So what is the point of that? Get rid of your driver, have the mbus
-driver set up its own windows and put cfi-flash directly under
-mbus. Smaller, simpler, clearer, better.
+I am trying to figure out if we should just take the original patch
+proposed in the thread (although Linus had some objections) or look at
+alternative solutions such as adding a irq_chip request as Stephen
+suggested.
 
-What you've done is *exactly* the sort of thing I was warning against
-:)
+Cheers
+Jon
 
-BTW, I've made the same basic choice on our Kirkwood systems. The NAND
-timing pameters are set by the bootloader and the kernel doesn't touch
-them. The bootloader knows which flash chip is placed on the board so
-only it knows the correct timing parameters. There is not any reason
-to communicate them to the kernel.
-
-I do see a fine use for your driver for non-boot devices, but the
-window stuff needs to be removed so it isn't mandatory to use your
-driver in the NOP case.
-
-> In conclusion: there is absolutely no need to change the NOR driver,
-> and there is no need to explictly add an explicit description of the
-> NOR window in the device tree.
-
-As I've said, a DT that has child nodes without an associated address
-map is broken.
-
-Jason
+[1] comments.gmane.org/gmane.linux.ports.arm.omap/92192
