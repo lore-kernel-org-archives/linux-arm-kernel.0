@@ -1,30 +1,40 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 07 Mar 2013 20:09:31 +0900
-Subject: [PATCH v2 1/3] pinctrl: exynos: add exynos5250 SoC specific data
-In-Reply-To: <CACRpkdZ37FutKzwSSF7w425Nh=jPUU-FXf48HPs3oUXO9sJ0oA@mail.gmail.com>
-References: <1362568712-13586-1-git-send-email-thomas.abraham@linaro.org>
- <1362568712-13586-2-git-send-email-thomas.abraham@linaro.org>
- <CACRpkdZ37FutKzwSSF7w425Nh=jPUU-FXf48HPs3oUXO9sJ0oA@mail.gmail.com>
-Message-ID: <021201ce1b24$3e46e810$bad4b830$%kim@samsung.com>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Thu, 7 Mar 2013 19:16:13 +0800
+Subject: [PATCH 05/10] ARM: dt: tegra: add bindings of power management
+ configurations for PMC
+In-Reply-To: <51363F67.8040200@wwwdotorg.org>
+References: <1362397241-5786-1-git-send-email-josephl@nvidia.com>
+ <51363F67.8040200@wwwdotorg.org>
+Message-ID: <1362654973.1890.28.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij wrote:
+On Wed, 2013-03-06 at 02:54 +0800, Stephen Warren wrote:
+> On 03/04/2013 04:40 AM, Joseph Lo wrote:
+> > The PMC mostly controls the entry and exit of the system from different
+> > sleep modes. Different platform or system may have different configurations.
+> > The power management configurations of PMC is represented as some properties.
+> > The system needs to define the properties when the system supports deep sleep
+> > mode (i.e. suspend).
 > 
-> On Wed, Mar 6, 2013 at 12:18 PM, Thomas Abraham
-> <thomas.abraham@linaro.org> wrote:
-> 
-> > Add Samsung Exynos5250 SoC specific data to enable pinctrl support for
-> > all platforms based on Exynos5250.
-> >
-> > Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> > Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-> > Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> So shall I merge these three patches to the pinctrl tree or not?
-> 
-Hi Linus, this series is already in Samsung tree with your ack.
+> One overall question here: For LP0, the idea is that the bootloader
+> provides the AVP boot code, puts it in RAM, passes the address to the
+> kernel, which then arranges for that code to be executed when the system
+> resumes from LP0. Why does the bootloader have to provide the code? Why
+> can't the AVP code simply be part of the kernel, just like e.g. the main
+> CPU's hotplug/secondary-power-on/power-saving reset vector is part of
+> the kernel? If we did that, it'd remove any need for bootloader support
+> for LP0 - the kernel would manage it entirely internally. That seems
+> much simpler.
 
-Thanks.
+Yes, I had exactly the same question before.
 
-- Kukjin
+The AVP was a ARM7 (armv4) core. So the warm boot code needs to be built
+as armv4 binary.
+
+Other functions in warm boot should not be a problem to implement in
+kernel (at least for Tegra114, not confirm it's ok or not for Tegra20
+and Tegra30's warm boot code).
+
+Thanks,
+Joseph
