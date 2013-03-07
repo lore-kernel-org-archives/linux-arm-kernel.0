@@ -1,119 +1,139 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Thu, 7 Mar 2013 09:08:32 +0100
-Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
-In-Reply-To: <20130306180946.GA2433@obsidianresearch.com>
-References: <1360686546-24277-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1360686546-24277-25-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130212223511.GB31555@obsidianresearch.com>
- <20130306105441.4d24033e@skate>
- <20130306121118.GA17079@avionic-0098.mockup.avionic-design.de>
- <20130306180946.GA2433@obsidianresearch.com>
-Message-ID: <20130307080832.GD3451@avionic-0098.mockup.avionic-design.de>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Thu, 7 Mar 2013 16:08:44 +0800
+Subject: v3.9-rc1: swapper/0  [ INFO: possible circular locking
+ dependency detected ]
+In-Reply-To: <51371B5E.1000508@free-electrons.com>
+References: <51371B5E.1000508@free-electrons.com>
+Message-ID: <20130307080843.GG20470@nchen-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 06, 2013 at 11:09:46AM -0700, Jason Gunthorpe wrote:
-> On Wed, Mar 06, 2013 at 01:11:19PM +0100, Thierry Reding wrote:
+On Wed, Mar 06, 2013 at 11:33:02AM +0100, Maxime Ripard wrote:
+> Hi,
 > 
-> > I agree here. It seems that back at the time when the PCI DT bindings
-> > were devised no hardware existed with these properties. So I think that
-> > maybe it needs to be revised to take into account some of these new
-> > requirements. Just adding a bunch of properties to work around
-> > shortcomings in the specification doesn't seem very desirable to me.
+> Just noticed this in 3.9-rc1 on an iMX28 (ARM) board with a config
+> based on mxs_defconfig. I'm using the patchset "Add tested id switch
+> and vbus connect detect support for Chipidea" from Peter Chen in its
+> 10th version [1], rebased on top of 3.9-rc1, but since this doesn't
+> modify the locks present in the udc_irq function, I think the problem
+> is elsewhere.
 > 
-> Well, all the PCI hosts should use the same mechanism, and it should
-> make sense in the context of the rest of the spec. So I think some
-> approval/comment on this specific issue by Grant/Rob/Arnd is important
-> at this point.
+> Please let me know if you have any questions,
+> Thanks,
+> Maxime
 > 
-> The way the spec is written, 'reg' in a 'device_type = pci' context is
-> the device's config address - it is like 'reg' in a CPU block, or I2C
-> bus - the value has nothing to do with CPU mappable memory.
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-February/151837.html
 > 
-> > space. According to the PCI DT specification this isn't allowed, but it
-> > works on Linux and quite frankly I don't see why it shouldn't be
-> > allowed.
 > 
-> AFAIK, this only works because you are not using 'device_type = pci'.
-> 
-> IMHO, 'device_type = pci' is not optional, so you need to come up with
-> something that works under those conditions, and it changes how the OF
-> core handles 'reg' and the like.
+> [    1.893905] ======================================================
+> [    1.900097] [ INFO: possible circular locking dependency detected ]
+> [    1.906381] 3.9.0-rc1-00024-g39231ac #475 Not tainted
+> [    1.911441] -------------------------------------------------------
+> [    1.917716] swapper/0 is trying to acquire lock:
+> [    1.922341]  (&(&ci->lock)->rlock){-.....}, at: [<c02580fc>] ep_enable+0x20/0x25c
+> [    1.929935] 
+> [    1.929935] but task is already holding lock:
+> [    1.935782]  (&(&cdev->lock)->rlock){-.....}, at: [<c025e46c>] composite_setup+0x384/0xee8
+> [    1.944124] 
+> [    1.944124] which lock already depends on the new lock.
+> [    1.944124] 
+> [    1.952319] 
+> [    1.952319] the existing dependency chain (in reverse order) is:
+> [    1.959813] 
+> -> #1 (&(&cdev->lock)->rlock){-.....}:
+> [    1.964829]        [<c005adb0>] lock_acquire+0x98/0x104
+> [    1.970106]        [<c0375c28>] _raw_spin_lock_irqsave+0x3c/0x50
+> [    1.976152]        [<c025d960>] composite_disconnect+0x1c/0x5c
+> [    1.982016]        [<c02591c0>] udc_irq+0x6d8/0xbe8
+> [    1.986930]        [<c02571fc>] ci_irq+0x9c/0x108
+> [    1.991667]        [<c0067214>] handle_irq_event_percpu+0x5c/0x268
+> [    1.997896]        [<c006745c>] handle_irq_event+0x3c/0x5c
+> [    2.003417]        [<c00696c0>] handle_level_irq+0x8c/0xe8
+> [    2.008933]        [<c0066af4>] generic_handle_irq+0x20/0x30
+> [    2.014627]        [<c000fb8c>] handle_IRQ+0x30/0x84
+> [    2.019633]        [<c00086f0>] icoll_handle_irq+0x30/0x44
+> [    2.025148]        [<c000e8e4>] __irq_svc+0x44/0x54
+> [    2.030058]        [<c000fd58>] cpu_idle+0x60/0xec
+> [    2.034884]        [<c04e970c>] start_kernel+0x260/0x2a0
+> [    2.040237]        [<40008040>] 0x40008040
+> [    2.044364] 
+> -> #0 (&(&ci->lock)->rlock){-.....}:
+> [    2.049210]        [<c005a284>] __lock_acquire+0x14e8/0x1b18
+> [    2.054906]        [<c005adb0>] lock_acquire+0x98/0x104
+> [    2.060164]        [<c0375c28>] _raw_spin_lock_irqsave+0x3c/0x50
+> [    2.066202]        [<c02580fc>] ep_enable+0x20/0x25c
+> [    2.071207]        [<c02629d0>] gether_connect+0x34/0x1c0
+> [    2.076643]        [<c0262db0>] eem_set_alt+0x70/0xcc
+> [    2.081723]        [<c025eb54>] composite_setup+0xa6c/0xee8
+> [    2.087325]        [<c0259244>] udc_irq+0x75c/0xbe8
+> [    2.092237]        [<c02571fc>] ci_irq+0x9c/0x108
+> [    2.096973]        [<c0067214>] handle_irq_event_percpu+0x5c/0x268
+> [    2.103194]        [<c006745c>] handle_irq_event+0x3c/0x5c
+> [    2.108717]        [<c00696c0>] handle_level_irq+0x8c/0xe8
+> [    2.114234]        [<c0066af4>] generic_handle_irq+0x20/0x30
+> [    2.119926]        [<c000fb8c>] handle_IRQ+0x30/0x84
+> [    2.124929]        [<c00086f0>] icoll_handle_irq+0x30/0x44
+> [    2.130445]        [<c000e8e4>] __irq_svc+0x44/0x54
+> [    2.135353]        [<c000fd58>] cpu_idle+0x60/0xec
+> [    2.140176]        [<c04e970c>] start_kernel+0x260/0x2a0
+> [    2.145521]        [<40008040>] 0x40008040
+> [    2.149645] 
+> [    2.149645] other info that might help us debug this:
+> [    2.149645] 
+> [    2.157667]  Possible unsafe locking scenario:
+> [    2.157667] 
+> [    2.163598]        CPU0                    CPU1
+> [    2.168134]        ----                    ----
+> [    2.172667]   lock(&(&cdev->lock)->rlock);
+> [    2.176790]                                lock(&(&ci->lock)->rlock);
+> [    2.183255]                                lock(&(&cdev->lock)->rlock);
+> [    2.189893]   lock(&(&ci->lock)->rlock);
 
-Actually I do use device_type = "pciex" for the pci at 1,0 and pci at 2,0
-nodes which was suggested back when I first posted this series. Yet the
-address translation still works properly. And it should since they are
-translated to the parent bus which is used to access the configuration
-space window for each root port.
+The precondition of above is the chipidea interrupt can be re-entered.
+But as far as I know, the same interrupt can't be re-entered at current
+system.
 
-Looking at the code it looks indeed like the OF core only matches on
-"pci" (and "vci"), but not "pciex". Perhaps I should change both nodes
-to device_type = "pci" and see what the results are.
 
-> As I said before, the two best options to me seem to be:
+> [    2.193842] 
+> [    2.193842]  *** DEADLOCK ***
+> [    2.193842] 
+> [    2.199782] 1 lock held by swapper/0:
+> [    2.203451]  #0:  (&(&cdev->lock)->rlock){-.....}, at: [<c025e46c>] composite_setup+0x384/0xee8
+> [    2.212231] 
+> [    2.212231] stack backtrace:
+> [    2.216663] [<c0014120>] (unwind_backtrace+0x0/0xf0) from [<c0370078>] (print_circular_bug+0x25c/0x2a8)
+> [    2.226112] [<c0370078>] (print_circular_bug+0x25c/0x2a8) from [<c005a284>] (__lock_acquire+0x14e8/0x1b18)
+> [    2.235813] [<c005a284>] (__lock_acquire+0x14e8/0x1b18) from [<c005adb0>] (lock_acquire+0x98/0x104)
+> [    2.244904] [<c005adb0>] (lock_acquire+0x98/0x104) from [<c0375c28>] (_raw_spin_lock_irqsave+0x3c/0x50)
+> [    2.254347] [<c0375c28>] (_raw_spin_lock_irqsave+0x3c/0x50) from [<c02580fc>] (ep_enable+0x20/0x25c)
+> [    2.263527] [<c02580fc>] (ep_enable+0x20/0x25c) from [<c02629d0>] (gether_connect+0x34/0x1c0)
+> [    2.272094] [<c02629d0>] (gether_connect+0x34/0x1c0) from [<c0262db0>] (eem_set_alt+0x70/0xcc)
+> [    2.280744] [<c0262db0>] (eem_set_alt+0x70/0xcc) from [<c025eb54>] (composite_setup+0xa6c/0xee8)
+> [    2.289572] [<c025eb54>] (composite_setup+0xa6c/0xee8) from [<c0259244>] (udc_irq+0x75c/0xbe8)
+> [    2.298226] [<c0259244>] (udc_irq+0x75c/0xbe8) from [<c02571fc>] (ci_irq+0x9c/0x108)
+> [    2.306026] [<c02571fc>] (ci_irq+0x9c/0x108) from [<c0067214>] (handle_irq_event_percpu+0x5c/0x268)
+> [    2.315119] [<c0067214>] (handle_irq_event_percpu+0x5c/0x268) from [<c006745c>] (handle_irq_event+0x3c/0x5c)
+> [    2.324986] [<c006745c>] (handle_irq_event+0x3c/0x5c) from [<c00696c0>] (handle_level_irq+0x8c/0xe8)
+> [    2.334159] [<c00696c0>] (handle_level_irq+0x8c/0xe8) from [<c0066af4>] (generic_handle_irq+0x20/0x30)
+> [    2.343516] [<c0066af4>] (generic_handle_irq+0x20/0x30) from [<c000fb8c>] (handle_IRQ+0x30/0x84)
+> [    2.352342] [<c000fb8c>] (handle_IRQ+0x30/0x84) from [<c00086f0>] (icoll_handle_irq+0x30/0x44)
+> [    2.360991] [<c00086f0>] (icoll_handle_irq+0x30/0x44) from [<c000e8e4>] (__irq_svc+0x44/0x54)
+> [    2.369531] Exception stack(0xc050df68 to 0xc050dfb0)
+> [    2.374612] df60:                   00000001 00000001 00000000 20000013 c050c000 c05476e8
+> [    2.382819] df80: c050c000 c050c000 c05476e8 41069265 40504270 00000000 600000d3 c050dfb0
+> [    2.391015] dfa0: c005b708 c000fd58 20000013 ffffffff
+> [    2.396110] [<c000e8e4>] (__irq_svc+0x44/0x54) from [<c000fd58>] (cpu_idle+0x60/0xec)
+> [    2.403990] [<c000fd58>] (cpu_idle+0x60/0xec) from [<c04e970c>] (start_kernel+0x260/0x2a0)
+> [    2.412291] [<c04e970c>] (start_kernel+0x260/0x2a0) from [<40008040>] (0x40008040)
 > 
-> pcie-controller {
->  compatible = "marvell,armada-370-xp-pcie";
+> -- 
+> Maxime Ripard, Free Electrons
+> Kernel, drivers, real-time and embedded Linux
+> development, consulting, training and support.
+> http://free-electrons.com
 > 
->   // Index by marvell,pcie-port/reg-names/etc
->   regs = <0xd0040000 0x00002000
->           0xd0080000 0x00002000>;
-> 
->   ranges = <0x81000000 0 0  0xc0000000  0 0x00010000   /* downstream I/O */
->             0x82000000 0 0  0xc1000000  0 0x08000000>; /* non-prefetchable memory */
-> 
->   pcie at 0,0 {
->        device_type = "pci";
->        reg = <0x0800 0 0 0>; // 00:01.0  (????)
->        marvell,pcie-port = <0>;
->   };
-> }
-> 
-> or:
-> 
-> pcie-controller {
->   compatible = "marvell,armada-370-xp-pcie";
-> 
->   ranges = <0x81000000 0 0  0xc0000000  0 0x00010000   /* downstream I/O */
->             0x82000000 0 0  0xc1000000  0 0x08000000   /* non-prefetchable memory */
->             // Mapping for per-port host controller registers
->             0x82000000 0x10000000 0xd0040000  0xd0040000  0 0x2000>;
-> 
->   pcie at 0,0 {
->        device_type = "pci";
->        reg = <0x0800 0 0 0>; // 00:01.0  (????)
->        marvell,pcie-port = <0>;
->        
->        assigned-addresses = <0 0 0  0 0 // BAR 0 of the bridge, unused
->        			     0 0 0  0 0 // BAR 1 of the bridge, unused
->                              0x82000000 0x10000000 0xd0040000  0 0x2000>; // Extended
-> 
->   };
-> }
-> 
-> Both have various problems, but I think I prefer the first one as it
-> doesn't conflate the contoller registers and host apertures in a
-> single ranges..
 
-I think a better alternative would be (and this matches what Thomas has
-said elsewhere) to use something like the first alternative but move the
-regs property into the pcie at 0,X nodes. That would save us from having to
-index a property in the parent. At least from a DT point of view I find
-that to be a more consistent representation.
+-- 
 
-However that would probably not work out-of-the-box with the current OF
-core because of_address_to_resource() won't know how to find the new
-property. The assigned-addresses alternative seems to be the only one
-that would work on the current OF core and achieve proper address
-translation. But it doesn't seem like a good solution either since it
-repurposes the meaning of the property and therefore isn't any better
-than encoding the same information in the reg property.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130307/989c145c/attachment.sig>
+Best Regards,
+Peter Chen
