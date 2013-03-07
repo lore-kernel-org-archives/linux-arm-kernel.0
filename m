@@ -1,54 +1,56 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 07 Mar 2013 10:02:07 +0900
-Subject: [PATCH] ARM: EXYNOS: change HAVE_SAMSUNG_KEYPAD to
- KEYBOARD_SAMSUNG
-In-Reply-To: <1362566365.16460.173.camel@x61.thuisdomein>
-References: <1362566365.16460.173.camel@x61.thuisdomein>
-Message-ID: <014b01ce1acf$63ada580$2b08f080$%kim@samsung.com>
+From: simon.jeons@gmail.com (Simon Jeons)
+Date: Thu, 07 Mar 2013 09:05:56 +0800
+Subject: [PATCH] mm: Fixup the condition whether the page cache is free
+In-Reply-To: <20130306194703.GA1953@cmpxchg.org>
+References: <CAFNq8R7tq9kvD9LyhZJ-Cj0kexQfDsPhB4iQYyZ9s9+8Jo82QA@mail.gmail.com>
+ <20130304150937.GB23767@cmpxchg.org> <51369637.6030705@gmail.com>
+ <20130306194703.GA1953@cmpxchg.org>
+Message-ID: <5137E7F4.1060509@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul Bolle wrote:
-> 
-> Commit 6b5ab4f442e32f248b6fad29aafd1d5153f4dbd3 ("ARM: EXYNOS: Add
-> Exynos4 device tree enabled board file") added
-> 	select HAVE_SAMSUNG_KEYPAD if INPUT_KEYBOARD
-> 
-> to the MACH_EXYNOS4_DT Kconfig entry. But there's no Kconfig symbol
-> HAVE_SAMSUNG_KEYPAD. Since this select statement depends on
-> INPUT_KEYBOARD this entry should select KEYBOARD_SAMSUNG instead.
-> 
-> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
-> ---
-> 0) Tested with "git grep" only.
-> 
-> 1) Perhaps the fact that the symbol KEYBOARD_SAMSUNG enables a driver
-> called samsung-keypad caused confusion here. Anyhow, my choice for
-> KEYBOARD_SAMSUNG is only educated guesswork.
-> 
->  arch/arm/mach-exynos/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-> index 6c2bdc3..068aeb5 100644
-> --- a/arch/arm/mach-exynos/Kconfig
-> +++ b/arch/arm/mach-exynos/Kconfig
-> @@ -403,7 +403,7 @@ config MACH_EXYNOS4_DT
->  	depends on ARCH_EXYNOS4
->  	select ARM_AMBA
->  	select CPU_EXYNOS4210
-> -	select HAVE_SAMSUNG_KEYPAD if INPUT_KEYBOARD
-> +	select KEYBOARD_SAMSUNG if INPUT_KEYBOARD
->  	select PINCTRL
->  	select PINCTRL_EXYNOS
->  	select USE_OF
-> --
-> 1.7.11.7
+Hi Johannes,
+On 03/07/2013 03:47 AM, Johannes Weiner wrote:
+> On Wed, Mar 06, 2013 at 09:04:55AM +0800, Simon Jeons wrote:
+>> Hi Johannes,
+>> On 03/04/2013 11:09 PM, Johannes Weiner wrote:
+>>> On Mon, Mar 04, 2013 at 09:54:26AM +0800, Li Haifeng wrote:
+>>>> When a page cache is to reclaim, we should to decide whether the page
+>>>> cache is free.
+>>>> IMO, the condition whether a page cache is free should be 3 in page
+>>>> frame reclaiming. The reason lists as below.
+>>>>
+>>>> When page is allocated, the page->_count is 1(code fragment is code-1 ).
+>>>> And when the page is allocated for reading files from extern disk, the
+>>>> page->_count will increment 1 by page_cache_get() in
+>>>> add_to_page_cache_locked()(code fragment is code-2). When the page is to
+>>>> reclaim, the isolated LRU list also increase the page->_count(code
+>>>> fragment is code-3).
+>>> The page count is initialized to 1, but that does not stay with the
+>>> object.  It's a reference that is passed to the allocating task, which
+>>> drops it again when it's done with the page.  I.e. the pattern is like
+>>> this:
+>>>
+>>> instantiation:
+>>> page = page_cache_alloc()	/* instantiator reference -> 1 */
+>>> add_to_page_cache(page, mapping, offset)
+>>>    get_page(page)		/* page cache reference -> 2 */
+>>> lru_cache_add(page)
+>>>    get_page(page)		/* pagevec reference -> 3 */
+>>> /* ...initiate read, write, associate buffers, ... */
+>>> page_cache_release(page)	/* drop instantiator reference -> 2 + private */
+>>>
+>>> reclaim:
+>>> lru_add_drain()
+>>>    page_cache_release(page)	/* drop pagevec reference -> 1 + private */
+>> IIUC, when add page to lru will lead to add to pagevec firstly, and
+>> pagevec will take one reference, so if lru will take over the
+>> reference taken by pagevec when page transmit from pagevec to lru?
+>> or just drop the reference and lru will not take reference for page?
+> The LRU does not hold a reference, it would not make sense.  The
+> pagevec only needs one because it would be awkward to remove a
+> concurrently freed page out of a pagevec, but unlinking a page from
+> the LRU is easy.  See mm/swap.c::__page_cache_release() and friends.
 
-Looks good to me, applied.
-
-BTW, just to use only 8~12 digits of commit ID, "Commit 6b5ab4f4" is enough instead of full commit ID.
-
-Thanks.
-
-- Kukjin
+Since pagevec is per cpu, when can remove a concurrently freed page out 
+of a pagevec happen?
