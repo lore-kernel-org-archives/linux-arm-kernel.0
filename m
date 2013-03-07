@@ -1,258 +1,32 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Thu, 7 Mar 2013 11:36:14 +0800
-Subject: [PATCH v6 16/16] ARM: dts: add pinctrl property for spi node for
- atmel SoC
-In-Reply-To: <1362626715-6549-1-git-send-email-wenyou.yang@atmel.com>
-References: <1362626715-6549-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1362627374-9582-1-git-send-email-wenyou.yang@atmel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 7 Mar 2013 03:44:55 +0000
+Subject: [RFC PATCH] ARM: keep __my_cpu_offset consistent with generic one
+In-Reply-To: <1362624468-5451-1-git-send-email-tom.leiming@gmail.com>
+References: <1362624468-5451-1-git-send-email-tom.leiming@gmail.com>
+Message-ID: <20130307034454.GE25137@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-Cc: linux at arm.linux.org.uk
-Cc: linux-kernel at vger.kernel.org
----
- arch/arm/boot/dts/at91sam9260.dtsi |   22 ++++++++++++++++++++++
- arch/arm/boot/dts/at91sam9263.dtsi |   22 ++++++++++++++++++++++
- arch/arm/boot/dts/at91sam9g45.dtsi |   22 ++++++++++++++++++++++
- arch/arm/boot/dts/at91sam9n12.dtsi |   22 ++++++++++++++++++++++
- arch/arm/boot/dts/at91sam9x5.dtsi  |   22 ++++++++++++++++++++++
- 5 files changed, 110 insertions(+)
+Hello,
 
-diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
-index 6e31dc8..39253b9 100644
---- a/arch/arm/boot/dts/at91sam9260.dtsi
-+++ b/arch/arm/boot/dts/at91sam9260.dtsi
-@@ -322,6 +322,24 @@
- 					};
- 				};
- 
-+				spi0 {
-+					pinctrl_spi0: spi0-0 {
-+						atmel,pins =
-+							<0 0 0x1 0x0	/* PA0 periph A SPI0_MISO pin */
-+							 0 1 0x1 0x0	/* PA1 periph A SPI0_MOSI pin */
-+							 0 2 0x1 0x0>;	/* PA2 periph A SPI0_SPCK pin */
-+					};
-+				};
-+
-+				spi1 {
-+					pinctrl_spi1: spi1-0 {
-+						atmel,pins =
-+							<1 0 0x1 0x0	/* PB0 periph A SPI1_MISO pin */
-+							 1 1 0x1 0x0	/* PB1 periph A SPI1_MOSI pin */
-+							 1 2 0x1 0x0>;	/* PB2 periph A SPI1_SPCK pin */
-+					};
-+				};
-+
- 				pioA: gpio at fffff400 {
- 					compatible = "atmel,at91rm9200-gpio";
- 					reg = <0xfffff400 0x200>;
-@@ -477,6 +495,8 @@
- 				compatible = "atmel,at91rm9200-spi";
- 				reg = <0xfffc8000 0x200>;
- 				interrupts = <12 4 3>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_spi0>;
- 				status = "disabled";
- 			};
- 
-@@ -486,6 +506,8 @@
- 				compatible = "atmel,at91rm9200-spi";
- 				reg = <0xfffcc000 0x200>;
- 				interrupts = <13 4 3>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_spi1>;
- 				status = "disabled";
- 			};
- 
-diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
-index 6c6d9ae..94b58ab 100644
---- a/arch/arm/boot/dts/at91sam9263.dtsi
-+++ b/arch/arm/boot/dts/at91sam9263.dtsi
-@@ -303,6 +303,24 @@
- 					};
- 				};
- 
-+				spi0 {
-+					pinctrl_spi0: spi0-0 {
-+						atmel,pins =
-+							<0 0 0x2 0x0	/* PA0 periph B SPI0_MISO pin */
-+							 0 1 0x2 0x0	/* PA1 periph B SPI0_MOSI pin */
-+							 0 2 0x2 0x0>;	/* PA2 periph B SPI0_SPCK pin */
-+					};
-+				};
-+
-+				spi1 {
-+					pinctrl_spi1: spi1-0 {
-+						atmel,pins =
-+							<1 12 0x1 0x0	/* PB12 periph A SPI1_MISO pin */
-+							 1 13 0x1 0x0	/* PB13 periph A SPI1_MOSI pin */
-+							 1 14 0x1 0x0>;	/* PB14 periph A SPI1_SPCK pin */
-+					};
-+				};
-+
- 				pioA: gpio at fffff200 {
- 					compatible = "atmel,at91rm9200-gpio";
- 					reg = <0xfffff200 0x200>;
-@@ -469,6 +487,8 @@
- 				compatible = "atmel,at91rm9200-spi";
- 				reg = <0xfffa4000 0x200>;
- 				interrupts = <14 4 3>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_spi0>;
- 				status = "disabled";
- 			};
- 
-@@ -478,6 +498,8 @@
- 				compatible = "atmel,at91rm9200-spi";
- 				reg = <0xfffa8000 0x200>;
- 				interrupts = <15 4 3>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_spi1>;
- 				status = "disabled";
- 			};
- 		};
-diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-index e085b8a..cfdf429 100644
---- a/arch/arm/boot/dts/at91sam9g45.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-@@ -322,6 +322,24 @@
- 					};
- 				};
- 
-+				spi0 {
-+					pinctrl_spi0: spi0-0 {
-+						atmel,pins =
-+							<1 0 0x1 0x0	/* PB0 periph A SPI0_MISO pin */
-+							 1 1 0x1 0x0	/* PB1 periph A SPI0_MOSI pin */
-+							 1 2 0x1 0x0>;	/* PB2 periph A SPI0_SPCK pin */
-+					};
-+				};
-+
-+				spi1 {
-+					pinctrl_spi1: spi1-0 {
-+						atmel,pins =
-+							<1 14 0x1 0x0	/* PB14 periph A SPI1_MISO pin */
-+							 1 15 0x1 0x0	/* PB15 periph A SPI1_MOSI pin */
-+							 1 16 0x1 0x0>;	/* PB16 periph A SPI1_SPCK pin */
-+					};
-+				};
-+
- 				pioA: gpio at fffff200 {
- 					compatible = "atmel,at91rm9200-gpio";
- 					reg = <0xfffff200 0x200>;
-@@ -538,6 +556,8 @@
- 				compatible = "atmel,at91rm9200-spi";
- 				reg = <0xfffa4000 0x200>;
- 				interrupts = <14 4 3>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_spi0>;
- 				status = "disabled";
- 			};
- 
-@@ -547,6 +567,8 @@
- 				compatible = "atmel,at91rm9200-spi";
- 				reg = <0xfffa8000 0x200>;
- 				interrupts = <15 4 3>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_spi1>;
- 				status = "disabled";
- 			};
- 		};
-diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
-index f3f87ef3..b2961f1 100644
---- a/arch/arm/boot/dts/at91sam9n12.dtsi
-+++ b/arch/arm/boot/dts/at91sam9n12.dtsi
-@@ -261,6 +261,24 @@
- 					};
- 				};
- 
-+				spi0 {
-+					pinctrl_spi0: spi0-0 {
-+						atmel,pins =
-+							<0 11 0x1 0x0	/* PA11 periph A SPI0_MISO pin */
-+							 0 12 0x1 0x0	/* PA12 periph A SPI0_MOSI pin */
-+							 0 13 0x1 0x0>;	/* PA13 periph A SPI0_SPCK pin */
-+					};
-+				};
-+
-+				spi1 {
-+					pinctrl_spi1: spi1-0 {
-+						atmel,pins =
-+							<0 21 0x2 0x0	/* PA21 periph B SPI1_MISO pin */
-+							 0 22 0x2 0x0	/* PA22 periph B SPI1_MOSI pin */
-+							 0 23 0x2 0x0>;	/* PA23 periph B SPI1_SPCK pin */
-+					};
-+				};
-+
- 				pioA: gpio at fffff400 {
- 					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
- 					reg = <0xfffff400 0x200>;
-@@ -380,6 +398,8 @@
- 				compatible = "atmel,at91rm9200-spi";
- 				reg = <0xf0000000 0x100>;
- 				interrupts = <13 4 3>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_spi0>;
- 				status = "disabled";
- 			};
- 
-@@ -389,6 +409,8 @@
- 				compatible = "atmel,at91rm9200-spi";
- 				reg = <0xf0004000 0x100>;
- 				interrupts = <14 4 3>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_spi1>;
- 				status = "disabled";
- 			};
- 		};
-diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-index 83a4889..04fbf9d 100644
---- a/arch/arm/boot/dts/at91sam9x5.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-@@ -319,6 +319,24 @@
- 					};
- 				};
- 
-+				spi0 {
-+					pinctrl_spi0: spi0-0 {
-+						atmel,pins =
-+							<0 11 0x1 0x0	/* PA11 periph A SPI0_MISO pin */
-+							 0 12 0x1 0x0	/* PA12 periph A SPI0_MOSI pin */
-+							 0 13 0x1 0x0>;	/* PA13 periph A SPI0_SPCK pin */
-+					};
-+				};
-+
-+				spi1 {
-+					pinctrl_spi1: spi1-0 {
-+						atmel,pins =
-+							<0 21 0x2 0x0	/* PA21 periph B SPI1_MISO pin */
-+							 0 22 0x2 0x0	/* PA22 periph B SPI1_MOSI pin */
-+							 0 23 0x2 0x0>;	/* PA23 periph B SPI1_SPCK pin */
-+					};
-+				};
-+
- 				pioA: gpio at fffff400 {
- 					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
- 					reg = <0xfffff400 0x200>;
-@@ -512,6 +530,8 @@
- 				compatible = "atmel,at91rm9200-spi";
- 				reg = <0xf0000000 0x100>;
- 				interrupts = <13 4 3>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_spi0>;
- 				status = "disabled";
- 			};
- 
-@@ -521,6 +541,8 @@
- 				compatible = "atmel,at91rm9200-spi";
- 				reg = <0xf0004000 0x100>;
- 				interrupts = <14 4 3>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_spi1>;
- 				status = "disabled";
- 			};
- 		};
--- 
-1.7.9.5
+On Thu, Mar 07, 2013 at 02:47:48AM +0000, Ming Lei wrote:
+> Commit 14318efb(ARM: 7587/1: implement optimized percpu variable access)
+> introduces arm's __my_cpu_offset to optimize percpu vaiable access,
+> which really works well on hackbench test, but may cause __my_cpu_offset
+> to return garbage value before it is initialized in cpu_init() called
+> by setup_arch, so accessing a percpu variable before setup_arch may cause
+> kernel hang. But the generic__my_cpu_offset always returns zero before
+> percpu area is brought up.
+> 
+> So the patch tries to clear __my_cpu_offset on boot CPU early
+> to avoid boot hang.
+> 
+> At least now percpu variable is accessed by lockdep before
+> setup_arch(), and enabling CONFIG_LOCK_STAT or CONFIG_DEBUG_LOCKDEP
+> can trigger kernel hang.
+
+For the record, can you include a backtrace or something please? The
+description makes it sounds like a caller bug, so it would be good to
+document a valid user of per-cpu before cpu_init().
+
+Will
