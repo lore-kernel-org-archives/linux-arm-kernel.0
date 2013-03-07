@@ -1,65 +1,70 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 7 Mar 2013 03:15:48 +0100
-Subject: [GIT PULL] Nomadik multiplatform support for ARM SoC
-Message-ID: <CACRpkdbanRz=LuB2nLLso+8iBesy3LwNpqFRSZbDzbcO2Y9sgw@mail.gmail.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Thu, 7 Mar 2013 10:18:18 +0800
+Subject: [PATCH v11 8/9] usb: chipidea: imx: add getting vbus regulator
+ code
+In-Reply-To: <20130306101146.GM28587@arwen.pp.htv.fi>
+References: <1362563800-16673-1-git-send-email-peter.chen@freescale.com>
+ <1362563800-16673-9-git-send-email-peter.chen@freescale.com>
+ <20130306101146.GM28587@arwen.pp.htv.fi>
+Message-ID: <20130307021817.GB20470@nchen-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Arnd,
+On Wed, Mar 06, 2013 at 12:11:46PM +0200, Felipe Balbi wrote:
+> Hi,
+> 
+> On Wed, Mar 06, 2013 at 05:56:39PM +0800, Peter Chen wrote:
+> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> > ---
+> >  drivers/usb/chipidea/ci13xxx_imx.c |   28 +++++-----------------------
+> >  1 files changed, 5 insertions(+), 23 deletions(-)
+> > 
+> > diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
+> > index 3ed119e..b2d8350 100644
+> > --- a/drivers/usb/chipidea/ci13xxx_imx.c
+> > +++ b/drivers/usb/chipidea/ci13xxx_imx.c
+> > @@ -33,7 +33,6 @@ struct ci13xxx_imx_data {
+> >  	struct usb_phy *phy;
+> >  	struct platform_device *ci_pdev;
+> >  	struct clk *clk;
+> > -	struct regulator *reg_vbus;
+> >  };
+> >  
+> >  static const struct usbmisc_ops *usbmisc_ops;
+> > @@ -163,20 +162,9 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
+> >  		data->phy = phy;
+> >  	}
+> >  
+> > -	/* we only support host now, so enable vbus here */
+> >  	reg_vbus = devm_regulator_get(&pdev->dev, "vbus");
+> > -	if (!IS_ERR(reg_vbus)) {
+> > -		ret = regulator_enable(reg_vbus);
+> > -		if (ret) {
+> > -			dev_err(&pdev->dev,
+> > -				"Failed to enable vbus regulator, err=%d\n",
+> > -				ret);
+> > -			goto err_clk;
+> > -		}
+> > -		data->reg_vbus = reg_vbus;
+> > -	} else {
+> > -		reg_vbus = NULL;
+> > -	}
+> > +	if (!IS_ERR(reg_vbus))
+> > +		pdata->reg_vbus = reg_vbus;
+> 
+> what you're doing here is wrong. chipidea core should be the one calling
+> devm_regulator_get().
 
-this is a pull request containing multiplatform support for the
-Nomadik, targeted
-at v3.10, i.e. your multiplatform branch for next.
+chipidea core has not dts entry, is created by platform layer.
+Regulator info is passed from dts.
 
-Not much to say about this, the patches were posted, nobody said anything
-and it works fine for me, so please pull it in.
-
-Yours,
-Linus Walleij
+> 
+> -- 
+> balbi
 
 
-The following changes since commit 6dbe51c251a327e012439c4772097a13df43c5b8:
 
-  Linux 3.9-rc1 (2013-03-03 15:11:05 -0800)
+-- 
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
-tags/nomadik-multiplatform
-
-for you to fetch changes up to a2823dd5f5e2f9da2eafc402612ae85526ed222c:
-
-  ARM: nomadik: delete remnant include files (2013-03-07 02:48:03 +0100)
-
-----------------------------------------------------------------
-Multiplatform support for the Nomadik
-- Get rid of the last header files in the <mach/*> namespace
-- Move the debug macro to the common place
-- Make the necessary Kconfig fixes and move the platform Kconfig
-  fragment down to the mach directory.
-- Include necessary defconfig update to get the platform going.
-
-----------------------------------------------------------------
-Linus Walleij (4):
-      ARM: nomadik: delete IRQ header
-      ARM: nomadik: move debugmacro to debug includes
-      ARM: nomadik: convert to multiplatform
-      ARM: nomadik: delete remnant include files
-
- arch/arm/Kconfig                                   | 17 -----
- arch/arm/Kconfig.debug                             |  8 +++
- arch/arm/configs/nhk8815_defconfig                 | 42 ++++++------
- .../mach/debug-macro.S => include/debug/nomadik.S} |  0
- arch/arm/mach-nomadik/Kconfig                      | 22 +++++-
- arch/arm/mach-nomadik/Makefile.boot                |  4 --
- arch/arm/mach-nomadik/cpu-8815.c                   |  1 -
- arch/arm/mach-nomadik/include/mach/irqs.h          | 79 ----------------------
- arch/arm/mach-nomadik/include/mach/timex.h         |  6 --
- arch/arm/mach-nomadik/include/mach/uncompress.h    | 60 ----------------
- 10 files changed, 46 insertions(+), 193 deletions(-)
- rename arch/arm/{mach-nomadik/include/mach/debug-macro.S =>
-include/debug/nomadik.S} (100%)
- delete mode 100644 arch/arm/mach-nomadik/Makefile.boot
- delete mode 100644 arch/arm/mach-nomadik/include/mach/irqs.h
- delete mode 100644 arch/arm/mach-nomadik/include/mach/timex.h
- delete mode 100644 arch/arm/mach-nomadik/include/mach/uncompress.h
+Best Regards,
+Peter Chen
