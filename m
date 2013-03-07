@@ -1,69 +1,131 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Wed,  6 Mar 2013 20:52:13 -0800
-Subject: [PATCH] arm: mm: Populate initial page tables across sections
-Message-ID: <1362631933-23567-1-git-send-email-lauraa@codeaurora.org>
+From: davidb@codeaurora.org (David Brown)
+Date: Wed, 06 Mar 2013 21:20:45 -0800
+Subject: [PATCH 1/6] platform-drivers: msm: add single-wire serial bus
+ interface (SSBI) driver
+In-Reply-To: <20130307013008.GA2910@kroah.com> (Greg Kroah-Hartman's message
+ of "Thu, 7 Mar 2013 09:30:08 +0800")
+References: <1362616187-21089-1-git-send-email-davidb@codeaurora.org>
+ <1362616187-21089-2-git-send-email-davidb@codeaurora.org>
+ <20130307013008.GA2910@kroah.com>
+Message-ID: <8yawqtjvl8y.fsf@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current code for setting up initial page tables does
-not take into account section spanning for the non-section
-case. This may result in incorrect population of page tables
-and unexpected aborts. These problems have been observed in two cases:
+Greg Kroah-Hartman <gregkh@linuxfoundation.org> writes:
 
-1) An iomap entry that is not section aligned but the mapped size is
-greater than the section size
-2) Removal a block of section aligned memory with memblock remove and
-remapping of a separate region of memory to 4k chunks as part of CMA
+> On Wed, Mar 06, 2013 at 04:29:42PM -0800, David Brown wrote:
+>> +menu "Qualcomm MSM SSBI bus support"
+>> +	depends on ARCH_MSM
+>
+> Why?
 
-The solution is to call alloc_init_pte in SECTION_SIZE chunks. This
-ensures that alloc_init_pte will populate the page tables
-correctly.
+In the sense that ARCH_MSM are the only devices that ever were, or ever
+will be made with this device.  It doesn't strictly depend on it, but do
+we want to clutter the config for everything else.
 
-Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
----
- arch/arm/mm/mmu.c |   29 ++++++++++++++++++++++++-----
- 1 files changed, 24 insertions(+), 5 deletions(-)
+>> +config MSM_SSBI
+>> +	bool "Qualcomm Single-wire Serial Bus Interface (SSBI)"
+>
+> Why can't this be a module?
 
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 25cb67c..08cf68a 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -652,11 +652,30 @@ static void __init alloc_init_section(pud_t *pud, unsigned long addr,
- 
- 		flush_pmd_entry(p);
- 	} else {
--		/*
--		 * No need to loop; pte's aren't interested in the
--		 * individual L1 entries.
--		 */
--		alloc_init_pte(pmd, addr, end, __phys_to_pfn(phys), type);
-+		unsigned long pte_end;
-+
-+		if (addr + SECTION_SIZE < addr)
-+			pte_end = end;
-+		else if (IS_ALIGNED(addr, SECTION_SIZE))
-+			pte_end = min (end, addr + SECTION_SIZE);
-+		else
-+			pte_end = min (end, roundup(addr, SECTION_SIZE));
-+
-+		do {
-+			unsigned int offset;
-+
-+			alloc_init_pte(pmd, addr, pte_end, __phys_to_pfn(phys), type);
-+
-+			if (addr + SECTION_SIZE < addr)
-+				break;
-+
-+			if (end - pte_end)
-+				offset = min(SECTION_SIZE, end - pte_end);
-+			else
-+				break;
-+			addr += offset;
-+			pte_end += offset;
-+		} while (pmd++, addr < end);
- 	}
- }
- 
+Without this device, the PMIC drivers won't work, regulators can't be
+turned on, and most of the other devices won't work.  I can try if it
+can still be made a module, and it might be good at exercising the
+deferred probe mechanism.
+
+So, a deeper question.  I've resent this driver with minimal change.
+I've also made some other changes as patches afterwards.  Do we want
+these squashed into a single patch, or the initial one (not authored by
+me) followed by updates?
+
+>> +#
+>> +# Makefile for the MSM specific device drivers.
+>
+> MSM?
+>
+> No comment needed at all in this file :)
+
+Thanks, missed this.  I think the original patch was using platform/msm,
+and the minimalist comment almost made sense in that context.
+
+>> +struct msm_ssbi {
+>> +	struct device		*dev;
+>> +	struct device		*slave;
+>
+> Really?  Two pointers to devices?  Why?  Shouldn't this have a struct
+> device embedded in it instead of the dev member being a pointer?
+
+I'll go through this more thoroughly and organize things better.
+
+>> +static int ssbi_wait_mask(struct msm_ssbi *ssbi, u32 set_mask, u32 clr_mask)
+>> +{
+>> +	u32 timeout = SSBI_TIMEOUT_US;
+>> +	u32 val;
+>> +
+>> +	while (timeout--) {
+>> +		val = ssbi_readl(ssbi, SSBI2_STATUS);
+>> +		if (((val & set_mask) == set_mask) && ((val & clr_mask) == 0))
+>> +			return 0;
+>> +		udelay(1);
+>
+> Busy loop?  Really?
+
+I'm not sure what else to do here.  The controller is only slightly more
+than a bit-banged bus.  I think the reason for the longer possibly delay
+is because there is an arbiter (the PMIC is shared with the radio CPU).
+I'll investigate further.
+
+>> +	}
+>> +
+>> +	dev_err(ssbi->dev, "%s: timeout (status %x set_mask %x clr_mask %x)\n",
+>> +		__func__, ssbi_readl(ssbi, SSBI2_STATUS), set_mask, clr_mask);
+>
+> Why polute the log with this?  What can a user do with it?
+
+Nothing in fact, other than possibly learn that things, indeed aren't
+working.  I'll take it and the others out.
+
+>> +static int
+>> +msm_ssbi_write_bytes(struct msm_ssbi *ssbi, u16 addr, u8 *buf, int len)
+>> +{
+>> +	int ret = 0;
+>> +
+>> +	if (ssbi->controller_type == MSM_SBI_CTRL_SSBI2) {
+>> +		u32 mode2 = ssbi_readl(ssbi, SSBI2_MODE2);
+>> +		mode2 = SET_SSBI_MODE2_REG_ADDR_15_8(mode2, addr);
+>> +		ssbi_writel(ssbi, mode2, SSBI2_MODE2);
+>> +	}
+>
+> Perhaps have a controller type write function that can handle this type
+> of stuff instead of putting it in the "generic" write path?
+
+Yes, that's a better approach.
+
+>> +EXPORT_SYMBOL(msm_ssbi_read);
+>
+> msm_*?  Why not just ssbi_*?
+
+I'm fine with ssbi.  It is very MSM specific, though.
+
+> EXPORT_SYMBOL_GPL()?
+
+Yes, it's definitely a kernel internal API.
+
+>> +static struct platform_driver msm_ssbi_driver = {
+>> +	.probe		= msm_ssbi_probe,
+>> +	.remove		= __exit_p(msm_ssbi_remove),
+>
+> You just oopsed if someone unbound your device from the driver from
+> userspace.  Not good.
+
+I did catch this one in a later patch :-)  I can clean it up in the
+driver, though, since it looks like some more work needs to go into
+this.
+
+Thanks,
+David
+
 -- 
+sent by an employee of the Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
