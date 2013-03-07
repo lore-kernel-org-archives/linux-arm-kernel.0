@@ -1,69 +1,30 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 7 Mar 2013 23:42:34 +0800 (HKT)
-Subject: [PATCH 00/16] big.LITTLE low-level CPU and cluster power
- management
-In-Reply-To: <20130307145106.GA7451@amd.pavel.ucw.cz>
-References: <1357777251-13541-1-git-send-email-nicolas.pitre@linaro.org>
- <20130307082721.GB28982@xo-6d-61-c0.localdomain>
- <alpine.LFD.2.03.1303071701330.28820@syhkavp.arg>
- <20130307094017.GA6337@amd.pavel.ucw.cz>
- <alpine.LFD.2.03.1303071753280.28820@syhkavp.arg>
- <20130307145106.GA7451@amd.pavel.ucw.cz>
-Message-ID: <alpine.LFD.2.03.1303072335120.28820@syhkavp.arg>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 7 Mar 2013 15:37:36 +0000
+Subject: [PATCH V3 1/4] cpufreq: exynos: Adding cpufreq driver for
+ exynos5440
+In-Reply-To: <5138B200.7060906@samsung.com>
+References: <1362629627-10012-1-git-send-email-amit.daniel@samsung.com>
+ <5138B200.7060906@samsung.com>
+Message-ID: <20130307153736.GC4977@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 7 Mar 2013, Pavel Machek wrote:
-
-> Hi!
+On Thu, Mar 07, 2013 at 04:28:00PM +0100, Sylwester Nawrocki wrote:
+> On 03/07/2013 05:13 AM, Amit Daniel Kachhap wrote:
+> > +	dvfs_info->cpu_clk = devm_clk_get(dvfs_info->dev, "armclk");
+> > +	if (IS_ERR_OR_NULL(dvfs_info->cpu_clk)) {
 > 
-> > > > > I'd say:
-> > > > > 
-> > > > > * expose all 8 cores.
-> > > > 
-> > > > You may do that now.  However the resulting power efficiency is far from 
-> > > > optimal.
-> > > 
-> > > Really? Assuming the lwn article is accurate, it will be exactly the
-> > > same.
-> > > 
-> > > I propose exposing all 8 cores, then keeping 4 of them offline in
-> > > normal operation. This should have characteristics of your solution,
-> > > except that cpu does not change unexpectedly under the pinned tasks.
-> > > 
-> > > > > * as long as scheduler is not ready, you can offline "the other" set of cores...
-> > > > > 	/sys/.../cpu/..../online
-> > > > 
-> > > > You may do that now also.  But system performance is far from optimal.
-> > > 
-> > > Really? Do the offlining from the cpufreq code, and solution will be
-> > > equivalent to yours, except the hacks.
-> > 
-> > No it is not equivalent.  Offlining a CPU is a fairly heavy operation in 
-> > Linux and you don't want to do that multiple times per second for 
-> > example.  Whereas the switcher "hack" is similar to a context switch in 
-> > terms of software complexity.
+> devm_clk_get() return value needs to be checked with IS_ERR(),
+> not IS_ERR_OR_NULL().
 > 
-> Well, why not. Logically, you _are_ saving state, offlining, onlining,
-> and restoring state, multiple times per second, already. 
+> > +		pr_err("Failed to get cpu clock\n");
+> > +		ret = PTR_ERR(dvfs_info->cpu_clk);
+> > +		goto err_free_table;
 
-Maybe "logically", but in practice there is no actual 
-offlining/onlining but rather a migration.
-
-> Fast offline/online benefits everyone...
-
-Absolutely! You could ask tglx and cie where they are with their attempt 
-at making hotplug less costly?
-
-> As for the hacks... what does /proc/cpuinfo show on your system? What
-> happens when process requests binding to specific cpu? I fear that
-> switching hack is easy now, but will have unnice impact on unexpected
-> places.
-> 
-> BTW I guess this should be discussed on linux-kernel, not on the arm
-> list.
-
-There is nothing to discuss until I'm ready to show you the code.
-
-
-Nicolas
+Amit, to illustrate why this is wrong, consider this:
+1. Set cpu_clk to NULL.
+2. Realise IS_ERR_OR_NULL(NULL) is true.
+3. What is the value of PTR_ERR(NULL) ?
+4. What effect does that have when you jump to err_free_table ?
+5. What value is returned from this function in that case ?
+6. What does that return value mean to the driver core ?
