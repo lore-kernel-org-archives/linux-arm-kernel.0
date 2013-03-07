@@ -1,68 +1,37 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 07 Mar 2013 19:15:26 +0100
-Subject: [PATCH] ARM: sunxi: dt: Add support for the Miniand Mini X-plus
-In-Reply-To: <51386777.5040109@geeks.cl>
-References: <1362583127-25726-1-git-send-email-maxime.ripard@free-electrons.com>
- <51386777.5040109@geeks.cl>
-Message-ID: <5138D93E.6040607@free-electrons.com>
+From: afzal.mohd.ma@gmail.com (Afzal Mohammed)
+Date: Fri, 8 Mar 2013 00:12:41 +0530
+Subject: Question about fixed-clock
+In-Reply-To: <20130219033931.GA2479@afzal-ThinkPad-R50e>
+ <51234B8E.2000504@gmail.com>
+Message-ID: <20130307184240.GA3327@afzal-ThinkPad-R50e>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alejandro,
+Hi Daniel,
 
-Le 07/03/2013 11:09, Alejandro Mery a ?crit :
+On Tue, Feb 19, 2013 at 09:09:31AM +0530, Afzal Mohammed wrote:
+
+> Hope invoking of_clk_init before clock generator driver helps
+
+Mails coming from this id are in my personal capacity.
+
+On Tue, Feb 19, 2013 at 10:53:18AM +0100, Daniel Mack wrote:
+> On 19.02.2013 02:33, Fabio Estevam wrote:
+
+> > Have you registered it with clk_register_fixed_rate() ?
+
+> Hmm no, I didn't do anything else than adding it to the DT in the first
+> place, hoping that a driver will pick it up and add the clock for me.
+> But it turns out that of_clk_init() is not called at all on my platform.
 > 
-> On 06/03/13 16:18, Maxime Ripard wrote:
->> This board comes with an Allwinner A10, two external USB ports, a SD
->> Card reader, 1GB of RAM, the usual video connectors and an onboard wifi
->> chip.
->>
->> Of course, the support is quite minimal for now...
->>
->> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->> ---
->>   arch/arm/boot/dts/sun4i-a10-mini-xplus.dts |   30
->> ++++++++++++++++++++++++++++
->>   1 file changed, 30 insertions(+)
->>   create mode 100644 arch/arm/boot/dts/sun4i-a10-mini-xplus.dts
->>
->> diff --git a/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts
->> b/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts
->> new file mode 100644
->> index 0000000..635e135
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts
->> @@ -0,0 +1,30 @@
->> +/*
->> + * Copyright 2012 Maxime Ripard
->> + *
->> + * Maxime Ripard <maxime.ripard@free-electrons.com>
->> + *
->> + * The code contained herein is licensed under the GNU General Public
->> + * License. You may obtain a copy of the GNU General Public License
->> + * Version 2 or later at the following locations:
->> + *
->> + * http://www.opensource.org/licenses/gpl-license.html
->> + * http://www.gnu.org/copyleft/gpl.html
->> + */
->> +
->> +/dts-v1/;
->> +/include/ "sun4i-a10.dtsi"
->> +
->> +/ {
->> +    model = "Miniand Mini X-Plus";
->> +    compatible = "miniand,mini-xplus", "allwinner,sun4i-a10";
-> 
-> Hi, I just wanted to mention that Miniand is just a reseller. This
-> device is made by PineRiver <http://pineriver.cn/> and most commonly
-> available rebranded by "Jesurun" than miniand.
+> I'm doing this now from omap_generic_init() and it works. If that's an
+> appropriate place to call it, I can provide a patch.
 
-Thanks, I'll fix it.
+Initially didn't realize that it was for an am335x based one.
 
-Maxime
+I feel that for a platform having it's clock tree in DT, of_clk_init
+would take care of it, but if clock tree data is not in DT, clock
+tree would have to be extended in a non-DT way.
 
--- 
-Maxime Ripard, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Regards
+Afzal
