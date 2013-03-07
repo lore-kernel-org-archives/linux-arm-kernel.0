@@ -1,158 +1,170 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Thu, 7 Mar 2013 05:29:24 +0000
-Subject: [PATCH 2/2] ARM: dts: add AM33XX MMC support
-In-Reply-To: <1362629799-22485-3-git-send-email-mporter@ti.com>
-References: <1362629799-22485-1-git-send-email-mporter@ti.com>
- <1362629799-22485-3-git-send-email-mporter@ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EC20028@DBDE01.ent.ti.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Thu, 7 Mar 2013 13:50:24 +0800
+Subject: [PATCH v11 3/9] usb: chipidea: add otg id switch and vbus
+ connect/disconnect detect
+In-Reply-To: <CAB7JpEHoA3Hx-2rf=Xrpy-zQ-4YASiGzMfhBcX-Du008FAoc+Q@mail.gmail.com>
+References: <1362563800-16673-1-git-send-email-peter.chen@freescale.com>
+ <1362563800-16673-4-git-send-email-peter.chen@freescale.com>
+ <CAB7JpEHoA3Hx-2rf=Xrpy-zQ-4YASiGzMfhBcX-Du008FAoc+Q@mail.gmail.com>
+Message-ID: <20130307055023.GF20470@nchen-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
-> owner at vger.kernel.org] On Behalf Of Porter, Matt
-> Sent: Thursday, March 07, 2013 9:47 AM
-> To: Krishnamoorthy, Balaji T; Chris Ball; Cousson, Benoit; Tony
-> Lindgren; Russell King
-> Cc: Devicetree Discuss; Linux ARM Kernel List; Linux OMAP List; Linux
-> Kernel Mailing List; Linux MMC List
-> Subject: [PATCH 2/2] ARM: dts: add AM33XX MMC support
+On Wed, Mar 06, 2013 at 07:09:34PM +0200, Alexander Shishkin wrote:
+> > - start/stop API are used at otg id switch and probe routine
+> >
+> > - Defer some gadget operations at ci's delayed work queue
 > 
-> Adds AM33XX MMC support for am335x-bone, am335x-evm, and
-> am335x-evmsk.
+> When I asked you to reorder patches, I didn't mean squash them all
+> into one. Now you have a patch that does 5 different things and none
+> of them properly, because you still need to amend these changes later
+> in the patchset, like the patch 7, where you remove the delayed work,
+> which is added in this patch. At the same time, you have bits in this
+> patch that should be moved to other patches. See comments below.
 > 
-> Signed-off-by: Matt Porter <mporter@ti.com>
-> Acked-by: Tony Lindgren <tony@atomide.com>
-> ---
->  arch/arm/boot/dts/am335x-bone.dts  |    7 +++++++
->  arch/arm/boot/dts/am335x-evm.dts   |    7 +++++++
->  arch/arm/boot/dts/am335x-evmsk.dts |    7 +++++++
->  arch/arm/boot/dts/am33xx.dtsi      |   28 ++++++++++++++++++++++++++++
->  4 files changed, 49 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/am335x-bone.dts
-> b/arch/arm/boot/dts/am335x-bone.dts
-> index 11b240c..a154ce0 100644
-> --- a/arch/arm/boot/dts/am335x-bone.dts
-> +++ b/arch/arm/boot/dts/am335x-bone.dts
-> @@ -120,6 +120,8 @@
->  		};
-> 
->  		ldo3_reg: regulator at 5 {
-> +			regulator-min-microvolt = <1800000>;
-> +			regulator-max-microvolt = <3300000>;
->  			regulator-always-on;
->  		};
-> 
-> @@ -136,3 +138,8 @@
->  &cpsw_emac1 {
->  	phy_id = <&davinci_mdio>, <1>;
->  };
-> +
-> +&mmc1 {
-> +	status = "okay";
-> +	vmmc-supply = <&ldo3_reg>;
-> +};
-> diff --git a/arch/arm/boot/dts/am335x-evm.dts
-> b/arch/arm/boot/dts/am335x-evm.dts
-> index d649644..2907da6 100644
-> --- a/arch/arm/boot/dts/am335x-evm.dts
-> +++ b/arch/arm/boot/dts/am335x-evm.dts
-> @@ -232,6 +232,8 @@
->  		};
-> 
->  		vmmc_reg: regulator at 12 {
-> +			regulator-min-microvolt = <1800000>;
-> +			regulator-max-microvolt = <3300000>;
->  			regulator-always-on;
->  		};
->  	};
-> @@ -244,3 +246,8 @@
->  &cpsw_emac1 {
->  	phy_id = <&davinci_mdio>, <1>;
->  };
-> +
-> +&mmc1 {
-> +	status = "okay";
-> +	vmmc-supply = <&vmmc_reg>;
-> +};
-> diff --git a/arch/arm/boot/dts/am335x-evmsk.dts
-> b/arch/arm/boot/dts/am335x-evmsk.dts
-> index f5a6162..f050c46 100644
-> --- a/arch/arm/boot/dts/am335x-evmsk.dts
-> +++ b/arch/arm/boot/dts/am335x-evmsk.dts
-> @@ -244,7 +244,14 @@
->  		};
-> 
->  		vmmc_reg: regulator at 12 {
-> +			regulator-min-microvolt = <1800000>;
-> +			regulator-max-microvolt = <3300000>;
->  			regulator-always-on;
->  		};
->  	};
->  };
-> +
-> +&mmc1 {
-> +	status = "okay";
-> +	vmmc-supply = <&vmmc_reg>;
-> +};
-> diff --git a/arch/arm/boot/dts/am33xx.dtsi
-> b/arch/arm/boot/dts/am33xx.dtsi
-> index c3c781a..e029eea 100644
-> --- a/arch/arm/boot/dts/am33xx.dtsi
-> +++ b/arch/arm/boot/dts/am33xx.dtsi
-> @@ -234,6 +234,34 @@
->  			status = "disabled";
->  		};
-> 
-> +		mmc1: mmc at 48060000 {
-> +			compatible = "ti,omap3-hsmmc";
-> +			ti,hwmods = "mmc1";
-> +			ti,dual-volt;
-> +			ti,needs-special-reset;
-> +			dmas = <&edma 24
-> +				&edma 25>;
-> +			dma-names = "tx", "rx";
-> +			status = "disabled";
-> +		};
-> +
-> +		mmc2: mmc at 481d8000 {
-> +			compatible = "ti,omap3-hsmmc";
-> +			ti,hwmods = "mmc2";
-> +			ti,needs-special-reset;
-> +			dmas = <&edma 2
-> +				&edma 3>;
-> +			dma-names = "tx", "rx";
-> +			status = "disabled";
-> +		};
-> +
-> +		mmc3: mmc at 47810000 {
-> +			compatible = "ti,omap3-hsmmc";
-> +			ti,hwmods = "mmc3";
-> +			ti,needs-special-reset;
-> +			status = "disabled";
-> +		};
-Any specific reason why you did not add edma entry here as well?
 
-Also, I wonder why "interrupt" property is not coming here, I understand
-That hwmod is filling the gap here; but I would still recommend you to complete
-The DT node, as we only support DT boot.
+I am sorry to let you review difficult, as I changed/added patch according
+to function change, but not updated previous patches.
 
-I will test the whole patch series today and update you.
+I will re-organize all patches according to functionalities.
+Besides, can you help review all patches during next time, in that case,
+I can know which patch is ok.
 
-Thanks,
-Vaibhav
+> 
+> You remove this function in patch 7. Why add it in the first place?
+> 
+
+As it is needed at patch 7 to let the function work
+
+> > +
+> > +static inline void ci_role_destroy(struct ci13xxx *ci)
+> > +{
+> > +       ci_hdrc_gadget_destroy(ci);
+> > +       ci_hdrc_host_destroy(ci);
+> > +}
+> 
+> You shouldn't use "inline" here. And the name of the function is also
+> ambiguous, since it destroys all roles. It would be better to just
+> call both _destroys(), like I suggested in the diff I gave you some
+> time ago.
+
+Will change.
+
+> 
+> > +
+> >  static ssize_t show_role(struct device *dev, struct device_attribute *attr,
+> >                          char *buf)
+> >  {
+> > @@ -352,25 +468,50 @@ static ssize_t store_role(struct device *dev, struct device_attribute *attr,
+> >
+> >  static DEVICE_ATTR(role, S_IRUSR | S_IWUSR, show_role, store_role);
+> >
+> > +static bool ci_is_otg_capable(struct ci13xxx *ci)
+> > +{
+> > +       return hw_read(ci, CAP_DCCPARAMS, DCCPARAMS_DC | DCCPARAMS_HC)
+> > +               == (DCCPARAMS_DC | DCCPARAMS_HC);
+> > +}
+> 
+> Can't we
+> a) remember this value so that we don't have to read the register at
+> every interrupt
+
+Yes.
+
+> b) also take into account the fact that DCCPARAMS doesn't read
+> correctly on all chipideas? (see dr_mode patches)
+> 
+
+We have discussed it, but you have not given me exactly answer
+"Which situation we can read OTGSC"?
+
+1. We Can't read OTGSC if DCCPARAMS shows it is only device-capable
+2. DCCPARAMS doesn't correctly for some chips
+3. If we depend on dr_mode, OTGSC should be read when dr_mode = "peripheral",
+in that case, the condition is ci->roles[CI_ROLE_GADGET].
+
+If the dr_mode is not set by DT, the 1 and 3 is conflict.
 
 
-> +
->  		wdt2: wdt at 44e35000 {
->  			compatible = "ti,omap3-wdt";
->  			ti,hwmods = "wd_timer2";
-> --
-> 1.7.9.5
+> >
+> > -       if (ci->is_otg)
+> > +       if (ci_is_otg_capable(ci))
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap"
-> in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> ci->is_otg is actually the right thing to use, we should instead make
+> sure that it's set properly
+> 
+
+Yes, what is ci->is_otg stands for in your opinion?
+In my patchset, it means it supportes partial OTG (id switch) function.
+
+> >         if (ci->roles[CI_ROLE_HOST] && ci->roles[CI_ROLE_GADGET]) {
+> > +               dev_dbg(dev, "support otg\n");
+> >                 ci->is_otg = true;
+> > +               /* if otg is supported, create struct usb_otg */
+> > +               ci_hdrc_otg_init(ci);
+> >                 /* ID pin needs 1ms debouce time, we delay 2ms for safe */
+> >                 mdelay(2);
+> >                 ci->role = ci_otg_role(ci);
+> 
+> I'm thinking that this should be based on dr_mode patches and not the
+> other way around.
+> 
+
+No, ci->role means which role is currently.
+And it is otg mode already as 
+(ci->roles[CI_ROLE_HOST] && ci->roles[CI_ROLE_GADGET]).
+
+> >
+> >  static int ci_otg_set_peripheral(struct usb_otg *otg,
+> >                 struct usb_gadget *periph)
+> > @@ -55,6 +62,7 @@ int ci_hdrc_otg_init(struct ci13xxx *ci)
+> >         ci->otg.set_host = ci_otg_set_host;
+> >         if (!IS_ERR_OR_NULL(ci->transceiver))
+> >                 ci->transceiver->otg = &ci->otg;
+> > +       ci_enable_otg_interrupt(ci, OTGSC_IDIE);
+> 
+> There should be a counter-action to ci_hdrc_otg_init().
+> Btw, why can't clear_otg_interrupt() be called from here as well
+> instead of hw_device_init()? 
+
+What the criterion for reading OTGSC?
+What means otg capable and how do we know it is otg capable?
+
+> This function should only be called for
+> otg capable devices, so it should be safe. And while at it, I think
+> this whole otg.c/otg.h part of this patch should be moved to patch 2.
+> 
+
+OK.
+
+> >
+> > +static int udc_id_switch_for_device(struct ci13xxx *ci)
+> 
+> I would use _to_ instead of _for_, for clarity.
+> 
+> > +{
+> > +       ci_clear_otg_interrupt(ci, OTGSC_BSVIS);
+> > +       ci_enable_otg_interrupt(ci, OTGSC_BSVIE);
+> > +
+> > +       return 0;
+> > +}
+> > +
+> > +static void udc_id_switch_for_host(struct ci13xxx *ci)
+> 
+> Same here.
+> 
+
+Will change
+
+> 
+> Newlines are wrong here as well as in the udc.h bit. Which is weird,
+> because they were ok in the original patch I sent you
+> http://www.mail-archive.com/linux-usb at vger.kernel.org/msg13668.html
+> 
+
+Will change
+
+-- 
+
+Best Regards,
+Peter Chen
