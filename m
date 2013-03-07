@@ -1,71 +1,72 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 7 Mar 2013 14:40:54 +0800
-Subject: [PATCH 3/9] MXS/i.MX28: prepare different clocking of the
- built-in RTC
-In-Reply-To: <1362405948-12992-4-git-send-email-s.trumtrar@pengutronix.de>
-References: <1362405948-12992-1-git-send-email-s.trumtrar@pengutronix.de>
- <1362405948-12992-4-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <20130307064052.GC5372@S2101-09.ap.freescale.net>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Thu, 7 Mar 2013 08:42:18 +0200
+Subject: [PATCH v9 3/9] ARM: edma: add AM33XX support to the private EDMA
+ API
+In-Reply-To: <1362586540-10393-4-git-send-email-mporter@ti.com>
+References: <1362586540-10393-1-git-send-email-mporter@ti.com>
+ <1362586540-10393-4-git-send-email-mporter@ti.com>
+Message-ID: <CAHp75Ve40sM-d9Gr3k6mgOOTkM_G+cYSPcftqqsuAi-MzEb9dg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 04, 2013 at 03:05:42PM +0100, Steffen Trumtrar wrote:
-> From: Juergen Beisert <jbe@pengutronix.de>
-> 
-> Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
-> ---
->  drivers/rtc/rtc-stmp3xxx.c |    8 ++++++++
->  1 file changed, 8 insertions(+)
+On Wed, Mar 6, 2013 at 6:15 PM, Matt Porter <mporter@ti.com> wrote:
+> Adds support for parsing the TI EDMA DT data into the
+> required EDMA private API platform data. Enables runtime
+> PM support to initialize the EDMA hwmod. Adds AM33XX EDMA
+> crossbar event mux support. Enables build on OMAP.
 
-So this is a rtc patch, and should be prefixed with "rtc: stmp3xxx: "
-like patches #6~9.
+> --- a/arch/arm/common/edma.c
+> +++ b/arch/arm/common/edma.c
 
-And IMO, all the changes in this patch can just be added together with
-the codes that use them.  IOW, it can be merged into patch #4.
-
-> 
-> diff --git a/drivers/rtc/rtc-stmp3xxx.c b/drivers/rtc/rtc-stmp3xxx.c
-> index 98f0d3c..7311292 100644
-> --- a/drivers/rtc/rtc-stmp3xxx.c
-> +++ b/drivers/rtc/rtc-stmp3xxx.c
-> @@ -53,18 +53,26 @@
->  #define STMP3XXX_RTC_PERSISTENT0		0x60
->  #define STMP3XXX_RTC_PERSISTENT0_SET		0x64
->  #define STMP3XXX_RTC_PERSISTENT0_CLR		0x68
-> +#define STMP3XXX_RTC_PERSISTENT0_CLOCKSOURCE	(1 << 0)
->  #define STMP3XXX_RTC_PERSISTENT0_ALARM_WAKE_EN	0x00000002
->  #define STMP3XXX_RTC_PERSISTENT0_ALARM_EN	0x00000004
-> +#define STMP3XXX_RTC_PERSISTENT0_XTAL24MHZ_PWRUP (1 << 4)
-> +#define STMP3XXX_RTC_PERSISTENT0_XTAL32KHZ_PWRUP (1 << 5)
-> +#define STMP3XXX_RTC_PERSISTENT0_XTAL32_FREQ	(1 << 6)
+> +static int edma_xbar_event_map(struct device *dev,
+> +                              struct device_node *node,
+> +                              struct edma_soc_info *pdata, int len)
+> +{
+> +       int ret = 0;
+> +       int i;
+> +       struct resource res;
+> +       void *xbar;
+> +       const s16 (*xbar_chans)[2];
+> +       u32 shift, offset, mux;
 > +
->  #define STMP3XXX_RTC_PERSISTENT0_ALARM_WAKE	0x00000080
->  
->  #define STMP3XXX_RTC_PERSISTENT1		0x70
->  /* missing bitmask in headers */
->  #define STMP3XXX_RTC_PERSISTENT1_FORCE_UPDATER	0x80000000
->  
-> +enum clock_source { MXS_UNKNOWN, MXS_OSC_24M, MXS_OSC_32K, MXS_OSC_32K768 };
+> +       xbar_chans = devm_kzalloc(dev,
+> +                                 len/sizeof(s16) + 2*sizeof(s16),
+> +                                 GFP_KERNEL);
+> +       if (!xbar_chans)
+> +               return -ENOMEM;
 > +
-We generic write it like
+> +       ret = of_address_to_resource(node, 1, &res);
+> +       if (ret)
+> +               return -EIO;
+> +
+> +       xbar = devm_ioremap(dev, res.start, resource_size(&res));
+> +       if (!xbar)
+> +               return -ENOMEM;
+> +
+> +       ret = edma_of_read_u32_to_s16_array(node,
+> +                                           "ti,edma-xbar-event-map",
+> +                                           (s16 *)xbar_chans,
+> +                                           len/sizeof(u32));
+> +       if (ret)
+> +               return -EIO;
+> +
+> +       for (i = 0; xbar_chans[i][0] != -1; i++) {
+> +               shift = (xbar_chans[i][1] % 4) * 8;
 
-enum clock_source {
-        MXS_UNKNOWN,
-        MXS_OSC_24M,
-        MXS_OSC_32K,
-        MXS_OSC_32K768
-};
+Looks like shift = (xbar_chans[i][1] & 0x03) << 3;
 
-Shawn
+> +               offset = xbar_chans[i][1] >> 2;
+> +               offset <<= 2;
 
->  struct stmp3xxx_rtc_data {
->  	struct rtc_device *rtc;
->  	void __iomem *io;
->  	int irq_alarm;
-> +	enum clock_source clk_src;
->  };
->  
->  #if IS_ENABLED(CONFIG_STMP3XXX_RTC_WATCHDOG)
-> -- 
-> 1.7.10.4
-> 
+Is it offset = xbar_chans[i][1] & 0xfffc; ?
+
+> +               mux = readl((void *)((u32)xbar + offset));
+> +               mux &= ~(0xff << shift);
+> +               mux |= xbar_chans[i][0] << shift;
+> +               writel(mux, (void *)((u32)xbar + offset));
+> +       }
+
+
+-- 
+With Best Regards,
+Andy Shevchenko
