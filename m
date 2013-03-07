@@ -1,37 +1,104 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 07 Mar 2013 12:26:29 +0900
-Subject: [PATCH v2 0/3] pinctrl: exynos: add support for Samsung's
- Exynos5250
-In-Reply-To: <CAJuYYwS9+ZV43QaweUmqh_qFffT1fytM7G9WVbVWdi=hFjvpaw@mail.gmail.com>
-References: <1362568712-13586-1-git-send-email-thomas.abraham@linaro.org>
- <014101ce1ac8$5a4e8600$0eeb9200$%kim@samsung.com>
- <CAJuYYwS9+ZV43QaweUmqh_qFffT1fytM7G9WVbVWdi=hFjvpaw@mail.gmail.com>
-Message-ID: <017b01ce1ae3$8f0486e0$ad0d94a0$%kim@samsung.com>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Thu, 7 Mar 2013 11:25:15 +0800
+Subject: [PATCH v6 00/16] spi/spi-atmel: add dmaengine support for atmel spi
+ controller and to test the device tree support
+Message-ID: <1362626715-6549-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas Abraham wrote:
-> 
-> On 7 March 2013 05:41, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> > Thomas Abraham wrote:
-> >>
-> >> Changes since v1:
-> >> - Change the compatible string from "samsung,pinctrl-exynos5250" to
-> >>   "samsung,exynos5250-pinctrl".
-> >> - Rebased to v3.9-rc1
-> >>
-> >
-> > Thomas, this stuff is already in my tree for v3.10, and above changes
-> > included in there. Do you want to replace with this patches?
-> 
-> Dear Mr. Kim,
-> 
-> The v2 version includes one fix for the compatilble string. It changes
-> the compatible string from "samsung,pinctrl-exynos5250" to
-> "samsung,exynos5250-pinctrl". So could you pick this v2 series instead
-> of the series which you have already merged.
-> 
+Hi All, 
 
-Hey, probably, you didn't check my tree. As I said, already changed/fixed.
+This set of patches is to add dmaengine support for atmel spi and to test device tree support.
 
-- Kukjin
+The work is based on Nicolas and Richard's work.
+
+Because the dma engine device tree support isn't available now, to at91sam9x5ek and at91sam9n12ek
+with dma support, it doesn't work on the dmaengine mode, only on PIO mode so far.
+
+It has been tested as below:
+ 1./tested on v3.9-rc1, by using mtd utils, "mount", "umount" and "cp" commands.
+ 2./tested on "spi/next" git tree after changing master->num_chipselect which fixed in v3.9-rc1.
+ 3./tested by using Documentation/spi/spidev_test.c on "/dev/spidev".
+ 4./tested on on at91sam9x5ek, at91sam9m10g45ek, at91sam9263ek and at91sam9g20ek boards.
+
+It is based on v3.9-rc1
+
+Changelog:
+v6:
+     1./ remove: fix master->num_chipselect wrongly set patch which isn't a issue in v3.9-rc1.
+     2./ fix probing failure after xfer->speed_hz set.
+
+v5:
+     1./ add pinctrl patches.
+     2./ detect capabilities by reading spi version register to replace multiple compatiles.
+     3./ change the "cs-gpios" property of spi node.
+     4./ rebase on v3.8.
+
+v4:
+     1./ Take Joe Perches's adivce, rewrite atmel_spi_is_v2(struct atmel_spi *as) 
+         and atmel_spi_use_dma(struct atmel_spi *as),
+	 and remove atmel_spi_use_pdc(struct atmel_spi *as).
+     2./ Rebase on v3.8-rc3.
+
+V3:
+     1./ Rebase on v3.8-rc2.
+     2./ Remove some Jean-Christophe's patches which has been applied on v3.8-rc2.
+     3./ Remove spi property "cs-gpios" from the SoC dtsi files to the board dts files
+         to avoid some useless pin conflicts.
+
+v2: 
+     1./ Remove the patch :PATCH]mtd: m25p80: change the m25p80_read to reading page to page
+	 which purpose to fix the BUG: when run "flashcp /bin/busybox /dev/mtdX" in the at91sam9g25ek
+	 with DMA mode, it arises a OOPS. Now fix it in this patch:
+	    [PATHC] spi/atmel_spi: add dmaengine support changing to fix the [BUG].
+     2./ Remove two patches:
+   	    which purpose to read dts property to select SPI IP version and DMA mode
+	    Now they will be gat from device tree different compatile.
+     3./ Fix DMA: when enable both spi0 AND spi1, the spi0 doesn't work BUG.
+     4./ Rebase v3.7-rc8.
+
+Best Regards,
+Wenyou Yang.
+
+Nicolas Ferre (5):
+  spi/spi-atmel: add physical base address
+  spi/spi-atmel: call unmapping on transfers buffers
+  spi/spi-atmel: status information passed through controller data
+  spi/spi-atmel: add flag to controller data for lock operations
+  spi/spi-atmel: add dmaengine support
+
+Richard Genoud (6):
+  spi/spi-atmel: fix spi-atmel driver to adapt to slave_config changes
+  spi/spi-atmel: correct 16 bits transfers using PIO
+  spi/spi-atmel: correct 16 bits transfers with DMA
+  ARM: at91: add clocks for spi dt entries
+  ARM: dts: add spi nodes for atmel SoC
+  ARM: dts: add spi nodes for the atmel boards
+
+Wenyou Yang (5):
+  spi/spi-atmel: fix probing failure after xfer->speed_hz set
+  spi/spi-atmel: detect the capabilities of SPI core by reading the
+    VERSION register.
+  spi/spi-atmel: add support transfer on CS1,2,3, not only on CS0
+  spi/spi-atmel: add pinctrl support for atmel spi
+  ARM: dts: add pinctrl property for spi node for atmel SoC
+
+ arch/arm/boot/dts/at91sam9260.dtsi          |   40 ++
+ arch/arm/boot/dts/at91sam9263.dtsi          |   40 ++
+ arch/arm/boot/dts/at91sam9263ek.dts         |   10 +
+ arch/arm/boot/dts/at91sam9g20ek_common.dtsi |   10 +
+ arch/arm/boot/dts/at91sam9g45.dtsi          |   40 ++
+ arch/arm/boot/dts/at91sam9m10g45ek.dts      |   10 +
+ arch/arm/boot/dts/at91sam9n12.dtsi          |   40 ++
+ arch/arm/boot/dts/at91sam9n12ek.dts         |   10 +
+ arch/arm/boot/dts/at91sam9x5.dtsi           |   40 ++
+ arch/arm/boot/dts/at91sam9x5ek.dtsi         |   10 +
+ arch/arm/mach-at91/at91sam9260.c            |    2 +
+ arch/arm/mach-at91/at91sam9g45.c            |    2 +
+ arch/arm/mach-at91/at91sam9n12.c            |    2 +
+ arch/arm/mach-at91/at91sam9x5.c             |    2 +
+ drivers/spi/spi-atmel.c                     |  766 ++++++++++++++++++++++++---
+ 15 files changed, 955 insertions(+), 69 deletions(-)
+
+-- 
+1.7.9.5
