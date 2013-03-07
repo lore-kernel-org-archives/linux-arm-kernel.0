@@ -1,44 +1,56 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 7 Mar 2013 04:20:55 +0100
-Subject: [PATCH v4 0/3] R-Car SATA platform data
-In-Reply-To: <5137D139.9010304@cogentembedded.com>
-References: <201302272332.51650.sergei.shtylyov@cogentembedded.com>
- <20130301072501.GE14376@verge.net.au>
- <5137D139.9010304@cogentembedded.com>
-Message-ID: <20130307032055.GI9499@verge.net.au>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 8 Mar 2013 01:04:51 +0800
+Subject: [PATCH] cpufreq: ARM big LITTLE: Add generic cpufreq driver and
+ its DT glue
+In-Reply-To: <20130307114950.GF17833@n2100.arm.linux.org.uk>
+References: <f20e3c5e822c4bd28a3b71264d73143cc1f850b0.1362458878.git.viresh.kumar@linaro.org>
+ <20130305105251.GL17833@n2100.arm.linux.org.uk>
+ <CAKohpo=cBkHZnSa8ZsM=k7RRN+RZDXFUWDM82EXXBSQcM-8Vhw@mail.gmail.com>
+ <20130307005119.GY17833@n2100.arm.linux.org.uk>
+ <CAKohpok7aD-J-undUisxaOotbXWimPo46jqOH4ok04kg_hMWHA@mail.gmail.com>
+ <20130307114950.GF17833@n2100.arm.linux.org.uk>
+Message-ID: <CAKohpomp_DFi3GAJeTUiQowyEvfXcmTeuf9+O0qcXsXtbFkTDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 07, 2013 at 02:28:57AM +0300, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 03/01/2013 10:25 AM, Simon Horman wrote:
-> 
-> >
-> >>Hello.
-> >>
-> >>    Here's the v4 of the set of now 3 patches (the driver itself has been merged
-> >>since) against the Simon Horman's renesas.git repo, 'next' branch:
-> >>
-> >>[1/3] ARM: mach-shmobile: r8a7779: SATA DT configuration
-> >>[2/3] ARM: mach-shmobile: r8a7779: add SATA support
-> >>[3/3] ARM: mach-shmobile: marzen: add SATA support
-> >>
-> >>Patch changes since the initial posting are reported in the individual patches.
-> >Thanks. I have refreshed the topic/r-car-sata branch of the renesas tree
-> >accordingly. That branch still contains a copy of the "Add Renesas R-Car
-> >on-chip 3Gbps SATA controller driver." but it should disappear once I rebase
-> >(e.g. on v3.9-rc1).
-> 
->    I see you have finally merged my patches to your 'next' branch, thanks.
-> However, you've also merged Morimoto-san's patch to change from gic_spi()
-> to gic_iid(), and I thought I'd recast patch 2/3 to make it use
-> gic_iid() too.
+On 7 March 2013 19:49, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> So how is this different from any other clock which may also return zero
+> from its clk_get_rate() ?
+>
+> If that's the condition you want to check for, call clk_get_rate() after
+> a successful clk_get*() and check for the condition.  Don't go treating
+> the cookie somehow specially.  You're *assuming* a behaviour that is
+> inappropriate for the side of the interface you're working with.
 
-Sorry for messing that up.
+Okay. I will replace the earlier fixup with following:
 
-> How do we do now, do I need to send a new patch to convert to gic_iid()?
+diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+index fdf54a9..87b7e48 100644
+--- a/drivers/cpufreq/Kconfig.arm
++++ b/drivers/cpufreq/Kconfig.arm
+@@ -9,8 +9,7 @@ config ARM_BIG_LITTLE_CPUFREQ
+ config ARM_DT_BL_CPUFREQ
+        tristate "Generic ARM big LITTLE CPUfreq driver probed via DT"
+        select ARM_BIG_LITTLE_CPUFREQ
+-       depends on OF
+-       default n
++       depends on OF && HAVE_CLK
+        help
+          This enables the Generic CPUfreq driver for ARM big.LITTLE platform.
+          This gets frequency tables from DT.
+diff --git a/drivers/cpufreq/arm_big_little.c b/drivers/cpufreq/arm_big_little.c
+index 2486b9a..a41fd89 100644
+--- a/drivers/cpufreq/arm_big_little.c
++++ b/drivers/cpufreq/arm_big_little.c
+@@ -147,7 +147,7 @@ static void put_cluster_clk_and_freq_table(u32 cluster)
 
-Yes, I think it would be best if you sent an incremental patch.
+ static int get_cluster_clk_and_freq_table(u32 cluster)
+ {
+-       char name[9] = "cluster";
++       char name[9] = "cpu-cluster";
+        int count;
 
-Sorry once again for the mix-up.
+        if (atomic_inc_return(&cluster_usage[cluster]) != 1)
+
+
+For more clarity i will resend this patch now will all updates.
