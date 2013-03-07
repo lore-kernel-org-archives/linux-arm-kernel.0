@@ -1,52 +1,296 @@
 From: ian@slimlogic.co.uk (Ian Lartey)
-Date: Thu,  7 Mar 2013 13:17:55 +0000
-Subject: [PATCH v8 11/12] leds: Kconfig for Palmas LEDs
+Date: Thu,  7 Mar 2013 13:17:56 +0000
+Subject: [PATCH v8 12/12] clk: add a clock driver for palmas
 In-Reply-To: <1362662276-20792-1-git-send-email-ian@slimlogic.co.uk>
 References: <1362662276-20792-1-git-send-email-ian@slimlogic.co.uk>
-Message-ID: <1362662276-20792-11-git-send-email-ian@slimlogic.co.uk>
+Message-ID: <1362662276-20792-12-git-send-email-ian@slimlogic.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the Kconfig and Makefile for the Palmas LED driver.
+Palmas has two clock generators in it, clk32kg and clk32kg audio. They
+are fixed frequency clocks that only have enable/disable functionality.
 
 Signed-off-by: Graeme Gregory <gg@slimlogic.co.uk>
+Signed-off-by: J Keerthy <j-keerthy@ti.com>
 Signed-off-by: Ian Lartey <ian@slimlogic.co.uk>
 ---
- drivers/leds/Kconfig  |    9 +++++++++
- drivers/leds/Makefile |    1 +
- 2 files changed, 10 insertions(+), 0 deletions(-)
+ drivers/clk/clk-palmas.c |  268 ++++++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 268 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/clk/clk-palmas.c
 
-diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
-index ec50824..a070e29 100644
---- a/drivers/leds/Kconfig
-+++ b/drivers/leds/Kconfig
-@@ -469,6 +469,15 @@ config LEDS_BLINKM
- 	  This option enables support for the BlinkM RGB LED connected
- 	  through I2C. Say Y to enable support for the BlinkM LED.
- 
-+config LEDS_PALMAS
-+	bool "LED support for the Palmas family of PMICs"
-+	depends on LEDS_CLASS
-+	depends on MFD_PALMAS
-+	help
-+	  This option enables the driver for LED1 & LED2 pins on Palmas PMIC
-+	  if these pins are enabled in the mux configuration. The driver support
-+	  ON/OFF and blinking with hardware control.
+diff --git a/drivers/clk/clk-palmas.c b/drivers/clk/clk-palmas.c
+new file mode 100644
+index 0000000..328eea4
+--- /dev/null
++++ b/drivers/clk/clk-palmas.c
+@@ -0,0 +1,268 @@
++/*
++ * PALMAS resource clock module driver
++ *
++ * Copyright (C) 2011-2013 Texas Instruments Inc.
++ * Graeme Gregory <gg@slimlogic.co.uk>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
++ * 02110-1301 USA
++ *
++ */
 +
- config LEDS_TRIGGERS
- 	bool "LED Trigger support"
- 	depends on LEDS_CLASS
-diff --git a/drivers/leds/Makefile b/drivers/leds/Makefile
-index 215e7e3..233023e 100644
---- a/drivers/leds/Makefile
-+++ b/drivers/leds/Makefile
-@@ -52,6 +52,7 @@ obj-$(CONFIG_LEDS_RENESAS_TPU)		+= leds-renesas-tpu.o
- obj-$(CONFIG_LEDS_MAX8997)		+= leds-max8997.o
- obj-$(CONFIG_LEDS_LM355x)		+= leds-lm355x.o
- obj-$(CONFIG_LEDS_BLINKM)		+= leds-blinkm.o
-+obj-$(CONFIG_LEDS_PALMAS)		+= leds-palmas.o
- 
- # LED SPI Drivers
- obj-$(CONFIG_LEDS_DAC124S085)		+= leds-dac124s085.o
++#include <linux/clk.h>
++#include <linux/module.h>
++#include <linux/slab.h>
++#include <linux/platform_device.h>
++#include <linux/mfd/palmas.h>
++#include <linux/clk-provider.h>
++#include <linux/of_platform.h>
++
++struct palmas_clk {
++	struct palmas *palmas;
++	struct device *dev;
++	struct clk_hw clk32kg;
++	struct clk_hw clk32kgaudio;
++	int clk32kgaudio_mode_sleep;
++	int clk32kg_mode_sleep;
++};
++
++static int palmas_clock_setbits(struct palmas *palmas, unsigned int reg,
++		unsigned int data)
++{
++	return palmas_update_bits(palmas, PALMAS_RESOURCE_BASE,
++			reg, data, data);
++}
++
++static int palmas_clock_clrbits(struct palmas *palmas, unsigned int reg,
++		unsigned int data)
++{
++	return palmas_update_bits(palmas, PALMAS_RESOURCE_BASE,
++			reg, data, 0);
++}
++
++static int palmas_prepare_clk32kg(struct clk_hw *hw)
++{
++	struct palmas_clk *palmas_clk = container_of(hw, struct palmas_clk,
++			clk32kg);
++	int ret;
++
++	ret = palmas_clock_setbits(palmas_clk->palmas,
++			PALMAS_CLK32KG_CTRL, PALMAS_CLK32KG_CTRL_MODE_ACTIVE);
++	if (ret)
++		dev_err(palmas_clk->dev, "Failed to enable clk32kg: %d\n", ret);
++
++	return ret;
++}
++
++static void palmas_unprepare_clk32kg(struct clk_hw *hw)
++{
++	struct palmas_clk *palmas_clk = container_of(hw, struct palmas_clk,
++			clk32kg);
++	int ret;
++
++	ret = palmas_clock_clrbits(palmas_clk->palmas,
++			PALMAS_CLK32KG_CTRL, PALMAS_CLK32KG_CTRL_MODE_ACTIVE);
++	if (ret)
++		dev_err(palmas_clk->dev, "Failed to enable clk32kg: %d\n", ret);
++
++	return;
++}
++
++static const struct clk_ops palmas_clk32kg_ops = {
++	.prepare = palmas_prepare_clk32kg,
++	.unprepare = palmas_unprepare_clk32kg,
++};
++
++static int palmas_prepare_clk32kgaudio(struct clk_hw *hw)
++{
++	struct palmas_clk *palmas_clk = container_of(hw, struct palmas_clk,
++			clk32kgaudio);
++	int ret;
++
++	ret = palmas_clock_setbits(palmas_clk->palmas,
++		PALMAS_CLK32KGAUDIO_CTRL, PALMAS_CLK32KGAUDIO_CTRL_MODE_ACTIVE);
++	if (ret)
++		dev_err(palmas_clk->dev,
++				"Failed to enable clk32kgaudio: %d\n", ret);
++
++	return ret;
++}
++
++static void palmas_unprepare_clk32kgaudio(struct clk_hw *hw)
++{
++	struct palmas_clk *palmas_clk = container_of(hw, struct palmas_clk,
++			clk32kgaudio);
++	int ret;
++
++	ret = palmas_clock_clrbits(palmas_clk->palmas,
++		PALMAS_CLK32KGAUDIO_CTRL, PALMAS_CLK32KGAUDIO_CTRL_MODE_ACTIVE);
++	if (ret)
++		dev_err(palmas_clk->dev,
++				"Failed to enable clk32kgaudio: %d\n", ret);
++
++	return;
++}
++
++static const struct clk_ops palmas_clk32kgaudio_ops = {
++	.prepare = palmas_prepare_clk32kgaudio,
++	.unprepare = palmas_unprepare_clk32kgaudio,
++};
++
++static int palmas_initialise_clk(struct palmas_clk *palmas_clk)
++{
++	int ret;
++
++	if (palmas_clk->clk32kg_mode_sleep) {
++		ret = palmas_clock_setbits(palmas_clk->palmas,
++			PALMAS_CLK32KG_CTRL, PALMAS_CLK32KG_CTRL_MODE_SLEEP);
++		if (ret)
++			return ret;
++	}
++
++	if (palmas_clk->clk32kgaudio_mode_sleep) {
++		ret = palmas_clock_setbits(palmas_clk->palmas,
++			PALMAS_CLK32KGAUDIO_CTRL,
++			PALMAS_CLK32KGAUDIO_CTRL_MODE_SLEEP);
++		if (ret)
++			return ret;
++	}
++
++	return 0;
++}
++
++static void palmas_dt_to_pdata(struct device_node *node,
++		struct palmas_clk_platform_data *pdata)
++{
++	int ret;
++	u32 prop;
++
++	ret = of_property_read_u32(node, "ti,clk32kg-mode-sleep", &prop);
++	if (!ret)
++		pdata->clk32kg_mode_sleep = prop;
++
++	ret = of_property_read_u32(node, "ti,clk32kgaudio-mode-sleep", &prop);
++	if (!ret)
++		pdata->clk32kgaudio_mode_sleep = prop;
++}
++
++static int palmas_clk_probe(struct platform_device *pdev)
++{
++	struct palmas *palmas = dev_get_drvdata(pdev->dev.parent);
++	struct palmas_clk_platform_data *pdata = pdev->dev.platform_data;
++	struct device_node *node = pdev->dev.of_node;
++	struct palmas_clk *palmas_clk;
++	struct clk *clk;
++	struct clk_init_data init_clk32g, init_clk32gaudio;
++	int ret;
++
++	if (node && !pdata) {
++		pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
++
++		if (!pdata)
++			return -ENOMEM;
++
++		palmas_dt_to_pdata(node, pdata);
++	}
++
++	palmas_clk = devm_kzalloc(&pdev->dev, sizeof(*palmas_clk), GFP_KERNEL);
++	if (!palmas_clk)
++		return -ENOMEM;
++
++	palmas_clk->palmas = palmas;
++	palmas_clk->dev = &pdev->dev;
++
++	init_clk32g.name = "clk32kg";
++	init_clk32g.ops = &palmas_clk32kg_ops;
++	init_clk32g.parent_names = NULL;
++	init_clk32g.num_parents = 0;
++	palmas_clk->clk32kg.init = &init_clk32g;
++
++	clk = clk_register(palmas_clk->dev, &palmas_clk->clk32kg);
++	if (IS_ERR(clk)) {
++		dev_dbg(&pdev->dev, "clk32kg clock register failed %ld\n",
++				PTR_ERR(clk));
++		ret = PTR_ERR(clk);
++		goto err_clk32kg;
++	}
++
++	init_clk32gaudio.name = "clk32kgaudio";
++	init_clk32gaudio.ops = &palmas_clk32kgaudio_ops;
++	init_clk32gaudio.parent_names = NULL;
++	init_clk32gaudio.num_parents = 0;
++	palmas_clk->clk32kgaudio.init = &init_clk32gaudio;
++
++	clk = clk_register(palmas_clk->dev, &palmas_clk->clk32kgaudio);
++	if (IS_ERR(clk)) {
++		dev_dbg(&pdev->dev, "clk32kgaudio clock register failed %ld\n",
++		PTR_ERR(clk));
++		ret = PTR_ERR(clk);
++		goto err_audio;
++	}
++
++	ret = palmas_initialise_clk(palmas_clk);
++	if (ret)
++		goto err;
++
++	dev_set_drvdata(&pdev->dev, palmas_clk);
++
++	return 0;
++
++err:
++	clk_unregister(palmas_clk->clk32kgaudio.clk);
++err_audio:
++	clk_unregister(palmas_clk->clk32kg.clk);
++err_clk32kg:
++
++	return ret;
++}
++
++static int palmas_clk_remove(struct platform_device *pdev)
++{
++	struct palmas_clk *palmas_clk = dev_get_drvdata(&pdev->dev);
++
++	clk_unregister(palmas_clk->clk32kgaudio.clk);
++	clk_unregister(palmas_clk->clk32kg.clk);
++
++	return 0;
++}
++
++static struct of_device_id of_palmas_match_tbl[] = {
++	{ .compatible = "ti,palmas-clk", },
++	{ .compatible = "ti,palmas-charger-clk", },
++	{ .compatible = "ti,twl6035-clk", },
++	{ .compatible = "ti,twl6036-clk", },
++	{ .compatible = "ti,twl6037-clk", },
++	{ .compatible = "ti,tps65913-clk", },
++	{ .compatible = "ti,tps65914-clk", },
++	{ .compatible = "ti,tps80036-clk", },
++	{ /* end */ }
++};
++MODULE_DEVICE_TABLE(of, of_palmas_match_tbl);
++
++static struct platform_driver palmas_clk_driver = {
++	.probe = palmas_clk_probe,
++	.remove = palmas_clk_remove,
++	.driver = {
++		.name = "palmas-clk",
++		.of_match_table = of_palmas_match_tbl,
++		.owner = THIS_MODULE,
++	},
++};
++
++module_platform_driver(palmas_clk_driver);
++
++MODULE_AUTHOR("Graeme Gregory <gg@slimlogic.co.uk>");
++MODULE_DESCRIPTION("PALMAS clock driver");
++MODULE_LICENSE("GPL");
++MODULE_ALIAS("platform:palmas-clk");
 -- 
 1.7.0.4
