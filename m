@@ -1,164 +1,106 @@
-From: mporter@ti.com (Matt Porter)
-Date: Thu, 7 Mar 2013 09:12:35 -0500
-Subject: [PATCH 2/2] ARM: dts: add AM33XX MMC support
-In-Reply-To: <41fde401c8e646689123d7c6d3a2dffc@DLEE71.ent.ti.com>
-References: <1362629799-22485-1-git-send-email-mporter@ti.com>
- <1362629799-22485-3-git-send-email-mporter@ti.com>
- <41fde401c8e646689123d7c6d3a2dffc@DLEE71.ent.ti.com>
-Message-ID: <20130307141235.GQ6209@beef>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Thu, 7 Mar 2013 09:14:45 -0500
+Subject: [PATCH] xen: arm: mandate EABI and use generic atomic operations.
+In-Reply-To: <1362640645-26564-1-git-send-email-ian.campbell@citrix.com>
+References: <1362640645-26564-1-git-send-email-ian.campbell@citrix.com>
+Message-ID: <20130307141445.GB14958@phenom.dumpdata.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 07, 2013 at 05:29:24AM +0000, Vaibhav Hiremath wrote:
-> > -----Original Message-----
-> > From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
-> > owner at vger.kernel.org] On Behalf Of Porter, Matt
-> > Sent: Thursday, March 07, 2013 9:47 AM
-> > To: Krishnamoorthy, Balaji T; Chris Ball; Cousson, Benoit; Tony
-> > Lindgren; Russell King
-> > Cc: Devicetree Discuss; Linux ARM Kernel List; Linux OMAP List; Linux
-> > Kernel Mailing List; Linux MMC List
-> > Subject: [PATCH 2/2] ARM: dts: add AM33XX MMC support
-> > 
-> > Adds AM33XX MMC support for am335x-bone, am335x-evm, and
-> > am335x-evmsk.
-> > 
-> > Signed-off-by: Matt Porter <mporter@ti.com>
-> > Acked-by: Tony Lindgren <tony@atomide.com>
-> > ---
-> >  arch/arm/boot/dts/am335x-bone.dts  |    7 +++++++
-> >  arch/arm/boot/dts/am335x-evm.dts   |    7 +++++++
-> >  arch/arm/boot/dts/am335x-evmsk.dts |    7 +++++++
-> >  arch/arm/boot/dts/am33xx.dtsi      |   28 ++++++++++++++++++++++++++++
-> >  4 files changed, 49 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/am335x-bone.dts
-> > b/arch/arm/boot/dts/am335x-bone.dts
-> > index 11b240c..a154ce0 100644
-> > --- a/arch/arm/boot/dts/am335x-bone.dts
-> > +++ b/arch/arm/boot/dts/am335x-bone.dts
-> > @@ -120,6 +120,8 @@
-> >  		};
-> > 
-> >  		ldo3_reg: regulator at 5 {
-> > +			regulator-min-microvolt = <1800000>;
-> > +			regulator-max-microvolt = <3300000>;
-> >  			regulator-always-on;
-> >  		};
-> > 
-> > @@ -136,3 +138,8 @@
-> >  &cpsw_emac1 {
-> >  	phy_id = <&davinci_mdio>, <1>;
-> >  };
-> > +
-> > +&mmc1 {
-> > +	status = "okay";
-> > +	vmmc-supply = <&ldo3_reg>;
-> > +};
-> > diff --git a/arch/arm/boot/dts/am335x-evm.dts
-> > b/arch/arm/boot/dts/am335x-evm.dts
-> > index d649644..2907da6 100644
-> > --- a/arch/arm/boot/dts/am335x-evm.dts
-> > +++ b/arch/arm/boot/dts/am335x-evm.dts
-> > @@ -232,6 +232,8 @@
-> >  		};
-> > 
-> >  		vmmc_reg: regulator at 12 {
-> > +			regulator-min-microvolt = <1800000>;
-> > +			regulator-max-microvolt = <3300000>;
-> >  			regulator-always-on;
-> >  		};
-> >  	};
-> > @@ -244,3 +246,8 @@
-> >  &cpsw_emac1 {
-> >  	phy_id = <&davinci_mdio>, <1>;
-> >  };
-> > +
-> > +&mmc1 {
-> > +	status = "okay";
-> > +	vmmc-supply = <&vmmc_reg>;
-> > +};
-> > diff --git a/arch/arm/boot/dts/am335x-evmsk.dts
-> > b/arch/arm/boot/dts/am335x-evmsk.dts
-> > index f5a6162..f050c46 100644
-> > --- a/arch/arm/boot/dts/am335x-evmsk.dts
-> > +++ b/arch/arm/boot/dts/am335x-evmsk.dts
-> > @@ -244,7 +244,14 @@
-> >  		};
-> > 
-> >  		vmmc_reg: regulator at 12 {
-> > +			regulator-min-microvolt = <1800000>;
-> > +			regulator-max-microvolt = <3300000>;
-> >  			regulator-always-on;
-> >  		};
-> >  	};
-> >  };
-> > +
-> > +&mmc1 {
-> > +	status = "okay";
-> > +	vmmc-supply = <&vmmc_reg>;
-> > +};
-> > diff --git a/arch/arm/boot/dts/am33xx.dtsi
-> > b/arch/arm/boot/dts/am33xx.dtsi
-> > index c3c781a..e029eea 100644
-> > --- a/arch/arm/boot/dts/am33xx.dtsi
-> > +++ b/arch/arm/boot/dts/am33xx.dtsi
-> > @@ -234,6 +234,34 @@
-> >  			status = "disabled";
-> >  		};
-> > 
-> > +		mmc1: mmc at 48060000 {
-> > +			compatible = "ti,omap3-hsmmc";
-> > +			ti,hwmods = "mmc1";
-> > +			ti,dual-volt;
-> > +			ti,needs-special-reset;
-> > +			dmas = <&edma 24
-> > +				&edma 25>;
-> > +			dma-names = "tx", "rx";
-> > +			status = "disabled";
-> > +		};
-> > +
-> > +		mmc2: mmc at 481d8000 {
-> > +			compatible = "ti,omap3-hsmmc";
-> > +			ti,hwmods = "mmc2";
-> > +			ti,needs-special-reset;
-> > +			dmas = <&edma 2
-> > +				&edma 3>;
-> > +			dma-names = "tx", "rx";
-> > +			status = "disabled";
-> > +		};
-> > +
-> > +		mmc3: mmc at 47810000 {
-> > +			compatible = "ti,omap3-hsmmc";
-> > +			ti,hwmods = "mmc3";
-> > +			ti,needs-special-reset;
-> > +			status = "disabled";
-> > +		};
-> Any specific reason why you did not add edma entry here as well?
+On Thu, Mar 07, 2013 at 07:17:25AM +0000, Ian Campbell wrote:
+> Rob Herring has observed that c81611c4e96f "xen: event channel arrays are
+> xen_ulong_t and not unsigned long" introduced a compile failure when building
+> without CONFIG_AEABI:
+> 
+> /tmp/ccJaIZOW.s: Assembler messages:
+> /tmp/ccJaIZOW.s:831: Error: even register required -- `ldrexd r5,r6,[r4]'
+> 
+> Will Deacon pointed out that this is because OABI does not require even base
+> registers for 64-bit values. We can avoid this by simply using the existing
+> atomic64_xchg operation and the same containerof trick as used by the cmpxchg
+> macros. However since this code is used on memory which is shared with the
+> hypervisor we require proper atomic instructions and cannot use the generic
+> atomic64 callbacks (which are based on spinlocks), therefore add a dependency
+> on !GENERIC_ATOMIC64. Since we already depend on !CPU_V6 there isn't much
+> downside to this.
+> 
+> While thinking about this we also observed that OABI has different struct
+> alignment requirements to EABI, which is a problem for hypercall argument
+> structs which are shared with the hypervisor and which must be in EABI layout.
+> Since I don't expect people to want to run OABI kernels on Xen depend on
+> CONFIG_AEABI explicitly too (although it also happens to be enforced by the
+> !GENERIC_ATOMIC64 requirement too).
+> 
+> Signed-off-by: Ian Campbell <ian.campbell@citrix.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Rob Herring <robherring2@gmail.com>
+> Cc: Stefano Stabellini <Stefano.Stabellini@eu.citrix.com>
+> Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 
-Yes, I've answered this one before and I think this illustrates a need
-for a comment in the .dtsi. mmc3 edma event are on the crossbar and so
-the event that will be mapped is system-specific. Since Luca is still
-working on DT support for WiLink, there's no way to show an example of
-how this is used upstream as that's the only in-kernel user.
+Stefano, I need your Ack before I can put it in my tree for Linus.
 
-I have a test driver I've cited in the postings that shows how the
-crossbar is configured via the board .dts. It doesn't belong in the
-.dtsi, however, in this case. When WiLink DT support is ready we can
-have an entry in the am335x-evmsk.dts that shows this case.
-
-> Also, I wonder why "interrupt" property is not coming here, I understand
-> That hwmod is filling the gap here; but I would still recommend you to complete
-> The DT node, as we only support DT boot.
-
-Yeah, I only added needed properties so as to not confuse people as to
-where the interrupt resources are coming from. If you feel strongly
-about this I don't have a problem with adding unused data in the dts.
-I suppose this will help clear things to have a switch away from using
-the hwmod data.
-
-> I will test the whole patch series today and update you.
-
-Thanks.
-
--Matt
+> ---
+>  arch/arm/Kconfig                  |    3 ++-
+>  arch/arm/include/asm/xen/events.h |   25 ++++---------------------
+>  2 files changed, 6 insertions(+), 22 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 5b71469..be632ba 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1887,8 +1887,9 @@ config XEN_DOM0
+>  
+>  config XEN
+>  	bool "Xen guest support on ARM (EXPERIMENTAL)"
+> -	depends on ARM && OF
+> +	depends on ARM && AEABI && OF
+>  	depends on CPU_V7 && !CPU_V6
+> +	depends on !GENERIC_ATOMIC64
+>  	help
+>  	  Say Y if you want to run Linux in a Virtual Machine on Xen on ARM.
+>  
+> diff --git a/arch/arm/include/asm/xen/events.h b/arch/arm/include/asm/xen/events.h
+> index 5c27696..8b1f37b 100644
+> --- a/arch/arm/include/asm/xen/events.h
+> +++ b/arch/arm/include/asm/xen/events.h
+> @@ -2,6 +2,7 @@
+>  #define _ASM_ARM_XEN_EVENTS_H
+>  
+>  #include <asm/ptrace.h>
+> +#include <asm/atomic.h>
+>  
+>  enum ipi_vector {
+>  	XEN_PLACEHOLDER_VECTOR,
+> @@ -15,26 +16,8 @@ static inline int xen_irqs_disabled(struct pt_regs *regs)
+>  	return raw_irqs_disabled_flags(regs->ARM_cpsr);
+>  }
+>  
+> -/*
+> - * We cannot use xchg because it does not support 8-byte
+> - * values. However it is safe to use {ldr,dtd}exd directly because all
+> - * platforms which Xen can run on support those instructions.
+> - */
+> -static inline xen_ulong_t xchg_xen_ulong(xen_ulong_t *ptr, xen_ulong_t val)
+> -{
+> -	xen_ulong_t oldval;
+> -	unsigned int tmp;
+> -
+> -	wmb();
+> -	asm volatile("@ xchg_xen_ulong\n"
+> -		"1:     ldrexd  %0, %H0, [%3]\n"
+> -		"       strexd  %1, %2, %H2, [%3]\n"
+> -		"       teq     %1, #0\n"
+> -		"       bne     1b"
+> -		: "=&r" (oldval), "=&r" (tmp)
+> -		: "r" (val), "r" (ptr)
+> -		: "memory", "cc");
+> -	return oldval;
+> -}
+> +#define xchg_xen_ulong(ptr, val) atomic64_xchg(container_of((ptr),	\
+> +							    atomic64_t,	\
+> +							    counter), (val))
+>  
+>  #endif /* _ASM_ARM_XEN_EVENTS_H */
+> -- 
+> 1.7.10.4
+> 
