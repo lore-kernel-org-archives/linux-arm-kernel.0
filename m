@@ -1,37 +1,71 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 7 Mar 2013 14:37:30 +0800 (HKT)
-Subject: ARM: 7653/2: do not scale loops_per_jiffy when using a constant
- delay clock
-In-Reply-To: <20130307033221.GC25137@mudshark.cambridge.arm.com>
-References: <20130306022308.GA21539@mudshark.cambridge.arm.com>
- <20130306183751.GV17833@n2100.arm.linux.org.uk>
- <20130307033221.GC25137@mudshark.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.03.1303071417260.28820@syhkavp.arg>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 7 Mar 2013 14:40:54 +0800
+Subject: [PATCH 3/9] MXS/i.MX28: prepare different clocking of the
+ built-in RTC
+In-Reply-To: <1362405948-12992-4-git-send-email-s.trumtrar@pengutronix.de>
+References: <1362405948-12992-1-git-send-email-s.trumtrar@pengutronix.de>
+ <1362405948-12992-4-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <20130307064052.GC5372@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 7 Mar 2013, Will Deacon wrote:
+On Mon, Mar 04, 2013 at 03:05:42PM +0100, Steffen Trumtrar wrote:
+> From: Juergen Beisert <jbe@pengutronix.de>
+> 
+> Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
+> ---
+>  drivers/rtc/rtc-stmp3xxx.c |    8 ++++++++
+>  1 file changed, 8 insertions(+)
 
-> On the topic of this patch: I still think that we should revert it and
-> require cpufreq drivers to pass CPUFREQ_CONST_LOOPS in their flags (I guess
-> the cpu0 platform data may need extending to take some flags).
+So this is a rtc patch, and should be prefixed with "rtc: stmp3xxx: "
+like patches #6~9.
 
-I must disagree.  The constness here is a property of the timer source 
-used to implement one of the udelay() providers.  Constness has no 
-relation with cpufreq which may or may not impact a given udelay 
-implementation.
+And IMO, all the changes in this patch can just be added together with
+the codes that use them.  IOW, it can be merged into patch #4.
 
-> Longer term, we might want to assess the binding between timer-based 
-> delays and loops_per_jiffy, but that's an entirely new problem.
+> 
+> diff --git a/drivers/rtc/rtc-stmp3xxx.c b/drivers/rtc/rtc-stmp3xxx.c
+> index 98f0d3c..7311292 100644
+> --- a/drivers/rtc/rtc-stmp3xxx.c
+> +++ b/drivers/rtc/rtc-stmp3xxx.c
+> @@ -53,18 +53,26 @@
+>  #define STMP3XXX_RTC_PERSISTENT0		0x60
+>  #define STMP3XXX_RTC_PERSISTENT0_SET		0x64
+>  #define STMP3XXX_RTC_PERSISTENT0_CLR		0x68
+> +#define STMP3XXX_RTC_PERSISTENT0_CLOCKSOURCE	(1 << 0)
+>  #define STMP3XXX_RTC_PERSISTENT0_ALARM_WAKE_EN	0x00000002
+>  #define STMP3XXX_RTC_PERSISTENT0_ALARM_EN	0x00000004
+> +#define STMP3XXX_RTC_PERSISTENT0_XTAL24MHZ_PWRUP (1 << 4)
+> +#define STMP3XXX_RTC_PERSISTENT0_XTAL32KHZ_PWRUP (1 << 5)
+> +#define STMP3XXX_RTC_PERSISTENT0_XTAL32_FREQ	(1 << 6)
+> +
+>  #define STMP3XXX_RTC_PERSISTENT0_ALARM_WAKE	0x00000080
+>  
+>  #define STMP3XXX_RTC_PERSISTENT1		0x70
+>  /* missing bitmask in headers */
+>  #define STMP3XXX_RTC_PERSISTENT1_FORCE_UPDATER	0x80000000
+>  
+> +enum clock_source { MXS_UNKNOWN, MXS_OSC_24M, MXS_OSC_32K, MXS_OSC_32K768 };
+> +
+We generic write it like
 
-Actually I do think that the lpj should always be scaled regardless, as 
-this has meaning only for a CPU loop.  This is even more important if 
-there is the possibility for switching between different 
-implementations. The local timer based udelay implementation should 
-simply never factor in lpj into its delay evaluation.
+enum clock_source {
+        MXS_UNKNOWN,
+        MXS_OSC_24M,
+        MXS_OSC_32K,
+        MXS_OSC_32K768
+};
 
-So the current patch is a stop gap to fix the problem today.  When 
-something better is proposed we can remove this fix.
+Shawn
 
-
-Nicolas
+>  struct stmp3xxx_rtc_data {
+>  	struct rtc_device *rtc;
+>  	void __iomem *io;
+>  	int irq_alarm;
+> +	enum clock_source clk_src;
+>  };
+>  
+>  #if IS_ENABLED(CONFIG_STMP3XXX_RTC_WATCHDOG)
+> -- 
+> 1.7.10.4
+> 
