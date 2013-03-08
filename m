@@ -1,90 +1,40 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 8 Mar 2013 17:32:49 -0500
-Subject: [GIT PULL] ARM: mvebu: fixes for v3.9
-Message-ID: <20130308223249.GW23237@titan.lakedaemon.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 8 Mar 2013 22:46:38 +0000
+Subject: [PATCH 04/10] bus: introduce an Marvell EBU MBus driver
+In-Reply-To: <20130308200550.GD29435@obsidianresearch.com>
+References: <1362577426-12804-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201303081942.27233.arnd@arndb.de>
+ <20130308200550.GD29435@obsidianresearch.com>
+Message-ID: <201303082246.38910.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 6dbe51c251a327e012439c4772097a13df43c5b8:
+On Friday 08 March 2013, Jason Gunthorpe wrote:
+> 
+> On Fri, Mar 08, 2013 at 07:42:27PM +0000, Arnd Bergmann wrote:
+> > > An absent ranges makes some sense from a spec perspective - however do we
+> > > have the kernel infrastructure to grow an in memory DTB node?
+> > 
+> > I don't think it's necessary to amend the flattened DT in the DTB form,
+> > although that could be done if necessary. Once we have the live DT data
+> > structures, after calling unflatten_device_tree(), we can trivially call
+> > of_add_property() to add the ranges.
+> 
+> Oh, I've never looked at those APIs, that makes it pretty nice,
+> indeed. With those it would be easy to keep the in-memory DT in sync.
+> 
+> The only other problem with absent ranges is how do you learn the
+> target id and size to do the assignment?
 
-  Linux 3.9-rc1 (2013-03-03 15:11:05 -0800)
+You just need to look at all "reg" properties of direct children
+that are not status="disabled". Those properties are already in 
+the 64-bit address space co ntaining the target ID, and they have
+the size in them, at least for those where the size is known at
+boot time, probably all but PCIe, which can get the rest.
 
-are available in the git repository at:
+The algorithm should probably be similar to what we do for PCI
+resource assignment: collect all resources we need, sort them
+by size, and fill the logical bus address space starting with
+the largest one so we don't leave holes.
 
-  git://git.infradead.org/users/jcooper/linux.git tags/mvebu_fixes_for_v3.9
-
-for you to fetch changes up to b2d57222b0f0963258a47da0ea7f0ec451c64712:
-
-  arm: mach-orion5x: fix typo in compatible string of a .dts file (2013-03-08 22:19:42 +0000)
-
-----------------------------------------------------------------
-mvebu fixes for v3.9
-
-The first four patches:
-
-  89c58c1 rtc: rtc-mv: Add support for clk to avoid lockups
-  de88747 gpio: mvebu: Add clk support to prevent lockup
-  7bf5b40 ARM: kirkwood: fix to retain gbe MAC addresses for DT kernels
-  93fff4c ARM: kirkwood: of_serial: fix clock gating by removing clock-frequency
-
-are Cc'd to stable since they were held over from the previous merge window.
-
-The rest are a small collection of fixes and a couple of devicetree conversion
-catchups.
-
-----------------------------------------------------------------
-Andrew Lunn (2):
-      gpio: mvebu: Add clk support to prevent lockup
-      rtc: rtc-mv: Add support for clk to avoid lockups
-
-Florian Fainelli (1):
-      arm: mvebu: enable the USB ports on Armada 370 Reference Design board
-
-Heikki Krogerus (1):
-      arm: mvebu: Reduce reg-io-width with UARTs
-
-Jason Cooper (1):
-      ARM: kirkwood: of_serial: fix clock gating by removing clock-frequency
-
-Jean-Francois Moine (1):
-      ARM: Dove: add RTC device node
-
-Paul Bolle (1):
-      ARM: dove: drop "select COMMON_CLK_DOVE"
-
-Sebastian Hesselbarth (1):
-      ARM: kirkwood: fix to retain gbe MAC addresses for DT kernels
-
-Thomas Petazzoni (3):
-      arm: plat-orion: fix address decoding when > 4GB is used
-      arm: mvebu: fix address-cells in mpic DT node
-      arm: mach-orion5x: fix typo in compatible string of a .dts file
-
- arch/arm/Kconfig                                   |  1 -
- arch/arm/boot/dts/armada-370-rd.dts                |  8 +++++++
- arch/arm/boot/dts/armada-370-xp.dtsi               |  5 ++--
- arch/arm/boot/dts/armada-xp.dtsi                   |  4 ++--
- arch/arm/boot/dts/dove.dtsi                        |  5 ++++
- arch/arm/boot/dts/kirkwood-dns320.dts              |  2 --
- arch/arm/boot/dts/kirkwood-dns325.dts              |  1 -
- arch/arm/boot/dts/kirkwood-dockstar.dts            |  1 -
- arch/arm/boot/dts/kirkwood-dreamplug.dts           |  1 -
- arch/arm/boot/dts/kirkwood-goflexnet.dts           |  1 -
- arch/arm/boot/dts/kirkwood-ib62x0.dts              |  1 -
- arch/arm/boot/dts/kirkwood-iconnect.dts            |  1 -
- arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts      |  1 -
- arch/arm/boot/dts/kirkwood-km_kirkwood.dts         |  1 -
- arch/arm/boot/dts/kirkwood-lschlv2.dts             |  1 -
- arch/arm/boot/dts/kirkwood-lsxhl.dts               |  1 -
- arch/arm/boot/dts/kirkwood-mplcec4.dts             |  1 -
- arch/arm/boot/dts/kirkwood-ns2-common.dtsi         |  1 -
- arch/arm/boot/dts/kirkwood-nsa310.dts              |  1 -
- arch/arm/boot/dts/kirkwood-openblocks_a6.dts       |  2 --
- arch/arm/boot/dts/kirkwood-topkick.dts             |  1 -
- arch/arm/boot/dts/kirkwood.dtsi                    |  5 ++--
- .../dts/orion5x-lacie-ethernet-disk-mini-v2.dts    |  2 +-
- arch/arm/mach-kirkwood/board-dt.c                  | 25 +++++++++++++------
- arch/arm/plat-orion/addr-map.c                     |  7 ++++--
- drivers/gpio/gpio-mvebu.c                          |  7 ++++++
- drivers/rtc/rtc-mv.c                               | 28 ++++++++++++++++++----
- 27 files changed, 75 insertions(+), 40 deletions(-)
+	Arnd
