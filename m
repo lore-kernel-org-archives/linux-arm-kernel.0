@@ -1,42 +1,110 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Fri, 8 Mar 2013 09:52:28 -0700
-Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
-In-Reply-To: <20130308071443.GA5772@avionic-0098.mockup.avionic-design.de>
-References: <20130306105441.4d24033e@skate>
- <20130306121118.GA17079@avionic-0098.mockup.avionic-design.de>
- <20130306180946.GA2433@obsidianresearch.com>
- <20130307080832.GD3451@avionic-0098.mockup.avionic-design.de>
- <20130307174955.GC20840@obsidianresearch.com>
- <20130307194830.GA1811@avionic-0098.mockup.avionic-design.de>
- <20130307200235.GB20695@obsidianresearch.com>
- <20130307204726.GB1811@avionic-0098.mockup.avionic-design.de>
- <51392B4D.9040404@gmail.com>
- <20130308071443.GA5772@avionic-0098.mockup.avionic-design.de>
-Message-ID: <20130308165228.GB4094@obsidianresearch.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Fri, 8 Mar 2013 10:58:22 -0600
+Subject: [PATCH V2 01/17] ARM: OMAP2+: Simplify code configuring ONENAND
+ devices
+In-Reply-To: <1362761918-8696-1-git-send-email-jon-hunter@ti.com>
+References: <1362761918-8696-1-git-send-email-jon-hunter@ti.com>
+Message-ID: <1362761918-8696-2-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 08, 2013 at 08:14:44AM +0100, Thierry Reding wrote:
-> On Thu, Mar 07, 2013 at 06:05:33PM -0600, Rob Herring wrote:
-> > On 03/07/2013 02:47 PM, Thierry Reding wrote:
-> [...]
-> > > In a nutshell (since some of the context isn't quoted anymore) the
-> > > problem that we're trying to solve is that some of the embedded SoCs
-> > > require per-root-port registers for configuration. The PCI DT
-> > > specification doesn't make any provisions for this. A few alternatives
-> > > have been discussed so far:
-> > 
-> > I'm not sure I follow. This is different than the host controller
-> > registers? Why would this not just be multiple entries in the reg property?
-> 
-> Well the register regions are per root-port. On Tegra20 there's 2 of
-> them, Tegra30 has 3 and if I understand correctly Marvell can have up to
-> 10 (!). Adding all of them to the reg property of the host controller
-> could work but it needs some way to match the reg entry to the root port
-> similar to option 1 below.
+The OMAP2+ code that configures the GPMC for ONENAND devices is copying
+structures between functions unnecessarily. Avoid this by passing
+pointers instead and simplify the code.
 
-Thomas just posted an implementation like this, please see:
+A pointer to structure "omap_onenand_platform_data" is passed to the
+function omap2_onenand_calc_sync_timings(), but only the flags member
+of the structure is used. Simplify the code by only passing the flags
+member and not the entire structure.
 
-http://www.spinics.net/lists/arm-kernel/msg228749.html
+Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+---
+ arch/arm/mach-omap2/gpmc-onenand.c |   26 ++++++++++----------------
+ 1 file changed, 10 insertions(+), 16 deletions(-)
 
-Jason
+diff --git a/arch/arm/mach-omap2/gpmc-onenand.c b/arch/arm/mach-omap2/gpmc-onenand.c
+index fd6e35b..9f4c937 100644
+--- a/arch/arm/mach-omap2/gpmc-onenand.c
++++ b/arch/arm/mach-omap2/gpmc-onenand.c
+@@ -47,10 +47,9 @@ static struct platform_device gpmc_onenand_device = {
+ 	.resource	= &gpmc_onenand_resource,
+ };
+ 
+-static struct gpmc_timings omap2_onenand_calc_async_timings(void)
++static void omap2_onenand_calc_async_timings(struct gpmc_timings *t)
+ {
+ 	struct gpmc_device_timings dev_t;
+-	struct gpmc_timings t;
+ 
+ 	const int t_cer = 15;
+ 	const int t_avdp = 12;
+@@ -76,9 +75,7 @@ static struct gpmc_timings omap2_onenand_calc_async_timings(void)
+ 	dev_t.t_wpl = t_wpl * 1000;
+ 	dev_t.t_wph = t_wph * 1000;
+ 
+-	gpmc_calc_timings(&t, &dev_t);
+-
+-	return t;
++	gpmc_calc_timings(t, &dev_t);
+ }
+ 
+ static int gpmc_set_async_mode(int cs, struct gpmc_timings *t)
+@@ -158,12 +155,11 @@ static int omap2_onenand_get_freq(struct omap_onenand_platform_data *cfg,
+ 	return freq;
+ }
+ 
+-static struct gpmc_timings
+-omap2_onenand_calc_sync_timings(struct omap_onenand_platform_data *cfg,
+-				int freq)
++static void omap2_onenand_calc_sync_timings(struct gpmc_timings *t,
++					    unsigned int flags,
++					    int freq)
+ {
+ 	struct gpmc_device_timings dev_t;
+-	struct gpmc_timings t;
+ 	const int t_cer  = 15;
+ 	const int t_avdp = 12;
+ 	const int t_cez  = 20; /* max of t_cez, t_oez */
+@@ -172,9 +168,9 @@ omap2_onenand_calc_sync_timings(struct omap_onenand_platform_data *cfg,
+ 	int min_gpmc_clk_period, t_ces, t_avds, t_avdh, t_ach, t_aavdh, t_rdyo;
+ 	int div, gpmc_clk_ns;
+ 
+-	if (cfg->flags & ONENAND_SYNC_READ)
++	if (flags & ONENAND_SYNC_READ)
+ 		onenand_flags = ONENAND_FLAG_SYNCREAD;
+-	else if (cfg->flags & ONENAND_SYNC_READWRITE)
++	else if (flags & ONENAND_SYNC_READWRITE)
+ 		onenand_flags = ONENAND_FLAG_SYNCREAD | ONENAND_FLAG_SYNCWRITE;
+ 
+ 	switch (freq) {
+@@ -265,9 +261,7 @@ omap2_onenand_calc_sync_timings(struct omap_onenand_platform_data *cfg,
+ 	dev_t.cyc_aavdh_oe = 1;
+ 	dev_t.t_rdyo = t_rdyo * 1000 + min_gpmc_clk_period;
+ 
+-	gpmc_calc_timings(&t, &dev_t);
+-
+-	return t;
++	gpmc_calc_timings(t, &dev_t);
+ }
+ 
+ static int gpmc_set_sync_mode(int cs, struct gpmc_timings *t)
+@@ -300,7 +294,7 @@ static int omap2_onenand_setup_async(void __iomem *onenand_base)
+ 
+ 	omap2_onenand_set_async_mode(onenand_base);
+ 
+-	t = omap2_onenand_calc_async_timings();
++	omap2_onenand_calc_async_timings(&t);
+ 
+ 	ret = gpmc_set_async_mode(gpmc_onenand_data->cs, &t);
+ 	if (IS_ERR_VALUE(ret))
+@@ -322,7 +316,7 @@ static int omap2_onenand_setup_sync(void __iomem *onenand_base, int *freq_ptr)
+ 		set_onenand_cfg(onenand_base);
+ 	}
+ 
+-	t = omap2_onenand_calc_sync_timings(gpmc_onenand_data, freq);
++	omap2_onenand_calc_sync_timings(&t, gpmc_onenand_data->flags, freq);
+ 
+ 	ret = gpmc_set_sync_mode(gpmc_onenand_data->cs, &t);
+ 	if (IS_ERR_VALUE(ret))
+-- 
+1.7.10.4
