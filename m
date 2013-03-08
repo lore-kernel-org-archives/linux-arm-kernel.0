@@ -1,69 +1,76 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 08 Mar 2013 04:12:41 +0100
-Subject: [kvmarm] [GIT PULL v2] KVM/ARM Fixes for 3.9-rc1
-In-Reply-To: <20130307190900.GB15854@amt.cnet>
-References: <CAEDV+gLpqG0GxbCDoUqO2fdwpqLeEd_psaaFWzm2Xi829-zUTQ@mail.gmail.com>
- <f3db22097ee303991fccc64bbf863dd6@localhost>
- <CAEDV+g+ATCr3Hd+VjwLW7tgbJ9Cq4eaC49ZFO-1jB=grAVR49w@mail.gmail.com>
- <fd46d1c4746530d6c705dba843c848ea@localhost>
- <20130307190900.GB15854@amt.cnet>
-Message-ID: <600b4cf22f05ccd66c8f6e18eaaf75c4@localhost>
+From: hannes@cmpxchg.org (Johannes Weiner)
+Date: Thu, 7 Mar 2013 22:16:51 -0500
+Subject: [PATCH] mm: Fixup the condition whether the page cache is free
+In-Reply-To: <5139517F.60407@gmail.com>
+References: <CAFNq8R7tq9kvD9LyhZJ-Cj0kexQfDsPhB4iQYyZ9s9+8Jo82QA@mail.gmail.com>
+ <20130304150937.GB23767@cmpxchg.org> <51369637.6030705@gmail.com>
+ <20130306194703.GA1953@cmpxchg.org> <5137E7F4.1060509@gmail.com>
+ <51394945.4070803@gmail.com> <20130308023705.GI24384@cmpxchg.org>
+ <5139517F.60407@gmail.com>
+Message-ID: <20130308031651.GJ24384@cmpxchg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 7 Mar 2013 16:09:00 -0300, Marcelo Tosatti <mtosatti@redhat.com>
-wrote:
-> On Thu, Mar 07, 2013 at 07:57:23AM +0100, Marc Zyngier wrote:
->> On Wed, 6 Mar 2013 20:40:00 -0800, Christoffer Dall
->> <cdall@cs.columbia.edu>
->> wrote:
->> > On Wed, Mar 6, 2013 at 7:54 PM, Marc Zyngier <marc.zyngier@arm.com>
->> wrote:
->> >> On Wed, 6 Mar 2013 16:31:48 -0800, Christoffer Dall
->> >> <cdall@cs.columbia.edu>
->> >> wrote:
->> >>
->> >> Hi Christoffer,
->> >>
->> >>>
->> >>> Please pull these KVM/ARM fixes mostly centered around preparation
->> >>> for
->> >>> Marc's ARMv8 KVM work.
->> >>
->> >> Can we please hold on that for a while? asm-offset.c is usually a
->> >> candidate for merge conflicts as people start pushing patches post
->> merge
->> >> window, and it would make sense to see what is happening in that
->> >> space.
->> >>
->> > Sure, when would you see this happen exactly?
->> 
->> Usually, by -rc5 we have a pretty good idea of what is going in. Also,
->> putting things into -next is a good way to detect potential problems.
->> 
->> Oh, and keeping linux-arm-kernel into the loop. Most ARM developers
-don't
->> follow the KVM lists.
->> 
->>         M.
+On Fri, Mar 08, 2013 at 10:48:31AM +0800, Simon Jeons wrote:
+> On 03/08/2013 10:37 AM, Johannes Weiner wrote:
+> >On Fri, Mar 08, 2013 at 10:13:25AM +0800, Simon Jeons wrote:
+> >>Ping, :-)
+> >>On 03/07/2013 09:05 AM, Simon Jeons wrote:
+> >>>Hi Johannes,
+> >>>On 03/07/2013 03:47 AM, Johannes Weiner wrote:
+> >>>>On Wed, Mar 06, 2013 at 09:04:55AM +0800, Simon Jeons wrote:
+> >>>>>Hi Johannes,
+> >>>>>On 03/04/2013 11:09 PM, Johannes Weiner wrote:
+> >>>>>>On Mon, Mar 04, 2013 at 09:54:26AM +0800, Li Haifeng wrote:
+> >>>>>>>When a page cache is to reclaim, we should to decide whether the page
+> >>>>>>>cache is free.
+> >>>>>>>IMO, the condition whether a page cache is free should be 3 in page
+> >>>>>>>frame reclaiming. The reason lists as below.
+> >>>>>>>
+> >>>>>>>When page is allocated, the page->_count is 1(code
+> >>>>>>>fragment is code-1 ).
+> >>>>>>>And when the page is allocated for reading files from
+> >>>>>>>extern disk, the
+> >>>>>>>page->_count will increment 1 by page_cache_get() in
+> >>>>>>>add_to_page_cache_locked()(code fragment is code-2). When
+> >>>>>>>the page is to
+> >>>>>>>reclaim, the isolated LRU list also increase the page->_count(code
+> >>>>>>>fragment is code-3).
+> >>>>>>The page count is initialized to 1, but that does not stay with the
+> >>>>>>object.  It's a reference that is passed to the allocating task, which
+> >>>>>>drops it again when it's done with the page.  I.e. the pattern is like
+> >>>>>>this:
+> >>>>>>
+> >>>>>>instantiation:
+> >>>>>>page = page_cache_alloc()    /* instantiator reference -> 1 */
+> >>>>>>add_to_page_cache(page, mapping, offset)
+> >>>>>>   get_page(page)        /* page cache reference -> 2 */
+> >>>>>>lru_cache_add(page)
+> >>>>>>   get_page(page)        /* pagevec reference -> 3 */
+> >>>>>>/* ...initiate read, write, associate buffers, ... */
+> >>>>>>page_cache_release(page)    /* drop instantiator reference
+> >>>>>>-> 2 + private */
+> >>>>>>
+> >>>>>>reclaim:
+> >>>>>>lru_add_drain()
+> >>>>>>   page_cache_release(page)    /* drop pagevec reference ->
+> >>>>>>1 + private */
+> >>>>>IIUC, when add page to lru will lead to add to pagevec firstly, and
+> >>>>>pagevec will take one reference, so if lru will take over the
+> >>>>>reference taken by pagevec when page transmit from pagevec to lru?
+> >>>>>or just drop the reference and lru will not take reference for page?
+> >>>>The LRU does not hold a reference, it would not make sense.  The
+> >>>>pagevec only needs one because it would be awkward to remove a
+> >>>>concurrently freed page out of a pagevec, but unlinking a page from
+> >>>>the LRU is easy.  See mm/swap.c::__page_cache_release() and friends.
+> >>>Since pagevec is per cpu, when can remove a concurrently freed
+> >>>page out of a pagevec happen?
+> >It doesn't because the pagevec holds a reference, as I wrote above.
 > 
-> Mark, can you please be more verbose on the reason for this request? 
+> I mean since pagevec is per cpu, how can remove a concurrently freed
+> page out of a pagevec happen? If it doesn't happen pagevec don't
+> need to hold a reference. :-)
 
-arch/arm/kernel/asm-offset.c, being an ARM core file, is often the
-location of merge conflicts. And because arch/arm sees a lot more churn
-than any other architecture, we have the policy of dealing with conflicts
-before they hit Linus.
-
-We usually deal with that by providing stable branches that will contain
-the "offending" patches, and on which others can base their developments.
-
-This is why I suggested holding on this pull request until we got a better
-view of what potential merge conflicts we get with this patches. This
-shouldn't prevent the patches from entering -next though, as this would
-help detecting the above conflicts.
-
-Thanks,
-
-        M.
--- 
-Fast, cheap, reliable. Pick two.
+It has nothing to do with the pagevec being per CPU.  The page may get
+truncated or reclaimed and have every other reference being dropped
+while it sits on the pagevec.
