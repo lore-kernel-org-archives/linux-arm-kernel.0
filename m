@@ -1,50 +1,50 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Fri,  8 Mar 2013 16:39:48 +0530
-Subject: [PATCH] ARM: EXYNOS: Use wfi macro in platform_do_lowpower
-Message-ID: <1362740988-16483-1-git-send-email-tushar.behera@linaro.org>
+From: hechtb@gmail.com (Bastian Hecht)
+Date: Fri,  8 Mar 2013 12:29:34 +0100
+Subject: [PATCH v2 0/7] Enable CMT and TMU for DT
+Message-ID: <1362742181-19111-1-git-send-email-hechtb+renesas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As per commit b3377d186572 ("ARM: 7064/1: vexpress: Use wfi macro
-in platform_do_lowpower."), wfi macro should be used instead
-of the hardcoded WFI instruction.
+This is the sequel to "[PATCH 0/3] Add OF support to CMT driver - bindings
+discussion".
 
-This fixes following oops when the kernel is compiled in Thumb-2 mode
-on EXYNOS5. (Tested on EXYNOS5250 based Arndale board)
+I moved to a general bindings definition for all timer devices and realized
+it for CMT and TMU.
 
-$ reboot
-Disabling non-boot CPUs ...
-IRQ153 no longer affine to CPU1
-CPU1: shutdown
-Internal error: Oops - undefined instruction: 0 [#1] PREEMPT SMP THUMB2
-Modules linked in:
-CPU: 1    Not tainted  (3.9.0-rc1-00015-gce76372 #1)
-PC is at 0xc065858e
-LR is at exynos_cpu_die+0x53/0xc0
+For MTU2 I unfortunately got no hardware and no datasheet, so the DT
+implementation is postponed.
+For TMU there is no DT version for the INTCS available, so this is untested. As
+the code is so similar to the CMT driver, I decided to trust in the code
+regardless.
 
-Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
----
- arch/arm/mach-exynos/hotplug.c |    8 +-------
- 1 files changed, 1 insertions(+), 7 deletions(-)
+In this version r8a7740 moves the CMT10 to DT too.
 
-diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
-index c3f825b..d9712fe 100644
---- a/arch/arm/mach-exynos/hotplug.c
-+++ b/arch/arm/mach-exynos/hotplug.c
-@@ -99,13 +99,7 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
- 		if (cpu == 1)
- 			__raw_writel(0, S5P_ARM_CORE1_CONFIGURATION);
- 
--		/*
--		 * here's the WFI
--		 */
--		asm(".word	0xe320f003\n"
--		    :
--		    :
--		    : "memory", "cc");
-+		wfi();
- 
- 		if (pen_release == cpu_logical_map(cpu)) {
- 			/*
+Based on Simon Hormans topic/all+next.
+I can rebase patches 6 and 7 on topic/intc-of as well.
+
+Cheers,
+
+ Bastian
+
+Bastian Hecht (7):
+  ARM: shmobile: Define DT bindings for timer devices
+  clocksource: sh_cmt: Add OF support
+  clocksource: sh_tmu: Add OF support
+  ARM: shmobile: sh73a0: Add timer DT names to clock list
+  ARM: mach-shmobile: sh73a0: Setup the timer CMT10 using DT
+  ARM: shmobile: r8a7740: Add DT name to clock list for CMT10
+  ARM: mach-shmobile: r8a7740: Setup the timer CMT10 using DT
+
+ .../devicetree/bindings/timer/renesas,timer.txt    |   45 ++++++++
+ arch/arm/boot/dts/sh73a0.dtsi                      |   11 ++
+ arch/arm/mach-shmobile/clock-r8a7740.c             |    1 +
+ arch/arm/mach-shmobile/clock-sh73a0.c              |    3 +
+ arch/arm/mach-shmobile/setup-r8a7740.c             |   33 ------
+ arch/arm/mach-shmobile/setup-sh73a0.c              |   32 ------
+ drivers/clocksource/sh_cmt.c                       |  109 +++++++++++++++++---
+ drivers/clocksource/sh_tmu.c                       |   94 +++++++++++++++--
+ 8 files changed, 239 insertions(+), 89 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/timer/renesas,timer.txt
+
 -- 
-1.7.4.1
+1.7.9.5
