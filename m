@@ -1,34 +1,30 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Fri, 8 Mar 2013 10:50:23 -0700
-Subject: [PATCH 04/10] bus: introduce an Marvell EBU MBus driver
-In-Reply-To: <201303081541.29410.arnd@arndb.de>
-References: <1362577426-12804-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <201303081350.15429.arnd@arndb.de> <20130308150655.2bad20ce@skate>
- <201303081541.29410.arnd@arndb.de>
-Message-ID: <20130308175023.GE4094@obsidianresearch.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 08 Mar 2013 10:51:08 -0700
+Subject: [PATCH 1/5] ARM: DT: tegra114: add APB DMA controller DT entry
+In-Reply-To: <1362750782-15174-2-git-send-email-ldewangan@nvidia.com>
+References: <1362750782-15174-1-git-send-email-ldewangan@nvidia.com>
+ <1362750782-15174-2-git-send-email-ldewangan@nvidia.com>
+Message-ID: <513A250C.1000202@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 08, 2013 at 03:41:29PM +0000, Arnd Bergmann wrote:
+On 03/08/2013 06:52 AM, Laxman Dewangan wrote:
+> NVIDIA's Tegra114 has 32 channels APB DMA controller. Add DT entry for
+> APB DMA controllers and make it compatible with "nvidia,tegra114-apbdma".
 
-> If you want the boot loader to tell the kernel to autoconfigure all the
-> mappings, an absent ranges property would be the right thing. This makes
-> a lot of sense if you want to go fully dynamic, but I thought that you
-> were not attempting to go that far yet.
-> 
-> I think we really want the ranges to be populated at run-time though,
-> and have it match exactly the windows that we decide to put in, so that
-> of_address_translate works.
+> diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
 
-Right, so taking these two paragraphs together - if you have an absent
-ranges you are imagining that the mbus driver would write out a new
-fully populated ranges to the DTB? That would be necessary to keep
-of_address_translate working.
+> +	apbdma: dma {
+> +		compatible = "nvidia,tegra114-apbdma";
 
-If so we are talking about exactly the same thing - the in memory DTB
-would still have working address translation.
+So I know that the Tegra114 HW has a new channel-pause feature, which
+the driver /can/ use. However, if the driver didn't know about that
+feature, and continued to use the global-pause feature, would it still
+work fine?
 
-An absent ranges makes some sense from a spec perspective - however do we
-have the kernel infrastructure to grow an in memory DTB node?
+In other words, is the Tegra114 HW 100% backwards-compatible with the
+Tegra30 HW, it's just that there are new features that SW could
+optionally use?
 
-Jason
+If that is true, then we should also include "nvidia,tegra30-apbdma" in
+the compatible value.
