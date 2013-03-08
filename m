@@ -1,61 +1,54 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri, 8 Mar 2013 15:53:52 -0300
-Subject: [PATCH 04/10] bus: introduce an Marvell EBU MBus driver
-In-Reply-To: <20130308183120.GG4094@obsidianresearch.com>
-References: <20130306214036.62fc93b9@skate>
- <20130306215031.GB4916@obsidianresearch.com>
- <20130306222712.GP23237@titan.lakedaemon.net>
- <20130306230412.GA5870@obsidianresearch.com>
- <20130307222004.GA2450@localhost>
- <20130307230516.GA28975@obsidianresearch.com>
- <20130308091052.18612729@skate>
- <20130308172950.GC4094@obsidianresearch.com>
- <20130308175926.GC8693@localhost>
- <20130308183120.GG4094@obsidianresearch.com>
-Message-ID: <20130308185350.GA2469@localhost>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Fri, 08 Mar 2013 19:57:09 +0100
+Subject: s3c24xx pinctrl help
+In-Reply-To: <201303081538.04877.heiko@sntech.de>
+References: <201303081538.04877.heiko@sntech.de>
+Message-ID: <2034100.l6yoVjE7uo@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 08, 2013 at 11:31:20AM -0700, Jason Gunthorpe wrote:
-> On Fri, Mar 08, 2013 at 02:59:27PM -0300, Ezequiel Garcia wrote:
-> 
-> > > I looked through Ezequiel's patch and saw a driver that provided those
-> > > properties and no user of them at all. Are the patches incomplete? Is
-> > > there some plan to use these values in the future?
-> 
-> > Leaving aside the review comments that still I haven't addressed yet,
-> > the patchset is complete.
->  
-> > The timings parameters were not set in device tree files,
-> > not because I expected the bootloader to set them, but instead because
-> > SoC default values worked fine for the NOR devices I tested.
-> 
-> ? Isn't that the same thing? Were the timing registers the SOC reset
-> default or were they leftover from the bootloader?
-> 
+Hi Heiko,
 
-IMHO, SoC reset default value is not the same as leftover from bootloader,
-right?
-
-But this doesn't mean the driver is not useful to set proper parameter
-values in case default/bootloader are wrong or suboptimal.
-
-> > If this is suboptimal, I can fix the device tree files in v2
-> > to set proper timings parameter values.
+On Friday 08 of March 2013 15:38:04 Heiko St?bner wrote:
+> Hi Thomas,
 > 
-> I have no opinion on this for your boards, it depends entirely on what
-> flash chips you have to be compatible with, and how you feel about
-> your bootloader.
+> taking you up on your offer of helping, I would be cool if you could
+> simply give me a push in the right direction :-) .
 > 
-> Also, when looking at the idea from Maxime it occured to me that your
-> DT binding might be better using ns or ps for the timings, instead of
-> tclk cycles? That way NAND/NOR datasheet values can be included in the
-> DT directly and are correct no matter what the tclk frequency is set to.
 > 
+> From what I've seen so far, the bank handling itself is very similar
+> between exynos and s3c24xx as the underlying structures already handle
+> multiple widths of the register contents. More interesting is the eint
+> handling around which I couldn't wrap my head yet.
+> 
+> The basic structure is again similar with special eint registers, but
+> adds some quirks. EINT banks are gpf (8 eints) and gpg (8 or 16 eints
+> depending on the SoC).
+> 
+> The current way on Exynos seems to be to mark the offset in the eint
+> register and attach an irq_domain to the bank, which gets mapped to the
+> eints starting at the offset. The eints seem to have a parent interrupt
+> that is provided via the dt.
+> 
+> On the S3C24xx the gpg bank is doing this similar but gpf is very
+> strange.
+> 
+> The first half of the bank (gpf0 to gpf3) is not handled in eintpend
+> registers but in the main interrupt controller (bits 0 to 3), while the
+> second half of gpf is handled in eintpend. The new interrupt
+> declaration might show this better, which can be found at [0].
+> 
+> An exception is the s3c2412 which adds still another quirk where each
+> interrupt of gpf0 to gpf3 is represented in both the normal intc and
+> eint registers, again for reference probably easier to see in [1].
+> 
+> 
+> So I'm still quite stumped on how this could fit into the current
+> framework and would be really glad for some small pointers :-)
 
-Mmm... that sounds like a better aproach. I'll think about that.
+I wonder if some of my patches for pinctrl on S3C64xx might be helpful:
 
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+https://github.com/tom3q/linux/commits/v3.8-s3c64xx-dt-pinctrl
+
+Best regards,
+Tomasz
