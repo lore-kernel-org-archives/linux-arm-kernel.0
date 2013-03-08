@@ -1,122 +1,140 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 8 Mar 2013 11:27:30 -0600
-Subject: [PATCH 6/9] ARM: dts: Add OMAP3430 SDP flash memory bindings
+Date: Fri, 8 Mar 2013 11:27:31 -0600
+Subject: [PATCH 7/9] ARM: dts: Add OMAP2 gpio bindings
 In-Reply-To: <1362763654-9660-1-git-send-email-jon-hunter@ti.com>
 References: <1362763654-9660-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <1362763654-9660-7-git-send-email-jon-hunter@ti.com>
+Message-ID: <1362763654-9660-8-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the device-tree nodes for the 128MB ONENAND flash and 256MB NAND
-flash memories found on the OMAP3430 SDP board.
+Add gpios bindings for OMAP2420 and OMAP2430 devices.
 
 Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 ---
- arch/arm/boot/dts/omap3430-sdp.dts |   95 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 95 insertions(+)
+ arch/arm/boot/dts/omap2420.dtsi |   44 +++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/omap2430.dtsi |   55 +++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 99 insertions(+)
 
-diff --git a/arch/arm/boot/dts/omap3430-sdp.dts b/arch/arm/boot/dts/omap3430-sdp.dts
-index be0650d..c313762 100644
---- a/arch/arm/boot/dts/omap3430-sdp.dts
-+++ b/arch/arm/boot/dts/omap3430-sdp.dts
-@@ -44,3 +44,98 @@
- &mmc3 {
- 	status = "disabled";
- };
+diff --git a/arch/arm/boot/dts/omap2420.dtsi b/arch/arm/boot/dts/omap2420.dtsi
+index d4ce6c2..eee902f 100644
+--- a/arch/arm/boot/dts/omap2420.dtsi
++++ b/arch/arm/boot/dts/omap2420.dtsi
+@@ -29,6 +29,50 @@
+ 			pinctrl-single,function-mask = <0x3f>;
+ 		};
+ 
++		gpio1: gpio at 48018000 {
++			compatible = "ti,omap2-gpio";
++			reg = <0x48018000 0x200>;
++			interrupts = <29>;
++			ti,hwmods = "gpio1";
++			#gpio-cells = <2>;
++			gpio-controller;
++			#interrupt-cells = <2>;
++			interrupt-controller;
++		};
 +
-+&gpmc {
-+	ranges = <1 0 0x28000000 0x08000000>,
-+		 <2 0 0x20000000 0x10000000>;
++		gpio2: gpio at 4801a000 {
++			compatible = "ti,omap2-gpio";
++			reg = <0x4801a000 0x200>;
++			interrupts = <30>;
++			ti,hwmods = "gpio2";
++			#gpio-cells = <2>;
++			gpio-controller;
++			#interrupt-cells = <2>;
++			interrupt-controller;
++		};
 +
-+	nand at 1,0 {
-+		linux,mtd-name= "micron,mt29f1g08abb";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		reg = <1 0 0x08000000>;
-+		nand-bus-width = <8>;
++		gpio3: gpio at 4801c000 {
++			compatible = "ti,omap2-gpio";
++			reg = <0x4801c000 0x200>;
++			interrupts = <31>;
++			ti,hwmods = "gpio3";
++			#gpio-cells = <2>;
++			gpio-controller;
++			#interrupt-cells = <2>;
++			interrupt-controller;
++		};
 +
-+		gpmc,device_nand;
-+		gpmc,cs-on = <0>;
-+		gpmc,cs-rd-off = <36>;
-+		gpmc,cs-wr-off = <36>;
-+		gpmc,adv-on = <6>;
-+		gpmc,adv-rd-off = <24>;
-+		gpmc,adv-wr-off = <36>;
-+		gpmc,oe-on = <6>;
-+		gpmc,oe-off = <48>;
-+		gpmc,we-on = <6>;
-+		gpmc,we-off = <30>;
-+		gpmc,rd-cycle = <72>;
-+		gpmc,wr-cycle = <72>;
-+		gpmc,access = <54>;
-+		gpmc,wr-access = <30>;
++		gpio4: gpio at 4801e000 {
++			compatible = "ti,omap2-gpio";
++			reg = <0x4801e000 0x200>;
++			interrupts = <32>;
++			ti,hwmods = "gpio4";
++			#gpio-cells = <2>;
++			gpio-controller;
++			#interrupt-cells = <2>;
++			interrupt-controller;
++		};
 +
-+		partition at 0 {
-+			label = "xloader-nand";
-+			reg = <0 0x80000>;
+ 		gpmc: gpmc at 6800a000 {
+ 			compatible = "ti,omap2420-gpmc";
+ 			reg = <0x6800a000 0x1000>;
+diff --git a/arch/arm/boot/dts/omap2430.dtsi b/arch/arm/boot/dts/omap2430.dtsi
+index 832f184..fb74382 100644
+--- a/arch/arm/boot/dts/omap2430.dtsi
++++ b/arch/arm/boot/dts/omap2430.dtsi
+@@ -29,6 +29,61 @@
+ 			pinctrl-single,function-mask = <0x3f>;
+ 		};
+ 
++		gpio1: gpio at 4900c000 {
++			compatible = "ti,omap2-gpio";
++			reg = <0x4900c000 0x200>;
++			interrupts = <29>;
++			ti,hwmods = "gpio1";
++			#gpio-cells = <2>;
++			gpio-controller;
++			#interrupt-cells = <2>;
++			interrupt-controller;
 +		};
-+		partition at 0x80000 {
-+			label = "bootloader-nand";
-+			reg = <0x80000 0x140000>;
-+		};
-+		partition at 0x1c0000 {
-+			label = "params-nand";
-+			reg = <0x1c0000 0xc0000>;
-+		};
-+		partition at 0x280000 {
-+			label = "kernel-nand";
-+			reg = <0x280000 0x500000>;
-+		};
-+		partition at 0x780000 {
-+			label = "filesystem-nand";
-+			reg = <0x780000 0x7880000>;
-+		};
-+	};
 +
-+	onenand at 2,0 {
-+		linux,mtd-name= "samsung,kfm2g16q2m-deb8";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		reg = <2 0 0x10000000>;
++		gpio2: gpio at 4900e000 {
++			compatible = "ti,omap2-gpio";
++			reg = <0x4900e000 0x200>;
++			interrupts = <30>;
++			ti,hwmods = "gpio2";
++			#gpio-cells = <2>;
++			gpio-controller;
++			#interrupt-cells = <2>;
++			interrupt-controller;
++		};
 +
-+		gpmc,device-width = <2>;
-+		gpmc,mux-add-data = <2>;
-+		gpmc,cs-on = <0>;
-+		gpmc,cs-rd-off = <84>;
-+		gpmc,cs-wr-off = <72>;
-+		gpmc,adv-on = <0>;
-+		gpmc,adv-rd-off = <18>;
-+		gpmc,adv-wr-off = <18>;
-+		gpmc,oe-on = <30>;
-+		gpmc,oe-off = <84>;
-+		gpmc,we-on = <0>;
-+		gpmc,we-off = <42>;
-+		gpmc,rd-cycle = <108>;
-+		gpmc,wr-cycle = <96>;
-+		gpmc,access = <78>;
-+		gpmc,wr-data-mux-bus = <30>;
++		gpio3: gpio at 49010000 {
++			compatible = "ti,omap2-gpio";
++			reg = <0x49010000 0x200>;
++			interrupts = <31>;
++			ti,hwmods = "gpio3";
++			#gpio-cells = <2>;
++			gpio-controller;
++			#interrupt-cells = <2>;
++			interrupt-controller;
++		};
 +
-+		partition at 0 {
-+			label = "xloader-onenand";
-+			reg = <0 0x80000>;
++		gpio4: gpio at 49012000 {
++			compatible = "ti,omap2-gpio";
++			reg = <0x49012000 0x200>;
++			interrupts = <32>;
++			ti,hwmods = "gpio4";
++			#gpio-cells = <2>;
++			gpio-controller;
++			#interrupt-cells = <2>;
++			interrupt-controller;
 +		};
-+		partition at 0x80000 {
-+			label = "bootloader-onenand";
-+			reg = <0x80000 0x40000>;
++
++		gpio5: gpio at 480b6000 {
++			compatible = "ti,omap2-gpio";
++			reg = <0x480b6000 0x200>;
++			interrupts = <33>;
++			ti,hwmods = "gpio5";
++			#gpio-cells = <2>;
++			gpio-controller;
++			#interrupt-cells = <2>;
++			interrupt-controller;
 +		};
-+		partition at 0xc0000 {
-+			label = "params-onenand";
-+			reg = <0xc0000 0x20000>;
-+		};
-+		partition at 0xe0000 {
-+			label = "kernel-onenand";
-+			reg = <0xe0000 0x200000>;
-+		};
-+		partition at 0x2e0000 {
-+			label = "filesystem-onenand";
-+			reg = <0x2e0000 0xfd20000>;
-+		};
-+	};
-+};
++
+ 		gpmc: gpmc at 6e000000 {
+ 			compatible = "ti,omap2430-gpmc";
+ 			reg = <0x6e000000 0x1000>;
 -- 
 1.7.10.4
