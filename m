@@ -1,35 +1,44 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Fri, 8 Mar 2013 13:31:30 +0530
-Subject: asm/types.h Header file wont get generated while building uImage ?
-Message-ID: <CA+V-a8vYsBLVH-3Bm35Sv9K9ZMTcMB4_P_V3kBjyuEKDozPi5w@mail.gmail.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Fri, 8 Mar 2013 16:05:56 +0800
+Subject: [PATCH v11 4/9] usb: chipidea: udc: add pullup/pulldown dp at
+ hw_device_state
+In-Reply-To: <20130308071832.GE21589@arwen.pp.htv.fi>
+References: <1362563800-16673-1-git-send-email-peter.chen@freescale.com>
+ <1362563800-16673-5-git-send-email-peter.chen@freescale.com>
+ <20130306112633.GS28587@arwen.pp.htv.fi>
+ <20130307023612.GC20470@nchen-desktop>
+ <20130307095054.GK9171@arwen.pp.htv.fi>
+ <20130308012833.GA16076@nchen-desktop>
+ <20130308071832.GE21589@arwen.pp.htv.fi>
+Message-ID: <20130308080555.GA22550@nchen-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Mar 08, 2013 at 09:18:32AM +0200, Felipe Balbi wrote:
+> > > 
+> > > This isn't legal. If you want to make sure vbus is alive before
+> > > connecting pullups, then do it generically. Modify udc-core.c to make
+> > > those checks for you. Bypassing the framework is dangerous because
+> > > whenever I wanna change something, I might miss your private details and
+> > > end up causing regressions.
+> > 
+> > Let thing be generic is a good idea. Then, is it ok I post a patch let
+> > udc manage pullup by itself (through a flag) just you did for uvc?
+> > UDC core doesn't know VBUS, so the pullup can't be managed by udc core
+> > totally.
+> 
+> then teach UDC core about VBUS. Send the patches and we will figure out
+> if they can be applied or not.
 
-Usually for building uImage I follow this steps,
-1: do a clean distclean
-2: make ARCH=arm CROSS_COMPILE=xxx   xxxdefconfig
-3: make ARCH=arm CROSS_COMPILE=xxx  uImage
+I will do it
 
-This used to work until 3.8, for 3.9 I see the following error:
+> 
+> -- 
+> balbi
 
-  HOSTCC  scripts/genksyms/parse.tab.o
-In file included from include/linux/types.h:5:0,
-                 from include/linux/mod_devicetable.h:11,
-                 from scripts/mod/devicetable-offsets.c:2:
-include/uapi/linux/types.h:4:23: fatal error: asm/types.h: No such
-file or directory
-compilation terminated.
 
-Well this get fixed if do  make ARCH=arm
-CROSS_COMPILE=arm-none-linux-gnueabi- headers_install
-and the build the uImage.
 
-Is it the same way now its going to be followed or is it I am missing
-something ?
-(For  reference I have used da8xx_omapl_defconfig config when I faced
-this issue)
+-- 
 
-Regards,
---Prabhakar
+Best Regards,
+Peter Chen
