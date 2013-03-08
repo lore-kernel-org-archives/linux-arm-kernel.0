@@ -1,18 +1,22 @@
 From: Milo.Kim@ti.com (Kim, Milo)
-Date: Fri, 8 Mar 2013 01:13:06 +0000
-Subject: [PATCH v8 11/12] leds: Kconfig for Palmas LEDs
-In-Reply-To: <1362662276-20792-11-git-send-email-ian@slimlogic.co.uk>
+Date: Fri, 8 Mar 2013 01:13:02 +0000
+Subject: [PATCH v8 10/12] clk: Kconfig for Palmas clock driver
+In-Reply-To: <1362662276-20792-10-git-send-email-ian@slimlogic.co.uk>
 References: <1362662276-20792-1-git-send-email-ian@slimlogic.co.uk>
- <1362662276-20792-11-git-send-email-ian@slimlogic.co.uk>
-Message-ID: <A874F61F95741C4A9BA573A70FE3998F82E45A15@DQHE02.ent.ti.com>
+ <1362662276-20792-10-git-send-email-ian@slimlogic.co.uk>
+Message-ID: <A874F61F95741C4A9BA573A70FE3998F82E45A0E@DQHE02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Add the Kconfig and Makefile for the Palmas LED driver.
+>  drivers/clk/Kconfig        |    8 ++++++++
+>  drivers/clk/Makefile       |    1 +
+>  drivers/leds/leds-palmas.c |   19 ++++++-------------
 
-It would be better if the Palmas LED driver files are combined into one patch.
-[PATCH v8 09/12] leds: Add support for Palmas LEDs
-[PATCH v8 11/12] leds: Kconfig for Palmas LEDs
+If this patch is for only clock module, then LED patch should be detached.
+
+[PATCH v8 10/12] clk: Kconfig for Palmas clock driver
+[PATCH v8 12/12] clk: add a clock driver for palmas
+It could be joined into one patch file.
 
 Best Regards,
-Milo 
+Milo
