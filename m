@@ -1,47 +1,89 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 07 Mar 2013 17:14:01 -0800
-Subject: [PATCH 03/10] ARM: smp_twd: Divorce smp_twd from local timer API
-In-Reply-To: <20130308004011.GD11806@atomide.com>
-References: <1362614646-24113-1-git-send-email-sboyd@codeaurora.org>
- <1362614646-24113-4-git-send-email-sboyd@codeaurora.org>
- <20130308004011.GD11806@atomide.com>
-Message-ID: <51393B59.3070200@codeaurora.org>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Fri, 8 Mar 2013 09:28:34 +0800
+Subject: [PATCH v11 4/9] usb: chipidea: udc: add pullup/pulldown dp at
+ hw_device_state
+In-Reply-To: <20130307095054.GK9171@arwen.pp.htv.fi>
+References: <1362563800-16673-1-git-send-email-peter.chen@freescale.com>
+ <1362563800-16673-5-git-send-email-peter.chen@freescale.com>
+ <20130306112633.GS28587@arwen.pp.htv.fi>
+ <20130307023612.GC20470@nchen-desktop>
+ <20130307095054.GK9171@arwen.pp.htv.fi>
+Message-ID: <20130308012833.GA16076@nchen-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/07/13 16:40, Tony Lindgren wrote:
+On Thu, Mar 07, 2013 at 11:50:54AM +0200, Felipe Balbi wrote:
 > Hi,
->
-> * Stephen Boyd <sboyd@codeaurora.org> [130306 17:53]:
->> Separate the smp_twd timers from the local timer API. This will
->> allow us to remove ARM local timer support in the near future and
->> gets us closer to moving this driver to drivers/clocksource.
-> Looks like applying this patch makes omap4 to stop booting for
-> some reason.
->
->
+> 
+> On Thu, Mar 07, 2013 at 10:36:13AM +0800, Peter Chen wrote:
+> > > > diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
+> > > > index e82dae4..70f9f2d 100644
+> > > > --- a/drivers/usb/chipidea/udc.c
+> > > > +++ b/drivers/usb/chipidea/udc.c
+> > > > @@ -91,8 +91,10 @@ static int hw_device_state(struct ci13xxx *ci, u32 dma)
+> > > >  		/* interrupt, error, port change, reset, sleep/suspend */
+> > > >  		hw_write(ci, OP_USBINTR, ~0,
+> > > >  			     USBi_UI|USBi_UEI|USBi_PCI|USBi_URI|USBi_SLI);
+> > > > +		hw_write(ci, OP_USBCMD, USBCMD_RS, USBCMD_RS);
+> > > >  	} else {
+> > > >  		hw_write(ci, OP_USBINTR, ~0, 0);
+> > > > +		hw_write(ci, OP_USBCMD, USBCMD_RS, 0);
+> > > 
+> > > this patch doesn't make sense to me. What will happen is that you will
+> > > be enabling pullups when vbus_session() gets called and this might not
+> > > be what gadget driver wants.
+> > > 
+> > > You don't want to fiddle with that yourself since I'm changing the
+> > > framework so that gadget driver will always request pullups to be
+> > > enabled.
+> > 
+> > Hi Felipe,
+> > 
+> > Do you think pullup dp without vbus is a valid operation?
+> 
+> why not ? What I want to connect pullups first and only then issue SRP ?
 
-Hm... Perhaps you need the clock?
+I am not familiar with OTG, but it only stands for special case, right?
 
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index 2439843..081de6f 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -345,11 +345,11 @@ static int __init twd_local_timer_common_register(struct device_node *np)
-        if (err)
-                goto out_irq;
- 
-+       twd_get_clock(np);
-+
-        /* Immediately configure the timer on the boot CPU */
-        twd_timer_setup(this_cpu_ptr(twd_evt));
- 
--       twd_get_clock(np);
--
-        return 0;
- 
- out_irq:
+> 
+> > Current udc core code makes that possible.
+> 
+> so ?
+
+Without vbus, but pullup dp, it will cause more power.
+
+> 
+> > But I think current your udc core code (add pullup after loading
+> > gadget) make benefit for udc driver who has not vbus operation.
+> > 
+> > For chipidea driver:
+> > 
+> > - If vbus is there before load gadget module, the pullup dp is done by
+> > udc core code.
+> > - If vbus is not there before load gadget module, the pullup will be
+> > done when the vbus is there.
+> 
+> This isn't legal. If you want to make sure vbus is alive before
+> connecting pullups, then do it generically. Modify udc-core.c to make
+> those checks for you. Bypassing the framework is dangerous because
+> whenever I wanna change something, I might miss your private details and
+> end up causing regressions.
+
+Let thing be generic is a good idea. Then, is it ok I post a patch let
+udc manage pullup by itself (through a flag) just you did for uvc?
+UDC core doesn't know VBUS, so the pullup can't be managed by udc core
+totally.
+
+Besides, I looked four udc drivers (fsl_udc_core.c, at91_udc.c, mv_udc_core.c
+and bcm63xx_udc.c), the first three manage pullup by itself, ony
+bcm doesn't control it by itself.
+
+> -- 
+> balbi
+
+
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+
+Best Regards,
+Peter Chen
