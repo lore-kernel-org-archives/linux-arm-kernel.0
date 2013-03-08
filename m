@@ -1,51 +1,101 @@
-From: csd_b@daudt.org (Christian Daudt)
-Date: Thu, 7 Mar 2013 19:18:31 -0800
-Subject: [PATCH] ARM: mach-bcm: drop "select GENERIC_TIME"
-In-Reply-To: <1362563553.16460.166.camel@x61.thuisdomein>
-References: <1362563553.16460.166.camel@x61.thuisdomein>
-Message-ID: <CAGFynZ-CBRMGAwgF+xjAU_R8QPHhS_wtQgxgmW9JPVsjohOi2w@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 08 Mar 2013 04:23:57 +0100
+Subject: [kvmarm] [PATCH 04/29] arm64: KVM: system register definitions for
+ 64bit guests
+In-Reply-To: <39149D17-D998-413F-AB9C-A76E95483BED@suse.de>
+References: <1362455265-24165-1-git-send-email-marc.zyngier@arm.com>
+ <1362455265-24165-5-git-send-email-marc.zyngier@arm.com>
+ <39149D17-D998-413F-AB9C-A76E95483BED@suse.de>
+Message-ID: <9774bec864d923cdf3861f1ab7d5ed3c@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-My bad. Thanks for the fix !
+On Thu, 7 Mar 2013 11:33:12 +0100, Alexander Graf <agraf@suse.de> wrote:
+> On 05.03.2013, at 04:47, Marc Zyngier wrote:
+> 
+>> Define the saved/restored registers for 64bit guests.
+>> 
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>> arch/arm64/include/asm/kvm_asm.h | 68
+>> ++++++++++++++++++++++++++++++++++++++++
+>> 1 file changed, 68 insertions(+)
+>> create mode 100644 arch/arm64/include/asm/kvm_asm.h
+>> 
+>> diff --git a/arch/arm64/include/asm/kvm_asm.h
+>> b/arch/arm64/include/asm/kvm_asm.h
+>> new file mode 100644
+>> index 0000000..851fee5
+>> --- /dev/null
+>> +++ b/arch/arm64/include/asm/kvm_asm.h
+>> @@ -0,0 +1,68 @@
+>> +/*
+>> + * Copyright (C) 2012 - ARM Ltd
+>> + * Author: Marc Zyngier <marc.zyngier@arm.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or
+modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License
+>> + * along with this program.  If not, see
+<http://www.gnu.org/licenses/>.
+>> + */
+>> +
+>> +#ifndef __ARM_KVM_ASM_H__
+>> +#define __ARM_KVM_ASM_H__
+>> +
+>> +/*
+>> + * 0 is reserved as an invalid value.
+>> + * Order *must* be kept in sync with the hyp switch code.
+>> + */
+>> +#define	MPIDR_EL1	1	/* MultiProcessor Affinity Register */
+>> +#define	CSSELR_EL1	2	/* Cache Size Selection Register */
+>> +#define	SCTLR_EL1	3	/* System Control Register */
+>> +#define	ACTLR_EL1	4	/* Auxilliary Control Register */
+>> +#define	CPACR_EL1	5	/* Coprocessor Access Control */
+>> +#define	TTBR0_EL1	6	/* Translation Table Base Register 0 */
+>> +#define	TTBR1_EL1	7	/* Translation Table Base Register 1 */
+>> +#define	TCR_EL1		8	/* Translation Control Register */
+>> +#define	ESR_EL1		9	/* Exception Syndrome Register */
+>> +#define	AFSR0_EL1	10	/* Auxilary Fault Status Register 0 */
+>> +#define	AFSR1_EL1	11	/* Auxilary Fault Status Register 1 */
+>> +#define	FAR_EL1		12	/* Fault Address Register */
+>> +#define	MAIR_EL1	13	/* Memory Attribute Indirection Register */
+>> +#define	VBAR_EL1	14	/* Vector Base Address Register */
+>> +#define	CONTEXTIDR_EL1	15	/* Context ID Register */
+>> +#define	TPIDR_EL0	16	/* Thread ID, User R/W */
+>> +#define	TPIDRRO_EL0	17	/* Thread ID, User R/O */
+>> +#define	TPIDR_EL1	18	/* Thread ID, Privileged */
+>> +#define	AMAIR_EL1	19	/* Aux Memory Attribute Indirection Register */
+>> +#define	CNTKCTL_EL1	20	/* Timer Control Register (EL1) */
+>> +#define	NR_SYS_REGS	21
+> 
+> These are internal representations of the system registers. Keeping
+> everything strictly linear is quite cumbersome, why not let the compiler
+do
+> this for you?
+> 
+> enum kvm_sysreg_id {
+>     MPIDR_EL1 = 1,
+>     ...
+>     NR_SYS_REGS
+> }
+> 
+> That way gcc automatically counts the IDs up for you. You eliminate a
+> potential source of breakage (duplicate IDs) and the code is even easier
+to
+> read ;).
 
-Reviewed-by: Christian Daudt <csd@broadcom.com>
+I thought of that, but it doesn't fly because of the HYP assembly code,
+which directly uses these constants.
 
-
- Thanks,
-   csd
-
-
-On Wed, Mar 6, 2013 at 1:52 AM, Paul Bolle <pebolle@tiscali.nl> wrote:
-> The Kconfig symbol GENERIC_TIME was removed from the kernel in v2.6.36,
-> with commit 592913ecb87a9e06f98ddb55b298f1a66bf94c6b ("time: Kill off
-> CONFIG_GENERIC_TIME"). Somehow this select statement still popped up
-> recently. It's a nop so we can drop it.
->
-> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
-> ---
-> Tested with "git grep" only.
->
->  arch/arm/mach-bcm/Kconfig | 1 -
->  1 file changed, 1 deletion(-)
->
-> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-> index bf02471..be4a0a1 100644
-> --- a/arch/arm/mach-bcm/Kconfig
-> +++ b/arch/arm/mach-bcm/Kconfig
-> @@ -7,7 +7,6 @@ config ARCH_BCM
->         select ARM_GIC
->         select CPU_V7
->         select GENERIC_CLOCKEVENTS
-> -       select GENERIC_TIME
->         select GPIO_BCM
->         select SPARSE_IRQ
->         select TICK_ONESHOT
-> --
-> 1.7.11.7
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+        M.
+-- 
+Fast, cheap, reliable. Pick two.
