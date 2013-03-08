@@ -1,105 +1,87 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 8 Mar 2013 10:58:29 -0600
-Subject: [PATCH V2 08/17] ARM: OMAP2+: Convert TUSB to use
+Date: Fri, 8 Mar 2013 10:58:27 -0600
+Subject: [PATCH V2 06/17] ARM: OMAP2+: Convert NAND to use
  gpmc_cs_program_settings()
 In-Reply-To: <1362761918-8696-1-git-send-email-jon-hunter@ti.com>
 References: <1362761918-8696-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <1362761918-8696-9-git-send-email-jon-hunter@ti.com>
+Message-ID: <1362761918-8696-7-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert the OMAP2+ TUSB code to use the gpmc_cs_program_settings()
+Convert the OMAP2+ NAND code to use the gpmc_cs_program_settings()
 function for configuring the various GPMC options instead of directly
 programming the CONFIG1 register.
 
+This moves the configuration of some GPMC options outside the
+nand_gpmc_retime() because these options should only need to be set once
+regardless of whether the gpmc timing is changing dynamically at runtime.
+The programming of where the wait-pin is also moved slightly, but this
+will not have any impact to existing devices as no boards are currently
+setting the dev_ready variable.
+
 Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 ---
- arch/arm/mach-omap2/usb-tusb6010.c |   43 ++++++++++++++++--------------------
- 1 file changed, 19 insertions(+), 24 deletions(-)
+ arch/arm/mach-omap2/gpmc-nand.c |   33 +++++++++++++++++++++------------
+ 1 file changed, 21 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/usb-tusb6010.c b/arch/arm/mach-omap2/usb-tusb6010.c
-index faaf96d..1902b0b 100644
---- a/arch/arm/mach-omap2/usb-tusb6010.c
-+++ b/arch/arm/mach-omap2/usb-tusb6010.c
-@@ -8,6 +8,7 @@
-  * published by the Free Software Foundation.
-  */
+diff --git a/arch/arm/mach-omap2/gpmc-nand.c b/arch/arm/mach-omap2/gpmc-nand.c
+index e50e438..1c57755 100644
+--- a/arch/arm/mach-omap2/gpmc-nand.c
++++ b/arch/arm/mach-omap2/gpmc-nand.c
+@@ -74,14 +74,6 @@ static int omap2_nand_gpmc_retime(
+ 	t.cs_wr_off = gpmc_t->cs_wr_off;
+ 	t.wr_cycle = gpmc_t->wr_cycle;
  
-+#include <linux/err.h>
- #include <linux/string.h>
- #include <linux/types.h>
- #include <linux/errno.h>
-@@ -27,12 +28,21 @@ static u8		async_cs, sync_cs;
- static unsigned		refclk_psec;
+-	/* Configure GPMC */
+-	if (gpmc_nand_data->devsize == NAND_BUSWIDTH_16)
+-		gpmc_cs_configure(gpmc_nand_data->cs, GPMC_CONFIG_DEV_SIZE, 1);
+-	else
+-		gpmc_cs_configure(gpmc_nand_data->cs, GPMC_CONFIG_DEV_SIZE, 0);
+-	gpmc_cs_configure(gpmc_nand_data->cs,
+-			GPMC_CONFIG_DEV_TYPE, GPMC_DEVICETYPE_NAND);
+-	gpmc_cs_configure(gpmc_nand_data->cs, GPMC_CONFIG_WP, 0);
+ 	err = gpmc_cs_set_timings(gpmc_nand_data->cs, &t);
+ 	if (err)
+ 		return err;
+@@ -115,6 +107,7 @@ int gpmc_nand_init(struct omap_nand_platform_data *gpmc_nand_data,
+ 		   struct gpmc_timings *gpmc_t)
+ {
+ 	int err	= 0;
++	struct gpmc_settings s;
+ 	struct device *dev = &gpmc_nand_device.dev;
  
- static struct gpmc_settings tusb_async = {
-+	.wait_on_read	= true,
-+	.wait_on_write	= true,
-+	.device_width	= GPMC_DEVWIDTH_16BIT,
- 	.mux_add_data	= GPMC_MUX_AD,
- };
+ 	gpmc_nand_device.dev.platform_data = gpmc_nand_data;
+@@ -141,11 +134,27 @@ int gpmc_nand_init(struct omap_nand_platform_data *gpmc_nand_data,
+ 			dev_err(dev, "Unable to set gpmc timings: %d\n", err);
+ 			return err;
+ 		}
+-	}
  
- static struct gpmc_settings tusb_sync = {
-+	.burst_read	= true,
-+	.burst_write	= true,
- 	.sync_read	= true,
- 	.sync_write	= true,
-+	.wait_on_read	= true,
-+	.wait_on_write	= true,
-+	.burst_len	= GPMC_BURST_16,
-+	.device_width	= GPMC_DEVWIDTH_16BIT,
- 	.mux_add_data	= GPMC_MUX_AD,
- };
- 
-@@ -168,18 +178,12 @@ tusb6010_setup_interface(struct musb_hdrc_platform_data *data,
- 		return status;
- 	}
- 	tusb_resources[0].end = tusb_resources[0].start + 0x9ff;
-+	tusb_async.wait_pin = waitpin;
- 	async_cs = async;
--	gpmc_cs_write_reg(async, GPMC_CS_CONFIG1,
--			  GPMC_CONFIG1_PAGE_LEN(2)
--			| GPMC_CONFIG1_WAIT_READ_MON
--			| GPMC_CONFIG1_WAIT_WRITE_MON
--			| GPMC_CONFIG1_WAIT_PIN_SEL(waitpin)
--			| GPMC_CONFIG1_READTYPE_ASYNC
--			| GPMC_CONFIG1_WRITETYPE_ASYNC
--			| GPMC_CONFIG1_DEVICESIZE_16
--			| GPMC_CONFIG1_DEVICETYPE_NOR
--			| GPMC_CONFIG1_MUXADDDATA);
- 
-+	status = gpmc_cs_program_settings(async_cs, &tusb_async);
-+	if (IS_ERR_VALUE(status))
-+		return status;
- 
- 	/* SYNC region, primarily for DMA */
- 	status = gpmc_cs_request(sync, SZ_16M, (unsigned long *)
-@@ -189,21 +193,12 @@ tusb6010_setup_interface(struct musb_hdrc_platform_data *data,
- 		return status;
- 	}
- 	tusb_resources[1].end = tusb_resources[1].start + 0x9ff;
-+	tusb_sync.wait_pin = waitpin;
- 	sync_cs = sync;
--	gpmc_cs_write_reg(sync, GPMC_CS_CONFIG1,
--			  GPMC_CONFIG1_READMULTIPLE_SUPP
--			| GPMC_CONFIG1_READTYPE_SYNC
--			| GPMC_CONFIG1_WRITEMULTIPLE_SUPP
--			| GPMC_CONFIG1_WRITETYPE_SYNC
--			| GPMC_CONFIG1_PAGE_LEN(2)
--			| GPMC_CONFIG1_WAIT_READ_MON
--			| GPMC_CONFIG1_WAIT_WRITE_MON
--			| GPMC_CONFIG1_WAIT_PIN_SEL(waitpin)
--			| GPMC_CONFIG1_DEVICESIZE_16
--			| GPMC_CONFIG1_DEVICETYPE_NOR
--			| GPMC_CONFIG1_MUXADDDATA
--			/* fclk divider gets set later */
--			);
+-	/* Enable RD PIN Monitoring Reg */
+-	if (gpmc_nand_data->dev_ready) {
+-		gpmc_cs_configure(gpmc_nand_data->cs, GPMC_CONFIG_RDY_BSY, 1);
++		s.device_nand = true;
 +
-+	status = gpmc_cs_program_settings(sync_cs, &tusb_sync);
-+	if (IS_ERR_VALUE(status))
-+		return status;
++		/* Enable RD PIN Monitoring Reg */
++		if (gpmc_nand_data->dev_ready) {
++			s.wait_on_read = true;
++			s.wait_on_write = true;
++		}
++
++		if (gpmc_nand_data->devsize == NAND_BUSWIDTH_16)
++			s.device_width = GPMC_DEVWIDTH_16BIT;
++		else
++			s.device_width = GPMC_DEVWIDTH_8BIT;
++
++		err = gpmc_cs_program_settings(gpmc_nand_data->cs, &s);
++		if (IS_ERR_VALUE(err))
++			goto out_free_cs;
++
++		err = gpmc_cs_configure(gpmc_nand_data->cs, GPMC_CONFIG_WP, 0);
++		if (IS_ERR_VALUE(err))
++			goto out_free_cs;
+ 	}
  
- 	/* IRQ */
- 	status = gpio_request_one(irq, GPIOF_IN, "TUSB6010 irq");
+ 	gpmc_update_nand_reg(&gpmc_nand_data->reg, gpmc_nand_data->cs);
 -- 
 1.7.10.4
