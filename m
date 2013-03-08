@@ -1,50 +1,71 @@
-From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Fri, 8 Mar 2013 15:38:04 +0100
-Subject: s3c24xx pinctrl help
-Message-ID: <201303081538.04877.heiko@sntech.de>
+From: rogerq@ti.com (Roger Quadros)
+Date: Fri, 8 Mar 2013 17:04:50 +0200
+Subject: [PATCH 01/13] usb: phy: nop: Add device tree support and binding
+ information
+In-Reply-To: <5139C174.7030401@pengutronix.de>
+References: <1359993540-20780-1-git-send-email-rogerq@ti.com>
+ <1359993540-20780-2-git-send-email-rogerq@ti.com>
+ <5139C174.7030401@pengutronix.de>
+Message-ID: <5139FE12.6000700@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On 03/08/2013 12:46 PM, Marc Kleine-Budde wrote:
+> On 02/04/2013 04:58 PM, Roger Quadros wrote:
+>> The PHY clock, clock rate, VCC regulator and RESET regulator
+>> can now be provided via device tree.
+>>
+>> Signed-off-by: Roger Quadros <rogerq@ti.com>
+>> ---
+>>  .../devicetree/bindings/usb/usb-nop-xceiv.txt      |   34 ++++++++++++++++++++
+>>  drivers/usb/otg/nop-usb-xceiv.c                    |   31 ++++++++++++++++++
+>>  2 files changed, 65 insertions(+), 0 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt b/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
+>> new file mode 100644
+>> index 0000000..d7e2726
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
+>> @@ -0,0 +1,34 @@
+>> +USB NOP PHY
+>> +
+>> +Required properties:
+>> +- compatible: should be usb-nop-xceiv
+>> +
+>> +Optional properties:
+>> +- clocks: phandle to the PHY clock. Use as per Documentation/devicetree
+>> +  /bindings/clock/clock-bindings.txt
+>> +  This property is required if clock-frequency is specified.
+>> +
+>> +- clock-names: Should be "main_clk"
+>> +
+>> +- clock-frequency: the clock frequency (in Hz) that the PHY clock must
+>> +  be configured to.
+>> +
+>> +- vcc-supply: phandle to the regulator that provides RESET to the PHY.
+>> +
+>> +- reset-supply: phandle to the regulator that provides power to the PHY.
+>> +
+>> +Example:
+>> +
+>> +	hsusb1_phy {
+>> +		compatible = "usb-nop-xceiv";
+>> +		clock-frequency = <19200000>;
+> 
+> Why do you hardcode the clock frequency here? You should use
+> clk_get_rate() to get the frequency from the clock tree.
 
-taking you up on your offer of helping, I would be cool if you could simply
-give me a push in the right direction :-) .
+That would work only if the clock was programmed to the correct frequency
+by someone.
 
+e.g. In the OMAP case nobody programs the auxiliary clock on Panda which clocks
+the USB PHY.
 
->From what I've seen so far, the bank handling itself is very similar between
-exynos and s3c24xx as the underlying structures already handle multiple widths
-of the register contents. More interesting is the eint handling around which I 
-couldn't wrap my head yet.
+The usb-nop-xceiv device driver must program the clock rate using clk_set_rate(),
+but it needs to know what frequency it must program it to. Different boards/PHYs
+might use a different clock frequency. The 'clock-frequency' property
+is used to pass on this information to the driver.
 
-The basic structure is again similar with special eint registers, but adds 
-some quirks. EINT banks are gpf (8 eints) and gpg (8 or 16 eints depending on
-the SoC).
-
-The current way on Exynos seems to be to mark the offset in the eint register
-and attach an irq_domain to the bank, which gets mapped to the eints starting
-at the offset. The eints seem to have a parent interrupt that is provided via
-the dt.
-
-On the S3C24xx the gpg bank is doing this similar but gpf is very strange.
-
-The first half of the bank (gpf0 to gpf3) is not handled in eintpend registers
-but in the main interrupt controller (bits 0 to 3), while the second
-half of gpf is handled in eintpend. The new interrupt declaration might show
-this better, which can be found at [0].
-
-An exception is the s3c2412 which adds still another quirk where each
-interrupt of gpf0 to gpf3 is represented in both the normal intc and eint
-registers, again for reference probably easier to see in [1].
-
-
-So I'm still quite stumped on how this could fit into the current framework
-and would be really glad for some small pointers :-)
-
-
-Thanks
-Heiko
-
-
-
-[0] https://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/tree/arch/arm/mach-s3c24xx/irq.c?h=next/irq-s3c24xx-2&id=17453dd2e7df20612770ebbf1ab5d506a432210c#n574
-[1] https://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/tree/arch/arm/mach-s3c24xx/irq.c?h=next/irq-s3c24xx-2&id=17453dd2e7df20612770ebbf1ab5d506a432210c#n712
+cheers,
+-roger
