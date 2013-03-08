@@ -1,40 +1,39 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Fri, 8 Mar 2013 18:11:59 +0200
-Subject: [PATCH] ARM: OMAP: drop "select MACH_NOKIA_RM696"
-In-Reply-To: <1362738596.5994.48.camel@x61.thuisdomein>
-References: <1362738596.5994.48.camel@x61.thuisdomein>
-Message-ID: <20130308161159.GE14552@blackmetal.musicnaut.iki.fi>
+From: shijie8@gmail.com (Huang Shijie)
+Date: Fri, 8 Mar 2013 11:26:10 -0500
+Subject: [PATCH 07/12] mtd: gpmi: move to use generic DMA helper
+In-Reply-To: <1362748785.5101.4.camel@sauron.fi.intel.com>
+References: <1361978748-25281-1-git-send-email-shawn.guo@linaro.org>
+ <1361978748-25281-8-git-send-email-shawn.guo@linaro.org>
+ <1362748785.5101.4.camel@sauron.fi.intel.com>
+Message-ID: <CAMiH66EDjSAZLf-gtR-_kMasdKSKGRMrPThxtyw_RAixeNXHug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 08, 2013 at 11:29:56AM +0100, Paul Bolle wrote:
-> When support was added for Nokia N9 (RM-696), with commit
-> 63fc5f3bb3d0ca9ab4767a801b518aa6335f87ad ("ARM: OMAP: add minimal
-> support for Nokia RM-696"), a select statement for MACH_NOKIA_RM696 was
-> added to the tree. But there's no Kconfig symbol with that name. That
-> symbol would be superfluous, since support for that machine piggybacks
-> on MACH_NOKIA_RM680. So drop that select.
+On Fri, Mar 8, 2013 at 8:19 AM, Artem Bityutskiy <dedekind1@gmail.com> wrote:
+> On Wed, 2013-02-27 at 23:25 +0800, Shawn Guo wrote:
+>> With the generic DMA device tree helper supported by mxs-dma driver,
+>> client devices only need to call dma_request_slave_channel() for
+>> requesting a DMA channel from dmaengine.
+>>
+>> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+>> Cc: Artem Bityutskiy <dedekind1@gmail.com>
+>> Cc: linux-mtd at lists.infradead.org
+>
+> It looks like this ne is rather independent and can go via the MTD tree.
+> So pushed this one to l2-mtd.git - let me know if I am confused. Thanks!
+I suggest do not apply this patch. the whole patch set is still under
+review now.
 
-This is needed because of arch/arm/tools/mach-types. See
-include/generated/mach-types.h.
+Best Regards
+Huang Shijie
 
-If you have just CONFIG_MACH_NOKIA_RM680 and run the kernel on RM-696,
-then machine_is_nokia_rm696() will return false. If I rememeber correctly,
-this broke at least early printk / uncompressor output at the time.
-
-I guess people may still want to use machine_is_... macros e.g. for
-debugging.
-
-> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
-> ---
-> 0) Tested with "git grep".
-
-git grep won't search generated source files.
-
-> 1) Some searching on the web didn't return a "config MACH_NOKIA_RM696".
-> So apparently there's not even a development tree that uses this symbol.
-
-You can see machine_is_nokia_rm696() used in the public kernel source
-for Nokia N9 product. :-)
-
-A.
+>
+> --
+> Best Regards,
+> Artem Bityutskiy
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
