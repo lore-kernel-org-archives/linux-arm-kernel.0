@@ -1,48 +1,55 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Fri, 8 Mar 2013 11:31:20 -0700
-Subject: [PATCH 04/10] bus: introduce an Marvell EBU MBus driver
-In-Reply-To: <20130308175926.GC8693@localhost>
-References: <20130306202447.GA4916@obsidianresearch.com>
- <20130306214036.62fc93b9@skate>
- <20130306215031.GB4916@obsidianresearch.com>
- <20130306222712.GP23237@titan.lakedaemon.net>
- <20130306230412.GA5870@obsidianresearch.com>
- <20130307222004.GA2450@localhost>
- <20130307230516.GA28975@obsidianresearch.com>
- <20130308091052.18612729@skate>
- <20130308172950.GC4094@obsidianresearch.com>
- <20130308175926.GC8693@localhost>
-Message-ID: <20130308183120.GG4094@obsidianresearch.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 08 Mar 2013 11:40:38 -0700
+Subject: [PATCH 3/5] ARM: DT: tegra114:add aliases and DMA requestor for
+ serial controller
+In-Reply-To: <513A281B.9010702@nvidia.com>
+References: <1362750782-15174-1-git-send-email-ldewangan@nvidia.com>
+ <1362750782-15174-4-git-send-email-ldewangan@nvidia.com>
+ <513A25E4.8040504@wwwdotorg.org> <513A281B.9010702@nvidia.com>
+Message-ID: <513A30A6.3040806@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 08, 2013 at 02:59:27PM -0300, Ezequiel Garcia wrote:
+On 03/08/2013 11:04 AM, Laxman Dewangan wrote:
+> On Friday 08 March 2013 11:24 PM, Stephen Warren wrote:
+>> On 03/08/2013 06:53 AM, Laxman Dewangan wrote:
+>>> Add APB DMA requestor and serial aliases for serial controller.
+>>> There will be two serial driver i.e. 8250 based simple serial driver
+>>> and APB DMA based serial driver for higher baudrate and performace.
+>>>
+>>> The simple serial driver get enabled with compatible nvidia,tegra20-uart
+>>> and APB DMA based driver will get enabled with compatible
+>>> nvidia,tegra30-hsuart.
 
-> > I looked through Ezequiel's patch and saw a driver that provided those
-> > properties and no user of them at all. Are the patches incomplete? Is
-> > there some plan to use these values in the future?
+>>> diff --git a/arch/arm/boot/dts/tegra114.dtsi
+>>> b/arch/arm/boot/dts/tegra114.dtsi
+>>> +    /*
+>>> +     * There are two serial driver i.e. 8250 based simple serial
+>>> +     * driver and APB DMA based serial driver for higher baudrate
+>>> +     * and performace. To enable the 8250 based driver, the compatible
+>>> +     * is "nvidia,tegra30-uart", "nvidia,tegra20-uart" and to enable
+>>> +     * the APB DMA based serial driver, the comptible is
+>>> +     * "nvidia,tegra30-hsuart", "nvidia,tegra20-hsuart".
+>>> +     */
+>> Any references to Tegra30 there should be changed to Tegra114 I think.
+> 
+> Ok, there is not change on tegra30 and Tegra114, also we have not added
+> the tegra114 compatible in driver file.
 
-> Leaving aside the review comments that still I haven't addressed yet,
-> the patchset is complete.
- 
-> The timings parameters were not set in device tree files,
-> not because I expected the bootloader to set them, but instead because
-> SoC default values worked fine for the NOR devices I tested.
+As I mentioned elsewhere, compatible must always include the most
+specific value; nvidia,tegra114-uart in this case. If the HW is
+backwards-compatible, then also include entries for the HW it's
+compatible with.
 
-? Isn't that the same thing? Were the timing registers the SOC reset
-default or were they leftover from the bootloader?
+Hence here, you want:
 
-> If this is suboptimal, I can fix the device tree files in v2
-> to set proper timings parameter values.
+compatible = "nvidia,tegra114-uart", "nvdia,tegra20-uart";
 
-I have no opinion on this for your boards, it depends entirely on what
-flash chips you have to be compatible with, and how you feel about
-your bootloader.
+Since the compatible value here shouldn't include any Tegra30-related
+value, the comment shouldn't say that it should.
 
-Also, when looking at the idea from Maxime it occured to me that your
-DT binding might be better using ns or ps for the timings, instead of
-tclk cycles? That way NAND/NOR datasheet values can be included in the
-DT directly and are correct no matter what the tclk frequency is set to.
-
-Cheers,
-Jason
+Note that when there are multiple values in the compatible property,
+even if the driver doesn't know about the first value, it will still get
+matched based upon the 2nd/3rd/... value, so even though the driver
+doesn't explicitly know about nvidia,tegra114-uart, it will still get
+instantiated, because it does support nvdia,tegra20-uart.
