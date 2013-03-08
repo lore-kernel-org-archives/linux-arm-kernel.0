@@ -1,37 +1,44 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 08 Mar 2013 11:42:27 -0700
-Subject: [PATCH 4/5] ARM: DT: tegra114: add KBC controller DT entry
-In-Reply-To: <513A2A6D.7080604@nvidia.com>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Sat, 9 Mar 2013 00:16:24 +0530
+Subject: [PATCH 1/5] ARM: DT: tegra114: add APB DMA controller DT entry
+In-Reply-To: <513A30D3.4020700@wwwdotorg.org>
 References: <1362750782-15174-1-git-send-email-ldewangan@nvidia.com>
- <1362750782-15174-5-git-send-email-ldewangan@nvidia.com>
- <513A2810.1070903@wwwdotorg.org> <513A2A6D.7080604@nvidia.com>
-Message-ID: <513A3113.10909@wwwdotorg.org>
+ <1362750782-15174-2-git-send-email-ldewangan@nvidia.com>
+ <513A250C.1000202@wwwdotorg.org> <513A2888.5020402@nvidia.com>
+ <513A30D3.4020700@wwwdotorg.org>
+Message-ID: <513A3200.8070905@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/08/2013 11:14 AM, Laxman Dewangan wrote:
-> On Friday 08 March 2013 11:34 PM, Stephen Warren wrote:
->> On 03/08/2013 06:53 AM, Laxman Dewangan wrote:
->>> NVIDIA's Tegra114 SoCs have the matrix keyboard controller which
->>> supports 11x8 type of matrix. The number of rows and columns
->>> are configurable.
->> Earlier Tegra versions supported up to a 16x8 matrix. This feeds into
->> the following defines in the driver:
->>
->> #define KBC_MAX_GPIO    24
->> #define KBC_MAX_ROW     16
->> #define KBC_MAX_COL     8
->> #define KBC_MAX_KEY     (KBC_MAX_ROW * KBC_MAX_COL)
->>
->> Given Tegra114 supports /fewer/ pins and rows than earlier chips, I
->> think that makes the HW technically incompatible, since GPIO IDs 19..23
->> are invalid in this HW but valid earlier.
->>
->> Now in practice I suppose that with a correct DT keyboard map for a
->> Tegra114 device, those extra invalid GPIOs would never be referenced, so
->> this is a little nit-picky, but I still feel we should fix this.
-> 
-> Where do we fix this? In binding document?
+On Saturday 09 March 2013 12:11 AM, Stephen Warren wrote:
+> On 03/08/2013 11:06 AM, Laxman Dewangan wrote:
+>> On Friday 08 March 2013 11:21 PM, Stephen Warren wrote:
+>>> On 03/08/2013 06:52 AM, Laxman Dewangan wrote:
+>>>> NVIDIA's Tegra114 has 32 channels APB DMA controller. Add DT entry for
+>>>> APB DMA controllers and make it compatible with
+>>>> "nvidia,tegra114-apbdma".
+>>>> diff --git a/arch/arm/boot/dts/tegra114.dtsi
+>>>> b/arch/arm/boot/dts/tegra114.dtsi
+>>>> +    apbdma: dma {
+>>>> +        compatible = "nvidia,tegra114-apbdma";
+>>> So I know that the Tegra114 HW has a new channel-pause feature, which
+>>> the driver /can/ use. However, if the driver didn't know about that
+>>> feature, and continued to use the global-pause feature, would it still
+>>> work fine?
+>>>
+>>> In other words, is the Tegra114 HW 100% backwards-compatible with the
+>>> Tegra30 HW, it's just that there are new features that SW could
+>>> optionally use?
+>>>
+>>> If that is true, then we should also include "nvidia,tegra30-apbdma" in
+>>> the compatible value.
+>> Tegra114 HW is not compatible with the tegra30 as with global pause, it
+>> is not able to write into the dma register in T114. On t114, the dma
+>> register is clock gated with global enable/disable.
+> Interesting. In that case, the compatible value above is entirely
+> correct. Thanks for the explanation. It might be worth mentioning this
+> in the commit description.
 
-In the driver and .dtsi files; the rest of my message was describing how
-to fix this.
+I can describe here as I am going to respin the patches anyhow.
+However, I have already explain this in the driver commit when porting 
+for T114.
