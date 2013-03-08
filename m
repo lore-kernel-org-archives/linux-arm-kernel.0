@@ -1,239 +1,68 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 8 Mar 2013 19:56:25 +0100
-Subject: [PATCH 4/4] ARM: at91: introduce SAMA5 support
-In-Reply-To: <CAGhQ9VzY2UKZgxkbY-eO3j2R89W0phERDgpTAFh1Vy+bC0amWA@mail.gmail.com>
-References: <1362755638-20092-1-git-send-email-ludovic.desroches@atmel.com>
- <1362755638-20092-5-git-send-email-ludovic.desroches@atmel.com>
- <CAGhQ9VxXf5mrdZwCe1rqqDg-h_oeLfqs4fdw-m3h6P-QSBdn_Q@mail.gmail.com>
- <513a1756.e94aec0a.1f22.6694SMTPIN_ADDED_BROKEN@mx.google.com>
- <CAGhQ9VzY2UKZgxkbY-eO3j2R89W0phERDgpTAFh1Vy+bC0amWA@mail.gmail.com>
-Message-ID: <20130308185625.GF4590@game.jcrosoft.org>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Fri, 8 Mar 2013 20:12:27 +0100
+Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
+In-Reply-To: <20130308165228.GB4094@obsidianresearch.com>
+References: <20130306121118.GA17079@avionic-0098.mockup.avionic-design.de>
+ <20130306180946.GA2433@obsidianresearch.com>
+ <20130307080832.GD3451@avionic-0098.mockup.avionic-design.de>
+ <20130307174955.GC20840@obsidianresearch.com>
+ <20130307194830.GA1811@avionic-0098.mockup.avionic-design.de>
+ <20130307200235.GB20695@obsidianresearch.com>
+ <20130307204726.GB1811@avionic-0098.mockup.avionic-design.de>
+ <51392B4D.9040404@gmail.com>
+ <20130308071443.GA5772@avionic-0098.mockup.avionic-design.de>
+ <20130308165228.GB4094@obsidianresearch.com>
+Message-ID: <20130308191227.GA6551@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18:18 Fri 08 Mar     , Joachim Eastwood wrote:
-> On 8 March 2013 17:52, Ludovic Desroches <ludovic.desroches@atmel.com> wrote:
-> > Hi Joachim,
-> >
-> > On Fri, Mar 08, 2013 at 05:40:27PM +0100, Joachim Eastwood wrote:
-> >> On 8 March 2013 16:13,  <ludovic.desroches@atmel.com> wrote:
-> >> > From: Ludovic Desroches <ludovic.desroches@atmel.com>
-> >> >
-> >> > This patch introduces the SAMA5 support. It also updates the PMC driver to
-> >> > manage clock division which is a requirement since some peripherals can't work
-> >> > at the bus frequency on SAMA5.
-> >> >
-> >> > Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> >> > Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> >> > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> >> > ---
-> >> >  arch/arm/boot/dts/Makefile                 |    5 +
-> >> >  arch/arm/boot/dts/sama5d3.dtsi             | 1031 ++++++++++++++++++++++++++++
-> >> >  arch/arm/boot/dts/sama5d31ek.dts           |   51 ++
-> >> >  arch/arm/boot/dts/sama5d33ek.dts           |   44 ++
-> >> >  arch/arm/boot/dts/sama5d34ek.dts           |   61 ++
-> >> >  arch/arm/boot/dts/sama5d35ek.dts           |   56 ++
-> >> >  arch/arm/boot/dts/sama5d3xcm.dtsi          |   91 +++
-> >> >  arch/arm/boot/dts/sama5d3xdm.dtsi          |   42 ++
-> >> >  arch/arm/boot/dts/sama5d3xmb.dtsi          |  166 +++++
-> >> >  arch/arm/configs/sama5_defconfig           |  181 +++++
-> >> >  arch/arm/mach-at91/Kconfig                 |   34 +
-> >> >  arch/arm/mach-at91/Makefile                |    4 +
-> >> >  arch/arm/mach-at91/board-dt-sama5.c        |   86 +++
-> >> >  arch/arm/mach-at91/clock.c                 |  109 ++-
-> >> >  arch/arm/mach-at91/clock.h                 |    2 +
-> >> >  arch/arm/mach-at91/include/mach/at91_pmc.h |   18 +-
-> >> >  arch/arm/mach-at91/include/mach/cpu.h      |   20 +
-> >> >  arch/arm/mach-at91/include/mach/sama5d3.h  |   73 ++
-> >> >  arch/arm/mach-at91/sama5d3.c               |  377 ++++++++++
-> >> >  arch/arm/mach-at91/setup.c                 |   27 +
-> >> >  arch/arm/mach-at91/soc.h                   |    5 +
-> >> >  21 files changed, 2454 insertions(+), 29 deletions(-)
-> >> >  create mode 100644 arch/arm/boot/dts/sama5d3.dtsi
-> >> >  create mode 100644 arch/arm/boot/dts/sama5d31ek.dts
-> >> >  create mode 100644 arch/arm/boot/dts/sama5d33ek.dts
-> >> >  create mode 100644 arch/arm/boot/dts/sama5d34ek.dts
-> >> >  create mode 100644 arch/arm/boot/dts/sama5d35ek.dts
-> >> >  create mode 100644 arch/arm/boot/dts/sama5d3xcm.dtsi
-> >> >  create mode 100644 arch/arm/boot/dts/sama5d3xdm.dtsi
-> >> >  create mode 100644 arch/arm/boot/dts/sama5d3xmb.dtsi
-> >> >  create mode 100644 arch/arm/configs/sama5_defconfig
-> >> >  create mode 100644 arch/arm/mach-at91/board-dt-sama5.c
-> >> >  create mode 100644 arch/arm/mach-at91/include/mach/sama5d3.h
-> >> >  create mode 100644 arch/arm/mach-at91/sama5d3.c
-> >>
-> >> <snip>
-> >>
-> >> > --- a/arch/arm/mach-at91/Kconfig
-> >> > +++ b/arch/arm/mach-at91/Kconfig
-> >> > @@ -29,6 +29,14 @@ config SOC_AT91SAM9
-> >> >         select MULTI_IRQ_HANDLER
-> >> >         select SPARSE_IRQ
-> >> >
-> >> > +config SOC_SAMA5
-> >> > +       bool
-> >> > +       select AT91_SAM9_TIME
-> >> > +       select CPU_V7
-> >> > +       select GENERIC_CLOCKEVENTS
-> >> > +       select MULTI_IRQ_HANDLER
-> >> > +       select SPARSE_IRQ
-> >> > +
-> >> >  menu "Atmel AT91 System-on-Chip"
-> >> >
-> >> >  choice
-> >> > @@ -41,10 +49,28 @@ config SOC_SAM_V4_V5
-> >> >           Select this if you are using one of Atmel's AT91SAM9, AT91RM9200
-> >> >           or AT91X40 SoC.
-> >> >
-> >> > +config SOC_SAM_V7
-> >> > +       bool "Cortex A5"
-> >> > +       help
-> >> > +         Select this if you are using one of Atmel's SAMA5D3 SoC.
-> >> > +
-> >> >  endchoice
-> >> >
-> >> >  comment "Atmel AT91 Processor"
-> >> >
-> >> > +if SOC_SAM_V7
-> >> > +config SOC_SAMA5D3
-> >> > +       bool "SAMA5D3 family"
-> >> > +       depends on SOC_SAM_V7
-> >> > +       select SOC_SAMA5
-> >> > +       select HAVE_FB_ATMEL
-> >> > +       select HAVE_NET_MACB
-> >>
-> >> Remove HAVE_NET_MACB. It doesn't exist elsewhere in the kernel now.
-> >>
-> >
-> > Good point, thx.
-> >
-> >> > +       select HAVE_AT91_DBGU1
-> >> > +       help
-> >> > +         Select this if you are using one of Atmel's SAMA5D3 family SoC.
-> >> > +         This support covers SAMA5D31, SAMA5D33, SAMA5D34, SAMA5D35.
-> >> > +endif
-> >> > +
-> >>
-> >> <snip>
-> >>
-> >> > diff --git a/arch/arm/mach-at91/board-dt-sama5.c b/arch/arm/mach-at91/board-dt-sama5.c
-> >> > new file mode 100644
-> >> > index 0000000..705305e
-> >> > --- /dev/null
-> >> > +++ b/arch/arm/mach-at91/board-dt-sama5.c
-> >> > @@ -0,0 +1,86 @@
-> >> > +/*
-> >> > + *  Setup code for SAMA5 Evaluation Kits with Device Tree support
-> >> > + *
-> >> > + *  Copyright (C) 2013 Atmel,
-> >> > + *                2013 Ludovic Desroches <ludovic.desroches@atmel.com>
-> >> > + *
-> >> > + * Licensed under GPLv2 or later.
-> >> > + */
-> >> > +
-> >> > +#include <linux/types.h>
-> >> > +#include <linux/init.h>
-> >> > +#include <linux/module.h>
-> >> > +#include <linux/gpio.h>
-> >> > +#include <linux/micrel_phy.h>
-> >> > +#include <linux/of.h>
-> >> > +#include <linux/of_irq.h>
-> >> > +#include <linux/of_platform.h>
-> >> > +#include <linux/phy.h>
-> >> > +
-> >> > +#include <asm/setup.h>
-> >> > +#include <asm/irq.h>
-> >> > +#include <asm/mach/arch.h>
-> >> > +#include <asm/mach/map.h>
-> >> > +#include <asm/mach/irq.h>
-> >> > +
-> >> > +#include "at91_aic.h"
-> >> > +#include "generic.h"
-> >> > +
-> >> > +
-> >> > +static const struct of_device_id irq_of_match[] __initconst = {
-> >> > +
-> >> > +       { .compatible = "atmel,sama5d3-aic", .data = at91_aic5_of_init },
-> >> > +       { /*sentinel*/ }
-> >> > +};
-> >> > +
-> >> > +static void __init at91_dt_init_irq(void)
-> >> > +{
-> >> > +       of_irq_init(irq_of_match);
-> >> > +}
-> >> > +
-> >> > +static int ksz9021rn_phy_fixup(struct phy_device *phy)
-> >> > +{
-> >> > +       int value;
-> >> > +
-> >> > +#define GMII_RCCPSR    260
-> >> > +#define GMII_RRDPSR    261
-> >> > +#define GMII_ERCR      11
-> >> > +#define GMII_ERDWR     12
-> >> > +
-> >> > +       /* Set delay values */
-> >> > +       value = GMII_RCCPSR | 0x8000;
-> >> > +       phy_write(phy, GMII_ERCR, value);
-> >> > +       value = 0xF2F4;
-> >> > +       phy_write(phy, GMII_ERDWR, value);
-> >> > +       value = GMII_RRDPSR | 0x8000;
-> >> > +       phy_write(phy, GMII_ERCR, value);
-> >> > +       value = 0x2222;
-> >> > +       phy_write(phy, GMII_ERDWR, value);
-> >> > +
-> >> > +       return 0;
-> >> > +}
-> >> > +
-> >> > +static void __init sama5_dt_device_init(void)
-> >> > +{
-> >> > +       if (of_machine_is_compatible("atmel,sama5d3xcm"))
-> >> > +               phy_register_fixup_for_uid(PHY_ID_KSZ9021, MICREL_PHY_ID_MASK,
-> >> > +                       ksz9021rn_phy_fixup);
-> >> > +
-> >> > +       of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-> >> > +}
-> >> > +
-> >> > +static const char *sama5_dt_board_compat[] __initdata = {
-> >> > +       "atmel,sama5",
-> >> > +       NULL
-> >> > +};
-> >> > +
-> >> > +DT_MACHINE_START(sama5_dt, "Atmel SAMA5 (Device Tree)")
-> >> > +       /* Maintainer: Atmel */
-> >> > +       .init_time      = at91sam926x_pit_init,
-> >> > +       .map_io         = at91_map_io,
-> >> > +       .handle_irq     = at91_aic5_handle_irq,
-> >> > +       .init_early     = at91_dt_initialize,
-> >> > +       .init_irq       = at91_dt_init_irq,
-> >> > +       .init_machine   = sama5_dt_device_init,
-> >> > +       .dt_compat      = sama5_dt_board_compat,
-> >> > +MACHINE_END
-> >>
-> >> Do we really need board-dt-sama5.c?
-> >> Now that we have both irqchip_init and clocksource_of_init it
-> >> shouldn't be necessary with more than one board-dt.c.
-> >>
-> >
-> > At the beginning, I had the same point of view but we have a new
-> > architecture, we can't build a single kernel image for both AT91SAM9 and
-> > SAMA5. So why not splitting it?
+On Fri, Mar 08, 2013 at 09:52:28AM -0700, Jason Gunthorpe wrote:
+> On Fri, Mar 08, 2013 at 08:14:44AM +0100, Thierry Reding wrote:
+> > On Thu, Mar 07, 2013 at 06:05:33PM -0600, Rob Herring wrote:
+> > > On 03/07/2013 02:47 PM, Thierry Reding wrote:
+> > [...]
+> > > > In a nutshell (since some of the context isn't quoted anymore) the
+> > > > problem that we're trying to solve is that some of the embedded SoCs
+> > > > require per-root-port registers for configuration. The PCI DT
+> > > > specification doesn't make any provisions for this. A few alternatives
+> > > > have been discussed so far:
+> > > 
+> > > I'm not sure I follow. This is different than the host controller
+> > > registers? Why would this not just be multiple entries in the reg property?
+> > 
+> > Well the register regions are per root-port. On Tegra20 there's 2 of
+> > them, Tegra30 has 3 and if I understand correctly Marvell can have up to
+> > 10 (!). Adding all of them to the reg property of the host controller
+> > could work but it needs some way to match the reg entry to the root port
+> > similar to option 1 below.
 > 
-> It does add more lines to mach-at91 and I don't see a reason to have
-> two near identical board-dt files. board-dt could be used for SAMA5
-> even without irqchip_init and clocksource_of_init so what's the point
-> in splitting it?
+> Thomas just posted an implementation like this, please see:
 > 
-> When the at91 clocksource and irqchip driver are converted/moved we
-> could support all AT91 SoC from RM9200 to SAMA5 in one board-dt. I
-> don't see the reason for 3 board-dt files or even 2.
-> 
-> That we can't build a kernel that supports both ARMv4-5 and ARMv7
-> doesn't make a difference.
-my answer is no I do not want to if compatible_is on the c code so no
-different files
+> http://www.spinics.net/lists/arm-kernel/msg228749.html
 
-Best Regards,
-J.
-> 
-> regards
-> Joachim Eastwood
+Oh well. I don't like it, but if that's the way it has to be, then so be
+it. Any reason why the reg-names can't match the root port's node name
+so that it can be used directly instead of going through hoops to
+construct a string from extra parameters? Like below:
+
+	pcie-controller {
+		regs = <...>;
+		reg-names = ..., "pcie at 1,0", "pcie at 2,0";
+
+		pcie at 1,0 {
+			...
+		};
+
+		pcie at 2,0 {
+			...
+		};
+	};
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130308/c48fa649/attachment.sig>
