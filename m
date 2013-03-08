@@ -1,220 +1,82 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 8 Mar 2013 11:27:32 -0600
-Subject: [PATCH 8/9] ARM: dts: OMAP3+: Correct gpio #interrupts-cells property
-In-Reply-To: <1362763654-9660-1-git-send-email-jon-hunter@ti.com>
-References: <1362763654-9660-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <1362763654-9660-9-git-send-email-jon-hunter@ti.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Fri, 8 Mar 2013 10:29:50 -0700
+Subject: [PATCH 04/10] bus: introduce an Marvell EBU MBus driver
+In-Reply-To: <20130308091052.18612729@skate>
+References: <20130306190821.GA4689@obsidianresearch.com>
+ <20130306202710.15a6aa2c@skate>
+ <20130306202447.GA4916@obsidianresearch.com>
+ <20130306214036.62fc93b9@skate>
+ <20130306215031.GB4916@obsidianresearch.com>
+ <20130306222712.GP23237@titan.lakedaemon.net>
+ <20130306230412.GA5870@obsidianresearch.com>
+ <20130307222004.GA2450@localhost>
+ <20130307230516.GA28975@obsidianresearch.com>
+ <20130308091052.18612729@skate>
+Message-ID: <20130308172950.GC4094@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The OMAP gpio binding documention [1] states that the #interrupts-cells
-property for gpio controllers should be 2. Currently, for OMAP3+ devices
-the #interrupt-cells is set to 1. By setting this property to 2, it
-allows clients to pass a 2nd parameter indicating the sensitivity (level
-or edge) and polarity (high or low) of the interrupt. The OMAP gpio
-controllers support these options and so update the #interrupt-cells
-property for OMAP3+ devices to 2.
+On Fri, Mar 08, 2013 at 09:10:52AM +0100, Thomas Petazzoni wrote:
+> Dear Jason Gunthorpe,
+> 
+> On Thu, 7 Mar 2013 16:05:16 -0700, Jason Gunthorpe wrote:
+> 
+> > So what is the point of that? Get rid of your driver, have the mbus
+> > driver set up its own windows and put cfi-flash directly under
+> > mbus. Smaller, simpler, clearer, better.
+> 
+> No, we will still need the Device Bus driver to set up the timings.
 
-[1] Documentation/devicetree/bindings/gpio/gpio-omap.txt
+I looked through Ezequiel's patch and saw a driver that provided those
+properties and no user of them at all. Are the patches incomplete? Is
+there some plan to use these values in the future?
 
-Signed-off-by: Jon Hunter <jon-hunter@ti.com>
----
- arch/arm/boot/dts/omap3.dtsi |   12 ++++++------
- arch/arm/boot/dts/omap4.dtsi |   12 ++++++------
- arch/arm/boot/dts/omap5.dtsi |   16 ++++++++--------
- 3 files changed, 20 insertions(+), 20 deletions(-)
+> That's _your_ choice, and it's entirely inconsistent with most kernel
+> practices. For example, we have the pinctrl subsystem, which
+> precisely
 
-diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-index 5b36de5..c9bedf7 100644
---- a/arch/arm/boot/dts/omap3.dtsi
-+++ b/arch/arm/boot/dts/omap3.dtsi
-@@ -117,7 +117,7 @@
- 			gpio-controller;
- 			#gpio-cells = <2>;
- 			interrupt-controller;
--			#interrupt-cells = <1>;
-+			#interrupt-cells = <2>;
- 		};
- 
- 		gpio2: gpio at 49050000 {
-@@ -126,7 +126,7 @@
- 			gpio-controller;
- 			#gpio-cells = <2>;
- 			interrupt-controller;
--			#interrupt-cells = <1>;
-+			#interrupt-cells = <2>;
- 		};
- 
- 		gpio3: gpio at 49052000 {
-@@ -135,7 +135,7 @@
- 			gpio-controller;
- 			#gpio-cells = <2>;
- 			interrupt-controller;
--			#interrupt-cells = <1>;
-+			#interrupt-cells = <2>;
- 		};
- 
- 		gpio4: gpio at 49054000 {
-@@ -144,7 +144,7 @@
- 			gpio-controller;
- 			#gpio-cells = <2>;
- 			interrupt-controller;
--			#interrupt-cells = <1>;
-+			#interrupt-cells = <2>;
- 		};
- 
- 		gpio5: gpio at 49056000 {
-@@ -153,7 +153,7 @@
- 			gpio-controller;
- 			#gpio-cells = <2>;
- 			interrupt-controller;
--			#interrupt-cells = <1>;
-+			#interrupt-cells = <2>;
- 		};
- 
- 		gpio6: gpio at 49058000 {
-@@ -162,7 +162,7 @@
- 			gpio-controller;
- 			#gpio-cells = <2>;
- 			interrupt-controller;
--			#interrupt-cells = <1>;
-+			#interrupt-cells = <2>;
- 		};
- 
- 		uart1: serial at 4806a000 {
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index 726ef11..544be06 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -138,7 +138,7 @@
- 			gpio-controller;
- 			#gpio-cells = <2>;
- 			interrupt-controller;
--			#interrupt-cells = <1>;
-+			#interrupt-cells = <2>;
- 		};
- 
- 		gpio2: gpio at 48055000 {
-@@ -149,7 +149,7 @@
- 			gpio-controller;
- 			#gpio-cells = <2>;
- 			interrupt-controller;
--			#interrupt-cells = <1>;
-+			#interrupt-cells = <2>;
- 		};
- 
- 		gpio3: gpio at 48057000 {
-@@ -160,7 +160,7 @@
- 			gpio-controller;
- 			#gpio-cells = <2>;
- 			interrupt-controller;
--			#interrupt-cells = <1>;
-+			#interrupt-cells = <2>;
- 		};
- 
- 		gpio4: gpio at 48059000 {
-@@ -171,7 +171,7 @@
- 			gpio-controller;
- 			#gpio-cells = <2>;
- 			interrupt-controller;
--			#interrupt-cells = <1>;
-+			#interrupt-cells = <2>;
- 		};
- 
- 		gpio5: gpio at 4805b000 {
-@@ -182,7 +182,7 @@
- 			gpio-controller;
- 			#gpio-cells = <2>;
- 			interrupt-controller;
--			#interrupt-cells = <1>;
-+			#interrupt-cells = <2>;
- 		};
- 
- 		gpio6: gpio at 4805d000 {
-@@ -193,7 +193,7 @@
- 			gpio-controller;
- 			#gpio-cells = <2>;
- 			interrupt-controller;
--			#interrupt-cells = <1>;
-+			#interrupt-cells = <2>;
- 		};
- 
- 		gpmc: gpmc at 50000000 {
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index 34f41ad..93feb50 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -128,7 +128,7 @@
- 			gpio-controller;
- 			#gpio-cells = <2>;
- 			interrupt-controller;
--			#interrupt-cells = <1>;
-+			#interrupt-cells = <2>;
- 		};
- 
- 		gpio2: gpio at 48055000 {
-@@ -139,7 +139,7 @@
- 			gpio-controller;
- 			#gpio-cells = <2>;
- 			interrupt-controller;
--			#interrupt-cells = <1>;
-+			#interrupt-cells = <2>;
- 		};
- 
- 		gpio3: gpio at 48057000 {
-@@ -150,7 +150,7 @@
- 			gpio-controller;
- 			#gpio-cells = <2>;
- 			interrupt-controller;
--			#interrupt-cells = <1>;
-+			#interrupt-cells = <2>;
- 		};
- 
- 		gpio4: gpio at 48059000 {
-@@ -161,7 +161,7 @@
- 			gpio-controller;
- 			#gpio-cells = <2>;
- 			interrupt-controller;
--			#interrupt-cells = <1>;
-+			#interrupt-cells = <2>;
- 		};
- 
- 		gpio5: gpio at 4805b000 {
-@@ -172,7 +172,7 @@
- 			gpio-controller;
- 			#gpio-cells = <2>;
- 			interrupt-controller;
--			#interrupt-cells = <1>;
-+			#interrupt-cells = <2>;
- 		};
- 
- 		gpio6: gpio at 4805d000 {
-@@ -183,7 +183,7 @@
- 			gpio-controller;
- 			#gpio-cells = <2>;
- 			interrupt-controller;
--			#interrupt-cells = <1>;
-+			#interrupt-cells = <2>;
- 		};
- 
- 		gpio7: gpio at 48051000 {
-@@ -194,7 +194,7 @@
- 			gpio-controller;
- 			#gpio-cells = <2>;
- 			interrupt-controller;
--			#interrupt-cells = <1>;
-+			#interrupt-cells = <2>;
- 		};
- 
- 		gpio8: gpio at 48053000 {
-@@ -205,7 +205,7 @@
- 			gpio-controller;
- 			#gpio-cells = <2>;
- 			interrupt-controller;
--			#interrupt-cells = <1>;
-+			#interrupt-cells = <2>;
- 		};
- 
- 		gpmc: gpmc at 50000000 {
--- 
-1.7.10.4
+Again, Ezequiel's patches do exactly the same thing.
+
+pinctrl is a bit different, it depends on the PCB design which is
+fixed. NAND/NOR timings depend on the flash chip in use, which can
+vary from manufacturing run to manufacturing run.
+
+> Sorry, but we _do_ want the kernel to be able to set those timings
+> parameters, and therefore, a Device Bus driver will be needed,
+> regardless of whether it creates the address window or not.
+
+See the very good idea from Maxime Bizon about autoprobing the ONFI
+timings directly from the NAND chip.
+
+> > > In conclusion: there is absolutely no need to change the NOR driver,
+> > > and there is no need to explictly add an explicit description of the
+> > > NOR window in the device tree.
+> > 
+> > As I've said, a DT that has child nodes without an associated address
+> > map is broken.
+> 
+> That's a statement without any arguments. How can we have a serious
+> technical discussion if what you bring is just "this is broken", with no
+> arguments?
+
+I've brought many things up and you have ignored them all. Here is a
+list of a few:
+ - You can't actually do optmial dynamic allocation a device at a
+   time, that will make holes in the address space due to the alignment
+   constraints.
+ - Having an invalid address map in DT breaks the naming of platform
+   devices and breaks the collision avoidance mechanism in the OF core
+ - Breaking the address map means any downstream driver that tries to
+   use standard OF addressing functions on its of node gets broken.
+ - Breaking the address map means the standard OF platform device
+   creation functions don't work because they can't create the
+   resource ranges from OF. This means things like standard Linux
+   resource accounting is broken.
+ - Adding bus specific boiler plate to drivers is not the Linux
+   convention, the bus abstraction is ment to do that.
+Arnd also mentioned:
+ - Breaking the address map in DT breaks OS's without a mbus driver
+
+What more do you want to hear?
+
+Jason
