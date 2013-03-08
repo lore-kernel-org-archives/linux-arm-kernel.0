@@ -1,99 +1,52 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Fri, 8 Mar 2013 09:38:59 -0800
-Subject: RFC: Zynq Clock Controller
-In-Reply-To: <51398F54.5080802@metafoo.de>
-References: <37032699-343e-485c-80e0-9b23e3706c58@VA3EHSMHS013.ehs.local>
- <1362570681.5269.98.camel@coredoba.hi.pengutronix.de>
- <f288874c-d0ae-4581-8d0f-2b9abe4d3117@CO9EHSMHS002.ehs.local>
- <51385FA3.8080105@metafoo.de>
- <2a91857c-473f-4f92-b2b1-e7ac4679b72a@AM1EHSMHS007.ehs.local>
- <51390E92.2080806@metafoo.de>
- <a6c711bf-7722-4eb0-bb72-0e5c00e4ba9d@CO9EHSMHS016.ehs.local>
- <51398F54.5080802@metafoo.de>
-Message-ID: <ad0abbdf-b783-4c43-aa40-534f726fbfb7@DB8EHSMHS013.ehs.local>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Fri, 8 Mar 2013 10:43:58 -0700
+Subject: [PATCH 04/10] bus: introduce an Marvell EBU MBus driver
+In-Reply-To: <20130308150655.2bad20ce@skate>
+References: <1362577426-12804-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130306230412.GA5870@obsidianresearch.com>
+ <20130307113917.0b751a75@skate> <201303081350.15429.arnd@arndb.de>
+ <20130308150655.2bad20ce@skate>
+Message-ID: <20130308174358.GD4094@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 08, 2013 at 08:12:20AM +0100, Lars-Peter Clausen wrote:
-> On 03/08/2013 12:25 AM, S?ren Brinkmann wrote:
-> > On Thu, Mar 07, 2013 at 11:02:58PM +0100, Lars-Peter Clausen wrote:
-> >> On 03/07/2013 08:11 PM, S?ren Brinkmann wrote:
-> >>> On Thu, Mar 07, 2013 at 10:36:35AM +0100, Lars-Peter Clausen wrote:
-> >>>> On 03/06/2013 06:27 PM, S?ren Brinkmann wrote:
-> >>>>> Hi Jan,
-> >>>>>  
-> >>>>> what a small world. Good to hear from you.
-> >>>>>
-> >>>>> On Wed, Mar 06, 2013 at 12:51:21PM +0100, Jan L?bbe wrote:
-> >>>>>> Hi S?ren,
-> >>>>>>
-> >>>>>> On Tue, 2013-03-05 at 12:04 -0800, S?ren Brinkmann wrote:
-> >>>>>>> For this reasons, I'd like to propose moving Zynq into the same
-> >>>>>>> direction. I.e. adding a clock controller with the following DT
-> >>>>>>> description (details may change but the general idea should become
-> >>>>>>> clear):
-> >>>>>>> 	clkc: clkc {
-> >>>>>>>                 #clock-cells = <1>;
-> >>>>>>>                 compatible = "xlnx,ps7-clkc";
-> >>>>>>>                 ps_clk_frequency = <33333333>;	# board x-tal
-> >>>>>>>                 # optional props
-> >>>>>>>                 gem0_emio_clk_freq = <125000000>;
-> >>>>>>>                 gem1_emio_clk_freq = <50000000>;
-> >>>>>>>                 can_mio_clk_freq_xx = <1234>; # this is possible 54 times with xx = 00..53
-> >>>>>>>         };
-> >>>>
-> >>>> I definitely prefer the way it is right now in upstream, where we have one
-> >>>> dt node per clock. It is more descriptive and also more extensible. And you
-> >>>> also don't have to remember the clock index, and can use the phandle
-> >>>> directly instead.
-> >>> The problems I see with that are:
-> >>>  - with the clock controller we can model the clock tree as we need without changing the DT all the time
-> >>
-> >> When do we need to change the clock tree? The clock tree is pretty much fixed
-> >> in hardware. And the DT describes the hardware, so I don't so a problem there.
-> >>
-> >>>  - w/o a clock controller there is no block which has knowledge of the whole clock tree (unless we parse the DT), and could conduct reparent operations and similar
-> >>
-> >> The clk framework builds a representation of the clock tree. Each clock should
-> >> be able to handle re-parenting on it's own, without knowing about the other
-> >> clocks in the tree, the parent is selected by a field in the clocks register.
-> >> It doesn't even have to know who the parents are, the clk framework will take
-> >> care of all of this and just say, ok, switch your input clock to X, where X is
-> >> a simple integer number The clk framework will also take care of re-calculating
-> >> all the updates frequencies after re-parenting.
-> > Nope, clk_set_parent() takes two 'struct *clk' as argument. So, you have to have those of the clock to change and all its parents. A device driver for example, which gets a clock through clk_get() does not have that information and should not, since it should not have to be aware of the SOC's clock hierarchy, IMHO.
-> > 
-> 
-> Yes, you global clk_set_parent() method takes two clk structs. But the clock
-> framework takes care of all the magic of mapping that second clk struct to a
-> integer number, based on the clks parent list. So your set_parent callback in
-> your clk_ops takes as parameters your clk and the index of the parent.
-Right, but who/what in your scheme is supposed to call the high level API function requiring knowledge about all those 'struct *clk' and their hierarchy? This is where I think a big block has the advantage since it has a holistic view on the clock tree.
+On Fri, Mar 08, 2013 at 03:06:55PM +0100, Thomas Petazzoni wrote:
 
-> 
-> >>
-> >>>  - once the clock controller is properly defined the clock connection should be contained in a dtsi which never changes. So, regarding remembering outputs, I don't see a problem. I rather see issues with having a pile of clocks described in the DT. I have currently 44 outputs proposed, and to model the whole tree a lot of more clocks are used (I started modeling everything with the clock primitives and removed custom clock implementations, except for the PLLs). Having all those in the DT does not really help, IMHO.
-> >>
-> >> Well, except if you want to use external clocks for ethernet or CAN. Also you
-> >> don't need to change the dtsi either if you have a separate node for each clock.
-> >>
-> >> To avoid misunderstandings let me clarify that I don't want to have one node
-> >> per clock, but rather one node per clock block (or whatever they are called).
-> >> The combination of input select + divider + output gate. E.g. the UART clock
-> >> block with it's 3 inputs and two outputs.
-> >>
-> >> Also the APER clocks should probably be one node with 24 outputs.
-> > Okay, so instead of having one block encapsulating all clocks, you want it on a finer granularity. I don't see huge differences why that should be advantageous? It would just mean to create several blocks with their custom DT bindings instead of a single one. Just the abstraction level would be a little different.
-> 
-> The DT is supposed to describe the hardware, not the software. These are the
-> basic blocks. The are independent of each other and mostly orthogonal. It's the
-> same IP block instantiated a couple of times next to each other (sometimes with
-> slightly different parameters). They just happen to have their register mapped
-> in the same IO region. The SLCR is just a container which contains all these
-> blocks. Very much the same way the whole SoC is a container which contains the
-> different peripheral blocks, etc. By you rationale we could argue, why do we
-> need a dt node for each peripheral and not just simply one ZYNQ node?
-I see us ending up here with custom clock blocks for each and every peripheral. They all look similar on first look but have all their slight differences. So, it's either different implementations or having a lot of DT properties to make a single implementation work for all the variations. That's why I prefer the single controller solution.
-The DT description will always be an abstraction. You prefer grouping clocks for functional units, whereas I put them all into the same drawer labeled 'clocks'.
+> Really, I've sent this PCIe driver first on December, 7th, and it was
+> working. 99% percent of the problems have been around the Device Tree,
+> and continue to be around this. Wasn't DT supposed to make things
+> easier? I am really surprised by the amount of nitpicking that this
+> driver receives, when I see how incoherent the pinctrl DT bindings for
+> the various SoC are for example...
 
-	S?ren
+Well, please consider that the push to make the DT a stable ABI means
+it should be nearly as hard to change as the userspace ABI. If you've
+watched the kernel you know how rough it is to do that. :(
+
+Further, the PCI DT binding needs to implement the documented OF
+specifications. It is not nitpicking to say that X does not conform to
+the OF document.
+
+pinctrl doesn't have an OF spec so people are doing SOC unique things.
+
+I think a reasonable take away from some of this is that it may be
+worthwhile to propose a DT binding before writing code for it,
+especially if it is a new or complex concept.
+
+> At this point, I have absolutely no idea what direction to take to
+> bring this further. I'm basically in a dead-end.
+
+I think Jason C. has said he is fine with bringing in the MBUS driver as
+is.
+
+The PCI-E driver's DT binding looks great to me, I have no further
+comments at all, and I believe everyone else's comments related to DT
+are delt with as well.
+
+The huge discussion about the SW PCI-E bridge seems to be concluded
+and everyone is agreeing on that point too.
+
+Soo, I think you are not at all at a dead end, but nearly finished :)
+
+Regards,
+Jason
