@@ -1,50 +1,37 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 8 Mar 2013 18:28:07 +0200
-Subject: [PATCH 3/4] USB mxs-phy: use readl(), writel() instead of the
- _relaxed() versions
-In-Reply-To: <513A0C66.8080307@pengutronix.de>
-References: <1362048751-4061-1-git-send-email-mkl@pengutronix.de>
- <1362048751-4061-4-git-send-email-mkl@pengutronix.de>
- <87sj4gwuhi.fsf@ashishki-desk.ger.corp.intel.com>
- <513A0C66.8080307@pengutronix.de>
-Message-ID: <20130308162807.GD32368@arwen.pp.htv.fi>
+Date: Fri, 8 Mar 2013 18:30:50 +0200
+Subject: [PATCH 1/5] USB chipidea: ci13xxx-imx: create dynamic platformdata
+In-Reply-To: <1362049024-11383-2-git-send-email-mkl@pengutronix.de>
+References: <1362049024-11383-1-git-send-email-mkl@pengutronix.de>
+ <1362049024-11383-2-git-send-email-mkl@pengutronix.de>
+Message-ID: <20130308163050.GE32368@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+HI,
+
 Hi,
 
-On Fri, Mar 08, 2013 at 05:05:58PM +0100, Marc Kleine-Budde wrote:
-> On 02/28/2013 12:25 PM, Alexander Shishkin wrote:
-> > Marc Kleine-Budde <mkl@pengutronix.de> writes:
-> > 
-> >> This patch converts the mxs-phy driver from readl_relaxed(), writel_relaxed()
-> >> to the plain readl(), writel() functions, which are available on all platforms.
-> >> This is done to enable compile time testing on non ARM platforms.
-> >>
-> >> Reported-by: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-> > 
-> > I think it was Felipe who reported this actually.
-> 
-> Fixed. I'm about to repost this series with crediting Felipe as reporter.
-> 
-> Which tree would you like to be this series based on? It depends on the
-> "USB otg: use try_module_get in all usb_get_phy functions and add
-> missing module_put" patch which is part of your usb/fixes branch, but
-> not in usb/next yet.
+On Thu, Feb 28, 2013 at 11:57:00AM +0100, Marc Kleine-Budde wrote:
+> @@ -107,6 +100,18 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
+>  		&& !usbmisc_ops)
+>  		return -EPROBE_DEFER;
+>  
+> +	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
 
-look at my testing branch. I have them all already. You didn't get an
-email yet because I'm waiting for -rc2 to be tagged.
+this isn't necessary. Look at how platform_device_add_data() is
+implemented. It will duplicate whatever you pass to it. Which means you
+can change ci13xxx_imx_platdata as much as you want ;-)
 
-I have fixed the Reported-by tag, no issues there.
+> @@ -168,7 +173,7 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
+>  		reg_vbus = NULL;
+>  	}
+>  
+> -	ci13xxx_imx_platdata.phy = data->phy;
+> +	pdata->phy = data->phy;
 
-Anyway, as soon as v3.9-rc2 is tagged, I will rebase testing on top of
-that and move all patches to 'next', then everything will be stable from
-that point on.
-
-If you want to have changes to any of the patches, now is the time,
-after I move patches to 'next' the tree becomes immutable.
-
-cheers
+it would be pretty cool to start seeing patches teaching chipidea core
+how to handle its own resources (regulators, phys, clocks, etc).
 
 -- 
 balbi
@@ -54,4 +41,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130308/a67b5949/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130308/2ebaec4f/attachment.sig>
