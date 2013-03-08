@@ -1,73 +1,61 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 8 Mar 2013 19:46:48 +0100
-Subject: [PATCH 2/3] can: at91_can: add pinctrl support
-In-Reply-To: <513A21E4.6000801@pengutronix.de>
-References: <1362763842-14924-1-git-send-email-ludovic.desroches@atmel.com>
- <1362763842-14924-3-git-send-email-ludovic.desroches@atmel.com>
- <513A21E4.6000801@pengutronix.de>
-Message-ID: <20130308184648.GE4590@game.jcrosoft.org>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Fri, 8 Mar 2013 15:53:52 -0300
+Subject: [PATCH 04/10] bus: introduce an Marvell EBU MBus driver
+In-Reply-To: <20130308183120.GG4094@obsidianresearch.com>
+References: <20130306214036.62fc93b9@skate>
+ <20130306215031.GB4916@obsidianresearch.com>
+ <20130306222712.GP23237@titan.lakedaemon.net>
+ <20130306230412.GA5870@obsidianresearch.com>
+ <20130307222004.GA2450@localhost>
+ <20130307230516.GA28975@obsidianresearch.com>
+ <20130308091052.18612729@skate>
+ <20130308172950.GC4094@obsidianresearch.com>
+ <20130308175926.GC8693@localhost>
+ <20130308183120.GG4094@obsidianresearch.com>
+Message-ID: <20130308185350.GA2469@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18:37 Fri 08 Mar     , Marc Kleine-Budde wrote:
-> On 03/08/2013 06:30 PM, ludovic.desroches at atmel.com wrote:
-> > From: Ludovic Desroches <ludovic.desroches@atmel.com>
-> > 
-> > Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> > ---
-> >  drivers/net/can/at91_can.c | 9 +++++++++
-> >  1 file changed, 9 insertions(+)
-> > 
-> > diff --git a/drivers/net/can/at91_can.c b/drivers/net/can/at91_can.c
-> > index c7f70d4..56fb2aa 100644
-> > --- a/drivers/net/can/at91_can.c
-> > +++ b/drivers/net/can/at91_can.c
-> > @@ -28,6 +28,7 @@
-> >  #include <linux/module.h>
-> >  #include <linux/netdevice.h>
-> >  #include <linux/of.h>
-> > +#include <linux/pinctrl/consumer.h>
-> >  #include <linux/platform_device.h>
-> >  #include <linux/rtnetlink.h>
-> >  #include <linux/skbuff.h>
-> > @@ -1292,6 +1293,7 @@ static int at91_can_probe(struct platform_device *pdev)
-> >  	struct clk *clk;
-> >  	void __iomem *addr;
-> >  	int err, irq;
-> > +	struct pinctrl *pinctrl;
-> >  
-> >  	devtype_data = at91_can_get_driver_data(pdev);
-> >  	if (!devtype_data) {
-> > @@ -1314,6 +1316,13 @@ static int at91_can_probe(struct platform_device *pdev)
-> >  		goto exit_put;
-> >  	}
-> >  
-> > +	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
+On Fri, Mar 08, 2013 at 11:31:20AM -0700, Jason Gunthorpe wrote:
+> On Fri, Mar 08, 2013 at 02:59:27PM -0300, Ezequiel Garcia wrote:
 > 
-> Is this still needed? I think the pinctrl framework automatically
-> enables the default pinctrl for a device if available.
-yes this is useless
+> > > I looked through Ezequiel's patch and saw a driver that provided those
+> > > properties and no user of them at all. Are the patches incomplete? Is
+> > > there some plan to use these values in the future?
+> 
+> > Leaving aside the review comments that still I haven't addressed yet,
+> > the patchset is complete.
+>  
+> > The timings parameters were not set in device tree files,
+> > not because I expected the bootloader to set them, but instead because
+> > SoC default values worked fine for the NOR devices I tested.
+> 
+> ? Isn't that the same thing? Were the timing registers the SOC reset
+> default or were they leftover from the bootloader?
+> 
 
-Best Regards,
-J.
+IMHO, SoC reset default value is not the same as leftover from bootloader,
+right?
+
+But this doesn't mean the driver is not useful to set proper parameter
+values in case default/bootloader are wrong or suboptimal.
+
+> > If this is suboptimal, I can fix the device tree files in v2
+> > to set proper timings parameter values.
 > 
-> Marc
+> I have no opinion on this for your boards, it depends entirely on what
+> flash chips you have to be compatible with, and how you feel about
+> your bootloader.
 > 
-> > +	if (IS_ERR(pinctrl)) {
-> > +		dev_err(&pdev->dev, "Failed to request pinctrl\n");
-> > +		err = PTR_ERR(pinctrl);
-> > +		goto exit_put;
-> > +	}
-> > +
-> >  	if (!request_mem_region(res->start,
-> >  				resource_size(res),
-> >  				pdev->name)) {
-> > 
+> Also, when looking at the idea from Maxime it occured to me that your
+> DT binding might be better using ns or ps for the timings, instead of
+> tclk cycles? That way NAND/NOR datasheet values can be included in the
+> DT directly and are correct no matter what the tclk frequency is set to.
 > 
-> 
-> -- 
-> Pengutronix e.K.                  | Marc Kleine-Budde           |
-> Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-> Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-> Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-> 
+
+Mmm... that sounds like a better aproach. I'll think about that.
+
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
