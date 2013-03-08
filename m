@@ -1,66 +1,57 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  8 Mar 2013 16:19:06 +0100
-Subject: [PATCH v4 04/18] of/pci: Add of_pci_parse_bus_range() function
+Date: Fri,  8 Mar 2013 16:19:10 +0100
+Subject: [PATCH v4 08/18] clk: mvebu: add more PCIe clocks for Armada XP
 In-Reply-To: <1362755960-30791-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1362755960-30791-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1362755960-30791-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1362755960-30791-9-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <thierry.reding@avionic-design.de>
+The current revision of the datasheet only mentions the gatable clocks
+for the PCIe 0.0, 0.1, 0.2 and 0.3 interfaces, and forgot to mention
+the ones for the PCIe 1.0, 1.1, 1.2, 1.3, 2.0 and 3.0
+interfaces. After confirmation with Marvell engineers, this patch adds
+the missing gatable clocks for those PCIe interfaces.
 
-This function can be used to parse a bus-range property as specified by
-device nodes representing PCI bridges.
+It also changes the name of the previously existing PCIe gatable
+clocks, in order to match the naming using the datasheets.
 
-Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/of/of_pci.c    |   25 +++++++++++++++++++++++++
- include/linux/of_pci.h |    1 +
- 2 files changed, 26 insertions(+)
+ drivers/clk/mvebu/clk-gating-ctrl.c |   14 ++++++++++----
+ 1 file changed, 10 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-index d6e6de5..fb92ded 100644
---- a/drivers/of/of_pci.c
-+++ b/drivers/of/of_pci.c
-@@ -85,3 +85,28 @@ int of_pci_get_devfn(struct device_node *np)
- 	return (be32_to_cpup(reg) >> 8) & 0xff;
- }
- EXPORT_SYMBOL_GPL(of_pci_get_devfn);
-+
-+/**
-+ * of_pci_parse_bus_range() - parse the bus-range property of a PCI device
-+ * @node: device node
-+ * @res: address to a struct resource to return the bus-range
-+ *
-+ * Returns 0 on success or a negative error-code on failure.
-+ */
-+int of_pci_parse_bus_range(struct device_node *node, struct resource *res)
-+{
-+	const __be32 *values;
-+	int len;
-+
-+	values = of_get_property(node, "bus-range", &len);
-+	if (!values || len < sizeof(*values) * 2)
-+		return -EINVAL;
-+
-+	res->name = node->name;
-+	res->start = be32_to_cpup(values++);
-+	res->end = be32_to_cpup(values);
-+	res->flags = IORESOURCE_BUS;
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(of_pci_parse_bus_range);
-diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
-index 9118321..fb6e95e 100644
---- a/include/linux/of_pci.h
-+++ b/include/linux/of_pci.h
-@@ -12,5 +12,6 @@ struct device_node *of_pci_find_child_device(struct device_node *parent,
- 					     unsigned int devfn);
- int of_pci_get_bus(struct device_node *np);
- int of_pci_get_devfn(struct device_node *np);
-+int of_pci_parse_bus_range(struct device_node *node, struct resource *res);
- 
- #endif
+diff --git a/drivers/clk/mvebu/clk-gating-ctrl.c b/drivers/clk/mvebu/clk-gating-ctrl.c
+index b35785a..2f03723 100644
+--- a/drivers/clk/mvebu/clk-gating-ctrl.c
++++ b/drivers/clk/mvebu/clk-gating-ctrl.c
+@@ -137,10 +137,14 @@ static const struct mvebu_soc_descr __initconst armada_xp_gating_descr[] = {
+ 	{ "ge2", NULL,  2 },
+ 	{ "ge1", NULL, 3 },
+ 	{ "ge0", NULL, 4 },
+-	{ "pex0", NULL, 5 },
+-	{ "pex1", NULL, 6 },
+-	{ "pex2", NULL, 7 },
+-	{ "pex3", NULL, 8 },
++	{ "pex00", NULL, 5 },
++	{ "pex01", NULL, 6 },
++	{ "pex02", NULL, 7 },
++	{ "pex03", NULL, 8 },
++	{ "pex10", NULL, 9 },
++	{ "pex11", NULL, 10 },
++	{ "pex12", NULL, 11 },
++	{ "pex13", NULL, 12 },
+ 	{ "bp", NULL, 13 },
+ 	{ "sata0lnk", NULL, 14 },
+ 	{ "sata0", "sata0lnk", 15 },
+@@ -152,6 +156,8 @@ static const struct mvebu_soc_descr __initconst armada_xp_gating_descr[] = {
+ 	{ "xor0", NULL, 22 },
+ 	{ "crypto", NULL, 23 },
+ 	{ "tdm", NULL, 25 },
++	{ "pex20", NULL, 26 },
++	{ "pex30", NULL, 27 },
+ 	{ "xor1", NULL, 28 },
+ 	{ "sata1lnk", NULL, 29 },
+ 	{ "sata1", "sata1lnk", 30 },
 -- 
 1.7.9.5
