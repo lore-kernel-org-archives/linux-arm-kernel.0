@@ -1,54 +1,39 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 8 Mar 2013 12:08:12 -0800
-Subject: [PATCH 03/10] ARM: smp_twd: Divorce smp_twd from local timer API
-In-Reply-To: <513A40EF.8050403@codeaurora.org>
-References: <1362614646-24113-1-git-send-email-sboyd@codeaurora.org>
- <1362614646-24113-4-git-send-email-sboyd@codeaurora.org>
- <20130308004011.GD11806@atomide.com>
- <51393B59.3070200@codeaurora.org>
- <20130308180730.GE11806@atomide.com>
- <513A2B20.30805@codeaurora.org>
- <20130308194802.GG11806@atomide.com>
- <513A40EF.8050403@codeaurora.org>
-Message-ID: <20130308200811.GJ11806@atomide.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Fri, 8 Mar 2013 21:13:40 +0100
+Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
+In-Reply-To: <20130308200245.GC29435@obsidianresearch.com>
+References: <20130307174955.GC20840@obsidianresearch.com>
+ <20130307194830.GA1811@avionic-0098.mockup.avionic-design.de>
+ <20130307200235.GB20695@obsidianresearch.com>
+ <20130307204726.GB1811@avionic-0098.mockup.avionic-design.de>
+ <51392B4D.9040404@gmail.com>
+ <20130308071443.GA5772@avionic-0098.mockup.avionic-design.de>
+ <20130308165228.GB4094@obsidianresearch.com>
+ <20130308191227.GA6551@avionic-0098.mockup.avionic-design.de>
+ <513A3F4F.2090501@firmworks.com>
+ <20130308200245.GC29435@obsidianresearch.com>
+Message-ID: <20130308201339.GA26322@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stephen Boyd <sboyd@codeaurora.org> [130308 11:54]:
-> On 03/08/13 11:48, Tony Lindgren wrote:
-> > * Stephen Boyd <sboyd@codeaurora.org> [130308 10:21]:
-> >>
-> >> diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-> >> index 081de6f..4ea3e9d 100644
-> >> --- a/arch/arm/kernel/smp_twd.c
-> >> +++ b/arch/arm/kernel/smp_twd.c
-> >> @@ -227,7 +227,7 @@ static void __cpuinit twd_calibrate_rate(void)
-> >>  
-> >>  static irqreturn_t twd_handler(int irq, void *dev_id)
-> >>  {
-> >> -       struct clock_event_device *evt = *(struct clock_event_device **)dev_id;
-> >> +       struct clock_event_device *evt = dev_id;
-> >>  
-> >>         if (twd_timer_ack()) {
-> >>                 evt->event_handler(evt);
-> >>
-> > Yup thanks that fixes it, both fixes are needed. So for this patch + the
-> > two fixes please feel free to add:
-> >
-> > Acked-by: Tony Lindgren <tony@atomide.com>
+On Fri, Mar 08, 2013 at 01:02:46PM -0700, Jason Gunthorpe wrote:
+> On Fri, Mar 08, 2013 at 09:43:11AM -1000, Mitch Bradley wrote:
+[...]
+> > 2) The "@0,0" and "@1,0" suffixes do not correspond to the reg values
+> > <0x0800 0 0 0 0> and <0x1000 0 0 0 0> using any rule that I know.
 > 
-> Great. Thanks for testing.
+> @0,1,0 (bus,device,fn) could be more appropriate, but that is
+> cosmetic?
 
-Hmm noticed one more thing: vexpress no longer boots in qemu for
-me after applying this. Sorry did not get any debug_ll output, but
-maybe you can take a look at it. I tested with omap2plus_defconfig +
-linaro-qemu:
+The OF PCI specification is pretty strict about this as well. It says in
+section 2.2.1.3. that only the DD and DD,FF forms can appear in a device
+path.
 
-$ qemu-system-arm -machine vexpress-a9 -m 1024 -curses -net nic -net \
-user -serial stdio -append console=ttyAMA0,115200n8 rw \
-root=/dev/mmcblk0p2 rootwait physmap.enabled=0 -kernel zImage \
--initrd initrd.img -sd rootfs.img
-
-Regards,
-
-Tony
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130308/82f997bf/attachment.sig>
