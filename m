@@ -1,85 +1,109 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 8 Mar 2013 11:27:28 -0600
-Subject: [PATCH 4/9] ARM: dts: OMAP3: Add support for OMAP3430 SDP board
+Date: Fri, 8 Mar 2013 11:27:29 -0600
+Subject: [PATCH 5/9] ARM: dts: Add GPMC node for OMAP2, OMAP4 and OMAP5
 In-Reply-To: <1362763654-9660-1-git-send-email-jon-hunter@ti.com>
 References: <1362763654-9660-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <1362763654-9660-5-git-send-email-jon-hunter@ti.com>
+Message-ID: <1362763654-9660-6-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds basic device-tree support for OMAP3430 SDP board which has 256MB
-of RAM and uses the TWL4030 power management IC.
+Add the device-tree node for GPMC on OMAP2, OMAP4 and OMAP5 devices.
 
 Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 ---
- arch/arm/boot/dts/Makefile         |    1 +
- arch/arm/boot/dts/omap3430-sdp.dts |   46 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 47 insertions(+)
- create mode 100644 arch/arm/boot/dts/omap3430-sdp.dts
+ arch/arm/boot/dts/omap2420.dtsi |   11 +++++++++++
+ arch/arm/boot/dts/omap2430.dtsi |   11 +++++++++++
+ arch/arm/boot/dts/omap4.dtsi    |   11 +++++++++++
+ arch/arm/boot/dts/omap5.dtsi    |   11 +++++++++++
+ 4 files changed, 44 insertions(+)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 9c62558..89013ed 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -119,6 +119,7 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
- 	omap3-beagle-xm.dtb \
- 	omap3-evm.dtb \
- 	omap3-tobi.dtb \
-+	omap3430-sdp.dtb \
- 	omap4-panda.dtb \
- 	omap4-panda-a4.dtb \
- 	omap4-panda-es.dtb \
-diff --git a/arch/arm/boot/dts/omap3430-sdp.dts b/arch/arm/boot/dts/omap3430-sdp.dts
-new file mode 100644
-index 0000000..be0650d
---- /dev/null
-+++ b/arch/arm/boot/dts/omap3430-sdp.dts
-@@ -0,0 +1,46 @@
-+/*
-+ * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+/dts-v1/;
+diff --git a/arch/arm/boot/dts/omap2420.dtsi b/arch/arm/boot/dts/omap2420.dtsi
+index af65609..d4ce6c2 100644
+--- a/arch/arm/boot/dts/omap2420.dtsi
++++ b/arch/arm/boot/dts/omap2420.dtsi
+@@ -29,6 +29,17 @@
+ 			pinctrl-single,function-mask = <0x3f>;
+ 		};
+ 
++		gpmc: gpmc at 6800a000 {
++			compatible = "ti,omap2420-gpmc";
++			reg = <0x6800a000 0x1000>;
++			#address-cells = <2>;
++			#size-cells = <1>;
++			interrupts = <20>;
++			gpmc,num-cs = <8>;
++			gpmc,num-waitpins = <4>;
++			ti,hwmods = "gpmc";
++		};
 +
-+/include/ "omap3.dtsi"
+ 		mcbsp1: mcbsp at 48074000 {
+ 			compatible = "ti,omap2420-mcbsp";
+ 			reg = <0x48074000 0xff>;
+diff --git a/arch/arm/boot/dts/omap2430.dtsi b/arch/arm/boot/dts/omap2430.dtsi
+index c392445..832f184 100644
+--- a/arch/arm/boot/dts/omap2430.dtsi
++++ b/arch/arm/boot/dts/omap2430.dtsi
+@@ -29,6 +29,17 @@
+ 			pinctrl-single,function-mask = <0x3f>;
+ 		};
+ 
++		gpmc: gpmc at 6e000000 {
++			compatible = "ti,omap2430-gpmc";
++			reg = <0x6e000000 0x1000>;
++			#address-cells = <2>;
++			#size-cells = <1>;
++			interrupts = <20>;
++			gpmc,num-cs = <8>;
++			gpmc,num-waitpins = <4>;
++			ti,hwmods = "gpmc";
++		};
 +
-+/ {
-+	model = "TI OMAP3430 SDP";
-+	compatible = "ti,omap3430-sdp", "ti,omap3";
+ 		mcbsp1: mcbsp at 48074000 {
+ 			compatible = "ti,omap2430-mcbsp";
+ 			reg = <0x48074000 0xff>;
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index 827f6f3..726ef11 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -196,6 +196,17 @@
+ 			#interrupt-cells = <1>;
+ 		};
+ 
++		gpmc: gpmc at 50000000 {
++			compatible = "ti,omap4430-gpmc";
++			reg = <0x50000000 0x1000>;
++			#address-cells = <2>;
++			#size-cells = <1>;
++			interrupts = <0 20 0x4>;
++			gpmc,num-cs = <8>;
++			gpmc,num-waitpins = <4>;
++			ti,hwmods = "gpmc";
++		};
 +
-+	memory {
-+		device_type = "memory";
-+		reg = <0x80000000 0x10000000>; /* 256 MB */
-+	};
-+};
+ 		uart1: serial at 4806a000 {
+ 			compatible = "ti,omap4-uart";
+ 			reg = <0x4806a000 0x100>;
+diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+index 06d21d6..34f41ad 100644
+--- a/arch/arm/boot/dts/omap5.dtsi
++++ b/arch/arm/boot/dts/omap5.dtsi
+@@ -208,6 +208,17 @@
+ 			#interrupt-cells = <1>;
+ 		};
+ 
++		gpmc: gpmc at 50000000 {
++			compatible = "ti,omap4430-gpmc";
++			reg = <0x50000000 0x1000>;
++			#address-cells = <2>;
++			#size-cells = <1>;
++			interrupts = <0 20 0x4>;
++			gpmc,num-cs = <8>;
++			gpmc,num-waitpins = <4>;
++			ti,hwmods = "gpmc";
++		};
 +
-+&i2c1 {
-+	clock-frequency = <2600000>;
-+
-+	twl: twl at 48 {
-+		reg = <0x48>;
-+		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
-+		interrupt-parent = <&intc>;
-+	};
-+};
-+
-+/include/ "twl4030.dtsi"
-+
-+&mmc1 {
-+	vmmc-supply = <&vmmc1>;
-+	vmmc_aux-supply = <&vsim>;
-+	bus-width = <8>;
-+};
-+
-+&mmc2 {
-+	status = "disabled";
-+};
-+
-+&mmc3 {
-+	status = "disabled";
-+};
+ 		i2c1: i2c at 48070000 {
+ 			compatible = "ti,omap4-i2c";
+ 			reg = <0x48070000 0x100>;
 -- 
 1.7.10.4
