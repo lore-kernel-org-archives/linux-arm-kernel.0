@@ -1,35 +1,44 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 8 Mar 2013 17:03:49 +0100 (CET)
-Subject: [PATCH 3/4][V2] ARM: nomadik: add dynamic irq flag to the
- timer
-In-Reply-To: <513A0109.9060801@linaro.org>
-References: <1362219013-18173-1-git-send-email-daniel.lezcano@linaro.org>
- <513A0109.9060801@linaro.org>
-Message-ID: <alpine.LFD.2.02.1303081703160.22263@ionos>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Fri, 08 Mar 2013 17:05:58 +0100
+Subject: [PATCH 3/4] USB mxs-phy: use readl(), writel() instead of the
+ _relaxed() versions
+In-Reply-To: <87sj4gwuhi.fsf@ashishki-desk.ger.corp.intel.com>
+References: <1362048751-4061-1-git-send-email-mkl@pengutronix.de>
+ <1362048751-4061-4-git-send-email-mkl@pengutronix.de>
+ <87sj4gwuhi.fsf@ashishki-desk.ger.corp.intel.com>
+Message-ID: <513A0C66.8080307@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 8 Mar 2013, Daniel Lezcano wrote:
-
-> > Add the dynamic irq affinity feature to the timer clock device.
-> > 
-> > Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> > Reviewed-by: Vincent Guittot <vincent.guittot@linaro.org>
-> > Acked-by: Rickard Andersson <rickard.andersson@stericsson.com>
-> > ---
+On 02/28/2013 12:25 PM, Alexander Shishkin wrote:
+> Marc Kleine-Budde <mkl@pengutronix.de> writes:
 > 
-> Hi Linus,
+>> This patch converts the mxs-phy driver from readl_relaxed(), writel_relaxed()
+>> to the plain readl(), writel() functions, which are available on all platforms.
+>> This is done to enable compile time testing on non ARM platforms.
+>>
+>> Reported-by: Alexander Shishkin <alexander.shishkin@linux.intel.com>
 > 
-> AFAIU, you are ok with this patch, Rickard acked it and Vincent reviewed it.
-> 
-> Thomas agreed to merge it into its tree as I requested because we will
-> need to wait for your tree to gain visibility to this new flag before
-> submitting this patch, which can take awhile.
-> 
-> Could you please ack it if it is ok for you ?
+> I think it was Felipe who reported this actually.
 
-I can provide a for-arm tree to pull as well. Either way fine with me.
+Fixed. I'm about to repost this series with crediting Felipe as reporter.
 
-Thanks,
+Which tree would you like to be this series based on? It depends on the
+"USB otg: use try_module_get in all usb_get_phy functions and add
+missing module_put" patch which is part of your usb/fixes branch, but
+not in usb/next yet.
 
-	tglx
+Marc
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130308/94a68d9d/attachment-0001.sig>
