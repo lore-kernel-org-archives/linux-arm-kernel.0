@@ -1,89 +1,65 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 8 Mar 2013 09:28:34 +0800
-Subject: [PATCH v11 4/9] usb: chipidea: udc: add pullup/pulldown dp at
- hw_device_state
-In-Reply-To: <20130307095054.GK9171@arwen.pp.htv.fi>
-References: <1362563800-16673-1-git-send-email-peter.chen@freescale.com>
- <1362563800-16673-5-git-send-email-peter.chen@freescale.com>
- <20130306112633.GS28587@arwen.pp.htv.fi>
- <20130307023612.GC20470@nchen-desktop>
- <20130307095054.GK9171@arwen.pp.htv.fi>
-Message-ID: <20130308012833.GA16076@nchen-desktop>
+From: simon.jeons@gmail.com (Simon Jeons)
+Date: Fri, 08 Mar 2013 10:13:25 +0800
+Subject: [PATCH] mm: Fixup the condition whether the page cache is free
+In-Reply-To: <5137E7F4.1060509@gmail.com>
+References: <CAFNq8R7tq9kvD9LyhZJ-Cj0kexQfDsPhB4iQYyZ9s9+8Jo82QA@mail.gmail.com>
+ <20130304150937.GB23767@cmpxchg.org> <51369637.6030705@gmail.com>
+ <20130306194703.GA1953@cmpxchg.org> <5137E7F4.1060509@gmail.com>
+Message-ID: <51394945.4070803@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 07, 2013 at 11:50:54AM +0200, Felipe Balbi wrote:
-> Hi,
-> 
-> On Thu, Mar 07, 2013 at 10:36:13AM +0800, Peter Chen wrote:
-> > > > diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
-> > > > index e82dae4..70f9f2d 100644
-> > > > --- a/drivers/usb/chipidea/udc.c
-> > > > +++ b/drivers/usb/chipidea/udc.c
-> > > > @@ -91,8 +91,10 @@ static int hw_device_state(struct ci13xxx *ci, u32 dma)
-> > > >  		/* interrupt, error, port change, reset, sleep/suspend */
-> > > >  		hw_write(ci, OP_USBINTR, ~0,
-> > > >  			     USBi_UI|USBi_UEI|USBi_PCI|USBi_URI|USBi_SLI);
-> > > > +		hw_write(ci, OP_USBCMD, USBCMD_RS, USBCMD_RS);
-> > > >  	} else {
-> > > >  		hw_write(ci, OP_USBINTR, ~0, 0);
-> > > > +		hw_write(ci, OP_USBCMD, USBCMD_RS, 0);
-> > > 
-> > > this patch doesn't make sense to me. What will happen is that you will
-> > > be enabling pullups when vbus_session() gets called and this might not
-> > > be what gadget driver wants.
-> > > 
-> > > You don't want to fiddle with that yourself since I'm changing the
-> > > framework so that gadget driver will always request pullups to be
-> > > enabled.
-> > 
-> > Hi Felipe,
-> > 
-> > Do you think pullup dp without vbus is a valid operation?
-> 
-> why not ? What I want to connect pullups first and only then issue SRP ?
-
-I am not familiar with OTG, but it only stands for special case, right?
-
-> 
-> > Current udc core code makes that possible.
-> 
-> so ?
-
-Without vbus, but pullup dp, it will cause more power.
-
-> 
-> > But I think current your udc core code (add pullup after loading
-> > gadget) make benefit for udc driver who has not vbus operation.
-> > 
-> > For chipidea driver:
-> > 
-> > - If vbus is there before load gadget module, the pullup dp is done by
-> > udc core code.
-> > - If vbus is not there before load gadget module, the pullup will be
-> > done when the vbus is there.
-> 
-> This isn't legal. If you want to make sure vbus is alive before
-> connecting pullups, then do it generically. Modify udc-core.c to make
-> those checks for you. Bypassing the framework is dangerous because
-> whenever I wanna change something, I might miss your private details and
-> end up causing regressions.
-
-Let thing be generic is a good idea. Then, is it ok I post a patch let
-udc manage pullup by itself (through a flag) just you did for uvc?
-UDC core doesn't know VBUS, so the pullup can't be managed by udc core
-totally.
-
-Besides, I looked four udc drivers (fsl_udc_core.c, at91_udc.c, mv_udc_core.c
-and bcm63xx_udc.c), the first three manage pullup by itself, ony
-bcm doesn't control it by itself.
-
-> -- 
-> balbi
-
-
-
--- 
-
-Best Regards,
-Peter Chen
+Ping, :-)
+On 03/07/2013 09:05 AM, Simon Jeons wrote:
+> Hi Johannes,
+> On 03/07/2013 03:47 AM, Johannes Weiner wrote:
+>> On Wed, Mar 06, 2013 at 09:04:55AM +0800, Simon Jeons wrote:
+>>> Hi Johannes,
+>>> On 03/04/2013 11:09 PM, Johannes Weiner wrote:
+>>>> On Mon, Mar 04, 2013 at 09:54:26AM +0800, Li Haifeng wrote:
+>>>>> When a page cache is to reclaim, we should to decide whether the page
+>>>>> cache is free.
+>>>>> IMO, the condition whether a page cache is free should be 3 in page
+>>>>> frame reclaiming. The reason lists as below.
+>>>>>
+>>>>> When page is allocated, the page->_count is 1(code fragment is 
+>>>>> code-1 ).
+>>>>> And when the page is allocated for reading files from extern disk, 
+>>>>> the
+>>>>> page->_count will increment 1 by page_cache_get() in
+>>>>> add_to_page_cache_locked()(code fragment is code-2). When the page 
+>>>>> is to
+>>>>> reclaim, the isolated LRU list also increase the page->_count(code
+>>>>> fragment is code-3).
+>>>> The page count is initialized to 1, but that does not stay with the
+>>>> object.  It's a reference that is passed to the allocating task, which
+>>>> drops it again when it's done with the page.  I.e. the pattern is like
+>>>> this:
+>>>>
+>>>> instantiation:
+>>>> page = page_cache_alloc()    /* instantiator reference -> 1 */
+>>>> add_to_page_cache(page, mapping, offset)
+>>>>    get_page(page)        /* page cache reference -> 2 */
+>>>> lru_cache_add(page)
+>>>>    get_page(page)        /* pagevec reference -> 3 */
+>>>> /* ...initiate read, write, associate buffers, ... */
+>>>> page_cache_release(page)    /* drop instantiator reference -> 2 + 
+>>>> private */
+>>>>
+>>>> reclaim:
+>>>> lru_add_drain()
+>>>>    page_cache_release(page)    /* drop pagevec reference -> 1 + 
+>>>> private */
+>>> IIUC, when add page to lru will lead to add to pagevec firstly, and
+>>> pagevec will take one reference, so if lru will take over the
+>>> reference taken by pagevec when page transmit from pagevec to lru?
+>>> or just drop the reference and lru will not take reference for page?
+>> The LRU does not hold a reference, it would not make sense.  The
+>> pagevec only needs one because it would be awkward to remove a
+>> concurrently freed page out of a pagevec, but unlinking a page from
+>> the LRU is easy.  See mm/swap.c::__page_cache_release() and friends.
+>
+> Since pagevec is per cpu, when can remove a concurrently freed page 
+> out of a pagevec happen?
+>
+>
