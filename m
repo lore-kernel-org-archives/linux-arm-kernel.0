@@ -1,39 +1,57 @@
-From: shijie8@gmail.com (Huang Shijie)
-Date: Fri, 8 Mar 2013 11:26:10 -0500
-Subject: [PATCH 07/12] mtd: gpmi: move to use generic DMA helper
-In-Reply-To: <1362748785.5101.4.camel@sauron.fi.intel.com>
-References: <1361978748-25281-1-git-send-email-shawn.guo@linaro.org>
- <1361978748-25281-8-git-send-email-shawn.guo@linaro.org>
- <1362748785.5101.4.camel@sauron.fi.intel.com>
-Message-ID: <CAMiH66EDjSAZLf-gtR-_kMasdKSKGRMrPThxtyw_RAixeNXHug@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 8 Mar 2013 18:28:07 +0200
+Subject: [PATCH 3/4] USB mxs-phy: use readl(), writel() instead of the
+ _relaxed() versions
+In-Reply-To: <513A0C66.8080307@pengutronix.de>
+References: <1362048751-4061-1-git-send-email-mkl@pengutronix.de>
+ <1362048751-4061-4-git-send-email-mkl@pengutronix.de>
+ <87sj4gwuhi.fsf@ashishki-desk.ger.corp.intel.com>
+ <513A0C66.8080307@pengutronix.de>
+Message-ID: <20130308162807.GD32368@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 8, 2013 at 8:19 AM, Artem Bityutskiy <dedekind1@gmail.com> wrote:
-> On Wed, 2013-02-27 at 23:25 +0800, Shawn Guo wrote:
->> With the generic DMA device tree helper supported by mxs-dma driver,
->> client devices only need to call dma_request_slave_channel() for
->> requesting a DMA channel from dmaengine.
->>
->> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
->> Cc: Artem Bityutskiy <dedekind1@gmail.com>
->> Cc: linux-mtd at lists.infradead.org
->
-> It looks like this ne is rather independent and can go via the MTD tree.
-> So pushed this one to l2-mtd.git - let me know if I am confused. Thanks!
-I suggest do not apply this patch. the whole patch set is still under
-review now.
+Hi,
 
-Best Regards
-Huang Shijie
+On Fri, Mar 08, 2013 at 05:05:58PM +0100, Marc Kleine-Budde wrote:
+> On 02/28/2013 12:25 PM, Alexander Shishkin wrote:
+> > Marc Kleine-Budde <mkl@pengutronix.de> writes:
+> > 
+> >> This patch converts the mxs-phy driver from readl_relaxed(), writel_relaxed()
+> >> to the plain readl(), writel() functions, which are available on all platforms.
+> >> This is done to enable compile time testing on non ARM platforms.
+> >>
+> >> Reported-by: Alexander Shishkin <alexander.shishkin@linux.intel.com>
+> > 
+> > I think it was Felipe who reported this actually.
+> 
+> Fixed. I'm about to repost this series with crediting Felipe as reporter.
+> 
+> Which tree would you like to be this series based on? It depends on the
+> "USB otg: use try_module_get in all usb_get_phy functions and add
+> missing module_put" patch which is part of your usb/fixes branch, but
+> not in usb/next yet.
 
->
-> --
-> Best Regards,
-> Artem Bityutskiy
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+look at my testing branch. I have them all already. You didn't get an
+email yet because I'm waiting for -rc2 to be tagged.
+
+I have fixed the Reported-by tag, no issues there.
+
+Anyway, as soon as v3.9-rc2 is tagged, I will rebase testing on top of
+that and move all patches to 'next', then everything will be stable from
+that point on.
+
+If you want to have changes to any of the patches, now is the time,
+after I move patches to 'next' the tree becomes immutable.
+
+cheers
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130308/a67b5949/attachment-0001.sig>
