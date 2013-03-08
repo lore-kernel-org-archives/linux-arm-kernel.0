@@ -1,96 +1,143 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 8 Mar 2013 10:58:21 -0600
-Subject: [PATCH V2 00/17] ARM: OMAP2+: GPMC clean-up and DT update
-Message-ID: <1362761918-8696-1-git-send-email-jon-hunter@ti.com>
+Date: Fri, 8 Mar 2013 10:58:26 -0600
+Subject: [PATCH V2 05/17] ARM: OMAP2+: Convert ONENAND to use
+ gpmc_cs_program_settings()
+In-Reply-To: <1362761918-8696-1-git-send-email-jon-hunter@ti.com>
+References: <1362761918-8696-1-git-send-email-jon-hunter@ti.com>
+Message-ID: <1362761918-8696-6-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While adding device-tree support for NOR memories, it became apparent
-that there is no common way for configuring various GPMC settings for
-devices that interface to the GPMC. These settings include bus-width,
-synchronous/asynchronous mode, burst settings, wait monitoring etc.
-Therefore, to simplify the GPMC code and add device-tree support for
-NOR, it was first necessary to consolidate how these settings are
-programmed.
+Convert the OMAP2+ ONENAND code to use the gpmc_cs_program_settings()
+function for configuring the various GPMC options instead of directly
+programming the CONFIG1 register.
 
-Series based upon Mark Jackson's patch [1] and Ezequiel Garcia GPMC
-clean-up series [2]. Entire series available here [3].
+Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+---
+ arch/arm/mach-omap2/gpmc-onenand.c |   61 +++++++++++++++---------------------
+ 1 file changed, 25 insertions(+), 36 deletions(-)
 
-V2 changes:
-- Made gpmc_settings structure local in gpmc_nand_init().
-- Use resource_size() API in probe_nor().
-- Add kernel-doc for gpmc_cs_program_settings() function.
-- Use of_platform_device_create() to register NOR devices in probe_nor().
-- Add support for GPMC address-address-data multiplexing which required
-  changing GPMC DT property "gpmc,mux-add-data" to store a 32-bit value
-  and changing mux_add_data member of gpmc_settings to be a 32-bit type
-  instead of bool.
-- Add detection for incorrect GPMC chip-select base addresses.
-- Cleaned-up code in gpmc_mem_init() and changed gpmc_mem_init() so that
-  it would not return an error when the GPMC driver is being probed.
-
-V1 changes:
-- Clean-up/simplification of ONENAND initialisation code.
-- Add a new GPMC structure to unify storage of various GPMC settings
-  (that are non-timing related) for client devices and add a new
-  function to program these settings in a common way.
-- Migrate initialisation code for existing flash, usb and networking
-  devices to use the new structure and function for GPMC settings.
-- Add device-tree support for NOR flash memories.
-- Add additional GPMC timing parameters to GPMC device-tree binding.
-- Update GPMC NAND and ONENAND device-tree support to retrieve GPMC
-  settings from device-tree.
-
-Testing includes:
-- Boot testing on OMAP2420 H4, OMAP3430 SDP and OMAP4430 SDP with
-  and without device-tree present.
-- OMAP2420 H4 board has NOR flash and OMAP3430 SDP has NOR, NAND
-  and ONENAND flash. So verified that flash is detected on boot
-  as expected. Note additional patches [4] are required for OMAP2420
-  H4 and OMAP3430 SDP dts files in order to enable flash memory
-  support.
-- All of the above boards use GPMC for interfacing to a networking
-  chip and so verified that networking is working wit this series.
-  However, please note that networking is not currently supported
-  on these boards when booting with DT and so networking is only
-  tested without DT.
-
-[1] http://permalink.gmane.org/gmane.linux.ports.arm.omap/94765
-[2] http://comments.gmane.org/gmane.linux.ports.arm.omap/93784
-[3] https://github.com/jonhunter/linux/tree/omap-gpmc-for-v3.10
-[4] https://github.com/jonhunter/linux/tree/omap-dt-for-v3.10
-
-Jon Hunter (17):
-  ARM: OMAP2+: Simplify code configuring ONENAND devices
-  ARM: OMAP2+: Add variable to store number of GPMC waitpins
-  ARM: OMAP2+: Add structure for storing GPMC settings
-  ARM: OMAP2+: Add function for configuring GPMC settings
-  ARM: OMAP2+: Convert ONENAND to use gpmc_cs_program_settings()
-  ARM: OMAP2+: Convert NAND to use gpmc_cs_program_settings()
-  ARM: OMAP2+: Convert SMC91x to use gpmc_cs_program_settings()
-  ARM: OMAP2+: Convert TUSB to use gpmc_cs_program_settings()
-  ARM: OMAP2+: Don't configure of chip-select options in
-    gpmc_cs_configure()
-  ARM: OMAP2+: Add function to read GPMC settings from device-tree
-  ARM: OMAP2+: Add device-tree support for NOR flash
-  ARM: OMAP2+: Add additional GPMC timing parameters
-  ARM: OMAP2+: Convert NAND to retrieve GPMC settings from DT
-  ARM: OMAP2+: Convert ONENAND to retrieve GPMC settings from DT
-  ARM: OMAP2+: Detect incorrectly aligned GPMC base address
-  ARM: OMAP2+: Remove unnecesssary GPMC definitions and variable
-  ARM: OMAP2+: Allow GPMC probe to complete even if CS mapping fails
-
- Documentation/devicetree/bindings/bus/ti-gpmc.txt  |   48 +-
- Documentation/devicetree/bindings/mtd/gpmc-nor.txt |   98 ++++
- .../devicetree/bindings/mtd/gpmc-onenand.txt       |    3 +
- arch/arm/mach-omap2/gpmc-nand.c                    |   37 +-
- arch/arm/mach-omap2/gpmc-onenand.c                 |  110 ++---
- arch/arm/mach-omap2/gpmc-smc91x.c                  |   30 +-
- arch/arm/mach-omap2/gpmc.c                         |  521 +++++++++++++++-----
- arch/arm/mach-omap2/gpmc.h                         |   37 +-
- arch/arm/mach-omap2/usb-tusb6010.c                 |   62 ++-
- 9 files changed, 686 insertions(+), 260 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mtd/gpmc-nor.txt
-
+diff --git a/arch/arm/mach-omap2/gpmc-onenand.c b/arch/arm/mach-omap2/gpmc-onenand.c
+index 261eed1..aa3f53e 100644
+--- a/arch/arm/mach-omap2/gpmc-onenand.c
++++ b/arch/arm/mach-omap2/gpmc-onenand.c
+@@ -48,18 +48,22 @@ static struct platform_device gpmc_onenand_device = {
+ };
+ 
+ static struct gpmc_settings onenand_async = {
++	.device_width	= GPMC_DEVWIDTH_16BIT,
+ 	.mux_add_data	= GPMC_MUX_AD,
+ };
+ 
+ static struct gpmc_settings onenand_sync = {
+ 	.burst_read	= true,
++	.burst_wrap	= true,
++	.burst_len	= GPMC_BURST_16,
++	.device_width	= GPMC_DEVWIDTH_16BIT,
+ 	.mux_add_data	= GPMC_MUX_AD,
++	.wait_pin	= 0,
+ };
+ 
+ static void omap2_onenand_calc_async_timings(struct gpmc_timings *t)
+ {
+ 	struct gpmc_device_timings dev_t;
+-
+ 	const int t_cer = 15;
+ 	const int t_avdp = 12;
+ 	const int t_aavdh = 7;
+@@ -86,16 +90,6 @@ static void omap2_onenand_calc_async_timings(struct gpmc_timings *t)
+ 	gpmc_calc_timings(t, &onenand_async, &dev_t);
+ }
+ 
+-static int gpmc_set_async_mode(int cs, struct gpmc_timings *t)
+-{
+-	/* Configure GPMC for asynchronous read */
+-	gpmc_cs_write_reg(cs, GPMC_CS_CONFIG1,
+-			  GPMC_CONFIG1_DEVICESIZE_16 |
+-			  GPMC_CONFIG1_MUXADDDATA);
+-
+-	return gpmc_cs_set_timings(cs, t);
+-}
+-
+ static void omap2_onenand_set_async_mode(void __iomem *onenand_base)
+ {
+ 	u32 reg;
+@@ -243,8 +237,11 @@ static void omap2_onenand_calc_sync_timings(struct gpmc_timings *t,
+ 	/* Set synchronous read timings */
+ 	memset(&dev_t, 0, sizeof(dev_t));
+ 
++	if (onenand_flags & ONENAND_FLAG_SYNCREAD)
++		onenand_sync.sync_read = true;
+ 	if (onenand_flags & ONENAND_FLAG_SYNCWRITE) {
+ 		onenand_sync.sync_write = true;
++		onenand_sync.burst_write = true;
+ 	} else {
+ 		dev_t.t_avdp_w = max(t_avdp, t_cer) * 1000;
+ 		dev_t.t_wpl = t_wpl * 1000;
+@@ -270,29 +267,6 @@ static void omap2_onenand_calc_sync_timings(struct gpmc_timings *t,
+ 	gpmc_calc_timings(t, &onenand_sync, &dev_t);
+ }
+ 
+-static int gpmc_set_sync_mode(int cs, struct gpmc_timings *t)
+-{
+-	unsigned sync_read = onenand_flags & ONENAND_FLAG_SYNCREAD;
+-	unsigned sync_write = onenand_flags & ONENAND_FLAG_SYNCWRITE;
+-
+-	/* Configure GPMC for synchronous read */
+-	gpmc_cs_write_reg(cs, GPMC_CS_CONFIG1,
+-			  GPMC_CONFIG1_WRAPBURST_SUPP |
+-			  GPMC_CONFIG1_READMULTIPLE_SUPP |
+-			  (sync_read ? GPMC_CONFIG1_READTYPE_SYNC : 0) |
+-			  (sync_write ? GPMC_CONFIG1_WRITEMULTIPLE_SUPP : 0) |
+-			  (sync_write ? GPMC_CONFIG1_WRITETYPE_SYNC : 0) |
+-			  GPMC_CONFIG1_PAGE_LEN(2) |
+-			  (cpu_is_omap34xx() ? 0 :
+-				(GPMC_CONFIG1_WAIT_READ_MON |
+-				 GPMC_CONFIG1_WAIT_PIN_SEL(0))) |
+-			  GPMC_CONFIG1_DEVICESIZE_16 |
+-			  GPMC_CONFIG1_DEVICETYPE_NOR |
+-			  GPMC_CONFIG1_MUXADDDATA);
+-
+-	return gpmc_cs_set_timings(cs, t);
+-}
+-
+ static int omap2_onenand_setup_async(void __iomem *onenand_base)
+ {
+ 	struct gpmc_timings t;
+@@ -302,7 +276,11 @@ static int omap2_onenand_setup_async(void __iomem *onenand_base)
+ 
+ 	omap2_onenand_calc_async_timings(&t);
+ 
+-	ret = gpmc_set_async_mode(gpmc_onenand_data->cs, &t);
++	ret = gpmc_cs_program_settings(gpmc_onenand_data->cs, &onenand_async);
++	if (IS_ERR_VALUE(ret))
++		return ret;
++
++	ret = gpmc_cs_set_timings(gpmc_onenand_data->cs, &t);
+ 	if (IS_ERR_VALUE(ret))
+ 		return ret;
+ 
+@@ -322,9 +300,20 @@ static int omap2_onenand_setup_sync(void __iomem *onenand_base, int *freq_ptr)
+ 		set_onenand_cfg(onenand_base);
+ 	}
+ 
++	/*
++	 * FIXME: Appears to be legacy code from initial ONENAND commit.
++	 * Unclear what boards this is for and if this can be removed.
++	 */
++	if (!cpu_is_omap34xx())
++		onenand_sync.wait_on_read = true;
++
+ 	omap2_onenand_calc_sync_timings(&t, gpmc_onenand_data->flags, freq);
+ 
+-	ret = gpmc_set_sync_mode(gpmc_onenand_data->cs, &t);
++	ret = gpmc_cs_program_settings(gpmc_onenand_data->cs, &onenand_sync);
++	if (IS_ERR_VALUE(ret))
++		return ret;
++
++	ret = gpmc_cs_set_timings(gpmc_onenand_data->cs, &t);
+ 	if (IS_ERR_VALUE(ret))
+ 		return ret;
+ 
 -- 
 1.7.10.4
