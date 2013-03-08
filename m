@@ -1,98 +1,121 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 8 Mar 2013 11:27:26 -0600
-Subject: [PATCH 2/9] ARM: dts: OMAP2+: Add PMU nodes
+Date: Fri, 8 Mar 2013 11:27:30 -0600
+Subject: [PATCH 6/9] ARM: dts: Add OMAP3430 SDP flash memory bindings
 In-Reply-To: <1362763654-9660-1-git-send-email-jon-hunter@ti.com>
 References: <1362763654-9660-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <1362763654-9660-3-git-send-email-jon-hunter@ti.com>
+Message-ID: <1362763654-9660-7-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add PMU nodes for OMAP2, OMAP3 and OMAP4460 devices.
-
-Please note that the node for OMAP4460 has been placed in a separate
-header file for OMAP4460, because the node is not compatible with
-OMAP4430. The node for OMAP4430 is not included because PMU is not
-currently supported on OMAP4430 due to the absence of a cross-trigger
-interface driver.
+Add the device-tree nodes for the 128MB ONENAND flash and 256MB NAND
+flash memories found on the OMAP3430 SDP board.
 
 Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 ---
- arch/arm/boot/dts/omap2.dtsi         |    5 +++++
- arch/arm/boot/dts/omap3.dtsi         |    6 ++++++
- arch/arm/boot/dts/omap4-panda-es.dts |    2 ++
- arch/arm/boot/dts/omap4460.dtsi      |   18 ++++++++++++++++++
- 4 files changed, 31 insertions(+)
- create mode 100644 arch/arm/boot/dts/omap4460.dtsi
+ arch/arm/boot/dts/omap3430-sdp.dts |   95 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 95 insertions(+)
 
-diff --git a/arch/arm/boot/dts/omap2.dtsi b/arch/arm/boot/dts/omap2.dtsi
-index 761c4b6..27f5ea1 100644
---- a/arch/arm/boot/dts/omap2.dtsi
-+++ b/arch/arm/boot/dts/omap2.dtsi
-@@ -26,6 +26,11 @@
- 		};
- 	};
- 
-+	pmu {
-+		compatible = "arm,arm1136-pmu";
-+		interrupts = <3>;
+diff --git a/arch/arm/boot/dts/omap3430-sdp.dts b/arch/arm/boot/dts/omap3430-sdp.dts
+index be0650d..c313762 100644
+--- a/arch/arm/boot/dts/omap3430-sdp.dts
++++ b/arch/arm/boot/dts/omap3430-sdp.dts
+@@ -44,3 +44,98 @@
+ &mmc3 {
+ 	status = "disabled";
+ };
++
++&gpmc {
++	ranges = <1 0 0x28000000 0x08000000>,
++		 <2 0 0x20000000 0x10000000>;
++
++	nand at 1,0 {
++		linux,mtd-name= "micron,mt29f1g08abb";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		reg = <1 0 0x08000000>;
++		nand-bus-width = <8>;
++
++		gpmc,device_nand;
++		gpmc,cs-on = <0>;
++		gpmc,cs-rd-off = <36>;
++		gpmc,cs-wr-off = <36>;
++		gpmc,adv-on = <6>;
++		gpmc,adv-rd-off = <24>;
++		gpmc,adv-wr-off = <36>;
++		gpmc,oe-on = <6>;
++		gpmc,oe-off = <48>;
++		gpmc,we-on = <6>;
++		gpmc,we-off = <30>;
++		gpmc,rd-cycle = <72>;
++		gpmc,wr-cycle = <72>;
++		gpmc,access = <54>;
++		gpmc,wr-access = <30>;
++
++		partition at 0 {
++			label = "xloader-nand";
++			reg = <0 0x80000>;
++		};
++		partition at 0x80000 {
++			label = "bootloader-nand";
++			reg = <0x80000 0x140000>;
++		};
++		partition at 0x1c0000 {
++			label = "params-nand";
++			reg = <0x1c0000 0xc0000>;
++		};
++		partition at 0x280000 {
++			label = "kernel-nand";
++			reg = <0x280000 0x500000>;
++		};
++		partition at 0x780000 {
++			label = "filesystem-nand";
++			reg = <0x780000 0x7880000>;
++		};
 +	};
 +
- 	soc {
- 		compatible = "ti,omap-infra";
- 		mpu {
-diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-index 9f36531..2ddae38 100644
---- a/arch/arm/boot/dts/omap3.dtsi
-+++ b/arch/arm/boot/dts/omap3.dtsi
-@@ -26,6 +26,12 @@
- 		};
- 	};
- 
-+	pmu {
-+		compatible = "arm,cortex-a8-pmu";
-+		interrupts = <3>;
-+		ti,hwmods = "debugss";
-+	};
++	onenand at 2,0 {
++		linux,mtd-name= "samsung,kfm2g16q2m-deb8";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		reg = <2 0 0x10000000>;
 +
- 	/*
- 	 * The soc node represents the soc top level view. It is uses for IPs
- 	 * that are not memory mapped in the MPU view or for the MPU itself.
-diff --git a/arch/arm/boot/dts/omap4-panda-es.dts b/arch/arm/boot/dts/omap4-panda-es.dts
-index 73bc1a6..2a6e344 100644
---- a/arch/arm/boot/dts/omap4-panda-es.dts
-+++ b/arch/arm/boot/dts/omap4-panda-es.dts
-@@ -5,7 +5,9 @@
-  * it under the terms of the GNU General Public License version 2 as
-  * published by the Free Software Foundation.
-  */
++		gpmc,device-width = <2>;
++		gpmc,mux-add-data = <2>;
++		gpmc,cs-on = <0>;
++		gpmc,cs-rd-off = <84>;
++		gpmc,cs-wr-off = <72>;
++		gpmc,adv-on = <0>;
++		gpmc,adv-rd-off = <18>;
++		gpmc,adv-wr-off = <18>;
++		gpmc,oe-on = <30>;
++		gpmc,oe-off = <84>;
++		gpmc,we-on = <0>;
++		gpmc,we-off = <42>;
++		gpmc,rd-cycle = <108>;
++		gpmc,wr-cycle = <96>;
++		gpmc,access = <78>;
++		gpmc,wr-data-mux-bus = <30>;
 +
- /include/ "omap4-panda.dts"
-+/include/ "omap4460.dtsi"
- 
- /* Audio routing is differnet between PandaBoard4430 and PandaBoardES */
- &sound {
-diff --git a/arch/arm/boot/dts/omap4460.dtsi b/arch/arm/boot/dts/omap4460.dtsi
-new file mode 100644
-index 0000000..0a1d38b
---- /dev/null
-+++ b/arch/arm/boot/dts/omap4460.dtsi
-@@ -0,0 +1,18 @@
-+/*
-+ * Device Tree Source for OMAP4460 SoC
-+ *
-+ * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
-+
-+/ {
-+	pmu {
-+		compatible = "arm,cortex-a9-pmu";
-+		interrupts = <0 54 0x4>,
-+			     <0 55 0x4>;
-+		ti,hwmods = "debugss";
++		partition at 0 {
++			label = "xloader-onenand";
++			reg = <0 0x80000>;
++		};
++		partition at 0x80000 {
++			label = "bootloader-onenand";
++			reg = <0x80000 0x40000>;
++		};
++		partition at 0xc0000 {
++			label = "params-onenand";
++			reg = <0xc0000 0x20000>;
++		};
++		partition at 0xe0000 {
++			label = "kernel-onenand";
++			reg = <0xe0000 0x200000>;
++		};
++		partition at 0x2e0000 {
++			label = "filesystem-onenand";
++			reg = <0x2e0000 0xfd20000>;
++		};
 +	};
 +};
 -- 
