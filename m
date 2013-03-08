@@ -1,105 +1,36 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 8 Mar 2013 15:41:55 -0600
-Subject: [PATCH 5/9] ARM: dts: Add GPMC node for OMAP2, OMAP4 and OMAP5
-In-Reply-To: <CABxcv==OKX4z8x7ztqDJ5CozNmTQ5UaD43mTLWfQuqUt-y7xcQ@mail.gmail.com>
-References: <1362763654-9660-1-git-send-email-jon-hunter@ti.com>
- <1362763654-9660-6-git-send-email-jon-hunter@ti.com>
- <CABxcv==OKX4z8x7ztqDJ5CozNmTQ5UaD43mTLWfQuqUt-y7xcQ@mail.gmail.com>
-Message-ID: <513A5B23.5070302@ti.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 8 Mar 2013 16:50:22 -0500
+Subject: [PATCH] arm: mvebu: enable the USB ports on Armada 370
+ Reference Design board
+In-Reply-To: <1362477304-22143-1-git-send-email-florian@openwrt.org>
+References: <1362477304-22143-1-git-send-email-florian@openwrt.org>
+Message-ID: <20130308215022.GT23237@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 03/08/2013 02:25 PM, Javier Martinez Canillas wrote:
-> On Fri, Mar 8, 2013 at 6:27 PM, Jon Hunter <jon-hunter@ti.com> wrote:
->> Add the device-tree node for GPMC on OMAP2, OMAP4 and OMAP5 devices.
->>
->> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
->> ---
->>  arch/arm/boot/dts/omap2420.dtsi |   11 +++++++++++
->>  arch/arm/boot/dts/omap2430.dtsi |   11 +++++++++++
->>  arch/arm/boot/dts/omap4.dtsi    |   11 +++++++++++
->>  arch/arm/boot/dts/omap5.dtsi    |   11 +++++++++++
->>  4 files changed, 44 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/omap2420.dtsi b/arch/arm/boot/dts/omap2420.dtsi
->> index af65609..d4ce6c2 100644
->> --- a/arch/arm/boot/dts/omap2420.dtsi
->> +++ b/arch/arm/boot/dts/omap2420.dtsi
->> @@ -29,6 +29,17 @@
->>                         pinctrl-single,function-mask = <0x3f>;
->>                 };
->>
->> +               gpmc: gpmc at 6800a000 {
->> +                       compatible = "ti,omap2420-gpmc";
->> +                       reg = <0x6800a000 0x1000>;
->> +                       #address-cells = <2>;
->> +                       #size-cells = <1>;
->> +                       interrupts = <20>;
->> +                       gpmc,num-cs = <8>;
->> +                       gpmc,num-waitpins = <4>;
->> +                       ti,hwmods = "gpmc";
->> +               };
->> +
->>                 mcbsp1: mcbsp at 48074000 {
->>                         compatible = "ti,omap2420-mcbsp";
->>                         reg = <0x48074000 0xff>;
->> diff --git a/arch/arm/boot/dts/omap2430.dtsi b/arch/arm/boot/dts/omap2430.dtsi
->> index c392445..832f184 100644
->> --- a/arch/arm/boot/dts/omap2430.dtsi
->> +++ b/arch/arm/boot/dts/omap2430.dtsi
->> @@ -29,6 +29,17 @@
->>                         pinctrl-single,function-mask = <0x3f>;
->>                 };
->>
->> +               gpmc: gpmc at 6e000000 {
->> +                       compatible = "ti,omap2430-gpmc";
->> +                       reg = <0x6e000000 0x1000>;
->> +                       #address-cells = <2>;
->> +                       #size-cells = <1>;
->> +                       interrupts = <20>;
->> +                       gpmc,num-cs = <8>;
->> +                       gpmc,num-waitpins = <4>;
->> +                       ti,hwmods = "gpmc";
->> +               };
->> +
->>                 mcbsp1: mcbsp at 48074000 {
->>                         compatible = "ti,omap2430-mcbsp";
->>                         reg = <0x48074000 0xff>;
->> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
->> index 827f6f3..726ef11 100644
->> --- a/arch/arm/boot/dts/omap4.dtsi
->> +++ b/arch/arm/boot/dts/omap4.dtsi
->> @@ -196,6 +196,17 @@
->>                         #interrupt-cells = <1>;
->>                 };
->>
->> +               gpmc: gpmc at 50000000 {
->> +                       compatible = "ti,omap4430-gpmc";
->> +                       reg = <0x50000000 0x1000>;
+On Tue, Mar 05, 2013 at 10:55:04AM +0100, Florian Fainelli wrote:
+> This patch modifies the Armada 370 Reference Design DTS file to enable
+> support for the two USB ports found on this board.
 > 
-> Hi Jon,
+> Signed-off-by: Florian Fainelli <florian@openwrt.org>
+> ---
+> Jason,
 > 
-> By looking at the GPMC Register Summary from both the OMAP4460 and OMAP OMAP35x
-> Technical Reference Manuals I see that the GPMC register address space
-> is only 720 bytes length. From base address + 0x0 to base address +
-> 0x02d0.
+> Since this board was added after USB support was added to Marvell
+> Armada XP/370, I would appreciate if you could fold this into a
+> pull request for 3.9-rc2 for instance.
 > 
-> So shouldn't the regs property be <0x50000000 0x2d0> instead?
+> Thanks!
 > 
-> Of course are only a few kilobytes but still I wonder if it makes
-> sense to map them when they are not going to be used.
+>  arch/arm/boot/dts/armada-370-rd.dts |    8 ++++++++
+>  1 file changed, 8 insertions(+)
 
-Yes you are correct. In general, I have been trying to stay some-what
-consistent with what hwmod was doing as this was being auto-generated by
-some hardware design specs and I believe they wanted to eventually get
-to the point where DT files would be auto-generated too for OMAP.
-Furthermore my understanding is that the smallest page that can be
-mapped by the kernel for ARM is 4kB. So if you declare it as 0x2d0 or
-0x1000 it will map a 4kB page (I could be wrong here).
+Please keep in mind that usually only fixes are applied to the -rcX's
+for this window.  I've applied it this time because it is cleaning up a
+DT conversion we already did, and it doesn't touch C code.
 
-I don't have any strong feelings here but will do what the consensus
-prefers.
+At any rate, applied to mvebu/fixes
 
-Cheers
-Jon
+thx,
+
+Jason.
