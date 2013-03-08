@@ -1,43 +1,30 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 08 Mar 2013 10:54:44 -0700
-Subject: [PATCH 3/5] ARM: DT: tegra114:add aliases and DMA requestor for
- serial controller
-In-Reply-To: <1362750782-15174-4-git-send-email-ldewangan@nvidia.com>
-References: <1362750782-15174-1-git-send-email-ldewangan@nvidia.com>
- <1362750782-15174-4-git-send-email-ldewangan@nvidia.com>
-Message-ID: <513A25E4.8040504@wwwdotorg.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 8 Mar 2013 09:55:39 -0800
+Subject: [PATCH] ARM: OMAP: drop "select MACH_NOKIA_RM696"
+In-Reply-To: <1362763232.5994.75.camel@x61.thuisdomein>
+References: <1362738596.5994.48.camel@x61.thuisdomein>
+ <20130308161159.GE14552@blackmetal.musicnaut.iki.fi>
+ <20130308163507.GC26093@atomide.com>
+ <1362763232.5994.75.camel@x61.thuisdomein>
+Message-ID: <20130308175539.GG26093@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/08/2013 06:53 AM, Laxman Dewangan wrote:
-> Add APB DMA requestor and serial aliases for serial controller.
-> There will be two serial driver i.e. 8250 based simple serial driver
-> and APB DMA based serial driver for higher baudrate and performace.
+* Paul Bolle <pebolle@tiscali.nl> [130308 09:24]:
+> On Fri, 2013-03-08 at 08:35 -0800, Tony Lindgren wrote:
+> > I think the righ fix is to just add
+> > 
+> > config MACH_NOKIA_RM680
+> > 	bool
 > 
-> The simple serial driver get enabled with compatible nvidia,tegra20-uart
-> and APB DMA based driver will get enabled with compatible
-> nvidia,tegra30-hsuart.
+> I guess you meant MACH_NOKIA_RM696.
+
+Ooops yes.
+ 
+> > to the mach-omap2/Kconfig like we have for n8x0 also.
 > 
-> Also Fix the clock id for the UARTB.
+> Should I draft a patch?
 
-If you feel like saying "also", that should probably be a separate patch!
+Sure that would be nice.
 
-In this case, if the UARTB clock ID actually should be changed, then the
-fix should be rolled into Peter's Tegra114 clock series, since it adds
-the property you're changing here, and his series hasn't yet been applied.
-
-But, as I mentioned in my previous email, I don't believe the UARTB
-clock ID change is correct.
-
-> diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
-
-> +	/*
-> +	 * There are two serial driver i.e. 8250 based simple serial
-> +	 * driver and APB DMA based serial driver for higher baudrate
-> +	 * and performace. To enable the 8250 based driver, the compatible
-> +	 * is "nvidia,tegra30-uart", "nvidia,tegra20-uart" and to enable
-> +	 * the APB DMA based serial driver, the comptible is
-> +	 * "nvidia,tegra30-hsuart", "nvidia,tegra20-hsuart".
-> +	 */
-
-Any references to Tegra30 there should be changed to Tegra114 I think.
+Tony
