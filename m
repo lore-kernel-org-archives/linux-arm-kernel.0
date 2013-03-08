@@ -1,89 +1,92 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 8 Mar 2013 14:27:58 +0800
-Subject: [PATCH v11 6/9] usb: chipidea: add vbus regulator control
-In-Reply-To: <20130307095248.GL9171@arwen.pp.htv.fi>
-References: <1362563800-16673-1-git-send-email-peter.chen@freescale.com>
- <1362563800-16673-7-git-send-email-peter.chen@freescale.com>
- <20130306112916.GT28587@arwen.pp.htv.fi>
- <20130307024102.GD20470@nchen-desktop>
- <20130307095248.GL9171@arwen.pp.htv.fi>
-Message-ID: <20130308062757.GB16076@nchen-desktop>
+From: kyungsik.lee@lge.com (Kyungsik Lee)
+Date: Fri, 8 Mar 2013 15:39:01 +0900
+Subject: [PATCH v3 -next 0/5] Add support for LZ4-compressed kernel
+In-Reply-To: <20130305150616.cb737f9b217b8c82051b2ccb@linux-foundation.org>
+References: <1362484056-9778-1-git-send-email-kyungsik.lee@lge.com>
+ <20130305150616.cb737f9b217b8c82051b2ccb@linux-foundation.org>
+Message-ID: <20130308063901.GB4779@Corona>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 07, 2013 at 11:52:48AM +0200, Felipe Balbi wrote:
-> On Thu, Mar 07, 2013 at 10:41:03AM +0800, Peter Chen wrote:
-> > On Wed, Mar 06, 2013 at 01:29:16PM +0200, Felipe Balbi wrote:
-> > > Hi,
-> > > 
-> > > On Wed, Mar 06, 2013 at 05:56:37PM +0800, Peter Chen wrote:
-> > > > For boards which have board level vbus control (eg, gpio), we
-> > > > need to operation vbus according to below rules:
-> > > > - For host, the vbus should always be on.
-> > > > - For otg, the vbus needs to be turned on/off when usb role switches.
-> > > > 
-> > > > We put vbus operation to host as host is the only vbus user,
-> > > > When we are at host mode, the vbus is on, when we are not at
-> > > > host mode, vbus should be off.
-> > > > 
-> > > > Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> > > > ---
-> > > >  
-> > > > @@ -603,6 +594,7 @@ static int ci_hdrc_probe(struct platform_device *pdev)
-> > > >  
-> > > >  	ci->dev = dev;
-> > > >  	ci->platdata = dev->platform_data;
-> > > > +	ci->reg_vbus = ci->platdata->reg_vbus;
-> > > 
-> > > nak, teach ci_hdrc_probe() how to get its own regulator.
-> > > 
-> > > >  	if (ci->platdata->phy)
-> > > >  		ci->transceiver = ci->platdata->phy;
-> > > 
-> > > this should happen for PHYs as well btw.
+Hello,
+
+On Tue, Mar 05, 2013 at 03:06:16PM -0800, Andrew Morton wrote:
+> On Tue,  5 Mar 2013 20:47:31 +0900 Kyungsik Lee <kyungsik.lee@lge.com> wrote:
+> 
+> > This is the third version. In this version, Some codes are fixed
+> > and more description and note are added. I would like to thank David Sterba
+> > for his review.
 > > 
-> > Like I said at previous email, core code has NO DTS entry.
+> > The Last patch[5/5] of the patch set is for making x86 and arm default to
+> > LZ4-compressed for testing the LZ4 code in the linux-next.
+> > It was requested by Andrew Morton in the patch set v2.
+> > 
+> > Currently, A preliminary version of LZ4 de/compression tool is supported.
+> > However, It is expected that we will have a tool with more features
+> > once its format is finished.
 > 
-> that's your problem :-)
+> What happened to the changelog?  The earlier version at least had some
+> rudimentary benchmarking results, but now we don't even have that. 
 > 
-> You can just as well create both nodes in DTS file:
+> Someone should prepare the information explaining why we added this to
+> Linux, and I'd prefer that person be you rather than me!  Certainly it
+> should include performance measurements - both speed and space.  Also
+> it should capture our thinking regarding all the other decompressors,
+> explaining why we view it as acceptable to add yet another one.
 > 
-> ci13xx_fsl at foo {
-> 	compatible = "fsl,chipidea";
-> 	reg = <foo size>;
-> 	blablabla
-> 	ranges;
-> 
-> 	chipidea_core at bar {
-> 		compatible = "chipidea";
-> 		reg <bar size>;
-> 		blablabla
-> 	};
-> };
-> 
-> then assign the regulator to chipidea itself, not to the glue.
+> Please, put yourself in the position of someone reading these commits
+> in 2017 wondering "why did they merge this".  We should tell them.
 
-No, that will make things more complicated at current chipidea driver.
-
-Differ with dwc3, chipidea created its platform data at glue layer,
-and chipidea core owing this data when platform device is created.
-
-If we also want get things from DT node, we need to get node from
-glue layer as this node is NOT belonged to chipidea core's pdev.
-(We can't get it through compatible string as compatible string
- is the same from every chipidea device)
-
-Convert platform data to DT for chipidea core is a big job,
-it is out of scope of this patch. If Alex also thinks we
-are deserved to do it, I can do it later.
-
-> 
-> -- 
-> balbi
+Sorry for the inconvenience regarding changelog. Another patch(v4)
+is not required so this is the information you mentioned.
+I'm not sure that I captured what we had discussed regarding all the other
+decompressors properly.
 
 
+Benchmark Results(PATCH v3)
+Compiler: Linaro ARM gcc 4.6.2
 
--- 
+1. ARMv7, 1.5GHz based board
+   Kernel: linux 3.4
+   Uncompressed Kernel Size: 14MB
+        Compressed Size  Decompression Speed
+   LZO  6.7MB            20.1MB/s, 25.2MB/s(UA)
+   LZ4  7.3MB            29.1MB/s, 45.6MB/s(UA)
 
-Best Regards,
-Peter Chen
+2. ARMv7, 1.7GHz based board
+   Kernel: linux 3.7
+   Uncompressed Kernel Size: 14MB
+        Compressed Size  Decompression Speed
+   LZO  6.0MB            34.1MB/s, 52.2MB/s(UA)
+   LZ4  6.5MB            86.7MB/s
+- UA: Unaligned memory Access support
+- Latest patch set for LZO applied
+
+
+This patch set is for adding support for LZ4-compressed Kernel.
+LZ4 is a very fast lossless compression algorithm and it also features
+an extremely fast decoder [1].
+
+But we have five of decompressors already and one question which does arise,
+however, is that of where do we stop adding new ones? This issue had been
+discussed and came to the conclusion [2].
+Russell King said that
+we should have:
+- one decompressor which is the fastest
+- one decompressor for the highest compression ratio
+- one popular decompressor (eg conventional gzip)
+If we have a replacement one for one of these, then it should do exactly that:
+replace it.
+
+The benchmark shows that an 8% increase in image size vs a 66% increase
+in decompression speed compared to LZO(which has been known as the fastest
+decompressor in the Kernel). Therefore the "fast but may not be small"
+compression title has clearly been taken by LZ4 [3].
+
+[1] http://code.google.com/p/lz4/
+[2] http://thread.gmane.org/gmane.linux.kbuild.devel/9157
+[3] http://thread.gmane.org/gmane.linux.kbuild.devel/9347
+
+
+Thanks,
+Kyungsik
