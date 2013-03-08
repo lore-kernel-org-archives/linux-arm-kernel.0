@@ -1,39 +1,50 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 8 Mar 2013 08:35:07 -0800
-Subject: [PATCH] ARM: OMAP: drop "select MACH_NOKIA_RM696"
-In-Reply-To: <20130308161159.GE14552@blackmetal.musicnaut.iki.fi>
-References: <1362738596.5994.48.camel@x61.thuisdomein>
- <20130308161159.GE14552@blackmetal.musicnaut.iki.fi>
-Message-ID: <20130308163507.GC26093@atomide.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Fri, 08 Mar 2013 17:39:53 +0100
+Subject: [PATCH 5/5] USB chipidea i.MX: use devm_usb_get_phy_by_phandle
+ to get phy
+In-Reply-To: <20130308163339.GG32368@arwen.pp.htv.fi>
+References: <1362049024-11383-1-git-send-email-mkl@pengutronix.de>
+ <1362049024-11383-6-git-send-email-mkl@pengutronix.de>
+ <20130308163339.GG32368@arwen.pp.htv.fi>
+Message-ID: <513A1459.6010000@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Aaro Koskinen <aaro.koskinen@iki.fi> [130308 08:16]:
-> On Fri, Mar 08, 2013 at 11:29:56AM +0100, Paul Bolle wrote:
-> > When support was added for Nokia N9 (RM-696), with commit
-> > 63fc5f3bb3d0ca9ab4767a801b518aa6335f87ad ("ARM: OMAP: add minimal
-> > support for Nokia RM-696"), a select statement for MACH_NOKIA_RM696 was
-> > added to the tree. But there's no Kconfig symbol with that name. That
-> > symbol would be superfluous, since support for that machine piggybacks
-> > on MACH_NOKIA_RM680. So drop that select.
+On 03/08/2013 05:33 PM, Felipe Balbi wrote:
+> On Thu, Feb 28, 2013 at 11:57:04AM +0100, Marc Kleine-Budde wrote:
+>> @@ -147,19 +146,20 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
+>>  		return ret;
+>>  	}
+>>  
+>> -	phy_np = of_parse_phandle(pdev->dev.of_node, "fsl,usbphy", 0);
+>> -	if (phy_np) {
+>> -		data->phy_np = phy_np;
+>> -		phy_pdev = of_find_device_by_node(phy_np);
+>> -		if (phy_pdev) {
+>> -			struct usb_phy *phy;
+>> -			phy = pdev_to_phy(phy_pdev);
+>> -			if (phy &&
+>> -			    try_module_get(phy_pdev->dev.driver->owner)) {
+>> -				usb_phy_init(phy);
+>> -				data->phy = phy;
+>> -			}
+>> +	phy = devm_usb_get_phy_by_phandle(&pdev->dev, "fsl,usbphy", 0);
 > 
-> This is needed because of arch/arm/tools/mach-types. See
-> include/generated/mach-types.h.
-> 
-> If you have just CONFIG_MACH_NOKIA_RM680 and run the kernel on RM-696,
-> then machine_is_nokia_rm696() will return false. If I rememeber correctly,
-> this broke at least early printk / uncompressor output at the time.
-> 
-> I guess people may still want to use machine_is_... macros e.g. for
-> debugging.
+> very nice, but should be done at chipidea core.
 
-I think the righ fix is to just add
+Any suggestions for the phandle name? "chipidea,usbphy"?
 
-config MACH_NOKIA_RM680
-	bool
+Marc
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
-to the mach-omap2/Kconfig like we have for n8x0 also.
-
-Regards,
-
-Tony
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130308/e9867bb3/attachment.sig>
