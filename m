@@ -1,50 +1,56 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Fri, 8 Mar 2013 00:59:43 +0000
-Subject: [PATCH v5 01/16] spi/spi-atmel: fix master->num_chipselect
- wrongly set.
-In-Reply-To: <20130302231535.8E6043E35BE@localhost>
-References: <1361861289-30332-1-git-send-email-wenyou.yang@atmel.com>
- <1361861289-30332-2-git-send-email-wenyou.yang@atmel.com>
- <20130302231535.8E6043E35BE@localhost>
-Message-ID: <B256D81BAE5131468A838E5D7A2436414971AE03@penmbx02>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Thu, 7 Mar 2013 22:02:28 -0300
+Subject: [PATCH 04/10] bus: introduce an Marvell EBU MBus driver
+In-Reply-To: <20130307230516.GA28975@obsidianresearch.com>
+References: <1362577426-12804-5-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130306190821.GA4689@obsidianresearch.com>
+ <20130306202710.15a6aa2c@skate>
+ <20130306202447.GA4916@obsidianresearch.com>
+ <20130306214036.62fc93b9@skate>
+ <20130306215031.GB4916@obsidianresearch.com>
+ <20130306222712.GP23237@titan.lakedaemon.net>
+ <20130306230412.GA5870@obsidianresearch.com>
+ <20130307222004.GA2450@localhost>
+ <20130307230516.GA28975@obsidianresearch.com>
+Message-ID: <20130308010227.GA19029@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Grant Likely [mailto:glikely at secretlab.ca] On Behalf Of Grant Likely
-> Sent: 2013?3?3? 7:16
-> To: Yang, Wenyou; linux-arm-kernel at lists.infradead.org
-> Cc: Ferre, Nicolas; plagnioj at jcrosoft.com; richard.genoud at gmail.com; Lin, JM;
-> Yang, Wenyou; spi-devel-general at lists.sourceforge.net;
-> linux-kernel at vger.kernel.org
-> Subject: Re: [PATCH v5 01/16] spi/spi-atmel: fix master->num_chipselect
-> wrongly set.
+Hi Jason,
+
+On Thu, Mar 07, 2013 at 04:05:16PM -0700, Jason Gunthorpe wrote:
+> On Thu, Mar 07, 2013 at 07:20:05PM -0300, Ezequiel Garcia wrote:
+> > Now that the Device Bus driver is posted I think we have a nice example
+> > on how address decoding windows would be allocated through the mbus
+> > driver, *without* touching the child driver (i.e. NOR driver).
 > 
-> On Tue, 26 Feb 2013 14:47:54 +0800, Wenyou Yang <wenyou.yang@atmel.com>
-> wrote:
-> > if the spi property "cs-gpios" is set as below:
-> >
-> > 	cs-gpios = <0>, <&pioC 11 0>, <0>, <0>;
-> >
-> > the master->num_chipselect will wrongly be set to 0,
-> > and the spi fail to probe.
-> >
-> > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> > Cc: spi-devel-general at lists.sourceforge.net
-> > Cc: linux-kernel at vger.kernel.org
+> No, that isn't the case. Your device bus driver *is* the child driver,
+> and you have touched it by adding mbus window code :)
 > 
-> I think I've got this bug fixed in the core spi code. Give it a couple
-> of days and retest with linux-next.
-Hi Grant,
-
-Yes, in v3.9-rc1 this bug fixed, I retested on v3.9-rc1.
-But on "spi/next" git tree, it should to apply this patch.
-
-I sent the patches version 6, could you take a look them? 
-Thanks a lot for your work.
-
+> In fact, looking at what you've done - with the DTs you've proposed
+> your driver does *nothing* but make a call to the mbus driver to setup
+> the windows for its children. Without timing parameters from the DT the
+> driver does nothing else!
 > 
-> g.
 
-Best Regards,
-Wenyou Yang
+Yes, setting aside the timings parameters, the Device Bus driver is only
+charge of allocating the windows; perhaps we can say nothing more, nothing less :)
+
+> > In conclusion: there is absolutely no need to change the NOR driver,
+> > and there is no need to explictly add an explicit description of the
+> > NOR window in the device tree.
+> 
+> As I've said, a DT that has child nodes without an associated address
+> map is broken.
+> 
+
+Mmm... could explain me better, why you think it's *broken*?
+
+Perhaps I'm slower than most people around here, but I still
+don't fully understand this brokenness.
+
+Thanks,
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
