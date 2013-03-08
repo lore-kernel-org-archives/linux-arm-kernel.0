@@ -1,22 +1,28 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Fri, 8 Mar 2013 23:30:42 +0530
-Subject: [PATCH] ARM: DT: tegra20/tegra30: Correct clock id for UARTB
-In-Reply-To: <513A2433.2080002@wwwdotorg.org>
-References: <1362751245-32432-1-git-send-email-ldewangan@nvidia.com>
- <513A2433.2080002@wwwdotorg.org>
-Message-ID: <513A274A.4030709@nvidia.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Fri, 08 Mar 2013 19:02:44 +0100
+Subject: [PATCH] ARM: OMAP: drop "select MACH_NOKIA_RM696"
+In-Reply-To: <20130308175539.GG26093@atomide.com>
+References: <1362738596.5994.48.camel@x61.thuisdomein>
+ <20130308161159.GE14552@blackmetal.musicnaut.iki.fi>
+ <20130308163507.GC26093@atomide.com>
+ <1362763232.5994.75.camel@x61.thuisdomein>
+ <20130308175539.GG26093@atomide.com>
+Message-ID: <1362765764.5994.87.camel@x61.thuisdomein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 08 March 2013 11:17 PM, Stephen Warren wrote:
-> On 03/08/2013 07:00 AM, Laxman Dewangan wrote:
->> UARTB clock bit in CAR register is 7. Correcting this
->> in DTS file.
-> The register bit is 7, but the clock ID in the Tegra CAR DT binding is
-> 96 for UART2 or 97 for VFIR. This was due to there being 1 clock bit and
-> 2 separate IP block reset bits, or the other way around, so we highlight
-> the issue by assigning different clock IDs. See the comment before the
-> list of clock IDs in the binding document.
+On Fri, 2013-03-08 at 09:55 -0800, Tony Lindgren wrote:
+> * Paul Bolle <pebolle@tiscali.nl> [130308 09:24]:
+> > Should I draft a patch?
+> 
+> Sure that would be nice.
 
-Aaha, I missed the Documentation part. I was looking for DT entry only 
-found this.
+One thing I couldn't determine is how the generated mach-types.h header
+handles multiple CONFIG_MACH_* macros.
+
+If both CONFIG_MACH_FOO and CONFIG_MACH_BAR are defined, and these both
+have a line in */mach-types, will the machine_is_foo() and
+machine_is_bar() macros both behave as one would expect?
+
+
+Paul Bolle
