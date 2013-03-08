@@ -1,40 +1,71 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 08 Mar 2013 11:50:07 -0800
-Subject: [PATCH 03/10] ARM: smp_twd: Divorce smp_twd from local timer API
-In-Reply-To: <20130308194802.GG11806@atomide.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 8 Mar 2013 11:50:58 -0800
+Subject: [PATCH 04/10] ARM: OMAP2+: Divorce from local timer API
+In-Reply-To: <1362614646-24113-5-git-send-email-sboyd@codeaurora.org>
 References: <1362614646-24113-1-git-send-email-sboyd@codeaurora.org>
- <1362614646-24113-4-git-send-email-sboyd@codeaurora.org>
- <20130308004011.GD11806@atomide.com> <51393B59.3070200@codeaurora.org>
- <20130308180730.GE11806@atomide.com> <513A2B20.30805@codeaurora.org>
- <20130308194802.GG11806@atomide.com>
-Message-ID: <513A40EF.8050403@codeaurora.org>
+ <1362614646-24113-5-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20130308195058.GH11806@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/08/13 11:48, Tony Lindgren wrote:
-> * Stephen Boyd <sboyd@codeaurora.org> [130308 10:21]:
->>
->> diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
->> index 081de6f..4ea3e9d 100644
->> --- a/arch/arm/kernel/smp_twd.c
->> +++ b/arch/arm/kernel/smp_twd.c
->> @@ -227,7 +227,7 @@ static void __cpuinit twd_calibrate_rate(void)
->>  
->>  static irqreturn_t twd_handler(int irq, void *dev_id)
->>  {
->> -       struct clock_event_device *evt = *(struct clock_event_device **)dev_id;
->> +       struct clock_event_device *evt = dev_id;
->>  
->>         if (twd_timer_ack()) {
->>                 evt->event_handler(evt);
->>
-> Yup thanks that fixes it, both fixes are needed. So for this patch + the
-> two fixes please feel free to add:
->
-> Acked-by: Tony Lindgren <tony@atomide.com>
+* Stephen Boyd <sboyd@codeaurora.org> [130306 16:22]:
+> Now that the TWD doesn't rely on the local timer API, OMAP can
+> stop selecting it in Kconfig and relying on the config option to
+> decide if it should call smp_twd functions.
+> 
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-Great. Thanks for testing.
+Acked-by: Tony Lindgren <tony@atomide.com>
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  arch/arm/mach-omap2/Kconfig | 1 -
+>  arch/arm/mach-omap2/timer.c | 7 -------
+>  2 files changed, 8 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+> index 49ac3df..6e1f871 100644
+> --- a/arch/arm/mach-omap2/Kconfig
+> +++ b/arch/arm/mach-omap2/Kconfig
+> @@ -88,7 +88,6 @@ config ARCH_OMAP4
+>  	select CACHE_L2X0
+>  	select CPU_V7
+>  	select HAVE_SMP
+> -	select LOCAL_TIMERS if SMP
+>  	select OMAP_INTERCONNECT
+>  	select PL310_ERRATA_588369
+>  	select PL310_ERRATA_727915
+> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+> index 2bdd4cf..c00a8f8 100644
+> --- a/arch/arm/mach-omap2/timer.c
+> +++ b/arch/arm/mach-omap2/timer.c
+> @@ -587,7 +587,6 @@ OMAP_SYS_GP_TIMER_INIT(3_am33xx, 1, OMAP4_MPU_SOURCE, "ti,timer-alwon",
+>  #ifdef CONFIG_ARCH_OMAP4
+>  OMAP_SYS_32K_TIMER_INIT(4, 1, OMAP4_32K_SOURCE, "ti,timer-alwon",
+>  			2, OMAP4_MPU_SOURCE);
+> -#ifdef CONFIG_LOCAL_TIMERS
+>  static DEFINE_TWD_LOCAL_TIMER(twd_local_timer, OMAP44XX_LOCAL_TWD_BASE, 29);
+>  void __init omap4_local_timer_init(void)
+>  {
+> @@ -606,12 +605,6 @@ void __init omap4_local_timer_init(void)
+>  			pr_err("twd_local_timer_register failed %d\n", err);
+>  	}
+>  }
+> -#else /* CONFIG_LOCAL_TIMERS */
+> -void __init omap4_local_timer_init(void)
+> -{
+> -	omap4_sync32k_timer_init();
+> -}
+> -#endif /* CONFIG_LOCAL_TIMERS */
+>  #endif /* CONFIG_ARCH_OMAP4 */
+>  
+>  #ifdef CONFIG_SOC_OMAP5
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
