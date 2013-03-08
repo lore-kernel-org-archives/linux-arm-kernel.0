@@ -1,39 +1,38 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  8 Mar 2013 16:19:15 +0100
-Subject: [PATCH v4 13/18] arm: mvebu: PCIe Device Tree informations for
- OpenBlocks AX3-4
+Date: Fri,  8 Mar 2013 16:19:09 +0100
+Subject: [PATCH v4 07/18] clk: mvebu: create parent-child relation for PCIe
+ clocks on Armada 370
 In-Reply-To: <1362755960-30791-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1362755960-30791-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1362755960-30791-14-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1362755960-30791-8-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PlatHome OpenBlocks AX3-4 has an internal mini-PCIe slot that can
-be used to plug mini-PCIe devices. We therefore enable the PCIe
-interface that corresponds to this slot.
+The Armada 370 has two gatable clocks for each PCIe interface, and we
+want both of them to be enabled. We therefore make one of the two
+clocks a child of the other, as we did for the sataX and sataXlnk
+clocks on Armada XP.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Mike Turquette <mturquette@linaro.org>
 ---
- arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts |    8 ++++++++
- 1 file changed, 8 insertions(+)
+ drivers/clk/mvebu/clk-gating-ctrl.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-index 3818a82..5f87bc8 100644
---- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-+++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-@@ -139,5 +139,13 @@
- 		usb at d0051000 {
- 			status = "okay";
- 		};
-+
-+		pcie-controller {
-+			status = "okay";
-+			/* Internal mini-PCIe connector */
-+			pcie at 0,0 {
-+				status = "okay";
-+			};
-+		};
- 	};
- };
+diff --git a/drivers/clk/mvebu/clk-gating-ctrl.c b/drivers/clk/mvebu/clk-gating-ctrl.c
+index ebf141d..b35785a 100644
+--- a/drivers/clk/mvebu/clk-gating-ctrl.c
++++ b/drivers/clk/mvebu/clk-gating-ctrl.c
+@@ -119,8 +119,8 @@ static const struct mvebu_soc_descr __initconst armada_370_gating_descr[] = {
+ 	{ "pex1_en", NULL,  2 },
+ 	{ "ge1", NULL, 3 },
+ 	{ "ge0", NULL, 4 },
+-	{ "pex0", NULL, 5 },
+-	{ "pex1", NULL, 9 },
++	{ "pex0", "pex0_en", 5 },
++	{ "pex1", "pex1_en", 9 },
+ 	{ "sata0", NULL, 15 },
+ 	{ "sdio", NULL, 17 },
+ 	{ "tdm", NULL, 25 },
 -- 
 1.7.9.5
