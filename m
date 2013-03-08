@@ -1,91 +1,75 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Fri, 8 Mar 2013 21:25:00 +0100
-Subject: [PATCH 5/9] ARM: dts: Add GPMC node for OMAP2, OMAP4 and OMAP5
-In-Reply-To: <1362763654-9660-6-git-send-email-jon-hunter@ti.com>
-References: <1362763654-9660-1-git-send-email-jon-hunter@ti.com>
- <1362763654-9660-6-git-send-email-jon-hunter@ti.com>
-Message-ID: <CABxcv==OKX4z8x7ztqDJ5CozNmTQ5UaD43mTLWfQuqUt-y7xcQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 8 Mar 2013 12:29:47 -0800
+Subject: [PATCH 03/10] ARM: smp_twd: Divorce smp_twd from local timer API
+In-Reply-To: <513A4774.3040605@codeaurora.org>
+References: <1362614646-24113-1-git-send-email-sboyd@codeaurora.org>
+ <1362614646-24113-4-git-send-email-sboyd@codeaurora.org>
+ <20130308004011.GD11806@atomide.com>
+ <51393B59.3070200@codeaurora.org>
+ <20130308180730.GE11806@atomide.com>
+ <513A2B20.30805@codeaurora.org>
+ <20130308194802.GG11806@atomide.com>
+ <513A40EF.8050403@codeaurora.org>
+ <20130308200811.GJ11806@atomide.com>
+ <513A4774.3040605@codeaurora.org>
+Message-ID: <20130308202947.GK11806@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 8, 2013 at 6:27 PM, Jon Hunter <jon-hunter@ti.com> wrote:
-> Add the device-tree node for GPMC on OMAP2, OMAP4 and OMAP5 devices.
->
-> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-> ---
->  arch/arm/boot/dts/omap2420.dtsi |   11 +++++++++++
->  arch/arm/boot/dts/omap2430.dtsi |   11 +++++++++++
->  arch/arm/boot/dts/omap4.dtsi    |   11 +++++++++++
->  arch/arm/boot/dts/omap5.dtsi    |   11 +++++++++++
->  4 files changed, 44 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/omap2420.dtsi b/arch/arm/boot/dts/omap2420.dtsi
-> index af65609..d4ce6c2 100644
-> --- a/arch/arm/boot/dts/omap2420.dtsi
-> +++ b/arch/arm/boot/dts/omap2420.dtsi
-> @@ -29,6 +29,17 @@
->                         pinctrl-single,function-mask = <0x3f>;
->                 };
->
-> +               gpmc: gpmc at 6800a000 {
-> +                       compatible = "ti,omap2420-gpmc";
-> +                       reg = <0x6800a000 0x1000>;
-> +                       #address-cells = <2>;
-> +                       #size-cells = <1>;
-> +                       interrupts = <20>;
-> +                       gpmc,num-cs = <8>;
-> +                       gpmc,num-waitpins = <4>;
-> +                       ti,hwmods = "gpmc";
-> +               };
-> +
->                 mcbsp1: mcbsp at 48074000 {
->                         compatible = "ti,omap2420-mcbsp";
->                         reg = <0x48074000 0xff>;
-> diff --git a/arch/arm/boot/dts/omap2430.dtsi b/arch/arm/boot/dts/omap2430.dtsi
-> index c392445..832f184 100644
-> --- a/arch/arm/boot/dts/omap2430.dtsi
-> +++ b/arch/arm/boot/dts/omap2430.dtsi
-> @@ -29,6 +29,17 @@
->                         pinctrl-single,function-mask = <0x3f>;
->                 };
->
-> +               gpmc: gpmc at 6e000000 {
-> +                       compatible = "ti,omap2430-gpmc";
-> +                       reg = <0x6e000000 0x1000>;
-> +                       #address-cells = <2>;
-> +                       #size-cells = <1>;
-> +                       interrupts = <20>;
-> +                       gpmc,num-cs = <8>;
-> +                       gpmc,num-waitpins = <4>;
-> +                       ti,hwmods = "gpmc";
-> +               };
-> +
->                 mcbsp1: mcbsp at 48074000 {
->                         compatible = "ti,omap2430-mcbsp";
->                         reg = <0x48074000 0xff>;
-> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-> index 827f6f3..726ef11 100644
-> --- a/arch/arm/boot/dts/omap4.dtsi
-> +++ b/arch/arm/boot/dts/omap4.dtsi
-> @@ -196,6 +196,17 @@
->                         #interrupt-cells = <1>;
->                 };
->
-> +               gpmc: gpmc at 50000000 {
-> +                       compatible = "ti,omap4430-gpmc";
-> +                       reg = <0x50000000 0x1000>;
+* Stephen Boyd <sboyd@codeaurora.org> [130308 12:22]:
+> On 03/08/13 12:08, Tony Lindgren wrote:
+> > * Stephen Boyd <sboyd@codeaurora.org> [130308 11:54]:
+> >> On 03/08/13 11:48, Tony Lindgren wrote:
+> >>> * Stephen Boyd <sboyd@codeaurora.org> [130308 10:21]:
+> >>>> diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+> >>>> index 081de6f..4ea3e9d 100644
+> >>>> --- a/arch/arm/kernel/smp_twd.c
+> >>>> +++ b/arch/arm/kernel/smp_twd.c
+> >>>> @@ -227,7 +227,7 @@ static void __cpuinit twd_calibrate_rate(void)
+> >>>>  
+> >>>>  static irqreturn_t twd_handler(int irq, void *dev_id)
+> >>>>  {
+> >>>> -       struct clock_event_device *evt = *(struct clock_event_device **)dev_id;
+> >>>> +       struct clock_event_device *evt = dev_id;
+> >>>>  
+> >>>>         if (twd_timer_ack()) {
+> >>>>                 evt->event_handler(evt);
+> >>>>
+> >>> Yup thanks that fixes it, both fixes are needed. So for this patch + the
+> >>> two fixes please feel free to add:
+> >>>
+> >>> Acked-by: Tony Lindgren <tony@atomide.com>
+> >> Great. Thanks for testing.
+> > Hmm noticed one more thing: vexpress no longer boots in qemu for
+> > me after applying this. Sorry did not get any debug_ll output, but
+> > maybe you can take a look at it. I tested with omap2plus_defconfig +
+> > linaro-qemu:
+> >
+> > $ qemu-system-arm -machine vexpress-a9 -m 1024 -curses -net nic -net \
+> > user -serial stdio -append console=ttyAMA0,115200n8 rw \
+> > root=/dev/mmcblk0p2 rootwait physmap.enabled=0 -kernel zImage \
+> > -initrd initrd.img -sd rootfs.img
+> >
+> >
+> 
+> I wonder if you're hitting something similar to this issue on versatile
+> boards [1]. Can you try that patch? Otherwise I will try to get qemu
+> running (something I've never done, do you have instructions?).
 
-Hi Jon,
+Applying that does not seem to help, but you might want to get vexpress
+running anyways for some multiplatform sanity checks.
 
-By looking at the GPMC Register Summary from both the OMAP4460 and OMAP OMAP35x
-Technical Reference Manuals I see that the GPMC register address space
-is only 720 bytes length. From base address + 0x0 to base address +
-0x02d0.
+I just built and installed qemu-linaro from their git, then ran the
+command above. Looks like stock qemu does not work for vexpress for some
+reason. You can probably use a dummy initrd and rootfs to debug this
+though :)
 
-So shouldn't the regs property be <0x50000000 0x2d0> instead?
+More info on qemu-linaro at:
 
-Of course are only a few kilobytes but still I wonder if it makes
-sense to map them when they are not going to be used.
+https://launchpad.net/qemu-linaro
 
-Best regards,
-Javier
+Regards,
+
+Tony
+ 
+> [1] http://article.gmane.org/gmane.linux.ports.arm.kernel/221539
