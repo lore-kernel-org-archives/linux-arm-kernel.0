@@ -1,34 +1,48 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 8 Mar 2013 10:10:29 -0800
-Subject: [PATCH] ARM: OMAP: drop "select MACH_NOKIA_RM696"
-In-Reply-To: <1362765764.5994.87.camel@x61.thuisdomein>
-References: <1362738596.5994.48.camel@x61.thuisdomein>
- <20130308161159.GE14552@blackmetal.musicnaut.iki.fi>
- <20130308163507.GC26093@atomide.com>
- <1362763232.5994.75.camel@x61.thuisdomein>
- <20130308175539.GG26093@atomide.com>
- <1362765764.5994.87.camel@x61.thuisdomein>
-Message-ID: <20130308181029.GF11806@atomide.com>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Fri, 8 Mar 2013 23:44:05 +0530
+Subject: [PATCH 4/5] ARM: DT: tegra114: add KBC controller DT entry
+In-Reply-To: <513A2810.1070903@wwwdotorg.org>
+References: <1362750782-15174-1-git-send-email-ldewangan@nvidia.com>
+ <1362750782-15174-5-git-send-email-ldewangan@nvidia.com>
+ <513A2810.1070903@wwwdotorg.org>
+Message-ID: <513A2A6D.7080604@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Bolle <pebolle@tiscali.nl> [130308 10:06]:
-> On Fri, 2013-03-08 at 09:55 -0800, Tony Lindgren wrote:
-> > * Paul Bolle <pebolle@tiscali.nl> [130308 09:24]:
-> > > Should I draft a patch?
-> > 
-> > Sure that would be nice.
-> 
-> One thing I couldn't determine is how the generated mach-types.h header
-> handles multiple CONFIG_MACH_* macros.
-> 
-> If both CONFIG_MACH_FOO and CONFIG_MACH_BAR are defined, and these both
-> have a line in */mach-types, will the machine_is_foo() and
-> machine_is_bar() macros both behave as one would expect?
+On Friday 08 March 2013 11:34 PM, Stephen Warren wrote:
+> On 03/08/2013 06:53 AM, Laxman Dewangan wrote:
+>> NVIDIA's Tegra114 SoCs have the matrix keyboard controller which
+>> supports 11x8 type of matrix. The number of rows and columns
+>> are configurable.
+> Earlier Tegra versions supported up to a 16x8 matrix. This feeds into
+> the following defines in the driver:
+>
+> #define KBC_MAX_GPIO    24
+> #define KBC_MAX_ROW     16
+> #define KBC_MAX_COL     8
+> #define KBC_MAX_KEY     (KBC_MAX_ROW * KBC_MAX_COL)
+>
+> Given Tegra114 supports /fewer/ pins and rows than earlier chips, I
+> think that makes the HW technically incompatible, since GPIO IDs 19..23
+> are invalid in this HW but valid earlier.
+>
+> Now in practice I suppose that with a correct DT keyboard map for a
+> Tegra114 device, those extra invalid GPIOs would never be referenced, so
+> this is a little nit-picky, but I still feel we should fix this.
 
-Yes they do, for the selected ones the macro becomes
-machine_arch_type == MACH_TYPE_XYZ instead of 0.
+Where do we fix this? In binding document?
 
-Regards,
+>
+> So, I'd like to see the KBC driver updated to derive the values for all
+> the defines I listed above from the compatible value.
 
-Tony
+Ok, we can update the kbc driver to derive above param from compatible.
+
+>
+>
+>
+> Re-stated: The rules for compatible are: Always include the exact HW
+> name, then optionally include any other HW names it's compatible with.
+
+OK, will update this in next version of patch.
+>
