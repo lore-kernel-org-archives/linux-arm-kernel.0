@@ -1,7 +1,7 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 8 Mar 2013 09:10:52 +0100
+Date: Fri, 8 Mar 2013 09:14:39 +0100
 Subject: [PATCH 04/10] bus: introduce an Marvell EBU MBus driver
-In-Reply-To: <20130307230516.GA28975@obsidianresearch.com>
+In-Reply-To: <20130306230412.GA5870@obsidianresearch.com>
 References: <1362577426-12804-1-git-send-email-thomas.petazzoni@free-electrons.com>
  <1362577426-12804-5-git-send-email-thomas.petazzoni@free-electrons.com>
  <20130306190821.GA4689@obsidianresearch.com>
@@ -11,51 +11,45 @@ References: <1362577426-12804-1-git-send-email-thomas.petazzoni@free-electrons.c
  <20130306215031.GB4916@obsidianresearch.com>
  <20130306222712.GP23237@titan.lakedaemon.net>
  <20130306230412.GA5870@obsidianresearch.com>
- <20130307222004.GA2450@localhost>
- <20130307230516.GA28975@obsidianresearch.com>
-Message-ID: <20130308091052.18612729@skate>
+Message-ID: <20130308091439.15c7bafd@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Dear Jason Gunthorpe,
 
-On Thu, 7 Mar 2013 16:05:16 -0700, Jason Gunthorpe wrote:
+On Wed, 6 Mar 2013 16:04:12 -0700, Jason Gunthorpe wrote:
 
-> So what is the point of that? Get rid of your driver, have the mbus
-> driver set up its own windows and put cfi-flash directly under
-> mbus. Smaller, simpler, clearer, better.
-
-No, we will still need the Device Bus driver to set up the timings.
-
-> What you've done is *exactly* the sort of thing I was warning against
-> :)
+> The discussion was around the SOC specific tables in the driver and if
+> they should be in DT or C code. These tables very much describe the
+> hardware, and are copied from similar tables in the Marvell manuals.
 > 
-> BTW, I've made the same basic choice on our Kirkwood systems. The NAND
-> timing pameters are set by the bootloader and the kernel doesn't touch
-> them. The bootloader knows which flash chip is placed on the board so
-> only it knows the correct timing parameters. There is not any reason
-> to communicate them to the kernel.
-
-That's _your_ choice, and it's entirely inconsistent with most kernel
-practices. For example, we have the pinctrl subsystem, which precisely
-aims at empowering the kernel in terms of pin muxing, while previously,
-it was a mix of custom kernel APIs, or reliance on the bootloader for
-having setting up the pin muxing.
-
-Sorry, but we _do_ want the kernel to be able to set those timings
-parameters, and therefore, a Device Bus driver will be needed,
-regardless of whether it creates the address window or not.
-
-> > In conclusion: there is absolutely no need to change the NOR driver,
-> > and there is no need to explictly add an explicit description of the
-> > NOR window in the device tree.
+> For instance I repeated this idea:
 > 
-> As I've said, a DT that has child nodes without an associated address
-> map is broken.
+>    ranges =<MAPDEF(1, 0xe0, MAPDEF_NOMASK)  0xFE000000  0x10000 // boot rom
+>             MAPDEF(1, 0x3f, MAPDEF_NOMASK)  0xFD000000  0x10000 // devbus-boot
+>             MAPDEF(1, 0xxx, MAPDEF_NOMASK)  0xFF000000  0x10000 // internal-regs
+>              [..]
 
-That's a statement without any arguments. How can we have a serious
-technical discussion if what you bring is just "this is broken", with no
-arguments?
+A few other issues with this:
+
+ * It forces us to repeat the base address of the NOR twice in the
+   Device Tree. Once in the ranges = <...> property of the MBus DT node,
+   and once in the reg = <...> property of the NOR DT node. Duplication
+   of identical information, isn't that something that sounds broken?
+
+ * If we do dynamic allocation of the base address, it means that the
+   DT is no longer an accurate representation of what happens for real.
+   The user will write 0xDEADBEEF in the DT, and will get its NOR
+   mapped at 0xBEEFDEAD. Isn't that uselessly confusing?
+
+Sorry, but your proposal still has many, many disadvantages over the
+currently proposed solution, and no compelling argument other than your
+own perception that the DT should describing the address mapping.
+
+With MBus, the DT cannot describe the address mapping because it is
+fundamentally dynamic. Why the heck would we describe NOR windows in
+the DT and not the PCIe ones? They are both dynamic in the exact same
+way.
 
 Best regards,
 
