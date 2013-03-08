@@ -1,56 +1,72 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu, 7 Mar 2013 22:02:28 -0300
-Subject: [PATCH 04/10] bus: introduce an Marvell EBU MBus driver
-In-Reply-To: <20130307230516.GA28975@obsidianresearch.com>
-References: <1362577426-12804-5-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130306190821.GA4689@obsidianresearch.com>
- <20130306202710.15a6aa2c@skate>
- <20130306202447.GA4916@obsidianresearch.com>
- <20130306214036.62fc93b9@skate>
- <20130306215031.GB4916@obsidianresearch.com>
- <20130306222712.GP23237@titan.lakedaemon.net>
- <20130306230412.GA5870@obsidianresearch.com>
- <20130307222004.GA2450@localhost>
- <20130307230516.GA28975@obsidianresearch.com>
-Message-ID: <20130308010227.GA19029@localhost>
+From: Wenyou.Yang@atmel.com (Yang, Wenyou)
+Date: Fri, 8 Mar 2013 01:06:11 +0000
+Subject: [PATCH v6 01/16] spi/spi-atmel: fix probing failure after
+ xfer->speed_hz set
+In-Reply-To: <CAGhQ9VwW18LXY5Jn0FUFCaAzKxP1W3QADG=JBp9JbgaAwo=F2Q@mail.gmail.com>
+References: <1362626715-6549-1-git-send-email-wenyou.yang@atmel.com>
+ <1362626815-6628-1-git-send-email-wenyou.yang@atmel.com>
+ <CAGhQ9VwW18LXY5Jn0FUFCaAzKxP1W3QADG=JBp9JbgaAwo=F2Q@mail.gmail.com>
+Message-ID: <B256D81BAE5131468A838E5D7A2436414971BE26@penmbx02>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
+Hi Joachim,
 
-On Thu, Mar 07, 2013 at 04:05:16PM -0700, Jason Gunthorpe wrote:
-> On Thu, Mar 07, 2013 at 07:20:05PM -0300, Ezequiel Garcia wrote:
-> > Now that the Device Bus driver is posted I think we have a nice example
-> > on how address decoding windows would be allocated through the mbus
-> > driver, *without* touching the child driver (i.e. NOR driver).
+> -----Original Message-----
+> From: Joachim Eastwood [mailto:manabian at gmail.com]
+> Sent: 2013?3?7? 20:31
+> To: Yang, Wenyou
+> Cc: linux-arm-kernel at lists.infradead.org; grant.likely at secretlab.ca; Ferre,
+> Nicolas; plagnioj at jcrosoft.com; richard.genoud at gmail.com; Lin, JM;
+> spi-devel-general at lists.sourceforge.net; linux-kernel at vger.kernel.org
+> Subject: Re: [PATCH v6 01/16] spi/spi-atmel: fix probing failure after
+> xfer->speed_hz set
 > 
-> No, that isn't the case. Your device bus driver *is* the child driver,
-> and you have touched it by adding mbus window code :)
+> On 7 March 2013 04:26, Wenyou Yang <wenyou.yang@atmel.com> wrote:
+> > commit: 059b8ffeee5b427949872bb6ed5db5ae0788054e
+> > cause the atmel spi probing failure.
+> >
+> > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> > Cc: spi-devel-general at lists.sourceforge.net
+> > Cc: linux-kernel at vger.kernel.org
+> > ---
+> >  drivers/spi/spi-atmel.c |    6 +++---
+> >  1 file changed, 3 insertions(+), 3 deletions(-)
+> >
+> > diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+> > index 656d137..1eca815 100644
+> > --- a/drivers/spi/spi-atmel.c
+> > +++ b/drivers/spi/spi-atmel.c
+> > @@ -846,9 +846,9 @@ static int atmel_spi_transfer(struct spi_device *spi,
+> struct spi_message *msg)
+> >                         }
+> >                 }
+> >
+> > -               /* FIXME implement these protocol options!! */
+> > -               if (xfer->speed_hz) {
+> > -                       dev_dbg(&spi->dev, "no protocol options
+> yet\n");
+> > +               if (xfer->speed_hz < spi->max_speed_hz) {
+> > +                       dev_dbg(&spi->dev,
+> > +                               "speed in transfer less than bus
+> speed\n");
+> >                         return -ENOPROTOOPT;
+> >                 }
 > 
-> In fact, looking at what you've done - with the DTs you've proposed
-> your driver does *nothing* but make a call to the mbus driver to setup
-> the windows for its children. Without timing parameters from the DT the
-> driver does nothing else!
+> I sent a similar patch to spi-devl a while ago, which Grant said he applied.
+> https://patchwork.kernel.org/patch/2165301/
 > 
+> Can't find the patch in any upstream git tree so I guess Grant hasn't
+> pushed it yet.
 
-Yes, setting aside the timings parameters, the Device Bus driver is only
-charge of allocating the windows; perhaps we can say nothing more, nothing less :)
+Sorry, I didn't notice your patch before.
+Furthermore, I made this patch based on your and Grant,s email.
 
-> > In conclusion: there is absolutely no need to change the NOR driver,
-> > and there is no need to explictly add an explicit description of the
-> > NOR window in the device tree.
+I will drop this patch.
+
 > 
-> As I've said, a DT that has child nodes without an associated address
-> map is broken.
-> 
+> regards
+> Joachim Eastwood
 
-Mmm... could explain me better, why you think it's *broken*?
-
-Perhaps I'm slower than most people around here, but I still
-don't fully understand this brokenness.
-
-Thanks,
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Best Regards,
+Wenyou Yang
