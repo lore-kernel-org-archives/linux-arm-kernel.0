@@ -1,25 +1,48 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Fri, 08 Mar 2013 18:20:32 +0100
-Subject: [PATCH] ARM: OMAP: drop "select MACH_NOKIA_RM696"
-In-Reply-To: <20130308163507.GC26093@atomide.com>
-References: <1362738596.5994.48.camel@x61.thuisdomein>
- <20130308161159.GE14552@blackmetal.musicnaut.iki.fi>
- <20130308163507.GC26093@atomide.com>
-Message-ID: <1362763232.5994.75.camel@x61.thuisdomein>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Fri, 8 Mar 2013 11:27:24 -0600
+Subject: [PATCH 0/9] ARM: dts: Various OMAP2+ device-tree updates
+Message-ID: <1362763654-9660-1-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-03-08 at 08:35 -0800, Tony Lindgren wrote:
-> I think the righ fix is to just add
-> 
-> config MACH_NOKIA_RM680
-> 	bool
+Various OMAP device-tree updates for PMU, DMA, GPIO, GPMC and boards.
 
-I guess you meant MACH_NOKIA_RM696.
+The DMA, PMU and OMAP3430 SDP board changes have been sent before
+individually but re-sending here as a complete series for v3.10.
 
-> to the mach-omap2/Kconfig like we have for n8x0 also.
+This is based upon v3.9-rc1 and the OMAP3 GPMC binding from Florian
+Vaussard [1] and OMAP5 DT SPI patch from Felipe Balbi [2].
 
-Should I draft a patch?
+[1] https://patchwork.kernel.org/patch/2057111/
+[2] https://patchwork.kernel.org/patch/2134711/
 
+Jon Hunter (9):
+  ARM: OMAP2+: Prepare for device-tree PMU support
+  ARM: dts: OMAP2+: Add PMU nodes
+  ARM: dts: OMAP2+: Add SDMA controller bindings and nodes
+  ARM: dts: OMAP3: Add support for OMAP3430 SDP board
+  ARM: dts: Add GPMC node for OMAP2, OMAP4 and OMAP5
+  ARM: dts: Add OMAP3430 SDP flash memory bindings
+  ARM: dts: Add OMAP2 gpio bindings
+  ARM: dts: OMAP3+: Correct gpio #interrupts-cells property
+  ARM: dts: OMAP3: Add reg and interrupt properties for gpio
 
-Paul Bolle
+ .../devicetree/bindings/dma/omap-sdma.txt          |   51 +++++++
+ arch/arm/boot/dts/Makefile                         |    1 +
+ arch/arm/boot/dts/omap2.dtsi                       |   17 +++
+ arch/arm/boot/dts/omap2420.dtsi                    |   55 ++++++++
+ arch/arm/boot/dts/omap2430.dtsi                    |   66 +++++++++
+ arch/arm/boot/dts/omap3.dtsi                       |   70 +++++++++-
+ arch/arm/boot/dts/omap3430-sdp.dts                 |  141 ++++++++++++++++++++
+ arch/arm/boot/dts/omap4-panda-es.dts               |    2 +
+ arch/arm/boot/dts/omap4.dtsi                       |   64 ++++++++-
+ arch/arm/boot/dts/omap4460.dtsi                    |   18 +++
+ arch/arm/boot/dts/omap5.dtsi                       |   68 ++++++++--
+ arch/arm/mach-omap2/pmu.c                          |   14 +-
+ 12 files changed, 544 insertions(+), 23 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/dma/omap-sdma.txt
+ create mode 100644 arch/arm/boot/dts/omap3430-sdp.dts
+ create mode 100644 arch/arm/boot/dts/omap4460.dtsi
+
+-- 
+1.7.10.4
