@@ -1,109 +1,99 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 8 Mar 2013 11:27:29 -0600
-Subject: [PATCH 5/9] ARM: dts: Add GPMC node for OMAP2, OMAP4 and OMAP5
+Date: Fri, 8 Mar 2013 11:27:26 -0600
+Subject: [PATCH 2/9] ARM: dts: OMAP2+: Add PMU nodes
 In-Reply-To: <1362763654-9660-1-git-send-email-jon-hunter@ti.com>
 References: <1362763654-9660-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <1362763654-9660-6-git-send-email-jon-hunter@ti.com>
+Message-ID: <1362763654-9660-3-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the device-tree node for GPMC on OMAP2, OMAP4 and OMAP5 devices.
+Add PMU nodes for OMAP2, OMAP3 and OMAP4460 devices.
+
+Please note that the node for OMAP4460 has been placed in a separate
+header file for OMAP4460, because the node is not compatible with
+OMAP4430. The node for OMAP4430 is not included because PMU is not
+currently supported on OMAP4430 due to the absence of a cross-trigger
+interface driver.
 
 Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 ---
- arch/arm/boot/dts/omap2420.dtsi |   11 +++++++++++
- arch/arm/boot/dts/omap2430.dtsi |   11 +++++++++++
- arch/arm/boot/dts/omap4.dtsi    |   11 +++++++++++
- arch/arm/boot/dts/omap5.dtsi    |   11 +++++++++++
- 4 files changed, 44 insertions(+)
+ arch/arm/boot/dts/omap2.dtsi         |    5 +++++
+ arch/arm/boot/dts/omap3.dtsi         |    6 ++++++
+ arch/arm/boot/dts/omap4-panda-es.dts |    2 ++
+ arch/arm/boot/dts/omap4460.dtsi      |   18 ++++++++++++++++++
+ 4 files changed, 31 insertions(+)
+ create mode 100644 arch/arm/boot/dts/omap4460.dtsi
 
-diff --git a/arch/arm/boot/dts/omap2420.dtsi b/arch/arm/boot/dts/omap2420.dtsi
-index af65609..d4ce6c2 100644
---- a/arch/arm/boot/dts/omap2420.dtsi
-+++ b/arch/arm/boot/dts/omap2420.dtsi
-@@ -29,6 +29,17 @@
- 			pinctrl-single,function-mask = <0x3f>;
+diff --git a/arch/arm/boot/dts/omap2.dtsi b/arch/arm/boot/dts/omap2.dtsi
+index 761c4b6..27f5ea1 100644
+--- a/arch/arm/boot/dts/omap2.dtsi
++++ b/arch/arm/boot/dts/omap2.dtsi
+@@ -26,6 +26,11 @@
  		};
+ 	};
  
-+		gpmc: gpmc at 6800a000 {
-+			compatible = "ti,omap2420-gpmc";
-+			reg = <0x6800a000 0x1000>;
-+			#address-cells = <2>;
-+			#size-cells = <1>;
-+			interrupts = <20>;
-+			gpmc,num-cs = <8>;
-+			gpmc,num-waitpins = <4>;
-+			ti,hwmods = "gpmc";
-+		};
++	pmu {
++		compatible = "arm,arm1136-pmu";
++		interrupts = <3>;
++	};
 +
- 		mcbsp1: mcbsp at 48074000 {
- 			compatible = "ti,omap2420-mcbsp";
- 			reg = <0x48074000 0xff>;
-diff --git a/arch/arm/boot/dts/omap2430.dtsi b/arch/arm/boot/dts/omap2430.dtsi
-index c392445..832f184 100644
---- a/arch/arm/boot/dts/omap2430.dtsi
-+++ b/arch/arm/boot/dts/omap2430.dtsi
-@@ -29,6 +29,17 @@
- 			pinctrl-single,function-mask = <0x3f>;
+ 	soc {
+ 		compatible = "ti,omap-infra";
+ 		mpu {
+diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+index 9f36531..2ddae38 100644
+--- a/arch/arm/boot/dts/omap3.dtsi
++++ b/arch/arm/boot/dts/omap3.dtsi
+@@ -26,6 +26,12 @@
  		};
+ 	};
  
-+		gpmc: gpmc at 6e000000 {
-+			compatible = "ti,omap2430-gpmc";
-+			reg = <0x6e000000 0x1000>;
-+			#address-cells = <2>;
-+			#size-cells = <1>;
-+			interrupts = <20>;
-+			gpmc,num-cs = <8>;
-+			gpmc,num-waitpins = <4>;
-+			ti,hwmods = "gpmc";
-+		};
++	pmu {
++		compatible = "arm,cortex-a8-pmu";
++		interrupts = <3>;
++		ti,hwmods = "debugss";
++	};
 +
- 		mcbsp1: mcbsp at 48074000 {
- 			compatible = "ti,omap2430-mcbsp";
- 			reg = <0x48074000 0xff>;
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index 827f6f3..726ef11 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -196,6 +196,17 @@
- 			#interrupt-cells = <1>;
- 		};
+ 	/*
+ 	 * The soc node represents the soc top level view. It is uses for IPs
+ 	 * that are not memory mapped in the MPU view or for the MPU itself.
+diff --git a/arch/arm/boot/dts/omap4-panda-es.dts b/arch/arm/boot/dts/omap4-panda-es.dts
+index 73bc1a6..2a6e344 100644
+--- a/arch/arm/boot/dts/omap4-panda-es.dts
++++ b/arch/arm/boot/dts/omap4-panda-es.dts
+@@ -5,7 +5,9 @@
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software Foundation.
+  */
++
+ /include/ "omap4-panda.dts"
++/include/ "omap4460.dtsi"
  
-+		gpmc: gpmc at 50000000 {
-+			compatible = "ti,omap4430-gpmc";
-+			reg = <0x50000000 0x1000>;
-+			#address-cells = <2>;
-+			#size-cells = <1>;
-+			interrupts = <0 20 0x4>;
-+			gpmc,num-cs = <8>;
-+			gpmc,num-waitpins = <4>;
-+			ti,hwmods = "gpmc";
-+		};
+ /* Audio routing is differnet between PandaBoard4430 and PandaBoardES */
+ &sound {
+diff --git a/arch/arm/boot/dts/omap4460.dtsi b/arch/arm/boot/dts/omap4460.dtsi
+new file mode 100644
+index 0000000..0a1d38b
+--- /dev/null
++++ b/arch/arm/boot/dts/omap4460.dtsi
+@@ -0,0 +1,18 @@
++/*
++ * Device Tree Source for OMAP4460 SoC
++ *
++ * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
 +
- 		uart1: serial at 4806a000 {
- 			compatible = "ti,omap4-uart";
- 			reg = <0x4806a000 0x100>;
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index 06d21d6..34f41ad 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -208,6 +208,17 @@
- 			#interrupt-cells = <1>;
- 		};
- 
-+		gpmc: gpmc at 50000000 {
-+			compatible = "ti,omap4430-gpmc";
-+			reg = <0x50000000 0x1000>;
-+			#address-cells = <2>;
-+			#size-cells = <1>;
-+			interrupts = <0 20 0x4>;
-+			gpmc,num-cs = <8>;
-+			gpmc,num-waitpins = <4>;
-+			ti,hwmods = "gpmc";
-+		};
-+
- 		i2c1: i2c at 48070000 {
- 			compatible = "ti,omap4-i2c";
- 			reg = <0x48070000 0x100>;
++/ {
++	pmu {
++		compatible = "arm,cortex-a9-pmu";
++		interrupts = <0 54 0x4>,
++			     <0 55 0x4>;
++		ti,hwmods = "debugss";
++	};
++};
 -- 
 1.7.10.4
