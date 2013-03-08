@@ -1,68 +1,39 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 8 Mar 2013 18:34:54 +0200
-Subject: [PATCH 3/4] USB mxs-phy: use readl(), writel() instead of the
- _relaxed() versions
-In-Reply-To: <513A126D.5080906@pengutronix.de>
-References: <1362048751-4061-1-git-send-email-mkl@pengutronix.de>
- <1362048751-4061-4-git-send-email-mkl@pengutronix.de>
- <87sj4gwuhi.fsf@ashishki-desk.ger.corp.intel.com>
- <513A0C66.8080307@pengutronix.de>
- <20130308162807.GD32368@arwen.pp.htv.fi>
- <513A126D.5080906@pengutronix.de>
-Message-ID: <20130308163454.GH32368@arwen.pp.htv.fi>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 8 Mar 2013 08:35:07 -0800
+Subject: [PATCH] ARM: OMAP: drop "select MACH_NOKIA_RM696"
+In-Reply-To: <20130308161159.GE14552@blackmetal.musicnaut.iki.fi>
+References: <1362738596.5994.48.camel@x61.thuisdomein>
+ <20130308161159.GE14552@blackmetal.musicnaut.iki.fi>
+Message-ID: <20130308163507.GC26093@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 08, 2013 at 05:31:41PM +0100, Marc Kleine-Budde wrote:
-> On 03/08/2013 05:28 PM, Felipe Balbi wrote:
-> > Hi,
-> > 
-> > On Fri, Mar 08, 2013 at 05:05:58PM +0100, Marc Kleine-Budde wrote:
-> >> On 02/28/2013 12:25 PM, Alexander Shishkin wrote:
-> >>> Marc Kleine-Budde <mkl@pengutronix.de> writes:
-> >>>
-> >>>> This patch converts the mxs-phy driver from readl_relaxed(), writel_relaxed()
-> >>>> to the plain readl(), writel() functions, which are available on all platforms.
-> >>>> This is done to enable compile time testing on non ARM platforms.
-> >>>>
-> >>>> Reported-by: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-> >>>
-> >>> I think it was Felipe who reported this actually.
-> >>
-> >> Fixed. I'm about to repost this series with crediting Felipe as reporter.
-> >>
-> >> Which tree would you like to be this series based on? It depends on the
-> >> "USB otg: use try_module_get in all usb_get_phy functions and add
-> >> missing module_put" patch which is part of your usb/fixes branch, but
-> >> not in usb/next yet.
-> > 
-> > look at my testing branch. I have them all already. You didn't get an
-> > email yet because I'm waiting for -rc2 to be tagged.
+* Aaro Koskinen <aaro.koskinen@iki.fi> [130308 08:16]:
+> On Fri, Mar 08, 2013 at 11:29:56AM +0100, Paul Bolle wrote:
+> > When support was added for Nokia N9 (RM-696), with commit
+> > 63fc5f3bb3d0ca9ab4767a801b518aa6335f87ad ("ARM: OMAP: add minimal
+> > support for Nokia RM-696"), a select statement for MACH_NOKIA_RM696 was
+> > added to the tree. But there's no Kconfig symbol with that name. That
+> > symbol would be superfluous, since support for that machine piggybacks
+> > on MACH_NOKIA_RM680. So drop that select.
 > 
-> Thanks.
+> This is needed because of arch/arm/tools/mach-types. See
+> include/generated/mach-types.h.
 > 
-> > I have fixed the Reported-by tag, no issues there.
-> > 
-> > Anyway, as soon as v3.9-rc2 is tagged, I will rebase testing on top of
-> > that and move all patches to 'next', then everything will be stable from
-> > that point on.
-> > 
-> > If you want to have changes to any of the patches, now is the time,
-> > after I move patches to 'next' the tree becomes immutable.
+> If you have just CONFIG_MACH_NOKIA_RM680 and run the kernel on RM-696,
+> then machine_is_nokia_rm696() will return false. If I rememeber correctly,
+> this broke at least early printk / uncompressor output at the time.
 > 
-> Nope, I just wanted to keep track of the patches.
+> I guess people may still want to use machine_is_... macros e.g. for
+> debugging.
 
-alright, sorry for the time it's taking to have 'next' ready, but I need
-to make sure things are, at a minimum, compiling correctly. Plus, I have
-dependencies on commits which I have sent to Greg as fixes. They should
-be merged upstream any time now ;-)
+I think the righ fix is to just add
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130308/a9d25190/attachment.sig>
+config MACH_NOKIA_RM680
+	bool
+
+to the mach-omap2/Kconfig like we have for n8x0 also.
+
+Regards,
+
+Tony
