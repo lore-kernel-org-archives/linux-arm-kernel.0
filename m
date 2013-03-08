@@ -1,38 +1,35 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 8 Mar 2013 22:58:31 +0000
-Subject: [PATCH 04/10] bus: introduce an Marvell EBU MBus driver
-In-Reply-To: <20130308174358.GD4094@obsidianresearch.com>
-References: <1362577426-12804-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130308150655.2bad20ce@skate> <20130308174358.GD4094@obsidianresearch.com>
-Message-ID: <201303082258.31445.arnd@arndb.de>
+Date: Fri, 8 Mar 2013 23:12:02 +0000
+Subject: [PATCH] ARM: Dove: add RTC device node
+In-Reply-To: <20130308215818.GU23237@titan.lakedaemon.net>
+References: <20130308121317.4ee83c0a@armhf>
+ <20130308215818.GU23237@titan.lakedaemon.net>
+Message-ID: <201303082312.02189.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 08 March 2013, Jason Gunthorpe wrote:
-> > At this point, I have absolutely no idea what direction to take to
-> > bring this further. I'm basically in a dead-end.
+On Friday 08 March 2013, Jason Cooper wrote:
+> Applied to mvebu/fixes with the following commit entry:
 > 
-> I think Jason C. has said he is fine with bringing in the MBUS driver as
-> is.
+>     ARM: Dove: add RTC device node
 > 
-> The PCI-E driver's DT binding looks great to me, I have no further
-> comments at all, and I believe everyone else's comments related to DT
-> are delt with as well.
+>     The commit:
 > 
-> The huge discussion about the SW PCI-E bridge seems to be concluded
-> and everyone is agreeing on that point too.
+>       48be9ac ARM: Dove: split legacy and DT setup
 > 
-> Soo, I think you are not at all at a dead end, but nearly finished :)
+>     removed the RTC initialization.  This patch re-enables the RTC
+>     via the DT.
 
-I agree, I think the has been going really well and we are just fighting
-over a few details here. I was giving you all a hard time about the PCIe
-driver, but that was actually less about the binding than about the
-question whether to emulate P2P bridges or not. I still don't think
-it's a good solution, but that is because of the hardware shortcomings
-and all the alternatives are worse.
+Looks good. FWIW, the style I tend to use is
 
-In case of the MBUS driver, I don't think it's a hard problem at all
-(compared to the complexity of the PCIe driver and binding), we just
-have to agree to do the right thing here.
 
-	Arnd
+|ARM: Dove: add RTC device node
+|
+|The commit 48be9ac "ARM: Dove: split legacy and DT setup" removed the RTC
+|initialization.  This patch re-enables the RTC via the DT.
+
+I don't think that there is a wide agreement on how to refer to other
+patches yet, but I do a lot of regression fixes like that, so maybe I
+can start a trend here.
+
+	ARnd
