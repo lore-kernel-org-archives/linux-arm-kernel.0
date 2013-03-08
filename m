@@ -1,96 +1,131 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 8 Mar 2013 23:37:34 +0000
-Subject: [GIT PULL] preparation patches for Cortex-M3
-In-Reply-To: <20130307151138.GI15375@pengutronix.de>
-References: <20130307151138.GI15375@pengutronix.de>
-Message-ID: <20130308233733.GD4977@n2100.arm.linux.org.uk>
+From: wmb@firmworks.com (Mitch Bradley)
+Date: Fri, 08 Mar 2013 13:46:13 -1000
+Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
+In-Reply-To: <20130308200245.GC29435@obsidianresearch.com>
+References: <20130307080832.GD3451@avionic-0098.mockup.avionic-design.de>
+ <20130307174955.GC20840@obsidianresearch.com>
+ <20130307194830.GA1811@avionic-0098.mockup.avionic-design.de>
+ <20130307200235.GB20695@obsidianresearch.com>
+ <20130307204726.GB1811@avionic-0098.mockup.avionic-design.de>
+ <51392B4D.9040404@gmail.com>
+ <20130308071443.GA5772@avionic-0098.mockup.avionic-design.de>
+ <20130308165228.GB4094@obsidianresearch.com>
+ <20130308191227.GA6551@avionic-0098.mockup.avionic-design.de>
+ <513A3F4F.2090501@firmworks.com>
+ <20130308200245.GC29435@obsidianresearch.com>
+Message-ID: <513A7845.6040304@firmworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 07, 2013 at 04:11:38PM +0100, Uwe Kleine-K?nig wrote:
-> Hello Russell,
+On 3/8/2013 10:02 AM, Jason Gunthorpe wrote:
+> On Fri, Mar 08, 2013 at 09:43:11AM -1000, Mitch Bradley wrote:
 > 
-> the following changes since commit 949db153b6466c6f7cad5a427ecea94985927311:
+>>>> http://www.spinics.net/lists/arm-kernel/msg228749.html
+>>
+>> The example in that posting looks messed up to me.
+>>
+>> 1) It has "reg = <0x0800 0 0 0 0>", but 0x0800 0 0  is not a valid
+>> address in the address space defined by its parent - because the form of
+>> the parent's ranges property indicates that it's a PCI-style address
+>> form.  0x0800 0 0 lacks the top bits that indicate non-relocatable and
+>> the type (I/O, memory, etc).
 > 
->   Linux 3.8-rc5 (2013-01-25 11:57:28 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.pengutronix.de/git/ukl/linux.git for-next
-> 
-> for you to fetch changes up to 6ebd4d038dbb626a43d87db3007e71f92f49d7b3:
-> 
->   ARM: stub out read_cpuid and read_cpuid_ext for CPU_CP15=n (2013-01-31 21:44:48 +0100)
-> 
-> These are in next since next-20130213 without any problem reports.
-> 
-> I currently base my Cortex-M3 stuff on top of these. The complete series
-> still has some problems though that I have to debug first. I'd be glad
-> if you'd pull at least this series for 3.10.
+> You need to review the OF PCI bindings to make sense of this.  The
+> subnodes are PCI devices. Those PCI devices show up in the
+> configuration space (ie lspci). They are the PCI root port bridges.
 
-Okay, and you of course did try doing a test-merge with something like
-v3.9-rc1 before sending this pull request, so you know about these
-conflicts - which I've fixed up like this.  Does this look sensible?
+As it turns out, I wrote those bindings, almost 20 years ago.
 
-Note, it won't be pushed out for a while...
+Having dug through old versions of that patch, I think I see the source
+of the confusion.
 
-diff --cc arch/arm/include/asm/cputype.h
-index ad41ec2,574269e..0000000
---- a/arch/arm/include/asm/cputype.h
-+++ b/arch/arm/include/asm/cputype.h
-@@@ -38,6 -38,6 +38,24 @@@
-  #define MPIDR_AFFINITY_LEVEL(mpidr, level) \
-  	((mpidr >> (MPIDR_LEVEL_BITS * level)) & MPIDR_LEVEL_MASK)
-  
-++#define ARM_CPU_IMP_ARM			0x41
-++#define ARM_CPU_IMP_INTEL		0x69
-++
-++#define ARM_CPU_PART_ARM1136		0xB360
-++#define ARM_CPU_PART_ARM1156		0xB560
-++#define ARM_CPU_PART_ARM1176		0xB760
-++#define ARM_CPU_PART_ARM11MPCORE	0xB020
-++#define ARM_CPU_PART_CORTEX_A8		0xC080
-++#define ARM_CPU_PART_CORTEX_A9		0xC090
-++#define ARM_CPU_PART_CORTEX_A5		0xC050
-++#define ARM_CPU_PART_CORTEX_A15		0xC0F0
-++#define ARM_CPU_PART_CORTEX_A7		0xC070
-++
-++#define ARM_CPU_XSCALE_ARCH_MASK	0xe000
-++#define ARM_CPU_XSCALE_ARCH_V1		0x2000
-++#define ARM_CPU_XSCALE_ARCH_V2		0x4000
-++#define ARM_CPU_XSCALE_ARCH_V3		0x6000
-++
-  extern unsigned int processor_id;
-  
-  #ifdef CONFIG_CPU_CP15
-@@@ -92,21 -88,15 +106,30 @@@ static inline unsigned int __attribute_
-  	return read_cpuid(CPUID_ID);
-  }
-  
-+ #else /* ifdef CONFIG_CPU_CP15 */
-+ 
-+ static inline unsigned int __attribute_const__ read_cpuid_id(void)
-+ {
-+ 	return processor_id;
-+ }
-+ 
-+ #endif /* ifdef CONFIG_CPU_CP15 / else */
-+ 
- +static inline unsigned int __attribute_const__ read_cpuid_implementor(void)
- +{
- +	return (read_cpuid_id() & 0xFF000000) >> 24;
- +}
- +
- +static inline unsigned int __attribute_const__ read_cpuid_part_number(void)
- +{
- +	return read_cpuid_id() & 0xFFF0;
- +}
- +
- +static inline unsigned int __attribute_const__ xscale_cpu_arch_version(void)
- +{
- +	return read_cpuid_part_number() & ARM_CPU_XSCALE_ARCH_MASK;
- +}
- +
-  static inline unsigned int __attribute_const__ read_cpuid_cachetype(void)
-  {
-  	return read_cpuid(CPUID_CACHETYPE);
+In a very early version of the patch -
+  http://www.spinics.net/lists/arm-kernel/msg211839.html
+the pcie-controller address space had 1 address cell, essentially
+propagating the CPU address down to the subordinate nodes, and the
+subordinate pcie nodes had no child address specification.  Somebody
+correctly observed that PCI buses need to export 3/2 address/size cells
+to their children.
+
+But that stipulation applies only to the subordinate pcie nodes, not
+necessarily to the enclosing pcie-controller node.
+
+A later version -
+   http://permalink.gmane.org/gmane.linux.kernel.pci/20358
+applied 3/2 PCI addressing at both levels.  That is somewhat sensible if
+you treat the top level as a "PCI root complex" and if the subordinate
+port control registers are really PCI config header blocks.
+
+But look at the ranges entries therein.  PCI config address <0x800 ..>
+maps to CPU address 0xd004000 size 0x2000 and <0x1000 ..> maps to
+0xd0044000 size 0x2000.  0x800 size 0x2000 encroaches into the <0x1000
+..> range.  That can't be right.
+
+That, plus the first version of the patch, makes me think that these
+root-port control registers might not really be PCI config registers, in
+which case the use of PCI addressing at the top level is a fiction.
+
+Furthermore, we have the fact that pcie at 0,0 corresponds to
+marvell,pcie-port = <0> and marvell,pcie-lane = <0>, and similarly for
+pcie at 0,1 and pcie at 0,2.  That correspondence still appears in the recent
+patch.
+
+So it looks like the "@0,0" addressing attempts to represent lane,port
+instead of device,function PCI config space addressing.  0,0 is not the
+right PCI device/function number for reg=<0x800 ...> - 0x800 is device
+1, not device 0.
+
+Another problem is the device_type values.  If the top level is to be
+interpreted as a PCI addressing domain, it should have a device_type=pci
+property.
+
+One solution is for the top node to use 1-cell addresses, passing the
+CPU address to the subordinates.  The subordinate nodes use the standard
+PCI address representation.  The subordinate reg properties just list
+the CPU address of the control registers.  Each subordinate has a ranges
+properties to translate PCI to CPU addresses and a bus-range property
+for PCI bus numbers (unless those are determined dynamically).
+
+What you lose with that is the ability to refer to the nodes by
+port,lane.  If that is important, then the top address domain needs an
+additional cell to say whether a given address is a CPU address or
+port,lane.  The top node would need a ranges to map the various forms
+into CPU addresses.  The child reg properties could use the port,lane
+form, and marvell,pcie-{port,lane} would disappear.
+
+In neither case would you need the controversial "reg-names" thing.
+
+The tradeoff:
+
+Existing proposed patch: Violates addressing rules, requires funny new
+"reg-names" mechanism, pretends to create a PCI bus level that does not
+exist.
+
+One-cell top address: Follows addressing rules, may be able to use
+existing "simple-bus" address translation code, does not permit the
+pretty @lane,port human-readable form.
+
+Two-cell top address: Follows addressing rules, possibly requires new
+code to translate this particular 2-address-cell format, permits
+@lane,port representation.
+
+> 
+> The reg value follows the OF PCI spec and has the configuration
+> address of the bridge. For the first port's bridge this address in
+> lspci format is 00:01.0 which encodes to <0x800 0 0>
+> 
+> The Linux OF PCI core uses the reg value in this format to match the
+> OF node in the DT to the PCI device node as it does PCI discovery.
+> 
+>> 2) The "@0,0" and "@1,0" suffixes do not correspond to the reg values
+>> <0x0800 0 0 0 0> and <0x1000 0 0 0 0> using any rule that I know.
+> 
+> @0,1,0 (bus,device,fn) could be more appropriate, but that is
+> cosmetic?
+
+Except that the @0,0 in this case seems to represent port,lane and not
+device,function , as argued above.
+
+> 
+> Jason
+> 
