@@ -1,89 +1,25 @@
-From: jhovold@gmail.com (Johan Hovold)
-Date: Fri,  8 Mar 2013 13:51:41 +0100
-Subject: [PATCH 1/3] ARM: at91/rtc: fix boot after RTC wake-up
-In-Reply-To: <1362747103-21445-1-git-send-email-jhovold@gmail.com>
-References: <1362747103-21445-1-git-send-email-jhovold@gmail.com>
-Message-ID: <1362747103-21445-2-git-send-email-jhovold@gmail.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Fri, 08 Mar 2013 15:19:45 +0200
+Subject: [PATCH 07/12] mtd: gpmi: move to use generic DMA helper
+In-Reply-To: <1361978748-25281-8-git-send-email-shawn.guo@linaro.org>
+References: <1361978748-25281-1-git-send-email-shawn.guo@linaro.org>
+ <1361978748-25281-8-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1362748785.5101.4.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix failed boot after RTC wake-up by making sure RTC-interrupts are
-disabled at shutdown.
+On Wed, 2013-02-27 at 23:25 +0800, Shawn Guo wrote:
+> With the generic DMA device tree helper supported by mxs-dma driver,
+> client devices only need to call dma_request_slave_channel() for
+> requesting a DMA channel from dmaengine.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Artem Bityutskiy <dedekind1@gmail.com>
+> Cc: linux-mtd at lists.infradead.org
 
-The RTC-registers are not reset at shutdown when there is backup power
-available, and hence the RTC-interrupt, which uses the shared system
-interrupt, may be enabled during early boot. If an RTC-alarm goes off
-before the RTC-driver is initialised (e.g. when waking up from an
-RTC-alarm) this results in disabled system interrupts.
+It looks like this ne is rather independent and can go via the MTD tree.
+So pushed this one to l2-mtd.git - let me know if I am confused. Thanks!
 
-Without earlyprintk boot hangs after
-
-  Uncompressing Linux... done, booting the kernel.
-
-and earlyprintk reveals that the shared system interrupt gets disabled:
-
-  irq 17: nobody cared (try booting with the "irqpoll" option)
-  [<c000cf8c>] (unwind_backtrace+0x0/0xf0) from [<c00513ec>] (__report_bad_irq+0x20/0xe8)
-  [<c00513ec>] (__report_bad_irq+0x20/0xe8) from [<c00516fc>] (note_interrupt+0x1e0/0x244)
-  [<c00516fc>] (note_interrupt+0x1e0/0x244) from [<c004f980>] (handle_irq_event_percpu+0xac/0x1c4)
-  [<c004f980>] (handle_irq_event_percpu+0xac/0x1c4) from [<c004faec>] (handle_irq_event+0x54/0x84)
-  [<c004faec>] (handle_irq_event+0x54/0x84) from [<c0052364>] (handle_fasteoi_irq+0x84/0x154)
-  [<c0052364>] (handle_fasteoi_irq+0x84/0x154) from [<c004f1f8>] (generic_handle_irq+0x20/0x30)
-  [<c004f1f8>] (generic_handle_irq+0x20/0x30) from [<c0009b8c>] (handle_IRQ+0x30/0x84)
-  [<c0009b8c>] (handle_IRQ+0x30/0x84) from [<c0008fa0>] (__irq_svc+0x40/0x6c)
-  [<c0008fa0>] (__irq_svc+0x40/0x6c) from [<c001cd6c>] (__do_softirq+0x5c/0x164)
-  [<c001cd6c>] (__do_softirq+0x5c/0x164) from [<c001d268>] (irq_exit+0x58/0x60)
-  [<c001d268>] (irq_exit+0x58/0x60) from [<c0009b90>] (handle_IRQ+0x34/0x84)
-  [<c0009b90>] (handle_IRQ+0x34/0x84) from [<c0008fa0>] (__irq_svc+0x40/0x6c)
-  [<c0008fa0>] (__irq_svc+0x40/0x6c) from [<c03e668c>] (start_kernel+0x1d8/0x29c)
-  [<c03e668c>] (start_kernel+0x1d8/0x29c) from [<70008040>] (0x70008040)
-  handlers:
-  [<c0012df0>] at91sam926x_pit_interrupt
-  Disabling IRQ #17
-
-Note that disabling the RTC-interrupts at shutdown fixes boot after a
-clean shutdown, but that an RTC-alarm after a user (or watchdog) reset
-could still prevent the system from booting.
-
-Note also that the only way to recover from a failed boot after an
-RTC-alarm is to remove any backup power (e.g. backup battery) or to
-disable (or acknowledge) the RTC-interrupt manually from the bootloader.
-In particular, a user-reset is not sufficient.
-
-Tested on at91sam9g45.
-
-Cc: stable <stable@vger.kernel.org>
-Signed-off-by: Johan Hovold <jhovold@gmail.com>
----
- drivers/rtc/rtc-at91rm9200.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
-
-diff --git a/drivers/rtc/rtc-at91rm9200.c b/drivers/rtc/rtc-at91rm9200.c
-index b6469e2..936c75a 100644
---- a/drivers/rtc/rtc-at91rm9200.c
-+++ b/drivers/rtc/rtc-at91rm9200.c
-@@ -338,6 +338,14 @@ static int __exit at91_rtc_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static void at91_rtc_shutdown(struct platform_device *pdev)
-+{
-+	/* Disable all interrupts */
-+	at91_rtc_write(AT91_RTC_IDR, AT91_RTC_ACKUPD | AT91_RTC_ALARM |
-+					AT91_RTC_SECEV | AT91_RTC_TIMEV |
-+					AT91_RTC_CALEV);
-+}
-+
- #ifdef CONFIG_PM
- 
- /* AT91RM9200 RTC Power management control */
-@@ -384,6 +392,7 @@ static const struct dev_pm_ops at91_rtc_pm = {
- 
- static struct platform_driver at91_rtc_driver = {
- 	.remove		= __exit_p(at91_rtc_remove),
-+	.shutdown	= at91_rtc_shutdown,
- 	.driver		= {
- 		.name	= "at91_rtc",
- 		.owner	= THIS_MODULE,
 -- 
-1.8.1.1
+Best Regards,
+Artem Bityutskiy
