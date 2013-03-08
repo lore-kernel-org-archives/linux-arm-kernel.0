@@ -1,36 +1,41 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Fri, 8 Mar 2013 12:13:17 +0100
-Subject: [PATCH] ARM: Dove: add RTC device node
-Message-ID: <20130308121317.4ee83c0a@armhf>
+From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
+Date: Fri,  8 Mar 2013 08:18:56 -0300
+Subject: [PATCH] ARM: sunxi: cubieboard: Add UART muxing
+Message-ID: <1362741536-12632-1-git-send-email-emilio@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The commit 48be9ac930086f removed the RTC initialization.
-This patch re-enables the RTC via the DT.
+We previously relied on the bootloader to do the muxing of the UART for
+the Cubieboard. Don't rely on it anymore and use pinctrl.
 
-Signed-off-by: Jean-Fran?ois Moine <moinejf@free.fr>
+Also remove uart1, as it is not enabled by default and it's not exposed
+on the board headers.
+
+Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
 ---
- arch/arm/boot/dts/dove.dtsi |    5 +++++
- 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-index 46afade..28ff4dc 100644
---- a/arch/arm/boot/dts/dove.dtsi
-+++ b/arch/arm/boot/dts/dove.dtsi
-@@ -197,6 +197,11 @@
- 			status = "disabled";
+This is a followup patch to Maxime Ripard's "Extend UART support for 
+Allwinner SoCs" series.
+
+ arch/arm/boot/dts/sun4i-a10-cubieboard.dts | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+index 88e2dc1..dc760d0 100644
+--- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
++++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+@@ -37,10 +37,8 @@
  		};
  
-+		rtc at d8500 {
-+			compatible = "marvell,orion-rtc";
-+			reg = <0xd8500 0x20>;
-+		};
-+
- 		crypto: crypto at 30000 {
- 			compatible = "marvell,orion-crypto";
- 			reg = <0x30000 0x10000>,
-
-
+ 		uart0: uart at 01c28000 {
+-			status = "okay";
+-		};
+-
+-		uart1: uart at 01c28400 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&uart0_pins_a>;
+ 			status = "okay";
+ 		};
+ 	};
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+1.8.1.5
