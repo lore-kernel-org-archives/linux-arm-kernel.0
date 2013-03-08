@@ -1,42 +1,82 @@
-From: mbizon@freebox.fr (Maxime Bizon)
-Date: Fri, 08 Mar 2013 16:59:50 +0100
-Subject: [PATCH 04/10] bus: introduce an Marvell EBU MBus driver
-In-Reply-To: <20130307230516.GA28975@obsidianresearch.com>
-References: <1362577426-12804-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1362577426-12804-5-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130306190821.GA4689@obsidianresearch.com>
- <20130306202710.15a6aa2c@skate>
- <20130306202447.GA4916@obsidianresearch.com>
- <20130306214036.62fc93b9@skate>
- <20130306215031.GB4916@obsidianresearch.com>
- <20130306222712.GP23237@titan.lakedaemon.net>
- <20130306230412.GA5870@obsidianresearch.com>
- <20130307222004.GA2450@localhost>
- <20130307230516.GA28975@obsidianresearch.com>
-Message-ID: <1362758390.25161.17.camel@sakura.staff.proxad.net>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 8 Mar 2013 16:58:05 +0100
+Subject: [PATCH 2/4] ARM: at91: introduce the core type choice to split
+ ARMv4/5 and ARMv7 arch
+In-Reply-To: <1362755638-20092-3-git-send-email-ludovic.desroches@atmel.com>
+References: <1362755638-20092-1-git-send-email-ludovic.desroches@atmel.com>
+ <1362755638-20092-3-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <20130308155805.GB4590@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-03-07 at 16:05 -0700, Jason Gunthorpe wrote:
+On 16:13 Fri 08 Mar     , ludovic.desroches at atmel.com wrote:
+> From: Ludovic Desroches <ludovic.desroches@atmel.com>
 > 
-> BTW, I've made the same basic choice on our Kirkwood systems. The NAND
-> timing pameters are set by the bootloader and the kernel doesn't touch
-> them. The bootloader knows which flash chip is placed on the board so
-> only it knows the correct timing parameters. There is not any reason
-> to communicate them to the kernel. 
+> As we will introduce SAMA5, we need to distinguish the core architecture. It is
+> useless to show ARMv4/5 entries if we are configuring a kernel for SAMA5
+> devices.
+> 
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-since you can probe the chip ONFI timings, why are you doing that ?
-
-on a general standpoint, why would you ever want to run with whatever
-the bootloader left in registers if you have full knowledge to reprogram
-them in the kernel ?
-
-from a testability point this is horrible,
-
-users get the classic answer to bug reports, "the problem must be coming
-from your bootloader, try upgrading it"
-
-the 'B' in BIOS stands for buggy
-
--- 
-Maxime
+Best Regards,
+J.
+> ---
+>  arch/arm/mach-at91/Kconfig | 22 ++++++++++++++++++----
+>  1 file changed, 18 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+> index 68c53c3..8b35c7f 100644
+> --- a/arch/arm/mach-at91/Kconfig
+> +++ b/arch/arm/mach-at91/Kconfig
+> @@ -6,6 +6,10 @@ config HAVE_AT91_DBGU0
+>  config HAVE_AT91_DBGU1
+>  	bool
+>  
+> +config AT91_PMC_UNIT
+> +	bool
+> +	default !ARCH_AT91X40
+> +
+>  config AT91_SAM9_ALT_RESET
+>  	bool
+>  	default !ARCH_AT91X40
+> @@ -27,8 +31,21 @@ config SOC_AT91SAM9
+>  
+>  menu "Atmel AT91 System-on-Chip"
+>  
+> +choice
+> +
+> +	prompt "Core type"
+> +
+> +config SOC_SAM_V4_V5
+> +	bool "ARM7/ARM9"
+> +	help
+> +	  Select this if you are using one of Atmel's AT91SAM9, AT91RM9200
+> +	  or AT91X40 SoC.
+> +
+> +endchoice
+> +
+>  comment "Atmel AT91 Processor"
+>  
+> +if SOC_SAM_V4_V5
+>  config SOC_AT91RM9200
+>  	bool "AT91RM9200"
+>  	select CPU_ARM920T
+> @@ -94,13 +111,10 @@ config SOC_AT91SAM9N12
+>  	help
+>  	  Select this if you are using Atmel's AT91SAM9N12 SoC.
+>  
+> -config AT91_PMC_UNIT
+> -	bool
+> -	default !ARCH_AT91X40
+> -
+>  # ----------------------------------------------------------
+>  
+>  source arch/arm/mach-at91/Kconfig.non_dt
+> +endif # SOC_SAM_V4_V5
+>  
+>  comment "Generic Board Type"
+>  
+> -- 
+> 1.7.11.3
+> 
