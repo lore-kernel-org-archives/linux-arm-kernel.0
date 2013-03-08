@@ -1,49 +1,155 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 08 Mar 2013 16:17:29 +0100
-Subject: [PATCH 3/4][V2] ARM: nomadik: add dynamic irq flag to the timer
-In-Reply-To: <1362219013-18173-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1362219013-18173-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <513A0109.9060801@linaro.org>
+From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
+Date: Fri, 8 Mar 2013 16:18:21 +0100
+Subject: [PATCH] ARM: at91: add gpio suspend/resume support when using pinctrl
+Message-ID: <1362755901-20279-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Add the dynamic irq affinity feature to the timer clock device.
-> 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Reviewed-by: Vincent Guittot <vincent.guittot@linaro.org>
-> Acked-by: Rickard Andersson <rickard.andersson@stericsson.com>
-> ---
+From: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-Hi Linus,
+gpio suspend/resume and wakeup sources where not managed when using pinctrl so
+it was impossible to wake up the system with a gpio.
 
-AFAIU, you are ok with this patch, Rickard acked it and Vincent reviewed it.
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+---
+ arch/arm/mach-at91/include/mach/gpio.h |  8 +++++
+ arch/arm/mach-at91/pm.c                | 10 ++++--
+ drivers/pinctrl/pinctrl-at91.c         | 61 +++++++++++++++++++++++++++++++++-
+ 3 files changed, 76 insertions(+), 3 deletions(-)
 
-Thomas agreed to merge it into its tree as I requested because we will
-need to wait for your tree to gain visibility to this new flag before
-submitting this patch, which can take awhile.
-
-Could you please ack it if it is ok for you ?
-
-Thanks
-  -- Daniel
-
-> 
-> 
->  drivers/clocksource/nomadik-mtu.c |    3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clocksource/nomadik-mtu.c b/drivers/clocksource/nomadik-mtu.c
-> index 7cbcaa0..73dc540 100644
-> --- a/drivers/clocksource/nomadik-mtu.c
-> +++ b/drivers/clocksource/nomadik-mtu.c
-> @@ -136,7 +136,8 @@ static void nmdk_clkevt_mode(enum clock_event_mode mode,
->   static struct clock_event_device nmdk_clkevt = {
->  	.name		= "mtu_1",
-> -	.features	= CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_FEAT_PERIODIC,
-> +	.features	= CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_FEAT_PERIODIC |
-> +	                  CLOCK_EVT_FEAT_DYNIRQ,
->  	.rating		= 200,
->  	.set_mode	= nmdk_clkevt_mode,
->  	.set_next_event	= nmdk_clkevt_next,
-> -- 
-> 1.7.9.5
+diff --git a/arch/arm/mach-at91/include/mach/gpio.h b/arch/arm/mach-at91/include/mach/gpio.h
+index eed465a..5fc2377 100644
+--- a/arch/arm/mach-at91/include/mach/gpio.h
++++ b/arch/arm/mach-at91/include/mach/gpio.h
+@@ -209,6 +209,14 @@ extern int at91_get_gpio_value(unsigned pin);
+ extern void at91_gpio_suspend(void);
+ extern void at91_gpio_resume(void);
+ 
++#ifdef CONFIG_PINCTRL_AT91
++extern void at91_pinctrl_gpio_suspend(void);
++extern void at91_pinctrl_gpio_resume(void);
++#else
++static inline void at91_pinctrl_gpio_suspend(void) {}
++static inline void at91_pinctrl_gpio_resume(void) {}
++#endif
++
+ #endif	/* __ASSEMBLY__ */
+ 
+ #endif
+diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+index adb6db8..73f1f25 100644
+--- a/arch/arm/mach-at91/pm.c
++++ b/arch/arm/mach-at91/pm.c
+@@ -201,7 +201,10 @@ extern u32 at91_slow_clock_sz;
+ 
+ static int at91_pm_enter(suspend_state_t state)
+ {
+-	at91_gpio_suspend();
++	if (of_have_populated_dt())
++		at91_pinctrl_gpio_suspend();
++	else
++		at91_gpio_suspend();
+ 	at91_irq_suspend();
+ 
+ 	pr_debug("AT91: PM - wake mask %08x, pm state %d\n",
+@@ -286,7 +289,10 @@ static int at91_pm_enter(suspend_state_t state)
+ error:
+ 	target_state = PM_SUSPEND_ON;
+ 	at91_irq_resume();
+-	at91_gpio_resume();
++	if (of_have_populated_dt())
++		at91_pinctrl_gpio_resume();
++	else
++		at91_gpio_resume();
+ 	return 0;
+ }
+ 
+diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+index 75933a6..efb7f10 100644
+--- a/drivers/pinctrl/pinctrl-at91.c
++++ b/drivers/pinctrl/pinctrl-at91.c
+@@ -1277,21 +1277,80 @@ static int alt_gpio_irq_type(struct irq_data *d, unsigned type)
+ }
+ 
+ #ifdef CONFIG_PM
++
++static u32 wakeups[MAX_GPIO_BANKS];
++static u32 backups[MAX_GPIO_BANKS];
++
+ static int gpio_irq_set_wake(struct irq_data *d, unsigned state)
+ {
+ 	struct at91_gpio_chip *at91_gpio = irq_data_get_irq_chip_data(d);
+ 	unsigned	bank = at91_gpio->pioc_idx;
++	unsigned mask = 1 << d->hwirq;
+ 
+ 	if (unlikely(bank >= MAX_GPIO_BANKS))
+ 		return -EINVAL;
+ 
++	if (state)
++		wakeups[bank] |= mask;
++	else
++		wakeups[bank] &= ~mask;
++
+ 	irq_set_irq_wake(at91_gpio->pioc_virq, state);
+ 
+ 	return 0;
+ }
++
++void at91_pinctrl_gpio_suspend(void)
++{
++	int i;
++
++	for (i = 0; i < gpio_banks; i++) {
++		void __iomem  *pio;
++
++		if (!gpio_chips[i])
++			continue;
++
++		pio = gpio_chips[i]->regbase;
++
++		backups[i] = __raw_readl(pio + PIO_IMR);
++		__raw_writel(backups[i], pio + PIO_IDR);
++		__raw_writel(wakeups[i], pio + PIO_IER);
++
++		if (!wakeups[i]) {
++			clk_unprepare(gpio_chips[i]->clock);
++			clk_disable(gpio_chips[i]->clock);
++		} else {
++			printk(KERN_DEBUG "GPIO-%c may wake for %08x\n",
++			       'A'+i, wakeups[i]);
++		}
++	}
++}
++
++void at91_pinctrl_gpio_resume(void)
++{
++	int i;
++
++	for (i = 0; i < gpio_banks; i++) {
++		void __iomem  *pio;
++
++		if (!gpio_chips[i])
++			continue;
++
++		pio = gpio_chips[i]->regbase;
++
++		if (!wakeups[i]) {
++			if (clk_prepare(gpio_chips[i]->clock) == 0)
++				clk_enable(gpio_chips[i]->clock);
++		}
++
++		__raw_writel(wakeups[i], pio + PIO_IDR);
++		__raw_writel(backups[i], pio + PIO_IER);
++	}
++}
++
+ #else
+ #define gpio_irq_set_wake	NULL
+-#endif
++#endif /* CONFIG_PM */
+ 
+ static struct irq_chip gpio_irqchip = {
+ 	.name		= "GPIO",
+-- 
+1.7.11.3
