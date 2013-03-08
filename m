@@ -1,96 +1,82 @@
-From: hechtb@gmail.com (Bastian Hecht)
-Date: Fri,  8 Mar 2013 12:29:41 +0100
-Subject: [PATCH v2 7/7] ARM: mach-shmobile: r8a7740: Setup the timer CMT10
- using DT
-In-Reply-To: <1362742181-19111-1-git-send-email-hechtb+renesas@gmail.com>
-References: <1362742181-19111-1-git-send-email-hechtb+renesas@gmail.com>
-Message-ID: <1362742181-19111-8-git-send-email-hechtb+renesas@gmail.com>
+From: gleb@redhat.com (Gleb Natapov)
+Date: Fri, 8 Mar 2013 13:31:50 +0200
+Subject: [kvmarm] [GIT PULL v2] KVM/ARM Fixes for 3.9-rc1
+In-Reply-To: <600b4cf22f05ccd66c8f6e18eaaf75c4@localhost>
+References: <CAEDV+gLpqG0GxbCDoUqO2fdwpqLeEd_psaaFWzm2Xi829-zUTQ@mail.gmail.com>
+ <f3db22097ee303991fccc64bbf863dd6@localhost>
+ <CAEDV+g+ATCr3Hd+VjwLW7tgbJ9Cq4eaC49ZFO-1jB=grAVR49w@mail.gmail.com>
+ <fd46d1c4746530d6c705dba843c848ea@localhost>
+ <20130307190900.GB15854@amt.cnet>
+ <600b4cf22f05ccd66c8f6e18eaaf75c4@localhost>
+Message-ID: <20130308113150.GF24444@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We can now use the Device Tree for bringing up our timer device CMT10 on
-the SoC r8a7740.
+On Fri, Mar 08, 2013 at 04:12:41AM +0100, Marc Zyngier wrote:
+> On Thu, 7 Mar 2013 16:09:00 -0300, Marcelo Tosatti <mtosatti@redhat.com>
+> wrote:
+> > On Thu, Mar 07, 2013 at 07:57:23AM +0100, Marc Zyngier wrote:
+> >> On Wed, 6 Mar 2013 20:40:00 -0800, Christoffer Dall
+> >> <cdall@cs.columbia.edu>
+> >> wrote:
+> >> > On Wed, Mar 6, 2013 at 7:54 PM, Marc Zyngier <marc.zyngier@arm.com>
+> >> wrote:
+> >> >> On Wed, 6 Mar 2013 16:31:48 -0800, Christoffer Dall
+> >> >> <cdall@cs.columbia.edu>
+> >> >> wrote:
+> >> >>
+> >> >> Hi Christoffer,
+> >> >>
+> >> >>>
+> >> >>> Please pull these KVM/ARM fixes mostly centered around preparation
+> >> >>> for
+> >> >>> Marc's ARMv8 KVM work.
+> >> >>
+> >> >> Can we please hold on that for a while? asm-offset.c is usually a
+> >> >> candidate for merge conflicts as people start pushing patches post
+> >> merge
+> >> >> window, and it would make sense to see what is happening in that
+> >> >> space.
+> >> >>
+> >> > Sure, when would you see this happen exactly?
+> >> 
+> >> Usually, by -rc5 we have a pretty good idea of what is going in. Also,
+> >> putting things into -next is a good way to detect potential problems.
+> >> 
+> >> Oh, and keeping linux-arm-kernel into the loop. Most ARM developers
+> don't
+> >> follow the KVM lists.
+> >> 
+> >>         M.
+> > 
+> > Mark, can you please be more verbose on the reason for this request? 
+> 
+> arch/arm/kernel/asm-offset.c, being an ARM core file, is often the
+> location of merge conflicts. And because arch/arm sees a lot more churn
+> than any other architecture, we have the policy of dealing with conflicts
+> before they hit Linus.
+> 
+> We usually deal with that by providing stable branches that will contain
+> the "offending" patches, and on which others can base their developments.
+> 
+Can you elaborate on that? If all changes to arch/arm/kernel/asm-offset.c not
+go through the same tree how having many stable branches solve conflicts
+issues?
 
-Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
----
-v2: new
+> This is why I suggested holding on this pull request until we got a better
+> view of what potential merge conflicts we get with this patches.
+arch/arm/kernel/asm-offset.c in kvm.git:next will not change until 3.10-rc1
+is released. What holding the pull request will give us?
 
-I can rebase this on topic/intc-of if wanted.
+>                                                                    This
+> shouldn't prevent the patches from entering -next though, as this would
+> help detecting the above conflicts.
+> 
+> Thanks,
+> 
+>         M.
+> -- 
+> Fast, cheap, reliable. Pick two.
 
- arch/arm/boot/dts/r8a7740.dtsi         |   11 +++++++++++
- arch/arm/mach-shmobile/setup-r8a7740.c |   33 --------------------------------
- 2 files changed, 11 insertions(+), 33 deletions(-)
-
-diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
-index 798fa35..72f4c80 100644
---- a/arch/arm/boot/dts/r8a7740.dtsi
-+++ b/arch/arm/boot/dts/r8a7740.dtsi
-@@ -18,4 +18,15 @@
- 			compatible = "arm,cortex-a9";
- 		};
- 	};
-+
-+	timer at e6138010 {
-+		compatible = "renesas,cmt-timer";
-+		interrupt-parent = <&intca>;
-+		reg = <0xe6138010 0xc>;
-+		interrupts = <0x0b00>;
-+		renesas,device-id = <1>;
-+		renesas,channel-id = <0>;
-+		renesas,source-quality = <3>;
-+		renesas,event-quality = <3>;
-+	};
- };
-diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
-index 30ac79c..9db61a6 100644
---- a/arch/arm/mach-shmobile/setup-r8a7740.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7740.c
-@@ -255,38 +255,6 @@ static struct platform_device scifb_device = {
- 	},
- };
- 
--/* CMT */
--static struct sh_timer_config cmt10_platform_data = {
--	.name = "CMT10",
--	.channel_offset = 0x10,
--	.timer_bit = 0,
--	.clockevent_rating = 125,
--	.clocksource_rating = 125,
--};
--
--static struct resource cmt10_resources[] = {
--	[0] = {
--		.name	= "CMT10",
--		.start	= 0xe6138010,
--		.end	= 0xe613801b,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= evt2irq(0x0b00),
--		.flags	= IORESOURCE_IRQ,
--	},
--};
--
--static struct platform_device cmt10_device = {
--	.name		= "sh_cmt",
--	.id		= 10,
--	.dev = {
--		.platform_data	= &cmt10_platform_data,
--	},
--	.resource	= cmt10_resources,
--	.num_resources	= ARRAY_SIZE(cmt10_resources),
--};
--
- /* TMU */
- static struct sh_timer_config tmu00_platform_data = {
- 	.name = "TMU00",
-@@ -388,7 +356,6 @@ static struct platform_device *r8a7740_early_devices[] __initdata = {
- 	&scif6_device,
- 	&scif7_device,
- 	&scifb_device,
--	&cmt10_device,
- 	&tmu00_device,
- 	&tmu01_device,
- 	&tmu02_device,
--- 
-1.7.9.5
+--
+			Gleb.
