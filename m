@@ -1,44 +1,66 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  8 Mar 2013 16:19:20 +0100
-Subject: [PATCH v4 18/18] arm: mvebu: update defconfig with PCI and USB support
-In-Reply-To: <1362755960-30791-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1362755960-30791-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1362755960-30791-19-git-send-email-thomas.petazzoni@free-electrons.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 08 Mar 2013 16:28:55 +0100
+Subject: [PATCH 4/4][V2] ARM: timer-sp: Set dynamic irq affinity
+In-Reply-To: <1362219013-18173-5-git-send-email-daniel.lezcano@linaro.org>
+References: <1362219013-18173-1-git-send-email-daniel.lezcano@linaro.org>
+ <1362219013-18173-5-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <513A03B7.7000004@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have the necessary drivers and Device Tree informations to
-support PCIe on Armada 370 and Armada XP, enable the CONFIG_PCI
-option.
+On 03/02/2013 11:10 AM, Daniel Lezcano wrote:
+> From: Viresh Kumar <viresh.kumar@linaro.org>
+> 
+> When a cpu goes to a deep idle state where its local timer is shutdown, it
+> notifies the time frame work to use the broadcast timer instead.
+> 
+> Unfortunately, the broadcast device could wake up any CPU, including an idle one
+> which is not concerned by the wake up at all.
+> 
+> This implies, in the worst case, an idle CPU will wake up to send an IPI to
+> another idle cpu.
+> 
+> This patch fixes this for ARM platforms using timer-sp, by setting
+> CLOCK_EVT_FEAT_DYNIRQ feature.
+> 
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> ---
 
-Also, since the Armada 370 Mirabox has a built-in USB XHCI controller
-connected on the PCIe bus, enable the corresponding options as well.
+Hi Russell,
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/configs/mvebu_defconfig |    3 +++
- 1 file changed, 3 insertions(+)
+I asked Thomas if he could take this patch in its tree but it falls
+under your umbrella. Thomas agreed to take it if you ack this patch.
 
-diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
-index 2ec8119..071a5b1 100644
---- a/arch/arm/configs/mvebu_defconfig
-+++ b/arch/arm/configs/mvebu_defconfig
-@@ -13,6 +13,8 @@ CONFIG_MACH_ARMADA_370=y
- CONFIG_MACH_ARMADA_XP=y
- # CONFIG_CACHE_L2X0 is not set
- # CONFIG_SWP_EMULATE is not set
-+CONFIG_PCI=y
-+CONFIG_PCI_MVEBU=y
- CONFIG_SMP=y
- CONFIG_AEABI=y
- CONFIG_HIGHMEM=y
-@@ -53,6 +55,7 @@ CONFIG_USB_SUPPORT=y
- CONFIG_USB=y
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_EHCI_ROOT_HUB_TT=y
-+CONFIG_USB_XHCI_HCD=y
- CONFIG_MMC=y
- CONFIG_MMC_MVSDIO=y
- CONFIG_NEW_LEDS=y
+Is this patch acceptable for you ?
+
+Thanks in advance
+  -- Daniel
+
+
+>  arch/arm/common/timer-sp.c |    3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/common/timer-sp.c b/arch/arm/common/timer-sp.c
+> index 9d2d3ba..ae3c0f9 100644
+> --- a/arch/arm/common/timer-sp.c
+> +++ b/arch/arm/common/timer-sp.c
+> @@ -158,7 +158,8 @@ static int sp804_set_next_event(unsigned long next,
+>  }
+>  
+>  static struct clock_event_device sp804_clockevent = {
+> -	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
+> +	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
+> +		CLOCK_EVT_FEAT_DYNIRQ,
+>  	.set_mode	= sp804_set_mode,
+>  	.set_next_event	= sp804_set_next_event,
+>  	.rating		= 300,
+> 
+
+
 -- 
-1.7.9.5
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
