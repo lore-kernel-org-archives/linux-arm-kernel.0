@@ -1,41 +1,50 @@
-From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
-Date: Fri,  8 Mar 2013 08:18:56 -0300
-Subject: [PATCH] ARM: sunxi: cubieboard: Add UART muxing
-Message-ID: <1362741536-12632-1-git-send-email-emilio@elopez.com.ar>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Fri,  8 Mar 2013 16:39:48 +0530
+Subject: [PATCH] ARM: EXYNOS: Use wfi macro in platform_do_lowpower
+Message-ID: <1362740988-16483-1-git-send-email-tushar.behera@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We previously relied on the bootloader to do the muxing of the UART for
-the Cubieboard. Don't rely on it anymore and use pinctrl.
+As per commit b3377d186572 ("ARM: 7064/1: vexpress: Use wfi macro
+in platform_do_lowpower."), wfi macro should be used instead
+of the hardcoded WFI instruction.
 
-Also remove uart1, as it is not enabled by default and it's not exposed
-on the board headers.
+This fixes following oops when the kernel is compiled in Thumb-2 mode
+on EXYNOS5. (Tested on EXYNOS5250 based Arndale board)
 
-Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+$ reboot
+Disabling non-boot CPUs ...
+IRQ153 no longer affine to CPU1
+CPU1: shutdown
+Internal error: Oops - undefined instruction: 0 [#1] PREEMPT SMP THUMB2
+Modules linked in:
+CPU: 1    Not tainted  (3.9.0-rc1-00015-gce76372 #1)
+PC is at 0xc065858e
+LR is at exynos_cpu_die+0x53/0xc0
+
+Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
 ---
+ arch/arm/mach-exynos/hotplug.c |    8 +-------
+ 1 files changed, 1 insertions(+), 7 deletions(-)
 
-This is a followup patch to Maxime Ripard's "Extend UART support for 
-Allwinner SoCs" series.
-
- arch/arm/boot/dts/sun4i-a10-cubieboard.dts | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-index 88e2dc1..dc760d0 100644
---- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-@@ -37,10 +37,8 @@
- 		};
+diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
+index c3f825b..d9712fe 100644
+--- a/arch/arm/mach-exynos/hotplug.c
++++ b/arch/arm/mach-exynos/hotplug.c
+@@ -99,13 +99,7 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
+ 		if (cpu == 1)
+ 			__raw_writel(0, S5P_ARM_CORE1_CONFIGURATION);
  
- 		uart0: uart at 01c28000 {
--			status = "okay";
--		};
--
--		uart1: uart at 01c28400 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&uart0_pins_a>;
- 			status = "okay";
- 		};
- 	};
+-		/*
+-		 * here's the WFI
+-		 */
+-		asm(".word	0xe320f003\n"
+-		    :
+-		    :
+-		    : "memory", "cc");
++		wfi();
+ 
+ 		if (pen_release == cpu_logical_map(cpu)) {
+ 			/*
 -- 
-1.8.1.5
+1.7.4.1
