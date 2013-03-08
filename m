@@ -1,54 +1,45 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 8 Mar 2013 10:37:45 +0100
-Subject: [PATCH 0/5] at91: atmel_lcdfb: regression fixes and cpu_is removal
-In-Reply-To: <CAMgPeKV4=C_msvZixVS-o3-QHaJxZP7T4EwLa9vnmYgVheXHgQ@mail.gmail.com>
-References: <cover.1360340791.git.nicolas.ferre@atmel.com>
- <20130210004740.GH16278@quad.lixom.net>
- <CAMgPeKV4=C_msvZixVS-o3-QHaJxZP7T4EwLa9vnmYgVheXHgQ@mail.gmail.com>
-Message-ID: <5139B169.7050807@atmel.com>
+From: Wenyou.Yang@atmel.com (Yang, Wenyou)
+Date: Fri, 8 Mar 2013 09:43:49 +0000
+Subject: [PATCH v6 01/16] spi/spi-atmel: fix probing failure after
+ xfer->speed_hz set
+In-Reply-To: <51388575.4050506@cogentembedded.com>
+References: <1362626715-6549-1-git-send-email-wenyou.yang@atmel.com>
+ <1362626815-6628-1-git-send-email-wenyou.yang@atmel.com>
+ <51388575.4050506@cogentembedded.com>
+Message-ID: <B256D81BAE5131468A838E5D7A24364149720050@penmbx02>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/10/2013 07:45 PM, Johan Hovold :
-> On Sun, Feb 10, 2013 at 1:47 AM, Olof Johansson <olof@lixom.net> wrote:
->> On Fri, Feb 08, 2013 at 05:35:13PM +0100, Nicolas Ferre wrote:
->>> These patches fix a regression in 16-bpp support for older SOCs which
->>> use IBGR:555 rather than BGR:565 pixel layout. Use SOC-type to
->>> determine if the controller uses the intensity-bit and restore the
->>> old layout in that case.
->>>
->>> The last patch is a removal of uses of cpu_is_xxxx() macros in
->>> atmel_lcdfb with a platform-device-id table and static
->>> configurations.
->>>
->>>
->>> Patches from Johan Hovold taken from: "[PATCH 0/3] atmel_lcdfb: fix
->>> 16-bpp regression" and "[PATCH v2 0/3] ARM: at91/avr32/atmel_lcdfb:
->>> remove cpu_is macros" patch series to form a clean patch series with
->>> my signature.
->>>
->>> Arnd, Olof, as it seems that old fbdev drivers are not so much
->>> reviewed those days, can we take the decision to queue this material
->>> through arm-soc with other AT91 drivers updates?
->>
->> It would be beneficial to get an ack from Florian. Was he involved in
->> the review of the code that regressed 16-bpp support in the first
->> place? When was the regression introduced?
+Hi, Serqei,
+
+> -----Original Message-----
+> From: Sergei Shtylyov [mailto:sergei.shtylyov at cogentembedded.com]
+> Sent: 2013?3?7? 20:18
+> To: Yang, Wenyou
+> Cc: linux-arm-kernel at lists.infradead.org; richard.genoud at gmail.com; Lin, JM;
+> Ferre, Nicolas; linux-kernel at vger.kernel.org; grant.likely at secretlab.ca;
+> spi-devel-general at lists.sourceforge.net; plagnioj at jcrosoft.com
+> Subject: Re: [PATCH v6 01/16] spi/spi-atmel: fix probing failure after
+> xfer->speed_hz set
 > 
-> In v3.4 by commit 787f9fd2328 ("atmel_lcdfb: support 16bit BGR:565 mode,
-> remove unsupported 15bit modes").
+> Hello.
+> 
+> On 07-03-2013 7:26, Wenyou Yang wrote:
+> 
+> > commit: 059b8ffeee5b427949872bb6ed5db5ae0788054e
+> 
+>     Please also specify the summary line of that commit in parens (or however
+> you like).
+Thanks for your suggestion.
 
-Arnd, Olof,
+> 
+> > cause the atmel spi probing failure.
+> 
+> > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> > Cc: spi-devel-general at lists.sourceforge.net
+> > Cc: linux-kernel at vger.kernel.org
+> 
+> WBR, Sergei
 
-Please tell me if I can do something to ease the adoption of these
-patches during 3.9-rc timeframe (I can rebase it on top of 3.9-rc1 to
-avoid any conflict: the file board-neocore926.c was removed during the
-merge window).
-Johan has written the series a long time ago and we still do not have it
-in mainline.
-
-If the option to ask Andrew is better in your opinion, please tell me.
-
-Best regards,
--- 
-Nicolas Ferre
+Best Regards,
+Wenyou Yang
