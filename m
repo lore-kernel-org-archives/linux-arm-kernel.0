@@ -1,43 +1,39 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  8 Mar 2013 09:20:20 +0100
-Subject: [PATCH 4/4] clocksource: sh_mtu2: Set initcall level to subsys
-In-Reply-To: <1362730820-25417-1-git-send-email-horms+renesas@verge.net.au>
-References: <1362730820-25417-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1362730820-25417-5-git-send-email-horms+renesas@verge.net.au>
+Date: Fri,  8 Mar 2013 09:20:16 +0100
+Subject: [PATCH 0/4] clocksource: Set initcall level to subsys
+Message-ID: <1362730820-25417-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The reason for this is to ensure that MTU2 is probed earlier
-than with its previous initcall level, module init.
+This small series updates the innitcall level of the
+CMT, TMU, MTU2 and STI clock source drivers from module init
+to subsys.
 
 This came up as a problem with using CMT as a clock source kzm9g-reference
 which does not make use of early timers or devices. In that scenario
 initialisation of SDHI and MMCIF both stall on msleep() calls due to the
 absence of a initialised clock source.
 
-The purpose of this change is to keep the MTU2 code in sync with the CMT code
-which has been modified in a similar manner..
+The purpose of changing the TMU, MTU2 and STI drivers is to keep their
+source in sync with the CMT source.
 
-Compile tested only using se7206_defconfig.
-I do not believe I have any boards that support the MTU2.
+I have boot tested the CMT, TMU and STI changes as noted in their
+change logs.
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
+I have only compile tested the MTU2 change as I do not believe that
+I have access to a board that uses that driver.
+
+Simon Horman (4):
+  clocksource: sh_cmt: Set initcall level to subsys
+  clocksource: sh_tmu: Set initcall level to subsys
+  clocksource: em_sti: Set initcall level to subsys
+  clocksource: sh_mtu2: Set initcall level to subsys
+
+ drivers/clocksource/em_sti.c  |   13 ++++++++++++-
+ drivers/clocksource/sh_cmt.c  |    2 +-
  drivers/clocksource/sh_mtu2.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/clocksource/sh_tmu.c  |    2 +-
+ 4 files changed, 15 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/clocksource/sh_mtu2.c b/drivers/clocksource/sh_mtu2.c
-index 83943e2..4aac9ee 100644
---- a/drivers/clocksource/sh_mtu2.c
-+++ b/drivers/clocksource/sh_mtu2.c
-@@ -386,7 +386,7 @@ static void __exit sh_mtu2_exit(void)
- }
- 
- early_platform_init("earlytimer", &sh_mtu2_device_driver);
--module_init(sh_mtu2_init);
-+subsys_initcall(sh_mtu2_init);
- module_exit(sh_mtu2_exit);
- 
- MODULE_AUTHOR("Magnus Damm");
 -- 
 1.7.10.4
