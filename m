@@ -1,48 +1,79 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 8 Mar 2013 10:58:27 +0200
-Subject: [PATCH v11 6/9] usb: chipidea: add vbus regulator control
-In-Reply-To: <20130308085201.GC22550@nchen-desktop>
-References: <1362563800-16673-1-git-send-email-peter.chen@freescale.com>
- <1362563800-16673-7-git-send-email-peter.chen@freescale.com>
- <20130306112916.GT28587@arwen.pp.htv.fi>
- <20130307024102.GD20470@nchen-desktop>
- <20130307095248.GL9171@arwen.pp.htv.fi>
- <20130308062757.GB16076@nchen-desktop>
- <20130308072624.GF21589@arwen.pp.htv.fi>
- <20130308083245.GB22550@nchen-desktop>
- <20130308084235.GM21589@arwen.pp.htv.fi>
- <20130308085201.GC22550@nchen-desktop>
-Message-ID: <20130308085827.GO21589@arwen.pp.htv.fi>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 8 Mar 2013 10:14:23 +0100
+Subject: [PATCH] rtc: at91rm9200: add DT support
+In-Reply-To: <1360879147-17273-1-git-send-email-manabian@gmail.com>
+References: <1360879147-17273-1-git-send-email-manabian@gmail.com>
+Message-ID: <5139ABEF.2000408@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 08, 2013 at 04:52:02PM +0800, Peter Chen wrote:
-> On Fri, Mar 08, 2013 at 10:42:35AM +0200, Felipe Balbi wrote:
-> > 
-> > > Second, why you think it is a broken patch, it just follows current
-> > > framework. Besides, if you have concerns about DT stuff for chipidea
-> > > core, why not mention it when sasche added dr_mode and phy_mode at
-> > > that time?
-> > 
-> > Well, people make mistakes, right ? That was my mistake, but it doesn't
-> > we have to let the mistake proliferate.
-> > 
-> 
-> That means I need to post below two patches before this patchset can
-> be accepted.
-> 
-> - Let udc-core know vbus
-> - Convert platform data to DT for chipidea core driver
+On 02/14/2013 10:59 PM, Joachim Eastwood :
+> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
 
-right, ask for help if you need but don't try to deliver patches which
-are conceptually wrong.
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
+Alessandro, do you want to queue this one on your side?
+
+Best regards,
+
+> ---
+>  .../devicetree/bindings/rtc/atmel,at91rm9200-rtc.txt      | 15 +++++++++++++++
+>  drivers/rtc/rtc-at91rm9200.c                              |  9 +++++++++
+>  2 files changed, 24 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/rtc/atmel,at91rm9200-rtc.txt
+>
+> diff --git a/Documentation/devicetree/bindings/rtc/atmel,at91rm9200-rtc.txt b/Documentation/devicetree/bindings/rtc/atmel,at91rm9200-rtc.txt
+> new file mode 100644
+> index 0000000..2a3feab
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/rtc/atmel,at91rm9200-rtc.txt
+> @@ -0,0 +1,15 @@
+> +Atmel AT91RM9200 Real Time Clock
+> +
+> +Required properties:
+> +- compatible: should be: "atmel,at91rm9200-rtc"
+> +- reg: physical base address of the controller and length of memory mapped
+> +  region.
+> +- interrupts: rtc alarm/event interrupt
+> +
+> +Example:
+> +
+> +rtc at fffffe00 {
+> +	compatible = "atmel,at91rm9200-rtc";
+> +	reg = <0xfffffe00 0x100>;
+> +	interrupts = <1 4 7>;
+> +};
+> diff --git a/drivers/rtc/rtc-at91rm9200.c b/drivers/rtc/rtc-at91rm9200.c
+> index b6469e2..2ea0ee3 100644
+> --- a/drivers/rtc/rtc-at91rm9200.c
+> +++ b/drivers/rtc/rtc-at91rm9200.c
+> @@ -28,6 +28,8 @@
+>  #include <linux/ioctl.h>
+>  #include <linux/completion.h>
+>  #include <linux/io.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+>  
+>  #include <asm/uaccess.h>
+>  
+> @@ -382,12 +384,19 @@ static const struct dev_pm_ops at91_rtc_pm = {
+>  #define at91_rtc_pm_ptr	NULL
+>  #endif
+>  
+> +static const struct of_device_id at91_rtc_dt_ids[] = {
+> +	{ .compatible = "atmel,at91rm9200-rtc" },
+> +	{ /* sentinel */ }
+> +};
+> +MODULE_DEVICE_TABLE(of, at91_rtc_dt_ids);
+> +
+>  static struct platform_driver at91_rtc_driver = {
+>  	.remove		= __exit_p(at91_rtc_remove),
+>  	.driver		= {
+>  		.name	= "at91_rtc",
+>  		.owner	= THIS_MODULE,
+>  		.pm	= at91_rtc_pm_ptr,
+> +		.of_match_table = of_match_ptr(at91_rtc_dt_ids),
+>  	},
+>  };
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130308/87a201c3/attachment-0001.sig>
+Nicolas Ferre
