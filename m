@@ -1,55 +1,40 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 08 Mar 2013 11:40:38 -0700
-Subject: [PATCH 3/5] ARM: DT: tegra114:add aliases and DMA requestor for
- serial controller
-In-Reply-To: <513A281B.9010702@nvidia.com>
+Date: Fri, 08 Mar 2013 11:41:23 -0700
+Subject: [PATCH 1/5] ARM: DT: tegra114: add APB DMA controller DT entry
+In-Reply-To: <513A2888.5020402@nvidia.com>
 References: <1362750782-15174-1-git-send-email-ldewangan@nvidia.com>
- <1362750782-15174-4-git-send-email-ldewangan@nvidia.com>
- <513A25E4.8040504@wwwdotorg.org> <513A281B.9010702@nvidia.com>
-Message-ID: <513A30A6.3040806@wwwdotorg.org>
+ <1362750782-15174-2-git-send-email-ldewangan@nvidia.com>
+ <513A250C.1000202@wwwdotorg.org> <513A2888.5020402@nvidia.com>
+Message-ID: <513A30D3.4020700@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/08/2013 11:04 AM, Laxman Dewangan wrote:
-> On Friday 08 March 2013 11:24 PM, Stephen Warren wrote:
->> On 03/08/2013 06:53 AM, Laxman Dewangan wrote:
->>> Add APB DMA requestor and serial aliases for serial controller.
->>> There will be two serial driver i.e. 8250 based simple serial driver
->>> and APB DMA based serial driver for higher baudrate and performace.
->>>
->>> The simple serial driver get enabled with compatible nvidia,tegra20-uart
->>> and APB DMA based driver will get enabled with compatible
->>> nvidia,tegra30-hsuart.
-
+On 03/08/2013 11:06 AM, Laxman Dewangan wrote:
+> On Friday 08 March 2013 11:21 PM, Stephen Warren wrote:
+>> On 03/08/2013 06:52 AM, Laxman Dewangan wrote:
+>>> NVIDIA's Tegra114 has 32 channels APB DMA controller. Add DT entry for
+>>> APB DMA controllers and make it compatible with
+>>> "nvidia,tegra114-apbdma".
 >>> diff --git a/arch/arm/boot/dts/tegra114.dtsi
 >>> b/arch/arm/boot/dts/tegra114.dtsi
->>> +    /*
->>> +     * There are two serial driver i.e. 8250 based simple serial
->>> +     * driver and APB DMA based serial driver for higher baudrate
->>> +     * and performace. To enable the 8250 based driver, the compatible
->>> +     * is "nvidia,tegra30-uart", "nvidia,tegra20-uart" and to enable
->>> +     * the APB DMA based serial driver, the comptible is
->>> +     * "nvidia,tegra30-hsuart", "nvidia,tegra20-hsuart".
->>> +     */
->> Any references to Tegra30 there should be changed to Tegra114 I think.
+>>> +    apbdma: dma {
+>>> +        compatible = "nvidia,tegra114-apbdma";
+>> So I know that the Tegra114 HW has a new channel-pause feature, which
+>> the driver /can/ use. However, if the driver didn't know about that
+>> feature, and continued to use the global-pause feature, would it still
+>> work fine?
+>>
+>> In other words, is the Tegra114 HW 100% backwards-compatible with the
+>> Tegra30 HW, it's just that there are new features that SW could
+>> optionally use?
+>>
+>> If that is true, then we should also include "nvidia,tegra30-apbdma" in
+>> the compatible value.
 > 
-> Ok, there is not change on tegra30 and Tegra114, also we have not added
-> the tegra114 compatible in driver file.
+> Tegra114 HW is not compatible with the tegra30 as with global pause, it
+> is not able to write into the dma register in T114. On t114, the dma
+> register is clock gated with global enable/disable.
 
-As I mentioned elsewhere, compatible must always include the most
-specific value; nvidia,tegra114-uart in this case. If the HW is
-backwards-compatible, then also include entries for the HW it's
-compatible with.
-
-Hence here, you want:
-
-compatible = "nvidia,tegra114-uart", "nvdia,tegra20-uart";
-
-Since the compatible value here shouldn't include any Tegra30-related
-value, the comment shouldn't say that it should.
-
-Note that when there are multiple values in the compatible property,
-even if the driver doesn't know about the first value, it will still get
-matched based upon the 2nd/3rd/... value, so even though the driver
-doesn't explicitly know about nvidia,tegra114-uart, it will still get
-instantiated, because it does support nvdia,tegra20-uart.
+Interesting. In that case, the compatible value above is entirely
+correct. Thanks for the explanation. It might be worth mentioning this
+in the commit description.
