@@ -1,35 +1,34 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 8 Mar 2013 18:33:00 +0200
-Subject: [PATCH 3/5] USB chipidea: introduce dual role mode pdata flags
-In-Reply-To: <1362049024-11383-4-git-send-email-mkl@pengutronix.de>
+Date: Fri, 8 Mar 2013 18:33:39 +0200
+Subject: [PATCH 5/5] USB chipidea i.MX: use devm_usb_get_phy_by_phandle
+ to get phy
+In-Reply-To: <1362049024-11383-6-git-send-email-mkl@pengutronix.de>
 References: <1362049024-11383-1-git-send-email-mkl@pengutronix.de>
- <1362049024-11383-4-git-send-email-mkl@pengutronix.de>
-Message-ID: <20130308163300.GF32368@arwen.pp.htv.fi>
+ <1362049024-11383-6-git-send-email-mkl@pengutronix.de>
+Message-ID: <20130308163339.GG32368@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Feb 28, 2013 at 11:57:02AM +0100, Marc Kleine-Budde wrote:
-> @@ -487,14 +488,23 @@ static int ci_hdrc_probe(struct platform_device *pdev)
->  		return -ENODEV;
+On Thu, Feb 28, 2013 at 11:57:04AM +0100, Marc Kleine-Budde wrote:
+> @@ -147,19 +146,20 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
+>  		return ret;
 >  	}
 >  
-> +	/* For now we treat dual-role as otg */
-> +	dr_mode = ci->platdata->dr_mode;
-> +	if (dr_mode == USB_DR_MODE_UNKNOWN || dr_mode == USB_DR_MODE_DUAL_ROLE)
-> +		dr_mode = USB_DR_MODE_OTG;
-> +
->  	/* initialize role(s) before the interrupt is requested */
-> -	ret = ci_hdrc_host_init(ci);
-> -	if (ret)
-> -		dev_info(dev, "doesn't support host\n");
-> +	if (dr_mode == USB_DR_MODE_OTG || dr_mode == USB_DR_MODE_HOST) {
+> -	phy_np = of_parse_phandle(pdev->dev.of_node, "fsl,usbphy", 0);
+> -	if (phy_np) {
+> -		data->phy_np = phy_np;
+> -		phy_pdev = of_find_device_by_node(phy_np);
+> -		if (phy_pdev) {
+> -			struct usb_phy *phy;
+> -			phy = pdev_to_phy(phy_pdev);
+> -			if (phy &&
+> -			    try_module_get(phy_pdev->dev.driver->owner)) {
+> -				usb_phy_init(phy);
+> -				data->phy = phy;
+> -			}
+> +	phy = devm_usb_get_phy_by_phandle(&pdev->dev, "fsl,usbphy", 0);
 
-this is not something you should be passing via pdata; chipidea core
-should know how to read this data by itself. Meaning that chipidea core
-should be taught about devicetree. But make it optional since now all
-users use DT.
+very nice, but should be done at chipidea core.
 
 -- 
 balbi
@@ -39,4 +38,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130308/5eda4a64/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130308/14486a35/attachment.sig>
