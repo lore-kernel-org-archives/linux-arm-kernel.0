@@ -1,72 +1,18 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Fri, 8 Mar 2013 01:06:11 +0000
-Subject: [PATCH v6 01/16] spi/spi-atmel: fix probing failure after
- xfer->speed_hz set
-In-Reply-To: <CAGhQ9VwW18LXY5Jn0FUFCaAzKxP1W3QADG=JBp9JbgaAwo=F2Q@mail.gmail.com>
-References: <1362626715-6549-1-git-send-email-wenyou.yang@atmel.com>
- <1362626815-6628-1-git-send-email-wenyou.yang@atmel.com>
- <CAGhQ9VwW18LXY5Jn0FUFCaAzKxP1W3QADG=JBp9JbgaAwo=F2Q@mail.gmail.com>
-Message-ID: <B256D81BAE5131468A838E5D7A2436414971BE26@penmbx02>
+From: Milo.Kim@ti.com (Kim, Milo)
+Date: Fri, 8 Mar 2013 01:13:06 +0000
+Subject: [PATCH v8 11/12] leds: Kconfig for Palmas LEDs
+In-Reply-To: <1362662276-20792-11-git-send-email-ian@slimlogic.co.uk>
+References: <1362662276-20792-1-git-send-email-ian@slimlogic.co.uk>
+ <1362662276-20792-11-git-send-email-ian@slimlogic.co.uk>
+Message-ID: <A874F61F95741C4A9BA573A70FE3998F82E45A15@DQHE02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joachim,
+> Add the Kconfig and Makefile for the Palmas LED driver.
 
-> -----Original Message-----
-> From: Joachim Eastwood [mailto:manabian at gmail.com]
-> Sent: 2013?3?7? 20:31
-> To: Yang, Wenyou
-> Cc: linux-arm-kernel at lists.infradead.org; grant.likely at secretlab.ca; Ferre,
-> Nicolas; plagnioj at jcrosoft.com; richard.genoud at gmail.com; Lin, JM;
-> spi-devel-general at lists.sourceforge.net; linux-kernel at vger.kernel.org
-> Subject: Re: [PATCH v6 01/16] spi/spi-atmel: fix probing failure after
-> xfer->speed_hz set
-> 
-> On 7 March 2013 04:26, Wenyou Yang <wenyou.yang@atmel.com> wrote:
-> > commit: 059b8ffeee5b427949872bb6ed5db5ae0788054e
-> > cause the atmel spi probing failure.
-> >
-> > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> > Cc: spi-devel-general at lists.sourceforge.net
-> > Cc: linux-kernel at vger.kernel.org
-> > ---
-> >  drivers/spi/spi-atmel.c |    6 +++---
-> >  1 file changed, 3 insertions(+), 3 deletions(-)
-> >
-> > diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-> > index 656d137..1eca815 100644
-> > --- a/drivers/spi/spi-atmel.c
-> > +++ b/drivers/spi/spi-atmel.c
-> > @@ -846,9 +846,9 @@ static int atmel_spi_transfer(struct spi_device *spi,
-> struct spi_message *msg)
-> >                         }
-> >                 }
-> >
-> > -               /* FIXME implement these protocol options!! */
-> > -               if (xfer->speed_hz) {
-> > -                       dev_dbg(&spi->dev, "no protocol options
-> yet\n");
-> > +               if (xfer->speed_hz < spi->max_speed_hz) {
-> > +                       dev_dbg(&spi->dev,
-> > +                               "speed in transfer less than bus
-> speed\n");
-> >                         return -ENOPROTOOPT;
-> >                 }
-> 
-> I sent a similar patch to spi-devl a while ago, which Grant said he applied.
-> https://patchwork.kernel.org/patch/2165301/
-> 
-> Can't find the patch in any upstream git tree so I guess Grant hasn't
-> pushed it yet.
-
-Sorry, I didn't notice your patch before.
-Furthermore, I made this patch based on your and Grant,s email.
-
-I will drop this patch.
-
-> 
-> regards
-> Joachim Eastwood
+It would be better if the Palmas LED driver files are combined into one patch.
+[PATCH v8 09/12] leds: Add support for Palmas LEDs
+[PATCH v8 11/12] leds: Kconfig for Palmas LEDs
 
 Best Regards,
-Wenyou Yang
+Milo 
