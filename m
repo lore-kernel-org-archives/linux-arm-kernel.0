@@ -1,44 +1,73 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Sat, 9 Mar 2013 00:16:24 +0530
-Subject: [PATCH 1/5] ARM: DT: tegra114: add APB DMA controller DT entry
-In-Reply-To: <513A30D3.4020700@wwwdotorg.org>
-References: <1362750782-15174-1-git-send-email-ldewangan@nvidia.com>
- <1362750782-15174-2-git-send-email-ldewangan@nvidia.com>
- <513A250C.1000202@wwwdotorg.org> <513A2888.5020402@nvidia.com>
- <513A30D3.4020700@wwwdotorg.org>
-Message-ID: <513A3200.8070905@nvidia.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 8 Mar 2013 19:46:48 +0100
+Subject: [PATCH 2/3] can: at91_can: add pinctrl support
+In-Reply-To: <513A21E4.6000801@pengutronix.de>
+References: <1362763842-14924-1-git-send-email-ludovic.desroches@atmel.com>
+ <1362763842-14924-3-git-send-email-ludovic.desroches@atmel.com>
+ <513A21E4.6000801@pengutronix.de>
+Message-ID: <20130308184648.GE4590@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 09 March 2013 12:11 AM, Stephen Warren wrote:
-> On 03/08/2013 11:06 AM, Laxman Dewangan wrote:
->> On Friday 08 March 2013 11:21 PM, Stephen Warren wrote:
->>> On 03/08/2013 06:52 AM, Laxman Dewangan wrote:
->>>> NVIDIA's Tegra114 has 32 channels APB DMA controller. Add DT entry for
->>>> APB DMA controllers and make it compatible with
->>>> "nvidia,tegra114-apbdma".
->>>> diff --git a/arch/arm/boot/dts/tegra114.dtsi
->>>> b/arch/arm/boot/dts/tegra114.dtsi
->>>> +    apbdma: dma {
->>>> +        compatible = "nvidia,tegra114-apbdma";
->>> So I know that the Tegra114 HW has a new channel-pause feature, which
->>> the driver /can/ use. However, if the driver didn't know about that
->>> feature, and continued to use the global-pause feature, would it still
->>> work fine?
->>>
->>> In other words, is the Tegra114 HW 100% backwards-compatible with the
->>> Tegra30 HW, it's just that there are new features that SW could
->>> optionally use?
->>>
->>> If that is true, then we should also include "nvidia,tegra30-apbdma" in
->>> the compatible value.
->> Tegra114 HW is not compatible with the tegra30 as with global pause, it
->> is not able to write into the dma register in T114. On t114, the dma
->> register is clock gated with global enable/disable.
-> Interesting. In that case, the compatible value above is entirely
-> correct. Thanks for the explanation. It might be worth mentioning this
-> in the commit description.
+On 18:37 Fri 08 Mar     , Marc Kleine-Budde wrote:
+> On 03/08/2013 06:30 PM, ludovic.desroches at atmel.com wrote:
+> > From: Ludovic Desroches <ludovic.desroches@atmel.com>
+> > 
+> > Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> > ---
+> >  drivers/net/can/at91_can.c | 9 +++++++++
+> >  1 file changed, 9 insertions(+)
+> > 
+> > diff --git a/drivers/net/can/at91_can.c b/drivers/net/can/at91_can.c
+> > index c7f70d4..56fb2aa 100644
+> > --- a/drivers/net/can/at91_can.c
+> > +++ b/drivers/net/can/at91_can.c
+> > @@ -28,6 +28,7 @@
+> >  #include <linux/module.h>
+> >  #include <linux/netdevice.h>
+> >  #include <linux/of.h>
+> > +#include <linux/pinctrl/consumer.h>
+> >  #include <linux/platform_device.h>
+> >  #include <linux/rtnetlink.h>
+> >  #include <linux/skbuff.h>
+> > @@ -1292,6 +1293,7 @@ static int at91_can_probe(struct platform_device *pdev)
+> >  	struct clk *clk;
+> >  	void __iomem *addr;
+> >  	int err, irq;
+> > +	struct pinctrl *pinctrl;
+> >  
+> >  	devtype_data = at91_can_get_driver_data(pdev);
+> >  	if (!devtype_data) {
+> > @@ -1314,6 +1316,13 @@ static int at91_can_probe(struct platform_device *pdev)
+> >  		goto exit_put;
+> >  	}
+> >  
+> > +	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
+> 
+> Is this still needed? I think the pinctrl framework automatically
+> enables the default pinctrl for a device if available.
+yes this is useless
 
-I can describe here as I am going to respin the patches anyhow.
-However, I have already explain this in the driver commit when porting 
-for T114.
+Best Regards,
+J.
+> 
+> Marc
+> 
+> > +	if (IS_ERR(pinctrl)) {
+> > +		dev_err(&pdev->dev, "Failed to request pinctrl\n");
+> > +		err = PTR_ERR(pinctrl);
+> > +		goto exit_put;
+> > +	}
+> > +
+> >  	if (!request_mem_region(res->start,
+> >  				resource_size(res),
+> >  				pdev->name)) {
+> > 
+> 
+> 
+> -- 
+> Pengutronix e.K.                  | Marc Kleine-Budde           |
+> Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+> Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+> Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+> 
