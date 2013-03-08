@@ -1,43 +1,22 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 8 Mar 2013 06:41:39 +0000
-Subject: [PATCH] ARM: proc: Add Krait proc info
-In-Reply-To: <5136D220.5090904@codeaurora.org>
-References: <1362439299-29617-1-git-send-email-sboyd@codeaurora.org>
- <20130305083421.GA19391@mudshark.cambridge.arm.com>
- <51366B9E.7010502@codeaurora.org> <5136D220.5090904@codeaurora.org>
-Message-ID: <20130308064139.GA31156@mudshark.cambridge.arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 8 Mar 2013 08:09:22 +0100
+Subject: [PATCH v2 1/3] pinctrl: exynos: add exynos5250 SoC specific data
+In-Reply-To: <021201ce1b24$3e46e810$bad4b830$%kim@samsung.com>
+References: <1362568712-13586-1-git-send-email-thomas.abraham@linaro.org>
+ <1362568712-13586-2-git-send-email-thomas.abraham@linaro.org>
+ <CACRpkdZ37FutKzwSSF7w425Nh=jPUU-FXf48HPs3oUXO9sJ0oA@mail.gmail.com>
+ <021201ce1b24$3e46e810$bad4b830$%kim@samsung.com>
+Message-ID: <CACRpkdbFZyissz1ZHjSHL29LoC-LVNNm1MoydVk9AMMD5vfGRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 06, 2013 at 05:20:32AM +0000, Stephen Boyd wrote:
-> On 03/05/13 14:03, Stephen Boyd wrote:
-> > On 03/05/13 00:34, Will Deacon wrote:
-> >> I was looking at this the other day and wondered whether we could set
-> >> HWCAP_IDIV in __v7_setup, depending on ID_ISAR0[27:24]. I can't immediately
-> >> think why that would be difficult, but similarly there may well be a reason
-> >> why we assign it like this.
-> >>
-> >> Fancy taking a look?
-> > Ok I'll take a look. 
-> 
-> Hmm. I wonder if we did it this way because between version B and C of
-> DDI0406 the definition of those bits changed.
-> 
-> In DDI0406B we have
-> 
->     0 - no support
->     1 - support
-> 
-> and in DDI0406C we have
-> 
->     0 - no support
->     1 - support in Thumb
->     2 - support in Thumb and ARM
+On Thu, Mar 7, 2013 at 12:09 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> [Me]
+>> So shall I merge these three patches to the pinctrl tree or not?
+>>
+> Hi Linus, this series is already in Samsung tree with your ack.
 
-Well spotted, although I think this a documentation error. I've checked both
-A7 and A15 and they both advertise '2' (although r0p0 TRM for A7 also gets
-this wrong, the CPU does the right thing).
+OK good, thanks!
 
-What about the Qualcomm CPUs?
-
-Will
+Yours,
+Linus Walleij
