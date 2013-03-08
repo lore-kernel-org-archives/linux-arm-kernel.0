@@ -1,148 +1,105 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Fri, 8 Mar 2013 22:27:25 +0100
-Subject: [PATCH 4/4] ARM: at91: introduce SAMA5 support
-In-Reply-To: <20130308185625.GF4590@game.jcrosoft.org>
-References: <1362755638-20092-1-git-send-email-ludovic.desroches@atmel.com>
- <1362755638-20092-5-git-send-email-ludovic.desroches@atmel.com>
- <CAGhQ9VxXf5mrdZwCe1rqqDg-h_oeLfqs4fdw-m3h6P-QSBdn_Q@mail.gmail.com>
- <513a1756.e94aec0a.1f22.6694SMTPIN_ADDED_BROKEN@mx.google.com>
- <CAGhQ9VzY2UKZgxkbY-eO3j2R89W0phERDgpTAFh1Vy+bC0amWA@mail.gmail.com>
- <20130308185625.GF4590@game.jcrosoft.org>
-Message-ID: <CAGhQ9Vzjhg+js-yQ_E3dLRi7Cc6ZCSiRVhVp_hAtiXob+EKxdg@mail.gmail.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Fri, 8 Mar 2013 15:41:55 -0600
+Subject: [PATCH 5/9] ARM: dts: Add GPMC node for OMAP2, OMAP4 and OMAP5
+In-Reply-To: <CABxcv==OKX4z8x7ztqDJ5CozNmTQ5UaD43mTLWfQuqUt-y7xcQ@mail.gmail.com>
+References: <1362763654-9660-1-git-send-email-jon-hunter@ti.com>
+ <1362763654-9660-6-git-send-email-jon-hunter@ti.com>
+ <CABxcv==OKX4z8x7ztqDJ5CozNmTQ5UaD43mTLWfQuqUt-y7xcQ@mail.gmail.com>
+Message-ID: <513A5B23.5070302@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 March 2013 19:56, Jean-Christophe PLAGNIOL-VILLARD
-<plagnioj@jcrosoft.com> wrote:
-> On 18:18 Fri 08 Mar     , Joachim Eastwood wrote:
->> On 8 March 2013 17:52, Ludovic Desroches <ludovic.desroches@atmel.com> wrote:
 
-<snip>
-
->> >>
->> >> > diff --git a/arch/arm/mach-at91/board-dt-sama5.c b/arch/arm/mach-at91/board-dt-sama5.c
->> >> > new file mode 100644
->> >> > index 0000000..705305e
->> >> > --- /dev/null
->> >> > +++ b/arch/arm/mach-at91/board-dt-sama5.c
->> >> > @@ -0,0 +1,86 @@
->> >> > +/*
->> >> > + *  Setup code for SAMA5 Evaluation Kits with Device Tree support
->> >> > + *
->> >> > + *  Copyright (C) 2013 Atmel,
->> >> > + *                2013 Ludovic Desroches <ludovic.desroches@atmel.com>
->> >> > + *
->> >> > + * Licensed under GPLv2 or later.
->> >> > + */
->> >> > +
->> >> > +#include <linux/types.h>
->> >> > +#include <linux/init.h>
->> >> > +#include <linux/module.h>
->> >> > +#include <linux/gpio.h>
->> >> > +#include <linux/micrel_phy.h>
->> >> > +#include <linux/of.h>
->> >> > +#include <linux/of_irq.h>
->> >> > +#include <linux/of_platform.h>
->> >> > +#include <linux/phy.h>
->> >> > +
->> >> > +#include <asm/setup.h>
->> >> > +#include <asm/irq.h>
->> >> > +#include <asm/mach/arch.h>
->> >> > +#include <asm/mach/map.h>
->> >> > +#include <asm/mach/irq.h>
->> >> > +
->> >> > +#include "at91_aic.h"
->> >> > +#include "generic.h"
->> >> > +
->> >> > +
->> >> > +static const struct of_device_id irq_of_match[] __initconst = {
->> >> > +
->> >> > +       { .compatible = "atmel,sama5d3-aic", .data = at91_aic5_of_init },
->> >> > +       { /*sentinel*/ }
->> >> > +};
->> >> > +
->> >> > +static void __init at91_dt_init_irq(void)
->> >> > +{
->> >> > +       of_irq_init(irq_of_match);
->> >> > +}
->> >> > +
->> >> > +static int ksz9021rn_phy_fixup(struct phy_device *phy)
->> >> > +{
->> >> > +       int value;
->> >> > +
->> >> > +#define GMII_RCCPSR    260
->> >> > +#define GMII_RRDPSR    261
->> >> > +#define GMII_ERCR      11
->> >> > +#define GMII_ERDWR     12
->> >> > +
->> >> > +       /* Set delay values */
->> >> > +       value = GMII_RCCPSR | 0x8000;
->> >> > +       phy_write(phy, GMII_ERCR, value);
->> >> > +       value = 0xF2F4;
->> >> > +       phy_write(phy, GMII_ERDWR, value);
->> >> > +       value = GMII_RRDPSR | 0x8000;
->> >> > +       phy_write(phy, GMII_ERCR, value);
->> >> > +       value = 0x2222;
->> >> > +       phy_write(phy, GMII_ERDWR, value);
->> >> > +
->> >> > +       return 0;
->> >> > +}
->> >> > +
->> >> > +static void __init sama5_dt_device_init(void)
->> >> > +{
->> >> > +       if (of_machine_is_compatible("atmel,sama5d3xcm"))
->> >> > +               phy_register_fixup_for_uid(PHY_ID_KSZ9021, MICREL_PHY_ID_MASK,
->> >> > +                       ksz9021rn_phy_fixup);
->> >> > +
->> >> > +       of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
->> >> > +}
->> >> > +
->> >> > +static const char *sama5_dt_board_compat[] __initdata = {
->> >> > +       "atmel,sama5",
->> >> > +       NULL
->> >> > +};
->> >> > +
->> >> > +DT_MACHINE_START(sama5_dt, "Atmel SAMA5 (Device Tree)")
->> >> > +       /* Maintainer: Atmel */
->> >> > +       .init_time      = at91sam926x_pit_init,
->> >> > +       .map_io         = at91_map_io,
->> >> > +       .handle_irq     = at91_aic5_handle_irq,
->> >> > +       .init_early     = at91_dt_initialize,
->> >> > +       .init_irq       = at91_dt_init_irq,
->> >> > +       .init_machine   = sama5_dt_device_init,
->> >> > +       .dt_compat      = sama5_dt_board_compat,
->> >> > +MACHINE_END
->> >>
->> >> Do we really need board-dt-sama5.c?
->> >> Now that we have both irqchip_init and clocksource_of_init it
->> >> shouldn't be necessary with more than one board-dt.c.
->> >>
->> >
->> > At the beginning, I had the same point of view but we have a new
->> > architecture, we can't build a single kernel image for both AT91SAM9 and
->> > SAMA5. So why not splitting it?
+On 03/08/2013 02:25 PM, Javier Martinez Canillas wrote:
+> On Fri, Mar 8, 2013 at 6:27 PM, Jon Hunter <jon-hunter@ti.com> wrote:
+>> Add the device-tree node for GPMC on OMAP2, OMAP4 and OMAP5 devices.
 >>
->> It does add more lines to mach-at91 and I don't see a reason to have
->> two near identical board-dt files. board-dt could be used for SAMA5
->> even without irqchip_init and clocksource_of_init so what's the point
->> in splitting it?
+>> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+>> ---
+>>  arch/arm/boot/dts/omap2420.dtsi |   11 +++++++++++
+>>  arch/arm/boot/dts/omap2430.dtsi |   11 +++++++++++
+>>  arch/arm/boot/dts/omap4.dtsi    |   11 +++++++++++
+>>  arch/arm/boot/dts/omap5.dtsi    |   11 +++++++++++
+>>  4 files changed, 44 insertions(+)
 >>
->> When the at91 clocksource and irqchip driver are converted/moved we
->> could support all AT91 SoC from RM9200 to SAMA5 in one board-dt. I
->> don't see the reason for 3 board-dt files or even 2.
+>> diff --git a/arch/arm/boot/dts/omap2420.dtsi b/arch/arm/boot/dts/omap2420.dtsi
+>> index af65609..d4ce6c2 100644
+>> --- a/arch/arm/boot/dts/omap2420.dtsi
+>> +++ b/arch/arm/boot/dts/omap2420.dtsi
+>> @@ -29,6 +29,17 @@
+>>                         pinctrl-single,function-mask = <0x3f>;
+>>                 };
 >>
->> That we can't build a kernel that supports both ARMv4-5 and ARMv7
->> doesn't make a difference.
-> my answer is no I do not want to if compatible_is on the c code so no
-> different files
+>> +               gpmc: gpmc at 6800a000 {
+>> +                       compatible = "ti,omap2420-gpmc";
+>> +                       reg = <0x6800a000 0x1000>;
+>> +                       #address-cells = <2>;
+>> +                       #size-cells = <1>;
+>> +                       interrupts = <20>;
+>> +                       gpmc,num-cs = <8>;
+>> +                       gpmc,num-waitpins = <4>;
+>> +                       ti,hwmods = "gpmc";
+>> +               };
+>> +
+>>                 mcbsp1: mcbsp at 48074000 {
+>>                         compatible = "ti,omap2420-mcbsp";
+>>                         reg = <0x48074000 0xff>;
+>> diff --git a/arch/arm/boot/dts/omap2430.dtsi b/arch/arm/boot/dts/omap2430.dtsi
+>> index c392445..832f184 100644
+>> --- a/arch/arm/boot/dts/omap2430.dtsi
+>> +++ b/arch/arm/boot/dts/omap2430.dtsi
+>> @@ -29,6 +29,17 @@
+>>                         pinctrl-single,function-mask = <0x3f>;
+>>                 };
+>>
+>> +               gpmc: gpmc at 6e000000 {
+>> +                       compatible = "ti,omap2430-gpmc";
+>> +                       reg = <0x6e000000 0x1000>;
+>> +                       #address-cells = <2>;
+>> +                       #size-cells = <1>;
+>> +                       interrupts = <20>;
+>> +                       gpmc,num-cs = <8>;
+>> +                       gpmc,num-waitpins = <4>;
+>> +                       ti,hwmods = "gpmc";
+>> +               };
+>> +
+>>                 mcbsp1: mcbsp at 48074000 {
+>>                         compatible = "ti,omap2430-mcbsp";
+>>                         reg = <0x48074000 0xff>;
+>> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+>> index 827f6f3..726ef11 100644
+>> --- a/arch/arm/boot/dts/omap4.dtsi
+>> +++ b/arch/arm/boot/dts/omap4.dtsi
+>> @@ -196,6 +196,17 @@
+>>                         #interrupt-cells = <1>;
+>>                 };
+>>
+>> +               gpmc: gpmc at 50000000 {
+>> +                       compatible = "ti,omap4430-gpmc";
+>> +                       reg = <0x50000000 0x1000>;
+> 
+> Hi Jon,
+> 
+> By looking at the GPMC Register Summary from both the OMAP4460 and OMAP OMAP35x
+> Technical Reference Manuals I see that the GPMC register address space
+> is only 720 bytes length. From base address + 0x0 to base address +
+> 0x02d0.
+> 
+> So shouldn't the regs property be <0x50000000 0x2d0> instead?
+> 
+> Of course are only a few kilobytes but still I wonder if it makes
+> sense to map them when they are not going to be used.
 
-But you have this already on the above code:
->> >> > +       if (of_machine_is_compatible("atmel,sama5d3xcm"))
+Yes you are correct. In general, I have been trying to stay some-what
+consistent with what hwmod was doing as this was being auto-generated by
+some hardware design specs and I believe they wanted to eventually get
+to the point where DT files would be auto-generated too for OMAP.
+Furthermore my understanding is that the smallest page that can be
+mapped by the kernel for ARM is 4kB. So if you declare it as 0x2d0 or
+0x1000 it will map a 4kB page (I could be wrong here).
 
-I don't see the point to have different board-dt files.
-If a board turns out to need lots of specific C code to work I think
-it's fine to have it in its own board file. But right now you are just
-duplicating code unnecessary.
+I don't have any strong feelings here but will do what the consensus
+prefers.
 
-regards
-Joachim Eastwood
+Cheers
+Jon
