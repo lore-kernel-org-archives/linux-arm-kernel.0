@@ -1,30 +1,42 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 8 Mar 2013 09:55:39 -0800
-Subject: [PATCH] ARM: OMAP: drop "select MACH_NOKIA_RM696"
-In-Reply-To: <1362763232.5994.75.camel@x61.thuisdomein>
-References: <1362738596.5994.48.camel@x61.thuisdomein>
- <20130308161159.GE14552@blackmetal.musicnaut.iki.fi>
- <20130308163507.GC26093@atomide.com>
- <1362763232.5994.75.camel@x61.thuisdomein>
-Message-ID: <20130308175539.GG26093@atomide.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Fri, 8 Mar 2013 14:59:27 -0300
+Subject: [PATCH 04/10] bus: introduce an Marvell EBU MBus driver
+In-Reply-To: <20130308172950.GC4094@obsidianresearch.com>
+References: <20130306202710.15a6aa2c@skate>
+ <20130306202447.GA4916@obsidianresearch.com>
+ <20130306214036.62fc93b9@skate>
+ <20130306215031.GB4916@obsidianresearch.com>
+ <20130306222712.GP23237@titan.lakedaemon.net>
+ <20130306230412.GA5870@obsidianresearch.com>
+ <20130307222004.GA2450@localhost>
+ <20130307230516.GA28975@obsidianresearch.com>
+ <20130308091052.18612729@skate>
+ <20130308172950.GC4094@obsidianresearch.com>
+Message-ID: <20130308175926.GC8693@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Bolle <pebolle@tiscali.nl> [130308 09:24]:
-> On Fri, 2013-03-08 at 08:35 -0800, Tony Lindgren wrote:
-> > I think the righ fix is to just add
-> > 
-> > config MACH_NOKIA_RM680
-> > 	bool
+Jason,
+
+On Fri, Mar 08, 2013 at 10:29:50AM -0700, Jason Gunthorpe wrote:
 > 
-> I guess you meant MACH_NOKIA_RM696.
-
-Ooops yes.
- 
-> > to the mach-omap2/Kconfig like we have for n8x0 also.
+> I looked through Ezequiel's patch and saw a driver that provided those
+> properties and no user of them at all. Are the patches incomplete? Is
+> there some plan to use these values in the future?
 > 
-> Should I draft a patch?
 
-Sure that would be nice.
+Leaving aside the review comments that still I haven't addressed yet,
+the patchset is complete.
 
-Tony
+The timings parameters were not set in device tree files,
+not because I expected the bootloader to set them, but instead because
+SoC default values worked fine for the NOR devices I tested.
+
+If this is suboptimal, I can fix the device tree files in v2
+to set proper timings parameter values.
+
+Thanks,
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
