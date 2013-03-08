@@ -1,68 +1,86 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Fri, 8 Mar 2013 20:12:27 +0100
-Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
-In-Reply-To: <20130308165228.GB4094@obsidianresearch.com>
-References: <20130306121118.GA17079@avionic-0098.mockup.avionic-design.de>
- <20130306180946.GA2433@obsidianresearch.com>
- <20130307080832.GD3451@avionic-0098.mockup.avionic-design.de>
- <20130307174955.GC20840@obsidianresearch.com>
- <20130307194830.GA1811@avionic-0098.mockup.avionic-design.de>
- <20130307200235.GB20695@obsidianresearch.com>
- <20130307204726.GB1811@avionic-0098.mockup.avionic-design.de>
- <51392B4D.9040404@gmail.com>
- <20130308071443.GA5772@avionic-0098.mockup.avionic-design.de>
- <20130308165228.GB4094@obsidianresearch.com>
-Message-ID: <20130308191227.GA6551@avionic-0098.mockup.avionic-design.de>
+From: cdall@cs.columbia.edu (Christoffer Dall)
+Date: Fri, 8 Mar 2013 11:26:44 -0800
+Subject: [kvmarm] [GIT PULL v2] KVM/ARM Fixes for 3.9-rc1
+In-Reply-To: <600b4cf22f05ccd66c8f6e18eaaf75c4@localhost>
+References: <CAEDV+gLpqG0GxbCDoUqO2fdwpqLeEd_psaaFWzm2Xi829-zUTQ@mail.gmail.com>
+ <f3db22097ee303991fccc64bbf863dd6@localhost>
+ <CAEDV+g+ATCr3Hd+VjwLW7tgbJ9Cq4eaC49ZFO-1jB=grAVR49w@mail.gmail.com>
+ <fd46d1c4746530d6c705dba843c848ea@localhost>
+ <20130307190900.GB15854@amt.cnet>
+ <600b4cf22f05ccd66c8f6e18eaaf75c4@localhost>
+Message-ID: <CAEDV+gL_nMCw-1JK+L0W_X=T9q8gEo6xhC9trXHv84YjJ7OiGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 08, 2013 at 09:52:28AM -0700, Jason Gunthorpe wrote:
-> On Fri, Mar 08, 2013 at 08:14:44AM +0100, Thierry Reding wrote:
-> > On Thu, Mar 07, 2013 at 06:05:33PM -0600, Rob Herring wrote:
-> > > On 03/07/2013 02:47 PM, Thierry Reding wrote:
-> > [...]
-> > > > In a nutshell (since some of the context isn't quoted anymore) the
-> > > > problem that we're trying to solve is that some of the embedded SoCs
-> > > > require per-root-port registers for configuration. The PCI DT
-> > > > specification doesn't make any provisions for this. A few alternatives
-> > > > have been discussed so far:
-> > > 
-> > > I'm not sure I follow. This is different than the host controller
-> > > registers? Why would this not just be multiple entries in the reg property?
-> > 
-> > Well the register regions are per root-port. On Tegra20 there's 2 of
-> > them, Tegra30 has 3 and if I understand correctly Marvell can have up to
-> > 10 (!). Adding all of them to the reg property of the host controller
-> > could work but it needs some way to match the reg entry to the root port
-> > similar to option 1 below.
-> 
-> Thomas just posted an implementation like this, please see:
-> 
-> http://www.spinics.net/lists/arm-kernel/msg228749.html
+On Thu, Mar 7, 2013 at 7:12 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On Thu, 7 Mar 2013 16:09:00 -0300, Marcelo Tosatti <mtosatti@redhat.com>
+> wrote:
+>> On Thu, Mar 07, 2013 at 07:57:23AM +0100, Marc Zyngier wrote:
+>>> On Wed, 6 Mar 2013 20:40:00 -0800, Christoffer Dall
+>>> <cdall@cs.columbia.edu>
+>>> wrote:
+>>> > On Wed, Mar 6, 2013 at 7:54 PM, Marc Zyngier <marc.zyngier@arm.com>
+>>> wrote:
+>>> >> On Wed, 6 Mar 2013 16:31:48 -0800, Christoffer Dall
+>>> >> <cdall@cs.columbia.edu>
+>>> >> wrote:
+>>> >>
+>>> >> Hi Christoffer,
+>>> >>
+>>> >>>
+>>> >>> Please pull these KVM/ARM fixes mostly centered around preparation
+>>> >>> for
+>>> >>> Marc's ARMv8 KVM work.
+>>> >>
+>>> >> Can we please hold on that for a while? asm-offset.c is usually a
+>>> >> candidate for merge conflicts as people start pushing patches post
+>>> merge
+>>> >> window, and it would make sense to see what is happening in that
+>>> >> space.
+>>> >>
+>>> > Sure, when would you see this happen exactly?
+>>>
+>>> Usually, by -rc5 we have a pretty good idea of what is going in. Also,
+>>> putting things into -next is a good way to detect potential problems.
+>>>
+>>> Oh, and keeping linux-arm-kernel into the loop. Most ARM developers
+> don't
+>>> follow the KVM lists.
+>>>
+>>>         M.
+>>
+>> Mark, can you please be more verbose on the reason for this request?
+>
+> arch/arm/kernel/asm-offset.c, being an ARM core file, is often the
+> location of merge conflicts. And because arch/arm sees a lot more churn
+> than any other architecture, we have the policy of dealing with conflicts
+> before they hit Linus.
+>
+> We usually deal with that by providing stable branches that will contain
+> the "offending" patches, and on which others can base their developments.
+>
+> This is why I suggested holding on this pull request until we got a better
+> view of what potential merge conflicts we get with this patches. This
+> shouldn't prevent the patches from entering -next though, as this would
+> help detecting the above conflicts.
+>
+So I think you need to explain me a little more carefully how the
+'usually' applies in this case. This is just a pull request to the
+kvm/master branch - it's not to Linus or ARM-specific. The only thing
+is that we touch asm-offsets.c.
 
-Oh well. I don't like it, but if that's the way it has to be, then so be
-it. Any reason why the reg-names can't match the root port's node name
-so that it can be used directly instead of going through hoops to
-construct a string from extra parameters? Like below:
+The only thing I can see that happens here is:
+ - merge to kvm/master
+ - kvm/master gets merged by Linus into -rcX (he fixes any merge
+conflicts if present)
+ - we, ARM, kvm, everyone, pull back from Linus
 
-	pcie-controller {
-		regs = <...>;
-		reg-names = ..., "pcie at 1,0", "pcie at 2,0";
+and that's it.
 
-		pcie at 1,0 {
-			...
-		};
+Perhaps it would be helpful if you can explain the situation we need
+to avaoid and what exactly is the scenario when this breaks?
 
-		pcie at 2,0 {
-			...
-		};
-	};
+The merge conflicts in asm-offsets.c should be uber-trivial, so I'm
+not sure what the big deal is.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130308/c48fa649/attachment.sig>
+-Christoffer
