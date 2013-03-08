@@ -1,57 +1,50 @@
-From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
-Date: Fri, 8 Mar 2013 09:51:17 +0900
-Subject: [PATCH] ARM: mm: clean-up in order to reduce to call
- kmap_high_get()
-In-Reply-To: <20130307132623.GG17833@n2100.arm.linux.org.uk>
-References: <1362372609-877-1-git-send-email-iamjoonsoo.kim@lge.com>
- <20130307132623.GG17833@n2100.arm.linux.org.uk>
-Message-ID: <20130308005117.GB19010@lge.com>
+From: Wenyou.Yang@atmel.com (Yang, Wenyou)
+Date: Fri, 8 Mar 2013 00:59:43 +0000
+Subject: [PATCH v5 01/16] spi/spi-atmel: fix master->num_chipselect
+ wrongly set.
+In-Reply-To: <20130302231535.8E6043E35BE@localhost>
+References: <1361861289-30332-1-git-send-email-wenyou.yang@atmel.com>
+ <1361861289-30332-2-git-send-email-wenyou.yang@atmel.com>
+ <20130302231535.8E6043E35BE@localhost>
+Message-ID: <B256D81BAE5131468A838E5D7A2436414971AE03@penmbx02>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, Russell.
-
-On Thu, Mar 07, 2013 at 01:26:23PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Mar 04, 2013 at 01:50:09PM +0900, Joonsoo Kim wrote:
-> > In kmap_atomic(), kmap_high_get() is invoked for checking already
-> > mapped area. In __flush_dcache_page() and dma_cache_maint_page(),
-> > we explicitly call kmap_high_get() before kmap_atomic()
-> > when cache_is_vipt(), so kmap_high_get() can be invoked twice.
-> > This is useless operation, so remove one.
-> > 
-> > Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
-> > 
-> > diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> > index c7e3759..b7711be 100644
-> > --- a/arch/arm/mm/dma-mapping.c
-> > +++ b/arch/arm/mm/dma-mapping.c
-> > @@ -822,16 +822,16 @@ static void dma_cache_maint_page(struct page *page, unsigned long offset,
-> >  		if (PageHighMem(page)) {
-> >  			if (len + offset > PAGE_SIZE)
-> >  				len = PAGE_SIZE - offset;
-> > -			vaddr = kmap_high_get(page);
-> > -			if (vaddr) {
-> > -				vaddr += offset;
-> > -				op(vaddr, len, dir);
-> > -				kunmap_high(page);
-> > -			} else if (cache_is_vipt()) {
-> > -				/* unmapped pages might still be cached */
-> > +			if (cache_is_vipt()) {
+> -----Original Message-----
+> From: Grant Likely [mailto:glikely at secretlab.ca] On Behalf Of Grant Likely
+> Sent: 2013?3?3? 7:16
+> To: Yang, Wenyou; linux-arm-kernel at lists.infradead.org
+> Cc: Ferre, Nicolas; plagnioj at jcrosoft.com; richard.genoud at gmail.com; Lin, JM;
+> Yang, Wenyou; spi-devel-general at lists.sourceforge.net;
+> linux-kernel at vger.kernel.org
+> Subject: Re: [PATCH v5 01/16] spi/spi-atmel: fix master->num_chipselect
+> wrongly set.
 > 
-> This should be:
-> 			if (cache_is_vipt_nonaliasing())
+> On Tue, 26 Feb 2013 14:47:54 +0800, Wenyou Yang <wenyou.yang@atmel.com>
+> wrote:
+> > if the spi property "cs-gpios" is set as below:
+> >
+> > 	cs-gpios = <0>, <&pioC 11 0>, <0>, <0>;
+> >
+> > the master->num_chipselect will wrongly be set to 0,
+> > and the spi fail to probe.
+> >
+> > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> > Cc: spi-devel-general at lists.sourceforge.net
+> > Cc: linux-kernel at vger.kernel.org
 > 
-> to make it _explicit_ that this technique is only for non-aliasing VIPT
-> caches (this doesn't work on any other of our cache types.)  Yes, I
-> know we don't support highmem with VIPT aliasing caches - but still,
-> we should ensure that this is self-documented in this code.
+> I think I've got this bug fixed in the core spi code. Give it a couple
+> of days and retest with linux-next.
+Hi Grant,
+
+Yes, in v3.9-rc1 this bug fixed, I retested on v3.9-rc1.
+But on "spi/next" git tree, it should to apply this patch.
+
+I sent the patches version 6, could you take a look them? 
+Thanks a lot for your work.
+
 > 
-> Same for arch/arm/mm/flush.c
+> g.
 
-Okay. I will re-work and will send v2 soon.
-
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+Best Regards,
+Wenyou Yang
