@@ -1,48 +1,57 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Fri, 8 Mar 2013 09:48:32 -0700
-Subject: [PATCH 04/10] bus: introduce an Marvell EBU MBus driver
-In-Reply-To: <1362758390.25161.17.camel@sakura.staff.proxad.net>
-References: <20130306190821.GA4689@obsidianresearch.com>
- <20130306202710.15a6aa2c@skate>
- <20130306202447.GA4916@obsidianresearch.com>
- <20130306214036.62fc93b9@skate>
- <20130306215031.GB4916@obsidianresearch.com>
- <20130306222712.GP23237@titan.lakedaemon.net>
- <20130306230412.GA5870@obsidianresearch.com>
- <20130307222004.GA2450@localhost>
- <20130307230516.GA28975@obsidianresearch.com>
- <1362758390.25161.17.camel@sakura.staff.proxad.net>
-Message-ID: <20130308164832.GA4094@obsidianresearch.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Fri, 08 Mar 2013 17:52:19 +0100
+Subject: [PATCH 3/5] USB chipidea: introduce dual role mode pdata flags
+In-Reply-To: <CAB7JpEGP4HXrbGs539pV8ruPrS2ZOT0EYhGR74vvFDtHM4GsQg@mail.gmail.com>
+References: <1362049024-11383-1-git-send-email-mkl@pengutronix.de>
+ <1362049024-11383-4-git-send-email-mkl@pengutronix.de>
+ <20130308163300.GF32368@arwen.pp.htv.fi>
+ <CAB7JpEGP4HXrbGs539pV8ruPrS2ZOT0EYhGR74vvFDtHM4GsQg@mail.gmail.com>
+Message-ID: <513A1743.8070102@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 08, 2013 at 04:59:50PM +0100, Maxime Bizon wrote:
-> On Thu, 2013-03-07 at 16:05 -0700, Jason Gunthorpe wrote:
-> > 
-> > BTW, I've made the same basic choice on our Kirkwood systems. The NAND
-> > timing pameters are set by the bootloader and the kernel doesn't touch
-> > them. The bootloader knows which flash chip is placed on the board so
-> > only it knows the correct timing parameters. There is not any reason
-> > to communicate them to the kernel. 
+On 03/08/2013 05:46 PM, Alexander Shishkin wrote:
+> On 8 March 2013 18:33, Felipe Balbi <balbi@ti.com> wrote:
+>> Hi,
+>>
+>> On Thu, Feb 28, 2013 at 11:57:02AM +0100, Marc Kleine-Budde wrote:
+>>> @@ -487,14 +488,23 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+>>>               return -ENODEV;
+>>>       }
+>>>
+>>> +     /* For now we treat dual-role as otg */
+>>> +     dr_mode = ci->platdata->dr_mode;
+>>> +     if (dr_mode == USB_DR_MODE_UNKNOWN || dr_mode == USB_DR_MODE_DUAL_ROLE)
+>>> +             dr_mode = USB_DR_MODE_OTG;
+>>> +
+>>>       /* initialize role(s) before the interrupt is requested */
+>>> -     ret = ci_hdrc_host_init(ci);
+>>> -     if (ret)
+>>> -             dev_info(dev, "doesn't support host\n");
+>>> +     if (dr_mode == USB_DR_MODE_OTG || dr_mode == USB_DR_MODE_HOST) {
+>>
+>> this is not something you should be passing via pdata; chipidea core
+>> should know how to read this data by itself. Meaning that chipidea core
+>> should be taught about devicetree. But make it optional since now all
+>> users use DT.
 > 
-> since you can probe the chip ONFI timings, why are you doing that ?
+> And I don't think I like the idea of chipidea core calling into device
+> tree code directly.
 
-Hmm, very interesting idea, but there is no implementation of this for
-the Marvell NAND driver today.
+Hmmm....this means draw :)
 
-Ezequiel - how would you forsee fitting something like this in? The
-process for NAND would be to set the slowest timings (which have to be
-computed based on the TClk frequency), do READID, determine the
-fastest supported timings, and then update the timings again.
+Marc
 
-This seems like something that belongs in the NAND interface driver,
-not the device bus driver??
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
-> on a general standpoint, why would you ever want to run with whatever
-> the bootloader left in registers if you have full knowledge to reprogram
-> them in the kernel ?
-
-Well, because the kernel doesn't support those registers. There are
-quite a few of them on our Kirkwood systems, including NAND timing.
-
-Jason
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130308/2919a15a/attachment.sig>
