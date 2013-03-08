@@ -1,44 +1,95 @@
 From: hechtb@gmail.com (Bastian Hecht)
-Date: Fri,  8 Mar 2013 12:29:38 +0100
-Subject: [PATCH v2 4/7] ARM: shmobile: sh73a0: Add timer DT names to clock list
+Date: Fri,  8 Mar 2013 12:29:39 +0100
+Subject: [PATCH v2 5/7] ARM: mach-shmobile: sh73a0: Setup the timer CMT10
+ using DT
 In-Reply-To: <1362742181-19111-1-git-send-email-hechtb+renesas@gmail.com>
 References: <1362742181-19111-1-git-send-email-hechtb+renesas@gmail.com>
-Message-ID: <1362742181-19111-5-git-send-email-hechtb+renesas@gmail.com>
+Message-ID: <1362742181-19111-6-git-send-email-hechtb+renesas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds temporarily the alternative device names to the clock list
-that are used when booting via Device Tree setup.
+We can now use the Device Tree for bringing up our timer device CMT10 on
+the SoC sh73a0.
 
 Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
 ---
 v2:
-- Done for cmt and tmu
+- Moved the definition from the board .dts to the SoC .dtsi
+- Renamed cmt at 0xe6138010 to timer at e6138010
 
- arch/arm/mach-shmobile/clock-sh73a0.c |    3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/boot/dts/sh73a0.dtsi         |   11 +++++++++++
+ arch/arm/mach-shmobile/setup-sh73a0.c |   32 --------------------------------
+ 2 files changed, 11 insertions(+), 32 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/clock-sh73a0.c b/arch/arm/mach-shmobile/clock-sh73a0.c
-index 71843dd..2704467 100644
---- a/arch/arm/mach-shmobile/clock-sh73a0.c
-+++ b/arch/arm/mach-shmobile/clock-sh73a0.c
-@@ -558,7 +558,9 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh_mobile_ceu.0", &mstp_clks[MSTP127]), /* CEU0 */
- 	CLKDEV_DEV_ID("sh-mobile-csi2.0", &mstp_clks[MSTP126]), /* CSI2-RX0 */
- 	CLKDEV_DEV_ID("sh_tmu.0", &mstp_clks[MSTP125]), /* TMU00 */
-+	CLKDEV_DEV_ID("fff60008.timer", &mstp_clks[MSTP125]), /* TMU00 */
- 	CLKDEV_DEV_ID("sh_tmu.1", &mstp_clks[MSTP125]), /* TMU01 */
-+	CLKDEV_DEV_ID("fff60014.timer", &mstp_clks[MSTP125]), /* TMU01 */
- 	CLKDEV_DEV_ID("sh-mipi-dsi.0", &mstp_clks[MSTP118]), /* DSITX */
- 	CLKDEV_DEV_ID("i2c-sh_mobile.0", &mstp_clks[MSTP116]), /* I2C0 */
- 	CLKDEV_DEV_ID("e6820000.i2c", &mstp_clks[MSTP116]), /* I2C0 */
-@@ -575,6 +577,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh-sci.4", &mstp_clks[MSTP200]), /* SCIFA4 */
- 	CLKDEV_DEV_ID("sh-sci.6", &mstp_clks[MSTP331]), /* SCIFA6 */
- 	CLKDEV_DEV_ID("sh_cmt.10", &mstp_clks[MSTP329]), /* CMT10 */
-+	CLKDEV_DEV_ID("e6138010.timer", &mstp_clks[MSTP329]), /* CMT10 */
- 	CLKDEV_DEV_ID("sh_fsi2", &mstp_clks[MSTP328]), /* FSI */
- 	CLKDEV_DEV_ID("sh_irda.0", &mstp_clks[MSTP325]), /* IrDA */
- 	CLKDEV_DEV_ID("i2c-sh_mobile.1", &mstp_clks[MSTP323]), /* I2C1 */
+diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
+index 8a59465..6549d6c 100644
+--- a/arch/arm/boot/dts/sh73a0.dtsi
++++ b/arch/arm/boot/dts/sh73a0.dtsi
+@@ -97,4 +97,15 @@
+ 			      0 189 0x4
+ 			      0 190 0x4>;
+ 	};
++
++	timer at e6138010 {
++		compatible = "renesas,cmt-timer";
++		interrupt-parent = <&gic>;
++		reg = <0xe6138010 0xc>;
++		interrupts = <0 65 0x4>;
++		renesas,device-id = <1>;
++		renesas,channel-id = <0>;
++		renesas,source-quality = <3>;
++		renesas,event-quality = <3>;
++	};
+ };
+diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
+index 95a75af..64bc2c5 100644
+--- a/arch/arm/mach-shmobile/setup-sh73a0.c
++++ b/arch/arm/mach-shmobile/setup-sh73a0.c
+@@ -247,37 +247,6 @@ static struct platform_device scif8_device = {
+ 	},
+ };
+ 
+-static struct sh_timer_config cmt10_platform_data = {
+-	.name = "CMT10",
+-	.channel_offset = 0x10,
+-	.timer_bit = 0,
+-	.clockevent_rating = 125,
+-	.clocksource_rating = 125,
+-};
+-
+-static struct resource cmt10_resources[] = {
+-	[0] = {
+-		.name	= "CMT10",
+-		.start	= 0xe6138010,
+-		.end	= 0xe613801b,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start	= gic_spi(65),
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-};
+-
+-static struct platform_device cmt10_device = {
+-	.name		= "sh_cmt",
+-	.id		= 10,
+-	.dev = {
+-		.platform_data	= &cmt10_platform_data,
+-	},
+-	.resource	= cmt10_resources,
+-	.num_resources	= ARRAY_SIZE(cmt10_resources),
+-};
+-
+ /* TMU */
+ static struct sh_timer_config tmu00_platform_data = {
+ 	.name = "TMU00",
+@@ -913,7 +882,6 @@ static struct platform_device *sh73a0_devices_dt[] __initdata = {
+ 	&scif6_device,
+ 	&scif7_device,
+ 	&scif8_device,
+-	&cmt10_device,
+ };
+ 
+ static struct platform_device *sh73a0_early_devices[] __initdata = {
 -- 
 1.7.9.5
