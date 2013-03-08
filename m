@@ -1,59 +1,57 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 08 Mar 2013 01:40:53 +0100
-Subject: [PATCH 00/23] RFC: exynos multiplatform support
-In-Reply-To: <20130307072203.GC3451@avionic-0098.mockup.avionic-design.de>
-References: <1362505353-8873-1-git-send-email-arnd@arndb.de>
- <201303070302.46593.arnd@arndb.de>
- <20130307072203.GC3451@avionic-0098.mockup.avionic-design.de>
-Message-ID: <3271021.WsP8f9ZEBl@flatron>
+From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
+Date: Fri, 8 Mar 2013 09:51:17 +0900
+Subject: [PATCH] ARM: mm: clean-up in order to reduce to call
+ kmap_high_get()
+In-Reply-To: <20130307132623.GG17833@n2100.arm.linux.org.uk>
+References: <1362372609-877-1-git-send-email-iamjoonsoo.kim@lge.com>
+ <20130307132623.GG17833@n2100.arm.linux.org.uk>
+Message-ID: <20130308005117.GB19010@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 07 of March 2013 08:22:03 Thierry Reding wrote:
-> On Thu, Mar 07, 2013 at 03:02:46AM +0000, Arnd Bergmann wrote:
-> > On Wednesday 06 March 2013, Thierry Reding wrote:
-> > > > Option 2 would probably come down to having a trivial MFD driver
-> > > > exposing a regmap. You can probably reuse drivers/mfd/syscon.c
-> > > > for this and make the node compatible with "syscon" to designate
-> > > > the clock registers as a system-wide resource, making the other
-> > > > device nodes register-less.> > 
-> > > I think option 2 is the standard method if one hardware block
-> > > provides
-> > > several logical devices. I find it to be a pretty nice solution to
-> > > this
-> > > problem. We also have precedent in the PWM subsystem. The TWL chips
-> > > for
-> > > instance use it to create a platform device which is later driven by
-> > > a
-> > > PWM driver.
+Hello, Russell.
+
+On Thu, Mar 07, 2013 at 01:26:23PM +0000, Russell King - ARM Linux wrote:
+> On Mon, Mar 04, 2013 at 01:50:09PM +0900, Joonsoo Kim wrote:
+> > In kmap_atomic(), kmap_high_get() is invoked for checking already
+> > mapped area. In __flush_dcache_page() and dma_cache_maint_page(),
+> > we explicitly call kmap_high_get() before kmap_atomic()
+> > when cache_is_vipt(), so kmap_high_get() can be invoked twice.
+> > This is useless operation, so remove one.
 > > 
-> > One difference though is that the TWL chip is a heterogenous MFD that
-> > has a lot of different sub-devices, where in case of Exynos the timer
-> > device has a set of identical units, each of which can be used either
-> > as a PWM or as a clocksource or other timer.
+> > Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+> > 
+> > diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> > index c7e3759..b7711be 100644
+> > --- a/arch/arm/mm/dma-mapping.c
+> > +++ b/arch/arm/mm/dma-mapping.c
+> > @@ -822,16 +822,16 @@ static void dma_cache_maint_page(struct page *page, unsigned long offset,
+> >  		if (PageHighMem(page)) {
+> >  			if (len + offset > PAGE_SIZE)
+> >  				len = PAGE_SIZE - offset;
+> > -			vaddr = kmap_high_get(page);
+> > -			if (vaddr) {
+> > -				vaddr += offset;
+> > -				op(vaddr, len, dir);
+> > -				kunmap_high(page);
+> > -			} else if (cache_is_vipt()) {
+> > -				/* unmapped pages might still be cached */
+> > +			if (cache_is_vipt()) {
 > 
-> I didn't know that. However I still making this an MFD driver is a good
-> fit because it'll move the logic of defining the mode of each unit is
-> kept in a parent driver which can instantiate the proper child devices
-> for the corresponding subsystems.
+> This should be:
+> 			if (cache_is_vipt_nonaliasing())
 > 
-> One big disadvantage of this approach is that if this is continued there
-> is a risk that MFD will turn into a dump for all kinds of devices that
-> provide more than a single service.
+> to make it _explicit_ that this technique is only for non-aliasing VIPT
+> caches (this doesn't work on any other of our cache types.)  Yes, I
+> know we don't support highmem with VIPT aliasing caches - but still,
+> we should ensure that this is self-documented in this code.
 > 
-> So if people prefer option 3 I'm fine with it as well.
+> Same for arch/arm/mm/flush.c
 
-I have a question regarding making this an MFD driver.
+Okay. I will re-work and will send v2 soon.
 
-As you know, the main clocksource driver must be initialized early, from 
-init_time callback of machine_desc. How does using the MFD subsystem fit 
-into this scheme?
-
-P.S. I'm still not convinced about any benefits of options 2 and 3 over 
-option 1, which has the obvious advantage of requiring least amount of 
-changes to existing code and not binding the PWM and clocksource drivers 
-together (on Exynos SoCs only the PWM driver is used, clocksource is 
-handled by different hardware block - MCT).
-
-Best regards,
-Tomasz
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
