@@ -1,62 +1,89 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Fri, 8 Mar 2013 07:11:28 +0100 (CET)
-Subject: [PATCH V2] cpufreq: ARM big LITTLE: Add generic cpufreq driver
- and its DT glue
-In-Reply-To: <CAKohpo=-_uzTi6QR4MnXPd5yAZFTcw-3ZZL-TAVY+drV-bDjNw@mail.gmail.com>
-References: <6cba8f153cfd4b0d3075a34a6dfe287bdec2eb06.1362676407.git.viresh.kumar@linaro.org>
- <Pine.LNX.4.64.1303072248560.20470@axis700.grange>
- <CAKohpo=-_uzTi6QR4MnXPd5yAZFTcw-3ZZL-TAVY+drV-bDjNw@mail.gmail.com>
-Message-ID: <Pine.LNX.4.64.1303080706310.24111@axis700.grange>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Fri, 8 Mar 2013 14:27:58 +0800
+Subject: [PATCH v11 6/9] usb: chipidea: add vbus regulator control
+In-Reply-To: <20130307095248.GL9171@arwen.pp.htv.fi>
+References: <1362563800-16673-1-git-send-email-peter.chen@freescale.com>
+ <1362563800-16673-7-git-send-email-peter.chen@freescale.com>
+ <20130306112916.GT28587@arwen.pp.htv.fi>
+ <20130307024102.GD20470@nchen-desktop>
+ <20130307095248.GL9171@arwen.pp.htv.fi>
+Message-ID: <20130308062757.GB16076@nchen-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Viresh
+On Thu, Mar 07, 2013 at 11:52:48AM +0200, Felipe Balbi wrote:
+> On Thu, Mar 07, 2013 at 10:41:03AM +0800, Peter Chen wrote:
+> > On Wed, Mar 06, 2013 at 01:29:16PM +0200, Felipe Balbi wrote:
+> > > Hi,
+> > > 
+> > > On Wed, Mar 06, 2013 at 05:56:37PM +0800, Peter Chen wrote:
+> > > > For boards which have board level vbus control (eg, gpio), we
+> > > > need to operation vbus according to below rules:
+> > > > - For host, the vbus should always be on.
+> > > > - For otg, the vbus needs to be turned on/off when usb role switches.
+> > > > 
+> > > > We put vbus operation to host as host is the only vbus user,
+> > > > When we are at host mode, the vbus is on, when we are not at
+> > > > host mode, vbus should be off.
+> > > > 
+> > > > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> > > > ---
+> > > >  
+> > > > @@ -603,6 +594,7 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+> > > >  
+> > > >  	ci->dev = dev;
+> > > >  	ci->platdata = dev->platform_data;
+> > > > +	ci->reg_vbus = ci->platdata->reg_vbus;
+> > > 
+> > > nak, teach ci_hdrc_probe() how to get its own regulator.
+> > > 
+> > > >  	if (ci->platdata->phy)
+> > > >  		ci->transceiver = ci->platdata->phy;
+> > > 
+> > > this should happen for PHYs as well btw.
+> > 
+> > Like I said at previous email, core code has NO DTS entry.
+> 
+> that's your problem :-)
+> 
+> You can just as well create both nodes in DTS file:
+> 
+> ci13xx_fsl at foo {
+> 	compatible = "fsl,chipidea";
+> 	reg = <foo size>;
+> 	blablabla
+> 	ranges;
+> 
+> 	chipidea_core at bar {
+> 		compatible = "chipidea";
+> 		reg <bar size>;
+> 		blablabla
+> 	};
+> };
+> 
+> then assign the regulator to chipidea itself, not to the glue.
 
-On Fri, 8 Mar 2013, Viresh Kumar wrote:
+No, that will make things more complicated at current chipidea driver.
 
-> On 8 March 2013 05:56, Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
-> > I like generic drivers :)
-> 
-> Me too :)
-> 
-> > cpufreq-cpu0 is yet another such generic
-> > (cpufreq) driver. Now, comparing the functionality of the two:
-> 
-> Great!!
-> 
-> > we see, that this driver "only" switches CPU clock frequencies. Whereas
-> > the cpufreq-cpu0 driver also manipulates a regulator (if available)
-> > directly. I understand, power-saving is also an important consideration
-> > for big.LITTLE systems. So, I presume, you plan to implement voltage
-> > switching in cpufreq notifiers?
-> 
-> So the platform on which we are currently testing these is ARM TC2 Soc
-> and this switching is done by the firmware instead. And so didn't went
-> for regulator hookups initially.. Obviously in future regulator hookups would
-> find some space in this driver but not required for now.
-> 
-> > Now, my question is: is this (notifier)
-> > actually the preferred method and the cpufreq-cpu0 driver is doing it
-> > "wrongly?"
-> 
-> What notifiers are you talking about? I believe using the regulator framework
-> is the right way of doing this. And that would be part of this code later on.
+Differ with dwc3, chipidea created its platform data at glue layer,
+and chipidea core owing this data when platform device is created.
 
-Also in your driver you're doing
+If we also want get things from DT node, we need to get node from
+glue layer as this node is NOT belonged to chipidea core's pdev.
+(We can't get it through compatible string as compatible string
+ is the same from every chipidea device)
 
-		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
-		...
-		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+Convert platform data to DT for chipidea core is a big job,
+it is out of scope of this patch. If Alex also thinks we
+are deserved to do it, I can do it later.
 
-So, theoretically you could install such notifiers to adjust CPU voltages 
-(using regulators too). But adding regulator calls directly to the driver 
-would make it consistent with cpufreq-cpu0.c, so, if this doesn't violate 
-any concepts, I think, it would be good to add those when suitable systems 
-appear.
+> 
+> -- 
+> balbi
 
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+
+
+-- 
+
+Best Regards,
+Peter Chen
