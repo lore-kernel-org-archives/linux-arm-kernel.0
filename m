@@ -1,92 +1,141 @@
-From: wmb@firmworks.com (Mitch Bradley)
-Date: Fri, 08 Mar 2013 09:43:11 -1000
-Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
-In-Reply-To: <20130308191227.GA6551@avionic-0098.mockup.avionic-design.de>
-References: <20130306121118.GA17079@avionic-0098.mockup.avionic-design.de>
- <20130306180946.GA2433@obsidianresearch.com>
- <20130307080832.GD3451@avionic-0098.mockup.avionic-design.de>
- <20130307174955.GC20840@obsidianresearch.com>
- <20130307194830.GA1811@avionic-0098.mockup.avionic-design.de>
- <20130307200235.GB20695@obsidianresearch.com>
- <20130307204726.GB1811@avionic-0098.mockup.avionic-design.de>
- <51392B4D.9040404@gmail.com>
- <20130308071443.GA5772@avionic-0098.mockup.avionic-design.de>
- <20130308165228.GB4094@obsidianresearch.com>
- <20130308191227.GA6551@avionic-0098.mockup.avionic-design.de>
-Message-ID: <513A3F4F.2090501@firmworks.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Fri, 8 Mar 2013 12:47:55 -0700
+Subject: [PATCH 04/10] bus: introduce an Marvell EBU MBus driver
+In-Reply-To: <20130308164804.GR23237@titan.lakedaemon.net>
+References: <1362577426-12804-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130306202710.15a6aa2c@skate>
+ <20130306202447.GA4916@obsidianresearch.com>
+ <201303070337.43288.arnd@arndb.de>
+ <20130307063513.GA31330@obsidianresearch.com>
+ <20130308164804.GR23237@titan.lakedaemon.net>
+Message-ID: <20130308194755.GB29435@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/8/2013 9:12 AM, Thierry Reding wrote:
-> On Fri, Mar 08, 2013 at 09:52:28AM -0700, Jason Gunthorpe wrote:
->> On Fri, Mar 08, 2013 at 08:14:44AM +0100, Thierry Reding wrote:
->>> On Thu, Mar 07, 2013 at 06:05:33PM -0600, Rob Herring wrote:
->>>> On 03/07/2013 02:47 PM, Thierry Reding wrote:
->>> [...]
->>>>> In a nutshell (since some of the context isn't quoted anymore) the
->>>>> problem that we're trying to solve is that some of the embedded SoCs
->>>>> require per-root-port registers for configuration. The PCI DT
->>>>> specification doesn't make any provisions for this. A few alternatives
->>>>> have been discussed so far:
->>>>
->>>> I'm not sure I follow. This is different than the host controller
->>>> registers? Why would this not just be multiple entries in the reg property?
->>>
->>> Well the register regions are per root-port. On Tegra20 there's 2 of
->>> them, Tegra30 has 3 and if I understand correctly Marvell can have up to
->>> 10 (!). Adding all of them to the reg property of the host controller
->>> could work but it needs some way to match the reg entry to the root port
->>> similar to option 1 below.
->>
->> Thomas just posted an implementation like this, please see:
->>
->> http://www.spinics.net/lists/arm-kernel/msg228749.html
+On Fri, Mar 08, 2013 at 11:48:04AM -0500, Jason Cooper wrote:
+ 
+> Thanks to JasonG and Arnd for clearing up my misunderstandings.  The
+> only thing I would really like to see at this point is a clear,
+> thought-through migration path from Thomas' patches to JasonG's
+> proposal.  Obviously, it would be nice if the proposer took a crack at
+> this. ;-)
 
-The example in that posting looks messed up to me.
+The patch to add the top level ranges is a bit major because it
+restructures the DT to be organized by mbus target. It also would
+depend on Steven's preprocesor patchset (for our own sanity).
 
-1) It has "reg = <0x0800 0 0 0 0>", but 0x0800 0 0  is not a valid
-address in the address space defined by its parent - because the form of
-the parent's ranges property indicates that it's a PCI-style address
-form.  0x0800 0 0 lacks the top bits that indicate non-relocatable and
-the type (I/O, memory, etc).
+To my mind this is best done after Thomas's work goes in, because it
+is a complex change to the DT and has dependencies.
 
-2) The "@0,0" and "@1,0" suffixes do not correspond to the reg values
-<0x0800 0 0 0 0> and <0x1000 0 0 0 0> using any rule that I know.
+Eg kirkwood.dtsi would change to place, as best as possible, mbus
+targets directly below the mbus top level. Here is a sample that shows
+most of the main points:
 
-What is address space represented by the pcie-controller node?  reg
-properties in child nodes must contain proper addresses in some
-well-defined address space.  It looks like this example is trying to put
-half of the PCI bus abstraction in the pcie-controller node and the rest
-in the pcie sub-nodes, with some handwaving address-space splicing
-between the two.  That's not kosher.  Each level of the tree needs a
-coherent address space definition, otherwise the address space
-"calculus" breaks.
+/* MAPDEF is a 2 dw value, top DW encodes the target id, bottom dword is
+   usally 0. The special target id of '0' is no target/no window. */
+#define MAPDEF(x,y,z) ((x << 16) | (y << 8) | z) 0
+#define MAPDEF_INTERNAL MAPDEF(...)
+[..]
+#define PCI_MMIO_APERTURE 0xe0000000
+#define PCI_IO_APERTURE 0xe8000000
 
-> 
-> Oh well. I don't like it, but if that's the way it has to be, then so be
-> it. Any reason why the reg-names can't match the root port's node name
-> so that it can be used directly instead of going through hoops to
-> construct a string from extra parameters? Like below:
-> 
-> 	pcie-controller {
-> 		regs = <...>;
-> 		reg-names = ..., "pcie at 1,0", "pcie at 2,0";
-> 
-> 		pcie at 1,0 {
-> 			...
-> 		};
-> 
-> 		pcie at 2,0 {
-> 			...
-> 		};
-> 	};
-> 
-> Thierry
-> 
-> 
-> 
-> _______________________________________________
-> devicetree-discuss mailing list
-> devicetree-discuss at lists.ozlabs.org
-> https://lists.ozlabs.org/listinfo/devicetree-discuss
-> 
+mbus {
+  ranges = <MAPDEF_INTERNAL 0xf1000000 0x100000
+            MAPDEF_NAND     0xf4000000 0x10000
+            MAPDEF_CRYPTO   0xf5000000 0x10000
+
+ 	    /* These two are *not* mbus windows but are required to
+   	       model the PCI aperture abstraction. Windows are
+	       allocated within these regions dynamically
+               as neeed. */
+            0 PCI_MMIO_APERTURE PCI_MMIO_APERTURE 0x08000000
+            0 PCI_IO_APERTURE PCI_MMIO_APERTURE 0x00100000>
+  #address-cells = <2>;
+  [..]
+
+  // Internal regs special target
+  internal_regs at f1000000 {
+       compatible = "simple-bus";
+       ranges = <0x00000000 MAPDEF_INTERNAL 0x100000>;
+       #address-cells = <1>;
+
+       serial at 12000 {
+              compatible = "ns16550a";
+              reg = <0x12000 0x100>;
+              reg-shift = <2>;
+              interrupts = <33>;
+        };
+       [..]
+  }
+
+  // All the PCI-E targets
+  pcie-controller {
+     compatible = "marvell,armada-370-pcie";
+     reg = <MAPDEF_INTERNAL + 0x40000 0x2000>,
+           <MAPDEF_INTERNAL + 0x80000 0x2000>;
+     ranges = <0x82000000 0 PCI_MMIO_APERTURE PCI_MMIO_APERTURE 0 0x08000000   /* non-prefetchable memory */
+               0x81000000 0 0                 PCI_IO_APERTURE 0  0x00100000>; /* downstream I/O */
+     [..]
+     pcie at 0,0 {
+          reg = <0x0800 0 0 0 0>;
+          marvell,mbus-targets = <MAPDEF_PCIE0_MEM MAPDEF_PCIE0_IO>;
+     }
+  }
+
+  // Target id 1,0x2f
+  nand at 0xf4000000 {
+          #address-cells = <1>;
+          #size-cells = <1>;
+          cle = <0>;
+          ale = <1>;
+          bank-width = <1>;
+          compatible = "marvell,orion-nand";
+          reg = <MAPDEF_NAND 0x400>;
+  };
+
+  // Target id 0x3,0x1
+  crypto at f5000000 {
+          reg = <MAPDEF_INTERNAL + 0x30000 0x10000>,
+                <MAPDEF_CRYPTO 0x800>;
+  }
+}
+
+Which then results in mirroring changes to all the including dts:
+
+mbus {
+        internal_regs at f1000000 {
+                timer at 20300 {
+                        clock-frequency = <166666667>;
+                };
+}
+
+A word on the PCI aperture: It is possible to directly show the mbus
+windows for PCI in the DT, and rely on runtime updating to keep
+everything in sync with the dynamic choices made by the PCI driver,
+but there is no point in doing all this work since we have no use for
+this information within the DT. A simple CPU address range 'aperture'
+to indicate where we want to place the PCI region is all that is
+needed. If the region is someday selected dynamically then the two
+ranges would be updated at runtime.
+
+I think I can prepare a patch for this if we reach agreement, but I
+can only test it on Kirkwood today.. Also, I'm guessing there is some
+opinions on what should be after the @.. ?
+
+>From there..
+
+Future patches would have the mbus driver read the top level ranges at
+boot and program those windows. Then we remove the code in the board
+specific files that does the same.
+
+For kirwood, move the PCI specific window setup code into the non-dt
+pcie driver, and then we are ready to use Thomas's DT driver on
+kirkwood.
+
+When the non-DT code is removed many of the the tables in the mbus
+driver can then be purged.
+
+Future patches could support fully dyanmic window address assignment,
+but I'm honestly having a hard time seeing a use case for this..
+
+Jason
