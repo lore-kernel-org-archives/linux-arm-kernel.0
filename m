@@ -1,25 +1,62 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 8 Mar 2013 06:33:54 +0100
-Subject: [PATCH] ARM: shmobile: R8A7779: use gic_iid() in SATA IRQ resource
-In-Reply-To: <87obeuahg5.wl%kuninori.morimoto.gx@renesas.com>
-References: <201303080231.04149.sergei.shtylyov@cogentembedded.com>
- <87obeuahg5.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <20130308053345.GA771@verge.net.au>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Fri, 8 Mar 2013 07:11:28 +0100 (CET)
+Subject: [PATCH V2] cpufreq: ARM big LITTLE: Add generic cpufreq driver
+ and its DT glue
+In-Reply-To: <CAKohpo=-_uzTi6QR4MnXPd5yAZFTcw-3ZZL-TAVY+drV-bDjNw@mail.gmail.com>
+References: <6cba8f153cfd4b0d3075a34a6dfe287bdec2eb06.1362676407.git.viresh.kumar@linaro.org>
+ <Pine.LNX.4.64.1303072248560.20470@axis700.grange>
+ <CAKohpo=-_uzTi6QR4MnXPd5yAZFTcw-3ZZL-TAVY+drV-bDjNw@mail.gmail.com>
+Message-ID: <Pine.LNX.4.64.1303080706310.24111@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 07, 2013 at 04:00:46PM -0800, Kuninori Morimoto wrote:
-> 
-> Hi Sergei
-> 
-> > Commit "ARM: shmobile: r8a7779: use gic_iid macro" switched R8A7779 platform
-> > devices to using gic_iid() macro instead of gic_spi() but commit "ARM: mach-
-> > shmobile: r8a7779: add SATA support" added another use of gic_spi(). Convert
-> > the SATA IRQ resource to using gic_iid().
-> > 
-> > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> 
-> Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Hi Viresh
 
-Thanks, I have applied this to the soc5 branch and thus queued it
-up for v3.10.
+On Fri, 8 Mar 2013, Viresh Kumar wrote:
+
+> On 8 March 2013 05:56, Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
+> > I like generic drivers :)
+> 
+> Me too :)
+> 
+> > cpufreq-cpu0 is yet another such generic
+> > (cpufreq) driver. Now, comparing the functionality of the two:
+> 
+> Great!!
+> 
+> > we see, that this driver "only" switches CPU clock frequencies. Whereas
+> > the cpufreq-cpu0 driver also manipulates a regulator (if available)
+> > directly. I understand, power-saving is also an important consideration
+> > for big.LITTLE systems. So, I presume, you plan to implement voltage
+> > switching in cpufreq notifiers?
+> 
+> So the platform on which we are currently testing these is ARM TC2 Soc
+> and this switching is done by the firmware instead. And so didn't went
+> for regulator hookups initially.. Obviously in future regulator hookups would
+> find some space in this driver but not required for now.
+> 
+> > Now, my question is: is this (notifier)
+> > actually the preferred method and the cpufreq-cpu0 driver is doing it
+> > "wrongly?"
+> 
+> What notifiers are you talking about? I believe using the regulator framework
+> is the right way of doing this. And that would be part of this code later on.
+
+Also in your driver you're doing
+
+		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+		...
+		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+
+So, theoretically you could install such notifiers to adjust CPU voltages 
+(using regulators too). But adding regulator calls directly to the driver 
+would make it consistent with cpufreq-cpu0.c, so, if this doesn't violate 
+any concepts, I think, it would be good to add those when suitable systems 
+appear.
+
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
