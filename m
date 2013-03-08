@@ -1,39 +1,48 @@
-From: emilio@elopez.com.ar (=?UTF-8?B?RW1pbGlvIEzDs3Bleg==?=)
-Date: Fri, 8 Mar 2013 08:45:59 -0300
-Subject: [PATCHv2 0/6] Extend UART support for Allwinner SoCs
-In-Reply-To: <1362694460-1919-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1362694460-1919-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <BLU0-SMTP51628392EE95B57B8271B48AE60@phx.gbl>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Fri, 08 Mar 2013 13:06:37 +0100
+Subject: [PATCH] ARM: OMAP: fix typo "CONFIG_SMC91x_MODULE"
+Message-ID: <1362744397.5994.58.camel@x61.thuisdomein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+There's a (rather subtle) typo in "CONFIG_SMC91x_MODULE". Fix it once
+and for all by using IS_ENABLED(), which is designed to avoid issues
+like this.
 
-El 07/03/13 19:14, Maxime Ripard escribi?:
-> Hi,
-> 
-> This patchset reworks a bit the UART support that is found in the DT
-> for Allwinner SoCs, which was quite limited until now.
-> 
-> It first switches to using the clocks property, then rework a bit the
-> DTSI to have only the UART available in the A10 and the A13 (the A10
-> has 8 UARTs, while A13 has only the uart1 and uart3).
-> 
-> Thanks,
-> Maxime
+Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+---
+Untested! And this needs build- and runtime testing, especially for the
+MODULE case!
 
-The DT bits look correct to me, so
+ arch/arm/mach-omap2/board-2430sdp.c | 2 +-
+ arch/arm/mach-omap2/board-h4.c      | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-Acked-by: Emilio L?pez <emilio@elopez.com.ar>
-
-I also tested the series on a Cubieboard (have a look at my followup
-patch, "ARM: sunxi: cubieboard: Add UART muxing") and UART0 worked
-correctly, so you can also have my
-
-Tested-by: Emilio L?pez <emilio@elopez.com.ar>
-
-for the sun4i parts.
-
-Thanks,
-
-Emilio
+diff --git a/arch/arm/mach-omap2/board-2430sdp.c b/arch/arm/mach-omap2/board-2430sdp.c
+index a3e0aaa..cb0596b 100644
+--- a/arch/arm/mach-omap2/board-2430sdp.c
++++ b/arch/arm/mach-omap2/board-2430sdp.c
+@@ -166,7 +166,7 @@ static void __init sdp2430_display_init(void)
+ 	omap_display_init(&sdp2430_dss_data);
+ }
+ 
+-#if defined(CONFIG_SMC91X) || defined(CONFIG_SMC91x_MODULE)
++#if IS_ENABLED(CONFIG_SMC91X)
+ 
+ static struct omap_smc91x_platform_data board_smc91x_data = {
+ 	.cs		= 5,
+diff --git a/arch/arm/mach-omap2/board-h4.c b/arch/arm/mach-omap2/board-h4.c
+index 812c829..5b4ec51 100644
+--- a/arch/arm/mach-omap2/board-h4.c
++++ b/arch/arm/mach-omap2/board-h4.c
+@@ -246,7 +246,7 @@ static u32 is_gpmc_muxed(void)
+ 		return 0;
+ }
+ 
+-#if defined(CONFIG_SMC91X) || defined(CONFIG_SMC91x_MODULE)
++#if IS_ENABLED(CONFIG_SMC91X)
+ 
+ static struct omap_smc91x_platform_data board_smc91x_data = {
+ 	.cs		= 1,
+-- 
+1.7.11.7
