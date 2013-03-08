@@ -1,75 +1,81 @@
 From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
-Date: Fri, 8 Mar 2013 16:13:56 +0100
-Subject: [PATCH 2/4] ARM: at91: introduce the core type choice to split
- ARMv4/5 and ARMv7 arch
+Date: Fri, 8 Mar 2013 16:13:57 +0100
+Subject: [PATCH 3/4] ARM: at91: fix infinite loop in at91_irq_suspend/resume
 In-Reply-To: <1362755638-20092-1-git-send-email-ludovic.desroches@atmel.com>
 References: <1362755638-20092-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1362755638-20092-3-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <1362755638-20092-4-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-As we will introduce SAMA5, we need to distinguish the core architecture. It is
-useless to show ARMv4/5 entries if we are configuring a kernel for SAMA5
+Fix an infinite loop when suspending or resuming a device with AIC5 i.e. SAMA5
 devices.
 
 Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 ---
- arch/arm/mach-at91/Kconfig | 22 ++++++++++++++++++----
- 1 file changed, 18 insertions(+), 4 deletions(-)
+ arch/arm/mach-at91/irq.c | 20 ++++++++------------
+ 1 file changed, 8 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index 68c53c3..8b35c7f 100644
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@ -6,6 +6,10 @@ config HAVE_AT91_DBGU0
- config HAVE_AT91_DBGU1
- 	bool
+diff --git a/arch/arm/mach-at91/irq.c b/arch/arm/mach-at91/irq.c
+index 8e21026..e0ca591 100644
+--- a/arch/arm/mach-at91/irq.c
++++ b/arch/arm/mach-at91/irq.c
+@@ -92,23 +92,21 @@ static int at91_aic_set_wake(struct irq_data *d, unsigned value)
  
-+config AT91_PMC_UNIT
-+	bool
-+	default !ARCH_AT91X40
-+
- config AT91_SAM9_ALT_RESET
- 	bool
- 	default !ARCH_AT91X40
-@@ -27,8 +31,21 @@ config SOC_AT91SAM9
+ void at91_irq_suspend(void)
+ {
+-	int i = 0, bit;
++	int bit = -1;
  
- menu "Atmel AT91 System-on-Chip"
+ 	if (has_aic5()) {
+ 		/* disable enabled irqs */
+-		while ((bit = find_next_bit(backups, n_irqs, i)) < n_irqs) {
++		while ((bit = find_next_bit(backups, n_irqs, bit + 1)) < n_irqs) {
+ 			at91_aic_write(AT91_AIC5_SSR,
+ 				       bit & AT91_AIC5_INTSEL_MSK);
+ 			at91_aic_write(AT91_AIC5_IDCR, 1);
+-			i = bit;
+ 		}
+ 		/* enable wakeup irqs */
+-		i = 0;
+-		while ((bit = find_next_bit(wakeups, n_irqs, i)) < n_irqs) {
++		bit = -1;
++		while ((bit = find_next_bit(wakeups, n_irqs, bit + 1)) < n_irqs) {
+ 			at91_aic_write(AT91_AIC5_SSR,
+ 				       bit & AT91_AIC5_INTSEL_MSK);
+ 			at91_aic_write(AT91_AIC5_IECR, 1);
+-			i = bit;
+ 		}
+ 	} else {
+ 		at91_aic_write(AT91_AIC_IDCR, *backups);
+@@ -118,23 +116,21 @@ void at91_irq_suspend(void)
  
-+choice
-+
-+	prompt "Core type"
-+
-+config SOC_SAM_V4_V5
-+	bool "ARM7/ARM9"
-+	help
-+	  Select this if you are using one of Atmel's AT91SAM9, AT91RM9200
-+	  or AT91X40 SoC.
-+
-+endchoice
-+
- comment "Atmel AT91 Processor"
+ void at91_irq_resume(void)
+ {
+-	int i = 0, bit;
++	int bit = -1;
  
-+if SOC_SAM_V4_V5
- config SOC_AT91RM9200
- 	bool "AT91RM9200"
- 	select CPU_ARM920T
-@@ -94,13 +111,10 @@ config SOC_AT91SAM9N12
- 	help
- 	  Select this if you are using Atmel's AT91SAM9N12 SoC.
- 
--config AT91_PMC_UNIT
--	bool
--	default !ARCH_AT91X40
--
- # ----------------------------------------------------------
- 
- source arch/arm/mach-at91/Kconfig.non_dt
-+endif # SOC_SAM_V4_V5
- 
- comment "Generic Board Type"
- 
+ 	if (has_aic5()) {
+ 		/* disable wakeup irqs */
+-		while ((bit = find_next_bit(wakeups, n_irqs, i)) < n_irqs) {
++		while ((bit = find_next_bit(wakeups, n_irqs, bit + 1)) < n_irqs) {
+ 			at91_aic_write(AT91_AIC5_SSR,
+ 				       bit & AT91_AIC5_INTSEL_MSK);
+ 			at91_aic_write(AT91_AIC5_IDCR, 1);
+-			i = bit;
+ 		}
+ 		/* enable irqs disabled for suspend */
+-		i = 0;
+-		while ((bit = find_next_bit(backups, n_irqs, i)) < n_irqs) {
++		bit = -1;
++		while ((bit = find_next_bit(backups, n_irqs, bit + 1)) < n_irqs) {
+ 			at91_aic_write(AT91_AIC5_SSR,
+ 				       bit & AT91_AIC5_INTSEL_MSK);
+ 			at91_aic_write(AT91_AIC5_IECR, 1);
+-			i = bit;
+ 		}
+ 	} else {
+ 		at91_aic_write(AT91_AIC_IDCR, *wakeups);
 -- 
 1.7.11.3
