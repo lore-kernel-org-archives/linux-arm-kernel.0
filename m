@@ -1,36 +1,54 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Fri, 8 Mar 2013 13:05:50 -0700
-Subject: [PATCH 04/10] bus: introduce an Marvell EBU MBus driver
-In-Reply-To: <201303081942.27233.arnd@arndb.de>
-References: <1362577426-12804-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <201303081541.29410.arnd@arndb.de>
- <20130308175023.GE4094@obsidianresearch.com>
- <201303081942.27233.arnd@arndb.de>
-Message-ID: <20130308200550.GD29435@obsidianresearch.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 8 Mar 2013 12:08:12 -0800
+Subject: [PATCH 03/10] ARM: smp_twd: Divorce smp_twd from local timer API
+In-Reply-To: <513A40EF.8050403@codeaurora.org>
+References: <1362614646-24113-1-git-send-email-sboyd@codeaurora.org>
+ <1362614646-24113-4-git-send-email-sboyd@codeaurora.org>
+ <20130308004011.GD11806@atomide.com>
+ <51393B59.3070200@codeaurora.org>
+ <20130308180730.GE11806@atomide.com>
+ <513A2B20.30805@codeaurora.org>
+ <20130308194802.GG11806@atomide.com>
+ <513A40EF.8050403@codeaurora.org>
+Message-ID: <20130308200811.GJ11806@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 08, 2013 at 07:42:27PM +0000, Arnd Bergmann wrote:
-> > An absent ranges makes some sense from a spec perspective - however do we
-> > have the kernel infrastructure to grow an in memory DTB node?
+* Stephen Boyd <sboyd@codeaurora.org> [130308 11:54]:
+> On 03/08/13 11:48, Tony Lindgren wrote:
+> > * Stephen Boyd <sboyd@codeaurora.org> [130308 10:21]:
+> >>
+> >> diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+> >> index 081de6f..4ea3e9d 100644
+> >> --- a/arch/arm/kernel/smp_twd.c
+> >> +++ b/arch/arm/kernel/smp_twd.c
+> >> @@ -227,7 +227,7 @@ static void __cpuinit twd_calibrate_rate(void)
+> >>  
+> >>  static irqreturn_t twd_handler(int irq, void *dev_id)
+> >>  {
+> >> -       struct clock_event_device *evt = *(struct clock_event_device **)dev_id;
+> >> +       struct clock_event_device *evt = dev_id;
+> >>  
+> >>         if (twd_timer_ack()) {
+> >>                 evt->event_handler(evt);
+> >>
+> > Yup thanks that fixes it, both fixes are needed. So for this patch + the
+> > two fixes please feel free to add:
+> >
+> > Acked-by: Tony Lindgren <tony@atomide.com>
 > 
-> I don't think it's necessary to amend the flattened DT in the DTB form,
-> although that could be done if necessary. Once we have the live DT data
-> structures, after calling unflatten_device_tree(), we can trivially call
-> of_add_property() to add the ranges.
+> Great. Thanks for testing.
 
-Oh, I've never looked at those APIs, that makes it pretty nice,
-indeed. With those it would be easy to keep the in-memory DT in sync.
+Hmm noticed one more thing: vexpress no longer boots in qemu for
+me after applying this. Sorry did not get any debug_ll output, but
+maybe you can take a look at it. I tested with omap2plus_defconfig +
+linaro-qemu:
 
-The only other problem with absent ranges is how do you learn the
-target id and size to do the assignment?
+$ qemu-system-arm -machine vexpress-a9 -m 1024 -curses -net nic -net \
+user -serial stdio -append console=ttyAMA0,115200n8 rw \
+root=/dev/mmcblk0p2 rootwait physmap.enabled=0 -kernel zImage \
+-initrd initrd.img -sd rootfs.img
 
-> devices from the tree. If we need any of the MBUS children before
-> initcalls, we can also move that stage earlier and set up the mbus
-> windows from the machine_init callback.
+Regards,
 
-Yah, technically the interrupt controller and timer should be below
-the mbus block.
-
-Cheers,
-Jason
+Tony
