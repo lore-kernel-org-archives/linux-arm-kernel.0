@@ -1,108 +1,39 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Sat, 9 Mar 2013 23:41:18 +0530
-Subject: [PATCH V2 5/5] ARM: DT: tegra114: Add spi controller DT entry
-In-Reply-To: <1362852678-13421-1-git-send-email-ldewangan@nvidia.com>
-References: <1362852678-13421-1-git-send-email-ldewangan@nvidia.com>
-Message-ID: <1362852678-13421-6-git-send-email-ldewangan@nvidia.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Sat, 09 Mar 2013 20:08:01 +0100
+Subject: [PATCH] ARM: S3C24XX: drop "select MACH_NEO1973"
+Message-ID: <1362856081.3137.19.camel@x61.thuisdomein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-NVIDIA's Tegra114 has 6 spi controllers. These controllers are
-redesign on T114 with different register interface.
+The Kconfig entry for the Openmoko GTA02 / Freerunner phone selects
+MACH_NEO1973. But there is no Kconfig symbol MACH_NEO1973. The select
+statement for that symbol is a nop. It can safely be dropped.
 
-Add DT entry for spi controllers and make it compatible with
-"nvidia,tegra114-spi".
-
-Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
 ---
-Changes from V1:
-- None
+0) Tested with "git grep".
 
- arch/arm/boot/dts/tegra114.dtsi |   72 +++++++++++++++++++++++++++++++++++++++
- 1 files changed, 72 insertions(+), 0 deletions(-)
+1) There appear to be repositories that carry a "config MACH_NEO1973" in
+their tree. I guess it is used to collect functionality common to the
+GTA01 and the GTA02. But except for this select statement, MACH_NEO1973
+was never used in mainline. So if the GTA01 code ever gets merged into
+mainline, this select statement might be added once more (if it is
+actually needed then).
 
-diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
-index 21ff340..47ad1b8 100644
---- a/arch/arm/boot/dts/tegra114.dtsi
-+++ b/arch/arm/boot/dts/tegra114.dtsi
-@@ -209,6 +209,78 @@
- 		clock-names = "div-clk";
- 	};
- 
-+	spi at 7000d400 {
-+		compatible = "nvidia,tegra114-spi";
-+		reg = <0x7000d400 0x200>;
-+		interrupts = <0 59 0x04>;
-+		nvidia,dma-request-selector = <&apbdma 15>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		clocks = <&tegra_car 41>;
-+		clock-names = "spi";
-+		status = "disabled";
-+	};
-+
-+	spi at 7000d600 {
-+		compatible = "nvidia,tegra114-spi";
-+		reg = <0x7000d600 0x200>;
-+		interrupts = <0 82 0x04>;
-+		nvidia,dma-request-selector = <&apbdma 16>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		clocks = <&tegra_car 44>;
-+		clock-names = "spi";
-+		status = "disabled";
-+	};
-+
-+	spi at 7000d800 {
-+		compatible = "nvidia,tegra114-spi";
-+		reg = <0x7000d480 0x200>;
-+		interrupts = <0 83 0x04>;
-+		nvidia,dma-request-selector = <&apbdma 17>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		clocks = <&tegra_car 46>;
-+		clock-names = "spi";
-+		status = "disabled";
-+	};
-+
-+	spi at 7000da00 {
-+		compatible = "nvidia,tegra114-spi";
-+		reg = <0x7000da00 0x200>;
-+		interrupts = <0 93 0x04>;
-+		nvidia,dma-request-selector = <&apbdma 18>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		clocks = <&tegra_car 68>;
-+		clock-names = "spi";
-+		status = "disabled";
-+	};
-+
-+	spi at 7000dc00 {
-+		compatible = "nvidia,tegra114-spi";
-+		reg = <0x7000dc00 0x200>;
-+		interrupts = <0 94 0x04>;
-+		nvidia,dma-request-selector = <&apbdma 27>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		clocks = <&tegra_car 104>;
-+		clock-names = "spi";
-+		status = "disabled";
-+	};
-+
-+	spi at 7000de00 {
-+		compatible = "nvidia,tegra114-spi";
-+		reg = <0x7000de00 0x200>;
-+		interrupts = <0 79 0x04>;
-+		nvidia,dma-request-selector = <&apbdma 28>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		clocks = <&tegra_car 105>;
-+		clock-names = "spi";
-+		status = "disabled";
-+	};
-+
- 	sdhci at 78000000 {
- 		compatible = "nvidia,tegra114-sdhci", "nvidia,tegra30-sdhci";
- 		reg = <0x78000000 0x200>;
+ arch/arm/mach-s3c24xx/Kconfig | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
+index 7361b9d..bec43fe 100644
+--- a/arch/arm/mach-s3c24xx/Kconfig
++++ b/arch/arm/mach-s3c24xx/Kconfig
+@@ -641,7 +641,6 @@ comment "S3C2442 Boards"
+ config MACH_NEO1973_GTA02
+ 	bool "Openmoko GTA02 / Freerunner phone"
+ 	select I2C
+-	select MACH_NEO1973
+ 	select MFD_PCF50633
+ 	select PCF50633_GPIO
+ 	select POWER_SUPPLY
 -- 
-1.7.1.1
+1.7.11.7
