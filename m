@@ -1,109 +1,112 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Fri, 8 Mar 2013 18:31:52 -0700
-Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
-In-Reply-To: <513A7845.6040304@firmworks.com>
-References: <20130307194830.GA1811@avionic-0098.mockup.avionic-design.de>
- <20130307200235.GB20695@obsidianresearch.com>
- <20130307204726.GB1811@avionic-0098.mockup.avionic-design.de>
- <51392B4D.9040404@gmail.com>
- <20130308071443.GA5772@avionic-0098.mockup.avionic-design.de>
- <20130308165228.GB4094@obsidianresearch.com>
- <20130308191227.GA6551@avionic-0098.mockup.avionic-design.de>
- <513A3F4F.2090501@firmworks.com>
- <20130308200245.GC29435@obsidianresearch.com>
- <513A7845.6040304@firmworks.com>
-Message-ID: <20130309013152.GA3883@obsidianresearch.com>
+From: anilk4.v@gmail.com (Anil Kumar)
+Date: Sat, 9 Mar 2013 07:55:21 +0530
+Subject: [PATCH 4/9] ARM: dts: OMAP3: Add support for OMAP3430 SDP board
+In-Reply-To: <1362763654-9660-5-git-send-email-jon-hunter@ti.com>
+References: <1362763654-9660-1-git-send-email-jon-hunter@ti.com>
+ <1362763654-9660-5-git-send-email-jon-hunter@ti.com>
+Message-ID: <CABYxbz7Bg3Uf2wkhH=4d6nEPUjyHF8BiixN6rGCOgEVG_us8Jw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 08, 2013 at 01:46:13PM -1000, Mitch Bradley wrote:
-> On 3/8/2013 10:02 AM, Jason Gunthorpe wrote:
-> > On Fri, Mar 08, 2013 at 09:43:11AM -1000, Mitch Bradley wrote:
-> > 
-> >>>> http://www.spinics.net/lists/arm-kernel/msg228749.html
-> >>
-> >> The example in that posting looks messed up to me.
-> >>
-> >> 1) It has "reg = <0x0800 0 0 0 0>", but 0x0800 0 0  is not a valid
-> >> address in the address space defined by its parent - because the form of
-> >> the parent's ranges property indicates that it's a PCI-style address
-> >> form.  0x0800 0 0 lacks the top bits that indicate non-relocatable and
-> >> the type (I/O, memory, etc).
-> > 
-> > You need to review the OF PCI bindings to make sense of this.  The
-> > subnodes are PCI devices. Those PCI devices show up in the
-> > configuration space (ie lspci). They are the PCI root port bridges.
-> 
-> As it turns out, I wrote those bindings, almost 20 years ago.
-> 
-> Having dug through old versions of that patch, I think I see the source
-> of the confusion.
+Hi Jon,
 
-Not sure, I think this has gone into a weird tangent, your conclusions
-don't match how the PCI-E root complex is presented to the kernel.
+On Fri, Mar 8, 2013 at 10:57 PM, Jon Hunter <jon-hunter@ti.com> wrote:
+> Adds basic device-tree support for OMAP3430 SDP board which has 256MB
+> of RAM and uses the TWL4030 power management IC.
 
-Lets just go back to the start?
+I think this board support should be in separate patch series with
+related patches.
 
-The pci-controller node is a root complex.
+>
+> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+> ---
+>  arch/arm/boot/dts/Makefile         |    1 +
+>  arch/arm/boot/dts/omap3430-sdp.dts |   46 ++++++++++++++++++++++++++++++++++++
+>  2 files changed, 47 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/omap3430-sdp.dts
+>
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 9c62558..89013ed 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -119,6 +119,7 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
+>         omap3-beagle-xm.dtb \
+>         omap3-evm.dtb \
+>         omap3-tobi.dtb \
+> +       omap3430-sdp.dtb \
+>         omap4-panda.dtb \
+>         omap4-panda-a4.dtb \
+>         omap4-panda-es.dtb \
+> diff --git a/arch/arm/boot/dts/omap3430-sdp.dts b/arch/arm/boot/dts/omap3430-sdp.dts
+> new file mode 100644
+> index 0000000..be0650d
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/omap3430-sdp.dts
+> @@ -0,0 +1,46 @@
+> +/*
+> + * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +/dts-v1/;
+> +
+> +/include/ "omap3.dtsi"
+> +
+> +/ {
+> +       model = "TI OMAP3430 SDP";
+> +       compatible = "ti,omap3430-sdp", "ti,omap3";
 
-The children of that node are elements in the root complex - they are
-the root port bridges. They are all on PCI bus 0.
+I have not seen any related changes in "board-generic.c" for your board.
+So just wanted know, how this board is booting ?
 
-Each root port bridge responds to configuration cycles, and has a PCI
-configuration space. They show up in lspci.
+> +
+> +       memory {
+> +               device_type = "memory";
+> +               reg = <0x80000000 0x10000000>; /* 256 MB */
+> +       };
+> +};
+> +
+> +&i2c1 {
+> +       clock-frequency = <2600000>;
+> +
+> +       twl: twl at 48 {
+> +               reg = <0x48>;
+> +               interrupts = <7>; /* SYS_NIRQ cascaded to intc */
+> +               interrupt-parent = <&intc>;
+> +       };
+> +};
+> +
+> +/include/ "twl4030.dtsi"
+> +
+> +&mmc1 {
+> +       vmmc-supply = <&vmmc1>;
+> +       vmmc_aux-supply = <&vsim>;
+> +       bus-width = <8>;
+> +};
+> +
+> +&mmc2 {
+> +       status = "disabled";
+> +};
+> +
+> +&mmc3 {
+> +       status = "disabled";
+> +};
 
-The host controller device driver knows how to issue configuration
-cycles, and it knows how to deliver configuration cycles on bus 0 to
-the bridges.
+I think you should disable modules those are not currently used
+as they are enabled by default in omap3.dtsi.
 
-This one:
-+			pcie at 0,0 {
-+				device_type = "pci";
-+				reg = <0x0800 0 0 0 0>;
+exp:-
 
-Responds to bus 0, device 1, function 0.
+&mcbsp2 {
+        status = "disabled";
+};
 
-Each root port bridge has an associated non-PCI MMIO address
-space. The child above is associated with 0xd0040000. This MMIO
-address space is needed by the host controller driver to operate the
-port.
-
-The text after the @ is a mistake, Linux doesn't enforce anything
-about this text so nobody noticed till now, it should be corrected to
-@1,0, similarly for the second one.
-
-Also, from your comments the top level should gain a 'device_type =
-"pci"'.
-
-So, from that point, does the DT start to make sense? Are there other
-problems?
-
-The question at hand is how do you associate the non-PCI MMIO space
-0xd0040000 with the root port bridge 'pcie at 1,0' ? The patch proposes
-to use a reg array in the controller plus reg-names to do this.
-
-I have trouble making sense of your suggestions to switch away from
-5dw addressing. It is critical that the DT child stanza be associated
-with the PCI discovered root port bridge. By my understanding Linux
-does this based on the configuration space format 'reg' value. How is
-that association possible if you switch things away from 5dw
-addressing?
-
-Also, this is for firmware-less embedded. Linux is required to scan
-the bus and do full address assignment of all PCI devies, including
-the root port bridges. The ranges property on the top node specifies
-the addressing apertures that are available for this process. This is
-common practice, there are many examples of this in kernel dts for PCI
-controllers.
-
-It is impossible to specify any detail for the bridges (be it address
-ranges or bus number ranges) because we have no idea what discovery
-will find, or what values Linux will choose to assign.
-
-> In neither case would you need the controversial "reg-names" thing.
-
-reg-names has been a standard feature in the Linux kernel for a bit
-already..
-
-Thanks a lot for looking at this,
-Jason
+> --
+> 1.7.10.4
+>
+> _______________________________________________
+> devicetree-discuss mailing list
+> devicetree-discuss at lists.ozlabs.org
+> https://lists.ozlabs.org/listinfo/devicetree-discuss
