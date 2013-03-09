@@ -1,42 +1,36 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 8 Mar 2013 22:12:23 -0500
-Subject: [PATCH] ARM: Dove: add RTC device node
-In-Reply-To: <201303082312.02189.arnd@arndb.de>
-References: <20130308121317.4ee83c0a@armhf>
- <20130308215818.GU23237@titan.lakedaemon.net>
- <201303082312.02189.arnd@arndb.de>
-Message-ID: <20130309031223.GX23237@titan.lakedaemon.net>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Sat,  9 Mar 2013 18:39:33 +1300
+Subject: [PATCH 1/6] arm: vt8500: Increase available GPIOs on arch-vt8500
+In-Reply-To: <1362807578-23089-1-git-send-email-linux@prisktech.co.nz>
+References: <1362807578-23089-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <1362807578-23089-2-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 08, 2013 at 11:12:02PM +0000, Arnd Bergmann wrote:
-> On Friday 08 March 2013, Jason Cooper wrote:
-> > Applied to mvebu/fixes with the following commit entry:
-> > 
-> >     ARM: Dove: add RTC device node
-> > 
-> >     The commit:
-> > 
-> >       48be9ac ARM: Dove: split legacy and DT setup
-> > 
-> >     removed the RTC initialization.  This patch re-enables the RTC
-> >     via the DT.
-> 
-> Looks good. FWIW, the style I tend to use is
-> 
-> 
-> |ARM: Dove: add RTC device node
-> |
-> |The commit 48be9ac "ARM: Dove: split legacy and DT setup" removed the RTC
-> |initialization.  This patch re-enables the RTC via the DT.
-> 
-> I don't think that there is a wide agreement on how to refer to other
-> patches yet, but I do a lot of regression fixes like that, so maybe I
-> can start a trend here.
+With the inclusion of the pin control driver, more GPIO pins have been
+identified on the arch-vt8500 SoCs requiring an increase in the available
+GPIOs.
 
-Looks good to me.  flows a bit better than what I had.  I'll use that
-from now on for anything I come across.
+Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+---
+ arch/arm/Kconfig |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-thx,
-
-Jason.
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 5b71469..c5dd0c2 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1661,9 +1661,10 @@ config ARCH_NR_GPIO
+ 	int
+ 	default 1024 if ARCH_SHMOBILE || ARCH_TEGRA
+ 	default 355 if ARCH_U8500
++	default 352 if ARCH_VT8500
+ 	default 264 if MACH_H4700
+ 	default 512 if SOC_OMAP5
+-	default 288 if ARCH_VT8500 || ARCH_SUNXI
++	default 288 if ARCH_SUNXI
+ 	default 0
+ 	help
+ 	  Maximum number of GPIOs in the system.
+-- 
+1.7.9.5
