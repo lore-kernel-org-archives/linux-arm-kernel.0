@@ -1,182 +1,124 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat,  9 Mar 2013 21:15:54 +0100
-Subject: [PATCH] of: Add missing node iteration stubs for disabled CONFIG_OF
-Message-ID: <1362860154-3089-1-git-send-email-tomasz.figa@gmail.com>
+Date: Sat,  9 Mar 2013 21:23:09 +0100
+Subject: [PATCH v3 00/12] ARM: samsung-time: Prepare for multiplatform support
+Message-ID: <1362860601-18464-1-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch moves several for_each macros out of the #ifdef CONFIG_OF
-block and adds inline stubs for functions used by these macros, compiled
-conditionally when CONFIG_OF is not enabled.
+This series is an attempt to make the samsung-time clocksource driver ready
+for multiplatform kernels. It moves the driver to drivers/clocksource, cleans
+it up from uses of static platform-specific definitions, simplifies timer
+interrupt handling and adds Device Tree support.
 
-This eliminates the need to explicitly check for CONFIG_OF in driver
-code using mentioned functions and macros.
+Tested on a Tiny6410 board (Mini6410-compatible) both with and without Devicee
+Tree (with my DT patches for S3C64xx). Compile tested for other related SoCs.
 
-Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
----
- include/linux/of.h | 92 +++++++++++++++++++++++++++++++++++++-----------------
- 1 file changed, 63 insertions(+), 29 deletions(-)
+Changes since v2:
+(http://thread.gmane.org/gmane.linux.kernel.samsung-soc/16158)
+ - Addressed comments from Rob Herring and Mark Rutland
+ - Removed unused register definitions
+ - Replaced samsung,source-timer and samsung,event-timer properties
+   with samsung,pwm-outputs property that defines which PWM channels
+   are reserved for PWM outputs on particular platform
+ - Split non-DT and DT initialization into two functions
+ - Fixed a copy paste error
 
-diff --git a/include/linux/of.h b/include/linux/of.h
-index a0f1292..7a736b8 100644
---- a/include/linux/of.h
-+++ b/include/linux/of.h
-@@ -86,6 +86,31 @@ static inline struct device_node *of_node_get(struct device_node *node)
- static inline void of_node_put(struct device_node *node) { }
- #endif /* !CONFIG_OF_DYNAMIC */
- 
-+#define for_each_node_by_name(dn, name) \
-+	for (dn = of_find_node_by_name(NULL, name); dn; \
-+	     dn = of_find_node_by_name(dn, name))
-+#define for_each_node_by_type(dn, type) \
-+	for (dn = of_find_node_by_type(NULL, type); dn; \
-+	     dn = of_find_node_by_type(dn, type))
-+#define for_each_compatible_node(dn, type, compatible) \
-+	for (dn = of_find_compatible_node(NULL, type, compatible); dn; \
-+	     dn = of_find_compatible_node(dn, type, compatible))
-+#define for_each_matching_node(dn, matches) \
-+	for (dn = of_find_matching_node(NULL, matches); dn; \
-+	     dn = of_find_matching_node(dn, matches))
-+#define for_each_matching_node_and_match(dn, matches, match) \
-+	for (dn = of_find_matching_node_and_match(NULL, matches, match); \
-+	     dn; dn = of_find_matching_node_and_match(dn, matches, match))
-+#define for_each_child_of_node(parent, child) \
-+	for (child = of_get_next_child(parent, NULL); child != NULL; \
-+	     child = of_get_next_child(parent, child))
-+#define for_each_available_child_of_node(parent, child) \
-+	for (child = of_get_next_available_child(parent, NULL); child != NULL; \
-+	     child = of_get_next_available_child(parent, child))
-+#define for_each_node_with_property(dn, prop_name) \
-+	for (dn = of_find_node_with_property(NULL, prop_name); dn; \
-+	     dn = of_find_node_with_property(dn, prop_name))
-+
- #ifdef CONFIG_OF
- 
- /* Pointer for first entry in chain of all nodes. */
-@@ -167,19 +192,10 @@ static inline const char *of_node_full_name(const struct device_node *np)
- 
- extern struct device_node *of_find_node_by_name(struct device_node *from,
- 	const char *name);
--#define for_each_node_by_name(dn, name) \
--	for (dn = of_find_node_by_name(NULL, name); dn; \
--	     dn = of_find_node_by_name(dn, name))
- extern struct device_node *of_find_node_by_type(struct device_node *from,
- 	const char *type);
--#define for_each_node_by_type(dn, type) \
--	for (dn = of_find_node_by_type(NULL, type); dn; \
--	     dn = of_find_node_by_type(dn, type))
- extern struct device_node *of_find_compatible_node(struct device_node *from,
- 	const char *type, const char *compat);
--#define for_each_compatible_node(dn, type, compatible) \
--	for (dn = of_find_compatible_node(NULL, type, compatible); dn; \
--	     dn = of_find_compatible_node(dn, type, compatible))
- extern struct device_node *of_find_matching_node_and_match(
- 	struct device_node *from,
- 	const struct of_device_id *matches,
-@@ -190,12 +206,6 @@ static inline struct device_node *of_find_matching_node(
- {
- 	return of_find_matching_node_and_match(from, matches, NULL);
- }
--#define for_each_matching_node(dn, matches) \
--	for (dn = of_find_matching_node(NULL, matches); dn; \
--	     dn = of_find_matching_node(dn, matches))
--#define for_each_matching_node_and_match(dn, matches, match) \
--	for (dn = of_find_matching_node_and_match(NULL, matches, match); \
--	     dn; dn = of_find_matching_node_and_match(dn, matches, match))
- extern struct device_node *of_find_node_by_path(const char *path);
- extern struct device_node *of_find_node_by_phandle(phandle handle);
- extern struct device_node *of_get_parent(const struct device_node *node);
-@@ -207,14 +217,6 @@ extern struct device_node *of_get_next_available_child(
- 
- extern struct device_node *of_get_child_by_name(const struct device_node *node,
- 					const char *name);
--#define for_each_child_of_node(parent, child) \
--	for (child = of_get_next_child(parent, NULL); child != NULL; \
--	     child = of_get_next_child(parent, child))
--
--#define for_each_available_child_of_node(parent, child) \
--	for (child = of_get_next_available_child(parent, NULL); child != NULL; \
--	     child = of_get_next_available_child(parent, child))
--
- static inline int of_get_child_count(const struct device_node *np)
- {
- 	struct device_node *child;
-@@ -228,10 +230,6 @@ static inline int of_get_child_count(const struct device_node *np)
- 
- extern struct device_node *of_find_node_with_property(
- 	struct device_node *from, const char *prop_name);
--#define for_each_node_with_property(dn, prop_name) \
--	for (dn = of_find_node_with_property(NULL, prop_name); dn; \
--	     dn = of_find_node_with_property(dn, prop_name))
--
- extern struct property *of_find_property(const struct device_node *np,
- 					 const char *name,
- 					 int *lenp);
-@@ -353,13 +351,28 @@ static inline struct device_node *of_find_node_by_name(struct device_node *from,
- 	return NULL;
- }
- 
-+static inline struct device_node *of_find_node_by_type(struct device_node *from,
-+	const char *type)
-+{
-+	return NULL;
-+}
-+
- static inline bool of_have_populated_dt(void)
- {
- 	return false;
- }
- 
--#define for_each_child_of_node(parent, child) \
--	while (0)
-+static inline struct device_node *of_get_next_child(const struct device_node *node,
-+					     struct device_node *prev)
-+{
-+	return NULL;
-+}
-+
-+static inline struct device_node *of_get_next_available_child(
-+	const struct device_node *node, struct device_node *prev)
-+{
-+	return NULL;
-+}
- 
- static inline struct device_node *of_get_child_by_name(
- 					const struct device_node *node,
-@@ -373,6 +386,12 @@ static inline int of_get_child_count(const struct device_node *np)
- 	return 0;
- }
- 
-+static inline struct device_node *of_find_node_with_property(
-+	struct device_node *from, const char *prop_name)
-+{
-+	return NULL;
-+}
-+
- static inline int of_device_is_compatible(const struct device_node *device,
- 					  const char *name)
- {
-@@ -394,6 +413,21 @@ static inline struct device_node *of_find_compatible_node(
- 	return NULL;
- }
- 
-+static inline struct device_node *of_find_matching_node_and_match(
-+	struct device_node *from,
-+	const struct of_device_id *matches,
-+	const struct of_device_id **match)
-+{
-+	return NULL;
-+}
-+
-+static inline struct device_node *of_find_matching_node(
-+	struct device_node *from,
-+	const struct of_device_id *matches)
-+{
-+	return NULL;
-+}
-+
- static inline int of_property_read_u8_array(const struct device_node *np,
- 			const char *propname, u8 *out_values, size_t sz)
- {
+Changes since v1:
+(http://thread.gmane.org/gmane.linux.kernel.samsung-soc/16005)
+ - Addressed comments from Mark Rutland
+ - Documented struct samsung_timer_variant
+ - Dropped inactive mail addresses from CC
+
+Tomasz Figa (12):
+  ARM: SAMSUNG: Move samsung-time to drivers/clocksource
+  clocksource: samsung-time: Set platform-specific parameters at runtime
+  clocksource: samsung-time: Drop useless defines from public header
+  ARM: SAMSUNG: Move samsung-time.h header to inlude/clocksource
+  clocksource: samsung-time: Use local register definitions
+  clocksource: samsung-time: Remove use of static register mapping
+  clocksource: samsung-time: Use clk_get_sys for getting clocks
+  ARM: SAMSUNG: devs: Drop unnecessary IRQ resources of timer devices
+  clocksource: samsung-time: Do not use static IRQ definition
+  clocksource: samsung-time: Move IRQ mask/ack handling to the driver
+  ARM: SAMSUNG: Remove unused PWM timer IRQ chip code
+  clocksource: samsung-time: Add Device Tree support
+
+ .../devicetree/bindings/timer/samsung-pwm.txt      |  33 ++
+ arch/arm/Kconfig                                   |   1 -
+ arch/arm/mach-exynos/include/mach/irqs.h           |   3 +-
+ arch/arm/mach-exynos/mach-universal_c210.c         |  15 +-
+ arch/arm/mach-s3c24xx/common.c                     |  14 +
+ arch/arm/mach-s3c24xx/mach-amlm5900.c              |   2 +-
+ arch/arm/mach-s3c24xx/mach-anubis.c                |   2 +-
+ arch/arm/mach-s3c24xx/mach-at2440evb.c             |   2 +-
+ arch/arm/mach-s3c24xx/mach-bast.c                  |   2 +-
+ arch/arm/mach-s3c24xx/mach-gta02.c                 |   2 +-
+ arch/arm/mach-s3c24xx/mach-h1940.c                 |   2 +-
+ arch/arm/mach-s3c24xx/mach-jive.c                  |   2 +-
+ arch/arm/mach-s3c24xx/mach-mini2440.c              |   2 +-
+ arch/arm/mach-s3c24xx/mach-n30.c                   |   2 +-
+ arch/arm/mach-s3c24xx/mach-nexcoder.c              |   2 +-
+ arch/arm/mach-s3c24xx/mach-osiris.c                |   2 +-
+ arch/arm/mach-s3c24xx/mach-otom.c                  |   2 +-
+ arch/arm/mach-s3c24xx/mach-qt2410.c                |   2 +-
+ arch/arm/mach-s3c24xx/mach-rx1950.c                |   2 +-
+ arch/arm/mach-s3c24xx/mach-rx3715.c                |   2 +-
+ arch/arm/mach-s3c24xx/mach-smdk2410.c              |   2 +-
+ arch/arm/mach-s3c24xx/mach-smdk2413.c              |   2 +-
+ arch/arm/mach-s3c24xx/mach-smdk2416.c              |   2 +-
+ arch/arm/mach-s3c24xx/mach-smdk2440.c              |   2 +-
+ arch/arm/mach-s3c24xx/mach-smdk2443.c              |   2 +-
+ arch/arm/mach-s3c24xx/mach-tct_hammer.c            |   2 +-
+ arch/arm/mach-s3c24xx/mach-vr1000.c                |   2 +-
+ arch/arm/mach-s3c24xx/mach-vstms.c                 |   2 +-
+ arch/arm/mach-s3c64xx/common.c                     |  19 +-
+ arch/arm/mach-s3c64xx/include/mach/irqs.h          |   8 -
+ arch/arm/mach-s3c64xx/mach-anw6410.c               |   2 +-
+ arch/arm/mach-s3c64xx/mach-crag6410.c              |   2 +-
+ arch/arm/mach-s3c64xx/mach-hmt.c                   |   2 +-
+ arch/arm/mach-s3c64xx/mach-mini6410.c              |   2 +-
+ arch/arm/mach-s3c64xx/mach-ncp.c                   |   2 +-
+ arch/arm/mach-s3c64xx/mach-real6410.c              |   2 +-
+ arch/arm/mach-s3c64xx/mach-smartq.c                |   2 +-
+ arch/arm/mach-s3c64xx/mach-smartq5.c               |   2 +-
+ arch/arm/mach-s3c64xx/mach-smartq7.c               |   2 +-
+ arch/arm/mach-s3c64xx/mach-smdk6400.c              |   2 +-
+ arch/arm/mach-s3c64xx/mach-smdk6410.c              |   2 +-
+ arch/arm/mach-s5p64x0/common.c                     |  15 +
+ arch/arm/mach-s5p64x0/include/mach/irqs.h          |   2 -
+ arch/arm/mach-s5p64x0/mach-smdk6440.c              |   2 +-
+ arch/arm/mach-s5p64x0/mach-smdk6450.c              |   2 +-
+ arch/arm/mach-s5pc100/common.c                     |  15 +
+ arch/arm/mach-s5pc100/include/mach/irqs.h          |   2 -
+ arch/arm/mach-s5pc100/mach-smdkc100.c              |   2 +-
+ arch/arm/mach-s5pv210/common.c                     |  15 +
+ arch/arm/mach-s5pv210/include/mach/irqs.h          |   2 -
+ arch/arm/mach-s5pv210/mach-aquila.c                |   2 +-
+ arch/arm/mach-s5pv210/mach-goni.c                  |   2 +-
+ arch/arm/mach-s5pv210/mach-smdkc110.c              |   2 +-
+ arch/arm/mach-s5pv210/mach-smdkv210.c              |   2 +-
+ arch/arm/mach-s5pv210/mach-torbreck.c              |   2 +-
+ arch/arm/plat-samsung/Kconfig                      |  14 -
+ arch/arm/plat-samsung/Makefile                     |   2 -
+ arch/arm/plat-samsung/devs.c                       |  28 +-
+ arch/arm/plat-samsung/include/plat/irq-vic-timer.h |  13 -
+ arch/arm/plat-samsung/include/plat/irqs.h          |   9 -
+ arch/arm/plat-samsung/include/plat/samsung-time.h  |  53 --
+ arch/arm/plat-samsung/irq-vic-timer.c              |  98 ----
+ arch/arm/plat-samsung/s5p-irq.c                    |   3 -
+ arch/arm/plat-samsung/samsung-time.c               | 394 --------------
+ drivers/clocksource/Kconfig                        |   7 +
+ drivers/clocksource/Makefile                       |   1 +
+ drivers/clocksource/samsung-time.c                 | 571 +++++++++++++++++++++
+ include/clocksource/samsung-time.h                 |  57 ++
+ 68 files changed, 808 insertions(+), 670 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/timer/samsung-pwm.txt
+ delete mode 100644 arch/arm/plat-samsung/include/plat/irq-vic-timer.h
+ delete mode 100644 arch/arm/plat-samsung/include/plat/samsung-time.h
+ delete mode 100644 arch/arm/plat-samsung/irq-vic-timer.c
+ delete mode 100644 arch/arm/plat-samsung/samsung-time.c
+ create mode 100644 drivers/clocksource/samsung-time.c
+ create mode 100644 include/clocksource/samsung-time.h
+
 -- 
 1.8.1.5
