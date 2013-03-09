@@ -1,10 +1,10 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 09 Mar 2013 14:31:53 +0100
+Date: Sat, 09 Mar 2013 14:44:29 +0100
 Subject: s3c24xx pinctrl help
 In-Reply-To: <201303091356.25912.heiko@sntech.de>
 References: <201303081538.04877.heiko@sntech.de> <2034100.l6yoVjE7uo@flatron>
  <201303091356.25912.heiko@sntech.de>
-Message-ID: <1825121.bbMz1G1oeT@flatron>
+Message-ID: <46997515.mkKLqFWbgE@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -89,69 +89,25 @@ On Saturday 09 of March 2013 13:56:25 Heiko St?bner wrote:
 > 
 > 	return (virq) ? : -ENXIO;
 > }
-> 
-> The GPG bank could simply use the existing mechanisms, as it follows the
-> generic paradigm, and for GPF the callback would handle the distinction
-> between eints handled in the eint regs or in the main interrupt
-> controller.
 
-Right, I checked how EINTs work on S3C2440A in documentation and indeed it 
-is a bit different than I initially thought.
+I forgot one more thing in my previous reply. Your solution would not 
+allow GPIO bank-based specification of EINTs 0-3 in device tree.
 
-However this is still similar to S3C64xx in some aspects. On S3C64xx there 
-is following hierarchy of interrupts in EINT0 group:
+Consider following example:
 
-EINT0 
-...     -------> VIC0 INT0
-EINT3 
+device-0 {
+	...
+	interrupt-parent = <&gpf>;
+	interrupts = <2 0>;
+	...
+};
 
-EINT4
-...     -------> VIC0 INT1
-EINT11
+This would explicitly go through irq_create_mapping() without calling 
+gpio_to_irq.
 
-EINT12
-...     -------> VIC1 INT0
-EINT19
-
-EINT20
-...     -------> VIC1 INT1
-EINT27
-
-On S3C24xx it would look like this:
-
-EINT0  -------> INT0
-
-EINT1  -------> INT1
-
-EINT2  -------> INT2
-
-EINT3  -------> INT3
-
-EINT4
-...    -------> INT4
-EINT7
-
-EINT8
-...    -------> INT5
-EINT23
-
-So you can look at all EINTs as being multiplexed, just with some groups 
-consisting only of single interrupt signal.
-
-The only thing that differs here is that, at least on S3C2440, there are 
-no pending and mask bits for EINTs 0-3. Missing pending bits are not a 
-problem here, since receiving INT0 would mean receiving EINT0, but no mask 
-bits means that masking would have to be handled on interrupt controller 
-level, probably by using enable_irq and disable_irq_nosync. This could be 
-solved by assigning different irq chip to EINTs 0-3 and EINTs 4-7 in 
-domain map callback.
-
-Still, irq domain isn't really related with such low level things. As long 
-as you have a way to map domain hwirq to appropriate bitfields in control 
-registers and received interrupts to proper domain and its hwirq, you can 
-do whatever mapping you want.
+Of course you could say that this kind of specification is not valid for 
+EINTs0-3 and interrupt contoller has to be specified in interrupt-parent 
+specifier, not gpf bank. I guess it's just a matter of preference, though.
 
 Best regards,
 Tomasz
-
-P.S. Sorry for previous message, clicked Send accidentally...
