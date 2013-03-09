@@ -1,44 +1,83 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 09 Mar 2013 13:26:56 +0400
-Subject: [PATCH v8 3/7] ARM: davinci: Add support for configuring
- DA8XX_REMOTEPROC
-In-Reply-To: <1362782508-3166-4-git-send-email-rtivy@ti.com>
-References: <1362782508-3166-1-git-send-email-rtivy@ti.com>
- <1362782508-3166-4-git-send-email-rtivy@ti.com>
-Message-ID: <513B0060.3090501@cogentembedded.com>
+From: axel.lin@ingics.com (Axel Lin)
+Date: Sat, 09 Mar 2013 17:46:45 +0800
+Subject: [PATCH v2] mfd: ab8500-gpadc: Complain if we fail to enable vtvout LDO
+Message-ID: <1362822405.8907.1.camel@phoenix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Since commit c8801a8e
+"regulator: core: Mark all get and enable calls as __must_check",
+we must check return value of regulator_enable() to silence below build warning.
 
-On 09-03-2013 2:41, Robert Tivy wrote:
+  CC      drivers/mfd/ab8500-gpadc.o
+drivers/mfd/ab8500-gpadc.c: In function 'ab8500_gpadc_runtime_resume':
+drivers/mfd/ab8500-gpadc.c:598:18: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result [-Wunused-result]
+drivers/mfd/ab8500-gpadc.c: In function 'ab8500_gpadc_probe':
+drivers/mfd/ab8500-gpadc.c:655:18: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result [-Wunused-result]
 
-> Also fix REMOTEPROC config to select FW_LOADER (instead of FW_CONFIG).
+Also convert to devm_regulator_get(), this fixes a missing regulator_put() call
+in ab8500_gpadc_remove().
 
-> Signed-off-by: Robert Tivy <rtivy@ti.com>
-> ---
->   drivers/remoteproc/Kconfig |   26 +++++++++++++++++++++++++-
->   1 file changed, 25 insertions(+), 1 deletion(-)
+Signed-off-by: Axel Lin <axel.lin@ingics.com>
+---
+v2:
+In the case of goto fail_enable, we should call regulator_put instead of
+regulator_disable. However, the regulator_put call is also missed in
+ab8500_gpadc_remove(). Thus a simpler fix is to convert regulator_get to
+devm_regulator_get.
 
-> diff --git a/drivers/remoteproc/Kconfig b/drivers/remoteproc/Kconfig
-> index 96ce101..21d04f1 100644
-> --- a/drivers/remoteproc/Kconfig
-> +++ b/drivers/remoteproc/Kconfig
-[...]
-> @@ -41,4 +41,28 @@ config STE_MODEM_RPROC
->   	  This can be either built-in or a loadable module.
->   	  If unsure say N.
->
-> +config DA8XX_REMOTEPROC
-> +	tristate "DA830/OMAPL137 & DA850/OMAPL138 remoteproc support (EXPERIMENTAL)"
-> +	depends on ARCH_DAVINCI_DA8XX
-> +	select REMOTEPROC
-> +	select RPMSG
-> +	select CMA
-> +	default n
-> +	help
-> +	  Say y here to support DA830/OMAPL137 & DA850/OMAPL138 remote
+ drivers/mfd/ab8500-gpadc.c |   17 +++++++++++++----
+ 1 file changed, 13 insertions(+), 4 deletions(-)
 
-    Naming nit: they're OMAP-L13x. Here and above.
-
-WBR, Sergei
+diff --git a/drivers/mfd/ab8500-gpadc.c b/drivers/mfd/ab8500-gpadc.c
+index b1f3561..5f341a5 100644
+--- a/drivers/mfd/ab8500-gpadc.c
++++ b/drivers/mfd/ab8500-gpadc.c
+@@ -594,9 +594,12 @@ static int ab8500_gpadc_runtime_suspend(struct device *dev)
+ static int ab8500_gpadc_runtime_resume(struct device *dev)
+ {
+ 	struct ab8500_gpadc *gpadc = dev_get_drvdata(dev);
++	int ret;
+ 
+-	regulator_enable(gpadc->regu);
+-	return 0;
++	ret = regulator_enable(gpadc->regu);
++	if (ret)
++		dev_err(dev, "Failed to enable vtvout LDO: %d\n", ret);
++	return ret;
+ }
+ 
+ static int ab8500_gpadc_runtime_idle(struct device *dev)
+@@ -643,7 +646,7 @@ static int ab8500_gpadc_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	/* VTVout LDO used to power up ab8500-GPADC */
+-	gpadc->regu = regulator_get(&pdev->dev, "vddadc");
++	gpadc->regu = devm_regulator_get(&pdev->dev, "vddadc");
+ 	if (IS_ERR(gpadc->regu)) {
+ 		ret = PTR_ERR(gpadc->regu);
+ 		dev_err(gpadc->dev, "failed to get vtvout LDO\n");
+@@ -652,7 +655,11 @@ static int ab8500_gpadc_probe(struct platform_device *pdev)
+ 
+ 	platform_set_drvdata(pdev, gpadc);
+ 
+-	regulator_enable(gpadc->regu);
++	ret = regulator_enable(gpadc->regu);
++	if (ret) {
++		dev_err(gpadc->dev, "Failed to enable vtvout LDO: %d\n", ret);
++		goto fail_enable;
++	}
+ 
+ 	pm_runtime_set_autosuspend_delay(gpadc->dev, GPADC_AUDOSUSPEND_DELAY);
+ 	pm_runtime_use_autosuspend(gpadc->dev);
+@@ -663,6 +670,8 @@ static int ab8500_gpadc_probe(struct platform_device *pdev)
+ 	list_add_tail(&gpadc->node, &ab8500_gpadc_list);
+ 	dev_dbg(gpadc->dev, "probe success\n");
+ 	return 0;
++
++fail_enable:
+ fail_irq:
+ 	free_irq(gpadc->irq, gpadc);
+ fail:
+-- 
+1.7.9.5
