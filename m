@@ -1,119 +1,109 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Sat, 9 Mar 2013 02:25:13 +0100
-Subject: [PATCH 5/9] ARM: dts: Add GPMC node for OMAP2, OMAP4 and OMAP5
-In-Reply-To: <513A5B23.5070302@ti.com>
-References: <1362763654-9660-1-git-send-email-jon-hunter@ti.com>
- <1362763654-9660-6-git-send-email-jon-hunter@ti.com>
- <CABxcv==OKX4z8x7ztqDJ5CozNmTQ5UaD43mTLWfQuqUt-y7xcQ@mail.gmail.com>
- <513A5B23.5070302@ti.com>
-Message-ID: <CABxcv=kEi9yKRCx56dt_GRwQ7aKvrRpwCAxO6BwH4_U6jp-=JA@mail.gmail.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Fri, 8 Mar 2013 18:31:52 -0700
+Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
+In-Reply-To: <513A7845.6040304@firmworks.com>
+References: <20130307194830.GA1811@avionic-0098.mockup.avionic-design.de>
+ <20130307200235.GB20695@obsidianresearch.com>
+ <20130307204726.GB1811@avionic-0098.mockup.avionic-design.de>
+ <51392B4D.9040404@gmail.com>
+ <20130308071443.GA5772@avionic-0098.mockup.avionic-design.de>
+ <20130308165228.GB4094@obsidianresearch.com>
+ <20130308191227.GA6551@avionic-0098.mockup.avionic-design.de>
+ <513A3F4F.2090501@firmworks.com>
+ <20130308200245.GC29435@obsidianresearch.com>
+ <513A7845.6040304@firmworks.com>
+Message-ID: <20130309013152.GA3883@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 8, 2013 at 10:41 PM, Jon Hunter <jon-hunter@ti.com> wrote:
->
-> On 03/08/2013 02:25 PM, Javier Martinez Canillas wrote:
->> On Fri, Mar 8, 2013 at 6:27 PM, Jon Hunter <jon-hunter@ti.com> wrote:
->>> Add the device-tree node for GPMC on OMAP2, OMAP4 and OMAP5 devices.
->>>
->>> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
->>> ---
->>>  arch/arm/boot/dts/omap2420.dtsi |   11 +++++++++++
->>>  arch/arm/boot/dts/omap2430.dtsi |   11 +++++++++++
->>>  arch/arm/boot/dts/omap4.dtsi    |   11 +++++++++++
->>>  arch/arm/boot/dts/omap5.dtsi    |   11 +++++++++++
->>>  4 files changed, 44 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/omap2420.dtsi b/arch/arm/boot/dts/omap2420.dtsi
->>> index af65609..d4ce6c2 100644
->>> --- a/arch/arm/boot/dts/omap2420.dtsi
->>> +++ b/arch/arm/boot/dts/omap2420.dtsi
->>> @@ -29,6 +29,17 @@
->>>                         pinctrl-single,function-mask = <0x3f>;
->>>                 };
->>>
->>> +               gpmc: gpmc at 6800a000 {
->>> +                       compatible = "ti,omap2420-gpmc";
->>> +                       reg = <0x6800a000 0x1000>;
->>> +                       #address-cells = <2>;
->>> +                       #size-cells = <1>;
->>> +                       interrupts = <20>;
->>> +                       gpmc,num-cs = <8>;
->>> +                       gpmc,num-waitpins = <4>;
->>> +                       ti,hwmods = "gpmc";
->>> +               };
->>> +
->>>                 mcbsp1: mcbsp at 48074000 {
->>>                         compatible = "ti,omap2420-mcbsp";
->>>                         reg = <0x48074000 0xff>;
->>> diff --git a/arch/arm/boot/dts/omap2430.dtsi b/arch/arm/boot/dts/omap2430.dtsi
->>> index c392445..832f184 100644
->>> --- a/arch/arm/boot/dts/omap2430.dtsi
->>> +++ b/arch/arm/boot/dts/omap2430.dtsi
->>> @@ -29,6 +29,17 @@
->>>                         pinctrl-single,function-mask = <0x3f>;
->>>                 };
->>>
->>> +               gpmc: gpmc at 6e000000 {
->>> +                       compatible = "ti,omap2430-gpmc";
->>> +                       reg = <0x6e000000 0x1000>;
->>> +                       #address-cells = <2>;
->>> +                       #size-cells = <1>;
->>> +                       interrupts = <20>;
->>> +                       gpmc,num-cs = <8>;
->>> +                       gpmc,num-waitpins = <4>;
->>> +                       ti,hwmods = "gpmc";
->>> +               };
->>> +
->>>                 mcbsp1: mcbsp at 48074000 {
->>>                         compatible = "ti,omap2430-mcbsp";
->>>                         reg = <0x48074000 0xff>;
->>> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
->>> index 827f6f3..726ef11 100644
->>> --- a/arch/arm/boot/dts/omap4.dtsi
->>> +++ b/arch/arm/boot/dts/omap4.dtsi
->>> @@ -196,6 +196,17 @@
->>>                         #interrupt-cells = <1>;
->>>                 };
->>>
->>> +               gpmc: gpmc at 50000000 {
->>> +                       compatible = "ti,omap4430-gpmc";
->>> +                       reg = <0x50000000 0x1000>;
->>
->> Hi Jon,
->>
->> By looking at the GPMC Register Summary from both the OMAP4460 and OMAP OMAP35x
->> Technical Reference Manuals I see that the GPMC register address space
->> is only 720 bytes length. From base address + 0x0 to base address +
->> 0x02d0.
->>
->> So shouldn't the regs property be <0x50000000 0x2d0> instead?
->>
->> Of course are only a few kilobytes but still I wonder if it makes
->> sense to map them when they are not going to be used.
->
-> Yes you are correct. In general, I have been trying to stay some-what
-> consistent with what hwmod was doing as this was being auto-generated by
-> some hardware design specs and I believe they wanted to eventually get
-> to the point where DT files would be auto-generated too for OMAP.
-> Furthermore my understanding is that the smallest page that can be
-> mapped by the kernel for ARM is 4kB. So if you declare it as 0x2d0 or
-> 0x1000 it will map a 4kB page (I could be wrong here).
->
-> I don't have any strong feelings here but will do what the consensus
-> prefers.
->
+On Fri, Mar 08, 2013 at 01:46:13PM -1000, Mitch Bradley wrote:
+> On 3/8/2013 10:02 AM, Jason Gunthorpe wrote:
+> > On Fri, Mar 08, 2013 at 09:43:11AM -1000, Mitch Bradley wrote:
+> > 
+> >>>> http://www.spinics.net/lists/arm-kernel/msg228749.html
+> >>
+> >> The example in that posting looks messed up to me.
+> >>
+> >> 1) It has "reg = <0x0800 0 0 0 0>", but 0x0800 0 0  is not a valid
+> >> address in the address space defined by its parent - because the form of
+> >> the parent's ranges property indicates that it's a PCI-style address
+> >> form.  0x0800 0 0 lacks the top bits that indicate non-relocatable and
+> >> the type (I/O, memory, etc).
+> > 
+> > You need to review the OF PCI bindings to make sense of this.  The
+> > subnodes are PCI devices. Those PCI devices show up in the
+> > configuration space (ie lspci). They are the PCI root port bridges.
+> 
+> As it turns out, I wrote those bindings, almost 20 years ago.
+> 
+> Having dug through old versions of that patch, I think I see the source
+> of the confusion.
 
-Yes, you are right here.
+Not sure, I think this has gone into a weird tangent, your conclusions
+don't match how the PCI-E root complex is presented to the kernel.
 
-I forget that ioremap() does a page-aligned mapping and since the
-minimum page size for ARM is 4KB as you said, there is no difference
-between using 0x2d0 and 0x1000. Sorry for the noise.
+Lets just go back to the start?
 
-Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+The pci-controller node is a root complex.
 
-> Cheers
-> Jon
+The children of that node are elements in the root complex - they are
+the root port bridges. They are all on PCI bus 0.
 
-Best regards,
-Javier
+Each root port bridge responds to configuration cycles, and has a PCI
+configuration space. They show up in lspci.
+
+The host controller device driver knows how to issue configuration
+cycles, and it knows how to deliver configuration cycles on bus 0 to
+the bridges.
+
+This one:
++			pcie at 0,0 {
++				device_type = "pci";
++				reg = <0x0800 0 0 0 0>;
+
+Responds to bus 0, device 1, function 0.
+
+Each root port bridge has an associated non-PCI MMIO address
+space. The child above is associated with 0xd0040000. This MMIO
+address space is needed by the host controller driver to operate the
+port.
+
+The text after the @ is a mistake, Linux doesn't enforce anything
+about this text so nobody noticed till now, it should be corrected to
+@1,0, similarly for the second one.
+
+Also, from your comments the top level should gain a 'device_type =
+"pci"'.
+
+So, from that point, does the DT start to make sense? Are there other
+problems?
+
+The question at hand is how do you associate the non-PCI MMIO space
+0xd0040000 with the root port bridge 'pcie at 1,0' ? The patch proposes
+to use a reg array in the controller plus reg-names to do this.
+
+I have trouble making sense of your suggestions to switch away from
+5dw addressing. It is critical that the DT child stanza be associated
+with the PCI discovered root port bridge. By my understanding Linux
+does this based on the configuration space format 'reg' value. How is
+that association possible if you switch things away from 5dw
+addressing?
+
+Also, this is for firmware-less embedded. Linux is required to scan
+the bus and do full address assignment of all PCI devies, including
+the root port bridges. The ranges property on the top node specifies
+the addressing apertures that are available for this process. This is
+common practice, there are many examples of this in kernel dts for PCI
+controllers.
+
+It is impossible to specify any detail for the bridges (be it address
+ranges or bus number ranges) because we have no idea what discovery
+will find, or what values Linux will choose to assign.
+
+> In neither case would you need the controversial "reg-names" thing.
+
+reg-names has been a standard feature in the Linux kernel for a bit
+already..
+
+Thanks a lot for looking at this,
+Jason
