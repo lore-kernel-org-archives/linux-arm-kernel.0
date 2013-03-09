@@ -1,77 +1,92 @@
 From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Sat, 9 Mar 2013 23:41:14 +0530
-Subject: [PATCH V2 1/5] ARM: DT: tegra114: add APB DMA controller DT entry
+Date: Sat, 9 Mar 2013 23:41:15 +0530
+Subject: [PATCH V2 2/5] ARM: DT: tegra114: Add i2c controller DT entry
 In-Reply-To: <1362852678-13421-1-git-send-email-ldewangan@nvidia.com>
 References: <1362852678-13421-1-git-send-email-ldewangan@nvidia.com>
-Message-ID: <1362852678-13421-2-git-send-email-ldewangan@nvidia.com>
+Message-ID: <1362852678-13421-3-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-NVIDIA's Tegra114 has 32 channels APB DMA controller. Add DT entry for
-APB DMA controllers and make it compatible with "nvidia,tegra114-apbdma".
+NVIDIA's Tegra114 has 5 i2c controllers. These controllers have
+additional feature/configurations to make it functional over
+Tegra30's i2c controller driver.
 
-Tegra114 DMA controller is not compatible with Tegra30/Tegra20 DMA
-controller driver as in T114, the global pause also clock gate the
-DMA register and hence it iw not possible to write the DMA register
-with global pause.
+Add DT entry for i2c controllers and make it compatible with
+"nvidia,tegra114-i2c".
 
 Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
 ---
 Changes from V1:
-- Add reeason why APBDMA is not compatible with older driver
-  in description.
+- None
 
- arch/arm/boot/dts/tegra114.dtsi |   38 ++++++++++++++++++++++++++++++++++++++
- 1 files changed, 38 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/tegra114.dtsi |   55 +++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 55 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
-index 0eec49f..b73b8a6 100644
+index b73b8a6..14afbc8 100644
 --- a/arch/arm/boot/dts/tegra114.dtsi
 +++ b/arch/arm/boot/dts/tegra114.dtsi
-@@ -38,6 +38,44 @@
- 		reg = <0x6000c004 0x14c>;
+@@ -135,6 +135,61 @@
+ 		clocks = <&tegra_car 65>;
  	};
  
-+	apbdma: dma {
-+		compatible = "nvidia,tegra114-apbdma";
-+		reg = <0x6000a000 0x1400>;
-+		interrupts = <0 104 0x04
-+			      0 105 0x04
-+			      0 106 0x04
-+			      0 107 0x04
-+			      0 108 0x04
-+			      0 109 0x04
-+			      0 110 0x04
-+			      0 111 0x04
-+			      0 112 0x04
-+			      0 113 0x04
-+			      0 114 0x04
-+			      0 115 0x04
-+			      0 116 0x04
-+			      0 117 0x04
-+			      0 118 0x04
-+			      0 119 0x04
-+			      0 128 0x04
-+			      0 129 0x04
-+			      0 130 0x04
-+			      0 131 0x04
-+			      0 132 0x04
-+			      0 133 0x04
-+			      0 134 0x04
-+			      0 135 0x04
-+			      0 136 0x04
-+			      0 137 0x04
-+			      0 138 0x04
-+			      0 139 0x04
-+			      0 140 0x04
-+			      0 141 0x04
-+			      0 142 0x04
-+			      0 143 0x04>;
-+		clocks = <&tegra_car 34>;
++	i2c at 7000c000 {
++		compatible = "nvidia,tegra114-i2c";
++		reg = <0x7000c000 0x100>;
++		interrupts = <0 38 0x04>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
++		clocks = <&tegra_car 12>;
++		clock-names = "div-clk";
 +	};
 +
- 	gpio: gpio {
- 		compatible = "nvidia,tegra114-gpio", "nvidia,tegra30-gpio";
- 		reg = <0x6000d000 0x1000>;
++	i2c at 7000c400 {
++		compatible = "nvidia,tegra114-i2c";
++		reg = <0x7000c400 0x100>;
++		interrupts = <0 84 0x04>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
++		clocks = <&tegra_car 54>;
++		clock-names = "div-clk";
++	};
++
++	i2c at 7000c500 {
++		compatible = "nvidia,tegra114-i2c";
++		reg = <0x7000c500 0x100>;
++		interrupts = <0 92 0x04>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
++		clocks = <&tegra_car 67>;
++		clock-names = "div-clk";
++	};
++
++	i2c at 7000c700 {
++		compatible = "nvidia,tegra114-i2c";
++		reg = <0x7000c700 0x100>;
++		interrupts = <0 120 0x04>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
++		clocks = <&tegra_car 103>;
++		clock-names = "div-clk";
++	};
++
++	i2c at 7000d000 {
++		compatible = "nvidia,tegra114-i2c";
++		reg = <0x7000d000 0x100>;
++		interrupts = <0 53 0x04>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
++		clocks = <&tegra_car 47>;
++		clock-names = "div-clk";
++	};
++
+ 	sdhci at 78000000 {
+ 		compatible = "nvidia,tegra114-sdhci", "nvidia,tegra30-sdhci";
+ 		reg = <0x78000000 0x200>;
 -- 
 1.7.1.1
