@@ -1,51 +1,41 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 09 Mar 2013 18:14:28 +0900
-Subject: [PATCH 0/5] ARM: S3C24XX: more fixes and enhancements for the
- s3c24xx irqs
-In-Reply-To: <201302262357.24544.heiko@sntech.de>
-References: <201302262357.24544.heiko@sntech.de>
-Message-ID: <042901ce1ca6$8054e800$80feb800$%kim@samsung.com>
+Date: Sat, 09 Mar 2013 18:15:08 +0900
+Subject: [PATCH v6 01/16] clk: samsung: add common clock framework helper
+ functions for Samsung platforms
+References: <1361175686-19400-1-git-send-email-thomas.abraham@linaro.org>
+ <201303030208.49722.heiko@sntech.de> <51333149.1060105@gmail.com>
+ <2984153.Xctncej7hL@flatron>
+Message-ID: <042a01ce1ca6$98912140$c9b363c0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko St?bner wrote:
-> 
-> Asorted fixes and enhancements for the recent redo of the s3c24xx
-> interrupt controllers.
-> 
-> The only real error that gets fixed is the handling of 0-hwirq as
-> parent_irq on s3c2412 in patch 2. No other of the s3c24xx platforms
-> uses the bit0 of the parent controller as parent_irq.
-> 
-> Heiko Stuebner (5):
->   ARM: S3C24XX: fix redundant checks in the irq mapping function
->   ARM: S3C24XX: fix irq parent check
->   ARM: S3C24XX: move s3c24xx_init_irq to s3c2410_init_irq
->   ARM: S3C24XX: make s3c24xx_init_intc static
->   ARM: S3C24XX: add handle_irq function
-> 
->  arch/arm/Kconfig                                 |    1 +
->  arch/arm/mach-s3c24xx/common.h                   |    1 +
->  arch/arm/mach-s3c24xx/include/mach/entry-macro.S |   70 ---------
->  arch/arm/mach-s3c24xx/irq.c                      |  167 +++++++++++++--------
->  arch/arm/mach-s3c24xx/mach-amlm5900.c            |    2 +-
->  arch/arm/mach-s3c24xx/mach-bast.c                |    2 +-
->  arch/arm/mach-s3c24xx/mach-h1940.c               |    7 +-
->  arch/arm/mach-s3c24xx/mach-n30.c                 |    4 +-
->  arch/arm/mach-s3c24xx/mach-otom.c                |    2 +-
->  arch/arm/mach-s3c24xx/mach-qt2410.c              |    2 +-
->  arch/arm/mach-s3c24xx/mach-smdk2410.c            |    2 +-
->  arch/arm/mach-s3c24xx/mach-tct_hammer.c          |    2 +-
->  arch/arm/mach-s3c24xx/mach-vr1000.c              |    2 +-
->  arch/arm/plat-samsung/include/plat/cpu.h         |    1 -
->  14 files changed, 115 insertions(+), 150 deletions(-)
->  delete mode 100644 arch/arm/mach-s3c24xx/include/mach/entry-macro.S
-> 
-> --
-> 1.7.2.3
+Kukjin Kim wrote:
 
-Looks good to me, applied.
+[...]
 
-Thanks.
+Thomas,
+
+As I said, I applied this whole series into Samsung tree, following error
+happens with exynos4_defconfig(non-DT) though.
+
+drivers/clk/samsung/clk.c: In function 'samsung_clk_of_register_fixed_ext':
+drivers/clk/samsung/clk.c:251:2: error: implicit declaration of function
+'for_each_matching_node_and_match' [-Werror=implicit-function-declaration]
+drivers/clk/samsung/clk.c:251:60: error: expected ';' before '{' token
+drivers/clk/samsung/clk.c:249:6: warning: unused variable 'freq'
+[-Wunused-variable]
+cc1: some warnings being treated as errors
+make[3]: *** [drivers/clk/samsung/clk.o] Error 1
+make[2]: *** [drivers/clk/samsung] Error 2
+make[2]: *** Waiting for unfinished jobs....
+make[1]: *** [drivers/clk] Error 2
+make[1]: *** Waiting for unfinished jobs....
+make: *** [drivers] Error 2
+make: *** Waiting for unfinished jobs....
+
+I think, it's time to decide to support non-DT exynos continuously, above
+compilation error can be fixed though.
+
+Hey guys, how do you think?
 
 - Kukjin
