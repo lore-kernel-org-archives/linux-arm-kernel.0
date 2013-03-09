@@ -1,83 +1,43 @@
-From: axel.lin@ingics.com (Axel Lin)
-Date: Sat, 09 Mar 2013 17:46:45 +0800
-Subject: [PATCH v2] mfd: ab8500-gpadc: Complain if we fail to enable vtvout LDO
-Message-ID: <1362822405.8907.1.camel@phoenix>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Sat, 9 Mar 2013 18:47:26 +0800
+Subject: [PATCH V3 1/4] cpufreq: exynos: Adding cpufreq driver for
+ exynos5440
+In-Reply-To: <1362629627-10012-1-git-send-email-amit.daniel@samsung.com>
+References: <1362629627-10012-1-git-send-email-amit.daniel@samsung.com>
+Message-ID: <CAKohpokJafWjXj8hYT6tgYMGSqgnFCc3MZmNFco2tTeNkOWDmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit c8801a8e
-"regulator: core: Mark all get and enable calls as __must_check",
-we must check return value of regulator_enable() to silence below build warning.
+On 7 March 2013 12:13, Amit Daniel Kachhap <amit.daniel@samsung.com> wrote:
+> diff --git a/drivers/cpufreq/exynos5440-cpufreq.c b/drivers/cpufreq/exynos5440-cpufreq.c
+> +struct exynos_dvfs_data {
+> +       void __iomem *base;
+> +       struct resource *mem;
+> +       int irq;
+> +       struct clk *cpu_clk;
+> +       unsigned int cur_frequency;
+> +       unsigned int latency;
+> +       struct cpufreq_frequency_table *freq_table;
+> +       unsigned int freq_count;
+> +       struct device *dev;
+> +       bool dvfs_enable;
 
-  CC      drivers/mfd/ab8500-gpadc.o
-drivers/mfd/ab8500-gpadc.c: In function 'ab8500_gpadc_runtime_resume':
-drivers/mfd/ab8500-gpadc.c:598:18: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result [-Wunused-result]
-drivers/mfd/ab8500-gpadc.c: In function 'ab8500_gpadc_probe':
-drivers/mfd/ab8500-gpadc.c:655:18: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result [-Wunused-result]
+s/enable/enabled?
 
-Also convert to devm_regulator_get(), this fixes a missing regulator_put() call
-in ab8500_gpadc_remove().
+> +static int exynos_cpufreq_probe(struct platform_device *pdev)
 
-Signed-off-by: Axel Lin <axel.lin@ingics.com>
----
-v2:
-In the case of goto fail_enable, we should call regulator_put instead of
-regulator_disable. However, the regulator_put call is also missed in
-ab8500_gpadc_remove(). Thus a simpler fix is to convert regulator_get to
-devm_regulator_get.
+> +       dvfs_info->cpu_clk = devm_clk_get(dvfs_info->dev, "armclk");
+> +       if (IS_ERR_OR_NULL(dvfs_info->cpu_clk)) {
 
- drivers/mfd/ab8500-gpadc.c |   17 +++++++++++++----
- 1 file changed, 13 insertions(+), 4 deletions(-)
+s/IS_ERR_OR_NULL/IS_ERR
 
-diff --git a/drivers/mfd/ab8500-gpadc.c b/drivers/mfd/ab8500-gpadc.c
-index b1f3561..5f341a5 100644
---- a/drivers/mfd/ab8500-gpadc.c
-+++ b/drivers/mfd/ab8500-gpadc.c
-@@ -594,9 +594,12 @@ static int ab8500_gpadc_runtime_suspend(struct device *dev)
- static int ab8500_gpadc_runtime_resume(struct device *dev)
- {
- 	struct ab8500_gpadc *gpadc = dev_get_drvdata(dev);
-+	int ret;
- 
--	regulator_enable(gpadc->regu);
--	return 0;
-+	ret = regulator_enable(gpadc->regu);
-+	if (ret)
-+		dev_err(dev, "Failed to enable vtvout LDO: %d\n", ret);
-+	return ret;
- }
- 
- static int ab8500_gpadc_runtime_idle(struct device *dev)
-@@ -643,7 +646,7 @@ static int ab8500_gpadc_probe(struct platform_device *pdev)
- 	}
- 
- 	/* VTVout LDO used to power up ab8500-GPADC */
--	gpadc->regu = regulator_get(&pdev->dev, "vddadc");
-+	gpadc->regu = devm_regulator_get(&pdev->dev, "vddadc");
- 	if (IS_ERR(gpadc->regu)) {
- 		ret = PTR_ERR(gpadc->regu);
- 		dev_err(gpadc->dev, "failed to get vtvout LDO\n");
-@@ -652,7 +655,11 @@ static int ab8500_gpadc_probe(struct platform_device *pdev)
- 
- 	platform_set_drvdata(pdev, gpadc);
- 
--	regulator_enable(gpadc->regu);
-+	ret = regulator_enable(gpadc->regu);
-+	if (ret) {
-+		dev_err(gpadc->dev, "Failed to enable vtvout LDO: %d\n", ret);
-+		goto fail_enable;
-+	}
- 
- 	pm_runtime_set_autosuspend_delay(gpadc->dev, GPADC_AUDOSUSPEND_DELAY);
- 	pm_runtime_use_autosuspend(gpadc->dev);
-@@ -663,6 +670,8 @@ static int ab8500_gpadc_probe(struct platform_device *pdev)
- 	list_add_tail(&gpadc->node, &ab8500_gpadc_list);
- 	dev_dbg(gpadc->dev, "probe success\n");
- 	return 0;
-+
-+fail_enable:
- fail_irq:
- 	free_irq(gpadc->irq, gpadc);
- fail:
--- 
-1.7.9.5
+> +       if (devm_request_irq(dvfs_info->dev, dvfs_info->irq, exynos_cpufreq_irq,
+> +                               IRQF_TRIGGER_NONE, CPUFREQ_NAME, dvfs_info)) {
+> +               pr_err("Failed to register IRQ\n");
+> +               ret = -ENODEV;
+
+use the value returned from this function rather than creating your
+own.. true for all
+other calls too, unless they return NULL on error.
+
+> +}
