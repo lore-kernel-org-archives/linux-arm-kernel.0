@@ -1,67 +1,44 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 09 Mar 2013 18:18:26 +0900
-Subject: [PATCH v3 0/4] Initial Device Tree support for S3C64xx
-In-Reply-To: <1361036261-8315-1-git-send-email-tomasz.figa@gmail.com>
-References: <1361036261-8315-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <042b01ce1ca7$0e9ba2c0$2bd2e840$%kim@samsung.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sat, 09 Mar 2013 13:26:56 +0400
+Subject: [PATCH v8 3/7] ARM: davinci: Add support for configuring
+ DA8XX_REMOTEPROC
+In-Reply-To: <1362782508-3166-4-git-send-email-rtivy@ti.com>
+References: <1362782508-3166-1-git-send-email-rtivy@ti.com>
+ <1362782508-3166-4-git-send-email-rtivy@ti.com>
+Message-ID: <513B0060.3090501@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz Figa wrote:
-> 
-> This series adds Device Tree support for Samsung S3C64xx SoC series.
-> 
-> It fixes several problems preventing from booting an S3C64xx-based system
-> using Device Tree, adds all the infrastructure for Device Tree-based board
-> support, including mach-s3c64xx-dt and dts include files for S3C64xx SoCs, and
-> (very) basic device tree source for FriendlyARM Mini6410 board.
-> 
-> Current support is very limited and allows only basic bootup with UART and
-> SDHCI, but should be fine as a start and will be extended in future, hopefully
-> with help of S3C64xx board maintainers.
-> 
-> This series depends on my other series reworking samsung-time for
-> multiplatform:
-> [PATCH v2 00/12] ARM: samsung-time: Prepare for multiplatform support
-> http://thread.gmane.org/gmane.linux.kernel.samsung-soc/16158
-> 
-Tomasz, can you address comments from ml for above patches? So that this could
-be sent to upstream together :-)
+Hello.
 
-- Kukjin
+On 09-03-2013 2:41, Robert Tivy wrote:
 
-> Changes since v2:
->  - Updated timer node for next version of samsung-time patches
-> 
-> Changes since v1:
->  - Dropped two VIC-related patches that are no longer necessary
->  - Added Device Tree-based instantation of system timers
->  - Corrected VIC interrupt specifiers
->  - Adjusted CPU compatible values and dropped @id
-> 
-> Tomasz Figa (4):
->   ARM: common: vic: Parse interrupt and resume masks from device tree
->   ARM: s3c64xx: Add board file for boot using Device Tree
->   ARM: dts: Add basic dts include files for Samsung S3C64xx SoCs
->   ARM: dts: Add dts file for S3C6410-based Mini6410 board
-> 
->  Documentation/devicetree/bindings/arm/vic.txt |   6 ++
->  arch/arm/boot/dts/Makefile                    |   1 +
->  arch/arm/boot/dts/s3c6400.dtsi                |  33 ++++++++
->  arch/arm/boot/dts/s3c6410-mini6410.dts        |  50 +++++++++++++
->  arch/arm/boot/dts/s3c6410.dtsi                |  33 ++++++++
->  arch/arm/boot/dts/s3c64xx.dtsi                | 104
-++++++++++++++++++++++++++
->  arch/arm/common/vic.c                         |   7 +-
->  arch/arm/mach-s3c64xx/Kconfig                 |  14 ++++
->  arch/arm/mach-s3c64xx/Makefile                |   1 +
->  arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c       |  94 +++++++++++++++++++++++
->  10 files changed, 342 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/boot/dts/s3c6400.dtsi
->  create mode 100644 arch/arm/boot/dts/s3c6410-mini6410.dts
->  create mode 100644 arch/arm/boot/dts/s3c6410.dtsi
->  create mode 100644 arch/arm/boot/dts/s3c64xx.dtsi
->  create mode 100644 arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c
-> 
-> --
-> 1.8.1.2
+> Also fix REMOTEPROC config to select FW_LOADER (instead of FW_CONFIG).
+
+> Signed-off-by: Robert Tivy <rtivy@ti.com>
+> ---
+>   drivers/remoteproc/Kconfig |   26 +++++++++++++++++++++++++-
+>   1 file changed, 25 insertions(+), 1 deletion(-)
+
+> diff --git a/drivers/remoteproc/Kconfig b/drivers/remoteproc/Kconfig
+> index 96ce101..21d04f1 100644
+> --- a/drivers/remoteproc/Kconfig
+> +++ b/drivers/remoteproc/Kconfig
+[...]
+> @@ -41,4 +41,28 @@ config STE_MODEM_RPROC
+>   	  This can be either built-in or a loadable module.
+>   	  If unsure say N.
+>
+> +config DA8XX_REMOTEPROC
+> +	tristate "DA830/OMAPL137 & DA850/OMAPL138 remoteproc support (EXPERIMENTAL)"
+> +	depends on ARCH_DAVINCI_DA8XX
+> +	select REMOTEPROC
+> +	select RPMSG
+> +	select CMA
+> +	default n
+> +	help
+> +	  Say y here to support DA830/OMAPL137 & DA850/OMAPL138 remote
+
+    Naming nit: they're OMAP-L13x. Here and above.
+
+WBR, Sergei
