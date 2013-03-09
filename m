@@ -1,43 +1,66 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Sat,  9 Mar 2013 18:44:37 +1300
-Subject: [PATCH] tty: serial: vt8500: Unneccessary duplicated clock code
- removed
-In-Reply-To: <1362807877-23263-1-git-send-email-linux@prisktech.co.nz>
-References: <1362807877-23263-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <1362807877-23263-2-git-send-email-linux@prisktech.co.nz>
+From: axel.lin@ingics.com (Axel Lin)
+Date: Sat, 09 Mar 2013 16:49:41 +0800
+Subject: [PATCH] mfd: ab8500-gpadc: Complain if we fail to enable vtvout LDO
+Message-ID: <1362818981.6371.1.camel@phoenix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the extra code left over when the serial driver was changed
-to require a clock. There is no fallback to 24Mhz as a clock is
-now required.
+Since commit c8801a8e
+"regulator: core: Mark all get and enable calls as __must_check",
+we must check return value of regulator_enable() to silence below build warning.
 
-Also remove a second call to of_clk_get which is unnecessary.
+  CC      drivers/mfd/ab8500-gpadc.o
+drivers/mfd/ab8500-gpadc.c: In function 'ab8500_gpadc_runtime_resume':
+drivers/mfd/ab8500-gpadc.c:598:18: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result [-Wunused-result]
+drivers/mfd/ab8500-gpadc.c: In function 'ab8500_gpadc_probe':
+drivers/mfd/ab8500-gpadc.c:655:18: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result [-Wunused-result]
 
-Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+Signed-off-by: Axel Lin <axel.lin@ingics.com>
 ---
- drivers/tty/serial/vt8500_serial.c |    9 +--------
- 1 file changed, 1 insertion(+), 8 deletions(-)
+ drivers/mfd/ab8500-gpadc.c |   16 +++++++++++++---
+ 1 file changed, 13 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/tty/serial/vt8500_serial.c b/drivers/tty/serial/vt8500_serial.c
-index a3f9dd5..705240e 100644
---- a/drivers/tty/serial/vt8500_serial.c
-+++ b/drivers/tty/serial/vt8500_serial.c
-@@ -611,14 +611,7 @@ static int vt8500_serial_probe(struct platform_device *pdev)
- 	vt8500_port->uart.dev = &pdev->dev;
- 	vt8500_port->uart.flags = UPF_IOREMAP | UPF_BOOT_AUTOCONF;
+diff --git a/drivers/mfd/ab8500-gpadc.c b/drivers/mfd/ab8500-gpadc.c
+index b1f3561..e005670 100644
+--- a/drivers/mfd/ab8500-gpadc.c
++++ b/drivers/mfd/ab8500-gpadc.c
+@@ -594,9 +594,12 @@ static int ab8500_gpadc_runtime_suspend(struct device *dev)
+ static int ab8500_gpadc_runtime_resume(struct device *dev)
+ {
+ 	struct ab8500_gpadc *gpadc = dev_get_drvdata(dev);
++	int ret;
  
--	vt8500_port->clk = of_clk_get(pdev->dev.of_node, 0);
--	if (!IS_ERR(vt8500_port->clk)) {
--		vt8500_port->uart.uartclk = clk_get_rate(vt8500_port->clk);
--	} else {
--		/* use the default of 24Mhz if not specified and warn */
--		pr_warn("%s: serial clock source not specified\n", __func__);
--		vt8500_port->uart.uartclk = 24000000;
--	}
-+	vt8500_port->uart.uartclk = clk_get_rate(vt8500_port->clk);
+-	regulator_enable(gpadc->regu);
+-	return 0;
++	ret = regulator_enable(gpadc->regu);
++	if (ret)
++		dev_err(dev, "Failed to enable vtvout LDO: %d\n", ret);
++	return ret;
+ }
  
- 	snprintf(vt8500_port->name, sizeof(vt8500_port->name),
- 		 "VT8500 UART%d", pdev->id);
+ static int ab8500_gpadc_runtime_idle(struct device *dev)
+@@ -652,7 +655,11 @@ static int ab8500_gpadc_probe(struct platform_device *pdev)
+ 
+ 	platform_set_drvdata(pdev, gpadc);
+ 
+-	regulator_enable(gpadc->regu);
++	ret = regulator_enable(gpadc->regu);
++	if (ret) {
++		dev_err(gpadc->dev, "Failed to enable vtvout LDO: %d\n", ret);
++		goto fail_enable;
++	}
+ 
+ 	pm_runtime_set_autosuspend_delay(gpadc->dev, GPADC_AUDOSUSPEND_DELAY);
+ 	pm_runtime_use_autosuspend(gpadc->dev);
+@@ -663,6 +670,9 @@ static int ab8500_gpadc_probe(struct platform_device *pdev)
+ 	list_add_tail(&gpadc->node, &ab8500_gpadc_list);
+ 	dev_dbg(gpadc->dev, "probe success\n");
+ 	return 0;
++
++fail_enable:
++	regulator_disable(gpadc->regu);
+ fail_irq:
+ 	free_irq(gpadc->irq, gpadc);
+ fail:
 -- 
 1.7.9.5
