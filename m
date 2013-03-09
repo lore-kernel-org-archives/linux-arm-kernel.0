@@ -1,89 +1,118 @@
 From: linux@prisktech.co.nz (Tony Prisk)
-Date: Sat,  9 Mar 2013 18:39:32 +1300
-Subject: [PATCH 0/6] arm: vt8500: Add support for pinctrl/gpio module
-Message-ID: <1362807578-23089-1-git-send-email-linux@prisktech.co.nz>
+Date: Sat,  9 Mar 2013 18:39:38 +1300
+Subject: [PATCH 6/6] arm: vt8500: Remove pinmux configuration from
+ mach-vt8500/vt8500.c
+In-Reply-To: <1362807578-23089-1-git-send-email-linux@prisktech.co.nz>
+References: <1362807578-23089-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <1362807578-23089-7-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series removes the existing GPIO driver and replaces it with
-a combined pinctrl+gpio driver.
+With the new pinctrl driver and wm,pinmux property the configuration
+code required for initializing the framebuffer hardware can be removed
+from vt8500.c and configured in devicetree with pinctrl driver properties.
 
-Patch 1 - Increase the available GPIO space for the newly added gpios.
-  Because there is no hardware documentation from Wondermedia we don't know
-  how many GPIO's there actually are. New gpio pins have been located since
-  the original GPIO driver was written, hence the increase.
+Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+---
+ arch/arm/mach-vt8500/vt8500.c |   70 +----------------------------------------
+ 1 file changed, 1 insertion(+), 69 deletions(-)
 
-Patch 2 - The main pinctrl/gpio driver and the data for the 5 supported SoCs.
-  Each SoC is different, and therefore has its own data. This design was
-  borrowed from the Tegra pinctrl driver. The pin numbering is based on a
-  bank+pin encoding so that when other pin functions are found later on we can
-  add them without having to renumber existing pins.
-
-Patch 3 - Update the SoC dts(i) files to support the new pinctrl driver.
-
-Patch 4 - Remove the existing GPIO driver nodes from the dtsi's.
-
-Patch 5 - Remove the existing GPIO driver.
-
-Patch 6 - Remove the pinmux configuration code from mach-vt8500/vt8500.c that
-  was used to configure the graphics hardware at boot time. This is now done
-  in the pinctrl node of the dtsi.
-
-
-I suspect this series may need to be broken up since there are two arm-soc
-patches, and 4 pinctrl/gpio patches.
-
-Patch 1 is fairly independant, but is required for the new driver to function
-properly.
-Patches 2-5 are pinctrl/gpio patches.
-Patch 6 relies on all the previous patches being available or the graphics
-hardware will be non-functional.
-
-Let me know how you want to handle this and I'll break it up if necessary.
-
-Regards
-Tony Prisk
-
-
-Tony Prisk (6):
-  arm: vt8500: Increase available GPIOs on arch-vt8500
-  pinctrl: gpio: vt8500: Add pincontrol driver for arch-vt8500
-  arm: dts: vt8500: Update Wondermedia SoC dtsi files for pinctrl
-    driver
-  arm: vt8500: Remove gpio devicetree nodes
-  gpio: vt8500: Remove arch-vt8500 gpio driver
-  arm: vt8500: Remove pinmux configuration from mach-vt8500/vt8500.c
-
- .../devicetree/bindings/pinctrl/pinctrl-vt8500.txt |   56 ++
- arch/arm/Kconfig                                   |    3 +-
- arch/arm/boot/dts/vt8500.dtsi                      |    7 +-
- arch/arm/boot/dts/wm8505.dtsi                      |    7 +-
- arch/arm/boot/dts/wm8650.dtsi                      |    7 +-
- arch/arm/boot/dts/wm8850.dtsi                      |    7 +-
- arch/arm/mach-vt8500/Kconfig                       |    1 +
- arch/arm/mach-vt8500/vt8500.c                      |   70 +--
- drivers/gpio/Kconfig                               |    6 -
- drivers/gpio/Makefile                              |    1 -
- drivers/gpio/gpio-vt8500.c                         |  355 -----------
- drivers/pinctrl/Kconfig                            |   37 ++
- drivers/pinctrl/Makefile                           |    5 +
- drivers/pinctrl/pinctrl-vt8500.c                   |  509 ++++++++++++++++
- drivers/pinctrl/pinctrl-wm8505.c                   |  540 +++++++++++++++++
- drivers/pinctrl/pinctrl-wm8650.c                   |  378 ++++++++++++
- drivers/pinctrl/pinctrl-wm8750.c                   |  417 +++++++++++++
- drivers/pinctrl/pinctrl-wm8850.c                   |  396 +++++++++++++
- drivers/pinctrl/pinctrl-wmt.c                      |  625 ++++++++++++++++++++
- drivers/pinctrl/pinctrl-wmt.h                      |   79 +++
- 20 files changed, 3062 insertions(+), 444 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/pinctrl/pinctrl-vt8500.txt
- delete mode 100644 drivers/gpio/gpio-vt8500.c
- create mode 100644 drivers/pinctrl/pinctrl-vt8500.c
- create mode 100644 drivers/pinctrl/pinctrl-wm8505.c
- create mode 100644 drivers/pinctrl/pinctrl-wm8650.c
- create mode 100644 drivers/pinctrl/pinctrl-wm8750.c
- create mode 100644 drivers/pinctrl/pinctrl-wm8850.c
- create mode 100644 drivers/pinctrl/pinctrl-wmt.c
- create mode 100644 drivers/pinctrl/pinctrl-wmt.h
-
+diff --git a/arch/arm/mach-vt8500/vt8500.c b/arch/arm/mach-vt8500/vt8500.c
+index 49e8005..b06b7fc 100644
+--- a/arch/arm/mach-vt8500/vt8500.c
++++ b/arch/arm/mach-vt8500/vt8500.c
+@@ -34,12 +34,8 @@
+ 
+ #include "common.h"
+ 
+-#define LEGACY_GPIO_BASE	0xD8110000
+ #define LEGACY_PMC_BASE		0xD8130000
+ 
+-/* Registers in GPIO Controller */
+-#define VT8500_GPIO_MUX_REG	0x200
+-
+ /* Registers in Power Management Controller */
+ #define VT8500_HCR_REG		0x12
+ #define VT8500_PMSR_REG		0x60
+@@ -77,71 +73,6 @@ static void vt8500_power_off(void)
+ void __init vt8500_init(void)
+ {
+ 	struct device_node *np;
+-#if defined(CONFIG_FB_VT8500) || defined(CONFIG_FB_WM8505)
+-	struct device_node *fb;
+-	void __iomem *gpio_base;
+-#endif
+-
+-#ifdef CONFIG_FB_VT8500
+-	fb = of_find_compatible_node(NULL, NULL, "via,vt8500-fb");
+-	if (fb) {
+-		np = of_find_compatible_node(NULL, NULL, "via,vt8500-gpio");
+-		if (np) {
+-			gpio_base = of_iomap(np, 0);
+-
+-			if (!gpio_base)
+-				pr_err("%s: of_iomap(gpio_mux) failed\n",
+-								__func__);
+-
+-			of_node_put(np);
+-		} else {
+-			gpio_base = ioremap(LEGACY_GPIO_BASE, 0x1000);
+-			if (!gpio_base)
+-				pr_err("%s: ioremap(legacy_gpio_mux) failed\n",
+-								__func__);
+-		}
+-		if (gpio_base) {
+-			writel(readl(gpio_base + VT8500_GPIO_MUX_REG) | 1,
+-				gpio_base + VT8500_GPIO_MUX_REG);
+-			iounmap(gpio_base);
+-		} else
+-			pr_err("%s: Could not remap GPIO mux\n", __func__);
+-
+-		of_node_put(fb);
+-	}
+-#endif
+-
+-#ifdef CONFIG_FB_WM8505
+-	fb = of_find_compatible_node(NULL, NULL, "wm,wm8505-fb");
+-	if (fb) {
+-		np = of_find_compatible_node(NULL, NULL, "wm,wm8505-gpio");
+-		if (!np)
+-			np = of_find_compatible_node(NULL, NULL,
+-							"wm,wm8650-gpio");
+-		if (np) {
+-			gpio_base = of_iomap(np, 0);
+-
+-			if (!gpio_base)
+-				pr_err("%s: of_iomap(gpio_mux) failed\n",
+-								__func__);
+-
+-			of_node_put(np);
+-		} else {
+-			gpio_base = ioremap(LEGACY_GPIO_BASE, 0x1000);
+-			if (!gpio_base)
+-				pr_err("%s: ioremap(legacy_gpio_mux) failed\n",
+-								__func__);
+-		}
+-		if (gpio_base) {
+-			writel(readl(gpio_base + VT8500_GPIO_MUX_REG) |
+-				0x80000000, gpio_base + VT8500_GPIO_MUX_REG);
+-			iounmap(gpio_base);
+-		} else
+-			pr_err("%s: Could not remap GPIO mux\n", __func__);
+-
+-		of_node_put(fb);
+-	}
+-#endif
+ 
+ 	np = of_find_compatible_node(NULL, NULL, "via,vt8500-pmc");
+ 	if (np) {
+@@ -156,6 +87,7 @@ void __init vt8500_init(void)
+ 		if (!pmc_base)
+ 			pr_err("%s:ioremap(power_off) failed\n", __func__);
+ 	}
++
+ 	if (pmc_base)
+ 		pm_power_off = &vt8500_power_off;
+ 	else
 -- 
 1.7.9.5
