@@ -1,39 +1,65 @@
 From: pebolle@tiscali.nl (Paul Bolle)
-Date: Sat, 09 Mar 2013 20:08:01 +0100
-Subject: [PATCH] ARM: S3C24XX: drop "select MACH_NEO1973"
-Message-ID: <1362856081.3137.19.camel@x61.thuisdomein>
+Date: Sat, 09 Mar 2013 20:48:30 +0100
+Subject: [PATCH] ARM: OMAP: drop "select MACH_NOKIA_RM696"
+In-Reply-To: <20130309000157.GE30923@n2100.arm.linux.org.uk>
+References: <1362738596.5994.48.camel@x61.thuisdomein>
+ <20130308161159.GE14552@blackmetal.musicnaut.iki.fi>
+ <20130308163507.GC26093@atomide.com>
+ <1362763232.5994.75.camel@x61.thuisdomein>
+ <20130308175539.GG26093@atomide.com>
+ <1362765764.5994.87.camel@x61.thuisdomein>
+ <20130309000157.GE30923@n2100.arm.linux.org.uk>
+Message-ID: <1362858510.3137.31.camel@x61.thuisdomein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Kconfig entry for the Openmoko GTA02 / Freerunner phone selects
-MACH_NEO1973. But there is no Kconfig symbol MACH_NEO1973. The select
-statement for that symbol is a nop. It can safely be dropped.
+On Sat, 2013-03-09 at 00:01 +0000, Russell King - ARM Linux wrote:
+> It's actually quite clever.  There's two levels to it.
+> 
+> The first is that CONFIG_MACH_xxx result in their machine_is_xxx() macros
+> being defined to constant zero if the CONFIG option is not enabled.  That
+> allows the compiler to throw away code for disabled platforms because
+> the expression is always false.
+> 
+> Otherwise, they end up as (machine_arch_type == MACH_TYPE_xxx).
+> 
+> The second is the magic which happens when two CONFIG_MACH_xxx are
+> selected.  If only one is selected, then machine_arch_type is defined
+> to the appropriate MACH_TYPE_xxx.  This means that the above expression
+> becomes constant-true, and the conditional is eliminated.
+> 
+> If more than one is selected, then machine_arch_type is defined to a
+> variable which is appropriately set to one of the MACH_TYPE_xxx values.
 
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
----
-0) Tested with "git grep".
+At boot?
 
-1) There appear to be repositories that carry a "config MACH_NEO1973" in
-their tree. I guess it is used to collect functionality common to the
-GTA01 and the GTA02. But except for this select statement, MACH_NEO1973
-was never used in mainline. So if the GTA01 code ever gets merged into
-mainline, this select statement might be added once more (if it is
-actually needed then).
+> So, the result is that:
+> - de-selected platforms have their if (machine_is_xxx()) { } optimised
+>   out of the kernel.
+> - for a kernel built targetting one platform, all the
+>   if (machine_is_xxx()) tests are optimised away, leaving only the
+>   relevant code behind.
+> - otherwise, we get the _appropriate_ conditional code for the
+>   configuration generated.
 
- arch/arm/mach-s3c24xx/Kconfig | 1 -
- 1 file changed, 1 deletion(-)
+Thanks for clarifying this. Quite clever indeed. 
 
-diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
-index 7361b9d..bec43fe 100644
---- a/arch/arm/mach-s3c24xx/Kconfig
-+++ b/arch/arm/mach-s3c24xx/Kconfig
-@@ -641,7 +641,6 @@ comment "S3C2442 Boards"
- config MACH_NEO1973_GTA02
- 	bool "Openmoko GTA02 / Freerunner phone"
- 	select I2C
--	select MACH_NEO1973
- 	select MFD_PCF50633
- 	select PCF50633_GPIO
- 	select POWER_SUPPLY
--- 
-1.7.11.7
+> However, going back to that MACH_NOKIA_RM696.  If there exists only a
+> select of this symbol and no "config MACH_NOKIA_RM696" entry, then the
+> symbol will never be generated in the output .config file.
+> 
+>[...]
+> 
+> My conclusion is... it's a mess.
+
+That mess can only be fully cleaned up if the code for the RM-696 that
+now is maintained in some unknown to me repository gets merged into
+mainline, can't it?
+
+In the meantime, how do you prefer I solve the (trivial) issue of an
+useless select for MACH_NOKIA_RM696? Drop that select or add an (equally
+useless) config entry for MACH_NOKIA_RM696? Or should I try to ignore it
+for the time being?
+
+
+Paul Bolle
