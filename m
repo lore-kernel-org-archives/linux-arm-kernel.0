@@ -1,89 +1,45 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat,  9 Mar 2013 21:29:35 +0100
-Subject: [PATCH v4 4/4] ARM: dts: Add dts file for S3C6410-based Mini6410 board
-In-Reply-To: <1362860975-18635-1-git-send-email-tomasz.figa@gmail.com>
-References: <1362860975-18635-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <1362860975-18635-5-git-send-email-tomasz.figa@gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sat, 9 Mar 2013 21:31:59 +0100
+Subject: [GIT PULL] preparation patches for Cortex-M3
+In-Reply-To: <20130308233733.GD4977@n2100.arm.linux.org.uk>
+References: <20130307151138.GI15375@pengutronix.de>
+ <20130308233733.GD4977@n2100.arm.linux.org.uk>
+Message-ID: <20130309203159.GM15375@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds basic device tree sources for FriendlyARM Mini6410 board
-based on Samsung S3C6410 SoC.
+Hello Russell,
 
-Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
----
- arch/arm/boot/dts/Makefile             |  1 +
- arch/arm/boot/dts/s3c6410-mini6410.dts | 50 ++++++++++++++++++++++++++++++++++
- 2 files changed, 51 insertions(+)
- create mode 100644 arch/arm/boot/dts/s3c6410-mini6410.dts
+On Fri, Mar 08, 2013 at 11:37:34PM +0000, Russell King - ARM Linux wrote:
+> On Thu, Mar 07, 2013 at 04:11:38PM +0100, Uwe Kleine-K?nig wrote:
+> > Hello Russell,
+> > 
+> > the following changes since commit 949db153b6466c6f7cad5a427ecea94985927311:
+> > 
+> >   Linux 3.8-rc5 (2013-01-25 11:57:28 -0800)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.pengutronix.de/git/ukl/linux.git for-next
+> > 
+> > for you to fetch changes up to 6ebd4d038dbb626a43d87db3007e71f92f49d7b3:
+> > 
+> >   ARM: stub out read_cpuid and read_cpuid_ext for CPU_CP15=n (2013-01-31 21:44:48 +0100)
+> > 
+> > These are in next since next-20130213 without any problem reports.
+> > 
+> > I currently base my Cortex-M3 stuff on top of these. The complete series
+> > still has some problems though that I have to debug first. I'd be glad
+> > if you'd pull at least this series for 3.10.
+> 
+> Okay, and you of course did try doing a test-merge with something like
+> v3.9-rc1 before sending this pull request, so you know about these
+> conflicts - which I've fixed up like this.  Does this look sensible?
+I should have mentioned the conflict resolution in next is fine. Your's
+is slightly different, but even better.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index d3cd880..1a370e6 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -137,6 +137,7 @@ dtb-$(CONFIG_ARCH_U8500) += snowball.dtb \
- 	hrefprev60.dtb \
- 	hrefv60plus.dtb \
- 	ccu9540.dtb
-+dtb-$(CONFIG_ARCH_S3C64XX) += s3c6410-mini6410.dtb
- dtb-$(CONFIG_ARCH_SHMOBILE) += emev2-kzm9d.dtb \
- 	r8a7740-armadillo800eva.dtb \
- 	sh73a0-kzm9g.dtb \
-diff --git a/arch/arm/boot/dts/s3c6410-mini6410.dts b/arch/arm/boot/dts/s3c6410-mini6410.dts
-new file mode 100644
-index 0000000..9ac82c2
---- /dev/null
-+++ b/arch/arm/boot/dts/s3c6410-mini6410.dts
-@@ -0,0 +1,50 @@
-+/*
-+ * Samsung's S3C6410 based Mini6410 board device tree source
-+ *
-+ * Copyright (c) 2013 Tomasz Figa <tomasz.figa@gmail.com>
-+ *
-+ * Device tree source file for FriendlyARM Mini6410 board which is based on
-+ * Samsung's S3C6410 SoC.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+/dts-v1/;
-+/include/ "s3c6410.dtsi"
-+
-+/ {
-+	model = "FriendlyARM Mini6410 board based on S3C6410";
-+	compatible = "friendlyarm,mini6410", "samsung,s3c6410";
-+
-+	memory {
-+		reg = <0x50000000 0x10000000>;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttySAC0,115200n8 earlyprintk rootwait root=/dev/mmcblk0p1";
-+	};
-+
-+	serial at 7f005000 {
-+		status = "okay";
-+	};
-+
-+	serial at 7f005400 {
-+		status = "okay";
-+	};
-+
-+	serial at 7f005800 {
-+		status = "okay";
-+	};
-+
-+	serial at 7f005c00 {
-+		status = "okay";
-+	};
-+
-+	sdhci at 7c200000 {
-+		bus-width = <4>;
-+		non-removable;
-+		status = "okay";
-+	};
-+};
--- 
-1.8.1.5
+I documented to point out merge conflicts for future pull requests in my
+check list, so I expect to do better next time.
+
+Thanks for pulling and the conflict handling
+Uwe
