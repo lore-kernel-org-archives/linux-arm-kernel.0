@@ -1,66 +1,38 @@
-From: axel.lin@ingics.com (Axel Lin)
-Date: Sat, 09 Mar 2013 16:49:41 +0800
-Subject: [PATCH] mfd: ab8500-gpadc: Complain if we fail to enable vtvout LDO
-Message-ID: <1362818981.6371.1.camel@phoenix>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sat, 9 Mar 2013 09:51:54 +0100
+Subject: [GIT PULL 3.9] Various fixes for Marvell EBU platforms
+In-Reply-To: <20130308222317.GV23237@titan.lakedaemon.net>
+References: <1362565416-15718-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130308222317.GV23237@titan.lakedaemon.net>
+Message-ID: <20130309095154.33bb27a8@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit c8801a8e
-"regulator: core: Mark all get and enable calls as __must_check",
-we must check return value of regulator_enable() to silence below build warning.
+Dear Jason Cooper,
 
-  CC      drivers/mfd/ab8500-gpadc.o
-drivers/mfd/ab8500-gpadc.c: In function 'ab8500_gpadc_runtime_resume':
-drivers/mfd/ab8500-gpadc.c:598:18: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result [-Wunused-result]
-drivers/mfd/ab8500-gpadc.c: In function 'ab8500_gpadc_probe':
-drivers/mfd/ab8500-gpadc.c:655:18: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result [-Wunused-result]
+On Fri, 8 Mar 2013 17:23:17 -0500, Jason Cooper wrote:
 
-Signed-off-by: Axel Lin <axel.lin@ingics.com>
----
- drivers/mfd/ab8500-gpadc.c |   16 +++++++++++++---
- 1 file changed, 13 insertions(+), 3 deletions(-)
+> > Heikki Krogerus (1):
+> >       arm: mvebu: Reduce reg-io-width with UARTs
+> > 
+> > Thomas Petazzoni (3):
+> >       arm: plat-orion: fix address decoding when > 4GB is used
+> >       arm: mvebu: fix address-cells in mpic DT node
+> >       arm: mach-orion5x: fix typo in compatible string of a .dts file
+> > 
+> >  arch/arm/boot/dts/armada-370-xp.dtsi               |    5 ++---
+> >  arch/arm/boot/dts/armada-xp.dtsi                   |    4 ++--
+> >  .../dts/orion5x-lacie-ethernet-disk-mini-v2.dts    |    2 +-
+> >  arch/arm/plat-orion/addr-map.c                     |    7 +++++--
+> >  4 files changed, 10 insertions(+), 8 deletions(-)
+> 
+> All applied to mvebu/fixes
 
-diff --git a/drivers/mfd/ab8500-gpadc.c b/drivers/mfd/ab8500-gpadc.c
-index b1f3561..e005670 100644
---- a/drivers/mfd/ab8500-gpadc.c
-+++ b/drivers/mfd/ab8500-gpadc.c
-@@ -594,9 +594,12 @@ static int ab8500_gpadc_runtime_suspend(struct device *dev)
- static int ab8500_gpadc_runtime_resume(struct device *dev)
- {
- 	struct ab8500_gpadc *gpadc = dev_get_drvdata(dev);
-+	int ret;
- 
--	regulator_enable(gpadc->regu);
--	return 0;
-+	ret = regulator_enable(gpadc->regu);
-+	if (ret)
-+		dev_err(dev, "Failed to enable vtvout LDO: %d\n", ret);
-+	return ret;
- }
- 
- static int ab8500_gpadc_runtime_idle(struct device *dev)
-@@ -652,7 +655,11 @@ static int ab8500_gpadc_probe(struct platform_device *pdev)
- 
- 	platform_set_drvdata(pdev, gpadc);
- 
--	regulator_enable(gpadc->regu);
-+	ret = regulator_enable(gpadc->regu);
-+	if (ret) {
-+		dev_err(gpadc->dev, "Failed to enable vtvout LDO: %d\n", ret);
-+		goto fail_enable;
-+	}
- 
- 	pm_runtime_set_autosuspend_delay(gpadc->dev, GPADC_AUDOSUSPEND_DELAY);
- 	pm_runtime_use_autosuspend(gpadc->dev);
-@@ -663,6 +670,9 @@ static int ab8500_gpadc_probe(struct platform_device *pdev)
- 	list_add_tail(&gpadc->node, &ab8500_gpadc_list);
- 	dev_dbg(gpadc->dev, "probe success\n");
- 	return 0;
-+
-+fail_enable:
-+	regulator_disable(gpadc->regu);
- fail_irq:
- 	free_irq(gpadc->irq, gpadc);
- fail:
+Thanks!
+
+Thomas
 -- 
-1.7.9.5
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
