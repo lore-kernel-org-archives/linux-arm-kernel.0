@@ -1,22 +1,29 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Sat, 9 Mar 2013 19:02:14 +0100
-Subject: [PATCH 8/9] iommu: OMAP: build only on OMAP2+
-In-Reply-To: <1362521809-22989-9-git-send-email-arnd@arndb.de>
-References: <1362521809-22989-1-git-send-email-arnd@arndb.de>
- <1362521809-22989-9-git-send-email-arnd@arndb.de>
-Message-ID: <20130309180213.GA4876@8bytes.org>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Sat, 9 Mar 2013 23:41:13 +0530
+Subject: [PATCH V2 0/5] ARM: DT: tegra114: Add DT entry for different
+ controller
+Message-ID: <1362852678-13421-1-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 05, 2013 at 11:16:48PM +0100, Arnd Bergmann wrote:
-> The OMAP IOMMU driver intentionally fails to build on OMAP1
-> platforms, so we should not allow enabling it there.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Joerg Roedel <joro@8bytes.org>
-> Cc: iommu at lists.linux-foundation.org
-> Cc: Ohad Ben-Cohen <ohad@wizery.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Omar Ramirez Luna <omar.luna@linaro.org>
+This patch series add DT entry for APB DMA, I2C, UART, KBC and SPI.
 
-Applied to iommu/fixes, thanks Arnd.
+This patch series is generated on top of CCF work for T114 done by Peter
+and hence it should be applied on top of T114 CCF patches.
+
+Changes from V1:
+- Add reeason why APBDMA is not compatible with older driver
+  in description.
+- Remove UARTB car id correction. Make the compatible with tegra114 and
+  older chip.
+- Add compatible for kbc as nvidia,tegra114-kbc and nvidia,tegra20-kbc.
+
+Laxman Dewangan (5):
+  ARM: DT: tegra114: add APB DMA controller DT entry
+  ARM: DT: tegra114: Add i2c controller DT entry
+  ARM: DT: tegra114:add aliases and DMA requestor for serial controller
+  ARM: DT: tegra114: add KBC controller DT entry
+  ARM: DT: tegra114: Add spi controller DT entry
+
+ arch/arm/boot/dts/tegra114.dtsi |  200 ++++++++++++++++++++++++++++++++++++++-
+ 1 files changed, 196 insertions(+), 4 deletions(-)
