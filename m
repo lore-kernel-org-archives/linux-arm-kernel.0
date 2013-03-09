@@ -1,61 +1,37 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sat, 9 Mar 2013 09:58:49 +0100
-Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
-In-Reply-To: <20130308191227.GA6551@avionic-0098.mockup.avionic-design.de>
-References: <20130306121118.GA17079@avionic-0098.mockup.avionic-design.de>
- <20130306180946.GA2433@obsidianresearch.com>
- <20130307080832.GD3451@avionic-0098.mockup.avionic-design.de>
- <20130307174955.GC20840@obsidianresearch.com>
- <20130307194830.GA1811@avionic-0098.mockup.avionic-design.de>
- <20130307200235.GB20695@obsidianresearch.com>
- <20130307204726.GB1811@avionic-0098.mockup.avionic-design.de>
- <51392B4D.9040404@gmail.com>
- <20130308071443.GA5772@avionic-0098.mockup.avionic-design.de>
- <20130308165228.GB4094@obsidianresearch.com>
- <20130308191227.GA6551@avionic-0098.mockup.avionic-design.de>
-Message-ID: <20130309095849.639f398e@skate>
+From: gwenhael.goavec-merou@armadeus.com (Gwenhael Goavec-Merou)
+Date: Sat,  9 Mar 2013 10:06:10 +0100
+Subject: [PATCH] ARM: imx51: Add pinctrl for ecspi2
+Message-ID: <1362819970-24442-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Thierry Reding,
+Add ecspi2 group of pins for imx51.
 
-On Fri, 8 Mar 2013 20:12:27 +0100, Thierry Reding wrote:
+Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
+---
+ arch/arm/boot/dts/imx51.dtsip | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-> Oh well. I don't like it, but if that's the way it has to be, then so be
-> it.
-
-I don't like it too much either, but it's not a big problem either. It
-works, and satisfies the DT requirements reasonably.
-
-> Any reason why the reg-names can't match the root port's node name
-> so that it can be used directly instead of going through hoops to
-> construct a string from extra parameters? Like below:
-> 
-> 	pcie-controller {
-> 		regs = <...>;
-> 		reg-names = ..., "pcie at 1,0", "pcie at 2,0";
-> 
-> 		pcie at 1,0 {
-> 			...
-> 		};
-> 
-> 		pcie at 2,0 {
-> 			...
-> 		};
-> 	};
-
-Yes, I thought about doing this, but in my driver, I also use the
-"pcie0.0" string to request the address decoding window from the
-mvebu-mbus driver. So I would anyway have to construct this "pciX.Y"
-string. But if you feel like using "pcie at X,Y" for the reg-names is
-better even if I still need to construct the "pcieX.Y" string, then I
-will be perfectly ok with making this change.
-
-Best regards,
-
-Thomas
+diff --git a/arch/arm/boot/dts/imx51.dtsip b/arch/arm/boot/dts/imx51.dtsip
+index 6e14b75..819f710 100644
+--- a/arch/arm/boot/dts/imx51.dtsip
++++ b/arch/arm/boot/dts/imx51.dtsip
+@@ -317,6 +317,16 @@
+ 					};
+ 				};
+ 
++				ecspi2 {
++					pinctrl_ecspi2_1: ecspi2grp-1 {
++						fsl,pins = <
++							MX51_PAD_NANDF_RB3__ECSPI2_MISO 212 0x185
++							MX51_PAD_NANDF_D15__ECSPI2_MOSI 264 0x185
++							MX51_PAD_NANDF_RB2__ECSPI2_SCLK 205 0x185
++						>;
++					};
++				};
++
+ 				esdhc1 {
+ 					pinctrl_esdhc1_1: esdhc1grp-1 {
+ 						fsl,pins = <
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.8.1.5
