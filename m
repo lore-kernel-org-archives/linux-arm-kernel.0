@@ -1,73 +1,84 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Sun, 10 Mar 2013 19:22:24 +0100
-Subject: [PATCH 0/4] time: dynamic irq affinity
-In-Reply-To: <513CC404.6000200@ti.com>
-References: <1361917047-29230-1-git-send-email-daniel.lezcano@linaro.org>
- <513CC404.6000200@ti.com>
-Message-ID: <513CCF60.6060406@linaro.org>
+From: wmb@firmworks.com (Mitch Bradley)
+Date: Sun, 10 Mar 2013 08:33:08 -1000
+Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
+In-Reply-To: <20130310160615.14ba099c@skate>
+References: <20130212223511.GB31555@obsidianresearch.com>
+ <20130306105441.4d24033e@skate>
+ <20130306121118.GA17079@avionic-0098.mockup.avionic-design.de>
+ <20130306180946.GA2433@obsidianresearch.com>
+ <20130307080832.GD3451@avionic-0098.mockup.avionic-design.de>
+ <20130307174955.GC20840@obsidianresearch.com>
+ <20130307194830.GA1811@avionic-0098.mockup.avionic-design.de>
+ <20130307200235.GB20695@obsidianresearch.com>
+ <20130307204726.GB1811@avionic-0098.mockup.avionic-design.de>
+ <51392B4D.9040404@gmail.com>
+ <20130308071443.GA5772@avionic-0098.mockup.avionic-design.de>
+ <513A7044.1020700@gmail.com> <513C1473.60600@firmworks.com>
+ <20130310160615.14ba099c@skate>
+Message-ID: <513CD1E4.6050408@firmworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/10/2013 06:33 PM, Santosh Shilimkar wrote:
-> On Wednesday 27 February 2013 03:47 AM, Daniel Lezcano wrote:
->> When a cpu goes to a deep idle state where its local timer is shutdown,
->> it notifies the time framework to use the broadcast timer instead.
->>
->> Unfortunately, the broadcast device could wake up any CPU, including an
->> idle one which is not concerned by the wake up at all.
->>
->> This implies, in the worst case, an idle CPU will wake up to send an IPI
->> to another idle cpu.
->>
->> This patch solves this by setting the irq affinity to the cpu concerned
->> by the nearest timer event, by this way, the CPU which is wake up is
->> guarantee to be the one concerned by the next event and we are safe with
->> unnecessary wakeup for another idle CPU.
->>
->> As the irq affinity is not supported by all the archs, a flag is needed
->> to specify which clocksource can handle it.
->>
->> Daniel Lezcano (3):
->>   time : pass broadcast parameter
->>   time : set broadcast irq affinity
->>   ARM: nomadik: add dynamic irq flag to the timer
->>
->> Viresh Kumar (1):
->>   ARM: timer-sp: Set dynamic irq affinity
->>
-> Thanks Daniel for addressing the comments from earlier version. This
-> version looks good to me.
+On 3/10/2013 5:06 AM, Thomas Petazzoni wrote:
+> Dear Mitch Bradley,
 > 
-> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> On Sat, 09 Mar 2013 19:04:51 -1000, Mitch Bradley wrote:
+>  
+>> As stated in my recent reply to Jason, I thing the correct property is
+>> "ranges".  "Ranges" translates mappable child address space addresses
+>> into parent addresses, and that is exactly what is going on.  A specific
+>> subset of config addresses is mappable into parent MMIO space.
 > 
-> Regards,
-> Santosh
-> P.S: As I mentioned 'CLOCK_EVT_FEAT_DYNIRQ' optimization on
-> OMAP at least I found risky because you might end up missing
-> the asynchronous IPI wakeups because of the current SGI's
-> implementation. This must be true for other ARM platforms
-> as well.
+> The PCI configuration space is *not* mapped in the MMIO space on
+> Marvell hardware. In the MMIO space of each PCIe interface, there are
+> many registers, only *two* of which are dedicated to accessing the PCI
+> configuration space:
+> 
+>  * One register to set the offset in the PCI configuration space.
+> 
+>  * One register to read or write a value in the PCI configuration, at
+>    the offset specified in the first register.
+> 
+> See the implementation of mvebu_pcie_hw_rd_conf() and
+> mvebu_pcie_hw_wr_conf() in the driver.
+> 
+> So really, the values specified in the reg = <...> property are *not*
+> the PCI configuration spaces mapped in the MMIO space. They represent a
+> bunch of per PCIe interface registers used to configure them, get the
+> status of the link... and access, through an indirect mechanism, the
+> PCI configuration space.
+> 
+> Does this helps?
 
-I don't think it is the case for all the ARM platforms, at least we
-tested it on vexpress TC2 and u8500, and the number of IPI were reduced
-very significantly increasing the idle time for cpu0. TC2 will need
-another optimization on another area for the idle wake up to gain real
-improvements.
+I agree that PCI config space accesses to *downstream* devices is via an
+indirect-access register pair.
 
-I will test it on OMAP but with the coupled idle state, I am not sure of
-the behavior. Could elaborate a bit the specificity of OMAP ? I am not
-sure to understand why I may miss some IPI wakeups.
+The question is, does that indirect-access mechanism apply also to the
+internal config headers for the root port bridges?
 
-Testing on more boards will be worth but not until we have correct
-cpuidle support, with deep idle states.
+According to section 20.15 of the MV78230 functional spec that I am
+looking at, the configuration header registers are mapped to the
+internal memory space.  That section is unclear about whether those
+registers are CPU-accessible via indirect-access config transactions.
+When the PCIe hardware is configured for endpoint mode, the internal
+headers can be accessed via PCIe config transactions from an external
+port, but in root complex mode, the possibility of indirect access from
+the CPU is not mentioned.
 
-Thanks
-  -- Daniel
+The manual is a little vague in some respects, but it does say quite
+clearly that MMIO access to the root port bridge config header is
+possible, and it lists the MMIO addresses thereof (section A.10).
 
+So we all agree that access to external (downstream) config registers is
+via the indirect register pair.  The unclear thing is whether the
+internal config registers for the root port bridges can be indirectly
+accessed.
 
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+Do we have empirical evidence that indirect-access works to the internal
+root port bridge config headers?
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+> 
+> Thanks,
+> 
+> Thomas
+> 
