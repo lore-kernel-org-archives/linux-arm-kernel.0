@@ -1,46 +1,29 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Sun, 10 Mar 2013 23:51:59 +0100
-Subject: [PATCH 2/2] ARM: imx: Disable imx-cpufreq when cpufreq-cpu0 used
-In-Reply-To: <1362934407-29030-3-git-send-email-mpa@pengutronix.de>
-References: <1362934407-29030-1-git-send-email-mpa@pengutronix.de>
- <1362934407-29030-3-git-send-email-mpa@pengutronix.de>
-Message-ID: <20130310225159.GS1906@pengutronix.de>
+Date: Mon, 11 Mar 2013 00:08:56 +0100
+Subject: [PATCH v3 1/2] i.MX27: Add clock support for SAHARA2.
+In-Reply-To: <20130310083401.GB10448@gondor.apana.org.au>
+References: <1362137873-8827-1-git-send-email-javier.martin@vista-silicon.com>
+ <1362137873-8827-2-git-send-email-javier.martin@vista-silicon.com>
+ <20130304075306.GA1906@pengutronix.de>
+ <CACKLOr2kuWXMreEFA4wqyYVRNnPwmEoHPM2+V+tN5P_1bQ+iJQ@mail.gmail.com>
+ <20130310083401.GB10448@gondor.apana.org.au>
+Message-ID: <20130310230856.GU1906@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 10, 2013 at 05:53:27PM +0100, Markus Pargmann wrote:
-> cpufreq-cpu0 has DT support. So if imx27 or imx51 is booted with DT
-> support, it should not use the old imx-cpufreq driver. Instead the
-> operating-points should be defined in the appropriate DT files.
+On Sun, Mar 10, 2013 at 04:34:01PM +0800, Herbert Xu wrote:
+> > >
+> > > https://patchwork.kernel.org/patch/1817741/
+> > >
+> > > So the change above becomes unnecessary
+> > 
+> > Very good. Then this patch can be safely dropped.
 > 
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> ---
->  arch/arm/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 5b71469..1247fe5 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -2156,6 +2156,7 @@ source "drivers/cpufreq/Kconfig"
->  config CPU_FREQ_IMX
->  	tristate "CPUfreq driver for i.MX CPUs"
->  	depends on ARCH_MXC && CPU_FREQ
-> +	depends on (!GENERIC_CPUFREQ_CPU0 || (!MACH_IMX51_DT && !MACH_IMX27_DT))
+> So should I take this patch or not?
 
-Does this driver work with multiplatform anyway? I mean it registers
-a cpufreq driver without knowing that the kernel even runs on i.MX.
-Maybe removing it is the better option?
+This clk patch, no. The sahara patch, yes, if it is fine for you.
 
 Sascha
-
->  	select CPU_FREQ_TABLE
->  	help
->  	  This enables the CPUfreq driver for i.MX CPUs.
-> -- 
-> 1.8.1.5
-> 
-> 
 
 -- 
 Pengutronix e.K.                           |                             |
