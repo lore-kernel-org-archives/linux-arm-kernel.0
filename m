@@ -1,53 +1,32 @@
-From: notasas@gmail.com (Grazvydas Ignotas)
-Date: Sun, 10 Mar 2013 02:46:31 +0200
-Subject: [PATCH] ARM: OMAP3: hwmod data: disable MIDLEMODE control for musb
-Message-ID: <1362876391-6801-1-git-send-email-notasas@gmail.com>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Sun, 10 Mar 2013 09:51:52 +0800
+Subject: [PATCH] ARM:kernel: beautify code, rel->r_offset is __u32 which never
+ < 0
+Message-ID: <513BE738.3080806@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For some unknown reason, allowing hwmod to control MIDLEMODE causes
-core_pwrdm to not hit idle states for musb in DM3730 at least.
-I've verified that setting any MIDLEMODE value other than "force
-standby" before enabling the device causes subsequent suspend
-attempts to fail with core_pwrdm not entering idle states, even
-if the driver is unloaded and "force standby" is restored before
-suspend attempt.
 
-Keeping the register set at force standby (reset value) makes it work
-and device still functions properly. musb has driver-controlled
-OTG_FORCESTDBY register that controls MSTANDBY signal, so perhaps
-MIDLEMODE is not even needed? Note that TI PSP kernels also have
-similar workarounds.
+  rel->r_offset is __u32 which never < 0.
+  it is defined in uapi/linux/elf.h
 
-Signed-off-by: Grazvydas Ignotas <notasas@gmail.com>
+Signed-off-by: Chen Gang <gang.chen@asianux.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   14 +++++++++-----
- 1 file changed, 9 insertions(+), 5 deletions(-)
+ arch/arm/kernel/module.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-index ac7e03e..0388bba 100644
---- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-@@ -1666,11 +1666,15 @@ static struct omap_hwmod_class_sysconfig omap3xxx_usbhsotg_sysc = {
- 	.rev_offs	= 0x0400,
- 	.sysc_offs	= 0x0404,
- 	.syss_offs	= 0x0408,
--	.sysc_flags	= (SYSC_HAS_SIDLEMODE | SYSC_HAS_MIDLEMODE|
--			  SYSC_HAS_ENAWAKEUP | SYSC_HAS_SOFTRESET |
--			  SYSC_HAS_AUTOIDLE),
--	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
--			  MSTANDBY_FORCE | MSTANDBY_NO | MSTANDBY_SMART),
-+	/*
-+	 * musb has MMIDLEMODE, but if we ever enable the device not in force
-+	 * idle mode, core_pwrdm does not enter idle states at least on 36xx.
-+	 * Note that musb also has OTG_FORCESTDBY register that the driver
-+	 * uses to control MSTANDBY signal manually.
-+	 */
-+	.sysc_flags	= (SYSC_HAS_SIDLEMODE | SYSC_HAS_ENAWAKEUP |
-+			  SYSC_HAS_SOFTRESET | SYSC_HAS_AUTOIDLE),
-+	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
- 	.sysc_fields	= &omap_hwmod_sysc_type1,
- };
+diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
+index 1e9be5d..386086e 100644
+--- a/arch/arm/kernel/module.c
++++ b/arch/arm/kernel/module.c
+@@ -74,7 +74,7 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
+ 		sym = ((Elf32_Sym *)symsec->sh_addr) + offset;
+ 		symname = strtab + sym->st_name;
  
+-		if (rel->r_offset < 0 || rel->r_offset > dstsec->sh_size - sizeof(u32)) {
++		if (rel->r_offset > dstsec->sh_size - sizeof(u32)) {
+ 			pr_err("%s: section %u reloc %u sym '%s': out of bounds relocation, offset %d size %u\n",
+ 			       module->name, relindex, i, symname,
+ 			       rel->r_offset, dstsec->sh_size);
 -- 
-1.7.9.5
+1.7.7.6
