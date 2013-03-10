@@ -1,52 +1,50 @@
-From: liuj97@gmail.com (Jiang Liu)
-Date: Sun, 10 Mar 2013 16:01:02 +0800
-Subject: [PATCH v2,
- part2 02/10] mm/ARM: use free_highmem_page() to free highmem pages
- into buddy system
-In-Reply-To: <1362902470-25787-1-git-send-email-jiang.liu@huawei.com>
-References: <1362902470-25787-1-git-send-email-jiang.liu@huawei.com>
-Message-ID: <1362902470-25787-3-git-send-email-jiang.liu@huawei.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Sun, 10 Mar 2013 16:34:01 +0800
+Subject: [PATCH v3 1/2] i.MX27: Add clock support for SAHARA2.
+In-Reply-To: <CACKLOr2kuWXMreEFA4wqyYVRNnPwmEoHPM2+V+tN5P_1bQ+iJQ@mail.gmail.com>
+References: <1362137873-8827-1-git-send-email-javier.martin@vista-silicon.com>
+ <1362137873-8827-2-git-send-email-javier.martin@vista-silicon.com>
+ <20130304075306.GA1906@pengutronix.de>
+ <CACKLOr2kuWXMreEFA4wqyYVRNnPwmEoHPM2+V+tN5P_1bQ+iJQ@mail.gmail.com>
+Message-ID: <20130310083401.GB10448@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use helper function free_highmem_page() to free highmem pages into
-the buddy system.
+On Tue, Mar 05, 2013 at 08:48:19AM +0100, javier Martin wrote:
+> Hi Sascha,
+> 
+> On 4 March 2013 08:53, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> > On Fri, Mar 01, 2013 at 12:37:52PM +0100, Javier Martin wrote:
+> >>
+> >> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
+> >> ---
+> >>  arch/arm/mach-imx/clk-imx27.c |    2 ++
+> >>  1 file changed, 2 insertions(+)
+> >>
+> >> diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
+> >> index 4c1d1e4..0b9664a 100644
+> >> --- a/arch/arm/mach-imx/clk-imx27.c
+> >> +++ b/arch/arm/mach-imx/clk-imx27.c
+> >> @@ -253,6 +253,8 @@ int __init mx27_clocks_init(unsigned long fref)
+> >>       clk_register_clkdev(clk[nfc_baud_gate], NULL, "imx27-nand.0");
+> >>       clk_register_clkdev(clk[vpu_baud_gate], "per", "coda-imx27.0");
+> >>       clk_register_clkdev(clk[vpu_ahb_gate], "ahb", "coda-imx27.0");
+> >> +     clk_register_clkdev(clk[sahara_ahb_gate], "ahb", "sahara-imx27.0");
+> >> +     clk_register_clkdev(clk[sahara_ipg_gate], "ipg", "sahara-imx27.0");
+> >
+> > One of the first patches I want to push upstream for the next merge
+> > window is this one:
+> >
+> > https://patchwork.kernel.org/patch/1817741/
+> >
+> > So the change above becomes unnecessary
+> 
+> Very good. Then this patch can be safely dropped.
 
-Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-cc: Marek Szyprowski <m.szyprowski@samsung.com>
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- arch/arm/mm/init.c |    7 ++-----
- 1 file changed, 2 insertions(+), 5 deletions(-)
+So should I take this patch or not?
 
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 40a5bc2..687a114 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -519,10 +519,8 @@ static void __init free_unused_memmap(struct meminfo *mi)
- #ifdef CONFIG_HIGHMEM
- static inline void free_area_high(unsigned long pfn, unsigned long end)
- {
--	for (; pfn < end; pfn++) {
--		__free_reserved_page(pfn_to_page(pfn));
--		totalhigh_pages++;
--	}
-+	for (; pfn < end; pfn++)
-+		free_highmem_page(pfn_to_page(pfn));
- }
- #endif
- 
-@@ -571,7 +569,6 @@ static void __init free_highpages(void)
- 		if (start < end)
- 			free_area_high(start, end);
- 	}
--	totalram_pages += totalhigh_pages;
- #endif
- }
- 
+Thanks,
 -- 
-1.7.9.5
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
