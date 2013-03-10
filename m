@@ -1,37 +1,111 @@
-From: holler@ahsoftware.de (Alexander Holler)
-Date: Sun, 10 Mar 2013 18:06:11 +0100
-Subject: [PATCH v2] arm: fix memset-related crashes caused by recent GCC
- (4.7.2) optimizations
-In-Reply-To: <20130307151755.GB4977@n2100.arm.linux.org.uk>
-References: <1360587435-28386-1-git-send-email-ivan.djelic@parrot.com>
- <513795C5.4050608@gmail.com> <20130307151755.GB4977@n2100.arm.linux.org.uk>
-Message-ID: <513CBD83.7040909@ahsoftware.de>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Sun, 10 Mar 2013 18:18:22 +0100
+Subject: [PATCH 1/1] ARM: OMAP: gpmc: request CS address space for ethernet
+ chips
+Message-ID: <1362935902-29720-1-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 07.03.2013 16:17, schrieb Russell King - ARM Linux:
-> On Wed, Mar 06, 2013 at 08:15:17PM +0100, Dirk Behme wrote:
->> Am 11.02.2013 13:57, schrieb Ivan Djelic:
->>> Recent GCC versions (e.g. GCC-4.7.2) perform optimizations based on
->>> assumptions about the implementation of memset and similar functions.
->>> The current ARM optimized memset code does not return the value of
->>> its first argument, as is usually expected from standard implementations.
+Besides being used to interface with external memory devices,
+the General-Purpose Memory Controller can be used to connect
+Pseudo-SRAM devices such as ethernet controllers to OMAP2+
+processors using the GPMC as a data bus.
 
-I've just tried this patch with kernel 4.8.2 on an armv5-system where I 
-use gcc 4.7.2 since several months and where most parts of the system 
-are compiled with gcc 4.7.2 too.
+The actual mapping between the GPMC address space and OMAP2+
+address space is made using the GPMC DT "ranges" property.
+But also a explicit call to gpmc_cs_request() is needed.
 
-And I had at least one problem which manifested itself with
+So, this patch allows an ethernet chip to be defined as an
+GPMC child node an its chip-select memory address be requested.
 
-[  181.198559] pts1: unknown flag 212
+Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+---
 
-while trying to establish a btle-connection.
+Jon,
 
-So I assume either the patch is wrong, the patch isn't the whole story, 
-an existing bug is now triggered, or ...
+This patch assumes that we have solved somehow the issue that a
+call to request_irq() is needed before before using a GPIO as an
+IRQ and this is no longer the case when using from Device Trees.
 
-I don't know.
+Anyway, this is independent as how we solve this, whether is
+using Jan's patch [1], adding a .request function pointer to
+irq_chip as suggested by Stephen [2], or any other approach.
 
-Regards,
+[1]: https://patchwork.kernel.org/patch/2009331/
+[2]: http://www.mail-archive.com/linux-omap at vger.kernel.org/msg85592.html
 
-Alexander
+ arch/arm/mach-omap2/gpmc.c |   45 ++++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 45 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+index 4fe9ee7..d1bf48b 100644
+--- a/arch/arm/mach-omap2/gpmc.c
++++ b/arch/arm/mach-omap2/gpmc.c
+@@ -29,6 +29,7 @@
+ #include <linux/of.h>
+ #include <linux/of_mtd.h>
+ #include <linux/of_device.h>
++#include <linux/of_address.h>
+ #include <linux/mtd/nand.h>
+ 
+ #include <linux/platform_data/mtd-nand-omap2.h>
+@@ -1296,6 +1297,42 @@ static int gpmc_probe_onenand_child(struct platform_device *pdev,
+ }
+ #endif
+ 
++static int gpmc_probe_ethernet_child(struct platform_device *pdev,
++				     struct device_node *child)
++{
++	int ret, cs;
++	unsigned long base;
++	struct resource res;
++	struct platform_device *of_dev;
++
++	if (of_property_read_u32(child, "reg", &cs) < 0) {
++		dev_err(&pdev->dev, "%s has no 'reg' property\n",
++			child->full_name);
++		return -ENODEV;
++	}
++
++	if (of_address_to_resource(child, 0, &res)) {
++		dev_err(&pdev->dev, "%s has malformed 'reg' property\n",
++			child->full_name);
++		return -ENODEV;
++	}
++
++	ret = gpmc_cs_request(cs, resource_size(&res), &base);
++	if (IS_ERR_VALUE(ret)) {
++		dev_err(&pdev->dev, "cannot request GPMC CS %d\n", cs);
++		return ret;
++	}
++
++	of_dev = of_platform_device_create(child, NULL, &pdev->dev);
++	if (!of_dev) {
++		dev_err(&pdev->dev, "cannot create platform device for %s\n",
++			child->full_name);
++		return -ENODEV;
++	}
++
++	return 0;
++}
++
+ static int gpmc_probe_dt(struct platform_device *pdev)
+ {
+ 	int ret;
+@@ -1326,6 +1363,14 @@ static int gpmc_probe_dt(struct platform_device *pdev)
+ 			return ret;
+ 		}
+ 	}
++
++	for_each_node_by_name(child, "ethernet") {
++		ret = gpmc_probe_ethernet_child(pdev, child);
++		if (ret < 0) {
++			of_node_put(child);
++			return ret;
++		}
++	}
+ 	return 0;
+ }
+ #else
+-- 
+1.7.7.6
