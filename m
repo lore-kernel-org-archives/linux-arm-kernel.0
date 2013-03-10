@@ -1,84 +1,160 @@
-From: wmb@firmworks.com (Mitch Bradley)
-Date: Sun, 10 Mar 2013 08:33:08 -1000
-Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
-In-Reply-To: <20130310160615.14ba099c@skate>
-References: <20130212223511.GB31555@obsidianresearch.com>
- <20130306105441.4d24033e@skate>
- <20130306121118.GA17079@avionic-0098.mockup.avionic-design.de>
- <20130306180946.GA2433@obsidianresearch.com>
- <20130307080832.GD3451@avionic-0098.mockup.avionic-design.de>
- <20130307174955.GC20840@obsidianresearch.com>
- <20130307194830.GA1811@avionic-0098.mockup.avionic-design.de>
- <20130307200235.GB20695@obsidianresearch.com>
- <20130307204726.GB1811@avionic-0098.mockup.avionic-design.de>
- <51392B4D.9040404@gmail.com>
- <20130308071443.GA5772@avionic-0098.mockup.avionic-design.de>
- <513A7044.1020700@gmail.com> <513C1473.60600@firmworks.com>
- <20130310160615.14ba099c@skate>
-Message-ID: <513CD1E4.6050408@firmworks.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Sun, 10 Mar 2013 19:33:09 +0100
+Subject: [PATCH 08/10] ASoC: dmaengine_pcm: Add open function for DT DMA
+ request
+In-Reply-To: <1362940391-8338-1-git-send-email-mpa@pengutronix.de>
+References: <1362940391-8338-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1362940391-8338-9-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/10/2013 5:06 AM, Thomas Petazzoni wrote:
-> Dear Mitch Bradley,
-> 
-> On Sat, 09 Mar 2013 19:04:51 -1000, Mitch Bradley wrote:
->  
->> As stated in my recent reply to Jason, I thing the correct property is
->> "ranges".  "Ranges" translates mappable child address space addresses
->> into parent addresses, and that is exactly what is going on.  A specific
->> subset of config addresses is mappable into parent MMIO space.
-> 
-> The PCI configuration space is *not* mapped in the MMIO space on
-> Marvell hardware. In the MMIO space of each PCIe interface, there are
-> many registers, only *two* of which are dedicated to accessing the PCI
-> configuration space:
-> 
->  * One register to set the offset in the PCI configuration space.
-> 
->  * One register to read or write a value in the PCI configuration, at
->    the offset specified in the first register.
-> 
-> See the implementation of mvebu_pcie_hw_rd_conf() and
-> mvebu_pcie_hw_wr_conf() in the driver.
-> 
-> So really, the values specified in the reg = <...> property are *not*
-> the PCI configuration spaces mapped in the MMIO space. They represent a
-> bunch of per PCIe interface registers used to configure them, get the
-> status of the link... and access, through an indirect mechanism, the
-> PCI configuration space.
-> 
-> Does this helps?
+Add a function to open a DMA PCM substream using devicetree data
+provided via the client device node. The patch introduces a public
+function and a private subfunction that is called by both open
+functions.
 
-I agree that PCI config space accesses to *downstream* devices is via an
-indirect-access register pair.
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+ include/sound/dmaengine_pcm.h |  2 +
+ sound/soc/soc-dmaengine-pcm.c | 89 ++++++++++++++++++++++++++++++++++---------
+ 2 files changed, 72 insertions(+), 19 deletions(-)
 
-The question is, does that indirect-access mechanism apply also to the
-internal config headers for the root port bridges?
-
-According to section 20.15 of the MV78230 functional spec that I am
-looking at, the configuration header registers are mapped to the
-internal memory space.  That section is unclear about whether those
-registers are CPU-accessible via indirect-access config transactions.
-When the PCIe hardware is configured for endpoint mode, the internal
-headers can be accessed via PCIe config transactions from an external
-port, but in root complex mode, the possibility of indirect access from
-the CPU is not mentioned.
-
-The manual is a little vague in some respects, but it does say quite
-clearly that MMIO access to the root port bridge config header is
-possible, and it lists the MMIO addresses thereof (section A.10).
-
-So we all agree that access to external (downstream) config registers is
-via the indirect register pair.  The unclear thing is whether the
-internal config registers for the root port bridges can be indirectly
-accessed.
-
-Do we have empirical evidence that indirect-access works to the internal
-root port bridge config headers?
-
-> 
-> Thanks,
-> 
-> Thomas
-> 
+diff --git a/include/sound/dmaengine_pcm.h b/include/sound/dmaengine_pcm.h
+index b877334..358951a 100644
+--- a/include/sound/dmaengine_pcm.h
++++ b/include/sound/dmaengine_pcm.h
+@@ -43,6 +43,8 @@ snd_pcm_uframes_t snd_dmaengine_pcm_pointer_no_residue(struct snd_pcm_substream
+ 
+ int snd_dmaengine_pcm_open(struct snd_pcm_substream *substream,
+ 	dma_filter_fn filter_fn, void *filter_data);
++int of_snd_dmaengine_pcm_open(struct snd_pcm_substream *substream,
++	struct device_node *client_node, const char *name);
+ int snd_dmaengine_pcm_close(struct snd_pcm_substream *substream);
+ 
+ struct dma_chan *snd_dmaengine_pcm_get_chan(struct snd_pcm_substream *substream);
+diff --git a/sound/soc/soc-dmaengine-pcm.c b/sound/soc/soc-dmaengine-pcm.c
+index 111b7d92..017b691 100644
+--- a/sound/soc/soc-dmaengine-pcm.c
++++ b/sound/soc/soc-dmaengine-pcm.c
+@@ -20,6 +20,8 @@
+  */
+ #include <linux/module.h>
+ #include <linux/init.h>
++#include <linux/of.h>
++#include <linux/of_dma.h>
+ #include <linux/dmaengine.h>
+ #include <linux/slab.h>
+ #include <sound/pcm.h>
+@@ -260,24 +262,21 @@ static int dmaengine_pcm_request_channel(struct dmaengine_pcm_runtime_data *prtd
+ 	return 0;
+ }
+ 
+-/**
+- * snd_dmaengine_pcm_open - Open a dmaengine based PCM substream
+- * @substream: PCM substream
+- * @filter_fn: Filter function used to request the DMA channel
+- * @filter_data: Data passed to the DMA filter function
+- *
+- * Returns 0 on success, a negative error code otherwise.
+- *
+- * This function will request a DMA channel using the passed filter function and
+- * data. The function should usually be called from the pcm open callback.
+- *
+- * Note that this function will use private_data field of the substream's
+- * runtime. So it is not availabe to your pcm driver implementation. If you need
+- * to keep additional data attached to a substream use
+- * snd_dmaengine_pcm_{set,get}_data.
+- */
+-int snd_dmaengine_pcm_open(struct snd_pcm_substream *substream,
+-	dma_filter_fn filter_fn, void *filter_data)
++static int of_dmaengine_pcm_request_channel(
++		struct dmaengine_pcm_runtime_data *prtd, struct device_node *np,
++		const char *name)
++{
++	prtd->dma_chan = of_dma_request_slave_channel(np, name);
++
++	if (!prtd->dma_chan)
++		return -ENXIO;
++
++	return 0;
++}
++
++static int _snd_dmaengine_pcm_open(struct snd_pcm_substream *substream,
++		dma_filter_fn filter_fn, void *filter_data,
++		struct device_node *np, const char *slave_name)
+ {
+ 	struct dmaengine_pcm_runtime_data *prtd;
+ 	int ret;
+@@ -291,7 +290,11 @@ int snd_dmaengine_pcm_open(struct snd_pcm_substream *substream,
+ 	if (!prtd)
+ 		return -ENOMEM;
+ 
+-	ret = dmaengine_pcm_request_channel(prtd, filter_fn, filter_data);
++	if (np)
++		ret = of_dmaengine_pcm_request_channel(prtd, np, slave_name);
++	else
++		ret = dmaengine_pcm_request_channel(prtd, filter_fn,
++						    filter_data);
+ 	if (ret < 0) {
+ 		kfree(prtd);
+ 		return ret;
+@@ -301,9 +304,57 @@ int snd_dmaengine_pcm_open(struct snd_pcm_substream *substream,
+ 
+ 	return 0;
+ }
++
++/**
++ * snd_dmaengine_pcm_open - Open a dmaengine based PCM substream
++ * @substream: PCM substream
++ * @filter_fn: Filter function used to request the DMA channel
++ * @filter_data: Data passed to the DMA filter function
++ *
++ * Returns 0 on success, a negative error code otherwise.
++ *
++ * This function will request a DMA channel using the passed filter function and
++ * data. The function should usually be called from the pcm open callback.
++ *
++ * Note that this function will use private_data field of the substream's
++ * runtime. So it is not availabe to your pcm driver implementation. If you need
++ * to keep additional data attached to a substream use
++ * snd_dmaengine_pcm_{set,get}_data.
++ */
++int snd_dmaengine_pcm_open(struct snd_pcm_substream *substream,
++	dma_filter_fn filter_fn, void *filter_data)
++{
++	return _snd_dmaengine_pcm_open(substream, filter_fn, filter_data, NULL,
++					NULL);
++}
+ EXPORT_SYMBOL_GPL(snd_dmaengine_pcm_open);
+ 
+ /**
++ * of_snd_dmaengine_pcm_open - Open a dmaengine based PCM substream using oftree data
++ * @substream: PCM substream
++ * @client_node: DMA client oftree node used to request a DMA channel
++ * @name: DMA request name
++ *
++ * Returns 0 on success, a negative error code otherwise.
++ *
++ * This function will request a DMA channel using devicetree data.
++ *
++ * Note that this function will use private_data field of the substream's
++ * runtime. So it is not availabe to your pcm driver implementation. If you need
++ * to keep additional data attached to a substream use
++ * snd_dmaengine_pcm_{set,get}_data.
++ *
++ * Use the normal snd_dmaengine_pcm_close function to close the substream.
++ */
++int of_snd_dmaengine_pcm_open(struct snd_pcm_substream *substream,
++		struct device_node *client_node, const char *name)
++{
++	return _snd_dmaengine_pcm_open(substream, NULL, NULL, client_node,
++					name);
++}
++EXPORT_SYMBOL_GPL(of_snd_dmaengine_pcm_open);
++
++/**
+  * snd_dmaengine_pcm_close - Close a dmaengine based PCM substream
+  * @substream: PCM substream
+  */
+-- 
+1.8.1.5
