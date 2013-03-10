@@ -1,63 +1,53 @@
-From: holler@ahsoftware.de (Alexander Holler)
-Date: Sun, 10 Mar 2013 18:41:46 +0100
-Subject: [PATCH v2] arm: fix memset-related crashes caused by recent GCC
- (4.7.2) optimizations
-In-Reply-To: <20130310172854.GH4977@n2100.arm.linux.org.uk>
-References: <1360587435-28386-1-git-send-email-ivan.djelic@parrot.com>
- <513795C5.4050608@gmail.com> <20130307151755.GB4977@n2100.arm.linux.org.uk>
- <513CBD83.7040909@ahsoftware.de>
- <20130310172854.GH4977@n2100.arm.linux.org.uk>
-Message-ID: <513CC5DA.6010502@ahsoftware.de>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Sun, 10 Mar 2013 23:37:58 +0530
+Subject: [PATCH 05/15] ARM: OMAP5: PM: Enables ES2 PM mode by default
+In-Reply-To: <20130304182921.GC14860@kahuna>
+References: <1362139864-9233-1-git-send-email-santosh.shilimkar@ti.com>
+ <1362139864-9233-6-git-send-email-santosh.shilimkar@ti.com>
+ <20130301193745.GA22626@kahuna> <51319273.5090703@ti.com>
+ <20130304182921.GC14860@kahuna>
+Message-ID: <513CCBFE.3000700@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 10.03.2013 18:28, schrieb Russell King - ARM Linux:
-> On Sun, Mar 10, 2013 at 06:06:11PM +0100, Alexander Holler wrote:
->> Am 07.03.2013 16:17, schrieb Russell King - ARM Linux:
->>> On Wed, Mar 06, 2013 at 08:15:17PM +0100, Dirk Behme wrote:
->>>> Am 11.02.2013 13:57, schrieb Ivan Djelic:
->>>>> Recent GCC versions (e.g. GCC-4.7.2) perform optimizations based on
->>>>> assumptions about the implementation of memset and similar functions.
->>>>> The current ARM optimized memset code does not return the value of
->>>>> its first argument, as is usually expected from standard implementations.
->>
->> I've just tried this patch with kernel 4.8.2 on an armv5-system where I
->> use gcc 4.7.2 since several months and where most parts of the system
->> are compiled with gcc 4.7.2 too.
->>
->> And I had at least one problem which manifested itself with
->
-> Yes, the patch _is_ wrong.  Reverted.  I was trusting Nicolas' review
-> of it, but the patch is definitely wrong.  Look carefully at this
-> fragment of code:
->
-> 1:      subs    r2, r2, #4              @ 1 do we have enough
->          blt     5f                      @ 1 bytes to align with?
->          cmp     r3, #2                  @ 1
->          strltb  r1, [ip], #1            @ 1
->          strleb  r1, [ip], #1            @ 1
->          strb    r1, [ip], #1            @ 1
->          add     r2, r2, r3              @ 1 (r2 = r2 - (4 - r3))
-> /*
->   * The pointer is now aligned and the length is adjusted.  Try doing the
->   * memset again.
->   */
->
-> ENTRY(memset)
-> /*
->   * Preserve the contents of r0 for the return value.
->   */
->          mov     ip, r0
->          ands    r3, ip, #3              @ 1 unaligned?
->          bne     1b                      @ 1
->
-> and consider what happens when 'r0' is not aligned to a word... We end
-> up aligning the pointer in "1:" and then fall through into memset again
-> which reloads the old misaligned pointer.
+On Monday 04 March 2013 11:59 PM, Nishanth Menon wrote:
+> On 11:17-20130302, Santosh Shilimkar wrote:
+>> On Saturday 02 March 2013 01:07 AM, Nishanth Menon wrote:
+>>> On 17:40-20130301, Santosh Shilimkar wrote:
+>>>> Enables MPUSS ES2 power management mode using ES2_PM_MODE in
+>>>> AMBA_IF_MODE register.
+>>>>
 
-Thanks a lot for the very fast answer. I myself wasn't in the mood to go 
-through arm-assembler (which I don't read that often), sorry.
+[..]
+
+>>>> diff --git a/arch/arm/mach-omap2/omap-wakeupgen.h b/arch/arm/mach-omap2/omap-wakeupgen.h
+>>>> index b0fd16f..b3c8ecc 100644
+>>>> --- a/arch/arm/mach-omap2/omap-wakeupgen.h
+>>>> +++ b/arch/arm/mach-omap2/omap-wakeupgen.h
+>>>> @@ -27,6 +27,7 @@
+>>>>  #define OMAP_WKG_ENB_E_1			0x420
+>>>>  #define OMAP_AUX_CORE_BOOT_0			0x800
+>>>>  #define OMAP_AUX_CORE_BOOT_1			0x804
+>>>> +#define OMAP_AMBA_IF_MODE			0x80c
+>>>>  #define OMAP_PTMSYNCREQ_MASK			0xc00
+>>>>  #define OMAP_PTMSYNCREQ_EN			0xc04
+>>>>  #define OMAP_TIMESTAMPCYCLELO			0xc08
+>>>
+>>> Curious, I see OMAP5_AMBA_IF_MODE_OFFSET in
+>>> arch/arm/mach-omap2/omap4-sar-layout.h
+>>> if we dont save new modified contents there, Wont restore logic just
+>>> reset it back to 0?
+>>>
+>> It is already restored in the wakeup-gen restore code.
+> I apologize, I do not see it in:
+> https://github.com/SantoshShilimkar/linux/blob/testing/3.10/omap5-int-rebuild/arch/arm/mach-omap2/omap-wakeupgen.c
+> I might have expected an save of val to sar offset to ensure this is
+> done, but since you indicate this is in wakeupgen restore logic, which I
+> presume is done by ROM, we might expect an write to sar_base +
+> OMAP5_AMBA_IF_MODE_OFFSET with the val for it to function?
+> 
+Arr.. Looks like I missed the hunk while updating the patches. Will
+fix the appropriate patch which updates the wakeupgen SAR offsets.
 
 Regards,
-
-Alexander
+Santosh
