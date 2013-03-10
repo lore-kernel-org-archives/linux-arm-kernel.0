@@ -1,54 +1,44 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sun, 10 Mar 2013 16:06:15 +0100
+Date: Sun, 10 Mar 2013 16:09:37 +0100
 Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
-In-Reply-To: <513C1473.60600@firmworks.com>
-References: <20130212223511.GB31555@obsidianresearch.com>
- <20130306105441.4d24033e@skate>
- <20130306121118.GA17079@avionic-0098.mockup.avionic-design.de>
- <20130306180946.GA2433@obsidianresearch.com>
- <20130307080832.GD3451@avionic-0098.mockup.avionic-design.de>
- <20130307174955.GC20840@obsidianresearch.com>
+In-Reply-To: <20130308201339.GA26322@avionic-0098.mockup.avionic-design.de>
+References: <20130307174955.GC20840@obsidianresearch.com>
  <20130307194830.GA1811@avionic-0098.mockup.avionic-design.de>
  <20130307200235.GB20695@obsidianresearch.com>
  <20130307204726.GB1811@avionic-0098.mockup.avionic-design.de>
  <51392B4D.9040404@gmail.com>
  <20130308071443.GA5772@avionic-0098.mockup.avionic-design.de>
- <513A7044.1020700@gmail.com> <513C1473.60600@firmworks.com>
-Message-ID: <20130310160615.14ba099c@skate>
+ <20130308165228.GB4094@obsidianresearch.com>
+ <20130308191227.GA6551@avionic-0098.mockup.avionic-design.de>
+ <513A3F4F.2090501@firmworks.com>
+ <20130308200245.GC29435@obsidianresearch.com>
+ <20130308201339.GA26322@avionic-0098.mockup.avionic-design.de>
+Message-ID: <20130310160937.37df66b2@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Mitch Bradley,
+Dear Thierry Reding,
 
-On Sat, 09 Mar 2013 19:04:51 -1000, Mitch Bradley wrote:
- 
-> As stated in my recent reply to Jason, I thing the correct property is
-> "ranges".  "Ranges" translates mappable child address space addresses
-> into parent addresses, and that is exactly what is going on.  A specific
-> subset of config addresses is mappable into parent MMIO space.
+On Fri, 8 Mar 2013 21:13:40 +0100, Thierry Reding wrote:
+> On Fri, Mar 08, 2013 at 01:02:46PM -0700, Jason Gunthorpe wrote:
+> > On Fri, Mar 08, 2013 at 09:43:11AM -1000, Mitch Bradley wrote:
+> [...]
+> > > 2) The "@0,0" and "@1,0" suffixes do not correspond to the reg values
+> > > <0x0800 0 0 0 0> and <0x1000 0 0 0 0> using any rule that I know.
+> > 
+> > @0,1,0 (bus,device,fn) could be more appropriate, but that is
+> > cosmetic?
+> 
+> The OF PCI specification is pretty strict about this as well. It says in
+> section 2.2.1.3. that only the DD and DD,FF forms can appear in a device
+> path.
 
-The PCI configuration space is *not* mapped in the MMIO space on
-Marvell hardware. In the MMIO space of each PCIe interface, there are
-many registers, only *two* of which are dedicated to accessing the PCI
-configuration space:
+Note that in the case of my driver, the @X,Y represent the port and
+lane of the PCIe interface. Not sure if it is correct, I can change the
+names to whatever is appropriate, those names aren't used anywhere in
+the driver.
 
- * One register to set the offset in the PCI configuration space.
-
- * One register to read or write a value in the PCI configuration, at
-   the offset specified in the first register.
-
-See the implementation of mvebu_pcie_hw_rd_conf() and
-mvebu_pcie_hw_wr_conf() in the driver.
-
-So really, the values specified in the reg = <...> property are *not*
-the PCI configuration spaces mapped in the MMIO space. They represent a
-bunch of per PCIe interface registers used to configure them, get the
-status of the link... and access, through an indirect mechanism, the
-PCI configuration space.
-
-Does this helps?
-
-Thanks,
+Best regards,
 
 Thomas
 -- 
