@@ -1,36 +1,35 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Sun, 10 Mar 2013 19:33:02 +0100
-Subject: [PATCH 01/10] imx-ssi: Fix AC97 rates
+Date: Sun, 10 Mar 2013 19:33:04 +0100
+Subject: [PATCH 03/10] mx-ssi: flush fifos
 In-Reply-To: <1362940391-8338-1-git-send-email-mpa@pengutronix.de>
 References: <1362940391-8338-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1362940391-8338-2-git-send-email-mpa@pengutronix.de>
+Message-ID: <1362940391-8338-4-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sascha Hauer <s.hauer@pengutronix.de>
 
-This device supports multiple rates as described in later AC97
-standards. This patch allows playback of different sample frequencies
-without conversion.
-
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- sound/soc/fsl/imx-ssi.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ sound/soc/fsl/imx-ssi.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
 diff --git a/sound/soc/fsl/imx-ssi.c b/sound/soc/fsl/imx-ssi.c
-index 55464a5..7ee0147 100644
+index 0e3fc8d..96e24a3 100644
 --- a/sound/soc/fsl/imx-ssi.c
 +++ b/sound/soc/fsl/imx-ssi.c
-@@ -400,7 +400,7 @@ static struct snd_soc_dai_driver imx_ac97_dai = {
- 		.stream_name = "AC97 Playback",
- 		.channels_min = 2,
- 		.channels_max = 2,
--		.rates = SNDRV_PCM_RATE_48000,
-+		.rates = SNDRV_PCM_RATE_8000_48000,
- 		.formats = SNDRV_PCM_FMTBIT_S16_LE,
- 	},
- 	.capture = {
+@@ -347,6 +347,11 @@ static int imx_ssi_trigger(struct snd_pcm_substream *substream, int cmd,
+ 		/* rx/tx are always enabled to access ac97 registers */
+ 		writel(scr, ssi->base + SSI_SCR);
+ 
++	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
++		writel(SSI_SOR_TX_CLR, ssi->base + SSI_SOR);
++	else
++		writel(SSI_SOR_RX_CLR, ssi->base + SSI_SOR);
++
+ 	writel(sier, ssi->base + SSI_SIER);
+ 
+ 	return 0;
 -- 
 1.8.1.5
