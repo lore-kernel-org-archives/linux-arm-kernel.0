@@ -1,29 +1,49 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Sun, 10 Mar 2013 23:51:17 +0100
-Subject: [PATCH V2 5/5] ARM: DT: tegra114: Add spi controller DT entry
-In-Reply-To: <1362852678-13421-6-git-send-email-ldewangan@nvidia.com>
-References: <1362852678-13421-1-git-send-email-ldewangan@nvidia.com>
- <1362852678-13421-6-git-send-email-ldewangan@nvidia.com>
-Message-ID: <20130310225117.GI4743@avionic-0098.mockup.avionic-design.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Sun, 10 Mar 2013 23:51:59 +0100
+Subject: [PATCH 2/2] ARM: imx: Disable imx-cpufreq when cpufreq-cpu0 used
+In-Reply-To: <1362934407-29030-3-git-send-email-mpa@pengutronix.de>
+References: <1362934407-29030-1-git-send-email-mpa@pengutronix.de>
+ <1362934407-29030-3-git-send-email-mpa@pengutronix.de>
+Message-ID: <20130310225159.GS1906@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 09, 2013 at 11:41:18PM +0530, Laxman Dewangan wrote:
-> NVIDIA's Tegra114 has 6 spi controllers. These controllers are
-> redesign on T114 with different register interface.
+On Sun, Mar 10, 2013 at 05:53:27PM +0100, Markus Pargmann wrote:
+> cpufreq-cpu0 has DT support. So if imx27 or imx51 is booted with DT
+> support, it should not use the old imx-cpufreq driver. Instead the
+> operating-points should be defined in the appropriate DT files.
 > 
-> Add DT entry for spi controllers and make it compatible with
-> "nvidia,tegra114-spi".
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> ---
+>  arch/arm/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 5b71469..1247fe5 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -2156,6 +2156,7 @@ source "drivers/cpufreq/Kconfig"
+>  config CPU_FREQ_IMX
+>  	tristate "CPUfreq driver for i.MX CPUs"
+>  	depends on ARCH_MXC && CPU_FREQ
+> +	depends on (!GENERIC_CPUFREQ_CPU0 || (!MACH_IMX51_DT && !MACH_IMX27_DT))
 
-Similarly, SPI is an abbreviation and should be in all uppercase
-letters. I can't really comment on the rest since there's no TRM
-available publicly to check against.
+Does this driver work with multiplatform anyway? I mean it registers
+a cpufreq driver without knowing that the kernel even runs on i.MX.
+Maybe removing it is the better option?
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130310/7af363f9/attachment-0001.sig>
+Sascha
+
+>  	select CPU_FREQ_TABLE
+>  	help
+>  	  This enables the CPUfreq driver for i.MX CPUs.
+> -- 
+> 1.8.1.5
+> 
+> 
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
