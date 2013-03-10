@@ -1,44 +1,32 @@
 From: gang.chen@asianux.com (Chen Gang)
-Date: Sun, 10 Mar 2013 11:13:47 +0800
-Subject: [PATCH] ARM:vexpress: beautify code, using 'static const' instead
- of 'const static'
-In-Reply-To: <CAKohpon1G9hei1QcCyEAYCdxY-pYJ5GCD31yoEmNSVTpnLh15g@mail.gmail.com>
-References: <513BF001.30204@asianux.com>
- <CAKohpon1G9hei1QcCyEAYCdxY-pYJ5GCD31yoEmNSVTpnLh15g@mail.gmail.com>
-Message-ID: <513BFA6B.7000702@asianux.com>
+Date: Sun, 10 Mar 2013 11:48:16 +0800
+Subject: [PATCH] drivers/clk: fixup commit
+ 72480014b86c8b51fb51c5c6a0525876055c37c7
+Message-ID: <513C0280.7040004@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2013?03?10? 10:57, Viresh Kumar ??:
-> On 10 March 2013 07:59, Chen Gang <gang.chen@asianux.com> wrote:
->> >
->> >   better using 'static const' instead of 'const static'
->> >
->> > Signed-off-by: Chen Gang <gang.chen@asianux.com>
->> > ---
->> >  arch/arm/mach-vexpress/platsmp.c |    2 +-
->> >  1 files changed, 1 insertions(+), 1 deletions(-)
->> >
->> > diff --git a/arch/arm/mach-vexpress/platsmp.c b/arch/arm/mach-vexpress/platsmp.c
->> > index dc1ace5..9152bf7 100644
->> > --- a/arch/arm/mach-vexpress/platsmp.c
->> > +++ b/arch/arm/mach-vexpress/platsmp.c
->> > @@ -40,7 +40,7 @@ static struct map_desc vexpress_dt_cortex_a9_scu_map __initdata = {
->> >
->> >  static void *vexpress_dt_cortex_a9_scu_base __initdata;
->> >
->> > -const static char *vexpress_dt_cortex_a9_match[] __initconst = {
->> > +static const char *vexpress_dt_cortex_a9_match[] __initconst = {
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> 
-> 
 
-  thank you.
+  prate is not defined, will cause compiling issue.
+  need use parent_rate instead of prate.
 
-  :-)
+Signed-off-by: Chen Gang <gang.chen@asianux.com>
+---
+ drivers/clk/clk-vt8500.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-
+diff --git a/drivers/clk/clk-vt8500.c b/drivers/clk/clk-vt8500.c
+index b5538bb..09c6331 100644
+--- a/drivers/clk/clk-vt8500.c
++++ b/drivers/clk/clk-vt8500.c
+@@ -157,7 +157,7 @@ static int vt8500_dclk_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	divisor =  parent_rate / rate;
+ 
+ 	/* If prate / rate would be decimal, incr the divisor */
+-	if (rate * divisor < *prate)
++	if (rate * divisor < parent_rate)
+ 		divisor++;
+ 
+ 	if (divisor == cdev->div_mask + 1)
 -- 
-Chen Gang
-
-Asianux Corporation
+1.7.7.6
