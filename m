@@ -1,181 +1,102 @@
-From: liuj97@gmail.com (Jiang Liu)
-Date: Sun, 10 Mar 2013 14:26:46 +0800
-Subject: [PATCH v2,
- part1 03/29] mm/ARM: use common help functions to free reserved pages
-In-Reply-To: <1362896833-21104-1-git-send-email-jiang.liu@huawei.com>
-References: <1362896833-21104-1-git-send-email-jiang.liu@huawei.com>
-Message-ID: <1362896833-21104-4-git-send-email-jiang.liu@huawei.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Sat, 9 Mar 2013 23:55:39 -0700
+Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
+In-Reply-To: <513C117D.6080800@firmworks.com>
+References: <20130307204726.GB1811@avionic-0098.mockup.avionic-design.de>
+ <51392B4D.9040404@gmail.com>
+ <20130308071443.GA5772@avionic-0098.mockup.avionic-design.de>
+ <20130308165228.GB4094@obsidianresearch.com>
+ <20130308191227.GA6551@avionic-0098.mockup.avionic-design.de>
+ <513A3F4F.2090501@firmworks.com>
+ <20130308200245.GC29435@obsidianresearch.com>
+ <513A7845.6040304@firmworks.com>
+ <20130309013152.GA3883@obsidianresearch.com>
+ <513C117D.6080800@firmworks.com>
+Message-ID: <20130310065539.GA14704@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use common help functions to free reserved pages.
+On Sat, Mar 09, 2013 at 06:52:13PM -1000, Mitch Bradley wrote:
 
-Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- arch/arm/mm/init.c   |   48 ++++++++++++++++--------------------------------
- arch/arm64/mm/init.c |   26 ++------------------------
- 2 files changed, 18 insertions(+), 56 deletions(-)
+> Okay, I think I finally get it.  The Marvell root port bridge setup
+> registers look like standard config headers, even though they aren't
+> really in config space (because you need a different access method for
+> them, compared to real config accesses to downstream devices).
 
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index ad722f1..40a5bc2 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -424,24 +424,6 @@ void __init bootmem_init(void)
- 	max_pfn = max_high - PHYS_PFN_OFFSET;
- }
- 
--static inline int free_area(unsigned long pfn, unsigned long end, char *s)
--{
--	unsigned int pages = 0, size = (end - pfn) << (PAGE_SHIFT - 10);
--
--	for (; pfn < end; pfn++) {
--		struct page *page = pfn_to_page(pfn);
--		ClearPageReserved(page);
--		init_page_count(page);
--		__free_page(page);
--		pages++;
--	}
--
--	if (size && s)
--		printk(KERN_INFO "Freeing %s memory: %dK\n", s, size);
--
--	return pages;
--}
--
- /*
-  * Poison init memory with an undefined instruction (ARM) or a branch to an
-  * undefined instruction (Thumb).
-@@ -534,6 +516,16 @@ static void __init free_unused_memmap(struct meminfo *mi)
- #endif
- }
- 
-+#ifdef CONFIG_HIGHMEM
-+static inline void free_area_high(unsigned long pfn, unsigned long end)
-+{
-+	for (; pfn < end; pfn++) {
-+		__free_reserved_page(pfn_to_page(pfn));
-+		totalhigh_pages++;
-+	}
-+}
-+#endif
-+
- static void __init free_highpages(void)
- {
- #ifdef CONFIG_HIGHMEM
-@@ -569,8 +561,7 @@ static void __init free_highpages(void)
- 			if (res_end > end)
- 				res_end = end;
- 			if (res_start != start)
--				totalhigh_pages += free_area(start, res_start,
--							     NULL);
-+				free_area_high(start, res_start);
- 			start = res_end;
- 			if (start == end)
- 				break;
-@@ -578,7 +569,7 @@ static void __init free_highpages(void)
- 
- 		/* And now free anything which remains */
- 		if (start < end)
--			totalhigh_pages += free_area(start, end, NULL);
-+			free_area_high(start, end);
- 	}
- 	totalram_pages += totalhigh_pages;
- #endif
-@@ -609,8 +600,7 @@ void __init mem_init(void)
- 
- #ifdef CONFIG_SA1111
- 	/* now that our DMA memory is actually so designated, we can free it */
--	totalram_pages += free_area(PHYS_PFN_OFFSET,
--				    __phys_to_pfn(__pa(swapper_pg_dir)), NULL);
-+	free_reserved_area(__va(PHYS_PFN_OFFSET), swapper_pg_dir, 0, NULL);
- #endif
- 
- 	free_highpages();
-@@ -738,16 +728,12 @@ void free_initmem(void)
- 	extern char __tcm_start, __tcm_end;
- 
- 	poison_init_mem(&__tcm_start, &__tcm_end - &__tcm_start);
--	totalram_pages += free_area(__phys_to_pfn(__pa(&__tcm_start)),
--				    __phys_to_pfn(__pa(&__tcm_end)),
--				    "TCM link");
-+	free_reserved_area(&__tcm_start, &__tcm_end, 0, "TCM link");
- #endif
- 
- 	poison_init_mem(__init_begin, __init_end - __init_begin);
- 	if (!machine_is_integrator() && !machine_is_cintegrator())
--		totalram_pages += free_area(__phys_to_pfn(__pa(__init_begin)),
--					    __phys_to_pfn(__pa(__init_end)),
--					    "init");
-+		free_initmem_default(0);
- }
- 
- #ifdef CONFIG_BLK_DEV_INITRD
-@@ -758,9 +744,7 @@ void free_initrd_mem(unsigned long start, unsigned long end)
- {
- 	if (!keep_initrd) {
- 		poison_init_mem((void *)start, PAGE_ALIGN(end) - start);
--		totalram_pages += free_area(__phys_to_pfn(__pa(start)),
--					    __phys_to_pfn(__pa(end)),
--					    "initrd");
-+		free_reserved_area(start, end, 0, "initrd");
- 	}
- }
- 
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 800aac3..f497ca7 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -197,24 +197,6 @@ void __init bootmem_init(void)
- 	max_pfn = max_low_pfn = max;
- }
- 
--static inline int free_area(unsigned long pfn, unsigned long end, char *s)
--{
--	unsigned int pages = 0, size = (end - pfn) << (PAGE_SHIFT - 10);
--
--	for (; pfn < end; pfn++) {
--		struct page *page = pfn_to_page(pfn);
--		ClearPageReserved(page);
--		init_page_count(page);
--		__free_page(page);
--		pages++;
--	}
--
--	if (size && s)
--		pr_info("Freeing %s memory: %dK\n", s, size);
--
--	return pages;
--}
--
- /*
-  * Poison init memory with an undefined instruction (0x0).
-  */
-@@ -405,9 +387,7 @@ void __init mem_init(void)
- void free_initmem(void)
- {
- 	poison_init_mem(__init_begin, __init_end - __init_begin);
--	totalram_pages += free_area(__phys_to_pfn(__pa(__init_begin)),
--				    __phys_to_pfn(__pa(__init_end)),
--				    "init");
-+	free_initmem_default(0);
- }
- 
- #ifdef CONFIG_BLK_DEV_INITRD
-@@ -418,9 +398,7 @@ void free_initrd_mem(unsigned long start, unsigned long end)
- {
- 	if (!keep_initrd) {
- 		poison_init_mem((void *)start, PAGE_ALIGN(end) - start);
--		totalram_pages += free_area(__phys_to_pfn(__pa(start)),
--					    __phys_to_pfn(__pa(end)),
--					    "initrd");
-+		free_reserved_area(start, end, 0, "initrd");
- 	}
- }
- 
--- 
-1.7.9.5
+Well, thats pretty close. On Marvell the MMIO space has a lot of
+stuff, some of it is config related, lots of it isn't. In fact most of
+it isn't. Tegra is different, the MMIO region is exactly the config
+space of the root port bridge.
+
+Tegra could probably happily and sanely do as you've described (well,
+see below), but it is wonky for Marvell. It looks like there are more
+drivers coming that have this need - so I had hoped for a general
+answer to the 'per-port MMIO space' problem that is unrelated to the
+MMIO spaces role in config access.
+
+> So, in order for the common code that enumerates the PCI bus to work,
+> you need to "spoof" the config accesses so that when you try to access
+> those particular "pseudo config headers", it uses the MMIO method
+> instead of the real config access method.
+
+There are rules for config access in both Tegra and Marvell that are
+not trivial. Again, the driver takes are of this and all Linux sees is
+a nice compliant config space.
+
+> If that is indeed the case, them I would vote for a slight modification
+> of the intermediate patch that I cited earlier - the one in which the
+> ranges property includes translations from those special config
+> addresses into CPU addresses.  The modification is to fix the sizes,
+> changing 0x2000 to 0x800, so those ranges entries do not overlap in the
+> child address domain.
+
+On Marvell the size of the MMIO space is 0x2000, there are imporant
+registers there beyond index 0x800 (todays driver may not touch them
+but HW has them). Reducing the size doesn't seem appropriate.
+
+> pcie-controller {
+> 	compatible = "marvell,armada-370-pcie";
+> 	status = "disabled";
+
+        device_type = "pci";                                                                    
+
+Here as well, as you noted before?
+
+> 	#address-cells = <3>;
+> 	#size-cells = <2>;
+> 
+> 	bus-range = <0x00 0xff>;
+> 
+> 	ranges = <0x00000800 0 0          0xd4004000 0 0x00000800   /* Root
+> port config header */
+> 	          0x00001000 0 0          0xd4008000 0 0x00000800   /* Root
+> port config header */
+> 		  0x82000000 0 0xe0000000 0xe0000000 0 0x08000000   /*
+> non-prefetchable memory */
+> 	          0x81000000 0 0          0xe8000000 0 0x00100000>; /*
+> downstream I/O */
+> 
+> 	pcie at 1,0 {
+> 		device_type = "pci";
+> 		reg = <0x0800 0 0 0 0>;
+
+Okay, this was Thierry's original idea, and it was my note that this
+didn't seem like a good choice. I'm not wedded to that, but I'll
+explain my reasoning a bit.
+
+Two things bothered me
+  - Describing a CPU MMIO mapping with a config address space seems
+    wonky
+  - Linux's OF core doesn't parse a 'reg' property under
+    'device_type = "pci"' as something CPU mappable, it only looks
+    to assigned-addresses for that. So the OF core would need to learn
+    how to handle this case, and it would have to be well defined..
+
+    Thierry's original patch avoided this problem by not using
+    device_type = "pci"..
+
+Also, did you mean to have a 0 size for the 'reg'? How will things
+know how big the MMIO region is? Can't just assume 0x800..
+
+Again, thanks!
+Jason
