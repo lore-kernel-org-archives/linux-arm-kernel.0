@@ -1,93 +1,212 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Sun, 10 Mar 2013 19:33:10 +0100
-Subject: [PATCH 09/10] ASoC: imx-pcm-dma: Add support for DMA init by device
- node
+Date: Sun, 10 Mar 2013 19:33:08 +0100
+Subject: [PATCH 07/10] ASoC: phycore-ac97: Add DT support
 In-Reply-To: <1362940391-8338-1-git-send-email-mpa@pengutronix.de>
 References: <1362940391-8338-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1362940391-8338-10-git-send-email-mpa@pengutronix.de>
+Message-ID: <1362940391-8338-8-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for DMA initialization using devicetree node.
-
-This patch adds two fields to imx_pcm_dma_params to pass device node
-information from other imx drivers to this one. If the dma_node is set,
-this driver tries to initialize a PCM DMA substream based on the
-dma_node and name.
+Add devicetree support for this audio soc fabric driver.
 
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- sound/soc/fsl/imx-pcm-dma.c | 31 ++++++++++++++++++++-----------
- sound/soc/fsl/imx-pcm.h     |  6 ++++++
- 2 files changed, 26 insertions(+), 11 deletions(-)
+ sound/soc/fsl/phycore-ac97.c | 148 ++++++++++++++++++++++++++++++++++++-------
+ 1 file changed, 125 insertions(+), 23 deletions(-)
 
-diff --git a/sound/soc/fsl/imx-pcm-dma.c b/sound/soc/fsl/imx-pcm-dma.c
-index 500f8ce..794103b 100644
---- a/sound/soc/fsl/imx-pcm-dma.c
-+++ b/sound/soc/fsl/imx-pcm-dma.c
-@@ -101,26 +101,35 @@ static int snd_imx_open(struct snd_pcm_substream *substream)
- {
- 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
- 	struct imx_pcm_dma_params *dma_params;
--	struct imx_dma_data *dma_data;
-+	struct imx_dma_data *dma_data = NULL;
- 	int ret;
+diff --git a/sound/soc/fsl/phycore-ac97.c b/sound/soc/fsl/phycore-ac97.c
+index d146cec..a898ce3 100644
+--- a/sound/soc/fsl/phycore-ac97.c
++++ b/sound/soc/fsl/phycore-ac97.c
+@@ -21,6 +21,8 @@
  
- 	snd_soc_set_runtime_hwparams(substream, &snd_imx_hardware);
+ #include "imx-audmux.h"
  
- 	dma_params = snd_soc_dai_get_dma_data(rtd->cpu_dai, substream);
- 
--	dma_data = kzalloc(sizeof(*dma_data), GFP_KERNEL);
--	if (!dma_data)
--		return -ENOMEM;
-+	if (dma_params->dma_client_node) {
-+		ret = of_snd_dmaengine_pcm_open(substream,
-+				dma_params->dma_client_node,
-+				dma_params->dma_req_name);
-+		if (ret)
-+			return ret;
-+	} else {
-+		dma_data = kzalloc(sizeof(*dma_data), GFP_KERNEL);
-+		if (!dma_data)
-+			return -ENOMEM;
- 
--	dma_data->peripheral_type = dma_params->shared_peripheral ?
-+		dma_data->peripheral_type = dma_params->shared_peripheral ?
- 					IMX_DMATYPE_SSI_SP : IMX_DMATYPE_SSI;
--	dma_data->priority = DMA_PRIO_HIGH;
--	dma_data->dma_request = dma_params->dma;
-+		dma_data->priority = DMA_PRIO_HIGH;
-+		dma_data->dma_request = dma_params->dma;
- 
--	ret = snd_dmaengine_pcm_open(substream, filter, dma_data);
--	if (ret) {
--		kfree(dma_data);
--		return ret;
-+		ret = snd_dmaengine_pcm_open(substream, filter, dma_data);
++#define DRV_NAME "phycore-audio-fabric"
 +
-+		if (ret) {
-+			kfree(dma_data);
-+			return ret;
-+		}
- 	}
+ static struct snd_soc_card imx_phycore;
  
- 	snd_dmaengine_pcm_set_data(substream, dma_data);
-diff --git a/sound/soc/fsl/imx-pcm.h b/sound/soc/fsl/imx-pcm.h
-index 5ae13a1..d281fe2 100644
---- a/sound/soc/fsl/imx-pcm.h
-+++ b/sound/soc/fsl/imx-pcm.h
-@@ -23,6 +23,12 @@ struct imx_pcm_dma_params {
- 	unsigned long dma_addr;
- 	int burstsize;
- 	bool shared_peripheral;	/* The peripheral is on SPBA bus */
-+
-+	/* If set, the DMA channel is requested using this devicetree node while
-+	 * ignoring fields 'dma' and 'shared_peripheral'. They have to be set
-+	 * in devicetree according to the DMA Controller devicetree bindings. */
-+	struct device_node *dma_client_node;
-+	const char *dma_req_name; /* DMA Request name from devicetree */
+ static struct snd_soc_ops imx_phycore_hifi_ops = {
+@@ -32,8 +34,13 @@ static struct snd_soc_dai_link imx_phycore_dai_ac97[] = {
+ 		.stream_name	= "HiFi",
+ 		.codec_dai_name		= "wm9712-hifi",
+ 		.codec_name	= "wm9712-codec",
++#ifdef CONFIG_MACH_IMX27_DT
++		.cpu_dai_name	= "10010000.ssi",
++		.platform_name	= "imx-fiq-pcm-audio",
++#else
+ 		.cpu_dai_name	= "imx-ssi.0",
+ 		.platform_name	= "imx-fiq-pcm-audio.0",
++#endif
+ 		.ops		= &imx_phycore_hifi_ops,
+ 	},
+ };
+@@ -45,41 +52,53 @@ static struct snd_soc_card imx_phycore = {
+ 	.num_links	= ARRAY_SIZE(imx_phycore_dai_ac97),
  };
  
- int snd_imx_pcm_mmap(struct snd_pcm_substream *substream,
+-static struct platform_device *imx_phycore_snd_ac97_device;
++static void phycore_ac97_pca100_audmux(void)
++{
++	imx_audmux_v1_configure_port(MX27_AUDMUX_HPCR1_SSI0,
++		IMX_AUDMUX_V1_PCR_SYN | /* 4wire mode */
++		IMX_AUDMUX_V1_PCR_TFCSEL(3) |
++		IMX_AUDMUX_V1_PCR_TCLKDIR | /* clock is output */
++		IMX_AUDMUX_V1_PCR_RXDSEL(3));
++	imx_audmux_v1_configure_port(3,
++		IMX_AUDMUX_V1_PCR_SYN | /* 4wire mode */
++		IMX_AUDMUX_V1_PCR_TFCSEL(0) |
++		IMX_AUDMUX_V1_PCR_TFSDIR |
++		IMX_AUDMUX_V1_PCR_RXDSEL(0));
++}
++
++static void phycore_ac97_pcm043_audmux(void)
++{
++	imx_audmux_v2_configure_port(3,
++		IMX_AUDMUX_V2_PTCR_SYN | /* 4wire mode */
++		IMX_AUDMUX_V2_PTCR_TFSEL(0) |
++		IMX_AUDMUX_V2_PTCR_TFSDIR,
++		IMX_AUDMUX_V2_PDCR_RXDSEL(0));
++	imx_audmux_v2_configure_port(0,
++		IMX_AUDMUX_V2_PTCR_SYN | /* 4wire mode */
++		IMX_AUDMUX_V2_PTCR_TCSEL(3) |
++		IMX_AUDMUX_V2_PTCR_TCLKDIR, /* clock is output */
++		IMX_AUDMUX_V2_PDCR_RXDSEL(3));
++}
++
+ static struct platform_device *imx_phycore_snd_device;
+ 
++#ifndef CONFIG_MACH_IMX27_DT
++
++static struct platform_device *imx_phycore_snd_ac97_device;
++
+ static int __init imx_phycore_init(void)
+ {
+ 	int ret;
+ 
+ 	if (machine_is_pca100()) {
+-		imx_audmux_v1_configure_port(MX27_AUDMUX_HPCR1_SSI0,
+-			IMX_AUDMUX_V1_PCR_SYN | /* 4wire mode */
+-			IMX_AUDMUX_V1_PCR_TFCSEL(3) |
+-			IMX_AUDMUX_V1_PCR_TCLKDIR | /* clock is output */
+-			IMX_AUDMUX_V1_PCR_RXDSEL(3));
+-		imx_audmux_v1_configure_port(3,
+-			IMX_AUDMUX_V1_PCR_SYN | /* 4wire mode */
+-			IMX_AUDMUX_V1_PCR_TFCSEL(0) |
+-			IMX_AUDMUX_V1_PCR_TFSDIR |
+-			IMX_AUDMUX_V1_PCR_RXDSEL(0));
++		phycore_ac97_pca100_audmux();
+ 	} else if (machine_is_pcm043()) {
+-		imx_audmux_v2_configure_port(3,
+-			IMX_AUDMUX_V2_PTCR_SYN | /* 4wire mode */
+-			IMX_AUDMUX_V2_PTCR_TFSEL(0) |
+-			IMX_AUDMUX_V2_PTCR_TFSDIR,
+-			IMX_AUDMUX_V2_PDCR_RXDSEL(0));
+-		imx_audmux_v2_configure_port(0,
+-			IMX_AUDMUX_V2_PTCR_SYN | /* 4wire mode */
+-			IMX_AUDMUX_V2_PTCR_TCSEL(3) |
+-			IMX_AUDMUX_V2_PTCR_TCLKDIR, /* clock is output */
+-			IMX_AUDMUX_V2_PDCR_RXDSEL(3));
++		phycore_ac97_pcm043_audmux();
+ 	} else {
+ 		/* return happy. We might run on a totally different machine */
+ 		return 0;
+ 	}
+ 
+-
+ 	/*
+ 	 * First add codec driver, otherwise soc-audio may be deferred and fails
+ 	 * to load.
+@@ -125,6 +144,89 @@ static void __exit imx_phycore_exit(void)
+ late_initcall(imx_phycore_init);
+ module_exit(imx_phycore_exit);
+ 
++#else  /* !CONFIG_MACH_IMX27_DT */
++
++enum dev_type {
++	MX27_PCA100,
++	MX27_PCM043,
++};
++
++static const struct of_device_id imx_phycore_ac97_of_dev_id[] = {
++	{
++		.compatible = "phytec,imx27-pca100-ac97",
++		.data = (void *)MX27_PCA100,
++	}, {
++		.compatible = "phytec,imx27-pcm043-ac97",
++		.data = (void *)MX27_PCM043
++	}, {
++		/* sentinel */
++	}
++};
++MODULE_DEVICE_TABLE(of, imx_phycore_ac97_of_dev_id);
++
++static int phycore_ac97_setup_devices(struct platform_device *pdev)
++{
++	int ret;
++
++	imx_phycore_snd_device = platform_device_alloc("wm9712-codec", -1);
++	if (!imx_phycore_snd_device)
++		return -ENOMEM;
++
++	ret = platform_device_add(imx_phycore_snd_device);
++	if (ret) {
++		dev_err(&pdev->dev, "ASoC: Platform device allocation failed\n");
++		goto fail1;
++	}
++
++	ret = snd_soc_register_card(&imx_phycore);
++	if (ret) {
++		dev_err(&pdev->dev, "ASoC: soc card registration failed\n");
++		goto fail2;
++	}
++	return 0;
++
++fail2:
++	platform_device_del(imx_phycore_snd_device);
++fail1:
++	platform_device_put(imx_phycore_snd_device);
++	return ret;
++}
++
++static int imx_phycore_ac97_probe(struct platform_device *pdev)
++{
++	int ret;
++
++	imx_phycore.dev = &pdev->dev;
++
++	if (pdev->dev.of_node->data == MX27_PCA100)
++		phycore_ac97_pca100_audmux();
++	else
++		phycore_ac97_pcm043_audmux();
++
++	ret = phycore_ac97_setup_devices(pdev);
++	return ret;
++}
++
++static int imx_phycore_ac97_remove(struct platform_device *pdev)
++{
++	platform_device_unregister(imx_phycore_snd_device);
++	return 0;
++}
++
++static struct platform_driver imx_phycore_ac97_driver = {
++	.probe		= imx_phycore_ac97_probe,
++	.remove		= imx_phycore_ac97_remove,
++	.driver		= {
++		.name	= DRV_NAME,
++		.owner	= THIS_MODULE,
++		.of_match_table = imx_phycore_ac97_of_dev_id,
++	},
++};
++
++module_platform_driver(imx_phycore_ac97_driver);
++
++#endif  /* CONFIG_MACH_IMX27_DT */
++
+ MODULE_AUTHOR("Sascha Hauer <s.hauer@pengutronix.de>");
+-MODULE_DESCRIPTION("PhyCORE ALSA SoC driver");
++MODULE_DESCRIPTION(DRV_NAME ": PhyCORE ALSA SoC fabric driver");
+ MODULE_LICENSE("GPL");
 -- 
 1.8.1.5
