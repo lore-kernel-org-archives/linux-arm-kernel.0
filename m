@@ -1,81 +1,181 @@
-From: wmb@firmworks.com (Mitch Bradley)
-Date: Sat, 09 Mar 2013 19:04:51 -1000
-Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
-In-Reply-To: <513A7044.1020700@gmail.com>
-References: <20130212223511.GB31555@obsidianresearch.com>
- <20130306105441.4d24033e@skate>
- <20130306121118.GA17079@avionic-0098.mockup.avionic-design.de>
- <20130306180946.GA2433@obsidianresearch.com>
- <20130307080832.GD3451@avionic-0098.mockup.avionic-design.de>
- <20130307174955.GC20840@obsidianresearch.com>
- <20130307194830.GA1811@avionic-0098.mockup.avionic-design.de>
- <20130307200235.GB20695@obsidianresearch.com>
- <20130307204726.GB1811@avionic-0098.mockup.avionic-design.de>
- <51392B4D.9040404@gmail.com>
- <20130308071443.GA5772@avionic-0098.mockup.avionic-design.de>
- <513A7044.1020700@gmail.com>
-Message-ID: <513C1473.60600@firmworks.com>
+From: liuj97@gmail.com (Jiang Liu)
+Date: Sun, 10 Mar 2013 14:26:46 +0800
+Subject: [PATCH v2,
+ part1 03/29] mm/ARM: use common help functions to free reserved pages
+In-Reply-To: <1362896833-21104-1-git-send-email-jiang.liu@huawei.com>
+References: <1362896833-21104-1-git-send-email-jiang.liu@huawei.com>
+Message-ID: <1362896833-21104-4-git-send-email-jiang.liu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/8/2013 1:12 PM, Rob Herring wrote:
-> On 03/08/2013 01:14 AM, Thierry Reding wrote:
->> On Thu, Mar 07, 2013 at 06:05:33PM -0600, Rob Herring wrote:
->>> On 03/07/2013 02:47 PM, Thierry Reding wrote:
->> [...]
->>>> In a nutshell (since some of the context isn't quoted anymore) the
->>>> problem that we're trying to solve is that some of the embedded SoCs
->>>> require per-root-port registers for configuration. The PCI DT
->>>> specification doesn't make any provisions for this. A few alternatives
->>>> have been discussed so far:
->>>
->>> I'm not sure I follow. This is different than the host controller
->>> registers? Why would this not just be multiple entries in the reg property?
->>
->> Well the register regions are per root-port. On Tegra20 there's 2 of
->> them, Tegra30 has 3 and if I understand correctly Marvell can have up to
->> 10 (!). Adding all of them to the reg property of the host controller
->> could work but it needs some way to match the reg entry to the root port
->> similar to option 1 below.
-> 
-> The compatible property of the PCI host controller can imply what each
-> index of the reg property entries is for.
-> 
->>
->> Adding a property in the root port nodes seems like a cleaner and more
->> accurate representation of the hardware to me, but if that's not
->> acceptable perhaps we need to bite the bullet and add the code to look
->> the registers up from the parent's reg property.
-> 
-> What I don't like is a new property defined to describe mmio addresses.
-> We already have a property for that and it is "reg". But I think I'm
-> still missing something:
+Use common help functions to free reserved pages.
 
+Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+ arch/arm/mm/init.c   |   48 ++++++++++++++++--------------------------------
+ arch/arm64/mm/init.c |   26 ++------------------------
+ 2 files changed, 18 insertions(+), 56 deletions(-)
 
-As stated in my recent reply to Jason, I thing the correct property is
-"ranges".  "Ranges" translates mappable child address space addresses
-into parent addresses, and that is exactly what is going on.  A specific
-subset of config addresses is mappable into parent MMIO space.
-
-When done that way, there is no need for the multi-entry reg property at
-the top level, and the correspondence between specific root port DT
-nodes and their MMIO addresses is easily determined by matching child
-reg properties to parent ranges entries.
-
-> 
->>>> 			pci at 0,1 {
->>>> 				...
->>>> 				reg = <0x00000800 0 0 0 0>;
-> 
-> Is this a PCI bus address?
-> 
->>>> 				regs = <0x80000000 0x00001000>;
->>>> 			};
-> 
-> Rob
-> 
-> _______________________________________________
-> devicetree-discuss mailing list
-> devicetree-discuss at lists.ozlabs.org
-> https://lists.ozlabs.org/listinfo/devicetree-discuss
-> 
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index ad722f1..40a5bc2 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -424,24 +424,6 @@ void __init bootmem_init(void)
+ 	max_pfn = max_high - PHYS_PFN_OFFSET;
+ }
+ 
+-static inline int free_area(unsigned long pfn, unsigned long end, char *s)
+-{
+-	unsigned int pages = 0, size = (end - pfn) << (PAGE_SHIFT - 10);
+-
+-	for (; pfn < end; pfn++) {
+-		struct page *page = pfn_to_page(pfn);
+-		ClearPageReserved(page);
+-		init_page_count(page);
+-		__free_page(page);
+-		pages++;
+-	}
+-
+-	if (size && s)
+-		printk(KERN_INFO "Freeing %s memory: %dK\n", s, size);
+-
+-	return pages;
+-}
+-
+ /*
+  * Poison init memory with an undefined instruction (ARM) or a branch to an
+  * undefined instruction (Thumb).
+@@ -534,6 +516,16 @@ static void __init free_unused_memmap(struct meminfo *mi)
+ #endif
+ }
+ 
++#ifdef CONFIG_HIGHMEM
++static inline void free_area_high(unsigned long pfn, unsigned long end)
++{
++	for (; pfn < end; pfn++) {
++		__free_reserved_page(pfn_to_page(pfn));
++		totalhigh_pages++;
++	}
++}
++#endif
++
+ static void __init free_highpages(void)
+ {
+ #ifdef CONFIG_HIGHMEM
+@@ -569,8 +561,7 @@ static void __init free_highpages(void)
+ 			if (res_end > end)
+ 				res_end = end;
+ 			if (res_start != start)
+-				totalhigh_pages += free_area(start, res_start,
+-							     NULL);
++				free_area_high(start, res_start);
+ 			start = res_end;
+ 			if (start == end)
+ 				break;
+@@ -578,7 +569,7 @@ static void __init free_highpages(void)
+ 
+ 		/* And now free anything which remains */
+ 		if (start < end)
+-			totalhigh_pages += free_area(start, end, NULL);
++			free_area_high(start, end);
+ 	}
+ 	totalram_pages += totalhigh_pages;
+ #endif
+@@ -609,8 +600,7 @@ void __init mem_init(void)
+ 
+ #ifdef CONFIG_SA1111
+ 	/* now that our DMA memory is actually so designated, we can free it */
+-	totalram_pages += free_area(PHYS_PFN_OFFSET,
+-				    __phys_to_pfn(__pa(swapper_pg_dir)), NULL);
++	free_reserved_area(__va(PHYS_PFN_OFFSET), swapper_pg_dir, 0, NULL);
+ #endif
+ 
+ 	free_highpages();
+@@ -738,16 +728,12 @@ void free_initmem(void)
+ 	extern char __tcm_start, __tcm_end;
+ 
+ 	poison_init_mem(&__tcm_start, &__tcm_end - &__tcm_start);
+-	totalram_pages += free_area(__phys_to_pfn(__pa(&__tcm_start)),
+-				    __phys_to_pfn(__pa(&__tcm_end)),
+-				    "TCM link");
++	free_reserved_area(&__tcm_start, &__tcm_end, 0, "TCM link");
+ #endif
+ 
+ 	poison_init_mem(__init_begin, __init_end - __init_begin);
+ 	if (!machine_is_integrator() && !machine_is_cintegrator())
+-		totalram_pages += free_area(__phys_to_pfn(__pa(__init_begin)),
+-					    __phys_to_pfn(__pa(__init_end)),
+-					    "init");
++		free_initmem_default(0);
+ }
+ 
+ #ifdef CONFIG_BLK_DEV_INITRD
+@@ -758,9 +744,7 @@ void free_initrd_mem(unsigned long start, unsigned long end)
+ {
+ 	if (!keep_initrd) {
+ 		poison_init_mem((void *)start, PAGE_ALIGN(end) - start);
+-		totalram_pages += free_area(__phys_to_pfn(__pa(start)),
+-					    __phys_to_pfn(__pa(end)),
+-					    "initrd");
++		free_reserved_area(start, end, 0, "initrd");
+ 	}
+ }
+ 
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index 800aac3..f497ca7 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -197,24 +197,6 @@ void __init bootmem_init(void)
+ 	max_pfn = max_low_pfn = max;
+ }
+ 
+-static inline int free_area(unsigned long pfn, unsigned long end, char *s)
+-{
+-	unsigned int pages = 0, size = (end - pfn) << (PAGE_SHIFT - 10);
+-
+-	for (; pfn < end; pfn++) {
+-		struct page *page = pfn_to_page(pfn);
+-		ClearPageReserved(page);
+-		init_page_count(page);
+-		__free_page(page);
+-		pages++;
+-	}
+-
+-	if (size && s)
+-		pr_info("Freeing %s memory: %dK\n", s, size);
+-
+-	return pages;
+-}
+-
+ /*
+  * Poison init memory with an undefined instruction (0x0).
+  */
+@@ -405,9 +387,7 @@ void __init mem_init(void)
+ void free_initmem(void)
+ {
+ 	poison_init_mem(__init_begin, __init_end - __init_begin);
+-	totalram_pages += free_area(__phys_to_pfn(__pa(__init_begin)),
+-				    __phys_to_pfn(__pa(__init_end)),
+-				    "init");
++	free_initmem_default(0);
+ }
+ 
+ #ifdef CONFIG_BLK_DEV_INITRD
+@@ -418,9 +398,7 @@ void free_initrd_mem(unsigned long start, unsigned long end)
+ {
+ 	if (!keep_initrd) {
+ 		poison_init_mem((void *)start, PAGE_ALIGN(end) - start);
+-		totalram_pages += free_area(__phys_to_pfn(__pa(start)),
+-					    __phys_to_pfn(__pa(end)),
+-					    "initrd");
++		free_reserved_area(start, end, 0, "initrd");
+ 	}
+ }
+ 
+-- 
+1.7.9.5
