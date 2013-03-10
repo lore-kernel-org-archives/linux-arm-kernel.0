@@ -1,30 +1,31 @@
 From: gang.chen@asianux.com (Chen Gang)
-Date: Sun, 10 Mar 2013 10:15:54 +0800
-Subject: [PATCH] ARM:net: an issue for k which is u32, never < 0
-Message-ID: <513BECDA.3030803@asianux.com>
+Date: Sun, 10 Mar 2013 10:29:21 +0800
+Subject: [PATCH] ARM:vexpress: beautify code, using 'static const' instead
+ of 'const static'
+Message-ID: <513BF001.30204@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-  k is u32 which never < 0, need type cast, or cause issue.
+  better using 'static const' instead of 'const static'
 
 Signed-off-by: Chen Gang <gang.chen@asianux.com>
 ---
- arch/arm/net/bpf_jit_32.c |    2 +-
+ arch/arm/mach-vexpress/platsmp.c |    2 +-
  1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
-index 6828ef6..a0bd8a7 100644
---- a/arch/arm/net/bpf_jit_32.c
-+++ b/arch/arm/net/bpf_jit_32.c
-@@ -576,7 +576,7 @@ load_ind:
- 			/* x = ((*(frame + k)) & 0xf) << 2; */
- 			ctx->seen |= SEEN_X | SEEN_DATA | SEEN_CALL;
- 			/* the interpreter should deal with the negative K */
--			if (k < 0)
-+			if ((int)k < 0)
- 				return -1;
- 			/* offset in r1: we might have to take the slow path */
- 			emit_mov_i(r_off, k, ctx);
+diff --git a/arch/arm/mach-vexpress/platsmp.c b/arch/arm/mach-vexpress/platsmp.c
+index dc1ace5..9152bf7 100644
+--- a/arch/arm/mach-vexpress/platsmp.c
++++ b/arch/arm/mach-vexpress/platsmp.c
+@@ -40,7 +40,7 @@ static struct map_desc vexpress_dt_cortex_a9_scu_map __initdata = {
+ 
+ static void *vexpress_dt_cortex_a9_scu_base __initdata;
+ 
+-const static char *vexpress_dt_cortex_a9_match[] __initconst = {
++static const char *vexpress_dt_cortex_a9_match[] __initconst = {
+ 	"arm,cortex-a5-scu",
+ 	"arm,cortex-a9-scu",
+ 	NULL
 -- 
 1.7.7.6
