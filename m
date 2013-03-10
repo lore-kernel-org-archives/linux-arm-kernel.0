@@ -1,31 +1,30 @@
 From: gang.chen@asianux.com (Chen Gang)
-Date: Sun, 10 Mar 2013 09:59:22 +0800
-Subject: [PATCH] ARM:kernel: beautify code, using 'static const' instead of
- 'const static'
-Message-ID: <513BE8FA.6080304@asianux.com>
+Date: Sun, 10 Mar 2013 10:15:54 +0800
+Subject: [PATCH] ARM:net: an issue for k which is u32, never < 0
+Message-ID: <513BECDA.3030803@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-  better using 'static const' instead of 'const static'
+  k is u32 which never < 0, need type cast, or cause issue.
 
 Signed-off-by: Chen Gang <gang.chen@asianux.com>
 ---
- arch/arm/kernel/smp_twd.c |    2 +-
+ arch/arm/net/bpf_jit_32.c |    2 +-
  1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index 3f25650..ef3e499 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -362,7 +362,7 @@ int __init twd_local_timer_register(struct twd_local_timer *tlt)
- }
- 
- #ifdef CONFIG_OF
--const static struct of_device_id twd_of_match[] __initconst = {
-+static const struct of_device_id twd_of_match[] __initconst = {
- 	{ .compatible = "arm,cortex-a9-twd-timer",	},
- 	{ .compatible = "arm,cortex-a5-twd-timer",	},
- 	{ .compatible = "arm,arm11mp-twd-timer",	},
+diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
+index 6828ef6..a0bd8a7 100644
+--- a/arch/arm/net/bpf_jit_32.c
++++ b/arch/arm/net/bpf_jit_32.c
+@@ -576,7 +576,7 @@ load_ind:
+ 			/* x = ((*(frame + k)) & 0xf) << 2; */
+ 			ctx->seen |= SEEN_X | SEEN_DATA | SEEN_CALL;
+ 			/* the interpreter should deal with the negative K */
+-			if (k < 0)
++			if ((int)k < 0)
+ 				return -1;
+ 			/* offset in r1: we might have to take the slow path */
+ 			emit_mov_i(r_off, k, ctx);
 -- 
 1.7.7.6
