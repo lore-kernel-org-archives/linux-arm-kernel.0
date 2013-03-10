@@ -1,32 +1,37 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Sun, 10 Mar 2013 17:53:27 +0100
-Subject: [PATCH 2/2] ARM: imx: Disable imx-cpufreq when cpufreq-cpu0 used
-In-Reply-To: <1362934407-29030-1-git-send-email-mpa@pengutronix.de>
-References: <1362934407-29030-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1362934407-29030-3-git-send-email-mpa@pengutronix.de>
+From: holler@ahsoftware.de (Alexander Holler)
+Date: Sun, 10 Mar 2013 18:06:11 +0100
+Subject: [PATCH v2] arm: fix memset-related crashes caused by recent GCC
+ (4.7.2) optimizations
+In-Reply-To: <20130307151755.GB4977@n2100.arm.linux.org.uk>
+References: <1360587435-28386-1-git-send-email-ivan.djelic@parrot.com>
+ <513795C5.4050608@gmail.com> <20130307151755.GB4977@n2100.arm.linux.org.uk>
+Message-ID: <513CBD83.7040909@ahsoftware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cpufreq-cpu0 has DT support. So if imx27 or imx51 is booted with DT
-support, it should not use the old imx-cpufreq driver. Instead the
-operating-points should be defined in the appropriate DT files.
+Am 07.03.2013 16:17, schrieb Russell King - ARM Linux:
+> On Wed, Mar 06, 2013 at 08:15:17PM +0100, Dirk Behme wrote:
+>> Am 11.02.2013 13:57, schrieb Ivan Djelic:
+>>> Recent GCC versions (e.g. GCC-4.7.2) perform optimizations based on
+>>> assumptions about the implementation of memset and similar functions.
+>>> The current ARM optimized memset code does not return the value of
+>>> its first argument, as is usually expected from standard implementations.
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
- arch/arm/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+I've just tried this patch with kernel 4.8.2 on an armv5-system where I 
+use gcc 4.7.2 since several months and where most parts of the system 
+are compiled with gcc 4.7.2 too.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 5b71469..1247fe5 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -2156,6 +2156,7 @@ source "drivers/cpufreq/Kconfig"
- config CPU_FREQ_IMX
- 	tristate "CPUfreq driver for i.MX CPUs"
- 	depends on ARCH_MXC && CPU_FREQ
-+	depends on (!GENERIC_CPUFREQ_CPU0 || (!MACH_IMX51_DT && !MACH_IMX27_DT))
- 	select CPU_FREQ_TABLE
- 	help
- 	  This enables the CPUfreq driver for i.MX CPUs.
--- 
-1.8.1.5
+And I had at least one problem which manifested itself with
+
+[  181.198559] pts1: unknown flag 212
+
+while trying to establish a btle-connection.
+
+So I assume either the patch is wrong, the patch isn't the whole story, 
+an existing bug is now triggered, or ...
+
+I don't know.
+
+Regards,
+
+Alexander
