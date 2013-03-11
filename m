@@ -1,34 +1,38 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Mon, 11 Mar 2013 09:19:26 +0800
-Subject: [PATCH v3 1/2] i.MX27: Add clock support for SAHARA2.
-In-Reply-To: <20130310230856.GU1906@pengutronix.de>
-References: <1362137873-8827-1-git-send-email-javier.martin@vista-silicon.com>
- <1362137873-8827-2-git-send-email-javier.martin@vista-silicon.com>
- <20130304075306.GA1906@pengutronix.de>
- <CACKLOr2kuWXMreEFA4wqyYVRNnPwmEoHPM2+V+tN5P_1bQ+iJQ@mail.gmail.com>
- <20130310083401.GB10448@gondor.apana.org.au>
- <20130310230856.GU1906@pengutronix.de>
-Message-ID: <20130311011926.GA14930@gondor.apana.org.au>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sun, 10 Mar 2013 20:26:59 -0500
+Subject: [PATCH] ARM:kernel: beautify code, using 'static const' instead
+ of 'const static'
+In-Reply-To: <513BE8FA.6080304@asianux.com>
+References: <513BE8FA.6080304@asianux.com>
+Message-ID: <513D32E3.1080101@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 11, 2013 at 12:08:56AM +0100, Sascha Hauer wrote:
-> On Sun, Mar 10, 2013 at 04:34:01PM +0800, Herbert Xu wrote:
-> > > >
-> > > > https://patchwork.kernel.org/patch/1817741/
-> > > >
-> > > > So the change above becomes unnecessary
-> > > 
-> > > Very good. Then this patch can be safely dropped.
-> > 
-> > So should I take this patch or not?
+On 03/09/2013 07:59 PM, Chen Gang wrote:
 > 
-> This clk patch, no. The sahara patch, yes, if it is fine for you.
+>   better using 'static const' instead of 'const static'
+> 
+> Signed-off-by: Chen Gang <gang.chen@asianux.com>
+> ---
+>  arch/arm/kernel/smp_twd.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+> index 3f25650..ef3e499 100644
+> --- a/arch/arm/kernel/smp_twd.c
+> +++ b/arch/arm/kernel/smp_twd.c
+> @@ -362,7 +362,7 @@ int __init twd_local_timer_register(struct twd_local_timer *tlt)
+>  }
+>  
+>  #ifdef CONFIG_OF
+> -const static struct of_device_id twd_of_match[] __initconst = {
+> +static const struct of_device_id twd_of_match[] __initconst = {
 
-But will the second patch work fine without the first?
+This will go away with conversion to use CLKSRC_OF.
 
-Thanks,
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Rob
+
+>  	{ .compatible = "arm,cortex-a9-twd-timer",	},
+>  	{ .compatible = "arm,cortex-a5-twd-timer",	},
+>  	{ .compatible = "arm,arm11mp-twd-timer",	},
+> 
