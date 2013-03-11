@@ -1,74 +1,40 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 11 Mar 2013 10:40:51 +0200
-Subject: [PATCH 01/13] usb: phy: nop: Add device tree support and binding
- information
-In-Reply-To: <513A079A.1020106@pengutronix.de>
-References: <1359993540-20780-1-git-send-email-rogerq@ti.com>
- <1359993540-20780-2-git-send-email-rogerq@ti.com>
- <5139C174.7030401@pengutronix.de> <513A079A.1020106@pengutronix.de>
-Message-ID: <513D9893.50703@ti.com>
+From: prakash.pm@ti.com (Manjunathappa, Prakash)
+Date: Mon, 11 Mar 2013 08:53:30 +0000
+Subject: [PATCH v2 1/4] spi/davinci: add DT binding documentation
+In-Reply-To: <201303051932.41327.arnd@arndb.de>
+References: <1362401955-9616-1-git-send-email-prakash.pm@ti.com>
+ <6918845.dALXSKksQd@wuerfel>
+ <A73F36158E33644199EB82C5EC81C7BC3EA4854E@DBDE01.ent.ti.com>
+ <201303051932.41327.arnd@arndb.de>
+Message-ID: <A73F36158E33644199EB82C5EC81C7BC3EA48A6D@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/08/2013 05:45 PM, Marc Kleine-Budde wrote:
-> On 03/08/2013 11:46 AM, Marc Kleine-Budde wrote:
->> On 02/04/2013 04:58 PM, Roger Quadros wrote:
->>> The PHY clock, clock rate, VCC regulator and RESET regulator
->>> can now be provided via device tree.
->>>
->>> Signed-off-by: Roger Quadros <rogerq@ti.com>
->>> ---
->>>  .../devicetree/bindings/usb/usb-nop-xceiv.txt      |   34 ++++++++++++++++++++
->>>  drivers/usb/otg/nop-usb-xceiv.c                    |   31 ++++++++++++++++++
->>>  2 files changed, 65 insertions(+), 0 deletions(-)
->>>  create mode 100644 Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt b/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
->>> new file mode 100644
->>> index 0000000..d7e2726
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
->>> @@ -0,0 +1,34 @@
->>> +USB NOP PHY
->>> +
->>> +Required properties:
->>> +- compatible: should be usb-nop-xceiv
->>> +
->>> +Optional properties:
->>> +- clocks: phandle to the PHY clock. Use as per Documentation/devicetree
->>> +  /bindings/clock/clock-bindings.txt
->>> +  This property is required if clock-frequency is specified.
->>> +
->>> +- clock-names: Should be "main_clk"
->>> +
->>> +- clock-frequency: the clock frequency (in Hz) that the PHY clock must
->>> +  be configured to.
->>> +
->>> +- vcc-supply: phandle to the regulator that provides RESET to the PHY.
->>> +
->>> +- reset-supply: phandle to the regulator that provides power to the PHY.
->>> +
->>> +Example:
->>> +
->>> +	hsusb1_phy {
->>> +		compatible = "usb-nop-xceiv";
->>> +		clock-frequency = <19200000>;
->>
->> Why do you hardcode the clock frequency here? You should use
->> clk_get_rate() to get the frequency from the clock tree.
+On Wed, Mar 06, 2013 at 01:02:41, Arnd Bergmann wrote:
+> On Tuesday 05 March 2013, Manjunathappa, Prakash wrote:
+> > On Mon, Mar 04, 2013 at 21:59:16, Arnd Bergmann wrote:
+> > > On Monday 04 March 2013 18:29:12 Manjunathappa, Prakash wrote:
+> > > > +- reg: Offset and length of SPI controller register space
+> > > > +- num-cs: Number of chip selects
+> > > > +- ti,davinci-spi-intr-line: interrupt line used to connect the SPI
+> > > > +	IP to the interrupt controller withn the SoC. Possible values
+> > > > +	are 0 and 1. Manual says one of the two possible interrupt
+> > > > +	lines can be tied to the interrupt controller. Set this
+> > > > +	based on a specifc SoC configuration.
+> > > > +- interrupts: interrupt number offset at the irq parent
+> > > 
+> > > I would not call this an "offset". It is an interrupt descriptor
+> > > which may be something other than a simple number.
+> > > 
+> > 
+> > I am planning to drop from this documentation as it is common property.
 > 
-> What about declaring a "fixed-clock" node in the device tree? Then it
-> should be possible to keep the driver free of any omap specific code.
+> I think it makese sense to document the fact that there should be exactly
+> one interrupt listed in the interrupts property, especially since the
+> hardware has two outputs.
 > 
 
-The current implementation is not OMAP specific and is not limited to a
-fixed frequency clock. The PHY driver is using standard clock APIs to set
-the clock rate 'only' if the 'clock-frequency' property is present in the
-device tree node.
+Agreed, will consider this property for documenting.
 
-What is the benefit of declaring it as a "fixed-clock"?
-FYI. The clock may not necessarily be a fixed frequency clock and someone
-needs to program the rate.
-
-cheers,
--roger
+Thanks,
+Prakash
