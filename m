@@ -1,39 +1,65 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 11 Mar 2013 14:36:39 +0800
-Subject: [PATCH 2/2] ARM: imx: Disable imx-cpufreq when cpufreq-cpu0 used
-In-Reply-To: <20130310225159.GS1906@pengutronix.de>
-References: <1362934407-29030-1-git-send-email-mpa@pengutronix.de>
- <1362934407-29030-3-git-send-email-mpa@pengutronix.de>
- <20130310225159.GS1906@pengutronix.de>
-Message-ID: <20130311063636.GA25910@S2101-09.ap.freescale.net>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 11 Mar 2013 16:05:44 +0900
+Subject: [PATCH v3] arm: plat-samsung: check processor type before cache
+ restoration in resume
+In-Reply-To: <1361961363-28412-1-git-send-email-inderpal.singh@linaro.org>
+References: <1361961363-28412-1-git-send-email-inderpal.singh@linaro.org>
+Message-ID: <052201ce1e26$d9886bf0$8c9943d0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 10, 2013 at 11:51:59PM +0100, Sascha Hauer wrote:
-> On Sun, Mar 10, 2013 at 05:53:27PM +0100, Markus Pargmann wrote:
-> > cpufreq-cpu0 has DT support. So if imx27 or imx51 is booted with DT
-> > support, it should not use the old imx-cpufreq driver. Instead the
-> > operating-points should be defined in the appropriate DT files.
-> > 
-> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> > ---
-> >  arch/arm/Kconfig | 1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > index 5b71469..1247fe5 100644
-> > --- a/arch/arm/Kconfig
-> > +++ b/arch/arm/Kconfig
-> > @@ -2156,6 +2156,7 @@ source "drivers/cpufreq/Kconfig"
-> >  config CPU_FREQ_IMX
-> >  	tristate "CPUfreq driver for i.MX CPUs"
-> >  	depends on ARCH_MXC && CPU_FREQ
-> > +	depends on (!GENERIC_CPUFREQ_CPU0 || (!MACH_IMX51_DT && !MACH_IMX27_DT))
+Inderpal Singh wrote:
 > 
-> Does this driver work with multiplatform anyway? I mean it registers
-> a cpufreq driver without knowing that the kernel even runs on i.MX.
-> Maybe removing it is the better option?
+> Only cortex-a9 based samsung platforms have l2x0 cache controller. Hence check
+> the same before restoring the cache in resume.
 > 
-+1 on killing imx cpufreq driver.
+> This is needed for single kernel image.
+> 
+> Signed-off-by: Inderpal Singh <inderpal.singh@linaro.org>
+> ---
+> changes in v2:
+>         - check processor midr instead of checking all soc ids as
+>         suggested by Kukjin
+> 
+> changes in v3:
+> 	- simplify by reading midr in assembly as per Russell
+> 
+>  arch/arm/plat-samsung/s5p-sleep.S |    9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/arch/arm/plat-samsung/s5p-sleep.S b/arch/arm/plat-samsung/s5p-
+> sleep.S
+> index bdf6dad..6e15993 100644
+> --- a/arch/arm/plat-samsung/s5p-sleep.S
+> +++ b/arch/arm/plat-samsung/s5p-sleep.S
+> @@ -25,6 +25,9 @@
+>  #include <asm/asm-offsets.h>
+>  #include <asm/hardware/cache-l2x0.h>
+> 
+> +#define CPU_MASK	0xff0ffff0
+> +#define CPU_CORTEX_A9	0x410fc090
+> +
+>  /*
+>   *	 The following code is located into the .data section. This is to
+>   *	 allow l2x0_regs_phys to be accessed with a relative load while we
+> @@ -51,6 +54,12 @@
+> 
+>  ENTRY(s3c_cpu_resume)
+>  #ifdef CONFIG_CACHE_L2X0
+> +	mrc     p15, 0, r0, c0, c0, 0
+> +	ldr	r1, =CPU_MASK
+> +	and	r0, r0, r1
+> +	ldr	r1, =CPU_CORTEX_A9
+> +	cmp	r0, r1
+> +	bne	resume_l2on
+>  	adr	r0, l2x0_regs_phys
+>  	ldr	r0, [r0]
+>  	ldr	r1, [r0, #L2X0_R_PHY_BASE]
+> --
+> 1.7.9.5
 
-Shawn
+Looks good to me, applied.
+
+Thanks.
+
+- Kukjin
