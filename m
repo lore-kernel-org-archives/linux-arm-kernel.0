@@ -1,41 +1,53 @@
-From: wmb@firmworks.com (Mitch Bradley)
-Date: Mon, 11 Mar 2013 09:49:10 -1000
-Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
-In-Reply-To: <20130311182339.GB10992@obsidianresearch.com>
-References: <20130308191227.GA6551@avionic-0098.mockup.avionic-design.de>
- <513A3F4F.2090501@firmworks.com>
- <20130308200245.GC29435@obsidianresearch.com>
- <513A7845.6040304@firmworks.com> <20130309013152.GA3883@obsidianresearch.com>
- <513C117D.6080800@firmworks.com>
- <20130310065539.GA14704@obsidianresearch.com>
- <513D6F9C.9000100@firmworks.com>
- <20130311074615.GA6365@avionic-0098.mockup.avionic-design.de>
- <513E1CBA.4040007@firmworks.com>
- <20130311182339.GB10992@obsidianresearch.com>
-Message-ID: <513E3536.2060104@firmworks.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Mon, 11 Mar 2013 20:51:08 +0100
+Subject: [PATCH 01/10] imx-ssi: Fix AC97 rates
+In-Reply-To: <CAOMZO5A8F81PzCjKHrkZ_AtGMr341d6OmYHMQvdzgunmGFDVsw@mail.gmail.com>
+References: <1362940391-8338-1-git-send-email-mpa@pengutronix.de>
+ <1362940391-8338-2-git-send-email-mpa@pengutronix.de>
+ <CAOMZO5A8F81PzCjKHrkZ_AtGMr341d6OmYHMQvdzgunmGFDVsw@mail.gmail.com>
+Message-ID: <20130311195108.GC18350@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/11/2013 8:23 AM, Jason Gunthorpe wrote:
->> (b) The discovery/enumeration code needs to access config space via
->> pci_ops.  The root complex driver implements pci_ops based on a trivial
->> parsing of ranges (omitting irrelevant details):
->>
->> pci_op_read(devfn, pos) {
->>    loop_over_ranges_entries {
->>       if (to_devfn(ranges_entry.child) == devfn) {
->>          return mmio_read(ranges_entry.parent + pos);
->                             ^^^^^^^^^^^^^^^^^^^
-> 
-> This has to be converted through all enclosing node's ranges prior to
-> being used as a CPU address - the OF core has all the code to do this,
-> but a new entry point would be needed for this specific application...
+Hi Fabio,
 
-Agreed.  But I was considering that detail to be outside the scope of
-this discussion because the same thing must happen for any physical
-address at this level of the tree.
+On Sun, Mar 10, 2013 at 03:47:10PM -0300, Fabio Estevam wrote:
+> Hi Markus,
+> 
+> On Sun, Mar 10, 2013 at 3:33 PM, Markus Pargmann <mpa@pengutronix.de> wrote:
+> > From: Sascha Hauer <s.hauer@pengutronix.de>
+> >
+> > This device supports multiple rates as described in later AC97
+> > standards. This patch allows playback of different sample frequencies
+> > without conversion.
+> >
+> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> > ---
+> >  sound/soc/fsl/imx-ssi.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> Currently we have the following ssi drivers for imx:
+> 
+> sound/soc/fsl/imx-ssi.c: for i.mx SoCs running on non-dt platform
+> sound/soc/fsl/fsl_ssi.c: for PowerPC and i.mx SoCs running on dt platforms
+> 
+> I see that in this series you convert sound/soc/fsl/imx-ssi.c into dt.
+> 
+> Shouldn't we use sound/soc/fsl/fsl_ssi.c instead and maybe even get
+> rid of sound/soc/fsl/imx-ssi.c when all imx become converted to dt?
+> 
 
-> 
-> Cheers,
-> Jason
-> 
+At the moment fsl-ssi and imx-ssi don't seem to have very much in
+common. However I could try to merge the imx-ssi driver code into
+fsl_ssi and make it handle imx27-ssi differently.
+
+Regards,
+
+Markus
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
