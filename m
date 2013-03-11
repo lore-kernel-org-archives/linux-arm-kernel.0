@@ -1,68 +1,69 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 11 Mar 2013 10:58:31 +0200
-Subject: omap4 pandaboard: clock input for TiWi module inactive
-In-Reply-To: <CAEYbN3QotnnAUU=7c7=r1sHDnZ5VhgNfXfP6ANf3+ssCzmEa=A@mail.gmail.com>
-References: <CAEYbN3QotnnAUU=7c7=r1sHDnZ5VhgNfXfP6ANf3+ssCzmEa=A@mail.gmail.com>
-Message-ID: <513D9CB7.2010402@ti.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 11 Mar 2013 14:42:41 +0530
+Subject: [PATCH 0/4] time: dynamic irq affinity
+In-Reply-To: <513D9896.2010304@linaro.org>
+References: <1361917047-29230-1-git-send-email-daniel.lezcano@linaro.org>
+ <513CC404.6000200@ti.com> <513CCF60.6060406@linaro.org>
+ <513D4E79.5090307@ti.com> <513D9896.2010304@linaro.org>
+Message-ID: <513DA009.9080601@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(+ Peter, Luca, Balaji)
+On Monday 11 March 2013 02:10 PM, Daniel Lezcano wrote:
+> On 03/11/2013 04:24 AM, Santosh Shilimkar wrote:
+>> On Sunday 10 March 2013 11:52 PM, Daniel Lezcano wrote:
+> 
+> [ ... ]
+> 
+>>> I don't think it is the case for all the ARM platforms, at least we
+>>> tested it on vexpress TC2 and u8500, and the number of IPI were reduced
+>>> very significantly increasing the idle time for cpu0. TC2 will need
+>>> another optimization on another area for the idle wake up to gain real
+>>> improvements.
+>>>
+>> You are missing my point. TC2 can be an exception since the SGI can wakeup
+>> CPUs even from low power states where local timer's are stalled. Is that
+>> the case with U8500 ?
+> 
+> Well, the cpuidle driver is not going into a deep idle state to check
+> this out.
+> 
+> AFAICT this board has a specific firmware with the PRCMU (a device
+> managing the power on the board) and it replaces the GIC when going to
+> deep idle state, especially by reconnecting the GIC to the A9 cores
+> automatically when an interrupt occurs.
+> 
+But most likely it will be limited to peripheral interrupts. SGI's
+are per-cpu irq's so you need to check that part.
 
-else your e-mail might just go unnoticed ;)
+> But definitively worth to check.
+> 
+>>> I will test it on OMAP but with the coupled idle state, I am not sure of
+>>> the behavior. Could elaborate a bit the specificity of OMAP ? I am not
+>>> sure to understand why I may miss some IPI wakeups.
+>>>
+>> I already mention the issue here [1]. You might not see any major issues
+>> because the missed asynchronous IPIs might eventually get executed when
+>> CPU's wakeup from deeper states because of idle wakeups. OMAP is no
+>> different from idle wakeup optimisation and it will surely benefit and work.
+>> The main reason I didn't pursue it because of not having solution for
+>> [1] which as discussed in past is very much essential from kernel
+>> functional correctness perspective. You might want to verify that by
+>> adding a tracepoint on IPI's on other reasons except the timer wakeup.
+> 
+> Oh, ok. I didn't make the connection. I got the point now.
+> 
+Good.
 
-On 03/07/2013 10:37 PM, Levi Pearson wrote:
-> I recently upgraded from a 3.4 kernel to a 3.8 kernel and found that
-> the drivers for the functionality provided by the TiWi module on the
-> pandaboard (Bluetooth, WiFI, etc.) could no longer probe the device.
-> After some investigation, it turned out that the TiWi clock is
-> provided by the twl6030 PMIC chip.
+> If we can raise a fake hardware interrupt on the GIC (not sure that
+> could be done), may be we can implement something similar to the
+> broadcast timer mechanism to replace the IPI when the cores are not IPI
+> wakeup capable.
 > 
-> The clock output of the twl6030 was first enabled via these commits:
-> 
-> https://patchwork.kernel.org/patch/546381/
-> https://patchwork.kernel.org/patch/546401/
-> 
-> Since most of the functionality of the TWL6030 is power regulation and
-> the clock is enabled via a similar mechanism to the power outputs, the
-> clock was added as a 'pseudo-regulator' to
-> drivers/regulator/twl-regulator.c.
-> 
-> Some time later, a series of commits removed the clock functionality
-> from twl-regulator.c, apparently due to being out-of-place in the
-> Device Tree listings or something.
-> 
-> The first of these is recorded here: https://lkml.org/lkml/2012/6/4/330
-> The next two just clean up the code that was orphaned by the previous:
->  e76ab829 "regulator: twl: Remove references to the twl4030 regulator"
->  029dd3ce "regulator: twl: Remove another unused variable warning"
-> 
-> Luciano Cuelho, who maintains the driver for the WiFi portion of the
-> TiWi modules, reported the resulting breakage some time later on the
-> LKML: https://lkml.org/lkml/2012/11/15/72
-> 
-> Despite the protestation of Mark Brown that his code removal wasn't
-> the cause of the problem, reverting his changes does indeed enable the
-> clock.  However, it also seems to be the case that there ought to be a
-> better home for the clock than twl-regulator.c.  At the time of the
-> previous discussion, it wasn't clear if the framework was in place to
-> support a clock driver for the twl6030's clock, but it seems like the
-> support exists now, since there's a clock driver for the twl6030's
-> companion, the twl6040 audio chip.
-> 
-> So: Is there any chance of simply reverting the 3 commits that broke
-> the clock?  I have done this locally, but I hate to see pandaboard
-> support in the mainstream kernel continue to be broken in this way.
-> 
-> If for whatever reason the commits cannot be reverted, would creating
-> a driver like drivers/clk/clk-twl6040.c that enabled the twl6030's
-> clock output be a suitable alternative?  I'd be willing to take a stab
-> at writing it if there's not something like that in the works already.
-> 
-> ---
-> Levi Pearson
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+It isn't straight forward. The easiest way is to replace the SGI IPI
+with one which is wakeup capable even from deeper states. But then
+it all depends on hardware support and what that hook looks
+like per platform.
+
+Regards,
+Santosh
