@@ -1,189 +1,146 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Mon, 11 Mar 2013 13:11:19 -0500
-Subject: [PATCH 1/1] ARM: OMAP: gpmc: request CS address space for ethernet
- chips
-In-Reply-To: <513E1B24.7020000@collabora.co.uk>
-References: <1362935902-29720-1-git-send-email-javier.martinez@collabora.co.uk>
- <513E10AF.2080802@ti.com> <513E1B24.7020000@collabora.co.uk>
-Message-ID: <513E1E47.6080509@ti.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Mon, 11 Mar 2013 12:15:54 -0600
+Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
+In-Reply-To: <513D6F9C.9000100@firmworks.com>
+References: <20130308071443.GA5772@avionic-0098.mockup.avionic-design.de>
+ <20130308165228.GB4094@obsidianresearch.com>
+ <20130308191227.GA6551@avionic-0098.mockup.avionic-design.de>
+ <513A3F4F.2090501@firmworks.com>
+ <20130308200245.GC29435@obsidianresearch.com>
+ <513A7845.6040304@firmworks.com>
+ <20130309013152.GA3883@obsidianresearch.com>
+ <513C117D.6080800@firmworks.com>
+ <20130310065539.GA14704@obsidianresearch.com>
+ <513D6F9C.9000100@firmworks.com>
+Message-ID: <20130311181554.GA10992@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sun, Mar 10, 2013 at 07:46:04PM -1000, Mitch Bradley wrote:
 
-On 03/11/2013 12:57 PM, Javier Martinez Canillas wrote:
-> On 03/11/2013 06:13 PM, Jon Hunter wrote:
->>
+> So it seems that we are faced with two requirements that are somewhat at
+> odds with one another.
 > 
-> Hi Jon, thanks a lot for your feedback.
+> 1) Some of the root port bridge registers have to be accessed via config
+> space access functions so common PCI enumeration code will work.  To
+> represent this with the usual DT structure, the top root-complex needs
+> to define a 3/2 address space so its children
+> can have standard PCI reg properties.  Presumably, if those registers
+> are being programmed by common code, Marvell-specific code would
+> restrict its role to setting up config-space access functions, leaving
+> the actual touching of the registers to the common code.
 > 
->> On 03/10/2013 12:18 PM, Javier Martinez Canillas wrote:
->>> Besides being used to interface with external memory devices,
->>> the General-Purpose Memory Controller can be used to connect
->>> Pseudo-SRAM devices such as ethernet controllers to OMAP2+
->>> processors using the GPMC as a data bus.
->>>
->>> The actual mapping between the GPMC address space and OMAP2+
->>> address space is made using the GPMC DT "ranges" property.
->>> But also a explicit call to gpmc_cs_request() is needed.
->>
->> One problem with gpmc_cs_request() is that it will map the chip-select
->> to any physical location in the 1GB address space for the gpmc
->> controller. So in other words, it will ignore the ranges property
->> altogether. If you look at my code for NOR, I have added a
->> gpmc_cs_remap() function to remap the cs to the location as specified by
->> the device-tree.
->>
+> 2) Marvell chips have additional non-standard per-root-port registers
+> that generic PCI code would not understand.  These registers would be
+> touched only by Marvell-specific code.
 > 
-> I see, thanks for pointing this out.
+> The two kinds of registers are adjacent in MMIO space.  However, unless
+> I am misunderstanding this MV78230 manual, the highest "config header"
+> register index is 0x134, well below the 0x1000 size limit of a PCIe
+> config header.  Some of the extra registers are at 0x8xx, and others are
+> above 0x1800.
+
+The register block you are looking at is for the cores 'target end
+port mode', and the MMIO version is for internal use only, to allow
+the CPU to configure RO bits, and other tasks. The target core will
+allow access to that space via config cycles, either internally
+(through the indirection register) or externally (from the off-chip
+root complex) generated.
+
+However - the driver runs the core in a 'root port bridge mode' where
+the config header register block you are looking at is inhibited. The
+Marvell IP block requires software support to run in bridge mode. So
+Marvell really has only (2), while Tegra has only (1).
+
+> For requirement (2), the top node has a reg property listing the
+> portions of the address space that are consumed by the driver at the top
+> level instead of being passed through to the PCI addressing domain.  E.g.
 > 
->> Ideally we should change gpmc_cs_request() so we can pass the desire
->> base address that we want to map the gpmc cs too. I had started out that
->> way but it made the code some what messy and so I opted to create a
->> gpmc_cs_remap() function instead. The goal will be to get rid of
->> gpmc_cs_remap() once DT migration is completed and we can change
->> gpmc_cs_request() to map the cs to a specific address (see my FIXME
->> comment).
->>
+>   reg = <0xd0040800 0x1800>, <0xd0080800 0x1800>;
+
+Okay, so this is agreeing with what Thomas already has:
+
+http://www.spinics.net/lists/arm-kernel/msg228749.html
+
+With your two notes:
+ - Correct the pcie at x,y to match the OF spec
+ - Add a 'device_type = "pci"' to the pcie-controller node
+
+Is that right?
+ 
+> I said that it was bogus to use size=0x2000 for a config space header.
+>  That was based on an interpretation - which I now dislike - of the
+> meaning of 3-cell config addresses.  By that old interpretation,
+> size=0x800 would also be bogus, because bits 10-8 of the config address
+> are for the function number.
+
+Hum, I thought the spec was pretty clear on this point:
+
+ 00 denotes Configuration Space, in which case:
+  [..]
+     bbbbbbbb,ddddd,fff,rrrrrrrrr is the Configuration Space address
+     hh...hh,ll...ll must be zero
+
+And also the text at 2.1.4.4..
+
+So you get an 8 bit register offset, placed in the highest DW..
+
+Can you read things another way?
+
+Is there an updated spec that supports PCI-E extended config space?
+
+> Consider the following question, which I have never previously
+> considered, at least not explicitly:
+>
+> Q: What would be the 3-cell representation of the Command/Status
+> register address (offset 4) in device 1, function 1?
+
+Well, see section 11.1.2, where it provides an example
+for the 'Expansion ROM base address register (0x30)' as being:
+
+   02xxxx30 00000000 00000000 
+
+Also the f-code bindings say:
+
+ The data type 'config-addr' refers to the 'phys.hi' cell of the
+ numerical representation of a Configuration Space address.
+
+So there is an strong convention to use the 'r' bits as the
+offset..
+
+Further, review section 12 about how ranges should be treated - it
+specifically says that the b,d,f bits in ranges should be 0, and the
+child address should have those bits masked prior to searching the
+ranges.
+
+Section 12 would seem to forbid this:
+
+      ranges = <0x00000800 0 0          0xd4004000 0 0x00000800   /* Root port config header */
+                0x00001000 0 0          0xd4008000 0 0x00000800   /* Root port config header */
+
+Are you reading that differently?
+
+> > Two things bothered me
+> >   - Describing a CPU MMIO mapping with a config address space seems
+> >     wonky
 > 
-> By looking at gpmc_probe_onenand_child() and gpmc_probe_nand_child() I see that
-> these functions just allocates platform data and call gpmc_onenand_init() and
-> gpmc_nand_init() accordingly. So if I understood right these functions have the
-> same issue and need to call gpmc_cs_remap() too in order to map to the location
-> specified on the DT.
+> I agree that mapping config space is sort of a jarring concept, but I
+> think that's because PCs have polluted the mindspace, not because
+> there
 
-Ideally they should but it is not critical.
+I'm well aware of MMIO config space acces, that isn't so jarring. What
+is so jarring is the idea that the OF translation would work like:
 
-So today for NAND and ONENAND the ranges property is completely ignored
-(I just came to realise this recently). However, this works because the
-address mapped by gpmc_cs_request() is passed to the NAND/ONENAND
-drivers via the platform data. However, NOR (and your ethernet patch) we
-can't pass via platform data and therefore we must remap.
+<0x00000900 0 0> -> 0xd4004000
+<0x00000901 0 0> -> 0xd4004001
 
-This needs to be fixed, but it is not critical in terms that it won't
-crash. However, I fear your ethernet patch could :-o
+Which is completely unlike any ranges translation I've ever seen.
 
->> Your code probably works today because the cs is setup by the bootloader
->> and so when you request the cs in the kernel the mapping is not changed
->> from the bootloader settings. However, if the mapping in DT (ranges
->> property) is different from that setup by the bootloader then the kernel
->> would probably crash because the kernel would not remap it as expected.
->>
->>> So, this patch allows an ethernet chip to be defined as an
->>> GPMC child node an its chip-select memory address be requested.
->>>
->>> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->>> ---
->>>
->>> Jon,
->>>
->>> This patch assumes that we have solved somehow the issue that a
->>> call to request_irq() is needed before before using a GPIO as an
->>> IRQ and this is no longer the case when using from Device Trees.
->>>
->>> Anyway, this is independent as how we solve this, whether is
->>> using Jan's patch [1], adding a .request function pointer to
->>> irq_chip as suggested by Stephen [2], or any other approach.
->>>
->>> [1]: https://patchwork.kernel.org/patch/2009331/
->>> [2]: http://www.mail-archive.com/linux-omap at vger.kernel.org/msg85592.html
->>>
->>>  arch/arm/mach-omap2/gpmc.c |   45 ++++++++++++++++++++++++++++++++++++++++++++
->>>  1 files changed, 45 insertions(+), 0 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
->>> index 4fe9ee7..d1bf48b 100644
->>> --- a/arch/arm/mach-omap2/gpmc.c
->>> +++ b/arch/arm/mach-omap2/gpmc.c
->>> @@ -29,6 +29,7 @@
->>>  #include <linux/of.h>
->>>  #include <linux/of_mtd.h>
->>>  #include <linux/of_device.h>
->>> +#include <linux/of_address.h>
->>>  #include <linux/mtd/nand.h>
->>>  
->>>  #include <linux/platform_data/mtd-nand-omap2.h>
->>> @@ -1296,6 +1297,42 @@ static int gpmc_probe_onenand_child(struct platform_device *pdev,
->>>  }
->>>  #endif
->>>  
->>> +static int gpmc_probe_ethernet_child(struct platform_device *pdev,
->>> +				     struct device_node *child)
->>> +{
->>> +	int ret, cs;
->>> +	unsigned long base;
->>> +	struct resource res;
->>> +	struct platform_device *of_dev;
->>> +
->>> +	if (of_property_read_u32(child, "reg", &cs) < 0) {
->>> +		dev_err(&pdev->dev, "%s has no 'reg' property\n",
->>> +			child->full_name);
->>> +		return -ENODEV;
->>> +	}
->>> +
->>> +	if (of_address_to_resource(child, 0, &res)) {
->>> +		dev_err(&pdev->dev, "%s has malformed 'reg' property\n",
->>> +			child->full_name);
->>> +		return -ENODEV;
->>> +	}
->>> +
->>> +	ret = gpmc_cs_request(cs, resource_size(&res), &base);
->>> +	if (IS_ERR_VALUE(ret)) {
->>> +		dev_err(&pdev->dev, "cannot request GPMC CS %d\n", cs);
->>> +		return ret;
->>> +	}
->>> +
->>> +	of_dev = of_platform_device_create(child, NULL, &pdev->dev);
->>> +	if (!of_dev) {
->>> +		dev_err(&pdev->dev, "cannot create platform device for %s\n",
->>> +			child->full_name);
->>> +		return -ENODEV;
->>> +	}
->>> +
->>> +	return 0;
->>> +}
->>
->> So this function does not setup the cs at all and so that means you are
->> dependent on having the bootloader configure the cs. I would really like
->> to get away from that sort of dependency. In fact I am wondering if we
->> could make the gpmc_probe_nor() function a gpmc_probe_generic() that we
->> can use for both nor and ethernet as we are doing very similar things
->> (if we add the timings and gpmc settings to the ethernet binding).
->>
-> 
-> Yes, I also thought about a gmpc_probe_generic() for all GMPC child nodes since
-> the chip-select setup is the same for all of them.
-> 
-> The problem I saw was that gpmc_probe_{onenand,nand}_child() were just wrappers
-> around gpmc_{onenand,nand}_init() and since the init functions call
-> gpmc_cs_request(), I couldn't have a generic probe that call gpmc_cs_request()
-> for all childs.
+Basically, I look at how the register offset is encoded in the higest
+dword plus the statement in section 12, and and conclude the there
+wasn't an intention to model a memory map'd config space through OF.
 
-Yes I was thinking about leaving nand and onenand the way they were but
-using probe_generic() for nor and ethernet.
+What am I missing here?
 
-> But since we should probably have to change this to call gpmc_cs_remap() besides
-> gpmc_cs_request(), I think is better to not use gpmc_{onenand,nand}_init() at
-> all and make this somehow generic.
-
-Yes but may be we could do this longer term and just get ethernet
-working for now.
-
-> Actually, since the mapping (and the IORESOURCE_MEM struct resource allocation)
-> is made by the DT core using the "ranges" property. I wonder if we could add
-> some callback function (e.g: .range_request() ) that can be set by memory
-> controllers that want to take an action (such as calling gpmc_cs_request() and
-> gpmc_cs_remap() ) once each element in the "ranges" vector is processed by the
-> DT core.
-
-Possibly but again I think that should be look at longer term. I think
-you are on the right path. Care to see if you can make gpmc_probe_nor
-into gpmc_probe_generic and make this work for ethernet too? Leave nand
-and onenand as-is for now.
-
->> Also I think we need to add some DT binding documentation for this as well.
->>
-> 
-> +1
-
-Thanks
-Jon
+Regards,
+Jason
