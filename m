@@ -1,31 +1,65 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Mon, 11 Mar 2013 17:34:59 +0200
-Subject: Dead mappings and drivers in MTD
-Message-ID: <1363016099.3348.47.camel@sauron.fi.intel.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Mon, 11 Mar 2013 16:39:56 +0100
+Subject: [PATCH 1/3] can: at91_can: add dt support
+In-Reply-To: <513DF46E.7000903@pengutronix.de>
+References: <1362763842-14924-1-git-send-email-ludovic.desroches@atmel.com>
+ <1362763842-14924-2-git-send-email-ludovic.desroches@atmel.com>
+ <513A2365.5050803@pengutronix.de>
+ <20130311091722.GA2572@ludovic.desroches@atmel.com>
+ <513DF46E.7000903@pengutronix.de>
+Message-ID: <20130311153956.GB3198@ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi MTD folks,
+On Mon, Mar 11, 2013 at 04:12:46PM +0100, Marc Kleine-Budde wrote:
+> On 03/11/2013 10:17 AM, Ludovic Desroches wrote:
+> > On Fri, Mar 08, 2013 at 06:44:05PM +0100, Marc Kleine-Budde wrote:
+> >> On 03/08/2013 06:30 PM, ludovic.desroches at atmel.com wrote:
+> >>> From: Ludovic Desroches <ludovic.desroches@atmel.com>
+> >>>
+> >>> Add device tree support.
+> >>>
+> >>> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> >>> ---
+> >>>  .../devicetree/bindings/net/can/atmel-can.txt      | 14 ++++
+> >>>  drivers/net/can/at91_can.c                         | 75 ++++++++++++++++------
+> >>>  2 files changed, 70 insertions(+), 19 deletions(-)
+> >>>  create mode 100644 Documentation/devicetree/bindings/net/can/atmel-can.txt
+> >>>
+> >>> diff --git a/Documentation/devicetree/bindings/net/can/atmel-can.txt b/Documentation/devicetree/bindings/net/can/atmel-can.txt
+> >>> new file mode 100644
+> >>> index 0000000..69381db
+> >>> --- /dev/null
+> >>> +++ b/Documentation/devicetree/bindings/net/can/atmel-can.txt
+> >>> @@ -0,0 +1,14 @@
+> >>> +* AT91 CAN *
+> >>> +
+> >>> +Required properties:
+> >>> +  - compatible: Should be "atmel,at91sam9263-can" or "atmel,at91sam9x5-can"
+> >>
+> >> On imx we use the oldest SoC with that IP available. Which strategy are
+> >> you following on at91?
+> >>
+> > 
+> > We are using the same strategy.
+> 
+> But "atmel,at91sam9x5-can" isn't a specific SoC, probably a SoC family.
+> Or are you using "atmel,at91sam9x5-can" for the other devices in the DT,
+> too.
+> 
 
-we have huge amount of drivers, espacially mapping drives in
-'drivers/mtd', and for sure may of them are for ancient devices which
-are long dead and not supported by modern kernels anyway. I would like
-to do a small clean-up. It is difficult to judge which ones are dead for
-me, so I am asking the community to help. Thanks!
+You are right at91sam9x5 is not a specific SoC but a family of SoCs:
+at91sam9g25, at91sam9g35, at91sam9x25 and at91sam9x35. This compatible string
+is used for all the devices from and after the at91sam9x5 family: at91sam9n12,
+samad3x, etc.
 
-There are few easy cases - some drivers depend on Kconfig symbols which
-are not defined anywhere - I guess these are clear candidates for
-removal. For example this one:
+> I picked at91sam9x5-can for the non devicetree driver out of the blue,
+> as there was no scheme established, yet. I'm not hanging on that name,
+> I'd rather appreciate to follow the common at91 DT rules.
 
-config MTD_DBOX2
-        tristate "CFI Flash device mapped on D-Box2"
-        depends on DBOX2 && MTD_CFI_INTELSTD && MTD_CFI_INTELEXT && MTD_CFI_AMDSTD
-        help
-          This enables access routines for the flash chips on the Nokia/Sagem
-          D-Box 2 board. If you have one of these boards and would like to use
+It follows at91 Dt rules, we have atmel,at91sam9x5-i2c, atmel,at91sam9x5-gpio
+and others.
 
-Grepping for "DBOX2" gives nothing.
+Regards
 
--- 
-Best Regards,
-Artem Bityutskiy
+Ludovic
