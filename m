@@ -1,39 +1,31 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 11 Mar 2013 14:51:37 -0600
-Subject: [PATCH 05/10] ARM: dt: tegra: add bindings of power management
- configurations for PMC
-In-Reply-To: <1362654973.1890.28.camel@jlo-ubuntu-64.nvidia.com>
-References: <1362397241-5786-1-git-send-email-josephl@nvidia.com>
- <51363F67.8040200@wwwdotorg.org>
- <1362654973.1890.28.camel@jlo-ubuntu-64.nvidia.com>
-Message-ID: <513E43D9.9060109@wwwdotorg.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 11 Mar 2013 20:53:11 +0000
+Subject: [GIT PULL] mxs fixes for 3.9, take 2
+In-Reply-To: <20130311142402.GE25910@S2101-09.ap.freescale.net>
+References: <20130311142402.GE25910@S2101-09.ap.freescale.net>
+Message-ID: <201303112053.11330.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/07/2013 04:16 AM, Joseph Lo wrote:
-> On Wed, 2013-03-06 at 02:54 +0800, Stephen Warren wrote:
->> On 03/04/2013 04:40 AM, Joseph Lo wrote:
->>> The PMC mostly controls the entry and exit of the system from different
->>> sleep modes. Different platform or system may have different configurations.
->>> The power management configurations of PMC is represented as some properties.
->>> The system needs to define the properties when the system supports deep sleep
->>> mode (i.e. suspend).
->>
->> One overall question here: For LP0, the idea is that the bootloader
->> provides the AVP boot code, puts it in RAM, passes the address to the
->> kernel, which then arranges for that code to be executed when the system
->> resumes from LP0. Why does the bootloader have to provide the code? Why
->> can't the AVP code simply be part of the kernel, just like e.g. the main
->> CPU's hotplug/secondary-power-on/power-saving reset vector is part of
->> the kernel? If we did that, it'd remove any need for bootloader support
->> for LP0 - the kernel would manage it entirely internally. That seems
->> much simpler.
+On Monday 11 March 2013, Shawn Guo wrote:
+> The following changes since commit 95381f38c0ed85be732553bf56f613ce701d411b:
 > 
-> Yes, I had exactly the same question before.
+>   ARM: mxs: ocotp: Fix sparse warning (2013-03-04 10:07:28 +0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.linaro.org/people/shawnguo/linux-2.6.git tags/mxs-fixes-3.9-2
+> 
+> for you to fetch changes up to 4a38a8502b0ea4ecbe86f60e0b2416771c51888d:
+> 
+>   ARM: mxs: cfa10049: Fix fb initialisation function (2013-03-07 10:54:23 +0800)
+> 
+> ----------------------------------------------------------------
+> The 2nd mxs fixes for 3.9:
+>  - Fix an error caused by incorrect conflict resolution when
+>    applying the patch
+> 
 
-I think the downstream discussion we had concluded that we need to keep
-doing this, so we do need the lp0-vec property in DT.
+Applied to fixes branch, thanks!
 
-The reason is that LP0 vector code is sometimes encrypted, and the
-kernel can't perform that encryption, and hence can't provide the code
-itself - the code must be given to the kernel.
+	Arnd
