@@ -1,40 +1,34 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 11 Mar 2013 10:28:48 -0700
-Subject: [PATCH 03/10] ARM: smp_twd: Divorce smp_twd from local timer API
-In-Reply-To: <513A8B22.5030008@codeaurora.org>
-References: <20130308004011.GD11806@atomide.com>
- <51393B59.3070200@codeaurora.org>
- <20130308180730.GE11806@atomide.com>
- <513A2B20.30805@codeaurora.org>
- <20130308194802.GG11806@atomide.com>
- <513A40EF.8050403@codeaurora.org>
- <20130308200811.GJ11806@atomide.com>
- <513A4774.3040605@codeaurora.org>
- <20130308202947.GK11806@atomide.com>
- <513A8B22.5030008@codeaurora.org>
-Message-ID: <20130311172847.GP26093@atomide.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 11 Mar 2013 11:30:02 -0600
+Subject: [PATCH v4 0/2] Uncompress debug for multiplatform
+In-Reply-To: <20130311170350.GM4977@n2100.arm.linux.org.uk>
+References: <1363001737-8745-1-git-send-email-shawn.guo@linaro.org>
+ <20130311170350.GM4977@n2100.arm.linux.org.uk>
+Message-ID: <513E149A.2060704@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stephen Boyd <sboyd@codeaurora.org> [130308 17:10]:
-> On 03/08/13 12:29, Tony Lindgren wrote:
-> > Applying that does not seem to help, but you might want to get vexpress
-> > running anyways for some multiplatform sanity checks.
-> >
-> > I just built and installed qemu-linaro from their git, then ran the
-> > command above. Looks like stock qemu does not work for vexpress for some
-> > reason. You can probably use a dummy initrd and rootfs to debug this
-> > though :)
+On 03/11/2013 11:03 AM, Russell King - ARM Linux wrote:
+> On Mon, Mar 11, 2013 at 07:35:35PM +0800, Shawn Guo wrote:
+>> Instead of giving zero support of uncompress debug for multiplatform
+>> build, the series turns uncompress debug into one part of DEBUG_LL
+>> support.  When DEBUG_LL is turned on for a particular platform,
+>> uncompress debug works too for that platform.
+>>
+>> OMAP is an exception here.  OMAP low-level debug code places data
+>> in the .data section, and that is allowed in decompressor.  That's
+>> why Kconfig symbol DEBUG_UNCOMPRESS that controls multiplatform
+>> uncompress debug support is defined with !DEBUG_OMAP2PLUS_UART.
+>>
+>> Changes since v3:
+>>  - Create Kconfig symbol DEBUG_UNCOMPRESS for building in
+>>    multiplatform uncompress debug support, so that we can leave
+>>    out the platform which is part of multiplatform but not ready
+>>    for being part of uncompress debug like OMAP example.
 > 
-> So my patchset didn't break qemu?
+> Wasn't Tegra also having problems with this as well?
 
-Sorry if that was unclear: Yes your patchset breaks booting vexpress
-in qemu.
-
-What I meant earlier is that I've ever gotten the qemu-linaro to boot
-vexpress and the unpatches qemu did not seem to boot vexpress at all
-the last time I tried few months back.
-
-Regards,
-
-Tony
+Tegra isn't converted to multi-platform yet. I hope to in 3.10. If this
+series is something that could be put into an arm-soc topic branch for
+me to build on during the Tegra conversion, that might be useful
+(although I haven't looked at the series to be sure).
