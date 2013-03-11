@@ -1,52 +1,102 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Mon, 11 Mar 2013 10:57:10 +0100
-Subject: [PATCH 3/3] can: Kconfig: CAN_AT91 depends on ARCH_AT91
-In-Reply-To: <20130311092419.GB2572@ludovic.desroches@atmel.com>
-References: <1362763842-14924-1-git-send-email-ludovic.desroches@atmel.com>
- <1362763842-14924-4-git-send-email-ludovic.desroches@atmel.com>
- <513A2396.4080508@pengutronix.de>
- <20130311092419.GB2572@ludovic.desroches@atmel.com>
-Message-ID: <513DAA76.6040803@pengutronix.de>
+From: manishv.b@ti.com (Vishwanathrao Badarkhe, Manish)
+Date: Mon, 11 Mar 2013 15:30:02 +0530
+Subject: [PATCH] ARM: dts: omap2plus: remove interrupt-parent property
+Message-ID: <1362996002-15552-1-git-send-email-manishv.b@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/11/2013 10:24 AM, Ludovic Desroches wrote:
-> On Fri, Mar 08, 2013 at 06:44:54PM +0100, Marc Kleine-Budde wrote:
->> On 03/08/2013 06:30 PM, ludovic.desroches at atmel.com wrote:
->>> From: Ludovic Desroches <ludovic.desroches@atmel.com>
->>>
->>> SAMA5D3 devices also embed CAN feature. Moreover if we want to produce a single
->>> kernel image (at least for Atmel devices) it is not useful to be too
->>> restrictive.
->>
->> If it compiles on other ARMs aswell we can make it depend on ARCH_ARM.
->> 
-> I was thinking about it but I am wondering if it makes sense. Should we have a
-> non atmel device with atmel can?
+Removed interrupt-parent property from dts file as it is already
+with root node in dtsi file.
 
-I don't know if atmels sells the IP core separately, but ARM Linux is
-going towards a multi ARCH kernel anyways. So the can core should
-compile on non atmel and/or multi arch kernels.
+Signed-off-by: Vishwanathrao Badarkhe, Manish <manishv.b@ti.com>
+---
+:100644 100644 f624dc8... 36e839a... M	arch/arm/boot/dts/omap3-beagle.dts
+:100644 100644 e8ba1c2... a5375fd... M	arch/arm/boot/dts/omap3-evm.dts
+:100644 100644 4122efe... 389c9c7... M	arch/arm/boot/dts/omap4-panda.dts
+:100644 100644 43e5258... cdf5dfd... M	arch/arm/boot/dts/omap4-sdp.dts
+:100644 100644 6601e6a... 1d4a9d4... M	arch/arm/boot/dts/omap4-var-som.dts
+ arch/arm/boot/dts/omap3-beagle.dts  |    1 -
+ arch/arm/boot/dts/omap3-evm.dts     |    1 -
+ arch/arm/boot/dts/omap4-panda.dts   |    2 --
+ arch/arm/boot/dts/omap4-sdp.dts     |    2 --
+ arch/arm/boot/dts/omap4-var-som.dts |    1 -
+ 5 files changed, 0 insertions(+), 7 deletions(-)
 
-> I have no position about this point, if you think it's better to make
-> it depending onto ARCH_ARM, I'll change it if there is no compilation
-> issue.
-
-Please make it so.
-
-regards,
-Marc
-
+diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
+index f624dc8..36e839a 100644
+--- a/arch/arm/boot/dts/omap3-beagle.dts
++++ b/arch/arm/boot/dts/omap3-beagle.dts
+@@ -46,7 +46,6 @@
+ 	twl: twl at 48 {
+ 		reg = <0x48>;
+ 		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
+-		interrupt-parent = <&intc>;
+ 	};
+ };
+ 
+diff --git a/arch/arm/boot/dts/omap3-evm.dts b/arch/arm/boot/dts/omap3-evm.dts
+index e8ba1c2..a5375fd 100644
+--- a/arch/arm/boot/dts/omap3-evm.dts
++++ b/arch/arm/boot/dts/omap3-evm.dts
+@@ -34,7 +34,6 @@
+ 	twl: twl at 48 {
+ 		reg = <0x48>;
+ 		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
+-		interrupt-parent = <&intc>;
+ 	};
+ };
+ 
+diff --git a/arch/arm/boot/dts/omap4-panda.dts b/arch/arm/boot/dts/omap4-panda.dts
+index 4122efe..389c9c7 100644
+--- a/arch/arm/boot/dts/omap4-panda.dts
++++ b/arch/arm/boot/dts/omap4-panda.dts
+@@ -119,7 +119,6 @@
+ 		reg = <0x48>;
+ 		/* SPI = 0, IRQ# = 7, 4 = active high level-sensitive */
+ 		interrupts = <0 7 4>; /* IRQ_SYS_1N cascaded to gic */
+-		interrupt-parent = <&gic>;
+ 	};
+ 
+ 	twl6040: twl at 4b {
+@@ -127,7 +126,6 @@
+ 		reg = <0x4b>;
+ 		/* SPI = 0, IRQ# = 119, 4 = active high level-sensitive */
+ 		interrupts = <0 119 4>; /* IRQ_SYS_2N cascaded to gic */
+-		interrupt-parent = <&gic>;
+ 		ti,audpwron-gpio = <&gpio4 31 0>;  /* gpio line 127 */
+ 
+ 		vio-supply = <&v1v8>;
+diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
+index 43e5258..cdf5dfd 100644
+--- a/arch/arm/boot/dts/omap4-sdp.dts
++++ b/arch/arm/boot/dts/omap4-sdp.dts
+@@ -221,7 +221,6 @@
+ 		reg = <0x48>;
+ 		/* SPI = 0, IRQ# = 7, 4 = active high level-sensitive */
+ 		interrupts = <0 7 4>; /* IRQ_SYS_1N cascaded to gic */
+-		interrupt-parent = <&gic>;
+ 	};
+ 
+ 	twl6040: twl at 4b {
+@@ -229,7 +228,6 @@
+ 		reg = <0x4b>;
+ 		/* SPI = 0, IRQ# = 119, 4 = active high level-sensitive */
+ 		interrupts = <0 119 4>; /* IRQ_SYS_2N cascaded to gic */
+-		interrupt-parent = <&gic>;
+ 		ti,audpwron-gpio = <&gpio4 31 0>;  /* gpio line 127 */
+ 
+ 		vio-supply = <&v1v8>;
+diff --git a/arch/arm/boot/dts/omap4-var-som.dts b/arch/arm/boot/dts/omap4-var-som.dts
+index 6601e6a..1d4a9d4 100644
+--- a/arch/arm/boot/dts/omap4-var-som.dts
++++ b/arch/arm/boot/dts/omap4-var-som.dts
+@@ -35,7 +35,6 @@
+ 		reg = <0x48>;
+ 		/* SPI = 0, IRQ# = 7, 4 = active high level-sensitive */
+ 		interrupts = <0 7 4>; /* IRQ_SYS_1N cascaded to gic */
+-		interrupt-parent = <&gic>;
+ 	};
+ };
+ 
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130311/1be12da8/attachment.sig>
+1.7.4.1
