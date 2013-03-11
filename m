@@ -1,136 +1,75 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Mon, 11 Mar 2013 16:52:55 +0100
-Subject: [PATCH 01/13] usb: phy: nop: Add device tree support and binding
- information
-In-Reply-To: <20130205072637.GA32118@arwen.pp.htv.fi>
-References: <1359993540-20780-1-git-send-email-rogerq@ti.com>
- <1359993540-20780-2-git-send-email-rogerq@ti.com>
- <20130205072637.GA32118@arwen.pp.htv.fi>
-Message-ID: <513DFDD7.7000801@pengutronix.de>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Mon, 11 Mar 2013 16:40:16 +0100
+Subject: [PATCH] genirq: move mask_cache into struct irq_chip_type
+In-Reply-To: <alpine.LFD.2.02.1303061518160.22263@ionos>
+References: <20110720234537.GD16297@kw.sim.vm.gnt>
+ <1311295758-27493-1-git-send-email-simon@sequanux.org>
+ <CAMAG_edBy1kjmEGDD76-C5T0xtha9YxMFJ6B3D8A5kHBwQ1PMQ@mail.gmail.com>
+ <20110726153930.GG16297@kw.sim.vm.gnt>
+ <CAMAG_ee8YBvDsdQ2zNfn-7qdyTmVYBVb8xykMMv4pg8tEswJgg@mail.gmail.com>
+ <5134AF7E.5010605@keymile.com>
+ <20130304154454.GG21620@kw.sim.vm.gnt>
+ <alpine.LFD.2.02.1303051114370.22263@ionos>
+ <20130306132944.GJ21620@kw.sim.vm.gnt>
+ <alpine.LFD.2.02.1303061518160.22263@ionos>
+Message-ID: <20130311154016.GM21620@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/05/2013 08:26 AM, Felipe Balbi wrote:
-> Hi,
+On Wed, Mar 06, 2013 at 04:19:30PM +0100, Thomas Gleixner wrote:
+> On Wed, 6 Mar 2013, Simon Guinot wrote:
 > 
-> On Mon, Feb 04, 2013 at 05:58:48PM +0200, Roger Quadros wrote:
->> The PHY clock, clock rate, VCC regulator and RESET regulator
->> can now be provided via device tree.
->>
->> Signed-off-by: Roger Quadros <rogerq@ti.com>
->> ---
->>  .../devicetree/bindings/usb/usb-nop-xceiv.txt      |   34 ++++++++++++++++++++
->>  drivers/usb/otg/nop-usb-xceiv.c                    |   31 ++++++++++++++++++
->>  2 files changed, 65 insertions(+), 0 deletions(-)
->>  create mode 100644 Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
->>
->> diff --git a/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt b/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
->> new file mode 100644
->> index 0000000..d7e2726
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
->> @@ -0,0 +1,34 @@
->> +USB NOP PHY
->> +
->> +Required properties:
->> +- compatible: should be usb-nop-xceiv
->> +
->> +Optional properties:
->> +- clocks: phandle to the PHY clock. Use as per Documentation/devicetree
->> +  /bindings/clock/clock-bindings.txt
->> +  This property is required if clock-frequency is specified.
->> +
->> +- clock-names: Should be "main_clk"
->> +
->> +- clock-frequency: the clock frequency (in Hz) that the PHY clock must
->> +  be configured to.
->> +
->> +- vcc-supply: phandle to the regulator that provides RESET to the PHY.
->> +
->> +- reset-supply: phandle to the regulator that provides power to the PHY.
->> +
->> +Example:
->> +
->> +	hsusb1_phy {
->> +		compatible = "usb-nop-xceiv";
->> +		clock-frequency = <19200000>;
->> +		clocks = <&osc 0>;
->> +		clock-names = "main_clk";
->> +		vcc-supply = <&hsusb1_vcc_regulator>;
->> +		reset-supply = <&hsusb1_reset_regulator>;
->> +	};
->> +
->> +hsusb1_phy is a NOP USB PHY device that gets its clock from an oscillator
->> +and expects that clock to be configured to 19.2MHz by the NOP PHY driver.
->> +hsusb1_vcc_regulator provides power to the PHY and hsusb1_reset_regulator
->> +controls RESET.
->> diff --git a/drivers/usb/otg/nop-usb-xceiv.c b/drivers/usb/otg/nop-usb-xceiv.c
->> index ac027a1..adbb7ab 100644
->> --- a/drivers/usb/otg/nop-usb-xceiv.c
->> +++ b/drivers/usb/otg/nop-usb-xceiv.c
->> @@ -34,6 +34,7 @@
->>  #include <linux/slab.h>
->>  #include <linux/clk.h>
->>  #include <linux/regulator/consumer.h>
->> +#include <linux/of.h>
->>  
->>  struct nop_usb_xceiv {
->>  	struct usb_phy		phy;
->> @@ -138,8 +139,19 @@ static int nop_set_host(struct usb_otg *otg, struct usb_bus *host)
->>  	return 0;
->>  }
->>  
->> +static void nop_xeiv_get_dt_pdata(struct device *dev,
+> > On Tue, Mar 05, 2013 at 11:15:04AM +0100, Thomas Gleixner wrote:
+> > > On Mon, 4 Mar 2013, Simon Guinot wrote:
+> > > > On Mon, Mar 04, 2013 at 03:28:14PM +0100, Gerlando Falauto wrote:
+> > > > 
+> > > > AFAIK this issue is still here. I include the current Orion maintainers
+> > > > in the Cc list.
+> > > 
+> > > Can you please resend the patch?
+> > 
+> > Hi Thomas,
+> > 
+> > Do you agree with the original patch concept: moving mask_cache from
+> > struct irq_chip_generic into struct irq_chip_type ?
 > 
-> asking to remove, but xeiv != xceiv :-)
+> Not really. See below.
+>  
+> > This allows to handle the irq_chips which have separate mask registers
+> > for the edge and level interrupts. At the time of this patch, this was
+> > the only existing case.
+> > 
+> > Saeed objected that the patch was not correct because this was breaking
+> > "hypothetic" devices with multiple irq_chip_type and a single mask
+> > register.
 > 
->> +				struct nop_usb_xceiv_platform_data *pdata)
->> +{
->> +	struct device_node *node = dev->of_node;
->> +	u32 clk_rate;
->> +
->> +	if (!of_property_read_u32(node, "clock-frequency", &clk_rate))
->> +		pdata->clk_rate = clk_rate;
->> +}
->> +
->>  static int nop_usb_xceiv_probe(struct platform_device *pdev)
->>  {
->> +	struct device *dev = &pdev->dev;
->>  	struct nop_usb_xceiv_platform_data *pdata = pdev->dev.platform_data;
->>  	struct nop_usb_xceiv	*nop;
->>  	enum usb_phy_type	type = USB_PHY_TYPE_USB2;
->> @@ -153,6 +165,17 @@ static int nop_usb_xceiv_probe(struct platform_device *pdev)
->>  	if (!nop->phy.otg)
->>  		return -ENOMEM;
->>  
->> +	if (dev->of_node) {
->> +		pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
->> +		if (!pdata) {
->> +			dev_err(dev, "Memory allocation failure\n");
->> +			return -ENOMEM;
->> +		}
->> +		nop_xeiv_get_dt_pdata(dev, pdata);
+> Not so hypothetic. There _are_ irq controllers out there which use the
+> same mask register for both level and edge type irqs.
+
+Sure, but if the same mask register is used, then a single irq_chip_type
+should be able to handle both level and edge interrupts ? I mean, if one
+needs to register different irq_chip_type for edge and level interrupts,
+it is most likely because the registers are not the same...
+
+Simon
+
 > 
-> actually, I would prefer to not create pdata at all. I mean, ideally
-> pdata would be used to initialize fields in your own structure, so first
-> move clk_rate to your own private structure, copy pdata's clk_rate value
-> to that, then you don't need this hackery when using DT.
-
-As far as I can see, clk_rate is never used, but in the probe function.
-Why should it be saved into the private data structure at all?
-
-Marc
-
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
+> > The other option was to provide some dedicated irq_mask handlers for the
+> > Orion irq chip.
+> 
+> I'd rather refactor the core code so it uses a pointer to the
+> mask_cache. The default would be to let it point to gc->mask_cache and
+> optionally let it point to ct->mask_cache. We'd need to store the flag
+> in the gc struct so we can redirect the pointer to the ct->mask_cache
+> in irq_setup_alt_chip().
+> 
+> Thanks,
+> 
+> 	tglx
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130311/9b8ca4b8/attachment.sig>
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130311/ea7b9c97/attachment.sig>
