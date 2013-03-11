@@ -1,30 +1,26 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 11 Mar 2013 10:46:29 -0600
-Subject: [PATCH 3/6] arm: dts: vt8500: Update Wondermedia SoC dtsi files
- for pinctrl driver
-In-Reply-To: <1362807578-23089-4-git-send-email-linux@prisktech.co.nz>
-References: <1362807578-23089-1-git-send-email-linux@prisktech.co.nz>
- <1362807578-23089-4-git-send-email-linux@prisktech.co.nz>
-Message-ID: <513E0A65.4000604@wwwdotorg.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 11 Mar 2013 16:47:41 +0000
+Subject: [PATCH] ARM:net: an issue for k which is u32, never < 0
+In-Reply-To: <20130310.171238.330349067962026661.davem@davemloft.net>
+References: <513BECDA.3030803@asianux.com>
+ <20130310.171238.330349067962026661.davem@davemloft.net>
+Message-ID: <20130311164741.GL4977@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/08/2013 10:39 PM, Tony Prisk wrote:
-> This patch adds pinctrl nodes to the VIA VT8500 and Wondermedia SoC dtsi
-> files to support the pinctrl driver.
+On Sun, Mar 10, 2013 at 05:12:38PM -0400, David Miller wrote:
+> From: Chen Gang <gang.chen@asianux.com>
+> Date: Sun, 10 Mar 2013 10:15:54 +0800
+> 
+> > 
+> >   k is u32 which never < 0, need type cast, or cause issue.
+> > 
+> > Signed-off-by: Chen Gang <gang.chen@asianux.com>
+> 
+> Who will apply this, ARM folks or me?
 
-> diff --git a/arch/arm/boot/dts/vt8500.dtsi b/arch/arm/boot/dts/vt8500.dtsi
+I'm happy if you wish to take the patch:
 
-> +		pinctrl: pinctrl at d8110000 {
-> +			compatible = "via,vt8500-pinctrl";
-> +			gpio-controller;
-> +			reg = <0xd8110000 0x10000>;
-> +			#gpio-cells = <2>;
-> +			wm,pinmux = <0x00000001 0x00000001>;
-> +		};
+Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-In the binding documentation, "wm,pinmux" is listed under "optional
-sub-node properties", but here the property is included in the main
-node, not a sub-node.
-
-I'm a little confused what this property means then...
+Thanks.
