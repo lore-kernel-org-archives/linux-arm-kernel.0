@@ -1,28 +1,31 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 11 Mar 2013 10:36:55 -0700
-Subject: [PATCH v4 2/2] ARM: uncompress debug support for multiplatform
- build
-In-Reply-To: <1363001737-8745-3-git-send-email-shawn.guo@linaro.org>
-References: <1363001737-8745-1-git-send-email-shawn.guo@linaro.org>
- <1363001737-8745-3-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20130311173655.GQ26093@atomide.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 11 Mar 2013 11:38:06 -0600
+Subject: [PATCH V2 3/5] ARM: DT: tegra114:add aliases and DMA requestor
+ for serial controller
+In-Reply-To: <1362852678-13421-4-git-send-email-ldewangan@nvidia.com>
+References: <1362852678-13421-1-git-send-email-ldewangan@nvidia.com>
+ <1362852678-13421-4-git-send-email-ldewangan@nvidia.com>
+Message-ID: <513E167E.8030000@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Shawn Guo <shawn.guo@linaro.org> [130311 04:39]:
-> Instead of giving zero support of uncompress debug for multiplatform
-> build, the patch turns uncompress debug into one part of DEBUG_LL
-> support.  When DEBUG_LL is turned on for a particular platform,
-> uncompress debug works too for that platform.
+On 03/09/2013 11:11 AM, Laxman Dewangan wrote:
+> Add APB DMA requestor and serial aliases for serial controller.
+> There will be two serial driver i.e. 8250 based simple serial driver
+> and APB DMA based serial driver for higher baudrate and performace.
 > 
-> OMAP is an exception here.  OMAP low-level debug code places data
-> in the .data section, and that is allowed in decompressor.  That's
-> why Kconfig symbol DEBUG_UNCOMPRESS that controls multiplatform
-> uncompress debug support is defined with !DEBUG_OMAP2PLUS_UART.
+> The simple serial driver get enabled with compatible "nvidia,tegra114-uart",
+> "nvidia,tegra20-uart" and APB DMA based driver will get enabled with
+> compatible "nvidia,tegra114-hsuart", "nvidia,tegra30-hsuart".
+> 
+> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+> ---
+> Changes from V1:
+> - Remove UARTB car id correction. Make the compatible with tegra114 and
+>   tegra30 for hsuart and tegra20 for simple uart driver.
 
-This seems like a good solution for now. Later on we can rip out
-the use .data for omap and just rely on ifdefs for all the port
-variables if we conclude that we won't try to attempt any runtime
-autodetection for omaps. So for both patches:
-
-Acked-by: Tony Lindgren <tony@atomide.com>
+Why the difference for the two drivers? Either the HW is compatible with
+all 3 of 114/30/20 (in which case you only need list 114/20 in the
+compatible value), or it's not compatible with either 30/20, since we
+already know that 30/20 are compatible with each-other (in which case
+you should only list 114 in the compatible property).
