@@ -1,103 +1,74 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Mon, 11 Mar 2013 16:40:25 +0530
-Subject: [PATCH 7/8] memory: emif: errata i743: Prohibit usage of
- Power-Down mode
-In-Reply-To: <513D708D.1000501@ti.com>
-References: <1362978365-5593-1-git-send-email-lokeshvutla@ti.com>
- <1362978365-5593-8-git-send-email-lokeshvutla@ti.com>
- <513D708D.1000501@ti.com>
-Message-ID: <513DBBA1.3090606@ti.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon, 11 Mar 2013 12:06:37 +0100
+Subject: [rtc-linux] [PATCH 3/3] ARM: at91: fix hanged boot
+In-Reply-To: <20130311100243.GD8797@localhost>
+References: <1362747103-21445-1-git-send-email-jhovold@gmail.com>
+ <1362747103-21445-4-git-send-email-jhovold@gmail.com>
+ <20130308160258.GD4590@game.jcrosoft.org>
+ <20130311100243.GD8797@localhost>
+Message-ID: <20130311110637.GG4590@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-On Monday 11 March 2013 11:20 AM, Santosh Shilimkar wrote:
-> On Monday 11 March 2013 10:36 AM, Lokesh Vutla wrote:
->> From: Grygorii Strashko <grygorii.strashko@ti.com>
->>
->> ERRATA DESCRIPTION :
->> The EMIF supports power-down state for low power. The EMIF
->> automatically puts the SDRAM into power-down after the memory is
->> not accessed for a defined number of cycles and the
->> EMIF_PWR_MGMT_CTRL[10:8] REG_LP_MODE bit field is set to 0x4.
->> As the EMIF supports automatic output impedance calibration, a ZQ
->> calibration long command is issued every time it exits active
->> power-down and precharge power-down modes. The EMIF waits and
->> blocks any other command during this calibration.
->> The EMIF does not allow selective disabling of ZQ calibration upon
->> exit of power-down mode. Due to very short periods of power-down
->> cycles, ZQ calibration overhead creates bandwidth issues and
->> increases overall system power consumption. On the other hand,
->> issuing ZQ calibration long commands when exiting self-refresh is
->> still required.
->>
->> WORKAROUND :
->> Because there is no power consumption benefit of the power-down due
->> to the calibration and there is a performance risk, the guideline
->> is to not allow power-down state and, therefore, to not have set
->> the EMIF_PWR_MGMT_CTRL[10:8] REG_LP_MODE bit field to 0x4.
->>
->> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
->> Signed-off-by: Vitaly Chernooky <vitaly.chernooky@ti.com>
->> Signed-off-by: Oleksandr Dmytryshyn <oleksandr.dmytryshyn@ti.com>
->> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
->> ---
-> Nice changelog.
->
->>   drivers/memory/emif.c |   35 +++++++++++++++++++++++++++++++++++
->>   1 file changed, 35 insertions(+)
->>
->> diff --git a/drivers/memory/emif.c b/drivers/memory/emif.c
->> index f75806a..119503a 100644
->> --- a/drivers/memory/emif.c
->> +++ b/drivers/memory/emif.c
->> @@ -257,6 +257,41 @@ static void set_lpmode(struct emif_data *emif, u8 lpmode)
->>   	u32 temp;
->>   	void __iomem *base = emif->base;
->>
->> +	/*
->> +	 * Workaround for errata i743 - LPDDR2 Power-Down State is Not
->> +	 * Efficient
->> +	 *
->> +	 * i743 DESCRIPTION:
->> +	 * The EMIF supports power-down state for low power. The EMIF
->> +	 * automatically puts the SDRAM into power-down after the memory is
->> +	 * not accessed for a defined number of cycles and the
->> +	 * EMIF_PWR_MGMT_CTRL[10:8] REG_LP_MODE bit field is set to 0x4.
->> +	 * As the EMIF supports automatic output impedance calibration, a ZQ
->> +	 * calibration long command is issued every time it exits active
->> +	 * power-down and precharge power-down modes. The EMIF waits and
->> +	 * blocks any other command during this calibration.
->> +	 * The EMIF does not allow selective disabling of ZQ calibration upon
->> +	 * exit of power-down mode. Due to very short periods of power-down
->> +	 * cycles, ZQ calibration overhead creates bandwidth issues and
->> +	 * increases overall system power consumption. On the other hand,
->> +	 * issuing ZQ calibration long commands when exiting self-refresh is
->> +	 * still required.
->> +	 *
->> +	 * WORKAROUND
->> +	 * Because there is no power consumption benefit of the power-down due
->> +	 * to the calibration and there is a performance risk, the guideline
->> +	 * is to not allow power-down state and, therefore, to not have set
->> +	 * the EMIF_PWR_MGMT_CTRL[10:8] REG_LP_MODE bit field to 0x4.
->> +	 */
->> +	if ((emif->plat_data->ip_rev == EMIF_4D) &&
->> +	    (EMIF_LP_MODE_PWR_DN == lpmode)) {
-> Ok. So the errata is limited to only 'EMIF_4D' version and not applicable
-> for next EMIF version used in OMAP5 devices, right ? If yes, would be good
-> to just mention that in already good changelog.
-Yes, it is not applicable for EMIF_4D5 used in OMAP5 ES2.0 Soc's.
-Ill update this in change log.
+On 11:02 Mon 11 Mar     , Johan Hovold wrote:
+> On Fri, Mar 08, 2013 at 05:02:58PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > On 13:51 Fri 08 Mar     , Johan Hovold wrote:
+> > > Make sure the RTC and RTT-interrupts are masked at boot by adding a new
+> > > SOC-initialiser and helpers functions.
+> > > 
+> > > This fixes hanged boot on all AT91 SOCs but RM9200, for example, after a
+> > > reset during an RTC-update or if an RTC or RTT-alarm goes off after a
+> > > non-clean shutdown.
+> > > 
+> > > The RTC and RTT-peripherals are powered by backup power (VDDBU) (on all
+> > > AT91 SOCs but RM9200) and are not reset on wake-up, user, watchdog or
+> > > software reset. This means that their interrupts may be enabled during
+> > > early boot if, for example, they where not disabled during a previous
+> > > shutdown (e.g. due to a buggy driver or a non-clean shutdown such as a
+> > > user reset). Furthermore, an RTC or RTT-alarm may also be active.
+> > > 
+> > > The RTC and RTT-interrupts use the shared system-interrupt line, and if
+> > > an interrupt occurs before a handler (e.g. RTC-driver) has been
+> > > installed this leads to the system interrupt being disabled and prevents
+> > > the system from booting.
+> > > 
+> > > Note that when boot hangs due to an early RTC or RTT-interrupt, the only
+> > > way to get the system to start again is to remove the backup power (e.g.
+> > > battery) or to disable the interrupt manually from the bootloader. In
+> > > particular, a user reset is not sufficient.
+> > > 
+> > > Tested on at91sam9263 and at91sam9g45.
+> > > 
+> > > Signed-off-by: Johan Hovold <jhovold@gmail.com>
+> > > ---
+> > >  arch/arm/mach-at91/at91rm9200.c               |  9 ++++++++
+> > >  arch/arm/mach-at91/at91sam9260.c              |  6 ++++++
+> > >  arch/arm/mach-at91/at91sam9261.c              |  6 ++++++
+> > >  arch/arm/mach-at91/at91sam9263.c              |  7 ++++++
+> > >  arch/arm/mach-at91/at91sam9g45.c              |  7 ++++++
+> > >  arch/arm/mach-at91/at91sam9n12.c              |  6 ++++++
+> > >  arch/arm/mach-at91/at91sam9rl.c               |  7 ++++++
+> > >  arch/arm/mach-at91/at91sam9x5.c               |  6 ++++++
+> > >  arch/arm/mach-at91/generic.h                  |  2 ++
+> > >  arch/arm/mach-at91/include/mach/at91sam9n12.h |  5 +++++
+> > >  arch/arm/mach-at91/include/mach/at91sam9x5.h  |  5 +++++
+> > nack for DT probe te address via DT
+> 
+> Fair enough. I'll respin and add proper DT-support. 
+> 
+> > >  arch/arm/mach-at91/setup.c                    | 31 +++++++++++++++++++++++++++
+> > >  arch/arm/mach-at91/soc.h                      |  1 +
+> > >  13 files changed, 98 insertions(+)
+> > 
+> > at boot time we can disable all the irq as we need none of them
+> 
+> Yes, but all but the VDDBU-powered-peripheral ones will already have
+> been disabled at reset. If a buggy bootloader enables something it
+> should not, then the bootloader should be fixed.
+so fix the bootloader NACK in the kernel
+it's too much ugly
 
-Thanks
-Lokesh
->
->> +		WARN_ONCE(1,
->> +			  "REG_LP_MODE = LP_MODE_PWR_DN(4) is prohibited by"
->> +			  "erratum i743 switch to LP_MODE_SELF_REFRESH(2)\n");
->> +		/* rallback LP_MODE to Self-refresh mode */
-> s/rallback/rollback ?
->
-> With above updates,
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->
+the kernel requirere the interrupt to be disabled
+
+Best Regards,
+J.
