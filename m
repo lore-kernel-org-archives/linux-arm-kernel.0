@@ -1,22 +1,42 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 11 Mar 2013 11:05:50 +0530
-Subject: [PATCH 3/8] memory: emif: handle overflow for timing for LP mode
-In-Reply-To: <1362978365-5593-4-git-send-email-lokeshvutla@ti.com>
+Date: Mon, 11 Mar 2013 11:08:21 +0530
+Subject: [PATCH 4/8] memory: emif: Handle devices which are not rated
+ for >85C
+In-Reply-To: <1362978365-5593-5-git-send-email-lokeshvutla@ti.com>
 References: <1362978365-5593-1-git-send-email-lokeshvutla@ti.com>
- <1362978365-5593-4-git-send-email-lokeshvutla@ti.com>
-Message-ID: <513D6D36.7060909@ti.com>
+ <1362978365-5593-5-git-send-email-lokeshvutla@ti.com>
+Message-ID: <513D6DCD.20507@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Monday 11 March 2013 10:36 AM, Lokesh Vutla wrote:
 > From: Nishanth Menon <nm@ti.com>
 > 
-> In case the custom timings provide values which overflow
-> the maximum possible field value, warn and use maximum
-> permissible value.
+> As per JESD209-2E specification for LPDDR2,
+>       http://www.jedec.org/standards-documents/results/jesd209-2E
+> Table 73, LPDDR2 memories come in two flavors - Standard and
+> Extended. The Standard types can operate from -25C to +85C
+> However, beyond that and upto +105C can only be supported by
+> Extended types.
 > 
+right.
+
+> Unfortunately, it seems there is no info in MR0(device info) or
+> MR[1,2](device feature) for run time detection of this capability
+> as far as seen on the spec. Hence, we provide a custom_config
+> flag to be populated by platforms which have these "extended"
+> type memories.
+> 
+> For the "Standard" memories, we need to consider MR4 notifications
+> of temperature triggers >85C as equivalent to thermal shutdown
+> events (equivalent to Spec specified thermal shutdown events for
+> "extended" parts).
+>
+Make sense.
+ 
+> Reported-by: Richard Woodruff <r-woodruff2@ti.com>
 > Signed-off-by: Nishanth Menon <nm@ti.com>
 > Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
 > ---
-
+Thanks for the fix.
 Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
