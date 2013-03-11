@@ -1,65 +1,46 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Mon, 11 Mar 2013 16:39:56 +0100
-Subject: [PATCH 1/3] can: at91_can: add dt support
-In-Reply-To: <513DF46E.7000903@pengutronix.de>
-References: <1362763842-14924-1-git-send-email-ludovic.desroches@atmel.com>
- <1362763842-14924-2-git-send-email-ludovic.desroches@atmel.com>
- <513A2365.5050803@pengutronix.de>
- <20130311091722.GA2572@ludovic.desroches@atmel.com>
- <513DF46E.7000903@pengutronix.de>
-Message-ID: <20130311153956.GB3198@ludovic.desroches@atmel.com>
+From: sourav.poddar@ti.com (Sourav Poddar)
+Date: Mon, 11 Mar 2013 21:12:26 +0530
+Subject: [Resend/PATCH 0/5] omap4/5: i2c/spi: device tree data
+In-Reply-To: <513DEAE1.1050606@ti.com>
+References: <1363009486-19430-1-git-send-email-sourav.poddar@ti.com>
+ <513DEAE1.1050606@ti.com>
+Message-ID: <513DFB62.5030709@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 11, 2013 at 04:12:46PM +0100, Marc Kleine-Budde wrote:
-> On 03/11/2013 10:17 AM, Ludovic Desroches wrote:
-> > On Fri, Mar 08, 2013 at 06:44:05PM +0100, Marc Kleine-Budde wrote:
-> >> On 03/08/2013 06:30 PM, ludovic.desroches at atmel.com wrote:
-> >>> From: Ludovic Desroches <ludovic.desroches@atmel.com>
-> >>>
-> >>> Add device tree support.
-> >>>
-> >>> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> >>> ---
-> >>>  .../devicetree/bindings/net/can/atmel-can.txt      | 14 ++++
-> >>>  drivers/net/can/at91_can.c                         | 75 ++++++++++++++++------
-> >>>  2 files changed, 70 insertions(+), 19 deletions(-)
-> >>>  create mode 100644 Documentation/devicetree/bindings/net/can/atmel-can.txt
-> >>>
-> >>> diff --git a/Documentation/devicetree/bindings/net/can/atmel-can.txt b/Documentation/devicetree/bindings/net/can/atmel-can.txt
-> >>> new file mode 100644
-> >>> index 0000000..69381db
-> >>> --- /dev/null
-> >>> +++ b/Documentation/devicetree/bindings/net/can/atmel-can.txt
-> >>> @@ -0,0 +1,14 @@
-> >>> +* AT91 CAN *
-> >>> +
-> >>> +Required properties:
-> >>> +  - compatible: Should be "atmel,at91sam9263-can" or "atmel,at91sam9x5-can"
-> >>
-> >> On imx we use the oldest SoC with that IP available. Which strategy are
-> >> you following on at91?
-> >>
-> > 
-> > We are using the same strategy.
-> 
-> But "atmel,at91sam9x5-can" isn't a specific SoC, probably a SoC family.
-> Or are you using "atmel,at91sam9x5-can" for the other devices in the DT,
-> too.
-> 
-
-You are right at91sam9x5 is not a specific SoC but a family of SoCs:
-at91sam9g25, at91sam9g35, at91sam9x25 and at91sam9x35. This compatible string
-is used for all the devices from and after the at91sam9x5 family: at91sam9n12,
-samad3x, etc.
-
-> I picked at91sam9x5-can for the non devicetree driver out of the blue,
-> as there was no scheme established, yet. I'm not hanging on that name,
-> I'd rather appreciate to follow the common at91 DT rules.
-
-It follows at91 Dt rules, we have atmel,at91sam9x5-i2c, atmel,at91sam9x5-gpio
-and others.
-
-Regards
-
-Ludovic
+On Monday 11 March 2013 08:02 PM, Benoit Cousson wrote:
+> Hi Sourav,
+>
+> On 03/11/2013 02:44 PM, Sourav Poddar wrote:
+>> Hi Tony/Benoit,
+>>
+>> These patches had been sent couple of times before, but there were no comments on it.
+> Sorry for that. I got a big flu in Jan and was in Linaro Connect last week.
+> Patches look good, I just have to check that they apply nicely to the
+> dts/for_3.9 I already prepared.
+>
+Ok. Thanks!!
+> I still have to rebase that branch on top of a recent master branch and
+> then check your branch.
+>
+>> If there are no comments, Can these be picked ?
+>> Cc: Andrew Morton<akpm@osdl.org>
+>>
+>> The following changes since commit f6161aa153581da4a3867a2d1a7caf4be19b6ec9:
+>>
+>>    Linux 3.9-rc2 (2013-03-10 16:54:19 -0700)
+>>
+>> are available in the git repository at:
+>>    git at gitorious.org:linux-connectivity/linux-connectivity.git omap_i2c_spi_dts_data
+>>
+>> Felipe Balbi (1):
+>>        arm: dts: omap5: add SPI devices to OMAP5 DeviceTree file
+>>
+>> Sourav Poddar (4):
+>>        arm: dts: omap4-sdp: Add I2c pinctrl data
+>>        arm: dts: omap5-evm: Add I2c pinctrl data
+>>        arm: dts: omap4-panda: Add I2c pinctrl data
+>>        arm: dts: omap5-evm: Add mcspi data
+> Thanks,
+> Benoit
+>
