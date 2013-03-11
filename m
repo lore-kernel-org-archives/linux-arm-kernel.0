@@ -1,195 +1,180 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 11 Mar 2013 20:44:51 +0100
-Subject: [RFC PATCH 7/8] s5p-fimc: Add fimc-is subdevs registration
+Date: Mon, 11 Mar 2013 20:44:52 +0100
+Subject: [RFC PATCH 8/8] s5p-fimc: Create media links for the FIMC-IS entities
 In-Reply-To: <1363031092-29950-1-git-send-email-s.nawrocki@samsung.com>
 References: <1363031092-29950-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <1363031092-29950-8-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <1363031092-29950-9-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch allows to register FIMC-IS device represented by FIMC-IS-ISP
-subdev to the top level media device driver. The use_isp platform data
-structure field allows to select whether the fimc-is ISP subdev should
-be tried to be registered or not.
+Create disabled links from the FIMC-LITE subdevs to the FIMC-IS-ISP
+subdev and from FIMC-IS-ISP to all FIMC subdevs.
 
 Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- drivers/media/platform/s5p-fimc/fimc-mdevice.c |   51 ++++++++++++++++++++++--
- drivers/media/platform/s5p-fimc/fimc-mdevice.h |   15 +++++++
- 2 files changed, 62 insertions(+), 4 deletions(-)
+ drivers/media/platform/s5p-fimc/fimc-mdevice.c |   78 +++++++++++++++++++-----
+ 1 file changed, 62 insertions(+), 16 deletions(-)
 
 diff --git a/drivers/media/platform/s5p-fimc/fimc-mdevice.c b/drivers/media/platform/s5p-fimc/fimc-mdevice.c
-index e9e5337..1521dec 100644
+index 1521dec..5304da5 100644
 --- a/drivers/media/platform/s5p-fimc/fimc-mdevice.c
 +++ b/drivers/media/platform/s5p-fimc/fimc-mdevice.c
-@@ -31,6 +31,7 @@
- #include <media/s5p_fimc.h>
+@@ -807,9 +807,17 @@ static int __fimc_md_create_fimc_sink_links(struct fimc_md *fmd,
+ 	struct fimc_sensor_info *s_info = NULL;
+ 	struct media_entity *sink;
+ 	unsigned int flags = 0;
+-	int ret, i;
++	int i, ret = 0;
  
- #include "fimc-core.h"
-+#include "fimc-is.h"
- #include "fimc-lite.h"
- #include "fimc-mdevice.h"
- #include "mipi-csis.h"
-@@ -85,9 +86,11 @@ static void fimc_pipeline_prepare(struct fimc_pipeline *p,
- 		case GRP_ID_FIMC:
- 			/* No need to control FIMC subdev through subdev ops */
+-	for (i = 0; i < FIMC_MAX_DEVS; i++) {
++	if (sensor) {
++		s_info = v4l2_get_subdev_hostdata(sensor);
++		/* Skip direct FIMC links in the logical FIMC-IS sensor path */
++		if (s_info && s_info->pdata.fimc_bus_type ==
++		    FIMC_BUS_TYPE_ISP_WRITEBACK)
++			ret = 1;
++	}
++
++	for (i = 0; !ret && i < FIMC_MAX_DEVS; i++) {
+ 		if (!fmd->fimc[i])
+ 			continue;
+ 		/*
+@@ -838,7 +846,7 @@ static int __fimc_md_create_fimc_sink_links(struct fimc_md *fmd,
+ 
+ 		if (flags == 0 || sensor == NULL)
+ 			continue;
+-		s_info = v4l2_get_subdev_hostdata(sensor);
++
+ 		if (!WARN_ON(s_info == NULL)) {
+ 			unsigned long irq_flags;
+ 			spin_lock_irqsave(&fmd->slock, irq_flags);
+@@ -851,25 +859,20 @@ static int __fimc_md_create_fimc_sink_links(struct fimc_md *fmd,
+ 		if (!fmd->fimc_lite[i])
+ 			continue;
+ 
+-		if (link_mask & (1 << (i + FIMC_MAX_DEVS)))
+-			flags = MEDIA_LNK_FL_ENABLED;
+-		else
+-			flags = 0;
+-
+ 		sink = &fmd->fimc_lite[i]->subdev.entity;
+ 		ret = media_entity_create_link(source, pad, sink,
+-					       FLITE_SD_PAD_SINK, flags);
++					       FLITE_SD_PAD_SINK, 0);
+ 		if (ret)
+ 			return ret;
+ 
+ 		/* Notify FIMC-LITE subdev entity */
+ 		ret = media_entity_call(sink, link_setup, &sink->pads[0],
+-					&source->pads[pad], flags);
++					&source->pads[pad], 0);
+ 		if (ret)
  			break;
-+		case GRP_ID_FIMC_IS:
-+			p->subdevs[IDX_IS_ISP] = sd;
-+			break;
- 		default:
--			pr_warn("%s: Unknown subdev grp_id: %#x\n",
--				__func__, sd->grp_id);
-+			break;
- 		}
- 		me = &sd->entity;
- 		if (me->num_pads == 1)
-@@ -291,6 +294,7 @@ static void fimc_md_unregister_sensor(struct v4l2_subdev *sd)
  
- 	if (!client)
- 		return;
-+
- 	v4l2_device_unregister_subdev(sd);
- 
- 	if (!client->dev.of_node) {
-@@ -341,7 +345,11 @@ static int fimc_md_of_add_sensor(struct fimc_md *fmd,
- 		goto mod_put;
- 
- 	v4l2_set_subdev_hostdata(sd, si);
--	sd->grp_id = GRP_ID_SENSOR;
-+	if (si->pdata.fimc_bus_type == FIMC_BUS_TYPE_ISP_WRITEBACK)
-+		sd->grp_id = GRP_ID_FIMC_IS_SENSOR;
-+	else
-+		sd->grp_id = GRP_ID_SENSOR;
-+
- 	si->subdev = sd;
- 	v4l2_info(&fmd->v4l2_dev, "Registered sensor subdevice: %s (%d)\n",
- 		  sd->name, fmd->num_sensors);
-@@ -360,7 +368,7 @@ static int fimc_md_parse_port_node(struct fimc_md *fmd,
- 				   struct device_node *port,
- 				   unsigned int index)
- {
--	struct device_node *rem, *endpoint;
-+	struct device_node *rem, *endpoint, *np;
- 	struct fimc_source_info *pd;
- 	struct v4l2_of_endpoint bus_cfg;
- 	u32 tmp, reg = 0;
-@@ -415,6 +423,18 @@ static int fimc_md_parse_port_node(struct fimc_md *fmd,
- 		v4l2_err(&fmd->v4l2_dev, "Wrong port id (%u) at node %s\n",
- 			 reg, rem->full_name);
+-		v4l2_info(&fmd->v4l2_dev, "created link [%s] %c> [%s]\n",
+-			  source->name, flags ? '=' : '-', sink->name);
++		v4l2_info(&fmd->v4l2_dev, "created link [%s] -> [%s]\n",
++			  source->name, sink->name);
  	}
-+	/*
-+	 * For FIMC-IS handled sensors, that are placed under fimc-is-i2c
-+	 * device node, FIMC is connected to the FIMC-IS through its ISP
-+	 * Writeback input. Sensors are attached to the FIMC-LITE hostdata
-+	 * interface directly or through MIPI-CSIS, depending on the external
-+	 * media bus used. This needs to be handled in a more reliable way,
-+	 * not by just checking parent's node name.
-+	 */
-+	if ((np = of_get_parent(rem)) && !of_node_cmp(np->name, "i2c-isp"))
-+		pd->fimc_bus_type = FIMC_BUS_TYPE_ISP_WRITEBACK;
-+	else
-+		pd->fimc_bus_type = pd->sensor_bus_type;
+ 	return 0;
+ }
+@@ -878,26 +881,59 @@ static int __fimc_md_create_fimc_sink_links(struct fimc_md *fmd,
+ static int __fimc_md_create_flite_source_links(struct fimc_md *fmd)
+ {
+ 	struct media_entity *source, *sink;
+-	unsigned int flags = MEDIA_LNK_FL_ENABLED;
+ 	int i, ret = 0;
  
- 	ret = fimc_md_of_add_sensor(fmd, rem, index);
- 	of_node_put(rem);
-@@ -607,6 +627,22 @@ static int register_csis_entity(struct fimc_md *fmd,
+ 	for (i = 0; i < FIMC_LITE_MAX_DEVS; i++) {
+ 		struct fimc_lite *fimc = fmd->fimc_lite[i];
++
+ 		if (fimc == NULL)
+ 			continue;
++
+ 		source = &fimc->subdev.entity;
+ 		sink = &fimc->vfd.entity;
+ 		/* FIMC-LITE's subdev and video node */
+ 		ret = media_entity_create_link(source, FLITE_SD_PAD_SOURCE_DMA,
+-					       sink, 0, flags);
++					       sink, 0, 0);
++		if (ret)
++			break;
++		/* Link from FIMC-LITE to IS-ISP subdev */
++		sink = &fmd->fimc_is->isp.subdev.entity;
++		ret = media_entity_create_link(source, FLITE_SD_PAD_SOURCE_ISP,
++					       sink, 0, 0);
+ 		if (ret)
+ 			break;
+-		/* TODO: create links to other entities */
+ 	}
+ 
  	return ret;
  }
  
-+static int register_fimc_is_entity(struct fimc_md *fmd, struct fimc_is *is)
++/* Create FIMC-IS links */
++static int __fimc_md_create_fimc_is_links(struct fimc_md *fmd)
 +{
-+	struct v4l2_subdev *sd = &is->isp.subdev;
-+	int ret;
++	struct media_entity *source, *sink;
++	int i, ret;
 +
-+	ret = v4l2_device_register_subdev(&fmd->v4l2_dev, sd);
-+	if (ret) {
-+		v4l2_err(&fmd->v4l2_dev,
-+			 "Failed to register FIMC-ISP (%d)\n", ret);
-+		return ret;
++	source = &fmd->fimc_is->isp.subdev.entity;
++
++	for (i = 0; i < FIMC_MAX_DEVS; i++) {
++		if (fmd->fimc[i] == NULL)
++			continue;
++
++		/* Link from IS-ISP subdev to FIMC */
++		sink = &fmd->fimc[i]->vid_cap.subdev.entity;
++		ret = media_entity_create_link(source, FIMC_IS_SD_PAD_SRC_FIFO,
++					       sink, FIMC_SD_PAD_SINK_FIFO, 0);
++		if (ret)
++			return ret;
 +	}
 +
-+	fmd->fimc_is = is;
-+	return 0;
++	/* Link from IS-ISP subdev to is.isp capture video node */
++	sink = &fmd->fimc_is->isp.vfd.entity;
++	ret = media_entity_create_link(source, FIMC_IS_SD_PAD_SRC_DMA,
++					       sink, 0, 0);
++	return ret;
 +}
 +
- static int fimc_md_register_platform_entity(struct fimc_md *fmd,
- 					    struct platform_device *pdev,
- 					    int plat_entity)
-@@ -634,6 +670,9 @@ static int fimc_md_register_platform_entity(struct fimc_md *fmd,
- 		case IDX_CSIS:
- 			ret = register_csis_entity(fmd, pdev, drvdata);
+ /**
+  * fimc_md_create_links - create default links between registered entities
+  *
+@@ -980,6 +1016,7 @@ static int fimc_md_create_links(struct fimc_md *fmd)
+ 	for (i = 0; i < CSIS_MAX_ENTITIES; i++) {
+ 		if (fmd->csis[i].sd == NULL)
+ 			continue;
++
+ 		source = &fmd->csis[i].sd->entity;
+ 		pad = CSIS_PAD_SOURCE;
+ 		sensor = csi_sensors[i];
+@@ -994,15 +1031,24 @@ static int fimc_md_create_links(struct fimc_md *fmd)
+ 	for (i = 0; i < FIMC_MAX_DEVS; i++) {
+ 		if (!fmd->fimc[i])
+ 			continue;
++
+ 		source = &fmd->fimc[i]->vid_cap.subdev.entity;
+ 		sink = &fmd->fimc[i]->vid_cap.vfd.entity;
++
+ 		ret = media_entity_create_link(source, FIMC_SD_PAD_SOURCE,
+ 					      sink, 0, flags);
+ 		if (ret)
  			break;
-+		case IDX_IS_ISP:
-+			ret = register_fimc_is_entity(fmd, drvdata);
-+			break;
- 		default:
- 			ret = -ENODEV;
- 		}
-@@ -697,6 +736,8 @@ static int fimc_md_register_of_platform_entities(struct fimc_md *fmd,
- 		/* If driver of any entity isn't ready try all again later. */
- 		if (!strcmp(node->name, CSIS_OF_NODE_NAME))
- 			plat_entity = IDX_CSIS;
-+		else if	(!strcmp(node->name, FIMC_IS_OF_NODE_NAME))
-+			plat_entity = IDX_IS_ISP;
- 		else if (!strcmp(node->name, FIMC_LITE_OF_NODE_NAME))
- 			plat_entity = IDX_FLITE;
- 		else if	(!strcmp(node->name, FIMC_OF_NODE_NAME))
-@@ -1271,6 +1312,8 @@ static int fimc_md_probe(struct platform_device *pdev)
- 	v4l2_dev->notify = fimc_sensor_notify;
- 	strlcpy(v4l2_dev->name, "s5p-fimc-md", sizeof(v4l2_dev->name));
+ 	}
  
-+	fmd->use_isp = fimc_md_is_isp_available(dev->of_node);
+-	return __fimc_md_create_flite_source_links(fmd);
++	ret = __fimc_md_create_flite_source_links(fmd);
++	if (ret < 0)
++		return ret;
 +
- 	ret = v4l2_device_register(dev, &fmd->v4l2_dev);
- 	if (ret < 0) {
- 		v4l2_err(v4l2_dev, "Failed to register v4l2_device: %d\n", ret);
-diff --git a/drivers/media/platform/s5p-fimc/fimc-mdevice.h b/drivers/media/platform/s5p-fimc/fimc-mdevice.h
-index a827bf9..52a8ecb 100644
---- a/drivers/media/platform/s5p-fimc/fimc-mdevice.h
-+++ b/drivers/media/platform/s5p-fimc/fimc-mdevice.h
-@@ -12,6 +12,7 @@
- #include <linux/clk.h>
- #include <linux/platform_device.h>
- #include <linux/mutex.h>
-+#include <linux/of.h>
- #include <linux/pinctrl/consumer.h>
- #include <media/media-device.h>
- #include <media/media-entity.h>
-@@ -81,6 +82,8 @@ struct fimc_sensor_info {
-  * @camclk: external sensor clock information
-  * @fimc: array of registered fimc devices
-  * @pmf: handle to the CAMCLK clock control FIMC helper device
-+ * @fimc_is: fimc-is data structure
-+ * @use_isp: set to true when FIMC-IS subsystem is used
-  * @media_dev: top level media device
-  * @v4l2_dev: top level v4l2_device holding up the subdevs
-  * @pdev: platform device this media device is hooked up into
-@@ -99,6 +102,8 @@ struct fimc_md {
- 	struct fimc_lite *fimc_lite[FIMC_LITE_MAX_DEVS];
- 	struct fimc_dev *fimc[FIMC_MAX_DEVS];
- 	struct device *pmf;
-+	struct fimc_is *fimc_is;
-+	bool use_isp;
- 	struct media_device media_dev;
- 	struct v4l2_device v4l2_dev;
- 	struct platform_device *pdev;
-@@ -137,4 +142,14 @@ static inline void fimc_md_graph_unlock(struct fimc_dev *fimc)
- 
- int fimc_md_set_camclk(struct v4l2_subdev *sd, bool on);
- 
-+#ifdef CONFIG_OF
-+static inline bool fimc_md_is_isp_available(struct device_node *node)
-+{
-+	node = of_get_child_by_name(node, FIMC_IS_OF_NODE_NAME);
-+	return node ? of_device_is_available(node) : false;
-+}
-+#else
-+#define fimc_md_is_isp_available(node) (false)
-+#endif /* CONFIG_OF */
++	if (fmd->use_isp)
++		ret = __fimc_md_create_fimc_is_links(fmd);
 +
- #endif
++	return ret;
+ }
+ 
+ /*
 -- 
 1.7.9.5
