@@ -1,42 +1,52 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 11 Mar 2013 09:33:52 -0700
-Subject: [PATCH] ARM: OMAP: drop "select MACH_NOKIA_RM696"
-In-Reply-To: <1362858510.3137.31.camel@x61.thuisdomein>
-References: <1362738596.5994.48.camel@x61.thuisdomein>
- <20130308161159.GE14552@blackmetal.musicnaut.iki.fi>
- <20130308163507.GC26093@atomide.com>
- <1362763232.5994.75.camel@x61.thuisdomein>
- <20130308175539.GG26093@atomide.com>
- <1362765764.5994.87.camel@x61.thuisdomein>
- <20130309000157.GE30923@n2100.arm.linux.org.uk>
- <1362858510.3137.31.camel@x61.thuisdomein>
-Message-ID: <20130311163351.GJ26093@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 11 Mar 2013 16:38:42 +0000
+Subject: [PATCH] ARM: multiplatform: Sort the max gpio numbers.
+In-Reply-To: <1359890688-10336-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1359890688-10336-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20130311163842.GK4977@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Bolle <pebolle@tiscali.nl> [130309 11:52]:
-> On Sat, 2013-03-09 at 00:01 +0000, Russell King - ARM Linux wrote:
+Arnd, Olof,
+
+Have you merged this for -rc ?
+
+On Sun, Feb 03, 2013 at 12:24:48PM +0100, Maxime Ripard wrote:
+> When building a multiplatform kernel, we could end up with a smaller
+> number of GPIOs than the one required by the platform the kernel was
+> running on.
 > 
-> > However, going back to that MACH_NOKIA_RM696.  If there exists only a
-> > select of this symbol and no "config MACH_NOKIA_RM696" entry, then the
-> > symbol will never be generated in the output .config file.
-> > 
-> >[...]
-> > 
-> > My conclusion is... it's a mess.
+> Sort the max GPIO number by descending order so that we always take the
+> highest number required.
 > 
-> That mess can only be fully cleaned up if the code for the RM-696 that
-> now is maintained in some unknown to me repository gets merged into
-> mainline, can't it?
->
-> In the meantime, how do you prefer I solve the (trivial) issue of an
-> useless select for MACH_NOKIA_RM696? Drop that select or add an (equally
-> useless) config entry for MACH_NOKIA_RM696? Or should I try to ignore it
-> for the time being?
-
-Just adding the config MACH_NOKIA_RM696 to Kconfig as bool should fix
-this unless I'm missing something here.
-
-Regards,
-
-Tony
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  arch/arm/Kconfig |    7 +++++--
+>  1 file changed, 5 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 1e86fa9..852ae76 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1626,13 +1626,16 @@ config LOCAL_TIMERS
+>  	  accounting to be spread across the timer interval, preventing a
+>  	  "thundering herd" at every timer tick.
+>  
+> +# The GPIO number here must be sorted by descending number. In case of
+> +# a multiplatform kernel, we just want the highest value required by the
+> +# selected platforms.
+>  config ARCH_NR_GPIO
+>  	int
+>  	default 1024 if ARCH_SHMOBILE || ARCH_TEGRA
+> -	default 355 if ARCH_U8500
+> -	default 264 if MACH_H4700
+>  	default 512 if SOC_OMAP5
+> +	default 355 if ARCH_U8500
+>  	default 288 if ARCH_VT8500 || ARCH_SUNXI
+> +	default 264 if MACH_H4700
+>  	default 0
+>  	help
+>  	  Maximum number of GPIOs in the system.
+> -- 
+> 1.7.10.4
+> 
