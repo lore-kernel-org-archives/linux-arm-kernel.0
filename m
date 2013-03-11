@@ -1,66 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 11 Mar 2013 20:43:53 +0000
-Subject: Regulator API ignored return values
-Message-ID: <201303112043.53334.arnd@arndb.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 11 Mar 2013 14:44:10 -0600
+Subject: [GIT PULL] ARM: tegra: DT-related fixes needed by the MMC tree
+Message-ID: <1363034651-21472-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+In order to convert the Tegra MMC driver to using mmc_of_parse(), some
+bugs in the Tegra device-tree content need to be fixed first; it's
+currently wrong but unused, and mmc_of_parse() causes that data to be
+used for the first time.
 
-Mark Brown has added a patch to Linux-next that warns about certain regulator
-API functions being called without checking the results, which seems to have
-uncovered a number of bugs.
+----------------------------------------------------------------
 
-I've added a few people to Cc that might be interested in the reports and
-in fixing these bugs. Below you can find a list of all instances I found
-building the ARM defconfigs.
+The following changes since commit 6dbe51c251a327e012439c4772097a13df43c5b8:
 
-	Arnd
+  Linux 3.9-rc1
 
-==> build/dove_defconfig/faillog <==
-/git/arm-soc/drivers/mmc/host/sdhci.c: In function 'sdhci_add_host':
-/git/arm-soc/drivers/mmc/host/sdhci.c:2910:19: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result [-Wunused-result]
+are available in the git repository at:
 
-==> build/imx_v4_v5_defconfig/faillog <==
-/git/arm-soc/drivers/input/touchscreen/ads7846.c: In function '__ads7846_enable':
-/git/arm-soc/drivers/input/touchscreen/ads7846.c:239:18: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result [-Wunused-result]
-/git/arm-soc/drivers/mmc/host/sdhci.c: In function 'sdhci_add_host':
-/git/arm-soc/drivers/mmc/host/sdhci.c:2910:19: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result [-Wunused-result]
-/git/arm-soc/drivers/video/backlight/l4f00242t03.c: In function 'l4f00242t03_lcd_init':
-/git/arm-soc/drivers/video/backlight/l4f00242t03.c:58:18: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result [-Wunused-result]
-/git/arm-soc/drivers/video/backlight/l4f00242t03.c:61:18: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result [-Wunused-result]
+  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git tegra-for-3.10-fixes-for-mmc
 
-==> build/imx_v6_v7_defconfig/faillog <==
-/git/arm-soc/drivers/mmc/host/sdhci.c: In function 'sdhci_add_host':
-/git/arm-soc/drivers/mmc/host/sdhci.c:2910:19: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result [-Wunused-result]
-/git/arm-soc/drivers/video/backlight/l4f00242t03.c: In function 'l4f00242t03_lcd_init':
-/git/arm-soc/drivers/video/backlight/l4f00242t03.c:58:18: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result [-Wunused-result]
-/git/arm-soc/drivers/video/backlight/l4f00242t03.c:61:18: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result [-Wunused-result]
+for you to fetch changes up to 908ab9368866e6edf0edebdd546adefd5f3128f9:
 
-==> build/magician_defconfig/faillog <==
-/git/arm-soc/drivers/usb/otg/gpio_vbus.c: In function 'set_vbus_draw':
-/git/arm-soc/drivers/usb/otg/gpio_vbus.c:72:20: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result [-Wunused-result]
+  ARM: dts: tegra: fix the activate polarity of cd-gpio in mmc host
 
-==> build/mmp2_defconfig/faillog <==
-/git/arm-soc/drivers/mmc/host/sdhci.c: In function 'sdhci_add_host':
-/git/arm-soc/drivers/mmc/host/sdhci.c:2910:19: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result [-Wunused-result]
+----------------------------------------------------------------
 
-==> build/omap2plus_defconfig/faillog <==
-/git/arm-soc/drivers/input/touchscreen/ads7846.c: In function '__ads7846_enable':
-/git/arm-soc/drivers/input/touchscreen/ads7846.c:239:18: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result [-Wunused-result]
+Joseph Lo (1):
+      ARM: dts: tegra: fix the activate polarity of cd-gpio in mmc host
 
-==> build/tegra_defconfig/faillog <==
-/git/arm-soc/arch/arm/mach-tegra/board-harmony-pcie.c: In function 'harmony_pcie_init':
-/git/arm-soc/arch/arm/mach-tegra/board-harmony-pcie.c:65:18: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result [-Wunused-result]
-/git/arm-soc/drivers/mmc/host/sdhci.c: In function 'sdhci_add_host':
-/git/arm-soc/drivers/mmc/host/sdhci.c:2910:19: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result [-Wunused-result]
-
-==> build/u8500_defconfig/faillog <==
-/git/arm-soc/arch/arm/mach-ux500/board-mop500.c: In function 'mop500_prox_activate':
-/git/arm-soc/arch/arm/mach-ux500/board-mop500.c:432:18: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result [-Wunused-result]
-/git/arm-soc/drivers/mfd/ab8500-gpadc.c: In function 'ab8500_gpadc_runtime_resume':
-/git/arm-soc/drivers/mfd/ab8500-gpadc.c:598:18: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result [-Wunused-result]
-/git/arm-soc/drivers/mfd/ab8500-gpadc.c: In function 'ab8500_gpadc_probe':
-/git/arm-soc/drivers/mfd/ab8500-gpadc.c:655:18: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result [-Wunused-result]
-/git/arm-soc/drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c: In function 'synaptics_rmi4_resume':
-/git/arm-soc/drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c:1085:18: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result [-Wunused-result]
+ arch/arm/boot/dts/tegra20-colibri-512.dtsi |    2 +-
+ arch/arm/boot/dts/tegra20-harmony.dts      |    4 ++--
+ arch/arm/boot/dts/tegra20-paz00.dts        |    2 +-
+ arch/arm/boot/dts/tegra20-seaboard.dts     |    2 +-
+ arch/arm/boot/dts/tegra20-tamonten.dtsi    |    2 +-
+ arch/arm/boot/dts/tegra20-trimslice.dts    |    2 +-
+ arch/arm/boot/dts/tegra20-ventana.dts      |    2 +-
+ arch/arm/boot/dts/tegra20-whistler.dts     |    1 +
+ arch/arm/boot/dts/tegra30-beaver.dts       |    2 +-
+ arch/arm/boot/dts/tegra30-cardhu.dtsi      |    2 +-
+ 10 files changed, 11 insertions(+), 10 deletions(-)
