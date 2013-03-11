@@ -1,90 +1,189 @@
-From: jhovold@gmail.com (Johan Hovold)
-Date: Mon, 11 Mar 2013 19:07:55 +0100
-Subject: [PATCH v2 1/5] ARM: at91/rtc: fix boot after RTC wake-up
-In-Reply-To: <1363025279-17615-1-git-send-email-jhovold@gmail.com>
-References: <20130311180611.GF8797@localhost>
- <1363025279-17615-1-git-send-email-jhovold@gmail.com>
-Message-ID: <1363025279-17615-2-git-send-email-jhovold@gmail.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Mon, 11 Mar 2013 13:11:19 -0500
+Subject: [PATCH 1/1] ARM: OMAP: gpmc: request CS address space for ethernet
+ chips
+In-Reply-To: <513E1B24.7020000@collabora.co.uk>
+References: <1362935902-29720-1-git-send-email-javier.martinez@collabora.co.uk>
+ <513E10AF.2080802@ti.com> <513E1B24.7020000@collabora.co.uk>
+Message-ID: <513E1E47.6080509@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix failed boot after RTC wake-up by making sure RTC-interrupts are
-disabled at shutdown.
 
-The RTC-registers are not reset at shutdown when there is backup power
-available, and hence the RTC-interrupt, which uses the shared system
-interrupt, may be enabled during early boot. If an RTC-alarm goes off
-before the RTC-driver is initialised (e.g. when waking up from an
-RTC-alarm) this results in disabled system interrupts.
+On 03/11/2013 12:57 PM, Javier Martinez Canillas wrote:
+> On 03/11/2013 06:13 PM, Jon Hunter wrote:
+>>
+> 
+> Hi Jon, thanks a lot for your feedback.
+> 
+>> On 03/10/2013 12:18 PM, Javier Martinez Canillas wrote:
+>>> Besides being used to interface with external memory devices,
+>>> the General-Purpose Memory Controller can be used to connect
+>>> Pseudo-SRAM devices such as ethernet controllers to OMAP2+
+>>> processors using the GPMC as a data bus.
+>>>
+>>> The actual mapping between the GPMC address space and OMAP2+
+>>> address space is made using the GPMC DT "ranges" property.
+>>> But also a explicit call to gpmc_cs_request() is needed.
+>>
+>> One problem with gpmc_cs_request() is that it will map the chip-select
+>> to any physical location in the 1GB address space for the gpmc
+>> controller. So in other words, it will ignore the ranges property
+>> altogether. If you look at my code for NOR, I have added a
+>> gpmc_cs_remap() function to remap the cs to the location as specified by
+>> the device-tree.
+>>
+> 
+> I see, thanks for pointing this out.
+> 
+>> Ideally we should change gpmc_cs_request() so we can pass the desire
+>> base address that we want to map the gpmc cs too. I had started out that
+>> way but it made the code some what messy and so I opted to create a
+>> gpmc_cs_remap() function instead. The goal will be to get rid of
+>> gpmc_cs_remap() once DT migration is completed and we can change
+>> gpmc_cs_request() to map the cs to a specific address (see my FIXME
+>> comment).
+>>
+> 
+> By looking at gpmc_probe_onenand_child() and gpmc_probe_nand_child() I see that
+> these functions just allocates platform data and call gpmc_onenand_init() and
+> gpmc_nand_init() accordingly. So if I understood right these functions have the
+> same issue and need to call gpmc_cs_remap() too in order to map to the location
+> specified on the DT.
 
-Without earlyprintk boot hangs after
+Ideally they should but it is not critical.
 
-  Uncompressing Linux... done, booting the kernel.
+So today for NAND and ONENAND the ranges property is completely ignored
+(I just came to realise this recently). However, this works because the
+address mapped by gpmc_cs_request() is passed to the NAND/ONENAND
+drivers via the platform data. However, NOR (and your ethernet patch) we
+can't pass via platform data and therefore we must remap.
 
-and earlyprintk reveals that the shared system interrupt gets disabled:
+This needs to be fixed, but it is not critical in terms that it won't
+crash. However, I fear your ethernet patch could :-o
 
-  irq 17: nobody cared (try booting with the "irqpoll" option)
-  [<c000cf8c>] (unwind_backtrace+0x0/0xf0) from [<c00513ec>] (__report_bad_irq+0x20/0xe8)
-  [<c00513ec>] (__report_bad_irq+0x20/0xe8) from [<c00516fc>] (note_interrupt+0x1e0/0x244)
-  [<c00516fc>] (note_interrupt+0x1e0/0x244) from [<c004f980>] (handle_irq_event_percpu+0xac/0x1c4)
-  [<c004f980>] (handle_irq_event_percpu+0xac/0x1c4) from [<c004faec>] (handle_irq_event+0x54/0x84)
-  [<c004faec>] (handle_irq_event+0x54/0x84) from [<c0052364>] (handle_fasteoi_irq+0x84/0x154)
-  [<c0052364>] (handle_fasteoi_irq+0x84/0x154) from [<c004f1f8>] (generic_handle_irq+0x20/0x30)
-  [<c004f1f8>] (generic_handle_irq+0x20/0x30) from [<c0009b8c>] (handle_IRQ+0x30/0x84)
-  [<c0009b8c>] (handle_IRQ+0x30/0x84) from [<c0008fa0>] (__irq_svc+0x40/0x6c)
-  [<c0008fa0>] (__irq_svc+0x40/0x6c) from [<c001cd6c>] (__do_softirq+0x5c/0x164)
-  [<c001cd6c>] (__do_softirq+0x5c/0x164) from [<c001d268>] (irq_exit+0x58/0x60)
-  [<c001d268>] (irq_exit+0x58/0x60) from [<c0009b90>] (handle_IRQ+0x34/0x84)
-  [<c0009b90>] (handle_IRQ+0x34/0x84) from [<c0008fa0>] (__irq_svc+0x40/0x6c)
-  [<c0008fa0>] (__irq_svc+0x40/0x6c) from [<c03e668c>] (start_kernel+0x1d8/0x29c)
-  [<c03e668c>] (start_kernel+0x1d8/0x29c) from [<70008040>] (0x70008040)
-  handlers:
-  [<c0012df0>] at91sam926x_pit_interrupt
-  Disabling IRQ #17
+>> Your code probably works today because the cs is setup by the bootloader
+>> and so when you request the cs in the kernel the mapping is not changed
+>> from the bootloader settings. However, if the mapping in DT (ranges
+>> property) is different from that setup by the bootloader then the kernel
+>> would probably crash because the kernel would not remap it as expected.
+>>
+>>> So, this patch allows an ethernet chip to be defined as an
+>>> GPMC child node an its chip-select memory address be requested.
+>>>
+>>> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>>> ---
+>>>
+>>> Jon,
+>>>
+>>> This patch assumes that we have solved somehow the issue that a
+>>> call to request_irq() is needed before before using a GPIO as an
+>>> IRQ and this is no longer the case when using from Device Trees.
+>>>
+>>> Anyway, this is independent as how we solve this, whether is
+>>> using Jan's patch [1], adding a .request function pointer to
+>>> irq_chip as suggested by Stephen [2], or any other approach.
+>>>
+>>> [1]: https://patchwork.kernel.org/patch/2009331/
+>>> [2]: http://www.mail-archive.com/linux-omap at vger.kernel.org/msg85592.html
+>>>
+>>>  arch/arm/mach-omap2/gpmc.c |   45 ++++++++++++++++++++++++++++++++++++++++++++
+>>>  1 files changed, 45 insertions(+), 0 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+>>> index 4fe9ee7..d1bf48b 100644
+>>> --- a/arch/arm/mach-omap2/gpmc.c
+>>> +++ b/arch/arm/mach-omap2/gpmc.c
+>>> @@ -29,6 +29,7 @@
+>>>  #include <linux/of.h>
+>>>  #include <linux/of_mtd.h>
+>>>  #include <linux/of_device.h>
+>>> +#include <linux/of_address.h>
+>>>  #include <linux/mtd/nand.h>
+>>>  
+>>>  #include <linux/platform_data/mtd-nand-omap2.h>
+>>> @@ -1296,6 +1297,42 @@ static int gpmc_probe_onenand_child(struct platform_device *pdev,
+>>>  }
+>>>  #endif
+>>>  
+>>> +static int gpmc_probe_ethernet_child(struct platform_device *pdev,
+>>> +				     struct device_node *child)
+>>> +{
+>>> +	int ret, cs;
+>>> +	unsigned long base;
+>>> +	struct resource res;
+>>> +	struct platform_device *of_dev;
+>>> +
+>>> +	if (of_property_read_u32(child, "reg", &cs) < 0) {
+>>> +		dev_err(&pdev->dev, "%s has no 'reg' property\n",
+>>> +			child->full_name);
+>>> +		return -ENODEV;
+>>> +	}
+>>> +
+>>> +	if (of_address_to_resource(child, 0, &res)) {
+>>> +		dev_err(&pdev->dev, "%s has malformed 'reg' property\n",
+>>> +			child->full_name);
+>>> +		return -ENODEV;
+>>> +	}
+>>> +
+>>> +	ret = gpmc_cs_request(cs, resource_size(&res), &base);
+>>> +	if (IS_ERR_VALUE(ret)) {
+>>> +		dev_err(&pdev->dev, "cannot request GPMC CS %d\n", cs);
+>>> +		return ret;
+>>> +	}
+>>> +
+>>> +	of_dev = of_platform_device_create(child, NULL, &pdev->dev);
+>>> +	if (!of_dev) {
+>>> +		dev_err(&pdev->dev, "cannot create platform device for %s\n",
+>>> +			child->full_name);
+>>> +		return -ENODEV;
+>>> +	}
+>>> +
+>>> +	return 0;
+>>> +}
+>>
+>> So this function does not setup the cs at all and so that means you are
+>> dependent on having the bootloader configure the cs. I would really like
+>> to get away from that sort of dependency. In fact I am wondering if we
+>> could make the gpmc_probe_nor() function a gpmc_probe_generic() that we
+>> can use for both nor and ethernet as we are doing very similar things
+>> (if we add the timings and gpmc settings to the ethernet binding).
+>>
+> 
+> Yes, I also thought about a gmpc_probe_generic() for all GMPC child nodes since
+> the chip-select setup is the same for all of them.
+> 
+> The problem I saw was that gpmc_probe_{onenand,nand}_child() were just wrappers
+> around gpmc_{onenand,nand}_init() and since the init functions call
+> gpmc_cs_request(), I couldn't have a generic probe that call gpmc_cs_request()
+> for all childs.
 
-Note that disabling the RTC-interrupts at shutdown fixes boot after a
-clean shutdown, but that an RTC-alarm after a user (or watchdog) reset
-could still prevent the system from booting.
+Yes I was thinking about leaving nand and onenand the way they were but
+using probe_generic() for nor and ethernet.
 
-Note also that the only way to recover from a failed boot after an
-RTC-alarm is to remove any backup power (e.g. backup battery) or to
-disable (or acknowledge) the RTC-interrupt manually from the bootloader.
-In particular, a user-reset is not sufficient.
+> But since we should probably have to change this to call gpmc_cs_remap() besides
+> gpmc_cs_request(), I think is better to not use gpmc_{onenand,nand}_init() at
+> all and make this somehow generic.
 
-Tested on at91sam9g45.
+Yes but may be we could do this longer term and just get ethernet
+working for now.
 
-Cc: stable <stable@vger.kernel.org>
-Signed-off-by: Johan Hovold <jhovold@gmail.com>
----
- drivers/rtc/rtc-at91rm9200.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+> Actually, since the mapping (and the IORESOURCE_MEM struct resource allocation)
+> is made by the DT core using the "ranges" property. I wonder if we could add
+> some callback function (e.g: .range_request() ) that can be set by memory
+> controllers that want to take an action (such as calling gpmc_cs_request() and
+> gpmc_cs_remap() ) once each element in the "ranges" vector is processed by the
+> DT core.
 
-diff --git a/drivers/rtc/rtc-at91rm9200.c b/drivers/rtc/rtc-at91rm9200.c
-index b6469e2..936c75a 100644
---- a/drivers/rtc/rtc-at91rm9200.c
-+++ b/drivers/rtc/rtc-at91rm9200.c
-@@ -338,6 +338,14 @@ static int __exit at91_rtc_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static void at91_rtc_shutdown(struct platform_device *pdev)
-+{
-+	/* Disable all interrupts */
-+	at91_rtc_write(AT91_RTC_IDR, AT91_RTC_ACKUPD | AT91_RTC_ALARM |
-+					AT91_RTC_SECEV | AT91_RTC_TIMEV |
-+					AT91_RTC_CALEV);
-+}
-+
- #ifdef CONFIG_PM
- 
- /* AT91RM9200 RTC Power management control */
-@@ -384,6 +392,7 @@ static const struct dev_pm_ops at91_rtc_pm = {
- 
- static struct platform_driver at91_rtc_driver = {
- 	.remove		= __exit_p(at91_rtc_remove),
-+	.shutdown	= at91_rtc_shutdown,
- 	.driver		= {
- 		.name	= "at91_rtc",
- 		.owner	= THIS_MODULE,
--- 
-1.8.1.5
+Possibly but again I think that should be look at longer term. I think
+you are on the right path. Care to see if you can make gpmc_probe_nor
+into gpmc_probe_generic and make this work for ethernet too? Leave nand
+and onenand as-is for now.
+
+>> Also I think we need to add some DT binding documentation for this as well.
+>>
+> 
+> +1
+
+Thanks
+Jon
