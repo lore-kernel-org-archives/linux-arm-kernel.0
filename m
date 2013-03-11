@@ -1,30 +1,31 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 11 Mar 2013 11:35:37 -0600
-Subject: [PATCH V2 2/5] ARM: DT: tegra114: Add i2c controller DT entry
-In-Reply-To: <20130310223936.GF4743@avionic-0098.mockup.avionic-design.de>
-References: <1362852678-13421-1-git-send-email-ldewangan@nvidia.com>
- <1362852678-13421-3-git-send-email-ldewangan@nvidia.com>
- <20130310223936.GF4743@avionic-0098.mockup.avionic-design.de>
-Message-ID: <513E15E9.8090904@wwwdotorg.org>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 11 Mar 2013 10:36:42 -0700
+Subject: [PATCH] spi: s3c64xx: let device core setup the default pin
+ configuration
+In-Reply-To: <1362570130-14084-1-git-send-email-thomas.abraham@linaro.org>
+References: <1362570130-14084-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <CAD=FV=W++WXLOazKR=f6PHdzr=AVOwyT2i=swNtw6yMOJhJgmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/10/2013 04:39 PM, Thierry Reding wrote:
-> On Sat, Mar 09, 2013 at 11:41:15PM +0530, Laxman Dewangan wrote:
->> NVIDIA's Tegra114 has 5 i2c controllers. These controllers have 
->> additional feature/configurations to make it functional over 
->> Tegra30's i2c controller driver.
->> 
->> Add DT entry for i2c controllers and make it compatible with 
->> "nvidia,tegra114-i2c".
-> 
-> Both the subject and description should probably use I2C instead of
-> i2c. Also I don't understand what "make it functional over" means.
-> Perhaps, since the entries aren't marked compatible with
-> nvidia,tegra30-i2c you meant to say that they are incompatible with
-> Tegra30?
+Thomas,
 
-The second sentence Laxman wrote above should probably say:
+On Wed, Mar 6, 2013 at 3:42 AM, Thomas Abraham
+<thomas.abraham@linaro.org> wrote:
+> With device core now able to setup the default pin configuration,
+> the pin configuration code based on the deprecated Samsung specific
+> gpio bindings is removed.
+>
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> ---
+>  .../devicetree/bindings/spi/spi-samsung.txt        |    8 +--
+>  drivers/spi/spi-s3c64xx.c                          |   66 +------------------
+>  2 files changed, 6 insertions(+), 68 deletions(-)
 
-These controllers have a modified clocking structure that make them
-incompatible with previous hardware.
+With <https://patchwork.kernel.org/patch/2225151/> on exynos5250-snow
+(ARM Chromebook):
+
+Reviewed-by: Doug Anderson <dianders@chromium.org>
+Tested-by: Doug Anderson <dianders@chromium.org>
+
+-Doug
