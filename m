@@ -1,73 +1,221 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 11 Mar 2013 19:35:36 +0800
-Subject: [PATCH v4 1/2] ARM: use Kconfig to select uncompress.h
-In-Reply-To: <1363001737-8745-1-git-send-email-shawn.guo@linaro.org>
-References: <1363001737-8745-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1363001737-8745-2-git-send-email-shawn.guo@linaro.org>
+From: hechtb@gmail.com (Bastian Hecht)
+Date: Mon, 11 Mar 2013 12:36:36 +0100
+Subject: [PATCH v2 3/7] clocksource: sh_tmu: Add OF support
+In-Reply-To: <1362742181-19111-4-git-send-email-hechtb+renesas@gmail.com>
+References: <1362742181-19111-1-git-send-email-hechtb+renesas@gmail.com>
+ <1362742181-19111-4-git-send-email-hechtb+renesas@gmail.com>
+Message-ID: <CABYn4sx1iMZWdC188_2GrN69E7-UKBiPSOcnXeeQeW5gxjF14w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Following the approach handling DEBUG_LL inclusion, the patch creates
-a Kconfig symbol CONFIG_UNCOMPRESS_INCLUDE for choosing the correct
-uncompress header.  For traditional build, mach/uncompress.h will be
-included in arch/arm/boot/compressed/misc.c.  For multiplatform build,
-debug/uncompress.h which contains a suite of empty functions will be
-used.  In this way, a platform with particular uncompress.h
-implementation could choose its own uncompress.h with this Kconfig
-option.
+Hello all,
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/Kconfig.debug              |    5 +++++
- arch/arm/boot/compressed/misc.c     |    8 +-------
- arch/arm/include/debug/uncompress.h |    3 +++
- 3 files changed, 9 insertions(+), 7 deletions(-)
- create mode 100644 arch/arm/include/debug/uncompress.h
+this patch misses 2 trivial lines in static int sh_tmu_setup():
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index acdddda..fc54a5b 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -601,6 +601,11 @@ config DEBUG_LL_INCLUDE
- 	default "debug/zynq.S" if DEBUG_ZYNQ_UART0 || DEBUG_ZYNQ_UART1
- 	default "mach/debug-macro.S"
- 
-+config UNCOMPRESS_INCLUDE
-+	string
-+	default "debug/uncompress.h" if ARCH_MULTIPLATFORM
-+	default "mach/uncompress.h"
-+
- config EARLY_PRINTK
- 	bool "Early printk"
- 	depends on DEBUG_LL
-diff --git a/arch/arm/boot/compressed/misc.c b/arch/arm/boot/compressed/misc.c
-index df89983..31bd43b 100644
---- a/arch/arm/boot/compressed/misc.c
-+++ b/arch/arm/boot/compressed/misc.c
-@@ -25,13 +25,7 @@ unsigned int __machine_arch_type;
- static void putstr(const char *ptr);
- extern void error(char *x);
- 
--#ifdef CONFIG_ARCH_MULTIPLATFORM
--static inline void putc(int c) {}
--static inline void flush(void) {}
--static inline void arch_decomp_setup(void) {}
--#else
--#include <mach/uncompress.h>
--#endif
-+#include CONFIG_UNCOMPRESS_INCLUDE
- 
- #ifdef CONFIG_DEBUG_ICEDCC
- 
-diff --git a/arch/arm/include/debug/uncompress.h b/arch/arm/include/debug/uncompress.h
-new file mode 100644
-index 0000000..e19955d
---- /dev/null
-+++ b/arch/arm/include/debug/uncompress.h
-@@ -0,0 +1,3 @@
-+static inline void putc(int c) {}
-+static inline void flush(void) {}
-+static inline void arch_decomp_setup(void) {}
--- 
-1.7.9.5
++       p->channel_offset = cfg->channel_offset;
++       p->timer_bit = cfg->timer_bit;
+
+In such a case, do I post a complete v3 series containing 7 patches?
+Or just this single patch as v3?
+
+Thanks,
+
+ Bastian
+
+
+2013/3/8 Bastian Hecht <hechtb@gmail.com>:
+> We add the capabilty to probe SH CMT timer devices using Device Tree
+> setup.
+>
+> Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
+> ---
+> v2: new. Done analogously to the cmt driver
+>
+>  drivers/clocksource/sh_tmu.c |   94 +++++++++++++++++++++++++++++++++++++-----
+>  1 file changed, 83 insertions(+), 11 deletions(-)
+>
+> diff --git a/drivers/clocksource/sh_tmu.c b/drivers/clocksource/sh_tmu.c
+> index b4502edc..7d5c999 100644
+> --- a/drivers/clocksource/sh_tmu.c
+> +++ b/drivers/clocksource/sh_tmu.c
+> @@ -34,10 +34,13 @@
+>  #include <linux/module.h>
+>  #include <linux/pm_domain.h>
+>  #include <linux/pm_runtime.h>
+> +#include <linux/of.h>
+>
+>  struct sh_tmu_priv {
+>         void __iomem *mapbase;
+>         struct clk *clk;
+> +       long channel_offset;
+> +       int timer_bit;
+>         struct irqaction irqaction;
+>         struct platform_device *pdev;
+>         unsigned long rate;
+> @@ -57,12 +60,11 @@ static DEFINE_RAW_SPINLOCK(sh_tmu_lock);
+>
+>  static inline unsigned long sh_tmu_read(struct sh_tmu_priv *p, int reg_nr)
+>  {
+> -       struct sh_timer_config *cfg = p->pdev->dev.platform_data;
+>         void __iomem *base = p->mapbase;
+>         unsigned long offs;
+>
+>         if (reg_nr == TSTR)
+> -               return ioread8(base - cfg->channel_offset);
+> +               return ioread8(base - p->channel_offset);
+>
+>         offs = reg_nr << 2;
+>
+> @@ -75,12 +77,11 @@ static inline unsigned long sh_tmu_read(struct sh_tmu_priv *p, int reg_nr)
+>  static inline void sh_tmu_write(struct sh_tmu_priv *p, int reg_nr,
+>                                 unsigned long value)
+>  {
+> -       struct sh_timer_config *cfg = p->pdev->dev.platform_data;
+>         void __iomem *base = p->mapbase;
+>         unsigned long offs;
+>
+>         if (reg_nr == TSTR) {
+> -               iowrite8(value, base - cfg->channel_offset);
+> +               iowrite8(value, base - p->channel_offset);
+>                 return;
+>         }
+>
+> @@ -94,7 +95,6 @@ static inline void sh_tmu_write(struct sh_tmu_priv *p, int reg_nr,
+>
+>  static void sh_tmu_start_stop_ch(struct sh_tmu_priv *p, int start)
+>  {
+> -       struct sh_timer_config *cfg = p->pdev->dev.platform_data;
+>         unsigned long flags, value;
+>
+>         /* start stop register shared by multiple timer channels */
+> @@ -102,9 +102,9 @@ static void sh_tmu_start_stop_ch(struct sh_tmu_priv *p, int start)
+>         value = sh_tmu_read(p, TSTR);
+>
+>         if (start)
+> -               value |= 1 << cfg->timer_bit;
+> +               value |= 1 << p->timer_bit;
+>         else
+> -               value &= ~(1 << cfg->timer_bit);
+> +               value &= ~(1 << p->timer_bit);
+>
+>         sh_tmu_write(p, TSTR, value);
+>         raw_spin_unlock_irqrestore(&sh_tmu_lock, flags);
+> @@ -421,9 +421,75 @@ static int sh_tmu_register(struct sh_tmu_priv *p, char *name,
+>         return 0;
+>  }
+>
+> -static int sh_tmu_setup(struct sh_tmu_priv *p, struct platform_device *pdev)
+> +static const struct of_device_id of_sh_tmu_match[] = {
+> +       { .compatible = "renesas,tmu-timer" },
+> +       {},
+> +};
+> +MODULE_DEVICE_TABLE(of, of_sh_tmu_match);
+> +
+> +#define TMU_OFFSET_MULTIPLIER  0xc
+> +#define TMU_MAX_CHANNELS       3
+> +
+> +static struct sh_timer_config *sh_tmu_parse_dt(struct device *dev)
+> +{
+> +       struct sh_timer_config *cfg;
+> +       struct device_node *np = dev->of_node;
+> +       u32 channel_id, rating;
+> +
+> +       if (!IS_ENABLED(CONFIG_OF) || !np)
+> +               return NULL;
+> +
+> +       cfg = devm_kzalloc(dev, sizeof(struct sh_timer_config), GFP_KERNEL);
+> +       if (!cfg) {
+> +               dev_err(dev, "failed to allocate DT config data\n");
+> +               return NULL;
+> +       }
+> +
+> +       if (of_property_read_u32(np, "renesas,channel-id", &channel_id)) {
+> +               dev_err(dev, "channel id missing\n");
+> +               return NULL;
+> +       }
+> +       if (channel_id >= TMU_MAX_CHANNELS) {
+> +               dev_err(dev, "invalid channel id\n");
+> +               return NULL;
+> +       }
+> +
+> +       cfg->channel_offset = channel_id * TMU_OFFSET_MULTIPLIER + 4;
+> +       cfg->timer_bit = channel_id;
+> +
+> +       /*
+> +        * We convert the {source,event}-quality DT properties to linux specific
+> +        * clock{source,event}_ratings.
+> +        */
+> +       if (!of_property_read_u32(np, "renesas,source-quality", &rating)) {
+> +               if (rating > 10) {
+> +                       dev_err(dev, "invalid source-quality\n");
+> +                       return NULL;
+> +               }
+> +               if (rating)
+> +                       cfg->clocksource_rating = rating * 50 - 1;
+> +       }
+> +
+> +       if (!of_property_read_u32(np, "renesas,event-quality", &rating)) {
+> +               if (rating > 10) {
+> +                       dev_err(dev, "invalid event-quality\n");
+> +                       return NULL;
+> +               }
+> +               if (rating)
+> +                       cfg->clockevent_rating = rating * 50 - 1;
+> +       }
+> +
+> +       if (!cfg->clocksource_rating && !cfg->clockevent_rating) {
+> +               dev_err(dev, "source- and event-quality 0, timer is unused\n");
+> +               return NULL;
+> +       }
+> +
+> +       return cfg;
+> +}
+> +
+> +static int sh_tmu_setup(struct sh_tmu_priv *p, struct platform_device *pdev,
+> +                                               struct sh_timer_config *cfg)
+>  {
+> -       struct sh_timer_config *cfg = pdev->dev.platform_data;
+>         struct resource *res;
+>         int irq, ret;
+>         ret = -ENXIO;
+> @@ -487,7 +553,7 @@ static int sh_tmu_setup(struct sh_tmu_priv *p, struct platform_device *pdev)
+>  static int sh_tmu_probe(struct platform_device *pdev)
+>  {
+>         struct sh_tmu_priv *p = platform_get_drvdata(pdev);
+> -       struct sh_timer_config *cfg = pdev->dev.platform_data;
+> +       struct sh_timer_config *cfg;
+>         int ret;
+>
+>         if (!is_early_platform_device(pdev)) {
+> @@ -495,6 +561,11 @@ static int sh_tmu_probe(struct platform_device *pdev)
+>                 pm_runtime_enable(&pdev->dev);
+>         }
+>
+> +       if (pdev->dev.of_node)
+> +               cfg = sh_tmu_parse_dt(&pdev->dev);
+> +       else
+> +               cfg = pdev->dev.platform_data;
+> +
+>         if (p) {
+>                 dev_info(&pdev->dev, "kept as earlytimer\n");
+>                 goto out;
+> @@ -506,7 +577,7 @@ static int sh_tmu_probe(struct platform_device *pdev)
+>                 return -ENOMEM;
+>         }
+>
+> -       ret = sh_tmu_setup(p, pdev);
+> +       ret = sh_tmu_setup(p, pdev, cfg);
+>         if (ret) {
+>                 kfree(p);
+>                 platform_set_drvdata(pdev, NULL);
+> @@ -535,6 +606,7 @@ static struct platform_driver sh_tmu_device_driver = {
+>         .remove         = sh_tmu_remove,
+>         .driver         = {
+>                 .name   = "sh_tmu",
+> +               .of_match_table = of_sh_tmu_match,
+>         }
+>  };
+>
+> --
+> 1.7.9.5
+>
