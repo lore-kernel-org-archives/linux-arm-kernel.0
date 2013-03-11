@@ -1,75 +1,91 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Mon, 11 Mar 2013 16:40:16 +0100
-Subject: [PATCH] genirq: move mask_cache into struct irq_chip_type
-In-Reply-To: <alpine.LFD.2.02.1303061518160.22263@ionos>
-References: <20110720234537.GD16297@kw.sim.vm.gnt>
- <1311295758-27493-1-git-send-email-simon@sequanux.org>
- <CAMAG_edBy1kjmEGDD76-C5T0xtha9YxMFJ6B3D8A5kHBwQ1PMQ@mail.gmail.com>
- <20110726153930.GG16297@kw.sim.vm.gnt>
- <CAMAG_ee8YBvDsdQ2zNfn-7qdyTmVYBVb8xykMMv4pg8tEswJgg@mail.gmail.com>
- <5134AF7E.5010605@keymile.com>
- <20130304154454.GG21620@kw.sim.vm.gnt>
- <alpine.LFD.2.02.1303051114370.22263@ionos>
- <20130306132944.GJ21620@kw.sim.vm.gnt>
- <alpine.LFD.2.02.1303061518160.22263@ionos>
-Message-ID: <20130311154016.GM21620@kw.sim.vm.gnt>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Mon, 11 Mar 2013 16:53:22 +0100
+Subject: [PATCH 01/13] usb: phy: nop: Add device tree support and binding
+ information
+In-Reply-To: <513D9893.50703@ti.com>
+References: <1359993540-20780-1-git-send-email-rogerq@ti.com>
+ <1359993540-20780-2-git-send-email-rogerq@ti.com>
+ <5139C174.7030401@pengutronix.de> <513A079A.1020106@pengutronix.de>
+ <513D9893.50703@ti.com>
+Message-ID: <513DFDF2.7060407@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 06, 2013 at 04:19:30PM +0100, Thomas Gleixner wrote:
-> On Wed, 6 Mar 2013, Simon Guinot wrote:
+On 03/11/2013 09:40 AM, Roger Quadros wrote:
+> On 03/08/2013 05:45 PM, Marc Kleine-Budde wrote:
+>> On 03/08/2013 11:46 AM, Marc Kleine-Budde wrote:
+>>> On 02/04/2013 04:58 PM, Roger Quadros wrote:
+>>>> The PHY clock, clock rate, VCC regulator and RESET regulator
+>>>> can now be provided via device tree.
+>>>>
+>>>> Signed-off-by: Roger Quadros <rogerq@ti.com>
+>>>> ---
+>>>>  .../devicetree/bindings/usb/usb-nop-xceiv.txt      |   34 ++++++++++++++++++++
+>>>>  drivers/usb/otg/nop-usb-xceiv.c                    |   31 ++++++++++++++++++
+>>>>  2 files changed, 65 insertions(+), 0 deletions(-)
+>>>>  create mode 100644 Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt b/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
+>>>> new file mode 100644
+>>>> index 0000000..d7e2726
+>>>> --- /dev/null
+>>>> +++ b/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
+>>>> @@ -0,0 +1,34 @@
+>>>> +USB NOP PHY
+>>>> +
+>>>> +Required properties:
+>>>> +- compatible: should be usb-nop-xceiv
+>>>> +
+>>>> +Optional properties:
+>>>> +- clocks: phandle to the PHY clock. Use as per Documentation/devicetree
+>>>> +  /bindings/clock/clock-bindings.txt
+>>>> +  This property is required if clock-frequency is specified.
+>>>> +
+>>>> +- clock-names: Should be "main_clk"
+>>>> +
+>>>> +- clock-frequency: the clock frequency (in Hz) that the PHY clock must
+>>>> +  be configured to.
+>>>> +
+>>>> +- vcc-supply: phandle to the regulator that provides RESET to the PHY.
+>>>> +
+>>>> +- reset-supply: phandle to the regulator that provides power to the PHY.
+>>>> +
+>>>> +Example:
+>>>> +
+>>>> +	hsusb1_phy {
+>>>> +		compatible = "usb-nop-xceiv";
+>>>> +		clock-frequency = <19200000>;
+>>>
+>>> Why do you hardcode the clock frequency here? You should use
+>>> clk_get_rate() to get the frequency from the clock tree.
+>>
+>> What about declaring a "fixed-clock" node in the device tree? Then it
+>> should be possible to keep the driver free of any omap specific code.
+>>
 > 
-> > On Tue, Mar 05, 2013 at 11:15:04AM +0100, Thomas Gleixner wrote:
-> > > On Mon, 4 Mar 2013, Simon Guinot wrote:
-> > > > On Mon, Mar 04, 2013 at 03:28:14PM +0100, Gerlando Falauto wrote:
-> > > > 
-> > > > AFAIK this issue is still here. I include the current Orion maintainers
-> > > > in the Cc list.
-> > > 
-> > > Can you please resend the patch?
-> > 
-> > Hi Thomas,
-> > 
-> > Do you agree with the original patch concept: moving mask_cache from
-> > struct irq_chip_generic into struct irq_chip_type ?
+> The current implementation is not OMAP specific and is not limited to a
+> fixed frequency clock. The PHY driver is using standard clock APIs to set
+> the clock rate 'only' if the 'clock-frequency' property is present in the
+> device tree node.
 > 
-> Not really. See below.
->  
-> > This allows to handle the irq_chips which have separate mask registers
-> > for the edge and level interrupts. At the time of this patch, this was
-> > the only existing case.
-> > 
-> > Saeed objected that the patch was not correct because this was breaking
-> > "hypothetic" devices with multiple irq_chip_type and a single mask
-> > register.
-> 
-> Not so hypothetic. There _are_ irq controllers out there which use the
-> same mask register for both level and edge type irqs.
+> What is the benefit of declaring it as a "fixed-clock"?
+> FYI. The clock may not necessarily be a fixed frequency clock and someone
+> needs to program the rate.
 
-Sure, but if the same mask register is used, then a single irq_chip_type
-should be able to handle both level and edge interrupts ? I mean, if one
-needs to register different irq_chip_type for edge and level interrupts,
-it is most likely because the registers are not the same...
+Okay, now I got it.
 
-Simon
+Marc
 
-> 
-> > The other option was to provide some dedicated irq_mask handlers for the
-> > Orion irq chip.
-> 
-> I'd rather refactor the core code so it uses a pointer to the
-> mask_cache. The default would be to let it point to gc->mask_cache and
-> optionally let it point to ct->mask_cache. We'd need to store the flag
-> in the gc struct so we can redirect the pointer to the ct->mask_cache
-> in irq_setup_alt_chip().
-> 
-> Thanks,
-> 
-> 	tglx
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130311/ea7b9c97/attachment.sig>
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130311/6e3b09c1/attachment-0001.sig>
