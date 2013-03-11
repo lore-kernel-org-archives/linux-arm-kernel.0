@@ -1,319 +1,202 @@
 From: jhovold@gmail.com (Johan Hovold)
-Date: Mon, 11 Mar 2013 19:07:59 +0100
-Subject: [PATCH v2 5/5] ARM: at91: fix hanged boot
+Date: Mon, 11 Mar 2013 19:07:58 +0100
+Subject: [PATCH v2 4/5] Revert "arm: at91: move at91rm9200 rtc header in
+ drivers/rtc"
 In-Reply-To: <1363025279-17615-1-git-send-email-jhovold@gmail.com>
 References: <20130311180611.GF8797@localhost>
  <1363025279-17615-1-git-send-email-jhovold@gmail.com>
-Message-ID: <1363025279-17615-6-git-send-email-jhovold@gmail.com>
+Message-ID: <1363025279-17615-5-git-send-email-jhovold@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make sure the RTC and RTT-interrupts are masked at boot by adding a new
-SOC-initialiser and helpers functions.
+This reverts commit 75984df05d86956541795f01e62d7dc67bc522fd.
 
-This fixes hanged boot on all AT91 SOCs but RM9200, for example, after a
-reset during an RTC-update or if an RTC or RTT-alarm goes off after a
-non-clean shutdown.
-
-The RTC and RTT-peripherals are powered by backup power (VDDBU) (on all
-AT91 SOCs but RM9200) and are not reset on wake-up, user, watchdog or
-software reset. This means that their interrupts may be enabled during
-early boot if, for example, they where not disabled during a previous
-shutdown (e.g. due to a buggy driver or a non-clean shutdown such as a
-user reset). Furthermore, an RTC or RTT-alarm may also be active.
-
-The RTC and RTT-interrupts use the shared system-interrupt line, and if
-an interrupt occurs before a handler (e.g. RTC-driver) has been
-installed this leads to the system interrupt being disabled and prevents
-the system from booting.
-
-Note that when boot hangs due to an early RTC or RTT-interrupt, the only
-way to get the system to start again is to remove the backup power (e.g.
-battery) or to disable the interrupt manually from the bootloader. In
-particular, a user reset is not sufficient.
-
-Tested on at91sam9263 and at91sam9g45.
+A couple of these register definitions are needed by arch code as the
+RTC-interrupts must be disabled at early boot.
 
 Signed-off-by: Johan Hovold <jhovold@gmail.com>
 ---
- arch/arm/mach-at91/at91sam9260.c |  6 +++
- arch/arm/mach-at91/at91sam9261.c |  6 +++
- arch/arm/mach-at91/at91sam9263.c |  7 ++++
- arch/arm/mach-at91/at91sam9g45.c |  7 ++++
- arch/arm/mach-at91/at91sam9rl.c  |  7 ++++
- arch/arm/mach-at91/generic.h     |  2 +
- arch/arm/mach-at91/setup.c       | 88 ++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-at91/soc.h         |  1 +
- 8 files changed, 124 insertions(+)
+ arch/arm/mach-at91/include/mach/at91_rtc.h | 75 ++++++++++++++++++++++++++++++
+ drivers/rtc/rtc-at91rm9200.c               |  2 +-
+ drivers/rtc/rtc-at91rm9200.h               | 75 ------------------------------
+ 3 files changed, 76 insertions(+), 76 deletions(-)
+ create mode 100644 arch/arm/mach-at91/include/mach/at91_rtc.h
+ delete mode 100644 drivers/rtc/rtc-at91rm9200.h
 
-diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-index b67cd53..c47a0db 100644
---- a/arch/arm/mach-at91/at91sam9260.c
-+++ b/arch/arm/mach-at91/at91sam9260.c
-@@ -342,6 +342,11 @@ static void __init at91sam9260_ioremap_registers(void)
- 	at91_ioremap_matrix(AT91SAM9260_BASE_MATRIX);
- }
- 
-+static void __init at91sam9260_sysirq_mask(void)
-+{
-+	at91_sysirq_mask_rtt(AT91SAM9260_BASE_RTT);
-+}
+diff --git a/arch/arm/mach-at91/include/mach/at91_rtc.h b/arch/arm/mach-at91/include/mach/at91_rtc.h
+new file mode 100644
+index 0000000..da1945e
+--- /dev/null
++++ b/arch/arm/mach-at91/include/mach/at91_rtc.h
+@@ -0,0 +1,75 @@
++/*
++ * arch/arm/mach-at91/include/mach/at91_rtc.h
++ *
++ * Copyright (C) 2005 Ivan Kokshaysky
++ * Copyright (C) SAN People
++ *
++ * Real Time Clock (RTC) - System peripheral registers.
++ * Based on AT91RM9200 datasheet revision E.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
 +
- static void __init at91sam9260_initialize(void)
- {
- 	arm_pm_idle = at91sam9_idle;
-@@ -400,5 +405,6 @@ AT91_SOC_START(sam9260)
- 	.default_irq_priority = at91sam9260_default_irq_priority,
- 	.ioremap_registers = at91sam9260_ioremap_registers,
- 	.register_clocks = at91sam9260_register_clocks,
-+	.sysirq_mask = at91sam9260_sysirq_mask,
- 	.init = at91sam9260_initialize,
- AT91_SOC_END
-diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
-index 0204f4c..396e4cb 100644
---- a/arch/arm/mach-at91/at91sam9261.c
-+++ b/arch/arm/mach-at91/at91sam9261.c
-@@ -286,6 +286,11 @@ static void __init at91sam9261_ioremap_registers(void)
- 	at91_ioremap_matrix(AT91SAM9261_BASE_MATRIX);
- }
- 
-+static void __init at91sam9261_sysirq_mask(void)
-+{
-+	at91_sysirq_mask_rtt(AT91SAM9261_BASE_RTT);
-+}
++#ifndef AT91_RTC_H
++#define AT91_RTC_H
 +
- static void __init at91sam9261_initialize(void)
- {
- 	arm_pm_idle = at91sam9_idle;
-@@ -344,5 +349,6 @@ AT91_SOC_START(sam9261)
- 	.default_irq_priority = at91sam9261_default_irq_priority,
- 	.ioremap_registers = at91sam9261_ioremap_registers,
- 	.register_clocks = at91sam9261_register_clocks,
-+	.sysirq_mask = at91sam9261_sysirq_mask,
- 	.init = at91sam9261_initialize,
- AT91_SOC_END
-diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
-index c0cbb81..a0166a3 100644
---- a/arch/arm/mach-at91/at91sam9263.c
-+++ b/arch/arm/mach-at91/at91sam9263.c
-@@ -325,6 +325,12 @@ static void __init at91sam9263_ioremap_registers(void)
- 	at91_ioremap_matrix(AT91SAM9263_BASE_MATRIX);
- }
- 
-+static void __init at91sam9263_sysirq_mask(void)
-+{
-+	at91_sysirq_mask_rtt(AT91SAM9263_BASE_RTT0);
-+	at91_sysirq_mask_rtt(AT91SAM9263_BASE_RTT1);
-+}
++#define	AT91_RTC_CR		0x00			/* Control Register */
++#define		AT91_RTC_UPDTIM		(1 <<  0)		/* Update Request Time Register */
++#define		AT91_RTC_UPDCAL		(1 <<  1)		/* Update Request Calendar Register */
++#define		AT91_RTC_TIMEVSEL	(3 <<  8)		/* Time Event Selection */
++#define			AT91_RTC_TIMEVSEL_MINUTE	(0 << 8)
++#define			AT91_RTC_TIMEVSEL_HOUR		(1 << 8)
++#define			AT91_RTC_TIMEVSEL_DAY24		(2 << 8)
++#define			AT91_RTC_TIMEVSEL_DAY12		(3 << 8)
++#define		AT91_RTC_CALEVSEL	(3 << 16)		/* Calendar Event Selection */
++#define			AT91_RTC_CALEVSEL_WEEK		(0 << 16)
++#define			AT91_RTC_CALEVSEL_MONTH		(1 << 16)
++#define			AT91_RTC_CALEVSEL_YEAR		(2 << 16)
 +
- static void __init at91sam9263_initialize(void)
- {
- 	arm_pm_idle = at91sam9_idle;
-@@ -382,5 +388,6 @@ AT91_SOC_START(sam9263)
- 	.default_irq_priority = at91sam9263_default_irq_priority,
- 	.ioremap_registers = at91sam9263_ioremap_registers,
- 	.register_clocks = at91sam9263_register_clocks,
-+	.sysirq_mask = at91sam9263_sysirq_mask,
- 	.init = at91sam9263_initialize,
- AT91_SOC_END
-diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-index b4968aa..3d5498e 100644
---- a/arch/arm/mach-at91/at91sam9g45.c
-+++ b/arch/arm/mach-at91/at91sam9g45.c
-@@ -370,6 +370,12 @@ static void __init at91sam9g45_ioremap_registers(void)
- 	at91_ioremap_matrix(AT91SAM9G45_BASE_MATRIX);
- }
- 
-+static void __init at91sam9g45_sysirq_mask(void)
-+{
-+	at91_sysirq_mask_rtc(AT91SAM9G45_BASE_RTC);
-+	at91_sysirq_mask_rtt(AT91SAM9G45_BASE_RTT);
-+}
++#define	AT91_RTC_MR		0x04			/* Mode Register */
++#define			AT91_RTC_HRMOD		(1 <<  0)		/* 12/24 Hour Mode */
 +
- static void __init at91sam9g45_initialize(void)
- {
- 	arm_pm_idle = at91sam9_idle;
-@@ -427,5 +433,6 @@ AT91_SOC_START(sam9g45)
- 	.default_irq_priority = at91sam9g45_default_irq_priority,
- 	.ioremap_registers = at91sam9g45_ioremap_registers,
- 	.register_clocks = at91sam9g45_register_clocks,
-+	.sysirq_mask = at91sam9g45_sysirq_mask,
- 	.init = at91sam9g45_initialize,
- AT91_SOC_END
-diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
-index 3de3e04..bde999f 100644
---- a/arch/arm/mach-at91/at91sam9rl.c
-+++ b/arch/arm/mach-at91/at91sam9rl.c
-@@ -289,6 +289,12 @@ static void __init at91sam9rl_ioremap_registers(void)
- 	at91_ioremap_matrix(AT91SAM9RL_BASE_MATRIX);
- }
- 
-+static void __init at91sam9rl_sysirq_mask(void)
-+{
-+	at91_sysirq_mask_rtc(AT91SAM9RL_BASE_RTC);
-+	at91_sysirq_mask_rtt(AT91SAM9RL_BASE_RTT);
-+}
++#define	AT91_RTC_TIMR		0x08			/* Time Register */
++#define		AT91_RTC_SEC		(0x7f <<  0)		/* Current Second */
++#define		AT91_RTC_MIN		(0x7f <<  8)		/* Current Minute */
++#define		AT91_RTC_HOUR		(0x3f << 16)		/* Current Hour */
++#define		AT91_RTC_AMPM		(1    << 22)		/* Ante Meridiem Post Meridiem Indicator */
 +
- static void __init at91sam9rl_initialize(void)
- {
- 	arm_pm_idle = at91sam9_idle;
-@@ -346,5 +352,6 @@ AT91_SOC_START(sam9rl)
- 	.default_irq_priority = at91sam9rl_default_irq_priority,
- 	.ioremap_registers = at91sam9rl_ioremap_registers,
- 	.register_clocks = at91sam9rl_register_clocks,
-+	.sysirq_mask = at91sam9rl_sysirq_mask,
- 	.init = at91sam9rl_initialize,
- AT91_SOC_END
-diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
-index fc593d6..90a854d 100644
---- a/arch/arm/mach-at91/generic.h
-+++ b/arch/arm/mach-at91/generic.h
-@@ -33,6 +33,8 @@ extern int  __init at91_aic_of_init(struct device_node *node,
- 				    struct device_node *parent);
- extern int  __init at91_aic5_of_init(struct device_node *node,
- 				    struct device_node *parent);
-+extern void __init at91_sysirq_mask_rtc(u32 rtc_base);
-+extern void __init at91_sysirq_mask_rtt(u32 rtt_base);
++#define	AT91_RTC_CALR		0x0c			/* Calendar Register */
++#define		AT91_RTC_CENT		(0x7f <<  0)		/* Current Century */
++#define		AT91_RTC_YEAR		(0xff <<  8)		/* Current Year */
++#define		AT91_RTC_MONTH		(0x1f << 16)		/* Current Month */
++#define		AT91_RTC_DAY		(7    << 21)		/* Current Day */
++#define		AT91_RTC_DATE		(0x3f << 24)		/* Current Date */
++
++#define	AT91_RTC_TIMALR		0x10			/* Time Alarm Register */
++#define		AT91_RTC_SECEN		(1 <<  7)		/* Second Alarm Enable */
++#define		AT91_RTC_MINEN		(1 << 15)		/* Minute Alarm Enable */
++#define		AT91_RTC_HOUREN		(1 << 23)		/* Hour Alarm Enable */
++
++#define	AT91_RTC_CALALR		0x14			/* Calendar Alarm Register */
++#define		AT91_RTC_MTHEN		(1 << 23)		/* Month Alarm Enable */
++#define		AT91_RTC_DATEEN		(1 << 31)		/* Date Alarm Enable */
++
++#define	AT91_RTC_SR		0x18			/* Status Register */
++#define		AT91_RTC_ACKUPD		(1 <<  0)		/* Acknowledge for Update */
++#define		AT91_RTC_ALARM		(1 <<  1)		/* Alarm Flag */
++#define		AT91_RTC_SECEV		(1 <<  2)		/* Second Event */
++#define		AT91_RTC_TIMEV		(1 <<  3)		/* Time Event */
++#define		AT91_RTC_CALEV		(1 <<  4)		/* Calendar Event */
++
++#define	AT91_RTC_SCCR		0x1c			/* Status Clear Command Register */
++#define	AT91_RTC_IER		0x20			/* Interrupt Enable Register */
++#define	AT91_RTC_IDR		0x24			/* Interrupt Disable Register */
++#define	AT91_RTC_IMR		0x28			/* Interrupt Mask Register */
++
++#define	AT91_RTC_VER		0x2c			/* Valid Entry Register */
++#define		AT91_RTC_NVTIM		(1 <<  0)		/* Non valid Time */
++#define		AT91_RTC_NVCAL		(1 <<  1)		/* Non valid Calendar */
++#define		AT91_RTC_NVTIMALR	(1 <<  2)		/* Non valid Time Alarm */
++#define		AT91_RTC_NVCALALR	(1 <<  3)		/* Non valid Calendar Alarm */
++
++#endif
+diff --git a/drivers/rtc/rtc-at91rm9200.c b/drivers/rtc/rtc-at91rm9200.c
+index 936c75a..1ed0433 100644
+--- a/drivers/rtc/rtc-at91rm9200.c
++++ b/drivers/rtc/rtc-at91rm9200.c
+@@ -31,7 +31,7 @@
  
+ #include <asm/uaccess.h>
  
-  /* Timer */
-diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
-index 4b67847..4c5790f 100644
---- a/arch/arm/mach-at91/setup.c
-+++ b/arch/arm/mach-at91/setup.c
-@@ -19,6 +19,8 @@
- #include <mach/cpu.h>
- #include <mach/at91_dbgu.h>
- #include <mach/at91_pmc.h>
+-#include "rtc-at91rm9200.h"
 +#include <mach/at91_rtc.h>
-+#include <mach/at91_rtt.h>
  
- #include "at91_shdwc.h"
- #include "soc.h"
-@@ -311,6 +313,39 @@ void __init at91_ioremap_matrix(u32 base_addr)
- 		panic("Impossible to ioremap at91_matrix_base\n");
- }
- 
-+void __init __at91_sysirq_mask_rtc(void __iomem *rtc_base)
-+{
-+	u32 mask;
-+
-+	mask = __raw_readl(rtc_base + AT91_RTC_IMR);
-+	if (mask) {
-+		pr_info("AT91: Disabling rtc irq\n");
-+		__raw_writel(mask, rtc_base + AT91_RTC_IDR);
-+	}
-+}
-+
-+void __init __at91_sysirq_mask_rtt(void __iomem *rtt_base)
-+{
-+	u32 mr;
-+
-+	mr = __raw_readl(rtt_base + AT91_RTT_MR);
-+	if (mr & (AT91_RTT_ALMIEN | AT91_RTT_RTTINCIEN)) {
-+		pr_info("AT91: Disabling rtt irq\n");
-+		mr &= ~(AT91_RTT_ALMIEN | AT91_RTT_RTTINCIEN);
-+		__raw_writel(mr, rtt_base + AT91_RTT_MR);
-+	}
-+}
-+
-+void __init at91_sysirq_mask_rtc(u32 rtc_base)
-+{
-+	__at91_sysirq_mask_rtc(AT91_IO_P2V(rtc_base));
-+}
-+
-+void __init at91_sysirq_mask_rtt(u32 rtt_base)
-+{
-+	__at91_sysirq_mask_rtt(AT91_IO_P2V(rtt_base));
-+}
-+
- #if defined(CONFIG_OF)
- static struct of_device_id rstc_ids[] = {
- 	{ .compatible = "atmel,at91sam9260-rstc", .data = at91sam9_alt_restart },
-@@ -440,6 +475,54 @@ end:
- 	of_node_put(np);
- }
- 
-+static struct of_device_id sysirq_mask_rtc_ids[] = {
-+	{ .compatible = "atmel,at91sam9g45-rtc" },
-+	{ /* sentinel */ }
-+};
-+
-+static void at91_dt_sysirq_mask_rtc(void)
-+{
-+	struct device_node *np;
-+	void __iomem *base;
-+
-+	for_each_matching_node(np, sysirq_mask_rtc_ids) {
-+		base = of_iomap(np, 0);
-+		if (!base) {
-+			pr_warn("AT91: unable to map rtc cpu registers\n");
-+			continue;
-+		}
-+		__at91_sysirq_mask_rtc(base);
-+		iounmap(base);
-+	}
-+}
-+
-+static struct of_device_id sysirq_mask_rtt_ids[] = {
-+	{ .compatible = "atmel,at91sam9260-rtt" },
-+	{ /* sentinel */ }
-+};
-+
-+static void at91_dt_sysirq_mask_rtt(void)
-+{
-+	struct device_node *np;
-+	void __iomem *base;
-+
-+	for_each_matching_node(np, sysirq_mask_rtt_ids) {
-+		base = of_iomap(np, 0);
-+		if (!base) {
-+			pr_warn("AT91: unable to map rtt cpu registers\n");
-+			continue;
-+		}
-+		__at91_sysirq_mask_rtt(base);
-+		iounmap(base);
-+	}
-+}
-+
-+static void at91_dt_sysirq_mask(void)
-+{
-+	at91_dt_sysirq_mask_rtc();
-+	at91_dt_sysirq_mask_rtt();
-+}
-+
- void __init at91rm9200_dt_initialize(void)
- {
- 	at91_dt_ramc();
-@@ -467,6 +550,8 @@ void __init at91_dt_initialize(void)
- 
- 	if (at91_boot_soc.init)
- 		at91_boot_soc.init();
-+
-+	at91_dt_sysirq_mask();
- }
- #endif
- 
-@@ -482,5 +567,8 @@ void __init at91_initialize(unsigned long main_clock)
- 
- 	at91_boot_soc.init();
- 
-+	if (at91_boot_soc.sysirq_mask)
-+		at91_boot_soc.sysirq_mask();
-+
- 	pinctrl_provide_dummies();
- }
-diff --git a/arch/arm/mach-at91/soc.h b/arch/arm/mach-at91/soc.h
-index 9c6d3d4..134f4c4 100644
---- a/arch/arm/mach-at91/soc.h
-+++ b/arch/arm/mach-at91/soc.h
-@@ -10,6 +10,7 @@ struct at91_init_soc {
- 	void (*map_io)(void);
- 	void (*ioremap_registers)(void);
- 	void (*register_clocks)(void);
-+	void (*sysirq_mask)(void);
- 	void (*init)(void);
- };
- 
+ #define at91_rtc_read(field) \
+ 	__raw_readl(at91_rtc_regs + field)
+diff --git a/drivers/rtc/rtc-at91rm9200.h b/drivers/rtc/rtc-at91rm9200.h
+deleted file mode 100644
+index da1945e..0000000
+--- a/drivers/rtc/rtc-at91rm9200.h
++++ /dev/null
+@@ -1,75 +0,0 @@
+-/*
+- * arch/arm/mach-at91/include/mach/at91_rtc.h
+- *
+- * Copyright (C) 2005 Ivan Kokshaysky
+- * Copyright (C) SAN People
+- *
+- * Real Time Clock (RTC) - System peripheral registers.
+- * Based on AT91RM9200 datasheet revision E.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- */
+-
+-#ifndef AT91_RTC_H
+-#define AT91_RTC_H
+-
+-#define	AT91_RTC_CR		0x00			/* Control Register */
+-#define		AT91_RTC_UPDTIM		(1 <<  0)		/* Update Request Time Register */
+-#define		AT91_RTC_UPDCAL		(1 <<  1)		/* Update Request Calendar Register */
+-#define		AT91_RTC_TIMEVSEL	(3 <<  8)		/* Time Event Selection */
+-#define			AT91_RTC_TIMEVSEL_MINUTE	(0 << 8)
+-#define			AT91_RTC_TIMEVSEL_HOUR		(1 << 8)
+-#define			AT91_RTC_TIMEVSEL_DAY24		(2 << 8)
+-#define			AT91_RTC_TIMEVSEL_DAY12		(3 << 8)
+-#define		AT91_RTC_CALEVSEL	(3 << 16)		/* Calendar Event Selection */
+-#define			AT91_RTC_CALEVSEL_WEEK		(0 << 16)
+-#define			AT91_RTC_CALEVSEL_MONTH		(1 << 16)
+-#define			AT91_RTC_CALEVSEL_YEAR		(2 << 16)
+-
+-#define	AT91_RTC_MR		0x04			/* Mode Register */
+-#define			AT91_RTC_HRMOD		(1 <<  0)		/* 12/24 Hour Mode */
+-
+-#define	AT91_RTC_TIMR		0x08			/* Time Register */
+-#define		AT91_RTC_SEC		(0x7f <<  0)		/* Current Second */
+-#define		AT91_RTC_MIN		(0x7f <<  8)		/* Current Minute */
+-#define		AT91_RTC_HOUR		(0x3f << 16)		/* Current Hour */
+-#define		AT91_RTC_AMPM		(1    << 22)		/* Ante Meridiem Post Meridiem Indicator */
+-
+-#define	AT91_RTC_CALR		0x0c			/* Calendar Register */
+-#define		AT91_RTC_CENT		(0x7f <<  0)		/* Current Century */
+-#define		AT91_RTC_YEAR		(0xff <<  8)		/* Current Year */
+-#define		AT91_RTC_MONTH		(0x1f << 16)		/* Current Month */
+-#define		AT91_RTC_DAY		(7    << 21)		/* Current Day */
+-#define		AT91_RTC_DATE		(0x3f << 24)		/* Current Date */
+-
+-#define	AT91_RTC_TIMALR		0x10			/* Time Alarm Register */
+-#define		AT91_RTC_SECEN		(1 <<  7)		/* Second Alarm Enable */
+-#define		AT91_RTC_MINEN		(1 << 15)		/* Minute Alarm Enable */
+-#define		AT91_RTC_HOUREN		(1 << 23)		/* Hour Alarm Enable */
+-
+-#define	AT91_RTC_CALALR		0x14			/* Calendar Alarm Register */
+-#define		AT91_RTC_MTHEN		(1 << 23)		/* Month Alarm Enable */
+-#define		AT91_RTC_DATEEN		(1 << 31)		/* Date Alarm Enable */
+-
+-#define	AT91_RTC_SR		0x18			/* Status Register */
+-#define		AT91_RTC_ACKUPD		(1 <<  0)		/* Acknowledge for Update */
+-#define		AT91_RTC_ALARM		(1 <<  1)		/* Alarm Flag */
+-#define		AT91_RTC_SECEV		(1 <<  2)		/* Second Event */
+-#define		AT91_RTC_TIMEV		(1 <<  3)		/* Time Event */
+-#define		AT91_RTC_CALEV		(1 <<  4)		/* Calendar Event */
+-
+-#define	AT91_RTC_SCCR		0x1c			/* Status Clear Command Register */
+-#define	AT91_RTC_IER		0x20			/* Interrupt Enable Register */
+-#define	AT91_RTC_IDR		0x24			/* Interrupt Disable Register */
+-#define	AT91_RTC_IMR		0x28			/* Interrupt Mask Register */
+-
+-#define	AT91_RTC_VER		0x2c			/* Valid Entry Register */
+-#define		AT91_RTC_NVTIM		(1 <<  0)		/* Non valid Time */
+-#define		AT91_RTC_NVCAL		(1 <<  1)		/* Non valid Calendar */
+-#define		AT91_RTC_NVTIMALR	(1 <<  2)		/* Non valid Time Alarm */
+-#define		AT91_RTC_NVCALALR	(1 <<  3)		/* Non valid Calendar Alarm */
+-
+-#endif
 -- 
 1.8.1.5
