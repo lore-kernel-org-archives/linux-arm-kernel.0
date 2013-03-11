@@ -1,80 +1,40 @@
-From: sourav.poddar@ti.com (Sourav Poddar)
-Date: Mon, 11 Mar 2013 19:16:13 +0530
-Subject: [Resend/PATCH 5/5] arm: dts: omap5-evm: Add mcspi data
-Message-ID: <1363009573-19596-1-git-send-email-sourav.poddar@ti.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Mon, 11 Mar 2013 14:47:29 +0100
+Subject: [PATCH] ARM: imx: fix typo "DEBUG_IMX50_IMX53_UART"
+In-Reply-To: <CAOMZO5AhjKV=ja+Agr_pMg4ghB6Vux2ciBnr_M8SQuS4AQ4Bzg@mail.gmail.com>
+References: <1363007760.3137.69.camel@x61.thuisdomein>
+ <20130311133720.GB25910@S2101-09.ap.freescale.net>
+ <CAOMZO5AhjKV=ja+Agr_pMg4ghB6Vux2ciBnr_M8SQuS4AQ4Bzg@mail.gmail.com>
+Message-ID: <1363009649.3137.78.camel@x61.thuisdomein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add mcspi node and pinmux data for omap5 mcspi controller.
+On Mon, 2013-03-11 at 10:41 -0300, Fabio Estevam wrote:
+> Please see my commit:
+> 
+> commit 7356420cd34e40fe27bf26555b0bf3f2849a43dd
+> Author: Fabio Estevam <fabio.estevam@freescale.com>
+> Date:   Tue Jan 22 10:40:55 2013 -0200
+> 
+>     ARM: imx: Remove mx508 support
+> 
+>     Only mx508 based board is mach-mx50_rdp and it has been marked as BROKEN
+>     for several releases.
+> 
+>     mx508 currently lacks clock support.
+> 
+>     In case someone needs to add mx508 support back, then the
+> recommended approach
+>     is to use device tree.
+> 
+>     Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+>     Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> 
+> ,it does remove the MX50 reference, so this patch is not needed.
 
-Tested on omap5430 evm with 3.9-rc2 custom kernel.
+That's not correct:
+    $ git grep -n DEBUG_IMX50_IMX53_UART v3.9-rc2
+    v3.9-rc2:arch/arm/Kconfig.debug:495:                                            DEBUG_IMX50_IMX53_UART || \
 
-Cc: Andrew Morton <akpm@osdl.org>
-Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
----
- arch/arm/boot/dts/omap5-evm.dts |   46 +++++++++++++++++++++++++++++++++++++++
- 1 files changed, 46 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap5-evm.dts b/arch/arm/boot/dts/omap5-evm.dts
-index a4784be..d0ea53c 100644
---- a/arch/arm/boot/dts/omap5-evm.dts
-+++ b/arch/arm/boot/dts/omap5-evm.dts
-@@ -115,6 +115,33 @@
- 			0x186 0x100     /* i2c5_sda INPUTENABLE | MODE0 */
- 		>;
- 	};
-+
-+	mcspi2_pins: pinmux_mcspi2_pins {
-+		pinctrl-single,pins = <
-+			0xbc 0x100	/*  MCSPI2_CLK INPUTENABLE | MODE0 */
-+			0xbe 0x100	/*  MCSPI2_SIMO INPUTENABLE | MODE0 */
-+			0xc0 0x118	/*  MCSPI2_SOMI PULLUP | INPUTENABLE | MODE0 */
-+			0xc2 0x0	/*  MCSPI2_CS MODE0 */
-+		>;
-+	};
-+
-+	mcspi3_pins: pinmux_mcspi3_pins {
-+		pinctrl-single,pins = <
-+			0x78 0x101	/*  MCSPI2_SOMI INPUTENABLE | MODE1 */
-+			0x7a 0x101	/*  MCSPI2_CS INPUTENABLE | MODE1 */
-+			0x7c 0x101	/*  MCSPI2_SIMO INPUTENABLE | MODE1 */
-+			0x7e 0x101	/*  MCSPI2_CLK INPUTENABLE | MODE1 */
-+		>;
-+	};
-+
-+	mcspi4_pins: pinmux_mcspi4_pins {
-+		pinctrl-single,pins = <
-+			0x164 0x101	/*  MCSPI2_CLK INPUTENABLE | MODE1 */
-+			0x168 0x101	/*  MCSPI2_SIMO INPUTENABLE | MODE1 */
-+			0x16a 0x101	/*  MCSPI2_SOMI INPUTENABLE | MODE1 */
-+			0x16c 0x101	/*  MCSPI2_CS INPUTENABLE | MODE1 */
-+		>;
-+	};
- };
- 
- &mmc1 {
-@@ -213,3 +240,22 @@
- 	cs1-used;
- 	device-handle = <&samsung_K3PE0E000B>;
- };
-+
-+&mcspi1 {
-+
-+};
-+
-+&mcspi2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mcspi2_pins>;
-+};
-+
-+&mcspi3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mcspi3_pins>;
-+};
-+
-+&mcspi4 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mcspi4_pins>;
-+};
--- 
-1.7.1
+Paul Bolle
