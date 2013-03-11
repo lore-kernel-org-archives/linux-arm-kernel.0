@@ -1,102 +1,99 @@
-From: manishv.b@ti.com (Vishwanathrao Badarkhe, Manish)
-Date: Mon, 11 Mar 2013 15:30:02 +0530
-Subject: [PATCH] ARM: dts: omap2plus: remove interrupt-parent property
-Message-ID: <1362996002-15552-1-git-send-email-manishv.b@ti.com>
+From: jhovold@gmail.com (Johan Hovold)
+Date: Mon, 11 Mar 2013 11:02:43 +0100
+Subject: [rtc-linux] [PATCH 3/3] ARM: at91: fix hanged boot
+In-Reply-To: <20130308160258.GD4590@game.jcrosoft.org>
+References: <1362747103-21445-1-git-send-email-jhovold@gmail.com>
+ <1362747103-21445-4-git-send-email-jhovold@gmail.com>
+ <20130308160258.GD4590@game.jcrosoft.org>
+Message-ID: <20130311100243.GD8797@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Removed interrupt-parent property from dts file as it is already
-with root node in dtsi file.
+On Fri, Mar 08, 2013 at 05:02:58PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 13:51 Fri 08 Mar     , Johan Hovold wrote:
+> > Make sure the RTC and RTT-interrupts are masked at boot by adding a new
+> > SOC-initialiser and helpers functions.
+> > 
+> > This fixes hanged boot on all AT91 SOCs but RM9200, for example, after a
+> > reset during an RTC-update or if an RTC or RTT-alarm goes off after a
+> > non-clean shutdown.
+> > 
+> > The RTC and RTT-peripherals are powered by backup power (VDDBU) (on all
+> > AT91 SOCs but RM9200) and are not reset on wake-up, user, watchdog or
+> > software reset. This means that their interrupts may be enabled during
+> > early boot if, for example, they where not disabled during a previous
+> > shutdown (e.g. due to a buggy driver or a non-clean shutdown such as a
+> > user reset). Furthermore, an RTC or RTT-alarm may also be active.
+> > 
+> > The RTC and RTT-interrupts use the shared system-interrupt line, and if
+> > an interrupt occurs before a handler (e.g. RTC-driver) has been
+> > installed this leads to the system interrupt being disabled and prevents
+> > the system from booting.
+> > 
+> > Note that when boot hangs due to an early RTC or RTT-interrupt, the only
+> > way to get the system to start again is to remove the backup power (e.g.
+> > battery) or to disable the interrupt manually from the bootloader. In
+> > particular, a user reset is not sufficient.
+> > 
+> > Tested on at91sam9263 and at91sam9g45.
+> > 
+> > Signed-off-by: Johan Hovold <jhovold@gmail.com>
+> > ---
+> >  arch/arm/mach-at91/at91rm9200.c               |  9 ++++++++
+> >  arch/arm/mach-at91/at91sam9260.c              |  6 ++++++
+> >  arch/arm/mach-at91/at91sam9261.c              |  6 ++++++
+> >  arch/arm/mach-at91/at91sam9263.c              |  7 ++++++
+> >  arch/arm/mach-at91/at91sam9g45.c              |  7 ++++++
+> >  arch/arm/mach-at91/at91sam9n12.c              |  6 ++++++
+> >  arch/arm/mach-at91/at91sam9rl.c               |  7 ++++++
+> >  arch/arm/mach-at91/at91sam9x5.c               |  6 ++++++
+> >  arch/arm/mach-at91/generic.h                  |  2 ++
+> >  arch/arm/mach-at91/include/mach/at91sam9n12.h |  5 +++++
+> >  arch/arm/mach-at91/include/mach/at91sam9x5.h  |  5 +++++
+> nack for DT probe te address via DT
 
-Signed-off-by: Vishwanathrao Badarkhe, Manish <manishv.b@ti.com>
----
-:100644 100644 f624dc8... 36e839a... M	arch/arm/boot/dts/omap3-beagle.dts
-:100644 100644 e8ba1c2... a5375fd... M	arch/arm/boot/dts/omap3-evm.dts
-:100644 100644 4122efe... 389c9c7... M	arch/arm/boot/dts/omap4-panda.dts
-:100644 100644 43e5258... cdf5dfd... M	arch/arm/boot/dts/omap4-sdp.dts
-:100644 100644 6601e6a... 1d4a9d4... M	arch/arm/boot/dts/omap4-var-som.dts
- arch/arm/boot/dts/omap3-beagle.dts  |    1 -
- arch/arm/boot/dts/omap3-evm.dts     |    1 -
- arch/arm/boot/dts/omap4-panda.dts   |    2 --
- arch/arm/boot/dts/omap4-sdp.dts     |    2 --
- arch/arm/boot/dts/omap4-var-som.dts |    1 -
- 5 files changed, 0 insertions(+), 7 deletions(-)
+Fair enough. I'll respin and add proper DT-support. 
 
-diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
-index f624dc8..36e839a 100644
---- a/arch/arm/boot/dts/omap3-beagle.dts
-+++ b/arch/arm/boot/dts/omap3-beagle.dts
-@@ -46,7 +46,6 @@
- 	twl: twl at 48 {
- 		reg = <0x48>;
- 		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
--		interrupt-parent = <&intc>;
- 	};
- };
- 
-diff --git a/arch/arm/boot/dts/omap3-evm.dts b/arch/arm/boot/dts/omap3-evm.dts
-index e8ba1c2..a5375fd 100644
---- a/arch/arm/boot/dts/omap3-evm.dts
-+++ b/arch/arm/boot/dts/omap3-evm.dts
-@@ -34,7 +34,6 @@
- 	twl: twl at 48 {
- 		reg = <0x48>;
- 		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
--		interrupt-parent = <&intc>;
- 	};
- };
- 
-diff --git a/arch/arm/boot/dts/omap4-panda.dts b/arch/arm/boot/dts/omap4-panda.dts
-index 4122efe..389c9c7 100644
---- a/arch/arm/boot/dts/omap4-panda.dts
-+++ b/arch/arm/boot/dts/omap4-panda.dts
-@@ -119,7 +119,6 @@
- 		reg = <0x48>;
- 		/* SPI = 0, IRQ# = 7, 4 = active high level-sensitive */
- 		interrupts = <0 7 4>; /* IRQ_SYS_1N cascaded to gic */
--		interrupt-parent = <&gic>;
- 	};
- 
- 	twl6040: twl at 4b {
-@@ -127,7 +126,6 @@
- 		reg = <0x4b>;
- 		/* SPI = 0, IRQ# = 119, 4 = active high level-sensitive */
- 		interrupts = <0 119 4>; /* IRQ_SYS_2N cascaded to gic */
--		interrupt-parent = <&gic>;
- 		ti,audpwron-gpio = <&gpio4 31 0>;  /* gpio line 127 */
- 
- 		vio-supply = <&v1v8>;
-diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
-index 43e5258..cdf5dfd 100644
---- a/arch/arm/boot/dts/omap4-sdp.dts
-+++ b/arch/arm/boot/dts/omap4-sdp.dts
-@@ -221,7 +221,6 @@
- 		reg = <0x48>;
- 		/* SPI = 0, IRQ# = 7, 4 = active high level-sensitive */
- 		interrupts = <0 7 4>; /* IRQ_SYS_1N cascaded to gic */
--		interrupt-parent = <&gic>;
- 	};
- 
- 	twl6040: twl at 4b {
-@@ -229,7 +228,6 @@
- 		reg = <0x4b>;
- 		/* SPI = 0, IRQ# = 119, 4 = active high level-sensitive */
- 		interrupts = <0 119 4>; /* IRQ_SYS_2N cascaded to gic */
--		interrupt-parent = <&gic>;
- 		ti,audpwron-gpio = <&gpio4 31 0>;  /* gpio line 127 */
- 
- 		vio-supply = <&v1v8>;
-diff --git a/arch/arm/boot/dts/omap4-var-som.dts b/arch/arm/boot/dts/omap4-var-som.dts
-index 6601e6a..1d4a9d4 100644
---- a/arch/arm/boot/dts/omap4-var-som.dts
-+++ b/arch/arm/boot/dts/omap4-var-som.dts
-@@ -35,7 +35,6 @@
- 		reg = <0x48>;
- 		/* SPI = 0, IRQ# = 7, 4 = active high level-sensitive */
- 		interrupts = <0 7 4>; /* IRQ_SYS_1N cascaded to gic */
--		interrupt-parent = <&gic>;
- 	};
- };
- 
--- 
-1.7.4.1
+> >  arch/arm/mach-at91/setup.c                    | 31 +++++++++++++++++++++++++++
+> >  arch/arm/mach-at91/soc.h                      |  1 +
+> >  13 files changed, 98 insertions(+)
+> 
+> at boot time we can disable all the irq as we need none of them
+
+Yes, but all but the VDDBU-powered-peripheral ones will already have
+been disabled at reset. If a buggy bootloader enables something it
+should not, then the bootloader should be fixed.
+
+> > diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
+> > index 7aeb473..4651ebb 100644
+> > --- a/arch/arm/mach-at91/at91rm9200.c
+> > +++ b/arch/arm/mach-at91/at91rm9200.c
+> > @@ -325,6 +325,14 @@ static void __init at91rm9200_ioremap_registers(void)
+> >  	at91_ioremap_ramc(0, AT91RM9200_BASE_MC, 256);
+> >  }
+> >  
+> > +static void __init at91rm9200_sysirq_mask(void)
+> > +{
+> > +	/*
+> > +	 * No need to mask any system interrupts as the RM9200 has no backup
+> > +	 * power and resets all system peripherals at every reset.
+> > +	 */
+> > +}
+> no need drop it
+
+Ok.
+
+Thanks,
+Johan
+
+> > +
+> >  static void __init at91rm9200_initialize(void)
+> >  {
+> >  	arm_pm_idle = at91rm9200_idle;
+> > @@ -387,5 +395,6 @@ AT91_SOC_START(rm9200)
+> >  	.default_irq_priority = at91rm9200_default_irq_priority,
+> >  	.ioremap_registers = at91rm9200_ioremap_registers,
+> >  	.register_clocks = at91rm9200_register_clocks,
+> > +	.sysirq_mask = at91rm9200_sysirq_mask,
+> >  	.init = at91rm9200_initialize,
+> >  AT91_SOC_END
