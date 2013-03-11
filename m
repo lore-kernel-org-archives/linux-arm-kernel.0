@@ -1,105 +1,39 @@
-From: sourav.poddar@ti.com (Sourav Poddar)
-Date: Mon, 11 Mar 2013 19:15:59 +0530
-Subject: [Resend/PATCH 3/5] arm: dts: omap4-panda: Add I2c pinctrl data
-Message-ID: <1363009559-19534-1-git-send-email-sourav.poddar@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 11 Mar 2013 08:45:51 -0500
+Subject: [PATCH] clocksource: add empty version of clocksource_of_init
+Message-ID: <1363009551-8978-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Booting 3.9-rc2 on omap4 panda results in the following error
+From: Rob Herring <rob.herring@calxeda.com>
 
-[    0.444427] omap_i2c 48070000.i2c: did not get pins for i2c error: -19
-[    0.445770] omap_i2c 48070000.i2c: bus 0 rev0.11 at 400 kHz
-[    0.473937] omap_i2c 48072000.i2c: did not get pins for i2c error: -19
-[    0.474670] omap_i2c 48072000.i2c: bus 1 rev0.11 at 400 kHz
-[    0.474822] omap_i2c 48060000.i2c: did not get pins for i2c error: -19
-[    0.476379] omap_i2c 48060000.i2c: bus 2 rev0.11 at 100 kHz
-[    0.477294] omap_i2c 48350000.i2c: did not get pins for i2c error: -19
-[    0.477996] omap_i2c 48350000.i2c: bus 3 rev0.11 at 400 kHz
-[    0.483398] Switching to clocksource 32k_counter
+Add an empty clocksource_of_init when !CLKSRC_OF. This is needed for builds
+where no timer has selected CLKSRC_OF.
 
-This happens because omap4 panda dts file is not adapted to use i2c through
-pinctrl framework. Populating i2c pinctrl data to get rid of the error.
-
-Tested on omap4460 panda with 3.9-rc2 kernel.
-
-Cc: Andrew Morton <akpm@osdl.org>
-Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
-Reported-by: Luciano Coelho <coelho@ti.com>
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+Cc: John Stultz <john.stultz@linaro.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
 ---
- arch/arm/boot/dts/omap4-panda.dts |   40 +++++++++++++++++++++++++++++++++++++
- 1 files changed, 40 insertions(+), 0 deletions(-)
+This is part of my CLKSRC_OF init rework. It is also needed for
+Arnd's default machine patch. I plan to send a pull request to arm-soc
+for all this shortly.
 
-diff --git a/arch/arm/boot/dts/omap4-panda.dts b/arch/arm/boot/dts/omap4-panda.dts
-index 4122efe..f951e6b 100644
---- a/arch/arm/boot/dts/omap4-panda.dts
-+++ b/arch/arm/boot/dts/omap4-panda.dts
-@@ -110,9 +110,40 @@
- 			0x58 0x10b	/* hdmi_hpd.gpio_63 INPUT PULLDOWN | MODE3 */
- 		>;
- 	};
-+
-+	i2c1_pins: pinmux_i2c1_pins {
-+		pinctrl-single,pins = <
-+			0xe2 0x118        /* i2c1_scl PULLUP | INPUTENABLE | MODE0 */
-+			0xe4 0x118        /* i2c1_sda PULLUP | INPUTENABLE | MODE0 */
-+		>;
-+	};
-+
-+	i2c2_pins: pinmux_i2c2_pins {
-+		pinctrl-single,pins = <
-+			0xe6 0x118        /* i2c2_scl PULLUP | INPUTENABLE | MODE0 */
-+			0xe8 0x118        /* i2c2_sda PULLUP | INPUTENABLE | MODE0 */
-+		>;
-+	};
-+
-+	i2c3_pins: pinmux_i2c3_pins {
-+		pinctrl-single,pins = <
-+			0xea 0x118        /* i2c3_scl PULLUP | INPUTENABLE | MODE0 */
-+			0xec 0x118     /* i2c3_sda PULLUP | INPUTENABLE | MODE0 */
-+		>;
-+	};
-+
-+	i2c4_pins: pinmux_i2c4_pins {
-+		pinctrl-single,pins = <
-+			0xee 0x118        /* i2c4_scl PULLUP | INPUTENABLE | MODE0 */
-+			0xf0 0x118     /* i2c4_sda PULLUP | INPUTENABLE | MODE0 */
-+		>;
-+	};
- };
- 
- &i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins>;
-+
- 	clock-frequency = <400000>;
- 
- 	twl: twl at 48 {
-@@ -139,10 +170,16 @@
- /include/ "twl6030.dtsi"
- 
- &i2c2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c2_pins>;
-+
- 	clock-frequency = <400000>;
- };
- 
- &i2c3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c3_pins>;
-+
- 	clock-frequency = <100000>;
- 
- 	/*
-@@ -156,6 +193,9 @@
- };
- 
- &i2c4 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c4_pins>;
-+
- 	clock-frequency = <400000>;
- };
+Rob
+
+ include/linux/clocksource.h |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/include/linux/clocksource.h b/include/linux/clocksource.h
+index 27cfda4..08ed5e1 100644
+--- a/include/linux/clocksource.h
++++ b/include/linux/clocksource.h
+@@ -340,6 +340,7 @@ extern void clocksource_of_init(void);
+ 		__used __section(__clksrc_of_table)			\
+ 		 = { .compatible = compat, .data = fn };
+ #else
++static inline void clocksource_of_init(void) {}
+ #define CLOCKSOURCE_OF_DECLARE(name, compat, fn)
+ #endif
  
 -- 
-1.7.1
+1.7.10.4
