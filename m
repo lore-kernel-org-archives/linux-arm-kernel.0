@@ -1,80 +1,52 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 11 Mar 2013 10:51:43 +0100
-Subject: omap4 pandaboard: clock input for TiWi module inactive
-In-Reply-To: <513D9CB7.2010402@ti.com>
-References: <CAEYbN3QotnnAUU=7c7=r1sHDnZ5VhgNfXfP6ANf3+ssCzmEa=A@mail.gmail.com>
- <513D9CB7.2010402@ti.com>
-Message-ID: <513DA92F.7020908@ti.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Mon, 11 Mar 2013 10:57:10 +0100
+Subject: [PATCH 3/3] can: Kconfig: CAN_AT91 depends on ARCH_AT91
+In-Reply-To: <20130311092419.GB2572@ludovic.desroches@atmel.com>
+References: <1362763842-14924-1-git-send-email-ludovic.desroches@atmel.com>
+ <1362763842-14924-4-git-send-email-ludovic.desroches@atmel.com>
+ <513A2396.4080508@pengutronix.de>
+ <20130311092419.GB2572@ludovic.desroches@atmel.com>
+Message-ID: <513DAA76.6040803@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/11/2013 09:58 AM, Roger Quadros wrote:
-> (+ Peter, Luca, Balaji)
-> 
-> else your e-mail might just go unnoticed ;)
-> 
-> On 03/07/2013 10:37 PM, Levi Pearson wrote:
->> I recently upgraded from a 3.4 kernel to a 3.8 kernel and found that
->> the drivers for the functionality provided by the TiWi module on the
->> pandaboard (Bluetooth, WiFI, etc.) could no longer probe the device.
->> After some investigation, it turned out that the TiWi clock is
->> provided by the twl6030 PMIC chip.
+On 03/11/2013 10:24 AM, Ludovic Desroches wrote:
+> On Fri, Mar 08, 2013 at 06:44:54PM +0100, Marc Kleine-Budde wrote:
+>> On 03/08/2013 06:30 PM, ludovic.desroches at atmel.com wrote:
+>>> From: Ludovic Desroches <ludovic.desroches@atmel.com>
+>>>
+>>> SAMA5D3 devices also embed CAN feature. Moreover if we want to produce a single
+>>> kernel image (at least for Atmel devices) it is not useful to be too
+>>> restrictive.
 >>
->> The clock output of the twl6030 was first enabled via these commits:
->>
->> https://patchwork.kernel.org/patch/546381/
->> https://patchwork.kernel.org/patch/546401/
->>
->> Since most of the functionality of the TWL6030 is power regulation and
->> the clock is enabled via a similar mechanism to the power outputs, the
->> clock was added as a 'pseudo-regulator' to
->> drivers/regulator/twl-regulator.c.
->>
->> Some time later, a series of commits removed the clock functionality
->> from twl-regulator.c, apparently due to being out-of-place in the
->> Device Tree listings or something.
->>
->> The first of these is recorded here: https://lkml.org/lkml/2012/6/4/330
->> The next two just clean up the code that was orphaned by the previous:
->>  e76ab829 "regulator: twl: Remove references to the twl4030 regulator"
->>  029dd3ce "regulator: twl: Remove another unused variable warning"
->>
->> Luciano Cuelho, who maintains the driver for the WiFi portion of the
->> TiWi modules, reported the resulting breakage some time later on the
->> LKML: https://lkml.org/lkml/2012/11/15/72
->>
->> Despite the protestation of Mark Brown that his code removal wasn't
->> the cause of the problem, reverting his changes does indeed enable the
->> clock.  However, it also seems to be the case that there ought to be a
->> better home for the clock than twl-regulator.c.  At the time of the
->> previous discussion, it wasn't clear if the framework was in place to
->> support a clock driver for the twl6030's clock, but it seems like the
->> support exists now, since there's a clock driver for the twl6030's
->> companion, the twl6040 audio chip.
+>> If it compiles on other ARMs aswell we can make it depend on ARCH_ARM.
+>> 
+> I was thinking about it but I am wondering if it makes sense. Should we have a
+> non atmel device with atmel can?
 
-IMHO the 'hack' in the twl-regulator should not have been removed before we
-provide proper support for the clocks via the common clock framework.
+I don't know if atmels sells the IP core separately, but ARM Linux is
+going towards a multi ARCH kernel anyways. So the can core should
+compile on non atmel and/or multi arch kernels.
 
->> So: Is there any chance of simply reverting the 3 commits that broke
->> the clock?  I have done this locally, but I hate to see pandaboard
->> support in the mainstream kernel continue to be broken in this way.
+> I have no position about this point, if you think it's better to make
+> it depending onto ARCH_ARM, I'll change it if there is no compilation
+> issue.
 
-We should have the clock driver under drivers/clk/ via clk-twl6030.c driver
-for all the clocks twl6030 provides and use that in drivers (updating the
-clock tree as well).
+Please make it so.
 
->> If for whatever reason the commits cannot be reverted, would creating
->> a driver like drivers/clk/clk-twl6040.c that enabled the twl6030's
->> clock output be a suitable alternative?  I'd be willing to take a stab
->> at writing it if there's not something like that in the works already.
-
-If you can take this it would be great. It is still in my to-do list to
-integrate the clk-twl6040 clock with the omap-mcpdm driver. I already got
-working code, but it is not working in a way I would really wanted to be.
-Integrating external clock to the SoC's clock tree does not seams to be that
-straight forward: at boot time when the clock tree is initialized the external
-chip is yet to be probed -> the root clock is not there, but later on for some
-reason I can not get the CCF to enable the clock tree correctly.
+regards,
+Marc
 
 -- 
-P?ter
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130311/1be12da8/attachment.sig>
