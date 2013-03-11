@@ -1,46 +1,103 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 10 Mar 2013 22:05:46 -0700
-Subject: 3.9-rc1 regression in arm dtb build
-In-Reply-To: <5138FDAE.8060202@wwwdotorg.org>
-References: <20130306193332.GA6022@amd.pavel.ucw.cz>
- <5137C404.9060902@wwwdotorg.org>
- <20130307144506.GB7344@amd.pavel.ucw.cz>
- <5138FDAE.8060202@wwwdotorg.org>
-Message-ID: <20130311050546.GA21863@quad.lixom.net>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Mon, 11 Mar 2013 10:36:01 +0530
+Subject: [PATCH 4/8] memory: emif: Handle devices which are not rated for >85C
+In-Reply-To: <1362978365-5593-1-git-send-email-lokeshvutla@ti.com>
+References: <1362978365-5593-1-git-send-email-lokeshvutla@ti.com>
+Message-ID: <1362978365-5593-5-git-send-email-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 07, 2013 at 01:50:54PM -0700, Stephen Warren wrote:
-> On 03/07/2013 07:45 AM, Pavel Machek wrote:
-> > Hi!
-> >>> commit 499cd8298628eeabf0eb5eb6525d4faa0eec80d8
-> >>> Author: Grant Likely <grant.likely@secretlab.ca>
-> >>> Date:   Tue Nov 27 16:29:11 2012 -0700
-> > ...
-> >>> 1) it is inconsistent with 3.8, making switching between 3.9-rc1 and
-> >>> 3.8 tricky
-> >>
-> >> It's pretty easy to locate the DTB by automatically looking in
-> >> arch/*/boot/dts first, then if the file doesn't exist there, looking in
-> >> arch/*/boot instead as a legacy fallback.
-> > 
-> > Unfortunately, that does not work. See 2) below. Stale files even
-> > survive "make clean".
-> 
-> Oh right. I guess it works fine when having built 3.7 and then building
-> 3.8, since you'd look in the new location first and only fall back to
-> the old location if missing. However, if you then switch back to 3.7 to
-> test something, I guess that doesn't work so well.
-> 
-> I tend to always build the dtbs target, so I wasn't affected by this.
-> And, often run "git clean -f -d -x" too.
-> 
-> Grant, what's your call on this issue; should I/you look into ways to
-> clean the files better, or do you want to revert this?
+From: Nishanth Menon <nm@ti.com>
 
-I'm not Grant, but I think we're better off cleaning up the current situation
-instead of reverting. Otherwise 3.8 will be the oddball weird release; it's
-better to get people moved over to the new location.
+As per JESD209-2E specification for LPDDR2,
+      http://www.jedec.org/standards-documents/results/jesd209-2E
+Table 73, LPDDR2 memories come in two flavors - Standard and
+Extended. The Standard types can operate from -25C to +85C
+However, beyond that and upto +105C can only be supported by
+Extended types.
 
+Unfortunately, it seems there is no info in MR0(device info) or
+MR[1,2](device feature) for run time detection of this capability
+as far as seen on the spec. Hence, we provide a custom_config
+flag to be populated by platforms which have these "extended"
+type memories.
 
--Olof
+For the "Standard" memories, we need to consider MR4 notifications
+of temperature triggers >85C as equivalent to thermal shutdown
+events (equivalent to Spec specified thermal shutdown events for
+"extended" parts).
+
+Reported-by: Richard Woodruff <r-woodruff2@ti.com>
+Signed-off-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+---
+ drivers/memory/emif.c                   |   27 +++++++++++++++++++++++++++
+ include/linux/platform_data/emif_plat.h |    1 +
+ 2 files changed, 28 insertions(+)
+
+diff --git a/drivers/memory/emif.c b/drivers/memory/emif.c
+index 37e0c77..927fb55 100644
+--- a/drivers/memory/emif.c
++++ b/drivers/memory/emif.c
+@@ -914,6 +914,7 @@ static irqreturn_t handle_temp_alert(void __iomem *base, struct emif_data *emif)
+ {
+ 	u32		old_temp_level;
+ 	irqreturn_t	ret = IRQ_HANDLED;
++	struct emif_custom_configs *custom_configs;
+ 
+ 	spin_lock_irqsave(&emif_lock, irq_state);
+ 	old_temp_level = emif->temperature_level;
+@@ -926,6 +927,29 @@ static irqreturn_t handle_temp_alert(void __iomem *base, struct emif_data *emif)
+ 		goto out;
+ 	}
+ 
++	custom_configs = emif->plat_data->custom_configs;
++
++	/*
++	 * IF we detect higher than "nominal rating" from DDR sensor
++	 * on an unsupported DDR part, shutdown system
++	 */
++	if (custom_configs && !(custom_configs->mask &
++				EMIF_CUSTOM_CONFIG_EXTENDED_TEMP_PART)) {
++		if (emif->temperature_level >= SDRAM_TEMP_HIGH_DERATE_REFRESH) {
++			dev_err(emif->dev,
++				"%s:NOT Extended temperature capable memory."
++				"Converting MR4=0x%02x as shutdown event\n",
++				__func__, emif->temperature_level);
++			/*
++			 * Temperature far too high - do kernel_power_off()
++			 * from thread context
++			 */
++			emif->temperature_level = SDRAM_TEMP_VERY_HIGH_SHUTDOWN;
++			ret = IRQ_WAKE_THREAD;
++			goto out;
++		}
++	}
++
+ 	if (emif->temperature_level < old_temp_level ||
+ 		emif->temperature_level == SDRAM_TEMP_VERY_HIGH_SHUTDOWN) {
+ 		/*
+@@ -1224,6 +1248,9 @@ static void __init_or_module of_get_custom_configs(struct device_node *np_emif,
+ 		cust_cfgs->temp_alert_poll_interval_ms = *poll_intvl;
+ 	}
+ 
++	if (of_find_property(np_emif, "extended-temp-part", &len))
++		cust_cfgs->mask |= EMIF_CUSTOM_CONFIG_EXTENDED_TEMP_PART;
++
+ 	if (!is_custom_config_valid(cust_cfgs, emif->dev)) {
+ 		devm_kfree(emif->dev, cust_cfgs);
+ 		return;
+diff --git a/include/linux/platform_data/emif_plat.h b/include/linux/platform_data/emif_plat.h
+index 03378ca..5c19a2a 100644
+--- a/include/linux/platform_data/emif_plat.h
++++ b/include/linux/platform_data/emif_plat.h
+@@ -40,6 +40,7 @@
+ /* Custom config requests */
+ #define EMIF_CUSTOM_CONFIG_LPMODE			0x00000001
+ #define EMIF_CUSTOM_CONFIG_TEMP_ALERT_POLL_INTERVAL	0x00000002
++#define EMIF_CUSTOM_CONFIG_EXTENDED_TEMP_PART		0x00000004
+ 
+ #ifndef __ASSEMBLY__
+ /**
+-- 
+1.7.9.5
