@@ -1,99 +1,73 @@
-From: jhovold@gmail.com (Johan Hovold)
-Date: Mon, 11 Mar 2013 11:02:43 +0100
-Subject: [rtc-linux] [PATCH 3/3] ARM: at91: fix hanged boot
-In-Reply-To: <20130308160258.GD4590@game.jcrosoft.org>
-References: <1362747103-21445-1-git-send-email-jhovold@gmail.com>
- <1362747103-21445-4-git-send-email-jhovold@gmail.com>
- <20130308160258.GD4590@game.jcrosoft.org>
-Message-ID: <20130311100243.GD8797@localhost>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 11 Mar 2013 10:21:39 +0000
+Subject: [kvmarm] [GIT PULL v2] KVM/ARM Fixes for 3.9-rc1
+In-Reply-To: <20130308113150.GF24444@redhat.com>
+References: <CAEDV+gLpqG0GxbCDoUqO2fdwpqLeEd_psaaFWzm2Xi829-zUTQ@mail.gmail.com>
+ <f3db22097ee303991fccc64bbf863dd6@localhost>
+ <CAEDV+g+ATCr3Hd+VjwLW7tgbJ9Cq4eaC49ZFO-1jB=grAVR49w@mail.gmail.com>
+ <fd46d1c4746530d6c705dba843c848ea@localhost>
+ <20130307190900.GB15854@amt.cnet>
+ <600b4cf22f05ccd66c8f6e18eaaf75c4@localhost>
+ <20130308113150.GF24444@redhat.com>
+Message-ID: <513DB033.9040006@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 08, 2013 at 05:02:58PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 13:51 Fri 08 Mar     , Johan Hovold wrote:
-> > Make sure the RTC and RTT-interrupts are masked at boot by adding a new
-> > SOC-initialiser and helpers functions.
-> > 
-> > This fixes hanged boot on all AT91 SOCs but RM9200, for example, after a
-> > reset during an RTC-update or if an RTC or RTT-alarm goes off after a
-> > non-clean shutdown.
-> > 
-> > The RTC and RTT-peripherals are powered by backup power (VDDBU) (on all
-> > AT91 SOCs but RM9200) and are not reset on wake-up, user, watchdog or
-> > software reset. This means that their interrupts may be enabled during
-> > early boot if, for example, they where not disabled during a previous
-> > shutdown (e.g. due to a buggy driver or a non-clean shutdown such as a
-> > user reset). Furthermore, an RTC or RTT-alarm may also be active.
-> > 
-> > The RTC and RTT-interrupts use the shared system-interrupt line, and if
-> > an interrupt occurs before a handler (e.g. RTC-driver) has been
-> > installed this leads to the system interrupt being disabled and prevents
-> > the system from booting.
-> > 
-> > Note that when boot hangs due to an early RTC or RTT-interrupt, the only
-> > way to get the system to start again is to remove the backup power (e.g.
-> > battery) or to disable the interrupt manually from the bootloader. In
-> > particular, a user reset is not sufficient.
-> > 
-> > Tested on at91sam9263 and at91sam9g45.
-> > 
-> > Signed-off-by: Johan Hovold <jhovold@gmail.com>
-> > ---
-> >  arch/arm/mach-at91/at91rm9200.c               |  9 ++++++++
-> >  arch/arm/mach-at91/at91sam9260.c              |  6 ++++++
-> >  arch/arm/mach-at91/at91sam9261.c              |  6 ++++++
-> >  arch/arm/mach-at91/at91sam9263.c              |  7 ++++++
-> >  arch/arm/mach-at91/at91sam9g45.c              |  7 ++++++
-> >  arch/arm/mach-at91/at91sam9n12.c              |  6 ++++++
-> >  arch/arm/mach-at91/at91sam9rl.c               |  7 ++++++
-> >  arch/arm/mach-at91/at91sam9x5.c               |  6 ++++++
-> >  arch/arm/mach-at91/generic.h                  |  2 ++
-> >  arch/arm/mach-at91/include/mach/at91sam9n12.h |  5 +++++
-> >  arch/arm/mach-at91/include/mach/at91sam9x5.h  |  5 +++++
-> nack for DT probe te address via DT
+On 08/03/13 11:31, Gleb Natapov wrote:
+> On Fri, Mar 08, 2013 at 04:12:41AM +0100, Marc Zyngier wrote:
+>> On Thu, 7 Mar 2013 16:09:00 -0300, Marcelo Tosatti <mtosatti@redhat.com>
+>> wrote:
+>>> On Thu, Mar 07, 2013 at 07:57:23AM +0100, Marc Zyngier wrote:
+>>>> On Wed, 6 Mar 2013 20:40:00 -0800, Christoffer Dall
+>>>> <cdall@cs.columbia.edu>
+>>>> wrote:
+>>>>> On Wed, Mar 6, 2013 at 7:54 PM, Marc Zyngier <marc.zyngier@arm.com>
+>>>> wrote:
+>>>>>> On Wed, 6 Mar 2013 16:31:48 -0800, Christoffer Dall
+>>>>>> <cdall@cs.columbia.edu>
+>>>>>> wrote:
+>>>>>>
+>>>>>> Hi Christoffer,
+>>>>>>
+>>>>>>>
+>>>>>>> Please pull these KVM/ARM fixes mostly centered around preparation
+>>>>>>> for
+>>>>>>> Marc's ARMv8 KVM work.
+>>>>>>
+>>>>>> Can we please hold on that for a while? asm-offset.c is usually a
+>>>>>> candidate for merge conflicts as people start pushing patches post
+>>>> merge
+>>>>>> window, and it would make sense to see what is happening in that
+>>>>>> space.
+>>>>>>
+>>>>> Sure, when would you see this happen exactly?
+>>>>
+>>>> Usually, by -rc5 we have a pretty good idea of what is going in. Also,
+>>>> putting things into -next is a good way to detect potential problems.
+>>>>
+>>>> Oh, and keeping linux-arm-kernel into the loop. Most ARM developers
+>> don't
+>>>> follow the KVM lists.
+>>>>
+>>>>         M.
+>>>
+>>> Mark, can you please be more verbose on the reason for this request? 
+>>
+>> arch/arm/kernel/asm-offset.c, being an ARM core file, is often the
+>> location of merge conflicts. And because arch/arm sees a lot more churn
+>> than any other architecture, we have the policy of dealing with conflicts
+>> before they hit Linus.
+>>
+>> We usually deal with that by providing stable branches that will contain
+>> the "offending" patches, and on which others can base their developments.
+>>
+> Can you elaborate on that? If all changes to arch/arm/kernel/asm-offset.c not
+> go through the same tree how having many stable branches solve conflicts
+> issues?
 
-Fair enough. I'll respin and add proper DT-support. 
+Patches for the conflicting file go to a stable branch (usually in RMK's
+tree), and everyone else bases their own branch on the stable one.
 
-> >  arch/arm/mach-at91/setup.c                    | 31 +++++++++++++++++++++++++++
-> >  arch/arm/mach-at91/soc.h                      |  1 +
-> >  13 files changed, 98 insertions(+)
-> 
-> at boot time we can disable all the irq as we need none of them
-
-Yes, but all but the VDDBU-powered-peripheral ones will already have
-been disabled at reset. If a buggy bootloader enables something it
-should not, then the bootloader should be fixed.
-
-> > diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
-> > index 7aeb473..4651ebb 100644
-> > --- a/arch/arm/mach-at91/at91rm9200.c
-> > +++ b/arch/arm/mach-at91/at91rm9200.c
-> > @@ -325,6 +325,14 @@ static void __init at91rm9200_ioremap_registers(void)
-> >  	at91_ioremap_ramc(0, AT91RM9200_BASE_MC, 256);
-> >  }
-> >  
-> > +static void __init at91rm9200_sysirq_mask(void)
-> > +{
-> > +	/*
-> > +	 * No need to mask any system interrupts as the RM9200 has no backup
-> > +	 * power and resets all system peripherals at every reset.
-> > +	 */
-> > +}
-> no need drop it
-
-Ok.
-
-Thanks,
-Johan
-
-> > +
-> >  static void __init at91rm9200_initialize(void)
-> >  {
-> >  	arm_pm_idle = at91rm9200_idle;
-> > @@ -387,5 +395,6 @@ AT91_SOC_START(rm9200)
-> >  	.default_irq_priority = at91rm9200_default_irq_priority,
-> >  	.ioremap_registers = at91rm9200_ioremap_registers,
-> >  	.register_clocks = at91rm9200_register_clocks,
-> > +	.sysirq_mask = at91rm9200_sysirq_mask,
-> >  	.init = at91rm9200_initialize,
-> >  AT91_SOC_END
+	M.
+-- 
+Jazz is not dead. It just smells funny...
