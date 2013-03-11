@@ -1,29 +1,22 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 11 Mar 2013 20:54:49 +0000
-Subject: [GIT PULL] imx fixes for 3.9, take 2
-In-Reply-To: <20130311141714.GD25910@S2101-09.ap.freescale.net>
-References: <20130311141714.GD25910@S2101-09.ap.freescale.net>
-Message-ID: <201303112054.50171.arnd@arndb.de>
+Date: Mon, 11 Mar 2013 20:57:21 +0000
+Subject: [GIT PULL] ARM: mvebu: fixes for v3.9
+In-Reply-To: <20130308223249.GW23237@titan.lakedaemon.net>
+References: <20130308223249.GW23237@titan.lakedaemon.net>
+Message-ID: <201303112057.21736.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 11 March 2013, Shawn Guo wrote:
-> The following changes since commit 0545c798e9bb7fe29606681653c20d68e47f4840:
+On Friday 08 March 2013, Jason Cooper wrote:
+> The following changes since commit 6dbe51c251a327e012439c4772097a13df43c5b8:
 > 
->   ARM: dts: imx53-mba53: fix fsl,pins for disp1-grp1 (2013-03-04 09:20:15 +0800)
+>   Linux 3.9-rc1 (2013-03-03 15:11:05 -0800)
 > 
 > are available in the git repository at:
 > 
->   git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-fixes-3.9-2
+>   git://git.infradead.org/users/jcooper/linux.git tags/mvebu_fixes_for_v3.9
 > 
-> for you to fetch changes up to 0c52db7e681678f9b2a3fb96c3dd557168b4e025:
-> 
->   ARM: imx: fix typo "DEBUG_IMX50_IMX53_UART" (2013-03-11 21:28:18 +0800)
-> 
-> ----------------------------------------------------------------
-> The 2nd take of imx fixes for 3.9:
->  - Fix pll1_sys clk initial status
->  - Fix a typo in imx DEBUG_LL Kconfig
+> for you to fetch changes up to b2d57222b0f0963258a47da0ea7f0ec451c64712:
 > 
 
 Applied to fixes branch, thanks!
