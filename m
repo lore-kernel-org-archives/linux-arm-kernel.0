@@ -1,43 +1,33 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Sun, 10 Mar 2013 17:17:47 -0700 (PDT)
-Subject: [PATCH v2 5/7] ARM: mach-shmobile: sh73a0: Setup the timer CMT10
- using DT
-In-Reply-To: <1362742181-19111-6-git-send-email-hechtb+renesas@gmail.com>
-References: <1362742181-19111-1-git-send-email-hechtb+renesas@gmail.com>
- <1362742181-19111-6-git-send-email-hechtb+renesas@gmail.com>
-Message-ID: <87y5duhjru.wl%kuninori.morimoto.gx@renesas.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 11 Mar 2013 00:41:56 +0000 (UTC)
+Subject: OMAP4 PM bootloader dependency problems
+In-Reply-To: <5111615B.50708@ti.com>
+References: <alpine.DEB.2.00.1301220229140.25789@utopia.booyaka.com>
+ <5111615B.50708@ti.com>
+Message-ID: <alpine.DEB.2.00.1303110039230.774@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Jon,
 
-Hi Bastian
+sorry for the delay,
 
-1 question
+On Tue, 5 Feb 2013, Jon Hunter wrote:
 
-> We can now use the Device Tree for bringing up our timer device CMT10 on
-> the SoC sh73a0.
+> I noticed on my OMAP4430 SDP that in suspend L3INIT was failing to enter 
+> retention state. I am not sure if this is the same problem that you are 
+> seeing or not. However, I found that the reason the L3INIT was not entering
+> retention on this board was because the USB DPLL was not locked by the
+> bootloader on this board. On my panda the USB DPLL is locked the L3INIT 
+> is entering suspend. 
 > 
-> Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
-(snip)
->  /* TMU */
->  static struct sh_timer_config tmu00_platform_data = {
->  	.name = "TMU00",
-> @@ -913,7 +882,6 @@ static struct platform_device *sh73a0_devices_dt[] __initdata = {
->  	&scif6_device,
->  	&scif7_device,
->  	&scif8_device,
-> -	&cmt10_device,
->  };
+> I crafted the following which is working on my omap4430 panda, sdp and 
+> omap4460 panda. Let me know what you think ...
 
-I didn't test this patch,
-but setup-sh73a0.c :: sh73a0_devices_dt is
-used from sh73a0_add_standard_devices() or sh73a0_add_early_devices(),
-and it is used from board-kzm9g.c (not -reference.c).
-
-Does board-kzm9g.c still works ?
-Is it better that sh73a0_early_devices[] has it ?
+Looks fine to me.  It doesn't fix the problem I'm seeing with OMAP4 
+L3INIT, unfortunately.  But it sounds like it fixes a problem for you -- 
+which means it probably fixes something for other people too.  Queued
+for v3.9-rc.
 
 
-Best regards
----
-Kuninori Morimoto
+- Paul
