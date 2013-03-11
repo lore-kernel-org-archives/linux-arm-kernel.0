@@ -1,51 +1,67 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Mon, 11 Mar 2013 09:08:26 +0100
-Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
-In-Reply-To: <20130310160937.37df66b2@skate>
-References: <20130307200235.GB20695@obsidianresearch.com>
- <20130307204726.GB1811@avionic-0098.mockup.avionic-design.de>
- <51392B4D.9040404@gmail.com>
- <20130308071443.GA5772@avionic-0098.mockup.avionic-design.de>
- <20130308165228.GB4094@obsidianresearch.com>
- <20130308191227.GA6551@avionic-0098.mockup.avionic-design.de>
- <513A3F4F.2090501@firmworks.com>
- <20130308200245.GC29435@obsidianresearch.com>
- <20130308201339.GA26322@avionic-0098.mockup.avionic-design.de>
- <20130310160937.37df66b2@skate>
-Message-ID: <20130311080826.GB6365@avionic-0098.mockup.avionic-design.de>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 11 Mar 2013 09:40:54 +0100
+Subject: [PATCH 0/4] time: dynamic irq affinity
+In-Reply-To: <513D4E79.5090307@ti.com>
+References: <1361917047-29230-1-git-send-email-daniel.lezcano@linaro.org>
+ <513CC404.6000200@ti.com> <513CCF60.6060406@linaro.org>
+ <513D4E79.5090307@ti.com>
+Message-ID: <513D9896.2010304@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 10, 2013 at 04:09:37PM +0100, Thomas Petazzoni wrote:
-> Dear Thierry Reding,
-> 
-> On Fri, 8 Mar 2013 21:13:40 +0100, Thierry Reding wrote:
-> > On Fri, Mar 08, 2013 at 01:02:46PM -0700, Jason Gunthorpe wrote:
-> > > On Fri, Mar 08, 2013 at 09:43:11AM -1000, Mitch Bradley wrote:
-> > [...]
-> > > > 2) The "@0,0" and "@1,0" suffixes do not correspond to the reg values
-> > > > <0x0800 0 0 0 0> and <0x1000 0 0 0 0> using any rule that I know.
-> > > 
-> > > @0,1,0 (bus,device,fn) could be more appropriate, but that is
-> > > cosmetic?
-> > 
-> > The OF PCI specification is pretty strict about this as well. It says in
-> > section 2.2.1.3. that only the DD and DD,FF forms can appear in a device
-> > path.
-> 
-> Note that in the case of my driver, the @X,Y represent the port and
-> lane of the PCIe interface. Not sure if it is correct, I can change the
-> names to whatever is appropriate, those names aren't used anywhere in
-> the driver.
+On 03/11/2013 04:24 AM, Santosh Shilimkar wrote:
+> On Sunday 10 March 2013 11:52 PM, Daniel Lezcano wrote:
 
-I think they need to be changed to be @dev,fn in order to conform to the
-OF PCI binding.
+[ ... ]
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130311/40ace6a4/attachment.sig>
+>> I don't think it is the case for all the ARM platforms, at least we
+>> tested it on vexpress TC2 and u8500, and the number of IPI were reduced
+>> very significantly increasing the idle time for cpu0. TC2 will need
+>> another optimization on another area for the idle wake up to gain real
+>> improvements.
+>>
+> You are missing my point. TC2 can be an exception since the SGI can wakeup
+> CPUs even from low power states where local timer's are stalled. Is that
+> the case with U8500 ?
+
+Well, the cpuidle driver is not going into a deep idle state to check
+this out.
+
+AFAICT this board has a specific firmware with the PRCMU (a device
+managing the power on the board) and it replaces the GIC when going to
+deep idle state, especially by reconnecting the GIC to the A9 cores
+automatically when an interrupt occurs.
+
+But definitively worth to check.
+
+>> I will test it on OMAP but with the coupled idle state, I am not sure of
+>> the behavior. Could elaborate a bit the specificity of OMAP ? I am not
+>> sure to understand why I may miss some IPI wakeups.
+>>
+> I already mention the issue here [1]. You might not see any major issues
+> because the missed asynchronous IPIs might eventually get executed when
+> CPU's wakeup from deeper states because of idle wakeups. OMAP is no
+> different from idle wakeup optimisation and it will surely benefit and work.
+> The main reason I didn't pursue it because of not having solution for
+> [1] which as discussed in past is very much essential from kernel
+> functional correctness perspective. You might want to verify that by
+> adding a tracepoint on IPI's on other reasons except the timer wakeup.
+
+Oh, ok. I didn't make the connection. I got the point now.
+
+If we can raise a fake hardware interrupt on the GIC (not sure that
+could be done), may be we can implement something similar to the
+broadcast timer mechanism to replace the IPI when the cores are not IPI
+wakeup capable.
+
+
+> [1] https://lkml.org/lkml/2013/2/27/39
+> 
+
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
