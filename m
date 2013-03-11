@@ -1,22 +1,25 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 11 Mar 2013 21:00:43 +0000
-Subject: [PATCH 2/4][V2] time : set broadcast irq affinity
-In-Reply-To: <alpine.LFD.2.02.1303080817230.22263@ionos>
-References: <1362219013-18173-1-git-send-email-daniel.lezcano@linaro.org>
- <51396B39.3090504@linaro.org> <alpine.LFD.2.02.1303080817230.22263@ionos>
-Message-ID: <201303112100.43543.arnd@arndb.de>
+Date: Mon, 11 Mar 2013 21:02:36 +0000
+Subject: [PATCH 1/2] ARM: exynos: pl330: Add #dma-cells for generic dma
+ binding support
+In-Reply-To: <015901ce1ad3$6ea43540$4bec9fc0$%kim@samsung.com>
+References: <1362375268-29405-1-git-send-email-padma.v@samsung.com>
+ <CAAgF-Bf+rqiFUaBD=aRqry6-2z4o0Ao2L2YRm8bu1x98TfPPyg@mail.gmail.com>
+ <015901ce1ad3$6ea43540$4bec9fc0$%kim@samsung.com>
+Message-ID: <201303112102.36909.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 08 March 2013, Thomas Gleixner wrote:
-> On Fri, 8 Mar 2013, Daniel Lezcano wrote:
-> > On 03/06/2013 10:48 AM, Thomas Gleixner wrote:
-> > I was wondering if it would be possible to take the 3/4 and 4/4
-> > otherwise the flag dependency will prevent to send those to the
-> > maintainer's tree until they gain visibility on it.
+On Thursday 07 March 2013, Kukjin Kim wrote:
+> > Can you please take this patch in 3.9 rc2 ?
+> > 
+> Sure, I will.
 > 
-> I can take them with the ack of arm soc folks.
+> BTW, Arnd, I'm not sure second one(socfpga.dtsi) can be handled in samsung
+> tree.
 
-Sounds good,
+I guess you're right, I've applied the second one to the fixes branch now.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Thanks,
+
+	Arnd
