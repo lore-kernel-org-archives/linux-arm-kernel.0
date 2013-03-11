@@ -1,55 +1,30 @@
-From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Mon, 11 Mar 2013 22:23:45 +0800
-Subject: [PATCH -next] pinctrl: sirf: using for_each_set_bit to simplify the
- code
-Message-ID: <CAPgLHd9n7nmyhUcRgPwEyjweZKA+fgi409yEJgK6LmF2Wu6n-g@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 11 Mar 2013 22:24:05 +0800
+Subject: [GIT PULL] mxs fixes for 3.9, take 2
+Message-ID: <20130311142402.GE25910@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+The following changes since commit 95381f38c0ed85be732553bf56f613ce701d411b:
 
-Using for_each_set_bit() to simplify the code.
+  ARM: mxs: ocotp: Fix sparse warning (2013-03-04 10:07:28 +0800)
 
-Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
----
- drivers/pinctrl/pinctrl-sirf.c | 10 ++--------
- 1 file changed, 2 insertions(+), 8 deletions(-)
+are available in the git repository at:
 
-diff --git a/drivers/pinctrl/pinctrl-sirf.c b/drivers/pinctrl/pinctrl-sirf.c
-index 498b2ba..d6cf500 100644
---- a/drivers/pinctrl/pinctrl-sirf.c
-+++ b/drivers/pinctrl/pinctrl-sirf.c
-@@ -1669,15 +1669,12 @@ static void sirfsoc_gpio_set_pullup(const u32 *pullups)
- 	const unsigned long *p = (const unsigned long *)pullups;
- 
- 	for (i = 0; i < SIRFSOC_GPIO_NO_OF_BANKS; i++) {
--		n = find_first_bit(p + i, BITS_PER_LONG);
--		while (n < BITS_PER_LONG) {
-+		for_each_set_bit(n, p + i, BITS_PER_LONG) {
- 			u32 offset = SIRFSOC_GPIO_CTRL(i, n);
- 			u32 val = readl(sgpio_bank[i].chip.regs + offset);
- 			val |= SIRFSOC_GPIO_CTL_PULL_MASK;
- 			val |= SIRFSOC_GPIO_CTL_PULL_HIGH;
- 			writel(val, sgpio_bank[i].chip.regs + offset);
--
--			n = find_next_bit(p + i, BITS_PER_LONG, n + 1);
- 		}
- 	}
- }
-@@ -1688,15 +1685,12 @@ static void sirfsoc_gpio_set_pulldown(const u32 *pulldowns)
- 	const unsigned long *p = (const unsigned long *)pulldowns;
- 
- 	for (i = 0; i < SIRFSOC_GPIO_NO_OF_BANKS; i++) {
--		n = find_first_bit(p + i, BITS_PER_LONG);
--		while (n < BITS_PER_LONG) {
-+		for_each_set_bit(n, p + i, BITS_PER_LONG) {
- 			u32 offset = SIRFSOC_GPIO_CTRL(i, n);
- 			u32 val = readl(sgpio_bank[i].chip.regs + offset);
- 			val |= SIRFSOC_GPIO_CTL_PULL_MASK;
- 			val &= ~SIRFSOC_GPIO_CTL_PULL_HIGH;
- 			writel(val, sgpio_bank[i].chip.regs + offset);
--
--			n = find_next_bit(p + i, BITS_PER_LONG, n + 1);
- 		}
- 	}
- }
+  git://git.linaro.org/people/shawnguo/linux-2.6.git tags/mxs-fixes-3.9-2
+
+for you to fetch changes up to 4a38a8502b0ea4ecbe86f60e0b2416771c51888d:
+
+  ARM: mxs: cfa10049: Fix fb initialisation function (2013-03-07 10:54:23 +0800)
+
+----------------------------------------------------------------
+The 2nd mxs fixes for 3.9:
+ - Fix an error caused by incorrect conflict resolution when
+   applying the patch
+
+----------------------------------------------------------------
+Maxime Ripard (1):
+      ARM: mxs: cfa10049: Fix fb initialisation function
+
+ arch/arm/mach-mxs/mach-mxs.c |   10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
