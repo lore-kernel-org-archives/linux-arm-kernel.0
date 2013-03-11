@@ -1,33 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 11 Mar 2013 16:31:06 +0000
-Subject: [PATCH 4/9] mfd: max8925: fix trivial build warning for non-dt
-In-Reply-To: <1360880818-4071454-5-git-send-email-arnd@arndb.de>
-References: <1360880818-4071454-1-git-send-email-arnd@arndb.de>
- <1360880818-4071454-5-git-send-email-arnd@arndb.de>
-Message-ID: <201303111631.06866.arnd@arndb.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 11 Mar 2013 09:33:52 -0700
+Subject: [PATCH] ARM: OMAP: drop "select MACH_NOKIA_RM696"
+In-Reply-To: <1362858510.3137.31.camel@x61.thuisdomein>
+References: <1362738596.5994.48.camel@x61.thuisdomein>
+ <20130308161159.GE14552@blackmetal.musicnaut.iki.fi>
+ <20130308163507.GC26093@atomide.com>
+ <1362763232.5994.75.camel@x61.thuisdomein>
+ <20130308175539.GG26093@atomide.com>
+ <1362765764.5994.87.camel@x61.thuisdomein>
+ <20130309000157.GE30923@n2100.arm.linux.org.uk>
+ <1362858510.3137.31.camel@x61.thuisdomein>
+Message-ID: <20130311163351.GJ26093@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 14 February 2013, Arnd Bergmann wrote:
-> Patch fe527ea5a "mfd: max8925: Support dt for backlight"
-> added a new function for DT probing but introduced a
-> build warning for the case where CONFIG_OF is disabled:
+* Paul Bolle <pebolle@tiscali.nl> [130309 11:52]:
+> On Sat, 2013-03-09 at 00:01 +0000, Russell King - ARM Linux wrote:
 > 
-> drivers/video/backlight/max8925_bl.c: In function 'max8925_backlight_probe':
-> drivers/video/backlight/max8925_bl.c:177:3: warning: statement with no effect [-Wunused-value]
+> > However, going back to that MACH_NOKIA_RM696.  If there exists only a
+> > select of this symbol and no "config MACH_NOKIA_RM696" entry, then the
+> > symbol will never be generated in the output .config file.
+> > 
+> >[...]
+> > 
+> > My conclusion is... it's a mess.
 > 
-> A much nicer fix is to use the IS_ENABLED keyword to
-> have the same effect of dropping the device tree specific
-> function when it's not needed.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Qing Xu <qingx@marvell.com>
-> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
-> Cc: Samuel Ortiz <sameo@linux.intel.com>
+> That mess can only be fully cleaned up if the code for the RM-696 that
+> now is maintained in some unknown to me repository gets merged into
+> mainline, can't it?
+>
+> In the meantime, how do you prefer I solve the (trivial) issue of an
+> useless select for MACH_NOKIA_RM696? Drop that select or add an (equally
+> useless) config entry for MACH_NOKIA_RM696? Or should I try to ignore it
+> for the time being?
 
-Hmm, it seems I already had this patch for the issue, but for some reason it
-didn't apply for some time and when I looked at the problem again now, I found
-more issues, and I'd suggest reverting commit fe527ea5a completely. There are
-similar problems in the max8925_power patch.
+Just adding the config MACH_NOKIA_RM696 to Kconfig as bool should fix
+this unless I'm missing something here.
 
-	Arnd
+Regards,
+
+Tony
