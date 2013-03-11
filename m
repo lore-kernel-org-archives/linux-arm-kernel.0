@@ -1,147 +1,60 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
-Date: Mon, 11 Mar 2013 12:19:52 +0100
-Subject: [PATCH] ARM: at91: change name template in AT91_SOC_START macro
-In-Reply-To: <1362755638-20092-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1362755638-20092-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1363000792-30800-1-git-send-email-ludovic.desroches@atmel.com>
+From: hechtb@gmail.com (Bastian Hecht)
+Date: Mon, 11 Mar 2013 12:33:18 +0100
+Subject: [PATCH v2 5/7] ARM: mach-shmobile: sh73a0: Setup the timer CMT10
+ using DT
+In-Reply-To: <87y5duhjru.wl%kuninori.morimoto.gx@renesas.com>
+References: <1362742181-19111-1-git-send-email-hechtb+renesas@gmail.com>
+ <1362742181-19111-6-git-send-email-hechtb+renesas@gmail.com>
+ <87y5duhjru.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <CABYn4sy=9Wkh7tCsBpna4hwX3ptRwCeC_+ys0apAHGbjjieN2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Desroches <ludovic.desroches@atmel.com>
+Hello Morimoto-san!
 
-New devices are no more prefixed with at91 so remove the at91 and _name
-concatenation.
+2013/3/11 Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>:
+>
+> Hi Bastian
+>
+> 1 question
+>
+>> We can now use the Device Tree for bringing up our timer device CMT10 on
+>> the SoC sh73a0.
+>>
+>> Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
+> (snip)
+>>  /* TMU */
+>>  static struct sh_timer_config tmu00_platform_data = {
+>>       .name = "TMU00",
+>> @@ -913,7 +882,6 @@ static struct platform_device *sh73a0_devices_dt[] __initdata = {
+>>       &scif6_device,
+>>       &scif7_device,
+>>       &scif8_device,
+>> -     &cmt10_device,
+>>  };
+>
+> I didn't test this patch,
+> but setup-sh73a0.c :: sh73a0_devices_dt is
+> used from sh73a0_add_standard_devices() or sh73a0_add_early_devices(),
+> and it is used from board-kzm9g.c (not -reference.c).
+>
+> Does board-kzm9g.c still works ?
+> Is it better that sh73a0_early_devices[] has it ?
+>
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
----
- arch/arm/mach-at91/at91rm9200.c  | 2 +-
- arch/arm/mach-at91/at91sam9260.c | 2 +-
- arch/arm/mach-at91/at91sam9261.c | 2 +-
- arch/arm/mach-at91/at91sam9263.c | 2 +-
- arch/arm/mach-at91/at91sam9g45.c | 2 +-
- arch/arm/mach-at91/at91sam9n12.c | 2 +-
- arch/arm/mach-at91/at91sam9rl.c  | 2 +-
- arch/arm/mach-at91/at91sam9x5.c  | 2 +-
- arch/arm/mach-at91/soc.h         | 2 +-
- 9 files changed, 9 insertions(+), 9 deletions(-)
+As the timer devices have no board dependencies we can put them into
+the general sh73a0.dtsi and it works for the reference and
+no-reference case.
 
-diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
-index 9706c00..ccce759 100644
---- a/arch/arm/mach-at91/at91rm9200.c
-+++ b/arch/arm/mach-at91/at91rm9200.c
-@@ -384,7 +384,7 @@ static unsigned int at91rm9200_default_irq_priority[NR_AIC_IRQS] __initdata = {
- 	0	/* Advanced Interrupt Controller (IRQ6) */
- };
- 
--AT91_SOC_START(rm9200)
-+AT91_SOC_START(at91rm9200)
- 	.map_io = at91rm9200_map_io,
- 	.default_irq_priority = at91rm9200_default_irq_priority,
- 	.ioremap_registers = at91rm9200_ioremap_registers,
-diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-index b67cd53..1833b4c 100644
---- a/arch/arm/mach-at91/at91sam9260.c
-+++ b/arch/arm/mach-at91/at91sam9260.c
-@@ -395,7 +395,7 @@ static unsigned int at91sam9260_default_irq_priority[NR_AIC_IRQS] __initdata = {
- 	0,	/* Advanced Interrupt Controller */
- };
- 
--AT91_SOC_START(sam9260)
-+AT91_SOC_START(at91sam9260)
- 	.map_io = at91sam9260_map_io,
- 	.default_irq_priority = at91sam9260_default_irq_priority,
- 	.ioremap_registers = at91sam9260_ioremap_registers,
-diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
-index 2998a08..ac7a341b 100644
---- a/arch/arm/mach-at91/at91sam9261.c
-+++ b/arch/arm/mach-at91/at91sam9261.c
-@@ -337,7 +337,7 @@ static unsigned int at91sam9261_default_irq_priority[NR_AIC_IRQS] __initdata = {
- 	0,	/* Advanced Interrupt Controller */
- };
- 
--AT91_SOC_START(sam9261)
-+AT91_SOC_START(at91sam9261)
- 	.map_io = at91sam9261_map_io,
- 	.default_irq_priority = at91sam9261_default_irq_priority,
- 	.ioremap_registers = at91sam9261_ioremap_registers,
-diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
-index b9fc60d..8e2d9f4 100644
---- a/arch/arm/mach-at91/at91sam9263.c
-+++ b/arch/arm/mach-at91/at91sam9263.c
-@@ -374,7 +374,7 @@ static unsigned int at91sam9263_default_irq_priority[NR_AIC_IRQS] __initdata = {
- 	0,	/* Advanced Interrupt Controller (IRQ1) */
- };
- 
--AT91_SOC_START(sam9263)
-+AT91_SOC_START(at91sam9263)
- 	.map_io = at91sam9263_map_io,
- 	.default_irq_priority = at91sam9263_default_irq_priority,
- 	.ioremap_registers = at91sam9263_ioremap_registers,
-diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-index d3addee..4fcbe7b 100644
---- a/arch/arm/mach-at91/at91sam9g45.c
-+++ b/arch/arm/mach-at91/at91sam9g45.c
-@@ -418,7 +418,7 @@ static unsigned int at91sam9g45_default_irq_priority[NR_AIC_IRQS] __initdata = {
- 	0,	/* Advanced Interrupt Controller (IRQ0) */
- };
- 
--AT91_SOC_START(sam9g45)
-+AT91_SOC_START(at91sam9g45)
- 	.map_io = at91sam9g45_map_io,
- 	.default_irq_priority = at91sam9g45_default_irq_priority,
- 	.ioremap_registers = at91sam9g45_ioremap_registers,
-diff --git a/arch/arm/mach-at91/at91sam9n12.c b/arch/arm/mach-at91/at91sam9n12.c
-index 5dfc8fd..2c7a2f4 100644
---- a/arch/arm/mach-at91/at91sam9n12.c
-+++ b/arch/arm/mach-at91/at91sam9n12.c
-@@ -226,7 +226,7 @@ void __init at91sam9n12_initialize(void)
- 	at91_extern_irq = (1 << AT91SAM9N12_ID_IRQ0);
- }
- 
--AT91_SOC_START(sam9n12)
-+AT91_SOC_START(at91sam9n12)
- 	.map_io = at91sam9n12_map_io,
- 	.register_clocks = at91sam9n12_register_clocks,
- 	.init = at91sam9n12_initialize,
-diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
-index eb98704..c396007 100644
---- a/arch/arm/mach-at91/at91sam9rl.c
-+++ b/arch/arm/mach-at91/at91sam9rl.c
-@@ -340,7 +340,7 @@ static unsigned int at91sam9rl_default_irq_priority[NR_AIC_IRQS] __initdata = {
- 	0,	/* Advanced Interrupt Controller */
- };
- 
--AT91_SOC_START(sam9rl)
-+AT91_SOC_START(at91sam9rl)
- 	.map_io = at91sam9rl_map_io,
- 	.default_irq_priority = at91sam9rl_default_irq_priority,
- 	.ioremap_registers = at91sam9rl_ioremap_registers,
-diff --git a/arch/arm/mach-at91/at91sam9x5.c b/arch/arm/mach-at91/at91sam9x5.c
-index 44a9a62..3a1a799 100644
---- a/arch/arm/mach-at91/at91sam9x5.c
-+++ b/arch/arm/mach-at91/at91sam9x5.c
-@@ -320,7 +320,7 @@ static void __init at91sam9x5_map_io(void)
-  *  Interrupt initialization
-  * -------------------------------------------------------------------- */
- 
--AT91_SOC_START(sam9x5)
-+AT91_SOC_START(at91sam9x5)
- 	.map_io = at91sam9x5_map_io,
- 	.register_clocks = at91sam9x5_register_clocks,
- AT91_SOC_END
-diff --git a/arch/arm/mach-at91/soc.h b/arch/arm/mach-at91/soc.h
-index 9c6d3d4..f3d3502 100644
---- a/arch/arm/mach-at91/soc.h
-+++ b/arch/arm/mach-at91/soc.h
-@@ -24,7 +24,7 @@ extern struct at91_init_soc at91sam9x5_soc;
- extern struct at91_init_soc at91sam9n12_soc;
- 
- #define AT91_SOC_START(_name)				\
--struct at91_init_soc __initdata at91##_name##_soc	\
-+struct at91_init_soc __initdata _name##_soc		\
-  __used							\
- 						= {	\
- 	.builtin	= 1,				\
--- 
-1.7.11.3
+Still - while rechecking it I discovered a small slip I made in my
+series. In 0003-Add OF to TMU I forgot 2 trivial lines. So thanks for
+asking ;)
+
+Cheers,
+
+ Bastian
+
+
+> Best regards
+> ---
+> Kuninori Morimoto
