@@ -1,50 +1,33 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 11 Mar 2013 20:51:08 +0100
-Subject: [PATCH 01/10] imx-ssi: Fix AC97 rates
-In-Reply-To: <CAOMZO5A8F81PzCjKHrkZ_AtGMr341d6OmYHMQvdzgunmGFDVsw@mail.gmail.com>
+Date: Mon, 11 Mar 2013 20:56:07 +0100
+Subject: [PATCH 06/10] ARM: soc-audio phycore-ac97: fix driver init order
+In-Reply-To: <20130311111011.GA10617@opensource.wolfsonmicro.com>
 References: <1362940391-8338-1-git-send-email-mpa@pengutronix.de>
- <1362940391-8338-2-git-send-email-mpa@pengutronix.de>
- <CAOMZO5A8F81PzCjKHrkZ_AtGMr341d6OmYHMQvdzgunmGFDVsw@mail.gmail.com>
-Message-ID: <20130311195108.GC18350@pengutronix.de>
+ <1362940391-8338-7-git-send-email-mpa@pengutronix.de>
+ <20130311111011.GA10617@opensource.wolfsonmicro.com>
+Message-ID: <20130311195607.GD18350@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+On Mon, Mar 11, 2013 at 11:10:11AM +0000, Mark Brown wrote:
+> On Sun, Mar 10, 2013 at 07:33:07PM +0100, Markus Pargmann wrote:
+> > Adding a soc-audio sound driver internally uses snd_soc_register_device,
+> > which tries to bind it with the codec. The adding of the driver is
+> > deferred because the codec driver is not loaded.
+> 
+> > This patch changes the order of registration. The codec driver is there
+> > before the ac97 driver, so the snd_soc_register_device call is
+> > successfull.
+> 
+> You shouldn't be using soc-audio in the first place...
 
-On Sun, Mar 10, 2013 at 03:47:10PM -0300, Fabio Estevam wrote:
-> Hi Markus,
-> 
-> On Sun, Mar 10, 2013 at 3:33 PM, Markus Pargmann <mpa@pengutronix.de> wrote:
-> > From: Sascha Hauer <s.hauer@pengutronix.de>
-> >
-> > This device supports multiple rates as described in later AC97
-> > standards. This patch allows playback of different sample frequencies
-> > without conversion.
-> >
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> > ---
-> >  sound/soc/fsl/imx-ssi.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> Currently we have the following ssi drivers for imx:
-> 
-> sound/soc/fsl/imx-ssi.c: for i.mx SoCs running on non-dt platform
-> sound/soc/fsl/fsl_ssi.c: for PowerPC and i.mx SoCs running on dt platforms
-> 
-> I see that in this series you convert sound/soc/fsl/imx-ssi.c into dt.
-> 
-> Shouldn't we use sound/soc/fsl/fsl_ssi.c instead and maybe even get
-> rid of sound/soc/fsl/imx-ssi.c when all imx become converted to dt?
-> 
-
-At the moment fsl-ssi and imx-ssi don't seem to have very much in
-common. However I could try to merge the imx-ssi driver code into
-fsl_ssi and make it handle imx27-ssi differently.
+Yes. This is just a fixup of the old "driver" part.
+The new DT driver does not use soc-audio (added in patch 7)
 
 Regards,
 
 Markus
+
 
 -- 
 Pengutronix e.K.                           |                             |
