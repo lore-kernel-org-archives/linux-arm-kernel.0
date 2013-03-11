@@ -1,120 +1,82 @@
-From: cdall@cs.columbia.edu (Christoffer Dall)
-Date: Mon, 11 Mar 2013 08:58:52 -0700
-Subject: [kvmarm] [GIT PULL v2] KVM/ARM Fixes for 3.9-rc1
-In-Reply-To: <513DB41F.1010904@arm.com>
-References: <CAEDV+gLpqG0GxbCDoUqO2fdwpqLeEd_psaaFWzm2Xi829-zUTQ@mail.gmail.com>
- <f3db22097ee303991fccc64bbf863dd6@localhost>
- <CAEDV+g+ATCr3Hd+VjwLW7tgbJ9Cq4eaC49ZFO-1jB=grAVR49w@mail.gmail.com>
- <fd46d1c4746530d6c705dba843c848ea@localhost>
- <20130307190900.GB15854@amt.cnet>
- <600b4cf22f05ccd66c8f6e18eaaf75c4@localhost>
- <CAEDV+gL_nMCw-1JK+L0W_X=T9q8gEo6xhC9trXHv84YjJ7OiGA@mail.gmail.com>
- <513DB41F.1010904@arm.com>
-Message-ID: <CAEDV+gJAuVujPnZrtQSTvc7WPJ+iD4c6u9b2Pm32KQPYP8ek5w@mail.gmail.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Mon, 11 Mar 2013 16:59:40 +0100
+Subject: [PATCH 1/3] can: at91_can: add dt support
+In-Reply-To: <20130311153956.GB3198@ludovic.desroches@atmel.com>
+References: <1362763842-14924-1-git-send-email-ludovic.desroches@atmel.com>
+ <1362763842-14924-2-git-send-email-ludovic.desroches@atmel.com>
+ <513A2365.5050803@pengutronix.de>
+ <20130311091722.GA2572@ludovic.desroches@atmel.com>
+ <513DF46E.7000903@pengutronix.de>
+ <20130311153956.GB3198@ludovic.desroches@atmel.com>
+Message-ID: <513DFF6C.2050408@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 11, 2013 at 3:38 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 08/03/13 19:26, Christoffer Dall wrote:
->> On Thu, Mar 7, 2013 at 7:12 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>> On Thu, 7 Mar 2013 16:09:00 -0300, Marcelo Tosatti <mtosatti@redhat.com>
->>> wrote:
->>>> On Thu, Mar 07, 2013 at 07:57:23AM +0100, Marc Zyngier wrote:
->>>>> On Wed, 6 Mar 2013 20:40:00 -0800, Christoffer Dall
->>>>> <cdall@cs.columbia.edu>
->>>>> wrote:
->>>>>> On Wed, Mar 6, 2013 at 7:54 PM, Marc Zyngier <marc.zyngier@arm.com>
->>>>> wrote:
->>>>>>> On Wed, 6 Mar 2013 16:31:48 -0800, Christoffer Dall
->>>>>>> <cdall@cs.columbia.edu>
->>>>>>> wrote:
->>>>>>>
->>>>>>> Hi Christoffer,
->>>>>>>
->>>>>>>>
->>>>>>>> Please pull these KVM/ARM fixes mostly centered around preparation
->>>>>>>> for
->>>>>>>> Marc's ARMv8 KVM work.
->>>>>>>
->>>>>>> Can we please hold on that for a while? asm-offset.c is usually a
->>>>>>> candidate for merge conflicts as people start pushing patches post
->>>>> merge
->>>>>>> window, and it would make sense to see what is happening in that
->>>>>>> space.
->>>>>>>
->>>>>> Sure, when would you see this happen exactly?
+On 03/11/2013 04:39 PM, Ludovic Desroches wrote:
+> On Mon, Mar 11, 2013 at 04:12:46PM +0100, Marc Kleine-Budde wrote:
+>> On 03/11/2013 10:17 AM, Ludovic Desroches wrote:
+>>> On Fri, Mar 08, 2013 at 06:44:05PM +0100, Marc Kleine-Budde wrote:
+>>>> On 03/08/2013 06:30 PM, ludovic.desroches at atmel.com wrote:
+>>>>> From: Ludovic Desroches <ludovic.desroches@atmel.com>
 >>>>>
->>>>> Usually, by -rc5 we have a pretty good idea of what is going in. Also,
->>>>> putting things into -next is a good way to detect potential problems.
+>>>>> Add device tree support.
 >>>>>
->>>>> Oh, and keeping linux-arm-kernel into the loop. Most ARM developers
->>> don't
->>>>> follow the KVM lists.
+>>>>> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+>>>>> ---
+>>>>>  .../devicetree/bindings/net/can/atmel-can.txt      | 14 ++++
+>>>>>  drivers/net/can/at91_can.c                         | 75 ++++++++++++++++------
+>>>>>  2 files changed, 70 insertions(+), 19 deletions(-)
+>>>>>  create mode 100644 Documentation/devicetree/bindings/net/can/atmel-can.txt
 >>>>>
->>>>>         M.
+>>>>> diff --git a/Documentation/devicetree/bindings/net/can/atmel-can.txt b/Documentation/devicetree/bindings/net/can/atmel-can.txt
+>>>>> new file mode 100644
+>>>>> index 0000000..69381db
+>>>>> --- /dev/null
+>>>>> +++ b/Documentation/devicetree/bindings/net/can/atmel-can.txt
+>>>>> @@ -0,0 +1,14 @@
+>>>>> +* AT91 CAN *
+>>>>> +
+>>>>> +Required properties:
+>>>>> +  - compatible: Should be "atmel,at91sam9263-can" or "atmel,at91sam9x5-can"
 >>>>
->>>> Mark, can you please be more verbose on the reason for this request?
+>>>> On imx we use the oldest SoC with that IP available. Which strategy are
+>>>> you following on at91?
+>>>>
 >>>
->>> arch/arm/kernel/asm-offset.c, being an ARM core file, is often the
->>> location of merge conflicts. And because arch/arm sees a lot more churn
->>> than any other architecture, we have the policy of dealing with conflicts
->>> before they hit Linus.
->>>
->>> We usually deal with that by providing stable branches that will contain
->>> the "offending" patches, and on which others can base their developments.
->>>
->>> This is why I suggested holding on this pull request until we got a better
->>> view of what potential merge conflicts we get with this patches. This
->>> shouldn't prevent the patches from entering -next though, as this would
->>> help detecting the above conflicts.
->>>
->> So I think you need to explain me a little more carefully how the
->> 'usually' applies in this case. This is just a pull request to the
->> kvm/master branch - it's not to Linus or ARM-specific. The only thing
->> is that we touch asm-offsets.c.
->
-> Yes, and that's the issue. Core changes to the ARM code usually goes
-> through RMK in order to avoid conflicts. This is a long established
-> policy. It could be another tree (arm-soc, for example), but that's the
-> general idea.
->
-> At least getting an Ack from Russell so he knows about this patch seems
-> to be the minimum we could do.
->
->> The only thing I can see that happens here is:
->>  - merge to kvm/master
->>  - kvm/master gets merged by Linus into -rcX (he fixes any merge
->> conflicts if present)
->
-> And that's exactly what we've worked very hard to avoid. We don't let
-> conflicts go up to Linus.
->
->>  - we, ARM, kvm, everyone, pull back from Linus
+>>> We are using the same strategy.
 >>
->> and that's it.
+>> But "atmel,at91sam9x5-can" isn't a specific SoC, probably a SoC family.
+>> Or are you using "atmel,at91sam9x5-can" for the other devices in the DT,
+>> too.
 >>
->> Perhaps it would be helpful if you can explain the situation we need
->> to avaoid and what exactly is the scenario when this breaks?
->>
->> The merge conflicts in asm-offsets.c should be uber-trivial, so I'm
->> not sure what the big deal is.
->
-> Given that we don't know what is to be merged yet, your crystal ball is
-> as good as mine.
->
-> Anyway, I've said it. In the end, this is your decision as a maintainer.
->
-I certainly appreciate your input, and I definitely want to do this in
-a way that makes the community happy, I'm just a bit confused about
-exactly how the process should go, and I still don't quite see what
-sending a pull request at -rc5 will give us. Maybe I'm being slow?
+> 
+> You are right at91sam9x5 is not a specific SoC but a family of SoCs:
+> at91sam9g25, at91sam9g35, at91sam9x25 and at91sam9x35. This compatible string
+> is used for all the devices from and after the at91sam9x5 family: at91sam9n12,
+> samad3x, etc.
+> 
+>> I picked at91sam9x5-can for the non devicetree driver out of the blue,
+>> as there was no scheme established, yet. I'm not hanging on that name,
+>> I'd rather appreciate to follow the common at91 DT rules.
+> 
+> It follows at91 Dt rules, we have atmel,at91sam9x5-i2c, atmel,at91sam9x5-gpio
+> and others.
 
-Otherwise, it sounds like I should simply send Russel a pull-request
-for a specific branch made off one of his stable branches?
+That's okay then, just wanted to clarify this. Can you send a v2, then
+I'll apply the patches.
 
-Is there an established branch to use or workflow (perhaps even
-documented somewhere that I can look at), or do I have to send Russell
-an e-mail requesting a stable branch and base my pull request off
-there, or does something automagically happen at rc5?
+Marc
 
--Christoffer
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130311/abe11a34/attachment.sig>
