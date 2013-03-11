@@ -1,84 +1,74 @@
 From: jhovold@gmail.com (Johan Hovold)
-Date: Mon, 11 Mar 2013 19:07:54 +0100
-Subject: [PATCH v2 0/5] ARM: at91: fix hanged boot
-In-Reply-To: <20130311180611.GF8797@localhost>
+Date: Mon, 11 Mar 2013 19:07:57 +0100
+Subject: [PATCH v2 3/5] ARM: at91/dts: add RTT nodes
+In-Reply-To: <1363025279-17615-1-git-send-email-jhovold@gmail.com>
 References: <20130311180611.GF8797@localhost>
-Message-ID: <1363025279-17615-1-git-send-email-jhovold@gmail.com>
+ <1363025279-17615-1-git-send-email-jhovold@gmail.com>
+Message-ID: <1363025279-17615-4-git-send-email-jhovold@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These patches fix a few severe issues affecting most AT91 SOCs where
-boot can hang after a non-general reset, and where the only way to get
-the system booting again is to do a general reset -- something which
-could require physically removing any backup battery.
+Add RTT nodes for Atmel SOCs.
 
-The problems stem from the fact that the RTC and RTT-peripherals are
-powered by backup power (VDDBU) and are not reset on wake-up, user,
-watchdog or software reset. Consequently, RTC and RTT-alarms and their
-interrupts may be enabled at boot, leading to a system lock-up when an
-interrupt arrives on the shared system-interrupt line before the
-appropriate handler (e.g. RTC-driver) has been installed.
+Signed-off-by: Johan Hovold <jhovold@gmail.com>
+---
+ arch/arm/boot/dts/at91sam9260.dtsi |  5 +++++
+ arch/arm/boot/dts/at91sam9263.dtsi | 10 ++++++++++
+ arch/arm/boot/dts/at91sam9g45.dtsi |  5 +++++
+ 3 files changed, 20 insertions(+)
 
-The easiest way to trigger this is to simply wake up from an RTC-alarm
-on at91sam9g45. The RTC-driver currently does not disable interrupts at
-shutdown so even after a clean shut-down the system will always hang
-after waking up.
-
-The first patch fixes this very general case of RTC-wake up after a
-clean shutdown in the RTC-driver and is marked for stable as it is
-perfectly straight-forward. [ Note that the other, RTT-based, AT91
-RTC-driver already disables its interrupts at shutdown. ]
-
-The more general problem can be triggered, for example, by doing a
-user-reset while updating the RTC-time or if an RTC or RTT-alarm goes
-off after a non-clean shutdown.
-
-To fix this I propose that arch-code should mask the relevant interrupts
-before enabling the system interrupt at early boot, and this is what
-the fifth patch does. To access the RTC-registers I choose to revert a
-recent patch that moved the register definitions to drivers/rtc.
-
-Arguably, the relevant interrupts could also be disabled in bootloaders,
-but I suggest fixing it in the kernel once and for all.
-
-The patches have been tested on at91sam9263 and at91sam9g45 (non-DT),
-and compile-tested for the other SOCs and DT.
-
-Johan
-
-
-v2:
- - add DT-support
- - make sys_irq_mask non-mandatory
-
-
-Johan Hovold (5):
-  ARM: at91/rtc: fix boot after RTC wake-up
-  ARM: at91/dts: add RTC nodes
-  ARM: at91/dts: add RTT nodes
-  Revert "arm: at91: move at91rm9200 rtc header in drivers/rtc"
-  ARM: at91: fix hanged boot
-
- arch/arm/boot/dts/at91rm9200.dtsi          |  5 ++
- arch/arm/boot/dts/at91sam9260.dtsi         |  5 ++
- arch/arm/boot/dts/at91sam9263.dtsi         | 10 ++++
- arch/arm/boot/dts/at91sam9g45.dtsi         | 10 ++++
- arch/arm/boot/dts/at91sam9n12.dtsi         |  5 ++
- arch/arm/boot/dts/at91sam9x5.dtsi          |  5 ++
- arch/arm/mach-at91/at91sam9260.c           |  6 ++
- arch/arm/mach-at91/at91sam9261.c           |  6 ++
- arch/arm/mach-at91/at91sam9263.c           |  7 +++
- arch/arm/mach-at91/at91sam9g45.c           |  7 +++
- arch/arm/mach-at91/at91sam9rl.c            |  7 +++
- arch/arm/mach-at91/generic.h               |  2 +
- arch/arm/mach-at91/include/mach/at91_rtc.h | 75 +++++++++++++++++++++++++
- arch/arm/mach-at91/setup.c                 | 88 ++++++++++++++++++++++++++++++
- arch/arm/mach-at91/soc.h                   |  1 +
- drivers/rtc/rtc-at91rm9200.c               | 11 +++-
- drivers/rtc/rtc-at91rm9200.h               | 75 -------------------------
- 17 files changed, 249 insertions(+), 76 deletions(-)
- create mode 100644 arch/arm/mach-at91/include/mach/at91_rtc.h
- delete mode 100644 drivers/rtc/rtc-at91rm9200.h
-
+diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
+index cb7bcc5..3a7a8dd 100644
+--- a/arch/arm/boot/dts/at91sam9260.dtsi
++++ b/arch/arm/boot/dts/at91sam9260.dtsi
+@@ -462,6 +462,11 @@
+ 				status = "disabled";
+ 			};
+ 
++			rtt at fffffd20 {
++				compatible = "atmel,at91sam9260-rtt";
++				reg = <0xfffffd20 0x10>;
++			};
++
+ 			ssc0: ssc at fffbc000 {
+ 				compatible = "atmel,at91rm9200-ssc";
+ 				reg = <0xfffbc000 0x4000>;
+diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
+index 271d4de..3a44382 100644
+--- a/arch/arm/boot/dts/at91sam9263.dtsi
++++ b/arch/arm/boot/dts/at91sam9263.dtsi
+@@ -457,6 +457,16 @@
+ 				status = "disabled";
+ 			};
+ 
++			rtt at fffffd20 {
++				compatible = "atmel,at91sam9260-rtt";
++				reg = <0xfffffd20 0x10>;
++			};
++
++			rtt at fffffd50 {
++				compatible = "atmel,at91sam9260-rtt";
++				reg = <0xfffffd50 0x10>;
++			};
++
+ 			watchdog at fffffd40 {
+ 				compatible = "atmel,at91sam9260-wdt";
+ 				reg = <0xfffffd40 0x10>;
+diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+index c1ad522..750b696 100644
+--- a/arch/arm/boot/dts/at91sam9g45.dtsi
++++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+@@ -531,6 +531,11 @@
+ 				reg = <0xfffffdb0 0x30>;
+ 			};
+ 
++			rtt at fffffd20 {
++				compatible = "atmel,at91sam9260-rtt";
++				reg = <0xfffffd20 0x10>;
++			};
++
+ 			watchdog at fffffd40 {
+ 				compatible = "atmel,at91sam9260-wdt";
+ 				reg = <0xfffffd40 0x10>;
 -- 
 1.8.1.5
