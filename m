@@ -1,28 +1,33 @@
-From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Mon, 11 Mar 2013 22:12:53 +0800
-Subject: [PATCH -next] ARM: EXYNOS: remove duplicated include from common.c
-Message-ID: <CAPgLHd9eSiAne_f_8ctbXt8x+ET3v_1o=-gdO1D_11kxx2jo3g@mail.gmail.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Mon, 11 Mar 2013 15:12:39 +0100
+Subject: [PATCH 1/2] arm: at91: dt: at91sam9x5: correct NAND pins comments
+Message-ID: <1363011160-11297-1-git-send-email-richard.genoud@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+Comments on NAND pins where inverted.
 
-Remove duplicated include.
-
-Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
 ---
- arch/arm/mach-exynos/common.c | 1 -
- 1 file changed, 1 deletion(-)
+based on 3.9-rc2
 
-diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-index d63d399..01e4089 100644
---- a/arch/arm/mach-exynos/common.c
-+++ b/arch/arm/mach-exynos/common.c
-@@ -23,7 +23,6 @@
- #include <linux/of_irq.h>
- #include <linux/export.h>
- #include <linux/irqdomain.h>
--#include <linux/irqchip.h>
- #include <linux/of_address.h>
- #include <linux/irqchip/arm-gic.h>
+ arch/arm/boot/dts/at91sam9x5.dtsi |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+index aa98e64..9b5d048 100644
+--- a/arch/arm/boot/dts/at91sam9x5.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+@@ -238,8 +238,8 @@
+ 				nand {
+ 					pinctrl_nand: nand-0 {
+ 						atmel,pins =
+-							<3 4 0x0 0x1	/* PD5 gpio RDY pin pull_up */
+-							 3 5 0x0 0x1>;	/* PD4 gpio enable pin pull_up */
++							<3 4 0x0 0x1	/* PD4 gpio Chip Enable pin pull_up */
++							 3 5 0x0 0x1>;	/* PD5 gpio RDY/BUSY pin pull_up */
+ 					};
+ 				};
  
+-- 
+1.7.2.5
