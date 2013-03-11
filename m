@@ -1,54 +1,23 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Mon, 11 Mar 2013 15:51:46 +0100
-Subject: [GIT PULL] Device Tree fixes for v3.9
-In-Reply-To: <201303111443.21019.arnd@arndb.de>
-References: <CACRpkdai0PRbK-R_KfNqkkVuSNn97v9Za8Doq71Zb-xCHW+J1A@mail.gmail.com>
- <201303012319.28231.arnd@arndb.de>
- <20130302005852.GA3106@gmail.com>
- <201303111443.21019.arnd@arndb.de>
-Message-ID: <20130311145146.GA11450@zurbaran>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Mon, 11 Mar 2013 15:57:02 +0100
+Subject: [PATCH] ARM: imx: fix typo "DEBUG_IMX50_IMX53_UART"
+In-Reply-To: <CAOMZO5DFh_H5murFk_qR=v+kA2vu46rEjgU4cjjrO2gKtYA5mQ@mail.gmail.com>
+References: <1363007760.3137.69.camel@x61.thuisdomein>
+ <20130311133720.GB25910@S2101-09.ap.freescale.net>
+ <CAOMZO5AhjKV=ja+Agr_pMg4ghB6Vux2ciBnr_M8SQuS4AQ4Bzg@mail.gmail.com>
+ <1363009649.3137.78.camel@x61.thuisdomein>
+ <CAOMZO5DFh_H5murFk_qR=v+kA2vu46rEjgU4cjjrO2gKtYA5mQ@mail.gmail.com>
+Message-ID: <1363013822.3137.82.camel@x61.thuisdomein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Mon, 2013-03-11 at 10:50 -0300, Fabio Estevam wrote:
+> I missed to remove one entry.
 
-On Mon, Mar 11, 2013 at 02:43:20PM +0000, Arnd Bergmann wrote:
-> On Saturday 02 March 2013, Lee Jones wrote:
-> > > 
-> > > I'm still getting build errors even with those patches applied:
-> > > 
-> > > Warning (reg_format): "reg" property in /soc-u9500/prcmu at 80157000/ab8500 at 5 has invalid length (4 bytes) (#address-cells == 1, #size-cells == 1)
-> > > Warning (reg_format): "reg" property in /soc-u9500/prcmu at 80157000/ab8500 at 5 has invalid length (4 bytes) (#address-cells == 1, #size-cells == 1)
-> > > Warning (reg_format): "reg" property in /soc-u9500/prcmu at 80157000/ab8500 at 5 has invalid length (4 bytes) (#address-cells == 1, #size-cells == 1)
-> > > Warning (reg_format): "reg" property in /soc-u9500/prcmu at 80157000/ab8500 at 5 has invalid length (4 bytes) (#address-cells == 1, #size-cells == 1)
-> > 
-> > These have been there since DT landed for the AB8500 - it's on my TODO
-> > to fix, but it's a really low priority.
-> 
-> I've come up with the trivial patch below. I'm trying hard to kill off all known
-> warnings, and will not take submissions introducing new ones if I see them.
-> 
-> Maybe Sam can just pick this up along with the other patch.
-I'll take it.
+Actually, your patch was fine. DEBUG_IMX50_IMX53_UART returned a bit
+later - and by accident - in commit
+f8c95fe6d9adad72fc7bce90f4ab68d119f50c5b ("ARM: imx: support DEBUG_LL
+uart port selection for all i.MX SoCs").
 
 
-
-> > > drivers/built-in.o: In function `ab8500_power_off':
-> > > /git/arm-soc/drivers/mfd/ab8500-sysctrl.c:37: undefined reference to `power_supply_get_by_name'
-> > > /git/arm-soc/drivers/mfd/ab8500-sysctrl.c:53: undefined reference to `power_supply_get_by_name'
-> > > make[2]: *** [vmlinux] Error 1
-> > 
-> > This has already been fixed.
-> > 
-> > https://patchwork.kernel.org/patch/2163301/
-> 
-> It hasn't made it into v3.9-rc2 or even linux-next yet. I guess it got lost
-> somewhere.
-In my Inbox. I'm planning to send a pull request to Linus later this week.
-
-Cheers,
-Samuel.
-
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+Paul Bolle
