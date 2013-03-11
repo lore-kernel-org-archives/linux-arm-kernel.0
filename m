@@ -1,151 +1,67 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 11 Mar 2013 16:26:55 -0600
-Subject: [PATCH REPOST] i2c: tegra: assume CONFIG_OF, remove platform data
-Message-ID: <1363040815-31833-1-git-send-email-swarren@wwwdotorg.org>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 11 Mar 2013 23:32:31 +0100
+Subject: [PATCH v6 1/3] serial: sh-sci: Add OF support
+In-Reply-To: <CABYn4sz_5vEzXba0Y7iXKBbGhfGwY2cd8fn30mUQ0GQcbGTG+w@mail.gmail.com>
+References: <1362569437-11133-1-git-send-email-hechtb+renesas@gmail.com>
+ <9335181.JoypQftkI4@avalon>
+ <CABYn4sz_5vEzXba0Y7iXKBbGhfGwY2cd8fn30mUQ0GQcbGTG+w@mail.gmail.com>
+Message-ID: <1689352.QAdqes1IG8@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+Hi Bastian,
 
-Tegra only supports, and always enables, device tree. Remove all ifdefs
-and runtime checks for DT support from the driver. Platform data is
-therefore no longer required. Delete the header that defines it.
+On Thursday 07 March 2013 11:26:29 Bastian Hecht wrote:
+> Hi Laurent,
+> 
+> >> +- renesas,scscr : Should contain a bitfield used by the Serial Control
+> >> Register.
+> >> +  b7 = SCSCR_TIE
+> >> +  b6 = SCSCR_RIE
+> >> +  b5 = SCSCR_TE
+> >> +  b4 = SCSCR_RE
+> >> +  b3 = SCSCR_REIE
+> >> +  b2 = SCSCR_TOIE
+> >> +  b1 = SCSCR_CKE1
+> >> +  b0 = SCSCR_CKE0
+> > 
+> > What is that for exactly ?
+> 
+> What I can see from 3 different datasheets (sh7372, sh73a0, r8a7740)
+> the first 2 bits differ in meaning.
+> 
+> On r8a7740 it depends: In asynchronous mode the first 2 bits CKE0/1
+> define whether you want to use an external clock to drive the baud
+> generator or if you want to use the internal SUB clock. If you use the
+> SUB clock you can further define if you want to use a subscaled SUB
+> clock in the SCSMR register. In synchronous mode you must rely on the
+> internal clock for the baud generator and can select if the SCK pin is
+> used as clock input or output.
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
- arch/arm/mach-tegra/tegra.c    |    2 --
- drivers/i2c/busses/i2c-tegra.c |   26 +++++++-------------------
- include/linux/i2c-tegra.h      |   25 -------------------------
- 3 files changed, 7 insertions(+), 46 deletions(-)
- delete mode 100644 include/linux/i2c-tegra.h
+What about adding an optional source clock property to the bindings, that 
+would contain the phandle of the source clock ? If the property is absent then 
+the internal clock would be used.
 
-diff --git a/arch/arm/mach-tegra/tegra.c b/arch/arm/mach-tegra/tegra.c
-index 27232c9..f68c9f6 100644
---- a/arch/arm/mach-tegra/tegra.c
-+++ b/arch/arm/mach-tegra/tegra.c
-@@ -31,8 +31,6 @@
- #include <linux/pda_power.h>
- #include <linux/platform_data/tegra_usb.h>
- #include <linux/io.h>
--#include <linux/i2c.h>
--#include <linux/i2c-tegra.h>
- #include <linux/usb/tegra_usb_phy.h>
- 
- #include <asm/mach-types.h>
-diff --git a/drivers/i2c/busses/i2c-tegra.c b/drivers/i2c/busses/i2c-tegra.c
-index 36704e3..865f885 100644
---- a/drivers/i2c/busses/i2c-tegra.c
-+++ b/drivers/i2c/busses/i2c-tegra.c
-@@ -25,7 +25,6 @@
- #include <linux/interrupt.h>
- #include <linux/delay.h>
- #include <linux/slab.h>
--#include <linux/i2c-tegra.h>
- #include <linux/of_i2c.h>
- #include <linux/of_device.h>
- #include <linux/module.h>
-@@ -172,7 +171,7 @@ struct tegra_i2c_dev {
- 	u8 *msg_buf;
- 	size_t msg_buf_remaining;
- 	int msg_read;
--	unsigned long bus_clk_rate;
-+	u32 bus_clk_rate;
- 	bool is_suspended;
- };
- 
-@@ -685,7 +684,6 @@ static const struct tegra_i2c_hw_feature tegra114_i2c_hw = {
- 	.clk_divisor_std_fast_mode = 0x19,
- };
- 
--#if defined(CONFIG_OF)
- /* Match table for of_platform binding */
- static const struct of_device_id tegra_i2c_of_match[] = {
- 	{ .compatible = "nvidia,tegra114-i2c", .data = &tegra114_i2c_hw, },
-@@ -695,16 +693,13 @@ static const struct of_device_id tegra_i2c_of_match[] = {
- 	{},
- };
- MODULE_DEVICE_TABLE(of, tegra_i2c_of_match);
--#endif
- 
- static int tegra_i2c_probe(struct platform_device *pdev)
- {
- 	struct tegra_i2c_dev *i2c_dev;
--	struct tegra_i2c_platform_data *pdata = pdev->dev.platform_data;
- 	struct resource *res;
- 	struct clk *div_clk;
- 	struct clk *fast_clk;
--	const unsigned int *prop;
- 	void __iomem *base;
- 	int irq;
- 	int ret = 0;
-@@ -745,23 +740,16 @@ static int tegra_i2c_probe(struct platform_device *pdev)
- 	i2c_dev->cont_id = pdev->id;
- 	i2c_dev->dev = &pdev->dev;
- 
--	i2c_dev->bus_clk_rate = 100000; /* default clock rate */
--	if (pdata) {
--		i2c_dev->bus_clk_rate = pdata->bus_clk_rate;
--
--	} else if (i2c_dev->dev->of_node) {    /* if there is a device tree node ... */
--		prop = of_get_property(i2c_dev->dev->of_node,
--				"clock-frequency", NULL);
--		if (prop)
--			i2c_dev->bus_clk_rate = be32_to_cpup(prop);
--	}
-+	ret = of_property_read_u32(i2c_dev->dev->of_node, "clock-frequency",
-+					&i2c_dev->bus_clk_rate);
-+	if (ret)
-+		i2c_dev->bus_clk_rate = 100000; /* default clock rate */
- 
- 	i2c_dev->hw = &tegra20_i2c_hw;
- 
- 	if (pdev->dev.of_node) {
- 		const struct of_device_id *match;
--		match = of_match_device(of_match_ptr(tegra_i2c_of_match),
--						&pdev->dev);
-+		match = of_match_device(tegra_i2c_of_match, &pdev->dev);
- 		i2c_dev->hw = match->data;
- 		i2c_dev->is_dvc = of_device_is_compatible(pdev->dev.of_node,
- 						"nvidia,tegra20-i2c-dvc");
-@@ -867,7 +855,7 @@ static struct platform_driver tegra_i2c_driver = {
- 	.driver  = {
- 		.name  = "tegra-i2c",
- 		.owner = THIS_MODULE,
--		.of_match_table = of_match_ptr(tegra_i2c_of_match),
-+		.of_match_table = tegra_i2c_of_match,
- 		.pm    = TEGRA_I2C_PM,
- 	},
- };
-diff --git a/include/linux/i2c-tegra.h b/include/linux/i2c-tegra.h
-deleted file mode 100644
-index 9c85da4..0000000
---- a/include/linux/i2c-tegra.h
-+++ /dev/null
-@@ -1,25 +0,0 @@
--/*
-- * drivers/i2c/busses/i2c-tegra.c
-- *
-- * Copyright (C) 2010 Google, Inc.
-- * Author: Colin Cross <ccross@android.com>
-- *
-- * This software is licensed under the terms of the GNU General Public
-- * License version 2, as published by the Free Software Foundation, and
-- * may be copied, distributed, and modified under those terms.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- */
--
--#ifndef _LINUX_I2C_TEGRA_H
--#define _LINUX_I2C_TEGRA_H
--
--struct tegra_i2c_platform_data {
--	unsigned long bus_clk_rate;
--};
--
--#endif /* _LINUX_I2C_TEGRA_H */
+How is subscaling used in practice ?
+
+> On sh73a0 and sh7372 it's used to control the output clock SCK (set it
+> to high impedance or actually output a clock when in sychronous mode)
+
+Maybe we could add a synchronous mode property to the DT bindings and use it 
+to infer the bit values.
+
+> Bit 2 and 3 don't exist in my datasheets.
+> 
+> The other bits define under which conditions you receive interrupts
+> (send FIFO empty, receive FIFO full) and which bits you need to start
+> transfers (one bit to start sending, one receiving). The bits 8 to 31
+> are used to set up DMA transfers and various interrupt events like
+> error status and finish transfers. I haven't included them as they are
+> not used in the driver.
+
+If they're not used maybe we can drop them :-)
+
 -- 
-1.7.10.4
+Regards,
+
+Laurent Pinchart
