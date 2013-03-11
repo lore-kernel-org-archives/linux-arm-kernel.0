@@ -1,37 +1,33 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 11 Mar 2013 20:18:15 -0300
-Subject: [PATCH 1/2] w1: mxc_w1: Convert to devm_ioremap_resource()
-Message-ID: <1363043896-16140-1-git-send-email-festevam@gmail.com>
+Date: Mon, 11 Mar 2013 20:18:16 -0300
+Subject: [PATCH 2/2] ARM: imx_v6_v7_defconfig: Select CONFIG_W1_MASTER_MXC
+In-Reply-To: <1363043896-16140-1-git-send-email-festevam@gmail.com>
+References: <1363043896-16140-1-git-send-email-festevam@gmail.com>
+Message-ID: <1363043896-16140-2-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@freescale.com>
 
-According to Documentation/driver-model/devres.txt:
-
-  devm_request_and_ioremap() : obsoleted by devm_ioremap_resource()
+Select CONFIG_W1_MASTER_MXC.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- drivers/w1/masters/mxc_w1.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/configs/imx_v6_v7_defconfig |    2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/w1/masters/mxc_w1.c b/drivers/w1/masters/mxc_w1.c
-index 950d354..47e12cf 100644
---- a/drivers/w1/masters/mxc_w1.c
-+++ b/drivers/w1/masters/mxc_w1.c
-@@ -121,9 +121,9 @@ static int mxc_w1_probe(struct platform_device *pdev)
- 	mdev->clkdiv = (clk_get_rate(mdev->clk) / 1000000) - 1;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	mdev->regs = devm_request_and_ioremap(&pdev->dev, res);
--	if (!mdev->regs)
--		return -EBUSY;
-+	mdev->regs = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(mdev->regs))
-+		return PTR_ERR(mdev->regs);
- 
- 	clk_prepare_enable(mdev->clk);
- 	__raw_writeb(mdev->clkdiv, mdev->regs + MXC_W1_TIME_DIVIDER);
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index e36b010..50f9a7f 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -143,6 +143,8 @@ CONFIG_SPI=y
+ CONFIG_SPI_IMX=y
+ CONFIG_GPIO_SYSFS=y
+ CONFIG_GPIO_MC9S08DZ60=y
++CONFIG_W1=y
++CONFIG_W1_MASTER_MXC=y
+ # CONFIG_HWMON is not set
+ CONFIG_WATCHDOG=y
+ CONFIG_IMX2_WDT=y
 -- 
 1.7.9.5
