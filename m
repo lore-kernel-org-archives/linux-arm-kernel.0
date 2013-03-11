@@ -1,30 +1,43 @@
 From: gang.chen@asianux.com (Chen Gang)
-Date: Mon, 11 Mar 2013 12:53:00 +0800
-Subject: [PATCH] ARM:net: an issue for k which is u32, never < 0
-In-Reply-To: <20130310.171238.330349067962026661.davem@davemloft.net>
-References: <513BECDA.3030803@asianux.com>
- <20130310.171238.330349067962026661.davem@davemloft.net>
-Message-ID: <513D632C.7030709@asianux.com>
+Date: Mon, 11 Mar 2013 13:02:59 +0800
+Subject: [PATCH] ARM:kernel: beautify code, using 'static const' instead
+ of 'const static'
+In-Reply-To: <513D32E3.1080101@gmail.com>
+References: <513BE8FA.6080304@asianux.com> <513D32E3.1080101@gmail.com>
+Message-ID: <513D6583.8040506@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2013?03?11? 05:12, David Miller ??:
-> From: Chen Gang <gang.chen@asianux.com>
-> Date: Sun, 10 Mar 2013 10:15:54 +0800
-> 
+? 2013?03?11? 09:26, Rob Herring ??:
+> On 03/09/2013 07:59 PM, Chen Gang wrote:
 >> > 
->> >   k is u32 which never < 0, need type cast, or cause issue.
+>> >   better using 'static const' instead of 'const static'
 >> > 
 >> > Signed-off-by: Chen Gang <gang.chen@asianux.com>
-> Who will apply this, ARM folks or me?
-> 
-> 
+>> > ---
+>> >  arch/arm/kernel/smp_twd.c |    2 +-
+>> >  1 files changed, 1 insertions(+), 1 deletions(-)
+>> > 
+>> > diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+>> > index 3f25650..ef3e499 100644
+>> > --- a/arch/arm/kernel/smp_twd.c
+>> > +++ b/arch/arm/kernel/smp_twd.c
+>> > @@ -362,7 +362,7 @@ int __init twd_local_timer_register(struct twd_local_timer *tlt)
+>> >  }
+>> >  
+>> >  #ifdef CONFIG_OF
+>> > -const static struct of_device_id twd_of_match[] __initconst = {
+>> > +static const struct of_device_id twd_of_match[] __initconst = {
+> This will go away with conversion to use CLKSRC_OF.
 
-  sorry I don't know, either. I get the mail addresses by
-./scripts/get_maintainers.pl. it includes you.
+  excuse me, I am not quite familiar with ARM, so I do not quite
+understand what you said.
 
-  if no others reply within a week, I hope you can help to check and
-apply it.
+  could you describe it with more details ?
+  and how about this patch ?
+    a. do not need this patch.
+    b. or this patch need improving.
+    c. or this patch is ok, can be applied.
 
   thanks.
 
