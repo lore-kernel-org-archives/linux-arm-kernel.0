@@ -1,99 +1,144 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 11 Mar 2013 20:44:44 +0100
-Subject: [RFC PATCH 0/8] A V4L2 driver for Exynos4x12 Imaging Subsystem
-Message-ID: <1363031092-29950-1-git-send-email-s.nawrocki@samsung.com>
+Date: Mon, 11 Mar 2013 20:44:46 +0100
+Subject: [RFC PATCH 2/8] s5p-fimc: Add FIMC-IS ISP I2C bus driver
+In-Reply-To: <1363031092-29950-1-git-send-email-s.nawrocki@samsung.com>
+References: <1363031092-29950-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <1363031092-29950-3-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series is an initial version of a driver for the camera ISP
-subsystem (FIMC-IS) embedded in Samsung Exynos4x12 SoCs.
+This patch adds the ISP I2C bus controller driver files.
 
-The FIMC-IS subsystem is build around a ARM Cortex-A5 CPU that controls
-its dedicated peripherals, like I2C, SPI, UART, PWM, ADC,...  and the
-ISP chain. There are 3 hardware image processing blocks: ISP, DRC
-(dynamic range compression) and FD (face detection) that are normally
-controlled by the Cortex-A5 firmware.
+Creating a standard I2C bus adapter, even if the driver doesn't
+actually communicates with the hardware and it is instead used
+by the ISP firmware running on the Cortex-A5, allows to use
+standard hardware description in the device tree. As the sensor
+would have actually had a standard V4L2 sub-device driver run
+on the host CPU.
 
-The driver currently exposes two additional sub-device to user space:
-the image sensor and FIMC-IS-ISP sub-device. Another one might be
-added in future for the FD features.
+This approach allows to adapt the driver with a relatively small
+effort should the Imaging Subsystem architecture change so that
+the I2C bus is controlled by the host CPU, rather than the
+internal FIMC-IS ARM CPU. The image sensor drivers can be
+standard I2C client driver, as in case of most existing image
+sensor driver.
 
-The FIMC-IS has various data inputs, it can capture data from memory
-or from other SoC IP blocks (FIMC-LITE). It is currently plugged
-between FIMC-LITE and FIMC IP blocks, so there is a media pipeline
-like:
-
-sensor -> MIPI-CSIS -> FIMC-LITE -> FIMC-IS-ISP -> FIMC -> memory
-
-A raw Bayer image data can be captured from the ISP block which has
-it's own DMA engines. Support for this is not really included in
-this series though, only a video capture node driver stubs are added.
-
-This is a bit complicated code, nevertheless I would really appreciate
-any review comments you might have.
-
-And this is just a basic set of futures this patch series addresses.
-Others include input/output DMA support for the DRC and FD blocks,
-support for more ISP controls, etc.
-
-But it all is not immediately needed to make use of this really
-great ISP!
-
-A full git tree with all dependencies can be found at:
-git://linuxtv.org/snawrocki/samsung.git
-http://git.linuxtv.org/snawrocki/samsung.git/exynos4-fimc-is
-
-Sylwester Nawrocki (8):
-  s5p-fimc: Add Exynos4x12 FIMC-IS driver
-  s5p-fimc: Add FIMC-IS ISP I2C bus driver
-  s5p-fimc: Add FIMC-IS parameter region definitions
-  s5p-fimc: Add common FIMC-IS image sensor driver
-  s5p-fimc: Add ISP video capture driver stubs
-  fimc-is: Add Exynos4x12 FIMC-IS device tree bindings documentation
-  s5p-fimc: Add fimc-is subdevs registration
-  s5p-fimc: Create media links for the FIMC-IS entities
-
- .../devicetree/bindings/media/exynos4-fimc-is.txt  |   41 +
- drivers/media/platform/s5p-fimc/Kconfig            |   13 +
- drivers/media/platform/s5p-fimc/Makefile           |    4 +
- drivers/media/platform/s5p-fimc/fimc-is-command.h  |  147 +++
- drivers/media/platform/s5p-fimc/fimc-is-errno.c    |  272 ++++++
- drivers/media/platform/s5p-fimc/fimc-is-errno.h    |  248 +++++
- drivers/media/platform/s5p-fimc/fimc-is-i2c.c      |   81 ++
- drivers/media/platform/s5p-fimc/fimc-is-i2c.h      |   15 +
- drivers/media/platform/s5p-fimc/fimc-is-param.c    |  971 +++++++++++++++++++
- drivers/media/platform/s5p-fimc/fimc-is-param.h    | 1018 ++++++++++++++++++++
- drivers/media/platform/s5p-fimc/fimc-is-regs.c     |  242 +++++
- drivers/media/platform/s5p-fimc/fimc-is-regs.h     |  164 ++++
- drivers/media/platform/s5p-fimc/fimc-is-sensor.c   |  308 ++++++
- drivers/media/platform/s5p-fimc/fimc-is-sensor.h   |   80 ++
- drivers/media/platform/s5p-fimc/fimc-is.c          |  970 +++++++++++++++++++
- drivers/media/platform/s5p-fimc/fimc-is.h          |  344 +++++++
- drivers/media/platform/s5p-fimc/fimc-isp-video.c   |  414 ++++++++
- drivers/media/platform/s5p-fimc/fimc-isp-video.h   |   50 +
- drivers/media/platform/s5p-fimc/fimc-isp.c         |  791 +++++++++++++++
- drivers/media/platform/s5p-fimc/fimc-isp.h         |  205 ++++
- drivers/media/platform/s5p-fimc/fimc-mdevice.c     |  129 ++-
- drivers/media/platform/s5p-fimc/fimc-mdevice.h     |   15 +
- 22 files changed, 6502 insertions(+), 20 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/media/exynos4-fimc-is.txt
- create mode 100644 drivers/media/platform/s5p-fimc/fimc-is-command.h
- create mode 100644 drivers/media/platform/s5p-fimc/fimc-is-errno.c
- create mode 100644 drivers/media/platform/s5p-fimc/fimc-is-errno.h
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ drivers/media/platform/s5p-fimc/fimc-is-i2c.c |   81 +++++++++++++++++++++++++
+ drivers/media/platform/s5p-fimc/fimc-is-i2c.h |   15 +++++
+ 2 files changed, 96 insertions(+)
  create mode 100644 drivers/media/platform/s5p-fimc/fimc-is-i2c.c
  create mode 100644 drivers/media/platform/s5p-fimc/fimc-is-i2c.h
- create mode 100644 drivers/media/platform/s5p-fimc/fimc-is-param.c
- create mode 100644 drivers/media/platform/s5p-fimc/fimc-is-param.h
- create mode 100644 drivers/media/platform/s5p-fimc/fimc-is-regs.c
- create mode 100644 drivers/media/platform/s5p-fimc/fimc-is-regs.h
- create mode 100644 drivers/media/platform/s5p-fimc/fimc-is-sensor.c
- create mode 100644 drivers/media/platform/s5p-fimc/fimc-is-sensor.h
- create mode 100644 drivers/media/platform/s5p-fimc/fimc-is.c
- create mode 100644 drivers/media/platform/s5p-fimc/fimc-is.h
- create mode 100644 drivers/media/platform/s5p-fimc/fimc-isp-video.c
- create mode 100644 drivers/media/platform/s5p-fimc/fimc-isp-video.h
- create mode 100644 drivers/media/platform/s5p-fimc/fimc-isp.c
- create mode 100644 drivers/media/platform/s5p-fimc/fimc-isp.h
 
---
+diff --git a/drivers/media/platform/s5p-fimc/fimc-is-i2c.c b/drivers/media/platform/s5p-fimc/fimc-is-i2c.c
+new file mode 100644
+index 0000000..d4c75dc
+--- /dev/null
++++ b/drivers/media/platform/s5p-fimc/fimc-is-i2c.c
+@@ -0,0 +1,81 @@
++/*
++ * Samsung EXYNOS4x12 FIMC-IS (Imaging Subsystem) driver
++ *
++ * Copyright (C) 2013 Samsung Electronics Co., Ltd.
++ * Sylwester Nawrocki <s.nawrocki@samsung.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#define pr_fmt(fmt) "%s:%d " fmt, __func__, __LINE__
++
++#include <linux/module.h>
++#include <linux/of_i2c.h>
++#include <linux/platform_device.h>
++#include "fimc-is-i2c.h"
++
++/*
++ * An empty algorithm is used as the actual I2C bus controller driver
++ * is implemented in the FIMC-IS subsystem firmware and the host CPU
++ * doesn't touch the hardware.
++ */
++static const struct i2c_algorithm fimc_is_i2c_algorithm;
++
++static int fimc_is_i2c_probe(struct platform_device *pdev)
++{
++	struct device_node *node = pdev->dev.of_node;
++	struct i2c_adapter *i2c_adap;
++	int ret;
++
++	i2c_adap = devm_kzalloc(&pdev->dev, sizeof(*i2c_adap), GFP_KERNEL);
++
++	i2c_adap->dev.of_node = node;
++	i2c_adap->dev.parent = &pdev->dev;
++	strlcpy(i2c_adap->name, "exynos4x12-is-i2c", sizeof(i2c_adap->name));
++	i2c_adap->owner = THIS_MODULE;
++	i2c_adap->algo = &fimc_is_i2c_algorithm;
++	i2c_adap->class = I2C_CLASS_SPD;
++
++	ret = i2c_add_adapter(i2c_adap);
++	if (ret < 0) {
++		dev_err(&pdev->dev, "failed to add I2C bus %s\n",
++						node->full_name);
++		return ret;
++	}
++	of_i2c_register_devices(i2c_adap);
++
++	return 0;
++}
++
++static int fimc_is_i2c_remove(struct platform_device *pdev)
++{
++	return 0;
++}
++
++static const struct of_device_id fimc_is_i2c_of_match[] = {
++	{ .compatible = FIMC_IS_I2C_COMPATIBLE },
++	{ },
++};
++MODULE_DEVICE_TABLE(of, fimc_is_i2c_of_match);
++
++static struct platform_driver fimc_is_i2c_driver = {
++	.probe		= fimc_is_i2c_probe,
++	.remove		= fimc_is_i2c_remove,
++	.driver = {
++		.of_match_table = fimc_is_i2c_of_match,
++		.name		= "fimc-is-i2c",
++		.owner		= THIS_MODULE,
++	}
++};
++
++int fimc_is_register_i2c_driver(void)
++{
++	return platform_driver_register(&fimc_is_i2c_driver);
++}
++
++void fimc_is_unregister_i2c_driver(void)
++{
++	platform_driver_unregister(&fimc_is_i2c_driver);
++}
++
+diff --git a/drivers/media/platform/s5p-fimc/fimc-is-i2c.h b/drivers/media/platform/s5p-fimc/fimc-is-i2c.h
+new file mode 100644
+index 0000000..0d38d6b
+--- /dev/null
++++ b/drivers/media/platform/s5p-fimc/fimc-is-i2c.h
+@@ -0,0 +1,15 @@
++/*
++ * Samsung EXYNOS4x12 FIMC-IS (Imaging Subsystem) driver
++ *
++ * Copyright (C) 2013 Samsung Electronics Co., Ltd.
++ * Sylwester Nawrocki <s.nawrocki@samsung.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#define FIMC_IS_I2C_COMPATIBLE	"samsung,exynos4212-i2c-isp"
++
++int fimc_is_register_i2c_driver(void);
++void fimc_is_unregister_i2c_driver(void);
+-- 
 1.7.9.5
