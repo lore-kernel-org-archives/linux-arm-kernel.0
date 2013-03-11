@@ -1,55 +1,35 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 11 Mar 2013 19:44:48 +0100
-Subject: [PATCH 2/2] ARM: imx: Disable imx-cpufreq when cpufreq-cpu0 used
-In-Reply-To: <20130310225159.GS1906@pengutronix.de>
-References: <1362934407-29030-1-git-send-email-mpa@pengutronix.de>
- <1362934407-29030-3-git-send-email-mpa@pengutronix.de>
- <20130310225159.GS1906@pengutronix.de>
-Message-ID: <20130311184448.GA18350@pengutronix.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 11 Mar 2013 12:47:37 -0600
+Subject: [PATCH V2 4/5] ARM: DT: tegra114: add KBC controller DT entry
+In-Reply-To: <513E1B7E.8090203@nvidia.com>
+References: <1362852678-13421-1-git-send-email-ldewangan@nvidia.com>
+ <1362852678-13421-5-git-send-email-ldewangan@nvidia.com>
+ <513E17C1.1070305@wwwdotorg.org> <513E1B7E.8090203@nvidia.com>
+Message-ID: <513E26C9.4080706@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 10, 2013 at 11:51:59PM +0100, Sascha Hauer wrote:
-> On Sun, Mar 10, 2013 at 05:53:27PM +0100, Markus Pargmann wrote:
-> > cpufreq-cpu0 has DT support. So if imx27 or imx51 is booted with DT
-> > support, it should not use the old imx-cpufreq driver. Instead the
-> > operating-points should be defined in the appropriate DT files.
-> > 
-> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> > ---
-> >  arch/arm/Kconfig | 1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > index 5b71469..1247fe5 100644
-> > --- a/arch/arm/Kconfig
-> > +++ b/arch/arm/Kconfig
-> > @@ -2156,6 +2156,7 @@ source "drivers/cpufreq/Kconfig"
-> >  config CPU_FREQ_IMX
-> >  	tristate "CPUfreq driver for i.MX CPUs"
-> >  	depends on ARCH_MXC && CPU_FREQ
-> > +	depends on (!GENERIC_CPUFREQ_CPU0 || (!MACH_IMX51_DT && !MACH_IMX27_DT))
+On 03/11/2013 11:59 AM, Laxman Dewangan wrote:
+> On Monday 11 March 2013 11:13 PM, Stephen Warren wrote:
+>> On 03/09/2013 11:11 AM, Laxman Dewangan wrote:
+>>> NVIDIA's Tegra114 SoCs have the matrix keyboard controller which
+>>> supports 11x8 type of matrix. The number of rows and columns
+>>> are configurable.
+>>>
+>>> Add DT entry for KBC controller with compatibility as
+>>> "nvidia,tegra114-kbc",
+>>> "nvidia,tegra20-kbc".
+>> I thought the HW really wasn't compatible with Tegra20 due to the
+>> reduced number of rows/columns/pins supported?
 > 
-> Does this driver work with multiplatform anyway? I mean it registers
-> a cpufreq driver without knowing that the kernel even runs on i.MX.
-> Maybe removing it is the better option?
+> Hw controller is really compatible. Only thing is that there is no
+> physical pins on SoC for KBC-ROW11 to KBC-ROW15.
+> Because, there is no physical pins for ROW11 to ROW15, we asked to
+> remove programming/reference this rows from  TRM of T114 to consistent
+> with SoCs.
 
-It works with multiplatform builds. imx-cpufreq has a global get_cpu_op
-function pointer that is set by the board init code. If it is not set,
-the driver fails with EINVAL.
-
-But when using cpufreq-cpu0 and platform specific code that still sets
-the get_cpu_op function both drivers could run. So I thought it's
-better to remove imx-cpufreq when cpufreq-cpu0 is used.
-
-And +1 for removing imx-cpufreq.
-
-Regards,
-
-Markus
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+I think that makes the HW incompatible. If you only have knowledge of
+Tegra20/30, you can assume that there are more rows/pins/columns than
+there actually are. Applying those same validation restrictions on
+Tegra114 will yield validation that isn't strict enough; invalid values
+could be accepted.
