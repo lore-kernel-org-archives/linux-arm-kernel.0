@@ -1,120 +1,66 @@
-From: rtivy@ti.com (Tivy, Robert)
-Date: Mon, 11 Mar 2013 20:26:10 +0000
-Subject: [PATCH v8 3/7] ARM: davinci: Add support for configuring
- DA8XX_REMOTEPROC
-In-Reply-To: <513DC4A1.8020700@ti.com>
-References: <1362782508-3166-1-git-send-email-rtivy@ti.com>
- <1362782508-3166-4-git-send-email-rtivy@ti.com> <513DC4A1.8020700@ti.com>
-Message-ID: <13514BD7FAEBA745BBD7D8A672905C143121BDA8@DFLE08.ent.ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 11 Mar 2013 20:43:53 +0000
+Subject: Regulator API ignored return values
+Message-ID: <201303112043.53334.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Nori, Sekhar
-> Sent: Monday, March 11, 2013 4:49 AM
-> 
-> On 3/9/2013 4:11 AM, Robert Tivy wrote:
-> > Also fix REMOTEPROC config to select FW_LOADER (instead of
-> FW_CONFIG).
-> 
-> It is preferable to have the patch description make sense standalone
-> even when read without the subject line.
+Hi all,
 
-Will fix.
+Mark Brown has added a patch to Linux-next that warns about certain regulator
+API functions being called without checking the results, which seems to have
+uncovered a number of bugs.
 
-> 
-> >
-> > Signed-off-by: Robert Tivy <rtivy@ti.com>
-> 
-> Please follow the subject line conventions of the subsystem the patch
-> is
-> touching. This is not an ARM patch so the "ARM: davinci: " prefix in
-> subject is surely wrong.
+I've added a few people to Cc that might be interested in the reports and
+in fixing these bugs. Below you can find a list of all instances I found
+building the ARM defconfigs.
 
-So even though it is a driver for just DA8XX, it should not get the "ARM: davinci:" prefix?
+	Arnd
 
-Is that mandated by the fact that it's in a general "driver" subdirectory?
+==> build/dove_defconfig/faillog <==
+/git/arm-soc/drivers/mmc/host/sdhci.c: In function 'sdhci_add_host':
+/git/arm-soc/drivers/mmc/host/sdhci.c:2910:19: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result [-Wunused-result]
 
-> 
-> And I think I mentioned this once before but we want to see
-> Kconfig/Makefile changes along with driver addition in the same patch.
+==> build/imx_v4_v5_defconfig/faillog <==
+/git/arm-soc/drivers/input/touchscreen/ads7846.c: In function '__ads7846_enable':
+/git/arm-soc/drivers/input/touchscreen/ads7846.c:239:18: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result [-Wunused-result]
+/git/arm-soc/drivers/mmc/host/sdhci.c: In function 'sdhci_add_host':
+/git/arm-soc/drivers/mmc/host/sdhci.c:2910:19: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result [-Wunused-result]
+/git/arm-soc/drivers/video/backlight/l4f00242t03.c: In function 'l4f00242t03_lcd_init':
+/git/arm-soc/drivers/video/backlight/l4f00242t03.c:58:18: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result [-Wunused-result]
+/git/arm-soc/drivers/video/backlight/l4f00242t03.c:61:18: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result [-Wunused-result]
 
-Yeah, I was confusing Ohad's feedback about the "fix" to Kconfig being in a separate patch.  I will therefore put the "fix" (FW_CONFIG -> FW_LOADER) into its own patch, and group the driver's Kconfig additions with the driver and its Makefile.
+==> build/imx_v6_v7_defconfig/faillog <==
+/git/arm-soc/drivers/mmc/host/sdhci.c: In function 'sdhci_add_host':
+/git/arm-soc/drivers/mmc/host/sdhci.c:2910:19: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result [-Wunused-result]
+/git/arm-soc/drivers/video/backlight/l4f00242t03.c: In function 'l4f00242t03_lcd_init':
+/git/arm-soc/drivers/video/backlight/l4f00242t03.c:58:18: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result [-Wunused-result]
+/git/arm-soc/drivers/video/backlight/l4f00242t03.c:61:18: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result [-Wunused-result]
 
-> 
-> > ---
-> >  drivers/remoteproc/Kconfig |   26 +++++++++++++++++++++++++-
-> >  1 file changed, 25 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/drivers/remoteproc/Kconfig b/drivers/remoteproc/Kconfig
-> > index 96ce101..21d04f1 100644
-> > --- a/drivers/remoteproc/Kconfig
-> > +++ b/drivers/remoteproc/Kconfig
-> > @@ -5,7 +5,7 @@ config REMOTEPROC
-> >  	tristate
-> >  	depends on EXPERIMENTAL
-> >  	depends on HAS_DMA
-> > -	select FW_CONFIG
-> > +	select FW_LOADER
-> >  	select VIRTIO
-> >
-> >  config OMAP_REMOTEPROC
-> > @@ -41,4 +41,28 @@ config STE_MODEM_RPROC
-> >  	  This can be either built-in or a loadable module.
-> >  	  If unsure say N.
-> >
-> > +config DA8XX_REMOTEPROC
-> > +	tristate "DA830/OMAPL137 & DA850/OMAPL138 remoteproc support
-> (EXPERIMENTAL)"
-> > +	depends on ARCH_DAVINCI_DA8XX
-> > +	select REMOTEPROC
-> > +	select RPMSG
-> > +	select CMA
-> 
-> Its nice to keep the selects sorted. It helps avoid duplicates.
+==> build/magician_defconfig/faillog <==
+/git/arm-soc/drivers/usb/otg/gpio_vbus.c: In function 'set_vbus_draw':
+/git/arm-soc/drivers/usb/otg/gpio_vbus.c:72:20: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result [-Wunused-result]
 
-Will fix.
+==> build/mmp2_defconfig/faillog <==
+/git/arm-soc/drivers/mmc/host/sdhci.c: In function 'sdhci_add_host':
+/git/arm-soc/drivers/mmc/host/sdhci.c:2910:19: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result [-Wunused-result]
 
-> 
-> > +	default n
-> 
-> No need of this I think, it should default to no already.
+==> build/omap2plus_defconfig/faillog <==
+/git/arm-soc/drivers/input/touchscreen/ads7846.c: In function '__ads7846_enable':
+/git/arm-soc/drivers/input/touchscreen/ads7846.c:239:18: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result [-Wunused-result]
 
-OK.
+==> build/tegra_defconfig/faillog <==
+/git/arm-soc/arch/arm/mach-tegra/board-harmony-pcie.c: In function 'harmony_pcie_init':
+/git/arm-soc/arch/arm/mach-tegra/board-harmony-pcie.c:65:18: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result [-Wunused-result]
+/git/arm-soc/drivers/mmc/host/sdhci.c: In function 'sdhci_add_host':
+/git/arm-soc/drivers/mmc/host/sdhci.c:2910:19: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result [-Wunused-result]
 
-> 
-> > +	help
-> > +	  Say y here to support DA830/OMAPL137 & DA850/OMAPL138 remote
-> > +	  processors via the remote processor framework.
-> > +
-> > +	  You want to say y here in order to enable AMP
-> > +	  use-cases to run on your platform (multimedia codecs are
-> > +	  offloaded to remote DSP processors using this framework).
-> > +
-> > +	  This module controls the name of the firmware file that gets
-> > +	  loaded on the DSP.  This file must reside in the /lib/firmware
-> > +	  directory.  It can be specified via the module parameter
-> > +	  da8xx_fw_name=<filename>, and if not specified will default to
-> > +	  "rproc-dsp-fw".
-> 
-> I hope running modinfo gives these details as well.
-
-It will in the next patch :)
-
-> 
-> > +
-> > +	  It's safe to say n here if you're not interested in multimedia
-> > +	  offloading or just want a bare minimum kernel.
-> 
-> I think this is misleading a bit since just selecting 'n' here will not
-> result in a "bare minimum kernel" - better to just avoid mention of it.
-
-Agreed, will drop.
-
-> 
-> Thanks,
-> Sekhar
-
-Thanks & Regards,
-
-- Rob
+==> build/u8500_defconfig/faillog <==
+/git/arm-soc/arch/arm/mach-ux500/board-mop500.c: In function 'mop500_prox_activate':
+/git/arm-soc/arch/arm/mach-ux500/board-mop500.c:432:18: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result [-Wunused-result]
+/git/arm-soc/drivers/mfd/ab8500-gpadc.c: In function 'ab8500_gpadc_runtime_resume':
+/git/arm-soc/drivers/mfd/ab8500-gpadc.c:598:18: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result [-Wunused-result]
+/git/arm-soc/drivers/mfd/ab8500-gpadc.c: In function 'ab8500_gpadc_probe':
+/git/arm-soc/drivers/mfd/ab8500-gpadc.c:655:18: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result [-Wunused-result]
+/git/arm-soc/drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c: In function 'synaptics_rmi4_resume':
+/git/arm-soc/drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c:1085:18: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result [-Wunused-result]
