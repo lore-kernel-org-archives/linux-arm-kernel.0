@@ -1,37 +1,53 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Mon, 11 Mar 2013 10:36:03 +0530
-Subject: [PATCH 6/8] memory: emif: fix timings initialization issue
-In-Reply-To: <1362978365-5593-1-git-send-email-lokeshvutla@ti.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 11 Mar 2013 11:04:02 +0530
+Subject: [PATCH 1/8] memory: emif: Correct the lpmode timeout calculation
+In-Reply-To: <1362978365-5593-2-git-send-email-lokeshvutla@ti.com>
 References: <1362978365-5593-1-git-send-email-lokeshvutla@ti.com>
-Message-ID: <1362978365-5593-7-git-send-email-lokeshvutla@ti.com>
+ <1362978365-5593-2-git-send-email-lokeshvutla@ti.com>
+Message-ID: <513D6CCA.4000906@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Oleksandr Dmytryshyn <oleksandr.dmytryshyn@ti.com>
+minor nit.
+$subject
+s/Correct/Fix
 
-The issue was that only the first timings table was added to the
-emif platform data at the emif driver registration. All other
-timings tables was filled with zeros. Now all emif timings table
-are added to the platform data.
+On Monday 11 March 2013 10:35 AM, Lokesh Vutla wrote:
+> The driver tries to round up the specified timeout cycles to
+> the next power of 2 value. But this is done wrongly.
+> Correcting this here.
+>
+Change needs to be improved here. See below.
+ 
+> Reported-by: Nishanth Menon <nm@ti.com>
+> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+> ---
+>  drivers/memory/emif.c |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/memory/emif.c b/drivers/memory/emif.c
+> index df08736..622638c 100644
+> --- a/drivers/memory/emif.c
+> +++ b/drivers/memory/emif.c
+> @@ -732,9 +732,9 @@ static u32 get_pwr_mgmt_ctrl(u32 freq, struct emif_data *emif, u32 ip_rev)
+>  	if (timeout < 16) {
+>  		timeout = 0;
+>  	} else {
+> -		timeout = __fls(timeout) - 3;
+>  		if (timeout & (timeout - 1))
+So from the change, it appears that, the timeout
+check for power of 2 should be done before updating
+the variable which seems to be the right fix.
 
-Signed-off-by: Oleksandr Dmytryshyn <oleksandr.dmytryshyn@ti.com>
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
----
- drivers/memory/emif.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> -			timeout++;
+> +			timeout <<= 1;
+> +		timeout = __fls(timeout) - 3;
+>  	}
+>  
+>  	switch (lpmode) {
+> 
+So just make changelog verbose as well as add a
+comment about the calculation in the code.
 
-diff --git a/drivers/memory/emif.c b/drivers/memory/emif.c
-index 02a94fc..f75806a 100644
---- a/drivers/memory/emif.c
-+++ b/drivers/memory/emif.c
-@@ -1463,7 +1463,7 @@ static struct emif_data *__init_or_module get_device_details(
- 	if (pd->timings) {
- 		temp = devm_kzalloc(dev, size, GFP_KERNEL);
- 		if (temp) {
--			memcpy(temp, pd->timings, sizeof(*pd->timings));
-+			memcpy(temp, pd->timings, size);
- 			pd->timings = temp;
- 		} else {
- 			dev_warn(dev, "%s:%d: allocation error\n", __func__,
--- 
-1.7.9.5
+Otherwise, patch looks fine to me.
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
