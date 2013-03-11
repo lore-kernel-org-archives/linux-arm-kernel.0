@@ -1,38 +1,38 @@
 From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Mon, 11 Mar 2013 10:35:57 +0530
-Subject: [PATCH 0/8] memory: emif: miscellaneous bug fixes for EMIF driver
-Message-ID: <1362978365-5593-1-git-send-email-lokeshvutla@ti.com>
+Date: Mon, 11 Mar 2013 10:35:59 +0530
+Subject: [PATCH 2/8] memory: emif: setup LP settings on freq update
+In-Reply-To: <1362978365-5593-1-git-send-email-lokeshvutla@ti.com>
+References: <1362978365-5593-1-git-send-email-lokeshvutla@ti.com>
+Message-ID: <1362978365-5593-3-git-send-email-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series resolves a few minor issues for EMIF driver.
+From: Ambresh K <ambresh@ti.com>
 
-Tested all patches on OMAP4430-sdp.
-Patch : "memory: emif: setup LP settings on freq update"
-is tested on a local tree, since freq update cannot be
-tested on mainline.
+Program the power management shadow register on freq update
+Else the concept of threshold frequencies dont really matter
+as the system always uses the performance mode timing for LP
+which is programmed in at init time.
 
-Ambresh K (1):
-  memory: emif: setup LP settings on freq update
+Signed-off-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Ambresh K <ambresh@ti.com>
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+---
+ drivers/memory/emif.c |    2 ++
+ 1 file changed, 2 insertions(+)
 
-Grygorii Strashko (1):
-  memory: emif: errata i743: Prohibit usage of Power-Down mode
-
-Lokesh Vutla (2):
-  memory: emif: Correct the lpmode timeout calculation
-  memory: emif: Load the correct custom config values from dt
-
-Nishanth Menon (3):
-  memory: emif: handle overflow for timing for LP mode
-  memory: emif: Handle devices which are not rated for >85C
-  memory: emif: use restart if power_off not present when out of spec
-
-Oleksandr Dmytryshyn (1):
-  memory: emif: fix timings initialization issue
-
- drivers/memory/emif.c                   |  122 +++++++++++++++++++++++++++----
- include/linux/platform_data/emif_plat.h |    1 +
- 2 files changed, 108 insertions(+), 15 deletions(-)
-
+diff --git a/drivers/memory/emif.c b/drivers/memory/emif.c
+index 622638c..16f5089 100644
+--- a/drivers/memory/emif.c
++++ b/drivers/memory/emif.c
+@@ -815,6 +815,8 @@ static void setup_registers(struct emif_data *emif, struct emif_regs *regs)
+ 
+ 	writel(regs->sdram_tim2_shdw, base + EMIF_SDRAM_TIMING_2_SHDW);
+ 	writel(regs->phy_ctrl_1_shdw, base + EMIF_DDR_PHY_CTRL_1_SHDW);
++	writel(regs->pwr_mgmt_ctrl_shdw,
++	       base + EMIF_POWER_MANAGEMENT_CTRL_SHDW);
+ 
+ 	/* Settings specific for EMIF4D5 */
+ 	if (emif->plat_data->ip_rev != EMIF_4D5)
 -- 
 1.7.9.5
