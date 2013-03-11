@@ -1,69 +1,214 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 11 Mar 2013 14:42:41 +0530
-Subject: [PATCH 0/4] time: dynamic irq affinity
-In-Reply-To: <513D9896.2010304@linaro.org>
-References: <1361917047-29230-1-git-send-email-daniel.lezcano@linaro.org>
- <513CC404.6000200@ti.com> <513CCF60.6060406@linaro.org>
- <513D4E79.5090307@ti.com> <513D9896.2010304@linaro.org>
-Message-ID: <513DA009.9080601@ti.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Mon, 11 Mar 2013 10:17:22 +0100
+Subject: [PATCH 1/3] can: at91_can: add dt support
+In-Reply-To: <513A2365.5050803@pengutronix.de>
+References: <1362763842-14924-1-git-send-email-ludovic.desroches@atmel.com>
+ <1362763842-14924-2-git-send-email-ludovic.desroches@atmel.com>
+ <513A2365.5050803@pengutronix.de>
+Message-ID: <20130311091722.GA2572@ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 11 March 2013 02:10 PM, Daniel Lezcano wrote:
-> On 03/11/2013 04:24 AM, Santosh Shilimkar wrote:
->> On Sunday 10 March 2013 11:52 PM, Daniel Lezcano wrote:
+On Fri, Mar 08, 2013 at 06:44:05PM +0100, Marc Kleine-Budde wrote:
+> On 03/08/2013 06:30 PM, ludovic.desroches at atmel.com wrote:
+> > From: Ludovic Desroches <ludovic.desroches@atmel.com>
+> > 
+> > Add device tree support.
+> > 
+> > Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> > ---
+> >  .../devicetree/bindings/net/can/atmel-can.txt      | 14 ++++
+> >  drivers/net/can/at91_can.c                         | 75 ++++++++++++++++------
+> >  2 files changed, 70 insertions(+), 19 deletions(-)
+> >  create mode 100644 Documentation/devicetree/bindings/net/can/atmel-can.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/net/can/atmel-can.txt b/Documentation/devicetree/bindings/net/can/atmel-can.txt
+> > new file mode 100644
+> > index 0000000..69381db
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/net/can/atmel-can.txt
+> > @@ -0,0 +1,14 @@
+> > +* AT91 CAN *
+> > +
+> > +Required properties:
+> > +  - compatible: Should be "atmel,at91sam9263-can" or "atmel,at91sam9x5-can"
 > 
-> [ ... ]
+> On imx we use the oldest SoC with that IP available. Which strategy are
+> you following on at91?
 > 
->>> I don't think it is the case for all the ARM platforms, at least we
->>> tested it on vexpress TC2 and u8500, and the number of IPI were reduced
->>> very significantly increasing the idle time for cpu0. TC2 will need
->>> another optimization on another area for the idle wake up to gain real
->>> improvements.
->>>
->> You are missing my point. TC2 can be an exception since the SGI can wakeup
->> CPUs even from low power states where local timer's are stalled. Is that
->> the case with U8500 ?
-> 
-> Well, the cpuidle driver is not going into a deep idle state to check
-> this out.
-> 
-> AFAICT this board has a specific firmware with the PRCMU (a device
-> managing the power on the board) and it replaces the GIC when going to
-> deep idle state, especially by reconnecting the GIC to the A9 cores
-> automatically when an interrupt occurs.
-> 
-But most likely it will be limited to peripheral interrupts. SGI's
-are per-cpu irq's so you need to check that part.
 
-> But definitively worth to check.
-> 
->>> I will test it on OMAP but with the coupled idle state, I am not sure of
->>> the behavior. Could elaborate a bit the specificity of OMAP ? I am not
->>> sure to understand why I may miss some IPI wakeups.
->>>
->> I already mention the issue here [1]. You might not see any major issues
->> because the missed asynchronous IPIs might eventually get executed when
->> CPU's wakeup from deeper states because of idle wakeups. OMAP is no
->> different from idle wakeup optimisation and it will surely benefit and work.
->> The main reason I didn't pursue it because of not having solution for
->> [1] which as discussed in past is very much essential from kernel
->> functional correctness perspective. You might want to verify that by
->> adding a tracepoint on IPI's on other reasons except the timer wakeup.
-> 
-> Oh, ok. I didn't make the connection. I got the point now.
-> 
-Good.
+We are using the same strategy.
 
-> If we can raise a fake hardware interrupt on the GIC (not sure that
-> could be done), may be we can implement something similar to the
-> broadcast timer mechanism to replace the IPI when the cores are not IPI
-> wakeup capable.
+> > +  - reg: Should contain RTC registers location and length
 > 
-It isn't straight forward. The easiest way is to replace the SGI IPI
-with one which is wakeup capable even from deeper states. But then
-it all depends on hardware support and what that hook looks
-like per platform.
+> RTC?
+> 
 
-Regards,
-Santosh
+My mistake, I'll correct that, bad copy-paste.
+
+> > +  - interrupts: Should contain IRQ line for the CAN controller
+> > +
+> > +Example:
+> > +
+> > +	can0: can at f000c000 {
+> > +		compatbile = "atmel,at91sam9x5-can";
+> > +		reg = <0xf000c000 0x300>;
+> > +		interrupts = <40 4 5>
+> > +	};
+> > diff --git a/drivers/net/can/at91_can.c b/drivers/net/can/at91_can.c
+> > index 44f3637..c7f70d4 100644
+> > --- a/drivers/net/can/at91_can.c
+> > +++ b/drivers/net/can/at91_can.c
+> > @@ -27,6 +27,7 @@
+> >  #include <linux/kernel.h>
+> >  #include <linux/module.h>
+> >  #include <linux/netdevice.h>
+> > +#include <linux/of.h>
+> >  #include <linux/platform_device.h>
+> >  #include <linux/rtnetlink.h>
+> >  #include <linux/skbuff.h>
+> > @@ -155,19 +156,20 @@ struct at91_priv {
+> >  	canid_t mb0_id;
+> >  };
+> >  
+> > -static const struct at91_devtype_data at91_devtype_data[] = {
+> > -	[AT91_DEVTYPE_SAM9263] = {
+> > -		.rx_first = 1,
+> > -		.rx_split = 8,
+> > -		.rx_last = 11,
+> > -		.tx_shift = 2,
+> > -	},
+> > -	[AT91_DEVTYPE_SAM9X5] = {
+> > -		.rx_first = 0,
+> > -		.rx_split = 4,
+> > -		.rx_last = 5,
+> > -		.tx_shift = 1,
+> > -	},
+> > +static struct at91_devtype_data at91_at91sam9263_data = {
+> > +	.rx_first = 1,
+> > +	.rx_split = 8,
+> > +	.rx_last = 11,
+> > +	.tx_shift = 2,
+> > +	.type = AT91_DEVTYPE_SAM9263
+> 
+> nitpick:
+> can you add a trailing ","
+> 
+> > +};
+> > +
+> > +static struct at91_devtype_data at91_at91sam9x5_data = {
+> > +	.rx_first = 0,
+> > +	.rx_split = 4,
+> > +	.rx_last = 5,
+> > +	.tx_shift = 1,
+> > +	.type = AT91_DEVTYPE_SAM9X5
+> 
+> dito
+> 
+
+ok
+
+> >  };
+> >  
+> >  static const struct can_bittiming_const at91_bittiming_const = {
+> > @@ -1249,10 +1251,41 @@ static struct attribute_group at91_sysfs_attr_group = {
+> >  	.attrs = at91_sysfs_attrs,
+> >  };
+> >  
+> > +#if defined(CONFIG_OF)
+> > +static const struct of_device_id at91_can_dt_ids[] = {
+> > +	{
+> > +		.compatible = "atmel,at91sam9x5-can",
+> > +		.data = &at91_at91sam9x5_data,
+> > +	}, {
+> > +		.compatible = "atmel,at91sam9263-can",
+> > +		.data = &at91_at91sam9263_data,
+> > +	}, {
+> > +		/* sentinel */
+> > +	}
+> > +};
+> > +MODULE_DEVICE_TABLE(of, at91_can_dt_ids);
+> > +#else
+> > +#define at91_can_dt_ids NULL
+> > +#endif
+> > +
+> > +static struct at91_devtype_data* at91_can_get_driver_data(
+> > +						struct platform_device *pdev)
+> 
+> I think it's okay to put this into one line.
+> 
+
+ok
+
+> > +{
+> > +	if (pdev->dev.of_node) {
+> > +		const struct of_device_id *match;
+> > +		match = of_match_node(at91_can_dt_ids, pdev->dev.of_node);
+> > +		if (!match) {
+> > +			dev_err(&pdev->dev, "no matching node found in dtb\n");
+> > +			return NULL;
+> > +		}
+> > +		return (struct at91_devtype_data *)match->data;
+> > +	}
+> > +	return (struct at91_devtype_data *)platform_get_device_id(pdev)->driver_data;
+> > +}
+> > +
+> >  static int at91_can_probe(struct platform_device *pdev)
+> >  {
+> >  	const struct at91_devtype_data *devtype_data;
+> > -	enum at91_devtype devtype;
+> >  	struct net_device *dev;
+> >  	struct at91_priv *priv;
+> >  	struct resource *res;
+> > @@ -1260,8 +1293,12 @@ static int at91_can_probe(struct platform_device *pdev)
+> >  	void __iomem *addr;
+> >  	int err, irq;
+> >  
+> > -	devtype = pdev->id_entry->driver_data;
+> > -	devtype_data = &at91_devtype_data[devtype];
+> > +	devtype_data = at91_can_get_driver_data(pdev);
+> > +	if (!devtype_data) {
+> > +		dev_err(&pdev->dev, "no driver data\n");
+> > +		err = -ENODEV;
+> > +		goto exit;
+> > +	}
+> >  
+> >  	clk = clk_get(&pdev->dev, "can_clk");
+> >  	if (IS_ERR(clk)) {
+> > @@ -1310,7 +1347,6 @@ static int at91_can_probe(struct platform_device *pdev)
+> >  	priv->dev = dev;
+> >  	priv->reg_base = addr;
+> >  	priv->devtype_data = *devtype_data;
+> > -	priv->devtype_data.type = devtype;
+> >  	priv->clk = clk;
+> >  	priv->pdata = pdev->dev.platform_data;
+> >  	priv->mb0_id = 0x7ff;
+> > @@ -1373,10 +1409,10 @@ static int at91_can_remove(struct platform_device *pdev)
+> >  static const struct platform_device_id at91_can_id_table[] = {
+> >  	{
+> >  		.name = "at91_can",
+> > -		.driver_data = AT91_DEVTYPE_SAM9263,
+> > +		.driver_data = (unsigned long)&at91_at91sam9x5_data,
+> >  	}, {
+> >  		.name = "at91sam9x5_can",
+> > -		.driver_data = AT91_DEVTYPE_SAM9X5,
+> > +		.driver_data = (unsigned long)&at91_at91sam9263_data,
+> >  	}, {
+> >  		/* sentinel */
+> >  	}
+> > @@ -1389,6 +1425,7 @@ static struct platform_driver at91_can_driver = {
+> >  	.driver = {
+> >  		.name = KBUILD_MODNAME,
+> >  		.owner = THIS_MODULE,
+> > +		.of_match_table = at91_can_dt_ids,
+> >  	},
+> >  	.id_table = at91_can_id_table,
+> >  };
+> 
+> Marc
+
+Thanks for your feedback
+
+Regards
+
+Ludovic
