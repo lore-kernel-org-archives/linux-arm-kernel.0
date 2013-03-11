@@ -1,91 +1,31 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Mon, 11 Mar 2013 16:53:22 +0100
-Subject: [PATCH 01/13] usb: phy: nop: Add device tree support and binding
- information
-In-Reply-To: <513D9893.50703@ti.com>
-References: <1359993540-20780-1-git-send-email-rogerq@ti.com>
- <1359993540-20780-2-git-send-email-rogerq@ti.com>
- <5139C174.7030401@pengutronix.de> <513A079A.1020106@pengutronix.de>
- <513D9893.50703@ti.com>
-Message-ID: <513DFDF2.7060407@pengutronix.de>
+From: weiyj.lk@gmail.com (Wei Yongjun)
+Date: Mon, 11 Mar 2013 23:55:18 +0800
+Subject: [PATCH] clk: prima2: fix return value check in sirfsoc_of_clk_init()
+Message-ID: <CAPgLHd82XEZEP4eDvmvPjdHHz6u40+16W1GZeCWWw6Cj3SAwCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/11/2013 09:40 AM, Roger Quadros wrote:
-> On 03/08/2013 05:45 PM, Marc Kleine-Budde wrote:
->> On 03/08/2013 11:46 AM, Marc Kleine-Budde wrote:
->>> On 02/04/2013 04:58 PM, Roger Quadros wrote:
->>>> The PHY clock, clock rate, VCC regulator and RESET regulator
->>>> can now be provided via device tree.
->>>>
->>>> Signed-off-by: Roger Quadros <rogerq@ti.com>
->>>> ---
->>>>  .../devicetree/bindings/usb/usb-nop-xceiv.txt      |   34 ++++++++++++++++++++
->>>>  drivers/usb/otg/nop-usb-xceiv.c                    |   31 ++++++++++++++++++
->>>>  2 files changed, 65 insertions(+), 0 deletions(-)
->>>>  create mode 100644 Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt b/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
->>>> new file mode 100644
->>>> index 0000000..d7e2726
->>>> --- /dev/null
->>>> +++ b/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
->>>> @@ -0,0 +1,34 @@
->>>> +USB NOP PHY
->>>> +
->>>> +Required properties:
->>>> +- compatible: should be usb-nop-xceiv
->>>> +
->>>> +Optional properties:
->>>> +- clocks: phandle to the PHY clock. Use as per Documentation/devicetree
->>>> +  /bindings/clock/clock-bindings.txt
->>>> +  This property is required if clock-frequency is specified.
->>>> +
->>>> +- clock-names: Should be "main_clk"
->>>> +
->>>> +- clock-frequency: the clock frequency (in Hz) that the PHY clock must
->>>> +  be configured to.
->>>> +
->>>> +- vcc-supply: phandle to the regulator that provides RESET to the PHY.
->>>> +
->>>> +- reset-supply: phandle to the regulator that provides power to the PHY.
->>>> +
->>>> +Example:
->>>> +
->>>> +	hsusb1_phy {
->>>> +		compatible = "usb-nop-xceiv";
->>>> +		clock-frequency = <19200000>;
->>>
->>> Why do you hardcode the clock frequency here? You should use
->>> clk_get_rate() to get the frequency from the clock tree.
->>
->> What about declaring a "fixed-clock" node in the device tree? Then it
->> should be possible to keep the driver free of any omap specific code.
->>
-> 
-> The current implementation is not OMAP specific and is not limited to a
-> fixed frequency clock. The PHY driver is using standard clock APIs to set
-> the clock rate 'only' if the 'clock-frequency' property is present in the
-> device tree node.
-> 
-> What is the benefit of declaring it as a "fixed-clock"?
-> FYI. The clock may not necessarily be a fixed frequency clock and someone
-> needs to program the rate.
+From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-Okay, now I got it.
+In case of error, the function clk_get() returns ERR_PTR()
+not NULL. The NULL test in the return value check should
+be replaced with IS_ERR().
 
-Marc
+Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+---
+ drivers/clk/clk-prima2.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130311/6e3b09c1/attachment-0001.sig>
+diff --git a/drivers/clk/clk-prima2.c b/drivers/clk/clk-prima2.c
+index f8e9d0c..b208665 100644
+--- a/drivers/clk/clk-prima2.c
++++ b/drivers/clk/clk-prima2.c
+@@ -1113,7 +1113,7 @@ void __init sirfsoc_of_clk_init(void)
+ 
+ 	for (i = pll1; i < maxclk; i++) {
+ 		prima2_clks[i] = clk_register(NULL, prima2_clk_hw_array[i]);
+-		BUG_ON(!prima2_clks[i]);
++		BUG_ON(IS_ERR(prima2_clks[i]);
+ 	}
+ 	clk_register_clkdev(prima2_clks[cpu], NULL, "cpu");
+ 	clk_register_clkdev(prima2_clks[io],  NULL, "io");
