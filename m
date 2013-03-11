@@ -1,73 +1,147 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Mon, 11 Mar 2013 12:15:33 +0100
-Subject: [PATCH 0/4] SAMA5D3 support
-In-Reply-To: <CAOCHtYiqkQYZukbp=xOyxT_vmRRRbbpev5R3vvtKPqEu9GttOQ@mail.gmail.com>
+From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
+Date: Mon, 11 Mar 2013 12:19:52 +0100
+Subject: [PATCH] ARM: at91: change name template in AT91_SOC_START macro
+In-Reply-To: <1362755638-20092-1-git-send-email-ludovic.desroches@atmel.com>
 References: <1362755638-20092-1-git-send-email-ludovic.desroches@atmel.com>
- <CAOCHtYiqkQYZukbp=xOyxT_vmRRRbbpev5R3vvtKPqEu9GttOQ@mail.gmail.com>
-Message-ID: <20130311111533.GA5659@ludovic.desroches@atmel.com>
+Message-ID: <1363000792-30800-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robert,
+From: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-On Fri, Mar 08, 2013 at 12:00:07PM -0600, Robert Nelson wrote:
-> On Fri, Mar 8, 2013 at 9:13 AM,  <ludovic.desroches@atmel.com> wrote:
-> > From: Ludovic Desroches <ludovic.desroches@atmel.com>
-> >
-> > Hi,
-> >
-> > This set of patches introduces basic support for the SAMA5D3 family. It is
-> > based on Jean-Christophe Kconfig cleanup patch series available at:
-> >
-> >   git://github.com/at91linux/linux-at91.git delivery/at91_3.9_dt_cleanup
-> >
-> > Regards
-> >
-> > Ludovic Desroches (4):
-> >   ARM: at91: add AT91_SAM9_TIME entry to select at91sam926x_time.c
-> >     compilation
-> >   ARM: at91: introduce the core type choice to split ARMv4/5 and ARMv7
-> >     arch
-> >   ARM: at91: fix infinite loop in at91_irq_suspend/resume
-> >   ARM: at91: introduce SAMA5 support
-> 
-> Hi Ludovic,
-> 
-> Looks like something is still missing, with the 3 cleanup patches
-> (delivery/at91_3.9_dt_cleanup) and these 4 on top of mainline built
-> with "sama5_defconfig" results in:
-> 
->   CC      net/wireless/ap.o
->   CC      net/wireless/trace.o
->   LD      net/wireless/cfg80211.o
->   LD      net/wireless/built-in.o
->   LD      net/built-in.o
->   LINK    vmlinux
->   LD      vmlinux.o
->   MODPOST vmlinux.o
->   GEN     .version
->   CHK     include/generated/compile.h
->   UPD     include/generated/compile.h
->   CC      init/version.o
->   LD      init/built-in.o
-> arch/arm/mach-at91/built-in.o: In function `soc_detect':
-> pm.c:(.init.text+0xa88): undefined reference to `sama5d3_soc'
-> make: *** [vmlinux] Error 1
-> 
-> Everything looks correct in:
-> ./arch/arm/mach-at91/setup.c
-> ./arch/arm/mach-at91/soc.h
-> 
+New devices are no more prefixed with at91 so remove the at91 and _name
+concatenation.
 
-Thanks for testing it. You are right, I have split my patch series and I have
-forgotten one patch.
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+---
+ arch/arm/mach-at91/at91rm9200.c  | 2 +-
+ arch/arm/mach-at91/at91sam9260.c | 2 +-
+ arch/arm/mach-at91/at91sam9261.c | 2 +-
+ arch/arm/mach-at91/at91sam9263.c | 2 +-
+ arch/arm/mach-at91/at91sam9g45.c | 2 +-
+ arch/arm/mach-at91/at91sam9n12.c | 2 +-
+ arch/arm/mach-at91/at91sam9rl.c  | 2 +-
+ arch/arm/mach-at91/at91sam9x5.c  | 2 +-
+ arch/arm/mach-at91/soc.h         | 2 +-
+ 9 files changed, 9 insertions(+), 9 deletions(-)
 
-Regards
-
-Ludovic
-
-> Regards,
-> 
-> -- 
-> Robert Nelson
-> http://www.rcn-ee.com/
+diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
+index 9706c00..ccce759 100644
+--- a/arch/arm/mach-at91/at91rm9200.c
++++ b/arch/arm/mach-at91/at91rm9200.c
+@@ -384,7 +384,7 @@ static unsigned int at91rm9200_default_irq_priority[NR_AIC_IRQS] __initdata = {
+ 	0	/* Advanced Interrupt Controller (IRQ6) */
+ };
+ 
+-AT91_SOC_START(rm9200)
++AT91_SOC_START(at91rm9200)
+ 	.map_io = at91rm9200_map_io,
+ 	.default_irq_priority = at91rm9200_default_irq_priority,
+ 	.ioremap_registers = at91rm9200_ioremap_registers,
+diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
+index b67cd53..1833b4c 100644
+--- a/arch/arm/mach-at91/at91sam9260.c
++++ b/arch/arm/mach-at91/at91sam9260.c
+@@ -395,7 +395,7 @@ static unsigned int at91sam9260_default_irq_priority[NR_AIC_IRQS] __initdata = {
+ 	0,	/* Advanced Interrupt Controller */
+ };
+ 
+-AT91_SOC_START(sam9260)
++AT91_SOC_START(at91sam9260)
+ 	.map_io = at91sam9260_map_io,
+ 	.default_irq_priority = at91sam9260_default_irq_priority,
+ 	.ioremap_registers = at91sam9260_ioremap_registers,
+diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
+index 2998a08..ac7a341b 100644
+--- a/arch/arm/mach-at91/at91sam9261.c
++++ b/arch/arm/mach-at91/at91sam9261.c
+@@ -337,7 +337,7 @@ static unsigned int at91sam9261_default_irq_priority[NR_AIC_IRQS] __initdata = {
+ 	0,	/* Advanced Interrupt Controller */
+ };
+ 
+-AT91_SOC_START(sam9261)
++AT91_SOC_START(at91sam9261)
+ 	.map_io = at91sam9261_map_io,
+ 	.default_irq_priority = at91sam9261_default_irq_priority,
+ 	.ioremap_registers = at91sam9261_ioremap_registers,
+diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
+index b9fc60d..8e2d9f4 100644
+--- a/arch/arm/mach-at91/at91sam9263.c
++++ b/arch/arm/mach-at91/at91sam9263.c
+@@ -374,7 +374,7 @@ static unsigned int at91sam9263_default_irq_priority[NR_AIC_IRQS] __initdata = {
+ 	0,	/* Advanced Interrupt Controller (IRQ1) */
+ };
+ 
+-AT91_SOC_START(sam9263)
++AT91_SOC_START(at91sam9263)
+ 	.map_io = at91sam9263_map_io,
+ 	.default_irq_priority = at91sam9263_default_irq_priority,
+ 	.ioremap_registers = at91sam9263_ioremap_registers,
+diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
+index d3addee..4fcbe7b 100644
+--- a/arch/arm/mach-at91/at91sam9g45.c
++++ b/arch/arm/mach-at91/at91sam9g45.c
+@@ -418,7 +418,7 @@ static unsigned int at91sam9g45_default_irq_priority[NR_AIC_IRQS] __initdata = {
+ 	0,	/* Advanced Interrupt Controller (IRQ0) */
+ };
+ 
+-AT91_SOC_START(sam9g45)
++AT91_SOC_START(at91sam9g45)
+ 	.map_io = at91sam9g45_map_io,
+ 	.default_irq_priority = at91sam9g45_default_irq_priority,
+ 	.ioremap_registers = at91sam9g45_ioremap_registers,
+diff --git a/arch/arm/mach-at91/at91sam9n12.c b/arch/arm/mach-at91/at91sam9n12.c
+index 5dfc8fd..2c7a2f4 100644
+--- a/arch/arm/mach-at91/at91sam9n12.c
++++ b/arch/arm/mach-at91/at91sam9n12.c
+@@ -226,7 +226,7 @@ void __init at91sam9n12_initialize(void)
+ 	at91_extern_irq = (1 << AT91SAM9N12_ID_IRQ0);
+ }
+ 
+-AT91_SOC_START(sam9n12)
++AT91_SOC_START(at91sam9n12)
+ 	.map_io = at91sam9n12_map_io,
+ 	.register_clocks = at91sam9n12_register_clocks,
+ 	.init = at91sam9n12_initialize,
+diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
+index eb98704..c396007 100644
+--- a/arch/arm/mach-at91/at91sam9rl.c
++++ b/arch/arm/mach-at91/at91sam9rl.c
+@@ -340,7 +340,7 @@ static unsigned int at91sam9rl_default_irq_priority[NR_AIC_IRQS] __initdata = {
+ 	0,	/* Advanced Interrupt Controller */
+ };
+ 
+-AT91_SOC_START(sam9rl)
++AT91_SOC_START(at91sam9rl)
+ 	.map_io = at91sam9rl_map_io,
+ 	.default_irq_priority = at91sam9rl_default_irq_priority,
+ 	.ioremap_registers = at91sam9rl_ioremap_registers,
+diff --git a/arch/arm/mach-at91/at91sam9x5.c b/arch/arm/mach-at91/at91sam9x5.c
+index 44a9a62..3a1a799 100644
+--- a/arch/arm/mach-at91/at91sam9x5.c
++++ b/arch/arm/mach-at91/at91sam9x5.c
+@@ -320,7 +320,7 @@ static void __init at91sam9x5_map_io(void)
+  *  Interrupt initialization
+  * -------------------------------------------------------------------- */
+ 
+-AT91_SOC_START(sam9x5)
++AT91_SOC_START(at91sam9x5)
+ 	.map_io = at91sam9x5_map_io,
+ 	.register_clocks = at91sam9x5_register_clocks,
+ AT91_SOC_END
+diff --git a/arch/arm/mach-at91/soc.h b/arch/arm/mach-at91/soc.h
+index 9c6d3d4..f3d3502 100644
+--- a/arch/arm/mach-at91/soc.h
++++ b/arch/arm/mach-at91/soc.h
+@@ -24,7 +24,7 @@ extern struct at91_init_soc at91sam9x5_soc;
+ extern struct at91_init_soc at91sam9n12_soc;
+ 
+ #define AT91_SOC_START(_name)				\
+-struct at91_init_soc __initdata at91##_name##_soc	\
++struct at91_init_soc __initdata _name##_soc		\
+  __used							\
+ 						= {	\
+ 	.builtin	= 1,				\
+-- 
+1.7.11.3
