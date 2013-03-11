@@ -1,23 +1,39 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 11 Mar 2013 11:21:30 +0530
-Subject: [PATCH 8/8] memory: emif: Load the correct custom config values
- from dt
-In-Reply-To: <1362978365-5593-9-git-send-email-lokeshvutla@ti.com>
-References: <1362978365-5593-1-git-send-email-lokeshvutla@ti.com>
- <1362978365-5593-9-git-send-email-lokeshvutla@ti.com>
-Message-ID: <513D70E2.6030702@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 11 Mar 2013 14:36:39 +0800
+Subject: [PATCH 2/2] ARM: imx: Disable imx-cpufreq when cpufreq-cpu0 used
+In-Reply-To: <20130310225159.GS1906@pengutronix.de>
+References: <1362934407-29030-1-git-send-email-mpa@pengutronix.de>
+ <1362934407-29030-3-git-send-email-mpa@pengutronix.de>
+ <20130310225159.GS1906@pengutronix.de>
+Message-ID: <20130311063636.GA25910@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 11 March 2013 10:36 AM, Lokesh Vutla wrote:
-> of_get_property returns value in Big Endian format.
-> Before using this value it should be converted to little endian
-> using be32_to_cpup().
-> Custom configs of emif are read from dt using of_get_property,
-> but these are not converted to litte endian format.
-> Correcting the same here.
+On Sun, Mar 10, 2013 at 11:51:59PM +0100, Sascha Hauer wrote:
+> On Sun, Mar 10, 2013 at 05:53:27PM +0100, Markus Pargmann wrote:
+> > cpufreq-cpu0 has DT support. So if imx27 or imx51 is booted with DT
+> > support, it should not use the old imx-cpufreq driver. Instead the
+> > operating-points should be defined in the appropriate DT files.
+> > 
+> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> > ---
+> >  arch/arm/Kconfig | 1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > index 5b71469..1247fe5 100644
+> > --- a/arch/arm/Kconfig
+> > +++ b/arch/arm/Kconfig
+> > @@ -2156,6 +2156,7 @@ source "drivers/cpufreq/Kconfig"
+> >  config CPU_FREQ_IMX
+> >  	tristate "CPUfreq driver for i.MX CPUs"
+> >  	depends on ARCH_MXC && CPU_FREQ
+> > +	depends on (!GENERIC_CPUFREQ_CPU0 || (!MACH_IMX51_DT && !MACH_IMX27_DT))
 > 
-> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-> ---
-Looks fine.
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Does this driver work with multiplatform anyway? I mean it registers
+> a cpufreq driver without knowing that the kernel even runs on i.MX.
+> Maybe removing it is the better option?
+> 
++1 on killing imx cpufreq driver.
+
+Shawn
