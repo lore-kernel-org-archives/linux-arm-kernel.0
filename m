@@ -1,24 +1,40 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Mon, 11 Mar 2013 14:39:04 +0100
-Subject: [PATCH] ARM: imx: fix typo "DEBUG_IMX50_IMX53_UART"
-In-Reply-To: <513DDD59.6000903@cogentembedded.com>
-References: <1363007760.3137.69.camel@x61.thuisdomein>
- <513DDD59.6000903@cogentembedded.com>
-Message-ID: <1363009144.3137.72.camel@x61.thuisdomein>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Mon, 11 Mar 2013 13:40:55 +0000
+Subject: [PATCH] ARM:vexpress: beautify code, using 'static const'
+ instead of 'const static'
+In-Reply-To: <513BF001.30204@asianux.com>
+References: <513BF001.30204@asianux.com>
+Message-ID: <1363009255.3165.19.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-03-11 at 17:34 +0400, Sergei Shtylyov wrote:
-> On 11-03-2013 17:16, Paul Bolle wrote:
-> > 1) Typo was added in commit f8c95fe6d9adad72fc7bce90f4ab68d119f50c5b
-> > ("ARM: imx: support DEBUG_LL uart port selection for all i.MX SoCs").
-> > Looking at that patch and at the tree makes clear that DEBUG_IMX53_UART
-> > was intended here.
+On Sun, 2013-03-10 at 02:29 +0000, Chen Gang wrote:
+>   better using 'static const' instead of 'const static'
 > 
->     Should probably be in the changelog instead.
+> Signed-off-by: Chen Gang <gang.chen@asianux.com>
+> ---
+>  arch/arm/mach-vexpress/platsmp.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-vexpress/platsmp.c b/arch/arm/mach-vexpress/platsmp.c
+> index dc1ace5..9152bf7 100644
+> --- a/arch/arm/mach-vexpress/platsmp.c
+> +++ b/arch/arm/mach-vexpress/platsmp.c
+> @@ -40,7 +40,7 @@ static struct map_desc vexpress_dt_cortex_a9_scu_map __initdata = {
+>  
+>  static void *vexpress_dt_cortex_a9_scu_base __initdata;
+>  
+> -const static char *vexpress_dt_cortex_a9_match[] __initconst = {
+> +static const char *vexpress_dt_cortex_a9_match[] __initconst = {
+>  	"arm,cortex-a5-scu",
+>  	"arm,cortex-a9-scu",
+>  	NULL
 
-I feared being to verbose. But putting it in the commit explanation is
-fine with me. I'll try to send an updated patch later this day.
+Thanks for spotting this. I will keep this in mind, but I can't promise
+to take this patch as it goes, because the platsmp.c is likely to change
+(shrink) in near future. Either way I'll make sure you get due
+credit :-)
 
+Cheers!
 
-Paul Bolle
+Pawel
