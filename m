@@ -1,67 +1,34 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 11 Mar 2013 23:32:31 +0100
-Subject: [PATCH v6 1/3] serial: sh-sci: Add OF support
-In-Reply-To: <CABYn4sz_5vEzXba0Y7iXKBbGhfGwY2cd8fn30mUQ0GQcbGTG+w@mail.gmail.com>
-References: <1362569437-11133-1-git-send-email-hechtb+renesas@gmail.com>
- <9335181.JoypQftkI4@avalon>
- <CABYn4sz_5vEzXba0Y7iXKBbGhfGwY2cd8fn30mUQ0GQcbGTG+w@mail.gmail.com>
-Message-ID: <1689352.QAdqes1IG8@avalon>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 11 Mar 2013 22:34:55 +0000
+Subject: [PATCH 9/9] ARM: spear3xx: Use correct pl080 header file
+In-Reply-To: <CAKohponFisFjM9CbpHoR7h-pn1SAOWeck63v3FKZe4UV0cR2DQ@mail.gmail.com>
+References: <1362521809-22989-1-git-send-email-arnd@arndb.de>
+ <1362521809-22989-10-git-send-email-arnd@arndb.de>
+ <CAKohponFisFjM9CbpHoR7h-pn1SAOWeck63v3FKZe4UV0cR2DQ@mail.gmail.com>
+Message-ID: <201303112234.55748.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bastian,
-
-On Thursday 07 March 2013 11:26:29 Bastian Hecht wrote:
-> Hi Laurent,
+On Tuesday 05 March 2013, Viresh Kumar wrote:
+> On 6 March 2013 06:16, Arnd Bergmann <arnd@arndb.de> wrote:
+> > The definitions have move around recently, causing build errors
+> > in spear3xx for all configurations:
+> >
+> > spear3xx.c:47:5: error: 'PL080_BSIZE_16' undeclared here (not in a function)
+> > spear3xx.c:47:23: error: 'PL080_CONTROL_SB_SIZE_SHIFT' undeclared here (not in a function)
+> > spear3xx.c:48:22: error: 'PL080_CONTROL_DB_SIZE_SHIFT' undeclared here (not in a function)
+> >
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Alessandro Rubini <rubini@gnudd.com>
+> > Cc: Viresh Kumar <viresh.kumar@linaro.org>
+> > ---
+> >  arch/arm/mach-spear3xx/spear3xx.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> >> +- renesas,scscr : Should contain a bitfield used by the Serial Control
-> >> Register.
-> >> +  b7 = SCSCR_TIE
-> >> +  b6 = SCSCR_RIE
-> >> +  b5 = SCSCR_TE
-> >> +  b4 = SCSCR_RE
-> >> +  b3 = SCSCR_REIE
-> >> +  b2 = SCSCR_TOIE
-> >> +  b1 = SCSCR_CKE1
-> >> +  b0 = SCSCR_CKE0
-> > 
-> > What is that for exactly ?
-> 
-> What I can see from 3 different datasheets (sh7372, sh73a0, r8a7740)
-> the first 2 bits differ in meaning.
-> 
-> On r8a7740 it depends: In asynchronous mode the first 2 bits CKE0/1
-> define whether you want to use an external clock to drive the baud
-> generator or if you want to use the internal SUB clock. If you use the
-> SUB clock you can further define if you want to use a subscaled SUB
-> clock in the SCSMR register. In synchronous mode you must rely on the
-> internal clock for the baud generator and can select if the SCK pin is
-> used as clock input or output.
+> You are a bit late in posting this.
+> We already got the same patch from Vipul yesterday :)
 
-What about adding an optional source clock property to the bindings, that 
-would contain the phandle of the source clock ? If the property is absent then 
-the internal clock would be used.
+Are you going to send a pull request for that one then? Another -rc has
+just passed with the platform being broken.
 
-How is subscaling used in practice ?
-
-> On sh73a0 and sh7372 it's used to control the output clock SCK (set it
-> to high impedance or actually output a clock when in sychronous mode)
-
-Maybe we could add a synchronous mode property to the DT bindings and use it 
-to infer the bit values.
-
-> Bit 2 and 3 don't exist in my datasheets.
-> 
-> The other bits define under which conditions you receive interrupts
-> (send FIFO empty, receive FIFO full) and which bits you need to start
-> transfers (one bit to start sending, one receiving). The bits 8 to 31
-> are used to set up DMA transfers and various interrupt events like
-> error status and finish transfers. I haven't included them as they are
-> not used in the driver.
-
-If they're not used maybe we can drop them :-)
-
--- 
-Regards,
-
-Laurent Pinchart
+	Arnd
