@@ -1,26 +1,29 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 11 Mar 2013 16:47:41 +0000
-Subject: [PATCH] ARM:net: an issue for k which is u32, never < 0
-In-Reply-To: <20130310.171238.330349067962026661.davem@davemloft.net>
-References: <513BECDA.3030803@asianux.com>
- <20130310.171238.330349067962026661.davem@davemloft.net>
-Message-ID: <20130311164741.GL4977@n2100.arm.linux.org.uk>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 11 Mar 2013 16:53:21 +0000 (UTC)
+Subject: [PATCH] ARM: OMAP3: hwmod data: disable MIDLEMODE control for musb
+In-Reply-To: <CANOLnOMUHzbGW-Yz_cXhW1+KNvP-4k6vMDodE94K5G2pwrSf7Q@mail.gmail.com>
+References: <1362876391-6801-1-git-send-email-notasas@gmail.com>
+ <alpine.DEB.2.00.1303102304490.774@utopia.booyaka.com>
+ <CANOLnOMUHzbGW-Yz_cXhW1+KNvP-4k6vMDodE94K5G2pwrSf7Q@mail.gmail.com>
+Message-ID: <alpine.DEB.2.00.1303111648370.9211@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 10, 2013 at 05:12:38PM -0400, David Miller wrote:
-> From: Chen Gang <gang.chen@asianux.com>
-> Date: Sun, 10 Mar 2013 10:15:54 +0800
-> 
-> > 
-> >   k is u32 which never < 0, need type cast, or cause issue.
-> > 
-> > Signed-off-by: Chen Gang <gang.chen@asianux.com>
-> 
-> Who will apply this, ARM folks or me?
+Hello Gra?vydas,
 
-I'm happy if you wish to take the patch:
+On Mon, 11 Mar 2013, Grazvydas Ignotas wrote:
 
-Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> Soft reset seems to recover from this so there is no problem, but you
+> can't reset before every suspend so a workaround is still needed..
 
-Thanks.
+OK, that's good.
+
+> Well as long as it works it's good for me, although it'll bloat the
+> code a bit compared to just changing the data. Should I attempt an
+> implementation?
+
+Please do.  I'd be shocked if it comes out to more than four or five extra 
+ARM instructions...
+
+
+- Paul
