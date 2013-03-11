@@ -1,35 +1,76 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 11 Mar 2013 16:15:13 -0600
-Subject: [PATCH V2 0/5] ARM: DT: tegra114: Add DT entry for different
- controller
-In-Reply-To: <1362852678-13421-1-git-send-email-ldewangan@nvidia.com>
-References: <1362852678-13421-1-git-send-email-ldewangan@nvidia.com>
-Message-ID: <513E5771.9000408@wwwdotorg.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 11 Mar 2013 15:17:40 -0700
+Subject: [PATCH 03/10] ARM: smp_twd: Divorce smp_twd from local timer API
+In-Reply-To: <20130311172847.GP26093@atomide.com>
+References: <20130308004011.GD11806@atomide.com>
+ <51393B59.3070200@codeaurora.org> <20130308180730.GE11806@atomide.com>
+ <513A2B20.30805@codeaurora.org> <20130308194802.GG11806@atomide.com>
+ <513A40EF.8050403@codeaurora.org> <20130308200811.GJ11806@atomide.com>
+ <513A4774.3040605@codeaurora.org> <20130308202947.GK11806@atomide.com>
+ <513A8B22.5030008@codeaurora.org> <20130311172847.GP26093@atomide.com>
+Message-ID: <513E5804.3050104@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/09/2013 11:11 AM, Laxman Dewangan wrote:
-> This patch series add DT entry for APB DMA, I2C, UART, KBC and SPI.
-> 
-> This patch series is generated on top of CCF work for T114 done by Peter
-> and hence it should be applied on top of T114 CCF patches.
-> 
-> Changes from V1:
-> - Add reeason why APBDMA is not compatible with older driver
->   in description.
-> - Remove UARTB car id correction. Make the compatible with tegra114 and
->   older chip.
-> - Add compatible for kbc as nvidia,tegra114-kbc and nvidia,tegra20-kbc.
-> 
-> Laxman Dewangan (5):
->   ARM: DT: tegra114: add APB DMA controller DT entry
->   ARM: DT: tegra114: Add i2c controller DT entry
->   ARM: DT: tegra114:add aliases and DMA requestor for serial controller
->   ARM: DT: tegra114: add KBC controller DT entry
->   ARM: DT: tegra114: Add spi controller DT entry
+On 03/11/13 10:28, Tony Lindgren wrote:
+> * Stephen Boyd <sboyd@codeaurora.org> [130308 17:10]:
+>> On 03/08/13 12:29, Tony Lindgren wrote:
+>>> Applying that does not seem to help, but you might want to get vexpress
+>>> running anyways for some multiplatform sanity checks.
+>>>
+>>> I just built and installed qemu-linaro from their git, then ran the
+>>> command above. Looks like stock qemu does not work for vexpress for some
+>>> reason. You can probably use a dummy initrd and rootfs to debug this
+>>> though :)
+>> So my patchset didn't break qemu?
+> Sorry if that was unclear: Yes your patchset breaks booting vexpress
+> in qemu.
+>
+>
 
-What branch is this series based on? I tried to apply these for testing,
-but git am failed to apply it to Tegra's for-3.10/dt, and Tegra's
-for-next, and my local work branch, and next-20130307.
+Ok. qemu works for me before applying my patches. I've added this into
+the series before this patch to fix the boot issue.
 
-Can you please rebase onto Tegra's for-3.10/dt. Thanks.
+-----8<-----
+
+Subject: [PATCH] ARM: vexpress: Move smp_twd setup to time_late_init hook
+
+On devices without a clock describing the rate of the twd we
+detect the rate at runtime via twd_calibrate_rate(). Currently
+this happens when smp_prepare_cpus() calls the localtimer start
+callback, after the sp804 timer has been registered and when
+jiffies have started incrementing.
+
+In the next patch we're going to make twd_local_timer_register()
+register the twd clockevent on the boot CPU. In the case of
+vexpress, this will hang the system at boot because jiffies
+haven't started incrementing when twd_calibrate_rate() is called.
+Register the smp_twd during time_late_init() on vexpress to avoid
+this problem.
+
+Based on a patch by Marc Zyngier <marc.zyngier@arm.com>.
+
+Reported-by: Tony Lindgren <tony@atomide.com>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ arch/arm/mach-vexpress/ct-ca9x4.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-vexpress/ct-ca9x4.c b/arch/arm/mach-vexpress/ct-ca9x4.c
+index 6f34497..a9f39bf 100644
+--- a/arch/arm/mach-vexpress/ct-ca9x4.c
++++ b/arch/arm/mach-vexpress/ct-ca9x4.c
+@@ -62,7 +62,7 @@ static void __init ct_ca9x4_init_irq(void)
+ {
+ 	gic_init(0, 29, ioremap(A9_MPCORE_GIC_DIST, SZ_4K),
+ 		 ioremap(A9_MPCORE_GIC_CPU, SZ_256));
+-	ca9x4_twd_init();
++	late_time_init = ca9x4_twd_init;
+ }
+ 
+ static int ct_ca9x4_clcd_setup(struct clcd_fb *fb)
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
