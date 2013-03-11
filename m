@@ -1,207 +1,99 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 11 Mar 2013 20:39:21 +0100
-Subject: [PATCH v2 2/2] video: imxfb: Add DT support
-In-Reply-To: <20130311102540.GB23082@e106331-lin.cambridge.arm.com>
-References: <1362504608-15839-1-git-send-email-mpa@pengutronix.de>
- <1362504608-15839-3-git-send-email-mpa@pengutronix.de>
- <20130311102540.GB23082@e106331-lin.cambridge.arm.com>
-Message-ID: <20130311193921.GB18350@pengutronix.de>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 11 Mar 2013 20:44:44 +0100
+Subject: [RFC PATCH 0/8] A V4L2 driver for Exynos4x12 Imaging Subsystem
+Message-ID: <1363031092-29950-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch series is an initial version of a driver for the camera ISP
+subsystem (FIMC-IS) embedded in Samsung Exynos4x12 SoCs.
 
-On Mon, Mar 11, 2013 at 10:25:40AM +0000, Mark Rutland wrote:
-> Hi,
-> 
-> Any reason for not CCing devicetree-discuss?
+The FIMC-IS subsystem is build around a ARM Cortex-A5 CPU that controls
+its dedicated peripherals, like I2C, SPI, UART, PWM, ADC,...  and the
+ISP chain. There are 3 hardware image processing blocks: ISP, DRC
+(dynamic range compression) and FD (face detection) that are normally
+controlled by the Cortex-A5 firmware.
 
-There is no reason, sorry, I forgot CC, I will add it to CC for the next
-version.
+The driver currently exposes two additional sub-device to user space:
+the image sensor and FIMC-IS-ISP sub-device. Another one might be
+added in future for the FD features.
 
-> 
-> I have a couple of comments on the binding and the way it's parsed.
-> 
-> On Tue, Mar 05, 2013 at 05:30:08PM +0000, Markus Pargmann wrote:
-> > Add devicetree support for imx framebuffer driver. It uses the generic
-> > display bindings and helper functions.
-> >
-> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> > Cc: Fabio Estevam <festevam@gmail.com>
-> > ---
-> >
-> > Notes:
-> >     Changes in v2:
-> >     - Removed pwmr register property
-> >     - Cleanup of devicetree binding documentation
-> >     - Use default values for pwmr and lscr1
-> >
-> >  .../devicetree/bindings/video/fsl,imx-fb.txt       |  49 ++++++
-> >  drivers/video/imxfb.c                              | 182 +++++++++++++++++----
-> >  2 files changed, 197 insertions(+), 34 deletions(-)
-> >  create mode 100644 Documentation/devicetree/bindings/video/fsl,imx-fb.txt
-> >
-> > diff --git a/Documentation/devicetree/bindings/video/fsl,imx-fb.txt b/Documentation/devicetree/bindings/video/fsl,imx-fb.txt
-> > new file mode 100644
-> > index 0000000..e1a53a3
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/video/fsl,imx-fb.txt
-> > @@ -0,0 +1,49 @@
-> > +Freescale imx21 Framebuffer
-> > +
-> > +This framebuffer driver supports devices imx1, imx21, imx25, and imx27.
-> > +
-> > +Required properties:
-> > +- compatible : "fsl,<chip>-fb", chip should be imx1 or imx21
-> > +- reg : Should contain 1 register ranges(address and length)
-> > +- interrupts : One interrupt of the fb dev
-> > +
-> > +Required nodes:
-> > +- display: Phandle to a display node as described in
-> > +       Documentation/devicetree/bindings/video/display-timing.txt
-> > +       Additional, the display node has to define properties:
-> > +       - bpp: Bits per pixel
-> > +       - pcr: LCDC PCR value
-> 
-> As these are non-standard, it would be good to prefix them (e.g. "fsl,pcr").
+The FIMC-IS has various data inputs, it can capture data from memory
+or from other SoC IP blocks (FIMC-LITE). It is currently plugged
+between FIMC-LITE and FIMC IP blocks, so there is a media pipeline
+like:
 
-Okay.
+sensor -> MIPI-CSIS -> FIMC-LITE -> FIMC-IS-ISP -> FIMC -> memory
 
-> If you need them, why are they not a good fit for the generic binding?
+A raw Bayer image data can be captured from the ISP block which has
+it's own DMA engines. Support for this is not really included in
+this series though, only a video capture node driver stubs are added.
 
-I think bpp could be used by some other drivers but not of the majority.
-There are actually already some of them having bindings for bpp, e.g.
-Documentation/devicetree/bindings/video/via,vt8500-fb.txt .
+This is a bit complicated code, nevertheless I would really appreciate
+any review comments you might have.
 
-> 
-> I'm not familiar with the hardware, what is the PCR exactly?
+And this is just a basic set of futures this patch series addresses.
+Others include input/output DMA support for the DRC and FD blocks,
+support for more ISP controls, etc.
 
-PCR is an integer that encodes a lot of bools to specify the behavior of
-the imxfb-lcd interaction. The alternative would be a lot of optional
-bool properties which are parsed in the driver to construct it that way.
+But it all is not immediately needed to make use of this really
+great ISP!
 
-> 
-> [...]
-> 
-> > -static int __init imxfb_probe(struct platform_device *pdev)
-> > +static int imxfb_of_read_mode(struct device_node *np,
-> > +               struct imx_fb_videomode *imxfb_mode)
-> > +{
-> > +       int ret;
-> > +       struct fb_videomode *of_mode = &imxfb_mode->mode;
-> > +       u32 bpp;
-> > +       u32 pcr;
-> > +
-> > +       ret = of_property_read_string(np, "model", &of_mode->name);
-> > +       if (ret)
-> > +               of_mode->name = NULL;
-> > +
-> > +       ret = of_get_fb_videomode(np, of_mode, OF_USE_NATIVE_MODE);
-> > +       if (ret)
-> > +               return ret;
-> > +
-> > +       ret = of_property_read_u32(np, "bpp", &bpp);
-> > +       ret |= of_property_read_u32(np, "pcr", &pcr);
-> > +
-> > +       if (ret)
-> > +               return ret;
-> 
-> Is this return value used anywhere in anything more than an "if (!err)"
-> capacity?  If so it may be worth having individual return value checks:
-> 
-> If one call returns -EINVAL (-22) and the other -ENODATA (-61), out the other
-> end we'd get -EISDIR (-21). If we don't care particularly about which error
-> code we actually pass on, we could always return a sensible code when ret is
-> nonzero:
-> 
-> if (ret)
-> 	return -EINVAL;
+A full git tree with all dependencies can be found at:
+git://linuxtv.org/snawrocki/samsung.git
+http://git.linuxtv.org/snawrocki/samsung.git/exynos4-fimc-is
 
-Yes, the error codes are directly passed through the probe function,
-so I will change it to return -EINVAL and print an device error message.
+Sylwester Nawrocki (8):
+  s5p-fimc: Add Exynos4x12 FIMC-IS driver
+  s5p-fimc: Add FIMC-IS ISP I2C bus driver
+  s5p-fimc: Add FIMC-IS parameter region definitions
+  s5p-fimc: Add common FIMC-IS image sensor driver
+  s5p-fimc: Add ISP video capture driver stubs
+  fimc-is: Add Exynos4x12 FIMC-IS device tree bindings documentation
+  s5p-fimc: Add fimc-is subdevs registration
+  s5p-fimc: Create media links for the FIMC-IS entities
 
-> 
-> > +
-> > +       if (bpp > 255)
-> > +               return -EINVAL;
-> 
-> Might it also be worth checking for 0 here?
+ .../devicetree/bindings/media/exynos4-fimc-is.txt  |   41 +
+ drivers/media/platform/s5p-fimc/Kconfig            |   13 +
+ drivers/media/platform/s5p-fimc/Makefile           |    4 +
+ drivers/media/platform/s5p-fimc/fimc-is-command.h  |  147 +++
+ drivers/media/platform/s5p-fimc/fimc-is-errno.c    |  272 ++++++
+ drivers/media/platform/s5p-fimc/fimc-is-errno.h    |  248 +++++
+ drivers/media/platform/s5p-fimc/fimc-is-i2c.c      |   81 ++
+ drivers/media/platform/s5p-fimc/fimc-is-i2c.h      |   15 +
+ drivers/media/platform/s5p-fimc/fimc-is-param.c    |  971 +++++++++++++++++++
+ drivers/media/platform/s5p-fimc/fimc-is-param.h    | 1018 ++++++++++++++++++++
+ drivers/media/platform/s5p-fimc/fimc-is-regs.c     |  242 +++++
+ drivers/media/platform/s5p-fimc/fimc-is-regs.h     |  164 ++++
+ drivers/media/platform/s5p-fimc/fimc-is-sensor.c   |  308 ++++++
+ drivers/media/platform/s5p-fimc/fimc-is-sensor.h   |   80 ++
+ drivers/media/platform/s5p-fimc/fimc-is.c          |  970 +++++++++++++++++++
+ drivers/media/platform/s5p-fimc/fimc-is.h          |  344 +++++++
+ drivers/media/platform/s5p-fimc/fimc-isp-video.c   |  414 ++++++++
+ drivers/media/platform/s5p-fimc/fimc-isp-video.h   |   50 +
+ drivers/media/platform/s5p-fimc/fimc-isp.c         |  791 +++++++++++++++
+ drivers/media/platform/s5p-fimc/fimc-isp.h         |  205 ++++
+ drivers/media/platform/s5p-fimc/fimc-mdevice.c     |  129 ++-
+ drivers/media/platform/s5p-fimc/fimc-mdevice.h     |   15 +
+ 22 files changed, 6502 insertions(+), 20 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/media/exynos4-fimc-is.txt
+ create mode 100644 drivers/media/platform/s5p-fimc/fimc-is-command.h
+ create mode 100644 drivers/media/platform/s5p-fimc/fimc-is-errno.c
+ create mode 100644 drivers/media/platform/s5p-fimc/fimc-is-errno.h
+ create mode 100644 drivers/media/platform/s5p-fimc/fimc-is-i2c.c
+ create mode 100644 drivers/media/platform/s5p-fimc/fimc-is-i2c.h
+ create mode 100644 drivers/media/platform/s5p-fimc/fimc-is-param.c
+ create mode 100644 drivers/media/platform/s5p-fimc/fimc-is-param.h
+ create mode 100644 drivers/media/platform/s5p-fimc/fimc-is-regs.c
+ create mode 100644 drivers/media/platform/s5p-fimc/fimc-is-regs.h
+ create mode 100644 drivers/media/platform/s5p-fimc/fimc-is-sensor.c
+ create mode 100644 drivers/media/platform/s5p-fimc/fimc-is-sensor.h
+ create mode 100644 drivers/media/platform/s5p-fimc/fimc-is.c
+ create mode 100644 drivers/media/platform/s5p-fimc/fimc-is.h
+ create mode 100644 drivers/media/platform/s5p-fimc/fimc-isp-video.c
+ create mode 100644 drivers/media/platform/s5p-fimc/fimc-isp-video.h
+ create mode 100644 drivers/media/platform/s5p-fimc/fimc-isp.c
+ create mode 100644 drivers/media/platform/s5p-fimc/fimc-isp.h
 
-Yes, changed.
-
-> 
-> [...]
-> 
-> > @@ -837,15 +914,51 @@ static int __init imxfb_probe(struct platform_device *pdev)
-> >
-> >         fbi = info->par;
-> >
-> > -       if (!fb_mode)
-> > -               fb_mode = pdata->mode[0].mode.name;
-> > -
-> >         platform_set_drvdata(pdev, info);
-> >
-> >         ret = imxfb_init_fbinfo(pdev);
-> >         if (ret < 0)
-> >                 goto failed_init;
-> >
-> > +       if (pdata) {
-> > +               if (!fb_mode)
-> > +                       fb_mode = pdata->mode[0].mode.name;
-> > +
-> > +               fbi->mode = pdata->mode;
-> > +               fbi->num_modes = pdata->num_modes;
-> > +       } else {
-> > +               struct device_node *display_np;
-> > +               fb_mode = NULL;
-> > +
-> > +               display_np = of_parse_phandle(pdev->dev.of_node, "display", 0);
-> > +               if (!display_np) {
-> > +                       dev_err(&pdev->dev, "No display defined in devicetree\n");
-> > +                       ret = -EINVAL;
-> > +                       goto failed_of_parse;
-> > +               }
-> > +
-> > +               /*
-> > +                * imxfb does not support more modes, we choose only the native
-> > +                * mode.
-> > +                */
-> > +               fbi->num_modes = 1;
-> > +
-> > +               fbi->mode = devm_kzalloc(&pdev->dev,
-> > +                               sizeof(struct imx_fb_videomode), GFP_KERNEL);
-> > +               if (!fbi->mode) {
-> > +                       ret = -ENOMEM;
-> > +                       goto failed_of_parse;
-> > +               }
-> > +
-> > +               ret = imxfb_of_read_mode(display_np, fbi->mode);
-> > +               if (ret)
-> > +                       goto failed_of_parse;
-> > +       }
-> > +
-> > +       for (i = 0, m = &fbi->mode[0]; i < fbi->num_modes; i++, m++)
-> > +               info->fix.smem_len = max_t(size_t, info->fix.smem_len,
-> > +                               m->mode.xres * m->mode.yres * m->bpp / 8);
-> 
-> Surely this is broken if bpp is not as multiple of 8?
-> 
-> If we can only handle multiples of 8, could we not sanity check this earlier?
-> 
-> If there's no strong preference for describing it in bits, could we not
-> describe it in bytes and side-step the issue?
-
-I think it is more common using bits per pixel. Indeed the for loop
-seems to be broken. I fixed it by calculating the maximum bytes used per
-pixel before. A grep through the kernel shows that there seem to be some
-displays using bpp that are not a multiple of 8.
-
-Thanks for your comments,
-
-Markus
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+--
+1.7.9.5
