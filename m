@@ -1,39 +1,72 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 11 Mar 2013 08:45:51 -0500
-Subject: [PATCH] clocksource: add empty version of clocksource_of_init
-Message-ID: <1363009551-8978-1-git-send-email-robherring2@gmail.com>
+From: sourav.poddar@ti.com (Sourav Poddar)
+Date: Mon, 11 Mar 2013 19:16:05 +0530
+Subject: [Resend/PATCH 4/5] arm: dts: omap5: add SPI devices to OMAP5
+ DeviceTree file
+Message-ID: <1363009565-19565-1-git-send-email-sourav.poddar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+From: Felipe Balbi <balbi@ti.com>
 
-Add an empty clocksource_of_init when !CLKSRC_OF. This is needed for builds
-where no timer has selected CLKSRC_OF.
+Add all 4 mcspi instances to omap5.dtsi file.
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Cc: John Stultz <john.stultz@linaro.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Andrew Morton <akpm@osdl.org>
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
 ---
-This is part of my CLKSRC_OF init rework. It is also needed for
-Arnd's default machine patch. I plan to send a pull request to arm-soc
-for all this shortly.
+ arch/arm/boot/dts/omap5.dtsi |   40 ++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 40 insertions(+), 0 deletions(-)
 
-Rob
-
- include/linux/clocksource.h |    1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/include/linux/clocksource.h b/include/linux/clocksource.h
-index 27cfda4..08ed5e1 100644
---- a/include/linux/clocksource.h
-+++ b/include/linux/clocksource.h
-@@ -340,6 +340,7 @@ extern void clocksource_of_init(void);
- 		__used __section(__clksrc_of_table)			\
- 		 = { .compatible = compat, .data = fn };
- #else
-+static inline void clocksource_of_init(void) {}
- #define CLOCKSOURCE_OF_DECLARE(name, compat, fn)
- #endif
+diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+index 790bb2a..9e182a9 100644
+--- a/arch/arm/boot/dts/omap5.dtsi
++++ b/arch/arm/boot/dts/omap5.dtsi
+@@ -241,6 +241,46 @@
+ 			ti,hwmods = "i2c5";
+ 		};
  
++		mcspi1: spi at 48098000 {
++			compatible = "ti,omap4-mcspi";
++			reg = <0x48098000 0x200>;
++			interrupts = <0 65 0x4>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			ti,hwmods = "mcspi1";
++			ti,spi-num-cs = <4>;
++		};
++
++		mcspi2: spi at 4809a000 {
++			compatible = "ti,omap4-mcspi";
++			reg = <0x4809a000 0x200>;
++			interrupts = <0 66 0x4>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			ti,hwmods = "mcspi2";
++			ti,spi-num-cs = <2>;
++		};
++
++		mcspi3: spi at 480b8000 {
++			compatible = "ti,omap4-mcspi";
++			reg = <0x480b8000 0x200>;
++			interrupts = <0 91 0x4>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			ti,hwmods = "mcspi3";
++			ti,spi-num-cs = <2>;
++		};
++
++		mcspi4: spi at 480ba000 {
++			compatible = "ti,omap4-mcspi";
++			reg = <0x480ba000 0x200>;
++			interrupts = <0 48 0x4>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			ti,hwmods = "mcspi4";
++			ti,spi-num-cs = <1>;
++		};
++
+ 		uart1: serial at 4806a000 {
+ 			compatible = "ti,omap4-uart";
+ 			reg = <0x4806a000 0x100>;
 -- 
-1.7.10.4
+1.7.1
