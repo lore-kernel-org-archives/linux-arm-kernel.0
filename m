@@ -1,36 +1,207 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Mon, 11 Mar 2013 12:54:00 -0600
-Subject: Multi-platform, and secure-only ARM errata workarounds
-In-Reply-To: <CAOesGMgYL19+u-bLp080iasct5xtC=qfNCoz=SY7bbVgF=7JQg@mail.gmail.com>
-References: <512CF87A.4090404@wwwdotorg.org>
- <20130226181114.GU17833@n2100.arm.linux.org.uk>
- <5130E757.6090500@wwwdotorg.org>
- <20130304063436.GB27241@tbergstrom-lnx.Nvidia.com>
- <20130304091600.GC27241@tbergstrom-lnx.Nvidia.com>
- <5134D50B.8060001@wwwdotorg.org>
- <20130305074047.GH27241@tbergstrom-lnx.Nvidia.com>
- <513624AA.4090207@wwwdotorg.org> <513CC21E.7080901@ti.com>
- <CAOesGMgYL19+u-bLp080iasct5xtC=qfNCoz=SY7bbVgF=7JQg@mail.gmail.com>
-Message-ID: <20130311185400.GC10992@obsidianresearch.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Mon, 11 Mar 2013 20:39:21 +0100
+Subject: [PATCH v2 2/2] video: imxfb: Add DT support
+In-Reply-To: <20130311102540.GB23082@e106331-lin.cambridge.arm.com>
+References: <1362504608-15839-1-git-send-email-mpa@pengutronix.de>
+ <1362504608-15839-3-git-send-email-mpa@pengutronix.de>
+ <20130311102540.GB23082@e106331-lin.cambridge.arm.com>
+Message-ID: <20130311193921.GB18350@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 10, 2013 at 11:47:31AM -0700, Olof Johansson wrote:
+Hi,
 
-> If we already have to use appended DTB on these systems, then we
-> already have a need to wrap the kernel in a per-system image (i.e. by
-> appending the DTB to the kernel and booting that). If we're already
-> doing that, we could just as well add a wrapper around the whole thing
-> that enables the errata before launching the zimage.
+On Mon, Mar 11, 2013 at 10:25:40AM +0000, Mark Rutland wrote:
+> Hi,
+> 
+> Any reason for not CCing devicetree-discuss?
 
-What about bundling the DTB and a block of asm code to do 'CPU
-startup' together somehow? If it was easy to locate the code in the
-bundle then it could be jumped to directly from the vmlinux pre-mmu
-startup code, from the secondary CPU startup, and from the CPU wake up
-as well.
+There is no reason, sorry, I forgot CC, I will add it to CC for the next
+version.
 
-The tool to generate this bundle could generate and compile the asm
-code based on an errata list in the DTB itself..
+> 
+> I have a couple of comments on the binding and the way it's parsed.
+> 
+> On Tue, Mar 05, 2013 at 05:30:08PM +0000, Markus Pargmann wrote:
+> > Add devicetree support for imx framebuffer driver. It uses the generic
+> > display bindings and helper functions.
+> >
+> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> > Cc: Fabio Estevam <festevam@gmail.com>
+> > ---
+> >
+> > Notes:
+> >     Changes in v2:
+> >     - Removed pwmr register property
+> >     - Cleanup of devicetree binding documentation
+> >     - Use default values for pwmr and lscr1
+> >
+> >  .../devicetree/bindings/video/fsl,imx-fb.txt       |  49 ++++++
+> >  drivers/video/imxfb.c                              | 182 +++++++++++++++++----
+> >  2 files changed, 197 insertions(+), 34 deletions(-)
+> >  create mode 100644 Documentation/devicetree/bindings/video/fsl,imx-fb.txt
+> >
+> > diff --git a/Documentation/devicetree/bindings/video/fsl,imx-fb.txt b/Documentation/devicetree/bindings/video/fsl,imx-fb.txt
+> > new file mode 100644
+> > index 0000000..e1a53a3
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/video/fsl,imx-fb.txt
+> > @@ -0,0 +1,49 @@
+> > +Freescale imx21 Framebuffer
+> > +
+> > +This framebuffer driver supports devices imx1, imx21, imx25, and imx27.
+> > +
+> > +Required properties:
+> > +- compatible : "fsl,<chip>-fb", chip should be imx1 or imx21
+> > +- reg : Should contain 1 register ranges(address and length)
+> > +- interrupts : One interrupt of the fb dev
+> > +
+> > +Required nodes:
+> > +- display: Phandle to a display node as described in
+> > +       Documentation/devicetree/bindings/video/display-timing.txt
+> > +       Additional, the display node has to define properties:
+> > +       - bpp: Bits per pixel
+> > +       - pcr: LCDC PCR value
+> 
+> As these are non-standard, it would be good to prefix them (e.g. "fsl,pcr").
 
-Regards,
-Jason
+Okay.
+
+> If you need them, why are they not a good fit for the generic binding?
+
+I think bpp could be used by some other drivers but not of the majority.
+There are actually already some of them having bindings for bpp, e.g.
+Documentation/devicetree/bindings/video/via,vt8500-fb.txt .
+
+> 
+> I'm not familiar with the hardware, what is the PCR exactly?
+
+PCR is an integer that encodes a lot of bools to specify the behavior of
+the imxfb-lcd interaction. The alternative would be a lot of optional
+bool properties which are parsed in the driver to construct it that way.
+
+> 
+> [...]
+> 
+> > -static int __init imxfb_probe(struct platform_device *pdev)
+> > +static int imxfb_of_read_mode(struct device_node *np,
+> > +               struct imx_fb_videomode *imxfb_mode)
+> > +{
+> > +       int ret;
+> > +       struct fb_videomode *of_mode = &imxfb_mode->mode;
+> > +       u32 bpp;
+> > +       u32 pcr;
+> > +
+> > +       ret = of_property_read_string(np, "model", &of_mode->name);
+> > +       if (ret)
+> > +               of_mode->name = NULL;
+> > +
+> > +       ret = of_get_fb_videomode(np, of_mode, OF_USE_NATIVE_MODE);
+> > +       if (ret)
+> > +               return ret;
+> > +
+> > +       ret = of_property_read_u32(np, "bpp", &bpp);
+> > +       ret |= of_property_read_u32(np, "pcr", &pcr);
+> > +
+> > +       if (ret)
+> > +               return ret;
+> 
+> Is this return value used anywhere in anything more than an "if (!err)"
+> capacity?  If so it may be worth having individual return value checks:
+> 
+> If one call returns -EINVAL (-22) and the other -ENODATA (-61), out the other
+> end we'd get -EISDIR (-21). If we don't care particularly about which error
+> code we actually pass on, we could always return a sensible code when ret is
+> nonzero:
+> 
+> if (ret)
+> 	return -EINVAL;
+
+Yes, the error codes are directly passed through the probe function,
+so I will change it to return -EINVAL and print an device error message.
+
+> 
+> > +
+> > +       if (bpp > 255)
+> > +               return -EINVAL;
+> 
+> Might it also be worth checking for 0 here?
+
+Yes, changed.
+
+> 
+> [...]
+> 
+> > @@ -837,15 +914,51 @@ static int __init imxfb_probe(struct platform_device *pdev)
+> >
+> >         fbi = info->par;
+> >
+> > -       if (!fb_mode)
+> > -               fb_mode = pdata->mode[0].mode.name;
+> > -
+> >         platform_set_drvdata(pdev, info);
+> >
+> >         ret = imxfb_init_fbinfo(pdev);
+> >         if (ret < 0)
+> >                 goto failed_init;
+> >
+> > +       if (pdata) {
+> > +               if (!fb_mode)
+> > +                       fb_mode = pdata->mode[0].mode.name;
+> > +
+> > +               fbi->mode = pdata->mode;
+> > +               fbi->num_modes = pdata->num_modes;
+> > +       } else {
+> > +               struct device_node *display_np;
+> > +               fb_mode = NULL;
+> > +
+> > +               display_np = of_parse_phandle(pdev->dev.of_node, "display", 0);
+> > +               if (!display_np) {
+> > +                       dev_err(&pdev->dev, "No display defined in devicetree\n");
+> > +                       ret = -EINVAL;
+> > +                       goto failed_of_parse;
+> > +               }
+> > +
+> > +               /*
+> > +                * imxfb does not support more modes, we choose only the native
+> > +                * mode.
+> > +                */
+> > +               fbi->num_modes = 1;
+> > +
+> > +               fbi->mode = devm_kzalloc(&pdev->dev,
+> > +                               sizeof(struct imx_fb_videomode), GFP_KERNEL);
+> > +               if (!fbi->mode) {
+> > +                       ret = -ENOMEM;
+> > +                       goto failed_of_parse;
+> > +               }
+> > +
+> > +               ret = imxfb_of_read_mode(display_np, fbi->mode);
+> > +               if (ret)
+> > +                       goto failed_of_parse;
+> > +       }
+> > +
+> > +       for (i = 0, m = &fbi->mode[0]; i < fbi->num_modes; i++, m++)
+> > +               info->fix.smem_len = max_t(size_t, info->fix.smem_len,
+> > +                               m->mode.xres * m->mode.yres * m->bpp / 8);
+> 
+> Surely this is broken if bpp is not as multiple of 8?
+> 
+> If we can only handle multiples of 8, could we not sanity check this earlier?
+> 
+> If there's no strong preference for describing it in bits, could we not
+> describe it in bytes and side-step the issue?
+
+I think it is more common using bits per pixel. Indeed the for loop
+seems to be broken. I fixed it by calculating the maximum bytes used per
+pixel before. A grep through the kernel shows that there seem to be some
+displays using bpp that are not a multiple of 8.
+
+Thanks for your comments,
+
+Markus
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
