@@ -1,103 +1,90 @@
 From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Mon, 11 Mar 2013 10:36:01 +0530
-Subject: [PATCH 4/8] memory: emif: Handle devices which are not rated for >85C
+Date: Mon, 11 Mar 2013 10:36:04 +0530
+Subject: [PATCH 7/8] memory: emif: errata i743: Prohibit usage of Power-Down
+ mode
 In-Reply-To: <1362978365-5593-1-git-send-email-lokeshvutla@ti.com>
 References: <1362978365-5593-1-git-send-email-lokeshvutla@ti.com>
-Message-ID: <1362978365-5593-5-git-send-email-lokeshvutla@ti.com>
+Message-ID: <1362978365-5593-8-git-send-email-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nishanth Menon <nm@ti.com>
+From: Grygorii Strashko <grygorii.strashko@ti.com>
 
-As per JESD209-2E specification for LPDDR2,
-      http://www.jedec.org/standards-documents/results/jesd209-2E
-Table 73, LPDDR2 memories come in two flavors - Standard and
-Extended. The Standard types can operate from -25C to +85C
-However, beyond that and upto +105C can only be supported by
-Extended types.
+ERRATA DESCRIPTION :
+The EMIF supports power-down state for low power. The EMIF
+automatically puts the SDRAM into power-down after the memory is
+not accessed for a defined number of cycles and the
+EMIF_PWR_MGMT_CTRL[10:8] REG_LP_MODE bit field is set to 0x4.
+As the EMIF supports automatic output impedance calibration, a ZQ
+calibration long command is issued every time it exits active
+power-down and precharge power-down modes. The EMIF waits and
+blocks any other command during this calibration.
+The EMIF does not allow selective disabling of ZQ calibration upon
+exit of power-down mode. Due to very short periods of power-down
+cycles, ZQ calibration overhead creates bandwidth issues and
+increases overall system power consumption. On the other hand,
+issuing ZQ calibration long commands when exiting self-refresh is
+still required.
 
-Unfortunately, it seems there is no info in MR0(device info) or
-MR[1,2](device feature) for run time detection of this capability
-as far as seen on the spec. Hence, we provide a custom_config
-flag to be populated by platforms which have these "extended"
-type memories.
+WORKAROUND :
+Because there is no power consumption benefit of the power-down due
+to the calibration and there is a performance risk, the guideline
+is to not allow power-down state and, therefore, to not have set
+the EMIF_PWR_MGMT_CTRL[10:8] REG_LP_MODE bit field to 0x4.
 
-For the "Standard" memories, we need to consider MR4 notifications
-of temperature triggers >85C as equivalent to thermal shutdown
-events (equivalent to Spec specified thermal shutdown events for
-"extended" parts).
-
-Reported-by: Richard Woodruff <r-woodruff2@ti.com>
-Signed-off-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+Signed-off-by: Vitaly Chernooky <vitaly.chernooky@ti.com>
+Signed-off-by: Oleksandr Dmytryshyn <oleksandr.dmytryshyn@ti.com>
 Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
 ---
- drivers/memory/emif.c                   |   27 +++++++++++++++++++++++++++
- include/linux/platform_data/emif_plat.h |    1 +
- 2 files changed, 28 insertions(+)
+ drivers/memory/emif.c |   35 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
 
 diff --git a/drivers/memory/emif.c b/drivers/memory/emif.c
-index 37e0c77..927fb55 100644
+index f75806a..119503a 100644
 --- a/drivers/memory/emif.c
 +++ b/drivers/memory/emif.c
-@@ -914,6 +914,7 @@ static irqreturn_t handle_temp_alert(void __iomem *base, struct emif_data *emif)
- {
- 	u32		old_temp_level;
- 	irqreturn_t	ret = IRQ_HANDLED;
-+	struct emif_custom_configs *custom_configs;
+@@ -257,6 +257,41 @@ static void set_lpmode(struct emif_data *emif, u8 lpmode)
+ 	u32 temp;
+ 	void __iomem *base = emif->base;
  
- 	spin_lock_irqsave(&emif_lock, irq_state);
- 	old_temp_level = emif->temperature_level;
-@@ -926,6 +927,29 @@ static irqreturn_t handle_temp_alert(void __iomem *base, struct emif_data *emif)
- 		goto out;
- 	}
- 
-+	custom_configs = emif->plat_data->custom_configs;
-+
 +	/*
-+	 * IF we detect higher than "nominal rating" from DDR sensor
-+	 * on an unsupported DDR part, shutdown system
++	 * Workaround for errata i743 - LPDDR2 Power-Down State is Not
++	 * Efficient
++	 *
++	 * i743 DESCRIPTION:
++	 * The EMIF supports power-down state for low power. The EMIF
++	 * automatically puts the SDRAM into power-down after the memory is
++	 * not accessed for a defined number of cycles and the
++	 * EMIF_PWR_MGMT_CTRL[10:8] REG_LP_MODE bit field is set to 0x4.
++	 * As the EMIF supports automatic output impedance calibration, a ZQ
++	 * calibration long command is issued every time it exits active
++	 * power-down and precharge power-down modes. The EMIF waits and
++	 * blocks any other command during this calibration.
++	 * The EMIF does not allow selective disabling of ZQ calibration upon
++	 * exit of power-down mode. Due to very short periods of power-down
++	 * cycles, ZQ calibration overhead creates bandwidth issues and
++	 * increases overall system power consumption. On the other hand,
++	 * issuing ZQ calibration long commands when exiting self-refresh is
++	 * still required.
++	 *
++	 * WORKAROUND
++	 * Because there is no power consumption benefit of the power-down due
++	 * to the calibration and there is a performance risk, the guideline
++	 * is to not allow power-down state and, therefore, to not have set
++	 * the EMIF_PWR_MGMT_CTRL[10:8] REG_LP_MODE bit field to 0x4.
 +	 */
-+	if (custom_configs && !(custom_configs->mask &
-+				EMIF_CUSTOM_CONFIG_EXTENDED_TEMP_PART)) {
-+		if (emif->temperature_level >= SDRAM_TEMP_HIGH_DERATE_REFRESH) {
-+			dev_err(emif->dev,
-+				"%s:NOT Extended temperature capable memory."
-+				"Converting MR4=0x%02x as shutdown event\n",
-+				__func__, emif->temperature_level);
-+			/*
-+			 * Temperature far too high - do kernel_power_off()
-+			 * from thread context
-+			 */
-+			emif->temperature_level = SDRAM_TEMP_VERY_HIGH_SHUTDOWN;
-+			ret = IRQ_WAKE_THREAD;
-+			goto out;
-+		}
++	if ((emif->plat_data->ip_rev == EMIF_4D) &&
++	    (EMIF_LP_MODE_PWR_DN == lpmode)) {
++		WARN_ONCE(1,
++			  "REG_LP_MODE = LP_MODE_PWR_DN(4) is prohibited by"
++			  "erratum i743 switch to LP_MODE_SELF_REFRESH(2)\n");
++		/* rallback LP_MODE to Self-refresh mode */
++		lpmode = EMIF_LP_MODE_SELF_REFRESH;
 +	}
 +
- 	if (emif->temperature_level < old_temp_level ||
- 		emif->temperature_level == SDRAM_TEMP_VERY_HIGH_SHUTDOWN) {
- 		/*
-@@ -1224,6 +1248,9 @@ static void __init_or_module of_get_custom_configs(struct device_node *np_emif,
- 		cust_cfgs->temp_alert_poll_interval_ms = *poll_intvl;
- 	}
- 
-+	if (of_find_property(np_emif, "extended-temp-part", &len))
-+		cust_cfgs->mask |= EMIF_CUSTOM_CONFIG_EXTENDED_TEMP_PART;
-+
- 	if (!is_custom_config_valid(cust_cfgs, emif->dev)) {
- 		devm_kfree(emif->dev, cust_cfgs);
- 		return;
-diff --git a/include/linux/platform_data/emif_plat.h b/include/linux/platform_data/emif_plat.h
-index 03378ca..5c19a2a 100644
---- a/include/linux/platform_data/emif_plat.h
-+++ b/include/linux/platform_data/emif_plat.h
-@@ -40,6 +40,7 @@
- /* Custom config requests */
- #define EMIF_CUSTOM_CONFIG_LPMODE			0x00000001
- #define EMIF_CUSTOM_CONFIG_TEMP_ALERT_POLL_INTERVAL	0x00000002
-+#define EMIF_CUSTOM_CONFIG_EXTENDED_TEMP_PART		0x00000004
- 
- #ifndef __ASSEMBLY__
- /**
+ 	temp = readl(base + EMIF_POWER_MANAGEMENT_CONTROL);
+ 	temp &= ~LP_MODE_MASK;
+ 	temp |= (lpmode << LP_MODE_SHIFT);
 -- 
 1.7.9.5
