@@ -1,38 +1,56 @@
 From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Mon, 11 Mar 2013 10:35:59 +0530
-Subject: [PATCH 2/8] memory: emif: setup LP settings on freq update
+Date: Mon, 11 Mar 2013 10:36:02 +0530
+Subject: [PATCH 5/8] memory: emif: use restart if power_off not present when
+ out of spec
 In-Reply-To: <1362978365-5593-1-git-send-email-lokeshvutla@ti.com>
 References: <1362978365-5593-1-git-send-email-lokeshvutla@ti.com>
-Message-ID: <1362978365-5593-3-git-send-email-lokeshvutla@ti.com>
+Message-ID: <1362978365-5593-6-git-send-email-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ambresh K <ambresh@ti.com>
+From: Nishanth Menon <nm@ti.com>
 
-Program the power management shadow register on freq update
-Else the concept of threshold frequencies dont really matter
-as the system always uses the performance mode timing for LP
-which is programmed in at init time.
+Some machine or kernel variants might have missed implementation
+of power off handlers. We DONOT want to let the system be in
+"out of spec" state in this condition. So, WARN and attempt
+a machine restart in the hopes of clearing the out-of-spec
+temperature condition.
+
+NOTE: This is not the safest option, but safer than leaving the
+system in unstable conditions.
 
 Signed-off-by: Nishanth Menon <nm@ti.com>
-Signed-off-by: Ambresh K <ambresh@ti.com>
 Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
 ---
- drivers/memory/emif.c |    2 ++
- 1 file changed, 2 insertions(+)
+ drivers/memory/emif.c |    9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/memory/emif.c b/drivers/memory/emif.c
-index 622638c..16f5089 100644
+index 927fb55..02a94fc 100644
 --- a/drivers/memory/emif.c
 +++ b/drivers/memory/emif.c
-@@ -815,6 +815,8 @@ static void setup_registers(struct emif_data *emif, struct emif_regs *regs)
+@@ -25,6 +25,7 @@
+ #include <linux/module.h>
+ #include <linux/list.h>
+ #include <linux/spinlock.h>
++#include <linux/pm.h>
+ #include <memory/jedec_ddr.h>
+ #include "emif.h"
+ #include "of_memory.h"
+@@ -1011,7 +1012,13 @@ static irqreturn_t emif_threaded_isr(int irq, void *dev_id)
  
- 	writel(regs->sdram_tim2_shdw, base + EMIF_SDRAM_TIMING_2_SHDW);
- 	writel(regs->phy_ctrl_1_shdw, base + EMIF_DDR_PHY_CTRL_1_SHDW);
-+	writel(regs->pwr_mgmt_ctrl_shdw,
-+	       base + EMIF_POWER_MANAGEMENT_CTRL_SHDW);
+ 	if (emif->temperature_level == SDRAM_TEMP_VERY_HIGH_SHUTDOWN) {
+ 		dev_emerg(emif->dev, "SDRAM temperature exceeds operating limit.. Needs shut down!!!\n");
+-		kernel_power_off();
++		/* If we have Power OFF ability, use it, else try restarting */
++		if (pm_power_off) {
++			kernel_power_off();
++		} else {
++			WARN(1, "FIXME: NO pm_power_off!!! trying restart\n");
++			kernel_restart("SDRAM Over-temp Emergency restart");
++		}
+ 		return IRQ_HANDLED;
+ 	}
  
- 	/* Settings specific for EMIF4D5 */
- 	if (emif->plat_data->ip_rev != EMIF_4D5)
 -- 
 1.7.9.5
