@@ -1,180 +1,113 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 11 Mar 2013 20:44:52 +0100
-Subject: [RFC PATCH 8/8] s5p-fimc: Create media links for the FIMC-IS entities
-In-Reply-To: <1363031092-29950-1-git-send-email-s.nawrocki@samsung.com>
-References: <1363031092-29950-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <1363031092-29950-9-git-send-email-s.nawrocki@samsung.com>
+From: notasas@gmail.com (Grazvydas Ignotas)
+Date: Mon, 11 Mar 2013 21:49:00 +0200
+Subject: [PATCH] ARM: OMAP3: hwmod data: keep MIDLEMODE in force-standby for
+ musb
+Message-ID: <1363031340-9382-1-git-send-email-notasas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Create disabled links from the FIMC-LITE subdevs to the FIMC-IS-ISP
-subdev and from FIMC-IS-ISP to all FIMC subdevs.
+For some unknown reason, allowing hwmod to control MIDLEMODE causes
+core_pwrdm to not hit idle states for musb in DM3730 at least.
+I've verified that setting any MIDLEMODE value other than "force
+standby" before enabling the device causes subsequent suspend
+attempts to fail with core_pwrdm not entering idle states, even
+if the driver is unloaded and "force standby" is restored before
+suspend attempt. To recover from this, soft reset can be used, but
+that's not suitable solution for suspend.
 
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Keeping the register set at force standby (reset value) makes it work
+and device still functions properly, as musb has driver-controlled
+OTG_FORCESTDBY register that controls MSTANDBY signal.
+Note that TI PSP kernels also have similar workarounds.
+
+This patch also fixes HWMOD_SWSUP_MSTANDBY documentation to match the
+actual flag name.
+
+Signed-off-by: Grazvydas Ignotas <notasas@gmail.com>
 ---
- drivers/media/platform/s5p-fimc/fimc-mdevice.c |   78 +++++++++++++++++++-----
- 1 file changed, 62 insertions(+), 16 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod.c           |    7 +++++--
+ arch/arm/mach-omap2/omap_hwmod.h           |    9 +++++++--
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    7 ++++++-
+ 3 files changed, 18 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/media/platform/s5p-fimc/fimc-mdevice.c b/drivers/media/platform/s5p-fimc/fimc-mdevice.c
-index 1521dec..5304da5 100644
---- a/drivers/media/platform/s5p-fimc/fimc-mdevice.c
-+++ b/drivers/media/platform/s5p-fimc/fimc-mdevice.c
-@@ -807,9 +807,17 @@ static int __fimc_md_create_fimc_sink_links(struct fimc_md *fmd,
- 	struct fimc_sensor_info *s_info = NULL;
- 	struct media_entity *sink;
- 	unsigned int flags = 0;
--	int ret, i;
-+	int i, ret = 0;
- 
--	for (i = 0; i < FIMC_MAX_DEVS; i++) {
-+	if (sensor) {
-+		s_info = v4l2_get_subdev_hostdata(sensor);
-+		/* Skip direct FIMC links in the logical FIMC-IS sensor path */
-+		if (s_info && s_info->pdata.fimc_bus_type ==
-+		    FIMC_BUS_TYPE_ISP_WRITEBACK)
-+			ret = 1;
-+	}
-+
-+	for (i = 0; !ret && i < FIMC_MAX_DEVS; i++) {
- 		if (!fmd->fimc[i])
- 			continue;
- 		/*
-@@ -838,7 +846,7 @@ static int __fimc_md_create_fimc_sink_links(struct fimc_md *fmd,
- 
- 		if (flags == 0 || sensor == NULL)
- 			continue;
--		s_info = v4l2_get_subdev_hostdata(sensor);
-+
- 		if (!WARN_ON(s_info == NULL)) {
- 			unsigned long irq_flags;
- 			spin_lock_irqsave(&fmd->slock, irq_flags);
-@@ -851,25 +859,20 @@ static int __fimc_md_create_fimc_sink_links(struct fimc_md *fmd,
- 		if (!fmd->fimc_lite[i])
- 			continue;
- 
--		if (link_mask & (1 << (i + FIMC_MAX_DEVS)))
--			flags = MEDIA_LNK_FL_ENABLED;
--		else
--			flags = 0;
--
- 		sink = &fmd->fimc_lite[i]->subdev.entity;
- 		ret = media_entity_create_link(source, pad, sink,
--					       FLITE_SD_PAD_SINK, flags);
-+					       FLITE_SD_PAD_SINK, 0);
- 		if (ret)
- 			return ret;
- 
- 		/* Notify FIMC-LITE subdev entity */
- 		ret = media_entity_call(sink, link_setup, &sink->pads[0],
--					&source->pads[pad], flags);
-+					&source->pads[pad], 0);
- 		if (ret)
- 			break;
- 
--		v4l2_info(&fmd->v4l2_dev, "created link [%s] %c> [%s]\n",
--			  source->name, flags ? '=' : '-', sink->name);
-+		v4l2_info(&fmd->v4l2_dev, "created link [%s] -> [%s]\n",
-+			  source->name, sink->name);
- 	}
- 	return 0;
- }
-@@ -878,26 +881,59 @@ static int __fimc_md_create_fimc_sink_links(struct fimc_md *fmd,
- static int __fimc_md_create_flite_source_links(struct fimc_md *fmd)
- {
- 	struct media_entity *source, *sink;
--	unsigned int flags = MEDIA_LNK_FL_ENABLED;
- 	int i, ret = 0;
- 
- 	for (i = 0; i < FIMC_LITE_MAX_DEVS; i++) {
- 		struct fimc_lite *fimc = fmd->fimc_lite[i];
-+
- 		if (fimc == NULL)
- 			continue;
-+
- 		source = &fimc->subdev.entity;
- 		sink = &fimc->vfd.entity;
- 		/* FIMC-LITE's subdev and video node */
- 		ret = media_entity_create_link(source, FLITE_SD_PAD_SOURCE_DMA,
--					       sink, 0, flags);
-+					       sink, 0, 0);
-+		if (ret)
-+			break;
-+		/* Link from FIMC-LITE to IS-ISP subdev */
-+		sink = &fmd->fimc_is->isp.subdev.entity;
-+		ret = media_entity_create_link(source, FLITE_SD_PAD_SOURCE_ISP,
-+					       sink, 0, 0);
- 		if (ret)
- 			break;
--		/* TODO: create links to other entities */
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index c2c798c..a202a47 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -1368,7 +1368,9 @@ static void _enable_sysc(struct omap_hwmod *oh)
  	}
  
- 	return ret;
- }
+ 	if (sf & SYSC_HAS_MIDLEMODE) {
+-		if (oh->flags & HWMOD_SWSUP_MSTANDBY) {
++		if (oh->flags & HWMOD_FORCE_MSTANDBY) {
++			idlemode = HWMOD_IDLEMODE_FORCE;
++		} else if (oh->flags & HWMOD_SWSUP_MSTANDBY) {
+ 			idlemode = HWMOD_IDLEMODE_NO;
+ 		} else {
+ 			if (sf & SYSC_HAS_ENAWAKEUP)
+@@ -1440,7 +1442,8 @@ static void _idle_sysc(struct omap_hwmod *oh)
+ 	}
  
-+/* Create FIMC-IS links */
-+static int __fimc_md_create_fimc_is_links(struct fimc_md *fmd)
-+{
-+	struct media_entity *source, *sink;
-+	int i, ret;
-+
-+	source = &fmd->fimc_is->isp.subdev.entity;
-+
-+	for (i = 0; i < FIMC_MAX_DEVS; i++) {
-+		if (fmd->fimc[i] == NULL)
-+			continue;
-+
-+		/* Link from IS-ISP subdev to FIMC */
-+		sink = &fmd->fimc[i]->vid_cap.subdev.entity;
-+		ret = media_entity_create_link(source, FIMC_IS_SD_PAD_SRC_FIFO,
-+					       sink, FIMC_SD_PAD_SINK_FIFO, 0);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	/* Link from IS-ISP subdev to is.isp capture video node */
-+	sink = &fmd->fimc_is->isp.vfd.entity;
-+	ret = media_entity_create_link(source, FIMC_IS_SD_PAD_SRC_DMA,
-+					       sink, 0, 0);
-+	return ret;
-+}
-+
- /**
-  * fimc_md_create_links - create default links between registered entities
+ 	if (sf & SYSC_HAS_MIDLEMODE) {
+-		if (oh->flags & HWMOD_SWSUP_MSTANDBY) {
++		if ((oh->flags & HWMOD_SWSUP_MSTANDBY) ||
++		    (oh->flags & HWMOD_FORCE_MSTANDBY)) {
+ 			idlemode = HWMOD_IDLEMODE_FORCE;
+ 		} else {
+ 			if (sf & SYSC_HAS_ENAWAKEUP)
+diff --git a/arch/arm/mach-omap2/omap_hwmod.h b/arch/arm/mach-omap2/omap_hwmod.h
+index d43d9b6..d5dc935 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.h
++++ b/arch/arm/mach-omap2/omap_hwmod.h
+@@ -427,8 +427,8 @@ struct omap_hwmod_omap4_prcm {
   *
-@@ -980,6 +1016,7 @@ static int fimc_md_create_links(struct fimc_md *fmd)
- 	for (i = 0; i < CSIS_MAX_ENTITIES; i++) {
- 		if (fmd->csis[i].sd == NULL)
- 			continue;
-+
- 		source = &fmd->csis[i].sd->entity;
- 		pad = CSIS_PAD_SOURCE;
- 		sensor = csi_sensors[i];
-@@ -994,15 +1031,24 @@ static int fimc_md_create_links(struct fimc_md *fmd)
- 	for (i = 0; i < FIMC_MAX_DEVS; i++) {
- 		if (!fmd->fimc[i])
- 			continue;
-+
- 		source = &fmd->fimc[i]->vid_cap.subdev.entity;
- 		sink = &fmd->fimc[i]->vid_cap.vfd.entity;
-+
- 		ret = media_entity_create_link(source, FIMC_SD_PAD_SOURCE,
- 					      sink, 0, flags);
- 		if (ret)
- 			break;
- 	}
- 
--	return __fimc_md_create_flite_source_links(fmd);
-+	ret = __fimc_md_create_flite_source_links(fmd);
-+	if (ret < 0)
-+		return ret;
-+
-+	if (fmd->use_isp)
-+		ret = __fimc_md_create_fimc_is_links(fmd);
-+
-+	return ret;
- }
+  * HWMOD_SWSUP_SIDLE: omap_hwmod code should manually bring module in and out
+  *     of idle, rather than relying on module smart-idle
+- * HWMOD_SWSUP_MSTDBY: omap_hwmod code should manually bring module in and out
+- *     of standby, rather than relying on module smart-standby
++ * HWMOD_SWSUP_MSTANDBY: omap_hwmod code should manually bring module in and
++ *     out of standby, rather than relying on module smart-standby
+  * HWMOD_INIT_NO_RESET: don't reset this module at boot - important for
+  *     SDRAM controller, etc. XXX probably belongs outside the main hwmod file
+  *     XXX Should be HWMOD_SETUP_NO_RESET
+@@ -459,6 +459,10 @@ struct omap_hwmod_omap4_prcm {
+  *     correctly, or this is being abused to deal with some PM latency
+  *     issues -- but we're currently suffering from a shortage of
+  *     folks who are able to track these issues down properly.
++ * HWMOD_FORCE_MSTANDBY: Always keep MIDLEMODE bits cleared so that device
++ *     is kept in force-standby mode. Failing to do so causes PM problems
++ *     with musb on OMAP3630 at least. Note that musb has a dedicated register
++ *     to control MSTANDBY signal when MIDLEMODE is set to force-standby.
+  */
+ #define HWMOD_SWSUP_SIDLE			(1 << 0)
+ #define HWMOD_SWSUP_MSTANDBY			(1 << 1)
+@@ -471,6 +475,7 @@ struct omap_hwmod_omap4_prcm {
+ #define HWMOD_16BIT_REG				(1 << 8)
+ #define HWMOD_EXT_OPT_MAIN_CLK			(1 << 9)
+ #define HWMOD_BLOCK_WFI				(1 << 10)
++#define HWMOD_FORCE_MSTANDBY			(1 << 11)
  
  /*
+  * omap_hwmod._int_flags definitions
+diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+index ac7e03e..5112d04 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+@@ -1707,9 +1707,14 @@ static struct omap_hwmod omap3xxx_usbhsotg_hwmod = {
+ 	 * Erratum ID: i479  idle_req / idle_ack mechanism potentially
+ 	 * broken when autoidle is enabled
+ 	 * workaround is to disable the autoidle bit at module level.
++	 *
++	 * Enabling the device in any other MIDLEMODE setting but force-idle
++	 * causes core_pwrdm not enter idle states@least on OMAP3630.
++	 * Note that musb has OTG_FORCESTDBY register that controls MSTANDBY
++	 * signal when MIDLEMODE is set to force-idle.
+ 	 */
+ 	.flags		= HWMOD_NO_OCP_AUTOIDLE | HWMOD_SWSUP_SIDLE
+-				| HWMOD_SWSUP_MSTANDBY,
++				| HWMOD_FORCE_MSTANDBY,
+ };
+ 
+ /* usb_otg_hs */
 -- 
 1.7.9.5
