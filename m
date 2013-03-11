@@ -1,47 +1,46 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Mon, 11 Mar 2013 13:02:59 +0800
-Subject: [PATCH] ARM:kernel: beautify code, using 'static const' instead
- of 'const static'
-In-Reply-To: <513D32E3.1080101@gmail.com>
-References: <513BE8FA.6080304@asianux.com> <513D32E3.1080101@gmail.com>
-Message-ID: <513D6583.8040506@asianux.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 10 Mar 2013 22:05:46 -0700
+Subject: 3.9-rc1 regression in arm dtb build
+In-Reply-To: <5138FDAE.8060202@wwwdotorg.org>
+References: <20130306193332.GA6022@amd.pavel.ucw.cz>
+ <5137C404.9060902@wwwdotorg.org>
+ <20130307144506.GB7344@amd.pavel.ucw.cz>
+ <5138FDAE.8060202@wwwdotorg.org>
+Message-ID: <20130311050546.GA21863@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2013?03?11? 09:26, Rob Herring ??:
-> On 03/09/2013 07:59 PM, Chen Gang wrote:
->> > 
->> >   better using 'static const' instead of 'const static'
->> > 
->> > Signed-off-by: Chen Gang <gang.chen@asianux.com>
->> > ---
->> >  arch/arm/kernel/smp_twd.c |    2 +-
->> >  1 files changed, 1 insertions(+), 1 deletions(-)
->> > 
->> > diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
->> > index 3f25650..ef3e499 100644
->> > --- a/arch/arm/kernel/smp_twd.c
->> > +++ b/arch/arm/kernel/smp_twd.c
->> > @@ -362,7 +362,7 @@ int __init twd_local_timer_register(struct twd_local_timer *tlt)
->> >  }
->> >  
->> >  #ifdef CONFIG_OF
->> > -const static struct of_device_id twd_of_match[] __initconst = {
->> > +static const struct of_device_id twd_of_match[] __initconst = {
-> This will go away with conversion to use CLKSRC_OF.
+On Thu, Mar 07, 2013 at 01:50:54PM -0700, Stephen Warren wrote:
+> On 03/07/2013 07:45 AM, Pavel Machek wrote:
+> > Hi!
+> >>> commit 499cd8298628eeabf0eb5eb6525d4faa0eec80d8
+> >>> Author: Grant Likely <grant.likely@secretlab.ca>
+> >>> Date:   Tue Nov 27 16:29:11 2012 -0700
+> > ...
+> >>> 1) it is inconsistent with 3.8, making switching between 3.9-rc1 and
+> >>> 3.8 tricky
+> >>
+> >> It's pretty easy to locate the DTB by automatically looking in
+> >> arch/*/boot/dts first, then if the file doesn't exist there, looking in
+> >> arch/*/boot instead as a legacy fallback.
+> > 
+> > Unfortunately, that does not work. See 2) below. Stale files even
+> > survive "make clean".
+> 
+> Oh right. I guess it works fine when having built 3.7 and then building
+> 3.8, since you'd look in the new location first and only fall back to
+> the old location if missing. However, if you then switch back to 3.7 to
+> test something, I guess that doesn't work so well.
+> 
+> I tend to always build the dtbs target, so I wasn't affected by this.
+> And, often run "git clean -f -d -x" too.
+> 
+> Grant, what's your call on this issue; should I/you look into ways to
+> clean the files better, or do you want to revert this?
 
-  excuse me, I am not quite familiar with ARM, so I do not quite
-understand what you said.
+I'm not Grant, but I think we're better off cleaning up the current situation
+instead of reverting. Otherwise 3.8 will be the oddball weird release; it's
+better to get people moved over to the new location.
 
-  could you describe it with more details ?
-  and how about this patch ?
-    a. do not need this patch.
-    b. or this patch need improving.
-    c. or this patch is ok, can be applied.
 
-  thanks.
-
--- 
-Chen Gang
-
-Asianux Corporation
+-Olof
