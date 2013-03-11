@@ -1,23 +1,31 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 11 Mar 2013 20:59:26 +0530
-Subject: [PATCH 04/10] ARM: OMAP2+: Divorce from local timer API
-In-Reply-To: <20130308195058.GH11806@atomide.com>
-References: <1362614646-24113-1-git-send-email-sboyd@codeaurora.org>
- <1362614646-24113-5-git-send-email-sboyd@codeaurora.org>
- <20130308195058.GH11806@atomide.com>
-Message-ID: <513DF856.7070400@ti.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Mon, 11 Mar 2013 17:34:59 +0200
+Subject: Dead mappings and drivers in MTD
+Message-ID: <1363016099.3348.47.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 09 March 2013 01:20 AM, Tony Lindgren wrote:
-> * Stephen Boyd <sboyd@codeaurora.org> [130306 16:22]:
->> Now that the TWD doesn't rely on the local timer API, OMAP can
->> stop selecting it in Kconfig and relying on the config option to
->> decide if it should call smp_twd functions.
->>
+Hi MTD folks,
 
-> 
-> Acked-by: Tony Lindgren <tony@atomide.com>
-> 
+we have huge amount of drivers, espacially mapping drives in
+'drivers/mtd', and for sure may of them are for ancient devices which
+are long dead and not supported by modern kernels anyway. I would like
+to do a small clean-up. It is difficult to judge which ones are dead for
+me, so I am asking the community to help. Thanks!
 
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+There are few easy cases - some drivers depend on Kconfig symbols which
+are not defined anywhere - I guess these are clear candidates for
+removal. For example this one:
+
+config MTD_DBOX2
+        tristate "CFI Flash device mapped on D-Box2"
+        depends on DBOX2 && MTD_CFI_INTELSTD && MTD_CFI_INTELEXT && MTD_CFI_AMDSTD
+        help
+          This enables access routines for the flash chips on the Nokia/Sagem
+          D-Box 2 board. If you have one of these boards and would like to use
+
+Grepping for "DBOX2" gives nothing.
+
+-- 
+Best Regards,
+Artem Bityutskiy
