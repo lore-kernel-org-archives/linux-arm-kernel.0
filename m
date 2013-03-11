@@ -1,250 +1,53 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Mon, 11 Mar 2013 08:46:15 +0100
-Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
-In-Reply-To: <513D6F9C.9000100@firmworks.com>
-References: <20130308071443.GA5772@avionic-0098.mockup.avionic-design.de>
- <20130308165228.GB4094@obsidianresearch.com>
- <20130308191227.GA6551@avionic-0098.mockup.avionic-design.de>
- <513A3F4F.2090501@firmworks.com>
- <20130308200245.GC29435@obsidianresearch.com>
- <513A7845.6040304@firmworks.com>
- <20130309013152.GA3883@obsidianresearch.com>
- <513C117D.6080800@firmworks.com>
- <20130310065539.GA14704@obsidianresearch.com>
- <513D6F9C.9000100@firmworks.com>
-Message-ID: <20130311074615.GA6365@avionic-0098.mockup.avionic-design.de>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Mon, 11 Mar 2013 09:04:22 +0100
+Subject: [PATCH v3 1/2] i.MX27: Add clock support for SAHARA2.
+In-Reply-To: <20130311074206.GY1906@pengutronix.de>
+References: <1362137873-8827-1-git-send-email-javier.martin@vista-silicon.com>
+ <1362137873-8827-2-git-send-email-javier.martin@vista-silicon.com>
+ <20130304075306.GA1906@pengutronix.de>
+ <CACKLOr2kuWXMreEFA4wqyYVRNnPwmEoHPM2+V+tN5P_1bQ+iJQ@mail.gmail.com>
+ <20130310083401.GB10448@gondor.apana.org.au>
+ <20130310230856.GU1906@pengutronix.de>
+ <20130311011926.GA14930@gondor.apana.org.au>
+ <20130311074206.GY1906@pengutronix.de>
+Message-ID: <CACKLOr3mLUYSUDuXFrfRg+ujRqBKE-wbudetygH3aQd0K31pxA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 10, 2013 at 07:46:04PM -1000, Mitch Bradley wrote:
-> On 3/9/2013 8:55 PM, Jason Gunthorpe wrote:
-> > On Sat, Mar 09, 2013 at 06:52:13PM -1000, Mitch Bradley wrote:
-> > 
-> >> Okay, I think I finally get it.  The Marvell root port bridge setup
-> >> registers look like standard config headers, even though they aren't
-> >> really in config space (because you need a different access method for
-> >> them, compared to real config accesses to downstream devices).
-> > 
-> > Well, thats pretty close. On Marvell the MMIO space has a lot of
-> > stuff, some of it is config related, lots of it isn't. In fact most of
-> > it isn't. Tegra is different, the MMIO region is exactly the config
-> > space of the root port bridge.
-> > 
-> > Tegra could probably happily and sanely do as you've described (well,
-> > see below), but it is wonky for Marvell. It looks like there are more
-> > drivers coming that have this need - so I had hoped for a general
-> > answer to the 'per-port MMIO space' problem that is unrelated to the
-> > MMIO spaces role in config access.
-> > 
-> >> So, in order for the common code that enumerates the PCI bus to work,
-> >> you need to "spoof" the config accesses so that when you try to access
-> >> those particular "pseudo config headers", it uses the MMIO method
-> >> instead of the real config access method.
-> > 
-> > There are rules for config access in both Tegra and Marvell that are
-> > not trivial. Again, the driver takes are of this and all Linux sees is
-> > a nice compliant config space.
-> 
-> Thanks for explaining that.
-> 
-> So it seems that we are faced with two requirements that are somewhat at
-> odds with one another.
-> 
-> 1) Some of the root port bridge registers have to be accessed via config
-> space access functions so common PCI enumeration code will work.  To
-> represent this with the usual DT structure, the top root-complex needs
-> to define a 3/2 address space so its children
-> can have standard PCI reg properties.  Presumably, if those registers
-> are being programmed by common code, Marvell-specific code would
-> restrict its role to setting up config-space access functions, leaving
-> the actual touching of the registers to the common code.
-> 
-> 2) Marvell chips have additional non-standard per-root-port registers
-> that generic PCI code would not understand.  These registers would be
-> touched only by Marvell-specific code.
-> 
-> The two kinds of registers are adjacent in MMIO space.  However, unless
-> I am misunderstanding this MV78230 manual, the highest "config header"
-> register index is 0x134, well below the 0x1000 size limit of a PCIe
-> config header.  Some of the extra registers are at 0x8xx, and others are
-> above 0x1800.
-> 
-> That suggests the following:
-> 
-> For the "config header" registers that use generic PCI code, use a
-> ranges entry to associate (pass through) MMIO addresses to the config
-> header portion of the register block.  This parameterizes the code that
-> sets up the special-case PCI config access.  That specification
-> technique is general and could be used not only for the Marvell case,
-> but also for any other chip that has some number of direct-mapped config
-> headers.
-> 
-> For requirement (2), the top node has a reg property listing the
-> portions of the address space that are consumed by the driver at the top
-> level instead of being passed through to the PCI addressing domain.  E.g.
-> 
->   reg = <0xd0040800 0x1800>, <0xd0080800 0x1800>;
-> 
-> Thus we have accurately described the two aspects of the true situation.
->  The PCI-compliant "config header" registers are passed through to the
-> child nodes where they can be dealt with in the normal PCI fashion.  The
-> non-PCI-compliant register footprint lives within the Marvell-specific
-> root-complex driver.
-> 
-> The root-complex driver presumably needs associate non-compliant
-> register blocks with specific child nodes.  That can be done by
-> requiring that the reg entries are in the same order as the config-space
-> ranges entries.
-> 
-> Anticipating the possible objection that ARM's 0x1000-byte page size
-> does not permit virtual-to-physical mapping at 0x800-byte granularity:
-> The device tree does not guarantee that reg entries are page-aligned; it
-> simply tries to describe the reality, even though it might be messy.
-> 
-> > 
-> >> If that is indeed the case, them I would vote for a slight modification
-> >> of the intermediate patch that I cited earlier - the one in which the
-> >> ranges property includes translations from those special config
-> >> addresses into CPU addresses.  The modification is to fix the sizes,
-> >> changing 0x2000 to 0x800, so those ranges entries do not overlap in the
-> >> child address domain.
-> 
-> BTW I have completely changed my mind about the overlap thing.
-> 
-> I said that it was bogus to use size=0x2000 for a config space header.
->  That was based on an interpretation - which I now dislike - of the
-> meaning of 3-cell config addresses.  By that old interpretation,
-> size=0x800 would also be bogus, because bits 10-8 of the config address
-> are for the function number.
-> 
-> Consider the following question, which I have never previously
-> considered, at least not explicitly:
-> 
-> Q: What would be the 3-cell representation of the Command/Status
-> register address (offset 4) in device 1, function 1?
-> 
-> One obvious - but weak - answer is  <0x00000904 0 0> .  It's obvious
-> because the value 0x80000904 is what you put in the cf8 indirect access
-> address register.  But it is weak because it unnecessarily restricts the
-> config header size, and because it works differently than offsets
-> applied to memory and I/O space addresses.  Furthermore, coupling the
-> offset to the cf8 register is dodgy because of the funniness where you
-> have to but the byte-selector bits 1..0 not in the address register cf8,
-> but rather in the data register cfc.
-> 
-> The better answer is  <0x00000900 0 4>, using the third cell for the
-> offset, as with IO and memory space offsets.
-> 
-> Under this better interpretation, config space sizes larger than 0x100
-> are no problem.  The first cell is just a selector.  The size is "added"
-> to the third cell, so it does not encroach into the first cell's
-> device,function bits.
-> 
-> This better interpretation easily handles PCIe's 0x1000-byte extended
-> config headers, and trivially accomodates even larger sizes should a
-> future PCI variant further increase the header size. as described way
-> down below.
+Hi,
 
-That makes a lot of sense. It also mirrors parts of a discussion we
-previously had when we first discussed a DT binding for Tegra PCIe.
+On 11 March 2013 08:42, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> On Mon, Mar 11, 2013 at 09:19:26AM +0800, Herbert Xu wrote:
+>> On Mon, Mar 11, 2013 at 12:08:56AM +0100, Sascha Hauer wrote:
+>> > On Sun, Mar 10, 2013 at 04:34:01PM +0800, Herbert Xu wrote:
+>> > > > >
+>> > > > > https://patchwork.kernel.org/patch/1817741/
+>> > > > >
+>> > > > > So the change above becomes unnecessary
+>> > > >
+>> > > > Very good. Then this patch can be safely dropped.
+>> > >
+>> > > So should I take this patch or not?
+>> >
+>> > This clk patch, no. The sahara patch, yes, if it is fine for you.
+>>
+>> But will the second patch work fine without the first?
+>
+> It will work once a device is registered. The necessary clocks for it
+> will be provided by the devicetree then.
 
-Thanks for taking the time to go over this in so much detail. I very
-much appreciate it.
+As Sascha stated you can safely drop this first patch:
+[PATCH v3 1/2] i.MX27: Add clock support for SAHARA2.
 
-> >> 	#address-cells = <3>;
-> >> 	#size-cells = <2>;
-> >>
-> >> 	bus-range = <0x00 0xff>;
-> >>
-> >> 	ranges = <0x00000800 0 0          0xd4004000 0 0x00000800   /* Root
-> >> port config header */
-> >> 	          0x00001000 0 0          0xd4008000 0 0x00000800   /* Root
-> >> port config header */
-> >> 		  0x82000000 0 0xe0000000 0xe0000000 0 0x08000000   /*
-> >> non-prefetchable memory */
-> >> 	          0x81000000 0 0          0xe8000000 0 0x00100000>; /*
-> >> downstream I/O */
-> >>
-> >> 	pcie at 1,0 {
-> >> 		device_type = "pci";
-> >> 		reg = <0x0800 0 0 0 0>;
-> > 
-> > Okay, this was Thierry's original idea, and it was my note that this
-> > didn't seem like a good choice. I'm not wedded to that, but I'll
-> > explain my reasoning a bit.
-> > 
-> > Two things bothered me
-> >   - Describing a CPU MMIO mapping with a config address space seems
-> >     wonky
-> 
-> I agree that mapping config space is sort of a jarring concept, but I
-> think that's because PCs have polluted the mindspace, not because there
-> is anything inherently bad about it.  The original PCI spec
-> fundamentally treated config space as just another (rather segmented)
-> linear address space.  It specified the cf8/cfc indirect access
-> mechanism not as a deep semantic feature, but rather as an
-> implementation hack to work around addressing limitations of PC chipsets
-> and the addressing-deficient popular OS of the time (Windows 3.1 which
-> was a veneer over DOS).  The PCI spec defined configuration mechanism #2
-> as a direct map into PC I/O space.  RISC chipsets of that era (e.g.
-> Alpha, Power PC) often direct-mapped config space into some form of
-> load/store space.
-> 
-> But PCs soon encroached on the RISC market and RISC system vendors
-> started to "leverage" PC I/O chipsets.  The indirect access "config
-> mechanism #1" became part of the mindset.  Indirect access was hardcoded
-> in enough software that chipset designers would provide indirect access
-> even if direct-mapping was possible.
-> 
-> Fundamentally, a config header is just a block of registers, addressable
-> as an index relative to some base.  It might require some specific
-> access path - but that is true with any block of registers.  Even
-> direct-mapped MMIO registers often require specific semantics such as
-> non-cached, non-write-buffered, or special address space ids.
-> 
-> The PCI SIG expected PCIe extended config space to be direct-mapped -
-> see slide 25 of
-> 
-> http://www.pcisig.com/specifications/pciexpress/technical_library/dev_con_09_02/specifications/pciexpress/PCIExpress_SoftwareandConfigurationModel.pdf
-> 
-> So mappability of config space was intended from the get-go.  The real
-> wonky thing is the "indirect access zombie that cannot die".
-> 
-> >   - Linux's OF core doesn't parse a 'reg' property under
-> >     'device_type = "pci"' as something CPU mappable, it only looks
-> >     to assigned-addresses for that. So the OF core would need to learn
-> >     how to handle this case, and it would have to be well defined..
-> 
-> The way I envisioned it working is that the root-complex node defines
-> its own config space access functions (the "ops" argument to
-> pci_scan_root_bus).  For config addresses listed in ranges, the
-> functions do MMIO.  For others, they use the chipset's indirect-access
-> registers.  The OF core is not involved.
-> 
-> > 
-> >     Thierry's original patch avoided this problem by not using
-> >     device_type = "pci"..
+And merge the second one:
+[PATCH v3 2/2] crypto: sahara: Add driver for SAHARA2 accelerator.
 
-I think the OF core still needs to be involved in order to translate the
-reg = <0x0800 0 0 0 0>; entry into a resource that can be ioremap()'ed.
-As Jason already said, the OF core only does that for assigned-addresses
-when device_type = "pci".
-
-Otherwise the pci_ops implementation still couldn't access the MMIO
-registers. Aiming for a driver-specific solution doesn't seem like a
-good idea but if the functionality is common enough to be required by
-two or more drivers perhaps a new helper could be created for exactly
-this purpose.
-
-Perhaps another alternative would be to extend the OF core to translate
-the entries in the reg property as well. Or maybe I misunderstood what
-you said.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130311/4e7dd462/attachment.sig>
+Regards.
+-- 
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
