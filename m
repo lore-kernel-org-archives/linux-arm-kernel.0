@@ -1,46 +1,136 @@
-From: sourav.poddar@ti.com (Sourav Poddar)
-Date: Mon, 11 Mar 2013 21:12:26 +0530
-Subject: [Resend/PATCH 0/5] omap4/5: i2c/spi: device tree data
-In-Reply-To: <513DEAE1.1050606@ti.com>
-References: <1363009486-19430-1-git-send-email-sourav.poddar@ti.com>
- <513DEAE1.1050606@ti.com>
-Message-ID: <513DFB62.5030709@ti.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Mon, 11 Mar 2013 16:52:55 +0100
+Subject: [PATCH 01/13] usb: phy: nop: Add device tree support and binding
+ information
+In-Reply-To: <20130205072637.GA32118@arwen.pp.htv.fi>
+References: <1359993540-20780-1-git-send-email-rogerq@ti.com>
+ <1359993540-20780-2-git-send-email-rogerq@ti.com>
+ <20130205072637.GA32118@arwen.pp.htv.fi>
+Message-ID: <513DFDD7.7000801@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 11 March 2013 08:02 PM, Benoit Cousson wrote:
-> Hi Sourav,
->
-> On 03/11/2013 02:44 PM, Sourav Poddar wrote:
->> Hi Tony/Benoit,
+On 02/05/2013 08:26 AM, Felipe Balbi wrote:
+> Hi,
+> 
+> On Mon, Feb 04, 2013 at 05:58:48PM +0200, Roger Quadros wrote:
+>> The PHY clock, clock rate, VCC regulator and RESET regulator
+>> can now be provided via device tree.
 >>
->> These patches had been sent couple of times before, but there were no comments on it.
-> Sorry for that. I got a big flu in Jan and was in Linaro Connect last week.
-> Patches look good, I just have to check that they apply nicely to the
-> dts/for_3.9 I already prepared.
->
-Ok. Thanks!!
-> I still have to rebase that branch on top of a recent master branch and
-> then check your branch.
->
->> If there are no comments, Can these be picked ?
->> Cc: Andrew Morton<akpm@osdl.org>
+>> Signed-off-by: Roger Quadros <rogerq@ti.com>
+>> ---
+>>  .../devicetree/bindings/usb/usb-nop-xceiv.txt      |   34 ++++++++++++++++++++
+>>  drivers/usb/otg/nop-usb-xceiv.c                    |   31 ++++++++++++++++++
+>>  2 files changed, 65 insertions(+), 0 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
 >>
->> The following changes since commit f6161aa153581da4a3867a2d1a7caf4be19b6ec9:
->>
->>    Linux 3.9-rc2 (2013-03-10 16:54:19 -0700)
->>
->> are available in the git repository at:
->>    git at gitorious.org:linux-connectivity/linux-connectivity.git omap_i2c_spi_dts_data
->>
->> Felipe Balbi (1):
->>        arm: dts: omap5: add SPI devices to OMAP5 DeviceTree file
->>
->> Sourav Poddar (4):
->>        arm: dts: omap4-sdp: Add I2c pinctrl data
->>        arm: dts: omap5-evm: Add I2c pinctrl data
->>        arm: dts: omap4-panda: Add I2c pinctrl data
->>        arm: dts: omap5-evm: Add mcspi data
-> Thanks,
-> Benoit
->
+>> diff --git a/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt b/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
+>> new file mode 100644
+>> index 0000000..d7e2726
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
+>> @@ -0,0 +1,34 @@
+>> +USB NOP PHY
+>> +
+>> +Required properties:
+>> +- compatible: should be usb-nop-xceiv
+>> +
+>> +Optional properties:
+>> +- clocks: phandle to the PHY clock. Use as per Documentation/devicetree
+>> +  /bindings/clock/clock-bindings.txt
+>> +  This property is required if clock-frequency is specified.
+>> +
+>> +- clock-names: Should be "main_clk"
+>> +
+>> +- clock-frequency: the clock frequency (in Hz) that the PHY clock must
+>> +  be configured to.
+>> +
+>> +- vcc-supply: phandle to the regulator that provides RESET to the PHY.
+>> +
+>> +- reset-supply: phandle to the regulator that provides power to the PHY.
+>> +
+>> +Example:
+>> +
+>> +	hsusb1_phy {
+>> +		compatible = "usb-nop-xceiv";
+>> +		clock-frequency = <19200000>;
+>> +		clocks = <&osc 0>;
+>> +		clock-names = "main_clk";
+>> +		vcc-supply = <&hsusb1_vcc_regulator>;
+>> +		reset-supply = <&hsusb1_reset_regulator>;
+>> +	};
+>> +
+>> +hsusb1_phy is a NOP USB PHY device that gets its clock from an oscillator
+>> +and expects that clock to be configured to 19.2MHz by the NOP PHY driver.
+>> +hsusb1_vcc_regulator provides power to the PHY and hsusb1_reset_regulator
+>> +controls RESET.
+>> diff --git a/drivers/usb/otg/nop-usb-xceiv.c b/drivers/usb/otg/nop-usb-xceiv.c
+>> index ac027a1..adbb7ab 100644
+>> --- a/drivers/usb/otg/nop-usb-xceiv.c
+>> +++ b/drivers/usb/otg/nop-usb-xceiv.c
+>> @@ -34,6 +34,7 @@
+>>  #include <linux/slab.h>
+>>  #include <linux/clk.h>
+>>  #include <linux/regulator/consumer.h>
+>> +#include <linux/of.h>
+>>  
+>>  struct nop_usb_xceiv {
+>>  	struct usb_phy		phy;
+>> @@ -138,8 +139,19 @@ static int nop_set_host(struct usb_otg *otg, struct usb_bus *host)
+>>  	return 0;
+>>  }
+>>  
+>> +static void nop_xeiv_get_dt_pdata(struct device *dev,
+> 
+> asking to remove, but xeiv != xceiv :-)
+> 
+>> +				struct nop_usb_xceiv_platform_data *pdata)
+>> +{
+>> +	struct device_node *node = dev->of_node;
+>> +	u32 clk_rate;
+>> +
+>> +	if (!of_property_read_u32(node, "clock-frequency", &clk_rate))
+>> +		pdata->clk_rate = clk_rate;
+>> +}
+>> +
+>>  static int nop_usb_xceiv_probe(struct platform_device *pdev)
+>>  {
+>> +	struct device *dev = &pdev->dev;
+>>  	struct nop_usb_xceiv_platform_data *pdata = pdev->dev.platform_data;
+>>  	struct nop_usb_xceiv	*nop;
+>>  	enum usb_phy_type	type = USB_PHY_TYPE_USB2;
+>> @@ -153,6 +165,17 @@ static int nop_usb_xceiv_probe(struct platform_device *pdev)
+>>  	if (!nop->phy.otg)
+>>  		return -ENOMEM;
+>>  
+>> +	if (dev->of_node) {
+>> +		pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
+>> +		if (!pdata) {
+>> +			dev_err(dev, "Memory allocation failure\n");
+>> +			return -ENOMEM;
+>> +		}
+>> +		nop_xeiv_get_dt_pdata(dev, pdata);
+> 
+> actually, I would prefer to not create pdata at all. I mean, ideally
+> pdata would be used to initialize fields in your own structure, so first
+> move clk_rate to your own private structure, copy pdata's clk_rate value
+> to that, then you don't need this hackery when using DT.
+
+As far as I can see, clk_rate is never used, but in the probe function.
+Why should it be saved into the private data structure at all?
+
+Marc
+
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130311/9b8ca4b8/attachment.sig>
