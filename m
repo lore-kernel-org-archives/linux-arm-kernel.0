@@ -1,33 +1,41 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 11 Mar 2013 10:51:50 +0800
-Subject: [PATCH] ARM: imx: pll1_sys should be an initial on clk
-Message-ID: <1362970310-10617-1-git-send-email-shawn.guo@linaro.org>
+Date: Mon, 11 Mar 2013 11:03:14 +0800
+Subject: [PATCH 07/12] mtd: gpmi: move to use generic DMA helper
+In-Reply-To: <1362748785.5101.4.camel@sauron.fi.intel.com>
+References: <1361978748-25281-1-git-send-email-shawn.guo@linaro.org>
+ <1361978748-25281-8-git-send-email-shawn.guo@linaro.org>
+ <1362748785.5101.4.camel@sauron.fi.intel.com>
+Message-ID: <20130311030312.GB18574@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We always boot from PLL1, so let's have pll1_sys in the clks_init_on
-list to have clk prepare/enable use count match the hardware status,
-so that drivers managing pll1_sys like cpufreq can get the use count
-right from the start.
+Artem,
 
-Reported-by: Dirk Behme <dirk.behme@de.bosch.com>
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/mach-imx/clk-imx6q.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On Fri, Mar 08, 2013 at 03:19:45PM +0200, Artem Bityutskiy wrote:
+> On Wed, 2013-02-27 at 23:25 +0800, Shawn Guo wrote:
+> > With the generic DMA device tree helper supported by mxs-dma driver,
+> > client devices only need to call dma_request_slave_channel() for
+> > requesting a DMA channel from dmaengine.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > Cc: Artem Bityutskiy <dedekind1@gmail.com>
+> > Cc: linux-mtd at lists.infradead.org
+> 
+> It looks like this ne is rather independent and can go via the MTD tree.
+> So pushed this one to l2-mtd.git - let me know if I am confused. Thanks!
 
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index 7b025ee..2f9ff93 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -172,7 +172,7 @@ static struct clk *clk[clk_max];
- static struct clk_onecell_data clk_data;
- 
- static enum mx6q_clks const clks_init_on[] __initconst = {
--	mmdc_ch0_axi, rom,
-+	mmdc_ch0_axi, rom, pll1_sys,
- };
- 
- static struct clk_div_table clk_enet_ref_table[] = {
--- 
-1.7.9.5
+First of all, there is a new version (v2) of the patch (series) to
+address review comments.
+
+Secondly, as Arnd pointed it out, you shouldn't apply this single
+patch, because it depends on the first 3 patches in the series to
+work.  Applying this single patch will result in a non-functional
+gpmi driver.
+
+As I mentioned in the cover letter, I prefer to have your ACK on
+the patch to merge the series through arm-soc tree as a whole.  If
+you insist that you merge the patch through your tree, I can also
+create a topic branch containing the first 3 patches, as Arnd suggests.
+Please just let me know.
+
+Shawn
