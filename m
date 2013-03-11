@@ -1,36 +1,58 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 11 Mar 2013 20:56:07 +0100
-Subject: [PATCH 06/10] ARM: soc-audio phycore-ac97: fix driver init order
-In-Reply-To: <20130311111011.GA10617@opensource.wolfsonmicro.com>
-References: <1362940391-8338-1-git-send-email-mpa@pengutronix.de>
- <1362940391-8338-7-git-send-email-mpa@pengutronix.de>
- <20130311111011.GA10617@opensource.wolfsonmicro.com>
-Message-ID: <20130311195607.GD18350@pengutronix.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 11 Mar 2013 15:04:13 -0500
+Subject: [GIT PULL] clocksource cleanup for 3.10
+Message-ID: <513E38BD.4080407@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 11, 2013 at 11:10:11AM +0000, Mark Brown wrote:
-> On Sun, Mar 10, 2013 at 07:33:07PM +0100, Markus Pargmann wrote:
-> > Adding a soc-audio sound driver internally uses snd_soc_register_device,
-> > which tries to bind it with the codec. The adding of the driver is
-> > deferred because the codec driver is not loaded.
-> 
-> > This patch changes the order of registration. The codec driver is there
-> > before the ac97 driver, so the snd_soc_register_device call is
-> > successfull.
-> 
-> You shouldn't be using soc-audio in the first place...
+Arnd, Olof,
 
-Yes. This is just a fixup of the old "driver" part.
-The new DT driver does not use soc-audio (added in patch 7)
+Please pull. This improves the clocksource init to avoid double matching
+to the DT device node. The clocksource init function changes are needed
+for any other clocksource conversions to CLKSRC_OF, so we need to make
+sure any other conversions use this branch (It happens to silently work
+without warnings, but there would be a mismatch in function ptrs). I'm
+including the twd_smp timer support for CLKSRC_OF here because of the
+dependency on this change.
 
-Regards,
+Rob
 
-Markus
+The following changes since commit f6161aa153581da4a3867a2d1a7caf4be19b6ec9:
 
+  Linux 3.9-rc2 (2013-03-10 16:54:19 -0700)
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+are available in the git repository at:
+
+  git://sources.calxeda.com/kernel/linux.git tags/clksrc-cleanup-for-3.10
+
+for you to fetch changes up to da4a686a2cfb077a8bfc1697f597e7f86235b822:
+
+  ARM: smp_twd: convert to use CLKSRC_OF init (2013-03-11 08:42:08 -0500)
+
+----------------------------------------------------------------
+- Add device_node ptr to clocksource init functions
+- Add CLKSRC_OF support to twd_smp timer
+
+----------------------------------------------------------------
+Rob Herring (4):
+      clocksource: add empty version of clocksource_of_init
+      clocksource: pass DT node pointer to init functions
+      clocksource: tegra20: use the device_node pointer passed to init
+      ARM: smp_twd: convert to use CLKSRC_OF init
+
+ arch/arm/Kconfig                    |    1 +
+ arch/arm/include/asm/smp_twd.h      |    8 ----
+ arch/arm/kernel/smp_twd.c           |   17 ++------
+ arch/arm/mach-highbank/highbank.c   |    5 +--
+ arch/arm/mach-imx/mach-imx6q.c      |    5 +--
+ arch/arm/mach-omap2/timer.c         |    2 +-
+ arch/arm/mach-spear13xx/spear13xx.c |    4 +-
+ arch/arm/mach-ux500/timer.c         |    3 +-
+ arch/arm/mach-vexpress/v2m.c        |    6 +--
+ drivers/clocksource/bcm2835_timer.c |   12 +-----
+ drivers/clocksource/clksrc-of.c     |    4 +-
+ drivers/clocksource/tegra20_timer.c |   73
++++++++++++++----------------------
+ drivers/clocksource/vt8500_timer.c  |   14 +------
+ include/linux/clocksource.h         |    1 +
+ 14 files changed, 49 insertions(+), 106 deletions(-)
