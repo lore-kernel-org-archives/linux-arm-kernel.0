@@ -1,76 +1,151 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 11 Mar 2013 15:17:40 -0700
-Subject: [PATCH 03/10] ARM: smp_twd: Divorce smp_twd from local timer API
-In-Reply-To: <20130311172847.GP26093@atomide.com>
-References: <20130308004011.GD11806@atomide.com>
- <51393B59.3070200@codeaurora.org> <20130308180730.GE11806@atomide.com>
- <513A2B20.30805@codeaurora.org> <20130308194802.GG11806@atomide.com>
- <513A40EF.8050403@codeaurora.org> <20130308200811.GJ11806@atomide.com>
- <513A4774.3040605@codeaurora.org> <20130308202947.GK11806@atomide.com>
- <513A8B22.5030008@codeaurora.org> <20130311172847.GP26093@atomide.com>
-Message-ID: <513E5804.3050104@codeaurora.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 11 Mar 2013 16:26:55 -0600
+Subject: [PATCH REPOST] i2c: tegra: assume CONFIG_OF, remove platform data
+Message-ID: <1363040815-31833-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/11/13 10:28, Tony Lindgren wrote:
-> * Stephen Boyd <sboyd@codeaurora.org> [130308 17:10]:
->> On 03/08/13 12:29, Tony Lindgren wrote:
->>> Applying that does not seem to help, but you might want to get vexpress
->>> running anyways for some multiplatform sanity checks.
->>>
->>> I just built and installed qemu-linaro from their git, then ran the
->>> command above. Looks like stock qemu does not work for vexpress for some
->>> reason. You can probably use a dummy initrd and rootfs to debug this
->>> though :)
->> So my patchset didn't break qemu?
-> Sorry if that was unclear: Yes your patchset breaks booting vexpress
-> in qemu.
->
->
+From: Stephen Warren <swarren@nvidia.com>
 
-Ok. qemu works for me before applying my patches. I've added this into
-the series before this patch to fix the boot issue.
+Tegra only supports, and always enables, device tree. Remove all ifdefs
+and runtime checks for DT support from the driver. Platform data is
+therefore no longer required. Delete the header that defines it.
 
------8<-----
-
-Subject: [PATCH] ARM: vexpress: Move smp_twd setup to time_late_init hook
-
-On devices without a clock describing the rate of the twd we
-detect the rate at runtime via twd_calibrate_rate(). Currently
-this happens when smp_prepare_cpus() calls the localtimer start
-callback, after the sp804 timer has been registered and when
-jiffies have started incrementing.
-
-In the next patch we're going to make twd_local_timer_register()
-register the twd clockevent on the boot CPU. In the case of
-vexpress, this will hang the system at boot because jiffies
-haven't started incrementing when twd_calibrate_rate() is called.
-Register the smp_twd during time_late_init() on vexpress to avoid
-this problem.
-
-Based on a patch by Marc Zyngier <marc.zyngier@arm.com>.
-
-Reported-by: Tony Lindgren <tony@atomide.com>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- arch/arm/mach-vexpress/ct-ca9x4.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-tegra/tegra.c    |    2 --
+ drivers/i2c/busses/i2c-tegra.c |   26 +++++++-------------------
+ include/linux/i2c-tegra.h      |   25 -------------------------
+ 3 files changed, 7 insertions(+), 46 deletions(-)
+ delete mode 100644 include/linux/i2c-tegra.h
 
-diff --git a/arch/arm/mach-vexpress/ct-ca9x4.c b/arch/arm/mach-vexpress/ct-ca9x4.c
-index 6f34497..a9f39bf 100644
---- a/arch/arm/mach-vexpress/ct-ca9x4.c
-+++ b/arch/arm/mach-vexpress/ct-ca9x4.c
-@@ -62,7 +62,7 @@ static void __init ct_ca9x4_init_irq(void)
- {
- 	gic_init(0, 29, ioremap(A9_MPCORE_GIC_DIST, SZ_4K),
- 		 ioremap(A9_MPCORE_GIC_CPU, SZ_256));
--	ca9x4_twd_init();
-+	late_time_init = ca9x4_twd_init;
- }
+diff --git a/arch/arm/mach-tegra/tegra.c b/arch/arm/mach-tegra/tegra.c
+index 27232c9..f68c9f6 100644
+--- a/arch/arm/mach-tegra/tegra.c
++++ b/arch/arm/mach-tegra/tegra.c
+@@ -31,8 +31,6 @@
+ #include <linux/pda_power.h>
+ #include <linux/platform_data/tegra_usb.h>
+ #include <linux/io.h>
+-#include <linux/i2c.h>
+-#include <linux/i2c-tegra.h>
+ #include <linux/usb/tegra_usb_phy.h>
  
- static int ct_ca9x4_clcd_setup(struct clcd_fb *fb)
-
+ #include <asm/mach-types.h>
+diff --git a/drivers/i2c/busses/i2c-tegra.c b/drivers/i2c/busses/i2c-tegra.c
+index 36704e3..865f885 100644
+--- a/drivers/i2c/busses/i2c-tegra.c
++++ b/drivers/i2c/busses/i2c-tegra.c
+@@ -25,7 +25,6 @@
+ #include <linux/interrupt.h>
+ #include <linux/delay.h>
+ #include <linux/slab.h>
+-#include <linux/i2c-tegra.h>
+ #include <linux/of_i2c.h>
+ #include <linux/of_device.h>
+ #include <linux/module.h>
+@@ -172,7 +171,7 @@ struct tegra_i2c_dev {
+ 	u8 *msg_buf;
+ 	size_t msg_buf_remaining;
+ 	int msg_read;
+-	unsigned long bus_clk_rate;
++	u32 bus_clk_rate;
+ 	bool is_suspended;
+ };
+ 
+@@ -685,7 +684,6 @@ static const struct tegra_i2c_hw_feature tegra114_i2c_hw = {
+ 	.clk_divisor_std_fast_mode = 0x19,
+ };
+ 
+-#if defined(CONFIG_OF)
+ /* Match table for of_platform binding */
+ static const struct of_device_id tegra_i2c_of_match[] = {
+ 	{ .compatible = "nvidia,tegra114-i2c", .data = &tegra114_i2c_hw, },
+@@ -695,16 +693,13 @@ static const struct of_device_id tegra_i2c_of_match[] = {
+ 	{},
+ };
+ MODULE_DEVICE_TABLE(of, tegra_i2c_of_match);
+-#endif
+ 
+ static int tegra_i2c_probe(struct platform_device *pdev)
+ {
+ 	struct tegra_i2c_dev *i2c_dev;
+-	struct tegra_i2c_platform_data *pdata = pdev->dev.platform_data;
+ 	struct resource *res;
+ 	struct clk *div_clk;
+ 	struct clk *fast_clk;
+-	const unsigned int *prop;
+ 	void __iomem *base;
+ 	int irq;
+ 	int ret = 0;
+@@ -745,23 +740,16 @@ static int tegra_i2c_probe(struct platform_device *pdev)
+ 	i2c_dev->cont_id = pdev->id;
+ 	i2c_dev->dev = &pdev->dev;
+ 
+-	i2c_dev->bus_clk_rate = 100000; /* default clock rate */
+-	if (pdata) {
+-		i2c_dev->bus_clk_rate = pdata->bus_clk_rate;
+-
+-	} else if (i2c_dev->dev->of_node) {    /* if there is a device tree node ... */
+-		prop = of_get_property(i2c_dev->dev->of_node,
+-				"clock-frequency", NULL);
+-		if (prop)
+-			i2c_dev->bus_clk_rate = be32_to_cpup(prop);
+-	}
++	ret = of_property_read_u32(i2c_dev->dev->of_node, "clock-frequency",
++					&i2c_dev->bus_clk_rate);
++	if (ret)
++		i2c_dev->bus_clk_rate = 100000; /* default clock rate */
+ 
+ 	i2c_dev->hw = &tegra20_i2c_hw;
+ 
+ 	if (pdev->dev.of_node) {
+ 		const struct of_device_id *match;
+-		match = of_match_device(of_match_ptr(tegra_i2c_of_match),
+-						&pdev->dev);
++		match = of_match_device(tegra_i2c_of_match, &pdev->dev);
+ 		i2c_dev->hw = match->data;
+ 		i2c_dev->is_dvc = of_device_is_compatible(pdev->dev.of_node,
+ 						"nvidia,tegra20-i2c-dvc");
+@@ -867,7 +855,7 @@ static struct platform_driver tegra_i2c_driver = {
+ 	.driver  = {
+ 		.name  = "tegra-i2c",
+ 		.owner = THIS_MODULE,
+-		.of_match_table = of_match_ptr(tegra_i2c_of_match),
++		.of_match_table = tegra_i2c_of_match,
+ 		.pm    = TEGRA_I2C_PM,
+ 	},
+ };
+diff --git a/include/linux/i2c-tegra.h b/include/linux/i2c-tegra.h
+deleted file mode 100644
+index 9c85da4..0000000
+--- a/include/linux/i2c-tegra.h
++++ /dev/null
+@@ -1,25 +0,0 @@
+-/*
+- * drivers/i2c/busses/i2c-tegra.c
+- *
+- * Copyright (C) 2010 Google, Inc.
+- * Author: Colin Cross <ccross@android.com>
+- *
+- * This software is licensed under the terms of the GNU General Public
+- * License version 2, as published by the Free Software Foundation, and
+- * may be copied, distributed, and modified under those terms.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- */
+-
+-#ifndef _LINUX_I2C_TEGRA_H
+-#define _LINUX_I2C_TEGRA_H
+-
+-struct tegra_i2c_platform_data {
+-	unsigned long bus_clk_rate;
+-};
+-
+-#endif /* _LINUX_I2C_TEGRA_H */
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+1.7.10.4
