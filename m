@@ -1,27 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 11 Mar 2013 17:03:50 +0000
-Subject: [PATCH v4 0/2] Uncompress debug for multiplatform
-In-Reply-To: <1363001737-8745-1-git-send-email-shawn.guo@linaro.org>
-References: <1363001737-8745-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20130311170350.GM4977@n2100.arm.linux.org.uk>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 11 Mar 2013 11:10:14 -0600
+Subject: [PATCH] arm: tegra: fuse: export chip id and revision
+In-Reply-To: <1363005441-26329-1-git-send-email-dahuang@nvidia.com>
+References: <1363005441-26329-1-git-send-email-dahuang@nvidia.com>
+Message-ID: <513E0FF6.1050909@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 11, 2013 at 07:35:35PM +0800, Shawn Guo wrote:
-> Instead of giving zero support of uncompress debug for multiplatform
-> build, the series turns uncompress debug into one part of DEBUG_LL
-> support.  When DEBUG_LL is turned on for a particular platform,
-> uncompress debug works too for that platform.
-> 
-> OMAP is an exception here.  OMAP low-level debug code places data
-> in the .data section, and that is allowed in decompressor.  That's
-> why Kconfig symbol DEBUG_UNCOMPRESS that controls multiplatform
-> uncompress debug support is defined with !DEBUG_OMAP2PLUS_UART.
-> 
-> Changes since v3:
->  - Create Kconfig symbol DEBUG_UNCOMPRESS for building in
->    multiplatform uncompress debug support, so that we can leave
->    out the platform which is part of multiplatform but not ready
->    for being part of uncompress debug like OMAP example.
+On 03/11/2013 06:37 AM, Danny Huang wrote:
+> Expose tegra chip id and revision in /proc/cpu/chipinfo for user mode
+> usage.
 
-Wasn't Tegra also having problems with this as well?
+I agree with Shawn's comments, but I have a few other comments here too
+for the record.
+
+Nit: "Tegra" and "ID" above should be capitalized as I've done so in
+this sentence.
+
+> diff --git a/arch/arm/mach-tegra/fuse.c b/arch/arm/mach-tegra/fuse.c
+
+> +static int __init tegra_chip_info(void)
+> +{
+> +	proc_entry = create_proc_entry("cpu/chipinfo", S_IRUGO, NULL);
+> +	if (proc_entry)
+> +		proc_entry->read_proc = show_chip_info;
+> +	return 0;
+> +}
+> +
+> +late_initcall(tegra_chip_info);
+
+Please don't introduce any more initcalls. Especially initcalls that are
+not conditional on the run-time (rather than compile-time) SoC. This
+code may be compiled into a kernel that supports SoCs other than Tegra.
+However, tegra_chip_info() shouldn't run on those SoCs.
+
+It'd probably be simplest to just perform this initialization as part of
+the already-existing tegra_init_fuse(). If not, please call this
+initialization function from one of the initialization functions in
+arch/arm/mach-tegra/common.c. Both those cases only execute on Tegra.
