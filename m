@@ -1,41 +1,80 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Mon, 11 Mar 2013 09:32:17 +0200
-Subject: [PATCH 07/12] mtd: gpmi: move to use generic DMA helper
-In-Reply-To: <201303081406.18597.arnd@arndb.de>
-References: <1361978748-25281-1-git-send-email-shawn.guo@linaro.org>
- <1361978748-25281-8-git-send-email-shawn.guo@linaro.org>
- <1362748785.5101.4.camel@sauron.fi.intel.com>
- <201303081406.18597.arnd@arndb.de>
-Message-ID: <1362987137.5101.33.camel@sauron.fi.intel.com>
+From: silviupopescu1990@gmail.com (Silviu-Mihai Popescu)
+Date: Mon, 11 Mar 2013 09:38:23 +0200
+Subject: [PATCH] watchdog: convert to devm_ioremap_resource()
+Message-ID: <1362987503-6449-1-git-send-email-silviupopescu1990@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-03-08 at 14:06 +0000, Arnd Bergmann wrote:
-> On Friday 08 March 2013, Artem Bityutskiy wrote:
-> > On Wed, 2013-02-27 at 23:25 +0800, Shawn Guo wrote:
-> > > With the generic DMA device tree helper supported by mxs-dma driver,
-> > > client devices only need to call dma_request_slave_channel() for
-> > > requesting a DMA channel from dmaengine.
-> > > 
-> > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > > Cc: Artem Bityutskiy <dedekind1@gmail.com>
-> > > Cc: linux-mtd at lists.infradead.org
-> > 
-> > It looks like this ne is rather independent and can go via the MTD tree.
-> > So pushed this one to l2-mtd.git - let me know if I am confused. Thanks!
-> 
-> I think you should not apply this patch on a tree that does not already
-> have the first three patches in the series. The easiest way would be
-> to keep the series together. As an alternative, Shawn could create a
-> git branch with those three patches and let you (and the other subsystem
-> maintainers) pull that branch in before applying the subsystem specific
-> patch.
+Convert all uses of devm_request_and_ioremap() to the newly introduced
+devm_ioremap_resource() which provides more consistent error handling.
 
-OK, this one looked independent to me. Anyway, dropped it and for this
-one:
+devm_ioremap_resource() provides its own error messages so all explicit
+error messages can be removed from the failure code paths.
 
-Acked-by: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
+Signed-off-by: Silviu-Mihai Popescu <silviupopescu1990@gmail.com>
+---
+ drivers/watchdog/ath79_wdt.c   |    8 +++-----
+ drivers/watchdog/davinci_wdt.c |    8 +++-----
+ drivers/watchdog/s3c2410_wdt.c |    9 +++------
+ 3 files changed, 9 insertions(+), 16 deletions(-)
 
+diff --git a/drivers/watchdog/ath79_wdt.c b/drivers/watchdog/ath79_wdt.c
+index 8987990..d184c48 100644
+--- a/drivers/watchdog/ath79_wdt.c
++++ b/drivers/watchdog/ath79_wdt.c
+@@ -253,11 +253,9 @@ static int ath79_wdt_probe(struct platform_device *pdev)
+ 		return -EINVAL;
+ 	}
+ 
+-	wdt_base = devm_request_and_ioremap(&pdev->dev, res);
+-	if (!wdt_base) {
+-		dev_err(&pdev->dev, "unable to remap memory region\n");
+-		return -ENOMEM;
+-	}
++	wdt_base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(wdt_base))
++		return PTR_ERR(wdt_base);
+ 
+ 	wdt_clk = devm_clk_get(&pdev->dev, "wdt");
+ 	if (IS_ERR(wdt_clk))
+diff --git a/drivers/watchdog/davinci_wdt.c b/drivers/watchdog/davinci_wdt.c
+index 7df1fdc..005fd71 100644
+--- a/drivers/watchdog/davinci_wdt.c
++++ b/drivers/watchdog/davinci_wdt.c
+@@ -221,11 +221,9 @@ static int davinci_wdt_probe(struct platform_device *pdev)
+ 		return -ENOENT;
+ 	}
+ 
+-	wdt_base = devm_request_and_ioremap(dev, wdt_mem);
+-	if (!wdt_base) {
+-		dev_err(dev, "ioremap failed\n");
+-		return -EADDRNOTAVAIL;
+-	}
++	wdt_base = devm_ioremap_resource(dev, wdt_mem);
++	if (IS_ERR(wdt_base))
++		return PTR_ERR(wdt_base);
+ 
+ 	ret = misc_register(&davinci_wdt_miscdev);
+ 	if (ret < 0) {
+diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
+index c1a221c..393496c 100644
+--- a/drivers/watchdog/s3c2410_wdt.c
++++ b/drivers/watchdog/s3c2410_wdt.c
+@@ -330,12 +330,9 @@ static int s3c2410wdt_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	/* get the memory region for the watchdog timer */
+-	wdt_base = devm_request_and_ioremap(dev, wdt_mem);
+-	if (wdt_base == NULL) {
+-		dev_err(dev, "failed to devm_request_and_ioremap() region\n");
+-		ret = -ENOMEM;
+-		goto err;
+-	}
++	wdt_base = devm_ioremap_resource(dev, wdt_mem);
++	if (IS_ERR(wdt_base))
++		return PTR_ERR(wdt_base);
+ 
+ 	DBG("probe: mapped wdt_base=%p\n", wdt_base);
+ 
 -- 
-Best Regards,
-Artem Bityutskiy
+1.7.9.5
