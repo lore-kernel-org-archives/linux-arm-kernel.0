@@ -1,67 +1,74 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 11 Mar 2013 09:40:54 +0100
-Subject: [PATCH 0/4] time: dynamic irq affinity
-In-Reply-To: <513D4E79.5090307@ti.com>
-References: <1361917047-29230-1-git-send-email-daniel.lezcano@linaro.org>
- <513CC404.6000200@ti.com> <513CCF60.6060406@linaro.org>
- <513D4E79.5090307@ti.com>
-Message-ID: <513D9896.2010304@linaro.org>
+From: rogerq@ti.com (Roger Quadros)
+Date: Mon, 11 Mar 2013 10:40:51 +0200
+Subject: [PATCH 01/13] usb: phy: nop: Add device tree support and binding
+ information
+In-Reply-To: <513A079A.1020106@pengutronix.de>
+References: <1359993540-20780-1-git-send-email-rogerq@ti.com>
+ <1359993540-20780-2-git-send-email-rogerq@ti.com>
+ <5139C174.7030401@pengutronix.de> <513A079A.1020106@pengutronix.de>
+Message-ID: <513D9893.50703@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/11/2013 04:24 AM, Santosh Shilimkar wrote:
-> On Sunday 10 March 2013 11:52 PM, Daniel Lezcano wrote:
-
-[ ... ]
-
->> I don't think it is the case for all the ARM platforms, at least we
->> tested it on vexpress TC2 and u8500, and the number of IPI were reduced
->> very significantly increasing the idle time for cpu0. TC2 will need
->> another optimization on another area for the idle wake up to gain real
->> improvements.
+On 03/08/2013 05:45 PM, Marc Kleine-Budde wrote:
+> On 03/08/2013 11:46 AM, Marc Kleine-Budde wrote:
+>> On 02/04/2013 04:58 PM, Roger Quadros wrote:
+>>> The PHY clock, clock rate, VCC regulator and RESET regulator
+>>> can now be provided via device tree.
+>>>
+>>> Signed-off-by: Roger Quadros <rogerq@ti.com>
+>>> ---
+>>>  .../devicetree/bindings/usb/usb-nop-xceiv.txt      |   34 ++++++++++++++++++++
+>>>  drivers/usb/otg/nop-usb-xceiv.c                    |   31 ++++++++++++++++++
+>>>  2 files changed, 65 insertions(+), 0 deletions(-)
+>>>  create mode 100644 Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt b/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
+>>> new file mode 100644
+>>> index 0000000..d7e2726
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
+>>> @@ -0,0 +1,34 @@
+>>> +USB NOP PHY
+>>> +
+>>> +Required properties:
+>>> +- compatible: should be usb-nop-xceiv
+>>> +
+>>> +Optional properties:
+>>> +- clocks: phandle to the PHY clock. Use as per Documentation/devicetree
+>>> +  /bindings/clock/clock-bindings.txt
+>>> +  This property is required if clock-frequency is specified.
+>>> +
+>>> +- clock-names: Should be "main_clk"
+>>> +
+>>> +- clock-frequency: the clock frequency (in Hz) that the PHY clock must
+>>> +  be configured to.
+>>> +
+>>> +- vcc-supply: phandle to the regulator that provides RESET to the PHY.
+>>> +
+>>> +- reset-supply: phandle to the regulator that provides power to the PHY.
+>>> +
+>>> +Example:
+>>> +
+>>> +	hsusb1_phy {
+>>> +		compatible = "usb-nop-xceiv";
+>>> +		clock-frequency = <19200000>;
 >>
-> You are missing my point. TC2 can be an exception since the SGI can wakeup
-> CPUs even from low power states where local timer's are stalled. Is that
-> the case with U8500 ?
-
-Well, the cpuidle driver is not going into a deep idle state to check
-this out.
-
-AFAICT this board has a specific firmware with the PRCMU (a device
-managing the power on the board) and it replaces the GIC when going to
-deep idle state, especially by reconnecting the GIC to the A9 cores
-automatically when an interrupt occurs.
-
-But definitively worth to check.
-
->> I will test it on OMAP but with the coupled idle state, I am not sure of
->> the behavior. Could elaborate a bit the specificity of OMAP ? I am not
->> sure to understand why I may miss some IPI wakeups.
->>
-> I already mention the issue here [1]. You might not see any major issues
-> because the missed asynchronous IPIs might eventually get executed when
-> CPU's wakeup from deeper states because of idle wakeups. OMAP is no
-> different from idle wakeup optimisation and it will surely benefit and work.
-> The main reason I didn't pursue it because of not having solution for
-> [1] which as discussed in past is very much essential from kernel
-> functional correctness perspective. You might want to verify that by
-> adding a tracepoint on IPI's on other reasons except the timer wakeup.
-
-Oh, ok. I didn't make the connection. I got the point now.
-
-If we can raise a fake hardware interrupt on the GIC (not sure that
-could be done), may be we can implement something similar to the
-broadcast timer mechanism to replace the IPI when the cores are not IPI
-wakeup capable.
-
-
-> [1] https://lkml.org/lkml/2013/2/27/39
+>> Why do you hardcode the clock frequency here? You should use
+>> clk_get_rate() to get the frequency from the clock tree.
+> 
+> What about declaring a "fixed-clock" node in the device tree? Then it
+> should be possible to keep the driver free of any omap specific code.
 > 
 
+The current implementation is not OMAP specific and is not limited to a
+fixed frequency clock. The PHY driver is using standard clock APIs to set
+the clock rate 'only' if the 'clock-frequency' property is present in the
+device tree node.
 
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+What is the benefit of declaring it as a "fixed-clock"?
+FYI. The clock may not necessarily be a fixed frequency clock and someone
+needs to program the rate.
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+cheers,
+-roger
