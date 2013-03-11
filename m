@@ -1,49 +1,41 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 11 Mar 2013 16:09:24 +0900
-Subject: [PATCH] ARM: S3C24XX: drop "select MACH_NEO1973"
-In-Reply-To: <1362856081.3137.19.camel@x61.thuisdomein>
-References: <1362856081.3137.19.camel@x61.thuisdomein>
-Message-ID: <052301ce1e27$5cc9cd10$165d6730$%kim@samsung.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Mon, 11 Mar 2013 09:32:17 +0200
+Subject: [PATCH 07/12] mtd: gpmi: move to use generic DMA helper
+In-Reply-To: <201303081406.18597.arnd@arndb.de>
+References: <1361978748-25281-1-git-send-email-shawn.guo@linaro.org>
+ <1361978748-25281-8-git-send-email-shawn.guo@linaro.org>
+ <1362748785.5101.4.camel@sauron.fi.intel.com>
+ <201303081406.18597.arnd@arndb.de>
+Message-ID: <1362987137.5101.33.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul Bolle wrote:
+On Fri, 2013-03-08 at 14:06 +0000, Arnd Bergmann wrote:
+> On Friday 08 March 2013, Artem Bityutskiy wrote:
+> > On Wed, 2013-02-27 at 23:25 +0800, Shawn Guo wrote:
+> > > With the generic DMA device tree helper supported by mxs-dma driver,
+> > > client devices only need to call dma_request_slave_channel() for
+> > > requesting a DMA channel from dmaengine.
+> > > 
+> > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > > Cc: Artem Bityutskiy <dedekind1@gmail.com>
+> > > Cc: linux-mtd at lists.infradead.org
+> > 
+> > It looks like this ne is rather independent and can go via the MTD tree.
+> > So pushed this one to l2-mtd.git - let me know if I am confused. Thanks!
 > 
-> The Kconfig entry for the Openmoko GTA02 / Freerunner phone selects
-> MACH_NEO1973. But there is no Kconfig symbol MACH_NEO1973. The select
-> statement for that symbol is a nop. It can safely be dropped.
-> 
-> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
-> ---
-> 0) Tested with "git grep".
-> 
-> 1) There appear to be repositories that carry a "config MACH_NEO1973" in
-> their tree. I guess it is used to collect functionality common to the
-> GTA01 and the GTA02. But except for this select statement, MACH_NEO1973
-> was never used in mainline. So if the GTA01 code ever gets merged into
-> mainline, this select statement might be added once more (if it is
-> actually needed then).
-> 
->  arch/arm/mach-s3c24xx/Kconfig | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
-> index 7361b9d..bec43fe 100644
-> --- a/arch/arm/mach-s3c24xx/Kconfig
-> +++ b/arch/arm/mach-s3c24xx/Kconfig
-> @@ -641,7 +641,6 @@ comment "S3C2442 Boards"
->  config MACH_NEO1973_GTA02
->  	bool "Openmoko GTA02 / Freerunner phone"
->  	select I2C
-> -	select MACH_NEO1973
->  	select MFD_PCF50633
->  	select PCF50633_GPIO
->  	select POWER_SUPPLY
-> --
-> 1.7.11.7
+> I think you should not apply this patch on a tree that does not already
+> have the first three patches in the series. The easiest way would be
+> to keep the series together. As an alternative, Shawn could create a
+> git branch with those three patches and let you (and the other subsystem
+> maintainers) pull that branch in before applying the subsystem specific
+> patch.
 
-Yeah, we don't need it.
+OK, this one looked independent to me. Anyway, dropped it and for this
+one:
 
-Applied, thanks.
+Acked-by: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
 
-- Kukjin
+-- 
+Best Regards,
+Artem Bityutskiy
