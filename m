@@ -1,90 +1,31 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Tue, 12 Mar 2013 12:03:16 +0800
-Subject: [PATCH V2 5/9] ARM: dts: tegra: add power gpio keys to DT
-Message-ID: <1363060996-9363-1-git-send-email-josephl@nvidia.com>
+Date: Tue, 12 Mar 2013 12:03:28 +0800
+Subject: [PATCH V2 6/9] ARM: dts: tegra: whistler: add wakeup source for KBC
+Message-ID: <1363061008-9443-1-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the power gpio key to DT and enable the wakeup of the gpio key
-for the device. The Seaboard and paz00 already had the power gpio key
-binding and the power key of Whistler was on KBC. So these boards' device
-tree didn't include in this patch.
+Adding KBC as a wakeup source for Whistler board.
 
 Signed-off-by: Joseph Lo <josephl@nvidia.com>
 ---
 V2:
 * no change
 ---
- arch/arm/boot/dts/tegra20-harmony.dts   | 11 +++++++++++
- arch/arm/boot/dts/tegra20-trimslice.dts | 11 +++++++++++
- arch/arm/boot/dts/tegra20-ventana.dts   | 11 +++++++++++
- 3 files changed, 33 insertions(+)
+ arch/arm/boot/dts/tegra20-whistler.dts | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/tegra20-harmony.dts b/arch/arm/boot/dts/tegra20-harmony.dts
-index 1f79c0d..3532853 100644
---- a/arch/arm/boot/dts/tegra20-harmony.dts
-+++ b/arch/arm/boot/dts/tegra20-harmony.dts
-@@ -568,6 +568,17 @@
- 				0x1F0400D6>;	/* KEY_QUESTION */
- 	};
- 
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+
-+		power {
-+			label = "Power";
-+			gpios = <&gpio 170 1>; /* gpio PV2, active low */
-+			linux,code = <116>; /* KEY_POWER */
-+			gpio-key,wakeup;
-+		};
-+	};
-+
- 	regulators {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
-diff --git a/arch/arm/boot/dts/tegra20-trimslice.dts b/arch/arm/boot/dts/tegra20-trimslice.dts
-index 98f3e44..3cfd9ed 100644
---- a/arch/arm/boot/dts/tegra20-trimslice.dts
-+++ b/arch/arm/boot/dts/tegra20-trimslice.dts
-@@ -335,6 +335,17 @@
- 		gpios = <&gpio 191 1>; /* gpio PX7, active low */
- 	};
- 
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+
-+		power {
-+			label = "Power";
-+			gpios = <&gpio 190 1>; /* gpio PX6, active low */
-+			linux,code = <116>; /* KEY_POWER */
-+			gpio-key,wakeup;
-+		};
-+	};
-+
- 	regulators {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
-diff --git a/arch/arm/boot/dts/tegra20-ventana.dts b/arch/arm/boot/dts/tegra20-ventana.dts
-index 4aef56f..ede91c0 100644
---- a/arch/arm/boot/dts/tegra20-ventana.dts
-+++ b/arch/arm/boot/dts/tegra20-ventana.dts
-@@ -531,6 +531,17 @@
- 		bus-width = <8>;
- 	};
- 
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+
-+		power {
-+			label = "Power";
-+			gpios = <&gpio 170 1>; /* gpio PV2, active low */
-+			linux,code = <116>; /* KEY_POWER */
-+			gpio-key,wakeup;
-+		};
-+	};
-+
- 	regulators {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
+diff --git a/arch/arm/boot/dts/tegra20-whistler.dts b/arch/arm/boot/dts/tegra20-whistler.dts
+index 5762188..4afcae1 100644
+--- a/arch/arm/boot/dts/tegra20-whistler.dts
++++ b/arch/arm/boot/dts/tegra20-whistler.dts
+@@ -526,6 +526,7 @@
+ 		nvidia,repeat-delay-ms = <160>;
+ 		nvidia,kbc-row-pins = <0 1 2>;
+ 		nvidia,kbc-col-pins = <16 17>;
++		nvidia,wakeup-source;
+ 		linux,keymap = <0x00000074	/* KEY_POWER */
+ 				0x01000066	/* KEY_HOME */
+ 				0x0101009E	/* KEY_BACK */
 -- 
 1.8.1.5
