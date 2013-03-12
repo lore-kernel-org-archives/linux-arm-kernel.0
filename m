@@ -1,69 +1,62 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 12 Mar 2013 14:15:09 -0500
-Subject: [PATCH v2 05/14] ARM: integrator: use clocksource_of_init for
- sp804
-In-Reply-To: <1363108124-17484-6-git-send-email-haojian.zhuang@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 12 Mar 2013 19:17:24 +0000
+Subject: [PATCH v2 03/14] clocksource: sp804: append CONFIG_OF
+In-Reply-To: <1363108124-17484-4-git-send-email-haojian.zhuang@linaro.org>
 References: <1363108124-17484-1-git-send-email-haojian.zhuang@linaro.org>
- <1363108124-17484-6-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <513F7EBD.80207@gmail.com>
+ <1363108124-17484-4-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <201303121917.24928.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/12/2013 12:08 PM, Haojian Zhuang wrote:
-> Remove all code to parse sp804 in integrator platform driver. Use
-> clocksource_of_init() instead since these code are implemented in sp804
-> driver already.
+(resending this email as I got a few rejects from mailing lists when
+I accidentally had an invalid email address for Mike)
+
+On Tuesday 12 March 2013, Haojian Zhuang wrote:
+> of_find_matching_node() & of_device_is_available() are depend on CONFIG_OF
+> macro. If CONFIG_OF isn't defined for non-DT mode, the build error
+> occurs.
 > 
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
-> ---
->  arch/arm/boot/dts/integrator.dtsi        |    3 +++
->  arch/arm/boot/dts/integratorap.dts       |   15 +++++------
->  arch/arm/boot/dts/integratorcp.dts       |    9 +++----
->  arch/arm/mach-integrator/Kconfig         |    3 +++
->  arch/arm/mach-integrator/integrator_ap.c |   41 +-----------------------------
->  arch/arm/mach-integrator/integrator_cp.c |   35 ++-----------------------
->  6 files changed, 20 insertions(+), 86 deletions(-)
+> So add CONFIG_OF for those DT functions.
 
+I don't like this patch too much:
 
-> diff --git a/arch/arm/boot/dts/integratorap.dts b/arch/arm/boot/dts/integratorap.dts
-> index c9c3fa3..70e321c 100644
-> --- a/arch/arm/boot/dts/integratorap.dts
-> +++ b/arch/arm/boot/dts/integratorap.dts
-> @@ -9,11 +9,6 @@
->  	model = "ARM Integrator/AP";
->  	compatible = "arm,integrator-ap";
+We should be able to do this without the #ifdef. The problem is really that the
+declarations are also hidden behind an #ifdef. I think we should change the
+linux/of.h header file to either provide alternative empty inline functions
+or at least leave the declarations visible so we can compile the code as
+long as the call gets discarded.
+
 >  
-> -	aliases {
-> -		arm,timer-primary = &timer2;
-> -		arm,timer-secondary = &timer1;
-> -	};
-> -
->  	chosen {
->  		bootargs = "root=/dev/ram0 console=ttyAM0,38400n8 earlyprintk";
->  	};
-> @@ -24,15 +19,19 @@
->  	};
+> +#ifdef CONFIG_OF
+>  static struct device_node *from = NULL;
 >  
->  	timer0: timer at 13000000 {
-> -		compatible = "arm,integrator-timer";
-> +		compatible = "arm,sp804", "arm,primecell";
+>  static struct of_device_id sp804_timer_match[] __initdata = {
+> @@ -294,3 +295,4 @@ err:
+>  	iounmap(base);
+>  }
+>  CLOCKSOURCE_OF_DECLARE(sp804, "arm,sp804", sp804_dt_init);
+> +#endif
 
-You are breaking existing dtb's changing this, but this is wrong for
-other reasons. The integrator does not have an SP804. It is the same
-programming model, but is a single timer and not the dual timer. So
-having a different compatible string is the correct way. I doubt it has
-the primecell ID registers which is what "arm,primecell" indicates.
+There is actually an empty definition for CLOCKSOURCE_OF_DECLARE(),
+but I think it would be better to still define it the same way as
+with CONFIG_OF enabled but attribute((__unused__)), like:
 
->  	};
->  
->  	timer1: timer at 13000100 {
-> -		compatible = "arm,integrator-timer";
-> +		compatible = "arm,sp804", "arm,primecell";
-> +		arm,sp804-clockevent = <0>;
+#ifdef CONFIG_CLKSRC_OF
+extern void clocksource_of_init(void);
+#define CLOCKSOURCE_OF_DECLARE(name, compat, fn)                        \
+        static const struct of_device_id __clksrc_of_table_##name       \
+                __used __section(__clksrc_of_table)                     \
+                 = { .compatible = compat, .data = fn };
+#else
+static inline void clocksource_of_init(void) {}
+#define CLOCKSOURCE_OF_DECLARE(name, compat, fn)                        \
+        static const struct of_device_id __clksrc_of_table_##name       \
+                __unused = { .compatible = compat, .data = fn };
+#endif
 
-I don't like this nor the old way with aliases. We should describe the
-h/w features of the timer to determine what to use it for. AFAICT, all 3
-timers are identical on integrator and it does not matter which one
-Linux picks for clocksource vs. clockevent.
+This way, all the code still gets built, but since there is nothing
+pointing to __clksrc_of_table_##name and it is marked __unused, it
+gets dropped along with all other symbols that are only referenced
+from it.
 
-Rob
+	Arnd
