@@ -1,67 +1,22 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 12 Mar 2013 10:27:55 +0100
-Subject: [PATCH 1/2] cpuidle / kirkwood: remove redundant Kconfig option
-Message-ID: <1363080476-26555-1-git-send-email-daniel.lezcano@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 12 Mar 2013 09:23:58 +0000
+Subject: [PATCH 0/3] ARM sched_clock selection enhancements
+In-Reply-To: <1363055197-17296-1-git-send-email-robherring2@gmail.com>
+References: <1363055197-17296-1-git-send-email-robherring2@gmail.com>
+Message-ID: <20130312092358.GP4977@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the CPU_IDLE and the ARCH_KIRKWOOD options are set it is
-pointless to define a new option CPU_IDLE_KIRKWOOD because it
-is redundant.
+On Mon, Mar 11, 2013 at 09:26:34PM -0500, Rob Herring wrote:
+> In preparation to move more timer initialization to use CLKSRC_OF and
+> out of the platforms, a way to select the timer used for sched_clock is
+> needed. This series makes the ARM sched_clock support code prefer 64-bit
+> counters or higher frequency counters. This is sufficient at least on
+> ARM Ltd boards to use the 24MHz counter rather than sp804 and to always
+> use the 64-bit architected timer when present. This mechanism can be
+> extended to DT properties if needed for any non-discoverable h/w feature.
 
-The Makefile drivers directory contains a condition to compile
-the cpuidle drivers:
-
-obj-$(CONFIG_CPU_IDLE)          += cpuidle/
-
-Hence, if CPU_IDLE is not set we won't enter this directory.
-
-This patch removes the useless Kconfig option and replaces the
-condition in the Makefile by CONFIG_ARCH_KIRKWOOD.
-
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
----
- arch/arm/configs/kirkwood_defconfig |    1 -
- drivers/cpuidle/Kconfig             |    6 ------
- drivers/cpuidle/Makefile            |    2 +-
- 3 files changed, 1 insertion(+), 8 deletions(-)
-
-diff --git a/arch/arm/configs/kirkwood_defconfig b/arch/arm/configs/kirkwood_defconfig
-index 13482ea..93f3794 100644
---- a/arch/arm/configs/kirkwood_defconfig
-+++ b/arch/arm/configs/kirkwood_defconfig
-@@ -56,7 +56,6 @@ CONFIG_AEABI=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
- CONFIG_CPU_IDLE=y
--CONFIG_CPU_IDLE_KIRKWOOD=y
- CONFIG_NET=y
- CONFIG_PACKET=y
- CONFIG_UNIX=y
-diff --git a/drivers/cpuidle/Kconfig b/drivers/cpuidle/Kconfig
-index 071e2c3..c4cc27e 100644
---- a/drivers/cpuidle/Kconfig
-+++ b/drivers/cpuidle/Kconfig
-@@ -39,10 +39,4 @@ config CPU_IDLE_CALXEDA
- 	help
- 	  Select this to enable cpuidle on Calxeda processors.
- 
--config CPU_IDLE_KIRKWOOD
--	bool "CPU Idle Driver for Kirkwood processors"
--	depends on ARCH_KIRKWOOD
--	help
--	  Select this to enable cpuidle on Kirkwood processors.
--
- endif
-diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
-index 24c6e7d..0d8bd55 100644
---- a/drivers/cpuidle/Makefile
-+++ b/drivers/cpuidle/Makefile
-@@ -6,4 +6,4 @@ obj-y += cpuidle.o driver.o governor.o sysfs.o governors/
- obj-$(CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED) += coupled.o
- 
- obj-$(CONFIG_CPU_IDLE_CALXEDA) += cpuidle-calxeda.o
--obj-$(CONFIG_CPU_IDLE_KIRKWOOD) += cpuidle-kirkwood.o
-+obj-$(CONFIG_ARCH_KIRKWOOD) += cpuidle-kirkwood.o
--- 
-1.7.9.5
+No - this stuff is designed specifically to cope with the dilemas of
+less-than-64-bit sched_clock sources.  If you have 64-bit sources, then
+that should be dealt with differently - this code will break with 64-bit
+sources due to the multiplication and shift losing the high order bits.
