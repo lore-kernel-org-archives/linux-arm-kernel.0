@@ -1,178 +1,203 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 12 Mar 2013 16:40:19 +0000 (UTC)
-Subject: OMAP baseline test results for v3.9-rc1
-Message-ID: <alpine.DEB.2.00.1303121634080.2723@utopia.booyaka.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 12 Mar 2013 17:46:43 +0100
+Subject: [PATCH v2 00/13] ARM: spear multiplatform support
+Message-ID: <1363106816-9603-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This is the second time I post the SPEAr multiplatform patches.
+It did not work out for 3.9, mostly because of conflicts against
+patches in the DMA tree, but also because I did not push very
+hard for these. The patches are basically unchanged now, just
+some context differences since I rebased them on top of 3.9-rc2.
 
-Here are some basic OMAP test results for Linux v3.9-rc1.
-Logs and other details at:
+I'm adding them to the arm-soc tree for 3.10 now. If there are
+any bugs, let's fix them on top of this branch. It would be
+good to get some more testing on the branch though.
 
-    http://www.pwsan.com/omap/testlogs/test_v3.9-rc1/20130312100243/
+Arnd Bergmann (13):
+  ARM: spear13xx: make mach/dma.h local
+  ARM: spear: unify mach/generic.h and mach/irqs.h
+  ARM: spear: move identical headers to plat-spear/include/mach
+  ARM: spear: make spear3xx/6xx mach/spear.h files identical
+  ARM: spear: merge Kconfig files
+  ARM: spear: move spear.h and misc_regs.h into plat-spear
+  ARM: spear: move all files to mach-spear
+  ARM: spear: move generic.h and pl080.h into private dir
+  ARM: spear: make clock driver independent of headers
+  ARM: spear: rename duplicate pl080_plat_data
+  ARM: spear: use multiplatform configuration options.
+  ARM: spear: fix build error in restart.c
+  ARM: spear: enable spear13xx in multi_v7_defconfig
 
+ arch/arm/Kconfig                                   |  12 +-
+ arch/arm/Makefile                                  |   5 +-
+ arch/arm/configs/multi_v7_defconfig                |   9 +
+ arch/arm/configs/spear3xx_defconfig                |   2 +
+ arch/arm/configs/spear6xx_defconfig                |   1 +
+ arch/arm/mach-spear/Kconfig                        | 103 +++++
+ arch/arm/mach-spear/Makefile                       |  24 ++
+ arch/arm/mach-spear/Makefile.boot                  |   3 +
+ arch/arm/mach-spear/generic.h                      |  59 +++
+ arch/arm/mach-spear/headsmp.S                      |  47 +++
+ arch/arm/mach-spear/hotplug.c                      | 103 +++++
+ arch/arm/mach-spear/include/mach/debug-macro.S     |  36 ++
+ arch/arm/mach-spear/include/mach/irqs.h            |  35 ++
+ arch/arm/mach-spear/include/mach/misc_regs.h       |  22 ++
+ arch/arm/mach-spear/include/mach/spear.h           |  95 +++++
+ arch/arm/mach-spear/include/mach/timex.h           |  19 +
+ arch/arm/mach-spear/include/mach/uncompress.h      |  42 ++
+ arch/arm/mach-spear/pl080.c                        |  78 ++++
+ arch/arm/mach-spear/pl080.h                        |  21 +
+ arch/arm/mach-spear/platsmp.c                      | 130 +++++++
+ arch/arm/mach-spear/restart.c                      |  34 ++
+ arch/arm/mach-spear/spear1310.c                    |  96 +++++
+ arch/arm/mach-spear/spear1340.c                    | 193 +++++++++
+ arch/arm/mach-spear/spear13xx-dma.h                | 128 ++++++
+ arch/arm/mach-spear/spear13xx.c                    | 184 +++++++++
+ arch/arm/mach-spear/spear300.c                     | 220 +++++++++++
+ arch/arm/mach-spear/spear310.c                     | 262 +++++++++++++
+ arch/arm/mach-spear/spear320.c                     | 277 +++++++++++++
+ arch/arm/mach-spear/spear3xx.c                     | 116 ++++++
+ arch/arm/mach-spear/spear6xx.c                     | 431 +++++++++++++++++++++
+ arch/arm/mach-spear/time.c                         | 245 ++++++++++++
+ arch/arm/mach-spear13xx/Kconfig                    |  20 -
+ arch/arm/mach-spear13xx/Makefile                   |  10 -
+ arch/arm/mach-spear13xx/Makefile.boot              |   3 -
+ arch/arm/mach-spear13xx/headsmp.S                  |  47 ---
+ arch/arm/mach-spear13xx/hotplug.c                  | 103 -----
+ arch/arm/mach-spear13xx/include/mach/debug-macro.S |  14 -
+ arch/arm/mach-spear13xx/include/mach/dma.h         | 128 ------
+ arch/arm/mach-spear13xx/include/mach/generic.h     |  51 ---
+ arch/arm/mach-spear13xx/include/mach/hardware.h    |   1 -
+ arch/arm/mach-spear13xx/include/mach/irqs.h        |  20 -
+ arch/arm/mach-spear13xx/include/mach/spear.h       |  54 ---
+ arch/arm/mach-spear13xx/include/mach/timex.h       |  19 -
+ arch/arm/mach-spear13xx/include/mach/uncompress.h  |  19 -
+ arch/arm/mach-spear13xx/platsmp.c                  | 130 -------
+ arch/arm/mach-spear13xx/spear1310.c                |  98 -----
+ arch/arm/mach-spear13xx/spear1340.c                | 192 ---------
+ arch/arm/mach-spear13xx/spear13xx.c                | 183 ---------
+ arch/arm/mach-spear3xx/Kconfig                     |  26 --
+ arch/arm/mach-spear3xx/Makefile                    |  15 -
+ arch/arm/mach-spear3xx/Makefile.boot               |   3 -
+ arch/arm/mach-spear3xx/include/mach/debug-macro.S  |  14 -
+ arch/arm/mach-spear3xx/include/mach/generic.h      |  36 --
+ arch/arm/mach-spear3xx/include/mach/hardware.h     |   1 -
+ arch/arm/mach-spear3xx/include/mach/irqs.h         |  19 -
+ arch/arm/mach-spear3xx/include/mach/misc_regs.h    |  22 --
+ arch/arm/mach-spear3xx/include/mach/spear.h        |  60 ---
+ arch/arm/mach-spear3xx/include/mach/timex.h        |  19 -
+ arch/arm/mach-spear3xx/include/mach/uncompress.h   |  19 -
+ arch/arm/mach-spear3xx/spear300.c                  | 220 -----------
+ arch/arm/mach-spear3xx/spear310.c                  | 262 -------------
+ arch/arm/mach-spear3xx/spear320.c                  | 276 -------------
+ arch/arm/mach-spear3xx/spear3xx.c                  | 113 ------
+ arch/arm/mach-spear6xx/Kconfig                     |  10 -
+ arch/arm/mach-spear6xx/Makefile                    |   6 -
+ arch/arm/mach-spear6xx/Makefile.boot               |   3 -
+ arch/arm/mach-spear6xx/include/mach/debug-macro.S  |  14 -
+ arch/arm/mach-spear6xx/include/mach/generic.h      |  23 --
+ arch/arm/mach-spear6xx/include/mach/hardware.h     |   1 -
+ arch/arm/mach-spear6xx/include/mach/irqs.h         |  25 --
+ arch/arm/mach-spear6xx/include/mach/misc_regs.h    |  22 --
+ arch/arm/mach-spear6xx/include/mach/spear.h        |  46 ---
+ arch/arm/mach-spear6xx/include/mach/timex.h        |  19 -
+ arch/arm/mach-spear6xx/include/mach/uncompress.h   |  19 -
+ arch/arm/mach-spear6xx/spear6xx.c                  | 430 --------------------
+ arch/arm/plat-spear/Kconfig                        |  47 ---
+ arch/arm/plat-spear/Makefile                       |   9 -
+ arch/arm/plat-spear/include/plat/debug-macro.S     |  36 --
+ arch/arm/plat-spear/include/plat/pl080.h           |  21 -
+ arch/arm/plat-spear/include/plat/timex.h           |  19 -
+ arch/arm/plat-spear/include/plat/uncompress.h      |  42 --
+ arch/arm/plat-spear/pl080.c                        |  78 ----
+ arch/arm/plat-spear/restart.c                      |  33 --
+ arch/arm/plat-spear/time.c                         | 245 ------------
+ drivers/clk/spear/spear1310_clock.c                |  64 ++-
+ drivers/clk/spear/spear1340_clock.c                |  63 ++-
+ drivers/clk/spear/spear3xx_clock.c                 |  60 +--
+ drivers/clk/spear/spear6xx_clock.c                 |  31 +-
+ 88 files changed, 3130 insertions(+), 3465 deletions(-)
+ create mode 100644 arch/arm/mach-spear/Kconfig
+ create mode 100644 arch/arm/mach-spear/Makefile
+ create mode 100644 arch/arm/mach-spear/Makefile.boot
+ create mode 100644 arch/arm/mach-spear/generic.h
+ create mode 100644 arch/arm/mach-spear/headsmp.S
+ create mode 100644 arch/arm/mach-spear/hotplug.c
+ create mode 100644 arch/arm/mach-spear/include/mach/debug-macro.S
+ create mode 100644 arch/arm/mach-spear/include/mach/irqs.h
+ create mode 100644 arch/arm/mach-spear/include/mach/misc_regs.h
+ create mode 100644 arch/arm/mach-spear/include/mach/spear.h
+ create mode 100644 arch/arm/mach-spear/include/mach/timex.h
+ create mode 100644 arch/arm/mach-spear/include/mach/uncompress.h
+ create mode 100644 arch/arm/mach-spear/pl080.c
+ create mode 100644 arch/arm/mach-spear/pl080.h
+ create mode 100644 arch/arm/mach-spear/platsmp.c
+ create mode 100644 arch/arm/mach-spear/restart.c
+ create mode 100644 arch/arm/mach-spear/spear1310.c
+ create mode 100644 arch/arm/mach-spear/spear1340.c
+ create mode 100644 arch/arm/mach-spear/spear13xx-dma.h
+ create mode 100644 arch/arm/mach-spear/spear13xx.c
+ create mode 100644 arch/arm/mach-spear/spear300.c
+ create mode 100644 arch/arm/mach-spear/spear310.c
+ create mode 100644 arch/arm/mach-spear/spear320.c
+ create mode 100644 arch/arm/mach-spear/spear3xx.c
+ create mode 100644 arch/arm/mach-spear/spear6xx.c
+ create mode 100644 arch/arm/mach-spear/time.c
+ delete mode 100644 arch/arm/mach-spear13xx/Kconfig
+ delete mode 100644 arch/arm/mach-spear13xx/Makefile
+ delete mode 100644 arch/arm/mach-spear13xx/Makefile.boot
+ delete mode 100644 arch/arm/mach-spear13xx/headsmp.S
+ delete mode 100644 arch/arm/mach-spear13xx/hotplug.c
+ delete mode 100644 arch/arm/mach-spear13xx/include/mach/debug-macro.S
+ delete mode 100644 arch/arm/mach-spear13xx/include/mach/dma.h
+ delete mode 100644 arch/arm/mach-spear13xx/include/mach/generic.h
+ delete mode 100644 arch/arm/mach-spear13xx/include/mach/hardware.h
+ delete mode 100644 arch/arm/mach-spear13xx/include/mach/irqs.h
+ delete mode 100644 arch/arm/mach-spear13xx/include/mach/spear.h
+ delete mode 100644 arch/arm/mach-spear13xx/include/mach/timex.h
+ delete mode 100644 arch/arm/mach-spear13xx/include/mach/uncompress.h
+ delete mode 100644 arch/arm/mach-spear13xx/platsmp.c
+ delete mode 100644 arch/arm/mach-spear13xx/spear1310.c
+ delete mode 100644 arch/arm/mach-spear13xx/spear1340.c
+ delete mode 100644 arch/arm/mach-spear13xx/spear13xx.c
+ delete mode 100644 arch/arm/mach-spear3xx/Kconfig
+ delete mode 100644 arch/arm/mach-spear3xx/Makefile
+ delete mode 100644 arch/arm/mach-spear3xx/Makefile.boot
+ delete mode 100644 arch/arm/mach-spear3xx/include/mach/debug-macro.S
+ delete mode 100644 arch/arm/mach-spear3xx/include/mach/generic.h
+ delete mode 100644 arch/arm/mach-spear3xx/include/mach/hardware.h
+ delete mode 100644 arch/arm/mach-spear3xx/include/mach/irqs.h
+ delete mode 100644 arch/arm/mach-spear3xx/include/mach/misc_regs.h
+ delete mode 100644 arch/arm/mach-spear3xx/include/mach/spear.h
+ delete mode 100644 arch/arm/mach-spear3xx/include/mach/timex.h
+ delete mode 100644 arch/arm/mach-spear3xx/include/mach/uncompress.h
+ delete mode 100644 arch/arm/mach-spear3xx/spear300.c
+ delete mode 100644 arch/arm/mach-spear3xx/spear310.c
+ delete mode 100644 arch/arm/mach-spear3xx/spear320.c
+ delete mode 100644 arch/arm/mach-spear3xx/spear3xx.c
+ delete mode 100644 arch/arm/mach-spear6xx/Kconfig
+ delete mode 100644 arch/arm/mach-spear6xx/Makefile
+ delete mode 100644 arch/arm/mach-spear6xx/Makefile.boot
+ delete mode 100644 arch/arm/mach-spear6xx/include/mach/debug-macro.S
+ delete mode 100644 arch/arm/mach-spear6xx/include/mach/generic.h
+ delete mode 100644 arch/arm/mach-spear6xx/include/mach/hardware.h
+ delete mode 100644 arch/arm/mach-spear6xx/include/mach/irqs.h
+ delete mode 100644 arch/arm/mach-spear6xx/include/mach/misc_regs.h
+ delete mode 100644 arch/arm/mach-spear6xx/include/mach/spear.h
+ delete mode 100644 arch/arm/mach-spear6xx/include/mach/timex.h
+ delete mode 100644 arch/arm/mach-spear6xx/include/mach/uncompress.h
+ delete mode 100644 arch/arm/mach-spear6xx/spear6xx.c
+ delete mode 100644 arch/arm/plat-spear/Kconfig
+ delete mode 100644 arch/arm/plat-spear/Makefile
+ delete mode 100644 arch/arm/plat-spear/include/plat/debug-macro.S
+ delete mode 100644 arch/arm/plat-spear/include/plat/pl080.h
+ delete mode 100644 arch/arm/plat-spear/include/plat/timex.h
+ delete mode 100644 arch/arm/plat-spear/include/plat/uncompress.h
+ delete mode 100644 arch/arm/plat-spear/pl080.c
+ delete mode 100644 arch/arm/plat-spear/restart.c
+ delete mode 100644 arch/arm/plat-spear/time.c
 
-Test summary
-------------
-
-Build:
-    FAIL ( 4/16): am33xx_only, omap1_defconfig,
-    	   	  omap1_defconfig_5912osk_only,
-		  omap2plus_defconfig_2430sdp_only
-    Pass (12/16): n800_multi_omap2xxx, n800_only_a,
-    	 	  omap1_defconfig_1510innovator_only, 
-		  omap2plus_defconfig, omap2plus_defconfig_cpupm,
-		  omap2plus_defconfig_no_pm,
-		  omap2plus_defconfig_omap2_4_only,
-		  omap2plus_defconfig_omap3_4_only,
-		  rmk_omap3430_ldp_allnoconfig,
-		  rmk_omap3430_ldp_oldconfig,
-		  rmk_omap4430_sdp_allnoconfig
-		  rmk_omap4430_sdp_oldconfig
-
-Boot to userspace:
-    FAIL ( 4/11): 2430sdp, 37xxevm, am335xbone, cmt3517
-    Pass ( 7/11): 2420n800, 3517evm, 3530es3beagle,
-  	   	  3730beaglexm, 4430es2panda, 5912osk,
-		  4460pandaes
-  
-PM ret, suspend:
-    FAIL ( 4/ 6): 2430sdp, 37xxevm, 4430es2panda, 4460pandaes
-    Pass ( 2/ 6): 3530es3beagle, 3730beaglexm
-
-PM ret, dynamic idle:
-    FAIL ( 4/ 6): 2430sdp, 37xxevm, 4430es2panda, 4460pandaes
-    Pass ( 2/ 6): 3530es3beagle, 3730beaglexm
-
-PM off, suspend:
-    FAIL ( 3/ 5): 37xxevm, 4430es2panda, 4460pandaes
-    Pass ( 2/ 5): 3530es3beagle, 3730beaglexm
-
-PM off, dynamic idle:
-    FAIL ( 3/ 5): 37xxevm, 4430es2panda, 4460pandaes
-    Pass ( 2/ 5): 3530es3beagle, 3730beaglexm
-
-
-Failing tests: fixed by posted patches
---------------------------------------
-
-Build:
-
-* omap1_defconfig: several problems with mach-omap1/board-h2.c
-  - Fixed by Tony: http://www.spinics.net/lists/arm-kernel/msg224133.html
-
-* omap1_defconfig_5912osk_only: implicit declaration of function 'cpu_is_omap15xx'
-  - Fixed by Aaro: http://www.spinics.net/lists/linux-omap/msg87523.html
-
-
-Failing tests: needing investigation
-------------------------------------
-
-Build:
-
-* am33xx_only, omap2plus_defconfig_2430sdp_only: omap-{smp,hotplug}.c link errors
-
-Boot tests:
-
-* 2430sdp & 37xxevm: hang during MMC partition probe
-  - Cause unknown
-
-* 3517EVM & CM-T3517: boot hangs with NFS root
-  - Likely some Kconfig, board file, and PM issues with EMAC
-  - Longstanding bug
-
-* CM-T3517: boot hangs with MMC root
-  - Due to missing MMC setup in board file
-  - http://www.spinics.net/lists/arm-kernel/msg211471.html
-  - Longstanding bug
-
-Boot warnings:
-
-* CM-T3517: L3 in-band error with IPSS during boot
-  - Cause unknown but see http://marc.info/?l=linux-omap&m=134833869730129&w=2
-  - Longstanding issue; does not occur on the 3517EVM
-
-PM tests:
-
-* 2430sdp: pwrdm state mismatch(dsp_pwrdm) 0 != 3
-  - need to doublecheck wakeup dependencies
-  - (am assuming it's still there; does not boot to userspace)
-
-* 2430sdp: power domains not entering retention
-  - Cause unknown
-  - (am assuming it's still there; does not boot to userspace)
-
-* 4430es2panda, 4460pandaes: pwrdm state mismatch on CAM, DSS, ABE
-
-* 4460pandaes: pwrdm state mismatch on IVAHD, TESLA 
-
-* 4430es2panda: CORE, TESLA, IVAHD, L3INIT didn't enter target state
-  - Probably due to lack of reset code for M3, DSP, SL2IF, FSUSB
-    per discussion with Tero Kristo
-  - Likely dependent on the bootloader version
-    - fails with 2012.07-00136-g755de79
-
-* 4460pandaes: CORE, L3INIT didn't enter target state
-  - Cause unknown; appeared with v3.9-rc1
-
-* 4460pandaes: chip not entering retention in dynamic idle
-  - Presumably 4430es2panda also fails this
-
-* 3730 Beagle XM: does not serial wake from off-idle suspend when console
-  UART doesn't clock-gate ("debug ignore_loglevel")
-  - Cause unknown
-  - Not yet part of the automated test suite
-  - Re-tested at v3.7; still failing:
-    http://www.pwsan.com/omap/transcripts/20121211-3730beaglexm-3.7-pm-offmode-fail-debug.txt
-
-Other:
-
-* 2420N800: powers down 30 seconds after boot
-  - Presumably due to missing CBUS patches for watchdog control
-  - http://lkml.org/lkml/2012/9/3/265
-  - http://marc.info/?l=linux-omap&m=135274739624125&w=2
-  - http://marc.info/?l=linux-omap&m=135664195831104&w=2
-  - Should be working in v3.9-rc1 when CONFIG_RETU_WATCHDOG=y ?
-
-* 4430es2panda: omap_hwmod: l3_instr: _wait_target_disable failed
-  - Unknown cause; could be due to the lack of hierarchical enable/disable
-    in hwmod code
-  - Jon Hunter reports this does not appear with the same X-loader/bootloader
-    on his 4430ES2.3 Panda, so could be ES-level dependent
-
-
-
-vmlinux object size
-(delta in bytes from test_v3.8 (19f949f52599ba7c3f67a5897ac6be14bfcb1200)):
-   text     data      bss    total  kernel
-+195310   +37968    +1364  +234642  omap2plus_defconfig
-+185362   +37128    +1364  +223854  omap2plus_defconfig_cpupm
-+186719   +31416    +1300  +219435  omap2plus_defconfig_omap2_4_only
-+181125   +41432    +1300  +223857  omap2plus_defconfig_omap3_4_only
- +10460   +10272    +1184   +21916  rmk_omap3430_ldp_allnoconfig
- +40867   +14672     +972   +56511  rmk_omap4430_sdp_oldconfig
-
-Looks like v3.9 is well on target to exceed even the previous 
-per-release bloat records.
-
-There are some entries missing from the above table; this is probably due 
-to some bug in my scripts that needs to be dealt with.
-
-
-Boot-time memory difference
-(delta in bytes from test_v3.8 (19f949f52599ba7c3f67a5897ac6be14bfcb1200))
-  avail  rsrvd   high  freed  board          kconfig
- -15892k 15892k      .     4k  2420n800       n800_only_a
- -16644k 16644k      .  -328k  2430sdp        omap2plus_defconfig
- -16644k 16644k      .    12k  3517evm        omap2plus_defconfig
- -16644k 16644k      .    12k  3530es3beagle  omap2plus_defconfig
- -16644k 16644k      .    12k  3730beaglexm   omap2plus_defconfig
- -16644k 16644k      .  -328k  37xxevm        omap2plus_defconfig
- -16636k 16636k      .    12k  4430es2panda   omap2plus_defconfig
- -16656k 16656k      .    12k  4460pandaes    omap2plus_defconfig
-
-Current guess is that this huge change is due to CMA:
-
-[    0.000000] cma: CMA: reserved 16 MiB at 86800000
-
-etc.
+-- 
+1.8.1.2
