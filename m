@@ -1,61 +1,92 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 12 Mar 2013 07:53:39 -0400
-Subject: linux-next: manual merge of the akpm tree with the arm-soc tree
-In-Reply-To: <CAOesGMgSzn+uCVEMKZgtorcNkdzzvntmnfoej5vN-AjF43pnyQ@mail.gmail.com>
-References: <20130312144714.39749c5b0bd1aea14c4d2ff8@canb.auug.org.au>
- <20130312062509.GQ21478@lunn.ch>
- <20130312111246.GD12700@titan.lakedaemon.net>
- <CAOesGMgSzn+uCVEMKZgtorcNkdzzvntmnfoej5vN-AjF43pnyQ@mail.gmail.com>
-Message-ID: <20130312115339.GF12700@titan.lakedaemon.net>
+From: dahuang@nvidia.com (Danny Huang)
+Date: Tue, 12 Mar 2013 20:01:07 +0800
+Subject: [PATCH v2] ARM: tegra: expose chip ID and revision
+Message-ID: <1363089667-15737-1-git-send-email-dahuang@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 12, 2013 at 04:37:39AM -0700, Olof Johansson wrote:
-> On Tue, Mar 12, 2013 at 4:12 AM, Jason Cooper <jason@lakedaemon.net> wrote:
-> > On Tue, Mar 12, 2013 at 07:25:09AM +0100, Andrew Lunn wrote:
-> >> On Tue, Mar 12, 2013 at 02:47:14PM +1100, Stephen Rothwell wrote:
-> >> > Hi Andrew,
-> >> >
-> >> > Today's linux-next merge of the akpm tree got a conflict in
-> >> > drivers/rtc/rtc-mv.c between commit 89c58c198b25 ("rtc: rtc-mv: Add
-> >> > support for clk to avoid lockups") from the arm-soc tree and commit "rtc:
-> >> > rtc-mv: use devm_rtc_device_register()" from the akpm tree.
-> >> >
-> >> > I fixed it up (I think - see below) and can carry the fix as necessary
-> >> > (no action is required).
-> >>
-> >> Hi Stephan
-> >>
-> >> Looks O.K. to me.
-> >>
-> >> Acked-by: Andrew Lunn <andrew@lunn.ch>
-> >
-> > Same here,
-> >
-> > Acked-by: Jason Cooper <jason@lakedaemon.net>
-> 
-> We should make sure that future RTC changes get queued through AKPM
-> and not through us to avoid these kind of conflicts. Same as other
-> driver subsystems..
+Expose Tegra chip ID and revision in /sys/devices/soc for user mode
+usage
 
-I agree, however, this patch is part of a four patch series fixing a
-single problem reported by Simon Baatz:
+Signed-off-by: Danny Huang <dahuang@nvidia.com>
+---
+ arch/arm/mach-tegra/Kconfig  |  3 +++
+ arch/arm/mach-tegra/common.c | 23 +++++++++++++++++++++++
+ 2 files changed, 26 insertions(+)
 
-  89c58c1 rtc: rtc-mv: Add support for clk to avoid lockups
-  de88747 gpio: mvebu: Add clk support to prevent lockup
-  7bf5b40 ARM: kirkwood: fix to retain gbe MAC addresses for DT kernels
-  93fff4c ARM: kirkwood: of_serial: fix clock gating by removing clock-frequency
-
-Basically, if the user builds a kernel with most everything as modules
-(eg copying the debian config), it will fail to boot.  All four fixes
-are needed together to solve the problem.
-
-I chose to keep them together to maintain bisectability.  Either you
-have all of the fix (you landed on this branch), or you don't.  Was this
-the correct decision in this case, or did I miss something?
-
-Also, this series is CC'd to stable for inclusion in v3.8
-
-thx,
-
-Jason.
+diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+index d1c4893..b7abcfa 100644
+--- a/arch/arm/mach-tegra/Kconfig
++++ b/arch/arm/mach-tegra/Kconfig
+@@ -17,6 +17,7 @@ config ARCH_TEGRA_2x_SOC
+ 	select PINCTRL_TEGRA20
+ 	select PL310_ERRATA_727915 if CACHE_L2X0
+ 	select PL310_ERRATA_769419 if CACHE_L2X0
++	select SOC_BUS
+ 	select USB_ARCH_HAS_EHCI if USB_SUPPORT
+ 	select USB_ULPI if USB
+ 	select USB_ULPI_VIEWPORT if USB_SUPPORT
+@@ -36,6 +37,7 @@ config ARCH_TEGRA_3x_SOC
+ 	select PINCTRL
+ 	select PINCTRL_TEGRA30
+ 	select PL310_ERRATA_769419 if CACHE_L2X0
++	select SOC_BUS
+ 	select USB_ARCH_HAS_EHCI if USB_SUPPORT
+ 	select USB_ULPI if USB
+ 	select USB_ULPI_VIEWPORT if USB_SUPPORT
+@@ -51,6 +53,7 @@ config ARCH_TEGRA_114_SOC
+ 	select CPU_V7
+ 	select PINCTRL
+ 	select PINCTRL_TEGRA114
++	select SOC_BUS
+ 	help
+ 	  Support for NVIDIA Tegra T114 processor family, based on the
+ 	  ARM CortexA15MP CPU
+diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
+index f0315c9..9547c59 100644
+--- a/arch/arm/mach-tegra/common.c
++++ b/arch/arm/mach-tegra/common.c
+@@ -23,6 +23,8 @@
+ #include <linux/clk.h>
+ #include <linux/delay.h>
+ #include <linux/irqchip.h>
++#include <linux/slab.h>
++#include <linux/sys_soc.h>
+ #include <linux/clk/tegra.h>
+ 
+ #include <asm/hardware/cache-l2x0.h>
+@@ -94,6 +96,26 @@ static void __init tegra_init_cache(void)
+ 
+ }
+ 
++void __init tegra_soc_device_init(void)
++{
++	struct soc_device *soc_dev;
++	struct soc_device_attribute *soc_dev_attr;
++
++	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
++	if (!soc_dev_attr)
++		return;
++
++	soc_dev_attr->soc_id = kasprintf(GFP_KERNEL, "%d", tegra_chip_id);
++	soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%d", tegra_revision);
++	soc_dev_attr->family = kasprintf(GFP_KERNEL, "Tegra");
++
++	soc_dev = soc_device_register(soc_dev_attr);
++	if (IS_ERR_OR_NULL(soc_dev))
++		kfree(soc_dev_attr);
++
++	return;
++}
++
+ void __init tegra_init_early(void)
+ {
+ 	tegra_cpu_reset_handler_init();
+@@ -108,4 +130,5 @@ void __init tegra_init_early(void)
+ void __init tegra_init_late(void)
+ {
+ 	tegra_powergate_debugfs_init();
++	tegra_soc_device_init();
+ }
+-- 
+1.8.1.5
