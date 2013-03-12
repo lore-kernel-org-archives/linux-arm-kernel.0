@@ -1,201 +1,52 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Tue, 12 Mar 2013 12:02:23 +0800
-Subject: [PATCH V2 2/9] ARM: tegra: irq: add wake up handling
-Message-ID: <1363060943-9070-1-git-send-email-josephl@nvidia.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 12 Mar 2013 12:02:44 +0800
+Subject: [PATCH v4 0/2] Uncompress debug for multiplatform
+In-Reply-To: <513E149A.2060704@wwwdotorg.org>
+References: <1363001737-8745-1-git-send-email-shawn.guo@linaro.org>
+ <20130311170350.GM4977@n2100.arm.linux.org.uk>
+ <513E149A.2060704@wwwdotorg.org>
+Message-ID: <20130312040242.GF25910@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the wake up handling for legacy irq controller, and using
-IRQCHIP_MASK_ON_SUSPEND for wake irq handling.
+On Mon, Mar 11, 2013 at 11:30:02AM -0600, Stephen Warren wrote:
+> On 03/11/2013 11:03 AM, Russell King - ARM Linux wrote:
+> > On Mon, Mar 11, 2013 at 07:35:35PM +0800, Shawn Guo wrote:
+> >> Instead of giving zero support of uncompress debug for multiplatform
+> >> build, the series turns uncompress debug into one part of DEBUG_LL
+> >> support.  When DEBUG_LL is turned on for a particular platform,
+> >> uncompress debug works too for that platform.
+> >>
+> >> OMAP is an exception here.  OMAP low-level debug code places data
+> >> in the .data section, and that is allowed in decompressor.  That's
+> >> why Kconfig symbol DEBUG_UNCOMPRESS that controls multiplatform
+> >> uncompress debug support is defined with !DEBUG_OMAP2PLUS_UART.
+> >>
+> >> Changes since v3:
+> >>  - Create Kconfig symbol DEBUG_UNCOMPRESS for building in
+> >>    multiplatform uncompress debug support, so that we can leave
+> >>    out the platform which is part of multiplatform but not ready
+> >>    for being part of uncompress debug like OMAP example.
+> > 
+> > Wasn't Tegra also having problems with this as well?
+> 
+> Tegra isn't converted to multi-platform yet. I hope to in 3.10.
 
-Based on the work by:
-Varun Wadekar <vwadekar@nvidia.com>
+Yeah, that's why I did not touch Tegra as the series is based on
+v3.9-rc1 where Tegra hasn't been part of multi-platform yet.
 
-Signed-off-by: Joseph Lo <josephl@nvidia.com>
----
-V2:
-* no change
----
- arch/arm/mach-tegra/common.c |  2 +
- arch/arm/mach-tegra/irq.c    | 95 +++++++++++++++++++++++++++++++++++++++++++-
- arch/arm/mach-tegra/irq.h    |  6 +++
- 3 files changed, 102 insertions(+), 1 deletion(-)
+But I just noticed that debug-macro.S for Tegra has been renamed to
+debug/tegra.S, and we already know it will be broken when multi-platform
+is enabled together with this series for Tegra.  I should probably just
+take a further step to mark Tegra as another exception right now, to
+ensure the series will not break thing when getting merged together
+with Tegra multi-platform work.  Something like the following:
 
-diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
-index f0315c9..bc7268a 100644
---- a/arch/arm/mach-tegra/common.c
-+++ b/arch/arm/mach-tegra/common.c
-@@ -33,6 +33,7 @@
- #include "common.h"
- #include "fuse.h"
- #include "iomap.h"
-+#include "irq.h"
- #include "pmc.h"
- #include "apbio.h"
- #include "sleep.h"
-@@ -63,6 +64,7 @@ void __init tegra_dt_init_irq(void)
- 	tegra_clocks_init();
- 	tegra_init_irq();
- 	irqchip_init();
-+	tegra_legacy_irq_syscore_init();
- }
- #endif
- 
-diff --git a/arch/arm/mach-tegra/irq.c b/arch/arm/mach-tegra/irq.c
-index 1952e82..efa85ef 100644
---- a/arch/arm/mach-tegra/irq.c
-+++ b/arch/arm/mach-tegra/irq.c
-@@ -4,7 +4,7 @@
-  * Author:
-  *	Colin Cross <ccross@android.com>
-  *
-- * Copyright (C) 2010, NVIDIA Corporation
-+ * Copyright (C) 2010,2013, NVIDIA Corporation
-  *
-  * This software is licensed under the terms of the GNU General Public
-  * License version 2, as published by the Free Software Foundation, and
-@@ -23,6 +23,7 @@
- #include <linux/io.h>
- #include <linux/of.h>
- #include <linux/irqchip/arm-gic.h>
-+#include <linux/syscore_ops.h>
- 
- #include "board.h"
- #include "iomap.h"
-@@ -43,6 +44,7 @@
- #define ICTLR_COP_IEP_CLASS	0x3c
- 
- #define FIRST_LEGACY_IRQ 32
-+#define TEGRA_MAX_NUM_ICTLRS	5
- 
- #define SGI_MASK 0xFFFF
- 
-@@ -56,6 +58,15 @@ static void __iomem *ictlr_reg_base[] = {
- 	IO_ADDRESS(TEGRA_QUINARY_ICTLR_BASE),
- };
- 
-+#ifdef CONFIG_PM_SLEEP
-+static u32 cop_ier[TEGRA_MAX_NUM_ICTLRS];
-+static u32 cop_iep[TEGRA_MAX_NUM_ICTLRS];
-+static u32 cpu_ier[TEGRA_MAX_NUM_ICTLRS];
-+static u32 cpu_iep[TEGRA_MAX_NUM_ICTLRS];
-+
-+static u32 ictlr_wake_mask[TEGRA_MAX_NUM_ICTLRS];
-+#endif
-+
- bool tegra_pending_sgi(void)
- {
- 	u32 pending_set;
-@@ -125,6 +136,86 @@ static int tegra_retrigger(struct irq_data *d)
- 	return 1;
- }
- 
-+#ifdef CONFIG_PM_SLEEP
-+static int tegra_set_wake(struct irq_data *d, unsigned int enable)
-+{
-+	u32 irq = d->irq;
-+	u32 index, mask;
-+
-+	BUG_ON(irq < FIRST_LEGACY_IRQ ||
-+	       irq >= FIRST_LEGACY_IRQ + num_ictlrs * 32);
-+
-+	index = ((irq - FIRST_LEGACY_IRQ) / 32);
-+	mask = BIT((irq - FIRST_LEGACY_IRQ) % 32);
-+	if (enable)
-+		ictlr_wake_mask[index] |= mask;
-+	else
-+		ictlr_wake_mask[index] &= ~mask;
-+
-+	return 0;
-+}
-+
-+static int tegra_legacy_irq_suspend(void)
-+{
-+	unsigned long flags;
-+	int i;
-+
-+	local_irq_save(flags);
-+	for (i = 0; i < num_ictlrs; i++) {
-+		void __iomem *ictlr = ictlr_reg_base[i];
-+		/* Save interrupt state */
-+		cpu_ier[i] = readl_relaxed(ictlr + ICTLR_CPU_IER);
-+		cpu_iep[i] = readl_relaxed(ictlr + ICTLR_CPU_IEP_CLASS);
-+		cop_ier[i] = readl_relaxed(ictlr + ICTLR_COP_IER);
-+		cop_iep[i] = readl_relaxed(ictlr + ICTLR_COP_IEP_CLASS);
-+
-+		/* Disable COP interrupts */
-+		writel_relaxed(~0ul, ictlr + ICTLR_COP_IER_CLR);
-+
-+		/* Disable CPU interrupts */
-+		writel_relaxed(~0ul, ictlr + ICTLR_CPU_IER_CLR);
-+
-+		/* Enable the wakeup sources of ictlr */
-+		writel_relaxed(ictlr_wake_mask[i], ictlr + ICTLR_CPU_IER_SET);
-+	}
-+	local_irq_restore(flags);
-+
-+	return 0;
-+}
-+
-+static void tegra_legacy_irq_resume(void)
-+{
-+	unsigned long flags;
-+	int i;
-+
-+	local_irq_save(flags);
-+	for (i = 0; i < num_ictlrs; i++) {
-+		void __iomem *ictlr = ictlr_reg_base[i];
-+		writel_relaxed(cpu_iep[i], ictlr + ICTLR_CPU_IEP_CLASS);
-+		writel_relaxed(~0ul, ictlr + ICTLR_CPU_IER_CLR);
-+		writel_relaxed(cpu_ier[i], ictlr + ICTLR_CPU_IER_SET);
-+		writel_relaxed(cop_iep[i], ictlr + ICTLR_COP_IEP_CLASS);
-+		writel_relaxed(~0ul, ictlr + ICTLR_COP_IER_CLR);
-+		writel_relaxed(cop_ier[i], ictlr + ICTLR_COP_IER_SET);
-+	}
-+	local_irq_restore(flags);
-+}
-+
-+static struct syscore_ops tegra_legacy_irq_syscore_ops = {
-+	.suspend = tegra_legacy_irq_suspend,
-+	.resume = tegra_legacy_irq_resume,
-+};
-+
-+int tegra_legacy_irq_syscore_init(void)
-+{
-+	register_syscore_ops(&tegra_legacy_irq_syscore_ops);
-+
-+	return 0;
-+}
-+#else
-+#define tegra_set_wake NULL
-+#endif
-+
- void __init tegra_init_irq(void)
- {
- 	int i;
-@@ -150,6 +241,8 @@ void __init tegra_init_irq(void)
- 	gic_arch_extn.irq_mask = tegra_mask;
- 	gic_arch_extn.irq_unmask = tegra_unmask;
- 	gic_arch_extn.irq_retrigger = tegra_retrigger;
-+	gic_arch_extn.irq_set_wake = tegra_set_wake;
-+	gic_arch_extn.flags = IRQCHIP_MASK_ON_SUSPEND;
- 
- 	/*
- 	 * Check if there is a devicetree present, since the GIC will be
-diff --git a/arch/arm/mach-tegra/irq.h b/arch/arm/mach-tegra/irq.h
-index 5142649..bc05ce5 100644
---- a/arch/arm/mach-tegra/irq.h
-+++ b/arch/arm/mach-tegra/irq.h
-@@ -19,4 +19,10 @@
- 
- bool tegra_pending_sgi(void);
- 
-+#ifdef CONFIG_PM_SLEEP
-+int tegra_legacy_irq_syscore_init(void);
-+#else
-+static inline int tegra_legacy_irq_syscore_init(void) { return 0; }
-+#endif
-+
- #endif
--- 
-1.8.1.5
+config DEBUG_UNCOMPRESS
+        bool
+        default y if ARCH_MULTIPLATFORM && DEBUG_LL && \
+                     !DEBUG_OMAP2PLUS_UART && \
+                     !DEBUG_TEGRA_UART
+
+
+Shawn
