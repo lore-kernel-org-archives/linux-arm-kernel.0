@@ -1,377 +1,323 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 12 Mar 2013 17:46:51 +0100
-Subject: [PATCH v2 08/13] ARM: spear: move generic.h and pl080.h into private
- dir
+Date: Tue, 12 Mar 2013 17:46:47 +0100
+Subject: [PATCH v2 04/13] ARM: spear: make spear3xx/6xx mach/spear.h files
+ identical
 In-Reply-To: <1363106816-9603-1-git-send-email-arnd@arndb.de>
 References: <1363106816-9603-1-git-send-email-arnd@arndb.de>
-Message-ID: <1363106816-9603-9-git-send-email-arnd@arndb.de>
+Message-ID: <1363106816-9603-5-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No file outside of mach-spear includes these files any more,
-so they don't have to be globally visible now.
+The two files are almost identical already basically just differ
+in the identifier names. By changing the identifiers to be the
+same, we are able to merge the two as a preparation to building
+a combined kernel.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- arch/arm/mach-spear/generic.h               | 58 +++++++++++++++++++++++++++++
- arch/arm/mach-spear/include/mach/generic.h  | 58 -----------------------------
- arch/arm/mach-spear/include/mach/hardware.h |  1 -
- arch/arm/mach-spear/include/plat/pl080.h    | 21 -----------
- arch/arm/mach-spear/pl080.h                 | 21 +++++++++++
- arch/arm/mach-spear/platsmp.c               |  2 +-
- arch/arm/mach-spear/restart.c               |  2 +-
- arch/arm/mach-spear/spear1310.c             |  2 +-
- arch/arm/mach-spear/spear1340.c             |  2 +-
- arch/arm/mach-spear/spear13xx.c             |  2 +-
- arch/arm/mach-spear/spear300.c              |  2 +-
- arch/arm/mach-spear/spear310.c              |  2 +-
- arch/arm/mach-spear/spear320.c              |  2 +-
- arch/arm/mach-spear/spear3xx.c              |  4 +-
- arch/arm/mach-spear/spear6xx.c              |  4 +-
- arch/arm/mach-spear/time.c                  |  2 +-
- 16 files changed, 92 insertions(+), 93 deletions(-)
- create mode 100644 arch/arm/mach-spear/generic.h
- delete mode 100644 arch/arm/mach-spear/include/mach/generic.h
- delete mode 100644 arch/arm/mach-spear/include/mach/hardware.h
- delete mode 100644 arch/arm/mach-spear/include/plat/pl080.h
- create mode 100644 arch/arm/mach-spear/pl080.h
+ arch/arm/mach-spear3xx/include/mach/misc_regs.h |  2 +-
+ arch/arm/mach-spear3xx/include/mach/spear.h     | 47 ++++++++++---------
+ arch/arm/mach-spear3xx/spear300.c               |  2 +-
+ arch/arm/mach-spear3xx/spear310.c               |  2 +-
+ arch/arm/mach-spear3xx/spear320.c               |  2 +-
+ arch/arm/mach-spear3xx/spear3xx.c               |  8 ++--
+ arch/arm/mach-spear6xx/include/mach/misc_regs.h |  2 +-
+ arch/arm/mach-spear6xx/include/mach/spear.h     | 61 +++++++++++++++----------
+ arch/arm/mach-spear6xx/spear6xx.c               | 12 ++---
+ 9 files changed, 75 insertions(+), 63 deletions(-)
 
-diff --git a/arch/arm/mach-spear/generic.h b/arch/arm/mach-spear/generic.h
-new file mode 100644
-index 0000000..af47d9b
---- /dev/null
-+++ b/arch/arm/mach-spear/generic.h
-@@ -0,0 +1,58 @@
-+/*
-+ * spear machine family generic header file
-+ *
-+ * Copyright (C) 2009-2012 ST Microelectronics
-+ * Rajeev Kumar <rajeev-dlh.kumar@st.com>
-+ * Viresh Kumar <viresh.linux@gmail.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#ifndef __MACH_GENERIC_H
-+#define __MACH_GENERIC_H
-+
-+#include <linux/dmaengine.h>
-+#include <linux/amba/pl08x.h>
-+#include <linux/init.h>
-+#include <asm/mach/time.h>
-+
-+extern void spear13xx_timer_init(void);
-+extern void spear3xx_timer_init(void);
-+extern struct pl022_ssp_controller pl022_plat_data;
-+extern struct pl08x_platform_data pl080_plat_data;
-+extern struct dw_dma_platform_data dmac_plat_data;
-+extern struct dw_dma_slave cf_dma_priv;
-+extern struct dw_dma_slave nand_read_dma_priv;
-+extern struct dw_dma_slave nand_write_dma_priv;
-+bool dw_dma_filter(struct dma_chan *chan, void *slave);
-+
-+void __init spear_setup_of_timer(void);
-+void __init spear3xx_clk_init(void);
-+void __init spear3xx_map_io(void);
-+void __init spear3xx_dt_init_irq(void);
-+void __init spear6xx_clk_init(void);
-+void __init spear13xx_map_io(void);
-+void __init spear13xx_l2x0_init(void);
-+
-+void spear_restart(char, const char *);
-+
-+void spear13xx_secondary_startup(void);
-+void __cpuinit spear13xx_cpu_die(unsigned int cpu);
-+
-+extern struct smp_operations spear13xx_smp_ops;
-+
-+#ifdef CONFIG_MACH_SPEAR1310
-+void __init spear1310_clk_init(void);
-+#else
-+static inline void spear1310_clk_init(void) {}
-+#endif
-+
-+#ifdef CONFIG_MACH_SPEAR1340
-+void __init spear1340_clk_init(void);
-+#else
-+static inline void spear1340_clk_init(void) {}
-+#endif
-+
-+#endif /* __MACH_GENERIC_H */
-diff --git a/arch/arm/mach-spear/include/mach/generic.h b/arch/arm/mach-spear/include/mach/generic.h
-deleted file mode 100644
-index af47d9b..0000000
---- a/arch/arm/mach-spear/include/mach/generic.h
-+++ /dev/null
-@@ -1,58 +0,0 @@
--/*
-- * spear machine family generic header file
-- *
-- * Copyright (C) 2009-2012 ST Microelectronics
-- * Rajeev Kumar <rajeev-dlh.kumar@st.com>
-- * Viresh Kumar <viresh.linux@gmail.com>
-- *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2. This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- */
--
--#ifndef __MACH_GENERIC_H
--#define __MACH_GENERIC_H
--
--#include <linux/dmaengine.h>
--#include <linux/amba/pl08x.h>
--#include <linux/init.h>
--#include <asm/mach/time.h>
--
--extern void spear13xx_timer_init(void);
--extern void spear3xx_timer_init(void);
--extern struct pl022_ssp_controller pl022_plat_data;
--extern struct pl08x_platform_data pl080_plat_data;
--extern struct dw_dma_platform_data dmac_plat_data;
--extern struct dw_dma_slave cf_dma_priv;
--extern struct dw_dma_slave nand_read_dma_priv;
--extern struct dw_dma_slave nand_write_dma_priv;
--bool dw_dma_filter(struct dma_chan *chan, void *slave);
--
--void __init spear_setup_of_timer(void);
--void __init spear3xx_clk_init(void);
--void __init spear3xx_map_io(void);
--void __init spear3xx_dt_init_irq(void);
--void __init spear6xx_clk_init(void);
--void __init spear13xx_map_io(void);
--void __init spear13xx_l2x0_init(void);
--
--void spear_restart(char, const char *);
--
--void spear13xx_secondary_startup(void);
--void __cpuinit spear13xx_cpu_die(unsigned int cpu);
--
--extern struct smp_operations spear13xx_smp_ops;
--
--#ifdef CONFIG_MACH_SPEAR1310
--void __init spear1310_clk_init(void);
--#else
--static inline void spear1310_clk_init(void) {}
--#endif
--
--#ifdef CONFIG_MACH_SPEAR1340
--void __init spear1340_clk_init(void);
--#else
--static inline void spear1340_clk_init(void) {}
--#endif
--
--#endif /* __MACH_GENERIC_H */
-diff --git a/arch/arm/mach-spear/include/mach/hardware.h b/arch/arm/mach-spear/include/mach/hardware.h
-deleted file mode 100644
-index 40a8c17..0000000
---- a/arch/arm/mach-spear/include/mach/hardware.h
-+++ /dev/null
-@@ -1 +0,0 @@
--/* empty */
-diff --git a/arch/arm/mach-spear/include/plat/pl080.h b/arch/arm/mach-spear/include/plat/pl080.h
-deleted file mode 100644
-index eb6590d..0000000
---- a/arch/arm/mach-spear/include/plat/pl080.h
-+++ /dev/null
-@@ -1,21 +0,0 @@
--/*
-- * arch/arm/plat-spear/include/plat/pl080.h
-- *
-- * DMAC pl080 definitions for SPEAr platform
-- *
-- * Copyright (C) 2012 ST Microelectronics
-- * Viresh Kumar <viresh.linux@gmail.com>
-- *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2. This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- */
--
--#ifndef __PLAT_PL080_H
--#define __PLAT_PL080_H
--
--struct pl08x_channel_data;
--int pl080_get_signal(const struct pl08x_channel_data *cd);
--void pl080_put_signal(const struct pl08x_channel_data *cd, int signal);
--
--#endif /* __PLAT_PL080_H */
-diff --git a/arch/arm/mach-spear/pl080.h b/arch/arm/mach-spear/pl080.h
-new file mode 100644
-index 0000000..eb6590d
---- /dev/null
-+++ b/arch/arm/mach-spear/pl080.h
-@@ -0,0 +1,21 @@
-+/*
-+ * arch/arm/plat-spear/include/plat/pl080.h
-+ *
-+ * DMAC pl080 definitions for SPEAr platform
-+ *
-+ * Copyright (C) 2012 ST Microelectronics
-+ * Viresh Kumar <viresh.linux@gmail.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#ifndef __PLAT_PL080_H
-+#define __PLAT_PL080_H
-+
-+struct pl08x_channel_data;
-+int pl080_get_signal(const struct pl08x_channel_data *cd);
-+void pl080_put_signal(const struct pl08x_channel_data *cd, int signal);
-+
-+#endif /* __PLAT_PL080_H */
-diff --git a/arch/arm/mach-spear/platsmp.c b/arch/arm/mach-spear/platsmp.c
-index af4ade6..927979e 100644
---- a/arch/arm/mach-spear/platsmp.c
-+++ b/arch/arm/mach-spear/platsmp.c
-@@ -19,7 +19,7 @@
- #include <asm/cacheflush.h>
- #include <asm/smp_scu.h>
- #include <mach/spear.h>
--#include <mach/generic.h>
-+#include "generic.h"
+diff --git a/arch/arm/mach-spear3xx/include/mach/misc_regs.h b/arch/arm/mach-spear3xx/include/mach/misc_regs.h
+index 6309bf6..075812c 100644
+--- a/arch/arm/mach-spear3xx/include/mach/misc_regs.h
++++ b/arch/arm/mach-spear3xx/include/mach/misc_regs.h
+@@ -16,7 +16,7 @@
  
- static DEFINE_SPINLOCK(boot_lock);
- 
-diff --git a/arch/arm/mach-spear/restart.c b/arch/arm/mach-spear/restart.c
-index 7d4616d..004f0f2 100644
---- a/arch/arm/mach-spear/restart.c
-+++ b/arch/arm/mach-spear/restart.c
-@@ -14,7 +14,7 @@
- #include <linux/amba/sp810.h>
- #include <asm/system_misc.h>
- #include <mach/spear.h>
--#include <mach/generic.h>
-+#include "generic.h"
- 
- #define SPEAR13XX_SYS_SW_RES			(VA_MISC_BASE + 0x204)
- void spear_restart(char mode, const char *cmd)
-diff --git a/arch/arm/mach-spear/spear1310.c b/arch/arm/mach-spear/spear1310.c
-index 56214d1..fe868b2 100644
---- a/arch/arm/mach-spear/spear1310.c
-+++ b/arch/arm/mach-spear/spear1310.c
-@@ -19,7 +19,7 @@
- #include <linux/pata_arasan_cf_data.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
--#include <mach/generic.h>
-+#include "generic.h"
  #include <mach/spear.h>
  
- /* Base addresses */
-diff --git a/arch/arm/mach-spear/spear1340.c b/arch/arm/mach-spear/spear1340.c
-index b01c4c7..75e3864 100644
---- a/arch/arm/mach-spear/spear1340.c
-+++ b/arch/arm/mach-spear/spear1340.c
-@@ -20,7 +20,7 @@
- #include <linux/of_platform.h>
- #include <linux/irqchip.h>
- #include <asm/mach/arch.h>
--#include <mach/generic.h>
-+#include "generic.h"
- #include <mach/spear.h>
+-#define MISC_BASE		IOMEM(VA_SPEAR3XX_ICM3_MISC_REG_BASE)
++#define MISC_BASE		IOMEM(VA_SPEAR_ICM3_MISC_REG_BASE)
+ #define DMA_CHN_CFG		(MISC_BASE + 0x0A0)
  
- #include "spear13xx-dma.h"
-diff --git a/arch/arm/mach-spear/spear13xx.c b/arch/arm/mach-spear/spear13xx.c
-index 988fefe..6f62dd5 100644
---- a/arch/arm/mach-spear/spear13xx.c
-+++ b/arch/arm/mach-spear/spear13xx.c
-@@ -21,7 +21,7 @@
- #include <asm/hardware/cache-l2x0.h>
- #include <asm/mach/map.h>
- #include <asm/smp_twd.h>
--#include <mach/generic.h>
-+#include "generic.h"
- #include <mach/spear.h>
- 
- #include "spear13xx-dma.h"
-diff --git a/arch/arm/mach-spear/spear300.c b/arch/arm/mach-spear/spear300.c
-index 72449ee..bac56e8 100644
---- a/arch/arm/mach-spear/spear300.c
-+++ b/arch/arm/mach-spear/spear300.c
-@@ -17,7 +17,7 @@
- #include <linux/irqchip.h>
- #include <linux/of_platform.h>
- #include <asm/mach/arch.h>
--#include <mach/generic.h>
-+#include "generic.h"
- #include <mach/spear.h>
- 
- /* DMAC platform data's slave info */
-diff --git a/arch/arm/mach-spear/spear310.c b/arch/arm/mach-spear/spear310.c
-index 0b7962d..6ffbc63 100644
---- a/arch/arm/mach-spear/spear310.c
-+++ b/arch/arm/mach-spear/spear310.c
-@@ -18,7 +18,7 @@
- #include <linux/irqchip.h>
- #include <linux/of_platform.h>
- #include <asm/mach/arch.h>
--#include <mach/generic.h>
-+#include "generic.h"
- #include <mach/spear.h>
- 
- #define SPEAR310_UART1_BASE		UL(0xB2000000)
-diff --git a/arch/arm/mach-spear/spear320.c b/arch/arm/mach-spear/spear320.c
-index e9db7db..b8a4bb5 100644
---- a/arch/arm/mach-spear/spear320.c
-+++ b/arch/arm/mach-spear/spear320.c
-@@ -20,7 +20,7 @@
- #include <linux/of_platform.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
--#include <mach/generic.h>
-+#include "generic.h"
- #include <mach/spear.h>
- 
- #define SPEAR320_UART1_BASE		UL(0xA3000000)
-diff --git a/arch/arm/mach-spear/spear3xx.c b/arch/arm/mach-spear/spear3xx.c
-index d7580f2..be0c94d 100644
---- a/arch/arm/mach-spear/spear3xx.c
-+++ b/arch/arm/mach-spear/spear3xx.c
-@@ -18,8 +18,8 @@
- #include <linux/clk.h>
- #include <linux/io.h>
- #include <asm/mach/map.h>
--#include <plat/pl080.h>
--#include <mach/generic.h>
-+#include "pl080.h"
-+#include "generic.h"
- #include <mach/spear.h>
- 
- /* ssp device registration */
-diff --git a/arch/arm/mach-spear/spear6xx.c b/arch/arm/mach-spear/spear6xx.c
-index 97fb31d..78e1359 100644
---- a/arch/arm/mach-spear/spear6xx.c
-+++ b/arch/arm/mach-spear/spear6xx.c
-@@ -24,8 +24,8 @@
- #include <asm/mach/arch.h>
- #include <asm/mach/time.h>
- #include <asm/mach/map.h>
--#include <plat/pl080.h>
--#include <mach/generic.h>
-+#include "pl080.h"
-+#include "generic.h"
- #include <mach/spear.h>
- 
- /* dmac device registration */
-diff --git a/arch/arm/mach-spear/time.c b/arch/arm/mach-spear/time.c
-index bd5c53c..d449673 100644
---- a/arch/arm/mach-spear/time.c
-+++ b/arch/arm/mach-spear/time.c
-@@ -23,7 +23,7 @@
- #include <linux/time.h>
- #include <linux/irq.h>
- #include <asm/mach/time.h>
--#include <mach/generic.h>
-+#include "generic.h"
- 
+ #endif /* __MACH_MISC_REGS_H */
+diff --git a/arch/arm/mach-spear3xx/include/mach/spear.h b/arch/arm/mach-spear3xx/include/mach/spear.h
+index 8cca951..ee5a774 100644
+--- a/arch/arm/mach-spear3xx/include/mach/spear.h
++++ b/arch/arm/mach-spear3xx/include/mach/spear.h
+@@ -1,9 +1,8 @@
  /*
-  * We would use TIMER0 and TIMER1 as clockevent and clocksource.
+- * arch/arm/mach-spear3xx/include/mach/spear.h
++ * SPEAr3xx/6xx Machine family specific definition
+  *
+- * SPEAr3xx Machine family specific definition
+- *
+- * Copyright (C) 2009 ST Microelectronics
++ * Copyright (C) 2009,2012 ST Microelectronics
++ * Rajeev Kumar<rajeev-dlh.kumar@st.com>
+  * Viresh Kumar <viresh.linux@gmail.com>
+  *
+  * This file is licensed under the terms of the GNU General Public
+@@ -11,38 +10,38 @@
+  * warranty of any kind, whether express or implied.
+  */
+ 
+-#ifndef __MACH_SPEAR3XX_H
+-#define __MACH_SPEAR3XX_H
++#ifndef __MACH_SPEAR_H
++#define __MACH_SPEAR_H
+ 
+ #include <asm/memory.h>
+ 
+ /* ICM1 - Low speed connection */
+-#define SPEAR3XX_ICM1_2_BASE		UL(0xD0000000)
+-#define VA_SPEAR3XX_ICM1_2_BASE		UL(0xFD000000)
+-#define SPEAR3XX_ICM1_UART_BASE		UL(0xD0000000)
+-#define VA_SPEAR3XX_ICM1_UART_BASE	(VA_SPEAR3XX_ICM1_2_BASE | SPEAR3XX_ICM1_UART_BASE)
++#define SPEAR_ICM1_2_BASE		UL(0xD0000000)
++#define VA_SPEAR_ICM1_2_BASE		UL(0xFD000000)
++#define SPEAR_ICM1_UART_BASE		UL(0xD0000000)
++#define VA_SPEAR_ICM1_UART_BASE		(VA_SPEAR_ICM1_2_BASE | SPEAR_ICM1_UART_BASE)
+ #define SPEAR3XX_ICM1_SSP_BASE		UL(0xD0100000)
+ 
+-/* ML1 - Multi Layer CPU Subsystem */
+-#define SPEAR3XX_ICM3_ML1_2_BASE	UL(0xF0000000)
++/* ML-1, 2 - Multi Layer CPU Subsystem */
++#define SPEAR_ICM3_ML1_2_BASE		UL(0xF0000000)
+ #define VA_SPEAR6XX_ML_CPU_BASE		UL(0xF0000000)
+ 
+ /* ICM3 - Basic Subsystem */
+-#define SPEAR3XX_ICM3_SMI_CTRL_BASE	UL(0xFC000000)
+-#define VA_SPEAR3XX_ICM3_SMI_CTRL_BASE	UL(0xFC000000)
+-#define SPEAR3XX_ICM3_DMA_BASE		UL(0xFC400000)
+-#define SPEAR3XX_ICM3_SYS_CTRL_BASE	UL(0xFCA00000)
+-#define VA_SPEAR3XX_ICM3_SYS_CTRL_BASE	(VA_SPEAR3XX_ICM3_SMI_CTRL_BASE | SPEAR3XX_ICM3_SYS_CTRL_BASE)
+-#define SPEAR3XX_ICM3_MISC_REG_BASE	UL(0xFCA80000)
+-#define VA_SPEAR3XX_ICM3_MISC_REG_BASE	(VA_SPEAR3XX_ICM3_SMI_CTRL_BASE | SPEAR3XX_ICM3_MISC_REG_BASE)
++#define SPEAR_ICM3_SMI_CTRL_BASE	UL(0xFC000000)
++#define VA_SPEAR_ICM3_SMI_CTRL_BASE	UL(0xFC000000)
++#define SPEAR_ICM3_DMA_BASE		UL(0xFC400000)
++#define SPEAR_ICM3_SYS_CTRL_BASE	UL(0xFCA00000)
++#define VA_SPEAR_ICM3_SYS_CTRL_BASE	(VA_SPEAR_ICM3_SMI_CTRL_BASE | SPEAR_ICM3_SYS_CTRL_BASE)
++#define SPEAR_ICM3_MISC_REG_BASE	UL(0xFCA80000)
++#define VA_SPEAR_ICM3_MISC_REG_BASE	(VA_SPEAR_ICM3_SMI_CTRL_BASE | SPEAR_ICM3_MISC_REG_BASE)
+ 
+ /* Debug uart for linux, will be used for debug and uncompress messages */
+-#define SPEAR_DBG_UART_BASE		SPEAR3XX_ICM1_UART_BASE
+-#define VA_SPEAR_DBG_UART_BASE		VA_SPEAR3XX_ICM1_UART_BASE
++#define SPEAR_DBG_UART_BASE		SPEAR_ICM1_UART_BASE
++#define VA_SPEAR_DBG_UART_BASE		VA_SPEAR_ICM1_UART_BASE
+ 
+ /* Sysctl base for spear platform */
+-#define SPEAR_SYS_CTRL_BASE		SPEAR3XX_ICM3_SYS_CTRL_BASE
+-#define VA_SPEAR_SYS_CTRL_BASE		VA_SPEAR3XX_ICM3_SYS_CTRL_BASE
++#define SPEAR_SYS_CTRL_BASE		SPEAR_ICM3_SYS_CTRL_BASE
++#define VA_SPEAR_SYS_CTRL_BASE		VA_SPEAR_ICM3_SYS_CTRL_BASE
+ 
+ /* SPEAr320 Macros */
+ #define SPEAR320_SOC_CONFIG_BASE	UL(0xB3000000)
+@@ -57,4 +56,4 @@
+ 	#define SPEAR320_UART6_PCLK_SHIFT		12
+ 	#define SPEAR320_RS485_PCLK_SHIFT		13
+ 
+-#endif /* __MACH_SPEAR3XX_H */
++#endif /* __MACH_SPEAR_H */
+diff --git a/arch/arm/mach-spear3xx/spear300.c b/arch/arm/mach-spear3xx/spear300.c
+index bbc9b7e..72449ee 100644
+--- a/arch/arm/mach-spear3xx/spear300.c
++++ b/arch/arm/mach-spear3xx/spear300.c
+@@ -185,7 +185,7 @@ struct pl08x_channel_data spear300_dma_info[] = {
+ static struct of_dev_auxdata spear300_auxdata_lookup[] __initdata = {
+ 	OF_DEV_AUXDATA("arm,pl022", SPEAR3XX_ICM1_SSP_BASE, NULL,
+ 			&pl022_plat_data),
+-	OF_DEV_AUXDATA("arm,pl080", SPEAR3XX_ICM3_DMA_BASE, NULL,
++	OF_DEV_AUXDATA("arm,pl080", SPEAR_ICM3_DMA_BASE, NULL,
+ 			&pl080_plat_data),
+ 	{}
+ };
+diff --git a/arch/arm/mach-spear3xx/spear310.c b/arch/arm/mach-spear3xx/spear310.c
+index c13a434..0b7962d 100644
+--- a/arch/arm/mach-spear3xx/spear310.c
++++ b/arch/arm/mach-spear3xx/spear310.c
+@@ -217,7 +217,7 @@ static struct amba_pl011_data spear310_uart_data[] = {
+ static struct of_dev_auxdata spear310_auxdata_lookup[] __initdata = {
+ 	OF_DEV_AUXDATA("arm,pl022", SPEAR3XX_ICM1_SSP_BASE, NULL,
+ 			&pl022_plat_data),
+-	OF_DEV_AUXDATA("arm,pl080", SPEAR3XX_ICM3_DMA_BASE, NULL,
++	OF_DEV_AUXDATA("arm,pl080", SPEAR_ICM3_DMA_BASE, NULL,
+ 			&pl080_plat_data),
+ 	OF_DEV_AUXDATA("arm,pl011", SPEAR310_UART1_BASE, NULL,
+ 			&spear310_uart_data[0]),
+diff --git a/arch/arm/mach-spear3xx/spear320.c b/arch/arm/mach-spear3xx/spear320.c
+index f671a0a..e9db7db 100644
+--- a/arch/arm/mach-spear3xx/spear320.c
++++ b/arch/arm/mach-spear3xx/spear320.c
+@@ -223,7 +223,7 @@ static struct amba_pl011_data spear320_uart_data[] = {
+ static struct of_dev_auxdata spear320_auxdata_lookup[] __initdata = {
+ 	OF_DEV_AUXDATA("arm,pl022", SPEAR3XX_ICM1_SSP_BASE, NULL,
+ 			&pl022_plat_data),
+-	OF_DEV_AUXDATA("arm,pl080", SPEAR3XX_ICM3_DMA_BASE, NULL,
++	OF_DEV_AUXDATA("arm,pl080", SPEAR_ICM3_DMA_BASE, NULL,
+ 			&pl080_plat_data),
+ 	OF_DEV_AUXDATA("arm,pl022", SPEAR320_SSP0_BASE, NULL,
+ 			&spear320_ssp_data[0]),
+diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
+index 72e3ae7..d7580f2 100644
+--- a/arch/arm/mach-spear3xx/spear3xx.c
++++ b/arch/arm/mach-spear3xx/spear3xx.c
+@@ -67,13 +67,13 @@ struct pl08x_platform_data pl080_plat_data = {
+  */
+ struct map_desc spear3xx_io_desc[] __initdata = {
+ 	{
+-		.virtual	= VA_SPEAR3XX_ICM1_2_BASE,
+-		.pfn		= __phys_to_pfn(SPEAR3XX_ICM1_2_BASE),
++		.virtual	= VA_SPEAR_ICM1_2_BASE,
++		.pfn		= __phys_to_pfn(SPEAR_ICM1_2_BASE),
+ 		.length		= SZ_16M,
+ 		.type		= MT_DEVICE
+ 	}, {
+-		.virtual	= VA_SPEAR3XX_ICM3_SMI_CTRL_BASE,
+-		.pfn		= __phys_to_pfn(SPEAR3XX_ICM3_SMI_CTRL_BASE),
++		.virtual	= VA_SPEAR_ICM3_SMI_CTRL_BASE,
++		.pfn		= __phys_to_pfn(SPEAR_ICM3_SMI_CTRL_BASE),
+ 		.length		= SZ_16M,
+ 		.type		= MT_DEVICE
+ 	},
+diff --git a/arch/arm/mach-spear6xx/include/mach/misc_regs.h b/arch/arm/mach-spear6xx/include/mach/misc_regs.h
+index c34acc2..28aa508 100644
+--- a/arch/arm/mach-spear6xx/include/mach/misc_regs.h
++++ b/arch/arm/mach-spear6xx/include/mach/misc_regs.h
+@@ -16,7 +16,7 @@
+ 
+ #include <mach/spear.h>
+ 
+-#define MISC_BASE		IOMEM(VA_SPEAR6XX_ICM3_MISC_REG_BASE)
++#define MISC_BASE		IOMEM(VA_SPEAR_ICM3_MISC_REG_BASE)
+ #define DMA_CHN_CFG		(MISC_BASE + 0x0A0)
+ 
+ #endif /* __MACH_MISC_REGS_H */
+diff --git a/arch/arm/mach-spear6xx/include/mach/spear.h b/arch/arm/mach-spear6xx/include/mach/spear.h
+index cb8ed2f..ee5a774 100644
+--- a/arch/arm/mach-spear6xx/include/mach/spear.h
++++ b/arch/arm/mach-spear6xx/include/mach/spear.h
+@@ -1,46 +1,59 @@
+ /*
+- * arch/arm/mach-spear6xx/include/mach/spear.h
++ * SPEAr3xx/6xx Machine family specific definition
+  *
+- * SPEAr6xx Machine family specific definition
+- *
+- * Copyright (C) 2009 ST Microelectronics
++ * Copyright (C) 2009,2012 ST Microelectronics
+  * Rajeev Kumar<rajeev-dlh.kumar@st.com>
++ * Viresh Kumar <viresh.linux@gmail.com>
+  *
+  * This file is licensed under the terms of the GNU General Public
+  * License version 2. This program is licensed "as is" without any
+  * warranty of any kind, whether express or implied.
+  */
+ 
+-#ifndef __MACH_SPEAR6XX_H
+-#define __MACH_SPEAR6XX_H
++#ifndef __MACH_SPEAR_H
++#define __MACH_SPEAR_H
+ 
+ #include <asm/memory.h>
+ 
+ /* ICM1 - Low speed connection */
+-#define SPEAR6XX_ICM1_BASE		UL(0xD0000000)
+-#define VA_SPEAR6XX_ICM1_BASE		UL(0xFD000000)
+-#define SPEAR6XX_ICM1_UART0_BASE	UL(0xD0000000)
+-#define VA_SPEAR6XX_ICM1_UART0_BASE	(VA_SPEAR6XX_ICM1_2_BASE | SPEAR6XX_ICM1_UART0_BASE)
++#define SPEAR_ICM1_2_BASE		UL(0xD0000000)
++#define VA_SPEAR_ICM1_2_BASE		UL(0xFD000000)
++#define SPEAR_ICM1_UART_BASE		UL(0xD0000000)
++#define VA_SPEAR_ICM1_UART_BASE		(VA_SPEAR_ICM1_2_BASE | SPEAR_ICM1_UART_BASE)
++#define SPEAR3XX_ICM1_SSP_BASE		UL(0xD0100000)
+ 
+ /* ML-1, 2 - Multi Layer CPU Subsystem */
+-#define SPEAR6XX_ML_CPU_BASE		UL(0xF0000000)
++#define SPEAR_ICM3_ML1_2_BASE		UL(0xF0000000)
+ #define VA_SPEAR6XX_ML_CPU_BASE		UL(0xF0000000)
+ 
+ /* ICM3 - Basic Subsystem */
+-#define SPEAR6XX_ICM3_SMI_CTRL_BASE	UL(0xFC000000)
+-#define VA_SPEAR6XX_ICM3_SMI_CTRL_BASE	UL(0xFC000000)
+-#define SPEAR6XX_ICM3_DMA_BASE		UL(0xFC400000)
+-#define SPEAR6XX_ICM3_SYS_CTRL_BASE	UL(0xFCA00000)
+-#define VA_SPEAR6XX_ICM3_SYS_CTRL_BASE	(VA_SPEAR6XX_ICM3_SMI_CTRL_BASE | SPEAR6XX_ICM3_SYS_CTRL_BASE)
+-#define SPEAR6XX_ICM3_MISC_REG_BASE	UL(0xFCA80000)
+-#define VA_SPEAR6XX_ICM3_MISC_REG_BASE	(VA_SPEAR6XX_ICM3_SMI_CTRL_BASE | SPEAR6XX_ICM3_MISC_REG_BASE)
++#define SPEAR_ICM3_SMI_CTRL_BASE	UL(0xFC000000)
++#define VA_SPEAR_ICM3_SMI_CTRL_BASE	UL(0xFC000000)
++#define SPEAR_ICM3_DMA_BASE		UL(0xFC400000)
++#define SPEAR_ICM3_SYS_CTRL_BASE	UL(0xFCA00000)
++#define VA_SPEAR_ICM3_SYS_CTRL_BASE	(VA_SPEAR_ICM3_SMI_CTRL_BASE | SPEAR_ICM3_SYS_CTRL_BASE)
++#define SPEAR_ICM3_MISC_REG_BASE	UL(0xFCA80000)
++#define VA_SPEAR_ICM3_MISC_REG_BASE	(VA_SPEAR_ICM3_SMI_CTRL_BASE | SPEAR_ICM3_MISC_REG_BASE)
+ 
+ /* Debug uart for linux, will be used for debug and uncompress messages */
+-#define SPEAR_DBG_UART_BASE		SPEAR6XX_ICM1_UART0_BASE
+-#define VA_SPEAR_DBG_UART_BASE		VA_SPEAR6XX_ICM1_UART0_BASE
++#define SPEAR_DBG_UART_BASE		SPEAR_ICM1_UART_BASE
++#define VA_SPEAR_DBG_UART_BASE		VA_SPEAR_ICM1_UART_BASE
+ 
+ /* Sysctl base for spear platform */
+-#define SPEAR_SYS_CTRL_BASE		SPEAR6XX_ICM3_SYS_CTRL_BASE
+-#define VA_SPEAR_SYS_CTRL_BASE		VA_SPEAR6XX_ICM3_SYS_CTRL_BASE
+-
+-#endif /* __MACH_SPEAR6XX_H */
++#define SPEAR_SYS_CTRL_BASE		SPEAR_ICM3_SYS_CTRL_BASE
++#define VA_SPEAR_SYS_CTRL_BASE		VA_SPEAR_ICM3_SYS_CTRL_BASE
++
++/* SPEAr320 Macros */
++#define SPEAR320_SOC_CONFIG_BASE	UL(0xB3000000)
++#define VA_SPEAR320_SOC_CONFIG_BASE	UL(0xFE000000)
++#define SPEAR320_CONTROL_REG		IOMEM(VA_SPEAR320_SOC_CONFIG_BASE)
++#define SPEAR320_EXT_CTRL_REG		IOMEM(VA_SPEAR320_SOC_CONFIG_BASE + 0x0018)
++	#define SPEAR320_UARTX_PCLK_MASK		0x1
++	#define SPEAR320_UART2_PCLK_SHIFT		8
++	#define SPEAR320_UART3_PCLK_SHIFT		9
++	#define SPEAR320_UART4_PCLK_SHIFT		10
++	#define SPEAR320_UART5_PCLK_SHIFT		11
++	#define SPEAR320_UART6_PCLK_SHIFT		12
++	#define SPEAR320_RS485_PCLK_SHIFT		13
++
++#endif /* __MACH_SPEAR_H */
+diff --git a/arch/arm/mach-spear6xx/spear6xx.c b/arch/arm/mach-spear6xx/spear6xx.c
+index 8904d8a..97fb31d 100644
+--- a/arch/arm/mach-spear6xx/spear6xx.c
++++ b/arch/arm/mach-spear6xx/spear6xx.c
+@@ -351,17 +351,17 @@ struct pl08x_platform_data pl080_plat_data = {
+ struct map_desc spear6xx_io_desc[] __initdata = {
+ 	{
+ 		.virtual	= VA_SPEAR6XX_ML_CPU_BASE,
+-		.pfn		= __phys_to_pfn(SPEAR6XX_ML_CPU_BASE),
++		.pfn		= __phys_to_pfn(SPEAR_ICM3_ML1_2_BASE),
+ 		.length		= 2 * SZ_16M,
+ 		.type		= MT_DEVICE
+ 	},	{
+-		.virtual	= VA_SPEAR6XX_ICM1_BASE,
+-		.pfn		= __phys_to_pfn(SPEAR6XX_ICM1_BASE),
++		.virtual	= VA_SPEAR_ICM1_2_BASE,
++		.pfn		= __phys_to_pfn(SPEAR_ICM1_2_BASE),
+ 		.length		= SZ_16M,
+ 		.type		= MT_DEVICE
+ 	}, {
+-		.virtual	= VA_SPEAR6XX_ICM3_SMI_CTRL_BASE,
+-		.pfn		= __phys_to_pfn(SPEAR6XX_ICM3_SMI_CTRL_BASE),
++		.virtual	= VA_SPEAR_ICM3_SMI_CTRL_BASE,
++		.pfn		= __phys_to_pfn(SPEAR_ICM3_SMI_CTRL_BASE),
+ 		.length		= SZ_16M,
+ 		.type		= MT_DEVICE
+ 	},
+@@ -404,7 +404,7 @@ void __init spear6xx_timer_init(void)
+ 
+ /* Add auxdata to pass platform data */
+ struct of_dev_auxdata spear6xx_auxdata_lookup[] __initdata = {
+-	OF_DEV_AUXDATA("arm,pl080", SPEAR6XX_ICM3_DMA_BASE, NULL,
++	OF_DEV_AUXDATA("arm,pl080", SPEAR_ICM3_DMA_BASE, NULL,
+ 			&pl080_plat_data),
+ 	{}
+ };
 -- 
 1.8.1.2
