@@ -1,202 +1,128 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 12 Mar 2013 20:57:34 +0100 (CET)
-Subject: [PATCH] irqchip: Add support for ARMv7-M's NVIC
-In-Reply-To: <1363103673-24720-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1363103673-24720-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <alpine.LFD.2.02.1303121923280.22263@ionos>
+From: davidb@codeaurora.org (David Brown)
+Date: Tue, 12 Mar 2013 13:12:35 -0700
+Subject: [PATCH v2 11/11] RFC: SSBI: Simple pm8058 test driver
+In-Reply-To: <1362616187-21089-1-git-send-email-davidb@codeaurora.org>
+References: <1362616187-21089-1-git-send-email-davidb@codeaurora.org>
+Message-ID: <1363119155-4682-1-git-send-email-davidb@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 12 Mar 2013, Uwe Kleine-K?nig wrote:
-> +static struct nvic_chip_data nvic_data __read_mostly;
+A very small ssbi device driver that reads the pm8058 version register
+and prints it out.
 
-What the heck is this? You have a static struct which you set in
-irqdata.chip_data?
+Signed-off-by: David Brown <davidb@codeaurora.org>
+---
+Resending due to address error in header
 
-> +static inline void __iomem *nvic_dist_base(struct irq_data *d)
-> +{
-> +	struct nvic_chip_data *nvic_data = irq_data_get_irq_chip_data(d);
+ arch/arm/boot/dts/msm8660-surf.dts |  4 +++
+ arch/arm/boot/dts/msm8960-cdp.dts  |  4 +++
+ drivers/ssbi/Makefile              |  1 +
+ drivers/ssbi/ssbi-test.c           | 61 ++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 70 insertions(+)
+ create mode 100644 drivers/ssbi/ssbi-test.c
 
-And then you do the dance of reading the pointer to that static struct
-out of irq_data and dereferencing it?
-
-What's the point of this? 
-
-> +	return nvic_data->dist_base;
-> +}
-> +
-> +static void nvic_mask_irq(struct irq_data *d)
-> +{
-> +	u32 mask = 1 << (d->hwirq % 32);
-> +
-> +	writel_relaxed(mask, nvic_dist_base(d) + NVIC_ICER + d->irq / 32 * 4);
-
-You're really missing the point of irq_data.chip_data 
-
-If you set proper irq chip data per bank then this whole stuff is
-reduced to:
-
-   struct mydata *md = irq_data_get_irq_chip_data(d);
-   u32 mask = 1 << (d->irq - md->irq_base);
-
-   writel_relaxed(mask, md->iobase + NVIC_ICER);
-
-Can you spot the difference and what that means in terms of
-instruction cycles?
-
-> +}
-> +
-> +static void nvic_unmask_irq(struct irq_data *d)
-> +{
-> +	u32 mask = 1 << (d->hwirq % 32);
-> +
-> +	writel_relaxed(mask, nvic_dist_base(d) + NVIC_ISER + d->hwirq / 32 * 4);
-> +}
-> +
-> +void nvic_eoi(struct irq_data *d)
-
-static ?
-
-> +{
-> +	/*
-> +	 * This is a no-op as end of interrupt is signaled by the exception
-> +	 * return sequence.
-> +	 */
-> +}
-> +
-> +static struct irq_chip nvic_chip = {
-> +	.name = "NVIC",
-> +	.irq_mask = nvic_mask_irq,
-> +	.irq_unmask = nvic_unmask_irq,
-> +	.irq_eoi = nvic_eoi,
-> +};
-> +
-> +static void __init nvic_init_bases(struct device_node *node,
-> +		void __iomem *dist_base)
-
-Please make this
-
-static void __init nvic_init_bases(struct device_node *node,
-                                   void __iomem *dist_base)
-
-That's way easier to parse. Applies to all other multiline stuff as
-well.
-
-> +{
-> +	unsigned int irqs, i, irq_base;
-> +
-> +	nvic_data.dist_base = dist_base;
-> +
-> +	irqs = ((readl_relaxed(dist_base + NVIC_INTR_CTRL) & 0x0f) + 1) * 32;
-> +	if (irqs > 496)
-> +		irqs = 496;
-
-Magic constants. Please use proper defines. 
-
-Aside of that without a proper comment the logic looks ass backwards.
-
-> +	irqs = ((readl_relaxed(dist_base + NVIC_INTR_CTRL) & 0x0f) + 1) * 32;
-
-Without looking at the datasheet I assume that the chip tells you the
-number of interrupt banks where a result of 0 means 1 bank and so
-forth.
-
-How should a reviewer understand why the number of banks is limited to
-31 without a comment? Do you really expect that a reviewer who
-stumbles over that goes to search for the datasheet and verify what
-you hacked up?
-
-> +	irq_base = irq_alloc_descs(-1, 16, irqs - 16, numa_node_id());
-
-  irq_alloc_desc_from(16, irqs - 16, ...)
-
-Also why are you allocating irqs-16 instead of the full number of
-irqs?
-
-> +	if (IS_ERR_VALUE(irq_base)) {
-
-See Russells reply
-
-> +		WARN(1, "Cannot allocate irq_descs\n");
-
-What's the point of that warn? The call path is always the same. So
-you are spamming dmesg with a pointless backtrace. And on top of that
-you do:
-
-> +		irq_base = 16;
-
-So you cannot allocate irq_descs and then you set base to 16 and pray
-that everything works?
-
-> +	}
-> +	nvic_data.domain = irq_domain_add_legacy(node, irqs - 16, irq_base, 0,
-> +			&irq_domain_simple_ops, NULL);
-> +	if (WARN_ON(!nvic_data.domain))
-> +		return;
-
-See above. Also you are leaking irqdescs though it's questionable
-whether the machine can continue at all. And of course the init call
-itself will return sucess.
-
-> +	/*
-> +	 * Set priority on all interrupts.
-> +	 */
-> +	for (i = 0; i < irqs; i += 4)
-> +		writel_relaxed(0, dist_base + NVIC_IPRI + i);
-> +
-> +	/*
-> +	 * Disable all interrupts
-> +	 */
-> +	for (i = 0; i < irqs; i += 32)
-> +		writel_relaxed(~0, dist_base + NVIC_ICER + i * 4 / 32);
-> +
-> +	/*
-> +	 * Setup the Linux IRQ subsystem.
-> +	 */
-> +	for (i = 0; i < irqs; i++) {
-> +		irq_set_chip_and_handler(irq_base + i, &nvic_chip,
-> +				handle_fasteoi_irq);
-
-Above you do:
-	irq_base = irq_alloc_descs(-1, 16, irqs - 16, numa_node_id());
-
-So you allocate irqs-16 interrupt descriptors and then you initialize
-16 more than you allocated.
-
-Brilliant stuff that.
-
-> +		irq_set_chip_data(irq_base + i, &nvic_data);
-> +		set_irq_flags(irq_base + i, IRQF_VALID | IRQF_PROBE);
-> +	}
-> +}
-> +
-> +static int __init nvic_of_init(struct device_node *node,
-> +		struct device_node *parent)
-> +{
-> +	void __iomem *dist_base;
-> +
-> +	if (WARN_ON(!node))
-
-Sigh.
-
-Though the real question is: can this actually happen?
-
-> +		return -ENODEV;
-> +
-> +	dist_base = of_iomap(node, 0);
-> +	WARN(!dist_base, "unable to map nvic dist registers\n");
-
-Brilliant. You can't map stuff and then you continue just for fun or
-what?
-
-> +	nvic_init_bases(node, dist_base);
-
-Great. You have failure pathes in nvic_init_bases() and then you
-return unconditionally success:
-
-> +	return 0;
-> +}
-
-Thanks,
-
-	tglx
+diff --git a/arch/arm/boot/dts/msm8660-surf.dts b/arch/arm/boot/dts/msm8660-surf.dts
+index 67f8670..68a0c7c4 100644
+--- a/arch/arm/boot/dts/msm8660-surf.dts
++++ b/arch/arm/boot/dts/msm8660-surf.dts
+@@ -43,5 +43,9 @@
+ 		compatible = "qcom,ssbi";
+ 		reg = <0x500000 0x1000>;
+ 		qcom,controller-type = "pmic-arbiter";
++
++		qcom,ssbi-test {
++			compatible = "qcom,ssbi-test";
++		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/msm8960-cdp.dts b/arch/arm/boot/dts/msm8960-cdp.dts
+index c9b09a8..60804d7 100644
+--- a/arch/arm/boot/dts/msm8960-cdp.dts
++++ b/arch/arm/boot/dts/msm8960-cdp.dts
+@@ -43,5 +43,9 @@
+ 		compatible = "qcom,ssbi";
+ 		reg = <0x500000 0x1000>;
+ 		qcom,controller-type = "pmic-arbiter";
++
++		qcom,ssbi-test {
++			compatible = "qcom,ssbi-test";
++		};
+ 	};
+ };
+diff --git a/drivers/ssbi/Makefile b/drivers/ssbi/Makefile
+index 38fb70c..dea13c1 100644
+--- a/drivers/ssbi/Makefile
++++ b/drivers/ssbi/Makefile
+@@ -1 +1,2 @@
+ obj-$(CONFIG_SSBI) += ssbi.o
++obj-$(CONFIG_SSBI) += ssbi-test.o
+diff --git a/drivers/ssbi/ssbi-test.c b/drivers/ssbi/ssbi-test.c
+new file mode 100644
+index 0000000..7804cfe
+--- /dev/null
++++ b/drivers/ssbi/ssbi-test.c
+@@ -0,0 +1,61 @@
++/* A simple ssbi test device. */
++
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/ssbi.h>
++
++static int __init ssbi_test_probe(struct platform_device *pdev)
++{
++	int ret;
++	char version;
++
++	dev_info(&pdev->dev, "probe, me = %p, parent = %p\n",
++		 pdev, pdev->dev.parent);
++
++	/* Let's try reading. */
++	ret = ssbi_read(pdev->dev.parent, 0x02, &version, 1);
++	if (ret != 0)
++		return ret;
++
++	dev_info(&pdev->dev, "Version = %02x\n", version);
++
++	/* Should already be hooked in. */
++	return 0;
++}
++
++static int ssbi_test_remove(struct platform_device *pdev)
++{
++	return 0;
++}
++
++static struct of_device_id ssbi_test_match_table[] = {
++	{ .compatible = "qcom,ssbi-test" },
++	{}
++};
++
++static struct platform_driver ssbi_test_driver = {
++	.remove = ssbi_test_remove,
++	.driver = {
++		.name = "sbbi_test",
++		.owner = THIS_MODULE,
++		.of_match_table = ssbi_test_match_table,
++	},
++};
++
++static int __init ssbi_test_init(void)
++{
++	int ret;
++
++	ret = platform_driver_probe(&ssbi_test_driver, ssbi_test_probe);
++	return ret;
++}
++
++static void __exit ssbi_test_exit(void)
++{
++}
++
++module_init(ssbi_test_init);
++module_exit(ssbi_test_exit);
++
++MODULE_LICENSE("GPL");
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
