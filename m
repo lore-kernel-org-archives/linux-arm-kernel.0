@@ -1,86 +1,42 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 12 Mar 2013 14:24:15 +0100
-Subject: [PATCH v6 1/3] serial: sh-sci: Add OF support
-In-Reply-To: <20130312082038.GC3553@linux-sh.org>
-References: <1362569437-11133-1-git-send-email-hechtb+renesas@gmail.com>
- <1689352.QAdqes1IG8@avalon> <20130312082038.GC3553@linux-sh.org>
-Message-ID: <1527167.zrgCvGiAzu@avalon>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Tue, 12 Mar 2013 06:27:19 -0700
+Subject: [PATCH 1/6] platform-drivers: msm: add single-wire serial bus
+ interface (SSBI) driver
+In-Reply-To: <8yamwu9nmar.fsf@huya.qualcomm.com>
+References: <1362616187-21089-1-git-send-email-davidb@codeaurora.org>
+ <1362616187-21089-2-git-send-email-davidb@codeaurora.org>
+ <20130307013008.GA2910@kroah.com>
+ <8yamwu9nmar.fsf@huya.qualcomm.com>
+Message-ID: <20130312132719.GA3421@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
-
-On Tuesday 12 March 2013 17:20:39 Paul Mundt wrote:
-> On Mon, Mar 11, 2013 at 11:32:31PM +0100, Laurent Pinchart wrote:
-> > On Thursday 07 March 2013 11:26:29 Bastian Hecht wrote:
-> > > >> +- renesas,scscr : Should contain a bitfield used by the Serial
-> > > >> Control
-> > > >> Register.
-> > > >> +  b7 = SCSCR_TIE
-> > > >> +  b6 = SCSCR_RIE
-> > > >> +  b5 = SCSCR_TE
-> > > >> +  b4 = SCSCR_RE
-> > > >> +  b3 = SCSCR_REIE
-> > > >> +  b2 = SCSCR_TOIE
-> > > >> +  b1 = SCSCR_CKE1
-> > > >> +  b0 = SCSCR_CKE0
-> > > > 
-> > > > What is that for exactly ?
-> > > 
-> > > What I can see from 3 different datasheets (sh7372, sh73a0, r8a7740)
-> > > the first 2 bits differ in meaning.
-> > > 
-> > > On r8a7740 it depends: In asynchronous mode the first 2 bits CKE0/1
-> > > define whether you want to use an external clock to drive the baud
-> > > generator or if you want to use the internal SUB clock. If you use the
-> > > SUB clock you can further define if you want to use a subscaled SUB
-> > > clock in the SCSMR register. In synchronous mode you must rely on the
-> > > internal clock for the baud generator and can select if the SCK pin is
-> > > used as clock input or output.
-> > 
-> > What about adding an optional source clock property to the bindings, that
-> > would contain the phandle of the source clock ? If the property is absent
-> > then the internal clock would be used.
+On Mon, Mar 11, 2013 at 11:51:08PM -0700, David Brown wrote:
+> Greg Kroah-Hartman <gregkh@linuxfoundation.org> writes:
 > 
-> We can't really use the internal oscillator at the moment, it's one of
-> the things that is blocked on adoption of the common struct clk work. The
-> baud rate generator algo will likewise differ depending on whether it's
-> using an internally generated clock or not, which also makes a different
-> set of baud rates available.
+> >> +static int ssbi_wait_mask(struct msm_ssbi *ssbi, u32 set_mask, u32 clr_mask)
+> >> +{
+> >> +	u32 timeout = SSBI_TIMEOUT_US;
+> >> +	u32 val;
+> >> +
+> >> +	while (timeout--) {
+> >> +		val = ssbi_readl(ssbi, SSBI2_STATUS);
+> >> +		if (((val & set_mask) == set_mask) && ((val & clr_mask) == 0))
+> >> +			return 0;
+> >> +		udelay(1);
+> >
+> > Busy loop?  Really?
 > 
-> My plan originally was to wait until the common struct clk stuff came
-> along well enough that we could provide a clock dynamically depending on
-> the target baud (or for avoiding cpufreq pre/post-change notifier
-> chains), but this obviously hasn't happened yet.
+> Finally was able to dig up some of the reason for this.  The
+> transactions typically take about 5us.  In the case of contention with
+> another CPU, it could take as much as 20us.
 > 
-> I think your idea for the abstraction with the phandle sounds like the
-> right approach, but we aren't presently in a state where we can handle
-> that.
+> Would it be sufficient to just explain this in a comment?
 
-Do the platforms that will be converted to DT currently need to make the clock 
-source configurable ? If not we could just leave it out of the DT bindings 
-until needed. Hopefully by then we'll have a common clock framework 
-implementation.
+That would be good to do, especially if it turns out to be a longer
+delay and people start to wonder why their system load is increasing for
+no noticeable reason.
 
-> > > Bit 2 and 3 don't exist in my datasheets.
-> > > 
-> > > The other bits define under which conditions you receive interrupts
-> > > (send FIFO empty, receive FIFO full) and which bits you need to start
-> > > transfers (one bit to start sending, one receiving). The bits 8 to 31
-> > > are used to set up DMA transfers and various interrupt events like
-> > > error status and finish transfers. I haven't included them as they are
-> > > not used in the driver.
-> > 
-> > If they're not used maybe we can drop them :-)
-> 
-> Obviously they're used, otherwise they wouldn't be defined in the common
-> header. Whether they are used by these specific CPUs or not isn't
-> relevant, as there are plenty of cases where they are. grep harder.
+thanks,
 
-My point is that if they're only used by arm/sh/* SoCs we don't need to 
-support them in DT.
-
--- 
-Regards,
-
-Laurent Pinchart
+greg k-h
