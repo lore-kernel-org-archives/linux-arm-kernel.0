@@ -1,24 +1,38 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 12 Mar 2013 18:54:08 +0000
-Subject: [PATCH 03/10] mx-ssi: flush fifos
-In-Reply-To: <1362940391-8338-4-git-send-email-mpa@pengutronix.de>
-References: <1362940391-8338-1-git-send-email-mpa@pengutronix.de>
- <1362940391-8338-4-git-send-email-mpa@pengutronix.de>
-Message-ID: <20130312185408.GU19942@opensource.wolfsonmicro.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 12 Mar 2013 18:54:45 +0000
+Subject: [PATCH v2 05/14] ARM: integrator: use clocksource_of_init for
+ sp804
+In-Reply-To: <1363108124-17484-6-git-send-email-haojian.zhuang@linaro.org>
+References: <1363108124-17484-1-git-send-email-haojian.zhuang@linaro.org>
+ <1363108124-17484-6-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <201303121854.45864.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 10, 2013 at 07:33:04PM +0100, Markus Pargmann wrote:
-> From: Sascha Hauer <s.hauer@pengutronix.de>
+On Tuesday 12 March 2013, Haojian Zhuang wrote:
 > 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> -       aliases {
+> -               arm,timer-primary = &timer2;
+> -               arm,timer-secondary = &timer1;
+> -       };
+> -
+>         chosen {
+>                 bootargs = "root=/dev/ram0 console=ttyAMA0,38400n8 earlyprintk";
+>         };
+> @@ -29,10 +24,14 @@
+>  
+>         timer1: timer at 13000100 {
+>                 compatible = "arm,sp804", "arm,primecell";
+> +               arm,sp804-clockevent = <0>;
+> +               status = "ok";
+>         };
 
-Why?  Is this a bug fix?  I'm guessing it is but...
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130312/d8e88678/attachment.sig>
+I would prefer to keep the old way of doing this. The "aliases" node is
+meant for configuration, while the timer device itself should not care
+whether it is used as a clockevent or clocksource or some other device.
+
+We could probably change the identifiers in the aliases to
+"linux,clocksource" and "linux,clockevents" instead of
+"arm,timer-primary" and "arm,timer-secondary".
+
+	Arnd
