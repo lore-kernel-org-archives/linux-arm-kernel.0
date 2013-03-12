@@ -1,33 +1,57 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Tue, 12 Mar 2013 10:30:55 -0400
-Subject: FW: Regulator API ignored return values
-In-Reply-To: <201303121403.09315.arnd@arndb.de> (Arnd Bergmann's message of
- "Tue, 12 Mar 2013 14:03:09 +0000")
-References: <25B60CDC2F704E4E9D88FFD52780CB4C0BDEB0547F@SC-VEXCH1.marvell.com>
- <CADz5_g+KfxL43BKKsgZZ3Xg4sZWE4-ZaFpFhphKrfj9yK59-XA@mail.gmail.com>
- <201303121403.09315.arnd@arndb.de>
-Message-ID: <87y5dsheqo.fsf@octavius.laptop.org>
+From: karl.beldan@gmail.com (Karl Beldan)
+Date: Tue, 12 Mar 2013 15:35:10 +0100
+Subject: [PATCH 2/4] ARM: imx: support DEBUG_LL uart port selection for
+ all i.MX SoCs
+In-Reply-To: <1355319945-3199-3-git-send-email-shawn.guo@linaro.org>
+References: <1355319945-3199-1-git-send-email-shawn.guo@linaro.org>
+ <1355319945-3199-3-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20130312143510.GA26044@magnum.frso.rivierawaves.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Dec 12, 2012 at 09:45:43PM +0800, Shawn Guo wrote:
+> Extend imx6q DEBUG_LL uart port selection support to cover all i.MX
+> SoCs.  The 'range' of the Kconfig option gets dropped, as users
+> looking at the option must know the uart number on his board.  The
+> bottom line is that the build system will report an error if an
+> invalid port number is picked for given SoC.
+> 
+> The header arch/arm/include/debug/imx-uart.h is created to accommodate
+> all the uart base addresses.  And the header will also be used for
+> other low-level debug facility later.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  arch/arm/Kconfig.debug            |   13 ++++--
+>  arch/arm/include/debug/imx-uart.h |   88 +++++++++++++++++++++++++++++++++++++
+>  arch/arm/include/debug/imx.S      |   29 +-----------
+>  3 files changed, 98 insertions(+), 32 deletions(-)
+>  create mode 100644 arch/arm/include/debug/imx-uart.h
+> 
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index ae2ee04..05f83c8 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -457,11 +457,16 @@ choice
+>  
+>  endchoice
+>  
+> -config DEBUG_IMX6Q_UART_PORT
+> -	int "i.MX6Q Debug UART Port (1-5)" if DEBUG_IMX6Q_UART
+> -	range 1 5
+> +config DEBUG_IMX_UART_PORT
+> +	int "i.MX Debug UART Port Selection" if DEBUG_IMX1_UART || \
+> +						DEBUG_IMX25_UART || \
+> +						DEBUG_IMX21_IMX27_UART || \
+> +						DEBUG_IMX31_UART || \
+> +						DEBUG_IMX35_UART || \
+> +						DEBUG_IMX51_UART || \
+> +						DEBUG_IMX50_IMX53_UART || \
+> +						DEBUG_IMX6Q_UART
+>  	default 1
+> -	depends on SOC_IMX6Q
 
-On Tue, Mar 12 2013, Arnd Bergmann wrote:
->> Need add regulator_put here since regulator_get has succeed?
->
-> Hmm, we still don't actually bail out if the error is encountered, so
-> the reference count is balanced with the current patch, but I maybe
-> a failed regulator_enable() should actually be a fatal error?
-
-The reason I didn't make it a fatal error is that this is just vqmmc
-(responsible for moving from 3.3V to 1.8V for UHS modes), not the
-main vmmc regulator.  We can just disable those UHS modes from the
-capabilities on the host if vqmmc is missing, or failed to enable,
-or doesn't support those voltages, and that's what the code does now.
-
-Thanks,
-
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+After removing any dependency everybody gets a DEBUG_IMX_UART_PORT in
+their config now.
+ 
+Karl
