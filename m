@@ -1,233 +1,66 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 12 Mar 2013 21:47:01 +0100
-Subject: [PATCH] irqchip: Add support for ARMv7-M's NVIC
-In-Reply-To: <alpine.LFD.2.02.1303121923280.22263@ionos>
-References: <1363103673-24720-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <alpine.LFD.2.02.1303121923280.22263@ionos>
-Message-ID: <20130312204701.GS15375@pengutronix.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 12 Mar 2013 15:52:39 -0500
+Subject: [PATCH v2 05/14] ARM: integrator: use clocksource_of_init for
+ sp804
+In-Reply-To: <201303121933.47994.arnd@arndb.de>
+References: <1363108124-17484-1-git-send-email-haojian.zhuang@linaro.org>
+ <1363108124-17484-6-git-send-email-haojian.zhuang@linaro.org>
+ <513F7EBD.80207@gmail.com> <201303121933.47994.arnd@arndb.de>
+Message-ID: <513F9597.8050000@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Thomas,
+On 03/12/2013 02:33 PM, Arnd Bergmann wrote:
+> On Tuesday 12 March 2013, Rob Herring wrote:
+>> On 03/12/2013 12:08 PM, Haojian Zhuang wrote:
+> 
+>> You are breaking existing dtb's changing this, but this is wrong for
+>> other reasons. The integrator does not have an SP804. It is the same
+>> programming model, but is a single timer and not the dual timer. So
+>> having a different compatible string is the correct way. I doubt it has
+>> the primecell ID registers which is what "arm,primecell" indicates.
+> 
+> At least the qemu model has the primecell ID only for actual sp804 but
+> not for the integrator, see http://git.qemu.org/?p=qemu.git;a=blob;f=hw/arm_timer.c
 
-On Tue, Mar 12, 2013 at 08:57:34PM +0100, Thomas Gleixner wrote:
-> On Tue, 12 Mar 2013, Uwe Kleine-K?nig wrote:
-> > +static struct nvic_chip_data nvic_data __read_mostly;
-> 
-> What the heck is this? You have a static struct which you set in
-> irqdata.chip_data?
-I copied that idea from the gic driver and didn't question it because I
-thought it's too early to allocate memory when it's needed. Or do you
-just wonder about the usage of this static variable?
+Right. I think I added that to qemu...
 
-> > +static inline void __iomem *nvic_dist_base(struct irq_data *d)
-> > +{
-> > +	struct nvic_chip_data *nvic_data = irq_data_get_irq_chip_data(d);
-> 
-> And then you do the dance of reading the pointer to that static struct
-> out of irq_data and dereferencing it?
-> 
-> What's the point of this? 
-The idea was to keep the functions generic anyhow.
- 
-> > +	return nvic_data->dist_base;
-> > +}
-> > +
-> > +static void nvic_mask_irq(struct irq_data *d)
-> > +{
-> > +	u32 mask = 1 << (d->hwirq % 32);
-> > +
-> > +	writel_relaxed(mask, nvic_dist_base(d) + NVIC_ICER + d->irq / 32 * 4);
-> 
-> You're really missing the point of irq_data.chip_data 
-> 
-> If you set proper irq chip data per bank then this whole stuff is
-> reduced to:
-> 
->    struct mydata *md = irq_data_get_irq_chip_data(d);
->    u32 mask = 1 << (d->irq - md->irq_base);
-> 
->    writel_relaxed(mask, md->iobase + NVIC_ICER);
-> 
-> Can you spot the difference and what that means in terms of
-> instruction cycles?
-Yeah I see. The cost is increased memory usage. You'd probably say that
-the amount needed here is too small to care about. Still many decisions
-like this sum up and make the 4 MiB of RAM I have a tight fit.
- 
-> > +}
-> > +
-> > +static void nvic_unmask_irq(struct irq_data *d)
-> > +{
-> > +	u32 mask = 1 << (d->hwirq % 32);
-> > +
-> > +	writel_relaxed(mask, nvic_dist_base(d) + NVIC_ISER + d->hwirq / 32 * 4);
-> > +}
-> > +
-> > +void nvic_eoi(struct irq_data *d)
-> 
-> static ?
-yes.
-
-> > +{
-> > +	/*
-> > +	 * This is a no-op as end of interrupt is signaled by the exception
-> > +	 * return sequence.
-> > +	 */
-> > +}
-> > +
-> > +static struct irq_chip nvic_chip = {
-> > +	.name = "NVIC",
-> > +	.irq_mask = nvic_mask_irq,
-> > +	.irq_unmask = nvic_unmask_irq,
-> > +	.irq_eoi = nvic_eoi,
-> > +};
-> > +
-> > +static void __init nvic_init_bases(struct device_node *node,
-> > +		void __iomem *dist_base)
-> 
-> Please make this
-> 
-> static void __init nvic_init_bases(struct device_node *node,
->                                    void __iomem *dist_base)
-> 
-> That's way easier to parse. Applies to all other multiline stuff as
-> well.
-My version is like vim does the layout for me. It's the first time
-someone opposes to it. The reason I prefer using a fixed indention is
-that I don't need to touch the latter lines when for example the
-function name or the function's type change.
-
-Hmm, I can fix that if you insist.
-
-> > +{
-> > +	unsigned int irqs, i, irq_base;
-> > +
-> > +	nvic_data.dist_base = dist_base;
-> > +
-> > +	irqs = ((readl_relaxed(dist_base + NVIC_INTR_CTRL) & 0x0f) + 1) * 32;
-> > +	if (irqs > 496)
-> > +		irqs = 496;
-> 
-> Magic constants. Please use proper defines. 
-> 
-> Aside of that without a proper comment the logic looks ass backwards.
-Ok.
-
-> > +	irqs = ((readl_relaxed(dist_base + NVIC_INTR_CTRL) & 0x0f) + 1) * 32;
-> 
-> Without looking at the datasheet I assume that the chip tells you the
-> number of interrupt banks where a result of 0 means 1 bank and so
-> forth.
-> 
-> How should a reviewer understand why the number of banks is limited to
-> 31 without a comment? Do you really expect that a reviewer who
-> stumbles over that goes to search for the datasheet and verify what
-> you hacked up?
-Will add a comment.
-
-> > +	irq_base = irq_alloc_descs(-1, 16, irqs - 16, numa_node_id());
-> 
->   irq_alloc_desc_from(16, irqs - 16, ...)
-> 
-> Also why are you allocating irqs-16 instead of the full number of
-> irqs?
-I already have a comment there in my tree.
-
-> > +	if (IS_ERR_VALUE(irq_base)) {
-> 
-> See Russells reply
-> 
-> > +		WARN(1, "Cannot allocate irq_descs\n");
-> 
-> What's the point of that warn? The call path is always the same. So
-> you are spamming dmesg with a pointless backtrace. And on top of that
-> you do:
-There is one warning per call to nvic_init_bases. So I don't expect more
-than one message in dmesg.
+Since the primecell ID registers are defined to be at 0xFF? offset, it
+is quite impossible for the integrator timers to have the ID registers
+within their 0x100 address space.
 
 > 
-> > +		irq_base = 16;
+>>>  	};
+>>>  
+>>>  	timer1: timer at 13000100 {
+>>> -		compatible = "arm,integrator-timer";
+>>> +		compatible = "arm,sp804", "arm,primecell";
+>>> +		arm,sp804-clockevent = <0>;
+>>
+>> I don't like this nor the old way with aliases. We should describe the
+>> h/w features of the timer to determine what to use it for. AFAICT, all 3
+>> timers are identical on integrator and it does not matter which one
+>> Linux picks for clocksource vs. clockevent.
 > 
-> So you cannot allocate irq_descs and then you set base to 16 and pray
-> that everything works?
-If something goes wrong here the machine is probably silent about it. So
-continuing after a prayer might (or might not?) be an option.
+> Interesting point. I remember we had a discussion about this when the
+> initial binding integrator code was merged, but I don't remember what
+> the intent was for doing it like this. Probably just minimizing the
+> changes to the existing code.
 
-> > +	}
-> > +	nvic_data.domain = irq_domain_add_legacy(node, irqs - 16, irq_base, 0,
-> > +			&irq_domain_simple_ops, NULL);
-> > +	if (WARN_ON(!nvic_data.domain))
-> > +		return;
-> 
-> See above. Also you are leaking irqdescs though it's questionable
-> whether the machine can continue at all. And of course the init call
-> itself will return sucess.
-> 
-> > +	/*
-> > +	 * Set priority on all interrupts.
-> > +	 */
-> > +	for (i = 0; i < irqs; i += 4)
-> > +		writel_relaxed(0, dist_base + NVIC_IPRI + i);
-> > +
-> > +	/*
-> > +	 * Disable all interrupts
-> > +	 */
-> > +	for (i = 0; i < irqs; i += 32)
-> > +		writel_relaxed(~0, dist_base + NVIC_ICER + i * 4 / 32);
-> > +
-> > +	/*
-> > +	 * Setup the Linux IRQ subsystem.
-> > +	 */
-> > +	for (i = 0; i < irqs; i++) {
-> > +		irq_set_chip_and_handler(irq_base + i, &nvic_chip,
-> > +				handle_fasteoi_irq);
-> 
-> Above you do:
-> 	irq_base = irq_alloc_descs(-1, 16, irqs - 16, numa_node_id());
-> 
-> So you allocate irqs-16 interrupt descriptors and then you initialize
-> 16 more than you allocated.
-right.
+Re-reading the thread on this for Integrator, I don't think any
+conclusion was really made, but it got merged. I don't think we should
+a) change the existing alias names or b) expand their usage. OMAP is a
+good example of lots of timers and using h/w properties to select
+particular instances based on properties. I think on the ARM boards the
+selection has been pretty arbitrary. I traced the commit history back
+for the timer code and could not find any evidence to the contrary
+except on VExpress which has broken sp804 on the core tile.
 
-> Brilliant stuff that.
-> 
-> > +		irq_set_chip_data(irq_base + i, &nvic_data);
-> > +		set_irq_flags(irq_base + i, IRQF_VALID | IRQF_PROBE);
-> > +	}
-> > +}
-> > +
-> > +static int __init nvic_of_init(struct device_node *node,
-> > +		struct device_node *parent)
-> > +{
-> > +	void __iomem *dist_base;
-> > +
-> > +	if (WARN_ON(!node))
-> 
-> Sigh.
-> 
-> Though the real question is: can this actually happen?
-It didn't happen for me. What do you suggest? dropping WARN_ON?
+Another part is sched_clock selection. I use the sp804 on highbank, but
+the ARM boards have their 24MHz counter. Also, if I'm on midway, then I
+want to use the arch timers even though the sp804 is still there. My
+sched_clock patches yesterday attempt to address that. Any comments on
+what characteristics should be used to select timer would be helpful.
+Higher frequency and/or bits is better, but to what limit in frequency?
 
-> > +		return -ENODEV;
-> > +
-> > +	dist_base = of_iomap(node, 0);
-> > +	WARN(!dist_base, "unable to map nvic dist registers\n");
-> 
-> Brilliant. You can't map stuff and then you continue just for fun or
-> what?
-What do you suggest? returning -ESOMETHING?
-> 
-> > +	nvic_init_bases(node, dist_base);
-> 
-> Great. You have failure pathes in nvic_init_bases() and then you
-> return unconditionally success:
-Most of your critics also apply to irq-gic.c. I will follow up with a
-patch for that when you are happy with my work for the nvic.
-
-Best regards and thanks for your feed-back,
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Rob
