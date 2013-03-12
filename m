@@ -1,50 +1,56 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Tue, 12 Mar 2013 15:41:02 +0530
-Subject: [PATCH V2 0/5] ARM: DT: tegra114: Add DT entry for different
- controller
-In-Reply-To: <513E5771.9000408@wwwdotorg.org>
-References: <1362852678-13421-1-git-send-email-ldewangan@nvidia.com>
- <513E5771.9000408@wwwdotorg.org>
-Message-ID: <513EFF36.50107@nvidia.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 12 Mar 2013 15:45:35 +0530
+Subject: [PATCH v2] arm: davinci: fix edma dmaengine induced null pointer
+ dereference on da830
+In-Reply-To: <20130306175753.14f74f31@pcnovotny-t.fit.vutbr.cz>
+References: <1362499102-16468-1-git-send-email-mporter@ti.com>
+ <20130306175753.14f74f31@pcnovotny-t.fit.vutbr.cz>
+Message-ID: <513F0047.9070303@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 12 March 2013 03:45 AM, Stephen Warren wrote:
-> On 03/09/2013 11:11 AM, Laxman Dewangan wrote:
->> This patch series add DT entry for APB DMA, I2C, UART, KBC and SPI.
+On 3/6/2013 10:27 PM, Tomas Novotny wrote:
+> On Tue,  5 Mar 2013 10:58:22 -0500
+> Matt Porter <mporter@ti.com> wrote:
+> 
+>> This adds additional error checking to the private edma api implementation
+>> to catch the case where the edma_alloc_slot() has an invalid controller
+>> parameter. The edma dmaengine wrapper driver relies on this condition
+>> being handled in order to avoid setting up a second edma dmaengine
+>> instance on DA830.
 >>
->> This patch series is generated on top of CCF work for T114 done by Peter
->> and hence it should be applied on top of T114 CCF patches.
+>> Verfied using a DA850 with the second EDMA controller platform instance
+>> removed to simulate a DA830 which only has a single EDMA controller.
 >>
->> Changes from V1:
->> - Add reeason why APBDMA is not compatible with older driver
->>    in description.
->> - Remove UARTB car id correction. Make the compatible with tegra114 and
->>    older chip.
->> - Add compatible for kbc as nvidia,tegra114-kbc and nvidia,tegra20-kbc.
+>> Reported-by: Tomas Novotny <tomas@novotny.cz>
+>> Signed-off-by: Matt Porter <mporter@ti.com>
+>> Cc: stable at vger.kernel.org # v3.7.x+
+>> ---
+>> v2: Move error check out of conditional to catch all cases
 >>
->> Laxman Dewangan (5):
->>    ARM: DT: tegra114: add APB DMA controller DT entry
->>    ARM: DT: tegra114: Add i2c controller DT entry
->>    ARM: DT: tegra114:add aliases and DMA requestor for serial controller
->>    ARM: DT: tegra114: add KBC controller DT entry
->>    ARM: DT: tegra114: Add spi controller DT entry
-> What branch is this series based on? I tried to apply these for testing,
-> but git am failed to apply it to Tegra's for-3.10/dt, and Tegra's
-> for-next, and my local work branch, and next-20130307.
->
-> Can you please rebase onto Tegra's for-3.10/dt. Thanks.
+>>  arch/arm/mach-davinci/dma.c |    3 +++
+>>  1 file changed, 3 insertions(+)
+>>
+>> diff --git a/arch/arm/mach-davinci/dma.c b/arch/arm/mach-davinci/dma.c
+>> index a685e97..45b7c71 100644
+>> --- a/arch/arm/mach-davinci/dma.c
+>> +++ b/arch/arm/mach-davinci/dma.c
+>> @@ -743,6 +743,9 @@ EXPORT_SYMBOL(edma_free_channel);
+>>   */
+>>  int edma_alloc_slot(unsigned ctlr, int slot)
+>>  {
+>> +	if (!edma_cc[ctlr])
+>> +		return -EINVAL;
+>> +
+>>  	if (slot >= 0)
+>>  		slot = EDMA_CHAN_SLOT(slot);
+>>  
+> 
+> On the TI AM1707 based custom board:
+> 
+> Tested-by: Tomas Novotny <tomas@novotny.cz>
 
-I created the patch as:
-- linux next 20130307
-- Then add all clock changes from Peter's
-git://nv-tegra.nvidia.com/user/pdeschrijver/linux.git
+I tested it on DA830 EVM. Queuing this for v3.9-rc
 
-- Then I generated the DT entry on top of this which has clock reference.
-
-In your 3.10/DT, there is no change for Peter's clock change and 
-possibly this is the reason.
-
-
-If I base my change on your 3.10/DT then:
-- Do I need to add the clock entry for all modules also?
+Thanks,
+Sekhar
