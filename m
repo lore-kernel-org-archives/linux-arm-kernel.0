@@ -1,92 +1,95 @@
-From: dahuang@nvidia.com (Danny Huang)
-Date: Tue, 12 Mar 2013 20:01:07 +0800
-Subject: [PATCH v2] ARM: tegra: expose chip ID and revision
-Message-ID: <1363089667-15737-1-git-send-email-dahuang@nvidia.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Tue, 12 Mar 2013 13:10:42 +0100
+Subject: [PATCH 1/7] clk: samsung: add plls used in s3c2416 and s3c2443
+In-Reply-To: <201303120142.19842.heiko@sntech.de>
+References: <201303120141.31262.heiko@sntech.de>
+ <201303120142.19842.heiko@sntech.de>
+Message-ID: <513F1B42.7000201@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Expose Tegra chip ID and revision in /sys/devices/soc for user mode
-usage
+Hi,
 
-Signed-off-by: Danny Huang <dahuang@nvidia.com>
----
- arch/arm/mach-tegra/Kconfig  |  3 +++
- arch/arm/mach-tegra/common.c | 23 +++++++++++++++++++++++
- 2 files changed, 26 insertions(+)
+On 03/12/2013 01:42 AM, Heiko St?bner wrote:
+> This adds support for pll2126x, pll3000x, pll6552x and pll6553x.
+> 
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+>  drivers/clk/samsung/clk-pll.c |  376 +++++++++++++++++++++++++++++++++++++++++
+>  drivers/clk/samsung/clk-pll.h |    8 +
+>  2 files changed, 384 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/clk/samsung/clk-pll.c b/drivers/clk/samsung/clk-pll.c
+> index 4b24511..b772f9e 100644
+> --- a/drivers/clk/samsung/clk-pll.c
+> +++ b/drivers/clk/samsung/clk-pll.c
+> @@ -400,6 +400,97 @@ struct clk * __init samsung_clk_register_pll46xx(const char *name,
+...
+> +struct samsung_clk_pll2126x {
+> +	struct clk_hw		hw;
+> +	const void __iomem	*con_reg;
+> +};
+> +
+> +#define to_clk_pll2126x(_hw) container_of(_hw, struct samsung_clk_pll2126x, hw)
+> +
+> +static unsigned long samsung_pll2126x_recalc_rate(struct clk_hw *hw,
+> +				unsigned long parent_rate)
+> +{
+> +	struct samsung_clk_pll2126x *pll = to_clk_pll2126x(hw);
+> +	u32 pll_con, mdiv, pdiv, sdiv;
+> +	u64 fvco = parent_rate;
+> +
+> +	pll_con = __raw_readl(pll->con_reg);
+> +	mdiv = (pll_con >> PLL2126X_MDIV_SHIFT) & PLL2126X_MDIV_MASK;
+> +	pdiv = (pll_con >> PLL2126X_PDIV_SHIFT) & PLL2126X_PDIV_MASK;
+> +	sdiv = (pll_con >> PLL2126X_SDIV_SHIFT) & PLL2126X_SDIV_MASK;
+> +
+> +	fvco *= (mdiv + 8);
+> +	do_div(fvco, (pdiv + 2) << sdiv);
+> +
+> +	return (unsigned long)fvco;
+> +}
+> +
+> +/* todo: implement pll2126x clock round rate operation */
+> +static long samsung_pll2126x_round_rate(struct clk_hw *hw,
+> +				unsigned long drate, unsigned long *prate)
+> +{
+> +	return -ENOTSUPP;
+> +}
 
-diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-index d1c4893..b7abcfa 100644
---- a/arch/arm/mach-tegra/Kconfig
-+++ b/arch/arm/mach-tegra/Kconfig
-@@ -17,6 +17,7 @@ config ARCH_TEGRA_2x_SOC
- 	select PINCTRL_TEGRA20
- 	select PL310_ERRATA_727915 if CACHE_L2X0
- 	select PL310_ERRATA_769419 if CACHE_L2X0
-+	select SOC_BUS
- 	select USB_ARCH_HAS_EHCI if USB_SUPPORT
- 	select USB_ULPI if USB
- 	select USB_ULPI_VIEWPORT if USB_SUPPORT
-@@ -36,6 +37,7 @@ config ARCH_TEGRA_3x_SOC
- 	select PINCTRL
- 	select PINCTRL_TEGRA30
- 	select PL310_ERRATA_769419 if CACHE_L2X0
-+	select SOC_BUS
- 	select USB_ARCH_HAS_EHCI if USB_SUPPORT
- 	select USB_ULPI if USB
- 	select USB_ULPI_VIEWPORT if USB_SUPPORT
-@@ -51,6 +53,7 @@ config ARCH_TEGRA_114_SOC
- 	select CPU_V7
- 	select PINCTRL
- 	select PINCTRL_TEGRA114
-+	select SOC_BUS
- 	help
- 	  Support for NVIDIA Tegra T114 processor family, based on the
- 	  ARM CortexA15MP CPU
-diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
-index f0315c9..9547c59 100644
---- a/arch/arm/mach-tegra/common.c
-+++ b/arch/arm/mach-tegra/common.c
-@@ -23,6 +23,8 @@
- #include <linux/clk.h>
- #include <linux/delay.h>
- #include <linux/irqchip.h>
-+#include <linux/slab.h>
-+#include <linux/sys_soc.h>
- #include <linux/clk/tegra.h>
- 
- #include <asm/hardware/cache-l2x0.h>
-@@ -94,6 +96,26 @@ static void __init tegra_init_cache(void)
- 
- }
- 
-+void __init tegra_soc_device_init(void)
-+{
-+	struct soc_device *soc_dev;
-+	struct soc_device_attribute *soc_dev_attr;
-+
-+	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
-+	if (!soc_dev_attr)
-+		return;
-+
-+	soc_dev_attr->soc_id = kasprintf(GFP_KERNEL, "%d", tegra_chip_id);
-+	soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%d", tegra_revision);
-+	soc_dev_attr->family = kasprintf(GFP_KERNEL, "Tegra");
-+
-+	soc_dev = soc_device_register(soc_dev_attr);
-+	if (IS_ERR_OR_NULL(soc_dev))
-+		kfree(soc_dev_attr);
-+
-+	return;
-+}
-+
- void __init tegra_init_early(void)
- {
- 	tegra_cpu_reset_handler_init();
-@@ -108,4 +130,5 @@ void __init tegra_init_early(void)
- void __init tegra_init_late(void)
- {
- 	tegra_powergate_debugfs_init();
-+	tegra_soc_device_init();
- }
--- 
-1.8.1.5
+If you look at __clk_round_rate() in drivers/clk/clk.c it calls
+clk->ops->round_rate() recursively on the parent clock if
+CLK_SET_RATE_PARENT flag is set. But if the clock provides round_rate
+operation __clk_round_rate() will use it and will cast -ENOTSUPP
+you return above to unsigned long. Unless you want to loose some hair
+later and waste time on debugging I suggest to either remove all these
+callbacks that return -ENOSUPP or implement them properly right away.
+
+I'm just wondering why __clk_round_rate() return value type is unsigned long
+despite the struct clk_ops round_rate return long, which might indicate
+the negative values round_rate might callback are properly handled by the
+clk core code.
+
+Somewhat similar situation is with clk_mux_get_parent() in clk-mux.c
+which can return -EINVAL which is then casted to u8.
+
+I still have sending a patch for clk_mux_get_parent() on my todo list.
+I guess we could just put a WARN_ON() there and return 0.
+
+> +/* todo: implement pll2126x clock set rate */
+> +static int samsung_pll2126x_set_rate(struct clk_hw *hw, unsigned long drate,
+> +				unsigned long prate)
+> +{
+> +	return -ENOTSUPP;
+> +}
+> +
+> +static const struct clk_ops samsung_pll2126x_clk_ops = {
+> +	.recalc_rate = samsung_pll2126x_recalc_rate,
+> +	.round_rate = samsung_pll2126x_round_rate,
+> +	.set_rate = samsung_pll2126x_set_rate,
+> +};
+
+--
+
+Thanks,
+Sylwester
