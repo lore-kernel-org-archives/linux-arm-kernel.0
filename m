@@ -1,57 +1,48 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 12 Mar 2013 18:05:58 +0000
-Subject: [PATCH 14/29] arm64: KVM: guest one-reg interface
-In-Reply-To: <513F6659.7060500@codeaurora.org>
-References: <1362455265-24165-1-git-send-email-marc.zyngier@arm.com>
- <1362455265-24165-15-git-send-email-marc.zyngier@arm.com>
- <513F6659.7060500@codeaurora.org>
-Message-ID: <513F6E86.4040902@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 12 Mar 2013 18:11:50 +0000
+Subject: [PATCH v2 01/14] clocksource: move sp timer driver
+In-Reply-To: <1363108124-17484-2-git-send-email-haojian.zhuang@linaro.org>
+References: <1363108124-17484-1-git-send-email-haojian.zhuang@linaro.org>
+ <1363108124-17484-2-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <201303121811.50968.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/03/13 17:31, Christopher Covington wrote:
-> Hi Marc,
-> 
-> On 03/04/2013 10:47 PM, Marc Zyngier wrote:
->> Let userspace play with the guest registers.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm64/kvm/guest.c | 240 +++++++++++++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 240 insertions(+)
->>  create mode 100644 arch/arm64/kvm/guest.c
-> 
-> [...]
-> 
->> +int __attribute_const__ kvm_target_cpu(void)
->> +{
->> +	unsigned long implementor = read_cpuid_implementor();
->> +	unsigned long part_number = read_cpuid_part_number();
->> +
->> +	if (implementor != ARM_CPU_IMP_ARM)
->> +		return -EINVAL;
->> +
->> +	switch (part_number) {
->> +	case ARM_CPU_PART_AEM_V8:
->> +	case ARM_CPU_PART_FOUNDATION:
->> +		/* Treat the models just as an A57 for the time being */
->> +	case ARM_CPU_PART_CORTEX_A57:
->> +		return KVM_ARM_TARGET_CORTEX_A57;
->> +	default:
->> +		return -EINVAL;
->> +	}
->> +}
-> 
-> What is the motivation behind these checks? Why not let any ARMv8 system that
-> has EL2 host a virtualized Cortex A57 guest?
+Hi Haojian,
 
-The main reason is errata management. How do you deal with errata in the
-guest when you hide the underlying host CPU? I don't have an answer to
-that. So for the time being, we only allow the guest to see the same CPU
-as the host, and require that new CPUs are added to this function.
+The patch looks good in principle, but I have two comments:
 
-We went the same way for KVM/ARM.
+On Tuesday 12 March 2013, Haojian Zhuang wrote:
+> Move ARM SP804 timer driver from arch/arm directory into
+> drivers/clocksource directory.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+The patch description should always explain why we do it, not
+what is being done in here. Something like "all clocksource
+drivers should get moved there, and this is needed for integrating
+into the clocksource_of infrastructure.
+'
+>  arch/arm/Kconfig                          |    5 -
+>  arch/arm/common/Makefile                  |    1 -
+>  arch/arm/common/timer-sp.c                |  191 -----------------------------
+>  arch/arm/include/asm/hardware/arm_timer.h |   35 ------
+>  arch/arm/include/asm/hardware/timer-sp.h  |   15 ---
+>  arch/arm/mach-highbank/highbank.c         |    4 +-
+>  arch/arm/mach-integrator/integrator_ap.c  |    2 +-
+>  arch/arm/mach-integrator/integrator_cp.c  |    4 +-
+>  arch/arm/mach-realview/core.c             |    4 +-
+>  arch/arm/mach-versatile/core.c            |    4 +-
+>  arch/arm/mach-vexpress/ct-ca9x4.c         |    5 +-
+>  arch/arm/mach-vexpress/v2m.c              |    4 +-
+>  drivers/clocksource/Kconfig               |    5 +
+>  drivers/clocksource/Makefile              |    1 +
+>  drivers/clocksource/timer-sp.c            |  191 +++++++++++++++++++++++++++++
+>  include/clocksource/arm_timer.h           |   35 ++++++
+>  include/clocksource/timer-sp.h            |   19 +++
+
+Please use 'git format-patch -M' to generate the patches. I just
+realized I forgot it myself in the spear series.
+
+I have now set 'git config diff.renames true' and would recommend to
+everybody to do the same.
+
+	Arnd
