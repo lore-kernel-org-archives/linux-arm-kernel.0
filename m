@@ -1,70 +1,119 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Tue, 12 Mar 2013 19:54:27 +0530
-Subject: [PATCH 3/4] clk: samsung: always allocate the clk_table
-In-Reply-To: <513F321E.1020703@samsung.com>
-References: <201303120042.09633.heiko@sntech.de>
- <201303120044.29499.heiko@sntech.de>
- <CAJuYYwT183EcZZ20P8D7AP34CwXfKYLzsmZdoJz1ny7XznzyAg@mail.gmail.com>
- <513F1037.3080107@samsung.com>
- <CAJuYYwRDv4ULqXQOXmTsGfqVopt6XPR+XXb-pPZ35+pC7kUN3A@mail.gmail.com>
- <513F321E.1020703@samsung.com>
-Message-ID: <CAJuYYwSiQs0JC7esh-urmSUUsxhfP8bsGisdkvxHs8DFvLAS6Q@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 12 Mar 2013 14:25:14 +0000
+Subject: [PATCH 06/29] arm64: KVM: fault injection into a guest
+In-Reply-To: <513F2BB9.80306@codeaurora.org>
+References: <1362455265-24165-1-git-send-email-marc.zyngier@arm.com>
+ <1362455265-24165-7-git-send-email-marc.zyngier@arm.com>
+ <513F2BB9.80306@codeaurora.org>
+Message-ID: <513F3ACA.7020002@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 March 2013 19:18, Sylwester Nawrocki <s.nawrocki@samsung.com> wrote:
-> On 03/12/2013 12:46 PM, Thomas Abraham wrote:
->> And, you mentioned Exynos4 will be dt-only from 3.10. Does that mean
->> we just drop support for universal and nuri non-dt board support? Or,
->> will there be a equivalent dt support added for these boards?
->
-> I think Tomasz has some initial dts files for Universal_c210 ready, and
-> Nuri could probably just be dropped. But we need Kyungmin's opinion on
-> that.
->
-> I'm not sure about other boards, they look pretty basic though.
-> So it shouldn't be difficult to replace them with corresponding dts
-> files. Currently there are:
->
-> arch/arm/mach-exynos/mach-smdk4x12.c
-> arch/arm/mach-exynos/mach-origen.c
-> arch/arm/mach-exynos/mach-nuri.c
-> arch/arm/mach-exynos/mach-universal_c210.c
-> arch/arm/mach-exynos/mach-armlex4210.c
-> arch/arm/mach-exynos/mach-smdkv310.c
->
-> And there are dts files for:
->
-> arch/arm/boot/dts/exynos4210-smdkv310.dts
-> arch/arm/boot/dts/exynos4210-origen.dts
-> arch/arm/boot/dts/exynos5250-smdk5250.dts
-> arch/arm/boot/dts/exynos5250-snow.dts
-> arch/arm/boot/dts/exynos4210-trats.dts
-> arch/arm/boot/dts/exynos5440-ssdk5440.dts
-> arch/arm/boot/dts/exynos4412-smdk4412.dts
->
-> So except Universal_c210 and Nuri the only ones not supporting booting
-> from DT are these two simple boards, which seem to be maintained by
-> Samsung:
->
-> arch/arm/mach-exynos/mach-smdk4x12.c
-> arch/arm/mach-exynos/mach-armlex4210.c
+On 12/03/13 13:20, Christopher Covington wrote:
 
-There has not been much board support development for these boards for
-couple of kernel releases now.
+Hi Christopher,
 
->
-> It would be nice to make Exynos DT only in this kernel release.
-> I guess there was enough time to get all boards converted to DT
-> already.
+> I noticed you went through the trouble of defining several constants in an
+> earlier patch. Perhaps you could put them to use here?
+> 
+> On 03/04/2013 10:47 PM, Marc Zyngier wrote:
+>> Implement the injection of a fault (undefined, data abort or
+>> prefetch abort) into a 64bit guest.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm64/kvm/inject_fault.c | 117 ++++++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 117 insertions(+)
+>>  create mode 100644 arch/arm64/kvm/inject_fault.c
+> 
+> [...]
+> 
+>> +static void inject_abt64(struct kvm_vcpu *vcpu, bool is_iabt, unsigned long addr)
+>> +{
+>> +	unsigned long cpsr = *vcpu_cpsr(vcpu);
+>> +	int is_aarch32;
+>> +	u32 esr = 0;
+>> +
+>> +	is_aarch32 = vcpu_mode_is_32bit(vcpu);
+>> +
+>> +	*vcpu_spsr(vcpu) = cpsr;
+>> +	vcpu->arch.regs.elr_el1 = *vcpu_pc(vcpu);
+>> +
+>> +	*vcpu_cpsr(vcpu) = PSR_MODE_EL1h | PSR_A_BIT | PSR_F_BIT | PSR_I_BIT;
+>> +	*vcpu_pc(vcpu) = vcpu->arch.sys_regs[VBAR_EL1] + 0x200;
+>> +
+>> +	vcpu->arch.sys_regs[FAR_EL1] = addr;
+>> +
+>> +	/*
+>> +	 * Build an {i,d}abort, depending on the level and the
+>> +	 * instruction set. Report an external synchronous abort.
+>> +	 */
+>> +	if (kvm_vcpu_trap_il_is32bit(vcpu))
+>> +		esr |= (1 << 25);
+> 
+> ESR_EL2_IL
 
-Thanks for sharing your thoughts on this.
+This is the illustration of what I was saying earlier about confusing
+levels. Here, we're dealing with the guest's EL1. Using the _EL2 define
+is semantically wrong, even if it has the same value.
 
-Regards,
-Thomas.
+> 
+>> +	if (is_aarch32 || (cpsr & PSR_MODE_MASK) == PSR_MODE_EL0t)
+>> +		esr |= (0x20 << 26);
+> 
+> ESR_EL2_EC_IABT << ESR_EL2_EC_SHIFT
+> 
+>> +	else
+>> +		esr |= (0x21 << 26);
+> 
+> ESR_EL2_EC_IABT_HYP << ESR_EL2_EC_SHIFT
 
->
-> --
->
-> Regards,
-> Sylwester
+Even worse here. What this actually mean is "Exception@the current
+level", which is EL1. Having _HYP here is completely misleading.
+
+Now, maybe I should review all these defines and give them a more
+general meaning. Then we'd be able to share the defines across levels
+(arm/arch64/kernel/entry.S could use some defines too...). But overall,
+I'm quite reluctant to start mixing ESR_EL1 and ESR_EL2.
+
+>> +
+>> +	if (!is_iabt)
+>> +		esr |= (1 << 28);
+> 
+> ESR_EL2_EC_DABT << ESR_EL2_EC_SHIFT
+
+Nasty. Works, but very nasty... ;-)
+
+>> +
+>> +	vcpu->arch.sys_regs[ESR_EL1] = esr | 0x10;
+>> +}
+>> +
+>> +static void inject_undef64(struct kvm_vcpu *vcpu)
+>> +{
+>> +	unsigned long cpsr = *vcpu_cpsr(vcpu);
+>> +	u32 esr = 0;
+>> +
+>> +	*vcpu_spsr(vcpu) = cpsr;
+>> +	vcpu->arch.regs.elr_el1 = *vcpu_pc(vcpu);
+>> +
+>> +	*vcpu_cpsr(vcpu) = PSR_MODE_EL1h | PSR_F_BIT | PSR_I_BIT;
+>> +	*vcpu_pc(vcpu) = vcpu->arch.sys_regs[VBAR_EL1] + 0x200;
+>> +
+>> +	/*
+>> +	 * Build an unknown exception, depending on the instruction
+>> +	 * set.
+>> +	 */
+>> +	if (kvm_vcpu_trap_il_is32bit(vcpu))
+>> +		esr |= (1 << 25);
+> 
+> ESR_EL2_IL
+> 
+>> +
+>> +	vcpu->arch.sys_regs[ESR_EL1] = esr;
+>> +}
+
+Thanks for reviewing,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
