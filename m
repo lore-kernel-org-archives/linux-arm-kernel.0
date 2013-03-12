@@ -1,42 +1,69 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 12 Mar 2013 19:33:47 +0000
-Subject: [PATCH v2 05/14] ARM: integrator: use clocksource_of_init for
- sp804
-In-Reply-To: <513F7EBD.80207@gmail.com>
-References: <1363108124-17484-1-git-send-email-haojian.zhuang@linaro.org>
- <1363108124-17484-6-git-send-email-haojian.zhuang@linaro.org>
- <513F7EBD.80207@gmail.com>
-Message-ID: <201303121933.47994.arnd@arndb.de>
+From: ulf.hansson@stericsson.com (Ulf Hansson)
+Date: Tue, 12 Mar 2013 20:26:04 +0100
+Subject: [RESEND PATCH 3/4] clk: Introduce optional unprepare_unused callback
+In-Reply-To: <1363116365-3960-1-git-send-email-ulf.hansson@stericsson.com>
+References: <1363116365-3960-1-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <1363116365-3960-4-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 12 March 2013, Rob Herring wrote:
-> On 03/12/2013 12:08 PM, Haojian Zhuang wrote:
+From: Ulf Hansson <ulf.hansson@linaro.org>
 
-> You are breaking existing dtb's changing this, but this is wrong for
-> other reasons. The integrator does not have an SP804. It is the same
-> programming model, but is a single timer and not the dual timer. So
-> having a different compatible string is the correct way. I doubt it has
-> the primecell ID registers which is what "arm,primecell" indicates.
+An unprepare_unused callback is introduced due to the same reasons to
+why the disable_unused callback was added.
 
-At least the qemu model has the primecell ID only for actual sp804 but
-not for the integrator, see http://git.qemu.org/?p=qemu.git;a=blob;f=hw/arm_timer.c
+During the clk_disable_unused sequence, those clk_hw that needs specific
+treatment with regards to being unprepared, shall implement the
+unprepare_unused callback.
 
-> >  	};
-> >  
-> >  	timer1: timer at 13000100 {
-> > -		compatible = "arm,integrator-timer";
-> > +		compatible = "arm,sp804", "arm,primecell";
-> > +		arm,sp804-clockevent = <0>;
-> 
-> I don't like this nor the old way with aliases. We should describe the
-> h/w features of the timer to determine what to use it for. AFAICT, all 3
-> timers are identical on integrator and it does not matter which one
-> Linux picks for clocksource vs. clockevent.
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/clk/clk.c            |    7 +++++--
+ include/linux/clk-provider.h |    5 +++++
+ 2 files changed, 10 insertions(+), 2 deletions(-)
 
-Interesting point. I remember we had a discussion about this when the
-initial binding integrator code was merged, but I don't remember what
-the intent was for doing it like this. Probably just minimizing the
-changes to the existing code.
-
-	Arnd
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 0944348..d8dc6d7c 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -358,9 +358,12 @@ static void clk_unprepare_unused_subtree(struct clk *clk)
+ 	if (clk->flags & CLK_IGNORE_UNUSED)
+ 		return;
+ 
+-	if (__clk_is_prepared(clk))
+-		if (clk->ops->unprepare)
++	if (__clk_is_prepared(clk)) {
++		if (clk->ops->unprepare_unused)
++			clk->ops->unprepare_unused(clk->hw);
++		else if (clk->ops->unprepare)
+ 			clk->ops->unprepare(clk->hw);
++	}
+ }
+ 
+ /* caller must hold prepare_lock */
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 86ff6be..9e97fb4 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -49,6 +49,10 @@ struct clk_hw;
+  *		This function is allowed to sleep. Optional, if this op is not
+  *		set then the prepare count will be used.
+  *
++ * @unprepare_unused: Unprepare the clock atomically.  Only called from
++ *		clk_disable_unused for prepare clocks with special needs.
++ *		Called with prepare mutex held. This function may sleep.
++ *
+  * @enable:	Enable the clock atomically. This must not return until the
+  * 		clock is generating a valid clock signal, usable by consumer
+  * 		devices. Called with enable_lock held. This function must not
+@@ -113,6 +117,7 @@ struct clk_ops {
+ 	int		(*prepare)(struct clk_hw *hw);
+ 	void		(*unprepare)(struct clk_hw *hw);
+ 	int		(*is_prepared)(struct clk_hw *hw);
++	void		(*unprepare_unused)(struct clk_hw *hw);
+ 	int		(*enable)(struct clk_hw *hw);
+ 	void		(*disable)(struct clk_hw *hw);
+ 	int		(*is_enabled)(struct clk_hw *hw);
+-- 
+1.7.10
