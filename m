@@ -1,42 +1,58 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 12 Mar 2013 09:47:36 -0400
-Subject: [GIT PULL] ARM: mvebu: DT changes for v3.10
-Message-ID: <20130312134736.GH12700@titan.lakedaemon.net>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Tue, 12 Mar 2013 14:48:14 +0100
+Subject: [PATCH 3/4] clk: samsung: always allocate the clk_table
+In-Reply-To: <CAJuYYwRDv4ULqXQOXmTsGfqVopt6XPR+XXb-pPZ35+pC7kUN3A@mail.gmail.com>
+References: <201303120042.09633.heiko@sntech.de>
+ <201303120044.29499.heiko@sntech.de>
+ <CAJuYYwT183EcZZ20P8D7AP34CwXfKYLzsmZdoJz1ny7XznzyAg@mail.gmail.com>
+ <513F1037.3080107@samsung.com>
+ <CAJuYYwRDv4ULqXQOXmTsGfqVopt6XPR+XXb-pPZ35+pC7kUN3A@mail.gmail.com>
+Message-ID: <513F321E.1020703@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit f6161aa153581da4a3867a2d1a7caf4be19b6ec9:
+On 03/12/2013 12:46 PM, Thomas Abraham wrote:
+> And, you mentioned Exynos4 will be dt-only from 3.10. Does that mean
+> we just drop support for universal and nuri non-dt board support? Or,
+> will there be a equivalent dt support added for these boards?
 
-  Linux 3.9-rc2 (2013-03-10 16:54:19 -0700)
+I think Tomasz has some initial dts files for Universal_c210 ready, and
+Nuri could probably just be dropped. But we need Kyungmin's opinion on
+that.
 
-are available in the git repository at:
+I'm not sure about other boards, they look pretty basic though.
+So it shouldn't be difficult to replace them with corresponding dts
+files. Currently there are:
 
-  git://git.infradead.org/users/jcooper/linux.git tags/mvebu_dt_for_v3.10
+arch/arm/mach-exynos/mach-smdk4x12.c
+arch/arm/mach-exynos/mach-origen.c
+arch/arm/mach-exynos/mach-nuri.c
+arch/arm/mach-exynos/mach-universal_c210.c
+arch/arm/mach-exynos/mach-armlex4210.c
+arch/arm/mach-exynos/mach-smdkv310.c
 
-for you to fetch changes up to c3117edec5f92cce39f2d220c62f76675397af8d:
+And there are dts files for:
 
-  Dove: Thermal: Add DT node and enable in defconfig (2013-03-12 11:33:22 +0000)
+arch/arm/boot/dts/exynos4210-smdkv310.dts
+arch/arm/boot/dts/exynos4210-origen.dts
+arch/arm/boot/dts/exynos5250-smdk5250.dts
+arch/arm/boot/dts/exynos5250-snow.dts
+arch/arm/boot/dts/exynos4210-trats.dts
+arch/arm/boot/dts/exynos5440-ssdk5440.dts
+arch/arm/boot/dts/exynos4412-smdk4412.dts
 
-----------------------------------------------------------------
-mvebu DT changes for v3.10
+So except Universal_c210 and Nuri the only ones not supporting booting
+from DT are these two simple boards, which seem to be maintained by
+Samsung:
 
- - mvebu: gpio expander for the Mirabox
- - kirkwood: thermal sensor
- - dove: thermal sensor
+arch/arm/mach-exynos/mach-smdk4x12.c
+arch/arm/mach-exynos/mach-armlex4210.c
 
-----------------------------------------------------------------
-Andrew Lunn (1):
-      Dove: Thermal: Add DT node and enable in defconfig
+It would be nice to make Exynos DT only in this kernel release.
+I guess there was enough time to get all boards converted to DT
+already.
 
-Gregory CLEMENT (1):
-      arm: mvebu: enable gpio expander over i2c on Mirabox platform
+--
 
-Nobuhiro Iwamatsu (1):
-      ARM: Kirkwood: Add support thermal sensor for 88F6282 and 88F6283
-
- arch/arm/boot/dts/armada-370-mirabox.dts | 11 +++++++++++
- arch/arm/boot/dts/dove.dtsi              |  5 +++++
- arch/arm/boot/dts/kirkwood-6282.dtsi     |  6 ++++++
- arch/arm/configs/dove_defconfig          |  2 ++
- arch/arm/configs/kirkwood_defconfig      |  2 ++
- 5 files changed, 26 insertions(+)
+Regards,
+Sylwester
