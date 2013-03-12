@@ -1,40 +1,45 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 12 Mar 2013 11:46:49 +0200
-Subject: [RFC PATCH 2/3] usb: udc: delete the vbus indicator at
- individual driver
-In-Reply-To: <1363078999-7361-2-git-send-email-peter.chen@freescale.com>
+Date: Tue, 12 Mar 2013 11:47:37 +0200
+Subject: [RFC PATCH 3/3] usb: udc-core: add judgement logic for
+ usb_gadget_connect
+In-Reply-To: <1363078999-7361-3-git-send-email-peter.chen@freescale.com>
 References: <1363078999-7361-1-git-send-email-peter.chen@freescale.com>
- <1363078999-7361-2-git-send-email-peter.chen@freescale.com>
-Message-ID: <20130312094649.GC15163@arwen.pp.htv.fi>
+ <1363078999-7361-3-git-send-email-peter.chen@freescale.com>
+Message-ID: <20130312094737.GD15163@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 12, 2013 at 05:03:18PM +0800, Peter Chen wrote:
-> Let the common struct usb_gadget own it.
+On Tue, Mar 12, 2013 at 05:03:19PM +0800, Peter Chen wrote:
+> - If there is no vbus control to indicate connection
+> and disconnect, we can pullup dp when we load gadget module.
+> - If we have vbus control logic, the dp is better pulled up
+> when there is a vbus session.
 > 
-> CC: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-> CC: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> CC: Li Yang <leoli@freescale.com>
-> CC: Roland Stigge <stigge@antcom.de>
-> CC: Yu Xu <yuxu@marvell.com>
-> CC: Chao Xie <chao.xie@marvell.com>
-> CC: Eric Miao <eric.y.miao@gmail.com>
-> CC: Ben Dooks <ben-linux@fluff.org>
 > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> ---
+>  drivers/usb/gadget/udc-core.c |   24 ++++++++++++++++--------
+>  1 files changed, 16 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/usb/gadget/udc-core.c b/drivers/usb/gadget/udc-core.c
+> index 2a9cd36..4b56f7c 100644
+> --- a/drivers/usb/gadget/udc-core.c
+> +++ b/drivers/usb/gadget/udc-core.c
+> @@ -262,6 +262,7 @@ EXPORT_SYMBOL_GPL(usb_del_gadget_udc);
+>  static int udc_bind_to_driver(struct usb_udc *udc, struct usb_gadget_driver *driver)
+>  {
+>  	int ret;
+> +	struct usb_gadget *gadget = udc->gadget;
+>  
+>  	dev_dbg(&udc->dev, "registering UDC driver [%s]\n",
+>  			driver->function);
+> @@ -269,15 +270,18 @@ static int udc_bind_to_driver(struct usb_udc *udc, struct usb_gadget_driver *dri
+>  	udc->driver = driver;
+>  	udc->dev.driver = &driver->driver;
+>  
+> -	ret = driver->bind(udc->gadget, driver);
+> +	ret = driver->bind(gadget, driver);
 
-you need to split this patch, should be something like below:
-
-for_each_driver() {
-	initialize gadget->vbus_active (don't remove private method)
-}
-
-add vbus_active support to udc-core
-
-for_each_driver() {
-	remove driver's private vbus_active method
-}
-
-you need one patch per driver so it's easy to review and ack.
+this small cleanup (s/udc->gadget/gadget) deserves a separate patch.
 
 -- 
 balbi
@@ -44,4 +49,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130312/8cb76081/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130312/428625d4/attachment.sig>
