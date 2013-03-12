@@ -1,54 +1,43 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Tue, 12 Mar 2013 13:31:05 -0400
-Subject: [PATCH 14/29] arm64: KVM: guest one-reg interface
-In-Reply-To: <1362455265-24165-15-git-send-email-marc.zyngier@arm.com>
-References: <1362455265-24165-1-git-send-email-marc.zyngier@arm.com>
- <1362455265-24165-15-git-send-email-marc.zyngier@arm.com>
-Message-ID: <513F6659.7060500@codeaurora.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 12 Mar 2013 11:58:56 -0600
+Subject: [PATCH v2] ARM: tegra: expose chip ID and revision
+In-Reply-To: <1363089667-15737-1-git-send-email-dahuang@nvidia.com>
+References: <1363089667-15737-1-git-send-email-dahuang@nvidia.com>
+Message-ID: <513F6CE0.2090600@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On 03/12/2013 06:01 AM, Danny Huang wrote:
+> Expose Tegra chip ID and revision in /sys/devices/soc for user mode
+> usage
 
-On 03/04/2013 10:47 PM, Marc Zyngier wrote:
-> Let userspace play with the guest registers.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/kvm/guest.c | 240 +++++++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 240 insertions(+)
->  create mode 100644 arch/arm64/kvm/guest.c
+> diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+> index d1c4893..b7abcfa 100644
+> --- a/arch/arm/mach-tegra/Kconfig
+> +++ b/arch/arm/mach-tegra/Kconfig
+> @@ -17,6 +17,7 @@ config ARCH_TEGRA_2x_SOC
+>  	select PINCTRL_TEGRA20
+>  	select PL310_ERRATA_727915 if CACHE_L2X0
+>  	select PL310_ERRATA_769419 if CACHE_L2X0
+> +	select SOC_BUS
+>  	select USB_ARCH_HAS_EHCI if USB_SUPPORT
+>  	select USB_ULPI if USB
+>  	select USB_ULPI_VIEWPORT if USB_SUPPORT
+> @@ -36,6 +37,7 @@ config ARCH_TEGRA_3x_SOC
+>  	select PINCTRL
+>  	select PINCTRL_TEGRA30
+>  	select PL310_ERRATA_769419 if CACHE_L2X0
+> +	select SOC_BUS
+>  	select USB_ARCH_HAS_EHCI if USB_SUPPORT
+>  	select USB_ULPI if USB
+>  	select USB_ULPI_VIEWPORT if USB_SUPPORT
+> @@ -51,6 +53,7 @@ config ARCH_TEGRA_114_SOC
+>  	select CPU_V7
+>  	select PINCTRL
+>  	select PINCTRL_TEGRA114
+> +	select SOC_BUS
+>  	help
 
-[...]
-
-> +int __attribute_const__ kvm_target_cpu(void)
-> +{
-> +	unsigned long implementor = read_cpuid_implementor();
-> +	unsigned long part_number = read_cpuid_part_number();
-> +
-> +	if (implementor != ARM_CPU_IMP_ARM)
-> +		return -EINVAL;
-> +
-> +	switch (part_number) {
-> +	case ARM_CPU_PART_AEM_V8:
-> +	case ARM_CPU_PART_FOUNDATION:
-> +		/* Treat the models just as an A57 for the time being */
-> +	case ARM_CPU_PART_CORTEX_A57:
-> +		return KVM_ARM_TARGET_CORTEX_A57;
-> +	default:
-> +		return -EINVAL;
-> +	}
-> +}
-
-What is the motivation behind these checks? Why not let any ARMv8 system that
-has EL2 host a virtualized Cortex A57 guest?
-
-[...]
-
-Thanks,
-Christopher
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by
-the Linux Foundation
+I assume we'll want this feature for all Tegra SoCs. Can't we select it
+from ARCH_TEGRA, rather than separately for each chip? CONFIG_ARCH_TEGRA
+is defined in arch/arm/Kconfig.
