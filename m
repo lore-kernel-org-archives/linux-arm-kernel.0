@@ -1,41 +1,31 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 12 Mar 2013 10:00:06 +0800
-Subject: [PATCH] clk: prima2: fix return value check in
- sirfsoc_of_clk_init()
-In-Reply-To: <CAPgLHd82XEZEP4eDvmvPjdHHz6u40+16W1GZeCWWw6Cj3SAwCg@mail.gmail.com>
-References: <CAPgLHd82XEZEP4eDvmvPjdHHz6u40+16W1GZeCWWw6Cj3SAwCg@mail.gmail.com>
-Message-ID: <CAGsJ_4ykNjO9rxB9_THY8Vb+Q7aYZiwDxjA=EWOOSumZmtHtnw@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 11 Mar 2013 21:26:34 -0500
+Subject: [PATCH 0/3] ARM sched_clock selection enhancements
+Message-ID: <1363055197-17296-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/3/11 Wei Yongjun <weiyj.lk@gmail.com>:
-> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
->
-> In case of error, the function clk_get() returns ERR_PTR()
-> not NULL. The NULL test in the return value check should
-> be replaced with IS_ERR().
->
-> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+From: Rob Herring <rob.herring@calxeda.com>
 
-Acked. Thanks!
+In preparation to move more timer initialization to use CLKSRC_OF and
+out of the platforms, a way to select the timer used for sched_clock is
+needed. This series makes the ARM sched_clock support code prefer 64-bit
+counters or higher frequency counters. This is sufficient at least on
+ARM Ltd boards to use the 24MHz counter rather than sp804 and to always
+use the 64-bit architected timer when present. This mechanism can be
+extended to DT properties if needed for any non-discoverable h/w feature.
 
-> ---
->  drivers/clk/clk-prima2.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/clk/clk-prima2.c b/drivers/clk/clk-prima2.c
-> index f8e9d0c..b208665 100644
-> --- a/drivers/clk/clk-prima2.c
-> +++ b/drivers/clk/clk-prima2.c
-> @@ -1113,7 +1113,7 @@ void __init sirfsoc_of_clk_init(void)
->
->         for (i = pll1; i < maxclk; i++) {
->                 prima2_clks[i] = clk_register(NULL, prima2_clk_hw_array[i]);
-> -               BUG_ON(!prima2_clks[i]);
-> +               BUG_ON(IS_ERR(prima2_clks[i]);
->         }
->         clk_register_clkdev(prima2_clks[cpu], NULL, "cpu");
->         clk_register_clkdev(prima2_clks[io],  NULL, "io");
->
+Rob
 
--barry
+Rob Herring (3):
+  ARM: sched_clock: allow changing to higher frequency counter
+  ARM: sched_clock: support 64-bit counters
+  ARM: arch_timer: use the 64-bit sched_clock setup
+
+ arch/arm/include/asm/sched_clock.h |    1 +
+ arch/arm/kernel/arch_timer.c       |    8 +-------
+ arch/arm/kernel/sched_clock.c      |   35 ++++++++++++++++++++++++++++++++---
+ 3 files changed, 34 insertions(+), 10 deletions(-)
+
+-- 
+1.7.10.4
