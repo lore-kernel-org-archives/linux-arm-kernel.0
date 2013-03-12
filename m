@@ -1,430 +1,259 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Tue, 12 Mar 2013 11:41:54 -0700
-Subject: [PATCH v2 09/11] SSBI: Remove MSM_ prefix from SSBI drivers
-In-Reply-To: <1363113716-25897-1-git-send-email-davidb@codeaurora.org>
-References: <1362616187-21089-1-git-send-email-davidb@codeaurora.org>
- <1363113716-25897-1-git-send-email-davidb@codeaurora.org>
-Message-ID: <1363113716-25897-10-git-send-email-davidb@codeaurora.org>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Tue, 12 Mar 2013 20:42:23 +0200
+Subject: [PATCH] clk: add table lookup to mux
+Message-ID: <1363113747-6572-1-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Although the SSBI sub is currently only used on MSM SoCs, it is still
-a bus in its own right.  Remove this msm_ prefix from the driver and
-it's symbols.  Clients can now refer directly to ssbi_write() and
-ssbi_read().
+Add a table lookup feature to the mux clock. Also allow arbitrary masks
+instead of the width. This will be used by some clocks on Tegra114. Also
+adapt the tegra periph clk because it uses struct clk_mux directly.
 
-Signed-off-by: David Brown <davidb@codeaurora.org>
+Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+
+--
+Mike,
+
+This is the same patch I posted before which implements a table lookup
+feature for the mux clock. I squashed both the changes to clk-mux.c and
+tegra/clk.h together in order to make the patch bisectable.
+
+Thanks,
+
+Peter.
 ---
- drivers/Makefile                     |  2 +-
- drivers/mfd/Kconfig                  |  2 +-
- drivers/mfd/pm8921-core.c            | 14 +++---
- drivers/ssbi/Kconfig                 |  4 +-
- drivers/ssbi/Makefile                |  2 +-
- drivers/ssbi/ssbi.c                  | 86 ++++++++++++++++++------------------
- include/linux/{msm_ssbi.h => ssbi.h} | 18 ++++----
- 7 files changed, 64 insertions(+), 64 deletions(-)
- rename include/linux/{msm_ssbi.h => ssbi.h} (67%)
+ drivers/clk/clk-mux.c        |   50 ++++++++++++++++++++++++++++++++----------
+ drivers/clk/tegra/clk.h      |   27 ++++++++++++++++-------
+ include/linux/clk-private.h  |    3 ++-
+ include/linux/clk-provider.h |    9 +++++++-
+ 4 files changed, 68 insertions(+), 21 deletions(-)
 
-diff --git a/drivers/Makefile b/drivers/Makefile
-index 778821b..4865ed2 100644
---- a/drivers/Makefile
-+++ b/drivers/Makefile
-@@ -114,7 +114,7 @@ obj-y				+= firmware/
- obj-$(CONFIG_CRYPTO)		+= crypto/
- obj-$(CONFIG_SUPERH)		+= sh/
- obj-$(CONFIG_ARCH_SHMOBILE)	+= sh/
--obj-$(CONFIG_MSM_SSBI)		+= ssbi/
-+obj-$(CONFIG_SSBI)		+= ssbi/
- ifndef CONFIG_ARCH_USES_GETTIMEOFFSET
- obj-y				+= clocksource/
- endif
-diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-index 671f5b1..5bfa7bb 100644
---- a/drivers/mfd/Kconfig
-+++ b/drivers/mfd/Kconfig
-@@ -990,7 +990,7 @@ config MFD_PM8XXX
- 
- config MFD_PM8921_CORE
- 	tristate "Qualcomm PM8921 PMIC chip"
--	depends on MSM_SSBI
-+	depends on SSBI
- 	select MFD_CORE
- 	select MFD_PM8XXX
- 	help
-diff --git a/drivers/mfd/pm8921-core.c b/drivers/mfd/pm8921-core.c
-index d4b297c..ecc137f 100644
---- a/drivers/mfd/pm8921-core.c
-+++ b/drivers/mfd/pm8921-core.c
-@@ -17,7 +17,7 @@
- #include <linux/platform_device.h>
- #include <linux/slab.h>
- #include <linux/err.h>
--#include <linux/msm_ssbi.h>
-+#include <linux/ssbi.h>
- #include <linux/mfd/core.h>
- #include <linux/mfd/pm8xxx/pm8921.h>
- #include <linux/mfd/pm8xxx/core.h>
-@@ -35,7 +35,7 @@ static int pm8921_readb(const struct device *dev, u16 addr, u8 *val)
- 	const struct pm8xxx_drvdata *pm8921_drvdata = dev_get_drvdata(dev);
- 	const struct pm8921 *pmic = pm8921_drvdata->pm_chip_data;
- 
--	return msm_ssbi_read(pmic->dev->parent, addr, val, 1);
-+	return ssbi_read(pmic->dev->parent, addr, val, 1);
- }
- 
- static int pm8921_writeb(const struct device *dev, u16 addr, u8 val)
-@@ -43,7 +43,7 @@ static int pm8921_writeb(const struct device *dev, u16 addr, u8 val)
- 	const struct pm8xxx_drvdata *pm8921_drvdata = dev_get_drvdata(dev);
- 	const struct pm8921 *pmic = pm8921_drvdata->pm_chip_data;
- 
--	return msm_ssbi_write(pmic->dev->parent, addr, &val, 1);
-+	return ssbi_write(pmic->dev->parent, addr, &val, 1);
- }
- 
- static int pm8921_read_buf(const struct device *dev, u16 addr, u8 *buf,
-@@ -52,7 +52,7 @@ static int pm8921_read_buf(const struct device *dev, u16 addr, u8 *buf,
- 	const struct pm8xxx_drvdata *pm8921_drvdata = dev_get_drvdata(dev);
- 	const struct pm8921 *pmic = pm8921_drvdata->pm_chip_data;
- 
--	return msm_ssbi_read(pmic->dev->parent, addr, buf, cnt);
-+	return ssbi_read(pmic->dev->parent, addr, buf, cnt);
- }
- 
- static int pm8921_write_buf(const struct device *dev, u16 addr, u8 *buf,
-@@ -61,7 +61,7 @@ static int pm8921_write_buf(const struct device *dev, u16 addr, u8 *buf,
- 	const struct pm8xxx_drvdata *pm8921_drvdata = dev_get_drvdata(dev);
- 	const struct pm8921 *pmic = pm8921_drvdata->pm_chip_data;
- 
--	return msm_ssbi_write(pmic->dev->parent, addr, buf, cnt);
-+	return ssbi_write(pmic->dev->parent, addr, buf, cnt);
- }
- 
- static int pm8921_read_irq_stat(const struct device *dev, int irq)
-@@ -124,7 +124,7 @@ static int pm8921_probe(struct platform_device *pdev)
- 	}
- 
- 	/* Read PMIC chip revision */
--	rc = msm_ssbi_read(pdev->dev.parent, REG_HWREV, &val, sizeof(val));
-+	rc = ssbi_read(pdev->dev.parent, REG_HWREV, &val, sizeof(val));
- 	if (rc) {
- 		pr_err("Failed to read hw rev reg %d:rc=%d\n", REG_HWREV, rc);
- 		goto err_read_rev;
-@@ -133,7 +133,7 @@ static int pm8921_probe(struct platform_device *pdev)
- 	rev = val;
- 
- 	/* Read PMIC chip revision 2 */
--	rc = msm_ssbi_read(pdev->dev.parent, REG_HWREV_2, &val, sizeof(val));
-+	rc = ssbi_read(pdev->dev.parent, REG_HWREV_2, &val, sizeof(val));
- 	if (rc) {
- 		pr_err("Failed to read hw rev 2 reg %d:rc=%d\n",
- 			REG_HWREV_2, rc);
-diff --git a/drivers/ssbi/Kconfig b/drivers/ssbi/Kconfig
-index c7bc534..1ae4040 100644
---- a/drivers/ssbi/Kconfig
-+++ b/drivers/ssbi/Kconfig
-@@ -1,10 +1,10 @@
- #
--# MSM SSBI bus support
-+# SSBI bus support
- #
- 
- menu "Qualcomm MSM SSBI bus support"
- 
--config MSM_SSBI
-+config SSBI
- 	tristate "Qualcomm Single-wire Serial Bus Interface (SSBI)"
- 	help
- 	  If you say yes to this option, support will be included for the
-diff --git a/drivers/ssbi/Makefile b/drivers/ssbi/Makefile
-index 22e408f..38fb70c 100644
---- a/drivers/ssbi/Makefile
-+++ b/drivers/ssbi/Makefile
-@@ -1 +1 @@
--obj-$(CONFIG_MSM_SSBI) += ssbi.o
-+obj-$(CONFIG_SSBI) += ssbi.o
-diff --git a/drivers/ssbi/ssbi.c b/drivers/ssbi/ssbi.c
-index b056a07..f32da02 100644
---- a/drivers/ssbi/ssbi.c
-+++ b/drivers/ssbi/ssbi.c
-@@ -1,4 +1,4 @@
--/* Copyright (c) 2009-2011, Code Aurora Forum. All rights reserved.
-+/* Copyright (c) 2009-2013, The Linux Foundation. All rights reserved.
-  * Copyright (c) 2010, Google Inc.
-  *
-  * Original authors: Code Aurora Forum
-@@ -24,7 +24,7 @@
- #include <linux/kernel.h>
- #include <linux/platform_device.h>
- #include <linux/slab.h>
--#include <linux/msm_ssbi.h>
-+#include <linux/ssbi.h>
- #include <linux/module.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
-@@ -65,23 +65,23 @@
- 
- #define SSBI_TIMEOUT_US			100
- 
--struct msm_ssbi {
-+struct ssbi {
- 	struct device		*slave;
- 	void __iomem		*base;
- 	spinlock_t		lock;
--	enum msm_ssbi_controller_type controller_type;
--	int (*read)(struct msm_ssbi *, u16 addr, u8 *buf, int len);
--	int (*write)(struct msm_ssbi *, u16 addr, u8 *buf, int len);
-+	enum ssbi_controller_type controller_type;
-+	int (*read)(struct ssbi *, u16 addr, u8 *buf, int len);
-+	int (*write)(struct ssbi *, u16 addr, u8 *buf, int len);
- };
- 
--#define to_msm_ssbi(dev)	platform_get_drvdata(to_platform_device(dev))
-+#define to_ssbi(dev)	platform_get_drvdata(to_platform_device(dev))
- 
--static inline u32 ssbi_readl(struct msm_ssbi *ssbi, u32 reg)
-+static inline u32 ssbi_readl(struct ssbi *ssbi, u32 reg)
+diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
+index 508c032..25b1734 100644
+--- a/drivers/clk/clk-mux.c
++++ b/drivers/clk/clk-mux.c
+@@ -32,6 +32,7 @@
+ static u8 clk_mux_get_parent(struct clk_hw *hw)
  {
- 	return readl(ssbi->base + reg);
- }
- 
--static inline void ssbi_writel(struct msm_ssbi *ssbi, u32 val, u32 reg)
-+static inline void ssbi_writel(struct ssbi *ssbi, u32 val, u32 reg)
- {
- 	writel(val, ssbi->base + reg);
- }
-@@ -95,7 +95,7 @@ static inline void ssbi_writel(struct msm_ssbi *ssbi, u32 val, u32 reg)
-  *
-  * As such, this wait merely spins, with a udelay.
-  */
--static int ssbi_wait_mask(struct msm_ssbi *ssbi, u32 set_mask, u32 clr_mask)
-+static int ssbi_wait_mask(struct ssbi *ssbi, u32 set_mask, u32 clr_mask)
- {
- 	u32 timeout = SSBI_TIMEOUT_US;
+ 	struct clk_mux *mux = to_clk_mux(hw);
++	int num_parents = __clk_get_num_parents(hw->clk);
  	u32 val;
-@@ -111,7 +111,7 @@ static int ssbi_wait_mask(struct msm_ssbi *ssbi, u32 set_mask, u32 clr_mask)
+ 
+ 	/*
+@@ -42,7 +43,16 @@ static u8 clk_mux_get_parent(struct clk_hw *hw)
+ 	 * val = 0x4 really means "bit 2, index starts at bit 0"
+ 	 */
+ 	val = readl(mux->reg) >> mux->shift;
+-	val &= (1 << mux->width) - 1;
++	val &= mux->mask;
++
++	if (mux->table) {
++		int i;
++
++		for (i = 0; i < num_parents; i++)
++			if (mux->table[i] == val)
++				return i;
++		return -EINVAL;
++	}
+ 
+ 	if (val && (mux->flags & CLK_MUX_INDEX_BIT))
+ 		val = ffs(val) - 1;
+@@ -50,7 +60,7 @@ static u8 clk_mux_get_parent(struct clk_hw *hw)
+ 	if (val && (mux->flags & CLK_MUX_INDEX_ONE))
+ 		val--;
+ 
+-	if (val >= __clk_get_num_parents(hw->clk))
++	if (val >= num_parents)
+ 		return -EINVAL;
+ 
+ 	return val;
+@@ -62,17 +72,22 @@ static int clk_mux_set_parent(struct clk_hw *hw, u8 index)
+ 	u32 val;
+ 	unsigned long flags = 0;
+ 
+-	if (mux->flags & CLK_MUX_INDEX_BIT)
+-		index = (1 << ffs(index));
++	if (mux->table)
++		index = mux->table[index];
+ 
+-	if (mux->flags & CLK_MUX_INDEX_ONE)
+-		index++;
++	else {
++		if (mux->flags & CLK_MUX_INDEX_BIT)
++			index = (1 << ffs(index));
++
++		if (mux->flags & CLK_MUX_INDEX_ONE)
++			index++;
++	}
+ 
+ 	if (mux->lock)
+ 		spin_lock_irqsave(mux->lock, flags);
+ 
+ 	val = readl(mux->reg);
+-	val &= ~(((1 << mux->width) - 1) << mux->shift);
++	val &= ~(mux->mask << mux->shift);
+ 	val |= index << mux->shift;
+ 	writel(val, mux->reg);
+ 
+@@ -88,10 +103,10 @@ const struct clk_ops clk_mux_ops = {
+ };
+ EXPORT_SYMBOL_GPL(clk_mux_ops);
+ 
+-struct clk *clk_register_mux(struct device *dev, const char *name,
++struct clk *clk_register_mux_table(struct device *dev, const char *name,
+ 		const char **parent_names, u8 num_parents, unsigned long flags,
+-		void __iomem *reg, u8 shift, u8 width,
+-		u8 clk_mux_flags, spinlock_t *lock)
++		void __iomem *reg, u8 shift, u32 mask,
++		u8 clk_mux_flags, u32 *table, spinlock_t *lock)
+ {
+ 	struct clk_mux *mux;
+ 	struct clk *clk;
+@@ -113,9 +128,10 @@ struct clk *clk_register_mux(struct device *dev, const char *name,
+ 	/* struct clk_mux assignments */
+ 	mux->reg = reg;
+ 	mux->shift = shift;
+-	mux->width = width;
++	mux->mask = mask;
+ 	mux->flags = clk_mux_flags;
+ 	mux->lock = lock;
++	mux->table = table;
+ 	mux->hw.init = &init;
+ 
+ 	clk = clk_register(dev, &mux->hw);
+@@ -125,3 +141,15 @@ struct clk *clk_register_mux(struct device *dev, const char *name,
+ 
+ 	return clk;
  }
++
++struct clk *clk_register_mux(struct device *dev, const char *name,
++		const char **parent_names, u8 num_parents, unsigned long flags,
++		void __iomem *reg, u8 shift, u8 width,
++		u8 clk_mux_flags, spinlock_t *lock)
++{
++	u32 mask = BIT(width) - 1;
++
++	return clk_register_mux_table(dev, name, parent_names, num_parents,
++				      flags, reg, shift, mask, clk_mux_flags,
++				      NULL, lock);
++}
+diff --git a/drivers/clk/tegra/clk.h b/drivers/clk/tegra/clk.h
+index 0744731..a09d7dc 100644
+--- a/drivers/clk/tegra/clk.h
++++ b/drivers/clk/tegra/clk.h
+@@ -355,15 +355,16 @@ struct clk *tegra_clk_register_periph_nodiv(const char *name,
+ 		struct tegra_clk_periph *periph, void __iomem *clk_base,
+ 		u32 offset);
  
- static int
--msm_ssbi_read_bytes(struct msm_ssbi *ssbi, u16 addr, u8 *buf, int len)
-+ssbi_read_bytes(struct ssbi *ssbi, u16 addr, u8 *buf, int len)
- {
- 	u32 cmd = SSBI_CMD_RDWRN | ((addr & 0xff) << 16);
- 	int ret = 0;
-@@ -140,7 +140,7 @@ err:
- }
+-#define TEGRA_CLK_PERIPH(_mux_shift, _mux_width, _mux_flags,		\
++#define TEGRA_CLK_PERIPH(_mux_shift, _mux_mask, _mux_flags,		\
+ 			 _div_shift, _div_width, _div_frac_width,	\
+ 			 _div_flags, _clk_num, _enb_refcnt, _regs,	\
+-			 _gate_flags)					\
++			 _gate_flags, _table)				\
+ 	{								\
+ 		.mux = {						\
+ 			.flags = _mux_flags,				\
+ 			.shift = _mux_shift,				\
+-			.width = _mux_width,				\
++			.mask = _mux_mask,				\
++			.table = _table,				\
+ 		},							\
+ 		.divider = {						\
+ 			.flags = _div_flags,				\
+@@ -393,26 +394,36 @@ struct tegra_periph_init_data {
+ 	const char *dev_id;
+ };
  
- static int
--msm_ssbi_write_bytes(struct msm_ssbi *ssbi, u16 addr, u8 *buf, int len)
-+ssbi_write_bytes(struct ssbi *ssbi, u16 addr, u8 *buf, int len)
- {
- 	int ret = 0;
- 
-@@ -172,7 +172,7 @@ err:
-  * busywait.
-  */
- static inline int
--msm_ssbi_pa_transfer(struct msm_ssbi *ssbi, u32 cmd, u8 *data)
-+ssbi_pa_transfer(struct ssbi *ssbi, u32 cmd, u8 *data)
- {
- 	u32 timeout = SSBI_TIMEOUT_US;
- 	u32 rd_status = 0;
-@@ -197,7 +197,7 @@ msm_ssbi_pa_transfer(struct msm_ssbi *ssbi, u32 cmd, u8 *data)
- }
- 
- static int
--msm_ssbi_pa_read_bytes(struct msm_ssbi *ssbi, u16 addr, u8 *buf, int len)
-+ssbi_pa_read_bytes(struct ssbi *ssbi, u16 addr, u8 *buf, int len)
- {
- 	u32 cmd;
- 	int ret = 0;
-@@ -205,7 +205,7 @@ msm_ssbi_pa_read_bytes(struct msm_ssbi *ssbi, u16 addr, u8 *buf, int len)
- 	cmd = SSBI_PA_CMD_RDWRN | (addr & SSBI_PA_CMD_ADDR_MASK) << 8;
- 
- 	while (len) {
--		ret = msm_ssbi_pa_transfer(ssbi, cmd, buf);
-+		ret = ssbi_pa_transfer(ssbi, cmd, buf);
- 		if (ret)
- 			goto err;
- 		buf++;
-@@ -217,14 +217,14 @@ err:
- }
- 
- static int
--msm_ssbi_pa_write_bytes(struct msm_ssbi *ssbi, u16 addr, u8 *buf, int len)
-+ssbi_pa_write_bytes(struct ssbi *ssbi, u16 addr, u8 *buf, int len)
- {
- 	u32 cmd;
- 	int ret = 0;
- 
- 	while (len) {
- 		cmd = (addr & SSBI_PA_CMD_ADDR_MASK) << 8 | *buf;
--		ret = msm_ssbi_pa_transfer(ssbi, cmd, NULL);
-+		ret = ssbi_pa_transfer(ssbi, cmd, NULL);
- 		if (ret)
- 			goto err;
- 		buf++;
-@@ -235,9 +235,9 @@ err:
- 	return ret;
- }
- 
--int msm_ssbi_read(struct device *dev, u16 addr, u8 *buf, int len)
-+int ssbi_read(struct device *dev, u16 addr, u8 *buf, int len)
- {
--	struct msm_ssbi *ssbi = to_msm_ssbi(dev);
-+	struct ssbi *ssbi = to_ssbi(dev);
- 	unsigned long flags;
- 	int ret;
- 
-@@ -247,11 +247,11 @@ int msm_ssbi_read(struct device *dev, u16 addr, u8 *buf, int len)
- 
- 	return ret;
- }
--EXPORT_SYMBOL_GPL(msm_ssbi_read);
-+EXPORT_SYMBOL_GPL(ssbi_read);
- 
--int msm_ssbi_write(struct device *dev, u16 addr, u8 *buf, int len)
-+int ssbi_write(struct device *dev, u16 addr, u8 *buf, int len)
- {
--	struct msm_ssbi *ssbi = to_msm_ssbi(dev);
-+	struct ssbi *ssbi = to_ssbi(dev);
- 	unsigned long flags;
- 	int ret;
- 
-@@ -261,17 +261,17 @@ int msm_ssbi_write(struct device *dev, u16 addr, u8 *buf, int len)
- 
- 	return ret;
- }
--EXPORT_SYMBOL_GPL(msm_ssbi_write);
-+EXPORT_SYMBOL_GPL(ssbi_write);
- 
--static int msm_ssbi_probe(struct platform_device *pdev)
-+static int ssbi_probe(struct platform_device *pdev)
- {
- 	struct device_node *np = pdev->dev.of_node;
- 	struct resource *mem_res;
--	struct msm_ssbi *ssbi;
-+	struct ssbi *ssbi;
- 	int ret = 0;
- 	const char *type;
- 
--	ssbi = kzalloc(sizeof(struct msm_ssbi), GFP_KERNEL);
-+	ssbi = kzalloc(sizeof(struct ssbi), GFP_KERNEL);
- 	if (!ssbi) {
- 		pr_err("can not allocate ssbi_data\n");
- 		return -ENOMEM;
-@@ -312,11 +312,11 @@ static int msm_ssbi_probe(struct platform_device *pdev)
+-#define TEGRA_INIT_DATA(_name, _con_id, _dev_id, _parent_names, _offset, \
+-			_mux_shift, _mux_width, _mux_flags, _div_shift,	\
++#define TEGRA_INIT_DATA_TABLE(_name, _con_id, _dev_id, _parent_names, _offset,\
++			_mux_shift, _mux_mask, _mux_flags, _div_shift,	\
+ 			_div_width, _div_frac_width, _div_flags, _regs,	\
+-			_clk_num, _enb_refcnt, _gate_flags, _clk_id)	\
++			_clk_num, _enb_refcnt, _gate_flags, _clk_id, _table) \
+ 	{								\
+ 		.name = _name,						\
+ 		.clk_id = _clk_id,					\
+ 		.parent_names = _parent_names,				\
+ 		.num_parents = ARRAY_SIZE(_parent_names),		\
+-		.periph = TEGRA_CLK_PERIPH(_mux_shift, _mux_width,	\
++		.periph = TEGRA_CLK_PERIPH(_mux_shift, _mux_mask,	\
+ 					   _mux_flags, _div_shift,	\
+ 					   _div_width, _div_frac_width,	\
+ 					   _div_flags, _clk_num,	\
+ 					   _enb_refcnt, _regs,		\
+-					   _gate_flags),		\
++					   _gate_flags, _table),	\
+ 		.offset = _offset,					\
+ 		.con_id = _con_id,					\
+ 		.dev_id = _dev_id,					\
  	}
  
- 	if (ssbi->controller_type == MSM_SBI_CTRL_PMIC_ARBITER) {
--		ssbi->read = msm_ssbi_pa_read_bytes;
--		ssbi->write = msm_ssbi_pa_write_bytes;
-+		ssbi->read = ssbi_pa_read_bytes;
-+		ssbi->write = ssbi_pa_write_bytes;
- 	} else {
--		ssbi->read = msm_ssbi_read_bytes;
--		ssbi->write = msm_ssbi_write_bytes;
-+		ssbi->read = ssbi_read_bytes;
-+		ssbi->write = ssbi_write_bytes;
- 	}
++#define TEGRA_INIT_DATA(_name, _con_id, _dev_id, _parent_names, _offset,\
++			_mux_shift, _mux_width, _mux_flags, _div_shift,	\
++			_div_width, _div_frac_width, _div_flags, _regs,	\
++			_clk_num, _enb_refcnt, _gate_flags, _clk_id)	\
++	TEGRA_INIT_DATA_TABLE(_name, _con_id, _dev_id, _parent_names, _offset,\
++			_mux_shift, BIT(_mux_width) - 1, _mux_flags,	\
++			_div_shift, _div_width, _div_frac_width, _div_flags, \
++			_regs, _clk_num, _enb_refcnt, _gate_flags, _clk_id,\
++			NULL)
++
+ /**
+  * struct clk_super_mux - super clock
+  *
+diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
+index 9c7f580..53d39c2 100644
+--- a/include/linux/clk-private.h
++++ b/include/linux/clk-private.h
+@@ -144,12 +144,13 @@ struct clk {
  
- 	spin_lock_init(&ssbi->lock);
-@@ -336,9 +336,9 @@ err_get_mem_res:
- 	return ret;
- }
- 
--static int msm_ssbi_remove(struct platform_device *pdev)
-+static int ssbi_remove(struct platform_device *pdev)
- {
--	struct msm_ssbi *ssbi = platform_get_drvdata(pdev);
-+	struct ssbi *ssbi = platform_get_drvdata(pdev);
- 
- 	platform_set_drvdata(pdev, NULL);
- 	iounmap(ssbi->base);
-@@ -351,29 +351,29 @@ static struct of_device_id ssbi_match_table[] = {
- 	{}
+ #define DEFINE_CLK_MUX(_name, _parent_names, _parents, _flags,	\
+ 				_reg, _shift, _width,		\
+-				_mux_flags, _lock)		\
++				_mux_flags, _table, _lock)	\
+ 	static struct clk _name;				\
+ 	static struct clk_mux _name##_hw = {			\
+ 		.hw = {						\
+ 			.clk = &_name,				\
+ 		},						\
++		.table = _table,				\
+ 		.reg = _reg,					\
+ 		.shift = _shift,				\
+ 		.width = _width,				\
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 7f197d7..fc435bb 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -287,8 +287,9 @@ struct clk *clk_register_divider_table(struct device *dev, const char *name,
+ struct clk_mux {
+ 	struct clk_hw	hw;
+ 	void __iomem	*reg;
++	u32		*table;
++	u32		mask;
+ 	u8		shift;
+-	u8		width;
+ 	u8		flags;
+ 	spinlock_t	*lock;
  };
+@@ -297,11 +298,17 @@ struct clk_mux {
+ #define CLK_MUX_INDEX_BIT		BIT(1)
  
--static struct platform_driver msm_ssbi_driver = {
--	.probe		= msm_ssbi_probe,
--	.remove		= msm_ssbi_remove,
-+static struct platform_driver ssbi_driver = {
-+	.probe		= ssbi_probe,
-+	.remove		= ssbi_remove,
- 	.driver		= {
--		.name	= "msm_ssbi",
-+		.name	= "ssbi",
- 		.owner	= THIS_MODULE,
- 		.of_match_table = ssbi_match_table,
- 	},
- };
+ extern const struct clk_ops clk_mux_ops;
++
+ struct clk *clk_register_mux(struct device *dev, const char *name,
+ 		const char **parent_names, u8 num_parents, unsigned long flags,
+ 		void __iomem *reg, u8 shift, u8 width,
+ 		u8 clk_mux_flags, spinlock_t *lock);
  
--static int __init msm_ssbi_init(void)
-+static int __init ssbi_init(void)
- {
--	return platform_driver_register(&msm_ssbi_driver);
-+	return platform_driver_register(&ssbi_driver);
- }
--module_init(msm_ssbi_init);
-+module_init(ssbi_init);
- 
--static void __exit msm_ssbi_exit(void)
-+static void __exit ssbi_exit(void)
- {
--	platform_driver_unregister(&msm_ssbi_driver);
-+	platform_driver_unregister(&ssbi_driver);
- }
--module_exit(msm_ssbi_exit)
-+module_exit(ssbi_exit)
- 
- MODULE_LICENSE("GPL v2");
- MODULE_VERSION("1.0");
--MODULE_ALIAS("platform:msm_ssbi");
-+MODULE_ALIAS("platform:ssbi");
- MODULE_AUTHOR("Dima Zavin <dima@android.com>");
-diff --git a/include/linux/msm_ssbi.h b/include/linux/ssbi.h
-similarity index 67%
-rename from include/linux/msm_ssbi.h
-rename to include/linux/ssbi.h
-index 0fe245b..44ef5da 100644
---- a/include/linux/msm_ssbi.h
-+++ b/include/linux/ssbi.h
-@@ -12,27 +12,27 @@
-  * GNU General Public License for more details.
-  */
- 
--#ifndef _LINUX_MSM_SSBI_H
--#define _LINUX_MSM_SSBI_H
-+#ifndef _LINUX_SSBI_H
-+#define _LINUX_SSBI_H
- 
- #include <linux/types.h>
- 
--struct msm_ssbi_slave_info {
-+struct ssbi_slave_info {
- 	const char	*name;
- 	void		*platform_data;
- };
- 
--enum msm_ssbi_controller_type {
-+enum ssbi_controller_type {
- 	MSM_SBI_CTRL_SSBI = 0,
- 	MSM_SBI_CTRL_SSBI2,
- 	MSM_SBI_CTRL_PMIC_ARBITER,
- };
- 
--struct msm_ssbi_platform_data {
--	struct msm_ssbi_slave_info	slave;
--	enum msm_ssbi_controller_type controller_type;
-+struct ssbi_platform_data {
-+	struct ssbi_slave_info	slave;
-+	enum ssbi_controller_type controller_type;
- };
- 
--int msm_ssbi_write(struct device *dev, u16 addr, u8 *buf, int len);
--int msm_ssbi_read(struct device *dev, u16 addr, u8 *buf, int len);
-+int ssbi_write(struct device *dev, u16 addr, u8 *buf, int len);
-+int ssbi_read(struct device *dev, u16 addr, u8 *buf, int len);
- #endif
++struct clk *clk_register_mux_table(struct device *dev, const char *name,
++		const char **parent_names, u8 num_parents, unsigned long flags,
++		void __iomem *reg, u8 shift, u32 mask,
++		u8 clk_mux_flags, u32 *table, spinlock_t *lock);
++
+ /**
+  * struct clk_fixed_factor - fixed multiplier and divider clock
+  *
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+1.7.10.4
