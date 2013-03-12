@@ -1,256 +1,42 @@
-From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Tue, 12 Mar 2013 20:26:05 +0100
-Subject: [RESEND PATCH 4/4] clk: ux500: Support is_prepared callback for
- clk-prcmu
-In-Reply-To: <1363116365-3960-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1363116365-3960-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <1363116365-3960-5-git-send-email-ulf.hansson@stericsson.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 12 Mar 2013 20:27:02 +0100
+Subject: [PATCH] irqchip: Add support for ARMv7-M's NVIC
+In-Reply-To: <20130312160101.GW4977@n2100.arm.linux.org.uk>
+References: <1363103673-24720-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20130312160101.GW4977@n2100.arm.linux.org.uk>
+Message-ID: <20130312192702.GQ15375@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulf Hansson <ulf.hansson@linaro.org>
+On Tue, Mar 12, 2013 at 04:01:01PM +0000, Russell King - ARM Linux wrote:
+> On Tue, Mar 12, 2013 at 04:54:33PM +0100, Uwe Kleine-K?nig wrote:
+> > +#include <asm/irq.h>
+> > +#include <asm/io.h>
+> 
+> linux/io.h
+> 
+> > +	unsigned int irqs, i, irq_base;
+> > +
+> > +	irq_base = irq_alloc_descs(-1, 16, irqs - 16, numa_node_id());
+> > +	if (IS_ERR_VALUE(irq_base)) {
+> 
+> Erm... irq_alloc_descs() returns a negative number on error.
+> 
+> 	if ((int)irq_base < 0)
+> 
+> or make irq_base an int, and use:
+> 
+> 	if (irq_base < 0)
+Just for me: So the check using IS_ERR_VALUE is as wrong as the other
+occurences in arch/arm that you just kicked out or is it just ugly?
 
-To be able to gate unused prcmu clocks from the clk_disable_unused sequence,
-clk-prcmu now implements the is_prepared callback.
+I thought about it and went the "make irq_base int" route (and even
+fixed the asm includes) even before I sent my patch. Just failed to pass
+the right hash to format-patch after rebasing :-|
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- drivers/clk/ux500/clk-prcmu.c |  134 ++++++++++++++++++++++++-----------------
- 1 file changed, 80 insertions(+), 54 deletions(-)
+Best regards
+Uwe
 
-diff --git a/drivers/clk/ux500/clk-prcmu.c b/drivers/clk/ux500/clk-prcmu.c
-index 74faa7e..9d83256 100644
---- a/drivers/clk/ux500/clk-prcmu.c
-+++ b/drivers/clk/ux500/clk-prcmu.c
-@@ -20,15 +20,23 @@
- struct clk_prcmu {
- 	struct clk_hw hw;
- 	u8 cg_sel;
-+	int is_prepared;
- 	int is_enabled;
-+	int opp_requested;
- };
- 
- /* PRCMU clock operations. */
- 
- static int clk_prcmu_prepare(struct clk_hw *hw)
- {
-+	int ret;
- 	struct clk_prcmu *clk = to_clk_prcmu(hw);
--	return prcmu_request_clock(clk->cg_sel, true);
-+
-+	ret = prcmu_request_clock(clk->cg_sel, true);
-+	if (!ret)
-+		clk->is_prepared = 1;
-+
-+	return ret;;
- }
- 
- static void clk_prcmu_unprepare(struct clk_hw *hw)
-@@ -37,6 +45,14 @@ static void clk_prcmu_unprepare(struct clk_hw *hw)
- 	if (prcmu_request_clock(clk->cg_sel, false))
- 		pr_err("clk_prcmu: %s failed to disable %s.\n", __func__,
- 			hw->init->name);
-+	else
-+		clk->is_prepared = 0;
-+}
-+
-+static int clk_prcmu_is_prepared(struct clk_hw *hw)
-+{
-+	struct clk_prcmu *clk = to_clk_prcmu(hw);
-+	return clk->is_prepared;
- }
- 
- static int clk_prcmu_enable(struct clk_hw *hw)
-@@ -79,58 +95,52 @@ static int clk_prcmu_set_rate(struct clk_hw *hw, unsigned long rate,
- 	return prcmu_set_clock_rate(clk->cg_sel, rate);
- }
- 
--static int request_ape_opp100(bool enable)
--{
--	static int reqs;
--	int err = 0;
--
--	if (enable) {
--		if (!reqs)
--			err = prcmu_qos_add_requirement(PRCMU_QOS_APE_OPP,
--							"clock", 100);
--		if (!err)
--			reqs++;
--	} else {
--		reqs--;
--		if (!reqs)
--			prcmu_qos_remove_requirement(PRCMU_QOS_APE_OPP,
--						"clock");
--	}
--	return err;
--}
--
- static int clk_prcmu_opp_prepare(struct clk_hw *hw)
- {
- 	int err;
- 	struct clk_prcmu *clk = to_clk_prcmu(hw);
- 
--	err = request_ape_opp100(true);
--	if (err) {
--		pr_err("clk_prcmu: %s failed to request APE OPP100 for %s.\n",
--			__func__, hw->init->name);
--		return err;
-+	if (!clk->opp_requested) {
-+		err = prcmu_qos_add_requirement(PRCMU_QOS_APE_OPP,
-+						(char *)__clk_get_name(hw->clk),
-+						100);
-+		if (err) {
-+			pr_err("clk_prcmu: %s fail req APE OPP for %s.\n",
-+				__func__, hw->init->name);
-+			return err;
-+		}
-+		clk->opp_requested = 1;
- 	}
- 
- 	err = prcmu_request_clock(clk->cg_sel, true);
--	if (err)
--		request_ape_opp100(false);
-+	if (err) {
-+		prcmu_qos_remove_requirement(PRCMU_QOS_APE_OPP,
-+					(char *)__clk_get_name(hw->clk));
-+		clk->opp_requested = 0;
-+		return err;
-+	}
- 
--	return err;
-+	clk->is_prepared = 1;
-+	return 0;
- }
- 
- static void clk_prcmu_opp_unprepare(struct clk_hw *hw)
- {
- 	struct clk_prcmu *clk = to_clk_prcmu(hw);
- 
--	if (prcmu_request_clock(clk->cg_sel, false))
--		goto out_error;
--	if (request_ape_opp100(false))
--		goto out_error;
--	return;
--
--out_error:
--	pr_err("clk_prcmu: %s failed to disable %s.\n", __func__,
--		hw->init->name);
-+	if (prcmu_request_clock(clk->cg_sel, false)) {
-+		pr_err("clk_prcmu: %s failed to disable %s.\n", __func__,
-+			hw->init->name);
-+		return;
-+	}
-+
-+	if (clk->opp_requested) {
-+		prcmu_qos_remove_requirement(PRCMU_QOS_APE_OPP,
-+					(char *)__clk_get_name(hw->clk));
-+		clk->opp_requested = 0;
-+	}
-+
-+	clk->is_prepared = 0;
- }
- 
- static int clk_prcmu_opp_volt_prepare(struct clk_hw *hw)
-@@ -138,38 +148,49 @@ static int clk_prcmu_opp_volt_prepare(struct clk_hw *hw)
- 	int err;
- 	struct clk_prcmu *clk = to_clk_prcmu(hw);
- 
--	err = prcmu_request_ape_opp_100_voltage(true);
--	if (err) {
--		pr_err("clk_prcmu: %s failed to request APE OPP VOLT for %s.\n",
--			__func__, hw->init->name);
--		return err;
-+	if (!clk->opp_requested) {
-+		err = prcmu_request_ape_opp_100_voltage(true);
-+		if (err) {
-+			pr_err("clk_prcmu: %s fail req APE OPP VOLT for %s.\n",
-+				__func__, hw->init->name);
-+			return err;
-+		}
-+		clk->opp_requested = 1;
- 	}
- 
- 	err = prcmu_request_clock(clk->cg_sel, true);
--	if (err)
-+	if (err) {
- 		prcmu_request_ape_opp_100_voltage(false);
-+		clk->opp_requested = 0;
-+		return err;
-+	}
- 
--	return err;
-+	clk->is_prepared = 1;
-+	return 0;
- }
- 
- static void clk_prcmu_opp_volt_unprepare(struct clk_hw *hw)
- {
- 	struct clk_prcmu *clk = to_clk_prcmu(hw);
- 
--	if (prcmu_request_clock(clk->cg_sel, false))
--		goto out_error;
--	if (prcmu_request_ape_opp_100_voltage(false))
--		goto out_error;
--	return;
--
--out_error:
--	pr_err("clk_prcmu: %s failed to disable %s.\n", __func__,
--		hw->init->name);
-+	if (prcmu_request_clock(clk->cg_sel, false)) {
-+		pr_err("clk_prcmu: %s failed to disable %s.\n", __func__,
-+			hw->init->name);
-+		return;
-+	}
-+
-+	if (clk->opp_requested) {
-+		prcmu_request_ape_opp_100_voltage(false);
-+		clk->opp_requested = 0;
-+	}
-+
-+	clk->is_prepared = 0;
- }
- 
- static struct clk_ops clk_prcmu_scalable_ops = {
- 	.prepare = clk_prcmu_prepare,
- 	.unprepare = clk_prcmu_unprepare,
-+	.is_prepared = clk_prcmu_is_prepared,
- 	.enable = clk_prcmu_enable,
- 	.disable = clk_prcmu_disable,
- 	.is_enabled = clk_prcmu_is_enabled,
-@@ -181,6 +202,7 @@ static struct clk_ops clk_prcmu_scalable_ops = {
- static struct clk_ops clk_prcmu_gate_ops = {
- 	.prepare = clk_prcmu_prepare,
- 	.unprepare = clk_prcmu_unprepare,
-+	.is_prepared = clk_prcmu_is_prepared,
- 	.enable = clk_prcmu_enable,
- 	.disable = clk_prcmu_disable,
- 	.is_enabled = clk_prcmu_is_enabled,
-@@ -202,6 +224,7 @@ static struct clk_ops clk_prcmu_rate_ops = {
- static struct clk_ops clk_prcmu_opp_gate_ops = {
- 	.prepare = clk_prcmu_opp_prepare,
- 	.unprepare = clk_prcmu_opp_unprepare,
-+	.is_prepared = clk_prcmu_is_prepared,
- 	.enable = clk_prcmu_enable,
- 	.disable = clk_prcmu_disable,
- 	.is_enabled = clk_prcmu_is_enabled,
-@@ -211,6 +234,7 @@ static struct clk_ops clk_prcmu_opp_gate_ops = {
- static struct clk_ops clk_prcmu_opp_volt_scalable_ops = {
- 	.prepare = clk_prcmu_opp_volt_prepare,
- 	.unprepare = clk_prcmu_opp_volt_unprepare,
-+	.is_prepared = clk_prcmu_is_prepared,
- 	.enable = clk_prcmu_enable,
- 	.disable = clk_prcmu_disable,
- 	.is_enabled = clk_prcmu_is_enabled,
-@@ -242,7 +266,9 @@ static struct clk *clk_reg_prcmu(const char *name,
- 	}
- 
- 	clk->cg_sel = cg_sel;
-+	clk->is_prepared = 1;
- 	clk->is_enabled = 1;
-+	clk->opp_requested = 0;
- 	/* "rate" can be used for changing the initial frequency */
- 	if (rate)
- 		prcmu_set_clock_rate(cg_sel, rate);
 -- 
-1.7.10
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
