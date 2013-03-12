@@ -1,87 +1,33 @@
-From: silviupopescu1990@gmail.com (Silviu-Mihai Popescu)
-Date: Tue, 12 Mar 2013 09:58:29 +0200
-Subject: [PATCH] mach_omap2: use PTR_RET instead of IS_ERR + PTR_ERR
-Message-ID: <1363075109-27038-1-git-send-email-silviupopescu1990@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 12 Mar 2013 16:02:07 +0800
+Subject: [RFC PATCH] ARM: bcm2835: convert to multi-platform
+In-Reply-To: <1363064399-19559-1-git-send-email-swarren@wwwdotorg.org>
+References: <1363064399-19559-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20130312080206.GI18574@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This uses PTR_RET instead of IS_ERR and PTR_ERR in order to increase
-readability.
+On Mon, Mar 11, 2013 at 10:59:59PM -0600, Stephen Warren wrote:
+> This allows BCM2835 be included in a kernel build that supports multiple
+> SoCs at once, which is useful for distro kernels.
+> 
+> This change:
+> * Moves bcm2835's debug-macro.S into ARM's include/debug/, and hooks it
+>   into the relevant menu.
+> * Moves bcm2835's Kconfig into its own directory, as seems typical for
+>   multi-platform conversions.
+> * Removes bcm2835_soc.h, and moves the content to the files where it was
+>   used; just one usage per define.
+> * Deletes some headers and Makefile.boot that aren't needed now that we
+>   support multi-platform.
+> 
+> TO DO:
+> * It'd be nice to restore uncompress.h. I need to take a look at Shawn
+>   Guo's patches related to this, and presumably rebase this on top of
+>   them.
 
-Signed-off-by: Silviu-Mihai Popescu <silviupopescu1990@gmail.com>
----
- arch/arm/mach-omap2/devices.c |    4 ++--
- arch/arm/mach-omap2/fb.c      |    5 +----
- arch/arm/mach-omap2/gpmc.c    |    2 +-
- arch/arm/mach-omap2/pmu.c     |    5 +----
- 4 files changed, 5 insertions(+), 11 deletions(-)
+You do not need to restore uncompress.h, and from what I've seen,
+with my patches in place, uncompress debug will probably just work
+on BCM2835 out of box (you need to have DEBUG_LL selected for BCM2835).
 
-diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
-index 1ec7f05..2a0816e 100644
---- a/arch/arm/mach-omap2/devices.c
-+++ b/arch/arm/mach-omap2/devices.c
-@@ -66,7 +66,7 @@ static int __init omap3_l3_init(void)
- 
- 	WARN(IS_ERR(pdev), "could not build omap_device for %s\n", oh_name);
- 
--	return IS_ERR(pdev) ? PTR_ERR(pdev) : 0;
-+	return PTR_RET(pdev);
- }
- omap_postcore_initcall(omap3_l3_init);
- 
-@@ -100,7 +100,7 @@ static int __init omap4_l3_init(void)
- 
- 	WARN(IS_ERR(pdev), "could not build omap_device for %s\n", oh_name);
- 
--	return IS_ERR(pdev) ? PTR_ERR(pdev) : 0;
-+	return PTR_RET(pdev);
- }
- omap_postcore_initcall(omap4_l3_init);
- 
-diff --git a/arch/arm/mach-omap2/fb.c b/arch/arm/mach-omap2/fb.c
-index 190ae49..2ca33cc 100644
---- a/arch/arm/mach-omap2/fb.c
-+++ b/arch/arm/mach-omap2/fb.c
-@@ -83,10 +83,7 @@ static int __init omap_init_vrfb(void)
- 	pdev = platform_device_register_resndata(NULL, "omapvrfb", -1,
- 			res, num_res, NULL, 0);
- 
--	if (IS_ERR(pdev))
--		return PTR_ERR(pdev);
--	else
--		return 0;
-+	return PTR_RET(pdev);
- }
- 
- omap_arch_initcall(omap_init_vrfb);
-diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-index 410e1ba..c665721 100644
---- a/arch/arm/mach-omap2/gpmc.c
-+++ b/arch/arm/mach-omap2/gpmc.c
-@@ -1448,7 +1448,7 @@ static int __init omap_gpmc_init(void)
- 	pdev = omap_device_build(DEVICE_NAME, -1, oh, NULL, 0);
- 	WARN(IS_ERR(pdev), "could not build omap_device for %s\n", oh_name);
- 
--	return IS_ERR(pdev) ? PTR_ERR(pdev) : 0;
-+	return PTR_RET(pdev);
- }
- omap_postcore_initcall(omap_gpmc_init);
- 
-diff --git a/arch/arm/mach-omap2/pmu.c b/arch/arm/mach-omap2/pmu.c
-index 9debf82..13ff2f5 100644
---- a/arch/arm/mach-omap2/pmu.c
-+++ b/arch/arm/mach-omap2/pmu.c
-@@ -52,10 +52,7 @@ static int __init omap2_init_pmu(unsigned oh_num, char *oh_names[])
- 	WARN(IS_ERR(omap_pmu_dev), "Can't build omap_device for %s.\n",
- 	     dev_name);
- 
--	if (IS_ERR(omap_pmu_dev))
--		return PTR_ERR(omap_pmu_dev);
--
--	return 0;
-+	return PTR_RET(omap_pmu_dev);
- }
- 
- static int __init omap_init_pmu(void)
--- 
-1.7.9.5
+Shawn
