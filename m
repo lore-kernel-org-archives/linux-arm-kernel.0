@@ -1,49 +1,464 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 12 Mar 2013 10:56:38 +0000
-Subject: [PATCH v1] ARM: keep __my_cpu_offset consistent with generic one
-In-Reply-To: <CACVXFVOhr222CVrzkVP_oLgVkdReD9BXXSBg7fmp6Wvx9_peCw@mail.gmail.com>
-References: <1362663356-21151-1-git-send-email-tom.leiming@gmail.com>
- <CACVXFVOhr222CVrzkVP_oLgVkdReD9BXXSBg7fmp6Wvx9_peCw@mail.gmail.com>
-Message-ID: <20130312105638.GQ4977@n2100.arm.linux.org.uk>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Tue, 12 Mar 2013 12:00:51 +0100
+Subject: [PATCH V3 1/2] ARM: dts: OMAP2+: Add SDMA controller bindings
+ and nodes
+In-Reply-To: <1361903244-19837-2-git-send-email-jon-hunter@ti.com>
+References: <1361903244-19837-1-git-send-email-jon-hunter@ti.com>
+ <1361903244-19837-2-git-send-email-jon-hunter@ti.com>
+Message-ID: <513F0AE3.6030408@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 12, 2013 at 10:32:21AM +0800, Ming Lei wrote:
-> On Thu, Mar 7, 2013 at 9:35 PM, Ming Lei <tom.leiming@gmail.com> wrote:
-> > Commit 14318efb(ARM: 7587/1: implement optimized percpu variable access)
-> > introduces arm's __my_cpu_offset to optimize percpu vaiable access,
-> > which really works well on hackbench, but will cause __my_cpu_offset
-> > to return garbage value before it is initialized in cpu_init() called
-> > by setup_arch, so accessing percpu variable before setup_arch may cause
-> > kernel hang. But generic __my_cpu_offset always returns zero before
-> > percpu area is brought up, and won't hang kernel.
-> >
-> > So the patch tries to clear __my_cpu_offset on boot CPU early
-> > to avoid boot hang.
-> >
-> > At least now percpu variable is accessed by lockdep before
-> > setup_arch(), and enabling CONFIG_LOCK_STAT or CONFIG_DEBUG_LOCKDEP
-> > can trigger kernel hang.
-> >
-> > Cc: Peter Zijlstra <peterz@infradead.org>
-> > Cc: Ingo Molnar <mingo@redhat.com>
-> > Cc: Rob Herring <rob.herring@calxeda.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Cc: Nicolas Pitre <nico@linaro.org>
-> > Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> > Signed-off-by: Ming Lei <tom.leiming@gmail.com>
-> > ---
-> > V1:
-> >         - documents lockdep uses percpu variable early
++ Seb G.
+
+Hi Jon,
+
+How to you plan to merge that series?
+Seb's just posted a McBSP adaptation to SDMA binding, so I'll have to
+take this one before being able to merge any other SDMA driver
+adaptation patches.
+
+I'm fine to take that one, if you are OK, to avoid merge conflict in DTS
+later.
+
+On 02/26/2013 07:27 PM, Jon Hunter wrote:
+> Add SDMA controller binding for OMAP2+ devices and populate DMA client
+> information for SPI and MMC periperhal on OMAP3+ devices. Please note
+
+typo-------------------------------^
+
+> that OMAP24xx devices do not have SPI and MMC bindings available yet and
+> so DMA client information is not populated.
 > 
-> Looks no one objects the patch, so I has submitted it into Russell's
-> patch system, and hope it can be pushed to linus tree soon and
-> make LOCK_STAT/DEBUG_LOCKDEP usable on ARMv7.
+> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+> Reviewed-by: Felipe Balbi <balbi@ti.com>
+> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> ---
+>  .../devicetree/bindings/dma/omap-sdma.txt          |   51 ++++++++++++++++++++
 
-I'm not convinced it is correct.  Is the percpu data as stored in the
-kernel image (in other words, at offset zero) supposed to be read only?
-If so, the above means that we'll be accessing that rather than the
-copy of the percpu data we should be accessing.
+That's a detail, but the bindings should be introduced along with the
+driver DT adaptation since it does represent its "interface".
 
-The percpu data areas are allocated by setup_per_cpu_areas() - that's
-where we should be initializing this, just like it's done on PowerPC.
+>  arch/arm/boot/dts/omap2.dtsi                       |   12 +++++
+>  arch/arm/boot/dts/omap3.dtsi                       |   40 +++++++++++++++
+>  arch/arm/boot/dts/omap4.dtsi                       |   41 ++++++++++++++++
+>  arch/arm/boot/dts/omap5.dtsi                       |   41 ++++++++++++++++
+>  5 files changed, 185 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/dma/omap-sdma.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/dma/omap-sdma.txt b/Documentation/devicetree/bindings/dma/omap-sdma.txt
+> new file mode 100644
+> index 0000000..22aab28
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/dma/omap-sdma.txt
+> @@ -0,0 +1,51 @@
+> +* TI OMAP SDMA controller
+> +
+> +Required properties:
+> +- compatible:		Should be set to one of the following:
+> +
+> +			ti,omap2420-sdma (omap2420)
+> +			ti,omap2430-sdma (omap2430)
+> +			ti,omap3430-sdma (omap3430)
+> +			ti,omap3630-sdma (omap3630)
+> +			ti,omap4430-sdma (omap4430 & omap4460 & omap543x)
+> +
+> +- reg: 			Contains DMA registers location and length.
+> +- interrupts: 		Contains DMA interrupt information.
+> +- #dma-cells: 		Must be 1.
+> +- #dma-channels:	Contains total number of programmable DMA channels.
+> +- #dma-requests:	Contains total number of DMA requests.
+> +
+> +Example:
+> +
+> +	sdma: dma-controller at 4A056000 {
+> +		compatible = "ti,omap-sdma";
+> +		reg = <0x4A056000 0x1000>;
+
+
+Nit: you do have several hexa values in upper case, here and in some dts
+as well.
+
+Regards,
+Benoit
+
+
+> +		interrupts = <0 12 0x4>,
+> +			     <0 13 0x4>,
+> +			     <0 14 0x4>,
+> +			     <0 15 0x4>;
+> +		#dma-cells = <1>;
+> +		#dma-channels = <32>;
+> +		#dma-requests = <127>;
+> +	};
+> +
+> +
+> +* TI OMAP SDMA clients
+> +
+> +Required properties:
+> +- dmas:			List of one or more DMA specifiers, each consisting of
+> +			- A phandle pointing to DMA controller node
+> +			- The DMA request number associated with client device
+> +- dma-names: 		Contains one identifier string for each dma specifier in
+> +			the dmas property. The specific strings that can be used
+> +			are defined in the binding of the DMA client device.
+> +
+> +Example:
+> +
+> +	mmc1: mmc at 4809c000 {
+> +		...
+> +		dmas = <&sdma 61>,	/* TX channel */
+> +		       <&sdma 62>;	/* RX channel */
+> +		dma-names = "tx", "rx";
+> +		...
+> +	};
+> diff --git a/arch/arm/boot/dts/omap2.dtsi b/arch/arm/boot/dts/omap2.dtsi
+> index 761c4b6..22dffa0 100644
+> --- a/arch/arm/boot/dts/omap2.dtsi
+> +++ b/arch/arm/boot/dts/omap2.dtsi
+> @@ -49,6 +49,18 @@
+>  			reg = <0x480FE000 0x1000>;
+>  		};
+>  
+> +		sdma: dma-controller at 48056000 {
+> +			compatible = "ti,omap2430-sdma", "ti,omap2420-sdma";
+> +			reg = <0x48056000 0x1000>;
+> +			interrupts = <12>,
+> +				     <13>,
+> +				     <14>,
+> +				     <15>;
+> +			#dma-cells = <1>;
+> +			#dma-channels = <32>;
+> +			#dma-requests = <64>;
+> +		};
+> +
+>  		uart1: serial at 4806a000 {
+>  			compatible = "ti,omap2-uart";
+>  			ti,hwmods = "uart1";
+> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+> index 1acc261..4e7acb6 100644
+> --- a/arch/arm/boot/dts/omap3.dtsi
+> +++ b/arch/arm/boot/dts/omap3.dtsi
+> @@ -75,6 +75,18 @@
+>  			reg = <0x48200000 0x1000>;
+>  		};
+>  
+> +		sdma: dma-controller at 48056000 {
+> +			compatible = "ti,omap3630-sdma", "ti,omap3430-sdma";
+> +			reg = <0x48056000 0x1000>;
+> +			interrupts = <12>,
+> +				     <13>,
+> +				     <14>,
+> +				     <15>;
+> +			#dma-cells = <1>;
+> +			#dma-channels = <32>;
+> +			#dma-requests = <96>;
+> +		};
+> +
+>  		omap3_pmx_core: pinmux at 48002030 {
+>  			compatible = "ti,omap3-padconf", "pinctrl-single";
+>  			reg = <0x48002030 0x05cc>;
+> @@ -192,6 +204,16 @@
+>  			#size-cells = <0>;
+>  			ti,hwmods = "mcspi1";
+>  			ti,spi-num-cs = <4>;
+> +			dmas = <&sdma 35>,
+> +			       <&sdma 36>,
+> +			       <&sdma 37>,
+> +			       <&sdma 38>,
+> +			       <&sdma 39>,
+> +			       <&sdma 40>,
+> +			       <&sdma 41>,
+> +			       <&sdma 42>;
+> +			dma-names = "tx0", "rx0", "tx1", "rx1",
+> +				    "tx2", "rx2", "tx3", "rx3";
+>  		};
+>  
+>  		mcspi2: spi at 4809a000 {
+> @@ -200,6 +222,11 @@
+>  			#size-cells = <0>;
+>  			ti,hwmods = "mcspi2";
+>  			ti,spi-num-cs = <2>;
+> +			dmas = <&sdma 43>,
+> +			       <&sdma 44>,
+> +			       <&sdma 45>,
+> +			       <&sdma 46>;
+> +			dma-names = "tx0", "rx0", "tx1", "rx1";
+>  		};
+>  
+>  		mcspi3: spi at 480b8000 {
+> @@ -208,6 +235,11 @@
+>  			#size-cells = <0>;
+>  			ti,hwmods = "mcspi3";
+>  			ti,spi-num-cs = <2>;
+> +			dmas = <&sdma 15>,
+> +			       <&sdma 16>,
+> +			       <&sdma 23>,
+> +			       <&sdma 24>;
+> +			dma-names = "tx0", "rx0", "tx1", "rx1";
+>  		};
+>  
+>  		mcspi4: spi at 480ba000 {
+> @@ -216,22 +248,30 @@
+>  			#size-cells = <0>;
+>  			ti,hwmods = "mcspi4";
+>  			ti,spi-num-cs = <1>;
+> +			dmas = <&sdma 70>, <&sdma 71>;
+> +			dma-names = "tx0", "rx0";
+>  		};
+>  
+>  		mmc1: mmc at 4809c000 {
+>  			compatible = "ti,omap3-hsmmc";
+>  			ti,hwmods = "mmc1";
+>  			ti,dual-volt;
+> +			dmas = <&sdma 61>, <&sdma 62>;
+> +			dma-names = "tx", "rx";
+>  		};
+>  
+>  		mmc2: mmc at 480b4000 {
+>  			compatible = "ti,omap3-hsmmc";
+>  			ti,hwmods = "mmc2";
+> +			dmas = <&sdma 47>, <&sdma 48>;
+> +			dma-names = "tx", "rx";
+>  		};
+>  
+>  		mmc3: mmc at 480ad000 {
+>  			compatible = "ti,omap3-hsmmc";
+>  			ti,hwmods = "mmc3";
+> +			dmas = <&sdma 77>, <&sdma 78>;
+> +			dma-names = "tx", "rx";
+>  		};
+>  
+>  		wdt2: wdt at 48314000 {
+> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+> index 739bb79..827f6f3 100644
+> --- a/arch/arm/boot/dts/omap4.dtsi
+> +++ b/arch/arm/boot/dts/omap4.dtsi
+> @@ -118,6 +118,18 @@
+>  			pinctrl-single,function-mask = <0x7fff>;
+>  		};
+>  
+> +		sdma: dma-controller at 4A056000 {
+> +			compatible = "ti,omap4430-sdma";
+> +			reg = <0x4A056000 0x1000>;
+> +			interrupts = <0 12 0x4>,
+> +				     <0 13 0x4>,
+> +				     <0 14 0x4>,
+> +				     <0 15 0x4>;
+> +			#dma-cells = <1>;
+> +			#dma-channels = <32>;
+> +			#dma-requests = <127>;
+> +		};
+> +
+>  		gpio1: gpio at 4a310000 {
+>  			compatible = "ti,omap4-gpio";
+>  			reg = <0x4a310000 0x200>;
+> @@ -260,6 +272,16 @@
+>  			#size-cells = <0>;
+>  			ti,hwmods = "mcspi1";
+>  			ti,spi-num-cs = <4>;
+> +			dmas = <&sdma 35>,
+> +			       <&sdma 36>,
+> +			       <&sdma 37>,
+> +			       <&sdma 38>,
+> +			       <&sdma 39>,
+> +			       <&sdma 40>,
+> +			       <&sdma 41>,
+> +			       <&sdma 42>;
+> +			dma-names = "tx0", "rx0", "tx1", "rx1",
+> +				    "tx2", "rx2", "tx3", "rx3";
+>  		};
+>  
+>  		mcspi2: spi at 4809a000 {
+> @@ -270,6 +292,11 @@
+>  			#size-cells = <0>;
+>  			ti,hwmods = "mcspi2";
+>  			ti,spi-num-cs = <2>;
+> +			dmas = <&sdma 43>,
+> +			       <&sdma 44>,
+> +			       <&sdma 45>,
+> +			       <&sdma 46>;
+> +			dma-names = "tx0", "rx0", "tx1", "rx1";
+>  		};
+>  
+>  		mcspi3: spi at 480b8000 {
+> @@ -280,6 +307,8 @@
+>  			#size-cells = <0>;
+>  			ti,hwmods = "mcspi3";
+>  			ti,spi-num-cs = <2>;
+> +			dmas = <&sdma 15>, <&sdma 16>;
+> +			dma-names = "tx0", "rx0";
+>  		};
+>  
+>  		mcspi4: spi at 480ba000 {
+> @@ -290,6 +319,8 @@
+>  			#size-cells = <0>;
+>  			ti,hwmods = "mcspi4";
+>  			ti,spi-num-cs = <1>;
+> +			dmas = <&sdma 70>, <&sdma 71>;
+> +			dma-names = "tx0", "rx0";
+>  		};
+>  
+>  		mmc1: mmc at 4809c000 {
+> @@ -299,6 +330,8 @@
+>  			ti,hwmods = "mmc1";
+>  			ti,dual-volt;
+>  			ti,needs-special-reset;
+> +			dmas = <&sdma 61>, <&sdma 62>;
+> +			dma-names = "tx", "rx";
+>  		};
+>  
+>  		mmc2: mmc at 480b4000 {
+> @@ -307,6 +340,8 @@
+>  			interrupts = <0 86 0x4>;
+>  			ti,hwmods = "mmc2";
+>  			ti,needs-special-reset;
+> +			dmas = <&sdma 47>, <&sdma 48>;
+> +			dma-names = "tx", "rx";
+>  		};
+>  
+>  		mmc3: mmc at 480ad000 {
+> @@ -315,6 +350,8 @@
+>  			interrupts = <0 94 0x4>;
+>  			ti,hwmods = "mmc3";
+>  			ti,needs-special-reset;
+> +			dmas = <&sdma 77>, <&sdma 78>;
+> +			dma-names = "tx", "rx";
+>  		};
+>  
+>  		mmc4: mmc at 480d1000 {
+> @@ -323,6 +360,8 @@
+>  			interrupts = <0 96 0x4>;
+>  			ti,hwmods = "mmc4";
+>  			ti,needs-special-reset;
+> +			dmas = <&sdma 57>, <&sdma 58>;
+> +			dma-names = "tx", "rx";
+>  		};
+>  
+>  		mmc5: mmc at 480d5000 {
+> @@ -331,6 +370,8 @@
+>  			interrupts = <0 59 0x4>;
+>  			ti,hwmods = "mmc5";
+>  			ti,needs-special-reset;
+> +			dmas = <&sdma 59>, <&sdma 60>;
+> +			dma-names = "tx", "rx";
+>  		};
+>  
+>  		wdt2: wdt at 4a314000 {
+> diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+> index 9e182a9..06d21d6 100644
+> --- a/arch/arm/boot/dts/omap5.dtsi
+> +++ b/arch/arm/boot/dts/omap5.dtsi
+> @@ -108,6 +108,18 @@
+>  			      <0x48212000 0x1000>;
+>  		};
+>  
+> +		sdma: dma-controller at 4A056000 {
+> +			compatible = "ti,omap4430-sdma";
+> +			reg = <0x4A056000 0x1000>;
+> +			interrupts = <0 12 0x4>,
+> +				     <0 13 0x4>,
+> +				     <0 14 0x4>,
+> +				     <0 15 0x4>;
+> +			#dma-cells = <1>;
+> +			#dma-channels = <32>;
+> +			#dma-requests = <127>;
+> +		};
+> +
+>  		gpio1: gpio at 4ae10000 {
+>  			compatible = "ti,omap4-gpio";
+>  			reg = <0x4ae10000 0x200>;
+> @@ -249,6 +261,16 @@
+>  			#size-cells = <0>;
+>  			ti,hwmods = "mcspi1";
+>  			ti,spi-num-cs = <4>;
+> +			dmas = <&sdma 35>,
+> +			       <&sdma 36>,
+> +			       <&sdma 37>,
+> +			       <&sdma 38>,
+> +			       <&sdma 39>,
+> +			       <&sdma 40>,
+> +			       <&sdma 41>,
+> +			       <&sdma 42>;
+> +			dma-names = "tx0", "rx0", "tx1", "rx1",
+> +				    "tx2", "rx2", "tx3", "rx3";
+>  		};
+>  
+>  		mcspi2: spi at 4809a000 {
+> @@ -259,6 +281,11 @@
+>  			#size-cells = <0>;
+>  			ti,hwmods = "mcspi2";
+>  			ti,spi-num-cs = <2>;
+> +			dmas = <&sdma 43>,
+> +			       <&sdma 44>,
+> +			       <&sdma 45>,
+> +			       <&sdma 46>;
+> +			dma-names = "tx0", "rx0", "tx1", "rx1";
+>  		};
+>  
+>  		mcspi3: spi at 480b8000 {
+> @@ -269,6 +296,8 @@
+>  			#size-cells = <0>;
+>  			ti,hwmods = "mcspi3";
+>  			ti,spi-num-cs = <2>;
+> +			dmas = <&sdma 15>, <&sdma 16>;
+> +			dma-names = "tx0", "rx0";
+>  		};
+>  
+>  		mcspi4: spi at 480ba000 {
+> @@ -279,6 +308,8 @@
+>  			#size-cells = <0>;
+>  			ti,hwmods = "mcspi4";
+>  			ti,spi-num-cs = <1>;
+> +			dmas = <&sdma 70>, <&sdma 71>;
+> +			dma-names = "tx0", "rx0";
+>  		};
+>  
+>  		uart1: serial at 4806a000 {
+> @@ -336,6 +367,8 @@
+>  			ti,hwmods = "mmc1";
+>  			ti,dual-volt;
+>  			ti,needs-special-reset;
+> +			dmas = <&sdma 61>, <&sdma 62>;
+> +			dma-names = "tx", "rx";
+>  		};
+>  
+>  		mmc2: mmc at 480b4000 {
+> @@ -344,6 +377,8 @@
+>  			interrupts = <0 86 0x4>;
+>  			ti,hwmods = "mmc2";
+>  			ti,needs-special-reset;
+> +			dmas = <&sdma 47>, <&sdma 48>;
+> +			dma-names = "tx", "rx";
+>  		};
+>  
+>  		mmc3: mmc at 480ad000 {
+> @@ -352,6 +387,8 @@
+>  			interrupts = <0 94 0x4>;
+>  			ti,hwmods = "mmc3";
+>  			ti,needs-special-reset;
+> +			dmas = <&sdma 77>, <&sdma 78>;
+> +			dma-names = "tx", "rx";
+>  		};
+>  
+>  		mmc4: mmc at 480d1000 {
+> @@ -360,6 +397,8 @@
+>  			interrupts = <0 96 0x4>;
+>  			ti,hwmods = "mmc4";
+>  			ti,needs-special-reset;
+> +			dmas = <&sdma 57>, <&sdma 58>;
+> +			dma-names = "tx", "rx";
+>  		};
+>  
+>  		mmc5: mmc at 480d5000 {
+> @@ -368,6 +407,8 @@
+>  			interrupts = <0 59 0x4>;
+>  			ti,hwmods = "mmc5";
+>  			ti,needs-special-reset;
+> +			dmas = <&sdma 59>, <&sdma 60>;
+> +			dma-names = "tx", "rx";
+>  		};
+>  
+>  		keypad: keypad at 4ae1c000 {
+> 
