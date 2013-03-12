@@ -1,34 +1,22 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 12 Mar 2013 19:00:19 +0000
-Subject: [PATCH v2 08/14] clk: hs: add clock support
-In-Reply-To: <1363108124-17484-9-git-send-email-haojian.zhuang@linaro.org>
-References: <1363108124-17484-1-git-send-email-haojian.zhuang@linaro.org>
- <1363108124-17484-9-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <201303121900.19441.arnd@arndb.de>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Tue, 12 Mar 2013 21:00:30 +0200
+Subject: OMAP baseline test results for v3.9-rc1
+In-Reply-To: <alpine.DEB.2.00.1303121634080.2723@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1303121634080.2723@utopia.booyaka.com>
+Message-ID: <20130312190030.GB8798@blackmetal.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 12 March 2013, Haojian Zhuang wrote:
-> +void __init hs_init_clocks(void)
-> +{
-> +       struct device_node *node;
-> +
-> +       /* map pmctrl registers */
-> +       node = of_find_compatible_node(NULL, NULL, "hisilicon,pmctrl");
-> +       hs_clk.pmctrl = of_iomap(node, 0);
-> +       WARN_ON(!hs_clk.pmctrl);
-> +
-> +       node = of_find_compatible_node(NULL, NULL, "hisilicon,sctrl");
-> +       hs_clk.sctrl = of_iomap(node, 0);
-> +
-> +       of_clk_init(hs_clk_match);
-> +}
+Hi,
 
-You should be able to just use CLK_OF_DECLARE() with each member of
-hs_clk_match[] now and call of_clk_init(NULL) from platform code.
+On Tue, Mar 12, 2013 at 04:40:19PM +0000, Paul Walmsley wrote:
+> * 2420N800: powers down 30 seconds after boot
+>   - Presumably due to missing CBUS patches for watchdog control
+>   - http://lkml.org/lkml/2012/9/3/265
+>   - http://marc.info/?l=linux-omap&m=135274739624125&w=2
+>   - http://marc.info/?l=linux-omap&m=135664195831104&w=2
+>   - Should be working in v3.9-rc1 when CONFIG_RETU_WATCHDOG=y ?
 
-This requires moving the of_iomap() calls somewhere else, but it
-could be a function that gets called by whichever setup function
-gets run first.
+Yes, you need also CONFIG_I2C_CBUS_GPIO and CONFIG_MFD_RETU.
 
-	Arnd
+A.
