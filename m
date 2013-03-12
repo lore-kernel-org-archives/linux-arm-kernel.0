@@ -1,100 +1,70 @@
 From: marvin24@gmx.de (Marc Dietrich)
-Date: Tue, 12 Mar 2013 11:35:43 +0100
-Subject: [PATCH V2 3/9] ARM: dt: tegra: add bindings of power management
- configurations for PMC
-In-Reply-To: <1363060962-9172-1-git-send-email-josephl@nvidia.com>
-References: <1363060962-9172-1-git-send-email-josephl@nvidia.com>
-Message-ID: <1715411.W3GXSOcQoS@fb07-iapwap2.physik.uni-giessen.de>
+Date: Tue, 12 Mar 2013 11:43:17 +0100
+Subject: [PATCH V2 9/9] ARM: dts: tegra: add the PM configurations of PMC
+In-Reply-To: <1363061043-9680-1-git-send-email-josephl@nvidia.com>
+References: <1363061043-9680-1-git-send-email-josephl@nvidia.com>
+Message-ID: <97395805.p014F9TUYL@fb07-iapwap2.physik.uni-giessen.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joseph,
+Joseph,
 
-Am Dienstag, 12. M?rz 2013, 12:02:42 schrieb Joseph Lo:
-> The PMC mostly controls the entry and exit of the system from different
-> sleep modes. Different platform or system may have different configurations.
-> The power management configurations of PMC is represented as some
-> properties. The system needs to define the properties when the system
-> supports deep sleep mode (i.e. suspend).
+Am Dienstag, 12. M?rz 2013, 12:04:03 schrieb Joseph Lo:
+> Adding the PM configuration of PMC when the platform support suspend
+> function.
 > 
 > Signed-off-by: Joseph Lo <josephl@nvidia.com>
 > ---
 > V2:
-> * squash the patches that defined the PM bindings for PMC and the
->   implementation
-> * replace the "unsigned long" with "u32" for the variables that are parsed
->   from DT
+> * no change
 > ---
->  .../bindings/arm/tegra/nvidia,tegra20-pmc.txt      | 42 ++++++++++-
->  arch/arm/mach-tegra/pmc.c                          | 83
-> ++++++++++++++++++++++ arch/arm/mach-tegra/pmc.h                          |
->  8 +++
->  3 files changed, 132 insertions(+), 1 deletion(-)
+>  arch/arm/boot/dts/tegra20-harmony.dts   | 6 ++++++
+>  arch/arm/boot/dts/tegra20-paz00.dts     | 7 +++++++
+>  arch/arm/boot/dts/tegra20-seaboard.dts  | 6 ++++++
+>  arch/arm/boot/dts/tegra20-trimslice.dts | 9 +++++++++
+>  arch/arm/boot/dts/tegra20-ventana.dts   | 6 ++++++
+>  arch/arm/boot/dts/tegra20-whistler.dts  | 8 ++++++++
+>  arch/arm/boot/dts/tegra30-beaver.dts    | 7 +++++++
+>  arch/arm/boot/dts/tegra30-cardhu.dtsi   | 7 +++++++
+>  8 files changed, 56 insertions(+)
 > 
-> diff --git
-> a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
-> b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt index
-> b5846e2..12a436e 100644
-> --- a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
-> +++ b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
-> @@ -1,14 +1,46 @@
->  NVIDIA Tegra Power Management Controller (PMC)
+> [...]
+>
+> diff --git a/arch/arm/boot/dts/tegra20-paz00.dts
+> b/arch/arm/boot/dts/tegra20-paz00.dts index 41e82e3..cd8e798 100644
+> --- a/arch/arm/boot/dts/tegra20-paz00.dts
+> +++ b/arch/arm/boot/dts/tegra20-paz00.dts
+> @@ -415,6 +415,13 @@
 > 
-> -Properties:
-> +The PMC block interacts with an external Power Management Unit. The PMC
-> +mostly controls the entry and exit of the system from different sleep
-> +modes. It provides power-gating controllers for SoC and CPU power-islands.
-> +
-> +Required properties:
->  - name : Should be pmc
->  - compatible : Should contain "nvidia,tegra<chip>-pmc".
->  - reg : Offset and length of the register set for the device
-> +
-> +Optional properties:
->  - nvidia,invert-interrupt : If present, inverts the PMU interrupt signal.
->    The PMU is an external Power Management Unit, whose interrupt output
->    signal is fed into the PMC. This signal is optionally inverted, and then
->    fed into the ARM GIC. The PMC is not involved in the detection or
->    handling of this interrupt signal, merely its inversion.
-> +- nvidia,suspend-mode : The suspend mode that the platform should use.
-> +  Valid valuse are 0, 1 and 2:
-> +  0 (LP0): CPU + Core voltage off and DRAM in self-refresh
-> +  1 (LP1): CPU vlotage off and DRAM in self-refresh
-> +  2 (LP2): CPU voltage off
-> +- nvidia,core-power-req-active-high : Boolean, core power request
-> active-high +- nvidia,sys-clock-req-active-high : Boolean, system clock
-> request active-high +- nvidia,combined-power-req : Boolean, combined power
-> request for CPU & Core +- nvidia,cpu-pwr-good-en : Boolean, CPU power good
-> signal (from PMIC to PMC) +			   is enabled.
-> +
-> +Required properties when nvidia,suspend-mode is specified:
-> +- nvidia,cpu-pwr-good-time : CPU power good time in uS.
-> +- nvidia,cpu-pwr-off-time : CPU power off time in uS.
-> +- nvidia,core-pwr-good-time : <Oscillator-stable-time Power-stable-time>
-> +			      Core power good time in uS.
-> +- nvidia,core-pwr-off-time : Core power off time in uS.
-> +
-> +Required properties when nvidia,suspend-mode=<0>:
-> +- nvidia,lp0-vec : <start length> Starting address and length of LP0 vector
-> +  The LP0 vector contains the warm boot code that is executed by AVP when
-> +  resuming from the LP0 state. The AVP (Audio-Video Processor) is an ARM7
-> +  processor and always being the first boot processor when chip is power
-> on +  or resume from deep sleep mode. When the system is resumed from the
-> deep +  sleep mode, the warm boot code will restore some PLLs, clocks and
-> then +  bring up CPU0 for resuming the system.
-> 
->  Example:
-> 
-> @@ -16,4 +48,12 @@ pmc at 7000f400 {
->  	compatible = "nvidia,tegra20-pmc";
->  	reg = <0x7000e400 0x400>;
->  	nvidia,invert-interrupt;
-> +	nvidia,suspend-mode = <1>;
-> +	nvidia,cpu-pwr-good-time = <2000>;
-> +	nvidia,cpu-pwr-off-time = <100>;
-> +	nvidia,core-pwr-good-ticks = <3845 3845>;
-> +	nvidia,core-pwr-off-ticks = <458>;
+>  	pmc {
+>  		nvidia,invert-interrupt;
+> +		nvidia,suspend-mode = <2>;
+> +		nvidia,cpu-pwr-good-time = <5000>;
 
-s/ticks/time/
+should be 2000
+
+> +		nvidia,cpu-pwr-off-time = <5000>;
+
+should be 0
+
+> +		nvidia,core-pwr-good-time = <3845 3845>;
+
+mmh, no idea here. original source [1] shows 0x7e7e ticks which translates to 
+1 sec?
+
+> +		nvidia,core-pwr-off-time = <3875>;
+
+should be 0
+
+> +		nvidia,sys-clock-req-active-high;
+> +		nvidia,combined-power-req;
+
+paz00 has no combined power req.
+
+>  	};
+> 
+>  	usb at c5000000 {
+
+[1]: http://gitorious.org/ac100/kernel/blobs/2.6.32/arch/arm/mach-tegra/odm_kit/query/paz00/nvodm_query.c#line649
 
 Marc
