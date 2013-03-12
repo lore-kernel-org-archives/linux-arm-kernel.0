@@ -1,30 +1,24 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 12 Mar 2013 07:43:58 -0500
-Subject: [PATCH 0/3] ARM sched_clock selection enhancements
-In-Reply-To: <20130312092358.GP4977@n2100.arm.linux.org.uk>
-References: <1363055197-17296-1-git-send-email-robherring2@gmail.com>
- <20130312092358.GP4977@n2100.arm.linux.org.uk>
-Message-ID: <513F230E.1030307@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 12 Mar 2013 12:48:24 +0000
+Subject: linux-next: manual merge of the akpm tree with the arm-soc tree
+In-Reply-To: <20130312115339.GF12700@titan.lakedaemon.net>
+References: <20130312144714.39749c5b0bd1aea14c4d2ff8@canb.auug.org.au>
+ <CAOesGMgSzn+uCVEMKZgtorcNkdzzvntmnfoej5vN-AjF43pnyQ@mail.gmail.com>
+ <20130312115339.GF12700@titan.lakedaemon.net>
+Message-ID: <201303121248.24736.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/12/2013 04:23 AM, Russell King - ARM Linux wrote:
-> On Mon, Mar 11, 2013 at 09:26:34PM -0500, Rob Herring wrote:
->> In preparation to move more timer initialization to use CLKSRC_OF and
->> out of the platforms, a way to select the timer used for sched_clock is
->> needed. This series makes the ARM sched_clock support code prefer 64-bit
->> counters or higher frequency counters. This is sufficient at least on
->> ARM Ltd boards to use the 24MHz counter rather than sp804 and to always
->> use the 64-bit architected timer when present. This mechanism can be
->> extended to DT properties if needed for any non-discoverable h/w feature.
-> 
-> No - this stuff is designed specifically to cope with the dilemas of
-> less-than-64-bit sched_clock sources.  If you have 64-bit sources, then
-> that should be dealt with differently - this code will break with 64-bit
-> sources due to the multiplication and shift losing the high order bits.
+On Tuesday 12 March 2013, Jason Cooper wrote:
+> I chose to keep them together to maintain bisectability.  Either you
+> have all of the fix (you landed on this branch), or you don't.  Was this
+> the correct decision in this case, or did I miss something?
 
-It is dealt with differently. In the 64-bit case, there is only a
-multiply and all the code to deal with wrapping of 32-bit counters is
-skipped. It is exactly the same conversion as arm64.
+I think you don't need to worry about bisection in this case, especially
+as you mentioned that 3.8 is already broken.
 
-Rob
+>From all I can tell, these are four separate fixes, and you want to have
+all of them get merged, but applying just one of them will not make the
+state of the kernel tree any worse than what it is before the patches.
+
+	Arnd
