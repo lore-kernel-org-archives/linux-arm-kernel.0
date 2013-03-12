@@ -1,35 +1,85 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Mon, 11 Mar 2013 23:51:08 -0700
-Subject: [PATCH 1/6] platform-drivers: msm: add single-wire serial bus
- interface (SSBI) driver
-In-Reply-To: <20130307013008.GA2910@kroah.com> (Greg Kroah-Hartman's message
- of "Thu, 7 Mar 2013 09:30:08 +0800")
-References: <1362616187-21089-1-git-send-email-davidb@codeaurora.org>
- <1362616187-21089-2-git-send-email-davidb@codeaurora.org>
- <20130307013008.GA2910@kroah.com>
-Message-ID: <8yamwu9nmar.fsf@huya.qualcomm.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 12 Mar 2013 12:23:03 +0530
+Subject: [PATCH v9 5/9] dmaengine: edma: Add TI EDMA device tree binding
+In-Reply-To: <1362586540-10393-6-git-send-email-mporter@ti.com>
+References: <1362586540-10393-1-git-send-email-mporter@ti.com>
+ <1362586540-10393-6-git-send-email-mporter@ti.com>
+Message-ID: <513ED0CF.6070302@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greg Kroah-Hartman <gregkh@linuxfoundation.org> writes:
+On 3/6/2013 9:45 PM, Matt Porter wrote:
+> The binding definition is based on the generic DMA controller
+> binding.
+> 
+> Signed-off-by: Matt Porter <mporter@ti.com>
 
->> +static int ssbi_wait_mask(struct msm_ssbi *ssbi, u32 set_mask, u32 clr_mask)
->> +{
->> +	u32 timeout = SSBI_TIMEOUT_US;
->> +	u32 val;
->> +
->> +	while (timeout--) {
->> +		val = ssbi_readl(ssbi, SSBI2_STATUS);
->> +		if (((val & set_mask) == set_mask) && ((val & clr_mask) == 0))
->> +			return 0;
->> +		udelay(1);
->
-> Busy loop?  Really?
+Okay the bindings the documented after they are used leading to some
+confusion. This patch should be moved up the series. As I noted in my
+other e-mail, some of these bindings are not really hardware description
+and need to be re-looked.
 
-Finally was able to dig up some of the reason for this.  The
-transactions typically take about 5us.  In the case of contention with
-another CPU, it could take as much as 20us.
+Thanks,
+Sekhar
 
-Would it be sufficient to just explain this in a comment?
-
-David
+> ---
+>  Documentation/devicetree/bindings/dma/ti-edma.txt |   49 +++++++++++++++++++++
+>  1 file changed, 49 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/dma/ti-edma.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/dma/ti-edma.txt b/Documentation/devicetree/bindings/dma/ti-edma.txt
+> new file mode 100644
+> index 0000000..075a60e3
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/dma/ti-edma.txt
+> @@ -0,0 +1,49 @@
+> +TI EDMA
+> +
+> +Required properties:
+> +- compatible : "ti,edma3"
+> +- ti,hwmods: Name of the hwmods associated to the EDMA
+> +- ti,edma-regions: Number of regions
+> +- ti,edma-slots: Number of slots
+> +- ti,edma-queue-tc-map: List of transfer control to queue mappings
+> +- ti,edma-queue-priority-map: List of queue priority mappings
+> +- ti,edma-default-queue: Default queue value
+> +
+> +Optional properties:
+> +- ti,edma-reserved-channels: List of reserved channel regions
+> +- ti,edma-reserved-slots: List of reserved slot regions
+> +- ti,edma-xbar-event-map: Crossbar event to channel map
+> +
+> +Example:
+> +
+> +edma: edma at 49000000 {
+> +	reg = <0x49000000 0x10000>;
+> +	interrupt-parent = <&intc>;
+> +	interrupts = <12 13 14>;
+> +	compatible = "ti,edma3";
+> +	ti,hwmods = "tpcc", "tptc0", "tptc1", "tptc2";
+> +	#dma-cells = <1>;
+> +	dma-channels = <64>;
+> +	ti,edma-regions = <4>;
+> +	ti,edma-slots = <256>;
+> +	ti,edma-reserved-channels = <0  2
+> +				     14 2
+> +				     26 6
+> +				     48 4
+> +				     56 8>;
+> +	ti,edma-reserved-slots = <0  2
+> +				  14 2
+> +				  26 6
+> +				  48 4
+> +				  56 8
+> +				  64 127>;
+> +	ti,edma-queue-tc-map = <0 0
+> +				1 1
+> +				2 2>;
+> +	ti,edma-queue-priority-map = <0 0
+> +				      1 1
+> +				      2 2>;
+> +	ti,edma-default-queue = <0>;
+> +	ti,edma-xbar-event-map = <1 12
+> +				  2 13>;
+> +};
+> 
