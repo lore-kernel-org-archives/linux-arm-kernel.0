@@ -1,84 +1,49 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Tue, 12 Mar 2013 11:50:34 +0100
-Subject: [PATCH 3/4] clk: samsung: always allocate the clk_table
-In-Reply-To: <CAJuYYwT183EcZZ20P8D7AP34CwXfKYLzsmZdoJz1ny7XznzyAg@mail.gmail.com>
-References: <201303120042.09633.heiko@sntech.de>
- <201303120044.29499.heiko@sntech.de>
- <CAJuYYwT183EcZZ20P8D7AP34CwXfKYLzsmZdoJz1ny7XznzyAg@mail.gmail.com>
-Message-ID: <201303121150.35223.heiko@sntech.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 12 Mar 2013 10:56:38 +0000
+Subject: [PATCH v1] ARM: keep __my_cpu_offset consistent with generic one
+In-Reply-To: <CACVXFVOhr222CVrzkVP_oLgVkdReD9BXXSBg7fmp6Wvx9_peCw@mail.gmail.com>
+References: <1362663356-21151-1-git-send-email-tom.leiming@gmail.com>
+ <CACVXFVOhr222CVrzkVP_oLgVkdReD9BXXSBg7fmp6Wvx9_peCw@mail.gmail.com>
+Message-ID: <20130312105638.GQ4977@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 12. M?rz 2013, 10:54:47 schrieb Thomas Abraham:
-> On 12 March 2013 05:14, Heiko St?bner <heiko@sntech.de> wrote:
-> > This is needed to allow looking up previous created clocks when
-> > adding separate aliases to them.
-> > 
-> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+On Tue, Mar 12, 2013 at 10:32:21AM +0800, Ming Lei wrote:
+> On Thu, Mar 7, 2013 at 9:35 PM, Ming Lei <tom.leiming@gmail.com> wrote:
+> > Commit 14318efb(ARM: 7587/1: implement optimized percpu variable access)
+> > introduces arm's __my_cpu_offset to optimize percpu vaiable access,
+> > which really works well on hackbench, but will cause __my_cpu_offset
+> > to return garbage value before it is initialized in cpu_init() called
+> > by setup_arch, so accessing percpu variable before setup_arch may cause
+> > kernel hang. But generic __my_cpu_offset always returns zero before
+> > percpu area is brought up, and won't hang kernel.
+> >
+> > So the patch tries to clear __my_cpu_offset on boot CPU early
+> > to avoid boot hang.
+> >
+> > At least now percpu variable is accessed by lockdep before
+> > setup_arch(), and enabling CONFIG_LOCK_STAT or CONFIG_DEBUG_LOCKDEP
+> > can trigger kernel hang.
+> >
+> > Cc: Peter Zijlstra <peterz@infradead.org>
+> > Cc: Ingo Molnar <mingo@redhat.com>
+> > Cc: Rob Herring <rob.herring@calxeda.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Cc: Nicolas Pitre <nico@linaro.org>
+> > Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> > Signed-off-by: Ming Lei <tom.leiming@gmail.com>
 > > ---
-> > 
-> >  drivers/clk/samsung/clk.c |    2 +-
-> >  1 files changed, 1 insertions(+), 1 deletions(-)
-> > 
-> > diff --git a/drivers/clk/samsung/clk.c b/drivers/clk/samsung/clk.c
-> > index 1a5de69..7c943f8 100644
-> > --- a/drivers/clk/samsung/clk.c
-> > +++ b/drivers/clk/samsung/clk.c
-> > @@ -58,11 +58,11 @@ void __init samsung_clk_init(struct device_node *np,
-> > void __iomem *base,
-> > 
-> >  {
-> >  
-> >         reg_base = base;
-> > 
-> > -#ifdef CONFIG_OF
-> > 
-> >         clk_table = kzalloc(sizeof(struct clk *) * nr_clks, GFP_KERNEL);
-> >         if (!clk_table)
-> >         
-> >                 panic("could not allocate clock lookup table\n");
+> > V1:
+> >         - documents lockdep uses percpu variable early
 > 
-> This change is fine but one point that should be considered is that on
-> non-dt platforms, the memory allocation of clk_table cannot really be
-> justified just because few clocks require two or more aliases.
+> Looks no one objects the patch, so I has submitted it into Russell's
+> patch system, and hope it can be pushed to linus tree soon and
+> make LOCK_STAT/DEBUG_LOCKDEP usable on ARMv7.
 
-hmm, at least on s3c24xx there are quite a lot of the clocks requiring more 
-than one alias. Also the clk_table is allocated on all dt platforms so these 
-platforms have to handle the (small) memory consumption in any case and non-dt 
-platforms are supposed to die out in the not to distant future.
+I'm not convinced it is correct.  Is the percpu data as stored in the
+kernel image (in other words, at offset zero) supposed to be read only?
+If so, the above means that we'll be accessing that rather than the
+copy of the percpu data we should be accessing.
 
-I.e. I'm working on s3c24xx dt support, Tomasz is working on s3c64xx dt 
-support, exynos5 already only has dt support and exynos4 will probably lose 
-non-dt support at some point. And if someone converts the other s5p SoCs to 
-the common clock framework they should already have the means to go to dt 
-directly by then.
-
-So the non-dt common-clock path is merely a "short" intermediate step to 
-support smooth transitions to dt making the memory argument in my opinion a 
-moot point :-)
-
-
-Handling the aliases directly also requires adding quit a lot more 
-{MUX/DIV/...}_*A aliases for all the necessary combinations.
-
-And in general I also find the readability of separate aliases a lot better - 
-as shown in the s3c2443 clk driver in the second series. And the removal once 
-we only support dt will be a lot cleaner too.
-
-
-Heiko
-
-> Instead, the optional alias passed for divider/mux register functions
-> can actually be a list of alias names, the list being terminated by a
-> zero-length string. The clock register helper functions can then loop
-> through that list and register all the aliases.
-
-
-> > +#ifdef CONFIG_OF
-> > 
-> >         clk_data.clks = clk_table;
-> >         clk_data.clk_num = nr_clks;
-> >         of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
-> > 
-> > --
-> > 1.7.2.3
+The percpu data areas are allocated by setup_per_cpu_areas() - that's
+where we should be initializing this, just like it's done on PowerPC.
