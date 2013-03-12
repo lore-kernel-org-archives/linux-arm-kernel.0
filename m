@@ -1,105 +1,86 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Tue, 12 Mar 2013 09:20:57 -0400
-Subject: [PATCH 06/29] arm64: KVM: fault injection into a guest
-In-Reply-To: <1362455265-24165-7-git-send-email-marc.zyngier@arm.com>
-References: <1362455265-24165-1-git-send-email-marc.zyngier@arm.com>
- <1362455265-24165-7-git-send-email-marc.zyngier@arm.com>
-Message-ID: <513F2BB9.80306@codeaurora.org>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 12 Mar 2013 14:24:15 +0100
+Subject: [PATCH v6 1/3] serial: sh-sci: Add OF support
+In-Reply-To: <20130312082038.GC3553@linux-sh.org>
+References: <1362569437-11133-1-git-send-email-hechtb+renesas@gmail.com>
+ <1689352.QAdqes1IG8@avalon> <20130312082038.GC3553@linux-sh.org>
+Message-ID: <1527167.zrgCvGiAzu@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Hi Paul,
 
-I noticed you went through the trouble of defining several constants in an
-earlier patch. Perhaps you could put them to use here?
-
-On 03/04/2013 10:47 PM, Marc Zyngier wrote:
-> Implement the injection of a fault (undefined, data abort or
-> prefetch abort) into a 64bit guest.
+On Tuesday 12 March 2013 17:20:39 Paul Mundt wrote:
+> On Mon, Mar 11, 2013 at 11:32:31PM +0100, Laurent Pinchart wrote:
+> > On Thursday 07 March 2013 11:26:29 Bastian Hecht wrote:
+> > > >> +- renesas,scscr : Should contain a bitfield used by the Serial
+> > > >> Control
+> > > >> Register.
+> > > >> +  b7 = SCSCR_TIE
+> > > >> +  b6 = SCSCR_RIE
+> > > >> +  b5 = SCSCR_TE
+> > > >> +  b4 = SCSCR_RE
+> > > >> +  b3 = SCSCR_REIE
+> > > >> +  b2 = SCSCR_TOIE
+> > > >> +  b1 = SCSCR_CKE1
+> > > >> +  b0 = SCSCR_CKE0
+> > > > 
+> > > > What is that for exactly ?
+> > > 
+> > > What I can see from 3 different datasheets (sh7372, sh73a0, r8a7740)
+> > > the first 2 bits differ in meaning.
+> > > 
+> > > On r8a7740 it depends: In asynchronous mode the first 2 bits CKE0/1
+> > > define whether you want to use an external clock to drive the baud
+> > > generator or if you want to use the internal SUB clock. If you use the
+> > > SUB clock you can further define if you want to use a subscaled SUB
+> > > clock in the SCSMR register. In synchronous mode you must rely on the
+> > > internal clock for the baud generator and can select if the SCK pin is
+> > > used as clock input or output.
+> > 
+> > What about adding an optional source clock property to the bindings, that
+> > would contain the phandle of the source clock ? If the property is absent
+> > then the internal clock would be used.
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/kvm/inject_fault.c | 117 ++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 117 insertions(+)
->  create mode 100644 arch/arm64/kvm/inject_fault.c
+> We can't really use the internal oscillator at the moment, it's one of
+> the things that is blocked on adoption of the common struct clk work. The
+> baud rate generator algo will likewise differ depending on whether it's
+> using an internally generated clock or not, which also makes a different
+> set of baud rates available.
+> 
+> My plan originally was to wait until the common struct clk stuff came
+> along well enough that we could provide a clock dynamically depending on
+> the target baud (or for avoiding cpufreq pre/post-change notifier
+> chains), but this obviously hasn't happened yet.
+> 
+> I think your idea for the abstraction with the phandle sounds like the
+> right approach, but we aren't presently in a state where we can handle
+> that.
 
-[...]
+Do the platforms that will be converted to DT currently need to make the clock 
+source configurable ? If not we could just leave it out of the DT bindings 
+until needed. Hopefully by then we'll have a common clock framework 
+implementation.
 
-> +static void inject_abt64(struct kvm_vcpu *vcpu, bool is_iabt, unsigned long addr)
-> +{
-> +	unsigned long cpsr = *vcpu_cpsr(vcpu);
-> +	int is_aarch32;
-> +	u32 esr = 0;
-> +
-> +	is_aarch32 = vcpu_mode_is_32bit(vcpu);
-> +
-> +	*vcpu_spsr(vcpu) = cpsr;
-> +	vcpu->arch.regs.elr_el1 = *vcpu_pc(vcpu);
-> +
-> +	*vcpu_cpsr(vcpu) = PSR_MODE_EL1h | PSR_A_BIT | PSR_F_BIT | PSR_I_BIT;
-> +	*vcpu_pc(vcpu) = vcpu->arch.sys_regs[VBAR_EL1] + 0x200;
-> +
-> +	vcpu->arch.sys_regs[FAR_EL1] = addr;
-> +
-> +	/*
-> +	 * Build an {i,d}abort, depending on the level and the
-> +	 * instruction set. Report an external synchronous abort.
-> +	 */
-> +	if (kvm_vcpu_trap_il_is32bit(vcpu))
-> +		esr |= (1 << 25);
+> > > Bit 2 and 3 don't exist in my datasheets.
+> > > 
+> > > The other bits define under which conditions you receive interrupts
+> > > (send FIFO empty, receive FIFO full) and which bits you need to start
+> > > transfers (one bit to start sending, one receiving). The bits 8 to 31
+> > > are used to set up DMA transfers and various interrupt events like
+> > > error status and finish transfers. I haven't included them as they are
+> > > not used in the driver.
+> > 
+> > If they're not used maybe we can drop them :-)
+> 
+> Obviously they're used, otherwise they wouldn't be defined in the common
+> header. Whether they are used by these specific CPUs or not isn't
+> relevant, as there are plenty of cases where they are. grep harder.
 
-ESR_EL2_IL
-
-> +	if (is_aarch32 || (cpsr & PSR_MODE_MASK) == PSR_MODE_EL0t)
-> +		esr |= (0x20 << 26);
-
-ESR_EL2_EC_IABT << ESR_EL2_EC_SHIFT
-
-> +	else
-> +		esr |= (0x21 << 26);
-
-ESR_EL2_EC_IABT_HYP << ESR_EL2_EC_SHIFT
-
-> +
-> +	if (!is_iabt)
-> +		esr |= (1 << 28);
-
-ESR_EL2_EC_DABT << ESR_EL2_EC_SHIFT
-
-> +
-> +	vcpu->arch.sys_regs[ESR_EL1] = esr | 0x10;
-> +}
-> +
-> +static void inject_undef64(struct kvm_vcpu *vcpu)
-> +{
-> +	unsigned long cpsr = *vcpu_cpsr(vcpu);
-> +	u32 esr = 0;
-> +
-> +	*vcpu_spsr(vcpu) = cpsr;
-> +	vcpu->arch.regs.elr_el1 = *vcpu_pc(vcpu);
-> +
-> +	*vcpu_cpsr(vcpu) = PSR_MODE_EL1h | PSR_F_BIT | PSR_I_BIT;
-> +	*vcpu_pc(vcpu) = vcpu->arch.sys_regs[VBAR_EL1] + 0x200;
-> +
-> +	/*
-> +	 * Build an unknown exception, depending on the instruction
-> +	 * set.
-> +	 */
-> +	if (kvm_vcpu_trap_il_is32bit(vcpu))
-> +		esr |= (1 << 25);
-
-ESR_EL2_IL
-
-> +
-> +	vcpu->arch.sys_regs[ESR_EL1] = esr;
-> +}
-
-[...]
-
-Regards,
-Christopher
+My point is that if they're only used by arm/sh/* SoCs we don't need to 
+support them in DT.
 
 -- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by
-the Linux Foundation
+Regards,
+
+Laurent Pinchart
