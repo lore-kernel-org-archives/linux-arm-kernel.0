@@ -1,66 +1,61 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 12 Mar 2013 15:52:39 -0500
-Subject: [PATCH v2 05/14] ARM: integrator: use clocksource_of_init for
- sp804
-In-Reply-To: <201303121933.47994.arnd@arndb.de>
-References: <1363108124-17484-1-git-send-email-haojian.zhuang@linaro.org>
- <1363108124-17484-6-git-send-email-haojian.zhuang@linaro.org>
- <513F7EBD.80207@gmail.com> <201303121933.47994.arnd@arndb.de>
-Message-ID: <513F9597.8050000@gmail.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue, 12 Mar 2013 15:03:28 -0600
+Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
+In-Reply-To: <20130312203819.GA23221@avionic-0098.mockup.avionic-design.de>
+References: <513C117D.6080800@firmworks.com>
+ <20130310065539.GA14704@obsidianresearch.com>
+ <513D6F9C.9000100@firmworks.com>
+ <20130311181554.GA10992@obsidianresearch.com>
+ <513E519B.6010503@firmworks.com>
+ <20130311232516.GA13873@obsidianresearch.com>
+ <513E6AFE.3090304@firmworks.com>
+ <20130312070852.GA6727@avionic-0098.mockup.avionic-design.de>
+ <20130312155749.GA1820@obsidianresearch.com>
+ <20130312203819.GA23221@avionic-0098.mockup.avionic-design.de>
+Message-ID: <20130312210328.GA22702@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/12/2013 02:33 PM, Arnd Bergmann wrote:
-> On Tuesday 12 March 2013, Rob Herring wrote:
->> On 03/12/2013 12:08 PM, Haojian Zhuang wrote:
-> 
->> You are breaking existing dtb's changing this, but this is wrong for
->> other reasons. The integrator does not have an SP804. It is the same
->> programming model, but is a single timer and not the dual timer. So
->> having a different compatible string is the correct way. I doubt it has
->> the primecell ID registers which is what "arm,primecell" indicates.
-> 
-> At least the qemu model has the primecell ID only for actual sp804 but
-> not for the integrator, see http://git.qemu.org/?p=qemu.git;a=blob;f=hw/arm_timer.c
+On Tue, Mar 12, 2013 at 09:38:19PM +0100, Thierry Reding wrote:
 
-Right. I think I added that to qemu...
+> I've also verified that things actually do work with the binding that I
+> proposed for Tegra, even if I add device_type = "pci" to the root port
+> nodes. The reason is that the OF core looks up the type of the *parent*
+> node to find a matching bus. This happens to be the pcie-controller node
+> which is not a PCI device and therefore the address translation works
+> properly.
 
-Since the primecell ID registers are defined to be at 0xFF? offset, it
-is quite impossible for the integrator timers to have the ID registers
-within their 0x100 address space.
+Mitch pointed out early on that the parent node needs a 'device_type =
+"pci"' as well.
 
-> 
->>>  	};
->>>  
->>>  	timer1: timer at 13000100 {
->>> -		compatible = "arm,integrator-timer";
->>> +		compatible = "arm,sp804", "arm,primecell";
->>> +		arm,sp804-clockevent = <0>;
->>
->> I don't like this nor the old way with aliases. We should describe the
->> h/w features of the timer to determine what to use it for. AFAICT, all 3
->> timers are identical on integrator and it does not matter which one
->> Linux picks for clocksource vs. clockevent.
-> 
-> Interesting point. I remember we had a discussion about this when the
-> initial binding integrator code was merged, but I don't remember what
-> the intent was for doing it like this. Probably just minimizing the
-> changes to the existing code.
+The pcie-controller node would be classified as a 'bus node' according
+to the spec.
 
-Re-reading the thread on this for Integrator, I don't think any
-conclusion was really made, but it got merged. I don't think we should
-a) change the existing alias names or b) expand their usage. OMAP is a
-good example of lots of timers and using h/w properties to select
-particular instances based on properties. I think on the ARM boards the
-selection has been pretty arbitrary. I traced the commit history back
-for the timer code and could not find any evidence to the contrary
-except on VExpress which has broken sp804 on the core tile.
+Not going down the of_pci_* code paths for address translation at the
+root port bridge nodes is certainly not right.
 
-Another part is sched_clock selection. I use the sp804 on highbank, but
-the ARM boards have their 24MHz counter. Also, if I'm on midway, then I
-want to use the arch timers even though the sp804 is still there. My
-sched_clock patches yesterday attempt to address that. Any comments on
-what characteristics should be used to select timer would be helpful.
-Higher frequency and/or bits is better, but to what limit in frequency?
+> ranges = <0x00000800 0 0 0x80000000 0 0x00001000   /* port 0 configuration space */
+>           0x00001000 0 0 0x80001000 0 0x00001000   /* port 1 configuration space */
 
-Rob
+Section 12 says that the 'b,d,f' bits are 0 in ranges, so the above is
+in conflict with that language:
+
+ In particular, the phys.hi fields of the child address spaces in the
+ "ranges" property for PCI does not contain the same information as
+ "reg" property entries within PCI nodes. The only information that is
+ present in "ranges" phys.hi entries are the non-relocatable,
+ prefetchable and the PCI address space bits for which the entry
+ applies. I.e., only the n, p and ss bits are present; the bbbbbbbb,
+ ddddd, fff and rrrrrrrr fields are 0.
+
+And the further requirement:
+
+ When an address is to be mapped through a PCI bus bridge node, the
+ phys.hi value of the address to be mapped and the child field of a
+ "ranges" entry should be masked so that only the ss bits are compared.
+
+Which is embodied by the code in of_bus_pci_map, meaning the OF core
+won't even look at the bits in the high DW when searching ranges.
+
+Regards,
+Jason
