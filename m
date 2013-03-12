@@ -1,32 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 12 Mar 2013 13:40:32 +0000
-Subject: [RFC 1/1] clk: Add notifier support in
- clk_prepare_enable/clk_disable_unprepare
-In-Reply-To: <1363091861-21534-1-git-send-email-bilhuang@nvidia.com>
-References: <1363091861-21534-1-git-send-email-bilhuang@nvidia.com>
-Message-ID: <20130312134032.GU4977@n2100.arm.linux.org.uk>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 12 Mar 2013 09:47:36 -0400
+Subject: [GIT PULL] ARM: mvebu: DT changes for v3.10
+Message-ID: <20130312134736.GH12700@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 12, 2013 at 05:37:41AM -0700, Bill Huang wrote:
-> Add the below four notifier events so drivers which are interested in
-> knowing the clock status can act accordingly. This is extremely useful
-> in some of the DVFS (Dynamic Voltage Frequency Scaling) design.
-> 
-> PRE_CLK_ENABLE
-> POST_CLK_ENABLE
-> PRE_CLK_DISABLE
-> POST_CLK_DISABLE
-> 
-> Signed-off-by: Bill Huang <bilhuang@nvidia.com>
+The following changes since commit f6161aa153581da4a3867a2d1a7caf4be19b6ec9:
 
-NAK.  *Sigh* NO, this is the wrong level to be doing stuff like this.
+  Linux 3.9-rc2 (2013-03-10 16:54:19 -0700)
 
-The *ONLY* thing that clk_prepare_enable() and clk_prepare_disable() should
-*EVER* be doing is calling clk_prepare(), clk_enable(), clk_disable() and
-clk_unprepare().  Those two functions are *merely* helpers for drivers
-who don't wish to make the individual calls.
+are available in the git repository at:
 
-Drivers are still completely free to call the individual functions, at
-which point your proposal breaks horribly - and they _do_ call the
-individual functions.
+  git://git.infradead.org/users/jcooper/linux.git tags/mvebu_dt_for_v3.10
+
+for you to fetch changes up to c3117edec5f92cce39f2d220c62f76675397af8d:
+
+  Dove: Thermal: Add DT node and enable in defconfig (2013-03-12 11:33:22 +0000)
+
+----------------------------------------------------------------
+mvebu DT changes for v3.10
+
+ - mvebu: gpio expander for the Mirabox
+ - kirkwood: thermal sensor
+ - dove: thermal sensor
+
+----------------------------------------------------------------
+Andrew Lunn (1):
+      Dove: Thermal: Add DT node and enable in defconfig
+
+Gregory CLEMENT (1):
+      arm: mvebu: enable gpio expander over i2c on Mirabox platform
+
+Nobuhiro Iwamatsu (1):
+      ARM: Kirkwood: Add support thermal sensor for 88F6282 and 88F6283
+
+ arch/arm/boot/dts/armada-370-mirabox.dts | 11 +++++++++++
+ arch/arm/boot/dts/dove.dtsi              |  5 +++++
+ arch/arm/boot/dts/kirkwood-6282.dtsi     |  6 ++++++
+ arch/arm/configs/dove_defconfig          |  2 ++
+ arch/arm/configs/kirkwood_defconfig      |  2 ++
+ 5 files changed, 26 insertions(+)
