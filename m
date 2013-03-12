@@ -1,111 +1,65 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Tue, 12 Mar 2013 16:43:56 -0500
-Subject: [PATCH V3 1/2] ARM: dts: OMAP2+: Add SDMA controller bindings
- and nodes
-In-Reply-To: <513F0AE3.6030408@ti.com>
-References: <1361903244-19837-1-git-send-email-jon-hunter@ti.com>
- <1361903244-19837-2-git-send-email-jon-hunter@ti.com>
- <513F0AE3.6030408@ti.com>
-Message-ID: <513FA19C.60904@ti.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Tue, 12 Mar 2013 18:07:07 -0400
+Subject: [PATCH 14/29] arm64: KVM: guest one-reg interface
+In-Reply-To: <513F6E86.4040902@arm.com>
+References: <1362455265-24165-1-git-send-email-marc.zyngier@arm.com>
+ <1362455265-24165-15-git-send-email-marc.zyngier@arm.com>
+ <513F6659.7060500@codeaurora.org> <513F6E86.4040902@arm.com>
+Message-ID: <513FA70B.2040600@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Salut Benoit!
+Hi Marc,
 
-On 03/12/2013 06:00 AM, Benoit Cousson wrote:
-> + Seb G.
-> 
-> Hi Jon,
-> 
-> How to you plan to merge that series?
-
-Good question ... my thinking was that you or Tony would take 1/2 and
-once that is queued then I would ask Tony to ack 2/2 and Vinod take that
-patch.
-
-By the way, I have accumulated several DT patches which I sent out
-altogether [1] (at least for my own sanity if no one elses ;-) and I
-have included the below patch with it. I was hoping that may be I could
-create a branch for you to pull. If you would rather cherry-pick the
-various patches and merge yourself then I can separate them too.
-
-> Seb's just posted a McBSP adaptation to SDMA binding, so I'll have to
-> take this one before being able to merge any other SDMA driver
-> adaptation patches.
-> 
-> I'm fine to take that one, if you are OK, to avoid merge conflict in DTS
-> later.
-
-Fine with me and that would be preferred. I don't see any downside in
-taking this one and then having Vinod take the other later.
-
-> On 02/26/2013 07:27 PM, Jon Hunter wrote:
->> Add SDMA controller binding for OMAP2+ devices and populate DMA client
->> information for SPI and MMC periperhal on OMAP3+ devices. Please note
-> 
-> typo-------------------------------^
-
-Thanks! Will fix.
-
->> that OMAP24xx devices do not have SPI and MMC bindings available yet and
->> so DMA client information is not populated.
+On 03/12/2013 02:05 PM, Marc Zyngier wrote:
+> On 12/03/13 17:31, Christopher Covington wrote:
+>> Hi Marc,
 >>
->> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
->> Reviewed-by: Felipe Balbi <balbi@ti.com>
->> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> ---
->>  .../devicetree/bindings/dma/omap-sdma.txt          |   51 ++++++++++++++++++++
-> 
-> That's a detail, but the bindings should be introduced along with the
-> driver DT adaptation since it does represent its "interface".
-
-Ok, I can add that to patch 2/2 instead.
-
->>  arch/arm/boot/dts/omap2.dtsi                       |   12 +++++
->>  arch/arm/boot/dts/omap3.dtsi                       |   40 +++++++++++++++
->>  arch/arm/boot/dts/omap4.dtsi                       |   41 ++++++++++++++++
->>  arch/arm/boot/dts/omap5.dtsi                       |   41 ++++++++++++++++
->>  5 files changed, 185 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/dma/omap-sdma.txt
+>> On 03/04/2013 10:47 PM, Marc Zyngier wrote:
+>>> Let userspace play with the guest registers.
+>>>
+>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>> ---
+>>>  arch/arm64/kvm/guest.c | 240 +++++++++++++++++++++++++++++++++++++++++++++++++
+>>>  1 file changed, 240 insertions(+)
+>>>  create mode 100644 arch/arm64/kvm/guest.c
 >>
->> diff --git a/Documentation/devicetree/bindings/dma/omap-sdma.txt b/Documentation/devicetree/bindings/dma/omap-sdma.txt
->> new file mode 100644
->> index 0000000..22aab28
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/dma/omap-sdma.txt
->> @@ -0,0 +1,51 @@
->> +* TI OMAP SDMA controller
->> +
->> +Required properties:
->> +- compatible:		Should be set to one of the following:
->> +
->> +			ti,omap2420-sdma (omap2420)
->> +			ti,omap2430-sdma (omap2430)
->> +			ti,omap3430-sdma (omap3430)
->> +			ti,omap3630-sdma (omap3630)
->> +			ti,omap4430-sdma (omap4430 & omap4460 & omap543x)
->> +
->> +- reg: 			Contains DMA registers location and length.
->> +- interrupts: 		Contains DMA interrupt information.
->> +- #dma-cells: 		Must be 1.
->> +- #dma-channels:	Contains total number of programmable DMA channels.
->> +- #dma-requests:	Contains total number of DMA requests.
->> +
->> +Example:
->> +
->> +	sdma: dma-controller at 4A056000 {
->> +		compatible = "ti,omap-sdma";
->> +		reg = <0x4A056000 0x1000>;
+>> [...]
+>>
+>>> +int __attribute_const__ kvm_target_cpu(void)
+>>> +{
+>>> +	unsigned long implementor = read_cpuid_implementor();
+>>> +	unsigned long part_number = read_cpuid_part_number();
+>>> +
+>>> +	if (implementor != ARM_CPU_IMP_ARM)
+>>> +		return -EINVAL;
+>>> +
+>>> +	switch (part_number) {
+>>> +	case ARM_CPU_PART_AEM_V8:
+>>> +	case ARM_CPU_PART_FOUNDATION:
+>>> +		/* Treat the models just as an A57 for the time being */
+>>> +	case ARM_CPU_PART_CORTEX_A57:
+>>> +		return KVM_ARM_TARGET_CORTEX_A57;
+>>> +	default:
+>>> +		return -EINVAL;
+>>> +	}
+>>> +}
+>>
+>> What is the motivation behind these checks? Why not let any ARMv8 system that
+>> has EL2 host a virtualized Cortex A57 guest?
 > 
-> 
-> Nit: you do have several hexa values in upper case, here and in some dts
-> as well.
+> The main reason is errata management. How do you deal with errata in the
+> guest when you hide the underlying host CPU? I don't have an answer to
+> that. So for the time being, we only allow the guest to see the same CPU
+> as the host, and require that new CPUs are added to this function.
 
-Yes will fix that too.
+Can you please elaborate on how this code ensures the guest is seeing the same
+CPU as the host? It looks rather unlike VPIDR = MIDR.
 
-Cheers
-Jon
+Thanks,
+Christopher
 
-[1]
-http://www.mail-archive.com/devicetree-discuss at lists.ozlabs.org/msg28050.html
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by
+the Linux Foundation
