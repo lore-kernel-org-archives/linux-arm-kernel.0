@@ -1,52 +1,54 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Mon, 11 Mar 2013 22:19:46 -0700 (PDT)
-Subject: [PATCH 00/04] ARM: shmobile: r8a73a4 SoC and APE6EVM board support
-In-Reply-To: <20130312045559.19701.77841.sendpatchset@w520>
-References: <20130312045559.19701.77841.sendpatchset@w520>
-Message-ID: <87vc8xry8i.wl%kuninori.morimoto.gx@renesas.com>
+From: srinidhi.kasagar@stericsson.com (Srinidhi Kasagar)
+Date: Tue, 12 Mar 2013 11:12:29 +0530
+Subject: [PATCH] ARM: ux500: Remove duplicate ux500_l2x0_unlock function
+In-Reply-To: <20130312045823.GA526@android11.spreadtrum.com>
+References: <20130312045823.GA526@android11.spreadtrum.com>
+Message-ID: <20130312054226.GA811@bnru09>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Mar 12, 2013 at 05:58:23 +0100, Steve zhan wrote:
+> Hi Linus:
+>     Pls check/apply the below patch.
+> Thanks.
 
-Hi
+NAK, I think you have not read the comment i guess. See below.
 
-> ARM: shmobile: r8a73a4 SoC and APE6EVM board support
 > 
-> [PATCH 01/04] ARM: shmobile: Initial r8a73a4 SoC support
-> [PATCH 02/04] ARM: shmobile: r8a73a4 SCIF support
-> [PATCH 03/04] ARM: shmobile: r8a73a4 IRQC support
-> [PATCH 04/04] ARM: shmobile: APE6EVM support
+> -----
+> steve
 > 
-> This series adds initial support for r8a73a4 and APE6EVM. The SoC
-> is known as r8a73a4 which is built around Cortex-A15 and makes use
-> of SCIF for serial and IRQC interrupt controller for external IRQs.
+> commit f962757a91b1c83a080e7c5b05cc6fb7828f1d84
+> Author: steve.zhan <zhanzhenbo@gmail.com>
+> Date:   Tue Mar 12 00:12:53 2013 +0800
 > 
-> This initial SoC and board support is providing limited DT-only
-> support and a very basic C-version of board support. In the future
-> improved PINCTRL and clock framework support will be added, followed
-> by SMP support.
+>     ARM: ux500: Remove duplicate ux500_l2x0_unlock function
+>     
+>     To avoids code duplication, remove reduplicate l2 cache unlock
+>     function "ux500_l2x0_unlock" in the ux500_l2x0_init, as arm\mm
+>     \cache-l2x0.c l2x0_init will call l2x0_unlock function to
+>     make sure that I&D is not locked down when starting.
+>     
+>     Signed-off-by: steve.zhan <zhanzhenbo@gmail.com>
 > 
-> Signed-off-by: Magnus Damm <damm@opensource.se>
-> ---
-> 
->  Written against all+next in renesas.git.
->  [PATCH 03/04] requires the IRQC driver to build
-> 
->  arch/arm/boot/dts/Makefile                    |    1 
->  arch/arm/boot/dts/r8a73a4-ape6evm.dts         |   26 ++
->  arch/arm/boot/dts/r8a73a4.dtsi                |   87 ++++++++
->  arch/arm/mach-shmobile/Kconfig                |   16 +
->  arch/arm/mach-shmobile/Makefile               |    2 
->  arch/arm/mach-shmobile/board-ape6evm.c        |   40 +++
->  arch/arm/mach-shmobile/clock-r8a73a4.c        |  104 +++++++++
->  arch/arm/mach-shmobile/include/mach/r8a73a4.h |    7 
->  arch/arm/mach-shmobile/setup-r8a73a4.c        |  268 +++++++++++++++++++++++++
->  9 files changed, 549 insertions(+), 2 deletions(-)
+> diff --git a/arch/arm/mach-ux500/cache-l2x0.c b/arch/arm/mach-ux500/cache-l2x0.c
+> index 1c1609d..372bdf6 100644
+> --- a/arch/arm/mach-ux500/cache-l2x0.c
+> +++ b/arch/arm/mach-ux500/cache-l2x0.c
+> @@ -15,26 +15,6 @@
+>  
+>  static void __iomem *l2x0_base;
+>  
+> -static int __init ux500_l2x0_unlock(void)
+> -{
+> -	int i;
+> -
+> -	/*
+> -	 * Unlock Data and Instruction Lock if locked. Ux500 U-Boot versions
+> -	 * apparently locks both caches before jumping to the kernel. The
+> -	 * l2x0 core will not touch the unlock registers if the l2x0 is
+> -	 * already enabled, so we do it right here instead. The PL310 has
 
-For all patches
+The l2x0 core will unlock only if l2x0 is already not enabled. So we need this.
 
-Reviewed-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-
-Best regards
----
-Kuninori Morimoto
+/srinidhi
