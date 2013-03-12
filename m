@@ -1,170 +1,43 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Tue, 12 Mar 2013 09:50:48 +0100
-Subject: [PATCH 4/9] ARM: dts: OMAP3: Add support for OMAP3430 SDP board
-In-Reply-To: <F3DBB1B3EF102E4994C89758CFCA32412CE371@DBDE01.ent.ti.com>
-References: <1362763654-9660-1-git-send-email-jon-hunter@ti.com>
- <1362763654-9660-5-git-send-email-jon-hunter@ti.com>
- <CABYxbz7Bg3Uf2wkhH=4d6nEPUjyHF8BiixN6rGCOgEVG_us8Jw@mail.gmail.com>
- <513E1A1C.8070206@ti.com>
- <F3DBB1B3EF102E4994C89758CFCA32412CE371@DBDE01.ent.ti.com>
-Message-ID: <CABxcv=npsMrbVqJ0G_Lr3qDVKZ=N5Micd4rmadJP_Egi3hKwiA@mail.gmail.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Tue, 12 Mar 2013 14:23:00 +0530
+Subject: [PATCH 2/4] clk: samsung: remove np check in clock init
+In-Reply-To: <201303120044.00803.heiko@sntech.de>
+References: <201303120042.09633.heiko@sntech.de>
+ <201303120044.00803.heiko@sntech.de>
+Message-ID: <CAJuYYwSU_pFoyHkzt=sP6AfN03F9V1_Rx+3o1ekbLHD4jC5SpA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 12, 2013 at 3:42 AM, Kumar, Anil <anilkumar.v@ti.com> wrote:
+On 12 March 2013 05:14, Heiko St?bner <heiko@sntech.de> wrote:
+> This let to the suspend init never being reached on non-DT platforms.
 >
-> On Mon, Mar 11, 2013 at 23:23:32, Hunter, Jon wrote:
->>
->> On 03/08/2013 08:25 PM, Anil Kumar wrote:
->> > Hi Jon,
->> >
->> > On Fri, Mar 8, 2013 at 10:57 PM, Jon Hunter <jon-hunter@ti.com> wrote:
->> >> Adds basic device-tree support for OMAP3430 SDP board which has 256MB
->> >> of RAM and uses the TWL4030 power management IC.
->> >
->> > I think this board support should be in separate patch series with
->> > related patches.
->>
->> Well I wanted to keep them altogether so that I can send a pull request
->> to Benoit and Tony.
+> Signed-off-by: Heiko Stueber <heiko@sntech.de>
+> ---
+>  drivers/clk/samsung/clk.c |    2 --
+>  1 files changed, 0 insertions(+), 2 deletions(-)
 >
-> Sorry, but can you please tell what makes you to think that you
-> can send pull request only when they are altogether ?
->
-> Is there any logical dependency with other patches except
-> "[PATCH 6/9] ARM: dts: Add OMAP3430 SDP flash memory bindings" is on
-> top of this patch ?
->
->>
->> >>
->> >> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
->> >> ---
->> >>  arch/arm/boot/dts/Makefile         |    1 +
->> >>  arch/arm/boot/dts/omap3430-sdp.dts |   46 ++++++++++++++++++++++++++++++++++++
->> >>  2 files changed, 47 insertions(+)
->> >>  create mode 100644 arch/arm/boot/dts/omap3430-sdp.dts
->> >>
->> >> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> >> index 9c62558..89013ed 100644
->> >> --- a/arch/arm/boot/dts/Makefile
->> >> +++ b/arch/arm/boot/dts/Makefile
->> >> @@ -119,6 +119,7 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
->> >>         omap3-beagle-xm.dtb \
->> >>         omap3-evm.dtb \
->> >>         omap3-tobi.dtb \
->> >> +       omap3430-sdp.dtb \
->> >>         omap4-panda.dtb \
->> >>         omap4-panda-a4.dtb \
->> >>         omap4-panda-es.dtb \
->> >> diff --git a/arch/arm/boot/dts/omap3430-sdp.dts b/arch/arm/boot/dts/omap3430-sdp.dts
->> >> new file mode 100644
->> >> index 0000000..be0650d
->> >> --- /dev/null
->> >> +++ b/arch/arm/boot/dts/omap3430-sdp.dts
->> >> @@ -0,0 +1,46 @@
->> >> +/*
->> >> + * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
->> >> + *
->> >> + * This program is free software; you can redistribute it and/or modify
->> >> + * it under the terms of the GNU General Public License version 2 as
->> >> + * published by the Free Software Foundation.
->> >> + */
->> >> +/dts-v1/;
->> >> +
->> >> +/include/ "omap3.dtsi"
->> >> +
->> >> +/ {
->> >> +       model = "TI OMAP3430 SDP";
->> >> +       compatible = "ti,omap3430-sdp", "ti,omap3";
->> >
->> > I have not seen any related changes in "board-generic.c" for your board.
->> > So just wanted know, how this board is booting ?
->>
->> If you look at board-generic.c you will see that "ti,omap3" will match
->> the OMAP3 generic machine. So you don't need to modify the board-generic.c.
->
-> According to this omap3-beagle.dts and omap3-beagle-xm.dts are also
-> booting in some way. So it is not clear to me, why there two
-> "DT_MACHINE_START" for omap3. I have seen there is only one
-> different in "init_time" for the same.
->
+> diff --git a/drivers/clk/samsung/clk.c b/drivers/clk/samsung/clk.c
+> index d36cdd5..1a5de69 100644
+> --- a/drivers/clk/samsung/clk.c
+> +++ b/drivers/clk/samsung/clk.c
+> @@ -57,8 +57,6 @@ void __init samsung_clk_init(struct device_node *np, void __iomem *base,
+>                 unsigned long nr_rdump)
+>  {
+>         reg_base = base;
+> -       if (!np)
+> -               return;
 
-Hi Anil,
+Hi Heiko,
 
-You may take a look to commit:
+Sorry, I did not understand the need for this. Could you please add
+few more details on this change.
 
-7dd9d50 ARM: OMAP3: Add generic machine descriptor for boards with
-OMAP3 GP device
+Thanks,
+Thomas.
 
-So, the second DT_MACHINE_START is meant to be used by OMAP3 boards
-which use GP devices and this is not the case for "ti,omap3430-sdp"
-afaiu.
-
-I wonder if instead of adding each OMAP3 board with GP devices such as
-"ti,omap3-beagle", is not better to have a "ti,omap3-gp" compatible
-property.
-
-The whole point of DT is to decouple the hardware description from the
-kernel code so in general we should use the more generic compatible
-string ("ti,omap3") unless the hardware has some specifics that have
-to be addressed, such as these boards that use GP devices.
-
->>
->> >> +
->> >> +       memory {
->> >> +               device_type = "memory";
->> >> +               reg = <0x80000000 0x10000000>; /* 256 MB */
->> >> +       };
->> >> +};
->> >> +
->> >> +&i2c1 {
->> >> +       clock-frequency = <2600000>;
->> >> +
->> >> +       twl: twl at 48 {
->> >> +               reg = <0x48>;
->> >> +               interrupts = <7>; /* SYS_NIRQ cascaded to intc */
->> >> +               interrupt-parent = <&intc>;
->> >> +       };
->> >> +};
->> >> +
->> >> +/include/ "twl4030.dtsi"
->> >> +
->> >> +&mmc1 {
->> >> +       vmmc-supply = <&vmmc1>;
->> >> +       vmmc_aux-supply = <&vsim>;
->> >> +       bus-width = <8>;
->> >> +};
->> >> +
->> >> +&mmc2 {
->> >> +       status = "disabled";
->> >> +};
->> >> +
->> >> +&mmc3 {
->> >> +       status = "disabled";
->> >> +};
->> >
->> > I think you should disable modules those are not currently used
->> > as they are enabled by default in omap3.dtsi.
->> >
->> > exp:-
->> >
->> > &mcbsp2 {
->> >         status = "disabled";
->> > };
->>
->> Well may be we could do that in a follow-up patch. If you look at other
->> omap3 boards we have not gone through and disabled all unused modules
->> either. So although I agree, right now I just want to get minimal
->> support added.
->>
 >
-> Hmm... But it makes the kernel to call unused driver probe and get failed
-> those required some platform date from DT? you can see the kernel boot logs.
+>  #ifdef CONFIG_OF
+>         clk_table = kzalloc(sizeof(struct clk *) * nr_clks, GFP_KERNEL);
+> --
+> 1.7.2.3
 >
-> Thanks,
-> Anil
->
->
-
-Best regards,
-Javier
