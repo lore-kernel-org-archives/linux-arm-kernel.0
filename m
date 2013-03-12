@@ -1,32 +1,39 @@
-From: zhangyanfei@cn.fujitsu.com (Zhang Yanfei)
-Date: Tue, 12 Mar 2013 12:42:37 +0800
-Subject: [PATCH 01/18] arm: remove cast for kzalloc return value
-Message-ID: <513EB23D.7020303@cn.fujitsu.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Tue, 12 Mar 2013 13:55:59 +0900
+Subject: [PATCH 00/04] ARM: shmobile: r8a73a4 SoC and APE6EVM board support
+Message-ID: <20130312045559.19701.77841.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-remove cast for kzalloc return value.
+ARM: shmobile: r8a73a4 SoC and APE6EVM board support
 
-Signed-off-by: Zhang Yanfei <zhangyanfei@cn.fujitsu.com>
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-arm-kernel at lists.infradead.org
+[PATCH 01/04] ARM: shmobile: Initial r8a73a4 SoC support
+[PATCH 02/04] ARM: shmobile: r8a73a4 SCIF support
+[PATCH 03/04] ARM: shmobile: r8a73a4 IRQC support
+[PATCH 04/04] ARM: shmobile: APE6EVM support
+
+This series adds initial support for r8a73a4 and APE6EVM. The SoC
+is known as r8a73a4 which is built around Cortex-A15 and makes use
+of SCIF for serial and IRQC interrupt controller for external IRQs.
+
+This initial SoC and board support is providing limited DT-only
+support and a very basic C-version of board support. In the future
+improved PINCTRL and clock framework support will be added, followed
+by SMP support.
+
+Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
- arch/arm/kernel/topology.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
-index 79282eb..f10316b 100644
---- a/arch/arm/kernel/topology.c
-+++ b/arch/arm/kernel/topology.c
-@@ -100,7 +100,7 @@ static void __init parse_dt_topology(void)
- 	int alloc_size, cpu = 0;
- 
- 	alloc_size = nr_cpu_ids * sizeof(struct cpu_capacity);
--	cpu_capacity = (struct cpu_capacity *)kzalloc(alloc_size, GFP_NOWAIT);
-+	cpu_capacity = kzalloc(alloc_size, GFP_NOWAIT);
- 
- 	while ((cn = of_find_node_by_type(cn, "cpu"))) {
- 		const u32 *rate, *reg;
--- 
-1.7.1
+ Written against all+next in renesas.git.
+ [PATCH 03/04] requires the IRQC driver to build
+
+ arch/arm/boot/dts/Makefile                    |    1 
+ arch/arm/boot/dts/r8a73a4-ape6evm.dts         |   26 ++
+ arch/arm/boot/dts/r8a73a4.dtsi                |   87 ++++++++
+ arch/arm/mach-shmobile/Kconfig                |   16 +
+ arch/arm/mach-shmobile/Makefile               |    2 
+ arch/arm/mach-shmobile/board-ape6evm.c        |   40 +++
+ arch/arm/mach-shmobile/clock-r8a73a4.c        |  104 +++++++++
+ arch/arm/mach-shmobile/include/mach/r8a73a4.h |    7 
+ arch/arm/mach-shmobile/setup-r8a73a4.c        |  268 +++++++++++++++++++++++++
+ 9 files changed, 549 insertions(+), 2 deletions(-)
