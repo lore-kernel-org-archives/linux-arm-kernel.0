@@ -1,40 +1,60 @@
 From: davidb@codeaurora.org (David Brown)
-Date: Tue, 12 Mar 2013 11:41:48 -0700
-Subject: [PATCH v2 03/11] ssbi: Fix exit mismatch in remove function
+Date: Tue, 12 Mar 2013 11:41:49 -0700
+Subject: [PATCH v2 04/11] ssbi: Allow compilation as a module
 In-Reply-To: <1363113716-25897-1-git-send-email-davidb@codeaurora.org>
 References: <1362616187-21089-1-git-send-email-davidb@codeaurora.org>
  <1363113716-25897-1-git-send-email-davidb@codeaurora.org>
-Message-ID: <1363113716-25897-4-git-send-email-davidb@codeaurora.org>
+Message-ID: <1363113716-25897-5-git-send-email-davidb@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-msm_ssbi_remove is referenced with __exit_p, but not declared with
-__exit.  This causes a warning when the driver is not built as a
-module:
-
-drivers/ssbi/ssbi.c:341:23: warning: 'msm_ssbi_remove' defined but not used [-Wunused-function]
-
-The remove is needed for unbinding to work, even if not compiled as a
-module, so just remove it.
+The ssbi driver's read/write entry points are protected with wrappers
+in the case when the driver isn't enabled.  These wrappers don't make
+any sense, since a client of the SSBI bus won't work without it.  Make
+these just regular functions, so that the SSBI driver can be built as
+a module.
 
 Signed-off-by: David Brown <davidb@codeaurora.org>
 ---
- drivers/ssbi/ssbi.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/ssbi/Kconfig     |  2 +-
+ include/linux/msm_ssbi.h | 11 -----------
+ 2 files changed, 1 insertion(+), 12 deletions(-)
 
-diff --git a/drivers/ssbi/ssbi.c b/drivers/ssbi/ssbi.c
-index c08a7b8..da086d4 100644
---- a/drivers/ssbi/ssbi.c
-+++ b/drivers/ssbi/ssbi.c
-@@ -372,7 +372,7 @@ static int msm_ssbi_remove(struct platform_device *pdev)
+diff --git a/drivers/ssbi/Kconfig b/drivers/ssbi/Kconfig
+index b57c41b..c7bc534 100644
+--- a/drivers/ssbi/Kconfig
++++ b/drivers/ssbi/Kconfig
+@@ -5,7 +5,7 @@
+ menu "Qualcomm MSM SSBI bus support"
  
- static struct platform_driver msm_ssbi_driver = {
- 	.probe		= msm_ssbi_probe,
--	.remove		= __exit_p(msm_ssbi_remove),
-+	.remove		= msm_ssbi_remove,
- 	.driver		= {
- 		.name	= "msm_ssbi",
- 		.owner	= THIS_MODULE,
+ config MSM_SSBI
+-	bool "Qualcomm Single-wire Serial Bus Interface (SSBI)"
++	tristate "Qualcomm Single-wire Serial Bus Interface (SSBI)"
+ 	help
+ 	  If you say yes to this option, support will be included for the
+ 	  built-in SSBI interface on Qualcomm MSM family processors.
+diff --git a/include/linux/msm_ssbi.h b/include/linux/msm_ssbi.h
+index cfa47df..0fe245b 100644
+--- a/include/linux/msm_ssbi.h
++++ b/include/linux/msm_ssbi.h
+@@ -33,17 +33,6 @@ struct msm_ssbi_platform_data {
+ 	enum msm_ssbi_controller_type controller_type;
+ };
+ 
+-#ifdef CONFIG_MSM_SSBI
+ int msm_ssbi_write(struct device *dev, u16 addr, u8 *buf, int len);
+ int msm_ssbi_read(struct device *dev, u16 addr, u8 *buf, int len);
+-#else
+-static inline int msm_ssbi_write(struct device *dev, u16 addr, u8 *buf, int len)
+-{
+-	return -ENXIO;
+-}
+-static inline int msm_ssbi_read(struct device *dev, u16 addr, u8 *buf, int len)
+-{
+-	return -ENXIO;
+-}
+-#endif
+ #endif
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
