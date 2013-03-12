@@ -1,33 +1,31 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 12 Mar 2013 16:02:07 +0800
-Subject: [RFC PATCH] ARM: bcm2835: convert to multi-platform
-In-Reply-To: <1363064399-19559-1-git-send-email-swarren@wwwdotorg.org>
-References: <1363064399-19559-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20130312080206.GI18574@S2101-09.ap.freescale.net>
+From: prakash.pm@ti.com (Manjunathappa, Prakash)
+Date: Tue, 12 Mar 2013 13:40:26 +0530
+Subject: [PATCH v3 4/5] ARM: davinci: da850: override SPI DT node device name
+In-Reply-To: <1363075827-31053-1-git-send-email-prakash.pm@ti.com>
+References: <1363075827-31053-1-git-send-email-prakash.pm@ti.com>
+Message-ID: <1363075827-31053-5-git-send-email-prakash.pm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 11, 2013 at 10:59:59PM -0600, Stephen Warren wrote:
-> This allows BCM2835 be included in a kernel build that supports multiple
-> SoCs at once, which is useful for distro kernels.
-> 
-> This change:
-> * Moves bcm2835's debug-macro.S into ARM's include/debug/, and hooks it
->   into the relevant menu.
-> * Moves bcm2835's Kconfig into its own directory, as seems typical for
->   multi-platform conversions.
-> * Removes bcm2835_soc.h, and moves the content to the files where it was
->   used; just one usage per define.
-> * Deletes some headers and Makefile.boot that aren't needed now that we
->   support multi-platform.
-> 
-> TO DO:
-> * It'd be nice to restore uncompress.h. I need to take a look at Shawn
->   Guo's patches related to this, and presumably rebase this on top of
->   them.
+Populate OF_DEV_AUXDATA with desired device name expected by spi-davinci
+driver. Without this clk_get of spi-davinci DT driver fails.
 
-You do not need to restore uncompress.h, and from what I've seen,
-with my patches in place, uncompress debug will probably just work
-on BCM2835 out of box (you need to have DEBUG_LL selected for BCM2835).
+Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
+---
+ arch/arm/mach-davinci/da8xx-dt.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-Shawn
+diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
+index 5404e92..e049f07 100644
+--- a/arch/arm/mach-davinci/da8xx-dt.c
++++ b/arch/arm/mach-davinci/da8xx-dt.c
+@@ -40,6 +40,7 @@ static void __init da8xx_init_irq(void)
+ struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
+ 	OF_DEV_AUXDATA("ti,davinci-i2c", 0x01c22000, "i2c_davinci.1", NULL),
+ 	OF_DEV_AUXDATA("ti,davinci-wdt", 0x01c21000, "watchdog", NULL),
++	OF_DEV_AUXDATA("ti,da830-spi", 0x01f0e000, "spi_davinci.1", NULL),
+ 	{}
+ };
+ 
+-- 
+1.7.4.1
