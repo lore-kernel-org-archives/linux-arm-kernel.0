@@ -1,98 +1,233 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 12 Mar 2013 13:46:28 -0700
-Subject: [PATCH v2 05/11] SSBI: Convert SSBI to device tree
-In-Reply-To: <1363113716-25897-6-git-send-email-davidb@codeaurora.org>
-References: <1362616187-21089-1-git-send-email-davidb@codeaurora.org>
- <1363113716-25897-1-git-send-email-davidb@codeaurora.org>
- <1363113716-25897-6-git-send-email-davidb@codeaurora.org>
-Message-ID: <513F9424.8020902@codeaurora.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 12 Mar 2013 21:47:01 +0100
+Subject: [PATCH] irqchip: Add support for ARMv7-M's NVIC
+In-Reply-To: <alpine.LFD.2.02.1303121923280.22263@ionos>
+References: <1363103673-24720-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <alpine.LFD.2.02.1303121923280.22263@ionos>
+Message-ID: <20130312204701.GS15375@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/12/13 11:41, David Brown wrote:
-> @@ -261,56 +263,13 @@ int msm_ssbi_write(struct device *dev, u16 addr, u8 *buf, int len)
->  }
->  EXPORT_SYMBOL_GPL(msm_ssbi_write);
->  
-> -static int msm_ssbi_add_slave(struct msm_ssbi *ssbi,
-> -				const struct msm_ssbi_slave_info *slave)
-> -{
-> -	struct platform_device *slave_pdev;
-> -	int ret;
-> -
-> -	if (ssbi->slave) {
-> -		pr_err("slave already attached??\n");
-> -		return -EBUSY;
-> -	}
-> -
-> -	slave_pdev = platform_device_alloc(slave->name, -1);
-> -	if (!slave_pdev) {
-> -		pr_err("cannot allocate pdev for slave '%s'", slave->name);
-> -		ret = -ENOMEM;
-> -		goto err;
-> -	}
-> -
-> -	slave_pdev->dev.parent = ssbi->dev;
-> -	slave_pdev->dev.platform_data = slave->platform_data;
-> -
-> -	ret = platform_device_add(slave_pdev);
-> -	if (ret) {
-> -		pr_err("cannot add slave platform device for '%s'\n",
-> -				slave->name);
-> -		goto err;
-> -	}
-> -
-> -	ssbi->slave = &slave_pdev->dev;
-> -	return 0;
-> -
-> -err:
-> -	if (slave_pdev)
-> -		platform_device_put(slave_pdev);
-> -	return ret;
-> -}
-> -
->  static int msm_ssbi_probe(struct platform_device *pdev)
->  {
-> -	const struct msm_ssbi_platform_data *pdata = pdev->dev.platform_data;
+Hello Thomas,
 
-Now that all this code is gone do we have a user of the
-msm_ssbi_platform_data struct? Why not remove it from the header file?
-If you remove it from the header you can probably move the enum for
-controller_type into this file too.
+On Tue, Mar 12, 2013 at 08:57:34PM +0100, Thomas Gleixner wrote:
+> On Tue, 12 Mar 2013, Uwe Kleine-K?nig wrote:
+> > +static struct nvic_chip_data nvic_data __read_mostly;
+> 
+> What the heck is this? You have a static struct which you set in
+> irqdata.chip_data?
+I copied that idea from the gic driver and didn't question it because I
+thought it's too early to allocate memory when it's needed. Or do you
+just wonder about the usage of this static variable?
 
-> @@ -334,7 +293,25 @@ static int msm_ssbi_probe(struct platform_device *pdev)
->  	ssbi->dev = &pdev->dev;
->  	platform_set_drvdata(pdev, ssbi);
->  
-> -	ssbi->controller_type = pdata->controller_type;
-> +	type = of_get_property(np, "qcom,controller-type", NULL);
-> +	if (type == NULL) {
-> +		pr_err("Missing qcom,controller-type property\n");
+> > +static inline void __iomem *nvic_dist_base(struct irq_data *d)
+> > +{
+> > +	struct nvic_chip_data *nvic_data = irq_data_get_irq_chip_data(d);
+> 
+> And then you do the dance of reading the pointer to that static struct
+> out of irq_data and dereferencing it?
+> 
+> What's the point of this? 
+The idea was to keep the functions generic anyhow.
+ 
+> > +	return nvic_data->dist_base;
+> > +}
+> > +
+> > +static void nvic_mask_irq(struct irq_data *d)
+> > +{
+> > +	u32 mask = 1 << (d->hwirq % 32);
+> > +
+> > +	writel_relaxed(mask, nvic_dist_base(d) + NVIC_ICER + d->irq / 32 * 4);
+> 
+> You're really missing the point of irq_data.chip_data 
+> 
+> If you set proper irq chip data per bank then this whole stuff is
+> reduced to:
+> 
+>    struct mydata *md = irq_data_get_irq_chip_data(d);
+>    u32 mask = 1 << (d->irq - md->irq_base);
+> 
+>    writel_relaxed(mask, md->iobase + NVIC_ICER);
+> 
+> Can you spot the difference and what that means in terms of
+> instruction cycles?
+Yeah I see. The cost is increased memory usage. You'd probably say that
+the amount needed here is too small to care about. Still many decisions
+like this sum up and make the 4 MiB of RAM I have a tight fit.
+ 
+> > +}
+> > +
+> > +static void nvic_unmask_irq(struct irq_data *d)
+> > +{
+> > +	u32 mask = 1 << (d->hwirq % 32);
+> > +
+> > +	writel_relaxed(mask, nvic_dist_base(d) + NVIC_ISER + d->hwirq / 32 * 4);
+> > +}
+> > +
+> > +void nvic_eoi(struct irq_data *d)
+> 
+> static ?
+yes.
 
-This could be dev_err() considering you use dev_info() below.
-> +		ret = -EINVAL;
-> +		goto err_ssbi_controller;
-> +	}
-> +	dev_info(&pdev->dev, "SSBI controller type: '%s'\n", type);
-> +	if (strcmp(type, "ssbi") == 0)
-> +		ssbi->controller_type = MSM_SBI_CTRL_SSBI;
-> +	else if (strcmp(type, "ssbi2") == 0)
-> +		ssbi->controller_type = MSM_SBI_CTRL_SSBI2;
-> +	else if (strcmp(type, "pmic-arbiter") == 0)
-> +		ssbi->controller_type = MSM_SBI_CTRL_PMIC_ARBITER;
-> +	else {
-> +		pr_err("Unknown qcom,controller-type\n");
+> > +{
+> > +	/*
+> > +	 * This is a no-op as end of interrupt is signaled by the exception
+> > +	 * return sequence.
+> > +	 */
+> > +}
+> > +
+> > +static struct irq_chip nvic_chip = {
+> > +	.name = "NVIC",
+> > +	.irq_mask = nvic_mask_irq,
+> > +	.irq_unmask = nvic_unmask_irq,
+> > +	.irq_eoi = nvic_eoi,
+> > +};
+> > +
+> > +static void __init nvic_init_bases(struct device_node *node,
+> > +		void __iomem *dist_base)
+> 
+> Please make this
+> 
+> static void __init nvic_init_bases(struct device_node *node,
+>                                    void __iomem *dist_base)
+> 
+> That's way easier to parse. Applies to all other multiline stuff as
+> well.
+My version is like vim does the layout for me. It's the first time
+someone opposes to it. The reason I prefer using a fixed indention is
+that I don't need to touch the latter lines when for example the
+function name or the function's type change.
 
-dev_err()?
+Hmm, I can fix that if you insist.
 
-> @@ -370,12 +347,18 @@ static int msm_ssbi_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> +static struct of_device_id ssbi_match_table[] = {
+> > +{
+> > +	unsigned int irqs, i, irq_base;
+> > +
+> > +	nvic_data.dist_base = dist_base;
+> > +
+> > +	irqs = ((readl_relaxed(dist_base + NVIC_INTR_CTRL) & 0x0f) + 1) * 32;
+> > +	if (irqs > 496)
+> > +		irqs = 496;
+> 
+> Magic constants. Please use proper defines. 
+> 
+> Aside of that without a proper comment the logic looks ass backwards.
+Ok.
 
-const?
+> > +	irqs = ((readl_relaxed(dist_base + NVIC_INTR_CTRL) & 0x0f) + 1) * 32;
+> 
+> Without looking at the datasheet I assume that the chip tells you the
+> number of interrupt banks where a result of 0 means 1 bank and so
+> forth.
+> 
+> How should a reviewer understand why the number of banks is limited to
+> 31 without a comment? Do you really expect that a reviewer who
+> stumbles over that goes to search for the datasheet and verify what
+> you hacked up?
+Will add a comment.
+
+> > +	irq_base = irq_alloc_descs(-1, 16, irqs - 16, numa_node_id());
+> 
+>   irq_alloc_desc_from(16, irqs - 16, ...)
+> 
+> Also why are you allocating irqs-16 instead of the full number of
+> irqs?
+I already have a comment there in my tree.
+
+> > +	if (IS_ERR_VALUE(irq_base)) {
+> 
+> See Russells reply
+> 
+> > +		WARN(1, "Cannot allocate irq_descs\n");
+> 
+> What's the point of that warn? The call path is always the same. So
+> you are spamming dmesg with a pointless backtrace. And on top of that
+> you do:
+There is one warning per call to nvic_init_bases. So I don't expect more
+than one message in dmesg.
+
+> 
+> > +		irq_base = 16;
+> 
+> So you cannot allocate irq_descs and then you set base to 16 and pray
+> that everything works?
+If something goes wrong here the machine is probably silent about it. So
+continuing after a prayer might (or might not?) be an option.
+
+> > +	}
+> > +	nvic_data.domain = irq_domain_add_legacy(node, irqs - 16, irq_base, 0,
+> > +			&irq_domain_simple_ops, NULL);
+> > +	if (WARN_ON(!nvic_data.domain))
+> > +		return;
+> 
+> See above. Also you are leaking irqdescs though it's questionable
+> whether the machine can continue at all. And of course the init call
+> itself will return sucess.
+> 
+> > +	/*
+> > +	 * Set priority on all interrupts.
+> > +	 */
+> > +	for (i = 0; i < irqs; i += 4)
+> > +		writel_relaxed(0, dist_base + NVIC_IPRI + i);
+> > +
+> > +	/*
+> > +	 * Disable all interrupts
+> > +	 */
+> > +	for (i = 0; i < irqs; i += 32)
+> > +		writel_relaxed(~0, dist_base + NVIC_ICER + i * 4 / 32);
+> > +
+> > +	/*
+> > +	 * Setup the Linux IRQ subsystem.
+> > +	 */
+> > +	for (i = 0; i < irqs; i++) {
+> > +		irq_set_chip_and_handler(irq_base + i, &nvic_chip,
+> > +				handle_fasteoi_irq);
+> 
+> Above you do:
+> 	irq_base = irq_alloc_descs(-1, 16, irqs - 16, numa_node_id());
+> 
+> So you allocate irqs-16 interrupt descriptors and then you initialize
+> 16 more than you allocated.
+right.
+
+> Brilliant stuff that.
+> 
+> > +		irq_set_chip_data(irq_base + i, &nvic_data);
+> > +		set_irq_flags(irq_base + i, IRQF_VALID | IRQF_PROBE);
+> > +	}
+> > +}
+> > +
+> > +static int __init nvic_of_init(struct device_node *node,
+> > +		struct device_node *parent)
+> > +{
+> > +	void __iomem *dist_base;
+> > +
+> > +	if (WARN_ON(!node))
+> 
+> Sigh.
+> 
+> Though the real question is: can this actually happen?
+It didn't happen for me. What do you suggest? dropping WARN_ON?
+
+> > +		return -ENODEV;
+> > +
+> > +	dist_base = of_iomap(node, 0);
+> > +	WARN(!dist_base, "unable to map nvic dist registers\n");
+> 
+> Brilliant. You can't map stuff and then you continue just for fun or
+> what?
+What do you suggest? returning -ESOMETHING?
+> 
+> > +	nvic_init_bases(node, dist_base);
+> 
+> Great. You have failure pathes in nvic_init_bases() and then you
+> return unconditionally success:
+Most of your critics also apply to irq-gic.c. I will follow up with a
+patch for that when you are happy with my work for the nvic.
+
+Best regards and thanks for your feed-back,
+Uwe
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
