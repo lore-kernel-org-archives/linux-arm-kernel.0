@@ -1,31 +1,50 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 11 Mar 2013 21:26:34 -0500
-Subject: [PATCH 0/3] ARM sched_clock selection enhancements
-Message-ID: <1363055197-17296-1-git-send-email-robherring2@gmail.com>
+Date: Mon, 11 Mar 2013 21:26:35 -0500
+Subject: [PATCH 1/3] ARM: sched_clock: allow changing to higher frequency
+ counter
+In-Reply-To: <1363055197-17296-1-git-send-email-robherring2@gmail.com>
+References: <1363055197-17296-1-git-send-email-robherring2@gmail.com>
+Message-ID: <1363055197-17296-2-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-In preparation to move more timer initialization to use CLKSRC_OF and
-out of the platforms, a way to select the timer used for sched_clock is
-needed. This series makes the ARM sched_clock support code prefer 64-bit
-counters or higher frequency counters. This is sufficient at least on
-ARM Ltd boards to use the 24MHz counter rather than sp804 and to always
-use the 64-bit architected timer when present. This mechanism can be
-extended to DT properties if needed for any non-discoverable h/w feature.
+Allow multiple calls to setup_sched_clock and switch to the new counter
+if it is higher frequency.
 
-Rob
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+---
+ arch/arm/kernel/sched_clock.c |    6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-Rob Herring (3):
-  ARM: sched_clock: allow changing to higher frequency counter
-  ARM: sched_clock: support 64-bit counters
-  ARM: arch_timer: use the 64-bit sched_clock setup
-
- arch/arm/include/asm/sched_clock.h |    1 +
- arch/arm/kernel/arch_timer.c       |    8 +-------
- arch/arm/kernel/sched_clock.c      |   35 ++++++++++++++++++++++++++++++++---
- 3 files changed, 34 insertions(+), 10 deletions(-)
-
+diff --git a/arch/arm/kernel/sched_clock.c b/arch/arm/kernel/sched_clock.c
+index bd6f56b..040168e 100644
+--- a/arch/arm/kernel/sched_clock.c
++++ b/arch/arm/kernel/sched_clock.c
+@@ -20,6 +20,7 @@ struct clock_data {
+ 	u64 epoch_ns;
+ 	u32 epoch_cyc;
+ 	u32 epoch_cyc_copy;
++	unsigned long rate;
+ 	u32 mult;
+ 	u32 shift;
+ 	bool suspended;
+@@ -113,11 +114,14 @@ void __init setup_sched_clock(u32 (*read)(void), int bits, unsigned long rate)
+ 	u64 res, wrap;
+ 	char r_unit;
+ 
++	if (cd.rate > rate)
++		return;
++
+ 	BUG_ON(bits > 32);
+ 	WARN_ON(!irqs_disabled());
+-	WARN_ON(read_sched_clock != jiffy_sched_clock_read);
+ 	read_sched_clock = read;
+ 	sched_clock_mask = (1 << bits) - 1;
++	cd.rate = rate;
+ 
+ 	/* calculate the mult/shift to convert counter ticks to ns. */
+ 	clocks_calc_mult_shift(&cd.mult, &cd.shift, rate, NSEC_PER_SEC, 0);
 -- 
 1.7.10.4
