@@ -1,35 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 12 Mar 2013 12:33:32 +0000
-Subject: [RFC PATCH] ARM: bcm2835: convert to multi-platform
-In-Reply-To: <1363064399-19559-1-git-send-email-swarren@wwwdotorg.org>
-References: <1363064399-19559-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <201303121233.32476.arnd@arndb.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 12 Mar 2013 07:43:58 -0500
+Subject: [PATCH 0/3] ARM sched_clock selection enhancements
+In-Reply-To: <20130312092358.GP4977@n2100.arm.linux.org.uk>
+References: <1363055197-17296-1-git-send-email-robherring2@gmail.com>
+ <20130312092358.GP4977@n2100.arm.linux.org.uk>
+Message-ID: <513F230E.1030307@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 12 March 2013, Stephen Warren wrote:
-> This allows BCM2835 be included in a kernel build that supports multiple
-> SoCs at once, which is useful for distro kernels.
+On 03/12/2013 04:23 AM, Russell King - ARM Linux wrote:
+> On Mon, Mar 11, 2013 at 09:26:34PM -0500, Rob Herring wrote:
+>> In preparation to move more timer initialization to use CLKSRC_OF and
+>> out of the platforms, a way to select the timer used for sched_clock is
+>> needed. This series makes the ARM sched_clock support code prefer 64-bit
+>> counters or higher frequency counters. This is sufficient at least on
+>> ARM Ltd boards to use the 24MHz counter rather than sp804 and to always
+>> use the 64-bit architected timer when present. This mechanism can be
+>> extended to DT properties if needed for any non-discoverable h/w feature.
 > 
-> This change:
-> * Moves bcm2835's debug-macro.S into ARM's include/debug/, and hooks it
->   into the relevant menu.
-> * Moves bcm2835's Kconfig into its own directory, as seems typical for
->   multi-platform conversions.
-> * Removes bcm2835_soc.h, and moves the content to the files where it was
->   used; just one usage per define.
-> * Deletes some headers and Makefile.boot that aren't needed now that we
->   support multi-platform.
+> No - this stuff is designed specifically to cope with the dilemas of
+> less-than-64-bit sched_clock sources.  If you have 64-bit sources, then
+> that should be dealt with differently - this code will break with 64-bit
+> sources due to the multiplication and shift losing the high order bits.
 
-Nice work!
+It is dealt with differently. In the 64-bit case, there is only a
+multiply and all the code to deal with wrapping of 32-bit counters is
+skipped. It is exactly the same conversion as arm64.
 
-> TO DO:
-> * It'd be nice to restore uncompress.h. I need to take a look at Shawn
->   Guo's patches related to this, and presumably rebase this on top of
->   them.
-
-As Shawn said, that should not even be necessary.
- 
-> Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
-
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Rob
