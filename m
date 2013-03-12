@@ -1,67 +1,54 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 12 Mar 2013 20:13:42 +0000
-Subject: [PATCH] irqchip: Add support for ARMv7-M's NVIC
-In-Reply-To: <20130312192702.GQ15375@pengutronix.de>
-References: <1363103673-24720-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20130312160101.GW4977@n2100.arm.linux.org.uk>
- <20130312192702.GQ15375@pengutronix.de>
-Message-ID: <20130312201342.GY4977@n2100.arm.linux.org.uk>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Tue, 12 Mar 2013 13:20:07 -0700
+Subject: linux-next: manual merge of the akpm tree with the arm-soc tree
+In-Reply-To: <20130312115339.GF12700@titan.lakedaemon.net>
+References: <20130312144714.39749c5b0bd1aea14c4d2ff8@canb.auug.org.au>
+ <20130312062509.GQ21478@lunn.ch>
+ <20130312111246.GD12700@titan.lakedaemon.net>
+ <CAOesGMgSzn+uCVEMKZgtorcNkdzzvntmnfoej5vN-AjF43pnyQ@mail.gmail.com>
+ <20130312115339.GF12700@titan.lakedaemon.net>
+Message-ID: <20130312132007.d1336d28311d3fbda324942d@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 12, 2013 at 08:27:02PM +0100, Uwe Kleine-K?nig wrote:
-> On Tue, Mar 12, 2013 at 04:01:01PM +0000, Russell King - ARM Linux wrote:
-> > On Tue, Mar 12, 2013 at 04:54:33PM +0100, Uwe Kleine-K?nig wrote:
-> > > +#include <asm/irq.h>
-> > > +#include <asm/io.h>
+On Tue, 12 Mar 2013 07:53:39 -0400 Jason Cooper <jason@lakedaemon.net> wrote:
+
+> On Tue, Mar 12, 2013 at 04:37:39AM -0700, Olof Johansson wrote:
+> > On Tue, Mar 12, 2013 at 4:12 AM, Jason Cooper <jason@lakedaemon.net> wrote:
+> > > On Tue, Mar 12, 2013 at 07:25:09AM +0100, Andrew Lunn wrote:
+> > >> On Tue, Mar 12, 2013 at 02:47:14PM +1100, Stephen Rothwell wrote:
+> > >> > Hi Andrew,
+> > >> >
+> > >> > Today's linux-next merge of the akpm tree got a conflict in
+> > >> > drivers/rtc/rtc-mv.c between commit 89c58c198b25 ("rtc: rtc-mv: Add
+> > >> > support for clk to avoid lockups") from the arm-soc tree and commit "rtc:
+> > >> > rtc-mv: use devm_rtc_device_register()" from the akpm tree.
+> > >> >
+> > >> > I fixed it up (I think - see below) and can carry the fix as necessary
+> > >> > (no action is required).
+> > >>
+> > >> Hi Stephan
+> > >>
+> > >> Looks O.K. to me.
+> > >>
+> > >> Acked-by: Andrew Lunn <andrew@lunn.ch>
+> > >
+> > > Same here,
+> > >
+> > > Acked-by: Jason Cooper <jason@lakedaemon.net>
 > > 
-> > linux/io.h
-> > 
-> > > +	unsigned int irqs, i, irq_base;
-> > > +
-> > > +	irq_base = irq_alloc_descs(-1, 16, irqs - 16, numa_node_id());
-> > > +	if (IS_ERR_VALUE(irq_base)) {
-> > 
-> > Erm... irq_alloc_descs() returns a negative number on error.
-> > 
-> > 	if ((int)irq_base < 0)
-> > 
-> > or make irq_base an int, and use:
-> > 
-> > 	if (irq_base < 0)
-> Just for me: So the check using IS_ERR_VALUE is as wrong as the other
-> occurences in arch/arm that you just kicked out or is it just ugly?
+> > We should make sure that future RTC changes get queued through AKPM
+> > and not through us to avoid these kind of conflicts. Same as other
+> > driver subsystems..
+> 
+> I agree, however, this patch is part of a four patch series fixing a
+> single problem reported by Simon Baatz:
+> 
+>   89c58c1 rtc: rtc-mv: Add support for clk to avoid lockups
+>   de88747 gpio: mvebu: Add clk support to prevent lockup
+>   7bf5b40 ARM: kirkwood: fix to retain gbe MAC addresses for DT kernels
+>   93fff4c ARM: kirkwood: of_serial: fix clock gating by removing clock-frequency
 
-See my recent patch removing all but one.
-
-What we're suffering from here is a mentality problem - one which seems
-to be basically this:
-
-	If a macro exists which looks like it does the job I need,
-	I must use it.  I won't look at the function and check its
-	range of values that it returns, I'll just use it and hope
-	it's the right thing.
-
-The IS_ERR_VALUE() patch and my IS_ERR_OR_NULL() patches, I've spent on
-each one less than a minute, greping, reading the function, checking its
-range of return values, sometimes longer if I need to look at other
-functions, and worked out what the valid range of return values are.
-
-However, the general pattern in the kernel is this:
-
-	For any function that returns an int, values of success will
-	be positive.  Values indicating errors will be negative.
-
-There are very few int-returning functions which violate that.  There
-is one big, well known exception, and that's in the mmap() stuff,
-where there's a need to return valid values in the range (0..TASK_SIZE)
-but differentiate them from -ve errnos.  This is where IS_ERR_VALUE()
-came from, and why it was created.  See 07ab67c8d0d7c (Fix
-get_unmapped_area sanity tests).
-
-
-Today, it seems that IS_ERR_VALUE() is now being used just as a subsitute
-for testing for < 0... and it needs to stop.  See above - unless there's
-a *good* reason, treat +ve values as success, -ve values as failure from
-functions returning int.  Always design functions in the kernel like that.
-Again - unless there's a *good* reason like needing to return 0..TASK_SIZE.
+Yep, don't go out of your way to avoid the cross-tree conflicts - we
+fix those up all the time.  It's best to keep a patch series like this
+all in one place.
