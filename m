@@ -1,267 +1,111 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 12 Mar 2013 22:40:13 +0100 (CET)
-Subject: [PATCH] irqchip: Add support for ARMv7-M's NVIC
-In-Reply-To: <20130312204701.GS15375@pengutronix.de>
-References: <1363103673-24720-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <alpine.LFD.2.02.1303121923280.22263@ionos>
- <20130312204701.GS15375@pengutronix.de>
-Message-ID: <alpine.LFD.2.02.1303122150490.22263@ionos>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Tue, 12 Mar 2013 16:43:56 -0500
+Subject: [PATCH V3 1/2] ARM: dts: OMAP2+: Add SDMA controller bindings
+ and nodes
+In-Reply-To: <513F0AE3.6030408@ti.com>
+References: <1361903244-19837-1-git-send-email-jon-hunter@ti.com>
+ <1361903244-19837-2-git-send-email-jon-hunter@ti.com>
+ <513F0AE3.6030408@ti.com>
+Message-ID: <513FA19C.60904@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 12 Mar 2013, Uwe Kleine-K?nig wrote:
+Salut Benoit!
 
-> Hello Thomas,
+On 03/12/2013 06:00 AM, Benoit Cousson wrote:
+> + Seb G.
 > 
-> On Tue, Mar 12, 2013 at 08:57:34PM +0100, Thomas Gleixner wrote:
-> > On Tue, 12 Mar 2013, Uwe Kleine-K?nig wrote:
-> > > +static struct nvic_chip_data nvic_data __read_mostly;
-> > 
-> > What the heck is this? You have a static struct which you set in
-> > irqdata.chip_data?
-> I copied that idea from the gic driver and didn't question it because I
-> thought it's too early to allocate memory when it's needed. Or do you
-> just wonder about the usage of this static variable?
-
-Right, copying stuff from some other file is always a great excuse for
-disabling the brain while coding.
-
-Why the heck do you think it's safe to call irq_alloc_descs() from
-that code then? Just because it did not explode in your face?
-
-> > > +static inline void __iomem *nvic_dist_base(struct irq_data *d)
-> > > +{
-> > > +	struct nvic_chip_data *nvic_data = irq_data_get_irq_chip_data(d);
-> > 
-> > And then you do the dance of reading the pointer to that static struct
-> > out of irq_data and dereferencing it?
-> > 
-> > What's the point of this? 
-> The idea was to keep the functions generic anyhow.
-
-Generic waste or what? If you dereference a static variable indirectly
-via five indirections that makes the code obvious and the function
-generic. I see ... NOT
-  
-> > > +	return nvic_data->dist_base;
-> > > +}
-> > > +
-> > > +static void nvic_mask_irq(struct irq_data *d)
-> > > +{
-> > > +	u32 mask = 1 << (d->hwirq % 32);
-> > > +
-> > > +	writel_relaxed(mask, nvic_dist_base(d) + NVIC_ICER + d->irq / 32 * 4);
-> > 
-> > You're really missing the point of irq_data.chip_data 
-> > 
-> > If you set proper irq chip data per bank then this whole stuff is
-> > reduced to:
-> > 
-> >    struct mydata *md = irq_data_get_irq_chip_data(d);
-> >    u32 mask = 1 << (d->irq - md->irq_base);
-> > 
-> >    writel_relaxed(mask, md->iobase + NVIC_ICER);
-> > 
-> > Can you spot the difference and what that means in terms of
-> > instruction cycles?
-> Yeah I see. The cost is increased memory usage. You'd probably say that
-> the amount needed here is too small to care about. Still many decisions
-> like this sum up and make the 4 MiB of RAM I have a tight fit.
-
-You did not answer my question completely.
-
-You buy less memory usage for an increased instruction foot print
-along with modulo/multiply/divide complexity in the interrupt hot
-path.
-  
-> > > +static void __init nvic_init_bases(struct device_node *node,
-> > > +		void __iomem *dist_base)
-> > 
-> > Please make this
-> > 
-> > static void __init nvic_init_bases(struct device_node *node,
-> >                                    void __iomem *dist_base)
-> > 
-> > That's way easier to parse. Applies to all other multiline stuff as
-> > well.
-> My version is like vim does the layout for me. It's the first time
-> someone opposes to it. The reason I prefer using a fixed indention is
-> that I don't need to touch the latter lines when for example the
-> function name or the function's type change.
-
-I don't care about vim and your preferences. I care about the
-readability and that's key for reviewing patch and reading code. Can
-you spot the difference of:
-
-static void __init nvic_init_bases(struct device_node *node,
-	void __iomem *dist_base)
-and
-
-static void __init nvic_init_bases(struct device_node *node,
-                                   void __iomem *dist_base)
-
-Or
-
-		irq_set_chip_and_handler(irq_base + i, &nvic_chip,
-				handle_fasteoi_irq);
-and
-
-		irq_set_chip_and_handler(irq_base + i, &nvic_chip,
-				         handle_fasteoi_irq);
-
-The alignment of the arguments after the opening bracket makes it
-entirely clear while your vim/lazyness style forces the reader to
-decode it separately.
- 
-> Hmm, I can fix that if you insist.
-
-You can Hmm as long as you want, except if you provide me an argument
-why your magic vim setting is superiour.
-
-> > > +	irq_base = irq_alloc_descs(-1, 16, irqs - 16, numa_node_id());
-> > 
-> >   irq_alloc_desc_from(16, irqs - 16, ...)
-> > 
-> > Also why are you allocating irqs-16 instead of the full number of
-> > irqs?
-> I already have a comment there in my tree.
-
-Brilliant answer. I ask you a question and you tell me that you have a
-comment in your tree ????
-
-Stop that nonsense, I don't care about your magic tree, but I care
-about answers to a review question.
- 
-> > > +	if (IS_ERR_VALUE(irq_base)) {
-> > 
-> > See Russells reply
-> > 
-> > > +		WARN(1, "Cannot allocate irq_descs\n");
-> > 
-> > What's the point of that warn? The call path is always the same. So
-> > you are spamming dmesg with a pointless backtrace. And on top of that
-> > you do:
-> There is one warning per call to nvic_init_bases. So I don't expect more
-> than one message in dmesg.
-
-You're missing the point again. It does not matter whether you expect
-one or more. The point is, the call chain is known already. So why is
-dumping a stack trace usefull? It's entirely sufficient to have a
-pr_warn() or whatever, simply because this is the important
-information which might scroll out of the observers window with a
-stack trace which is completely useless. A stack trace is only
-helpfull when the code in question can be called from a gazillion of
-call sites. If the call chain is clear, it's pointless.
- 
-> > 
-> > > +		irq_base = 16;
-> > 
-> > So you cannot allocate irq_descs and then you set base to 16 and pray
-> > that everything works?
-> If something goes wrong here the machine is probably silent about it. So
-> continuing after a prayer might (or might not?) be an option.
-
-What are you smoking? Either the machine can work with the
-preallocated 16 irqs and allow you to retrieve additional debugging
-info or it does not. It's that easy.
- 
-> > > +	}
-> > > +	nvic_data.domain = irq_domain_add_legacy(node, irqs - 16, irq_base, 0,
-> > > +			&irq_domain_simple_ops, NULL);
-> > > +	if (WARN_ON(!nvic_data.domain))
-> > > +		return;
-> > 
-> > See above. Also you are leaking irqdescs though it's questionable
-> > whether the machine can continue at all. And of course the init call
-> > itself will return sucess.
-
--ENOANSWER
-
-> > > +	/*
-> > > +	 * Set priority on all interrupts.
-> > > +	 */
-> > > +	for (i = 0; i < irqs; i += 4)
-> > > +		writel_relaxed(0, dist_base + NVIC_IPRI + i);
-> > > +
-> > > +	/*
-> > > +	 * Disable all interrupts
-> > > +	 */
-> > > +	for (i = 0; i < irqs; i += 32)
-> > > +		writel_relaxed(~0, dist_base + NVIC_ICER + i * 4 / 32);
-> > > +
-> > > +	/*
-> > > +	 * Setup the Linux IRQ subsystem.
-> > > +	 */
-> > > +	for (i = 0; i < irqs; i++) {
-> > > +		irq_set_chip_and_handler(irq_base + i, &nvic_chip,
-> > > +				handle_fasteoi_irq);
-> > 
-> > Above you do:
-> > 	irq_base = irq_alloc_descs(-1, 16, irqs - 16, numa_node_id());
-> > 
-> > So you allocate irqs-16 interrupt descriptors and then you initialize
-> > 16 more than you allocated.
-> right.
+> Hi Jon,
 > 
-> > Brilliant stuff that.
+> How to you plan to merge that series?
 
--ENOANSWER
- 
-> > > +		irq_set_chip_data(irq_base + i, &nvic_data);
-> > > +		set_irq_flags(irq_base + i, IRQF_VALID | IRQF_PROBE);
-> > > +	}
-> > > +}
-> > > +
-> > > +static int __init nvic_of_init(struct device_node *node,
-> > > +		struct device_node *parent)
-> > > +{
-> > > +	void __iomem *dist_base;
-> > > +
-> > > +	if (WARN_ON(!node))
-> > 
-> > Sigh.
-> > 
-> > Though the real question is: can this actually happen?
-> It didn't happen for me.
+Good question ... my thinking was that you or Tony would take 1/2 and
+once that is queued then I would ask Tony to ack 2/2 and Vinod take that
+patch.
 
-Great argument for writing silly code.
+By the way, I have accumulated several DT patches which I sent out
+altogether [1] (at least for my own sanity if no one elses ;-) and I
+have included the below patch with it. I was hoping that may be I could
+create a branch for you to pull. If you would rather cherry-pick the
+various patches and merge yourself then I can separate them too.
 
-> What do you suggest? dropping WARN_ON?
+> Seb's just posted a McBSP adaptation to SDMA binding, so I'll have to
+> take this one before being able to merge any other SDMA driver
+> adaptation patches.
+> 
+> I'm fine to take that one, if you are OK, to avoid merge conflict in DTS
+> later.
 
-Did you actually try to understand any of my review questions?
+Fine with me and that would be preferred. I don't see any downside in
+taking this one and then having Vinod take the other later.
 
-> > > +		return -ENODEV;
-> > > +
-> > > +	dist_base = of_iomap(node, 0);
-> > > +	WARN(!dist_base, "unable to map nvic dist registers\n");
-> > 
-> > Brilliant. You can't map stuff and then you continue just for fun or
-> > what?
-> What do you suggest? returning -ESOMETHING?
+> On 02/26/2013 07:27 PM, Jon Hunter wrote:
+>> Add SDMA controller binding for OMAP2+ devices and populate DMA client
+>> information for SPI and MMC periperhal on OMAP3+ devices. Please note
+> 
+> typo-------------------------------^
 
--EMORON perhaps?
+Thanks! Will fix.
 
-Come on, do I need to make any further suggestions? See above, either
-the machine can survive the failure or it cannot.
- 
-> > > +	nvic_init_bases(node, dist_base);
-> > 
-> > Great. You have failure pathes in nvic_init_bases() and then you
-> > return unconditionally success:
+>> that OMAP24xx devices do not have SPI and MMC bindings available yet and
+>> so DMA client information is not populated.
+>>
+>> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+>> Reviewed-by: Felipe Balbi <balbi@ti.com>
+>> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> ---
+>>  .../devicetree/bindings/dma/omap-sdma.txt          |   51 ++++++++++++++++++++
+> 
+> That's a detail, but the bindings should be introduced along with the
+> driver DT adaptation since it does represent its "interface".
 
--ENOANSWER
+Ok, I can add that to patch 2/2 instead.
 
-> Most of your critics also apply to irq-gic.c.
+>>  arch/arm/boot/dts/omap2.dtsi                       |   12 +++++
+>>  arch/arm/boot/dts/omap3.dtsi                       |   40 +++++++++++++++
+>>  arch/arm/boot/dts/omap4.dtsi                       |   41 ++++++++++++++++
+>>  arch/arm/boot/dts/omap5.dtsi                       |   41 ++++++++++++++++
+>>  5 files changed, 185 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/dma/omap-sdma.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/dma/omap-sdma.txt b/Documentation/devicetree/bindings/dma/omap-sdma.txt
+>> new file mode 100644
+>> index 0000000..22aab28
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/dma/omap-sdma.txt
+>> @@ -0,0 +1,51 @@
+>> +* TI OMAP SDMA controller
+>> +
+>> +Required properties:
+>> +- compatible:		Should be set to one of the following:
+>> +
+>> +			ti,omap2420-sdma (omap2420)
+>> +			ti,omap2430-sdma (omap2430)
+>> +			ti,omap3430-sdma (omap3430)
+>> +			ti,omap3630-sdma (omap3630)
+>> +			ti,omap4430-sdma (omap4430 & omap4460 & omap543x)
+>> +
+>> +- reg: 			Contains DMA registers location and length.
+>> +- interrupts: 		Contains DMA interrupt information.
+>> +- #dma-cells: 		Must be 1.
+>> +- #dma-channels:	Contains total number of programmable DMA channels.
+>> +- #dma-requests:	Contains total number of DMA requests.
+>> +
+>> +Example:
+>> +
+>> +	sdma: dma-controller at 4A056000 {
+>> +		compatible = "ti,omap-sdma";
+>> +		reg = <0x4A056000 0x1000>;
+> 
+> 
+> Nit: you do have several hexa values in upper case, here and in some dts
+> as well.
 
-That's completely irrelevant.
+Yes will fix that too.
 
-> I will follow up with a patch for that when you are happy with my
-> work for the nvic.
+Cheers
+Jon
 
-Do you really think that copying crappy code, making that copied code
-worse and on top of that nerve racking the reviewer makes you the
-person of choice to fixup the initial crap ?
-
-Thanks,
-
-	tglx
+[1]
+http://www.mail-archive.com/devicetree-discuss at lists.ozlabs.org/msg28050.html
