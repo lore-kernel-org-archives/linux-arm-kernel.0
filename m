@@ -1,34 +1,24 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 12 Mar 2013 13:53:49 -0500
-Subject: [PATCH v2 02/14] clocksource: sp804: add device tree support
-In-Reply-To: <201303121851.35326.arnd@arndb.de>
-References: <1363108124-17484-1-git-send-email-haojian.zhuang@linaro.org>
- <1363108124-17484-3-git-send-email-haojian.zhuang@linaro.org>
- <201303121851.35326.arnd@arndb.de>
-Message-ID: <513F79BD.1050903@gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 12 Mar 2013 18:54:08 +0000
+Subject: [PATCH 03/10] mx-ssi: flush fifos
+In-Reply-To: <1362940391-8338-4-git-send-email-mpa@pengutronix.de>
+References: <1362940391-8338-1-git-send-email-mpa@pengutronix.de>
+ <1362940391-8338-4-git-send-email-mpa@pengutronix.de>
+Message-ID: <20130312185408.GU19942@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/12/2013 01:51 PM, Arnd Bergmann wrote:
-> On Tuesday 12 March 2013, Haojian Zhuang wrote:
->> +static void __init sp804_dt_init(void)
->> +{
-> ...
->> +
->> +       np = of_find_matching_node(from, sp804_timer_match);
-> ...
->> +}
->> +CLOCKSOURCE_OF_DECLARE(sp804, "arm,sp804", sp804_dt_init);
+On Sun, Mar 10, 2013 at 07:33:04PM +0100, Markus Pargmann wrote:
+> From: Sascha Hauer <s.hauer@pengutronix.de>
 > 
-> On second thought, I guess it would be nice if we could change the
-> calling conventions for CLOCKSOURCE_OF_DECLARE init functions to
-> always pass the device along.  It is a bit silly if we already have
-> the node in clocksource_of_init and then require the init function
-> to call of_find_matching_node(). That change would also make patch
-> 3 in this series unnecessary.
-> 
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 
-My pull request to you yesterday does this. And I also have similar
-sp804 patches I'm working on...
-
-Rob
+Why?  Is this a bug fix?  I'm guessing it is but...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130312/d8e88678/attachment.sig>
