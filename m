@@ -1,39 +1,48 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Tue, 12 Mar 2013 10:25:05 -0700
-Subject: [PATCH v1] ARM: keep __my_cpu_offset consistent with generic one
-In-Reply-To: <CACVXFVP4NeZBg5yZW8q+vhgs0m3knkkdvyjv_hc9BLrFPqEBJA@mail.gmail.com>
-References: <1362663356-21151-1-git-send-email-tom.leiming@gmail.com>
- <CACVXFVOhr222CVrzkVP_oLgVkdReD9BXXSBg7fmp6Wvx9_peCw@mail.gmail.com>
- <20130312105638.GQ4977@n2100.arm.linux.org.uk>
- <CACVXFVOEvvFT805TJHoppqGRLTRuP18=Wg72LSXryffZD_WH1A@mail.gmail.com>
- <20130312113048.GS4977@n2100.arm.linux.org.uk>
- <CACVXFVP4NeZBg5yZW8q+vhgs0m3knkkdvyjv_hc9BLrFPqEBJA@mail.gmail.com>
-Message-ID: <20130312172505.GA25266@htj.dyndns.org>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Tue, 12 Mar 2013 13:30:39 -0400
+Subject: [PATCH 12/29] arm64: KVM: kvm_arch and kvm_vcpu_arch definitions
+In-Reply-To: <1362455265-24165-13-git-send-email-marc.zyngier@arm.com>
+References: <1362455265-24165-1-git-send-email-marc.zyngier@arm.com>
+ <1362455265-24165-13-git-send-email-marc.zyngier@arm.com>
+Message-ID: <513F663F.8040200@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Marc,
 
-On Tue, Mar 12, 2013 at 07:44:55PM +0800, Ming Lei wrote:
-> On Tue, Mar 12, 2013 at 7:30 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> >>
-> >> Ingo and Peter, what is your opinion on the problem?
-> >
-> > Having discussed this with Ben Herrenschmidt, it seems that we do need
-> > to have a more complex patch to sort this out - we need to setup our
-> > private pointer inside setup_per_cpu_areas().
+On 03/04/2013 10:47 PM, Marc Zyngier wrote:
+> Provide the architecture dependent structures for VM and
+> vcpu abstractions.
 > 
-> Suppose so, seems the patch is still needed to make CPU0 see
-> static variables in '.data..percpu' section correctly.
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/include/asm/kvm_host.h | 178 ++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 178 insertions(+)
+>  create mode 100644 arch/arm64/include/asm/kvm_host.h
+> 
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> new file mode 100644
+> index 0000000..d1095d1
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/kvm_host.h
 
-If my memory serves me right, x86 also has places where CPU0 accesses
-its per-cpu data in .data.percpu.  While those existed (not sure
-they're still there but probably they're) mostly due to historical
-reasons rather than by design, as long as the data is in consistent
-state by and during percpu setup, nothing will break.
+[...]
 
-Thanks.
+> +struct kvm_vcpu_fault_info {
+> +	u32 esr_el2;		/* Hyp Syndrom Register */
+
+Syndrome
+
+> +	u64 far_el2;		/* Hyp Fault Address Register */
+> +	u64 hpfar_el2;		/* Hyp IPA Fault Address Register */
+> +};
+
+[...]
+
+Regards,
+Christopher
 
 -- 
-tejun
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by
+the Linux Foundation
