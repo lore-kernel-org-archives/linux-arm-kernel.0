@@ -1,32 +1,36 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 12 Mar 2013 12:28:30 +0000
-Subject: [PATCH 00/04] ARM: shmobile: r8a73a4 SoC and APE6EVM board support
-In-Reply-To: <20130312045559.19701.77841.sendpatchset@w520>
+Date: Tue, 12 Mar 2013 12:31:29 +0000
+Subject: [PATCH 03/04] ARM: shmobile: r8a73a4 IRQC support
+In-Reply-To: <20130312045628.19701.58216.sendpatchset@w520>
 References: <20130312045559.19701.77841.sendpatchset@w520>
-Message-ID: <201303121228.31067.arnd@arndb.de>
+ <20130312045628.19701.58216.sendpatchset@w520>
+Message-ID: <201303121231.29869.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tuesday 12 March 2013, Magnus Damm wrote:
-> ARM: shmobile: r8a73a4 SoC and APE6EVM board support
+> From: Magnus Damm <damm@opensource.se>
 > 
-> [PATCH 01/04] ARM: shmobile: Initial r8a73a4 SoC support
-> [PATCH 02/04] ARM: shmobile: r8a73a4 SCIF support
-> [PATCH 03/04] ARM: shmobile: r8a73a4 IRQC support
-> [PATCH 04/04] ARM: shmobile: APE6EVM support
+> Add IRQC interrupt controller support to r8a73a4 by
+> hooking up two IRQC instances to handle 58 external
+> IRQ signals. There IRQC controllers are tied to SPIs
+> of the GIC. On r8a73a4 exact IRQ pin routing is handled
+> by the PFC which is excluded from this patch.
 > 
-> This series adds initial support for r8a73a4 and APE6EVM. The SoC
-> is known as r8a73a4 which is built around Cortex-A15 and makes use
-> of SCIF for serial and IRQC interrupt controller for external IRQs.
-> 
-> This initial SoC and board support is providing limited DT-only
-> support and a very basic C-version of board support. In the future
-> improved PINCTRL and clock framework support will be added, followed
-> by SMP support.
+> Both platform devices and DT devices are added in this
+> patch. The platform device versions are used to provide
+> a static interrupt map configuration for board code
+> written in C.
 > 
 > Signed-off-by: Magnus Damm <damm@opensource.se>
 
-Patches look good so far. I assume you have made them in a way that lets
-you easily keep around non-DT support internally, right?
+What is the status of the IRQC DT support? I remember that I wasn't
+happy with a prior version, but I did not follow up on some of the
+questions that came up, sorry about that.
+
+Did the patches end up getting merged anyway, or should we resume the
+discussion about those patches? I understand that lack of INTC bindings
+would make new SoC support particularly hard, and I don't want to
+be responsible for holding you up here.
 
 	Arnd
