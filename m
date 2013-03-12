@@ -1,52 +1,39 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Wed, 13 Mar 2013 01:08:43 +0800
-Subject: [PATCH v2 14/14] Document: add device tree binding file for sp804
-In-Reply-To: <1363108124-17484-1-git-send-email-haojian.zhuang@linaro.org>
-References: <1363108124-17484-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1363108124-17484-15-git-send-email-haojian.zhuang@linaro.org>
+From: tj@kernel.org (Tejun Heo)
+Date: Tue, 12 Mar 2013 10:25:05 -0700
+Subject: [PATCH v1] ARM: keep __my_cpu_offset consistent with generic one
+In-Reply-To: <CACVXFVP4NeZBg5yZW8q+vhgs0m3knkkdvyjv_hc9BLrFPqEBJA@mail.gmail.com>
+References: <1362663356-21151-1-git-send-email-tom.leiming@gmail.com>
+ <CACVXFVOhr222CVrzkVP_oLgVkdReD9BXXSBg7fmp6Wvx9_peCw@mail.gmail.com>
+ <20130312105638.GQ4977@n2100.arm.linux.org.uk>
+ <CACVXFVOEvvFT805TJHoppqGRLTRuP18=Wg72LSXryffZD_WH1A@mail.gmail.com>
+ <20130312113048.GS4977@n2100.arm.linux.org.uk>
+ <CACVXFVP4NeZBg5yZW8q+vhgs0m3knkkdvyjv_hc9BLrFPqEBJA@mail.gmail.com>
+Message-ID: <20130312172505.GA25266@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add binding document for sp804 dual timer.
+Hello,
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
----
- .../devicetree/bindings/timer/arm,sp804.txt        |   27 ++++++++++++++++++++
- 1 file changed, 27 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/timer/arm,sp804.txt
+On Tue, Mar 12, 2013 at 07:44:55PM +0800, Ming Lei wrote:
+> On Tue, Mar 12, 2013 at 7:30 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> >>
+> >> Ingo and Peter, what is your opinion on the problem?
+> >
+> > Having discussed this with Ben Herrenschmidt, it seems that we do need
+> > to have a more complex patch to sort this out - we need to setup our
+> > private pointer inside setup_per_cpu_areas().
+> 
+> Suppose so, seems the patch is still needed to make CPU0 see
+> static variables in '.data..percpu' section correctly.
 
-diff --git a/Documentation/devicetree/bindings/timer/arm,sp804.txt b/Documentation/devicetree/bindings/timer/arm,sp804.txt
-new file mode 100644
-index 0000000..ec1ae45
---- /dev/null
-+++ b/Documentation/devicetree/bindings/timer/arm,sp804.txt
-@@ -0,0 +1,27 @@
-+ARM sp804 Dual Timers
-+---------------------------------------
-+
-+Required properties:
-+- compatible: Should be "arm,sp804" & "arm,primecell"
-+- interrupts: Should contain the list of Dual Timer interrupts
-+	interrupts = <0 0 4>, <0 1 4>;
-+- reg: Should contain location and length for dual timer register.
-+- clocks: clock driving the dual timer hardware
-+	clocks = <&timclk0 &timclk1>;
-+
-+Optional properties:
-+- arm,sp804-clocksource: Should contain the register offset of TIMER1 or
-+  TIMER2 in Dual Timer Controller.
-+	arm,sp804-clocksource = <0x20>;
-+
-+Example:
-+
-+	timer0: timer at fc800000 {
-+		compatible = "arm,sp804", "arm,primecell";
-+		reg = <0xfc800000 0x1000>;
-+		/* timer00 & timer01 */
-+		interrupts = <0 0 4>, <0 1 4>;
-+		clocks = <&timclk0 &timclk1>;
-+		clock-names = "apb_pclk";
-+		status = "disabled";
-+	};
+If my memory serves me right, x86 also has places where CPU0 accesses
+its per-cpu data in .data.percpu.  While those existed (not sure
+they're still there but probably they're) mostly due to historical
+reasons rather than by design, as long as the data is in consistent
+state by and during percpu setup, nothing will break.
+
+Thanks.
+
 -- 
-1.7.10.4
+tejun
