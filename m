@@ -1,152 +1,191 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 12 Mar 2013 13:50:42 +0000
-Subject: [PATCH 04/29] arm64: KVM: system register definitions for 64bit
- guests
-In-Reply-To: <513F2BA7.6020004@codeaurora.org>
-References: <1362455265-24165-1-git-send-email-marc.zyngier@arm.com>
- <1362455265-24165-5-git-send-email-marc.zyngier@arm.com>
- <513F2BA7.6020004@codeaurora.org>
-Message-ID: <513F32B2.6070700@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 12 Mar 2013 13:51:23 +0000
+Subject: [GIT PULL]  arm-soc fixes for 3.9-rc2
+Message-ID: <201303121351.23297.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/03/13 13:20, Christopher Covington wrote:
+Hi Linus,
 
-Hi Christopher,
+Here is the usual round of arm-soc fixes on top of 3.9-rc2. There are a couple more
+fixes in there than I'd like because Olof and I did not get around to send a pull
+request last week during Linaro Connect.
 
-> Here are a few minor questions and suggestions.
-> 
-> On 03/04/2013 10:47 PM, Marc Zyngier wrote:
->> Define the saved/restored registers for 64bit guests.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm64/include/asm/kvm_asm.h | 68 ++++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 68 insertions(+)
->>  create mode 100644 arch/arm64/include/asm/kvm_asm.h
-> 
-> [...]
-> 
->> +/*
->> + * 0 is reserved as an invalid value.
->> + * Order *must* be kept in sync with the hyp switch code.
->> + */
->> +#define	MPIDR_EL1	1	/* MultiProcessor Affinity Register */
->> +#define	CSSELR_EL1	2	/* Cache Size Selection Register */
->> +#define	SCTLR_EL1	3	/* System Control Register */
->> +#define	ACTLR_EL1	4	/* Auxilliary Control Register */
->> +#define	CPACR_EL1	5	/* Coprocessor Access Control */
->> +#define	TTBR0_EL1	6	/* Translation Table Base Register 0 */
->> +#define	TTBR1_EL1	7	/* Translation Table Base Register 1 */
->> +#define	TCR_EL1		8	/* Translation Control Register */
->> +#define	ESR_EL1		9	/* Exception Syndrome Register */
->> +#define	AFSR0_EL1	10	/* Auxilary Fault Status Register 0 */
->> +#define	AFSR1_EL1	11	/* Auxilary Fault Status Register 1 */
->> +#define	FAR_EL1		12	/* Fault Address Register */
->> +#define	MAIR_EL1	13	/* Memory Attribute Indirection Register */
->> +#define	VBAR_EL1	14	/* Vector Base Address Register */
->> +#define	CONTEXTIDR_EL1	15	/* Context ID Register */
->> +#define	TPIDR_EL0	16	/* Thread ID, User R/W */
->> +#define	TPIDRRO_EL0	17	/* Thread ID, User R/O */
->> +#define	TPIDR_EL1	18	/* Thread ID, Privileged */
->> +#define	AMAIR_EL1	19	/* Aux Memory Attribute Indirection Register */
->> +#define	CNTKCTL_EL1	20	/* Timer Control Register (EL1) */
-> 
-> Any particular reason to have CNTKCTL_EL1 enumerated here and handled by
-> (dump|load)_sysregs, but all the other timer registers handled by
-> (save|restore)_timer_state in hyp.S?
+	Arnd
+----
+The following changes since commit 6dbe51c251a327e012439c4772097a13df43c5b8:
 
-This one is a bit of an odd one, as it controls the guest kernel
-decision to expose its timer/counter to its own userspace. It is not
-directly involved into the timekeeping itself.
+  Linux 3.9-rc1 (2013-03-03 15:11:05 -0800)
 
-As such, my choice was to make it part of the CPU state rather than the
-timer state. But I admit this may not be the most obvious choice.
+are available in the git repository at:
 
->> +#define	NR_SYS_REGS	21
-> 
-> [...]
-> 
->> +/* Hyp Syndrome Register (HSR) bits */
->> +#define ESR_EL2_EC_SHIFT	(26)
->> +#define ESR_EL2_EC		(0x3fU << ESR_EL2_EC_SHIFT)
->> +#define ESR_EL2_IL		(1U << 25)
->> +#define ESR_EL2_ISS		(ESR_EL2_IL - 1)
->> +#define ESR_EL2_ISV_SHIFT	(24)
->> +#define ESR_EL2_ISV		(1U << ESR_EL2_ISV_SHIFT)
->> +#define ESR_EL2_SAS_SHIFT	(22)
->> +#define ESR_EL2_SAS		(3U << ESR_EL2_SAS_SHIFT)
->> +#define ESR_EL2_SSE		(1 << 21)
->> +#define ESR_EL2_SRT_SHIFT	(16)
->> +#define ESR_EL2_SRT_MASK	(0x1f << ESR_EL2_SRT_SHIFT)
->> +#define ESR_EL2_SF 		(1 << 15)
->> +#define ESR_EL2_AR 		(1 << 14)
->> +#define ESR_EL2_EA 		(1 << 9)
->> +#define ESR_EL2_CM 		(1 << 8)
->> +#define ESR_EL2_S1PTW 		(1 << 7)
->> +#define ESR_EL2_WNR		(1 << 6)
->> +#define ESR_EL2_FSC		(0x3f)
->> +#define ESR_EL2_FSC_TYPE	(0x3c)
->> +
->> +#define ESR_EL2_CV_SHIFT	(24)
->> +#define ESR_EL2_CV		(1U << ESR_EL2_CV_SHIFT)
->> +#define ESR_EL2_COND_SHIFT	(20)
->> +#define ESR_EL2_COND		(0xfU << ESR_EL2_COND_SHIFT)
-> 
-> [...]
-> 
->> +#define ESR_EL2_EC_UNKNOWN	(0x00)
->> +#define ESR_EL2_EC_WFI		(0x01)
->> +#define ESR_EL2_EC_CP15_32	(0x03)
->> +#define ESR_EL2_EC_CP15_64	(0x04)
->> +#define ESR_EL2_EC_CP14_MR	(0x05)
->> +#define ESR_EL2_EC_CP14_LS	(0x06)
->> +#define ESR_EL2_EC_SIMD_FP	(0x07)
->> +#define ESR_EL2_EC_CP10_ID	(0x08)
->> +#define ESR_EL2_EC_CP14_64	(0x0C)
->> +#define ESR_EL2_EC_ILL_ISS	(0x0E)
->> +#define ESR_EL2_EC_SVC32	(0x11)
->> +#define ESR_EL2_EC_HVC32	(0x12)
->> +#define ESR_EL2_EC_SMC32	(0x13)
->> +#define ESR_EL2_EC_SVC64	(0x14)
->> +#define ESR_EL2_EC_HVC64	(0x16)
->> +#define ESR_EL2_EC_SMC64	(0x17)
->> +#define ESR_EL2_EC_SYS64	(0x18)
->> +#define ESR_EL2_EC_IABT		(0x20)
->> +#define ESR_EL2_EC_IABT_HYP	(0x21)
->> +#define ESR_EL2_EC_PC_ALIGN	(0x22)
->> +#define ESR_EL2_EC_DABT		(0x24)
->> +#define ESR_EL2_EC_DABT_HYP	(0x25)
->> +#define ESR_EL2_EC_SP_ALIGN	(0x26)
->> +#define ESR_EL2_EC_FP32		(0x28)
->> +#define ESR_EL2_EC_FP64		(0x2C)
->> +#define ESR_EL2_EC_SERRROR	(0x2F)
->> +#define ESR_EL2_EC_BREAKPT	(0x30)
->> +#define ESR_EL2_EC_BREAKPT_HYP	(0x31)
->> +#define ESR_EL2_EC_SOFTSTP	(0x32)
->> +#define ESR_EL2_EC_SOFTSTP_HYP	(0x33)
->> +#define ESR_EL2_EC_WATCHPT	(0x34)
->> +#define ESR_EL2_EC_WATCHPT_HYP	(0x35)
->> +#define ESR_EL2_EC_BKPT32	(0x38)
->> +#define ESR_EL2_EC_VECTOR32	(0x3A)
->> +#define ESR_EL2_EC_BKPT64	(0x3C)
-> 
-> Is there any functional difference between these fields and bits at EL2 and
-> these fields at other exception levels? If not, you could consider omitting
-> "_EL2".
-> 
-> [...]
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes
 
-A few values here are EL2 specific (ESR_EL2_EC_*_HYP,
-ESR_EL2_EC_HVC{32,64}, ESR_EL2_EC_CP1*...).
+for you to fetch changes up to 27f423fe120df3a7488dd750b4e0508f03c325b6:
 
-The fields themselves should be broadly compatible (I should go and
-verify this though). Now, what I want to avoid is any sort of confusion
-between exception levels, and make clear which level we're operating on.
+  ARM: spear3xx: Use correct pl080 header file (2013-03-12 10:56:32 +0100)
 
-If I can be sure we always operate in a non-ambiguous context, then _EL2
-can go indeed.
+----------------------------------------------------------------
+arm-soc fixes for 3.9-rc2
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+These bug fixes are for the largest part for mvebu/kirkwood, which
+saw a few regressions after the clock infrastructure was enabled,
+and for OMAP, which showed a few more preexisting bugs with
+the new multiplatform support.
+
+Other small fixes are for imx, mxs, tegra, spear and socfpga.
+
+----------------------------------------------------------------
+Aaro Koskinen (1):
+      ARM: OMAP: RX-51: add missing USB phy binding
+
+Andrew Lunn (2):
+      gpio: mvebu: Add clk support to prevent lockup
+      rtc: rtc-mv: Add support for clk to avoid lockups
+
+Arnd Bergmann (5):
+      Merge tag 'omap-for-v3.9-rc1/fixes-signed' of git://git.kernel.org/.../tmlind/linux-omap into fixes
+      Merge tag 'mxs-fixes-3.9-2' of git://git.linaro.org/people/shawnguo/linux-2.6 into fixes
+      Merge tag 'imx-fixes-3.9-2' of git://git.linaro.org/people/shawnguo/linux-2.6 into fixes
+      Merge tag 'mvebu_fixes_for_v3.9' of git://git.infradead.org/users/jcooper/linux into fixes
+      ARM: spear3xx: Use correct pl080 header file
+
+Fabio Estevam (4):
+      ARM: mxs_defconfig: Make USB host functional again
+      ARM: mxs: mm: Fix sparse warning
+      ARM: mxs: icoll: Fix sparse warning
+      ARM: mxs: ocotp: Fix sparse warning
+
+Felipe Balbi (1):
+      ARM: OMAP2+: mux: fix debugfs file permission
+
+Florian Fainelli (1):
+      arm: mvebu: enable the USB ports on Armada 370 Reference Design board
+
+Heikki Krogerus (1):
+      arm: mvebu: Reduce reg-io-width with UARTs
+
+Jason Cooper (1):
+      ARM: kirkwood: of_serial: fix clock gating by removing clock-frequency
+
+Javi Merino (1):
+      irqchip: fix typo when moving gic_raise_softirq()
+
+Jean-Francois Moine (1):
+      ARM: Dove: add RTC device node
+
+Jon Hunter (1):
+      ARM: OMAP2+: Fix broken gpmc support
+
+Maxime Ripard (2):
+      ARM: mxs: cfa10049: Fix fb initialisation function
+      ARM: multiplatform: Sort the max gpio numbers.
+
+Nicolas Pitre (1):
+      ARM: mach-imx: move early resume code out of the .data section
+
+Nishanth Menon (1):
+      ARM: dts: remove generated .dtb files on clean
+
+Olof Johansson (2):
+      Merge tag 'imx-fixes-3.9' of git://git.linaro.org/people/shawnguo/linux-2.6 into fixes
+      Merge tag 'mxs-fixes-3.9' of git://git.linaro.org/people/shawnguo/linux-2.6 into fixes
+
+Padmavathi Venna (1):
+      Arm: socfpga: pl330: Add #dma-cells for generic dma binding support
+
+Paul Bolle (3):
+      ARM: SPEAr13xx: Fix typo "ARCH_HAVE_CPUFREQ"
+      ARM: dove: drop "select COMMON_CLK_DOVE"
+      ARM: imx: fix typo "DEBUG_IMX50_IMX53_UART"
+
+Prashant Gaikwad (2):
+      ARM: Tegra: Add clock entry for smp_twd clock
+      clk: Tegra: Remove duplicate smp_twd clock
+
+Rajendra Nayak (1):
+      ARM: OMAP3: board-generic: Add missing omap3_init_late
+
+Ruslan Bilovol (1):
+      ARM: OMAP2+: mux: correct wrong error messages
+
+Santosh Shilimkar (1):
+      ARM: OMAP2+: Remove duplicate omap4430_init_late() declaration
+
+Sebastian Hesselbarth (1):
+      ARM: kirkwood: fix to retain gbe MAC addresses for DT kernels
+
+Shawn Guo (2):
+      ARM: dts: imx53-mba53: fix fsl,pins for disp1-grp1
+      ARM: imx: pll1_sys should be an initial on clk
+
+Stephen Warren (1):
+      ARM: bcm2835: fix I2C module clock rate
+
+Thomas Petazzoni (3):
+      arm: plat-orion: fix address decoding when > 4GB is used
+      arm: mvebu: fix address-cells in mpic DT node
+      arm: mach-orion5x: fix typo in compatible string of a .dts file
+
+Tony Lindgren (2):
+      ARM: OMAP1: Fix build related to kgdb.h no longer including serial_8250.h
+      ARM: OMAP2+: Fix unmet direct dependencies for zoom for 8250 serial
+
+ arch/arm/Kconfig                                   |  8 ++++---
+ arch/arm/Kconfig.debug                             |  2 +-
+ arch/arm/boot/Makefile                             |  2 +-
+ arch/arm/boot/dts/armada-370-rd.dts                |  8 +++++++
+ arch/arm/boot/dts/armada-370-xp.dtsi               |  5 ++--
+ arch/arm/boot/dts/armada-xp.dtsi                   |  4 ++--
+ arch/arm/boot/dts/bcm2835.dtsi                     |  2 +-
+ arch/arm/boot/dts/dove.dtsi                        |  5 ++++
+ arch/arm/boot/dts/imx53-mba53.dts                  |  3 +--
+ arch/arm/boot/dts/kirkwood-dns320.dts              |  2 --
+ arch/arm/boot/dts/kirkwood-dns325.dts              |  1 -
+ arch/arm/boot/dts/kirkwood-dockstar.dts            |  1 -
+ arch/arm/boot/dts/kirkwood-dreamplug.dts           |  1 -
+ arch/arm/boot/dts/kirkwood-goflexnet.dts           |  1 -
+ arch/arm/boot/dts/kirkwood-ib62x0.dts              |  1 -
+ arch/arm/boot/dts/kirkwood-iconnect.dts            |  1 -
+ arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts      |  1 -
+ arch/arm/boot/dts/kirkwood-km_kirkwood.dts         |  1 -
+ arch/arm/boot/dts/kirkwood-lschlv2.dts             |  1 -
+ arch/arm/boot/dts/kirkwood-lsxhl.dts               |  1 -
+ arch/arm/boot/dts/kirkwood-mplcec4.dts             |  1 -
+ arch/arm/boot/dts/kirkwood-ns2-common.dtsi         |  1 -
+ arch/arm/boot/dts/kirkwood-nsa310.dts              |  1 -
+ arch/arm/boot/dts/kirkwood-openblocks_a6.dts       |  2 --
+ arch/arm/boot/dts/kirkwood-topkick.dts             |  1 -
+ arch/arm/boot/dts/kirkwood.dtsi                    |  5 ++--
+ .../dts/orion5x-lacie-ethernet-disk-mini-v2.dts    |  2 +-
+ arch/arm/boot/dts/socfpga.dtsi                     |  3 +++
+ arch/arm/boot/dts/tegra20.dtsi                     |  1 +
+ arch/arm/boot/dts/tegra30.dtsi                     |  1 +
+ arch/arm/configs/mxs_defconfig                     |  1 +
+ arch/arm/configs/omap2plus_defconfig               |  2 ++
+ arch/arm/mach-imx/clk-imx6q.c                      |  2 +-
+ arch/arm/mach-imx/headsmp.S                        | 18 +++++++-------
+ arch/arm/mach-imx/pm-imx6q.c                       | 15 ------------
+ arch/arm/mach-kirkwood/board-dt.c                  | 25 +++++++++++++------
+ arch/arm/mach-mxs/icoll.c                          |  2 +-
+ arch/arm/mach-mxs/mach-mxs.c                       | 10 ++++----
+ arch/arm/mach-mxs/mm.c                             |  1 +
+ arch/arm/mach-mxs/ocotp.c                          |  1 +
+ arch/arm/mach-omap1/common.h                       |  2 ++
+ arch/arm/mach-omap2/Kconfig                        |  6 -----
+ arch/arm/mach-omap2/board-generic.c                |  2 ++
+ arch/arm/mach-omap2/board-rx51.c                   |  2 ++
+ arch/arm/mach-omap2/common.h                       |  1 -
+ arch/arm/mach-omap2/gpmc.c                         |  6 ++---
+ arch/arm/mach-omap2/mux.c                          |  9 +++----
+ arch/arm/mach-spear3xx/spear3xx.c                  |  2 +-
+ arch/arm/plat-orion/addr-map.c                     |  7 ++++--
+ arch/arm/plat-spear/Kconfig                        |  2 +-
+ drivers/clk/tegra/clk-tegra20.c                    |  1 -
+ drivers/clk/tegra/clk-tegra30.c                    |  1 -
+ drivers/gpio/gpio-mvebu.c                          |  7 ++++++
+ drivers/irqchip/irq-gic.c                          |  2 +-
+ drivers/rtc/rtc-mv.c                               | 28 ++++++++++++++++++----
+ drivers/video/omap/lcd_ams_delta.c                 |  1 +
+ drivers/video/omap/lcd_osk.c                       |  3 +++
+ 57 files changed, 131 insertions(+), 97 deletions(-)
