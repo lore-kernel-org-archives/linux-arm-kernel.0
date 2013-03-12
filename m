@@ -1,89 +1,46 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 11 Mar 2013 21:26:36 -0500
-Subject: [PATCH 2/3] ARM: sched_clock: support 64-bit counters
+Date: Mon, 11 Mar 2013 21:26:37 -0500
+Subject: [PATCH 3/3] ARM: arch_timer: use the 64-bit sched_clock setup
 In-Reply-To: <1363055197-17296-1-git-send-email-robherring2@gmail.com>
 References: <1363055197-17296-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1363055197-17296-3-git-send-email-robherring2@gmail.com>
+Message-ID: <1363055197-17296-4-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-With architected timers, we now have 64-bit counters which can be used
-directly for sched_clock. However, the ARM sched_clock code currently just
-uses the lower 32-bits and handles wrapping in software. Add support for
-using the full 64-bit counter values. If multiple counters are registered,
-a 64-bit counter is preferred.
+Now that the ARM sched_clock code can support using 64-bit counters, call
+setup_sched_clock_64 instead.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 ---
- arch/arm/include/asm/sched_clock.h |    1 +
- arch/arm/kernel/sched_clock.c      |   29 +++++++++++++++++++++++++++--
- 2 files changed, 28 insertions(+), 2 deletions(-)
+ arch/arm/kernel/arch_timer.c |    8 +-------
+ 1 file changed, 1 insertion(+), 7 deletions(-)
 
-diff --git a/arch/arm/include/asm/sched_clock.h b/arch/arm/include/asm/sched_clock.h
-index e3f7572..e093ea4 100644
---- a/arch/arm/include/asm/sched_clock.h
-+++ b/arch/arm/include/asm/sched_clock.h
-@@ -10,5 +10,6 @@
- 
- extern void sched_clock_postinit(void);
- extern void setup_sched_clock(u32 (*read)(void), int bits, unsigned long rate);
-+extern void setup_sched_clock_64(u64 (*read)(void), unsigned long rate);
- 
- #endif
-diff --git a/arch/arm/kernel/sched_clock.c b/arch/arm/kernel/sched_clock.c
-index 040168e..1708357 100644
---- a/arch/arm/kernel/sched_clock.c
-+++ b/arch/arm/kernel/sched_clock.c
-@@ -45,6 +45,7 @@ static u32 notrace jiffy_sched_clock_read(void)
+diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
+index d957a51..d813ae6 100644
+--- a/arch/arm/kernel/arch_timer.c
++++ b/arch/arm/kernel/arch_timer.c
+@@ -22,11 +22,6 @@ static unsigned long arch_timer_read_counter_long(void)
+ 	return arch_timer_read_counter();
  }
  
- static u32 __read_mostly (*read_sched_clock)(void) = jiffy_sched_clock_read;
-+static u64 __read_mostly (*read_sched_clock_64)(void);
+-static u32 arch_timer_read_counter_u32(void)
+-{
+-	return arch_timer_read_counter();
+-}
+-
+ static struct delay_timer arch_delay_timer;
  
- static inline u64 cyc_to_ns(u64 cyc, u32 mult, u32 shift)
- {
-@@ -165,14 +166,38 @@ void __init setup_sched_clock(u32 (*read)(void), int bits, unsigned long rate)
- 	pr_debug("Registered %pF as sched_clock source\n", read);
+ static void __init arch_timer_delay_timer_register(void)
+@@ -55,7 +50,6 @@ int __init arch_timer_sched_clock_init(void)
+ 	if (arch_timer_get_rate() == 0)
+ 		return -ENXIO;
+ 
+-	setup_sched_clock(arch_timer_read_counter_u32,
+-			  32, arch_timer_get_rate());
++	setup_sched_clock_64(arch_timer_read_counter, arch_timer_get_rate());
+ 	return 0;
  }
- 
-+void __init setup_sched_clock_64(u64 (*read)(void), unsigned long rate)
-+{
-+	if (cd.rate > rate)
-+		return;
-+
-+	WARN_ON(!irqs_disabled());
-+	read_sched_clock_64 = read;
-+	cd.rate = rate;
-+
-+	/* Cache the sched_clock multiplier to save a divide in the hot path. */
-+	cd.mult = NSEC_PER_SEC / rate;
-+	cd.shift = 0;
-+
-+	/* Enable IRQ time accounting if we have a fast enough sched_clock */
-+	if (irqtime > 0 || (irqtime == -1 && rate >= 1000000))
-+		enable_sched_clock_irqtime();
-+
-+	pr_debug("Registered %pF as sched_clock source\n", read);
-+}
-+
- unsigned long long notrace sched_clock(void)
- {
--	u32 cyc = read_sched_clock();
--	return cyc_to_sched_clock(cyc, sched_clock_mask);
-+	if (read_sched_clock_64)
-+		return cyc_to_ns(read_sched_clock_64(), cd.mult, cd.shift);
-+
-+	return cyc_to_sched_clock(read_sched_clock(), sched_clock_mask);
- }
- 
- void __init sched_clock_postinit(void)
- {
-+	if (read_sched_clock_64)
-+		return;
- 	/*
- 	 * If no sched_clock function has been provided at that point,
- 	 * make it the final one one.
 -- 
 1.7.10.4
