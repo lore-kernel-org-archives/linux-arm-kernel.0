@@ -1,81 +1,87 @@
-From: jhovold@gmail.com (Johan Hovold)
-Date: Tue, 12 Mar 2013 20:21:34 +0100
-Subject: [PATCH] ARM: w1-gpio: fix erroneous gpio requests
-Message-ID: <1363116094-8630-1-git-send-email-jhovold@gmail.com>
+From: ulf.hansson@stericsson.com (Ulf Hansson)
+Date: Tue, 12 Mar 2013 20:26:02 +0100
+Subject: [RESEND PATCH 1/4] clk: Introduce optional is_prepared callback
+In-Reply-To: <1363116365-3960-1-git-send-email-ulf.hansson@stericsson.com>
+References: <1363116365-3960-1-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <1363116365-3960-2-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix regression introduced by commit d2323cf773 ("onewire: w1-gpio: add
-ext_pullup_enable pin in platform data") which added a gpio entry to the
-platform data, but did not add the required initialisers to the board
-files using it. Consequently, the driver would request gpio 0 at probe,
-which could break other uses of the corresponding pin.
+From: Ulf Hansson <ulf.hansson@linaro.org>
 
-On AT91 requesting gpio 0 changes the pin muxing for PIOA0, which, for
-instance, breaks SPI0 on at91sam9g20.
+To reflect whether a clk_hw is prepared the clk_hw may implement
+the optional is_prepared callback. If not implemented we fall back
+to use the software prepare counter.
 
-Cc: stable <stable@vger.kernel.org>
-Signed-off-by: Johan Hovold <jhovold@gmail.com>
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
+ drivers/clk/clk.c            |   21 +++++++++++++++++++++
+ include/linux/clk-provider.h |    6 ++++++
+ 2 files changed, 27 insertions(+)
 
-Not sure whose tree this should go in through, so adding relevant maintainers
-and authors as CC.
-
-/Johan
-
- arch/arm/mach-at91/board-foxg20.c    | 1 +
- arch/arm/mach-at91/board-stamp9g20.c | 1 +
- arch/arm/mach-ixp4xx/vulcan-setup.c  | 1 +
- arch/arm/mach-pxa/raumfeld.c         | 1 +
- 4 files changed, 4 insertions(+)
-
-diff --git a/arch/arm/mach-at91/board-foxg20.c b/arch/arm/mach-at91/board-foxg20.c
-index 191d37c..1478294 100644
---- a/arch/arm/mach-at91/board-foxg20.c
-+++ b/arch/arm/mach-at91/board-foxg20.c
-@@ -176,6 +176,7 @@ static struct w1_gpio_platform_data w1_gpio_pdata = {
- 	/* If you choose to use a pin other than PB16 it needs to be 3.3V */
- 	.pin		= AT91_PIN_PB16,
- 	.is_open_drain  = 1,
-+	.ext_pullup_enable_pin	= -EINVAL,
- };
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 593a2e4..deb259a 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -458,6 +458,27 @@ unsigned long __clk_get_flags(struct clk *clk)
+ 	return !clk ? 0 : clk->flags;
+ }
  
- static struct platform_device w1_device = {
-diff --git a/arch/arm/mach-at91/board-stamp9g20.c b/arch/arm/mach-at91/board-stamp9g20.c
-index 48a962b..58a6758 100644
---- a/arch/arm/mach-at91/board-stamp9g20.c
-+++ b/arch/arm/mach-at91/board-stamp9g20.c
-@@ -188,6 +188,7 @@ static struct spi_board_info portuxg20_spi_devices[] = {
- static struct w1_gpio_platform_data w1_gpio_pdata = {
- 	.pin		= AT91_PIN_PA29,
- 	.is_open_drain	= 1,
-+	.ext_pullup_enable_pin	= -EINVAL,
- };
++bool __clk_is_prepared(struct clk *clk)
++{
++	int ret;
++
++	if (!clk)
++		return false;
++
++	/*
++	 * .is_prepared is optional for clocks that can prepare
++	 * fall back to software usage counter if it is missing
++	 */
++	if (!clk->ops->is_prepared) {
++		ret = clk->prepare_count ? 1 : 0;
++		goto out;
++	}
++
++	ret = clk->ops->is_prepared(clk->hw);
++out:
++	return !!ret;
++}
++
+ bool __clk_is_enabled(struct clk *clk)
+ {
+ 	int ret;
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 4989b8a..86ff6be 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -45,6 +45,10 @@ struct clk_hw;
+  * 		undo any work done in the @prepare callback. Called with
+  * 		prepare_lock held.
+  *
++ * @is_prepared: Queries the hardware to determine if the clock is prepared.
++ *		This function is allowed to sleep. Optional, if this op is not
++ *		set then the prepare count will be used.
++ *
+  * @enable:	Enable the clock atomically. This must not return until the
+  * 		clock is generating a valid clock signal, usable by consumer
+  * 		devices. Called with enable_lock held. This function must not
+@@ -108,6 +112,7 @@ struct clk_hw;
+ struct clk_ops {
+ 	int		(*prepare)(struct clk_hw *hw);
+ 	void		(*unprepare)(struct clk_hw *hw);
++	int		(*is_prepared)(struct clk_hw *hw);
+ 	int		(*enable)(struct clk_hw *hw);
+ 	void		(*disable)(struct clk_hw *hw);
+ 	int		(*is_enabled)(struct clk_hw *hw);
+@@ -351,6 +356,7 @@ unsigned int __clk_get_enable_count(struct clk *clk);
+ unsigned int __clk_get_prepare_count(struct clk *clk);
+ unsigned long __clk_get_rate(struct clk *clk);
+ unsigned long __clk_get_flags(struct clk *clk);
++bool __clk_is_prepared(struct clk *clk);
+ bool __clk_is_enabled(struct clk *clk);
+ struct clk *__clk_lookup(const char *name);
  
- static struct platform_device w1_device = {
-diff --git a/arch/arm/mach-ixp4xx/vulcan-setup.c b/arch/arm/mach-ixp4xx/vulcan-setup.c
-index 2798f43..1dddc1b 100644
---- a/arch/arm/mach-ixp4xx/vulcan-setup.c
-+++ b/arch/arm/mach-ixp4xx/vulcan-setup.c
-@@ -163,6 +163,7 @@ static struct platform_device vulcan_max6369 = {
- 
- static struct w1_gpio_platform_data vulcan_w1_gpio_pdata = {
- 	.pin			= 14,
-+	.ext_pullup_enable_pin	= -EINVAL,
- };
- 
- static struct platform_device vulcan_w1_gpio = {
-diff --git a/arch/arm/mach-pxa/raumfeld.c b/arch/arm/mach-pxa/raumfeld.c
-index 25b08bfa..6283fcb 100644
---- a/arch/arm/mach-pxa/raumfeld.c
-+++ b/arch/arm/mach-pxa/raumfeld.c
-@@ -505,6 +505,7 @@ static struct w1_gpio_platform_data w1_gpio_platform_data = {
- 	.pin			= GPIO_ONE_WIRE,
- 	.is_open_drain		= 0,
- 	.enable_external_pullup	= w1_enable_external_pullup,
-+	.ext_pullup_enable_pin	= -EINVAL,
- };
- 
- struct platform_device raumfeld_w1_gpio_device = {
 -- 
-1.8.1.5
+1.7.10
