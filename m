@@ -1,26 +1,27 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 12 Mar 2013 18:53:47 +0000
-Subject: [PATCH 02/10] imx-ssi: Fix occasional AC97 reset failure
-In-Reply-To: <1362940391-8338-3-git-send-email-mpa@pengutronix.de>
-References: <1362940391-8338-1-git-send-email-mpa@pengutronix.de>
- <1362940391-8338-3-git-send-email-mpa@pengutronix.de>
-Message-ID: <20130312185347.GT19942@opensource.wolfsonmicro.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 12 Mar 2013 12:53:46 -0600
+Subject: [PATCH] clk: add table lookup to mux
+In-Reply-To: <1363113747-6572-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1363113747-6572-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <513F79BA.7000608@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 10, 2013 at 07:33:03PM +0100, Markus Pargmann wrote:
-> From: Sascha Hauer <s.hauer@pengutronix.de>
+On 03/12/2013 12:42 PM, Peter De Schrijver wrote:
+> Add a table lookup feature to the mux clock. Also allow arbitrary masks
+> instead of the width. This will be used by some clocks on Tegra114. Also
+> adapt the tegra periph clk because it uses struct clk_mux directly.
 > 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+> 
+> --
+> Mike,
+> 
+> This is the same patch I posted before which implements a table lookup
+> feature for the mux clock. I squashed both the changes to clk-mux.c and
+> tegra/clk.h together in order to make the patch bisectable.
 
-Applied but *always* use subject lines appropriate to the subsystem and
-bugfixes like this should be pulled to the front of the series as they
-should be sent to mainline earlier.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130312/4c4a6c5f/attachment.sig>
+For the record in this thread, this is a dependency of the Tegra114
+clock driver. Can this patch be added to a stable branch in the clk or
+arm-soc trees, which I can merge before applying the Tegra114 clock
+driver? Thanks.
