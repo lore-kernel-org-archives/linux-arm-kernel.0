@@ -1,203 +1,150 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 12 Mar 2013 13:56:28 +0900
-Subject: [PATCH 03/04] ARM: shmobile: r8a73a4 IRQC support
+Date: Tue, 12 Mar 2013 13:56:37 +0900
+Subject: [PATCH 04/04] ARM: shmobile: APE6EVM support
 In-Reply-To: <20130312045559.19701.77841.sendpatchset@w520>
 References: <20130312045559.19701.77841.sendpatchset@w520>
-Message-ID: <20130312045628.19701.58216.sendpatchset@w520>
+Message-ID: <20130312045637.19701.62477.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Add IRQC interrupt controller support to r8a73a4 by
-hooking up two IRQC instances to handle 58 external
-IRQ signals. There IRQC controllers are tied to SPIs
-of the GIC. On r8a73a4 exact IRQ pin routing is handled
-by the PFC which is excluded from this patch.
+Add APE6EVM board support making use of 1 GiB of memory,
+the SCIFA0 serial port and the Architecture timer.
 
-Both platform devices and DT devices are added in this
-patch. The platform device versions are used to provide
-a static interrupt map configuration for board code
-written in C.
+More devices will be added on top of this patch after
+PICNTRL and clock framework are in better shape.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
- Depends on:
- [PATCH] irqchip: Renesas IRQC driver
- [PATCH] irqchip: irqc: Add DT support
+ arch/arm/boot/dts/Makefile             |    1 
+ arch/arm/boot/dts/r8a73a4-ape6evm.dts  |   26 ++++++++++++++++++++
+ arch/arm/mach-shmobile/Kconfig         |    8 +++++-
+ arch/arm/mach-shmobile/Makefile        |    1 
+ arch/arm/mach-shmobile/board-ape6evm.c |   40 ++++++++++++++++++++++++++++++++
+ 5 files changed, 75 insertions(+), 1 deletion(-)
 
- arch/arm/boot/dts/r8a73a4.dtsi         |   32 ++++++++++
- arch/arm/mach-shmobile/Kconfig         |    1 
- arch/arm/mach-shmobile/setup-r8a73a4.c |   97 ++++++++++++++++++++++++++++++++
- 3 files changed, 130 insertions(+)
-
---- 0002/arch/arm/boot/dts/r8a73a4.dtsi
-+++ work/arch/arm/boot/dts/r8a73a4.dtsi	2013-03-12 00:42:47.000000000 +0900
-@@ -51,4 +51,36 @@
- 				<1 11 0xf08>,
- 				<1 10 0xf08>;
- 	};
+--- 0001/arch/arm/boot/dts/Makefile
++++ work/arch/arm/boot/dts/Makefile	2013-03-11 23:05:33.000000000 +0900
+@@ -125,6 +125,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE) += emev2-kzm
+ 	r8a7779-marzen-reference.dtb \
+ 	sh73a0-kzm9g.dtb \
+ 	sh73a0-kzm9g-reference.dtb \
++	r8a73a4-ape6evm.dtb \
+ 	sh7372-mackerel.dtb
+ dtb-$(CONFIG_ARCH_SPEAR13XX) += spear1310-evb.dtb \
+ 	spear1340-evb.dtb
+--- /dev/null
++++ work/arch/arm/boot/dts/r8a73a4-ape6evm.dts	2013-03-11 23:06:38.000000000 +0900
+@@ -0,0 +1,26 @@
++/*
++ * Device Tree Source for the APE6EVM board
++ *
++ * Copyright (C) 2013 Renesas Solutions Corp.
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
 +
-+	irqc0: interrupt-controller at e61c0000 {
-+		compatible = "renesas,irqc";
-+		#interrupt-cells = <2>;
-+		interrupt-controller;
-+		reg = <0xe61c0000 0x200>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 0 4>, <0 1 4>, <0 2 4>,	<0 3 4>,
-+				<0 4 4>, <0 5 4>, <0 6 4>, <0 7 4>,
-+				<0 8 4>, <0 9 4>, <0 10 4>, <0 11 4>,
-+				<0 12 4>, <0 13 4>, <0 14 4>, <0 15 4>,
-+				<0 16 4>, <0 17 4>, <0 18 4>, <0 19 4>,
-+				<0 20 4>, <0 21 4>, <0 22 4>, <0 23 4>,
-+				<0 24 4>, <0 25 4>, <0 26 4>, <0 27 4>,
-+				<0 28 4>, <0 29 4>, <0 30 4>, <0 31 4>;
++/dts-v1/;
++/include/ "r8a73a4.dtsi"
++
++/ {
++	model = "APE6EVM";
++	compatible = "renesas,ape6evm", "renesas,r8a73a4";
++
++	chosen {
++		bootargs = "console=ttySC0,115200 ignore_loglevel";
 +	};
 +
-+	irqc1: interrupt-controller at e61c0200 {
-+		compatible = "renesas,irqc";
-+		#interrupt-cells = <2>;
-+		interrupt-controller;
-+		reg = <0xe61c0200 0x200>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 32 4>, <0 33 4>, <0 34 4>, <0 35 4>,
-+				<0 36 4>, <0 37 4>, <0 38 4>, <0 39 4>,
-+				<0 40 4>, <0 41 4>, <0 42 4>, <0 43 4>,
-+				<0 44 4>, <0 45 4>, <0 46 4>, <0 47 4>,
-+				<0 48 4>, <0 49 4>, <0 50 4>, <0 51 4>,
-+				<0 52 4>, <0 53 4>, <0 54 4>, <0 55 4>,
-+				<0 56 4>, <0 57 4>;
++	memory at 40000000 {
++		device_type = "memory";
++		reg = <0x40000000 0x40000000>;
 +	};
-+
- };
---- 0003/arch/arm/mach-shmobile/Kconfig
-+++ work/arch/arm/mach-shmobile/Kconfig	2013-03-12 00:42:47.000000000 +0900
-@@ -24,6 +24,7 @@ config ARCH_R8A73A4
- 	select CPU_V7
- 	select ARM_ARCH_TIMER
- 	select SH_CLK_CPG
-+	select RENESAS_IRQC
++};
+--- 0002/arch/arm/mach-shmobile/Kconfig
++++ work/arch/arm/mach-shmobile/Kconfig	2013-03-11 23:07:50.000000000 +0900
+@@ -76,6 +76,11 @@ config MACH_AG5EVM
+ 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
+ 	select SH_LCD_MIPI_DSI
  
- config ARCH_R8A7740
- 	bool "R-Mobile A1 (R8A77400)"
---- 0002/arch/arm/mach-shmobile/setup-r8a73a4.c
-+++ work/arch/arm/mach-shmobile/setup-r8a73a4.c	2013-03-12 00:43:25.000000000 +0900
-@@ -22,6 +22,7 @@
- #include <linux/of_platform.h>
- #include <linux/irq.h>
- #include <linux/serial_sci.h>
-+#include <linux/platform_data/irq-renesas-irqc.h>
- #include <mach/common.h>
- #include <mach/irqs.h>
- #include <mach/r8a73a4.h>
-@@ -135,6 +136,100 @@ static struct platform_device scif5_devi
- 	},
- };
++config MACH_APE6EVM
++	bool "APE6EVM board"
++	depends on ARCH_R8A73A4
++	select USE_OF
++
+ config MACH_MACKEREL
+ 	bool "mackerel board"
+ 	depends on ARCH_SH7372
+@@ -163,7 +168,7 @@ config MEMORY_START
+ 	hex "Physical memory start address"
+ 	default "0x40000000" if MACH_AP4EVB || MACH_AG5EVM || \
+ 				MACH_MACKEREL || MACH_BONITO || \
+-				MACH_ARMADILLO800EVA
++				MACH_ARMADILLO800EVA || MACH_APE6EVM
+ 	default "0x41000000" if MACH_KOTA2
+ 	default "0x00000000"
+ 	---help---
+@@ -173,6 +178,7 @@ config MEMORY_START
  
-+static struct renesas_irqc_config irqc0_platform_data = {
-+	.irq_base = irq_pin(0), /* IRQ0 -> IRQ31 */
+ config MEMORY_SIZE
+ 	hex "Physical memory size"
++	default "0x40000000" if MACH_APE6EVM
+ 	default "0x20000000" if MACH_AG5EVM || MACH_BONITO || \
+ 				MACH_ARMADILLO800EVA
+ 	default "0x1e000000" if MACH_KOTA2
+--- 0002/arch/arm/mach-shmobile/Makefile
++++ work/arch/arm/mach-shmobile/Makefile	2013-03-11 23:05:33.000000000 +0900
+@@ -35,6 +35,7 @@ obj-$(CONFIG_ARCH_SH73A0)	+= pm-sh73a0.o
+ # Board objects
+ obj-$(CONFIG_MACH_AP4EVB)	+= board-ap4evb.o
+ obj-$(CONFIG_MACH_AG5EVM)	+= board-ag5evm.o
++obj-$(CONFIG_MACH_APE6EVM)	+= board-ape6evm.o
+ obj-$(CONFIG_MACH_MACKEREL)	+= board-mackerel.o
+ obj-$(CONFIG_MACH_KOTA2)	+= board-kota2.o
+ obj-$(CONFIG_MACH_BONITO)	+= board-bonito.o
+--- /dev/null
++++ work/arch/arm/mach-shmobile/board-ape6evm.c	2013-03-11 23:05:34.000000000 +0900
+@@ -0,0 +1,40 @@
++/*
++ * APE6EVM board support
++ *
++ * Copyright (C) 2013  Renesas Solutions Corp.
++ * Copyright (C) 2013  Magnus Damm
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; version 2 of the License.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
++ */
++
++#include <linux/kernel.h>
++#include <linux/interrupt.h>
++#include <linux/platform_device.h>
++#include <linux/irqchip.h>
++#include <mach/common.h>
++#include <mach/r8a73a4.h>
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
++
++static const char *ape6evm_boards_compat_dt[] __initdata = {
++	"renesas,ape6evm",
++	NULL,
 +};
 +
-+static struct resource irqc0_resources[] = {
-+	DEFINE_RES_MEM(0xe61c0000, 0x200), /* IRQC Event Detector Block_0 */
-+	DEFINE_RES_IRQ(gic_spi(0)), /* IRQ0 */
-+	DEFINE_RES_IRQ(gic_spi(1)), /* IRQ1 */
-+	DEFINE_RES_IRQ(gic_spi(2)), /* IRQ2 */
-+	DEFINE_RES_IRQ(gic_spi(3)), /* IRQ3 */
-+	DEFINE_RES_IRQ(gic_spi(4)), /* IRQ4 */
-+	DEFINE_RES_IRQ(gic_spi(5)), /* IRQ5 */
-+	DEFINE_RES_IRQ(gic_spi(6)), /* IRQ6 */
-+	DEFINE_RES_IRQ(gic_spi(7)), /* IRQ7 */
-+	DEFINE_RES_IRQ(gic_spi(8)), /* IRQ8 */
-+	DEFINE_RES_IRQ(gic_spi(9)), /* IRQ9 */
-+	DEFINE_RES_IRQ(gic_spi(10)), /* IRQ10 */
-+	DEFINE_RES_IRQ(gic_spi(11)), /* IRQ11 */
-+	DEFINE_RES_IRQ(gic_spi(12)), /* IRQ12 */
-+	DEFINE_RES_IRQ(gic_spi(13)), /* IRQ13 */
-+	DEFINE_RES_IRQ(gic_spi(14)), /* IRQ14 */
-+	DEFINE_RES_IRQ(gic_spi(15)), /* IRQ15 */
-+	DEFINE_RES_IRQ(gic_spi(16)), /* IRQ16 */
-+	DEFINE_RES_IRQ(gic_spi(17)), /* IRQ17 */
-+	DEFINE_RES_IRQ(gic_spi(18)), /* IRQ18 */
-+	DEFINE_RES_IRQ(gic_spi(19)), /* IRQ19 */
-+	DEFINE_RES_IRQ(gic_spi(20)), /* IRQ20 */
-+	DEFINE_RES_IRQ(gic_spi(21)), /* IRQ21 */
-+	DEFINE_RES_IRQ(gic_spi(22)), /* IRQ22 */
-+	DEFINE_RES_IRQ(gic_spi(23)), /* IRQ23 */
-+	DEFINE_RES_IRQ(gic_spi(24)), /* IRQ24 */
-+	DEFINE_RES_IRQ(gic_spi(25)), /* IRQ25 */
-+	DEFINE_RES_IRQ(gic_spi(26)), /* IRQ26 */
-+	DEFINE_RES_IRQ(gic_spi(27)), /* IRQ27 */
-+	DEFINE_RES_IRQ(gic_spi(28)), /* IRQ28 */
-+	DEFINE_RES_IRQ(gic_spi(29)), /* IRQ29 */
-+	DEFINE_RES_IRQ(gic_spi(30)), /* IRQ30 */
-+	DEFINE_RES_IRQ(gic_spi(31)), /* IRQ31 */
-+};
-+
-+static struct platform_device irqc0_device = {
-+	.name		= "renesas_irqc",
-+	.id		= 0,
-+	.resource	= irqc0_resources,
-+	.num_resources	= ARRAY_SIZE(irqc0_resources),
-+	.dev		= {
-+		.platform_data  = &irqc0_platform_data,
-+	},
-+};
-+
-+static struct renesas_irqc_config irqc1_platform_data = {
-+	.irq_base = irq_pin(32), /* IRQ32 -> IRQ57 */
-+};
-+
-+static struct resource irqc1_resources[] = {
-+	DEFINE_RES_MEM(0xe61c0200, 0x200), /* IRQC Event Detector Block_1 */
-+	DEFINE_RES_IRQ(gic_spi(32)), /* IRQ32 */
-+	DEFINE_RES_IRQ(gic_spi(33)), /* IRQ33 */
-+	DEFINE_RES_IRQ(gic_spi(34)), /* IRQ34 */
-+	DEFINE_RES_IRQ(gic_spi(35)), /* IRQ35 */
-+	DEFINE_RES_IRQ(gic_spi(36)), /* IRQ36 */
-+	DEFINE_RES_IRQ(gic_spi(37)), /* IRQ37 */
-+	DEFINE_RES_IRQ(gic_spi(38)), /* IRQ38 */
-+	DEFINE_RES_IRQ(gic_spi(39)), /* IRQ39 */
-+	DEFINE_RES_IRQ(gic_spi(40)), /* IRQ40 */
-+	DEFINE_RES_IRQ(gic_spi(41)), /* IRQ41 */
-+	DEFINE_RES_IRQ(gic_spi(42)), /* IRQ42 */
-+	DEFINE_RES_IRQ(gic_spi(43)), /* IRQ43 */
-+	DEFINE_RES_IRQ(gic_spi(44)), /* IRQ44 */
-+	DEFINE_RES_IRQ(gic_spi(45)), /* IRQ45 */
-+	DEFINE_RES_IRQ(gic_spi(46)), /* IRQ46 */
-+	DEFINE_RES_IRQ(gic_spi(47)), /* IRQ47 */
-+	DEFINE_RES_IRQ(gic_spi(48)), /* IRQ48 */
-+	DEFINE_RES_IRQ(gic_spi(49)), /* IRQ49 */
-+	DEFINE_RES_IRQ(gic_spi(50)), /* IRQ50 */
-+	DEFINE_RES_IRQ(gic_spi(51)), /* IRQ51 */
-+	DEFINE_RES_IRQ(gic_spi(52)), /* IRQ52 */
-+	DEFINE_RES_IRQ(gic_spi(53)), /* IRQ53 */
-+	DEFINE_RES_IRQ(gic_spi(54)), /* IRQ54 */
-+	DEFINE_RES_IRQ(gic_spi(55)), /* IRQ55 */
-+	DEFINE_RES_IRQ(gic_spi(56)), /* IRQ56 */
-+	DEFINE_RES_IRQ(gic_spi(57)), /* IRQ57 */
-+};
-+
-+static struct platform_device irqc1_device = {
-+	.name		= "renesas_irqc",
-+	.id		= 1,
-+	.resource	= irqc1_resources,
-+	.num_resources	= ARRAY_SIZE(irqc1_resources),
-+	.dev		= {
-+		.platform_data  = &irqc1_platform_data,
-+	},
-+};
-+
- static struct platform_device *r8a73a4_devices[] __initdata = {
- 	&scif0_device,
- 	&scif1_device,
-@@ -142,6 +237,8 @@ static struct platform_device *r8a73a4_d
- 	&scif3_device,
- 	&scif4_device,
- 	&scif5_device,
-+	&irqc0_device,
-+	&irqc1_device,
- };
- 
- void __init r8a73a4_add_standard_devices(void)
++DT_MACHINE_START(APE6EVM_DT, "ape6evm")
++	.init_irq	= irqchip_init,
++	.init_time	= shmobile_timer_init,
++	.init_machine	= r8a73a4_add_standard_devices,
++	.dt_compat	= ape6evm_boards_compat_dt,
++MACHINE_END
