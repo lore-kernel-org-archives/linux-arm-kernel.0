@@ -1,54 +1,69 @@
-From: srinidhi.kasagar@stericsson.com (Srinidhi Kasagar)
-Date: Tue, 12 Mar 2013 11:12:29 +0530
-Subject: [PATCH] ARM: ux500: Remove duplicate ux500_l2x0_unlock function
-In-Reply-To: <20130312045823.GA526@android11.spreadtrum.com>
-References: <20130312045823.GA526@android11.spreadtrum.com>
-Message-ID: <20130312054226.GA811@bnru09>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 12 Mar 2013 07:25:09 +0100
+Subject: linux-next: manual merge of the akpm tree with the arm-soc tree
+In-Reply-To: <20130312144714.39749c5b0bd1aea14c4d2ff8@canb.auug.org.au>
+References: <20130312144714.39749c5b0bd1aea14c4d2ff8@canb.auug.org.au>
+Message-ID: <20130312062509.GQ21478@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 12, 2013 at 05:58:23 +0100, Steve zhan wrote:
-> Hi Linus:
->     Pls check/apply the below patch.
-> Thanks.
+On Tue, Mar 12, 2013 at 02:47:14PM +1100, Stephen Rothwell wrote:
+> Hi Andrew,
+> 
+> Today's linux-next merge of the akpm tree got a conflict in
+> drivers/rtc/rtc-mv.c between commit 89c58c198b25 ("rtc: rtc-mv: Add
+> support for clk to avoid lockups") from the arm-soc tree and commit "rtc:
+> rtc-mv: use devm_rtc_device_register()" from the akpm tree.
+> 
+> I fixed it up (I think - see below) and can carry the fix as necessary
+> (no action is required).
 
-NAK, I think you have not read the comment i guess. See below.
+Hi Stephan
+
+Looks O.K. to me.
+
+Acked-by: Andrew Lunn <andrew@lunn.ch>
 
 > 
-> -----
-> steve
+> -- 
+> Cheers,
+> Stephen Rothwell                    sfr at canb.auug.org.au
 > 
-> commit f962757a91b1c83a080e7c5b05cc6fb7828f1d84
-> Author: steve.zhan <zhanzhenbo@gmail.com>
-> Date:   Tue Mar 12 00:12:53 2013 +0800
-> 
->     ARM: ux500: Remove duplicate ux500_l2x0_unlock function
->     
->     To avoids code duplication, remove reduplicate l2 cache unlock
->     function "ux500_l2x0_unlock" in the ux500_l2x0_init, as arm\mm
->     \cache-l2x0.c l2x0_init will call l2x0_unlock function to
->     make sure that I&D is not locked down when starting.
->     
->     Signed-off-by: steve.zhan <zhanzhenbo@gmail.com>
-> 
-> diff --git a/arch/arm/mach-ux500/cache-l2x0.c b/arch/arm/mach-ux500/cache-l2x0.c
-> index 1c1609d..372bdf6 100644
-> --- a/arch/arm/mach-ux500/cache-l2x0.c
-> +++ b/arch/arm/mach-ux500/cache-l2x0.c
-> @@ -15,26 +15,6 @@
->  
->  static void __iomem *l2x0_base;
->  
-> -static int __init ux500_l2x0_unlock(void)
-> -{
-> -	int i;
-> -
-> -	/*
-> -	 * Unlock Data and Instruction Lock if locked. Ux500 U-Boot versions
-> -	 * apparently locks both caches before jumping to the kernel. The
-> -	 * l2x0 core will not touch the unlock registers if the l2x0 is
-> -	 * already enabled, so we do it right here instead. The PL310 has
-
-The l2x0 core will unlock only if l2x0 is already not enabled. So we need this.
-
-/srinidhi
+> diff --cc drivers/rtc/rtc-mv.c
+> index f378e17,1ee8551..0000000
+> --- a/drivers/rtc/rtc-mv.c
+> +++ b/drivers/rtc/rtc-mv.c
+> @@@ -272,16 -262,15 +272,17 @@@ static int __init mv_rtc_probe(struct p
+>   
+>   	if (pdata->irq >= 0) {
+>   		device_init_wakeup(&pdev->dev, 1);
+> - 		pdata->rtc = rtc_device_register(pdev->name, &pdev->dev,
+> + 		pdata->rtc = devm_rtc_device_register(&pdev->dev, pdev->name,
+>   						 &mv_rtc_alarm_ops,
+>   						 THIS_MODULE);
+> - 	} else
+> - 		pdata->rtc = rtc_device_register(pdev->name, &pdev->dev,
+> + 	} else {
+> + 		pdata->rtc = devm_rtc_device_register(&pdev->dev, pdev->name,
+>   						 &mv_rtc_ops, THIS_MODULE);
+> + 	}
+>  -	if (IS_ERR(pdata->rtc))
+>  -		return PTR_ERR(pdata->rtc);
+>  +	if (IS_ERR(pdata->rtc)) {
+>  +		ret = PTR_ERR(pdata->rtc);
+>  +		goto out;
+>  +	}
+>   
+>   	if (pdata->irq >= 0) {
+>   		writel(0, pdata->ioaddr + RTC_ALARM_INTERRUPT_MASK_REG_OFFS);
+> @@@ -308,10 -292,6 +309,9 @@@ static int __exit mv_rtc_remove(struct 
+>   	if (pdata->irq >= 0)
+>   		device_init_wakeup(&pdev->dev, 0);
+>   
+> - 	rtc_device_unregister(pdata->rtc);
+>  +	if (!IS_ERR(pdata->clk))
+>  +		clk_disable_unprepare(pdata->clk);
+>  +
+>   	return 0;
+>   }
+>   
