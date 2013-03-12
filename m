@@ -1,39 +1,62 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 12 Mar 2013 13:45:14 -0600
-Subject: [PATCH v2] ARM: tegra: expose chip ID and revision
-In-Reply-To: <201303121910.55141.arnd@arndb.de>
-References: <1363089667-15737-1-git-send-email-dahuang@nvidia.com>
- <201303121259.18710.arnd@arndb.de> <513F6E2C.1000101@wwwdotorg.org>
- <201303121910.55141.arnd@arndb.de>
-Message-ID: <513F85CA.2000800@wwwdotorg.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 12 Mar 2013 20:56:59 +0100
+Subject: IS_ERR_VALUE()
+In-Reply-To: <20130312141604.GV4977@n2100.arm.linux.org.uk>
+References: <20130312141604.GV4977@n2100.arm.linux.org.uk>
+Message-ID: <20130312195659.GR15375@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/12/2013 01:10 PM, Arnd Bergmann wrote:
-> On Tuesday 12 March 2013, Stephen Warren wrote:
->>> You are dropping the soc_dev on the floor here by just returning.
->>>
->>> The idea of the soc node is to have all on-soc components be children
->>> of that node, so you should instead pass it into of_platform_populate
->>> as the parent device.
->>
->> Tegra DTs don't have a separate node for on-soc vs. off-soc components.
->> Wouldn't passing soc_dev into of_platform_populate() make everything a
->> child of this soc_dev; is that what we want?
+Hello,
+
+On Tue, Mar 12, 2013 at 02:16:04PM +0000, Russell King - ARM Linux wrote:
+> I am removing almost all references to the above macro from arch/arm.
+> Many of them are wrong.  Some of them are buggy.
 > 
-> Yes, we had long discussions about this when the soc infrastructure was
-> merged. Right now, everything is a child of /sys/devices/platform/,
-> basically saying that all devices are random stuff that cannot be
-> probed. Moving it to /sys/devices/soc0 would not make the hierarchy
-> any deeper but show much clearer which devices are part of the
-> soc, and which ones are added as anonymous platform devices by code
-> that does not use DT based probing. Ideally the second category is
-> empty.
+> For instance:
+> 
+> int gpmc_cs_set_timings(int cs, const struct gpmc_timings *t)
+> {
+>         int div;
+>         div = gpmc_calc_divider(t->sync_clk);
+>         if (div < 0)
+>                 return div;
+> static int gpmc_set_async_mode(int cs, struct gpmc_timings *t)
+> {
+> ...
+>         return gpmc_cs_set_timings(cs, t);
+> 
+> .....
+>         ret = gpmc_set_async_mode(gpmc_onenand_data->cs, &t);
+>         if (IS_ERR_VALUE(ret))
+>                 return ret;
 
-OK, that makes sense.
+Well, gpmc_calc_divider returns -1 on failure, so I agree that it's
+wrong to use IS_ERR_VALUE on it.
+ 
+> So, gpmc_cs_set_timings() thinks any negative return value is an error,
+> but where we check that in higher levels, only a limited range are
+> errors... seriously?  Come on guys, get with the program.  Get your
+> error checking in order.
+ 
+Still I don't get what is really wrong in your examples (but I didn't
+check all). If a function returning an int is supposed to return 0 on
+success and -ESOMEERROR on failure it doesn't matter much if I do (ret <
+0) or IS_ERR_VALUE(ret). (Even if ret is signed, the check (x) >=
+(unsigned long)-MAX_ERRNO in IS_ERR_VALUE does the right thing.)
 
-Danny, in that case, the initialization of this SoC object should
-definitely happen inside tegra_init_fuse(), which is called from
-tegra_init_early(), so that mach-tegra/tegra.c:tegra_dt_init() can call
-a function in fuse.c to retrieve that SoC object in order to pass it
-into of_platform_populate().
+There is only a semantical difference between the two checks for
+(unsigned)ret being between MAX_INT+1 and (unsigned)-MAX_ERRNO. But a
+value in this range isn't allowed for such a function. So you could also
+just check using "if (ret)". All but the previous sentence also apply to
+functions returning an int >=0 on success and -ESOMEERROR on failure.
+
+So unless I missed something---and if I do, please tell me---your patch
+is not about correctness, but "only" about style and consistency?!
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
