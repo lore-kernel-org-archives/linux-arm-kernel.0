@@ -1,155 +1,258 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Tue, 12 Mar 2013 16:18:52 +0530
-Subject: [PATCH 4/4] clk: samsung: add infrastructure to add separate
- aliases
-In-Reply-To: <201303121104.38251.heiko@sntech.de>
-References: <201303120042.09633.heiko@sntech.de>
- <201303120045.25824.heiko@sntech.de>
- <CAJuYYwQ+-NhP+t-WEUhZxCN3AQFUzLSqt9aFWu5K0uwL_jO20A@mail.gmail.com>
- <201303121104.38251.heiko@sntech.de>
-Message-ID: <CAJuYYwR4mBmuytzZCovncEjmKQX=O4FFAJJ5vZ-tmyDpavh2hQ@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 12 Mar 2013 18:49:38 +0800
+Subject: [PATCH V4 1/4] cpufreq: exynos: Adding cpufreq driver for
+ exynos5440
+In-Reply-To: <1363082299-10561-2-git-send-email-amit.daniel@samsung.com>
+References: <1363082299-10561-1-git-send-email-amit.daniel@samsung.com>
+ <1363082299-10561-2-git-send-email-amit.daniel@samsung.com>
+Message-ID: <CAOh2x=narPBYBNMMs5Qw_rGSgVsSNumb_jw_88C1PNGEc6sSEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 March 2013 15:34, Heiko St?bner <heiko@sntech.de> wrote:
-> Am Dienstag, 12. M?rz 2013, 10:57:30 schrieb Thomas Abraham:
->> On 12 March 2013 05:15, Heiko St?bner <heiko@sntech.de> wrote:
->> > The current code adds aliases, if necessary, directly when adding the
->> > clock, limiting the number of possible aliases to one.
->> >
->> > Some platforms need more than one alias, like the hsmmc pclocks on
->> > s3c2416 which need a "hsmmc" and "mmc_busclk.0" alias for the s3c-sdhci
->> > driver.
->> >
->> > Therefore add the possibility to separately add clock aliases for
->> > previously created clocks.
->> >
->> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
->> > ---
->> > change since the discussion: removed the list->alias check
->> >
->> >  drivers/clk/samsung/clk.c |   33 +++++++++++++++++++++++++++++++++
->> >  drivers/clk/samsung/clk.h |   21 +++++++++++++++++++++
->> >  2 files changed, 54 insertions(+), 0 deletions(-)
->> >
->> > diff --git a/drivers/clk/samsung/clk.c b/drivers/clk/samsung/clk.c
->> > index 7c943f8..20ec566 100644
->> > --- a/drivers/clk/samsung/clk.c
->> > +++ b/drivers/clk/samsung/clk.c
->> > @@ -94,6 +94,39 @@ void samsung_clk_add_lookup(struct clk *clk, unsigned
->> > int id)
->> >
->> >                 clk_table[id] = clk;
->> >
->> >  }
->> >
->> > +/* register a list of aliases */
->> > +void __init samsung_clk_register_alias(struct samsung_clock_alias *list,
->> > +                                       unsigned int nr_clk)
->> > +{
->> > +       struct clk *clk;
->> > +       unsigned int idx, ret;
->> > +
->> > +       if (!clk_table) {
->> > +               pr_err("%s: clock table missing\n", __func__);
->> > +               return;
->> > +       }
->> > +
->> > +       for (idx = 0; idx < nr_clk; idx++, list++) {
->> > +               if (!list->id) {
->> > +                       pr_err("%s: clock id missing for index %d\n",
->> > __func__, +                               idx);
->> > +                       continue;
->> > +               }
->> > +
->> > +               clk = clk_table[list->id];
->> > +               if (!clk) {
->> > +                       pr_err("%s: failed to find clock %d\n", __func__,
->> > +                               list->id);
->> > +                       continue;
->> > +               }
->> > +
->> > +               ret = clk_register_clkdev(clk, list->alias,
->> > list->dev_name); +               if (ret)
->> > +                       pr_err("%s: failed to register lookup %s\n",
->> > +                                       __func__, list->alias);
->> > +       }
->> > +}
->> > +
->> >
->> >  /* register a list of fixed clocks */
->> >  void __init samsung_clk_register_fixed_rate(
->> >
->> >                 struct samsung_fixed_rate_clock *list, unsigned int
->> >                 nr_clk)
->> >
->> > diff --git a/drivers/clk/samsung/clk.h b/drivers/clk/samsung/clk.h
->> > index 26a752b..6bacd6f 100644
->> > --- a/drivers/clk/samsung/clk.h
->> > +++ b/drivers/clk/samsung/clk.h
->> > @@ -23,6 +23,25 @@
->> >
->> >  #include <mach/map.h>
->> >
->> >  /**
->> >
->> > + * struct samsung_clock_alias: information about mux clock
->> > + * @id: platform specific id of the clock.
->> > + * @dev_name: name of the device to which this clock belongs.
->> > + * @alias: optional clock alias name to be assigned to this clock.
->> > + */
->> > +struct samsung_clock_alias {
->> > +       unsigned int            id;
->> > +       const char              *dev_name;
->> > +       const char              *alias;
->> > +};
->> > +
->> > +#define ALIAS(_id, dname, a)   \
->> > +       {                                                       \
->> > +               .id             = _id,                          \
->> > +               .dev_name       = dname,                        \
->> > +               .alias          = a,                            \
->> > +       }
->> > +
->> > +/**
->> >
->> >   * struct samsung_fixed_rate_clock: information about fixed-rate clock
->> >   * @id: platform specific id of the clock.
->> >   * @name: name of this fixed-rate clock.
->> >
->> > @@ -251,6 +270,8 @@ extern void __init samsung_clk_of_register_fixed_ext(
->> >
->> >  extern void samsung_clk_add_lookup(struct clk *clk, unsigned int id);
->> >
->> > +extern void samsung_clk_register_alias(struct samsung_clock_alias *list,
->> > +               unsigned int nr_clk);
->> >
->> >  extern void __init samsung_clk_register_fixed_rate(
->> >
->> >                 struct samsung_fixed_rate_clock *clk_list, unsigned int
->> >                 nr_clk);
->> >
->> >  extern void __init samsung_clk_register_fixed_factor(
->> >
->> > --
->> > 1.7.2.3
->>
->> This change looks fine but as discussed on 3/4 patch of this series,
->> allocating clk_table for non-dt platforms would not be very helpful.
->
-> But how would we look up the previously registered clk otherwise?
-> Using clk_table for this lookup seemed like the best way to easily access
-> these clocks.
+This is what Russell told me a long time back:
+"Don't use Adding, Fixing, etc words as this work is not something, which is
+already done."
 
-I did assume that the aliases for a clock are set when that clock is
-registered. Are there any instances where the aliases have to be set
-after a clock has been registered (using the samsung clock driver
-helper functions)?
+So your subject should have been: "cpufreq: exynos: Add cpufreq driver
+for exynos5440"
 
-Thanks,
-Thomas.
+Fix it if you need another version, which i believe you do :)
 
+On Tue, Mar 12, 2013 at 5:58 PM, Amit Daniel Kachhap
+<amit.daniel@samsung.com> wrote:
+> This patch adds dvfs support for exynos5440 SOC. This soc has 4 cores and
+> they scale at same frequency. The nature of exynos5440 clock controller is
+> different from previous exynos controllers so not using the common exynos
+> cpufreq framework. The major difference being interrupt notfication for
+
+s/notfication/notification
+
+> frequency change. Also, OPP library is used for device tree parsing to get
+> different parameters like frequency, voltage etc. Since the opp library sorts
+> the frequency table in ascending order so they are again re-arranged in
+> descending order. This will have one-to-one mapping with the clock controller
+> state management logic.
 >
+> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+> ---
+>  .../bindings/cpufreq/cpufreq-exynos5440.txt        |   29 ++
+>  drivers/cpufreq/Kconfig.arm                        |    9 +
+>  drivers/cpufreq/Makefile                           |    1 +
+>  drivers/cpufreq/exynos5440-cpufreq.c               |  466 ++++++++++++++++++++
+>  4 files changed, 505 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-exynos5440.txt
+>  create mode 100644 drivers/cpufreq/exynos5440-cpufreq.c
 >
-> Thanks
-> Heiko
+> diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-exynos5440.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-exynos5440.txt
+> new file mode 100644
+> index 0000000..a0dbe0b
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-exynos5440.txt
+> @@ -0,0 +1,29 @@
+> +
+> +Exynos5440 cpufreq driver
+> +-------------------
+> +
+> +Exynos5440 SoC cpufreq driver for CPU frequency scaling.
+> +
+> +Required properties:
+> +- interrupts: Interrupt to know the completion of cpu frequency change.
+> +- operating-points: Table of frequencies and voltage CPU could be transitioned into,
+> +       in the decreasing order. Frequency should be in KHZ units and voltage
+
+s/KHZ/KHz
+
+> +       should be in microvolts.
+
+probably s/microvolts/micro-volts ??
+
+> +
+> +Optional properties:
+> +- clock-latency: Clock monitor latency in microsecond.
+> +
+> +All the required listed above must be defined under node cpufreq.
+> +
+> +Example:
+> +--------
+> +       cpufreq at 160000 {
+> +               compatible = "samsung,exynos5440-cpufreq";
+> +               reg = <0x160000 0x1000>;
+> +               interrupts = <0 57 0>;
+> +               operating-points = <
+> +                               1000000 975000
+> +                               800000  925000>;
+> +               clock-latency = <100000>;
+> +       };
+> +
+
+> diff --git a/drivers/cpufreq/exynos5440-cpufreq.c b/drivers/cpufreq/exynos5440-cpufreq.c
+> +static void exynos_enable_dvfs(void)
+> +{
+
+> +       /* Set initial performance index */
+> +       for (i = 0; freq_table[i].frequency != CPUFREQ_TABLE_END; i++)
+> +               if (freq_table[i].frequency == dvfs_info->cur_frequency)
+> +                       break;
+> +
+> +       if (freq_table[i].frequency == CPUFREQ_TABLE_END) {
+> +               dev_crit(dvfs_info->dev, "Boot up frequency not supported\n");
+> +               /* Assign the highest frequency */
+> +               i = 0;
+> +               dvfs_info->cur_frequency = freq_table[i].frequency;
+
+What about:
+
+dvfs_info->cur_frequency = freq_table[0].frequency;
+
+as i don't see i being used again?
+
+> +       }
+
+> +}
+
+> +static int exynos_target(struct cpufreq_policy *policy,
+> +                         unsigned int target_freq,
+> +                         unsigned int relation)
+> +{
+
+> +       if (cpufreq_frequency_table_target(policy, freq_table,
+> +                                          target_freq, relation, &index)) {
+> +               ret = -EINVAL;
+
+Use the error value returned by called functions, probably i gave this
+comment last time too?
+
+> +               goto out;
+> +       }
+
+> +}
+
+> +static void exynos_sort_descend_freq_table(void)
+> +{
+> +       struct cpufreq_frequency_table *freq_tbl = dvfs_info->freq_table;
+> +       int i = 0, index;
+> +       unsigned int tmp_freq;
+> +
+> +       /*
+> +        * Freq table is already in ascending order as it is created from
+> +        * OPP library, so just swap the elements to make it descending.
+
+why??
+
+> +        */
+> +       for (i = 0; i < dvfs_info->freq_count / 2; i++) {
+> +               index = dvfs_info->freq_count - i - 1;
+> +               tmp_freq = freq_tbl[i].frequency;
+> +               freq_tbl[i].frequency = freq_tbl[index].frequency;
+> +               freq_tbl[index].frequency = tmp_freq;
+> +       }
+> +}
+> +
+
+> +static int exynos_cpufreq_probe(struct platform_device *pdev)
+> +{
+> +       int ret = -EINVAL;
+> +       struct device_node *np;
+> +       struct resource res;
+> +
+> +       np =  of_find_compatible_node(NULL, NULL, "samsung,exynos5440-cpufreq");
+> +       if (!np)
+> +               return -ENODEV;
+> +
+> +       dvfs_info = devm_kzalloc(&pdev->dev, sizeof(*dvfs_info), GFP_KERNEL);
+> +       if (!dvfs_info) {
+> +               ret = -ENOMEM;
+> +               goto err_put_node;
+> +       }
+> +
+> +       dvfs_info->dev = &pdev->dev;
+> +       dvfs_info->dev->of_node = np;
+> +
+> +       ret = of_address_to_resource(np, 0, &res);
+> +       if (ret)
+> +               goto err_put_node;
+> +
+> +       dvfs_info->base = devm_ioremap_resource(dvfs_info->dev, &res);
+> +       if (IS_ERR(dvfs_info->base)) {
+> +               ret = PTR_ERR(dvfs_info->base);
+> +               goto err_put_node;
+> +       }
+> +
+> +       dvfs_info->irq = irq_of_parse_and_map(np, 0);
+> +       if (dvfs_info->irq == 0) {
+
+maybe, if (!dvfs_info->irq) {
+
+
+> +               dev_err(dvfs_info->dev, "No cpufreq irq found\n");
+> +               ret = -ENODEV;
+> +               goto err_put_node;
+> +       }
+> +
+> +       ret = of_init_opp_table(dvfs_info->dev);
+> +       if (ret) {
+> +               dev_err(dvfs_info->dev, "failed to init OPP table: %d\n", ret);
+> +               goto err_put_node;
+> +       }
+> +
+> +       ret = opp_init_cpufreq_table(dvfs_info->dev, &dvfs_info->freq_table);
+> +       if (ret) {
+> +               dev_err(dvfs_info->dev,
+> +                       "failed to init cpufreq table: %d\n", ret);
+> +               goto err_put_node;
+> +       }
+> +       dvfs_info->freq_count = opp_get_opp_count(dvfs_info->dev);
+> +       exynos_sort_descend_freq_table();
+> +
+> +       if (of_property_read_u32(np, "clock-latency", &dvfs_info->latency))
+> +               dvfs_info->latency = DEF_TRANS_LATENCY;
+> +
+> +       dvfs_info->cpu_clk = devm_clk_get(dvfs_info->dev, "armclk");
+> +       if (IS_ERR(dvfs_info->cpu_clk)) {
+> +               dev_err(dvfs_info->dev, "Failed to get cpu clock\n");
+> +               ret = PTR_ERR(dvfs_info->cpu_clk);
+> +               goto err_free_table;
+> +       }
+> +
+> +       dvfs_info->cur_frequency = clk_get_rate(dvfs_info->cpu_clk);
+> +       if (!dvfs_info->cur_frequency) {
+> +               dev_err(dvfs_info->dev, "Failed to get clock rate\n");
+> +               ret = -EINVAL;
+> +               goto err_free_table;
+> +       }
+> +       dvfs_info->cur_frequency /= 1000;
+> +
+> +       INIT_WORK(&dvfs_info->irq_work, exynos_cpufreq_work);
+> +       ret = devm_request_irq(dvfs_info->dev, dvfs_info->irq,
+> +                               exynos_cpufreq_irq, IRQF_TRIGGER_NONE,
+> +                               CPUFREQ_NAME, dvfs_info);
+> +       if (ret) {
+> +               dev_err(dvfs_info->dev, "Failed to register IRQ\n");
+> +               goto err_free_table;
+> +       }
+> +
+> +       ret = init_div_table();
+> +       if (ret) {
+> +               dev_err(dvfs_info->dev, "Failed to initialise div table\n");
+> +               goto err_free_table;
+> +       }
+> +
+> +       exynos_enable_dvfs();
+> +       ret = cpufreq_register_driver(&exynos_driver);
+> +       if (ret) {
+> +               dev_err(dvfs_info->dev,
+> +                       "%s: failed to register cpufreq driver\n", __func__);
+> +               goto err_free_table;
+> +       }
+> +
+> +       of_node_put(np);
+> +       dvfs_info->dvfs_enabled = true;
+> +       return 0;
+> +
+> +err_free_table:
+> +       opp_free_cpufreq_table(dvfs_info->dev, &dvfs_info->freq_table);
+> +err_put_node:
+> +       of_node_put(np);
+> +       dev_err(dvfs_info->dev, "%s: failed initialization\n", __func__);
+> +       return ret;
+> +}
