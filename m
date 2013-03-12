@@ -1,46 +1,75 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Tue, 12 Mar 2013 17:10:41 +1300
-Subject: [PATCH 3/6] arm: dts: vt8500: Update Wondermedia SoC dtsi files
- for pinctrl driver
-In-Reply-To: <513E0A65.4000604@wwwdotorg.org>
-References: <1362807578-23089-1-git-send-email-linux@prisktech.co.nz>
- <1362807578-23089-4-git-send-email-linux@prisktech.co.nz>
- <513E0A65.4000604@wwwdotorg.org>
-Message-ID: <1363061441.23051.6.camel@gitbox>
+From: keyuan.liu@gmail.com (Kevin Liu)
+Date: Tue, 12 Mar 2013 12:15:14 +0800
+Subject: FW: Regulator API ignored return values
+In-Reply-To: <25B60CDC2F704E4E9D88FFD52780CB4C0BDEB0547F@SC-VEXCH1.marvell.com>
+References: <25B60CDC2F704E4E9D88FFD52780CB4C0BDEB0547F@SC-VEXCH1.marvell.com>
+Message-ID: <CADz5_g+KfxL43BKKsgZZ3Xg4sZWE4-ZaFpFhphKrfj9yK59-XA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-03-11 at 10:46 -0600, Stephen Warren wrote:
-> On 03/08/2013 10:39 PM, Tony Prisk wrote:
-> > This patch adds pinctrl nodes to the VIA VT8500 and Wondermedia SoC dtsi
-> > files to support the pinctrl driver.
-> 
-> > diff --git a/arch/arm/boot/dts/vt8500.dtsi b/arch/arm/boot/dts/vt8500.dtsi
-> 
-> > +		pinctrl: pinctrl at d8110000 {
-> > +			compatible = "via,vt8500-pinctrl";
-> > +			gpio-controller;
-> > +			reg = <0xd8110000 0x10000>;
-> > +			#gpio-cells = <2>;
-> > +			wm,pinmux = <0x00000001 0x00000001>;
-> > +		};
-> 
-> In the binding documentation, "wm,pinmux" is listed under "optional
-> sub-node properties", but here the property is included in the main
-> node, not a sub-node.
-> 
-> I'm a little confused what this property means then...
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> -----Original Message-----
+> From: linux-mmc-owner at vger.kernel.org [mailto:linux-mmc-owner at vger.kernel.org] On Behalf Of Chris Ball
+> Sent: Tuesday, March 12, 2013 5:56 AM
+> To: Arnd Bergmann
+> Cc: linux-kernel at vger.kernel.org; Stephen Warren; linux-arm-kernel at lists.infradead.org; Mark Brown; Linus Walleij; Axel Lin; Jingoo Han; Felipe Balbi; Dmitry Torokhov; linux-mmc at vger.kernel.org
+> Subject: Re: Regulator API ignored return values
+>
+> Hi,
+>
+> On Mon, Mar 11 2013, Arnd Bergmann wrote:
+>> ==> build/dove_defconfig/faillog <==
+>> /git/arm-soc/drivers/mmc/host/sdhci.c: In function 'sdhci_add_host':
+>> /git/arm-soc/drivers/mmc/host/sdhci.c:2910:19: warning: ignoring
+>> return value of 'regulator_enable', declared with attribute
+>> warn_unused_result [-Wunused-result]
+>
+> Thanks, this looks like the right fix to me:
+>
+>
+> Subject: [PATCH] mmc: sdhci: Don't ignore regulator_enable() return value
+>
+> Fixes:
+> /git/arm-soc/drivers/mmc/host/sdhci.c: In function 'sdhci_add_host':
+> /git/arm-soc/drivers/mmc/host/sdhci.c:2910:19: warning: ignoring
+> return value of 'regulator_enable', declared with attribute
+> warn_unused_result [-Wunused-result]
+>
+> Reported-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Chris Ball <cjb@laptop.org>
+> ---
+>  drivers/mmc/host/sdhci.c | 7 ++++++-
+>  1 file changed, 6 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+> index 51bbba4..fbf0b93 100644
+> --- a/drivers/mmc/host/sdhci.c
+> +++ b/drivers/mmc/host/sdhci.c
+> @@ -2907,12 +2907,17 @@ int sdhci_add_host(struct sdhci_host *host)
+>                         host->vqmmc = NULL;
+>                 }
+>         } else {
+> -               regulator_enable(host->vqmmc);
+> +               ret = regulator_enable(host->vqmmc);
+>                 if (!regulator_is_supported_voltage(host->vqmmc, 1700000,
+>                         1950000))
+>                         caps[1] &= ~(SDHCI_SUPPORT_SDR104 |
+>                                         SDHCI_SUPPORT_SDR50 |
+>                                         SDHCI_SUPPORT_DDR50);
+> +               if (ret) {
+> +                       pr_warn("%s: Failed to enable vqmmc regulator: %d\n",
+> +                               mmc_hostname(mmc), ret);
 
-Sorry - this was copied in large part from the brcm,bcm2835-gpio.txt
-binding. I added wm,pinmux alongside the existing wm,pins, wm,function
-and wm,pull properties.
+Need add regulator_put here since regulator_get has succeed?
 
-You are correct that this shouldn't be listed as a subnode property.
-
-Regards
-Tony P
+> +                       host->vqmmc = NULL;
+> +               }
+>         }
+>
+>         if (host->quirks2 & SDHCI_QUIRK2_NO_1_8_V)
+> --
+> Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+> One Laptop Per Child
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
