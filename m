@@ -1,54 +1,87 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 12 Mar 2013 16:57:06 +0900
-Subject: [PATCH 04/04] ARM: shmobile: APE6EVM support
-In-Reply-To: <87li9trr7l.wl%kuninori.morimoto.gx@renesas.com>
-References: <20130312045559.19701.77841.sendpatchset@w520>
- <20130312045637.19701.62477.sendpatchset@w520>
- <87li9trr7l.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <CANqRtoTSXBPo6-MksuXtfHVwEDTqEGdKg0tczJKriCuFW9mnzg@mail.gmail.com>
+From: silviupopescu1990@gmail.com (Silviu-Mihai Popescu)
+Date: Tue, 12 Mar 2013 09:58:29 +0200
+Subject: [PATCH] mach_omap2: use PTR_RET instead of IS_ERR + PTR_ERR
+Message-ID: <1363075109-27038-1-git-send-email-silviupopescu1990@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 12, 2013 at 4:51 PM, Kuninori Morimoto
-<kuninori.morimoto.gx@renesas.com> wrote:
->
-> Hi Magnus
->
-> I already sent Reviewed-by, but...
->
->> @@ -0,0 +1,40 @@
->> +/*
->> + * APE6EVM board support
->> + *
->> + * Copyright (C) 2013  Renesas Solutions Corp.
->> + * Copyright (C) 2013  Magnus Damm
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License as published by
->> + * the Free Software Foundation; version 2 of the License.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + *
->> + * You should have received a copy of the GNU General Public License
->> + * along with this program; if not, write to the Free Software
->> + * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
->> + */
->> +
->> +#include <linux/kernel.h>
->> +#include <linux/interrupt.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/irqchip.h>
->> +#include <mach/common.h>
->> +#include <mach/r8a73a4.h>
->> +#include <asm/mach-types.h>
->> +#include <asm/mach/arch.h>
->
-> There are too many include here,
-> and not in alphabetical order :)
+This uses PTR_RET instead of IS_ERR and PTR_ERR in order to increase
+readability.
 
-Yes. And what's next? Do I need to encode using Shift-JIS? =)
+Signed-off-by: Silviu-Mihai Popescu <silviupopescu1990@gmail.com>
+---
+ arch/arm/mach-omap2/devices.c |    4 ++--
+ arch/arm/mach-omap2/fb.c      |    5 +----
+ arch/arm/mach-omap2/gpmc.c    |    2 +-
+ arch/arm/mach-omap2/pmu.c     |    5 +----
+ 4 files changed, 5 insertions(+), 11 deletions(-)
 
-/ magnus
+diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+index 1ec7f05..2a0816e 100644
+--- a/arch/arm/mach-omap2/devices.c
++++ b/arch/arm/mach-omap2/devices.c
+@@ -66,7 +66,7 @@ static int __init omap3_l3_init(void)
+ 
+ 	WARN(IS_ERR(pdev), "could not build omap_device for %s\n", oh_name);
+ 
+-	return IS_ERR(pdev) ? PTR_ERR(pdev) : 0;
++	return PTR_RET(pdev);
+ }
+ omap_postcore_initcall(omap3_l3_init);
+ 
+@@ -100,7 +100,7 @@ static int __init omap4_l3_init(void)
+ 
+ 	WARN(IS_ERR(pdev), "could not build omap_device for %s\n", oh_name);
+ 
+-	return IS_ERR(pdev) ? PTR_ERR(pdev) : 0;
++	return PTR_RET(pdev);
+ }
+ omap_postcore_initcall(omap4_l3_init);
+ 
+diff --git a/arch/arm/mach-omap2/fb.c b/arch/arm/mach-omap2/fb.c
+index 190ae49..2ca33cc 100644
+--- a/arch/arm/mach-omap2/fb.c
++++ b/arch/arm/mach-omap2/fb.c
+@@ -83,10 +83,7 @@ static int __init omap_init_vrfb(void)
+ 	pdev = platform_device_register_resndata(NULL, "omapvrfb", -1,
+ 			res, num_res, NULL, 0);
+ 
+-	if (IS_ERR(pdev))
+-		return PTR_ERR(pdev);
+-	else
+-		return 0;
++	return PTR_RET(pdev);
+ }
+ 
+ omap_arch_initcall(omap_init_vrfb);
+diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+index 410e1ba..c665721 100644
+--- a/arch/arm/mach-omap2/gpmc.c
++++ b/arch/arm/mach-omap2/gpmc.c
+@@ -1448,7 +1448,7 @@ static int __init omap_gpmc_init(void)
+ 	pdev = omap_device_build(DEVICE_NAME, -1, oh, NULL, 0);
+ 	WARN(IS_ERR(pdev), "could not build omap_device for %s\n", oh_name);
+ 
+-	return IS_ERR(pdev) ? PTR_ERR(pdev) : 0;
++	return PTR_RET(pdev);
+ }
+ omap_postcore_initcall(omap_gpmc_init);
+ 
+diff --git a/arch/arm/mach-omap2/pmu.c b/arch/arm/mach-omap2/pmu.c
+index 9debf82..13ff2f5 100644
+--- a/arch/arm/mach-omap2/pmu.c
++++ b/arch/arm/mach-omap2/pmu.c
+@@ -52,10 +52,7 @@ static int __init omap2_init_pmu(unsigned oh_num, char *oh_names[])
+ 	WARN(IS_ERR(omap_pmu_dev), "Can't build omap_device for %s.\n",
+ 	     dev_name);
+ 
+-	if (IS_ERR(omap_pmu_dev))
+-		return PTR_ERR(omap_pmu_dev);
+-
+-	return 0;
++	return PTR_RET(omap_pmu_dev);
+ }
+ 
+ static int __init omap_init_pmu(void)
+-- 
+1.7.9.5
