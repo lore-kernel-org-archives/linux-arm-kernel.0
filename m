@@ -1,49 +1,70 @@
 From: prakash.pm@ti.com (Manjunathappa, Prakash)
-Date: Tue, 12 Mar 2013 13:40:22 +0530
-Subject: [PATCH v3 0/5] Enable SPI flash support on da850-evm DT kernel
-Message-ID: <1363075827-31053-1-git-send-email-prakash.pm@ti.com>
+Date: Tue, 12 Mar 2013 13:40:27 +0530
+Subject: [PATCH v3 5/5] ARM: davinci: da850-evm: add SPI flash support
+In-Reply-To: <1363075827-31053-1-git-send-email-prakash.pm@ti.com>
+References: <1363075827-31053-1-git-send-email-prakash.pm@ti.com>
+Message-ID: <1363075827-31053-6-git-send-email-prakash.pm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch enables support for m25p64 SPI flash support on
-da850-EVM.
+Enable m25p64 SPI flash support on da850-EVM. Also
+add partition information of SPI flash.
 
-Testing information:
-da850-evm comes with partitions specified in DT blob.
-Able to mount/umount and create/delete files on filesystem partition.
+Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
+---
+ arch/arm/boot/dts/da850-evm.dts |   40 +++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 40 insertions(+), 0 deletions(-)
 
-Depends on below patch in spi-next branch of git://git.secretlab.ca/git/linux-2.6.git.
-"spi/davinci: add OF support for the spi controller"
-
-Applies on top of v3.9/dt-2 branch of linux_davinci tree:
-git://gitorious.org/linux-davinci/linux-davinci.git
-
-Since v2:
-Fix compatible property DT naming convention.
-
-Since v1:
-Look for m25p64 instead of m25p80 flash chip and correct partition information.
-Dropped below accepted patch:
-"spi/davinci: fix module build error"
-Considered below missed out patch:
-spi/davinci: add DT binding documentation
-
-Manjunathappa, Prakash (4):
-  spi/davinci: no wildcards in DT compatible property
-  ARM: davinci: da850: add SPI1 DT node
-  ARM: davinci: da850: override SPI DT node device name
-  ARM: davinci: da850-evm: add SPI flash support
-
-Murali Karicheri (1):
-  spi/davinci: add DT binding documentation
-
- .../devicetree/bindings/spi/spi-davinci.txt        |   51 ++++++++++++++++++++
- arch/arm/boot/dts/da850-evm.dts                    |   40 +++++++++++++++
- arch/arm/boot/dts/da850.dtsi                       |   18 +++++++
- arch/arm/mach-davinci/da8xx-dt.c                   |    1 +
- drivers/spi/spi-davinci.c                          |    4 +-
- 5 files changed, 112 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/spi/spi-davinci.txt
-
+diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
+index c359872..fe2bbe7 100644
+--- a/arch/arm/boot/dts/da850-evm.dts
++++ b/arch/arm/boot/dts/da850-evm.dts
+@@ -41,6 +41,46 @@
+ 		wdt: wdt at 1c21000 {
+ 			status = "okay";
+ 		};
++		spi1: spi at 1f0e000 {
++			status = "okay";
++			pinctrl-names = "default";
++			pinctrl-0 = <&spi1_pins>;
++			flash: m25p80 at 0 {
++				#address-cells = <1>;
++				#size-cells = <1>;
++				compatible = "m25p64";
++				spi-max-frequency = <30000000>;
++				reg = <0>;
++				partition at 0 {
++					label = "U-Boot-SPL";
++					reg = <0x00000000 0x00010000>;
++					read-only;
++				};
++				partition at 1 {
++					label = "U-Boot";
++					reg = <0x00010000 0x00080000>;
++					read-only;
++				};
++				partition at 2 {
++					label = "U-Boot-Env";
++					reg = <0x00090000 0x00010000>;
++					read-only;
++				};
++				partition at 3 {
++					label = "Kernel";
++					reg = <0x000a0000 0x00280000>;
++				};
++				partition at 4 {
++					label = "Filesystem";
++					reg = <0x00320000 0x00400000>;
++				};
++				partition at 5 {
++					label = "MAC-Address";
++					reg = <0x007f0000 0x00010000>;
++					read-only;
++				};
++			};
++		};
+ 	};
+ 	nand_cs3 at 62000000 {
+ 		status = "okay";
 -- 
 1.7.4.1
