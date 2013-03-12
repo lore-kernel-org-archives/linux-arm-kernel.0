@@ -1,27 +1,34 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 12 Mar 2013 12:53:46 -0600
-Subject: [PATCH] clk: add table lookup to mux
-In-Reply-To: <1363113747-6572-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1363113747-6572-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <513F79BA.7000608@wwwdotorg.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 12 Mar 2013 13:53:49 -0500
+Subject: [PATCH v2 02/14] clocksource: sp804: add device tree support
+In-Reply-To: <201303121851.35326.arnd@arndb.de>
+References: <1363108124-17484-1-git-send-email-haojian.zhuang@linaro.org>
+ <1363108124-17484-3-git-send-email-haojian.zhuang@linaro.org>
+ <201303121851.35326.arnd@arndb.de>
+Message-ID: <513F79BD.1050903@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/12/2013 12:42 PM, Peter De Schrijver wrote:
-> Add a table lookup feature to the mux clock. Also allow arbitrary masks
-> instead of the width. This will be used by some clocks on Tegra114. Also
-> adapt the tegra periph clk because it uses struct clk_mux directly.
+On 03/12/2013 01:51 PM, Arnd Bergmann wrote:
+> On Tuesday 12 March 2013, Haojian Zhuang wrote:
+>> +static void __init sp804_dt_init(void)
+>> +{
+> ...
+>> +
+>> +       np = of_find_matching_node(from, sp804_timer_match);
+> ...
+>> +}
+>> +CLOCKSOURCE_OF_DECLARE(sp804, "arm,sp804", sp804_dt_init);
 > 
-> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+> On second thought, I guess it would be nice if we could change the
+> calling conventions for CLOCKSOURCE_OF_DECLARE init functions to
+> always pass the device along.  It is a bit silly if we already have
+> the node in clocksource_of_init and then require the init function
+> to call of_find_matching_node(). That change would also make patch
+> 3 in this series unnecessary.
 > 
-> --
-> Mike,
-> 
-> This is the same patch I posted before which implements a table lookup
-> feature for the mux clock. I squashed both the changes to clk-mux.c and
-> tegra/clk.h together in order to make the patch bisectable.
 
-For the record in this thread, this is a dependency of the Tegra114
-clock driver. Can this patch be added to a stable branch in the clk or
-arm-soc trees, which I can merge before applying the Tegra114 clock
-driver? Thanks.
+My pull request to you yesterday does this. And I also have similar
+sp804 patches I'm working on...
+
+Rob
