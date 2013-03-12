@@ -1,71 +1,97 @@
-From: lethal@linux-sh.org (Paul Mundt)
-Date: Tue, 12 Mar 2013 17:20:39 +0900
-Subject: [PATCH v6 1/3] serial: sh-sci: Add OF support
-In-Reply-To: <1689352.QAdqes1IG8@avalon>
-References: <1362569437-11133-1-git-send-email-hechtb+renesas@gmail.com>
- <9335181.JoypQftkI4@avalon>
- <CABYn4sz_5vEzXba0Y7iXKBbGhfGwY2cd8fn30mUQ0GQcbGTG+w@mail.gmail.com>
- <1689352.QAdqes1IG8@avalon>
-Message-ID: <20130312082038.GC3553@linux-sh.org>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Tue, 12 Mar 2013 14:20:34 +0530
+Subject: [PATCH 1/4] clk: samsung: register clk_div_tables for divider
+ clocks
+In-Reply-To: <201303120043.24557.heiko@sntech.de>
+References: <201303120042.09633.heiko@sntech.de>
+ <201303120043.24557.heiko@sntech.de>
+Message-ID: <CAJuYYwS1FSNE5s8TAsTjdX49ZUHapOjRHqAiKqLgLPEV3QM1Uw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 11, 2013 at 11:32:31PM +0100, Laurent Pinchart wrote:
-> On Thursday 07 March 2013 11:26:29 Bastian Hecht wrote:
-> > >> +- renesas,scscr : Should contain a bitfield used by the Serial Control
-> > >> Register.
-> > >> +  b7 = SCSCR_TIE
-> > >> +  b6 = SCSCR_RIE
-> > >> +  b5 = SCSCR_TE
-> > >> +  b4 = SCSCR_RE
-> > >> +  b3 = SCSCR_REIE
-> > >> +  b2 = SCSCR_TOIE
-> > >> +  b1 = SCSCR_CKE1
-> > >> +  b0 = SCSCR_CKE0
-> > > 
-> > > What is that for exactly ?
-> > 
-> > What I can see from 3 different datasheets (sh7372, sh73a0, r8a7740)
-> > the first 2 bits differ in meaning.
-> > 
-> > On r8a7740 it depends: In asynchronous mode the first 2 bits CKE0/1
-> > define whether you want to use an external clock to drive the baud
-> > generator or if you want to use the internal SUB clock. If you use the
-> > SUB clock you can further define if you want to use a subscaled SUB
-> > clock in the SCSMR register. In synchronous mode you must rely on the
-> > internal clock for the baud generator and can select if the SCK pin is
-> > used as clock input or output.
-> 
-> What about adding an optional source clock property to the bindings, that 
-> would contain the phandle of the source clock ? If the property is absent then 
-> the internal clock would be used.
-> 
-We can't really use the internal oscillator at the moment, it's one of
-the things that is blocked on adoption of the common struct clk work. The
-baud rate generator algo will likewise differ depending on whether it's
-using an internally generated clock or not, which also makes a different
-set of baud rates available.
+On 12 March 2013 05:13, Heiko St?bner <heiko@sntech.de> wrote:
+> On some Samsung platforms divider clocks only use specific divider combinations
+> like the armdiv on s3c2443 and s3c2416. For these usecases the generic divider
+> clock already provides the option of providing a lookup table mapping register
+> values to divider values.
+>
+> Therefore add a new field to samsung_div_clock and if filled with a table,
+> use clk_register_divider_table instead of clk_register_divider to register
+> a divider clock
+>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+>  drivers/clk/samsung/clk.c |   14 +++++++++++---
+>  drivers/clk/samsung/clk.h |   13 +++++++++----
+>  2 files changed, 20 insertions(+), 7 deletions(-)
+>
+> diff --git a/drivers/clk/samsung/clk.c b/drivers/clk/samsung/clk.c
+> index 91d12f3..d36cdd5 100644
+> --- a/drivers/clk/samsung/clk.c
+> +++ b/drivers/clk/samsung/clk.c
+> @@ -183,9 +183,17 @@ void __init samsung_clk_register_div(struct samsung_div_clock *list,
+>         unsigned int idx, ret;
+>
+>         for (idx = 0; idx < nr_clk; idx++, list++) {
+> -               clk = clk_register_divider(NULL, list->name, list->parent_name,
+> -                       list->flags, reg_base + list->offset, list->shift,
+> -                       list->width, list->div_flags, &lock);
+> +               if (list->table)
+> +                       clk = clk_register_divider_table(NULL, list->name,
+> +                                       list->parent_name, list->flags,
+> +                                       reg_base + list->offset, list->shift,
+> +                                       list->width, list->div_flags,
+> +                                       list->table, &lock);
+> +               else
+> +                       clk = clk_register_divider(NULL, list->name,
+> +                                       list->parent_name, list->flags,
+> +                                       reg_base + list->offset, list->shift,
+> +                                       list->width, list->div_flags, &lock);
+>                 if (IS_ERR(clk)) {
+>                         pr_err("%s: failed to register clock %s\n", __func__,
+>                                 list->name);
+> diff --git a/drivers/clk/samsung/clk.h b/drivers/clk/samsung/clk.h
+> index 961192f..26a752b 100644
+> --- a/drivers/clk/samsung/clk.h
+> +++ b/drivers/clk/samsung/clk.h
+> @@ -150,9 +150,10 @@ struct samsung_div_clock {
+>         u8                      width;
+>         u8                      div_flags;
+>         const char              *alias;
+> +       struct clk_div_table    *table;
+>  };
+>
+> -#define __DIV(_id, dname, cname, pname, o, s, w, f, df, a)     \
+> +#define __DIV(_id, dname, cname, pname, o, s, w, f, df, a, t)  \
+>         {                                                       \
+>                 .id             = _id,                          \
+>                 .dev_name       = dname,                        \
+> @@ -164,16 +165,20 @@ struct samsung_div_clock {
+>                 .width          = w,                            \
+>                 .div_flags      = df,                           \
+>                 .alias          = a,                            \
+> +               .table          = t,                            \
+>         }
+>
+>  #define DIV(_id, cname, pname, o, s, w)                                \
+> -       __DIV(_id, NULL, cname, pname, o, s, w, 0, 0, NULL)
+> +       __DIV(_id, NULL, cname, pname, o, s, w, 0, 0, NULL, NULL)
+>
+>  #define DIV_A(_id, cname, pname, o, s, w, a)                   \
+> -       __DIV(_id, NULL, cname, pname, o, s, w, 0, 0, a)
+> +       __DIV(_id, NULL, cname, pname, o, s, w, 0, 0, a, NULL)
+>
+>  #define DIV_F(_id, cname, pname, o, s, w, f, df)               \
+> -       __DIV(_id, NULL, cname, pname, o, s, w, f, df, NULL)
+> +       __DIV(_id, NULL, cname, pname, o, s, w, f, df, NULL, NULL)
+> +
+> +#define DIV_T(_id, cname, pname, o, s, w, t)                   \
+> +       __DIV(_id, NULL, cname, pname, o, s, w, 0, 0, NULL, t)
+>
+>  /**
+>   * struct samsung_gate_clock: information about gate clock
+> --
+> 1.7.2.3
+>
 
-My plan originally was to wait until the common struct clk stuff came
-along well enough that we could provide a clock dynamically depending on
-the target baud (or for avoiding cpufreq pre/post-change notifier
-chains), but this obviously hasn't happened yet.
-
-I think your idea for the abstraction with the phandle sounds like the
-right approach, but we aren't presently in a state where we can handle
-that.
-
-> > Bit 2 and 3 don't exist in my datasheets.
-> > 
-> > The other bits define under which conditions you receive interrupts
-> > (send FIFO empty, receive FIFO full) and which bits you need to start
-> > transfers (one bit to start sending, one receiving). The bits 8 to 31
-> > are used to set up DMA transfers and various interrupt events like
-> > error status and finish transfers. I haven't included them as they are
-> > not used in the driver.
-> 
-> If they're not used maybe we can drop them :-)
-> 
-Obviously they're used, otherwise they wouldn't be defined in the common
-header. Whether they are used by these specific CPUs or not isn't
-relevant, as there are plenty of cases where they are. grep harder.
+Reviewed-by: Thomas Abraham <thomas.abraham@linaro.org>
