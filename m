@@ -1,65 +1,55 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Tue, 12 Mar 2013 18:07:07 -0400
-Subject: [PATCH 14/29] arm64: KVM: guest one-reg interface
-In-Reply-To: <513F6E86.4040902@arm.com>
-References: <1362455265-24165-1-git-send-email-marc.zyngier@arm.com>
- <1362455265-24165-15-git-send-email-marc.zyngier@arm.com>
- <513F6659.7060500@codeaurora.org> <513F6E86.4040902@arm.com>
-Message-ID: <513FA70B.2040600@codeaurora.org>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue, 12 Mar 2013 16:08:54 -0600
+Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
+In-Reply-To: <20130312213006.GA23717@avionic-0098.mockup.avionic-design.de>
+References: <513D6F9C.9000100@firmworks.com>
+ <20130311181554.GA10992@obsidianresearch.com>
+ <513E519B.6010503@firmworks.com>
+ <20130311232516.GA13873@obsidianresearch.com>
+ <513E6AFE.3090304@firmworks.com>
+ <20130312070852.GA6727@avionic-0098.mockup.avionic-design.de>
+ <20130312155749.GA1820@obsidianresearch.com>
+ <20130312203819.GA23221@avionic-0098.mockup.avionic-design.de>
+ <20130312210328.GA22702@obsidianresearch.com>
+ <20130312213006.GA23717@avionic-0098.mockup.avionic-design.de>
+Message-ID: <20130312220854.GA23112@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On Tue, Mar 12, 2013 at 10:30:06PM +0100, Thierry Reding wrote:
 
-On 03/12/2013 02:05 PM, Marc Zyngier wrote:
-> On 12/03/13 17:31, Christopher Covington wrote:
->> Hi Marc,
->>
->> On 03/04/2013 10:47 PM, Marc Zyngier wrote:
->>> Let userspace play with the guest registers.
->>>
->>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>> ---
->>>  arch/arm64/kvm/guest.c | 240 +++++++++++++++++++++++++++++++++++++++++++++++++
->>>  1 file changed, 240 insertions(+)
->>>  create mode 100644 arch/arm64/kvm/guest.c
->>
->> [...]
->>
->>> +int __attribute_const__ kvm_target_cpu(void)
->>> +{
->>> +	unsigned long implementor = read_cpuid_implementor();
->>> +	unsigned long part_number = read_cpuid_part_number();
->>> +
->>> +	if (implementor != ARM_CPU_IMP_ARM)
->>> +		return -EINVAL;
->>> +
->>> +	switch (part_number) {
->>> +	case ARM_CPU_PART_AEM_V8:
->>> +	case ARM_CPU_PART_FOUNDATION:
->>> +		/* Treat the models just as an A57 for the time being */
->>> +	case ARM_CPU_PART_CORTEX_A57:
->>> +		return KVM_ARM_TARGET_CORTEX_A57;
->>> +	default:
->>> +		return -EINVAL;
->>> +	}
->>> +}
->>
->> What is the motivation behind these checks? Why not let any ARMv8 system that
->> has EL2 host a virtualized Cortex A57 guest?
+> > Not going down the of_pci_* code paths for address translation at the
+> > root port bridge nodes is certainly not right.
 > 
-> The main reason is errata management. How do you deal with errata in the
-> guest when you hide the underlying host CPU? I don't have an answer to
-> that. So for the time being, we only allow the guest to see the same CPU
-> as the host, and require that new CPUs are added to this function.
+> I'm not so sure. Why should the pcie-controller be a PCI device?
 
-Can you please elaborate on how this code ensures the guest is seeing the same
-CPU as the host? It looks rather unlike VPIDR = MIDR.
+The spec is clear on that point as well:
 
-Thanks,
-Christopher
+ device_type
+  A Standard Package conforming to this specification and corresponding
+  to a device that implements a PCI bus shall implement this property
+  with the string value "pci"
 
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by
-the Linux Foundation
+The children of a pcie-controller node are PCI devices, thus the
+pcie-controller node 'implements a PCI bus'. Or, as you say 'device on
+the processor/SoC/platform bus that bridges to the PCI bus'
+
+Think of device_type as also meaning bus_type and it makes more
+logical sense, the name is terrible, but its usage is governed by the
+OF docs..
+
+> The other alternative would be to amend the specification. Besides the
+> fact that the specification says so I don't see any reason why this
+> shouldn't be allowed.
+
+'the specification says so' *IS* the reason. DT isn't a free for all
+where you get to do whatever you want, or whatever 'feels' right. It
+is supposed to be a stable, OS agnostic ABI. That means bindings have
+to follow the specs (when available).
+
+Maybe a future revision will support PCI-E ECAM, but we don't know
+what that will look like, and I'm pretty sure you don't want to hold
+up your patches until an IEEE committee gets around to deciding
+something ;)
+
+Jason
