@@ -1,24 +1,37 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 12 Mar 2013 12:48:24 +0000
-Subject: linux-next: manual merge of the akpm tree with the arm-soc tree
-In-Reply-To: <20130312115339.GF12700@titan.lakedaemon.net>
-References: <20130312144714.39749c5b0bd1aea14c4d2ff8@canb.auug.org.au>
- <CAOesGMgSzn+uCVEMKZgtorcNkdzzvntmnfoej5vN-AjF43pnyQ@mail.gmail.com>
- <20130312115339.GF12700@titan.lakedaemon.net>
-Message-ID: <201303121248.24736.arnd@arndb.de>
+Date: Tue, 12 Mar 2013 12:59:18 +0000
+Subject: [PATCH v2] ARM: tegra: expose chip ID and revision
+In-Reply-To: <1363089667-15737-1-git-send-email-dahuang@nvidia.com>
+References: <1363089667-15737-1-git-send-email-dahuang@nvidia.com>
+Message-ID: <201303121259.18710.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 12 March 2013, Jason Cooper wrote:
-> I chose to keep them together to maintain bisectability.  Either you
-> have all of the fix (you landed on this branch), or you don't.  Was this
-> the correct decision in this case, or did I miss something?
+On Tuesday 12 March 2013, Danny Huang wrote:
+> 
+> +void __init tegra_soc_device_init(void)
+> +{
+> +       struct soc_device *soc_dev;
+> +       struct soc_device_attribute *soc_dev_attr;
+> +
+> +       soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
+> +       if (!soc_dev_attr)
+> +               return;
+> +
+> +       soc_dev_attr->soc_id = kasprintf(GFP_KERNEL, "%d", tegra_chip_id);
+> +       soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%d", tegra_revision);
+> +       soc_dev_attr->family = kasprintf(GFP_KERNEL, "Tegra");
+> +
+> +       soc_dev = soc_device_register(soc_dev_attr);
+> +       if (IS_ERR_OR_NULL(soc_dev))
+> +               kfree(soc_dev_attr);
+> +
+> +       return;
 
-I think you don't need to worry about bisection in this case, especially
-as you mentioned that 3.8 is already broken.
+You are dropping the soc_dev on the floor here by just returning.
 
->From all I can tell, these are four separate fixes, and you want to have
-all of them get merged, but applying just one of them will not make the
-state of the kernel tree any worse than what it is before the patches.
+The idea of the soc node is to have all on-soc components be children
+of that node, so you should instead pass it into of_platform_populate
+as the parent device.
 
 	Arnd
