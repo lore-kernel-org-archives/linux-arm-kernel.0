@@ -1,40 +1,40 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 13 Mar 2013 04:24:20 +0800
-Subject: [PATCH] ARM: w1-gpio: fix erroneous gpio requests
-In-Reply-To: <20130312202028.GA6060@kroah.com>
-References: <1363116094-8630-1-git-send-email-jhovold@gmail.com>
- <20130312202028.GA6060@kroah.com>
-Message-ID: <FE853F2C-A85A-4D0E-BF0E-80698F3E6567@jcrosoft.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 12 Mar 2013 13:26:40 -0700
+Subject: [PATCH v2 07/11] ssbi: Use regular init level
+In-Reply-To: <1363113716-25897-8-git-send-email-davidb@codeaurora.org>
+References: <1362616187-21089-1-git-send-email-davidb@codeaurora.org>
+ <1363113716-25897-1-git-send-email-davidb@codeaurora.org>
+ <1363113716-25897-8-git-send-email-davidb@codeaurora.org>
+Message-ID: <513F8F80.1070409@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 03/12/13 11:41, David Brown wrote:
+> With device tree, and deferred probe, it is no longer necessary to
+> make sure that the ssbi bus driver is initialized very early.  Restore
+> to a regular module_init().
+>
+> Signed-off-by: David Brown <davidb@codeaurora.org>
+> ---
+>  drivers/ssbi/ssbi.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/ssbi/ssbi.c b/drivers/ssbi/ssbi.c
+> index 7ae8925..6878e55 100644
+> --- a/drivers/ssbi/ssbi.c
+> +++ b/drivers/ssbi/ssbi.c
+> @@ -379,7 +379,7 @@ static int __init msm_ssbi_init(void)
+>  {
+>  	return platform_driver_register(&msm_ssbi_driver);
+>  }
+> -postcore_initcall(msm_ssbi_init);
+> +module_init(msm_ssbi_init);
+>  
+>  static void __exit msm_ssbi_exit(void)
+>  {
 
-On Mar 13, 2013, at 4:20 AM, Greg Kroah-Hartman <gregkh@linuxfoundation.org> wrote:
+With this change we can use module_platform_driver() too.
 
-> On Tue, Mar 12, 2013 at 08:21:34PM +0100, Johan Hovold wrote:
->> Fix regression introduced by commit d2323cf773 ("onewire: w1-gpio: add
->> ext_pullup_enable pin in platform data") which added a gpio entry to the
->> platform data, but did not add the required initialisers to the board
->> files using it. Consequently, the driver would request gpio 0 at probe,
->> which could break other uses of the corresponding pin.
->> 
->> On AT91 requesting gpio 0 changes the pin muxing for PIOA0, which, for
->> instance, breaks SPI0 on at91sam9g20.
-
-not only on AT91, 0 is a valid gpio
->> 
->> Cc: stable <stable@vger.kernel.org>
->> Signed-off-by: Johan Hovold <jhovold@gmail.com>
->> ---
->> 
->> Not sure whose tree this should go in through, so adding relevant maintainers
->> and authors as CC.
-> 
-> As I took the offending patch, I might as well take this fix for it as
-> well.
-> 
-> Unless anyone else objects?
-Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-
-Best Regards,
-J.
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
