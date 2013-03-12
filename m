@@ -1,192 +1,43 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Tue, 12 Mar 2013 16:54:33 +0100
-Subject: [PATCH] irqchip: Add support for ARMv7-M's NVIC
-Message-ID: <1363103673-24720-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue, 12 Mar 2013 09:57:49 -0600
+Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
+In-Reply-To: <20130312070852.GA6727@avionic-0098.mockup.avionic-design.de>
+References: <513A7845.6040304@firmworks.com>
+ <20130309013152.GA3883@obsidianresearch.com>
+ <513C117D.6080800@firmworks.com>
+ <20130310065539.GA14704@obsidianresearch.com>
+ <513D6F9C.9000100@firmworks.com>
+ <20130311181554.GA10992@obsidianresearch.com>
+ <513E519B.6010503@firmworks.com>
+ <20130311232516.GA13873@obsidianresearch.com>
+ <513E6AFE.3090304@firmworks.com>
+ <20130312070852.GA6727@avionic-0098.mockup.avionic-design.de>
+Message-ID: <20130312155749.GA1820@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Catalin Marinas <catalin.marinas@arm.com>
+On Tue, Mar 12, 2013 at 08:08:52AM +0100, Thierry Reding wrote:
 
-This interrupt controller is found on Cortex-M3 and Cortex-M4 machines.
+> So to recapitulate, we agree that configuration space can be translated
+> through the "ranges" property. That means the only missing link is a new
+> function to translate not only "assigned-addresses" but also the "reg"
+> property for PCI devices. Is that it?
 
-[ukleinek: drop locking, switch to fasteoi handler, add irqdomain
-and dt support, move to drivers/irq]
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- drivers/irqchip/Kconfig    |   4 ++
- drivers/irqchip/Makefile   |   1 +
- drivers/irqchip/irq-nvic.c | 136 +++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 141 insertions(+)
- create mode 100644 drivers/irqchip/irq-nvic.c
+No, the first conclusion is that placing a config space in ranges is
+against the language in the current spec (see section 12).
 
-diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-index a350969..18657fd 100644
---- a/drivers/irqchip/Kconfig
-+++ b/drivers/irqchip/Kconfig
-@@ -10,6 +10,10 @@ config ARM_GIC
- config GIC_NON_BANKED
- 	bool
- 
-+config ARM_NVIC
-+	bool
-+	select IRQ_DOMAIN
-+
- config ARM_VIC
- 	bool
- 	select IRQ_DOMAIN
-diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-index 98e3b87..7227c5f 100644
---- a/drivers/irqchip/Makefile
-+++ b/drivers/irqchip/Makefile
-@@ -7,5 +7,6 @@ obj-$(CONFIG_METAG_PERFCOUNTER_IRQS)	+= irq-metag.o
- obj-$(CONFIG_ARCH_SUNXI)		+= irq-sunxi.o
- obj-$(CONFIG_ARCH_SPEAR3XX)		+= spear-shirq.o
- obj-$(CONFIG_ARM_GIC)			+= irq-gic.o
-+obj-$(CONFIG_ARM_NVIC)			+= irq-nvic.o
- obj-$(CONFIG_ARM_VIC)			+= irq-vic.o
- obj-$(CONFIG_VERSATILE_FPGA_IRQ)	+= irq-versatile-fpga.o
-diff --git a/drivers/irqchip/irq-nvic.c b/drivers/irqchip/irq-nvic.c
-new file mode 100644
-index 0000000..ddfb3d8
---- /dev/null
-+++ b/drivers/irqchip/irq-nvic.c
-@@ -0,0 +1,136 @@
-+/*
-+ * drivers/irq/irq-nvic.c
-+ *
-+ * Copyright (C) 2008 ARM Limited, All Rights Reserved.
-+ * Copyright (C) 2013 Pengutronix
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * Support for the Nested Vectored Interrupt Controller found on the
-+ * ARMv7-M CPUs (Cortex-M3/M4)
-+ */
-+#include <linux/init.h>
-+#include <linux/kernel.h>
-+#include <linux/compiler.h>
-+#include <linux/smp.h>
-+#include <linux/export.h>
-+#include <linux/err.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/irqdomain.h>
-+
-+#include <asm/irq.h>
-+#include <asm/io.h>
-+#include <asm/mach/irq.h>
-+
-+#include "irqchip.h"
-+
-+#define NVIC_INTR_CTRL			(0x004)
-+#define NVIC_ISER			(0x100)
-+#define NVIC_ICER			(0x180)
-+#define NVIC_IPRI			(0x400)
-+
-+struct nvic_chip_data {
-+	void __iomem *dist_base;
-+	struct irq_domain *domain;
-+};
-+
-+static struct nvic_chip_data nvic_data __read_mostly;
-+
-+static inline void __iomem *nvic_dist_base(struct irq_data *d)
-+{
-+	struct nvic_chip_data *nvic_data = irq_data_get_irq_chip_data(d);
-+	return nvic_data->dist_base;
-+}
-+
-+static void nvic_mask_irq(struct irq_data *d)
-+{
-+	u32 mask = 1 << (d->hwirq % 32);
-+
-+	writel_relaxed(mask, nvic_dist_base(d) + NVIC_ICER + d->irq / 32 * 4);
-+}
-+
-+static void nvic_unmask_irq(struct irq_data *d)
-+{
-+	u32 mask = 1 << (d->hwirq % 32);
-+
-+	writel_relaxed(mask, nvic_dist_base(d) + NVIC_ISER + d->hwirq / 32 * 4);
-+}
-+
-+void nvic_eoi(struct irq_data *d)
-+{
-+	/*
-+	 * This is a no-op as end of interrupt is signaled by the exception
-+	 * return sequence.
-+	 */
-+}
-+
-+static struct irq_chip nvic_chip = {
-+	.name = "NVIC",
-+	.irq_mask = nvic_mask_irq,
-+	.irq_unmask = nvic_unmask_irq,
-+	.irq_eoi = nvic_eoi,
-+};
-+
-+static void __init nvic_init_bases(struct device_node *node,
-+		void __iomem *dist_base)
-+{
-+	unsigned int irqs, i, irq_base;
-+
-+	nvic_data.dist_base = dist_base;
-+
-+	irqs = ((readl_relaxed(dist_base + NVIC_INTR_CTRL) & 0x0f) + 1) * 32;
-+	if (irqs > 496)
-+		irqs = 496;
-+
-+	irq_base = irq_alloc_descs(-1, 16, irqs - 16, numa_node_id());
-+	if (IS_ERR_VALUE(irq_base)) {
-+		WARN(1, "Cannot allocate irq_descs\n");
-+		irq_base = 16;
-+	}
-+	nvic_data.domain = irq_domain_add_legacy(node, irqs - 16, irq_base, 0,
-+			&irq_domain_simple_ops, NULL);
-+	if (WARN_ON(!nvic_data.domain))
-+		return;
-+
-+	/*
-+	 * Set priority on all interrupts.
-+	 */
-+	for (i = 0; i < irqs; i += 4)
-+		writel_relaxed(0, dist_base + NVIC_IPRI + i);
-+
-+	/*
-+	 * Disable all interrupts
-+	 */
-+	for (i = 0; i < irqs; i += 32)
-+		writel_relaxed(~0, dist_base + NVIC_ICER + i * 4 / 32);
-+
-+	/*
-+	 * Setup the Linux IRQ subsystem.
-+	 */
-+	for (i = 0; i < irqs; i++) {
-+		irq_set_chip_and_handler(irq_base + i, &nvic_chip,
-+				handle_fasteoi_irq);
-+		irq_set_chip_data(irq_base + i, &nvic_data);
-+		set_irq_flags(irq_base + i, IRQF_VALID | IRQF_PROBE);
-+	}
-+}
-+
-+static int __init nvic_of_init(struct device_node *node,
-+		struct device_node *parent)
-+{
-+	void __iomem *dist_base;
-+
-+	if (WARN_ON(!node))
-+		return -ENODEV;
-+
-+	dist_base = of_iomap(node, 0);
-+	WARN(!dist_base, "unable to map nvic dist registers\n");
-+
-+	nvic_init_bases(node, dist_base);
-+
-+	return 0;
-+}
-+IRQCHIP_DECLARE(cortex_m3_nvic, "arm,cortex-m3-nvic", nvic_of_init);
--- 
-1.8.2.rc2
+The second conclusion is that there is probably a way forward to
+update the spec in a backwards compatible way to model ECAM, but would
+require more analysis.
+
+Finally, there was no objections to the approach in Thomas's patch,
+other than the note to fix the '@1,0' and the extra device_type="pci"
+..
+
+> And for Marvell the non-configuration-space per-root-port registers need
+> to be mapped separately from the configuration space windows?
+
+No, there are no configuration space windows on Marvell, so only one mapping.
+
+Regards,
+Jason
