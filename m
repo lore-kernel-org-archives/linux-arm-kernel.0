@@ -1,134 +1,71 @@
-From: steve.capper@arm.com (Steve Capper)
-Date: Tue, 12 Mar 2013 08:14:51 +0000
-Subject: [RFC PATCH] ARM: mm: make UACCESS_WITH_MEMCPY huge page aware.
-Message-ID: <1363076091-24476-1-git-send-email-steve.capper@arm.com>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Tue, 12 Mar 2013 17:20:39 +0900
+Subject: [PATCH v6 1/3] serial: sh-sci: Add OF support
+In-Reply-To: <1689352.QAdqes1IG8@avalon>
+References: <1362569437-11133-1-git-send-email-hechtb+renesas@gmail.com>
+ <9335181.JoypQftkI4@avalon>
+ <CABYn4sz_5vEzXba0Y7iXKBbGhfGwY2cd8fn30mUQ0GQcbGTG+w@mail.gmail.com>
+ <1689352.QAdqes1IG8@avalon>
+Message-ID: <20130312082038.GC3553@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The memory pinning code in uaccess_with_memcpy.c does not check
-for HugeTLB or THP pages, and will enter an infinite loop should
-a __copy_to_user or __clear_user occur against a huge page.
+On Mon, Mar 11, 2013 at 11:32:31PM +0100, Laurent Pinchart wrote:
+> On Thursday 07 March 2013 11:26:29 Bastian Hecht wrote:
+> > >> +- renesas,scscr : Should contain a bitfield used by the Serial Control
+> > >> Register.
+> > >> +  b7 = SCSCR_TIE
+> > >> +  b6 = SCSCR_RIE
+> > >> +  b5 = SCSCR_TE
+> > >> +  b4 = SCSCR_RE
+> > >> +  b3 = SCSCR_REIE
+> > >> +  b2 = SCSCR_TOIE
+> > >> +  b1 = SCSCR_CKE1
+> > >> +  b0 = SCSCR_CKE0
+> > > 
+> > > What is that for exactly ?
+> > 
+> > What I can see from 3 different datasheets (sh7372, sh73a0, r8a7740)
+> > the first 2 bits differ in meaning.
+> > 
+> > On r8a7740 it depends: In asynchronous mode the first 2 bits CKE0/1
+> > define whether you want to use an external clock to drive the baud
+> > generator or if you want to use the internal SUB clock. If you use the
+> > SUB clock you can further define if you want to use a subscaled SUB
+> > clock in the SCSMR register. In synchronous mode you must rely on the
+> > internal clock for the baud generator and can select if the SCK pin is
+> > used as clock input or output.
+> 
+> What about adding an optional source clock property to the bindings, that 
+> would contain the phandle of the source clock ? If the property is absent then 
+> the internal clock would be used.
+> 
+We can't really use the internal oscillator at the moment, it's one of
+the things that is blocked on adoption of the common struct clk work. The
+baud rate generator algo will likewise differ depending on whether it's
+using an internally generated clock or not, which also makes a different
+set of baud rates available.
 
-This patch adds detection code for huge pages to pin_page_for_write.
-As this code can be executed in a fast path it refers to the actual
-pmds rather than the vma. It also takes advantage of the fact that
-HugeTLB and THP pages have the same pmd layout on ARM.
+My plan originally was to wait until the common struct clk stuff came
+along well enough that we could provide a clock dynamically depending on
+the target baud (or for avoiding cpufreq pre/post-change notifier
+chains), but this obviously hasn't happened yet.
 
-Two helper functions are introduced; pmd_thp_or_huge will check
-whether or not a page is huge or transparent huge (which have the
-same pmd layout on ARM), and pmd_hugewillfault will detect whether
-or not a page fault will occur on write to the page.
+I think your idea for the abstraction with the phandle sounds like the
+right approach, but we aren't presently in a state where we can handle
+that.
 
-This patch is to be applied on top of the set at:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-February/148451.html
-
-I would really welcome comments/discussion on this.
-
-Reported-by: Grazvydas Ignotas <notasas@gmail.com>
-Signed-off-by: Steve Capper <steve.capper@arm.com>
----
- arch/arm/include/asm/pgtable-2level.h |    6 +++++
- arch/arm/include/asm/pgtable-3level.h |    3 +++
- arch/arm/lib/uaccess_with_memcpy.c    |   40 ++++++++++++++++++++++++++++++---
- 3 files changed, 46 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/include/asm/pgtable-2level.h b/arch/arm/include/asm/pgtable-2level.h
-index e3b5ec2..2338ed5 100644
---- a/arch/arm/include/asm/pgtable-2level.h
-+++ b/arch/arm/include/asm/pgtable-2level.h
-@@ -282,8 +282,14 @@ PMD_BIT_FUNC(mknexec,	|= PMD_SECT_XN);
- 	pmdret;									\
- })
- 
-+#define pmd_hugewillfault(pmd) (	!pmd_young(pmd) ||	\
-+					!pmd_write(pmd) ||	\
-+					!pmd_dirty(pmd) )
-+#define pmd_thp_or_huge(pmd)		((pmd_val(pmd) & PMD_TYPE_MASK) == PMD_TYPE_SECT)
- #else
- #define HPAGE_SIZE 0
-+#define pmd_hugewillfault(pmd)	(0)
-+#define pmd_thp_or_huge(pmd)	(0)
- #endif /* CONFIG_SYS_SUPPORTS_HUGETLBFS */
- 
- #ifdef CONFIG_TRANSPARENT_HUGEPAGE
-diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
-index d5ceb22..65bf7b4 100644
---- a/arch/arm/include/asm/pgtable-3level.h
-+++ b/arch/arm/include/asm/pgtable-3level.h
-@@ -189,6 +189,9 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
- #define __HAVE_ARCH_PMD_WRITE
- #define pmd_write(pmd)		(!(pmd_val(pmd) & PMD_SECT_RDONLY))
- 
-+#define pmd_hugewillfault(pmd) ( !pmd_young(pmd) || !pmd_write(pmd) )
-+#define pmd_thp_or_huge(pmd)	((pmd_val(pmd) & PMD_TYPE_MASK) == PMD_TYPE_SECT)
-+
- #ifdef CONFIG_TRANSPARENT_HUGEPAGE
- #define pmd_trans_huge(pmd)	((pmd_val(pmd) & PMD_TYPE_MASK) == PMD_TYPE_SECT)
- #define pmd_trans_splitting(pmd) (pmd_val(pmd) & PMD_SECT_SPLITTING)
-diff --git a/arch/arm/lib/uaccess_with_memcpy.c b/arch/arm/lib/uaccess_with_memcpy.c
-index 025f742..ae9fde2 100644
---- a/arch/arm/lib/uaccess_with_memcpy.c
-+++ b/arch/arm/lib/uaccess_with_memcpy.c
-@@ -40,7 +40,35 @@ pin_page_for_write(const void __user *_addr, pte_t **ptep, spinlock_t **ptlp)
- 		return 0;
- 
- 	pmd = pmd_offset(pud, addr);
--	if (unlikely(pmd_none(*pmd) || pmd_bad(*pmd)))
-+	if (unlikely(pmd_none(*pmd)))
-+		return 0;
-+
-+	/*
-+	 * A pmd can be bad if it refers to a HugeTLB or THP page.
-+	 *
-+	 * Both THP and HugeTLB pages have the same pmd layout
-+	 * and should not be manipulated by the pte functions.
-+	 * 
-+	 * Lock the page table for the destination and check
-+	 * to see that it's still huge and whether or not we will
-+	 * need to fault on write, or if we have a splitting THP.
-+	 */
-+	if (unlikely(pmd_thp_or_huge(*pmd))) {
-+		ptl = &current->mm->page_table_lock;
-+		spin_lock(ptl);
-+		if (unlikely( !pmd_thp_or_huge(*pmd)
-+			|| pmd_hugewillfault(*pmd)
-+			|| pmd_trans_splitting(*pmd))) {
-+			spin_unlock(ptl);
-+			return 0;
-+		}
-+
-+		*ptep = NULL;
-+		*ptlp = ptl;
-+		return 1;
-+	}
-+
-+	if (unlikely(pmd_bad(*pmd)))
- 		return 0;
- 
- 	pte = pte_offset_map_lock(current->mm, pmd, addr, &ptl);
-@@ -94,7 +122,10 @@ __copy_to_user_memcpy(void __user *to, const void *from, unsigned long n)
- 		from += tocopy;
- 		n -= tocopy;
- 
--		pte_unmap_unlock(pte, ptl);
-+		if (pte)
-+			pte_unmap_unlock(pte, ptl);
-+		else
-+			spin_unlock(ptl);
- 	}
- 	if (!atomic)
- 		up_read(&current->mm->mmap_sem);
-@@ -147,7 +178,10 @@ __clear_user_memset(void __user *addr, unsigned long n)
- 		addr += tocopy;
- 		n -= tocopy;
- 
--		pte_unmap_unlock(pte, ptl);
-+		if (pte)
-+			pte_unmap_unlock(pte, ptl);
-+		else
-+			spin_unlock(ptl);
- 	}
- 	up_read(&current->mm->mmap_sem);
- 
--- 
-1.7.9.5
+> > Bit 2 and 3 don't exist in my datasheets.
+> > 
+> > The other bits define under which conditions you receive interrupts
+> > (send FIFO empty, receive FIFO full) and which bits you need to start
+> > transfers (one bit to start sending, one receiving). The bits 8 to 31
+> > are used to set up DMA transfers and various interrupt events like
+> > error status and finish transfers. I haven't included them as they are
+> > not used in the driver.
+> 
+> If they're not used maybe we can drop them :-)
+> 
+Obviously they're used, otherwise they wouldn't be defined in the common
+header. Whether they are used by these specific CPUs or not isn't
+relevant, as there are plenty of cases where they are. grep harder.
