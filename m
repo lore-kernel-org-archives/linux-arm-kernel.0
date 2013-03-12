@@ -1,45 +1,55 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 12 Mar 2013 12:23:32 -0600
-Subject: [PATCH v4 0/2] Uncompress debug for multiplatform
-In-Reply-To: <20130312040242.GF25910@S2101-09.ap.freescale.net>
-References: <1363001737-8745-1-git-send-email-shawn.guo@linaro.org>
- <20130311170350.GM4977@n2100.arm.linux.org.uk>
- <513E149A.2060704@wwwdotorg.org>
- <20130312040242.GF25910@S2101-09.ap.freescale.net>
-Message-ID: <513F72A4.8020309@wwwdotorg.org>
+Date: Tue, 12 Mar 2013 12:31:49 -0600
+Subject: [PATCH V2 0/5] ARM: DT: tegra114: Add DT entry for different
+ controller
+In-Reply-To: <513EFF36.50107@nvidia.com>
+References: <1362852678-13421-1-git-send-email-ldewangan@nvidia.com>
+ <513E5771.9000408@wwwdotorg.org> <513EFF36.50107@nvidia.com>
+Message-ID: <513F7495.60001@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/11/2013 10:02 PM, Shawn Guo wrote:
-> On Mon, Mar 11, 2013 at 11:30:02AM -0600, Stephen Warren wrote:
->> On 03/11/2013 11:03 AM, Russell King - ARM Linux wrote:
->>> On Mon, Mar 11, 2013 at 07:35:35PM +0800, Shawn Guo wrote:
->>>> Instead of giving zero support of uncompress debug for multiplatform
->>>> build, the series turns uncompress debug into one part of DEBUG_LL
->>>> support.  When DEBUG_LL is turned on for a particular platform,
->>>> uncompress debug works too for that platform.
->>>>
->>>> OMAP is an exception here.  OMAP low-level debug code places data
->>>> in the .data section, and that is allowed in decompressor.  That's
->>>> why Kconfig symbol DEBUG_UNCOMPRESS that controls multiplatform
->>>> uncompress debug support is defined with !DEBUG_OMAP2PLUS_UART.
->>>>
->>>> Changes since v3:
->>>>  - Create Kconfig symbol DEBUG_UNCOMPRESS for building in
->>>>    multiplatform uncompress debug support, so that we can leave
->>>>    out the platform which is part of multiplatform but not ready
->>>>    for being part of uncompress debug like OMAP example.
+On 03/12/2013 04:11 AM, Laxman Dewangan wrote:
+> On Tuesday 12 March 2013 03:45 AM, Stephen Warren wrote:
+>> On 03/09/2013 11:11 AM, Laxman Dewangan wrote:
+>>> This patch series add DT entry for APB DMA, I2C, UART, KBC and SPI.
 >>>
->>> Wasn't Tegra also having problems with this as well?
+>>> This patch series is generated on top of CCF work for T114 done by Peter
+>>> and hence it should be applied on top of T114 CCF patches.
+>>>
+>>> Changes from V1:
+>>> - Add reeason why APBDMA is not compatible with older driver
+>>>    in description.
+>>> - Remove UARTB car id correction. Make the compatible with tegra114 and
+>>>    older chip.
+>>> - Add compatible for kbc as nvidia,tegra114-kbc and nvidia,tegra20-kbc.
+>>>
+>>> Laxman Dewangan (5):
+>>>    ARM: DT: tegra114: add APB DMA controller DT entry
+>>>    ARM: DT: tegra114: Add i2c controller DT entry
+>>>    ARM: DT: tegra114:add aliases and DMA requestor for serial controller
+>>>    ARM: DT: tegra114: add KBC controller DT entry
+>>>    ARM: DT: tegra114: Add spi controller DT entry
+>> What branch is this series based on? I tried to apply these for testing,
+>> but git am failed to apply it to Tegra's for-3.10/dt, and Tegra's
+>> for-next, and my local work branch, and next-20130307.
 >>
->> Tegra isn't converted to multi-platform yet. I hope to in 3.10.
+>> Can you please rebase onto Tegra's for-3.10/dt. Thanks.
 > 
-> Yeah, that's why I did not touch Tegra as the series is based on
-> v3.9-rc1 where Tegra hasn't been part of multi-platform yet.
+> I created the patch as:
+> - linux next 20130307
+> - Then add all clock changes from Peter's
+> git://nv-tegra.nvidia.com/user/pdeschrijver/linux.git
 > 
-> But I just noticed that debug-macro.S for Tegra has been renamed to
-> debug/tegra.S, and we already know it will be broken when multi-platform
-> is enabled together with this series for Tegra.
+> - Then I generated the DT entry on top of this which has clock reference.
+> 
+> In your 3.10/DT, there is no change for Peter's clock change and
+> possibly this is the reason.
 
-Was that because the code touches .data? Perhaps I can get away with
-using some hard-coded IRAM location or something.
+Yes, that's probably the problem. Please base on the current for-3.10/dt
+branch directly.
+
+> If I base my change on your 3.10/DT then:
+> - Do I need to add the clock entry for all modules also?
+
+Yes, please add complete nodes.
