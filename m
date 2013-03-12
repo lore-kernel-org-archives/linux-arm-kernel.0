@@ -1,18 +1,75 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 12 Mar 2013 08:53:58 +0800
-Subject: [PATCH 9/9] ARM: spear3xx: Use correct pl080 header file
-In-Reply-To: <201303112234.55748.arnd@arndb.de>
-References: <1362521809-22989-1-git-send-email-arnd@arndb.de>
- <1362521809-22989-10-git-send-email-arnd@arndb.de>
- <CAKohponFisFjM9CbpHoR7h-pn1SAOWeck63v3FKZe4UV0cR2DQ@mail.gmail.com>
- <201303112234.55748.arnd@arndb.de>
-Message-ID: <CAKohpokhB-5QBR1S-oGXywTrtasjK-C47FJOjTCr+GenHurF2g@mail.gmail.com>
+From: Wenyou.Yang@atmel.com (Yang, Wenyou)
+Date: Tue, 12 Mar 2013 01:10:15 +0000
+Subject: [PATCH v6 12/16] spi/spi-atmel: add pinctrl support for atmel spi
+In-Reply-To: <20130311131126.GB2001@game.jcrosoft.org>
+References: <1362626715-6549-1-git-send-email-wenyou.yang@atmel.com>
+ <1362627243-9351-1-git-send-email-wenyou.yang@atmel.com>
+ <20130311131126.GB2001@game.jcrosoft.org>
+Message-ID: <B256D81BAE5131468A838E5D7A2436414972659B@penmbx02>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 March 2013 06:34, Arnd Bergmann <arnd@arndb.de> wrote:
-> Are you going to send a pull request for that one then? Another -rc has
-> just passed with the platform being broken.
+Hi JC,
 
-Probably you can just apply that patch, i am not planning to send a pull
-request for that one.
+> -----Original Message-----
+> From: Jean-Christophe PLAGNIOL-VILLARD [mailto:plagnioj at jcrosoft.com]
+> Sent: 2013?3?11? 21:11
+> To: Yang, Wenyou
+> Cc: linux-arm-kernel at lists.infradead.org; grant.likely at secretlab.ca; Ferre,
+> Nicolas; richard.genoud at gmail.com; Lin, JM;
+> spi-devel-general at lists.sourceforge.net; linux-kernel at vger.kernel.org
+> Subject: Re: [PATCH v6 12/16] spi/spi-atmel: add pinctrl support for atmel spi
+> 
+> On 11:34 Thu 07 Mar     , Wenyou Yang wrote:
+> > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> > Cc: spi-devel-general at lists.sourceforge.net
+> > Cc: linux-kernel at vger.kernel.org
+> > ---
+> >  drivers/spi/spi-atmel.c |    8 ++++++++
+> >  1 file changed, 8 insertions(+)
+> >
+> > diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+> > index 1e212d1..6b166f4 100644
+> > --- a/drivers/spi/spi-atmel.c
+> > +++ b/drivers/spi/spi-atmel.c
+> > @@ -23,6 +23,7 @@
+> >  #include <linux/platform_data/atmel.h>
+> >  #include <linux/platform_data/dma-atmel.h>
+> >  #include <linux/of.h>
+> > +#include <linux/pinctrl/consumer.h>
+> >
+> >  #include <linux/io.h>
+> >  #include <linux/gpio.h>
+> > @@ -1493,11 +1494,18 @@ static int atmel_spi_probe(struct
+> platform_device *pdev)
+> >  	int			ret;
+> >  	struct spi_master	*master;
+> >  	struct atmel_spi	*as;
+> > +	struct pinctrl		*pinctrl;
+> >
+> >  	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> >  	if (!regs)
+> >  		return -ENXIO;
+> >
+> > +	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
+> > +	if (IS_ERR(pinctrl)) {
+> > +		dev_err(&pdev->dev, "Failed to request pinctrl\n");
+> > +		return PTR_ERR(pinctrl);
+> > +	}
+> 
+> drop this, this is handled at bus level
+> 
+Thanks a lot for your advance.
+
+> Best Regards,
+> J.
+
+Best Regards
+Wenyou Yang
+> > +
+> >  	irq = platform_get_irq(pdev, 0);
+> >  	if (irq < 0)
+> >  		return irq;
+> > --
+> > 1.7.9.5
+> >
