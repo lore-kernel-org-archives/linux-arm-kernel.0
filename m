@@ -1,391 +1,236 @@
-From: prakash.pm@ti.com (Manjunathappa, Prakash)
-Date: Tue, 12 Mar 2013 19:43:54 +0530
-Subject: [PATCH v5 1/4] ARM: davinci: mmc: derive version information from
- device name
-In-Reply-To: <1363097637-11371-1-git-send-email-prakash.pm@ti.com>
-References: <1363097637-11371-1-git-send-email-prakash.pm@ti.com>
-Message-ID: <1363097637-11371-2-git-send-email-prakash.pm@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 12 Mar 2013 14:16:04 +0000
+Subject: IS_ERR_VALUE()
+Message-ID: <20130312141604.GV4977@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove specifying mmc controller IP version information via platform
-data, instead specify device name so that driver derives it from
-platform_device_id table. Also change the clock node name to match
-the changed dev_id.
-Tested on da850-evm to make sure driver loads without clk_get failures.
+I am removing almost all references to the above macro from arch/arm.
+Many of them are wrong.  Some of them are buggy.
 
-Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
-Reviewed-by: Sekhar Nori <nsekhar@ti.com>
+For instance:
+
+int gpmc_cs_set_timings(int cs, const struct gpmc_timings *t)
+{
+        int div;
+        div = gpmc_calc_divider(t->sync_clk);
+        if (div < 0)
+                return div;
+static int gpmc_set_async_mode(int cs, struct gpmc_timings *t)
+{
+...
+        return gpmc_cs_set_timings(cs, t);
+
+.....
+        ret = gpmc_set_async_mode(gpmc_onenand_data->cs, &t);
+        if (IS_ERR_VALUE(ret))
+                return ret;
+
+So, gpmc_cs_set_timings() thinks any negative return value is an error,
+but where we check that in higher levels, only a limited range are
+errors... seriously?  Come on guys, get with the program.  Get your
+error checking in order.
+
+There is only _one_ use of IS_ERR_VALUE() in arch/arm which is correct,
+and that is in arch/arm/include/asm/syscall.h:
+
+static inline long syscall_get_error(struct task_struct *task,
+                                     struct pt_regs *regs)
+{
+        unsigned long error = regs->ARM_r0;
+        return IS_ERR_VALUE(error) ? error : 0;
+}
+
+So, here's a patch to remove them all, except for the above.
+
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
-Since v4:
-Minor nit, check on return value for failure of max-frequency property
-parsing.
-Merged patch "ARM: davinci: mmc: derive version information from device name"
-with this patch
+This patch will be going into my "cleanup" branch along with the removal
+of many wrong IS_ERR_OR_NULL() uses - with any errors anyone spots fixed.
 
- arch/arm/mach-davinci/board-da830-evm.c     |    1 -
- arch/arm/mach-davinci/board-da850-evm.c     |    2 --
- arch/arm/mach-davinci/board-dm355-evm.c     |    1 -
- arch/arm/mach-davinci/board-dm365-evm.c     |    1 -
- arch/arm/mach-davinci/board-dm644x-evm.c    |    1 -
- arch/arm/mach-davinci/board-neuros-osd2.c   |    1 -
- arch/arm/mach-davinci/board-omapl138-hawk.c |    1 -
- arch/arm/mach-davinci/board-tnetv107x-evm.c |    1 -
- arch/arm/mach-davinci/da830.c               |    2 +-
- arch/arm/mach-davinci/da850.c               |    4 ++--
- arch/arm/mach-davinci/devices-da8xx.c       |    4 ++--
- arch/arm/mach-davinci/devices-tnetv107x.c   |    4 ++--
- arch/arm/mach-davinci/devices.c             |    6 ++++--
- arch/arm/mach-davinci/dm355.c               |    4 ++--
- arch/arm/mach-davinci/dm365.c               |    4 ++--
- arch/arm/mach-davinci/dm644x.c              |    2 +-
- arch/arm/mach-davinci/tnetv107x.c           |    4 ++--
- drivers/mmc/host/davinci_mmc.c              |   18 +++++++++++++++++-
- include/linux/platform_data/mmc-davinci.h   |    3 ---
- 19 files changed, 35 insertions(+), 29 deletions(-)
+ arch/arm/mach-exynos/mach-nuri.c        |    2 +-
+ arch/arm/mach-imx/devices/devices.c     |    2 +-
+ arch/arm/mach-omap2/board-omap3beagle.c |    2 +-
+ arch/arm/mach-omap2/clock.c             |    2 +-
+ arch/arm/mach-omap2/gpmc-onenand.c      |    4 ++--
+ arch/arm/mach-omap2/gpmc.c              |    8 ++++----
+ arch/arm/mach-omap2/omap_device.c       |    2 +-
+ arch/arm/mach-omap2/omap_hwmod.c        |    4 ++--
+ arch/arm/mach-omap2/timer.c             |    2 +-
+ arch/arm/plat-omap/dmtimer.c            |    2 +-
+ 10 files changed, 15 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
-index 95b5e10..d6a41f0 100644
---- a/arch/arm/mach-davinci/board-da830-evm.c
-+++ b/arch/arm/mach-davinci/board-da830-evm.c
-@@ -246,7 +246,6 @@ static struct davinci_mmc_config da830_evm_mmc_config = {
- 	.wires			= 8,
- 	.max_freq		= 50000000,
- 	.caps			= MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED,
--	.version		= MMC_CTLR_VERSION_2,
- };
+diff --git a/arch/arm/mach-exynos/mach-nuri.c b/arch/arm/mach-exynos/mach-nuri.c
+index 1ea7973..688991a 100644
+--- a/arch/arm/mach-exynos/mach-nuri.c
++++ b/arch/arm/mach-exynos/mach-nuri.c
+@@ -1251,7 +1251,7 @@ static void __init nuri_camera_init(void)
+ 	}
  
- static inline void da830_evm_init_mmc(void)
-diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-index 0299915..ff0dfd6 100644
---- a/arch/arm/mach-davinci/board-da850-evm.c
-+++ b/arch/arm/mach-davinci/board-da850-evm.c
-@@ -802,7 +802,6 @@ static struct davinci_mmc_config da850_mmc_config = {
- 	.wires		= 4,
- 	.max_freq	= 50000000,
- 	.caps		= MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED,
--	.version	= MMC_CTLR_VERSION_2,
- };
+ 	m5mols_board_info.irq = s5p_register_gpio_interrupt(GPIO_CAM_8M_ISP_INT);
+-	if (!IS_ERR_VALUE(m5mols_board_info.irq))
++	if (m5mols_board_info.irq >= 0)
+ 		s3c_gpio_cfgpin(GPIO_CAM_8M_ISP_INT, S3C_GPIO_SFN(0xF));
+ 	else
+ 		pr_err("%s: Failed to configure 8M_ISP_INT GPIO\n", __func__);
+diff --git a/arch/arm/mach-imx/devices/devices.c b/arch/arm/mach-imx/devices/devices.c
+index 1b37482..1b4366a 100644
+--- a/arch/arm/mach-imx/devices/devices.c
++++ b/arch/arm/mach-imx/devices/devices.c
+@@ -37,7 +37,7 @@ int __init mxc_device_init(void)
+ 	int ret;
  
- static const short da850_evm_mmcsd0_pins[] __initconst = {
-@@ -1362,7 +1361,6 @@ static struct davinci_mmc_config da850_wl12xx_mmc_config = {
- 	.max_freq	= 25000000,
- 	.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_NONREMOVABLE |
- 			  MMC_CAP_POWER_OFF_CARD,
--	.version	= MMC_CTLR_VERSION_2,
- };
+ 	ret = device_register(&mxc_aips_bus);
+-	if (IS_ERR_VALUE(ret))
++	if (ret < 0)
+ 		goto done;
  
- static const short da850_wl12xx_pins[] __initconst = {
-diff --git a/arch/arm/mach-davinci/board-dm355-evm.c b/arch/arm/mach-davinci/board-dm355-evm.c
-index cdf8d07..2caa5e9 100644
---- a/arch/arm/mach-davinci/board-dm355-evm.c
-+++ b/arch/arm/mach-davinci/board-dm355-evm.c
-@@ -280,7 +280,6 @@ static struct davinci_mmc_config dm355evm_mmc_config = {
- 	.wires		= 4,
- 	.max_freq       = 50000000,
- 	.caps           = MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED,
--	.version	= MMC_CTLR_VERSION_1,
- };
+ 	ret = device_register(&mxc_ahb_bus);
+diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
+index c3558f9..6c949bc 100644
+--- a/arch/arm/mach-omap2/board-omap3beagle.c
++++ b/arch/arm/mach-omap2/board-omap3beagle.c
+@@ -479,7 +479,7 @@ static int __init beagle_opp_init(void)
  
- /* Don't connect anything to J10 unless you're only using USB host
-diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
-index 5d49c75..ba06295 100644
---- a/arch/arm/mach-davinci/board-dm365-evm.c
-+++ b/arch/arm/mach-davinci/board-dm365-evm.c
-@@ -253,7 +253,6 @@ static struct davinci_mmc_config dm365evm_mmc_config = {
- 	.wires		= 4,
- 	.max_freq	= 50000000,
- 	.caps		= MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED,
--	.version	= MMC_CTLR_VERSION_2,
- };
+ 	/* Initialize the omap3 opp table if not already created. */
+ 	r = omap3_opp_init();
+-	if (IS_ERR_VALUE(r) && (r != -EEXIST)) {
++	if (r < 0 && (r != -EEXIST)) {
+ 		pr_err("%s: opp default init failed\n", __func__);
+ 		return r;
+ 	}
+diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
+index e4ec3a6..2191f25 100644
+--- a/arch/arm/mach-omap2/clock.c
++++ b/arch/arm/mach-omap2/clock.c
+@@ -596,7 +596,7 @@ int __init omap2_clk_switch_mpurate_at_boot(const char *mpurate_ck_name)
+ 		return -ENOENT;
  
- static void dm365evm_emac_configure(void)
-diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
-index f5e018d..4a57280 100644
---- a/arch/arm/mach-davinci/board-dm644x-evm.c
-+++ b/arch/arm/mach-davinci/board-dm644x-evm.c
-@@ -570,7 +570,6 @@ static struct davinci_mmc_config dm6446evm_mmc_config = {
- 	.get_cd		= dm6444evm_mmc_get_cd,
- 	.get_ro		= dm6444evm_mmc_get_ro,
- 	.wires		= 4,
--	.version	= MMC_CTLR_VERSION_1
- };
+ 	r = clk_set_rate(mpurate_ck, mpurate);
+-	if (IS_ERR_VALUE(r)) {
++	if (r < 0) {
+ 		WARN(1, "clock: %s: unable to set MPU rate to %d: %d\n",
+ 		     mpurate_ck_name, mpurate, r);
+ 		clk_put(mpurate_ck);
+diff --git a/arch/arm/mach-omap2/gpmc-onenand.c b/arch/arm/mach-omap2/gpmc-onenand.c
+index fadd8743..0d75889 100644
+--- a/arch/arm/mach-omap2/gpmc-onenand.c
++++ b/arch/arm/mach-omap2/gpmc-onenand.c
+@@ -303,7 +303,7 @@ static int omap2_onenand_setup_async(void __iomem *onenand_base)
+ 	t = omap2_onenand_calc_async_timings();
  
- static struct i2c_board_info __initdata i2c_info[] =  {
-diff --git a/arch/arm/mach-davinci/board-neuros-osd2.c b/arch/arm/mach-davinci/board-neuros-osd2.c
-index 3e3e3af..bad8192 100644
---- a/arch/arm/mach-davinci/board-neuros-osd2.c
-+++ b/arch/arm/mach-davinci/board-neuros-osd2.c
-@@ -164,7 +164,6 @@ static void __init davinci_ntosd2_map_io(void)
+ 	ret = gpmc_set_async_mode(gpmc_onenand_data->cs, &t);
+-	if (IS_ERR_VALUE(ret))
++	if (ret < 0)
+ 		return ret;
  
- static struct davinci_mmc_config davinci_ntosd2_mmc_config = {
- 	.wires		= 4,
--	.version	= MMC_CTLR_VERSION_1
- };
+ 	omap2_onenand_set_async_mode(onenand_base);
+@@ -325,7 +325,7 @@ static int omap2_onenand_setup_sync(void __iomem *onenand_base, int *freq_ptr)
+ 	t = omap2_onenand_calc_sync_timings(gpmc_onenand_data, freq);
  
+ 	ret = gpmc_set_sync_mode(gpmc_onenand_data->cs, &t);
+-	if (IS_ERR_VALUE(ret))
++	if (ret < 0)
+ 		return ret;
  
-diff --git a/arch/arm/mach-davinci/board-omapl138-hawk.c b/arch/arm/mach-davinci/board-omapl138-hawk.c
-index dc1208e..4331ff3 100644
---- a/arch/arm/mach-davinci/board-omapl138-hawk.c
-+++ b/arch/arm/mach-davinci/board-omapl138-hawk.c
-@@ -138,7 +138,6 @@ static struct davinci_mmc_config da850_mmc_config = {
- 	.wires		= 4,
- 	.max_freq	= 50000000,
- 	.caps		= MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED,
--	.version	= MMC_CTLR_VERSION_2,
- };
+ 	set_onenand_cfg(onenand_base);
+diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+index e4b16c8..0011116 100644
+--- a/arch/arm/mach-omap2/gpmc.c
++++ b/arch/arm/mach-omap2/gpmc.c
+@@ -716,7 +716,7 @@ static int gpmc_setup_irq(void)
+ 		return -EINVAL;
  
- static __init void omapl138_hawk_mmc_init(void)
-diff --git a/arch/arm/mach-davinci/board-tnetv107x-evm.c b/arch/arm/mach-davinci/board-tnetv107x-evm.c
-index be30997..42066ed 100644
---- a/arch/arm/mach-davinci/board-tnetv107x-evm.c
-+++ b/arch/arm/mach-davinci/board-tnetv107x-evm.c
-@@ -85,7 +85,6 @@ static struct davinci_mmc_config mmc_config = {
- 	.wires		= 4,
- 	.max_freq	= 50000000,
- 	.caps		= MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED,
--	.version	= MMC_CTLR_VERSION_1,
- };
+ 	gpmc_irq_start = irq_alloc_descs(-1, 0, GPMC_NR_IRQ, 0);
+-	if (IS_ERR_VALUE(gpmc_irq_start)) {
++	if (gpmc_irq_start < 0) {
+ 		pr_err("irq_alloc_descs failed\n");
+ 		return gpmc_irq_start;
+ 	}
+@@ -801,7 +801,7 @@ static int gpmc_mem_init(void)
+ 			continue;
+ 		gpmc_cs_get_memconf(cs, &base, &size);
+ 		rc = gpmc_cs_insert_mem(cs, base, size);
+-		if (IS_ERR_VALUE(rc)) {
++		if (rc < 0) {
+ 			while (--cs >= 0)
+ 				if (gpmc_cs_mem_enabled(cs))
+ 					gpmc_cs_delete_mem(cs);
+@@ -1373,14 +1373,14 @@ static int gpmc_probe(struct platform_device *pdev)
+ 		 GPMC_REVISION_MINOR(l));
  
- static const short sdio1_pins[] __initconst = {
-diff --git a/arch/arm/mach-davinci/da830.c b/arch/arm/mach-davinci/da830.c
-index 678a54a..42ad1ab 100644
---- a/arch/arm/mach-davinci/da830.c
-+++ b/arch/arm/mach-davinci/da830.c
-@@ -394,7 +394,7 @@ static struct clk_lookup da830_clks[] = {
- 	CLK(NULL,		"tpcc",		&tpcc_clk),
- 	CLK(NULL,		"tptc0",	&tptc0_clk),
- 	CLK(NULL,		"tptc1",	&tptc1_clk),
--	CLK("davinci_mmc.0",	NULL,		&mmcsd_clk),
-+	CLK("davinci-mmc-da830.0", NULL,	&mmcsd_clk),
- 	CLK(NULL,		"uart0",	&uart0_clk),
- 	CLK(NULL,		"uart1",	&uart1_clk),
- 	CLK(NULL,		"uart2",	&uart2_clk),
-diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-index 6b9154e..364f61d 100644
---- a/arch/arm/mach-davinci/da850.c
-+++ b/arch/arm/mach-davinci/da850.c
-@@ -404,8 +404,8 @@ static struct clk_lookup da850_clks[] = {
- 	CLK("davinci_emac.1",	NULL,		&emac_clk),
- 	CLK("davinci-mcasp.0",	NULL,		&mcasp_clk),
- 	CLK("da8xx_lcdc.0",	"fck",		&lcdc_clk),
--	CLK("davinci_mmc.0",	NULL,		&mmcsd0_clk),
--	CLK("davinci_mmc.1",	NULL,		&mmcsd1_clk),
-+	CLK("davinci-mmc-da830.0", NULL,	&mmcsd0_clk),
-+	CLK("davinci-mmc-da830.1", NULL,	&mmcsd1_clk),
- 	CLK(NULL,		"aemif",	&aemif_clk),
- 	CLK(NULL,		"usb11",	&usb11_clk),
- 	CLK(NULL,		"usb20",	&usb20_clk),
-diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
-index cc6916d..3f27600 100644
---- a/arch/arm/mach-davinci/devices-da8xx.c
-+++ b/arch/arm/mach-davinci/devices-da8xx.c
-@@ -664,7 +664,7 @@ static struct resource da8xx_mmcsd0_resources[] = {
- };
+ 	rc = gpmc_mem_init();
+-	if (IS_ERR_VALUE(rc)) {
++	if (rc < 0) {
+ 		clk_disable_unprepare(gpmc_l3_clk);
+ 		clk_put(gpmc_l3_clk);
+ 		dev_err(gpmc_dev, "failed to reserve memory\n");
+ 		return rc;
+ 	}
  
- static struct platform_device da8xx_mmcsd0_device = {
--	.name		= "davinci_mmc",
-+	.name		= "davinci-mmc-da830",
- 	.id		= 0,
- 	.num_resources	= ARRAY_SIZE(da8xx_mmcsd0_resources),
- 	.resource	= da8xx_mmcsd0_resources,
-@@ -701,7 +701,7 @@ static struct resource da850_mmcsd1_resources[] = {
- };
+-	if (IS_ERR_VALUE(gpmc_setup_irq()))
++	if (gpmc_setup_irq() < 0)
+ 		dev_warn(gpmc_dev, "gpmc_setup_irq failed\n");
  
- static struct platform_device da850_mmcsd1_device = {
--	.name		= "davinci_mmc",
-+	.name		= "davinci-mmc-da830",
- 	.id		= 1,
- 	.num_resources	= ARRAY_SIZE(da850_mmcsd1_resources),
- 	.resource	= da850_mmcsd1_resources,
-diff --git a/arch/arm/mach-davinci/devices-tnetv107x.c b/arch/arm/mach-davinci/devices-tnetv107x.c
-index 773ab07..0eda4d1 100644
---- a/arch/arm/mach-davinci/devices-tnetv107x.c
-+++ b/arch/arm/mach-davinci/devices-tnetv107x.c
-@@ -218,7 +218,7 @@ static u64 mmc1_dma_mask = DMA_BIT_MASK(32);
+ 	rc = gpmc_probe_dt(pdev);
+diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
+index 381be7a..72b09e0 100644
+--- a/arch/arm/mach-omap2/omap_device.c
++++ b/arch/arm/mach-omap2/omap_device.c
+@@ -131,7 +131,7 @@ static int omap_device_build_from_dt(struct platform_device *pdev)
+ 	int oh_cnt, i, ret = 0;
  
- static struct platform_device mmc_devices[2] = {
- 	{
--		.name		= "davinci_mmc",
-+		.name		= "davinci-mmc-dm355",
- 		.id		= 0,
- 		.dev		= {
- 			.dma_mask		= &mmc0_dma_mask,
-@@ -228,7 +228,7 @@ static struct platform_device mmc_devices[2] = {
- 		.resource	= mmc0_resources
- 	},
- 	{
--		.name		= "davinci_mmc",
-+		.name		= "davinci-mmc-dm355",
- 		.id		= 1,
- 		.dev		= {
- 			.dma_mask		= &mmc1_dma_mask,
-diff --git a/arch/arm/mach-davinci/devices.c b/arch/arm/mach-davinci/devices.c
-index 4c48a36..92411b2 100644
---- a/arch/arm/mach-davinci/devices.c
-+++ b/arch/arm/mach-davinci/devices.c
-@@ -150,7 +150,7 @@ static struct resource mmcsd0_resources[] = {
- };
+ 	oh_cnt = of_property_count_strings(node, "ti,hwmods");
+-	if (!oh_cnt || IS_ERR_VALUE(oh_cnt)) {
++	if (oh_cnt <= 0) {
+ 		dev_dbg(&pdev->dev, "No 'hwmods' to build omap_device\n");
+ 		return -ENODEV;
+ 	}
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index c2c798c..a62213e 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -1663,7 +1663,7 @@ static int _deassert_hardreset(struct omap_hwmod *oh, const char *name)
+ 		return -ENOSYS;
  
- static struct platform_device davinci_mmcsd0_device = {
--	.name = "davinci_mmc",
-+	.name = "davinci-mmc-dm355",
- 	.id = 0,
- 	.dev = {
- 		.dma_mask = &mmcsd0_dma_mask,
-@@ -187,7 +187,7 @@ static struct resource mmcsd1_resources[] = {
- };
+ 	ret = _lookup_hardreset(oh, name, &ohri);
+-	if (IS_ERR_VALUE(ret))
++	if (ret < 0)
+ 		return ret;
  
- static struct platform_device davinci_mmcsd1_device = {
--	.name = "davinci_mmc",
-+	.name = "davinci-mmc-dm355",
- 	.id = 1,
- 	.dev = {
- 		.dma_mask = &mmcsd1_dma_mask,
-@@ -235,6 +235,7 @@ void __init davinci_setup_mmc(int module, struct davinci_mmc_config *config)
- 			mmcsd1_resources[0].end = DM365_MMCSD1_BASE +
- 							SZ_4K - 1;
- 			mmcsd1_resources[2].start = IRQ_DM365_SDIOINT1;
-+			davinci_mmcsd1_device.name = "davinci-mmc-da830";
- 		} else
- 			break;
+ 	if (oh->clkdm) {
+@@ -2413,7 +2413,7 @@ static int __init _init(struct omap_hwmod *oh, void *data)
+ 	_init_mpu_rt_base(oh, NULL);
  
-@@ -256,6 +257,7 @@ void __init davinci_setup_mmc(int module, struct davinci_mmc_config *config)
- 			mmcsd0_resources[0].end = DM365_MMCSD0_BASE +
- 							SZ_4K - 1;
- 			mmcsd0_resources[2].start = IRQ_DM365_SDIOINT0;
-+			davinci_mmcsd0_device.name = "davinci-mmc-da830";
- 		} else if (cpu_is_davinci_dm644x()) {
- 			/* REVISIT: should this be in board-init code? */
- 			/* Power-on 3.3V IO cells */
-diff --git a/arch/arm/mach-davinci/dm355.c b/arch/arm/mach-davinci/dm355.c
-index b49c3b7..ed3e79a 100644
---- a/arch/arm/mach-davinci/dm355.c
-+++ b/arch/arm/mach-davinci/dm355.c
-@@ -361,8 +361,8 @@ static struct clk_lookup dm355_clks[] = {
- 	CLK("i2c_davinci.1", NULL, &i2c_clk),
- 	CLK("davinci-mcbsp.0", NULL, &asp0_clk),
- 	CLK("davinci-mcbsp.1", NULL, &asp1_clk),
--	CLK("davinci_mmc.0", NULL, &mmcsd0_clk),
--	CLK("davinci_mmc.1", NULL, &mmcsd1_clk),
-+	CLK("davinci-mmc-dm355.0", NULL, &mmcsd0_clk),
-+	CLK("davinci-mmc-dm355.1", NULL, &mmcsd1_clk),
- 	CLK("spi_davinci.0", NULL, &spi0_clk),
- 	CLK("spi_davinci.1", NULL, &spi1_clk),
- 	CLK("spi_davinci.2", NULL, &spi2_clk),
-diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
-index 6c39805..3f46b24 100644
---- a/arch/arm/mach-davinci/dm365.c
-+++ b/arch/arm/mach-davinci/dm365.c
-@@ -454,8 +454,8 @@ static struct clk_lookup dm365_clks[] = {
- 	CLK(NULL, "uart0", &uart0_clk),
- 	CLK(NULL, "uart1", &uart1_clk),
- 	CLK("i2c_davinci.1", NULL, &i2c_clk),
--	CLK("davinci_mmc.0", NULL, &mmcsd0_clk),
--	CLK("davinci_mmc.1", NULL, &mmcsd1_clk),
-+	CLK("davinci-mmc-da830.0", NULL, &mmcsd0_clk),
-+	CLK("davinci-mmc-da830.1", NULL, &mmcsd1_clk),
- 	CLK("spi_davinci.0", NULL, &spi0_clk),
- 	CLK("spi_davinci.1", NULL, &spi1_clk),
- 	CLK("spi_davinci.2", NULL, &spi2_clk),
-diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
-index 11c79a3..5e1e502 100644
---- a/arch/arm/mach-davinci/dm644x.c
-+++ b/arch/arm/mach-davinci/dm644x.c
-@@ -310,7 +310,7 @@ static struct clk_lookup dm644x_clks[] = {
- 	CLK("i2c_davinci.1", NULL, &i2c_clk),
- 	CLK("palm_bk3710", NULL, &ide_clk),
- 	CLK("davinci-mcbsp", NULL, &asp_clk),
--	CLK("davinci_mmc.0", NULL, &mmcsd_clk),
-+	CLK("davinci-mmc-dm355.0", NULL, &mmcsd_clk),
- 	CLK(NULL, "spi", &spi_clk),
- 	CLK(NULL, "gpio", &gpio_clk),
- 	CLK(NULL, "usb", &usb_clk),
-diff --git a/arch/arm/mach-davinci/tnetv107x.c b/arch/arm/mach-davinci/tnetv107x.c
-index dc1a209..f9b9399 100644
---- a/arch/arm/mach-davinci/tnetv107x.c
-+++ b/arch/arm/mach-davinci/tnetv107x.c
-@@ -272,7 +272,7 @@ static struct clk_lookup clks[] = {
- 	CLK("tnetv107x-keypad.0", NULL,			&clk_keypad),
- 	CLK(NULL,		"clk_gpio",		&clk_gpio),
- 	CLK(NULL,		"clk_mdio",		&clk_mdio),
--	CLK("davinci_mmc.0",	NULL,			&clk_sdio0),
-+	CLK("davinci-mmc-dm355.0",	NULL,			&clk_sdio0),
- 	CLK(NULL,		"uart0",		&clk_uart0),
- 	CLK(NULL,		"uart1",		&clk_uart1),
- 	CLK(NULL,		"timer0",		&clk_timer0),
-@@ -292,7 +292,7 @@ static struct clk_lookup clks[] = {
- 	CLK(NULL,		"clk_system",		&clk_system),
- 	CLK(NULL,		"clk_imcop",		&clk_imcop),
- 	CLK(NULL,		"clk_spare",		&clk_spare),
--	CLK("davinci_mmc.1",	NULL,			&clk_sdio1),
-+	CLK("davinci-mmc-dm355.1",	NULL,			&clk_sdio1),
- 	CLK(NULL,		"clk_ddr2_vrst",	&clk_ddr2_vrst),
- 	CLK(NULL,		"clk_ddr2_vctl_rst",	&clk_ddr2_vctl_rst),
- 	CLK(NULL,		NULL,			NULL),
-diff --git a/drivers/mmc/host/davinci_mmc.c b/drivers/mmc/host/davinci_mmc.c
-index 27123f8..50e9782 100644
---- a/drivers/mmc/host/davinci_mmc.c
-+++ b/drivers/mmc/host/davinci_mmc.c
-@@ -1157,6 +1157,18 @@ static void __init init_mmcsd_host(struct mmc_davinci_host *host)
- 	mmc_davinci_reset_ctrl(host, 0);
- }
+ 	r = _init_clocks(oh, NULL);
+-	if (IS_ERR_VALUE(r)) {
++	if (r < 0) {
+ 		WARN(1, "omap_hwmod: %s: couldn't init clocks\n", oh->name);
+ 		return -EINVAL;
+ 	}
+diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+index 2bdd4cf..5bde35b 100644
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -287,7 +287,7 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
+ 			r = -EINVAL;
+ 		} else {
+ 			r = clk_set_parent(timer->fclk, src);
+-			if (IS_ERR_VALUE(r))
++			if (r < 0)
+ 				pr_warn("%s: %s cannot set source\n",
+ 					__func__, oh->name);
+ 			clk_put(src);
+diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
+index a0daa2f..17f21c2 100644
+--- a/arch/arm/plat-omap/dmtimer.c
++++ b/arch/arm/plat-omap/dmtimer.c
+@@ -506,7 +506,7 @@ int omap_dm_timer_set_source(struct omap_dm_timer *timer, int source)
+ 	}
  
-+static struct platform_device_id davinci_mmc_devtype[] = {
-+	{
-+		.name	= "davinci-mmc-dm355",
-+		.driver_data = MMC_CTLR_VERSION_1,
-+	}, {
-+		.name	= "davinci-mmc-da830",
-+		.driver_data = MMC_CTLR_VERSION_2,
-+	},
-+	{},
-+};
-+MODULE_DEVICE_TABLE(platform, davinci_mmc_devtype);
-+
- static int __init davinci_mmcsd_probe(struct platform_device *pdev)
- {
- 	struct davinci_mmc_config *pdata = pdev->dev.platform_data;
-@@ -1165,6 +1177,7 @@ static int __init davinci_mmcsd_probe(struct platform_device *pdev)
- 	struct resource *r, *mem = NULL;
- 	int ret = 0, irq = 0;
- 	size_t mem_size;
-+	const struct platform_device_id *id_entry;
+ 	ret = clk_set_parent(timer->fclk, parent);
+-	if (IS_ERR_VALUE(ret))
++	if (ret < 0)
+ 		pr_err("%s: failed to set %s as parent\n", __func__,
+ 			parent_name);
  
- 	/* REVISIT:  when we're fully converted, fail if pdata is NULL */
- 
-@@ -1239,7 +1252,9 @@ static int __init davinci_mmcsd_probe(struct platform_device *pdev)
- 	if (pdata && (pdata->wires == 8))
- 		mmc->caps |= (MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA);
- 
--	host->version = pdata->version;
-+	id_entry = platform_get_device_id(pdev);
-+	if (id_entry)
-+		host->version = id_entry->driver_data;
- 
- 	mmc->ops = &mmc_davinci_ops;
- 	mmc->f_min = 312500;
-@@ -1410,6 +1425,7 @@ static struct platform_driver davinci_mmcsd_driver = {
- 		.pm	= davinci_mmcsd_pm_ops,
- 	},
- 	.remove		= __exit_p(davinci_mmcsd_remove),
-+	.id_table	= davinci_mmc_devtype,
- };
- 
- static int __init davinci_mmcsd_init(void)
-diff --git a/include/linux/platform_data/mmc-davinci.h b/include/linux/platform_data/mmc-davinci.h
-index 5ba6b22..9cea4ee 100644
---- a/include/linux/platform_data/mmc-davinci.h
-+++ b/include/linux/platform_data/mmc-davinci.h
-@@ -23,9 +23,6 @@ struct davinci_mmc_config {
- 	/* any additional host capabilities: OR'd in to mmc->f_caps */
- 	u32     caps;
- 
--	/* Version of the MMC/SD controller */
--	u8	version;
--
- 	/* Number of sg segments */
- 	u8	nr_sg;
- };
--- 
-1.7.4.1
