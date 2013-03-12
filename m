@@ -1,98 +1,35 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Wed, 13 Mar 2013 01:08:41 +0800
-Subject: [PATCH v2 12/14] Document: append hisilicon clock binding
+Date: Wed, 13 Mar 2013 01:08:42 +0800
+Subject: [PATCH v2 13/14] Document: dts: create hisilicon document
 In-Reply-To: <1363108124-17484-1-git-send-email-haojian.zhuang@linaro.org>
 References: <1363108124-17484-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1363108124-17484-13-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1363108124-17484-14-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add hisilicon clock binding document for device tree.
+Append the illustration on two boards from hisilicon.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 ---
- .../devicetree/bindings/clock/hisilicon.txt        |   73 ++++++++++++++++++++
- 1 file changed, 73 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/hisilicon.txt
+ .../devicetree/bindings/arm/hisilicon/hisilicon.txt          |   10 ++++++++++
+ 1 file changed, 10 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
 
-diff --git a/Documentation/devicetree/bindings/clock/hisilicon.txt b/Documentation/devicetree/bindings/clock/hisilicon.txt
+diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
 new file mode 100644
-index 0000000..be8db9d
+index 0000000..3be60c8
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/hisilicon.txt
-@@ -0,0 +1,73 @@
-+Device Tree Clock bindings for arch-vt8500
++++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+@@ -0,0 +1,10 @@
++Hisilicon Platforms Device Tree Bindings
++----------------------------------------------------
 +
-+This binding uses the common clock binding[1].
++Hi3716 Development Board
++Required root node properties:
++	- compatible = "hisilicon,hi3716-dkb";
 +
-+[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-+
-+Required properties for mux clocks:
-+ - compatible : Shall be "hisilicon,hi3620-clk-mux".
-+ - clocks : shall be the input parent clock phandle for the clock. This should
-+	be the reference clock.
-+ - clock-output-names : shall be reference name.
-+ - #clock-cells : from common clock binding; shall be set to 0.
-+ - hisilicon,hi3620-mux : array of mux register offset & mask bits
-+
-+Required properties for Hi3620 gate clocks:
-+ - compatible : Shall be "hisilicon,hi3620-clk-gate".
-+ - clocks : shall be the input parent clock phandle for the clock. This should
-+	be the reference clock.
-+ - clock-output-names : shall be reference name.
-+ - #clock-cells : from common clock binding; shall be set to 0.
-+ - hisilicon,hi3620-clkgate : array of enable register offset & enable bits
-+ - hisilicon,hi3620-clkreset : array of reset register offset & enable bits
-+
-+Required properties for clock divider:
-+ - compatible : Shall be "hisilicon,hi3620-clk-div".
-+ - clocks : shall be the input parent clock phandle for the clock. This should
-+	be the reference clock.
-+ - clock-output-names : shall be reference name.
-+ - #clock-cells : from common clock binding; shall be set to 0.
-+ - #hisilicon,clkdiv-table-cells : the number of parameters after phandle in
-+   hisilicon,clkdiv-table property.
-+ - hisilicon,clkdiv-table : list of value that are used to configure clock
-+   divider. They're value of phandle, index & divider value.
-+ - hisilicon,clkdiv : array of divider register offset & mask bits.
-+
-+Required properties for gate clocks:
-+ - compatible : Shall be "hisilicon,clk-gate".
-+ - clocks : shall be the input parent clock phandle for the clock. This should
-+	be the reference clock.
-+ - clock-output-names : shall be reference name.
-+ - #clock-cells : from common clock binding; shall be set to 0.
-+ - hisilicon,clkgate-inverted : bool value. True means that set-to-disable.
-+
-+Required properties for clock fixed factor divider:
-+ - compatible : Shall be "hisilicon,fixed-factor".
-+ - clocks : shall be the input parent clock phandle for the clock. This should
-+	be the reference clock.
-+ - clock-output-names : shall be reference name.
-+ - #clock-cells : from common clock binding; shall be set to 0.
-+ - hisilicon,fixed-factor : array of multiplier & divider.
-+
-+For example:
-+	timclk1: clkgate at 38 {
-+		compatible = "hisilicon,clk-gate";
-+		#clock-cells = <0>;
-+		clocks = <&refclk_timer1>;
-+		clock-output-names = "timclk1";
-+		hisilicon,clkgate-inverted;
-+		hisilicon,clkgate = <0 18>;
-+	};
-+
-+	dtable: clkdiv at 0 {
-+		#hisilicon,clkdiv-table-cells = <2>;
-+	};
-+
-+	div_cfgaxi: clkdiv at 2 {
-+		compatible = "hisilicon,hi3620-clk-div";
-+		#clock-cells = <0>;
-+		clocks = <&div_shareaxi>;
-+		clock-output-names = "cfgAXI_div";
-+		hisilicon,clkdiv-table = <&dtable 0x01 2>;
-+		hisilicon,clkdiv = <0x100 0x60>;
-+	};
++Hi4511 Board
++Required root node properties:
++	- compatible = "hisilicon,hi3620-hi4511";
 -- 
 1.7.10.4
