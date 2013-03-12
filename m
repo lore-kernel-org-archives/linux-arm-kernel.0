@@ -1,37 +1,23 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 12 Mar 2013 12:59:18 +0000
-Subject: [PATCH v2] ARM: tegra: expose chip ID and revision
-In-Reply-To: <1363089667-15737-1-git-send-email-dahuang@nvidia.com>
-References: <1363089667-15737-1-git-send-email-dahuang@nvidia.com>
-Message-ID: <201303121259.18710.arnd@arndb.de>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Tue, 12 Mar 2013 14:17:46 +0100
+Subject: [PATCH 1/7] clk: samsung: add plls used in s3c2416 and s3c2443
+In-Reply-To: <201303121321.34338.heiko@sntech.de>
+References: <201303120141.31262.heiko@sntech.de>
+ <201303120142.19842.heiko@sntech.de> <513F1B42.7000201@samsung.com>
+ <201303121321.34338.heiko@sntech.de>
+Message-ID: <513F2AFA.6030804@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 12 March 2013, Danny Huang wrote:
-> 
-> +void __init tegra_soc_device_init(void)
-> +{
-> +       struct soc_device *soc_dev;
-> +       struct soc_device_attribute *soc_dev_attr;
-> +
-> +       soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
-> +       if (!soc_dev_attr)
-> +               return;
-> +
-> +       soc_dev_attr->soc_id = kasprintf(GFP_KERNEL, "%d", tegra_chip_id);
-> +       soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%d", tegra_revision);
-> +       soc_dev_attr->family = kasprintf(GFP_KERNEL, "Tegra");
-> +
-> +       soc_dev = soc_device_register(soc_dev_attr);
-> +       if (IS_ERR_OR_NULL(soc_dev))
-> +               kfree(soc_dev_attr);
-> +
-> +       return;
+On 03/12/2013 01:21 PM, Heiko St?bner wrote:
+> Thanks for the hint ... this is what I rightfully get for mindlessly copying 
+> from the other plls in the file;-) .
 
-You are dropping the soc_dev on the floor here by just returning.
+:)
 
-The idea of the soc node is to have all on-soc components be children
-of that node, so you should instead pass it into of_platform_populate
-as the parent device.
+> What about the other plls in the pll-file, they should be affected in the same 
+> way, right?
 
-	Arnd
+Yes, they're of course also affected. Otherwise we wouldn't know about
+the problem;) We are going to submit all fixes we have for the clk driver
+shortly. But those are mostly for the Exynos clocks definitions.
