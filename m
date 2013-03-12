@@ -1,82 +1,61 @@
 From: mporter@ti.com (Matt Porter)
-Date: Tue, 12 Mar 2013 12:08:07 -0400
-Subject: [PATCH v9 3/9] ARM: edma: add AM33XX support to the private EDMA
- API
-In-Reply-To: <CAHp75Ve40sM-d9Gr3k6mgOOTkM_G+cYSPcftqqsuAi-MzEb9dg@mail.gmail.com>
+Date: Tue, 12 Mar 2013 12:09:45 -0400
+Subject: [PATCH v9 5/9] dmaengine: edma: Add TI EDMA device tree binding
+In-Reply-To: <90c29a73df9e495f907517c49dd45b88@DFLE72.ent.ti.com>
 References: <1362586540-10393-1-git-send-email-mporter@ti.com>
- <1362586540-10393-4-git-send-email-mporter@ti.com>
- <CAHp75Ve40sM-d9Gr3k6mgOOTkM_G+cYSPcftqqsuAi-MzEb9dg@mail.gmail.com>
-Message-ID: <20130312160807.GW6209@beef>
+ <1362586540-10393-6-git-send-email-mporter@ti.com>
+ <90c29a73df9e495f907517c49dd45b88@DFLE72.ent.ti.com>
+Message-ID: <20130312160945.GX6209@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 07, 2013 at 08:42:18AM +0200, Andy Shevchenko wrote:
-> On Wed, Mar 6, 2013 at 6:15 PM, Matt Porter <mporter@ti.com> wrote:
-> > Adds support for parsing the TI EDMA DT data into the
-> > required EDMA private API platform data. Enables runtime
-> > PM support to initialize the EDMA hwmod. Adds AM33XX EDMA
-> > crossbar event mux support. Enables build on OMAP.
+On Wed, Mar 06, 2013 at 08:24:06PM +0000, Peter Korsgaard wrote:
+> >>>>> "Matt" == Matt Porter <mporter@ti.com> writes:
 > 
-> > --- a/arch/arm/common/edma.c
-> > +++ b/arch/arm/common/edma.c
+>  Matt> The binding definition is based on the generic DMA controller
+>  Matt> binding.
 > 
-> > +static int edma_xbar_event_map(struct device *dev,
-> > +                              struct device_node *node,
-> > +                              struct edma_soc_info *pdata, int len)
-> > +{
-> > +       int ret = 0;
-> > +       int i;
-> > +       struct resource res;
-> > +       void *xbar;
-> > +       const s16 (*xbar_chans)[2];
-> > +       u32 shift, offset, mux;
-> > +
-> > +       xbar_chans = devm_kzalloc(dev,
-> > +                                 len/sizeof(s16) + 2*sizeof(s16),
-> > +                                 GFP_KERNEL);
-> > +       if (!xbar_chans)
-> > +               return -ENOMEM;
-> > +
-> > +       ret = of_address_to_resource(node, 1, &res);
-> > +       if (ret)
-> > +               return -EIO;
-> > +
-> > +       xbar = devm_ioremap(dev, res.start, resource_size(&res));
-> > +       if (!xbar)
-> > +               return -ENOMEM;
-> > +
-> > +       ret = edma_of_read_u32_to_s16_array(node,
-> > +                                           "ti,edma-xbar-event-map",
-> > +                                           (s16 *)xbar_chans,
-> > +                                           len/sizeof(u32));
-> > +       if (ret)
-> > +               return -EIO;
-> > +
-> > +       for (i = 0; xbar_chans[i][0] != -1; i++) {
-> > +               shift = (xbar_chans[i][1] % 4) * 8;
+>  Matt> Signed-off-by: Matt Porter <mporter@ti.com>
+>  Matt> ---
+>  Matt>  Documentation/devicetree/bindings/dma/ti-edma.txt |   49 +++++++++++++++++++++
+>  Matt>  1 file changed, 49 insertions(+)
+>  Matt>  create mode 100644 Documentation/devicetree/bindings/dma/ti-edma.txt
 > 
-> Looks like shift = (xbar_chans[i][1] & 0x03) << 3;
+>  Matt> diff --git a/Documentation/devicetree/bindings/dma/ti-edma.txt b/Documentation/devicetree/bindings/dma/ti-edma.txt
+>  Matt> new file mode 100644
+>  Matt> index 0000000..075a60e3
+>  Matt> --- /dev/null
+>  Matt> +++ b/Documentation/devicetree/bindings/dma/ti-edma.txt
+>  Matt> @@ -0,0 +1,49 @@
+>  Matt> +TI EDMA
+>  Matt> +
+>  Matt> +Required properties:
+>  Matt> +- compatible : "ti,edma3"
+>  Matt> +- ti,hwmods: Name of the hwmods associated to the EDMA
+>  Matt> +- ti,edma-regions: Number of regions
+>  Matt> +- ti,edma-slots: Number of slots
+>  Matt> +- ti,edma-queue-tc-map: List of transfer control to queue mappings
+>  Matt> +- ti,edma-queue-priority-map: List of queue priority mappings
+>  Matt> +- ti,edma-default-queue: Default queue value
+>  Matt> +
+>  Matt> +Optional properties:
+>  Matt> +- ti,edma-reserved-channels: List of reserved channel regions
+>  Matt> +- ti,edma-reserved-slots: List of reserved slot regions
+>  Matt> +- ti,edma-xbar-event-map: Crossbar event to channel map
+>  Matt> +
+>  Matt> +Example:
+>  Matt> +
+>  Matt> +edma: edma at 49000000 {
+>  Matt> +	reg = <0x49000000 0x10000>;
+>  Matt> +	interrupt-parent = <&intc>;
+>  Matt> +	interrupts = <12 13 14>;
+> 
+> Probably interrupt-parent should be removed from the example as well to
+> match am33xx.dtsi
 
-Yes, will update.
+On second thought, I'm not sure we're going to get any direction on this
+one so let's just do what feels right and make it reflect common usage
+like you suggested.
 
-> > +               offset = xbar_chans[i][1] >> 2;
-> > +               offset <<= 2;
-> 
-> Is it offset = xbar_chans[i][1] & 0xfffc; ?
-
-Yes, will update
-
-> > +               mux = readl((void *)((u32)xbar + offset));
-> > +               mux &= ~(0xff << shift);
-> > +               mux |= xbar_chans[i][0] << shift;
-> > +               writel(mux, (void *)((u32)xbar + offset));
-> > +       }
-> 
-> 
-> -- 
-> With Best Regards,
-> Andy Shevchenko
-> _______________________________________________
-> devicetree-discuss mailing list
-> devicetree-discuss at lists.ozlabs.org
-> https://lists.ozlabs.org/listinfo/devicetree-discuss
+Thanks,
+Matt
