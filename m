@@ -1,118 +1,150 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 11 Mar 2013 18:20:46 -0700
-Subject: [PATCH 03/10] ARM: smp_twd: Divorce smp_twd from local timer API
-In-Reply-To: <20130311225004.GR26093@atomide.com>
-References: <20130308180730.GE11806@atomide.com>
- <513A2B20.30805@codeaurora.org> <20130308194802.GG11806@atomide.com>
- <513A40EF.8050403@codeaurora.org> <20130308200811.GJ11806@atomide.com>
- <513A4774.3040605@codeaurora.org> <20130308202947.GK11806@atomide.com>
- <513A8B22.5030008@codeaurora.org> <20130311172847.GP26093@atomide.com>
- <513E5804.3050104@codeaurora.org> <20130311225004.GR26093@atomide.com>
-Message-ID: <513E82EE.2040407@codeaurora.org>
+From: cstsai@itri.org.tw (cstsai)
+Date: Tue, 12 Mar 2013 09:49:51 +0800
+Subject: [PATCH v8 3/7] ARM: davinci: Add support for
+ configuringDA8XX_REMOTEPROC
+References: <1362782508-3166-1-git-send-email-rtivy@ti.com><1362782508-3166-4-git-send-email-rtivy@ti.com>	<513DC4A1.8020700@ti.com>
+ <13514BD7FAEBA745BBD7D8A672905C143121BDA8@DFLE08.ent.ti.com>
+Message-ID: <E78723D735DE45359449DC4823132BD2@520A0002602>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/11/13 15:50, Tony Lindgren wrote:
-> * Stephen Boyd <sboyd@codeaurora.org> [130311 15:22]:
->> Ok. qemu works for me before applying my patches. I've added this into
->> the series before this patch to fix the boot issue.
-> OK thanks:
+Dear Sir,
+
+Please don't send update emails to me
+
+Whenever I need I can check from website
+
+Thanks & Regards,
+cstsai
+
+----- Original Message ----- 
+From: "Tivy, Robert" <rtivy@ti.com>
+To: "Nori, Sekhar" <nsekhar@ti.com>
+Cc: <ohad@wizery.com>; <davinci-linux-open-source@linux.davincidsp.com>; 
+<stable@vger.kernel.org>; <linux-arm-kernel@lists.infradead.org>
+Sent: Tuesday, March 12, 2013 4:26 AM
+Subject: RE: [PATCH v8 3/7] ARM: davinci: Add support for 
+configuringDA8XX_REMOTEPROC
+
+
+> -----Original Message-----
+> From: Nori, Sekhar
+> Sent: Monday, March 11, 2013 4:49 AM
 >
+> On 3/9/2013 4:11 AM, Robert Tivy wrote:
+> > Also fix REMOTEPROC config to select FW_LOADER (instead of
+> FW_CONFIG).
 >
+> It is preferable to have the patch description make sense standalone
+> even when read without the subject line.
 
-Actually, it's worse. From reading the code it looks like quite a few
-other machines register a clockevent and get jiffies going so they can
-calibrate the twd. I also see that Rob Herring's pull request to move
-smp_twd to CLKSRC_OF_DECLARE is going to conflict with any changes I
-make in the board files. I think we need to make the twd use the
-late_time_init callback if there is no clock rate and ignore the other
-patch I sent out a few hours ago. Basically, squash this into this 3/10
-patch.
+Will fix.
 
-----8<-----
+>
+> >
+> > Signed-off-by: Robert Tivy <rtivy@ti.com>
+>
+> Please follow the subject line conventions of the subsystem the patch
+> is
+> touching. This is not an ARM patch so the "ARM: davinci: " prefix in
+> subject is surely wrong.
 
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index a1185d3..c58918f 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -90,8 +90,10 @@ static int twd_timer_ack(void)
- 	return 0;
- }
- 
--static void twd_timer_stop(struct clock_event_device *clk)
-+static void twd_timer_stop(void)
- {
-+	struct clock_event_device *clk = __this_cpu_ptr(twd_evt);
-+
- 	twd_set_mode(CLOCK_EVT_MODE_UNUSED, clk);
- 	disable_percpu_irq(clk->irq);
- }
-@@ -265,8 +267,9 @@ static void twd_get_clock(struct device_node *np)
- /*
-  * Setup the local clock events for a CPU.
-  */
--static int __cpuinit twd_timer_setup(struct clock_event_device *clk)
-+static void __cpuinit twd_timer_setup(void)
- {
-+	struct clock_event_device *clk = __this_cpu_ptr(twd_evt);
- 	int cpu = smp_processor_id();
- 
- 	/*
-@@ -275,9 +278,9 @@ static int __cpuinit twd_timer_setup(struct clock_event_device *clk)
- 	 */
- 	if (per_cpu(percpu_setup_called, cpu)) {
- 		__raw_writel(0, twd_base + TWD_TIMER_CONTROL);
--		clockevents_register_device(__this_cpu_ptr(twd_evt));
-+		clockevents_register_device(clk);
- 		enable_percpu_irq(clk->irq, 0);
--		return 0;
-+		return;
- 	}
- 	per_cpu(percpu_setup_called, cpu) = true;
- 
-@@ -302,20 +305,18 @@ static int __cpuinit twd_timer_setup(struct clock_event_device *clk)
- 					0xf, 0xffffffff);
- 	enable_percpu_irq(clk->irq, 0);
- 
--	return 0;
-+	return;
- }
- 
- static int __cpuinit twd_timer_cpu_notify(struct notifier_block *self,
- 					   unsigned long action, void *hcpu)
- {
--	struct clock_event_device *evt = this_cpu_ptr(twd_evt);
--
- 	switch (action & ~CPU_TASKS_FROZEN) {
- 	case CPU_STARTING:
--		twd_timer_setup(evt);
-+		twd_timer_setup();
- 		break;
- 	case CPU_DYING:
--		twd_timer_stop(evt);
-+		twd_timer_stop();
- 		break;
- 	}
- 
-@@ -348,8 +349,15 @@ static int __init twd_local_timer_common_register(struct device_node *np)
- 
- 	twd_get_clock(np);
- 
--	/* Immediately configure the timer on the boot CPU */
--	twd_timer_setup(this_cpu_ptr(twd_evt));
-+	/*
-+	 * Immediately configure the timer on the boot CPU, unless we need
-+	 * jiffies to be incrementing to calibrate the rate in which case
-+	 * setup the timer in late_time_init.
-+	 */
-+	if (twd_timer_rate)
-+		twd_timer_setup();
-+	else
-+		late_time_init = twd_timer_setup;
- 
- 	return 0;
- 
+So even though it is a driver for just DA8XX, it should not get the "ARM: 
+davinci:" prefix?
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Is that mandated by the fact that it's in a general "driver" subdirectory?
+
+>
+> And I think I mentioned this once before but we want to see
+> Kconfig/Makefile changes along with driver addition in the same patch.
+
+Yeah, I was confusing Ohad's feedback about the "fix" to Kconfig being in a 
+separate patch.  I will therefore put the "fix" (FW_CONFIG -> FW_LOADER) 
+into its own patch, and group the driver's Kconfig additions with the driver 
+and its Makefile.
+
+>
+> > ---
+> >  drivers/remoteproc/Kconfig |   26 +++++++++++++++++++++++++-
+> >  1 file changed, 25 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/drivers/remoteproc/Kconfig b/drivers/remoteproc/Kconfig
+> > index 96ce101..21d04f1 100644
+> > --- a/drivers/remoteproc/Kconfig
+> > +++ b/drivers/remoteproc/Kconfig
+> > @@ -5,7 +5,7 @@ config REMOTEPROC
+> >  tristate
+> >  depends on EXPERIMENTAL
+> >  depends on HAS_DMA
+> > - select FW_CONFIG
+> > + select FW_LOADER
+> >  select VIRTIO
+> >
+> >  config OMAP_REMOTEPROC
+> > @@ -41,4 +41,28 @@ config STE_MODEM_RPROC
+> >    This can be either built-in or a loadable module.
+> >    If unsure say N.
+> >
+> > +config DA8XX_REMOTEPROC
+> > + tristate "DA830/OMAPL137 & DA850/OMAPL138 remoteproc support
+> (EXPERIMENTAL)"
+> > + depends on ARCH_DAVINCI_DA8XX
+> > + select REMOTEPROC
+> > + select RPMSG
+> > + select CMA
+>
+> Its nice to keep the selects sorted. It helps avoid duplicates.
+
+Will fix.
+
+>
+> > + default n
+>
+> No need of this I think, it should default to no already.
+
+OK.
+
+>
+> > + help
+> > +   Say y here to support DA830/OMAPL137 & DA850/OMAPL138 remote
+> > +   processors via the remote processor framework.
+> > +
+> > +   You want to say y here in order to enable AMP
+> > +   use-cases to run on your platform (multimedia codecs are
+> > +   offloaded to remote DSP processors using this framework).
+> > +
+> > +   This module controls the name of the firmware file that gets
+> > +   loaded on the DSP.  This file must reside in the /lib/firmware
+> > +   directory.  It can be specified via the module parameter
+> > +   da8xx_fw_name=<filename>, and if not specified will default to
+> > +   "rproc-dsp-fw".
+>
+> I hope running modinfo gives these details as well.
+
+It will in the next patch :)
+
+>
+> > +
+> > +   It's safe to say n here if you're not interested in multimedia
+> > +   offloading or just want a bare minimum kernel.
+>
+> I think this is misleading a bit since just selecting 'n' here will not
+> result in a "bare minimum kernel" - better to just avoid mention of it.
+
+Agreed, will drop.
+
+>
+> Thanks,
+> Sekhar
+
+Thanks & Regards,
+
+- Rob
+
+_______________________________________________
+Davinci-linux-open-source mailing list
+Davinci-linux-open-source at linux.davincidsp.com
+http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source 
+
+====================================================================
+This email may contain confidential information. Please do not use or disclose it in any way and delete it if you are not the intended recipient.
