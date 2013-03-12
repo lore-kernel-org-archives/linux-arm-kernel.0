@@ -1,91 +1,135 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 12 Mar 2013 17:54:18 +0100
-Subject: [PATCH 2/2] arm: at91: dt: at91sam9x5: add i2c-gpio pinctrl
-In-Reply-To: <1363107286-25698-2-git-send-email-richard.genoud@gmail.com>
-References: <1363107286-25698-1-git-send-email-richard.genoud@gmail.com>
- <1363107286-25698-2-git-send-email-richard.genoud@gmail.com>
-Message-ID: <20130312165418.GD2001@game.jcrosoft.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 12 Mar 2013 10:06:41 -0700
+Subject: [PATCH 03/10] ARM: smp_twd: Divorce smp_twd from local timer API
+In-Reply-To: <513E82EE.2040407@codeaurora.org>
+References: <20130308194802.GG11806@atomide.com>
+ <513A40EF.8050403@codeaurora.org>
+ <20130308200811.GJ11806@atomide.com>
+ <513A4774.3040605@codeaurora.org>
+ <20130308202947.GK11806@atomide.com>
+ <513A8B22.5030008@codeaurora.org>
+ <20130311172847.GP26093@atomide.com>
+ <513E5804.3050104@codeaurora.org>
+ <20130311225004.GR26093@atomide.com>
+ <513E82EE.2040407@codeaurora.org>
+Message-ID: <20130312170640.GC22059@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17:54 Tue 12 Mar     , Richard Genoud wrote:
-> i2c-gpio is sometimes used in place of i2c-at91.
-> This adds the pin muxes for the gpios.
+* Stephen Boyd <sboyd@codeaurora.org> [130311 18:25]:
+> On 03/11/13 15:50, Tony Lindgren wrote:
+> > * Stephen Boyd <sboyd@codeaurora.org> [130311 15:22]:
+> >> Ok. qemu works for me before applying my patches. I've added this into
+> >> the series before this patch to fix the boot issue.
+> > OK thanks:
+> >
+> >
+> 
+> Actually, it's worse. From reading the code it looks like quite a few
+> other machines register a clockevent and get jiffies going so they can
+> calibrate the twd. I also see that Rob Herring's pull request to move
+> smp_twd to CLKSRC_OF_DECLARE is going to conflict with any changes I
+> make in the board files. I think we need to make the twd use the
+> late_time_init callback if there is no clock rate and ignore the other
+> patch I sent out a few hours ago. Basically, squash this into this 3/10
+> patch.
 
-I'm more to drop the i2c gpio support as the hw work fine
+Looks reasonable to me to keep things working.
 
-Best Regards,
-J.
+Regards,
+
+Tony
+ 
+> ----8<-----
 > 
-> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
-> ---
->  based on v3.9-rc2
+> diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+> index a1185d3..c58918f 100644
+> --- a/arch/arm/kernel/smp_twd.c
+> +++ b/arch/arm/kernel/smp_twd.c
+> @@ -90,8 +90,10 @@ static int twd_timer_ack(void)
+>  	return 0;
+>  }
+>  
+> -static void twd_timer_stop(struct clock_event_device *clk)
+> +static void twd_timer_stop(void)
+>  {
+> +	struct clock_event_device *clk = __this_cpu_ptr(twd_evt);
+> +
+>  	twd_set_mode(CLOCK_EVT_MODE_UNUSED, clk);
+>  	disable_percpu_irq(clk->irq);
+>  }
+> @@ -265,8 +267,9 @@ static void twd_get_clock(struct device_node *np)
+>  /*
+>   * Setup the local clock events for a CPU.
+>   */
+> -static int __cpuinit twd_timer_setup(struct clock_event_device *clk)
+> +static void __cpuinit twd_timer_setup(void)
+>  {
+> +	struct clock_event_device *clk = __this_cpu_ptr(twd_evt);
+>  	int cpu = smp_processor_id();
+>  
+>  	/*
+> @@ -275,9 +278,9 @@ static int __cpuinit twd_timer_setup(struct clock_event_device *clk)
+>  	 */
+>  	if (per_cpu(percpu_setup_called, cpu)) {
+>  		__raw_writel(0, twd_base + TWD_TIMER_CONTROL);
+> -		clockevents_register_device(__this_cpu_ptr(twd_evt));
+> +		clockevents_register_device(clk);
+>  		enable_percpu_irq(clk->irq, 0);
+> -		return 0;
+> +		return;
+>  	}
+>  	per_cpu(percpu_setup_called, cpu) = true;
+>  
+> @@ -302,20 +305,18 @@ static int __cpuinit twd_timer_setup(struct clock_event_device *clk)
+>  					0xf, 0xffffffff);
+>  	enable_percpu_irq(clk->irq, 0);
+>  
+> -	return 0;
+> +	return;
+>  }
+>  
+>  static int __cpuinit twd_timer_cpu_notify(struct notifier_block *self,
+>  					   unsigned long action, void *hcpu)
+>  {
+> -	struct clock_event_device *evt = this_cpu_ptr(twd_evt);
+> -
+>  	switch (action & ~CPU_TASKS_FROZEN) {
+>  	case CPU_STARTING:
+> -		twd_timer_setup(evt);
+> +		twd_timer_setup();
+>  		break;
+>  	case CPU_DYING:
+> -		twd_timer_stop(evt);
+> +		twd_timer_stop();
+>  		break;
+>  	}
+>  
+> @@ -348,8 +349,15 @@ static int __init twd_local_timer_common_register(struct device_node *np)
+>  
+>  	twd_get_clock(np);
+>  
+> -	/* Immediately configure the timer on the boot CPU */
+> -	twd_timer_setup(this_cpu_ptr(twd_evt));
+> +	/*
+> +	 * Immediately configure the timer on the boot CPU, unless we need
+> +	 * jiffies to be incrementing to calibrate the rate in which case
+> +	 * setup the timer in late_time_init.
+> +	 */
+> +	if (twd_timer_rate)
+> +		twd_timer_setup();
+> +	else
+> +		late_time_init = twd_timer_setup;
+>  
+>  	return 0;
+>  
 > 
->  arch/arm/boot/dts/at91sam9x5.dtsi |   30 ++++++++++++++++++++++++++++++
->  1 files changed, 30 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-> index 8cbcff4..d18aff5 100644
-> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-> @@ -343,6 +343,30 @@
->  					};
->  				};
->  
-> +				i2c_gpio0 {
-> +					pinctrl_i2c_gpio0: i2c_gpio0-0 {
-> +						atmel,pins =
-> +							<0 30 0x0 0x2	/* PA30 gpio multidrive I2C0 data */
-> +							 0 31 0x0 0x2>;	/* PA31 gpio multidrive I2C0 clock */
-> +					};
-> +				};
-> +
-> +				i2c_gpio1 {
-> +					pinctrl_i2c_gpio1: i2c_gpio1-0 {
-> +						atmel,pins =
-> +							<2 0 0x0 0x2	/* PC0 gpio multidrive I2C1 data */
-> +							 2 1 0x0 0x2>;	/* PC1 gpio multidrive I2C1 clock */
-> +					};
-> +				};
-> +
-> +				i2c_gpio2 {
-> +					pinctrl_i2c_gpio2: i2c_gpio2-0 {
-> +						atmel,pins =
-> +							<1 4 0x0 0x2	/* PB4 gpio multidrive I2C2 data */
-> +							 1 5 0x0 0x2>;	/* PB5 gpio multidrive I2C2 clock */
-> +					};
-> +				};
-> +
->  				pioA: gpio at fffff400 {
->  					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
->  					reg = <0xfffff400 0x200>;
-> @@ -583,6 +607,8 @@
->  		i2c-gpio,delay-us = <2>;	/* ~100 kHz */
->  		#address-cells = <1>;
->  		#size-cells = <0>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_i2c_gpio0>;
->  		status = "disabled";
->  	};
->  
-> @@ -596,6 +622,8 @@
->  		i2c-gpio,delay-us = <2>;	/* ~100 kHz */
->  		#address-cells = <1>;
->  		#size-cells = <0>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_i2c_gpio1>;
->  		status = "disabled";
->  	};
->  
-> @@ -609,6 +637,8 @@
->  		i2c-gpio,delay-us = <2>;	/* ~100 kHz */
->  		#address-cells = <1>;
->  		#size-cells = <0>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_i2c_gpio2>;
->  		status = "disabled";
->  	};
->  };
 > -- 
-> 1.7.2.5
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> hosted by The Linux Foundation
 > 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
