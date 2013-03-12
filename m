@@ -1,33 +1,42 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 12 Mar 2013 13:32:59 -0600
-Subject: [PATCH V2 0/9] ARM: tegra: add platform suspend support
-In-Reply-To: <1363060916-8897-1-git-send-email-josephl@nvidia.com>
-References: <1363060916-8897-1-git-send-email-josephl@nvidia.com>
-Message-ID: <513F82EB.1030407@wwwdotorg.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 12 Mar 2013 19:33:47 +0000
+Subject: [PATCH v2 05/14] ARM: integrator: use clocksource_of_init for
+ sp804
+In-Reply-To: <513F7EBD.80207@gmail.com>
+References: <1363108124-17484-1-git-send-email-haojian.zhuang@linaro.org>
+ <1363108124-17484-6-git-send-email-haojian.zhuang@linaro.org>
+ <513F7EBD.80207@gmail.com>
+Message-ID: <201303121933.47994.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/11/2013 10:01 PM, Joseph Lo wrote:
-> This series introduces a basic functionality for Tegra to support the
-> platform suspend and resume.
+On Tuesday 12 March 2013, Rob Herring wrote:
+> On 03/12/2013 12:08 PM, Haojian Zhuang wrote:
+
+> You are breaking existing dtb's changing this, but this is wrong for
+> other reasons. The integrator does not have an SP804. It is the same
+> programming model, but is a single timer and not the dual timer. So
+> having a different compatible string is the correct way. I doubt it has
+> the primecell ID registers which is what "arm,primecell" indicates.
+
+At least the qemu model has the primecell ID only for actual sp804 but
+not for the integrator, see http://git.qemu.org/?p=qemu.git;a=blob;f=hw/arm_timer.c
+
+> >  	};
+> >  
+> >  	timer1: timer at 13000100 {
+> > -		compatible = "arm,integrator-timer";
+> > +		compatible = "arm,sp804", "arm,primecell";
+> > +		arm,sp804-clockevent = <0>;
 > 
-> Note: This series only adds the support for Tegra20 and Tegra30. The
-> Tegra114 will be supported later.
+> I don't like this nor the old way with aliases. We should describe the
+> h/w features of the timer to determine what to use it for. AFAICT, all 3
+> timers are identical on integrator and it does not matter which one
+> Linux picks for clocksource vs. clockevent.
 
-Aside from the few issues that have already been pointed out, this looks
-OK now. I have a couple questions:
+Interesting point. I remember we had a discussion about this when the
+initial binding integrator code was merged, but I don't remember what
+the intent was for doing it like this. Probably just minimizing the
+changes to the existing code.
 
-1) Please remind me if this series depends on anything. If not, I hope
-to apply it mostly directly on top of 3.9-rc1 or so.
-
-2) You mentioned that Tegra114 isn't supported. What is the failure mode
-on Tegra114? Is suspend simply not available and hence can't be
-requested, or will suspend attempts gracefully return an error, or will
-there we crashes, boot failures, etc.?
-
-3) Sorry for asking this again, but since only LP2 is actually
-implemented in patch 4, what happens if the user selects LP0 or LP1?
-Does the system (a) just use LP2, (b) fail to suspend, and hence
-immediately resume, (c) suspend, but can't be resumed, ...?
-
-Thanks.
+	Arnd
