@@ -1,61 +1,32 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 12 Mar 2013 15:03:28 -0600
-Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
-In-Reply-To: <20130312203819.GA23221@avionic-0098.mockup.avionic-design.de>
-References: <513C117D.6080800@firmworks.com>
- <20130310065539.GA14704@obsidianresearch.com>
- <513D6F9C.9000100@firmworks.com>
- <20130311181554.GA10992@obsidianresearch.com>
- <513E519B.6010503@firmworks.com>
- <20130311232516.GA13873@obsidianresearch.com>
- <513E6AFE.3090304@firmworks.com>
- <20130312070852.GA6727@avionic-0098.mockup.avionic-design.de>
- <20130312155749.GA1820@obsidianresearch.com>
- <20130312203819.GA23221@avionic-0098.mockup.avionic-design.de>
-Message-ID: <20130312210328.GA22702@obsidianresearch.com>
+From: jhovold@gmail.com (Johan Hovold)
+Date: Tue, 12 Mar 2013 22:17:02 +0100
+Subject: [PATCH] ARM: w1-gpio: fix erroneous gpio requests
+In-Reply-To: <FE853F2C-A85A-4D0E-BF0E-80698F3E6567@jcrosoft.com>
+References: <1363116094-8630-1-git-send-email-jhovold@gmail.com>
+ <20130312202028.GA6060@kroah.com>
+ <FE853F2C-A85A-4D0E-BF0E-80698F3E6567@jcrosoft.com>
+Message-ID: <20130312211702.GG8797@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 12, 2013 at 09:38:19PM +0100, Thierry Reding wrote:
+On Wed, Mar 13, 2013 at 04:24:20AM +0800, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On Mar 13, 2013, at 4:20 AM, Greg Kroah-Hartman <gregkh@linuxfoundation.org> wrote:
+> > On Tue, Mar 12, 2013 at 08:21:34PM +0100, Johan Hovold wrote:
+> >> Fix regression introduced by commit d2323cf773 ("onewire: w1-gpio: add
+> >> ext_pullup_enable pin in platform data") which added a gpio entry to the
+> >> platform data, but did not add the required initialisers to the board
+> >> files using it. Consequently, the driver would request gpio 0 at probe,
+> >> which could break other uses of the corresponding pin.
+> >> 
+> >> On AT91 requesting gpio 0 changes the pin muxing for PIOA0, which, for
+> >> instance, breaks SPI0 on at91sam9g20.
+> 
+> not only on AT91, 0 is a valid gpio
 
-> I've also verified that things actually do work with the binding that I
-> proposed for Tegra, even if I add device_type = "pci" to the root port
-> nodes. The reason is that the OF core looks up the type of the *parent*
-> node to find a matching bus. This happens to be the pcie-controller node
-> which is not a PCI device and therefore the address translation works
-> properly.
+AT91 (and 9g20) was just an example of what the implications could be
+like.
 
-Mitch pointed out early on that the parent node needs a 'device_type =
-"pci"' as well.
+I discovered the change after having debugged broken MMC on a custom
+at91sam9g45 board.
 
-The pcie-controller node would be classified as a 'bus node' according
-to the spec.
-
-Not going down the of_pci_* code paths for address translation at the
-root port bridge nodes is certainly not right.
-
-> ranges = <0x00000800 0 0 0x80000000 0 0x00001000   /* port 0 configuration space */
->           0x00001000 0 0 0x80001000 0 0x00001000   /* port 1 configuration space */
-
-Section 12 says that the 'b,d,f' bits are 0 in ranges, so the above is
-in conflict with that language:
-
- In particular, the phys.hi fields of the child address spaces in the
- "ranges" property for PCI does not contain the same information as
- "reg" property entries within PCI nodes. The only information that is
- present in "ranges" phys.hi entries are the non-relocatable,
- prefetchable and the PCI address space bits for which the entry
- applies. I.e., only the n, p and ss bits are present; the bbbbbbbb,
- ddddd, fff and rrrrrrrr fields are 0.
-
-And the further requirement:
-
- When an address is to be mapped through a PCI bus bridge node, the
- phys.hi value of the address to be mapped and the child field of a
- "ranges" entry should be masked so that only the ss bits are compared.
-
-Which is embodied by the code in of_bus_pci_map, meaning the OF core
-won't even look at the bits in the high DW when searching ranges.
-
-Regards,
-Jason
+Johan
