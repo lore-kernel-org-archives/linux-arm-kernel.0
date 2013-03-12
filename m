@@ -1,56 +1,100 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 12 Mar 2013 15:45:35 +0530
-Subject: [PATCH v2] arm: davinci: fix edma dmaengine induced null pointer
- dereference on da830
-In-Reply-To: <20130306175753.14f74f31@pcnovotny-t.fit.vutbr.cz>
-References: <1362499102-16468-1-git-send-email-mporter@ti.com>
- <20130306175753.14f74f31@pcnovotny-t.fit.vutbr.cz>
-Message-ID: <513F0047.9070303@ti.com>
+From: marvin24@gmx.de (Marc Dietrich)
+Date: Tue, 12 Mar 2013 11:35:43 +0100
+Subject: [PATCH V2 3/9] ARM: dt: tegra: add bindings of power management
+ configurations for PMC
+In-Reply-To: <1363060962-9172-1-git-send-email-josephl@nvidia.com>
+References: <1363060962-9172-1-git-send-email-josephl@nvidia.com>
+Message-ID: <1715411.W3GXSOcQoS@fb07-iapwap2.physik.uni-giessen.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/6/2013 10:27 PM, Tomas Novotny wrote:
-> On Tue,  5 Mar 2013 10:58:22 -0500
-> Matt Porter <mporter@ti.com> wrote:
-> 
->> This adds additional error checking to the private edma api implementation
->> to catch the case where the edma_alloc_slot() has an invalid controller
->> parameter. The edma dmaengine wrapper driver relies on this condition
->> being handled in order to avoid setting up a second edma dmaengine
->> instance on DA830.
->>
->> Verfied using a DA850 with the second EDMA controller platform instance
->> removed to simulate a DA830 which only has a single EDMA controller.
->>
->> Reported-by: Tomas Novotny <tomas@novotny.cz>
->> Signed-off-by: Matt Porter <mporter@ti.com>
->> Cc: stable at vger.kernel.org # v3.7.x+
->> ---
->> v2: Move error check out of conditional to catch all cases
->>
->>  arch/arm/mach-davinci/dma.c |    3 +++
->>  1 file changed, 3 insertions(+)
->>
->> diff --git a/arch/arm/mach-davinci/dma.c b/arch/arm/mach-davinci/dma.c
->> index a685e97..45b7c71 100644
->> --- a/arch/arm/mach-davinci/dma.c
->> +++ b/arch/arm/mach-davinci/dma.c
->> @@ -743,6 +743,9 @@ EXPORT_SYMBOL(edma_free_channel);
->>   */
->>  int edma_alloc_slot(unsigned ctlr, int slot)
->>  {
->> +	if (!edma_cc[ctlr])
->> +		return -EINVAL;
->> +
->>  	if (slot >= 0)
->>  		slot = EDMA_CHAN_SLOT(slot);
->>  
-> 
-> On the TI AM1707 based custom board:
-> 
-> Tested-by: Tomas Novotny <tomas@novotny.cz>
+Hi Joseph,
 
-I tested it on DA830 EVM. Queuing this for v3.9-rc
+Am Dienstag, 12. M?rz 2013, 12:02:42 schrieb Joseph Lo:
+> The PMC mostly controls the entry and exit of the system from different
+> sleep modes. Different platform or system may have different configurations.
+> The power management configurations of PMC is represented as some
+> properties. The system needs to define the properties when the system
+> supports deep sleep mode (i.e. suspend).
+> 
+> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+> ---
+> V2:
+> * squash the patches that defined the PM bindings for PMC and the
+>   implementation
+> * replace the "unsigned long" with "u32" for the variables that are parsed
+>   from DT
+> ---
+>  .../bindings/arm/tegra/nvidia,tegra20-pmc.txt      | 42 ++++++++++-
+>  arch/arm/mach-tegra/pmc.c                          | 83
+> ++++++++++++++++++++++ arch/arm/mach-tegra/pmc.h                          |
+>  8 +++
+>  3 files changed, 132 insertions(+), 1 deletion(-)
+> 
+> diff --git
+> a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
+> b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt index
+> b5846e2..12a436e 100644
+> --- a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
+> +++ b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
+> @@ -1,14 +1,46 @@
+>  NVIDIA Tegra Power Management Controller (PMC)
+> 
+> -Properties:
+> +The PMC block interacts with an external Power Management Unit. The PMC
+> +mostly controls the entry and exit of the system from different sleep
+> +modes. It provides power-gating controllers for SoC and CPU power-islands.
+> +
+> +Required properties:
+>  - name : Should be pmc
+>  - compatible : Should contain "nvidia,tegra<chip>-pmc".
+>  - reg : Offset and length of the register set for the device
+> +
+> +Optional properties:
+>  - nvidia,invert-interrupt : If present, inverts the PMU interrupt signal.
+>    The PMU is an external Power Management Unit, whose interrupt output
+>    signal is fed into the PMC. This signal is optionally inverted, and then
+>    fed into the ARM GIC. The PMC is not involved in the detection or
+>    handling of this interrupt signal, merely its inversion.
+> +- nvidia,suspend-mode : The suspend mode that the platform should use.
+> +  Valid valuse are 0, 1 and 2:
+> +  0 (LP0): CPU + Core voltage off and DRAM in self-refresh
+> +  1 (LP1): CPU vlotage off and DRAM in self-refresh
+> +  2 (LP2): CPU voltage off
+> +- nvidia,core-power-req-active-high : Boolean, core power request
+> active-high +- nvidia,sys-clock-req-active-high : Boolean, system clock
+> request active-high +- nvidia,combined-power-req : Boolean, combined power
+> request for CPU & Core +- nvidia,cpu-pwr-good-en : Boolean, CPU power good
+> signal (from PMIC to PMC) +			   is enabled.
+> +
+> +Required properties when nvidia,suspend-mode is specified:
+> +- nvidia,cpu-pwr-good-time : CPU power good time in uS.
+> +- nvidia,cpu-pwr-off-time : CPU power off time in uS.
+> +- nvidia,core-pwr-good-time : <Oscillator-stable-time Power-stable-time>
+> +			      Core power good time in uS.
+> +- nvidia,core-pwr-off-time : Core power off time in uS.
+> +
+> +Required properties when nvidia,suspend-mode=<0>:
+> +- nvidia,lp0-vec : <start length> Starting address and length of LP0 vector
+> +  The LP0 vector contains the warm boot code that is executed by AVP when
+> +  resuming from the LP0 state. The AVP (Audio-Video Processor) is an ARM7
+> +  processor and always being the first boot processor when chip is power
+> on +  or resume from deep sleep mode. When the system is resumed from the
+> deep +  sleep mode, the warm boot code will restore some PLLs, clocks and
+> then +  bring up CPU0 for resuming the system.
+> 
+>  Example:
+> 
+> @@ -16,4 +48,12 @@ pmc at 7000f400 {
+>  	compatible = "nvidia,tegra20-pmc";
+>  	reg = <0x7000e400 0x400>;
+>  	nvidia,invert-interrupt;
+> +	nvidia,suspend-mode = <1>;
+> +	nvidia,cpu-pwr-good-time = <2000>;
+> +	nvidia,cpu-pwr-off-time = <100>;
+> +	nvidia,core-pwr-good-ticks = <3845 3845>;
+> +	nvidia,core-pwr-off-ticks = <458>;
 
-Thanks,
-Sekhar
+s/ticks/time/
+
+Marc
