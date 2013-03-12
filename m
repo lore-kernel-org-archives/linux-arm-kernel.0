@@ -1,203 +1,371 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 12 Mar 2013 17:46:43 +0100
-Subject: [PATCH v2 00/13] ARM: spear multiplatform support
-Message-ID: <1363106816-9603-1-git-send-email-arnd@arndb.de>
+Date: Tue, 12 Mar 2013 17:46:45 +0100
+Subject: [PATCH v2 02/13] ARM: spear: unify mach/generic.h and mach/irqs.h
+In-Reply-To: <1363106816-9603-1-git-send-email-arnd@arndb.de>
+References: <1363106816-9603-1-git-send-email-arnd@arndb.de>
+Message-ID: <1363106816-9603-3-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the second time I post the SPEAr multiplatform patches.
-It did not work out for 3.9, mostly because of conflicts against
-patches in the DMA tree, but also because I did not push very
-hard for these. The patches are basically unchanged now, just
-some context differences since I rebased them on top of 3.9-rc2.
+These are indeed easy to combine, as there are no conflicting
+definitions in generic.h, and irqs.h will be obsolete once
+we enable SPARSE_IRQ.
 
-I'm adding them to the arm-soc tree for 3.10 now. If there are
-any bugs, let's fix them on top of this branch. It would be
-good to get some more testing on the branch though.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+ arch/arm/mach-spear13xx/include/mach/generic.h | 21 ++++++++----
+ arch/arm/mach-spear13xx/include/mach/irqs.h    | 23 ++++++++++---
+ arch/arm/mach-spear3xx/include/mach/generic.h  | 42 +++++++++++++++++------
+ arch/arm/mach-spear3xx/include/mach/irqs.h     | 24 ++++++++++---
+ arch/arm/mach-spear3xx/spear320.c              |  1 +
+ arch/arm/mach-spear3xx/spear3xx.c              |  4 ++-
+ arch/arm/mach-spear6xx/include/mach/generic.h  | 47 ++++++++++++++++++++++----
+ arch/arm/mach-spear6xx/include/mach/irqs.h     | 22 ++++++++----
+ 8 files changed, 146 insertions(+), 38 deletions(-)
 
-Arnd Bergmann (13):
-  ARM: spear13xx: make mach/dma.h local
-  ARM: spear: unify mach/generic.h and mach/irqs.h
-  ARM: spear: move identical headers to plat-spear/include/mach
-  ARM: spear: make spear3xx/6xx mach/spear.h files identical
-  ARM: spear: merge Kconfig files
-  ARM: spear: move spear.h and misc_regs.h into plat-spear
-  ARM: spear: move all files to mach-spear
-  ARM: spear: move generic.h and pl080.h into private dir
-  ARM: spear: make clock driver independent of headers
-  ARM: spear: rename duplicate pl080_plat_data
-  ARM: spear: use multiplatform configuration options.
-  ARM: spear: fix build error in restart.c
-  ARM: spear: enable spear13xx in multi_v7_defconfig
-
- arch/arm/Kconfig                                   |  12 +-
- arch/arm/Makefile                                  |   5 +-
- arch/arm/configs/multi_v7_defconfig                |   9 +
- arch/arm/configs/spear3xx_defconfig                |   2 +
- arch/arm/configs/spear6xx_defconfig                |   1 +
- arch/arm/mach-spear/Kconfig                        | 103 +++++
- arch/arm/mach-spear/Makefile                       |  24 ++
- arch/arm/mach-spear/Makefile.boot                  |   3 +
- arch/arm/mach-spear/generic.h                      |  59 +++
- arch/arm/mach-spear/headsmp.S                      |  47 +++
- arch/arm/mach-spear/hotplug.c                      | 103 +++++
- arch/arm/mach-spear/include/mach/debug-macro.S     |  36 ++
- arch/arm/mach-spear/include/mach/irqs.h            |  35 ++
- arch/arm/mach-spear/include/mach/misc_regs.h       |  22 ++
- arch/arm/mach-spear/include/mach/spear.h           |  95 +++++
- arch/arm/mach-spear/include/mach/timex.h           |  19 +
- arch/arm/mach-spear/include/mach/uncompress.h      |  42 ++
- arch/arm/mach-spear/pl080.c                        |  78 ++++
- arch/arm/mach-spear/pl080.h                        |  21 +
- arch/arm/mach-spear/platsmp.c                      | 130 +++++++
- arch/arm/mach-spear/restart.c                      |  34 ++
- arch/arm/mach-spear/spear1310.c                    |  96 +++++
- arch/arm/mach-spear/spear1340.c                    | 193 +++++++++
- arch/arm/mach-spear/spear13xx-dma.h                | 128 ++++++
- arch/arm/mach-spear/spear13xx.c                    | 184 +++++++++
- arch/arm/mach-spear/spear300.c                     | 220 +++++++++++
- arch/arm/mach-spear/spear310.c                     | 262 +++++++++++++
- arch/arm/mach-spear/spear320.c                     | 277 +++++++++++++
- arch/arm/mach-spear/spear3xx.c                     | 116 ++++++
- arch/arm/mach-spear/spear6xx.c                     | 431 +++++++++++++++++++++
- arch/arm/mach-spear/time.c                         | 245 ++++++++++++
- arch/arm/mach-spear13xx/Kconfig                    |  20 -
- arch/arm/mach-spear13xx/Makefile                   |  10 -
- arch/arm/mach-spear13xx/Makefile.boot              |   3 -
- arch/arm/mach-spear13xx/headsmp.S                  |  47 ---
- arch/arm/mach-spear13xx/hotplug.c                  | 103 -----
- arch/arm/mach-spear13xx/include/mach/debug-macro.S |  14 -
- arch/arm/mach-spear13xx/include/mach/dma.h         | 128 ------
- arch/arm/mach-spear13xx/include/mach/generic.h     |  51 ---
- arch/arm/mach-spear13xx/include/mach/hardware.h    |   1 -
- arch/arm/mach-spear13xx/include/mach/irqs.h        |  20 -
- arch/arm/mach-spear13xx/include/mach/spear.h       |  54 ---
- arch/arm/mach-spear13xx/include/mach/timex.h       |  19 -
- arch/arm/mach-spear13xx/include/mach/uncompress.h  |  19 -
- arch/arm/mach-spear13xx/platsmp.c                  | 130 -------
- arch/arm/mach-spear13xx/spear1310.c                |  98 -----
- arch/arm/mach-spear13xx/spear1340.c                | 192 ---------
- arch/arm/mach-spear13xx/spear13xx.c                | 183 ---------
- arch/arm/mach-spear3xx/Kconfig                     |  26 --
- arch/arm/mach-spear3xx/Makefile                    |  15 -
- arch/arm/mach-spear3xx/Makefile.boot               |   3 -
- arch/arm/mach-spear3xx/include/mach/debug-macro.S  |  14 -
- arch/arm/mach-spear3xx/include/mach/generic.h      |  36 --
- arch/arm/mach-spear3xx/include/mach/hardware.h     |   1 -
- arch/arm/mach-spear3xx/include/mach/irqs.h         |  19 -
- arch/arm/mach-spear3xx/include/mach/misc_regs.h    |  22 --
- arch/arm/mach-spear3xx/include/mach/spear.h        |  60 ---
- arch/arm/mach-spear3xx/include/mach/timex.h        |  19 -
- arch/arm/mach-spear3xx/include/mach/uncompress.h   |  19 -
- arch/arm/mach-spear3xx/spear300.c                  | 220 -----------
- arch/arm/mach-spear3xx/spear310.c                  | 262 -------------
- arch/arm/mach-spear3xx/spear320.c                  | 276 -------------
- arch/arm/mach-spear3xx/spear3xx.c                  | 113 ------
- arch/arm/mach-spear6xx/Kconfig                     |  10 -
- arch/arm/mach-spear6xx/Makefile                    |   6 -
- arch/arm/mach-spear6xx/Makefile.boot               |   3 -
- arch/arm/mach-spear6xx/include/mach/debug-macro.S  |  14 -
- arch/arm/mach-spear6xx/include/mach/generic.h      |  23 --
- arch/arm/mach-spear6xx/include/mach/hardware.h     |   1 -
- arch/arm/mach-spear6xx/include/mach/irqs.h         |  25 --
- arch/arm/mach-spear6xx/include/mach/misc_regs.h    |  22 --
- arch/arm/mach-spear6xx/include/mach/spear.h        |  46 ---
- arch/arm/mach-spear6xx/include/mach/timex.h        |  19 -
- arch/arm/mach-spear6xx/include/mach/uncompress.h   |  19 -
- arch/arm/mach-spear6xx/spear6xx.c                  | 430 --------------------
- arch/arm/plat-spear/Kconfig                        |  47 ---
- arch/arm/plat-spear/Makefile                       |   9 -
- arch/arm/plat-spear/include/plat/debug-macro.S     |  36 --
- arch/arm/plat-spear/include/plat/pl080.h           |  21 -
- arch/arm/plat-spear/include/plat/timex.h           |  19 -
- arch/arm/plat-spear/include/plat/uncompress.h      |  42 --
- arch/arm/plat-spear/pl080.c                        |  78 ----
- arch/arm/plat-spear/restart.c                      |  33 --
- arch/arm/plat-spear/time.c                         | 245 ------------
- drivers/clk/spear/spear1310_clock.c                |  64 ++-
- drivers/clk/spear/spear1340_clock.c                |  63 ++-
- drivers/clk/spear/spear3xx_clock.c                 |  60 +--
- drivers/clk/spear/spear6xx_clock.c                 |  31 +-
- 88 files changed, 3130 insertions(+), 3465 deletions(-)
- create mode 100644 arch/arm/mach-spear/Kconfig
- create mode 100644 arch/arm/mach-spear/Makefile
- create mode 100644 arch/arm/mach-spear/Makefile.boot
- create mode 100644 arch/arm/mach-spear/generic.h
- create mode 100644 arch/arm/mach-spear/headsmp.S
- create mode 100644 arch/arm/mach-spear/hotplug.c
- create mode 100644 arch/arm/mach-spear/include/mach/debug-macro.S
- create mode 100644 arch/arm/mach-spear/include/mach/irqs.h
- create mode 100644 arch/arm/mach-spear/include/mach/misc_regs.h
- create mode 100644 arch/arm/mach-spear/include/mach/spear.h
- create mode 100644 arch/arm/mach-spear/include/mach/timex.h
- create mode 100644 arch/arm/mach-spear/include/mach/uncompress.h
- create mode 100644 arch/arm/mach-spear/pl080.c
- create mode 100644 arch/arm/mach-spear/pl080.h
- create mode 100644 arch/arm/mach-spear/platsmp.c
- create mode 100644 arch/arm/mach-spear/restart.c
- create mode 100644 arch/arm/mach-spear/spear1310.c
- create mode 100644 arch/arm/mach-spear/spear1340.c
- create mode 100644 arch/arm/mach-spear/spear13xx-dma.h
- create mode 100644 arch/arm/mach-spear/spear13xx.c
- create mode 100644 arch/arm/mach-spear/spear300.c
- create mode 100644 arch/arm/mach-spear/spear310.c
- create mode 100644 arch/arm/mach-spear/spear320.c
- create mode 100644 arch/arm/mach-spear/spear3xx.c
- create mode 100644 arch/arm/mach-spear/spear6xx.c
- create mode 100644 arch/arm/mach-spear/time.c
- delete mode 100644 arch/arm/mach-spear13xx/Kconfig
- delete mode 100644 arch/arm/mach-spear13xx/Makefile
- delete mode 100644 arch/arm/mach-spear13xx/Makefile.boot
- delete mode 100644 arch/arm/mach-spear13xx/headsmp.S
- delete mode 100644 arch/arm/mach-spear13xx/hotplug.c
- delete mode 100644 arch/arm/mach-spear13xx/include/mach/debug-macro.S
- delete mode 100644 arch/arm/mach-spear13xx/include/mach/dma.h
- delete mode 100644 arch/arm/mach-spear13xx/include/mach/generic.h
- delete mode 100644 arch/arm/mach-spear13xx/include/mach/hardware.h
- delete mode 100644 arch/arm/mach-spear13xx/include/mach/irqs.h
- delete mode 100644 arch/arm/mach-spear13xx/include/mach/spear.h
- delete mode 100644 arch/arm/mach-spear13xx/include/mach/timex.h
- delete mode 100644 arch/arm/mach-spear13xx/include/mach/uncompress.h
- delete mode 100644 arch/arm/mach-spear13xx/platsmp.c
- delete mode 100644 arch/arm/mach-spear13xx/spear1310.c
- delete mode 100644 arch/arm/mach-spear13xx/spear1340.c
- delete mode 100644 arch/arm/mach-spear13xx/spear13xx.c
- delete mode 100644 arch/arm/mach-spear3xx/Kconfig
- delete mode 100644 arch/arm/mach-spear3xx/Makefile
- delete mode 100644 arch/arm/mach-spear3xx/Makefile.boot
- delete mode 100644 arch/arm/mach-spear3xx/include/mach/debug-macro.S
- delete mode 100644 arch/arm/mach-spear3xx/include/mach/generic.h
- delete mode 100644 arch/arm/mach-spear3xx/include/mach/hardware.h
- delete mode 100644 arch/arm/mach-spear3xx/include/mach/irqs.h
- delete mode 100644 arch/arm/mach-spear3xx/include/mach/misc_regs.h
- delete mode 100644 arch/arm/mach-spear3xx/include/mach/spear.h
- delete mode 100644 arch/arm/mach-spear3xx/include/mach/timex.h
- delete mode 100644 arch/arm/mach-spear3xx/include/mach/uncompress.h
- delete mode 100644 arch/arm/mach-spear3xx/spear300.c
- delete mode 100644 arch/arm/mach-spear3xx/spear310.c
- delete mode 100644 arch/arm/mach-spear3xx/spear320.c
- delete mode 100644 arch/arm/mach-spear3xx/spear3xx.c
- delete mode 100644 arch/arm/mach-spear6xx/Kconfig
- delete mode 100644 arch/arm/mach-spear6xx/Makefile
- delete mode 100644 arch/arm/mach-spear6xx/Makefile.boot
- delete mode 100644 arch/arm/mach-spear6xx/include/mach/debug-macro.S
- delete mode 100644 arch/arm/mach-spear6xx/include/mach/generic.h
- delete mode 100644 arch/arm/mach-spear6xx/include/mach/hardware.h
- delete mode 100644 arch/arm/mach-spear6xx/include/mach/irqs.h
- delete mode 100644 arch/arm/mach-spear6xx/include/mach/misc_regs.h
- delete mode 100644 arch/arm/mach-spear6xx/include/mach/spear.h
- delete mode 100644 arch/arm/mach-spear6xx/include/mach/timex.h
- delete mode 100644 arch/arm/mach-spear6xx/include/mach/uncompress.h
- delete mode 100644 arch/arm/mach-spear6xx/spear6xx.c
- delete mode 100644 arch/arm/plat-spear/Kconfig
- delete mode 100644 arch/arm/plat-spear/Makefile
- delete mode 100644 arch/arm/plat-spear/include/plat/debug-macro.S
- delete mode 100644 arch/arm/plat-spear/include/plat/pl080.h
- delete mode 100644 arch/arm/plat-spear/include/plat/timex.h
- delete mode 100644 arch/arm/plat-spear/include/plat/uncompress.h
- delete mode 100644 arch/arm/plat-spear/pl080.c
- delete mode 100644 arch/arm/plat-spear/restart.c
- delete mode 100644 arch/arm/plat-spear/time.c
-
+diff --git a/arch/arm/mach-spear13xx/include/mach/generic.h b/arch/arm/mach-spear13xx/include/mach/generic.h
+index 633e678..af47d9b 100644
+--- a/arch/arm/mach-spear13xx/include/mach/generic.h
++++ b/arch/arm/mach-spear13xx/include/mach/generic.h
+@@ -1,9 +1,8 @@
+ /*
+- * arch/arm/mach-spear13xx/include/mach/generic.h
++ * spear machine family generic header file
+  *
+- * spear13xx machine family generic header file
+- *
+- * Copyright (C) 2012 ST Microelectronics
++ * Copyright (C) 2009-2012 ST Microelectronics
++ * Rajeev Kumar <rajeev-dlh.kumar@st.com>
+  * Viresh Kumar <viresh.linux@gmail.com>
+  *
+  * This file is licensed under the terms of the GNU General Public
+@@ -15,22 +14,30 @@
+ #define __MACH_GENERIC_H
+ 
+ #include <linux/dmaengine.h>
++#include <linux/amba/pl08x.h>
++#include <linux/init.h>
+ #include <asm/mach/time.h>
+ 
+-/* Add spear13xx structure declarations here */
+ extern void spear13xx_timer_init(void);
++extern void spear3xx_timer_init(void);
+ extern struct pl022_ssp_controller pl022_plat_data;
++extern struct pl08x_platform_data pl080_plat_data;
+ extern struct dw_dma_platform_data dmac_plat_data;
+ extern struct dw_dma_slave cf_dma_priv;
+ extern struct dw_dma_slave nand_read_dma_priv;
+ extern struct dw_dma_slave nand_write_dma_priv;
++bool dw_dma_filter(struct dma_chan *chan, void *slave);
+ 
+-/* Add spear13xx family function declarations here */
+ void __init spear_setup_of_timer(void);
++void __init spear3xx_clk_init(void);
++void __init spear3xx_map_io(void);
++void __init spear3xx_dt_init_irq(void);
++void __init spear6xx_clk_init(void);
+ void __init spear13xx_map_io(void);
+ void __init spear13xx_l2x0_init(void);
+-bool dw_dma_filter(struct dma_chan *chan, void *slave);
++
+ void spear_restart(char, const char *);
++
+ void spear13xx_secondary_startup(void);
+ void __cpuinit spear13xx_cpu_die(unsigned int cpu);
+ 
+diff --git a/arch/arm/mach-spear13xx/include/mach/irqs.h b/arch/arm/mach-spear13xx/include/mach/irqs.h
+index 271a62b..92da0a8 100644
+--- a/arch/arm/mach-spear13xx/include/mach/irqs.h
++++ b/arch/arm/mach-spear13xx/include/mach/irqs.h
+@@ -1,9 +1,8 @@
+ /*
+- * arch/arm/mach-spear13xx/include/mach/irqs.h
++ * IRQ helper macros for spear machine family
+  *
+- * IRQ helper macros for spear13xx machine family
+- *
+- * Copyright (C) 2012 ST Microelectronics
++ * Copyright (C) 2009-2012 ST Microelectronics
++ * Rajeev Kumar <rajeev-dlh.kumar@st.com>
+  * Viresh Kumar <viresh.linux@gmail.com>
+  *
+  * This file is licensed under the terms of the GNU General Public
+@@ -14,7 +13,23 @@
+ #ifndef __MACH_IRQS_H
+ #define __MACH_IRQS_H
+ 
++#ifdef CONFIG_ARCH_SPEAR3XX
++#define NR_IRQS			256
++#endif
++
++#ifdef CONFIG_ARCH_SPEAR6XX
++/* IRQ definitions */
++/* VIC 1 */
++#define IRQ_VIC_END				64
++
++/* GPIO pins virtual irqs */
++#define VIRTUAL_IRQS				24
++#define NR_IRQS					(IRQ_VIC_END + VIRTUAL_IRQS)
++#endif
++
++#ifdef CONFIG_ARCH_SPEAR13XX
+ #define IRQ_GIC_END			160
+ #define NR_IRQS				IRQ_GIC_END
++#endif
+ 
+ #endif /* __MACH_IRQS_H */
+diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
+index df31079..af47d9b 100644
+--- a/arch/arm/mach-spear3xx/include/mach/generic.h
++++ b/arch/arm/mach-spear3xx/include/mach/generic.h
+@@ -1,10 +1,9 @@
+ /*
+- * arch/arm/mach-spear3xx/generic.h
++ * spear machine family generic header file
+  *
+- * SPEAr3XX machine family generic header file
+- *
+- * Copyright (C) 2009 ST Microelectronics
+- * Viresh Kumar<viresh.linux@gmail.com>
++ * Copyright (C) 2009-2012 ST Microelectronics
++ * Rajeev Kumar <rajeev-dlh.kumar@st.com>
++ * Viresh Kumar <viresh.linux@gmail.com>
+  *
+  * This file is licensed under the terms of the GNU General Public
+  * License version 2. This program is licensed "as is" without any
+@@ -14,23 +13,46 @@
+ #ifndef __MACH_GENERIC_H
+ #define __MACH_GENERIC_H
+ 
++#include <linux/dmaengine.h>
+ #include <linux/amba/pl08x.h>
+ #include <linux/init.h>
+-#include <linux/platform_device.h>
+-#include <linux/amba/bus.h>
+ #include <asm/mach/time.h>
+-#include <asm/mach/map.h>
+ 
+-/* Add spear3xx family device structure declarations here */
++extern void spear13xx_timer_init(void);
+ extern void spear3xx_timer_init(void);
+ extern struct pl022_ssp_controller pl022_plat_data;
+ extern struct pl08x_platform_data pl080_plat_data;
++extern struct dw_dma_platform_data dmac_plat_data;
++extern struct dw_dma_slave cf_dma_priv;
++extern struct dw_dma_slave nand_read_dma_priv;
++extern struct dw_dma_slave nand_write_dma_priv;
++bool dw_dma_filter(struct dma_chan *chan, void *slave);
+ 
+-/* Add spear3xx family function declarations here */
+ void __init spear_setup_of_timer(void);
+ void __init spear3xx_clk_init(void);
+ void __init spear3xx_map_io(void);
++void __init spear3xx_dt_init_irq(void);
++void __init spear6xx_clk_init(void);
++void __init spear13xx_map_io(void);
++void __init spear13xx_l2x0_init(void);
+ 
+ void spear_restart(char, const char *);
+ 
++void spear13xx_secondary_startup(void);
++void __cpuinit spear13xx_cpu_die(unsigned int cpu);
++
++extern struct smp_operations spear13xx_smp_ops;
++
++#ifdef CONFIG_MACH_SPEAR1310
++void __init spear1310_clk_init(void);
++#else
++static inline void spear1310_clk_init(void) {}
++#endif
++
++#ifdef CONFIG_MACH_SPEAR1340
++void __init spear1340_clk_init(void);
++#else
++static inline void spear1340_clk_init(void) {}
++#endif
++
+ #endif /* __MACH_GENERIC_H */
+diff --git a/arch/arm/mach-spear3xx/include/mach/irqs.h b/arch/arm/mach-spear3xx/include/mach/irqs.h
+index f95e5b2..92da0a8 100644
+--- a/arch/arm/mach-spear3xx/include/mach/irqs.h
++++ b/arch/arm/mach-spear3xx/include/mach/irqs.h
+@@ -1,9 +1,8 @@
+ /*
+- * arch/arm/mach-spear3xx/include/mach/irqs.h
++ * IRQ helper macros for spear machine family
+  *
+- * IRQ helper macros for SPEAr3xx machine family
+- *
+- * Copyright (C) 2009 ST Microelectronics
++ * Copyright (C) 2009-2012 ST Microelectronics
++ * Rajeev Kumar <rajeev-dlh.kumar@st.com>
+  * Viresh Kumar <viresh.linux@gmail.com>
+  *
+  * This file is licensed under the terms of the GNU General Public
+@@ -14,6 +13,23 @@
+ #ifndef __MACH_IRQS_H
+ #define __MACH_IRQS_H
+ 
++#ifdef CONFIG_ARCH_SPEAR3XX
+ #define NR_IRQS			256
++#endif
++
++#ifdef CONFIG_ARCH_SPEAR6XX
++/* IRQ definitions */
++/* VIC 1 */
++#define IRQ_VIC_END				64
++
++/* GPIO pins virtual irqs */
++#define VIRTUAL_IRQS				24
++#define NR_IRQS					(IRQ_VIC_END + VIRTUAL_IRQS)
++#endif
++
++#ifdef CONFIG_ARCH_SPEAR13XX
++#define IRQ_GIC_END			160
++#define NR_IRQS				IRQ_GIC_END
++#endif
+ 
+ #endif /* __MACH_IRQS_H */
+diff --git a/arch/arm/mach-spear3xx/spear320.c b/arch/arm/mach-spear3xx/spear320.c
+index e1c7707..f671a0a 100644
+--- a/arch/arm/mach-spear3xx/spear320.c
++++ b/arch/arm/mach-spear3xx/spear320.c
+@@ -19,6 +19,7 @@
+ #include <linux/irqchip.h>
+ #include <linux/of_platform.h>
+ #include <asm/mach/arch.h>
++#include <asm/mach/map.h>
+ #include <mach/generic.h>
+ #include <mach/spear.h>
+ 
+diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
+index f9d754f..72e3ae7 100644
+--- a/arch/arm/mach-spear3xx/spear3xx.c
++++ b/arch/arm/mach-spear3xx/spear3xx.c
+@@ -14,8 +14,10 @@
+ #define pr_fmt(fmt) "SPEAr3xx: " fmt
+ 
+ #include <linux/amba/pl022.h>
+-#include <linux/amba/pl08x.h>
++#include <linux/amba/pl080.h>
++#include <linux/clk.h>
+ #include <linux/io.h>
++#include <asm/mach/map.h>
+ #include <plat/pl080.h>
+ #include <mach/generic.h>
+ #include <mach/spear.h>
+diff --git a/arch/arm/mach-spear6xx/include/mach/generic.h b/arch/arm/mach-spear6xx/include/mach/generic.h
+index 65514b1..af47d9b 100644
+--- a/arch/arm/mach-spear6xx/include/mach/generic.h
++++ b/arch/arm/mach-spear6xx/include/mach/generic.h
+@@ -1,10 +1,9 @@
+ /*
+- * arch/arm/mach-spear6xx/include/mach/generic.h
++ * spear machine family generic header file
+  *
+- * SPEAr6XX machine family specific generic header file
+- *
+- * Copyright (C) 2009 ST Microelectronics
+- * Rajeev Kumar<rajeev-dlh.kumar@st.com>
++ * Copyright (C) 2009-2012 ST Microelectronics
++ * Rajeev Kumar <rajeev-dlh.kumar@st.com>
++ * Viresh Kumar <viresh.linux@gmail.com>
+  *
+  * This file is licensed under the terms of the GNU General Public
+  * License version 2. This program is licensed "as is" without any
+@@ -14,10 +13,46 @@
+ #ifndef __MACH_GENERIC_H
+ #define __MACH_GENERIC_H
+ 
++#include <linux/dmaengine.h>
++#include <linux/amba/pl08x.h>
+ #include <linux/init.h>
++#include <asm/mach/time.h>
++
++extern void spear13xx_timer_init(void);
++extern void spear3xx_timer_init(void);
++extern struct pl022_ssp_controller pl022_plat_data;
++extern struct pl08x_platform_data pl080_plat_data;
++extern struct dw_dma_platform_data dmac_plat_data;
++extern struct dw_dma_slave cf_dma_priv;
++extern struct dw_dma_slave nand_read_dma_priv;
++extern struct dw_dma_slave nand_write_dma_priv;
++bool dw_dma_filter(struct dma_chan *chan, void *slave);
+ 
+ void __init spear_setup_of_timer(void);
+-void spear_restart(char, const char *);
++void __init spear3xx_clk_init(void);
++void __init spear3xx_map_io(void);
++void __init spear3xx_dt_init_irq(void);
+ void __init spear6xx_clk_init(void);
++void __init spear13xx_map_io(void);
++void __init spear13xx_l2x0_init(void);
++
++void spear_restart(char, const char *);
++
++void spear13xx_secondary_startup(void);
++void __cpuinit spear13xx_cpu_die(unsigned int cpu);
++
++extern struct smp_operations spear13xx_smp_ops;
++
++#ifdef CONFIG_MACH_SPEAR1310
++void __init spear1310_clk_init(void);
++#else
++static inline void spear1310_clk_init(void) {}
++#endif
++
++#ifdef CONFIG_MACH_SPEAR1340
++void __init spear1340_clk_init(void);
++#else
++static inline void spear1340_clk_init(void) {}
++#endif
+ 
+ #endif /* __MACH_GENERIC_H */
+diff --git a/arch/arm/mach-spear6xx/include/mach/irqs.h b/arch/arm/mach-spear6xx/include/mach/irqs.h
+index 37a5c41..92da0a8 100644
+--- a/arch/arm/mach-spear6xx/include/mach/irqs.h
++++ b/arch/arm/mach-spear6xx/include/mach/irqs.h
+@@ -1,10 +1,9 @@
+ /*
+- * arch/arm/mach-spear6xx/include/mach/irqs.h
++ * IRQ helper macros for spear machine family
+  *
+- * IRQ helper macros for SPEAr6xx machine family
+- *
+- * Copyright (C) 2009 ST Microelectronics
+- * Rajeev Kumar<rajeev-dlh.kumar@st.com>
++ * Copyright (C) 2009-2012 ST Microelectronics
++ * Rajeev Kumar <rajeev-dlh.kumar@st.com>
++ * Viresh Kumar <viresh.linux@gmail.com>
+  *
+  * This file is licensed under the terms of the GNU General Public
+  * License version 2. This program is licensed "as is" without any
+@@ -14,6 +13,11 @@
+ #ifndef __MACH_IRQS_H
+ #define __MACH_IRQS_H
+ 
++#ifdef CONFIG_ARCH_SPEAR3XX
++#define NR_IRQS			256
++#endif
++
++#ifdef CONFIG_ARCH_SPEAR6XX
+ /* IRQ definitions */
+ /* VIC 1 */
+ #define IRQ_VIC_END				64
+@@ -21,5 +25,11 @@
+ /* GPIO pins virtual irqs */
+ #define VIRTUAL_IRQS				24
+ #define NR_IRQS					(IRQ_VIC_END + VIRTUAL_IRQS)
++#endif
++
++#ifdef CONFIG_ARCH_SPEAR13XX
++#define IRQ_GIC_END			160
++#define NR_IRQS				IRQ_GIC_END
++#endif
+ 
+-#endif	/* __MACH_IRQS_H */
++#endif /* __MACH_IRQS_H */
 -- 
 1.8.1.2
