@@ -1,142 +1,81 @@
-From: anilkumar.v@ti.com (Kumar, Anil)
-Date: Tue, 12 Mar 2013 02:42:49 +0000
-Subject: [PATCH 4/9] ARM: dts: OMAP3: Add support for OMAP3430 SDP board
-In-Reply-To: <513E1A1C.8070206@ti.com>
-References: <1362763654-9660-1-git-send-email-jon-hunter@ti.com>
- <1362763654-9660-5-git-send-email-jon-hunter@ti.com>
- <CABYxbz7Bg3Uf2wkhH=4d6nEPUjyHF8BiixN6rGCOgEVG_us8Jw@mail.gmail.com>
- <513E1A1C.8070206@ti.com>
-Message-ID: <F3DBB1B3EF102E4994C89758CFCA32412CE371@DBDE01.ent.ti.com>
+From: simon.jeons@gmail.com (Simon Jeons)
+Date: Tue, 12 Mar 2013 11:19:13 +0800
+Subject: [PATCH] mm: Fixup the condition whether the page cache is free
+In-Reply-To: <20130308031651.GJ24384@cmpxchg.org>
+References: <CAFNq8R7tq9kvD9LyhZJ-Cj0kexQfDsPhB4iQYyZ9s9+8Jo82QA@mail.gmail.com>
+ <20130304150937.GB23767@cmpxchg.org> <51369637.6030705@gmail.com>
+ <20130306194703.GA1953@cmpxchg.org> <5137E7F4.1060509@gmail.com>
+ <51394945.4070803@gmail.com> <20130308023705.GI24384@cmpxchg.org>
+ <5139517F.60407@gmail.com> <20130308031651.GJ24384@cmpxchg.org>
+Message-ID: <513E9EB1.60204@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Hugh and Johannes,
+On 03/08/2013 11:16 AM, Johannes Weiner wrote:
+> On Fri, Mar 08, 2013 at 10:48:31AM +0800, Simon Jeons wrote:
+>> On 03/08/2013 10:37 AM, Johannes Weiner wrote:
+>>> On Fri, Mar 08, 2013 at 10:13:25AM +0800, Simon Jeons wrote:
+>>>> Ping, :-)
+>>>> On 03/07/2013 09:05 AM, Simon Jeons wrote:
+>>>>> Hi Johannes,
+>>>>> On 03/07/2013 03:47 AM, Johannes Weiner wrote:
+>>>>>> On Wed, Mar 06, 2013 at 09:04:55AM +0800, Simon Jeons wrote:
+>>>>>>> Hi Johannes,
+>>>>>>> On 03/04/2013 11:09 PM, Johannes Weiner wrote:
+>>>>>>>> On Mon, Mar 04, 2013 at 09:54:26AM +0800, Li Haifeng wrote:
+>>>>>>>>> When a page cache is to reclaim, we should to decide whether the page
+>>>>>>>>> cache is free.
+>>>>>>>>> IMO, the condition whether a page cache is free should be 3 in page
+>>>>>>>>> frame reclaiming. The reason lists as below.
+>>>>>>>>>
+>>>>>>>>> When page is allocated, the page->_count is 1(code
+>>>>>>>>> fragment is code-1 ).
+>>>>>>>>> And when the page is allocated for reading files from
+>>>>>>>>> extern disk, the
+>>>>>>>>> page->_count will increment 1 by page_cache_get() in
+>>>>>>>>> add_to_page_cache_locked()(code fragment is code-2). When
+>>>>>>>>> the page is to
+>>>>>>>>> reclaim, the isolated LRU list also increase the page->_count(code
+>>>>>>>>> fragment is code-3).
+>>>>>>>> The page count is initialized to 1, but that does not stay with the
+>>>>>>>> object.  It's a reference that is passed to the allocating task, which
+>>>>>>>> drops it again when it's done with the page.  I.e. the pattern is like
+>>>>>>>> this:
+>>>>>>>>
+>>>>>>>> instantiation:
+>>>>>>>> page = page_cache_alloc()    /* instantiator reference -> 1 */
+>>>>>>>> add_to_page_cache(page, mapping, offset)
+>>>>>>>>    get_page(page)        /* page cache reference -> 2 */
+>>>>>>>> lru_cache_add(page)
+>>>>>>>>    get_page(page)        /* pagevec reference -> 3 */
+>>>>>>>> /* ...initiate read, write, associate buffers, ... */
+>>>>>>>> page_cache_release(page)    /* drop instantiator reference
+>>>>>>>> -> 2 + private */
+>>>>>>>>
+>>>>>>>> reclaim:
+>>>>>>>> lru_add_drain()
+>>>>>>>>    page_cache_release(page)    /* drop pagevec reference ->
+>>>>>>>> 1 + private */
+>>>>>>> IIUC, when add page to lru will lead to add to pagevec firstly, and
+>>>>>>> pagevec will take one reference, so if lru will take over the
+>>>>>>> reference taken by pagevec when page transmit from pagevec to lru?
+>>>>>>> or just drop the reference and lru will not take reference for page?
+>>>>>> The LRU does not hold a reference, it would not make sense.  The
+>>>>>> pagevec only needs one because it would be awkward to remove a
+>>>>>> concurrently freed page out of a pagevec, but unlinking a page from
+>>>>>> the LRU is easy.  See mm/swap.c::__page_cache_release() and friends.
+>>>>> Since pagevec is per cpu, when can remove a concurrently freed
+>>>>> page out of a pagevec happen?
+>>> It doesn't because the pagevec holds a reference, as I wrote above.
+>> I mean since pagevec is per cpu, how can remove a concurrently freed
+>> page out of a pagevec happen? If it doesn't happen pagevec don't
+>> need to hold a reference. :-)
+> It has nothing to do with the pagevec being per CPU.  The page may get
+> truncated or reclaimed and have every other reference being dropped
+> while it sits on the pagevec.
 
-On Mon, Mar 11, 2013 at 23:23:32, Hunter, Jon wrote:
-> 
-> On 03/08/2013 08:25 PM, Anil Kumar wrote:
-> > Hi Jon,
-> > 
-> > On Fri, Mar 8, 2013 at 10:57 PM, Jon Hunter <jon-hunter@ti.com> wrote:
-> >> Adds basic device-tree support for OMAP3430 SDP board which has 256MB
-> >> of RAM and uses the TWL4030 power management IC.
-> > 
-> > I think this board support should be in separate patch series with
-> > related patches.
-> 
-> Well I wanted to keep them altogether so that I can send a pull request
-> to Benoit and Tony.
-
-Sorry, but can you please tell what makes you to think that you
-can send pull request only when they are altogether ?
-
-Is there any logical dependency with other patches except 
-"[PATCH 6/9] ARM: dts: Add OMAP3430 SDP flash memory bindings" is on 
-top of this patch ?
-
-> 
-> >>
-> >> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-> >> ---
-> >>  arch/arm/boot/dts/Makefile         |    1 +
-> >>  arch/arm/boot/dts/omap3430-sdp.dts |   46 ++++++++++++++++++++++++++++++++++++
-> >>  2 files changed, 47 insertions(+)
-> >>  create mode 100644 arch/arm/boot/dts/omap3430-sdp.dts
-> >>
-> >> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> >> index 9c62558..89013ed 100644
-> >> --- a/arch/arm/boot/dts/Makefile
-> >> +++ b/arch/arm/boot/dts/Makefile
-> >> @@ -119,6 +119,7 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
-> >>         omap3-beagle-xm.dtb \
-> >>         omap3-evm.dtb \
-> >>         omap3-tobi.dtb \
-> >> +       omap3430-sdp.dtb \
-> >>         omap4-panda.dtb \
-> >>         omap4-panda-a4.dtb \
-> >>         omap4-panda-es.dtb \
-> >> diff --git a/arch/arm/boot/dts/omap3430-sdp.dts b/arch/arm/boot/dts/omap3430-sdp.dts
-> >> new file mode 100644
-> >> index 0000000..be0650d
-> >> --- /dev/null
-> >> +++ b/arch/arm/boot/dts/omap3430-sdp.dts
-> >> @@ -0,0 +1,46 @@
-> >> +/*
-> >> + * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
-> >> + *
-> >> + * This program is free software; you can redistribute it and/or modify
-> >> + * it under the terms of the GNU General Public License version 2 as
-> >> + * published by the Free Software Foundation.
-> >> + */
-> >> +/dts-v1/;
-> >> +
-> >> +/include/ "omap3.dtsi"
-> >> +
-> >> +/ {
-> >> +       model = "TI OMAP3430 SDP";
-> >> +       compatible = "ti,omap3430-sdp", "ti,omap3";
-> > 
-> > I have not seen any related changes in "board-generic.c" for your board.
-> > So just wanted know, how this board is booting ?
-> 
-> If you look at board-generic.c you will see that "ti,omap3" will match
-> the OMAP3 generic machine. So you don't need to modify the board-generic.c.
-
-According to this omap3-beagle.dts and omap3-beagle-xm.dts are also 
-booting in some way. So it is not clear to me, why there two
-"DT_MACHINE_START" for omap3. I have seen there is only one 
-different in "init_time" for the same. 
-
-> 
-> >> +
-> >> +       memory {
-> >> +               device_type = "memory";
-> >> +               reg = <0x80000000 0x10000000>; /* 256 MB */
-> >> +       };
-> >> +};
-> >> +
-> >> +&i2c1 {
-> >> +       clock-frequency = <2600000>;
-> >> +
-> >> +       twl: twl at 48 {
-> >> +               reg = <0x48>;
-> >> +               interrupts = <7>; /* SYS_NIRQ cascaded to intc */
-> >> +               interrupt-parent = <&intc>;
-> >> +       };
-> >> +};
-> >> +
-> >> +/include/ "twl4030.dtsi"
-> >> +
-> >> +&mmc1 {
-> >> +       vmmc-supply = <&vmmc1>;
-> >> +       vmmc_aux-supply = <&vsim>;
-> >> +       bus-width = <8>;
-> >> +};
-> >> +
-> >> +&mmc2 {
-> >> +       status = "disabled";
-> >> +};
-> >> +
-> >> +&mmc3 {
-> >> +       status = "disabled";
-> >> +};
-> > 
-> > I think you should disable modules those are not currently used
-> > as they are enabled by default in omap3.dtsi.
-> > 
-> > exp:-
-> > 
-> > &mcbsp2 {
-> >         status = "disabled";
-> > };
-> 
-> Well may be we could do that in a follow-up patch. If you look at other
-> omap3 boards we have not gone through and disabled all unused modules
-> either. So although I agree, right now I just want to get minimal
-> support added.
-> 
-
-Hmm... But it makes the kernel to call unused driver probe and get failed
-those required some platform date from DT? you can see the kernel boot logs.
-
-Thanks,
-Anil  
+In function shmem_replace_page, there are twice call of 
+page_cache_release for oldpage, one is for pre_new_page, the other is 
+for page cache, but if page is still in pagevec,  pagevec has one 
+reference and oldpage can't be freed, is it a bug?
