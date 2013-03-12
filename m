@@ -1,128 +1,67 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Tue, 12 Mar 2013 13:12:35 -0700
-Subject: [PATCH v2 11/11] RFC: SSBI: Simple pm8058 test driver
-In-Reply-To: <1362616187-21089-1-git-send-email-davidb@codeaurora.org>
-References: <1362616187-21089-1-git-send-email-davidb@codeaurora.org>
-Message-ID: <1363119155-4682-1-git-send-email-davidb@codeaurora.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 12 Mar 2013 20:13:42 +0000
+Subject: [PATCH] irqchip: Add support for ARMv7-M's NVIC
+In-Reply-To: <20130312192702.GQ15375@pengutronix.de>
+References: <1363103673-24720-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20130312160101.GW4977@n2100.arm.linux.org.uk>
+ <20130312192702.GQ15375@pengutronix.de>
+Message-ID: <20130312201342.GY4977@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A very small ssbi device driver that reads the pm8058 version register
-and prints it out.
+On Tue, Mar 12, 2013 at 08:27:02PM +0100, Uwe Kleine-K?nig wrote:
+> On Tue, Mar 12, 2013 at 04:01:01PM +0000, Russell King - ARM Linux wrote:
+> > On Tue, Mar 12, 2013 at 04:54:33PM +0100, Uwe Kleine-K?nig wrote:
+> > > +#include <asm/irq.h>
+> > > +#include <asm/io.h>
+> > 
+> > linux/io.h
+> > 
+> > > +	unsigned int irqs, i, irq_base;
+> > > +
+> > > +	irq_base = irq_alloc_descs(-1, 16, irqs - 16, numa_node_id());
+> > > +	if (IS_ERR_VALUE(irq_base)) {
+> > 
+> > Erm... irq_alloc_descs() returns a negative number on error.
+> > 
+> > 	if ((int)irq_base < 0)
+> > 
+> > or make irq_base an int, and use:
+> > 
+> > 	if (irq_base < 0)
+> Just for me: So the check using IS_ERR_VALUE is as wrong as the other
+> occurences in arch/arm that you just kicked out or is it just ugly?
 
-Signed-off-by: David Brown <davidb@codeaurora.org>
----
-Resending due to address error in header
+See my recent patch removing all but one.
 
- arch/arm/boot/dts/msm8660-surf.dts |  4 +++
- arch/arm/boot/dts/msm8960-cdp.dts  |  4 +++
- drivers/ssbi/Makefile              |  1 +
- drivers/ssbi/ssbi-test.c           | 61 ++++++++++++++++++++++++++++++++++++++
- 4 files changed, 70 insertions(+)
- create mode 100644 drivers/ssbi/ssbi-test.c
+What we're suffering from here is a mentality problem - one which seems
+to be basically this:
 
-diff --git a/arch/arm/boot/dts/msm8660-surf.dts b/arch/arm/boot/dts/msm8660-surf.dts
-index 67f8670..68a0c7c4 100644
---- a/arch/arm/boot/dts/msm8660-surf.dts
-+++ b/arch/arm/boot/dts/msm8660-surf.dts
-@@ -43,5 +43,9 @@
- 		compatible = "qcom,ssbi";
- 		reg = <0x500000 0x1000>;
- 		qcom,controller-type = "pmic-arbiter";
-+
-+		qcom,ssbi-test {
-+			compatible = "qcom,ssbi-test";
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/msm8960-cdp.dts b/arch/arm/boot/dts/msm8960-cdp.dts
-index c9b09a8..60804d7 100644
---- a/arch/arm/boot/dts/msm8960-cdp.dts
-+++ b/arch/arm/boot/dts/msm8960-cdp.dts
-@@ -43,5 +43,9 @@
- 		compatible = "qcom,ssbi";
- 		reg = <0x500000 0x1000>;
- 		qcom,controller-type = "pmic-arbiter";
-+
-+		qcom,ssbi-test {
-+			compatible = "qcom,ssbi-test";
-+		};
- 	};
- };
-diff --git a/drivers/ssbi/Makefile b/drivers/ssbi/Makefile
-index 38fb70c..dea13c1 100644
---- a/drivers/ssbi/Makefile
-+++ b/drivers/ssbi/Makefile
-@@ -1 +1,2 @@
- obj-$(CONFIG_SSBI) += ssbi.o
-+obj-$(CONFIG_SSBI) += ssbi-test.o
-diff --git a/drivers/ssbi/ssbi-test.c b/drivers/ssbi/ssbi-test.c
-new file mode 100644
-index 0000000..7804cfe
---- /dev/null
-+++ b/drivers/ssbi/ssbi-test.c
-@@ -0,0 +1,61 @@
-+/* A simple ssbi test device. */
-+
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/ssbi.h>
-+
-+static int __init ssbi_test_probe(struct platform_device *pdev)
-+{
-+	int ret;
-+	char version;
-+
-+	dev_info(&pdev->dev, "probe, me = %p, parent = %p\n",
-+		 pdev, pdev->dev.parent);
-+
-+	/* Let's try reading. */
-+	ret = ssbi_read(pdev->dev.parent, 0x02, &version, 1);
-+	if (ret != 0)
-+		return ret;
-+
-+	dev_info(&pdev->dev, "Version = %02x\n", version);
-+
-+	/* Should already be hooked in. */
-+	return 0;
-+}
-+
-+static int ssbi_test_remove(struct platform_device *pdev)
-+{
-+	return 0;
-+}
-+
-+static struct of_device_id ssbi_test_match_table[] = {
-+	{ .compatible = "qcom,ssbi-test" },
-+	{}
-+};
-+
-+static struct platform_driver ssbi_test_driver = {
-+	.remove = ssbi_test_remove,
-+	.driver = {
-+		.name = "sbbi_test",
-+		.owner = THIS_MODULE,
-+		.of_match_table = ssbi_test_match_table,
-+	},
-+};
-+
-+static int __init ssbi_test_init(void)
-+{
-+	int ret;
-+
-+	ret = platform_driver_probe(&ssbi_test_driver, ssbi_test_probe);
-+	return ret;
-+}
-+
-+static void __exit ssbi_test_exit(void)
-+{
-+}
-+
-+module_init(ssbi_test_init);
-+module_exit(ssbi_test_exit);
-+
-+MODULE_LICENSE("GPL");
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+	If a macro exists which looks like it does the job I need,
+	I must use it.  I won't look at the function and check its
+	range of values that it returns, I'll just use it and hope
+	it's the right thing.
+
+The IS_ERR_VALUE() patch and my IS_ERR_OR_NULL() patches, I've spent on
+each one less than a minute, greping, reading the function, checking its
+range of return values, sometimes longer if I need to look at other
+functions, and worked out what the valid range of return values are.
+
+However, the general pattern in the kernel is this:
+
+	For any function that returns an int, values of success will
+	be positive.  Values indicating errors will be negative.
+
+There are very few int-returning functions which violate that.  There
+is one big, well known exception, and that's in the mmap() stuff,
+where there's a need to return valid values in the range (0..TASK_SIZE)
+but differentiate them from -ve errnos.  This is where IS_ERR_VALUE()
+came from, and why it was created.  See 07ab67c8d0d7c (Fix
+get_unmapped_area sanity tests).
+
+
+Today, it seems that IS_ERR_VALUE() is now being used just as a subsitute
+for testing for < 0... and it needs to stop.  See above - unless there's
+a *good* reason, treat +ve values as success, -ve values as failure from
+functions returning int.  Always design functions in the kernel like that.
+Again - unless there's a *good* reason like needing to return 0..TASK_SIZE.
