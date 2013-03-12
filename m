@@ -1,127 +1,202 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Tue, 12 Mar 2013 08:08:52 +0100
-Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
-In-Reply-To: <513E6AFE.3090304@firmworks.com>
-References: <20130308200245.GC29435@obsidianresearch.com>
- <513A7845.6040304@firmworks.com>
- <20130309013152.GA3883@obsidianresearch.com>
- <513C117D.6080800@firmworks.com>
- <20130310065539.GA14704@obsidianresearch.com>
- <513D6F9C.9000100@firmworks.com>
- <20130311181554.GA10992@obsidianresearch.com>
- <513E519B.6010503@firmworks.com>
- <20130311232516.GA13873@obsidianresearch.com>
- <513E6AFE.3090304@firmworks.com>
-Message-ID: <20130312070852.GA6727@avionic-0098.mockup.avionic-design.de>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Tue, 12 Mar 2013 08:45:06 +0100
+Subject: [PATCH v2 1/2] can: at91_can: add dt support
+In-Reply-To: <513E1523.4010803@pengutronix.de>
+References: <1363022764-7647-1-git-send-email-ludovic.desroches@atmel.com>
+ <513E1523.4010803@pengutronix.de>
+Message-ID: <20130312074505.GC3198@ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 11, 2013 at 01:38:38PM -1000, Mitch Bradley wrote:
-> On 3/11/2013 1:25 PM, Jason Gunthorpe wrote:
-> > On Mon, Mar 11, 2013 at 11:50:19AM -1000, Mitch Bradley wrote:
+On Mon, Mar 11, 2013 at 06:32:19PM +0100, Marc Kleine-Budde wrote:
+> On 03/11/2013 06:26 PM, ludovic.desroches at atmel.com wrote:
+> > From: Ludovic Desroches <ludovic.desroches@atmel.com>
 > > 
-> >>> However - the driver runs the core in a 'root port bridge mode' where
-> >>> the config header register block you are looking at is inhibited. The
-> >>> Marvell IP block requires software support to run in bridge mode. So
-> >>> Marvell really has only (2), while Tegra has only (1).
-> >>
-> >> Interesting.
-> >>
-> >> For Marvell, if Marvell has only (2), does that imply that standard PCI
-> >> discovery and enumeration code cannot find the root port bridges, and
-> >> also there is no way to auto-configure the bridges with common pci-pci
-> >> bridge code?
+> > Add device tree support.
 > > 
-> > The driver is required to take care of all of this. From the common
-> > code's perspective there is a bridge config header, and writing to it
-> > controls the device, as the PCI spec intends. But the driver doesn't
-> > copy those read/writes 1:1 to any HW register block, it distributes
-> > them around the device's register space as necessary to create the
-> > PCI bridge config header.
+> > Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> > ---
+> > Changes in v2:
+> > - code cleanup
+> > - correct typo
 > > 
-> > The DT is still modeling the HW, there really are root port bridge(s),
-> > that are completely conformant at the TLP level, but the IP designers
-> > choose to leave the detail of the bridge config space up to a SW
-> > implementation.
+> >  .../devicetree/bindings/net/can/atmel-can.txt      | 14 ++++
+> >  drivers/net/can/at91_can.c                         | 74 ++++++++++++++++------
+> >  2 files changed, 69 insertions(+), 19 deletions(-)
+> >  create mode 100644 Documentation/devicetree/bindings/net/can/atmel-can.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/net/can/atmel-can.txt b/Documentation/devicetree/bindings/net/can/atmel-can.txt
+> > new file mode 100644
+> > index 0000000..72cf0c5
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/net/can/atmel-can.txt
+> > @@ -0,0 +1,14 @@
+> > +* AT91 CAN *
+> > +
+> > +Required properties:
+> > +  - compatible: Should be "atmel,at91sam9263-can" or "atmel,at91sam9x5-can"
+> > +  - reg: Should contain CAN controller registers location and length
+> > +  - interrupts: Should contain IRQ line for the CAN controller
+> > +
+> > +Example:
+> > +
+> > +	can0: can at f000c000 {
+> > +		compatbile = "atmel,at91sam9x5-can";
+> > +		reg = <0xf000c000 0x300>;
+> > +		interrupts = <40 4 5>
+> > +	};
+> > diff --git a/drivers/net/can/at91_can.c b/drivers/net/can/at91_can.c
+> > index 44f3637..8c113f5 100644
+> > --- a/drivers/net/can/at91_can.c
+> > +++ b/drivers/net/can/at91_can.c
+> > @@ -27,6 +27,7 @@
+> >  #include <linux/kernel.h>
+> >  #include <linux/module.h>
+> >  #include <linux/netdevice.h>
+> > +#include <linux/of.h>
+> >  #include <linux/platform_device.h>
+> >  #include <linux/rtnetlink.h>
+> >  #include <linux/skbuff.h>
+> > @@ -155,19 +156,20 @@ struct at91_priv {
+> >  	canid_t mb0_id;
+> >  };
+> >  
+> > -static const struct at91_devtype_data at91_devtype_data[] = {
+> > -	[AT91_DEVTYPE_SAM9263] = {
+> > -		.rx_first = 1,
+> > -		.rx_split = 8,
+> > -		.rx_last = 11,
+> > -		.tx_shift = 2,
+> > -	},
+> > -	[AT91_DEVTYPE_SAM9X5] = {
+> > -		.rx_first = 0,
+> > -		.rx_split = 4,
+> > -		.rx_last = 5,
+> > -		.tx_shift = 1,
+> > -	},
+> > +static struct at91_devtype_data at91_at91sam9263_data = {
+> > +	.rx_first = 1,
+> > +	.rx_split = 8,
+> > +	.rx_last = 11,
+> > +	.tx_shift = 2,
+> > +	.type = AT91_DEVTYPE_SAM9263,
+> > +};
+> > +
+> > +static struct at91_devtype_data at91_at91sam9x5_data = {
+> > +	.rx_first = 0,
+> > +	.rx_split = 4,
+> > +	.rx_last = 5,
+> > +	.tx_shift = 1,
+> > +	.type = AT91_DEVTYPE_SAM9X5,
+> >  };
+> >  
+> >  static const struct can_bittiming_const at91_bittiming_const = {
+> > @@ -1249,10 +1251,40 @@ static struct attribute_group at91_sysfs_attr_group = {
+> >  	.attrs = at91_sysfs_attrs,
+> >  };
+> >  
+> > +#if defined(CONFIG_OF)
+> > +static const struct of_device_id at91_can_dt_ids[] = {
+> > +	{
+> > +		.compatible = "atmel,at91sam9x5-can",
+> > +		.data = &at91_at91sam9x5_data,
+> > +	}, {
+> > +		.compatible = "atmel,at91sam9263-can",
+> > +		.data = &at91_at91sam9263_data,
+> > +	}, {
+> > +		/* sentinel */
+> > +	}
+> > +};
+> > +MODULE_DEVICE_TABLE(of, at91_can_dt_ids);
+> > +#else
+> > +#define at91_can_dt_ids NULL
+> > +#endif
+> > +
+> > +static struct at91_devtype_data* at91_can_get_driver_data(struct platform_device *pdev)
+> > +{
+> > +	if (pdev->dev.of_node) {
+> > +		const struct of_device_id *match;
+> > +		match = of_match_node(at91_can_dt_ids, pdev->dev.of_node);
+> > +		if (!match) {
+> > +			dev_err(&pdev->dev, "no matching node found in dtb\n");
+> > +			return NULL;
+> > +		}
+> > +		return (struct at91_devtype_data *)match->data;
+> > +	}
+> > +	return (struct at91_devtype_data *)platform_get_device_id(pdev)->driver_data;
+> > +}
+> > +
+> >  static int at91_can_probe(struct platform_device *pdev)
+> >  {
+> >  	const struct at91_devtype_data *devtype_data;
+> > -	enum at91_devtype devtype;
+> >  	struct net_device *dev;
+> >  	struct at91_priv *priv;
+> >  	struct resource *res;
+> > @@ -1260,8 +1292,12 @@ static int at91_can_probe(struct platform_device *pdev)
+> >  	void __iomem *addr;
+> >  	int err, irq;
+> >  
+> > -	devtype = pdev->id_entry->driver_data;
+> > -	devtype_data = &at91_devtype_data[devtype];
+> > +	devtype_data = at91_can_get_driver_data(pdev);
+> > +	if (!devtype_data) {
+> > +		dev_err(&pdev->dev, "no driver data\n");
+> > +		err = -ENODEV;
+> > +		goto exit;
+> > +	}
+> >  
+> >  	clk = clk_get(&pdev->dev, "can_clk");
+> >  	if (IS_ERR(clk)) {
+> > @@ -1310,7 +1346,6 @@ static int at91_can_probe(struct platform_device *pdev)
+> >  	priv->dev = dev;
+> >  	priv->reg_base = addr;
+> >  	priv->devtype_data = *devtype_data;
+> > -	priv->devtype_data.type = devtype;
+> >  	priv->clk = clk;
+> >  	priv->pdata = pdev->dev.platform_data;
+> >  	priv->mb0_id = 0x7ff;
+> > @@ -1373,10 +1408,10 @@ static int at91_can_remove(struct platform_device *pdev)
+> >  static const struct platform_device_id at91_can_id_table[] = {
+> >  	{
+> >  		.name = "at91_can",
+> > -		.driver_data = AT91_DEVTYPE_SAM9263,
+> > +		.driver_data = (unsigned long)&at91_at91sam9x5_data,
+> >  	}, {
+> >  		.name = "at91sam9x5_can",
+> > -		.driver_data = AT91_DEVTYPE_SAM9X5,
+> > +		.driver_data = (unsigned long)&at91_at91sam9263_data,
 > 
-> Oh, ouch, deep spoofing.  I had to do that in system management mode
-> firmware for a Geode chip.  What a pain that was.
+> It's a kernel_ulong_t, not a (unsigned long), I can fix this while
+> applying the patch.
 > 
+
+Ok I let you fix it while applying so.
+
+Thanks Marc.
+
+Regards
+
+Ludovic
+
+> >  	}, {
+> >  		/* sentinel */
+> >  	}
+> > @@ -1389,6 +1424,7 @@ static struct platform_driver at91_can_driver = {
+> >  	.driver = {
+> >  		.name = KBUILD_MODNAME,
+> >  		.owner = THIS_MODULE,
+> > +		.of_match_table = at91_can_dt_ids,
+> >  	},
+> >  	.id_table = at91_can_id_table,
+> >  };
 > > 
-> >> At this point I am confused again.  There was talk of the need to
-> >> use standard PCI enumeration code to deal with the bridges, thus the
-> >> need for 3/2 to describe the interface between root-complex and the
-> >> child root-port nodes.
-> > 
-> > I think your confusion is coming from your expectation that the PCI-E
-> > IP block would be an entirely self contained root port, rather than
-> > 'tools to build a root port, with the right driver SW'.
-> > 
-> >>> Further, review section 12 about how ranges should be treated - it
-> >>> specifically says that the b,d,f bits in ranges should be 0, and the
-> >>> child address should have those bits masked prior to searching the
-> >>> ranges.
-> >>>
-> >>> Section 12 would seem to forbid this:
-> >>>
-> >>>       ranges = <0x00000800 0 0          0xd4004000 0 0x00000800   /* Root port config header */
-> >>>                 0x00001000 0 0          0xd4008000 0 0x00000800   /* Root port config header */
-> >>>
-> >>> Are you reading that differently?
-> >>
-> >> I wasn't reading it at all, until you pointed it out to me :-)  I was
-> >> just reasoning based on my mental model.
-> >>
-> >> Again, I agree with your reading of the spec, but I can't think of any
-> >> reason why relaxing that restriction to permit config space mappings
-> >> would be a problem.
-> > 
-> > Okay, just wanted to confirm that, I think I follow you now. :)
-> > 
-> > So you are basically proposing a small update to Section 12 that would
-> > read something like:
-> > 
-> > 'When matching a config space address, the b,d,f bits are valid in the
-> >  ranges and left unmasked in the child. The r bits in the ranges
-> >  should be 0, and the r bits from the child are copied in the last DW
-> >  and masked off in the first DW.'
-> > 
-> > Which, as you note, would not conflict with any existing usage..
-> > 
-> > Though, I can already see that the above language is not good enough,
-> > it doesn't elegantly represent standard ECAM, for instance.. How would
-> > you even represent ECAM with ranges??
-> > 
-> > Another wrinkle is that tegra not only has the per-bridge memory
-> > mapped config space, bit it also has 4 'all port' ECAM-like memory
-> > mapped config spaces. The rules around them are sufficiently
-> > specialized that I'm not sure a ranges mapping would ever be
-> > practical.. So right out of the gate we'd fail to capture memory
-> > mapped config access via ranges on at least one SOC.
-> > 
-> > So, to me, this seems like overkill. Only ECAM has a hope of having a
-> > common implementation, everything else will be host driver specific,
-> > so why go to the trouble to revise the OF PCI specification for config
-> > space?
-> > 
-> > Particularly since there are patches waiting on this question being
-> > resolved :)
 > 
-> Okay, so I'll just bow out.  Do what you have to do.
-
-So to recapitulate, we agree that configuration space can be translated
-through the "ranges" property. That means the only missing link is a new
-function to translate not only "assigned-addresses" but also the "reg"
-property for PCI devices. Is that it?
-
-And for Marvell the non-configuration-space per-root-port registers need
-to be mapped separately from the configuration space windows?
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130312/1908ebed/attachment-0001.sig>
+> Marc
+> 
+> -- 
+> Pengutronix e.K.                  | Marc Kleine-Budde           |
+> Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+> Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+> Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+> 
