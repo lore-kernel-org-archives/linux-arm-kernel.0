@@ -1,54 +1,91 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 12 Mar 2013 09:57:05 -0700
-Subject: [PATCH] omap2: twl-common: Add default power configuration
-In-Reply-To: <CABuKBeLFfvCVyt9VhvwHVGuVGA7RDx9bZH_6gHk7yhfe-nmH5A@mail.gmail.com>
-References: <1358967038-6615-1-git-send-email-matthias.bgg@gmail.com>
- <CAOCHtYjufr+MS1=6Cnsn-EgvkPs+Y5oWejAG98aLkVjdQbu1ZA@mail.gmail.com>
- <20130201224242.GE22517@atomide.com>
- <CABuKBe+NrMiX0nuEgwnHBqu-DqHST+uGG_Zyc7Ek=4WCOV1T6g@mail.gmail.com>
- <512355CF.6070605@ti.com>
- <CABuKBeLFfvCVyt9VhvwHVGuVGA7RDx9bZH_6gHk7yhfe-nmH5A@mail.gmail.com>
-Message-ID: <20130312165705.GA22059@atomide.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 12 Mar 2013 17:54:18 +0100
+Subject: [PATCH 2/2] arm: at91: dt: at91sam9x5: add i2c-gpio pinctrl
+In-Reply-To: <1363107286-25698-2-git-send-email-richard.genoud@gmail.com>
+References: <1363107286-25698-1-git-send-email-richard.genoud@gmail.com>
+ <1363107286-25698-2-git-send-email-richard.genoud@gmail.com>
+Message-ID: <20130312165418.GD2001@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 17:54 Tue 12 Mar     , Richard Genoud wrote:
+> i2c-gpio is sometimes used in place of i2c-at91.
+> This adds the pin muxes for the gpios.
 
-* Matthias Brugger <matthias.bgg@gmail.com> [130308 11:02]:
-> Hello Tony and Peter,
+I'm more to drop the i2c gpio support as the hw work fine
+
+Best Regards,
+J.
 > 
-> 2013/2/19 Peter Ujfalusi <peter.ujfalusi@ti.com>:
-> > Hi Matthias,
-> >
-> > On 02/15/2013 04:59 PM, Matthias Brugger wrote:
-> >> 2013/2/1 Tony Lindgren <tony@atomide.com>:
-> >>> Hi,
-> >>>
-> >>> * Robert Nelson <robertcnelson@gmail.com> [130124 07:58]:
-> >>>> On Wed, Jan 23, 2013 at 12:50 PM, Matthias Brugger
-> >>>> <matthias.bgg@gmail.com> wrote:
-> >>>>> This patch adds a generic power script configuration.
-> >>>>> When rebooting an OMAP3530 at 125 MHz, the reboot hangs.
-> >>>>> With the generic power script, TWL4030 will be reset
-> >>>>> when a warm reset occures. This way the OMAP3530 does not
-> >>>>> hang on reboot.
-> >>>
-> >>> Both look OK to me. I've added Peter to cc, it's best that he queues
-> >>> all the twl changes.
-> >>>
-> >>
-> >> Peter any comments on this patch?
-> >
-> > The patch looks good to me as well.
+> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+> ---
+>  based on v3.9-rc2
 > 
-> It looks like the patch wasn't added to the 3.9 series. Is there any
-> reason for that, or was it just a misunderstanding between you two,
-> about who will push it to Linus?
-
-Sorry looks like this got missed. I suggest Peter collects the twl
-patches and then provides me + mfd + asoc and whoever needs the
-pull requests.
-
-Regards,
-
-Tony
+>  arch/arm/boot/dts/at91sam9x5.dtsi |   30 ++++++++++++++++++++++++++++++
+>  1 files changed, 30 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+> index 8cbcff4..d18aff5 100644
+> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+> @@ -343,6 +343,30 @@
+>  					};
+>  				};
+>  
+> +				i2c_gpio0 {
+> +					pinctrl_i2c_gpio0: i2c_gpio0-0 {
+> +						atmel,pins =
+> +							<0 30 0x0 0x2	/* PA30 gpio multidrive I2C0 data */
+> +							 0 31 0x0 0x2>;	/* PA31 gpio multidrive I2C0 clock */
+> +					};
+> +				};
+> +
+> +				i2c_gpio1 {
+> +					pinctrl_i2c_gpio1: i2c_gpio1-0 {
+> +						atmel,pins =
+> +							<2 0 0x0 0x2	/* PC0 gpio multidrive I2C1 data */
+> +							 2 1 0x0 0x2>;	/* PC1 gpio multidrive I2C1 clock */
+> +					};
+> +				};
+> +
+> +				i2c_gpio2 {
+> +					pinctrl_i2c_gpio2: i2c_gpio2-0 {
+> +						atmel,pins =
+> +							<1 4 0x0 0x2	/* PB4 gpio multidrive I2C2 data */
+> +							 1 5 0x0 0x2>;	/* PB5 gpio multidrive I2C2 clock */
+> +					};
+> +				};
+> +
+>  				pioA: gpio at fffff400 {
+>  					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
+>  					reg = <0xfffff400 0x200>;
+> @@ -583,6 +607,8 @@
+>  		i2c-gpio,delay-us = <2>;	/* ~100 kHz */
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_i2c_gpio0>;
+>  		status = "disabled";
+>  	};
+>  
+> @@ -596,6 +622,8 @@
+>  		i2c-gpio,delay-us = <2>;	/* ~100 kHz */
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_i2c_gpio1>;
+>  		status = "disabled";
+>  	};
+>  
+> @@ -609,6 +637,8 @@
+>  		i2c-gpio,delay-us = <2>;	/* ~100 kHz */
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_i2c_gpio2>;
+>  		status = "disabled";
+>  	};
+>  };
+> -- 
+> 1.7.2.5
+> 
