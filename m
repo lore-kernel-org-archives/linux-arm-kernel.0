@@ -1,86 +1,267 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Tue, 12 Mar 2013 22:30:06 +0100
-Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
-In-Reply-To: <20130312210328.GA22702@obsidianresearch.com>
-References: <20130310065539.GA14704@obsidianresearch.com>
- <513D6F9C.9000100@firmworks.com>
- <20130311181554.GA10992@obsidianresearch.com>
- <513E519B.6010503@firmworks.com>
- <20130311232516.GA13873@obsidianresearch.com>
- <513E6AFE.3090304@firmworks.com>
- <20130312070852.GA6727@avionic-0098.mockup.avionic-design.de>
- <20130312155749.GA1820@obsidianresearch.com>
- <20130312203819.GA23221@avionic-0098.mockup.avionic-design.de>
- <20130312210328.GA22702@obsidianresearch.com>
-Message-ID: <20130312213006.GA23717@avionic-0098.mockup.avionic-design.de>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 12 Mar 2013 22:40:13 +0100 (CET)
+Subject: [PATCH] irqchip: Add support for ARMv7-M's NVIC
+In-Reply-To: <20130312204701.GS15375@pengutronix.de>
+References: <1363103673-24720-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <alpine.LFD.2.02.1303121923280.22263@ionos>
+ <20130312204701.GS15375@pengutronix.de>
+Message-ID: <alpine.LFD.2.02.1303122150490.22263@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 12, 2013 at 03:03:28PM -0600, Jason Gunthorpe wrote:
-> On Tue, Mar 12, 2013 at 09:38:19PM +0100, Thierry Reding wrote:
-> 
-> > I've also verified that things actually do work with the binding that I
-> > proposed for Tegra, even if I add device_type = "pci" to the root port
-> > nodes. The reason is that the OF core looks up the type of the *parent*
-> > node to find a matching bus. This happens to be the pcie-controller node
-> > which is not a PCI device and therefore the address translation works
-> > properly.
-> 
-> Mitch pointed out early on that the parent node needs a 'device_type =
-> "pci"' as well.
-> 
-> The pcie-controller node would be classified as a 'bus node' according
-> to the spec.
-> 
-> Not going down the of_pci_* code paths for address translation at the
-> root port bridge nodes is certainly not right.
+On Tue, 12 Mar 2013, Uwe Kleine-K?nig wrote:
 
-I'm not so sure. Why should the pcie-controller be a PCI device? It
-really isn't. Instead it is a device on the processor/SoC/platform bus
-that bridges to the PCI bus. As such its children should be PCI devices
-to reflect that the translation happens within the pcie-controller node.
-
-In the above it is logical to not set the pcie-controller's device_type
-property to "pci".
-
-> > ranges = <0x00000800 0 0 0x80000000 0 0x00001000   /* port 0 configuration space */
-> >           0x00001000 0 0 0x80001000 0 0x00001000   /* port 1 configuration space */
+> Hello Thomas,
 > 
-> Section 12 says that the 'b,d,f' bits are 0 in ranges, so the above is
-> in conflict with that language:
-> 
->  In particular, the phys.hi fields of the child address spaces in the
->  "ranges" property for PCI does not contain the same information as
->  "reg" property entries within PCI nodes. The only information that is
->  present in "ranges" phys.hi entries are the non-relocatable,
->  prefetchable and the PCI address space bits for which the entry
->  applies. I.e., only the n, p and ss bits are present; the bbbbbbbb,
->  ddddd, fff and rrrrrrrr fields are 0.
-> 
-> And the further requirement:
-> 
->  When an address is to be mapped through a PCI bus bridge node, the
->  phys.hi value of the address to be mapped and the child field of a
->  "ranges" entry should be masked so that only the ss bits are compared.
-> 
-> Which is embodied by the code in of_bus_pci_map, meaning the OF core
-> won't even look at the bits in the high DW when searching ranges.
+> On Tue, Mar 12, 2013 at 08:57:34PM +0100, Thomas Gleixner wrote:
+> > On Tue, 12 Mar 2013, Uwe Kleine-K?nig wrote:
+> > > +static struct nvic_chip_data nvic_data __read_mostly;
+> > 
+> > What the heck is this? You have a static struct which you set in
+> > irqdata.chip_data?
+> I copied that idea from the gic driver and didn't question it because I
+> thought it's too early to allocate memory when it's needed. Or do you
+> just wonder about the usage of this static variable?
 
-Okay, so the problem with that is that we won't be able to include more
-entries for configuration space within a ranges property because we
-can't uniquely map them (they both have the same ss field values). One
-possibility would be to differentiate using the phys.mid and phys.low
-cells but they need to be 0 according to the spec.
+Right, copying stuff from some other file is always a great excuse for
+disabling the brain while coding.
 
-The other alternative would be to amend the specification. Besides the
-fact that the specification says so I don't see any reason why this
-shouldn't be allowed.
+Why the heck do you think it's safe to call irq_alloc_descs() from
+that code then? Just because it did not explode in your face?
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130312/ca54ca56/attachment.sig>
+> > > +static inline void __iomem *nvic_dist_base(struct irq_data *d)
+> > > +{
+> > > +	struct nvic_chip_data *nvic_data = irq_data_get_irq_chip_data(d);
+> > 
+> > And then you do the dance of reading the pointer to that static struct
+> > out of irq_data and dereferencing it?
+> > 
+> > What's the point of this? 
+> The idea was to keep the functions generic anyhow.
+
+Generic waste or what? If you dereference a static variable indirectly
+via five indirections that makes the code obvious and the function
+generic. I see ... NOT
+  
+> > > +	return nvic_data->dist_base;
+> > > +}
+> > > +
+> > > +static void nvic_mask_irq(struct irq_data *d)
+> > > +{
+> > > +	u32 mask = 1 << (d->hwirq % 32);
+> > > +
+> > > +	writel_relaxed(mask, nvic_dist_base(d) + NVIC_ICER + d->irq / 32 * 4);
+> > 
+> > You're really missing the point of irq_data.chip_data 
+> > 
+> > If you set proper irq chip data per bank then this whole stuff is
+> > reduced to:
+> > 
+> >    struct mydata *md = irq_data_get_irq_chip_data(d);
+> >    u32 mask = 1 << (d->irq - md->irq_base);
+> > 
+> >    writel_relaxed(mask, md->iobase + NVIC_ICER);
+> > 
+> > Can you spot the difference and what that means in terms of
+> > instruction cycles?
+> Yeah I see. The cost is increased memory usage. You'd probably say that
+> the amount needed here is too small to care about. Still many decisions
+> like this sum up and make the 4 MiB of RAM I have a tight fit.
+
+You did not answer my question completely.
+
+You buy less memory usage for an increased instruction foot print
+along with modulo/multiply/divide complexity in the interrupt hot
+path.
+  
+> > > +static void __init nvic_init_bases(struct device_node *node,
+> > > +		void __iomem *dist_base)
+> > 
+> > Please make this
+> > 
+> > static void __init nvic_init_bases(struct device_node *node,
+> >                                    void __iomem *dist_base)
+> > 
+> > That's way easier to parse. Applies to all other multiline stuff as
+> > well.
+> My version is like vim does the layout for me. It's the first time
+> someone opposes to it. The reason I prefer using a fixed indention is
+> that I don't need to touch the latter lines when for example the
+> function name or the function's type change.
+
+I don't care about vim and your preferences. I care about the
+readability and that's key for reviewing patch and reading code. Can
+you spot the difference of:
+
+static void __init nvic_init_bases(struct device_node *node,
+	void __iomem *dist_base)
+and
+
+static void __init nvic_init_bases(struct device_node *node,
+                                   void __iomem *dist_base)
+
+Or
+
+		irq_set_chip_and_handler(irq_base + i, &nvic_chip,
+				handle_fasteoi_irq);
+and
+
+		irq_set_chip_and_handler(irq_base + i, &nvic_chip,
+				         handle_fasteoi_irq);
+
+The alignment of the arguments after the opening bracket makes it
+entirely clear while your vim/lazyness style forces the reader to
+decode it separately.
+ 
+> Hmm, I can fix that if you insist.
+
+You can Hmm as long as you want, except if you provide me an argument
+why your magic vim setting is superiour.
+
+> > > +	irq_base = irq_alloc_descs(-1, 16, irqs - 16, numa_node_id());
+> > 
+> >   irq_alloc_desc_from(16, irqs - 16, ...)
+> > 
+> > Also why are you allocating irqs-16 instead of the full number of
+> > irqs?
+> I already have a comment there in my tree.
+
+Brilliant answer. I ask you a question and you tell me that you have a
+comment in your tree ????
+
+Stop that nonsense, I don't care about your magic tree, but I care
+about answers to a review question.
+ 
+> > > +	if (IS_ERR_VALUE(irq_base)) {
+> > 
+> > See Russells reply
+> > 
+> > > +		WARN(1, "Cannot allocate irq_descs\n");
+> > 
+> > What's the point of that warn? The call path is always the same. So
+> > you are spamming dmesg with a pointless backtrace. And on top of that
+> > you do:
+> There is one warning per call to nvic_init_bases. So I don't expect more
+> than one message in dmesg.
+
+You're missing the point again. It does not matter whether you expect
+one or more. The point is, the call chain is known already. So why is
+dumping a stack trace usefull? It's entirely sufficient to have a
+pr_warn() or whatever, simply because this is the important
+information which might scroll out of the observers window with a
+stack trace which is completely useless. A stack trace is only
+helpfull when the code in question can be called from a gazillion of
+call sites. If the call chain is clear, it's pointless.
+ 
+> > 
+> > > +		irq_base = 16;
+> > 
+> > So you cannot allocate irq_descs and then you set base to 16 and pray
+> > that everything works?
+> If something goes wrong here the machine is probably silent about it. So
+> continuing after a prayer might (or might not?) be an option.
+
+What are you smoking? Either the machine can work with the
+preallocated 16 irqs and allow you to retrieve additional debugging
+info or it does not. It's that easy.
+ 
+> > > +	}
+> > > +	nvic_data.domain = irq_domain_add_legacy(node, irqs - 16, irq_base, 0,
+> > > +			&irq_domain_simple_ops, NULL);
+> > > +	if (WARN_ON(!nvic_data.domain))
+> > > +		return;
+> > 
+> > See above. Also you are leaking irqdescs though it's questionable
+> > whether the machine can continue at all. And of course the init call
+> > itself will return sucess.
+
+-ENOANSWER
+
+> > > +	/*
+> > > +	 * Set priority on all interrupts.
+> > > +	 */
+> > > +	for (i = 0; i < irqs; i += 4)
+> > > +		writel_relaxed(0, dist_base + NVIC_IPRI + i);
+> > > +
+> > > +	/*
+> > > +	 * Disable all interrupts
+> > > +	 */
+> > > +	for (i = 0; i < irqs; i += 32)
+> > > +		writel_relaxed(~0, dist_base + NVIC_ICER + i * 4 / 32);
+> > > +
+> > > +	/*
+> > > +	 * Setup the Linux IRQ subsystem.
+> > > +	 */
+> > > +	for (i = 0; i < irqs; i++) {
+> > > +		irq_set_chip_and_handler(irq_base + i, &nvic_chip,
+> > > +				handle_fasteoi_irq);
+> > 
+> > Above you do:
+> > 	irq_base = irq_alloc_descs(-1, 16, irqs - 16, numa_node_id());
+> > 
+> > So you allocate irqs-16 interrupt descriptors and then you initialize
+> > 16 more than you allocated.
+> right.
+> 
+> > Brilliant stuff that.
+
+-ENOANSWER
+ 
+> > > +		irq_set_chip_data(irq_base + i, &nvic_data);
+> > > +		set_irq_flags(irq_base + i, IRQF_VALID | IRQF_PROBE);
+> > > +	}
+> > > +}
+> > > +
+> > > +static int __init nvic_of_init(struct device_node *node,
+> > > +		struct device_node *parent)
+> > > +{
+> > > +	void __iomem *dist_base;
+> > > +
+> > > +	if (WARN_ON(!node))
+> > 
+> > Sigh.
+> > 
+> > Though the real question is: can this actually happen?
+> It didn't happen for me.
+
+Great argument for writing silly code.
+
+> What do you suggest? dropping WARN_ON?
+
+Did you actually try to understand any of my review questions?
+
+> > > +		return -ENODEV;
+> > > +
+> > > +	dist_base = of_iomap(node, 0);
+> > > +	WARN(!dist_base, "unable to map nvic dist registers\n");
+> > 
+> > Brilliant. You can't map stuff and then you continue just for fun or
+> > what?
+> What do you suggest? returning -ESOMETHING?
+
+-EMORON perhaps?
+
+Come on, do I need to make any further suggestions? See above, either
+the machine can survive the failure or it cannot.
+ 
+> > > +	nvic_init_bases(node, dist_base);
+> > 
+> > Great. You have failure pathes in nvic_init_bases() and then you
+> > return unconditionally success:
+
+-ENOANSWER
+
+> Most of your critics also apply to irq-gic.c.
+
+That's completely irrelevant.
+
+> I will follow up with a patch for that when you are happy with my
+> work for the nvic.
+
+Do you really think that copying crappy code, making that copied code
+worse and on top of that nerve racking the reviewer makes you the
+person of choice to fixup the initial crap ?
+
+Thanks,
+
+	tglx
