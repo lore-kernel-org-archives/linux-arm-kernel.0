@@ -1,66 +1,73 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 13 Mar 2013 12:10:50 -0600
-Subject: [RFC 1/1] clk: Add notifier support in
- clk_prepare_enable/clk_disable_unprepare
-In-Reply-To: <1363153204.3311.14.camel@bilhuang-vm1>
-References: <1363091861-21534-1-git-send-email-bilhuang@nvidia.com>
- <20130312134032.GU4977@n2100.arm.linux.org.uk>
- <1363139273.21694.11.camel@bilhuang-vm1> <514003B6.8020904@wwwdotorg.org>
- <1363151317.3311.9.camel@bilhuang-vm1> <51400D9D.9060305@wwwdotorg.org>
- <1363153204.3311.14.camel@bilhuang-vm1>
-Message-ID: <5140C12A.4060900@wwwdotorg.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 13 Mar 2013 11:17:46 -0700
+Subject: [PATCHv3 00/10] Remove ARM local timer API
+Message-ID: <1363198676-30417-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/12/2013 11:40 PM, Bill Huang wrote:
-> On Wed, 2013-03-13 at 13:24 +0800, Stephen Warren wrote:
->> On 03/12/2013 11:08 PM, Bill Huang wrote:
->>> On Wed, 2013-03-13 at 12:42 +0800, Stephen Warren wrote:
->>>> On 03/12/2013 07:47 PM, Bill Huang wrote:
->>>>> On Tue, 2013-03-12 at 21:40 +0800, Russell King - ARM Linux wrote:
->>>>>> On Tue, Mar 12, 2013 at 05:37:41AM -0700, Bill Huang wrote:
->>>>>>> Add the below four notifier events so drivers which are interested in
->>>>>>> knowing the clock status can act accordingly. This is extremely useful
->>>>>>> in some of the DVFS (Dynamic Voltage Frequency Scaling) design.
->>>>>>>
->>>>>>> PRE_CLK_ENABLE
->>>>>>> POST_CLK_ENABLE
->>>>>>> PRE_CLK_DISABLE
->>>>>>> POST_CLK_DISABLE
-...
->>> Thanks, I know the point, but unfortunately there is no good choice for
->>> hooking this since those low level functions clk_enable/clk_disable will
->>> be called in interrupt context so it is not possible to send notify. We
->>> might need to come out a better approach if we can think of any.
->>> Currently I still think this is acceptable (Having all the drivers which
->>> are using our interested clocks call these function to enable/disable
->>> clock in their runtime_pm calls) though it's not perfect. 
->>
->> No, that definitely won't work. Not all drivers use those APIs, nor
->> should they.
->>
-> That will be too bad, it looks like we deadlock in the mechanism, we
-> cannot change existing drivers behavior (that means some call
-> clk_disable/enable directly, some are not), and we cannot hook notifier
-> in clk_disable/enable either, that means there seems no any chance to
-> get what we want, any idea?
+In light of Mark Rutland's recent work on divorcing the ARM architected
+timers from the ARM local timer API and introducing a generic arch hook for
+broadcast it seems that we should remove the local timer API entirely.
+Doing so will reduce the architecture dependencies of our timer drivers,
+reduce code in ARM core, and simplify timer drivers because they no longer
+go through an architecture layer that is essentially a hotplug notifier.
 
-I don't know the correct answer.
+Previous attempts have been made[1] unsuccessfully. I'm hoping this can
+be accepted now so that we can clean up the timer drivers that are
+used in both UP and SMP situations. Right now these drivers have to ignore
+the timer setup callback on the boot CPU to avoid registering clockevents
+twice. This is not very symmetric and causes convuluted code that does
+the same thing in two places.
 
-But I have a question: Why can't we run notifications from the real
-clk_enable? Does the notification mechanism itself inherently block, or
-are we worried that implementations/receivers of these notifications
-might block. Perhaps we can simply define that these notification types
-may be triggered in atomic context and hence implementations have to
-support executing in atomic context. Is possible to make that a
-requirement? Is it possible to implement the code that receives these
-notifications in atomic context?
+Patches based on v3.9-rc2. I'm still looking for Acks/Tested-by
+on EXYNOS and PRIMA2.
 
-Is it possible to defer triggering of notifications to some non-atomic
-context, even if they happen in an atomic context?
+[1] http://article.gmane.org/gmane.linux.ports.arm.kernel/145705
 
-I also wonder if this is the right conceptual level to be hooking into
-the system. Perhaps DVFS is not something that should be triggered by
-noticing that clocks have changed rates, but rather it should be some
-form of higher layer that controls (calls into) both the regulator and
-clock APIs?
+Note: A hotplug notifier is used by both x86 for the apb_timer (see 
+apbt_cpuhp_notify) and by metag (see arch_timer_cpu_notify in
+metag_generic.c) so this is not new.
+
+Changes since v2:
+ * Bug fixes in smp_twd from Tony Lindgren's testing
+ * Move smp_twd to use late_time_init hook
+ * Collected Acks
+
+Changes since v1:
+ * Picked up Mark's generic dummy timer driver
+ * Split out omap changes into new patch
+
+Mark Rutland (1):
+  clocksource: add generic dummy timer driver
+
+Stephen Boyd (9):
+  ARM: smp: Remove duplicate dummy timer implementation
+  ARM: smp_twd: Divorce smp_twd from local timer API
+  ARM: OMAP2+: Divorce from local timer API
+  ARM: EXYNOS4: Divorce mct from local timer API
+  ARM: PRIMA2: Divorce timer-marco from local timer API
+  ARM: msm: Divorce msm_timer from local timer API
+  clocksource: time-armada-370-xp: Fix sparse warning
+  clocksource: time-armada-370-xp: Divorce from local timer API
+  ARM: smp: Remove local timer API
+
+ arch/arm/Kconfig                         |  12 +--
+ arch/arm/include/asm/localtimer.h        |  34 ---------
+ arch/arm/kernel/smp.c                    |  87 ---------------------
+ arch/arm/kernel/smp_twd.c                |  64 ++++++++++------
+ arch/arm/mach-exynos/mct.c               |  53 +++++++++----
+ arch/arm/mach-msm/timer.c                | 125 +++++++++++++++++--------------
+ arch/arm/mach-omap2/Kconfig              |   1 -
+ arch/arm/mach-omap2/timer.c              |   7 --
+ arch/arm/mach-prima2/timer-marco.c       |  98 ++++++++++++------------
+ drivers/clocksource/Makefile             |   1 +
+ drivers/clocksource/dummy_timer.c        |  67 +++++++++++++++++
+ drivers/clocksource/time-armada-370-xp.c |  88 ++++++++++------------
+ include/linux/time-armada-370-xp.h       |   4 +-
+ 13 files changed, 309 insertions(+), 332 deletions(-)
+ delete mode 100644 arch/arm/include/asm/localtimer.h
+ create mode 100644 drivers/clocksource/dummy_timer.c
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
