@@ -1,60 +1,32 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 13 Mar 2013 22:42:15 +0100 (CET)
-Subject: [patch 4/7] tick: Handle broadcast wakeup of multiple cpus
-In-Reply-To: <20130313113623.GA6635@e102568-lin.cambridge.arm.com>
-References: <20130306111351.883117670@linutronix.de>
- <20130306111537.492045206@linutronix.de>
- <20130313113623.GA6635@e102568-lin.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.02.1303132239510.22263@ionos>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Thu, 14 Mar 2013 08:45:30 +1100
+Subject: [PATCH] ARM: fix CONFIG_VIRT_TO_BUS handling
+In-Reply-To: <201303131643.48506.arnd@arndb.de>
+References: <201303131643.48506.arnd@arndb.de>
+Message-ID: <20130314084530.88019561cedf9a96bd01193d@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 13 Mar 2013, Lorenzo Pieralisi wrote:
-> > +	/* Take care of enforced broadcast requests */
-> > +	cpumask_or(tmpmask, tmpmask, tick_broadcast_force_mask);
-> > +	cpumask_clear(tick_broadcast_force_mask);
-> 
-> I tested the set and it works fine on a dual cluster big.LITTLE testchip
-> using broadcast timer to manage deep idle cluster states.
-> 
-> Just asking a question: the force mask is cleared before sending the
-> timer IPI. Would not be better to clear it after the IPI is sent in
-> 
-> tick_do_broadcast(...) ?
-> 
-> Can you spot a regression if we do this ? The idle thread checks that
-> mask with irqs disabled, so it is possible that we clear the mask before
-> the CPU has a chance to get the IPI. If we clear the mask after sending
-> the IPI, we are increasing the chances for the idle thread to get it.
-> 
-> It is just a further optimization, just asking, thanks.
+Hi Arnd,
 
-Need to think about that.
- 
-> > @@ -524,7 +530,16 @@ void tick_broadcast_oneshot_control(unsi
-> >  		WARN_ON_ONCE(cpumask_test_cpu(cpu, tick_broadcast_pending_mask));
-> >  		if (!cpumask_test_and_set_cpu(cpu, tick_broadcast_oneshot_mask)) {
-> >  			clockevents_set_mode(dev, CLOCK_EVT_MODE_SHUTDOWN);
-> > -			if (dev->next_event.tv64 < bc->next_event.tv64)
-> > +			/*
-> > +			 * We only reprogram the broadcast timer if we
-> > +			 * did not mark ourself in the force mask and
-> > +			 * if the cpu local event is earlier than the
-> > +			 * broadcast event. If the current CPU is in
-> > +			 * the force mask, then we are going to be
-> > +			 * woken by the IPI right away.
-> > +			 */
-> > +			if (!cpumask_test_cpu(cpu, tick_broadcast_force_mask) &&
-> Is the test against tick_broadcast_force_mask necessary if we add the check
-> in the idle thread before entering idle ? It does not hurt, agreed, and we'd
-> better leave it there, it is just for my own understanding, thanks a lot.
+On Wed, 13 Mar 2013 16:43:48 +0000 Arnd Bergmann <arnd@arndb.de> wrote:
+>
+> I'd like to merge this one through the arm-soc tree as a 3.9 bug fix
+> unless there are objections.
 
-Well, it's necessary for all archs which do not have the check (yet).
- 
-> Having said that, on the series:
-> 
-> Tested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+The only problem is that, in the current arm-soc tree, VIRT_TO_BUS
+depends on HAVE_VIRT_TO_BUS (since my first patch is in there but not the
+second) ... that means that after this patch is applied you will get
+warnings from the new "select VIRT_TO_BUS" statements (I think :-)).
 
-Thanks,
-
-	tglx
+Sorry about the mess.
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130314/7984a6db/attachment.sig>
