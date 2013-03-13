@@ -1,38 +1,68 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 13 Mar 2013 14:48:07 +0000
-Subject: [PATCH v3 06/11] ARM: vexpress: use clocksource_of_init for sp804
-In-Reply-To: <CAD6h2NSUyFvhoqMsYqT=rzFZ--MWv+0vHOCtAV9n-5YO+LNTMA@mail.gmail.com>
-References: <1363151142-32162-1-git-send-email-haojian.zhuang@linaro.org>
- <1363151142-32162-7-git-send-email-haojian.zhuang@linaro.org>
- <1363173037.3100.22.camel@hornet>
- <CAD6h2NQWB3+1QepQjBE0BZiG44YAQRi7e-9+oZvVYpYV8QycDA@mail.gmail.com>
- <1363175175.3100.37.camel@hornet>
- <CAD6h2NSUyFvhoqMsYqT=rzFZ--MWv+0vHOCtAV9n-5YO+LNTMA@mail.gmail.com>
-Message-ID: <1363186087.3100.72.camel@hornet>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 13 Mar 2013 10:50:26 -0400
+Subject: [PATCH] ARM: mvebu: fix RAM size for Armada XP board DB-MV784MP-GP
+In-Reply-To: <51408F0C.2010408@free-electrons.com>
+References: <20130216164457.GA23237@titan.lakedaemon.net>
+ <1363101135-21635-1-git-send-email-jason@lakedaemon.net>
+ <51408D86.6040703@cogentembedded.com>
+ <51408F0C.2010408@free-electrons.com>
+Message-ID: <20130313145026.GO12700@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-03-13 at 12:21 +0000, Haojian Zhuang wrote:
-> Do you mean that system wants to pick any one randomly? It's impossible.
+On Wed, Mar 13, 2013 at 03:37:00PM +0100, Gregory CLEMENT wrote:
+> On 03/13/2013 03:30 PM, Sergei Shtylyov wrote:
+> > Hello.
+> > 
+> > On 12-03-2013 19:12, Jason Cooper wrote:
+> > 
+> >> The board is supplied with a 4GB RAM module.  This value can be
+> >> overridden by the bootloader based on probed memory size.  We set it to
+> >> a reasonable value here.
+> > 
+> >> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+> >> ---
+> >> As promised, catching this fix in the -rc cycle.
+> > 
+> >> For those not familiar, earlier versions of the patch adding this board listed
+> >> 3GB because that is all that was visible.  I mistaken applied v3 of the patch
+> >> instead of v4 which properly listed 4GB.  This patch cleans up my error.
+> > 
+> >>   arch/arm/boot/dts/armada-xp-gp.dts | 9 ++++-----
+> >>   1 file changed, 4 insertions(+), 5 deletions(-)
+> > 
+> >> diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
+> >> index 1c8afe2..4a2776a 100644
+> >> --- a/arch/arm/boot/dts/armada-xp-gp.dts
+> >> +++ b/arch/arm/boot/dts/armada-xp-gp.dts
+> >> @@ -28,12 +28,11 @@
+> >>   		device_type = "memory";
+> >>
+> >>   		/*
+> >> -		 * 4 GB of plug-in RAM modules by default but only 3GB
+> >> -		 * are visible, the amount of memory available can be
+> >> -		 * changed by the bootloader according the size of the
+> >> -		 * module actually plugged
+> >> +		 * 4 GB of plug-in RAM modules by default. The amount of memory
+> >> +		 * available can be changed by the bootloader according the
+> > 
+> >     "According to the size".
+> > 
+> >> +		 * size of the module actually plugged
+> >>   		 */
+> >> -		reg = <0x00000000 0xC0000000>;
+> >> +		reg = <0x00000000 0xD0000000>;
+> > 
+> >     But this is not 4G?
+> 
+> You're totally right!
+> It should be reg = <0x00000000 0xF0000000>;
 
-It is possible in case of the VE platform. Therefore it is not
-completely impossible. QED :-)
+$ printf "0x%08x\n" `echo "4 * (1024 ^ 3)" | bc`
+0x100000000
 
-> Imagine that only TIMINT1 signal in sp804 is routed to interrupt controller.
-> Could system still pick any one it wants?
+?
 
-If you tell the system that only TIMINT1 is wired, it shouldn't even try
-to use the second timer for anything that would require the interrupt.
-Therefore, describing the hardware sufficiently, you're giving the
-system enough information to make the right decisions.
+thx,
 
-> I think that clocksource or clockevent must be specified in DTS. Whatever
-> we're using alias or property.
-
-I'm convinced it does not *must* be there. I think it *can* be there,
-for platforms where the available timers are not equal (for whatever
-reason). My point is: why are you trying to force me to put some
-information into my hardware description which doesn't have any meaning
-for me?
-
-Pawe?
+Jason.
