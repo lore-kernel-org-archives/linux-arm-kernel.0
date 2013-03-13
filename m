@@ -1,74 +1,157 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Wed, 13 Mar 2013 09:18:15 +0100
-Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
-In-Reply-To: <20130312220854.GA23112@obsidianresearch.com>
-References: <20130311181554.GA10992@obsidianresearch.com>
- <513E519B.6010503@firmworks.com>
- <20130311232516.GA13873@obsidianresearch.com>
- <513E6AFE.3090304@firmworks.com>
- <20130312070852.GA6727@avionic-0098.mockup.avionic-design.de>
- <20130312155749.GA1820@obsidianresearch.com>
- <20130312203819.GA23221@avionic-0098.mockup.avionic-design.de>
- <20130312210328.GA22702@obsidianresearch.com>
- <20130312213006.GA23717@avionic-0098.mockup.avionic-design.de>
- <20130312220854.GA23112@obsidianresearch.com>
-Message-ID: <20130313081815.GD25940@avionic-0098.mockup.avionic-design.de>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Wed, 13 Mar 2013 16:27:24 +0800
+Subject: [PATCH 1/3] ARM: tegra: moving the CPU power timer function to PMC
+ driver
+Message-ID: <1363163246-26368-1-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 12, 2013 at 04:08:54PM -0600, Jason Gunthorpe wrote:
-> On Tue, Mar 12, 2013 at 10:30:06PM +0100, Thierry Reding wrote:
-> 
-> > > Not going down the of_pci_* code paths for address translation at the
-> > > root port bridge nodes is certainly not right.
-> > 
-> > I'm not so sure. Why should the pcie-controller be a PCI device?
-> 
-> The spec is clear on that point as well:
-> 
->  device_type
->   A Standard Package conforming to this specification and corresponding
->   to a device that implements a PCI bus shall implement this property
->   with the string value "pci"
-> 
-> The children of a pcie-controller node are PCI devices, thus the
-> pcie-controller node 'implements a PCI bus'. Or, as you say 'device on
-> the processor/SoC/platform bus that bridges to the PCI bus'
-> 
-> Think of device_type as also meaning bus_type and it makes more
-> logical sense, the name is terrible, but its usage is governed by the
-> OF docs..
-> 
-> > The other alternative would be to amend the specification. Besides the
-> > fact that the specification says so I don't see any reason why this
-> > shouldn't be allowed.
-> 
-> 'the specification says so' *IS* the reason. DT isn't a free for all
-> where you get to do whatever you want, or whatever 'feels' right. It
-> is supposed to be a stable, OS agnostic ABI. That means bindings have
-> to follow the specs (when available).
-> 
-> Maybe a future revision will support PCI-E ECAM, but we don't know
-> what that will look like, and I'm pretty sure you don't want to hold
-> up your patches until an IEEE committee gets around to deciding
-> something ;)
+The CPU power timer set up fucntion was related to PMC register. Now moving
+it to PMC driver. And it also help to clean up the PM related code later.
 
-Mitch already answered this. The specification is now almost 15 years
-old and it couldn't possibly have foreseen all of the future use-cases.
-If the specification is too restrictive and Mitch gives his blessing to
-remove some of the restrictions, I don't see any reason why we shouldn't
-do so if it lets us represent the reality of hardware more accurately in
-DT.
+Signed-off-by: Joseph Lo <josephl@nvidia.com>
+---
+This series was based on the patch set of suspending support.
+---
+ arch/arm/mach-tegra/pm.c  | 36 ------------------------------------
+ arch/arm/mach-tegra/pmc.c | 38 ++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-tegra/pmc.h |  1 +
+ 3 files changed, 39 insertions(+), 36 deletions(-)
 
-Furthermore we're not discussing radical changes. None of the changes
-will be backwards-incompatible, but they will allow recent hardware to
-be represented more correctly or conveniently.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130313/901fb399/attachment.sig>
+diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c
+index 915e13b..b7cc637 100644
+--- a/arch/arm/mach-tegra/pm.c
++++ b/arch/arm/mach-tegra/pm.c
+@@ -23,7 +23,6 @@
+ #include <linux/delay.h>
+ #include <linux/cpu_pm.h>
+ #include <linux/suspend.h>
+-#include <linux/clk.h>
+ #include <linux/err.h>
+ #include <linux/clk/tegra.h>
+ 
+@@ -44,47 +43,12 @@
+ #define TEGRA_POWER_CPU_PWRREQ_OE	(1 << 16)  /* CPU pwr req enable */
+ 
+ #define PMC_CTRL		0x0
+-#define PMC_CPUPWRGOOD_TIMER	0xc8
+-#define PMC_CPUPWROFF_TIMER	0xcc
+ 
+ #ifdef CONFIG_PM_SLEEP
+ static DEFINE_SPINLOCK(tegra_lp2_lock);
+ static void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
+-static struct clk *tegra_pclk;
+ void (*tegra_tear_down_cpu)(void);
+ 
+-static void set_power_timers(unsigned long us_on, unsigned long us_off)
+-{
+-	unsigned long long ticks;
+-	unsigned long long pclk;
+-	unsigned long rate;
+-	static unsigned long tegra_last_pclk;
+-
+-	if (tegra_pclk == NULL) {
+-		tegra_pclk = clk_get_sys(NULL, "pclk");
+-		WARN_ON(IS_ERR(tegra_pclk));
+-	}
+-
+-	rate = clk_get_rate(tegra_pclk);
+-
+-	if (WARN_ON_ONCE(rate <= 0))
+-		pclk = 100000000;
+-	else
+-		pclk = rate;
+-
+-	if ((rate != tegra_last_pclk)) {
+-		ticks = (us_on * pclk) + 999999ull;
+-		do_div(ticks, 1000000);
+-		writel((unsigned long)ticks, pmc + PMC_CPUPWRGOOD_TIMER);
+-
+-		ticks = (us_off * pclk) + 999999ull;
+-		do_div(ticks, 1000000);
+-		writel((unsigned long)ticks, pmc + PMC_CPUPWROFF_TIMER);
+-		wmb();
+-	}
+-	tegra_last_pclk = pclk;
+-}
+-
+ /*
+  * restore_cpu_complex
+  *
+diff --git a/arch/arm/mach-tegra/pmc.c b/arch/arm/mach-tegra/pmc.c
+index f0c5435..bb1fe8e 100644
+--- a/arch/arm/mach-tegra/pmc.c
++++ b/arch/arm/mach-tegra/pmc.c
+@@ -19,6 +19,7 @@
+ #include <linux/io.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
++#include <linux/clk.h>
+ 
+ #include "fuse.h"
+ #include "pmc.h"
+@@ -52,6 +53,9 @@ static DEFINE_SPINLOCK(tegra_powergate_lock);
+ static void __iomem *tegra_pmc_base;
+ static bool tegra_pmc_invert_interrupt;
+ 
++#define PMC_CPUPWRGOOD_TIMER	0xc8
++#define PMC_CPUPWROFF_TIMER	0xcc
++
+ struct pmc_pm_data {
+ 	u32 cpu_good_time;	/* CPU power good time in uS */
+ 	u32 cpu_off_time;	/* CPU power off time in uS */
+@@ -158,6 +162,40 @@ int tegra_pmc_cpu_remove_clamping(int cpuid)
+ }
+ 
+ #ifdef CONFIG_PM_SLEEP
++static struct clk *tegra_pclk;
++
++void set_power_timers(unsigned long us_on, unsigned long us_off)
++{
++	unsigned long long ticks;
++	unsigned long long pclk;
++	unsigned long rate;
++	static unsigned long tegra_last_pclk;
++
++	if (tegra_pclk == NULL) {
++		tegra_pclk = clk_get_sys(NULL, "pclk");
++		WARN_ON(IS_ERR(tegra_pclk));
++	}
++
++	rate = clk_get_rate(tegra_pclk);
++
++	if (WARN_ON_ONCE(rate <= 0))
++		pclk = 100000000;
++	else
++		pclk = rate;
++
++	if ((rate != tegra_last_pclk)) {
++		ticks = (us_on * pclk) + 999999ull;
++		do_div(ticks, 1000000);
++		tegra_pmc_writel((unsigned long)ticks, PMC_CPUPWRGOOD_TIMER);
++
++		ticks = (us_off * pclk) + 999999ull;
++		do_div(ticks, 1000000);
++		tegra_pmc_writel((unsigned long)ticks, PMC_CPUPWROFF_TIMER);
++		wmb();
++	}
++	tegra_last_pclk = pclk;
++}
++
+ enum tegra_suspend_mode tegra_pmc_get_suspend_mode(void)
+ {
+ 	return pmc_pm_data.suspend_mode;
+diff --git a/arch/arm/mach-tegra/pmc.h b/arch/arm/mach-tegra/pmc.h
+index 72b2cee..9413a44 100644
+--- a/arch/arm/mach-tegra/pmc.h
++++ b/arch/arm/mach-tegra/pmc.h
+@@ -27,6 +27,7 @@ enum tegra_suspend_mode {
+ };
+ 
+ #ifdef CONFIG_PM_SLEEP
++void set_power_timers(unsigned long us_on, unsigned long us_off);
+ enum tegra_suspend_mode tegra_pmc_get_suspend_mode(void);
+ void tegra_pmc_set_suspend_mode(enum tegra_suspend_mode mode);
+ u32 tegra_pmc_get_cpu_good_time(void);
+-- 
+1.8.1.5
