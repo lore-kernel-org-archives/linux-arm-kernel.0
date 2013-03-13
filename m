@@ -1,52 +1,91 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 13 Mar 2013 10:45:35 +0100
-Subject: [GIT PULL] at91: fixes for 3.9-rc #1
-Message-ID: <51404ABF.7080405@atmel.com>
+From: dahuang@nvidia.com (Danny Huang)
+Date: Wed, 13 Mar 2013 17:48:00 +0800
+Subject: [PATCH v3] ARM: tegra: expose chip ID and revision
+Message-ID: <1363168080-12697-1-git-send-email-dahuang@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+Expose Tegra chip ID and revision in /sys/devices/soc for user mode
+usage
 
-Here is a little pull-request for 3.9-rc (I guess it if -rc4 now that
-you've just sent the one for -rc3).
+Signed-off-by: Danny Huang <dahuang@nvidia.com>
+---
+ arch/arm/Kconfig            |  1 +
+ arch/arm/mach-tegra/tegra.c | 31 ++++++++++++++++++++++++++++++-
+ 2 files changed, 31 insertions(+), 1 deletion(-)
 
-I have other material but it is related to the AT91 framebuffer and we are
-currently discussing it so I hold them back for now.
-
-Thanks, best regards,
-
-The following changes since commit f6161aa153581da4a3867a2d1a7caf4be19b6ec9:
-
-  Linux 3.9-rc2 (2013-03-10 16:54:19 -0700)
-
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git tags/at91-fixes
-
-for you to fetch changes up to 5982c177468eb5829146e16b55d43f0b08270ac0:
-
-  ARM: at91: fix infinite loop in at91_irq_suspend/resume (2013-03-13 10:25:38 +0100)
-
-----------------------------------------------------------------
-Two patches for Device Tree on at91sam9x5/NAND.
-Two more for fixing PM suspend/resume IRQ on AIC5 and
-GPIO used with pinctrl.
-
-----------------------------------------------------------------
-Ludovic Desroches (2):
-      ARM: at91: add gpio suspend/resume support when using pinctrl
-      ARM: at91: fix infinite loop in at91_irq_suspend/resume
-
-Richard Genoud (2):
-      ARM: at91: dt: at91sam9x5: correct NAND pins comments
-      ARM: at91: dt: at91sam9x5: complete NAND pinctrl
-
- arch/arm/boot/dts/at91sam9x5.dtsi      | 28 ++++++++++++++--
- arch/arm/mach-at91/include/mach/gpio.h |  8 +++++
- arch/arm/mach-at91/irq.c               | 20 +++++-------
- arch/arm/mach-at91/pm.c                | 10 ++++--
- drivers/pinctrl/pinctrl-at91.c         | 61 ++++++++++++++++++++++++++++++++++-
- 5 files changed, 110 insertions(+), 17 deletions(-)
-
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 2363926..12fa4e5 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -675,6 +675,7 @@ config ARCH_TEGRA
+ 	select HAVE_CLK
+ 	select HAVE_SMP
+ 	select MIGHT_HAVE_CACHE_L2X0
++	select SOC_BUS
+ 	select SPARSE_IRQ
+ 	select USE_OF
+ 	help
+diff --git a/arch/arm/mach-tegra/tegra.c b/arch/arm/mach-tegra/tegra.c
+index 27232c9..536ed3e 100644
+--- a/arch/arm/mach-tegra/tegra.c
++++ b/arch/arm/mach-tegra/tegra.c
+@@ -33,6 +33,8 @@
+ #include <linux/io.h>
+ #include <linux/i2c.h>
+ #include <linux/i2c-tegra.h>
++#include <linux/slab.h>
++#include <linux/sys_soc.h>
+ #include <linux/usb/tegra_usb_phy.h>
+ 
+ #include <asm/mach-types.h>
+@@ -42,6 +44,7 @@
+ 
+ #include "board.h"
+ #include "common.h"
++#include "fuse.h"
+ #include "iomap.h"
+ 
+ static struct tegra_ehci_platform_data tegra_ehci1_pdata = {
+@@ -80,12 +83,38 @@ static struct of_dev_auxdata tegra20_auxdata_lookup[] __initdata = {
+ 
+ static void __init tegra_dt_init(void)
+ {
++	struct device *parent = NULL;
++	struct soc_device *soc_dev;
++	struct soc_device_attribute *soc_dev_attr;
++
++	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
++	if (!soc_dev_attr)
++		goto out;
++
++	soc_dev_attr->soc_id = kasprintf(GFP_KERNEL, "%d", tegra_chip_id);
++	soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%d", tegra_revision);
++	soc_dev_attr->family = kasprintf(GFP_KERNEL, "Tegra");
++
++	soc_dev = soc_device_register(soc_dev_attr);
++	if (IS_ERR(soc_dev)) {
++		kfree(soc_dev_attr->soc_id);
++		kfree(soc_dev_attr->revision);
++		kfree(soc_dev_attr->family);
++		kfree(soc_dev_attr);
++		goto out;
++	}
++
++	parent = soc_device_to_device(soc_dev);
++	if (IS_ERR(parent))
++		parent = NULL;
++
+ 	/*
+ 	 * Finished with the static registrations now; fill in the missing
+ 	 * devices
+ 	 */
++out:
+ 	of_platform_populate(NULL, of_default_bus_match_table,
+-				tegra20_auxdata_lookup, NULL);
++				tegra20_auxdata_lookup, parent);
+ }
+ 
+ static void __init trimslice_init(void)
 -- 
-Nicolas Ferre
+1.8.1.5
