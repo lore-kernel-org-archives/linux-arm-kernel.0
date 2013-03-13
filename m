@@ -1,43 +1,68 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 13 Mar 2013 08:43:18 +0000
-Subject: [PATCH v2 05/14] ARM: integrator: use clocksource_of_init for
- sp804
-In-Reply-To: <CAD6h2NRDJuGTTZ1B0iy__2SYYw7R18NRqQcwjsSvMJ3gA4E_WQ@mail.gmail.com>
-References: <1363108124-17484-1-git-send-email-haojian.zhuang@linaro.org>
- <CACRpkdbCJd-ag1gLrJqJZ1D6+E5eX2tNuuNAtiKgtuBsxmrpmA@mail.gmail.com>
- <CAD6h2NRDJuGTTZ1B0iy__2SYYw7R18NRqQcwjsSvMJ3gA4E_WQ@mail.gmail.com>
-Message-ID: <201303130843.18806.arnd@arndb.de>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 13 Mar 2013 10:43:36 +0200
+Subject: [RFC PATCH 2/3] usb: udc: delete the vbus indicator at
+ individual driver
+In-Reply-To: <20130313074918.GB18168@nchen-desktop>
+References: <1363078999-7361-1-git-send-email-peter.chen@freescale.com>
+ <1363078999-7361-2-git-send-email-peter.chen@freescale.com>
+ <20130312094649.GC15163@arwen.pp.htv.fi>
+ <20130313031042.GA18168@nchen-desktop>
+ <20130313074409.GE5374@arwen.pp.htv.fi>
+ <20130313074918.GB18168@nchen-desktop>
+Message-ID: <20130313084336.GD6270@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 13 March 2013, Haojian Zhuang wrote:
-> match table:
-> {.compatible = "arm,sp804", .data = SP804_TIMER, },
-> {.compaitlbe = "arm,integrator-timer", .data = INTEGRATOR_TIMER, },
+On Wed, Mar 13, 2013 at 03:49:19PM +0800, Peter Chen wrote:
+> On Wed, Mar 13, 2013 at 09:44:09AM +0200, Felipe Balbi wrote:
+> > On Wed, Mar 13, 2013 at 11:10:43AM +0800, Peter Chen wrote:
+> > > On Tue, Mar 12, 2013 at 11:46:49AM +0200, Felipe Balbi wrote:
+> > > > On Tue, Mar 12, 2013 at 05:03:18PM +0800, Peter Chen wrote:
+> > > > > Let the common struct usb_gadget own it.
+> > > > > 
+> > > > > CC: Alexander Shishkin <alexander.shishkin@linux.intel.com>
+> > > > > CC: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> > > > > CC: Li Yang <leoli@freescale.com>
+> > > > > CC: Roland Stigge <stigge@antcom.de>
+> > > > > CC: Yu Xu <yuxu@marvell.com>
+> > > > > CC: Chao Xie <chao.xie@marvell.com>
+> > > > > CC: Eric Miao <eric.y.miao@gmail.com>
+> > > > > CC: Ben Dooks <ben-linux@fluff.org>
+> > > > > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> > > > 
+> > > > you need to split this patch, should be something like below:
+> > > > 
+> > > > for_each_driver() {
+> > > > 	initialize gadget->vbus_active (don't remove private method)
+> > > > }
+> > > > 
+> > > > add vbus_active support to udc-core
+> > > > 
+> > > > for_each_driver() {
+> > > > 	remove driver's private vbus_active method
+> > > > }
+> > > > 
+> > > > you need one patch per driver so it's easy to review and ack.
+> > > 
+> > > Eg, If I changed 10 udc drivers, I need
+> > > 1(add vbus_active to struct usb_gadget) + 10 + 1 + 10 = 22 patches?
+> > 
+> > in order to keep possible regressions localized to a single driver.
+> > Imagine if you cause a regression on omap_udc, then we decide to revert
+> > your patch. All other drivers, which can be correct will loose the
+> > change as well.
 > 
-> sp804_get_clock_rate():
->     char dev_id_buf[ID_BUF_SIZE];
->     if (match->data)
->         snprintf(dev_id_buf, ID_BUF_SIZE, "ap_timer");
->     else
->         snprintf(dev_id_buf, ID_BUF_SIZE, "sp804");
->     clk = clk_get_sys(dev_id_buf, name);
-> 
-> sp804_dt_init_clk():
->     char dev_id_buf[ID_BUF_SIZE];
->     if (match->data)
->         snprintf(dev_id_buf, ID_BUF_SIZE, "ap_timer");
->     else
->         snprintf(dev_id_buf, ID_BUF_SIZE, "sp804");
->     lookup = clkdev_alloc(clk, name, dev_id_buf);
-> 
-> I think it won't break out code any more. Since most code are same, we
-> could handle it in the same driver.
-> 
+> I agree, why we can't merge below two steps into one step, if there
+> are problems for single driver, we also need to revert one patch.
 
-The data member of struct of_device_id is a pointer, you could
-point that directly to a const string containing the name, if that
-is the only difference, or to another structure that describes
-the other parameters.
+indeed, that might be doable and might look better.
 
-	Arnd
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130313/a8ac6a15/attachment.sig>
