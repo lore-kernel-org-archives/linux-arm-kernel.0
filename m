@@ -1,50 +1,30 @@
 From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Wed, 13 Mar 2013 09:37:48 +0100
-Subject: [GIT PULL] Device Tree fixes for v3.9
-In-Reply-To: <201303111443.21019.arnd@arndb.de>
-References: <CACRpkdai0PRbK-R_KfNqkkVuSNn97v9Za8Doq71Zb-xCHW+J1A@mail.gmail.com>
- <201303012319.28231.arnd@arndb.de>
- <20130302005852.GA3106@gmail.com>
- <201303111443.21019.arnd@arndb.de>
-Message-ID: <20130313083748.GE21994@zurbaran>
+Date: Wed, 13 Mar 2013 09:39:23 +0100
+Subject: [PATCH v2] mfd: ab8500-gpadc: Complain if we fail to enable
+ vtvout LDO
+In-Reply-To: <1362822405.8907.1.camel@phoenix>
+References: <1362822405.8907.1.camel@phoenix>
+Message-ID: <20130313083923.GI21994@zurbaran>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi Axel,
 
-On Mon, Mar 11, 2013 at 02:43:20PM +0000, Arnd Bergmann wrote:
-> On Saturday 02 March 2013, Lee Jones wrote:
-> > > 
-> > > I'm still getting build errors even with those patches applied:
-> > > 
-> > > Warning (reg_format): "reg" property in /soc-u9500/prcmu at 80157000/ab8500 at 5 has invalid length (4 bytes) (#address-cells == 1, #size-cells == 1)
-> > > Warning (reg_format): "reg" property in /soc-u9500/prcmu at 80157000/ab8500 at 5 has invalid length (4 bytes) (#address-cells == 1, #size-cells == 1)
-> > > Warning (reg_format): "reg" property in /soc-u9500/prcmu at 80157000/ab8500 at 5 has invalid length (4 bytes) (#address-cells == 1, #size-cells == 1)
-> > > Warning (reg_format): "reg" property in /soc-u9500/prcmu at 80157000/ab8500 at 5 has invalid length (4 bytes) (#address-cells == 1, #size-cells == 1)
-> > 
-> > These have been there since DT landed for the AB8500 - it's on my TODO
-> > to fix, but it's a really low priority.
+On Sat, Mar 09, 2013 at 05:46:45PM +0800, Axel Lin wrote:
+> Since commit c8801a8e
+> "regulator: core: Mark all get and enable calls as __must_check",
+> we must check return value of regulator_enable() to silence below build warning.
 > 
-> I've come up with the trivial patch below. I'm trying hard to kill off all known
-> warnings, and will not take submissions introducing new ones if I see them.
+>   CC      drivers/mfd/ab8500-gpadc.o
+> drivers/mfd/ab8500-gpadc.c: In function 'ab8500_gpadc_runtime_resume':
+> drivers/mfd/ab8500-gpadc.c:598:18: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result [-Wunused-result]
+> drivers/mfd/ab8500-gpadc.c: In function 'ab8500_gpadc_probe':
+> drivers/mfd/ab8500-gpadc.c:655:18: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result [-Wunused-result]
 > 
-> Maybe Sam can just pick this up along with the other patch.
-I applied the patch below to my fd-fixes tree. Which one do you mean by "the
-other patch" ?
-
-
-> > > drivers/built-in.o: In function `ab8500_power_off':
-> > > /git/arm-soc/drivers/mfd/ab8500-sysctrl.c:37: undefined reference to `power_supply_get_by_name'
-> > > /git/arm-soc/drivers/mfd/ab8500-sysctrl.c:53: undefined reference to `power_supply_get_by_name'
-> > > make[2]: *** [vmlinux] Error 1
-> > 
-> > This has already been fixed.
-> > 
-> > https://patchwork.kernel.org/patch/2163301/
-> 
-> It hasn't made it into v3.9-rc2 or even linux-next yet. I guess it got lost
-> somewhere.
-It's applied to my mfd-fixes as well now.
+> Also convert to devm_regulator_get(), this fixes a missing regulator_put() call
+> in ab8500_gpadc_remove().
+This is on the edge of a patch split for 2 separate fixes, but I applied it
+anyway.
 
 Cheers,
 Samuel.
