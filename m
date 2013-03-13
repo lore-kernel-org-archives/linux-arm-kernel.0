@@ -1,28 +1,77 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 13 Mar 2013 10:21:16 +0800
-Subject: [PATCH v4 0/2] Uncompress debug for multiplatform
-In-Reply-To: <513F72A4.8020309@wwwdotorg.org>
-References: <1363001737-8745-1-git-send-email-shawn.guo@linaro.org>
- <20130311170350.GM4977@n2100.arm.linux.org.uk>
- <513E149A.2060704@wwwdotorg.org>
- <20130312040242.GF25910@S2101-09.ap.freescale.net>
- <513F72A4.8020309@wwwdotorg.org>
-Message-ID: <20130313022115.GE27461@S2101-09.ap.freescale.net>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Wed, 13 Mar 2013 10:43:43 +0800
+Subject: [PATCH V2 9/9] ARM: dts: tegra: add the PM configurations of PMC
+In-Reply-To: <97395805.p014F9TUYL@fb07-iapwap2.physik.uni-giessen.de>
+References: <1363061043-9680-1-git-send-email-josephl@nvidia.com>
+ <97395805.p014F9TUYL@fb07-iapwap2.physik.uni-giessen.de>
+Message-ID: <1363142623.3998.33.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 12, 2013 at 12:23:32PM -0600, Stephen Warren wrote:
-> > Yeah, that's why I did not touch Tegra as the series is based on
-> > v3.9-rc1 where Tegra hasn't been part of multi-platform yet.
+Hi Marc,
+
+On Tue, 2013-03-12 at 18:43 +0800, Marc Dietrich wrote:
+> Am Dienstag, 12. M?rz 2013, 12:04:03 schrieb Joseph Lo:
+> > Adding the PM configuration of PMC when the platform support suspend
+> > function.
 > > 
-> > But I just noticed that debug-macro.S for Tegra has been renamed to
-> > debug/tegra.S, and we already know it will be broken when multi-platform
-> > is enabled together with this series for Tegra.
+> > Signed-off-by: Joseph Lo <josephl@nvidia.com>
+> > ---
+> > V2:
+> > * no change
+> > ---
+> >  arch/arm/boot/dts/tegra20-harmony.dts   | 6 ++++++
+> >  arch/arm/boot/dts/tegra20-paz00.dts     | 7 +++++++
+> >  arch/arm/boot/dts/tegra20-seaboard.dts  | 6 ++++++
+> >  arch/arm/boot/dts/tegra20-trimslice.dts | 9 +++++++++
+> >  arch/arm/boot/dts/tegra20-ventana.dts   | 6 ++++++
+> >  arch/arm/boot/dts/tegra20-whistler.dts  | 8 ++++++++
+> >  arch/arm/boot/dts/tegra30-beaver.dts    | 7 +++++++
+> >  arch/arm/boot/dts/tegra30-cardhu.dtsi   | 7 +++++++
+> >  8 files changed, 56 insertions(+)
+> > 
+> > [...]
+> >
+> > diff --git a/arch/arm/boot/dts/tegra20-paz00.dts
+> > b/arch/arm/boot/dts/tegra20-paz00.dts index 41e82e3..cd8e798 100644
+> > --- a/arch/arm/boot/dts/tegra20-paz00.dts
+> > +++ b/arch/arm/boot/dts/tegra20-paz00.dts
+> > @@ -415,6 +415,13 @@
+> > 
+> >  	pmc {
+> >  		nvidia,invert-interrupt;
+> > +		nvidia,suspend-mode = <2>;
+> > +		nvidia,cpu-pwr-good-time = <5000>;
 > 
-> Was that because the code touches .data? Perhaps I can get away with
-> using some hard-coded IRAM location or something.
+> should be 2000
+> 
+> > +		nvidia,cpu-pwr-off-time = <5000>;
+> 
+> should be 0
+> 
+> > +		nvidia,core-pwr-good-time = <3845 3845>;
+> 
+> mmh, no idea here. original source [1] shows 0x7e7e ticks which translates to 
+> 1 sec?
+> 
+The ticks was based on the 32KHz clock domain. I translate it to uS.
 
-Even worse.  It has the reference to tegra_uart_config which will be
-unavailable in decompressor.
+> > +		nvidia,core-pwr-off-time = <3875>;
+> 
+> should be 0
+> 
+> > +		nvidia,sys-clock-req-active-high;
+> > +		nvidia,combined-power-req;
+> 
+> paz00 has no combined power req.
+> 
+> >  	};
+> > 
+> >  	usb at c5000000 {
+> 
+> [1]: http://gitorious.org/ac100/kernel/blobs/2.6.32/arch/arm/mach-tegra/odm_kit/query/paz00/nvodm_query.c#line649
+> 
+Thanks for your review and point me out the detail information about
+paz00 board.
 
-Shawn
+Joseph
