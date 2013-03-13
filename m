@@ -1,77 +1,62 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 13 Mar 2013 16:43:48 +0000
-Subject: [PATCH] ARM: fix CONFIG_VIRT_TO_BUS handling
-Message-ID: <201303131643.48506.arnd@arndb.de>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Wed, 13 Mar 2013 17:46:45 +0100
+Subject: [Resend/PATCH 0/5] omap4/5: i2c/spi: device tree data
+In-Reply-To: <513DFB62.5030709@ti.com>
+References: <1363009486-19430-1-git-send-email-sourav.poddar@ti.com>
+ <513DEAE1.1050606@ti.com> <513DFB62.5030709@ti.com>
+Message-ID: <5140AD75.2050900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-887cbce0 "arch Kconfig: centralise CONFIG_ARCH_NO_VIRT_TO_BUS"
-and  4febd95a8 "Select VIRT_TO_BUS directly where needed" from
-Stephen Rothwell changed globally how CONFIG_VIRT_TO_BUS is
-selected, while my own a5d533ee0 "ARM: disable virt_to_bus/
-virt_to_bus almost everywhere" was merged at the same time and
-changed which platforms select it on ARM.
+Hi Sourav,
 
-The result of this conflict was that we again see CONFIG_VIRT_TO_BUS
-on all ARM systems. This patch fixes up the problem and removes
-CONFIG_ARCH_NO_VIRT_TO_BUS again on ARM.
+I've just applied your branch after a minor subject cleanup for consistency.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Stephen Rothwell <sfr@canb.auug.org.au>
----
+git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.10/dts
 
-I'd like to merge this one through the arm-soc tree as a 3.9 bug fix
-unless there are objections.
+Regards,
+Benoit
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 78ffcc6..ad52cd4 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -49,7 +49,6 @@ config ARM
- 	select HAVE_REGS_AND_STACK_ACCESS_API
- 	select HAVE_SYSCALL_TRACEPOINTS
- 	select HAVE_UID16
--	select HAVE_VIRT_TO_BUS
- 	select KTIME_SCALAR
- 	select PERF_USE_VMALLOC
- 	select RTC_LIB
-@@ -733,6 +732,7 @@ config ARCH_RPC
- 	select NEED_MACH_IO_H
- 	select NEED_MACH_MEMORY_H
- 	select NO_IOPORT
-+	select VIRT_TO_BUS
- 	help
- 	  On the Acorn Risc-PC, Linux can support the internal IDE disk and
- 	  CD-ROM interface, serial and parallel port, and the floppy drive.
-@@ -868,6 +868,7 @@ config ARCH_SHARK
- 	select ISA_DMA
- 	select NEED_MACH_MEMORY_H
- 	select PCI
-+	select VIRT_TO_BUS
- 	select ZONE_DMA
- 	help
- 	  Support for the StrongARM based Digital DNARD machine, also known
-@@ -1451,10 +1452,6 @@ config ISA_DMA
- 	bool
- 	select ISA_DMA_API
- 
--config ARCH_NO_VIRT_TO_BUS
--	def_bool y
--	depends on !ARCH_RPC && !ARCH_NETWINDER && !ARCH_SHARK
--
- # Select ISA DMA interface
- config ISA_DMA_API
- 	bool
-diff --git a/arch/arm/mach-footbridge/Kconfig b/arch/arm/mach-footbridge/Kconfig
-index abda5a1..0f2111a 100644
---- a/arch/arm/mach-footbridge/Kconfig
-+++ b/arch/arm/mach-footbridge/Kconfig
-@@ -67,6 +67,7 @@ config ARCH_NETWINDER
- 	select ISA
- 	select ISA_DMA
- 	select PCI
-+	select VIRT_TO_BUS
- 	help
- 	  Say Y here if you intend to run this kernel on the Rebel.COM
- 	  NetWinder.  Information about this machine can be found at:
+
+On 03/11/2013 04:42 PM, Sourav Poddar wrote:
+> On Monday 11 March 2013 08:02 PM, Benoit Cousson wrote:
+>> Hi Sourav,
+>>
+>> On 03/11/2013 02:44 PM, Sourav Poddar wrote:
+>>> Hi Tony/Benoit,
+>>>
+>>> These patches had been sent couple of times before, but there were no
+>>> comments on it.
+>> Sorry for that. I got a big flu in Jan and was in Linaro Connect last
+>> week.
+>> Patches look good, I just have to check that they apply nicely to the
+>> dts/for_3.9 I already prepared.
+>>
+> Ok. Thanks!!
+>> I still have to rebase that branch on top of a recent master branch and
+>> then check your branch.
+>>
+>>> If there are no comments, Can these be picked ?
+>>> Cc: Andrew Morton<akpm@osdl.org>
+>>>
+>>> The following changes since commit
+>>> f6161aa153581da4a3867a2d1a7caf4be19b6ec9:
+>>>
+>>>    Linux 3.9-rc2 (2013-03-10 16:54:19 -0700)
+>>>
+>>> are available in the git repository at:
+>>>    git at gitorious.org:linux-connectivity/linux-connectivity.git
+>>> omap_i2c_spi_dts_data
+>>>
+>>> Felipe Balbi (1):
+>>>        arm: dts: omap5: add SPI devices to OMAP5 DeviceTree file
+>>>
+>>> Sourav Poddar (4):
+>>>        arm: dts: omap4-sdp: Add I2c pinctrl data
+>>>        arm: dts: omap5-evm: Add I2c pinctrl data
+>>>        arm: dts: omap4-panda: Add I2c pinctrl data
+>>>        arm: dts: omap5-evm: Add mcspi data
+>> Thanks,
+>> Benoit
+>>
+> 
