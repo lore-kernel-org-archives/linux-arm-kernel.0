@@ -1,41 +1,41 @@
-From: elen.song@atmel.com (corp\elen.song)
-Date: Wed, 13 Mar 2013 12:00:13 +0800
-Subject: [PATCH 0/3] DMA: AT91: Fix get residue function in at_hdmac.c
-In-Reply-To: <1354871458-13930-1-git-send-email-elen.song@atmel.com>
-References: <1354871458-13930-1-git-send-email-elen.song@atmel.com>
-Message-ID: <513FF9CD.2010809@atmel.com>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Wed, 13 Mar 2013 12:08:53 +0800
+Subject: [PATCH v2 08/14] clk: hs: add clock support
+In-Reply-To: <201303121900.19441.arnd@arndb.de>
+References: <1363108124-17484-1-git-send-email-haojian.zhuang@linaro.org>
+ <1363108124-17484-9-git-send-email-haojian.zhuang@linaro.org>
+ <201303121900.19441.arnd@arndb.de>
+Message-ID: <CAD6h2NS0b+DJ6VKGiXGSbGf0tUzBoDso6L20rmCuJ8askRurjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/7/2012 5:10 PM, Elen Song wrote:
-> The residue actually means the bytes remain in transfer identified by current cookie.
-> The get residue api did not return the correct values in at_hdmac.c.
-> This patch serial focus on fix the issue.
+On 13 March 2013 03:00, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 12 March 2013, Haojian Zhuang wrote:
+>> +void __init hs_init_clocks(void)
+>> +{
+>> +       struct device_node *node;
+>> +
+>> +       /* map pmctrl registers */
+>> +       node = of_find_compatible_node(NULL, NULL, "hisilicon,pmctrl");
+>> +       hs_clk.pmctrl = of_iomap(node, 0);
+>> +       WARN_ON(!hs_clk.pmctrl);
+>> +
+>> +       node = of_find_compatible_node(NULL, NULL, "hisilicon,sctrl");
+>> +       hs_clk.sctrl = of_iomap(node, 0);
+>> +
+>> +       of_clk_init(hs_clk_match);
+>> +}
 >
-> This patch serials is based on DMA: AT91: Get residual bytes in dma buffer v2.
-> It is split into 3 aimed patch, the first one is to get transmit buswidth,
-> the second one is to get resiude in cookie, it use the buswidth to get residual bytes,
-> the third part is to handle the status that there are still some bytes remain in dma fifo.
+> You should be able to just use CLK_OF_DECLARE() with each member of
+> hs_clk_match[] now and call of_clk_init(NULL) from platform code.
 >
-> Compare to v2, this patch serials improve:
-> 1) consider buswidth to get correct residue.
-> 2) handle dma fifo empty status.
+> This requires moving the of_iomap() calls somewhere else, but it
+> could be a function that gets called by whichever setup function
+> gets run first.
 >
->
-> Elen Song (3):
->    DMA: AT91: Add value about transmit buswidth
->    DMA: AT91: Get residual bytes in dma buffer
->    DMA: AT91: Check fifo empty
->
->   drivers/dma/at_hdmac.c      |  151 ++++++++++++++++++++++++++++++++++++++-----
->   drivers/dma/at_hdmac_regs.h |    5 ++
->   2 files changed, 139 insertions(+), 17 deletions(-)
->
-Hi All:
+>         Arnd
 
-Any new comments about this patch serial?
-I verified this patch serial, it can smooth apply on 3.9-rc2 and the 
-function is all right.
+Yes, it's better. I'll update it.
 
-Best regards
-Elen Song
+Regards
+Haojian
