@@ -1,43 +1,43 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 13 Mar 2013 09:36:23 -0700
-Subject: [PATCH v4 3/3] ARM: dts: Add sbs-battery for exynos5250-snow
-In-Reply-To: <1363192583-26363-1-git-send-email-dianders@chromium.org>
-References: <1360957573-864-1-git-send-email-dianders@chromium.org>
- <1363192583-26363-1-git-send-email-dianders@chromium.org>
-Message-ID: <1363192583-26363-3-git-send-email-dianders@chromium.org>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Wed, 13 Mar 2013 16:41:15 +0000
+Subject: [PATCH v3 03/11] clocksource: sp804: add device tree support
+In-Reply-To: <201303131635.02355.arnd@arndb.de>
+References: <1363151142-32162-1-git-send-email-haojian.zhuang@linaro.org>
+ <CAD6h2NQa-RhR555o_1_RYPuPb4366H_AwK1U9S3pRVPdo_xNNg@mail.gmail.com>
+ <1363189748.3100.108.camel@hornet> <201303131635.02355.arnd@arndb.de>
+Message-ID: <1363192875.3100.125.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have i2c-arbitrator in place on bus 4 we can add the
-sbs-battery driver.  Future devices will be added onto bus 4 once
-drivers are in good shape.
+On Wed, 2013-03-13 at 16:35 +0000, Arnd Bergmann wrote:
+> Makes sense. I guess you can actually derive "has_timint1"
+> from the presence of the irq and just try to parse it:
+> 
+> 	irq = irq_of_parse_and_map(np, 0);
+> 	if (irq) {
+> 		evtoffs = TIMER_1_BASE;
+> 		srcoffs = TIMER_2_BASE;
+> 	} else {
+> 		irq = irq_of_parse_and_map(np, 1);
+> 		if (!irq)
+> 			return -ENODEV;
+> 		srcoffs = TIMER_1_BASE;
+> 		evtoffs = TIMER_2_BASE;
+> 	}
+> 
+> 
+> I wonder if we can ever get into the second case though: If the
+> first interrupt in not valid, can there be a second one in the
+> interrupts property? I don't know of a way to put an "invalid"
+> interrupt in there.
 
-Signed-off-by: Doug Anderson <dianders@chromium.org>
-Tested-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
----
-Changes in v4: None
-Changes in v3: None
-Changes in v2: None
+The discussion in the "[PATCH v3 03/11] clocksource: sp804: add device
+tree support" thread resulted in some ideas how to describe such
+situation. I suggested using interrupt-names property to explicitly
+describe the numbers, Rob wanted to simply define one or two interrupts
+and in the former case have a special property describing which one is
+it. Either way you can get this information from the tree. The main
+argument is about the clockevent/source aliases - whether they should be
+obligatory, optional or banned.
 
- arch/arm/boot/dts/exynos5250-snow.dts | 6 ++++++
- 1 file changed, 6 insertions(+)
-
-diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
-index bf16353..7aa66c8 100644
---- a/arch/arm/boot/dts/exynos5250-snow.dts
-+++ b/arch/arm/boot/dts/exynos5250-snow.dts
-@@ -66,6 +66,12 @@
- 			reg = <0>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-+
-+			battery: sbs-battery at b {
-+				compatible = "sbs,sbs-battery";
-+				reg = <0xb>;
-+				sbs,poll-retry-count = <1>;
-+			};
- 		};
- 	};
- 
--- 
-1.8.1.3
+Pawe?
