@@ -1,106 +1,134 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 13 Mar 2013 11:32:01 -0500
-Subject: [PATCH v3 06/11] ARM: vexpress: use clocksource_of_init for sp804
-In-Reply-To: <CAD6h2NTufx2rRwbwsgGHN42t7+_KL418++zk_C++EvFKU+ZwLg@mail.gmail.com>
-References: <1363151142-32162-1-git-send-email-haojian.zhuang@linaro.org>
- <1363151142-32162-7-git-send-email-haojian.zhuang@linaro.org>
- <1363173037.3100.22.camel@hornet>
- <CAD6h2NQWB3+1QepQjBE0BZiG44YAQRi7e-9+oZvVYpYV8QycDA@mail.gmail.com>
- <1363175175.3100.37.camel@hornet>
- <CAD6h2NSUyFvhoqMsYqT=rzFZ--MWv+0vHOCtAV9n-5YO+LNTMA@mail.gmail.com>
- <1363186087.3100.72.camel@hornet>
- <CAD6h2NRkS4qk+iqbWhaOpBHmjSYOB=YBbfNkn0X3jzNawzgNEA@mail.gmail.com>
- <1363187979.3100.93.camel@hornet>
- <CAD6h2NTufx2rRwbwsgGHN42t7+_KL418++zk_C++EvFKU+ZwLg@mail.gmail.com>
-Message-ID: <5140AA01.1010007@gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 13 Mar 2013 17:32:35 +0100
+Subject: [PATCH 2/3] ARM: at91: rename board-dt to more specific name
+ board-dt-sam9
+In-Reply-To: <51408A5D.6020402@atmel.com>
+References: <20130307130842.GA4590@game.jcrosoft.org>
+ <1362666113-16434-1-git-send-email-plagnioj@jcrosoft.com>
+ <1362666113-16434-2-git-send-email-plagnioj@jcrosoft.com>
+ <51408A5D.6020402@atmel.com>
+Message-ID: <5140AA23.6070201@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/13/2013 10:59 AM, Haojian Zhuang wrote:
-> On 13 March 2013 23:19, Pawel Moll <pawel.moll@arm.com> wrote:
->> On Wed, 2013-03-13 at 15:01 +0000, Haojian Zhuang wrote:
->>> Yes, it's possible. Since only clocksource / clockevent is using SP804 timer
->>> on the VE platform. If user app or something else is using other SP804
->>> timer, it would be mess because of resource conflict.
+On 03/13/2013 03:17 PM, Nicolas Ferre :
+> On 03/07/2013 03:21 PM, Jean-Christophe PLAGNIOL-VILLARD :
+>> as we will introduce the Cortex-A5 sama5 support
+> 
+> We may need more arguments here (Cf. discussion about the sama5d3
+> support). Let's discuss this and modify this commit message quickly.
+
+Queued to at91-3.10-soc with following commit message:
+
+"
+We will produce a board-dt file per SoC core type. That will ease code
+readability and will prevent from including superfluous code for supporting
+machines that will never be compiled together (particularly the ARM9 and C-A5
+upcoming SoCs).
+"
+
+Thanks, best regards,
+
+>> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> Cc: Ludovic Desroches <ludovic.desroches@atmel.com>
+>> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+>> ---
+>>  arch/arm/configs/at91_dt_defconfig                 |    2 +-
+>>  arch/arm/configs/at91sam9260_defconfig             |    2 +-
+>>  arch/arm/configs/at91sam9g20_defconfig             |    2 +-
+>>  arch/arm/configs/at91sam9g45_defconfig             |    2 +-
+>>  arch/arm/mach-at91/Kconfig                         |    2 +-
+>>  arch/arm/mach-at91/Makefile                        |    2 +-
+>>  arch/arm/mach-at91/{board-dt.c => board-dt-sam9.c} |    0
+>>  7 files changed, 6 insertions(+), 6 deletions(-)
+>>  rename arch/arm/mach-at91/{board-dt.c => board-dt-sam9.c} (100%)
 >>
->> How would you expose this device to the app or something else? It's an
->> amba_bus device, so it must be bound with an amba_driver. Otherwise
->> you're abusing the device model and, well, you're on your own.
+>> diff --git a/arch/arm/configs/at91_dt_defconfig b/arch/arm/configs/at91_dt_defconfig
+>> index 1ea9590..047f2a4 100644
+>> --- a/arch/arm/configs/at91_dt_defconfig
+>> +++ b/arch/arm/configs/at91_dt_defconfig
+>> @@ -20,7 +20,7 @@ CONFIG_SOC_AT91SAM9263=y
+>>  CONFIG_SOC_AT91SAM9G45=y
+>>  CONFIG_SOC_AT91SAM9X5=y
+>>  CONFIG_SOC_AT91SAM9N12=y
+>> -CONFIG_MACH_AT91SAM_DT=y
+>> +CONFIG_MACH_AT91SAM9_DT=y
+>>  CONFIG_AT91_PROGRAMMABLE_CLOCKS=y
+>>  CONFIG_AT91_TIMER_HZ=128
+>>  CONFIG_AEABI=y
+>> diff --git a/arch/arm/configs/at91sam9260_defconfig b/arch/arm/configs/at91sam9260_defconfig
+>> index 0ea5d2c..05618eb 100644
+>> --- a/arch/arm/configs/at91sam9260_defconfig
+>> +++ b/arch/arm/configs/at91sam9260_defconfig
+>> @@ -22,7 +22,7 @@ CONFIG_MACH_QIL_A9260=y
+>>  CONFIG_MACH_CPU9260=y
+>>  CONFIG_MACH_FLEXIBITY=y
+>>  CONFIG_MACH_SNAPPER_9260=y
+>> -CONFIG_MACH_AT91SAM_DT=y
+>> +CONFIG_MACH_AT91SAM9_DT=y
+>>  CONFIG_AT91_PROGRAMMABLE_CLOCKS=y
+>>  # CONFIG_ARM_THUMB is not set
+>>  CONFIG_ZBOOT_ROM_TEXT=0x0
+>> diff --git a/arch/arm/configs/at91sam9g20_defconfig b/arch/arm/configs/at91sam9g20_defconfig
+>> index 3b18810..892e828 100644
+>> --- a/arch/arm/configs/at91sam9g20_defconfig
+>> +++ b/arch/arm/configs/at91sam9g20_defconfig
+>> @@ -22,7 +22,7 @@ CONFIG_MACH_PCONTROL_G20=y
+>>  CONFIG_MACH_GSIA18S=y
+>>  CONFIG_MACH_USB_A9G20=y
+>>  CONFIG_MACH_SNAPPER_9260=y
+>> -CONFIG_MACH_AT91SAM_DT=y
+>> +CONFIG_MACH_AT91SAM9_DT=y
+>>  CONFIG_AT91_PROGRAMMABLE_CLOCKS=y
+>>  # CONFIG_ARM_THUMB is not set
+>>  CONFIG_AEABI=y
+>> diff --git a/arch/arm/configs/at91sam9g45_defconfig b/arch/arm/configs/at91sam9g45_defconfig
+>> index 606d48f..5f551b7 100644
+>> --- a/arch/arm/configs/at91sam9g45_defconfig
+>> +++ b/arch/arm/configs/at91sam9g45_defconfig
+>> @@ -18,7 +18,7 @@ CONFIG_MODULE_UNLOAD=y
+>>  CONFIG_ARCH_AT91=y
+>>  CONFIG_ARCH_AT91SAM9G45=y
+>>  CONFIG_MACH_AT91SAM9M10G45EK=y
+>> -CONFIG_MACH_AT91SAM_DT=y
+>> +CONFIG_MACH_AT91SAM9_DT=y
+>>  CONFIG_AT91_PROGRAMMABLE_CLOCKS=y
+>>  CONFIG_AT91_SLOW_CLOCK=y
+>>  CONFIG_AEABI=y
+>> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+>> index 98c2e05..440682b 100644
+>> --- a/arch/arm/mach-at91/Kconfig
+>> +++ b/arch/arm/mach-at91/Kconfig
+>> @@ -108,7 +108,7 @@ config MACH_AT91RM9200_DT
+>>  	  Select this if you want to experiment device-tree with
+>>  	  an Atmel RM9200 Evaluation Kit.
+>>  
+>> -config MACH_AT91SAM_DT
+>> +config MACH_AT91SAM9_DT
+>>  	bool "Atmel AT91SAM Evaluation Kits with device-tree support"
+>>  	depends on SOC_AT91SAM9
+>>  	select USE_OF
+>> diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
+>> index 39218ca..5eca35a 100644
+>> --- a/arch/arm/mach-at91/Makefile
+>> +++ b/arch/arm/mach-at91/Makefile
+>> @@ -88,7 +88,7 @@ obj-$(CONFIG_MACH_AT91SAM9M10G45EK) += board-sam9m10g45ek.o
+>>  
+>>  # AT91SAM board with device-tree
+>>  obj-$(CONFIG_MACH_AT91RM9200_DT) += board-rm9200-dt.o
+>> -obj-$(CONFIG_MACH_AT91SAM_DT) += board-dt.o
+>> +obj-$(CONFIG_MACH_AT91SAM9_DT) += board-dt-sam9.o
+>>  
+>>  # AT91X40 board-specific support
+>>  obj-$(CONFIG_MACH_AT91EB01)	+= board-eb01.o
+>> diff --git a/arch/arm/mach-at91/board-dt.c b/arch/arm/mach-at91/board-dt-sam9.c
+>> similarity index 100%
+>> rename from arch/arm/mach-at91/board-dt.c
+>> rename to arch/arm/mach-at91/board-dt-sam9.c
 >>
->> The devices are managed by the system. The device tree is merely a
->> description of the available hardware.
->>
-> Maybe I didn't express my idea well. My point is that timer could be
-> clock source
-> /clock event. It could also just be a timer that user app or other device driver
-> may want to use it directly. There're a lot of reason that user app or some
->  driver wants to use hardware timer. For example, the specific timer may
-> keep running even system is in low power mode.
 > 
-> Although there's so much hardware timers available, system must choose
-> one for the usage of clock source / clock event / other hardware timer usage.
 > 
->>>>> Imagine that only TIMINT1 signal in sp804 is routed to interrupt controller.
->>>>> Could system still pick any one it wants?
->>>>
->>> Then we need another new property. I try to find using minim properties.
->>
->> No, we don't. See the discussion with Rob. He has an idea (using the
->> interrupt property only), I have another one (using already defined
->> interrupt-names property). I see you've just came with another one
->> (TIMINTC treated as TIMINT1), which is fine with me. Either way you've
->> got what you need to make the right decision.
->>
-> After considered as second time, I think that we still need a property to meet
-> alias usage. Excuse me expand it in this topic.
-> 
-> arm,sp804-has-irq = <offset>;
 
-Interrupt/timer number not offset please. The offset is implied by the
-fact that the h/w is an sp804. The Integrator AP is not actually an
-sp804, so it's init should be handled differently with a different
-compatible property.
 
-> The offset means TIMER register offset. If it's not zero, TIMER2 is using
-> irq. And it could be configured as clock event. Otherwise, TIMER1 is clock
-> event.
-> We must make sure that only one of all sp804 timers is using this property.
-> 
-> alias:
-> linux,clocksource = <&sp804-A>
-> linux,clockevent = <&sp804-A>
-> 
-> Although both of them points to timerA, only TIMER1 or TIMER2 of sp804
-> is using irq. So one is clock source, and the other is clock event.
-> 
-> alias:
-> linux,clocksource = <&sp804-A>
-> linux,clockevent = <&sp804-B>
-> The issue comes since system don't know whether TIMER1 or TIMER2 could
-> be configured as clock source.
-
-If you have 2 sp804's, why do you care which one is used by the OS? If
-they are identical, then it doesn't matter. If they are not, then
-describe how they are not identical.
-
-The realview and versatile boards currently do this, but there is no
-good reason that I see and I intend to change this.
-
-> We still need a new property to claim it. It seems that we can't drop
-> "arm,sp804-clocksource", although everybody don't like it.
-> 
-> What's your opinion?
-
-As previously stated, I don't think we need this or the alias based on
-current in tree users.
-
-There is an issue that you don't know about all available timers so you
-can select the one with the minimum required features leaving others
-with more features (i.e. an irq) free. If you need more control like
-this then you can do custom setup before or instead of calling
-clocksource_of_init. None of the current platforms have this issue nor
-do they use sp804 for anything beyond clksrc and clkevt. I would not
-expect lots of new users of sp804 as I expect most new platforms will
-use architected timers. So let's not solve imaginary problems now.
-
-Rob
+-- 
+Nicolas Ferre
