@@ -1,51 +1,38 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 13 Mar 2013 15:19:07 +0100 (CET)
-Subject: [PATCH] ARM: smp: Allow real broadcast device selection instead
- of always dummy
-In-Reply-To: <514046B6.9020005@ti.com>
-References: <1363165608-13739-1-git-send-email-santosh.shilimkar@ti.com>
- <514046B6.9020005@ti.com>
-Message-ID: <alpine.LFD.2.02.1303131516090.22263@ionos>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 13 Mar 2013 15:20:41 +0100
+Subject: [PATCH v8 08/12] gpio: palmas: Enable DT support for palmas gpio.
+In-Reply-To: <1362662276-20792-8-git-send-email-ian@slimlogic.co.uk>
+References: <1362662276-20792-1-git-send-email-ian@slimlogic.co.uk>
+ <1362662276-20792-8-git-send-email-ian@slimlogic.co.uk>
+Message-ID: <CACRpkdbG-aXsCDgrLStHGPJFUO=T62DQyhjkhhiTkG8H9OhLGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 13 Mar 2013, Santosh Shilimkar wrote:
-> On Wednesday 13 March 2013 02:36 PM, Santosh Shilimkar wrote:
-> > With recent arm broadcast time clean-up from Mark Rutland, the dummy
-> > broadcast device is always registered with timer subsystem. And since
-> > the rating of the dummy clock event is very high, it is preferred
-> > over a real broad-cast clock event.
-> > 
-> > This is a change in behavior from past and not an intended
-> > one. So reduce the rating of the dummy clockevent so that
-> > real broadcast device is selected when available.
-> > 
-> > Without this all the C states with C3STOP won't work since
-> > the broad cast notifier will take an abort.
-> > 
-> > Cc: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Russell King <linux@arm.linux.org.uk>
-> > 
-> > Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> > ---
-> > Its a regression so hopefully can get into the 3.9-rcx. Noticed
-> > this one on A15 platform. A9 platform the issue may not be seen
-> > since the local timer check avoids dummy timer registration.
-> > 
-> Some one pointed me to a fix made by Mark which was discussed
-> under '[BUG] ARM Architected timers appear broken in 3.9-rc1' subject.
-> That patch seems to be more of work around since the root of the
-> problem is incorrect dummy timer rating. Either way, both patches
-> fix the issue.
+On Thu, Mar 7, 2013 at 2:17 PM, Ian Lartey <ian@slimlogic.co.uk> wrote:
 
-Well, using a dummy timer as the broadcast event device is a bug, no
-matter what the rating is. The fix is in Linus tree already.
+> From: J Keerthy <j-keerthy@ti.com>
+>
+> Enable DT support for palmas gpio.
+>
+> Signed-off-by: J Keerthy <j-keerthy@ti.com>
 
-Though making the rating of the dummy lower is definitely a good
-thing, so a real hardware device which is detected later can replace
-the dummy device. So yes, the rating should be low for the dummy
-timer.
+This needs to be CC: to devicetree-discuss.
 
-Thanks,
+> +static struct of_device_id of_palmas_match_tbl[] = {
+> +       { .compatible = "ti,palmas-gpio", },
+> +       { .compatible = "ti,palmas-charger-gpio", },
+> +       { .compatible = "ti,twl6035-gpio", },
+> +       { .compatible = "ti,twl6036-gpio", },
+> +       { .compatible = "ti,twl6037-gpio", },
+> +       { .compatible = "ti,tps65913-gpio", },
+> +       { .compatible = "ti,tps65914-gpio", },
+> +       { .compatible = "ti,tps80036-gpio", },
+> +       { /* end */ }
+> +};
 
-	tglx
+I can see that the binding came in a previous patch in this series, OK.
+
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+Yours,
+Linus Walleij
