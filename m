@@ -1,110 +1,101 @@
-From: levipearson@gmail.com (Levi Pearson)
-Date: Wed, 13 Mar 2013 10:12:20 -0600
-Subject: omap4 pandaboard: clock input for TiWi module inactive
-In-Reply-To: <51403905.3020102@ti.com>
-References: <CAEYbN3QotnnAUU=7c7=r1sHDnZ5VhgNfXfP6ANf3+ssCzmEa=A@mail.gmail.com>
- <513D9CB7.2010402@ti.com> <513DA92F.7020908@ti.com>
- <CAEYbN3T97W=74nMG4x4tVECRkff2RSasapvZQowpUwhJtUd=JQ@mail.gmail.com>
- <51403905.3020102@ti.com>
-Message-ID: <CAEYbN3Sh+ECYO6jYXNQ6oz5s=y4v44Se8JtUx994eLSJSnjZQA@mail.gmail.com>
+From: jhovold@gmail.com (Johan Hovold)
+Date: Wed, 13 Mar 2013 17:11:59 +0100
+Subject: [PATCH] ARM: at91/avr32/atmel-mci: fix DMA-channel leak on module
+ unload
+Message-ID: <1363191119-4948-1-git-send-email-jhovold@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 13, 2013 at 2:29 AM, Peter Ujfalusi <peter.ujfalusi@ti.com> wrote:
-> On 03/12/2013 05:33 PM, Levi Pearson wrote:
->> I spent some more time looking at clk-twl6030.c, and it seems it just turns the
->> twl6030 chip on when you ask it to enable the clock, and as far as I
->> can tell that
->> happens based on module dependencies?  There aren't any explicit references to
->> it that I can find, so I'm not entirely sure how a clk-twl6040 would
->> cause a clock
->> to be enabled.
->
-> The clk-twl6040 is not really a good example for you start with. We only need
-> it to turn on in order to get the clock on the output. But the principle is
-> the same at the end. you need to enable/disable the clock from twl6030...
->
+Fix regression introduced by commit 796211b7953 ("mmc: atmel-mci: add
+pdc support and runtime capabilities detection") which removed the need
+for CONFIG_MMC_ATMELMCI_DMA but kept the Kconfig-entry as well as the
+compile guards around dma_release_channel() in remove(). Consequently,
+DMA is always enabled (if supported), but the DMA-channel is not
+released on module unload unless the DMA-config option is selected.
 
-Well, it's at least a nice minimal example of how to interface with the clk API.
+Remove the no longer used CONFIG_MMC_ATMELMCI_DMA option completely.
 
->> I looked into the early boot clock setup code, and that does look a lot less
->> straightforward.
->
-> Yes, this is what I thought for the twl6040 clock integration with McPDM. It
-> turned out a bit more complicated.
-> At boot time you do not have the twl clock driver loaded.
-> You have the clock tree already defined.
-> When you boot further you add the clock for twl6040.
-
-I can't see where exactly this is done, though.  I think I'm just
-going to have to
-poke around the clock trees for other platforms or something to see how it's
-normally done, but unfortunately my time to work on this is pretty limited too!
-
-> You want to hook it up with the existing clock tree - to set it as parent of
-> one of the clock root (which you already modified to not to be the root clock).
-> I shall work, but it does not:
-> for external chips we need to do the configuration/enable in clk_prepare time
-> (because they are over i2c).
-> So the driver goes and asks for a clock (which supposed to be at the end
-> rooted to this new external clock).
-> Nothing happens.
-> The relevant clock tree has been already got prepared earlier so new prepare
-> will not going to go down to the root, leaving the root clock disabled.
->
-> I'm still looking a way to somehow fix this, but my time is limited right now.
-
-Is it possible to do static config on the clocks to create the basic
-structure during
-the early boot phase, and then add the dynamic control functions to
-the structure
-later after i2c has been set up?  See below for more details, but TWL6030 is the
-parent of all 32k clocks on the board, it just enables some of them by
-default when
-it's powered on.  Seems like that should be reflected in the early set
-up structure.
-
->> There are already a few 32k clocks listed there, and
->> I *think* they
->> all source from the twl6040; do they just come up automatically at power-on?
->> From what I can tell, clk32kg is just a gated fork of the regular 32k
->> clock that is
->> available at boot from twl6040.  I am surprised it doesn't come on by default.
->
-> I have not checked the schematics, but it could be that we have crystal 32K on
-> board as well. TWL6030 can gate some of it's 32K outputs and this is the case
-> with WiLink on PandaBoard.
-
-There is a crystal 32k; it's connected directly to TWL6030 via OSC32KIN and
-OSC32KOUT.  There are also 3 gated outputs:
-  * CLK32K_AUD  <- this goes to TWL6040 as the CLK32K input of its PLL block
-  * CLK32K_MAIN  <- this goes to OMAP4430's SYS32K input
-  * CLK32K_GATE  <- this is goes to WL172x chip's SLOW_CLK input
-
-And those are all the 32k clocks on the board.  No one gets a 32k clock except
-through TWL6030, though I guess there may be some internal 32k clock gating
-inside the OMAP. The question in the back of my mind is why CLK32K_AUD and
-CLK32K_MAIN are enabled by default in the power modes we use but
-CLK32K_GATE is not.  Or... maybe it is and we are specifically disabling it
-somewhere?
-
->> I also don't have a TRM for twl6040 that matches up with what twl-regulator.c is
->> doing to enable the clk32kg output; it looks like it's adding it to
->> one of the power
->> modes, but I'm not entirely sure how the registers it's writing to work, so my
->> confidence level in being able to get it transplanted to a separate
->> driver has lowered
->> quite a bit.
->
-> I'm not sure if I have twl6030 TRM either, but I can try to come up with a
-> basic driver for the twl6030 clocks.
-
-I actually found a TRM for it on google, but the register addresses in
-the code don't
-seem to match up with what's documented in the TRM I have.  Wouldn't
-be the first
-time that external docs didn't list all the registers....
-
+Cc: stable <stable@vger.kernel.org>
+Signed-off-by: Johan Hovold <jhovold@gmail.com>
 ---
+ arch/arm/configs/at91sam9g45_defconfig |  1 -
+ arch/avr32/configs/favr-32_defconfig   |  1 -
+ arch/avr32/configs/merisc_defconfig    |  1 -
+ drivers/mmc/host/Kconfig               | 10 ----------
+ drivers/mmc/host/atmel-mci.c           |  2 --
+ 5 files changed, 15 deletions(-)
 
-     --Levi
+diff --git a/arch/arm/configs/at91sam9g45_defconfig b/arch/arm/configs/at91sam9g45_defconfig
+index 606d48f..8aab786 100644
+--- a/arch/arm/configs/at91sam9g45_defconfig
++++ b/arch/arm/configs/at91sam9g45_defconfig
+@@ -173,7 +173,6 @@ CONFIG_MMC=y
+ # CONFIG_MMC_BLOCK_BOUNCE is not set
+ CONFIG_SDIO_UART=m
+ CONFIG_MMC_ATMELMCI=y
+-CONFIG_MMC_ATMELMCI_DMA=y
+ CONFIG_LEDS_ATMEL_PWM=y
+ CONFIG_LEDS_GPIO=y
+ CONFIG_LEDS_TRIGGER_TIMER=y
+diff --git a/arch/avr32/configs/favr-32_defconfig b/arch/avr32/configs/favr-32_defconfig
+index 0421498..9791820 100644
+--- a/arch/avr32/configs/favr-32_defconfig
++++ b/arch/avr32/configs/favr-32_defconfig
+@@ -122,7 +122,6 @@ CONFIG_USB_G_SERIAL=m
+ CONFIG_USB_CDC_COMPOSITE=m
+ CONFIG_MMC=y
+ CONFIG_MMC_ATMELMCI=y
+-CONFIG_MMC_ATMELMCI_DMA=y
+ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
+ CONFIG_LEDS_ATMEL_PWM=m
+diff --git a/arch/avr32/configs/merisc_defconfig b/arch/avr32/configs/merisc_defconfig
+index 3befab9..65de443 100644
+--- a/arch/avr32/configs/merisc_defconfig
++++ b/arch/avr32/configs/merisc_defconfig
+@@ -102,7 +102,6 @@ CONFIG_FRAMEBUFFER_CONSOLE=y
+ CONFIG_LOGO=y
+ CONFIG_MMC=y
+ CONFIG_MMC_ATMELMCI=y
+-CONFIG_MMC_ATMELMCI_DMA=y
+ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
+ CONFIG_LEDS_ATMEL_PWM=y
+diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+index 8d13c65..009dabd 100644
+--- a/drivers/mmc/host/Kconfig
++++ b/drivers/mmc/host/Kconfig
+@@ -292,16 +292,6 @@ config MMC_ATMELMCI
+ 
+ 	  If unsure, say N.
+ 
+-config MMC_ATMELMCI_DMA
+-	bool "Atmel MCI DMA support"
+-	depends on MMC_ATMELMCI && (AVR32 || ARCH_AT91SAM9G45) && DMA_ENGINE
+-	help
+-	  Say Y here to have the Atmel MCI driver use a DMA engine to
+-	  do data transfers and thus increase the throughput and
+-	  reduce the CPU utilization.
+-
+-	  If unsure, say N.
+-
+ config MMC_MSM
+ 	tristate "Qualcomm SDCC Controller Support"
+ 	depends on MMC && ARCH_MSM
+diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+index 722af1d..10f8b73 100644
+--- a/drivers/mmc/host/atmel-mci.c
++++ b/drivers/mmc/host/atmel-mci.c
+@@ -2487,10 +2487,8 @@ static int __exit atmci_remove(struct platform_device *pdev)
+ 	atmci_readl(host, ATMCI_SR);
+ 	clk_disable(host->mck);
+ 
+-#ifdef CONFIG_MMC_ATMELMCI_DMA
+ 	if (host->dma.chan)
+ 		dma_release_channel(host->dma.chan);
+-#endif
+ 
+ 	free_irq(platform_get_irq(pdev, 0), host);
+ 	iounmap(host->regs);
+-- 
+1.8.1.5
