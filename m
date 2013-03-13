@@ -1,79 +1,50 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 13 Mar 2013 11:10:37 +0000
-Subject: [PATCH v3 06/11] ARM: vexpress: use clocksource_of_init for sp804
-In-Reply-To: <1363151142-32162-7-git-send-email-haojian.zhuang@linaro.org>
-References: <1363151142-32162-1-git-send-email-haojian.zhuang@linaro.org>
- <1363151142-32162-7-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1363173037.3100.22.camel@hornet>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 13 Mar 2013 12:12:13 +0100
+Subject: ARM: at-91: ARCH_AT91SAM9X5 went missing
+In-Reply-To: <1363171688.3137.196.camel@x61.thuisdomein>
+References: <1363171688.3137.196.camel@x61.thuisdomein>
+Message-ID: <51405F0D.40102@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-03-13 at 05:05 +0000, Haojian Zhuang wrote:
-> Remove all code to parse sp804. Use clocksource_of_init() instead since
-> all these code are implemented in sp804 driver already.
+On 03/13/2013 11:48 AM, Paul Bolle :
+> 0) Commit 1e3ce2b8545390a2aee8dbfcd49ca4161b636000
+> ("AR[M]: at91: introduce SOC_AT91xxx define to allow to compile SoC core
+> support") dropped the Kconfig symbol ARCH_AT91SAM9X5. It seems it missed
+> something like this:
 > 
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
-> ---
->  arch/arm/boot/dts/vexpress-v2m-rs1.dtsi |    2 ++
->  arch/arm/boot/dts/vexpress-v2m.dtsi     |    2 ++
->  arch/arm/boot/dts/vexpress-v2p-ca9.dts  |    2 ++
->  arch/arm/mach-vexpress/Kconfig          |    1 +
->  arch/arm/mach-vexpress/v2m.c            |   13 ++-----------
->  5 files changed, 9 insertions(+), 11 deletions(-)
+> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+> index 6071f4c..2db5370 100644
+> --- a/arch/arm/mach-at91/Kconfig
+> +++ b/arch/arm/mach-at91/Kconfig
+> @@ -131,6 +131,10 @@ config ARCH_AT91SAM9G45
+>         bool "AT91SAM9G45"
+>         select SOC_AT91SAM9G45
+>  
+> +config ARCH_AT91SAM9X5
+> +       bool "AT91SAM9X5"
+> +       select SOC_AT91SAM9X5
+> +
+>  config ARCH_AT91X40
+>         bool "AT91x40"
+>         depends on !MMU
 > 
-> diff --git a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
-> index ac870fb..3fa798f 100644
-> --- a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
-> +++ b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
-> @@ -183,6 +183,8 @@
->  				interrupts = <2>;
->  				clocks = <&v2m_sysctl 0>, <&v2m_sysctl 1>, <&smbclk>;
->  				clock-names = "timclken1", "timclken2", "apb_pclk";
-> +				arm,sp804-clocksource = <0x20>;
-> +				arm,sp804-clockevent = <0>;
->  			};
->  
->  			v2m_timer23: timer at 120000 {
-> diff --git a/arch/arm/boot/dts/vexpress-v2m.dtsi b/arch/arm/boot/dts/vexpress-v2m.dtsi
-> index f142036..86e4046 100644
-> --- a/arch/arm/boot/dts/vexpress-v2m.dtsi
-> +++ b/arch/arm/boot/dts/vexpress-v2m.dtsi
-> @@ -182,6 +182,8 @@
->  				interrupts = <2>;
->  				clocks = <&v2m_sysctl 0>, <&v2m_sysctl 1>, <&smbclk>;
->  				clock-names = "timclken1", "timclken2", "apb_pclk";
-> +				arm,sp804-clocksource = <0x20>;
-> +				arm,sp804-clockevent = <0>;
->  			};
->  
->  			v2m_timer23: timer at 12000 {
-> diff --git a/arch/arm/boot/dts/vexpress-v2p-ca9.dts b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-> index 1420bb1..a2eba95 100644
-> --- a/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-> +++ b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-> @@ -98,6 +98,8 @@
->  			     <0 49 4>;
->  		clocks = <&oscclk2>, <&oscclk2>;
->  		clock-names = "timclk", "apb_pclk";
-> +		arm,sp804-clocksource = <0x20>;
-> +		arm,sp804-clockevent = <0>;
->  	};
->  
->  	watchdog at 100e5000 {
+> 1) But before I submit something along those lines: ARCH_AT91* variants
+> are still used quite a bit around the tree (both as Kconfig symbols and
+> as Kconfig macros). How are the current SOC_AT91* symbols wired back to
+> the old ARCH_AT91* symbols? Or are those old symbols and macros _only_
+> needed for backwards compatibility?
 
-I love the possibility of removing the SP804 code from the VE machine
-(thanks for your work!), but I'd like to avoid it being replaced by
-cryptic properties in the tree.
+These ARCH_AT91xxx variables are not used anymore for pure Device Tree
+SoCs (I mean: at91sam9x5, at91sam9n12, sama5d3 families). They are used
+for non-DT SoCs and for chips that support both legacy board files and DT.
+The old ARCH_AT91xxx symbols are selecting the corresponding SOC_AT91xxx
+symbol.
 
-Now, to get this right: I'm not saying that there should be completly no
-OS-specific (but neutral) properties for the clocking system.
+ARCH_AT91xxx in Kconfig that are specific to a particular SoC are going
+to disappear as we tend to allow the compilation of a particular driver
+for a wider range of configurations.
 
-I'm saying that in "my" (the VE) case, there are four, effectively
-identical timers (each pair sharing an interrupt though). Every single
-one of them is perfectly capable of serving as clocksource or
-clockevent. Therefore I believe the driver/framework/OS should make its
-own decision.
-
-Cheers!
-
-Pawe?
+Hope that it helps. Best regards,
+-- 
+Nicolas Ferre
