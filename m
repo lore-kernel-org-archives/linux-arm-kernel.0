@@ -1,31 +1,115 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 13 Mar 2013 13:35:45 +0800
-Subject: [PATCH 1/2] ARM: imx: remove duplicated function declaration
-Message-ID: <1363152946-15378-1-git-send-email-shawn.guo@linaro.org>
+From: padma.kvr@gmail.com (Padma Venkat)
+Date: Wed, 13 Mar 2013 11:06:36 +0530
+Subject: [PATCH V2] DMA: PL330: Add check if device tree compatible
+In-Reply-To: <1362475531-32260-2-git-send-email-padma.v@samsung.com>
+References: <1362475531-32260-1-git-send-email-padma.v@samsung.com>
+ <1362475531-32260-2-git-send-email-padma.v@samsung.com>
+Message-ID: <CAAgF-BfEsFyY7e1pTnn9eWeWo5yDq-6KfKoj0eASRJT+8N6j0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 13eed98 (arm/imx6q: add device tree machine support) added
-duplicated function declaration for imx_enable_cpu() and
-imx_set_cpu_jump().  Remove them.
+Hi,
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/mach-imx/common.h |    2 --
- 1 file changed, 2 deletions(-)
+On Tue, Mar 5, 2013 at 2:55 PM, Padmavathi Venna <padma.v@samsung.com> wrote:
+> This patch register the dma controller with generic dma helpers only
+> in DT case. This also adds some extra error handling in the driver.
+>
+> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+> Reported-by: Sachin Kamat <sachin.kamat@linaro.org>
+> ---
+>
+> Based on Vinod Koul next branch.
+>
+> Changes since V1:
+>         - return silently when of_dma_controller_register fails, as
+>           suggested by Arnd.
+>
+>  drivers/dma/pl330.c |   38 +++++++++++++++++++++++++++-----------
+>  1 files changed, 27 insertions(+), 11 deletions(-)
+>
+> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+> index 7181531..5dbc594 100644
+> --- a/drivers/dma/pl330.c
+> +++ b/drivers/dma/pl330.c
+> @@ -2882,7 +2882,7 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+>  {
+>         struct dma_pl330_platdata *pdat;
+>         struct dma_pl330_dmac *pdmac;
+> -       struct dma_pl330_chan *pch;
+> +       struct dma_pl330_chan *pch, *_p;
+>         struct pl330_info *pi;
+>         struct dma_device *pd;
+>         struct resource *res;
+> @@ -2984,7 +2984,16 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+>         ret = dma_async_device_register(pd);
+>         if (ret) {
+>                 dev_err(&adev->dev, "unable to register DMAC\n");
+> -               goto probe_err2;
+> +               goto probe_err3;
+> +       }
+> +
+> +       if (adev->dev.of_node) {
+> +               ret = of_dma_controller_register(adev->dev.of_node,
+> +                                        of_dma_pl330_xlate, pdmac);
+> +               if (ret) {
+> +                       dev_err(&adev->dev,
+> +                       "unable to register DMA to the generic DT DMA helpers\n");
+> +               }
+>         }
+>
+>         dev_info(&adev->dev,
+> @@ -2995,16 +3004,21 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+>                 pi->pcfg.data_bus_width / 8, pi->pcfg.num_chan,
+>                 pi->pcfg.num_peri, pi->pcfg.num_events);
+>
+> -       ret = of_dma_controller_register(adev->dev.of_node,
+> -                                        of_dma_pl330_xlate, pdmac);
+> -       if (ret) {
+> -               dev_err(&adev->dev,
+> -               "unable to register DMA to the generic DT DMA helpers\n");
+> -               goto probe_err2;
+> -       }
+> -
+>         return 0;
+> +probe_err3:
+> +       amba_set_drvdata(adev, NULL);
+>
+> +       /* Idle the DMAC */
+> +       list_for_each_entry_safe(pch, _p, &pdmac->ddma.channels,
+> +                       chan.device_node) {
+> +
+> +               /* Remove the channel */
+> +               list_del(&pch->chan.device_node);
+> +
+> +               /* Flush the channel */
+> +               pl330_control(&pch->chan, DMA_TERMINATE_ALL, 0);
+> +               pl330_free_chan_resources(&pch->chan);
+> +       }
+>  probe_err2:
+>         pl330_del(pi);
+>  probe_err1:
+> @@ -3023,8 +3037,10 @@ static int pl330_remove(struct amba_device *adev)
+>         if (!pdmac)
+>                 return 0;
+>
+> -       of_dma_controller_free(adev->dev.of_node);
+> +       if (adev->dev.of_node)
+> +               of_dma_controller_free(adev->dev.of_node);
+>
+> +       dma_async_device_unregister(&pdmac->ddma);
 
-diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-index 5a800bf..048e6c8 100644
---- a/arch/arm/mach-imx/common.h
-+++ b/arch/arm/mach-imx/common.h
-@@ -122,8 +122,6 @@ static inline void imx_scu_map_io(void) {}
- static inline void imx_smp_prepare(void) {}
- static inline void imx_scu_standby_enable(void) {}
- #endif
--extern void imx_enable_cpu(int cpu, bool enable);
--extern void imx_set_cpu_jump(int cpu, void *jump_addr);
- extern void imx_src_init(void);
- extern void imx_src_prepare_restart(void);
- extern void imx_gpc_init(void);
--- 
-1.7.9.5
+Any comment on this patch?
+
+Vinod,
+
+Can you please take this patch into your tree?
+
+>         amba_set_drvdata(adev, NULL);
+>
+>         /* Idle the DMAC */
+> --
+> 1.7.4.4
+>
+
+Thanks
+Padma
