@@ -1,35 +1,27 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 13 Mar 2013 15:05:16 +0530
-Subject: [patch 0/7] tick: Optimize broadcast handling and prevent expiry
- ping pong
-In-Reply-To: <20130306111351.883117670@linutronix.de>
-References: <20130306111351.883117670@linutronix.de>
-Message-ID: <51404854.8030303@ti.com>
+From: mpfj-list@mimc.co.uk (Mark Jackson)
+Date: Wed, 13 Mar 2013 09:34:48 +0000
+Subject: [PATCH v3 net-next 1/1] drivers: net: davinci_cpdma: acknowledge
+ interrupt properly
+In-Reply-To: <1361175560-600-1-git-send-email-mugunthanvnm@ti.com>
+References: <1361175560-600-1-git-send-email-mugunthanvnm@ti.com>
+Message-ID: <51404838.2040008@mimc.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas,
+On 18/02/13 08:19, Mugunthan V N wrote:
+> CPDMA interrupts are not properly acknowledged which leads to interrupt
+> storm, only cpdma interrupt 0 is acknowledged in Davinci CPDMA driver.
+> Changed cpdma_ctlr_eoi api to acknowledge 1 and 2 interrupts which are
+> used for rx and tx respectively.
+> 
+> Reported-by: Pantelis Antoniou <panto@antoniou-consulting.com>
+> Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
 
-On Wednesday 06 March 2013 04:48 PM, Thomas Gleixner wrote:
-> Jason decoded a problem related to the broadcast timer mode. The
-> reprogramming of the cpu local timer causes a huge number of
-> retries. Also there is a situation where the CPU which does not handle
-> the broadcast timer interrupt exits and reenters broadcast mode before
-> the broadcast interrupt got handled by another CPU. This can lead to
-> an interesting ping pong of the broadcast and the cpu local timer
-> code.
-> 
-> This series addresses these problems. The first two patches convert
-> the broadcast code to proper cpumask_var_t instead of adding more
-> bitmaps later.
-> 
-> The rest of the series is adopted from the quick patches which I
-> posted earlier while discussing the issue with Jason et. al.
-> 
-> Please give it a proper testing on your affected hardware.
-> 
-I have tested this revised patches on OMAP4 and OMAP5 platforms
-with CPUidle enabled against 3.9-rc2. As expected they seems to
-work without any issue and also fixes the reported retry issue.
+Not sure if I'm seeing this same problem [1], but it doesn't appear fixed to me.
 
-Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+I've tried both mainline -rc2 and -next.
+
+[1] https://lkml.org/lkml/2013/3/12/376
+
+Regards
+Mark J.
