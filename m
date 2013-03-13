@@ -1,29 +1,50 @@
 From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Wed, 13 Mar 2013 09:35:23 +0100
-Subject: [PATCH] mfd: Fix AB8500 build failure if POWER_SUPPLY is not
- configured
-In-Reply-To: <1362080229-27334-1-git-send-email-linux@roeck-us.net>
-References: <1362080229-27334-1-git-send-email-linux@roeck-us.net>
-Message-ID: <20130313083523.GC21994@zurbaran>
+Date: Wed, 13 Mar 2013 09:37:48 +0100
+Subject: [GIT PULL] Device Tree fixes for v3.9
+In-Reply-To: <201303111443.21019.arnd@arndb.de>
+References: <CACRpkdai0PRbK-R_KfNqkkVuSNn97v9Za8Doq71Zb-xCHW+J1A@mail.gmail.com>
+ <201303012319.28231.arnd@arndb.de>
+ <20130302005852.GA3106@gmail.com>
+ <201303111443.21019.arnd@arndb.de>
+Message-ID: <20130313083748.GE21994@zurbaran>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guenter,
+Hi Arnd,
 
-On Thu, Feb 28, 2013 at 11:37:09AM -0800, Guenter Roeck wrote:
-> ab8500-sysctrl.c fails to build if POWER_SUPPLY is not configured.
+On Mon, Mar 11, 2013 at 02:43:20PM +0000, Arnd Bergmann wrote:
+> On Saturday 02 March 2013, Lee Jones wrote:
+> > > 
+> > > I'm still getting build errors even with those patches applied:
+> > > 
+> > > Warning (reg_format): "reg" property in /soc-u9500/prcmu at 80157000/ab8500 at 5 has invalid length (4 bytes) (#address-cells == 1, #size-cells == 1)
+> > > Warning (reg_format): "reg" property in /soc-u9500/prcmu at 80157000/ab8500 at 5 has invalid length (4 bytes) (#address-cells == 1, #size-cells == 1)
+> > > Warning (reg_format): "reg" property in /soc-u9500/prcmu at 80157000/ab8500 at 5 has invalid length (4 bytes) (#address-cells == 1, #size-cells == 1)
+> > > Warning (reg_format): "reg" property in /soc-u9500/prcmu at 80157000/ab8500 at 5 has invalid length (4 bytes) (#address-cells == 1, #size-cells == 1)
+> > 
+> > These have been there since DT landed for the AB8500 - it's on my TODO
+> > to fix, but it's a really low priority.
 > 
-> drivers/built-in.o: In function `ab8500_power_off':
-> drivers/mfd/ab8500-sysctrl.c:37: undefined reference to `power_supply_get_by_name'
-> drivers/mfd/ab8500-sysctrl.c:53: undefined reference to `power_supply_get_by_name'
+> I've come up with the trivial patch below. I'm trying hard to kill off all known
+> warnings, and will not take submissions introducing new ones if I see them.
 > 
-> Select POWER_SUPPLY in Kconfig if AB8500_CORE is configured to fix the problem.
+> Maybe Sam can just pick this up along with the other patch.
+I applied the patch below to my fd-fixes tree. Which one do you mean by "the
+other patch" ?
+
+
+> > > drivers/built-in.o: In function `ab8500_power_off':
+> > > /git/arm-soc/drivers/mfd/ab8500-sysctrl.c:37: undefined reference to `power_supply_get_by_name'
+> > > /git/arm-soc/drivers/mfd/ab8500-sysctrl.c:53: undefined reference to `power_supply_get_by_name'
+> > > make[2]: *** [vmlinux] Error 1
+> > 
+> > This has already been fixed.
+> > 
+> > https://patchwork.kernel.org/patch/2163301/
 > 
-> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
-> ---
->  drivers/mfd/Kconfig |    1 +
->  1 file changed, 1 insertion(+)
-I applied Axel's patch to my mfd-fixes tree now.
+> It hasn't made it into v3.9-rc2 or even linux-next yet. I guess it got lost
+> somewhere.
+It's applied to my mfd-fixes as well now.
 
 Cheers,
 Samuel.
