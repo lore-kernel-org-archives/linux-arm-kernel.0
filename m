@@ -1,51 +1,42 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 12 Mar 2013 22:42:30 -0600
-Subject: [RFC 1/1] clk: Add notifier support in
- clk_prepare_enable/clk_disable_unprepare
-In-Reply-To: <1363139273.21694.11.camel@bilhuang-vm1>
-References: <1363091861-21534-1-git-send-email-bilhuang@nvidia.com>
- <20130312134032.GU4977@n2100.arm.linux.org.uk>
- <1363139273.21694.11.camel@bilhuang-vm1>
-Message-ID: <514003B6.8020904@wwwdotorg.org>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Wed, 13 Mar 2013 12:57:34 +0800
+Subject: [PATCH V2 9/9] ARM: dts: tegra: add the PM configurations of PMC
+In-Reply-To: <513FFD12.8050007@wwwdotorg.org>
+References: <1363061043-9680-1-git-send-email-josephl@nvidia.com>
+ <97395805.p014F9TUYL@fb07-iapwap2.physik.uni-giessen.de>
+ <1363142623.3998.33.camel@jlo-ubuntu-64.nvidia.com>
+ <513FFD12.8050007@wwwdotorg.org>
+Message-ID: <1363150654.3998.103.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/12/2013 07:47 PM, Bill Huang wrote:
-> On Tue, 2013-03-12 at 21:40 +0800, Russell King - ARM Linux wrote:
->> On Tue, Mar 12, 2013 at 05:37:41AM -0700, Bill Huang wrote:
->>> Add the below four notifier events so drivers which are interested in
->>> knowing the clock status can act accordingly. This is extremely useful
->>> in some of the DVFS (Dynamic Voltage Frequency Scaling) design.
->>>
->>> PRE_CLK_ENABLE
->>> POST_CLK_ENABLE
->>> PRE_CLK_DISABLE
->>> POST_CLK_DISABLE
->>>
->>> Signed-off-by: Bill Huang <bilhuang@nvidia.com>
->>
->> NAK.  *Sigh* NO, this is the wrong level to be doing stuff like this.
->>
->> The *ONLY* thing that clk_prepare_enable() and clk_prepare_disable() should
->> *EVER* be doing is calling clk_prepare(), clk_enable(), clk_disable() and
->> clk_unprepare().  Those two functions are *merely* helpers for drivers
->> who don't wish to make the individual calls.
->>
->> Drivers are still completely free to call the individual functions, at
->> which point your proposal breaks horribly - and they _do_ call the
->> individual functions.
->
-> I'm proposing to give device driver a choice when it knows that some
-> driver might be interested in knowing its clock's enabled/disabled state
-> change at runtime, this is very important for centralized DVFS core
-> driver. It is not meant to be covering all cases especially for drivers
-> which is not part of the DVFS, so we don't care if it is calling
-> clk_enable/disable directly or not.
+On Wed, 2013-03-13 at 12:14 +0800, Stephen Warren wrote:
+> On 03/12/2013 08:43 PM, Joseph Lo wrote:
+> > Hi Marc,
+> > 
+> > On Tue, 2013-03-12 at 18:43 +0800, Marc Dietrich wrote:
+> >> Am Dienstag, 12. M?rz 2013, 12:04:03 schrieb Joseph Lo:
+> >>> Adding the PM configuration of PMC when the platform support suspend
+> >>> function.
+> 
+> >>> +		nvidia,core-pwr-good-time = <3845 3845>;
+> >>
+> >> mmh, no idea here. original source [1] shows 0x7e7e ticks which translates to 
+> >> 1 sec?
+> >>
+> > The ticks was based on the 32KHz clock domain. I translate it to uS.
+> 
+> >>> 0x7e7e * (1.0/32000) * 1000000
+> 1011937.4999999999
+> 
+> Oh, I suppose perhaps the 0x7e7e value is both values packed together,
+> so this should be:
+> 
+> >>> 0x7e * (1.0/32000) * 1000000
+> 3937.5
+Yes.
 
-I believe the point Russell is making is not that the idea behind this
-patch is wrong, but simply that the function where you put the hooks is
-wrong. The hooks should at least be in clk_enable/clk_disable and not
-clk_prepare_enable/clk_disable_unprepare, since any driver is free to
-call clk_prepare separately from clk_enable. The hooks should be
-implemented in the lowest-level common function that all
-driver-accessible paths call through.
+0x7e * (1.0/32768) * 1000000 = 3845
+
+Thanks,
+Joseph
