@@ -1,79 +1,142 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 13 Mar 2013 13:40:02 -0700
-Subject: [PATCH v2 4/4] ARM: dts: Add adc and thermistors for exynos5250-snow
-In-Reply-To: <1363207202-10858-1-git-send-email-dianders@chromium.org>
-References: <1363129994-10438-1-git-send-email-dianders@chromium.org>
- <1363207202-10858-1-git-send-email-dianders@chromium.org>
-Message-ID: <1363207202-10858-5-git-send-email-dianders@chromium.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 14 Mar 2013 00:45:03 +0300
+Subject: [PATCH 2/7] ARM: shmobile: marzen: add USB EHCI driver support
+In-Reply-To: <1352446306-19945-3-git-send-email-horms@verge.net.au>
+References: <1352446306-19945-1-git-send-email-horms@verge.net.au>
+ <1352446306-19945-3-git-send-email-horms@verge.net.au>
+Message-ID: <5140F35F.3090702@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hook up the exynos5250-snow thermistors via the device tree now that
-there's a driver available to use them.
+Hello.
 
-Signed-off-by: Doug Anderson <dianders@chromium.org>
----
-Changes in v2:
-- Match 'uV' -> 'uv' change in Naveen's bindings.
+On 11/09/2012 10:31 AM, Simon Horman wrote:
 
- arch/arm/boot/dts/cros5250-common.dtsi |  4 ++++
- arch/arm/boot/dts/exynos5250-snow.dts  | 31 +++++++++++++++++++++++++++++++
- 2 files changed, 35 insertions(+)
+> From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+>
+> This patch supports CN21/CN22 USB 2.0 (port 0/1/2),
+> and enable USB momery on defconfig
 
-diff --git a/arch/arm/boot/dts/cros5250-common.dtsi b/arch/arm/boot/dts/cros5250-common.dtsi
-index 46c0980..f7cc835 100644
---- a/arch/arm/boot/dts/cros5250-common.dtsi
-+++ b/arch/arm/boot/dts/cros5250-common.dtsi
-@@ -167,6 +167,10 @@
- 		status = "disabled";
- 	};
- 
-+	adc at 12D10000 {
-+		vdd-supply = <&buck5_reg>;
-+	};
-+
- 	hdmi {
- 		hpd-gpio = <&gpx3 7 0xf 1 3>;
- 	};
-diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
-index 17dd951..b78da7c 100644
---- a/arch/arm/boot/dts/exynos5250-snow.dts
-+++ b/arch/arm/boot/dts/exynos5250-snow.dts
-@@ -40,4 +40,35 @@
- 				<&gpc4 5 2 3 0>, <&gpc4 6 2 3 0>;
- 		};
- 	};
-+
-+	adc at 12D10000 {
-+		ncp15wb473 at 3 {
-+			compatible = "ntc,ncp15wb473";
-+			pullup-uv = <1800000>;
-+			pullup-ohm = <47000>;
-+			pulldown-ohm = <0>;
-+			io-channels = <&adc 3>;
-+		};
-+		ncp15wb473 at 4 {
-+			compatible = "ntc,ncp15wb473";
-+			pullup-uv = <1800000>;
-+			pullup-ohm = <47000>;
-+			pulldown-ohm = <0>;
-+			io-channels = <&adc 4>;
-+		};
-+		ncp15wb473 at 5 {
-+			compatible = "ntc,ncp15wb473";
-+			pullup-uv = <1800000>;
-+			pullup-ohm = <47000>;
-+			pulldown-ohm = <0>;
-+			io-channels = <&adc 5>;
-+		};
-+		ncp15wb473 at 6 {
-+			compatible = "ntc,ncp15wb473";
-+			pullup-uv = <1800000>;
-+			pullup-ohm = <47000>;
-+			pulldown-ohm = <0>;
-+			io-channels = <&adc 6>;
-+		};
-+	};
- };
--- 
-1.8.1.3
+    Sorry for late comment but I'm studying this code just now (in order 
+to add R-Car M1A USB support).
+
+> Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> Signed-off-by: Simon Horman <horms@verge.net.au>
+> ---
+>   arch/arm/configs/marzen_defconfig     |    6 ++
+>   arch/arm/mach-shmobile/Kconfig        |    1 +
+>   arch/arm/mach-shmobile/board-marzen.c |  108 ++++++++++++++++++++++++++++++++-
+>   3 files changed, 114 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-shmobile/board-marzen.c b/arch/arm/mach-shmobile/board-marzen.c
+> index 74c7f0b..707b3bd 100644
+> --- a/arch/arm/mach-shmobile/board-marzen.c
+> +++ b/arch/arm/mach-shmobile/board-marzen.c
+> @@ -34,6 +34,9 @@
+[...]
+> @@ -172,6 +175,101 @@ static struct platform_device *marzen_devices[] __initdata = {
+>   	&usb_phy_device,
+>   };
+>   
+> +/* USB */
+> +static struct usb_phy *phy;
+> +static int usb_power_on(struct platform_device *pdev)
+> +{
+> +	if (!phy)
+> +		return -EIO;
+> +
+> +	pm_runtime_enable(&pdev->dev);
+> +	pm_runtime_get_sync(&pdev->dev);
+> +
+> +	usb_phy_init(phy);
+> +
+> +	return 0;
+> +}
+> +
+> +static void usb_power_off(struct platform_device *pdev)
+> +{
+> +	if (!phy)
+> +		return;
+> +
+> +	usb_phy_shutdown(phy);
+> +
+> +	pm_runtime_put_sync(&pdev->dev);
+> +	pm_runtime_disable(&pdev->dev);
+> +}
+> +
+> +static struct usb_ehci_pdata ehcix_pdata = {
+> +	.power_on	= usb_power_on,
+> +	.power_off	= usb_power_off,
+> +	.power_suspend	= usb_power_off,
+> +};
+> +
+> +static struct resource ehci0_resources[] = {
+> +	[0] = {
+> +		.start	= 0xffe70000,
+> +		.end	= 0xffe70400 - 1,
+> +		.flags	= IORESOURCE_MEM,
+> +	},
+> +	[1] = {
+> +		.start	= gic_spi(44),
+> +		.flags	= IORESOURCE_IRQ,
+> +	},
+> +};
+> +
+> +static struct platform_device ehci0_device = {
+> +	.name	= "ehci-platform",
+> +	.id	= 0,
+> +	.dev	= {
+> +		.dma_mask		= &ehci0_device.dev.coherent_dma_mask,
+> +		.coherent_dma_mask	= 0xffffffff,
+> +		.platform_data		= &ehcix_pdata,
+> +	},
+> +	.num_resources	= ARRAY_SIZE(ehci0_resources),
+> +	.resource	= ehci0_resources,
+> +};
+> +
+> +static struct resource ehci1_resources[] = {
+> +	[0] = {
+> +		.start	= 0xfff70000,
+> +		.end	= 0xfff70400 - 1,
+> +		.flags	= IORESOURCE_MEM,
+> +	},
+> +	[1] = {
+> +		.start	= gic_spi(45),
+> +		.flags	= IORESOURCE_IRQ,
+> +	},
+> +};
+> +
+> +static struct platform_device ehci1_device = {
+> +	.name	= "ehci-platform",
+> +	.id	= 1,
+> +	.dev	= {
+> +		.dma_mask		= &ehci1_device.dev.coherent_dma_mask,
+> +		.coherent_dma_mask	= 0xffffffff,
+> +		.platform_data		= &ehcix_pdata,
+> +	},
+> +	.num_resources	= ARRAY_SIZE(ehci1_resources),
+> +	.resource	= ehci1_resources,
+> +};
+> +
+> +static struct platform_device *marzen_late_devices[] __initdata = {
+> +	&ehci0_device,
+> +	&ehci1_device,
+> +};
+> +
+> +void __init marzen_init_late(void)
+> +{
+> +	/* get usb phy */
+> +	phy = usb_get_phy(USB_PHY_TYPE_USB2);
+> +
+> +	shmobile_init_late();
+> +	platform_add_devices(marzen_late_devices,
+> +			     ARRAY_SIZE(marzen_late_devices));
+> +}
+> +
+>
+
+    Morimoto-san, I don't understand why this SoC specific platform device
+ended up in the board file? Could you explain your reasons please?
+    I think this is generally a bad practice as this approach scales badly.
+
+WVR, Sergei
