@@ -1,34 +1,97 @@
 From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Thu, 14 Mar 2013 01:19:49 +0530
-Subject: [PATCH V3 0/5] ARM: DT: tegra114: Add DT entry for different
- controller
-Message-ID: <1363204194-19487-1-git-send-email-ldewangan@nvidia.com>
+Date: Thu, 14 Mar 2013 01:19:51 +0530
+Subject: [PATCH V3 2/5] ARM: tegra: add i2c nodes to Tegra114 DT
+In-Reply-To: <1363204194-19487-1-git-send-email-ldewangan@nvidia.com>
+References: <1363204194-19487-1-git-send-email-ldewangan@nvidia.com>
+Message-ID: <1363204194-19487-3-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series add DT entry for APB DMA, I2C, UART, KBC and SPI.
+NVIDIA's Tegra114 has 5 i2c controllers. These controllers have
+following changes which makes incompatible with previous hardware:
+- Single clock source to i2c controller.
+- Interrupt support for per packet transfer.
 
-This patch series is generated on top of CCF work for T114 done by Peter
-and hence it should be applied on top of T114 CCF patches.
+Add DT entry for i2c controllers and make it compatible with
+"nvidia,tegra114-i2c".
 
-Changes from V1: 
-- Add reason why APBDMA is not compatible with older driver
-  in description.
-- Remove UARTB car id correction. Make the compatible with tegra114 and
-  older chip.
-- Add compatible for kbc as nvidia,tegra114-kbc and nvidia,tegra20-kbc.
+Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+---
+Changes from V1:
+- None
 
 Changes from V2:
-- Rebase whole tree with Stephen tegra tree for-3.10/dt.
-- Rephrase the commit subjects.
-- Add more description about why driver is not compatible with prev hardware.
+- Rebase to for-3.10/dt of Stephen's tegra tree.
+- Better describe why Tegra114 is not compatible with previous hardware.
 
-Laxman Dewangan (5):
-  ARM: tegra: add APB DMA nodes to Tegra114 DT
-  ARM: tegra: add i2c nodes to Tegra114 DT
-  ARM: tegra:add aliases and DMA requestor for serial nodes of Tegra114
-  ARM: tegra: add KBC nodes to Tegra114 DT
-  ARM: tegra: add spi nodes to Tegra114 DT
+ arch/arm/boot/dts/tegra114.dtsi |   55 +++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 55 insertions(+), 0 deletions(-)
 
- arch/arm/boot/dts/tegra114.dtsi |  200 ++++++++++++++++++++++++++++++++++++++-
- 1 files changed, 196 insertions(+), 4 deletions(-)
+diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
+index 634d70c..ce44938 100644
+--- a/arch/arm/boot/dts/tegra114.dtsi
++++ b/arch/arm/boot/dts/tegra114.dtsi
+@@ -138,6 +138,61 @@
+ 		status = "disabled";
+ 	};
+ 
++	i2c at 7000c000 {
++		compatible = "nvidia,tegra114-i2c";
++		reg = <0x7000c000 0x100>;
++		interrupts = <0 38 0x04>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
++		clocks = <&tegra_car 12>;
++		clock-names = "div-clk";
++	};
++
++	i2c at 7000c400 {
++		compatible = "nvidia,tegra114-i2c";
++		reg = <0x7000c400 0x100>;
++		interrupts = <0 84 0x04>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
++		clocks = <&tegra_car 54>;
++		clock-names = "div-clk";
++	};
++
++	i2c at 7000c500 {
++		compatible = "nvidia,tegra114-i2c";
++		reg = <0x7000c500 0x100>;
++		interrupts = <0 92 0x04>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
++		clocks = <&tegra_car 67>;
++		clock-names = "div-clk";
++	};
++
++	i2c at 7000c700 {
++		compatible = "nvidia,tegra114-i2c";
++		reg = <0x7000c700 0x100>;
++		interrupts = <0 120 0x04>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
++		clocks = <&tegra_car 103>;
++		clock-names = "div-clk";
++	};
++
++	i2c at 7000d000 {
++		compatible = "nvidia,tegra114-i2c";
++		reg = <0x7000d000 0x100>;
++		interrupts = <0 53 0x04>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
++		clocks = <&tegra_car 47>;
++		clock-names = "div-clk";
++	};
++
+ 	rtc {
+ 		compatible = "nvidia,tegra114-rtc", "nvidia,tegra20-rtc";
+ 		reg = <0x7000e000 0x100>;
+-- 
+1.7.1.1
