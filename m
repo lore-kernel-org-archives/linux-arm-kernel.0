@@ -1,36 +1,31 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Wed, 13 Mar 2013 11:48:08 +0100
-Subject: ARM: at-91: ARCH_AT91SAM9X5 went missing
-Message-ID: <1363171688.3137.196.camel@x61.thuisdomein>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 13 Mar 2013 10:49:45 +0000
+Subject: [PATCH 08/10] ASoC: dmaengine_pcm: Add open function for DT DMA
+ request
+In-Reply-To: <20130313021712.GD27461@S2101-09.ap.freescale.net>
+References: <1362940391-8338-1-git-send-email-mpa@pengutronix.de>
+ <1362940391-8338-9-git-send-email-mpa@pengutronix.de>
+ <20130312190206.GY19942@opensource.wolfsonmicro.com>
+ <20130313021712.GD27461@S2101-09.ap.freescale.net>
+Message-ID: <20130313104945.GI25610@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-0) Commit 1e3ce2b8545390a2aee8dbfcd49ca4161b636000
-("AR[M]: at91: introduce SOC_AT91xxx define to allow to compile SoC core
-support") dropped the Kconfig symbol ARCH_AT91SAM9X5. It seems it missed
-something like this:
+On Wed, Mar 13, 2013 at 10:18:29AM +0800, Shawn Guo wrote:
 
-diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index 6071f4c..2db5370 100644
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@ -131,6 +131,10 @@ config ARCH_AT91SAM9G45
-        bool "AT91SAM9G45"
-        select SOC_AT91SAM9G45
- 
-+config ARCH_AT91SAM9X5
-+       bool "AT91SAM9X5"
-+       select SOC_AT91SAM9X5
-+
- config ARCH_AT91X40
-        bool "AT91x40"
-        depends on !MMU
+> I did not see any objection from you on that patch, so I'm waiting for
+> you to publish a branch for it, so that my mxs-dma generic binding
+> series can move forward.
 
-1) But before I submit something along those lines: ARCH_AT91* variants
-are still used quite a bit around the tree (both as Kconfig symbols and
-as Kconfig macros). How are the current SOC_AT91* symbols wired back to
-the old ARCH_AT91* symbols? Or are those old symbols and macros _only_
-needed for backwards compatibility?
-
-
-Paul Bolle
+I commented on the removal of the const from the name parameter (and
+ideally an in order version of the patch series would be nice) but in
+general I was mostly waiting for review and test from other people.  DT
+and dmaengine both seem endless sources of problems so I'd rather make
+sure everyone's had a chance to look.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130313/99380e3e/attachment.sig>
