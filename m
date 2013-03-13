@@ -1,72 +1,39 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 13 Mar 2013 07:35:41 +0100
+Date: Wed, 13 Mar 2013 07:41:00 +0100
 Subject: [PATCH v2 05/14] ARM: integrator: use clocksource_of_init for
  sp804
-In-Reply-To: <1363108124-17484-6-git-send-email-haojian.zhuang@linaro.org>
+In-Reply-To: <CAD6h2NTNFZM4cgDmCJG+NrNbd27MdXGGsRCTpC1bJGeMAgcP-g@mail.gmail.com>
 References: <1363108124-17484-1-git-send-email-haojian.zhuang@linaro.org>
  <1363108124-17484-6-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <CACRpkdar6JqZUyLWDgPBCUC6BNX2BzQwLvtqnWZ_M5yu0VHqNw@mail.gmail.com>
+ <513F7EBD.80207@gmail.com> <201303121933.47994.arnd@arndb.de>
+ <513F9597.8050000@gmail.com>
+ <CAD6h2NTNFZM4cgDmCJG+NrNbd27MdXGGsRCTpC1bJGeMAgcP-g@mail.gmail.com>
+Message-ID: <CACRpkdbCJd-ag1gLrJqJZ1D6+E5eX2tNuuNAtiKgtuBsxmrpmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 12, 2013 at 6:08 PM, Haojian Zhuang
+On Wed, Mar 13, 2013 at 3:04 AM, Haojian Zhuang
 <haojian.zhuang@linaro.org> wrote:
+> On 13 March 2013 04:52, Rob Herring <robherring2@gmail.com> wrote:
+>> On 03/12/2013 02:33 PM, Arnd Bergmann wrote:
+>>> On Tuesday 12 March 2013, Rob Herring wrote:
+>>>> On 03/12/2013 12:08 PM, Haojian Zhuang wrote:
+>>
+>> Since the primecell ID registers are defined to be at 0xFF? offset, it
+>> is quite impossible for the integrator timers to have the ID registers
+>> within their 0x100 address space.
+>>
+> I'm sorry that I don't know this. I can add "arm,integrator-timer" into
+> compatible table of sp804 driver. I think that we could resolve this
+> issue. What's your opinion?
 
-> Remove all code to parse sp804 in integrator platform driver. Use
-> clocksource_of_init() instead since these code are implemented in sp804
-> driver already.
+As per the other discussion:
 
-(...)
-> --- a/arch/arm/boot/dts/integratorap.dts
-> +++ b/arch/arm/boot/dts/integratorap.dts
->         timer0: timer at 13000000 {
-> -               compatible = "arm,integrator-timer";
-> +               compatible = "arm,sp804", "arm,primecell";
->         };
->
->         timer1: timer at 13000100 {
-> -               compatible = "arm,integrator-timer";
-> +               compatible = "arm,sp804", "arm,primecell";
-> +               arm,sp804-clockevent = <0>;
-> +               status = "ok";
->         };
->
->         timer2: timer at 13000200 {
-> -               compatible = "arm,integrator-timer";
-> +               compatible = "arm,sp804", "arm,primecell";
-> +               arm,sp804-clocksource = <0>;
-> +               status = "ok";
->         };
+The Integrator/AP has a timer which is different from the SP804.
 
-This is wrong. The Integrator/AP timer is not an SP804.
-It may look similar but it's a totally different kind of beast.
+The Integrator/CP has an SP804.
 
-What is needed is to break out the timer code from
-integrator_ap.c and move it to drivers/clocksource,
-but wait with that until you fixed the SP804 in the
-Integrator/CP, which is probably what you want to
-prioritize.
-
-(...)
-> --- a/arch/arm/mach-integrator/Kconfig
-> +++ b/arch/arm/mach-integrator/Kconfig
-(...)
-> -static void __init ap_of_timer_init(void)
-> -{
-> -       struct device_node *node;
-> -       const char *path;
-> -       void __iomem *base;
-> -       int err;
-> -       int irq;
-> -       struct clk *clk;
-> -       unsigned long rate;
-> -
-> -       clk = clk_get_sys("ap_timer", NULL);
-
-As you see you are not changing this clock lookup either, which
-will never work.
-
-Please restrict the patch to altering Integrator/CP.
+Please restrict the patch set to Integrator/CP.
 
 Yours,
 Linus Walleij
