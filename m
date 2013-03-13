@@ -1,62 +1,107 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 13 Mar 2013 17:30:41 +0100
-Subject: [PATCH 3/3] ARM: at91: renamme rm9200 dt file
-In-Reply-To: <51408BC0.6020109@atmel.com>
-References: <20130307130842.GA4590@game.jcrosoft.org>
- <1362666113-16434-1-git-send-email-plagnioj@jcrosoft.com>
- <1362666113-16434-3-git-send-email-plagnioj@jcrosoft.com>
- <51408BC0.6020109@atmel.com>
-Message-ID: <5140A9B1.8030202@atmel.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 13 Mar 2013 17:30:53 +0100
+Subject: [PATCH V2] clk: Add composite clock type
+In-Reply-To: <512F9FEF.4010304@wwwdotorg.org>
+References: <1359965482-29655-1-git-send-email-pgaikwad@nvidia.com>
+ <512F0E2F.4000104@nvidia.com> <512F9FEF.4010304@wwwdotorg.org>
+Message-ID: <2953843.6tCZYDlhTN@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/13/2013 03:22 PM, Nicolas Ferre :
-> On 03/07/2013 03:21 PM, Jean-Christophe PLAGNIOL-VILLARD :
->> to follow the same scheme board-dt-<socs>.c
+Hi Prashant,
+
+On Thursday 28 of February 2013 11:20:31 Stephen Warren wrote:
+> On 02/28/2013 12:58 AM, Prashant Gaikwad wrote:
+> > On Wednesday 06 February 2013 03:36 PM, Tomasz Figa wrote:
+> >> On Wednesday 06 of February 2013 08:34:32 Prashant Gaikwad wrote:
+> >>> On Tuesday 05 February 2013 03:45 PM, Tomasz Figa wrote:
+> >>>> Hi Prashant,
+> >>>> 
+> >>>> Thank you for your patch. Please see some comments inline.
+> >>>> 
+> >>>> On Monday 04 of February 2013 13:41:22 Prashant Gaikwad wrote:
+> >>>>> Not all clocks are required to be decomposed into basic clock
+> >>>>> types but at the same time want to use the functionality
+> >>>>> provided by these basic clock types instead of duplicating.
+> >>>>> 
+> >>>>> For example, Tegra SoC has ~100 clocks which can be decomposed
+> >>>>> into Mux -> Div -> Gate clock types making the clock count to
+> >>>>> ~300. Also, parent change operation can not be performed on gate
+> >>>>> clock which forces to use mux clock in driver if want to change
+> >>>>> the parent.
+> >>>>> 
+> >>>>> Instead aggregate the basic clock types functionality into one
+> >>>>> clock and just use this clock for all operations. This clock
+> >>>>> type re-uses the functionality of basic clock types and not
+> >>>>> limited to basic clock types but any hardware-specific
+> >>>>> implementation.
+> >>>>> 
+> >>>>> diff --git a/drivers/clk/clk-composite.c
+> >>>>> 
+> >>>>> +static u8 clk_composite_get_parent(struct clk_hw *hw)
+> >>>>> +{
+> >>>>> +     struct clk_composite *composite = to_clk_composite(hw);
+> >>>>> +     const struct clk_ops *mux_ops = composite->mux_ops;
+> >>>>> +     struct clk_hw *mux_hw = composite->mux_hw;
+> >>>>> +
+> >>>>> +     mux_hw->clk = hw->clk;
+> >>>> 
+> >>>> Why is this needed? Looks like this filed is already being initialized
+> >>>> in clk_register_composite.
+> >>> 
+> >>> Some ops will get called during clk_init where this clk is not populated
+> >>> hence doing here. I have done it for all ops to make sure that any
+> >>> future change in clock framework don't break this clock.
+> >>> Now, why duplicate it in clk_register_composite? It is possible that
+> >>> none of these ops get called in clk_init.
+> >>> For example, recalc_rate is called during init and this ops is supported
+> >>> by div clock type, but what if div clock is not added.
+> >>> 
+> >>> I hope this explains the need.
+> >> 
+> >> Sorry, I don't understand your explanation.
+> >> 
+> >> I have asked why mux_hw->clk field has to be reinitialized in all the
+> >> ops.
+> >> 
+> >> In other words, is it even possible that this clk pointer changes since
+> >> calling clk_register from clk_register_composite and if yes, why?
+> > 
+> > Tomasz,
+> > 
+> > calling sequence is as
+> > 
+> > clk_register(struct clk_hw *hw)
+> > 
+> >     clk_init(struct clk_hw *hw)
+> >     
+> >         .
+> >         .
+> >         hw->clk = clk;
+> >         clk->ops.recalc_rate(hw) => clk_composite_recalc_rate(hw) =>
+> > 
+> > composite->div_ops.recalc_rate(div_hw) => clk_divider_recalc_rate(hw)
+> > 
+> > Now if clk_divider_recalc_rate tries to access clk from hw then it will
+> > get NULL since this is not assigned yet and that is what I am doing in
+> > clk_composite_recalc_rate.
+> > 
+> > I am doing it in all ops because I can not assume which one will get
+> > called first and always. If in future something changes the calling
+> > sequence in ccf framework then it will break this clock.
 > 
-> Well not <socs> as each and every SoC will not have its own board file.
-> I confess that finding a proper name is not easy, what about:
-> 
-> Rename the board-rm9200-dt.c file so that we follow the pattern for
-> Device Tree board files: board-dt-<name of SoC sharing same core>.c
+> Surely the CCF core should be taking care of this as part of
+> clk_register() or clk_init()?
 
-Queued in at91-3.10-soc with this modified commit message.
+Any news on this? It would be nice if this patch could be merged soon, because 
+we'd like to rework Exynos clock code to use composite clocks before merge 
+window, to have that merged for 3.10.
 
-Thanks, best regards,
+If you don't have time to work on this, would you mind if I made any necessary 
+fixes, added my sign-off next to yours and posted next version myself?
 
-
-> Best regards,
-> 
->> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
->> Cc: Ludovic Desroches <ludovic.desroches@atmel.com>
->> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
->> ---
->>  arch/arm/mach-at91/Makefile                                 |    2 +-
->>  arch/arm/mach-at91/{board-rm9200-dt.c => board-dt-rm9200.c} |    0
->>  2 files changed, 1 insertion(+), 1 deletion(-)
->>  rename arch/arm/mach-at91/{board-rm9200-dt.c => board-dt-rm9200.c} (100%)
->>
->> diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
->> index 5eca35a..505fed9 100644
->> --- a/arch/arm/mach-at91/Makefile
->> +++ b/arch/arm/mach-at91/Makefile
->> @@ -87,7 +87,7 @@ obj-$(CONFIG_MACH_SNAPPER_9260)	+= board-snapper9260.o
->>  obj-$(CONFIG_MACH_AT91SAM9M10G45EK) += board-sam9m10g45ek.o
->>  
->>  # AT91SAM board with device-tree
->> -obj-$(CONFIG_MACH_AT91RM9200_DT) += board-rm9200-dt.o
->> +obj-$(CONFIG_MACH_AT91RM9200_DT) += board-dt-rm9200.o
->>  obj-$(CONFIG_MACH_AT91SAM9_DT) += board-dt-sam9.o
->>  
->>  # AT91X40 board-specific support
->> diff --git a/arch/arm/mach-at91/board-rm9200-dt.c b/arch/arm/mach-at91/board-dt-rm9200.c
->> similarity index 100%
->> rename from arch/arm/mach-at91/board-rm9200-dt.c
->> rename to arch/arm/mach-at91/board-dt-rm9200.c
->>
-> 
-> 
-
-
+Best regards,
 -- 
-Nicolas Ferre
+Tomasz Figa
+Samsung Poland R&D Center
+SW Solution Development, Kernel and System Framework
