@@ -1,65 +1,54 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Wed, 13 Mar 2013 14:30:19 -0400
-Subject: [PATCH 10/29] arm64: KVM: Cortex-A57 specific system registers
- handling
-In-Reply-To: <1362455265-24165-11-git-send-email-marc.zyngier@arm.com>
-References: <1362455265-24165-1-git-send-email-marc.zyngier@arm.com>
- <1362455265-24165-11-git-send-email-marc.zyngier@arm.com>
-Message-ID: <5140C5BB.7010401@codeaurora.org>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 13 Mar 2013 12:30:54 -0600
+Subject: [PATCH] ARM: mvebu: fix RAM size for Armada XP board DB-MV784MP-GP
+In-Reply-To: <20130313174324.GS21478@lunn.ch>
+References: <20130216164457.GA23237@titan.lakedaemon.net>
+ <1363101135-21635-1-git-send-email-jason@lakedaemon.net>
+ <51408D86.6040703@cogentembedded.com>
+ <51408F0C.2010408@free-electrons.com>
+ <20130313173559.GD24042@obsidianresearch.com>
+ <20130313174324.GS21478@lunn.ch>
+Message-ID: <20130313183054.GA26303@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
-
-I wonder if two of these registers could be handled in a generic fashion.
-
-On 03/04/2013 10:47 PM, Marc Zyngier wrote:
-> Add the support code for Cortex-A57 specific system registers.
+On Wed, Mar 13, 2013 at 06:43:24PM +0100, Andrew Lunn wrote:
+> On Wed, Mar 13, 2013 at 11:35:59AM -0600, Jason Gunthorpe wrote:
+> > On Wed, Mar 13, 2013 at 03:37:00PM +0100, Gregory CLEMENT wrote:
+> > 
+> > > >> +		 * size of the module actually plugged
+> > > >>   		 */
+> > > >> -		reg = <0x00000000 0xC0000000>;
+> > > >> +		reg = <0x00000000 0xD0000000>;
+> > > > 
+> > > >     But this is not 4G?
+> > > 
+> > > You're totally right!
+> > > It should be reg = <0x00000000 0xF0000000>;
+> > 
+> > Isn't it 'right' as it is? The various included DT's put devices at
+> > address 0xd0008000 for instance, memory shouldn't overlap that..
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/kvm/sys_regs_a57.c | 96 +++++++++++++++++++++++++++++++++++++++++++
+> Shouldn't DT describe the hardware? The hardware has 4GB. How much of
+> it Linux decides to use so as to avoid overlaps with registers etc, is
+> not a hardware issue, but software.
 
-[...]
+Sure, but which HW? The 'reg' in 'memory' is not describing a DDR
+bus. It is describing the DDR address mapping registers in the SOC -
+and they are probably set for 0 -> 0xD0000000 by the firmware.
 
-> +#define MPIDR_EL1_AFF0_MASK	0xff
-> +
-> +static void reset_mpidr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
-> +{
-> +	/*
-> +	 * Simply map the vcpu_id into the Aff0 field of the MPIDR.
-> +	 */
-> +	vcpu->arch.sys_regs[MPIDR_EL1] = (1 << 31) | (vcpu->vcpu_id & MPIDR_EL1_AFF0_MASK);
-> +}
+To describe the 4G of DDR you need DT nodes that show:
+- The N DDR chip selects going to each DDR rank
+- How much memory is in each DDR rank
+- How each chip select is currently mapped into CPU address space
 
-What's A57-specific about this MPIDR behavior?
+This is the minimal amount of information needed for Linux to
+reprogram the entire address map, if it so chooses.
 
-[...]
+To me, the *address map* in the DTB passed from the firwmare should
+reflect the state of the machine when the OS is started. That way an
+OS without drivers for the address map hardware will function
+properly.
 
-> +/*
-> + * A57-specific sys-reg registers.
-> + * Important: Must be sorted ascending by Op0, Op1, CRn, CRm, Op2
-> + */
-> +static const struct sys_reg_desc a57_sys_regs[] = {
-> +	{ Op0(0b11), Op1(0b000), CRn(0b0000), CRm(0b0000), Op2(0b101), /* MPIDR_EL1 */
-> +	  NULL, reset_mpidr, MPIDR_EL1 },
-> +	{ Op0(0b11), Op1(0b000), CRn(0b0001), CRm(0b0000), Op2(0b000), /* SCTLR_EL1 */
-> +	  NULL, reset_val, SCTLR_EL1, 0x00C50078 },
-> +	{ Op0(0b11), Op1(0b000), CRn(0b0001), CRm(0b0000), Op2(0b001), /* ACTLR_EL1 */
-> +	  access_actlr, reset_actlr, ACTLR_EL1 },
-> +	{ Op0(0b11), Op1(0b000), CRn(0b0001), CRm(0b0000), Op2(0b010), /* CPACR_EL1 */
-> +	  NULL, reset_val, CPACR_EL1, 0 },
-
-What's A57-specific about this CPACR behavior?
-
-> +};
-
-[...]
-
-Thanks,
-Christopher
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by
-the Linux Foundation
+Regards,
+Jason
