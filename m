@@ -1,110 +1,67 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Thu, 14 Mar 2013 01:19:54 +0530
-Subject: [PATCH V3 5/5] ARM: tegra: add spi nodes to Tegra114 DT
-In-Reply-To: <1363204194-19487-1-git-send-email-ldewangan@nvidia.com>
-References: <1363204194-19487-1-git-send-email-ldewangan@nvidia.com>
-Message-ID: <1363204194-19487-6-git-send-email-ldewangan@nvidia.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 13 Mar 2013 13:59:01 -0600
+Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
+In-Reply-To: <20130313192628.GA28714@avionic-0098.mockup.avionic-design.de>
+References: <513E6AFE.3090304@firmworks.com>
+ <20130312070852.GA6727@avionic-0098.mockup.avionic-design.de>
+ <20130312155749.GA1820@obsidianresearch.com>
+ <20130312203819.GA23221@avionic-0098.mockup.avionic-design.de>
+ <20130312210328.GA22702@obsidianresearch.com>
+ <20130312213006.GA23717@avionic-0098.mockup.avionic-design.de>
+ <20130312220854.GA23112@obsidianresearch.com>
+ <20130313081815.GD25940@avionic-0098.mockup.avionic-design.de>
+ <20130313170205.GB24042@obsidianresearch.com>
+ <20130313192628.GA28714@avionic-0098.mockup.avionic-design.de>
+Message-ID: <20130313195901.GA26550@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-NVIDIA's Tegra114 has 6 spi controllers. These controllers are
-redesign on T114 with different register interface.
+On Wed, Mar 13, 2013 at 08:26:28PM +0100, Thierry Reding wrote:
 
-Add DT entry for spi controllers and make it compatible with
-"nvidia,tegra114-spi".
+> As Mitch already said there's very little chance that the specification
+> update will be ratified through IEEE, so I think that we might just as
+> well put a corresponding text somewhere below Documentation/devicetree.
 
-Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
----
-Changes from V1:
-- None
-Changes fro V2:
-- Rebase  to for-3.10/dt of Stephen's Tegra tree.
-
- arch/arm/boot/dts/tegra114.dtsi |   72 +++++++++++++++++++++++++++++++++++++++
- 1 files changed, 72 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
-index d2bbfaf..95c4369 100644
---- a/arch/arm/boot/dts/tegra114.dtsi
-+++ b/arch/arm/boot/dts/tegra114.dtsi
-@@ -212,6 +212,78 @@
- 		clock-names = "div-clk";
- 	};
+Sure, I'm fine with that.
  
-+	spi at 7000d400 {
-+		compatible = "nvidia,tegra114-spi";
-+		reg = <0x7000d400 0x200>;
-+		interrupts = <0 59 0x04>;
-+		nvidia,dma-request-selector = <&apbdma 15>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		clocks = <&tegra_car 41>;
-+		clock-names = "spi";
-+		status = "disabled";
-+	};
-+
-+	spi at 7000d600 {
-+		compatible = "nvidia,tegra114-spi";
-+		reg = <0x7000d600 0x200>;
-+		interrupts = <0 82 0x04>;
-+		nvidia,dma-request-selector = <&apbdma 16>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		clocks = <&tegra_car 44>;
-+		clock-names = "spi";
-+		status = "disabled";
-+	};
-+
-+	spi at 7000d800 {
-+		compatible = "nvidia,tegra114-spi";
-+		reg = <0x7000d480 0x200>;
-+		interrupts = <0 83 0x04>;
-+		nvidia,dma-request-selector = <&apbdma 17>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		clocks = <&tegra_car 46>;
-+		clock-names = "spi";
-+		status = "disabled";
-+	};
-+
-+	spi at 7000da00 {
-+		compatible = "nvidia,tegra114-spi";
-+		reg = <0x7000da00 0x200>;
-+		interrupts = <0 93 0x04>;
-+		nvidia,dma-request-selector = <&apbdma 18>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		clocks = <&tegra_car 68>;
-+		clock-names = "spi";
-+		status = "disabled";
-+	};
-+
-+	spi at 7000dc00 {
-+		compatible = "nvidia,tegra114-spi";
-+		reg = <0x7000dc00 0x200>;
-+		interrupts = <0 94 0x04>;
-+		nvidia,dma-request-selector = <&apbdma 27>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		clocks = <&tegra_car 104>;
-+		clock-names = "spi";
-+		status = "disabled";
-+	};
-+
-+	spi at 7000de00 {
-+		compatible = "nvidia,tegra114-spi";
-+		reg = <0x7000de00 0x200>;
-+		interrupts = <0 79 0x04>;
-+		nvidia,dma-request-selector = <&apbdma 28>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		clocks = <&tegra_car 105>;
-+		clock-names = "spi";
-+		status = "disabled";
-+	};
-+
- 	rtc {
- 		compatible = "nvidia,tegra114-rtc", "nvidia,tegra20-rtc";
- 		reg = <0x7000e000 0x100>;
--- 
-1.7.1.1
+> Also note that this has absolutely nothing to do with ECAM. All I'm
+> proposing is to allow the reg property of a root port to be translated
+> into a CPU addressable memory region through the ranges property. This
+> turns out to actually work properly with the current OF core in Linux.
+
+ECAM is the only standard based mechanism that could possibly use this
+new config space ranges concept. Whatever you do for tegra shouldn't
+stomp on the possibility of making that work in the future. So at
+least think about how ECAM could be modeled for a few mins before
+going ahead.
+
+Tegra is the non-standard unusual case here, an update to the PCI OF
+binding should be of general use.
+
+> > Anyhow, I think this has been hashed to death, as long as your final
+> > binding has the 'device_type = pci' on the pcie-controller node I
+> > think it will be fine.
+> 
+> No. The pcie-controller is *not* a PCI device. It is a PCI host bridge.
+> It is the instance that translates from the platform to the PCI bus. Why
+> should it be device_type = "pci"? 
+
+Spec says so, Mitch said so, other PCI host bridge bindings in the
+tree work like this. Do a grep in the powerpc tree, for instance.
+
+arch/x86/platform/ce4100/falconfalls.dts is a pretty comprehensive
+example.
+
+> And we've also been over this before, making that change stops the
+> proposed binding from working properly because the entry in the reg
+> property can't be translated into a CPU addressable memory region.
+
+Sigh, that's because the change makes things follow the OF PCI
+spec. The Linux OF core follows the spec. Config space ranges binding
+is specifically *defined to not work* in the spec. Why should it work
+today?
+
+You have to deal with this problem somehow, and omitting the top level
+device_type is not a solution.
+
+Jason
