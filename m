@@ -1,74 +1,67 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Wed, 13 Mar 2013 15:49:19 +0800
-Subject: [RFC PATCH 2/3] usb: udc: delete the vbus indicator at
- individual driver
-In-Reply-To: <20130313074409.GE5374@arwen.pp.htv.fi>
-References: <1363078999-7361-1-git-send-email-peter.chen@freescale.com>
- <1363078999-7361-2-git-send-email-peter.chen@freescale.com>
- <20130312094649.GC15163@arwen.pp.htv.fi>
- <20130313031042.GA18168@nchen-desktop>
- <20130313074409.GE5374@arwen.pp.htv.fi>
-Message-ID: <20130313074918.GB18168@nchen-desktop>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Wed, 13 Mar 2013 16:01:14 +0800
+Subject: [PATCH V3 0/9] ARM: tegra: add platform suspend support
+Message-ID: <1363161683-20825-1-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 13, 2013 at 09:44:09AM +0200, Felipe Balbi wrote:
-> On Wed, Mar 13, 2013 at 11:10:43AM +0800, Peter Chen wrote:
-> > On Tue, Mar 12, 2013 at 11:46:49AM +0200, Felipe Balbi wrote:
-> > > On Tue, Mar 12, 2013 at 05:03:18PM +0800, Peter Chen wrote:
-> > > > Let the common struct usb_gadget own it.
-> > > > 
-> > > > CC: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-> > > > CC: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> > > > CC: Li Yang <leoli@freescale.com>
-> > > > CC: Roland Stigge <stigge@antcom.de>
-> > > > CC: Yu Xu <yuxu@marvell.com>
-> > > > CC: Chao Xie <chao.xie@marvell.com>
-> > > > CC: Eric Miao <eric.y.miao@gmail.com>
-> > > > CC: Ben Dooks <ben-linux@fluff.org>
-> > > > Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> > > 
-> > > you need to split this patch, should be something like below:
-> > > 
-> > > for_each_driver() {
-> > > 	initialize gadget->vbus_active (don't remove private method)
-> > > }
-> > > 
-> > > add vbus_active support to udc-core
-> > > 
-> > > for_each_driver() {
-> > > 	remove driver's private vbus_active method
-> > > }
-> > > 
-> > > you need one patch per driver so it's easy to review and ack.
-> > 
-> > Eg, If I changed 10 udc drivers, I need
-> > 1(add vbus_active to struct usb_gadget) + 10 + 1 + 10 = 22 patches?
-> 
-> in order to keep possible regressions localized to a single driver.
-> Imagine if you cause a regression on omap_udc, then we decide to revert
-> your patch. All other drivers, which can be correct will loose the
-> change as well.
+This series introduces a basic functionality for Tegra to support the
+platform suspend and resume.
+
+Note: This series only adds the support for Tegra20 and Tegra30. The
+Tegra114 will be supported later.
+
+This series were depending on the patch below that not yet be merged into
+linux-mmc tree.
+"mmc: tegra: use mmc_of_parse to get the support of standard MMC DT bindings"
 
 
-I agree, why we can't merge below two steps into one step, if there
-are problems for single driver, we also need to revert one patch.
+Verified on Seaboard and Cardhu.
 
-> > > for_each_driver() {
-> > > 	initialize gadget->vbus_active (don't remove private method)
-> > > }
-> > > for_each_driver() {
-> > > 	remove driver's private vbus_active method
-> > > }
+V3:
+* fix the PMC DT configurations for paz00 board
+* add a protection for only support LP2 suspend mode
 
+V2:
+* re-order the patch sequence to make sure the suspend function can be
+  enabled well after the last patch be merged
+* squash the patches that defined the PM bindings for PMC and the
+  implementation
 
-> 
-> -- 
-> balbi
+Joseph Lo (9):
+  gpio: tegra: add gpio wakeup source handling
+  ARM: tegra: irq: add wake up handling
+  ARM: dt: tegra: add bindings of power management configurations for
+    PMC
+  ARM: tegra: pm: add platform suspend support
+  ARM: dts: tegra: add power gpio keys to DT
+  ARM: dts: tegra: whistler: add wakeup source for KBC
+  ARM: dts: tegra: add non-removable and keep-power-in-suspend property
+    for MMC
+  ARM: tegra: config: defconfig update
+  ARM: dts: tegra: add the PM configurations of PMC
 
-
+ .../bindings/arm/tegra/nvidia,tegra20-pmc.txt      |  42 ++++++-
+ arch/arm/boot/dts/tegra20-harmony.dts              |  17 +++
+ arch/arm/boot/dts/tegra20-paz00.dts                |   7 ++
+ arch/arm/boot/dts/tegra20-seaboard.dts             |   8 ++
+ arch/arm/boot/dts/tegra20-trimslice.dts            |  20 +++
+ arch/arm/boot/dts/tegra20-ventana.dts              |  19 +++
+ arch/arm/boot/dts/tegra20-whistler.dts             |  10 ++
+ arch/arm/boot/dts/tegra30-beaver.dts               |   8 ++
+ arch/arm/boot/dts/tegra30-cardhu-a02.dts           |   1 +
+ arch/arm/boot/dts/tegra30-cardhu-a04.dts           |   1 +
+ arch/arm/boot/dts/tegra30-cardhu.dtsi              |   8 ++
+ arch/arm/configs/tegra_defconfig                   |   1 +
+ arch/arm/mach-tegra/common.c                       |   3 +
+ arch/arm/mach-tegra/irq.c                          |  95 +++++++++++++-
+ arch/arm/mach-tegra/irq.h                          |   6 +
+ arch/arm/mach-tegra/pm.c                           |  71 +++++++++++
+ arch/arm/mach-tegra/pm.h                           |   6 +
+ arch/arm/mach-tegra/pmc.c                          | 136 +++++++++++++++++++++
+ arch/arm/mach-tegra/pmc.h                          |  17 +++
+ drivers/gpio/gpio-tegra.c                          |  21 +++-
+ 20 files changed, 493 insertions(+), 4 deletions(-)
 
 -- 
-
-Best Regards,
-Peter Chen
+1.8.1.5
