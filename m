@@ -1,52 +1,89 @@
-From: anilkumar.v@ti.com (Kumar, Anil)
-Date: Wed, 13 Mar 2013 02:59:59 +0000
-Subject: [PATCH 4/9] ARM: dts: OMAP3: Add support for OMAP3430 SDP board
-In-Reply-To: <513F9DA8.4090200@ti.com>
-References: <1362763654-9660-1-git-send-email-jon-hunter@ti.com>
- <1362763654-9660-5-git-send-email-jon-hunter@ti.com>
- <CABYxbz7Bg3Uf2wkhH=4d6nEPUjyHF8BiixN6rGCOgEVG_us8Jw@mail.gmail.com>
- <513E1A1C.8070206@ti.com>
- <F3DBB1B3EF102E4994C89758CFCA32412CE371@DBDE01.ent.ti.com>
- <513F9DA8.4090200@ti.com>
-Message-ID: <F3DBB1B3EF102E4994C89758CFCA32412CE851@DBDE01.ent.ti.com>
+From: alim.akhtar@gmail.com (Alim Akhtar)
+Date: Wed, 13 Mar 2013 08:30:01 +0530
+Subject: [PATCH 3/4] clk: samsung: always allocate the clk_table
+In-Reply-To: <CAJuYYwSiQs0JC7esh-urmSUUsxhfP8bsGisdkvxHs8DFvLAS6Q@mail.gmail.com>
+References: <201303120042.09633.heiko@sntech.de>
+ <201303120044.29499.heiko@sntech.de>
+ <CAJuYYwT183EcZZ20P8D7AP34CwXfKYLzsmZdoJz1ny7XznzyAg@mail.gmail.com>
+ <513F1037.3080107@samsung.com>
+ <CAJuYYwRDv4ULqXQOXmTsGfqVopt6XPR+XXb-pPZ35+pC7kUN3A@mail.gmail.com>
+ <513F321E.1020703@samsung.com>
+ <CAJuYYwSiQs0JC7esh-urmSUUsxhfP8bsGisdkvxHs8DFvLAS6Q@mail.gmail.com>
+Message-ID: <CAGOxZ50ONw82_6=noLLLg=bFdr-kmOQ8+RZP3MsGEixE1eG-GA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 13, 2013 at 02:57:04, Hunter, Jon wrote:
-> 
-> On 03/11/2013 09:42 PM, Kumar, Anil wrote:
-> > 
-> > On Mon, Mar 11, 2013 at 23:23:32, Hunter, Jon wrote:
-> >>
-> >> On 03/08/2013 08:25 PM, Anil Kumar wrote:
-> >>> Hi Jon,
-> >>>
-> >>> On Fri, Mar 8, 2013 at 10:57 PM, Jon Hunter <jon-hunter@ti.com> wrote:
-> >>>> Adds basic device-tree support for OMAP3430 SDP board which has 256MB
-> >>>> of RAM and uses the TWL4030 power management IC.
-> >>>
-> >>> I think this board support should be in separate patch series with
-> >>> related patches.
-> >>
-> >> Well I wanted to keep them altogether so that I can send a pull request
-> >> to Benoit and Tony.
-> > 
-> > Sorry, but can you please tell what makes you to think that you
-> > can send pull request only when they are altogether ?
-> 
-> That's not the point.
->  
-> > Is there any logical dependency with other patches except 
-> > "[PATCH 6/9] ARM: dts: Add OMAP3430 SDP flash memory bindings" is on 
-> > top of this patch ?
-> 
-> Per the $subject of the series these a various DT patches I have pending.
-> Yes I could break this series up into many separate series, one for PMU,
-> one for DMA, one for GPMC, one for OMAP3 SDP, but I thought it would be
-> easier for Tony and Benoit to pull as a single series.
+Hi All
 
-I am really Sorry, If I said any nonsense here. I did not know that 
-we can do like that also.
+On Tue, Mar 12, 2013 at 7:54 PM, Thomas Abraham
+<thomas.abraham@linaro.org> wrote:
+> On 12 March 2013 19:18, Sylwester Nawrocki <s.nawrocki@samsung.com> wrote:
+>> On 03/12/2013 12:46 PM, Thomas Abraham wrote:
+>>> And, you mentioned Exynos4 will be dt-only from 3.10. Does that mean
+>>> we just drop support for universal and nuri non-dt board support? Or,
+>>> will there be a equivalent dt support added for these boards?
+>>
+>> I think Tomasz has some initial dts files for Universal_c210 ready, and
+>> Nuri could probably just be dropped. But we need Kyungmin's opinion on
+>> that.
+>>
+>> I'm not sure about other boards, they look pretty basic though.
+>> So it shouldn't be difficult to replace them with corresponding dts
+>> files. Currently there are:
+>>
+>> arch/arm/mach-exynos/mach-smdk4x12.c
+>> arch/arm/mach-exynos/mach-origen.c
+>> arch/arm/mach-exynos/mach-nuri.c
+>> arch/arm/mach-exynos/mach-universal_c210.c
+>> arch/arm/mach-exynos/mach-armlex4210.c
+>> arch/arm/mach-exynos/mach-smdkv310.c
+>>
+>> And there are dts files for:
+>>
+>> arch/arm/boot/dts/exynos4210-smdkv310.dts
+>> arch/arm/boot/dts/exynos4210-origen.dts
+>> arch/arm/boot/dts/exynos5250-smdk5250.dts
+>> arch/arm/boot/dts/exynos5250-snow.dts
+>> arch/arm/boot/dts/exynos4210-trats.dts
+>> arch/arm/boot/dts/exynos5440-ssdk5440.dts
+>> arch/arm/boot/dts/exynos4412-smdk4412.dts
+>>
+>> So except Universal_c210 and Nuri the only ones not supporting booting
+>> from DT are these two simple boards, which seem to be maintained by
+>> Samsung:
+>>
+>> arch/arm/mach-exynos/mach-smdk4x12.c
+>> arch/arm/mach-exynos/mach-armlex4210.c
+>
+> There has not been much board support development for these boards for
+> couple of kernel releases now.
+>
 
-Thanks,
-Anil
+Right, Armlex4210 can be removed as there is no much development
+happening. And I do not think any one else using it now.
+
+I do not know about smdk4x12.c though,
+
+>>
+>> It would be nice to make Exynos DT only in this kernel release.
+>> I guess there was enough time to get all boards converted to DT
+>> already.
+>
+> Thanks for sharing your thoughts on this.
+>
+> Regards,
+> Thomas.
+>
+>>
+>> --
+>>
+>> Regards,
+>> Sylwester
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+-- 
+Regards,
+Alim
