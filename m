@@ -1,46 +1,92 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Wed, 13 Mar 2013 12:22:27 +0100
-Subject: ARM: at-91: ARCH_AT91SAM9X5 went missing
-In-Reply-To: <51405F0D.40102@atmel.com>
-References: <1363171688.3137.196.camel@x61.thuisdomein>
- <51405F0D.40102@atmel.com>
-Message-ID: <1363173747.3137.202.camel@x61.thuisdomein>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 13 Mar 2013 16:54:01 +0530
+Subject: [PATCH] ARM: smp: Allow real broadcast device selection instead
+ of always dummy
+In-Reply-To: <20130313101641.GA13483@e106331-lin.cambridge.arm.com>
+References: <1363165608-13739-1-git-send-email-santosh.shilimkar@ti.com>
+ <514046B6.9020005@ti.com>
+ <20130313101641.GA13483@e106331-lin.cambridge.arm.com>
+Message-ID: <514061D1.20603@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-03-13 at 12:12 +0100, Nicolas Ferre wrote:
-> These ARCH_AT91xxx variables are not used anymore for pure Device Tree
-> SoCs (I mean: at91sam9x5, at91sam9n12, sama5d3 families). They are used
-> for non-DT SoCs and for chips that support both legacy board files and DT.
-> The old ARCH_AT91xxx symbols are selecting the corresponding SOC_AT91xxx
-> symbol.
+On Wednesday 13 March 2013 03:46 PM, Mark Rutland wrote:
+> Hi Santosh,
 > 
-> ARCH_AT91xxx in Kconfig that are specific to a particular SoC are going
-> to disappear as we tend to allow the compilation of a particular driver
-> for a wider range of configurations.
+> On Wed, Mar 13, 2013 at 09:28:22AM +0000, Santosh Shilimkar wrote:
+>> (Forgot to CC Thomas)
+>>
+>> On Wednesday 13 March 2013 02:36 PM, Santosh Shilimkar wrote:
+>>> With recent arm broadcast time clean-up from Mark Rutland, the dummy
+>>> broadcast device is always registered with timer subsystem. And since
+>>> the rating of the dummy clock event is very high, it is preferred
+>>> over a real broad-cast clock event.
+>>>
+>>> This is a change in behavior from past and not an intended
+>>> one. So reduce the rating of the dummy clockevent so that
+>>> real broadcast device is selected when available.
+>>>
+>>> Without this all the C states with C3STOP won't work since
+>>> the broad cast notifier will take an abort.
+>>>
+>>> Cc: Mark Rutland <mark.rutland@arm.com>
+>>> Cc: Russell King <linux@arm.linux.org.uk>
+>>>
+>>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>> ---
+>>> Its a regression so hopefully can get into the 3.9-rcx. Noticed
+>>> this one on A15 platform. A9 platform the issue may not be seen
+>>> since the local timer check avoids dummy timer registration.
+>>>
+>> Some one pointed me to a fix made by Mark which was discussed
+>> under '[BUG] ARM Architected timers appear broken in 3.9-rc1' subject.
+>> That patch seems to be more of work around since the root of the
+>> problem is incorrect dummy timer rating. Either way, both patches
+>> fix the issue.
+> 
+> Is the problem that the dummy timer is being registered as the broadcast
+> source, or that it is selected as a local timer in preference of real timers?
+>
+Dummy timer is preferred over real broadcast timer.
+ 
+> If it is the former, Then I believe my patch solve the issue more generally -
+> if you happen to register a dummy timer before other timers, it will become the
+> broadcast source. Regardless of how temporary this is, it should never happen,
+> and lowering the rating of the dummy won't fix this.
+> 
+Well by the time we need active broadcast functionality, clock-events are
+already chosen if the ratings are appropriate.
 
-So setting one of the SOC_* symbols will not generate the corresponding
-ARCH_* symbol, will it? To be specific, for the people entering the
-configuration from the new SOC_* side none of this is relevant anymore
-(this is all the stuff outside of arch/arm):
-
-drivers/misc/Kconfig:87:        prompt "TC Block" if ARCH_AT91RM9200 || ARCH_AT91SAM9260 || CPU_AT32AP700X
-drivers/pcmcia/Kconfig:291:     depends on PCMCIA && ARCH_AT91RM9200
-drivers/rtc/Kconfig:977:        depends on ARCH_AT91 && !(ARCH_AT91RM9200 || ARCH_AT91X40)
-drivers/tty/serial/atmel_serial.c:268:#ifdef CONFIG_ARCH_AT91RM9200
-drivers/watchdog/Kconfig:127:   depends on ARCH_AT91 && !ARCH_AT91RM9200
-drivers/misc/Kconfig:87:        prompt "TC Block" if ARCH_AT91RM9200 || ARCH_AT91SAM9260 || CPU_AT32AP700X
-drivers/video/Kconfig:1026:     depends on FB_ATMEL && ARCH_AT91SAM9261
-drivers/net/can/Kconfig:68:     depends on ARCH_AT91SAM9263 || ARCH_AT91SAM9X5
-drivers/rtc/Kconfig:991:        prompt "RTT module Number" if ARCH_AT91SAM9263
-drivers/rtc/Kconfig:1000:       range 0 3 if !ARCH_AT91SAM9263
-drivers/rtc/Kconfig:1001:       range 0 15 if ARCH_AT91SAM9263
-drivers/usb/gadget/Kconfig:157: depends on AVR32 || ARCH_AT91SAM9RL || ARCH_AT91SAM9G45
-drivers/usb/gadget/atmel_usba_udc.c:329:#if defined(CONFIG_ARCH_AT91SAM9RL)
-drivers/usb/gadget/atmel_usba_udc.c:349:#endif /* CONFIG_ARCH_AT91SAM9RL */
-drivers/mmc/host/Kconfig:305:   depends on MMC_ATMELMCI && (AVR32 || ARCH_AT91SAM9G45) && DMA_ENGINE
-drivers/usb/gadget/Kconfig:157: depends on AVR32 || ARCH_AT91SAM9RL || ARCH_AT91SAM9G45
-drivers/net/can/Kconfig:68:     depends on ARCH_AT91SAM9263 || ARCH_AT91SAM9X5
+> If it is the latter, then this patch would ensure that a real timer with a
+> rating over 100 is selected in preference to the dummy, which is certainly what
+> we want. The proposed generic dummy timer in Stephen Boyd's local timer API
+> removal series [1] similarly uses a low rating to ensure that real timers are
+> selected in preference to an always-registered dummy. I note that the
+> architected timer has a higher rating (450) than the dummy (400), so this
+> shouldn't currently be a problem.
+> 
+Because we always register dummy broadcast on ARM now 
+and with higher rating, it is picked as broadcast source. We definitely don't
+want such a behavior when we have real broadcast device is available.
 
 
-Paul Bolle
+With your patch, we are trying to avoid the registration which goes
+against the the whole idea of registering it always and picking
+the right clock-event based on rating by clock-event core.
+The clock-event core except the proper ratings to be provided based on
+the capability of the timer source and its resolution and in that case
+dummy should have the lowest rating which is what I tried to patch.
+
+> Have I missed something?
+> 
+Not much. I was just looking at x86 code as well after your email
+to see how the LAPIC issue is handled. They seems to also have
+correct rating to take care of the selection.
+
+Probably we can merge both the fixes but from clock-event core
+code perspective, the ratings fix is more than enough.
+
+Thomas might be able to comment better.
+
+Regards,
+Santosh
