@@ -1,51 +1,33 @@
-From: jangra.pankaj9@gmail.com (Pankaj Jangra)
-Date: Wed, 13 Mar 2013 22:29:04 +0530
-Subject: [PATCH 6/7] ARM: SAMSUNG: use clk_prepare_enable in samsung-time
-In-Reply-To: <201303120145.21072.heiko@sntech.de>
-References: <201303120141.31262.heiko@sntech.de>
- <201303120145.21072.heiko@sntech.de>
-Message-ID: <CADTbHxq-gxoN9HKkjPsZ5uBt7PhrvO8XdQdmAyscOA+xPy9Z7A@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 13 Mar 2013 17:59:49 +0100
+Subject: memory leak and other oddness in pinctrl-mvebu.c
+In-Reply-To: <20130310000647.GZ23237@titan.lakedaemon.net>
+References: <1362758331.32099.121.camel@i7.infradead.org>
+ <513AF783.6050906@gmail.com>
+ <1362855725.3690.92.camel@shinybook.infradead.org>
+ <20130309225333.GY23237@titan.lakedaemon.net>
+ <1362872371.3690.106.camel@shinybook.infradead.org>
+ <20130310000647.GZ23237@titan.lakedaemon.net>
+Message-ID: <CACRpkdaN4+jM6JYP_m1xcMJ=JY345SFyU_AH6cdUoxWTdEHJ8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sun, Mar 10, 2013 at 1:06 AM, Jason Cooper <jason@lakedaemon.net> wrote:
 
-On Tue, Mar 12, 2013 at 6:15 AM, Heiko St?bner <heiko@sntech.de> wrote:
-> The common clock framework expects clocks to be prepared
-> before they are enabled.
->
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->  arch/arm/plat-samsung/samsung-time.c |    6 +++---
->  1 files changed, 3 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/plat-samsung/samsung-time.c b/arch/arm/plat-samsung/samsung-time.c
-> index f899cbc..6ebb851 100644
-> --- a/arch/arm/plat-samsung/samsung-time.c
-> +++ b/arch/arm/plat-samsung/samsung-time.c
-> @@ -355,7 +355,7 @@ static void __init samsung_timer_resources(void)
->         if (IS_ERR(timerclk))
->                 panic("failed to get timers clock for timer");
->
-Also how about calling the clk_prepare_enable() only if the clk_get()
-call is a sucess? Though clk framework will take care of it. Just
-thinking even to avoid that call if clk_get() fails since you are
-modifying the code.
+> Added LinusW, Gregory and Ezequiel to the email.  Guys, can you give
+> this a Tested-by before I apply (or Ack for LinusW)?
 
-> -       clk_enable(timerclk);
-> +       clk_prepare_enable(timerclk);
->
->         sprintf(devname, "s3c24xx-pwm.%lu", event_id);
->         s3c_device_timer[event_id].id = event_id;
-> @@ -369,7 +369,7 @@ static void __init samsung_timer_resources(void)
->         if (IS_ERR(tdiv_event))
->                 panic("failed to get pwm-tdiv clock for event timer");
->
-Same here...
-> -       clk_enable(tin_event);
-> +       clk_prepare_enable(tin_event);
->
->         sprintf(devname, "s3c24xx-pwm.%lu", source_id);
+If the Marvell people are happy I'm happy. But I would like to have
+some Tested-by from Sebastian or so? Also I don't quite see the
+final form of this patch?
 
-Regards,
-Pankaj Jangra
+And shouldn't I rather take the final patch into the pinctrl tree?
+
+Then there is a larger issue lurking behind this, and that is that
+all platforms run their own awkward DT parse code, and that comes
+from the fact that we could not agree on a common mapping.
+We must think real hard if we can't atleast share some of the
+parsing code here.
+
+Yours,
+Linus Walleij
