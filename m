@@ -1,48 +1,51 @@
-From: jonathan.austin@arm.com (Jonathan Austin)
-Date: Wed, 13 Mar 2013 16:53:18 +0000
-Subject: [PATCH 3/3] ARM: vexpress-nommu: add a Makefile.boot to restore
- single-platform build
-In-Reply-To: <1363193598-28116-1-git-send-email-jonathan.austin@arm.com>
-References: <1363193598-28116-1-git-send-email-jonathan.austin@arm.com>
-Message-ID: <1363193598-28116-4-git-send-email-jonathan.austin@arm.com>
+From: jangra.pankaj9@gmail.com (Pankaj Jangra)
+Date: Wed, 13 Mar 2013 22:29:04 +0530
+Subject: [PATCH 6/7] ARM: SAMSUNG: use clk_prepare_enable in samsung-time
+In-Reply-To: <201303120145.21072.heiko@sntech.de>
+References: <201303120141.31262.heiko@sntech.de>
+ <201303120145.21072.heiko@sntech.de>
+Message-ID: <CADTbHxq-gxoN9HKkjPsZ5uBt7PhrvO8XdQdmAyscOA+xPy9Z7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a single-platform kernel is built, a machine-specific Makefile.boot is
-expected. In the move to a multiplatform kernels this was removed for
-vexpress. Assuming AUTO_ZRELADDR is selected and a DT is used, the values
-recorded in it are no-longer required. However, the missing file breaks building
-of a single platform kernel for vexpress, such as when using vexpress and a
-platform without an MMU.
+Hi,
 
-This patch re-instates Makefile.boot for vexpress in single platform
-configuration, fixing single-platform build. This change does not affect the
-multi-platform kernel.
+On Tue, Mar 12, 2013 at 6:15 AM, Heiko St?bner <heiko@sntech.de> wrote:
+> The common clock framework expects clocks to be prepared
+> before they are enabled.
+>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+>  arch/arm/plat-samsung/samsung-time.c |    6 +++---
+>  1 files changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/plat-samsung/samsung-time.c b/arch/arm/plat-samsung/samsung-time.c
+> index f899cbc..6ebb851 100644
+> --- a/arch/arm/plat-samsung/samsung-time.c
+> +++ b/arch/arm/plat-samsung/samsung-time.c
+> @@ -355,7 +355,7 @@ static void __init samsung_timer_resources(void)
+>         if (IS_ERR(timerclk))
+>                 panic("failed to get timers clock for timer");
+>
+Also how about calling the clk_prepare_enable() only if the clk_get()
+call is a sucess? Though clk framework will take care of it. Just
+thinking even to avoid that call if clk_get() fails since you are
+modifying the code.
 
-Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
----
+> -       clk_enable(timerclk);
+> +       clk_prepare_enable(timerclk);
+>
+>         sprintf(devname, "s3c24xx-pwm.%lu", event_id);
+>         s3c_device_timer[event_id].id = event_id;
+> @@ -369,7 +369,7 @@ static void __init samsung_timer_resources(void)
+>         if (IS_ERR(tdiv_event))
+>                 panic("failed to get pwm-tdiv clock for event timer");
+>
+Same here...
+> -       clk_enable(tin_event);
+> +       clk_prepare_enable(tin_event);
+>
+>         sprintf(devname, "s3c24xx-pwm.%lu", source_id);
 
-I'm less sure about this patch than I am about the other two. If anyone has
-cleaner suggestions than adding back Makefile.boot then I'd happily consider
-them.
-
-This seemed preferable to making point-change just for this case to the generic
-include mechanism in arch/arm/Makefile:235, where the Makefile.boot file are
-included.
-
- arch/arm/mach-vexpress/Makefile.boot |    4 ++++
- 1 file changed, 4 insertions(+)
- create mode 100644 arch/arm/mach-vexpress/Makefile.boot
-
-diff --git a/arch/arm/mach-vexpress/Makefile.boot b/arch/arm/mach-vexpress/Makefile.boot
-new file mode 100644
-index 0000000..8caa868
---- /dev/null
-+++ b/arch/arm/mach-vexpress/Makefile.boot
-@@ -0,0 +1,4 @@
-+# This is a dummy Makefile.boot for building ARCH_VEXPRESS as a standalone
-+# platform as opposed with ARCH_MULTIPLATFORM. It is preferable to use
-+# CONFIG_AUTO_ZRELADDR=y and DT but uncomment the line below if you need it.
-+#   zreladdr-y	+= 0x00008000
--- 
-1.7.9.5
+Regards,
+Pankaj Jangra
