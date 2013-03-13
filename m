@@ -1,57 +1,35 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 13 Mar 2013 14:58:22 +0530
-Subject: [PATCH] ARM: smp: Allow real broadcast device selection instead
- of always dummy
-In-Reply-To: <1363165608-13739-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1363165608-13739-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <514046B6.9020005@ti.com>
+Date: Wed, 13 Mar 2013 15:05:16 +0530
+Subject: [patch 0/7] tick: Optimize broadcast handling and prevent expiry
+ ping pong
+In-Reply-To: <20130306111351.883117670@linutronix.de>
+References: <20130306111351.883117670@linutronix.de>
+Message-ID: <51404854.8030303@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(Forgot to CC Thomas)
+Thomas,
 
-On Wednesday 13 March 2013 02:36 PM, Santosh Shilimkar wrote:
-> With recent arm broadcast time clean-up from Mark Rutland, the dummy
-> broadcast device is always registered with timer subsystem. And since
-> the rating of the dummy clock event is very high, it is preferred
-> over a real broad-cast clock event.
+On Wednesday 06 March 2013 04:48 PM, Thomas Gleixner wrote:
+> Jason decoded a problem related to the broadcast timer mode. The
+> reprogramming of the cpu local timer causes a huge number of
+> retries. Also there is a situation where the CPU which does not handle
+> the broadcast timer interrupt exits and reenters broadcast mode before
+> the broadcast interrupt got handled by another CPU. This can lead to
+> an interesting ping pong of the broadcast and the cpu local timer
+> code.
 > 
-> This is a change in behavior from past and not an intended
-> one. So reduce the rating of the dummy clockevent so that
-> real broadcast device is selected when available.
+> This series addresses these problems. The first two patches convert
+> the broadcast code to proper cpumask_var_t instead of adding more
+> bitmaps later.
 > 
-> Without this all the C states with C3STOP won't work since
-> the broad cast notifier will take an abort.
+> The rest of the series is adopted from the quick patches which I
+> posted earlier while discussing the issue with Jason et. al.
 > 
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
+> Please give it a proper testing on your affected hardware.
 > 
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
-> Its a regression so hopefully can get into the 3.9-rcx. Noticed
-> this one on A15 platform. A9 platform the issue may not be seen
-> since the local timer check avoids dummy timer registration.
-> 
-Some one pointed me to a fix made by Mark which was discussed
-under '[BUG] ARM Architected timers appear broken in 3.9-rc1' subject.
-That patch seems to be more of work around since the root of the
-problem is incorrect dummy timer rating. Either way, both patches
-fix the issue.
+I have tested this revised patches on OMAP4 and OMAP5 platforms
+with CPUidle enabled against 3.9-rc2. As expected they seems to
+work without any issue and also fixes the reported retry issue.
 
->  arch/arm/kernel/smp.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-> index 31644f1..79078ed 100644
-> --- a/arch/arm/kernel/smp.c
-> +++ b/arch/arm/kernel/smp.c
-> @@ -480,7 +480,7 @@ static void __cpuinit broadcast_timer_setup(struct clock_event_device *evt)
->  	evt->features	= CLOCK_EVT_FEAT_ONESHOT |
->  			  CLOCK_EVT_FEAT_PERIODIC |
->  			  CLOCK_EVT_FEAT_DUMMY;
-> -	evt->rating	= 400;
-> +	evt->rating	= 100;
->  	evt->mult	= 1;
->  	evt->set_mode	= broadcast_timer_set_mode;
->  
-> 
+Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
