@@ -1,57 +1,70 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 13 Mar 2013 13:30:59 +0100
-Subject: ARM: at-91: ARCH_AT91SAM9X5 went missing
-In-Reply-To: <1363173747.3137.202.camel@x61.thuisdomein>
-References: <1363171688.3137.196.camel@x61.thuisdomein>
- <51405F0D.40102@atmel.com> <1363173747.3137.202.camel@x61.thuisdomein>
-Message-ID: <51407183.8030802@atmel.com>
+From: david.woodhouse@intel.com (Woodhouse, David)
+Date: Wed, 13 Mar 2013 13:35:05 +0000
+Subject: [RFC] arm: use built-in byte swap function
+In-Reply-To: <20130219203115.114eab79e8d2099c6306d921@freescale.com>
+References: <20130129181046.GC25415@pd.tnic>
+ <1359541333.3529.186.camel@shinybook.infradead.org>
+ <20130130200900.9d7cf7908caeaef4ecee1d61@freescale.com>
+ <20130131092801.GV23505@n2100.arm.linux.org.uk>
+ <20130131145947.f62474a0600848df86548b96@freescale.com>
+ <20130201011712.GF23505@n2100.arm.linux.org.uk>
+ <1359703995.23531.6.camel@shinybook.infradead.org>
+ <20130205210436.670c62e26d2121330e87af35@freescale.com>
+ <1360141322.6066.4.camel@shinybook.infradead.org>
+ <20130206191905.ac8eb6743e69425f30888704@freescale.com>
+ <20130207181315.GM17833@n2100.arm.linux.org.uk>
+ <1360344301.6066.263.camel@shinybook.infradead.org>
+ <alpine.LFD.2.02.1302081503430.6300@xanadu.home>
+ <1360363233.6066.283.camel@shinybook.infradead.org>
+ <alpine.LFD.2.02.1302081745500.6300@xanadu.home>
+ <20130208191208.2ef3d78bda71aa7b44d00d7b@freescale.com>
+ <alpine.LFD.2.02.1302082102380.6300@xanadu.home>
+ <20130219203115.114eab79e8d2099c6306d921@freescale.com>
+Message-ID: <1363181704.32099.360.camel@i7.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/13/2013 12:22 PM, Paul Bolle :
-> On Wed, 2013-03-13 at 12:12 +0100, Nicolas Ferre wrote:
->> These ARCH_AT91xxx variables are not used anymore for pure Device Tree
->> SoCs (I mean: at91sam9x5, at91sam9n12, sama5d3 families). They are used
->> for non-DT SoCs and for chips that support both legacy board files and DT.
->> The old ARCH_AT91xxx symbols are selecting the corresponding SOC_AT91xxx
->> symbol.
->>
->> ARCH_AT91xxx in Kconfig that are specific to a particular SoC are going
->> to disappear as we tend to allow the compilation of a particular driver
->> for a wider range of configurations.
+On Tue, 2013-02-19 at 20:31 -0600, Kim Phillips wrote:
 > 
-> So setting one of the SOC_* symbols will not generate the corresponding
-> ARCH_* symbol, will it? To be specific, for the people entering the
-> configuration from the new SOC_* side none of this is relevant anymore
-> (this is all the stuff outside of arch/arm):
+> > > imx_v6_v7_defconfig:        7672373         7667089         -5284
+> > > lart_defconfig:     2941150         2941054         -96
+> > > mxs_defconfig:      11091983        11095679        3696
+> > 
+> > The savings are good, with some impressive cases.  However the 
+> > mxs_defconfig is completely the opposite and by far.  Any idea?
 > 
-> drivers/misc/Kconfig:87:        prompt "TC Block" if ARCH_AT91RM9200 || ARCH_AT91SAM9260 || CPU_AT32AP700X
-> drivers/pcmcia/Kconfig:291:     depends on PCMCIA && ARCH_AT91RM9200
-> drivers/rtc/Kconfig:977:        depends on ARCH_AT91 && !(ARCH_AT91RM9200 || ARCH_AT91X40)
-> drivers/tty/serial/atmel_serial.c:268:#ifdef CONFIG_ARCH_AT91RM9200
-> drivers/watchdog/Kconfig:127:   depends on ARCH_AT91 && !ARCH_AT91RM9200
-> drivers/misc/Kconfig:87:        prompt "TC Block" if ARCH_AT91RM9200 || ARCH_AT91SAM9260 || CPU_AT32AP700X
-> drivers/video/Kconfig:1026:     depends on FB_ATMEL && ARCH_AT91SAM9261
-> drivers/net/can/Kconfig:68:     depends on ARCH_AT91SAM9263 || ARCH_AT91SAM9X5
-> drivers/rtc/Kconfig:991:        prompt "RTT module Number" if ARCH_AT91SAM9263
-> drivers/rtc/Kconfig:1000:       range 0 3 if !ARCH_AT91SAM9263
-> drivers/rtc/Kconfig:1001:       range 0 15 if ARCH_AT91SAM9263
-> drivers/usb/gadget/Kconfig:157: depends on AVR32 || ARCH_AT91SAM9RL || ARCH_AT91SAM9G45
-> drivers/usb/gadget/atmel_usba_udc.c:329:#if defined(CONFIG_ARCH_AT91SAM9RL)
-> drivers/usb/gadget/atmel_usba_udc.c:349:#endif /* CONFIG_ARCH_AT91SAM9RL */
-> drivers/mmc/host/Kconfig:305:   depends on MMC_ATMELMCI && (AVR32 || ARCH_AT91SAM9G45) && DMA_ENGINE
-> drivers/usb/gadget/Kconfig:157: depends on AVR32 || ARCH_AT91SAM9RL || ARCH_AT91SAM9G45
-> drivers/net/can/Kconfig:68:     depends on ARCH_AT91SAM9263 || ARCH_AT91SAM9X5
+> Unfortunately, I don't seem to be able to reproduce this anymore.
+> Same linux-next, with three different compilers always produces
+> smaller binaries:
+> 
+>    text    data     bss     dec     hex filename
+> 5239363  280576 5569648 11089587         a936b3 linux-next-mxs-orig-gcc4.7/vmlinux
+> 5239169  280556 5569648 11089373         a935dd linux-next-mxs-bswap-gcc4.7/vmlinux
+> 
+> 5262223  280592 5569648 11112463         a9900f linux-next-mxs-orig-gcc4.6.3/vmlinux
+> 5261909  280584 5569648 11112141         a98ecd linux-next-mxs-bswap-gcc4.6.3/vmlinux
+> 
+> 5241379  280580 5569648 11091607         a93e97 linux-next-mxs-orig-gcc4.6ubuntu/vmlinux
+> 5241189  280600 5569648 11091437         a93ded linux-next-mxs-bswap-gcc4.6ubuntu/vmlinux
+> 
+> So I've since made a more consistent cross-build environment, using
+> cross tools from Linaro [1,2] instead of via Ubuntu [3].
 
-They are being removed one by one and replaced by ARCH_AT91, ARM or even
-simply HAVE_CLK...
+Andrew Pinski has done some work on GCC to support further
+optimisations: http://gcc.gnu.org/bugzilla/show_bug.cgi?id=55177
 
-Have a look at recent patch "[PATCH v2 2/2] can: Kconfig: CAN_AT91
-depends on ARM".
+If you feel like building with the branch at
+http://gcc.gnu.org/git/?p=gcc.git;a=shortlog;h=refs/heads/pinskia/bytewiseunop and seeing how that affects the results, that could be interesting.
 
-But it is true that if you find good patches to remove them, I am in
-favor for this move.
-
-Best regards,
 -- 
-Nicolas Ferre
+                   Sent with MeeGo's ActiveSync support.
+
+David Woodhouse                            Open Source Technology Centre
+David.Woodhouse at intel.com                              Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/x-pkcs7-signature
+Size: 6242 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130313/3150b8c1/attachment.bin>
