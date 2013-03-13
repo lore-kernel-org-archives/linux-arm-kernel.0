@@ -1,91 +1,35 @@
-From: padma.kvr@gmail.com (Padma Venkat)
-Date: Wed, 13 Mar 2013 11:00:19 +0530
-Subject: [PATCH V2] ARM: dts: Modify SPI nodes according generic DMA DT
- bindings
-In-Reply-To: <1362480394-1064-1-git-send-email-padma.v@samsung.com>
-References: <1362480394-1064-1-git-send-email-padma.v@samsung.com>
-Message-ID: <CAAgF-Bc53K57YzrCA=js_=f5v5ssvfSv0Nee4hLYMesGFTp9pg@mail.gmail.com>
+From: s-anna@ti.com (Anna, Suman)
+Date: Wed, 13 Mar 2013 05:31:53 +0000
+Subject: [PATCHv3 01/14] mailbox: rename pl320-ipc specific mailbox.h
+In-Reply-To: <20130313035252.GA1515@kroah.com>
+References: <1363145030-14373-1-git-send-email-s-anna@ti.com>
+ <20130313035252.GA1515@kroah.com>
+Message-ID: <37C860A02101E749A747FA2D3C1E3C504978B9@DLEE11.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+> On Tue, Mar 12, 2013 at 10:23:50PM -0500, Suman Anna wrote:
+> > The patch 30058677 "ARM / highbank: add support for pl320 IPC"
+> > added a pl320 IPC specific header file as a generic mailbox.h.
+> > This file has been renamed appropriately to allow the introduction of
+> > the generic mailbox API framework.
+> >
+> > Signed-off-by: Suman Anna <s-anna@ti.com>
+> > Cc: Mark Langsdorf <mark.langsdorf@calxeda.com>
+> > Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+> > ---
+> >  drivers/cpufreq/highbank-cpufreq.c |  2 +-
+> >  drivers/mailbox/pl320-ipc.c        |  2 +-
+> >  include/linux/mailbox.h            | 17 -----------------
+> >  include/linux/pl320-ipc.h          | 17 +++++++++++++++++
+> >  4 files changed, 19 insertions(+), 19 deletions(-)  delete mode
+> > 100644 include/linux/mailbox.h  create mode 100644
+> > include/linux/pl320-ipc.h
+> 
+> Why are you sending these To: me?  I'm not the mailbox maintainer, and have
+> never handled them before that I can remember.  Who is the maintainer?
 
-On Tue, Mar 5, 2013 at 4:16 PM, Padmavathi Venna <padma.v@samsung.com> wrote:
-> This patch removes custom way of adding spi dma channels and
-> adds according to new generic DMA DT bindings on samsung exynos4
-> and exynos5440 platforms.
->
-> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
-> ---
->
-> Changes since V1:
->         - Corrected the pdma phandle in spi1 node.
->
->  arch/arm/boot/dts/exynos4.dtsi    |   15 +++++++++------
->  arch/arm/boot/dts/exynos5440.dtsi |    5 +++--
->  2 files changed, 12 insertions(+), 8 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
-> index 1a62bcf..4521a72 100644
-> --- a/arch/arm/boot/dts/exynos4.dtsi
-> +++ b/arch/arm/boot/dts/exynos4.dtsi
-> @@ -235,8 +235,9 @@
->                 compatible = "samsung,exynos4210-spi";
->                 reg = <0x13920000 0x100>;
->                 interrupts = <0 66 0>;
-> -               tx-dma-channel = <&pdma0 7>; /* preliminary */
-> -               rx-dma-channel = <&pdma0 6>; /* preliminary */
-> +               dmas = <&pdma0 7
-> +                       &pdma0 6>;
-> +               dma-names = "tx", "rx";
->                 #address-cells = <1>;
->                 #size-cells = <0>;
->                 status = "disabled";
-> @@ -246,8 +247,9 @@
->                 compatible = "samsung,exynos4210-spi";
->                 reg = <0x13930000 0x100>;
->                 interrupts = <0 67 0>;
-> -               tx-dma-channel = <&pdma1 7>; /* preliminary */
-> -               rx-dma-channel = <&pdma1 6>; /* preliminary */
-> +               dmas = <&pdma1 7
-> +                       &pdma1 6>;
-> +               dma-names = "tx", "rx";
->                 #address-cells = <1>;
->                 #size-cells = <0>;
->                 status = "disabled";
-> @@ -257,8 +259,9 @@
->                 compatible = "samsung,exynos4210-spi";
->                 reg = <0x13940000 0x100>;
->                 interrupts = <0 68 0>;
-> -               tx-dma-channel = <&pdma0 9>; /* preliminary */
-> -               rx-dma-channel = <&pdma0 8>; /* preliminary */
-> +               dmas = <&pdma0 9
-> +                       &pdma0 8>;
-> +               dma-names = "tx", "rx";
->                 #address-cells = <1>;
->                 #size-cells = <0>;
->                 status = "disabled";
-> diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
-> index 9a99755..31a3626 100644
-> --- a/arch/arm/boot/dts/exynos5440.dtsi
-> +++ b/arch/arm/boot/dts/exynos5440.dtsi
-> @@ -79,8 +79,9 @@
->                 compatible = "samsung,exynos4210-spi";
->                 reg = <0xD0000 0x1000>;
->                 interrupts = <0 4 0>;
-> -               tx-dma-channel = <&pdma0 5>; /* preliminary */
-> -               rx-dma-channel = <&pdma0 4>; /* preliminary */
-> +               dmas = <&pdma0 5
-> +                       &pdma0 4>;
-> +               dma-names = "tx", "rx";
->                 #address-cells = <1>;
->                 #size-cells = <0>;
->         };
+Er.. sorry Greg, I have taken the recipient list from the original series posting, but this series should have been directed to the ARM-SoC maintainer. The patches are generalizing the OMAP mailbox driver to add support for ST's mailbox as well,  and moving it to under /drivers/mailbox. The folder is new in 3.9, and the code under this, so far,  has all been for ARM based chips. I guess the maintainer for this folder needs to be sorted out for the long-term.
 
-Any comment on this patch? If not can you please take this into your tree?
-
-Thanks
-Padma
-> --
-> 1.7.4.4
->
+Regards
+Suman
