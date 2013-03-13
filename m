@@ -1,51 +1,72 @@
-From: vipulkumar.samar@st.com (vipul kumar samar)
-Date: Wed, 13 Mar 2013 11:34:05 +0530
-Subject: [PATCH v2 00/13] ARM: spear multiplatform support
-In-Reply-To: <CAOh2x==O4OtpTPxgpBs5B0NZtbc6MkeyetsJz9AGDEAarA=OFQ@mail.gmail.com>
-References: <1363106816-9603-1-git-send-email-arnd@arndb.de>
- <CAOh2x==O4OtpTPxgpBs5B0NZtbc6MkeyetsJz9AGDEAarA=OFQ@mail.gmail.com>
-Message-ID: <514016D5.10808@st.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 13 Mar 2013 07:35:41 +0100
+Subject: [PATCH v2 05/14] ARM: integrator: use clocksource_of_init for
+ sp804
+In-Reply-To: <1363108124-17484-6-git-send-email-haojian.zhuang@linaro.org>
+References: <1363108124-17484-1-git-send-email-haojian.zhuang@linaro.org>
+ <1363108124-17484-6-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <CACRpkdar6JqZUyLWDgPBCUC6BNX2BzQwLvtqnWZ_M5yu0VHqNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/13/2013 11:29 AM, Viresh Kumar wrote:
-> On Wed, Mar 13, 2013 at 12:46 AM, Arnd Bergmann<arnd@arndb.de>  wrote:
->> This is the second time I post the SPEAr multiplatform patches.
->> It did not work out for 3.9, mostly because of conflicts against
->> patches in the DMA tree, but also because I did not push very
->> hard for these. The patches are basically unchanged now, just
->> some context differences since I rebased them on top of 3.9-rc2.
->>
->> I'm adding them to the arm-soc tree for 3.10 now. If there are
->> any bugs, let's fix them on top of this branch. It would be
->> good to get some more testing on the branch though.
->
-> I thought i would meet you at Connect, but last time i didn't come and
-> this time you :)
->
-> Anyways thanks for all the good work you have done for SPEAr. These
-> are already Acked by me
->
-> @Vipul: Can you give these a try? Please consider following which we got
-> from the last discussion:
+On Tue, Mar 12, 2013 at 6:08 PM, Haojian Zhuang
+<haojian.zhuang@linaro.org> wrote:
 
-ohk, i'll test this patch set and update you ASAP.
+> Remove all code to parse sp804 in integrator platform driver. Use
+> clocksource_of_init() instead since these code are implemented in sp804
+> driver already.
 
+(...)
+> --- a/arch/arm/boot/dts/integratorap.dts
+> +++ b/arch/arm/boot/dts/integratorap.dts
+>         timer0: timer at 13000000 {
+> -               compatible = "arm,integrator-timer";
+> +               compatible = "arm,sp804", "arm,primecell";
+>         };
 >
-> From: Arnd...
+>         timer1: timer at 13000100 {
+> -               compatible = "arm,integrator-timer";
+> +               compatible = "arm,sp804", "arm,primecell";
+> +               arm,sp804-clockevent = <0>;
+> +               status = "ok";
+>         };
 >
-> Thanks for testing out the patches. I forgot about the loadaddress,
-> which indeed does not get set for multiplatform kernels, because
-> the kernel does not know the correct address when it depends on
-> the platform you are booting on.
->
-> The recommended solution for this is to boot a normal 'vmlinux'
-> or 'zImage' file rather than a uImage file. If you u-boot version
-> is too old for that and you cannot update, you can manually
-> call 'mkimage' to create a uImage file with the correct load
-> address.
+>         timer2: timer at 13000200 {
+> -               compatible = "arm,integrator-timer";
+> +               compatible = "arm,sp804", "arm,primecell";
+> +               arm,sp804-clocksource = <0>;
+> +               status = "ok";
+>         };
 
-Ohk.
+This is wrong. The Integrator/AP timer is not an SP804.
+It may look similar but it's a totally different kind of beast.
 
-Regards
-Vipul Samar
+What is needed is to break out the timer code from
+integrator_ap.c and move it to drivers/clocksource,
+but wait with that until you fixed the SP804 in the
+Integrator/CP, which is probably what you want to
+prioritize.
+
+(...)
+> --- a/arch/arm/mach-integrator/Kconfig
+> +++ b/arch/arm/mach-integrator/Kconfig
+(...)
+> -static void __init ap_of_timer_init(void)
+> -{
+> -       struct device_node *node;
+> -       const char *path;
+> -       void __iomem *base;
+> -       int err;
+> -       int irq;
+> -       struct clk *clk;
+> -       unsigned long rate;
+> -
+> -       clk = clk_get_sys("ap_timer", NULL);
+
+As you see you are not changing this clock lookup either, which
+will never work.
+
+Please restrict the patch to altering Integrator/CP.
+
+Yours,
+Linus Walleij
