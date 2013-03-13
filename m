@@ -1,114 +1,47 @@
-From: darrick.wong@oracle.com (Darrick J. Wong)
-Date: Tue, 12 Mar 2013 18:10:20 -0700
-Subject: [PATCH] bounce:fix bug, avoid to flush dcache on slab page from
- jbd2.
-In-Reply-To: <20130312153221.0d26fe5599d4885e51bb0c7c@linux-foundation.org>
-References: <5139DB90.5090302@gmail.com>
- <20130312153221.0d26fe5599d4885e51bb0c7c@linux-foundation.org>
-Message-ID: <20130313011020.GA5313@blackbox.djwong.org>
+From: bilhuang@nvidia.com (Bill Huang)
+Date: Tue, 12 Mar 2013 18:47:53 -0700
+Subject: [RFC 1/1] clk: Add notifier support in
+ clk_prepare_enable/clk_disable_unprepare
+In-Reply-To: <20130312134032.GU4977@n2100.arm.linux.org.uk>
+References: <1363091861-21534-1-git-send-email-bilhuang@nvidia.com>
+ <20130312134032.GU4977@n2100.arm.linux.org.uk>
+Message-ID: <1363139273.21694.11.camel@bilhuang-vm1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 12, 2013 at 03:32:21PM -0700, Andrew Morton wrote:
-> On Fri, 08 Mar 2013 20:37:36 +0800 Shuge <shugelinux@gmail.com> wrote:
-> 
-> > The bounce accept slab pages from jbd2, and flush dcache on them.
-> > When enabling VM_DEBUG, it will tigger VM_BUG_ON in page_mapping().
-> > So, check PageSlab to avoid it in __blk_queue_bounce().
+On Tue, 2013-03-12 at 21:40 +0800, Russell King - ARM Linux wrote:
+> On Tue, Mar 12, 2013 at 05:37:41AM -0700, Bill Huang wrote:
+> > Add the below four notifier events so drivers which are interested in
+> > knowing the clock status can act accordingly. This is extremely useful
+> > in some of the DVFS (Dynamic Voltage Frequency Scaling) design.
 > > 
-> > Bug URL: http://lkml.org/lkml/2013/3/7/56
+> > PRE_CLK_ENABLE
+> > POST_CLK_ENABLE
+> > PRE_CLK_DISABLE
+> > POST_CLK_DISABLE
 > > 
-> > ...
-> >
-> > --- a/mm/bounce.c
-> > +++ b/mm/bounce.c
-> > @@ -214,7 +214,8 @@ static void __blk_queue_bounce(struct request_queue 
-> > *q, struct bio **bio_orig,
-> >   		if (rw == WRITE) {
-> >   			char *vto, *vfrom;
-> >   -			flush_dcache_page(from->bv_page);
-> > +			if (unlikely(!PageSlab(from->bv_page)))
-> > +				flush_dcache_page(from->bv_page);
-> >   			vto = page_address(to->bv_page) + to->bv_offset;
-> >   			vfrom = kmap(from->bv_page) + from->bv_offset;
-> >   			memcpy(vto, vfrom, to->bv_len);
+> > Signed-off-by: Bill Huang <bilhuang@nvidia.com>
 > 
-> I guess this is triggered by Catalin's f1a0c4aa0937975b ("arm64: Cache
-> maintenance routines"), which added a page_mapping() call to arm64's
-> arch/arm64/mm/flush.c:flush_dcache_page().
+> NAK.  *Sigh* NO, this is the wrong level to be doing stuff like this.
 > 
-> What's happening is that jbd2 is using kmalloc() to allocate buffer_head
-> data.  That gets submitted down the BIO layer and __blk_queue_bounce()
-> calls flush_dcache_page() which in the arm64 case calls page_mapping()
-> and page_mapping() does VM_BUG_ON(PageSlab) and splat.
+> The *ONLY* thing that clk_prepare_enable() and clk_prepare_disable() should
+> *EVER* be doing is calling clk_prepare(), clk_enable(), clk_disable() and
+> clk_unprepare().  Those two functions are *merely* helpers for drivers
+> who don't wish to make the individual calls.
 > 
-> The unusual thing about all of this is that the payload for some disk
-> IO is coming from kmalloc, rather than being a user page.  It's oddball
-> but we've done this for ages and should continue to support it.
-> 
-> 
-> Now, the page from kmalloc() cannot be in highmem, so why did the
-> bounce code decide to bounce it?
-> 
-> __blk_queue_bounce() does
-> 
-> 		/*
-> 		 * is destination page below bounce pfn?
-> 		 */
-> 		if (page_to_pfn(page) <= queue_bounce_pfn(q) && !force)
-> 			continue;
-> 
-> and `force' comes from must_snapshot_stable_pages().  But
-> must_snapshot_stable_pages() must have returned false, because if it
-> had returned true then it would have been must_snapshot_stable_pages()
-> which went BUG, because must_snapshot_stable_pages() calls page_mapping().
-> 
-> So my tentative diagosis is that arm64 is fishy.  A page which was
-> allocated via jbd2_alloc(GFP_NOFS)->kmem_cache_alloc() ended up being
-> above arm64's queue_bounce_pfn().  Can you please do a bit of
-> investigation to work out if this is what is happening?  Find out why
-> __blk_queue_bounce() decided to bounce a page which shouldn't have been
-> bounced?
+> Drivers are still completely free to call the individual functions, at
+> which point your proposal breaks horribly - and they _do_ call the
+> individual functions.
+I'm proposing to give device driver a choice when it knows that some
+driver might be interested in knowing its clock's enabled/disabled state
+change at runtime, this is very important for centralized DVFS core
+driver. It is not meant to be covering all cases especially for drivers
+which is not part of the DVFS, so we don't care if it is calling
+clk_enable/disable directly or not.
 
-That sure is strange.  I didn't see any obvious reasons why we'd end up with a
-kmalloc above queue_bounce_pfn().  But then I don't have any arm64s either.
+One major side effect being that it affects those existing drivers who
+were calling clk_prepare_enable and clk_prepare_disable but it should
+not hurt if they don't care the notifier, or maybe we should define a
+new set of functions for the purpose?
 
-> This is all terribly fragile :( afaict if someone sets
-> bdi_cap_stable_pages_required() against that jbd2 queue, we're going to
-> hit that BUG_ON() again, via must_snapshot_stable_pages()'s
-> page_mapping() call.  (Darrick, this means you ;))
-
-Wheeee.  You're right, we shouldn't be calling page_mapping on slab pages.
-We can keep walking the bio segments to find a non-slab page that can tell us
-MS_SNAP_STABLE is set, since we probably won't need the bounce buffer anyway.
-
-How does something like this look?  (+ the patch above)
-
---D
-
-Subject: [PATCH] mm: Don't blow up on slab pages being written to disk
-
-Don't assume that all pages attached to a bio are non-slab pages.  This happens
-if (for example) jbd2 allocates a buffer out of the slab to hold frozen data.
-If we encounter a slab page, just ignore the page and keep searching.
-Hopefully filesystems are smart enough to guarantee that slab pages won't
-be dirtied while they're also being written to disk.
-
-Signed-off-by: Darrick J. Wong <darrick.wong@oracle.com>
----
- mm/bounce.c |    2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/mm/bounce.c b/mm/bounce.c
-index 5f89017..af34855 100644
---- a/mm/bounce.c
-+++ b/mm/bounce.c
-@@ -199,6 +199,8 @@ static int must_snapshot_stable_pages(struct request_queue *q, struct bio *bio)
- 	 */
- 	bio_for_each_segment(from, bio, i) {
- 		page = from->bv_page;
-+		if (PageSlab(page))
-+			continue;
- 		mapping = page_mapping(page);
- 		if (!mapping)
- 			continue;
+Mike, how do you think? Thanks.
