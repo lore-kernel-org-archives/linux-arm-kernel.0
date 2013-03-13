@@ -1,121 +1,73 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 13 Mar 2013 15:17:01 +0100
-Subject: [PATCH 2/3] ARM: at91: rename board-dt to more specific name
- board-dt-sam9
-In-Reply-To: <1362666113-16434-2-git-send-email-plagnioj@jcrosoft.com>
-References: <20130307130842.GA4590@game.jcrosoft.org>
- <1362666113-16434-1-git-send-email-plagnioj@jcrosoft.com>
- <1362666113-16434-2-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <51408A5D.6020402@atmel.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 13 Mar 2013 09:17:21 -0500
+Subject: [PATCH v3 03/11] clocksource: sp804: add device tree support
+In-Reply-To: <1363172730.3100.17.camel@hornet>
+References: <1363151142-32162-1-git-send-email-haojian.zhuang@linaro.org>
+ <1363151142-32162-4-git-send-email-haojian.zhuang@linaro.org>
+ <1363172730.3100.17.camel@hornet>
+Message-ID: <51408A71.9090501@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/07/2013 03:21 PM, Jean-Christophe PLAGNIOL-VILLARD :
-> as we will introduce the Cortex-A5 sama5 support
-
-We may need more arguments here (Cf. discussion about the sama5d3
-support). Let's discuss this and modify this commit message quickly.
-
-Bye,
-
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: Ludovic Desroches <ludovic.desroches@atmel.com>
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> ---
->  arch/arm/configs/at91_dt_defconfig                 |    2 +-
->  arch/arm/configs/at91sam9260_defconfig             |    2 +-
->  arch/arm/configs/at91sam9g20_defconfig             |    2 +-
->  arch/arm/configs/at91sam9g45_defconfig             |    2 +-
->  arch/arm/mach-at91/Kconfig                         |    2 +-
->  arch/arm/mach-at91/Makefile                        |    2 +-
->  arch/arm/mach-at91/{board-dt.c => board-dt-sam9.c} |    0
->  7 files changed, 6 insertions(+), 6 deletions(-)
->  rename arch/arm/mach-at91/{board-dt.c => board-dt-sam9.c} (100%)
+On 03/13/2013 06:05 AM, Pawel Moll wrote:
+> On Wed, 2013-03-13 at 05:05 +0000, Haojian Zhuang wrote:
+>> +++ b/Documentation/devicetree/bindings/timer/arm,sp804.txt
+>> @@ -0,0 +1,27 @@
+>> +ARM sp804 Dual Timers
+>> +---------------------------------------
+>> +
+>> +Required properties:
+>> +- compatible: Should be "arm,sp804" & "arm,primecell"
+>> +- interrupts: Should contain the list of Dual Timer interrupts
+>> +	interrupts = <0 0 4>, <0 1 4>;
 > 
-> diff --git a/arch/arm/configs/at91_dt_defconfig b/arch/arm/configs/at91_dt_defconfig
-> index 1ea9590..047f2a4 100644
-> --- a/arch/arm/configs/at91_dt_defconfig
-> +++ b/arch/arm/configs/at91_dt_defconfig
-> @@ -20,7 +20,7 @@ CONFIG_SOC_AT91SAM9263=y
->  CONFIG_SOC_AT91SAM9G45=y
->  CONFIG_SOC_AT91SAM9X5=y
->  CONFIG_SOC_AT91SAM9N12=y
-> -CONFIG_MACH_AT91SAM_DT=y
-> +CONFIG_MACH_AT91SAM9_DT=y
->  CONFIG_AT91_PROGRAMMABLE_CLOCKS=y
->  CONFIG_AT91_TIMER_HZ=128
->  CONFIG_AEABI=y
-> diff --git a/arch/arm/configs/at91sam9260_defconfig b/arch/arm/configs/at91sam9260_defconfig
-> index 0ea5d2c..05618eb 100644
-> --- a/arch/arm/configs/at91sam9260_defconfig
-> +++ b/arch/arm/configs/at91sam9260_defconfig
-> @@ -22,7 +22,7 @@ CONFIG_MACH_QIL_A9260=y
->  CONFIG_MACH_CPU9260=y
->  CONFIG_MACH_FLEXIBITY=y
->  CONFIG_MACH_SNAPPER_9260=y
-> -CONFIG_MACH_AT91SAM_DT=y
-> +CONFIG_MACH_AT91SAM9_DT=y
->  CONFIG_AT91_PROGRAMMABLE_CLOCKS=y
->  # CONFIG_ARM_THUMB is not set
->  CONFIG_ZBOOT_ROM_TEXT=0x0
-> diff --git a/arch/arm/configs/at91sam9g20_defconfig b/arch/arm/configs/at91sam9g20_defconfig
-> index 3b18810..892e828 100644
-> --- a/arch/arm/configs/at91sam9g20_defconfig
-> +++ b/arch/arm/configs/at91sam9g20_defconfig
-> @@ -22,7 +22,7 @@ CONFIG_MACH_PCONTROL_G20=y
->  CONFIG_MACH_GSIA18S=y
->  CONFIG_MACH_USB_A9G20=y
->  CONFIG_MACH_SNAPPER_9260=y
-> -CONFIG_MACH_AT91SAM_DT=y
-> +CONFIG_MACH_AT91SAM9_DT=y
->  CONFIG_AT91_PROGRAMMABLE_CLOCKS=y
->  # CONFIG_ARM_THUMB is not set
->  CONFIG_AEABI=y
-> diff --git a/arch/arm/configs/at91sam9g45_defconfig b/arch/arm/configs/at91sam9g45_defconfig
-> index 606d48f..5f551b7 100644
-> --- a/arch/arm/configs/at91sam9g45_defconfig
-> +++ b/arch/arm/configs/at91sam9g45_defconfig
-> @@ -18,7 +18,7 @@ CONFIG_MODULE_UNLOAD=y
->  CONFIG_ARCH_AT91=y
->  CONFIG_ARCH_AT91SAM9G45=y
->  CONFIG_MACH_AT91SAM9M10G45EK=y
-> -CONFIG_MACH_AT91SAM_DT=y
-> +CONFIG_MACH_AT91SAM9_DT=y
->  CONFIG_AT91_PROGRAMMABLE_CLOCKS=y
->  CONFIG_AT91_SLOW_CLOCK=y
->  CONFIG_AEABI=y
-> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-> index 98c2e05..440682b 100644
-> --- a/arch/arm/mach-at91/Kconfig
-> +++ b/arch/arm/mach-at91/Kconfig
-> @@ -108,7 +108,7 @@ config MACH_AT91RM9200_DT
->  	  Select this if you want to experiment device-tree with
->  	  an Atmel RM9200 Evaluation Kit.
->  
-> -config MACH_AT91SAM_DT
-> +config MACH_AT91SAM9_DT
->  	bool "Atmel AT91SAM Evaluation Kits with device-tree support"
->  	depends on SOC_AT91SAM9
->  	select USE_OF
-> diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
-> index 39218ca..5eca35a 100644
-> --- a/arch/arm/mach-at91/Makefile
-> +++ b/arch/arm/mach-at91/Makefile
-> @@ -88,7 +88,7 @@ obj-$(CONFIG_MACH_AT91SAM9M10G45EK) += board-sam9m10g45ek.o
->  
->  # AT91SAM board with device-tree
->  obj-$(CONFIG_MACH_AT91RM9200_DT) += board-rm9200-dt.o
-> -obj-$(CONFIG_MACH_AT91SAM_DT) += board-dt.o
-> +obj-$(CONFIG_MACH_AT91SAM9_DT) += board-dt-sam9.o
->  
->  # AT91X40 board-specific support
->  obj-$(CONFIG_MACH_AT91EB01)	+= board-eb01.o
-> diff --git a/arch/arm/mach-at91/board-dt.c b/arch/arm/mach-at91/board-dt-sam9.c
-> similarity index 100%
-> rename from arch/arm/mach-at91/board-dt.c
-> rename to arch/arm/mach-at91/board-dt-sam9.c
+> SP804 has three interrupt outputs: TIMINT1 (interrupt generated by the
+> first timer), TIMINT2 (the second timer) and TIMINTC (combined - logical
+> sum of the two former ones). You may want to describe this somehow to
+> make the choice possible later (eg. VE has the combined interrupt wired
+> while - if I understand what Rob is saying correctly - Highbank uses
+> only the TIMINT1).
+
+How about:
+
+1 irq - TIMINT1
+2 irqs w/ same source # - TIMINTC
+2 irqs w/ different source # - TIMINT1 and TIMINT2
+
+I'm not completely sure if Linux and the irq domain code handles the
+same interrupt source repeated. It should because that is basically a
+shared irq line.
+
+If we ever see only TIMINT2 connected we can add a property for that,
+but I think that case is unlikely.
+
 > 
+>> +- reg: Should contain location and length for dual timer register.
+>> +- clocks: clock driving the dual timer hardware
+>> +	clocks = <&timclk0 &timclk1>;
+> 
+> Again, there are three "clock" inputs (even ignoring the APBCLK):
 
+We should not ignore that clock as we may want this to be a proper
+amba_device someday.
 
--- 
-Nicolas Ferre
+> TIMCLK, TIMCLKEN1, TIMCLKEN2. The real clocking rate for the timer
+> depends on the TIMCLK and respective TIMCLKENx - see
+> http://infocenter.arm.com/help/topic/com.arm.doc.ddi0271d/CJABHCIG.html 
+> 
+> The driver than could make educated choice based on this information.
+> 
+> You may choose to ignore this fact (and require only a clock
+> representing the effective rate). I did it for the VE DTS, but it still
+> doesn't seem completely right
+> 
+>> +Optional properties:
+>> +- arm,sp804-clocksource: Should contain the register offset of TIMER1 or
+>> +  TIMER2 in Dual Timer Controller.
+>> +	arm,sp804-clocksource = <0x20>;
+> 
+> You seem to be missing the "arm,sp804-clockevent" one here.
+
+These should stay as aliases or go away as I suggested.
+
+Rob
