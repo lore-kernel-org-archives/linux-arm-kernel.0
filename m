@@ -1,54 +1,72 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Wed, 13 Mar 2013 23:01:40 +0800
-Subject: [PATCH v3 06/11] ARM: vexpress: use clocksource_of_init for sp804
-In-Reply-To: <1363186087.3100.72.camel@hornet>
+Date: Wed, 13 Mar 2013 23:11:33 +0800
+Subject: [PATCH v3 03/11] clocksource: sp804: add device tree support
+In-Reply-To: <1363186548.3100.75.camel@hornet>
 References: <1363151142-32162-1-git-send-email-haojian.zhuang@linaro.org>
- <1363151142-32162-7-git-send-email-haojian.zhuang@linaro.org>
- <1363173037.3100.22.camel@hornet>
- <CAD6h2NQWB3+1QepQjBE0BZiG44YAQRi7e-9+oZvVYpYV8QycDA@mail.gmail.com>
- <1363175175.3100.37.camel@hornet>
- <CAD6h2NSUyFvhoqMsYqT=rzFZ--MWv+0vHOCtAV9n-5YO+LNTMA@mail.gmail.com>
- <1363186087.3100.72.camel@hornet>
-Message-ID: <CAD6h2NRkS4qk+iqbWhaOpBHmjSYOB=YBbfNkn0X3jzNawzgNEA@mail.gmail.com>
+ <1363151142-32162-4-git-send-email-haojian.zhuang@linaro.org>
+ <1363172730.3100.17.camel@hornet> <51408A71.9090501@gmail.com>
+ <1363185757.3100.66.camel@hornet> <51409276.8050601@gmail.com>
+ <1363186548.3100.75.camel@hornet>
+Message-ID: <CAD6h2NTP+X6RVr23Y-XLrQMqHptH974oYooTX=Y6F_Q4hyrmNA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 March 2013 22:48, Pawel Moll <pawel.moll@arm.com> wrote:
-> On Wed, 2013-03-13 at 12:21 +0000, Haojian Zhuang wrote:
->> Do you mean that system wants to pick any one randomly? It's impossible.
+On 13 March 2013 22:55, Pawel Moll <pawel.moll@arm.com> wrote:
+> On Wed, 2013-03-13 at 14:51 +0000, Rob Herring wrote:
+>> On 03/13/2013 09:42 AM, Pawel Moll wrote:
+>> > On Wed, 2013-03-13 at 14:17 +0000, Rob Herring wrote:
+>> >> How about:
+>> >>
+>> >> 1 irq - TIMINT1
+>> >> 2 irqs w/ same source # - TIMINTC
+>> >> 2 irqs w/ different source # - TIMINT1 and TIMINT2
+>> >>
+>> >> I'm not completely sure if Linux and the irq domain code handles the
+>> >> same interrupt source repeated. It should because that is basically a
+>> >> shared irq line.
+>> >>
+>> >> If we ever see only TIMINT2 connected we can add a property for that,
+>> >> but I think that case is unlikely.
+>> >
+>> > I was rather thinking about using the "interrupt-names" property and
+>> > naming them explicitly, eg:
+>> >
+>> >     interrupt-names = "timint1", "timint2";
+>> >     interrupts = <1>, <2>;
+>> >
+>> >     interrupt-names = "timint1";
+>> >     interrupts = <1>;
+>> >
+>> >     interrupt-names = "timint2";
+>> >     interrupts = <2>;
+>> >
+>> >     interrupt-names = "timintc";
+>> >     interrupts = <3>;
+>> >
+>> > But now I see that of_amba_device_create() doesn't do anything about it
+>> > (platform device would use them as resource name so we could use
+>> > platform_get_resource_byname), so I'm not sure any more...
+>>
+>> The interrupt-names property should not be required and without it here
+>> you cannot determine the configuration.
 >
-> It is possible in case of the VE platform. Therefore it is not
-> completely impossible. QED :-)
+> It is not required by the standard interrupt bindings. But it could be
+> required by the SP804 binding, couldn't it? (like any other property)
+> "Encoding" the information by specific organization of the field makes
+> it "invisible to the naked eye".
 >
-Yes, it's possible. Since only clocksource / clockevent is using SP804 timer
-on the VE platform. If user app or something else is using other SP804
-timer, it would be mess because of resource conflict.
+> Not that I have any strong feelings about it.
+>
+> Pawe?
+>
+>
 
->> Imagine that only TIMINT1 signal in sp804 is routed to interrupt controller.
->> Could system still pick any one it wants?
->
-Then we need another new property. I try to find using minim properties.
+What's the scenario that we must use TIMINTC? TIMINT1 & TIMINT2 are
+already enough on these two TIMERs. If we really needn't TIMINTC, we
+need to support it. Since it's over-designed.
 
-> If you tell the system that only TIMINT1 is wired, it shouldn't even try
-> to use the second timer for anything that would require the interrupt.
-> Therefore, describing the hardware sufficiently, you're giving the
-> system enough information to make the right decisions.
->
->> I think that clocksource or clockevent must be specified in DTS. Whatever
->> we're using alias or property.
->
-> I'm convinced it does not *must* be there. I think it *can* be there,
-> for platforms where the available timers are not equal (for whatever
-> reason). My point is: why are you trying to force me to put some
-> information into my hardware description which doesn't have any meaning
-> for me?
->
-As I mentioned above, system must know the behavior first. The upper layer
-software could know which timer is used in clocksource or clockevent.
+If TIMINT1 & TIMINT2 aren't routed, and only TIMINTC is routed. It's another
+case. We can consider it as replacement of TIMINT1.
 
-For example, your Android system could be shared on multiple platforms. It
-could parse hardware information from DTS. (Of course, it hasn't this feature
-yet). Then it could arrange apps to use other timers.
-
-It's like you define console on specified UART even you have multiples UART
-port.
+Regards
+Haojian
