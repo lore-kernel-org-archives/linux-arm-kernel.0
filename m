@@ -1,103 +1,76 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 13 Mar 2013 11:18:35 +0800
-Subject: [PATCH v5 2/2] ARM: uncompress debug support for multiplatform build
-In-Reply-To: <1363001737-8745-3-git-send-email-shawn.guo@linaro.org>
-References: <1363001737-8745-3-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1363144715-12002-1-git-send-email-shawn.guo@linaro.org>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Wed, 13 Mar 2013 11:25:57 +0800
+Subject: [PATCH v2 03/14] clocksource: sp804: append CONFIG_OF
+In-Reply-To: <201303121917.24928.arnd@arndb.de>
+References: <1363108124-17484-1-git-send-email-haojian.zhuang@linaro.org>
+ <1363108124-17484-4-git-send-email-haojian.zhuang@linaro.org>
+ <201303121917.24928.arnd@arndb.de>
+Message-ID: <CAD6h2NQHjP2YSv2=BAqTa+MaZKvSe6JPwmuhMLkJcjuaMtVtsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of giving zero support of uncompress debug for multiplatform
-build, the patch turns uncompress debug into one part of DEBUG_LL
-support.  When DEBUG_LL is turned on for a particular platform,
-uncompress debug works too for that platform.
+On 13 March 2013 03:17, Arnd Bergmann <arnd@arndb.de> wrote:
+> (resending this email as I got a few rejects from mailing lists when
+> I accidentally had an invalid email address for Mike)
+>
+> On Tuesday 12 March 2013, Haojian Zhuang wrote:
+>> of_find_matching_node() & of_device_is_available() are depend on CONFIG_OF
+>> macro. If CONFIG_OF isn't defined for non-DT mode, the build error
+>> occurs.
+>>
+>> So add CONFIG_OF for those DT functions.
+>
+> I don't like this patch too much:
+>
+> We should be able to do this without the #ifdef. The problem is really that the
+> declarations are also hidden behind an #ifdef. I think we should change the
+> linux/of.h header file to either provide alternative empty inline functions
+> or at least leave the declarations visible so we can compile the code as
+> long as the call gets discarded.
+>
+>>
+>> +#ifdef CONFIG_OF
+>>  static struct device_node *from = NULL;
+>>
+>>  static struct of_device_id sp804_timer_match[] __initdata = {
+>> @@ -294,3 +295,4 @@ err:
+>>       iounmap(base);
+>>  }
+>>  CLOCKSOURCE_OF_DECLARE(sp804, "arm,sp804", sp804_dt_init);
+>> +#endif
+>
+> There is actually an empty definition for CLOCKSOURCE_OF_DECLARE(),
+> but I think it would be better to still define it the same way as
+> with CONFIG_OF enabled but attribute((__unused__)), like:
+>
+> #ifdef CONFIG_CLKSRC_OF
+> extern void clocksource_of_init(void);
+> #define CLOCKSOURCE_OF_DECLARE(name, compat, fn)                        \
+>         static const struct of_device_id __clksrc_of_table_##name       \
+>                 __used __section(__clksrc_of_table)                     \
+>                  = { .compatible = compat, .data = fn };
+> #else
+> static inline void clocksource_of_init(void) {}
+> #define CLOCKSOURCE_OF_DECLARE(name, compat, fn)                        \
+>         static const struct of_device_id __clksrc_of_table_##name       \
+>                 __unused = { .compatible = compat, .data = fn };
+> #endif
+>
+> This way, all the code still gets built, but since there is nothing
+> pointing to __clksrc_of_table_##name and it is marked __unused, it
+> gets dropped along with all other symbols that are only referenced
+> from it.
+>
+>         Arnd
+>
 
-OMAP and Tegra are exceptions here.  OMAP low-level debug code places
-data in the .data section, and that is not allowed in decompressor.
-And Tegra code has reference to variable that's unavailable in
-decompressor but only in kernel.  That's why Kconfig symbol
-DEBUG_UNCOMPRESS controlling multiplatform uncompress debug support is
-defined with !DEBUG_OMAP2PLUS_UART && !DEBUG_TEGRA_UART.
+If CONFIG_CLKSRC_OF is depend on CONFIG_USEOF, I think that
+we can resolve all these issue. We don't need to define
+CLOCKSOURCE_OF_DECLARE() for non-DT mode, and we also
+don't need to define of_device_is_available(), ... in non-DT mode.
 
-It creates arch/arm/boot/compressed/debug.S with CONFIG_DEBUG_LL_INCLUDE
-included there, implements a generic putc() using those macros, which
-will be built when DEBUG_UNCOMPRESS is defined.
+We only need to add "depends on USE_OF" for CLKSRC_OF
+configuration. It's simpler. What's your opinion?
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Acked-by: Olof Johansson <olof@lixom.net>
-Acked-by: Tony Lindgren <tony@atomide.com>
----
-Changes since v4:
- - Mark DEBUG_TEGRA_UART as another exception, as the debug code refers
-   to tegra_uart_config which is only accessible in kernel.
-
- arch/arm/Kconfig.debug              |    6 ++++++
- arch/arm/boot/compressed/Makefile   |    3 +++
- arch/arm/boot/compressed/debug.S    |   12 ++++++++++++
- arch/arm/include/debug/uncompress.h |    4 ++++
- 4 files changed, 25 insertions(+)
- create mode 100644 arch/arm/boot/compressed/debug.S
-
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index fc54a5b..7aa30e4 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -601,6 +601,12 @@ config DEBUG_LL_INCLUDE
- 	default "debug/zynq.S" if DEBUG_ZYNQ_UART0 || DEBUG_ZYNQ_UART1
- 	default "mach/debug-macro.S"
- 
-+config DEBUG_UNCOMPRESS
-+	bool
-+	default y if ARCH_MULTIPLATFORM && DEBUG_LL && \
-+		     !DEBUG_OMAP2PLUS_UART && \
-+		     !DEBUG_TEGRA_UART
-+
- config UNCOMPRESS_INCLUDE
- 	string
- 	default "debug/uncompress.h" if ARCH_MULTIPLATFORM
-diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index 5cad8a6..e3238bc 100644
---- a/arch/arm/boot/compressed/Makefile
-+++ b/arch/arm/boot/compressed/Makefile
-@@ -24,6 +24,9 @@ endif
- AFLAGS_head.o += -DTEXT_OFFSET=$(TEXT_OFFSET)
- HEAD	= head.o
- OBJS	+= misc.o decompress.o
-+ifeq ($(CONFIG_DEBUG_UNCOMPRESS),y)
-+OBJS	+= debug.o
-+endif
- FONTC	= $(srctree)/drivers/video/console/font_acorn_8x8.c
- 
- # string library code (-Os is enforced to keep it much smaller)
-diff --git a/arch/arm/boot/compressed/debug.S b/arch/arm/boot/compressed/debug.S
-new file mode 100644
-index 0000000..6e8382d
---- /dev/null
-+++ b/arch/arm/boot/compressed/debug.S
-@@ -0,0 +1,12 @@
-+#include <linux/linkage.h>
-+#include <asm/assembler.h>
-+
-+#include CONFIG_DEBUG_LL_INCLUDE
-+
-+ENTRY(putc)
-+	addruart r1, r2, r3
-+	waituart r3, r1
-+	senduart r0, r1
-+	busyuart r3, r1
-+	mov	 pc, lr
-+ENDPROC(putc)
-diff --git a/arch/arm/include/debug/uncompress.h b/arch/arm/include/debug/uncompress.h
-index e19955d..0e2949b 100644
---- a/arch/arm/include/debug/uncompress.h
-+++ b/arch/arm/include/debug/uncompress.h
-@@ -1,3 +1,7 @@
-+#ifdef CONFIG_DEBUG_UNCOMPRESS
-+extern void putc(int c);
-+#else
- static inline void putc(int c) {}
-+#endif
- static inline void flush(void) {}
- static inline void arch_decomp_setup(void) {}
--- 
-1.7.9.5
+Regards
+Haojian
