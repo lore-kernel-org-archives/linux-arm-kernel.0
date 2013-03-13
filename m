@@ -1,154 +1,77 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Wed, 13 Mar 2013 17:41:16 +0100
-Subject: [PATCH] arm: dts: Add uart1 and uart2 to igep boards.
-In-Reply-To: <CAAwP0s3bs=uqCRPgQiXQUnHq-6L61ayrP0WrXdJrNxNuGfmV0A@mail.gmail.com>
-References: <1355326422-12357-1-git-send-email-matthias.bgg@gmail.com>
- <50C8AC3C.9020908@ti.com>
- <CABuKBeJsHCq98Pe-BwPajbQ+2OLQpwrbtVTJe=j9thPDQCCBrg@mail.gmail.com>
- <CAAwP0s01Jxh0f-T0sd5D980dZPcEV0J1KzjPbNHkrXLaKA3YUg@mail.gmail.com>
- <CABuKBeJsg_P=aDr0s9iVOD+7YTNoVUFQJCJymJyJ7NqXHUBzKQ@mail.gmail.com>
- <511E0807.8000200@ti.com>
- <CAAwP0s3bs=uqCRPgQiXQUnHq-6L61ayrP0WrXdJrNxNuGfmV0A@mail.gmail.com>
-Message-ID: <5140AC2C.50309@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 13 Mar 2013 16:43:48 +0000
+Subject: [PATCH] ARM: fix CONFIG_VIRT_TO_BUS handling
+Message-ID: <201303131643.48506.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
+887cbce0 "arch Kconfig: centralise CONFIG_ARCH_NO_VIRT_TO_BUS"
+and  4febd95a8 "Select VIRT_TO_BUS directly where needed" from
+Stephen Rothwell changed globally how CONFIG_VIRT_TO_BUS is
+selected, while my own a5d533ee0 "ARM: disable virt_to_bus/
+virt_to_bus almost everywhere" was merged at the same time and
+changed which platforms select it on ARM.
 
-On 03/02/2013 02:52 AM, Javier Martinez Canillas wrote:
-> On Fri, Feb 15, 2013 at 11:03 AM, Cousson, Benoit <b-cousson@ti.com> wrote:
->> Hi Matthias,
->>
->>
->> On 2/15/2013 10:35 AM, Matthias Brugger wrote:
->>>
->>> 2013/1/26 Javier Martinez Canillas <martinez.javier@gmail.com>:
->>>>
->>>> On Sat, Jan 26, 2013 at 4:16 PM, Matthias Brugger
->>>> <matthias.bgg@gmail.com>
->>>> wrote:
->>>>>
->>>>> Hi Benoit,
->>>>>
->>>>> 2012/12/12 Benoit Cousson <b-cousson@ti.com>:
->>>>>>
->>>>>> Hi Matthias,
->>>>>>
->>>>>> On 12/12/2012 04:33 PM, Matthias Brugger wrote:
->>>>>>>
->>>>>>> This patch is a follow-up patch for Javier Martinez effort adding
->>>>>>> initial
->>>>>>> device tree support to IGEP technology devices. [1]
->>>>>>>
->>>>>>> It adds uart1 and uart2 bindings to the generic dtsi for the IGEP
->>>>>>> boards.
->>>>>>>
->>>>>>> [1] http://www.spinics.net/lists/linux-omap/msg83409.html
->>>>>>>
->>>>>>> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
->>>>>>> ---
->>>>>>>   arch/arm/boot/dts/omap3-igep.dtsi |   24 ++++++++++++++++++++++++
->>>>>>>   1 file changed, 24 insertions(+)
->>>>>>>
->>>>>>> diff --git a/arch/arm/boot/dts/omap3-igep.dtsi
->>>>>>> b/arch/arm/boot/dts/omap3-igep.dtsi
->>>>>>> index 125fe00..c02e3c0 100644
->>>>>>> --- a/arch/arm/boot/dts/omap3-igep.dtsi
->>>>>>> +++ b/arch/arm/boot/dts/omap3-igep.dtsi
->>>>>>> @@ -27,6 +27,20 @@
->>>>>>>   };
->>>>>>>
->>>>>>>   &omap3_pmx_core {
->>>>>>> +     uart1_pins: pinmux_uart1_pins {
->>>>>>> +             pinctrl-single,pins = <
->>>>>>> +                     0x152 0x100     /* uart1_rx.uart1_rx INPUT |
->>>>>>> MODE0
->>>>>>> */
->>>>>>> +                     0x14c 0         /* uart1_tx.uart1_tx OUTPUT |
->>>>>>> MODE0 */
->>>>>>> +             >;
->>>>>>> +     };
->>>>>>> +
->>>>>>> +     uart2_pins: pinmux_uart2_pins {
->>>>>>> +             pinctrl-single,pins = <
->>>>>>> +                     0x14a 0x100     /* uart2_rx.uart2_rx INPUT |
->>>>>>> MODE0
->>>>>>> */
->>>>>>> +                     0x148 0         /* uart2_tx.uart2_tx OUTPUT |
->>>>>>> MODE0 */
->>>>>>> +             >;
->>>>>>> +     };
->>>>>>> +
->>>>>>>        uart3_pins: pinmux_uart3_pins {
->>>>>>>                pinctrl-single,pins = <
->>>>>>>                        0x16e 0x100     /* uart3_rx.uart3_rx INPUT |
->>>>>>> MODE0
->>>>>>> */
->>>>>>> @@ -77,6 +91,16 @@
->>>>>>>        status = "disabled";
->>>>>>>   };
->>>>>>>
->>>>>>> +&uart1 {
->>>>>>> +       pinctrl-names = "default";
->>>>>>> +       pinctrl-0 = <&uart1_pins>;
->>>>>>> +};
->>>>>>> +
->>>>>>> +&uart2 {
->>>>>>> +       pinctrl-names = "default";
->>>>>>> +       pinctrl-0 = <&uart2_pins>;
->>>>>>> +};
->>>>>>> +
->>>>>>>   &uart3 {
->>>>>>>          pinctrl-names = "default";
->>>>>>>          pinctrl-0 = <&uart3_pins>;
->>>>>>>
->>>>>>
->>>>>> That looks good to me. I'll apply it on top of javier's series for 3.9.
->>>>>
->>>>>
->>>>> Can you pin-point me to the repository where this patches are in right
->>>>> now? I tried to figure it out these days, but didn't found where to
->>>>> clone the repository from.
->>>>>
->>>>> Thanks,
->>>>> Matthias
->>>>>
->>>>
->>>> Hi Matthias,
->>>>
->>>> OMAP DT tree is:
->>>> git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git
->>>
->>>
->>> Hi all,
->>>
->>> unfortunately I can't find the patch in this tree.
->>
->>
->> Sorry about that. I've never pushed the latest branch, and was busy the past
->> month. I'll refresh the branch with all the pending patches.
->>
->> Regards,
->> Benoit
->>
-> 
-> Hi Benoit,
-> 
-> I realized that your for_3.9/dts branch has not landed in mainline yet
-> and we are near to the end of the merge window.
-> 
-> Are you still planing to include those changes for 3.9 or are you
-> going to wait until the next release?
+The result of this conflict was that we again see CONFIG_VIRT_TO_BUS
+on all ARM systems. This patch fixes up the problem and removes
+CONFIG_ARCH_NO_VIRT_TO_BUS again on ARM.
 
-I'm really sorry about that. I was not available to push it at the proper time.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Stephen Rothwell <sfr@canb.auug.org.au>
+---
 
-I've just rebased it on 3.9-rc2 and pushed it to a new branch.
-git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.10/dts
+I'd like to merge this one through the arm-soc tree as a 3.9 bug fix
+unless there are objections.
 
-It includes the one from Matthias and yours as well. I'm still checking my inbox to catch up on the new ones I missed.
-
-I'm planning to push this ASAP to avoid missing the deadline again.
-
-
-Regards,
-Benoit
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 78ffcc6..ad52cd4 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -49,7 +49,6 @@ config ARM
+ 	select HAVE_REGS_AND_STACK_ACCESS_API
+ 	select HAVE_SYSCALL_TRACEPOINTS
+ 	select HAVE_UID16
+-	select HAVE_VIRT_TO_BUS
+ 	select KTIME_SCALAR
+ 	select PERF_USE_VMALLOC
+ 	select RTC_LIB
+@@ -733,6 +732,7 @@ config ARCH_RPC
+ 	select NEED_MACH_IO_H
+ 	select NEED_MACH_MEMORY_H
+ 	select NO_IOPORT
++	select VIRT_TO_BUS
+ 	help
+ 	  On the Acorn Risc-PC, Linux can support the internal IDE disk and
+ 	  CD-ROM interface, serial and parallel port, and the floppy drive.
+@@ -868,6 +868,7 @@ config ARCH_SHARK
+ 	select ISA_DMA
+ 	select NEED_MACH_MEMORY_H
+ 	select PCI
++	select VIRT_TO_BUS
+ 	select ZONE_DMA
+ 	help
+ 	  Support for the StrongARM based Digital DNARD machine, also known
+@@ -1451,10 +1452,6 @@ config ISA_DMA
+ 	bool
+ 	select ISA_DMA_API
+ 
+-config ARCH_NO_VIRT_TO_BUS
+-	def_bool y
+-	depends on !ARCH_RPC && !ARCH_NETWINDER && !ARCH_SHARK
+-
+ # Select ISA DMA interface
+ config ISA_DMA_API
+ 	bool
+diff --git a/arch/arm/mach-footbridge/Kconfig b/arch/arm/mach-footbridge/Kconfig
+index abda5a1..0f2111a 100644
+--- a/arch/arm/mach-footbridge/Kconfig
++++ b/arch/arm/mach-footbridge/Kconfig
+@@ -67,6 +67,7 @@ config ARCH_NETWINDER
+ 	select ISA
+ 	select ISA_DMA
+ 	select PCI
++	select VIRT_TO_BUS
+ 	help
+ 	  Say Y here if you intend to run this kernel on the Rebel.COM
+ 	  NetWinder.  Information about this machine can be found at:
