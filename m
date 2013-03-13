@@ -1,34 +1,43 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Wed, 13 Mar 2013 09:39:23 +0100
-Subject: [PATCH v2] mfd: ab8500-gpadc: Complain if we fail to enable
- vtvout LDO
-In-Reply-To: <1362822405.8907.1.camel@phoenix>
-References: <1362822405.8907.1.camel@phoenix>
-Message-ID: <20130313083923.GI21994@zurbaran>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 13 Mar 2013 08:43:18 +0000
+Subject: [PATCH v2 05/14] ARM: integrator: use clocksource_of_init for
+ sp804
+In-Reply-To: <CAD6h2NRDJuGTTZ1B0iy__2SYYw7R18NRqQcwjsSvMJ3gA4E_WQ@mail.gmail.com>
+References: <1363108124-17484-1-git-send-email-haojian.zhuang@linaro.org>
+ <CACRpkdbCJd-ag1gLrJqJZ1D6+E5eX2tNuuNAtiKgtuBsxmrpmA@mail.gmail.com>
+ <CAD6h2NRDJuGTTZ1B0iy__2SYYw7R18NRqQcwjsSvMJ3gA4E_WQ@mail.gmail.com>
+Message-ID: <201303130843.18806.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Axel,
-
-On Sat, Mar 09, 2013 at 05:46:45PM +0800, Axel Lin wrote:
-> Since commit c8801a8e
-> "regulator: core: Mark all get and enable calls as __must_check",
-> we must check return value of regulator_enable() to silence below build warning.
+On Wednesday 13 March 2013, Haojian Zhuang wrote:
+> match table:
+> {.compatible = "arm,sp804", .data = SP804_TIMER, },
+> {.compaitlbe = "arm,integrator-timer", .data = INTEGRATOR_TIMER, },
 > 
->   CC      drivers/mfd/ab8500-gpadc.o
-> drivers/mfd/ab8500-gpadc.c: In function 'ab8500_gpadc_runtime_resume':
-> drivers/mfd/ab8500-gpadc.c:598:18: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result [-Wunused-result]
-> drivers/mfd/ab8500-gpadc.c: In function 'ab8500_gpadc_probe':
-> drivers/mfd/ab8500-gpadc.c:655:18: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result [-Wunused-result]
+> sp804_get_clock_rate():
+>     char dev_id_buf[ID_BUF_SIZE];
+>     if (match->data)
+>         snprintf(dev_id_buf, ID_BUF_SIZE, "ap_timer");
+>     else
+>         snprintf(dev_id_buf, ID_BUF_SIZE, "sp804");
+>     clk = clk_get_sys(dev_id_buf, name);
 > 
-> Also convert to devm_regulator_get(), this fixes a missing regulator_put() call
-> in ab8500_gpadc_remove().
-This is on the edge of a patch split for 2 separate fixes, but I applied it
-anyway.
+> sp804_dt_init_clk():
+>     char dev_id_buf[ID_BUF_SIZE];
+>     if (match->data)
+>         snprintf(dev_id_buf, ID_BUF_SIZE, "ap_timer");
+>     else
+>         snprintf(dev_id_buf, ID_BUF_SIZE, "sp804");
+>     lookup = clkdev_alloc(clk, name, dev_id_buf);
+> 
+> I think it won't break out code any more. Since most code are same, we
+> could handle it in the same driver.
+> 
 
-Cheers,
-Samuel.
+The data member of struct of_device_id is a pointer, you could
+point that directly to a const string containing the name, if that
+is the only difference, or to another structure that describes
+the other parameters.
 
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+	Arnd
