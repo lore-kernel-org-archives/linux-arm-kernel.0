@@ -1,40 +1,91 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 13 Mar 2013 06:25:13 +0100
-Subject: [PATCH v2 05/14] ARM: integrator: use clocksource_of_init for
- sp804
-In-Reply-To: <201303121854.45864.arnd@arndb.de>
-References: <1363108124-17484-1-git-send-email-haojian.zhuang@linaro.org>
- <1363108124-17484-6-git-send-email-haojian.zhuang@linaro.org>
- <201303121854.45864.arnd@arndb.de>
-Message-ID: <CACRpkdZ8w3yehwduwXKc3NK98fEOg7Bz9EG1_frJ4bZTCd45Kg@mail.gmail.com>
+From: padma.kvr@gmail.com (Padma Venkat)
+Date: Wed, 13 Mar 2013 11:00:19 +0530
+Subject: [PATCH V2] ARM: dts: Modify SPI nodes according generic DMA DT
+ bindings
+In-Reply-To: <1362480394-1064-1-git-send-email-padma.v@samsung.com>
+References: <1362480394-1064-1-git-send-email-padma.v@samsung.com>
+Message-ID: <CAAgF-Bc53K57YzrCA=js_=f5v5ssvfSv0Nee4hLYMesGFTp9pg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 12, 2013 at 7:54 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 12 March 2013, Haojian Zhuang wrote:
+Hi Kukjin,
 
->>         timer1: timer at 13000100 {
->>                 compatible = "arm,sp804", "arm,primecell";
->> +               arm,sp804-clockevent = <0>;
->> +               status = "ok";
->>         };
+On Tue, Mar 5, 2013 at 4:16 PM, Padmavathi Venna <padma.v@samsung.com> wrote:
+> This patch removes custom way of adding spi dma channels and
+> adds according to new generic DMA DT bindings on samsung exynos4
+> and exynos5440 platforms.
 >
-> I would prefer to keep the old way of doing this. The "aliases" node is
-> meant for configuration, while the timer device itself should not care
-> whether it is used as a clockevent or clocksource or some other device.
+> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+> ---
 >
-> We could probably change the identifiers in the aliases to
-> "linux,clocksource" and "linux,clockevents" instead of
-> "arm,timer-primary" and "arm,timer-secondary".
+> Changes since V1:
+>         - Corrected the pdma phandle in spi1 node.
+>
+>  arch/arm/boot/dts/exynos4.dtsi    |   15 +++++++++------
+>  arch/arm/boot/dts/exynos5440.dtsi |    5 +++--
+>  2 files changed, 12 insertions(+), 8 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+> index 1a62bcf..4521a72 100644
+> --- a/arch/arm/boot/dts/exynos4.dtsi
+> +++ b/arch/arm/boot/dts/exynos4.dtsi
+> @@ -235,8 +235,9 @@
+>                 compatible = "samsung,exynos4210-spi";
+>                 reg = <0x13920000 0x100>;
+>                 interrupts = <0 66 0>;
+> -               tx-dma-channel = <&pdma0 7>; /* preliminary */
+> -               rx-dma-channel = <&pdma0 6>; /* preliminary */
+> +               dmas = <&pdma0 7
+> +                       &pdma0 6>;
+> +               dma-names = "tx", "rx";
+>                 #address-cells = <1>;
+>                 #size-cells = <0>;
+>                 status = "disabled";
+> @@ -246,8 +247,9 @@
+>                 compatible = "samsung,exynos4210-spi";
+>                 reg = <0x13930000 0x100>;
+>                 interrupts = <0 67 0>;
+> -               tx-dma-channel = <&pdma1 7>; /* preliminary */
+> -               rx-dma-channel = <&pdma1 6>; /* preliminary */
+> +               dmas = <&pdma1 7
+> +                       &pdma1 6>;
+> +               dma-names = "tx", "rx";
+>                 #address-cells = <1>;
+>                 #size-cells = <0>;
+>                 status = "disabled";
+> @@ -257,8 +259,9 @@
+>                 compatible = "samsung,exynos4210-spi";
+>                 reg = <0x13940000 0x100>;
+>                 interrupts = <0 68 0>;
+> -               tx-dma-channel = <&pdma0 9>; /* preliminary */
+> -               rx-dma-channel = <&pdma0 8>; /* preliminary */
+> +               dmas = <&pdma0 9
+> +                       &pdma0 8>;
+> +               dma-names = "tx", "rx";
+>                 #address-cells = <1>;
+>                 #size-cells = <0>;
+>                 status = "disabled";
+> diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
+> index 9a99755..31a3626 100644
+> --- a/arch/arm/boot/dts/exynos5440.dtsi
+> +++ b/arch/arm/boot/dts/exynos5440.dtsi
+> @@ -79,8 +79,9 @@
+>                 compatible = "samsung,exynos4210-spi";
+>                 reg = <0xD0000 0x1000>;
+>                 interrupts = <0 4 0>;
+> -               tx-dma-channel = <&pdma0 5>; /* preliminary */
+> -               rx-dma-channel = <&pdma0 4>; /* preliminary */
+> +               dmas = <&pdma0 5
+> +                       &pdma0 4>;
+> +               dma-names = "tx", "rx";
+>                 #address-cells = <1>;
+>                 #size-cells = <0>;
+>         };
 
-I named it like that exactly to be OS-neutral.
+Any comment on this patch? If not can you please take this into your tree?
 
-The idea is that what timer is to be used for primary and secondary
-may have implications on things like power consumption and
-one timer may be broken in the HW etc. That is not a Linux-specific
-thing.
-
-A bit hard to do things right here :-/
-
-Yours,
-Linus Walleij
+Thanks
+Padma
+> --
+> 1.7.4.4
+>
