@@ -1,61 +1,56 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 13 Mar 2013 11:17:50 -0700
-Subject: [PATCHv3 04/10] ARM: OMAP2+: Divorce from local timer API
+Date: Wed, 13 Mar 2013 11:17:54 -0700
+Subject: [PATCHv3 08/10] clocksource: time-armada-370-xp: Fix sparse warning
 In-Reply-To: <1363198676-30417-1-git-send-email-sboyd@codeaurora.org>
 References: <1363198676-30417-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1363198676-30417-5-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1363198676-30417-9-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the TWD doesn't rely on the local timer API, OMAP can
-stop selecting it in Kconfig and relying on the config option to
-decide if it should call smp_twd functions.
+drivers/clocksource/time-armada-370-xp.c:217:13: warning: symbol
+'armada_370_xp_timer_init' was not declared. Should it be static?
 
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Acked-by: Tony Lindgren <tony@atomide.com>
+Also remove the __init marking in the prototype as it's
+unnecessary and drop the init.h file.
+
+Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/mach-omap2/Kconfig | 1 -
- arch/arm/mach-omap2/timer.c | 7 -------
- 2 files changed, 8 deletions(-)
+ drivers/clocksource/time-armada-370-xp.c | 3 ++-
+ include/linux/time-armada-370-xp.h       | 4 +---
+ 2 files changed, 3 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index 49ac3df..6e1f871 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -88,7 +88,6 @@ config ARCH_OMAP4
- 	select CACHE_L2X0
- 	select CPU_V7
- 	select HAVE_SMP
--	select LOCAL_TIMERS if SMP
- 	select OMAP_INTERCONNECT
- 	select PL310_ERRATA_588369
- 	select PL310_ERRATA_727915
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index 2bdd4cf..c00a8f8 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -587,7 +587,6 @@ OMAP_SYS_GP_TIMER_INIT(3_am33xx, 1, OMAP4_MPU_SOURCE, "ti,timer-alwon",
- #ifdef CONFIG_ARCH_OMAP4
- OMAP_SYS_32K_TIMER_INIT(4, 1, OMAP4_32K_SOURCE, "ti,timer-alwon",
- 			2, OMAP4_MPU_SOURCE);
--#ifdef CONFIG_LOCAL_TIMERS
- static DEFINE_TWD_LOCAL_TIMER(twd_local_timer, OMAP44XX_LOCAL_TWD_BASE, 29);
- void __init omap4_local_timer_init(void)
- {
-@@ -606,12 +605,6 @@ void __init omap4_local_timer_init(void)
- 			pr_err("twd_local_timer_register failed %d\n", err);
- 	}
- }
--#else /* CONFIG_LOCAL_TIMERS */
--void __init omap4_local_timer_init(void)
--{
--	omap4_sync32k_timer_init();
--}
--#endif /* CONFIG_LOCAL_TIMERS */
- #endif /* CONFIG_ARCH_OMAP4 */
+diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
+index 47a6730..efe4aef 100644
+--- a/drivers/clocksource/time-armada-370-xp.c
++++ b/drivers/clocksource/time-armada-370-xp.c
+@@ -27,10 +27,11 @@
+ #include <linux/of_address.h>
+ #include <linux/irq.h>
+ #include <linux/module.h>
++#include <linux/percpu.h>
++#include <linux/time-armada-370-xp.h>
  
- #ifdef CONFIG_SOC_OMAP5
+ #include <asm/sched_clock.h>
+ #include <asm/localtimer.h>
+-#include <linux/percpu.h>
+ /*
+  * Timer block registers.
+  */
+diff --git a/include/linux/time-armada-370-xp.h b/include/linux/time-armada-370-xp.h
+index dfdfdc0..6fb0856 100644
+--- a/include/linux/time-armada-370-xp.h
++++ b/include/linux/time-armada-370-xp.h
+@@ -11,8 +11,6 @@
+ #ifndef __TIME_ARMADA_370_XPPRCMU_H
+ #define __TIME_ARMADA_370_XPPRCMU_H
+ 
+-#include <linux/init.h>
+-
+-void __init armada_370_xp_timer_init(void);
++void armada_370_xp_timer_init(void);
+ 
+ #endif
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
