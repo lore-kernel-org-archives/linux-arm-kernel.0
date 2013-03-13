@@ -1,84 +1,62 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Wed, 13 Mar 2013 17:59:20 +0530
-Subject: [PATCH] ARM: hw_breakpoint: Enable debug powerdown only if system
- supports 'has_ossr'
-In-Reply-To: <51406BA7.8010306@arm.com>
-References: <1363157553-21085-1-git-send-email-lokeshvutla@ti.com>
- <51406BA7.8010306@arm.com>
-Message-ID: <51407120.7030709@ti.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 13 Mar 2013 13:26:05 +0100
+Subject: ARM: at-91: ARCH_AT91SAM9X5 went missing
+In-Reply-To: <1363173747.3137.202.camel@x61.thuisdomein>
+References: <1363171688.3137.196.camel@x61.thuisdomein>
+ <51405F0D.40102@atmel.com>
+ <1363173747.3137.202.camel@x61.thuisdomein>
+Message-ID: <20130313122605.GE2001@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dietmar,
-On Wednesday 13 March 2013 05:35 PM, Dietmar Eggemann wrote:
-> On 13/03/13 06:52, Lokesh Vutla wrote:
->> Commit {9a6eb31 ARM: hw_breakpoint: Debug powerdown support for
->> self-hosted
->> debug} introduces debug powerdown support for self-hosted debug.
->> While merging the patch 'has_ossr' check was removed which
->> was needed for hardwares which doesn't support self-hosted debug.
->> Pandaboard (A9) is one such hardware and Dietmar's orginial
->> patch did mention this issue.
->> Without that check on Panda with CPUIDLE enabled, a flood of
->> below messages thrown.
->>
->> [ 3.597930] hw-breakpoint: CPU 0 failed to disable vector catch
->> [ 3.597991] hw-breakpoint: CPU 1 failed to disable vector catch
->>
->
-> Hi Lokesh,
->
-> I confirm that this has_ossr condition has to go back into the
-> pm_init(void) call. I just verified it again on my Panda board and I get
-> the same issue like you without it.
->
-> I guess what was happening is that Will asked me if this check is really
-> necessary and I said No without re-testing on my Panda board as an V7
-> debug architecture example where OSSR is not implemented. Since then I
-> only tested in on V7.1 debug architectures where OSSR is mandatory.
-> Sorry about this and thanks for catching this.
-Thanks for confirming..:)
+On 12:22 Wed 13 Mar     , Paul Bolle wrote:
+> On Wed, 2013-03-13 at 12:12 +0100, Nicolas Ferre wrote:
+> > These ARCH_AT91xxx variables are not used anymore for pure Device Tree
+> > SoCs (I mean: at91sam9x5, at91sam9n12, sama5d3 families). They are used
+> > for non-DT SoCs and for chips that support both legacy board files and DT.
+> > The old ARCH_AT91xxx symbols are selecting the corresponding SOC_AT91xxx
+> > symbol.
+> > 
+> > ARCH_AT91xxx in Kconfig that are specific to a particular SoC are going
+> > to disappear as we tend to allow the compilation of a particular driver
+> > for a wider range of configurations.
+> 
+> So setting one of the SOC_* symbols will not generate the corresponding
+> ARCH_* symbol, will it? To be specific, for the people entering the
+> configuration from the new SOC_* side none of this is relevant anymore
+> (this is all the stuff outside of arch/arm):
 
-Regards,
-Lokesh
+yes it's as when I prepare the at91 for dt support I split the code in two
+world. The old style (one soc at a time) and the st multi soc
 
->
-> You can add my Acked-by: if you wish.
->
-> -- Dietmar
->
->> So restore that check back to avoid the mentioned issue.
->>
->> Cc: Dietmar Eggemann <dietmar.eggemann@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Reported-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
->> ---
->>   arch/arm/kernel/hw_breakpoint.c |    3 ++-
->>   1 file changed, 2 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/kernel/hw_breakpoint.c
->> b/arch/arm/kernel/hw_breakpoint.c
->> index 96093b7..0ba062d 100644
->> --- a/arch/arm/kernel/hw_breakpoint.c
->> +++ b/arch/arm/kernel/hw_breakpoint.c
->> @@ -1049,7 +1049,8 @@ static struct notifier_block __cpuinitdata
->> dbg_cpu_pm_nb = {
->>
->>   static void __init pm_init(void)
->>   {
->> -     cpu_pm_register_notifier(&dbg_cpu_pm_nb);
->> +     if (has_ossr)
->> +             cpu_pm_register_notifier(&dbg_cpu_pm_nb);
->>   }
->>   #else
->>   static inline void pm_init(void)
->>
->
-> -- IMPORTANT NOTICE: The contents of this email and any attachments are
-> confidential and may also be privileged. If you are not the intended
-> recipient, please notify the sender immediately and do not disclose the
-> contents to any other person, use it for any purpose, or store or copy
-> the information in any medium.  Thank you.
->
+the ARCH_AT91xxx are still here as part of the code  are still depending on
+old style platform data and not converted to DT
+
+but the ARCH_AT91SAM9x5 never exist at the mainline
+
+and all the old style as now mark as deprecated and for removal
+
+Best Regards,
+J.
+> 
+> drivers/misc/Kconfig:87:        prompt "TC Block" if ARCH_AT91RM9200 || ARCH_AT91SAM9260 || CPU_AT32AP700X
+> drivers/pcmcia/Kconfig:291:     depends on PCMCIA && ARCH_AT91RM9200
+> drivers/rtc/Kconfig:977:        depends on ARCH_AT91 && !(ARCH_AT91RM9200 || ARCH_AT91X40)
+> drivers/tty/serial/atmel_serial.c:268:#ifdef CONFIG_ARCH_AT91RM9200
+> drivers/watchdog/Kconfig:127:   depends on ARCH_AT91 && !ARCH_AT91RM9200
+> drivers/misc/Kconfig:87:        prompt "TC Block" if ARCH_AT91RM9200 || ARCH_AT91SAM9260 || CPU_AT32AP700X
+> drivers/video/Kconfig:1026:     depends on FB_ATMEL && ARCH_AT91SAM9261
+> drivers/net/can/Kconfig:68:     depends on ARCH_AT91SAM9263 || ARCH_AT91SAM9X5
+> drivers/rtc/Kconfig:991:        prompt "RTT module Number" if ARCH_AT91SAM9263
+> drivers/rtc/Kconfig:1000:       range 0 3 if !ARCH_AT91SAM9263
+> drivers/rtc/Kconfig:1001:       range 0 15 if ARCH_AT91SAM9263
+> drivers/usb/gadget/Kconfig:157: depends on AVR32 || ARCH_AT91SAM9RL || ARCH_AT91SAM9G45
+> drivers/usb/gadget/atmel_usba_udc.c:329:#if defined(CONFIG_ARCH_AT91SAM9RL)
+> drivers/usb/gadget/atmel_usba_udc.c:349:#endif /* CONFIG_ARCH_AT91SAM9RL */
+> drivers/mmc/host/Kconfig:305:   depends on MMC_ATMELMCI && (AVR32 || ARCH_AT91SAM9G45) && DMA_ENGINE
+> drivers/usb/gadget/Kconfig:157: depends on AVR32 || ARCH_AT91SAM9RL || ARCH_AT91SAM9G45
+> drivers/net/can/Kconfig:68:     depends on ARCH_AT91SAM9263 || ARCH_AT91SAM9X5
+> 
+> 
+> Paul Bolle
+> 
