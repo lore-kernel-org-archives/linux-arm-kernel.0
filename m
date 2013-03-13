@@ -1,101 +1,35 @@
-From: jhovold@gmail.com (Johan Hovold)
-Date: Wed, 13 Mar 2013 17:11:59 +0100
-Subject: [PATCH] ARM: at91/avr32/atmel-mci: fix DMA-channel leak on module
- unload
-Message-ID: <1363191119-4948-1-git-send-email-jhovold@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 13 Mar 2013 17:14:35 +0100
+Subject: [PATCH 4/6] arm: vt8500: Remove gpio devicetree nodes
+In-Reply-To: <1362807578-23089-5-git-send-email-linux@prisktech.co.nz>
+References: <1362807578-23089-1-git-send-email-linux@prisktech.co.nz>
+ <1362807578-23089-5-git-send-email-linux@prisktech.co.nz>
+Message-ID: <CACRpkdYbtH7jJqmXT-SHKy8qbzbNntSwnJwS1+PR7brTJ3ijiw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix regression introduced by commit 796211b7953 ("mmc: atmel-mci: add
-pdc support and runtime capabilities detection") which removed the need
-for CONFIG_MMC_ATMELMCI_DMA but kept the Kconfig-entry as well as the
-compile guards around dma_release_channel() in remove(). Consequently,
-DMA is always enabled (if supported), but the DMA-channel is not
-released on module unload unless the DMA-config option is selected.
+On Sat, Mar 9, 2013 at 6:39 AM, Tony Prisk <linux@prisktech.co.nz> wrote:
 
-Remove the no longer used CONFIG_MMC_ATMELMCI_DMA option completely.
+> Remove the gpio related devicetree nodes as these are no longer required
+> with the move to a combined pinctrl/gpio driver.
+>
+> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+(...)
 
-Cc: stable <stable@vger.kernel.org>
-Signed-off-by: Johan Hovold <jhovold@gmail.com>
----
- arch/arm/configs/at91sam9g45_defconfig |  1 -
- arch/avr32/configs/favr-32_defconfig   |  1 -
- arch/avr32/configs/merisc_defconfig    |  1 -
- drivers/mmc/host/Kconfig               | 10 ----------
- drivers/mmc/host/atmel-mci.c           |  2 --
- 5 files changed, 15 deletions(-)
+> -               gpio: gpio-controller at d8110000 {
+> -                       compatible = "via,vt8500-gpio";
+> -                       gpio-controller;
+> -                       reg = <0xd8110000 0x10000>;
+> -                       #gpio-cells = <3>;
+> -               };
 
-diff --git a/arch/arm/configs/at91sam9g45_defconfig b/arch/arm/configs/at91sam9g45_defconfig
-index 606d48f..8aab786 100644
---- a/arch/arm/configs/at91sam9g45_defconfig
-+++ b/arch/arm/configs/at91sam9g45_defconfig
-@@ -173,7 +173,6 @@ CONFIG_MMC=y
- # CONFIG_MMC_BLOCK_BOUNCE is not set
- CONFIG_SDIO_UART=m
- CONFIG_MMC_ATMELMCI=y
--CONFIG_MMC_ATMELMCI_DMA=y
- CONFIG_LEDS_ATMEL_PWM=y
- CONFIG_LEDS_GPIO=y
- CONFIG_LEDS_TRIGGER_TIMER=y
-diff --git a/arch/avr32/configs/favr-32_defconfig b/arch/avr32/configs/favr-32_defconfig
-index 0421498..9791820 100644
---- a/arch/avr32/configs/favr-32_defconfig
-+++ b/arch/avr32/configs/favr-32_defconfig
-@@ -122,7 +122,6 @@ CONFIG_USB_G_SERIAL=m
- CONFIG_USB_CDC_COMPOSITE=m
- CONFIG_MMC=y
- CONFIG_MMC_ATMELMCI=y
--CONFIG_MMC_ATMELMCI_DMA=y
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
- CONFIG_LEDS_ATMEL_PWM=m
-diff --git a/arch/avr32/configs/merisc_defconfig b/arch/avr32/configs/merisc_defconfig
-index 3befab9..65de443 100644
---- a/arch/avr32/configs/merisc_defconfig
-+++ b/arch/avr32/configs/merisc_defconfig
-@@ -102,7 +102,6 @@ CONFIG_FRAMEBUFFER_CONSOLE=y
- CONFIG_LOGO=y
- CONFIG_MMC=y
- CONFIG_MMC_ATMELMCI=y
--CONFIG_MMC_ATMELMCI_DMA=y
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
- CONFIG_LEDS_ATMEL_PWM=y
-diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-index 8d13c65..009dabd 100644
---- a/drivers/mmc/host/Kconfig
-+++ b/drivers/mmc/host/Kconfig
-@@ -292,16 +292,6 @@ config MMC_ATMELMCI
- 
- 	  If unsure, say N.
- 
--config MMC_ATMELMCI_DMA
--	bool "Atmel MCI DMA support"
--	depends on MMC_ATMELMCI && (AVR32 || ARCH_AT91SAM9G45) && DMA_ENGINE
--	help
--	  Say Y here to have the Atmel MCI driver use a DMA engine to
--	  do data transfers and thus increase the throughput and
--	  reduce the CPU utilization.
--
--	  If unsure, say N.
--
- config MMC_MSM
- 	tristate "Qualcomm SDCC Controller Support"
- 	depends on MMC && ARCH_MSM
-diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-index 722af1d..10f8b73 100644
---- a/drivers/mmc/host/atmel-mci.c
-+++ b/drivers/mmc/host/atmel-mci.c
-@@ -2487,10 +2487,8 @@ static int __exit atmci_remove(struct platform_device *pdev)
- 	atmci_readl(host, ATMCI_SR);
- 	clk_disable(host->mck);
- 
--#ifdef CONFIG_MMC_ATMELMCI_DMA
- 	if (host->dma.chan)
- 		dma_release_channel(host->dma.chan);
--#endif
- 
- 	free_irq(platform_get_irq(pdev, 0), host);
- 	iounmap(host->regs);
--- 
-1.8.1.5
+Whopeedo. If I understand the fine devicetree folks you may
+remove this stuff from the devicetree, but the code in the new
+pin control driver should still be backward-compatible with
+devicetrees that look like this.
+
+It's not like I care, just noting that this is the philosophy around
+such things.
+
+Yours,
+Linus Walleij
