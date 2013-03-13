@@ -1,47 +1,110 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Wed, 13 Mar 2013 20:21:47 +0800
-Subject: [PATCH v3 06/11] ARM: vexpress: use clocksource_of_init for sp804
-In-Reply-To: <1363175175.3100.37.camel@hornet>
-References: <1363151142-32162-1-git-send-email-haojian.zhuang@linaro.org>
- <1363151142-32162-7-git-send-email-haojian.zhuang@linaro.org>
- <1363173037.3100.22.camel@hornet>
- <CAD6h2NQWB3+1QepQjBE0BZiG44YAQRi7e-9+oZvVYpYV8QycDA@mail.gmail.com>
- <1363175175.3100.37.camel@hornet>
-Message-ID: <CAD6h2NSUyFvhoqMsYqT=rzFZ--MWv+0vHOCtAV9n-5YO+LNTMA@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 13 Mar 2013 12:25:50 +0000
+Subject: [PATCH] ARM: smp: Allow real broadcast device selection
+ instead of always dummy
+In-Reply-To: <514061D1.20603@ti.com>
+References: <1363165608-13739-1-git-send-email-santosh.shilimkar@ti.com>
+ <514046B6.9020005@ti.com>
+ <20130313101641.GA13483@e106331-lin.cambridge.arm.com>
+ <514061D1.20603@ti.com>
+Message-ID: <20130313122550.GD13483@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 March 2013 19:46, Pawel Moll <pawel.moll@arm.com> wrote:
-> On Wed, 2013-03-13 at 11:42 +0000, Haojian Zhuang wrote:
->> > I love the possibility of removing the SP804 code from the VE machine
->> > (thanks for your work!), but I'd like to avoid it being replaced by
->> > cryptic properties in the tree.
->> >
->> > Now, to get this right: I'm not saying that there should be completly no
->> > OS-specific (but neutral) properties for the clocking system.
->> >
->> > I'm saying that in "my" (the VE) case, there are four, effectively
->> > identical timers (each pair sharing an interrupt though). Every single
->> > one of them is perfectly capable of serving as clocksource or
->> > clockevent. Therefore I believe the driver/framework/OS should make its
->> > own decision.
->> >
->> I can move those properties into dts file instead.
->
-> I'm not sure I understand you here...
->
->> If clocksource uses alias to configure source or event. There's still a lot
->> of work. At least we need to split dual timer into two timer devices in DTS.
->
-> My point is: at least for VE there is _no need_ for any alias or special
-> property in the tree (DTS). All timers are equal. The system can (and
-> should) pick any one it wants.
->
-> Pawe?
->
-Do you mean that system wants to pick any one randomly? It's impossible.
-Imagine that only TIMINT1 signal in sp804 is routed to interrupt controller.
-Could system still pick any one it wants?
+On Wed, Mar 13, 2013 at 11:24:01AM +0000, Santosh Shilimkar wrote:
+> On Wednesday 13 March 2013 03:46 PM, Mark Rutland wrote:
+> > Hi Santosh,
+> > 
+> > On Wed, Mar 13, 2013 at 09:28:22AM +0000, Santosh Shilimkar wrote:
+> >> (Forgot to CC Thomas)
+> >>
+> >> On Wednesday 13 March 2013 02:36 PM, Santosh Shilimkar wrote:
+> >>> With recent arm broadcast time clean-up from Mark Rutland, the dummy
+> >>> broadcast device is always registered with timer subsystem. And since
+> >>> the rating of the dummy clock event is very high, it is preferred
+> >>> over a real broad-cast clock event.
+> >>>
+> >>> This is a change in behavior from past and not an intended
+> >>> one. So reduce the rating of the dummy clockevent so that
+> >>> real broadcast device is selected when available.
+> >>>
+> >>> Without this all the C states with C3STOP won't work since
+> >>> the broad cast notifier will take an abort.
+> >>>
+> >>> Cc: Mark Rutland <mark.rutland@arm.com>
+> >>> Cc: Russell King <linux@arm.linux.org.uk>
+> >>>
+> >>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> >>> ---
+> >>> Its a regression so hopefully can get into the 3.9-rcx. Noticed
+> >>> this one on A15 platform. A9 platform the issue may not be seen
+> >>> since the local timer check avoids dummy timer registration.
+> >>>
+> >> Some one pointed me to a fix made by Mark which was discussed
+> >> under '[BUG] ARM Architected timers appear broken in 3.9-rc1' subject.
+> >> That patch seems to be more of work around since the root of the
+> >> problem is incorrect dummy timer rating. Either way, both patches
+> >> fix the issue.
+> > 
+> > Is the problem that the dummy timer is being registered as the broadcast
+> > source, or that it is selected as a local timer in preference of real timers?
+> >
+> Dummy timer is preferred over real broadcast timer.
 
-I think that clocksource or clockevent must be specified in DTS. Whatever
-we're using alias or property.
+Ok.
+
+>  
+> > If it is the former, Then I believe my patch solve the issue more generally -
+> > if you happen to register a dummy timer before other timers, it will become the
+> > broadcast source. Regardless of how temporary this is, it should never happen,
+> > and lowering the rating of the dummy won't fix this.
+> > 
+> Well by the time we need active broadcast functionality, clock-events are
+> already chosen if the ratings are appropriate.
+
+That's a fair point. I still think it's worth having the check in the core
+broadcast code - rejecting dummy timers is always a sensible thing to do, and
+it prevents future crashes if new timers are added without sensible rating
+values.
+
+> 
+> > If it is the latter, then this patch would ensure that a real timer with a
+> > rating over 100 is selected in preference to the dummy, which is certainly what
+> > we want. The proposed generic dummy timer in Stephen Boyd's local timer API
+> > removal series [1] similarly uses a low rating to ensure that real timers are
+> > selected in preference to an always-registered dummy. I note that the
+> > architected timer has a higher rating (450) than the dummy (400), so this
+> > shouldn't currently be a problem.
+> > 
+> Because we always register dummy broadcast on ARM now 
+> and with higher rating, it is picked as broadcast source. We definitely don't
+> want such a behavior when we have real broadcast device is available.
+
+Agreed. We *never* want to pick a dummy timer as a broadcast source, as this
+never makes sense.
+
+> With your patch, we are trying to avoid the registration which goes
+> against the the whole idea of registering it always and picking
+> the right clock-event based on rating by clock-event core.
+> The clock-event core except the proper ratings to be provided based on
+> the capability of the timer source and its resolution and in that case
+> dummy should have the lowest rating which is what I tried to patch.
+> 
+> > Have I missed something?
+> > 
+> Not much. I was just looking at x86 code as well after your email
+> to see how the LAPIC issue is handled. They seems to also have
+> correct rating to take care of the selection.
+> 
+> Probably we can merge both the fixes but from clock-event core
+> code perspective, the ratings fix is more than enough.
+
+I do agree it'd be worth lowering the dummy timer's rating to ensure it doesn't
+override a real timer elsewhere. 
+
+Thomas has already pulled my fix into tip timers/urgent [1].
+
+[1] https://git.kernel.org/cgit/linux/kernel/git/tip/tip.git/commit/?h=timers/urgent&id=a7dc19b8652c862d5b7c4d2339bd3c428bd29c4a
+
+Thanks,
+Mark.
