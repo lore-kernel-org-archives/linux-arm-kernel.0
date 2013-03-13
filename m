@@ -1,103 +1,165 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 13 Mar 2013 10:21:06 +0100
-Subject: [PATCH 3/4] ARM: at91: fix infinite loop in
- at91_irq_suspend/resume
-In-Reply-To: <20130308155828.GC4590@game.jcrosoft.org>
-References: <1362755638-20092-1-git-send-email-ludovic.desroches@atmel.com>
- <1362755638-20092-4-git-send-email-ludovic.desroches@atmel.com>
- <20130308155828.GC4590@game.jcrosoft.org>
-Message-ID: <51404502.3070702@atmel.com>
+Date: Wed, 13 Mar 2013 10:22:18 +0100
+Subject: [PATCH] ARM: at91: add gpio suspend/resume support when using
+ pinctrl
+In-Reply-To: <1362755901-20279-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1362755901-20279-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <5140454A.2030409@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/08/2013 04:58 PM, Jean-Christophe PLAGNIOL-VILLARD :
-> On 16:13 Fri 08 Mar     , ludovic.desroches at atmel.com wrote:
->> From: Ludovic Desroches <ludovic.desroches@atmel.com>
->>
->> Fix an infinite loop when suspending or resuming a device with AIC5 i.e. SAMA5
->> devices.
->>
->> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-
-I think that we can queue this one for "fixes".
-
-I integrated it in at91-3.9-fixes branch. It means that you can drop
-this one from your patch series.
-
-Thanks, best regards.
-
+On 03/08/2013 04:18 PM, ludovic.desroches at atmel.com :
+> From: Ludovic Desroches <ludovic.desroches@atmel.com>
 > 
-> Best Regards,
-> J.
->> ---
->>  arch/arm/mach-at91/irq.c | 20 ++++++++------------
->>  1 file changed, 8 insertions(+), 12 deletions(-)
->>
->> diff --git a/arch/arm/mach-at91/irq.c b/arch/arm/mach-at91/irq.c
->> index 8e21026..e0ca591 100644
->> --- a/arch/arm/mach-at91/irq.c
->> +++ b/arch/arm/mach-at91/irq.c
->> @@ -92,23 +92,21 @@ static int at91_aic_set_wake(struct irq_data *d, unsigned value)
->>  
->>  void at91_irq_suspend(void)
->>  {
->> -	int i = 0, bit;
->> +	int bit = -1;
->>  
->>  	if (has_aic5()) {
->>  		/* disable enabled irqs */
->> -		while ((bit = find_next_bit(backups, n_irqs, i)) < n_irqs) {
->> +		while ((bit = find_next_bit(backups, n_irqs, bit + 1)) < n_irqs) {
->>  			at91_aic_write(AT91_AIC5_SSR,
->>  				       bit & AT91_AIC5_INTSEL_MSK);
->>  			at91_aic_write(AT91_AIC5_IDCR, 1);
->> -			i = bit;
->>  		}
->>  		/* enable wakeup irqs */
->> -		i = 0;
->> -		while ((bit = find_next_bit(wakeups, n_irqs, i)) < n_irqs) {
->> +		bit = -1;
->> +		while ((bit = find_next_bit(wakeups, n_irqs, bit + 1)) < n_irqs) {
->>  			at91_aic_write(AT91_AIC5_SSR,
->>  				       bit & AT91_AIC5_INTSEL_MSK);
->>  			at91_aic_write(AT91_AIC5_IECR, 1);
->> -			i = bit;
->>  		}
->>  	} else {
->>  		at91_aic_write(AT91_AIC_IDCR, *backups);
->> @@ -118,23 +116,21 @@ void at91_irq_suspend(void)
->>  
->>  void at91_irq_resume(void)
->>  {
->> -	int i = 0, bit;
->> +	int bit = -1;
->>  
->>  	if (has_aic5()) {
->>  		/* disable wakeup irqs */
->> -		while ((bit = find_next_bit(wakeups, n_irqs, i)) < n_irqs) {
->> +		while ((bit = find_next_bit(wakeups, n_irqs, bit + 1)) < n_irqs) {
->>  			at91_aic_write(AT91_AIC5_SSR,
->>  				       bit & AT91_AIC5_INTSEL_MSK);
->>  			at91_aic_write(AT91_AIC5_IDCR, 1);
->> -			i = bit;
->>  		}
->>  		/* enable irqs disabled for suspend */
->> -		i = 0;
->> -		while ((bit = find_next_bit(backups, n_irqs, i)) < n_irqs) {
->> +		bit = -1;
->> +		while ((bit = find_next_bit(backups, n_irqs, bit + 1)) < n_irqs) {
->>  			at91_aic_write(AT91_AIC5_SSR,
->>  				       bit & AT91_AIC5_INTSEL_MSK);
->>  			at91_aic_write(AT91_AIC5_IECR, 1);
->> -			i = bit;
->>  		}
->>  	} else {
->>  		at91_aic_write(AT91_AIC_IDCR, *wakeups);
->> -- 
->> 1.7.11.3
->>
+> gpio suspend/resume and wakeup sources where not managed when using pinctrl so
+> it was impossible to wake up the system with a gpio.
 > 
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+
+Nice, I queue it for "fixes" in at91-3.9-fixes.
+
+Thanks, best regards,
+
+> ---
+>  arch/arm/mach-at91/include/mach/gpio.h |  8 +++++
+>  arch/arm/mach-at91/pm.c                | 10 ++++--
+>  drivers/pinctrl/pinctrl-at91.c         | 61 +++++++++++++++++++++++++++++++++-
+>  3 files changed, 76 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-at91/include/mach/gpio.h b/arch/arm/mach-at91/include/mach/gpio.h
+> index eed465a..5fc2377 100644
+> --- a/arch/arm/mach-at91/include/mach/gpio.h
+> +++ b/arch/arm/mach-at91/include/mach/gpio.h
+> @@ -209,6 +209,14 @@ extern int at91_get_gpio_value(unsigned pin);
+>  extern void at91_gpio_suspend(void);
+>  extern void at91_gpio_resume(void);
+>  
+> +#ifdef CONFIG_PINCTRL_AT91
+> +extern void at91_pinctrl_gpio_suspend(void);
+> +extern void at91_pinctrl_gpio_resume(void);
+> +#else
+> +static inline void at91_pinctrl_gpio_suspend(void) {}
+> +static inline void at91_pinctrl_gpio_resume(void) {}
+> +#endif
+> +
+>  #endif	/* __ASSEMBLY__ */
+>  
+>  #endif
+> diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+> index adb6db8..73f1f25 100644
+> --- a/arch/arm/mach-at91/pm.c
+> +++ b/arch/arm/mach-at91/pm.c
+> @@ -201,7 +201,10 @@ extern u32 at91_slow_clock_sz;
+>  
+>  static int at91_pm_enter(suspend_state_t state)
+>  {
+> -	at91_gpio_suspend();
+> +	if (of_have_populated_dt())
+> +		at91_pinctrl_gpio_suspend();
+> +	else
+> +		at91_gpio_suspend();
+>  	at91_irq_suspend();
+>  
+>  	pr_debug("AT91: PM - wake mask %08x, pm state %d\n",
+> @@ -286,7 +289,10 @@ static int at91_pm_enter(suspend_state_t state)
+>  error:
+>  	target_state = PM_SUSPEND_ON;
+>  	at91_irq_resume();
+> -	at91_gpio_resume();
+> +	if (of_have_populated_dt())
+> +		at91_pinctrl_gpio_resume();
+> +	else
+> +		at91_gpio_resume();
+>  	return 0;
+>  }
+>  
+> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+> index 75933a6..efb7f10 100644
+> --- a/drivers/pinctrl/pinctrl-at91.c
+> +++ b/drivers/pinctrl/pinctrl-at91.c
+> @@ -1277,21 +1277,80 @@ static int alt_gpio_irq_type(struct irq_data *d, unsigned type)
+>  }
+>  
+>  #ifdef CONFIG_PM
+> +
+> +static u32 wakeups[MAX_GPIO_BANKS];
+> +static u32 backups[MAX_GPIO_BANKS];
+> +
+>  static int gpio_irq_set_wake(struct irq_data *d, unsigned state)
+>  {
+>  	struct at91_gpio_chip *at91_gpio = irq_data_get_irq_chip_data(d);
+>  	unsigned	bank = at91_gpio->pioc_idx;
+> +	unsigned mask = 1 << d->hwirq;
+>  
+>  	if (unlikely(bank >= MAX_GPIO_BANKS))
+>  		return -EINVAL;
+>  
+> +	if (state)
+> +		wakeups[bank] |= mask;
+> +	else
+> +		wakeups[bank] &= ~mask;
+> +
+>  	irq_set_irq_wake(at91_gpio->pioc_virq, state);
+>  
+>  	return 0;
+>  }
+> +
+> +void at91_pinctrl_gpio_suspend(void)
+> +{
+> +	int i;
+> +
+> +	for (i = 0; i < gpio_banks; i++) {
+> +		void __iomem  *pio;
+> +
+> +		if (!gpio_chips[i])
+> +			continue;
+> +
+> +		pio = gpio_chips[i]->regbase;
+> +
+> +		backups[i] = __raw_readl(pio + PIO_IMR);
+> +		__raw_writel(backups[i], pio + PIO_IDR);
+> +		__raw_writel(wakeups[i], pio + PIO_IER);
+> +
+> +		if (!wakeups[i]) {
+> +			clk_unprepare(gpio_chips[i]->clock);
+> +			clk_disable(gpio_chips[i]->clock);
+> +		} else {
+> +			printk(KERN_DEBUG "GPIO-%c may wake for %08x\n",
+> +			       'A'+i, wakeups[i]);
+> +		}
+> +	}
+> +}
+> +
+> +void at91_pinctrl_gpio_resume(void)
+> +{
+> +	int i;
+> +
+> +	for (i = 0; i < gpio_banks; i++) {
+> +		void __iomem  *pio;
+> +
+> +		if (!gpio_chips[i])
+> +			continue;
+> +
+> +		pio = gpio_chips[i]->regbase;
+> +
+> +		if (!wakeups[i]) {
+> +			if (clk_prepare(gpio_chips[i]->clock) == 0)
+> +				clk_enable(gpio_chips[i]->clock);
+> +		}
+> +
+> +		__raw_writel(wakeups[i], pio + PIO_IDR);
+> +		__raw_writel(backups[i], pio + PIO_IER);
+> +	}
+> +}
+> +
+>  #else
+>  #define gpio_irq_set_wake	NULL
+> -#endif
+> +#endif /* CONFIG_PM */
+>  
+>  static struct irq_chip gpio_irqchip = {
+>  	.name		= "GPIO",
 > 
 
 
