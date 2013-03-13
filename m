@@ -1,53 +1,64 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 13 Mar 2013 12:03:06 -0600
-Subject: [PATCH V3 4/9] ARM: tegra: pm: add platform suspend support
-In-Reply-To: <1363161683-20825-5-git-send-email-josephl@nvidia.com>
-References: <1363161683-20825-1-git-send-email-josephl@nvidia.com>
- <1363161683-20825-5-git-send-email-josephl@nvidia.com>
-Message-ID: <5140BF5A.3040108@wwwdotorg.org>
+From: sourav.poddar@ti.com (Sourav Poddar)
+Date: Wed, 13 Mar 2013 23:37:41 +0530
+Subject: [Resend/PATCH 0/5] omap4/5: i2c/spi: device tree data
+In-Reply-To: <5140AD75.2050900@ti.com>
+References: <1363009486-19430-1-git-send-email-sourav.poddar@ti.com>
+ <513DEAE1.1050606@ti.com> <513DFB62.5030709@ti.com> <5140AD75.2050900@ti.com>
+Message-ID: <5140C06D.8030507@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/13/2013 02:01 AM, Joseph Lo wrote:
-> Adding suspend to RAM support for Tegra platform. There are three suspend
-> mode for Tegra. The difference were below.
-> 
-> * LP2: CPU voltage off
-> * LP1: CPU voltage off, DRAM in self-refresh
-> * LP0: CPU + Core voltage off, DRAM in self-refresh
-> 
-> After this patch, the LP2 suspend mode will be supported.
 
-> diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c
-
-> +void __init tegra_init_suspend(void)
-...
-> +	/* We only support LP2 suspend mode right now. */
-> +	if (mode > TEGRA_SUSPEND_LP2)
-> +		tegra_pmc_set_suspend_mode(TEGRA_SUSPEND_LP2);
-
-I see that in patch 3/9, tegra_pmc_parse_dt() simply assigns directly to
-pmc_pm_data.suspend_mode rather than calling a function. If it's useful
-to call a function here, isn't doing so also useful in tegra_pmc_parse_dt()?
-
-I guess you did this because pmc_pm_data is static so you can't just
-assign it here.
-
-Instead, I would suggest that tegra_pmc_parse_dt() does this validation
-itself, either by:
-
-a) Enhancing tegra_pmc_parse_dt() to know which modes are supported itself.
-
-or:
-
-b) Have tegra_pmc_parse_dt() call a function in pm.c to determine
-whether the user-selected suspend mode is valid or not. Something like:
-
-pmc_pm_data.suspend_mode = tegra_pm_validate_suspend_mode(suspend_mode);
-
-That way, tegra_pm_validate_suspend_mode() can encapsulate all details
-of which suspend modes are supported, any SoC-specific differences (e.g.
-not Tegra114 in any mode, but any earlier chip in LP2 mode for example).
-
-(a) is slightly simpler. (b) is probably more flexible. I guess I'd
-prefer (b).
+On Wednesday 13 March 2013 10:16 PM, Benoit Cousson wrote:
+> Hi Sourav,
+>
+> I've just applied your branch after a minor subject cleanup for consistency.
+>
+> git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.10/dts
+>
+Thanks Benoit!
+> Regards,
+> Benoit
+>
+>
+> On 03/11/2013 04:42 PM, Sourav Poddar wrote:
+>> On Monday 11 March 2013 08:02 PM, Benoit Cousson wrote:
+>>> Hi Sourav,
+>>>
+>>> On 03/11/2013 02:44 PM, Sourav Poddar wrote:
+>>>> Hi Tony/Benoit,
+>>>>
+>>>> These patches had been sent couple of times before, but there were no
+>>>> comments on it.
+>>> Sorry for that. I got a big flu in Jan and was in Linaro Connect last
+>>> week.
+>>> Patches look good, I just have to check that they apply nicely to the
+>>> dts/for_3.9 I already prepared.
+>>>
+>> Ok. Thanks!!
+>>> I still have to rebase that branch on top of a recent master branch and
+>>> then check your branch.
+>>>
+>>>> If there are no comments, Can these be picked ?
+>>>> Cc: Andrew Morton<akpm@osdl.org>
+>>>>
+>>>> The following changes since commit
+>>>> f6161aa153581da4a3867a2d1a7caf4be19b6ec9:
+>>>>
+>>>>     Linux 3.9-rc2 (2013-03-10 16:54:19 -0700)
+>>>>
+>>>> are available in the git repository at:
+>>>>     git at gitorious.org:linux-connectivity/linux-connectivity.git
+>>>> omap_i2c_spi_dts_data
+>>>>
+>>>> Felipe Balbi (1):
+>>>>         arm: dts: omap5: add SPI devices to OMAP5 DeviceTree file
+>>>>
+>>>> Sourav Poddar (4):
+>>>>         arm: dts: omap4-sdp: Add I2c pinctrl data
+>>>>         arm: dts: omap5-evm: Add I2c pinctrl data
+>>>>         arm: dts: omap4-panda: Add I2c pinctrl data
+>>>>         arm: dts: omap5-evm: Add mcspi data
+>>> Thanks,
+>>> Benoit
+>>>
