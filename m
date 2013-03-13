@@ -1,115 +1,72 @@
-From: padma.kvr@gmail.com (Padma Venkat)
-Date: Wed, 13 Mar 2013 11:06:36 +0530
-Subject: [PATCH V2] DMA: PL330: Add check if device tree compatible
-In-Reply-To: <1362475531-32260-2-git-send-email-padma.v@samsung.com>
-References: <1362475531-32260-1-git-send-email-padma.v@samsung.com>
- <1362475531-32260-2-git-send-email-padma.v@samsung.com>
-Message-ID: <CAAgF-BfEsFyY7e1pTnn9eWeWo5yDq-6KfKoj0eASRJT+8N6j0A@mail.gmail.com>
+From: bilhuang@nvidia.com (Bill Huang)
+Date: Tue, 12 Mar 2013 22:40:04 -0700
+Subject: [RFC 1/1] clk: Add notifier support in
+ clk_prepare_enable/clk_disable_unprepare
+In-Reply-To: <51400D9D.9060305@wwwdotorg.org>
+References: <1363091861-21534-1-git-send-email-bilhuang@nvidia.com>
+ <20130312134032.GU4977@n2100.arm.linux.org.uk>
+ <1363139273.21694.11.camel@bilhuang-vm1> <514003B6.8020904@wwwdotorg.org>
+ <1363151317.3311.9.camel@bilhuang-vm1> <51400D9D.9060305@wwwdotorg.org>
+Message-ID: <1363153204.3311.14.camel@bilhuang-vm1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Mar 5, 2013 at 2:55 PM, Padmavathi Venna <padma.v@samsung.com> wrote:
-> This patch register the dma controller with generic dma helpers only
-> in DT case. This also adds some extra error handling in the driver.
->
-> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
-> Reported-by: Sachin Kamat <sachin.kamat@linaro.org>
-> ---
->
-> Based on Vinod Koul next branch.
->
-> Changes since V1:
->         - return silently when of_dma_controller_register fails, as
->           suggested by Arnd.
->
->  drivers/dma/pl330.c |   38 +++++++++++++++++++++++++++-----------
->  1 files changed, 27 insertions(+), 11 deletions(-)
->
-> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-> index 7181531..5dbc594 100644
-> --- a/drivers/dma/pl330.c
-> +++ b/drivers/dma/pl330.c
-> @@ -2882,7 +2882,7 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
->  {
->         struct dma_pl330_platdata *pdat;
->         struct dma_pl330_dmac *pdmac;
-> -       struct dma_pl330_chan *pch;
-> +       struct dma_pl330_chan *pch, *_p;
->         struct pl330_info *pi;
->         struct dma_device *pd;
->         struct resource *res;
-> @@ -2984,7 +2984,16 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
->         ret = dma_async_device_register(pd);
->         if (ret) {
->                 dev_err(&adev->dev, "unable to register DMAC\n");
-> -               goto probe_err2;
-> +               goto probe_err3;
-> +       }
-> +
-> +       if (adev->dev.of_node) {
-> +               ret = of_dma_controller_register(adev->dev.of_node,
-> +                                        of_dma_pl330_xlate, pdmac);
-> +               if (ret) {
-> +                       dev_err(&adev->dev,
-> +                       "unable to register DMA to the generic DT DMA helpers\n");
-> +               }
->         }
->
->         dev_info(&adev->dev,
-> @@ -2995,16 +3004,21 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
->                 pi->pcfg.data_bus_width / 8, pi->pcfg.num_chan,
->                 pi->pcfg.num_peri, pi->pcfg.num_events);
->
-> -       ret = of_dma_controller_register(adev->dev.of_node,
-> -                                        of_dma_pl330_xlate, pdmac);
-> -       if (ret) {
-> -               dev_err(&adev->dev,
-> -               "unable to register DMA to the generic DT DMA helpers\n");
-> -               goto probe_err2;
-> -       }
-> -
->         return 0;
-> +probe_err3:
-> +       amba_set_drvdata(adev, NULL);
->
-> +       /* Idle the DMAC */
-> +       list_for_each_entry_safe(pch, _p, &pdmac->ddma.channels,
-> +                       chan.device_node) {
-> +
-> +               /* Remove the channel */
-> +               list_del(&pch->chan.device_node);
-> +
-> +               /* Flush the channel */
-> +               pl330_control(&pch->chan, DMA_TERMINATE_ALL, 0);
-> +               pl330_free_chan_resources(&pch->chan);
-> +       }
->  probe_err2:
->         pl330_del(pi);
->  probe_err1:
-> @@ -3023,8 +3037,10 @@ static int pl330_remove(struct amba_device *adev)
->         if (!pdmac)
->                 return 0;
->
-> -       of_dma_controller_free(adev->dev.of_node);
-> +       if (adev->dev.of_node)
-> +               of_dma_controller_free(adev->dev.of_node);
->
-> +       dma_async_device_unregister(&pdmac->ddma);
-
-Any comment on this patch?
-
-Vinod,
-
-Can you please take this patch into your tree?
-
->         amba_set_drvdata(adev, NULL);
->
->         /* Idle the DMAC */
-> --
-> 1.7.4.4
->
-
-Thanks
-Padma
+On Wed, 2013-03-13 at 13:24 +0800, Stephen Warren wrote:
+> On 03/12/2013 11:08 PM, Bill Huang wrote:
+> > On Wed, 2013-03-13 at 12:42 +0800, Stephen Warren wrote:
+> >> On 03/12/2013 07:47 PM, Bill Huang wrote:
+> >>> On Tue, 2013-03-12 at 21:40 +0800, Russell King - ARM Linux wrote:
+> >>>> On Tue, Mar 12, 2013 at 05:37:41AM -0700, Bill Huang wrote:
+> >>>>> Add the below four notifier events so drivers which are interested in
+> >>>>> knowing the clock status can act accordingly. This is extremely useful
+> >>>>> in some of the DVFS (Dynamic Voltage Frequency Scaling) design.
+> >>>>>
+> >>>>> PRE_CLK_ENABLE
+> >>>>> POST_CLK_ENABLE
+> >>>>> PRE_CLK_DISABLE
+> >>>>> POST_CLK_DISABLE
+> >>>>>
+> >>>>> Signed-off-by: Bill Huang <bilhuang@nvidia.com>
+> >>>>
+> >>>> NAK.  *Sigh* NO, this is the wrong level to be doing stuff like this.
+> >>>>
+> >>>> The *ONLY* thing that clk_prepare_enable() and clk_prepare_disable() should
+> >>>> *EVER* be doing is calling clk_prepare(), clk_enable(), clk_disable() and
+> >>>> clk_unprepare().  Those two functions are *merely* helpers for drivers
+> >>>> who don't wish to make the individual calls.
+> >>>>
+> >>>> Drivers are still completely free to call the individual functions, at
+> >>>> which point your proposal breaks horribly - and they _do_ call the
+> >>>> individual functions.
+> >>>
+> >>> I'm proposing to give device driver a choice when it knows that some
+> >>> driver might be interested in knowing its clock's enabled/disabled state
+> >>> change at runtime, this is very important for centralized DVFS core
+> >>> driver. It is not meant to be covering all cases especially for drivers
+> >>> which is not part of the DVFS, so we don't care if it is calling
+> >>> clk_enable/disable directly or not.
+> >>
+> >> I believe the point Russell is making is not that the idea behind this
+> >> patch is wrong, but simply that the function where you put the hooks is
+> >> wrong. The hooks should at least be in clk_enable/clk_disable and not
+> >> clk_prepare_enable/clk_disable_unprepare, since any driver is free to
+> >> call clk_prepare separately from clk_enable. The hooks should be
+> >> implemented in the lowest-level common function that all
+> >> driver-accessible paths call through.
+> > 
+> > Thanks, I know the point, but unfortunately there is no good choice for
+> > hooking this since those low level functions clk_enable/clk_disable will
+> > be called in interrupt context so it is not possible to send notify. We
+> > might need to come out a better approach if we can think of any.
+> > Currently I still think this is acceptable (Having all the drivers which
+> > are using our interested clocks call these function to enable/disable
+> > clock in their runtime_pm calls) though it's not perfect. 
+> 
+> No, that definitely won't work. Not all drivers use those APIs, nor
+> should they.
+> 
+That will be too bad, it looks like we deadlock in the mechanism, we
+cannot change existing drivers behavior (that means some call
+clk_disable/enable directly, some are not), and we cannot hook notifier
+in clk_disable/enable either, that means there seems no any chance to
+get what we want, any idea?
