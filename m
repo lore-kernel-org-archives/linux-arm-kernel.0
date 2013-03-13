@@ -1,36 +1,62 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Wed, 13 Mar 2013 17:29:14 +0100
-Subject: [PATCH] topology: removed kzalloc return value cast
-In-Reply-To: <1362922535-25172-1-git-send-email-mihai.stirbat@gmail.com>
-References: <1362922535-25172-1-git-send-email-mihai.stirbat@gmail.com>
-Message-ID: <CAKfTPtA374ZaW_cJYQbjR5qz6iAVXkgMa6=i5OMDUXncqMnrXQ@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 13 Mar 2013 17:30:41 +0100
+Subject: [PATCH 3/3] ARM: at91: renamme rm9200 dt file
+In-Reply-To: <51408BC0.6020109@atmel.com>
+References: <20130307130842.GA4590@game.jcrosoft.org>
+ <1362666113-16434-1-git-send-email-plagnioj@jcrosoft.com>
+ <1362666113-16434-3-git-send-email-plagnioj@jcrosoft.com>
+ <51408BC0.6020109@atmel.com>
+Message-ID: <5140A9B1.8030202@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 March 2013 21:35, Mihai Stirbat <mihai.stirbat@gmail.com> wrote:
-> Signed-off-by: Mihai Stirbat <mihai.stirbat@gmail.com>
-> ---
->  arch/arm/kernel/topology.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
-> index 79282eb..f10316b 100644
-> --- a/arch/arm/kernel/topology.c
-> +++ b/arch/arm/kernel/topology.c
-> @@ -100,7 +100,7 @@ static void __init parse_dt_topology(void)
->         int alloc_size, cpu = 0;
->
->         alloc_size = nr_cpu_ids * sizeof(struct cpu_capacity);
-> -       cpu_capacity = (struct cpu_capacity *)kzalloc(alloc_size, GFP_NOWAIT);
-> +       cpu_capacity = kzalloc(alloc_size, GFP_NOWAIT);
+On 03/13/2013 03:22 PM, Nicolas Ferre :
+> On 03/07/2013 03:21 PM, Jean-Christophe PLAGNIOL-VILLARD :
+>> to follow the same scheme board-dt-<socs>.c
+> 
+> Well not <socs> as each and every SoC will not have its own board file.
+> I confess that finding a proper name is not easy, what about:
+> 
+> Rename the board-rm9200-dt.c file so that we follow the pattern for
+> Device Tree board files: board-dt-<name of SoC sharing same core>.c
 
-you're right
+Queued in at91-3.10-soc with this modified commit message.
 
-Acked-by: Vincent Guittot <vincent.guittot@linaro.org>
+Thanks, best regards,
 
->
->         while ((cn = of_find_node_by_type(cn, "cpu"))) {
->                 const u32 *rate, *reg;
-> --
-> 1.7.10.4
->
+
+> Best regards,
+> 
+>> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> Cc: Ludovic Desroches <ludovic.desroches@atmel.com>
+>> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+>> ---
+>>  arch/arm/mach-at91/Makefile                                 |    2 +-
+>>  arch/arm/mach-at91/{board-rm9200-dt.c => board-dt-rm9200.c} |    0
+>>  2 files changed, 1 insertion(+), 1 deletion(-)
+>>  rename arch/arm/mach-at91/{board-rm9200-dt.c => board-dt-rm9200.c} (100%)
+>>
+>> diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
+>> index 5eca35a..505fed9 100644
+>> --- a/arch/arm/mach-at91/Makefile
+>> +++ b/arch/arm/mach-at91/Makefile
+>> @@ -87,7 +87,7 @@ obj-$(CONFIG_MACH_SNAPPER_9260)	+= board-snapper9260.o
+>>  obj-$(CONFIG_MACH_AT91SAM9M10G45EK) += board-sam9m10g45ek.o
+>>  
+>>  # AT91SAM board with device-tree
+>> -obj-$(CONFIG_MACH_AT91RM9200_DT) += board-rm9200-dt.o
+>> +obj-$(CONFIG_MACH_AT91RM9200_DT) += board-dt-rm9200.o
+>>  obj-$(CONFIG_MACH_AT91SAM9_DT) += board-dt-sam9.o
+>>  
+>>  # AT91X40 board-specific support
+>> diff --git a/arch/arm/mach-at91/board-rm9200-dt.c b/arch/arm/mach-at91/board-dt-rm9200.c
+>> similarity index 100%
+>> rename from arch/arm/mach-at91/board-rm9200-dt.c
+>> rename to arch/arm/mach-at91/board-dt-rm9200.c
+>>
+> 
+> 
+
+
+-- 
+Nicolas Ferre
