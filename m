@@ -1,51 +1,99 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 13 Mar 2013 16:35:02 +0000
-Subject: [PATCH v3 03/11] clocksource: sp804: add device tree support
-In-Reply-To: <1363189748.3100.108.camel@hornet>
-References: <1363151142-32162-1-git-send-email-haojian.zhuang@linaro.org>
- <CAD6h2NQa-RhR555o_1_RYPuPb4366H_AwK1U9S3pRVPdo_xNNg@mail.gmail.com>
- <1363189748.3100.108.camel@hornet>
-Message-ID: <201303131635.02355.arnd@arndb.de>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 13 Mar 2013 09:36:22 -0700
+Subject: [PATCH v4 2/3] ARM: dts: Add i2c-arbitrator bus for exynos5250-snow
+In-Reply-To: <1363192583-26363-1-git-send-email-dianders@chromium.org>
+References: <1360957573-864-1-git-send-email-dianders@chromium.org>
+ <1363192583-26363-1-git-send-email-dianders@chromium.org>
+Message-ID: <1363192583-26363-2-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 13 March 2013, Pawel Moll wrote:
-> Fine, so simply reverse the logic and drop the "arm,sp804-clock*"
-> properties. Something like:
-> 
-> if (has_timint1) {
->         evtoffs = TIMER_1_BASE;
->         irq = irq_of_parse_and_map(np, 1);
->         srcoffs = TIMER_2_BASE;
-> } else (has_timint2) {
->         evtoffs = TIMER_2_BASE;
->         irq = irq_of_parse_and_map(np, 2);
->         srcoffs = TIMER_1_BASE;
-> } else {
->         can't be clockevent, sorry
-> }
-> 
-> Hope it makes clear what I'd expect from the driver.
+We need to use the i2c-arbitrator to talk to any of the devices on i2c
+bus 4 on exynos5250-snow so that we don't confuse the embedded
+controller (EC).  Add the i2c-arbitrator to the device tree.  As we
+add future devices (keyboard, sbs, tps65090) we'll add them on top of
+this.
 
-Makes sense. I guess you can actually derive "has_timint1"
-from the presence of the irq and just try to parse it:
+The arbitrated bus is numbered 104 simply as a convenience to make it
+easier for people poking around to guess that it might have something
+to do with the physical bus 4.
 
-	irq = irq_of_parse_and_map(np, 0);
-	if (irq) {
-		evtoffs = TIMER_1_BASE;
-		srcoffs = TIMER_2_BASE;
-	} else {
-		irq = irq_of_parse_and_map(np, 1);
-		if (!irq)
-			return -ENODEV;
-		srcoffs = TIMER_1_BASE;
-		evtoffs = TIMER_2_BASE;
-	}
+The addition is split between the cros5250-common and the snow device
+tree file since not all cros5250-class devices use arbitration.
 
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+Tested-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+---
+Changes in v4:
+- Changed mux gpio syntax to work atop Thomas's "ARM: dts: add pin
+  state information in client nodes for Exynos5 platforms"; avoid
+  adding gpios property to i2c at 12CA0000 for the same reason.
 
-I wonder if we can ever get into the second case though: If the
-first interrupt in not valid, can there be a second one in the
-interrupts property? I don't know of a way to put an "invalid"
-interrupt in there.
+Changes in v3: None
+Changes in v2:
+- Use new device tree property names / compatible string.
+- Include that the GPIOs for arbitration are active low.
 
-	Arnd
+ arch/arm/boot/dts/cros5250-common.dtsi |  3 ++-
+ arch/arm/boot/dts/exynos5250-snow.dts  | 25 +++++++++++++++++++++++++
+ 2 files changed, 27 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/cros5250-common.dtsi b/arch/arm/boot/dts/cros5250-common.dtsi
+index 8a5b3a6..0a61bbb 100644
+--- a/arch/arm/boot/dts/cros5250-common.dtsi
++++ b/arch/arm/boot/dts/cros5250-common.dtsi
+@@ -193,7 +193,8 @@
+ 	};
+ 
+ 	i2c at 12CA0000 {
+-		status = "disabled";
++		samsung,i2c-sda-delay = <100>;
++		samsung,i2c-max-bus-freq = <66000>;
+ 	};
+ 
+ 	i2c at 12CB0000 {
+diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+index 581ffae..bf16353 100644
+--- a/arch/arm/boot/dts/exynos5250-snow.dts
++++ b/arch/arm/boot/dts/exynos5250-snow.dts
+@@ -16,6 +16,10 @@
+ 	model = "Google Snow";
+ 	compatible = "google,snow", "samsung,exynos5250";
+ 
++	aliases {
++		i2c104 = &i2c_104;
++	};
++
+ 	pinctrl at 11400000 {
+ 		sd3_clk: sd3-clk {
+ 			samsung,pin-drv = <0>;
+@@ -44,6 +48,27 @@
+ 		};
+ 	};
+ 
++	i2c-arbitrator {
++		compatible = "i2c-arbitrator-cros-ec";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		i2c-parent = <&{/i2c@12CA0000}>;
++
++		ap-claim-gpio = <&gpf0 3 1>;
++		ec-claim-gpio = <&gpe0 4 1>;
++		slew-delay-us = <10>;
++		wait-retry-us = <3000>;
++		wait-free-us = <50000>;
++
++		/* Use ID 104 as a hint that we're on physical bus 4 */
++		i2c_104: i2c at 0 {
++			reg = <0>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++	};
++
+ 	/*
+ 	 * On Snow we've got SIP WiFi and so can keep drive strengths low to
+ 	 * reduce EMI.
+-- 
+1.8.1.3
