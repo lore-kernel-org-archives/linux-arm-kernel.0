@@ -1,47 +1,26 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed, 13 Mar 2013 11:02:05 -0600
-Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
-In-Reply-To: <20130313081815.GD25940@avionic-0098.mockup.avionic-design.de>
-References: <513E519B.6010503@firmworks.com>
- <20130311232516.GA13873@obsidianresearch.com>
- <513E6AFE.3090304@firmworks.com>
- <20130312070852.GA6727@avionic-0098.mockup.avionic-design.de>
- <20130312155749.GA1820@obsidianresearch.com>
- <20130312203819.GA23221@avionic-0098.mockup.avionic-design.de>
- <20130312210328.GA22702@obsidianresearch.com>
- <20130312213006.GA23717@avionic-0098.mockup.avionic-design.de>
- <20130312220854.GA23112@obsidianresearch.com>
- <20130313081815.GD25940@avionic-0098.mockup.avionic-design.de>
-Message-ID: <20130313170205.GB24042@obsidianresearch.com>
+From: jangra.pankaj9@gmail.com (Pankaj Jangra)
+Date: Wed, 13 Mar 2013 22:39:18 +0530
+Subject: [PATCH 1/1] clk: Fix incorrect return type in clk.c
+In-Reply-To: <1363168069-11331-1-git-send-email-sachin.kamat@linaro.org>
+References: <1363168069-11331-1-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <CADTbHxrF5M++Y5ku90uN7n6Jx=o80qY+dFX+B_s0udSC06D-PQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 13, 2013 at 09:18:15AM +0100, Thierry Reding wrote:
+Hi.
 
-> Mitch already answered this. The specification is now almost 15 years
-> old and it couldn't possibly have foreseen all of the future use-cases.
-> If the specification is too restrictive and Mitch gives his blessing to
-> remove some of the restrictions, I don't see any reason why we shouldn't
-> do so if it lets us represent the reality of hardware more accurately in
-> DT.
+On Wed, Mar 13, 2013 at 3:17 PM, Sachin Kamat <sachin.kamat@linaro.org> wrote:
+> Return type of function clk_propagate_rate_change is a pointer.
+> But 0 was being returned. Change it to NULL.
+> Silences the following warning:
+> drivers/clk/clk.c:977:24: warning: Using plain integer as NULL pointer
+>
+> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+> ---
+>  drivers/clk/clk.c |    2 +-
 
-I understand the spec is old, and I have no problem with making a
-Linux specific revision, but do *that* - don't bury some random
-deviation inside the bindings for a driver. I even suggested some
-language, but I feel more thought is needed to consider how to model
-the standardized ECAM mechanism..
+Looks good to me.
+Reviewed-by: Pankaj Jangra <jangra.pankaj9@gmail.com>
 
-> Furthermore we're not discussing radical changes. None of the changes
-> will be backwards-incompatible, but they will allow recent hardware to
-> be represented more correctly or conveniently.
-
-Sure, but it is still inconsistent, one MMIO config mechansim is in
-ranges, one is in regs. Plus I don't think tegra's case is a great
-starting point to design a spec update, it's config access mechanism
-is especially strange...
-
-Anyhow, I think this has been hashed to death, as long as your final
-binding has the 'device_type = pci' on the pcie-controller node I
-think it will be fine.
-
-Jason
+Regards,
+Pankaj Jangra
