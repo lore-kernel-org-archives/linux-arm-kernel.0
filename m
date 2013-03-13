@@ -1,19 +1,23 @@
 From: timur@tabi.org (Timur Tabi)
-Date: Wed, 13 Mar 2013 17:53:39 -0500
-Subject: [PATCH 00/10] ASoC: imx sound: Add DT support
-In-Reply-To: <1362940391-8338-1-git-send-email-mpa@pengutronix.de>
+Date: Wed, 13 Mar 2013 17:55:24 -0500
+Subject: [PATCH 01/10] imx-ssi: Fix AC97 rates
+In-Reply-To: <20130311195108.GC18350@pengutronix.de>
 References: <1362940391-8338-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <CAOZdJXXYcPZHoJAVT+mNZig7xZkDEjhsd9zjL7gD9_7NngBEeA@mail.gmail.com>
+ <1362940391-8338-2-git-send-email-mpa@pengutronix.de>
+ <CAOMZO5A8F81PzCjKHrkZ_AtGMr341d6OmYHMQvdzgunmGFDVsw@mail.gmail.com>
+ <20130311195108.GC18350@pengutronix.de>
+Message-ID: <CAOZdJXXm=jJv3zyD4j11t3BgNGyKz6V9jzShQLTk-BTiwDjvMg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 10, 2013 at 1:33 PM, Markus Pargmann <mpa@pengutronix.de> wrote:
+On Mon, Mar 11, 2013 at 2:51 PM, Markus Pargmann <mpa@pengutronix.de> wrote:
 >
->
-> This series adds DT support for imx-ssi and phycore-ac97. It also
-> contains some fixes for imx-ssi and phycore-ac97.
+> At the moment fsl-ssi and imx-ssi don't seem to have very much in
+> common. However I could try to merge the imx-ssi driver code into
+> fsl_ssi and make it handle imx27-ssi differently.
 
-I'm confused.  We already have an SSI driver that has device tree support.
+imx-ssi is the legacy driver that supports older, non-DT IMX platforms.
+fsl-ssi is the "new" driver that supports PowerPC and IMX DT-enabled platforms.
 
 -- 
 Timur Tabi
