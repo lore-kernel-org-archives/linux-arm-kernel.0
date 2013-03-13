@@ -1,114 +1,65 @@
-From: B37400@freescale.com (Singh Sandeep-B37400)
-Date: Wed, 13 Mar 2013 05:17:58 +0000
-Subject: [PATCH 1/4] Device tree entry for Freescale TDM controller
-In-Reply-To: <20130307133421.GA4977@n2100.arm.linux.org.uk>
-References: <1362655668-26721-1-git-send-email-Sandeep@freescale.com>
- <20130307133421.GA4977@n2100.arm.linux.org.uk>
-Message-ID: <3F1D9DCAAB49B94D88DBE05911FA4E6E06FA8A37@039-SN1MPN1-001.039d.mgd.msft.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 12 Mar 2013 23:24:45 -0600
+Subject: [RFC 1/1] clk: Add notifier support in
+ clk_prepare_enable/clk_disable_unprepare
+In-Reply-To: <1363151317.3311.9.camel@bilhuang-vm1>
+References: <1363091861-21534-1-git-send-email-bilhuang@nvidia.com>
+ <20130312134032.GU4977@n2100.arm.linux.org.uk>
+ <1363139273.21694.11.camel@bilhuang-vm1> <514003B6.8020904@wwwdotorg.org>
+ <1363151317.3311.9.camel@bilhuang-vm1>
+Message-ID: <51400D9D.9060305@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: Thursday, March 07, 2013 7:04 PM
-> To: Singh Sandeep-B37400
-> Cc: linuxppc-dev at lists.ozlabs.org; linux-arm-kernel at lists.infradead.org;
-> Aggrwal Poonam-B10812
-> Subject: Re: [PATCH 1/4] Device tree entry for Freescale TDM controller
+On 03/12/2013 11:08 PM, Bill Huang wrote:
+> On Wed, 2013-03-13 at 12:42 +0800, Stephen Warren wrote:
+>> On 03/12/2013 07:47 PM, Bill Huang wrote:
+>>> On Tue, 2013-03-12 at 21:40 +0800, Russell King - ARM Linux wrote:
+>>>> On Tue, Mar 12, 2013 at 05:37:41AM -0700, Bill Huang wrote:
+>>>>> Add the below four notifier events so drivers which are interested in
+>>>>> knowing the clock status can act accordingly. This is extremely useful
+>>>>> in some of the DVFS (Dynamic Voltage Frequency Scaling) design.
+>>>>>
+>>>>> PRE_CLK_ENABLE
+>>>>> POST_CLK_ENABLE
+>>>>> PRE_CLK_DISABLE
+>>>>> POST_CLK_DISABLE
+>>>>>
+>>>>> Signed-off-by: Bill Huang <bilhuang@nvidia.com>
+>>>>
+>>>> NAK.  *Sigh* NO, this is the wrong level to be doing stuff like this.
+>>>>
+>>>> The *ONLY* thing that clk_prepare_enable() and clk_prepare_disable() should
+>>>> *EVER* be doing is calling clk_prepare(), clk_enable(), clk_disable() and
+>>>> clk_unprepare().  Those two functions are *merely* helpers for drivers
+>>>> who don't wish to make the individual calls.
+>>>>
+>>>> Drivers are still completely free to call the individual functions, at
+>>>> which point your proposal breaks horribly - and they _do_ call the
+>>>> individual functions.
+>>>
+>>> I'm proposing to give device driver a choice when it knows that some
+>>> driver might be interested in knowing its clock's enabled/disabled state
+>>> change at runtime, this is very important for centralized DVFS core
+>>> driver. It is not meant to be covering all cases especially for drivers
+>>> which is not part of the DVFS, so we don't care if it is calling
+>>> clk_enable/disable directly or not.
+>>
+>> I believe the point Russell is making is not that the idea behind this
+>> patch is wrong, but simply that the function where you put the hooks is
+>> wrong. The hooks should at least be in clk_enable/clk_disable and not
+>> clk_prepare_enable/clk_disable_unprepare, since any driver is free to
+>> call clk_prepare separately from clk_enable. The hooks should be
+>> implemented in the lowest-level common function that all
+>> driver-accessible paths call through.
 > 
-> I know I'm probably missing something... but... why are these patches
-> copied to the ARM list?  They appear to be PowerPC patches.
-There was a request from few ARM Linux developers that they were interested
-in developing TDM subsystem for ARM and would like to see TDM patches in
-ARM mailing list. Just trying to oblige
-> 
-> On Thu, Mar 07, 2013 at 04:57:45PM +0530, Sandeep Singh wrote:
-> > Added dtsi file for Freescale TDM controller.
-> > This controller is available on many Freescale SOCs like MPC8315,
-> > P1020, P1010,
-> > P1022 and P1024
-> > Signed-off-by: Sandeep Singh <Sandeep@freescale.com>
-> > Signed-off-by: Poonam Aggrwal <poonam.aggrwal@freescale.com>
-> > ---
-> >  arch/powerpc/boot/dts/fsl/pq3-tdm1.0-0.dtsi |   42
-> +++++++++++++++++++++++++++
-> >  1 files changed, 42 insertions(+), 0 deletions(-)  create mode 100644
-> > arch/powerpc/boot/dts/fsl/pq3-tdm1.0-0.dtsi
-> >
-> > diff --git a/arch/powerpc/boot/dts/fsl/pq3-tdm1.0-0.dtsi
-> > b/arch/powerpc/boot/dts/fsl/pq3-tdm1.0-0.dtsi
-> > new file mode 100644
-> > index 0000000..e89f637
-> > --- /dev/null
-> > +++ b/arch/powerpc/boot/dts/fsl/pq3-tdm1.0-0.dtsi
-> > @@ -0,0 +1,42 @@
-> > +/*
-> > + * PQ3 TDM device tree stub [ controller @ offset 0x16000 ]
-> > + *
-> > + * Copyright 2012 Freescale Semiconductor Inc.
-> > + *
-> > + * Redistribution and use in source and binary forms, with or without
-> > + * modification, are permitted provided that the following conditions
-> are met:
-> > + *     * Redistributions of source code must retain the above
-> copyright
-> > + *       notice, this list of conditions and the following disclaimer.
-> > + *     * Redistributions in binary form must reproduce the above
-> copyright
-> > + *       notice, this list of conditions and the following disclaimer
-> in the
-> > + *       documentation and/or other materials provided with the
-> distribution.
-> > + *     * Neither the name of Freescale Semiconductor nor the
-> > + *       names of its contributors may be used to endorse or promote
-> products
-> > + *       derived from this software without specific prior written
-> permission.
-> > + *
-> > + *
-> > + * ALTERNATIVELY, this software may be distributed under the terms of
-> > +the
-> > + * GNU General Public License ("GPL") as published by the Free
-> > +Software
-> > + * Foundation, either version 2 of that License or (at your option)
-> > +any
-> > + * later version.
-> > + *
-> > + * THIS SOFTWARE IS PROVIDED BY Freescale Semiconductor ``AS IS'' AND
-> > +ANY
-> > + * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-> > +IMPLIED
-> > + * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-> > +ARE
-> > + * DISCLAIMED. IN NO EVENT SHALL Freescale Semiconductor BE LIABLE
-> > +FOR ANY
-> > + * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-> > +DAMAGES
-> > + * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-> > +SERVICES;
-> > + * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-> > +CAUSED AND
-> > + * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-> > +OR TORT
-> > + * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
-> > +USE OF THIS
-> > + * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-> > + */
-> > +
-> > +tdm at 16000 {
-> > +	compatible = "fsl,tdm1.0";
-> > +	reg = <0x16000 0x200 0x2c000 0x2000>;
-> > +	clock-frequency = <0>;
-> > +	tdm_tx_clk = <2048000>;
-> > +	interrupts = <62 8 0 0>;
-> > +	fsl,max-time-slots = <128>;
-> > +};
-> > --
-> > 1.7.6.GIT
-> >
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Thanks, I know the point, but unfortunately there is no good choice for
+> hooking this since those low level functions clk_enable/clk_disable will
+> be called in interrupt context so it is not possible to send notify. We
+> might need to come out a better approach if we can think of any.
+> Currently I still think this is acceptable (Having all the drivers which
+> are using our interested clocks call these function to enable/disable
+> clock in their runtime_pm calls) though it's not perfect. 
+
+No, that definitely won't work. Not all drivers use those APIs, nor
+should they.
