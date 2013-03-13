@@ -1,25 +1,24 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 13 Mar 2013 10:22:17 +0000 (UTC)
-Subject: OMAP baseline test results for v3.9-rc1
-In-Reply-To: <51402BE9.5040402@compulab.co.il>
-References: <alpine.DEB.2.00.1303121634080.2723@utopia.booyaka.com>
- <51402BE9.5040402@compulab.co.il>
-Message-ID: <alpine.DEB.2.00.1303131020270.32131@utopia.booyaka.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 13 Mar 2013 10:23:00 +0000
+Subject: [PATCH] ASoC: samsung: remove last traces of neo1973-gta01
+In-Reply-To: <1363126175.3137.160.camel@x61.thuisdomein>
+References: <1363126175.3137.160.camel@x61.thuisdomein>
+Message-ID: <20130313102300.GC25610@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Igor,
+On Tue, Mar 12, 2013 at 11:09:35PM +0100, Paul Bolle wrote:
+> The (rudimentary) support for the Openmoko Neo1973 GTA01 got removed in
+> commit 1ae5cbc52e7c6619a3f44b87809fd25370df31bb ("ASoC: neo1973_wm8753:
+> remove references to the neo1973-gta01 machine"). Remove its last traces
+> in the Kconfig file too.
 
-On Wed, 13 Mar 2013, Igor Grinberg wrote:
-
-> This should have been fixed by:
-> ff95793 (ARM: OMAP3: cm-t3517: add MMC support)
-> 
-> I also can't find the MMC rootfs boot log on your website.
-
-Hmm, I thought I had switched the CM-T3517 over to use MMC booting, but 
-looks like it's still trying to use nfsroot.  Thanks for letting me know.  
-Will switch to MMC and try again.
-
-
-- Paul
+The support wasn't rudimentary, it was a pretty much complete audio
+driver.  Anyway I've applied this with a fixed up commit message.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130313/5ec2d461/attachment.sig>
