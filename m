@@ -1,125 +1,70 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Wed, 13 Mar 2013 16:35:47 +0100
-Subject: [PATCH V3 1/2] ARM: dts: OMAP2+: Add SDMA controller bindings
- and nodes
-In-Reply-To: <513FA19C.60904@ti.com>
-References: <1361903244-19837-1-git-send-email-jon-hunter@ti.com>
- <1361903244-19837-2-git-send-email-jon-hunter@ti.com>
- <513F0AE3.6030408@ti.com> <513FA19C.60904@ti.com>
-Message-ID: <51409CD3.10301@ti.com>
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Wed, 13 Mar 2013 16:37:16 +0100
+Subject: [PATCH] ARM: mach-moxart: platform port for MOXA ART SoC
+In-Reply-To: <CACmBeS01vs=fHOXu1Lnq8GX8YAbF6aBKmqopKPVt78mPYm=_9w@mail.gmail.com>
+References: <CACmBeS1NLFUYHBOVL28aCCzRrgXYGPZF9t3qj6AdcgaMkrPGoQ@mail.gmail.com>
+ <CACmBeS01vs=fHOXu1Lnq8GX8YAbF6aBKmqopKPVt78mPYm=_9w@mail.gmail.com>
+Message-ID: <CACmBeS05cyT8N9nZeqbJUPMSGeZYLWjL0Tu1GSZ-ms+Hjc0UoQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Salut Jon,
+Hi,
 
-On 03/12/2013 10:43 PM, Jon Hunter wrote:
-> Salut Benoit!
-> 
-> On 03/12/2013 06:00 AM, Benoit Cousson wrote:
->> + Seb G.
->>
->> Hi Jon,
->>
->> How to you plan to merge that series?
-> 
-> Good question ... my thinking was that you or Tony would take 1/2 and
-> once that is queued then I would ask Tony to ack 2/2 and Vinod take that
-> patch.
+I ask for feedback and to submit (if possible) a new ARM SoC platform
+port. This is now near complete (I think) (tested on UC-7112-LX Plus)
+and applies to 2.6.34.14.
 
-Yep, this is what I was thinking too.
+The patch contains the following drivers and platform specific implementations:
 
-> By the way, I have accumulated several DT patches which I sent out
-> altogether [1] (at least for my own sanity if no one elses ;-) and I
-> have included the below patch with it. I was hoping that may be I could
-> create a branch for you to pull. If you would rather cherry-pick the
-> various patches and merge yourself then I can separate them too.
+* ARCH_MOXART (FA526 processor)
+* 100Hz interrupt timer
+* UART
+* MTD map driver
+* Ethernet driver (RTL8201CP)
+* MMC driver
+* MOXA Smartio/Industio family multiport serial driver
+* RTC driver
+* Watchdog driver
+* GPIO driver
 
-Merging your branch is indeed even better for me. So go ahead.
+Predicted patch rejects below (in need of a solution, feedback is much
+appreciated) because they are critical in areas of boot, MMC and TTY.
 
-Thanks,
-Benoit
+arch/arm/boot/compressed/head.S:
+A valid (and unique) architecture ID is not loaded to r1. Looks like
+the bootloader is broken, it should be doing this!
+http://gicl.cs.drexel.edu/people/sevy/linux/ARM_Linux_boot_sequence.html
 
-> 
->> Seb's just posted a McBSP adaptation to SDMA binding, so I'll have to
->> take this one before being able to merge any other SDMA driver
->> adaptation patches.
->>
->> I'm fine to take that one, if you are OK, to avoid merge conflict in DTS
->> later.
-> 
-> Fine with me and that would be preferred. I don't see any downside in
-> taking this one and then having Vinod take the other later.
+arch/arm/tools/mach-types:
+Omitted (do not edit manually / add a new machine using
+http://www.arm.linux.org.uk/developer/machines/?action=new). A fix to
+this and above is not feasible as long as MOXA withholds bootloader
+sources (requested without success).
+
+drivers/char/mxser.c drivers/char/mxser.h: MOXA
+SMARTIO/INDUSTIO/INTELLIO SERIAL CARD (Ji?? Slab?):
+Force board setup for CONFIG_ARCH_MOXART.
+ASYNCB_CLOSING is avoided because of a lockup (infinite wait after
+tty_wait_until_sent). Why this happens is unknown (to me) I'm hoping
+someone (Ji???) can shed light. SysRq trace @ http://ideone.com/e845mr
+What significance does ASYNCB_CLOSING have?
+Obviously, automatic detection is better but "mxser_read_register" is
+pointless on this hardware. What to do instead? Is it better to make a
+copy and submit a new driver?
+
+drivers/mmc/core/sd.c:
+The MMC controller is "special"? "UNSTUFF_BITS" is redefined here
+http://repo.or.cz/w/linux-2.6.19-moxart.git/blob/50cdf2c57662f9f69c5615976412f76bfd73311a:/drivers/mmc/mmc.c
+. Without the new macro it'll report the wrong geometry and prod_name.
+I'm thinking a driver should never have to redefine UNSTUFF_BITS.
+Possible workaround: modify bits (in driver) to line up as expected
+before returning the response (mmc_request_done).
 
 
-> 
->> On 02/26/2013 07:27 PM, Jon Hunter wrote:
->>> Add SDMA controller binding for OMAP2+ devices and populate DMA client
->>> information for SPI and MMC periperhal on OMAP3+ devices. Please note
->>
->> typo-------------------------------^
-> 
-> Thanks! Will fix.
-> 
->>> that OMAP24xx devices do not have SPI and MMC bindings available yet and
->>> so DMA client information is not populated.
->>>
->>> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
->>> Reviewed-by: Felipe Balbi <balbi@ti.com>
->>> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>> Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>> ---
->>>  .../devicetree/bindings/dma/omap-sdma.txt          |   51 ++++++++++++++++++++
->>
->> That's a detail, but the bindings should be introduced along with the
->> driver DT adaptation since it does represent its "interface".
-> 
-> Ok, I can add that to patch 2/2 instead.
-> 
->>>  arch/arm/boot/dts/omap2.dtsi                       |   12 +++++
->>>  arch/arm/boot/dts/omap3.dtsi                       |   40 +++++++++++++++
->>>  arch/arm/boot/dts/omap4.dtsi                       |   41 ++++++++++++++++
->>>  arch/arm/boot/dts/omap5.dtsi                       |   41 ++++++++++++++++
->>>  5 files changed, 185 insertions(+)
->>>  create mode 100644 Documentation/devicetree/bindings/dma/omap-sdma.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/dma/omap-sdma.txt b/Documentation/devicetree/bindings/dma/omap-sdma.txt
->>> new file mode 100644
->>> index 0000000..22aab28
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/dma/omap-sdma.txt
->>> @@ -0,0 +1,51 @@
->>> +* TI OMAP SDMA controller
->>> +
->>> +Required properties:
->>> +- compatible:		Should be set to one of the following:
->>> +
->>> +			ti,omap2420-sdma (omap2420)
->>> +			ti,omap2430-sdma (omap2430)
->>> +			ti,omap3430-sdma (omap3430)
->>> +			ti,omap3630-sdma (omap3630)
->>> +			ti,omap4430-sdma (omap4430 & omap4460 & omap543x)
->>> +
->>> +- reg: 			Contains DMA registers location and length.
->>> +- interrupts: 		Contains DMA interrupt information.
->>> +- #dma-cells: 		Must be 1.
->>> +- #dma-channels:	Contains total number of programmable DMA channels.
->>> +- #dma-requests:	Contains total number of DMA requests.
->>> +
->>> +Example:
->>> +
->>> +	sdma: dma-controller at 4A056000 {
->>> +		compatible = "ti,omap-sdma";
->>> +		reg = <0x4A056000 0x1000>;
->>
->>
->> Nit: you do have several hexa values in upper case, here and in some dts
->> as well.
-> 
-> Yes will fix that too.
-> 
-> Cheers
-> Jon
-> 
-> [1]
-> http://www.mail-archive.com/devicetree-discuss at lists.ozlabs.org/msg28050.html
-> 
+For reference, this is my previous post from a few months back:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2012-December/137130.html
+
+Gitweb: http://repo.or.cz/w/linux-2.6.34.14-moxart.git/commitdiff/?h=3bc2e98ebb92961e1c5992736186920cd070f4ee&hp=b7f1d43323eceb02fd663a71eb2f8be9c17e6740
+
+Download link (size: 193K):
+https://linux-2-6-34-14-moxart.googlecode.com/files/linux-2.6.34.14-moxart.patch
