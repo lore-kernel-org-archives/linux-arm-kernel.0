@@ -1,60 +1,56 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 13 Mar 2013 15:29:38 +0100
-Subject: [Bulk] Re: [PATCH 2/6] pinctrl: gpio: vt8500: Add pincontrol
- driver for arch-vt8500
-In-Reply-To: <1363062095.23051.16.camel@gitbox>
-References: <1362807578-23089-1-git-send-email-linux@prisktech.co.nz>
- <1362807578-23089-3-git-send-email-linux@prisktech.co.nz>
- <513E09FE.5040104@wwwdotorg.org> <1363062095.23051.16.camel@gitbox>
-Message-ID: <CACRpkdYTKk-fPkUX_jOoHoqxgpsEh2L1ryGC7VSNiAbsmOtcEg@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 13 Mar 2013 18:30:30 +0400
+Subject: [PATCH] ARM: mvebu: fix RAM size for Armada XP board DB-MV784MP-GP
+In-Reply-To: <1363101135-21635-1-git-send-email-jason@lakedaemon.net>
+References: <20130216164457.GA23237@titan.lakedaemon.net>
+ <1363101135-21635-1-git-send-email-jason@lakedaemon.net>
+Message-ID: <51408D86.6040703@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 12, 2013 at 5:21 AM, Tony Prisk <linux@prisktech.co.nz> wrote:
-> On Mon, 2013-03-11 at 10:44 -0600, Stephen Warren wrote:
+Hello.
 
->> > +Required subnode-properties:
->> > +- wm,pins: An array of cells. Each cell contains the ID of a pin.
->>
->> That's a little odd. Presumably this is to allow configuring "pin
->> configuration" data beyond the mux function and pull. Why aren't those
->> options exposed as explicit properties, rather than allowing manual
->> register tweaking?
->
-> Little confused about this one - wm,pins is the same as the brcm binding
-> and is the pins being configured.
->
-> I assume you mean wm,pinmux is confusing.
->
-> The wm,pinmux does, as you guessed, control some addition pinmux
-> alternate features. I exposed it this way because we don't know what
-> most of the bits in the register do (There is no vendor hardware
-> documentation for these SoCs), and rather than having to churn the code
-> constantly to add the new configurations it seemed to make sense to just
-> expose the register this way and let people configure it in the DT. It
-> is masked so that we can change only the bits we know and leave the rest
-> as configured by the bootloader.
->
-> Also, it would also add a lot of complexity to the pinctrl code to
-> support the few additional functions we know this register provides
-> because each SoC has a different layout for bits in this register, and
-> we don't actually know which pins/pads are controlled by each bit
-> (again, lack of documentation).
->
-> I realise this is contradictory to the point of having a pinctrl driver,
-> but it was the best I could come up with given the poor information we
-> have.
->
-> Always open to suggestions..
+On 12-03-2013 19:12, Jason Cooper wrote:
 
-In that case I strongly prefer that you try to encode this into the driver
-as such if that is possible. Putting it into the device tree will be
-subject to flux, and while we can handle some drastic code changes
-internally in the kernel, device trees will need to stay
-backward-compatible.
+> The board is supplied with a 4GB RAM module.  This value can be
+> overridden by the bootloader based on probed memory size.  We set it to
+> a reasonable value here.
 
-Isn't it possible to put a table for this into the kernel code and just
-switch the right numbers in from the compatible= string?
+> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+> ---
+> As promised, catching this fix in the -rc cycle.
 
-Yours,
-Linus Walleij
+> For those not familiar, earlier versions of the patch adding this board listed
+> 3GB because that is all that was visible.  I mistaken applied v3 of the patch
+> instead of v4 which properly listed 4GB.  This patch cleans up my error.
+
+>   arch/arm/boot/dts/armada-xp-gp.dts | 9 ++++-----
+>   1 file changed, 4 insertions(+), 5 deletions(-)
+
+> diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
+> index 1c8afe2..4a2776a 100644
+> --- a/arch/arm/boot/dts/armada-xp-gp.dts
+> +++ b/arch/arm/boot/dts/armada-xp-gp.dts
+> @@ -28,12 +28,11 @@
+>   		device_type = "memory";
+>
+>   		/*
+> -		 * 4 GB of plug-in RAM modules by default but only 3GB
+> -		 * are visible, the amount of memory available can be
+> -		 * changed by the bootloader according the size of the
+> -		 * module actually plugged
+> +		 * 4 GB of plug-in RAM modules by default. The amount of memory
+> +		 * available can be changed by the bootloader according the
+
+    "According to the size".
+
+> +		 * size of the module actually plugged
+>   		 */
+> -		reg = <0x00000000 0xC0000000>;
+> +		reg = <0x00000000 0xD0000000>;
+
+    But this is not 4G?
+
+>   	};
+
+WBR, Sergei
