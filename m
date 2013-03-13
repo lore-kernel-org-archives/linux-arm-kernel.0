@@ -1,53 +1,60 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 13 Mar 2013 15:22:56 +0100
-Subject: [PATCH 3/3] ARM: at91: renamme rm9200 dt file
-In-Reply-To: <1362666113-16434-3-git-send-email-plagnioj@jcrosoft.com>
-References: <20130307130842.GA4590@game.jcrosoft.org>
- <1362666113-16434-1-git-send-email-plagnioj@jcrosoft.com>
- <1362666113-16434-3-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <51408BC0.6020109@atmel.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 13 Mar 2013 15:29:38 +0100
+Subject: [Bulk] Re: [PATCH 2/6] pinctrl: gpio: vt8500: Add pincontrol
+ driver for arch-vt8500
+In-Reply-To: <1363062095.23051.16.camel@gitbox>
+References: <1362807578-23089-1-git-send-email-linux@prisktech.co.nz>
+ <1362807578-23089-3-git-send-email-linux@prisktech.co.nz>
+ <513E09FE.5040104@wwwdotorg.org> <1363062095.23051.16.camel@gitbox>
+Message-ID: <CACRpkdYTKk-fPkUX_jOoHoqxgpsEh2L1ryGC7VSNiAbsmOtcEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/07/2013 03:21 PM, Jean-Christophe PLAGNIOL-VILLARD :
-> to follow the same scheme board-dt-<socs>.c
+On Tue, Mar 12, 2013 at 5:21 AM, Tony Prisk <linux@prisktech.co.nz> wrote:
+> On Mon, 2013-03-11 at 10:44 -0600, Stephen Warren wrote:
 
-Well not <socs> as each and every SoC will not have its own board file.
-I confess that finding a proper name is not easy, what about:
+>> > +Required subnode-properties:
+>> > +- wm,pins: An array of cells. Each cell contains the ID of a pin.
+>>
+>> That's a little odd. Presumably this is to allow configuring "pin
+>> configuration" data beyond the mux function and pull. Why aren't those
+>> options exposed as explicit properties, rather than allowing manual
+>> register tweaking?
+>
+> Little confused about this one - wm,pins is the same as the brcm binding
+> and is the pins being configured.
+>
+> I assume you mean wm,pinmux is confusing.
+>
+> The wm,pinmux does, as you guessed, control some addition pinmux
+> alternate features. I exposed it this way because we don't know what
+> most of the bits in the register do (There is no vendor hardware
+> documentation for these SoCs), and rather than having to churn the code
+> constantly to add the new configurations it seemed to make sense to just
+> expose the register this way and let people configure it in the DT. It
+> is masked so that we can change only the bits we know and leave the rest
+> as configured by the bootloader.
+>
+> Also, it would also add a lot of complexity to the pinctrl code to
+> support the few additional functions we know this register provides
+> because each SoC has a different layout for bits in this register, and
+> we don't actually know which pins/pads are controlled by each bit
+> (again, lack of documentation).
+>
+> I realise this is contradictory to the point of having a pinctrl driver,
+> but it was the best I could come up with given the poor information we
+> have.
+>
+> Always open to suggestions..
 
-Rename the board-rm9200-dt.c file so that we follow the pattern for
-Device Tree board files: board-dt-<name of SoC sharing same core>.c
+In that case I strongly prefer that you try to encode this into the driver
+as such if that is possible. Putting it into the device tree will be
+subject to flux, and while we can handle some drastic code changes
+internally in the kernel, device trees will need to stay
+backward-compatible.
 
-Best regards,
+Isn't it possible to put a table for this into the kernel code and just
+switch the right numbers in from the compatible= string?
 
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: Ludovic Desroches <ludovic.desroches@atmel.com>
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> ---
->  arch/arm/mach-at91/Makefile                                 |    2 +-
->  arch/arm/mach-at91/{board-rm9200-dt.c => board-dt-rm9200.c} |    0
->  2 files changed, 1 insertion(+), 1 deletion(-)
->  rename arch/arm/mach-at91/{board-rm9200-dt.c => board-dt-rm9200.c} (100%)
-> 
-> diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
-> index 5eca35a..505fed9 100644
-> --- a/arch/arm/mach-at91/Makefile
-> +++ b/arch/arm/mach-at91/Makefile
-> @@ -87,7 +87,7 @@ obj-$(CONFIG_MACH_SNAPPER_9260)	+= board-snapper9260.o
->  obj-$(CONFIG_MACH_AT91SAM9M10G45EK) += board-sam9m10g45ek.o
->  
->  # AT91SAM board with device-tree
-> -obj-$(CONFIG_MACH_AT91RM9200_DT) += board-rm9200-dt.o
-> +obj-$(CONFIG_MACH_AT91RM9200_DT) += board-dt-rm9200.o
->  obj-$(CONFIG_MACH_AT91SAM9_DT) += board-dt-sam9.o
->  
->  # AT91X40 board-specific support
-> diff --git a/arch/arm/mach-at91/board-rm9200-dt.c b/arch/arm/mach-at91/board-dt-rm9200.c
-> similarity index 100%
-> rename from arch/arm/mach-at91/board-rm9200-dt.c
-> rename to arch/arm/mach-at91/board-dt-rm9200.c
-> 
-
-
--- 
-Nicolas Ferre
+Yours,
+Linus Walleij
