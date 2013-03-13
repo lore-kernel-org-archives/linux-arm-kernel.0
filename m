@@ -1,34 +1,24 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 13 Mar 2013 18:43:24 +0100
-Subject: [PATCH] ARM: mvebu: fix RAM size for Armada XP board DB-MV784MP-GP
-In-Reply-To: <20130313173559.GD24042@obsidianresearch.com>
-References: <20130216164457.GA23237@titan.lakedaemon.net>
- <1363101135-21635-1-git-send-email-jason@lakedaemon.net>
- <51408D86.6040703@cogentembedded.com>
- <51408F0C.2010408@free-electrons.com>
- <20130313173559.GD24042@obsidianresearch.com>
-Message-ID: <20130313174324.GS21478@lunn.ch>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 13 Mar 2013 11:45:52 -0600
+Subject: [PATCH v3] ARM: tegra: expose chip ID and revision
+In-Reply-To: <1363168080-12697-1-git-send-email-dahuang@nvidia.com>
+References: <1363168080-12697-1-git-send-email-dahuang@nvidia.com>
+Message-ID: <5140BB50.8080004@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 13, 2013 at 11:35:59AM -0600, Jason Gunthorpe wrote:
-> On Wed, Mar 13, 2013 at 03:37:00PM +0100, Gregory CLEMENT wrote:
-> 
-> > >> +		 * size of the module actually plugged
-> > >>   		 */
-> > >> -		reg = <0x00000000 0xC0000000>;
-> > >> +		reg = <0x00000000 0xD0000000>;
-> > > 
-> > >     But this is not 4G?
-> > 
-> > You're totally right!
-> > It should be reg = <0x00000000 0xF0000000>;
-> 
-> Isn't it 'right' as it is? The various included DT's put devices at
-> address 0xd0008000 for instance, memory shouldn't overlap that..
+On 03/13/2013 03:48 AM, Danny Huang wrote:
+> Expose Tegra chip ID and revision in /sys/devices/soc for user mode
+> usage
 
-Shouldn't DT describe the hardware? The hardware has 4GB. How much of
-it Linux decides to use so as to avoid overlaps with registers etc, is
-not a hardware issue, but software.
+> diff --git a/arch/arm/mach-tegra/tegra.c b/arch/arm/mach-tegra/tegra.c
 
-    Andrew
+>  static void __init tegra_dt_init(void)
+>  {
+> +	struct device *parent = NULL;
+> +	struct soc_device *soc_dev;
+> +	struct soc_device_attribute *soc_dev_attr;
+
+Since Russell asked you to redo the patch anyway, I'd prefer that
+variables be declared in the order they're used. So, soc_dev_attr, then
+soc_dev, then parent.
