@@ -1,56 +1,110 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Wed, 13 Mar 2013 17:11:28 +0100
-Subject: [PATCH V3 1/2] ARM: dts: OMAP2+: Add SDMA controller bindings
- and nodes
-In-Reply-To: <5140A05F.60108@ti.com>
-References: <1361903244-19837-1-git-send-email-jon-hunter@ti.com>
- <1361903244-19837-2-git-send-email-jon-hunter@ti.com>
- <513F0AE3.6030408@ti.com> <513FA19C.60904@ti.com> <51409CD3.10301@ti.com>
- <5140A05F.60108@ti.com>
-Message-ID: <5140A530.7030704@ti.com>
+From: levipearson@gmail.com (Levi Pearson)
+Date: Wed, 13 Mar 2013 10:12:20 -0600
+Subject: omap4 pandaboard: clock input for TiWi module inactive
+In-Reply-To: <51403905.3020102@ti.com>
+References: <CAEYbN3QotnnAUU=7c7=r1sHDnZ5VhgNfXfP6ANf3+ssCzmEa=A@mail.gmail.com>
+ <513D9CB7.2010402@ti.com> <513DA92F.7020908@ti.com>
+ <CAEYbN3T97W=74nMG4x4tVECRkff2RSasapvZQowpUwhJtUd=JQ@mail.gmail.com>
+ <51403905.3020102@ti.com>
+Message-ID: <CAEYbN3Sh+ECYO6jYXNQ6oz5s=y4v44Se8JtUx994eLSJSnjZQA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/13/2013 04:50 PM, Jon Hunter wrote:
-> 
-> On 03/13/2013 10:35 AM, Benoit Cousson wrote:
->> Salut Jon,
->>
->> On 03/12/2013 10:43 PM, Jon Hunter wrote:
->>> Salut Benoit!
->>>
->>> On 03/12/2013 06:00 AM, Benoit Cousson wrote:
->>>> + Seb G.
->>>>
->>>> Hi Jon,
->>>>
->>>> How to you plan to merge that series?
->>>
->>> Good question ... my thinking was that you or Tony would take 1/2 and
->>> once that is queued then I would ask Tony to ack 2/2 and Vinod take that
->>> patch.
->>
->> Yep, this is what I was thinking too.
->>
->>> By the way, I have accumulated several DT patches which I sent out
->>> altogether [1] (at least for my own sanity if no one elses ;-) and I
->>> have included the below patch with it. I was hoping that may be I could
->>> create a branch for you to pull. If you would rather cherry-pick the
->>> various patches and merge yourself then I can separate them too.
->>
->> Merging your branch is indeed even better for me. So go ahead.
-> 
-> Ok. Care to take a quick review to see if there is anything else you
-> feel needs fixing before I re-submit fixing the commments posted so far?
+On Wed, Mar 13, 2013 at 2:29 AM, Peter Ujfalusi <peter.ujfalusi@ti.com> wrote:
+> On 03/12/2013 05:33 PM, Levi Pearson wrote:
+>> I spent some more time looking at clk-twl6030.c, and it seems it just turns the
+>> twl6030 chip on when you ask it to enable the clock, and as far as I
+>> can tell that
+>> happens based on module dependencies?  There aren't any explicit references to
+>> it that I can find, so I'm not entirely sure how a clk-twl6040 would
+>> cause a clock
+>> to be enabled.
+>
+> The clk-twl6040 is not really a good example for you start with. We only need
+> it to turn on in order to get the clock on the output. But the principle is
+> the same at the end. you need to enable/disable the clock from twl6030...
+>
 
-OK, I will.
+Well, it's at least a nice minimal example of how to interface with the clk API.
 
-> Do you have an updated branch for v3.10 that I should base on?
+>> I looked into the early boot clock setup code, and that does look a lot less
+>> straightforward.
+>
+> Yes, this is what I thought for the twl6040 clock integration with McPDM. It
+> turned out a bit more complicated.
+> At boot time you do not have the twl clock driver loaded.
+> You have the clock tree already defined.
+> When you boot further you add the clock for twl6040.
 
-Yep, I've just pushed the old one rebased on top of 3.9-rc2.
+I can't see where exactly this is done, though.  I think I'm just
+going to have to
+poke around the clock trees for other platforms or something to see how it's
+normally done, but unfortunately my time to work on this is pretty limited too!
 
-git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.10/dts
+> You want to hook it up with the existing clock tree - to set it as parent of
+> one of the clock root (which you already modified to not to be the root clock).
+> I shall work, but it does not:
+> for external chips we need to do the configuration/enable in clk_prepare time
+> (because they are over i2c).
+> So the driver goes and asks for a clock (which supposed to be at the end
+> rooted to this new external clock).
+> Nothing happens.
+> The relevant clock tree has been already got prepared earlier so new prepare
+> will not going to go down to the root, leaving the root clock disabled.
+>
+> I'm still looking a way to somehow fix this, but my time is limited right now.
 
+Is it possible to do static config on the clocks to create the basic
+structure during
+the early boot phase, and then add the dynamic control functions to
+the structure
+later after i2c has been set up?  See below for more details, but TWL6030 is the
+parent of all 32k clocks on the board, it just enables some of them by
+default when
+it's powered on.  Seems like that should be reflected in the early set
+up structure.
 
-Regards,
-Benoit
+>> There are already a few 32k clocks listed there, and
+>> I *think* they
+>> all source from the twl6040; do they just come up automatically at power-on?
+>> From what I can tell, clk32kg is just a gated fork of the regular 32k
+>> clock that is
+>> available at boot from twl6040.  I am surprised it doesn't come on by default.
+>
+> I have not checked the schematics, but it could be that we have crystal 32K on
+> board as well. TWL6030 can gate some of it's 32K outputs and this is the case
+> with WiLink on PandaBoard.
+
+There is a crystal 32k; it's connected directly to TWL6030 via OSC32KIN and
+OSC32KOUT.  There are also 3 gated outputs:
+  * CLK32K_AUD  <- this goes to TWL6040 as the CLK32K input of its PLL block
+  * CLK32K_MAIN  <- this goes to OMAP4430's SYS32K input
+  * CLK32K_GATE  <- this is goes to WL172x chip's SLOW_CLK input
+
+And those are all the 32k clocks on the board.  No one gets a 32k clock except
+through TWL6030, though I guess there may be some internal 32k clock gating
+inside the OMAP. The question in the back of my mind is why CLK32K_AUD and
+CLK32K_MAIN are enabled by default in the power modes we use but
+CLK32K_GATE is not.  Or... maybe it is and we are specifically disabling it
+somewhere?
+
+>> I also don't have a TRM for twl6040 that matches up with what twl-regulator.c is
+>> doing to enable the clk32kg output; it looks like it's adding it to
+>> one of the power
+>> modes, but I'm not entirely sure how the registers it's writing to work, so my
+>> confidence level in being able to get it transplanted to a separate
+>> driver has lowered
+>> quite a bit.
+>
+> I'm not sure if I have twl6030 TRM either, but I can try to come up with a
+> basic driver for the twl6030 clocks.
+
+I actually found a TRM for it on google, but the register addresses in
+the code don't
+seem to match up with what's documented in the TRM I have.  Wouldn't
+be the first
+time that external docs didn't list all the registers....
+
+---
+
+     --Levi
