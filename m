@@ -1,55 +1,28 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Wed, 13 Mar 2013 10:20:03 +0800
-Subject: [PATCH v2 01/14] clocksource: move sp timer driver
-In-Reply-To: <201303121811.50968.arnd@arndb.de>
-References: <1363108124-17484-1-git-send-email-haojian.zhuang@linaro.org>
- <1363108124-17484-2-git-send-email-haojian.zhuang@linaro.org>
- <201303121811.50968.arnd@arndb.de>
-Message-ID: <CAD6h2NSJLNh6=AFWhdmmdK73_4RLNzrsJLag06h78FfJr0bgPQ@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 13 Mar 2013 10:21:16 +0800
+Subject: [PATCH v4 0/2] Uncompress debug for multiplatform
+In-Reply-To: <513F72A4.8020309@wwwdotorg.org>
+References: <1363001737-8745-1-git-send-email-shawn.guo@linaro.org>
+ <20130311170350.GM4977@n2100.arm.linux.org.uk>
+ <513E149A.2060704@wwwdotorg.org>
+ <20130312040242.GF25910@S2101-09.ap.freescale.net>
+ <513F72A4.8020309@wwwdotorg.org>
+Message-ID: <20130313022115.GE27461@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 March 2013 02:11, Arnd Bergmann <arnd@arndb.de> wrote:
-> Hi Haojian,
->
-> The patch looks good in principle, but I have two comments:
->
-> On Tuesday 12 March 2013, Haojian Zhuang wrote:
->> Move ARM SP804 timer driver from arch/arm directory into
->> drivers/clocksource directory.
->
-> The patch description should always explain why we do it, not
-> what is being done in here. Something like "all clocksource
-> drivers should get moved there, and this is needed for integrating
-> into the clocksource_of infrastructure.
-> '
->>  arch/arm/Kconfig                          |    5 -
->>  arch/arm/common/Makefile                  |    1 -
->>  arch/arm/common/timer-sp.c                |  191 -----------------------------
->>  arch/arm/include/asm/hardware/arm_timer.h |   35 ------
->>  arch/arm/include/asm/hardware/timer-sp.h  |   15 ---
->>  arch/arm/mach-highbank/highbank.c         |    4 +-
->>  arch/arm/mach-integrator/integrator_ap.c  |    2 +-
->>  arch/arm/mach-integrator/integrator_cp.c  |    4 +-
->>  arch/arm/mach-realview/core.c             |    4 +-
->>  arch/arm/mach-versatile/core.c            |    4 +-
->>  arch/arm/mach-vexpress/ct-ca9x4.c         |    5 +-
->>  arch/arm/mach-vexpress/v2m.c              |    4 +-
->>  drivers/clocksource/Kconfig               |    5 +
->>  drivers/clocksource/Makefile              |    1 +
->>  drivers/clocksource/timer-sp.c            |  191 +++++++++++++++++++++++++++++
->>  include/clocksource/arm_timer.h           |   35 ++++++
->>  include/clocksource/timer-sp.h            |   19 +++
->
-> Please use 'git format-patch -M' to generate the patches. I just
-> realized I forgot it myself in the spear series.
->
-> I have now set 'git config diff.renames true' and would recommend to
-> everybody to do the same.
->
->         Arnd
+On Tue, Mar 12, 2013 at 12:23:32PM -0600, Stephen Warren wrote:
+> > Yeah, that's why I did not touch Tegra as the series is based on
+> > v3.9-rc1 where Tegra hasn't been part of multi-platform yet.
+> > 
+> > But I just noticed that debug-macro.S for Tegra has been renamed to
+> > debug/tegra.S, and we already know it will be broken when multi-platform
+> > is enabled together with this series for Tegra.
+> 
+> Was that because the code touches .data? Perhaps I can get away with
+> using some hard-coded IRAM location or something.
 
-This configuration is so good. Thanks a lot.
+Even worse.  It has the reference to tegra_uart_config which will be
+unavailable in decompressor.
 
-Regards
-Haojian
+Shawn
