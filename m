@@ -1,7 +1,8 @@
 From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 13 Mar 2013 10:17:24 -0700
-Subject: [PATCH] ARM: dts: add usb 2.0 clock references to device tree
-Message-ID: <1363195044-15715-1-git-send-email-dianders@chromium.org>
+Date: Wed, 13 Mar 2013 10:18:18 -0700
+Subject: [PATCH] ARM: dts: add usb 2.0 clock references to exynos5250 device
+ tree
+Message-ID: <1363195099-15919-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
