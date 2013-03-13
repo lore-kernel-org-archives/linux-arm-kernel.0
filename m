@@ -1,105 +1,31 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 13 Mar 2013 11:29:43 +0100
-Subject: [PATCH 1/2] arm: at91: dt: at91sam9x5: add i2c pinctrl
-In-Reply-To: <20130313100735.GA9249@ludovic.desroches@atmel.com>
-References: <1363107286-25698-1-git-send-email-richard.genoud@gmail.com>
- <20130313100735.GA9249@ludovic.desroches@atmel.com>
-Message-ID: <51405517.2080702@atmel.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Wed, 13 Mar 2013 16:02:15 +0530
+Subject: PL330 interrupt handling
+In-Reply-To: <CAOcd1mo4ZQSzZ_RYPm__kVr1ygmvG3LYGmabrfb=MALvk0P=5w@mail.gmail.com>
+References: <CAOcd1mrL219kP-SLcjxQ2x79A-LvwxXjesv3G9Y=R+w5=Rjtsw@mail.gmail.com>
+ <CABb+yY1EqszSFhnbWve2yEpmcgMdofM5uFJSCe1b4he0-LnGQA@mail.gmail.com>
+ <CAOcd1mo4ZQSzZ_RYPm__kVr1ygmvG3LYGmabrfb=MALvk0P=5w@mail.gmail.com>
+Message-ID: <CABb+yY1ppU8wPn3V95tJYhB7ERqnzoAsXXJFSW7SeaMQhgy3tw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/13/2013 11:07 AM, Ludovic Desroches :
-> On Tue, Mar 12, 2013 at 05:54:45PM +0100, Richard Genoud wrote:
->> This adds the at19 i2c controller pin muxes for at91sam9x5 based boards.
->>
->> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
-> 
-> Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+On Wed, Mar 13, 2013 at 3:45 PM, Naveen Mamindlapalli
+<naveen.mamindlapalli@gmail.com> wrote:
+> Hi Jassi,
+>
+> Thanks for the reply.
+> I am not aware of the advantages with such configuration. Is there any
+> documentation (other than TRM) that explains about how to configure PL330,
+> especially interrupts?
+>
+Configuration is decided at design time of the controller. You can
+only read the configuration from the driver.
+For you, if pl330.c works with more than one dma client at a time,
+your h/w setup is same as others and you need not worry.
 
-queued to at91-3.10-dt branch.
-
-Thanks,
-
-
->> ---
->>  based on v3.9-rc2
->>
->>  arch/arm/boot/dts/at91sam9x5.dtsi |   30 ++++++++++++++++++++++++++++++
->>  1 files changed, 30 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
->> index aa98e64..8cbcff4 100644
->> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
->> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
->> @@ -319,6 +319,30 @@
->>  					};
->>  				};
->>  
->> +				i2c0 {
->> +					pinctrl_i2c0: i2c0-0 {
->> +						atmel,pins =
->> +							<0 30 0x1 0x0	/* PA30 periph A I2C0 data */
->> +							 0 31 0x1 0x0>;	/* PA31 periph A I2C0 clock */
->> +					};
->> +				};
->> +
->> +				i2c1 {
->> +					pinctrl_i2c1: i2c1-0 {
->> +						atmel,pins =
->> +							<2 0 0x3 0x0	/* PC0 periph C I2C1 data */
->> +							 2 1 0x3 0x0>;	/* PC1 periph C I2C1 clock */
->> +					};
->> +				};
->> +
->> +				i2c2 {
->> +					pinctrl_i2c2: i2c2-0 {
->> +						atmel,pins =
->> +							<1 4 0x2 0x0	/* PB4 periph B I2C2 data */
->> +							 1 5 0x2 0x0>;	/* PB5 periph B I2C2 clock */
->> +					};
->> +				};
->> +
->>  				pioA: gpio at fffff400 {
->>  					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
->>  					reg = <0xfffff400 0x200>;
->> @@ -447,6 +471,8 @@
->>  				interrupts = <9 4 6>;
->>  				#address-cells = <1>;
->>  				#size-cells = <0>;
->> +				pinctrl-names = "default";
->> +				pinctrl-0 = <&pinctrl_i2c0>;
->>  				status = "disabled";
->>  			};
->>  
->> @@ -456,6 +482,8 @@
->>  				interrupts = <10 4 6>;
->>  				#address-cells = <1>;
->>  				#size-cells = <0>;
->> +				pinctrl-names = "default";
->> +				pinctrl-0 = <&pinctrl_i2c1>;
->>  				status = "disabled";
->>  			};
->>  
->> @@ -465,6 +493,8 @@
->>  				interrupts = <11 4 6>;
->>  				#address-cells = <1>;
->>  				#size-cells = <0>;
->> +				pinctrl-names = "default";
->> +				pinctrl-0 = <&pinctrl_i2c2>;
->>  				status = "disabled";
->>  			};
->>  
->> -- 
->> 1.7.2.5
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> 
-
-
--- 
-Nicolas Ferre
+> I have one more question regarding alignment:
+> It seems to me that this driver doesn't take care of source/destination
+> address alignment restrictions. Is this the application driver
+> responsibility to handle the alignment issues?
+>
+Yes.
