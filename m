@@ -1,45 +1,114 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Wed, 13 Mar 2013 08:57:04 +0800
-Subject: [PATCH v1] ARM: keep __my_cpu_offset consistent with generic one
-In-Reply-To: <20130312172505.GA25266@htj.dyndns.org>
-References: <1362663356-21151-1-git-send-email-tom.leiming@gmail.com>
- <CACVXFVOhr222CVrzkVP_oLgVkdReD9BXXSBg7fmp6Wvx9_peCw@mail.gmail.com>
- <20130312105638.GQ4977@n2100.arm.linux.org.uk>
- <CACVXFVOEvvFT805TJHoppqGRLTRuP18=Wg72LSXryffZD_WH1A@mail.gmail.com>
- <20130312113048.GS4977@n2100.arm.linux.org.uk>
- <CACVXFVP4NeZBg5yZW8q+vhgs0m3knkkdvyjv_hc9BLrFPqEBJA@mail.gmail.com>
- <20130312172505.GA25266@htj.dyndns.org>
-Message-ID: <CACVXFVNNzgMFQ_G7HeF39S7Pz42qsM+0rZaTCSy76y+sXUREUA@mail.gmail.com>
+From: darrick.wong@oracle.com (Darrick J. Wong)
+Date: Tue, 12 Mar 2013 18:10:20 -0700
+Subject: [PATCH] bounce:fix bug, avoid to flush dcache on slab page from
+ jbd2.
+In-Reply-To: <20130312153221.0d26fe5599d4885e51bb0c7c@linux-foundation.org>
+References: <5139DB90.5090302@gmail.com>
+ <20130312153221.0d26fe5599d4885e51bb0c7c@linux-foundation.org>
+Message-ID: <20130313011020.GA5313@blackbox.djwong.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 13, 2013 at 1:25 AM, Tejun Heo <tj@kernel.org> wrote:
-> Hello,
->
-> On Tue, Mar 12, 2013 at 07:44:55PM +0800, Ming Lei wrote:
->> On Tue, Mar 12, 2013 at 7:30 PM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> >>
->> >> Ingo and Peter, what is your opinion on the problem?
->> >
->> > Having discussed this with Ben Herrenschmidt, it seems that we do need
->> > to have a more complex patch to sort this out - we need to setup our
->> > private pointer inside setup_per_cpu_areas().
->>
->> Suppose so, seems the patch is still needed to make CPU0 see
->> static variables in '.data..percpu' section correctly.
->
-> If my memory serves me right, x86 also has places where CPU0 accesses
-> its per-cpu data in .data.percpu.  While those existed (not sure
-> they're still there but probably they're) mostly due to historical
-> reasons rather than by design, as long as the data is in consistent
-> state by and during percpu setup, nothing will break.
+On Tue, Mar 12, 2013 at 03:32:21PM -0700, Andrew Morton wrote:
+> On Fri, 08 Mar 2013 20:37:36 +0800 Shuge <shugelinux@gmail.com> wrote:
+> 
+> > The bounce accept slab pages from jbd2, and flush dcache on them.
+> > When enabling VM_DEBUG, it will tigger VM_BUG_ON in page_mapping().
+> > So, check PageSlab to avoid it in __blk_queue_bounce().
+> > 
+> > Bug URL: http://lkml.org/lkml/2013/3/7/56
+> > 
+> > ...
+> >
+> > --- a/mm/bounce.c
+> > +++ b/mm/bounce.c
+> > @@ -214,7 +214,8 @@ static void __blk_queue_bounce(struct request_queue 
+> > *q, struct bio **bio_orig,
+> >   		if (rw == WRITE) {
+> >   			char *vto, *vfrom;
+> >   -			flush_dcache_page(from->bv_page);
+> > +			if (unlikely(!PageSlab(from->bv_page)))
+> > +				flush_dcache_page(from->bv_page);
+> >   			vto = page_address(to->bv_page) + to->bv_offset;
+> >   			vfrom = kmap(from->bv_page) + from->bv_offset;
+> >   			memcpy(vto, vfrom, to->bv_len);
+> 
+> I guess this is triggered by Catalin's f1a0c4aa0937975b ("arm64: Cache
+> maintenance routines"), which added a page_mapping() call to arm64's
+> arch/arm64/mm/flush.c:flush_dcache_page().
+> 
+> What's happening is that jbd2 is using kmalloc() to allocate buffer_head
+> data.  That gets submitted down the BIO layer and __blk_queue_bounce()
+> calls flush_dcache_page() which in the arm64 case calls page_mapping()
+> and page_mapping() does VM_BUG_ON(PageSlab) and splat.
+> 
+> The unusual thing about all of this is that the payload for some disk
+> IO is coming from kmalloc, rather than being a user page.  It's oddball
+> but we've done this for ages and should continue to support it.
+> 
+> 
+> Now, the page from kmalloc() cannot be in highmem, so why did the
+> bounce code decide to bounce it?
+> 
+> __blk_queue_bounce() does
+> 
+> 		/*
+> 		 * is destination page below bounce pfn?
+> 		 */
+> 		if (page_to_pfn(page) <= queue_bounce_pfn(q) && !force)
+> 			continue;
+> 
+> and `force' comes from must_snapshot_stable_pages().  But
+> must_snapshot_stable_pages() must have returned false, because if it
+> had returned true then it would have been must_snapshot_stable_pages()
+> which went BUG, because must_snapshot_stable_pages() calls page_mapping().
+> 
+> So my tentative diagosis is that arm64 is fishy.  A page which was
+> allocated via jbd2_alloc(GFP_NOFS)->kmem_cache_alloc() ended up being
+> above arm64's queue_bounce_pfn().  Can you please do a bit of
+> investigation to work out if this is what is happening?  Find out why
+> __blk_queue_bounce() decided to bounce a page which shouldn't have been
+> bounced?
 
-Tejun, thanks for your input, yes, nothing will break.  For lockdep,
-the percpu variables in non-boot-CPUs may be initialized again after
-percpu area is set up.
+That sure is strange.  I didn't see any obvious reasons why we'd end up with a
+kmalloc above queue_bounce_pfn().  But then I don't have any arm64s either.
 
+> This is all terribly fragile :( afaict if someone sets
+> bdi_cap_stable_pages_required() against that jbd2 queue, we're going to
+> hit that BUG_ON() again, via must_snapshot_stable_pages()'s
+> page_mapping() call.  (Darrick, this means you ;))
 
-Thanks,
--- 
-Ming Lei
+Wheeee.  You're right, we shouldn't be calling page_mapping on slab pages.
+We can keep walking the bio segments to find a non-slab page that can tell us
+MS_SNAP_STABLE is set, since we probably won't need the bounce buffer anyway.
+
+How does something like this look?  (+ the patch above)
+
+--D
+
+Subject: [PATCH] mm: Don't blow up on slab pages being written to disk
+
+Don't assume that all pages attached to a bio are non-slab pages.  This happens
+if (for example) jbd2 allocates a buffer out of the slab to hold frozen data.
+If we encounter a slab page, just ignore the page and keep searching.
+Hopefully filesystems are smart enough to guarantee that slab pages won't
+be dirtied while they're also being written to disk.
+
+Signed-off-by: Darrick J. Wong <darrick.wong@oracle.com>
+---
+ mm/bounce.c |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/mm/bounce.c b/mm/bounce.c
+index 5f89017..af34855 100644
+--- a/mm/bounce.c
++++ b/mm/bounce.c
+@@ -199,6 +199,8 @@ static int must_snapshot_stable_pages(struct request_queue *q, struct bio *bio)
+ 	 */
+ 	bio_for_each_segment(from, bio, i) {
+ 		page = from->bv_page;
++		if (PageSlab(page))
++			continue;
+ 		mapping = page_mapping(page);
+ 		if (!mapping)
+ 			continue;
