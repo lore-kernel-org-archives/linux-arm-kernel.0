@@ -1,41 +1,46 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Wed, 13 Mar 2013 12:08:53 +0800
-Subject: [PATCH v2 08/14] clk: hs: add clock support
-In-Reply-To: <201303121900.19441.arnd@arndb.de>
-References: <1363108124-17484-1-git-send-email-haojian.zhuang@linaro.org>
- <1363108124-17484-9-git-send-email-haojian.zhuang@linaro.org>
- <201303121900.19441.arnd@arndb.de>
-Message-ID: <CAD6h2NS0b+DJ6VKGiXGSbGf0tUzBoDso6L20rmCuJ8askRurjA@mail.gmail.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Tue, 12 Mar 2013 21:11:38 -0700
+Subject: [PATCH] bounce:fix bug, avoid to flush dcache on slab page from
+ jbd2.
+In-Reply-To: <513FF3F3.2000509@gmail.com>
+References: <5139DB90.5090302@gmail.com>
+ <20130312153221.0d26fe5599d4885e51bb0c7c@linux-foundation.org>
+ <20130313011020.GA5313@blackbox.djwong.org>
+ <513FF3F3.2000509@gmail.com>
+Message-ID: <20130312211138.a2824b7e.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 March 2013 03:00, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 12 March 2013, Haojian Zhuang wrote:
->> +void __init hs_init_clocks(void)
->> +{
->> +       struct device_node *node;
->> +
->> +       /* map pmctrl registers */
->> +       node = of_find_compatible_node(NULL, NULL, "hisilicon,pmctrl");
->> +       hs_clk.pmctrl = of_iomap(node, 0);
->> +       WARN_ON(!hs_clk.pmctrl);
->> +
->> +       node = of_find_compatible_node(NULL, NULL, "hisilicon,sctrl");
->> +       hs_clk.sctrl = of_iomap(node, 0);
->> +
->> +       of_clk_init(hs_clk_match);
->> +}
->
-> You should be able to just use CLK_OF_DECLARE() with each member of
-> hs_clk_match[] now and call of_clk_init(NULL) from platform code.
->
-> This requires moving the of_iomap() calls somewhere else, but it
-> could be a function that gets called by whichever setup function
-> gets run first.
->
->         Arnd
+On Wed, 13 Mar 2013 11:35:15 +0800 Shuge <shugelinux@gmail.com> wrote:
 
-Yes, it's better. I'll update it.
+> Hi all
+> >>> The bounce accept slab pages from jbd2, and flush dcache on them.
+> >>> When enabling VM_DEBUG, it will tigger VM_BUG_ON in page_mapping().
+> >>> So, check PageSlab to avoid it in __blk_queue_bounce().
+> >>>
+> >>> Bug URL: http://lkml.org/lkml/2013/3/7/56
+> >>>
+> >>> ...
+> >>>
+> >> ......
+> >>
+> > That sure is strange.  I didn't see any obvious reasons why we'd end up with a
+> >
+> ......
+> 
+>      Well, this problem not only appear in arm64, but also arm32. And my 
+> kernel version is 3.3.0, arch is arm32.
+> Following the newest kernel, the problem shoulde be exist.
+>      I agree with Darrick's modification. Hum, if 
+> CONFIG_NEED_BOUNCE_POOL is not set, it also flush dcahce on
+> the pages of b_frozen_data, some of them are allocated by kmem_cache_alloc.
+>      As we know, jbd2_alloc allocate a buffer from jbd2_xk slab pool, 
+> when the size is smaller than PAGE_SIZE.
+> The b_frozen_data  is not mapped to usrspace, not aliasing cache. It cat 
+> be lazy flush or other. Is it right?
 
-Regards
-Haojian
+Please reread my email.  The page at b_frozen_data was allocated with
+GFP_NOFS.  Hence it should not need bounce treatment (if arm is
+anything like x86).
+
+And yet it *did* receive bounce treatment.  Why?
