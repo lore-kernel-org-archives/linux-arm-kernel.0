@@ -1,34 +1,33 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 12 Mar 2013 22:14:10 -0600
-Subject: [PATCH V2 9/9] ARM: dts: tegra: add the PM configurations of PMC
-In-Reply-To: <1363142623.3998.33.camel@jlo-ubuntu-64.nvidia.com>
-References: <1363061043-9680-1-git-send-email-josephl@nvidia.com>
- <97395805.p014F9TUYL@fb07-iapwap2.physik.uni-giessen.de>
- <1363142623.3998.33.camel@jlo-ubuntu-64.nvidia.com>
-Message-ID: <513FFD12.8050007@wwwdotorg.org>
+Date: Tue, 12 Mar 2013 22:28:54 -0600
+Subject: [RFC PATCH] ARM: bcm2835: convert to multi-platform
+In-Reply-To: <20130313020732.GA27654@S2101-09.ap.freescale.net>
+References: <1363064399-19559-1-git-send-email-swarren@wwwdotorg.org>
+ <20130312080206.GI18574@S2101-09.ap.freescale.net>
+ <513F7254.1060301@wwwdotorg.org>
+ <20130313020732.GA27654@S2101-09.ap.freescale.net>
+Message-ID: <51400086.5090300@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/12/2013 08:43 PM, Joseph Lo wrote:
-> Hi Marc,
+On 03/12/2013 08:07 PM, Shawn Guo wrote:
+> On Tue, Mar 12, 2013 at 12:22:12PM -0600, Stephen Warren wrote:
+>>>> TO DO:
+>>>> * It'd be nice to restore uncompress.h. I need to take a look at Shawn
+>>>>   Guo's patches related to this, and presumably rebase this on top of
+>>>>   them.
+>>>
+>>> You do not need to restore uncompress.h, and from what I've seen,
+>>> with my patches in place, uncompress debug will probably just work
+>>> on BCM2835 out of box (you need to have DEBUG_LL selected for BCM2835).
+>>
+>> Should the usual "Uncompressing kernel" message show up automatically
+>> then? I don't think it did, which is why I mentioned that "TO DO". I
+>> almost always run with DEBUG_LL enabled and earlyprintk in the kernel
+>> command-line, but I should double-check I didn't accidentally drop it
+>> when testing this patch.
 > 
-> On Tue, 2013-03-12 at 18:43 +0800, Marc Dietrich wrote:
->> Am Dienstag, 12. M?rz 2013, 12:04:03 schrieb Joseph Lo:
->>> Adding the PM configuration of PMC when the platform support suspend
->>> function.
+> Yes, if you have both DEBUG_LL and DEBUG_BCM2835 set, I would expect
+> you can see "Uncompressing kernel" message.
 
->>> +		nvidia,core-pwr-good-time = <3845 3845>;
->>
->> mmh, no idea here. original source [1] shows 0x7e7e ticks which translates to 
->> 1 sec?
->>
-> The ticks was based on the 32KHz clock domain. I translate it to uS.
-
->>> 0x7e7e * (1.0/32000) * 1000000
-1011937.4999999999
-
-Oh, I suppose perhaps the 0x7e7e value is both values packed together,
-so this should be:
-
->>> 0x7e * (1.0/32000) * 1000000
-3937.5
+Ah yes. I just tried it again, and it does work perfectly. Thanks.
