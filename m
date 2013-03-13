@@ -1,74 +1,56 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Thu, 14 Mar 2013 00:16:34 +0100
-Subject: [PATCH 6/7] ARM: SAMSUNG: use clk_prepare_enable in samsung-time
-In-Reply-To: <CADTbHxq-gxoN9HKkjPsZ5uBt7PhrvO8XdQdmAyscOA+xPy9Z7A@mail.gmail.com>
-References: <201303120141.31262.heiko@sntech.de>
- <201303120145.21072.heiko@sntech.de>
- <CADTbHxq-gxoN9HKkjPsZ5uBt7PhrvO8XdQdmAyscOA+xPy9Z7A@mail.gmail.com>
-Message-ID: <201303140016.35152.heiko@sntech.de>
+From: john.stultz@linaro.org (John Stultz)
+Date: Wed, 13 Mar 2013 16:29:56 -0700
+Subject: [PATCH V7 1/2] ARM: bcm281xx: Add timer driver (driver portion)
+In-Reply-To: <1363210048-3334-1-git-send-email-csd@broadcom.com>
+References: <1363210048-3334-1-git-send-email-csd@broadcom.com>
+Message-ID: <51410BF4.4040400@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 03/13/2013 02:27 PM, Christian Daudt wrote:
+> This adds support for the Broadcom timer, used in the following SoCs:
+> BCM11130, BCM11140, BCM11351, BCM28145, BCM28155
+[snip]
+> Signed-off-by: Christian Daudt <csd@broadcom.com>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Acked-by: John Stultz <john.stultz@linaro.org>
+> Reviewed-by: Stephen Warren <swarren@nvidia.com>
 
-Am Mittwoch, 13. M?rz 2013, 17:59:04 schrieb Pankaj Jangra:
-> Hi,
-> 
-> On Tue, Mar 12, 2013 at 6:15 AM, Heiko St?bner <heiko@sntech.de> wrote:
-> > The common clock framework expects clocks to be prepared
-> > before they are enabled.
-> > 
-> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > ---
-> > 
-> >  arch/arm/plat-samsung/samsung-time.c |    6 +++---
-> >  1 files changed, 3 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/arch/arm/plat-samsung/samsung-time.c
-> > b/arch/arm/plat-samsung/samsung-time.c index f899cbc..6ebb851 100644
-> > --- a/arch/arm/plat-samsung/samsung-time.c
-> > +++ b/arch/arm/plat-samsung/samsung-time.c
-> > @@ -355,7 +355,7 @@ static void __init samsung_timer_resources(void)
-> > 
-> >         if (IS_ERR(timerclk))
-> >         
-> >                 panic("failed to get timers clock for timer");
-> 
-> Also how about calling the clk_prepare_enable() only if the clk_get()
-> call is a sucess? Though clk framework will take care of it. Just
-> thinking even to avoid that call if clk_get() fails since you are
-> modifying the code.
+Hey Olof,
+     So Christian mentioned you were hoping I'd pull these in through my 
+tree, but I'd really rather these go via the arch-soc tree, since that 
+is more likely where they will be tested and more intelligently reviewed.
 
-I remember there was a discussion about panic vc error handling when this was 
-introduced but I don't remember the specifics, but it seems they agreed to do 
-it this way with letting the kernel panic when the clock is missing.
+I've mentioned before my distaste for the drivers/clocksource directory 
+becoming a dumping ground for arch specific (for the most part arm) 
+clocksource, and more recently clockevent, drivers. I initially wanted 
+the drivers/clocksource directory to be only for cross-arch 
+clocksources, and I fear we'll end up with something like the 
+drivers/rtc directory where its not entirely clear what hardware you 
+actually need for a given driver (might as well be rtc-<sha1>.c ;).
 
+That said, I realize I've been overruled on this. :)
 
-Also the current plan seems to replace the clocksource and pwm drivers that 
-occupy the same register space with a driver handling both, making the pwm 
-specific clocks obsolete and only the timers clock will remain. So this was 
-merely meant as a fixup when using the clock changes with the current 
-clocksource code.
+But I'd really rather the patch flow for arch specific clocksource and 
+clockevent drivers go through the arch tree, since there's a better 
+chance folks will be building and testing against other arch specific 
+changes that might cause problems. There's just no way for me to be able 
+to intelligently review these sorts of changes.
 
+Now, if there are changes to the clocksource core code, then I 
+definitely want to be in the path there. Additionally meta-drivers like 
+mmio, I should probably be more involved with, so they can be more 
+properly integrated into the clocksource core. Also for drivers that are 
+actually arch shared (ie: things like hpet/acpi_pm where ia64 and x86 
+share them).
 
-> > -       clk_enable(timerclk);
-> > +       clk_prepare_enable(timerclk);
-> > 
-> >         sprintf(devname, "s3c24xx-pwm.%lu", event_id);
-> >         s3c_device_timer[event_id].id = event_id;
-> > 
-> > @@ -369,7 +369,7 @@ static void __init samsung_timer_resources(void)
-> > 
-> >         if (IS_ERR(tdiv_event))
-> >         
-> >                 panic("failed to get pwm-tdiv clock for event timer");
-> 
-> Same here...
-> 
-> > -       clk_enable(tin_event);
-> > +       clk_prepare_enable(tin_event);
-> > 
-> >         sprintf(devname, "s3c24xx-pwm.%lu", source_id);
-> 
-> Regards,
-> Pankaj Jangra
+But if its arch specific for hardware I don't have, I'd really prefer 
+the arch maintainer be the upstream path.
+
+Thomas: Am I being too obstinate here?  If not, should we drop "F:      
+drivers/clocksource" from the MAINTAINERS entry?
+
+Christian: Sorry for the confusion on all this!
+
+thanks
+-john
