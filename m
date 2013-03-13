@@ -1,78 +1,126 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Wed, 13 Mar 2013 15:09:33 +0800
-Subject: [PATCH v2 05/14] ARM: integrator: use clocksource_of_init for
- sp804
-In-Reply-To: <CACRpkdbCJd-ag1gLrJqJZ1D6+E5eX2tNuuNAtiKgtuBsxmrpmA@mail.gmail.com>
-References: <1363108124-17484-1-git-send-email-haojian.zhuang@linaro.org>
- <1363108124-17484-6-git-send-email-haojian.zhuang@linaro.org>
- <513F7EBD.80207@gmail.com> <201303121933.47994.arnd@arndb.de>
- <513F9597.8050000@gmail.com>
- <CAD6h2NTNFZM4cgDmCJG+NrNbd27MdXGGsRCTpC1bJGeMAgcP-g@mail.gmail.com>
- <CACRpkdbCJd-ag1gLrJqJZ1D6+E5eX2tNuuNAtiKgtuBsxmrpmA@mail.gmail.com>
-Message-ID: <CAD6h2NRDJuGTTZ1B0iy__2SYYw7R18NRqQcwjsSvMJ3gA4E_WQ@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 13 Mar 2013 16:30:09 +0900
+Subject: [PATCH v3 2/3] ARM: dts: Add i2c-arbitrator bus for
+ exynos5250-snow
+In-Reply-To: <CAHfPSqAtxjYV79VvQZDLtzfyRxkYoMEc4=S2fN=KRNtYOEQ7ig@mail.gmail.com>
+References: <1360887677-20758-1-git-send-email-dianders@chromium.org>
+ <1360957573-864-1-git-send-email-dianders@chromium.org>
+ <1360957573-864-2-git-send-email-dianders@chromium.org>
+ <CAHfPSqAtxjYV79VvQZDLtzfyRxkYoMEc4=S2fN=KRNtYOEQ7ig@mail.gmail.com>
+Message-ID: <096801ce1fbc$979d1550$c6d73ff0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 March 2013 14:41, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Wed, Mar 13, 2013 at 3:04 AM, Haojian Zhuang
-> <haojian.zhuang@linaro.org> wrote:
->> On 13 March 2013 04:52, Rob Herring <robherring2@gmail.com> wrote:
->>> On 03/12/2013 02:33 PM, Arnd Bergmann wrote:
->>>> On Tuesday 12 March 2013, Rob Herring wrote:
->>>>> On 03/12/2013 12:08 PM, Haojian Zhuang wrote:
->>>
->>> Since the primecell ID registers are defined to be at 0xFF? offset, it
->>> is quite impossible for the integrator timers to have the ID registers
->>> within their 0x100 address space.
->>>
->> I'm sorry that I don't know this. I can add "arm,integrator-timer" into
->> compatible table of sp804 driver. I think that we could resolve this
->> issue. What's your opinion?
->
-> As per the other discussion:
->
-> The Integrator/AP has a timer which is different from the SP804.
->
-> The Integrator/CP has an SP804.
->
-> Please restrict the patch set to Integrator/CP.
->
-> Yours,
-> Linus Walleij
+Naveen Krishna Ch wrote:
+> On 16 February 2013 04:46, Doug Anderson <dianders@chromium.org> wrote:
+> > We need to use the i2c-arbitrator to talk to any of the devices on i2c
+> > bus 4 on exynos5250-snow so that we don't confuse the embedded
+> > controller (EC).  Add the i2c-arbitrator to the device tree.  As we
+> > add future devices (keyboard, sbs, tps65090) we'll add them on top of
+> > this.
+> >
+> > The arbitrated bus is numbered 104 simply as a convenience to make it
+> > easier for people poking around to guess that it might have something
+> > to do with the physical bus 4.
+> >
+> > The addition is split between the cros5250-common and the snow device
+> > tree file since not all cros5250-class devices use arbitration.
+> >
+> > Signed-off-by: Doug Anderson <dianders@chromium.org>
+> Tested-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+> The patch set [v3] is tested on snow with test case which uses i2c-4 from both
+> EC and AP side continuously for a more than a couple of minutes.
+> 
+Thanks for your test and looks good to me.
 
-According to Rob's comment, I thought that only prime-cell ID registers
-are not contained in integrator-timer controller.
+BTW, Doug, I think, this should be re-worked to use pinctrl. Can you?
 
-Yes, I missed to include lookup to handle integrator-ap timer. I think that
-we can use a string name that are binded to different compatible name.
-Code is in below.
+Thanks.
 
-#define SP804_TIMER       0
-#define INTEGRATOR_TIMER     1
-#define ID_BUF_SIZE         16
+- Kukjin
 
-match table:
-{.compatible = "arm,sp804", .data = SP804_TIMER, },
-{.compaitlbe = "arm,integrator-timer", .data = INTEGRATOR_TIMER, },
-
-sp804_get_clock_rate():
-    char dev_id_buf[ID_BUF_SIZE];
-    if (match->data)
-        snprintf(dev_id_buf, ID_BUF_SIZE, "ap_timer");
-    else
-        snprintf(dev_id_buf, ID_BUF_SIZE, "sp804");
-    clk = clk_get_sys(dev_id_buf, name);
-
-sp804_dt_init_clk():
-    char dev_id_buf[ID_BUF_SIZE];
-    if (match->data)
-        snprintf(dev_id_buf, ID_BUF_SIZE, "ap_timer");
-    else
-        snprintf(dev_id_buf, ID_BUF_SIZE, "sp804");
-    lookup = clkdev_alloc(clk, name, dev_id_buf);
-
-I think it won't break out code any more. Since most code are same, we
-could handle it in the same driver.
-
-Regards
-Haojian
+> > ---
+> > Changes in v3: None
+> > Changes in v2:
+> > - Use new device tree property names / compatible string.
+> > - Include that the GPIOs for arbitration are active low.
+> >
+> >  arch/arm/boot/dts/cros5250-common.dtsi |  5 ++++-
+> >  arch/arm/boot/dts/exynos5250-snow.dts  | 25 +++++++++++++++++++++++++
+> >  2 files changed, 29 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/arch/arm/boot/dts/cros5250-common.dtsi
+> b/arch/arm/boot/dts/cros5250-common.dtsi
+> > index 46c0980..f451375 100644
+> > --- a/arch/arm/boot/dts/cros5250-common.dtsi
+> > +++ b/arch/arm/boot/dts/cros5250-common.dtsi
+> > @@ -58,7 +58,10 @@
+> >         };
+> >
+> >         i2c at 12CA0000 {
+> > -               status = "disabled";
+> > +               samsung,i2c-sda-delay = <100>;
+> > +               samsung,i2c-max-bus-freq = <66000>;
+> > +               gpios = <&gpa2 0 3 3 0>,
+> > +                       <&gpa2 1 3 3 0>;
+> >         };
+> >
+> >         i2c at 12CB0000 {
+> > diff --git a/arch/arm/boot/dts/exynos5250-snow.dts
+> b/arch/arm/boot/dts/exynos5250-snow.dts
+> > index 17dd951..d2d4b48 100644
+> > --- a/arch/arm/boot/dts/exynos5250-snow.dts
+> > +++ b/arch/arm/boot/dts/exynos5250-snow.dts
+> > @@ -16,6 +16,10 @@
+> >         model = "Google Snow";
+> >         compatible = "google,snow", "samsung,exynos5250";
+> >
+> > +       aliases {
+> > +               i2c104 = &i2c_104;
+> > +       };
+> > +
+> >         gpio-keys {
+> >                 compatible = "gpio-keys";
+> >
+> > @@ -29,6 +33,27 @@
+> >                 };
+> >         };
+> >
+> > +       i2c-arbitrator {
+> > +               compatible = "i2c-arbitrator-cros-ec";
+> > +               #address-cells = <1>;
+> > +               #size-cells = <0>;
+> > +
+> > +               i2c-parent = <&{/i2c@12CA0000}>;
+> > +
+> > +               ap-claim-gpio = <&gpf0 3 1 0x10000 0>;
+> > +               ec-claim-gpio = <&gpe0 4 0 0x10003 0>;
+> > +               slew-delay-us = <10>;
+> > +               wait-retry-us = <3000>;
+> > +               wait-free-us = <50000>;
+> > +
+> > +               /* Use ID 104 as a hint that we're on physical bus 4 */
+> > +               i2c_104: i2c at 0 {
+> > +                       reg = <0>;
+> > +                       #address-cells = <1>;
+> > +                       #size-cells = <0>;
+> > +               };
+> > +       };
+> > +
+> >         /*
+> >          * On Snow we've got SIP WiFi and so can keep drive strengths low to
+> >          * reduce EMI.
+> > --
+> > 1.8.1
+> >
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > Please read the FAQ at  http://www.tux.org/lkml/
+> 
+> 
+> 
+> --
+> Shine bright,
+> (: Nav :)
