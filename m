@@ -1,26 +1,45 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 12 Mar 2013 20:41:19 -0300
-Subject: [PATCH 2/2] ARM: imx_v6_v7_defconfig: Select CONFIG_W1_MASTER_MXC
-In-Reply-To: <20130312232410.GA29152@kroah.com>
-References: <1363043896-16140-1-git-send-email-festevam@gmail.com>
- <1363043896-16140-2-git-send-email-festevam@gmail.com>
- <20130312232410.GA29152@kroah.com>
-Message-ID: <CAOMZO5Dv4Oyy7qxQ5eeiwwWOhAv5WbfEp2NcAgvWsykMQar8cA@mail.gmail.com>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Wed, 13 Mar 2013 08:57:04 +0800
+Subject: [PATCH v1] ARM: keep __my_cpu_offset consistent with generic one
+In-Reply-To: <20130312172505.GA25266@htj.dyndns.org>
+References: <1362663356-21151-1-git-send-email-tom.leiming@gmail.com>
+ <CACVXFVOhr222CVrzkVP_oLgVkdReD9BXXSBg7fmp6Wvx9_peCw@mail.gmail.com>
+ <20130312105638.GQ4977@n2100.arm.linux.org.uk>
+ <CACVXFVOEvvFT805TJHoppqGRLTRuP18=Wg72LSXryffZD_WH1A@mail.gmail.com>
+ <20130312113048.GS4977@n2100.arm.linux.org.uk>
+ <CACVXFVP4NeZBg5yZW8q+vhgs0m3knkkdvyjv_hc9BLrFPqEBJA@mail.gmail.com>
+ <20130312172505.GA25266@htj.dyndns.org>
+Message-ID: <CACVXFVNNzgMFQ_G7HeF39S7Pz42qsM+0rZaTCSy76y+sXUREUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
-
-On Tue, Mar 12, 2013 at 8:24 PM, Greg KH <gregkh@linuxfoundation.org> wrote:
-> On Mon, Mar 11, 2013 at 08:18:16PM -0300, Fabio Estevam wrote:
->> From: Fabio Estevam <fabio.estevam@freescale.com>
+On Wed, Mar 13, 2013 at 1:25 AM, Tejun Heo <tj@kernel.org> wrote:
+> Hello,
+>
+> On Tue, Mar 12, 2013 at 07:44:55PM +0800, Ming Lei wrote:
+>> On Tue, Mar 12, 2013 at 7:30 PM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> >>
+>> >> Ingo and Peter, what is your opinion on the problem?
+>> >
+>> > Having discussed this with Ben Herrenschmidt, it seems that we do need
+>> > to have a more complex patch to sort this out - we need to setup our
+>> > private pointer inside setup_per_cpu_areas().
 >>
->> Select CONFIG_W1_MASTER_MXC.
+>> Suppose so, seems the patch is still needed to make CPU0 see
+>> static variables in '.data..percpu' section correctly.
 >
-> Why?  Don't tell me what you did, that's obvious, it's the story that is
-> needed.
->
-> dropped from my queue.
+> If my memory serves me right, x86 also has places where CPU0 accesses
+> its per-cpu data in .data.percpu.  While those existed (not sure
+> they're still there but probably they're) mostly due to historical
+> reasons rather than by design, as long as the data is in consistent
+> state by and during percpu setup, nothing will break.
 
-Ok, I will improve the commit log and re-submit it to linux-arm-kernel
-list, so that it can go via arm tree and avoid any conflict.
+Tejun, thanks for your input, yes, nothing will break.  For lockdep,
+the percpu variables in non-boot-CPUs may be initialized again after
+percpu area is set up.
+
+
+Thanks,
+-- 
+Ming Lei
