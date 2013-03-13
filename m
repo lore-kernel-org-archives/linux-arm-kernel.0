@@ -1,45 +1,47 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 13 Mar 2013 15:49:08 +0000
-Subject: [PATCH v3 03/11] clocksource: sp804: add device tree support
-In-Reply-To: <CAD6h2NQa-RhR555o_1_RYPuPb4366H_AwK1U9S3pRVPdo_xNNg@mail.gmail.com>
-References: <1363151142-32162-1-git-send-email-haojian.zhuang@linaro.org>
- <1363151142-32162-4-git-send-email-haojian.zhuang@linaro.org>
- <1363172730.3100.17.camel@hornet>	<51408A71.9090501@gmail.com>
- <1363185757.3100.66.camel@hornet>	<51409276.8050601@gmail.com>
- <1363186548.3100.75.camel@hornet>
- <CAD6h2NTP+X6RVr23Y-XLrQMqHptH974oYooTX=Y6F_Q4hyrmNA@mail.gmail.com>
- <1363188238.3100.95.camel@hornet>
- <CAD6h2NR+SC4cN5cBzHUNBfDQ1=x8Rbn3C4AizNyy562iMjyU6A@mail.gmail.com>
- <1363188595.3100.101.camel@hornet>
- <CAD6h2NQa-RhR555o_1_RYPuPb4366H_AwK1U9S3pRVPdo_xNNg@mail.gmail.com>
-Message-ID: <1363189748.3100.108.camel@hornet>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Wed, 13 Mar 2013 10:50:55 -0500
+Subject: [PATCH V3 1/2] ARM: dts: OMAP2+: Add SDMA controller bindings
+ and nodes
+In-Reply-To: <51409CD3.10301@ti.com>
+References: <1361903244-19837-1-git-send-email-jon-hunter@ti.com>
+ <1361903244-19837-2-git-send-email-jon-hunter@ti.com>
+ <513F0AE3.6030408@ti.com> <513FA19C.60904@ti.com> <51409CD3.10301@ti.com>
+Message-ID: <5140A05F.60108@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-03-13 at 15:42 +0000, Haojian Zhuang wrote:
-> In my current implementation, I need two things to judge whether
-> irq is really necessary.
+
+On 03/13/2013 10:35 AM, Benoit Cousson wrote:
+> Salut Jon,
 > 
-> If the timer contains "arm,sp804-clockevent = <evtoffs>" property,
-> I'll check whether the timer irq is specified at the same time.
+> On 03/12/2013 10:43 PM, Jon Hunter wrote:
+>> Salut Benoit!
+>>
+>> On 03/12/2013 06:00 AM, Benoit Cousson wrote:
+>>> + Seb G.
+>>>
+>>> Hi Jon,
+>>>
+>>> How to you plan to merge that series?
+>>
+>> Good question ... my thinking was that you or Tony would take 1/2 and
+>> once that is queued then I would ask Tony to ack 2/2 and Vinod take that
+>> patch.
 > 
-> TIMINT1 & TIMINTC are not routed. TIMINT2 is used for clock event.
+> Yep, this is what I was thinking too.
+> 
+>> By the way, I have accumulated several DT patches which I sent out
+>> altogether [1] (at least for my own sanity if no one elses ;-) and I
+>> have included the below patch with it. I was hoping that may be I could
+>> create a branch for you to pull. If you would rather cherry-pick the
+>> various patches and merge yourself then I can separate them too.
+> 
+> Merging your branch is indeed even better for me. So go ahead.
 
-Fine, so simply reverse the logic and drop the "arm,sp804-clock*"
-properties. Something like:
+Ok. Care to take a quick review to see if there is anything else you
+feel needs fixing before I re-submit fixing the commments posted so far?
 
-if (has_timint1) {
-	evtoffs = TIMER_1_BASE;
-	irq = irq_of_parse_and_map(np, 1);
-	srcoffs = TIMER_2_BASE;
-} else (has_timint2) {
-	evtoffs = TIMER_2_BASE;
-	irq = irq_of_parse_and_map(np, 2);
-	srcoffs = TIMER_1_BASE;
-} else {
-	can't be clockevent, sorry
-}
+Do you have an updated branch for v3.10 that I should base on?
 
-Hope it makes clear what I'd expect from the driver.
-
-Pawe?
+Cheers
+Jon
