@@ -1,61 +1,165 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 13 Mar 2013 11:52:57 -0600
-Subject: [PATCH 2/3] ARM: tegra: refactor the pmc_pm_set function
-In-Reply-To: <1363163246-26368-2-git-send-email-josephl@nvidia.com>
-References: <1363163246-26368-1-git-send-email-josephl@nvidia.com>
- <1363163246-26368-2-git-send-email-josephl@nvidia.com>
-Message-ID: <5140BCF9.2070900@wwwdotorg.org>
+From: martinez.javier@gmail.com (Javier Martinez Canillas)
+Date: Wed, 13 Mar 2013 18:58:52 +0100
+Subject: [PATCH] arm: dts: Add uart1 and uart2 to igep boards.
+In-Reply-To: <5140AC2C.50309@ti.com>
+References: <1355326422-12357-1-git-send-email-matthias.bgg@gmail.com>
+ <50C8AC3C.9020908@ti.com>
+ <CABuKBeJsHCq98Pe-BwPajbQ+2OLQpwrbtVTJe=j9thPDQCCBrg@mail.gmail.com>
+ <CAAwP0s01Jxh0f-T0sd5D980dZPcEV0J1KzjPbNHkrXLaKA3YUg@mail.gmail.com>
+ <CABuKBeJsg_P=aDr0s9iVOD+7YTNoVUFQJCJymJyJ7NqXHUBzKQ@mail.gmail.com>
+ <511E0807.8000200@ti.com>
+ <CAAwP0s3bs=uqCRPgQiXQUnHq-6L61ayrP0WrXdJrNxNuGfmV0A@mail.gmail.com>
+ <5140AC2C.50309@ti.com>
+Message-ID: <CAAwP0s03GeDed-95w0e6vmOBfLsoHMkTmOLdVcmNS6GJ7k94-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/13/2013 02:27 AM, Joseph Lo wrote:
-> The pmc_pm_set function was designed for SoC to configure the related
-> settings when system going to some low power modes (e.g. platform
-> suspend or CPU idle powered-down mode). We refactor the function to make
-> it work on the usage.
+On Wed, Mar 13, 2013 at 5:41 PM, Benoit Cousson <b-cousson@ti.com> wrote:
+> Hi Javier,
+>
+> On 03/02/2013 02:52 AM, Javier Martinez Canillas wrote:
+>> On Fri, Feb 15, 2013 at 11:03 AM, Cousson, Benoit <b-cousson@ti.com> wrote:
+>>> Hi Matthias,
+>>>
+>>>
+>>> On 2/15/2013 10:35 AM, Matthias Brugger wrote:
+>>>>
+>>>> 2013/1/26 Javier Martinez Canillas <martinez.javier@gmail.com>:
+>>>>>
+>>>>> On Sat, Jan 26, 2013 at 4:16 PM, Matthias Brugger
+>>>>> <matthias.bgg@gmail.com>
+>>>>> wrote:
+>>>>>>
+>>>>>> Hi Benoit,
+>>>>>>
+>>>>>> 2012/12/12 Benoit Cousson <b-cousson@ti.com>:
+>>>>>>>
+>>>>>>> Hi Matthias,
+>>>>>>>
+>>>>>>> On 12/12/2012 04:33 PM, Matthias Brugger wrote:
+>>>>>>>>
+>>>>>>>> This patch is a follow-up patch for Javier Martinez effort adding
+>>>>>>>> initial
+>>>>>>>> device tree support to IGEP technology devices. [1]
+>>>>>>>>
+>>>>>>>> It adds uart1 and uart2 bindings to the generic dtsi for the IGEP
+>>>>>>>> boards.
+>>>>>>>>
+>>>>>>>> [1] http://www.spinics.net/lists/linux-omap/msg83409.html
+>>>>>>>>
+>>>>>>>> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+>>>>>>>> ---
+>>>>>>>>   arch/arm/boot/dts/omap3-igep.dtsi |   24 ++++++++++++++++++++++++
+>>>>>>>>   1 file changed, 24 insertions(+)
+>>>>>>>>
+>>>>>>>> diff --git a/arch/arm/boot/dts/omap3-igep.dtsi
+>>>>>>>> b/arch/arm/boot/dts/omap3-igep.dtsi
+>>>>>>>> index 125fe00..c02e3c0 100644
+>>>>>>>> --- a/arch/arm/boot/dts/omap3-igep.dtsi
+>>>>>>>> +++ b/arch/arm/boot/dts/omap3-igep.dtsi
+>>>>>>>> @@ -27,6 +27,20 @@
+>>>>>>>>   };
+>>>>>>>>
+>>>>>>>>   &omap3_pmx_core {
+>>>>>>>> +     uart1_pins: pinmux_uart1_pins {
+>>>>>>>> +             pinctrl-single,pins = <
+>>>>>>>> +                     0x152 0x100     /* uart1_rx.uart1_rx INPUT |
+>>>>>>>> MODE0
+>>>>>>>> */
+>>>>>>>> +                     0x14c 0         /* uart1_tx.uart1_tx OUTPUT |
+>>>>>>>> MODE0 */
+>>>>>>>> +             >;
+>>>>>>>> +     };
+>>>>>>>> +
+>>>>>>>> +     uart2_pins: pinmux_uart2_pins {
+>>>>>>>> +             pinctrl-single,pins = <
+>>>>>>>> +                     0x14a 0x100     /* uart2_rx.uart2_rx INPUT |
+>>>>>>>> MODE0
+>>>>>>>> */
+>>>>>>>> +                     0x148 0         /* uart2_tx.uart2_tx OUTPUT |
+>>>>>>>> MODE0 */
+>>>>>>>> +             >;
+>>>>>>>> +     };
+>>>>>>>> +
+>>>>>>>>        uart3_pins: pinmux_uart3_pins {
+>>>>>>>>                pinctrl-single,pins = <
+>>>>>>>>                        0x16e 0x100     /* uart3_rx.uart3_rx INPUT |
+>>>>>>>> MODE0
+>>>>>>>> */
+>>>>>>>> @@ -77,6 +91,16 @@
+>>>>>>>>        status = "disabled";
+>>>>>>>>   };
+>>>>>>>>
+>>>>>>>> +&uart1 {
+>>>>>>>> +       pinctrl-names = "default";
+>>>>>>>> +       pinctrl-0 = <&uart1_pins>;
+>>>>>>>> +};
+>>>>>>>> +
+>>>>>>>> +&uart2 {
+>>>>>>>> +       pinctrl-names = "default";
+>>>>>>>> +       pinctrl-0 = <&uart2_pins>;
+>>>>>>>> +};
+>>>>>>>> +
+>>>>>>>>   &uart3 {
+>>>>>>>>          pinctrl-names = "default";
+>>>>>>>>          pinctrl-0 = <&uart3_pins>;
+>>>>>>>>
+>>>>>>>
+>>>>>>> That looks good to me. I'll apply it on top of javier's series for 3.9.
+>>>>>>
+>>>>>>
+>>>>>> Can you pin-point me to the repository where this patches are in right
+>>>>>> now? I tried to figure it out these days, but didn't found where to
+>>>>>> clone the repository from.
+>>>>>>
+>>>>>> Thanks,
+>>>>>> Matthias
+>>>>>>
+>>>>>
+>>>>> Hi Matthias,
+>>>>>
+>>>>> OMAP DT tree is:
+>>>>> git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git
+>>>>
+>>>>
+>>>> Hi all,
+>>>>
+>>>> unfortunately I can't find the patch in this tree.
+>>>
+>>>
+>>> Sorry about that. I've never pushed the latest branch, and was busy the past
+>>> month. I'll refresh the branch with all the pending patches.
+>>>
+>>> Regards,
+>>> Benoit
+>>>
+>>
+>> Hi Benoit,
+>>
+>> I realized that your for_3.9/dts branch has not landed in mainline yet
+>> and we are near to the end of the merge window.
+>>
+>> Are you still planing to include those changes for 3.9 or are you
+>> going to wait until the next release?
+>
+> I'm really sorry about that. I was not available to push it at the proper time.
+>
 
-> diff --git a/arch/arm/mach-tegra/pmc.c b/arch/arm/mach-tegra/pmc.c
+No worries, it was just a gentle remainder :-)
 
-> +#include <linux/clk-provider.h>
+> I've just rebased it on 3.9-rc2 and pushed it to a new branch.
+> git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.10/dts
+>
+> It includes the one from Matthias and yours as well. I'm still checking my inbox to catch up on the new ones I missed.
+>
+> I'm planning to push this ASAP to avoid missing the deadline again.
+>
 
-This code isn't a clock-provider, and hence shouldn't include that
-header file.
+Great, thanks a lot for the information
 
-> +void tegra_pmc_pm_set(enum tegra_suspend_mode mode)
+>
+> Regards,
+> Benoit
 
-> +	switch (mode) {
-> +	case TEGRA_SUSPEND_LP2:
-> +		rate = __clk_get_rate(tegra_pclk);
-
-Doesn't regular clk_get_rate() work here?
-
-> @@ -234,6 +229,9 @@ void tegra_pmc_suspend_init(void)
->  {
->  	u32 reg;
->  
-> +	tegra_pclk = clk_get_sys(NULL, "pclk");
-> +	WARN_ON(IS_ERR(tegra_pclk));
-
-Shouldn't this instead error out and/or disable any system suspend
-modes? Otherwise, tegra_pmc_pm_set() is going to call
-clk_get_rate(tegra_pclk), and tegra_pclk won't be a valid clock object.
-
-Also, can you use regular clk_get() rather than clk_get_sys()? That'd
-need a clocks property in the PMC DT node.
-
-I guess I see now that this series does actually depend on the suspend
-series. However, stuff like:
-
-> -u32 tegra_pmc_get_cpu_good_time(void)
-> -{
-> -	return pmc_pm_data.cpu_good_time;
-> -}
-> -
-> -u32 tegra_pmc_get_cpu_off_time(void)
-> -{
-> -	return pmc_pm_data.cpu_off_time;
-> -}
-
-... was actually added in that series, so if you put this series first,
-or merged the two series with these patches first, you could end up
-avoiding some churn.
+Best regards,
+Javier
