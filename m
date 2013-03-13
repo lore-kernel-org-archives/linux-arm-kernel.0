@@ -1,70 +1,70 @@
-From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Wed, 13 Mar 2013 16:37:16 +0100
-Subject: [PATCH] ARM: mach-moxart: platform port for MOXA ART SoC
-In-Reply-To: <CACmBeS01vs=fHOXu1Lnq8GX8YAbF6aBKmqopKPVt78mPYm=_9w@mail.gmail.com>
-References: <CACmBeS1NLFUYHBOVL28aCCzRrgXYGPZF9t3qj6AdcgaMkrPGoQ@mail.gmail.com>
- <CACmBeS01vs=fHOXu1Lnq8GX8YAbF6aBKmqopKPVt78mPYm=_9w@mail.gmail.com>
-Message-ID: <CACmBeS05cyT8N9nZeqbJUPMSGeZYLWjL0Tu1GSZ-ms+Hjc0UoQ@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 13 Mar 2013 10:39:41 -0500
+Subject: [PATCH v3 03/11] clocksource: sp804: add device tree support
+In-Reply-To: <1363188595.3100.101.camel@hornet>
+References: <1363151142-32162-1-git-send-email-haojian.zhuang@linaro.org>
+ <1363151142-32162-4-git-send-email-haojian.zhuang@linaro.org>
+ <1363172730.3100.17.camel@hornet>	<51408A71.9090501@gmail.com>
+ <1363185757.3100.66.camel@hornet>	<51409276.8050601@gmail.com>
+ <1363186548.3100.75.camel@hornet>
+ <CAD6h2NTP+X6RVr23Y-XLrQMqHptH974oYooTX=Y6F_Q4hyrmNA@mail.gmail.com>
+ <1363188238.3100.95.camel@hornet>
+ <CAD6h2NR+SC4cN5cBzHUNBfDQ1=x8Rbn3C4AizNyy562iMjyU6A@mail.gmail.com>
+ <1363188595.3100.101.camel@hornet>
+Message-ID: <51409DBD.5080209@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 03/13/2013 10:29 AM, Pawel Moll wrote:
+> On Wed, 2013-03-13 at 15:25 +0000, Haojian Zhuang wrote:
+>> On 13 March 2013 23:23, Pawel Moll <pawel.moll@arm.com> wrote:
+>>> On Wed, 2013-03-13 at 14:17 +0000, Rob Herring wrote:
+>>>> How about:
+>>>>
+>>>> 1 irq - TIMINT1
+>>>> 2 irqs w/ same source # - TIMINTC
+>>>> 2 irqs w/ different source # - TIMINT1 and TIMINT2
+>>>
+>>> On Wed, 2013-03-13 at 15:11 +0000, Haojian Zhuang wrote:
+>>>> What's the scenario that we must use TIMINTC? TIMINT1 & TIMINT2 are
+>>>> already enough on these two TIMERs. If we really needn't TIMINTC, we
+>>>> need to support it. Since it's over-designed.
+>>>>
+>>>> If TIMINT1 & TIMINT2 aren't routed, and only TIMINTC is routed. It's another
+>>>> case. We can consider it as replacement of TIMINT1.
+>>>
+>>> Just a thought... How to describe a SP804 with only TIMINT2 wired up?
+>>>
+>>> Pawe?
+>>>
+>>>
+>> There's no difference on TIMINTC is only used to replace TIMINT1 or TIMINT2.
+>> We only need to tell sp804 driver which timer is using irq, and the irq number.
+> 
+> If I understand you well:
+> 
+> * Both TIMINT1 and TIMINT2 wired up - TIMINTC doesn't matter
+> 
+> 	interrupts = <1>, <2>;
+> 
+> * TIMINT1 wired up, TIMINT2 not wired up
+> 
+> 	interrupts = <1>;
+> 
+> * Only TIMINTC wired up - treat it as TIMINT1
+> 
+> 	interrupts = <1>;
+> 
+> So far so good. My question is, how do you describe the following:
+> 
+> * _Only_ TIMINT2 wired up, TIMINT1 and TIMINTC _not_ wired up
+> 
+> 	interrupts = ???
 
-I ask for feedback and to submit (if possible) a new ARM SoC platform
-port. This is now near complete (I think) (tested on UC-7112-LX Plus)
-and applies to 2.6.34.14.
+I previously described that to add a property in that case. That makes
+INT1 and INT2 only handling asymetric though. An alternative would be an
+optional property "arm,sp804-has-irq = <#>" in the case of only INT1 or
+INT2 connected. The combined irq would be a single irq without the
+"arm,sp804-has-irq" property and both connected would be 2 irqs.
 
-The patch contains the following drivers and platform specific implementations:
-
-* ARCH_MOXART (FA526 processor)
-* 100Hz interrupt timer
-* UART
-* MTD map driver
-* Ethernet driver (RTL8201CP)
-* MMC driver
-* MOXA Smartio/Industio family multiport serial driver
-* RTC driver
-* Watchdog driver
-* GPIO driver
-
-Predicted patch rejects below (in need of a solution, feedback is much
-appreciated) because they are critical in areas of boot, MMC and TTY.
-
-arch/arm/boot/compressed/head.S:
-A valid (and unique) architecture ID is not loaded to r1. Looks like
-the bootloader is broken, it should be doing this!
-http://gicl.cs.drexel.edu/people/sevy/linux/ARM_Linux_boot_sequence.html
-
-arch/arm/tools/mach-types:
-Omitted (do not edit manually / add a new machine using
-http://www.arm.linux.org.uk/developer/machines/?action=new). A fix to
-this and above is not feasible as long as MOXA withholds bootloader
-sources (requested without success).
-
-drivers/char/mxser.c drivers/char/mxser.h: MOXA
-SMARTIO/INDUSTIO/INTELLIO SERIAL CARD (Ji?? Slab?):
-Force board setup for CONFIG_ARCH_MOXART.
-ASYNCB_CLOSING is avoided because of a lockup (infinite wait after
-tty_wait_until_sent). Why this happens is unknown (to me) I'm hoping
-someone (Ji???) can shed light. SysRq trace @ http://ideone.com/e845mr
-What significance does ASYNCB_CLOSING have?
-Obviously, automatic detection is better but "mxser_read_register" is
-pointless on this hardware. What to do instead? Is it better to make a
-copy and submit a new driver?
-
-drivers/mmc/core/sd.c:
-The MMC controller is "special"? "UNSTUFF_BITS" is redefined here
-http://repo.or.cz/w/linux-2.6.19-moxart.git/blob/50cdf2c57662f9f69c5615976412f76bfd73311a:/drivers/mmc/mmc.c
-. Without the new macro it'll report the wrong geometry and prod_name.
-I'm thinking a driver should never have to redefine UNSTUFF_BITS.
-Possible workaround: modify bits (in driver) to line up as expected
-before returning the response (mmc_request_done).
-
-
-For reference, this is my previous post from a few months back:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2012-December/137130.html
-
-Gitweb: http://repo.or.cz/w/linux-2.6.34.14-moxart.git/commitdiff/?h=3bc2e98ebb92961e1c5992736186920cd070f4ee&hp=b7f1d43323eceb02fd663a71eb2f8be9c17e6740
-
-Download link (size: 193K):
-https://linux-2-6-34-14-moxart.googlecode.com/files/linux-2.6.34.14-moxart.patch
+Rob
