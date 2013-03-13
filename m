@@ -1,39 +1,36 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 13 Mar 2013 07:41:00 +0100
-Subject: [PATCH v2 05/14] ARM: integrator: use clocksource_of_init for
- sp804
-In-Reply-To: <CAD6h2NTNFZM4cgDmCJG+NrNbd27MdXGGsRCTpC1bJGeMAgcP-g@mail.gmail.com>
-References: <1363108124-17484-1-git-send-email-haojian.zhuang@linaro.org>
- <1363108124-17484-6-git-send-email-haojian.zhuang@linaro.org>
- <513F7EBD.80207@gmail.com> <201303121933.47994.arnd@arndb.de>
- <513F9597.8050000@gmail.com>
- <CAD6h2NTNFZM4cgDmCJG+NrNbd27MdXGGsRCTpC1bJGeMAgcP-g@mail.gmail.com>
-Message-ID: <CACRpkdbCJd-ag1gLrJqJZ1D6+E5eX2tNuuNAtiKgtuBsxmrpmA@mail.gmail.com>
+From: girishks2000@gmail.com (Girish K S)
+Date: Wed, 13 Mar 2013 12:13:29 +0530
+Subject: [PATCH V3 0/5] Add polling support for 64xx spi controller
+Message-ID: <1363157014-9615-1-git-send-email-ks.giri@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 13, 2013 at 3:04 AM, Haojian Zhuang
-<haojian.zhuang@linaro.org> wrote:
-> On 13 March 2013 04:52, Rob Herring <robherring2@gmail.com> wrote:
->> On 03/12/2013 02:33 PM, Arnd Bergmann wrote:
->>> On Tuesday 12 March 2013, Rob Herring wrote:
->>>> On 03/12/2013 12:08 PM, Haojian Zhuang wrote:
->>
->> Since the primecell ID registers are defined to be at 0xFF? offset, it
->> is quite impossible for the integrator timers to have the ID registers
->> within their 0x100 address space.
->>
-> I'm sorry that I don't know this. I can add "arm,integrator-timer" into
-> compatible table of sp804 driver. I think that we could resolve this
-> issue. What's your opinion?
+[PATCH 1/5]: fixes the error handling in the interrupt handler
+[PATCH 2/5]: The existing driver support partial polling mode.
+	     This patch modifies the current driver to support
+	     only polling mode.
+[PATCH 3/5]: provision to support SoC's with dedicated i/o pins
+[PATCH 4/5]: provision to support dedicated cs pin
+[PATCH 5/5]: support exynos5440 SoC in polling mode
 
-As per the other discussion:
+Tested this patch on exynos5250 in dma mode, and exynos5440 in
+polling mode.
 
-The Integrator/AP has a timer which is different from the SP804.
+changes in v3: 
+	    Rebase it to the linus's master branch. After rebase
+there was a logical code change due to the merge of generic dma
+patch. resolved the merge conflicts and tested for the functionality
+	
+Girish K S (5):
+  spi: s3c64xx: modified error interrupt handling and init
+  spi: s3c64xx: added support for polling mode
+  spi: s3c64xx: Added provision for non-gpio i/o's
+  spi: s3c64xx: Added provision for dedicated cs pin
+  spi: s3c64xx: Added support for exynos5440 spi
 
-The Integrator/CP has an SP804.
+ drivers/spi/spi-s3c64xx.c                 | 204 +++++++++++++++++++++---------
+ include/linux/platform_data/spi-s3c64xx.h |   3 +
+ 2 files changed, 148 insertions(+), 59 deletions(-)
 
-Please restrict the patch set to Integrator/CP.
-
-Yours,
-Linus Walleij
+-- 
+1.8.0
