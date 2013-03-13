@@ -1,112 +1,49 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Tue, 12 Mar 2013 22:24:26 -0500
-Subject: [PATCHv3 10/14] mailbox: add no_irq send message
-Message-ID: <1363145066-14681-1-git-send-email-s-anna@ti.com>
+Date: Tue, 12 Mar 2013 22:24:28 -0500
+Subject: [PATCHv3 12/14] mailbox/omap: check iomem resource before
+ dereferencing it
+Message-ID: <1363145068-14752-1-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Loic Pallardy <loic.pallardy@st.com>
+Add a NULL check for iomem resource in mailbox probe functions.
 
-For debug purpose, mailbox must be available when
-interrupts are disabled to collect dump information.
-
-Signed-off-by: Loic Pallardy <loic.pallardy@st.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Fernando Guzman Lugo <lugo.fernando@gmail.com>
+Signed-off-by: Suman Anna <s-anna@ti.com>
 ---
- drivers/mailbox/mailbox.c | 66 +++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/mailbox.h   |  3 +++
- 2 files changed, 69 insertions(+)
+ drivers/mailbox/mailbox-omap1.c | 3 +++
+ drivers/mailbox/mailbox-omap2.c | 5 +++++
+ 2 files changed, 8 insertions(+)
 
-diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
-index 35813f5..eaaf87e 100644
---- a/drivers/mailbox/mailbox.c
-+++ b/drivers/mailbox/mailbox.c
-@@ -110,6 +110,72 @@ out:
- }
- EXPORT_SYMBOL(mailbox_msg_send);
+diff --git a/drivers/mailbox/mailbox-omap1.c b/drivers/mailbox/mailbox-omap1.c
+index 7b30157..4441872 100644
+--- a/drivers/mailbox/mailbox-omap1.c
++++ b/drivers/mailbox/mailbox-omap1.c
+@@ -179,6 +179,9 @@ static int omap1_mbox_probe(struct platform_device *pdev)
+ 	list[0]->irq = platform_get_irq_byname(pdev, "dsp");
  
-+#define TRANSFER_TIMEOUT 30000 /* Becomes ~3s timeout */
+ 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!mem)
++		return -ENOMEM;
 +
-+static struct mailbox_msg no_irq_msg_res;
-+
-+struct mailbox_msg *mailbox_msg_send_receive_no_irq(struct mailbox *mbox,
-+		struct mailbox_msg *msg)
-+{
-+	int ret = 0;
-+	int count = 0;
-+
-+	BUG_ON(!irqs_disabled());
-+
-+	if (likely(mbox->ops->write && mbox->ops->read)) {
-+		if (__mbox_poll_for_space(mbox)) {
-+			ret = -EBUSY;
-+			goto out;
-+		}
-+		mbox->ops->write(mbox, msg);
-+		while (!is_mbox_irq(mbox, IRQ_RX)) {
-+			udelay(100);
-+			cpu_relax();
-+			count++;
-+			if (count > TRANSFER_TIMEOUT) {
-+				pr_err("%s: Error: transfer timed out\n",
-+						__func__);
-+				ret = -EINVAL;
-+				goto out;
-+			}
-+		}
-+		mbox->ops->read(mbox, &no_irq_msg_res);
-+		ack_mbox_irq(mbox, IRQ_RX);
-+	} else {
-+		ret = -EINVAL;
+ 	mbox_base = ioremap(mem->start, resource_size(mem));
+ 	if (!mbox_base)
+ 		return -ENOMEM;
+diff --git a/drivers/mailbox/mailbox-omap2.c b/drivers/mailbox/mailbox-omap2.c
+index 72f8368..eed5a3d 100644
+--- a/drivers/mailbox/mailbox-omap2.c
++++ b/drivers/mailbox/mailbox-omap2.c
+@@ -296,6 +296,11 @@ static int omap2_mbox_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!mem) {
++		ret = -ENOMEM;
++		goto free_privblk;
 +	}
 +
-+out:
-+	BUG_ON(ret < 0);
-+
-+	return &no_irq_msg_res;
-+}
-+EXPORT_SYMBOL(mailbox_msg_send_receive_no_irq);
-+
-+int mailbox_msg_send_no_irq(struct mailbox *mbox,
-+		struct mailbox_msg *msg)
-+{
-+	int ret = 0;
-+
-+	BUG_ON(!irqs_disabled());
-+
-+	if (likely(mbox->ops->write)) {
-+		if (__mbox_poll_for_space(mbox)) {
-+			ret = -EBUSY;
-+			goto out;
-+		}
-+		mbox->ops->write(mbox, msg);
-+	} else {
-+		ret = -EINVAL;
-+	}
-+
-+out:
-+	WARN_ON(ret < 0);
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL(mailbox_msg_send_no_irq);
-+
- void mailbox_save_ctx(struct mailbox *mbox)
- {
- 	if (!mbox->ops->save_ctx) {
-diff --git a/include/linux/mailbox.h b/include/linux/mailbox.h
-index f8730b4..a41b67d 100644
---- a/include/linux/mailbox.h
-+++ b/include/linux/mailbox.h
-@@ -28,6 +28,9 @@ struct mailbox_msg {
- }
- 
- int mailbox_msg_send(struct mailbox *, struct mailbox_msg *msg);
-+struct mailbox_msg *mailbox_msg_send_receive_no_irq(struct mailbox *,
-+		struct mailbox_msg *msg);
-+int mailbox_msg_send_no_irq(struct mailbox *, struct mailbox_msg *msg);
- 
- struct mailbox *mailbox_get(const char *, struct notifier_block *nb);
- void mailbox_put(struct mailbox *mbox, struct notifier_block *nb);
+ 	mbox_base = ioremap(mem->start, resource_size(mem));
+ 	if (!mbox_base) {
+ 		ret = -ENOMEM;
 -- 
 1.8.1.2
