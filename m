@@ -1,101 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 13 Mar 2013 09:42:28 +0000
-Subject: [PATCH] bounce:fix bug, avoid to flush dcache on slab page
- from jbd2.
-In-Reply-To: <20130312211138.a2824b7e.akpm@linux-foundation.org>
-References: <5139DB90.5090302@gmail.com>
- <20130312153221.0d26fe5599d4885e51bb0c7c@linux-foundation.org>
- <20130313011020.GA5313@blackbox.djwong.org> <513FF3F3.2000509@gmail.com>
- <20130312211138.a2824b7e.akpm@linux-foundation.org>
-Message-ID: <20130313094228.GZ4977@n2100.arm.linux.org.uk>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Wed, 13 Mar 2013 15:17:49 +0530
+Subject: [PATCH 1/1] clk: Fix incorrect return type in clk.c
+Message-ID: <1363168069-11331-1-git-send-email-sachin.kamat@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 12, 2013 at 09:11:38PM -0700, Andrew Morton wrote:
-> Please reread my email.  The page at b_frozen_data was allocated with
-> GFP_NOFS.  Hence it should not need bounce treatment (if arm is
-> anything like x86).
-> 
-> And yet it *did* receive bounce treatment.  Why?
+Return type of function clk_propagate_rate_change is a pointer.
+But 0 was being returned. Change it to NULL.
+Silences the following warning:
+drivers/clk/clk.c:977:24: warning: Using plain integer as NULL pointer
 
-If I had to guess, it's because you've uncovered a bug in the utter crap
-that we call a "dma mask".
+Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+---
+ drivers/clk/clk.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-When is a mask not a mask?  When it is used as a numerical limit.  When
-is a mask really a mask?  When it indicates which bits are significant in
-a DMA address.
-
-The problem here is that there's a duality in the way the mask is used,
-and that is caused by memory on x86 always starting at physical address
-zero.  The problem is this:
-
-On ARM, we have some platforms which offset the start of physical memory.
-This offset can be significant - maybe 3GB.  However, only a limited
-amount of that memory may be DMA-able.  So, we may end up with the
-maximum physical address of DMA-able memory being 3GB + 64MB for example,
-or 0xc4000000, because the DMA controller only has 26 address lines.  So,
-this brings up the problem of whether we set the DMA mask to 0xc3ffffff
-or 0x03ffffff.
-
-There's places in the kernel which assume that DMA masks are a set of
-zero bits followed by a set of one bits, and nothing else does...
-
-Now, max_low_pfn is initialized this way:
-
-/**
- * init_bootmem - register boot memory
- * @start: pfn where the bitmap is to be placed
- * @pages: number of available physical pages
- *
- * Returns the number of bytes needed to hold the bitmap.
- */
-unsigned long __init init_bootmem(unsigned long start, unsigned long pages)
-{
-        max_low_pfn = pages;
-        min_low_pfn = start;
-        return init_bootmem_core(NODE_DATA(0)->bdata, start, 0, pages);
-}
-
-So, min_low_pfn is the PFN offset of the start of physical memory (so
-3GB >> PAGE_SHIFT) and max_low_pfn ends up being the number of pages,
-_not_ the maximum PFN value - if it were to be the maximum PFN value,
-then we end up with a _huge_ bootmem bitmap which may not even fit in
-the available memory we have.
-
-However, other places in the kernel treat max_low_pfn entirely
-differently:
-
-        blk_max_low_pfn = max_low_pfn - 1;
-
-void blk_queue_bounce_limit(struct request_queue *q, u64 dma_mask)
-{
-        unsigned long b_pfn = dma_mask >> PAGE_SHIFT;
-
-        if (b_pfn < blk_max_low_pfn)
-                dma = 1;
-        q->limits.bounce_pfn = b_pfn;
-
-And then we have stuff doing this:
-
-	page_to_pfn(bv->bv_page) > queue_bounce_pfn(q);
-                if (page_to_pfn(page) <= queue_bounce_pfn(q) && !force)
-                if (queue_bounce_pfn(q) >= blk_max_pfn && !must_bounce)
-
-So, "max_low_pfn" is totally and utterly confused in the kernel as to
-what it is, and it only really works on x86 (and other architectures)
-that start their memory at physical address 0 (because then it doesn't
-matter how you interpret it.)
-
-So the whole thing about "is a DMA mask a mask or a maximum address"
-is totally confused in the kernel in such a way that platforms like ARM
-get a very hard time, and what we now have in place has worked 100%
-fine for all the platforms we've had for the last 10+ years.
-
-It's a very longstanding bug in the kernel, going all the way back to
-2.2 days or so.
-
-What to do about it, I have no idea - changing to satisfy the "DMA mask
-is a maximum address" is likely to break things.  What we need is a
-proper fix, and a consistent way to interpret DMA masks which works not
-only on x86, but also on platforms which have limited DMA to memory
-which has huge physical offsets.
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index ed87b24..467b31f 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -974,7 +974,7 @@ static struct clk *clk_propagate_rate_change(struct clk *clk, unsigned long even
+ 	int ret = NOTIFY_DONE;
+ 
+ 	if (clk->rate == clk->new_rate)
+-		return 0;
++		return NULL;
+ 
+ 	if (clk->notifier_count) {
+ 		ret = __clk_notify(clk, event, clk->rate, clk->new_rate);
+-- 
+1.7.4.1
