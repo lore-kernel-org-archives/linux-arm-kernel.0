@@ -1,119 +1,61 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 13 Mar 2013 11:17:47 -0700
-Subject: [PATCHv3 01/10] clocksource: add generic dummy timer driver
+Date: Wed, 13 Mar 2013 11:17:48 -0700
+Subject: [PATCHv3 02/10] ARM: smp: Remove duplicate dummy timer implementation
 In-Reply-To: <1363198676-30417-1-git-send-email-sboyd@codeaurora.org>
 References: <1363198676-30417-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1363198676-30417-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1363198676-30417-3-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Rutland <mark.rutland@arm.com>
+Drop ARM's version of the dummy timer now that we have a generic
+implementation in drivers/clocksource.
 
-Several architectures have a dummy timer driver tightly coupled with
-their broadcast code to support machines without cpu-local timers (or
-where there is a lack of driver support).
-
-Since 12ad100046: "clockevents: Add generic timer broadcast function"
-it's been possible to write broadcast-capable timer drivers decoupled
-from the broadcast mechanism. We can use this functionality to implement
-a generic dummy timer driver that can be shared by all architectures
-with generic tick broadcast (ARCH_HAS_TICK_BROADCAST).
-
-This patch implements a generic dummy timer using this facility.
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: John Stultz <john.stultz@linaro.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-[sboyd: Make percpu data static and use __this_cpu_ptr()]
+Cc: Russell King <linux@arm.linux.org.uk>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/clocksource/Makefile      |  1 +
- drivers/clocksource/dummy_timer.c | 67 +++++++++++++++++++++++++++++++++++++++
- 2 files changed, 68 insertions(+)
- create mode 100644 drivers/clocksource/dummy_timer.c
+ arch/arm/kernel/smp.c | 22 ++--------------------
+ 1 file changed, 2 insertions(+), 20 deletions(-)
 
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index 4d8283a..655d718 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -22,3 +22,4 @@ obj-$(CONFIG_VT8500_TIMER)	+= vt8500_timer.o
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 31644f1..4de4d14 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -469,24 +469,6 @@ void tick_broadcast(const struct cpumask *mask)
+ }
+ #endif
  
- obj-$(CONFIG_ARM_ARCH_TIMER)		+= arm_arch_timer.o
- obj-$(CONFIG_CLKSRC_METAG_GENERIC)	+= metag_generic.o
-+obj-$(CONFIG_ARCH_HAS_TICK_BROADCAST)	+= dummy_timer.o
-diff --git a/drivers/clocksource/dummy_timer.c b/drivers/clocksource/dummy_timer.c
-new file mode 100644
-index 0000000..7e1ce45
---- /dev/null
-+++ b/drivers/clocksource/dummy_timer.c
-@@ -0,0 +1,67 @@
-+/*
-+ *  linux/drivers/clocksource/dummy_timer.c
-+ *
-+ *  Copyright (C) 2013 ARM Ltd.
-+ *  All Rights Reserved
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#include <linux/clockchips.h>
-+#include <linux/cpu.h>
-+#include <linux/init.h>
-+#include <linux/percpu.h>
-+
-+static DEFINE_PER_CPU(struct clock_event_device, dummy_timer_evt);
-+
-+static void dummy_timer_set_mode(enum clock_event_mode mode,
-+			   struct clock_event_device *evt)
-+{
-+	/*
-+	 * Core clockevents code will call this when exchanging timer devices.
-+	 * We don't need to do anything here.
-+	 */
-+}
-+
-+static void __cpuinit dummy_timer_setup(void)
-+{
-+	int cpu = smp_processor_id();
-+	struct clock_event_device *evt = __this_cpu_ptr(&dummy_timer_evt);
-+
-+	evt->name	= "dummy_timer";
-+	evt->features	= CLOCK_EVT_FEAT_PERIODIC |
-+			  CLOCK_EVT_FEAT_ONESHOT |
-+			  CLOCK_EVT_FEAT_DUMMY;
-+	evt->rating	= 100;
-+	evt->set_mode	= dummy_timer_set_mode;
-+	evt->cpumask	= cpumask_of(cpu);
-+
-+	clockevents_register_device(evt);
-+}
-+
-+static int __cpuinit dummy_timer_cpu_notify(struct notifier_block *self,
-+				      unsigned long action, void *hcpu)
-+{
-+	if ((action & ~CPU_TASKS_FROZEN) == CPU_STARTING)
-+		dummy_timer_setup();
-+
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block dummy_timer_cpu_nb __cpuinitdata = {
-+	.notifier_call = dummy_timer_cpu_notify,
-+};
-+
-+static int __init dummy_timer_register(void)
-+{
-+	int err = register_cpu_notifier(&dummy_timer_cpu_nb);
-+	if (err)
-+		return err;
-+
-+	/* We won't get a call on the boot CPU, so register immediately */
-+	dummy_timer_setup();
-+
-+	return 0;
-+}
-+device_initcall(dummy_timer_register);
+-static void broadcast_timer_set_mode(enum clock_event_mode mode,
+-	struct clock_event_device *evt)
+-{
+-}
+-
+-static void __cpuinit broadcast_timer_setup(struct clock_event_device *evt)
+-{
+-	evt->name	= "dummy_timer";
+-	evt->features	= CLOCK_EVT_FEAT_ONESHOT |
+-			  CLOCK_EVT_FEAT_PERIODIC |
+-			  CLOCK_EVT_FEAT_DUMMY;
+-	evt->rating	= 400;
+-	evt->mult	= 1;
+-	evt->set_mode	= broadcast_timer_set_mode;
+-
+-	clockevents_register_device(evt);
+-}
+-
+ static struct local_timer_ops *lt_ops;
+ 
+ #ifdef CONFIG_LOCAL_TIMERS
+@@ -510,8 +492,8 @@ static void __cpuinit percpu_timer_setup(void)
+ 
+ 	evt->cpumask = cpumask_of(cpu);
+ 
+-	if (!lt_ops || lt_ops->setup(evt))
+-		broadcast_timer_setup(evt);
++	if (lt_ops)
++		lt_ops->setup(evt);
+ }
+ 
+ #ifdef CONFIG_HOTPLUG_CPU
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
