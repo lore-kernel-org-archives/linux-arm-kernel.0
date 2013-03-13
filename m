@@ -1,76 +1,98 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Wed, 13 Mar 2013 11:25:57 +0800
-Subject: [PATCH v2 03/14] clocksource: sp804: append CONFIG_OF
-In-Reply-To: <201303121917.24928.arnd@arndb.de>
-References: <1363108124-17484-1-git-send-email-haojian.zhuang@linaro.org>
- <1363108124-17484-4-git-send-email-haojian.zhuang@linaro.org>
- <201303121917.24928.arnd@arndb.de>
-Message-ID: <CAD6h2NQHjP2YSv2=BAqTa+MaZKvSe6JPwmuhMLkJcjuaMtVtsA@mail.gmail.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Tue, 12 Mar 2013 22:23:50 -0500
+Subject: [PATCHv3 01/14] mailbox: rename pl320-ipc specific mailbox.h
+Message-ID: <1363145030-14373-1-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 March 2013 03:17, Arnd Bergmann <arnd@arndb.de> wrote:
-> (resending this email as I got a few rejects from mailing lists when
-> I accidentally had an invalid email address for Mike)
->
-> On Tuesday 12 March 2013, Haojian Zhuang wrote:
->> of_find_matching_node() & of_device_is_available() are depend on CONFIG_OF
->> macro. If CONFIG_OF isn't defined for non-DT mode, the build error
->> occurs.
->>
->> So add CONFIG_OF for those DT functions.
->
-> I don't like this patch too much:
->
-> We should be able to do this without the #ifdef. The problem is really that the
-> declarations are also hidden behind an #ifdef. I think we should change the
-> linux/of.h header file to either provide alternative empty inline functions
-> or at least leave the declarations visible so we can compile the code as
-> long as the call gets discarded.
->
->>
->> +#ifdef CONFIG_OF
->>  static struct device_node *from = NULL;
->>
->>  static struct of_device_id sp804_timer_match[] __initdata = {
->> @@ -294,3 +295,4 @@ err:
->>       iounmap(base);
->>  }
->>  CLOCKSOURCE_OF_DECLARE(sp804, "arm,sp804", sp804_dt_init);
->> +#endif
->
-> There is actually an empty definition for CLOCKSOURCE_OF_DECLARE(),
-> but I think it would be better to still define it the same way as
-> with CONFIG_OF enabled but attribute((__unused__)), like:
->
-> #ifdef CONFIG_CLKSRC_OF
-> extern void clocksource_of_init(void);
-> #define CLOCKSOURCE_OF_DECLARE(name, compat, fn)                        \
->         static const struct of_device_id __clksrc_of_table_##name       \
->                 __used __section(__clksrc_of_table)                     \
->                  = { .compatible = compat, .data = fn };
-> #else
-> static inline void clocksource_of_init(void) {}
-> #define CLOCKSOURCE_OF_DECLARE(name, compat, fn)                        \
->         static const struct of_device_id __clksrc_of_table_##name       \
->                 __unused = { .compatible = compat, .data = fn };
-> #endif
->
-> This way, all the code still gets built, but since there is nothing
-> pointing to __clksrc_of_table_##name and it is marked __unused, it
-> gets dropped along with all other symbols that are only referenced
-> from it.
->
->         Arnd
->
+The patch 30058677 "ARM / highbank: add support for pl320 IPC"
+added a pl320 IPC specific header file as a generic mailbox.h.
+This file has been renamed appropriately to allow the
+introduction of the generic mailbox API framework.
 
-If CONFIG_CLKSRC_OF is depend on CONFIG_USEOF, I think that
-we can resolve all these issue. We don't need to define
-CLOCKSOURCE_OF_DECLARE() for non-DT mode, and we also
-don't need to define of_device_is_available(), ... in non-DT mode.
+Signed-off-by: Suman Anna <s-anna@ti.com>
+Cc: Mark Langsdorf <mark.langsdorf@calxeda.com>
+Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+---
+ drivers/cpufreq/highbank-cpufreq.c |  2 +-
+ drivers/mailbox/pl320-ipc.c        |  2 +-
+ include/linux/mailbox.h            | 17 -----------------
+ include/linux/pl320-ipc.h          | 17 +++++++++++++++++
+ 4 files changed, 19 insertions(+), 19 deletions(-)
+ delete mode 100644 include/linux/mailbox.h
+ create mode 100644 include/linux/pl320-ipc.h
 
-We only need to add "depends on USE_OF" for CLKSRC_OF
-configuration. It's simpler. What's your opinion?
-
-Regards
-Haojian
+diff --git a/drivers/cpufreq/highbank-cpufreq.c b/drivers/cpufreq/highbank-cpufreq.c
+index b61b5a3..3118b87 100644
+--- a/drivers/cpufreq/highbank-cpufreq.c
++++ b/drivers/cpufreq/highbank-cpufreq.c
+@@ -19,7 +19,7 @@
+ #include <linux/cpu.h>
+ #include <linux/err.h>
+ #include <linux/of.h>
+-#include <linux/mailbox.h>
++#include <linux/pl320-ipc.h>
+ #include <linux/platform_device.h>
+ 
+ #define HB_CPUFREQ_CHANGE_NOTE	0x80000001
+diff --git a/drivers/mailbox/pl320-ipc.c b/drivers/mailbox/pl320-ipc.c
+index d873cba..f3755e0 100644
+--- a/drivers/mailbox/pl320-ipc.c
++++ b/drivers/mailbox/pl320-ipc.c
+@@ -26,7 +26,7 @@
+ #include <linux/device.h>
+ #include <linux/amba/bus.h>
+ 
+-#include <linux/mailbox.h>
++#include <linux/pl320-ipc.h>
+ 
+ #define IPCMxSOURCE(m)		((m) * 0x40)
+ #define IPCMxDSET(m)		(((m) * 0x40) + 0x004)
+diff --git a/include/linux/mailbox.h b/include/linux/mailbox.h
+deleted file mode 100644
+index 5161f63..0000000
+--- a/include/linux/mailbox.h
++++ /dev/null
+@@ -1,17 +0,0 @@
+-/*
+- * This program is free software; you can redistribute it and/or modify it
+- * under the terms and conditions of the GNU General Public License,
+- * version 2, as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope it will be useful, but WITHOUT
+- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+- * more details.
+- *
+- * You should have received a copy of the GNU General Public License along with
+- * this program.  If not, see <http://www.gnu.org/licenses/>.
+- */
+-
+-int pl320_ipc_transmit(u32 *data);
+-int pl320_ipc_register_notifier(struct notifier_block *nb);
+-int pl320_ipc_unregister_notifier(struct notifier_block *nb);
+diff --git a/include/linux/pl320-ipc.h b/include/linux/pl320-ipc.h
+new file mode 100644
+index 0000000..5161f63
+--- /dev/null
++++ b/include/linux/pl320-ipc.h
+@@ -0,0 +1,17 @@
++/*
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++int pl320_ipc_transmit(u32 *data);
++int pl320_ipc_register_notifier(struct notifier_block *nb);
++int pl320_ipc_unregister_notifier(struct notifier_block *nb);
+-- 
+1.8.1.2
