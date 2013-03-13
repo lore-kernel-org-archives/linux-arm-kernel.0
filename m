@@ -1,37 +1,41 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed, 13 Mar 2013 11:13:07 -0600
-Subject: [PATCH] ARM: mvebu: fix RAM size for Armada XP board DB-MV784MP-GP
-In-Reply-To: <20130313145419.GP12700@titan.lakedaemon.net>
-References: <20130216164457.GA23237@titan.lakedaemon.net>
- <1363101135-21635-1-git-send-email-jason@lakedaemon.net>
- <51408D86.6040703@cogentembedded.com>
- <20130313143913.GN12700@titan.lakedaemon.net>
- <51409063.8080308@free-electrons.com>
- <20130313145419.GP12700@titan.lakedaemon.net>
-Message-ID: <20130313171307.GC24042@obsidianresearch.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 13 Mar 2013 10:17:24 -0700
+Subject: [PATCH] ARM: dts: add usb 2.0 clock references to device tree
+Message-ID: <1363195044-15715-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 13, 2013 at 10:54:19AM -0400, Jason Cooper wrote:
+This is a fixup to two device tree nodes that have already landed but
+without clock nodes since the transition to common clock happened at
+the same time.
 
-> > I was wrong in my initial version, all we can do in 32 bits is not
-> > 4GB but 4GB-1B: reg = <0x00000000 0xFFFFFFFF>
-> 
-> hmmm, with the impending conquering of the server market by ARM, you'd
-> think we'd at least be able to parse a 64 bit integer...
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+---
+ arch/arm/boot/dts/exynos5250.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-AFAIK, it would be like this:
-
-/ {
-        #address-cells = <2>;
-        #size-cells = <2>;
-        memory {
-                device_type = "memory";
-                reg = <0 0  1 0>;
-        };
-
-And the other children nodes must be revised to support the 2 dw
-address and size..
-
-Regards,
-Jason
+diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+index 24c52e6..59be603 100644
+--- a/arch/arm/boot/dts/exynos5250.dtsi
++++ b/arch/arm/boot/dts/exynos5250.dtsi
+@@ -402,12 +402,18 @@
+ 		compatible = "samsung,exynos4210-ehci";
+ 		reg = <0x12110000 0x100>;
+ 		interrupts = <0 71 0>;
++
++		clocks = <&clock 285>;
++		clock-names = "usbhost";
+ 	};
+ 
+ 	usb at 12120000 {
+ 		compatible = "samsung,exynos4210-ohci";
+ 		reg = <0x12120000 0x100>;
+ 		interrupts = <0 71 0>;
++
++		clocks = <&clock 285>;
++		clock-names = "usbhost";
+ 	};
+ 
+ 	amba {
+-- 
+1.8.1.3
