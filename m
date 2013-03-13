@@ -1,29 +1,22 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 13 Mar 2013 18:48:34 +0100
-Subject: [PATCH] pinctrl: mvebu: prevent walking off the end of group array
-In-Reply-To: <1363196155-1620-1-git-send-email-jason@lakedaemon.net>
-References: <1362872371.3690.106.camel@shinybook.infradead.org>
- <1363196155-1620-1-git-send-email-jason@lakedaemon.net>
-Message-ID: <5140BBF2.4050309@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 13 Mar 2013 18:50:10 +0100
+Subject: [PATCH -next] pinctrl: sirf: using for_each_set_bit to simplify
+ the code
+In-Reply-To: <CAPgLHd9n7nmyhUcRgPwEyjweZKA+fgi409yEJgK6LmF2Wu6n-g@mail.gmail.com>
+References: <CAPgLHd9n7nmyhUcRgPwEyjweZKA+fgi409yEJgK6LmF2Wu6n-g@mail.gmail.com>
+Message-ID: <CACRpkdZ_AvahCLkPhbdB7Dk-qaxpAEN-B9qCMsJWBKi8+GtuOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/13/2013 06:35 PM, Jason Cooper wrote:
-> From: David Woodhouse<dwmw2@infradead.org>
->
-> While investigating (ab)use of krealloc, David found this bug.  It's
-> unlikely to occur, but now we detect the condition and error out
-> appropriately.
->
-> Signed-off-by: David Woodhouse<David.Woodhouse@intel.com>
-> Signed-off-by: Jason Cooper<jason@lakedaemon.net>
-> ---
-> David, please double check that this is as you intended.  I had to hand-jam it in due to some peculiarities on my side.
->
+On Mon, Mar 11, 2013 at 3:23 PM, Wei Yongjun <weiyj.lk@gmail.com> wrote:
 
-Jason,
+> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+>
+> Using for_each_set_bit() to simplify the code.
+>
+> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-thanks for preparing that patch. I ll test (and Ack) asap but that will not be
-before this weekend. If Thomas and Andrew ack it before me, consider it good.
+Barry, can I have your ACK on this?
 
-Sebastian
+Yours,
+Linus Walleij
