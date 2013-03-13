@@ -1,167 +1,57 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 13 Mar 2013 10:22:18 +0100
-Subject: [PATCH] ARM: at91: add gpio suspend/resume support when using
- pinctrl
-In-Reply-To: <1362755901-20279-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1362755901-20279-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <5140454A.2030409@atmel.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 13 Mar 2013 14:58:22 +0530
+Subject: [PATCH] ARM: smp: Allow real broadcast device selection instead
+ of always dummy
+In-Reply-To: <1363165608-13739-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1363165608-13739-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <514046B6.9020005@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/08/2013 04:18 PM, ludovic.desroches at atmel.com :
-> From: Ludovic Desroches <ludovic.desroches@atmel.com>
+(Forgot to CC Thomas)
+
+On Wednesday 13 March 2013 02:36 PM, Santosh Shilimkar wrote:
+> With recent arm broadcast time clean-up from Mark Rutland, the dummy
+> broadcast device is always registered with timer subsystem. And since
+> the rating of the dummy clock event is very high, it is preferred
+> over a real broad-cast clock event.
 > 
-> gpio suspend/resume and wakeup sources where not managed when using pinctrl so
-> it was impossible to wake up the system with a gpio.
+> This is a change in behavior from past and not an intended
+> one. So reduce the rating of the dummy clockevent so that
+> real broadcast device is selected when available.
 > 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-
-Nice, I queue it for "fixes" in at91-3.9-fixes.
-
-Thanks, best regards,
-
+> Without this all the C states with C3STOP won't work since
+> the broad cast notifier will take an abort.
+> 
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> 
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 > ---
->  arch/arm/mach-at91/include/mach/gpio.h |  8 +++++
->  arch/arm/mach-at91/pm.c                | 10 ++++--
->  drivers/pinctrl/pinctrl-at91.c         | 61 +++++++++++++++++++++++++++++++++-
->  3 files changed, 76 insertions(+), 3 deletions(-)
+> Its a regression so hopefully can get into the 3.9-rcx. Noticed
+> this one on A15 platform. A9 platform the issue may not be seen
+> since the local timer check avoids dummy timer registration.
 > 
-> diff --git a/arch/arm/mach-at91/include/mach/gpio.h b/arch/arm/mach-at91/include/mach/gpio.h
-> index eed465a..5fc2377 100644
-> --- a/arch/arm/mach-at91/include/mach/gpio.h
-> +++ b/arch/arm/mach-at91/include/mach/gpio.h
-> @@ -209,6 +209,14 @@ extern int at91_get_gpio_value(unsigned pin);
->  extern void at91_gpio_suspend(void);
->  extern void at91_gpio_resume(void);
->  
-> +#ifdef CONFIG_PINCTRL_AT91
-> +extern void at91_pinctrl_gpio_suspend(void);
-> +extern void at91_pinctrl_gpio_resume(void);
-> +#else
-> +static inline void at91_pinctrl_gpio_suspend(void) {}
-> +static inline void at91_pinctrl_gpio_resume(void) {}
-> +#endif
-> +
->  #endif	/* __ASSEMBLY__ */
->  
->  #endif
-> diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-> index adb6db8..73f1f25 100644
-> --- a/arch/arm/mach-at91/pm.c
-> +++ b/arch/arm/mach-at91/pm.c
-> @@ -201,7 +201,10 @@ extern u32 at91_slow_clock_sz;
->  
->  static int at91_pm_enter(suspend_state_t state)
->  {
-> -	at91_gpio_suspend();
-> +	if (of_have_populated_dt())
-> +		at91_pinctrl_gpio_suspend();
-> +	else
-> +		at91_gpio_suspend();
->  	at91_irq_suspend();
->  
->  	pr_debug("AT91: PM - wake mask %08x, pm state %d\n",
-> @@ -286,7 +289,10 @@ static int at91_pm_enter(suspend_state_t state)
->  error:
->  	target_state = PM_SUSPEND_ON;
->  	at91_irq_resume();
-> -	at91_gpio_resume();
-> +	if (of_have_populated_dt())
-> +		at91_pinctrl_gpio_resume();
-> +	else
-> +		at91_gpio_resume();
->  	return 0;
->  }
->  
-> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-> index 75933a6..efb7f10 100644
-> --- a/drivers/pinctrl/pinctrl-at91.c
-> +++ b/drivers/pinctrl/pinctrl-at91.c
-> @@ -1277,21 +1277,80 @@ static int alt_gpio_irq_type(struct irq_data *d, unsigned type)
->  }
->  
->  #ifdef CONFIG_PM
-> +
-> +static u32 wakeups[MAX_GPIO_BANKS];
-> +static u32 backups[MAX_GPIO_BANKS];
-> +
->  static int gpio_irq_set_wake(struct irq_data *d, unsigned state)
->  {
->  	struct at91_gpio_chip *at91_gpio = irq_data_get_irq_chip_data(d);
->  	unsigned	bank = at91_gpio->pioc_idx;
-> +	unsigned mask = 1 << d->hwirq;
->  
->  	if (unlikely(bank >= MAX_GPIO_BANKS))
->  		return -EINVAL;
->  
-> +	if (state)
-> +		wakeups[bank] |= mask;
-> +	else
-> +		wakeups[bank] &= ~mask;
-> +
->  	irq_set_irq_wake(at91_gpio->pioc_virq, state);
->  
->  	return 0;
->  }
-> +
-> +void at91_pinctrl_gpio_suspend(void)
-> +{
-> +	int i;
-> +
-> +	for (i = 0; i < gpio_banks; i++) {
-> +		void __iomem  *pio;
-> +
-> +		if (!gpio_chips[i])
-> +			continue;
-> +
-> +		pio = gpio_chips[i]->regbase;
-> +
-> +		backups[i] = __raw_readl(pio + PIO_IMR);
-> +		__raw_writel(backups[i], pio + PIO_IDR);
-> +		__raw_writel(wakeups[i], pio + PIO_IER);
-> +
-> +		if (!wakeups[i]) {
-> +			clk_unprepare(gpio_chips[i]->clock);
-> +			clk_disable(gpio_chips[i]->clock);
-> +		} else {
-> +			printk(KERN_DEBUG "GPIO-%c may wake for %08x\n",
-> +			       'A'+i, wakeups[i]);
-> +		}
-> +	}
-> +}
-> +
-> +void at91_pinctrl_gpio_resume(void)
-> +{
-> +	int i;
-> +
-> +	for (i = 0; i < gpio_banks; i++) {
-> +		void __iomem  *pio;
-> +
-> +		if (!gpio_chips[i])
-> +			continue;
-> +
-> +		pio = gpio_chips[i]->regbase;
-> +
-> +		if (!wakeups[i]) {
-> +			if (clk_prepare(gpio_chips[i]->clock) == 0)
-> +				clk_enable(gpio_chips[i]->clock);
-> +		}
-> +
-> +		__raw_writel(wakeups[i], pio + PIO_IDR);
-> +		__raw_writel(backups[i], pio + PIO_IER);
-> +	}
-> +}
-> +
->  #else
->  #define gpio_irq_set_wake	NULL
-> -#endif
-> +#endif /* CONFIG_PM */
->  
->  static struct irq_chip gpio_irqchip = {
->  	.name		= "GPIO",
+Some one pointed me to a fix made by Mark which was discussed
+under '[BUG] ARM Architected timers appear broken in 3.9-rc1' subject.
+That patch seems to be more of work around since the root of the
+problem is incorrect dummy timer rating. Either way, both patches
+fix the issue.
+
+>  arch/arm/kernel/smp.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-
-
--- 
-Nicolas Ferre
+> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+> index 31644f1..79078ed 100644
+> --- a/arch/arm/kernel/smp.c
+> +++ b/arch/arm/kernel/smp.c
+> @@ -480,7 +480,7 @@ static void __cpuinit broadcast_timer_setup(struct clock_event_device *evt)
+>  	evt->features	= CLOCK_EVT_FEAT_ONESHOT |
+>  			  CLOCK_EVT_FEAT_PERIODIC |
+>  			  CLOCK_EVT_FEAT_DUMMY;
+> -	evt->rating	= 400;
+> +	evt->rating	= 100;
+>  	evt->mult	= 1;
+>  	evt->set_mode	= broadcast_timer_set_mode;
+>  
+> 
