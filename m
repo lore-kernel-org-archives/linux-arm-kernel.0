@@ -1,47 +1,54 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 13 Mar 2013 14:36:48 +0530
-Subject: [PATCH] ARM: smp: Allow real broadcast device selection instead of
- always dummy
-Message-ID: <1363165608-13739-1-git-send-email-santosh.shilimkar@ti.com>
+From: kishon@ti.com (kishon)
+Date: Wed, 13 Mar 2013 14:41:27 +0530
+Subject: [PATCH v3 0/7] ARM: dts: omap: Add dts data for USB
+In-Reply-To: <1362663320-23799-1-git-send-email-kishon@ti.com>
+References: <1362663320-23799-1-git-send-email-kishon@ti.com>
+Message-ID: <514042BF.2090207@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With recent arm broadcast time clean-up from Mark Rutland, the dummy
-broadcast device is always registered with timer subsystem. And since
-the rating of the dummy clock event is very high, it is preferred
-over a real broad-cast clock event.
+Benoit,
 
-This is a change in behavior from past and not an intended
-one. So reduce the rating of the dummy clockevent so that
-real broadcast device is selected when available.
+Will you be queuing this patch series?
 
-Without this all the C states with C3STOP won't work since
-the broad cast notifier will take an abort.
+Thanks
+Kishon
 
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
-Its a regression so hopefully can get into the 3.9-rcx. Noticed
-this one on A15 platform. A9 platform the issue may not be seen
-since the local timer check avoids dummy timer registration.
-
- arch/arm/kernel/smp.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 31644f1..79078ed 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -480,7 +480,7 @@ static void __cpuinit broadcast_timer_setup(struct clock_event_device *evt)
- 	evt->features	= CLOCK_EVT_FEAT_ONESHOT |
- 			  CLOCK_EVT_FEAT_PERIODIC |
- 			  CLOCK_EVT_FEAT_DUMMY;
--	evt->rating	= 400;
-+	evt->rating	= 100;
- 	evt->mult	= 1;
- 	evt->set_mode	= broadcast_timer_set_mode;
- 
--- 
-1.7.9.5
+On Thursday 07 March 2013 07:05 PM, Kishon Vijay Abraham I wrote:
+> Hi Benoit,
+>
+> Here are the dt data patches to get usb device functional in OMAP platforms.
+>
+> All the patches deal with modifying arch/arm/boot except one which modifies
+> Documentation/../usb/omap-usb.txt
+>
+> Changes from v2:
+> * squashed the dt data for dwc3-omap with dwc3 core into a single patch.
+>
+> Changes from v1:
+> Patch *ARM: dts: omap: Add usb_otg and glue data* has some properties with
+> names that has "_". It's replaced with a "-" here.
+>
+> This patch is developed on Linux 3.9-rc1.
+>
+> Kishon Vijay Abraham I (7):
+>    ARM: dts: omap: Add omap control usb data
+>    ARM: dts: omap: Add omap-usb2 dt data
+>    ARM: dts: omap: Add usb_otg and glue data
+>    ARM: dts: omap5: Add omap control usb data
+>    ARM: dts: omap5: Add ocp2scp data
+>    ARM: dts: omap5: Add omap-usb3 and omap-usb2 dt data
+>    ARM: dts: omap5: add dwc3 omap and dwc3 core dt data
+>
+>   Documentation/devicetree/bindings/usb/omap-usb.txt |    1 +
+>   arch/arm/boot/dts/omap3-beagle-xm.dts              |    6 +++
+>   arch/arm/boot/dts/omap3-evm.dts                    |    6 +++
+>   arch/arm/boot/dts/omap3-overo.dtsi                 |    6 +++
+>   arch/arm/boot/dts/omap3.dtsi                       |   12 +++++
+>   arch/arm/boot/dts/omap4-panda.dts                  |    6 +++
+>   arch/arm/boot/dts/omap4-sdp.dts                    |    6 +++
+>   arch/arm/boot/dts/omap4.dtsi                       |   26 +++++++++++
+>   arch/arm/boot/dts/omap5.dtsi                       |   48 ++++++++++++++++++++
+>   arch/arm/boot/dts/twl4030.dtsi                     |    2 +-
+>   10 files changed, 118 insertions(+), 1 deletion(-)
+>
