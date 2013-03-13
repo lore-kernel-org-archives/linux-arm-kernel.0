@@ -1,54 +1,41 @@
-From: kishon@ti.com (kishon)
-Date: Wed, 13 Mar 2013 14:41:27 +0530
-Subject: [PATCH v3 0/7] ARM: dts: omap: Add dts data for USB
-In-Reply-To: <1362663320-23799-1-git-send-email-kishon@ti.com>
-References: <1362663320-23799-1-git-send-email-kishon@ti.com>
-Message-ID: <514042BF.2090207@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 13 Mar 2013 10:19:31 +0100
+Subject: [PATCH 1/2] arm: at91: dt: at91sam9x5: correct NAND pins comments
+In-Reply-To: <1363011160-11297-1-git-send-email-richard.genoud@gmail.com>
+References: <1363011160-11297-1-git-send-email-richard.genoud@gmail.com>
+Message-ID: <514044A3.7000000@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Benoit,
+On 03/11/2013 03:12 PM, Richard Genoud :
+> Comments on NAND pins where inverted.
+> 
+> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+> ---
+> based on 3.9-rc2
+> 
+>  arch/arm/boot/dts/at91sam9x5.dtsi |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+> index aa98e64..9b5d048 100644
+> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+> @@ -238,8 +238,8 @@
+>  				nand {
+>  					pinctrl_nand: nand-0 {
+>  						atmel,pins =
+> -							<3 4 0x0 0x1	/* PD5 gpio RDY pin pull_up */
+> -							 3 5 0x0 0x1>;	/* PD4 gpio enable pin pull_up */
+> +							<3 4 0x0 0x1	/* PD4 gpio Chip Enable pin pull_up */
+> +							 3 5 0x0 0x1>;	/* PD5 gpio RDY/BUSY pin pull_up */
+>  					};
+>  				};
+>  
+> 
 
-Will you be queuing this patch series?
+Thanks, both queued in at91-3.9-fixes branch.
 
-Thanks
-Kishon
-
-On Thursday 07 March 2013 07:05 PM, Kishon Vijay Abraham I wrote:
-> Hi Benoit,
->
-> Here are the dt data patches to get usb device functional in OMAP platforms.
->
-> All the patches deal with modifying arch/arm/boot except one which modifies
-> Documentation/../usb/omap-usb.txt
->
-> Changes from v2:
-> * squashed the dt data for dwc3-omap with dwc3 core into a single patch.
->
-> Changes from v1:
-> Patch *ARM: dts: omap: Add usb_otg and glue data* has some properties with
-> names that has "_". It's replaced with a "-" here.
->
-> This patch is developed on Linux 3.9-rc1.
->
-> Kishon Vijay Abraham I (7):
->    ARM: dts: omap: Add omap control usb data
->    ARM: dts: omap: Add omap-usb2 dt data
->    ARM: dts: omap: Add usb_otg and glue data
->    ARM: dts: omap5: Add omap control usb data
->    ARM: dts: omap5: Add ocp2scp data
->    ARM: dts: omap5: Add omap-usb3 and omap-usb2 dt data
->    ARM: dts: omap5: add dwc3 omap and dwc3 core dt data
->
->   Documentation/devicetree/bindings/usb/omap-usb.txt |    1 +
->   arch/arm/boot/dts/omap3-beagle-xm.dts              |    6 +++
->   arch/arm/boot/dts/omap3-evm.dts                    |    6 +++
->   arch/arm/boot/dts/omap3-overo.dtsi                 |    6 +++
->   arch/arm/boot/dts/omap3.dtsi                       |   12 +++++
->   arch/arm/boot/dts/omap4-panda.dts                  |    6 +++
->   arch/arm/boot/dts/omap4-sdp.dts                    |    6 +++
->   arch/arm/boot/dts/omap4.dtsi                       |   26 +++++++++++
->   arch/arm/boot/dts/omap5.dtsi                       |   48 ++++++++++++++++++++
->   arch/arm/boot/dts/twl4030.dtsi                     |    2 +-
->   10 files changed, 118 insertions(+), 1 deletion(-)
->
+Best regards,
+-- 
+Nicolas Ferre
