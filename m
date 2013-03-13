@@ -1,37 +1,38 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 13 Mar 2013 10:14:22 +0000 (UTC)
-Subject: [PATCH] ARM: OMAP3: hwmod data: keep MIDLEMODE in force-standby
- for musb
-In-Reply-To: <1363031340-9382-1-git-send-email-notasas@gmail.com>
-References: <1363031340-9382-1-git-send-email-notasas@gmail.com>
-Message-ID: <alpine.DEB.2.00.1303131013270.32131@utopia.booyaka.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 13 Mar 2013 10:09:49 +0000
+Subject: [PATCH v3] ARM: tegra: expose chip ID and revision
+In-Reply-To: <1363168080-12697-1-git-send-email-dahuang@nvidia.com>
+References: <1363168080-12697-1-git-send-email-dahuang@nvidia.com>
+Message-ID: <20130313100949.GA4977@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Gra?vydas,
+On Wed, Mar 13, 2013 at 05:48:00PM +0800, Danny Huang wrote:
+> +	soc_dev = soc_device_register(soc_dev_attr);
+> +	if (IS_ERR(soc_dev)) {
+> +		kfree(soc_dev_attr->soc_id);
+> +		kfree(soc_dev_attr->revision);
+> +		kfree(soc_dev_attr->family);
+> +		kfree(soc_dev_attr);
+> +		goto out;
+> +	}
+> +
+> +	parent = soc_device_to_device(soc_dev);
+> +	if (IS_ERR(parent))
+> +		parent = NULL;
 
-On Mon, 11 Mar 2013, Grazvydas Ignotas wrote:
+I know other places have done this kind of thing but what use is it?
 
-> For some unknown reason, allowing hwmod to control MIDLEMODE causes
-> core_pwrdm to not hit idle states for musb in DM3730 at least.
-> I've verified that setting any MIDLEMODE value other than "force
-> standby" before enabling the device causes subsequent suspend
-> attempts to fail with core_pwrdm not entering idle states, even
-> if the driver is unloaded and "force standby" is restored before
-> suspend attempt. To recover from this, soft reset can be used, but
-> that's not suitable solution for suspend.
-> 
-> Keeping the register set at force standby (reset value) makes it work
-> and device still functions properly, as musb has driver-controlled
-> OTG_FORCESTDBY register that controls MSTANDBY signal.
-> Note that TI PSP kernels also have similar workarounds.
-> 
-> This patch also fixes HWMOD_SWSUP_MSTANDBY documentation to match the
-> actual flag name.
-> 
-> Signed-off-by: Grazvydas Ignotas <notasas@gmail.com>
+struct device *soc_device_to_device(struct soc_device *soc_dev)
+{
+        return &soc_dev->dev;
+}
 
-Thanks for the good patch description and for making those changes.  
-Queued for v3.9-rc.
+Now, consider that soc_device_register() returns one of two things:
+1. A valid pointer - it must be valid, because soc_device_register()
+   already dereferences it.
+2. An error pointer, trappable with IS_ERR().
 
-- Paul
+You are trapping it with IS_ERR() - that's good news.  So, by the time
+we get to soc_device_to_device(), we know that it _is_ a valid pointer.
+So why would soc_device_to_device() return an error pointer?
