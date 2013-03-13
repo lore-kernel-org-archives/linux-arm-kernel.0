@@ -1,72 +1,44 @@
-From: bilhuang@nvidia.com (Bill Huang)
-Date: Tue, 12 Mar 2013 22:40:04 -0700
-Subject: [RFC 1/1] clk: Add notifier support in
- clk_prepare_enable/clk_disable_unprepare
-In-Reply-To: <51400D9D.9060305@wwwdotorg.org>
-References: <1363091861-21534-1-git-send-email-bilhuang@nvidia.com>
- <20130312134032.GU4977@n2100.arm.linux.org.uk>
- <1363139273.21694.11.camel@bilhuang-vm1> <514003B6.8020904@wwwdotorg.org>
- <1363151317.3311.9.camel@bilhuang-vm1> <51400D9D.9060305@wwwdotorg.org>
-Message-ID: <1363153204.3311.14.camel@bilhuang-vm1>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 13 Mar 2013 13:59:04 +0800
+Subject: [PATCH v2 00/13] ARM: spear multiplatform support
+In-Reply-To: <1363106816-9603-1-git-send-email-arnd@arndb.de>
+References: <1363106816-9603-1-git-send-email-arnd@arndb.de>
+Message-ID: <CAOh2x==O4OtpTPxgpBs5B0NZtbc6MkeyetsJz9AGDEAarA=OFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-03-13 at 13:24 +0800, Stephen Warren wrote:
-> On 03/12/2013 11:08 PM, Bill Huang wrote:
-> > On Wed, 2013-03-13 at 12:42 +0800, Stephen Warren wrote:
-> >> On 03/12/2013 07:47 PM, Bill Huang wrote:
-> >>> On Tue, 2013-03-12 at 21:40 +0800, Russell King - ARM Linux wrote:
-> >>>> On Tue, Mar 12, 2013 at 05:37:41AM -0700, Bill Huang wrote:
-> >>>>> Add the below four notifier events so drivers which are interested in
-> >>>>> knowing the clock status can act accordingly. This is extremely useful
-> >>>>> in some of the DVFS (Dynamic Voltage Frequency Scaling) design.
-> >>>>>
-> >>>>> PRE_CLK_ENABLE
-> >>>>> POST_CLK_ENABLE
-> >>>>> PRE_CLK_DISABLE
-> >>>>> POST_CLK_DISABLE
-> >>>>>
-> >>>>> Signed-off-by: Bill Huang <bilhuang@nvidia.com>
-> >>>>
-> >>>> NAK.  *Sigh* NO, this is the wrong level to be doing stuff like this.
-> >>>>
-> >>>> The *ONLY* thing that clk_prepare_enable() and clk_prepare_disable() should
-> >>>> *EVER* be doing is calling clk_prepare(), clk_enable(), clk_disable() and
-> >>>> clk_unprepare().  Those two functions are *merely* helpers for drivers
-> >>>> who don't wish to make the individual calls.
-> >>>>
-> >>>> Drivers are still completely free to call the individual functions, at
-> >>>> which point your proposal breaks horribly - and they _do_ call the
-> >>>> individual functions.
-> >>>
-> >>> I'm proposing to give device driver a choice when it knows that some
-> >>> driver might be interested in knowing its clock's enabled/disabled state
-> >>> change at runtime, this is very important for centralized DVFS core
-> >>> driver. It is not meant to be covering all cases especially for drivers
-> >>> which is not part of the DVFS, so we don't care if it is calling
-> >>> clk_enable/disable directly or not.
-> >>
-> >> I believe the point Russell is making is not that the idea behind this
-> >> patch is wrong, but simply that the function where you put the hooks is
-> >> wrong. The hooks should at least be in clk_enable/clk_disable and not
-> >> clk_prepare_enable/clk_disable_unprepare, since any driver is free to
-> >> call clk_prepare separately from clk_enable. The hooks should be
-> >> implemented in the lowest-level common function that all
-> >> driver-accessible paths call through.
-> > 
-> > Thanks, I know the point, but unfortunately there is no good choice for
-> > hooking this since those low level functions clk_enable/clk_disable will
-> > be called in interrupt context so it is not possible to send notify. We
-> > might need to come out a better approach if we can think of any.
-> > Currently I still think this is acceptable (Having all the drivers which
-> > are using our interested clocks call these function to enable/disable
-> > clock in their runtime_pm calls) though it's not perfect. 
-> 
-> No, that definitely won't work. Not all drivers use those APIs, nor
-> should they.
-> 
-That will be too bad, it looks like we deadlock in the mechanism, we
-cannot change existing drivers behavior (that means some call
-clk_disable/enable directly, some are not), and we cannot hook notifier
-in clk_disable/enable either, that means there seems no any chance to
-get what we want, any idea?
+On Wed, Mar 13, 2013 at 12:46 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> This is the second time I post the SPEAr multiplatform patches.
+> It did not work out for 3.9, mostly because of conflicts against
+> patches in the DMA tree, but also because I did not push very
+> hard for these. The patches are basically unchanged now, just
+> some context differences since I rebased them on top of 3.9-rc2.
+>
+> I'm adding them to the arm-soc tree for 3.10 now. If there are
+> any bugs, let's fix them on top of this branch. It would be
+> good to get some more testing on the branch though.
+
+I thought i would meet you at Connect, but last time i didn't come and
+this time you :)
+
+Anyways thanks for all the good work you have done for SPEAr. These
+are already Acked by me
+
+@Vipul: Can you give these a try? Please consider following which we got
+from the last discussion:
+
+From: Arnd...
+
+Thanks for testing out the patches. I forgot about the loadaddress,
+which indeed does not get set for multiplatform kernels, because
+the kernel does not know the correct address when it depends on
+the platform you are booting on.
+
+The recommended solution for this is to boot a normal 'vmlinux'
+or 'zImage' file rather than a uImage file. If you u-boot version
+is too old for that and you cannot update, you can manually
+call 'mkimage' to create a uImage file with the correct load
+address.
+
+--
+viresh
