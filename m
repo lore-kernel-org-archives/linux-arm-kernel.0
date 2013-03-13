@@ -1,27 +1,25 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 13 Mar 2013 19:00:02 +0100
-Subject: [PATCHv3 03/14] mailbox: OMAP: introduce mailbox framework
-In-Reply-To: <1363145044-14442-1-git-send-email-s-anna@ti.com>
-References: <1363145044-14442-1-git-send-email-s-anna@ti.com>
-Message-ID: <CACRpkdY8ZWNUVHJorbhN7XvOys9KJH8hKeCBYARih=1FiNk-CQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 13 Mar 2013 18:01:33 +0000
+Subject: [GIT PULL] Device Tree fixes for v3.9
+In-Reply-To: <20130313083748.GE21994@zurbaran>
+References: <CACRpkdai0PRbK-R_KfNqkkVuSNn97v9Za8Doq71Zb-xCHW+J1A@mail.gmail.com>
+ <201303111443.21019.arnd@arndb.de> <20130313083748.GE21994@zurbaran>
+Message-ID: <201303131801.33344.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 13, 2013 at 4:24 AM, Suman Anna <s-anna@ti.com> wrote:
+On Wednesday 13 March 2013, Samuel Ortiz wrote:
+> > Maybe Sam can just pick this up along with the other patch.
+> I applied the patch below to my fd-fixes tree. Which one do you mean by "the
+> other patch" ?
 
-> From: Omar Ramirez Luna <omar.luna@linaro.org>
-(...)
->
-> Signed-off-by: Omar Ramirez Luna <omar.luna@linaro.org>
-> [s-anna at ti.com: Kconfig fixes for build errors]
-> Signed-off-by: Suman Anna <s-anna@ti.com>
-> Acked-by: Tony Lindgren <tony@atomide.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+The one that you said is in your tree below.
 
-It's not like I care super-much, but I think your SoB should
-be at the bottom.
+> > > https://patchwork.kernel.org/patch/2163301/
+> > 
+> > It hasn't made it into v3.9-rc2 or even linux-next yet. I guess it got lost
+> > somewhere.
+> It's applied to my mfd-fixes as well now.
 
-It's a simple git rebase -i anyway...
 
-Yours,
-Linus Walleij
+	Arnd
