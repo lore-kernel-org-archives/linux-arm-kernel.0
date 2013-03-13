@@ -1,107 +1,89 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Wed, 13 Mar 2013 13:05:37 +0800
-Subject: [PATCH v3 06/11] ARM: vexpress: use clocksource_of_init for sp804
+Date: Wed, 13 Mar 2013 13:05:38 +0800
+Subject: [PATCH v3 07/11] ARM: debug: support debug ll on hisilicon soc
 In-Reply-To: <1363151142-32162-1-git-send-email-haojian.zhuang@linaro.org>
 References: <1363151142-32162-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1363151142-32162-7-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1363151142-32162-8-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove all code to parse sp804. Use clocksource_of_init() instead since
-all these code are implemented in sp804 driver already.
+Support UART0 debug ll on hisilicon Hi3620 SoC.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 ---
- arch/arm/boot/dts/vexpress-v2m-rs1.dtsi |    2 ++
- arch/arm/boot/dts/vexpress-v2m.dtsi     |    2 ++
- arch/arm/boot/dts/vexpress-v2p-ca9.dts  |    2 ++
- arch/arm/mach-vexpress/Kconfig          |    1 +
- arch/arm/mach-vexpress/v2m.c            |   13 ++-----------
- 5 files changed, 9 insertions(+), 11 deletions(-)
+ arch/arm/Kconfig.debug             |   15 +++++++++++++++
+ arch/arm/include/debug/hisilicon.S |   30 ++++++++++++++++++++++++++++++
+ 2 files changed, 45 insertions(+)
+ create mode 100644 arch/arm/include/debug/hisilicon.S
 
-diff --git a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
-index ac870fb..3fa798f 100644
---- a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
-+++ b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
-@@ -183,6 +183,8 @@
- 				interrupts = <2>;
- 				clocks = <&v2m_sysctl 0>, <&v2m_sysctl 1>, <&smbclk>;
- 				clock-names = "timclken1", "timclken2", "apb_pclk";
-+				arm,sp804-clocksource = <0x20>;
-+				arm,sp804-clockevent = <0>;
- 			};
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index ecfcdba..fd2a39d 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -240,6 +240,20 @@ choice
+ 		  Say Y here if you want kernel low-level debugging support
+ 		  on i.MX6Q.
  
- 			v2m_timer23: timer at 120000 {
-diff --git a/arch/arm/boot/dts/vexpress-v2m.dtsi b/arch/arm/boot/dts/vexpress-v2m.dtsi
-index f142036..86e4046 100644
---- a/arch/arm/boot/dts/vexpress-v2m.dtsi
-+++ b/arch/arm/boot/dts/vexpress-v2m.dtsi
-@@ -182,6 +182,8 @@
- 				interrupts = <2>;
- 				clocks = <&v2m_sysctl 0>, <&v2m_sysctl 1>, <&smbclk>;
- 				clock-names = "timclken1", "timclken2", "apb_pclk";
-+				arm,sp804-clocksource = <0x20>;
-+				arm,sp804-clockevent = <0>;
- 			};
- 
- 			v2m_timer23: timer at 12000 {
-diff --git a/arch/arm/boot/dts/vexpress-v2p-ca9.dts b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-index 1420bb1..a2eba95 100644
---- a/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-+++ b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-@@ -98,6 +98,8 @@
- 			     <0 49 4>;
- 		clocks = <&oscclk2>, <&oscclk2>;
- 		clock-names = "timclk", "apb_pclk";
-+		arm,sp804-clocksource = <0x20>;
-+		arm,sp804-clockevent = <0>;
- 	};
- 
- 	watchdog at 100e5000 {
-diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
-index 52d315b..ff78c15 100644
---- a/arch/arm/mach-vexpress/Kconfig
-+++ b/arch/arm/mach-vexpress/Kconfig
-@@ -5,6 +5,7 @@ config ARCH_VEXPRESS
- 	select ARM_GIC
- 	select ARM_TIMER_SP804
- 	select CLKDEV_LOOKUP
-+	select CLKSRC_OF
- 	select COMMON_CLK
- 	select COMMON_CLK_VERSATILE
- 	select CPU_V7
-diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
-index 51e8701..bb599d3 100644
---- a/arch/arm/mach-vexpress/v2m.c
-+++ b/arch/arm/mach-vexpress/v2m.c
-@@ -21,6 +21,7 @@
- #include <linux/regulator/fixed.h>
- #include <linux/regulator/machine.h>
- #include <linux/vexpress.h>
-+#include <linux/clocksource.h>
- #include <clocksource/arm_timer.h>
- #include <clocksource/timer-sp.h>
- 
-@@ -431,19 +432,9 @@ void __init v2m_dt_init_early(void)
- 
- static void __init v2m_dt_timer_init(void)
- {
--	struct device_node *node = NULL;
--
- 	vexpress_clk_of_init();
- 
--	do {
--		node = of_find_compatible_node(node, NULL, "arm,sp804");
--	} while (node && vexpress_get_site_by_node(node) != VEXPRESS_SITE_MB);
--	if (node) {
--		pr_info("Using SP804 '%s' as a clock & events source\n",
--				node->full_name);
--		v2m_sp804_init(of_iomap(node, 0),
--				irq_of_parse_and_map(node, 0));
--	}
-+	clocksource_of_init();
- 
- 	if (arch_timer_of_register() != 0)
- 		twd_local_timer_of_register();
++	config DEBUG_HI3620_UART
++		bool "Hisilicon HI3620 Debug UART"
++		depends on ARCH_HI3xxx
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on HI3620 UART.
++
++	config DEBUG_HI3716_UART
++		bool "Hisilicon Hi3716 Debug UART"
++		depends on ARCH_HI3xxx
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on HI3716 UART.
++
+ 	config DEBUG_MMP_UART2
+ 		bool "Kernel low-level debugging message via MMP UART2"
+ 		depends on ARCH_MMP
+@@ -589,6 +603,7 @@ config DEBUG_LL_INCLUDE
+ 				 DEBUG_IMX53_UART ||\
+ 				 DEBUG_IMX6Q_UART
+ 	default "debug/highbank.S" if DEBUG_HIGHBANK_UART
++	default "debug/hisilicon.S" if DEBUG_HI3620_UART || DEBUG_HI3716_UART
+ 	default "debug/mvebu.S" if DEBUG_MVEBU_UART
+ 	default "debug/omap2plus.S" if DEBUG_OMAP2PLUS_UART
+ 	default "debug/picoxcell.S" if DEBUG_PICOXCELL_UART
+diff --git a/arch/arm/include/debug/hisilicon.S b/arch/arm/include/debug/hisilicon.S
+new file mode 100644
+index 0000000..47ad019
+--- /dev/null
++++ b/arch/arm/include/debug/hisilicon.S
+@@ -0,0 +1,30 @@
++/*
++ * Early serial output macro for Hisilicon SoC
++ *
++ * Copyright (C) 2012-2013 Hisilicon Technologies Co., Ltd.
++ * Copyright (C) 2012-2013 Linaro Ltd.
++ *
++ * Author: Haojian Zhuang <haojian.zhuang@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++#if defined(CONFIG_DEBUG_HI3620_UART)
++#define HS_UART_PHYS_BASE	0xfcb00000
++#define HS_UART_VIRT_BASE	0xfeb00000
++#elif defined(CONFIG_DEBUG_HI3716_UART)
++#define HS_UART_PHYS_BASE	0xf8b00000
++#define HS_UART_VIRT_BASE	0xfeb00000
++#endif
++
++#if defined(CONFIG_DEBUG_HI3620_UART) || defined(CONFIG_DEBUG_HI3716_UART)
++		.macro	addruart,rp,rv,tmp
++		ldr	\rp, =HS_UART_PHYS_BASE
++		ldr	\rv, =HS_UART_VIRT_BASE
++		.endm
++
++#include <asm/hardware/debug-pl01x.S>
++
++#endif
 -- 
 1.7.10.4
