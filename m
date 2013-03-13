@@ -1,32 +1,61 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 13 Mar 2013 13:50:53 -0400
-Subject: [PATCH] pinctrl: mvebu: prevent walking off the end of group array
-In-Reply-To: <CACRpkdaoF-PqqOi3bCQXnuey_2U+niHA8RWriXiJUE=kUZB0dQ@mail.gmail.com>
-References: <1362872371.3690.106.camel@shinybook.infradead.org>
- <1363196155-1620-1-git-send-email-jason@lakedaemon.net>
- <CACRpkdaoF-PqqOi3bCQXnuey_2U+niHA8RWriXiJUE=kUZB0dQ@mail.gmail.com>
-Message-ID: <20130313175053.GQ12700@titan.lakedaemon.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 13 Mar 2013 11:52:57 -0600
+Subject: [PATCH 2/3] ARM: tegra: refactor the pmc_pm_set function
+In-Reply-To: <1363163246-26368-2-git-send-email-josephl@nvidia.com>
+References: <1363163246-26368-1-git-send-email-josephl@nvidia.com>
+ <1363163246-26368-2-git-send-email-josephl@nvidia.com>
+Message-ID: <5140BCF9.2070900@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 13, 2013 at 06:47:36PM +0100, Linus Walleij wrote:
-> On Wed, Mar 13, 2013 at 6:35 PM, Jason Cooper <jason@lakedaemon.net> wrote:
-> 
-> > From: David Woodhouse <dwmw2@infradead.org>
-> >
-> > While investigating (ab)use of krealloc, David found this bug.  It's
-> > unlikely to occur, but now we detect the condition and error out
-> > appropriately.
-> >
-> > Signed-off-by: David Woodhouse <David.Woodhouse@intel.com>
-> > Signed-off-by: Jason Cooper <jason@lakedaemon.net>
-> > ---
-> > David, please double check that this is as you intended.  I had to hand-jam it in due to some peculiarities on my side.
-> 
-> I have tentatively applied this to my fixes branch.
+On 03/13/2013 02:27 AM, Joseph Lo wrote:
+> The pmc_pm_set function was designed for SoC to configure the related
+> settings when system going to some low power modes (e.g. platform
+> suspend or CPU idle powered-down mode). We refactor the function to make
+> it work on the usage.
 
-Dang, you're quick.  Please see V2 <shuffles feet>
+> diff --git a/arch/arm/mach-tegra/pmc.c b/arch/arm/mach-tegra/pmc.c
 
-thx,
+> +#include <linux/clk-provider.h>
 
-Jason.
+This code isn't a clock-provider, and hence shouldn't include that
+header file.
+
+> +void tegra_pmc_pm_set(enum tegra_suspend_mode mode)
+
+> +	switch (mode) {
+> +	case TEGRA_SUSPEND_LP2:
+> +		rate = __clk_get_rate(tegra_pclk);
+
+Doesn't regular clk_get_rate() work here?
+
+> @@ -234,6 +229,9 @@ void tegra_pmc_suspend_init(void)
+>  {
+>  	u32 reg;
+>  
+> +	tegra_pclk = clk_get_sys(NULL, "pclk");
+> +	WARN_ON(IS_ERR(tegra_pclk));
+
+Shouldn't this instead error out and/or disable any system suspend
+modes? Otherwise, tegra_pmc_pm_set() is going to call
+clk_get_rate(tegra_pclk), and tegra_pclk won't be a valid clock object.
+
+Also, can you use regular clk_get() rather than clk_get_sys()? That'd
+need a clocks property in the PMC DT node.
+
+I guess I see now that this series does actually depend on the suspend
+series. However, stuff like:
+
+> -u32 tegra_pmc_get_cpu_good_time(void)
+> -{
+> -	return pmc_pm_data.cpu_good_time;
+> -}
+> -
+> -u32 tegra_pmc_get_cpu_off_time(void)
+> -{
+> -	return pmc_pm_data.cpu_off_time;
+> -}
+
+... was actually added in that series, so if you put this series first,
+or merged the two series with these patches first, you could end up
+avoiding some churn.
