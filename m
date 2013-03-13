@@ -1,8 +1,10 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Wed, 13 Mar 2013 21:54:07 +0100
+From: wmb@firmworks.com (Mitch Bradley)
+Date: Wed, 13 Mar 2013 10:58:02 -1000
 Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
-In-Reply-To: <20130313195901.GA26550@obsidianresearch.com>
-References: <20130312070852.GA6727@avionic-0098.mockup.avionic-design.de>
+In-Reply-To: <20130313192628.GA28714@avionic-0098.mockup.avionic-design.de>
+References: <20130311232516.GA13873@obsidianresearch.com>
+ <513E6AFE.3090304@firmworks.com>
+ <20130312070852.GA6727@avionic-0098.mockup.avionic-design.de>
  <20130312155749.GA1820@obsidianresearch.com>
  <20130312203819.GA23221@avionic-0098.mockup.avionic-design.de>
  <20130312210328.GA22702@obsidianresearch.com>
@@ -11,102 +13,109 @@ References: <20130312070852.GA6727@avionic-0098.mockup.avionic-design.de>
  <20130313081815.GD25940@avionic-0098.mockup.avionic-design.de>
  <20130313170205.GB24042@obsidianresearch.com>
  <20130313192628.GA28714@avionic-0098.mockup.avionic-design.de>
- <20130313195901.GA26550@obsidianresearch.com>
-Message-ID: <20130313205407.GA29025@avionic-0098.mockup.avionic-design.de>
+Message-ID: <5140E85A.3040900@firmworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 13, 2013 at 01:59:01PM -0600, Jason Gunthorpe wrote:
-> On Wed, Mar 13, 2013 at 08:26:28PM +0100, Thierry Reding wrote:
+On 3/13/2013 9:26 AM, Thierry Reding wrote:
+> On Wed, Mar 13, 2013 at 11:02:05AM -0600, Jason Gunthorpe wrote:
+>> On Wed, Mar 13, 2013 at 09:18:15AM +0100, Thierry Reding wrote:
+>>
+>>> Mitch already answered this. The specification is now almost 15 years
+>>> old and it couldn't possibly have foreseen all of the future use-cases.
+>>> If the specification is too restrictive and Mitch gives his blessing to
+>>> remove some of the restrictions, I don't see any reason why we shouldn't
+>>> do so if it lets us represent the reality of hardware more accurately in
+>>> DT.
+>>
+>> I understand the spec is old, and I have no problem with making a
+>> Linux specific revision, but do *that* - don't bury some random
+>> deviation inside the bindings for a driver. I even suggested some
+>> language, but I feel more thought is needed to consider how to model
+>> the standardized ECAM mechanism..
 > 
-> > As Mitch already said there's very little chance that the specification
-> > update will be ratified through IEEE, so I think that we might just as
-> > well put a corresponding text somewhere below Documentation/devicetree.
+> As Mitch already said there's very little chance that the specification
+> update will be ratified through IEEE, so I think that we might just as
+> well put a corresponding text somewhere below Documentation/devicetree.
 > 
-> Sure, I'm fine with that.
->  
-> > Also note that this has absolutely nothing to do with ECAM. All I'm
-> > proposing is to allow the reg property of a root port to be translated
-> > into a CPU addressable memory region through the ranges property. This
-> > turns out to actually work properly with the current OF core in Linux.
+> Also note that this has absolutely nothing to do with ECAM. All I'm
+> proposing is to allow the reg property of a root port to be translated
+> into a CPU addressable memory region through the ranges property. This
+> turns out to actually work properly with the current OF core in Linux.
 > 
-> ECAM is the only standard based mechanism that could possibly use this
-> new config space ranges concept. Whatever you do for tegra shouldn't
-> stomp on the possibility of making that work in the future. So at
-> least think about how ECAM could be modeled for a few mins before
-> going ahead.
+>>> Furthermore we're not discussing radical changes. None of the changes
+>>> will be backwards-incompatible, but they will allow recent hardware to
+>>> be represented more correctly or conveniently.
+>>
+>> Sure, but it is still inconsistent, one MMIO config mechansim is in
+>> ranges, one is in regs. Plus I don't think tegra's case is a great
+>> starting point to design a spec update, it's config access mechanism
+>> is especially strange...
 > 
-> Tegra is the non-standard unusual case here, an update to the PCI OF
-> binding should be of general use.
-
-But I'm not trying to encode ECAM in the DT. ECAM isn't the problem at
-all. The only problem is that each root port has a separate window in
-the CPU address space that is used to access that port's configuration
-space.
-
-ECAM only comes into play when accessing the configuration space of
-subordinate devices (via type 1 transactions). But at that point the
-device tree doesn't need to know about it. The only thing that needs to
-be in DT is the memory region that the controller should write to in
-order to generate type 1 transactions. And that's a problem that has
-long been solved.
-
-> > > Anyhow, I think this has been hashed to death, as long as your final
-> > > binding has the 'device_type = pci' on the pcie-controller node I
-> > > think it will be fine.
-> > 
-> > No. The pcie-controller is *not* a PCI device. It is a PCI host bridge.
-> > It is the instance that translates from the platform to the PCI bus. Why
-> > should it be device_type = "pci"? 
+> Again, it is still the most accurate way to describe the hardware. I
+> know it's not terribly beautiful and doesn't match with what you'd
+> expect from PC hardware. However it is still a reality and something the
+> kernel will have to deal with. Marvell hardware isn't very pretty either
+> but that shouldn't exclude it from being supported by Linux.
 > 
-> Spec says so, Mitch said so, other PCI host bridge bindings in the
-> tree work like this. Do a grep in the powerpc tree, for instance.
+>> Anyhow, I think this has been hashed to death, as long as your final
+>> binding has the 'device_type = pci' on the pcie-controller node I
+>> think it will be fine.
 > 
-> arch/x86/platform/ce4100/falconfalls.dts is a pretty comprehensive
-> example.
+> No. The pcie-controller is *not* a PCI device. It is a PCI host bridge.
+> It is the instance that translates from the platform to the PCI bus. Why
+> should it be device_type = "pci"? 
 
-Yes, yes. We all know by now what the spec says. The whole point is
-that maybe the spec needs to be updated and this requirement lifted.
-What I keep trying to say is that in case of Tegra the PCIe controller
-does not provide the PCI bus. It doesn't appear as a device on the PCI
-bus and it doesn't have configuration space itself.
+device_type="pci" means that this device implements PCI functionality,
+which means that it is either a PCI host bridge or a PCI-to-PCI bridge.
 
-Only the PCI root ports provide access to the subordinate busses. And
-only they appear on the PCI bus.
+"device_type" answers the question "What does this device do?".  The
+alternative question "What bus does this device plug into?" is answered
+by looking at the parent.
 
-> > And we've also been over this before, making that change stops the
-> > proposed binding from working properly because the entry in the reg
-> > property can't be translated into a CPU addressable memory region.
+In this case, the answer to "what does pcie_controller do?" is "it
+implements a PCI bus" below.  So 'device_type = "pci"' is appropriate.
+
+Having just re-read the code in drivers/of/address.c, I think I have a
+deeper understanding of a few practical issues:
+
+In order to translate a 3/2 PCI address via of_get_pci_address(), the
+parent device (i.e. root complex / pcie-controller) must have both
+'device_type = "pci"' (else of_match_bus() won't find the pci version of
+"struct of_bus") and also 'name = "pci"' (else strcmp(bus->name, "pci")
+will fail).
+
+So it would seem that, if you want to use address.c verbatim (for the
+interface between pcie-controller and its direct children), not only do
+you need device_type = pci, but you also need to rename
+"pcie-controller" to "pci".
+
+But then you run into the problem that the pci variant of struct of_bus
+uses "assigned-addresses" instead of "reg".  So it still doesn't work
+as-is.  To make it work, you would need to add an "assigned-addresses"
+property to each root port node.  That property value could be in
+non-relocatable memory space, translatable via normal rules, in which
+case the "map config space to MMIO via ranges" discussion is moot for
+Marvell.
+
+Which re-raises a question for which I have not yet heard a compelling
+answer:  Why use 3/2 PCI addressing between Marvell pcie-controller and
+its root ports (with their unusual programming model)?  The Marvell
+hardware address structure between controller and root ports is
+definitely not 3/2.  Certainly you need 3/2 addressing below
+(implemented by) the root ports, but I just don't see the utility of
+pretending 3/2 addressing at the complex-to-port interface.  If the root
+port hardware used the common programming model, with real config
+headers and stuff, 3/2 would be good because you could use existing
+drivers.  But since you need a special root-port driver anyway, why go
+to the trouble of emulating non-existent addressing?
+
+
+
+And we've also been over this before,
+> making that change stops the proposed binding from working properly
+> because the entry in the reg property can't be translated into a CPU
+> addressable memory region.
 > 
-> Sigh, that's because the change makes things follow the OF PCI
-> spec. The Linux OF core follows the spec. Config space ranges binding
-> is specifically *defined to not work* in the spec. Why should it work
-> today?
-
-Okay. I keep understanding what you're saying. But the whole point of
-this discussion is that maybe the spec should be amended to allow this
-to work. In fact it does work with the current implementation in the
-Linux kernel. And what I've been trying to explain is that I think this
-to be the most accurate description of the Tegra hardware.
-
-> You have to deal with this problem somehow, and omitting the top level
-> device_type is not a solution.
-
-So we've already agreed that the specification might be too restrictive,
-and I'm trying to solve this problem by finding an accurate description
-in DT to represent the hardware without following the spec to the letter
-because it wasn't written with this kind of hardware in mind.
-
-Tegra's PCIe controller doesn't actually implement the bus. In fact we
-have to jump through hoops to make both root ports appear on the root
-bus specifically because there's no common access to the configuration
-space that includes the host bridge or the root ports.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130313/0239c411/attachment-0001.sig>
+> Thierry
+> 
