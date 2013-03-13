@@ -1,83 +1,36 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 13 Mar 2013 21:14:03 +0530
-Subject: [PATCH] ARM: smp: Allow real broadcast device selection instead
- of always dummy
-In-Reply-To: <20130313122550.GD13483@e106331-lin.cambridge.arm.com>
-References: <1363165608-13739-1-git-send-email-santosh.shilimkar@ti.com>
- <514046B6.9020005@ti.com>
- <20130313101641.GA13483@e106331-lin.cambridge.arm.com>
- <514061D1.20603@ti.com>
- <20130313122550.GD13483@e106331-lin.cambridge.arm.com>
-Message-ID: <51409EC3.5050905@ti.com>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Wed, 13 Mar 2013 23:44:04 +0800
+Subject: [PATCH v3 03/11] clocksource: sp804: add device tree support
+In-Reply-To: <1363189308.3100.104.camel@hornet>
+References: <1363151142-32162-1-git-send-email-haojian.zhuang@linaro.org>
+ <1363151142-32162-4-git-send-email-haojian.zhuang@linaro.org>
+ <1363172730.3100.17.camel@hornet> <51408A71.9090501@gmail.com>
+ <1363185757.3100.66.camel@hornet> <51409276.8050601@gmail.com>
+ <1363186548.3100.75.camel@hornet>
+ <CAD6h2NTP+X6RVr23Y-XLrQMqHptH974oYooTX=Y6F_Q4hyrmNA@mail.gmail.com>
+ <1363188238.3100.95.camel@hornet>
+ <CAD6h2NR+SC4cN5cBzHUNBfDQ1=x8Rbn3C4AizNyy562iMjyU6A@mail.gmail.com>
+ <1363188595.3100.101.camel@hornet> <51409DBD.5080209@gmail.com>
+ <1363189308.3100.104.camel@hornet>
+Message-ID: <CAD6h2NQEin1uZczh3kCD660x7U68RUmT16rHit1epaNL3V+S2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 13 March 2013 05:55 PM, Mark Rutland wrote:
-> On Wed, Mar 13, 2013 at 11:24:01AM +0000, Santosh Shilimkar wrote:
->> On Wednesday 13 March 2013 03:46 PM, Mark Rutland wrote:
->>> Hi Santosh,
+On 13 March 2013 23:41, Pawel Moll <pawel.moll@arm.com> wrote:
+> On Wed, 2013-03-13 at 15:39 +0000, Rob Herring wrote:
+>> I previously described that to add a property in that case. That makes
+>> INT1 and INT2 only handling asymetric though. An alternative would be an
+>> optional property "arm,sp804-has-irq = <#>" in the case of only INT1 or
+>> INT2 connected. The combined irq would be a single irq without the
+>> "arm,sp804-has-irq" property and both connected would be 2 irqs.
+>
+> Fine with me.
+>
+> Pawe?
+>
+>
 
-[..]
-
->>>
->>> Is the problem that the dummy timer is being registered as the broadcast
->>> source, or that it is selected as a local timer in preference of real timers?
->>>
->> Dummy timer is preferred over real broadcast timer.
-> 
-> Ok.
-> 
->>  
->>> If it is the former, Then I believe my patch solve the issue more generally -
->>> if you happen to register a dummy timer before other timers, it will become the
->>> broadcast source. Regardless of how temporary this is, it should never happen,
->>> and lowering the rating of the dummy won't fix this.
->>>
->> Well by the time we need active broadcast functionality, clock-events are
->> already chosen if the ratings are appropriate.
-> 
-> That's a fair point. I still think it's worth having the check in the core
-> broadcast code - rejecting dummy timers is always a sensible thing to do, and
-> it prevents future crashes if new timers are added without sensible rating
-> values.
-> 
->>
->>> If it is the latter, then this patch would ensure that a real timer with a
->>> rating over 100 is selected in preference to the dummy, which is certainly what
->>> we want. The proposed generic dummy timer in Stephen Boyd's local timer API
->>> removal series [1] similarly uses a low rating to ensure that real timers are
->>> selected in preference to an always-registered dummy. I note that the
->>> architected timer has a higher rating (450) than the dummy (400), so this
->>> shouldn't currently be a problem.
->>>
->> Because we always register dummy broadcast on ARM now 
->> and with higher rating, it is picked as broadcast source. We definitely don't
->> want such a behavior when we have real broadcast device is available.
-> 
-> Agreed. We *never* want to pick a dummy timer as a broadcast source, as this
-> never makes sense.
-> 
->> With your patch, we are trying to avoid the registration which goes
->> against the the whole idea of registering it always and picking
->> the right clock-event based on rating by clock-event core.
->> The clock-event core except the proper ratings to be provided based on
->> the capability of the timer source and its resolution and in that case
->> dummy should have the lowest rating which is what I tried to patch.
->>
->>> Have I missed something?
->>>
->> Not much. I was just looking at x86 code as well after your email
->> to see how the LAPIC issue is handled. They seems to also have
->> correct rating to take care of the selection.
->>
->> Probably we can merge both the fixes but from clock-event core
->> code perspective, the ratings fix is more than enough.
-> 
-> I do agree it'd be worth lowering the dummy timer's rating to ensure it doesn't
-> override a real timer elsewhere. 
-> 
-Yep. Can I add you acked-by tag then for $subject patch ?
-Would be good to get this one merged as well.
+It's OK to me. I can use this property instead.
 
 Regards
-Santosh
+Haojian
