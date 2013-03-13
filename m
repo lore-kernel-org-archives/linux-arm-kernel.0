@@ -1,37 +1,32 @@
-From: shugelinux@gmail.com (Shuge)
-Date: Wed, 13 Mar 2013 11:35:15 +0800
-Subject: [PATCH] bounce:fix bug, avoid to flush dcache on slab page from
- jbd2.
-In-Reply-To: <20130313011020.GA5313@blackbox.djwong.org>
-References: <5139DB90.5090302@gmail.com>
- <20130312153221.0d26fe5599d4885e51bb0c7c@linux-foundation.org>
- <20130313011020.GA5313@blackbox.djwong.org>
-Message-ID: <513FF3F3.2000509@gmail.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Tue, 12 Mar 2013 20:52:52 -0700
+Subject: [PATCHv3 01/14] mailbox: rename pl320-ipc specific mailbox.h
+In-Reply-To: <1363145030-14373-1-git-send-email-s-anna@ti.com>
+References: <1363145030-14373-1-git-send-email-s-anna@ti.com>
+Message-ID: <20130313035252.GA1515@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all
->>> The bounce accept slab pages from jbd2, and flush dcache on them.
->>> When enabling VM_DEBUG, it will tigger VM_BUG_ON in page_mapping().
->>> So, check PageSlab to avoid it in __blk_queue_bounce().
->>>
->>> Bug URL: http://lkml.org/lkml/2013/3/7/56
->>>
->>> ...
->>>
->> ......
->>
-> That sure is strange.  I didn't see any obvious reasons why we'd end up with a
->
-......
+On Tue, Mar 12, 2013 at 10:23:50PM -0500, Suman Anna wrote:
+> The patch 30058677 "ARM / highbank: add support for pl320 IPC"
+> added a pl320 IPC specific header file as a generic mailbox.h.
+> This file has been renamed appropriately to allow the
+> introduction of the generic mailbox API framework.
+> 
+> Signed-off-by: Suman Anna <s-anna@ti.com>
+> Cc: Mark Langsdorf <mark.langsdorf@calxeda.com>
+> Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+> ---
+>  drivers/cpufreq/highbank-cpufreq.c |  2 +-
+>  drivers/mailbox/pl320-ipc.c        |  2 +-
+>  include/linux/mailbox.h            | 17 -----------------
+>  include/linux/pl320-ipc.h          | 17 +++++++++++++++++
+>  4 files changed, 19 insertions(+), 19 deletions(-)
+>  delete mode 100644 include/linux/mailbox.h
+>  create mode 100644 include/linux/pl320-ipc.h
 
-     Well, this problem not only appear in arm64, but also arm32. And my 
-kernel version is 3.3.0, arch is arm32.
-Following the newest kernel, the problem shoulde be exist.
-     I agree with Darrick's modification. Hum, if 
-CONFIG_NEED_BOUNCE_POOL is not set, it also flush dcahce on
-the pages of b_frozen_data, some of them are allocated by kmem_cache_alloc.
-     As we know, jbd2_alloc allocate a buffer from jbd2_xk slab pool, 
-when the size is smaller than PAGE_SIZE.
-The b_frozen_data  is not mapped to usrspace, not aliasing cache. It cat 
-be lazy flush or other. Is it right?
+Why are you sending these To: me?  I'm not the mailbox maintainer, and
+have never handled them before that I can remember.  Who is the
+maintainer?
+
+greg k-h
