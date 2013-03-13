@@ -1,35 +1,48 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 13 Mar 2013 14:10:22 +0900
-Subject: [PATCH -next] ARM: EXYNOS: remove duplicated include from common.c
-In-Reply-To: <CAPgLHd9eSiAne_f_8ctbXt8x+ET3v_1o=-gdO1D_11kxx2jo3g@mail.gmail.com>
-References: <CAPgLHd9eSiAne_f_8ctbXt8x+ET3v_1o=-gdO1D_11kxx2jo3g@mail.gmail.com>
-Message-ID: <093201ce1fa9$109a12f0$31ce38d0$%kim@samsung.com>
+Date: Wed, 13 Mar 2013 14:10:37 +0900
+Subject: [PATCH] ASoC: samsung: remove last traces of neo1973-gta01
+In-Reply-To: <1363126175.3137.160.camel@x61.thuisdomein>
+References: <1363126175.3137.160.camel@x61.thuisdomein>
+Message-ID: <093301ce1fa9$19903ba0$4cb0b2e0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wei Yongjun wrote:
+Paul Bolle wrote:
 > 
-> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> The (rudimentary) support for the Openmoko Neo1973 GTA01 got removed in
+> commit 1ae5cbc52e7c6619a3f44b87809fd25370df31bb ("ASoC: neo1973_wm8753:
+> remove references to the neo1973-gta01 machine"). Remove its last traces
+> in the Kconfig file too.
 > 
-> Remove duplicated include.
-> 
-> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-> ---
->  arch/arm/mach-exynos/common.c | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-> index d63d399..01e4089 100644
-> --- a/arch/arm/mach-exynos/common.c
-> +++ b/arch/arm/mach-exynos/common.c
-> @@ -23,7 +23,6 @@
->  #include <linux/of_irq.h>
->  #include <linux/export.h>
->  #include <linux/irqdomain.h>
-> -#include <linux/irqchip.h>
->  #include <linux/of_address.h>
->  #include <linux/irqchip/arm-gic.h>
-> 
-Applied, thanks.
+> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 
 - Kukjin
+
+> ---
+> Untested.
+> 
+>  sound/soc/samsung/Kconfig | 5 ++---
+>  1 file changed, 2 insertions(+), 3 deletions(-)
+> 
+> diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
+> index 90e7e66..475fb0d 100644
+> --- a/sound/soc/samsung/Kconfig
+> +++ b/sound/soc/samsung/Kconfig
+> @@ -35,11 +35,10 @@ config SND_SAMSUNG_I2S
+>  	tristate
+> 
+>  config SND_SOC_SAMSUNG_NEO1973_WM8753
+> -	tristate "Audio support for Openmoko Neo1973 Smartphones (GTA01/GTA02)"
+> -	depends on SND_SOC_SAMSUNG && (MACH_NEO1973_GTA01 || MACH_NEO1973_GTA02)
+> +	tristate "Audio support for Openmoko Neo1973 Smartphones (GTA02)"
+> +	depends on SND_SOC_SAMSUNG && MACH_NEO1973_GTA02
+>  	select SND_S3C24XX_I2S
+>  	select SND_SOC_WM8753
+> -	select SND_SOC_LM4857 if MACH_NEO1973_GTA01
+>  	select SND_SOC_DFBMCS320
+>  	help
+>  	  Say Y here to enable audio support for the Openmoko Neo1973
+> --
+> 1.7.11.7
