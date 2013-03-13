@@ -1,102 +1,48 @@
 From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Thu, 14 Mar 2013 01:19:52 +0530
-Subject: [PATCH V3 3/5] ARM: tegra:add aliases and DMA requestor for serial
- nodes of Tegra114
+Date: Thu, 14 Mar 2013 01:19:53 +0530
+Subject: [PATCH V3 4/5] ARM: tegra: add KBC nodes to Tegra114 DT
 In-Reply-To: <1363204194-19487-1-git-send-email-ldewangan@nvidia.com>
 References: <1363204194-19487-1-git-send-email-ldewangan@nvidia.com>
-Message-ID: <1363204194-19487-4-git-send-email-ldewangan@nvidia.com>
+Message-ID: <1363204194-19487-5-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add APB DMA requestor and serial aliases for serial controller.
-There will be two serial driver i.e. 8250 based simple serial driver
-and APB DMA based serial driver for higher baudrate and performace.
+NVIDIA's Tegra114 SoCs have the matrix keyboard controller which
+supports 11x8 type of matrix. The number of rows and columns
+are configurable.
 
-The simple serial driver get enabled with compatible "nvidia,tegra114-uart",
-"nvidia,tegra20-uart" and APB DMA based driver will get enabled with
-compatible "nvidia,tegra114-hsuart", "nvidia,tegra30-hsuart".
+Add DT entry for KBC controller with compatibility as "nvidia,tegra114-kbc".
 
 Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
 ---
 Changes from V1:
-- Remove UARTB car id correction. Make the compatible with tegra114 and
-  tegra30 for hsuart and tegra20 for simple uart driver.
+- Add compatible for kbc as nvidia,tegra114-kbc and nvidia,tegra20-kbc.
 
 Changes from V2:
-- Rebase to for-3.10/dt of Stephen's tegra tree.
+- Rebase to for-3.10/dt of Stephen's Tegra tree.
+- Remove compatibilty of prev hardware as it has 11x8 matrix,
 
- arch/arm/boot/dts/tegra114.dtsi |   27 +++++++++++++++++++++++----
- 1 files changed, 23 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/tegra114.dtsi |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
-index ce44938..5a41d04 100644
+index 5a41d04..d2bbfaf 100644
 --- a/arch/arm/boot/dts/tegra114.dtsi
 +++ b/arch/arm/boot/dts/tegra114.dtsi
-@@ -4,6 +4,13 @@
- 	compatible = "nvidia,tegra114";
- 	interrupt-parent = <&gic>;
+@@ -218,6 +218,14 @@
+ 		interrupts = <0 2 0x04>;
+ 	};
  
-+	aliases {
-+		serial0 = &uarta;
-+		serial1 = &uartb;
-+		serial2 = &uartc;
-+		serial3 = &uartd;
++	kbc {
++		compatible = "nvidia,tegra114-kbc";
++		reg = <0x7000e200 0x100>;
++		interrupts = <0 85 0x04>;
++		clocks = <&tegra_car 36>;
++		status = "disabled";
 +	};
 +
- 	gic: interrupt-controller {
- 		compatible = "arm,cortex-a15-gic";
- 		#interrupt-cells = <3>;
-@@ -98,35 +105,47 @@
- 		       0x70003000 0x40c>;	/* Mux registers */
- 	};
- 
--	serial at 70006000 {
-+	/*
-+	 * There are two serial driver i.e. 8250 based simple serial
-+	 * driver and APB DMA based serial driver for higher baudrate
-+	 * and performace. To enable the 8250 based driver, the compatible
-+	 * is "nvidia,tegra114-uart", "nvidia,tegra20-uart" and to enable
-+	 * the APB DMA based serial driver, the comptible is
-+	 * "nvidia,tegra114-hsuart", "nvidia,tegra30-hsuart".
-+	 */
-+	uarta: serial at 70006000 {
- 		compatible = "nvidia,tegra114-uart", "nvidia,tegra20-uart";
- 		reg = <0x70006000 0x40>;
- 		reg-shift = <2>;
- 		interrupts = <0 36 0x04>;
-+		nvidia,dma-request-selector = <&apbdma 8>;
- 		status = "disabled";
- 	};
- 
--	serial at 70006040 {
-+	uartb: serial at 70006040 {
- 		compatible = "nvidia,tegra114-uart", "nvidia,tegra20-uart";
- 		reg = <0x70006040 0x40>;
- 		reg-shift = <2>;
- 		interrupts = <0 37 0x04>;
-+		nvidia,dma-request-selector = <&apbdma 9>;
- 		status = "disabled";
- 	};
- 
--	serial at 70006200 {
-+	uartc: serial at 70006200 {
- 		compatible = "nvidia,tegra114-uart", "nvidia,tegra20-uart";
- 		reg = <0x70006200 0x100>;
- 		reg-shift = <2>;
- 		interrupts = <0 46 0x04>;
-+		nvidia,dma-request-selector = <&apbdma 10>;
- 		status = "disabled";
- 	};
- 
--	serial at 70006300 {
-+	uartd: serial at 70006300 {
- 		compatible = "nvidia,tegra114-uart", "nvidia,tegra20-uart";
- 		reg = <0x70006300 0x100>;
- 		reg-shift = <2>;
- 		interrupts = <0 90 0x04>;
-+		nvidia,dma-request-selector = <&apbdma 19>;
- 		status = "disabled";
- 	};
- 
+ 	pmc {
+ 		compatible = "nvidia,tegra114-pmc", "nvidia,tegra30-pmc";
+ 		reg = <0x7000e400 0x400>;
 -- 
 1.7.1.1
