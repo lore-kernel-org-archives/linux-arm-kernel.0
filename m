@@ -1,23 +1,35 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Wed, 13 Mar 2013 09:45:04 +0800
-Subject: [PATCH v2 14/14] Document: add device tree binding file for sp804
-In-Reply-To: <201303121902.24841.arnd@arndb.de>
-References: <1363108124-17484-1-git-send-email-haojian.zhuang@linaro.org>
- <1363108124-17484-15-git-send-email-haojian.zhuang@linaro.org>
- <201303121902.24841.arnd@arndb.de>
-Message-ID: <CAD6h2NRv9R7Re=+6z=mTZa1rEyGKf6g4=Fuz=L2z0h41qY1BVQ@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 13 Mar 2013 09:52:47 +0800
+Subject: [PATCH 2/4] ARM: imx: support DEBUG_LL uart port selection for
+ all i.MX SoCs
+In-Reply-To: <20130312143510.GA26044@magnum.frso.rivierawaves.com>
+References: <1355319945-3199-1-git-send-email-shawn.guo@linaro.org>
+ <1355319945-3199-3-git-send-email-shawn.guo@linaro.org>
+ <20130312143510.GA26044@magnum.frso.rivierawaves.com>
+Message-ID: <20130313015246.GC27461@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 March 2013 03:02, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 12 March 2013, Haojian Zhuang wrote:
->> Add binding document for sp804 dual timer.
->>
->> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
->
-> Ah, I was missing this one earlier when looking at patch 2. I would actually
-> suggest combining both into a single patch.
->
->         Arnd
+On Tue, Mar 12, 2013 at 03:35:10PM +0100, Karl Beldan wrote:
+> > -config DEBUG_IMX6Q_UART_PORT
+> > -	int "i.MX6Q Debug UART Port (1-5)" if DEBUG_IMX6Q_UART
+> > -	range 1 5
+> > +config DEBUG_IMX_UART_PORT
+> > +	int "i.MX Debug UART Port Selection" if DEBUG_IMX1_UART || \
+> > +						DEBUG_IMX25_UART || \
+> > +						DEBUG_IMX21_IMX27_UART || \
+> > +						DEBUG_IMX31_UART || \
+> > +						DEBUG_IMX35_UART || \
+> > +						DEBUG_IMX51_UART || \
+> > +						DEBUG_IMX50_IMX53_UART || \
+> > +						DEBUG_IMX6Q_UART
+> >  	default 1
+> > -	depends on SOC_IMX6Q
+> 
+> After removing any dependency everybody gets a DEBUG_IMX_UART_PORT in
+> their config now.
+>  
+Right, this is something undesirable.  Will fix it.  Thanks for
+reporting, Karl.
 
-OK. I'll merge it into the patch #2.
+Shawn
