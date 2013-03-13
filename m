@@ -1,62 +1,49 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Wed, 13 Mar 2013 17:46:45 +0100
-Subject: [Resend/PATCH 0/5] omap4/5: i2c/spi: device tree data
-In-Reply-To: <513DFB62.5030709@ti.com>
-References: <1363009486-19430-1-git-send-email-sourav.poddar@ti.com>
- <513DEAE1.1050606@ti.com> <513DFB62.5030709@ti.com>
-Message-ID: <5140AD75.2050900@ti.com>
+From: jonathan.austin@arm.com (Jonathan Austin)
+Date: Wed, 13 Mar 2013 16:53:15 +0000
+Subject: [PATCH 0/3] Separate generic header usage from ARCH_MULTIPLATFORM
+Message-ID: <1363193598-28116-1-git-send-email-jonathan.austin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sourav,
+The original aim of this series was to restore the ability to build a NOMMU
+kernel for Versatile Express, something that was lost when we converted
+ARCH_VEXPRESS for ARCH_MULTIPLATFORM.
 
-I've just applied your branch after a minor subject cleanup for consistency.
+In order to do this, it is necessary to abstract the use of generic headers
+from selection of ARCH_MULTIPLATFORM so that the two can be used separately.
+This is necessary becuase building a multiplatform kernel for processors
+without and MMU doesn't make sense (it is necessary to hardcode certain mem-map
+related data) and the versatile express can host NOMMU processors.
 
-git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.10/dts
+This series performs this separation, and then goes on to add a 'dummy'
+ARCH_VEXPRESS_NOMMU platform that can be selected as standalone platform.
 
-Regards,
-Benoit
+Patch 2 was sent to the list as an RFC some time ago where it was ACKd, but
+alone is not sufficient to solve the problem, hence this follow-up series.
 
+Since the original single patch was sent I have also selected SPARSE_IRQ for
+ARCH_VEXPRESS_NOMMU in that patch.
 
-On 03/11/2013 04:42 PM, Sourav Poddar wrote:
-> On Monday 11 March 2013 08:02 PM, Benoit Cousson wrote:
->> Hi Sourav,
->>
->> On 03/11/2013 02:44 PM, Sourav Poddar wrote:
->>> Hi Tony/Benoit,
->>>
->>> These patches had been sent couple of times before, but there were no
->>> comments on it.
->> Sorry for that. I got a big flu in Jan and was in Linaro Connect last
->> week.
->> Patches look good, I just have to check that they apply nicely to the
->> dts/for_3.9 I already prepared.
->>
-> Ok. Thanks!!
->> I still have to rebase that branch on top of a recent master branch and
->> then check your branch.
->>
->>> If there are no comments, Can these be picked ?
->>> Cc: Andrew Morton<akpm@osdl.org>
->>>
->>> The following changes since commit
->>> f6161aa153581da4a3867a2d1a7caf4be19b6ec9:
->>>
->>>    Linux 3.9-rc2 (2013-03-10 16:54:19 -0700)
->>>
->>> are available in the git repository at:
->>>    git at gitorious.org:linux-connectivity/linux-connectivity.git
->>> omap_i2c_spi_dts_data
->>>
->>> Felipe Balbi (1):
->>>        arm: dts: omap5: add SPI devices to OMAP5 DeviceTree file
->>>
->>> Sourav Poddar (4):
->>>        arm: dts: omap4-sdp: Add I2c pinctrl data
->>>        arm: dts: omap5-evm: Add I2c pinctrl data
->>>        arm: dts: omap4-panda: Add I2c pinctrl data
->>>        arm: dts: omap5-evm: Add mcspi data
->> Thanks,
->> Benoit
->>
-> 
+Jonathan Austin (3):
+  ARM: allow platforms to use generic headers without
+    ARCH_MULTIPLATFORM
+  ARM: nommu: re-enable use of vexpress without ARCH_MULTIPLATFORM
+  ARM: vexpress-nommu: add a Makefile.boot to restore single-platform
+    build
+
+ arch/arm/Kconfig                     |   21 +++++++++++++++++++++
+ arch/arm/Makefile                    |    2 +-
+ arch/arm/boot/compressed/misc.c      |    2 +-
+ arch/arm/include/asm/timex.h         |    2 +-
+ arch/arm/mach-mvebu/Makefile         |    2 +-
+ arch/arm/mach-omap2/Makefile         |    2 +-
+ arch/arm/mach-vexpress/Makefile      |    2 +-
+ arch/arm/mach-vexpress/Makefile.boot |    4 ++++
+ arch/arm/plat-omap/Makefile          |    2 +-
+ arch/arm/plat-orion/Makefile         |    2 +-
+ arch/arm/plat-versatile/Makefile     |    2 +-
+ 11 files changed, 34 insertions(+), 9 deletions(-)
+ create mode 100644 arch/arm/mach-vexpress/Makefile.boot
+
+-- 
+1.7.9.5
