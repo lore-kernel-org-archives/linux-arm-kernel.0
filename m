@@ -1,121 +1,123 @@
-From: wmb@firmworks.com (Mitch Bradley)
-Date: Wed, 13 Mar 2013 10:58:02 -1000
-Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
-In-Reply-To: <20130313192628.GA28714@avionic-0098.mockup.avionic-design.de>
-References: <20130311232516.GA13873@obsidianresearch.com>
- <513E6AFE.3090304@firmworks.com>
- <20130312070852.GA6727@avionic-0098.mockup.avionic-design.de>
- <20130312155749.GA1820@obsidianresearch.com>
- <20130312203819.GA23221@avionic-0098.mockup.avionic-design.de>
- <20130312210328.GA22702@obsidianresearch.com>
- <20130312213006.GA23717@avionic-0098.mockup.avionic-design.de>
- <20130312220854.GA23112@obsidianresearch.com>
- <20130313081815.GD25940@avionic-0098.mockup.avionic-design.de>
- <20130313170205.GB24042@obsidianresearch.com>
- <20130313192628.GA28714@avionic-0098.mockup.avionic-design.de>
-Message-ID: <5140E85A.3040900@firmworks.com>
+From: jack@suse.cz (Jan Kara)
+Date: Wed, 13 Mar 2013 22:02:16 +0100
+Subject: [PATCH] bounce:fix bug, avoid to flush dcache on slab page
+ from jbd2.
+In-Reply-To: <20130313194429.GE5313@blackbox.djwong.org>
+References: <5139DB90.5090302@gmail.com>
+ <20130312153221.0d26fe5599d4885e51bb0c7c@linux-foundation.org>
+ <20130313011020.GA5313@blackbox.djwong.org>
+ <20130313085021.GA29730@quack.suse.cz>
+ <20130313194429.GE5313@blackbox.djwong.org>
+Message-ID: <20130313210216.GA7754@quack.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/13/2013 9:26 AM, Thierry Reding wrote:
-> On Wed, Mar 13, 2013 at 11:02:05AM -0600, Jason Gunthorpe wrote:
->> On Wed, Mar 13, 2013 at 09:18:15AM +0100, Thierry Reding wrote:
->>
->>> Mitch already answered this. The specification is now almost 15 years
->>> old and it couldn't possibly have foreseen all of the future use-cases.
->>> If the specification is too restrictive and Mitch gives his blessing to
->>> remove some of the restrictions, I don't see any reason why we shouldn't
->>> do so if it lets us represent the reality of hardware more accurately in
->>> DT.
->>
->> I understand the spec is old, and I have no problem with making a
->> Linux specific revision, but do *that* - don't bury some random
->> deviation inside the bindings for a driver. I even suggested some
->> language, but I feel more thought is needed to consider how to model
->> the standardized ECAM mechanism..
+On Wed 13-03-13 12:44:29, Darrick J. Wong wrote:
+> On Wed, Mar 13, 2013 at 09:50:21AM +0100, Jan Kara wrote:
+> > On Tue 12-03-13 18:10:20, Darrick J. Wong wrote:
+> > > On Tue, Mar 12, 2013 at 03:32:21PM -0700, Andrew Morton wrote:
+> > > > On Fri, 08 Mar 2013 20:37:36 +0800 Shuge <shugelinux@gmail.com> wrote:
+> > > > 
+> > > > > The bounce accept slab pages from jbd2, and flush dcache on them.
+> > > > > When enabling VM_DEBUG, it will tigger VM_BUG_ON in page_mapping().
+> > > > > So, check PageSlab to avoid it in __blk_queue_bounce().
+> > > > > 
+> > > > > Bug URL: http://lkml.org/lkml/2013/3/7/56
+> > > > > 
+> > > > > ...
+> > > > >
+> > > > > --- a/mm/bounce.c
+> > > > > +++ b/mm/bounce.c
+> > > > > @@ -214,7 +214,8 @@ static void __blk_queue_bounce(struct request_queue 
+> > > > > *q, struct bio **bio_orig,
+> > > > >   		if (rw == WRITE) {
+> > > > >   			char *vto, *vfrom;
+> > > > >   -			flush_dcache_page(from->bv_page);
+> > > > > +			if (unlikely(!PageSlab(from->bv_page)))
+> > > > > +				flush_dcache_page(from->bv_page);
+> > > > >   			vto = page_address(to->bv_page) + to->bv_offset;
+> > > > >   			vfrom = kmap(from->bv_page) + from->bv_offset;
+> > > > >   			memcpy(vto, vfrom, to->bv_len);
+> > > > 
+> > > > I guess this is triggered by Catalin's f1a0c4aa0937975b ("arm64: Cache
+> > > > maintenance routines"), which added a page_mapping() call to arm64's
+> > > > arch/arm64/mm/flush.c:flush_dcache_page().
+> > > > 
+> > > > What's happening is that jbd2 is using kmalloc() to allocate buffer_head
+> > > > data.  That gets submitted down the BIO layer and __blk_queue_bounce()
+> > > > calls flush_dcache_page() which in the arm64 case calls page_mapping()
+> > > > and page_mapping() does VM_BUG_ON(PageSlab) and splat.
+> > > > 
+> > > > The unusual thing about all of this is that the payload for some disk
+> > > > IO is coming from kmalloc, rather than being a user page.  It's oddball
+> > > > but we've done this for ages and should continue to support it.
+> > > > 
+> > > > 
+> > > > Now, the page from kmalloc() cannot be in highmem, so why did the
+> > > > bounce code decide to bounce it?
+> > > > 
+> > > > __blk_queue_bounce() does
+> > > > 
+> > > > 		/*
+> > > > 		 * is destination page below bounce pfn?
+> > > > 		 */
+> > > > 		if (page_to_pfn(page) <= queue_bounce_pfn(q) && !force)
+> > > > 			continue;
+> > > > 
+> > > > and `force' comes from must_snapshot_stable_pages().  But
+> > > > must_snapshot_stable_pages() must have returned false, because if it
+> > > > had returned true then it would have been must_snapshot_stable_pages()
+> > > > which went BUG, because must_snapshot_stable_pages() calls page_mapping().
+> > > > 
+> > > > So my tentative diagosis is that arm64 is fishy.  A page which was
+> > > > allocated via jbd2_alloc(GFP_NOFS)->kmem_cache_alloc() ended up being
+> > > > above arm64's queue_bounce_pfn().  Can you please do a bit of
+> > > > investigation to work out if this is what is happening?  Find out why
+> > > > __blk_queue_bounce() decided to bounce a page which shouldn't have been
+> > > > bounced?
+> > > 
+> > > That sure is strange.  I didn't see any obvious reasons why we'd end up with a
+> > > kmalloc above queue_bounce_pfn().  But then I don't have any arm64s either.
+> > > 
+> > > > This is all terribly fragile :( afaict if someone sets
+> > > > bdi_cap_stable_pages_required() against that jbd2 queue, we're going to
+> > > > hit that BUG_ON() again, via must_snapshot_stable_pages()'s
+> > > > page_mapping() call.  (Darrick, this means you ;))
+> > > 
+> > > Wheeee.  You're right, we shouldn't be calling page_mapping on slab pages.
+> > > We can keep walking the bio segments to find a non-slab page that can tell us
+> > > MS_SNAP_STABLE is set, since we probably won't need the bounce buffer anyway.
+> > > 
+> > > How does something like this look?  (+ the patch above)
+> >   Umm, this won't quite work. We can have a bio which has just PageSlab
+> > page attached and so you won't be able to get to the superblock. Heh, isn't
+> > the whole page_mapping() thing in must_snapshot_stable_pages() wrong? When we
+> > do direct IO, these pages come directly from userspace and hell knows where
+> > they come from. Definitely their page_mapping() doesn't give us anything
+> > useful... Sorry for not realizing this earlier when reviewing the patch.
+> > 
+> > ... remembering why we need to get to sb and why ext3 needs this ... So
+> > maybe a better solution would be to have a bio flag meaning that pages need
+> > bouncing? And we would set it from filesystems that need it - in case of
+> > ext3 only writeback of data from kjournald actually needs to bounce the
+> > pages. Thoughts?
 > 
-> As Mitch already said there's very little chance that the specification
-> update will be ratified through IEEE, so I think that we might just as
-> well put a corresponding text somewhere below Documentation/devicetree.
-> 
-> Also note that this has absolutely nothing to do with ECAM. All I'm
-> proposing is to allow the reg property of a root port to be translated
-> into a CPU addressable memory region through the ranges property. This
-> turns out to actually work properly with the current OF core in Linux.
-> 
->>> Furthermore we're not discussing radical changes. None of the changes
->>> will be backwards-incompatible, but they will allow recent hardware to
->>> be represented more correctly or conveniently.
->>
->> Sure, but it is still inconsistent, one MMIO config mechansim is in
->> ranges, one is in regs. Plus I don't think tegra's case is a great
->> starting point to design a spec update, it's config access mechanism
->> is especially strange...
-> 
-> Again, it is still the most accurate way to describe the hardware. I
-> know it's not terribly beautiful and doesn't match with what you'd
-> expect from PC hardware. However it is still a reality and something the
-> kernel will have to deal with. Marvell hardware isn't very pretty either
-> but that shouldn't exclude it from being supported by Linux.
-> 
->> Anyhow, I think this has been hashed to death, as long as your final
->> binding has the 'device_type = pci' on the pcie-controller node I
->> think it will be fine.
-> 
-> No. The pcie-controller is *not* a PCI device. It is a PCI host bridge.
-> It is the instance that translates from the platform to the PCI bus. Why
-> should it be device_type = "pci"? 
+> What about dirty pages that don't result in journal transactions?  I think
+> ext3_sync_file() eventually calls ext3_ordered_writepage, which then calls
+> __block_write_full_page, which in turn calls submit_bh().
+  So here we have two options:
+Either we let ext3 wait the same way as other filesystems when stable pages
+are required. Then only data IO from kjournald needs to be bounced (all
+other IO is properly protected by PageWriteback bit).
 
-device_type="pci" means that this device implements PCI functionality,
-which means that it is either a PCI host bridge or a PCI-to-PCI bridge.
+Or we won't let ext3 wait (as it is now), keep the superblock flag that fs
+needs bouncing, and set the bio flag in __block_write_full_page() and
+kjournald based on the sb flag.
 
-"device_type" answers the question "What does this device do?".  The
-alternative question "What bus does this device plug into?" is answered
-by looking at the parent.
+I think the first option is slightly better but I don't feel strongly
+about that.
 
-In this case, the answer to "what does pcie_controller do?" is "it
-implements a PCI bus" below.  So 'device_type = "pci"' is appropriate.
-
-Having just re-read the code in drivers/of/address.c, I think I have a
-deeper understanding of a few practical issues:
-
-In order to translate a 3/2 PCI address via of_get_pci_address(), the
-parent device (i.e. root complex / pcie-controller) must have both
-'device_type = "pci"' (else of_match_bus() won't find the pci version of
-"struct of_bus") and also 'name = "pci"' (else strcmp(bus->name, "pci")
-will fail).
-
-So it would seem that, if you want to use address.c verbatim (for the
-interface between pcie-controller and its direct children), not only do
-you need device_type = pci, but you also need to rename
-"pcie-controller" to "pci".
-
-But then you run into the problem that the pci variant of struct of_bus
-uses "assigned-addresses" instead of "reg".  So it still doesn't work
-as-is.  To make it work, you would need to add an "assigned-addresses"
-property to each root port node.  That property value could be in
-non-relocatable memory space, translatable via normal rules, in which
-case the "map config space to MMIO via ranges" discussion is moot for
-Marvell.
-
-Which re-raises a question for which I have not yet heard a compelling
-answer:  Why use 3/2 PCI addressing between Marvell pcie-controller and
-its root ports (with their unusual programming model)?  The Marvell
-hardware address structure between controller and root ports is
-definitely not 3/2.  Certainly you need 3/2 addressing below
-(implemented by) the root ports, but I just don't see the utility of
-pretending 3/2 addressing at the complex-to-port interface.  If the root
-port hardware used the common programming model, with real config
-headers and stuff, 3/2 would be good because you could use existing
-drivers.  But since you need a special root-port driver anyway, why go
-to the trouble of emulating non-existent addressing?
-
-
-
-And we've also been over this before,
-> making that change stops the proposed binding from working properly
-> because the entry in the reg property can't be translated into a CPU
-> addressable memory region.
-> 
-> Thierry
-> 
+								Honza
+-- 
+Jan Kara <jack@suse.cz>
+SUSE Labs, CR
