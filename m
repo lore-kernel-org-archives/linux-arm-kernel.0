@@ -1,109 +1,75 @@
-From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Wed, 13 Mar 2013 15:00:37 +0100
-Subject: [PATCH 4/4] clk: samsung: add infrastructure to add separate aliases
-In-Reply-To: <201303131458.18671.heiko@sntech.de>
-References: <201303131458.18671.heiko@sntech.de>
-Message-ID: <201303131500.37646.heiko@sntech.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 13 Mar 2013 15:15:16 +0100
+Subject: [PATCH v8 07/12] gpio: palmas: add in GPIO support for palmas
+ charger
+In-Reply-To: <1362662276-20792-7-git-send-email-ian@slimlogic.co.uk>
+References: <1362662276-20792-1-git-send-email-ian@slimlogic.co.uk>
+ <1362662276-20792-7-git-send-email-ian@slimlogic.co.uk>
+Message-ID: <CACRpkdaNs+NmAbuwRYzn1xgjHy=7ZknJa-GD1+Q8HBsu53KQqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current code adds aliases, if necessary, directly when adding the clock,
-limiting the number of possible aliases to one.
+Sorry for slow replies :-(
 
-Some platforms need more than one alias, like the hsmmc pclocks on s3c2416
-which need a "hsmmc" and "mmc_busclk.0" alias for the s3c-sdhci driver.
+On Thu, Mar 7, 2013 at 2:17 PM, Ian Lartey <ian@slimlogic.co.uk> wrote:
 
-Therefore add the possibility to separately add clock aliases for previously
-created clocks.
+> +static int palmas_gpio_read(struct palmas *palmas, unsigned int reg,
+> +               int gpio, unsigned int *dest)
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- drivers/clk/samsung/clk.c |   33 +++++++++++++++++++++++++++++++++
- drivers/clk/samsung/clk.h |   21 +++++++++++++++++++++
- 2 files changed, 54 insertions(+), 0 deletions(-)
+I don't like "int gpio" here, please use "int offset".
 
-diff --git a/drivers/clk/samsung/clk.c b/drivers/clk/samsung/clk.c
-index 1ed5716..82f27f6 100644
---- a/drivers/clk/samsung/clk.c
-+++ b/drivers/clk/samsung/clk.c
-@@ -97,6 +97,39 @@ void samsung_clk_add_lookup(struct clk *clk, unsigned int id)
- 		clk_table[id] = clk;
- }
- 
-+/* register a list of aliases */
-+void __init samsung_clk_register_alias(struct samsung_clock_alias *list,
-+					unsigned int nr_clk)
-+{
-+	struct clk *clk;
-+	unsigned int idx, ret;
-+
-+	if (!clk_table) {
-+		pr_err("%s: clock table missing\n", __func__);
-+		return;
-+	}
-+
-+	for (idx = 0; idx < nr_clk; idx++, list++) {
-+		if (!list->id) {
-+			pr_err("%s: clock id missing for index %d\n", __func__,
-+				idx);
-+			continue;
-+		}
-+
-+		clk = clk_table[list->id];
-+		if (!clk) {
-+			pr_err("%s: failed to find clock %d\n", __func__,
-+				list->id);
-+			continue;
-+		}
-+
-+		ret = clk_register_clkdev(clk, list->alias, list->dev_name);
-+		if (ret)
-+			pr_err("%s: failed to register lookup %s\n",
-+					__func__, list->alias);
-+	}
-+}
-+
- /* register a list of fixed clocks */
- void __init samsung_clk_register_fixed_rate(
- 		struct samsung_fixed_rate_clock *list, unsigned int nr_clk)
-diff --git a/drivers/clk/samsung/clk.h b/drivers/clk/samsung/clk.h
-index 26a752b..6bacd6f 100644
---- a/drivers/clk/samsung/clk.h
-+++ b/drivers/clk/samsung/clk.h
-@@ -23,6 +23,25 @@
- #include <mach/map.h>
- 
- /**
-+ * struct samsung_clock_alias: information about mux clock
-+ * @id: platform specific id of the clock.
-+ * @dev_name: name of the device to which this clock belongs.
-+ * @alias: optional clock alias name to be assigned to this clock.
-+ */
-+struct samsung_clock_alias {
-+	unsigned int		id;
-+	const char		*dev_name;
-+	const char		*alias;
-+};
-+
-+#define ALIAS(_id, dname, a)	\
-+	{							\
-+		.id		= _id,				\
-+		.dev_name	= dname,			\
-+		.alias		= a,				\
-+	}
-+
-+/**
-  * struct samsung_fixed_rate_clock: information about fixed-rate clock
-  * @id: platform specific id of the clock.
-  * @name: name of this fixed-rate clock.
-@@ -251,6 +270,8 @@ extern void __init samsung_clk_of_register_fixed_ext(
- 
- extern void samsung_clk_add_lookup(struct clk *clk, unsigned int id);
- 
-+extern void samsung_clk_register_alias(struct samsung_clock_alias *list,
-+		unsigned int nr_clk);
- extern void __init samsung_clk_register_fixed_rate(
- 		struct samsung_fixed_rate_clock *clk_list, unsigned int nr_clk);
- extern void __init samsung_clk_register_fixed_factor(
--- 
-1.7.2.3
+This is not a global GPIO number, it is an offset in the local gpio_chip,
+right?
+
+> +{
+> +       /* registers for second bank are identical and offset by 0x9 */
+> +       if (gpio > 7)
+> +               reg += PALMAS_GPIO_DATA_IN2;
+> +
+> +       return palmas_read(palmas, PALMAS_GPIO_BASE, reg, dest);
+> +}
+> +
+> +static int palmas_gpio_write(struct palmas *palmas, unsigned int reg,
+> +               int gpio, unsigned int data)
+> +{
+> +       /* registers for second bank are identical and offset by 0x9 */
+> +       if (gpio > 7)
+> +               reg += PALMAS_GPIO_DATA_IN2;
+> +
+> +       return palmas_write(palmas, PALMAS_GPIO_BASE, reg, data);
+> +}
+> +
+> +static int palmas_gpio_update_bits(struct palmas *palmas, unsigned int reg,
+> +               int gpio, unsigned int mask, unsigned int data)
+> +{
+> +       /* registers for second bank are identical and offset by 0x9 */
+> +       if (gpio > 7)
+> +               reg += PALMAS_GPIO_DATA_IN2;
+> +
+> +       return palmas_update_bits(palmas, PALMAS_GPIO_BASE, reg, mask, data);
+> +}
+
+
+> -       ret = palmas_read(palmas, PALMAS_GPIO_BASE, PALMAS_GPIO_DATA_IN, &val);
+> +       ret = palmas_gpio_read(palmas, PALMAS_GPIO_DATA_IN, offset, &val);
+
+(Obviously you are passing the offset.)
+
+> +               ret = palmas_gpio_write(palmas, PALMAS_GPIO_SET_DATA_OUT,
+> +                               offset, BIT(offset % 8));
+(..)
+> +               ret = palmas_gpio_write(palmas, PALMAS_GPIO_CLEAR_DATA_OUT,
+> +                               offset, BIT(offset % 8));
+(...)
+> +       ret = palmas_gpio_update_bits(palmas, PALMAS_GPIO_DATA_DIR,
+> +                       offset, 1 << (offset % 8), 1 << (offset % 8));
+
+Why aren't you using the BIT() macro here too?
+
+Further: if these functions are always used like this, with offset
+and some BIT() or (1 << (offset % 8)) why don't you move that
+latter part into the static helper and just pass offset into the
+helper?
+
+Yours,
+Linus Walleij
