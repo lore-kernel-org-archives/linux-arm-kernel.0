@@ -1,23 +1,40 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 13 Mar 2013 10:20:34 -0700
-Subject: [PATCH] ARM: dts: add usb 2.0 clock references to device tree
-In-Reply-To: <1363195044-15715-1-git-send-email-dianders@chromium.org>
-References: <1363195044-15715-1-git-send-email-dianders@chromium.org>
-Message-ID: <CAD=FV=W9KF4OM9VzMse4rRnKsph2h2izLKHptvffz4gRkFmBNw@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 13 Mar 2013 11:34:11 -0600
+Subject: [PATCH V2 0/9] ARM: tegra: add platform suspend support
+In-Reply-To: <1363154644.3998.140.camel@jlo-ubuntu-64.nvidia.com>
+References: <1363060916-8897-1-git-send-email-josephl@nvidia.com>
+ <513F82EB.1030407@wwwdotorg.org>
+ <1363154644.3998.140.camel@jlo-ubuntu-64.nvidia.com>
+Message-ID: <5140B893.9010704@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Argh...
+On 03/13/2013 12:04 AM, Joseph Lo wrote:
+...
+> BTW, I want to mention one thing about PMC DT bindings. Because I can't
+> add all of the PMC DT bindings in one time, the PMC is related to too
+> many devices to work for runtime PM and power domain control. And some
+> wake up sources control for deep sleep mode (LP0). They are still under
+> developing for upstream. May I add more bindings for PMC later?
 
-On Wed, Mar 13, 2013 at 10:17 AM, Doug Anderson <dianders@chromium.org> wrote:
-> This is a fixup to two device tree nodes that have already landed but
-> without clock nodes since the transition to common clock happened at
-> the same time.
->
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
+With DT you are supposed to define the complete DT binding for the HW up
+front. There have been some hints that incrementally defining bindings
+will start to get push-back. How hard is it in this case to simply
+define the entire binding right now?
 
-Please forgive my fat finger and see the version with the updated
-description: "[PATCH] ARM: dts: add usb 2.0 clock references to
-exynos5250 device tree".  There is no difference other than the title.
+That said, in practice, you can certainly incrementally define bindings
+at the moment. The main issue here is to ensure that when you add the
+new properties/..., then:
 
--Doug
+a) You don't change anything that's already there. The old properties
+and content must continue to work without modification.
+
+b) For all nodes/properties that are newly required, either there is a
+suitable default if they are missing from the DT (as they would be for
+DTs written to the old specification), /or/ the new nodes/properties
+only enable new features, so that any old DT continues to work fine with
+at least as many features as it always did.
+
+If you satisfy those conditions, I believe we can still get away with
+incrementally defining bindings. I don't know how long that will last
+though.
