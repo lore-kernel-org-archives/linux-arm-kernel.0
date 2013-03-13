@@ -1,46 +1,34 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Tue, 12 Mar 2013 21:11:38 -0700
-Subject: [PATCH] bounce:fix bug, avoid to flush dcache on slab page from
- jbd2.
-In-Reply-To: <513FF3F3.2000509@gmail.com>
-References: <5139DB90.5090302@gmail.com>
- <20130312153221.0d26fe5599d4885e51bb0c7c@linux-foundation.org>
- <20130313011020.GA5313@blackbox.djwong.org>
- <513FF3F3.2000509@gmail.com>
-Message-ID: <20130312211138.a2824b7e.akpm@linux-foundation.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 12 Mar 2013 22:14:10 -0600
+Subject: [PATCH V2 9/9] ARM: dts: tegra: add the PM configurations of PMC
+In-Reply-To: <1363142623.3998.33.camel@jlo-ubuntu-64.nvidia.com>
+References: <1363061043-9680-1-git-send-email-josephl@nvidia.com>
+ <97395805.p014F9TUYL@fb07-iapwap2.physik.uni-giessen.de>
+ <1363142623.3998.33.camel@jlo-ubuntu-64.nvidia.com>
+Message-ID: <513FFD12.8050007@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 13 Mar 2013 11:35:15 +0800 Shuge <shugelinux@gmail.com> wrote:
-
-> Hi all
-> >>> The bounce accept slab pages from jbd2, and flush dcache on them.
-> >>> When enabling VM_DEBUG, it will tigger VM_BUG_ON in page_mapping().
-> >>> So, check PageSlab to avoid it in __blk_queue_bounce().
-> >>>
-> >>> Bug URL: http://lkml.org/lkml/2013/3/7/56
-> >>>
-> >>> ...
-> >>>
-> >> ......
-> >>
-> > That sure is strange.  I didn't see any obvious reasons why we'd end up with a
-> >
-> ......
+On 03/12/2013 08:43 PM, Joseph Lo wrote:
+> Hi Marc,
 > 
->      Well, this problem not only appear in arm64, but also arm32. And my 
-> kernel version is 3.3.0, arch is arm32.
-> Following the newest kernel, the problem shoulde be exist.
->      I agree with Darrick's modification. Hum, if 
-> CONFIG_NEED_BOUNCE_POOL is not set, it also flush dcahce on
-> the pages of b_frozen_data, some of them are allocated by kmem_cache_alloc.
->      As we know, jbd2_alloc allocate a buffer from jbd2_xk slab pool, 
-> when the size is smaller than PAGE_SIZE.
-> The b_frozen_data  is not mapped to usrspace, not aliasing cache. It cat 
-> be lazy flush or other. Is it right?
+> On Tue, 2013-03-12 at 18:43 +0800, Marc Dietrich wrote:
+>> Am Dienstag, 12. M?rz 2013, 12:04:03 schrieb Joseph Lo:
+>>> Adding the PM configuration of PMC when the platform support suspend
+>>> function.
 
-Please reread my email.  The page at b_frozen_data was allocated with
-GFP_NOFS.  Hence it should not need bounce treatment (if arm is
-anything like x86).
+>>> +		nvidia,core-pwr-good-time = <3845 3845>;
+>>
+>> mmh, no idea here. original source [1] shows 0x7e7e ticks which translates to 
+>> 1 sec?
+>>
+> The ticks was based on the 32KHz clock domain. I translate it to uS.
 
-And yet it *did* receive bounce treatment.  Why?
+>>> 0x7e7e * (1.0/32000) * 1000000
+1011937.4999999999
+
+Oh, I suppose perhaps the 0x7e7e value is both values packed together,
+so this should be:
+
+>>> 0x7e * (1.0/32000) * 1000000
+3937.5
