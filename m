@@ -1,24 +1,27 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 13 Mar 2013 11:45:52 -0600
-Subject: [PATCH v3] ARM: tegra: expose chip ID and revision
-In-Reply-To: <1363168080-12697-1-git-send-email-dahuang@nvidia.com>
-References: <1363168080-12697-1-git-send-email-dahuang@nvidia.com>
-Message-ID: <5140BB50.8080004@wwwdotorg.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 13 Mar 2013 18:47:36 +0100
+Subject: [PATCH] pinctrl: mvebu: prevent walking off the end of group array
+In-Reply-To: <1363196155-1620-1-git-send-email-jason@lakedaemon.net>
+References: <1362872371.3690.106.camel@shinybook.infradead.org>
+ <1363196155-1620-1-git-send-email-jason@lakedaemon.net>
+Message-ID: <CACRpkdaoF-PqqOi3bCQXnuey_2U+niHA8RWriXiJUE=kUZB0dQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/13/2013 03:48 AM, Danny Huang wrote:
-> Expose Tegra chip ID and revision in /sys/devices/soc for user mode
-> usage
+On Wed, Mar 13, 2013 at 6:35 PM, Jason Cooper <jason@lakedaemon.net> wrote:
 
-> diff --git a/arch/arm/mach-tegra/tegra.c b/arch/arm/mach-tegra/tegra.c
+> From: David Woodhouse <dwmw2@infradead.org>
+>
+> While investigating (ab)use of krealloc, David found this bug.  It's
+> unlikely to occur, but now we detect the condition and error out
+> appropriately.
+>
+> Signed-off-by: David Woodhouse <David.Woodhouse@intel.com>
+> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+> ---
+> David, please double check that this is as you intended.  I had to hand-jam it in due to some peculiarities on my side.
 
->  static void __init tegra_dt_init(void)
->  {
-> +	struct device *parent = NULL;
-> +	struct soc_device *soc_dev;
-> +	struct soc_device_attribute *soc_dev_attr;
+I have tentatively applied this to my fixes branch.
 
-Since Russell asked you to redo the patch anyway, I'd prefer that
-variables be declared in the order they're used. So, soc_dev_attr, then
-soc_dev, then parent.
+Yours,
+Linus Walleij
