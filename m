@@ -1,50 +1,32 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 13 Mar 2013 12:12:13 +0100
-Subject: ARM: at-91: ARCH_AT91SAM9X5 went missing
-In-Reply-To: <1363171688.3137.196.camel@x61.thuisdomein>
-References: <1363171688.3137.196.camel@x61.thuisdomein>
-Message-ID: <51405F0D.40102@atmel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 13 Mar 2013 11:19:46 +0000
+Subject: [PATCH v5 2/2] ARM: uncompress debug support for multiplatform
+ build
+In-Reply-To: <1363144715-12002-1-git-send-email-shawn.guo@linaro.org>
+References: <1363001737-8745-3-git-send-email-shawn.guo@linaro.org>
+ <1363144715-12002-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <201303131119.46580.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/13/2013 11:48 AM, Paul Bolle :
-> 0) Commit 1e3ce2b8545390a2aee8dbfcd49ca4161b636000
-> ("AR[M]: at91: introduce SOC_AT91xxx define to allow to compile SoC core
-> support") dropped the Kconfig symbol ARCH_AT91SAM9X5. It seems it missed
-> something like this:
+On Wednesday 13 March 2013, Shawn Guo wrote:
+> build, the patch turns uncompress debug into one part of DEBUG_LL
+> support.  When DEBUG_LL is turned on for a particular platform,
+> uncompress debug works too for that platform.
 > 
-> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-> index 6071f4c..2db5370 100644
-> --- a/arch/arm/mach-at91/Kconfig
-> +++ b/arch/arm/mach-at91/Kconfig
-> @@ -131,6 +131,10 @@ config ARCH_AT91SAM9G45
->         bool "AT91SAM9G45"
->         select SOC_AT91SAM9G45
->  
-> +config ARCH_AT91SAM9X5
-> +       bool "AT91SAM9X5"
-> +       select SOC_AT91SAM9X5
-> +
->  config ARCH_AT91X40
->         bool "AT91x40"
->         depends on !MMU
+> OMAP and Tegra are exceptions here.  OMAP low-level debug code places
+> data in the .data section, and that is not allowed in decompressor.
+> And Tegra code has reference to variable that's unavailable in
+> decompressor but only in kernel.  That's why Kconfig symbol
+> DEBUG_UNCOMPRESS controlling multiplatform uncompress debug support is
+> defined with !DEBUG_OMAP2PLUS_UART && !DEBUG_TEGRA_UART.
 > 
-> 1) But before I submit something along those lines: ARCH_AT91* variants
-> are still used quite a bit around the tree (both as Kconfig symbols and
-> as Kconfig macros). How are the current SOC_AT91* symbols wired back to
-> the old ARCH_AT91* symbols? Or are those old symbols and macros _only_
-> needed for backwards compatibility?
+> It creates arch/arm/boot/compressed/debug.S with CONFIG_DEBUG_LL_INCLUDE
+> included there, implements a generic putc() using those macros, which
+> will be built when DEBUG_UNCOMPRESS is defined.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Acked-by: Olof Johansson <olof@lixom.net>
+> Acked-by: Tony Lindgren <tony@atomide.com>
 
-These ARCH_AT91xxx variables are not used anymore for pure Device Tree
-SoCs (I mean: at91sam9x5, at91sam9n12, sama5d3 families). They are used
-for non-DT SoCs and for chips that support both legacy board files and DT.
-The old ARCH_AT91xxx symbols are selecting the corresponding SOC_AT91xxx
-symbol.
-
-ARCH_AT91xxx in Kconfig that are specific to a particular SoC are going
-to disappear as we tend to allow the compilation of a particular driver
-for a wider range of configurations.
-
-Hope that it helps. Best regards,
--- 
-Nicolas Ferre
+Acked-by: Arnd Bergmann <arnd@arndb.de>
