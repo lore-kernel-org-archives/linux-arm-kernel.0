@@ -1,183 +1,271 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Wed, 13 Mar 2013 13:05:34 +0800
-Subject: [PATCH v3 03/11] clocksource: sp804: add device tree support
+Date: Wed, 13 Mar 2013 13:05:35 +0800
+Subject: [PATCH v3 04/11] ARM: integrator: use clocksource_of_init for sp804
 In-Reply-To: <1363151142-32162-1-git-send-email-haojian.zhuang@linaro.org>
 References: <1363151142-32162-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1363151142-32162-4-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1363151142-32162-5-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Parse clock & irq from device tree for sp804.
+Remove all code to parse sp804 in integrator platform driver. Use
+clocksource_of_init() instead since these code are implemented in sp804
+driver already.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 ---
- .../devicetree/bindings/timer/arm,sp804.txt        |   27 +++++
- drivers/clocksource/timer-sp.c                     |  105 ++++++++++++++++++++
- 2 files changed, 132 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/timer/arm,sp804.txt
+ arch/arm/boot/dts/integrator.dtsi        |    3 +++
+ arch/arm/boot/dts/integratorap.dts       |    9 +++----
+ arch/arm/boot/dts/integratorcp.dts       |    9 +++----
+ arch/arm/mach-integrator/Kconfig         |    3 +++
+ arch/arm/mach-integrator/integrator_ap.c |   41 +-----------------------------
+ arch/arm/mach-integrator/integrator_cp.c |   35 ++-----------------------
+ drivers/clocksource/timer-sp.c           |    2 ++
+ 7 files changed, 19 insertions(+), 83 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/timer/arm,sp804.txt b/Documentation/devicetree/bindings/timer/arm,sp804.txt
-new file mode 100644
-index 0000000..ec1ae45
---- /dev/null
-+++ b/Documentation/devicetree/bindings/timer/arm,sp804.txt
-@@ -0,0 +1,27 @@
-+ARM sp804 Dual Timers
-+---------------------------------------
-+
-+Required properties:
-+- compatible: Should be "arm,sp804" & "arm,primecell"
-+- interrupts: Should contain the list of Dual Timer interrupts
-+	interrupts = <0 0 4>, <0 1 4>;
-+- reg: Should contain location and length for dual timer register.
-+- clocks: clock driving the dual timer hardware
-+	clocks = <&timclk0 &timclk1>;
-+
-+Optional properties:
-+- arm,sp804-clocksource: Should contain the register offset of TIMER1 or
-+  TIMER2 in Dual Timer Controller.
-+	arm,sp804-clocksource = <0x20>;
-+
-+Example:
-+
-+	timer0: timer at fc800000 {
-+		compatible = "arm,sp804", "arm,primecell";
-+		reg = <0xfc800000 0x1000>;
-+		/* timer00 & timer01 */
-+		interrupts = <0 0 4>, <0 1 4>;
-+		clocks = <&timclk0 &timclk1>;
-+		clock-names = "apb_pclk";
+diff --git a/arch/arm/boot/dts/integrator.dtsi b/arch/arm/boot/dts/integrator.dtsi
+index 813b91d..749ac21 100644
+--- a/arch/arm/boot/dts/integrator.dtsi
++++ b/arch/arm/boot/dts/integrator.dtsi
+@@ -9,18 +9,21 @@
+ 		reg = <0x13000000 0x100>;
+ 		interrupt-parent = <&pic>;
+ 		interrupts = <5>;
 +		status = "disabled";
-+	};
+ 	};
+ 
+ 	timer at 13000100 {
+ 		reg = <0x13000100 0x100>;
+ 		interrupt-parent = <&pic>;
+ 		interrupts = <6>;
++		status = "disabled";
+ 	};
+ 
+ 	timer at 13000200 {
+ 		reg = <0x13000200 0x100>;
+ 		interrupt-parent = <&pic>;
+ 		interrupts = <7>;
++		status = "disabled";
+ 	};
+ 
+ 	pic at 14000000 {
+diff --git a/arch/arm/boot/dts/integratorap.dts b/arch/arm/boot/dts/integratorap.dts
+index c9c3fa3..112d2e0 100644
+--- a/arch/arm/boot/dts/integratorap.dts
++++ b/arch/arm/boot/dts/integratorap.dts
+@@ -9,11 +9,6 @@
+ 	model = "ARM Integrator/AP";
+ 	compatible = "arm,integrator-ap";
+ 
+-	aliases {
+-		arm,timer-primary = &timer2;
+-		arm,timer-secondary = &timer1;
+-	};
+-
+ 	chosen {
+ 		bootargs = "root=/dev/ram0 console=ttyAM0,38400n8 earlyprintk";
+ 	};
+@@ -29,10 +24,14 @@
+ 
+ 	timer1: timer at 13000100 {
+ 		compatible = "arm,integrator-timer";
++		arm,sp804-clockevent = <0>;
++		status = "ok";
+ 	};
+ 
+ 	timer2: timer at 13000200 {
+ 		compatible = "arm,integrator-timer";
++		arm,sp804-clocksource = <0>;
++		status = "ok";
+ 	};
+ 
+ 	pic: pic at 14000000 {
+diff --git a/arch/arm/boot/dts/integratorcp.dts b/arch/arm/boot/dts/integratorcp.dts
+index 8b11939..19b2e3e 100644
+--- a/arch/arm/boot/dts/integratorcp.dts
++++ b/arch/arm/boot/dts/integratorcp.dts
+@@ -9,11 +9,6 @@
+ 	model = "ARM Integrator/CP";
+ 	compatible = "arm,integrator-cp";
+ 
+-	aliases {
+-		arm,timer-primary = &timer2;
+-		arm,timer-secondary = &timer1;
+-	};
+-
+ 	chosen {
+ 		bootargs = "root=/dev/ram0 console=ttyAMA0,38400n8 earlyprintk";
+ 	};
+@@ -29,10 +24,14 @@
+ 
+ 	timer1: timer at 13000100 {
+ 		compatible = "arm,sp804", "arm,primecell";
++		arm,sp804-clockevent = <0>;
++		status = "ok";
+ 	};
+ 
+ 	timer2: timer at 13000200 {
+ 		compatible = "arm,sp804", "arm,primecell";
++		arm,sp804-clocksource = <0>;
++		status = "ok";
+ 	};
+ 
+ 	pic: pic at 14000000 {
+diff --git a/arch/arm/mach-integrator/Kconfig b/arch/arm/mach-integrator/Kconfig
+index abeff25..031f43a 100644
+--- a/arch/arm/mach-integrator/Kconfig
++++ b/arch/arm/mach-integrator/Kconfig
+@@ -5,6 +5,7 @@ menu "Integrator Options"
+ config ARCH_INTEGRATOR_AP
+ 	bool "Support Integrator/AP and Integrator/PP2 platforms"
+ 	select CLKSRC_MMIO
++	select CLKSRC_OF
+ 	select MIGHT_HAVE_PCI
+ 	select SERIAL_AMBA_PL010
+ 	select SERIAL_AMBA_PL010_CONSOLE
+@@ -15,6 +16,8 @@ config ARCH_INTEGRATOR_AP
+ 
+ config ARCH_INTEGRATOR_CP
+ 	bool "Support Integrator/CP platform"
++	select CLKSRC_MMIO
++	select CLKSRC_OF
+ 	select ARCH_CINTEGRATOR
+ 	select ARM_TIMER_SP804
+ 	select PLAT_VERSATILE_CLCD
+diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
+index c2112ff..2266944 100644
+--- a/arch/arm/mach-integrator/integrator_ap.c
++++ b/arch/arm/mach-integrator/integrator_ap.c
+@@ -425,45 +425,6 @@ void __init ap_init_early(void)
+ 
+ #ifdef CONFIG_OF
+ 
+-static void __init ap_of_timer_init(void)
+-{
+-	struct device_node *node;
+-	const char *path;
+-	void __iomem *base;
+-	int err;
+-	int irq;
+-	struct clk *clk;
+-	unsigned long rate;
+-
+-	clk = clk_get_sys("ap_timer", NULL);
+-	BUG_ON(IS_ERR(clk));
+-	clk_prepare_enable(clk);
+-	rate = clk_get_rate(clk);
+-
+-	err = of_property_read_string(of_aliases,
+-				"arm,timer-primary", &path);
+-	if (WARN_ON(err))
+-		return;
+-	node = of_find_node_by_path(path);
+-	base = of_iomap(node, 0);
+-	if (WARN_ON(!base))
+-		return;
+-	writel(0, base + TIMER_CTRL);
+-	integrator_clocksource_init(rate, base);
+-
+-	err = of_property_read_string(of_aliases,
+-				"arm,timer-secondary", &path);
+-	if (WARN_ON(err))
+-		return;
+-	node = of_find_node_by_path(path);
+-	base = of_iomap(node, 0);
+-	if (WARN_ON(!base))
+-		return;
+-	irq = irq_of_parse_and_map(node, 0);
+-	writel(0, base + TIMER_CTRL);
+-	integrator_clockevent_init(rate, base, irq);
+-}
+-
+ static const struct of_device_id fpga_irq_of_match[] __initconst = {
+ 	{ .compatible = "arm,versatile-fpga-irq", .data = fpga_irq_of_init, },
+ 	{ /* Sentinel */ }
+@@ -582,7 +543,7 @@ DT_MACHINE_START(INTEGRATOR_AP_DT, "ARM Integrator/AP (Device Tree)")
+ 	.init_early	= ap_init_early,
+ 	.init_irq	= ap_init_irq_of,
+ 	.handle_irq	= fpga_handle_irq,
+-	.init_time	= ap_of_timer_init,
++	.init_time	= clocksource_of_init,
+ 	.init_machine	= ap_init_of,
+ 	.restart	= integrator_restart,
+ 	.dt_compat      = ap_dt_board_compat,
+diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
+index 40373ec..6e1c340 100644
+--- a/arch/arm/mach-integrator/integrator_cp.c
++++ b/arch/arm/mach-integrator/integrator_cp.c
+@@ -28,6 +28,7 @@
+ #include <linux/of_address.h>
+ #include <linux/of_platform.h>
+ #include <linux/sys_soc.h>
++#include <linux/clocksource.h>
+ #include <clocksource/arm_timer.h>
+ #include <clocksource/timer-sp.h>
+ 
+@@ -251,38 +252,6 @@ static void __init intcp_init_early(void)
+ 
+ #ifdef CONFIG_OF
+ 
+-static void __init cp_of_timer_init(void)
+-{
+-	struct device_node *node;
+-	const char *path;
+-	void __iomem *base;
+-	int err;
+-	int irq;
+-
+-	err = of_property_read_string(of_aliases,
+-				"arm,timer-primary", &path);
+-	if (WARN_ON(err))
+-		return;
+-	node = of_find_node_by_path(path);
+-	base = of_iomap(node, 0);
+-	if (WARN_ON(!base))
+-		return;
+-	writel(0, base + TIMER_CTRL);
+-	sp804_clocksource_init(base, node->name);
+-
+-	err = of_property_read_string(of_aliases,
+-				"arm,timer-secondary", &path);
+-	if (WARN_ON(err))
+-		return;
+-	node = of_find_node_by_path(path);
+-	base = of_iomap(node, 0);
+-	if (WARN_ON(!base))
+-		return;
+-	irq = irq_of_parse_and_map(node, 0);
+-	writel(0, base + TIMER_CTRL);
+-	sp804_clockevents_init(base, irq, node->name);
+-}
+-
+ static const struct of_device_id fpga_irq_of_match[] __initconst = {
+ 	{ .compatible = "arm,versatile-fpga-irq", .data = fpga_irq_of_init, },
+ 	{ /* Sentinel */ }
+@@ -386,7 +355,7 @@ DT_MACHINE_START(INTEGRATOR_CP_DT, "ARM Integrator/CP (Device Tree)")
+ 	.init_early	= intcp_init_early,
+ 	.init_irq	= intcp_init_irq_of,
+ 	.handle_irq	= fpga_handle_irq,
+-	.init_time	= cp_of_timer_init,
++	.init_time	= clocksource_of_init,
+ 	.init_machine	= intcp_init_of,
+ 	.restart	= integrator_restart,
+ 	.dt_compat      = intcp_dt_board_compat,
 diff --git a/drivers/clocksource/timer-sp.c b/drivers/clocksource/timer-sp.c
-index a7f2510..63f757d 100644
+index 63f757d..b3d9eba 100644
 --- a/drivers/clocksource/timer-sp.c
 +++ b/drivers/clocksource/timer-sp.c
-@@ -19,16 +19,23 @@
-  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-  */
- #include <linux/clk.h>
-+#include <linux/clkdev.h>
- #include <linux/clocksource.h>
- #include <linux/clockchips.h>
- #include <linux/err.h>
- #include <linux/interrupt.h>
- #include <linux/irq.h>
- #include <linux/io.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
- #include <clocksource/arm_timer.h>
-+#include <clocksource/timer-sp.h>
+@@ -201,6 +201,7 @@ static struct device_node *from = NULL;
  
- #include <asm/sched_clock.h>
+ static struct of_device_id sp804_timer_match[] __initdata = {
+ 	{ .compatible = "arm,sp804", },
++	{ .compatible = "arm,integrator-timer", },
+ 	{}
+ };
  
-+#define SP804_CLKSRC	"sp804 source"
-+#define SP804_CLKEVT	"sp804 event"
-+
- static long __init sp804_get_clock_rate(const char *name)
- {
- 	struct clk *clk;
-@@ -189,3 +196,101 @@ void __init sp804_clockevents_init(void __iomem *base, unsigned int irq,
- 	setup_irq(irq, &sp804_timer_irq);
- 	clockevents_config_and_register(evt, rate, 0xf, 0xffffffff);
+@@ -294,3 +295,4 @@ err:
+ 	iounmap(base);
  }
-+
-+static struct device_node *from = NULL;
-+
-+static struct of_device_id sp804_timer_match[] __initdata = {
-+	{ .compatible = "arm,sp804", },
-+	{}
-+};
-+
-+static struct clk __init *sp804_dt_init_clk(struct device_node *np, int i,
-+					    const char *name)
-+{
-+	struct clk_lookup *lookup = NULL;
-+	struct clk *clk;
-+
-+	clk = of_clk_get(np, i);
-+	if (IS_ERR(clk))
-+		return clk;
-+	lookup = clkdev_alloc(clk, name, "sp804");
-+	if (!lookup) {
-+		clk_put(clk);
-+		return ERR_PTR(-EINVAL);
-+	}
-+	clkdev_add(lookup);
-+	return clk;
-+}
-+
-+static void __attribute__((__unused__)) __init sp804_dt_init(void)
-+{
-+	struct device_node *np = NULL;
-+	struct clk *clksrc = NULL, *clkevt = NULL;
-+	void __iomem *base;
-+	int retsrc, retevt, i = 0, irq = 0;
-+	u32 srcoffs = 0, evtoffs = 0;
-+
-+	np = of_find_matching_node(from, sp804_timer_match);
-+	WARN_ON(!np);
-+	if (!np) {
-+		pr_err("Failed to find sp804 timer\n");
-+		return;
-+	}
-+	from = np;
-+	/* check whether timer node is available */
-+	if (!of_device_is_available(np))
-+		return;
-+
-+	base = of_iomap(np, 0);
-+	WARN_ON(!base);
-+	if (!base)
-+		return;
-+
-+	retsrc = of_property_read_u32(np, "arm,sp804-clocksource", &srcoffs);
-+	retevt = of_property_read_u32(np, "arm,sp804-clockevent", &evtoffs);
-+	if (retsrc < 0 && retevt < 0)
-+		goto err;
-+
-+	if (!retsrc) {
-+		if (srcoffs) {
-+			/* TIMER2 is clock source */
-+			i = 1;
-+			srcoffs = TIMER_2_BASE;
-+		} else {
-+			/* TIMER1 is clock source */
-+			i = 0;
-+			srcoffs = TIMER_1_BASE;
-+		}
-+		clksrc = sp804_dt_init_clk(np, i, SP804_CLKSRC);
-+		if (IS_ERR(clksrc))
-+			goto err;
-+		sp804_clocksource_and_sched_clock_init(base + srcoffs,
-+						       SP804_CLKSRC);
-+	}
-+	if (!retevt) {
-+		if (evtoffs) {
-+			/* TIMER2 is clock event */
-+			i = 1;
-+			evtoffs = TIMER_2_BASE;
-+		} else {
-+			/* TIMER1 is clock event */
-+			i = 0;
-+			evtoffs = TIMER_1_BASE;
-+		}
-+		irq = irq_of_parse_and_map(np, i);
-+		if (irq < 0)
-+			goto err_evt;
-+		clkevt = sp804_dt_init_clk(np, i, SP804_CLKEVT);
-+		if (IS_ERR(clkevt))
-+			goto err_evt;
-+		sp804_clockevents_init(base + evtoffs, irq, SP804_CLKEVT);
-+	}
-+
-+	return;
-+err_evt:
-+	if (clksrc)
-+		clk_put(clksrc);
-+err:
-+	iounmap(base);
-+}
-+CLOCKSOURCE_OF_DECLARE(sp804, "arm,sp804", sp804_dt_init)
+ CLOCKSOURCE_OF_DECLARE(sp804, "arm,sp804", sp804_dt_init)
++CLOCKSOURCE_OF_DECLARE(integrator, "arm,integrator-timer", sp804_dt_init)
 -- 
 1.7.10.4
