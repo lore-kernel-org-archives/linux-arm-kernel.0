@@ -1,35 +1,44 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 13 Mar 2013 17:14:35 +0100
-Subject: [PATCH 4/6] arm: vt8500: Remove gpio devicetree nodes
-In-Reply-To: <1362807578-23089-5-git-send-email-linux@prisktech.co.nz>
-References: <1362807578-23089-1-git-send-email-linux@prisktech.co.nz>
- <1362807578-23089-5-git-send-email-linux@prisktech.co.nz>
-Message-ID: <CACRpkdYbtH7jJqmXT-SHKy8qbzbNntSwnJwS1+PR7brTJ3ijiw@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 13 Mar 2013 16:18:12 +0000
+Subject: [PATCH] ARM: smp: Allow real broadcast device selection
+ instead of always dummy
+In-Reply-To: <51409EC3.5050905@ti.com>
+References: <1363165608-13739-1-git-send-email-santosh.shilimkar@ti.com>
+ <514046B6.9020005@ti.com>
+ <20130313101641.GA13483@e106331-lin.cambridge.arm.com>
+ <514061D1.20603@ti.com>
+ <20130313122550.GD13483@e106331-lin.cambridge.arm.com>
+ <51409EC3.5050905@ti.com>
+Message-ID: <20130313161811.GF13483@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 9, 2013 at 6:39 AM, Tony Prisk <linux@prisktech.co.nz> wrote:
+On Wed, Mar 13, 2013 at 03:44:03PM +0000, Santosh Shilimkar wrote:
+> On Wednesday 13 March 2013 05:55 PM, Mark Rutland wrote:
+> > On Wed, Mar 13, 2013 at 11:24:01AM +0000, Santosh Shilimkar wrote:
+> >> On Wednesday 13 March 2013 03:46 PM, Mark Rutland wrote:
+> >>> Hi Santosh,
+> 
+> [..]
+> 
+> >>>
+> >>> Is the problem that the dummy timer is being registered as the broadcast
+> >>> source, or that it is selected as a local timer in preference of real timers?
+> >>>
+> >> Dummy timer is preferred over real broadcast timer.
+> > 
+> > Ok.
 
-> Remove the gpio related devicetree nodes as these are no longer required
-> with the move to a combined pinctrl/gpio driver.
->
-> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
-(...)
+[...]
 
-> -               gpio: gpio-controller at d8110000 {
-> -                       compatible = "via,vt8500-gpio";
-> -                       gpio-controller;
-> -                       reg = <0xd8110000 0x10000>;
-> -                       #gpio-cells = <3>;
-> -               };
+> > I do agree it'd be worth lowering the dummy timer's rating to ensure it doesn't
+> > override a real timer elsewhere. 
+> > 
+> Yep. Can I add you acked-by tag then for $subject patch ?
+> Would be good to get this one merged as well.
 
-Whopeedo. If I understand the fine devicetree folks you may
-remove this stuff from the devicetree, but the code in the new
-pin control driver should still be backward-compatible with
-devicetrees that look like this.
+Sure. Though could you reword the commit message? The patch solves the more
+general issue of a dummy being preferred over real hardware even outside of
+choosing the broadcast device.
 
-It's not like I care, just noting that this is the philosophy around
-such things.
-
-Yours,
-Linus Walleij
+Acked-by: Mark Rutland <mark.rutland@arm.com>
