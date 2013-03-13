@@ -1,44 +1,56 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 13 Mar 2013 13:59:04 +0800
-Subject: [PATCH v2 00/13] ARM: spear multiplatform support
-In-Reply-To: <1363106816-9603-1-git-send-email-arnd@arndb.de>
-References: <1363106816-9603-1-git-send-email-arnd@arndb.de>
-Message-ID: <CAOh2x==O4OtpTPxgpBs5B0NZtbc6MkeyetsJz9AGDEAarA=OFQ@mail.gmail.com>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Wed, 13 Mar 2013 14:04:04 +0800
+Subject: [PATCH V2 0/9] ARM: tegra: add platform suspend support
+In-Reply-To: <513F82EB.1030407@wwwdotorg.org>
+References: <1363060916-8897-1-git-send-email-josephl@nvidia.com>
+ <513F82EB.1030407@wwwdotorg.org>
+Message-ID: <1363154644.3998.140.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 13, 2013 at 12:46 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> This is the second time I post the SPEAr multiplatform patches.
-> It did not work out for 3.9, mostly because of conflicts against
-> patches in the DMA tree, but also because I did not push very
-> hard for these. The patches are basically unchanged now, just
-> some context differences since I rebased them on top of 3.9-rc2.
->
-> I'm adding them to the arm-soc tree for 3.10 now. If there are
-> any bugs, let's fix them on top of this branch. It would be
-> good to get some more testing on the branch though.
+On Wed, 2013-03-13 at 03:32 +0800, Stephen Warren wrote:
+> On 03/11/2013 10:01 PM, Joseph Lo wrote:
+> > This series introduces a basic functionality for Tegra to support the
+> > platform suspend and resume.
+> > 
+> > Note: This series only adds the support for Tegra20 and Tegra30. The
+> > Tegra114 will be supported later.
+> 
+> Aside from the few issues that have already been pointed out, this looks
+> OK now. I have a couple questions:
+> 
+> 1) Please remind me if this series depends on anything. If not, I hope
+> to apply it mostly directly on top of 3.9-rc1 or so.
+> 
+There is a patch that you just re-post to linux-mmc tree (mmc: tegra:
+use mmc_of_parse to get the support of standard MMC DT bindings). This
+series need the patch to make sure everything work.
 
-I thought i would meet you at Connect, but last time i didn't come and
-this time you :)
+> 2) You mentioned that Tegra114 isn't supported. What is the failure mode
+> on Tegra114? Is suspend simply not available and hence can't be
+> requested, or will suspend attempts gracefully return an error, or will
+> there we crashes, boot failures, etc.?
+> 
+Because the DT of Tegra114 didn't describe any PMC suspend information.
+So the driver will prevent to register any platform suspend ops. The
+result will something like below.
 
-Anyways thanks for all the good work you have done for SPEAr. These
-are already Acked by me
+Tegra114 > echo mem > /sys/power/state
+write error: No such device
 
-@Vipul: Can you give these a try? Please consider following which we got
-from the last discussion:
+> 3) Sorry for asking this again, but since only LP2 is actually
+> implemented in patch 4, what happens if the user selects LP0 or LP1?
+> Does the system (a) just use LP2, (b) fail to suspend, and hence
+> immediately resume, (c) suspend, but can't be resumed, ...?
+> 
+Ah. I didn't add any protection here. It will be (c) due the LP2 mask. I
+will add a protection in next version. Thanks for remind.
 
-From: Arnd...
+BTW, I want to mention one thing about PMC DT bindings. Because I can't
+add all of the PMC DT bindings in one time, the PMC is related to too
+many devices to work for runtime PM and power domain control. And some
+wake up sources control for deep sleep mode (LP0). They are still under
+developing for upstream. May I add more bindings for PMC later?
 
-Thanks for testing out the patches. I forgot about the loadaddress,
-which indeed does not get set for multiplatform kernels, because
-the kernel does not know the correct address when it depends on
-the platform you are booting on.
-
-The recommended solution for this is to boot a normal 'vmlinux'
-or 'zImage' file rather than a uImage file. If you u-boot version
-is too old for that and you cannot update, you can manually
-call 'mkimage' to create a uImage file with the correct load
-address.
-
---
-viresh
+Thanks,
+Joseph
