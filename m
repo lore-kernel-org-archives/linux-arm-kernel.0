@@ -1,64 +1,66 @@
-From: sourav.poddar@ti.com (Sourav Poddar)
-Date: Wed, 13 Mar 2013 23:37:41 +0530
-Subject: [Resend/PATCH 0/5] omap4/5: i2c/spi: device tree data
-In-Reply-To: <5140AD75.2050900@ti.com>
-References: <1363009486-19430-1-git-send-email-sourav.poddar@ti.com>
- <513DEAE1.1050606@ti.com> <513DFB62.5030709@ti.com> <5140AD75.2050900@ti.com>
-Message-ID: <5140C06D.8030507@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 13 Mar 2013 12:10:50 -0600
+Subject: [RFC 1/1] clk: Add notifier support in
+ clk_prepare_enable/clk_disable_unprepare
+In-Reply-To: <1363153204.3311.14.camel@bilhuang-vm1>
+References: <1363091861-21534-1-git-send-email-bilhuang@nvidia.com>
+ <20130312134032.GU4977@n2100.arm.linux.org.uk>
+ <1363139273.21694.11.camel@bilhuang-vm1> <514003B6.8020904@wwwdotorg.org>
+ <1363151317.3311.9.camel@bilhuang-vm1> <51400D9D.9060305@wwwdotorg.org>
+ <1363153204.3311.14.camel@bilhuang-vm1>
+Message-ID: <5140C12A.4060900@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 03/12/2013 11:40 PM, Bill Huang wrote:
+> On Wed, 2013-03-13 at 13:24 +0800, Stephen Warren wrote:
+>> On 03/12/2013 11:08 PM, Bill Huang wrote:
+>>> On Wed, 2013-03-13 at 12:42 +0800, Stephen Warren wrote:
+>>>> On 03/12/2013 07:47 PM, Bill Huang wrote:
+>>>>> On Tue, 2013-03-12 at 21:40 +0800, Russell King - ARM Linux wrote:
+>>>>>> On Tue, Mar 12, 2013 at 05:37:41AM -0700, Bill Huang wrote:
+>>>>>>> Add the below four notifier events so drivers which are interested in
+>>>>>>> knowing the clock status can act accordingly. This is extremely useful
+>>>>>>> in some of the DVFS (Dynamic Voltage Frequency Scaling) design.
+>>>>>>>
+>>>>>>> PRE_CLK_ENABLE
+>>>>>>> POST_CLK_ENABLE
+>>>>>>> PRE_CLK_DISABLE
+>>>>>>> POST_CLK_DISABLE
+...
+>>> Thanks, I know the point, but unfortunately there is no good choice for
+>>> hooking this since those low level functions clk_enable/clk_disable will
+>>> be called in interrupt context so it is not possible to send notify. We
+>>> might need to come out a better approach if we can think of any.
+>>> Currently I still think this is acceptable (Having all the drivers which
+>>> are using our interested clocks call these function to enable/disable
+>>> clock in their runtime_pm calls) though it's not perfect. 
+>>
+>> No, that definitely won't work. Not all drivers use those APIs, nor
+>> should they.
+>>
+> That will be too bad, it looks like we deadlock in the mechanism, we
+> cannot change existing drivers behavior (that means some call
+> clk_disable/enable directly, some are not), and we cannot hook notifier
+> in clk_disable/enable either, that means there seems no any chance to
+> get what we want, any idea?
 
-On Wednesday 13 March 2013 10:16 PM, Benoit Cousson wrote:
-> Hi Sourav,
->
-> I've just applied your branch after a minor subject cleanup for consistency.
->
-> git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.10/dts
->
-Thanks Benoit!
-> Regards,
-> Benoit
->
->
-> On 03/11/2013 04:42 PM, Sourav Poddar wrote:
->> On Monday 11 March 2013 08:02 PM, Benoit Cousson wrote:
->>> Hi Sourav,
->>>
->>> On 03/11/2013 02:44 PM, Sourav Poddar wrote:
->>>> Hi Tony/Benoit,
->>>>
->>>> These patches had been sent couple of times before, but there were no
->>>> comments on it.
->>> Sorry for that. I got a big flu in Jan and was in Linaro Connect last
->>> week.
->>> Patches look good, I just have to check that they apply nicely to the
->>> dts/for_3.9 I already prepared.
->>>
->> Ok. Thanks!!
->>> I still have to rebase that branch on top of a recent master branch and
->>> then check your branch.
->>>
->>>> If there are no comments, Can these be picked ?
->>>> Cc: Andrew Morton<akpm@osdl.org>
->>>>
->>>> The following changes since commit
->>>> f6161aa153581da4a3867a2d1a7caf4be19b6ec9:
->>>>
->>>>     Linux 3.9-rc2 (2013-03-10 16:54:19 -0700)
->>>>
->>>> are available in the git repository at:
->>>>     git at gitorious.org:linux-connectivity/linux-connectivity.git
->>>> omap_i2c_spi_dts_data
->>>>
->>>> Felipe Balbi (1):
->>>>         arm: dts: omap5: add SPI devices to OMAP5 DeviceTree file
->>>>
->>>> Sourav Poddar (4):
->>>>         arm: dts: omap4-sdp: Add I2c pinctrl data
->>>>         arm: dts: omap5-evm: Add I2c pinctrl data
->>>>         arm: dts: omap4-panda: Add I2c pinctrl data
->>>>         arm: dts: omap5-evm: Add mcspi data
->>> Thanks,
->>> Benoit
->>>
+I don't know the correct answer.
+
+But I have a question: Why can't we run notifications from the real
+clk_enable? Does the notification mechanism itself inherently block, or
+are we worried that implementations/receivers of these notifications
+might block. Perhaps we can simply define that these notification types
+may be triggered in atomic context and hence implementations have to
+support executing in atomic context. Is possible to make that a
+requirement? Is it possible to implement the code that receives these
+notifications in atomic context?
+
+Is it possible to defer triggering of notifications to some non-atomic
+context, even if they happen in an atomic context?
+
+I also wonder if this is the right conceptual level to be hooking into
+the system. Perhaps DVFS is not something that should be triggered by
+noticing that clocks have changed rates, but rather it should be some
+form of higher layer that controls (calls into) both the regulator and
+clock APIs?
