@@ -1,112 +1,80 @@
-From: darrick.wong@oracle.com (Darrick J. Wong)
-Date: Wed, 13 Mar 2013 12:44:29 -0700
-Subject: [PATCH] bounce:fix bug, avoid to flush dcache on slab page from
- jbd2.
-In-Reply-To: <20130313085021.GA29730@quack.suse.cz>
-References: <5139DB90.5090302@gmail.com>
- <20130312153221.0d26fe5599d4885e51bb0c7c@linux-foundation.org>
- <20130313011020.GA5313@blackbox.djwong.org>
- <20130313085021.GA29730@quack.suse.cz>
-Message-ID: <20130313194429.GE5313@blackbox.djwong.org>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Thu, 14 Mar 2013 01:19:50 +0530
+Subject: [PATCH V3 1/5] ARM: tegra: add APB DMA nodes to Tegra114 DT
+In-Reply-To: <1363204194-19487-1-git-send-email-ldewangan@nvidia.com>
+References: <1363204194-19487-1-git-send-email-ldewangan@nvidia.com>
+Message-ID: <1363204194-19487-2-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 13, 2013 at 09:50:21AM +0100, Jan Kara wrote:
-> On Tue 12-03-13 18:10:20, Darrick J. Wong wrote:
-> > On Tue, Mar 12, 2013 at 03:32:21PM -0700, Andrew Morton wrote:
-> > > On Fri, 08 Mar 2013 20:37:36 +0800 Shuge <shugelinux@gmail.com> wrote:
-> > > 
-> > > > The bounce accept slab pages from jbd2, and flush dcache on them.
-> > > > When enabling VM_DEBUG, it will tigger VM_BUG_ON in page_mapping().
-> > > > So, check PageSlab to avoid it in __blk_queue_bounce().
-> > > > 
-> > > > Bug URL: http://lkml.org/lkml/2013/3/7/56
-> > > > 
-> > > > ...
-> > > >
-> > > > --- a/mm/bounce.c
-> > > > +++ b/mm/bounce.c
-> > > > @@ -214,7 +214,8 @@ static void __blk_queue_bounce(struct request_queue 
-> > > > *q, struct bio **bio_orig,
-> > > >   		if (rw == WRITE) {
-> > > >   			char *vto, *vfrom;
-> > > >   -			flush_dcache_page(from->bv_page);
-> > > > +			if (unlikely(!PageSlab(from->bv_page)))
-> > > > +				flush_dcache_page(from->bv_page);
-> > > >   			vto = page_address(to->bv_page) + to->bv_offset;
-> > > >   			vfrom = kmap(from->bv_page) + from->bv_offset;
-> > > >   			memcpy(vto, vfrom, to->bv_len);
-> > > 
-> > > I guess this is triggered by Catalin's f1a0c4aa0937975b ("arm64: Cache
-> > > maintenance routines"), which added a page_mapping() call to arm64's
-> > > arch/arm64/mm/flush.c:flush_dcache_page().
-> > > 
-> > > What's happening is that jbd2 is using kmalloc() to allocate buffer_head
-> > > data.  That gets submitted down the BIO layer and __blk_queue_bounce()
-> > > calls flush_dcache_page() which in the arm64 case calls page_mapping()
-> > > and page_mapping() does VM_BUG_ON(PageSlab) and splat.
-> > > 
-> > > The unusual thing about all of this is that the payload for some disk
-> > > IO is coming from kmalloc, rather than being a user page.  It's oddball
-> > > but we've done this for ages and should continue to support it.
-> > > 
-> > > 
-> > > Now, the page from kmalloc() cannot be in highmem, so why did the
-> > > bounce code decide to bounce it?
-> > > 
-> > > __blk_queue_bounce() does
-> > > 
-> > > 		/*
-> > > 		 * is destination page below bounce pfn?
-> > > 		 */
-> > > 		if (page_to_pfn(page) <= queue_bounce_pfn(q) && !force)
-> > > 			continue;
-> > > 
-> > > and `force' comes from must_snapshot_stable_pages().  But
-> > > must_snapshot_stable_pages() must have returned false, because if it
-> > > had returned true then it would have been must_snapshot_stable_pages()
-> > > which went BUG, because must_snapshot_stable_pages() calls page_mapping().
-> > > 
-> > > So my tentative diagosis is that arm64 is fishy.  A page which was
-> > > allocated via jbd2_alloc(GFP_NOFS)->kmem_cache_alloc() ended up being
-> > > above arm64's queue_bounce_pfn().  Can you please do a bit of
-> > > investigation to work out if this is what is happening?  Find out why
-> > > __blk_queue_bounce() decided to bounce a page which shouldn't have been
-> > > bounced?
-> > 
-> > That sure is strange.  I didn't see any obvious reasons why we'd end up with a
-> > kmalloc above queue_bounce_pfn().  But then I don't have any arm64s either.
-> > 
-> > > This is all terribly fragile :( afaict if someone sets
-> > > bdi_cap_stable_pages_required() against that jbd2 queue, we're going to
-> > > hit that BUG_ON() again, via must_snapshot_stable_pages()'s
-> > > page_mapping() call.  (Darrick, this means you ;))
-> > 
-> > Wheeee.  You're right, we shouldn't be calling page_mapping on slab pages.
-> > We can keep walking the bio segments to find a non-slab page that can tell us
-> > MS_SNAP_STABLE is set, since we probably won't need the bounce buffer anyway.
-> > 
-> > How does something like this look?  (+ the patch above)
->   Umm, this won't quite work. We can have a bio which has just PageSlab
-> page attached and so you won't be able to get to the superblock. Heh, isn't
-> the whole page_mapping() thing in must_snapshot_stable_pages() wrong? When we
-> do direct IO, these pages come directly from userspace and hell knows where
-> they come from. Definitely their page_mapping() doesn't give us anything
-> useful... Sorry for not realizing this earlier when reviewing the patch.
-> 
-> ... remembering why we need to get to sb and why ext3 needs this ... So
-> maybe a better solution would be to have a bio flag meaning that pages need
-> bouncing? And we would set it from filesystems that need it - in case of
-> ext3 only writeback of data from kjournald actually needs to bounce the
-> pages. Thoughts?
+NVIDIA's Tegra114 has 32 channels APB DMA controller. Add DT entry for
+APB DMA controllers and make it compatible with "nvidia,tegra114-apbdma".
 
-What about dirty pages that don't result in journal transactions?  I think
-ext3_sync_file() eventually calls ext3_ordered_writepage, which then calls
-__block_write_full_page, which in turn calls submit_bh().
+Tegra114 DMA controller is not compatible with Tegra30/Tegra20 DMA
+controller driver as in T114, the global pause also clock gate the
+DMA register and hence it iw not possible to write the DMA register
+with global pause.
 
---D
-> 
-> 								Honza
-> -- 
-> Jan Kara <jack@suse.cz>
-> SUSE Labs, CR
+Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+---
+Changes from V1:
+- Add reeason why APBDMA is not compatible with older driver
+  in description.
+
+Changes from V2:
+ - Rebase to for-3.10/dt of Stephen's tegra tree.
+
+ arch/arm/boot/dts/tegra114.dtsi |   38 ++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 38 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
+index 7ddb328..634d70c 100644
+--- a/arch/arm/boot/dts/tegra114.dtsi
++++ b/arch/arm/boot/dts/tegra114.dtsi
+@@ -37,6 +37,44 @@
+ 		reg = <0x6000c004 0x14c>;
+ 	};
+ 
++	apbdma: dma {
++		compatible = "nvidia,tegra114-apbdma";
++		reg = <0x6000a000 0x1400>;
++		interrupts = <0 104 0x04
++			      0 105 0x04
++			      0 106 0x04
++			      0 107 0x04
++			      0 108 0x04
++			      0 109 0x04
++			      0 110 0x04
++			      0 111 0x04
++			      0 112 0x04
++			      0 113 0x04
++			      0 114 0x04
++			      0 115 0x04
++			      0 116 0x04
++			      0 117 0x04
++			      0 118 0x04
++			      0 119 0x04
++			      0 128 0x04
++			      0 129 0x04
++			      0 130 0x04
++			      0 131 0x04
++			      0 132 0x04
++			      0 133 0x04
++			      0 134 0x04
++			      0 135 0x04
++			      0 136 0x04
++			      0 137 0x04
++			      0 138 0x04
++			      0 139 0x04
++			      0 140 0x04
++			      0 141 0x04
++			      0 142 0x04
++			      0 143 0x04>;
++		clocks = <&tegra_car 34>;
++	};
++
+ 	gpio: gpio {
+ 		compatible = "nvidia,tegra114-gpio", "nvidia,tegra30-gpio";
+ 		reg = <0x6000d000 0x1000>;
+-- 
+1.7.1.1
