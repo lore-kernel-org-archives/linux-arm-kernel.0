@@ -1,28 +1,100 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 13 Mar 2013 19:31:50 +0100 (CET)
-Subject: [PATCH] ARM: smp: Allow real broadcast device selection instead
- of always dummy
-In-Reply-To: <51409D1D.9000500@ti.com>
-References: <1363165608-13739-1-git-send-email-santosh.shilimkar@ti.com>
- <514046B6.9020005@ti.com> <alpine.LFD.2.02.1303131516090.22263@ionos>
- <51409D1D.9000500@ti.com>
-Message-ID: <alpine.LFD.2.02.1303131931100.22263@ionos>
+From: zonque@gmail.com (Daniel Mack)
+Date: Wed, 13 Mar 2013 19:34:26 +0100
+Subject: [PATCH] ARM: mach-moxart: platform port for MOXA ART SoC
+In-Reply-To: <CACmBeS05cyT8N9nZeqbJUPMSGeZYLWjL0Tu1GSZ-ms+Hjc0UoQ@mail.gmail.com>
+References: <CACmBeS1NLFUYHBOVL28aCCzRrgXYGPZF9t3qj6AdcgaMkrPGoQ@mail.gmail.com>
+ <CACmBeS01vs=fHOXu1Lnq8GX8YAbF6aBKmqopKPVt78mPYm=_9w@mail.gmail.com>
+ <CACmBeS05cyT8N9nZeqbJUPMSGeZYLWjL0Tu1GSZ-ms+Hjc0UoQ@mail.gmail.com>
+Message-ID: <5140C6B2.7040702@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 13 Mar 2013, Santosh Shilimkar wrote:
-> On Wednesday 13 March 2013 07:49 PM, Thomas Gleixner wrote:
-> > Though making the rating of the dummy lower is definitely a good
-> > thing, so a real hardware device which is detected later can replace
-> > the dummy device. So yes, the rating should be low for the dummy
-> > timer.
-> > 
-> Exactly. As Mark pointed out, you have already applied Mark's patch.
-> I was just wondering whether you can take the $subject patch as well
-> with ack from Russell, Mark.
+Hi Jonas,
 
-It can go through the ARM tree as well, no dependencies on my stuff.
+On 13.03.2013 16:37, Jonas Jensen wrote:
+> I ask for feedback and to submit (if possible) a new ARM SoC platform
+> port. This is now near complete (I think) (tested on UC-7112-LX Plus)
+> and applies to 2.6.34.14.
 
-Thanks,
+First of all - thanks for submitting to the upstream kernel!
 
-	tglx
+However, your patch has many severe problems which you need to address.
+
+* please rebase your work. 2.6.34 is almost three years old now. 3.9 is
+in it's stabilisation phase, and all new support has to be done for 3.10.
+* all new platforms must be written with device-tree support
+* all drivers must have device-tree support as well
+
+> The patch contains the following drivers and platform specific
+implementations:
+>
+> * ARCH_MOXART (FA526 processor)
+> * 100Hz interrupt timer
+> * UART
+> * MTD map driver
+> * Ethernet driver (RTL8201CP)
+> * MMC driver
+> * MOXA Smartio/Industio family multiport serial driver
+> * RTC driver
+> * Watchdog driver
+> * GPIO driver
+
+Never send one big patch but series of smaller ones, so the individual
+subsystem maintainers can review and approve their bits.
+
+Please also read Documentation/SubmittingPatches for a lot more
+information about this subject.
+
+
+Best regards,
+Daniel
+
+
+
+> Predicted patch rejects below (in need of a solution, feedback is much
+> appreciated) because they are critical in areas of boot, MMC and TTY.
+> 
+> arch/arm/boot/compressed/head.S:
+> A valid (and unique) architecture ID is not loaded to r1. Looks like
+> the bootloader is broken, it should be doing this!
+> http://gicl.cs.drexel.edu/people/sevy/linux/ARM_Linux_boot_sequence.html
+> 
+> arch/arm/tools/mach-types:
+> Omitted (do not edit manually / add a new machine using
+> http://www.arm.linux.org.uk/developer/machines/?action=new). A fix to
+> this and above is not feasible as long as MOXA withholds bootloader
+> sources (requested without success).
+> 
+> drivers/char/mxser.c drivers/char/mxser.h: MOXA
+> SMARTIO/INDUSTIO/INTELLIO SERIAL CARD (Ji?? Slab?):
+> Force board setup for CONFIG_ARCH_MOXART.
+> ASYNCB_CLOSING is avoided because of a lockup (infinite wait after
+> tty_wait_until_sent). Why this happens is unknown (to me) I'm hoping
+> someone (Ji???) can shed light. SysRq trace @ http://ideone.com/e845mr
+> What significance does ASYNCB_CLOSING have?
+> Obviously, automatic detection is better but "mxser_read_register" is
+> pointless on this hardware. What to do instead? Is it better to make a
+> copy and submit a new driver?
+> 
+> drivers/mmc/core/sd.c:
+> The MMC controller is "special"? "UNSTUFF_BITS" is redefined here
+> http://repo.or.cz/w/linux-2.6.19-moxart.git/blob/50cdf2c57662f9f69c5615976412f76bfd73311a:/drivers/mmc/mmc.c
+> . Without the new macro it'll report the wrong geometry and prod_name.
+> I'm thinking a driver should never have to redefine UNSTUFF_BITS.
+> Possible workaround: modify bits (in driver) to line up as expected
+> before returning the response (mmc_request_done).
+> 
+> 
+> For reference, this is my previous post from a few months back:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-December/137130.html
+> 
+> Gitweb: http://repo.or.cz/w/linux-2.6.34.14-moxart.git/commitdiff/?h=3bc2e98ebb92961e1c5992736186920cd070f4ee&hp=b7f1d43323eceb02fd663a71eb2f8be9c17e6740
+> 
+> Download link (size: 193K):
+> https://linux-2-6-34-14-moxart.googlecode.com/files/linux-2.6.34.14-moxart.patch
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+> 
