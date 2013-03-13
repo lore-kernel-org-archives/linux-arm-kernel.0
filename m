@@ -1,33 +1,47 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 13 Mar 2013 17:59:49 +0100
-Subject: memory leak and other oddness in pinctrl-mvebu.c
-In-Reply-To: <20130310000647.GZ23237@titan.lakedaemon.net>
-References: <1362758331.32099.121.camel@i7.infradead.org>
- <513AF783.6050906@gmail.com>
- <1362855725.3690.92.camel@shinybook.infradead.org>
- <20130309225333.GY23237@titan.lakedaemon.net>
- <1362872371.3690.106.camel@shinybook.infradead.org>
- <20130310000647.GZ23237@titan.lakedaemon.net>
-Message-ID: <CACRpkdaN4+jM6JYP_m1xcMJ=JY345SFyU_AH6cdUoxWTdEHJ8g@mail.gmail.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 13 Mar 2013 11:02:05 -0600
+Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
+In-Reply-To: <20130313081815.GD25940@avionic-0098.mockup.avionic-design.de>
+References: <513E519B.6010503@firmworks.com>
+ <20130311232516.GA13873@obsidianresearch.com>
+ <513E6AFE.3090304@firmworks.com>
+ <20130312070852.GA6727@avionic-0098.mockup.avionic-design.de>
+ <20130312155749.GA1820@obsidianresearch.com>
+ <20130312203819.GA23221@avionic-0098.mockup.avionic-design.de>
+ <20130312210328.GA22702@obsidianresearch.com>
+ <20130312213006.GA23717@avionic-0098.mockup.avionic-design.de>
+ <20130312220854.GA23112@obsidianresearch.com>
+ <20130313081815.GD25940@avionic-0098.mockup.avionic-design.de>
+Message-ID: <20130313170205.GB24042@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 10, 2013 at 1:06 AM, Jason Cooper <jason@lakedaemon.net> wrote:
+On Wed, Mar 13, 2013 at 09:18:15AM +0100, Thierry Reding wrote:
 
-> Added LinusW, Gregory and Ezequiel to the email.  Guys, can you give
-> this a Tested-by before I apply (or Ack for LinusW)?
+> Mitch already answered this. The specification is now almost 15 years
+> old and it couldn't possibly have foreseen all of the future use-cases.
+> If the specification is too restrictive and Mitch gives his blessing to
+> remove some of the restrictions, I don't see any reason why we shouldn't
+> do so if it lets us represent the reality of hardware more accurately in
+> DT.
 
-If the Marvell people are happy I'm happy. But I would like to have
-some Tested-by from Sebastian or so? Also I don't quite see the
-final form of this patch?
+I understand the spec is old, and I have no problem with making a
+Linux specific revision, but do *that* - don't bury some random
+deviation inside the bindings for a driver. I even suggested some
+language, but I feel more thought is needed to consider how to model
+the standardized ECAM mechanism..
 
-And shouldn't I rather take the final patch into the pinctrl tree?
+> Furthermore we're not discussing radical changes. None of the changes
+> will be backwards-incompatible, but they will allow recent hardware to
+> be represented more correctly or conveniently.
 
-Then there is a larger issue lurking behind this, and that is that
-all platforms run their own awkward DT parse code, and that comes
-from the fact that we could not agree on a common mapping.
-We must think real hard if we can't atleast share some of the
-parsing code here.
+Sure, but it is still inconsistent, one MMIO config mechansim is in
+ranges, one is in regs. Plus I don't think tegra's case is a great
+starting point to design a spec update, it's config access mechanism
+is especially strange...
 
-Yours,
-Linus Walleij
+Anyhow, I think this has been hashed to death, as long as your final
+binding has the 'device_type = pci' on the pcie-controller node I
+think it will be fine.
+
+Jason
