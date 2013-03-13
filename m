@@ -1,52 +1,130 @@
 From: girishks2000@gmail.com (Girish K S)
-Date: Wed, 13 Mar 2013 12:13:32 +0530
-Subject: [PATCH V3 3/5] spi: s3c64xx: Added provision for non-gpio i/o's
+Date: Wed, 13 Mar 2013 12:13:33 +0530
+Subject: [PATCH V3 4/5] spi: s3c64xx: Added provision for dedicated cs pin
 In-Reply-To: <1363157014-9615-1-git-send-email-ks.giri@samsung.com>
 References: <1363157014-9615-1-git-send-email-ks.giri@samsung.com>
-Message-ID: <1363157014-9615-4-git-send-email-ks.giri@samsung.com>
+Message-ID: <1363157014-9615-5-git-send-email-ks.giri@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Girish K S <girishks2000@gmail.com>
 
-Currently the drivers supports only the GPIO based i/o pins.
-But there are Exynos SoC's that use the same controller with
-dedicated i/o pins.
+The existing driver supports gpio based /cs signal.
+For controller's that have one device per controller,
+the slave device's /cs signal might be internally controlled
+by the chip select bit of slave select register. They are not
+externally asserted/deasserted using gpio pin.
 
-This patch  provides provision to support gpio/dedicated pins.
-The decision is made by parsing the "gpios" property in the spi
-node.
+This patch adds support for controllers with dedicated /cs pin.
+if "cs-gpio" property doesnt exist in a spi dts node, the controller
+would treat the /cs pin as dedicated.
 
 Signed-off-by: Girish K S <ks.giri@samsung.com>
 ---
- drivers/spi/spi-s3c64xx.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ drivers/spi/spi-s3c64xx.c                 | 27 +++++++++++++++++++--------
+ include/linux/platform_data/spi-s3c64xx.h |  3 +++
+ 2 files changed, 22 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-index 054b8d4..94716d1 100644
+index 94716d1..ac557f8 100644
 --- a/drivers/spi/spi-s3c64xx.c
 +++ b/drivers/spi/spi-s3c64xx.c
-@@ -1112,6 +1112,9 @@ static int s3c64xx_spi_parse_dt_gpio(struct s3c64xx_spi_driver_data *sdd)
- 	struct device *dev = &sdd->pdev->dev;
- 	int idx, gpio, ret;
+@@ -414,14 +414,16 @@ static inline void enable_cs(struct s3c64xx_spi_driver_data *sdd,
+ 		if (sdd->tgl_spi != spi) { /* if last mssg on diff device */
+ 			/* Deselect the last toggled device */
+ 			cs = sdd->tgl_spi->controller_data;
+-			gpio_set_value(cs->line,
+-				spi->mode & SPI_CS_HIGH ? 0 : 1);
++			if (cs->cs_gpio)
++				gpio_set_value(cs->line,
++					spi->mode & SPI_CS_HIGH ? 0 : 1);
+ 		}
+ 		sdd->tgl_spi = NULL;
+ 	}
  
-+	if (!of_find_property(dev->of_node, "gpios", NULL))
-+		return 0;
+ 	cs = spi->controller_data;
+-	gpio_set_value(cs->line, spi->mode & SPI_CS_HIGH ? 1 : 0);
++	if (cs->cs_gpio)
++		gpio_set_value(cs->line, spi->mode & SPI_CS_HIGH ? 1 : 0);
+ 
+ 	/* Start the signals */
+ 	writel(0, sdd->regs + S3C64XX_SPI_SLAVE_SEL);
+@@ -550,7 +552,8 @@ static inline void disable_cs(struct s3c64xx_spi_driver_data *sdd,
+ 	if (sdd->tgl_spi == spi)
+ 		sdd->tgl_spi = NULL;
+ 
+-	gpio_set_value(cs->line, spi->mode & SPI_CS_HIGH ? 0 : 1);
++	if (cs->cs_gpio)
++		gpio_set_value(cs->line, spi->mode & SPI_CS_HIGH ? 0 : 1);
+ 
+ 	/* Quiese the signals */
+ 	writel(S3C64XX_SPI_SLAVE_SIG_INACT,
+@@ -889,7 +892,12 @@ static struct s3c64xx_spi_csinfo *s3c64xx_get_slave_ctrldata(
+ 		return ERR_PTR(-ENOMEM);
+ 	}
+ 
+-	cs->line = of_get_named_gpio(data_np, "cs-gpio", 0);
++	if (of_find_property(data_np, "cs-gpio", NULL)) {
++		/* The CS line is asserted/deasserted by the gpio pin */
++		cs->cs_gpio = true;
++		cs->line = of_get_named_gpio(data_np, "cs-gpio", 0);
++	}
 +
- 	/* find gpios for mosi, miso and clock lines */
- 	for (idx = 0; idx < 3; idx++) {
- 		gpio = of_get_gpio(dev->of_node, idx);
-@@ -1138,6 +1141,11 @@ free_gpio:
- static void s3c64xx_spi_dt_gpio_free(struct s3c64xx_spi_driver_data *sdd)
+ 	if (!gpio_is_valid(cs->line)) {
+ 		dev_err(&spi->dev, "chip select gpio is not specified or invalid\n");
+ 		kfree(cs);
+@@ -929,7 +937,8 @@ static int s3c64xx_spi_setup(struct spi_device *spi)
+ 		return -ENODEV;
+ 	}
+ 
+-	if (!spi_get_ctldata(spi)) {
++	/* Request gpio only if cs line is asserted by gpio pins */
++	if (cs->cs_gpio) {
+ 		err = gpio_request_one(cs->line, GPIOF_OUT_INIT_HIGH,
+ 				       dev_name(&spi->dev));
+ 		if (err) {
+@@ -938,9 +947,11 @@ static int s3c64xx_spi_setup(struct spi_device *spi)
+ 				cs->line, err);
+ 			goto err_gpio_req;
+ 		}
+-		spi_set_ctldata(spi, cs);
+ 	}
+ 
++	if (!spi_get_ctldata(spi))
++		spi_set_ctldata(spi, cs);
++
+ 	sci = sdd->cntrlr_info;
+ 
+ 	spin_lock_irqsave(&sdd->lock, flags);
+@@ -1028,7 +1039,7 @@ static void s3c64xx_spi_cleanup(struct spi_device *spi)
  {
- 	unsigned int idx;
-+	struct device *dev = &sdd->pdev->dev;
-+
-+	if (!of_find_property(dev->of_node, "gpios", NULL))
-+		return;
-+
- 	for (idx = 0; idx < 3; idx++)
- 		gpio_free(sdd->gpios[idx]);
- }
+ 	struct s3c64xx_spi_csinfo *cs = spi_get_ctldata(spi);
+ 
+-	if (cs) {
++	if (cs && cs->cs_gpio) {
+ 		gpio_free(cs->line);
+ 		if (spi->dev.of_node)
+ 			kfree(cs);
+diff --git a/include/linux/platform_data/spi-s3c64xx.h b/include/linux/platform_data/spi-s3c64xx.h
+index ceba18d..0343d8d 100644
+--- a/include/linux/platform_data/spi-s3c64xx.h
++++ b/include/linux/platform_data/spi-s3c64xx.h
+@@ -17,6 +17,8 @@ struct platform_device;
+  * struct s3c64xx_spi_csinfo - ChipSelect description
+  * @fb_delay: Slave specific feedback delay.
+  *            Refer to FB_CLK_SEL register definition in SPI chapter.
++ * @cs_gpio: CS line status, 'true' if CS line is asserted by gpio.
++ * 	     'false' if asserted by internal dedicated pin.
+  * @line: Custom 'identity' of the CS line.
+  *
+  * This is per SPI-Slave Chipselect information.
+@@ -25,6 +27,7 @@ struct platform_device;
+  */
+ struct s3c64xx_spi_csinfo {
+ 	u8 fb_delay;
++	bool cs_gpio;
+ 	unsigned line;
+ };
+ 
 -- 
 1.8.0
