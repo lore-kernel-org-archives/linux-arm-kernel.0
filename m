@@ -1,63 +1,66 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Thu, 14 Mar 2013 15:57:34 +0100
-Subject: [PATCH 0/9] ARM: dts: Various OMAP2+ device-tree updates
-In-Reply-To: <1362763654-9660-1-git-send-email-jon-hunter@ti.com>
-References: <1362763654-9660-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <5141E55E.9040801@ti.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Thu, 14 Mar 2013 16:11:22 +0100
+Subject: [PATCH 1/3] pwm: davinci: Add Kconfig support for ECAP & EHRPWM
+ devices
+In-Reply-To: <518397C60809E147AF5323E0420B992E3EA96FA6@DBDE01.ent.ti.com>
+References: <1363257158-11615-1-git-send-email-avinashphilip@ti.com>
+ <1363257158-11615-2-git-send-email-avinashphilip@ti.com>
+ <5141B6D8.2050308@ti.com>
+ <518397C60809E147AF5323E0420B992E3EA96FA6@DBDE01.ent.ti.com>
+Message-ID: <20130314151121.GA12656@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Salut Jon,
-
-On 03/08/2013 06:27 PM, Jon Hunter wrote:
-> Various OMAP device-tree updates for PMU, DMA, GPIO, GPMC and boards.
+On Thu, Mar 14, 2013 at 12:54:08PM +0000, Philip, Avinash wrote:
+> On Thu, Mar 14, 2013 at 17:09:04, Nori, Sekhar wrote:
+> > On 3/14/2013 4:02 PM, Philip Avinash wrote:
+> > > Add EHRPWM and ECAP support build support for DAVINCI_DA850 platforms.
+> > > 
+> > > Also, since DAVINCI platforms doesn't support TI-PWM-Subsystem module,
+> > > remove the select option for CONFIG_PWM_TIPWMSS.
+> > > 
+> > > Also, update CONFIG_PWM_TIPWMSS compiler directive appropriately in
+> > > pwm-tipwmss.h to fix the below compiler error upon removal of
+> > > CONFIG_PWM_TIPWMSS for Davinci platforms.
+> > > 
+> > > 	drivers/pwm/pwm-tiecap.c: In function 'ecap_pwm_probe':
+> > > 	drivers/pwm/pwm-tiecap.c:263:4: error: 'PWMSS_ECAPCLK_EN' undeclared
+> > > 	(first use in this function)
+> > > 	drivers/pwm/pwm-tiecap.c:263:4: note: each undeclared identifier
+> > > 	is reported only once for each function it appears in
+> > > 	drivers/pwm/pwm-tiecap.c:264:17: error: 'PWMSS_ECAPCLK_EN_ACK'
+> > > 	undeclared (first use in this function)
+> > > 	drivers/pwm/pwm-tiecap.c: In function 'ecap_pwm_remove':
+> > > 	drivers/pwm/pwm-tiecap.c:291:49: error: 'PWMSS_ECAPCLK_STOP_REQ'
+> > > 	undeclared (first use in this function)
+> > > 	make[2]: *** [drivers/pwm/pwm-tiecap.o] Error 1
+> > > 	make[1]: *** [drivers/pwm] Error 2
+> > > 	make: *** [drivers] Error 2
+> > > 
+> > > Signed-off-by: Philip Avinash <avinashphilip@ti.com>
+> > 
+> > >  config  PWM_TIECAP
+> > >  	tristate "ECAP PWM support"
+> > > -	depends on SOC_AM33XX
+> > > -	select PWM_TIPWMSS
+> > > +	depends on SOC_AM33XX || ARCH_DAVINCI_DA850
+> > 
+> > Having such narrow dependencies is wrong. The same device is present on
+> > DaVinci DA830 too. A depends on should not be required at all since the
+> > driver should build on all architectures. But I have seen resistance to
+> > doing that since users don't like to see configuration options totally
+> > irrelevant for the architecture they are building for. So may be take a
+> > middle path and do 'depends on ARCH_ARM'?
 > 
-> The DMA, PMU and OMAP3430 SDP board changes have been sent before
-> individually but re-sending here as a complete series for v3.10.
-> 
-> This is based upon v3.9-rc1 and the OMAP3 GPMC binding from Florian
-> Vaussard [1] and OMAP5 DT SPI patch from Felipe Balbi [2].
-> 
-> [1] https://patchwork.kernel.org/patch/2057111/
+> I will add dependency only on ARCH_ARM and submit another version.
 
-I've tried to follow the series review, and it seems that Florian was
-considering sending some other patches. It is not clear if this is a new
-version of the series or some additional patches.
+Perhaps SOC_AM33XX || ARCH_DAVINCI_DA8XX would be an alternative?
 
-I still did not merge this series wondering what to do with it.
-
-Felipe's patch on this other hand is already applied in my branch.
-
-Regards,
-Benoit
-
-> [2] https://patchwork.kernel.org/patch/2134711/
-> 
-> Jon Hunter (9):
->   ARM: OMAP2+: Prepare for device-tree PMU support
->   ARM: dts: OMAP2+: Add PMU nodes
->   ARM: dts: OMAP2+: Add SDMA controller bindings and nodes
->   ARM: dts: OMAP3: Add support for OMAP3430 SDP board
->   ARM: dts: Add GPMC node for OMAP2, OMAP4 and OMAP5
->   ARM: dts: Add OMAP3430 SDP flash memory bindings
->   ARM: dts: Add OMAP2 gpio bindings
->   ARM: dts: OMAP3+: Correct gpio #interrupts-cells property
->   ARM: dts: OMAP3: Add reg and interrupt properties for gpio
-> 
->  .../devicetree/bindings/dma/omap-sdma.txt          |   51 +++++++
->  arch/arm/boot/dts/Makefile                         |    1 +
->  arch/arm/boot/dts/omap2.dtsi                       |   17 +++
->  arch/arm/boot/dts/omap2420.dtsi                    |   55 ++++++++
->  arch/arm/boot/dts/omap2430.dtsi                    |   66 +++++++++
->  arch/arm/boot/dts/omap3.dtsi                       |   70 +++++++++-
->  arch/arm/boot/dts/omap3430-sdp.dts                 |  141 ++++++++++++++++++++
->  arch/arm/boot/dts/omap4-panda-es.dts               |    2 +
->  arch/arm/boot/dts/omap4.dtsi                       |   64 ++++++++-
->  arch/arm/boot/dts/omap4460.dtsi                    |   18 +++
->  arch/arm/boot/dts/omap5.dtsi                       |   68 ++++++++--
->  arch/arm/mach-omap2/pmu.c                          |   14 +-
->  12 files changed, 544 insertions(+), 23 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/dma/omap-sdma.txt
->  create mode 100644 arch/arm/boot/dts/omap3430-sdp.dts
->  create mode 100644 arch/arm/boot/dts/omap4460.dtsi
-> 
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130314/71cf5f8d/attachment.sig>
