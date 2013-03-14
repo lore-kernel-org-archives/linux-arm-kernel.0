@@ -1,9 +1,9 @@
 From: fabio.porcedda@gmail.com (Fabio Porcedda)
-Date: Thu, 14 Mar 2013 18:09:33 +0100
-Subject: [PATCH v2 3/8] drivers: char: use module_platform_driver_probe()
+Date: Thu, 14 Mar 2013 18:09:34 +0100
+Subject: [PATCH v2 4/8] drivers: input: use module_platform_driver_probe()
 In-Reply-To: <1363280978-24051-1-git-send-email-fabio.porcedda@gmail.com>
 References: <1363280978-24051-1-git-send-email-fabio.porcedda@gmail.com>
-Message-ID: <1363280978-24051-4-git-send-email-fabio.porcedda@gmail.com>
+Message-ID: <1363280978-24051-5-git-send-email-fabio.porcedda@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,62 +13,233 @@ a bit simpler.
 
 Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
 Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Matt Mackall <mpm@selenic.com>
-Cc: Herbert Xu <herbert@gondor.apana.org.au>
-Cc: Fabio Estevam <fabio.estevam@freescale.com>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
+Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Cc: Liam Girdwood <lrg@slimlogic.co.uk>
+Cc: Bill Pemberton <wfp5p@virginia.edu>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: David Howells <dhowells@redhat.com>
+Cc: linux-input at vger.kernel.org
 ---
- drivers/char/hw_random/mxc-rnga.c   | 13 +------------
- drivers/char/hw_random/tx4939-rng.c | 13 +------------
- 2 files changed, 2 insertions(+), 24 deletions(-)
+ drivers/input/keyboard/amikbd.c             | 14 +-------------
+ drivers/input/keyboard/davinci_keyscan.c    | 12 +-----------
+ drivers/input/keyboard/nomadik-ske-keypad.c | 12 +-----------
+ drivers/input/misc/twl4030-pwrbutton.c      | 13 +------------
+ drivers/input/mouse/amimouse.c              | 14 +-------------
+ drivers/input/serio/at32psif.c              | 13 +------------
+ drivers/input/serio/q40kbd.c                | 13 +------------
+ drivers/input/touchscreen/atmel-wm97xx.c    | 12 +-----------
+ drivers/input/touchscreen/mc13783_ts.c      | 12 +-----------
+ 9 files changed, 9 insertions(+), 106 deletions(-)
 
-diff --git a/drivers/char/hw_random/mxc-rnga.c b/drivers/char/hw_random/mxc-rnga.c
-index f05d857..895d0b8 100644
---- a/drivers/char/hw_random/mxc-rnga.c
-+++ b/drivers/char/hw_random/mxc-rnga.c
-@@ -228,18 +228,7 @@ static struct platform_driver mxc_rnga_driver = {
- 	.remove = __exit_p(mxc_rnga_remove),
+diff --git a/drivers/input/keyboard/amikbd.c b/drivers/input/keyboard/amikbd.c
+index 79172af..ba0b36f 100644
+--- a/drivers/input/keyboard/amikbd.c
++++ b/drivers/input/keyboard/amikbd.c
+@@ -260,18 +260,6 @@ static struct platform_driver amikbd_driver = {
+ 	},
  };
  
--static int __init mod_init(void)
+-static int __init amikbd_init(void)
 -{
--	return platform_driver_probe(&mxc_rnga_driver, mxc_rnga_probe);
+-	return platform_driver_probe(&amikbd_driver, amikbd_probe);
 -}
 -
--static void __exit mod_exit(void)
+-module_init(amikbd_init);
+-
+-static void __exit amikbd_exit(void)
 -{
--	platform_driver_unregister(&mxc_rnga_driver);
+-	platform_driver_unregister(&amikbd_driver);
 -}
 -
--module_init(mod_init);
--module_exit(mod_exit);
-+module_platform_driver_probe(mxc_rnga_driver, mxc_rnga_probe);
+-module_exit(amikbd_exit);
++module_platform_driver_probe(amikbd_driver, amikbd_probe);
  
- MODULE_AUTHOR("Freescale Semiconductor, Inc.");
- MODULE_DESCRIPTION("H/W RNGA driver for i.MX");
-diff --git a/drivers/char/hw_random/tx4939-rng.c b/drivers/char/hw_random/tx4939-rng.c
-index 3099198..d34a24a 100644
---- a/drivers/char/hw_random/tx4939-rng.c
-+++ b/drivers/char/hw_random/tx4939-rng.c
-@@ -166,18 +166,7 @@ static struct platform_driver tx4939_rng_driver = {
- 	.remove = tx4939_rng_remove,
+ MODULE_ALIAS("platform:amiga-keyboard");
+diff --git a/drivers/input/keyboard/davinci_keyscan.c b/drivers/input/keyboard/davinci_keyscan.c
+index 4e4e453..8297537 100644
+--- a/drivers/input/keyboard/davinci_keyscan.c
++++ b/drivers/input/keyboard/davinci_keyscan.c
+@@ -329,17 +329,7 @@ static struct platform_driver davinci_ks_driver = {
+ 	.remove	= davinci_ks_remove,
  };
  
--static int __init tx4939rng_init(void)
+-static int __init davinci_ks_init(void)
 -{
--	return platform_driver_probe(&tx4939_rng_driver, tx4939_rng_probe);
+-	return platform_driver_probe(&davinci_ks_driver, davinci_ks_probe);
 -}
+-module_init(davinci_ks_init);
 -
--static void __exit tx4939rng_exit(void)
+-static void __exit davinci_ks_exit(void)
 -{
--	platform_driver_unregister(&tx4939_rng_driver);
+-	platform_driver_unregister(&davinci_ks_driver);
 -}
--
--module_init(tx4939rng_init);
--module_exit(tx4939rng_exit);
-+module_platform_driver_probe(tx4939_rng_driver, tx4939_rng_probe);
+-module_exit(davinci_ks_exit);
++module_platform_driver_probe(davinci_ks_driver, davinci_ks_probe);
  
- MODULE_DESCRIPTION("H/W Random Number Generator (RNG) driver for TX4939");
- MODULE_LICENSE("GPL");
+ MODULE_AUTHOR("Miguel Aguilar");
+ MODULE_DESCRIPTION("Texas Instruments DaVinci Key Scan Driver");
+diff --git a/drivers/input/keyboard/nomadik-ske-keypad.c b/drivers/input/keyboard/nomadik-ske-keypad.c
+index 0e6a815..c7d505c 100644
+--- a/drivers/input/keyboard/nomadik-ske-keypad.c
++++ b/drivers/input/keyboard/nomadik-ske-keypad.c
+@@ -430,17 +430,7 @@ static struct platform_driver ske_keypad_driver = {
+ 	.remove = ske_keypad_remove,
+ };
+ 
+-static int __init ske_keypad_init(void)
+-{
+-	return platform_driver_probe(&ske_keypad_driver, ske_keypad_probe);
+-}
+-module_init(ske_keypad_init);
+-
+-static void __exit ske_keypad_exit(void)
+-{
+-	platform_driver_unregister(&ske_keypad_driver);
+-}
+-module_exit(ske_keypad_exit);
++module_platform_driver_probe(ske_keypad_driver, ske_keypad_probe);
+ 
+ MODULE_LICENSE("GPL v2");
+ MODULE_AUTHOR("Naveen Kumar <naveen.gaddipati@stericsson.com> / Sundar Iyer <sundar.iyer@stericsson.com>");
+diff --git a/drivers/input/misc/twl4030-pwrbutton.c b/drivers/input/misc/twl4030-pwrbutton.c
+index 27c2bc8..1700947 100644
+--- a/drivers/input/misc/twl4030-pwrbutton.c
++++ b/drivers/input/misc/twl4030-pwrbutton.c
+@@ -114,18 +114,7 @@ static struct platform_driver twl4030_pwrbutton_driver = {
+ 	},
+ };
+ 
+-static int __init twl4030_pwrbutton_init(void)
+-{
+-	return platform_driver_probe(&twl4030_pwrbutton_driver,
+-			twl4030_pwrbutton_probe);
+-}
+-module_init(twl4030_pwrbutton_init);
+-
+-static void __exit twl4030_pwrbutton_exit(void)
+-{
+-	platform_driver_unregister(&twl4030_pwrbutton_driver);
+-}
+-module_exit(twl4030_pwrbutton_exit);
++module_platform_driver_probe(twl4030_pwrbutton_driver, twl4030_pwrbutton_probe);
+ 
+ MODULE_ALIAS("platform:twl4030_pwrbutton");
+ MODULE_DESCRIPTION("Triton2 Power Button");
+diff --git a/drivers/input/mouse/amimouse.c b/drivers/input/mouse/amimouse.c
+index 5fa9934..b55d5af 100644
+--- a/drivers/input/mouse/amimouse.c
++++ b/drivers/input/mouse/amimouse.c
+@@ -146,18 +146,6 @@ static struct platform_driver amimouse_driver = {
+ 	},
+ };
+ 
+-static int __init amimouse_init(void)
+-{
+-	return platform_driver_probe(&amimouse_driver, amimouse_probe);
+-}
+-
+-module_init(amimouse_init);
+-
+-static void __exit amimouse_exit(void)
+-{
+-	platform_driver_unregister(&amimouse_driver);
+-}
+-
+-module_exit(amimouse_exit);
++module_platform_driver_probe(amimouse_driver, amimouse_probe);
+ 
+ MODULE_ALIAS("platform:amiga-mouse");
+diff --git a/drivers/input/serio/at32psif.c b/drivers/input/serio/at32psif.c
+index 36e799c..190ce35 100644
+--- a/drivers/input/serio/at32psif.c
++++ b/drivers/input/serio/at32psif.c
+@@ -359,18 +359,7 @@ static struct platform_driver psif_driver = {
+ 	},
+ };
+ 
+-static int __init psif_init(void)
+-{
+-	return platform_driver_probe(&psif_driver, psif_probe);
+-}
+-
+-static void __exit psif_exit(void)
+-{
+-	platform_driver_unregister(&psif_driver);
+-}
+-
+-module_init(psif_init);
+-module_exit(psif_exit);
++module_platform_driver_probe(psif_driver, psif_probe);
+ 
+ MODULE_AUTHOR("Hans-Christian Egtvedt <egtvedt@samfundet.no>");
+ MODULE_DESCRIPTION("Atmel AVR32 PSIF PS/2 driver");
+diff --git a/drivers/input/serio/q40kbd.c b/drivers/input/serio/q40kbd.c
+index 70fe542..436a343 100644
+--- a/drivers/input/serio/q40kbd.c
++++ b/drivers/input/serio/q40kbd.c
+@@ -193,15 +193,4 @@ static struct platform_driver q40kbd_driver = {
+ 	.remove		= q40kbd_remove,
+ };
+ 
+-static int __init q40kbd_init(void)
+-{
+-	return platform_driver_probe(&q40kbd_driver, q40kbd_probe);
+-}
+-
+-static void __exit q40kbd_exit(void)
+-{
+-	platform_driver_unregister(&q40kbd_driver);
+-}
+-
+-module_init(q40kbd_init);
+-module_exit(q40kbd_exit);
++module_platform_driver_probe(q40kbd_driver, q40kbd_probe);
+diff --git a/drivers/input/touchscreen/atmel-wm97xx.c b/drivers/input/touchscreen/atmel-wm97xx.c
+index c5c2dbb..2c1e46b 100644
+--- a/drivers/input/touchscreen/atmel-wm97xx.c
++++ b/drivers/input/touchscreen/atmel-wm97xx.c
+@@ -432,17 +432,7 @@ static struct platform_driver atmel_wm97xx_driver = {
+ 	},
+ };
+ 
+-static int __init atmel_wm97xx_init(void)
+-{
+-	return platform_driver_probe(&atmel_wm97xx_driver, atmel_wm97xx_probe);
+-}
+-module_init(atmel_wm97xx_init);
+-
+-static void __exit atmel_wm97xx_exit(void)
+-{
+-	platform_driver_unregister(&atmel_wm97xx_driver);
+-}
+-module_exit(atmel_wm97xx_exit);
++module_platform_driver_probe(atmel_wm97xx_driver, atmel_wm97xx_probe);
+ 
+ MODULE_AUTHOR("Hans-Christian Egtvedt <egtvedt@samfundet.no>");
+ MODULE_DESCRIPTION("wm97xx continuous touch driver for Atmel AT91 and AVR32");
+diff --git a/drivers/input/touchscreen/mc13783_ts.c b/drivers/input/touchscreen/mc13783_ts.c
+index 02103b6..89308fe 100644
+--- a/drivers/input/touchscreen/mc13783_ts.c
++++ b/drivers/input/touchscreen/mc13783_ts.c
+@@ -250,17 +250,7 @@ static struct platform_driver mc13783_ts_driver = {
+ 	},
+ };
+ 
+-static int __init mc13783_ts_init(void)
+-{
+-	return platform_driver_probe(&mc13783_ts_driver, &mc13783_ts_probe);
+-}
+-module_init(mc13783_ts_init);
+-
+-static void __exit mc13783_ts_exit(void)
+-{
+-	platform_driver_unregister(&mc13783_ts_driver);
+-}
+-module_exit(mc13783_ts_exit);
++module_platform_driver_probe(mc13783_ts_driver, mc13783_ts_probe);
+ 
+ MODULE_DESCRIPTION("MC13783 input touchscreen driver");
+ MODULE_AUTHOR("Sascha Hauer <s.hauer@pengutronix.de>");
 -- 
 1.8.1.5
