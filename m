@@ -1,156 +1,172 @@
 From: amit.daniel@samsung.com (Amit Daniel Kachhap)
-Date: Thu, 14 Mar 2013 11:32:57 +0530
-Subject: [PATCH 1/3] ARM: EXYNOS: Move arm core power down clock to exynos5250
- common clock
+Date: Thu, 14 Mar 2013 11:32:58 +0530
+Subject: [PATCH 2/3] ARM: SAMSUNG: Add SAMSUNG_PM config option to select pm
 In-Reply-To: <1363240979-1939-1-git-send-email-amit.daniel@samsung.com>
 References: <1363240979-1939-1-git-send-email-amit.daniel@samsung.com>
-Message-ID: <1363240979-1939-2-git-send-email-amit.daniel@samsung.com>
+Message-ID: <1363240979-1939-3-git-send-email-amit.daniel@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now with common clock support added for exynos5250 it is necessary to move
-this code to exynos5250 common clock driver as clock registers should be
-handled there. This change is tested in exynos5250 based arndale platform.
+This patch enables the selection of samsung pm related stuffs
+when SAMSUNG_PM config is enabled and not just when generic PM
+config is enabled. Power management for s3c64XX and s3c24XX
+is enabled by default and for other platform depends on S5P_PM.
+This patch also fixes the following compilation error's when compiling
+a platform like exynos5440 which does not select pm stuffs.
 
-Cc: Abhilash Kesavan <a.kesavan@samsung.com>
-Cc: Thomas Abraham <thomas.abraham@linaro.org>
+arch/arm/mach-exynos/built-in.o: In function `__virt_to_phys':
+linux/arch/arm/include/asm/memory.h:175: undefined reference to `s3c_cpu_resume'
+linux/arch/arm/include/asm/memory.h:175: undefined reference to `s3c_cpu_resume'
+linux/arch/arm/include/asm/memory.h:175: undefined reference to `s3c_cpu_resume'
+linux/arch/arm/include/asm/memory.h:175: undefined reference to `s3c_cpu_resume'
+arch/arm/mach-exynos/built-in.o: In function `exynos5_init_irq':
+linux/arch/arm/mach-exynos/common.c:492: undefined reference to `s3c_irq_wake'
+linux/arch/arm/mach-exynos/common.c:492: undefined reference to `s3c_irq_wake'
+arch/arm/mach-exynos/built-in.o: In function `exynos4_init_irq':
+linux/arch/arm/mach-exynos/common.c:476: undefined reference to `s3c_irq_wake'
+linux/arch/arm/mach-exynos/common.c:476: undefined reference to `s3c_irq_wake'
+arch/arm/plat-samsung/built-in.o: In function `s3c_irqext_wake':
+linux/arch/arm/plat-samsung/pm.c:144: undefined reference to `s3c_irqwake_eintallow'
+linux/arch/arm/plat-samsung/pm.c:144: undefined reference to `s3c_irqwake_eintallow'
+arch/arm/plat-samsung/built-in.o: In function `s3c_pm_enter':
+linux/arch/arm/plat-samsung/pm.c:263: undefined reference to `s3c_irqwake_intallow'
+linux/arch/arm/plat-samsung/pm.c:263: undefined reference to `s3c_irqwake_intallow'
+linux/arch/arm/plat-samsung/pm.c:264: undefined reference to `s3c_irqwake_eintallow'
+linux/arch/arm/plat-samsung/pm.c:264: undefined reference to `s3c_irqwake_eintallow'
+linux/arch/arm/plat-samsung/pm.c:275: undefined reference to `s3c_pm_save_core'
+linux/arch/arm/plat-samsung/pm.c:279: undefined reference to `s3c_pm_configure_extint'
+linux/arch/arm/plat-samsung/pm.c:310: undefined reference to `s3c_pm_restore_core'
+make: *** [vmlinux] Error 1
+
 Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
 ---
- arch/arm/mach-exynos/cpuidle.c       |   35 ----------------------------
- drivers/clk/samsung/clk-exynos5250.c |   42 ++++++++++++++++++++++++++++++++++
- 2 files changed, 42 insertions(+), 35 deletions(-)
+ arch/arm/mach-exynos/Makefile           |    2 +-
+ arch/arm/mach-exynos/common.c           |    2 +-
+ arch/arm/mach-exynos/common.h           |    1 -
+ arch/arm/mach-exynos/cpuidle.c          |    1 +
+ arch/arm/plat-samsung/Kconfig           |    7 +++++++
+ arch/arm/plat-samsung/Makefile          |    3 +--
+ arch/arm/plat-samsung/include/plat/pm.h |    8 ++++----
+ 7 files changed, 15 insertions(+), 9 deletions(-)
 
+diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
+index b09b027..2a431fc 100644
+--- a/arch/arm/mach-exynos/Makefile
++++ b/arch/arm/mach-exynos/Makefile
+@@ -14,7 +14,7 @@ obj-				:=
+ 
+ obj-$(CONFIG_ARCH_EXYNOS)	+= common.o
+ 
+-obj-$(CONFIG_PM)		+= pm.o
++obj-$(CONFIG_S5P_PM)		+= pm.o
+ obj-$(CONFIG_PM_GENERIC_DOMAINS) += pm_domains.o
+ obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
+ 
+diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+index 5b3c2b2..5e3ccda 100644
+--- a/arch/arm/mach-exynos/common.c
++++ b/arch/arm/mach-exynos/common.c
+@@ -764,7 +764,7 @@ static struct irq_chip exynos_irq_eint = {
+ 	.irq_mask_ack	= exynos_irq_eint_maskack,
+ 	.irq_ack	= exynos_irq_eint_ack,
+ 	.irq_set_type	= exynos_irq_eint_set_type,
+-#ifdef CONFIG_PM
++#ifdef CONFIG_S5P_PM
+ 	.irq_set_wake	= s3c_irqext_wake,
+ #endif
+ };
+diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+index fcfc64c..c6062dd 100644
+--- a/arch/arm/mach-exynos/common.h
++++ b/arch/arm/mach-exynos/common.h
+@@ -95,6 +95,5 @@ struct exynos_pmu_conf {
+ };
+ 
+ extern void exynos_sys_powerdown_conf(enum sys_powerdown mode);
+-extern void s3c_cpu_resume(void);
+ 
+ #endif /* __ARCH_ARM_MACH_EXYNOS_COMMON_H */
 diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
-index e2689d1..6929c77 100644
+index 6929c77..4fc1f4f 100644
 --- a/arch/arm/mach-exynos/cpuidle.c
 +++ b/arch/arm/mach-exynos/cpuidle.c
-@@ -160,46 +160,11 @@ static int exynos4_enter_lowpower(struct cpuidle_device *dev,
- 		return exynos4_enter_core0_aftr(dev, drv, new_index);
- }
+@@ -25,6 +25,7 @@
+ #include <mach/regs-pmu.h>
  
--static void __init exynos5_core_down_clk(void)
--{
--	unsigned int tmp;
--
--	/*
--	 * Enable arm clock down (in idle) and set arm divider
--	 * ratios in WFI/WFE state.
--	 */
--	tmp = PWR_CTRL1_CORE2_DOWN_RATIO | \
--	      PWR_CTRL1_CORE1_DOWN_RATIO | \
--	      PWR_CTRL1_DIV2_DOWN_EN	 | \
--	      PWR_CTRL1_DIV1_DOWN_EN	 | \
--	      PWR_CTRL1_USE_CORE1_WFE	 | \
--	      PWR_CTRL1_USE_CORE0_WFE	 | \
--	      PWR_CTRL1_USE_CORE1_WFI	 | \
--	      PWR_CTRL1_USE_CORE0_WFI;
--	__raw_writel(tmp, EXYNOS5_PWR_CTRL1);
--
--	/*
--	 * Enable arm clock up (on exiting idle). Set arm divider
--	 * ratios when not in idle along with the standby duration
--	 * ratios.
--	 */
--	tmp = PWR_CTRL2_DIV2_UP_EN	 | \
--	      PWR_CTRL2_DIV1_UP_EN	 | \
--	      PWR_CTRL2_DUR_STANDBY2_VAL | \
--	      PWR_CTRL2_DUR_STANDBY1_VAL | \
--	      PWR_CTRL2_CORE2_UP_RATIO	 | \
--	      PWR_CTRL2_CORE1_UP_RATIO;
--	__raw_writel(tmp, EXYNOS5_PWR_CTRL2);
--}
--
- static int __init exynos4_init_cpuidle(void)
- {
- 	int cpu_id, ret;
- 	struct cpuidle_device *device;
+ #include <plat/cpu.h>
++#include <plat/pm.h>
  
--	if (soc_is_exynos5250())
--		exynos5_core_down_clk();
--
- 	ret = cpuidle_register_driver(&exynos4_idle_driver);
- 	if (ret) {
- 		printk(KERN_ERR "CPUidle failed to register driver\n");
-diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
-index 1152125..b653863 100644
---- a/drivers/clk/samsung/clk-exynos5250.c
-+++ b/drivers/clk/samsung/clk-exynos5250.c
-@@ -22,6 +22,8 @@
+ #include "common.h"
  
- #define SRC_CPU			0x200
- #define DIV_CPU0		0x500
-+#define PWR_CTRL1		0x1020
-+#define PWR_CTRL2		0x1024
- #define SRC_CORE1		0x4204
- #define SRC_TOP0		0x10210
- #define SRC_TOP2		0x10218
-@@ -63,6 +65,23 @@
- #define SRC_CDREX		0x20200
- #define PLL_DIV2_SEL		0x20a24
+diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
+index 6cb19c6..66427af 100644
+--- a/arch/arm/plat-samsung/Kconfig
++++ b/arch/arm/plat-samsung/Kconfig
+@@ -31,6 +31,13 @@ config PLAT_S5P
+ 	help
+ 	  Base platform code for Samsung's S5P series SoC.
  
-+/*Below definitions are used for PWR_CTRL settings*/
-+#define PWR_CTRL1_CORE2_DOWN_RATIO		(7 << 28)
-+#define PWR_CTRL1_CORE1_DOWN_RATIO		(7 << 16)
-+#define PWR_CTRL1_DIV2_DOWN_EN			(1 << 9)
-+#define PWR_CTRL1_DIV1_DOWN_EN			(1 << 8)
-+#define PWR_CTRL1_USE_CORE1_WFE			(1 << 5)
-+#define PWR_CTRL1_USE_CORE0_WFE			(1 << 4)
-+#define PWR_CTRL1_USE_CORE1_WFI			(1 << 1)
-+#define PWR_CTRL1_USE_CORE0_WFI			(1 << 0)
++config SAMSUNG_PM
++	bool
++	depends on PM && (PLAT_S3C24XX || ARCH_S3C64XX || S5P_PM)
++	default y
++	help
++	  Base platform power management code for samsung code
 +
-+#define PWR_CTRL2_DIV2_UP_EN			(1 << 25)
-+#define PWR_CTRL2_DIV1_UP_EN			(1 << 24)
-+#define PWR_CTRL2_DUR_STANDBY2_VAL		(1 << 16)
-+#define PWR_CTRL2_DUR_STANDBY1_VAL		(1 << 8)
-+#define PWR_CTRL2_CORE2_UP_RATIO		(1 << 4)
-+#define PWR_CTRL2_CORE1_UP_RATIO		(1 << 0)
-+
- /*
-  * Let each supported clock get a unique id. This id is used to lookup the clock
-  * for device tree based platforms. The clocks are categorized into three
-@@ -110,6 +129,8 @@ enum exynos5250_clks {
- static __initdata unsigned long exynos5250_clk_regs[] = {
- 	SRC_CPU,
- 	DIV_CPU0,
-+	PWR_CTRL1,
-+	PWR_CTRL2,
- 	SRC_CORE1,
- 	SRC_TOP0,
- 	SRC_TOP2,
-@@ -467,6 +488,7 @@ void __init exynos5250_clk_init(struct device_node *np)
- {
- 	void __iomem *reg_base;
- 	struct clk *apll, *mpll, *epll, *vpll, *bpll, *gpll, *cpll;
-+	unsigned int tmp;
+ if PLAT_SAMSUNG
  
- 	if (np) {
- 		reg_base = of_iomap(np, 0);
-@@ -508,6 +530,26 @@ void __init exynos5250_clk_init(struct device_node *np)
- 	samsung_clk_register_gate(exynos5250_gate_clks,
- 			ARRAY_SIZE(exynos5250_gate_clks));
+ # boot configurations
+diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
+index a23c460..1c406b3 100644
+--- a/arch/arm/plat-samsung/Makefile
++++ b/arch/arm/plat-samsung/Makefile
+@@ -51,8 +51,7 @@ obj-$(CONFIG_SAMSUNG_DMADEV)	+= dma-ops.o
  
-+	/*
-+	 * Enable arm clock down (in idle) and set arm divider
-+	 * ratios in WFI/WFE state.
-+	 */
-+	tmp = (PWR_CTRL1_CORE2_DOWN_RATIO | PWR_CTRL1_CORE1_DOWN_RATIO |
-+		PWR_CTRL1_DIV2_DOWN_EN | PWR_CTRL1_DIV1_DOWN_EN |
-+		PWR_CTRL1_USE_CORE1_WFE | PWR_CTRL1_USE_CORE0_WFE |
-+		PWR_CTRL1_USE_CORE1_WFI | PWR_CTRL1_USE_CORE0_WFI);
-+	__raw_writel(tmp, reg_base + PWR_CTRL1);
-+
-+	/*
-+	 * Enable arm clock up (on exiting idle). Set arm divider
-+	 * ratios when not in idle along with the standby duration
-+	 * ratios.
-+	 */
-+	tmp = (PWR_CTRL2_DIV2_UP_EN | PWR_CTRL2_DIV1_UP_EN |
-+		PWR_CTRL2_DUR_STANDBY2_VAL | PWR_CTRL2_DUR_STANDBY1_VAL |
-+		PWR_CTRL2_CORE2_UP_RATIO | PWR_CTRL2_CORE1_UP_RATIO);
-+	__raw_writel(tmp, reg_base + PWR_CTRL2);
-+
- 	pr_info("Exynos5250: clock setup completed, armclk=%ld\n",
- 			_get_rate("armclk"));
- }
+ # PM support
+ 
+-obj-$(CONFIG_PM)		+= pm.o
+-obj-$(CONFIG_PM)		+= pm-gpio.o
++obj-$(CONFIG_SAMSUNG_PM)	+= pm.o pm-gpio.o
+ obj-$(CONFIG_SAMSUNG_PM_CHECK)	+= pm-check.o
+ 
+ obj-$(CONFIG_SAMSUNG_WAKEMASK)	+= wakeup-mask.o
+diff --git a/arch/arm/plat-samsung/include/plat/pm.h b/arch/arm/plat-samsung/include/plat/pm.h
+index f6fcade..46e2c82 100644
+--- a/arch/arm/plat-samsung/include/plat/pm.h
++++ b/arch/arm/plat-samsung/include/plat/pm.h
+@@ -19,7 +19,7 @@
+ 
+ struct device;
+ 
+-#ifdef CONFIG_PM
++#ifdef CONFIG_SAMSUNG_PM
+ 
+ extern __init int s3c_pm_init(void);
+ extern __init int s3c64xx_pm_init(void);
+@@ -58,8 +58,6 @@ extern unsigned char pm_uart_udivslot;  /* true to save UART UDIVSLOT */
+ 
+ /* from sleep.S */
+ 
+-extern void s3c_cpu_resume(void);
+-
+ extern int s3c2410_cpu_suspend(unsigned long);
+ 
+ /* sleep save info */
+@@ -106,12 +104,14 @@ extern void s3c_pm_do_save(struct sleep_save *ptr, int count);
+ extern void s3c_pm_do_restore(struct sleep_save *ptr, int count);
+ extern void s3c_pm_do_restore_core(struct sleep_save *ptr, int count);
+ 
+-#ifdef CONFIG_PM
++#ifdef CONFIG_SAMSUNG_PM
+ extern int s3c_irq_wake(struct irq_data *data, unsigned int state);
+ extern int s3c_irqext_wake(struct irq_data *data, unsigned int state);
++extern void s3c_cpu_resume(void);
+ #else
+ #define s3c_irq_wake NULL
+ #define s3c_irqext_wake NULL
++#define s3c_cpu_resume NULL
+ #endif
+ 
+ /* PM debug functions */
 -- 
 1.7.1
