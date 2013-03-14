@@ -1,72 +1,32 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 14 Mar 2013 18:12:04 +0200
-Subject: [PATCH] usb: limit OMAP related USB options to OMAP2PLUS platforms
-In-Reply-To: <5141EA01.3060905@windriver.com>
-References: <1361992119-2465-1-git-send-email-paul.gortmaker@windriver.com>
- <20130227195046.GA2300@arwen.pp.htv.fi>
- <512E653F.1090706@windriver.com> <5141EA01.3060905@windriver.com>
-Message-ID: <20130314161204.GE3001@arwen.pp.htv.fi>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 14 Mar 2013 16:14:20 +0000 (UTC)
+Subject: OMAP baseline test results for v3.9-rc1
+In-Reply-To: <20130312190030.GB8798@blackmetal.musicnaut.iki.fi>
+References: <alpine.DEB.2.00.1303121634080.2723@utopia.booyaka.com>
+ <20130312190030.GB8798@blackmetal.musicnaut.iki.fi>
+Message-ID: <alpine.DEB.2.00.1303141558020.8075@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Aaro,
 
-On Thu, Mar 14, 2013 at 11:17:21AM -0400, Paul Gortmaker wrote:
-> >>> diff --git a/drivers/usb/phy/Kconfig b/drivers/usb/phy/Kconfig
-> >>> index 65217a5..40b8463 100644
-> >>> --- a/drivers/usb/phy/Kconfig
-> >>> +++ b/drivers/usb/phy/Kconfig
-> >>> @@ -17,6 +17,7 @@ config OMAP_USB2
-> >>>  
-> >>>  config OMAP_USB3
-> >>>  	tristate "OMAP USB3 PHY Driver"
-> >>> +	depends on ARCH_OMAP2PLUS
-> >>>  	select USB_OTG_UTILS
-> >>>  	select OMAP_CONTROL_USB
-> >>>  	help
-> >>> @@ -27,6 +28,7 @@ config OMAP_USB3
-> >>>  
-> >>>  config OMAP_CONTROL_USB
-> >>>  	tristate "OMAP CONTROL USB Driver"
-> >>> +	depends on ARCH_OMAP2PLUS
-> >>
-> >> I rather not add dependencies here and fix the selections of
-> >> OMAP_CONTROL_USB.
-> > 
-> > I am not sure I understand what you mean, or why you wouldn't
-> > want sane dependencies in place like those given above.  Perhaps
-> > you can send an alternate patch so there is no ambiguity?
+On Tue, 12 Mar 2013, Aaro Koskinen wrote:
+
+> On Tue, Mar 12, 2013 at 04:40:19PM +0000, Paul Walmsley wrote:
+> > * 2420N800: powers down 30 seconds after boot
+> >   - Presumably due to missing CBUS patches for watchdog control
+> >   - http://lkml.org/lkml/2012/9/3/265
+> >   - http://marc.info/?l=linux-omap&m=135274739624125&w=2
+> >   - http://marc.info/?l=linux-omap&m=135664195831104&w=2
+> >   - Should be working in v3.9-rc1 when CONFIG_RETU_WATCHDOG=y ?
 > 
-> Hi Felipe,
-> 
-> I'm still seeing the OMAP settings in x86 builds on mainline
-> from today, and since I'd not got a reply to the above, I'm
-> still wondering what alternative you have in mind vs. my
-> above patch.  We can't be having the arch specific settings
-> leaking out to the other arch where they make no sense[1].
+> Yes, you need also CONFIG_I2C_CBUS_GPIO and CONFIG_MFD_RETU.
 
-why not ? It forces people to write portable drivers, it forces people
-to avoid including the wrong headers and allows maintainers and patch
-authors to easily compile test their drivers.
+Just enabled these two, and finally the N800 doesn't power down!  Nice 
+work!  Amazing how exciting something like this can be :-)
 
-On top of all that, it lets me better use linux-next as a big build
-testing before I send a pull request to Greg.
+This will be reflected in the v3.9-rc2 test log & the v3.9-rc1 log has now 
+been fixed on the web.
 
-When you're going to build a product, you will come up with a proper
-.config anyway. Because of a bunch of these misused 'depends on' and
-'select' statements that right now ARM multiplatform builds don't even
-compile cleanly if you enable all ARM-related drivers.
 
-Until all of those are cleaned up, the best way is to force people to
-write drivers which compile in all architectures and make sure Kconfig
-doesn't add any ARCH dependency.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130314/170926b3/attachment.sig>
+- Paul
