@@ -1,61 +1,28 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu, 14 Mar 2013 21:24:27 +0100
-Subject: [PATCH] ARM: decompressor: clearify a comment and minor typo fixes
-Message-ID: <1363292667-9291-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 14 Mar 2013 16:32:46 -0400 (EDT)
+Subject: [PATCH] USB: EHCI: fix for leaking isochronous data
+In-Reply-To: <51421B89.6020308@web.de>
+Message-ID: <Pine.LNX.4.44L0.1303141630550.1194-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
-Hello,
+On Thu, 14 Mar 2013, Soeren Moch wrote:
 
-this is what I noticed while digging through the decompressor's code.
+> >> I added a debug message to
+> >> drivers/usb/host/ehci-sched.c:itd_urb_transaction() to log the
+> >> allocation flags, see log below.
+> >
+> > But it looks like you didn't add a message to end_free_itds(), so we
+> > don't know when the memory gets deallocated.  And you didn't print out
+> > the values of urb, num_itds, and i, or the value of itd (so we can
+> > match up allocations against deallocations).
+> 
+> OK, I will implement this more detailed logging. But with several 
+> allocations per second and runtime of several hours this will result in 
+> a very long logfile.
 
-Uwe
+If the memory really is being leaked here in some sort of systematic
+way, we may be able to see it in your debugging output after a few
+seconds.
 
- arch/arm/boot/compressed/atags_to_fdt.c | 2 +-
- arch/arm/boot/compressed/head.S         | 9 +++++----
- 2 files changed, 6 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/boot/compressed/atags_to_fdt.c b/arch/arm/boot/compressed/atags_to_fdt.c
-index aabc02a..24fa535 100644
---- a/arch/arm/boot/compressed/atags_to_fdt.c
-+++ b/arch/arm/boot/compressed/atags_to_fdt.c
-@@ -87,7 +87,7 @@ static void merge_fdt_bootargs(void *fdt, const char *fdt_cmdline)
- /*
-  * Convert and fold provided ATAGs into the provided FDT.
-  *
-- * REturn values:
-+ * Return values:
-  *    = 0 -> pretend success
-  *    = 1 -> bad ATAG (may retry with another possible ATAG pointer)
-  *    < 0 -> error from libfdt
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index fe4d9c3..fe6d63a 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -258,7 +258,7 @@ restart:	adr	r0, LC0
- 		 * If we do have a DTB appended to zImage, and we do have
- 		 * an ATAG list around, we want the later to be translated
- 		 * and folded into the former here.  To be on the safe side,
--		 * let's temporarily move  the stack away into the malloc
-+		 * let's temporarily move the stack away into the malloc
- 		 * area.  No GOT fixup has occurred yet, but none of the
- 		 * code we're about to call uses any global variable.
- 		*/
-@@ -270,9 +270,10 @@ restart:	adr	r0, LC0
- 		bl	atags_to_fdt
- 
- 		/*
--		 * If returned value is 1, there is no ATAG at the location
--		 * pointed by r8.  Try the typical 0x100 offset from start
--		 * of RAM and hope for the best.
-+		 * If returned value is 1, there is neither an ATAG list nor a
-+		 * device tree blob at the location pointed to by r8.  Try the
-+		 * typical 0x100 offset from start of RAM and hope for the
-+		 * best.
- 		 */
- 		cmp	r0, #1
- 		sub	r0, r4, #TEXT_OFFSET
--- 
-1.8.2.rc2
+Alan Stern
