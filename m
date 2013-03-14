@@ -1,28 +1,49 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 14 Mar 2013 14:04:45 +0800
-Subject: [PATCH 08/10] ASoC: dmaengine_pcm: Add open function for DT DMA
- request
-In-Reply-To: <20130313104945.GI25610@opensource.wolfsonmicro.com>
-References: <1362940391-8338-1-git-send-email-mpa@pengutronix.de>
- <1362940391-8338-9-git-send-email-mpa@pengutronix.de>
- <20130312190206.GY19942@opensource.wolfsonmicro.com>
- <20130313021712.GD27461@S2101-09.ap.freescale.net>
- <20130313104945.GI25610@opensource.wolfsonmicro.com>
-Message-ID: <20130314060442.GB27654@S2101-09.ap.freescale.net>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 14 Mar 2013 11:38:30 +0530
+Subject: [PATCH v2] ARM: OMAP4: PM: Avoid expensive cpu_suspend() path
+ for all CPU power states except off
+In-Reply-To: <874ngfrybz.fsf@linaro.org>
+References: <1360745724-30058-1-git-send-email-santosh.shilimkar@ti.com>
+ <513DBB60.3010406@ti.com> <874ngfrybz.fsf@linaro.org>
+Message-ID: <5141695E.9070708@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 13, 2013 at 10:49:45AM +0000, Mark Brown wrote:
-> On Wed, Mar 13, 2013 at 10:18:29AM +0800, Shawn Guo wrote:
+On Wednesday 13 March 2013 11:12 PM, Kevin Hilman wrote:
+> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 > 
-> > I did not see any objection from you on that patch, so I'm waiting for
-> > you to publish a branch for it, so that my mxs-dma generic binding
-> > series can move forward.
+>> Kevin,
+>>
+>> On Wednesday 13 February 2013 02:25 PM, Santosh Shilimkar wrote:
+>>> Current CPU PM code code make use of common cpu_suspend() path for all the
+>>> CPU power states which is not optimal. In fact cpu_suspend() path is needed
+>>> only when we put CPU power domain to off state where the CPU context is lost.
+>>>
+>>> Update the code accordingly so that the expensive cpu_suspend() path
+>>> can be avoided for the shallow CPU power states like CPU PD INA/CSWR.
+>>>
+>>> The patch has been tested on OMAP4430 and OMAP5430(with few out of tree patches)
+>>> devices for suspend and CPUidle.
+>>>
+>>> Cc: Kevin Hilman <khilman@deeprootsystems.com>
+>>>
+>>> Reported-by: Richard Woodruff <r-woodruff2@ti.com>
+>>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>> ---
+>>> Update changelog to include testing details as suggested
+>>> by Kevin Hilman.
+>>>
+>> Ping.
+>> It can get into rc's but since it is not strict regression,
+>> and if it has to wait for 3.10 then I can add this one
+>> along with rest of the PM patches posted towards 3.10
+>>
+>> Either way, let me know.
 > 
-> I commented on the removal of the const from the name parameter (and
+> I have this updated one queued for v3.10 in my PM cleanup branch
+> (for_3.10/cleanup/pm)
+> 
+Thanks Kevin.
 
-I just double checked my mailbox and can only see the conversation
-between you and rmk, nothing particularly on the removal of the const
-from the name parameter.  Or I'm still missing something?
-
-Shawn
+Regards,
+Santosh
