@@ -1,40 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 Mar 2013 23:03:42 +0000
-Subject: [PATCH 0/5] at91: atmel_lcdfb: regression fixes and cpu_is removal
-In-Reply-To: <51405126.3090009@atmel.com>
-References: <cover.1360340791.git.nicolas.ferre@atmel.com>
- <5139B169.7050807@atmel.com> <51405126.3090009@atmel.com>
-Message-ID: <201303142303.42283.arnd@arndb.de>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Thu, 14 Mar 2013 16:05:27 -0700
+Subject: gen_pool_add broken with LPAE based systems
+Message-ID: <514257B7.5080206@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 13 March 2013, Nicolas Ferre wrote:
-> In case we end-up with an agreement on the path those fixes should
-> follow, here is the location of my updated material rebased on top of 3.9-rc2:
-> 
-> The following changes since commit f6161aa153581da4a3867a2d1a7caf4be19b6ec9:
-> 
->   Linux 3.9-rc2 (2013-03-10 16:54:19 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://github.com/at91linux/linux-at91.git at91-3.9-fixesLCD
-> 
-> for you to fetch changes up to bbd44f6bd9d1aa735b180b29b5719d63a8e87b55:
-> 
->   ARM: at91/avr32/atmel_lcdfb: add platform device-id table (2013-03-13 11:05:12 +0100)
-> 
-> ----------------------------------------------------------------
-> Johan Hovold (5):
->       atmel_lcdfb: fix 16-bpp modes on older SOCs
->       ARM: at91: fix LCD-wiring mode
->       ARM: at91/avr32/atmel_lcdfb: add bus-clock entry
->       atmel_lcdfb: move lcdcon2 register access to compute_hozval
->       ARM: at91/avr32/atmel_lcdfb: add platform device-id table
-> 
+Hi,
 
-I have merged the first two patches into the fixes branch now, from up to commit
-67cf9c0a. Please resubmit the remaining ones on top of this commit for 3.10, either
-through arm-soc or through the framebuffer tree.
+We use genalloc for managing certain pools of physical memory. genalloc 
+currently uses unsigned long for virtual addresses and phys_addr_t for 
+physical addresses. Our ARM LPAE systems have 64-bit physical addresses 
+but unsigned long is still 32 bits.  Using gen_pool_add breaks with 
+addresses > 4G because gen_pool_add treats the address passed in as the 
+virtual address. gen_pool allocates internally based on the 32 bit 
+virtual address as well so everything is broken if we want to be able to 
+manage the full address space after 4G. I see a couple of options:
 
-	Arnd
+1) Change gen_pool_add to use physical addresses and allocate based on 
+physical addresses instead of virtual addresses
+2) Change the virtual address to be a 64 bit type or something 
+selectable to a 64 bit type.
+3) Allow a flag per pool to select whether the allocator is virtual or 
+physical and switch between those.
+4) Split the APIs into virtual <-> physical and physical only and have 
+separate types for each.
+
+Any of these suggestions seem reasonable or is there another option to 
+consider?
+
+Thanks,
+Laura
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
