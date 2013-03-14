@@ -1,77 +1,92 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 14 Mar 2013 10:16:50 +0100 (CET)
-Subject: [PATCH V7 1/2] ARM: bcm281xx: Add timer driver (driver
- portion)
-In-Reply-To: <51410BF4.4040400@linaro.org>
-References: <1363210048-3334-1-git-send-email-csd@broadcom.com>
- <51410BF4.4040400@linaro.org>
-Message-ID: <alpine.LFD.2.02.1303140951580.22263@ionos>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 14 Mar 2013 14:46:54 +0530
+Subject: [PATCH v3 2/5] spi/davinci: add DT binding documentation
+In-Reply-To: <1363075827-31053-3-git-send-email-prakash.pm@ti.com>
+References: <1363075827-31053-1-git-send-email-prakash.pm@ti.com>
+ <1363075827-31053-3-git-send-email-prakash.pm@ti.com>
+Message-ID: <51419586.7090703@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 13 Mar 2013, John Stultz wrote:
-> On 03/13/2013 02:27 PM, Christian Daudt wrote:
-> > This adds support for the Broadcom timer, used in the following SoCs:
-> > BCM11130, BCM11140, BCM11351, BCM28145, BCM28155
-> [snip]
-> > Signed-off-by: Christian Daudt <csd@broadcom.com>
-> > Acked-by: Arnd Bergmann <arnd@arndb.de>
-> > Acked-by: John Stultz <john.stultz@linaro.org>
-> > Reviewed-by: Stephen Warren <swarren@nvidia.com>
+On 3/12/2013 1:40 PM, Manjunathappa, Prakash wrote:
+> From: Murali Karicheri <m-karicheri2@ti.com>
 > 
-> Hey Olof,
->     So Christian mentioned you were hoping I'd pull these in through my tree,
-> but I'd really rather these go via the arch-soc tree, since that is more
-> likely where they will be tested and more intelligently reviewed.
+> Get back missed out binding documentation submitted along
+> with below patch:
+> "spi/davinci: add OF support for the spi controller"
+
+This is not really the correct description of this patch. Years later
+its mostly irrelevant that binding documentation did not get applied
+along with the actual usage.
+
 > 
-> I've mentioned before my distaste for the drivers/clocksource directory
-> becoming a dumping ground for arch specific (for the most part arm)
-> clocksource, and more recently clockevent, drivers. I initially wanted the
-
-OTOH, if they are all in one place we have a better chance to analyze
-them in bulk, find similarities and patterns for consolidation. And
-it's simpler for the developer of a new SoC support to find the
-matching driver for his IP block instead of copying stuff from one
-mach directory to the next. We've been there :)
-
-> But I'd really rather the patch flow for arch specific clocksource and
-> clockevent drivers go through the arch tree, since there's a better chance
-> folks will be building and testing against other arch specific changes that
-> might cause problems. There's just no way for me to be able to intelligently
-> review these sorts of changes.
-
-I agree with the build and test part, but you can still review the
-code in general - correctness of the particular hw details aside. I
-just opened a random one there and found:
-
-static cycle_t vt8500_timer_read(struct clocksource *cs)
-{
-        int loops = msecs_to_loops(10);
-        writel(3, regbase + TIMER_CTRL_VAL);
-        while ((readl((regbase + TIMER_AS_VAL)) & TIMER_COUNT_R_ACTIVE)
-                                                && --loops)
-                cpu_relax();
-        return readl(regbase + TIMER_COUNT_VAL);
-
-You don't need particular hw knowledge to see that this looks more
-than fishy at least without comments describing the hardware designers
-brainfart.
- 
-> Now, if there are changes to the clocksource core code, then I definitely want
-> to be in the path there. Additionally meta-drivers like mmio, I should
-> probably be more involved with, so they can be more properly integrated into
-> the clocksource core. Also for drivers that are actually arch shared (ie:
-> things like hpet/acpi_pm where ia64 and x86 share them).
+> [prakash.pm at ti.com: Follow DT naming convention for compatible property]
+> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+> Reviewed-by: Grant Likely <grant.likely@secretlab.ca>
+> Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
+> ---
+>  .../devicetree/bindings/spi/spi-davinci.txt        |   51 ++++++++++++++++++++
+>  1 files changed, 51 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/spi/spi-davinci.txt
 > 
-> But if its arch specific for hardware I don't have, I'd really prefer the arch
-> maintainer be the upstream path.
-> 
-> Thomas: Am I being too obstinate here?  If not, should we drop "F:
-> drivers/clocksource" from the MAINTAINERS entry?
+> diff --git a/Documentation/devicetree/bindings/spi/spi-davinci.txt b/Documentation/devicetree/bindings/spi/spi-davinci.txt
+> new file mode 100644
+> index 0000000..75ad9ac
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/spi/spi-davinci.txt
+> @@ -0,0 +1,51 @@
+> +Davinci SPI controller device bindings
+> +
+> +Required properties:
+> +- #address-cells: number of cells required to define a chip select
+> +	address on the SPI bus. Should be set to 1.
+> +- #size-cells: should be zero.
+> +- compatible:
+> +	- "ti,dm6441-spi" for SPI used similar to that on DM644x SoC family
+> +	- "ti,da830-spi" for SPI used similar to that on DA8xx SoC family
+> +- reg: Offset and length of SPI controller register space
+> +- num-cs: Number of chip selects
+> +- ti,davinci-spi-intr-line: interrupt line used to connect the SPI
+> +	IP to the interrupt controller withn the SoC. Possible values
+> +	are 0 and 1. Manual says one of the two possible interrupt
+> +	lines can be tied to the interrupt controller. Set this
+> +	based on a specifc SoC configuration.
+> +- interrupts: interrupt number mapped to CPU.
+> +- clocks: spi clk phandle
+> +
+> +Example of a NOR flash slave device (n25q032) connected to DaVinci
+> +SPI controller device over the SPI bus.
+> +
+> +spi0:spi at 20BF0000 {
+> +	#address-cells	 = <1>;
+> +	#size-cells	 = <0>;
+> +	compatible	 = "ti,dm6446-spi";
+> +	reg	 = <0x20BF0000 0x1000>;
+> +	num-cs	 = <4>;
+> +	ti,davinci-spi-intr-line	= <0>;
+> +	interrupts	 = <338>;
+> +	clocks	 = <&clkspi>;
+> +
+> +	flash: n25q032 at 0 {
+> +	 #address-cells = <1>;
+> +	 #size-cells = <1>;
+> +	 compatible = "st,m25p32";
+> +	 spi-max-frequency = <25000000>;
+> +	 reg = <0>;
+> +
+> +	 partition at 0 {
+> +	 label = "u-boot-spl";
+> +	 reg = <0x0 0x80000>;
+> +	 read-only;
+> +	 };
+> +
+> +	 partition at 1 {
+> +	 label = "test";
+> +	 reg = <0x80000 0x380000>;
+> +	 };
+> +	};
 
-Maybe we should move the ARM specific ones into
-drivers/clocksource/arm/ ?
- 
+Looks like the tabs were messed up when you took Murali's patch.
+
 Thanks,
-
-	tglx
+Sekhar
