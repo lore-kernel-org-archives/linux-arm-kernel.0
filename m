@@ -1,22 +1,30 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 Mar 2013 22:59:21 +0000
-Subject: [GIT PULL] Samsung fixes for v3.9
-In-Reply-To: <093101ce1fa8$840c52d0$8c24f870$%kim@samsung.com>
-References: <093101ce1fa8$840c52d0$8c24f870$%kim@samsung.com>
-Message-ID: <201303142259.21663.arnd@arndb.de>
+Date: Thu, 14 Mar 2013 22:57:22 +0000
+Subject: [GIT PULL] at91: fixes for 3.9-rc #1
+In-Reply-To: <51418DDC.8030901@atmel.com>
+References: <51404ABF.7080405@atmel.com> <51418DDC.8030901@atmel.com>
+Message-ID: <201303142257.22786.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 13 March 2013, Kukjin Kim wrote:
-> Here is Samsung fixes for v3.9.
+On Thursday 14 March 2013, Nicolas Ferre wrote:
+> Here is a little pull-request for 3.9-rc (I guess it if -rc4 now that
+> you've just sent the one for -rc3).
 > 
-> Please pull from:
-> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> v3.9-samsung-fixes-1
+> I have other material but it is related to the AT91 framebuffer and we are
+> currently discussing it so I hold them back for now.
 > 
-> There are two commits for fix pl330 dma clkdev entries on s5pv210 and generic
-> dma binding support on exynos stuff.
+> Thanks, best regards,
+> 
+> The following changes since commit f6161aa153581da4a3867a2d1a7caf4be19b6ec9:
+> 
+>   Linux 3.9-rc2 (2013-03-10 16:54:19 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://github.com/at91linux/linux-at91.git tags/at91-fixes
+> 
 
-Pulled into the fixes branch, thanks!
+Pulled into the fixes branch now
 
 	Arnd
