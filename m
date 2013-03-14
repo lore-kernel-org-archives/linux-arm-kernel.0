@@ -1,54 +1,82 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Thu, 14 Mar 2013 13:50:36 +0800
-Subject: [PATCH 08/14] usb: omap_udc: using common vbus_active
+Date: Thu, 14 Mar 2013 13:50:35 +0800
+Subject: [PATCH 07/14] usb: mv_udc: using common vbus_active
 In-Reply-To: <1363240242-25775-1-git-send-email-peter.chen@freescale.com>
 References: <1363240242-25775-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1363240242-25775-9-git-send-email-peter.chen@freescale.com>
+Message-ID: <1363240242-25775-8-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Using common vbus_active to indicate vbus status
 
-CC: Felipe Balbi <balbi@ti.com>
+CC: Chao Xie <chao.xie@marvell.com>
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/gadget/omap_udc.c |    4 ++--
- drivers/usb/gadget/omap_udc.h |    1 -
- 2 files changed, 2 insertions(+), 3 deletions(-)
+ drivers/usb/gadget/mv_udc.h      |    1 -
+ drivers/usb/gadget/mv_udc_core.c |   14 +++++++-------
+ 2 files changed, 7 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/usb/gadget/omap_udc.c b/drivers/usb/gadget/omap_udc.c
-index 06be85c..2d0cf7f 100644
---- a/drivers/usb/gadget/omap_udc.c
-+++ b/drivers/usb/gadget/omap_udc.c
-@@ -1186,7 +1186,7 @@ omap_set_selfpowered(struct usb_gadget *gadget, int is_selfpowered)
+diff --git a/drivers/usb/gadget/mv_udc.h b/drivers/usb/gadget/mv_udc.h
+index 9073436..6d848b4 100644
+--- a/drivers/usb/gadget/mv_udc.h
++++ b/drivers/usb/gadget/mv_udc.h
+@@ -206,7 +206,6 @@ struct mv_udc {
  
- static int can_pullup(struct omap_udc *udc)
- {
--	return udc->driver && udc->softconnect && udc->vbus_active;
-+	return udc->driver && udc->softconnect && udc->gadget.vbus_active;
- }
- 
- static void pullup_enable(struct omap_udc *udc)
-@@ -1253,7 +1253,7 @@ static int omap_vbus_session(struct usb_gadget *gadget, int is_active)
- 	udc = container_of(gadget, struct omap_udc, gadget);
+ 	int			errors;
+ 	unsigned		softconnect:1,
+-				vbus_active:1,
+ 				remote_wakeup:1,
+ 				softconnected:1,
+ 				force_fs:1,
+diff --git a/drivers/usb/gadget/mv_udc_core.c b/drivers/usb/gadget/mv_udc_core.c
+index c8cf959..91a1b0d 100644
+--- a/drivers/usb/gadget/mv_udc_core.c
++++ b/drivers/usb/gadget/mv_udc_core.c
+@@ -1204,12 +1204,12 @@ static int mv_udc_vbus_session(struct usb_gadget *gadget, int is_active)
+ 	udc = container_of(gadget, struct mv_udc, gadget);
  	spin_lock_irqsave(&udc->lock, flags);
- 	VDBG("VBUS %s\n", is_active ? "on" : "off");
+ 
 -	udc->vbus_active = (is_active != 0);
 +	gadget->vbus_active = (is_active != 0);
- 	if (cpu_is_omap15xx()) {
- 		/* "software" detect, ignored if !VBUS_MODE_1510 */
- 		l = omap_readl(FUNC_MUX_CTRL_0);
-diff --git a/drivers/usb/gadget/omap_udc.h b/drivers/usb/gadget/omap_udc.h
-index cfadeb5..62cdb9d 100644
---- a/drivers/usb/gadget/omap_udc.h
-+++ b/drivers/usb/gadget/omap_udc.h
-@@ -166,7 +166,6 @@ struct omap_udc {
- 	struct usb_phy			*transceiver;
- 	struct list_head		iso;
- 	unsigned			softconnect:1;
--	unsigned			vbus_active:1;
- 	unsigned			ep0_pending:1;
- 	unsigned			ep0_in:1;
- 	unsigned			ep0_set_config:1;
+ 
+ 	dev_dbg(&udc->dev->dev, "%s: softconnect %d, vbus_active %d\n",
+-		__func__, udc->softconnect, udc->vbus_active);
++		__func__, udc->softconnect, gadget->vbus_active);
+ 
+-	if (udc->driver && udc->softconnect && udc->vbus_active) {
++	if (udc->driver && udc->softconnect && gadget->vbus_active) {
+ 		retval = mv_udc_enable(udc);
+ 		if (retval == 0) {
+ 			/* Clock is disabled, need re-init registers */
+@@ -1244,9 +1244,9 @@ static int mv_udc_pullup(struct usb_gadget *gadget, int is_on)
+ 	udc->softconnect = (is_on != 0);
+ 
+ 	dev_dbg(&udc->dev->dev, "%s: softconnect %d, vbus_active %d\n",
+-			__func__, udc->softconnect, udc->vbus_active);
++			__func__, udc->softconnect, gadget->vbus_active);
+ 
+-	if (udc->driver && udc->softconnect && udc->vbus_active) {
++	if (udc->driver && udc->softconnect && gadget->vbus_active) {
+ 		retval = mv_udc_enable(udc);
+ 		if (retval == 0) {
+ 			/* Clock is disabled, need re-init registers */
+@@ -1254,7 +1254,7 @@ static int mv_udc_pullup(struct usb_gadget *gadget, int is_on)
+ 			ep0_reset(udc);
+ 			udc_start(udc);
+ 		}
+-	} else if (udc->driver && udc->vbus_active) {
++	} else if (udc->driver && gadget->vbus_active) {
+ 		/* stop all the transfer in queue*/
+ 		stop_activity(udc, udc->driver);
+ 		udc_stop(udc);
+@@ -2356,7 +2356,7 @@ static int mv_udc_probe(struct platform_device *pdev)
+ 	if (udc->clock_gating)
+ 		mv_udc_disable_internal(udc);
+ 	else
+-		udc->vbus_active = 1;
++		udc->gadget.vbus_active = 1;
+ 
+ 	retval = usb_add_gadget_udc(&pdev->dev, &udc->gadget);
+ 	if (retval)
 -- 
 1.7.0.4
