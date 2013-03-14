@@ -1,69 +1,63 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Thu, 14 Mar 2013 13:50:41 +0800
-Subject: [PATCH 13/14] usb: udc-core: small cleanup for udc->gadget
+Date: Thu, 14 Mar 2013 13:50:40 +0800
+Subject: [PATCH 12/14] usb: s3c2410_udc: using common vbus_active
 In-Reply-To: <1363240242-25775-1-git-send-email-peter.chen@freescale.com>
 References: <1363240242-25775-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1363240242-25775-14-git-send-email-peter.chen@freescale.com>
+Message-ID: <1363240242-25775-13-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-:s/udc->gadget/gadget
+Using common vbus_active to indicate vbus status
 
+CC: Ben Dooks <ben-linux@fluff.org>
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/gadget/udc-core.c |   18 ++++++++++--------
- 1 files changed, 10 insertions(+), 8 deletions(-)
+ drivers/usb/gadget/s3c2410_udc.c |    6 +++---
+ drivers/usb/gadget/s3c2410_udc.h |    1 -
+ 2 files changed, 3 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/usb/gadget/udc-core.c b/drivers/usb/gadget/udc-core.c
-index 2a9cd36..4d90bdf 100644
---- a/drivers/usb/gadget/udc-core.c
-+++ b/drivers/usb/gadget/udc-core.c
-@@ -262,6 +262,7 @@ EXPORT_SYMBOL_GPL(usb_del_gadget_udc);
- static int udc_bind_to_driver(struct usb_udc *udc, struct usb_gadget_driver *driver)
- {
- 	int ret;
-+	struct usb_gadget *gadget = udc->gadget;
+diff --git a/drivers/usb/gadget/s3c2410_udc.c b/drivers/usb/gadget/s3c2410_udc.c
+index fc07b43..ae7a7e3 100644
+--- a/drivers/usb/gadget/s3c2410_udc.c
++++ b/drivers/usb/gadget/s3c2410_udc.c
+@@ -1494,7 +1494,7 @@ static int s3c2410_udc_vbus_session(struct usb_gadget *gadget, int is_active)
  
- 	dev_dbg(&udc->dev, "registering UDC driver [%s]\n",
- 			driver->function);
-@@ -269,15 +270,15 @@ static int udc_bind_to_driver(struct usb_udc *udc, struct usb_gadget_driver *dri
- 	udc->driver = driver;
- 	udc->dev.driver = &driver->driver;
+ 	dprintk(DEBUG_NORMAL, "%s()\n", __func__);
  
--	ret = driver->bind(udc->gadget, driver);
-+	ret = driver->bind(gadget, driver);
- 	if (ret)
- 		goto err1;
--	ret = usb_gadget_udc_start(udc->gadget, driver);
-+	ret = usb_gadget_udc_start(gadget, driver);
- 	if (ret) {
--		driver->unbind(udc->gadget);
-+		driver->unbind(gadget);
- 		goto err1;
- 	}
--	usb_gadget_connect(udc->gadget);
-+	usb_gadget_connect(gadget);
- 
- 	kobject_uevent(&udc->dev.kobj, KOBJ_CHANGE);
+-	udc->vbus = (is_active != 0);
++	gadget->vbus_active = (is_active != 0);
+ 	s3c2410_udc_set_pullup(udc, is_active);
  	return 0;
-@@ -379,13 +380,14 @@ static ssize_t usb_udc_softconn_store(struct device *dev,
- 		struct device_attribute *attr, const char *buf, size_t n)
- {
- 	struct usb_udc		*udc = container_of(dev, struct usb_udc, dev);
-+	struct usb_gadget *gadget = udc->gadget;
+ }
+@@ -1520,7 +1520,7 @@ static irqreturn_t s3c2410_udc_vbus_irq(int irq, void *_dev)
+ 	if (udc_info->vbus_pin_inverted)
+ 		value = !value;
  
- 	if (sysfs_streq(buf, "connect")) {
--		usb_gadget_udc_start(udc->gadget, udc->driver);
--		usb_gadget_connect(udc->gadget);
-+		usb_gadget_udc_start(gadget, udc->driver);
-+		usb_gadget_connect(gadget);
- 	} else if (sysfs_streq(buf, "disconnect")) {
--		usb_gadget_disconnect(udc->gadget);
--		usb_gadget_udc_stop(udc->gadget, udc->driver);
-+		usb_gadget_disconnect(gadget);
-+		usb_gadget_udc_stop(gadget, udc->driver);
+-	if (value != dev->vbus)
++	if (value != &dev->gadget.vbus)
+ 		s3c2410_udc_vbus_session(&dev->gadget, value);
+ 
+ 	return IRQ_HANDLED;
+@@ -1887,7 +1887,7 @@ static int s3c2410_udc_probe(struct platform_device *pdev)
+ 
+ 		dev_dbg(dev, "got irq %i\n", irq);
  	} else {
- 		dev_err(dev, "unsupported command '%s'\n", buf);
- 		return -EINVAL;
+-		udc->vbus = 1;
++		udc->gadget.vbus = 1;
+ 	}
+ 
+ 	if (udc_info && !udc_info->udc_command &&
+diff --git a/drivers/usb/gadget/s3c2410_udc.h b/drivers/usb/gadget/s3c2410_udc.h
+index 93bf225..ca5ad98 100644
+--- a/drivers/usb/gadget/s3c2410_udc.h
++++ b/drivers/usb/gadget/s3c2410_udc.h
+@@ -92,7 +92,6 @@ struct s3c2410_udc {
+ 	unsigned			req_std : 1;
+ 	unsigned			req_config : 1;
+ 	unsigned			req_pending : 1;
+-	u8				vbus;
+ 	struct dentry			*regs_info;
+ };
+ #define to_s3c2410(g)	(container_of((g), struct s3c2410_udc, gadget))
 -- 
 1.7.0.4
