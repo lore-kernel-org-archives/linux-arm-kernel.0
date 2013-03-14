@@ -1,35 +1,60 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 Mar 2013 13:48:43 +0000
-Subject: [PATCH v2 03/14] clocksource: sp804: append CONFIG_OF
-In-Reply-To: <CAD6h2NQHjP2YSv2=BAqTa+MaZKvSe6JPwmuhMLkJcjuaMtVtsA@mail.gmail.com>
-References: <1363108124-17484-1-git-send-email-haojian.zhuang@linaro.org>
- <201303121917.24928.arnd@arndb.de>
- <CAD6h2NQHjP2YSv2=BAqTa+MaZKvSe6JPwmuhMLkJcjuaMtVtsA@mail.gmail.com>
-Message-ID: <201303141348.43552.arnd@arndb.de>
+From: prakash.pm@ti.com (Manjunathappa, Prakash)
+Date: Thu, 14 Mar 2013 13:51:12 +0000
+Subject: [PATCH v5 1/4] ARM: davinci: mmc: derive version information
+ from device name
+In-Reply-To: <5141AF99.5090608@ti.com>
+References: <1363097637-11371-1-git-send-email-prakash.pm@ti.com>
+ <1363097637-11371-2-git-send-email-prakash.pm@ti.com>
+ <5141AF99.5090608@ti.com>
+Message-ID: <A73F36158E33644199EB82C5EC81C7BC3EA48F34@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 13 March 2013, Haojian Zhuang wrote:
-> If CONFIG_CLKSRC_OF is depend on CONFIG_USEOF, I think that
-> we can resolve all these issue. We don't need to define
-> CLOCKSOURCE_OF_DECLARE() for non-DT mode, and we also
-> don't need to define of_device_is_available(), ... in non-DT mode.
+On Thu, Mar 14, 2013 at 16:38:09, Nori, Sekhar wrote:
+> Prakash,
 > 
-> We only need to add "depends on USE_OF" for CLKSRC_OF
-> configuration. It's simpler. What's your opinion?
+> The series looks good to me. I tested it again on DA850 EVM (with and
+> without DT).
+> 
+> On 3/12/2013 7:43 PM, Manjunathappa, Prakash wrote:
+> > Remove specifying mmc controller IP version information via platform
+> > data, instead specify device name so that driver derives it from
+> > platform_device_id table. Also change the clock node name to match
+> > the changed dev_id.
+> > Tested on da850-evm to make sure driver loads without clk_get failures.
+> > 
+> > Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
+> > Reviewed-by: Sekhar Nori <nsekhar@ti.com>
+> > ---
+> 
+> > diff --git a/drivers/mmc/host/davinci_mmc.c b/drivers/mmc/host/davinci_mmc.c
+> > index 27123f8..50e9782 100644
+> > --- a/drivers/mmc/host/davinci_mmc.c
+> > +++ b/drivers/mmc/host/davinci_mmc.c
+> > @@ -1157,6 +1157,18 @@ static void __init init_mmcsd_host(struct mmc_davinci_host *host)
+> >  	mmc_davinci_reset_ctrl(host, 0);
+> >  }
+> >  
+> > +static struct platform_device_id davinci_mmc_devtype[] = {
+> > +	{
+> > +		.name	= "davinci-mmc-dm355",
+> > +		.driver_data = MMC_CTLR_VERSION_1,
+> > +	}, {
+> > +		.name	= "davinci-mmc-da830",
+> > +		.driver_data = MMC_CTLR_VERSION_2,
+> > +	},
+> > +	{},
+> > +};
+> > +MODULE_DEVICE_TABLE(platform, davinci_mmc_devtype);
+> 
+> I should have mentioned this previously, but your choice of name here is
+> too long. You can simply use dm355-mmc (rather dm6441-mmc?) and
+> da830-mmc instead like you did for SPI. This would have saved some long
+> lines. Sorry about not asking for this earlier. I know it would have
+> saved you a bunch of effort.
 > 
 
-I think that is not the right symbol. USE_OF is an ARM specific symbol
-that should not get selected from common code. Also I think 'depends on'
-is much better than 'select', because it has fewer side-effects.
+No problem, will change the name.
 
-Right now, CLKSRC_OF is only selected by platforms that also select USE_OF
-on ARM, which seems appropriate for now, but if we want to make
-CLKSRC_OF a generally visible option, it should use 'depends on OF'.
-
-What I don't understand is how that relates to my comment on your
-code. My goal was to support drivers that can contain all the code
-needed for CLKSRC_OF without any #ifdef but that still work if CONFIG_OF
-and CONFIG_CLKSRC_OF are both disabled.
-
-	Arnd
+Thanks,
+Prakash 
