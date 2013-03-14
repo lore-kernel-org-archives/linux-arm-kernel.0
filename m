@@ -1,75 +1,28 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 Mar 2013 09:06:26 +0000
-Subject: [PATCH 01/04] ARM: shmobile: Initial r8a73a4 SoC support
-In-Reply-To: <CANqRtoTSN=VBV1-dNMSM5aaMwHmmXe9Ow6pFK_AVzXKuOXkFEA@mail.gmail.com>
-References: <20130312045559.19701.77841.sendpatchset@w520>
- <201303121225.40230.arnd@arndb.de>
- <CANqRtoTSN=VBV1-dNMSM5aaMwHmmXe9Ow6pFK_AVzXKuOXkFEA@mail.gmail.com>
-Message-ID: <201303140906.27073.arnd@arndb.de>
+Date: Thu, 14 Mar 2013 09:09:21 +0000
+Subject: [PATCH v4 2/5] clk: hi3xxx: add clock support
+In-Reply-To: <1363245584-24488-3-git-send-email-haojian.zhuang@linaro.org>
+References: <1363245584-24488-1-git-send-email-haojian.zhuang@linaro.org>
+ <1363245584-24488-3-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <201303140909.21267.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 14 March 2013, Magnus Damm wrote:
-> On Tue, Mar 12, 2013 at 9:25 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Tuesday 12 March 2013, Magnus Damm wrote:
-> >> +static struct platform_device *r8a73a4_devices[] __initdata = {
-> >> +};
-> >> +
-> >> +void __init r8a73a4_add_standard_devices(void)
-> >> +{
-> >> +       r8a73a4_clock_init();
-> >> +
-> >> +       platform_add_devices(r8a73a4_devices, ARRAY_SIZE(r8a73a4_devices));
-> >> +}
-> >
-> > I would suggest doing the platform_add_devices() only when you actually
-> > add devices to the array, unless you have a number of conflicting patches
-> > that each want to add their own devices.
+On Thursday 14 March 2013, Haojian Zhuang wrote:
 > 
-> So you would prefer that I fold this portion into a patch later in the series?
-
-If you are adding the devices in a later patch of the same series, it's
-probably better to leave it like it is. I would just like to avoid having
-dead code in a release if you don't get around to also add the devices.
-
-> >> +#ifdef CONFIG_USE_OF
-> >> +void __init r8a73a4_add_standard_devices_dt(void)
-> >> +{
-> >> +       of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-> >> +}
-> >
-> > I have a patch that will make this function definition the default, so you
-> > no longer have to provide an init_machine callback if you don't do anything
-> > special. It's ok to leave it in for now, but we might want to do a follow
-> > up patch to remove it once both patches are merged.
+> Add clock support with device tree on Hisilicon SoC.
 > 
-> That's very nice! I am happy to hear that. Is that patch targeting v3.10?
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 
-Yes, I just need to produce a new version based on 3.9-rc.
+Looks good to me, just one final comment from my side:
 
-> >> +static const char *r8a73a4_boards_compat_dt[] __initdata = {
-> >> +       "renesas,r8a73a4",
-> >> +       NULL,
-> >> +};
-> >> +
-> >> +DT_MACHINE_START(R8A73A4_DT, "Generic R8A73A4 (Flattened Device Tree)")
-> >> +       .init_irq       = irqchip_init,
-> >
-> > Same thing for the default irqchip_init.
-> 
-> Excellent! I believe the easiest is to leave it as-is for now and have
-> a clean-up series that can be merged late in the cycle after your
-> patch is in. I am not sure if that fits with your way of dealing with
-> the pull requests. At least that's how we used to do it for SH. If you
-> have any suggestion when to remove it please let me know.
+> +
+> +static struct hs_clk hs_clk;
+> +
+> +static void __init hs_init_clocks(void);
+> +
 
-I don't want to get new patches during the merge window, but we can
-arrange a branch in the arm-soc tree that has both changes merged
-and the cleanup on top. We always send out pull requests for 10 to
-15 branches in the merge window, and the later branches can be based
-on the earlier ones to deal with dependencies like this.
-
-In this particular case, it would also not hurt to do the cleanup
-in 3.11, since the patch is only cosmetic.
+Please move the hs_init_clocks() function itself to the top of the file to
+avoid the forward declaration.
 
 	Arnd
