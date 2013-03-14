@@ -1,57 +1,99 @@
 From: fabio.porcedda@gmail.com (Fabio Porcedda)
-Date: Thu, 14 Mar 2013 14:11:20 +0100
-Subject: [PATCH 00/10] Use module_platform_driver_probe() part 2
-Message-ID: <1363266691-15757-1-git-send-email-fabio.porcedda@gmail.com>
+Date: Thu, 14 Mar 2013 14:11:21 +0100
+Subject: [PATCH 01/10] drivers: media: use module_platform_driver_probe()
+In-Reply-To: <1363266691-15757-1-git-send-email-fabio.porcedda@gmail.com>
+References: <1363266691-15757-1-git-send-email-fabio.porcedda@gmail.com>
+Message-ID: <1363266691-15757-2-git-send-email-fabio.porcedda@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
-this patch set is the second part for the conversion to use
-new module_platform_driver_probe() macro.
+This patch converts the drivers to use the
+module_platform_driver_probe() macro which makes the code smaller and
+a bit simpler.
 
-I will send a part 3 for the remaining drivers.
-
-Fabio Porcedda (10):
-  drivers: media: use module_platform_driver_probe()
-  drivers: ata: use module_platform_driver_probe()
-  drivers: char: use module_platform_driver_probe()
-  drivers: hwmon: use module_platform_driver_probe()
-  drivers: ide: use module_platform_driver_probe()
-  drivers: input: use module_platform_driver_probe()
-  drivers: memory: use module_platform_driver_probe()
-  drivers: mfd: use module_platform_driver_probe()
-  drivers: video: use module_platform_driver_probe()
-  drivers: misc: use module_platform_driver_probe()
-
- drivers/ata/pata_at32.c                        | 13 +------------
- drivers/ata/pata_samsung_cf.c                  | 13 +------------
- drivers/char/hw_random/mxc-rnga.c              | 13 +------------
- drivers/char/hw_random/tx4939-rng.c            | 13 +------------
- drivers/hwmon/mc13783-adc.c                    | 13 +------------
- drivers/ide/gayle.c                            | 15 +--------------
- drivers/ide/tx4938ide.c                        | 13 +------------
- drivers/ide/tx4939ide.c                        | 13 +------------
- drivers/input/keyboard/amikbd.c                | 14 +-------------
- drivers/input/keyboard/davinci_keyscan.c       | 12 +-----------
- drivers/input/keyboard/nomadik-ske-keypad.c    | 12 +-----------
- drivers/input/misc/twl4030-pwrbutton.c         | 13 +------------
- drivers/input/mouse/amimouse.c                 | 14 +-------------
- drivers/input/serio/at32psif.c                 | 13 +------------
- drivers/input/serio/q40kbd.c                   | 13 +------------
- drivers/input/touchscreen/atmel-wm97xx.c       | 12 +-----------
- drivers/input/touchscreen/mc13783_ts.c         | 12 +-----------
+Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
+Cc: Josh Wu <josh.wu@atmel.com>
+Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+Cc: Hans Verkuil <hans.verkuil@cisco.com>
+Cc: linux-media at vger.kernel.org
+---
  drivers/media/platform/sh_vou.c                | 13 +------------
  drivers/media/platform/soc_camera/atmel-isi.c  | 12 +-----------
  drivers/media/platform/soc_camera/mx1_camera.c | 13 +------------
- drivers/memory/emif.c                          | 12 +-----------
- drivers/mfd/davinci_voicecodec.c               | 12 +-----------
- drivers/mfd/htc-pasic3.c                       | 13 +------------
- drivers/misc/atmel_pwm.c                       | 12 +-----------
- drivers/misc/ep93xx_pwm.c                      | 13 +------------
- drivers/video/backlight/atmel-pwm-bl.c         | 12 +-----------
- drivers/video/sh_mipi_dsi.c                    | 12 +-----------
- drivers/video/sh_mobile_hdmi.c                 | 12 +-----------
- 28 files changed, 28 insertions(+), 329 deletions(-)
+ 3 files changed, 3 insertions(+), 35 deletions(-)
 
+diff --git a/drivers/media/platform/sh_vou.c b/drivers/media/platform/sh_vou.c
+index 66c8da1..d853162 100644
+--- a/drivers/media/platform/sh_vou.c
++++ b/drivers/media/platform/sh_vou.c
+@@ -1485,18 +1485,7 @@ static struct platform_driver __refdata sh_vou = {
+ 	},
+ };
+ 
+-static int __init sh_vou_init(void)
+-{
+-	return platform_driver_probe(&sh_vou, sh_vou_probe);
+-}
+-
+-static void __exit sh_vou_exit(void)
+-{
+-	platform_driver_unregister(&sh_vou);
+-}
+-
+-module_init(sh_vou_init);
+-module_exit(sh_vou_exit);
++module_platform_driver_probe(sh_vou, sh_vou_probe);
+ 
+ MODULE_DESCRIPTION("SuperH VOU driver");
+ MODULE_AUTHOR("Guennadi Liakhovetski <g.liakhovetski@gmx.de>");
+diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
+index 82dbf99..12ba31d 100644
+--- a/drivers/media/platform/soc_camera/atmel-isi.c
++++ b/drivers/media/platform/soc_camera/atmel-isi.c
+@@ -1081,17 +1081,7 @@ static struct platform_driver atmel_isi_driver = {
+ 	},
+ };
+ 
+-static int __init atmel_isi_init_module(void)
+-{
+-	return  platform_driver_probe(&atmel_isi_driver, &atmel_isi_probe);
+-}
+-
+-static void __exit atmel_isi_exit(void)
+-{
+-	platform_driver_unregister(&atmel_isi_driver);
+-}
+-module_init(atmel_isi_init_module);
+-module_exit(atmel_isi_exit);
++module_platform_driver_probe(atmel_isi_driver, atmel_isi_probe);
+ 
+ MODULE_AUTHOR("Josh Wu <josh.wu@atmel.com>");
+ MODULE_DESCRIPTION("The V4L2 driver for Atmel Linux");
+diff --git a/drivers/media/platform/soc_camera/mx1_camera.c b/drivers/media/platform/soc_camera/mx1_camera.c
+index 25b2a28..4389f43 100644
+--- a/drivers/media/platform/soc_camera/mx1_camera.c
++++ b/drivers/media/platform/soc_camera/mx1_camera.c
+@@ -859,18 +859,7 @@ static struct platform_driver mx1_camera_driver = {
+ 	.remove		= __exit_p(mx1_camera_remove),
+ };
+ 
+-static int __init mx1_camera_init(void)
+-{
+-	return platform_driver_probe(&mx1_camera_driver, mx1_camera_probe);
+-}
+-
+-static void __exit mx1_camera_exit(void)
+-{
+-	return platform_driver_unregister(&mx1_camera_driver);
+-}
+-
+-module_init(mx1_camera_init);
+-module_exit(mx1_camera_exit);
++module_platform_driver_probe(mx1_camera_driver, mx1_camera_probe);
+ 
+ MODULE_DESCRIPTION("i.MX1/i.MXL SoC Camera Host driver");
+ MODULE_AUTHOR("Paulius Zaleckas <paulius.zaleckas@teltonika.lt>");
 -- 
 1.8.1.5
