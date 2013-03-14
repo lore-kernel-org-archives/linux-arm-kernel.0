@@ -1,50 +1,41 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Thu, 14 Mar 2013 13:50:42 +0800
-Subject: [PATCH 14/14] usb: udc-core: add judgement logic for
- usb_gadget_connect
-In-Reply-To: <1363240242-25775-1-git-send-email-peter.chen@freescale.com>
-References: <1363240242-25775-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1363240242-25775-15-git-send-email-peter.chen@freescale.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 14 Mar 2013 13:53:24 +0800
+Subject: [PATCH 0/6] Remove mxsfb auxdata
+Message-ID: <1363240410-16865-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- If there is no vbus control to indicate connection.
-and disconnect, we can pullup dp when we load gadget module.
-- If we have vbus control logic, the dp is better pull up
-when there is a vbus session.
+The mxsfb driver was converted to device tree by asking platform to
+pass mxsfb_platform_data with auxdata.  We did this to have mach-mxs
+be DT only platform when there was no videomode bindings.  Now with
+the videomode bindings and helpers in place, the series changes mxsfb
+driver to get display_timings from device tree, and removes mxsfb
+platform_data and auxdata completely.
 
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
----
- drivers/usb/gadget/udc-core.c |   10 ++++++++--
- 1 files changed, 8 insertions(+), 2 deletions(-)
+To maintain the bisectability, the series needs to go via single tree,
+and I prefer to arm-soc tree.
 
-diff --git a/drivers/usb/gadget/udc-core.c b/drivers/usb/gadget/udc-core.c
-index 4d90bdf..4b56f7c 100644
---- a/drivers/usb/gadget/udc-core.c
-+++ b/drivers/usb/gadget/udc-core.c
-@@ -278,7 +278,10 @@ static int udc_bind_to_driver(struct usb_udc *udc, struct usb_gadget_driver *dri
- 		driver->unbind(gadget);
- 		goto err1;
- 	}
--	usb_gadget_connect(gadget);
-+	if (!gadget->ops->vbus_session ||
-+			(gadget->ops->vbus_session
-+				&& gadget->vbus_active))
-+		usb_gadget_connect(gadget);
- 
- 	kobject_uevent(&udc->dev.kobj, KOBJ_CHANGE);
- 	return 0;
-@@ -384,7 +387,10 @@ static ssize_t usb_udc_softconn_store(struct device *dev,
- 
- 	if (sysfs_streq(buf, "connect")) {
- 		usb_gadget_udc_start(gadget, udc->driver);
--		usb_gadget_connect(gadget);
-+		if (!gadget->ops->vbus_session ||
-+				(gadget->ops->vbus_session
-+					&& gadget->vbus_active))
-+			usb_gadget_connect(gadget);
- 	} else if (sysfs_streq(buf, "disconnect")) {
- 		usb_gadget_disconnect(gadget);
- 		usb_gadget_udc_stop(gadget, udc->driver);
+Shawn Guo (6):
+  video: mxsfb: use devm_* managed functions
+  video: mxsfb: remove fb_phys/fb_size from platform_data
+  video: mxsfb: remove dotclk_delay from platform_data
+  video: mxsfb: get display timings from device tree
+  ARM: mxs: move display timing configurations into device tree
+  video: mxsfb: remove mxsfb_platform_data
+
+ Documentation/devicetree/bindings/fb/mxsfb.txt |   34 ++++
+ arch/arm/boot/dts/imx23-evk.dts                |   25 +++
+ arch/arm/boot/dts/imx28-apf28dev.dts           |   25 +++
+ arch/arm/boot/dts/imx28-apx4devkit.dts         |   25 +++
+ arch/arm/boot/dts/imx28-cfa10049.dts           |   25 +++
+ arch/arm/boot/dts/imx28-evk.dts                |   25 +++
+ arch/arm/boot/dts/imx28-m28evk.dts             |   25 +++
+ arch/arm/mach-mxs/mach-mxs.c                   |  153 -----------------
+ drivers/video/Kconfig                          |    2 +
+ drivers/video/mxsfb.c                          |  219 +++++++++++++++---------
+ include/linux/mxsfb.h                          |   49 ------
+ 11 files changed, 320 insertions(+), 287 deletions(-)
+ delete mode 100644 include/linux/mxsfb.h
+
 -- 
-1.7.0.4
+1.7.9.5
