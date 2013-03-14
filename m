@@ -1,122 +1,16 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Thu, 14 Mar 2013 15:58:07 -0500
-Subject: [PATCH 0/8] ARM: OMAP3+: Switch to use DT based cpu0-cpufreq driver
-Message-ID: <1363294695-658-1-git-send-email-nm@ti.com>
+Date: Thu, 14 Mar 2013 15:58:11 -0500
+Subject: [PATCH 4/8] ARM: dts: OMAP443x: move CPU OPP tables to device tree
+In-Reply-To: <1363294695-658-1-git-send-email-nm@ti.com>
+References: <1363294695-658-1-git-send-email-nm@ti.com>
+Message-ID: <1363294695-658-5-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following series arose from trying to use BeagleBoard-XM (OMAP3 variant)
-for doing CPU DVFS using cpufreq-cpu0. This series will eventually result in
-migrating the cpufreq support only through device tree (part of the effort
-to migrate away from non-DT configurations for OMAP). Unfortunately, as already
-known, we have a bunch of legacy code and mutually dependent device tree
-conversion that is pending.
-Key features pending:
-A) clock framework transition to DT - this should happen soon, so this series hacks
-the clock node for the time being as suggested in review of original series
-B) on processors that use voltage controller, voltage processor (VC/VP hardware
-loop using I2C_SR path) - we have started work on transitioning them to regulator
-framework driven by DT.
-C) Adaptive Body Bias and SmartReflex AVS conversion to DT.
+Add DT OPP table for OMAP443x family of devices. This data is
+decoded by OF with of_init_opp_table() helper function.
 
-As a result of these pending features:
-- OMAP4 TWL6030 and TPS62361 which set voltage ONLY over I2C_SR have no regulators
-associated at the moment - fortunately, we boot at highest voltage, so things still
-work.
-- Missing ABB and AVS implies that for few of the SoCs (3630, OMAP4), I have not added
-those OPPs in DT yet - this also needs alignment with iMX, AM series like pending work,
-where certain OPPs need enabling based on efuse programmed bit sequences - since it
-is an add-on work, it is not addressed here.
-
-Note: Somewhere in the future, when we have regulators driven off CCF and OMAP
-converted to CCF, we could remove the DT regulator requirements there as well.
-
-Key benefit of the series is to allow all relevant TI platforms now to use a single
-cpufreq driver and equivalent frameworks in addition be part of the transition to
-DT. As a result of this series, CPUFreq feature will not be available for non-DT
-boot systems.
-
-Original discussion thread which triggered this series:
-	http://marc.info/?l=linux-pm&m=136304313700602&w=2
-	https://patchwork.kernel.org/patch/2251841/
-	https://patchwork.kernel.org/patch/2251851/
-
-Test coverage:
-	test script: http://pastebin.com/MpCRY0SB
-Platforms verified:
-	beaglebone(rev A6a) - AM33xx compatible
-	beagleboard (rev C1D) - OMAP3430 compatible
-	omap3-beagle-xm -OMAP3630 compatible
-	Pandaboard -(OMAP4430 ES2.3) verified with omapconf
-	Pandaboard-ES -(OMAP4460 ES1.1) verified with omapconf
-
-Series is based on v3.9-rc2 tag
-
-Also available at:
-	https://github.com/nmenon/linux-2.6-playground/commits/push/cpufreq-cpu0-omap-all-v1
-	git link: git://github.com/nmenon/linux-2.6-playground.git
-	branch: cpufreq-cpu0-omap-all-v1
-
-Nishanth Menon (8):
-  ARM: dts: OMAP34xx: move CPU OPP tables to device tree
-  ARM: dts: OMAP36xx: move CPU OPP tables to device tree
-  ARM: dts: OMAP3: use twl4030 vdd1 regulator for CPU
-  ARM: dts: OMAP443x: move CPU OPP tables to device tree
-  ARM: dts: omap4-panda: move generic sections to panda-common
-  ARM: dts: OMAP446x: move CPU OPP tables to device tree
-  ARM: OMAP3+: use cpu0-cpufreq driver
-  cpufreq: omap: remove omap-cpufreq
-
- MAINTAINERS                               |    1 -
- arch/arm/boot/dts/omap3-beagle-xm.dts     |    6 +
- arch/arm/boot/dts/omap3-beagle.dts        |    6 +
- arch/arm/boot/dts/omap3-evm.dts           |    6 +
- arch/arm/boot/dts/omap3.dtsi              |   10 +
- arch/arm/boot/dts/omap36xx.dtsi           |   12 ++
- arch/arm/boot/dts/omap4-panda-a4.dts      |    5 +-
- arch/arm/boot/dts/omap4-panda-common.dtsi |  205 ++++++++++++++++++++
- arch/arm/boot/dts/omap4-panda-es.dts      |    5 +-
- arch/arm/boot/dts/omap4-panda.dts         |  200 +-------------------
- arch/arm/boot/dts/omap4.dtsi              |   10 +
- arch/arm/boot/dts/omap446x.dtsi           |   27 +++
- arch/arm/boot/dts/twl4030.dtsi            |    6 +
- arch/arm/mach-omap2/board-generic.c       |    4 +
- arch/arm/mach-omap2/cclock33xx_data.c     |    2 +-
- arch/arm/mach-omap2/cclock3xxx_data.c     |    2 +-
- arch/arm/mach-omap2/cclock44xx_data.c     |    2 +-
- arch/arm/mach-omap2/opp3xxx_data.c        |   20 --
- arch/arm/mach-omap2/opp4xxx_data.c        |   23 ---
- drivers/cpufreq/Kconfig.arm               |    6 -
- drivers/cpufreq/Makefile                  |    1 -
- drivers/cpufreq/omap-cpufreq.c            |  291 -----------------------------
- 22 files changed, 305 insertions(+), 545 deletions(-)
- create mode 100644 arch/arm/boot/dts/omap4-panda-common.dtsi
- create mode 100644 arch/arm/boot/dts/omap446x.dtsi
- delete mode 100644 drivers/cpufreq/omap-cpufreq.c
-
-Size change information:
-add/remove: 0/0 grow/shrink: 3/5 up/down: 74/-291 (-217)
-function                                     old     new   delta
-omap_generic_init                             96     140     +44
-vermagic                                      49      64     +15
-linux_banner                                 130     145     +15
-kernel_config_data                         18333   18330      -3
-omap443x_opp_def_list                        144      80     -64
-omap36xx_opp_def_list                        160      96     -64
-omap446x_opp_def_list                        192     112     -80
-omap34xx_opp_def_list                        208     128     -80
-
-non-zero DTB size deltas(bytes):
-old	new	delta	 filename
-8068	8311	+243	omap3-beagle.dtb
-8647	8874	+227	omap3-beagle-xm.dtb
-7783	8026	+243	omap3-evm.dtb
-8000	8183	+183	omap3-tobi.dtb
-13646	13771	+125	omap4-panda-a4.dtb
-13646	13771	+125	omap4-panda.dtb
-13602	13719	+117	omap4-panda-es.dtb
-16256	16381	+125	omap4-sdp.dtb
-10889	11014	+125	omap4-var-som.dtb
+This is in preparation to use generic cpu0-cpufreq driver.
 
 Cc: Kevin Hilman <khilman@deeprootsystems.com>
 Cc: "Beno?t Cousson" <b-cousson@ti.com>
@@ -129,7 +23,51 @@ Cc: linux-arm-kernel at lists.infradead.org
 Cc: cpufreq at vger.kernel.org
 Cc: linux-pm at vger.kernel.org
 
-Regards,
-Nishanth Menon
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+ arch/arm/boot/dts/omap4.dtsi       |   10 ++++++++++
+ arch/arm/mach-omap2/opp4xxx_data.c |    8 --------
+ 2 files changed, 10 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index 739bb79..08983a3 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -31,6 +31,16 @@
+ 		cpu at 0 {
+ 			compatible = "arm,cortex-a9";
+ 			next-level-cache = <&L2>;
++			/* OMAP4430 variants OPP50-OPPNT */
++			operating-points = <
++				/* kHz    uV */
++				300000  1025000
++				600000  1200000
++				800000  1313000
++				1008000 1375000
++			>;
++			clock-latency = <300000>; /* From omap-cpufreq driver */
++			voltage-tolerance = <2>; /* 2 % */
+ 		};
+ 		cpu at 1 {
+ 			compatible = "arm,cortex-a9";
+diff --git a/arch/arm/mach-omap2/opp4xxx_data.c b/arch/arm/mach-omap2/opp4xxx_data.c
+index 1ef7a3e..478e2ee 100644
+--- a/arch/arm/mach-omap2/opp4xxx_data.c
++++ b/arch/arm/mach-omap2/opp4xxx_data.c
+@@ -65,14 +65,6 @@ struct omap_volt_data omap443x_vdd_core_volt_data[] = {
+ 
+ 
+ static struct omap_opp_def __initdata omap443x_opp_def_list[] = {
+-	/* MPU OPP1 - OPP50 */
+-	OPP_INITIALIZER("mpu", true, 300000000, OMAP4430_VDD_MPU_OPP50_UV),
+-	/* MPU OPP2 - OPP100 */
+-	OPP_INITIALIZER("mpu", true, 600000000, OMAP4430_VDD_MPU_OPP100_UV),
+-	/* MPU OPP3 - OPP-Turbo */
+-	OPP_INITIALIZER("mpu", true, 800000000, OMAP4430_VDD_MPU_OPPTURBO_UV),
+-	/* MPU OPP4 - OPP-SB */
+-	OPP_INITIALIZER("mpu", true, 1008000000, OMAP4430_VDD_MPU_OPPNITRO_UV),
+ 	/* L3 OPP1 - OPP50 */
+ 	OPP_INITIALIZER("l3_main_1", true, 100000000, OMAP4430_VDD_CORE_OPP50_UV),
+ 	/* L3 OPP2 - OPP100, OPP-Turbo, OPP-SB */
 -- 
 1.7.9.5
