@@ -1,41 +1,71 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 14 Mar 2013 13:08:55 +0100
-Subject: [PATCH] i.MX: Add GPT devicetree nodes
-Message-ID: <1363262942-26702-1-git-send-email-s.hauer@pengutronix.de>
+Date: Thu, 14 Mar 2013 13:09:02 +0100
+Subject: [PATCH 7/7] ARM: i.MX27: Add clocks to GPT devicetree nodes
+In-Reply-To: <1363262942-26702-1-git-send-email-s.hauer@pengutronix.de>
+References: <1363262942-26702-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1363262942-26702-8-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GPT is the general purpose timer found on i.MX SoCs. The bindings
-are used on i.MX25 and i.MX6 already. The remaining i.MX SoCs still
-use a platform based timer. This is a first step to change this: We
-add the devicetree nodes for the other DT enabled SoCs (i.MX27, i.MX31,
-i.MX51 and i.MX53).
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ arch/arm/boot/dts/imx27.dtsip | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-This series also adds the missing binding documentation for the GPT.
-
-The series is based on Shawns imx/dt branch.
-
-The last patch adds the clocks to the i.MX27 GPT. This is not applicable
-right now since it depends on the patch changing i.MX27 to devicetree
-based clock lookups.
-
-Sascga
-
-----------------------------------------------------------------
-Sascha Hauer (7):
-      ARM: i.MX: Add GPT devicetree Documentation
-      ARM: i.MX27: Add GPT devicetree nodes
-      ARM: i.MX31: Add GPT devicetree node
-      ARM: i.MX51: Add GPT devicetree node
-      ARM: i.MX53: Add GPT devicetree node
-      ARM: i.MX6: Add clocks to GPT devicetree node
-      ARM: i.MX27: Add clocks to GPT devicetree nodes
-
- .../devicetree/bindings/timer/fsl,imxgpt.txt       | 18 ++++++++
- arch/arm/boot/dts/imx27.dtsip                      | 49 +++++++++++++++++++++-
- arch/arm/boot/dts/imx31.dtsip                      | 16 +++++++
- arch/arm/boot/dts/imx51.dtsip                      |  8 ++++
- arch/arm/boot/dts/imx53.dtsip                      |  8 ++++
- arch/arm/boot/dts/imx6qdl.dtsip                    |  2 +
- 6 files changed, 100 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/timer/fsl,imxgpt.txt
+diff --git a/arch/arm/boot/dts/imx27.dtsip b/arch/arm/boot/dts/imx27.dtsip
+index 3e0585f..3ea1f59 100644
+--- a/arch/arm/boot/dts/imx27.dtsip
++++ b/arch/arm/boot/dts/imx27.dtsip
+@@ -68,18 +68,24 @@
+ 				compatible = "fsl,imx27-gpt", "fsl,imx1-gpt";
+ 				reg = <0x10003000 0x1000>;
+ 				interrupts = <26>;
++				clocks = <&clks 46>, <&clks 61>;
++				clock-names = "ipg", "per";
+ 			};
+ 
+ 			gpt2: timer at 10004000 {
+ 				compatible = "fsl,imx27-gpt", "fsl,imx1-gpt";
+ 				reg = <0x10004000 0x1000>;
+ 				interrupts = <25>;
++				clocks = <&clks 45>, <&clks 61>;
++				clock-names = "ipg", "per";
+ 			};
+ 
+ 			gpt3: timer at 10005000 {
+ 				compatible = "fsl,imx27-gpt", "fsl,imx1-gpt";
+ 				reg = <0x10005000 0x1000>;
+ 				interrupts = <24>;
++				clocks = <&clks 44>, <&clks 61>;
++				clock-names = "ipg", "per";
+ 			};
+ 
+ 			uart1: serial at 1000a000 {
+@@ -210,12 +216,16 @@
+ 				compatible = "fsl,imx27-gpt", "fsl,imx1-gpt";
+ 				reg = <0x10019000 0x1000>;
+ 				interrupts = <4>;
++				clocks = <&clks 43>, <&clks 61>;
++				clock-names = "ipg", "per";
+ 			};
+ 
+ 			gpt5: timer at 1001a000 {
+ 				compatible = "fsl,imx27-gpt", "fsl,imx1-gpt";
+ 				reg = <0x1001a000 0x1000>;
+ 				interrupts = <3>;
++				clocks = <&clks 42>, <&clks 61>;
++				clock-names = "ipg", "per";
+ 			};
+ 
+ 			uart5: serial at 1001b000 {
+@@ -245,6 +255,8 @@
+ 				compatible = "fsl,imx27-gpt", "fsl,imx1-gpt";
+ 				reg = <0x1001f000 0x1000>;
+ 				interrupts = <2>;
++				clocks = <&clks 41>, <&clks 61>;
++				clock-names = "ipg", "per";
+ 			};
+ 		};
+ 
+-- 
+1.8.2.rc2
