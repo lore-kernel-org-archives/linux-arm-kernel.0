@@ -1,112 +1,106 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Thu, 14 Mar 2013 13:19:17 -0700
-Subject: [PATCH v2 1/1] ARM: LPAE: Fix mapping in alloc_init_pte for
- unaligned addresses.
-In-Reply-To: <CAHkRjk7tensn15DLqsaWbnZ-dfu0VdGQcL=Ha5hybz0SCM8E4g@mail.gmail.com>
-References: <1344238885-13683-1-git-send-email-r.sricharan@ti.com>
- <CAJ7qFSeoyVGie__3mJ8=edeEf7Jh7TQY8vcWgGdOtWVXa8TU0Q@mail.gmail.com>
- <CAJ7qFScGw8oA9y7gjoUTp6xCoLnQti2OXuVqCMrxJUeHDSRENA@mail.gmail.com>
- <CAHkRjk7tensn15DLqsaWbnZ-dfu0VdGQcL=Ha5hybz0SCM8E4g@mail.gmail.com>
-Message-ID: <514230C5.4010502@codeaurora.org>
+From: smoch@web.de (Soeren Moch)
+Date: Thu, 14 Mar 2013 21:22:46 +0100
+Subject: [PATCH] USB: EHCI: fix for leaking isochronous data
+In-Reply-To: <51421B89.6020308@web.de>
+References: <Pine.LNX.4.44L0.1303101638330.3146-100000@netrider.rowland.org>
+ <51421B89.6020308@web.de>
+Message-ID: <51423196.6090907@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/13/2013 10:14 PM, Catalin Marinas wrote:
-> (sorry for if you got this message twice, gmail's new reply method
-> decided to send html)
->
-> On 18 September 2012 12:52, R, Sricharan <r.sricharan@ti.com> wrote:
->> Hi,
->> On Fri, Aug 17, 2012 at 4:32 PM, R, Sricharan <r.sricharan@ti.com> wrote:
->>> Hi,
+On 14.03.2013 19:48, Soeren Moch wrote:
+> On 10.03.2013 21:59, Alan Stern wrote:
+>> On Sun, 10 Mar 2013, Soeren Moch wrote:
+>>>> On Wed, 20 Feb 2013, Soeren Moch wrote:
+>>>>
+>>>>> Ok. I use 2 em2840-based usb sticks (em28xx driver) attached to a
+>>>>> Marvell Kirkwood-SoC with a orion-ehci usb controller. These usb
+>>>>> sticks
+>>>>> stream dvb data (digital TV) employing isochronous usb transfers (user
+>>>>> application is vdr).
+>>>>>
+>>>>> Starting from linux-3.6 I see
+>>>>>      ERROR: 1024 KiB atomic DMA coherent pool is too small!
+>>>>> in the syslog after several 10 minutes (sometimes hours) of streaming
+>>>>> and then streaming stops.
+>>>>>
+>>>>> In linux-3.6 the memory management for the arm architecture was
+>>>>> changed,
+>>>>> so that atomic coherent dma allocations are served from a special
+>>>>> pool.
+>>>>> This pool gets exhausted. The only user of this pool (in my test) is
+>>>>> orion-ehci. Although I have only 10 URBs in flight (5 for each stick,
+>>>>> resubmitted in the completion handler), I have 256 atomic coherent
+>>>>> allocations (memory from the pool is allocated in pages) from
+>>>>> orion-ehci
+>>>>> when I see this error. So I think there must be a memory leak (memory
+>>>>> allocated atomic somewhere below the usb_submit_urb call in
+>>>>> em28xx-core.c).
+>>>>>
+>>>>> With other dvb sticks using usb bulk transfers I never see this error.
+>>>>>
+>>>>> Since you already found a memory leak in the ehci driver for isoc
+>>>>> transfers, I hoped you can help to solve this problem. If there are
+>>>>> additional questions, please ask. If there is something I can test, I
+>>>>> would be glad to do so.
+>>>>
+>>>> I guess the first thing is to get a dmesg log showing the problem.  You
+>>>> should build a kernel with CONFIG_USB_DEBUG enabled and post the part
+>>>> of the dmesg output starting from when you plug in the troublesome DVB
+>>>> stick.
 >>>
->>>> With LPAE, When either the start address or end address
->>>> or physical address to be mapped is unaligned,
->>>> alloc_init_section creates page granularity mappings.
->>>> alloc_init_section calls alloc_init_pte which populates
->>>> one pmd entry and sets up the ptes. But if the size is
->>>> greater than what can be mapped by one pmd entry,
->>>> then the rest remains unmapped.
+>>> Sorry for my late response. Now I built a kernel 3.8.0 with usb_debug
+>>> enabled. See below for the syslog of device plug-in.
+>>>
+>>>> It also might help to have a record of all the isochronous-related
+>>>> coherent allocations and deallocations done by the ehci-hcd driver.
+>>>> Are you comfortable making your own debugging changes?  The allocations
+>>>> are done by a call to dma_pool_alloc() in
+>>>> drivers/usb/host/ehci-sched.c:itd_urb_transaction() if the device runs
+>>>> at high speed and sitd_urb_transaction() if the device runs at full
+>>>> speed.  The deallocations are done by calls to dma_pool_free() in
+>>>> ehci-timer.c:end_free_itds().
 >>>>
->>>> The issue becomes visible when LPAE is enabled, where we have
->>>> the 3 levels with seperate pgd and pmd's.
->>>> When a static mapping for 3MB is requested, only 2MB is mapped
->>>> and the remaining 1MB is unmapped. Fixing this here, by looping
->>>> in to map the entire unaligned address range.
->>>>
->>>> Boot tested on OMAP5 evm with both LPAE enabled/disabled
->>>> and verified that static mappings with unaligned addresses
->>>> are properly mapped.
->>>>
->>>> Signed-off-by: R Sricharan <r.sricharan@ti.com>
->>>> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>>> Cc: Catalin Marinas <catalin.marinas@arm.com>
->>>> ---
->>>> [V2] Moved the loop to alloc_init_pte as per Russell's
->>>>       feedback and changed the subject accordingly.
->>>>       Using PMD_XXX instead of SECTION_XXX to avoid
->>>>       different loop increments with/without LPAE.
->>>>
->>>>   arch/arm/mm/mmu.c |   22 ++++++++++++++++++----
->>>>   1 file changed, 18 insertions(+), 4 deletions(-)
->>>>
->>>> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
->>>> index cf4528d..0ed8808 100644
->>>> --- a/arch/arm/mm/mmu.c
->>>> +++ b/arch/arm/mm/mmu.c
->>>> @@ -585,11 +585,25 @@ static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
->>>>                                    unsigned long end, unsigned long pfn,
->>>>                                    const struct mem_type *type)
->>>>   {
->>>> -       pte_t *pte = early_pte_alloc(pmd, addr, type->prot_l1);
->>>> +       unsigned long next;
->>>> +       pte_t *pte;
->>>> +       phys_addr_t phys;
->>>> +
->>>>          do {
->>>> -               set_pte_ext(pte, pfn_pte(pfn, __pgprot(type->prot_pte)), 0);
->>>> -               pfn++;
->>>> -       } while (pte++, addr += PAGE_SIZE, addr != end);
->>>> +               if ((end-addr) & PMD_MASK)
->>>> +                       next = (addr + PMD_SIZE) & PMD_MASK;
->>>> +               else
->>>> +                       next = end;
->>>> +
->>>> +               pte = early_pte_alloc(pmd, addr, type->prot_l1);
->>>> +               do {
->>>> +                       set_pte_ext(pte, pfn_pte(pfn,
->>>> +                                       __pgprot(type->prot_pte)), 0);
->>>> +                       pfn++;
->>>> +               } while (pte++, addr += PAGE_SIZE, addr != next);
->>>> +
->>>> +               phys += next - addr;
->>>> +       } while (pmd++, addr = next, addr != end);
->>>>   }
->>>>
->>>    ping..
+>>>
+>>> I added a debug message to
+>>> drivers/usb/host/ehci-sched.c:itd_urb_transaction() to log the
+>>> allocation flags, see log below.
 >>
->>    Ping again.
->>    The issue is reproducible in mainline with CMA + LPAE enabled.
->>    CMA tries to reserve/map 16 MB with 2 level table entries and
->>     crashes in alloc_init_pte.
->>
->>    This patch fixes that. Just posted a V3 of the same patch.
->>
->>           https://patchwork.kernel.org/patch/1472031/
+>> But it looks like you didn't add a message to end_free_itds(), so we
+>> don't know when the memory gets deallocated.  And you didn't print out
+>> the values of urb, num_itds, and i, or the value of itd (so we can
+>> match up allocations against deallocations).
 >
-> I thought there was another patch where the looping was in an
-> alloc_init_pmd() function, or there are just two different threads. I
-> acked the other but not this one as I don't think looping over pmd
-> inside the alloc_init_pte() function is the right thing.
+> OK, I will implement this more detailed logging. But with several
+> allocations per second and runtime of several hours this will result in
+> a very long logfile.
 >
+>>> For me this looks like nothing is
+>>> allocated atomic here, so this function should not be the root cause of
+>>> the dma coherent pool exhaustion.
+>>
+>> I don't understand.  If non-atomic allocations can't exhaust the pool,
+>> why do we see these allocations fail?
+>
+> Good point. Unfortunately I'm not familiar with the memory management
+> details.
+>
+> Arnd, can memory allocated with dma_pool_alloc() and gfp_flags
+> 0x20000093 or 0x80000093 come from the atomic dma coherent pool?
 
-I submitted a patch last week for what I think is the same issue ("arm: 
-mm: Populate initial page tables across sections") but I don't think I 
-ever saw any feedback on the patch. Do we have three patches floating 
-around fixing the same issue?
+Sorry, I logged the wrong flags. All allocations are GFP_ATOMIC (0x20) 
+and therefore coming from the pool.
 
-Laura
+   Soeren
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+>>> Are there other allocation functions
+>>> which I could track?
+>>
+>> Yes, but they wouldn't be used for isochronous transfers.  See
+>> ehci_qtd_alloc(), ehci_qtd_free(), ehci_qh_alloc(), and qh_destroy() in
+>> ehci-mem.c, as well as some other one-time-only coherent allocations in
+>> that file.
+>>
+>> Alan Stern
+>>
+> Soeren Moch
