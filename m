@@ -1,17 +1,14 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Thu, 14 Mar 2013 15:58:09 -0500
-Subject: [PATCH 2/8] ARM: dts: OMAP36xx: move CPU OPP tables to device tree
+Date: Thu, 14 Mar 2013 15:58:10 -0500
+Subject: [PATCH 3/8] ARM: dts: OMAP3: use twl4030 vdd1 regulator for CPU
 In-Reply-To: <1363294695-658-1-git-send-email-nm@ti.com>
 References: <1363294695-658-1-git-send-email-nm@ti.com>
-Message-ID: <1363294695-658-3-git-send-email-nm@ti.com>
+Message-ID: <1363294695-658-4-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT OPP table for OMAP36xx family of devices. This data is
-decoded by OF with of_init_opp_table() helper function. This
-overrides the default OMAP34xx CPU OPP table definition.
-
-This is in preparation to use generic cpu0-cpufreq driver.
+Define VDD1 regulator in twl4030 DT and mark it as the supply for the
+various OMAP3 platforms.
 
 Cc: Kevin Hilman <khilman@deeprootsystems.com>
 Cc: "Beno?t Cousson" <b-cousson@ti.com>
@@ -26,52 +23,79 @@ Cc: linux-pm at vger.kernel.org
 
 Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
- arch/arm/boot/dts/omap36xx.dtsi    |   12 ++++++++++++
- arch/arm/mach-omap2/opp3xxx_data.c |    9 ---------
- 2 files changed, 12 insertions(+), 9 deletions(-)
+ arch/arm/boot/dts/omap3-beagle-xm.dts |    6 ++++++
+ arch/arm/boot/dts/omap3-beagle.dts    |    6 ++++++
+ arch/arm/boot/dts/omap3-evm.dts       |    6 ++++++
+ arch/arm/boot/dts/twl4030.dtsi        |    6 ++++++
+ 4 files changed, 24 insertions(+)
 
-diff --git a/arch/arm/boot/dts/omap36xx.dtsi b/arch/arm/boot/dts/omap36xx.dtsi
-index 96bf028..743eaa1 100644
---- a/arch/arm/boot/dts/omap36xx.dtsi
-+++ b/arch/arm/boot/dts/omap36xx.dtsi
-@@ -15,6 +15,18 @@
- 		serial3 = &uart4;
- 	};
+diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
+index 3705a81..7152746 100644
+--- a/arch/arm/boot/dts/omap3-beagle-xm.dts
++++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
+@@ -13,6 +13,12 @@
+ 	model = "TI OMAP3 BeagleBoard xM";
+ 	compatible = "ti,omap3-beagle-xm, ti,omap3-beagle", "ti,omap3";
  
 +	cpus {
-+		/* OMAP3630 'standard device' variants OPP50 to OPP130 */
 +		cpu at 0 {
-+			operating-points = <
-+				/* kHz    uV */
-+				300000   975000
-+				600000  1075000
-+				800000  1200000
-+			>;
-+			clock-latency = <300000>; /* From omap-cpufreq driver */
++			cpu0-supply = <&vcc>;
 +		};
 +	};
- 	ocp {
- 		uart4: serial at 49042000 {
- 			compatible = "ti,omap3-uart";
-diff --git a/arch/arm/mach-omap2/opp3xxx_data.c b/arch/arm/mach-omap2/opp3xxx_data.c
-index 1de18c2..cf7b3ab 100644
---- a/arch/arm/mach-omap2/opp3xxx_data.c
-+++ b/arch/arm/mach-omap2/opp3xxx_data.c
-@@ -114,15 +114,6 @@ static struct omap_opp_def __initdata omap34xx_opp_def_list[] = {
- };
++
+ 	memory {
+ 		device_type = "memory";
+ 		reg = <0x80000000 0x20000000>; /* 512 MB */
+diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
+index f624dc8..8886617 100644
+--- a/arch/arm/boot/dts/omap3-beagle.dts
++++ b/arch/arm/boot/dts/omap3-beagle.dts
+@@ -13,6 +13,12 @@
+ 	model = "TI OMAP3 BeagleBoard";
+ 	compatible = "ti,omap3-beagle", "ti,omap3";
  
- static struct omap_opp_def __initdata omap36xx_opp_def_list[] = {
--	/* MPU OPP1 - OPP50 */
--	OPP_INITIALIZER("mpu", true,  300000000, OMAP3630_VDD_MPU_OPP50_UV),
--	/* MPU OPP2 - OPP100 */
--	OPP_INITIALIZER("mpu", true,  600000000, OMAP3630_VDD_MPU_OPP100_UV),
--	/* MPU OPP3 - OPP-Turbo */
--	OPP_INITIALIZER("mpu", false, 800000000, OMAP3630_VDD_MPU_OPP120_UV),
--	/* MPU OPP4 - OPP-SB */
--	OPP_INITIALIZER("mpu", false, 1000000000, OMAP3630_VDD_MPU_OPP1G_UV),
--
- 	/* L3 OPP1 - OPP50 */
- 	OPP_INITIALIZER("l3_main", true, 100000000, OMAP3630_VDD_CORE_OPP50_UV),
- 	/* L3 OPP2 - OPP100, OPP-Turbo, OPP-SB */
++	cpus {
++		cpu at 0 {
++			cpu0-supply = <&vcc>;
++		};
++	};
++
+ 	memory {
+ 		device_type = "memory";
+ 		reg = <0x80000000 0x10000000>; /* 256 MB */
+diff --git a/arch/arm/boot/dts/omap3-evm.dts b/arch/arm/boot/dts/omap3-evm.dts
+index e8ba1c2..d36d19f 100644
+--- a/arch/arm/boot/dts/omap3-evm.dts
++++ b/arch/arm/boot/dts/omap3-evm.dts
+@@ -13,6 +13,12 @@
+ 	model = "TI OMAP3 EVM (OMAP3530, AM/DM37x)";
+ 	compatible = "ti,omap3-evm", "ti,omap3";
+ 
++	cpus {
++		cpu at 0 {
++			cpu0-supply = <&vcc>;
++		};
++	};
++
+ 	memory {
+ 		device_type = "memory";
+ 		reg = <0x80000000 0x10000000>; /* 256 MB */
+diff --git a/arch/arm/boot/dts/twl4030.dtsi b/arch/arm/boot/dts/twl4030.dtsi
+index ed0bc95..608f2e6 100644
+--- a/arch/arm/boot/dts/twl4030.dtsi
++++ b/arch/arm/boot/dts/twl4030.dtsi
+@@ -23,6 +23,12 @@
+ 		compatible = "ti,twl4030-wdt";
+ 	};
+ 
++	vcc: regulator-vdd1 {
++		compatible = "ti,twl4030-vdd1";
++		regulator-min-microvolt = <600000>;
++		regulator-max-microvolt = <1450000>;
++	};
++
+ 	vdac: regulator-vdac {
+ 		compatible = "ti,twl4030-vdac";
+ 		regulator-min-microvolt = <1800000>;
 -- 
 1.7.9.5
