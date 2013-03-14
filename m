@@ -1,34 +1,31 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Thu, 14 Mar 2013 13:44:50 +0100
-Subject: [PATCH 01/10] imx-ssi: Fix AC97 rates
-In-Reply-To: <CAOZdJXXm=jJv3zyD4j11t3BgNGyKz6V9jzShQLTk-BTiwDjvMg@mail.gmail.com>
-References: <1362940391-8338-1-git-send-email-mpa@pengutronix.de>
- <1362940391-8338-2-git-send-email-mpa@pengutronix.de>
- <CAOMZO5A8F81PzCjKHrkZ_AtGMr341d6OmYHMQvdzgunmGFDVsw@mail.gmail.com>
- <20130311195108.GC18350@pengutronix.de>
- <CAOZdJXXm=jJv3zyD4j11t3BgNGyKz6V9jzShQLTk-BTiwDjvMg@mail.gmail.com>
-Message-ID: <20130314124450.GC32452@pengutronix.de>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Thu, 14 Mar 2013 18:15:37 +0530
+Subject: [PATCH 0/2] Fix crash on OMAP with CONFIG_DEBUG_SLAB
+In-Reply-To: <1363264618-5071-1-git-send-email-rnayak@ti.com>
+References: <1363264618-5071-1-git-send-email-rnayak@ti.com>
+Message-ID: <5141C671.9070504@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 13, 2013 at 05:55:24PM -0500, Timur Tabi wrote:
-> On Mon, Mar 11, 2013 at 2:51 PM, Markus Pargmann <mpa@pengutronix.de> wrote:
-> >
-> > At the moment fsl-ssi and imx-ssi don't seem to have very much in
-> > common. However I could try to merge the imx-ssi driver code into
-> > fsl_ssi and make it handle imx27-ssi differently.
+Missed out Mike, copied now.
+
+On Thursday 14 March 2013 06:06 PM, Rajendra Nayak wrote:
+> These patches mainly fix the crash that was reported with
+> CONFIG_DEBUG_SLAB enabled on OMAPs, due to the early clock
+> initializations.
 > 
-> imx-ssi is the legacy driver that supports older, non-DT IMX platforms.
-> fsl-ssi is the "new" driver that supports PowerPC and IMX DT-enabled platforms.
-
-Okay, I will use the fsl-ssi driver then.
-
-Thanks
-
-Markus
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> Tested on Panda ES (omap4460), beagle Xm (omap3630) and
+> BeagleBoneBlack (AM335x)
+> 
+> Rajendra Nayak (2):
+>   ARM: OMAP2+: clocks: Have consistent naming for parent name arrays
+>   ARM: OMAP2+: clocks: Pass static parent pointers to common clock core
+> 
+>  arch/arm/mach-omap2/cclock2420_data.c |  314 ++++++++++-------
+>  arch/arm/mach-omap2/cclock2430_data.c |  332 ++++++++++--------
+>  arch/arm/mach-omap2/cclock33xx_data.c |   74 +++-
+>  arch/arm/mach-omap2/cclock3xxx_data.c |  599 ++++++++++++++++++---------------
+>  arch/arm/mach-omap2/cclock44xx_data.c |  240 ++++++++++---
+>  arch/arm/mach-omap2/clock.h           |   15 +-
+>  6 files changed, 965 insertions(+), 609 deletions(-)
+> 
