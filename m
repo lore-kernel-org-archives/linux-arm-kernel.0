@@ -1,45 +1,33 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 14 Mar 2013 17:16:56 +0530
-Subject: OMAP baseline test results for v3.9-rc1
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EC281B4@DBDE01.ent.ti.com>
-References: <alpine.DEB.2.00.1303121634080.2723@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83EC281B4@DBDE01.ent.ti.com>
-Message-ID: <5141B8B0.5050206@ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 14 Mar 2013 12:53:23 +0100
+Subject: [PATCH] ARM: i.MX25: Fix DT compilation
+Message-ID: <1363262003-4263-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 14 March 2013 04:59 PM, Hiremath, Vaibhav wrote:
-> 
->> -----Original Message-----
->> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
->> owner at vger.kernel.org] On Behalf Of Paul Walmsley
->> Sent: Tuesday, March 12, 2013 10:10 PM
->> To: linux-omap at vger.kernel.org
->> Cc: linux-arm-kernel at lists.infradead.org
->> Subject: OMAP baseline test results for v3.9-rc1
->>
->>
->> Here are some basic OMAP test results for Linux v3.9-rc1.
->> Logs and other details at:
->>
->>     http://www.pwsan.com/omap/testlogs/test_v3.9-rc1/20130312100243/
->>
->>
->> Test summary
->> ------------
->>
->> Build:
->>     FAIL ( 4/16): am33xx_only, omap1_defconfig,
-> This requires some cleanup in Makefile and Kconfig handling,
-> 
-> Either you disable SMP support for non-SMP devices like AM33xx 
-> 
-> OR
-> 
-> Fix the Makefile to resolve the build dependencies (may not be trivial)
-> 
-This one... Better things is not to build the OMAP4 files for AM33XX only build.
-Even if it is not trivial, its right way of fixing the issue.
+The i.MX25 DT machine descriptor calls a non existing imx25_timer_init()
+function. This patch adds it to fix compilation.
 
-Regards,
-Santosh
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ arch/arm/mach-imx/imx25-dt.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/arch/arm/mach-imx/imx25-dt.c b/arch/arm/mach-imx/imx25-dt.c
+index 03b65e5e..8234839 100644
+--- a/arch/arm/mach-imx/imx25-dt.c
++++ b/arch/arm/mach-imx/imx25-dt.c
+@@ -27,6 +27,11 @@ static const char * const imx25_dt_board_compat[] __initconst = {
+ 	NULL
+ };
+ 
++static void __init imx25_timer_init(void)
++{
++	mx25_clocks_init_dt();
++}
++
+ DT_MACHINE_START(IMX25_DT, "Freescale i.MX25 (Device Tree Support)")
+ 	.map_io		= mx25_map_io,
+ 	.init_early	= imx25_init_early,
+-- 
+1.8.2.rc2
