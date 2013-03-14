@@ -1,83 +1,62 @@
-From: ruslan.bilovol@ti.com (Ruslan Bilovol)
-Date: Thu, 14 Mar 2013 02:11:48 +0200
-Subject: [PATCH RESEND 1/1] omap4: control: Add the CONTROL_SMART2IO_PADCONF_2
- register definition
-In-Reply-To: <1363219908-32007-1-git-send-email-ruslan.bilovol@ti.com>
-References: <1363219908-32007-1-git-send-email-ruslan.bilovol@ti.com>
-Message-ID: <1363219908-32007-2-git-send-email-ruslan.bilovol@ti.com>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Wed, 13 Mar 2013 17:29:47 -0700 (PDT)
+Subject: [PATCH 2/7] ARM: shmobile: marzen: add USB EHCI driver support
+In-Reply-To: <5140F35F.3090702@cogentembedded.com>
+References: <1352446306-19945-1-git-send-email-horms@verge.net.au>
+ <1352446306-19945-3-git-send-email-horms@verge.net.au>
+ <5140F35F.3090702@cogentembedded.com>
+Message-ID: <87li9q4ydj.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds missing CONTROL_SMART2IO_PADCONF_2 register
-definition
 
-Signed-off-by: Ruslan Bilovol <ruslan.bilovol@ti.com>
+Hi Sergei
+
+> > +/* USB */
+> > +static struct usb_phy *phy;
+> > +static int usb_power_on(struct platform_device *pdev)
+> > +{
+> > +	if (!phy)
+> > +		return -EIO;
+> > +
+> > +	pm_runtime_enable(&pdev->dev);
+> > +	pm_runtime_get_sync(&pdev->dev);
+> > +
+> > +	usb_phy_init(phy);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static void usb_power_off(struct platform_device *pdev)
+> > +{
+> > +	if (!phy)
+> > +		return;
+> > +
+> > +	usb_phy_shutdown(phy);
+> > +
+> > +	pm_runtime_put_sync(&pdev->dev);
+> > +	pm_runtime_disable(&pdev->dev);
+> > +}
+> > +
+> > +static struct usb_ehci_pdata ehcix_pdata = {
+> > +	.power_on	= usb_power_on,
+> > +	.power_off	= usb_power_off,
+> > +	.power_suspend	= usb_power_off,
+> > +};
+(snip)
+>     Morimoto-san, I don't understand why this SoC specific platform device
+> ended up in the board file? Could you explain your reasons please?
+>     I think this is generally a bad practice as this approach scales badly.
+
+Do you mean it should exist in setup-r8a7779.c ?
+
+I forgot detail of it, but these usb is using callback function,
+and it is using *phy*.
+This phy came from marzen_init_late() with usb_get_phy(USB_PHY_TYPE_USB2);
+This usb_get_phy() is not needed if board doesn't have USB.
+
+You can modify it if you want
+
+Best regards
 ---
- arch/arm/mach-omap2/ctrl_module_pad_core_44xx.h |   45 +++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
-
-diff --git a/arch/arm/mach-omap2/ctrl_module_pad_core_44xx.h b/arch/arm/mach-omap2/ctrl_module_pad_core_44xx.h
-index c88420d..d512ade 100644
---- a/arch/arm/mach-omap2/ctrl_module_pad_core_44xx.h
-+++ b/arch/arm/mach-omap2/ctrl_module_pad_core_44xx.h
-@@ -46,6 +46,7 @@
- #define OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_SMART3IO_PADCONF_2	0x05c0
- #define OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_USBB_HSIC		0x05c4
- #define OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_SLIMBUS		0x05c8
-+#define OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_SMART2IO_PADCONF_2	0x05cc
- #define OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_PBIASLITE		0x0600
- #define OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_I2C_0		0x0604
- #define OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_CAMERA_RX		0x0608
-@@ -764,6 +765,50 @@
- #define OMAP4_HSI_DR0_LB_SHIFT					10
- #define OMAP4_HSI_DR0_LB_MASK					(1 << 10)
- 
-+/* CONTROL_SMART2IO_PADCONF_2 */
-+#define OMAP4_DPM_DR1_DS_SHIFT					31
-+#define OMAP4_DPM_DR1_DS_MASK					(1 << 31)
-+#define OMAP4_DPM_DR2_DS_SHIFT					30
-+#define OMAP4_DPM_DR2_DS_MASK					(1 << 30)
-+#define OMAP4_DPM_DR3_DS_SHIFT					29
-+#define OMAP4_DPM_DR3_DS_MASK					(1 << 29)
-+#define OMAP4_GPIO_DR10_DS_SHIFT				28
-+#define OMAP4_GPIO_DR10_DS_MASK					(1 << 28)
-+#define OMAP4_HSI2_DR0_DS_SHIFT					27
-+#define OMAP4_HSI2_DR0_DS_MASK					(1 << 27)
-+#define OMAP4_HSI2_DR1_DS_SHIFT					26
-+#define OMAP4_HSI2_DR1_DS_MASK					(1 << 26)
-+#define OMAP4_HSI2_DR2_DS_SHIFT					25
-+#define OMAP4_HSI2_DR2_DS_MASK					(1 << 25)
-+#define OMAP4_SDMMC3_DR0_DS_SHIFT				24
-+#define OMAP4_SDMMC3_DR0_DS_MASK				(1 << 24)
-+#define OMAP4_SDMMC4_DR0_DS_SHIFT				23
-+#define OMAP4_SDMMC4_DR0_DS_MASK				(1 << 23)
-+#define OMAP4_SDMMC4_DR1_DS_SHIFT				22
-+#define OMAP4_SDMMC4_DR1_DS_MASK				(1 << 22)
-+#define OMAP4_SPI3_DR0_DS_SHIFT					21
-+#define OMAP4_SPI3_DR0_DS_MASK					(1 << 21)
-+#define OMAP4_SPI3_DR1_DS_SHIFT					20
-+#define OMAP4_SPI3_DR1_DS_MASK					(1 << 20)
-+#define OMAP4_UART3_DR2_DS_SHIFT				19
-+#define OMAP4_UART3_DR2_DS_MASK					(1 << 19)
-+#define OMAP4_UART3_DR3_DS_SHIFT				18
-+#define OMAP4_UART3_DR3_DS_MASK					(1 << 18)
-+#define OMAP4_UART3_DR4_DS_SHIFT				17
-+#define OMAP4_UART3_DR4_DS_MASK					(1 << 17)
-+#define OMAP4_UART3_DR5_DS_SHIFT				16
-+#define OMAP4_UART3_DR5_DS_MASK					(1 << 16)
-+#define OMAP4_USBA0_DR0_DS_SHIFT				15
-+#define OMAP4_USBA0_DR0_DS_MASK					(1 << 15)
-+#define OMAP4_USBA0_DR1_DS_SHIFT				14
-+#define OMAP4_USBA0_DR1_DS_MASK					(1 << 14)
-+#define OMAP4_USBA_DR2_DS_SHIFT					13
-+#define OMAP4_USBA_DR2_DS_MASK					(1 << 13)
-+#define OMAP4_USBB2_DR0_DS_SHIFT				12
-+#define OMAP4_USBB2_DR0_DS_MASK					(1 << 12)
-+#define OMAP4_USBB1_DR0_DS_SHIFT				11
-+#define OMAP4_USBB1_DR0_DS_MASK					(1 << 11)
-+
- /* CONTROL_USBB_HSIC */
- #define OMAP4_USBB2_DR1_SR_SHIFT				30
- #define OMAP4_USBB2_DR1_SR_MASK					(0x3 << 30)
--- 
-1.7.9.5
+Kuninori Morimoto
