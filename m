@@ -1,85 +1,44 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Thu, 14 Mar 2013 11:17:21 -0400
-Subject: [PATCH] usb: limit OMAP related USB options to OMAP2PLUS platforms
-In-Reply-To: <512E653F.1090706@windriver.com>
-References: <1361992119-2465-1-git-send-email-paul.gortmaker@windriver.com>
- <20130227195046.GA2300@arwen.pp.htv.fi> <512E653F.1090706@windriver.com>
-Message-ID: <5141EA01.3060905@windriver.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 14 Mar 2013 11:39:27 -0400
+Subject: [PATCH] ARM: mvebu: fix RAM size for Armada XP board DB-MV784MP-GP
+In-Reply-To: <20130313171307.GC24042@obsidianresearch.com>
+References: <20130216164457.GA23237@titan.lakedaemon.net>
+ <1363101135-21635-1-git-send-email-jason@lakedaemon.net>
+ <51408D86.6040703@cogentembedded.com>
+ <20130313143913.GN12700@titan.lakedaemon.net>
+ <51409063.8080308@free-electrons.com>
+ <20130313145419.GP12700@titan.lakedaemon.net>
+ <20130313171307.GC24042@obsidianresearch.com>
+Message-ID: <20130314153927.GR12700@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-02-27 02:57 PM, Paul Gortmaker wrote:
-> On 13-02-27 02:51 PM, Felipe Balbi wrote:
->> HI,
->>
->> On Wed, Feb 27, 2013 at 02:08:39PM -0500, Paul Gortmaker wrote:
->>> commit 57f6ce072e35770a63be0c5d5e82f90d8da7d665 ("usb: phy:
->>> add a new driver for usb3 phy") added the new Kconfig option
->>> OMAP_USB3, but it had no dependencies whatsoever, and hence
->>> became available across all arch/platforms.
->>>
->>> Which presumably caused this to show up in x86 randconfig:
->>>
->>>     warning: (USB_MUSB_HDRC && OMAP_USB3) selects \
->>>         OMAP_CONTROL_USB which has unmet direct \
->>>         dependencies (USB_SUPPORT && ARCH_OMAP2PLUS)
->>>
->>> Then commit 6992819feb39cb9adac72170555d957d07f869f2 ("usb: phy:
->>> fix Kconfig warning") was added.  However, this just deleted the
->>> ARCH_OMAP2PLUS dependency from OMAP_CONTROL_USB, further
->>> compounding the problem by opening up OMAP_CONTROL_USB to
->>> all arch/platforms as well.
->>>
->>> Here we revert the change of 6992819feb to restore the dependency,
->>> and add the same ARCH_OMAP2PLUS dependency to the new OMAP_USB3.
->>>
->>> Perhaps a more platform specific dependency could be chosen for
->>> OMAP_USB3, but at least this keeps it from bleeding out to other
->>> architectures and non-OMAP ARM platforms as it is currently doing.
->>>
->>> Cc: Felipe Balbi <balbi@ti.com>
->>> Cc: Kishon Vijay Abraham I <kishon@ti.com>
->>> Cc: Moiz Sonasath <m-sonasath@ti.com>
->>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->>> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
->>> ---
->>>  drivers/usb/phy/Kconfig | 2 ++
->>>  1 file changed, 2 insertions(+)
->>>
->>> diff --git a/drivers/usb/phy/Kconfig b/drivers/usb/phy/Kconfig
->>> index 65217a5..40b8463 100644
->>> --- a/drivers/usb/phy/Kconfig
->>> +++ b/drivers/usb/phy/Kconfig
->>> @@ -17,6 +17,7 @@ config OMAP_USB2
->>>  
->>>  config OMAP_USB3
->>>  	tristate "OMAP USB3 PHY Driver"
->>> +	depends on ARCH_OMAP2PLUS
->>>  	select USB_OTG_UTILS
->>>  	select OMAP_CONTROL_USB
->>>  	help
->>> @@ -27,6 +28,7 @@ config OMAP_USB3
->>>  
->>>  config OMAP_CONTROL_USB
->>>  	tristate "OMAP CONTROL USB Driver"
->>> +	depends on ARCH_OMAP2PLUS
->>
->> I rather not add dependencies here and fix the selections of
->> OMAP_CONTROL_USB.
+On Wed, Mar 13, 2013 at 11:13:07AM -0600, Jason Gunthorpe wrote:
+> On Wed, Mar 13, 2013 at 10:54:19AM -0400, Jason Cooper wrote:
 > 
-> I am not sure I understand what you mean, or why you wouldn't
-> want sane dependencies in place like those given above.  Perhaps
-> you can send an alternate patch so there is no ambiguity?
+> > > I was wrong in my initial version, all we can do in 32 bits is not
+> > > 4GB but 4GB-1B: reg = <0x00000000 0xFFFFFFFF>
+> > 
+> > hmmm, with the impending conquering of the server market by ARM, you'd
+> > think we'd at least be able to parse a 64 bit integer...
+> 
+> AFAIK, it would be like this:
+> 
+> / {
+>         #address-cells = <2>;
+>         #size-cells = <2>;
+>         memory {
+>                 device_type = "memory";
+>                 reg = <0 0  1 0>;
+>         };
+> 
+> And the other children nodes must be revised to support the 2 dw
+> address and size..
 
-Hi Felipe,
+Agreed, but that's a pretty invasive change for a fix.  I'll go with
+0xFFFFFFFF for now, and look forward to LPAE support including proper
+64bit values.
 
-I'm still seeing the OMAP settings in x86 builds on mainline
-from today, and since I'd not got a reply to the above, I'm
-still wondering what alternative you have in mind vs. my
-above patch.  We can't be having the arch specific settings
-leaking out to the other arch where they make no sense[1].
+thx,
 
-Thanks,
-Paul.
-
-[1] https://lkml.org/lkml/2013/3/7/456
+Jason.
