@@ -1,9 +1,9 @@
 From: fabio.porcedda@gmail.com (Fabio Porcedda)
-Date: Thu, 14 Mar 2013 18:09:35 +0100
-Subject: [PATCH v2 5/8] drivers: memory: use module_platform_driver_probe()
+Date: Thu, 14 Mar 2013 18:09:37 +0100
+Subject: [PATCH v2 7/8] drivers: video: use module_platform_driver_probe()
 In-Reply-To: <1363280978-24051-1-git-send-email-fabio.porcedda@gmail.com>
 References: <1363280978-24051-1-git-send-email-fabio.porcedda@gmail.com>
-Message-ID: <1363280978-24051-6-git-send-email-fabio.porcedda@gmail.com>
+Message-ID: <1363280978-24051-8-git-send-email-fabio.porcedda@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,35 +13,59 @@ a bit simpler.
 
 Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
 Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Benoit Cousson <b-cousson@ti.com>
-Cc: Aneesh V <aneesh@ti.com>
+Cc: Richard Purdie <rpurdie@rpsys.net>
+Cc: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
+Cc: linux-fbdev at vger.kernel.org
 ---
- drivers/memory/emif.c | 12 +-----------
- 1 file changed, 1 insertion(+), 11 deletions(-)
+ drivers/video/sh_mipi_dsi.c    | 12 +-----------
+ drivers/video/sh_mobile_hdmi.c | 12 +-----------
+ 2 files changed, 2 insertions(+), 22 deletions(-)
 
-diff --git a/drivers/memory/emif.c b/drivers/memory/emif.c
-index df08736..ecbc1a9 100644
---- a/drivers/memory/emif.c
-+++ b/drivers/memory/emif.c
-@@ -1841,18 +1841,8 @@ static struct platform_driver emif_driver = {
+diff --git a/drivers/video/sh_mipi_dsi.c b/drivers/video/sh_mipi_dsi.c
+index 701b461..6cad530 100644
+--- a/drivers/video/sh_mipi_dsi.c
++++ b/drivers/video/sh_mipi_dsi.c
+@@ -581,17 +581,7 @@ static struct platform_driver sh_mipi_driver = {
  	},
  };
  
--static int __init_or_module emif_register(void)
+-static int __init sh_mipi_init(void)
 -{
--	return platform_driver_probe(&emif_driver, emif_probe);
+-	return platform_driver_probe(&sh_mipi_driver, sh_mipi_probe);
 -}
+-module_init(sh_mipi_init);
 -
--static void __exit emif_unregister(void)
+-static void __exit sh_mipi_exit(void)
 -{
--	platform_driver_unregister(&emif_driver);
+-	platform_driver_unregister(&sh_mipi_driver);
 -}
-+module_platform_driver_probe(emif_driver, emif_probe);
+-module_exit(sh_mipi_exit);
++module_platform_driver_probe(sh_mipi_driver, sh_mipi_probe);
  
--module_init(emif_register);
--module_exit(emif_unregister);
- MODULE_DESCRIPTION("TI EMIF SDRAM Controller Driver");
- MODULE_LICENSE("GPL");
- MODULE_ALIAS("platform:emif");
+ MODULE_AUTHOR("Guennadi Liakhovetski <g.liakhovetski@gmx.de>");
+ MODULE_DESCRIPTION("SuperH / ARM-shmobile MIPI DSI driver");
+diff --git a/drivers/video/sh_mobile_hdmi.c b/drivers/video/sh_mobile_hdmi.c
+index 930e550..bfe4728 100644
+--- a/drivers/video/sh_mobile_hdmi.c
++++ b/drivers/video/sh_mobile_hdmi.c
+@@ -1445,17 +1445,7 @@ static struct platform_driver sh_hdmi_driver = {
+ 	},
+ };
+ 
+-static int __init sh_hdmi_init(void)
+-{
+-	return platform_driver_probe(&sh_hdmi_driver, sh_hdmi_probe);
+-}
+-module_init(sh_hdmi_init);
+-
+-static void __exit sh_hdmi_exit(void)
+-{
+-	platform_driver_unregister(&sh_hdmi_driver);
+-}
+-module_exit(sh_hdmi_exit);
++module_platform_driver_probe(sh_hdmi_driver, sh_hdmi_probe);
+ 
+ MODULE_AUTHOR("Guennadi Liakhovetski <g.liakhovetski@gmx.de>");
+ MODULE_DESCRIPTION("SuperH / ARM-shmobile HDMI driver");
 -- 
 1.8.1.5
