@@ -1,43 +1,59 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 14 Mar 2013 10:38:43 -0700
-Subject: [PATCH] ARM: hw_breakpoint: Enable debug powerdown only if system
- supports 'has_ossr'
-In-Reply-To: <1363157553-21085-1-git-send-email-lokeshvutla@ti.com> (Lokesh
- Vutla's message of "Wed, 13 Mar 2013 12:22:33 +0530")
-References: <1363157553-21085-1-git-send-email-lokeshvutla@ti.com>
-Message-ID: <87txodnaos.fsf@linaro.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 14 Mar 2013 17:46:02 +0000
+Subject: [PATCH V3] ARM: mvebu: fix RAM size for Armada XP board DB-MV784MP-GP
+In-Reply-To: <20130216164457.GA23237@titan.lakedaemon.net>
+References: <20130216164457.GA23237@titan.lakedaemon.net>
+Message-ID: <1363283162-26041-1-git-send-email-jason@lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lokesh Vutla <lokeshvutla@ti.com> writes:
+The board is supplied with a 4GB RAM module.  This value can be
+overridden by the bootloader based on probed memory size.  We set it to
+a reasonable value here.
 
-> Commit {9a6eb31 ARM: hw_breakpoint: Debug powerdown support for self-hosted
-> debug} introduces debug powerdown support for self-hosted debug.
-> While merging the patch 'has_ossr' check was removed which
-> was needed for hardwares which doesn't support self-hosted debug.
-> Pandaboard (A9) is one such hardware and Dietmar's orginial
-> patch did mention this issue.
-> Without that check on Panda with CPUIDLE enabled, a flood of
-> below messages thrown.
->
-> [ 3.597930] hw-breakpoint: CPU 0 failed to disable vector catch
-> [ 3.597991] hw-breakpoint: CPU 1 failed to disable vector catch
->
-> So restore that check back to avoid the mentioned issue.
->
-> Cc: Dietmar Eggemann <dietmar.eggemann@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Reported-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+---
+Changes from v2:
+ - trimmed size to not conflict with internal register addresses, added comment.
+   Thanks to Jason Gunthorpe for raising this and Gregory Clement for confirming.
 
-I just noticed this on my Panda boards with CPUidle enabled, and
-$SUBJECT patch fixes it.
+Changes from v1:
+ - grammatical fix suggested by Sergei Shtylyov
+ - correct size suggested by several folks (within 32bit, 1 dword)
 
-FWIW,
+As promised, catching this fix in the -rc cycle.
 
-Tested-by: Kevin Hilman <khilman@linaro.org>
+For those not familiar, earlier versions of the patch adding this board listed
+3GB because that is all that was visible.  I mistaken applied v3 of the patch
+instead of v4 which properly listed 4GB.  This patch cleans up my error.
 
-I agree that this should get queued for v3.9-rc.
 
-Kevin
+ arch/arm/boot/dts/armada-xp-gp.dts | 12 +++++++-----
+ 1 file changed, 7 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
+index 1c8afe2..b2d7804 100644
+--- a/arch/arm/boot/dts/armada-xp-gp.dts
++++ b/arch/arm/boot/dts/armada-xp-gp.dts
+@@ -28,12 +28,14 @@
+ 		device_type = "memory";
+ 
+ 		/*
+-		 * 4 GB of plug-in RAM modules by default but only 3GB
+-		 * are visible, the amount of memory available can be
+-		 * changed by the bootloader according the size of the
+-		 * module actually plugged
++		 * 4 GB of plug-in RAM modules by default. The amount of memory
++		 * available can be changed by the bootloader according to the
++		 * size of the module actually plugged
++		 *
++		 * Clipped at 0xD0000000 since this is the start of the internal
++		 * registers.
+ 		 */
+-		reg = <0x00000000 0xC0000000>;
++		reg = <0x00000000 0xD0000000>;
+ 	};
+ 
+ 	soc {
+-- 
+1.8.1.5
