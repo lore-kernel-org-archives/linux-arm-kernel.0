@@ -1,44 +1,44 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 14 Mar 2013 20:08:10 +0100 (CET)
-Subject: [PATCH] genirq: allow an alternative setup for the mask cache
-In-Reply-To: <1363277430-21325-1-git-send-email-holger.brunck@keymile.com>
-References: <1363277430-21325-1-git-send-email-holger.brunck@keymile.com>
-Message-ID: <alpine.LFD.2.02.1303142005430.22263@ionos>
+From: florian@openwrt.org (Florian Fainelli)
+Date: Thu, 14 Mar 2013 20:32:57 +0100
+Subject: [PATCH] mv643xx_eth: convert to use the Marvell Orion MDIO driver
+In-Reply-To: <20130314190235.GW12700@titan.lakedaemon.net>
+References: <1359473048-26551-1-git-send-email-florian@openwrt.org>
+ <1363284515-9865-1-git-send-email-florian@openwrt.org>
+ <1363284515-9865-2-git-send-email-florian@openwrt.org>
+ <20130314190235.GW12700@titan.lakedaemon.net>
+Message-ID: <514225E9.9060902@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 14 Mar 2013, Holger Brunck wrote:
+Hello Jason,
 
-> The same interrupt mask cache (stored within struct irq_chip_generic)
-> is shared between all the irq_chip_type instances by default. But this
-> does not work on Orion SOCs which have separate mask registers for edge
-> and level interrupts. Therefore refactor the code that we always use a
-> pointer to access the mask register. By default it points to
-> gc->mask_cache for Orion SOCs it points to ct->mask_cache which is
-> setup in irq_setup_alt_chip().
+Le 14/03/2013 20:02, Jason Cooper a ?crit :
+> Florian,
+>
+> On Thu, Mar 14, 2013 at 07:08:32PM +0100, Florian Fainelli wrote:
+>> This patch converts the Marvell MV643XX ethernet driver to use the
+>> Marvell Orion MDIO driver. As a result, PowerPC and ARM platforms
+>> registering the Marvell MV643XX ethernet driver are also updated to
+>> register a Marvell Orion MDIO driver. This driver voluntarily overlaps
+>> with the Marvell Ethernet shared registers because it will use a subset
+>> of this shared register (shared_base + 0x4 - shared_base + 0x84). The
+>> Ethernet driver is also updated to look up for a PHY device using the
+>> Orion MDIO bus driver.
+>>
+>> Signed-off-by: Florian Fainelli <florian@openwrt.org>
+>> ---
+>>   arch/arm/plat-orion/common.c               |   97 +++++++++++----
+>>   arch/powerpc/platforms/chrp/pegasos_eth.c  |   20 +++
+>>   arch/powerpc/sysdev/mv64x60_dev.c          |   14 ++-
+>>   drivers/net/ethernet/marvell/Kconfig       |    1 +
+>>   drivers/net/ethernet/marvell/mv643xx_eth.c |  186 ++--------------------------
+>>   include/linux/mv643xx_eth.h                |    1 -
+>>   6 files changed, 117 insertions(+), 202 deletions(-)
+>
+> Isn't this the old version of 4/4 ?
 
-Sigh.
- 
-> @@ -275,6 +278,8 @@ int irq_setup_alt_chip(struct irq_data *d, unsigned int type)
->  	struct irq_chip_type *ct = gc->chip_types;
->  	unsigned int i;
->  
-> +	/* Setup pointer to the mask_cache */
-> +	gc->pmask_cache = &ct->mask_cache;
-
-You cannot do this unconditionally as this might break existing
-drivers.
-
-See my previous mail:
-
-I'd rather refactor the core code so it uses a pointer to the
-mask_cache. The default would be to let it point to gc->mask_cache and
-optionally let it point to ct->mask_cache. We'd need to store the flag
-in the gc struct so we can redirect the pointer to the ct->mask_cache
-in irq_setup_alt_chip().
-
-I wrote that for a reason.
-
-Thanks,
-
-	tglx
+No this really is v2, but I reformatted just that one and sent it 
+without the v2 changelog, you should have received the proper version a 
+couple minutes later once I realized my mistake.
+--
+Florian
