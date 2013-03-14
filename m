@@ -1,44 +1,83 @@
-From: prakash.pm@ti.com (Manjunathappa, Prakash)
-Date: Thu, 14 Mar 2013 13:42:19 +0000
-Subject: [PATCH v3 0/5] Enable SPI flash support on da850-evm DT kernel
-In-Reply-To: <5141A55A.9060708@ti.com>
-References: <1363075827-31053-1-git-send-email-prakash.pm@ti.com>
- <5141A55A.9060708@ti.com>
-Message-ID: <A73F36158E33644199EB82C5EC81C7BC3EA48F1B@DBDE01.ent.ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 14 Mar 2013 13:43:04 +0000
+Subject: [PATCH 03/04] ARM: shmobile: r8a73a4 IRQC support
+In-Reply-To: <CANqRtoSok=0CuLyMGD8-SoKezX54WfacnNnx8FhxCJzs_ggcXg@mail.gmail.com>
+References: <20130312045559.19701.77841.sendpatchset@w520>
+ <201303121231.29869.arnd@arndb.de>
+ <CANqRtoSok=0CuLyMGD8-SoKezX54WfacnNnx8FhxCJzs_ggcXg@mail.gmail.com>
+Message-ID: <201303141343.04328.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 14, 2013 at 15:54:26, Nori, Sekhar wrote:
-> On 3/12/2013 1:40 PM, Manjunathappa, Prakash wrote:
-> > Patch enables support for m25p64 SPI flash support on
-> > da850-EVM.
+On Thursday 14 March 2013, Magnus Damm wrote:
+> Hi Arnd,
 > 
-> This patch set looks good to me except the comments I had on 2/5. I
-> tested it using SPI flash on DA850 EVM and it worked fine on basic
-> read/write tests.
+> Thanks for your feedback, please see below for my reply.
 > 
+> On Tue, Mar 12, 2013 at 9:31 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Tuesday 12 March 2013, Magnus Damm wrote:
+> >> From: Magnus Damm <damm@opensource.se>
+> >>
+> >> Add IRQC interrupt controller support to r8a73a4 by
+> >> hooking up two IRQC instances to handle 58 external
+> >> IRQ signals. There IRQC controllers are tied to SPIs
+> >> of the GIC. On r8a73a4 exact IRQ pin routing is handled
+> >> by the PFC which is excluded from this patch.
+> >>
+> >> Both platform devices and DT devices are added in this
+> >> patch. The platform device versions are used to provide
+> >> a static interrupt map configuration for board code
+> >> written in C.
+> >>
+> >> Signed-off-by: Magnus Damm <damm@opensource.se>
+> >
+> > What is the status of the IRQC DT support? I remember that I wasn't
+> > happy with a prior version, but I did not follow up on some of the
+> > questions that came up, sorry about that.
+> 
+> Uhm, perhaps I misunderstand, but I wonder if you refer to INTC instead of IRQC?
 
-Thanks I will add your Reviewed-by.
+Yes, you are right.
 
-> Grant,
-> 
-> With your ack I would like to merge the series through DaVinci tree so
-> its easy to manage the conflicts in DT files.
-> 
-> > 
-> > Testing information:
-> > da850-evm comes with partitions specified in DT blob.
-> > Able to mount/umount and create/delete files on filesystem partition.
-> > 
-> > Depends on below patch in spi-next branch of git://git.secretlab.ca/git/linux-2.6.git.
-> > "spi/davinci: add OF support for the spi controller"
-> 
-> Prakash, there is no need to mention this dependency. The patch is
-> already in mainline.
-> 
+> This particular driver is for the IRQC hardware block. It is not
+> compatible with INTC. A while ago I posted an incremental DT support
+> patch for IRQC -  "[PATCH] irqchip: irqc: Add DT support", please see
+> https://lkml.org/lkml/2013/3/6/50
 
-Yes, I mentioned it here as my patches were based on linux-davinci: v3.9/dt-2 branch.
-Will rebase my next versions on davinci/master.
+Ok, I had missed that, but the driver certainly looks good to me.
 
-Thanks,
-Prakash
+> > Did the patches end up getting merged anyway, or should we resume the
+> > discussion about those patches? I understand that lack of INTC bindings
+> > would make new SoC support particularly hard, and I don't want to
+> > be responsible for holding you up here.
+> 
+> Thanks. I don't think the INTC patches went anywhere.
+> 
+> To zoom out a bit let me list different interrupt controllers:
+> 
+> A) INTC (drivers/sh/intc) [no DT yet]
+> B) GIC (drivers/irqchip/irq-gic.c) [DT]
+> C) INTC External IRQ Pin (drivers/irqchip/irq-renesas-intc-irqpin.c) [DT]
+> D) IRQC (drivers/irqchip/irq-renesas-irqc.c) [DT]
+> 
+> Simple use cases are:
+> - Legacy SH SoCs or ARM SoCs with Cortex-A8 or older make use of A).
+> - More recent ARM SoCs with Cortex-A9 or newer use B) and C) or B) and D).
+
+Ok. And I guess the EMMA EV2 uses only GIC but not IRQC or INTC, right?
+
+> On top of this we now and then have GPIO controllers that have
+> built-in interrupt controllers.
+
+Yes, obviously.
+
+Coming back to INTC, are you planning to use the same binding for A and C?
+Which of them the binding you posted earlier for?
+
+When I looked at the existing code, I had the impression that doing a
+binding for just the SH-Mobile SoCs that have an ARM core in them 
+(including those that also have an SH core) would be much easier than
+doing a binding that also covers the older SH SoCs, since those are
+much less uniform.
+
+	Arnd
