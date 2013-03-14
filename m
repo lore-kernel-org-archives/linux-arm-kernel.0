@@ -1,67 +1,40 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 14 Mar 2013 15:59:11 +0900
-Subject: [PATCH 03/04] ARM: shmobile: r8a73a4 IRQC support
-In-Reply-To: <201303121231.29869.arnd@arndb.de>
+Date: Thu, 14 Mar 2013 16:01:47 +0900
+Subject: [PATCH 04/04] ARM: shmobile: APE6EVM support
+In-Reply-To: <201303121216.21953.arnd@arndb.de>
 References: <20130312045559.19701.77841.sendpatchset@w520>
- <20130312045628.19701.58216.sendpatchset@w520>
- <201303121231.29869.arnd@arndb.de>
-Message-ID: <CANqRtoSok=0CuLyMGD8-SoKezX54WfacnNnx8FhxCJzs_ggcXg@mail.gmail.com>
+ <20130312045637.19701.62477.sendpatchset@w520>
+ <201303121216.21953.arnd@arndb.de>
+Message-ID: <CANqRtoR-bC0SjEkXH_+GNU_4T0CT0rRbeq_Tt2AhB1mk_S_cjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd,
 
-Thanks for your feedback, please see below for my reply.
-
-On Tue, Mar 12, 2013 at 9:31 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+On Tue, Mar 12, 2013 at 9:16 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 > On Tuesday 12 March 2013, Magnus Damm wrote:
->> From: Magnus Damm <damm@opensource.se>
->>
->> Add IRQC interrupt controller support to r8a73a4 by
->> hooking up two IRQC instances to handle 58 external
->> IRQ signals. There IRQC controllers are tied to SPIs
->> of the GIC. On r8a73a4 exact IRQ pin routing is handled
->> by the PFC which is excluded from this patch.
->>
->> Both platform devices and DT devices are added in this
->> patch. The platform device versions are used to provide
->> a static interrupt map configuration for board code
->> written in C.
->>
->> Signed-off-by: Magnus Damm <damm@opensource.se>
+>> +
+>> +static const char *ape6evm_boards_compat_dt[] __initdata = {
+>> +       "renesas,ape6evm",
+>> +       NULL,
+>> +};
+>> +
+>> +DT_MACHINE_START(APE6EVM_DT, "ape6evm")
+>> +       .init_irq       = irqchip_init,
+>> +       .init_time      = shmobile_timer_init,
+>> +       .init_machine   = r8a73a4_add_standard_devices,
+>> +       .dt_compat      = ape6evm_boards_compat_dt,
+>> +MACHINE_END
 >
-> What is the status of the IRQC DT support? I remember that I wasn't
-> happy with a prior version, but I did not follow up on some of the
-> questions that came up, sorry about that.
+> Do you plan to add board-specific contents here in a follow-up patch soon?
 
-Uhm, perhaps I misunderstand, but I wonder if you refer to INTC instead of IRQC?
+Yes, correct. At this point we cannot configure the pin controller from DT.
 
-This particular driver is for the IRQC hardware block. It is not
-compatible with INTC. A while ago I posted an incremental DT support
-patch for IRQC -  "[PATCH] irqchip: irqc: Add DT support", please see
-https://lkml.org/lkml/2013/3/6/50
+> If not, it seems the setup-r8a73a4.c already handles this board with its
+> defaults.
 
-> Did the patches end up getting merged anyway, or should we resume the
-> discussion about those patches? I understand that lack of INTC bindings
-> would make new SoC support particularly hard, and I don't want to
-> be responsible for holding you up here.
+Right, this portion is only made as a ground work for incremental patches.
 
-Thanks. I don't think the INTC patches went anywhere.
-
-To zoom out a bit let me list different interrupt controllers:
-
-A) INTC (drivers/sh/intc) [no DT yet]
-B) GIC (drivers/irqchip/irq-gic.c) [DT]
-C) INTC External IRQ Pin (drivers/irqchip/irq-renesas-intc-irqpin.c) [DT]
-D) IRQC (drivers/irqchip/irq-renesas-irqc.c) [DT]
-
-Simple use cases are:
-- Legacy SH SoCs or ARM SoCs with Cortex-A8 or older make use of A).
-- More recent ARM SoCs with Cortex-A9 or newer use B) and C) or B) and D).
-
-On top of this we now and then have GPIO controllers that have
-built-in interrupt controllers.
-
-Hope this helps,
+Thanks,
 
 / magnus
