@@ -1,71 +1,99 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 14 Mar 2013 16:28:09 +0900
-Subject: [PATCH 00/04] ARM: shmobile: r8a73a4 SoC and APE6EVM board support
-In-Reply-To: <201303121228.31067.arnd@arndb.de>
-References: <20130312045559.19701.77841.sendpatchset@w520>
- <201303121228.31067.arnd@arndb.de>
-Message-ID: <CANqRtoQeSqZas7Zdyz-de13_4W_a5P6_xrh_23nKZzZV47xF_w@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 14 Mar 2013 13:08:00 +0530
+Subject: [PATCH] ARM: hw_breakpoint: Enable debug powerdown only if system
+ supports 'has_ossr'
+In-Reply-To: <51407120.7030709@ti.com>
+References: <1363157553-21085-1-git-send-email-lokeshvutla@ti.com>
+ <51406BA7.8010306@arm.com> <51407120.7030709@ti.com>
+Message-ID: <51417E58.5050501@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 12, 2013 at 9:28 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 12 March 2013, Magnus Damm wrote:
->> ARM: shmobile: r8a73a4 SoC and APE6EVM board support
+Will,
+
+On Wednesday 13 March 2013 05:59 PM, Lokesh Vutla wrote:
+> Hi Dietmar,
+> On Wednesday 13 March 2013 05:35 PM, Dietmar Eggemann wrote:
+>> On 13/03/13 06:52, Lokesh Vutla wrote:
+>>> Commit {9a6eb31 ARM: hw_breakpoint: Debug powerdown support for
+>>> self-hosted
+>>> debug} introduces debug powerdown support for self-hosted debug.
+>>> While merging the patch 'has_ossr' check was removed which
+>>> was needed for hardwares which doesn't support self-hosted debug.
+>>> Pandaboard (A9) is one such hardware and Dietmar's orginial
+>>> patch did mention this issue.
+>>> Without that check on Panda with CPUIDLE enabled, a flood of
+>>> below messages thrown.
+>>>
+>>> [ 3.597930] hw-breakpoint: CPU 0 failed to disable vector catch
+>>> [ 3.597991] hw-breakpoint: CPU 1 failed to disable vector catch
+>>>
 >>
->> [PATCH 01/04] ARM: shmobile: Initial r8a73a4 SoC support
->> [PATCH 02/04] ARM: shmobile: r8a73a4 SCIF support
->> [PATCH 03/04] ARM: shmobile: r8a73a4 IRQC support
->> [PATCH 04/04] ARM: shmobile: APE6EVM support
+>> Hi Lokesh,
 >>
->> This series adds initial support for r8a73a4 and APE6EVM. The SoC
->> is known as r8a73a4 which is built around Cortex-A15 and makes use
->> of SCIF for serial and IRQC interrupt controller for external IRQs.
+>> I confirm that this has_ossr condition has to go back into the
+>> pm_init(void) call. I just verified it again on my Panda board and I get
+>> the same issue like you without it.
 >>
->> This initial SoC and board support is providing limited DT-only
->> support and a very basic C-version of board support. In the future
->> improved PINCTRL and clock framework support will be added, followed
->> by SMP support.
->>
->> Signed-off-by: Magnus Damm <damm@opensource.se>
->
-> Patches look good so far. I assume you have made them in a way that lets
-> you easily keep around non-DT support internally, right?
+>> I guess what was happening is that Will asked me if this check is really
+>> necessary and I said No without re-testing on my Panda board as an V7
+>> debug architecture example where OSSR is not implemented. Since then I
+>> only tested in on V7.1 debug architectures where OSSR is mandatory.
+>> Sorry about this and thanks for catching this.
+> Thanks for confirming..:)
+> 
+Can you please queue this one for 3.9-rc2+ ? Without this patch
+CPUIDLE is unusable on OMAP4 devices because of those flood
+of warning messages.
 
-Thanks. Regarding your question, please allow me try to answer a
-rather simple question in a complicated way. =)
+I was also wondering whether we should just warn once rather
+than continuous warnings in the notifier. Patch is end of the
+email.
 
-I have some perhaps naive hope of not having to force people to write
-out of tree code. I believe it is possible to use upstream to deliver
-something short term and at the same time work with upstream towards
-long term goals. So I hope we won't be forced to keep non-DT support
-around internally.
+Regards,
+Santosh
 
-For short term, in some cases where we don't have complete DT bindings
-(like clocks and pinctrl at the moment) we still have to use board
-code written in C to configure the hardware. Using DT only at this
-point would result in a non-working kernel without support for
-mandatory components like pinmux, clock support and power domains, so
-for short term that doesn't fly.
+>From b8db63f786719aef835f1ef4e20f3b3406b99b62 Mon Sep 17 00:00:00 2001
+From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Date: Thu, 14 Mar 2013 13:03:25 +0530
+Subject: [PATCH] ARM: hw_breakpoints: Use warn_once to avoid message flood on
+ unsupported ossr machines
 
-As I know you've seen, we are actively working on improving our DT
-coverage. Our approach to DT so far is to work our way towards more
-complete support in the -reference DT board support code. We keep the
-C version around as feature complete implementation and when the
--reference DT version of the board code is good enough then we kill
-the C version and use DT only.
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+ arch/arm/kernel/hw_breakpoint.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-These patches for new SoCs and boards use a mix of DT and C. In
-practice that means that I plan on using platform devices and DT in
-parallel. These platform devices can easily go away upon your request,
-if so a new version of the patch will be submitted with the offensive
-hunks removed. The old version may however still be used for back
-porting.
-
-So if there are some portions of the code that you would like me to
-rework then please let me know and I will do my best to follow your
-guidance. I am also open to clean up various portions of the code if
-you have some particular place that you feel needs extra attention.
-
-Thanks for your help,
-
-/ magnus
+diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
+index 96093b7..5dc1aa6 100644
+--- a/arch/arm/kernel/hw_breakpoint.c
++++ b/arch/arm/kernel/hw_breakpoint.c
+@@ -966,7 +966,7 @@ static void reset_ctrl_regs(void *unused)
+ 	}
+ 
+ 	if (err) {
+-		pr_warning("CPU %d debug is powered down!\n", cpu);
++		pr_warn_once("CPU %d debug is powered down!\n", cpu);
+ 		cpumask_or(&debug_err_mask, &debug_err_mask, cpumask_of(cpu));
+ 		return;
+ 	}
+@@ -987,7 +987,7 @@ clear_vcr:
+ 	isb();
+ 
+ 	if (cpumask_intersects(&debug_err_mask, cpumask_of(cpu))) {
+-		pr_warning("CPU %d failed to disable vector catch\n", cpu);
++		pr_warn_once("CPU %d failed to disable vector catch\n", cpu);
+ 		return;
+ 	}
+ 
+@@ -1007,7 +1007,7 @@ clear_vcr:
+ 	}
+ 
+ 	if (cpumask_intersects(&debug_err_mask, cpumask_of(cpu))) {
+-		pr_warning("CPU %d failed to clear debug register pairs\n", cpu);
++		pr_warn_once("CPU %d failed to clear debug register pairs\n", cpu);
+ 		return;
+ 	}
+ 
+-- 
+1.7.9.5
