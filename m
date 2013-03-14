@@ -1,10 +1,11 @@
 From: florian@openwrt.org (Florian Fainelli)
-Date: Thu, 14 Mar 2013 19:08:32 +0100
-Subject: [PATCH] mv643xx_eth: convert to use the Marvell Orion MDIO driver
+Date: Thu, 14 Mar 2013 19:08:35 +0100
+Subject: [PATCH 4/4 v2] mv643xx_eth: convert to use the Marvell Orion MDIO
+ driver
 In-Reply-To: <1363284515-9865-1-git-send-email-florian@openwrt.org>
 References: <1359473048-26551-1-git-send-email-florian@openwrt.org>
  <1363284515-9865-1-git-send-email-florian@openwrt.org>
-Message-ID: <1363284515-9865-2-git-send-email-florian@openwrt.org>
+Message-ID: <1363284515-9865-5-git-send-email-florian@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -19,6 +20,9 @@ Orion MDIO bus driver.
 
 Signed-off-by: Florian Fainelli <florian@openwrt.org>
 ---
+Changes since v1:
+- removed one too many mdio bus registration for Orion5x/Kirkwood
+
  arch/arm/plat-orion/common.c               |   97 +++++++++++----
  arch/powerpc/platforms/chrp/pegasos_eth.c  |   20 +++
  arch/powerpc/sysdev/mv64x60_dev.c          |   14 ++-
