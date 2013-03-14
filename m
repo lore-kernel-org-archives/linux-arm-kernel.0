@@ -1,80 +1,64 @@
-From: avinashphilip@ti.com (Philip Avinash)
-Date: Thu, 14 Mar 2013 16:07:33 +0530
-Subject: [PATCH 3/3] ARM: davinci: da850: add EHRPWM & ECAP DT node
-In-Reply-To: <1363257453-24747-1-git-send-email-avinashphilip@ti.com>
-References: <1363257453-24747-1-git-send-email-avinashphilip@ti.com>
-Message-ID: <1363257453-24747-4-git-send-email-avinashphilip@ti.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 14 Mar 2013 16:16:06 +0530
+Subject: [PATCH] ARM: smp: Allow real broadcast device selection instead
+ of always dummy
+In-Reply-To: <20130314102807.GG13483@e106331-lin.cambridge.arm.com>
+References: <1363165608-13739-1-git-send-email-santosh.shilimkar@ti.com>
+ <514046B6.9020005@ti.com>
+ <20130313101641.GA13483@e106331-lin.cambridge.arm.com>
+ <514061D1.20603@ti.com>
+ <20130313122550.GD13483@e106331-lin.cambridge.arm.com>
+ <51409EC3.5050905@ti.com>
+ <20130313161811.GF13483@e106331-lin.cambridge.arm.com>
+ <5141800A.2000307@ti.com>
+ <20130314102807.GG13483@e106331-lin.cambridge.arm.com>
+Message-ID: <5141AA6E.3020805@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add da850 EHRPWM & ECAP DT node.
-Also adds OF_DEV_AUXDATA for EHRPWM & ECAP driver to use EHRPWM & ECAP
-clock.
+On Thursday 14 March 2013 03:58 PM, Mark Rutland wrote:
+> On Thu, Mar 14, 2013 at 07:45:14AM +0000, Santosh Shilimkar wrote:
+>> On Wednesday 13 March 2013 09:48 PM, Mark Rutland wrote:
+>>> On Wed, Mar 13, 2013 at 03:44:03PM +0000, Santosh Shilimkar wrote:
+>>>> On Wednesday 13 March 2013 05:55 PM, Mark Rutland wrote:
+>>>>> On Wed, Mar 13, 2013 at 11:24:01AM +0000, Santosh Shilimkar wrote:
+>>>>>> On Wednesday 13 March 2013 03:46 PM, Mark Rutland wrote:
+>>>>>>> Hi Santosh,
+>>>>
+>>>> [..]
+>>>>
+>>>>>>>
+>>>>>>> Is the problem that the dummy timer is being registered as the broadcast
+>>>>>>> source, or that it is selected as a local timer in preference of real timers?
+>>>>>>>
+>>>>>> Dummy timer is preferred over real broadcast timer.
+>>>>>
+>>>>> Ok.
+>>>
+>>> [...]
+>>>
+>>>>> I do agree it'd be worth lowering the dummy timer's rating to ensure it doesn't
+>>>>> override a real timer elsewhere. 
+>>>>>
+>>>> Yep. Can I add you acked-by tag then for $subject patch ?
+>>>> Would be good to get this one merged as well.
+>>>
+>>> Sure. Though could you reword the commit message? The patch solves the more
+>>> general issue of a dummy being preferred over real hardware even outside of
+>>> choosing the broadcast device.
+>>>
+>>> Acked-by: Mark Rutland <mark.rutland@arm.com>
+>>
+>> Thanks. For record, patch is in end of the email which I plan
+>> to put into patch system.
+>>
+>> Regards,
+>> Santosh
+> 
+> The below patch seems fine. Are you intending for this to go in as a fix for
+> 3.9-rc*, or as a cleanup for 3.10?
+> 
+Fix for 3.9-rc*. I have put already it in patch system.
 
-Signed-off-by: Philip Avinash <avinashphilip@ti.com>
----
-:100644 100644 3ec1bda... 9b5b613... M	arch/arm/boot/dts/da850.dtsi
-:100644 100644 72466ab... e32484c... M	arch/arm/mach-davinci/da8xx-dt.c
- arch/arm/boot/dts/da850.dtsi     |   30 ++++++++++++++++++++++++++++++
- arch/arm/mach-davinci/da8xx-dt.c |    5 +++++
- 2 files changed, 35 insertions(+)
-
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index 3ec1bda..9b5b613 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -107,6 +107,36 @@
- 			reg = <0x21000 0x1000>;
- 			status = "disabled";
- 		};
-+		ehrpwm0: ehrpwm at 01f00000 {
-+			compatible = "ti,da850-ehrpwm";
-+			#pwm-cells = <3>;
-+			reg = <0x300000 0x2000>;
-+			status = "disabled";
-+		};
-+		ehrpwm1: ehrpwm at 01f02000 {
-+			compatible = "ti,da850-ehrpwm";
-+			#pwm-cells = <3>;
-+			reg = <0x302000 0x2000>;
-+			status = "disabled";
-+		};
-+		ecap0: ecap at 01f06000 {
-+			compatible = "ti,da850-ecap";
-+			#pwm-cells = <3>;
-+			reg = <0x306000 0x80>;
-+			status = "disabled";
-+		};
-+		ecap1: ecap at 01f07000 {
-+			compatible = "ti,da850-ecap";
-+			#pwm-cells = <3>;
-+			reg = <0x307000 0x80>;
-+			status = "disabled";
-+		};
-+		ecap2: ecap at 01f08000 {
-+			compatible = "ti,da850-ecap";
-+			#pwm-cells = <3>;
-+			reg = <0x308000 0x80>;
-+			status = "disabled";
-+		};
- 	};
- 	nand_cs3 at 62000000 {
- 		compatible = "ti,davinci-nand";
-diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
-index 72466ab..e32484c 100644
---- a/arch/arm/mach-davinci/da8xx-dt.c
-+++ b/arch/arm/mach-davinci/da8xx-dt.c
-@@ -41,6 +41,11 @@ static void __init da8xx_init_irq(void)
- struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("ti,davinci-i2c", 0x01c22000, "i2c_davinci.1", NULL),
- 	OF_DEV_AUXDATA("ti,davinci-wdt", 0x01c21000, "watchdog", NULL),
-+	OF_DEV_AUXDATA("ti,da850-ehrpwm", 0x01f00000, "ehrpwm", NULL),
-+	OF_DEV_AUXDATA("ti,da850-ehrpwm", 0x01f02000, "ehrpwm", NULL),
-+	OF_DEV_AUXDATA("ti,da850-ecap", 0x01f06000, "ecap", NULL),
-+	OF_DEV_AUXDATA("ti,da850-ecap", 0x01f07000, "ecap", NULL),
-+	OF_DEV_AUXDATA("ti,da850-ecap", 0x01f08000, "ecap", NULL),
- 	{}
- };
- 
--- 
-1.7.9.5
+Regards,
+Santosh
