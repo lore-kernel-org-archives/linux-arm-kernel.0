@@ -1,36 +1,28 @@
-From: amit.daniel@samsung.com (Amit Daniel Kachhap)
-Date: Thu, 14 Mar 2013 11:32:59 +0530
-Subject: [PATCH 3/3] ARM: EXYNOS: cpuidle: Allow C1 state only in supported
- SOC's.
-In-Reply-To: <1363240979-1939-1-git-send-email-amit.daniel@samsung.com>
-References: <1363240979-1939-1-git-send-email-amit.daniel@samsung.com>
-Message-ID: <1363240979-1939-4-git-send-email-amit.daniel@samsung.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 14 Mar 2013 14:04:45 +0800
+Subject: [PATCH 08/10] ASoC: dmaengine_pcm: Add open function for DT DMA
+ request
+In-Reply-To: <20130313104945.GI25610@opensource.wolfsonmicro.com>
+References: <1362940391-8338-1-git-send-email-mpa@pengutronix.de>
+ <1362940391-8338-9-git-send-email-mpa@pengutronix.de>
+ <20130312190206.GY19942@opensource.wolfsonmicro.com>
+ <20130313021712.GD27461@S2101-09.ap.freescale.net>
+ <20130313104945.GI25610@opensource.wolfsonmicro.com>
+Message-ID: <20130314060442.GB27654@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch registers the basic C0 state for all exynos SOC's but
-limits the C1(AFTR -Arm off top running) state in only the supported
-SOC's(ie. EXYNOS 4210, 4212, 4412 and 5250).
+On Wed, Mar 13, 2013 at 10:49:45AM +0000, Mark Brown wrote:
+> On Wed, Mar 13, 2013 at 10:18:29AM +0800, Shawn Guo wrote:
+> 
+> > I did not see any objection from you on that patch, so I'm waiting for
+> > you to publish a branch for it, so that my mxs-dma generic binding
+> > series can move forward.
+> 
+> I commented on the removal of the const from the name parameter (and
 
-Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
----
- arch/arm/mach-exynos/cpuidle.c |    4 +++-
- 1 files changed, 3 insertions(+), 1 deletions(-)
+I just double checked my mailbox and can only see the conversation
+between you and rmk, nothing particularly on the removal of the const
+from the name parameter.  Or I'm still missing something?
 
-diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
-index 4fc1f4f..459979a 100644
---- a/arch/arm/mach-exynos/cpuidle.c
-+++ b/arch/arm/mach-exynos/cpuidle.c
-@@ -177,7 +177,9 @@ static int __init exynos4_init_cpuidle(void)
- 		device->cpu = cpu_id;
- 
- 		/* Support IDLE only */
--		if (cpu_id != 0)
-+		if (!(soc_is_exynos4210() || soc_is_exynos4212() ||
-+			soc_is_exynos4412() || soc_is_exynos5250()) ||
-+			cpu_id != 0)
- 			device->state_count = 1;
- 
- 		ret = cpuidle_register_device(device);
--- 
-1.7.1
+Shawn
