@@ -1,88 +1,56 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Thu, 14 Mar 2013 14:09:18 +0530
-Subject: [PATCH v5 2/2] ARM: davinci: dm365 EVM: add support for VPBE
- display
-In-Reply-To: <50BDF925.3090700@ti.com>
-References: <1354522904-22501-1-git-send-email-prabhakar.lad@ti.com>
- <1354522904-22501-3-git-send-email-prabhakar.lad@ti.com>
- <50BDF925.3090700@ti.com>
-Message-ID: <CA+V-a8t8cTqmLb86j1tjT0x-L4_zc-6V+ZZmJiW9xoKSvbTbvQ@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 14 Mar 2013 09:44:12 +0100
+Subject: [GIT PULL] at91: fixes for 3.9-rc #1
+In-Reply-To: <51404ABF.7080405@atmel.com>
+References: <51404ABF.7080405@atmel.com>
+Message-ID: <51418DDC.8030901@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sekhar,
+(Updated to include Linus' acknowledgement on pinctrl-related patch)
 
-On Tue, Dec 4, 2012 at 6:52 PM, Sekhar Nori <nsekhar@ti.com> wrote:
-> On 12/3/2012 1:51 PM, Prabhakar Lad wrote:
->> From: Manjunath Hadli <manjunath.hadli@ti.com>
->>
->> add support for V4L2 video display to DM365 EVM.
->> Support for SD and ED modes is provided, along with Composite
->> and Component outputs.
->>
->> Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
->> Signed-off-by: Lad, Prabhakar <prabhakar.lad@ti.com>
->> ---
->>  arch/arm/mach-davinci/board-dm365-evm.c |  177 ++++++++++++++++++++++++++++++-
->>  1 files changed, 176 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
->> index 0c3dae6..10f2a85 100644
->> --- a/arch/arm/mach-davinci/board-dm365-evm.c
->> +++ b/arch/arm/mach-davinci/board-dm365-evm.c
->> @@ -27,6 +27,7 @@
->>  #include <linux/input.h>
->>  #include <linux/spi/spi.h>
->>  #include <linux/spi/eeprom.h>
->> +#include <linux/v4l2-dv-timings.h>
->>
->>  #include <asm/mach-types.h>
->>  #include <asm/mach/arch.h>
->> @@ -374,6 +375,180 @@ static struct vpfe_config vpfe_cfg = {
->>       .ccdc = "ISIF",
->>  };
->>
->> +/* venc standards timings */
->> +static struct vpbe_enc_mode_info dm365evm_enc_std_timing[] = {
->> +     {
->> +             .name           = "ntsc",
->> +             .timings_type   = VPBE_ENC_STD,
->> +             .std_id         = V4L2_STD_525_60,
->> +             .interlaced     = 1,
->> +             .xres           = 720,
->> +             .yres           = 480,
->> +             .aspect         = {11, 10},
->> +             .fps            = {30000, 1001},
->> +             .left_margin    = 0x79,
->> +             .right_margin   = 0,
->> +             .upper_margin   = 0x10,
->> +             .lower_margin   = 0,
->> +             .hsync_len      = 0,
->> +             .vsync_len      = 0,
->> +             .flags          = 0,
->
-> I wonder what makes this entire information board specific? Shouldn't
-> these (or at least most of these) be same across all devices which
-> support NTSC and hence should be coming from some common code instead of
-> being replicated for each platform that supports NTSC?
->
-most of the structure members are board specific,
+Arnd, Olof,
 
-	struct v4l2_fract aspect;
-	struct v4l2_fract fps;
-	unsigned int left_margin;
-	unsigned int right_margin;
-	unsigned int upper_margin;
-	unsigned int lower_margin;
-	unsigned int hsync_len;
-	unsigned int vsync_len;
-	unsigned int flags;
+Here is a little pull-request for 3.9-rc (I guess it if -rc4 now that
+you've just sent the one for -rc3).
 
-And as of now there is no ready made structure within v4l2 which
-provides the common data. So I'll be keeping this as it is.
+I have other material but it is related to the AT91 framebuffer and we are
+currently discussing it so I hold them back for now.
 
-Regards,
---Prabhakar
+Thanks, best regards,
 
-> Thanks,
-> Sekhar
+The following changes since commit f6161aa153581da4a3867a2d1a7caf4be19b6ec9:
+
+  Linux 3.9-rc2 (2013-03-10 16:54:19 -0700)
+
+are available in the git repository at:
+
+  git://github.com/at91linux/linux-at91.git tags/at91-fixes
+
+for you to fetch changes up to 0ed66befaae893e82c9f016238282d73ef9fd6c7:
+
+  ARM: at91: fix infinite loop in at91_irq_suspend/resume (2013-03-14 09:37:55 +0100)
+
+----------------------------------------------------------------
+Two patches for Device Tree on at91sam9x5/NAND.
+Two more for fixing PM suspend/resume IRQ on AIC5 and
+GPIO used with pinctrl.
+
+----------------------------------------------------------------
+Ludovic Desroches (2):
+      ARM: at91: add gpio suspend/resume support when using pinctrl
+      ARM: at91: fix infinite loop in at91_irq_suspend/resume
+
+Richard Genoud (2):
+      ARM: at91: dt: at91sam9x5: correct NAND pins comments
+      ARM: at91: dt: at91sam9x5: complete NAND pinctrl
+
+ arch/arm/boot/dts/at91sam9x5.dtsi      | 28 ++++++++++++++--
+ arch/arm/mach-at91/include/mach/gpio.h |  8 +++++
+ arch/arm/mach-at91/irq.c               | 20 +++++-------
+ arch/arm/mach-at91/pm.c                | 10 ++++--
+ drivers/pinctrl/pinctrl-at91.c         | 61 ++++++++++++++++++++++++++++++++++-
+ 5 files changed, 110 insertions(+), 17 deletions(-)
+
+-- 
+Nicolas Ferre
