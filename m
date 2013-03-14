@@ -1,39 +1,31 @@
-From: dwmw2@infradead.org (David Woodhouse)
-Date: Thu, 14 Mar 2013 10:29:43 +0000
-Subject: [PATCH V2] pinctrl: mvebu: prevent walking off the end of group
- array
-In-Reply-To: <1363196884-20193-1-git-send-email-jason@lakedaemon.net>
-References: <1362872371.3690.106.camel@shinybook.infradead.org>
- <1363196884-20193-1-git-send-email-jason@lakedaemon.net>
-Message-ID: <1363256983.4853.10.camel@i7.infradead.org>
+From: avinashphilip@ti.com (Philip Avinash)
+Date: Thu, 14 Mar 2013 16:02:35 +0530
+Subject: [PATCH 0/3] Davinci support for EHRPWM & ECAP
+Message-ID: <1363257158-11615-1-git-send-email-avinashphilip@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-03-13 at 17:48 +0000, Jason Cooper wrote:
-> From: David Woodhouse <dwmw2@infradead.org>
-> 
-> While investigating (ab)use of krealloc, David found this bug.  It's
-> unlikely to occur, but now we detect the condition and error out
-> appropriately.
-> 
-> Signed-off-by: David Woodhouse <David.Woodhouse@intel.com>
-> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
-> ---
-> Changes from v1:
->  - correct typo (s/ nt / int /) I should've caught before sending.
-> 
-> David, please double check that this is as you intended.  I had to hand-jam it
-> in due to some peculiarities on my side.
+This patch series enables EHRPWM & ECAP driver support for da850
+platforms.
 
-Looks fine; thanks.
+This patch series based on [1] and is available at [2]. This has been tested
+backlight support using EHRPWM in da850-evm.
+
+[1] https://gitorious.org/linux-pwm/linux-pwm/trees/for-next
+[2] https://github.com/avinashphilip/am335x_linux/tree/davinci-for-v3.9_soc_pwm
+
+Philip Avinash (3):
+  pwm: davinci: Add Kconfig support for ECAP & EHRPWM devices
+  pwm: pwm-tiecap: Add device-tree binding support for da850 SOC
+  pwm: pwm-tiehrpwm: Add device tree binding support for da850 SOC
+
+ .../devicetree/bindings/pwm/pwm-tiecap.txt         |    2 +-
+ .../devicetree/bindings/pwm/pwm-tiehrpwm.txt       |    2 +-
+ drivers/pwm/Kconfig                                |    8 +++-----
+ drivers/pwm/pwm-tiecap.c                           |    1 +
+ drivers/pwm/pwm-tiehrpwm.c                         |    1 +
+ drivers/pwm/pwm-tipwmss.h                          |    2 +-
+ 6 files changed, 8 insertions(+), 8 deletions(-)
 
 -- 
-David Woodhouse                            Open Source Technology Centre
-David.Woodhouse at intel.com                              Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/x-pkcs7-signature
-Size: 6171 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130314/80874e05/attachment-0001.bin>
+1.7.9.5
