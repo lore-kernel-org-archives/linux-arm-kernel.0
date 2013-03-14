@@ -1,18 +1,25 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Thu, 14 Mar 2013 15:58:13 -0500
-Subject: [PATCH 6/8] ARM: dts: OMAP446x: move CPU OPP tables to device tree
+Date: Thu, 14 Mar 2013 15:58:14 -0500
+Subject: [PATCH 7/8] ARM: OMAP3+: use cpu0-cpufreq driver
 In-Reply-To: <1363294695-658-1-git-send-email-nm@ti.com>
 References: <1363294695-658-1-git-send-email-nm@ti.com>
-Message-ID: <1363294695-658-7-git-send-email-nm@ti.com>
+Message-ID: <1363294695-658-8-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP4430 and 4460 have different OPP definitions. So, create an SoC
-variant dtsi file for 4460 and move the OPP definitions to it.
-Add DT OPP table for OMAP446x family of devices. This data is
-decoded by OF with of_init_opp_table() helper function.
+With OMAP3+ and AM33xx supported SoC having defined CPU DT
+entries with operating-points defined, we can now
+use the SoC generic cpu0-cpufreq driver to start
+using it, lets now switch to the generic driver.
 
-This is in preparation to use generic cpu0-cpufreq driver.
+As part of this change, switch the dummy clock node to use
+cpufreq-cpu0. This is an suggested solution till we have
+OMAP clock nodes in DT. Once the DT conversion is complete,
+we can then do: clocks = <&dpll_mpu_ck>; or the SoC specific
+equivalent.
+
+Inspired by patch: https://patchwork.kernel.org/patch/2067841/
+now made generic.
 
 Cc: Kevin Hilman <khilman@deeprootsystems.com>
 Cc: "Beno?t Cousson" <b-cousson@ti.com>
@@ -27,83 +34,65 @@ Cc: linux-pm at vger.kernel.org
 
 Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
- arch/arm/boot/dts/omap4-panda-es.dts |    2 +-
- arch/arm/boot/dts/omap446x.dtsi      |   27 +++++++++++++++++++++++++++
- arch/arm/mach-omap2/opp4xxx_data.c   |   15 ---------------
- 3 files changed, 28 insertions(+), 16 deletions(-)
- create mode 100644 arch/arm/boot/dts/omap446x.dtsi
+ arch/arm/mach-omap2/board-generic.c   |    4 ++++
+ arch/arm/mach-omap2/cclock33xx_data.c |    2 +-
+ arch/arm/mach-omap2/cclock3xxx_data.c |    2 +-
+ arch/arm/mach-omap2/cclock44xx_data.c |    2 +-
+ 4 files changed, 7 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap4-panda-es.dts b/arch/arm/boot/dts/omap4-panda-es.dts
-index 6422d7c..c52455b 100644
---- a/arch/arm/boot/dts/omap4-panda-es.dts
-+++ b/arch/arm/boot/dts/omap4-panda-es.dts
-@@ -7,7 +7,7 @@
-  */
- /dts-v1/;
+diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+index 0274ff7..970c6f4 100644
+--- a/arch/arm/mach-omap2/board-generic.c
++++ b/arch/arm/mach-omap2/board-generic.c
+@@ -49,6 +49,10 @@ static void __init omap_generic_init(void)
+ 		omap4_panda_display_init_of();
+ 	else if (of_machine_is_compatible("ti,omap4-sdp"))
+ 		omap_4430sdp_display_init_of();
++	if (IS_ENABLED(CONFIG_GENERIC_CPUFREQ_CPU0)) {
++		struct platform_device_info devinfo = { .name = "cpufreq-cpu0", };
++		platform_device_register_full(&devinfo);
++	}
+ }
  
--/include/ "omap4.dtsi"
-+/include/ "omap446x.dtsi"
- /include/ "omap4-panda-common.dtsi"
- 
- /* Audio routing is differnet between PandaBoard4430 and PandaBoardES */
-diff --git a/arch/arm/boot/dts/omap446x.dtsi b/arch/arm/boot/dts/omap446x.dtsi
-new file mode 100644
-index 0000000..8f7a080
---- /dev/null
-+++ b/arch/arm/boot/dts/omap446x.dtsi
-@@ -0,0 +1,27 @@
-+/*
-+ * Device Tree Source for OMAP446x SoC
-+ *
-+ * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
-+
-+/include/ "omap4.dtsi"
-+
-+/ {
-+	cpus {
-+		/* OMAP446x 'standard device' variants OPP50 to OPPTurbo */
-+		cpu at 0 {
-+			operating-points = <
-+				/* kHz    uV */
-+				350000   975000
-+				700000  1075000
-+				920000  1200000
-+			>;
-+			clock-latency = <300000>; /* From omap-cpufreq driver */
-+			voltage-tolerance = <2>; /* 2 % */
-+		};
-+	};
-+};
-diff --git a/arch/arm/mach-omap2/opp4xxx_data.c b/arch/arm/mach-omap2/opp4xxx_data.c
-index 478e2ee..4c5c038 100644
---- a/arch/arm/mach-omap2/opp4xxx_data.c
-+++ b/arch/arm/mach-omap2/opp4xxx_data.c
-@@ -116,21 +116,6 @@ struct omap_volt_data omap446x_vdd_core_volt_data[] = {
+ #ifdef CONFIG_SOC_OMAP2420
+diff --git a/arch/arm/mach-omap2/cclock33xx_data.c b/arch/arm/mach-omap2/cclock33xx_data.c
+index 476b820..cf7e736 100644
+--- a/arch/arm/mach-omap2/cclock33xx_data.c
++++ b/arch/arm/mach-omap2/cclock33xx_data.c
+@@ -852,7 +852,7 @@ static struct omap_clk am33xx_clks[] = {
+ 	CLK(NULL,	"dpll_core_m5_ck",	&dpll_core_m5_ck,	CK_AM33XX),
+ 	CLK(NULL,	"dpll_core_m6_ck",	&dpll_core_m6_ck,	CK_AM33XX),
+ 	CLK(NULL,	"dpll_mpu_ck",		&dpll_mpu_ck,	CK_AM33XX),
+-	CLK("cpu0",	NULL,			&dpll_mpu_ck,	CK_AM33XX),
++	CLK("cpufreq-cpu0.0",	NULL,			&dpll_mpu_ck,	CK_AM33XX),
+ 	CLK(NULL,	"dpll_mpu_m2_ck",	&dpll_mpu_m2_ck,	CK_AM33XX),
+ 	CLK(NULL,	"dpll_ddr_ck",		&dpll_ddr_ck,	CK_AM33XX),
+ 	CLK(NULL,	"dpll_ddr_m2_ck",	&dpll_ddr_m2_ck,	CK_AM33XX),
+diff --git a/arch/arm/mach-omap2/cclock3xxx_data.c b/arch/arm/mach-omap2/cclock3xxx_data.c
+index 4579c3c..5f68286 100644
+--- a/arch/arm/mach-omap2/cclock3xxx_data.c
++++ b/arch/arm/mach-omap2/cclock3xxx_data.c
+@@ -3501,7 +3501,7 @@ static struct omap_clk omap3xxx_clks[] = {
+ 	CLK(NULL,	"uart4_ick",	&uart4_ick_am35xx,	CK_AM35XX),
+ 	CLK(NULL,	"timer_32k_ck",	&omap_32k_fck,  CK_3XXX),
+ 	CLK(NULL,	"timer_sys_ck",	&sys_ck,	CK_3XXX),
+-	CLK(NULL,	"cpufreq_ck",	&dpll1_ck,	CK_3XXX),
++	CLK("cpufreq-cpu0.0",	NULL,	&dpll1_ck,	CK_3XXX),
  };
  
- static struct omap_opp_def __initdata omap446x_opp_def_list[] = {
--	/* MPU OPP1 - OPP50 */
--	OPP_INITIALIZER("mpu", true, 350000000, OMAP4460_VDD_MPU_OPP50_UV),
--	/* MPU OPP2 - OPP100 */
--	OPP_INITIALIZER("mpu", true, 700000000, OMAP4460_VDD_MPU_OPP100_UV),
--	/* MPU OPP3 - OPP-Turbo */
--	OPP_INITIALIZER("mpu", true, 920000000, OMAP4460_VDD_MPU_OPPTURBO_UV),
--	/*
--	 * MPU OPP4 - OPP-Nitro + Disabled as the reference schematics
--	 * recommends TPS623631 - confirm and enable the opp in board file
--	 * XXX: May be we should enable these based on mpu capability and
--	 * Exception board files disable it...
--	 */
--	OPP_INITIALIZER("mpu", false, 1200000000, OMAP4460_VDD_MPU_OPPNITRO_UV),
--	/* MPU OPP4 - OPP-Nitro SpeedBin */
--	OPP_INITIALIZER("mpu", false, 1500000000, OMAP4460_VDD_MPU_OPPNITRO_UV),
- 	/* L3 OPP1 - OPP50 */
- 	OPP_INITIALIZER("l3_main_1", true, 100000000, OMAP4460_VDD_CORE_OPP50_UV),
- 	/* L3 OPP2 - OPP100 */
+ static const char *enable_init_clks[] = {
+diff --git a/arch/arm/mach-omap2/cclock44xx_data.c b/arch/arm/mach-omap2/cclock44xx_data.c
+index 3d58f33..6e933e3 100644
+--- a/arch/arm/mach-omap2/cclock44xx_data.c
++++ b/arch/arm/mach-omap2/cclock44xx_data.c
+@@ -1660,7 +1660,7 @@ static struct omap_clk omap44xx_clks[] = {
+ 	CLK("4013a000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
+ 	CLK("4013c000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
+ 	CLK("4013e000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
+-	CLK(NULL,	"cpufreq_ck",	&dpll_mpu_ck,	CK_443X),
++	CLK("cpufreq-cpu0.0",	NULL,	&dpll_mpu_ck,	CK_443X),
+ };
+ 
+ int __init omap4xxx_clk_init(void)
 -- 
 1.7.9.5
