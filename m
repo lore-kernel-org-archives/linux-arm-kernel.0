@@ -1,28 +1,40 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 14 Mar 2013 14:16:14 -0400
-Subject: [PATCH 0/5] mv643xx_eth: use mvmdio MDIO bus driver
-In-Reply-To: <5142124E.7050909@openwrt.org>
-References: <1359473048-26551-1-git-send-email-florian@openwrt.org>
- <20130314172544.GT12700@titan.lakedaemon.net>
- <5142124E.7050909@openwrt.org>
-Message-ID: <20130314181614.GV12700@titan.lakedaemon.net>
+From: s-anna@ti.com (Anna, Suman)
+Date: Thu, 14 Mar 2013 18:30:45 +0000
+Subject: [PATCHv3 03/14] mailbox: OMAP: introduce mailbox framework
+In-Reply-To: <CACRpkdbUBkhkQ-ZiqkLUmsDBp3hw4k3Z1s4i4SD3C2ZfuGUF+w@mail.gmail.com>
+References: <1363145044-14442-1-git-send-email-s-anna@ti.com>
+ <CACRpkdY8ZWNUVHJorbhN7XvOys9KJH8hKeCBYARih=1FiNk-CQ@mail.gmail.com>
+ <37C860A02101E749A747FA2D3C1E3C50498B8E@DLEE11.ent.ti.com>
+ <CACRpkdbUBkhkQ-ZiqkLUmsDBp3hw4k3Z1s4i4SD3C2ZfuGUF+w@mail.gmail.com>
+Message-ID: <37C860A02101E749A747FA2D3C1E3C50499EBA@DLEE11.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 14, 2013 at 07:09:18PM +0100, Florian Fainelli wrote:
-> Hello Jason,
-> 
-> Le 03/14/13 18:25, Jason Cooper a ?crit :
-> >Florian,
+> On Wed, Mar 13, 2013 at 10:34 PM, Anna, Suman <s-anna@ti.com> wrote:
+> >> On Wed, Mar 13, 2013 at 4:24 AM, Suman Anna <s-anna@ti.com> wrote:
+> >>
+> >> > From: Omar Ramirez Luna <omar.luna@linaro.org>
+> >> (...)
+> >> >
+> >> > Signed-off-by: Omar Ramirez Luna <omar.luna@linaro.org>
+> >> > [s-anna at ti.com: Kconfig fixes for build errors]
+> >> > Signed-off-by: Suman Anna <s-anna@ti.com>
+> >> > Acked-by: Tony Lindgren <tony@atomide.com>
+> >> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> >>
+> >> It's not like I care super-much, but I think your SoB should be at the bottom.
+> >>
+> >> It's a simple git rebase -i anyway...
 > >
-> >Any word on version 2 of this series?  I'd like to base the conversion
-> >of kirkwood to DT based ethernet init on it.
+> > Sure, will do. Only this patch, right? I have my SoB only on one another original
+> patch, will adjust on that as well, but all the remaining ones will have yours at the
+> bottom.
 > 
-> Just sent them out for review, thanks for reminder, they were
-> sitting in my tree for a couple days already.
+> No I mean that the SoB-order should reflect the code flow path, and yours should
+> be at the bottom of all of them, but as noted I don't care much. In my case the
+> only thing I did was to pass the code :-)
 
-Great!  I'll give this a spin.
+Thanks for the clarification. I have updated the branch accordingly.
 
-thx,
-
-Jason.
+Regards,
+Suman
