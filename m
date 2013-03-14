@@ -1,63 +1,62 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 Mar 2013 08:59:15 +0000
-Subject: [PATCH 00/04] ARM: shmobile: r8a73a4 SoC and APE6EVM board support
-In-Reply-To: <CANqRtoQeSqZas7Zdyz-de13_4W_a5P6_xrh_23nKZzZV47xF_w@mail.gmail.com>
-References: <20130312045559.19701.77841.sendpatchset@w520>
- <201303121228.31067.arnd@arndb.de>
- <CANqRtoQeSqZas7Zdyz-de13_4W_a5P6_xrh_23nKZzZV47xF_w@mail.gmail.com>
-Message-ID: <201303140859.16166.arnd@arndb.de>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 14 Mar 2013 11:00:05 +0200
+Subject: [PATCH 14/14] usb: udc-core: add judgement logic for
+ usb_gadget_connect
+In-Reply-To: <1363240242-25775-15-git-send-email-peter.chen@freescale.com>
+References: <1363240242-25775-1-git-send-email-peter.chen@freescale.com>
+ <1363240242-25775-15-git-send-email-peter.chen@freescale.com>
+Message-ID: <20130314090005.GB14443@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 14 March 2013, Magnus Damm wrote:
+Hi,
 
-> These patches for new SoCs and boards use a mix of DT and C. In
-> practice that means that I plan on using platform devices and DT in
-> parallel. These platform devices can easily go away upon your request,
-> if so a new version of the patch will be submitted with the offensive
-> hunks removed. The old version may however still be used for back
-> porting.
+On Thu, Mar 14, 2013 at 01:50:42PM +0800, Peter Chen wrote:
+> - If there is no vbus control to indicate connection.
+> and disconnect, we can pullup dp when we load gadget module.
+> - If we have vbus control logic, the dp is better pull up
+> when there is a vbus session.
+> 
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> ---
+>  drivers/usb/gadget/udc-core.c |   10 ++++++++--
+>  1 files changed, 8 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/usb/gadget/udc-core.c b/drivers/usb/gadget/udc-core.c
+> index 4d90bdf..4b56f7c 100644
+> --- a/drivers/usb/gadget/udc-core.c
+> +++ b/drivers/usb/gadget/udc-core.c
+> @@ -278,7 +278,10 @@ static int udc_bind_to_driver(struct usb_udc *udc, struct usb_gadget_driver *dri
+>  		driver->unbind(gadget);
+>  		goto err1;
+>  	}
+> -	usb_gadget_connect(gadget);
+> +	if (!gadget->ops->vbus_session ||
+> +			(gadget->ops->vbus_session
+> +				&& gadget->vbus_active))
+> +		usb_gadget_connect(gadget);
+>  
+>  	kobject_uevent(&udc->dev.kobj, KOBJ_CHANGE);
+>  	return 0;
+> @@ -384,7 +387,10 @@ static ssize_t usb_udc_softconn_store(struct device *dev,
+>  
+>  	if (sysfs_streq(buf, "connect")) {
+>  		usb_gadget_udc_start(gadget, udc->driver);
+> -		usb_gadget_connect(gadget);
+> +		if (!gadget->ops->vbus_session ||
+> +				(gadget->ops->vbus_session
+> +					&& gadget->vbus_active))
+> +			usb_gadget_connect(gadget);
 
-Yes, that sounds like a good plan.
+this patch is incomplete. What happens if this test fails ? Who will
+connect pullup then ?
 
-> So if there are some portions of the code that you would like me to
-> rework then please let me know and I will do my best to follow your
-> guidance. I am also open to clean up various portions of the code if
-> you have some particular place that you feel needs extra attention.
-
-The only part that confused me was the use of "#ifdef CONFIG_USE_OF"
-in the setup-r8a73a4.c file. If the plan is to use a combination of
-DT with static platform_data (or platform_devices, more on that below),
-you always need that conditional code, and I think it would be more
-logical to remove the #ifdef. I understand that having the #ifdef
-in place makes your life easier for backporting to kernels that
-don't have enough DT support yet, but I think you are going to run
-into larger issues tha this the more those divert from current
-mainline over time.
-
-Regarding how to best mix platform devices and DT, my recommendation
-is to use AUXDATA for the platform_data and device names while getting
-the IRQ and MMIO resources from DT for devices that have no binding
-yet, rather than creating the complete device in platform code. In
-particular, this should make it easier to deal with IRQ domains, and
-with devices that are disabled on some boards, but again it will make
-you backporting more work.
-
-Regarding how platform devices are created, Greg KH has been trying
-to stop people from statically declaring the devices in platform code
-for many years, the recommended way to do it (if you have to) is calling
-one of platform_device_register_{full,resndata,data,simple}. We still
-have a large number of static platform devices in ARM, and I'm not
-asking anyone to actively convert the existing ones, but I should
-probably be a little stricter about using the proper interfaces in
-new code.
-
-To summarize, the many ways to create platform devices from most
-preferred to least are:
-
-1. DT without auxdata
-2. DT with auxdata
-3. platform_device_register_*
-4. static definition with platform_device_register
-
-	Arnd
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130314/6cfd0ff2/attachment.sig>
