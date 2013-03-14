@@ -1,9 +1,9 @@
 From: fabio.porcedda@gmail.com (Fabio Porcedda)
-Date: Thu, 14 Mar 2013 14:11:22 +0100
-Subject: [PATCH] drivers: misc: use module_platform_driver_probe()
+Date: Thu, 14 Mar 2013 14:11:23 +0100
+Subject: [PATCH 02/10] drivers: ata: use module_platform_driver_probe()
 In-Reply-To: <1363266691-15757-1-git-send-email-fabio.porcedda@gmail.com>
 References: <1363266691-15757-1-git-send-email-fabio.porcedda@gmail.com>
-Message-ID: <1363266691-15757-3-git-send-email-fabio.porcedda@gmail.com>
+Message-ID: <1363266691-15757-4-git-send-email-fabio.porcedda@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,83 +13,60 @@ a bit simpler.
 
 Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
 Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Jeff Garzik <jgarzik@pobox.com>
+Cc: linux-ide at vger.kernel.org
 ---
- drivers/misc/arm-charlcd.c | 13 +------------
- drivers/misc/atmel_pwm.c   | 12 +-----------
- drivers/misc/ep93xx_pwm.c  | 13 +------------
- 3 files changed, 3 insertions(+), 35 deletions(-)
+ drivers/ata/pata_at32.c       | 13 +------------
+ drivers/ata/pata_samsung_cf.c | 13 +------------
+ 2 files changed, 2 insertions(+), 24 deletions(-)
 
-diff --git a/drivers/misc/arm-charlcd.c b/drivers/misc/arm-charlcd.c
-index fe8616a..48651ef 100644
---- a/drivers/misc/arm-charlcd.c
-+++ b/drivers/misc/arm-charlcd.c
-@@ -378,18 +378,7 @@ static struct platform_driver charlcd_driver = {
- 	.remove = __exit_p(charlcd_remove),
+diff --git a/drivers/ata/pata_at32.c b/drivers/ata/pata_at32.c
+index 36f189c..8d493b4 100644
+--- a/drivers/ata/pata_at32.c
++++ b/drivers/ata/pata_at32.c
+@@ -393,18 +393,7 @@ static struct platform_driver pata_at32_driver = {
+ 	},
  };
  
--static int __init charlcd_init(void)
+-static int __init pata_at32_init(void)
 -{
--	return platform_driver_probe(&charlcd_driver, charlcd_probe);
+-	return platform_driver_probe(&pata_at32_driver, pata_at32_probe);
 -}
 -
--static void __exit charlcd_exit(void)
+-static void __exit pata_at32_exit(void)
 -{
--	platform_driver_unregister(&charlcd_driver);
+-	platform_driver_unregister(&pata_at32_driver);
 -}
 -
--module_init(charlcd_init);
--module_exit(charlcd_exit);
-+module_platform_driver_probe(charlcd_driver, charlcd_probe);
+-module_init(pata_at32_init);
+-module_exit(pata_at32_exit);
++module_platform_driver_probe(pata_at32_driver, pata_at32_probe);
  
- MODULE_AUTHOR("Linus Walleij <triad@df.lth.se>");
- MODULE_DESCRIPTION("ARM Character LCD Driver");
-diff --git a/drivers/misc/atmel_pwm.c b/drivers/misc/atmel_pwm.c
-index 28f5aaa..494d050 100644
---- a/drivers/misc/atmel_pwm.c
-+++ b/drivers/misc/atmel_pwm.c
-@@ -393,17 +393,7 @@ static struct platform_driver atmel_pwm_driver = {
- 	 */
- };
- 
--static int __init pwm_init(void)
--{
--	return platform_driver_probe(&atmel_pwm_driver, pwm_probe);
--}
--module_init(pwm_init);
--
--static void __exit pwm_exit(void)
--{
--	platform_driver_unregister(&atmel_pwm_driver);
--}
--module_exit(pwm_exit);
-+module_platform_driver_probe(atmel_pwm_driver, pwm_probe);
- 
- MODULE_DESCRIPTION("Driver for AT32/AT91 PWM module");
  MODULE_LICENSE("GPL");
-diff --git a/drivers/misc/ep93xx_pwm.c b/drivers/misc/ep93xx_pwm.c
-index 16d7179..96787ec 100644
---- a/drivers/misc/ep93xx_pwm.c
-+++ b/drivers/misc/ep93xx_pwm.c
-@@ -365,18 +365,7 @@ static struct platform_driver ep93xx_pwm_driver = {
- 	.remove		= __exit_p(ep93xx_pwm_remove),
+ MODULE_DESCRIPTION("AVR32 SMC/CFC PATA Driver");
+diff --git a/drivers/ata/pata_samsung_cf.c b/drivers/ata/pata_samsung_cf.c
+index 70b0e01..6ef27e9 100644
+--- a/drivers/ata/pata_samsung_cf.c
++++ b/drivers/ata/pata_samsung_cf.c
+@@ -661,18 +661,7 @@ static struct platform_driver pata_s3c_driver = {
+ 	},
  };
  
--static int __init ep93xx_pwm_init(void)
+-static int __init pata_s3c_init(void)
 -{
--	return platform_driver_probe(&ep93xx_pwm_driver, ep93xx_pwm_probe);
+-	return platform_driver_probe(&pata_s3c_driver, pata_s3c_probe);
 -}
 -
--static void __exit ep93xx_pwm_exit(void)
+-static void __exit pata_s3c_exit(void)
 -{
--	platform_driver_unregister(&ep93xx_pwm_driver);
+-	platform_driver_unregister(&pata_s3c_driver);
 -}
 -
--module_init(ep93xx_pwm_init);
--module_exit(ep93xx_pwm_exit);
-+module_platform_driver_probe(ep93xx_pwm_driver, ep93xx_pwm_probe);
+-module_init(pata_s3c_init);
+-module_exit(pata_s3c_exit);
++module_platform_driver_probe(pata_s3c_driver, pata_s3c_probe);
  
- MODULE_AUTHOR("Matthieu Crapet <mcrapet@gmail.com>, "
- 	      "H Hartley Sweeten <hsweeten@visionengravers.com>");
+ MODULE_AUTHOR("Abhilash Kesavan, <a.kesavan@samsung.com>");
+ MODULE_DESCRIPTION("low-level driver for Samsung PATA controller");
 -- 
 1.8.1.5
