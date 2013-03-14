@@ -1,37 +1,42 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 14 Mar 2013 09:14:26 +0100
-Subject: [PATCHv3 03/14] mailbox: OMAP: introduce mailbox framework
-In-Reply-To: <37C860A02101E749A747FA2D3C1E3C50498B8E@DLEE11.ent.ti.com>
-References: <1363145044-14442-1-git-send-email-s-anna@ti.com>
- <CACRpkdY8ZWNUVHJorbhN7XvOys9KJH8hKeCBYARih=1FiNk-CQ@mail.gmail.com>
- <37C860A02101E749A747FA2D3C1E3C50498B8E@DLEE11.ent.ti.com>
-Message-ID: <CACRpkdbUBkhkQ-ZiqkLUmsDBp3hw4k3Z1s4i4SD3C2ZfuGUF+w@mail.gmail.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Thu, 14 Mar 2013 09:17:32 +0100
+Subject: ARM: at-91: ARCH_AT91SAM9X5 went missing
+In-Reply-To: <20130313122605.GE2001@game.jcrosoft.org>
+References: <1363171688.3137.196.camel@x61.thuisdomein>
+ <51405F0D.40102@atmel.com> <1363173747.3137.202.camel@x61.thuisdomein>
+ <20130313122605.GE2001@game.jcrosoft.org>
+Message-ID: <1363249052.1335.32.camel@x61.thuisdomein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 13, 2013 at 10:34 PM, Anna, Suman <s-anna@ti.com> wrote:
->> On Wed, Mar 13, 2013 at 4:24 AM, Suman Anna <s-anna@ti.com> wrote:
->>
->> > From: Omar Ramirez Luna <omar.luna@linaro.org>
->> (...)
->> >
->> > Signed-off-by: Omar Ramirez Luna <omar.luna@linaro.org>
->> > [s-anna at ti.com: Kconfig fixes for build errors]
->> > Signed-off-by: Suman Anna <s-anna@ti.com>
->> > Acked-by: Tony Lindgren <tony@atomide.com>
->> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->>
->> It's not like I care super-much, but I think your SoB should be at the bottom.
->>
->> It's a simple git rebase -i anyway...
->
-> Sure, will do. Only this patch, right? I have my SoB only on one another original patch, will adjust on that as well, but all the remaining ones will have yours at the bottom.
+On Wed, 2013-03-13 at 13:26 +0100, Jean-Christophe PLAGNIOL-VILLARD
+wrote:
+> but the ARCH_AT91SAM9x5 never exist at the mainline
 
-No I mean that the SoB-order should reflect the code flow path, and
-yours should be
-at the bottom of all of them, but as noted I don't care much. In my
-case the only thing
-I did was to pass the code :-)
+I'm not sure I understand this.
 
-Yours,
-Linus Walleij
+We're discussing the effects of commit
+1e3ce2b8545390a2aee8dbfcd49ca4161b636000 ("AR[M]: at91: introduce
+SOC_AT91xxx define to allow to compile SoC core support") here. It did
+remove ARCH_AT91SAM9X5:
+    $ git show 1e3ce2b8545390a2aee8dbfcd49ca4161b636000 | grep ARCH_AT91SAM9X5
+    -config ARCH_AT91SAM9X5
+    @@ -93,8 +91,47 @@ config ARCH_AT91SAM9X5
+    -obj-$(CONFIG_ARCH_AT91SAM9X5)	+= at91sam9x5.o
+    -#ifdef CONFIG_ARCH_AT91SAM9X5
+    -#if !defined(CONFIG_ARCH_AT91SAM9X5)
+
+It also added SOC_AT91SAM9X5, and that symbol even triggers the
+compilation of a file named at91sam9x5.c:
+    $ git show 1e3ce2b8545390a2aee8dbfcd49ca4161b636000 | grep SOC_AT91SAM9X5
+    +config SOC_AT91SAM9X5
+    +obj-$(CONFIG_SOC_AT91SAM9X5)	+= at91sam9x5.o
+    +#ifdef CONFIG_SOC_AT91SAM9X5
+    +#if !defined(CONFIG_SOC_AT91SAM9X5)
+
+And also note that ARCH_AT91SAM9X5 still is used as an (optional) dependency:
+    $ git grep -n ARCH_AT91SAM9X5 v3.9-rc2
+    v3.9-rc2:drivers/net/can/Kconfig:68:    depends on ARCH_AT91SAM9263 || ARCH_AT91SAM9X5
+
+
+Paul Bolle
