@@ -1,64 +1,36 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 14 Mar 2013 16:16:06 +0530
-Subject: [PATCH] ARM: smp: Allow real broadcast device selection instead
- of always dummy
-In-Reply-To: <20130314102807.GG13483@e106331-lin.cambridge.arm.com>
-References: <1363165608-13739-1-git-send-email-santosh.shilimkar@ti.com>
- <514046B6.9020005@ti.com>
- <20130313101641.GA13483@e106331-lin.cambridge.arm.com>
- <514061D1.20603@ti.com>
- <20130313122550.GD13483@e106331-lin.cambridge.arm.com>
- <51409EC3.5050905@ti.com>
- <20130313161811.GF13483@e106331-lin.cambridge.arm.com>
- <5141800A.2000307@ti.com>
- <20130314102807.GG13483@e106331-lin.cambridge.arm.com>
-Message-ID: <5141AA6E.3020805@ti.com>
+From: pavel@denx.de (Pavel Machek)
+Date: Thu, 14 Mar 2013 12:03:10 +0100
+Subject: [PATCHv1 0/2] ARM: socfpga: Soft reset, hotplug and device
+ tree clocks
+In-Reply-To: <5141220A.7050008@gmail.com>
+References: <1363211722-27237-1-git-send-email-dinguyen@altera.com>
+ <5141220A.7050008@gmail.com>
+Message-ID: <20130314110310.GA3384@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 14 March 2013 03:58 PM, Mark Rutland wrote:
-> On Thu, Mar 14, 2013 at 07:45:14AM +0000, Santosh Shilimkar wrote:
->> On Wednesday 13 March 2013 09:48 PM, Mark Rutland wrote:
->>> On Wed, Mar 13, 2013 at 03:44:03PM +0000, Santosh Shilimkar wrote:
->>>> On Wednesday 13 March 2013 05:55 PM, Mark Rutland wrote:
->>>>> On Wed, Mar 13, 2013 at 11:24:01AM +0000, Santosh Shilimkar wrote:
->>>>>> On Wednesday 13 March 2013 03:46 PM, Mark Rutland wrote:
->>>>>>> Hi Santosh,
->>>>
->>>> [..]
->>>>
->>>>>>>
->>>>>>> Is the problem that the dummy timer is being registered as the broadcast
->>>>>>> source, or that it is selected as a local timer in preference of real timers?
->>>>>>>
->>>>>> Dummy timer is preferred over real broadcast timer.
->>>>>
->>>>> Ok.
->>>
->>> [...]
->>>
->>>>> I do agree it'd be worth lowering the dummy timer's rating to ensure it doesn't
->>>>> override a real timer elsewhere. 
->>>>>
->>>> Yep. Can I add you acked-by tag then for $subject patch ?
->>>> Would be good to get this one merged as well.
->>>
->>> Sure. Though could you reword the commit message? The patch solves the more
->>> general issue of a dummy being preferred over real hardware even outside of
->>> choosing the broadcast device.
->>>
->>> Acked-by: Mark Rutland <mark.rutland@arm.com>
->>
->> Thanks. For record, patch is in end of the email which I plan
->> to put into patch system.
->>
->> Regards,
->> Santosh
+Hi!
+ 
+> > Just 2 patches for mach-socfpga:
+> > 
+> > 0001: ARM: socfpga: Enable hotplug and soft reset
+> > 	- Able to hotplug CPU1 by putting it into reset and bringing back online.
+> > 
 > 
-> The below patch seems fine. Are you intending for this to go in as a fix for
-> 3.9-rc*, or as a cleanup for 3.10?
-> 
-Fix for 3.9-rc*. I have put already it in patch system.
+> Have you seen the discussion on PSCI? There's an ARM doc on it and
+> Linaro session from last week. Is there a possibility you can use that?
+> You would need to be able to run in non-secure mode and implement
+> smc calls.
 
-Regards,
-Santosh
+I tried googling PSCI, but got:
+
+Power State Coordination Interface
+System Software on ARM Processors
+This document is only available in a PDF version to registered ARM
+customers.
+
+Do you have better pointer?
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
