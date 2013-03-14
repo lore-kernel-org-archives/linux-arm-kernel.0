@@ -1,63 +1,50 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Thu, 14 Mar 2013 13:50:40 +0800
-Subject: [PATCH 12/14] usb: s3c2410_udc: using common vbus_active
+Date: Thu, 14 Mar 2013 13:50:42 +0800
+Subject: [PATCH 14/14] usb: udc-core: add judgement logic for
+ usb_gadget_connect
 In-Reply-To: <1363240242-25775-1-git-send-email-peter.chen@freescale.com>
 References: <1363240242-25775-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1363240242-25775-13-git-send-email-peter.chen@freescale.com>
+Message-ID: <1363240242-25775-15-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using common vbus_active to indicate vbus status
+- If there is no vbus control to indicate connection.
+and disconnect, we can pullup dp when we load gadget module.
+- If we have vbus control logic, the dp is better pull up
+when there is a vbus session.
 
-CC: Ben Dooks <ben-linux@fluff.org>
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/gadget/s3c2410_udc.c |    6 +++---
- drivers/usb/gadget/s3c2410_udc.h |    1 -
- 2 files changed, 3 insertions(+), 4 deletions(-)
+ drivers/usb/gadget/udc-core.c |   10 ++++++++--
+ 1 files changed, 8 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/usb/gadget/s3c2410_udc.c b/drivers/usb/gadget/s3c2410_udc.c
-index fc07b43..ae7a7e3 100644
---- a/drivers/usb/gadget/s3c2410_udc.c
-+++ b/drivers/usb/gadget/s3c2410_udc.c
-@@ -1494,7 +1494,7 @@ static int s3c2410_udc_vbus_session(struct usb_gadget *gadget, int is_active)
- 
- 	dprintk(DEBUG_NORMAL, "%s()\n", __func__);
- 
--	udc->vbus = (is_active != 0);
-+	gadget->vbus_active = (is_active != 0);
- 	s3c2410_udc_set_pullup(udc, is_active);
- 	return 0;
- }
-@@ -1520,7 +1520,7 @@ static irqreturn_t s3c2410_udc_vbus_irq(int irq, void *_dev)
- 	if (udc_info->vbus_pin_inverted)
- 		value = !value;
- 
--	if (value != dev->vbus)
-+	if (value != &dev->gadget.vbus)
- 		s3c2410_udc_vbus_session(&dev->gadget, value);
- 
- 	return IRQ_HANDLED;
-@@ -1887,7 +1887,7 @@ static int s3c2410_udc_probe(struct platform_device *pdev)
- 
- 		dev_dbg(dev, "got irq %i\n", irq);
- 	} else {
--		udc->vbus = 1;
-+		udc->gadget.vbus = 1;
+diff --git a/drivers/usb/gadget/udc-core.c b/drivers/usb/gadget/udc-core.c
+index 4d90bdf..4b56f7c 100644
+--- a/drivers/usb/gadget/udc-core.c
++++ b/drivers/usb/gadget/udc-core.c
+@@ -278,7 +278,10 @@ static int udc_bind_to_driver(struct usb_udc *udc, struct usb_gadget_driver *dri
+ 		driver->unbind(gadget);
+ 		goto err1;
  	}
+-	usb_gadget_connect(gadget);
++	if (!gadget->ops->vbus_session ||
++			(gadget->ops->vbus_session
++				&& gadget->vbus_active))
++		usb_gadget_connect(gadget);
  
- 	if (udc_info && !udc_info->udc_command &&
-diff --git a/drivers/usb/gadget/s3c2410_udc.h b/drivers/usb/gadget/s3c2410_udc.h
-index 93bf225..ca5ad98 100644
---- a/drivers/usb/gadget/s3c2410_udc.h
-+++ b/drivers/usb/gadget/s3c2410_udc.h
-@@ -92,7 +92,6 @@ struct s3c2410_udc {
- 	unsigned			req_std : 1;
- 	unsigned			req_config : 1;
- 	unsigned			req_pending : 1;
--	u8				vbus;
- 	struct dentry			*regs_info;
- };
- #define to_s3c2410(g)	(container_of((g), struct s3c2410_udc, gadget))
+ 	kobject_uevent(&udc->dev.kobj, KOBJ_CHANGE);
+ 	return 0;
+@@ -384,7 +387,10 @@ static ssize_t usb_udc_softconn_store(struct device *dev,
+ 
+ 	if (sysfs_streq(buf, "connect")) {
+ 		usb_gadget_udc_start(gadget, udc->driver);
+-		usb_gadget_connect(gadget);
++		if (!gadget->ops->vbus_session ||
++				(gadget->ops->vbus_session
++					&& gadget->vbus_active))
++			usb_gadget_connect(gadget);
+ 	} else if (sysfs_streq(buf, "disconnect")) {
+ 		usb_gadget_disconnect(gadget);
+ 		usb_gadget_udc_stop(gadget, udc->driver);
 -- 
 1.7.0.4
