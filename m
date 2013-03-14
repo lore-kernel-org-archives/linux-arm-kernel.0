@@ -1,44 +1,45 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 14 Mar 2013 11:39:27 -0400
-Subject: [PATCH] ARM: mvebu: fix RAM size for Armada XP board DB-MV784MP-GP
-In-Reply-To: <20130313171307.GC24042@obsidianresearch.com>
-References: <20130216164457.GA23237@titan.lakedaemon.net>
- <1363101135-21635-1-git-send-email-jason@lakedaemon.net>
- <51408D86.6040703@cogentembedded.com>
- <20130313143913.GN12700@titan.lakedaemon.net>
- <51409063.8080308@free-electrons.com>
- <20130313145419.GP12700@titan.lakedaemon.net>
- <20130313171307.GC24042@obsidianresearch.com>
-Message-ID: <20130314153927.GR12700@titan.lakedaemon.net>
+From: jacmet@sunsite.dk (Peter Korsgaard)
+Date: Thu, 14 Mar 2013 16:44:23 +0100
+Subject: [PATCH 2/3] pwm: pwm-tiecap: Add device-tree binding support for
+ da850 SOC
+In-Reply-To: <5141B7CC.7000700@ti.com> (Sekhar Nori's message of "Thu, 14 Mar
+ 2013 17:13:08 +0530")
+References: <1363257158-11615-1-git-send-email-avinashphilip@ti.com>
+ <1363257158-11615-3-git-send-email-avinashphilip@ti.com>
+ <5141B7CC.7000700@ti.com>
+Message-ID: <87txoe56lk.fsf@dell.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 13, 2013 at 11:13:07AM -0600, Jason Gunthorpe wrote:
-> On Wed, Mar 13, 2013 at 10:54:19AM -0400, Jason Cooper wrote:
-> 
-> > > I was wrong in my initial version, all we can do in 32 bits is not
-> > > 4GB but 4GB-1B: reg = <0x00000000 0xFFFFFFFF>
-> > 
-> > hmmm, with the impending conquering of the server market by ARM, you'd
-> > think we'd at least be able to parse a 64 bit integer...
-> 
-> AFAIK, it would be like this:
-> 
-> / {
->         #address-cells = <2>;
->         #size-cells = <2>;
->         memory {
->                 device_type = "memory";
->                 reg = <0 0  1 0>;
->         };
-> 
-> And the other children nodes must be revised to support the 2 dw
-> address and size..
+>>>>> "Sekhar" == Sekhar Nori <nsekhar@ti.com> writes:
 
-Agreed, but that's a pretty invasive change for a fix.  I'll go with
-0xFFFFFFFF for now, and look forward to LPAE support including proper
-64bit values.
+ >> Required properties:
+ >> -- compatible: Must be "ti,am33xx-ecap"
+ >> +- compatible: Must be "ti,am33xx-ecap" or "ti,da850-ecap"
+ >> - #pwm-cells: Should be 3. Number of cells being used to specify PWM property.
+ >> First cell specifies the per-chip index of the PWM to use, the second
+ >> cell is the period in nanoseconds and bit 0 in the third cell is used to
+ >> diff --git a/drivers/pwm/pwm-tiecap.c b/drivers/pwm/pwm-tiecap.c
+ >> index 22e96e2..e0d96c8 100644
+ >> --- a/drivers/pwm/pwm-tiecap.c
+ >> +++ b/drivers/pwm/pwm-tiecap.c
+ >> @@ -197,6 +197,7 @@ static const struct pwm_ops ecap_pwm_ops = {
+ >> 
+ >> static const struct of_device_id ecap_of_match[] = {
+ >> { .compatible	= "ti,am33xx-ecap" },
+ >> +	{ .compatible	= "ti,da850-ecap" },
+ >> {},
 
-thx,
+ Sekhar> You add a new compatible, but don't really show any changes in
+ Sekhar> driver in this series. So why can't we simply use
+ Sekhar> ti,am33xx-ecap on DA850 too?
 
-Jason.
+Indeed, if the hardware block is identical the dts should simply list:
+
+compatible = "ti,da850-ecap", "ti,am33xx-ecap"
+
+And the driver only bind to ti,am33xx-ecap (unless there ever needs to
+be a da850 specific workarounde.
+
+-- 
+Bye, Peter Korsgaard
