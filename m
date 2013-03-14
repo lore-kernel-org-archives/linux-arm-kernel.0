@@ -1,48 +1,49 @@
-From: fabio.porcedda@gmail.com (Fabio Porcedda)
-Date: Thu, 14 Mar 2013 18:09:30 +0100
-Subject: [PATCH v2 0/8] Use module_platform_driver_probe() part 2
-Message-ID: <1363280978-24051-1-git-send-email-fabio.porcedda@gmail.com>
+From: 1@t-123.tk (GPS tracker with multi discrete input and output /Attn: purchase
+ manager)
+Date: Thu, 14 Mar 2013 17:21:47 +0000
+Subject: =?GB2312?B?R1BTIHRyYWNrZXIgd2l0aCBtdWx0aSBkaXNjcmV0ZSBpbnB1dCBhbmQgb3V0cHV0IC9BdA==?=
+ =?GB2312?B?dG46IHB1cmNoYXNlIG1hbmFnZXLT68T6ubLP7cHLz+Cy4aGj?=
+Message-ID: <047d7b10d153e3f16604d7e5c119@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
-this patch set is the second part for the conversion to use
-new module_platform_driver_probe() macro.
+Tips:  GPS tracker with  multi discrete input and output /Attn: purchase  
+manager
 
-v2:
-  - rebased againg next and so dropped the already converted drivers.
+Dear Sir
 
-Fabio Porcedda (8):
-  drivers: media: use module_platform_driver_probe()
-  drivers: ata: use module_platform_driver_probe()
-  drivers: char: use module_platform_driver_probe()
-  drivers: input: use module_platform_driver_probe()
-  drivers: memory: use module_platform_driver_probe()
-  drivers: mfd: use module_platform_driver_probe()
-  drivers: video: use module_platform_driver_probe()
-  drivers: misc: use module_platform_driver_probe()
+        This is Anna,the sales manager of Redview GPS in China.
+        VT310 is a GPS tracker with 5 discrete inputs ,5 discrete outputs  
+and 2 analog ports . With VT310,you can get vehicle windows status, door  
+status, engine status, temperature and tank fuel level ,etc. This is widely  
+used in truck tracking application.
 
- drivers/ata/pata_at32.c                       | 13 +------------
- drivers/char/hw_random/mxc-rnga.c             | 13 +------------
- drivers/char/hw_random/tx4939-rng.c           | 13 +------------
- drivers/input/keyboard/amikbd.c               | 14 +-------------
- drivers/input/keyboard/davinci_keyscan.c      | 12 +-----------
- drivers/input/keyboard/nomadik-ske-keypad.c   | 12 +-----------
- drivers/input/misc/twl4030-pwrbutton.c        | 13 +------------
- drivers/input/mouse/amimouse.c                | 14 +-------------
- drivers/input/serio/at32psif.c                | 13 +------------
- drivers/input/serio/q40kbd.c                  | 13 +------------
- drivers/input/touchscreen/atmel-wm97xx.c      | 12 +-----------
- drivers/input/touchscreen/mc13783_ts.c        | 12 +-----------
- drivers/media/platform/soc_camera/atmel-isi.c | 12 +-----------
- drivers/memory/emif.c                         | 12 +-----------
- drivers/mfd/davinci_voicecodec.c              | 12 +-----------
- drivers/mfd/htc-pasic3.c                      | 13 +------------
- drivers/misc/atmel_pwm.c                      | 12 +-----------
- drivers/misc/ep93xx_pwm.c                     | 13 +------------
- drivers/video/sh_mipi_dsi.c                   | 12 +-----------
- drivers/video/sh_mobile_hdmi.c                | 12 +-----------
- 20 files changed, 20 insertions(+), 232 deletions(-)
+        I would appreciate if you forward this letter to Technical Manager  
+or to other expert responsible for technical integration of new products in  
+your company, or provide me with his contact for we could discuss all the  
+details of our future cooperation.
 
--- 
-1.8.1.5
+        Your early reply is highly appreciated.
+
+Best Regards
+
+Anna
+
+https://picasaweb.google.com/lh/sredir?uname=100357135436771405479&target=ALBUM&id=5851021127975176625&authkey=Gv1sRgCKSM89OKmabAiAE&invite=CPbz4aAM&feat=email
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130314/eb8f8d74/attachment-0001.html>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: picasaweblogo-zh_CN.gif
+Type: image/gif
+Size: 1646 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130314/eb8f8d74/attachment-0001.gif>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: email.jpg
+Type: image/jpeg
+Size: 7076 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130314/eb8f8d74/attachment-0001.jpg>
