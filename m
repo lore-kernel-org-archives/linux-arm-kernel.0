@@ -1,55 +1,45 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 14 Mar 2013 17:13:08 +0530
-Subject: [PATCH 2/3] pwm: pwm-tiecap: Add device-tree binding support
- for da850 SOC
-In-Reply-To: <1363257158-11615-3-git-send-email-avinashphilip@ti.com>
-References: <1363257158-11615-1-git-send-email-avinashphilip@ti.com>
- <1363257158-11615-3-git-send-email-avinashphilip@ti.com>
-Message-ID: <5141B7CC.7000700@ti.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 14 Mar 2013 17:16:56 +0530
+Subject: OMAP baseline test results for v3.9-rc1
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83EC281B4@DBDE01.ent.ti.com>
+References: <alpine.DEB.2.00.1303121634080.2723@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83EC281B4@DBDE01.ent.ti.com>
+Message-ID: <5141B8B0.5050206@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/14/2013 4:02 PM, Philip Avinash wrote:
-> ECAP IP is used in da850 SOC's also. Hence adds ECAP device tree binding
-> support for da850.
+On Thursday 14 March 2013 04:59 PM, Hiremath, Vaibhav wrote:
 > 
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Rob Landley <rob@landley.net>
-> Signed-off-by: Philip Avinash <avinashphilip@ti.com>
-> ---
-> :100644 100644 131e8c1... fcbd3c1... M	Documentation/devicetree/bindings/pwm/pwm-tiecap.txt
-> :100644 100644 22e96e2... e0d96c8... M	drivers/pwm/pwm-tiecap.c
->  .../devicetree/bindings/pwm/pwm-tiecap.txt         |    2 +-
->  drivers/pwm/pwm-tiecap.c                           |    1 +
->  2 files changed, 2 insertions(+), 1 deletion(-)
+>> -----Original Message-----
+>> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+>> owner at vger.kernel.org] On Behalf Of Paul Walmsley
+>> Sent: Tuesday, March 12, 2013 10:10 PM
+>> To: linux-omap at vger.kernel.org
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Subject: OMAP baseline test results for v3.9-rc1
+>>
+>>
+>> Here are some basic OMAP test results for Linux v3.9-rc1.
+>> Logs and other details at:
+>>
+>>     http://www.pwsan.com/omap/testlogs/test_v3.9-rc1/20130312100243/
+>>
+>>
+>> Test summary
+>> ------------
+>>
+>> Build:
+>>     FAIL ( 4/16): am33xx_only, omap1_defconfig,
+> This requires some cleanup in Makefile and Kconfig handling,
 > 
-> diff --git a/Documentation/devicetree/bindings/pwm/pwm-tiecap.txt b/Documentation/devicetree/bindings/pwm/pwm-tiecap.txt
-> index 131e8c1..fcbd3c1 100644
-> --- a/Documentation/devicetree/bindings/pwm/pwm-tiecap.txt
-> +++ b/Documentation/devicetree/bindings/pwm/pwm-tiecap.txt
-> @@ -1,7 +1,7 @@
->  TI SOC ECAP based APWM controller
->  
->  Required properties:
-> -- compatible: Must be "ti,am33xx-ecap"
-> +- compatible: Must be "ti,am33xx-ecap" or "ti,da850-ecap"
->  - #pwm-cells: Should be 3. Number of cells being used to specify PWM property.
->    First cell specifies the per-chip index of the PWM to use, the second
->    cell is the period in nanoseconds and bit 0 in the third cell is used to
-> diff --git a/drivers/pwm/pwm-tiecap.c b/drivers/pwm/pwm-tiecap.c
-> index 22e96e2..e0d96c8 100644
-> --- a/drivers/pwm/pwm-tiecap.c
-> +++ b/drivers/pwm/pwm-tiecap.c
-> @@ -197,6 +197,7 @@ static const struct pwm_ops ecap_pwm_ops = {
->  
->  static const struct of_device_id ecap_of_match[] = {
->  	{ .compatible	= "ti,am33xx-ecap" },
-> +	{ .compatible	= "ti,da850-ecap" },
->  	{},
+> Either you disable SMP support for non-SMP devices like AM33xx 
+> 
+> OR
+> 
+> Fix the Makefile to resolve the build dependencies (may not be trivial)
+> 
+This one... Better things is not to build the OMAP4 files for AM33XX only build.
+Even if it is not trivial, its right way of fixing the issue.
 
-You add a new compatible, but don't really show any changes in driver in
-this series. So why can't we simply use ti,am33xx-ecap on DA850 too?
-
-Thanks,
-Sekhar
+Regards,
+Santosh
