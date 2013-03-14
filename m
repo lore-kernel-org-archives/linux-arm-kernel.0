@@ -1,33 +1,28 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 14 Mar 2013 12:53:23 +0100
-Subject: [PATCH] ARM: i.MX25: Fix DT compilation
-Message-ID: <1363262003-4263-1-git-send-email-s.hauer@pengutronix.de>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 14 Mar 2013 17:25:13 +0530
+Subject: [PATCH v5 0/4] Add DT support for davinci_mmc driver
+In-Reply-To: <1363097637-11371-1-git-send-email-prakash.pm@ti.com>
+References: <1363097637-11371-1-git-send-email-prakash.pm@ti.com>
+Message-ID: <5141BAA1.1070906@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The i.MX25 DT machine descriptor calls a non existing imx25_timer_init()
-function. This patch adds it to fix compilation.
+On 3/12/2013 7:43 PM, Manjunathappa, Prakash wrote:
+> Patch set adds DT support for davinci_mmc driver and is
+> verified on da850-evm without card_detect/write_protect and
+> EDMA support. Also takecare to derive controller IP version from
+> platform_device_id table, remove version specification in pdata.
+> 
+> Applies on top of below patch under community review:
+> "Enable SPI flash support on da850-evm DT kernel"
+> http://www.spinics.net/lists/arm-kernel/msg229328.html
+> 
+> Depends on patch waiting for acceptance:
+> Patch "mmc: davinci: allow driver to work without DMA resource"
+> http://www.mail-archive.com/linux-mmc at vger.kernel.org/msg18771.html
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/mach-imx/imx25-dt.c | 5 +++++
- 1 file changed, 5 insertions(+)
+Since this patch did not get picked for v3.9, it may be worthwhile
+rebasing it and adding to this series.
 
-diff --git a/arch/arm/mach-imx/imx25-dt.c b/arch/arm/mach-imx/imx25-dt.c
-index 03b65e5e..8234839 100644
---- a/arch/arm/mach-imx/imx25-dt.c
-+++ b/arch/arm/mach-imx/imx25-dt.c
-@@ -27,6 +27,11 @@ static const char * const imx25_dt_board_compat[] __initconst = {
- 	NULL
- };
- 
-+static void __init imx25_timer_init(void)
-+{
-+	mx25_clocks_init_dt();
-+}
-+
- DT_MACHINE_START(IMX25_DT, "Freescale i.MX25 (Device Tree Support)")
- 	.map_io		= mx25_map_io,
- 	.init_early	= imx25_init_early,
--- 
-1.8.2.rc2
+Thanks,
+Sekhar
