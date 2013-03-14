@@ -1,94 +1,82 @@
-From: smoch@web.de (Soeren Moch)
-Date: Thu, 14 Mar 2013 19:48:41 +0100
-Subject: [PATCH] USB: EHCI: fix for leaking isochronous data
-In-Reply-To: <Pine.LNX.4.44L0.1303101638330.3146-100000@netrider.rowland.org>
-References: <Pine.LNX.4.44L0.1303101638330.3146-100000@netrider.rowland.org>
-Message-ID: <51421B89.6020308@web.de>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 14 Mar 2013 18:52:14 +0000 (UTC)
+Subject: [GIT PULL]: ARM: OMAP: miscellaneous PM/clock fixes for 3.9-rc
+Message-ID: <alpine.DEB.2.00.1303141850230.28203@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10.03.2013 21:59, Alan Stern wrote:
-> On Sun, 10 Mar 2013, Soeren Moch wrote:
->>> On Wed, 20 Feb 2013, Soeren Moch wrote:
->>>
->>>> Ok. I use 2 em2840-based usb sticks (em28xx driver) attached to a
->>>> Marvell Kirkwood-SoC with a orion-ehci usb controller. These usb sticks
->>>> stream dvb data (digital TV) employing isochronous usb transfers (user
->>>> application is vdr).
->>>>
->>>> Starting from linux-3.6 I see
->>>>      ERROR: 1024 KiB atomic DMA coherent pool is too small!
->>>> in the syslog after several 10 minutes (sometimes hours) of streaming
->>>> and then streaming stops.
->>>>
->>>> In linux-3.6 the memory management for the arm architecture was changed,
->>>> so that atomic coherent dma allocations are served from a special pool.
->>>> This pool gets exhausted. The only user of this pool (in my test) is
->>>> orion-ehci. Although I have only 10 URBs in flight (5 for each stick,
->>>> resubmitted in the completion handler), I have 256 atomic coherent
->>>> allocations (memory from the pool is allocated in pages) from orion-ehci
->>>> when I see this error. So I think there must be a memory leak (memory
->>>> allocated atomic somewhere below the usb_submit_urb call in em28xx-core.c).
->>>>
->>>> With other dvb sticks using usb bulk transfers I never see this error.
->>>>
->>>> Since you already found a memory leak in the ehci driver for isoc
->>>> transfers, I hoped you can help to solve this problem. If there are
->>>> additional questions, please ask. If there is something I can test, I
->>>> would be glad to do so.
->>>
->>> I guess the first thing is to get a dmesg log showing the problem.  You
->>> should build a kernel with CONFIG_USB_DEBUG enabled and post the part
->>> of the dmesg output starting from when you plug in the troublesome DVB
->>> stick.
->>
->> Sorry for my late response. Now I built a kernel 3.8.0 with usb_debug
->> enabled. See below for the syslog of device plug-in.
->>
->>> It also might help to have a record of all the isochronous-related
->>> coherent allocations and deallocations done by the ehci-hcd driver.
->>> Are you comfortable making your own debugging changes?  The allocations
->>> are done by a call to dma_pool_alloc() in
->>> drivers/usb/host/ehci-sched.c:itd_urb_transaction() if the device runs
->>> at high speed and sitd_urb_transaction() if the device runs at full
->>> speed.  The deallocations are done by calls to dma_pool_free() in
->>> ehci-timer.c:end_free_itds().
->>>
->>
->> I added a debug message to
->> drivers/usb/host/ehci-sched.c:itd_urb_transaction() to log the
->> allocation flags, see log below.
->
-> But it looks like you didn't add a message to end_free_itds(), so we
-> don't know when the memory gets deallocated.  And you didn't print out
-> the values of urb, num_itds, and i, or the value of itd (so we can
-> match up allocations against deallocations).
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-OK, I will implement this more detailed logging. But with several 
-allocations per second and runtime of several hours this will result in 
-a very long logfile.
+Hi Tony,
 
->> For me this looks like nothing is
->> allocated atomic here, so this function should not be the root cause of
->> the dma coherent pool exhaustion.
->
-> I don't understand.  If non-atomic allocations can't exhaust the pool,
-> why do we see these allocations fail?
+The following changes since commit f6161aa153581da4a3867a2d1a7caf4be19b6ec9:
 
-Good point. Unfortunately I'm not familiar with the memory management 
-details.
+  Linux 3.9-rc2 (2013-03-10 16:54:19 -0700)
 
-Arnd, can memory allocated with dma_pool_alloc() and gfp_flags 
-0x20000093 or 0x80000093 come from the atomic dma coherent pool?
+are available in the git repository at:
 
->> Are there other allocation functions
->> which I could track?
->
-> Yes, but they wouldn't be used for isochronous transfers.  See
-> ehci_qtd_alloc(), ehci_qtd_free(), ehci_qh_alloc(), and qh_destroy() in
-> ehci-mem.c, as well as some other one-time-only coherent allocations in
-> that file.
->
-> Alan Stern
->
-Soeren Moch
+  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/omap-fixes-a-for-3.9-rc
+
+for you to fetch changes up to 92702df3570e1ccfa050e135e50c450502251b79:
+
+  ARM: OMAP4: PM: fix PM regression introduced by recent clock cleanup (2013-03-13 04:27:32 -0600)
+
+- ----------------------------------------------------------------
+Miscellaneous OMAP fixes for v3.9-rc.  These primarily deal with OMAP2+ power
+management regressions.  There's also a fix for the OMAP1 OHCI controller.
+
+Basic build, boot, and PM test logs are at:
+
+    http://www.pwsan.com/omap/testlogs/fixes_a_3.9-rc/20130314101856/
+
+- ----------------------------------------------------------------
+
+vmlinux object size
+(delta in bytes from test_v3.9-rc2 (f6161aa153581da4a3867a2d1a7caf4be19b6ec9)):
+   text     data      bss    total  kernel
+    +40     +120        0     +160  omap1_defconfig
+    +40     +120        0     +160  omap2plus_defconfig
+    +40     +120        0     +160  omap2plus_defconfig_cpupm
+    +40     +152        0     +192  omap2plus_defconfig_omap2_4_only
+    +48     +144        0     +192  omap2plus_defconfig_omap3_4_only
+   +144     +152      -72     +224  rmk_omap3430_ldp_allnoconfig
+    +76     +120        0     +196  rmk_omap4430_sdp_oldconfig
+
+
+Aaro Koskinen (1):
+      ARM: OMAP1: fix USB host on 1710
+
+Grazvydas Ignotas (1):
+      ARM: OMAP3: hwmod data: keep MIDLEMODE in force-standby for musb
+
+Jon Hunter (1):
+      ARM: OMAP4: clock data: lock USB DPLL on boot
+
+Paul Walmsley (1):
+      ARM: OMAP4: PM: fix PM regression introduced by recent clock cleanup
+
+ arch/arm/mach-omap1/clock_data.c           |   12 +-----------
+ arch/arm/mach-omap2/cclock44xx_data.c      |   20 ++++++++++++++++++++
+ arch/arm/mach-omap2/omap_hwmod.c           |    7 +++++--
+ arch/arm/mach-omap2/omap_hwmod.h           |    9 +++++++--
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    7 ++++++-
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    6 ++++++
+ 6 files changed, 45 insertions(+), 16 deletions(-)
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.12 (GNU/Linux)
+
+iQIcBAEBAgAGBQJRQhuCAAoJEMePsQ0LvSpLp5UP/3Bg+ze1DP5lxEk0nFOMvGdG
+Nc1mg7CFg0L5MxeLUyoxypMLjvi8VyaY5/Vhgl5/IouQ8X4hj8R1HQBDyU8W3tMX
+6gHMlTEcagXUBkGMEemEamQH/GtyBuul01JeNfI3GhrpMU4TETw9hrBVBwxk5Y/s
+ukmra6r/aVNqW4OQwDje55a8FvzMfrVNZj4VhJAiN5ai17Okfz41V2sT4kc7QP9z
+haXMFbOFLFt+ZhIhwb0Yg2sOBJXUm3cWDnaKV9Emf0xwMld788LjV12ncWFiDeQx
+BlO3fGiD2+QmlikhxbnN/TU/yb/CHx/ajiS0RGyI+rM7Q4K8Z4g3eMr1WyICfsFs
+8KMUKhQBys8dlHPfr/cdkIXJ5OouEGbDlPlxuZ1Wyqc1QycX4DkTB4ciXjLbM+Hs
+hse+OVkFjh2SFU+0jEO6hMH0rGHAc/+JiBtuAaTEsxgBWyB5FaOQ7yuktOvruEme
+dOuYOwl7+fXxC6A+wW/dF4/obrO1dFaYYqGMXQYMvGr5Ym8fYFYUPfKw+R52FqjT
+P6YeOLb9kkphhaiQACZTSg7iGAfrknC3rpkvbtDAny3/YWetTnsj8IDO+V5EL/kP
+UCszt39awVpBHEjx9o45kHQxUs/MsWkI4j0ey/PvIDFzeVUwjmw6dyFhvuP7UaOW
+lBOhXS96kZzqdddAvzWq
+=6xNd
+-----END PGP SIGNATURE-----
