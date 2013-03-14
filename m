@@ -1,58 +1,45 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Thu, 14 Mar 2013 09:28:51 +0530
-Subject: [PATCH V6] ARM: LPAE: Fix mapping in alloc_init_section for
- unaligned addresses
-In-Reply-To: <51261288.5030806@ti.com>
-References: <1360574009-12429-1-git-send-email-r.sricharan@ti.com>
- <20130211131230.GA5676@MacBook-Pro.local> <5118F796.3080308@ti.com>
- <51261288.5030806@ti.com>
-Message-ID: <51414AFB.9080403@ti.com>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Thu, 14 Mar 2013 12:21:28 +0800
+Subject: [PATCH] ARM:OMAP2: an issue about curr_pwrst, u8 is never < 0
+Message-ID: <51415048.6000607@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 21 February 2013 05:56 PM, R Sricharan wrote:
-> Hi,
-> On Monday 11 February 2013 07:22 PM, R Sricharan wrote:
->> Hi Russell,
->>
->> On Monday 11 February 2013 06:42 PM, Catalin Marinas wrote:
->>> On Mon, Feb 11, 2013 at 09:13:29AM +0000, R Sricharan wrote:
->>>> +static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
->>>> +                      unsigned long end, phys_addr_t phys,
->>>> +                      const struct mem_type *type)
->>>> +{
->>>> +    pmd_t *pmd = pmd_offset(pud, addr);
->>>> +    unsigned long next;
->>>> +
->>>> +    do {
->>>>           /*
->>>> -         * No need to loop; pte's aren't interested in the
->>>> -         * individual L1 entries.
->>>> +         * With LPAE, we must loop over to map
->>>> +         * all the pmds for the given range.
->>>>            */
->>>> -        alloc_init_pte(pmd, addr, end, __phys_to_pfn(phys), type);
->>>> -    }
->>>> +        next = pmd_addr_end(addr, end);
->>>> +
->>>> +        /*
->>>> +         * Try a section mapping - end, addr and phys must all be
->>>> +         * aligned to a section boundary.
->>>> +         */
->>>
->>> Should this read "next, addr and phys" instead of "end..."?
->>>
->>> Otherwise:
->>>
->>> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
->>>
->>   Can I put this in to patch system ?
->
->    Ping..
->
-> Regards,
->  Sricharan
- Ping again..
 
-Regards,
- Sricharan
+  if pwrdm_read_pwrst returns negative number, curr_pwrst can not notice it.
+  since really need check curr_pwrst whether is negative,
+    need let the check valid in _pwrdm_save_clkdm_state_and_activate.
+    and also better to check the return value of pwrdm_read_pwrst, firstly.
+
+Signed-off-by: Chen Gang <gang.chen@asianux.com>
+---
+ arch/arm/mach-omap2/powerdomain.c |    7 +++++--
+ 1 files changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+index 43ac20c..876d067 100644
+--- a/arch/arm/mach-omap2/powerdomain.c
++++ b/arch/arm/mach-omap2/powerdomain.c
+@@ -233,7 +233,7 @@ static u8 _pwrdm_save_clkdm_state_and_activate(struct powerdomain *pwrdm,
+ {
+ 	u8 sleep_switch;
+ 
+-	if (curr_pwrst < 0) {
++	if ((char)curr_pwrst < 0) {
+ 		WARN_ON(1);
+ 		sleep_switch = ERROR_SWITCH;
+ 	} else if (curr_pwrst < PWRDM_POWER_ON) {
+@@ -1106,7 +1106,10 @@ int omap_set_pwrdm_state(struct powerdomain *pwrdm, u8 pwrst)
+ 
+ 	pwrdm_lock(pwrdm);
+ 
+-	curr_pwrst = pwrdm_read_pwrst(pwrdm);
++	ret = pwrdm_read_pwrst(pwrdm);
++	if (ret < 0)
++		goto osps_out;
++	curr_pwrst = (u8)(unsigned int)ret;
+ 	next_pwrst = pwrdm_read_next_pwrst(pwrdm);
+ 	if (curr_pwrst == pwrst && next_pwrst == pwrst)
+ 		goto osps_out;
+-- 
+1.7.7.6
