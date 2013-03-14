@@ -1,44 +1,44 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 14 Mar 2013 23:07:06 +0400
-Subject: [PATCH 3/3] ARM: EXYNOS5250: Register architected timers
-In-Reply-To: <1363222742-15220-4-git-send-email-agraf@suse.de>
-References: <1363222742-15220-1-git-send-email-agraf@suse.de>
- <1363222742-15220-4-git-send-email-agraf@suse.de>
-Message-ID: <51421FDA.8070507@cogentembedded.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 14 Mar 2013 20:08:10 +0100 (CET)
+Subject: [PATCH] genirq: allow an alternative setup for the mask cache
+In-Reply-To: <1363277430-21325-1-git-send-email-holger.brunck@keymile.com>
+References: <1363277430-21325-1-git-send-email-holger.brunck@keymile.com>
+Message-ID: <alpine.LFD.2.02.1303142005430.22263@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Thu, 14 Mar 2013, Holger Brunck wrote:
 
-On 14-03-2013 4:59, Alexander Graf wrote:
+> The same interrupt mask cache (stored within struct irq_chip_generic)
+> is shared between all the irq_chip_type instances by default. But this
+> does not work on Orion SOCs which have separate mask registers for edge
+> and level interrupts. Therefore refactor the code that we always use a
+> pointer to access the mask register. By default it points to
+> gc->mask_cache for Orion SOCs it points to ct->mask_cache which is
+> setup in irq_setup_alt_chip().
 
-> When running on an exynos 5250 SoC, we don't initialize the architected
-> timers. The chip however supports architected timers.
+Sigh.
+ 
+> @@ -275,6 +278,8 @@ int irq_setup_alt_chip(struct irq_data *d, unsigned int type)
+>  	struct irq_chip_type *ct = gc->chip_types;
+>  	unsigned int i;
+>  
+> +	/* Setup pointer to the mask_cache */
+> +	gc->pmask_cache = &ct->mask_cache;
 
-> When we don't initialize them, KVM will try to access them and run into
-> NULL pointer dereferences attempting to do so.
+You cannot do this unconditionally as this might break existing
+drivers.
 
-> This patch is really more of a hack than a real fix, but does get me
-> working with KVM on Arndale.
+See my previous mail:
 
-> Signed-off-by: Alexander Graf <agraf@suse.de>
-> ---
->   arch/arm/mach-exynos/mct.c |    4 ++++
->   1 file changed, 4 insertions(+)
+I'd rather refactor the core code so it uses a pointer to the
+mask_cache. The default would be to let it point to gc->mask_cache and
+optionally let it point to ct->mask_cache. We'd need to store the flag
+in the gc struct so we can redirect the pointer to the ct->mask_cache
+in irq_setup_alt_chip().
 
-> diff --git a/arch/arm/mach-exynos/mct.c b/arch/arm/mach-exynos/mct.c
-> index c9d6650..eefb8af 100644
-> --- a/arch/arm/mach-exynos/mct.c
-> +++ b/arch/arm/mach-exynos/mct.c
-> @@ -482,4 +482,8 @@ void __init exynos4_timer_init(void)
->   	exynos4_timer_resources();
->   	exynos4_clocksource_init();
->   	exynos4_clockevent_init();
-> +
-> +	if (soc_is_exynos5250()) {
-> +		arch_timer_of_register();
-> +	}
+I wrote that for a reason.
 
-    {} not needed here. scripts/checkpatch.pl should probabl;y warn about it.
+Thanks,
 
-WBR, Sergei
+	tglx
