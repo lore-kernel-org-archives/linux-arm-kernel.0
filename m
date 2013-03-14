@@ -1,60 +1,22 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Thu, 14 Mar 2013 15:46:51 -0700
-Subject: [PATCH] bounce:fix bug, avoid to flush dcache on slab page from
- jbd2.
-In-Reply-To: <20130313210216.GA7754@quack.suse.cz>
-References: <5139DB90.5090302@gmail.com>
- <20130312153221.0d26fe5599d4885e51bb0c7c@linux-foundation.org>
- <20130313011020.GA5313@blackbox.djwong.org>
- <20130313085021.GA29730@quack.suse.cz>
- <20130313194429.GE5313@blackbox.djwong.org>
- <20130313210216.GA7754@quack.suse.cz>
-Message-ID: <20130314154651.b454fc7c6de6222c6c3a1a4a@linux-foundation.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 14 Mar 2013 22:59:21 +0000
+Subject: [GIT PULL] Samsung fixes for v3.9
+In-Reply-To: <093101ce1fa8$840c52d0$8c24f870$%kim@samsung.com>
+References: <093101ce1fa8$840c52d0$8c24f870$%kim@samsung.com>
+Message-ID: <201303142259.21663.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 13 Mar 2013 22:02:16 +0100 Jan Kara <jack@suse.cz> wrote:
-
-> > > ... remembering why we need to get to sb and why ext3 needs this ... So
-> > > maybe a better solution would be to have a bio flag meaning that pages need
-> > > bouncing? And we would set it from filesystems that need it - in case of
-> > > ext3 only writeback of data from kjournald actually needs to bounce the
-> > > pages. Thoughts?
-> > 
-> > What about dirty pages that don't result in journal transactions?  I think
-> > ext3_sync_file() eventually calls ext3_ordered_writepage, which then calls
-> > __block_write_full_page, which in turn calls submit_bh().
->   So here we have two options:
-> Either we let ext3 wait the same way as other filesystems when stable pages
-> are required. Then only data IO from kjournald needs to be bounced (all
-> other IO is properly protected by PageWriteback bit).
+On Wednesday 13 March 2013, Kukjin Kim wrote:
+> Here is Samsung fixes for v3.9.
 > 
-> Or we won't let ext3 wait (as it is now), keep the superblock flag that fs
-> needs bouncing, and set the bio flag in __block_write_full_page() and
-> kjournald based on the sb flag.
+> Please pull from:
+> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> v3.9-samsung-fixes-1
 > 
-> I think the first option is slightly better but I don't feel strongly
-> about that.
+> There are two commits for fix pl330 dma clkdev entries on s5pv210 and generic
+> dma binding support on exynos stuff.
 
-It seems Just Wrong that we're dicking around with filesystem
-superblocks at this level.  It's the bounce code, for heavens sake!
+Pulled into the fixes branch, thanks!
 
-
-What the heck's going on here and why wasn't I able to work that out
-from reading the code :( The need to stabilise these pages is driven by
-the characteristics of the underlying device and driver stack, isn't
-it?  Things like checksumming?  What else drives this requirement? 
-</rant>
-
-Because I *think* it should be sufficient to maintain this boolean in
-the backing_dev.  My *guess* is that this is all here because we want
-to enable stable-snapshotting on a per-fs basis rather than on a
-per-device basis?  If so, why?  If not, what?
-
-
-
-btw, local variable `bdi' in must_snapshot_stable_pages() doesn't do
-anything.
-
-
-None of this will stop Shuge's kernel from going splat either.
+	Arnd
