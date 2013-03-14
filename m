@@ -1,72 +1,69 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Thu, 14 Mar 2013 13:50:39 +0800
-Subject: [PATCH 11/14] usb: pxa27x_udc: using common vbus_active
+Date: Thu, 14 Mar 2013 13:50:41 +0800
+Subject: [PATCH 13/14] usb: udc-core: small cleanup for udc->gadget
 In-Reply-To: <1363240242-25775-1-git-send-email-peter.chen@freescale.com>
 References: <1363240242-25775-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1363240242-25775-12-git-send-email-peter.chen@freescale.com>
+Message-ID: <1363240242-25775-14-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using common vbus_active to indicate vbus status
+:s/udc->gadget/gadget
 
-CC: Eric Miao <eric.y.miao@gmail.com>
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/gadget/pxa27x_udc.c |    8 ++++----
- drivers/usb/gadget/pxa27x_udc.h |    1 -
- 2 files changed, 4 insertions(+), 5 deletions(-)
+ drivers/usb/gadget/udc-core.c |   18 ++++++++++--------
+ 1 files changed, 10 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/usb/gadget/pxa27x_udc.c b/drivers/usb/gadget/pxa27x_udc.c
-index f7d2579..de997c5 100644
---- a/drivers/usb/gadget/pxa27x_udc.c
-+++ b/drivers/usb/gadget/pxa27x_udc.c
-@@ -1574,7 +1574,7 @@ static int should_enable_udc(struct pxa_udc *udc)
- 	int put_on;
- 
- 	put_on = ((udc->pullup_on) && (udc->driver));
--	put_on &= ((udc->vbus_sensed) || (IS_ERR_OR_NULL(udc->transceiver)));
-+	put_on &= ((udc->gadget.vbus_active) || (IS_ERR_OR_NULL(udc->transceiver)));
- 	return put_on;
- }
- 
-@@ -1595,7 +1595,7 @@ static int should_disable_udc(struct pxa_udc *udc)
- 	int put_off;
- 
- 	put_off = ((!udc->pullup_on) || (!udc->driver));
--	put_off |= ((!udc->vbus_sensed) && (!IS_ERR_OR_NULL(udc->transceiver)));
-+	put_off |= ((!udc->gadget.vbus_active) && (!IS_ERR_OR_NULL(udc->transceiver)));
- 	return put_off;
- }
- 
-@@ -1640,7 +1640,7 @@ static int pxa_udc_vbus_session(struct usb_gadget *_gadget, int is_active)
+diff --git a/drivers/usb/gadget/udc-core.c b/drivers/usb/gadget/udc-core.c
+index 2a9cd36..4d90bdf 100644
+--- a/drivers/usb/gadget/udc-core.c
++++ b/drivers/usb/gadget/udc-core.c
+@@ -262,6 +262,7 @@ EXPORT_SYMBOL_GPL(usb_del_gadget_udc);
+ static int udc_bind_to_driver(struct usb_udc *udc, struct usb_gadget_driver *driver)
  {
- 	struct pxa_udc *udc = to_gadget_udc(_gadget);
+ 	int ret;
++	struct usb_gadget *gadget = udc->gadget;
  
--	udc->vbus_sensed = is_active;
-+	_gadget->vbus_active = is_active;
- 	if (should_enable_udc(udc))
- 		udc_enable(udc);
- 	if (should_disable_udc(udc))
-@@ -2465,7 +2465,7 @@ static int __init pxa_udc_probe(struct platform_device *pdev)
- 	device_initialize(&udc->gadget.dev);
- 	udc->gadget.dev.parent = &pdev->dev;
- 	udc->gadget.dev.dma_mask = NULL;
--	udc->vbus_sensed = 0;
-+	udc->gadget.vbus_active = 0;
+ 	dev_dbg(&udc->dev, "registering UDC driver [%s]\n",
+ 			driver->function);
+@@ -269,15 +270,15 @@ static int udc_bind_to_driver(struct usb_udc *udc, struct usb_gadget_driver *dri
+ 	udc->driver = driver;
+ 	udc->dev.driver = &driver->driver;
  
- 	the_controller = udc;
- 	platform_set_drvdata(pdev, udc);
-diff --git a/drivers/usb/gadget/pxa27x_udc.h b/drivers/usb/gadget/pxa27x_udc.h
-index 28f2b53..184bf45 100644
---- a/drivers/usb/gadget/pxa27x_udc.h
-+++ b/drivers/usb/gadget/pxa27x_udc.h
-@@ -458,7 +458,6 @@ struct pxa_udc {
- 	unsigned				enabled:1;
- 	unsigned				pullup_on:1;
- 	unsigned				pullup_resume:1;
--	unsigned				vbus_sensed:1;
- 	unsigned				config:2;
- 	unsigned				last_interface:3;
- 	unsigned				last_alternate:3;
+-	ret = driver->bind(udc->gadget, driver);
++	ret = driver->bind(gadget, driver);
+ 	if (ret)
+ 		goto err1;
+-	ret = usb_gadget_udc_start(udc->gadget, driver);
++	ret = usb_gadget_udc_start(gadget, driver);
+ 	if (ret) {
+-		driver->unbind(udc->gadget);
++		driver->unbind(gadget);
+ 		goto err1;
+ 	}
+-	usb_gadget_connect(udc->gadget);
++	usb_gadget_connect(gadget);
+ 
+ 	kobject_uevent(&udc->dev.kobj, KOBJ_CHANGE);
+ 	return 0;
+@@ -379,13 +380,14 @@ static ssize_t usb_udc_softconn_store(struct device *dev,
+ 		struct device_attribute *attr, const char *buf, size_t n)
+ {
+ 	struct usb_udc		*udc = container_of(dev, struct usb_udc, dev);
++	struct usb_gadget *gadget = udc->gadget;
+ 
+ 	if (sysfs_streq(buf, "connect")) {
+-		usb_gadget_udc_start(udc->gadget, udc->driver);
+-		usb_gadget_connect(udc->gadget);
++		usb_gadget_udc_start(gadget, udc->driver);
++		usb_gadget_connect(gadget);
+ 	} else if (sysfs_streq(buf, "disconnect")) {
+-		usb_gadget_disconnect(udc->gadget);
+-		usb_gadget_udc_stop(udc->gadget, udc->driver);
++		usb_gadget_disconnect(gadget);
++		usb_gadget_udc_stop(gadget, udc->driver);
+ 	} else {
+ 		dev_err(dev, "unsupported command '%s'\n", buf);
+ 		return -EINVAL;
 -- 
 1.7.0.4
