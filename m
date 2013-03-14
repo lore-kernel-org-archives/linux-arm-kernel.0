@@ -1,32 +1,33 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 14 Mar 2013 16:14:20 +0000 (UTC)
-Subject: OMAP baseline test results for v3.9-rc1
-In-Reply-To: <20130312190030.GB8798@blackmetal.musicnaut.iki.fi>
-References: <alpine.DEB.2.00.1303121634080.2723@utopia.booyaka.com>
- <20130312190030.GB8798@blackmetal.musicnaut.iki.fi>
-Message-ID: <alpine.DEB.2.00.1303141558020.8075@utopia.booyaka.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Thu, 14 Mar 2013 10:22:36 -0600
+Subject: [PATCH V2] ARM: mvebu: fix RAM size for Armada XP board
+ DB-MV784MP-GP
+In-Reply-To: <1363276674-24172-1-git-send-email-jason@lakedaemon.net>
+References: <20130216164457.GA23237@titan.lakedaemon.net>
+ <1363276674-24172-1-git-send-email-jason@lakedaemon.net>
+Message-ID: <20130314162236.GA19701@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Aaro,
-
-On Tue, 12 Mar 2013, Aaro Koskinen wrote:
-
-> On Tue, Mar 12, 2013 at 04:40:19PM +0000, Paul Walmsley wrote:
-> > * 2420N800: powers down 30 seconds after boot
-> >   - Presumably due to missing CBUS patches for watchdog control
-> >   - http://lkml.org/lkml/2012/9/3/265
-> >   - http://marc.info/?l=linux-omap&m=135274739624125&w=2
-> >   - http://marc.info/?l=linux-omap&m=135664195831104&w=2
-> >   - Should be working in v3.9-rc1 when CONFIG_RETU_WATCHDOG=y ?
+On Thu, Mar 14, 2013 at 03:57:54PM +0000, Jason Cooper wrote:
+> The board is supplied with a 4GB RAM module.  This value can be
+> overridden by the bootloader based on probed memory size.  We set it to
+> a reasonable value here.
 > 
-> Yes, you need also CONFIG_I2C_CBUS_GPIO and CONFIG_MFD_RETU.
+> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+> Changes from v1:
+>  - grammatical fix suggested by Sergei Shtylyov
+>  - correct size suggested by several folks (within 32bit, 1 dword)
+> 
+> As promised, catching this fix in the -rc cycle.
+> 
+> For those not familiar, earlier versions of the patch adding this board listed
+> 3GB because that is all that was visible.  I mistaken applied v3 of the patch
+> instead of v4 which properly listed 4GB.  This patch cleans up my error.
 
-Just enabled these two, and finally the N800 doesn't power down!  Nice 
-work!  Amazing how exciting something like this can be :-)
+What happens when the kernel tries to treat 0xD0000000 and above as
+memory? Lots of internal register blocks overlap 0 -> 4GB - won't this
+cause resource conflicts on boot? I'm actually very surprised it boots
+at all - what does /proc/iomem say?
 
-This will be reflected in the v3.9-rc2 test log & the v3.9-rc1 log has now 
-been fixed on the web.
-
-
-- Paul
+Jason
