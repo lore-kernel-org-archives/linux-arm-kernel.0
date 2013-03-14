@@ -1,31 +1,96 @@
 From: avinashphilip@ti.com (Philip Avinash)
-Date: Thu, 14 Mar 2013 16:02:35 +0530
-Subject: [PATCH 0/3] Davinci support for EHRPWM & ECAP
-Message-ID: <1363257158-11615-1-git-send-email-avinashphilip@ti.com>
+Date: Thu, 14 Mar 2013 16:02:36 +0530
+Subject: [PATCH 1/3] pwm: davinci: Add Kconfig support for ECAP & EHRPWM
+ devices
+In-Reply-To: <1363257158-11615-1-git-send-email-avinashphilip@ti.com>
+References: <1363257158-11615-1-git-send-email-avinashphilip@ti.com>
+Message-ID: <1363257158-11615-2-git-send-email-avinashphilip@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series enables EHRPWM & ECAP driver support for da850
-platforms.
+Add EHRPWM and ECAP support build support for DAVINCI_DA850 platforms.
 
-This patch series based on [1] and is available at [2]. This has been tested
-backlight support using EHRPWM in da850-evm.
+Also, since DAVINCI platforms doesn't support TI-PWM-Subsystem module,
+remove the select option for CONFIG_PWM_TIPWMSS.
 
-[1] https://gitorious.org/linux-pwm/linux-pwm/trees/for-next
-[2] https://github.com/avinashphilip/am335x_linux/tree/davinci-for-v3.9_soc_pwm
+Also, update CONFIG_PWM_TIPWMSS compiler directive appropriately in
+pwm-tipwmss.h to fix the below compiler error upon removal of
+CONFIG_PWM_TIPWMSS for Davinci platforms.
 
-Philip Avinash (3):
-  pwm: davinci: Add Kconfig support for ECAP & EHRPWM devices
-  pwm: pwm-tiecap: Add device-tree binding support for da850 SOC
-  pwm: pwm-tiehrpwm: Add device tree binding support for da850 SOC
+	drivers/pwm/pwm-tiecap.c: In function 'ecap_pwm_probe':
+	drivers/pwm/pwm-tiecap.c:263:4: error: 'PWMSS_ECAPCLK_EN' undeclared
+	(first use in this function)
+	drivers/pwm/pwm-tiecap.c:263:4: note: each undeclared identifier
+	is reported only once for each function it appears in
+	drivers/pwm/pwm-tiecap.c:264:17: error: 'PWMSS_ECAPCLK_EN_ACK'
+	undeclared (first use in this function)
+	drivers/pwm/pwm-tiecap.c: In function 'ecap_pwm_remove':
+	drivers/pwm/pwm-tiecap.c:291:49: error: 'PWMSS_ECAPCLK_STOP_REQ'
+	undeclared (first use in this function)
+	make[2]: *** [drivers/pwm/pwm-tiecap.o] Error 1
+	make[1]: *** [drivers/pwm] Error 2
+	make: *** [drivers] Error 2
 
- .../devicetree/bindings/pwm/pwm-tiecap.txt         |    2 +-
- .../devicetree/bindings/pwm/pwm-tiehrpwm.txt       |    2 +-
- drivers/pwm/Kconfig                                |    8 +++-----
- drivers/pwm/pwm-tiecap.c                           |    1 +
- drivers/pwm/pwm-tiehrpwm.c                         |    1 +
- drivers/pwm/pwm-tipwmss.h                          |    2 +-
- 6 files changed, 8 insertions(+), 8 deletions(-)
+Signed-off-by: Philip Avinash <avinashphilip@ti.com>
+---
+:100644 100644 0e0bfa0... 897b53c... M	drivers/pwm/Kconfig
+:100644 100644 11f76a1... 10ad804... M	drivers/pwm/pwm-tipwmss.h
+ drivers/pwm/Kconfig       |    8 +++-----
+ drivers/pwm/pwm-tipwmss.h |    2 +-
+ 2 files changed, 4 insertions(+), 6 deletions(-)
 
+diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
+index 0e0bfa0..897b53c 100644
+--- a/drivers/pwm/Kconfig
++++ b/drivers/pwm/Kconfig
+@@ -147,8 +147,7 @@ config PWM_TEGRA
+ 
+ config  PWM_TIECAP
+ 	tristate "ECAP PWM support"
+-	depends on SOC_AM33XX
+-	select PWM_TIPWMSS
++	depends on SOC_AM33XX || ARCH_DAVINCI_DA850
+ 	help
+ 	  PWM driver support for the ECAP APWM controller found on AM33XX
+ 	  TI SOC
+@@ -158,8 +157,7 @@ config  PWM_TIECAP
+ 
+ config  PWM_TIEHRPWM
+ 	tristate "EHRPWM PWM support"
+-	depends on SOC_AM33XX
+-	select PWM_TIPWMSS
++	depends on SOC_AM33XX || ARCH_DAVINCI_DA850
+ 	help
+ 	  PWM driver support for the EHRPWM controller found on AM33XX
+ 	  TI SOC
+@@ -169,7 +167,7 @@ config  PWM_TIEHRPWM
+ 
+ config  PWM_TIPWMSS
+ 	bool
+-	depends on SOC_AM33XX && (PWM_TIEHRPWM || PWM_TIECAP)
++	default y if SOC_AM33XX && (PWM_TIECAP || PWM_TIEHRPWM)
+ 	help
+ 	  PWM Subsystem driver support for AM33xx SOC.
+ 
+diff --git a/drivers/pwm/pwm-tipwmss.h b/drivers/pwm/pwm-tipwmss.h
+index 11f76a1..10ad804 100644
+--- a/drivers/pwm/pwm-tipwmss.h
++++ b/drivers/pwm/pwm-tipwmss.h
+@@ -18,7 +18,6 @@
+ #ifndef __TIPWMSS_H
+ #define __TIPWMSS_H
+ 
+-#ifdef CONFIG_PWM_TIPWMSS
+ /* PWM substem clock gating */
+ #define PWMSS_ECAPCLK_EN	BIT(0)
+ #define PWMSS_ECAPCLK_STOP_REQ	BIT(1)
+@@ -28,6 +27,7 @@
+ #define PWMSS_ECAPCLK_EN_ACK	BIT(0)
+ #define PWMSS_EPWMCLK_EN_ACK	BIT(8)
+ 
++#ifdef CONFIG_PWM_TIPWMSS
+ extern u16 pwmss_submodule_state_change(struct device *dev, int set);
+ #else
+ static inline u16 pwmss_submodule_state_change(struct device *dev, int set)
 -- 
 1.7.9.5
