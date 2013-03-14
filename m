@@ -1,88 +1,87 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 14 Mar 2013 13:15:14 +0530
-Subject: [PATCH] ARM: smp: Allow real broadcast device selection instead
- of always dummy
-In-Reply-To: <20130313161811.GF13483@e106331-lin.cambridge.arm.com>
-References: <1363165608-13739-1-git-send-email-santosh.shilimkar@ti.com>
- <514046B6.9020005@ti.com>
- <20130313101641.GA13483@e106331-lin.cambridge.arm.com>
- <514061D1.20603@ti.com>
- <20130313122550.GD13483@e106331-lin.cambridge.arm.com>
- <51409EC3.5050905@ti.com>
- <20130313161811.GF13483@e106331-lin.cambridge.arm.com>
-Message-ID: <5141800A.2000307@ti.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Thu, 14 Mar 2013 16:44:08 +0900
+Subject: [PATCH 01/04] ARM: shmobile: Initial r8a73a4 SoC support
+In-Reply-To: <201303121225.40230.arnd@arndb.de>
+References: <20130312045559.19701.77841.sendpatchset@w520>
+ <20130312045609.19701.39029.sendpatchset@w520>
+ <201303121225.40230.arnd@arndb.de>
+Message-ID: <CANqRtoTSN=VBV1-dNMSM5aaMwHmmXe9Ow6pFK_AVzXKuOXkFEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 13 March 2013 09:48 PM, Mark Rutland wrote:
-> On Wed, Mar 13, 2013 at 03:44:03PM +0000, Santosh Shilimkar wrote:
->> On Wednesday 13 March 2013 05:55 PM, Mark Rutland wrote:
->>> On Wed, Mar 13, 2013 at 11:24:01AM +0000, Santosh Shilimkar wrote:
->>>> On Wednesday 13 March 2013 03:46 PM, Mark Rutland wrote:
->>>>> Hi Santosh,
->>
->> [..]
->>
->>>>>
->>>>> Is the problem that the dummy timer is being registered as the broadcast
->>>>> source, or that it is selected as a local timer in preference of real timers?
->>>>>
->>>> Dummy timer is preferred over real broadcast timer.
->>>
->>> Ok.
-> 
-> [...]
-> 
->>> I do agree it'd be worth lowering the dummy timer's rating to ensure it doesn't
->>> override a real timer elsewhere. 
->>>
->> Yep. Can I add you acked-by tag then for $subject patch ?
->> Would be good to get this one merged as well.
-> 
-> Sure. Though could you reword the commit message? The patch solves the more
-> general issue of a dummy being preferred over real hardware even outside of
-> choosing the broadcast device.
-> 
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
+Hi Arnd,
 
-Thanks. For record, patch is in end of the email which I plan
-to put into patch system.
+On Tue, Mar 12, 2013 at 9:25 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 12 March 2013, Magnus Damm wrote:
+>> +static struct platform_device *r8a73a4_devices[] __initdata = {
+>> +};
+>> +
+>> +void __init r8a73a4_add_standard_devices(void)
+>> +{
+>> +       r8a73a4_clock_init();
+>> +
+>> +       platform_add_devices(r8a73a4_devices, ARRAY_SIZE(r8a73a4_devices));
+>> +}
+>
+> I would suggest doing the platform_add_devices() only when you actually
+> add devices to the array, unless you have a number of conflicting patches
+> that each want to add their own devices.
 
-Regards,
-Santosh
+So you would prefer that I fold this portion into a patch later in the series?
 
->From 57c501bcdc88c7ff26a5c63956be07e94a5083c5 Mon Sep 17 00:00:00 2001
-From: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Date: Wed, 13 Mar 2013 12:33:16 +0530
-Subject: [PATCH 1/2] ARM: smp: Avoid dummy clockevent being preferred over real hardware clock-event
+>> +#ifdef CONFIG_USE_OF
+>> +void __init r8a73a4_add_standard_devices_dt(void)
+>> +{
+>> +       of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+>> +}
+>
+> I have a patch that will make this function definition the default, so you
+> no longer have to provide an init_machine callback if you don't do anything
+> special. It's ok to leave it in for now, but we might want to do a follow
+> up patch to remove it once both patches are merged.
 
-With recent arm broadcast time clean-up from Mark Rutland, the dummy
-broadcast device is always registered with timer subsystem. And since
-the rating of the dummy clock event is very high, it may be preferred
-over a real clock event.
+That's very nice! I am happy to hear that. Is that patch targeting v3.10?
 
-This is a change in behavior from past and not an intended
-one. So reduce the rating of the dummy clockevent so that
-real clockevent device is selected when available.
+>> +static const char *r8a73a4_boards_compat_dt[] __initdata = {
+>> +       "renesas,r8a73a4",
+>> +       NULL,
+>> +};
+>> +
+>> +DT_MACHINE_START(R8A73A4_DT, "Generic R8A73A4 (Flattened Device Tree)")
+>> +       .init_irq       = irqchip_init,
+>
+> Same thing for the default irqchip_init.
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- arch/arm/kernel/smp.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Excellent! I believe the easiest is to leave it as-is for now and have
+a clean-up series that can be merged late in the cycle after your
+patch is in. I am not sure if that fits with your way of dealing with
+the pull requests. At least that's how we used to do it for SH. If you
+have any suggestion when to remove it please let me know.
 
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 31644f1..79078ed 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -480,7 +480,7 @@ static void __cpuinit broadcast_timer_setup(struct clock_event_device *evt)
- 	evt->features	= CLOCK_EVT_FEAT_ONESHOT |
- 			  CLOCK_EVT_FEAT_PERIODIC |
- 			  CLOCK_EVT_FEAT_DUMMY;
--	evt->rating	= 400;
-+	evt->rating	= 100;
- 	evt->mult	= 1;
- 	evt->set_mode	= broadcast_timer_set_mode;
- 
--- 
-1.7.9.5
+>> +       .init_machine   = r8a73a4_add_standard_devices_dt,
+>> +       .init_time      = shmobile_timer_init,
+>> +       .dt_compat      = r8a73a4_boards_compat_dt,
+>
+> Have you looked into using clocksource_of_init() here? Since you are using
+> the ARM architected timers, I would expect that they soon will get probed
+> using that function, which means we have to be careful crossing patches
+> if someone wants to convert over all the existing users and you add a new one
+> here.
+
+Thanks for this suggestion. Right now we call shmobile_timer_init()
+that includes these calls:
+	arch_timer_of_register();
+	arch_timer_sched_clock_init();
+
+For SH and mach-shmobile we have our own timers in drivers/clocksource
+as platform regular devices. They export clock source and clock event
+interfaces. Today we simply use the regular driver model together with
+SoC code to register platform devices during SoC setup - this
+including timers but excluding the arch timer.
+
+I agree we need to find some way to make them work together with the
+ARM architected timer.
+
+Thanks,
+
+/ magnus
