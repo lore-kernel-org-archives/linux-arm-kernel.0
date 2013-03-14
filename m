@@ -1,47 +1,41 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 14 Mar 2013 17:20:54 +0400
-Subject: [PATCH 1/7] ARM: shmobile: marzen: add USB phy support
-In-Reply-To: <87k3pa4xpk.wl%kuninori.morimoto.gx@renesas.com>
-References: <1352446306-19945-1-git-send-email-horms@verge.net.au>
- <1352446306-19945-2-git-send-email-horms@verge.net.au>
- <5140FBB1.50401@mvista.com> <87k3pa4xpk.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <5141CEB6.2080803@cogentembedded.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 14 Mar 2013 13:26:21 +0000
+Subject: [PATCHv1 0/2] ARM: socfpga: Soft reset,
+ hotplug and device tree clocks
+In-Reply-To: <20130314110310.GA3384@amd.pavel.ucw.cz>
+References: <1363211722-27237-1-git-send-email-dinguyen@altera.com>
+ <5141220A.7050008@gmail.com> <20130314110310.GA3384@amd.pavel.ucw.cz>
+Message-ID: <201303141326.21347.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Thursday 14 March 2013, Pavel Machek wrote:
+> 
+> Hi!
+>  
+> > > Just 2 patches for mach-socfpga:
+> > > 
+> > > 0001: ARM: socfpga: Enable hotplug and soft reset
+> > >     - Able to hotplug CPU1 by putting it into reset and bringing back online.
+> > > 
+> > 
+> > Have you seen the discussion on PSCI? There's an ARM doc on it and
+> > Linaro session from last week. Is there a possibility you can use that?
+> > You would need to be able to run in non-secure mode and implement
+> > smc calls.
+> 
+> I tried googling PSCI, but got:
+> 
+> Power State Coordination Interface
+> System Software on ARM Processors
+> This document is only available in a PDF version to registered ARM
+> customers.
+> 
+> Do you have better pointer?
 
-On 14-03-2013 4:44, Kuninori Morimoto wrote:
+The easiest ist if you look at the kernel source at arch/arm/kernel/psci.c.
 
->>> +/* USB PHY */
->>> +static struct resource usb_phy_resources[] = {
->>> +	[0] = {
->>> +		.start		= 0xffe70000,
+I think the registration at ARM is free, but I agree it's annoying to
+force people to go through that.
 
->>      Why not 0xffe70800? 0xffe70000 is where the EHCI registers start.
->> I don't see why they should be overlapped like this.
-
-> Current rcar-phy try to access 0xffe7009x
-
-    That should be changed too IHO, as these registers are not really PHY 
-related, they control EHCI itself. These writes should be done somewhere in 
-setup-r8a7779.c probably.
-
->>> +	[1] = {
->>> +		.start		= 0xfff70000,
->>> +		.end		= 0xfff70900 - 1,
-
->>      Hm, this PHY register range doesn't seem to be documented?
-
-> 0xffe70000 is for port0/1
-> 0xfff70000 is for port2
-
-> But this 0xfff70000 is only for 0xfff7009x access
-
-    Yeah, I understood that it's only for the extra EHCI registers.
-
-> Best regards
-> ---
-> Kuninori Morimoto
-
-WBR, Sergei
+	Arnd
