@@ -1,33 +1,35 @@
-From: prakash.pm@ti.com (Manjunathappa, Prakash)
-Date: Thu, 14 Mar 2013 13:52:19 +0000
-Subject: [PATCH v5 0/4] Add DT support for davinci_mmc driver
-In-Reply-To: <5141BAA1.1070906@ti.com>
-References: <1363097637-11371-1-git-send-email-prakash.pm@ti.com>
- <5141BAA1.1070906@ti.com>
-Message-ID: <A73F36158E33644199EB82C5EC81C7BC3EA48F4D@DBDE01.ent.ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 14 Mar 2013 13:58:05 +0000
+Subject: [PATCH 10/10] drivers: misc: use module_platform_driver_probe()
+In-Reply-To: <1363266691-15757-12-git-send-email-fabio.porcedda@gmail.com>
+References: <1363266691-15757-1-git-send-email-fabio.porcedda@gmail.com>
+ <1363266691-15757-12-git-send-email-fabio.porcedda@gmail.com>
+Message-ID: <201303141358.05616.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 14, 2013 at 17:25:13, Nori, Sekhar wrote:
-> On 3/12/2013 7:43 PM, Manjunathappa, Prakash wrote:
-> > Patch set adds DT support for davinci_mmc driver and is
-> > verified on da850-evm without card_detect/write_protect and
-> > EDMA support. Also takecare to derive controller IP version from
-> > platform_device_id table, remove version specification in pdata.
-> > 
-> > Applies on top of below patch under community review:
-> > "Enable SPI flash support on da850-evm DT kernel"
-> > http://www.spinics.net/lists/arm-kernel/msg229328.html
-> > 
-> > Depends on patch waiting for acceptance:
-> > Patch "mmc: davinci: allow driver to work without DMA resource"
-> > http://www.mail-archive.com/linux-mmc at vger.kernel.org/msg18771.html
+On Thursday 14 March 2013, Fabio Porcedda wrote:
+> This patch converts the drivers to use the
+> module_platform_driver_probe() macro which makes the code smaller and
+> a bit simpler.
 > 
-> Since this patch did not get picked for v3.9, it may be worthwhile
-> rebasing it and adding to this series.
-> 
+> Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  drivers/misc/atmel_pwm.c  | 12 +-----------
+>  drivers/misc/ep93xx_pwm.c | 13 +------------
+>  2 files changed, 2 insertions(+), 23 deletions(-)
 
-Will do that.
+The patch itself seems fine, but there are two issues around it:
 
-Thanks,
-Prakash 
+* The PWM drivers should really get moved to drivers/pwm and converted to the new
+  PWM subsystem. I don't know if Hartley or Hans-Christian have plans to do
+  that already.
+
+* Regarding the use of module_platform_driver_probe, I'm a little worried about
+  the interactions with deferred probing. I don't think there are any regressions,
+  but we should probably make people aware that one cannot return -EPROBE_DEFER
+  from a platform_driver_probe function.
+
+	Arnd
