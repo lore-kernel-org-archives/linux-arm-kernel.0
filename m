@@ -1,36 +1,55 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Thu, 14 Mar 2013 12:03:10 +0100
-Subject: [PATCHv1 0/2] ARM: socfpga: Soft reset, hotplug and device
- tree clocks
-In-Reply-To: <5141220A.7050008@gmail.com>
-References: <1363211722-27237-1-git-send-email-dinguyen@altera.com>
- <5141220A.7050008@gmail.com>
-Message-ID: <20130314110310.GA3384@amd.pavel.ucw.cz>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 14 Mar 2013 16:38:09 +0530
+Subject: [PATCH v5 1/4] ARM: davinci: mmc: derive version information
+ from device name
+In-Reply-To: <1363097637-11371-2-git-send-email-prakash.pm@ti.com>
+References: <1363097637-11371-1-git-send-email-prakash.pm@ti.com>
+ <1363097637-11371-2-git-send-email-prakash.pm@ti.com>
+Message-ID: <5141AF99.5090608@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
- 
-> > Just 2 patches for mach-socfpga:
-> > 
-> > 0001: ARM: socfpga: Enable hotplug and soft reset
-> > 	- Able to hotplug CPU1 by putting it into reset and bringing back online.
-> > 
+Prakash,
+
+The series looks good to me. I tested it again on DA850 EVM (with and
+without DT).
+
+On 3/12/2013 7:43 PM, Manjunathappa, Prakash wrote:
+> Remove specifying mmc controller IP version information via platform
+> data, instead specify device name so that driver derives it from
+> platform_device_id table. Also change the clock node name to match
+> the changed dev_id.
+> Tested on da850-evm to make sure driver loads without clk_get failures.
 > 
-> Have you seen the discussion on PSCI? There's an ARM doc on it and
-> Linaro session from last week. Is there a possibility you can use that?
-> You would need to be able to run in non-secure mode and implement
-> smc calls.
+> Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
+> Reviewed-by: Sekhar Nori <nsekhar@ti.com>
+> ---
 
-I tried googling PSCI, but got:
+> diff --git a/drivers/mmc/host/davinci_mmc.c b/drivers/mmc/host/davinci_mmc.c
+> index 27123f8..50e9782 100644
+> --- a/drivers/mmc/host/davinci_mmc.c
+> +++ b/drivers/mmc/host/davinci_mmc.c
+> @@ -1157,6 +1157,18 @@ static void __init init_mmcsd_host(struct mmc_davinci_host *host)
+>  	mmc_davinci_reset_ctrl(host, 0);
+>  }
+>  
+> +static struct platform_device_id davinci_mmc_devtype[] = {
+> +	{
+> +		.name	= "davinci-mmc-dm355",
+> +		.driver_data = MMC_CTLR_VERSION_1,
+> +	}, {
+> +		.name	= "davinci-mmc-da830",
+> +		.driver_data = MMC_CTLR_VERSION_2,
+> +	},
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(platform, davinci_mmc_devtype);
 
-Power State Coordination Interface
-System Software on ARM Processors
-This document is only available in a PDF version to registered ARM
-customers.
+I should have mentioned this previously, but your choice of name here is
+too long. You can simply use dm355-mmc (rather dm6441-mmc?) and
+da830-mmc instead like you did for SPI. This would have saved some long
+lines. Sorry about not asking for this earlier. I know it would have
+saved you a bunch of effort.
 
-Do you have better pointer?
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Thanks,
+Sekhar
