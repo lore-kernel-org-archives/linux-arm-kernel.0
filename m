@@ -1,44 +1,88 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 14 Mar 2013 13:08:56 +0100
-Subject: [PATCH 1/7] ARM: i.MX: Add GPT devicetree Documentation
+Date: Thu, 14 Mar 2013 13:08:57 +0100
+Subject: [PATCH 2/7] ARM: i.MX27: Add GPT devicetree nodes
 In-Reply-To: <1363262942-26702-1-git-send-email-s.hauer@pengutronix.de>
 References: <1363262942-26702-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1363262942-26702-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1363262942-26702-3-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GPT binding is already used on i.MX6 and i.MX25, but not yet
-documented. Add a binding document for it.
+The GPT is the GPT timer found on i.MX SoCs.
+
+This adds the missing GPT devicetree nodes. Also fixup the watchdog
+register map size along the way. it's 0x1000, not 0x4000. This didn't
+hurt before as the region was not occupied by another device, but now
+overlaps with the GPT.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- Documentation/devicetree/bindings/timer/fsl,imxgpt.txt | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/timer/fsl,imxgpt.txt
+ arch/arm/boot/dts/imx27.dtsip | 37 ++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 36 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/timer/fsl,imxgpt.txt b/Documentation/devicetree/bindings/timer/fsl,imxgpt.txt
-new file mode 100644
-index 0000000..544890a
---- /dev/null
-+++ b/Documentation/devicetree/bindings/timer/fsl,imxgpt.txt
-@@ -0,0 +1,18 @@
-+Freescale i.MX GPT
+diff --git a/arch/arm/boot/dts/imx27.dtsip b/arch/arm/boot/dts/imx27.dtsip
+index 324130f..3e0585f 100644
+--- a/arch/arm/boot/dts/imx27.dtsip
++++ b/arch/arm/boot/dts/imx27.dtsip
+@@ -60,10 +60,28 @@
+ 
+ 			wdog: wdog at 10002000 {
+ 				compatible = "fsl,imx27-wdt", "fsl,imx21-wdt";
+-				reg = <0x10002000 0x4000>;
++				reg = <0x10002000 0x1000>;
+ 				interrupts = <27>;
+ 			};
+ 
++			gpt1: timer at 10003000 {
++				compatible = "fsl,imx27-gpt", "fsl,imx1-gpt";
++				reg = <0x10003000 0x1000>;
++				interrupts = <26>;
++			};
 +
-+Required properties:
++			gpt2: timer at 10004000 {
++				compatible = "fsl,imx27-gpt", "fsl,imx1-gpt";
++				reg = <0x10004000 0x1000>;
++				interrupts = <25>;
++			};
 +
-+- compatible : should be "fsl,<soc>-gpt"
-+- reg : Specifies base physical address and size of the registers.
-+- interrupts : A list of 4 interrupts; one per timer channel.
-+- clocks : The clocks provided by the SoC to drive the timer.
++			gpt3: timer at 10005000 {
++				compatible = "fsl,imx27-gpt", "fsl,imx1-gpt";
++				reg = <0x10005000 0x1000>;
++				interrupts = <24>;
++			};
 +
-+Example:
+ 			uart1: serial at 1000a000 {
+ 				compatible = "fsl,imx27-uart", "fsl,imx21-uart";
+ 				reg = <0x1000a000 0x1000>;
+@@ -188,6 +206,18 @@
+ 				status = "disabled";
+ 			};
+ 
++			gpt4: timer at 10019000 {
++				compatible = "fsl,imx27-gpt", "fsl,imx1-gpt";
++				reg = <0x10019000 0x1000>;
++				interrupts = <4>;
++			};
 +
-+gpt1: timer at 10003000 {
-+	compatible = "fsl,imx27-gpt", "fsl,imx1-gpt";
-+	reg = <0x10003000 0x1000>;
-+	interrupts = <26>;
-+	clocks = <&clks 46>, <&clks 61>;
-+	clock-names = "ipg", "per";
-+};
++			gpt5: timer at 1001a000 {
++				compatible = "fsl,imx27-gpt", "fsl,imx1-gpt";
++				reg = <0x1001a000 0x1000>;
++				interrupts = <3>;
++			};
++
+ 			uart5: serial at 1001b000 {
+ 				compatible = "fsl,imx27-uart", "fsl,imx21-uart";
+ 				reg = <0x1001b000 0x1000>;
+@@ -211,6 +241,11 @@
+ 				status = "disabled";
+ 			};
+ 
++			gpt6: timer at 1001f000 {
++				compatible = "fsl,imx27-gpt", "fsl,imx1-gpt";
++				reg = <0x1001f000 0x1000>;
++				interrupts = <2>;
++			};
+ 		};
+ 
+ 		aipi at 10020000 { /* AIPI2 */
 -- 
 1.8.2.rc2
