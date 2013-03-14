@@ -1,24 +1,40 @@
-From: timur@tabi.org (Timur Tabi)
-Date: Wed, 13 Mar 2013 17:55:24 -0500
-Subject: [PATCH 01/10] imx-ssi: Fix AC97 rates
-In-Reply-To: <20130311195108.GC18350@pengutronix.de>
-References: <1362940391-8338-1-git-send-email-mpa@pengutronix.de>
- <1362940391-8338-2-git-send-email-mpa@pengutronix.de>
- <CAOMZO5A8F81PzCjKHrkZ_AtGMr341d6OmYHMQvdzgunmGFDVsw@mail.gmail.com>
- <20130311195108.GC18350@pengutronix.de>
-Message-ID: <CAOZdJXXm=jJv3zyD4j11t3BgNGyKz6V9jzShQLTk-BTiwDjvMg@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 14 Mar 2013 03:10:20 +0300
+Subject: [PATCH 03/10] ARM: shmobile: r8a7779: add USB EHCI clock support
+In-Reply-To: <1352446165-19298-4-git-send-email-horms@verge.net.au>
+References: <1352446165-19298-1-git-send-email-horms@verge.net.au>
+ <1352446165-19298-4-git-send-email-horms@verge.net.au>
+Message-ID: <5141156C.4010909@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 11, 2013 at 2:51 PM, Markus Pargmann <mpa@pengutronix.de> wrote:
+Hello.
+
+On 11/09/2012 10:29 AM, Simon Horman wrote:
+
+> From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 >
-> At the moment fsl-ssi and imx-ssi don't seem to have very much in
-> common. However I could try to merge the imx-ssi driver code into
-> fsl_ssi and make it handle imx27-ssi differently.
+> ehci-platform driver require these clocks
+>
+> Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> Signed-off-by: Simon Horman <horms@verge.net.au>
+> ---
+>   arch/arm/mach-shmobile/clock-r8a7779.c |    5 +++++
+>   1 file changed, 5 insertions(+)
+>
+> diff --git a/arch/arm/mach-shmobile/clock-r8a7779.c b/arch/arm/mach-shmobile/clock-r8a7779.c
+> index 24f5a84..4ba4e3c 100644
+> --- a/arch/arm/mach-shmobile/clock-r8a7779.c
+> +++ b/arch/arm/mach-shmobile/clock-r8a7779.c
+[...]
+> @@ -153,6 +156,8 @@ static struct clk_lookup lookups[] = {
+>   	CLKDEV_CON_ID("peripheral_clk",	&div4_clks[DIV4_P]),
+>   
+>   	/* MSTP32 clocks */
+> +	CLKDEV_DEV_ID("ehci-platform.1", &mstp_clks[MSTP101]), /* USB EHCI port2 */
+> +	CLKDEV_DEV_ID("ehci-platform.0", &mstp_clks[MSTP100]), /* USB EHCI port0/1 */
 
-imx-ssi is the legacy driver that supports older, non-DT IMX platforms.
-fsl-ssi is the "new" driver that supports PowerPC and IMX DT-enabled platforms.
+    But how are those used? I don't see clk API support in ehci-platform.c.
+Are they used via runtime PM? I'm just not familiar enough with it...
 
--- 
-Timur Tabi
-Linux kernel developer at Freescale
+WBR, Sergei
