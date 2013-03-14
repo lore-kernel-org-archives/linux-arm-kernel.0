@@ -1,66 +1,73 @@
-From: avinashphilip@ti.com (Philip, Avinash)
-Date: Thu, 14 Mar 2013 12:54:08 +0000
-Subject: [PATCH 2/3] pwm: pwm-tiecap: Add device-tree binding support
- for da850 SOC
-In-Reply-To: <5141B7CC.7000700@ti.com>
-References: <1363257158-11615-1-git-send-email-avinashphilip@ti.com>
- <1363257158-11615-3-git-send-email-avinashphilip@ti.com>
- <5141B7CC.7000700@ti.com>
-Message-ID: <518397C60809E147AF5323E0420B992E3EA96FA1@DBDE01.ent.ti.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Thu, 14 Mar 2013 13:55:45 +0100
+Subject: [PATCH 07/10] ASoC: phycore-ac97: Add DT support
+In-Reply-To: <20130312185921.GX19942@opensource.wolfsonmicro.com>
+References: <1362940391-8338-1-git-send-email-mpa@pengutronix.de>
+ <1362940391-8338-8-git-send-email-mpa@pengutronix.de>
+ <20130312185921.GX19942@opensource.wolfsonmicro.com>
+Message-ID: <20130314125545.GD32452@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 14, 2013 at 17:13:08, Nori, Sekhar wrote:
-> On 3/14/2013 4:02 PM, Philip Avinash wrote:
-> > ECAP IP is used in da850 SOC's also. Hence adds ECAP device tree binding
-> > support for da850.
+On Tue, Mar 12, 2013 at 06:59:22PM +0000, Mark Brown wrote:
+> On Sun, Mar 10, 2013 at 07:33:08PM +0100, Markus Pargmann wrote:
+> > Add devicetree support for this audio soc fabric driver.
 > > 
-> > Cc: Grant Likely <grant.likely@secretlab.ca>
-> > Cc: Rob Herring <rob.herring@calxeda.com>
-> > Cc: Rob Landley <rob@landley.net>
-> > Signed-off-by: Philip Avinash <avinashphilip@ti.com>
+> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 > > ---
-> > :100644 100644 131e8c1... fcbd3c1... M	Documentation/devicetree/bindings/pwm/pwm-tiecap.txt
-> > :100644 100644 22e96e2... e0d96c8... M	drivers/pwm/pwm-tiecap.c
-> >  .../devicetree/bindings/pwm/pwm-tiecap.txt         |    2 +-
-> >  drivers/pwm/pwm-tiecap.c                           |    1 +
-> >  2 files changed, 2 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/pwm/pwm-tiecap.txt b/Documentation/devicetree/bindings/pwm/pwm-tiecap.txt
-> > index 131e8c1..fcbd3c1 100644
-> > --- a/Documentation/devicetree/bindings/pwm/pwm-tiecap.txt
-> > +++ b/Documentation/devicetree/bindings/pwm/pwm-tiecap.txt
-> > @@ -1,7 +1,7 @@
-> >  TI SOC ECAP based APWM controller
-> >  
-> >  Required properties:
-> > -- compatible: Must be "ti,am33xx-ecap"
-> > +- compatible: Must be "ti,am33xx-ecap" or "ti,da850-ecap"
-> >  - #pwm-cells: Should be 3. Number of cells being used to specify PWM property.
-> >    First cell specifies the per-chip index of the PWM to use, the second
-> >    cell is the period in nanoseconds and bit 0 in the third cell is used to
-> > diff --git a/drivers/pwm/pwm-tiecap.c b/drivers/pwm/pwm-tiecap.c
-> > index 22e96e2..e0d96c8 100644
-> > --- a/drivers/pwm/pwm-tiecap.c
-> > +++ b/drivers/pwm/pwm-tiecap.c
-> > @@ -197,6 +197,7 @@ static const struct pwm_ops ecap_pwm_ops = {
-> >  
-> >  static const struct of_device_id ecap_of_match[] = {
-> >  	{ .compatible	= "ti,am33xx-ecap" },
-> > +	{ .compatible	= "ti,da850-ecap" },
-> >  	{},
+> >  sound/soc/fsl/phycore-ac97.c | 148 ++++++++++++++++++++++++++++++++++++-------
+> >  1 file changed, 125 insertions(+), 23 deletions(-)
 > 
-> You add a new compatible, but don't really show any changes in driver in
-> this series. So why can't we simply use ti,am33xx-ecap on DA850 too?
-
-Ok it can happily live with ti,am33xx-ecap. Hence this patch and next [1]patch
-can be dropped.
-
-1. [PATCH 3/3] pwm: pwm-tiehrpwm: Add device tree binding support for da850 SOC
-
-Thanks
-Avinash
+> A binding document is mandatory for new bindings.
 > 
-> Thanks,
-> Sekhar
+> > +#ifdef CONFIG_MACH_IMX27_DT
+> > +		.cpu_dai_name	= "10010000.ssi",
+> > +		.platform_name	= "imx-fiq-pcm-audio",
+> > +#else
 > 
+> This looks wrong, at least the CPU DAI name should be being looked up
+> via the DT.
+
+Yes.
+
+> 
+> > +static const struct of_device_id imx_phycore_ac97_of_dev_id[] = {
+> > +	{
+> > +		.compatible = "phytec,imx27-pca100-ac97",
+> > +		.data = (void *)MX27_PCA100,
+> > +	}, {
+> > +		.compatible = "phytec,imx27-pcm043-ac97",
+> > +		.data = (void *)MX27_PCM043
+> > +	}, {
+> > +		/* sentinel */
+> > +	}
+> > +};
+> > +MODULE_DEVICE_TABLE(of, imx_phycore_ac97_of_dev_id);
+> 
+> It seems like we ought to be able to describe the properties of the
+> boards in this class rather than just enumerating the boards.  What are
+> the differences?
+
+All right I will change it. They are actually using different audmux
+port configuration.
+
+> 
+> >  MODULE_AUTHOR("Sascha Hauer <s.hauer@pengutronix.de>");
+> > -MODULE_DESCRIPTION("PhyCORE ALSA SoC driver");
+> > +MODULE_DESCRIPTION(DRV_NAME ": PhyCORE ALSA SoC fabric driver");
+> 
+> Please don't make up terms like "fabric driver".
+
+I didn't make it up. There are actually other drivers with that name,
+like "mpc5200 pcm030 fabric driver" or "mpc5200 Efika fabric driver"
+which actually do the same as this one.
+
+Regards,
+
+Markus
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
