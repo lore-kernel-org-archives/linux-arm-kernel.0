@@ -1,9 +1,9 @@
 From: fabio.porcedda@gmail.com (Fabio Porcedda)
-Date: Thu, 14 Mar 2013 14:11:26 +0100
-Subject: [PATCH 05/10] drivers: ide: use module_platform_driver_probe()
+Date: Thu, 14 Mar 2013 14:11:24 +0100
+Subject: [PATCH 03/10] drivers: char: use module_platform_driver_probe()
 In-Reply-To: <1363266691-15757-1-git-send-email-fabio.porcedda@gmail.com>
 References: <1363266691-15757-1-git-send-email-fabio.porcedda@gmail.com>
-Message-ID: <1363266691-15757-7-git-send-email-fabio.porcedda@gmail.com>
+Message-ID: <1363266691-15757-5-git-send-email-fabio.porcedda@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,87 +13,62 @@ a bit simpler.
 
 Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
 Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: "David S. Miller" <davem@davemloft.net>
-Cc: linux-ide at vger.kernel.org
+Cc: Matt Mackall <mpm@selenic.com>
+Cc: Herbert Xu <herbert@gondor.apana.org.au>
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/ide/gayle.c     | 15 +--------------
- drivers/ide/tx4938ide.c | 13 +------------
- drivers/ide/tx4939ide.c | 13 +------------
- 3 files changed, 3 insertions(+), 38 deletions(-)
+ drivers/char/hw_random/mxc-rnga.c   | 13 +------------
+ drivers/char/hw_random/tx4939-rng.c | 13 +------------
+ 2 files changed, 2 insertions(+), 24 deletions(-)
 
-diff --git a/drivers/ide/gayle.c b/drivers/ide/gayle.c
-index 51beb85..0a8440a 100644
---- a/drivers/ide/gayle.c
-+++ b/drivers/ide/gayle.c
-@@ -183,20 +183,7 @@ static struct platform_driver amiga_gayle_ide_driver = {
- 	},
+diff --git a/drivers/char/hw_random/mxc-rnga.c b/drivers/char/hw_random/mxc-rnga.c
+index f05d857..895d0b8 100644
+--- a/drivers/char/hw_random/mxc-rnga.c
++++ b/drivers/char/hw_random/mxc-rnga.c
+@@ -228,18 +228,7 @@ static struct platform_driver mxc_rnga_driver = {
+ 	.remove = __exit_p(mxc_rnga_remove),
  };
  
--static int __init amiga_gayle_ide_init(void)
+-static int __init mod_init(void)
 -{
--	return platform_driver_probe(&amiga_gayle_ide_driver,
--				     amiga_gayle_ide_probe);
+-	return platform_driver_probe(&mxc_rnga_driver, mxc_rnga_probe);
 -}
 -
--module_init(amiga_gayle_ide_init);
--
--static void __exit amiga_gayle_ide_exit(void)
+-static void __exit mod_exit(void)
 -{
--	platform_driver_unregister(&amiga_gayle_ide_driver);
+-	platform_driver_unregister(&mxc_rnga_driver);
 -}
 -
--module_exit(amiga_gayle_ide_exit);
-+module_platform_driver_probe(amiga_gayle_ide_driver, amiga_gayle_ide_probe);
+-module_init(mod_init);
+-module_exit(mod_exit);
++module_platform_driver_probe(mxc_rnga_driver, mxc_rnga_probe);
  
- MODULE_LICENSE("GPL");
- MODULE_ALIAS("platform:amiga-gayle-ide");
-diff --git a/drivers/ide/tx4938ide.c b/drivers/ide/tx4938ide.c
-index 91d49dd..ede8575 100644
---- a/drivers/ide/tx4938ide.c
-+++ b/drivers/ide/tx4938ide.c
-@@ -203,18 +203,7 @@ static struct platform_driver tx4938ide_driver = {
- 	.remove = __exit_p(tx4938ide_remove),
+ MODULE_AUTHOR("Freescale Semiconductor, Inc.");
+ MODULE_DESCRIPTION("H/W RNGA driver for i.MX");
+diff --git a/drivers/char/hw_random/tx4939-rng.c b/drivers/char/hw_random/tx4939-rng.c
+index 3099198..d34a24a 100644
+--- a/drivers/char/hw_random/tx4939-rng.c
++++ b/drivers/char/hw_random/tx4939-rng.c
+@@ -166,18 +166,7 @@ static struct platform_driver tx4939_rng_driver = {
+ 	.remove = tx4939_rng_remove,
  };
  
--static int __init tx4938ide_init(void)
+-static int __init tx4939rng_init(void)
 -{
--	return platform_driver_probe(&tx4938ide_driver, tx4938ide_probe);
+-	return platform_driver_probe(&tx4939_rng_driver, tx4939_rng_probe);
 -}
 -
--static void __exit tx4938ide_exit(void)
+-static void __exit tx4939rng_exit(void)
 -{
--	platform_driver_unregister(&tx4938ide_driver);
+-	platform_driver_unregister(&tx4939_rng_driver);
 -}
 -
--module_init(tx4938ide_init);
--module_exit(tx4938ide_exit);
-+module_platform_driver_probe(tx4938ide_driver, tx4938ide_probe);
+-module_init(tx4939rng_init);
+-module_exit(tx4939rng_exit);
++module_platform_driver_probe(tx4939_rng_driver, tx4939_rng_probe);
  
- MODULE_DESCRIPTION("TX4938 internal IDE driver");
- MODULE_LICENSE("GPL");
-diff --git a/drivers/ide/tx4939ide.c b/drivers/ide/tx4939ide.c
-index c0ab800..4ecdee5 100644
---- a/drivers/ide/tx4939ide.c
-+++ b/drivers/ide/tx4939ide.c
-@@ -624,18 +624,7 @@ static struct platform_driver tx4939ide_driver = {
- 	.resume = tx4939ide_resume,
- };
- 
--static int __init tx4939ide_init(void)
--{
--	return platform_driver_probe(&tx4939ide_driver, tx4939ide_probe);
--}
--
--static void __exit tx4939ide_exit(void)
--{
--	platform_driver_unregister(&tx4939ide_driver);
--}
--
--module_init(tx4939ide_init);
--module_exit(tx4939ide_exit);
-+module_platform_driver_probe(tx4939ide_driver, tx4939ide_probe);
- 
- MODULE_DESCRIPTION("TX4939 internal IDE driver");
+ MODULE_DESCRIPTION("H/W Random Number Generator (RNG) driver for TX4939");
  MODULE_LICENSE("GPL");
 -- 
 1.8.1.5
