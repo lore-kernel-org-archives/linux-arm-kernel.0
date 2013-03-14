@@ -1,38 +1,101 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 13 Mar 2013 22:56:25 -0600
-Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
-In-Reply-To: <20130313213344.GA29402@avionic-0098.mockup.avionic-design.de>
-References: <20130312070852.GA6727@avionic-0098.mockup.avionic-design.de>
- <20130312155749.GA1820@obsidianresearch.com>
- <20130312203819.GA23221@avionic-0098.mockup.avionic-design.de>
- <20130312210328.GA22702@obsidianresearch.com>
- <20130312213006.GA23717@avionic-0098.mockup.avionic-design.de>
- <20130312220854.GA23112@obsidianresearch.com>
- <20130313081815.GD25940@avionic-0098.mockup.avionic-design.de>
- <20130313170205.GB24042@obsidianresearch.com>
- <20130313192628.GA28714@avionic-0098.mockup.avionic-design.de>
- <5140E85A.3040900@firmworks.com>
- <20130313213344.GA29402@avionic-0098.mockup.avionic-design.de>
-Message-ID: <51415879.5080902@wwwdotorg.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 14 Mar 2013 05:14:21 +0000
+Subject: [PATCH v2 1/1] ARM: LPAE: Fix mapping in alloc_init_pte for
+ unaligned addresses.
+In-Reply-To: <CAJ7qFScGw8oA9y7gjoUTp6xCoLnQti2OXuVqCMrxJUeHDSRENA@mail.gmail.com>
+References: <1344238885-13683-1-git-send-email-r.sricharan@ti.com>
+ <CAJ7qFSeoyVGie__3mJ8=edeEf7Jh7TQY8vcWgGdOtWVXa8TU0Q@mail.gmail.com>
+ <CAJ7qFScGw8oA9y7gjoUTp6xCoLnQti2OXuVqCMrxJUeHDSRENA@mail.gmail.com>
+Message-ID: <CAHkRjk7tensn15DLqsaWbnZ-dfu0VdGQcL=Ha5hybz0SCM8E4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/13/2013 03:33 PM, Thierry Reding wrote:
-> On Wed, Mar 13, 2013 at 10:58:02AM -1000, Mitch Bradley wrote: 
-> [...]
->> In this case, the answer to "what does pcie_controller do?" is
->> "it implements a PCI bus" below.  So 'device_type = "pci"' is
->> appropriate.
-> 
-> Alright, that's 2 against 1. I don't have much of a choice but to
-> yield.
+(sorry for if you got this message twice, gmail's new reply method
+decided to send html)
 
-Just one note here though re: how the Tegra HW works:
+On 18 September 2012 12:52, R, Sricharan <r.sricharan@ti.com> wrote:
+> Hi,
+> On Fri, Aug 17, 2012 at 4:32 PM, R, Sricharan <r.sricharan@ti.com> wrote:
+>> Hi,
+>>
+>>> With LPAE, When either the start address or end address
+>>> or physical address to be mapped is unaligned,
+>>> alloc_init_section creates page granularity mappings.
+>>> alloc_init_section calls alloc_init_pte which populates
+>>> one pmd entry and sets up the ptes. But if the size is
+>>> greater than what can be mapped by one pmd entry,
+>>> then the rest remains unmapped.
+>>>
+>>> The issue becomes visible when LPAE is enabled, where we have
+>>> the 3 levels with seperate pgd and pmd's.
+>>> When a static mapping for 3MB is requested, only 2MB is mapped
+>>> and the remaining 1MB is unmapped. Fixing this here, by looping
+>>> in to map the entire unaligned address range.
+>>>
+>>> Boot tested on OMAP5 evm with both LPAE enabled/disabled
+>>> and verified that static mappings with unaligned addresses
+>>> are properly mapped.
+>>>
+>>> Signed-off-by: R Sricharan <r.sricharan@ti.com>
+>>> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>>> ---
+>>> [V2] Moved the loop to alloc_init_pte as per Russell's
+>>>      feedback and changed the subject accordingly.
+>>>      Using PMD_XXX instead of SECTION_XXX to avoid
+>>>      different loop increments with/without LPAE.
+>>>
+>>>  arch/arm/mm/mmu.c |   22 ++++++++++++++++++----
+>>>  1 file changed, 18 insertions(+), 4 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+>>> index cf4528d..0ed8808 100644
+>>> --- a/arch/arm/mm/mmu.c
+>>> +++ b/arch/arm/mm/mmu.c
+>>> @@ -585,11 +585,25 @@ static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
+>>>                                   unsigned long end, unsigned long pfn,
+>>>                                   const struct mem_type *type)
+>>>  {
+>>> -       pte_t *pte = early_pte_alloc(pmd, addr, type->prot_l1);
+>>> +       unsigned long next;
+>>> +       pte_t *pte;
+>>> +       phys_addr_t phys;
+>>> +
+>>>         do {
+>>> -               set_pte_ext(pte, pfn_pte(pfn, __pgprot(type->prot_pte)), 0);
+>>> -               pfn++;
+>>> -       } while (pte++, addr += PAGE_SIZE, addr != end);
+>>> +               if ((end-addr) & PMD_MASK)
+>>> +                       next = (addr + PMD_SIZE) & PMD_MASK;
+>>> +               else
+>>> +                       next = end;
+>>> +
+>>> +               pte = early_pte_alloc(pmd, addr, type->prot_l1);
+>>> +               do {
+>>> +                       set_pte_ext(pte, pfn_pte(pfn,
+>>> +                                       __pgprot(type->prot_pte)), 0);
+>>> +                       pfn++;
+>>> +               } while (pte++, addr += PAGE_SIZE, addr != next);
+>>> +
+>>> +               phys += next - addr;
+>>> +       } while (pmd++, addr = next, addr != end);
+>>>  }
+>>>
+>>   ping..
+>
+>   Ping again.
+>   The issue is reproducible in mainline with CMA + LPAE enabled.
+>   CMA tries to reserve/map 16 MB with 2 level table entries and
+>    crashes in alloc_init_pte.
+>
+>   This patch fixes that. Just posted a V3 of the same patch.
+>
+>          https://patchwork.kernel.org/patch/1472031/
 
-The Tegra "PCIe controller" HW translates from a SoC-internal bus to
-another SoC-internal bus. The "PCIe root ports" translate from that
-second SoC-internal bus to a PCIe bus. That's exactly why the PCIe
-root port configuration registers don't show up via type 0 PCIe
-configuration transactions. Thus, from a HW perspective, it really is
-true that the PCIe root ports are PCI devices, but the "PCIe
-controller" really isn't anything to do with PCIe.
+I thought there was another patch where the looping was in an
+alloc_init_pmd() function, or there are just two different threads. I
+acked the other but not this one as I don't think looping over pmd
+inside the alloc_init_pte() function is the right thing.
+
+-- 
+Catalin
