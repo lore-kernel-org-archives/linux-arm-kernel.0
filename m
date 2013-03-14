@@ -1,41 +1,58 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Thu, 14 Mar 2013 11:46:36 +0800
-Subject: [Suggestion] Latest randconfig build errors for CONFIG_MMU=no
-In-Reply-To: <514147A0.2060002@asianux.com>
-References: <514147A0.2060002@asianux.com>
-Message-ID: <5141481C.7050002@asianux.com>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Thu, 14 Mar 2013 09:28:51 +0530
+Subject: [PATCH V6] ARM: LPAE: Fix mapping in alloc_init_section for
+ unaligned addresses
+In-Reply-To: <51261288.5030806@ti.com>
+References: <1360574009-12429-1-git-send-email-r.sricharan@ti.com>
+ <20130211131230.GA5676@MacBook-Pro.local> <5118F796.3080308@ti.com>
+ <51261288.5030806@ti.com>
+Message-ID: <51414AFB.9080403@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thursday 21 February 2013 05:56 PM, R Sricharan wrote:
+> Hi,
+> On Monday 11 February 2013 07:22 PM, R Sricharan wrote:
+>> Hi Russell,
+>>
+>> On Monday 11 February 2013 06:42 PM, Catalin Marinas wrote:
+>>> On Mon, Feb 11, 2013 at 09:13:29AM +0000, R Sricharan wrote:
+>>>> +static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
+>>>> +                      unsigned long end, phys_addr_t phys,
+>>>> +                      const struct mem_type *type)
+>>>> +{
+>>>> +    pmd_t *pmd = pmd_offset(pud, addr);
+>>>> +    unsigned long next;
+>>>> +
+>>>> +    do {
+>>>>           /*
+>>>> -         * No need to loop; pte's aren't interested in the
+>>>> -         * individual L1 entries.
+>>>> +         * With LPAE, we must loop over to map
+>>>> +         * all the pmds for the given range.
+>>>>            */
+>>>> -        alloc_init_pte(pmd, addr, end, __phys_to_pfn(phys), type);
+>>>> -    }
+>>>> +        next = pmd_addr_end(addr, end);
+>>>> +
+>>>> +        /*
+>>>> +         * Try a section mapping - end, addr and phys must all be
+>>>> +         * aligned to a section boundary.
+>>>> +         */
+>>>
+>>> Should this read "next, addr and phys" instead of "end..."?
+>>>
+>>> Otherwise:
+>>>
+>>> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+>>>
+>>   Can I put this in to patch system ?
+>
+>    Ping..
+>
+> Regards,
+>  Sricharan
+ Ping again..
 
-also has additional information (maybe useful):
-
-  arch/arm/kernel/entry-armv.S:404:2: ???#warning "NPTL on non MMU needs fixing" [-Wcpp]
-  arch/arm/kernel/entry-armv.S:867:2: ???#warning "NPTL on non MMU needs fixing" [-Wcpp]
-  arch/arm/kernel/entry-armv.S:940:2: ???#warning "NPTL on non MMU needs fixing" [-Wcpp]
-
-
-? 2013?03?14? 11:44, Chen Gang ??:
-> Hello Maintainers:
-> 
->   when use randconfig:
->     make V=1 EXTRA_CFLAGS=-W ARCH=arm randconfig
->       (and "grep CONFIG_MMU .config" outputs "# CONFIG_MMU is not set")
-> 
->   the error information:
->     arch/arm/kernel/suspend.c: ????cpu_suspend??:
->     arch/arm/kernel/suspend.c:56:32: ???????????????
->     arch/arm/kernel/suspend.c:70:3: ??????????cpu_switch_mm? [-Werror=implicit-function-declaration]
->     arch/arm/kernel/suspend.c:71:3: ??????????local_flush_bp_all? [-Werror=implicit-function-declaration]
->     arch/arm/kernel/suspend.c:72:3: ??????????local_flush_tlb_all? [-Werror=implicit-function-declaration]
-> 
->   I want to be sure whether we can bear it ?
-> 
->   thanks.
-> 
-
-
--- 
-Chen Gang
-
-Asianux Corporation
+Regards,
+ Sricharan
