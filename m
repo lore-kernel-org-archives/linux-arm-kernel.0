@@ -1,64 +1,67 @@
-From: gautamvivek1987@gmail.com (Vivek Gautam)
-Date: Thu, 14 Mar 2013 11:52:51 +0530
-Subject: [PATCH] ARM: dts: add usb 2.0 clock references to exynos5250
- device tree
-In-Reply-To: <1363195099-15919-1-git-send-email-dianders@chromium.org>
-References: <1363195099-15919-1-git-send-email-dianders@chromium.org>
-Message-ID: <CAFp+6iEV+C_nGtMhCUQX-M4T3Ac2i8QeAhkGC1wxrCBTAJrNYw@mail.gmail.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Thu, 14 Mar 2013 15:59:11 +0900
+Subject: [PATCH 03/04] ARM: shmobile: r8a73a4 IRQC support
+In-Reply-To: <201303121231.29869.arnd@arndb.de>
+References: <20130312045559.19701.77841.sendpatchset@w520>
+ <20130312045628.19701.58216.sendpatchset@w520>
+ <201303121231.29869.arnd@arndb.de>
+Message-ID: <CANqRtoSok=0CuLyMGD8-SoKezX54WfacnNnx8FhxCJzs_ggcXg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Doug,
+Hi Arnd,
 
+Thanks for your feedback, please see below for my reply.
 
-On Wed, Mar 13, 2013 at 10:48 PM, Doug Anderson <dianders@chromium.org> wrote:
-> This is a fixup to two device tree nodes that have already landed but
-> without clock nodes since the transition to common clock happened at
-> the same time.
+On Tue, Mar 12, 2013 at 9:31 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 12 March 2013, Magnus Damm wrote:
+>> From: Magnus Damm <damm@opensource.se>
+>>
+>> Add IRQC interrupt controller support to r8a73a4 by
+>> hooking up two IRQC instances to handle 58 external
+>> IRQ signals. There IRQC controllers are tied to SPIs
+>> of the GIC. On r8a73a4 exact IRQ pin routing is handled
+>> by the PFC which is excluded from this patch.
+>>
+>> Both platform devices and DT devices are added in this
+>> patch. The platform device versions are used to provide
+>> a static interrupt map configuration for board code
+>> written in C.
+>>
+>> Signed-off-by: Magnus Damm <damm@opensource.se>
 >
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
-> ---
->  arch/arm/boot/dts/exynos5250.dtsi | 6 ++++++
->  1 file changed, 6 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-> index 24c52e6..59be603 100644
-> --- a/arch/arm/boot/dts/exynos5250.dtsi
-> +++ b/arch/arm/boot/dts/exynos5250.dtsi
-> @@ -402,12 +402,18 @@
->                 compatible = "samsung,exynos4210-ehci";
->                 reg = <0x12110000 0x100>;
->                 interrupts = <0 71 0>;
-> +
-> +               clocks = <&clock 285>;
-> +               clock-names = "usbhost";
->         };
->
->         usb at 12120000 {
->                 compatible = "samsung,exynos4210-ohci";
->                 reg = <0x12120000 0x100>;
->                 interrupts = <0 71 0>;
-> +
-> +               clocks = <&clock 285>;
-> +               clock-names = "usbhost";
+> What is the status of the IRQC DT support? I remember that I wasn't
+> happy with a prior version, but I did not follow up on some of the
+> questions that came up, sorry about that.
 
-It will be nice if you can please update relevant information
-alongwith this, in the bindings doc for "exynos-usb".
+Uhm, perhaps I misunderstand, but I wonder if you refer to INTC instead of IRQC?
 
->         };
->
->         amba {
-> --
-> 1.8.1.3
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+This particular driver is for the IRQC hardware block. It is not
+compatible with INTC. A while ago I posted an incremental DT support
+patch for IRQC -  "[PATCH] irqchip: irqc: Add DT support", please see
+https://lkml.org/lkml/2013/3/6/50
 
+> Did the patches end up getting merged anyway, or should we resume the
+> discussion about those patches? I understand that lack of INTC bindings
+> would make new SoC support particularly hard, and I don't want to
+> be responsible for holding you up here.
 
+Thanks. I don't think the INTC patches went anywhere.
 
--- 
-Thanks & Regards
-Vivek
+To zoom out a bit let me list different interrupt controllers:
+
+A) INTC (drivers/sh/intc) [no DT yet]
+B) GIC (drivers/irqchip/irq-gic.c) [DT]
+C) INTC External IRQ Pin (drivers/irqchip/irq-renesas-intc-irqpin.c) [DT]
+D) IRQC (drivers/irqchip/irq-renesas-irqc.c) [DT]
+
+Simple use cases are:
+- Legacy SH SoCs or ARM SoCs with Cortex-A8 or older make use of A).
+- More recent ARM SoCs with Cortex-A9 or newer use B) and C) or B) and D).
+
+On top of this we now and then have GPIO controllers that have
+built-in interrupt controllers.
+
+Hope this helps,
+
+/ magnus
