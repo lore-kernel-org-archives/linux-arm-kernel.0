@@ -1,29 +1,38 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Wed, 13 Mar 2013 17:57:08 -0700 (PDT)
-Subject: [PATCH 03/10] ARM: shmobile: r8a7779: add USB EHCI clock support
-In-Reply-To: <5141156C.4010909@cogentembedded.com>
-References: <1352446165-19298-1-git-send-email-horms@verge.net.au>
- <1352446165-19298-4-git-send-email-horms@verge.net.au>
- <5141156C.4010909@cogentembedded.com>
-Message-ID: <87hake4x3y.wl%kuninori.morimoto.gx@renesas.com>
+From: agraf@suse.de (Alexander Graf)
+Date: Thu, 14 Mar 2013 01:59:02 +0100
+Subject: [PATCH 3/3] ARM: EXYNOS5250: Register architected timers
+In-Reply-To: <1363222742-15220-1-git-send-email-agraf@suse.de>
+References: <1363222742-15220-1-git-send-email-agraf@suse.de>
+Message-ID: <1363222742-15220-4-git-send-email-agraf@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+When running on an exynos 5250 SoC, we don't initialize the architected
+timers. The chip however supports architected timers.
 
-Hi Sergei
+When we don't initialize them, KVM will try to access them and run into
+NULL pointer dereferences attempting to do so.
 
-> >   	/* MSTP32 clocks */
-> > +	CLKDEV_DEV_ID("ehci-platform.1", &mstp_clks[MSTP101]), /* USB EHCI port2 */
-> > +	CLKDEV_DEV_ID("ehci-platform.0", &mstp_clks[MSTP100]), /* USB EHCI port0/1 */
-> 
->     But how are those used? I don't see clk API support in ehci-platform.c.
-> Are they used via runtime PM? I'm just not familiar enough with it...
+This patch is really more of a hack than a real fix, but does get me
+working with KVM on Arndale.
 
-Yes exactry
-
-    - board-marzen.c :: usb_power_on()
-    - clock-r8a7779.c :: mstp_clks[]
-
-Best regards
+Signed-off-by: Alexander Graf <agraf@suse.de>
 ---
-Kuninori Morimoto
+ arch/arm/mach-exynos/mct.c |    4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm/mach-exynos/mct.c b/arch/arm/mach-exynos/mct.c
+index c9d6650..eefb8af 100644
+--- a/arch/arm/mach-exynos/mct.c
++++ b/arch/arm/mach-exynos/mct.c
+@@ -482,4 +482,8 @@ void __init exynos4_timer_init(void)
+ 	exynos4_timer_resources();
+ 	exynos4_clocksource_init();
+ 	exynos4_clockevent_init();
++
++	if (soc_is_exynos5250()) {
++		arch_timer_of_register();
++	}
+ }
+-- 
+1.7.10.4
