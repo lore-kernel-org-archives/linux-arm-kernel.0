@@ -1,46 +1,41 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 14 Mar 2013 13:08:58 +0100
-Subject: [PATCH 3/7] ARM: i.MX31: Add GPT devicetree node
-In-Reply-To: <1363262942-26702-1-git-send-email-s.hauer@pengutronix.de>
-References: <1363262942-26702-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1363262942-26702-4-git-send-email-s.hauer@pengutronix.de>
+Date: Thu, 14 Mar 2013 13:08:55 +0100
+Subject: [PATCH] i.MX: Add GPT devicetree nodes
+Message-ID: <1363262942-26702-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GPT is the GPT timer found on i.MX SoCs.
+The GPT is the general purpose timer found on i.MX SoCs. The bindings
+are used on i.MX25 and i.MX6 already. The remaining i.MX SoCs still
+use a platform based timer. This is a first step to change this: We
+add the devicetree nodes for the other DT enabled SoCs (i.MX27, i.MX31,
+i.MX51 and i.MX53).
 
-Since this is the first user of the AIPS2 this patch also adds it.
+This series also adds the missing binding documentation for the GPT.
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/boot/dts/imx31.dtsip | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+The series is based on Shawns imx/dt branch.
 
-diff --git a/arch/arm/boot/dts/imx31.dtsip b/arch/arm/boot/dts/imx31.dtsip
-index aa488ac..c544925 100644
---- a/arch/arm/boot/dts/imx31.dtsip
-+++ b/arch/arm/boot/dts/imx31.dtsip
-@@ -101,5 +101,21 @@
- 				#clock-cells = <1>;
- 			};
- 		};
-+
-+		aips at 53f00000 { /* AIPS2 */
-+			compatible = "fsl,aips-bus", "simple-bus";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			reg = <0x53f00000 0x100000>;
-+			ranges;
-+
-+			gpt: timer at 53f90000 {
-+				compatible = "fsl,imx31-gpt";
-+				reg = <0x53f90000 0x4000>;
-+				interrupts = <29>;
-+				clocks = <&clks 10>, <&clks 22>;
-+				clock-names = "ipg", "per";
-+			};
-+		};
- 	};
- };
--- 
-1.8.2.rc2
+The last patch adds the clocks to the i.MX27 GPT. This is not applicable
+right now since it depends on the patch changing i.MX27 to devicetree
+based clock lookups.
+
+Sascga
+
+----------------------------------------------------------------
+Sascha Hauer (7):
+      ARM: i.MX: Add GPT devicetree Documentation
+      ARM: i.MX27: Add GPT devicetree nodes
+      ARM: i.MX31: Add GPT devicetree node
+      ARM: i.MX51: Add GPT devicetree node
+      ARM: i.MX53: Add GPT devicetree node
+      ARM: i.MX6: Add clocks to GPT devicetree node
+      ARM: i.MX27: Add clocks to GPT devicetree nodes
+
+ .../devicetree/bindings/timer/fsl,imxgpt.txt       | 18 ++++++++
+ arch/arm/boot/dts/imx27.dtsip                      | 49 +++++++++++++++++++++-
+ arch/arm/boot/dts/imx31.dtsip                      | 16 +++++++
+ arch/arm/boot/dts/imx51.dtsip                      |  8 ++++
+ arch/arm/boot/dts/imx53.dtsip                      |  8 ++++
+ arch/arm/boot/dts/imx6qdl.dtsip                    |  2 +
+ 6 files changed, 100 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/timer/fsl,imxgpt.txt
