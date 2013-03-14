@@ -1,1719 +1,1800 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 Mar 2013 23:12:54 +0100
-Subject: [PATCH 2/6] ARM: gemini: remove platform support
+Date: Thu, 14 Mar 2013 23:12:57 +0100
+Subject: [PATCH 5/6] ARM: kill Hynix h720x platform
 In-Reply-To: <1363299178-8241-1-git-send-email-arnd@arndb.de>
 References: <1363299178-8241-1-git-send-email-arnd@arndb.de>
-Message-ID: <1363299178-8241-3-git-send-email-arnd@arndb.de>
+Message-ID: <1363299178-8241-6-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The gemini platform has not seen any updates from its
-maintainer since 2010, and has no defconfig file, which
-has lead to bitrot in a number of places:
-
-* System restart has been broken for a long time despite
-  repeated attempts from Russell to get the obvious
-  fix at least acknowledged by someone who can test it.
-* The platform still uses mach/gpio.h, which has been
-  deprecated for some time, and since Kconfig does not
-  select NEED_MACH_GPIO_H, it actually failed to build
-  because of this.
-* A change to asm/io.h introduced a number of compiler
-  warnings for gemini specific code that confuses
-  physical and virtual addresses.
-
-This removes gemini support entirely under the assumption
-that nobody uses it on mainline kernels. Of course, if
-there are still active users out there, they should let
-us know so we can put support back in and get it better
-tested.
+The platform was merged about 10 years ago, and has seen few updates
+for most of the time since. The people that merged the code seem
+no longer interested in it either, so let's remove it now.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Robert Schwebel <r.schwebel@pengutronix.de>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- MAINTAINERS                                     |   7 -
- arch/arm/Kconfig                                |  11 -
- arch/arm/Makefile                               |   1 -
- arch/arm/mach-gemini/Kconfig                    |  40 ----
- arch/arm/mach-gemini/Makefile                   |  13 --
- arch/arm/mach-gemini/Makefile.boot              |   9 -
- arch/arm/mach-gemini/board-nas4220b.c           | 107 ---------
- arch/arm/mach-gemini/board-rut1xx.c             |  92 --------
- arch/arm/mach-gemini/board-wbd111.c             | 134 ------------
- arch/arm/mach-gemini/board-wbd222.c             | 134 ------------
- arch/arm/mach-gemini/common.h                   |  31 ---
- arch/arm/mach-gemini/devices.c                  | 118 ----------
- arch/arm/mach-gemini/gpio.c                     | 231 --------------------
- arch/arm/mach-gemini/idle.c                     |  29 ---
- arch/arm/mach-gemini/include/mach/debug-macro.S |  21 --
- arch/arm/mach-gemini/include/mach/entry-macro.S |  33 ---
- arch/arm/mach-gemini/include/mach/global_reg.h  | 278 ------------------------
- arch/arm/mach-gemini/include/mach/gpio.h        |  20 --
- arch/arm/mach-gemini/include/mach/hardware.h    |  74 -------
- arch/arm/mach-gemini/include/mach/irqs.h        |  53 -----
- arch/arm/mach-gemini/include/mach/timex.h       |  13 --
- arch/arm/mach-gemini/include/mach/uncompress.h  |  42 ----
- arch/arm/mach-gemini/irq.c                      | 103 ---------
- arch/arm/mach-gemini/mm.c                       |  82 -------
- arch/arm/mach-gemini/reset.c                    |  23 --
- arch/arm/mach-gemini/time.c                     |  89 --------
- 26 files changed, 1788 deletions(-)
- delete mode 100644 arch/arm/mach-gemini/Kconfig
- delete mode 100644 arch/arm/mach-gemini/Makefile
- delete mode 100644 arch/arm/mach-gemini/Makefile.boot
- delete mode 100644 arch/arm/mach-gemini/board-nas4220b.c
- delete mode 100644 arch/arm/mach-gemini/board-rut1xx.c
- delete mode 100644 arch/arm/mach-gemini/board-wbd111.c
- delete mode 100644 arch/arm/mach-gemini/board-wbd222.c
- delete mode 100644 arch/arm/mach-gemini/common.h
- delete mode 100644 arch/arm/mach-gemini/devices.c
- delete mode 100644 arch/arm/mach-gemini/gpio.c
- delete mode 100644 arch/arm/mach-gemini/idle.c
- delete mode 100644 arch/arm/mach-gemini/include/mach/debug-macro.S
- delete mode 100644 arch/arm/mach-gemini/include/mach/entry-macro.S
- delete mode 100644 arch/arm/mach-gemini/include/mach/global_reg.h
- delete mode 100644 arch/arm/mach-gemini/include/mach/gpio.h
- delete mode 100644 arch/arm/mach-gemini/include/mach/hardware.h
- delete mode 100644 arch/arm/mach-gemini/include/mach/irqs.h
- delete mode 100644 arch/arm/mach-gemini/include/mach/timex.h
- delete mode 100644 arch/arm/mach-gemini/include/mach/uncompress.h
- delete mode 100644 arch/arm/mach-gemini/irq.c
- delete mode 100644 arch/arm/mach-gemini/mm.c
- delete mode 100644 arch/arm/mach-gemini/reset.c
- delete mode 100644 arch/arm/mach-gemini/time.c
+ arch/arm/Kconfig                               |  10 -
+ arch/arm/Makefile                              |   1 -
+ arch/arm/configs/h7201_defconfig               |  27 ---
+ arch/arm/configs/h7202_defconfig               |  47 -----
+ arch/arm/mach-h720x/Kconfig                    |  40 ----
+ arch/arm/mach-h720x/Makefile                   |  16 --
+ arch/arm/mach-h720x/Makefile.boot              |   2 -
+ arch/arm/mach-h720x/common.c                   | 268 -------------------------
+ arch/arm/mach-h720x/common.h                   |  30 ---
+ arch/arm/mach-h720x/cpu-h7201.c                |  57 ------
+ arch/arm/mach-h720x/cpu-h7202.c                | 225 ---------------------
+ arch/arm/mach-h720x/h7201-eval.c               |  38 ----
+ arch/arm/mach-h720x/h7202-eval.c               |  81 --------
+ arch/arm/mach-h720x/include/mach/boards.h      |  53 -----
+ arch/arm/mach-h720x/include/mach/debug-macro.S |  40 ----
+ arch/arm/mach-h720x/include/mach/entry-macro.S |  57 ------
+ arch/arm/mach-h720x/include/mach/h7201-regs.h  |  67 -------
+ arch/arm/mach-h720x/include/mach/h7202-regs.h  | 155 --------------
+ arch/arm/mach-h720x/include/mach/hardware.h    | 190 ------------------
+ arch/arm/mach-h720x/include/mach/irqs.h        | 116 -----------
+ arch/arm/mach-h720x/include/mach/isa-dma.h     |  19 --
+ arch/arm/mach-h720x/include/mach/timex.h       |  15 --
+ arch/arm/mach-h720x/include/mach/uncompress.h  |  36 ----
+ 23 files changed, 1590 deletions(-)
+ delete mode 100644 arch/arm/configs/h7201_defconfig
+ delete mode 100644 arch/arm/configs/h7202_defconfig
+ delete mode 100644 arch/arm/mach-h720x/Kconfig
+ delete mode 100644 arch/arm/mach-h720x/Makefile
+ delete mode 100644 arch/arm/mach-h720x/Makefile.boot
+ delete mode 100644 arch/arm/mach-h720x/common.c
+ delete mode 100644 arch/arm/mach-h720x/common.h
+ delete mode 100644 arch/arm/mach-h720x/cpu-h7201.c
+ delete mode 100644 arch/arm/mach-h720x/cpu-h7202.c
+ delete mode 100644 arch/arm/mach-h720x/h7201-eval.c
+ delete mode 100644 arch/arm/mach-h720x/h7202-eval.c
+ delete mode 100644 arch/arm/mach-h720x/include/mach/boards.h
+ delete mode 100644 arch/arm/mach-h720x/include/mach/debug-macro.S
+ delete mode 100644 arch/arm/mach-h720x/include/mach/entry-macro.S
+ delete mode 100644 arch/arm/mach-h720x/include/mach/h7201-regs.h
+ delete mode 100644 arch/arm/mach-h720x/include/mach/h7202-regs.h
+ delete mode 100644 arch/arm/mach-h720x/include/mach/hardware.h
+ delete mode 100644 arch/arm/mach-h720x/include/mach/irqs.h
+ delete mode 100644 arch/arm/mach-h720x/include/mach/isa-dma.h
+ delete mode 100644 arch/arm/mach-h720x/include/mach/timex.h
+ delete mode 100644 arch/arm/mach-h720x/include/mach/uncompress.h
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 9561658..4b59496 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -785,13 +785,6 @@ ARM/CORGI MACHINE SUPPORT
- M:	Richard Purdie <rpurdie@rpsys.net>
- S:	Maintained
- 
--ARM/CORTINA SYSTEMS GEMINI ARM ARCHITECTURE
--M:	Hans Ulli Kroll <ulli.kroll@googlemail.com>
--L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
--T:	git git://git.berlios.de/gemini-board
--S:	Maintained
--F:	arch/arm/mach-gemini/
--
- ARM/CSR SIRFPRIMA2 MACHINE SUPPORT
- M:	Barry Song <baohua.song@csr.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
 diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 78f31a3..b62699a 100644
+index 9d2e825..26e9251 100644
 --- a/arch/arm/Kconfig
 +++ b/arch/arm/Kconfig
-@@ -407,15 +407,6 @@ config ARCH_CLPS711X
+@@ -485,14 +485,6 @@ config ARCH_NETX
  	help
- 	  Support for Cirrus Logic 711x/721x/731x based boards.
+ 	  This enables support for systems based on the Hilscher NetX Soc
  
--config ARCH_GEMINI
--	bool "Cortina Systems Gemini"
--	select ARCH_REQUIRE_GPIOLIB
+-config ARCH_H720X
+-	bool "Hynix HMS720x-based"
 -	select ARCH_USES_GETTIMEOFFSET
--	select NEED_MACH_GPIO_H
--	select CPU_FA526
+-	select CPU_ARM720T
+-	select ISA_DMA_API
 -	help
--	  Support for the Cortina Systems Gemini family SoCs
+-	  This enables support for systems based on the Hynix HMS720x
 -
- config ARCH_SIRF
- 	bool "CSR SiRF"
- 	select ARCH_REQUIRE_GPIOLIB
-@@ -1050,8 +1041,6 @@ source "arch/arm/mach-ep93xx/Kconfig"
+ config ARCH_IOP13XX
+ 	bool "IOP13xx-based"
+ 	depends on MMU
+@@ -1041,8 +1033,6 @@ source "arch/arm/mach-ep93xx/Kconfig"
  
  source "arch/arm/mach-footbridge/Kconfig"
  
--source "arch/arm/mach-gemini/Kconfig"
+-source "arch/arm/mach-h720x/Kconfig"
 -
- source "arch/arm/mach-h720x/Kconfig"
- 
  source "arch/arm/mach-highbank/Kconfig"
+ 
+ source "arch/arm/mach-integrator/Kconfig"
 diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index ee4605f..50e755b 100644
+index b514a0a..5f4576d 100644
 --- a/arch/arm/Makefile
 +++ b/arch/arm/Makefile
-@@ -146,7 +146,6 @@ machine-$(CONFIG_ARCH_DAVINCI)		+= davinci
+@@ -145,7 +145,6 @@ machine-$(CONFIG_ARCH_DAVINCI)		+= davinci
  machine-$(CONFIG_ARCH_DOVE)		+= dove
  machine-$(CONFIG_ARCH_EBSA110)		+= ebsa110
  machine-$(CONFIG_ARCH_EP93XX)		+= ep93xx
--machine-$(CONFIG_ARCH_GEMINI)		+= gemini
- machine-$(CONFIG_ARCH_H720X)		+= h720x
+-machine-$(CONFIG_ARCH_H720X)		+= h720x
  machine-$(CONFIG_ARCH_HIGHBANK)		+= highbank
  machine-$(CONFIG_ARCH_INTEGRATOR)	+= integrator
-diff --git a/arch/arm/mach-gemini/Kconfig b/arch/arm/mach-gemini/Kconfig
+ machine-$(CONFIG_ARCH_IOP13XX)		+= iop13xx
+diff --git a/arch/arm/configs/h7201_defconfig b/arch/arm/configs/h7201_defconfig
 deleted file mode 100644
-index 6f066ee..0000000
---- a/arch/arm/mach-gemini/Kconfig
+index bee94d2..0000000
+--- a/arch/arm/configs/h7201_defconfig
++++ /dev/null
+@@ -1,27 +0,0 @@
+-CONFIG_EXPERIMENTAL=y
+-CONFIG_SYSVIPC=y
+-CONFIG_LOG_BUF_SHIFT=14
+-CONFIG_BLK_DEV_INITRD=y
+-CONFIG_MODULES=y
+-CONFIG_ARCH_H720X=y
+-CONFIG_ARCH_H7201=y
+-CONFIG_ZBOOT_ROM_TEXT=0x0
+-CONFIG_ZBOOT_ROM_BSS=0x0
+-CONFIG_FPE_NWFPE=y
+-CONFIG_MTD=y
+-CONFIG_MTD_DEBUG=y
+-CONFIG_MTD_PARTITIONS=y
+-CONFIG_MTD_CHAR=y
+-CONFIG_MTD_BLOCK=y
+-CONFIG_MTD_CFI=y
+-CONFIG_MTD_CFI_ADV_OPTIONS=y
+-CONFIG_MTD_CFI_INTELEXT=y
+-CONFIG_BLK_DEV_RAM=y
+-CONFIG_BLK_DEV_RAM_SIZE=8192
+-# CONFIG_INPUT_KEYBOARD is not set
+-# CONFIG_INPUT_MOUSE is not set
+-# CONFIG_VGA_CONSOLE is not set
+-CONFIG_SOUND=m
+-CONFIG_EXT2_FS=y
+-CONFIG_JFFS2_FS=y
+-CONFIG_DEBUG_USER=y
+diff --git a/arch/arm/configs/h7202_defconfig b/arch/arm/configs/h7202_defconfig
+deleted file mode 100644
+index e16d3f3..0000000
+--- a/arch/arm/configs/h7202_defconfig
++++ /dev/null
+@@ -1,47 +0,0 @@
+-CONFIG_EXPERIMENTAL=y
+-CONFIG_SYSVIPC=y
+-CONFIG_LOG_BUF_SHIFT=14
+-CONFIG_MODULES=y
+-CONFIG_ARCH_H720X=y
+-CONFIG_ARCH_H7202=y
+-# CONFIG_ARM_THUMB is not set
+-CONFIG_ZBOOT_ROM_TEXT=0x0
+-CONFIG_ZBOOT_ROM_BSS=0x0
+-CONFIG_CMDLINE="console=ttyS0,19200"
+-CONFIG_FPE_NWFPE=y
+-CONFIG_FPE_NWFPE_XP=y
+-CONFIG_NET=y
+-CONFIG_UNIX=y
+-CONFIG_INET=y
+-CONFIG_IP_PNP=y
+-CONFIG_IP_PNP_BOOTP=y
+-# CONFIG_IPV6 is not set
+-CONFIG_MTD=y
+-CONFIG_MTD_PARTITIONS=y
+-CONFIG_MTD_CMDLINE_PARTS=y
+-CONFIG_MTD_CHAR=y
+-CONFIG_MTD_BLOCK=y
+-CONFIG_MTD_CFI=y
+-CONFIG_MTD_CFI_INTELEXT=y
+-CONFIG_MTD_H720X=y
+-CONFIG_NETDEVICES=y
+-CONFIG_NET_ETHERNET=y
+-CONFIG_SERIAL_8250=y
+-CONFIG_SERIAL_8250_CONSOLE=y
+-CONFIG_FB=y
+-CONFIG_FB_MODE_HELPERS=y
+-# CONFIG_VGA_CONSOLE is not set
+-CONFIG_USB_GADGET=m
+-CONFIG_USB_ZERO=m
+-CONFIG_USB_GADGETFS=m
+-CONFIG_USB_MASS_STORAGE=m
+-CONFIG_USB_G_SERIAL=m
+-CONFIG_EXT2_FS=y
+-CONFIG_TMPFS=y
+-CONFIG_JFFS2_FS=y
+-CONFIG_NFS_FS=y
+-CONFIG_NFS_V3=y
+-CONFIG_MAGIC_SYSRQ=y
+-CONFIG_DEBUG_KERNEL=y
+-CONFIG_DEBUG_INFO=y
+-CONFIG_DEBUG_USER=y
+diff --git a/arch/arm/mach-h720x/Kconfig b/arch/arm/mach-h720x/Kconfig
+deleted file mode 100644
+index 6bb755b..0000000
+--- a/arch/arm/mach-h720x/Kconfig
 +++ /dev/null
 @@ -1,40 +0,0 @@
--if ARCH_GEMINI
+-if ARCH_H720X
 -
--menu "Cortina Systems Gemini Implementations"
+-menu "h720x Implementations"
 -
--config MACH_NAS4220B
--	bool "Raidsonic NAS-4220-B"
--	select GEMINI_MEM_SWAP
+-config ARCH_H7201
+-	bool "gms30c7201"
+-	depends on ARCH_H720X
+-	select CPU_H7201
+-	select ZONE_DMA
 -	help
--	  Say Y here if you intend to run this kernel on a
--	  Raidsonic NAS-4220-B.
+-	  Say Y here if you are using the Hynix GMS30C7201 Reference Board
 -
--config MACH_RUT100
--	bool "Teltonika RUT100"
--	select GEMINI_MEM_SWAP
+-config ARCH_H7202
+-	bool "hms30c7202"
+-	depends on ARCH_H720X
+-	select CPU_H7202
+-	select ZONE_DMA
 -	help
--	  Say Y here if you intend to run this kernel on a
--	  Teltonika 3G Router RUT100.
--
--config MACH_WBD111
--	bool "Wiliboard WBD-111"
--	select GEMINI_MEM_SWAP
--	help
--	  Say Y here if you intend to run this kernel on a
--	  Wiliboard WBD-111.
--
--config MACH_WBD222
--        bool "Wiliboard WBD-222"
--        select GEMINI_MEM_SWAP
--        help
--          Say Y here if you intend to run this kernel on a
--          Wiliboard WBD-222.
+-	  Say Y here if you are using the Hynix HMS30C7202 Reference Board
 -
 -endmenu
 -
--config GEMINI_MEM_SWAP
--	bool "Gemini memory is swapped"
+-config CPU_H7201
+-	bool
 -	help
--	  Say Y here if Gemini memory is swapped by bootloader.
+-	  Select code specific to h7201 variants
+-
+-config CPU_H7202
+-	bool
+-	help
+-	  Select code specific to h7202 variants
+-config H7202_SERIAL23
+-	depends on CPU_H7202
+-	bool "Use serial ports 2+3"
+-	help
+-	  Say Y here if you wish to use serial ports 2+3. They share their
+-	  pins with the keyboard matrix controller, so you have to decide.
+-
 -
 -endif
-diff --git a/arch/arm/mach-gemini/Makefile b/arch/arm/mach-gemini/Makefile
+diff --git a/arch/arm/mach-h720x/Makefile b/arch/arm/mach-h720x/Makefile
 deleted file mode 100644
-index 7963a77..0000000
---- a/arch/arm/mach-gemini/Makefile
+index e4cf728..0000000
+--- a/arch/arm/mach-h720x/Makefile
 +++ /dev/null
-@@ -1,13 +0,0 @@
+@@ -1,16 +0,0 @@
 -#
 -# Makefile for the linux kernel.
 -#
 -
--# Object file lists.
+-# Common support
+-obj-y := common.o
+-obj-m :=
+-obj-n :=
+-obj-  :=
 -
--obj-y			:= irq.o mm.o time.o devices.o gpio.o idle.o reset.o
+-# Specific board support
 -
--# Board-specific support
--obj-$(CONFIG_MACH_NAS4220B)	+= board-nas4220b.o
--obj-$(CONFIG_MACH_RUT100)	+= board-rut1xx.o
--obj-$(CONFIG_MACH_WBD111)	+= board-wbd111.o
--obj-$(CONFIG_MACH_WBD222)	+= board-wbd222.o
-diff --git a/arch/arm/mach-gemini/Makefile.boot b/arch/arm/mach-gemini/Makefile.boot
+-obj-$(CONFIG_ARCH_H7201)		+= h7201-eval.o
+-obj-$(CONFIG_ARCH_H7202)		+= h7202-eval.o
+-obj-$(CONFIG_CPU_H7201) 		+= cpu-h7201.o
+-obj-$(CONFIG_CPU_H7202) 		+= cpu-h7202.o
+diff --git a/arch/arm/mach-h720x/Makefile.boot b/arch/arm/mach-h720x/Makefile.boot
 deleted file mode 100644
-index 683f52b..0000000
---- a/arch/arm/mach-gemini/Makefile.boot
+index d875a70..0000000
+--- a/arch/arm/mach-h720x/Makefile.boot
 +++ /dev/null
-@@ -1,9 +0,0 @@
--ifeq ($(CONFIG_GEMINI_MEM_SWAP),y)
--   zreladdr-y	+= 0x00008000
--params_phys-y	:= 0x00000100
--initrd_phys-y	:= 0x00800000
--else
--   zreladdr-y	+= 0x10008000
--params_phys-y	:= 0x10000100
--initrd_phys-y	:= 0x10800000
--endif
-diff --git a/arch/arm/mach-gemini/board-nas4220b.c b/arch/arm/mach-gemini/board-nas4220b.c
+@@ -1,2 +0,0 @@
+-   zreladdr-$(CONFIG_ARCH_H720X)	+= 0x40008000
+-
+diff --git a/arch/arm/mach-h720x/common.c b/arch/arm/mach-h720x/common.c
 deleted file mode 100644
-index ca8a25b..0000000
---- a/arch/arm/mach-gemini/board-nas4220b.c
+index 17ef91f..0000000
+--- a/arch/arm/mach-h720x/common.c
 +++ /dev/null
-@@ -1,107 +0,0 @@
+@@ -1,268 +0,0 @@
 -/*
-- *  Support for Raidsonic NAS-4220-B
+- * linux/arch/arm/mach-h720x/common.c
 - *
-- *  Copyright (C) 2009 Janos Laube <janos.dev@gmail.com>
+- * Copyright (C) 2003 Thomas Gleixner <tglx@linutronix.de>
+- *               2003 Robert Schwebel <r.schwebel@pengutronix.de>
+- *               2004 Sascha Hauer    <s.hauer@pengutronix.de>
 - *
-- * based on rut1xx.c
-- *  Copyright (C) 2008 Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- */
--
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/platform_device.h>
--#include <linux/leds.h>
--#include <linux/input.h>
--#include <linux/gpio_keys.h>
--#include <linux/mdio-gpio.h>
--#include <linux/io.h>
--
--#include <asm/setup.h>
--#include <asm/mach-types.h>
--#include <asm/mach/arch.h>
--#include <asm/mach/time.h>
--
--#include <mach/hardware.h>
--#include <mach/global_reg.h>
--
--#include "common.h"
--
--static struct gpio_led ib4220b_leds[] = {
--	{
--		.name			= "nas4220b:orange:hdd",
--		.default_trigger	= "none",
--		.gpio			= 60,
--	},
--	{
--		.name			= "nas4220b:green:os",
--		.default_trigger	= "heartbeat",
--		.gpio			= 62,
--	},
--};
--
--static struct gpio_led_platform_data ib4220b_leds_data = {
--	.num_leds	= ARRAY_SIZE(ib4220b_leds),
--	.leds		= ib4220b_leds,
--};
--
--static struct platform_device ib4220b_led_device = {
--	.name	= "leds-gpio",
--	.id	= -1,
--	.dev	= {
--		.platform_data = &ib4220b_leds_data,
--	},
--};
--
--static struct gpio_keys_button ib4220b_keys[] = {
--	{
--		.code		= KEY_SETUP,
--		.gpio		= 61,
--		.active_low	= 1,
--		.desc		= "Backup Button",
--		.type		= EV_KEY,
--	},
--	{
--		.code		= KEY_RESTART,
--		.gpio		= 63,
--		.active_low	= 1,
--		.desc		= "Softreset Button",
--		.type		= EV_KEY,
--	},
--};
--
--static struct gpio_keys_platform_data ib4220b_keys_data = {
--	.buttons	= ib4220b_keys,
--	.nbuttons	= ARRAY_SIZE(ib4220b_keys),
--};
--
--static struct platform_device ib4220b_key_device = {
--	.name	= "gpio-keys",
--	.id	= -1,
--	.dev	= {
--		.platform_data = &ib4220b_keys_data,
--	},
--};
--
--static void __init ib4220b_init(void)
--{
--	gemini_gpio_init();
--	platform_register_uart();
--	platform_register_pflash(SZ_16M, NULL, 0);
--	platform_device_register(&ib4220b_led_device);
--	platform_device_register(&ib4220b_key_device);
--	platform_register_rtc();
--}
--
--MACHINE_START(NAS4220B, "Raidsonic NAS IB-4220-B")
--	.atag_offset	= 0x100,
--	.map_io		= gemini_map_io,
--	.init_irq	= gemini_init_irq,
--	.init_time	= gemini_timer_init,
--	.init_machine	= ib4220b_init,
--	.restart	= gemini_restart,
--MACHINE_END
-diff --git a/arch/arm/mach-gemini/board-rut1xx.c b/arch/arm/mach-gemini/board-rut1xx.c
-deleted file mode 100644
-index 7a675f8..0000000
---- a/arch/arm/mach-gemini/board-rut1xx.c
-+++ /dev/null
-@@ -1,92 +0,0 @@
--/*
-- *  Support for Teltonika RUT1xx
-- *
-- *  Copyright (C) 2008-2009 Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- */
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/platform_device.h>
--#include <linux/leds.h>
--#include <linux/input.h>
--#include <linux/gpio_keys.h>
--#include <linux/sizes.h>
--
--#include <asm/mach-types.h>
--#include <asm/mach/arch.h>
--#include <asm/mach/time.h>
--
--#include "common.h"
--
--static struct gpio_keys_button rut1xx_keys[] = {
--	{
--		.code		= KEY_SETUP,
--		.gpio		= 60,
--		.active_low	= 1,
--		.desc		= "Reset to defaults",
--		.type		= EV_KEY,
--	},
--};
--
--static struct gpio_keys_platform_data rut1xx_keys_data = {
--	.buttons	= rut1xx_keys,
--	.nbuttons	= ARRAY_SIZE(rut1xx_keys),
--};
--
--static struct platform_device rut1xx_keys_device = {
--	.name	= "gpio-keys",
--	.id	= -1,
--	.dev	= {
--		.platform_data = &rut1xx_keys_data,
--	},
--};
--
--static struct gpio_led rut100_leds[] = {
--	{
--		.name			= "Power",
--		.default_trigger	= "heartbeat",
--		.gpio			= 17,
--	},
--	{
--		.name			= "GSM",
--		.default_trigger	= "default-on",
--		.gpio			= 7,
--		.active_low		= 1,
--	},
--};
--
--static struct gpio_led_platform_data rut100_leds_data = {
--	.num_leds	= ARRAY_SIZE(rut100_leds),
--	.leds		= rut100_leds,
--};
--
--static struct platform_device rut1xx_leds = {
--	.name	= "leds-gpio",
--	.id	= -1,
--	.dev	= {
--		.platform_data = &rut100_leds_data,
--	},
--};
--
--static void __init rut1xx_init(void)
--{
--	gemini_gpio_init();
--	platform_register_uart();
--	platform_register_pflash(SZ_8M, NULL, 0);
--	platform_device_register(&rut1xx_leds);
--	platform_device_register(&rut1xx_keys_device);
--	platform_register_rtc();
--}
--
--MACHINE_START(RUT100, "Teltonika RUT100")
--	.atag_offset	= 0x100,
--	.map_io		= gemini_map_io,
--	.init_irq	= gemini_init_irq,
--	.init_time	= gemini_timer_init,
--	.init_machine	= rut1xx_init,
--	.restart	= gemini_restart,
--MACHINE_END
-diff --git a/arch/arm/mach-gemini/board-wbd111.c b/arch/arm/mach-gemini/board-wbd111.c
-deleted file mode 100644
-index 418188c..0000000
---- a/arch/arm/mach-gemini/board-wbd111.c
-+++ /dev/null
-@@ -1,134 +0,0 @@
--/*
-- *  Support for Wiliboard WBD-111
-- *
-- *  Copyright (C) 2009 Imre Kaloz <kaloz@openwrt.org>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- */
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/platform_device.h>
--#include <linux/leds.h>
--#include <linux/input.h>
--#include <linux/skbuff.h>
--#include <linux/gpio_keys.h>
--#include <linux/mdio-gpio.h>
--#include <linux/mtd/mtd.h>
--#include <linux/mtd/partitions.h>
--#include <asm/mach-types.h>
--#include <asm/mach/arch.h>
--#include <asm/mach/time.h>
--
--
--#include "common.h"
--
--static struct gpio_keys_button wbd111_keys[] = {
--	{
--		.code		= KEY_SETUP,
--		.gpio		= 5,
--		.active_low	= 1,
--		.desc		= "reset",
--		.type		= EV_KEY,
--	},
--};
--
--static struct gpio_keys_platform_data wbd111_keys_data = {
--	.buttons	= wbd111_keys,
--	.nbuttons	= ARRAY_SIZE(wbd111_keys),
--};
--
--static struct platform_device wbd111_keys_device = {
--	.name	= "gpio-keys",
--	.id	= -1,
--	.dev	= {
--		.platform_data = &wbd111_keys_data,
--	},
--};
--
--static struct gpio_led wbd111_leds[] = {
--	{
--		.name			= "L3red",
--		.gpio			= 1,
--	},
--	{
--		.name			= "L4green",
--		.gpio			= 2,
--	},
--	{
--		.name			= "L4red",
--		.gpio			= 3,
--	},
--	{
--		.name			= "L3green",
--		.gpio			= 5,
--	},
--};
--
--static struct gpio_led_platform_data wbd111_leds_data = {
--	.num_leds	= ARRAY_SIZE(wbd111_leds),
--	.leds		= wbd111_leds,
--};
--
--static struct platform_device wbd111_leds_device = {
--	.name	= "leds-gpio",
--	.id	= -1,
--	.dev	= {
--		.platform_data = &wbd111_leds_data,
--	},
--};
--
--static struct mtd_partition wbd111_partitions[] = {
--	{
--		.name		= "RedBoot",
--		.offset		= 0,
--		.size		= 0x020000,
--		.mask_flags	= MTD_WRITEABLE,
--	} , {
--		.name		= "kernel",
--		.offset		= 0x020000,
--		.size		= 0x100000,
--	} , {
--		.name		= "rootfs",
--		.offset		= 0x120000,
--		.size		= 0x6a0000,
--	} , {
--		.name		= "VCTL",
--		.offset		= 0x7c0000,
--		.size		= 0x010000,
--		.mask_flags	= MTD_WRITEABLE,
--	} , {
--		.name		= "cfg",
--		.offset		= 0x7d0000,
--		.size		= 0x010000,
--		.mask_flags	= MTD_WRITEABLE,
--	} , {
--		.name		= "FIS",
--		.offset		= 0x7e0000,
--		.size		= 0x010000,
--		.mask_flags	= MTD_WRITEABLE,
--	}
--};
--#define wbd111_num_partitions  ARRAY_SIZE(wbd111_partitions)
--
--static void __init wbd111_init(void)
--{
--	gemini_gpio_init();
--	platform_register_uart();
--	platform_register_pflash(SZ_8M, wbd111_partitions,
--				 wbd111_num_partitions);
--	platform_device_register(&wbd111_leds_device);
--	platform_device_register(&wbd111_keys_device);
--	platform_register_rtc();
--}
--
--MACHINE_START(WBD111, "Wiliboard WBD-111")
--	.atag_offset	= 0x100,
--	.map_io		= gemini_map_io,
--	.init_irq	= gemini_init_irq,
--	.init_time	= gemini_timer_init,
--	.init_machine	= wbd111_init,
--	.restart	= gemini_restart,
--MACHINE_END
-diff --git a/arch/arm/mach-gemini/board-wbd222.c b/arch/arm/mach-gemini/board-wbd222.c
-deleted file mode 100644
-index 266b265..0000000
---- a/arch/arm/mach-gemini/board-wbd222.c
-+++ /dev/null
-@@ -1,134 +0,0 @@
--/*
-- *  Support for Wiliboard WBD-222
-- *
-- *  Copyright (C) 2009 Imre Kaloz <kaloz@openwrt.org>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- */
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/platform_device.h>
--#include <linux/leds.h>
--#include <linux/input.h>
--#include <linux/skbuff.h>
--#include <linux/gpio_keys.h>
--#include <linux/mdio-gpio.h>
--#include <linux/mtd/mtd.h>
--#include <linux/mtd/partitions.h>
--#include <asm/mach-types.h>
--#include <asm/mach/arch.h>
--#include <asm/mach/time.h>
--
--
--#include "common.h"
--
--static struct gpio_keys_button wbd222_keys[] = {
--	{
--		.code		= KEY_SETUP,
--		.gpio		= 5,
--		.active_low	= 1,
--		.desc		= "reset",
--		.type		= EV_KEY,
--	},
--};
--
--static struct gpio_keys_platform_data wbd222_keys_data = {
--	.buttons	= wbd222_keys,
--	.nbuttons	= ARRAY_SIZE(wbd222_keys),
--};
--
--static struct platform_device wbd222_keys_device = {
--	.name	= "gpio-keys",
--	.id	= -1,
--	.dev	= {
--		.platform_data = &wbd222_keys_data,
--	},
--};
--
--static struct gpio_led wbd222_leds[] = {
--	{
--		.name			= "L3red",
--		.gpio			= 1,
--	},
--	{
--		.name			= "L4green",
--		.gpio			= 2,
--	},
--	{
--		.name			= "L4red",
--		.gpio			= 3,
--	},
--	{
--		.name			= "L3green",
--		.gpio			= 5,
--	},
--};
--
--static struct gpio_led_platform_data wbd222_leds_data = {
--	.num_leds	= ARRAY_SIZE(wbd222_leds),
--	.leds		= wbd222_leds,
--};
--
--static struct platform_device wbd222_leds_device = {
--	.name	= "leds-gpio",
--	.id	= -1,
--	.dev	= {
--		.platform_data = &wbd222_leds_data,
--	},
--};
--
--static struct mtd_partition wbd222_partitions[] = {
--	{
--		.name		= "RedBoot",
--		.offset		= 0,
--		.size		= 0x020000,
--		.mask_flags	= MTD_WRITEABLE,
--	} , {
--		.name		= "kernel",
--		.offset		= 0x020000,
--		.size		= 0x100000,
--	} , {
--		.name		= "rootfs",
--		.offset		= 0x120000,
--		.size		= 0x6a0000,
--	} , {
--		.name		= "VCTL",
--		.offset		= 0x7c0000,
--		.size		= 0x010000,
--		.mask_flags	= MTD_WRITEABLE,
--	} , {
--		.name		= "cfg",
--		.offset		= 0x7d0000,
--		.size		= 0x010000,
--		.mask_flags	= MTD_WRITEABLE,
--	} , {
--		.name		= "FIS",
--		.offset		= 0x7e0000,
--		.size		= 0x010000,
--		.mask_flags	= MTD_WRITEABLE,
--	}
--};
--#define wbd222_num_partitions  ARRAY_SIZE(wbd222_partitions)
--
--static void __init wbd222_init(void)
--{
--	gemini_gpio_init();
--	platform_register_uart();
--	platform_register_pflash(SZ_8M, wbd222_partitions,
--		wbd222_num_partitions);
--	platform_device_register(&wbd222_leds_device);
--	platform_device_register(&wbd222_keys_device);
--	platform_register_rtc();
--}
--
--MACHINE_START(WBD222, "Wiliboard WBD-222")
--	.atag_offset	= 0x100,
--	.map_io		= gemini_map_io,
--	.init_irq	= gemini_init_irq,
--	.init_time	= gemini_timer_init,
--	.init_machine	= wbd222_init,
--	.restart	= gemini_restart,
--MACHINE_END
-diff --git a/arch/arm/mach-gemini/common.h b/arch/arm/mach-gemini/common.h
-deleted file mode 100644
-index 38a4526..0000000
---- a/arch/arm/mach-gemini/common.h
-+++ /dev/null
-@@ -1,31 +0,0 @@
--/*
-- * Common Gemini architecture functions
-- *
-- * Copyright (C) 2008-2009 Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- */
--
--#ifndef __GEMINI_COMMON_H__
--#define __GEMINI_COMMON_H__
--
--struct mtd_partition;
--
--extern void gemini_map_io(void);
--extern void gemini_init_irq(void);
--extern void gemini_timer_init(void);
--extern void gemini_gpio_init(void);
--extern void platform_register_rtc(void);
--
--/* Common platform devices registration functions */
--extern int platform_register_uart(void);
--extern int platform_register_pflash(unsigned int size,
--				    struct mtd_partition *parts,
--				    unsigned int nr_parts);
--
--extern void gemini_restart(char mode, const char *cmd);
--
--#endif /* __GEMINI_COMMON_H__ */
-diff --git a/arch/arm/mach-gemini/devices.c b/arch/arm/mach-gemini/devices.c
-deleted file mode 100644
-index 5cff298..0000000
---- a/arch/arm/mach-gemini/devices.c
-+++ /dev/null
-@@ -1,118 +0,0 @@
--/*
-- * Common devices definition for Gemini
-- *
-- * Copyright (C) 2008-2009 Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
+- * common stuff for Hynix h720x processors
 - *
 - * This program is free software; you can redistribute it and/or modify
 - * it under the terms of the GNU General Public License version 2 as
 - * published by the Free Software Foundation.
+- *
 - */
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/io.h>
--#include <linux/platform_device.h>
--#include <linux/serial_8250.h>
--#include <linux/mtd/physmap.h>
 -
--#include <mach/irqs.h>
+-#include <linux/sched.h>
+-#include <linux/mman.h>
+-#include <linux/init.h>
+-#include <linux/interrupt.h>
+-#include <linux/io.h>
+-
+-#include <asm/page.h>
+-#include <asm/pgtable.h>
+-#include <asm/dma.h>
 -#include <mach/hardware.h>
--#include <mach/global_reg.h>
+-#include <asm/irq.h>
+-#include <asm/system_misc.h>
+-#include <asm/mach/irq.h>
+-#include <asm/mach/map.h>
+-#include <mach/irqs.h>
+-
+-#include <asm/mach/dma.h>
+-
+-#if 0
+-#define IRQDBG(args...) printk(args)
+-#else
+-#define IRQDBG(args...) do {} while(0)
+-#endif
+-
+-void __init arch_dma_init(dma_t *dma)
+-{
+-}
+-
+-/*
+- * Return nsecs since last timer reload
+- * (timercount * (usecs perjiffie)) / (ticks per jiffie)
+- */
+-u32 h720x_gettimeoffset(void)
+-{
+-	return ((CPU_REG(TIMER_VIRT, TM0_COUNT) * tick_usec) / LATCH) * 1000;
+-}
+-
+-/*
+- * mask Global irq's
+- */
+-static void mask_global_irq(struct irq_data *d)
+-{
+-	CPU_REG (IRQC_VIRT, IRQC_IER) &= ~(1 << d->irq);
+-}
+-
+-/*
+- * unmask Global irq's
+- */
+-static void unmask_global_irq(struct irq_data *d)
+-{
+-	CPU_REG (IRQC_VIRT, IRQC_IER) |= (1 << d->irq);
+-}
+-
+-
+-/*
+- * ack GPIO irq's
+- * Ack only for edge triggered int's valid
+- */
+-static void inline ack_gpio_irq(struct irq_data *d)
+-{
+-	u32 reg_base = GPIO_VIRT(IRQ_TO_REGNO(d->irq));
+-	u32 bit = IRQ_TO_BIT(d->irq);
+-	if ( (CPU_REG (reg_base, GPIO_EDGE) & bit))
+-		CPU_REG (reg_base, GPIO_CLR) = bit;
+-}
+-
+-/*
+- * mask GPIO irq's
+- */
+-static void inline mask_gpio_irq(struct irq_data *d)
+-{
+-	u32 reg_base = GPIO_VIRT(IRQ_TO_REGNO(d->irq));
+-	u32 bit = IRQ_TO_BIT(d->irq);
+-	CPU_REG (reg_base, GPIO_MASK) &= ~bit;
+-}
+-
+-/*
+- * unmask GPIO irq's
+- */
+-static void inline unmask_gpio_irq(struct irq_data *d)
+-{
+-	u32 reg_base = GPIO_VIRT(IRQ_TO_REGNO(d->irq));
+-	u32 bit = IRQ_TO_BIT(d->irq);
+-	CPU_REG (reg_base, GPIO_MASK) |= bit;
+-}
+-
+-static void
+-h720x_gpio_handler(unsigned int mask, unsigned int irq,
+-                 struct irq_desc *desc)
+-{
+-	IRQDBG("%s irq: %d\n", __func__, irq);
+-	while (mask) {
+-		if (mask & 1) {
+-			IRQDBG("handling irq %d\n", irq);
+-			generic_handle_irq(irq);
+-		}
+-		irq++;
+-		mask >>= 1;
+-	}
+-}
+-
+-static void
+-h720x_gpioa_demux_handler(unsigned int irq_unused, struct irq_desc *desc)
+-{
+-	unsigned int mask, irq;
+-
+-	mask = CPU_REG(GPIO_A_VIRT,GPIO_STAT);
+-	irq = IRQ_CHAINED_GPIOA(0);
+-	IRQDBG("%s mask: 0x%08x irq: %d\n", __func__, mask,irq);
+-	h720x_gpio_handler(mask, irq, desc);
+-}
+-
+-static void
+-h720x_gpiob_demux_handler(unsigned int irq_unused, struct irq_desc *desc)
+-{
+-	unsigned int mask, irq;
+-	mask = CPU_REG(GPIO_B_VIRT,GPIO_STAT);
+-	irq = IRQ_CHAINED_GPIOB(0);
+-	IRQDBG("%s mask: 0x%08x irq: %d\n", __func__, mask,irq);
+-	h720x_gpio_handler(mask, irq, desc);
+-}
+-
+-static void
+-h720x_gpioc_demux_handler(unsigned int irq_unused, struct irq_desc *desc)
+-{
+-	unsigned int mask, irq;
+-
+-	mask = CPU_REG(GPIO_C_VIRT,GPIO_STAT);
+-	irq = IRQ_CHAINED_GPIOC(0);
+-	IRQDBG("%s mask: 0x%08x irq: %d\n", __func__, mask,irq);
+-	h720x_gpio_handler(mask, irq, desc);
+-}
+-
+-static void
+-h720x_gpiod_demux_handler(unsigned int irq_unused, struct irq_desc *desc)
+-{
+-	unsigned int mask, irq;
+-
+-	mask = CPU_REG(GPIO_D_VIRT,GPIO_STAT);
+-	irq = IRQ_CHAINED_GPIOD(0);
+-	IRQDBG("%s mask: 0x%08x irq: %d\n", __func__, mask,irq);
+-	h720x_gpio_handler(mask, irq, desc);
+-}
+-
+-#ifdef CONFIG_CPU_H7202
+-static void
+-h720x_gpioe_demux_handler(unsigned int irq_unused, struct irq_desc *desc)
+-{
+-	unsigned int mask, irq;
+-
+-	mask = CPU_REG(GPIO_E_VIRT,GPIO_STAT);
+-	irq = IRQ_CHAINED_GPIOE(0);
+-	IRQDBG("%s mask: 0x%08x irq: %d\n", __func__, mask,irq);
+-	h720x_gpio_handler(mask, irq, desc);
+-}
+-#endif
+-
+-static struct irq_chip h720x_global_chip = {
+-	.irq_ack = mask_global_irq,
+-	.irq_mask = mask_global_irq,
+-	.irq_unmask = unmask_global_irq,
+-};
+-
+-static struct irq_chip h720x_gpio_chip = {
+-	.irq_ack = ack_gpio_irq,
+-	.irq_mask = mask_gpio_irq,
+-	.irq_unmask = unmask_gpio_irq,
+-};
+-
+-/*
+- * Initialize IRQ's, mask all, enable multiplexed irq's
+- */
+-void __init h720x_init_irq (void)
+-{
+-	int 	irq;
+-
+-	/* Mask global irq's */
+-	CPU_REG (IRQC_VIRT, IRQC_IER) = 0x0;
+-
+-	/* Mask all multiplexed irq's */
+-	CPU_REG (GPIO_A_VIRT, GPIO_MASK) = 0x0;
+-	CPU_REG (GPIO_B_VIRT, GPIO_MASK) = 0x0;
+-	CPU_REG (GPIO_C_VIRT, GPIO_MASK) = 0x0;
+-	CPU_REG (GPIO_D_VIRT, GPIO_MASK) = 0x0;
+-
+-	/* Initialize global IRQ's, fast path */
+-	for (irq = 0; irq < NR_GLBL_IRQS; irq++) {
+-		irq_set_chip_and_handler(irq, &h720x_global_chip,
+-					 handle_level_irq);
+-		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
+-	}
+-
+-	/* Initialize multiplexed IRQ's, slow path */
+-	for (irq = IRQ_CHAINED_GPIOA(0) ; irq <= IRQ_CHAINED_GPIOD(31); irq++) {
+-		irq_set_chip_and_handler(irq, &h720x_gpio_chip,
+-					 handle_edge_irq);
+-		set_irq_flags(irq, IRQF_VALID );
+-	}
+-	irq_set_chained_handler(IRQ_GPIOA, h720x_gpioa_demux_handler);
+-	irq_set_chained_handler(IRQ_GPIOB, h720x_gpiob_demux_handler);
+-	irq_set_chained_handler(IRQ_GPIOC, h720x_gpioc_demux_handler);
+-	irq_set_chained_handler(IRQ_GPIOD, h720x_gpiod_demux_handler);
+-
+-#ifdef CONFIG_CPU_H7202
+-	for (irq = IRQ_CHAINED_GPIOE(0) ; irq <= IRQ_CHAINED_GPIOE(31); irq++) {
+-		irq_set_chip_and_handler(irq, &h720x_gpio_chip,
+-					 handle_edge_irq);
+-		set_irq_flags(irq, IRQF_VALID );
+-	}
+-	irq_set_chained_handler(IRQ_GPIOE, h720x_gpioe_demux_handler);
+-#endif
+-
+-	/* Enable multiplexed irq's */
+-	CPU_REG (IRQC_VIRT, IRQC_IER) = IRQ_ENA_MUX;
+-}
+-
+-static struct map_desc h720x_io_desc[] __initdata = {
+-	{
+-		.virtual	= IO_VIRT,
+-		.pfn		= __phys_to_pfn(IO_PHYS),
+-		.length		= IO_SIZE,
+-		.type		= MT_DEVICE
+-	},
+-};
+-
+-/* Initialize io tables */
+-void __init h720x_map_io(void)
+-{
+-	iotable_init(h720x_io_desc,ARRAY_SIZE(h720x_io_desc));
+-}
+-
+-void h720x_restart(char mode, const char *cmd)
+-{
+-	CPU_REG (PMU_BASE, PMU_STAT) |= PMU_WARMRESET;
+-}
+-
+-static void h720x__idle(void)
+-{
+-	CPU_REG (PMU_BASE, PMU_MODE) = PMU_MODE_IDLE;
+-	nop();
+-	nop();
+-	CPU_REG (PMU_BASE, PMU_MODE) = PMU_MODE_RUN;
+-	nop();
+-	nop();
+-}
+-
+-static int __init h720x_idle_init(void)
+-{
+-	arm_pm_idle = h720x__idle;
+-	return 0;
+-}
+-
+-arch_initcall(h720x_idle_init);
+diff --git a/arch/arm/mach-h720x/common.h b/arch/arm/mach-h720x/common.h
+deleted file mode 100644
+index 7e73841..0000000
+--- a/arch/arm/mach-h720x/common.h
++++ /dev/null
+@@ -1,30 +0,0 @@
+-/*
+- * linux/arch/arm/mach-h720x/common.h
+- *
+- * Copyright (C) 2003 Thomas Gleixner <tglx@linutronix.de>
+- *               2003 Robert Schwebel <r.schwebel@pengutronix.de>
+- *               2004 Sascha Hauer    <s.hauer@pengutronix.de>
+- *
+- * Architecture specific stuff for Hynix GMS30C7201 development board
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- */
+-
+-extern u32 h720x_gettimeoffset(void);
+-extern void __init h720x_init_irq(void);
+-extern void __init h720x_map_io(void);
+-extern void h720x_restart(char, const char *);
+-
+-#ifdef CONFIG_ARCH_H7202
+-extern void h7202_timer_init(void);
+-extern void __init init_hw_h7202(void);
+-extern void __init h7202_init_irq(void);
+-extern void __init h7202_init_time(void);
+-#endif
+-
+-#ifdef CONFIG_ARCH_H7201
+-extern void h7201_timer_init(void);
+-#endif
+diff --git a/arch/arm/mach-h720x/cpu-h7201.c b/arch/arm/mach-h720x/cpu-h7201.c
+deleted file mode 100644
+index 13c7412..0000000
+--- a/arch/arm/mach-h720x/cpu-h7201.c
++++ /dev/null
+@@ -1,57 +0,0 @@
+-/*
+- * linux/arch/arm/mach-h720x/cpu-h7201.c
+- *
+- * Copyright (C) 2003 Thomas Gleixner <tglx@linutronix.de>
+- *               2003 Robert Schwebel <r.schwebel@pengutronix.de>
+- *               2004 Sascha Hauer    <s.hauer@pengutronix.de>
+- *
+- * processor specific stuff for the Hynix h7201
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- */
+-
+-#include <linux/init.h>
+-#include <linux/interrupt.h>
+-#include <linux/module.h>
+-#include <asm/types.h>
+-#include <mach/hardware.h>
+-#include <asm/irq.h>
+-#include <mach/irqs.h>
+-#include <asm/mach/irq.h>
+-#include <asm/mach/time.h>
+-#include "common.h"
+-/*
+- * Timer interrupt handler
+- */
+-static irqreturn_t
+-h7201_timer_interrupt(int irq, void *dev_id)
+-{
+-	CPU_REG (TIMER_VIRT, TIMER_TOPSTAT);
+-	timer_tick();
+-
+-	return IRQ_HANDLED;
+-}
+-
+-static struct irqaction h7201_timer_irq = {
+-	.name		= "h7201 Timer Tick",
+-	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
+-	.handler	= h7201_timer_interrupt,
+-};
+-
+-/*
+- * Setup TIMER0 as system timer
+- */
+-void __init h7201_timer_init(void)
+-{
+-	arch_gettimeoffset = h720x_gettimeoffset;
+-
+-	CPU_REG (TIMER_VIRT, TM0_PERIOD) = LATCH;
+-	CPU_REG (TIMER_VIRT, TM0_CTRL) = TM_RESET;
+-	CPU_REG (TIMER_VIRT, TM0_CTRL) = TM_REPEAT | TM_START;
+-	CPU_REG (TIMER_VIRT, TIMER_TOPCTRL) = ENABLE_TM0_INTR | TIMER_ENABLE_BIT;
+-
+-	setup_irq(IRQ_TIMER0, &h7201_timer_irq);
+-}
+diff --git a/arch/arm/mach-h720x/cpu-h7202.c b/arch/arm/mach-h720x/cpu-h7202.c
+deleted file mode 100644
+index e2ae7e8..0000000
+--- a/arch/arm/mach-h720x/cpu-h7202.c
++++ /dev/null
+@@ -1,225 +0,0 @@
+-/*
+- * linux/arch/arm/mach-h720x/cpu-h7202.c
+- *
+- * Copyright (C) 2003 Thomas Gleixner <tglx@linutronix.de>
+- *               2003 Robert Schwebel <r.schwebel@pengutronix.de>
+- *               2004 Sascha Hauer    <s.hauer@pengutronix.de>
+- *
+- * processor specific stuff for the Hynix h7202
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- */
+-
+-#include <linux/init.h>
+-#include <linux/interrupt.h>
+-#include <linux/module.h>
+-#include <asm/types.h>
+-#include <mach/hardware.h>
+-#include <asm/irq.h>
+-#include <mach/irqs.h>
+-#include <asm/mach/irq.h>
+-#include <asm/mach/time.h>
+-#include <linux/device.h>
+-#include <linux/serial_8250.h>
+-#include "common.h"
+-
+-static struct resource h7202ps2_resources[] = {
+-	[0] = {
+-		.start	= 0x8002c000,
+-		.end	= 0x8002c040,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start	= IRQ_PS2,
+-		.end	= IRQ_PS2,
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-};
+-
+-static struct platform_device h7202ps2_device = {
+-	.name		= "h7202ps2",
+-	.id		= -1,
+-	.num_resources	= ARRAY_SIZE(h7202ps2_resources),
+-	.resource	= h7202ps2_resources,
+-};
 -
 -static struct plat_serial8250_port serial_platform_data[] = {
 -	{
--		.membase	= (void *)IO_ADDRESS(GEMINI_UART_BASE),
--		.mapbase	= GEMINI_UART_BASE,
--		.irq		= IRQ_UART,
--		.uartclk	= UART_CLK,
+-		.membase	= (void*)SERIAL0_VIRT,
+-		.mapbase	= SERIAL0_BASE,
+-		.irq		= IRQ_UART0,
+-		.uartclk	= 2*1843200,
 -		.regshift	= 2,
 -		.iotype		= UPIO_MEM,
--		.type		= PORT_16550A,
--		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST | UPF_FIXED_TYPE,
+-		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
 -	},
--	{},
+-	{
+-		.membase	= (void*)SERIAL1_VIRT,
+-		.mapbase	= SERIAL1_BASE,
+-		.irq		= IRQ_UART1,
+-		.uartclk	= 2*1843200,
+-		.regshift	= 2,
+-		.iotype		= UPIO_MEM,
+-		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
+-	},
+-#ifdef CONFIG_H7202_SERIAL23
+-	{
+-		.membase	= (void*)SERIAL2_VIRT,
+-		.mapbase	= SERIAL2_BASE,
+-		.irq		= IRQ_UART2,
+-		.uartclk	= 2*1843200,
+-		.regshift	= 2,
+-		.iotype		= UPIO_MEM,
+-		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
+-	},
+-	{
+-		.membase	= (void*)SERIAL3_VIRT,
+-		.mapbase	= SERIAL3_BASE,
+-		.irq		= IRQ_UART3,
+-		.uartclk	= 2*1843200,
+-		.regshift	= 2,
+-		.iotype		= UPIO_MEM,
+-		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
+-	},
+-#endif
+-	{ },
 -};
 -
 -static struct platform_device serial_device = {
--	.name	= "serial8250",
--	.id	= PLAT8250_DEV_PLATFORM,
--	.dev	= {
--		.platform_data = serial_platform_data,
+-	.name			= "serial8250",
+-	.id			= PLAT8250_DEV_PLATFORM,
+-	.dev			= {
+-		.platform_data	= serial_platform_data,
 -	},
 -};
 -
--int platform_register_uart(void)
+-static struct platform_device *devices[] __initdata = {
+-	&h7202ps2_device,
+-	&serial_device,
+-};
+-
+-/* Although we have two interrupt lines for the timers, we only have one
+- * status register which clears all pending timer interrupts on reading. So
+- * we have to handle all timer interrupts in one place.
+- */
+-static void
+-h7202_timerx_demux_handler(unsigned int irq_unused, struct irq_desc *desc)
 -{
--	return platform_device_register(&serial_device);
+-	unsigned int mask, irq;
+-
+-	mask = CPU_REG (TIMER_VIRT, TIMER_TOPSTAT);
+-
+-	if ( mask & TSTAT_T0INT ) {
+-		timer_tick();
+-		if( mask == TSTAT_T0INT )
+-			return;
+-	}
+-
+-	mask >>= 1;
+-	irq = IRQ_TIMER1;
+-	while (mask) {
+-		if (mask & 1)
+-			generic_handle_irq(irq);
+-		irq++;
+-		mask >>= 1;
+-	}
 -}
 -
--static struct resource flash_resource = {
--	.start	= GEMINI_FLASH_BASE,
--	.flags	= IORESOURCE_MEM,
--};
--
--static struct physmap_flash_data pflash_platform_data = {};
--
--static struct platform_device pflash_device = {
--	.name	= "physmap-flash",
--	.id	= 0,
--	.dev 	= {
--		.platform_data = &pflash_platform_data,
--	},
--	.resource = &flash_resource,
--	.num_resources = 1,
--};
--
--int platform_register_pflash(unsigned int size, struct mtd_partition *parts,
--			     unsigned int nr_parts)
--{
--	unsigned int reg;
--
--	reg = __raw_readl(IO_ADDRESS(GEMINI_GLOBAL_BASE) + GLOBAL_STATUS);
--
--	if ((reg & FLASH_TYPE_MASK) != FLASH_TYPE_PARALLEL)
--		return -ENXIO;
--
--	if (reg & FLASH_WIDTH_16BIT)
--		pflash_platform_data.width = 2;
--	else
--		pflash_platform_data.width = 1;
--
--	/* enable parallel flash pins and disable others */
--	reg = __raw_readl(IO_ADDRESS(GEMINI_GLOBAL_BASE) + GLOBAL_MISC_CTRL);
--	reg &= ~PFLASH_PADS_DISABLE;
--	reg |= SFLASH_PADS_DISABLE | NAND_PADS_DISABLE;
--	__raw_writel(reg, IO_ADDRESS(GEMINI_GLOBAL_BASE) + GLOBAL_MISC_CTRL);
--
--	flash_resource.end = flash_resource.start + size - 1;
--
--	pflash_platform_data.parts = parts;
--	pflash_platform_data.nr_parts = nr_parts;
--
--	return platform_device_register(&pflash_device);
--}
--
--static struct resource gemini_rtc_resources[] = {
--	[0] = {
--		.start  = GEMINI_RTC_BASE,
--		.end    = GEMINI_RTC_BASE + 0x24,
--		.flags  = IORESOURCE_MEM,
--	},
--	[1] = {
--		.start  = IRQ_RTC,
--		.end    = IRQ_RTC,
--		.flags  = IORESOURCE_IRQ,
--	},
--};
--
--static struct platform_device gemini_rtc_device = {
--	.name		= "rtc-gemini",
--	.id		= 0,
--	.num_resources	= ARRAY_SIZE(gemini_rtc_resources),
--	.resource	= gemini_rtc_resources,
--};
--
--int __init platform_register_rtc(void)
--{
--	return platform_device_register(&gemini_rtc_device);
--}
--
-diff --git a/arch/arm/mach-gemini/gpio.c b/arch/arm/mach-gemini/gpio.c
-deleted file mode 100644
-index 70bfa57..0000000
---- a/arch/arm/mach-gemini/gpio.c
-+++ /dev/null
-@@ -1,231 +0,0 @@
 -/*
-- * Gemini gpiochip and interrupt routines
+- * Timer interrupt handler
+- */
+-static irqreturn_t
+-h7202_timer_interrupt(int irq, void *dev_id)
+-{
+-	h7202_timerx_demux_handler(0, NULL);
+-	return IRQ_HANDLED;
+-}
+-
+-/*
+- * mask multiplexed timer IRQs
+- */
+-static void inline __mask_timerx_irq(unsigned int irq)
+-{
+-	unsigned int bit;
+-	bit = 2 << ((irq == IRQ_TIMER64B) ? 4 : (irq - IRQ_TIMER1));
+-	CPU_REG (TIMER_VIRT, TIMER_TOPCTRL) &= ~bit;
+-}
+-
+-static void inline mask_timerx_irq(struct irq_data *d)
+-{
+-	__mask_timerx_irq(d->irq);
+-}
+-
+-/*
+- * unmask multiplexed timer IRQs
+- */
+-static void inline unmask_timerx_irq(struct irq_data *d)
+-{
+-	unsigned int bit;
+-	bit = 2 << ((d->irq == IRQ_TIMER64B) ? 4 : (d->irq - IRQ_TIMER1));
+-	CPU_REG (TIMER_VIRT, TIMER_TOPCTRL) |= bit;
+-}
+-
+-static struct irq_chip h7202_timerx_chip = {
+-	.irq_ack = mask_timerx_irq,
+-	.irq_mask = mask_timerx_irq,
+-	.irq_unmask = unmask_timerx_irq,
+-};
+-
+-static struct irqaction h7202_timer_irq = {
+-	.name		= "h7202 Timer Tick",
+-	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
+-	.handler	= h7202_timer_interrupt,
+-};
+-
+-/*
+- * Setup TIMER0 as system timer
+- */
+-void __init h7202_timer_init(void)
+-{
+-	arch_gettimeoffset = h720x_gettimeoffset;
+-
+-	CPU_REG (TIMER_VIRT, TM0_PERIOD) = LATCH;
+-	CPU_REG (TIMER_VIRT, TM0_CTRL) = TM_RESET;
+-	CPU_REG (TIMER_VIRT, TM0_CTRL) = TM_REPEAT | TM_START;
+-	CPU_REG (TIMER_VIRT, TIMER_TOPCTRL) = ENABLE_TM0_INTR | TIMER_ENABLE_BIT;
+-
+-	setup_irq(IRQ_TIMER0, &h7202_timer_irq);
+-}
+-
+-void __init h7202_init_irq (void)
+-{
+-	int 	irq;
+-
+-	CPU_REG (GPIO_E_VIRT, GPIO_MASK) = 0x0;
+-
+-	for (irq = IRQ_TIMER1;
+-	                  irq < IRQ_CHAINED_TIMERX(NR_TIMERX_IRQS); irq++) {
+-		__mask_timerx_irq(irq);
+-		irq_set_chip_and_handler(irq, &h7202_timerx_chip,
+-					 handle_edge_irq);
+-		set_irq_flags(irq, IRQF_VALID );
+-	}
+-	irq_set_chained_handler(IRQ_TIMERX, h7202_timerx_demux_handler);
+-
+-	h720x_init_irq();
+-}
+-
+-void __init init_hw_h7202(void)
+-{
+-	/* Enable clocks */
+-	CPU_REG (PMU_BASE, PMU_PLL_CTRL) |= PLL_2_EN | PLL_1_EN | PLL_3_MUTE;
+-
+-	CPU_REG (SERIAL0_VIRT, SERIAL_ENABLE) = SERIAL_ENABLE_EN;
+-	CPU_REG (SERIAL1_VIRT, SERIAL_ENABLE) = SERIAL_ENABLE_EN;
+-#ifdef CONFIG_H7202_SERIAL23
+-	CPU_REG (SERIAL2_VIRT, SERIAL_ENABLE) = SERIAL_ENABLE_EN;
+-	CPU_REG (SERIAL3_VIRT, SERIAL_ENABLE) = SERIAL_ENABLE_EN;
+-	CPU_IO (GPIO_AMULSEL) = AMULSEL_USIN2 | AMULSEL_USOUT2 |
+-	                        AMULSEL_USIN3 | AMULSEL_USOUT3;
+-#endif
+-	(void) platform_add_devices(devices, ARRAY_SIZE(devices));
+-}
+diff --git a/arch/arm/mach-h720x/h7201-eval.c b/arch/arm/mach-h720x/h7201-eval.c
+deleted file mode 100644
+index 4fdeb68..0000000
+--- a/arch/arm/mach-h720x/h7201-eval.c
++++ /dev/null
+@@ -1,38 +0,0 @@
+-/*
+- * linux/arch/arm/mach-h720x/h7201-eval.c
 - *
-- * Copyright (C) 2008-2009 Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
+- * Copyright (C) 2003 Thomas Gleixner <tglx@linutronix.de>
+- *               2003 Robert Schwebel <r.schwebel@pengutronix.de>
+- *               2004 Sascha Hauer    <s.hauer@pengutronix.de>
 - *
-- * Based on plat-mxc/gpio.c:
-- *  MXC GPIO support. (c) 2008 Daniel Mack <daniel@caiaq.de>
-- *  Copyright 2008 Juergen Beisert, kernel at pengutronix.de
+- * Architecture specific stuff for Hynix GMS30C7201 development board
 - *
 - * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- */
--
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/io.h>
--#include <linux/irq.h>
--#include <linux/gpio.h>
--
--#include <mach/hardware.h>
--#include <mach/irqs.h>
--#include <mach/gpio.h>
--
--#define GPIO_BASE(x)		IO_ADDRESS(GEMINI_GPIO_BASE(x))
--
--/* GPIO registers definition */
--#define GPIO_DATA_OUT		0x0
--#define GPIO_DATA_IN		0x4
--#define GPIO_DIR		0x8
--#define GPIO_DATA_SET		0x10
--#define GPIO_DATA_CLR		0x14
--#define GPIO_PULL_EN		0x18
--#define GPIO_PULL_TYPE		0x1C
--#define GPIO_INT_EN		0x20
--#define GPIO_INT_STAT		0x24
--#define GPIO_INT_MASK		0x2C
--#define GPIO_INT_CLR		0x30
--#define GPIO_INT_TYPE		0x34
--#define GPIO_INT_BOTH_EDGE	0x38
--#define GPIO_INT_LEVEL		0x3C
--#define GPIO_DEBOUNCE_EN	0x40
--#define GPIO_DEBOUNCE_PRESCALE	0x44
--
--#define GPIO_PORT_NUM		3
--
--static void _set_gpio_irqenable(void __iomem *base, unsigned int index,
--				int enable)
--{
--	unsigned int reg;
--
--	reg = __raw_readl(base + GPIO_INT_EN);
--	reg = (reg & (~(1 << index))) | (!!enable << index);
--	__raw_writel(reg, base + GPIO_INT_EN);
--}
--
--static void gpio_ack_irq(struct irq_data *d)
--{
--	unsigned int gpio = irq_to_gpio(d->irq);
--	void __iomem *base = GPIO_BASE(gpio / 32);
--
--	__raw_writel(1 << (gpio % 32), base + GPIO_INT_CLR);
--}
--
--static void gpio_mask_irq(struct irq_data *d)
--{
--	unsigned int gpio = irq_to_gpio(d->irq);
--	void __iomem *base = GPIO_BASE(gpio / 32);
--
--	_set_gpio_irqenable(base, gpio % 32, 0);
--}
--
--static void gpio_unmask_irq(struct irq_data *d)
--{
--	unsigned int gpio = irq_to_gpio(d->irq);
--	void __iomem *base = GPIO_BASE(gpio / 32);
--
--	_set_gpio_irqenable(base, gpio % 32, 1);
--}
--
--static int gpio_set_irq_type(struct irq_data *d, unsigned int type)
--{
--	unsigned int gpio = irq_to_gpio(d->irq);
--	unsigned int gpio_mask = 1 << (gpio % 32);
--	void __iomem *base = GPIO_BASE(gpio / 32);
--	unsigned int reg_both, reg_level, reg_type;
--
--	reg_type = __raw_readl(base + GPIO_INT_TYPE);
--	reg_level = __raw_readl(base + GPIO_INT_LEVEL);
--	reg_both = __raw_readl(base + GPIO_INT_BOTH_EDGE);
--
--	switch (type) {
--	case IRQ_TYPE_EDGE_BOTH:
--		reg_type &= ~gpio_mask;
--		reg_both |= gpio_mask;
--		break;
--	case IRQ_TYPE_EDGE_RISING:
--		reg_type &= ~gpio_mask;
--		reg_both &= ~gpio_mask;
--		reg_level &= ~gpio_mask;
--		break;
--	case IRQ_TYPE_EDGE_FALLING:
--		reg_type &= ~gpio_mask;
--		reg_both &= ~gpio_mask;
--		reg_level |= gpio_mask;
--		break;
--	case IRQ_TYPE_LEVEL_HIGH:
--		reg_type |= gpio_mask;
--		reg_level &= ~gpio_mask;
--		break;
--	case IRQ_TYPE_LEVEL_LOW:
--		reg_type |= gpio_mask;
--		reg_level |= gpio_mask;
--		break;
--	default:
--		return -EINVAL;
--	}
--
--	__raw_writel(reg_type, base + GPIO_INT_TYPE);
--	__raw_writel(reg_level, base + GPIO_INT_LEVEL);
--	__raw_writel(reg_both, base + GPIO_INT_BOTH_EDGE);
--
--	gpio_ack_irq(d);
--
--	return 0;
--}
--
--static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
--{
--	unsigned int port = (unsigned int)irq_desc_get_handler_data(desc);
--	unsigned int gpio_irq_no, irq_stat;
--
--	irq_stat = __raw_readl(GPIO_BASE(port) + GPIO_INT_STAT);
--
--	gpio_irq_no = GPIO_IRQ_BASE + port * 32;
--	for (; irq_stat != 0; irq_stat >>= 1, gpio_irq_no++) {
--
--		if ((irq_stat & 1) == 0)
--			continue;
--
--		generic_handle_irq(gpio_irq_no);
--	}
--}
--
--static struct irq_chip gpio_irq_chip = {
--	.name = "GPIO",
--	.irq_ack = gpio_ack_irq,
--	.irq_mask = gpio_mask_irq,
--	.irq_unmask = gpio_unmask_irq,
--	.irq_set_type = gpio_set_irq_type,
--};
--
--static void _set_gpio_direction(struct gpio_chip *chip, unsigned offset,
--				int dir)
--{
--	void __iomem *base = GPIO_BASE(offset / 32);
--	unsigned int reg;
--
--	reg = __raw_readl(base + GPIO_DIR);
--	if (dir)
--		reg |= 1 << (offset % 32);
--	else
--		reg &= ~(1 << (offset % 32));
--	__raw_writel(reg, base + GPIO_DIR);
--}
--
--static void gemini_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
--{
--	void __iomem *base = GPIO_BASE(offset / 32);
--
--	if (value)
--		__raw_writel(1 << (offset % 32), base + GPIO_DATA_SET);
--	else
--		__raw_writel(1 << (offset % 32), base + GPIO_DATA_CLR);
--}
--
--static int gemini_gpio_get(struct gpio_chip *chip, unsigned offset)
--{
--	void __iomem *base = GPIO_BASE(offset / 32);
--
--	return (__raw_readl(base + GPIO_DATA_IN) >> (offset % 32)) & 1;
--}
--
--static int gemini_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
--{
--	_set_gpio_direction(chip, offset, 0);
--	return 0;
--}
--
--static int gemini_gpio_direction_output(struct gpio_chip *chip, unsigned offset,
--					int value)
--{
--	_set_gpio_direction(chip, offset, 1);
--	gemini_gpio_set(chip, offset, value);
--	return 0;
--}
--
--static struct gpio_chip gemini_gpio_chip = {
--	.label			= "Gemini",
--	.direction_input	= gemini_gpio_direction_input,
--	.get			= gemini_gpio_get,
--	.direction_output	= gemini_gpio_direction_output,
--	.set			= gemini_gpio_set,
--	.base			= 0,
--	.ngpio			= GPIO_PORT_NUM * 32,
--};
--
--void __init gemini_gpio_init(void)
--{
--	int i, j;
--
--	for (i = 0; i < GPIO_PORT_NUM; i++) {
--		/* disable, unmask and clear all interrupts */
--		__raw_writel(0x0, GPIO_BASE(i) + GPIO_INT_EN);
--		__raw_writel(0x0, GPIO_BASE(i) + GPIO_INT_MASK);
--		__raw_writel(~0x0, GPIO_BASE(i) + GPIO_INT_CLR);
--
--		for (j = GPIO_IRQ_BASE + i * 32;
--		     j < GPIO_IRQ_BASE + (i + 1) * 32; j++) {
--			irq_set_chip_and_handler(j, &gpio_irq_chip,
--						 handle_edge_irq);
--			set_irq_flags(j, IRQF_VALID);
--		}
--
--		irq_set_chained_handler(IRQ_GPIO(i), gpio_irq_handler);
--		irq_set_handler_data(IRQ_GPIO(i), (void *)i);
--	}
--
--	BUG_ON(gpiochip_add(&gemini_gpio_chip));
--}
-diff --git a/arch/arm/mach-gemini/idle.c b/arch/arm/mach-gemini/idle.c
-deleted file mode 100644
-index 92bbd6b..0000000
---- a/arch/arm/mach-gemini/idle.c
-+++ /dev/null
-@@ -1,29 +0,0 @@
--/*
-- * arch/arm/mach-gemini/idle.c
-- */
--
--#include <linux/init.h>
--#include <asm/system.h>
--#include <asm/proc-fns.h>
--
--static void gemini_idle(void)
--{
--	/*
--	 * Because of broken hardware we have to enable interrupts or the CPU
--	 * will never wakeup... Acctualy it is not very good to enable
--	 * interrupts first since scheduler can miss a tick, but there is
--	 * no other way around this. Platforms that needs it for power saving
--	 * should call enable_hlt() in init code, since by default it is
--	 * disabled.
--	 */
--	local_irq_enable();
--	cpu_do_idle();
--}
--
--static int __init gemini_idle_init(void)
--{
--	arm_pm_idle = gemini_idle;
--	return 0;
--}
--
--arch_initcall(gemini_idle_init);
-diff --git a/arch/arm/mach-gemini/include/mach/debug-macro.S b/arch/arm/mach-gemini/include/mach/debug-macro.S
-deleted file mode 100644
-index 8376707..0000000
---- a/arch/arm/mach-gemini/include/mach/debug-macro.S
-+++ /dev/null
-@@ -1,21 +0,0 @@
--/*
-- * Debugging macro include header
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
 - *
-- *  Copyright (C) 1994-1999 Russell King
-- *  Copyright (C) 2001-2006 Storlink, Corp.
-- *  Copyright (C) 2008-2009 Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
+- */
+-
+-#include <linux/init.h>
+-#include <linux/kernel.h>
+-#include <linux/types.h>
+-#include <linux/string.h>
+-#include <linux/device.h>
+-
+-#include <asm/setup.h>
+-#include <asm/types.h>
+-#include <asm/mach-types.h>
+-#include <asm/page.h>
+-#include <asm/mach/arch.h>
+-#include <mach/hardware.h>
+-#include "common.h"
+-
+-MACHINE_START(H7201, "Hynix GMS30C7201")
+-	/* Maintainer: Robert Schwebel, Pengutronix */
+-	.atag_offset	= 0x1000,
+-	.map_io		= h720x_map_io,
+-	.init_irq	= h720x_init_irq,
+-	.init_time	= h7201_timer_init,
+-	.dma_zone_size	= SZ_256M,
+-	.restart	= h720x_restart,
+-MACHINE_END
+diff --git a/arch/arm/mach-h720x/h7202-eval.c b/arch/arm/mach-h720x/h7202-eval.c
+deleted file mode 100644
+index f68e967..0000000
+--- a/arch/arm/mach-h720x/h7202-eval.c
++++ /dev/null
+@@ -1,81 +0,0 @@
+-/*
+- * linux/arch/arm/mach-h720x/h7202-eval.c
+- *
+- * Copyright (C) 2003 Thomas Gleixner <tglx@linutronix.de>
+- *               2003 Robert Schwebel <r.schwebel@pengutronix.de>
+- *		 2004 Sascha Hauer <s.hauer@pengutronix.de>
+- *
+- * Architecture specific stuff for Hynix HMS30C7202 development board
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- */
+-
+-#include <linux/init.h>
+-#include <linux/kernel.h>
+-#include <linux/types.h>
+-#include <linux/string.h>
+-#include <linux/platform_device.h>
+-
+-#include <asm/setup.h>
+-#include <asm/types.h>
+-#include <asm/mach-types.h>
+-#include <asm/page.h>
+-#include <asm/mach/arch.h>
+-#include <mach/irqs.h>
+-#include <mach/hardware.h>
+-#include "common.h"
+-
+-static struct resource cirrus_resources[] = {
+-	[0] = {
+-		.start	= ETH0_PHYS + 0x300,
+-		.end	= ETH0_PHYS + 0x300 + 0x10,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start	= IRQ_CHAINED_GPIOB(8),
+-		.end	= IRQ_CHAINED_GPIOB(8),
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-};
+-
+-static struct platform_device cirrus_device = {
+-	.name		= "cirrus-cs89x0",
+-	.id		= -1,
+-	.num_resources	= ARRAY_SIZE(cirrus_resources),
+-	.resource	= cirrus_resources,
+-};
+-
+-static struct platform_device *devices[] __initdata = {
+-	&cirrus_device,
+-};
+-
+-/*
+- * Hardware init. This is called early in initcalls
+- * Place pin inits here. So you avoid adding ugly
+- * #ifdef stuff to common drivers.
+- * Use this only, if your bootloader is not able
+- * to initialize the pins proper.
+- */
+-static void __init init_eval_h7202(void)
+-{
+-	init_hw_h7202();
+-	(void) platform_add_devices(devices, ARRAY_SIZE(devices));
+-
+-	/* Enable interrupt on portb bit 8 (ethernet) */
+-	CPU_REG (GPIO_B_VIRT, GPIO_POL) &= ~(1 << 8);
+-	CPU_REG (GPIO_B_VIRT, GPIO_EN) |= (1 << 8);
+-}
+-
+-MACHINE_START(H7202, "Hynix HMS30C7202")
+-	/* Maintainer: Robert Schwebel, Pengutronix */
+-	.atag_offset	= 0x100,
+-	.map_io		= h720x_map_io,
+-	.init_irq	= h7202_init_irq,
+-	.init_time	= h7202_timer_init,
+-	.init_machine	= init_eval_h7202,
+-	.dma_zone_size	= SZ_256M,
+-	.restart	= h720x_restart,
+-MACHINE_END
+diff --git a/arch/arm/mach-h720x/include/mach/boards.h b/arch/arm/mach-h720x/include/mach/boards.h
+deleted file mode 100644
+index 38b8e0d..0000000
+--- a/arch/arm/mach-h720x/include/mach/boards.h
++++ /dev/null
+@@ -1,53 +0,0 @@
+-/*
+- * arch/arm/mach-h720x/include/mach/boards.h
+- *
+- * Copyright (C) 2003 Thomas Gleixner <tglx@linutronix.de>
+- *           (C) 2003 Robert Schwebel <r.schwebel@pengutronix.de>
+- *
+- * This file contains the board specific defines for various devices
 - *
 - * This program is free software; you can redistribute it and/or modify
 - * it under the terms of the GNU General Public License version 2 as
 - * published by the Free Software Foundation.
 - */
+-
+-#ifndef __ASM_ARCH_HARDWARE_INCMACH_H
+-#error Do not include this file directly. Include asm/hardware.h instead !
+-#endif
+-
+-/* Hynix H7202 developer board specific device defines */
+-#ifdef CONFIG_ARCH_H7202
+-
+-/* FLASH */
+-#define H720X_FLASH_VIRT	0xd0000000
+-#define H720X_FLASH_PHYS	0x00000000
+-#define H720X_FLASH_SIZE	0x02000000
+-
+-/* onboard LAN controller */
+-# define ETH0_PHYS		0x08000000
+-
+-/* Touch screen defines */
+-/* GPIO Port */
+-#define PEN_GPIO		GPIO_B_VIRT
+-/* Bitmask for pen down interrupt */
+-#define PEN_INT_BIT		(1<<7)
+-/* Bitmask for pen up interrupt */
+-#define PEN_ENA_BIT		(1<<6)
+-/* pen up interrupt */
+-#define IRQ_PEN			IRQ_MUX_GPIOB(7)
+-
+-#endif
+-
+-/* Hynix H7201 developer board specific device defines */
+-#if defined (CONFIG_ARCH_H7201)
+-/* ROM DISK SPACE */
+-#define ROM_DISK_BASE           0xc1800000
+-#define ROM_DISK_START          0x41800000
+-#define ROM_DISK_SIZE           0x00700000
+-
+-/* SRAM DISK SPACE */
+-#define SRAM_DISK_BASE          0xf1000000
+-#define SRAM_DISK_START         0x04000000
+-#define SRAM_DISK_SIZE          0x00400000
+-#endif
+-
+diff --git a/arch/arm/mach-h720x/include/mach/debug-macro.S b/arch/arm/mach-h720x/include/mach/debug-macro.S
+deleted file mode 100644
+index 8a46157..0000000
+--- a/arch/arm/mach-h720x/include/mach/debug-macro.S
++++ /dev/null
+@@ -1,40 +0,0 @@
+-/* arch/arm/mach-h720x/include/mach/debug-macro.S
+- *
+- * Debugging macro include header
+- *
+- *  Copyright (C) 1994-1999 Russell King
+- *  Moved from linux/arch/arm/kernel/debug.S by Ben Dooks
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+-*/
+-
 -#include <mach/hardware.h>
 -
--	.macro	addruart, rp, rv, tmp
--	ldr	\rp, =GEMINI_UART_BASE			@ physical
--	ldr	\rv, =IO_ADDRESS(GEMINI_UART_BASE)	@ virtual
--	.endm
+-		.equ    io_virt, IO_VIRT
+-		.equ    io_phys, IO_PHYS
 -
--#define UART_SHIFT	2
--#define FLOW_CONTROL
--#include <asm/hardware/debug-8250.S>
-diff --git a/arch/arm/mach-gemini/include/mach/entry-macro.S b/arch/arm/mach-gemini/include/mach/entry-macro.S
+-		.macro  addruart, rp, rv, tmp
+-		mov     \rp, #0x00020000	@ UART1
+-		add     \rv, \rp, #io_virt	@ virtual address
+-		add     \rp, \rp, #io_phys	@ physical base address
+-		.endm
+-
+-		.macro  senduart,rd,rx
+-		str     \rd, [\rx, #0x0]        @ UARTDR
+-
+-		.endm
+-
+-		.macro  waituart,rd,rx
+-1001:		ldr     \rd, [\rx, #0x18]       @ UARTFLG
+-		tst     \rd, #1 << 5	       @ UARTFLGUTXFF - 1 when full
+-		bne     1001b
+-		.endm
+-
+-		.macro  busyuart,rd,rx
+-1001:		ldr     \rd, [\rx, #0x18]       @ UARTFLG
+-		tst     \rd, #1 << 3	       @ UARTFLGUBUSY - 1 when busy
+-		bne     1001b
+-		.endm
+diff --git a/arch/arm/mach-h720x/include/mach/entry-macro.S b/arch/arm/mach-h720x/include/mach/entry-macro.S
 deleted file mode 100644
-index f044e43..0000000
---- a/arch/arm/mach-gemini/include/mach/entry-macro.S
+index 75267fa..0000000
+--- a/arch/arm/mach-h720x/include/mach/entry-macro.S
 +++ /dev/null
-@@ -1,33 +0,0 @@
+@@ -1,57 +0,0 @@
 -/*
-- * Low-level IRQ helper macros for Gemini platform.
+- * arch/arm/mach-h720x/include/mach/entry-macro.S
 - *
-- *  Copyright (C) 2001-2006 Storlink, Corp.
-- *  Copyright (C) 2008-2009 Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
+- * Low-level IRQ helper macros for Hynix HMS720x based platforms
 - *
 - * This file is licensed under  the terms of the GNU General Public
 - * License version 2. This program is licensed "as is" without any
 - * warranty of any kind, whether express or implied.
 - */
--#include <mach/hardware.h>
 -
--#define IRQ_STATUS	0x14
+-		.macro  get_irqnr_preamble, base, tmp
+-		.endm
 -
--	.macro  get_irqnr_preamble, base, tmp
--	.endm
+-		.macro  get_irqnr_and_base, irqnr, irqstat, base, tmp
+-#if defined (CONFIG_CPU_H7201) || defined (CONFIG_CPU_H7202)
+-		@ we could use the id register on H7202, but this is not
+-		@ properly updated when we come back from asm_do_irq
+-		@ without a previous return from interrupt
+-		@ (see loops below in irq_svc, irq_usr)
+-		@ We see unmasked pending ints only, as the masked pending ints
+-		@ are not visible here
 -
--	.macro  get_irqnr_and_base, irqnr, irqstat, base, tmp
--	ldr     \irqstat, =IO_ADDRESS(GEMINI_INTERRUPT_BASE + IRQ_STATUS)
--	ldr     \irqnr, [\irqstat]
--	cmp     \irqnr, #0
--	beq     2313f
--	mov     \tmp, \irqnr
--	mov     \irqnr, #0
--2312:
--	tst     \tmp, #1
--	bne     2313f
--	add     \irqnr, \irqnr, #1
--	mov     \tmp, \tmp, lsr #1
--	cmp     \irqnr, #31
--	bcc     2312b
--2313:
--	.endm
-diff --git a/arch/arm/mach-gemini/include/mach/global_reg.h b/arch/arm/mach-gemini/include/mach/global_reg.h
-deleted file mode 100644
-index de7ff7e..0000000
---- a/arch/arm/mach-gemini/include/mach/global_reg.h
-+++ /dev/null
-@@ -1,278 +0,0 @@
--/*
-- *  This file contains the hardware definitions for Gemini.
-- *
-- *  Copyright (C) 2009 Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- */
--#ifndef __MACH_GLOBAL_REG_H
--#define __MACH_GLOBAL_REG_H
--
--/* Global Word ID Register*/
--#define GLOBAL_ID			0x00
--
--#define CHIP_ID(reg)			((reg) >> 8)
--#define CHIP_REVISION(reg)		((reg) & 0xFF)
--
--/* Global Status Register */
--#define GLOBAL_STATUS			0x04
--
--#define CPU_BIG_ENDIAN			(1 << 31)
--#define PLL_OSC_30M			(1 << 30)	/* else 60MHz */
--
--#define OPERATION_MODE_MASK		(0xF << 26)
--#define OPM_IDDQ			(0xF << 26)
--#define OPM_NAND			(0xE << 26)
--#define OPM_RING			(0xD << 26)
--#define OPM_DIRECT_BOOT			(0xC << 26)
--#define OPM_USB1_PHY_TEST		(0xB << 26)
--#define OPM_USB0_PHY_TEST		(0xA << 26)
--#define OPM_SATA1_PHY_TEST		(0x9 << 26)
--#define OPM_SATA0_PHY_TEST		(0x8 << 26)
--#define OPM_ICE_ARM			(0x7 << 26)
--#define OPM_ICE_FARADAY			(0x6 << 26)
--#define OPM_PLL_BYPASS			(0x5 << 26)
--#define OPM_DEBUG			(0x4 << 26)
--#define OPM_BURN_IN			(0x3 << 26)
--#define OPM_MBIST			(0x2 << 26)
--#define OPM_SCAN			(0x1 << 26)
--#define OPM_REAL			(0x0 << 26)
--
--#define FLASH_TYPE_MASK			(0x3 << 24)
--#define FLASH_TYPE_NAND_2K		(0x3 << 24)
--#define FLASH_TYPE_NAND_512		(0x2 << 24)
--#define FLASH_TYPE_PARALLEL		(0x1 << 24)
--#define FLASH_TYPE_SERIAL		(0x0 << 24)
--/* if parallel */
--#define FLASH_WIDTH_16BIT		(1 << 23)	/* else 8 bit */
--/* if serial */
--#define FLASH_ATMEL			(1 << 23)	/* else STM */
--
--#define FLASH_SIZE_MASK			(0x3 << 21)
--#define NAND_256M			(0x3 << 21)	/* and more */
--#define NAND_128M			(0x2 << 21)
--#define NAND_64M			(0x1 << 21)
--#define NAND_32M			(0x0 << 21)
--#define ATMEL_16M			(0x3 << 21)	/* and more */
--#define ATMEL_8M			(0x2 << 21)
--#define ATMEL_4M_2M			(0x1 << 21)
--#define ATMEL_1M			(0x0 << 21)	/* and less */
--#define STM_32M				(1 << 22)	/* and more */
--#define STM_16M				(0 << 22)	/* and less */
--
--#define FLASH_PARALLEL_HIGH_PIN_CNT	(1 << 20)	/* else low pin cnt */
--
--#define CPU_AHB_RATIO_MASK		(0x3 << 18)
--#define CPU_AHB_1_1			(0x0 << 18)
--#define CPU_AHB_3_2			(0x1 << 18)
--#define CPU_AHB_24_13			(0x2 << 18)
--#define CPU_AHB_2_1			(0x3 << 18)
--
--#define REG_TO_AHB_SPEED(reg)		((((reg) >> 15) & 0x7) * 10 + 130)
--#define AHB_SPEED_TO_REG(x)		((((x - 130)) / 10) << 15)
--
--/* it is posible to override some settings, use >> OVERRIDE_xxxx_SHIFT */
--#define OVERRIDE_FLASH_TYPE_SHIFT	16
--#define OVERRIDE_FLASH_WIDTH_SHIFT	16
--#define OVERRIDE_FLASH_SIZE_SHIFT	16
--#define OVERRIDE_CPU_AHB_RATIO_SHIFT	15
--#define OVERRIDE_AHB_SPEED_SHIFT	15
--
--/* Global PLL Control Register */
--#define GLOBAL_PLL_CTRL			0x08
--
--#define PLL_BYPASS			(1 << 31)
--#define PLL_POWER_DOWN			(1 << 8)
--#define PLL_CONTROL_Q			(0x1F << 0)
--
--/* Global Soft Reset Control Register */
--#define GLOBAL_RESET			0x0C
--
--#define RESET_GLOBAL			(1 << 31)
--#define RESET_CPU1			(1 << 30)
--#define RESET_TVE			(1 << 28)
--#define RESET_SATA1			(1 << 27)
--#define RESET_SATA0			(1 << 26)
--#define RESET_CIR			(1 << 25)
--#define RESET_EXT_DEV			(1 << 24)
--#define RESET_WD			(1 << 23)
--#define RESET_GPIO2			(1 << 22)
--#define RESET_GPIO1			(1 << 21)
--#define RESET_GPIO0			(1 << 20)
--#define RESET_SSP			(1 << 19)
--#define RESET_UART			(1 << 18)
--#define RESET_TIMER			(1 << 17)
--#define RESET_RTC			(1 << 16)
--#define RESET_INT1			(1 << 15)
--#define RESET_INT0			(1 << 14)
--#define RESET_LCD			(1 << 13)
--#define RESET_LPC			(1 << 12)
--#define RESET_APB			(1 << 11)
--#define RESET_DMA			(1 << 10)
--#define RESET_USB1			(1 << 9)
--#define RESET_USB0			(1 << 8)
--#define RESET_PCI			(1 << 7)
--#define RESET_GMAC1			(1 << 6)
--#define RESET_GMAC0			(1 << 5)
--#define RESET_SECURITY			(1 << 4)
--#define RESET_RAID			(1 << 3)
--#define RESET_IDE			(1 << 2)
--#define RESET_FLASH			(1 << 1)
--#define RESET_DRAM			(1 << 0)
--
--/* Global IO Pad Driving Capability Control Register */
--#define GLOBAL_IO_DRIVING_CTRL		0x10
--
--#define DRIVING_CURRENT_MASK		0x3
--
--/* here 00-4mA, 01-8mA, 10-12mA, 11-16mA */
--#define GPIO1_PADS_31_28_SHIFT		28
--#define GPIO0_PADS_31_16_SHIFT		26
--#define GPIO0_PADS_15_0_SHIFT		24
--#define PCI_AND_EXT_RESET_PADS_SHIFT	22
--#define IDE_PADS_SHIFT			20
--#define GMAC1_PADS_SHIFT		18
--#define GMAC0_PADS_SHIFT		16
--/* DRAM is not in mA and poorly documented */
--#define DRAM_CLOCK_PADS_SHIFT		8
--#define DRAM_DATA_PADS_SHIFT		4
--#define DRAM_CONTROL_PADS_SHIFT		0
--
--/* Global IO Pad Slew Rate Control Register */
--#define GLOBAL_IO_SLEW_RATE_CTRL	0x14
--
--#define GPIO1_PADS_31_28_SLOW		(1 << 10)
--#define GPIO0_PADS_31_16_SLOW		(1 << 9)
--#define GPIO0_PADS_15_0_SLOW		(1 << 8)
--#define PCI_PADS_SLOW			(1 << 7)
--#define IDE_PADS_SLOW			(1 << 6)
--#define GMAC1_PADS_SLOW			(1 << 5)
--#define GMAC0_PADS_SLOW			(1 << 4)
--#define DRAM_CLOCK_PADS_SLOW		(1 << 1)
--#define DRAM_IO_PADS_SLOW		(1 << 0)
--
--/*
-- * General skew control defines
-- * 16 steps, each step is around 0.2ns
-- */
--#define SKEW_MASK			0xF
--
--/* Global IDE PAD Skew Control Register */
--#define GLOBAL_IDE_SKEW_CTRL		0x18
--
--#define IDE1_HOST_STROBE_DELAY_SHIFT	28
--#define IDE1_DEVICE_STROBE_DELAY_SHIFT	24
--#define IDE1_OUTPUT_IO_SKEW_SHIFT	20
--#define IDE1_INPUT_IO_SKEW_SHIFT	16
--#define IDE0_HOST_STROBE_DELAY_SHIFT	12
--#define IDE0_DEVICE_STROBE_DELAY_SHIFT	8
--#define IDE0_OUTPUT_IO_SKEW_SHIFT	4
--#define IDE0_INPUT_IO_SKEW_SHIFT	0
--
--/* Global GMAC Control Pad Skew Control Register */
--#define GLOBAL_GMAC_CTRL_SKEW_CTRL	0x1C
--
--#define GMAC1_TXC_SKEW_SHIFT		28
--#define GMAC1_TXEN_SKEW_SHIFT		24
--#define GMAC1_RXC_SKEW_SHIFT		20
--#define GMAC1_RXDV_SKEW_SHIFT		16
--#define GMAC0_TXC_SKEW_SHIFT		12
--#define GMAC0_TXEN_SKEW_SHIFT		8
--#define GMAC0_RXC_SKEW_SHIFT		4
--#define GMAC0_RXDV_SKEW_SHIFT		0
--
--/* Global GMAC0 Data PAD Skew Control Register */
--#define GLOBAL_GMAC0_DATA_SKEW_CTRL	0x20
--/* Global GMAC1 Data PAD Skew Control Register */
--#define GLOBAL_GMAC1_DATA_SKEW_CTRL	0x24
--
--#define GMAC_TXD_SKEW_SHIFT(x)		(((x) * 4) + 16)
--#define GMAC_RXD_SKEW_SHIFT(x)		((x) * 4)
--
--/* CPU has two AHB busses. */
--
--/* Global Arbitration0 Control Register */
--#define GLOBAL_ARBITRATION0_CTRL	0x28
--
--#define BOOT_CONTROLLER_HIGH_PRIO	(1 << 3)
--#define DMA_BUS1_HIGH_PRIO		(1 << 2)
--#define CPU0_HIGH_PRIO			(1 << 0)
--
--/* Global Arbitration1 Control Register */
--#define GLOBAL_ARBITRATION1_CTRL	0x2C
--
--#define TVE_HIGH_PRIO			(1 << 9)
--#define PCI_HIGH_PRIO			(1 << 8)
--#define USB1_HIGH_PRIO			(1 << 7)
--#define USB0_HIGH_PRIO			(1 << 6)
--#define GMAC1_HIGH_PRIO			(1 << 5)
--#define GMAC0_HIGH_PRIO			(1 << 4)
--#define SECURITY_HIGH_PRIO		(1 << 3)
--#define RAID_HIGH_PRIO			(1 << 2)
--#define IDE_HIGH_PRIO			(1 << 1)
--#define DMA_BUS2_HIGH_PRIO		(1 << 0)
--
--/* Common bits for both arbitration registers */
--#define BURST_LENGTH_SHIFT		16
--#define BURST_LENGTH_MASK		(0x3F << 16)
--
--/* Miscellaneous Control Register */
--#define GLOBAL_MISC_CTRL		0x30
--
--#define MEMORY_SPACE_SWAP		(1 << 31)
--#define USB1_PLUG_MINIB			(1 << 30) /* else plug is mini-A */
--#define USB0_PLUG_MINIB			(1 << 29)
--#define GMAC_GMII			(1 << 28)
--#define GMAC_1_ENABLE			(1 << 27)
--/* TODO: define ATA/SATA bits */
--#define USB1_VBUS_ON			(1 << 23)
--#define USB0_VBUS_ON			(1 << 22)
--#define APB_CLKOUT_ENABLE		(1 << 21)
--#define TVC_CLKOUT_ENABLE		(1 << 20)
--#define EXT_CLKIN_ENABLE		(1 << 19)
--#define PCI_66MHZ			(1 << 18) /* else 33 MHz */
--#define PCI_CLKOUT_ENABLE		(1 << 17)
--#define LPC_CLKOUT_ENABLE		(1 << 16)
--#define USB1_WAKEUP_ON			(1 << 15)
--#define USB0_WAKEUP_ON			(1 << 14)
--/* TODO: define PCI idle detect bits */
--#define TVC_PADS_ENABLE			(1 << 9)
--#define SSP_PADS_ENABLE			(1 << 8)
--#define LCD_PADS_ENABLE			(1 << 7)
--#define LPC_PADS_ENABLE			(1 << 6)
--#define PCI_PADS_ENABLE			(1 << 5)
--#define IDE_PADS_ENABLE			(1 << 4)
--#define DRAM_PADS_POWER_DOWN		(1 << 3)
--#define NAND_PADS_DISABLE		(1 << 2)
--#define PFLASH_PADS_DISABLE		(1 << 1)
--#define SFLASH_PADS_DISABLE		(1 << 0)
--
--/* Global Clock Control Register */
--#define GLOBAL_CLOCK_CTRL		0x34
--
--#define POWER_STATE_G0			(1 << 31)
--#define POWER_STATE_S1			(1 << 30) /* else it is S3/S4 state */
--#define SECURITY_APB_AHB		(1 << 29)
--/* else Security APB clk will be 0.75xAHB */
--/* TODO: TVC clock divider */
--#define PCI_CLKRUN_ENABLE		(1 << 16)
--#define BOOT_CLK_DISABLE		(1 << 13)
--#define TVC_CLK_DISABLE			(1 << 12)
--#define FLASH_CLK_DISABLE		(1 << 11)
--#define DDR_CLK_DISABLE			(1 << 10)
--#define PCI_CLK_DISABLE			(1 << 9)
--#define IDE_CLK_DISABLE			(1 << 8)
--#define USB1_CLK_DISABLE		(1 << 7)
--#define USB0_CLK_DISABLE		(1 << 6)
--#define SATA1_CLK_DISABLE		(1 << 5)
--#define SATA0_CLK_DISABLE		(1 << 4)
--#define GMAC1_CLK_DISABLE		(1 << 3)
--#define GMAC0_CLK_DISABLE		(1 << 2)
--#define SECURITY_CLK_DISABLE		(1 << 1)
--
--/* TODO: other registers definitions if needed */
--
--#endif /* __MACH_GLOBAL_REG_H */
-diff --git a/arch/arm/mach-gemini/include/mach/gpio.h b/arch/arm/mach-gemini/include/mach/gpio.h
-deleted file mode 100644
-index 40a0527..0000000
---- a/arch/arm/mach-gemini/include/mach/gpio.h
-+++ /dev/null
-@@ -1,20 +0,0 @@
--/*
-- * Gemini gpiolib specific defines
-- *
-- * Copyright (C) 2008-2009 Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- */
--
--#ifndef __MACH_GPIO_H__
--#define __MACH_GPIO_H__
--
--#include <mach/irqs.h>
--
--#define gpio_to_irq(x)	((x) + GPIO_IRQ_BASE)
--#define irq_to_gpio(x)	((x) - GPIO_IRQ_BASE)
--
--#endif /* __MACH_GPIO_H__ */
-diff --git a/arch/arm/mach-gemini/include/mach/hardware.h b/arch/arm/mach-gemini/include/mach/hardware.h
-deleted file mode 100644
-index 98e7b0f..0000000
---- a/arch/arm/mach-gemini/include/mach/hardware.h
-+++ /dev/null
-@@ -1,74 +0,0 @@
--/*
-- *  This file contains the hardware definitions for Gemini.
-- *
-- *  Copyright (C) 2001-2006 Storlink, Corp.
-- *  Copyright (C) 2008-2009 Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- */
--#ifndef __MACH_HARDWARE_H
--#define __MACH_HARDWARE_H
--
--/*
-- * Memory Map definitions
-- */
--#ifdef CONFIG_GEMINI_MEM_SWAP
--# define GEMINI_DRAM_BASE	0x00000000
--# define GEMINI_SRAM_BASE	0x70000000
+-		mov     \base, #0xf0000000	       @ base register
+-		orr     \base, \base, #0x24000	       @ irqbase
+-		ldr     \irqstat, [\base, #0x04]        @ get interrupt status
+-#if defined (CONFIG_CPU_H7201)
+-		ldr	\tmp, =0x001fffff
 -#else
--# define GEMINI_SRAM_BASE	0x00000000
--# define GEMINI_DRAM_BASE	0x10000000
+-		mvn     \tmp, #0xc0000000
 -#endif
--#define GEMINI_FLASH_BASE	0x30000000
--#define GEMINI_GLOBAL_BASE	0x40000000
--#define GEMINI_WAQTCHDOG_BASE	0x41000000
--#define GEMINI_UART_BASE	0x42000000
--#define GEMINI_TIMER_BASE	0x43000000
--#define GEMINI_LCD_BASE		0x44000000
--#define GEMINI_RTC_BASE		0x45000000
--#define GEMINI_SATA_BASE	0x46000000
--#define GEMINI_LPC_HOST_BASE	0x47000000
--#define GEMINI_LPC_IO_BASE	0x47800000
--#define GEMINI_INTERRUPT_BASE	0x48000000
--/* TODO: Different interrupt controllers when SMP
-- * #define GEMINI_INTERRUPT0_BASE	0x48000000
-- * #define GEMINI_INTERRUPT1_BASE	0x49000000
-- */
--#define GEMINI_SSP_CTRL_BASE	0x4A000000
--#define GEMINI_POWER_CTRL_BASE	0x4B000000
--#define GEMINI_CIR_BASE		0x4C000000
--#define GEMINI_GPIO_BASE(x)	(0x4D000000 + (x) * 0x1000000)
--#define GEMINI_PCI_IO_BASE	0x50000000
--#define GEMINI_PCI_MEM_BASE	0x58000000
--#define GEMINI_TOE_BASE		0x60000000
--#define GEMINI_GMAC0_BASE	0x6000A000
--#define GEMINI_GMAC1_BASE	0x6000E000
--#define GEMINI_SECURITY_BASE	0x62000000
--#define GEMINI_IDE0_BASE	0x63000000
--#define GEMINI_IDE1_BASE	0x63400000
--#define GEMINI_RAID_BASE	0x64000000
--#define GEMINI_FLASH_CTRL_BASE	0x65000000
--#define GEMINI_DRAM_CTRL_BASE	0x66000000
--#define GEMINI_GENERAL_DMA_BASE	0x67000000
--#define GEMINI_USB0_BASE	0x68000000
--#define GEMINI_USB1_BASE	0x69000000
--#define GEMINI_BIG_ENDIAN_BASE	0x80000000
+-		and     \irqstat, \irqstat, \tmp        @ mask out unused ints
+-		mov     \irqnr, #0
 -
--#define GEMINI_TIMER1_BASE	GEMINI_TIMER_BASE
--#define GEMINI_TIMER2_BASE	(GEMINI_TIMER_BASE + 0x10)
--#define GEMINI_TIMER3_BASE	(GEMINI_TIMER_BASE + 0x20)
+-		mov     \tmp, #0xff00
+-		orr     \tmp, \tmp, #0xff
+-		tst     \irqstat, \tmp
+-		addeq   \irqnr, \irqnr, #16
+-		moveq   \irqstat, \irqstat, lsr #16
+-		tst     \irqstat, #255
+-		addeq   \irqnr, \irqnr, #8
+-		moveq   \irqstat, \irqstat, lsr #8
+-		tst     \irqstat, #15
+-		addeq   \irqnr, \irqnr, #4
+-		moveq   \irqstat, \irqstat, lsr #4
+-		tst     \irqstat, #3
+-		addeq   \irqnr, \irqnr, #2
+-		moveq   \irqstat, \irqstat, lsr #2
+-		tst     \irqstat, #1
+-		addeq   \irqnr, \irqnr, #1
+-		moveq   \irqstat, \irqstat, lsr #1
+-		tst     \irqstat, #1		       @ bit 0 should be set
+-		.endm
+-
+-#else
+-#error hynix processor selection missmatch
+-#endif
+-
+diff --git a/arch/arm/mach-h720x/include/mach/h7201-regs.h b/arch/arm/mach-h720x/include/mach/h7201-regs.h
+deleted file mode 100644
+index 611b494..0000000
+--- a/arch/arm/mach-h720x/include/mach/h7201-regs.h
++++ /dev/null
+@@ -1,67 +0,0 @@
+-/*
+- * arch/arm/mach-h720x/include/mach/h7201-regs.h
+- *
+- * Copyright (C) 2000 Jungjun Kim, Hynix Semiconductor Inc.
+- *           (C) 2003 Thomas Gleixner <tglx@linutronix.de>
+- *           (C) 2003 Robert Schwebel <r.schwebel@pengutronix.de>
+- *           (C) 2004 Sascha Hauer    <s.hauer@pengutronix.de>
+- *
+- * This file contains the hardware definitions of the h720x processors
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * Do not add implementations specific defines here. This files contains
+- * only defines of the onchip peripherals. Add those defines to boards.h,
+- * which is included by this file.
+- */
+-
+-#define SERIAL2_VIRT 		(IO_VIRT + 0x50100)
+-#define SERIAL3_VIRT 		(IO_VIRT + 0x50200)
 -
 -/*
-- * UART Clock when System clk is 150MHz
+- * PCMCIA
 - */
--#define UART_CLK	48000000
+-#define PCMCIA0_ATT_BASE        0xe5000000
+-#define PCMCIA0_ATT_SIZE        0x00200000
+-#define PCMCIA0_ATT_START       0x20000000
+-#define PCMCIA0_MEM_BASE        0xe5200000
+-#define PCMCIA0_MEM_SIZE        0x00200000
+-#define PCMCIA0_MEM_START       0x24000000
+-#define PCMCIA0_IO_BASE         0xe5400000
+-#define PCMCIA0_IO_SIZE         0x00200000
+-#define PCMCIA0_IO_START        0x28000000
 -
+-#define PCMCIA1_ATT_BASE        0xe5600000
+-#define PCMCIA1_ATT_SIZE        0x00200000
+-#define PCMCIA1_ATT_START       0x30000000
+-#define PCMCIA1_MEM_BASE        0xe5800000
+-#define PCMCIA1_MEM_SIZE        0x00200000
+-#define PCMCIA1_MEM_START       0x34000000
+-#define PCMCIA1_IO_BASE         0xe5a00000
+-#define PCMCIA1_IO_SIZE         0x00200000
+-#define PCMCIA1_IO_START        0x38000000
+-
+-#define PRIME3C_BASE            0xf0050000
+-#define PRIME3C_SIZE            0x00001000
+-#define PRIME3C_START           0x10000000
+-
+-/* VGA Controller */
+-#define VGA_RAMBASE 		0x50
+-#define VGA_TIMING0 		0x60
+-#define VGA_TIMING1 		0x64
+-#define VGA_TIMING2 		0x68
+-#define VGA_TIMING3 		0x6c
+-
+-#define LCD_CTRL_VGA_ENABLE   	0x00000100
+-#define LCD_CTRL_VGA_BPP_MASK 	0x00000600
+-#define LCD_CTRL_VGA_4BPP    	0x00000000
+-#define LCD_CTRL_VGA_8BPP    	0x00000200
+-#define LCD_CTRL_VGA_16BPP   	0x00000300
+-#define LCD_CTRL_SHARE_DMA    	0x00000800
+-#define LCD_CTRL_VDE          	0x00100000
+-#define LCD_CTRL_LPE          	0x00400000	/* LCD Power enable */
+-#define LCD_CTRL_BLE          	0x00800000	/* LCD backlight enable */
+-
+-#define VGA_PALETTE_BASE	(IO_VIRT + 0x10800)
+diff --git a/arch/arm/mach-h720x/include/mach/h7202-regs.h b/arch/arm/mach-h720x/include/mach/h7202-regs.h
+deleted file mode 100644
+index 17c12eb..0000000
+--- a/arch/arm/mach-h720x/include/mach/h7202-regs.h
++++ /dev/null
+@@ -1,155 +0,0 @@
 -/*
-- * macro to get at IO space when running virtually
+- * arch/arm/mach-h720x/include/mach/h7202-regs.h
+- *
+- * Copyright (C) 2000 Jungjun Kim, Hynix Semiconductor Inc.
+- *           (C) 2003 Thomas Gleixner <tglx@linutronix.de>
+- *           (C) 2003 Robert Schwebel <r.schwebel@pengutronix.de>
+- *           (C) 2004 Sascha Hauer    <s.hauer@pengutronix.de>
+- *
+- * This file contains the hardware definitions of the h720x processors
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * Do not add implementations specific defines here. This files contains
+- * only defines of the onchip peripherals. Add those defines to boards.h,
+- * which is included by this file.
 - */
--#define IO_ADDRESS(x)	IOMEM((((x) & 0xFFF00000) >> 4) | ((x) & 0x000FFFFF) | 0xF0000000)
+-
+-#define SERIAL2_OFS		0x2d000
+-#define SERIAL2_BASE		(IO_PHYS + SERIAL2_OFS)
+-#define SERIAL2_VIRT 		(IO_VIRT + SERIAL2_OFS)
+-#define SERIAL3_OFS		0x2e000
+-#define SERIAL3_BASE		(IO_PHYS + SERIAL3_OFS)
+-#define SERIAL3_VIRT 		(IO_VIRT + SERIAL3_OFS)
+-
+-/* Matrix Keyboard Controller */
+-#define KBD_VIRT		(IO_VIRT + 0x22000)
+-#define KBD_KBCR		0x00
+-#define KBD_KBSC		0x04
+-#define KBD_KBTR		0x08
+-#define KBD_KBVR0		0x0C
+-#define KBD_KBVR1		0x10
+-#define KBD_KBSR		0x18
+-
+-#define KBD_KBCR_SCANENABLE	(1 << 7)
+-#define KBD_KBCR_NPOWERDOWN	(1 << 2)
+-#define KBD_KBCR_CLKSEL_MASK	(3)
+-#define KBD_KBCR_CLKSEL_PCLK2	0x0
+-#define KBD_KBCR_CLKSEL_PCLK128	0x1
+-#define KBD_KBCR_CLKSEL_PCLK256	0x2
+-#define KBD_KBCR_CLKSEL_PCLK512	0x3
+-
+-#define KBD_KBSR_INTR		(1 << 0)
+-#define KBD_KBSR_WAKEUP		(1 << 1)
+-
+-/* USB device controller */
+-
+-#define USBD_BASE		(IO_VIRT + 0x12000)
+-#define USBD_LENGTH		0x3C
+-
+-#define USBD_GCTRL		0x00
+-#define USBD_EPCTRL		0x04
+-#define USBD_INTMASK		0x08
+-#define USBD_INTSTAT		0x0C
+-#define USBD_PWR		0x10
+-#define USBD_DMARXTX		0x14
+-#define USBD_DEVID		0x18
+-#define USBD_DEVCLASS		0x1C
+-#define USBD_INTCLASS		0x20
+-#define USBD_SETUP0		0x24
+-#define USBD_SETUP1		0x28
+-#define USBD_ENDP0RD		0x2C
+-#define USBD_ENDP0WT		0x30
+-#define USBD_ENDP1RD		0x34
+-#define USBD_ENDP2WT		0x38
+-
+-/* PS/2 port */
+-#define PSDATA 0x00
+-#define PSSTAT 0x04
+-#define PSSTAT_TXEMPTY (1<<0)
+-#define PSSTAT_TXBUSY (1<<1)
+-#define PSSTAT_RXFULL (1<<2)
+-#define PSSTAT_RXBUSY (1<<3)
+-#define PSSTAT_CLKIN (1<<4)
+-#define PSSTAT_DATAIN (1<<5)
+-#define PSSTAT_PARITY (1<<6)
+-
+-#define PSCONF 0x08
+-#define PSCONF_ENABLE (1<<0)
+-#define PSCONF_TXINTEN (1<<2)
+-#define PSCONF_RXINTEN (1<<3)
+-#define PSCONF_FORCECLKLOW (1<<4)
+-#define PSCONF_FORCEDATLOW (1<<5)
+-#define PSCONF_LCE (1<<6)
+-
+-#define PSINTR 0x0C
+-#define PSINTR_TXINT (1<<0)
+-#define PSINTR_RXINT (1<<1)
+-#define PSINTR_PAR (1<<2)
+-#define PSINTR_RXTO (1<<3)
+-#define PSINTR_TXTO (1<<4)
+-
+-#define PSTDLO 0x10 /* clk low before start transmission */
+-#define PSTPRI 0x14 /* PRI clock */
+-#define PSTXMT 0x18 /* maximum transmission time */
+-#define PSTREC 0x20 /* maximum receive time */
+-#define PSPWDN 0x3c
+-
+-/* ADC converter */
+-#define ADC_BASE 		(IO_VIRT + 0x29000)
+-#define ADC_CR 			0x00
+-#define ADC_TSCTRL 		0x04
+-#define ADC_BT_CTRL 		0x08
+-#define ADC_MC_CTRL		0x0C
+-#define ADC_STATUS		0x10
+-
+-/* ADC control register bits */
+-#define ADC_CR_PW_CTRL 		0x80
+-#define ADC_CR_DIRECTC		0x04
+-#define ADC_CR_CONTIME_NO	0x00
+-#define ADC_CR_CONTIME_2	0x04
+-#define ADC_CR_CONTIME_4	0x08
+-#define ADC_CR_CONTIME_ADE	0x0c
+-#define ADC_CR_LONGCALTIME	0x01
+-
+-/* ADC touch panel register bits */
+-#define ADC_TSCTRL_ENABLE 	0x80
+-#define ADC_TSCTRL_INTR   	0x40
+-#define	ADC_TSCTRL_SWBYPSS	0x20
+-#define ADC_TSCTRL_SWINVT	0x10
+-#define ADC_TSCTRL_S400   	0x03
+-#define ADC_TSCTRL_S200   	0x02
+-#define ADC_TSCTRL_S100   	0x01
+-#define ADC_TSCTRL_S50    	0x00
+-
+-/* ADC Interrupt Status Register bits */
+-#define ADC_STATUS_TS_BIT	0x80
+-#define ADC_STATUS_MBT_BIT	0x40
+-#define ADC_STATUS_BBT_BIT	0x20
+-#define ADC_STATUS_MIC_BIT	0x10
+-
+-/* Touch data registers */
+-#define ADC_TS_X0X1  		0x30
+-#define ADC_TS_X2X3		0x34
+-#define ADC_TS_Y0Y1		0x38
+-#define ADC_TS_Y2Y3  		0x3c
+-#define ADC_TS_X4X5  		0x40
+-#define ADC_TS_X6X7  		0x44
+-#define ADC_TS_Y4Y5		0x48
+-#define ADC_TS_Y6Y7		0x50
+-
+-/* battery data */
+-#define ADC_MB_DATA		0x54
+-#define ADC_BB_DATA		0x58
+-
+-/* Sound data register */
+-#define ADC_SD_DAT0 		0x60
+-#define ADC_SD_DAT1		0x64
+-#define ADC_SD_DAT2		0x68
+-#define ADC_SD_DAT3		0x6c
+-#define ADC_SD_DAT4		0x70
+-#define ADC_SD_DAT5		0x74
+-#define ADC_SD_DAT6		0x78
+-#define ADC_SD_DAT7		0x7c
+diff --git a/arch/arm/mach-h720x/include/mach/hardware.h b/arch/arm/mach-h720x/include/mach/hardware.h
+deleted file mode 100644
+index c55a52c..0000000
+--- a/arch/arm/mach-h720x/include/mach/hardware.h
++++ /dev/null
+@@ -1,190 +0,0 @@
+-/*
+- * arch/arm/mach-h720x/include/mach/hardware.h
+- *
+- * Copyright (C) 2000 Jungjun Kim, Hynix Semiconductor Inc.
+- *           (C) 2003 Thomas Gleixner <tglx@linutronix.de>
+- *           (C) 2003 Robert Schwebel <r.schwebel@pengutronix.de>
+- *
+- * This file contains the hardware definitions of the h720x processors
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * Do not add implementations specific defines here. This files contains
+- * only defines of the onchip peripherals. Add those defines to boards.h,
+- * which is included by this file.
+- */
+-
+-#ifndef __ASM_ARCH_HARDWARE_H
+-#define __ASM_ARCH_HARDWARE_H
+-
+-#define IOCLK (3686400L)
+-
+-/* Onchip peripherals */
+-
+-#define IO_VIRT			0xf0000000	/* IO peripherals */
+-#define IO_PHYS			0x80000000
+-#define IO_SIZE			0x00050000
+-
+-#ifdef CONFIG_CPU_H7202
+-#include "h7202-regs.h"
+-#elif defined CONFIG_CPU_H7201
+-#include "h7201-regs.h"
+-#else
+-#error machine definition mismatch
+-#endif
+-
+-/* Macro to access the CPU IO */
+-#define CPU_IO(x) (*(volatile u32*)(x))
+-
+-/* Macro to access general purpose regs (base, offset) */
+-#define CPU_REG(x,y) CPU_IO(x+y)
+-
+-/* Macro to access irq related regs */
+-#define IRQ_REG(x) CPU_REG(IRQC_VIRT,x)
+-
+-/* CPU registers */
+-/* general purpose I/O */
+-#define GPIO_VIRT(x)		(IO_VIRT + 0x23000 + ((x)<<5))
+-#define GPIO_A_VIRT		(GPIO_VIRT(0))
+-#define GPIO_B_VIRT		(GPIO_VIRT(1))
+-#define GPIO_C_VIRT		(GPIO_VIRT(2))
+-#define GPIO_D_VIRT		(GPIO_VIRT(3))
+-#define GPIO_E_VIRT		(GPIO_VIRT(4))
+-#define GPIO_AMULSEL		(GPIO_VIRT(0) + 0xA4)
+-
+-#define AMULSEL_USIN2	(1<<5)
+-#define AMULSEL_USOUT2	(1<<6)
+-#define AMULSEL_USIN3	(1<<13)
+-#define AMULSEL_USOUT3	(1<<14)
+-#define AMULSEL_IRDIN	(1<<15)
+-#define AMULSEL_IRDOUT	(1<<7)
+-
+-/* Register offsets general purpose I/O */
+-#define GPIO_DATA		0x00
+-#define GPIO_DIR		0x04
+-#define GPIO_MASK		0x08
+-#define GPIO_STAT		0x0C
+-#define GPIO_EDGE		0x10
+-#define GPIO_CLR		0x14
+-#define GPIO_POL		0x18
+-#define GPIO_EN			0x1C
+-
+-/*interrupt controller */
+-#define IRQC_VIRT		(IO_VIRT + 0x24000)
+-/* register offset interrupt controller */
+-#define IRQC_IER		0x00
+-#define IRQC_ISR		0x04
+-
+-/* timer unit */
+-#define TIMER_VIRT		(IO_VIRT + 0x25000)
+-/* Register offsets timer unit */
+-#define TM0_PERIOD   		0x00
+-#define TM0_COUNT    		0x08
+-#define TM0_CTRL     		0x10
+-#define TM1_PERIOD   		0x20
+-#define TM1_COUNT    		0x28
+-#define TM1_CTRL     		0x30
+-#define TM2_PERIOD   		0x40
+-#define TM2_COUNT    		0x48
+-#define TM2_CTRL     		0x50
+-#define TIMER_TOPCTRL		0x60
+-#define TIMER_TOPSTAT		0x64
+-#define T64_COUNTL		0x80
+-#define T64_COUNTH		0x84
+-#define T64_CTRL		0x88
+-#define T64_BASEL		0x94
+-#define T64_BASEH		0x98
+-/* Bitmaks timer unit TOPSTAT reg */
+-#define TSTAT_T0INT		0x1
+-#define TSTAT_T1INT		0x2
+-#define TSTAT_T2INT		0x4
+-#define TSTAT_T3INT		0x8
+-/* Bit description of TMx_CTRL register */
+-#define TM_START  		0x1
+-#define TM_REPEAT 		0x2
+-#define TM_RESET  		0x4
+-/* Bit description of TIMER_CTRL register */
+-#define ENABLE_TM0_INTR  	0x1
+-#define ENABLE_TM1_INTR  	0x2
+-#define ENABLE_TM2_INTR  	0x4
+-#define TIMER_ENABLE_BIT 	0x8
+-#define ENABLE_TIMER64   	0x10
+-#define ENABLE_TIMER64_INT	0x20
+-
+-/* PMU & PLL */
+-#define PMU_BASE 		(IO_VIRT + 0x1000)
+-#define PMU_MODE		0x00
+-#define PMU_STAT   		0x20
+-#define PMU_PLL_CTRL 		0x28
+-
+-/* PMU Mode bits */
+-#define PMU_MODE_SLOW		0x00
+-#define PMU_MODE_RUN		0x01
+-#define PMU_MODE_IDLE		0x02
+-#define PMU_MODE_SLEEP		0x03
+-#define PMU_MODE_INIT		0x04
+-#define PMU_MODE_DEEPSLEEP	0x07
+-#define PMU_MODE_WAKEUP		0x08
+-
+-/* PMU ... */
+-#define PLL_2_EN		0x8000
+-#define PLL_1_EN		0x4000
+-#define PLL_3_MUTE		0x0080
+-
+-/* Control bits for PMU/ PLL */
+-#define PMU_WARMRESET		0x00010000
+-#define PLL_CTRL_MASK23		0x000080ff
+-
+-/* LCD Controller */
+-#define LCD_BASE 		(IO_VIRT + 0x10000)
+-#define LCD_CTRL 		0x00
+-#define LCD_STATUS		0x04
+-#define LCD_STATUS_M		0x08
+-#define LCD_INTERRUPT		0x0C
+-#define LCD_DBAR		0x10
+-#define LCD_DCAR		0x14
+-#define LCD_TIMING0 		0x20
+-#define LCD_TIMING1 		0x24
+-#define LCD_TIMING2 		0x28
+-#define LCD_TEST		0x40
+-
+-/* LCD Control Bits */
+-#define LCD_CTRL_LCD_ENABLE   	0x00000001
+-/* Bits per pixel */
+-#define LCD_CTRL_LCD_BPP_MASK 	0x00000006
+-#define LCD_CTRL_LCD_4BPP    	0x00000000
+-#define LCD_CTRL_LCD_8BPP    	0x00000002
+-#define LCD_CTRL_LCD_16BPP   	0x00000004
+-#define LCD_CTRL_LCD_BW		0x00000008
+-#define LCD_CTRL_LCD_TFT	0x00000010
+-#define LCD_CTRL_BGR		0x00001000
+-#define LCD_CTRL_LCD_VCOMP	0x00080000
+-#define LCD_CTRL_LCD_MONO8	0x00200000
+-#define LCD_CTRL_LCD_PWR	0x00400000
+-#define LCD_CTRL_LCD_BLE	0x00800000
+-#define LCD_CTRL_LDBUSEN	0x01000000
+-
+-/* Palette */
+-#define LCD_PALETTE_BASE 	(IO_VIRT + 0x10400)
+-
+-/* Serial ports */
+-#define SERIAL0_OFS		0x20000
+-#define SERIAL0_VIRT 		(IO_VIRT + SERIAL0_OFS)
+-#define SERIAL0_BASE		(IO_PHYS + SERIAL0_OFS)
+-
+-#define SERIAL1_OFS		0x21000
+-#define SERIAL1_VIRT 		(IO_VIRT + SERIAL1_OFS)
+-#define SERIAL1_BASE		(IO_PHYS + SERIAL1_OFS)
+-
+-#define SERIAL_ENABLE		0x30
+-#define SERIAL_ENABLE_EN	(1<<0)
+-
+-/* General defines to pacify gcc */
+-
+-#define __ASM_ARCH_HARDWARE_INCMACH_H
+-#include "boards.h"
+-#undef __ASM_ARCH_HARDWARE_INCMACH_H
+-
+-#endif				/* __ASM_ARCH_HARDWARE_H */
+diff --git a/arch/arm/mach-h720x/include/mach/irqs.h b/arch/arm/mach-h720x/include/mach/irqs.h
+deleted file mode 100644
+index 430a92b..0000000
+--- a/arch/arm/mach-h720x/include/mach/irqs.h
++++ /dev/null
+@@ -1,116 +0,0 @@
+-/*
+- * arch/arm/mach-h720x/include/mach/irqs.h
+- *
+- * Copyright (C) 2000 Jungjun Kim
+- *           (C) 2003 Robert Schwebel <r.schwebel@pengutronix.de>
+- *           (C) 2003 Thomas Gleixner <tglx@linutronix.de>
+- *
+- */
+-
+-#ifndef __ASM_ARCH_IRQS_H
+-#define __ASM_ARCH_IRQS_H
+-
+-#if defined (CONFIG_CPU_H7201)
+-
+-#define IRQ_PMU		0		/* 0x000001 */
+-#define IRQ_DMA		1 		/* 0x000002 */
+-#define IRQ_LCD		2		/* 0x000004 */
+-#define IRQ_VGA		3 		/* 0x000008 */
+-#define IRQ_PCMCIA1 	4 		/* 0x000010 */
+-#define IRQ_PCMCIA2 	5 		/* 0x000020 */
+-#define IRQ_AFE		6 		/* 0x000040 */
+-#define IRQ_AIC		7 		/* 0x000080 */
+-#define IRQ_KEYBOARD 	8 		/* 0x000100 */
+-#define IRQ_TIMER0	9 		/* 0x000200 */
+-#define IRQ_RTC		10		/* 0x000400 */
+-#define IRQ_SOUND	11		/* 0x000800 */
+-#define IRQ_USB		12		/* 0x001000 */
+-#define IRQ_IrDA 	13		/* 0x002000 */
+-#define IRQ_UART0	14		/* 0x004000 */
+-#define IRQ_UART1	15		/* 0x008000 */
+-#define IRQ_SPI		16		/* 0x010000 */
+-#define IRQ_GPIOA 	17		/* 0x020000 */
+-#define IRQ_GPIOB	18		/* 0x040000 */
+-#define IRQ_GPIOC	19		/* 0x080000 */
+-#define IRQ_GPIOD	20		/* 0x100000 */
+-#define IRQ_CommRX	21		/* 0x200000 */
+-#define IRQ_CommTX	22		/* 0x400000 */
+-#define IRQ_Soft	23		/* 0x800000 */
+-
+-#define NR_GLBL_IRQS	24
+-
+-#define IRQ_CHAINED_GPIOA(x)  (NR_GLBL_IRQS + x)
+-#define IRQ_CHAINED_GPIOB(x)  (IRQ_CHAINED_GPIOA(32) + x)
+-#define IRQ_CHAINED_GPIOC(x)  (IRQ_CHAINED_GPIOB(32) + x)
+-#define IRQ_CHAINED_GPIOD(x)  (IRQ_CHAINED_GPIOC(32) + x)
+-#define NR_IRQS               IRQ_CHAINED_GPIOD(32)
+-
+-/* Enable mask for multiplexed interrupts */
+-#define IRQ_ENA_MUX	(1<<IRQ_GPIOA) | (1<<IRQ_GPIOB) \
+-			| (1<<IRQ_GPIOC) | (1<<IRQ_GPIOD)
+-
+-
+-#elif defined (CONFIG_CPU_H7202)
+-
+-#define IRQ_PMU		0		/* 0x00000001 */
+-#define IRQ_DMA		1		/* 0x00000002 */
+-#define IRQ_LCD		2		/* 0x00000004 */
+-#define IRQ_SOUND	3		/* 0x00000008 */
+-#define IRQ_I2S		4		/* 0x00000010 */
+-#define IRQ_USB 	5		/* 0x00000020 */
+-#define IRQ_MMC 	6		/* 0x00000040 */
+-#define IRQ_RTC 	7		/* 0x00000080 */
+-#define IRQ_UART0 	8		/* 0x00000100 */
+-#define IRQ_UART1 	9		/* 0x00000200 */
+-#define IRQ_UART2 	10		/* 0x00000400 */
+-#define IRQ_UART3 	11		/* 0x00000800 */
+-#define IRQ_KBD 	12		/* 0x00001000 */
+-#define IRQ_PS2 	13		/* 0x00002000 */
+-#define IRQ_AIC 	14		/* 0x00004000 */
+-#define IRQ_TIMER0 	15		/* 0x00008000 */
+-#define IRQ_TIMERX 	16		/* 0x00010000 */
+-#define IRQ_WDT 	17		/* 0x00020000 */
+-#define IRQ_CAN0 	18		/* 0x00040000 */
+-#define IRQ_CAN1 	19		/* 0x00080000 */
+-#define IRQ_EXT0 	20		/* 0x00100000 */
+-#define IRQ_EXT1 	21		/* 0x00200000 */
+-#define IRQ_GPIOA 	22		/* 0x00400000 */
+-#define IRQ_GPIOB 	23		/* 0x00800000 */
+-#define IRQ_GPIOC 	24		/* 0x01000000 */
+-#define IRQ_GPIOD 	25		/* 0x02000000 */
+-#define IRQ_GPIOE 	26		/* 0x04000000 */
+-#define IRQ_COMMRX 	27		/* 0x08000000 */
+-#define IRQ_COMMTX 	28		/* 0x10000000 */
+-#define IRQ_SMC 	29		/* 0x20000000 */
+-#define IRQ_Soft 	30		/* 0x40000000 */
+-#define IRQ_RESERVED1 	31		/* 0x80000000 */
+-#define NR_GLBL_IRQS	32
+-
+-#define NR_TIMERX_IRQS	3
+-
+-#define IRQ_CHAINED_GPIOA(x)  (NR_GLBL_IRQS + x)
+-#define IRQ_CHAINED_GPIOB(x)  (IRQ_CHAINED_GPIOA(32) + x)
+-#define IRQ_CHAINED_GPIOC(x)  (IRQ_CHAINED_GPIOB(32) + x)
+-#define IRQ_CHAINED_GPIOD(x)  (IRQ_CHAINED_GPIOC(32) + x)
+-#define IRQ_CHAINED_GPIOE(x)  (IRQ_CHAINED_GPIOD(32) + x)
+-#define IRQ_CHAINED_TIMERX(x) (IRQ_CHAINED_GPIOE(32) + x)
+-#define IRQ_TIMER1            (IRQ_CHAINED_TIMERX(0))
+-#define IRQ_TIMER2            (IRQ_CHAINED_TIMERX(1))
+-#define IRQ_TIMER64B          (IRQ_CHAINED_TIMERX(2))
+-
+-#define NR_IRQS		(IRQ_CHAINED_TIMERX(NR_TIMERX_IRQS))
+-
+-/* Enable mask for multiplexed interrupts */
+-#define IRQ_ENA_MUX	(1<<IRQ_TIMERX) | (1<<IRQ_GPIOA) | (1<<IRQ_GPIOB) | \
+-			(1<<IRQ_GPIOC) 	| (1<<IRQ_GPIOD) | (1<<IRQ_GPIOE) | \
+-			(1<<IRQ_TIMERX)
+-
+-#else
+-#error cpu definition mismatch
+-#endif
+-
+-/* decode irq number to register number */
+-#define IRQ_TO_REGNO(irq) ((irq - NR_GLBL_IRQS) >> 5)
+-#define IRQ_TO_BIT(irq) (1 << ((irq - NR_GLBL_IRQS) % 32))
 -
 -#endif
-diff --git a/arch/arm/mach-gemini/include/mach/irqs.h b/arch/arm/mach-gemini/include/mach/irqs.h
+diff --git a/arch/arm/mach-h720x/include/mach/isa-dma.h b/arch/arm/mach-h720x/include/mach/isa-dma.h
 deleted file mode 100644
-index 06bc47e..0000000
---- a/arch/arm/mach-gemini/include/mach/irqs.h
+index 3eafb3f..0000000
+--- a/arch/arm/mach-h720x/include/mach/isa-dma.h
 +++ /dev/null
-@@ -1,53 +0,0 @@
+@@ -1,19 +0,0 @@
 -/*
-- *  Copyright (C) 2001-2006 Storlink, Corp.
-- *  Copyright (C) 2008-2009 Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
+- * arch/arm/mach-h720x/include/mach/isa-dma.h
+- *
+- * Architecture DMA routes
+- *
+- * Copyright (C) 1997.1998 Russell King
+- */
+-#ifndef __ASM_ARCH_DMA_H
+-#define __ASM_ARCH_DMA_H
+-
+-#if defined (CONFIG_CPU_H7201)
+-#define MAX_DMA_CHANNELS	3
+-#elif defined (CONFIG_CPU_H7202)
+-#define MAX_DMA_CHANNELS	4
+-#else
+-#error processor definition missmatch
+-#endif
+-
+-#endif /* __ASM_ARCH_DMA_H */
+diff --git a/arch/arm/mach-h720x/include/mach/timex.h b/arch/arm/mach-h720x/include/mach/timex.h
+deleted file mode 100644
+index 3f2f447..0000000
+--- a/arch/arm/mach-h720x/include/mach/timex.h
++++ /dev/null
+@@ -1,15 +0,0 @@
+-/*
+- * arch/arm/mach-h720x/include/mach/timex.h
+- * Copyright (C) 2000 Jungjun Kim, Hynix Semiconductor Inc.
 - *
 - * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
 - */
 -
--#ifndef __MACH_IRQS_H__
--#define __MACH_IRQS_H__
+-#ifndef __ASM_ARCH_TIMEX
+-#define __ASM_ARCH_TIMEX
 -
--#define IRQ_SERIRQ1	31
--#define IRQ_SERIRQ0	30
--#define IRQ_PCID	29
--#define IRQ_PCIC	28
--#define IRQ_PCIB	27
--#define IRQ_PWR		26
--#define IRQ_CIR		25
--#define IRQ_GPIO(x)	(22 + (x))
--#define IRQ_SSP		21
--#define IRQ_LPC		20
--#define IRQ_LCD		19
--#define IRQ_UART	18
--#define IRQ_RTC		17
--#define IRQ_TIMER3	16
--#define IRQ_TIMER2	15
--#define IRQ_TIMER1	14
--#define IRQ_FLASH	12
--#define IRQ_USB1	11
--#define IRQ_USB0	10
--#define IRQ_DMA		9
--#define IRQ_PCI		8
--#define IRQ_IPSEC	7
--#define IRQ_RAID	6
--#define IRQ_IDE1	5
--#define IRQ_IDE0	4
--#define IRQ_WATCHDOG	3
--#define IRQ_GMAC1	2
--#define IRQ_GMAC0	1
--#define IRQ_IPI		0
+-#define CLOCK_TICK_RATE		3686400
 -
--#define NORMAL_IRQ_NUM	32
--
--#define GPIO_IRQ_BASE	NORMAL_IRQ_NUM
--#define GPIO_IRQ_NUM	(3 * 32)
--
--#define ARCH_TIMER_IRQ	IRQ_TIMER2
--
--#define NR_IRQS		(NORMAL_IRQ_NUM + GPIO_IRQ_NUM)
--
--#endif /* __MACH_IRQS_H__ */
-diff --git a/arch/arm/mach-gemini/include/mach/timex.h b/arch/arm/mach-gemini/include/mach/timex.h
+-#endif
+diff --git a/arch/arm/mach-h720x/include/mach/uncompress.h b/arch/arm/mach-h720x/include/mach/uncompress.h
 deleted file mode 100644
-index dc5690b..0000000
---- a/arch/arm/mach-gemini/include/mach/timex.h
+index 43e343c..0000000
+--- a/arch/arm/mach-h720x/include/mach/uncompress.h
 +++ /dev/null
-@@ -1,13 +0,0 @@
+@@ -1,36 +0,0 @@
 -/*
-- * Gemini timex specifications
+- * arch/arm/mach-h720x/include/mach/uncompress.h
 - *
-- * Copyright (C) 2008-2009 Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
+- * Copyright (C) 2001-2002 Jungjun Kim
 - */
 -
--/* When AHB bus frequency is 150MHz */
--#define CLOCK_TICK_RATE	38000000
-diff --git a/arch/arm/mach-gemini/include/mach/uncompress.h b/arch/arm/mach-gemini/include/mach/uncompress.h
-deleted file mode 100644
-index 02e2256..0000000
---- a/arch/arm/mach-gemini/include/mach/uncompress.h
-+++ /dev/null
-@@ -1,42 +0,0 @@
--/*
-- * Copyright (C) 2008-2009 Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
-- *
-- * Based on mach-pxa/include/mach/uncompress.h:
-- * Copyright:	(C) 2001 MontaVista Software Inc.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- */
+-#ifndef __ASM_ARCH_UNCOMPRESS_H
+-#define __ASM_ARCH_UNCOMPRESS_H
 -
--#ifndef __MACH_UNCOMPRESS_H
--#define __MACH_UNCOMPRESS_H
--
--#include <linux/serial_reg.h>
 -#include <mach/hardware.h>
 -
--static volatile unsigned long * const UART = (unsigned long *)GEMINI_UART_BASE;
+-#define LSR 	0x14
+-#define TEMPTY 	0x40
 -
--/*
-- * The following code assumes the serial port has already been
-- * initialized by the bootloader.  If you didn't setup a port in
-- * your bootloader then nothing will appear (which might be desired).
-- */
--static inline void putc(char c)
+-static inline void putc(int c)
 -{
--	while (!(UART[UART_LSR] & UART_LSR_THRE))
+-	volatile unsigned char *p = (volatile unsigned char *)(IO_PHYS+0x20000);
+-
+-	/* wait until transmit buffer is empty */
+-	while((p[LSR] & TEMPTY) == 0x0)
 -		barrier();
--	UART[UART_TX] = c;
+-
+-	/* write next character */
+-	*p = c;
 -}
 -
 -static inline void flush(void)
@@ -1725,327 +1806,6 @@ index 02e2256..0000000
 - */
 -#define arch_decomp_setup()
 -
--#endif /* __MACH_UNCOMPRESS_H */
-diff --git a/arch/arm/mach-gemini/irq.c b/arch/arm/mach-gemini/irq.c
-deleted file mode 100644
-index 30bef11..0000000
---- a/arch/arm/mach-gemini/irq.c
-+++ /dev/null
-@@ -1,103 +0,0 @@
--/*
-- *  Interrupt routines for Gemini
-- *
-- *  Copyright (C) 2001-2006 Storlink, Corp.
-- *  Copyright (C) 2008-2009 Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- */
--#include <linux/init.h>
--#include <linux/io.h>
--#include <linux/ioport.h>
--#include <linux/stddef.h>
--#include <linux/list.h>
--#include <linux/sched.h>
--#include <asm/irq.h>
--#include <asm/mach/irq.h>
--#include <asm/system_misc.h>
--#include <mach/hardware.h>
--
--#define IRQ_SOURCE(base_addr)	(base_addr + 0x00)
--#define IRQ_MASK(base_addr)	(base_addr + 0x04)
--#define IRQ_CLEAR(base_addr)	(base_addr + 0x08)
--#define IRQ_TMODE(base_addr)	(base_addr + 0x0C)
--#define IRQ_TLEVEL(base_addr)	(base_addr + 0x10)
--#define IRQ_STATUS(base_addr)	(base_addr + 0x14)
--#define FIQ_SOURCE(base_addr)	(base_addr + 0x20)
--#define FIQ_MASK(base_addr)	(base_addr + 0x24)
--#define FIQ_CLEAR(base_addr)	(base_addr + 0x28)
--#define FIQ_TMODE(base_addr)	(base_addr + 0x2C)
--#define FIQ_LEVEL(base_addr)	(base_addr + 0x30)
--#define FIQ_STATUS(base_addr)	(base_addr + 0x34)
--
--static void gemini_ack_irq(struct irq_data *d)
--{
--	__raw_writel(1 << d->irq, IRQ_CLEAR(IO_ADDRESS(GEMINI_INTERRUPT_BASE)));
--}
--
--static void gemini_mask_irq(struct irq_data *d)
--{
--	unsigned int mask;
--
--	mask = __raw_readl(IRQ_MASK(IO_ADDRESS(GEMINI_INTERRUPT_BASE)));
--	mask &= ~(1 << d->irq);
--	__raw_writel(mask, IRQ_MASK(IO_ADDRESS(GEMINI_INTERRUPT_BASE)));
--}
--
--static void gemini_unmask_irq(struct irq_data *d)
--{
--	unsigned int mask;
--
--	mask = __raw_readl(IRQ_MASK(IO_ADDRESS(GEMINI_INTERRUPT_BASE)));
--	mask |= (1 << d->irq);
--	__raw_writel(mask, IRQ_MASK(IO_ADDRESS(GEMINI_INTERRUPT_BASE)));
--}
--
--static struct irq_chip gemini_irq_chip = {
--	.name		= "INTC",
--	.irq_ack	= gemini_ack_irq,
--	.irq_mask	= gemini_mask_irq,
--	.irq_unmask	= gemini_unmask_irq,
--};
--
--static struct resource irq_resource = {
--	.name	= "irq_handler",
--	.start	= GEMINI_INTERRUPT_BASE,
--	.end	= FIQ_STATUS(GEMINI_INTERRUPT_BASE) + 4,
--};
--
--void __init gemini_init_irq(void)
--{
--	unsigned int i, mode = 0, level = 0;
--
--	/*
--	 * Disable the idle handler by default since it is buggy
--	 * For more info see arch/arm/mach-gemini/idle.c
--	 */
--	disable_hlt();
--
--	request_resource(&iomem_resource, &irq_resource);
--
--	for (i = 0; i < NR_IRQS; i++) {
--		irq_set_chip(i, &gemini_irq_chip);
--		if((i >= IRQ_TIMER1 && i <= IRQ_TIMER3) || (i >= IRQ_SERIRQ0 && i <= IRQ_SERIRQ1)) {
--			irq_set_handler(i, handle_edge_irq);
--			mode |= 1 << i;
--			level |= 1 << i;
--		} else {			
--			irq_set_handler(i, handle_level_irq);
--		}
--		set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
--	}
--
--	/* Disable all interrupts */
--	__raw_writel(0, IRQ_MASK(IO_ADDRESS(GEMINI_INTERRUPT_BASE)));
--	__raw_writel(0, FIQ_MASK(IO_ADDRESS(GEMINI_INTERRUPT_BASE)));
--
--	/* Set interrupt mode */
--	__raw_writel(mode, IRQ_TMODE(IO_ADDRESS(GEMINI_INTERRUPT_BASE)));
--	__raw_writel(level, IRQ_TLEVEL(IO_ADDRESS(GEMINI_INTERRUPT_BASE)));
--}
-diff --git a/arch/arm/mach-gemini/mm.c b/arch/arm/mach-gemini/mm.c
-deleted file mode 100644
-index 2c2cd28..0000000
---- a/arch/arm/mach-gemini/mm.c
-+++ /dev/null
-@@ -1,82 +0,0 @@
--/*
-- *  Static mappings for Gemini
-- *
-- *  Copyright (C) 2001-2006 Storlink, Corp.
-- *  Copyright (C) 2008-2009 Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- */
--#include <linux/mm.h>
--#include <linux/init.h>
--
--#include <asm/mach/map.h>
--
--#include <mach/hardware.h>
--
--/* Page table mapping for I/O region */
--static struct map_desc gemini_io_desc[] __initdata = {
--	{
--		.virtual	= (unsigned long)IO_ADDRESS(GEMINI_GLOBAL_BASE),
--		.pfn		=__phys_to_pfn(GEMINI_GLOBAL_BASE),
--		.length		= SZ_512K,
--		.type 		= MT_DEVICE,
--	}, {
--		.virtual	= (unsigned long)IO_ADDRESS(GEMINI_UART_BASE),
--		.pfn		= __phys_to_pfn(GEMINI_UART_BASE),
--		.length		= SZ_512K,
--		.type 		= MT_DEVICE,
--	}, {
--		.virtual	= (unsigned long)IO_ADDRESS(GEMINI_TIMER_BASE),
--		.pfn		= __phys_to_pfn(GEMINI_TIMER_BASE),
--		.length		= SZ_512K,
--		.type 		= MT_DEVICE,
--	}, {
--		.virtual	= (unsigned long)IO_ADDRESS(GEMINI_INTERRUPT_BASE),
--		.pfn		= __phys_to_pfn(GEMINI_INTERRUPT_BASE),
--		.length		= SZ_512K,
--		.type 		= MT_DEVICE,
--	}, {
--		.virtual	= (unsigned long)IO_ADDRESS(GEMINI_POWER_CTRL_BASE),
--		.pfn		= __phys_to_pfn(GEMINI_POWER_CTRL_BASE),
--		.length		= SZ_512K,
--		.type 		= MT_DEVICE,
--	}, {
--		.virtual	= (unsigned long)IO_ADDRESS(GEMINI_GPIO_BASE(0)),
--		.pfn		= __phys_to_pfn(GEMINI_GPIO_BASE(0)),
--		.length		= SZ_512K,
--		.type 		= MT_DEVICE,
--	}, {
--		.virtual	= (unsigned long)IO_ADDRESS(GEMINI_GPIO_BASE(1)),
--		.pfn		= __phys_to_pfn(GEMINI_GPIO_BASE(1)),
--		.length		= SZ_512K,
--		.type 		= MT_DEVICE,
--	}, {
--		.virtual	= (unsigned long)IO_ADDRESS(GEMINI_GPIO_BASE(2)),
--		.pfn		= __phys_to_pfn(GEMINI_GPIO_BASE(2)),
--		.length		= SZ_512K,
--		.type 		= MT_DEVICE,
--	}, {
--		.virtual	= (unsigned long)IO_ADDRESS(GEMINI_FLASH_CTRL_BASE),
--		.pfn		= __phys_to_pfn(GEMINI_FLASH_CTRL_BASE),
--		.length		= SZ_512K,
--		.type 		= MT_DEVICE,
--	}, {
--		.virtual	= (unsigned long)IO_ADDRESS(GEMINI_DRAM_CTRL_BASE),
--		.pfn		= __phys_to_pfn(GEMINI_DRAM_CTRL_BASE),
--		.length		= SZ_512K,
--		.type 		= MT_DEVICE,
--	}, {
--		.virtual	= (unsigned long)IO_ADDRESS(GEMINI_GENERAL_DMA_BASE),
--		.pfn		= __phys_to_pfn(GEMINI_GENERAL_DMA_BASE),
--		.length		= SZ_512K,
--		.type 		= MT_DEVICE,
--	},
--};
--
--void __init gemini_map_io(void)
--{
--	iotable_init(gemini_io_desc, ARRAY_SIZE(gemini_io_desc));
--}
-diff --git a/arch/arm/mach-gemini/reset.c b/arch/arm/mach-gemini/reset.c
-deleted file mode 100644
-index b266597..0000000
---- a/arch/arm/mach-gemini/reset.c
-+++ /dev/null
-@@ -1,23 +0,0 @@
--/*
-- *  Copyright (C) 2001-2006 Storlink, Corp.
-- *  Copyright (C) 2008-2009 Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- */
--#ifndef __MACH_SYSTEM_H
--#define __MACH_SYSTEM_H
--
--#include <linux/io.h>
--#include <mach/hardware.h>
--#include <mach/global_reg.h>
--
--void gemini_restart(char mode, const char *cmd)
--{
--	__raw_writel(RESET_GLOBAL | RESET_CPU1,
--		     IO_ADDRESS(GEMINI_GLOBAL_BASE) + GLOBAL_RESET);
--}
--
--#endif /* __MACH_SYSTEM_H */
-diff --git a/arch/arm/mach-gemini/time.c b/arch/arm/mach-gemini/time.c
-deleted file mode 100644
-index 21dc5a8..0000000
---- a/arch/arm/mach-gemini/time.c
-+++ /dev/null
-@@ -1,89 +0,0 @@
--/*
-- *  Copyright (C) 2001-2006 Storlink, Corp.
-- *  Copyright (C) 2008-2009 Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- */
--#include <linux/interrupt.h>
--#include <linux/irq.h>
--#include <linux/io.h>
--#include <mach/hardware.h>
--#include <mach/global_reg.h>
--#include <asm/mach/time.h>
--
--/*
-- * Register definitions for the timers
-- */
--#define TIMER_COUNT(BASE_ADDR)		(BASE_ADDR  + 0x00)
--#define TIMER_LOAD(BASE_ADDR)		(BASE_ADDR  + 0x04)
--#define TIMER_MATCH1(BASE_ADDR)		(BASE_ADDR  + 0x08)
--#define TIMER_MATCH2(BASE_ADDR)		(BASE_ADDR  + 0x0C)
--#define TIMER_CR(BASE_ADDR)		(BASE_ADDR  + 0x30)
--
--#define TIMER_1_CR_ENABLE		(1 << 0)
--#define TIMER_1_CR_CLOCK		(1 << 1)
--#define TIMER_1_CR_INT			(1 << 2)
--#define TIMER_2_CR_ENABLE		(1 << 3)
--#define TIMER_2_CR_CLOCK		(1 << 4)
--#define TIMER_2_CR_INT			(1 << 5)
--#define TIMER_3_CR_ENABLE		(1 << 6)
--#define TIMER_3_CR_CLOCK		(1 << 7)
--#define TIMER_3_CR_INT			(1 << 8)
--
--/*
-- * IRQ handler for the timer
-- */
--static irqreturn_t gemini_timer_interrupt(int irq, void *dev_id)
--{
--	timer_tick();
--
--	return IRQ_HANDLED;
--}
--
--static struct irqaction gemini_timer_irq = {
--	.name		= "Gemini Timer Tick",
--	.flags		= IRQF_DISABLED | IRQF_TIMER,
--	.handler	= gemini_timer_interrupt,
--};
--
--/*
-- * Set up timer interrupt, and return the current time in seconds.
-- */
--void __init gemini_timer_init(void)
--{
--	unsigned int tick_rate, reg_v;
--
--	reg_v = __raw_readl(IO_ADDRESS(GEMINI_GLOBAL_BASE + GLOBAL_STATUS));
--	tick_rate = REG_TO_AHB_SPEED(reg_v) * 1000000;
--
--	printk(KERN_INFO "Bus: %dMHz", tick_rate / 1000000);
--
--	tick_rate /= 6;		/* APB bus run AHB*(1/6) */
--
--	switch(reg_v & CPU_AHB_RATIO_MASK) {
--	case CPU_AHB_1_1:
--		printk(KERN_CONT "(1/1)\n");
--		break;
--	case CPU_AHB_3_2:
--		printk(KERN_CONT "(3/2)\n");
--		break;
--	case CPU_AHB_24_13:
--		printk(KERN_CONT "(24/13)\n");
--		break;
--	case CPU_AHB_2_1:
--		printk(KERN_CONT "(2/1)\n");
--		break;
--	}
--
--	/*
--	 * Make irqs happen for the system timer
--	 */
--	setup_irq(IRQ_TIMER2, &gemini_timer_irq);
--	/* Start the timer */
--	__raw_writel(tick_rate / HZ, TIMER_COUNT(IO_ADDRESS(GEMINI_TIMER2_BASE)));
--	__raw_writel(tick_rate / HZ, TIMER_LOAD(IO_ADDRESS(GEMINI_TIMER2_BASE)));
--	__raw_writel(TIMER_2_CR_ENABLE | TIMER_2_CR_INT, TIMER_CR(IO_ADDRESS(GEMINI_TIMER_BASE)));
--}
+-#endif
 -- 
 1.8.1.2
