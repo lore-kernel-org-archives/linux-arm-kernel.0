@@ -1,70 +1,47 @@
-From: fabio.porcedda@gmail.com (Fabio Porcedda)
-Date: Thu, 14 Mar 2013 14:11:31 +0100
-Subject: [PATCH 10/10] drivers: misc: use module_platform_driver_probe()
-In-Reply-To: <1363266691-15757-1-git-send-email-fabio.porcedda@gmail.com>
-References: <1363266691-15757-1-git-send-email-fabio.porcedda@gmail.com>
-Message-ID: <1363266691-15757-12-git-send-email-fabio.porcedda@gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 14 Mar 2013 17:20:54 +0400
+Subject: [PATCH 1/7] ARM: shmobile: marzen: add USB phy support
+In-Reply-To: <87k3pa4xpk.wl%kuninori.morimoto.gx@renesas.com>
+References: <1352446306-19945-1-git-send-email-horms@verge.net.au>
+ <1352446306-19945-2-git-send-email-horms@verge.net.au>
+ <5140FBB1.50401@mvista.com> <87k3pa4xpk.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <5141CEB6.2080803@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch converts the drivers to use the
-module_platform_driver_probe() macro which makes the code smaller and
-a bit simpler.
+Hello.
 
-Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Arnd Bergmann <arnd@arndb.de>
----
- drivers/misc/atmel_pwm.c  | 12 +-----------
- drivers/misc/ep93xx_pwm.c | 13 +------------
- 2 files changed, 2 insertions(+), 23 deletions(-)
+On 14-03-2013 4:44, Kuninori Morimoto wrote:
 
-diff --git a/drivers/misc/atmel_pwm.c b/drivers/misc/atmel_pwm.c
-index 28f5aaa..494d050 100644
---- a/drivers/misc/atmel_pwm.c
-+++ b/drivers/misc/atmel_pwm.c
-@@ -393,17 +393,7 @@ static struct platform_driver atmel_pwm_driver = {
- 	 */
- };
- 
--static int __init pwm_init(void)
--{
--	return platform_driver_probe(&atmel_pwm_driver, pwm_probe);
--}
--module_init(pwm_init);
--
--static void __exit pwm_exit(void)
--{
--	platform_driver_unregister(&atmel_pwm_driver);
--}
--module_exit(pwm_exit);
-+module_platform_driver_probe(atmel_pwm_driver, pwm_probe);
- 
- MODULE_DESCRIPTION("Driver for AT32/AT91 PWM module");
- MODULE_LICENSE("GPL");
-diff --git a/drivers/misc/ep93xx_pwm.c b/drivers/misc/ep93xx_pwm.c
-index 16d7179..96787ec 100644
---- a/drivers/misc/ep93xx_pwm.c
-+++ b/drivers/misc/ep93xx_pwm.c
-@@ -365,18 +365,7 @@ static struct platform_driver ep93xx_pwm_driver = {
- 	.remove		= __exit_p(ep93xx_pwm_remove),
- };
- 
--static int __init ep93xx_pwm_init(void)
--{
--	return platform_driver_probe(&ep93xx_pwm_driver, ep93xx_pwm_probe);
--}
--
--static void __exit ep93xx_pwm_exit(void)
--{
--	platform_driver_unregister(&ep93xx_pwm_driver);
--}
--
--module_init(ep93xx_pwm_init);
--module_exit(ep93xx_pwm_exit);
-+module_platform_driver_probe(ep93xx_pwm_driver, ep93xx_pwm_probe);
- 
- MODULE_AUTHOR("Matthieu Crapet <mcrapet@gmail.com>, "
- 	      "H Hartley Sweeten <hsweeten@visionengravers.com>");
--- 
-1.8.1.5
+>>> +/* USB PHY */
+>>> +static struct resource usb_phy_resources[] = {
+>>> +	[0] = {
+>>> +		.start		= 0xffe70000,
+
+>>      Why not 0xffe70800? 0xffe70000 is where the EHCI registers start.
+>> I don't see why they should be overlapped like this.
+
+> Current rcar-phy try to access 0xffe7009x
+
+    That should be changed too IHO, as these registers are not really PHY 
+related, they control EHCI itself. These writes should be done somewhere in 
+setup-r8a7779.c probably.
+
+>>> +	[1] = {
+>>> +		.start		= 0xfff70000,
+>>> +		.end		= 0xfff70900 - 1,
+
+>>      Hm, this PHY register range doesn't seem to be documented?
+
+> 0xffe70000 is for port0/1
+> 0xfff70000 is for port2
+
+> But this 0xfff70000 is only for 0xfff7009x access
+
+    Yeah, I understood that it's only for the extra EHCI registers.
+
+> Best regards
+> ---
+> Kuninori Morimoto
+
+WBR, Sergei
