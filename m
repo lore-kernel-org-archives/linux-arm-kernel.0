@@ -1,9 +1,9 @@
 From: fabio.porcedda@gmail.com (Fabio Porcedda)
-Date: Thu, 14 Mar 2013 18:09:31 +0100
-Subject: [PATCH v2 1/8] drivers: media: use module_platform_driver_probe()
+Date: Thu, 14 Mar 2013 18:09:32 +0100
+Subject: [PATCH v2 2/8] drivers: ata: use module_platform_driver_probe()
 In-Reply-To: <1363280978-24051-1-git-send-email-fabio.porcedda@gmail.com>
 References: <1363280978-24051-1-git-send-email-fabio.porcedda@gmail.com>
-Message-ID: <1363280978-24051-2-git-send-email-fabio.porcedda@gmail.com>
+Message-ID: <1363280978-24051-3-git-send-email-fabio.porcedda@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,37 +13,35 @@ a bit simpler.
 
 Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
 Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
-Cc: Josh Wu <josh.wu@atmel.com>
-Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-Cc: Hans Verkuil <hans.verkuil@cisco.com>
-Cc: linux-media at vger.kernel.org
+Cc: Jeff Garzik <jgarzik@pobox.com>
+Cc: linux-ide at vger.kernel.org
 ---
- drivers/media/platform/soc_camera/atmel-isi.c | 12 +-----------
- 1 file changed, 1 insertion(+), 11 deletions(-)
+ drivers/ata/pata_at32.c | 13 +------------
+ 1 file changed, 1 insertion(+), 12 deletions(-)
 
-diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
-index 82dbf99..12ba31d 100644
---- a/drivers/media/platform/soc_camera/atmel-isi.c
-+++ b/drivers/media/platform/soc_camera/atmel-isi.c
-@@ -1081,17 +1081,7 @@ static struct platform_driver atmel_isi_driver = {
+diff --git a/drivers/ata/pata_at32.c b/drivers/ata/pata_at32.c
+index 36f189c..8d493b4 100644
+--- a/drivers/ata/pata_at32.c
++++ b/drivers/ata/pata_at32.c
+@@ -393,18 +393,7 @@ static struct platform_driver pata_at32_driver = {
  	},
  };
  
--static int __init atmel_isi_init_module(void)
+-static int __init pata_at32_init(void)
 -{
--	return  platform_driver_probe(&atmel_isi_driver, &atmel_isi_probe);
+-	return platform_driver_probe(&pata_at32_driver, pata_at32_probe);
 -}
 -
--static void __exit atmel_isi_exit(void)
+-static void __exit pata_at32_exit(void)
 -{
--	platform_driver_unregister(&atmel_isi_driver);
+-	platform_driver_unregister(&pata_at32_driver);
 -}
--module_init(atmel_isi_init_module);
--module_exit(atmel_isi_exit);
-+module_platform_driver_probe(atmel_isi_driver, atmel_isi_probe);
+-
+-module_init(pata_at32_init);
+-module_exit(pata_at32_exit);
++module_platform_driver_probe(pata_at32_driver, pata_at32_probe);
  
- MODULE_AUTHOR("Josh Wu <josh.wu@atmel.com>");
- MODULE_DESCRIPTION("The V4L2 driver for Atmel Linux");
+ MODULE_LICENSE("GPL");
+ MODULE_DESCRIPTION("AVR32 SMC/CFC PATA Driver");
 -- 
 1.8.1.5
