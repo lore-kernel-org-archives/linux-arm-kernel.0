@@ -1,25 +1,53 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 14 Mar 2013 16:49:34 -0500
-Subject: [PATCH 6/8] ARM: dts: OMAP446x: move CPU OPP tables to device tree
-In-Reply-To: <1363294695-658-7-git-send-email-nm@ti.com>
-References: <1363294695-658-1-git-send-email-nm@ti.com>
- <1363294695-658-7-git-send-email-nm@ti.com>
-Message-ID: <514245EE.6090906@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 14 Mar 2013 22:56:41 +0100
+Subject: [PATCH] isdn: hisax: netjet requires VIRT_TO_BUS
+In-Reply-To: <1363298204-8014-1-git-send-email-arnd@arndb.de>
+References: <1363298204-8014-1-git-send-email-arnd@arndb.de>
+Message-ID: <1363298204-8014-4-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Disabling CONFIG_VIRT_TO_BUS on ARM showed that the hisax netjet
+driver depends on this deprecated functionality but is not
+marked so in Kconfig.
 
-On 03/14/2013 03:58 PM, Nishanth Menon wrote:
-> OMAP4430 and 4460 have different OPP definitions. So, create an SoC
-> variant dtsi file for 4460 and move the OPP definitions to it.
+Rather than adding ARM to the already long list of architectures
+that this driver is broken on, this patch adds 'depends on
+VIRT_TO_BUS' and removes the dependency on !SPARC, which is
+also implied by that.
 
-FYI, I had to create a similar file for PMU [1]. However, I called it
-omap4460.dtsi and not omap446x.dtsi as there is only one omap446x
-device. That should go into to v3.10 and so may be worth basing this on
-top. I do like your omap4-panda-common.dtsi that is a nice clean-up.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Karsten Keil <isdn@linux-pingi.de>
+Cc: netdev at vger.kernel.org
+---
+Please apply for 3.9 or 3.10, this one is not urgent
 
-Cheers
-Jon
+ drivers/isdn/hisax/Kconfig | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-[1]
-http://git.kernel.org/cgit/linux/kernel/git/bcousson/linux-omap-dt.git/commit/?h=for_3.10/dts&id=5e64b6b1137a54f353528d6da60071c1ef0043ba
+diff --git a/drivers/isdn/hisax/Kconfig b/drivers/isdn/hisax/Kconfig
+index 5313c9e..d9edcc9 100644
+--- a/drivers/isdn/hisax/Kconfig
++++ b/drivers/isdn/hisax/Kconfig
+@@ -237,7 +237,8 @@ config HISAX_MIC
+ 
+ config HISAX_NETJET
+ 	bool "NETjet card"
+-	depends on PCI && (BROKEN || !(SPARC || PPC || PARISC || M68K || (MIPS && !CPU_LITTLE_ENDIAN) || FRV || (XTENSA && !CPU_LITTLE_ENDIAN)))
++	depends on PCI && (BROKEN || !(PPC || PARISC || M68K || (MIPS && !CPU_LITTLE_ENDIAN) || FRV || (XTENSA && !CPU_LITTLE_ENDIAN)))
++	depends on VIRT_TO_BUS
+ 	help
+ 	  This enables HiSax support for the NetJet from Traverse
+ 	  Technologies.
+@@ -248,7 +249,8 @@ config HISAX_NETJET
+ 
+ config HISAX_NETJET_U
+ 	bool "NETspider U card"
+-	depends on PCI && (BROKEN || !(SPARC || PPC || PARISC || M68K || (MIPS && !CPU_LITTLE_ENDIAN) || FRV || (XTENSA && !CPU_LITTLE_ENDIAN)))
++	depends on PCI && (BROKEN || !(PPC || PARISC || M68K || (MIPS && !CPU_LITTLE_ENDIAN) || FRV || (XTENSA && !CPU_LITTLE_ENDIAN)))
++	depends on VIRT_TO_BUS
+ 	help
+ 	  This enables HiSax support for the Netspider U interface ISDN card
+ 	  from Traverse Technologies.
+-- 
+1.8.1.2
