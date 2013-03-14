@@ -1,89 +1,29 @@
-From: dahuang@nvidia.com (Danny Huang)
-Date: Thu, 14 Mar 2013 08:48:40 +0800
-Subject: [PATCH v4] ARM: tegra: expose chip ID and revision
-Message-ID: <1363222120-22210-1-git-send-email-dahuang@nvidia.com>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Wed, 13 Mar 2013 17:57:08 -0700 (PDT)
+Subject: [PATCH 03/10] ARM: shmobile: r8a7779: add USB EHCI clock support
+In-Reply-To: <5141156C.4010909@cogentembedded.com>
+References: <1352446165-19298-1-git-send-email-horms@verge.net.au>
+ <1352446165-19298-4-git-send-email-horms@verge.net.au>
+ <5141156C.4010909@cogentembedded.com>
+Message-ID: <87hake4x3y.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Expose Tegra chip ID and revision in /sys/devices/soc for user mode
-usage
 
-Signed-off-by: Danny Huang <dahuang@nvidia.com>
+Hi Sergei
+
+> >   	/* MSTP32 clocks */
+> > +	CLKDEV_DEV_ID("ehci-platform.1", &mstp_clks[MSTP101]), /* USB EHCI port2 */
+> > +	CLKDEV_DEV_ID("ehci-platform.0", &mstp_clks[MSTP100]), /* USB EHCI port0/1 */
+> 
+>     But how are those used? I don't see clk API support in ehci-platform.c.
+> Are they used via runtime PM? I'm just not familiar enough with it...
+
+Yes exactry
+
+    - board-marzen.c :: usb_power_on()
+    - clock-r8a7779.c :: mstp_clks[]
+
+Best regards
 ---
- arch/arm/Kconfig            |  1 +
- arch/arm/mach-tegra/tegra.c | 29 ++++++++++++++++++++++++++++-
- 2 files changed, 29 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 2363926..12fa4e5 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -675,6 +675,7 @@ config ARCH_TEGRA
- 	select HAVE_CLK
- 	select HAVE_SMP
- 	select MIGHT_HAVE_CACHE_L2X0
-+	select SOC_BUS
- 	select SPARSE_IRQ
- 	select USE_OF
- 	help
-diff --git a/arch/arm/mach-tegra/tegra.c b/arch/arm/mach-tegra/tegra.c
-index 27232c9..84deeab 100644
---- a/arch/arm/mach-tegra/tegra.c
-+++ b/arch/arm/mach-tegra/tegra.c
-@@ -33,6 +33,8 @@
- #include <linux/io.h>
- #include <linux/i2c.h>
- #include <linux/i2c-tegra.h>
-+#include <linux/slab.h>
-+#include <linux/sys_soc.h>
- #include <linux/usb/tegra_usb_phy.h>
- 
- #include <asm/mach-types.h>
-@@ -42,6 +44,7 @@
- 
- #include "board.h"
- #include "common.h"
-+#include "fuse.h"
- #include "iomap.h"
- 
- static struct tegra_ehci_platform_data tegra_ehci1_pdata = {
-@@ -80,12 +83,36 @@ static struct of_dev_auxdata tegra20_auxdata_lookup[] __initdata = {
- 
- static void __init tegra_dt_init(void)
- {
-+	struct soc_device_attribute *soc_dev_attr;
-+	struct soc_device *soc_dev;
-+	struct device *parent = NULL;
-+
-+	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
-+	if (!soc_dev_attr)
-+		goto out;
-+
-+	soc_dev_attr->family = kasprintf(GFP_KERNEL, "Tegra");
-+	soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%d", tegra_revision);
-+	soc_dev_attr->soc_id = kasprintf(GFP_KERNEL, "%d", tegra_chip_id);
-+
-+	soc_dev = soc_device_register(soc_dev_attr);
-+	if (IS_ERR(soc_dev)) {
-+		kfree(soc_dev_attr->family);
-+		kfree(soc_dev_attr->revision);
-+		kfree(soc_dev_attr->soc_id);
-+		kfree(soc_dev_attr);
-+		goto out;
-+	}
-+
-+	parent = soc_device_to_device(soc_dev);
-+
- 	/*
- 	 * Finished with the static registrations now; fill in the missing
- 	 * devices
- 	 */
-+out:
- 	of_platform_populate(NULL, of_default_bus_match_table,
--				tegra20_auxdata_lookup, NULL);
-+				tegra20_auxdata_lookup, parent);
- }
- 
- static void __init trimslice_init(void)
--- 
-1.8.1.5
+Kuninori Morimoto
