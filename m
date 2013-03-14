@@ -1,9 +1,9 @@
 From: fabio.porcedda@gmail.com (Fabio Porcedda)
-Date: Thu, 14 Mar 2013 18:09:32 +0100
-Subject: [PATCH v2 2/8] drivers: ata: use module_platform_driver_probe()
+Date: Thu, 14 Mar 2013 18:09:33 +0100
+Subject: [PATCH v2 3/8] drivers: char: use module_platform_driver_probe()
 In-Reply-To: <1363280978-24051-1-git-send-email-fabio.porcedda@gmail.com>
 References: <1363280978-24051-1-git-send-email-fabio.porcedda@gmail.com>
-Message-ID: <1363280978-24051-3-git-send-email-fabio.porcedda@gmail.com>
+Message-ID: <1363280978-24051-4-git-send-email-fabio.porcedda@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,35 +13,62 @@ a bit simpler.
 
 Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
 Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Jeff Garzik <jgarzik@pobox.com>
-Cc: linux-ide at vger.kernel.org
+Cc: Matt Mackall <mpm@selenic.com>
+Cc: Herbert Xu <herbert@gondor.apana.org.au>
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/ata/pata_at32.c | 13 +------------
- 1 file changed, 1 insertion(+), 12 deletions(-)
+ drivers/char/hw_random/mxc-rnga.c   | 13 +------------
+ drivers/char/hw_random/tx4939-rng.c | 13 +------------
+ 2 files changed, 2 insertions(+), 24 deletions(-)
 
-diff --git a/drivers/ata/pata_at32.c b/drivers/ata/pata_at32.c
-index 36f189c..8d493b4 100644
---- a/drivers/ata/pata_at32.c
-+++ b/drivers/ata/pata_at32.c
-@@ -393,18 +393,7 @@ static struct platform_driver pata_at32_driver = {
- 	},
+diff --git a/drivers/char/hw_random/mxc-rnga.c b/drivers/char/hw_random/mxc-rnga.c
+index f05d857..895d0b8 100644
+--- a/drivers/char/hw_random/mxc-rnga.c
++++ b/drivers/char/hw_random/mxc-rnga.c
+@@ -228,18 +228,7 @@ static struct platform_driver mxc_rnga_driver = {
+ 	.remove = __exit_p(mxc_rnga_remove),
  };
  
--static int __init pata_at32_init(void)
+-static int __init mod_init(void)
 -{
--	return platform_driver_probe(&pata_at32_driver, pata_at32_probe);
+-	return platform_driver_probe(&mxc_rnga_driver, mxc_rnga_probe);
 -}
 -
--static void __exit pata_at32_exit(void)
+-static void __exit mod_exit(void)
 -{
--	platform_driver_unregister(&pata_at32_driver);
+-	platform_driver_unregister(&mxc_rnga_driver);
 -}
 -
--module_init(pata_at32_init);
--module_exit(pata_at32_exit);
-+module_platform_driver_probe(pata_at32_driver, pata_at32_probe);
+-module_init(mod_init);
+-module_exit(mod_exit);
++module_platform_driver_probe(mxc_rnga_driver, mxc_rnga_probe);
  
+ MODULE_AUTHOR("Freescale Semiconductor, Inc.");
+ MODULE_DESCRIPTION("H/W RNGA driver for i.MX");
+diff --git a/drivers/char/hw_random/tx4939-rng.c b/drivers/char/hw_random/tx4939-rng.c
+index 3099198..d34a24a 100644
+--- a/drivers/char/hw_random/tx4939-rng.c
++++ b/drivers/char/hw_random/tx4939-rng.c
+@@ -166,18 +166,7 @@ static struct platform_driver tx4939_rng_driver = {
+ 	.remove = tx4939_rng_remove,
+ };
+ 
+-static int __init tx4939rng_init(void)
+-{
+-	return platform_driver_probe(&tx4939_rng_driver, tx4939_rng_probe);
+-}
+-
+-static void __exit tx4939rng_exit(void)
+-{
+-	platform_driver_unregister(&tx4939_rng_driver);
+-}
+-
+-module_init(tx4939rng_init);
+-module_exit(tx4939rng_exit);
++module_platform_driver_probe(tx4939_rng_driver, tx4939_rng_probe);
+ 
+ MODULE_DESCRIPTION("H/W Random Number Generator (RNG) driver for TX4939");
  MODULE_LICENSE("GPL");
- MODULE_DESCRIPTION("AVR32 SMC/CFC PATA Driver");
 -- 
 1.8.1.5
