@@ -1,56 +1,36 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 13 Mar 2013 20:04:10 -0500
-Subject: [PATCHv1 0/2] ARM: socfpga: Soft reset, hotplug and device tree
- clocks
-In-Reply-To: <1363211722-27237-1-git-send-email-dinguyen@altera.com>
-References: <1363211722-27237-1-git-send-email-dinguyen@altera.com>
-Message-ID: <5141220A.7050008@gmail.com>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Wed, 13 Mar 2013 18:09:55 -0700 (PDT)
+Subject: [PATCH 2/7] ARM: shmobile: marzen: add USB EHCI driver support
+In-Reply-To: <87li9q4ydj.wl%kuninori.morimoto.gx@renesas.com>
+References: <1352446306-19945-1-git-send-email-horms@verge.net.au>
+ <1352446306-19945-3-git-send-email-horms@verge.net.au>
+ <5140F35F.3090702@cogentembedded.com>
+ <87li9q4ydj.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <87fvzy4win.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dinh,
 
-On 03/13/2013 04:55 PM, dinguyen at altera.com wrote:
-> From: Dinh Nguyen <dinguyen@altera.com>
-> 
-> Hi Arnd/Olof,
-> 
-> Just 2 patches for mach-socfpga:
-> 
-> 0001: ARM: socfpga: Enable hotplug and soft reset
-> 	- Able to hotplug CPU1 by putting it into reset and bringing back online.
-> 
+Hi Sergei
 
-Have you seen the discussion on PSCI? There's an ARM doc on it and
-Linaro session from last week. Is there a possibility you can use that?
-You would need to be able to run in non-secure mode and implement smc calls.
-
-Rob
-
-
-> 0002: ARM: socfpga: Add clock entries into device tree
-> 	- Correctly use the clock framework with device tree entries.
-> 	- Based from clk-highbank.c
-> 	
-> Based on arm-soc/for-next.
-> 	
-> Thanks,
-> Dinh
+> >     Morimoto-san, I don't understand why this SoC specific platform device
+> > ended up in the board file? Could you explain your reasons please?
+> >     I think this is generally a bad practice as this approach scales badly.
 > 
-> Dinh Nguyen (2):
->   ARM: socfpga: Enable hotplug and soft reset
->   ARM: socfpga: Add clock entries into device tree
+> Do you mean it should exist in setup-r8a7779.c ?
 > 
->  .../bindings/arm/altera/socfpga-clk-manager.txt    |   11 ++
->  .../devicetree/bindings/clock/altr_socfpga.txt     |   15 ++
->  arch/arm/boot/dts/socfpga.dtsi                     |  154 +++++++++++++++++
->  arch/arm/boot/dts/socfpga_cyclone5.dts             |    8 +
->  arch/arm/boot/dts/socfpga_vt.dts                   |    8 +
->  arch/arm/mach-socfpga/core.h                       |   17 ++
->  arch/arm/mach-socfpga/platsmp.c                    |    9 +-
->  arch/arm/mach-socfpga/socfpga.c                    |   16 +-
->  drivers/clk/socfpga/clk.c                          |  174 +++++++++++++++++---
->  9 files changed, 387 insertions(+), 25 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-clk-manager.txt
->  create mode 100644 Documentation/devicetree/bindings/clock/altr_socfpga.txt
+> I forgot detail of it, but these usb is using callback function,
+> and it is using *phy*.
+> This phy came from marzen_init_late() with usb_get_phy(USB_PHY_TYPE_USB2);
+> This usb_get_phy() is not needed if board doesn't have USB.
 > 
+> You can modify it if you want
+
+And, as you pointed in USB ML,
+This rcar_usb_phy driver will need board specific initialization.
+(it is not implemented at this point...)
+
+
+Best regards
+---
+Kuninori Morimoto
