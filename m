@@ -1,94 +1,118 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Thu, 14 Mar 2013 17:08:47 +0100
-Subject: [PATCH 0/9] ARM: dts: Various OMAP2+ device-tree updates
-In-Reply-To: <CAAwP0s2BW-GTKsS0UpAWiMbRTFyDzgeUmOCw2p0CaB3RDKOnBw@mail.gmail.com>
-References: <1362763654-9660-1-git-send-email-jon-hunter@ti.com>
- <5141E55E.9040801@ti.com>
- <CAAwP0s2BW-GTKsS0UpAWiMbRTFyDzgeUmOCw2p0CaB3RDKOnBw@mail.gmail.com>
-Message-ID: <5141F60F.7060207@ti.com>
+From: holger.brunck@keymile.com (Holger Brunck)
+Date: Thu, 14 Mar 2013 17:10:30 +0100
+Subject: [PATCH] genirq: allow an alternative setup for the mask cache
+Message-ID: <1363277430-21325-1-git-send-email-holger.brunck@keymile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
+The same interrupt mask cache (stored within struct irq_chip_generic)
+is shared between all the irq_chip_type instances by default. But this
+does not work on Orion SOCs which have separate mask registers for edge
+and level interrupts. Therefore refactor the code that we always use a
+pointer to access the mask register. By default it points to
+gc->mask_cache for Orion SOCs it points to ct->mask_cache which is
+setup in irq_setup_alt_chip().
 
-On 03/14/2013 05:02 PM, Javier Martinez Canillas wrote:
-> On Thu, Mar 14, 2013 at 3:57 PM, Benoit Cousson <b-cousson@ti.com> wrote:
->> Salut Jon,
->>
->> On 03/08/2013 06:27 PM, Jon Hunter wrote:
->>> Various OMAP device-tree updates for PMU, DMA, GPIO, GPMC and boards.
->>>
->>> The DMA, PMU and OMAP3430 SDP board changes have been sent before
->>> individually but re-sending here as a complete series for v3.10.
->>>
->>> This is based upon v3.9-rc1 and the OMAP3 GPMC binding from Florian
->>> Vaussard [1] and OMAP5 DT SPI patch from Felipe Balbi [2].
->>>
->>> [1] https://patchwork.kernel.org/patch/2057111/
->>
->> I've tried to follow the series review, and it seems that Florian was
->> considering sending some other patches. It is not clear if this is a new
->> version of the series or some additional patches.
->>
-> 
-> Hi Benoit,
-> 
-> According to [1] Jon suggested that it was not necessary to map all
-> the 16MB for the GPMC mapped register address space since in practice
-> is a very small fraction of that size is used.
-> 
-> I had the following patch but I did never post it because Jon said
-> that the I/O memory mapping is page-aligned and the minimum page
-> size for ARM is 4KB anyways, so there is no functional difference
-> between using 0x1000 or 0x02d0.
-> 
-> But now reading [2] I see that you prefer to do what the documentation
-> said and don't assume any the page size / alignment.
-> 
-> [2]: https://patchwork.kernel.org/patch/2239741/
-> 
-> From 68edff5a102bb8fc81e006738baa456eb69f080a Mon Sep 17 00:00:00 2001
-> From: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> Date: Wed, 27 Feb 2013 02:30:51 +0100
-> Subject: [PATCH] ARM: dts: OMAP3: reduce GPMC mapped registers address space
-> 
-> Currently the OMAP General-Purpose Memory Controller (GPMC) device
-> node maps 16 MB of address space for its hardware registers.
-> 
-> This is because the OMAP Technical Reference Manual says that the
-> GPMC module register address space size is 16 MB. But in practice
-> the maximum address offset used by a GPMC register is 0x02d0.
-> 
-> So, there is no need to map such a big address space for GPMC regs.
-> 
-> This change was suggested by Jon Hunter [1].
-> 
-> [1]: https://patchwork.kernel.org/patch/2057111/
-> 
-> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Signed-off-by: Holger Brunck <holger.brunck@keymile.com>
+---
+ include/linux/irq.h       |    3 +++
+ kernel/irq/generic-chip.c |   19 ++++++++++++-------
+ 2 files changed, 15 insertions(+), 7 deletions(-)
 
-Thanks for that super fast patch :-)
-
-Applied.
-
-Regards,
-Benoit
-
-> ---
->  arch/arm/boot/dts/omap3.dtsi |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-> index 2ddae38..a60eaf1 100644
-> --- a/arch/arm/boot/dts/omap3.dtsi
-> +++ b/arch/arm/boot/dts/omap3.dtsi
-> @@ -407,7 +407,7 @@
->  		gpmc: gpmc at 6e000000 {
->  			compatible = "ti,omap3430-gpmc";
->  			ti,hwmods = "gpmc";
-> -			reg = <0x6e000000 0x1000000>;
-> +			reg = <0x6e000000 0x02d0>;
->  			interrupts = <20>;
->  			gpmc,num-cs = <8>;
->  			gpmc,num-waitpins = <4>;
-> 
+diff --git a/include/linux/irq.h b/include/linux/irq.h
+index bc4e066..6bf2447 100644
+--- a/include/linux/irq.h
++++ b/include/linux/irq.h
+@@ -654,6 +654,7 @@ struct irq_chip_type {
+ 	struct irq_chip_regs	regs;
+ 	irq_flow_handler_t	handler;
+ 	u32			type;
++	u32			mask_cache;
+ };
+ 
+ /**
+@@ -663,6 +664,7 @@ struct irq_chip_type {
+  * @irq_base:		Interrupt base nr for this chip
+  * @irq_cnt:		Number of interrupts handled by this chip
+  * @mask_cache:		Cached mask register
++ * @pmask_cache:	pointer to cached mask register
+  * @type_cache:		Cached type register
+  * @polarity_cache:	Cached polarity register
+  * @wake_enabled:	Interrupt can wakeup from suspend
+@@ -684,6 +686,7 @@ struct irq_chip_generic {
+ 	unsigned int		irq_base;
+ 	unsigned int		irq_cnt;
+ 	u32			mask_cache;
++	u32			*pmask_cache;
+ 	u32			type_cache;
+ 	u32			polarity_cache;
+ 	u32			wake_enabled;
+diff --git a/kernel/irq/generic-chip.c b/kernel/irq/generic-chip.c
+index c89295a..1be14a3 100644
+--- a/kernel/irq/generic-chip.c
++++ b/kernel/irq/generic-chip.c
+@@ -43,7 +43,7 @@ void irq_gc_mask_disable_reg(struct irq_data *d)
+ 
+ 	irq_gc_lock(gc);
+ 	irq_reg_writel(mask, gc->reg_base + cur_regs(d)->disable);
+-	gc->mask_cache &= ~mask;
++	*gc->pmask_cache &= ~mask;
+ 	irq_gc_unlock(gc);
+ }
+ 
+@@ -60,8 +60,8 @@ void irq_gc_mask_set_bit(struct irq_data *d)
+ 	u32 mask = 1 << (d->irq - gc->irq_base);
+ 
+ 	irq_gc_lock(gc);
+-	gc->mask_cache |= mask;
+-	irq_reg_writel(gc->mask_cache, gc->reg_base + cur_regs(d)->mask);
++	*gc->pmask_cache |= mask;
++	irq_reg_writel(*gc->pmask_cache, gc->reg_base + cur_regs(d)->mask);
+ 	irq_gc_unlock(gc);
+ }
+ 
+@@ -78,8 +78,8 @@ void irq_gc_mask_clr_bit(struct irq_data *d)
+ 	u32 mask = 1 << (d->irq - gc->irq_base);
+ 
+ 	irq_gc_lock(gc);
+-	gc->mask_cache &= ~mask;
+-	irq_reg_writel(gc->mask_cache, gc->reg_base + cur_regs(d)->mask);
++	*gc->pmask_cache &= ~mask;
++	irq_reg_writel(*gc->pmask_cache, gc->reg_base + cur_regs(d)->mask);
+ 	irq_gc_unlock(gc);
+ }
+ 
+@@ -97,7 +97,7 @@ void irq_gc_unmask_enable_reg(struct irq_data *d)
+ 
+ 	irq_gc_lock(gc);
+ 	irq_reg_writel(mask, gc->reg_base + cur_regs(d)->enable);
+-	gc->mask_cache |= mask;
++	*gc->pmask_cache |= mask;
+ 	irq_gc_unlock(gc);
+ }
+ 
+@@ -243,9 +243,12 @@ void irq_setup_generic_chip(struct irq_chip_generic *gc, u32 msk,
+ 	list_add_tail(&gc->list, &gc_list);
+ 	raw_spin_unlock(&gc_lock);
+ 
++	/* Setup pointer to mask_cache */
++	gc->pmask_cache = &gc->mask_cache;
++
+ 	/* Init mask cache ? */
+ 	if (flags & IRQ_GC_INIT_MASK_CACHE)
+-		gc->mask_cache = irq_reg_readl(gc->reg_base + ct->regs.mask);
++		*gc->pmask_cache = irq_reg_readl(gc->reg_base + ct->regs.mask);
+ 
+ 	for (i = gc->irq_base; msk; msk >>= 1, i++) {
+ 		if (!(msk & 0x01))
+@@ -275,6 +278,8 @@ int irq_setup_alt_chip(struct irq_data *d, unsigned int type)
+ 	struct irq_chip_type *ct = gc->chip_types;
+ 	unsigned int i;
+ 
++	/* Setup pointer to the mask_cache */
++	gc->pmask_cache = &ct->mask_cache;
+ 	for (i = 0; i < gc->num_ct; i++, ct++) {
+ 		if (ct->type & type) {
+ 			d->chip = &ct->chip;
+-- 
+1.7.1
