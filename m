@@ -1,64 +1,72 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Thu, 14 Mar 2013 18:14:54 +0100 (CET)
-Subject: [PATCH v2 1/8] drivers: media: use module_platform_driver_probe()
-In-Reply-To: <1363280978-24051-2-git-send-email-fabio.porcedda@gmail.com>
+From: fabio.porcedda@gmail.com (Fabio Porcedda)
+Date: Thu, 14 Mar 2013 18:09:36 +0100
+Subject: [PATCH v2 6/8] drivers: mfd: use module_platform_driver_probe()
+In-Reply-To: <1363280978-24051-1-git-send-email-fabio.porcedda@gmail.com>
 References: <1363280978-24051-1-git-send-email-fabio.porcedda@gmail.com>
- <1363280978-24051-2-git-send-email-fabio.porcedda@gmail.com>
-Message-ID: <Pine.LNX.4.64.1303141814290.22728@axis700.grange>
+Message-ID: <1363280978-24051-7-git-send-email-fabio.porcedda@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 14 Mar 2013, Fabio Porcedda wrote:
+This patch converts the drivers to use the
+module_platform_driver_probe() macro which makes the code smaller and
+a bit simpler.
 
-> This patch converts the drivers to use the
-> module_platform_driver_probe() macro which makes the code smaller and
-> a bit simpler.
-> 
-> Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
-
-Thanks, will queue for 3.10.
-
-Regards
-Guennadi
-
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
-> Cc: Josh Wu <josh.wu@atmel.com>
-> Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> Cc: Hans Verkuil <hans.verkuil@cisco.com>
-> Cc: linux-media at vger.kernel.org
-> ---
->  drivers/media/platform/soc_camera/atmel-isi.c | 12 +-----------
->  1 file changed, 1 insertion(+), 11 deletions(-)
-> 
-> diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
-> index 82dbf99..12ba31d 100644
-> --- a/drivers/media/platform/soc_camera/atmel-isi.c
-> +++ b/drivers/media/platform/soc_camera/atmel-isi.c
-> @@ -1081,17 +1081,7 @@ static struct platform_driver atmel_isi_driver = {
->  	},
->  };
->  
-> -static int __init atmel_isi_init_module(void)
-> -{
-> -	return  platform_driver_probe(&atmel_isi_driver, &atmel_isi_probe);
-> -}
-> -
-> -static void __exit atmel_isi_exit(void)
-> -{
-> -	platform_driver_unregister(&atmel_isi_driver);
-> -}
-> -module_init(atmel_isi_init_module);
-> -module_exit(atmel_isi_exit);
-> +module_platform_driver_probe(atmel_isi_driver, atmel_isi_probe);
->  
->  MODULE_AUTHOR("Josh Wu <josh.wu@atmel.com>");
->  MODULE_DESCRIPTION("The V4L2 driver for Atmel Linux");
-> -- 
-> 1.8.1.5
-> 
-
+Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Samuel Ortiz <sameo@linux.intel.com>
+Cc: linux-arm-kernel at lists.infradead.org
 ---
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+ drivers/mfd/davinci_voicecodec.c | 12 +-----------
+ drivers/mfd/htc-pasic3.c         | 13 +------------
+ 2 files changed, 2 insertions(+), 23 deletions(-)
+
+diff --git a/drivers/mfd/davinci_voicecodec.c b/drivers/mfd/davinci_voicecodec.c
+index c0bcc87..c60ab0c 100644
+--- a/drivers/mfd/davinci_voicecodec.c
++++ b/drivers/mfd/davinci_voicecodec.c
+@@ -177,17 +177,7 @@ static struct platform_driver davinci_vc_driver = {
+ 	.remove	= davinci_vc_remove,
+ };
+ 
+-static int __init davinci_vc_init(void)
+-{
+-	return platform_driver_probe(&davinci_vc_driver, davinci_vc_probe);
+-}
+-module_init(davinci_vc_init);
+-
+-static void __exit davinci_vc_exit(void)
+-{
+-	platform_driver_unregister(&davinci_vc_driver);
+-}
+-module_exit(davinci_vc_exit);
++module_platform_driver_probe(davinci_vc_driver, davinci_vc_probe);
+ 
+ MODULE_AUTHOR("Miguel Aguilar");
+ MODULE_DESCRIPTION("Texas Instruments DaVinci Voice Codec Core Interface");
+diff --git a/drivers/mfd/htc-pasic3.c b/drivers/mfd/htc-pasic3.c
+index 9e5453d..0285fce 100644
+--- a/drivers/mfd/htc-pasic3.c
++++ b/drivers/mfd/htc-pasic3.c
+@@ -208,18 +208,7 @@ static struct platform_driver pasic3_driver = {
+ 	.remove		= pasic3_remove,
+ };
+ 
+-static int __init pasic3_base_init(void)
+-{
+-	return platform_driver_probe(&pasic3_driver, pasic3_probe);
+-}
+-
+-static void __exit pasic3_base_exit(void)
+-{
+-	platform_driver_unregister(&pasic3_driver);
+-}
+-
+-module_init(pasic3_base_init);
+-module_exit(pasic3_base_exit);
++module_platform_driver_probe(pasic3_driver, pasic3_probe);
+ 
+ MODULE_AUTHOR("Philipp Zabel <philipp.zabel@gmail.com>");
+ MODULE_DESCRIPTION("Core driver for HTC PASIC3");
+-- 
+1.8.1.5
