@@ -1,37 +1,38 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 13 Mar 2013 22:43:52 -0600
-Subject: [PATCH V2 0/9] ARM: tegra: add platform suspend support
-In-Reply-To: <1363224385.3308.8.camel@jlo-ubuntu-64.nvidia.com>
-References: <1363060916-8897-1-git-send-email-josephl@nvidia.com>
- <513F82EB.1030407@wwwdotorg.org>
- <1363154644.3998.140.camel@jlo-ubuntu-64.nvidia.com>
- <5140B893.9010704@wwwdotorg.org>
- <1363224385.3308.8.camel@jlo-ubuntu-64.nvidia.com>
-Message-ID: <51415588.7080403@wwwdotorg.org>
+Date: Wed, 13 Mar 2013 22:56:25 -0600
+Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
+In-Reply-To: <20130313213344.GA29402@avionic-0098.mockup.avionic-design.de>
+References: <20130312070852.GA6727@avionic-0098.mockup.avionic-design.de>
+ <20130312155749.GA1820@obsidianresearch.com>
+ <20130312203819.GA23221@avionic-0098.mockup.avionic-design.de>
+ <20130312210328.GA22702@obsidianresearch.com>
+ <20130312213006.GA23717@avionic-0098.mockup.avionic-design.de>
+ <20130312220854.GA23112@obsidianresearch.com>
+ <20130313081815.GD25940@avionic-0098.mockup.avionic-design.de>
+ <20130313170205.GB24042@obsidianresearch.com>
+ <20130313192628.GA28714@avionic-0098.mockup.avionic-design.de>
+ <5140E85A.3040900@firmworks.com>
+ <20130313213344.GA29402@avionic-0098.mockup.avionic-design.de>
+Message-ID: <51415879.5080902@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/13/2013 07:26 PM, Joseph Lo wrote:
-> On Thu, 2013-03-14 at 01:34 +0800, Stephen Warren wrote:
->> On 03/13/2013 12:04 AM, Joseph Lo wrote:
->> ...
->>> BTW, I want to mention one thing about PMC DT bindings. Because I can't
->>> add all of the PMC DT bindings in one time, the PMC is related to too
->>> many devices to work for runtime PM and power domain control. And some
->>> wake up sources control for deep sleep mode (LP0). They are still under
->>> developing for upstream. May I add more bindings for PMC later?
->>
->> With DT you are supposed to define the complete DT binding for the HW up
->> front. There have been some hints that incrementally defining bindings
->> will start to get push-back. How hard is it in this case to simply
->> define the entire binding right now?
->>
-> There are still two main features for PMC that we need to define
-> bindings/properties in DT. One is power main the other wake up source.
-> But we are not there yet. Because I don't have drivers to verify them is
-> enough or not. If I add all the bindings right now, I believe it will be
-> modify later.
+On 03/13/2013 03:33 PM, Thierry Reding wrote:
+> On Wed, Mar 13, 2013 at 10:58:02AM -1000, Mitch Bradley wrote: 
+> [...]
+>> In this case, the answer to "what does pcie_controller do?" is
+>> "it implements a PCI bus" below.  So 'device_type = "pci"' is
+>> appropriate.
+> 
+> Alright, that's 2 against 1. I don't have much of a choice but to
+> yield.
 
-Since the DT is supposed to be a representation of the HW, and not a
-representation of what a particular driver needs, I'm not sue why you'd
-need to be able to test a driver before you could design a DT binding.
+Just one note here though re: how the Tegra HW works:
+
+The Tegra "PCIe controller" HW translates from a SoC-internal bus to
+another SoC-internal bus. The "PCIe root ports" translate from that
+second SoC-internal bus to a PCIe bus. That's exactly why the PCIe
+root port configuration registers don't show up via type 0 PCIe
+configuration transactions. Thus, from a HW perspective, it really is
+true that the PCIe root ports are PCI devices, but the "PCIe
+controller" really isn't anything to do with PCIe.
