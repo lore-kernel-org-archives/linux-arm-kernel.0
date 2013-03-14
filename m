@@ -1,30 +1,156 @@
 From: amit.daniel@samsung.com (Amit Daniel Kachhap)
-Date: Thu, 14 Mar 2013 11:32:56 +0530
-Subject: [PATCH 0/3] ARM: EXYNOS: cpuidle: Several fixes in exynos cpuidle/PM
-Message-ID: <1363240979-1939-1-git-send-email-amit.daniel@samsung.com>
+Date: Thu, 14 Mar 2013 11:32:57 +0530
+Subject: [PATCH 1/3] ARM: EXYNOS: Move arm core power down clock to exynos5250
+ common clock
+In-Reply-To: <1363240979-1939-1-git-send-email-amit.daniel@samsung.com>
+References: <1363240979-1939-1-git-send-email-amit.daniel@samsung.com>
+Message-ID: <1363240979-1939-2-git-send-email-amit.daniel@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series contains a couple of fixes in cpuidle/PM due to
-1) clock migration in driver folder.
-2) exynos5440 platform which does not support cpuidle C1 state.
-3) Compilations error when generic PM options are enabled.
+Now with common clock support added for exynos5250 it is necessary to move
+this code to exynos5250 common clock driver as clock registers should be
+handled there. This change is tested in exynos5250 based arndale platform.
 
-All these patches are based on Samsung maintainer's for-next tree.
-git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git for-next
+Cc: Abhilash Kesavan <a.kesavan@samsung.com>
+Cc: Thomas Abraham <thomas.abraham@linaro.org>
+Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+---
+ arch/arm/mach-exynos/cpuidle.c       |   35 ----------------------------
+ drivers/clk/samsung/clk-exynos5250.c |   42 ++++++++++++++++++++++++++++++++++
+ 2 files changed, 42 insertions(+), 35 deletions(-)
 
-Amit Daniel Kachhap (3):
-  ARM: EXYNOS: Move arm core power down clock to exynos5250 common
-    clock
-  ARM: SAMSUNG: Add SAMSUNG_PM config option to select pm
-  ARM: EXYNOS: cpuidle: Allow C1 state only in supported SOC's.
-
- arch/arm/mach-exynos/Makefile           |    2 +-
- arch/arm/mach-exynos/common.c           |    2 +-
- arch/arm/mach-exynos/common.h           |    1 -
- arch/arm/mach-exynos/cpuidle.c          |   40 +++--------------------------
- arch/arm/plat-samsung/Kconfig           |    7 +++++
- arch/arm/plat-samsung/Makefile          |    3 +-
- arch/arm/plat-samsung/include/plat/pm.h |    8 +++---
- drivers/clk/samsung/clk-exynos5250.c    |   42 +++++++++++++++++++++++++++++++
- 8 files changed, 60 insertions(+), 45 deletions(-)
+diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
+index e2689d1..6929c77 100644
+--- a/arch/arm/mach-exynos/cpuidle.c
++++ b/arch/arm/mach-exynos/cpuidle.c
+@@ -160,46 +160,11 @@ static int exynos4_enter_lowpower(struct cpuidle_device *dev,
+ 		return exynos4_enter_core0_aftr(dev, drv, new_index);
+ }
+ 
+-static void __init exynos5_core_down_clk(void)
+-{
+-	unsigned int tmp;
+-
+-	/*
+-	 * Enable arm clock down (in idle) and set arm divider
+-	 * ratios in WFI/WFE state.
+-	 */
+-	tmp = PWR_CTRL1_CORE2_DOWN_RATIO | \
+-	      PWR_CTRL1_CORE1_DOWN_RATIO | \
+-	      PWR_CTRL1_DIV2_DOWN_EN	 | \
+-	      PWR_CTRL1_DIV1_DOWN_EN	 | \
+-	      PWR_CTRL1_USE_CORE1_WFE	 | \
+-	      PWR_CTRL1_USE_CORE0_WFE	 | \
+-	      PWR_CTRL1_USE_CORE1_WFI	 | \
+-	      PWR_CTRL1_USE_CORE0_WFI;
+-	__raw_writel(tmp, EXYNOS5_PWR_CTRL1);
+-
+-	/*
+-	 * Enable arm clock up (on exiting idle). Set arm divider
+-	 * ratios when not in idle along with the standby duration
+-	 * ratios.
+-	 */
+-	tmp = PWR_CTRL2_DIV2_UP_EN	 | \
+-	      PWR_CTRL2_DIV1_UP_EN	 | \
+-	      PWR_CTRL2_DUR_STANDBY2_VAL | \
+-	      PWR_CTRL2_DUR_STANDBY1_VAL | \
+-	      PWR_CTRL2_CORE2_UP_RATIO	 | \
+-	      PWR_CTRL2_CORE1_UP_RATIO;
+-	__raw_writel(tmp, EXYNOS5_PWR_CTRL2);
+-}
+-
+ static int __init exynos4_init_cpuidle(void)
+ {
+ 	int cpu_id, ret;
+ 	struct cpuidle_device *device;
+ 
+-	if (soc_is_exynos5250())
+-		exynos5_core_down_clk();
+-
+ 	ret = cpuidle_register_driver(&exynos4_idle_driver);
+ 	if (ret) {
+ 		printk(KERN_ERR "CPUidle failed to register driver\n");
+diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
+index 1152125..b653863 100644
+--- a/drivers/clk/samsung/clk-exynos5250.c
++++ b/drivers/clk/samsung/clk-exynos5250.c
+@@ -22,6 +22,8 @@
+ 
+ #define SRC_CPU			0x200
+ #define DIV_CPU0		0x500
++#define PWR_CTRL1		0x1020
++#define PWR_CTRL2		0x1024
+ #define SRC_CORE1		0x4204
+ #define SRC_TOP0		0x10210
+ #define SRC_TOP2		0x10218
+@@ -63,6 +65,23 @@
+ #define SRC_CDREX		0x20200
+ #define PLL_DIV2_SEL		0x20a24
+ 
++/*Below definitions are used for PWR_CTRL settings*/
++#define PWR_CTRL1_CORE2_DOWN_RATIO		(7 << 28)
++#define PWR_CTRL1_CORE1_DOWN_RATIO		(7 << 16)
++#define PWR_CTRL1_DIV2_DOWN_EN			(1 << 9)
++#define PWR_CTRL1_DIV1_DOWN_EN			(1 << 8)
++#define PWR_CTRL1_USE_CORE1_WFE			(1 << 5)
++#define PWR_CTRL1_USE_CORE0_WFE			(1 << 4)
++#define PWR_CTRL1_USE_CORE1_WFI			(1 << 1)
++#define PWR_CTRL1_USE_CORE0_WFI			(1 << 0)
++
++#define PWR_CTRL2_DIV2_UP_EN			(1 << 25)
++#define PWR_CTRL2_DIV1_UP_EN			(1 << 24)
++#define PWR_CTRL2_DUR_STANDBY2_VAL		(1 << 16)
++#define PWR_CTRL2_DUR_STANDBY1_VAL		(1 << 8)
++#define PWR_CTRL2_CORE2_UP_RATIO		(1 << 4)
++#define PWR_CTRL2_CORE1_UP_RATIO		(1 << 0)
++
+ /*
+  * Let each supported clock get a unique id. This id is used to lookup the clock
+  * for device tree based platforms. The clocks are categorized into three
+@@ -110,6 +129,8 @@ enum exynos5250_clks {
+ static __initdata unsigned long exynos5250_clk_regs[] = {
+ 	SRC_CPU,
+ 	DIV_CPU0,
++	PWR_CTRL1,
++	PWR_CTRL2,
+ 	SRC_CORE1,
+ 	SRC_TOP0,
+ 	SRC_TOP2,
+@@ -467,6 +488,7 @@ void __init exynos5250_clk_init(struct device_node *np)
+ {
+ 	void __iomem *reg_base;
+ 	struct clk *apll, *mpll, *epll, *vpll, *bpll, *gpll, *cpll;
++	unsigned int tmp;
+ 
+ 	if (np) {
+ 		reg_base = of_iomap(np, 0);
+@@ -508,6 +530,26 @@ void __init exynos5250_clk_init(struct device_node *np)
+ 	samsung_clk_register_gate(exynos5250_gate_clks,
+ 			ARRAY_SIZE(exynos5250_gate_clks));
+ 
++	/*
++	 * Enable arm clock down (in idle) and set arm divider
++	 * ratios in WFI/WFE state.
++	 */
++	tmp = (PWR_CTRL1_CORE2_DOWN_RATIO | PWR_CTRL1_CORE1_DOWN_RATIO |
++		PWR_CTRL1_DIV2_DOWN_EN | PWR_CTRL1_DIV1_DOWN_EN |
++		PWR_CTRL1_USE_CORE1_WFE | PWR_CTRL1_USE_CORE0_WFE |
++		PWR_CTRL1_USE_CORE1_WFI | PWR_CTRL1_USE_CORE0_WFI);
++	__raw_writel(tmp, reg_base + PWR_CTRL1);
++
++	/*
++	 * Enable arm clock up (on exiting idle). Set arm divider
++	 * ratios when not in idle along with the standby duration
++	 * ratios.
++	 */
++	tmp = (PWR_CTRL2_DIV2_UP_EN | PWR_CTRL2_DIV1_UP_EN |
++		PWR_CTRL2_DUR_STANDBY2_VAL | PWR_CTRL2_DUR_STANDBY1_VAL |
++		PWR_CTRL2_CORE2_UP_RATIO | PWR_CTRL2_CORE1_UP_RATIO);
++	__raw_writel(tmp, reg_base + PWR_CTRL2);
++
+ 	pr_info("Exynos5250: clock setup completed, armclk=%ld\n",
+ 			_get_rate("armclk"));
+ }
+-- 
+1.7.1
