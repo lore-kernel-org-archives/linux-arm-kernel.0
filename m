@@ -1,43 +1,49 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 Mar 2013 22:56:39 +0100
-Subject: [PATCH 2/3] mfd: Make AB8500_CORE select POWER_SUPPLY to fix build
- error
+Date: Thu, 14 Mar 2013 22:56:43 +0100
+Subject: [PATCH] vfio: include <linux/slab.h> for kmalloc
 In-Reply-To: <1363298204-8014-1-git-send-email-arnd@arndb.de>
 References: <1363298204-8014-1-git-send-email-arnd@arndb.de>
-Message-ID: <1363298204-8014-2-git-send-email-arnd@arndb.de>
+Message-ID: <1363298204-8014-6-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Axel Lin <axel.lin@ingics.com>
+The vfio drivers call kmalloc or kzalloc, but do not
+include <linux/slab.h>, which causes build errors on
+ARM.
 
-This patch fixes below build error when CONFIG_POWER_SUPPLY is not set.
-
-drivers/built-in.o: In function `ab8500_power_off':
-drivers/mfd/ab8500-sysctrl.c:37: undefined reference to `power_supply_get_by_name'
-drivers/mfd/ab8500-sysctrl.c:53: undefined reference to `power_supply_get_by_name'
-make: *** [vmlinux] Error 1
-
-Signed-off-by: Axel Lin <axel.lin@ingics.com>
-Acked-by: Lee Jones <lee.jones@linaro.org>
-Cc: Samuel Ortiz <sameo@linux.intel.com>
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Alex Williamson <alex.williamson@redhat.com>
+Cc: kvm at vger.kernel.org
 ---
-Please apply to MFD tree for 3.9
+Please apply for 3.9
 
- drivers/mfd/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/vfio/pci/vfio_pci_config.c | 1 +
+ drivers/vfio/pci/vfio_pci_intrs.c  | 1 +
+ 2 files changed, 2 insertions(+)
 
-diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-index 671f5b1..c346941 100644
---- a/drivers/mfd/Kconfig
-+++ b/drivers/mfd/Kconfig
-@@ -858,6 +858,7 @@ config EZX_PCAP
- config AB8500_CORE
- 	bool "ST-Ericsson AB8500 Mixed Signal Power Management chip"
- 	depends on GENERIC_HARDIRQS && ABX500_CORE && MFD_DB8500_PRCMU
-+	select POWER_SUPPLY
- 	select MFD_CORE
- 	select IRQ_DOMAIN
- 	help
+diff --git a/drivers/vfio/pci/vfio_pci_config.c b/drivers/vfio/pci/vfio_pci_config.c
+index 964ff22..aeb00fc 100644
+--- a/drivers/vfio/pci/vfio_pci_config.c
++++ b/drivers/vfio/pci/vfio_pci_config.c
+@@ -27,6 +27,7 @@
+ #include <linux/pci.h>
+ #include <linux/uaccess.h>
+ #include <linux/vfio.h>
++#include <linux/slab.h>
+ 
+ #include "vfio_pci_private.h"
+ 
+diff --git a/drivers/vfio/pci/vfio_pci_intrs.c b/drivers/vfio/pci/vfio_pci_intrs.c
+index 3639371..a965091 100644
+--- a/drivers/vfio/pci/vfio_pci_intrs.c
++++ b/drivers/vfio/pci/vfio_pci_intrs.c
+@@ -22,6 +22,7 @@
+ #include <linux/vfio.h>
+ #include <linux/wait.h>
+ #include <linux/workqueue.h>
++#include <linux/slab.h>
+ 
+ #include "vfio_pci_private.h"
+ 
 -- 
 1.8.1.2
