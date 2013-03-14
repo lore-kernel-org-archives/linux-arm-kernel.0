@@ -1,82 +1,94 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Thu, 14 Mar 2013 14:40:37 -0400
-Subject: [PATCH] usb: limit OMAP related USB options to OMAP2PLUS platforms
-In-Reply-To: <20130314161204.GE3001@arwen.pp.htv.fi>
-References: <1361992119-2465-1-git-send-email-paul.gortmaker@windriver.com>
- <20130227195046.GA2300@arwen.pp.htv.fi> <512E653F.1090706@windriver.com>
- <5141EA01.3060905@windriver.com> <20130314161204.GE3001@arwen.pp.htv.fi>
-Message-ID: <514219A5.9080305@windriver.com>
+From: smoch@web.de (Soeren Moch)
+Date: Thu, 14 Mar 2013 19:48:41 +0100
+Subject: [PATCH] USB: EHCI: fix for leaking isochronous data
+In-Reply-To: <Pine.LNX.4.44L0.1303101638330.3146-100000@netrider.rowland.org>
+References: <Pine.LNX.4.44L0.1303101638330.3146-100000@netrider.rowland.org>
+Message-ID: <51421B89.6020308@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-03-14 12:12 PM, Felipe Balbi wrote:
-> Hi,
-> 
-> On Thu, Mar 14, 2013 at 11:17:21AM -0400, Paul Gortmaker wrote:
->>>>> diff --git a/drivers/usb/phy/Kconfig b/drivers/usb/phy/Kconfig
->>>>> index 65217a5..40b8463 100644
->>>>> --- a/drivers/usb/phy/Kconfig
->>>>> +++ b/drivers/usb/phy/Kconfig
->>>>> @@ -17,6 +17,7 @@ config OMAP_USB2
->>>>>  
->>>>>  config OMAP_USB3
->>>>>  	tristate "OMAP USB3 PHY Driver"
->>>>> +	depends on ARCH_OMAP2PLUS
->>>>>  	select USB_OTG_UTILS
->>>>>  	select OMAP_CONTROL_USB
->>>>>  	help
->>>>> @@ -27,6 +28,7 @@ config OMAP_USB3
->>>>>  
->>>>>  config OMAP_CONTROL_USB
->>>>>  	tristate "OMAP CONTROL USB Driver"
->>>>> +	depends on ARCH_OMAP2PLUS
->>>>
->>>> I rather not add dependencies here and fix the selections of
->>>> OMAP_CONTROL_USB.
+On 10.03.2013 21:59, Alan Stern wrote:
+> On Sun, 10 Mar 2013, Soeren Moch wrote:
+>>> On Wed, 20 Feb 2013, Soeren Moch wrote:
 >>>
->>> I am not sure I understand what you mean, or why you wouldn't
->>> want sane dependencies in place like those given above.  Perhaps
->>> you can send an alternate patch so there is no ambiguity?
+>>>> Ok. I use 2 em2840-based usb sticks (em28xx driver) attached to a
+>>>> Marvell Kirkwood-SoC with a orion-ehci usb controller. These usb sticks
+>>>> stream dvb data (digital TV) employing isochronous usb transfers (user
+>>>> application is vdr).
+>>>>
+>>>> Starting from linux-3.6 I see
+>>>>      ERROR: 1024 KiB atomic DMA coherent pool is too small!
+>>>> in the syslog after several 10 minutes (sometimes hours) of streaming
+>>>> and then streaming stops.
+>>>>
+>>>> In linux-3.6 the memory management for the arm architecture was changed,
+>>>> so that atomic coherent dma allocations are served from a special pool.
+>>>> This pool gets exhausted. The only user of this pool (in my test) is
+>>>> orion-ehci. Although I have only 10 URBs in flight (5 for each stick,
+>>>> resubmitted in the completion handler), I have 256 atomic coherent
+>>>> allocations (memory from the pool is allocated in pages) from orion-ehci
+>>>> when I see this error. So I think there must be a memory leak (memory
+>>>> allocated atomic somewhere below the usb_submit_urb call in em28xx-core.c).
+>>>>
+>>>> With other dvb sticks using usb bulk transfers I never see this error.
+>>>>
+>>>> Since you already found a memory leak in the ehci driver for isoc
+>>>> transfers, I hoped you can help to solve this problem. If there are
+>>>> additional questions, please ask. If there is something I can test, I
+>>>> would be glad to do so.
+>>>
+>>> I guess the first thing is to get a dmesg log showing the problem.  You
+>>> should build a kernel with CONFIG_USB_DEBUG enabled and post the part
+>>> of the dmesg output starting from when you plug in the troublesome DVB
+>>> stick.
 >>
->> Hi Felipe,
+>> Sorry for my late response. Now I built a kernel 3.8.0 with usb_debug
+>> enabled. See below for the syslog of device plug-in.
 >>
->> I'm still seeing the OMAP settings in x86 builds on mainline
->> from today, and since I'd not got a reply to the above, I'm
->> still wondering what alternative you have in mind vs. my
->> above patch.  We can't be having the arch specific settings
->> leaking out to the other arch where they make no sense[1].
-> 
-> why not ? It forces people to write portable drivers, it forces people
-> to avoid including the wrong headers and allows maintainers and patch
-> authors to easily compile test their drivers.
+>>> It also might help to have a record of all the isochronous-related
+>>> coherent allocations and deallocations done by the ehci-hcd driver.
+>>> Are you comfortable making your own debugging changes?  The allocations
+>>> are done by a call to dma_pool_alloc() in
+>>> drivers/usb/host/ehci-sched.c:itd_urb_transaction() if the device runs
+>>> at high speed and sitd_urb_transaction() if the device runs at full
+>>> speed.  The deallocations are done by calls to dma_pool_free() in
+>>> ehci-timer.c:end_free_itds().
+>>>
+>>
+>> I added a debug message to
+>> drivers/usb/host/ehci-sched.c:itd_urb_transaction() to log the
+>> allocation flags, see log below.
+>
+> But it looks like you didn't add a message to end_free_itds(), so we
+> don't know when the memory gets deallocated.  And you didn't print out
+> the values of urb, num_itds, and i, or the value of itd (so we can
+> match up allocations against deallocations).
 
-Why not?  That was covered in the link I'd referenced.  What you
-list above is a very developer centric point of view.  To quote
-Andrew Morton from that same link, in regards to dependencies
-and how they should be used:
+OK, I will implement this more detailed logging. But with several 
+allocations per second and runtime of several hours this will result in 
+a very long logfile.
 
-"...offering useless stuff to non-kernel-developers has downsides
-with no balancing benefit, and we really should optimise things for
-our users because there are so many more of them than there are of us."
+>> For me this looks like nothing is
+>> allocated atomic here, so this function should not be the root cause of
+>> the dma coherent pool exhaustion.
+>
+> I don't understand.  If non-atomic allocations can't exhaust the pool,
+> why do we see these allocations fail?
 
-Look at what you've written.  The key word above and below in your
-text is "force people".  Showing no interest in simplifying things for
-our users and taking that approach is a good way to alienate our user
-base.
+Good point. Unfortunately I'm not familiar with the memory management 
+details.
 
-Paul.
---
+Arnd, can memory allocated with dma_pool_alloc() and gfp_flags 
+0x20000093 or 0x80000093 come from the atomic dma coherent pool?
 
-> 
-> On top of all that, it lets me better use linux-next as a big build
-> testing before I send a pull request to Greg.
-> 
-> When you're going to build a product, you will come up with a proper
-> .config anyway. Because of a bunch of these misused 'depends on' and
-> 'select' statements that right now ARM multiplatform builds don't even
-> compile cleanly if you enable all ARM-related drivers.
-> 
-> Until all of those are cleaned up, the best way is to force people to
-> write drivers which compile in all architectures and make sure Kconfig
-> doesn't add any ARCH dependency.
-> 
+>> Are there other allocation functions
+>> which I could track?
+>
+> Yes, but they wouldn't be used for isochronous transfers.  See
+> ehci_qtd_alloc(), ehci_qtd_free(), ehci_qh_alloc(), and qh_destroy() in
+> ehci-mem.c, as well as some other one-time-only coherent allocations in
+> that file.
+>
+> Alan Stern
+>
+Soeren Moch
