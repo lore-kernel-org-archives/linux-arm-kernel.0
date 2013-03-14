@@ -1,61 +1,93 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 14 Mar 2013 18:22:16 +0100
-Subject: [PATCH V2] ARM: mvebu: fix RAM size for Armada XP board
- DB-MV784MP-GP
-In-Reply-To: <20130314165612.GS12700@titan.lakedaemon.net>
-References: <20130216164457.GA23237@titan.lakedaemon.net>
- <1363276674-24172-1-git-send-email-jason@lakedaemon.net>
- <20130314162236.GA19701@obsidianresearch.com>
- <20130314165612.GS12700@titan.lakedaemon.net>
-Message-ID: <51420748.9090503@free-electrons.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Thu, 14 Mar 2013 11:25:55 -0600
+Subject: [PATCH 24/32] pci: PCIe driver for Marvell Armada 370/XP systems
+In-Reply-To: <20130314090120.GA2224@avionic-0098.mockup.avionic-design.de>
+References: <20130312210328.GA22702@obsidianresearch.com>
+ <20130312213006.GA23717@avionic-0098.mockup.avionic-design.de>
+ <20130312220854.GA23112@obsidianresearch.com>
+ <20130313081815.GD25940@avionic-0098.mockup.avionic-design.de>
+ <20130313170205.GB24042@obsidianresearch.com>
+ <20130313192628.GA28714@avionic-0098.mockup.avionic-design.de>
+ <5140E85A.3040900@firmworks.com>
+ <20130313220235.GA29895@avionic-0098.mockup.avionic-design.de>
+ <20130313222102.GA28336@obsidianresearch.com>
+ <20130314090120.GA2224@avionic-0098.mockup.avionic-design.de>
+Message-ID: <20130314172555.GA14048@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/14/2013 05:56 PM, Jason Cooper wrote:
-> On Thu, Mar 14, 2013 at 10:22:36AM -0600, Jason Gunthorpe wrote:
->> On Thu, Mar 14, 2013 at 03:57:54PM +0000, Jason Cooper wrote:
->>> The board is supplied with a 4GB RAM module.  This value can be
->>> overridden by the bootloader based on probed memory size.  We set it to
->>> a reasonable value here.
->>>
->>> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
->>> Changes from v1:
->>>  - grammatical fix suggested by Sergei Shtylyov
->>>  - correct size suggested by several folks (within 32bit, 1 dword)
->>>
->>> As promised, catching this fix in the -rc cycle.
->>>
->>> For those not familiar, earlier versions of the patch adding this board listed
->>> 3GB because that is all that was visible.  I mistaken applied v3 of the patch
->>> instead of v4 which properly listed 4GB.  This patch cleans up my error.
->>
->> What happens when the kernel tries to treat 0xD0000000 and above as
->> memory? Lots of internal register blocks overlap 0 -> 4GB - won't this
->> cause resource conflicts on boot? I'm actually very surprised it boots
->> at all - what does /proc/iomem say?
+[trimm'd the cc list]
+
+On Thu, Mar 14, 2013 at 10:01:20AM +0100, Thierry Reding wrote:
+
+> It turns out that this works with the Tegra driver because it uses the
+> new of_pci_process_ranges() function and simply overwrites earlier
+> matches by subsequent ones.
 > 
-> We'll have to wait to hear from Gregory or Florian on that.  They are
-> the only two I know of who have this board.  I can only compile-test.
-> 
+> 	ranges = <0x82000000 0 0 0x80000000 0 0x00001000   /* port 0 registers */
+> 		  0x82000000 0 0 0x80001000 0 0x00001000   /* port 1 registers */
+> 		  0x81000000 0 0 0x82000000 0 0x00010000   /* downstream I/O */
+> 		  0x82000000 0 0 0xa0000000 0 0x10000000   /* non-prefetchable memory */
+> 		  0xc2000000 0 0 0xb0000000 0 0x10000000>; /* prefetchable memory */
 
-Indeed there are conflicts with the internals registers. I was too focused
-on the size of the RAM itslelf and I forgotten that if we use the 4GB we have
-no more address space for the internal registers themselves.
-Even with LPAE we will need to leave a "hole" from 0xD0000000 to 0x100000000
-for these registers.
+Okay.. There is still something funny here, the 3rd dword of the child
+address should not be 0 in every line and there shouldn't be overlaps
+in the child address space.
 
-So to conclude, currently, if we try to boot the Armada XP GP board with
-reg = <0x00000000 0xFFFFFFFF>, the kernel crash, even if there is 4GB of
-RAM.
+I'm assuming 0x80000000, 0xa0000000 and 0xb0000000 are real CPU physical
+addresses?
 
-> thx,
-> 
-> Jason.
-> 
+Then it should probably look like:
 
+ranges = <0x82000000 0 0x80000000  0x80000000  0 0x00001000   /* port 0 registers */
+	  0x82000000 0 0x80001000  0x80001000  0 0x00001000   /* port 1 registers */
+	  0x81000000 0          0  0x82000000  0 0x00010000   /* downstream I/O */
+	  0x82000000 0 0xa0000000  0xa0000000  0 0x10000000   /* non-prefetchable memory */
+	  0xc2000000 0 0xb0000000  0xb0000000  0 0x10000000>; /* prefetchable memory */
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Which says 'access to CPU address 0xa0000000 produces a PCI-E memory TLP with
+address 0xa0000000' - this is the 'normal' case, I assume that is what
+happens on tegra?
+
+It also says 'access to CPU address 0x82000000 produces a PCI-E IO TLP
+with address 0' - this translation is something Linux typically
+expects..
+
+Then you'd go on to have:
+
+               pci at 1,0 {
+                        device_type = "pci";
+                        assigned-addresses = <0x82000000 0 0x80000000  0 0x1000>;
+                        reg = <0x000800 0 0 0 0>;
+               }
+               pci at 2,0 {
+                        device_type = "pci";
+                        assigned-addresses = <0x82000000 0 0x80001000  0 0x1000>;
+                        reg = <0x001000 0 0 0 0>;
+               }
+
+Notice I've made the upper dw of assigned-addresses's size 0 and
+included the full 3dw from the appropriate ranges line.
+
+> So the above will actually work along with the corresponding root-port
+> "assigned-addresses" properties. I still don't like it much because I
+> don't think it accurately reflects the hardware. 
+
+There are lots of valid ways to model the same HW :(
+
+Bear in mind, for the PCI case - the OF PCI bindings model the HW
+through the eyes of the abstractions in the PCI specification. That is
+to say, they are not supposed to be an exact representation of the on
+chip architecture.
+
+Perhaps this would be clearer if you used 'pcie-root-complex' as the
+name of the top level node?
+
+> same kludgy, non-spec conformant smack that my original proposal had
+> because it uses assigned-addresses for something it wasn't intended
+> to.
+
+Yes, only the top level 'reg' method avoids going outside any specs.
+
+Regards,
+Jason
