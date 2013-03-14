@@ -1,185 +1,88 @@
-From: dahuang@nvidia.com (Danny Huang)
-Date: Thu, 14 Mar 2013 15:40:22 +0800
-Subject: [PATCH] ARM: tegra114: add speedo-based process identification
-Message-ID: <1363246822-14597-1-git-send-email-dahuang@nvidia.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 14 Mar 2013 13:15:14 +0530
+Subject: [PATCH] ARM: smp: Allow real broadcast device selection instead
+ of always dummy
+In-Reply-To: <20130313161811.GF13483@e106331-lin.cambridge.arm.com>
+References: <1363165608-13739-1-git-send-email-santosh.shilimkar@ti.com>
+ <514046B6.9020005@ti.com>
+ <20130313101641.GA13483@e106331-lin.cambridge.arm.com>
+ <514061D1.20603@ti.com>
+ <20130313122550.GD13483@e106331-lin.cambridge.arm.com>
+ <51409EC3.5050905@ti.com>
+ <20130313161811.GF13483@e106331-lin.cambridge.arm.com>
+Message-ID: <5141800A.2000307@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add speedo-based process identifictaion for Tegra114.
+On Wednesday 13 March 2013 09:48 PM, Mark Rutland wrote:
+> On Wed, Mar 13, 2013 at 03:44:03PM +0000, Santosh Shilimkar wrote:
+>> On Wednesday 13 March 2013 05:55 PM, Mark Rutland wrote:
+>>> On Wed, Mar 13, 2013 at 11:24:01AM +0000, Santosh Shilimkar wrote:
+>>>> On Wednesday 13 March 2013 03:46 PM, Mark Rutland wrote:
+>>>>> Hi Santosh,
+>>
+>> [..]
+>>
+>>>>>
+>>>>> Is the problem that the dummy timer is being registered as the broadcast
+>>>>> source, or that it is selected as a local timer in preference of real timers?
+>>>>>
+>>>> Dummy timer is preferred over real broadcast timer.
+>>>
+>>> Ok.
+> 
+> [...]
+> 
+>>> I do agree it'd be worth lowering the dummy timer's rating to ensure it doesn't
+>>> override a real timer elsewhere. 
+>>>
+>> Yep. Can I add you acked-by tag then for $subject patch ?
+>> Would be good to get this one merged as well.
+> 
+> Sure. Though could you reword the commit message? The patch solves the more
+> general issue of a dummy being preferred over real hardware even outside of
+> choosing the broadcast device.
+> 
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-Based on the work by:
-Alex Frid <afrid@nvidia.com>
+Thanks. For record, patch is in end of the email which I plan
+to put into patch system.
 
-Signed-off-by: Danny Huang <dahuang@nvidia.com>
+Regards,
+Santosh
+
+>From 57c501bcdc88c7ff26a5c63956be07e94a5083c5 Mon Sep 17 00:00:00 2001
+From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Date: Wed, 13 Mar 2013 12:33:16 +0530
+Subject: [PATCH 1/2] ARM: smp: Avoid dummy clockevent being preferred over real hardware clock-event
+
+With recent arm broadcast time clean-up from Mark Rutland, the dummy
+broadcast device is always registered with timer subsystem. And since
+the rating of the dummy clock event is very high, it may be preferred
+over a real clock event.
+
+This is a change in behavior from past and not an intended
+one. So reduce the rating of the dummy clockevent so that
+real clockevent device is selected when available.
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/mach-tegra/Makefile          |   1 +
- arch/arm/mach-tegra/fuse.c            |   4 ++
- arch/arm/mach-tegra/fuse.h            |   7 +++
- arch/arm/mach-tegra/tegra114_speedo.c | 100 ++++++++++++++++++++++++++++++++++
- 4 files changed, 112 insertions(+)
- create mode 100644 arch/arm/mach-tegra/tegra114_speedo.c
+ arch/arm/kernel/smp.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
-index 92703f9..e40326d 100644
---- a/arch/arm/mach-tegra/Makefile
-+++ b/arch/arm/mach-tegra/Makefile
-@@ -28,6 +28,7 @@ obj-$(CONFIG_HOTPLUG_CPU)               += hotplug.o
- obj-$(CONFIG_CPU_FREQ)                  += cpu-tegra.o
- obj-$(CONFIG_TEGRA_PCI)			+= pcie.o
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 31644f1..79078ed 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -480,7 +480,7 @@ static void __cpuinit broadcast_timer_setup(struct clock_event_device *evt)
+ 	evt->features	= CLOCK_EVT_FEAT_ONESHOT |
+ 			  CLOCK_EVT_FEAT_PERIODIC |
+ 			  CLOCK_EVT_FEAT_DUMMY;
+-	evt->rating	= 400;
++	evt->rating	= 100;
+ 	evt->mult	= 1;
+ 	evt->set_mode	= broadcast_timer_set_mode;
  
-+obj-$(CONFIG_ARCH_TEGRA_114_SOC)	+= tegra114_speedo.o
- ifeq ($(CONFIG_CPU_IDLE),y)
- obj-$(CONFIG_ARCH_TEGRA_114_SOC)	+= cpuidle-tegra114.o
- endif
-diff --git a/arch/arm/mach-tegra/fuse.c b/arch/arm/mach-tegra/fuse.c
-index f7db078..e035cd2 100644
---- a/arch/arm/mach-tegra/fuse.c
-+++ b/arch/arm/mach-tegra/fuse.c
-@@ -2,6 +2,7 @@
-  * arch/arm/mach-tegra/fuse.c
-  *
-  * Copyright (C) 2010 Google, Inc.
-+ * Copyright (c) 2013, NVIDIA CORPORATION.  All rights reserved.
-  *
-  * Author:
-  *	Colin Cross <ccross@android.com>
-@@ -137,6 +138,9 @@ void tegra_init_fuse(void)
- 		tegra_fuse_spare_bit = TEGRA30_FUSE_SPARE_BIT;
- 		tegra_init_speedo_data = &tegra30_init_speedo_data;
- 		break;
-+	case TEGRA114:
-+		tegra_init_speedo_data = &tegra114_init_speedo_data;
-+		break;
- 	default:
- 		pr_warn("Tegra: unknown chip id %d\n", tegra_chip_id);
- 		tegra_fuse_spare_bit = TEGRA20_FUSE_SPARE_BIT;
-diff --git a/arch/arm/mach-tegra/fuse.h b/arch/arm/mach-tegra/fuse.h
-index da78434..aacc00d 100644
---- a/arch/arm/mach-tegra/fuse.h
-+++ b/arch/arm/mach-tegra/fuse.h
-@@ -1,5 +1,6 @@
- /*
-  * Copyright (C) 2010 Google, Inc.
-+ * Copyright (c) 2013, NVIDIA CORPORATION.  All rights reserved.
-  *
-  * Author:
-  *	Colin Cross <ccross@android.com>
-@@ -66,4 +67,10 @@ void tegra30_init_speedo_data(void);
- static inline void tegra30_init_speedo_data(void) {}
- #endif
- 
-+#ifdef CONFIG_ARCH_TEGRA_114_SOC
-+void tegra114_init_speedo_data(void);
-+#else
-+static inline void tegra114_init_speedo_data(void) {}
-+#endif
-+
- #endif
-diff --git a/arch/arm/mach-tegra/tegra114_speedo.c b/arch/arm/mach-tegra/tegra114_speedo.c
-new file mode 100644
-index 0000000..1188e7b
---- /dev/null
-+++ b/arch/arm/mach-tegra/tegra114_speedo.c
-@@ -0,0 +1,100 @@
-+/*
-+ * Copyright (c) 2013, NVIDIA CORPORATION.  All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/kernel.h>
-+
-+#include "fuse.h"
-+
-+#define CORE_PROCESS_CORNERS_NUM	2
-+#define CPU_PROCESS_CORNERS_NUM		2
-+
-+enum {
-+	THRESHOLD_INDEX_0,
-+	THRESHOLD_INDEX_1,
-+	THRESHOLD_INDEX_COUNT,
-+};
-+
-+static const u32 core_process_speedos[THRESHOLD_INDEX_COUNT]
-+	[CORE_PROCESS_CORNERS_NUM] = {
-+	{1123,     UINT_MAX},
-+	{0,        UINT_MAX},
-+};
-+
-+static const u32 cpu_process_speedos[THRESHOLD_INDEX_COUNT]
-+	[CPU_PROCESS_CORNERS_NUM] = {
-+	{1695,     UINT_MAX},
-+	{0,        UINT_MAX},
-+};
-+
-+static void rev_sku_to_speedo_ids(int rev, int sku, int *threshold)
-+{
-+	u32 tmp;
-+
-+	switch (sku) {
-+	case 0x00:
-+	case 0x10:
-+	case 0x05:
-+	case 0x06:
-+		tegra_cpu_speedo_id = 1;
-+		tegra_soc_speedo_id = 0;
-+		*threshold = THRESHOLD_INDEX_0;
-+		break;
-+
-+	case 0x03:
-+	case 0x04:
-+		tegra_cpu_speedo_id = 2;
-+		tegra_soc_speedo_id = 1;
-+		*threshold = THRESHOLD_INDEX_1;
-+		break;
-+
-+	default:
-+		pr_err("Tegra114 Unknown SKU %d\n", sku);
-+		tegra_cpu_speedo_id = 0;
-+		tegra_soc_speedo_id = 0;
-+		*threshold = THRESHOLD_INDEX_0;
-+		break;
-+	}
-+
-+	if (rev == TEGRA_REVISION_A01) {
-+		tmp = tegra_fuse_readl(0x270) << 1;
-+		tmp |= tegra_fuse_readl(0x26c);
-+		if (!tmp)
-+			tegra_cpu_speedo_id = 0;
-+	}
-+}
-+
-+void tegra114_init_speedo_data(void)
-+{
-+	u32 cpu_speedo_val;
-+	u32 core_speedo_val;
-+	int threshold;
-+	int i;
-+
-+	rev_sku_to_speedo_ids(tegra_revision, tegra_sku_id, &threshold);
-+
-+	cpu_speedo_val = tegra_fuse_readl(0x12c) + 1024;
-+	core_speedo_val = tegra_fuse_readl(0x134);
-+
-+	for (i = 0; i < CPU_PROCESS_CORNERS_NUM; i++)
-+		if (cpu_speedo_val < cpu_process_speedos[threshold][i])
-+			break;
-+	tegra_cpu_process_id = i;
-+
-+	for (i = 0; i < CORE_PROCESS_CORNERS_NUM; i++)
-+		if (core_speedo_val < core_process_speedos[threshold][i])
-+			break;
-+	tegra_core_process_id = i;
-+}
 -- 
-1.8.1.5
+1.7.9.5
