@@ -1,53 +1,43 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 Mar 2013 22:56:41 +0100
-Subject: [PATCH] isdn: hisax: netjet requires VIRT_TO_BUS
+Date: Thu, 14 Mar 2013 22:56:39 +0100
+Subject: [PATCH 2/3] mfd: Make AB8500_CORE select POWER_SUPPLY to fix build
+ error
 In-Reply-To: <1363298204-8014-1-git-send-email-arnd@arndb.de>
 References: <1363298204-8014-1-git-send-email-arnd@arndb.de>
-Message-ID: <1363298204-8014-4-git-send-email-arnd@arndb.de>
+Message-ID: <1363298204-8014-2-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Disabling CONFIG_VIRT_TO_BUS on ARM showed that the hisax netjet
-driver depends on this deprecated functionality but is not
-marked so in Kconfig.
+From: Axel Lin <axel.lin@ingics.com>
 
-Rather than adding ARM to the already long list of architectures
-that this driver is broken on, this patch adds 'depends on
-VIRT_TO_BUS' and removes the dependency on !SPARC, which is
-also implied by that.
+This patch fixes below build error when CONFIG_POWER_SUPPLY is not set.
 
+drivers/built-in.o: In function `ab8500_power_off':
+drivers/mfd/ab8500-sysctrl.c:37: undefined reference to `power_supply_get_by_name'
+drivers/mfd/ab8500-sysctrl.c:53: undefined reference to `power_supply_get_by_name'
+make: *** [vmlinux] Error 1
+
+Signed-off-by: Axel Lin <axel.lin@ingics.com>
+Acked-by: Lee Jones <lee.jones@linaro.org>
+Cc: Samuel Ortiz <sameo@linux.intel.com>
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Karsten Keil <isdn@linux-pingi.de>
-Cc: netdev at vger.kernel.org
 ---
-Please apply for 3.9 or 3.10, this one is not urgent
+Please apply to MFD tree for 3.9
 
- drivers/isdn/hisax/Kconfig | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ drivers/mfd/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/isdn/hisax/Kconfig b/drivers/isdn/hisax/Kconfig
-index 5313c9e..d9edcc9 100644
---- a/drivers/isdn/hisax/Kconfig
-+++ b/drivers/isdn/hisax/Kconfig
-@@ -237,7 +237,8 @@ config HISAX_MIC
- 
- config HISAX_NETJET
- 	bool "NETjet card"
--	depends on PCI && (BROKEN || !(SPARC || PPC || PARISC || M68K || (MIPS && !CPU_LITTLE_ENDIAN) || FRV || (XTENSA && !CPU_LITTLE_ENDIAN)))
-+	depends on PCI && (BROKEN || !(PPC || PARISC || M68K || (MIPS && !CPU_LITTLE_ENDIAN) || FRV || (XTENSA && !CPU_LITTLE_ENDIAN)))
-+	depends on VIRT_TO_BUS
+diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+index 671f5b1..c346941 100644
+--- a/drivers/mfd/Kconfig
++++ b/drivers/mfd/Kconfig
+@@ -858,6 +858,7 @@ config EZX_PCAP
+ config AB8500_CORE
+ 	bool "ST-Ericsson AB8500 Mixed Signal Power Management chip"
+ 	depends on GENERIC_HARDIRQS && ABX500_CORE && MFD_DB8500_PRCMU
++	select POWER_SUPPLY
+ 	select MFD_CORE
+ 	select IRQ_DOMAIN
  	help
- 	  This enables HiSax support for the NetJet from Traverse
- 	  Technologies.
-@@ -248,7 +249,8 @@ config HISAX_NETJET
- 
- config HISAX_NETJET_U
- 	bool "NETspider U card"
--	depends on PCI && (BROKEN || !(SPARC || PPC || PARISC || M68K || (MIPS && !CPU_LITTLE_ENDIAN) || FRV || (XTENSA && !CPU_LITTLE_ENDIAN)))
-+	depends on PCI && (BROKEN || !(PPC || PARISC || M68K || (MIPS && !CPU_LITTLE_ENDIAN) || FRV || (XTENSA && !CPU_LITTLE_ENDIAN)))
-+	depends on VIRT_TO_BUS
- 	help
- 	  This enables HiSax support for the Netspider U interface ISDN card
- 	  from Traverse Technologies.
 -- 
 1.8.1.2
