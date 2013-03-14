@@ -1,41 +1,43 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 Mar 2013 22:56:38 +0100
-Subject: [PATCH 1/3] mfd: remove __exit_p annotation for twl4030_madc_remove
-Message-ID: <1363298204-8014-1-git-send-email-arnd@arndb.de>
+Date: Thu, 14 Mar 2013 23:01:35 +0100
+Subject: [PATCH] Turn off -Wmaybe-uninitialized when building with -Os
+Message-ID: <7534695.eTHcH0enMV@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-4740f73fe5 "mfd: remove use of __devexit" removed the __devexit annotation
-on the twl4030_madc_remove function, but left an __exit_p() present on the
-pointer to this function. Using __exit_p was as wrong with the devexit in
-place as it is now, but now we get a gcc warning about an unused function.
+gcc-4.7 and higher add a lot of false positive warnings about
+potential uses of uninitialized warnings, but only when optimizing
+for size (-Os). This is the default when building allyesconfig,
+which turns on CONFIG_CC_OPTIMIZE_FOR_SIZE.
 
-In order for the twl4030_madc_remove to work correctly in built-in code, we
-have to remove the __exit_p.
+In order to avoid getting a lot of patches that initialize such
+variables and accidentally hide real errors along the way, let's
+just turn off this warning on the respective gcc versions
+when building with size optimizations. The -Wmaybe-uninitialized
+option was introduced in the same gcc version (4.7) that is now
+causing the false positives, so there is no effect on older compilers.
 
-Cc: Bill Pemberton <wfp5p@virginia.edu>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Samuel Ortiz <sameo@linux.intel.com>
+A side effect is that when building with CONFIG_CC_OPTIMIZE_FOR_SIZE,
+we might now see /fewer/ warnings about possibly uninitialized
+warnings than with -O2, but that is still much better than seeing
+warnings known to be bogus.
+
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
+Cc: stable at vger.kernel.org
+--
+I'd like to merge this for 3.9 and also for the stable kernels,
+if people agree this is a good idea.
 
-Please apply to MFD tree for 3.9
-
- drivers/mfd/twl4030-madc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/mfd/twl4030-madc.c b/drivers/mfd/twl4030-madc.c
-index 88ff9dc..942b666 100644
---- a/drivers/mfd/twl4030-madc.c
-+++ b/drivers/mfd/twl4030-madc.c
-@@ -800,7 +800,7 @@ static int twl4030_madc_remove(struct platform_device *pdev)
+diff --git a/Makefile b/Makefile
+index 10fb6c7..caea2d1 100644
+--- a/Makefile
++++ b/Makefile
+@@ -570,7 +570,7 @@ endif # $(dot-config)
+ all: vmlinux
  
- static struct platform_driver twl4030_madc_driver = {
- 	.probe = twl4030_madc_probe,
--	.remove = __exit_p(twl4030_madc_remove),
-+	.remove = twl4030_madc_remove,
- 	.driver = {
- 		   .name = "twl4030_madc",
- 		   .owner = THIS_MODULE,
--- 
-1.8.1.2
+ ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
+-KBUILD_CFLAGS	+= -Os
++KBUILD_CFLAGS	+= -Os $(call cc-disable-warning,maybe-uninitialized,)
+ else
+ KBUILD_CFLAGS	+= -O2
+ endif
