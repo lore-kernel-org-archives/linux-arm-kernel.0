@@ -1,24 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 Mar 2013 13:32:16 +0000
-Subject: [PATCH v4 5/5] ARM: config: append arch hi3xxx into multi
- defconfig
-In-Reply-To: <CAD6h2NSk_q6ru3AOtG-ZNDXkvFCggNkDGWJQy3LMRubZ8ZGHQw@mail.gmail.com>
-References: <1363245584-24488-1-git-send-email-haojian.zhuang@linaro.org>
- <201303140910.36483.arnd@arndb.de>
- <CAD6h2NSk_q6ru3AOtG-ZNDXkvFCggNkDGWJQy3LMRubZ8ZGHQw@mail.gmail.com>
-Message-ID: <201303141332.17124.arnd@arndb.de>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Thu, 14 Mar 2013 09:37:28 -0400
+Subject: some question about monitor mode support in arm
+In-Reply-To: <CANudz+tPrFxUEhzbpdVYnhnzKnJJ2wsJ7s_3YAWiOUJjJhQ3YA@mail.gmail.com>
+References: <CANudz+tPrFxUEhzbpdVYnhnzKnJJ2wsJ7s_3YAWiOUJjJhQ3YA@mail.gmail.com>
+Message-ID: <5141D298.6010401@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 14 March 2013, Haojian Zhuang wrote:
-> On 14 March 2013 17:10, Arnd Bergmann <arnd@arndb.de> wrote:
-> >
-> > Are you sure this is enough? Normally we also have to enable
-> > some device drivers to get a bootable system.
-> >
-> Yes, it could boot.  Those components are already enabled in multi_v7_defconfig.
-> Since hi3xxx used a lot of AMBA IPs.
+Hi,
 
-Ok, very good then.
+On 03/14/2013 05:43 AM, loody wrote:
+> Hi all:
+> Does linux kernel support monitor mode handling?
 
-	Arnd
+It does not, but hypervisor mode support was recently added, which has pretty
+similar mechanics.
+
+> I grep the keyword 'smc' but it only show how switch to, such as
+> mach-highbank/smc.S,
+> but not seem where to handle it.
+
+You can take a look at __hyp_set_vectors in arch/arm/kernel/hyp-stub.S for one
+example of setting up exception vectors.
+
+Cheers,
+Christopher
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by
+the Linux Foundation
