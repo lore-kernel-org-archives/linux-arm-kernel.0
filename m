@@ -1,47 +1,64 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 Mar 2013 23:14:26 +0100
-Subject: [PATCH 0/5] cns3xxx multiplatform support
-Message-ID: <1363299271-8283-1-git-send-email-arnd@arndb.de>
+Date: Thu, 14 Mar 2013 23:14:29 +0100
+Subject: [PATCH 3/5] ARM: cns3xxx: move debug_ll code to include/debug/
+In-Reply-To: <1363299271-8283-1-git-send-email-arnd@arndb.de>
+References: <1363299271-8283-1-git-send-email-arnd@arndb.de>
+Message-ID: <1363299271-8283-4-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've looked at all the platforms recently to see what their
-state is. cns3xxx seems quite clean but not very actively
-maintained. Since it is really easy to convert to multiplatform,
-that's what I did here. I'd like to apply this for linux-3.9
-unless there are objections or other comments.
+This is needed in order to keep debug_ll functionality on
+cns3xxx working when we enable ARCH_MULTIPLATFORM.
 
-Arnd Bergmann (5):
-  ARM: cns3xxx: make mach header files local
-  ARM: cns3xxx: enable sparse IRQ support
-  ARM: cns3xxx: move debug_ll code to include/debug/
-  ARM: cns3xxx: enable multiplatform support
-  ARM: cns3xxx: initial DT support
-
- arch/arm/Kconfig                                   |  11 --
- arch/arm/Kconfig.debug                             |   8 ++
- arch/arm/configs/cns3420vb_defconfig               |   3 +
- .../mach/debug-macro.S => include/debug/cns3xxx.S} |   0
- arch/arm/mach-cns3xxx/Kconfig                      |  12 ++
- arch/arm/mach-cns3xxx/Makefile                     |   8 +-
- arch/arm/mach-cns3xxx/cns3420vb.c                  |   6 +-
- arch/arm/mach-cns3xxx/{include/mach => }/cns3xxx.h |   7 +-
- arch/arm/mach-cns3xxx/core.c                       | 121 ++++++++++++++++++++-
- arch/arm/mach-cns3xxx/devices.c                    |   5 +-
- arch/arm/mach-cns3xxx/include/mach/irqs.h          |  24 ----
- arch/arm/mach-cns3xxx/include/mach/timex.h         |  12 --
- arch/arm/mach-cns3xxx/include/mach/uncompress.h    |  53 ---------
- arch/arm/mach-cns3xxx/pcie.c                       |   2 +-
- arch/arm/mach-cns3xxx/pm.c                         |   4 +-
- arch/arm/mach-cns3xxx/{include/mach => }/pm.h      |   0
- drivers/mmc/host/sdhci-cns3xxx.c                   |   1 -
- 17 files changed, 158 insertions(+), 119 deletions(-)
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/Kconfig.debug                                            | 8 ++++++++
+ arch/arm/configs/cns3420vb_defconfig                              | 1 +
+ .../include/mach/debug-macro.S => include/debug/cns3xxx.S}        | 0
+ 3 files changed, 9 insertions(+)
  rename arch/arm/{mach-cns3xxx/include/mach/debug-macro.S => include/debug/cns3xxx.S} (100%)
- rename arch/arm/mach-cns3xxx/{include/mach => }/cns3xxx.h (99%)
- delete mode 100644 arch/arm/mach-cns3xxx/include/mach/irqs.h
- delete mode 100644 arch/arm/mach-cns3xxx/include/mach/timex.h
- delete mode 100644 arch/arm/mach-cns3xxx/include/mach/uncompress.h
- rename arch/arm/mach-cns3xxx/{include/mach => }/pm.h (100%)
 
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index acdddda..52f410d 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -103,6 +103,13 @@ choice
+ 		  Say Y here if you want the debug print routines to direct
+ 		  their output to the second serial port on these devices.
+ 
++	config DEBUG_CNS3XXX
++		bool "Kernel Kernel low-level debugging on Cavium Networks CNS3xxx"
++		depends on ARCH_CNS3XXX
++		help
++		  Say Y here if you want the debug print routines to direct
++                  their output to the CNS3xxx UART0.
++
+ 	config DEBUG_DAVINCI_DA8XX_UART1
+ 		bool "Kernel low-level debugging on DaVinci DA8XX using UART1"
+ 		depends on ARCH_DAVINCI_DA8XX
+@@ -579,6 +586,7 @@ endchoice
+ 
+ config DEBUG_LL_INCLUDE
+ 	string
++	default "debug/cns3xxx.S" if DEBUG_CNS3XXX
+ 	default "debug/icedcc.S" if DEBUG_ICEDCC
+ 	default "debug/imx.S" if DEBUG_IMX1_UART || \
+ 				 DEBUG_IMX25_UART || \
+diff --git a/arch/arm/configs/cns3420vb_defconfig b/arch/arm/configs/cns3420vb_defconfig
+index 313627a..b79e984 100644
+--- a/arch/arm/configs/cns3420vb_defconfig
++++ b/arch/arm/configs/cns3420vb_defconfig
+@@ -21,6 +21,7 @@ CONFIG_MODVERSIONS=y
+ CONFIG_IOSCHED_CFQ=m
+ CONFIG_ARCH_CNS3XXX=y
+ CONFIG_MACH_CNS3420VB=y
++CONFIG_DEBUG_CNS3XXX=y
+ CONFIG_AEABI=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+diff --git a/arch/arm/mach-cns3xxx/include/mach/debug-macro.S b/arch/arm/include/debug/cns3xxx.S
+similarity index 100%
+rename from arch/arm/mach-cns3xxx/include/mach/debug-macro.S
+rename to arch/arm/include/debug/cns3xxx.S
 -- 
 1.8.1.2
