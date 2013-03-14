@@ -1,47 +1,34 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Fri, 15 Mar 2013 06:48:27 +1300
-Subject: [PATCH] drivers/clk: fixup commit
- 72480014b86c8b51fb51c5c6a0525876055c37c7
-In-Reply-To: <514191F3.7030203@asianux.com>
-References: <513C0280.7040004@asianux.com> <514191F3.7030203@asianux.com>
-Message-ID: <1363283307.12019.2.camel@gitbox>
+From: fabio.porcedda@gmail.com (Fabio Porcedda)
+Date: Thu, 14 Mar 2013 18:51:58 +0100
+Subject: [PATCH v2 4/8] drivers: input: use module_platform_driver_probe()
+In-Reply-To: <3681471.ufqahH3gTF@dtor-d630.eng.vmware.com>
+References: <1363280978-24051-1-git-send-email-fabio.porcedda@gmail.com>
+ <1363280978-24051-5-git-send-email-fabio.porcedda@gmail.com>
+ <3681471.ufqahH3gTF@dtor-d630.eng.vmware.com>
+Message-ID: <CAHkwnC-vOPxqWq3jF=sbDrhvyWhNYvV5rAd69K8b5iH3KyqyPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-03-14 at 17:01 +0800, Chen Gang wrote:
-> is there any member to help checking and applying it ?
-> 
->   this issue is repeated again by randconfig make, today.
-> 
-> 
-> ? 2013?03?10? 11:48, Chen Gang ??:
-> > 
-> >   prate is not defined, will cause compiling issue.
-> >   need use parent_rate instead of prate.
-> > 
-> > Signed-off-by: Chen Gang <gang.chen@asianux.com>
-> > ---
-> >  drivers/clk/clk-vt8500.c |    2 +-
-> >  1 files changed, 1 insertions(+), 1 deletions(-)
-> > 
-> > diff --git a/drivers/clk/clk-vt8500.c b/drivers/clk/clk-vt8500.c
-> > index b5538bb..09c6331 100644
-> > --- a/drivers/clk/clk-vt8500.c
-> > +++ b/drivers/clk/clk-vt8500.c
-> > @@ -157,7 +157,7 @@ static int vt8500_dclk_set_rate(struct clk_hw *hw, unsigned long rate,
-> >  	divisor =  parent_rate / rate;
-> >  
-> >  	/* If prate / rate would be decimal, incr the divisor */
-> > -	if (rate * divisor < *prate)
-> > +	if (rate * divisor < parent_rate)
-> >  		divisor++;
-> >  
-> >  	if (divisor == cdev->div_mask + 1)
-> > 
-> 
-> 
+On Thu, Mar 14, 2013 at 6:30 PM, Dmitry Torokhov
+<dmitry.torokhov@gmail.com> wrote:
+> Hi Fabio,
+>
+> On Thursday, March 14, 2013 06:09:34 PM Fabio Porcedda wrote:
+>> This patch converts the drivers to use the
+>> module_platform_driver_probe() macro which makes the code smaller and
+>> a bit simpler.
+>
+> I already have patches from Sachin Kamat for this, I am waiting for -rc3
+> to sync up with mainline and pick up the macro before applying them.
 
-The patch for this is in Mike's clk-fixes branch.
+Thank for reviewing.
 
-Regards
-Tony Prisk
+I've sent a updated patch without the patch already sent by Sachin Kamat.
+
+Best regards
+Fabio Porcedda
+
+> Thanks.
+>
+> --
+> Dmitry
