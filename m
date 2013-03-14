@@ -1,28 +1,27 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 Mar 2013 09:09:21 +0000
-Subject: [PATCH v4 2/5] clk: hi3xxx: add clock support
-In-Reply-To: <1363245584-24488-3-git-send-email-haojian.zhuang@linaro.org>
+Date: Thu, 14 Mar 2013 09:10:36 +0000
+Subject: [PATCH v4 5/5] ARM: config: append arch hi3xxx into multi
+ defconfig
+In-Reply-To: <1363245584-24488-6-git-send-email-haojian.zhuang@linaro.org>
 References: <1363245584-24488-1-git-send-email-haojian.zhuang@linaro.org>
- <1363245584-24488-3-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <201303140909.21267.arnd@arndb.de>
+ <1363245584-24488-6-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <201303140910.36483.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thursday 14 March 2013, Haojian Zhuang wrote:
-> 
-> Add clock support with device tree on Hisilicon SoC.
-> 
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -5,6 +5,7 @@ CONFIG_ARCH_MVEBU=y
+>  CONFIG_MACH_ARMADA_370=y
+>  CONFIG_MACH_ARMADA_XP=y
+>  CONFIG_ARCH_HIGHBANK=y
+> +CONFIG_ARCH_HI3xxx=y
+>  CONFIG_ARCH_SOCFPGA=y
+>  CONFIG_ARCH_SUNXI=y
+>  # CONFIG_ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA is not set
 
-Looks good to me, just one final comment from my side:
-
-> +
-> +static struct hs_clk hs_clk;
-> +
-> +static void __init hs_init_clocks(void);
-> +
-
-Please move the hs_init_clocks() function itself to the top of the file to
-avoid the forward declaration.
+Are you sure this is enough? Normally we also have to enable
+some device drivers to get a bootable system.
 
 	Arnd
