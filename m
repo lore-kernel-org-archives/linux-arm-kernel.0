@@ -1,67 +1,56 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Thu, 14 Mar 2013 17:24:39 +0800
-Subject: [PATCH 14/14] usb: udc-core: add judgement logic for
- usb_gadget_connect
-In-Reply-To: <20130314090005.GB14443@arwen.pp.htv.fi>
-References: <1363240242-25775-1-git-send-email-peter.chen@freescale.com>
- <1363240242-25775-15-git-send-email-peter.chen@freescale.com>
- <20130314090005.GB14443@arwen.pp.htv.fi>
-Message-ID: <20130314092438.GB26420@nchen-desktop>
+From: bilhuang@nvidia.com (Bill Huang)
+Date: Thu, 14 Mar 2013 02:31:04 -0700
+Subject: [RFC v2 1/1] clk: Add notifier support in clk_prepare/clk_unprepare
+Message-ID: <1363253464-3200-1-git-send-email-bilhuang@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 14, 2013 at 11:00:05AM +0200, Felipe Balbi wrote:
-> Hi,
-> 
-> On Thu, Mar 14, 2013 at 01:50:42PM +0800, Peter Chen wrote:
-> > - If there is no vbus control to indicate connection.
-> > and disconnect, we can pullup dp when we load gadget module.
-> > - If we have vbus control logic, the dp is better pull up
-> > when there is a vbus session.
-> > 
-> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> > ---
-> >  drivers/usb/gadget/udc-core.c |   10 ++++++++--
-> >  1 files changed, 8 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/drivers/usb/gadget/udc-core.c b/drivers/usb/gadget/udc-core.c
-> > index 4d90bdf..4b56f7c 100644
-> > --- a/drivers/usb/gadget/udc-core.c
-> > +++ b/drivers/usb/gadget/udc-core.c
-> > @@ -278,7 +278,10 @@ static int udc_bind_to_driver(struct usb_udc *udc, struct usb_gadget_driver *dri
-> >  		driver->unbind(gadget);
-> >  		goto err1;
-> >  	}
-> > -	usb_gadget_connect(gadget);
-> > +	if (!gadget->ops->vbus_session ||
-> > +			(gadget->ops->vbus_session
-> > +				&& gadget->vbus_active))
-> > +		usb_gadget_connect(gadget);
-> >  
-> >  	kobject_uevent(&udc->dev.kobj, KOBJ_CHANGE);
-> >  	return 0;
-> > @@ -384,7 +387,10 @@ static ssize_t usb_udc_softconn_store(struct device *dev,
-> >  
-> >  	if (sysfs_streq(buf, "connect")) {
-> >  		usb_gadget_udc_start(gadget, udc->driver);
-> > -		usb_gadget_connect(gadget);
-> > +		if (!gadget->ops->vbus_session ||
-> > +				(gadget->ops->vbus_session
-> > +					&& gadget->vbus_active))
-> > +			usb_gadget_connect(gadget);
-> 
-> this patch is incomplete. What happens if this test fails ? Who will
-> connect pullup then ?
+Add the below two notifier events so drivers which are interested in
+knowing the clock status can act accordingly. This is extremely useful
+in some of the DVFS (Dynamic Voltage Frequency Scaling) design.
 
-gadget->ops->vbus_session will handle it when the vbus interrupt comes
+CLK_PREPARED
+CLK_UNPREPARED
 
-> 
-> -- 
-> balbi
+Signed-off-by: Bill Huang <bilhuang@nvidia.com>
+---
+ drivers/clk/clk.c   |    3 +++
+ include/linux/clk.h |    2 ++
+ 2 files changed, 5 insertions(+)
 
-
-
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index ed87b24..3292cec 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -550,6 +550,7 @@ void clk_unprepare(struct clk *clk)
+ {
+ 	mutex_lock(&prepare_lock);
+ 	__clk_unprepare(clk);
++	__clk_notify(clk, CLK_UNPREPARED, clk->rate, clk->rate);
+ 	mutex_unlock(&prepare_lock);
+ }
+ EXPORT_SYMBOL_GPL(clk_unprepare);
+@@ -598,6 +599,8 @@ int clk_prepare(struct clk *clk)
+ 
+ 	mutex_lock(&prepare_lock);
+ 	ret = __clk_prepare(clk);
++	if (!ret)
++		__clk_notify(clk, CLK_PREPARED, clk->rate, clk->rate);
+ 	mutex_unlock(&prepare_lock);
+ 
+ 	return ret;
+diff --git a/include/linux/clk.h b/include/linux/clk.h
+index b3ac22d..16c1d92 100644
+--- a/include/linux/clk.h
++++ b/include/linux/clk.h
+@@ -43,6 +43,8 @@ struct clk;
+ #define PRE_RATE_CHANGE			BIT(0)
+ #define POST_RATE_CHANGE		BIT(1)
+ #define ABORT_RATE_CHANGE		BIT(2)
++#define CLK_PREPARED			BIT(3)
++#define CLK_UNPREPARED			BIT(4)
+ 
+ /**
+  * struct clk_notifier - associate a clk with a notifier
 -- 
-
-Best Regards,
-Peter Chen
+1.7.9.5
