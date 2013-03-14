@@ -1,59 +1,69 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 14 Mar 2013 13:25:44 -0400
-Subject: [PATCH 0/5] mv643xx_eth: use mvmdio MDIO bus driver
-In-Reply-To: <1359473048-26551-1-git-send-email-florian@openwrt.org>
-References: <1359473048-26551-1-git-send-email-florian@openwrt.org>
-Message-ID: <20130314172544.GT12700@titan.lakedaemon.net>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 14 Mar 2013 17:27:33 +0000
+Subject: [PATCH 4/4] ARM: at91: introduce SAMA5 support
+In-Reply-To: <1363280736-23624-5-git-send-email-ludovic.desroches@atmel.com>
+References: <1363280736-23624-1-git-send-email-ludovic.desroches@atmel.com>
+ <1363280736-23624-5-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <51420885.60006@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Florian,
+On 14/03/13 17:05, ludovic.desroches at atmel.com wrote:
+> From: Ludovic Desroches <ludovic.desroches@atmel.com>
+> 
+> This patch introduces the SAMA5 support. It also updates the PMC driver to
+> manage clock division which is a requirement since some peripherals can't work
+> at the bus frequency on SAMA5.
+> 
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Tested-by: Robert Nelson <robertcnelson@gmail.com>
+> ---
+>  arch/arm/boot/dts/Makefile                 |    5 +
+>  arch/arm/boot/dts/sama5d3.dtsi             | 1031 ++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/sama5d31ek.dts           |   51 ++
+>  arch/arm/boot/dts/sama5d33ek.dts           |   44 ++
+>  arch/arm/boot/dts/sama5d34ek.dts           |   61 ++
+>  arch/arm/boot/dts/sama5d35ek.dts           |   56 ++
+>  arch/arm/boot/dts/sama5d3xcm.dtsi          |   91 +++
+>  arch/arm/boot/dts/sama5d3xdm.dtsi          |   42 ++
+>  arch/arm/boot/dts/sama5d3xmb.dtsi          |  166 +++++
+>  arch/arm/configs/sama5_defconfig           |  181 +++++
+>  arch/arm/mach-at91/Kconfig                 |   33 +
+>  arch/arm/mach-at91/Makefile                |    4 +
+>  arch/arm/mach-at91/board-dt-sama5.c        |   86 +++
+>  arch/arm/mach-at91/clock.c                 |  109 ++-
+>  arch/arm/mach-at91/clock.h                 |    2 +
+>  arch/arm/mach-at91/include/mach/at91_pmc.h |   18 +-
+>  arch/arm/mach-at91/include/mach/cpu.h      |   20 +
+>  arch/arm/mach-at91/include/mach/sama5d3.h  |   73 ++
+>  arch/arm/mach-at91/sama5d3.c               |  377 ++++++++++
+>  arch/arm/mach-at91/setup.c                 |   27 +
+>  arch/arm/mach-at91/soc.h                   |    5 +
+>  21 files changed, 2453 insertions(+), 29 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/sama5d3.dtsi
+>  create mode 100644 arch/arm/boot/dts/sama5d31ek.dts
+>  create mode 100644 arch/arm/boot/dts/sama5d33ek.dts
+>  create mode 100644 arch/arm/boot/dts/sama5d34ek.dts
+>  create mode 100644 arch/arm/boot/dts/sama5d35ek.dts
+>  create mode 100644 arch/arm/boot/dts/sama5d3xcm.dtsi
+>  create mode 100644 arch/arm/boot/dts/sama5d3xdm.dtsi
+>  create mode 100644 arch/arm/boot/dts/sama5d3xmb.dtsi
+>  create mode 100644 arch/arm/configs/sama5_defconfig
+>  create mode 100644 arch/arm/mach-at91/board-dt-sama5.c
+>  create mode 100644 arch/arm/mach-at91/include/mach/sama5d3.h
+>  create mode 100644 arch/arm/mach-at91/sama5d3.c
 
-Any word on version 2 of this series?  I'd like to base the conversion
-of kirkwood to DT based ethernet init on it.
+So I haven't started reviewing this yet, but looking at the diffstat, I
+can't help but think this patch could use some splitting to be more
+easily reviewable.
 
-thx,
+How about having one patch for the clock stuff, one for the config, one
+for the DT, and finally one for the SoC support itself?
 
-Jason.
+Thanks,
 
-On Tue, Jan 29, 2013 at 04:24:03PM +0100, Florian Fainelli wrote:
-> Hi all,
-> 
-> This patch converts the mv643xx_eth driver to use the mvmdio MDIO bus driver
-> instead of rolling its own implementation. As a result, all users of this
-> mv643xx_eth driver are converted to register an "orion-mdio" platform_device.
-> The mvmdio driver is also updated to support an interrupt line which reports
-> SMI error/completion, and to allow traditionnal platform device registration
-> instead of just device tree.
-> 
-> David, I think it makes sense for you to merge all of this, since we do
-> not want the architecture files to be desynchronized from the mv643xx_eth to
-> avoid runtime breakage. The potential for merge conflicts should be very small.
-> 
-> You can probably safely merge patches 1 to 4 if Thomas agrees, and we will
-> see what kind of feeback I get on patch 5.
-> 
-> Florian Fainelli (5):
->   net: mvmdio: unmap base register address at driver removal
->   net: mvmdio: rename base register cookie from smireg to regs
->   net: mvmdio: enhance driver to support SMI error/done interrupts
->   net: mvmdio: allow Device Tree and platform device to coexist
->   mv643xx_eth: convert to use the Marvell Orion MDIO driver
-> 
->  .../devicetree/bindings/net/marvell-orion-mdio.txt |    3 +
->  arch/arm/plat-orion/common.c                       |   84 +++++++--
->  arch/powerpc/platforms/chrp/pegasos_eth.c          |   20 +++
->  arch/powerpc/sysdev/mv64x60_dev.c                  |   14 +-
->  drivers/net/ethernet/marvell/Kconfig               |    1 +
->  drivers/net/ethernet/marvell/mv643xx_eth.c         |  187 +-------------------
->  drivers/net/ethernet/marvell/mvmdio.c              |  136 +++++++++++---
->  7 files changed, 226 insertions(+), 219 deletions(-)
-> 
-> -- 
-> 1.7.10.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+	M.
+-- 
+Jazz is not dead. It just smells funny...
