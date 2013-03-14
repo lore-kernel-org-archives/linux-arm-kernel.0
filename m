@@ -1,44 +1,37 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Thu, 14 Mar 2013 12:38:00 +0800
-Subject: [Suggestion] Latest randconfig build errors for Head.S
-Message-ID: <51415428.1070401@asianux.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 13 Mar 2013 22:43:52 -0600
+Subject: [PATCH V2 0/9] ARM: tegra: add platform suspend support
+In-Reply-To: <1363224385.3308.8.camel@jlo-ubuntu-64.nvidia.com>
+References: <1363060916-8897-1-git-send-email-josephl@nvidia.com>
+ <513F82EB.1030407@wwwdotorg.org>
+ <1363154644.3998.140.camel@jlo-ubuntu-64.nvidia.com>
+ <5140B893.9010704@wwwdotorg.org>
+ <1363224385.3308.8.camel@jlo-ubuntu-64.nvidia.com>
+Message-ID: <51415588.7080403@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Maintainers:
+On 03/13/2013 07:26 PM, Joseph Lo wrote:
+> On Thu, 2013-03-14 at 01:34 +0800, Stephen Warren wrote:
+>> On 03/13/2013 12:04 AM, Joseph Lo wrote:
+>> ...
+>>> BTW, I want to mention one thing about PMC DT bindings. Because I can't
+>>> add all of the PMC DT bindings in one time, the PMC is related to too
+>>> many devices to work for runtime PM and power domain control. And some
+>>> wake up sources control for deep sleep mode (LP0). They are still under
+>>> developing for upstream. May I add more bindings for PMC later?
+>>
+>> With DT you are supposed to define the complete DT binding for the HW up
+>> front. There have been some hints that incrementally defining bindings
+>> will start to get push-back. How hard is it in this case to simply
+>> define the entire binding right now?
+>>
+> There are still two main features for PMC that we need to define
+> bindings/properties in DT. One is power main the other wake up source.
+> But we are not there yet. Because I don't have drivers to verify them is
+> enough or not. If I add all the bindings right now, I believe it will be
+> modify later.
 
-  are these warnings for head.S OK ?
-
-
-make:
-  make V=1 EXTRA_CFLAGS=-W ARCH=arm randconfig
-    (this time, CONFIG_MMU=y)
-
-warning information:
-  arch/arm/boot/compressed/head.S: Assembler messages:
-  arch/arm/boot/compressed/head.S:565: Warning: (null)
-  arch/arm/boot/compressed/head.S:676: Warning: (null)
-  arch/arm/boot/compressed/head.S:698: Warning: (null)
-  arch/arm/boot/compressed/head.S:722: Warning: (null)
-  arch/arm/boot/compressed/head.S:726: Warning: (null)
-  arch/arm/boot/compressed/head.S:735: Warning: (null)
-  arch/arm/boot/compressed/head.S:978: Warning: (null)
-  arch/arm/boot/compressed/head.S:1017: Warning: (null)
-  arch/arm/boot/compressed/head.S:1018: Warning: (null)
-  arch/arm/boot/compressed/head.S:1048: Warning: (null)
-  arch/arm/boot/compressed/head.S:1055: Warning: (null)
-  arch/arm/boot/compressed/head.S:1063: Warning: (null)
-  arch/arm/boot/compressed/head.S:1074: Warning: (null)
-  arch/arm/boot/compressed/head.S:1088: Warning: (null)
-  arch/arm/boot/compressed/head.S:1120: Warning: (null)
-  arch/arm/boot/compressed/head.S:1122: Warning: (null)
-  arch/arm/boot/compressed/head.S:1123: Warning: (null)
-  arch/arm/boot/compressed/head.S:1130: Warning: (null)
-  arch/arm/boot/compressed/head.S:1162: Warning: (null)
-
-
-
--- 
-Chen Gang
-
-Asianux Corporation
+Since the DT is supposed to be a representation of the HW, and not a
+representation of what a particular driver needs, I'm not sue why you'd
+need to be able to test a driver before you could design a DT binding.
