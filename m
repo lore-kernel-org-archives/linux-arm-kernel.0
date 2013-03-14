@@ -1,82 +1,52 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Thu, 14 Mar 2013 11:29:33 +0000
-Subject: [RFC PATCH 0/3] ARM: OMAP2+: Add command line parameter for
- debugSS module control
-In-Reply-To: <1362396957-30113-1-git-send-email-hvaibhav@ti.com>
-References: <hvaibhav@ti.com>
- <1362396957-30113-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EC281C1@DBDE01.ent.ti.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 14 Mar 2013 17:09:04 +0530
+Subject: [PATCH 1/3] pwm: davinci: Add Kconfig support for ECAP & EHRPWM
+ devices
+In-Reply-To: <1363257158-11615-2-git-send-email-avinashphilip@ti.com>
+References: <1363257158-11615-1-git-send-email-avinashphilip@ti.com>
+ <1363257158-11615-2-git-send-email-avinashphilip@ti.com>
+Message-ID: <5141B6D8.2050308@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 3/14/2013 4:02 PM, Philip Avinash wrote:
+> Add EHRPWM and ECAP support build support for DAVINCI_DA850 platforms.
+> 
+> Also, since DAVINCI platforms doesn't support TI-PWM-Subsystem module,
+> remove the select option for CONFIG_PWM_TIPWMSS.
+> 
+> Also, update CONFIG_PWM_TIPWMSS compiler directive appropriately in
+> pwm-tipwmss.h to fix the below compiler error upon removal of
+> CONFIG_PWM_TIPWMSS for Davinci platforms.
+> 
+> 	drivers/pwm/pwm-tiecap.c: In function 'ecap_pwm_probe':
+> 	drivers/pwm/pwm-tiecap.c:263:4: error: 'PWMSS_ECAPCLK_EN' undeclared
+> 	(first use in this function)
+> 	drivers/pwm/pwm-tiecap.c:263:4: note: each undeclared identifier
+> 	is reported only once for each function it appears in
+> 	drivers/pwm/pwm-tiecap.c:264:17: error: 'PWMSS_ECAPCLK_EN_ACK'
+> 	undeclared (first use in this function)
+> 	drivers/pwm/pwm-tiecap.c: In function 'ecap_pwm_remove':
+> 	drivers/pwm/pwm-tiecap.c:291:49: error: 'PWMSS_ECAPCLK_STOP_REQ'
+> 	undeclared (first use in this function)
+> 	make[2]: *** [drivers/pwm/pwm-tiecap.o] Error 1
+> 	make[1]: *** [drivers/pwm] Error 2
+> 	make: *** [drivers] Error 2
+> 
+> Signed-off-by: Philip Avinash <avinashphilip@ti.com>
 
-> -----Original Message-----
-> From: Hiremath, Vaibhav
-> Sent: Monday, March 04, 2013 5:06 PM
-> To: linux-omap at vger.kernel.org
-> Cc: tony at atomide.com; khilman at linaro.org; paul at pwsan.com; Nayak,
-> Rajendra; linux-arm-kernel at lists.infradead.org; Hiremath, Vaibhav
-> Subject: [RFC PATCH 0/3] ARM: OMAP2+: Add command line parameter for
-> debugSS module control
-> 
-> From: Vaibhav Hiremath <hvaibhav@ti.com>
-> 
-> Currently there is no clean mechanism to control debugSS module and
-> you have to always keep clocks enabled, either,
-> 
->     - By enabling it during boot as part of clk_init function
->       (post common-clock migration).
->     Or
->     - By having HWMOD_INIT_NO_IDLE flag in hwmod data
->       (Joel submitted patch for AM335x earlier).
-> 
-> Based on the discussion with Kevin H,
-> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg81771.html
-> 
-> This patch introduces new kernel parameter "omap_debugss_en",
-> which will allow user to control debugSS module enable/disable
-> part during boot-time.
-> 
-> In case of OMAP3, the debugSS is part of EMU domain and
-> is currently controlled by clock tree alone.
-> 
-> In case of OMAP4, the debugSS is part of EMU domain and
-> is currently controlled by clock tree, as MODULEMODE_SWCTRL
-> is not defined for hwmod.
-> 
-> In case of AM335x, the debugSS is in wakeup domain and is currently
-> controlled through hwmod alone. Currently we keep it always enabled.
-> 
-> Testing:
-> 	- Tested on AM335x based EVM and BeagleBone platform
-> 
-> 	  As required, without this flag the debugSS module will be
-> disabled
-> 	  during kernel boot.
-> 
-> OMAP (2/3/4) may require some changes from clock/hwmod perspective
-> in order to use this new parameter.
-> I am still looking into OMAP spec and this RFC version of patch-series
-> is to get comments or opinion from list.
-> 
-> Vaibhav Hiremath (3):
->   ARM: AM33XX: clock: Add debugSS clock nodes to clock tree
->   ARM: AM33XX: hwmod: Add hwmod data for debugSS
->   ARM: OMAP2+: Add command line parameter for debugSS module control
-> 
->  Documentation/kernel-parameters.txt        |    3 +
->  arch/arm/mach-omap2/Makefile               |    2 +-
->  arch/arm/mach-omap2/cclock33xx_data.c      |   47 +++++++++++++++--
->  arch/arm/mach-omap2/debugss.c              |   80
-> ++++++++++++++++++++++++++++
->  arch/arm/mach-omap2/omap_hwmod_33xx_data.c |   69 ++++++++++++++++----
-> ----
->  5 files changed, 173 insertions(+), 28 deletions(-)
->  create mode 100644 arch/arm/mach-omap2/debugss.c
+>  config  PWM_TIECAP
+>  	tristate "ECAP PWM support"
+> -	depends on SOC_AM33XX
+> -	select PWM_TIPWMSS
+> +	depends on SOC_AM33XX || ARCH_DAVINCI_DA850
 
-Kevin/Tony,
-
-Any comments or input on this patch series?
+Having such narrow dependencies is wrong. The same device is present on
+DaVinci DA830 too. A depends on should not be required at all since the
+driver should build on all architectures. But I have seen resistance to
+doing that since users don't like to see configuration options totally
+irrelevant for the architecture they are building for. So may be take a
+middle path and do 'depends on ARCH_ARM'?
 
 Thanks,
-Vaibhav
+Sekhar
