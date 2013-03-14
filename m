@@ -1,138 +1,65 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 Mar 2013 23:12:52 +0100
-Subject: [PATCH 0/6] ARM platform spring cleaning
-Message-ID: <1363299178-8241-1-git-send-email-arnd@arndb.de>
+Date: Thu, 14 Mar 2013 23:12:56 +0100
+Subject: [PATCH 4/6] ARM: l7200: remove zombie file
+In-Reply-To: <1363299178-8241-1-git-send-email-arnd@arndb.de>
+References: <1363299178-8241-1-git-send-email-arnd@arndb.de>
+Message-ID: <1363299178-8241-5-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We have discussed cleaning these up before, but we never actually
-removed them. For all I can tell, none of these have any users
-in the upstream kernel, so they can be removed. If you know of
-anyone using them, please yell now, or send a revert patch
-later if you really want them back.
+The l7200 platform was removed in 2.6.35, but one file came
+back due to a failed merge conflict resolution. Let's kill
+it again.
 
-Arnd Bergmann (6):
-  ARM: gemini: get platform to build again
-  ARM: gemini: remove platform support
-  ARM: remove fa526 CPU support
-  ARM: l7200: remove zombie file
-  ARM: kill Hynix h720x platform
-  mtd: remove h720x flash support
-
- MAINTAINERS                                     |  14 --
- arch/arm/Kconfig                                |  22 +-
- arch/arm/Makefile                               |   3 -
- arch/arm/boot/compressed/head.S                 |  28 ---
- arch/arm/configs/h7201_defconfig                |  27 ---
- arch/arm/configs/h7202_defconfig                |  47 ----
- arch/arm/include/asm/barrier.h                  |   6 -
- arch/arm/include/asm/glue-cache.h               |   8 -
- arch/arm/include/asm/glue-proc.h                |   9 -
- arch/arm/include/asm/page.h                     |   8 -
- arch/arm/include/asm/tlbflush.h                 |  19 --
- arch/arm/mach-gemini/Kconfig                    |  40 ----
- arch/arm/mach-gemini/Makefile                   |  13 --
- arch/arm/mach-gemini/Makefile.boot              |   9 -
- arch/arm/mach-gemini/board-nas4220b.c           | 106 ---------
- arch/arm/mach-gemini/board-rut1xx.c             |  90 --------
- arch/arm/mach-gemini/board-wbd111.c             | 133 ------------
- arch/arm/mach-gemini/board-wbd222.c             | 133 ------------
- arch/arm/mach-gemini/common.h                   |  29 ---
- arch/arm/mach-gemini/devices.c                  | 118 ----------
- arch/arm/mach-gemini/gpio.c                     | 230 --------------------
- arch/arm/mach-gemini/idle.c                     |  29 ---
- arch/arm/mach-gemini/include/mach/debug-macro.S |  21 --
- arch/arm/mach-gemini/include/mach/entry-macro.S |  33 ---
- arch/arm/mach-gemini/include/mach/global_reg.h  | 278 ------------------------
- arch/arm/mach-gemini/include/mach/gpio.h        |  20 --
- arch/arm/mach-gemini/include/mach/hardware.h    |  74 -------
- arch/arm/mach-gemini/include/mach/irqs.h        |  53 -----
- arch/arm/mach-gemini/include/mach/system.h      |  23 --
- arch/arm/mach-gemini/include/mach/timex.h       |  13 --
- arch/arm/mach-gemini/include/mach/uncompress.h  |  42 ----
- arch/arm/mach-gemini/irq.c                      | 103 ---------
- arch/arm/mach-gemini/mm.c                       |  82 -------
- arch/arm/mach-gemini/time.c                     |  89 --------
- arch/arm/mach-h720x/Kconfig                     |  40 ----
- arch/arm/mach-h720x/Makefile                    |  16 --
- arch/arm/mach-h720x/Makefile.boot               |   2 -
- arch/arm/mach-h720x/common.c                    | 268 -----------------------
- arch/arm/mach-h720x/common.h                    |  30 ---
- arch/arm/mach-h720x/cpu-h7201.c                 |  57 -----
- arch/arm/mach-h720x/cpu-h7202.c                 | 225 -------------------
- arch/arm/mach-h720x/h7201-eval.c                |  38 ----
- arch/arm/mach-h720x/h7202-eval.c                |  81 -------
- arch/arm/mach-h720x/include/mach/boards.h       |  53 -----
- arch/arm/mach-h720x/include/mach/debug-macro.S  |  40 ----
- arch/arm/mach-h720x/include/mach/entry-macro.S  |  57 -----
- arch/arm/mach-h720x/include/mach/h7201-regs.h   |  67 ------
- arch/arm/mach-h720x/include/mach/h7202-regs.h   | 155 -------------
- arch/arm/mach-h720x/include/mach/hardware.h     | 190 ----------------
- arch/arm/mach-h720x/include/mach/irqs.h         | 116 ----------
- arch/arm/mach-h720x/include/mach/isa-dma.h      |  19 --
- arch/arm/mach-h720x/include/mach/timex.h        |  15 --
- arch/arm/mach-h720x/include/mach/uncompress.h   |  36 ---
- arch/arm/mach-l7200/include/mach/debug-macro.S  |  38 ----
- arch/arm/mm/Kconfig                             |  32 +--
- arch/arm/mm/Makefile                            |   4 -
- arch/arm/mm/cache-fa.S                          | 249 ---------------------
- arch/arm/mm/copypage-fa.c                       |  86 --------
- arch/arm/mm/proc-fa526.S                        | 221 -------------------
- arch/arm/mm/tlb-fa.S                            |  69 ------
- drivers/mtd/maps/Kconfig                        |   7 -
- drivers/mtd/maps/Makefile                       |   1 -
- drivers/mtd/maps/h720x-flash.c                  | 120 ----------
- 63 files changed, 3 insertions(+), 4281 deletions(-)
- delete mode 100644 arch/arm/configs/h7201_defconfig
- delete mode 100644 arch/arm/configs/h7202_defconfig
- delete mode 100644 arch/arm/mach-gemini/Kconfig
- delete mode 100644 arch/arm/mach-gemini/Makefile
- delete mode 100644 arch/arm/mach-gemini/Makefile.boot
- delete mode 100644 arch/arm/mach-gemini/board-nas4220b.c
- delete mode 100644 arch/arm/mach-gemini/board-rut1xx.c
- delete mode 100644 arch/arm/mach-gemini/board-wbd111.c
- delete mode 100644 arch/arm/mach-gemini/board-wbd222.c
- delete mode 100644 arch/arm/mach-gemini/common.h
- delete mode 100644 arch/arm/mach-gemini/devices.c
- delete mode 100644 arch/arm/mach-gemini/gpio.c
- delete mode 100644 arch/arm/mach-gemini/idle.c
- delete mode 100644 arch/arm/mach-gemini/include/mach/debug-macro.S
- delete mode 100644 arch/arm/mach-gemini/include/mach/entry-macro.S
- delete mode 100644 arch/arm/mach-gemini/include/mach/global_reg.h
- delete mode 100644 arch/arm/mach-gemini/include/mach/gpio.h
- delete mode 100644 arch/arm/mach-gemini/include/mach/hardware.h
- delete mode 100644 arch/arm/mach-gemini/include/mach/irqs.h
- delete mode 100644 arch/arm/mach-gemini/include/mach/system.h
- delete mode 100644 arch/arm/mach-gemini/include/mach/timex.h
- delete mode 100644 arch/arm/mach-gemini/include/mach/uncompress.h
- delete mode 100644 arch/arm/mach-gemini/irq.c
- delete mode 100644 arch/arm/mach-gemini/mm.c
- delete mode 100644 arch/arm/mach-gemini/time.c
- delete mode 100644 arch/arm/mach-h720x/Kconfig
- delete mode 100644 arch/arm/mach-h720x/Makefile
- delete mode 100644 arch/arm/mach-h720x/Makefile.boot
- delete mode 100644 arch/arm/mach-h720x/common.c
- delete mode 100644 arch/arm/mach-h720x/common.h
- delete mode 100644 arch/arm/mach-h720x/cpu-h7201.c
- delete mode 100644 arch/arm/mach-h720x/cpu-h7202.c
- delete mode 100644 arch/arm/mach-h720x/h7201-eval.c
- delete mode 100644 arch/arm/mach-h720x/h7202-eval.c
- delete mode 100644 arch/arm/mach-h720x/include/mach/boards.h
- delete mode 100644 arch/arm/mach-h720x/include/mach/debug-macro.S
- delete mode 100644 arch/arm/mach-h720x/include/mach/entry-macro.S
- delete mode 100644 arch/arm/mach-h720x/include/mach/h7201-regs.h
- delete mode 100644 arch/arm/mach-h720x/include/mach/h7202-regs.h
- delete mode 100644 arch/arm/mach-h720x/include/mach/hardware.h
- delete mode 100644 arch/arm/mach-h720x/include/mach/irqs.h
- delete mode 100644 arch/arm/mach-h720x/include/mach/isa-dma.h
- delete mode 100644 arch/arm/mach-h720x/include/mach/timex.h
- delete mode 100644 arch/arm/mach-h720x/include/mach/uncompress.h
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/mach-l7200/include/mach/debug-macro.S | 38 --------------------------
+ 1 file changed, 38 deletions(-)
  delete mode 100644 arch/arm/mach-l7200/include/mach/debug-macro.S
- delete mode 100644 arch/arm/mm/cache-fa.S
- delete mode 100644 arch/arm/mm/copypage-fa.c
- delete mode 100644 arch/arm/mm/proc-fa526.S
- delete mode 100644 arch/arm/mm/tlb-fa.S
- delete mode 100644 drivers/mtd/maps/h720x-flash.c
 
+diff --git a/arch/arm/mach-l7200/include/mach/debug-macro.S b/arch/arm/mach-l7200/include/mach/debug-macro.S
+deleted file mode 100644
+index 0b4e760..0000000
+--- a/arch/arm/mach-l7200/include/mach/debug-macro.S
++++ /dev/null
+@@ -1,38 +0,0 @@
+-/* arch/arm/mach-l7200/include/mach/debug-macro.S
+- *
+- * Debugging macro include header
+- *
+- *  Copyright (C) 1994-1999 Russell King
+- *  Moved from linux/arch/arm/kernel/debug.S by Ben Dooks
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+-*/
+-
+-		.equ	io_virt, IO_BASE
+-		.equ	io_phys, IO_START
+-
+-		.macro	addruart, rp, rv, tmp
+-		mov	\rp, #0x00044000	@ UART1
+-@		mov	\rp, #0x00045000	@ UART2
+-		add	\rv, \rp, #io_virt	@ virtual address
+-		add	\rp, \rp, #io_phys	@ physical base address
+-		.endm
+-
+-		.macro	senduart,rd,rx
+-		str	\rd, [\rx, #0x0]	@ UARTDR
+-		.endm
+-
+-		.macro	waituart,rd,rx
+-1001:		ldr	\rd, [\rx, #0x18]	@ UARTFLG
+-		tst	\rd, #1 << 5		@ UARTFLGUTXFF - 1 when full
+-		bne	1001b
+-		.endm
+-
+-		.macro	busyuart,rd,rx
+-1001:		ldr	\rd, [\rx, #0x18]	@ UARTFLG
+-		tst	\rd, #1 << 3		@ UARTFLGUBUSY - 1 when busy
+-		bne	1001b
+-		.endm
 -- 
 1.8.1.2
