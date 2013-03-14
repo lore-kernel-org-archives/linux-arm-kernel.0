@@ -1,73 +1,35 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 14 Mar 2013 17:42:30 +0400
-Subject: [PATCH 2/7] ARM: shmobile: marzen: add USB EHCI driver support
-In-Reply-To: <87li9q4ydj.wl%kuninori.morimoto.gx@renesas.com>
-References: <1352446306-19945-1-git-send-email-horms@verge.net.au>
- <1352446306-19945-3-git-send-email-horms@verge.net.au>
- <5140F35F.3090702@cogentembedded.com>
- <87li9q4ydj.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <5141D3C6.4090806@cogentembedded.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 14 Mar 2013 13:48:43 +0000
+Subject: [PATCH v2 03/14] clocksource: sp804: append CONFIG_OF
+In-Reply-To: <CAD6h2NQHjP2YSv2=BAqTa+MaZKvSe6JPwmuhMLkJcjuaMtVtsA@mail.gmail.com>
+References: <1363108124-17484-1-git-send-email-haojian.zhuang@linaro.org>
+ <201303121917.24928.arnd@arndb.de>
+ <CAD6h2NQHjP2YSv2=BAqTa+MaZKvSe6JPwmuhMLkJcjuaMtVtsA@mail.gmail.com>
+Message-ID: <201303141348.43552.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Wednesday 13 March 2013, Haojian Zhuang wrote:
+> If CONFIG_CLKSRC_OF is depend on CONFIG_USEOF, I think that
+> we can resolve all these issue. We don't need to define
+> CLOCKSOURCE_OF_DECLARE() for non-DT mode, and we also
+> don't need to define of_device_is_available(), ... in non-DT mode.
+> 
+> We only need to add "depends on USE_OF" for CLKSRC_OF
+> configuration. It's simpler. What's your opinion?
+> 
 
-On 14-03-2013 4:29, Kuninori Morimoto wrote:
+I think that is not the right symbol. USE_OF is an ARM specific symbol
+that should not get selected from common code. Also I think 'depends on'
+is much better than 'select', because it has fewer side-effects.
 
->>> +/* USB */
->>> +static struct usb_phy *phy;
->>> +static int usb_power_on(struct platform_device *pdev)
->>> +{
->>> +	if (!phy)
->>> +		return -EIO;
->>> +
->>> +	pm_runtime_enable(&pdev->dev);
->>> +	pm_runtime_get_sync(&pdev->dev);
->>> +
->>> +	usb_phy_init(phy);
->>> +
->>> +	return 0;
->>> +}
->>> +
->>> +static void usb_power_off(struct platform_device *pdev)
->>> +{
->>> +	if (!phy)
->>> +		return;
->>> +
->>> +	usb_phy_shutdown(phy);
->>> +
->>> +	pm_runtime_put_sync(&pdev->dev);
->>> +	pm_runtime_disable(&pdev->dev);
->>> +}
->>> +
->>> +static struct usb_ehci_pdata ehcix_pdata = {
->>> +	.power_on	= usb_power_on,
->>> +	.power_off	= usb_power_off,
->>> +	.power_suspend	= usb_power_off,
->>> +};
-> (snip)
+Right now, CLKSRC_OF is only selected by platforms that also select USE_OF
+on ARM, which seems appropriate for now, but if we want to make
+CLKSRC_OF a generally visible option, it should use 'depends on OF'.
 
->>      Morimoto-san, I don't understand why this SoC specific platform device
->> ended up in the board file? Could you explain your reasons please?
->>      I think this is generally a bad practice as this approach scales badly.
+What I don't understand is how that relates to my comment on your
+code. My goal was to support drivers that can contain all the code
+needed for CLKSRC_OF without any #ifdef but that still work if CONFIG_OF
+and CONFIG_CLKSRC_OF are both disabled.
 
-> Do you mean it should exist in setup-r8a7779.c ?
-
-    Yes.
-
-> I forgot detail of it, but these usb is using callback function,
-> and it is using *phy*.
-
-   But this PHY also belongs to SoC.
-
-> This phy came from marzen_init_late() with usb_get_phy(USB_PHY_TYPE_USB2);
-> This usb_get_phy() is not needed if board doesn't have USB.
-
-    Anyway, there should be ways to separate the board specific platform code 
-and the SoC specific one. That's what other subarches do.
-
-> You can modify it if you want
-
-    Yes, I definitely would like to try.
-
-WBR, Sergei
+	Arnd
