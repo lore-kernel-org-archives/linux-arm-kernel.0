@@ -1,44 +1,54 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Thu, 14 Mar 2013 20:32:57 +0100
-Subject: [PATCH] mv643xx_eth: convert to use the Marvell Orion MDIO driver
-In-Reply-To: <20130314190235.GW12700@titan.lakedaemon.net>
-References: <1359473048-26551-1-git-send-email-florian@openwrt.org>
- <1363284515-9865-1-git-send-email-florian@openwrt.org>
- <1363284515-9865-2-git-send-email-florian@openwrt.org>
- <20130314190235.GW12700@titan.lakedaemon.net>
-Message-ID: <514225E9.9060902@openwrt.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 14 Mar 2013 12:41:12 -0700
+Subject: [PATCH] ARM: smp: Allow real broadcast device selection instead
+ of always dummy
+In-Reply-To: <20130314102807.GG13483@e106331-lin.cambridge.arm.com>
+References: <1363165608-13739-1-git-send-email-santosh.shilimkar@ti.com>
+ <514046B6.9020005@ti.com>
+ <20130313101641.GA13483@e106331-lin.cambridge.arm.com>
+ <514061D1.20603@ti.com>
+ <20130313122550.GD13483@e106331-lin.cambridge.arm.com>
+ <51409EC3.5050905@ti.com>
+ <20130313161811.GF13483@e106331-lin.cambridge.arm.com>
+ <5141800A.2000307@ti.com>
+ <20130314102807.GG13483@e106331-lin.cambridge.arm.com>
+Message-ID: <514227D8.9010205@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Jason,
-
-Le 14/03/2013 20:02, Jason Cooper a ?crit :
-> Florian,
->
-> On Thu, Mar 14, 2013 at 07:08:32PM +0100, Florian Fainelli wrote:
->> This patch converts the Marvell MV643XX ethernet driver to use the
->> Marvell Orion MDIO driver. As a result, PowerPC and ARM platforms
->> registering the Marvell MV643XX ethernet driver are also updated to
->> register a Marvell Orion MDIO driver. This driver voluntarily overlaps
->> with the Marvell Ethernet shared registers because it will use a subset
->> of this shared register (shared_base + 0x4 - shared_base + 0x84). The
->> Ethernet driver is also updated to look up for a PHY device using the
->> Orion MDIO bus driver.
+On 03/14/13 03:28, Mark Rutland wrote:
+> On Thu, Mar 14, 2013 at 07:45:14AM +0000, Santosh Shilimkar wrote:
+>> On Wednesday 13 March 2013 09:48 PM, Mark Rutland wrote:
+>>> On Wed, Mar 13, 2013 at 03:44:03PM +0000, Santosh Shilimkar wrote:
+>>>> On Wednesday 13 March 2013 05:55 PM, Mark Rutland wrote:
+>>>>> I do agree it'd be worth lowering the dummy timer's rating to ensure it doesn't
+>>>>> override a real timer elsewhere. 
+>>>>>
+>>>> Yep. Can I add you acked-by tag then for $subject patch ?
+>>>> Would be good to get this one merged as well.
+>>> Sure. Though could you reword the commit message? The patch solves the more
+>>> general issue of a dummy being preferred over real hardware even outside of
+>>> choosing the broadcast device.
+>>>
+>>> Acked-by: Mark Rutland <mark.rutland@arm.com>
+>> Thanks. For record, patch is in end of the email which I plan
+>> to put into patch system.
 >>
->> Signed-off-by: Florian Fainelli <florian@openwrt.org>
->> ---
->>   arch/arm/plat-orion/common.c               |   97 +++++++++++----
->>   arch/powerpc/platforms/chrp/pegasos_eth.c  |   20 +++
->>   arch/powerpc/sysdev/mv64x60_dev.c          |   14 ++-
->>   drivers/net/ethernet/marvell/Kconfig       |    1 +
->>   drivers/net/ethernet/marvell/mv643xx_eth.c |  186 ++--------------------------
->>   include/linux/mv643xx_eth.h                |    1 -
->>   6 files changed, 117 insertions(+), 202 deletions(-)
+>> Regards,
+>> Santosh
+> The below patch seems fine. Are you intending for this to go in as a fix for
+> 3.9-rc*, or as a cleanup for 3.10?
 >
-> Isn't this the old version of 4/4 ?
+> If you're aiming for the latter, it's going to clash with Stephen Boyd's local
+> timer API removal [1], in which the generic dummy timer driver [2] (replacing
+> the arm-specific dummy [3]) also has a rating of 100.
 
-No this really is v2, but I reformatted just that one and sent it 
-without the v2 changelog, you should have received the proper version a 
-couple minutes later once I realized my mistake.
---
-Florian
+Thanks for the heads up. Looks like the conflict will be trivial, but I
+wonder why need to put the patch at all? Per my understanding the
+regression has been fixed by your patch in Thomas' tree and then in 3.10
+we can merge the local timer removal patches and fix up the rating at
+the same time.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
