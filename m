@@ -1,9 +1,9 @@
 From: fabio.porcedda@gmail.com (Fabio Porcedda)
-Date: Thu, 14 Mar 2013 14:11:28 +0100
-Subject: [PATCH 07/10] drivers: memory: use module_platform_driver_probe()
+Date: Thu, 14 Mar 2013 14:11:29 +0100
+Subject: [PATCH 08/10] drivers: mfd: use module_platform_driver_probe()
 In-Reply-To: <1363266691-15757-1-git-send-email-fabio.porcedda@gmail.com>
 References: <1363266691-15757-1-git-send-email-fabio.porcedda@gmail.com>
-Message-ID: <1363266691-15757-9-git-send-email-fabio.porcedda@gmail.com>
+Message-ID: <1363266691-15757-10-git-send-email-fabio.porcedda@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,35 +13,60 @@ a bit simpler.
 
 Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
 Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Benoit Cousson <b-cousson@ti.com>
-Cc: Aneesh V <aneesh@ti.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Samuel Ortiz <sameo@linux.intel.com>
+Cc: linux-arm-kernel at lists.infradead.org
 ---
- drivers/memory/emif.c | 12 +-----------
- 1 file changed, 1 insertion(+), 11 deletions(-)
+ drivers/mfd/davinci_voicecodec.c | 12 +-----------
+ drivers/mfd/htc-pasic3.c         | 13 +------------
+ 2 files changed, 2 insertions(+), 23 deletions(-)
 
-diff --git a/drivers/memory/emif.c b/drivers/memory/emif.c
-index df08736..ecbc1a9 100644
---- a/drivers/memory/emif.c
-+++ b/drivers/memory/emif.c
-@@ -1841,18 +1841,8 @@ static struct platform_driver emif_driver = {
- 	},
+diff --git a/drivers/mfd/davinci_voicecodec.c b/drivers/mfd/davinci_voicecodec.c
+index c0bcc87..c60ab0c 100644
+--- a/drivers/mfd/davinci_voicecodec.c
++++ b/drivers/mfd/davinci_voicecodec.c
+@@ -177,17 +177,7 @@ static struct platform_driver davinci_vc_driver = {
+ 	.remove	= davinci_vc_remove,
  };
  
--static int __init_or_module emif_register(void)
+-static int __init davinci_vc_init(void)
 -{
--	return platform_driver_probe(&emif_driver, emif_probe);
+-	return platform_driver_probe(&davinci_vc_driver, davinci_vc_probe);
+-}
+-module_init(davinci_vc_init);
+-
+-static void __exit davinci_vc_exit(void)
+-{
+-	platform_driver_unregister(&davinci_vc_driver);
+-}
+-module_exit(davinci_vc_exit);
++module_platform_driver_probe(davinci_vc_driver, davinci_vc_probe);
+ 
+ MODULE_AUTHOR("Miguel Aguilar");
+ MODULE_DESCRIPTION("Texas Instruments DaVinci Voice Codec Core Interface");
+diff --git a/drivers/mfd/htc-pasic3.c b/drivers/mfd/htc-pasic3.c
+index 9e5453d..0285fce 100644
+--- a/drivers/mfd/htc-pasic3.c
++++ b/drivers/mfd/htc-pasic3.c
+@@ -208,18 +208,7 @@ static struct platform_driver pasic3_driver = {
+ 	.remove		= pasic3_remove,
+ };
+ 
+-static int __init pasic3_base_init(void)
+-{
+-	return platform_driver_probe(&pasic3_driver, pasic3_probe);
 -}
 -
--static void __exit emif_unregister(void)
+-static void __exit pasic3_base_exit(void)
 -{
--	platform_driver_unregister(&emif_driver);
+-	platform_driver_unregister(&pasic3_driver);
 -}
-+module_platform_driver_probe(emif_driver, emif_probe);
+-
+-module_init(pasic3_base_init);
+-module_exit(pasic3_base_exit);
++module_platform_driver_probe(pasic3_driver, pasic3_probe);
  
--module_init(emif_register);
--module_exit(emif_unregister);
- MODULE_DESCRIPTION("TI EMIF SDRAM Controller Driver");
- MODULE_LICENSE("GPL");
- MODULE_ALIAS("platform:emif");
+ MODULE_AUTHOR("Philipp Zabel <philipp.zabel@gmail.com>");
+ MODULE_DESCRIPTION("Core driver for HTC PASIC3");
 -- 
 1.8.1.5
