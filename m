@@ -1,40 +1,41 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 Mar 2013 22:56:44 +0100
-Subject: [PATCH] [media] ir: IR_RX51 only works on OMAP2
-In-Reply-To: <1363298204-8014-1-git-send-email-arnd@arndb.de>
-References: <1363298204-8014-1-git-send-email-arnd@arndb.de>
-Message-ID: <1363298204-8014-7-git-send-email-arnd@arndb.de>
+Date: Thu, 14 Mar 2013 22:56:38 +0100
+Subject: [PATCH 1/3] mfd: remove __exit_p annotation for twl4030_madc_remove
+Message-ID: <1363298204-8014-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver can be enabled on OMAP1 at the moment, which breaks
-allyesconfig for that platform. Let's mark it OMAP2PLUS-only
-in Kconfig, since that is the only thing it builds on.
+4740f73fe5 "mfd: remove use of __devexit" removed the __devexit annotation
+on the twl4030_madc_remove function, but left an __exit_p() present on the
+pointer to this function. Using __exit_p was as wrong with the devexit in
+place as it is now, but now we get a gcc warning about an unused function.
 
+In order for the twl4030_madc_remove to work correctly in built-in code, we
+have to remove the __exit_p.
+
+Cc: Bill Pemberton <wfp5p@virginia.edu>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Samuel Ortiz <sameo@linux.intel.com>
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
-Cc: Timo Kokkonen <timo.t.kokkonen@iki.fi>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Cc: linux-media at vger.kernel.org
 ---
-Mauro, please apply for 3.9
 
- drivers/media/rc/Kconfig | 2 +-
+Please apply to MFD tree for 3.9
+
+ drivers/mfd/twl4030-madc.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/media/rc/Kconfig b/drivers/media/rc/Kconfig
-index 19f3563..5a79c33 100644
---- a/drivers/media/rc/Kconfig
-+++ b/drivers/media/rc/Kconfig
-@@ -291,7 +291,7 @@ config IR_TTUSBIR
+diff --git a/drivers/mfd/twl4030-madc.c b/drivers/mfd/twl4030-madc.c
+index 88ff9dc..942b666 100644
+--- a/drivers/mfd/twl4030-madc.c
++++ b/drivers/mfd/twl4030-madc.c
+@@ -800,7 +800,7 @@ static int twl4030_madc_remove(struct platform_device *pdev)
  
- config IR_RX51
- 	tristate "Nokia N900 IR transmitter diode"
--	depends on OMAP_DM_TIMER && LIRC && !ARCH_MULTIPLATFORM
-+	depends on OMAP_DM_TIMER && ARCH_OMAP2PLUS && LIRC && !ARCH_MULTIPLATFORM
- 	---help---
- 	   Say Y or M here if you want to enable support for the IR
- 	   transmitter diode built in the Nokia N900 (RX51) device.
+ static struct platform_driver twl4030_madc_driver = {
+ 	.probe = twl4030_madc_probe,
+-	.remove = __exit_p(twl4030_madc_remove),
++	.remove = twl4030_madc_remove,
+ 	.driver = {
+ 		   .name = "twl4030_madc",
+ 		   .owner = THIS_MODULE,
 -- 
 1.8.1.2
