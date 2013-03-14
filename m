@@ -1,71 +1,38 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 14 Mar 2013 13:09:02 +0100
-Subject: [PATCH 7/7] ARM: i.MX27: Add clocks to GPT devicetree nodes
+Date: Thu, 14 Mar 2013 13:09:00 +0100
+Subject: [PATCH 5/7] ARM: i.MX53: Add GPT devicetree node
 In-Reply-To: <1363262942-26702-1-git-send-email-s.hauer@pengutronix.de>
 References: <1363262942-26702-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1363262942-26702-8-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1363262942-26702-6-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The GPT is the GPT timer found on i.MX SoCs. This patch adds the
+devicetree node for it.
+
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/boot/dts/imx27.dtsip | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/boot/dts/imx53.dtsip | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx27.dtsip b/arch/arm/boot/dts/imx27.dtsip
-index 3e0585f..3ea1f59 100644
---- a/arch/arm/boot/dts/imx27.dtsip
-+++ b/arch/arm/boot/dts/imx27.dtsip
-@@ -68,18 +68,24 @@
- 				compatible = "fsl,imx27-gpt", "fsl,imx1-gpt";
- 				reg = <0x10003000 0x1000>;
- 				interrupts = <26>;
-+				clocks = <&clks 46>, <&clks 61>;
-+				clock-names = "ipg", "per";
+diff --git a/arch/arm/boot/dts/imx53.dtsip b/arch/arm/boot/dts/imx53.dtsip
+index 98149ac..6c73bee 100644
+--- a/arch/arm/boot/dts/imx53.dtsip
++++ b/arch/arm/boot/dts/imx53.dtsip
+@@ -243,6 +243,14 @@
+ 				status = "disabled";
  			};
  
- 			gpt2: timer at 10004000 {
- 				compatible = "fsl,imx27-gpt", "fsl,imx1-gpt";
- 				reg = <0x10004000 0x1000>;
- 				interrupts = <25>;
-+				clocks = <&clks 45>, <&clks 61>;
++			gpt: timer at 53fa0000 {
++				compatible = "fsl,imx53-gpt", "fsl,imx31-gpt";
++				reg = <0x53fa0000 0x4000>;
++				interrupts = <39>;
++				clocks = <&clks 36>, <&clks 41>;
 +				clock-names = "ipg", "per";
- 			};
- 
- 			gpt3: timer at 10005000 {
- 				compatible = "fsl,imx27-gpt", "fsl,imx1-gpt";
- 				reg = <0x10005000 0x1000>;
- 				interrupts = <24>;
-+				clocks = <&clks 44>, <&clks 61>;
-+				clock-names = "ipg", "per";
- 			};
- 
- 			uart1: serial at 1000a000 {
-@@ -210,12 +216,16 @@
- 				compatible = "fsl,imx27-gpt", "fsl,imx1-gpt";
- 				reg = <0x10019000 0x1000>;
- 				interrupts = <4>;
-+				clocks = <&clks 43>, <&clks 61>;
-+				clock-names = "ipg", "per";
- 			};
- 
- 			gpt5: timer at 1001a000 {
- 				compatible = "fsl,imx27-gpt", "fsl,imx1-gpt";
- 				reg = <0x1001a000 0x1000>;
- 				interrupts = <3>;
-+				clocks = <&clks 42>, <&clks 61>;
-+				clock-names = "ipg", "per";
- 			};
- 
- 			uart5: serial at 1001b000 {
-@@ -245,6 +255,8 @@
- 				compatible = "fsl,imx27-gpt", "fsl,imx1-gpt";
- 				reg = <0x1001f000 0x1000>;
- 				interrupts = <2>;
-+				clocks = <&clks 41>, <&clks 61>;
-+				clock-names = "ipg", "per";
- 			};
- 		};
- 
++			};
++
+ 			iomuxc: iomuxc at 53fa8000 {
+ 				compatible = "fsl,imx53-iomuxc";
+ 				reg = <0x53fa8000 0x4000>;
 -- 
 1.8.2.rc2
