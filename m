@@ -1,52 +1,55 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 14 Mar 2013 17:09:04 +0530
-Subject: [PATCH 1/3] pwm: davinci: Add Kconfig support for ECAP & EHRPWM
- devices
-In-Reply-To: <1363257158-11615-2-git-send-email-avinashphilip@ti.com>
+Date: Thu, 14 Mar 2013 17:13:08 +0530
+Subject: [PATCH 2/3] pwm: pwm-tiecap: Add device-tree binding support
+ for da850 SOC
+In-Reply-To: <1363257158-11615-3-git-send-email-avinashphilip@ti.com>
 References: <1363257158-11615-1-git-send-email-avinashphilip@ti.com>
- <1363257158-11615-2-git-send-email-avinashphilip@ti.com>
-Message-ID: <5141B6D8.2050308@ti.com>
+ <1363257158-11615-3-git-send-email-avinashphilip@ti.com>
+Message-ID: <5141B7CC.7000700@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 3/14/2013 4:02 PM, Philip Avinash wrote:
-> Add EHRPWM and ECAP support build support for DAVINCI_DA850 platforms.
+> ECAP IP is used in da850 SOC's also. Hence adds ECAP device tree binding
+> support for da850.
 > 
-> Also, since DAVINCI platforms doesn't support TI-PWM-Subsystem module,
-> remove the select option for CONFIG_PWM_TIPWMSS.
-> 
-> Also, update CONFIG_PWM_TIPWMSS compiler directive appropriately in
-> pwm-tipwmss.h to fix the below compiler error upon removal of
-> CONFIG_PWM_TIPWMSS for Davinci platforms.
-> 
-> 	drivers/pwm/pwm-tiecap.c: In function 'ecap_pwm_probe':
-> 	drivers/pwm/pwm-tiecap.c:263:4: error: 'PWMSS_ECAPCLK_EN' undeclared
-> 	(first use in this function)
-> 	drivers/pwm/pwm-tiecap.c:263:4: note: each undeclared identifier
-> 	is reported only once for each function it appears in
-> 	drivers/pwm/pwm-tiecap.c:264:17: error: 'PWMSS_ECAPCLK_EN_ACK'
-> 	undeclared (first use in this function)
-> 	drivers/pwm/pwm-tiecap.c: In function 'ecap_pwm_remove':
-> 	drivers/pwm/pwm-tiecap.c:291:49: error: 'PWMSS_ECAPCLK_STOP_REQ'
-> 	undeclared (first use in this function)
-> 	make[2]: *** [drivers/pwm/pwm-tiecap.o] Error 1
-> 	make[1]: *** [drivers/pwm] Error 2
-> 	make: *** [drivers] Error 2
-> 
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Rob Landley <rob@landley.net>
 > Signed-off-by: Philip Avinash <avinashphilip@ti.com>
+> ---
+> :100644 100644 131e8c1... fcbd3c1... M	Documentation/devicetree/bindings/pwm/pwm-tiecap.txt
+> :100644 100644 22e96e2... e0d96c8... M	drivers/pwm/pwm-tiecap.c
+>  .../devicetree/bindings/pwm/pwm-tiecap.txt         |    2 +-
+>  drivers/pwm/pwm-tiecap.c                           |    1 +
+>  2 files changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/pwm/pwm-tiecap.txt b/Documentation/devicetree/bindings/pwm/pwm-tiecap.txt
+> index 131e8c1..fcbd3c1 100644
+> --- a/Documentation/devicetree/bindings/pwm/pwm-tiecap.txt
+> +++ b/Documentation/devicetree/bindings/pwm/pwm-tiecap.txt
+> @@ -1,7 +1,7 @@
+>  TI SOC ECAP based APWM controller
+>  
+>  Required properties:
+> -- compatible: Must be "ti,am33xx-ecap"
+> +- compatible: Must be "ti,am33xx-ecap" or "ti,da850-ecap"
+>  - #pwm-cells: Should be 3. Number of cells being used to specify PWM property.
+>    First cell specifies the per-chip index of the PWM to use, the second
+>    cell is the period in nanoseconds and bit 0 in the third cell is used to
+> diff --git a/drivers/pwm/pwm-tiecap.c b/drivers/pwm/pwm-tiecap.c
+> index 22e96e2..e0d96c8 100644
+> --- a/drivers/pwm/pwm-tiecap.c
+> +++ b/drivers/pwm/pwm-tiecap.c
+> @@ -197,6 +197,7 @@ static const struct pwm_ops ecap_pwm_ops = {
+>  
+>  static const struct of_device_id ecap_of_match[] = {
+>  	{ .compatible	= "ti,am33xx-ecap" },
+> +	{ .compatible	= "ti,da850-ecap" },
+>  	{},
 
->  config  PWM_TIECAP
->  	tristate "ECAP PWM support"
-> -	depends on SOC_AM33XX
-> -	select PWM_TIPWMSS
-> +	depends on SOC_AM33XX || ARCH_DAVINCI_DA850
-
-Having such narrow dependencies is wrong. The same device is present on
-DaVinci DA830 too. A depends on should not be required at all since the
-driver should build on all architectures. But I have seen resistance to
-doing that since users don't like to see configuration options totally
-irrelevant for the architecture they are building for. So may be take a
-middle path and do 'depends on ARCH_ARM'?
+You add a new compatible, but don't really show any changes in driver in
+this series. So why can't we simply use ti,am33xx-ecap on DA850 too?
 
 Thanks,
 Sekhar
