@@ -1,83 +1,73 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 Mar 2013 13:43:04 +0000
-Subject: [PATCH 03/04] ARM: shmobile: r8a73a4 IRQC support
-In-Reply-To: <CANqRtoSok=0CuLyMGD8-SoKezX54WfacnNnx8FhxCJzs_ggcXg@mail.gmail.com>
-References: <20130312045559.19701.77841.sendpatchset@w520>
- <201303121231.29869.arnd@arndb.de>
- <CANqRtoSok=0CuLyMGD8-SoKezX54WfacnNnx8FhxCJzs_ggcXg@mail.gmail.com>
-Message-ID: <201303141343.04328.arnd@arndb.de>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 14 Mar 2013 17:42:30 +0400
+Subject: [PATCH 2/7] ARM: shmobile: marzen: add USB EHCI driver support
+In-Reply-To: <87li9q4ydj.wl%kuninori.morimoto.gx@renesas.com>
+References: <1352446306-19945-1-git-send-email-horms@verge.net.au>
+ <1352446306-19945-3-git-send-email-horms@verge.net.au>
+ <5140F35F.3090702@cogentembedded.com>
+ <87li9q4ydj.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <5141D3C6.4090806@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 14 March 2013, Magnus Damm wrote:
-> Hi Arnd,
-> 
-> Thanks for your feedback, please see below for my reply.
-> 
-> On Tue, Mar 12, 2013 at 9:31 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Tuesday 12 March 2013, Magnus Damm wrote:
-> >> From: Magnus Damm <damm@opensource.se>
-> >>
-> >> Add IRQC interrupt controller support to r8a73a4 by
-> >> hooking up two IRQC instances to handle 58 external
-> >> IRQ signals. There IRQC controllers are tied to SPIs
-> >> of the GIC. On r8a73a4 exact IRQ pin routing is handled
-> >> by the PFC which is excluded from this patch.
-> >>
-> >> Both platform devices and DT devices are added in this
-> >> patch. The platform device versions are used to provide
-> >> a static interrupt map configuration for board code
-> >> written in C.
-> >>
-> >> Signed-off-by: Magnus Damm <damm@opensource.se>
-> >
-> > What is the status of the IRQC DT support? I remember that I wasn't
-> > happy with a prior version, but I did not follow up on some of the
-> > questions that came up, sorry about that.
-> 
-> Uhm, perhaps I misunderstand, but I wonder if you refer to INTC instead of IRQC?
+Hello.
 
-Yes, you are right.
+On 14-03-2013 4:29, Kuninori Morimoto wrote:
 
-> This particular driver is for the IRQC hardware block. It is not
-> compatible with INTC. A while ago I posted an incremental DT support
-> patch for IRQC -  "[PATCH] irqchip: irqc: Add DT support", please see
-> https://lkml.org/lkml/2013/3/6/50
+>>> +/* USB */
+>>> +static struct usb_phy *phy;
+>>> +static int usb_power_on(struct platform_device *pdev)
+>>> +{
+>>> +	if (!phy)
+>>> +		return -EIO;
+>>> +
+>>> +	pm_runtime_enable(&pdev->dev);
+>>> +	pm_runtime_get_sync(&pdev->dev);
+>>> +
+>>> +	usb_phy_init(phy);
+>>> +
+>>> +	return 0;
+>>> +}
+>>> +
+>>> +static void usb_power_off(struct platform_device *pdev)
+>>> +{
+>>> +	if (!phy)
+>>> +		return;
+>>> +
+>>> +	usb_phy_shutdown(phy);
+>>> +
+>>> +	pm_runtime_put_sync(&pdev->dev);
+>>> +	pm_runtime_disable(&pdev->dev);
+>>> +}
+>>> +
+>>> +static struct usb_ehci_pdata ehcix_pdata = {
+>>> +	.power_on	= usb_power_on,
+>>> +	.power_off	= usb_power_off,
+>>> +	.power_suspend	= usb_power_off,
+>>> +};
+> (snip)
 
-Ok, I had missed that, but the driver certainly looks good to me.
+>>      Morimoto-san, I don't understand why this SoC specific platform device
+>> ended up in the board file? Could you explain your reasons please?
+>>      I think this is generally a bad practice as this approach scales badly.
 
-> > Did the patches end up getting merged anyway, or should we resume the
-> > discussion about those patches? I understand that lack of INTC bindings
-> > would make new SoC support particularly hard, and I don't want to
-> > be responsible for holding you up here.
-> 
-> Thanks. I don't think the INTC patches went anywhere.
-> 
-> To zoom out a bit let me list different interrupt controllers:
-> 
-> A) INTC (drivers/sh/intc) [no DT yet]
-> B) GIC (drivers/irqchip/irq-gic.c) [DT]
-> C) INTC External IRQ Pin (drivers/irqchip/irq-renesas-intc-irqpin.c) [DT]
-> D) IRQC (drivers/irqchip/irq-renesas-irqc.c) [DT]
-> 
-> Simple use cases are:
-> - Legacy SH SoCs or ARM SoCs with Cortex-A8 or older make use of A).
-> - More recent ARM SoCs with Cortex-A9 or newer use B) and C) or B) and D).
+> Do you mean it should exist in setup-r8a7779.c ?
 
-Ok. And I guess the EMMA EV2 uses only GIC but not IRQC or INTC, right?
+    Yes.
 
-> On top of this we now and then have GPIO controllers that have
-> built-in interrupt controllers.
+> I forgot detail of it, but these usb is using callback function,
+> and it is using *phy*.
 
-Yes, obviously.
+   But this PHY also belongs to SoC.
 
-Coming back to INTC, are you planning to use the same binding for A and C?
-Which of them the binding you posted earlier for?
+> This phy came from marzen_init_late() with usb_get_phy(USB_PHY_TYPE_USB2);
+> This usb_get_phy() is not needed if board doesn't have USB.
 
-When I looked at the existing code, I had the impression that doing a
-binding for just the SH-Mobile SoCs that have an ARM core in them 
-(including those that also have an SH core) would be much easier than
-doing a binding that also covers the older SH SoCs, since those are
-much less uniform.
+    Anyway, there should be ways to separate the board specific platform code 
+and the SoC specific one. That's what other subarches do.
 
-	Arnd
+> You can modify it if you want
+
+    Yes, I definitely would like to try.
+
+WBR, Sergei
