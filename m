@@ -1,9 +1,9 @@
 From: fabio.porcedda@gmail.com (Fabio Porcedda)
-Date: Thu, 14 Mar 2013 14:11:29 +0100
-Subject: [PATCH 08/10] drivers: mfd: use module_platform_driver_probe()
+Date: Thu, 14 Mar 2013 14:11:30 +0100
+Subject: [PATCH 09/10] drivers: video: use module_platform_driver_probe()
 In-Reply-To: <1363266691-15757-1-git-send-email-fabio.porcedda@gmail.com>
 References: <1363266691-15757-1-git-send-email-fabio.porcedda@gmail.com>
-Message-ID: <1363266691-15757-10-git-send-email-fabio.porcedda@gmail.com>
+Message-ID: <1363266691-15757-11-git-send-email-fabio.porcedda@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,60 +13,83 @@ a bit simpler.
 
 Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
 Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Samuel Ortiz <sameo@linux.intel.com>
-Cc: linux-arm-kernel at lists.infradead.org
+Cc: Richard Purdie <rpurdie@rpsys.net>
+Cc: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
+Cc: linux-fbdev at vger.kernel.org
 ---
- drivers/mfd/davinci_voicecodec.c | 12 +-----------
- drivers/mfd/htc-pasic3.c         | 13 +------------
- 2 files changed, 2 insertions(+), 23 deletions(-)
+ drivers/video/backlight/atmel-pwm-bl.c | 12 +-----------
+ drivers/video/sh_mipi_dsi.c            | 12 +-----------
+ drivers/video/sh_mobile_hdmi.c         | 12 +-----------
+ 3 files changed, 3 insertions(+), 33 deletions(-)
 
-diff --git a/drivers/mfd/davinci_voicecodec.c b/drivers/mfd/davinci_voicecodec.c
-index c0bcc87..c60ab0c 100644
---- a/drivers/mfd/davinci_voicecodec.c
-+++ b/drivers/mfd/davinci_voicecodec.c
-@@ -177,17 +177,7 @@ static struct platform_driver davinci_vc_driver = {
- 	.remove	= davinci_vc_remove,
+diff --git a/drivers/video/backlight/atmel-pwm-bl.c b/drivers/video/backlight/atmel-pwm-bl.c
+index de5e5e7..20b330d 100644
+--- a/drivers/video/backlight/atmel-pwm-bl.c
++++ b/drivers/video/backlight/atmel-pwm-bl.c
+@@ -225,17 +225,7 @@ static struct platform_driver atmel_pwm_bl_driver = {
+ 	.remove = __exit_p(atmel_pwm_bl_remove),
  };
  
--static int __init davinci_vc_init(void)
+-static int __init atmel_pwm_bl_init(void)
 -{
--	return platform_driver_probe(&davinci_vc_driver, davinci_vc_probe);
+-	return platform_driver_probe(&atmel_pwm_bl_driver, atmel_pwm_bl_probe);
 -}
--module_init(davinci_vc_init);
+-module_init(atmel_pwm_bl_init);
 -
--static void __exit davinci_vc_exit(void)
+-static void __exit atmel_pwm_bl_exit(void)
 -{
--	platform_driver_unregister(&davinci_vc_driver);
+-	platform_driver_unregister(&atmel_pwm_bl_driver);
 -}
--module_exit(davinci_vc_exit);
-+module_platform_driver_probe(davinci_vc_driver, davinci_vc_probe);
+-module_exit(atmel_pwm_bl_exit);
++module_platform_driver_probe(atmel_pwm_bl_driver, atmel_pwm_bl_probe);
  
- MODULE_AUTHOR("Miguel Aguilar");
- MODULE_DESCRIPTION("Texas Instruments DaVinci Voice Codec Core Interface");
-diff --git a/drivers/mfd/htc-pasic3.c b/drivers/mfd/htc-pasic3.c
-index 9e5453d..0285fce 100644
---- a/drivers/mfd/htc-pasic3.c
-+++ b/drivers/mfd/htc-pasic3.c
-@@ -208,18 +208,7 @@ static struct platform_driver pasic3_driver = {
- 	.remove		= pasic3_remove,
+ MODULE_AUTHOR("Hans-Christian egtvedt <hans-christian.egtvedt@atmel.com>");
+ MODULE_DESCRIPTION("Atmel PWM backlight driver");
+diff --git a/drivers/video/sh_mipi_dsi.c b/drivers/video/sh_mipi_dsi.c
+index 701b461..6cad530 100644
+--- a/drivers/video/sh_mipi_dsi.c
++++ b/drivers/video/sh_mipi_dsi.c
+@@ -581,17 +581,7 @@ static struct platform_driver sh_mipi_driver = {
+ 	},
  };
  
--static int __init pasic3_base_init(void)
+-static int __init sh_mipi_init(void)
 -{
--	return platform_driver_probe(&pasic3_driver, pasic3_probe);
+-	return platform_driver_probe(&sh_mipi_driver, sh_mipi_probe);
 -}
+-module_init(sh_mipi_init);
 -
--static void __exit pasic3_base_exit(void)
+-static void __exit sh_mipi_exit(void)
 -{
--	platform_driver_unregister(&pasic3_driver);
+-	platform_driver_unregister(&sh_mipi_driver);
 -}
--
--module_init(pasic3_base_init);
--module_exit(pasic3_base_exit);
-+module_platform_driver_probe(pasic3_driver, pasic3_probe);
+-module_exit(sh_mipi_exit);
++module_platform_driver_probe(sh_mipi_driver, sh_mipi_probe);
  
- MODULE_AUTHOR("Philipp Zabel <philipp.zabel@gmail.com>");
- MODULE_DESCRIPTION("Core driver for HTC PASIC3");
+ MODULE_AUTHOR("Guennadi Liakhovetski <g.liakhovetski@gmx.de>");
+ MODULE_DESCRIPTION("SuperH / ARM-shmobile MIPI DSI driver");
+diff --git a/drivers/video/sh_mobile_hdmi.c b/drivers/video/sh_mobile_hdmi.c
+index 930e550..bfe4728 100644
+--- a/drivers/video/sh_mobile_hdmi.c
++++ b/drivers/video/sh_mobile_hdmi.c
+@@ -1445,17 +1445,7 @@ static struct platform_driver sh_hdmi_driver = {
+ 	},
+ };
+ 
+-static int __init sh_hdmi_init(void)
+-{
+-	return platform_driver_probe(&sh_hdmi_driver, sh_hdmi_probe);
+-}
+-module_init(sh_hdmi_init);
+-
+-static void __exit sh_hdmi_exit(void)
+-{
+-	platform_driver_unregister(&sh_hdmi_driver);
+-}
+-module_exit(sh_hdmi_exit);
++module_platform_driver_probe(sh_hdmi_driver, sh_hdmi_probe);
+ 
+ MODULE_AUTHOR("Guennadi Liakhovetski <g.liakhovetski@gmx.de>");
+ MODULE_DESCRIPTION("SuperH / ARM-shmobile HDMI driver");
 -- 
 1.8.1.5
