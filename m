@@ -1,35 +1,36 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 Mar 2013 20:15:31 +0000
-Subject: [RFC] USB: EHCI: hot-fix OMAP and Orion multiplatform config
-In-Reply-To: <Pine.LNX.4.44L0.1303151516170.1414-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1303151516170.1414-100000@iolanthe.rowland.org>
-Message-ID: <201303152015.31292.arnd@arndb.de>
+Date: Fri, 15 Mar 2013 20:18:08 +0000
+Subject: [PATCH 10/10] drivers: misc: use module_platform_driver_probe()
+In-Reply-To: <ADE657CA350FB648AAC2C43247A983F0020980106B9E@AUSP01VMBX24.collaborationhost.net>
+References: <1363266691-15757-1-git-send-email-fabio.porcedda@gmail.com>
+ <201303141358.05616.arnd@arndb.de>
+ <ADE657CA350FB648AAC2C43247A983F0020980106B9E@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <201303152018.09094.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 March 2013, Alan Stern wrote:
-> I just got an automated message from Greg:
+On Friday 15 March 2013, H Hartley Sweeten wrote:
+> Arnd,
 > 
-> --------------------------------------------------------------------------
-> This is a note to let you know that I've just added the patch titled
-> 
->     USB: EHCI: split ehci-omap out to a separate driver
-> 
-> to my usb git tree which can be found at
->     git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/usb.git
-> in the usb-next branch.
-> --------------------------------------------------------------------------
-> 
-> Unless something is changed, this patch won't get into 3.9-final.  
-> Do you want Greg to move it to his usb-linus branch?
+> Ill look at converting the ep93xx pwm driver to the PWM subsystem. The only issue is
+> the current driver exposes a sysfs interface that I think is not available in that subsystem.
 
-I don't care much which way we do it, but I'd certainly like to
-see one of these two solutions for the bug:
+You can probably keep providing that interface if you have active users.
 
-a) Apply Roger's patch for 3.9, and add my "USB: EHCI: DT support
-   for generic bus glue" patch on top after it has been tested
-b) Apply my "USB: EHCI: hot-fix OMAP and Orion multiplatform config"
-   when I send a version based on the proper tree for 3.9, and leave
-   the other ones to do it properly for 3.10.
+> >* Regarding the use of module_platform_driver_probe, I'm a little worried about
+> >  the interactions with deferred probing. I don't think there are any regressions,
+> >  but we should probably make people aware that one cannot return -EPROBE_DEFER
+> >  from a platform_driver_probe function.
+> 
+> The ep93xx pwm driver does not need to use platform_driver_probe(). It can be changed
+> to use module_platform_driver() by just moving the .probe to the platform_driver. This
+> driver was added before module_platform_driver() was available and I used the
+> platform_driver_probe() thinking it would save a couple lines of code.
+> 
+> I'll change this in a bit. Right now I'm trying to work out why kernel 3.8 is not booting
+> on the ep93xx. I had 3.6.6 on my development board and 3.7 works fine but 3.8 hangs
+> without uncompressing the kernel.
+
+Ok, thanks!
 
 	Arnd
