@@ -1,39 +1,28 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 15 Mar 2013 12:42:10 +0100
-Subject: [PATCH 4/4 v2] mv643xx_eth: convert to use the Marvell Orion
- MDIO driver
-In-Reply-To: <514300E0.2030108@openwrt.org>
-References: <1359473048-26551-1-git-send-email-florian@openwrt.org>
- <1363284515-9865-1-git-send-email-florian@openwrt.org>
- <1363284515-9865-5-git-send-email-florian@openwrt.org>
- <514300E0.2030108@openwrt.org>
-Message-ID: <20130315124210.27d0794a@skate>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 15 Mar 2013 11:54:22 +0000
+Subject: [PATCH v2 05/14] ARM: integrator: use clocksource_of_init for
+ sp804
+In-Reply-To: <513F7EBD.80207@gmail.com>
+References: <1363108124-17484-1-git-send-email-haojian.zhuang@linaro.org>
+ <1363108124-17484-6-git-send-email-haojian.zhuang@linaro.org>
+ <513F7EBD.80207@gmail.com>
+Message-ID: <20130315115422.GG4977@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Florian Fainelli,
+On Tue, Mar 12, 2013 at 02:15:09PM -0500, Rob Herring wrote:
+> You are breaking existing dtb's changing this, but this is wrong for
+> other reasons. The integrator does not have an SP804. It is the same
+> programming model,
 
-On Fri, 15 Mar 2013 12:07:12 +0100, Florian Fainelli wrote:
+No, it is not the same programming model.  It is a subset of the model.
+Integrator/AP is only 16-bit, and needs to have a prescaler configured
+according to the clockrate.  Integrator/CP and later platforms have
+SP804, which looks the same, but is 32-bit instead.
 
-> Thanks to the help of Andrew Lunn, there is at least two known issues 
-> with this patch version:
-> 
-> - we need to move up the mvmdio line in 
-> drivers/net/ethernet/marvell/Makefile to make sure that configs having 
-> both mvmdio and mv643xx_eth built-in get the probing order right
+If you look at arch/arm/include/asm/hardware/arm_timer.h, you will see
+that I fully documented what registers and bits are present on each
+platform of AP, CP, Versatile/AB,PB and Realview.
 
-I don't think it's the right way of fixing the problem. If there is no
-dependency on the two devices through the device model (i.e they don't
-have a parent->child relationship), then the mv643xx_eth driver should
-probably return -EPROBE_DEFER when it can't find its PHY so that its
-->probe() operation gets called once again by the kernel when other
-drivers (including mvmdio) have been probed.
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Note that even through the CP and Versatile platforms are both called
+SP804, there are subtle differences between the implementations.
