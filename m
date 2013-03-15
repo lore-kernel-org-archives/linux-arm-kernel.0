@@ -1,109 +1,140 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 15 Mar 2013 08:57:37 -0500
-Subject: [PATCH V2 4/8] ARM: dts: Add GPMC node for OMAP2, OMAP4 and OMAP5
+Date: Fri, 15 Mar 2013 08:57:38 -0500
+Subject: [PATCH V2 5/8] ARM: dts: Add OMAP2 gpio bindings
 In-Reply-To: <1363355861-11773-1-git-send-email-jon-hunter@ti.com>
 References: <1363355861-11773-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <1363355861-11773-5-git-send-email-jon-hunter@ti.com>
+Message-ID: <1363355861-11773-6-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the device-tree node for GPMC on OMAP2, OMAP4 and OMAP5 devices.
+Add gpios bindings for OMAP2420 and OMAP2430 devices.
 
 Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 ---
- arch/arm/boot/dts/omap2420.dtsi |   11 +++++++++++
- arch/arm/boot/dts/omap2430.dtsi |   11 +++++++++++
- arch/arm/boot/dts/omap4.dtsi    |   11 +++++++++++
- arch/arm/boot/dts/omap5.dtsi    |   11 +++++++++++
- 4 files changed, 44 insertions(+)
+ arch/arm/boot/dts/omap2420.dtsi |   44 +++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/omap2430.dtsi |   55 +++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 99 insertions(+)
 
 diff --git a/arch/arm/boot/dts/omap2420.dtsi b/arch/arm/boot/dts/omap2420.dtsi
-index af65609..d4ce6c2 100644
+index d4ce6c2..eee902f 100644
 --- a/arch/arm/boot/dts/omap2420.dtsi
 +++ b/arch/arm/boot/dts/omap2420.dtsi
-@@ -29,6 +29,17 @@
+@@ -29,6 +29,50 @@
  			pinctrl-single,function-mask = <0x3f>;
  		};
  
-+		gpmc: gpmc at 6800a000 {
-+			compatible = "ti,omap2420-gpmc";
-+			reg = <0x6800a000 0x1000>;
-+			#address-cells = <2>;
-+			#size-cells = <1>;
-+			interrupts = <20>;
-+			gpmc,num-cs = <8>;
-+			gpmc,num-waitpins = <4>;
-+			ti,hwmods = "gpmc";
++		gpio1: gpio at 48018000 {
++			compatible = "ti,omap2-gpio";
++			reg = <0x48018000 0x200>;
++			interrupts = <29>;
++			ti,hwmods = "gpio1";
++			#gpio-cells = <2>;
++			gpio-controller;
++			#interrupt-cells = <2>;
++			interrupt-controller;
 +		};
 +
- 		mcbsp1: mcbsp at 48074000 {
- 			compatible = "ti,omap2420-mcbsp";
- 			reg = <0x48074000 0xff>;
++		gpio2: gpio at 4801a000 {
++			compatible = "ti,omap2-gpio";
++			reg = <0x4801a000 0x200>;
++			interrupts = <30>;
++			ti,hwmods = "gpio2";
++			#gpio-cells = <2>;
++			gpio-controller;
++			#interrupt-cells = <2>;
++			interrupt-controller;
++		};
++
++		gpio3: gpio at 4801c000 {
++			compatible = "ti,omap2-gpio";
++			reg = <0x4801c000 0x200>;
++			interrupts = <31>;
++			ti,hwmods = "gpio3";
++			#gpio-cells = <2>;
++			gpio-controller;
++			#interrupt-cells = <2>;
++			interrupt-controller;
++		};
++
++		gpio4: gpio at 4801e000 {
++			compatible = "ti,omap2-gpio";
++			reg = <0x4801e000 0x200>;
++			interrupts = <32>;
++			ti,hwmods = "gpio4";
++			#gpio-cells = <2>;
++			gpio-controller;
++			#interrupt-cells = <2>;
++			interrupt-controller;
++		};
++
+ 		gpmc: gpmc at 6800a000 {
+ 			compatible = "ti,omap2420-gpmc";
+ 			reg = <0x6800a000 0x1000>;
 diff --git a/arch/arm/boot/dts/omap2430.dtsi b/arch/arm/boot/dts/omap2430.dtsi
-index c392445..832f184 100644
+index 832f184..fb74382 100644
 --- a/arch/arm/boot/dts/omap2430.dtsi
 +++ b/arch/arm/boot/dts/omap2430.dtsi
-@@ -29,6 +29,17 @@
+@@ -29,6 +29,61 @@
  			pinctrl-single,function-mask = <0x3f>;
  		};
  
-+		gpmc: gpmc at 6e000000 {
-+			compatible = "ti,omap2430-gpmc";
-+			reg = <0x6e000000 0x1000>;
-+			#address-cells = <2>;
-+			#size-cells = <1>;
-+			interrupts = <20>;
-+			gpmc,num-cs = <8>;
-+			gpmc,num-waitpins = <4>;
-+			ti,hwmods = "gpmc";
++		gpio1: gpio at 4900c000 {
++			compatible = "ti,omap2-gpio";
++			reg = <0x4900c000 0x200>;
++			interrupts = <29>;
++			ti,hwmods = "gpio1";
++			#gpio-cells = <2>;
++			gpio-controller;
++			#interrupt-cells = <2>;
++			interrupt-controller;
 +		};
 +
- 		mcbsp1: mcbsp at 48074000 {
- 			compatible = "ti,omap2430-mcbsp";
- 			reg = <0x48074000 0xff>;
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index 6669311..bcd64f5 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -196,6 +196,17 @@
- 			#interrupt-cells = <1>;
- 		};
- 
-+		gpmc: gpmc at 50000000 {
-+			compatible = "ti,omap4430-gpmc";
-+			reg = <0x50000000 0x1000>;
-+			#address-cells = <2>;
-+			#size-cells = <1>;
-+			interrupts = <0 20 0x4>;
-+			gpmc,num-cs = <8>;
-+			gpmc,num-waitpins = <4>;
-+			ti,hwmods = "gpmc";
++		gpio2: gpio at 4900e000 {
++			compatible = "ti,omap2-gpio";
++			reg = <0x4900e000 0x200>;
++			interrupts = <30>;
++			ti,hwmods = "gpio2";
++			#gpio-cells = <2>;
++			gpio-controller;
++			#interrupt-cells = <2>;
++			interrupt-controller;
 +		};
 +
- 		uart1: serial at 4806a000 {
- 			compatible = "ti,omap4-uart";
- 			reg = <0x4806a000 0x100>;
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index f840499..61cbd1c 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -208,6 +208,17 @@
- 			#interrupt-cells = <1>;
- 		};
- 
-+		gpmc: gpmc at 50000000 {
-+			compatible = "ti,omap4430-gpmc";
-+			reg = <0x50000000 0x1000>;
-+			#address-cells = <2>;
-+			#size-cells = <1>;
-+			interrupts = <0 20 0x4>;
-+			gpmc,num-cs = <8>;
-+			gpmc,num-waitpins = <4>;
-+			ti,hwmods = "gpmc";
++		gpio3: gpio at 49010000 {
++			compatible = "ti,omap2-gpio";
++			reg = <0x49010000 0x200>;
++			interrupts = <31>;
++			ti,hwmods = "gpio3";
++			#gpio-cells = <2>;
++			gpio-controller;
++			#interrupt-cells = <2>;
++			interrupt-controller;
 +		};
 +
- 		i2c1: i2c at 48070000 {
- 			compatible = "ti,omap4-i2c";
- 			reg = <0x48070000 0x100>;
++		gpio4: gpio at 49012000 {
++			compatible = "ti,omap2-gpio";
++			reg = <0x49012000 0x200>;
++			interrupts = <32>;
++			ti,hwmods = "gpio4";
++			#gpio-cells = <2>;
++			gpio-controller;
++			#interrupt-cells = <2>;
++			interrupt-controller;
++		};
++
++		gpio5: gpio at 480b6000 {
++			compatible = "ti,omap2-gpio";
++			reg = <0x480b6000 0x200>;
++			interrupts = <33>;
++			ti,hwmods = "gpio5";
++			#gpio-cells = <2>;
++			gpio-controller;
++			#interrupt-cells = <2>;
++			interrupt-controller;
++		};
++
+ 		gpmc: gpmc at 6e000000 {
+ 			compatible = "ti,omap2430-gpmc";
+ 			reg = <0x6e000000 0x1000>;
 -- 
 1.7.10.4
