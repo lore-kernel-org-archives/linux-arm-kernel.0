@@ -1,56 +1,48 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 15 Mar 2013 07:26:35 +0100
-Subject: [PATCH] isdn: hisax: netjet requires VIRT_TO_BUS
-In-Reply-To: <1363298204-8014-4-git-send-email-arnd@arndb.de>
+From: timo.t.kokkonen@iki.fi (Timo Kokkonen)
+Date: Fri, 15 Mar 2013 08:39:13 +0200
+Subject: [PATCH] [media] ir: IR_RX51 only works on OMAP2
+In-Reply-To: <1363298204-8014-7-git-send-email-arnd@arndb.de>
 References: <1363298204-8014-1-git-send-email-arnd@arndb.de>
- <1363298204-8014-4-git-send-email-arnd@arndb.de>
-Message-ID: <CAMuHMdVhjnX_hag5Y5VvDWVcjPK8tMM-qx-TQ2x=M88yTZQwYg@mail.gmail.com>
+ <1363298204-8014-7-git-send-email-arnd@arndb.de>
+Message-ID: <20130315063913.GC1638@itanic.dhcp.inet.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 14, 2013 at 10:56 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> Disabling CONFIG_VIRT_TO_BUS on ARM showed that the hisax netjet
-> driver depends on this deprecated functionality but is not
-> marked so in Kconfig.
->
-> Rather than adding ARM to the already long list of architectures
-> that this driver is broken on, this patch adds 'depends on
-> VIRT_TO_BUS' and removes the dependency on !SPARC, which is
-> also implied by that.
+On 03.14 2013 22:56:44, Arnd Bergmann wrote:
+> This driver can be enabled on OMAP1 at the moment, which breaks
+> allyesconfig for that platform. Let's mark it OMAP2PLUS-only
+> in Kconfig, since that is the only thing it builds on.
+> 
 
-IIRC, the real "arch" dependency for this driver is !BIG_ENDIAN, but
-unfortunately
-we don't have a generic Kconfig symbol for that.
-Perhaps we may want to introduce that?
-Of course we prefer to make drivers work on all endianness instead...
+Acked-by: Timo Kokkonen <timo.t.kokkonen@iki.fi>
 
-> --- a/drivers/isdn/hisax/Kconfig
-> +++ b/drivers/isdn/hisax/Kconfig
-> @@ -237,7 +237,8 @@ config HISAX_MIC
->
->  config HISAX_NETJET
->         bool "NETjet card"
-> -       depends on PCI && (BROKEN || !(SPARC || PPC || PARISC || M68K || (MIPS && !CPU_LITTLE_ENDIAN) || FRV || (XTENSA && !CPU_LITTLE_ENDIAN)))
-> +       depends on PCI && (BROKEN || !(PPC || PARISC || M68K || (MIPS && !CPU_LITTLE_ENDIAN) || FRV || (XTENSA && !CPU_LITTLE_ENDIAN)))
-> +       depends on VIRT_TO_BUS
->         help
->           This enables HiSax support for the NetJet from Traverse
->           Technologies.
-> @@ -248,7 +249,8 @@ config HISAX_NETJET
->
->  config HISAX_NETJET_U
->         bool "NETspider U card"
-> -       depends on PCI && (BROKEN || !(SPARC || PPC || PARISC || M68K || (MIPS && !CPU_LITTLE_ENDIAN) || FRV || (XTENSA && !CPU_LITTLE_ENDIAN)))
-> +       depends on PCI && (BROKEN || !(PPC || PARISC || M68K || (MIPS && !CPU_LITTLE_ENDIAN) || FRV || (XTENSA && !CPU_LITTLE_ENDIAN)))
-> +       depends on VIRT_TO_BUS
+Thanks!
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
+> Cc: Timo Kokkonen <timo.t.kokkonen@iki.fi>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Cc: linux-media at vger.kernel.org
+> ---
+> Mauro, please apply for 3.9
+> 
+>  drivers/media/rc/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/media/rc/Kconfig b/drivers/media/rc/Kconfig
+> index 19f3563..5a79c33 100644
+> --- a/drivers/media/rc/Kconfig
+> +++ b/drivers/media/rc/Kconfig
+> @@ -291,7 +291,7 @@ config IR_TTUSBIR
+>  
+>  config IR_RX51
+>  	tristate "Nokia N900 IR transmitter diode"
+> -	depends on OMAP_DM_TIMER && LIRC && !ARCH_MULTIPLATFORM
+> +	depends on OMAP_DM_TIMER && ARCH_OMAP2PLUS && LIRC && !ARCH_MULTIPLATFORM
+>  	---help---
+>  	   Say Y or M here if you want to enable support for the IR
+>  	   transmitter diode built in the Nokia N900 (RX51) device.
+> -- 
+> 1.8.1.2
+> 
