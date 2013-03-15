@@ -1,218 +1,106 @@
-From: prabhakar.csengg@gmail.com (Prabhakar lad)
-Date: Fri, 15 Mar 2013 20:41:43 +0530
-Subject: [PATCH v6 2/2] ARM: davinci: dm365 EVM: add support for VPBE display
-In-Reply-To: <1363360303-15521-1-git-send-email-prabhakar.csengg@gmail.com>
-References: <1363360303-15521-1-git-send-email-prabhakar.csengg@gmail.com>
-Message-ID: <1363360303-15521-3-git-send-email-prabhakar.csengg@gmail.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Fri, 15 Mar 2013 10:20:58 -0500
+Subject: [PATCH V3 00/18] ARM: OMAP2+: GPMC clean-up and DT update
+Message-ID: <1363360876-13617-1-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+While adding device-tree support for NOR memories, it became apparent
+that there is no common way for configuring various GPMC settings for
+devices that interface to the GPMC. These settings include bus-width,
+synchronous/asynchronous mode, burst settings, wait monitoring etc.
+Therefore, to simplify the GPMC code and add device-tree support for
+NOR, it was first necessary to consolidate how these settings are
+programmed.
 
-add support for V4L2 video display to DM365 EVM.
-Support for SD and ED modes is provided, along with Composite
-and Component outputs.
+Series based upon Mark Jackson's patch [1] and Ezequiel Garcia GPMC
+clean-up series [2]. Entire series available here [3].
 
-Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
----
- arch/arm/mach-davinci/board-dm365-evm.c |  164 ++++++++++++++++++++++++++++++-
- 1 files changed, 163 insertions(+), 1 deletions(-)
+V3 changes:
+- Rebased on RMK's IS_ERR_VALUE() patch and removed usage of
+  IS_ERR_VALUE() from series.
+- Fixed BUG in NAND code introduced in V2 by making gpmc_settings
+  structure a local variable (I forgot to initialise structure to zero).
+- Added fix from Javier to correct return value from gpmc_probe_nor().
 
-diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
-index cf77c46..0518ce5 100644
---- a/arch/arm/mach-davinci/board-dm365-evm.c
-+++ b/arch/arm/mach-davinci/board-dm365-evm.c
-@@ -27,6 +27,7 @@
- #include <linux/input.h>
- #include <linux/spi/spi.h>
- #include <linux/spi/eeprom.h>
-+#include <linux/v4l2-dv-timings.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -39,6 +40,7 @@
- #include <linux/platform_data/mtd-davinci.h>
- #include <linux/platform_data/keyscan-davinci.h>
- 
-+#include <media/ths7303.h>
- #include <media/tvp514x.h>
- 
- #include "davinci.h"
-@@ -374,6 +376,166 @@ static struct vpfe_config vpfe_cfg = {
- 	.ccdc = "ISIF",
- };
- 
-+/* venc standards timings */
-+static struct vpbe_enc_mode_info dm365evm_enc_std_timing[] = {
-+	{
-+		.name		= "ntsc",
-+		.timings_type	= VPBE_ENC_STD,
-+		.std_id		= V4L2_STD_525_60,
-+		.interlaced	= 1,
-+		.xres		= 720,
-+		.yres		= 480,
-+		.aspect		= {11, 10},
-+		.fps		= {30000, 1001},
-+		.left_margin	= 0x79,
-+		.upper_margin	= 0x10,
-+	},
-+	{
-+		.name		= "pal",
-+		.timings_type	= VPBE_ENC_STD,
-+		.std_id		= V4L2_STD_625_50,
-+		.interlaced	= 1,
-+		.xres		= 720,
-+		.yres		= 576,
-+		.aspect		= {54, 59},
-+		.fps		= {25, 1},
-+		.left_margin	= 0x7E,
-+		.upper_margin	= 0x16,
-+	},
-+};
-+
-+/* venc dv timings */
-+static struct vpbe_enc_mode_info dm365evm_enc_preset_timing[] = {
-+	{
-+		.name		= "480p59_94",
-+		.timings_type	= VPBE_ENC_DV_TIMINGS,
-+		.dv_timings	= V4L2_DV_BT_CEA_720X480P59_94,
-+		.interlaced	= 0,
-+		.xres		= 720,
-+		.yres		= 480,
-+		.aspect		= {1, 1},
-+		.fps		= {5994, 100},
-+		.left_margin	= 0x8F,
-+		.upper_margin	= 0x2D,
-+	},
-+	{
-+		.name		= "576p50",
-+		.timings_type	= VPBE_ENC_DV_TIMINGS,
-+		.dv_timings	= V4L2_DV_BT_CEA_720X576P50,
-+		.interlaced	= 0,
-+		.xres		= 720,
-+		.yres		= 576,
-+		.aspect		= {1, 1},
-+		.fps		= {50, 1},
-+		.left_margin	= 0x8C,
-+		.upper_margin   = 0x36,
-+	},
-+	{
-+		.name		= "720p60",
-+		.timings_type	= VPBE_ENC_DV_TIMINGS,
-+		.dv_timings	= V4L2_DV_BT_CEA_1280X720P60,
-+		.interlaced	= 0,
-+		.xres		= 1280,
-+		.yres		= 720,
-+		.aspect		= {1, 1},
-+		.fps		= {60, 1},
-+		.left_margin	= 0x117,
-+		.right_margin	= 70,
-+		.upper_margin	= 38,
-+		.lower_margin	= 3,
-+		.hsync_len	= 80,
-+		.vsync_len	= 5,
-+	},
-+	{
-+		.name		= "1080i60",
-+		.timings_type	= VPBE_ENC_DV_TIMINGS,
-+		.dv_timings	= V4L2_DV_BT_CEA_1920X1080I60,
-+		.interlaced	= 1,
-+		.xres		= 1920,
-+		.yres		= 1080,
-+		.aspect		= {1, 1},
-+		.fps		= {30, 1},
-+		.left_margin	= 0xc9,
-+		.right_margin	= 80,
-+		.upper_margin	= 30,
-+		.lower_margin	= 3,
-+		.hsync_len	= 88,
-+		.vsync_len	= 5,
-+	},
-+};
-+
-+#define VENC_STD_ALL	(V4L2_STD_NTSC | V4L2_STD_PAL)
-+
-+/*
-+ * The outputs available from VPBE + ecnoders. Keep the
-+ * the order same as that of encoders. First those from venc followed by that
-+ * from encoders. Index in the output refers to index on a particular
-+ * encoder.Driver uses this index to pass it to encoder when it supports more
-+ * than one output. Application uses index of the array to set an output.
-+ */
-+static struct vpbe_output dm365evm_vpbe_outputs[] = {
-+	{
-+		.output		= {
-+			.index		= 0,
-+			.name		= "Composite",
-+			.type		= V4L2_OUTPUT_TYPE_ANALOG,
-+			.std		= VENC_STD_ALL,
-+			.capabilities	= V4L2_OUT_CAP_STD,
-+		},
-+		.subdev_name	= DM365_VPBE_VENC_SUBDEV_NAME,
-+		.default_mode	= "ntsc",
-+		.num_modes	= ARRAY_SIZE(dm365evm_enc_std_timing),
-+		.modes		= dm365evm_enc_std_timing,
-+		.if_params	= V4L2_MBUS_FMT_FIXED,
-+	},
-+	{
-+		.output		= {
-+			.index		= 1,
-+			.name		= "Component",
-+			.type		= V4L2_OUTPUT_TYPE_ANALOG,
-+			.capabilities	= V4L2_OUT_CAP_DV_TIMINGS,
-+		},
-+		.subdev_name	= DM365_VPBE_VENC_SUBDEV_NAME,
-+		.default_mode	= "480p59_94",
-+		.num_modes	= ARRAY_SIZE(dm365evm_enc_preset_timing),
-+		.modes		= dm365evm_enc_preset_timing,
-+		.if_params	= V4L2_MBUS_FMT_FIXED,
-+	},
-+};
-+
-+/*
-+ * Amplifiers on the board
-+ */
-+struct ths7303_platform_data ths7303_pdata = {
-+	.ch_1 = 3,
-+	.ch_2 = 3,
-+	.ch_3 = 3,
-+	.init_enable = 1,
-+};
-+
-+static struct amp_config_info vpbe_amp = {
-+	.module_name	= "ths7303",
-+	.is_i2c		= 1,
-+	.board_info	= {
-+		I2C_BOARD_INFO("ths7303", 0x2c),
-+		.platform_data = &ths7303_pdata,
-+	}
-+};
-+
-+static struct vpbe_config dm365evm_display_cfg = {
-+	.module_name	= "dm365-vpbe-display",
-+	.i2c_adapter_id	= 1,
-+	.amp		= &vpbe_amp,
-+	.osd		= {
-+		.module_name	= DM365_VPBE_OSD_SUBDEV_NAME,
-+	},
-+	.venc		= {
-+		.module_name	= DM365_VPBE_VENC_SUBDEV_NAME,
-+	},
-+	.num_outputs	= ARRAY_SIZE(dm365evm_vpbe_outputs),
-+	.outputs	= dm365evm_vpbe_outputs,
-+};
-+
- static void __init evm_init_i2c(void)
- {
- 	davinci_init_i2c(&i2c_pdata);
-@@ -595,7 +757,7 @@ static __init void dm365_evm_init(void)
- 
- 	davinci_setup_mmc(0, &dm365evm_mmc_config);
- 
--	dm365_init_video(&vpfe_cfg, NULL);
-+	dm365_init_video(&vpfe_cfg, &dm365evm_display_cfg);
- 
- 	/* maybe setup mmc1/etc ... _after_ mmc0 */
- 	evm_init_cpld();
+V2 changes:
+- Made gpmc_settings structure local in gpmc_nand_init().
+- Use resource_size() API in probe_nor().
+- Add kernel-doc for gpmc_cs_program_settings() function.
+- Use of_platform_device_create() to register NOR devices in probe_nor().
+- Add support for GPMC address-address-data multiplexing which required
+  changing GPMC DT property "gpmc,mux-add-data" to store a 32-bit value
+  and changing mux_add_data member of gpmc_settings to be a 32-bit type
+  instead of bool.
+- Add detection for incorrect GPMC chip-select base addresses.
+- Cleaned-up code in gpmc_mem_init() and changed gpmc_mem_init() so that
+  it would not return an error when the GPMC driver is being probed.
+
+V1 changes:
+- Clean-up/simplification of ONENAND initialisation code.
+- Add a new GPMC structure to unify storage of various GPMC settings
+  (that are non-timing related) for client devices and add a new
+  function to program these settings in a common way.
+- Migrate initialisation code for existing flash, usb and networking
+  devices to use the new structure and function for GPMC settings.
+- Add device-tree support for NOR flash memories.
+- Add additional GPMC timing parameters to GPMC device-tree binding.
+- Update GPMC NAND and ONENAND device-tree support to retrieve GPMC
+  settings from device-tree.
+
+Testing includes:
+- Boot testing on OMAP2420 H4, OMAP3430 SDP and OMAP4430 SDP with
+  and without device-tree present.
+- OMAP2420 H4 board has NOR flash and OMAP3430 SDP has NOR, NAND
+  and ONENAND flash. So verified that flash is detected on boot
+  as expected. Note additional patches [4] are required for OMAP2420
+  H4 and OMAP3430 SDP dts files in order to enable flash memory
+  support.
+- All of the above boards use GPMC for interfacing to a networking
+  chip and so verified that networking is working wit this series.
+  However, please note that networking is not currently supported
+  on these boards when booting with DT and so networking is only
+  tested without DT.
+
+[1] http://permalink.gmane.org/gmane.linux.ports.arm.omap/94765
+[2] http://comments.gmane.org/gmane.linux.ports.arm.omap/93784
+[3] https://github.com/jonhunter/linux/tree/omap-gpmc-for-v3.10
+[4] https://github.com/jonhunter/linux/tree/omap-dt-for-v3.10
+
+Javier Martinez Canillas (1):
+  ARM: OMAP2+: return -ENODEV if GPMC child device creation fails
+
+Jon Hunter (17):
+  ARM: OMAP2+: Simplify code configuring ONENAND devices
+  ARM: OMAP2+: Add variable to store number of GPMC waitpins
+  ARM: OMAP2+: Add structure for storing GPMC settings
+  ARM: OMAP2+: Add function for configuring GPMC settings
+  ARM: OMAP2+: Convert ONENAND to use gpmc_cs_program_settings()
+  ARM: OMAP2+: Convert NAND to use gpmc_cs_program_settings()
+  ARM: OMAP2+: Convert SMC91x to use gpmc_cs_program_settings()
+  ARM: OMAP2+: Convert TUSB to use gpmc_cs_program_settings()
+  ARM: OMAP2+: Don't configure of chip-select options in
+    gpmc_cs_configure()
+  ARM: OMAP2+: Add function to read GPMC settings from device-tree
+  ARM: OMAP2+: Add device-tree support for NOR flash
+  ARM: OMAP2+: Add additional GPMC timing parameters
+  ARM: OMAP2+: Convert NAND to retrieve GPMC settings from DT
+  ARM: OMAP2+: Convert ONENAND to retrieve GPMC settings from DT
+  ARM: OMAP2+: Detect incorrectly aligned GPMC base address
+  ARM: OMAP2+: Remove unnecesssary GPMC definitions and variable
+  ARM: OMAP2+: Allow GPMC probe to complete even if CS mapping fails
+
+ Documentation/devicetree/bindings/bus/ti-gpmc.txt  |   48 +-
+ Documentation/devicetree/bindings/mtd/gpmc-nor.txt |   98 ++++
+ .../devicetree/bindings/mtd/gpmc-onenand.txt       |    3 +
+ arch/arm/mach-omap2/gpmc-nand.c                    |   39 +-
+ arch/arm/mach-omap2/gpmc-onenand.c                 |  110 ++--
+ arch/arm/mach-omap2/gpmc-smc91x.c                  |   30 +-
+ arch/arm/mach-omap2/gpmc.c                         |  524 +++++++++++++++-----
+ arch/arm/mach-omap2/gpmc.h                         |   37 +-
+ arch/arm/mach-omap2/usb-tusb6010.c                 |   62 ++-
+ 9 files changed, 691 insertions(+), 260 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mtd/gpmc-nor.txt
+
 -- 
-1.7.4.1
+1.7.10.4
