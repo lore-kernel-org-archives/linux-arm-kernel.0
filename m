@@ -1,33 +1,34 @@
 From: pawel.moll@arm.com (Pawel Moll)
-Date: Fri, 15 Mar 2013 16:38:59 +0000
-Subject: [PATCH 1/2] ARM: vexpress: Enable regulator framework when MMCI is in
- use
+Date: Fri, 15 Mar 2013 16:39:00 +0000
+Subject: [PATCH 2/2] ARM: vexpress: Remove A9 compatible value for V2P-CA5s
+ PMU node
 In-Reply-To: <1363365540-23001-1-git-send-email-pawel.moll@arm.com>
 References: <1363365540-23001-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <1363365540-23001-2-git-send-email-pawel.moll@arm.com>
+Message-ID: <1363365540-23001-3-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the MMCI driver obtains some of the platform data from
-a regulator (described by the device tree), the framework must
-be present - otherwise device's initialisation will fail.
+The Cortex-A5 PMU is not really compatible with Cortex-A9 one,
+so remove the respective compatible value from the PMU node in
+the V2P_CA5s' Device Tree.
 
 Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 ---
- arch/arm/mach-vexpress/Kconfig |    1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/vexpress-v2p-ca5s.dts |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
-index 52d315b..46ab88d 100644
---- a/arch/arm/mach-vexpress/Kconfig
-+++ b/arch/arm/mach-vexpress/Kconfig
-@@ -17,6 +17,7 @@ config ARCH_VEXPRESS
- 	select NO_IOPORT
- 	select PLAT_VERSATILE
- 	select PLAT_VERSATILE_CLCD
-+	select REGULATOR if MMC_ARMMMCI
- 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
- 	select VEXPRESS_CONFIG
- 	help
+diff --git a/arch/arm/boot/dts/vexpress-v2p-ca5s.dts b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
+index 6328cbc..c544a55 100644
+--- a/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
++++ b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
+@@ -111,7 +111,7 @@
+ 	};
+ 
+ 	pmu {
+-		compatible = "arm,cortex-a5-pmu", "arm,cortex-a9-pmu";
++		compatible = "arm,cortex-a5-pmu";
+ 		interrupts = <0 68 4>,
+ 			     <0 69 4>;
+ 	};
 -- 
 1.7.10.4
