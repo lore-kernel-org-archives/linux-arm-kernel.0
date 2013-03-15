@@ -1,31 +1,33 @@
 From: florian@openwrt.org (Florian Fainelli)
-Date: Fri, 15 Mar 2013 13:49:34 +0100
-Subject: [PATCH 3/6] ARM: remove fa526 CPU support
-In-Reply-To: <1363299178-8241-4-git-send-email-arnd@arndb.de>
-References: <1363299178-8241-1-git-send-email-arnd@arndb.de>
- <1363299178-8241-4-git-send-email-arnd@arndb.de>
-Message-ID: <514318DE.8060601@openwrt.org>
+Date: Fri, 15 Mar 2013 13:51:01 +0100
+Subject: [PATCH 0/4] mv643xx_eth: use mvmdio MDIO bus driver
+In-Reply-To: <20130315.085321.1047694772636447477.davem@davemloft.net>
+References: <1359473048-26551-1-git-send-email-florian@openwrt.org>
+ <1363284515-9865-1-git-send-email-florian@openwrt.org>
+ <20130315.085321.1047694772636447477.davem@davemloft.net>
+Message-ID: <51431935.6060407@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 03/14/13 23:12, Arnd Bergmann a ?crit :
-> With the Cortina Gemini platform gone, nothing in ARM uses
-> the Faraday 526 CPU core support any more. There is at least
-> one other platform using this (Moschip MCS814x), but the
-> efforts to get that merged into mainline appear to have
-> stalled.
-
-I was actually wrong for MCS8140, they used a genuine ARM926EJS core, 
-newer version like MCS8142 and MCS8144 use a FA626 core that the 
-mainline kernel does not support anyway.
-
-Someone recently announced support for a Moxart SoC which seems to use 
-the FA526 core however.
-
+Le 03/15/13 13:53, David Miller a ?crit :
+> From: Florian Fainelli <florian@openwrt.org>
+> Date: Thu, 14 Mar 2013 19:08:31 +0100
 >
-> If someone still needs this code, please speak up now,
-> otherwise we will remove it now. Of course there is
-> always the option to revert this patch if we need it
-> again later.
+>> This patch converts the mv643xx_eth driver to use the mvmdio MDIO bus driver
+>> instead of rolling its own implementation. As a result, all users of this
+>> mv643xx_eth driver are converted to register an "orion-mdio" platform_device.
+>> The mvmdio driver is also updated to support an interrupt line which reports
+>> SMI error/completion, and to allow traditionnal platform device registration
+>> instead of just device tree.
+>>
+>> David, I think it makes sense for you to merge all of this, since we do
+>> not want the architecture files to be desynchronized from the mv643xx_eth to
+>> avoid runtime breakage. The potential for merge conflicts should be very small.
+>
+> All applied to net-next, thanks.
+>
+
+Oh woah that was fast, maybe too fast, I will submit a follow-up patch 
+for patch 4 to address the issues I mentionned earlier.
 --
 Florian
