@@ -1,33 +1,38 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 15 Mar 2013 21:50:01 +0100
-Subject: [PATCH 2/5] ARM: sunxi: Add wemac to sun4i dtsi
+Date: Fri, 15 Mar 2013 21:50:02 +0100
+Subject: [PATCH 3/5] ARM: sun4i: Add muxing options for the ethernet controller
 In-Reply-To: <1363380605-6577-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1363380605-6577-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1363380605-6577-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1363380605-6577-4-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun4i-a10.dtsi |    7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/boot/dts/sun4i-a10.dtsi |   11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
 diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index 03d2b53..f3c2158 100644
+index f3c2158..fc4ce45 100644
 --- a/arch/arm/boot/dts/sun4i-a10.dtsi
 +++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -47,5 +47,12 @@
+@@ -46,6 +46,17 @@
+ 				allwinner,drive = <0>;
  				allwinner,pull = <0>;
  			};
- 		};
 +
-+		wemac: ethernet at 01c0b000 {
-+			compatible = "davicom,wemac";
-+			reg = <0x01c0b000 0x1000>;
-+			interrupts = <55>;
-+			status = "disabled";
-+		};
- 	};
- };
++			wemac_pins_a: wemac0 at 0 {
++				allwinner,pins = "PA0", "PA1", "PA2",
++						"PA3", "PA4", "PA5", "PA6",
++						"PA7", "PA8", "PA9", "PA10",
++						"PA11", "PA12", "PA13", "PA14",
++						"PA15", "PA16";
++				allwinner,function = "wemac";
++				allwinner,drive = <0>;
++				allwinner,pull = <0>;
++			};
+ 		};
+ 
+ 		wemac: ethernet at 01c0b000 {
 -- 
 1.7.10.4
