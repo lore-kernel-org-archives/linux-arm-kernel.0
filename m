@@ -1,30 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 Mar 2013 10:35:09 +0000
-Subject: [PATCH 0/6] ARM platform spring cleaning
-In-Reply-To: <20130315060824.GA9782@lunn.ch>
-References: <20130315060824.GA9782@lunn.ch>
-Message-ID: <201303151035.09964.arnd@arndb.de>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Fri, 15 Mar 2013 18:36:14 +0800
+Subject: [Suggestion] Latest randconfig build errors for Head.S
+In-Reply-To: <CAAQYJAvXLV38shKncAKKqgQ9G0SnXjh+=aJHBdhd29yzVtL80A@mail.gmail.com>
+References: <51415428.1070401@asianux.com>
+ <20130314234323.GD4977@n2100.arm.linux.org.uk> <514270D2.9010205@asianux.com>
+ <CAAQYJAvXLV38shKncAKKqgQ9G0SnXjh+=aJHBdhd29yzVtL80A@mail.gmail.com>
+Message-ID: <5142F99E.6030607@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 March 2013, Andrew Lunn wrote:
-> I see you plan to remove fa526 support.
+? 2013?03?15? 17:31, Andrea Adami ??:
+> AFAIK Arnd is aware and waiting for feedback about his patch:
 > 
-> Did you see:
+> ARM: compressed/head.S: work around new binutils warning   Arnd Bergmann
 > 
-> https://lkml.org/lkml/2013/3/13/288
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/144846.html
 
-No I had missed that.
+  excuse me, I am not familiar with arm assemble code, so can not give more information
 
-> a couple of days ago. Its quite a way from being ready for mainline,
-> but assuming Jonas keeps working on this port, he will need fa526
-> support.
+  but at least for me, it seems your patch is more precious, and also welcomed by compiler.
+  and I don't think your patch make the code "a more complex":
+    the reason is:
+    "keeping code simple and clear" is for readers and debuggers, not for writers.
+    I prefer to write more code to let readers and debuggers easy understand.
+      (if it has minor negative effect with performance)
 
-Ok, I'll drop the fa526 removal patch then. Thanks for pointing me
-to that submission.
+  thanks.
 
-There was some talk about merging some other fa526 based platform
-a while ago, but the people working on that seem to have lost
-interest for now, so I assumed that gemini would be the last one.
+-- 
+Chen Gang
 
-	Arnd
+Asianux Corporation
