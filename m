@@ -1,40 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 Mar 2013 10:15:00 +0000
-Subject: [PATCH] isdn: hisax: netjet requires VIRT_TO_BUS
-In-Reply-To: <CAMuHMdVhjnX_hag5Y5VvDWVcjPK8tMM-qx-TQ2x=M88yTZQwYg@mail.gmail.com>
-References: <1363298204-8014-1-git-send-email-arnd@arndb.de>
- <1363298204-8014-4-git-send-email-arnd@arndb.de>
- <CAMuHMdVhjnX_hag5Y5VvDWVcjPK8tMM-qx-TQ2x=M88yTZQwYg@mail.gmail.com>
-Message-ID: <201303151015.00746.arnd@arndb.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 15 Mar 2013 11:16:17 +0100
+Subject: [PATCH 0/5] at91: atmel_lcdfb: regression fixes and cpu_is removal
+In-Reply-To: <201303142303.42283.arnd@arndb.de>
+References: <cover.1360340791.git.nicolas.ferre@atmel.com>
+ <5139B169.7050807@atmel.com> <51405126.3090009@atmel.com>
+ <201303142303.42283.arnd@arndb.de>
+Message-ID: <5142F4F1.60006@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 March 2013, Geert Uytterhoeven wrote:
-> On Thu, Mar 14, 2013 at 10:56 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > Disabling CONFIG_VIRT_TO_BUS on ARM showed that the hisax netjet
-> > driver depends on this deprecated functionality but is not
-> > marked so in Kconfig.
-> >
-> > Rather than adding ARM to the already long list of architectures
-> > that this driver is broken on, this patch adds 'depends on
-> > VIRT_TO_BUS' and removes the dependency on !SPARC, which is
-> > also implied by that.
+On 03/15/2013 12:03 AM, Arnd Bergmann :
+> On Wednesday 13 March 2013, Nicolas Ferre wrote:
+>> In case we end-up with an agreement on the path those fixes should
+>> follow, here is the location of my updated material rebased on top of 3.9-rc2:
+>>
+>> The following changes since commit f6161aa153581da4a3867a2d1a7caf4be19b6ec9:
+>>
+>>   Linux 3.9-rc2 (2013-03-10 16:54:19 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>   git://github.com/at91linux/linux-at91.git at91-3.9-fixesLCD
+>>
+>> for you to fetch changes up to bbd44f6bd9d1aa735b180b29b5719d63a8e87b55:
+>>
+>>   ARM: at91/avr32/atmel_lcdfb: add platform device-id table (2013-03-13 11:05:12 +0100)
+>>
+>> ----------------------------------------------------------------
+>> Johan Hovold (5):
+>>       atmel_lcdfb: fix 16-bpp modes on older SOCs
+>>       ARM: at91: fix LCD-wiring mode
+>>       ARM: at91/avr32/atmel_lcdfb: add bus-clock entry
+>>       atmel_lcdfb: move lcdcon2 register access to compute_hozval
+>>       ARM: at91/avr32/atmel_lcdfb: add platform device-id table
+>>
 > 
-> IIRC, the real "arch" dependency for this driver is !BIG_ENDIAN, but
-> unfortunately
-> we don't have a generic Kconfig symbol for that.
-> Perhaps we may want to introduce that?
-> Of course we prefer to make drivers work on all endianness instead...
+> I have merged the first two patches into the fixes branch now, from up to commit
+> 67cf9c0a. Please resubmit the remaining ones on top of this commit for 3.10, either
+> through arm-soc or through the framebuffer tree.
 
-CONFIG_VIRT_TO_BUS is certainly also a dependency, since it fails
-to build without that. I think we can address the two problems separately.
+Thanks a lot.
+I have just sent the pull-request for remaining material. Tell me if it
+is what you've expected.
 
-David Howells brought up the topic of endian checks recently, noting
-that the way we define __BIG_ENDIAN and __LITTLE_ENDIAN in the kernel
-is incompatible to how do it in user space, and not much better either.
-
-A few architectures that are bi-endian (arc, arm, c6x, mips, sh) already
-have CONFIG_CPU_IS_LITTLE_ENDIAN and CONFIG_CPU_IS_BIG_ENDIAN. I guess
-it would be a good idea to provide these on all architectures.
-
-	Arnd
+Best regards,
+-- 
+Nicolas Ferre
