@@ -1,77 +1,50 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 15 Mar 2013 13:51:18 -0600
-Subject: [RFC v2 1/1] clk: Add notifier support in
- clk_prepare/clk_unprepare
-In-Reply-To: <20130315174558.GS4977@n2100.arm.linux.org.uk>
-References: <1363253464-3200-1-git-send-email-bilhuang@nvidia.com>
- <20130315174558.GS4977@n2100.arm.linux.org.uk>
-Message-ID: <51437BB6.3040607@wwwdotorg.org>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 15 Mar 2013 20:55:56 +0100 (CET)
+Subject: [PATCH] genirq: allow an alternative setup for the mask cache
+In-Reply-To: <51434BC2.70105@keymile.com>
+References: <1363277430-21325-1-git-send-email-holger.brunck@keymile.com>
+ <20130314174559.GO21620@kw.sim.vm.gnt> <51434BC2.70105@keymile.com>
+Message-ID: <alpine.LFD.2.02.1303152046180.22263@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/15/2013 11:45 AM, Russell King - ARM Linux wrote:
-> On Thu, Mar 14, 2013 at 02:31:04AM -0700, Bill Huang wrote:
->> Add the below two notifier events so drivers which are interested in
->> knowing the clock status can act accordingly. This is extremely useful
->> in some of the DVFS (Dynamic Voltage Frequency Scaling) design.
->>
->> CLK_PREPARED
->> CLK_UNPREPARED
->>
->> Signed-off-by: Bill Huang <bilhuang@nvidia.com>
->> ---
->>  drivers/clk/clk.c   |    3 +++
->>  include/linux/clk.h |    2 ++
->>  2 files changed, 5 insertions(+)
->>
->> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
->> index ed87b24..3292cec 100644
->> --- a/drivers/clk/clk.c
->> +++ b/drivers/clk/clk.c
->> @@ -550,6 +550,7 @@ void clk_unprepare(struct clk *clk)
->>  {
->>  	mutex_lock(&prepare_lock);
->>  	__clk_unprepare(clk);
->> +	__clk_notify(clk, CLK_UNPREPARED, clk->rate, clk->rate);
->>  	mutex_unlock(&prepare_lock);
->>  }
->>  EXPORT_SYMBOL_GPL(clk_unprepare);
->> @@ -598,6 +599,8 @@ int clk_prepare(struct clk *clk)
->>  
->>  	mutex_lock(&prepare_lock);
->>  	ret = __clk_prepare(clk);
->> +	if (!ret)
->> +		__clk_notify(clk, CLK_PREPARED, clk->rate, clk->rate);
+On Fri, 15 Mar 2013, Gerlando Falauto wrote:
+
+> Hi Simon,
 > 
-> So, on prepare, we notify after we've prepared the clock.  On unprepare,
-> we notify after the clock has been shut down.  Are you sure that's the
-> correct ordering?  Would it not be better to view it in a stack-like
-> fashion, iow:
+> On 03/14/2013 06:45 PM, Simon Guinot wrote:
+> > On Thu, Mar 14, 2013 at 05:10:30PM +0100, Holger Brunck wrote:
+> > > @@ -243,9 +243,12 @@ void irq_setup_generic_chip(struct irq_chip_generic
+> > > *gc, u32 msk,
+> > >   	list_add_tail(&gc->list, &gc_list);
+> > >   	raw_spin_unlock(&gc_lock);
+> > > 
+> > > +	/* Setup pointer to mask_cache */
+> > > +	gc->pmask_cache = &gc->mask_cache;
+> > 
+> > You need a flag here to choose between gc->mask_cache and
+> > ct->mask_cache.
+> 
+> I'm sorry, I don't understand...
+> Shouldn't pmask_cache be a pointer within ct, so that the pointers for all
+> instances could either be the same (in case of a single register) or all
+> different (in case of multiple registers)?
 
-> get
-> 	prepare
-> 		notify-prepare
-> 			enable
-> 			disable
-> 		notify-unprepare
-> 	unprepare
-> put
+You are right. gc->pmask_cache wont solve the issue.
 
-Yes, these should be stacked/nested better for consistency.
+We need a ct->pmask_cache, so the various instances of gc->ct[] can
+have their own selector, which default to gc-mask_cache if not
+requested to be separate by a flag. In that case we need to initialize
+the ct->mask_cache at setup time for each ct. No modifications to
+setup_alt_chip() required then.
 
-But for DVFS, the voltage needs to be raised before the prepare body is
-run, so that if clk_prepare actually enables the clock, the voltage is
-already at the safe level required by that clock. Similarly, for
-unprepare, you can only lower the voltage after having turned off the
-clock, which is guaranteed after the unprepare body. So, I think you
-want to move the notifier for prepare in the code above (and rename it
-to pre/before_prepare?), rather than the notifier for unprepare.
+> I already have a patch which seems to work, but I'm afraid I've come to YAM
+> (Yet Another Misunderstanding (R) ) in regards to Thomas' suggestion.
 
-In order to cover more cases, you might have both
-{pre,post}_{un,}prepare notifiers, although I'm not sure when you'd use
-the other two options.
+No, that was my brain going backwards :)
 
->> diff --git a/include/linux/clk.h b/include/linux/clk.h
+Care to send your patch ?
 
->> +#define CLK_PREPARED			BIT(3)
->> +#define CLK_UNPREPARED			BIT(4)
+Thanks,
+
+	tglx
