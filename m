@@ -1,34 +1,66 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 15 Mar 2013 12:42:57 -0600
-Subject: [PATCH V3 5/5] ARM: tegra: add spi nodes to Tegra114 DT
-In-Reply-To: <1363204194-19487-6-git-send-email-ldewangan@nvidia.com>
-References: <1363204194-19487-1-git-send-email-ldewangan@nvidia.com>
- <1363204194-19487-6-git-send-email-ldewangan@nvidia.com>
-Message-ID: <51436BB1.8060005@wwwdotorg.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 15 Mar 2013 14:44:44 -0400 (EDT)
+Subject: [RFC 1/1] clk: Add notifier support in
+ clk_prepare_enable/clk_disable_unprepare
+In-Reply-To: <20130315165744.GK4977@n2100.arm.linux.org.uk>
+References: <1363091861-21534-1-git-send-email-bilhuang@nvidia.com>
+ <20130312134032.GU4977@n2100.arm.linux.org.uk>
+ <1363139273.21694.11.camel@bilhuang-vm1>
+ <20130315165744.GK4977@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.03.1303151435470.3069@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/13/2013 01:49 PM, Laxman Dewangan wrote:
-> NVIDIA's Tegra114 has 6 spi controllers. These controllers are
-> redesign on T114 with different register interface.
+On Fri, 15 Mar 2013, Russell King - ARM Linux wrote:
 
-> diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
+> On Tue, Mar 12, 2013 at 06:47:53PM -0700, Bill Huang wrote:
+> > On Tue, 2013-03-12 at 21:40 +0800, Russell King - ARM Linux wrote:
+> > > On Tue, Mar 12, 2013 at 05:37:41AM -0700, Bill Huang wrote:
+> > > > Add the below four notifier events so drivers which are interested in
+> > > > knowing the clock status can act accordingly. This is extremely useful
+> > > > in some of the DVFS (Dynamic Voltage Frequency Scaling) design.
+> > > > 
+> > > > PRE_CLK_ENABLE
+> > > > POST_CLK_ENABLE
+> > > > PRE_CLK_DISABLE
+> > > > POST_CLK_DISABLE
+> > > > 
+> > > > Signed-off-by: Bill Huang <bilhuang@nvidia.com>
+> > > 
+> > > NAK.  *Sigh* NO, this is the wrong level to be doing stuff like this.
+> > > 
+> > > The *ONLY* thing that clk_prepare_enable() and clk_prepare_disable() should
+> > > *EVER* be doing is calling clk_prepare(), clk_enable(), clk_disable() and
+> > > clk_unprepare().  Those two functions are *merely* helpers for drivers
+> > > who don't wish to make the individual calls.
+> > > 
+> > > Drivers are still completely free to call the individual functions, at
+> > > which point your proposal breaks horribly - and they _do_ call the
+> > > individual functions.
+> >
+> > I'm proposing to give device driver a choice when it knows that some
+> > driver might be interested in knowing its clock's enabled/disabled state
+> > change at runtime, this is very important for centralized DVFS core
+> > driver. It is not meant to be covering all cases especially for drivers
+> > which is not part of the DVFS, so we don't care if it is calling
+> > clk_enable/disable directly or not.
+> 
+> But you're not giving drivers a choice.  You're giving them an ultimatum.
+> Either they use clk_prepare_enable() which must only be called from non-
+> atomic contexts and have the notifiers, or if they need to use the
+> individual functions (which is what they _should_ be doing but people
+> are too lazy to properly convert stuff) they don't get the option of
+> the notifiers at all.
+> 
+> This sucks totally, design wise.
+> 
+> The whole point of clk_prepare_enable() is that it is a helper function
+> to _only_ do the clk_prepare() call followed by a clk_enable() call and
+> _nothing_ _else_ _what_ _so_ _ever_.
 
-> +		reg = <0x7000d400 0x200>;
-...
-> +		reg = <0x7000d600 0x200>;
-...
-> +		reg = <0x7000d480 0x200>;
-...
-> +		reg = <0x7000da00 0x200>;
-...
-> +		reg = <0x7000dc00 0x200>;
-...
-> +		reg = <0x7000de00 0x200>;
+If people are too lazy and start abusing clk_prepare_enable() then this 
+helper function becomes counter-productive and should simply be removed.
+Same issue as with IS_ERR_OR_NULL().
 
-I assume that third entry should be 0x7000d800 not 0x7000d480; the TRM
-certainly thinks so. I fixed this up when I applied this patch.
 
-I've applied the series to Tegra's for-3.10/dt branch. I made a few
-node/property ordering changes for consistency, and some capitalization
-fixes in the commit subjects/descriptions.
+Nicolas
