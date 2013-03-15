@@ -1,48 +1,25 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 15 Mar 2013 11:16:17 +0100
-Subject: [PATCH 0/5] at91: atmel_lcdfb: regression fixes and cpu_is removal
-In-Reply-To: <201303142303.42283.arnd@arndb.de>
-References: <cover.1360340791.git.nicolas.ferre@atmel.com>
- <5139B169.7050807@atmel.com> <51405126.3090009@atmel.com>
- <201303142303.42283.arnd@arndb.de>
-Message-ID: <5142F4F1.60006@atmel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 15 Mar 2013 10:18:13 +0000
+Subject: [PATCH 2/3] mfd: Make AB8500_CORE select POWER_SUPPLY to fix
+ build error
+In-Reply-To: <20130315064436.GD12559@zurbaran>
+References: <1363298204-8014-1-git-send-email-arnd@arndb.de>
+ <1363298204-8014-2-git-send-email-arnd@arndb.de>
+ <20130315064436.GD12559@zurbaran>
+Message-ID: <201303151018.13518.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/15/2013 12:03 AM, Arnd Bergmann :
-> On Wednesday 13 March 2013, Nicolas Ferre wrote:
->> In case we end-up with an agreement on the path those fixes should
->> follow, here is the location of my updated material rebased on top of 3.9-rc2:
->>
->> The following changes since commit f6161aa153581da4a3867a2d1a7caf4be19b6ec9:
->>
->>   Linux 3.9-rc2 (2013-03-10 16:54:19 -0700)
->>
->> are available in the git repository at:
->>
->>   git://github.com/at91linux/linux-at91.git at91-3.9-fixesLCD
->>
->> for you to fetch changes up to bbd44f6bd9d1aa735b180b29b5719d63a8e87b55:
->>
->>   ARM: at91/avr32/atmel_lcdfb: add platform device-id table (2013-03-13 11:05:12 +0100)
->>
->> ----------------------------------------------------------------
->> Johan Hovold (5):
->>       atmel_lcdfb: fix 16-bpp modes on older SOCs
->>       ARM: at91: fix LCD-wiring mode
->>       ARM: at91/avr32/atmel_lcdfb: add bus-clock entry
->>       atmel_lcdfb: move lcdcon2 register access to compute_hozval
->>       ARM: at91/avr32/atmel_lcdfb: add platform device-id table
->>
+On Friday 15 March 2013, Samuel Ortiz wrote:
+> On Thu, Mar 14, 2013 at 10:56:39PM +0100, Arnd Bergmann wrote:
+> > 
+> > Please apply to MFD tree for 3.9
+> Already applied to mfd-fixes.
 > 
-> I have merged the first two patches into the fixes branch now, from up to commit
-> 67cf9c0a. Please resubmit the remaining ones on top of this commit for 3.10, either
-> through arm-soc or through the framebuffer tree.
 
-Thanks a lot.
-I have just sent the pull-request for remaining material. Tell me if it
-is what you've expected.
+For some reason I did not see it when I rebased my patches on top of linux-next
+to make sure I don't send any patches again that are already queued up.
 
-Best regards,
--- 
-Nicolas Ferre
+Is there a reason why mfd-fixes is not part of linux-next?
+
+	Arnd
