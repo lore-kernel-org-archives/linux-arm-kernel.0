@@ -1,79 +1,34 @@
-From: nschichan@freebox.fr (Nicolas Schichan)
-Date: Fri, 15 Mar 2013 19:39:19 +0100
-Subject: [PATCH RFC 1/3] seccomp: add generic code for jitted seccomp
- filters.
-In-Reply-To: <1363372123-8861-2-git-send-email-nschichan@freebox.fr>
-References: <1363372123-8861-1-git-send-email-nschichan@freebox.fr>
- <1363372123-8861-2-git-send-email-nschichan@freebox.fr>
-Message-ID: <51436AD7.1050205@freebox.fr>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 15 Mar 2013 12:42:57 -0600
+Subject: [PATCH V3 5/5] ARM: tegra: add spi nodes to Tegra114 DT
+In-Reply-To: <1363204194-19487-6-git-send-email-ldewangan@nvidia.com>
+References: <1363204194-19487-1-git-send-email-ldewangan@nvidia.com>
+ <1363204194-19487-6-git-send-email-ldewangan@nvidia.com>
+Message-ID: <51436BB1.8060005@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/15/2013 07:28 PM, Nicolas Schichan wrote:
-[Sorry, I forgot to put the mailing lists as the receivers of the introductory 
-message]
+On 03/13/2013 01:49 PM, Laxman Dewangan wrote:
+> NVIDIA's Tegra114 has 6 spi controllers. These controllers are
+> redesign on T114 with different register interface.
 
-Hi,
+> diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
 
-This patch serie adds support for jitted seccomp BPF filters, with the
-required modifications to make it work on the ARM architecture.
+> +		reg = <0x7000d400 0x200>;
+...
+> +		reg = <0x7000d600 0x200>;
+...
+> +		reg = <0x7000d480 0x200>;
+...
+> +		reg = <0x7000da00 0x200>;
+...
+> +		reg = <0x7000dc00 0x200>;
+...
+> +		reg = <0x7000de00 0x200>;
 
-- The first patch in the serie adds the required boiler plate in the
-   core kernel seccomp code to invoke the JIT compilation/free code.
+I assume that third entry should be 0x7000d800 not 0x7000d480; the TRM
+certainly thinks so. I fixed this up when I applied this patch.
 
-- The second patch reworks the ARM BPF JIT code to make the generation
-   process less dependent on struct sk_filter.
-
-- The last patch actually implements the ARM part in the BPF jit code.
-
-Some benchmarks, on a 1.6Ghz 88f6282 CPU:
-
-Each system call is tested in two way (fast/slow):
-
-  - on the fast version, the tested system call is accepted immediately
-    after checking the architecture (5 BPF instructions).
-
-  - on the slow version, the tested system call is accepted after
-    previously checking for 85 syscall (90 instructions, including the
-    architecture check).
-
-The tested syscall is invoked in a loop 1000000 time, the reported
-time is the time spent in the loop in seconds.
-
-Without Seccomp JIT:
-
-Syscall		Time-Fast  Time-Slow
---------------- ---------- ----------
-gettimeofday	0.389	   1.633
-getpid		0.406	   1.688
-getresuid	1.003	   2.266
-getcwd		1.342	   2.128
-
-With Seccomp JIT:
-
-Syscall		Time-Fast  Time-Slow
---------------- ----------- ---------
-gettimeofday	0.348	    0.428
-getpid		0.365	    0.480
-getresuid	0.981	    1.060
-getcwd		1.237	    1.294
-
-For reference, the same code without any seccomp filter:
-
-Syscall		Time
---------------- -----
-gettimeofday	0.119
-getpid		0.137
-getresuid	0.747
-getcwd		1.021
-
-The activation of the BPF JIT for seccomp is still controled with the
-/proc/sys/net/core/bpf_jit_enable sysctl knob.
-
-Those changes are based on the latest rmk-for-next branch.
-
-Regards,
-
--- 
-Nicolas Schichan
-Freebox SAS
+I've applied the series to Tegra's for-3.10/dt branch. I made a few
+node/property ordering changes for consistency, and some capitalization
+fixes in the commit subjects/descriptions.
