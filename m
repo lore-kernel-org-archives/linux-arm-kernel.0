@@ -1,34 +1,128 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 Mar 2013 10:56:55 +0000
-Subject: [Suggestion] Latest randconfig build errors for Head.S
-In-Reply-To: <CAAQYJAvXLV38shKncAKKqgQ9G0SnXjh+=aJHBdhd29yzVtL80A@mail.gmail.com>
-References: <51415428.1070401@asianux.com> <514270D2.9010205@asianux.com>
- <CAAQYJAvXLV38shKncAKKqgQ9G0SnXjh+=aJHBdhd29yzVtL80A@mail.gmail.com>
-Message-ID: <201303151056.55819.arnd@arndb.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 15 Mar 2013 11:58:56 +0100
+Subject: [PATCH 3/3] ARM: at91: add MPA 1600 DT board
+In-Reply-To: <CAGhQ9Vx9D_4LnXOgveQ_vnTa-QfgwTkuLrU=_Et1Z2fD_hDCNg@mail.gmail.com>
+References: <1360286756-29705-1-git-send-email-manabian@gmail.com>
+ <1360286756-29705-4-git-send-email-manabian@gmail.com>
+ <F3DBB1B3EF102E4994C89758CFCA32412C5A08@DBDE01.ent.ti.com>
+ <CAGhQ9Vx9D_4LnXOgveQ_vnTa-QfgwTkuLrU=_Et1Z2fD_hDCNg@mail.gmail.com>
+Message-ID: <5142FEF0.6070308@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 March 2013, Andrea Adami wrote:
-> On Fri, Mar 15, 2013 at 1:52 AM, Chen Gang <gang.chen@asianux.com> wrote:
-> > ? 2013?03?15? 07:43, Russell King - ARM Linux ??:
-> >> So our wonderful toolchain has decided to start producing NULL warnings
-> >> for every "mcr     p15, 0, rX, c7, c10, 4" instruction?  I'd just ignore
-> >> them and hope that the toolchain people fix it.
+On 02/08/2013 04:56 PM, Joachim Eastwood :
+> On 8 February 2013 04:19, Kumar, Anil <anilkumar.v@ti.com> wrote:
+>> On Fri, Feb 08, 2013 at 06:55:56, Joachim Eastwood wrote:
+>>> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+>>> ---
+>>>  arch/arm/boot/dts/Makefile    |  1 +
+>>>  arch/arm/boot/dts/mpa1600.dts | 71 +++++++++++++++++++++++++++++++++++++++++++
+>>>  2 files changed, 72 insertions(+)
+>>>  create mode 100644 arch/arm/boot/dts/mpa1600.dts
+>>>
+>>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>>> index 5ebb44f..8bfb5f3 100644
+>>> --- a/arch/arm/boot/dts/Makefile
+>>> +++ b/arch/arm/boot/dts/Makefile
+>>> @@ -3,6 +3,7 @@ ifeq ($(CONFIG_OF),y)
+>>>  # Keep at91 dtb files sorted alphabetically for each SoC
+>>>  # rm9200
+>>>  dtb-$(CONFIG_ARCH_AT91) += at91rm9200ek.dtb
+>>> +dtb-$(CONFIG_ARCH_AT91) += mpa1600.dtb
+>>>  # sam9260
+>>>  dtb-$(CONFIG_ARCH_AT91) += animeo_ip.dtb
+>>>  dtb-$(CONFIG_ARCH_AT91) += aks-cdu.dtb
+>>> diff --git a/arch/arm/boot/dts/mpa1600.dts b/arch/arm/boot/dts/mpa1600.dts
+>>> new file mode 100644
+>>> index 0000000..927972a
+>>> --- /dev/null
+>>> +++ b/arch/arm/boot/dts/mpa1600.dts
+>>> @@ -0,0 +1,71 @@
+>>> +/*
+>>> + * mpa1600.dts - Device Tree file for Phontech MPA 1600
+>>> + *
+>>> + *  Copyright (C) 2013 Joachim Eastwood <manabian@gmail.com>
+>>> + *
+>>> + * Licensed under GPLv2 only
+>>> + */
+>>> +/dts-v1/;
+>>> +/include/ "at91rm9200.dtsi"
+>>> +
+>>> +/ {
+>>> +     model = "Phontech MPA 1600";
+>>> +     compatible = "phontech,mpa1600", "atmel,at91rm9200";
+>>> +
+>>> +     memory {
+>>> +             reg = <0x20000000 0x4000000>;
+>>> +     };
+>>> +
+>>> +     clocks {
+>>> +             #address-cells = <1>;
+>>> +             #size-cells = <1>;
+>>> +             ranges;
+>>> +
+>>> +             main_clock: clock at 0 {
+>>> +                     compatible = "atmel,osc", "fixed-clock";
+>>> +                     clock-frequency = <18432000>;
+>>> +             };
+>>> +     };
+>>> +
+>>> +     ahb {
+>>> +             apb {
+>>> +                     dbgu: serial at fffff200 {
+>>> +                             status = "okay";
+>>> +                     };
+>>> +
+>>> +                     macb0: ethernet at fffbc000 {
+>>> +                             phy-mode = "rmii";
+>>> +                             status = "okay";
+>>> +                     };
+>>> +
+>>> +                     ssc0: ssc at fffd0000 {
+>>> +                             status = "okay";
+>>> +                     };
+>>> +
+>>> +                     ssc1: ssc at fffd4000 {
+>>> +                             status = "okay";
+>>> +                     };
+>>> +             };
+>>> +
+>>> +             usb0: ohci at 00300000 {
+>>> +                     num-ports = <1>;
+>>> +                     status = "okay";
+>>> +             };
+>>> +     };
+>>> +
+>>> +     i2c at 0 {
+>>> +             status = "okay";
+>>> +     };
+>>> +
+>>> +     gpio_keys {
+>>> +             compatible = "gpio-keys";
+>>> +             #address-cells = <1>;
+>>> +             #size-cells = <0>;
+>>
+>> No need to use these address-cells and size-cells properties as
+>> child DT node is not Using. Please see the discussion on link
+>>
+>> http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg15590.html
 > 
-> AFAIK Arnd is aware and waiting for feedback about his patch:
+> I see.
 > 
-> ARM: compressed/head.S: work around new binutils warning   Arnd Bergmann
-> 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/144846.html
+> Thanks for the feedback. I'll update this patch in the series.
 
-Right. The fact that as prints a warning for those instructions makes sense
-given that we are telling it we want to run on *all* ARM architectures,
-and that ARMv8 has deprecated them officially.
+I have modified it and queued the whole series in the:
+at91-3.10-dt branch.
 
-Of course, what is bogus about this is the "NULL" part rather than printing
-the text that was meant to come out to explain the situation.  I don't
-know how to report that bug other than what I tried before, but if it gets
-fixed by printing the right text, we will still want to build a kernel
-without getting any warnings.
 
-	Arnd
+> I assume someone will clean up all the other dts files or we'll never
+> get rid of these properties as people will copy-paste stuff.
+
+Just done in a new patch:
+[PATCH] ARM: at91/dt: gpio-keys: remove address-cells and size-cells
+properties
+
+
+Best regards,
+-- 
+Nicolas Ferre
