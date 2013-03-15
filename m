@@ -1,37 +1,39 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 16 Mar 2013 01:01:32 +0300
-Subject: [PATCH 4/6] ARM: sunxi: dt: Add uart3 dt node
-In-Reply-To: <1363377988-4966-5-git-send-email-maxime.ripard@free-electrons.com>
-References: <1363377988-4966-1-git-send-email-maxime.ripard@free-electrons.com>
- <1363377988-4966-5-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <51439A3C.1010505@cogentembedded.com>
+Date: Sat, 16 Mar 2013 01:08:31 +0300
+Subject: [RFC] USB: EHCI: hot-fix OMAP and Orion multiplatform config
+In-Reply-To: <201303152015.31292.arnd@arndb.de>
+References: <Pine.LNX.4.44L0.1303151516170.1414-100000@iolanthe.rowland.org>
+ <201303152015.31292.arnd@arndb.de>
+Message-ID: <51439BDF.3050300@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello.
 
-On 03/15/2013 11:06 PM, Maxime Ripard wrote:
+On 03/15/2013 11:15 PM, Arnd Bergmann wrote:
 
-> Both A10 and A13 Allwinner SoCs have a Synopsys APB uart3 device
-> available, so add it to the sunxi.dtsi file
+> On Friday 15 March 2013, Alan Stern wrote:
+>> I just got an automated message from Greg:
+>>
+>> --------------------------------------------------------------------------
+>> This is a note to let you know that I've just added the patch titled
+>>
+>>      USB: EHCI: split ehci-omap out to a separate driver
+>>
+>> to my usb git tree which can be found at
+>>      git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/usb.git
+>> in the usb-next branch.
+>> --------------------------------------------------------------------------
+>>
+>> Unless something is changed, this patch won't get into 3.9-final.
+>> Do you want Greg to move it to his usb-linus branch?
+> I don't care much which way we do it, but I'd certainly like to
+> see one of these two solutions for the bug:
 >
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Acked-by: Emilio L?pez <emilio@elopez.com.ar>
-> ---
->   arch/arm/boot/dts/sunxi.dtsi |   10 ++++++++++
->   1 file changed, 10 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/sunxi.dtsi b/arch/arm/boot/dts/sunxi.dtsi
-> index 4f78ef7..324da45 100644
-> --- a/arch/arm/boot/dts/sunxi.dtsi
-> +++ b/arch/arm/boot/dts/sunxi.dtsi
-> @@ -68,5 +68,15 @@
->   			clocks = <&osc>;
->   			status = "disabled";
->   		};
-> +
-> +		uart3: uart at 01c28c00 {
+> a) Apply Roger's patch for 3.9, and add my "USB: EHCI: DT support
+>     for generic bus glue" patch on top after it has been tested
 
-    IIRC, historically, the property name should be "serial", not "uart".
+    Arnd, sorry, where can I find this patch? Archive search doesn't 
+turn up anything...
 
 WBR, Sergei
