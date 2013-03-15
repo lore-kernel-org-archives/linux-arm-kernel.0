@@ -1,31 +1,46 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Fri, 15 Mar 2013 08:51:40 +0800
-Subject: [Suggestion] Latest randconfig build errors for CONFIG_MMU=no
-In-Reply-To: <5141CFE4.2030909@arm.com>
-References: <514147A0.2060002@asianux.com> <5141CFE4.2030909@arm.com>
-Message-ID: <5142709C.8080702@asianux.com>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Thu, 14 Mar 2013 17:52:38 -0700 (PDT)
+Subject: [PATCH 2/7] ARM: shmobile: marzen: add USB EHCI driver support
+In-Reply-To: <5141D3C6.4090806@cogentembedded.com>
+References: <1352446306-19945-1-git-send-email-horms@verge.net.au>
+ <1352446306-19945-3-git-send-email-horms@verge.net.au>
+ <5140F35F.3090702@cogentembedded.com>
+ <87li9q4ydj.wl%kuninori.morimoto.gx@renesas.com>
+ <5141D3C6.4090806@cogentembedded.com>
+Message-ID: <87boal32nh.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2013?03?14? 21:25, Jonathan Austin ??:
-> 
-> You're right that at the moment that suspend code is broken for NOMMU.
-> 
-> However, Will Deacon has a patch to fix it in his nommu branch on
-> kernel.org:
-> 
-> https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/commit/?h=nommu
-> 
-> I'll let Will comment on how/when he might look at proposing that code
-> to be merged.
-> 
-> Jonny
 
-  thank you.
+Hi Sergei
 
-  :-)
+> > I forgot detail of it, but these usb is using callback function,
+> > and it is using *phy*.
+> 
+>    But this PHY also belongs to SoC.
+> 
+> > This phy came from marzen_init_late() with usb_get_phy(USB_PHY_TYPE_USB2);
+> > This usb_get_phy() is not needed if board doesn't have USB.
+> 
+>     Anyway, there should be ways to separate the board specific platform code 
+> and the SoC specific one. That's what other subarches do.
+>
+> > You can modify it if you want
+> 
+>     Yes, I definitely would like to try.
 
--- 
-Chen Gang
+I checked CPG :: MSTP for USB0/1/2 and USB Host/Function,
+and GIC number for it.
+It seems no conflict each other
+I guess EHCI/OHCI goes to setup seems no problem.
 
-Asianux Corporation
+But, as you pointed on USB ML,
+USB-PHY :: USBPCTRL0 depends on platform
+(Host/Function selection, and OVC pin setting)
+
+rcar_usb_phy driver belongs to platform
+
+
+Best regards
+---
+Kuninori Morimoto
