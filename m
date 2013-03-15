@@ -1,23 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 Mar 2013 21:38:12 +0000
-Subject: [GIT PULL] Nomadik multiplatform support for ARM SoC
-In-Reply-To: <CACRpkdbanRz=LuB2nLLso+8iBesy3LwNpqFRSZbDzbcO2Y9sgw@mail.gmail.com>
-References: <CACRpkdbanRz=LuB2nLLso+8iBesy3LwNpqFRSZbDzbcO2Y9sgw@mail.gmail.com>
-Message-ID: <201303152138.12288.arnd@arndb.de>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Fri, 15 Mar 2013 16:46:45 -0500
+Subject: ep93xx irq-vic regression
+Message-ID: <ADE657CA350FB648AAC2C43247A983F0020980106C9F@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 07 March 2013, Linus Walleij wrote:
-> Hi Olof, Arnd,
-> 
-> this is a pull request containing multiplatform support for the
-> Nomadik, targeted
-> at v3.10, i.e. your multiplatform branch for next.
-> 
-> Not much to say about this, the patches were posted, nobody said anything
-> and it works fine for me, so please pull it in.
+ Hello all,
 
-Pulled into the next/multiplatform branch now along with my cns3xxx and
-spear series. Looking forward to seeing your u300 and integrator patches ;-)
+Yesterday I tried upgrading my ep93xx system from 3.6.6 to 3.8.3.
+The kernel compiles fine but the machine would not boot. It just
+hangs when the bootloader (RedBoot) tries to exec the kernel.
 
-	Arnd
+I then tried 3.7.0 and it works fine.
+
+I did a bisect and got down to this commit:
+
+$ git bisect bad
+07c9249f1fa90cc8189bed44c0bcece664596a72 is the first bad commit
+commit 07c9249f1fa90cc8189bed44c0bcece664596a72
+Author: Linus Walleij <linus.walleij@linaro.org>
+Date:   Tue Oct 16 18:50:00 2012 +0100
+
+    ARM: 7554/1: VIC: use irq_domain_add_simple()
+
+Any ideas on what might be the problem?
+
+Regards,
+Hartley
