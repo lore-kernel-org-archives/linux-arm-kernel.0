@@ -1,49 +1,58 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 15 Mar 2013 09:38:07 -0500
-Subject: [PATCH 2/8] ARM: dts: OMAP36xx: move CPU OPP tables to device tree
-In-Reply-To: <51432F94.7000306@ti.com>
-References: <1363294695-658-1-git-send-email-nm@ti.com>
- <1363294695-658-3-git-send-email-nm@ti.com>
- <514244B4.9050808@ti.com> <20130315135655.GA2939@kahuna>
- <51432F94.7000306@ti.com>
-Message-ID: <20130315143806.GA3103@kahuna>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 15 Mar 2013 20:07:39 +0530
+Subject: [PATCH] ARM: davinci: da850 evm: update clock rate for UART 1/2
+ DT nodes
+In-Reply-To: <A73F36158E33644199EB82C5EC81C7BC3EA49090@DBDE01.ent.ti.com>
+References: <1361262734-8540-1-git-send-email-prakash.pm@ti.com>
+ <512F33F3.9070203@ti.com>
+ <A73F36158E33644199EB82C5EC81C7BC3EA49090@DBDE01.ent.ti.com>
+Message-ID: <51433233.9070303@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09:26-20130315, Jon Hunter wrote:
-> 
-> On 03/15/2013 08:56 AM, Nishanth Menon wrote:
-> > On 16:44-20130314, Jon Hunter wrote:
-> >>
-> >> On 03/14/2013 03:58 PM, Nishanth Menon wrote:
-> >>> Add DT OPP table for OMAP36xx family of devices. This data is
-> >>> decoded by OF with of_init_opp_table() helper function. This
-> >>> overrides the default OMAP34xx CPU OPP table definition.
-> >>
-> >> Not sure I following the last sentence. The tables are in a different
-> >> dtsi file and only the relevant file should be included, right?
-> > omap3630.dsi includes omap3.dtsi (which is meant for OMAP34xx).
-> > The opp tables introduced by this patch in omap36xx.dtsi will override
-> > the ones defined on omap3.dtsi. Will the following rephrase help clarify
-> > this?
-> > 
-> > Original:
-> > This overrides the default OMAP34xx CPU OPP table definition.
-> > Suggested;
-> > This overrides the default OMAP34xx CPU OPP table definition in
-> > omap3.dtsi.
-> 
-> Sorry, I just missed that the omap3430 opps were in omap3.dtsi and not
-> omap34xx.dtsi. I guess I am not familiar with how the DTC overrides
-> nodes, however, at least from a readability standpoint it would seem
-> nice to have the omap3430 opps in a omap3430 specific dtsi and not
-> omap3.dtsi. However, thats just my opinion.
-most of omap3630 is based off omap3430. I know from an readability point
-of view, it might have been good to split that to omap3-common.dtsi,
-omap34xx.dtsi, omap36xx.dtsi etc.. But there is no real need at this
-point in time to do that. Unless, ofcourse, we'd like to set that up as
-an standard for all OMAP SoCs...
 
--- 
-Regards,
-Nishanth Menon
+
+On 3/15/2013 6:56 PM, Manjunathappa, Prakash wrote:
+> Hi Sekhar,
+> 
+> On Thu, Feb 28, 2013 at 16:09:47, Nori, Sekhar wrote:
+>> Prakash,
+>>
+>> On 2/19/2013 2:02 PM, Manjunathappa, Prakash wrote:
+>>> DT kernel with latest of denx SPL U-boot boots with garbled UART
+>>> logs. This is because in U-boot UART2 gets sourced by PLL0_SYSCLK2
+>>> configured for 150MHz. But later in kernel UART2 gets mapped to
+>>> PLL1_SYSCLK2 and is configured for 132MHz not for 150MHz.
+>>>
+>>> PLL1 is configured for 264MHz to support mDDR on the EVM. That is
+>>> memory controller driving mDDR can be configured for 150MHz and
+>>> mDDR it self can operate at 132MHz.
+>>>
+>>> So override UART1 and UART2 DT node clock-frequency property with
+>>> rate available on da850 EVM.
+>>>
+>>> Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
+>>
+>> How about dropping the clock-frequency attribute altogether? of_serial.c
+>> seems to be falling back on clk apis if frequency is not passed and that
+>> should make the kernel work with all versions of U-Boot.
+>>
+> 
+> Yes it can be dropped by having duplicate clock node for UART having only
+
+You meant an additional clk_lookup entry? That's different from a new
+'struct clk' node.
+
+> dev_id. This is required because DT kernel does the clk_get with only dev_id
+> and non-DT kernel only with con_id. In DT kernel clk_get is done from generic
+> code of_platform_serial_setup:of_serial.c and in non-DT kernel is done from
+> platform code, davinci_serial_setup_clk:arch/arm/mach-davinci/serial.c
+> 
+> Please let me know your opinion on this.
+
+When only one clock is present, con_id of NULL is more appropriate. How
+about fixing arch/arm/mach-davinci/serial.c and existing clk_lookup
+entries to use this?
+
+Thanks,
+Sekhar
