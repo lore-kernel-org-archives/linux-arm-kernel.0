@@ -1,323 +1,38 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Fri, 15 Mar 2013 14:40:09 +0000
-Subject: [PATCH] clk: vexpress: Add separate SP810 driver
-Message-ID: <1363358409-5693-1-git-send-email-pawel.moll@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 15 Mar 2013 14:47:05 +0000
+Subject: [RFC patch 02/11] cpuidle / arm : a single cpuidle driver
+In-Reply-To: <1363357630-22214-3-git-send-email-daniel.lezcano@linaro.org>
+References: <1363357630-22214-1-git-send-email-daniel.lezcano@linaro.org>
+ <1363357630-22214-3-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <201303151447.06150.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Factor out the SP810 clocking code into a separate driver,
-selecting better (faster) parent at clk_prepare() time.
-This is to avoid problems with clocking infrastructure
-initialisation order, in particular to avoid dependency
-of fixed clock being initialized before SP810. It also
-makes vexpress platform OF-based clock initialisation code
-unnecessary.
+On Friday 15 March 2013, Daniel Lezcano wrote:
+> The cpuidle drivers are duplicating a lot of code and in most
+> of the case there is a common pattern we can factor out:
+> 
+>         * setup the broadcast timers
+>         * register the driver
+>         * register the devices
+> 
+> This arm driver is the common part between all the ARM cpuidle drivers,
+> with the code factored out.
+> 
+> It does not handle the coupled idle state for now but it is the first
+> step to have everyone to converge to the same code pattern.
+> 
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-Signed-off-by: Pawel Moll <pawel.moll@arm.com>
----
- arch/arm/mach-vexpress/v2m.c         |    8 +-
- drivers/clk/versatile/Makefile       |    2 +-
- drivers/clk/versatile/clk-sp810.c    |  172 ++++++++++++++++++++++++++++++++++
- drivers/clk/versatile/clk-vexpress.c |   49 ----------
- 4 files changed, 180 insertions(+), 51 deletions(-)
- create mode 100644 drivers/clk/versatile/clk-sp810.c
+Unfortunately, I missed the session in Hong Kong, but I'd like to understand
+what part of this driver is actually ARM specific. I assume there is nothing
+in it that depends on 32 bit ARM hardware, right?
 
-Hi Mike,
+Would the same code be used with arch/arm64?
 
-I'd like to get this merged in 3.10. After this arm64
-will be able to avoid any platform clocking code. And
-in case of v7 this will happen once Rob's SP804 work
-is done.
+What about other architectures that want to share a cpuidle driver
+with and ARM SoC using the same hardware? We have a lot of examples
+of SoC vendors that use similar components on ARM and non-ARM SoCs
+based on SH, AVR32, Hexagon, C6x, MIPS or PowerPC.
 
-Thanks!
-
-Pawel
-
-diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
-index 915683c..c5e20b5 100644
---- a/arch/arm/mach-vexpress/v2m.c
-+++ b/arch/arm/mach-vexpress/v2m.c
-@@ -21,6 +21,8 @@
- #include <linux/regulator/fixed.h>
- #include <linux/regulator/machine.h>
- #include <linux/vexpress.h>
-+#include <linux/clk-provider.h>
-+#include <linux/clkdev.h>
- 
- #include <asm/arch_timer.h>
- #include <asm/mach-types.h>
-@@ -433,7 +435,7 @@ static void __init v2m_dt_timer_init(void)
- {
- 	struct device_node *node = NULL;
- 
--	vexpress_clk_of_init();
-+	of_clk_init(NULL);
- 
- 	do {
- 		node = of_find_compatible_node(node, NULL, "arm,sp804");
-@@ -441,6 +443,10 @@ static void __init v2m_dt_timer_init(void)
- 	if (node) {
- 		pr_info("Using SP804 '%s' as a clock & events source\n",
- 				node->full_name);
-+		WARN_ON(clk_register_clkdev(of_clk_get_by_name(node,
-+				"timclken1"), "v2m-timer0", "sp804"));
-+		WARN_ON(clk_register_clkdev(of_clk_get_by_name(node,
-+				"timclken2"), "v2m-timer1", "sp804"));
- 		v2m_sp804_init(of_iomap(node, 0),
- 				irq_of_parse_and_map(node, 0));
- 	}
-diff --git a/drivers/clk/versatile/Makefile b/drivers/clk/versatile/Makefile
-index ec3b88f..c16ca78 100644
---- a/drivers/clk/versatile/Makefile
-+++ b/drivers/clk/versatile/Makefile
-@@ -3,5 +3,5 @@ obj-$(CONFIG_ICST)		+= clk-icst.o
- obj-$(CONFIG_ARCH_INTEGRATOR)	+= clk-integrator.o
- obj-$(CONFIG_INTEGRATOR_IMPD1)	+= clk-impd1.o
- obj-$(CONFIG_ARCH_REALVIEW)	+= clk-realview.o
--obj-$(CONFIG_ARCH_VEXPRESS)	+= clk-vexpress.o
-+obj-$(CONFIG_ARCH_VEXPRESS)	+= clk-vexpress.o clk-sp810.o
- obj-$(CONFIG_VEXPRESS_CONFIG)	+= clk-vexpress-osc.o
-diff --git a/drivers/clk/versatile/clk-sp810.c b/drivers/clk/versatile/clk-sp810.c
-new file mode 100644
-index 0000000..1c2a7f4
---- /dev/null
-+++ b/drivers/clk/versatile/clk-sp810.c
-@@ -0,0 +1,172 @@
-+/*
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * Copyright (C) 2013 ARM Limited
-+ */
-+
-+#include <linux/amba/sp810.h>
-+#include <linux/clkdev.h>
-+#include <linux/clk-provider.h>
-+#include <linux/err.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+
-+#define to_clk_sp810_timerclken(_hw) \
-+		container_of(_hw, struct clk_sp810_timerclken, hw)
-+
-+struct clk_sp810;
-+
-+struct clk_sp810_timerclken {
-+	struct clk_hw hw;
-+	struct clk *clk;
-+	struct clk_sp810 *sp810;
-+	int channel;
-+};
-+
-+struct clk_sp810 {
-+	struct device_node *node;
-+	int refclk_index, timclk_index;
-+	void __iomem *base;
-+	spinlock_t lock;
-+	struct clk_sp810_timerclken timerclken[4];
-+};
-+
-+static u8 clk_sp810_timerclken_get_parent(struct clk_hw *hw)
-+{
-+	struct clk_sp810_timerclken *timerclken = to_clk_sp810_timerclken(hw);
-+	u32 val = readl(timerclken->sp810->base + SCCTRL);
-+
-+	return !!(val & (1 << SCCTRL_TIMERENnSEL_SHIFT(timerclken->channel)));
-+}
-+
-+static int clk_sp810_timerclken_set_parent(struct clk_hw *hw, u8 index)
-+{
-+	struct clk_sp810_timerclken *timerclken = to_clk_sp810_timerclken(hw);
-+	struct clk_sp810 *sp810 = timerclken->sp810;
-+	u32 val, shift = SCCTRL_TIMERENnSEL_SHIFT(timerclken->channel);
-+	unsigned long flags = 0;
-+
-+	if (WARN_ON(index > 1))
-+		return -EINVAL;
-+
-+	spin_lock_irqsave(&sp810->lock, flags);
-+
-+	val = readl(sp810->base + SCCTRL);
-+	val &= ~(1 << shift);
-+	val |= index << shift;
-+	writel(val, sp810->base + SCCTRL);
-+
-+	spin_unlock_irqrestore(&sp810->lock, flags);
-+
-+	return 0;
-+}
-+
-+static int clk_sp810_timerclken_prepare(struct clk_hw *hw)
-+{
-+	struct clk_sp810_timerclken *timerclken = to_clk_sp810_timerclken(hw);
-+	struct clk_sp810 *sp810 = timerclken->sp810;
-+	struct clk *refclk = of_clk_get(sp810->node, sp810->refclk_index);
-+	struct clk *timclk = of_clk_get(sp810->node, sp810->timclk_index);
-+	struct clk *old_parent = __clk_get_parent(hw->clk);
-+	struct clk *new_parent = old_parent;
-+	int new_parent_index;
-+
-+	if (WARN_ON(IS_ERR(refclk) || IS_ERR(timclk)))
-+		return -ENOENT;
-+
-+	/* Select "better" (faster) parent */
-+	if (__clk_get_rate(refclk) > __clk_get_rate(timclk)) {
-+		new_parent = refclk;
-+		new_parent_index = 0;
-+	} else {
-+		new_parent = timclk;
-+		new_parent_index = 1;
-+	}
-+
-+	/* Switch the parent if necessary */
-+	if (old_parent != new_parent) {
-+		__clk_prepare(new_parent);
-+		clk_sp810_timerclken_set_parent(hw, new_parent_index);
-+		__clk_reparent(hw->clk, new_parent);
-+		__clk_unprepare(old_parent);
-+	}
-+
-+	return 0;
-+}
-+
-+static const struct clk_ops clk_sp810_timerclken_ops = {
-+	.prepare = clk_sp810_timerclken_prepare,
-+	.get_parent = clk_sp810_timerclken_get_parent,
-+	.set_parent = clk_sp810_timerclken_set_parent,
-+};
-+
-+struct clk *clk_sp810_timerclken_of_get(struct of_phandle_args *clkspec,
-+		void *data)
-+{
-+	struct clk_sp810 *sp810 = data;
-+
-+	if (WARN_ON(clkspec->args_count != 1 || clkspec->args[0] >
-+			ARRAY_SIZE(sp810->timerclken)))
-+		return NULL;
-+
-+	return sp810->timerclken[clkspec->args[0]].clk;
-+}
-+
-+void __init clk_sp810_of_setup(struct device_node *node)
-+{
-+	struct clk_sp810 *sp810 = kzalloc(sizeof(*sp810), GFP_KERNEL);
-+	const char *parent_names[2];
-+	char name[12];
-+	struct clk_init_data init;
-+	int i;
-+
-+	if (!sp810) {
-+		pr_err("Failed to allocate memory for SP810!\n");
-+		return;
-+	}
-+
-+	sp810->refclk_index = of_property_match_string(node, "clock-names",
-+			"refclk");
-+	parent_names[0] = of_clk_get_parent_name(node, sp810->refclk_index);
-+
-+	sp810->timclk_index = of_property_match_string(node, "clock-names",
-+			"timclk");
-+	parent_names[1] = of_clk_get_parent_name(node, sp810->timclk_index);
-+
-+	if (parent_names[0] <= 0 || parent_names[1] <= 0) {
-+		pr_warn("Failed to obtain parent clocks for SP810!\n");
-+		return;
-+	}
-+
-+	sp810->node = node;
-+	sp810->base = of_iomap(node, 0);
-+	spin_lock_init(&sp810->lock);
-+
-+	init.name = name;
-+	init.ops = &clk_sp810_timerclken_ops;
-+	init.flags = CLK_IS_BASIC;
-+	init.parent_names = parent_names;
-+	init.num_parents = ARRAY_SIZE(parent_names);
-+
-+	for (i = 0; i < ARRAY_SIZE(sp810->timerclken); i++) {
-+		snprintf(name, ARRAY_SIZE(name), "timerclken%d", i);
-+
-+		sp810->timerclken[i].sp810 = sp810;
-+		sp810->timerclken[i].channel = i;
-+		sp810->timerclken[i].hw.init = &init;
-+
-+		sp810->timerclken[i].clk = clk_register(NULL,
-+				&sp810->timerclken[i].hw);
-+		WARN_ON(IS_ERR(sp810->timerclken[i].clk));
-+	}
-+
-+	of_clk_add_provider(node, clk_sp810_timerclken_of_get, sp810);
-+}
-+CLK_OF_DECLARE(sp810, "arm,sp810", clk_sp810_of_setup);
-diff --git a/drivers/clk/versatile/clk-vexpress.c b/drivers/clk/versatile/clk-vexpress.c
-index 82b45aa..a4a728d 100644
---- a/drivers/clk/versatile/clk-vexpress.c
-+++ b/drivers/clk/versatile/clk-vexpress.c
-@@ -15,8 +15,6 @@
- #include <linux/clkdev.h>
- #include <linux/clk-provider.h>
- #include <linux/err.h>
--#include <linux/of.h>
--#include <linux/of_address.h>
- #include <linux/vexpress.h>
- 
- static struct clk *vexpress_sp810_timerclken[4];
-@@ -86,50 +84,3 @@ void __init vexpress_clk_init(void __iomem *sp810_base)
- 	WARN_ON(clk_register_clkdev(vexpress_sp810_timerclken[1],
- 				"v2m-timer1", "sp804"));
- }
--
--#if defined(CONFIG_OF)
--
--struct clk *vexpress_sp810_of_get(struct of_phandle_args *clkspec, void *data)
--{
--	if (WARN_ON(clkspec->args_count != 1 || clkspec->args[0] >
--			ARRAY_SIZE(vexpress_sp810_timerclken)))
--		return NULL;
--
--	return vexpress_sp810_timerclken[clkspec->args[0]];
--}
--
--void __init vexpress_clk_of_init(void)
--{
--	struct device_node *node;
--	struct clk *clk;
--	struct clk *refclk, *timclk;
--
--	of_clk_init(NULL);
--
--	node = of_find_compatible_node(NULL, NULL, "arm,sp810");
--	vexpress_sp810_init(of_iomap(node, 0));
--	of_clk_add_provider(node, vexpress_sp810_of_get, NULL);
--
--	/* Select "better" (faster) parent for SP804 timers */
--	refclk = of_clk_get_by_name(node, "refclk");
--	timclk = of_clk_get_by_name(node, "timclk");
--	if (!WARN_ON(IS_ERR(refclk) || IS_ERR(timclk))) {
--		int i = 0;
--
--		if (clk_get_rate(refclk) > clk_get_rate(timclk))
--			clk = refclk;
--		else
--			clk = timclk;
--
--		for (i = 0; i < ARRAY_SIZE(vexpress_sp810_timerclken); i++)
--			WARN_ON(clk_set_parent(vexpress_sp810_timerclken[i],
--					clk));
--	}
--
--	WARN_ON(clk_register_clkdev(vexpress_sp810_timerclken[0],
--				"v2m-timer0", "sp804"));
--	WARN_ON(clk_register_clkdev(vexpress_sp810_timerclken[1],
--				"v2m-timer1", "sp804"));
--}
--
--#endif
--- 
-1.7.10.4
+	Arnd
