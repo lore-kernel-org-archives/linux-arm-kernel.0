@@ -1,20 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 Mar 2013 21:25:01 +0000
-Subject: [GIT PULL] Device Tree fixes for v3.9
-In-Reply-To: <CACRpkdai0PRbK-R_KfNqkkVuSNn97v9Za8Doq71Zb-xCHW+J1A@mail.gmail.com>
-References: <CACRpkdai0PRbK-R_KfNqkkVuSNn97v9Za8Doq71Zb-xCHW+J1A@mail.gmail.com>
-Message-ID: <201303152125.02181.arnd@arndb.de>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 15 Mar 2013 22:25:45 +0100
+Subject: [PATCH v2 0/2] refactoring for mask_cache
+In-Reply-To: <1363376175-22312-1-git-send-email-gerlando.falauto@keymile.com>
+References: <1363277430-21325-1-git-send-email-holger.brunck@keymile.com>
+ <1363376175-22312-1-git-send-email-gerlando.falauto@keymile.com>
+Message-ID: <20130315212545.GT21478@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 01 March 2013, Linus Walleij wrote:
+On Fri, Mar 15, 2013 at 08:36:13PM +0100, Gerlando Falauto wrote:
+> Hi everyone,
+> here is a 2-patch set to address the issue found with Orion,
+> hoping I understood correctly what Thomas meant.
+> Even though I'm also providing changes for mvebu, I only
+> tested the patch on a 3.0.40 kernel with the plat-orion/gpio.c driver.
+> We currently do not have a working 3.6+ configuration for our Kirkwood
+> boards (3.6 is apparently where this mvebu gpio driver was introduced),
+> so I would be glad if someone could give it a try.
 
-> Please pull it in, for fixes or -next at your decision. As you can see the
-> base is at Torvald's HEAD since all dependencies that conflicted with
-> this branch is now there. If you want me to resend based on v3.9-rc1
-> or so, just tell.
+Hi Garlando
 
-I guess it's too late not for 3.9, I just found the pull request again.
-I've applied it to the 3.10 next/fixes-non-critical branch now.
+Could you describe how to reproduce the issue, so i can test it on
+Kirkwood. I have a kirkwood with one GPIO button which i can use for
+tests.
 
-	Arnd
+Thanks
+	Andrew
