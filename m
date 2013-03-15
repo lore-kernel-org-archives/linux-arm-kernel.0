@@ -1,50 +1,64 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 15 Mar 2013 08:57:33 -0500
-Subject: [PATCH V2 0/8] ARM: dts: Various OMAP2+ device-tree updates
-Message-ID: <1363355861-11773-1-git-send-email-jon-hunter@ti.com>
+Date: Fri, 15 Mar 2013 08:57:34 -0500
+Subject: [PATCH V2 1/8] ARM: OMAP2+: Prepare for device-tree PMU support
+In-Reply-To: <1363355861-11773-1-git-send-email-jon-hunter@ti.com>
+References: <1363355861-11773-1-git-send-email-jon-hunter@ti.com>
+Message-ID: <1363355861-11773-2-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Various OMAP device-tree updates for PMU, DMA, GPIO, GPMC and boards.
+If device-tree is present, then do not create the PMU device from within
+the OMAP specific PMU code. This is required to allow device-tree to
+create the PMU device from the PMU device-tree node.
 
-The DMA, PMU and OMAP3430 SDP board changes have been sent before
-individually but re-sending here as a complete series for v3.10.
+PMU is not currently supported for OMAP4430 (due to a dependency on
+having a cross-trigger interface driver) and so ensure that this
+indicated on boot with or without device-tree.
 
-This is based upon Benoit's for_3.10/dts branch [1]. Branch available
-here [2].
+Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+Acked-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/mach-omap2/pmu.c |   14 +++++++++++---
+ 1 file changed, 11 insertions(+), 3 deletions(-)
 
-V2 changes:
-- Rebased on Benoit's for_3.10/dts branch
-- Squashed patches adding support for OMAP3430 SDP board and patch
-  to add flash support for OMAP3430 SDP board.
-
-[1] http://git.kernel.org/cgit/linux/kernel/git/bcousson/linux-omap-dt.git/log/?h=for_3.10/dts
-[2] git://github.com/jonhunter/linux.git omap-dt-for-v3.10
-
-Jon Hunter (8):
-  ARM: OMAP2+: Prepare for device-tree PMU support
-  ARM: dts: OMAP2+: Add PMU nodes
-  ARM: dts: OMAP2+: Add SDMA controller bindings and nodes
-  ARM: dts: Add GPMC node for OMAP2, OMAP4 and OMAP5
-  ARM: dts: Add OMAP2 gpio bindings
-  ARM: dts: OMAP3+: Correct gpio #interrupts-cells property
-  ARM: dts: OMAP3: Add reg and interrupt properties for gpio
-  ARM: dts: OMAP3: Add support for OMAP3430 SDP board
-
- arch/arm/boot/dts/Makefile           |    1 +
- arch/arm/boot/dts/omap2.dtsi         |   17 ++++
- arch/arm/boot/dts/omap2420.dtsi      |   55 +++++++++++++
- arch/arm/boot/dts/omap2430.dtsi      |   66 ++++++++++++++++
- arch/arm/boot/dts/omap3.dtsi         |   70 +++++++++++++++--
- arch/arm/boot/dts/omap3430-sdp.dts   |  141 ++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/omap4-panda-es.dts |    2 +
- arch/arm/boot/dts/omap4.dtsi         |   64 +++++++++++++--
- arch/arm/boot/dts/omap4460.dtsi      |   18 +++++
- arch/arm/boot/dts/omap5.dtsi         |   68 ++++++++++++++--
- arch/arm/mach-omap2/pmu.c            |   14 +++-
- 11 files changed, 493 insertions(+), 23 deletions(-)
- create mode 100644 arch/arm/boot/dts/omap3430-sdp.dts
- create mode 100644 arch/arm/boot/dts/omap4460.dtsi
-
+diff --git a/arch/arm/mach-omap2/pmu.c b/arch/arm/mach-omap2/pmu.c
+index 9debf82..9ace8ea 100644
+--- a/arch/arm/mach-omap2/pmu.c
++++ b/arch/arm/mach-omap2/pmu.c
+@@ -11,6 +11,8 @@
+  * the Free Software Foundation; either version 2 of the License, or
+  * (at your option) any later version.
+  */
++#include <linux/of.h>
++
+ #include <asm/pmu.h>
+ 
+ #include "soc.h"
+@@ -63,6 +65,15 @@ static int __init omap_init_pmu(void)
+ 	unsigned oh_num;
+ 	char **oh_names;
+ 
++	/* XXX Remove this check when the CTI driver is available */
++	if (cpu_is_omap443x()) {
++		pr_info("ARM PMU: not yet supported on OMAP4430 due to missing CTI driver\n");
++		return 0;
++	}
++
++	if (of_have_populated_dt())
++		return 0;
++
+ 	/*
+ 	 * To create an ARM-PMU device the following HWMODs
+ 	 * are required for the various OMAP2+ devices.
+@@ -75,9 +86,6 @@ static int __init omap_init_pmu(void)
+ 	if (cpu_is_omap443x()) {
+ 		oh_num = ARRAY_SIZE(omap4430_pmu_oh_names);
+ 		oh_names = omap4430_pmu_oh_names;
+-		/* XXX Remove the next two lines when CTI driver available */
+-		pr_info("ARM PMU: not yet supported on OMAP4430 due to missing CTI driver\n");
+-		return 0;
+ 	} else if (cpu_is_omap34xx() || cpu_is_omap44xx()) {
+ 		oh_num = ARRAY_SIZE(omap3_pmu_oh_names);
+ 		oh_names = omap3_pmu_oh_names;
 -- 
 1.7.10.4
