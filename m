@@ -1,61 +1,107 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 15 Mar 2013 11:13:29 +0530
-Subject: [PATCH 2/3] ARM: davinci: da850: Enable EHRPWM TBCLK from
- CFG_CHIP1
-In-Reply-To: <518397C60809E147AF5323E0420B992E3EA9742E@DBDE01.ent.ti.com>
-References: <1363257453-24747-1-git-send-email-avinashphilip@ti.com>
- <1363257453-24747-3-git-send-email-avinashphilip@ti.com>
- <5141CA40.9010005@ti.com>
- <518397C60809E147AF5323E0420B992E3EA97355@DBDE01.ent.ti.com>
- <5142ACEA.4060305@ti.com>
- <518397C60809E147AF5323E0420B992E3EA9742E@DBDE01.ent.ti.com>
-Message-ID: <5142B501.7020204@ti.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Fri, 15 Mar 2013 14:06:16 +0800
+Subject: [PATCH 14/14] usb: udc-core: add judgement logic for
+ usb_gadget_connect
+In-Reply-To: <20130314101904.GD32369@arwen.pp.htv.fi>
+References: <1363240242-25775-1-git-send-email-peter.chen@freescale.com>
+ <1363240242-25775-15-git-send-email-peter.chen@freescale.com>
+ <20130314090005.GB14443@arwen.pp.htv.fi>
+ <20130314092438.GB26420@nchen-desktop>
+ <20130314101904.GD32369@arwen.pp.htv.fi>
+Message-ID: <20130315060615.GB28361@nchen-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/15/2013 10:51 AM, Philip, Avinash wrote:
-> On Fri, Mar 15, 2013 at 10:38:58, Nori, Sekhar wrote:
->> On 3/15/2013 10:27 AM, Philip, Avinash wrote:
->>> On Thu, Mar 14, 2013 at 18:31:52, Nori, Sekhar wrote:
->>>> On 3/14/2013 4:07 PM, Philip Avinash wrote:
->>>>> da850 platforms require TBCLK synchronization in CFG_CHIP1 register for
->>>>> TBCLK enable in EHRPWM modules. Enabling of TBCLK is done only if EHRPWM
->>>>> DT node status is set to "okay" DT blob.
->>>>> Also adds macro definitions for DA8XX_EHRPWM_TBCLKSYNC and
->>>>> DA8XX_CFGCHIP1_REG.
->>>>
->>>> So there is actually a TBCLK in DA850 - it's just not modeled as a clock
->>>> similar to the way it is done on AM335x? If yes, then instead of adding
->>>> a dummy clock node and doing the TBCLK enable as part of init, why not
->>>> model TBCLK in clock tree even on DA850?
->>>
->>>
->>> TBCLK enabling should done from platform specific way. In DA850 it is done at
->>> CFGCHIP1 register. Unfortunately Davinci clock frame work will support only
->>> clock nodes inside PLLC and PSC modules. Handling of CFGCHP1 require
->>
->> That's true at the moment, but that can be fixed.
+On Thu, Mar 14, 2013 at 12:19:04PM +0200, Felipe Balbi wrote:
+> Hi,
 > 
-> I will check.
+> On Thu, Mar 14, 2013 at 05:24:39PM +0800, Peter Chen wrote:
+> > > > @@ -278,7 +278,10 @@ static int udc_bind_to_driver(struct usb_udc *udc, struct usb_gadget_driver *dri
+> > > >  		driver->unbind(gadget);
+> > > >  		goto err1;
+> > > >  	}
+> > > > -	usb_gadget_connect(gadget);
+> > > > +	if (!gadget->ops->vbus_session ||
+> > > > +			(gadget->ops->vbus_session
+> > > > +				&& gadget->vbus_active))
+> > > > +		usb_gadget_connect(gadget);
+> > > >  
+> > > >  	kobject_uevent(&udc->dev.kobj, KOBJ_CHANGE);
+> > > >  	return 0;
+> > > > @@ -384,7 +387,10 @@ static ssize_t usb_udc_softconn_store(struct device *dev,
+> > > >  
+> > > >  	if (sysfs_streq(buf, "connect")) {
+> > > >  		usb_gadget_udc_start(gadget, udc->driver);
+> > > > -		usb_gadget_connect(gadget);
+> > > > +		if (!gadget->ops->vbus_session ||
+> > > > +				(gadget->ops->vbus_session
+> > > > +					&& gadget->vbus_active))
+> > > > +			usb_gadget_connect(gadget);
+> > > 
+> > > this patch is incomplete. What happens if this test fails ? Who will
+> > > connect pullup then ?
+> > 
+> > gadget->ops->vbus_session will handle it when the vbus interrupt comes
+> 
+> for your driver, what about all the others ?
 
-For an example of non-PLL non-PSC clock on davinci, you can look at cdce
-clock registration in board-dm646x-evm.c
+All drivers have .vbus_session will try to pullup, but some still check
+if .pullup (using .softconnect) is called beforehand, it is duplicated
+with this patch. Sorry, my careless.
+If you have a look with these drivers, even usb_gadget_connect is called
+at udc_bind_to_driver, they will NOT pull up if vbus is not there.
+
+The most strict condition is : 
+gadget_is_loaded && vbus_session_is_called && pullup_is_called
+
+In fact, calling usb_gadget_connect(gadget) unconditionally at udc-core
+may hang system if low power is enabled as udc will enter low
+power mode after udc_start if no vbus is there.
+
+> Also, we shouldn't allow
+> this ping-pong between who handles pullup and who handles vbus_session.
+> 
+> It should all be managed by udc-core with UDC drivers just providing
+> enough hooks. If we allow the UDC driver to connect pullups when VBUS
+> IRQ comes, we could fall into all sorts of traps:
+> 
+> a) we could connect cable with no gadget driver loaded
+
+In that case, the pullup will not be called, it will check if gadget module
+is loaded.
+
+> b) there will be code duplication among all UDC drivers to call
+> 	usb_gadge_connect() from vbus_session
+
+Yes
+
+> c) we might screw up the usb_function_activate()/deactivate() counter
+> 
+
+why?
+
+> Need to be very careful with all these details, there are many, many
+> users to udc-core with different requirements. So unless we can come up
+> with a way which wouldn't cause code duplication or regressions, I don't
+> think we can solve the real problem.
+
+Yes, udc has vendor specific, no uniform spec like host.
 
 > 
->>
->>> modifications in clock frame work.
->>>
->>> Hence handling it as part of initialization.
->>
->> I am curious as to how this clock is handled in am335x. I searched for
->> tbclk in arch/arm/ of linux-next but could not find any references.
->> Where should I be looking?
-> 
-> Patch is submitted. This patch is not in Paul's tree.
-> 
-> [PATCH v2] ARM: AM33XX: clk: Add clock node for EHRPWM TBCLK
-> https://patchwork.kernel.org/patch/2127581/
+> I guess the best solution to all problems is to start deferring
+> pullup to when gadget driver says it's ok to connect them. It's far more
+> likely that we will already have connection to a host and VBUS will be
+> alive.
 
-Thanks!
+I still think (gadget_is_loaded && vbus_is_there) is enough.
 
-~Sekhar
+> 
+> Also, I'm not sure what does this all mean for SRP. Should we connect
+> pullup before or after SRP ?
+
+I am not familiar with SRP, but I think vbus is pre-condition.
+
+-- 
+
+Best Regards,
+Peter Chen
