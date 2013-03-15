@@ -1,38 +1,97 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 15 Mar 2013 15:54:47 +0530
-Subject: [PATCH 0/8] ARM: dts: OMAP5: ocp address space and few updates
-In-Reply-To: <1361374735-22018-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1361374735-22018-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <5142F6EF.7010900@ti.com>
+From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
+Date: Fri, 15 Mar 2013 15:54:25 +0530
+Subject: [PATCH v2 4/4] ARM: dts: Add adc and thermistors for
+ exynos5250-snow
+In-Reply-To: <1363207202-10858-5-git-send-email-dianders@chromium.org>
+References: <1363129994-10438-1-git-send-email-dianders@chromium.org>
+ <1363207202-10858-1-git-send-email-dianders@chromium.org>
+ <1363207202-10858-5-git-send-email-dianders@chromium.org>
+Message-ID: <CAHfPSqDmu52D42qiGM4rT3qeYWu0b5jxOOCNOXLa=1JZH4j9rw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Benoit,
+Doug,
 
-On Wednesday 20 February 2013 09:08 PM, Santosh Shilimkar wrote:
-> Few updates for OMAP5 found during testing OMAP5 DT builds. Couple
-> of patches were already posted on the list. The series also contains
-> a patch which adds DMA request, IRQ lines and IO address space 
-> DT extraction support to hwmod code so that we can get rid of
-> such information from hwmod data files. It has been tested on OMAP5
-> and OMAP4 devices.
-> 
-[..]
+On 14 March 2013 02:10, Doug Anderson <dianders@chromium.org> wrote:
+> Hook up the exynos5250-snow thermistors via the device tree now that
+> there's a driver available to use them.
+>
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> ---
+> Changes in v2:
+> - Match 'uV' -> 'uv' change in Naveen's bindings.
+>
+>  arch/arm/boot/dts/cros5250-common.dtsi |  4 ++++
+>  arch/arm/boot/dts/exynos5250-snow.dts  | 31 +++++++++++++++++++++++++++++++
+>  2 files changed, 35 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/cros5250-common.dtsi b/arch/arm/boot/dts/cros5250-common.dtsi
+> index 46c0980..f7cc835 100644
+> --- a/arch/arm/boot/dts/cros5250-common.dtsi
+> +++ b/arch/arm/boot/dts/cros5250-common.dtsi
+> @@ -167,6 +167,10 @@
+>                 status = "disabled";
+>         };
+>
+> +       adc at 12D10000 {
+> +               vdd-supply = <&buck5_reg>;
+> +       };
+> +
+>         hdmi {
+>                 hpd-gpio = <&gpx3 7 0xf 1 3>;
+>         };
+> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+> index 17dd951..b78da7c 100644
+> --- a/arch/arm/boot/dts/exynos5250-snow.dts
+> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
+> @@ -40,4 +40,35 @@
+>                                 <&gpc4 5 2 3 0>, <&gpc4 6 2 3 0>;
+>                 };
+>         };
+> +
+> +       adc at 12D10000 {
+> +               ncp15wb473 at 3 {
+> +                       compatible = "ntc,ncp15wb473";
+> +                       pullup-uv = <1800000>;
+> +                       pullup-ohm = <47000>;
+> +                       pulldown-ohm = <0>;
+> +                       io-channels = <&adc 3>;
+> +               };
+> +               ncp15wb473 at 4 {
+> +                       compatible = "ntc,ncp15wb473";
+> +                       pullup-uv = <1800000>;
+> +                       pullup-ohm = <47000>;
+> +                       pulldown-ohm = <0>;
+> +                       io-channels = <&adc 4>;
+> +               };
+> +               ncp15wb473 at 5 {
+> +                       compatible = "ntc,ncp15wb473";
+> +                       pullup-uv = <1800000>;
+> +                       pullup-ohm = <47000>;
+> +                       pulldown-ohm = <0>;
+> +                       io-channels = <&adc 5>;
+> +               };
+> +               ncp15wb473 at 6 {
+> +                       compatible = "ntc,ncp15wb473";
+> +                       pullup-uv = <1800000>;
+> +                       pullup-ohm = <47000>;
+> +                       pulldown-ohm = <0>;
+> +                       io-channels = <&adc 6>;
+> +               };
+> +       };
+>  };
+Thanks for the upload, i've tested with a similar changes.
+> --
+> 1.8.1.3
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
 
->   ARM: OMAP: hwmod: extract module address space from DT blob
-Above patch even though dt extraction code touches the hwmod file.
-Are you ok to keep this patch is the current series considering
-both the patches needs to go through your tree. If it needs to
-be in separate branch, then I can add that as part of the
-other generic patches with your ack.
 
->  arch/arm/boot/dts/omap5-evm.dts  |    2 +-
->  arch/arm/boot/dts/omap5.dtsi     |  282 +++++++++++++++++++++++++++++++++++---
->  arch/arm/mach-omap2/omap_hwmod.c |   31 ++++-
->  3 files changed, 293 insertions(+), 22 deletions(-)
-> 
 
-Let me know your preference. Either way is fine by me.
-
-Regards,
-Santosh
+-- 
+Shine bright,
+(: Nav :)
