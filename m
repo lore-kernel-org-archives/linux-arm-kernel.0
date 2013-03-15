@@ -1,49 +1,83 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 15 Mar 2013 10:21:11 -0500
-Subject: [PATCH V3 13/18] ARM: OMAP2+: Convert NAND to retrieve GPMC settings
- from DT
+Date: Fri, 15 Mar 2013 10:21:13 -0500
+Subject: [PATCH V3 15/18] ARM: OMAP2+: Detect incorrectly aligned GPMC base
+ address
 In-Reply-To: <1363360876-13617-1-git-send-email-jon-hunter@ti.com>
 References: <1363360876-13617-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <1363360876-13617-14-git-send-email-jon-hunter@ti.com>
+Message-ID: <1363360876-13617-16-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When booting with device-tree, retrieve GPMC settings for NAND from
-the device-tree blob. This will allow us to remove all static settings
-stored in the gpmc-nand.c in the future once the migration to
-device-tree is complete.
+Each GPMC chip-select can be configured to map 16MB, 32MB, 64MB or 128MB
+of address space. The physical base address where a chip-select starts
+is also configurable and must be aligned on a boundary that is equal to
+or greater than the size of the address space mapped bt the chip-select.
+When enabling a GPMC chip-select, ensure that the base address is aligned
+to the appropriate boundary.
 
+Reported-by: Mark Jackson <mpfj-list@mimc.co.uk>
 Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 ---
- arch/arm/mach-omap2/gpmc-nand.c |   16 ++++++++++------
- 1 file changed, 10 insertions(+), 6 deletions(-)
+ arch/arm/mach-omap2/gpmc.c |   22 +++++++++++++++++++---
+ 1 file changed, 19 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/gpmc-nand.c b/arch/arm/mach-omap2/gpmc-nand.c
-index 12e9753..d9c2719 100644
---- a/arch/arm/mach-omap2/gpmc-nand.c
-+++ b/arch/arm/mach-omap2/gpmc-nand.c
-@@ -137,12 +137,16 @@ int gpmc_nand_init(struct omap_nand_platform_data *gpmc_nand_data,
- 			return err;
- 		}
+diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+index c928a8c..a6f2b71 100644
+--- a/arch/arm/mach-omap2/gpmc.c
++++ b/arch/arm/mach-omap2/gpmc.c
+@@ -403,11 +403,18 @@ int gpmc_cs_set_timings(int cs, const struct gpmc_timings *t)
+ 	return 0;
+ }
  
--		s.device_nand = true;
--
--		/* Enable RD PIN Monitoring Reg */
--		if (gpmc_nand_data->dev_ready) {
--			s.wait_on_read = true;
--			s.wait_on_write = true;
-+		if (gpmc_nand_data->of_node) {
-+			gpmc_read_settings_dt(gpmc_nand_data->of_node, &s);
-+		} else {
-+			s.device_nand = true;
+-static void gpmc_cs_enable_mem(int cs, u32 base, u32 size)
++static int gpmc_cs_enable_mem(int cs, u32 base, u32 size)
+ {
+ 	u32 l;
+ 	u32 mask;
+ 
++	/*
++	 * Ensure that base address is aligned on a
++	 * boundary equal to or greater than size.
++	 */
++	if (base & (size - 1))
++		return -EINVAL;
 +
-+			/* Enable RD PIN Monitoring Reg */
-+			if (gpmc_nand_data->dev_ready) {
-+				s.wait_on_read = true;
-+				s.wait_on_write = true;
-+			}
- 		}
+ 	mask = (1 << GPMC_SECTION_SHIFT) - size;
+ 	l = gpmc_cs_read_reg(cs, GPMC_CS_CONFIG7);
+ 	l &= ~0x3f;
+@@ -416,6 +423,8 @@ static void gpmc_cs_enable_mem(int cs, u32 base, u32 size)
+ 	l |= ((mask >> GPMC_CHUNK_SHIFT) & 0x0f) << 8;
+ 	l |= GPMC_CONFIG7_CSVALID;
+ 	gpmc_cs_write_reg(cs, GPMC_CS_CONFIG7, l);
++
++	return 0;
+ }
  
- 		if (gpmc_nand_data->devsize == NAND_BUSWIDTH_16)
+ static void gpmc_cs_disable_mem(int cs)
+@@ -526,7 +535,9 @@ static int gpmc_cs_remap(int cs, u32 base)
+ 	ret = gpmc_cs_insert_mem(cs, base, size);
+ 	if (ret < 0)
+ 		return ret;
+-	gpmc_cs_enable_mem(cs, base, size);
++	ret = gpmc_cs_enable_mem(cs, base, size);
++	if (ret < 0)
++		return ret;
+ 
+ 	return 0;
+ }
+@@ -556,7 +567,12 @@ int gpmc_cs_request(int cs, unsigned long size, unsigned long *base)
+ 	if (r < 0)
+ 		goto out;
+ 
+-	gpmc_cs_enable_mem(cs, res->start, resource_size(res));
++	r = gpmc_cs_enable_mem(cs, res->start, resource_size(res));
++	if (r < 0) {
++		release_resource(res);
++		goto out;
++	}
++
+ 	*base = res->start;
+ 	gpmc_cs_set_reserved(cs, 1);
+ out:
 -- 
 1.7.10.4
