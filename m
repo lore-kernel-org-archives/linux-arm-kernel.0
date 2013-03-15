@@ -1,32 +1,27 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Fri, 15 Mar 2013 16:36:10 +0800
-Subject: [GIT PULL][for 3.9] pull request from fix branch in pxa git tree
-Message-ID: <CAN1soZzTVtg0HJFDiOFMfMngqz0yNs6Le+hvuNUxQ=Ka9dUaHQ@mail.gmail.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Fri, 15 Mar 2013 10:37:32 +0200
+Subject: [PATCH 1/4] mtd: merge mtdchar module with mtdcore
+In-Reply-To: <1363260463-10609-1-git-send-email-dedekind1@gmail.com>
+References: <1363260463-10609-1-git-send-email-dedekind1@gmail.com>
+Message-ID: <1363336652.11441.116.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd & Olof,
+On Thu, 2013-03-14 at 13:27 +0200, Artem Bityutskiy wrote:
+> From: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
+> 
+> The MTD subsystem has historically tried to be as configurable as possible. The
+> side-effect of this is that its configuration menu is rather large, and we are
+> gradually shrinking it. For example, we recently merged partitions support with
+> the mtdcore.
+> 
+> This patch does the next step - it merges the mtdchar module to mtdcore. And in
+> this case this is not only about eliminating too fine-grained separation and
+> simplifying the configuration menu. This is also about eliminating seemingly
+> useless kernel module.
 
-Please help to merge fix branch from pxa git tree.
+I've pushed the patch-set to the l2-mtd.git tree.
 
-Regards
-Haojian
-
-The following changes since commit f6161aa153581da4a3867a2d1a7caf4be19b6ec9:
-
-  Linux 3.9-rc2 (2013-03-10 16:54:19 -0700)
-
-are available in the git repository at:
-
-  git://github.com/hzhuang1/linux.git armsoc/fix
-
-for you to fetch changes up to e71dc5f787f3908b8b8158103fc7d74a78a22cd1:
-
-  ARM: mmp: add platform_device head file in gplugd (2013-03-15 16:27:53 +0800)
-
-----------------------------------------------------------------
-Haojian Zhuang (1):
-      ARM: mmp: add platform_device head file in gplugd
-
- arch/arm/mach-mmp/gplugd.c |    1 +
- 1 file changed, 1 insertion(+)
+-- 
+Best Regards,
+Artem Bityutskiy
