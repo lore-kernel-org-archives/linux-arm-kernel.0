@@ -1,49 +1,48 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 15 Mar 2013 18:23:28 +0530
-Subject: [PATCH 0/8] ARM: dts: OMAP5: ocp address space and few updates
-In-Reply-To: <514317EC.6040400@ti.com>
-References: <1361374735-22018-1-git-send-email-santosh.shilimkar@ti.com>
- <5142F6EF.7010900@ti.com> <514317EC.6040400@ti.com>
-Message-ID: <514319C8.7020304@ti.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 15 Mar 2013 16:51:23 +0400
+Subject: [PATCH 2/7] ARM: shmobile: marzen: add USB EHCI driver support
+In-Reply-To: <87boal32nh.wl%kuninori.morimoto.gx@renesas.com>
+References: <1352446306-19945-1-git-send-email-horms@verge.net.au>
+ <1352446306-19945-3-git-send-email-horms@verge.net.au>
+ <5140F35F.3090702@cogentembedded.com>
+ <87li9q4ydj.wl%kuninori.morimoto.gx@renesas.com>
+ <5141D3C6.4090806@cogentembedded.com>
+ <87boal32nh.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <5143194B.2040600@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 March 2013 06:15 PM, Benoit Cousson wrote:
-> Hi Santosh,
-> 
-> On 03/15/2013 11:24 AM, Santosh Shilimkar wrote:
->> Benoit,
->>
->> On Wednesday 20 February 2013 09:08 PM, Santosh Shilimkar wrote:
->>> Few updates for OMAP5 found during testing OMAP5 DT builds. Couple
->>> of patches were already posted on the list. The series also contains
->>> a patch which adds DMA request, IRQ lines and IO address space 
->>> DT extraction support to hwmod code so that we can get rid of
->>> such information from hwmod data files. It has been tested on OMAP5
->>> and OMAP4 devices.
->>>
->> [..]
->>
->>>   ARM: OMAP: hwmod: extract module address space from DT blob
->> Above patch even though dt extraction code touches the hwmod file.
->> Are you ok to keep this patch is the current series considering
->> both the patches needs to go through your tree. If it needs to
->> be in separate branch, then I can add that as part of the
->> other generic patches with your ack.
->>
->>>  arch/arm/boot/dts/omap5-evm.dts  |    2 +-
->>>  arch/arm/boot/dts/omap5.dtsi     |  282 +++++++++++++++++++++++++++++++++++---
->>>  arch/arm/mach-omap2/omap_hwmod.c |   31 ++++-
->>>  3 files changed, 293 insertions(+), 22 deletions(-)
->>>
->>
->> Let me know your preference. Either way is fine by me.
-> 
-> I can take both DTS and hwmod patches, so you can keep then in the same
-> series.
-> 
-Cool. I will wait for Jon to send you a branch and then post mine so
-that I have one less dependency for testing.
+Hello.
 
-Regards,
-Santosh
+On 15-03-2013 4:52, Kuninori Morimoto wrote:
+
+>>> I forgot detail of it, but these usb is using callback function,
+>>> and it is using *phy*.
+
+>>     But this PHY also belongs to SoC.
+
+>>> This phy came from marzen_init_late() with usb_get_phy(USB_PHY_TYPE_USB2);
+>>> This usb_get_phy() is not needed if board doesn't have USB.
+
+>>      Anyway, there should be ways to separate the board specific platform code
+>> and the SoC specific one. That's what other subarches do.
+
+>>> You can modify it if you want
+
+>>      Yes, I definitely would like to try.
+
+> I checked CPG :: MSTP for USB0/1/2 and USB Host/Function,
+> and GIC number for it.
+> It seems no conflict each other
+> I guess EHCI/OHCI goes to setup seems no problem.
+
+> But, as you pointed on USB ML,
+> USB-PHY :: USBPCTRL0 depends on platform
+> (Host/Function selection, and OVC pin setting)
+
+> rcar_usb_phy driver belongs to platform
+
+    No, it doesn't. Only it's (future) platform data will belong to the board --
+that's what they were designed for.
+
+WBR, Sergei
