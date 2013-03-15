@@ -1,34 +1,35 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Fri, 15 Mar 2013 16:39:00 +0000
-Subject: [PATCH 2/2] ARM: vexpress: Remove A9 compatible value for V2P-CA5s
- PMU node
-In-Reply-To: <1363365540-23001-1-git-send-email-pawel.moll@arm.com>
-References: <1363365540-23001-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <1363365540-23001-3-git-send-email-pawel.moll@arm.com>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Fri, 15 Mar 2013 17:46:57 +0100
+Subject: [PATCH 2/3] mfd: Make AB8500_CORE select POWER_SUPPLY to fix
+ build error
+In-Reply-To: <201303151018.13518.arnd@arndb.de>
+References: <1363298204-8014-1-git-send-email-arnd@arndb.de>
+ <1363298204-8014-2-git-send-email-arnd@arndb.de>
+ <20130315064436.GD12559@zurbaran>
+ <201303151018.13518.arnd@arndb.de>
+Message-ID: <20130315164657.GA29606@zurbaran>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Cortex-A5 PMU is not really compatible with Cortex-A9 one,
-so remove the respective compatible value from the PMU node in
-the V2P_CA5s' Device Tree.
+Hi Arnd,
 
-Signed-off-by: Pawel Moll <pawel.moll@arm.com>
----
- arch/arm/boot/dts/vexpress-v2p-ca5s.dts |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On Fri, Mar 15, 2013 at 10:18:13AM +0000, Arnd Bergmann wrote:
+> On Friday 15 March 2013, Samuel Ortiz wrote:
+> > On Thu, Mar 14, 2013 at 10:56:39PM +0100, Arnd Bergmann wrote:
+> > > 
+> > > Please apply to MFD tree for 3.9
+> > Already applied to mfd-fixes.
+> > 
+> 
+> For some reason I did not see it when I rebased my patches on top of linux-next
+> to make sure I don't send any patches again that are already queued up.
+> 
+> Is there a reason why mfd-fixes is not part of linux-next?
+No valid reasons, you're right. I'll ping Stephen about it.
 
-diff --git a/arch/arm/boot/dts/vexpress-v2p-ca5s.dts b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
-index 6328cbc..c544a55 100644
---- a/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
-+++ b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
-@@ -111,7 +111,7 @@
- 	};
- 
- 	pmu {
--		compatible = "arm,cortex-a5-pmu", "arm,cortex-a9-pmu";
-+		compatible = "arm,cortex-a5-pmu";
- 		interrupts = <0 68 4>,
- 			     <0 69 4>;
- 	};
+Cheers,
+Samuel.
+
 -- 
-1.7.10.4
+Intel Open Source Technology Centre
+http://oss.intel.com/
