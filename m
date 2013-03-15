@@ -1,28 +1,69 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 15 Mar 2013 18:05:03 +0000
-Subject: [PATCH 3/4 v2] net: mvmdio: enhance driver to support SMI
- error/done interrupts
-In-Reply-To: <1363284515-9865-4-git-send-email-florian@openwrt.org>
-References: <1359473048-26551-1-git-send-email-florian@openwrt.org>
- <1363284515-9865-1-git-send-email-florian@openwrt.org>
- <1363284515-9865-4-git-send-email-florian@openwrt.org>
-Message-ID: <20130315180503.GU4977@n2100.arm.linux.org.uk>
+From: chris@cloudcar.com (Christoffer Dall)
+Date: Fri, 15 Mar 2013 11:08:35 -0700
+Subject: [PATCH V6] ARM: LPAE: Fix mapping in alloc_init_section for
+ unaligned addresses
+In-Reply-To: <20130315173630.GR4977@n2100.arm.linux.org.uk>
+References: <1360574009-12429-1-git-send-email-r.sricharan@ti.com>
+ <20130211131230.GA5676@MacBook-Pro.local> <5118F796.3080308@ti.com>
+ <51261288.5030806@ti.com> <51414AFB.9080403@ti.com>
+ <20130315173630.GR4977@n2100.arm.linux.org.uk>
+Message-ID: <CANOGCgNDRb5OT9_D2Kny1_VrKWUVr9B5hjnmJvHpvve7mjidOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 14, 2013 at 07:08:34PM +0100, Florian Fainelli wrote:
-> +	if (dev->err_interrupt == NO_IRQ) {
-...
-> +	init_waitqueue_head(&dev->smi_busy_wait);
-> +
-> +	dev->err_interrupt = platform_get_irq(pdev, 0);
-> +	if (dev->err_interrupt != -ENXIO) {
-...
-> +	} else
-> +		dev->err_interrupt = NO_IRQ;
+On Fri, Mar 15, 2013 at 10:36 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Mar 14, 2013 at 09:28:51AM +0530, Sricharan R wrote:
+>> On Thursday 21 February 2013 05:56 PM, R Sricharan wrote:
+>> > Hi,
+>> > On Monday 11 February 2013 07:22 PM, R Sricharan wrote:
+>> >> Hi Russell,
+>> >>
+>> >> On Monday 11 February 2013 06:42 PM, Catalin Marinas wrote:
+>> >>> On Mon, Feb 11, 2013 at 09:13:29AM +0000, R Sricharan wrote:
+>> >>>> +static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
+>> >>>> +                      unsigned long end, phys_addr_t phys,
+>> >>>> +                      const struct mem_type *type)
+>> >>>> +{
+>> >>>> +    pmd_t *pmd = pmd_offset(pud, addr);
+>> >>>> +    unsigned long next;
+>> >>>> +
+>> >>>> +    do {
+>> >>>>           /*
+>> >>>> -         * No need to loop; pte's aren't interested in the
+>> >>>> -         * individual L1 entries.
+>> >>>> +         * With LPAE, we must loop over to map
+>> >>>> +         * all the pmds for the given range.
+>> >>>>            */
+>> >>>> -        alloc_init_pte(pmd, addr, end, __phys_to_pfn(phys), type);
+>> >>>> -    }
+>> >>>> +        next = pmd_addr_end(addr, end);
+>> >>>> +
+>> >>>> +        /*
+>> >>>> +         * Try a section mapping - end, addr and phys must all be
+>> >>>> +         * aligned to a section boundary.
+>> >>>> +         */
+>> >>>
+>> >>> Should this read "next, addr and phys" instead of "end..."?
+>> >>>
+>> >>> Otherwise:
+>> >>>
+>> >>> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+>> >>>
+>> >>   Can I put this in to patch system ?
+>> >
+>> >    Ping..
+>> >
+>> > Regards,
+>> >  Sricharan
+>>  Ping again..
+>
+> Do we have a winner out of all the patches which have been posted yet?
 
+I was fine with the latest version if my comments were addressed, but
+I don't remember seeing this version posted.
 
-FYI, NO_IRQ is not supposed to be used anymore (we're supposed to be
-removing it).  platform_get_irq() returns negative numbers for failure,
-so why not test for < 0 in both the above tests, or maybe <= 0 (as
-IRQ0 is also not supposed to be valid.)?
+Sricharan, can you please post a new complete patch that we can ack,
+and please remember cc'ing me directly so I don't miss it.
+
+-Christoffer
