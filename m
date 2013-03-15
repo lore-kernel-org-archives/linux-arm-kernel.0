@@ -1,42 +1,108 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 15 Mar 2013 10:21:16 -0500
-Subject: [PATCH V3 18/18] ARM: OMAP2+: return -ENODEV if GPMC child device
- creation fails
-In-Reply-To: <1363360876-13617-1-git-send-email-jon-hunter@ti.com>
-References: <1363360876-13617-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <1363360876-13617-19-git-send-email-jon-hunter@ti.com>
+From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
+Date: Fri, 15 Mar 2013 21:12:22 +0530
+Subject: [PATCH v2 4/4] ARM: dts: Add adc and thermistors for
+ exynos5250-snow
+In-Reply-To: <CAHfPSqDmu52D42qiGM4rT3qeYWu0b5jxOOCNOXLa=1JZH4j9rw@mail.gmail.com>
+References: <1363129994-10438-1-git-send-email-dianders@chromium.org>
+ <1363207202-10858-1-git-send-email-dianders@chromium.org>
+ <1363207202-10858-5-git-send-email-dianders@chromium.org>
+ <CAHfPSqDmu52D42qiGM4rT3qeYWu0b5jxOOCNOXLa=1JZH4j9rw@mail.gmail.com>
+Message-ID: <CAHfPSqDnbfmHVeuDeDFZearm1sSVA9YsJ5668iwtKHUt_gEDRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+On 15 March 2013 15:54, Naveen Krishna Ch <naveenkrishna.ch@gmail.com> wrote:
+> Doug,
+>
+> On 14 March 2013 02:10, Doug Anderson <dianders@chromium.org> wrote:
+>> Hook up the exynos5250-snow thermistors via the device tree now that
+>> there's a driver available to use them.
+>>
+>> Signed-off-by: Doug Anderson <dianders@chromium.org>
+Tested-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+used these changes to test on snow before submitting the ADC and NTC
+driver changes.
+>> ---
+>> Changes in v2:
+>> - Match 'uV' -> 'uv' change in Naveen's bindings.
+>>
+>>  arch/arm/boot/dts/cros5250-common.dtsi |  4 ++++
+>>  arch/arm/boot/dts/exynos5250-snow.dts  | 31 +++++++++++++++++++++++++++++++
+>>  2 files changed, 35 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/cros5250-common.dtsi b/arch/arm/boot/dts/cros5250-common.dtsi
+>> index 46c0980..f7cc835 100644
+>> --- a/arch/arm/boot/dts/cros5250-common.dtsi
+>> +++ b/arch/arm/boot/dts/cros5250-common.dtsi
+>> @@ -167,6 +167,10 @@
+>>                 status = "disabled";
+>>         };
+>>
+>> +       adc at 12D10000 {
+>> +               vdd-supply = <&buck5_reg>;
+>> +       };
+>> +
+>>         hdmi {
+>>                 hpd-gpio = <&gpx3 7 0xf 1 3>;
+>>         };
+>> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+>> index 17dd951..b78da7c 100644
+>> --- a/arch/arm/boot/dts/exynos5250-snow.dts
+>> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
+>> @@ -40,4 +40,35 @@
+>>                                 <&gpc4 5 2 3 0>, <&gpc4 6 2 3 0>;
+>>                 };
+>>         };
+>> +
+>> +       adc at 12D10000 {
+>> +               ncp15wb473 at 3 {
+>> +                       compatible = "ntc,ncp15wb473";
+>> +                       pullup-uv = <1800000>;
+>> +                       pullup-ohm = <47000>;
+>> +                       pulldown-ohm = <0>;
+>> +                       io-channels = <&adc 3>;
+>> +               };
+>> +               ncp15wb473 at 4 {
+>> +                       compatible = "ntc,ncp15wb473";
+>> +                       pullup-uv = <1800000>;
+>> +                       pullup-ohm = <47000>;
+>> +                       pulldown-ohm = <0>;
+>> +                       io-channels = <&adc 4>;
+>> +               };
+>> +               ncp15wb473 at 5 {
+>> +                       compatible = "ntc,ncp15wb473";
+>> +                       pullup-uv = <1800000>;
+>> +                       pullup-ohm = <47000>;
+>> +                       pulldown-ohm = <0>;
+>> +                       io-channels = <&adc 5>;
+>> +               };
+>> +               ncp15wb473 at 6 {
+>> +                       compatible = "ntc,ncp15wb473";
+>> +                       pullup-uv = <1800000>;
+>> +                       pullup-ohm = <47000>;
+>> +                       pulldown-ohm = <0>;
+>> +                       io-channels = <&adc 6>;
+>> +               };
+>> +       };
+>>  };
+> Thanks for the upload, i've tested with a similar changes.
+>> --
+>> 1.8.1.3
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> Please read the FAQ at  http://www.tux.org/lkml/
+>
+>
+>
+> --
+> Shine bright,
+> (: Nav :)
 
-gpmc_probe_nor_child() calls of_platform_device_create() to create a
-platform device for the NOR child. If this function fails the value
-of ret is returned to the caller but this value is zero since it was
-assigned the return of a previous call to gpmc_cs_program_settings()
-that had to succeed or otherwise gpmc_probe_nor_child() would have
-returned before.
 
-This means that if of_platform_device_create() fails, 0 will be returned
-to the caller instead of an appropriate error code.
 
-Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-Signed-off-by: Jon Hunter <jon-hunter@ti.com>
----
- arch/arm/mach-omap2/gpmc.c |    1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-index ee6601c..d4ec5bb 100644
---- a/arch/arm/mach-omap2/gpmc.c
-+++ b/arch/arm/mach-omap2/gpmc.c
-@@ -1504,6 +1504,7 @@ static int gpmc_probe_nor_child(struct platform_device *pdev,
- 		return 0;
- 
- 	dev_err(&pdev->dev, "failed to create gpmc child %s\n", child->name);
-+	ret = -ENODEV;
- 
- err:
- 	gpmc_cs_free(cs);
--- 
-1.7.10.4
+--
+Shine bright,
+(: Nav :)
