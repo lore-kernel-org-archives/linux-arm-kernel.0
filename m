@@ -1,88 +1,53 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 15 Mar 2013 09:56:19 -0500
-Subject: [PATCH 0/8] ARM: OMAP3+: Switch to use DT based cpu0-cpufreq
- driver
-In-Reply-To: <20130315142157.GC2939@kahuna>
+Date: Fri, 15 Mar 2013 09:58:43 -0500
+Subject: [PATCH 2/8] ARM: dts: OMAP36xx: move CPU OPP tables to device tree
+In-Reply-To: <20130315143806.GA3103@kahuna>
 References: <1363294695-658-1-git-send-email-nm@ti.com>
- <5142AF41.7070003@ti.com> <20130315142157.GC2939@kahuna>
-Message-ID: <51433693.2@ti.com>
+ <1363294695-658-3-git-send-email-nm@ti.com> <514244B4.9050808@ti.com>
+ <20130315135655.GA2939@kahuna> <51432F94.7000306@ti.com>
+ <20130315143806.GA3103@kahuna>
+Message-ID: <51433723.20107@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On 03/15/2013 09:21 AM, Nishanth Menon wrote:
-> On 10:48-20130315, Santosh Shilimkar wrote:
->> On Friday 15 March 2013 02:28 AM, Nishanth Menon wrote:
->>> The following series arose from trying to use BeagleBoard-XM (OMAP3 variant)
->>> for doing CPU DVFS using cpufreq-cpu0. This series will eventually result in
->>> migrating the cpufreq support only through device tree (part of the effort
->>> to migrate away from non-DT configurations for OMAP). Unfortunately, as already
->>> known, we have a bunch of legacy code and mutually dependent device tree
->>> conversion that is pending.
->>> Key features pending:
->>> A) clock framework transition to DT - this should happen soon, so this series hacks
->>> the clock node for the time being as suggested in review of original series
->>> B) on processors that use voltage controller, voltage processor (VC/VP hardware
->>> loop using I2C_SR path) - we have started work on transitioning them to regulator
->>> framework driven by DT.
->>> C) Adaptive Body Bias and SmartReflex AVS conversion to DT.
->>>
->>> As a result of these pending features:
->>> - OMAP4 TWL6030 and TPS62361 which set voltage ONLY over I2C_SR have no regulators
->>> associated at the moment - fortunately, we boot at highest voltage, so things still
->>> work.
->>> - Missing ABB and AVS implies that for few of the SoCs (3630, OMAP4), I have not added
->>> those OPPs in DT yet - this also needs alignment with iMX, AM series like pending work,
->>> where certain OPPs need enabling based on efuse programmed bit sequences - since it
->>> is an add-on work, it is not addressed here.
->>>
->> Thanks for looking into it.
-> Yes, this should be the next stage to solve.
+On 03/15/2013 09:38 AM, Nishanth Menon wrote:
+> On 09:26-20130315, Jon Hunter wrote:
 >>
->>> Note: Somewhere in the future, when we have regulators driven off CCF and OMAP
->>> converted to CCF, we could remove the DT regulator requirements there as well.
+>> On 03/15/2013 08:56 AM, Nishanth Menon wrote:
+>>> On 16:44-20130314, Jon Hunter wrote:
+>>>>
+>>>> On 03/14/2013 03:58 PM, Nishanth Menon wrote:
+>>>>> Add DT OPP table for OMAP36xx family of devices. This data is
+>>>>> decoded by OF with of_init_opp_table() helper function. This
+>>>>> overrides the default OMAP34xx CPU OPP table definition.
+>>>>
+>>>> Not sure I following the last sentence. The tables are in a different
+>>>> dtsi file and only the relevant file should be included, right?
+>>> omap3630.dsi includes omap3.dtsi (which is meant for OMAP34xx).
+>>> The opp tables introduced by this patch in omap36xx.dtsi will override
+>>> the ones defined on omap3.dtsi. Will the following rephrase help clarify
+>>> this?
 >>>
->>> Key benefit of the series is to allow all relevant TI platforms now to use a single
->>> cpufreq driver and equivalent frameworks in addition be part of the transition to
->>> DT. As a result of this series, CPUFreq feature will not be available for non-DT
->>> boot systems.
->>>
->> As commented by Jon on internal thread, I am also against the idea of dropping
->> non-DT support now. Till we migrate to 100 % DT, it is best to keep support
->> alive. Especial OMAP3 based devices.
+>>> Original:
+>>> This overrides the default OMAP34xx CPU OPP table definition.
+>>> Suggested;
+>>> This overrides the default OMAP34xx CPU OPP table definition in
+>>> omap3.dtsi.
 >>
->> Why don't you take phased approach and have both supported for time being.
->> Then once we move to DT only, we just drop the non-DT support as we plan
->> to do for many more stuff.
->>
->> BTW, we are using only CPUFreq driver before this series as well. I guess you
->> mean the common CPUFReq drivers used by other ARM SOCs.
-> I had removed the entries for OPPs and clock nodes used by
-> omap-cpufreq.c and deleted the omap-cpufreq.c as well - so the statement
-> "CPUFreq wont work in non-DT" configuration was accurate.
-> 
-> My intent was as follows:
-> - This series is driven mainly from maintenance angle - having to maintain
-> two different drivers (legacy omap-cpufreq.c and cpufreq-cpu0.c),
-> ensuring the data is proper in both OPP tables in kernel and DT entries
-> is sure to cause mayhem sometime. This is not just an pain for OMAP
-> community, but for cpufreq community as well (since there is absolutely
-> no reason other than OMAP legacy burden for making cpu0-cpufreq work in non-DT
-> world).
-> - as long as non-DT supported boot provides all features, there is no
-> real feature incentive to move to DT.
+>> Sorry, I just missed that the omap3430 opps were in omap3.dtsi and not
+>> omap34xx.dtsi. I guess I am not familiar with how the DTC overrides
+>> nodes, however, at least from a readability standpoint it would seem
+>> nice to have the omap3430 opps in a omap3430 specific dtsi and not
+>> omap3.dtsi. However, thats just my opinion.
+> most of omap3630 is based off omap3430. I know from an readability point
+> of view, it might have been good to split that to omap3-common.dtsi,
+> omap34xx.dtsi, omap36xx.dtsi etc.. But there is no real need at this
+> point in time to do that. Unless, ofcourse, we'd like to set that up as
+> an standard for all OMAP SoCs...
 
-You are missing the point. Before you can migrate people over to DT, you
-need to be ready. IMO OMAP is still not quite ready unfortunately.
-
-> But, that said, there is one path I see possible:
-> - keep omap-cpufreq alive (BUT I will add a patch that will not let it init
->   when in DT entries are present)
-> - add DT entries for all relevant OMAPs - in DT mode, we will *only*
-> support cpufreq-cpu0
-> - All future SoCs will continue to use cpufreq-cpu0 using DT, as was the
-> alignment I believe.
-
-Yes that is what we are doing for other drivers and should be done here.
+How would omap3-common.dtsi be any different from omap3.dtsi? I don't
+wish us to go nuts with creating dtsi files either, but having an
+omap3430.dtsi does not seem unreasonable to me, but that is just my opinion.
 
 Jon
