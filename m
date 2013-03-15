@@ -1,36 +1,54 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 15 Mar 2013 09:08:04 -0500
-Subject: [PATCH 6/8] ARM: dts: OMAP446x: move CPU OPP tables to device tree
-In-Reply-To: <514245EE.6090906@ti.com>
-References: <1363294695-658-1-git-send-email-nm@ti.com>
- <1363294695-658-7-git-send-email-nm@ti.com>
- <514245EE.6090906@ti.com>
-Message-ID: <20130315140804.GB2939@kahuna>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 15 Mar 2013 19:47:35 +0530
+Subject: DaVinci platform unable to boot via NFS
+In-Reply-To: <CA+V-a8sNLBi1zB942ZbK26POrzcq7oOpNW9yPG5dG_gX7ZZ1oQ@mail.gmail.com>
+References: <CA+V-a8sNLBi1zB942ZbK26POrzcq7oOpNW9yPG5dG_gX7ZZ1oQ@mail.gmail.com>
+Message-ID: <51432D7F.4090001@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16:49-20130314, Jon Hunter wrote:
-> 
-> On 03/14/2013 03:58 PM, Nishanth Menon wrote:
-> > OMAP4430 and 4460 have different OPP definitions. So, create an SoC
-> > variant dtsi file for 4460 and move the OPP definitions to it.
-> 
-> FYI, I had to create a similar file for PMU [1]. However, I called it
-> omap4460.dtsi and not omap446x.dtsi as there is only one omap446x
-Hmm, guess I was paranoid about marketing folks spinning off another
-omap446x variant out into the market. Since it is not yet done, nor
-known if they will ever do it, am OK with 4460 convention.
-> device. That should go into to v3.10 and so may be worth basing this on
-> top. I do like your omap4-panda-common.dtsi that is a nice clean-up.
-Thanks on the tip - Sounds good, since this series is based on DT, I
-will base my changes on top of for_3.10 branch.
-> 
-> Cheers
-> Jon
-> 
-> [1]
-> http://git.kernel.org/cgit/linux/kernel/git/bcousson/linux-omap-dt.git/commit/?h=for_3.10/dts&id=5e64b6b1137a54f353528d6da60071c1ef0043ba
+Prabhakar,
 
--- 
-Regards,
-Nishanth Menon
+On 3/15/2013 7:11 PM, Prabhakar Lad wrote:
+> Hi Mugunthan,
+> 
+> With 3.9 release I am not able to boot any davinci board via nfs, finally
+> digging Into I found that there were recent changes for Ethernet davinci.
+> Finally I reverting this to some safe commit I was able to boot via nfs.
+> I reverted back as following:-
+> git checkout  f9a8f83b04e0c362a2fc660dbad980d24af209fc  drivers/net/ethernet/ti/
+> 
+> Can you please take a look at and fix it.
+> 
+> Cheers,
+> --Prabhakar Lad
+> http://in.linkedin.com/pub/prabhakar-lad/19/92b/955
+> 
+
+A similar bug was reported on cpsw and the following patch from Daniel 
+seems to have helped.
+
+https://git.kernel.org/cgit/linux/kernel/git/davem/net.git/commit/?id=d35162f89b8f00537d7b240b76d2d0e8b8d29aa0
+
+I made a similar fix for davinci_emac.c and the resulting diff is below 
+(not tested or built).
+
+Can you please check if this helps in DaVinci case?
+
+Thanks,
+Sekhar
+
+----8<----
+diff --git a/drivers/net/ethernet/ti/davinci_emac.c b/drivers/net/ethernet/ti/davinci_emac.c
+index 52c0536..ae1b77a 100644
+--- a/drivers/net/ethernet/ti/davinci_emac.c
++++ b/drivers/net/ethernet/ti/davinci_emac.c
+@@ -1102,7 +1102,7 @@ static int emac_dev_xmit(struct sk_buff *skb, struct net_device *ndev)
+        /* If there is no more tx desc left free then we need to
+         * tell the kernel to stop sending us tx frames.
+         */
+-       if (unlikely(cpdma_check_free_tx_desc(priv->txchan)))
++       if (unlikely(!cpdma_check_free_tx_desc(priv->txchan)))
+                netif_stop_queue(ndev);
+
+        return NETDEV_TX_OK;
