@@ -1,40 +1,60 @@
-From: andrea.adami@gmail.com (Andrea Adami)
-Date: Fri, 15 Mar 2013 10:31:33 +0100
-Subject: [Suggestion] Latest randconfig build errors for Head.S
-In-Reply-To: <514270D2.9010205@asianux.com>
-References: <51415428.1070401@asianux.com>
- <20130314234323.GD4977@n2100.arm.linux.org.uk>
- <514270D2.9010205@asianux.com>
-Message-ID: <CAAQYJAvXLV38shKncAKKqgQ9G0SnXjh+=aJHBdhd29yzVtL80A@mail.gmail.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Fri, 15 Mar 2013 11:39:51 +0200
+Subject: [RFC 1/1] clk: Add notifier support in
+ clk_prepare_enable/clk_disable_unprepare
+In-Reply-To: <5142B027.4040403@wwwdotorg.org>
+References: <1363151317.3311.9.camel@bilhuang-vm1>
+ <51400D9D.9060305@wwwdotorg.org>
+ <1363153204.3311.14.camel@bilhuang-vm1>
+ <5140C12A.4060900@wwwdotorg.org>
+ <1363227311.3311.30.camel@bilhuang-vm1>
+ <20130314092132.GE18519@tbergstrom-lnx.Nvidia.com>
+ <1363253287.3311.32.camel@bilhuang-vm1>
+ <51420EBB.7080503@wwwdotorg.org>
+ <1363310454.3311.44.camel@bilhuang-vm1>
+ <5142B027.4040403@wwwdotorg.org>
+Message-ID: <20130315093951.GV18519@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 15, 2013 at 1:52 AM, Chen Gang <gang.chen@asianux.com> wrote:
-> ? 2013?03?15? 07:43, Russell King - ARM Linux ??:
->> So our wonderful toolchain has decided to start producing NULL warnings
->> for every "mcr     p15, 0, rX, c7, c10, 4" instruction?  I'd just ignore
->> them and hope that the toolchain people fix it.
+On Fri, Mar 15, 2013 at 06:22:47AM +0100, Stephen Warren wrote:
+> On 03/14/2013 07:20 PM, Bill Huang wrote:
+> > On Fri, 2013-03-15 at 01:54 +0800, Stephen Warren wrote:
+> >> On 03/14/2013 03:28 AM, Bill Huang wrote:
+> >>> On Thu, 2013-03-14 at 17:21 +0800, Peter De Schrijver wrote:
+> >>>> On Thu, Mar 14, 2013 at 03:15:11AM +0100, Bill Huang wrote:
+> >>>>
+> >>>>> I don't think deferring will work either, considering the usage of DVFS,
+> >>>>> device voltage is tightly coupled with frequency, when clock rate is
+> >>>>> about to increase, we have to boost voltage first and we can lower the
+> >>>>> voltage after the clock rate has decreased. All the above sequence have
+> >>>>> to be guaranteed or you might crash, so deferring not only make thing
+> >>>>> complicated in controlling the order but also hurt performance.
+> >>>>
+> >>>> But we could use notifiers in clk_prepare/clk_unprepare to set the voltage no?
+> >>>> As clk_prepare/clk_unprepare have to be called before clk_enable or after
+> >>>> clk_disable, the voltage can be raised to a safe level, before the clock
+> >>>> becomes active.
+> >>>
+> >>> Thanks Peter, actually I'm just about to propose my v2 RFC which add
+> >>> notifier in clk_prepare/clk_unprepare.
+> >>
+> >> Can't clk_set_rate() be called while the clock is prepared, or even
+> >> enabled? I don't see how your proposal would work.
+> >
+> > I think it works with just a little sacrifice on saving more power but
+> > that's related minor. Taking clk_prepare as an indicator on that clock
+> > will be enabled later, so we can raise the voltage to a safe level
+> > (according to the current rate or maybe default rate when clk_prepare is
+> > called, some time late when clk_set_rate() is called we can adjust again
+> > according to the requested rate change)
+> 
+> Is clk_set_rate() only legal to call in non-atomic contexts then? The
+> header file doesn't say, although I guess since many other functions
+> explicitly say they can't, then by omission it can...
 
-AFAIK Arnd is aware and waiting for feedback about his patch:
+Yes. Only clk_enable() and clk_disable() can be called in an atomic context.
 
-ARM: compressed/head.S: work around new binutils warning   Arnd Bergmann
+Cheers,
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/144846.html
-
-Regards
-
-Andrea
->
->   ok, thanks.
->
->   :-)
->
-> --
-> Chen Gang
->
-> Asianux Corporation
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Peter.
