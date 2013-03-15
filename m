@@ -1,33 +1,22 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Fri, 15 Mar 2013 18:36:14 +0800
-Subject: [Suggestion] Latest randconfig build errors for Head.S
-In-Reply-To: <CAAQYJAvXLV38shKncAKKqgQ9G0SnXjh+=aJHBdhd29yzVtL80A@mail.gmail.com>
-References: <51415428.1070401@asianux.com>
- <20130314234323.GD4977@n2100.arm.linux.org.uk> <514270D2.9010205@asianux.com>
- <CAAQYJAvXLV38shKncAKKqgQ9G0SnXjh+=aJHBdhd29yzVtL80A@mail.gmail.com>
-Message-ID: <5142F99E.6030607@asianux.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 15 Mar 2013 16:06:35 +0530
+Subject: [RESEND 0/2] davinci: Add device tree data for tps6507x.
+In-Reply-To: <1362637581-12673-1-git-send-email-manishv.b@ti.com>
+References: <1362637581-12673-1-git-send-email-manishv.b@ti.com>
+Message-ID: <5142F9B3.3050800@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2013?03?15? 17:31, Andrea Adami ??:
-> AFAIK Arnd is aware and waiting for feedback about his patch:
-> 
-> ARM: compressed/head.S: work around new binutils warning   Arnd Bergmann
-> 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/144846.html
+Hi Mark,
 
-  excuse me, I am not familiar with arm assemble code, so can not give more information
+On 3/7/2013 11:56 AM, Vishwanathrao Badarkhe, Manish wrote:
+> Add device tree data for regulator via tps6507x mfd device 
+> in da850-evm.
+> Applies on top of v3.9-rc1 of linus tree.
 
-  but at least for me, it seems your patch is more precious, and also welcomed by compiler.
-  and I don't think your patch make the code "a more complex":
-    the reason is:
-    "keeping code simple and clear" is for readers and debuggers, not for writers.
-    I prefer to write more code to let readers and debuggers easy understand.
-      (if it has minor negative effect with performance)
+I would like to take this series via the davinci tree to manage
+dependencies with rest of the DT patches. Any comments/objections on
+this series? It will be nice to get your Acked-by/Reviewed-by.
 
-  thanks.
-
--- 
-Chen Gang
-
-Asianux Corporation
+Thanks,
+Sekhar
