@@ -1,45 +1,53 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 15 Mar 2013 18:12:46 +0000
-Subject: Fwd: [PATCH] Turn off -Wmaybe-uninitialized when building with -Os
-In-Reply-To: <201303151455.38917.arnd@arndb.de>
-References: <201303151455.38917.arnd@arndb.de>
-Message-ID: <20130315181246.GW4977@n2100.arm.linux.org.uk>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 15 Mar 2013 12:26:59 -0600
+Subject: [PATCH V3 3/5] ARM: tegra:add aliases and DMA requestor for serial
+ nodes of Tegra114
+In-Reply-To: <5140DB61.3090809@wwwdotorg.org>
+References: <1363204194-19487-1-git-send-email-ldewangan@nvidia.com>
+ <1363204194-19487-4-git-send-email-ldewangan@nvidia.com>
+ <5140DB61.3090809@wwwdotorg.org>
+Message-ID: <514367F3.6040909@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 15, 2013 at 02:55:38PM +0000, Arnd Bergmann wrote:
-> I forgot to put the linux-kbuild list on Cc, that is probably the
-> best place to discuss this patch.
+On 03/13/2013 02:02 PM, Stephen Warren wrote:
+> On 03/13/2013 01:49 PM, Laxman Dewangan wrote:
+>> Add APB DMA requestor and serial aliases for serial controller.
+>> There will be two serial driver i.e. 8250 based simple serial driver
+>> and APB DMA based serial driver for higher baudrate and performace.
+>>
+>> The simple serial driver get enabled with compatible "nvidia,tegra114-uart",
+>> "nvidia,tegra20-uart" and APB DMA based driver will get enabled with
+>> compatible "nvidia,tegra114-hsuart", "nvidia,tegra30-hsuart".
 > 
-> ----------  Forwarded Message  ----------
+>> +	/*
+>> +	 * There are two serial driver i.e. 8250 based simple serial
+>> +	 * driver and APB DMA based serial driver for higher baudrate
+>> +	 * and performace. To enable the 8250 based driver, the compatible
+>> +	 * is "nvidia,tegra114-uart", "nvidia,tegra20-uart" and to enable
+>> +	 * the APB DMA based serial driver, the comptible is
+>> +	 * "nvidia,tegra114-hsuart", "nvidia,tegra30-hsuart".
+>> +	 */
 > 
-> Subject: [PATCH] Turn off -Wmaybe-uninitialized when building with -Os
-> Date: Thursday 14 March 2013
-> From: Arnd Bergmann <arnd@arndb.de>
-> To: linux-arch at vger.kernel.org, linux-arm-kernel at lists.infradead.org, linux-kernel at vger.kernel.org
+> Again, that text says you want either of:
 > 
-> gcc-4.7 and higher add a lot of false positive warnings about
-> potential uses of uninitialized warnings, but only when optimizing
-> for size (-Os). This is the default when building allyesconfig,
-> which turns on CONFIG_CC_OPTIMIZE_FOR_SIZE.
+> compatible = "nvidia,tegra114-uart",   "nvidia,tegra20-uart";
+> compatible = "nvidia,tegra114-hsuart", "nvidia,tegra30-hsuart";
 > 
-> In order to avoid getting a lot of patches that initialize such
-> variables and accidentally hide real errors along the way, let's
-> just turn off this warning on the respective gcc versions
-> when building with size optimizations. The -Wmaybe-uninitialized
-> option was introduced in the same gcc version (4.7) that is now
-> causing the false positives, so there is no effect on older compilers.
+> (note Tegra20-vs-Tegra30 in the second compatible value)
 > 
-> A side effect is that when building with CONFIG_CC_OPTIMIZE_FOR_SIZE,
-> we might now see /fewer/ warnings about possibly uninitialized
-> warnings than with -O2, but that is still much better than seeing
-> warnings known to be bogus.
+> Why isn't it instead:
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: stable at vger.kernel.org
-> --
-> I'd like to merge this for 3.9 and also for the stable kernels,
-> if people agree this is a good idea.
+> compatible = "nvidia,tegra114-uart",   "nvidia,tegra20-uart";
+> compatible = "nvidia,tegra114-hsuart", "nvidia,tegra20-hsuart";
+> 
+> (note both second compatible values say Tegra20)
+> 
+> I assume this is a typo.
+> 
+> I suppose I can fix this up when I apply it to avoid a resend, assuming
+> it's wrong.
 
-I think I replied to your previous version recently asking whether
-this affects real uninitialized variables too.
+Since I haven't seen a reply to this, when I apply this, I'm going to
+change the comment I quoted above to match the values I wrote above
+under "why isn't it instead:".
