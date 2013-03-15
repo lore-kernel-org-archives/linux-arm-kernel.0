@@ -1,22 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 Mar 2013 11:29:43 +0000
-Subject: [Suggestion] Latest randconfig build errors for Head.S
-In-Reply-To: <514301E8.9040201@gmail.com>
-References: <51415428.1070401@asianux.com> <201303151056.55819.arnd@arndb.de>
- <514301E8.9040201@gmail.com>
-Message-ID: <201303151129.43542.arnd@arndb.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 15 Mar 2013 12:42:10 +0100
+Subject: [PATCH 4/4 v2] mv643xx_eth: convert to use the Marvell Orion
+ MDIO driver
+In-Reply-To: <514300E0.2030108@openwrt.org>
+References: <1359473048-26551-1-git-send-email-florian@openwrt.org>
+ <1363284515-9865-1-git-send-email-florian@openwrt.org>
+ <1363284515-9865-5-git-send-email-florian@openwrt.org>
+ <514300E0.2030108@openwrt.org>
+Message-ID: <20130315124210.27d0794a@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 March 2013, Chen Gang F T wrote:
->   excuse me, my English is not quite well.
-> 
->   I guess your meaning is:
->     "that bug" means the toolchain's bug (need toolchain people fix it).
->     prefer to apply your patch, before "that bug" is fixed (we don't know when)
-> 
->   is it correct ?
+Dear Florian Fainelli,
 
-Yes, correct.
+On Fri, 15 Mar 2013 12:07:12 +0100, Florian Fainelli wrote:
 
-	Arnd
+> Thanks to the help of Andrew Lunn, there is at least two known issues 
+> with this patch version:
+> 
+> - we need to move up the mvmdio line in 
+> drivers/net/ethernet/marvell/Makefile to make sure that configs having 
+> both mvmdio and mv643xx_eth built-in get the probing order right
+
+I don't think it's the right way of fixing the problem. If there is no
+dependency on the two devices through the device model (i.e they don't
+have a parent->child relationship), then the mv643xx_eth driver should
+probably return -EPROBE_DEFER when it can't find its PHY so that its
+->probe() operation gets called once again by the kernel when other
+drivers (including mvmdio) have been probed.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
