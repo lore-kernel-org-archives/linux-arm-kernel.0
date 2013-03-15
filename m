@@ -1,46 +1,927 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 14 Mar 2013 23:43:23 +0000
-Subject: [Suggestion] Latest randconfig build errors for Head.S
-In-Reply-To: <51415428.1070401@asianux.com>
-References: <51415428.1070401@asianux.com>
-Message-ID: <20130314234323.GD4977@n2100.arm.linux.org.uk>
+From: smoch@web.de (Soeren Moch)
+Date: Fri, 15 Mar 2013 01:00:04 +0100
+Subject: [PATCH] USB: EHCI: fix for leaking isochronous data
+In-Reply-To: <Pine.LNX.4.44L0.1303141719450.1194-100000@iolanthe.rowland.org>
+References: <Pine.LNX.4.44L0.1303141719450.1194-100000@iolanthe.rowland.org>
+Message-ID: <51426484.3000609@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 14, 2013 at 12:38:00PM +0800, Chen Gang wrote:
-> Hello Maintainers:
-> 
->   are these warnings for head.S OK ?
-> 
-> 
-> make:
->   make V=1 EXTRA_CFLAGS=-W ARCH=arm randconfig
->     (this time, CONFIG_MMU=y)
-> 
-> warning information:
->   arch/arm/boot/compressed/head.S: Assembler messages:
->   arch/arm/boot/compressed/head.S:565: Warning: (null)
->   arch/arm/boot/compressed/head.S:676: Warning: (null)
->   arch/arm/boot/compressed/head.S:698: Warning: (null)
->   arch/arm/boot/compressed/head.S:722: Warning: (null)
->   arch/arm/boot/compressed/head.S:726: Warning: (null)
->   arch/arm/boot/compressed/head.S:735: Warning: (null)
->   arch/arm/boot/compressed/head.S:978: Warning: (null)
->   arch/arm/boot/compressed/head.S:1017: Warning: (null)
->   arch/arm/boot/compressed/head.S:1018: Warning: (null)
->   arch/arm/boot/compressed/head.S:1048: Warning: (null)
->   arch/arm/boot/compressed/head.S:1055: Warning: (null)
->   arch/arm/boot/compressed/head.S:1063: Warning: (null)
->   arch/arm/boot/compressed/head.S:1074: Warning: (null)
->   arch/arm/boot/compressed/head.S:1088: Warning: (null)
->   arch/arm/boot/compressed/head.S:1120: Warning: (null)
->   arch/arm/boot/compressed/head.S:1122: Warning: (null)
->   arch/arm/boot/compressed/head.S:1123: Warning: (null)
->   arch/arm/boot/compressed/head.S:1130: Warning: (null)
->   arch/arm/boot/compressed/head.S:1162: Warning: (null)
+On 14.03.2013 22:33, Alan Stern wrote:
+> On Thu, 14 Mar 2013, Soeren Moch wrote:
+>
+>>> If the memory really is being leaked here in some sort of systematic
+>>> way, we may be able to see it in your debugging output after a few
+>>> seconds.
+>>>
+>>
+>> OK, here are the first seconds of the log. But the buffer exhaustion
+>> usually occurs after several hours of runtime...
+>
+> The log shows a 1-1 match between allocations and deallocations, except
+> for three excess allocations about 45 lines before the end.  I have no
+> idea what's up with those.  They may be an artifact arising from where
+> you stopped copying the log data.
+>
+> There are as many as 400 iTDs being allocated before any are freed.
+> That seems like a lot.  Are they all for the same isochronous endpoint?
+> What's the endpoint's period?  How often are URBs submitted?
 
-*Sigh*
+I use 2 dvb sticks, capturing digital TV. For each stick 5 URBs on a 
+single endpoint are used, I think. I'm not sure, which endpoint in which 
+alternateSetting is active. I attached the output of 'lsusb -v' for the 
+sticks.
+How can I track down the other information you need?
 
-So our wonderful toolchain has decided to start producing NULL warnings
-for every "mcr     p15, 0, rX, c7, c10, 4" instruction?  I'd just ignore
-them and hope that the toolchain people fix it.
+> In general, there shouldn't be more than a couple of millisecond's
+> worth of iTDs allocated for any endpoint, depending on how many URBs
+> are in the pipeline at any time.
+
+Maybe the em28xx driver is not doing a good job here!?
+
+  Soeren Moch
+
+> Maybe a better way to go about this is, instead of printing out every
+> allocation and deallocation, to keep a running counter.  You could have
+> the driver print out the value of this counter every minute or so.  Any
+> time the device isn't in use, the counter should be 0.
+>
+> Alan Stern
+
+
+
+Bus 001 Device 005: ID 0ccd:00b2 TerraTec Electronic GmbH
+Device Descriptor:
+   bLength                18
+   bDescriptorType         1
+   bcdUSB               2.00
+   bDeviceClass            0 (Defined at Interface level)
+   bDeviceSubClass         0
+   bDeviceProtocol         0
+   bMaxPacketSize0        64
+   idVendor           0x0ccd TerraTec Electronic GmbH
+   idProduct          0x00b2
+   bcdDevice            1.00
+   iManufacturer           3 TERRATEC
+   iProduct                1 Cinergy HTC Stick
+   iSerial                 2 123456789ABCD
+   bNumConfigurations      1
+   Configuration Descriptor:
+     bLength                 9
+     bDescriptorType         2
+     wTotalLength          305
+     bNumInterfaces          1
+     bConfigurationValue     1
+     iConfiguration          0
+     bmAttributes         0x80
+       (Bus Powered)
+     MaxPower              500mA
+     Interface Descriptor:
+       bLength                 9
+       bDescriptorType         4
+       bInterfaceNumber        0
+       bAlternateSetting       0
+       bNumEndpoints           4
+       bInterfaceClass       255 Vendor Specific Class
+       bInterfaceSubClass      0
+       bInterfaceProtocol    255
+       iInterface              0
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x81  EP 1 IN
+         bmAttributes            3
+           Transfer Type            Interrupt
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x0001  1x 1 bytes
+         bInterval              11
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x82  EP 2 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x0000  1x 0 bytes
+         bInterval               1
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x83  EP 3 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x0000  1x 0 bytes
+         bInterval               4
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x84  EP 4 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x0000  1x 0 bytes
+         bInterval               1
+     Interface Descriptor:
+       bLength                 9
+       bDescriptorType         4
+       bInterfaceNumber        0
+       bAlternateSetting       1
+       bNumEndpoints           4
+       bInterfaceClass       255 Vendor Specific Class
+       bInterfaceSubClass      0
+       bInterfaceProtocol    255
+       iInterface              0
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x81  EP 1 IN
+         bmAttributes            3
+           Transfer Type            Interrupt
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x0001  1x 1 bytes
+         bInterval              11
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x82  EP 2 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x0000  1x 0 bytes
+         bInterval               1
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x83  EP 3 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x00c4  1x 196 bytes
+         bInterval               4
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x84  EP 4 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x03ac  1x 940 bytes
+         bInterval               1
+     Interface Descriptor:
+       bLength                 9
+       bDescriptorType         4
+       bInterfaceNumber        0
+       bAlternateSetting       2
+       bNumEndpoints           4
+       bInterfaceClass       255 Vendor Specific Class
+       bInterfaceSubClass      0
+       bInterfaceProtocol    255
+       iInterface              0
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x81  EP 1 IN
+         bmAttributes            3
+           Transfer Type            Interrupt
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x0001  1x 1 bytes
+         bInterval              11
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x82  EP 2 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x0ad0  2x 720 bytes
+         bInterval               1
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x83  EP 3 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x00c4  1x 196 bytes
+         bInterval               4
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x84  EP 4 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x03ac  1x 940 bytes
+         bInterval               1
+     Interface Descriptor:
+       bLength                 9
+       bDescriptorType         4
+       bInterfaceNumber        0
+       bAlternateSetting       3
+       bNumEndpoints           4
+       bInterfaceClass       255 Vendor Specific Class
+       bInterfaceSubClass      0
+       bInterfaceProtocol    255
+       iInterface              0
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x81  EP 1 IN
+         bmAttributes            3
+           Transfer Type            Interrupt
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x0001  1x 1 bytes
+         bInterval              11
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x82  EP 2 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x0c00  2x 1024 bytes
+         bInterval               1
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x83  EP 3 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x00c4  1x 196 bytes
+         bInterval               4
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x84  EP 4 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x03ac  1x 940 bytes
+         bInterval               1
+     Interface Descriptor:
+       bLength                 9
+       bDescriptorType         4
+       bInterfaceNumber        0
+       bAlternateSetting       4
+       bNumEndpoints           4
+       bInterfaceClass       255 Vendor Specific Class
+       bInterfaceSubClass      0
+       bInterfaceProtocol    255
+       iInterface              0
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x81  EP 1 IN
+         bmAttributes            3
+           Transfer Type            Interrupt
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x0001  1x 1 bytes
+         bInterval              11
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x82  EP 2 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x1300  3x 768 bytes
+         bInterval               1
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x83  EP 3 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x00c4  1x 196 bytes
+         bInterval               4
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x84  EP 4 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x03ac  1x 940 bytes
+         bInterval               1
+     Interface Descriptor:
+       bLength                 9
+       bDescriptorType         4
+       bInterfaceNumber        0
+       bAlternateSetting       5
+       bNumEndpoints           4
+       bInterfaceClass       255 Vendor Specific Class
+       bInterfaceSubClass      0
+       bInterfaceProtocol    255
+       iInterface              0
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x81  EP 1 IN
+         bmAttributes            3
+           Transfer Type            Interrupt
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x0001  1x 1 bytes
+         bInterval              11
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x82  EP 2 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x1380  3x 896 bytes
+         bInterval               1
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x83  EP 3 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x00c4  1x 196 bytes
+         bInterval               4
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x84  EP 4 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x03ac  1x 940 bytes
+         bInterval               1
+     Interface Descriptor:
+       bLength                 9
+       bDescriptorType         4
+       bInterfaceNumber        0
+       bAlternateSetting       6
+       bNumEndpoints           4
+       bInterfaceClass       255 Vendor Specific Class
+       bInterfaceSubClass      0
+       bInterfaceProtocol    255
+       iInterface              0
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x81  EP 1 IN
+         bmAttributes            3
+           Transfer Type            Interrupt
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x0001  1x 1 bytes
+         bInterval              11
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x82  EP 2 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x13c0  3x 960 bytes
+         bInterval               1
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x83  EP 3 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x00c4  1x 196 bytes
+         bInterval               4
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x84  EP 4 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x03ac  1x 940 bytes
+         bInterval               1
+     Interface Descriptor:
+       bLength                 9
+       bDescriptorType         4
+       bInterfaceNumber        0
+       bAlternateSetting       7
+       bNumEndpoints           4
+       bInterfaceClass       255 Vendor Specific Class
+       bInterfaceSubClass      0
+       bInterfaceProtocol    255
+       iInterface              0
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x81  EP 1 IN
+         bmAttributes            3
+           Transfer Type            Interrupt
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x0001  1x 1 bytes
+         bInterval              11
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x82  EP 2 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x1400  3x 1024 bytes
+         bInterval               1
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x83  EP 3 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x00c4  1x 196 bytes
+         bInterval               4
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x84  EP 4 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x03ac  1x 940 bytes
+         bInterval               1
+Device Qualifier (for other device speed):
+   bLength                10
+   bDescriptorType         6
+   bcdUSB               2.00
+   bDeviceClass            0 (Defined at Interface level)
+   bDeviceSubClass         0
+   bDeviceProtocol         0
+   bMaxPacketSize0        64
+   bNumConfigurations      1
+Device Status:     0x0000
+   (Bus Powered)
+
+Bus 001 Device 006: ID 2304:0242 Pinnacle Systems, Inc.
+Device Descriptor:
+   bLength                18
+   bDescriptorType         1
+   bcdUSB               2.00
+   bDeviceClass            0 (Defined at Interface level)
+   bDeviceSubClass         0
+   bDeviceProtocol         0
+   bMaxPacketSize0        64
+   idVendor           0x2304 Pinnacle Systems, Inc.
+   idProduct          0x0242
+   bcdDevice            1.00
+   iManufacturer           1 Pinnacle Systems
+   iProduct                2 PCTV 510e
+   iSerial                 3 123456789012
+   bNumConfigurations      1
+   Configuration Descriptor:
+     bLength                 9
+     bDescriptorType         2
+     wTotalLength          305
+     bNumInterfaces          1
+     bConfigurationValue     1
+     iConfiguration          0
+     bmAttributes         0x80
+       (Bus Powered)
+     MaxPower              500mA
+     Interface Descriptor:
+       bLength                 9
+       bDescriptorType         4
+       bInterfaceNumber        0
+       bAlternateSetting       0
+       bNumEndpoints           4
+       bInterfaceClass       255 Vendor Specific Class
+       bInterfaceSubClass      0
+       bInterfaceProtocol    255
+       iInterface              0
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x81  EP 1 IN
+         bmAttributes            3
+           Transfer Type            Interrupt
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x0001  1x 1 bytes
+         bInterval              11
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x82  EP 2 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x0000  1x 0 bytes
+         bInterval               1
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x83  EP 3 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x0000  1x 0 bytes
+         bInterval               4
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x84  EP 4 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x0000  1x 0 bytes
+         bInterval               1
+     Interface Descriptor:
+       bLength                 9
+       bDescriptorType         4
+       bInterfaceNumber        0
+       bAlternateSetting       1
+       bNumEndpoints           4
+       bInterfaceClass       255 Vendor Specific Class
+       bInterfaceSubClass      0
+       bInterfaceProtocol    255
+       iInterface              0
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x81  EP 1 IN
+         bmAttributes            3
+           Transfer Type            Interrupt
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x0001  1x 1 bytes
+         bInterval              11
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x82  EP 2 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x0000  1x 0 bytes
+         bInterval               1
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x83  EP 3 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x00c4  1x 196 bytes
+         bInterval               4
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x84  EP 4 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x03ac  1x 940 bytes
+         bInterval               1
+     Interface Descriptor:
+       bLength                 9
+       bDescriptorType         4
+       bInterfaceNumber        0
+       bAlternateSetting       2
+       bNumEndpoints           4
+       bInterfaceClass       255 Vendor Specific Class
+       bInterfaceSubClass      0
+       bInterfaceProtocol    255
+       iInterface              0
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x81  EP 1 IN
+         bmAttributes            3
+           Transfer Type            Interrupt
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x0001  1x 1 bytes
+         bInterval              11
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x82  EP 2 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x0ad0  2x 720 bytes
+         bInterval               1
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x83  EP 3 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x00c4  1x 196 bytes
+         bInterval               4
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x84  EP 4 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x03ac  1x 940 bytes
+         bInterval               1
+     Interface Descriptor:
+       bLength                 9
+       bDescriptorType         4
+       bInterfaceNumber        0
+       bAlternateSetting       3
+       bNumEndpoints           4
+       bInterfaceClass       255 Vendor Specific Class
+       bInterfaceSubClass      0
+       bInterfaceProtocol    255
+       iInterface              0
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x81  EP 1 IN
+         bmAttributes            3
+           Transfer Type            Interrupt
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x0001  1x 1 bytes
+         bInterval              11
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x82  EP 2 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x0c00  2x 1024 bytes
+         bInterval               1
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x83  EP 3 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x00c4  1x 196 bytes
+         bInterval               4
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x84  EP 4 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x03ac  1x 940 bytes
+         bInterval               1
+     Interface Descriptor:
+       bLength                 9
+       bDescriptorType         4
+       bInterfaceNumber        0
+       bAlternateSetting       4
+       bNumEndpoints           4
+       bInterfaceClass       255 Vendor Specific Class
+       bInterfaceSubClass      0
+       bInterfaceProtocol    255
+       iInterface              0
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x81  EP 1 IN
+         bmAttributes            3
+           Transfer Type            Interrupt
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x0001  1x 1 bytes
+         bInterval              11
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x82  EP 2 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x1300  3x 768 bytes
+         bInterval               1
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x83  EP 3 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x00c4  1x 196 bytes
+         bInterval               4
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x84  EP 4 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x03ac  1x 940 bytes
+         bInterval               1
+     Interface Descriptor:
+       bLength                 9
+       bDescriptorType         4
+       bInterfaceNumber        0
+       bAlternateSetting       5
+       bNumEndpoints           4
+       bInterfaceClass       255 Vendor Specific Class
+       bInterfaceSubClass      0
+       bInterfaceProtocol    255
+       iInterface              0
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x81  EP 1 IN
+         bmAttributes            3
+           Transfer Type            Interrupt
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x0001  1x 1 bytes
+         bInterval              11
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x82  EP 2 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x1380  3x 896 bytes
+         bInterval               1
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x83  EP 3 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x00c4  1x 196 bytes
+         bInterval               4
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x84  EP 4 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x03ac  1x 940 bytes
+         bInterval               1
+     Interface Descriptor:
+       bLength                 9
+       bDescriptorType         4
+       bInterfaceNumber        0
+       bAlternateSetting       6
+       bNumEndpoints           4
+       bInterfaceClass       255 Vendor Specific Class
+       bInterfaceSubClass      0
+       bInterfaceProtocol    255
+       iInterface              0
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x81  EP 1 IN
+         bmAttributes            3
+           Transfer Type            Interrupt
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x0001  1x 1 bytes
+         bInterval              11
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x82  EP 2 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x13c0  3x 960 bytes
+         bInterval               1
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x83  EP 3 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x00c4  1x 196 bytes
+         bInterval               4
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x84  EP 4 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x03ac  1x 940 bytes
+         bInterval               1
+     Interface Descriptor:
+       bLength                 9
+       bDescriptorType         4
+       bInterfaceNumber        0
+       bAlternateSetting       7
+       bNumEndpoints           4
+       bInterfaceClass       255 Vendor Specific Class
+       bInterfaceSubClass      0
+       bInterfaceProtocol    255
+       iInterface              0
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x81  EP 1 IN
+         bmAttributes            3
+           Transfer Type            Interrupt
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x0001  1x 1 bytes
+         bInterval              11
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x82  EP 2 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x1400  3x 1024 bytes
+         bInterval               1
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x83  EP 3 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x00c4  1x 196 bytes
+         bInterval               4
+       Endpoint Descriptor:
+         bLength                 7
+         bDescriptorType         5
+         bEndpointAddress     0x84  EP 4 IN
+         bmAttributes            1
+           Transfer Type            Isochronous
+           Synch Type               None
+           Usage Type               Data
+         wMaxPacketSize     0x03ac  1x 940 bytes
+         bInterval               1
+Device Qualifier (for other device speed):
+   bLength                10
+   bDescriptorType         6
+   bcdUSB               2.00
+   bDeviceClass            0 (Defined at Interface level)
+   bDeviceSubClass         0
+   bDeviceProtocol         0
+   bMaxPacketSize0        64
+   bNumConfigurations      1
+Device Status:     0x0000
+   (Bus Powered)
