@@ -1,27 +1,20 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 16 Mar 2013 01:24:44 +0300
-Subject: [RFC] USB: EHCI: hot-fix OMAP and Orion multiplatform config
-In-Reply-To: <201303152111.09705.arnd@arndb.de>
-References: <Pine.LNX.4.44L0.1303151516170.1414-100000@iolanthe.rowland.org>
- <201303152015.31292.arnd@arndb.de> <51439BDF.3050300@cogentembedded.com>
- <201303152111.09705.arnd@arndb.de>
-Message-ID: <51439FAC.4000300@cogentembedded.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 15 Mar 2013 21:25:01 +0000
+Subject: [GIT PULL] Device Tree fixes for v3.9
+In-Reply-To: <CACRpkdai0PRbK-R_KfNqkkVuSNn97v9Za8Doq71Zb-xCHW+J1A@mail.gmail.com>
+References: <CACRpkdai0PRbK-R_KfNqkkVuSNn97v9Za8Doq71Zb-xCHW+J1A@mail.gmail.com>
+Message-ID: <201303152125.02181.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Friday 01 March 2013, Linus Walleij wrote:
 
-On 03/16/2013 12:11 AM, Arnd Bergmann wrote:
+> Please pull it in, for fixes or -next at your decision. As you can see the
+> base is at Torvald's HEAD since all dependencies that conflicted with
+> this branch is now there. If you want me to resend based on v3.9-rc1
+> or so, just tell.
 
-> On Friday 15 March 2013, Sergei Shtylyov wrote:
->>> a) Apply Roger's patch for 3.9, and add my "USB: EHCI: DT support
->>>      for generic bus glue" patch on top after it has been tested
->>      Arnd, sorry, where can I find this patch? Archive search doesn't
->> turn up anything...
-> It's in this email thread, in one of my earlier replies to Alan.
+I guess it's too late not for 3.9, I just found the pull request again.
+I've applied it to the 3.10 next/fixes-non-critical branch now.
 
-    Ah, found it now. I thought however that it already handles the DT 
-properties for the EHCI platform data.
-Of course, that can be added later...
-
-WBR, Sergei
+	Arnd
