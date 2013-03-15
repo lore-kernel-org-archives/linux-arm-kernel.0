@@ -1,18 +1,20 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Fri, 15 Mar 2013 11:13:51 -0700
-Subject: [PATCH v2 8/8] drivers: misc: use module_platform_driver_probe()
-In-Reply-To: <1363280978-24051-9-git-send-email-fabio.porcedda@gmail.com>
-References: <1363280978-24051-1-git-send-email-fabio.porcedda@gmail.com>
- <1363280978-24051-9-git-send-email-fabio.porcedda@gmail.com>
-Message-ID: <20130315181351.GA16747@kroah.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 15 Mar 2013 18:16:14 +0000
+Subject: [PATCH 1/2] ARM: vexpress: Enable regulator framework when
+ MMCI is in use
+In-Reply-To: <1363365540-23001-2-git-send-email-pawel.moll@arm.com>
+References: <1363365540-23001-1-git-send-email-pawel.moll@arm.com>
+ <1363365540-23001-2-git-send-email-pawel.moll@arm.com>
+Message-ID: <20130315181614.GY4977@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 14, 2013 at 06:09:38PM +0100, Fabio Porcedda wrote:
-> This patch converts the drivers to use the
-> module_platform_driver_probe() macro which makes the code smaller and
-> a bit simpler.
+On Fri, Mar 15, 2013 at 04:38:59PM +0000, Pawel Moll wrote:
+> As the MMCI driver obtains some of the platform data from
+> a regulator (described by the device tree), the framework must
+> be present - otherwise device's initialisation will fail.
 
-Someone else beat you to this fix for these files, sorry.
+More description is required here.  How does it fail.  Please describe
+the problem fully.
 
-greg k-h
+MMCI should work without regulator support.
