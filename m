@@ -1,57 +1,40 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 15 Mar 2013 11:11:42 +0100
-Subject: [GIT PULL] at91: framebuffer enhancements for 3.10
-Message-ID: <5142F3DE.1060209@atmel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 15 Mar 2013 10:15:00 +0000
+Subject: [PATCH] isdn: hisax: netjet requires VIRT_TO_BUS
+In-Reply-To: <CAMuHMdVhjnX_hag5Y5VvDWVcjPK8tMM-qx-TQ2x=M88yTZQwYg@mail.gmail.com>
+References: <1363298204-8014-1-git-send-email-arnd@arndb.de>
+ <1363298204-8014-4-git-send-email-arnd@arndb.de>
+ <CAMuHMdVhjnX_hag5Y5VvDWVcjPK8tMM-qx-TQ2x=M88yTZQwYg@mail.gmail.com>
+Message-ID: <201303151015.00746.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+On Friday 15 March 2013, Geert Uytterhoeven wrote:
+> On Thu, Mar 14, 2013 at 10:56 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > Disabling CONFIG_VIRT_TO_BUS on ARM showed that the hisax netjet
+> > driver depends on this deprecated functionality but is not
+> > marked so in Kconfig.
+> >
+> > Rather than adding ARM to the already long list of architectures
+> > that this driver is broken on, this patch adds 'depends on
+> > VIRT_TO_BUS' and removes the dependency on !SPARC, which is
+> > also implied by that.
+> 
+> IIRC, the real "arch" dependency for this driver is !BIG_ENDIAN, but
+> unfortunately
+> we don't have a generic Kconfig symbol for that.
+> Perhaps we may want to introduce that?
+> Of course we prefer to make drivers work on all endianness instead...
 
-Following our conversation about these framebuffer patches for
-Atmel LCD driver, here are the remaining three patches that can be
-pushed for 3.10. As suggested by Arnd, I have kept them on top of last
-commit concerning this topic that have already been merged in arm-soc 3.9
-fixes branch.
-Thanks a lot for taking care of these modifications.
+CONFIG_VIRT_TO_BUS is certainly also a dependency, since it fails
+to build without that. I think we can address the two problems separately.
 
-Best regards,
+David Howells brought up the topic of endian checks recently, noting
+that the way we define __BIG_ENDIAN and __LITTLE_ENDIAN in the kernel
+is incompatible to how do it in user space, and not much better either.
 
-The following changes since commit 67cf9c0a00bd88443adb7d6c3efa8b18d03f97c5:
+A few architectures that are bi-endian (arc, arm, c6x, mips, sh) already
+have CONFIG_CPU_IS_LITTLE_ENDIAN and CONFIG_CPU_IS_BIG_ENDIAN. I guess
+it would be a good idea to provide these on all architectures.
 
-  ARM: at91: fix LCD-wiring mode (2013-03-13 11:05:04 +0100)
-
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git tags/at91-driversLCD
-
-for you to fetch changes up to bbd44f6bd9d1aa735b180b29b5719d63a8e87b55:
-
-  ARM: at91/avr32/atmel_lcdfb: add platform device-id table (2013-03-13 11:05:12 +0100)
-
-----------------------------------------------------------------
-Some Atmel framebuffer driver enhancements with modification
-of configuration data in ARM/AT91 and AVR32/AP7 trees.
-A merge of these modifications seems easier through arm-soc
-git tree nowadays.
-
-----------------------------------------------------------------
-Johan Hovold (3):
-      ARM: at91/avr32/atmel_lcdfb: add bus-clock entry
-      atmel_lcdfb: move lcdcon2 register access to compute_hozval
-      ARM: at91/avr32/atmel_lcdfb: add platform device-id table
-
- arch/arm/mach-at91/at91sam9261.c         |   2 +
- arch/arm/mach-at91/at91sam9261_devices.c |   6 +-
- arch/arm/mach-at91/at91sam9263.c         |   1 +
- arch/arm/mach-at91/at91sam9263_devices.c |   2 +-
- arch/arm/mach-at91/at91sam9g45.c         |   2 +
- arch/arm/mach-at91/at91sam9g45_devices.c |   6 +-
- arch/arm/mach-at91/at91sam9rl.c          |   1 +
- arch/arm/mach-at91/at91sam9rl_devices.c  |   2 +-
- arch/avr32/mach-at32ap/at32ap700x.c      |   6 +-
- drivers/video/atmel_lcdfb.c              | 120 +++++++++++++++++++++++++++--------
- include/video/atmel_lcdc.h               |   4 +-
- 11 files changed, 117 insertions(+), 35 deletions(-)
-
--- 
-Nicolas Ferre
+	Arnd
