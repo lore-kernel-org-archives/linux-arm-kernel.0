@@ -1,162 +1,89 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 15 Mar 2013 18:04:08 +0800
-Subject: [PATCH 14/14] usb: udc-core: add judgement logic for
- usb_gadget_connect
-In-Reply-To: <20130315075128.GF5074@arwen.pp.htv.fi>
-References: <1363240242-25775-1-git-send-email-peter.chen@freescale.com>
- <1363240242-25775-15-git-send-email-peter.chen@freescale.com>
- <20130314090005.GB14443@arwen.pp.htv.fi>
- <20130314092438.GB26420@nchen-desktop>
- <20130314101904.GD32369@arwen.pp.htv.fi>
- <20130315060615.GB28361@nchen-desktop>
- <20130315075128.GF5074@arwen.pp.htv.fi>
-Message-ID: <20130315100408.GG28361@nchen-desktop>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 15 Mar 2013 11:08:17 +0100
+Subject: [RFC 1/1] clk: Add notifier support in
+ clk_prepare_enable/clk_disable_unprepare
+In-Reply-To: <20130315093951.GV18519@tbergstrom-lnx.Nvidia.com>
+References: <1363151317.3311.9.camel@bilhuang-vm1>
+ <51400D9D.9060305@wwwdotorg.org>
+ <1363153204.3311.14.camel@bilhuang-vm1>
+ <5140C12A.4060900@wwwdotorg.org>
+ <1363227311.3311.30.camel@bilhuang-vm1>
+ <20130314092132.GE18519@tbergstrom-lnx.Nvidia.com>
+ <1363253287.3311.32.camel@bilhuang-vm1>
+ <51420EBB.7080503@wwwdotorg.org>
+ <1363310454.3311.44.camel@bilhuang-vm1>
+ <5142B027.4040403@wwwdotorg.org>
+ <20130315093951.GV18519@tbergstrom-lnx.Nvidia.com>
+Message-ID: <CAPDyKFoBJpraMz8i1FmFqG7=Zsv0DTQ0PKVOQJ-+iEsKpb3Hdg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 15, 2013 at 09:51:29AM +0200, Felipe Balbi wrote:
-> 
-> that's all wrong and needs to be fixed. UDC-core has to be the central
-> point for all these details. We start with the easiest way (call connect
-> unconditionally after gadget driver is loaded) and optimize it as we go
-> (making sure that there is VBUS before connecting pullups); but we can't
-> bypass UDC-core and call usb_gadget_connect() directly from UDC driver.
+On 15 March 2013 10:39, Peter De Schrijver <pdeschrijver@nvidia.com> wrote:
+> On Fri, Mar 15, 2013 at 06:22:47AM +0100, Stephen Warren wrote:
+>> On 03/14/2013 07:20 PM, Bill Huang wrote:
+>> > On Fri, 2013-03-15 at 01:54 +0800, Stephen Warren wrote:
+>> >> On 03/14/2013 03:28 AM, Bill Huang wrote:
+>> >>> On Thu, 2013-03-14 at 17:21 +0800, Peter De Schrijver wrote:
+>> >>>> On Thu, Mar 14, 2013 at 03:15:11AM +0100, Bill Huang wrote:
+>> >>>>
+>> >>>>> I don't think deferring will work either, considering the usage of DVFS,
+>> >>>>> device voltage is tightly coupled with frequency, when clock rate is
+>> >>>>> about to increase, we have to boost voltage first and we can lower the
+>> >>>>> voltage after the clock rate has decreased. All the above sequence have
+>> >>>>> to be guaranteed or you might crash, so deferring not only make thing
+>> >>>>> complicated in controlling the order but also hurt performance.
+>> >>>>
+>> >>>> But we could use notifiers in clk_prepare/clk_unprepare to set the voltage no?
+>> >>>> As clk_prepare/clk_unprepare have to be called before clk_enable or after
+>> >>>> clk_disable, the voltage can be raised to a safe level, before the clock
+>> >>>> becomes active.
+>> >>>
+>> >>> Thanks Peter, actually I'm just about to propose my v2 RFC which add
+>> >>> notifier in clk_prepare/clk_unprepare.
+>> >>
+>> >> Can't clk_set_rate() be called while the clock is prepared, or even
+>> >> enabled? I don't see how your proposal would work.
+>> >
+>> > I think it works with just a little sacrifice on saving more power but
+>> > that's related minor. Taking clk_prepare as an indicator on that clock
+>> > will be enabled later, so we can raise the voltage to a safe level
+>> > (according to the current rate or maybe default rate when clk_prepare is
+>> > called, some time late when clk_set_rate() is called we can adjust again
+>> > according to the requested rate change)
+>>
+>> Is clk_set_rate() only legal to call in non-atomic contexts then? The
+>> header file doesn't say, although I guess since many other functions
+>> explicitly say they can't, then by omission it can...
+>
+> Yes. Only clk_enable() and clk_disable() can be called in an atomic context.
+>
+> Cheers,
+>
+> Peter.
+>
+> _______________________________________________
+> linaro-dev mailing list
+> linaro-dev at lists.linaro.org
+> http://lists.linaro.org/mailman/listinfo/linaro-dev
 
-I have an idea that let the gadget driver call usb_gadget_connect/disconnect,
-and make a refcount for calling .pullup at usb_gadget_connect/disconnect.
-Below is an initial idea for it, I think it can also cover both udc 
-and uvc case.
+Just wanted to add my reflection on this topic;
 
- drivers/usb/chipidea/udc.c     |    6 ++----
- drivers/usb/gadget/composite.c |    6 ++++++
- include/linux/usb/gadget.h     |   21 +++++++++++++++++++--
- 3 files changed, 27 insertions(+), 6 deletions(-)
+Some prerequisites; I think am in favor of using the clk API to
+trigger DVFS changes and then I agree on that clk_prepare|unprepare
+needs to be possible to track from a DVFS perspective. clk_set_rate is
+not enough.
 
-diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
-index 81184b9..4b6b2d8 100644
---- a/drivers/usb/chipidea/udc.c
-+++ b/drivers/usb/chipidea/udc.c
-@@ -1386,17 +1386,15 @@ static int ci13xxx_vbus_session(struct usb_gadget *_gadget, int is_active)
- 			pm_runtime_get_sync(&_gadget->dev);
- 			hw_device_reset(ci, USBMODE_CM_DC);
- 			hw_device_state(ci, ci->ep0out->qh.dma);
--			ci13xxx_pullup(_gadget, true);
-+			ci->driver->connect(&ci->gadget);
- 			dev_dbg(ci->dev, "Connected to host\n");
- 		} else {
--			if (ci->driver)
--				ci->driver->disconnect(&ci->gadget);
-+			ci->driver->disconnect(&ci->gadget);
- 			hw_device_state(ci, 0);
- 			if (ci->platdata->notify_event)
- 				ci->platdata->notify_event(ci,
- 				CI13XXX_CONTROLLER_STOPPED_EVENT);
- 			_gadget_stop_activity(&ci->gadget);
--			ci13xxx_pullup(_gadget, false);
- 			pm_runtime_put_sync(&_gadget->dev);
- 			dev_dbg(ci->dev, "Disconnected from host\n");
- 		}
-diff --git a/drivers/usb/gadget/composite.c b/drivers/usb/gadget/composite.c
-index 7c821de..b7bf5ae 100644
---- a/drivers/usb/gadget/composite.c
-+++ b/drivers/usb/gadget/composite.c
-@@ -1479,6 +1479,11 @@ done:
- 	return value;
- }
- 
-+void composite_connect(struct usb_gadget *gadget)
-+{
-+	usb_gadget_connect(gadget);
-+}
-+
- void composite_disconnect(struct usb_gadget *gadget)
- {
- 	struct usb_composite_dev	*cdev = get_gadget_data(gadget);
-@@ -1492,6 +1497,7 @@ void composite_disconnect(struct usb_gadget *gadget)
- 		reset_config(cdev);
- 	if (cdev->driver->disconnect)
- 		cdev->driver->disconnect(cdev);
-+	usb_gadget_disconnect(gadget);
- 	spin_unlock_irqrestore(&cdev->lock, flags);
- }
- 
-diff --git a/include/linux/usb/gadget.h b/include/linux/usb/gadget.h
-index 7e373a2..7f7e6bf 100644
---- a/include/linux/usb/gadget.h
-+++ b/include/linux/usb/gadget.h
-@@ -536,6 +536,7 @@ struct usb_gadget {
- 	struct device			dev;
- 	unsigned			out_epnum;
- 	unsigned			in_epnum;
-+	int				connection;
- };
- 
- static inline void set_gadget_data(struct usb_gadget *gadget, void *data)
-@@ -722,9 +723,16 @@ static inline int usb_gadget_vbus_disconnect(struct usb_gadget *gadget)
-  */
- static inline int usb_gadget_connect(struct usb_gadget *gadget)
- {
-+	int ret = 0;
- 	if (!gadget->ops->pullup)
- 		return -EOPNOTSUPP;
--	return gadget->ops->pullup(gadget, 1);
-+
-+	if (gadget->connection == 0)
-+		ret = gadget->ops->pullup(gadget, 1);
-+	if (!ret)
-+		gadget->connection ++;
-+
-+	return ret;
- }
- 
- /**
-@@ -744,9 +752,18 @@ static inline int usb_gadget_connect(struct usb_gadget *gadget)
-  */
- static inline int usb_gadget_disconnect(struct usb_gadget *gadget)
- {
-+	int ret = 0;
-+
- 	if (!gadget->ops->pullup)
- 		return -EOPNOTSUPP;
--	return gadget->ops->pullup(gadget, 0);
-+
-+	if (gadget->connection == 1)
-+		ret = gadget->ops->pullup(gadget, 0);
-+
-+	if (!ret)
-+		gadget->connection --;
-+
-+	return ret;
- }
- 
-> > 
-> > In that case, the pullup will not be called, it will check if gadget
-> > module is loaded.
-> 
-> I don't see that in your patch.
+So if we decide to do the above (using the clk API to trigger DVFS
+changes), I believe we should discuss two possible solutions;
+- clk notifiers or..
+- dvfs clock type.
 
-At each udc driver, it makes sure it, maybe we can move it to usb_gaget_connect
-/usb_gadget_disconnect or its abstract layer.
+I am trying to make up my mind of what I think is the best solution.
+Have you considered "dvfs clock type"?
+I put some comments about this for "[PATCH 2/5] clk: notifier handler
+for dynamic voltage scaling" recently as well.
 
-> > 
-> > I am not familiar with SRP, but I think vbus is pre-condition.
-> 
-> hehe, google SRP.
-> 
-> Nah, I'll save you the trouble. SRP is a mechanism for the USB
-> peripheral to ask the host to enable VBUS. This means that we can keep
-> the VBUS charge pump disabled, and thus save power, until peripheral
-> requests for a session.
+What could the advantages/disadvantages be between the two options?
 
-Thanks.
-
-> 
-> -- 
-> balbi
-
-
-
--- 
-
-Best Regards,
-Peter Chen
+Kind regards
+Ulf Hansson
