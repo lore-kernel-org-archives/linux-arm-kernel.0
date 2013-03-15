@@ -1,22 +1,22 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 Mar 2013 22:01:44 +0000
-Subject: [GIT PULL] clocksource cleanup for 3.10
-In-Reply-To: <513E38BD.4080407@gmail.com>
-References: <513E38BD.4080407@gmail.com>
-Message-ID: <201303152201.44785.arnd@arndb.de>
+Date: Fri, 15 Mar 2013 22:05:13 +0000
+Subject: [GIT PULL] ARM: mvebu: DT changes for v3.10
+In-Reply-To: <20130312134736.GH12700@titan.lakedaemon.net>
+References: <20130312134736.GH12700@titan.lakedaemon.net>
+Message-ID: <201303152205.13483.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 11 March 2013, Rob Herring wrote:
-> Please pull. This improves the clocksource init to avoid double matching
-> to the DT device node. The clocksource init function changes are needed
-> for any other clocksource conversions to CLKSRC_OF, so we need to make
-> sure any other conversions use this branch (It happens to silently work
-> without warnings, but there would be a mismatch in function ptrs). I'm
-> including the twd_smp timer support for CLKSRC_OF here because of the
-> dependency on this change.
+On Tuesday 12 March 2013, Jason Cooper wrote:
+> The following changes since commit f6161aa153581da4a3867a2d1a7caf4be19b6ec9:
+> 
+>   Linux 3.9-rc2 (2013-03-10 16:54:19 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.infradead.org/users/jcooper/linux.git tags/mvebu_dt_for_v3.10
 > 
 
-Pulled into next/cleanup branch, thanks!
+Pulled into next/dt, thanks!
 
 	Arnd
