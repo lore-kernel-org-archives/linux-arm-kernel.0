@@ -1,20 +1,20 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 Mar 2013 13:41:14 +0000
-Subject: [PATCH] isdn: hisax: netjet requires VIRT_TO_BUS
-In-Reply-To: <20130315.083344.2224038988420448687.davem@davemloft.net>
-References: <201303151015.00746.arnd@arndb.de>
- <201303151229.52997.arnd@arndb.de>
- <20130315.083344.2224038988420448687.davem@davemloft.net>
-Message-ID: <201303151341.14311.arnd@arndb.de>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Fri, 15 Mar 2013 19:11:19 +0530
+Subject: DaVinci platform unable to boot via NFS
+Message-ID: <CA+V-a8sNLBi1zB942ZbK26POrzcq7oOpNW9yPG5dG_gX7ZZ1oQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 March 2013, David Miller wrote:
-> The first usage seems reason, but the temtation is going to be quite
-> strong to misuse to block out drivers when there is "no value" in
-> spending time necessary to simply make them endian clean instead.
+Hi Mugunthan,
 
-Right. I'll let someone else start that discussion then if they
-really want to see that patch.
+With 3.9 release I am not able to boot any davinci board via nfs, finally
+digging Into I found that there were recent changes for Ethernet davinci.
+Finally I reverting this to some safe commit I was able to boot via nfs.
+I reverted back as following:-
+git checkout  f9a8f83b04e0c362a2fc660dbad980d24af209fc  drivers/net/ethernet/ti/
 
-	Arnd
+Can you please take a look at and fix it.
+
+Cheers,
+--Prabhakar Lad
+http://in.linkedin.com/pub/prabhakar-lad/19/92b/955
