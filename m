@@ -1,45 +1,31 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 14 Mar 2013 17:08:06 -0700
-Subject: [PATCH] ARM: sched_clock: Add more notrace to prevent recursion
-Message-ID: <1363306086-23501-1-git-send-email-sboyd@codeaurora.org>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Fri, 15 Mar 2013 08:51:40 +0800
+Subject: [Suggestion] Latest randconfig build errors for CONFIG_MMU=no
+In-Reply-To: <5141CFE4.2030909@arm.com>
+References: <514147A0.2060002@asianux.com> <5141CFE4.2030909@arm.com>
+Message-ID: <5142709C.8080702@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cyc_to_sched_clock() is called by sched_clock() and cyc_to_ns()
-is called by cyc_to_sched_clock(). I suspect that some compilers
-inline both of these functions into sched_clock() and so we've
-been getting away without having a notrace marking. It seems that
-my compiler isn't inlining cyc_to_sched_clock() though, so I'm
-hitting a recursion bug when I enable the function graph tracer,
-causing my system to crash. Marking these functions notrace fixes
-it. Technically cyc_to_ns() doesn't need the notrace because it's
-already marked inline, but let's just add it so that if we ever
-remove inline from that function it doesn't blow up.
+? 2013?03?14? 21:25, Jonathan Austin ??:
+> 
+> You're right that at the moment that suspend code is broken for NOMMU.
+> 
+> However, Will Deacon has a patch to fix it in his nommu branch on
+> kernel.org:
+> 
+> https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/commit/?h=nommu
+> 
+> I'll let Will comment on how/when he might look at proposing that code
+> to be merged.
+> 
+> Jonny
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/kernel/sched_clock.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+  thank you.
 
-diff --git a/arch/arm/kernel/sched_clock.c b/arch/arm/kernel/sched_clock.c
-index bd6f56b..59d2adb 100644
---- a/arch/arm/kernel/sched_clock.c
-+++ b/arch/arm/kernel/sched_clock.c
-@@ -45,12 +45,12 @@ static u32 notrace jiffy_sched_clock_read(void)
- 
- static u32 __read_mostly (*read_sched_clock)(void) = jiffy_sched_clock_read;
- 
--static inline u64 cyc_to_ns(u64 cyc, u32 mult, u32 shift)
-+static inline u64 notrace cyc_to_ns(u64 cyc, u32 mult, u32 shift)
- {
- 	return (cyc * mult) >> shift;
- }
- 
--static unsigned long long cyc_to_sched_clock(u32 cyc, u32 mask)
-+static unsigned long long notrace cyc_to_sched_clock(u32 cyc, u32 mask)
- {
- 	u64 epoch_ns;
- 	u32 epoch_cyc;
+  :-)
+
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Chen Gang
+
+Asianux Corporation
