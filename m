@@ -1,36 +1,32 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Fri, 15 Mar 2013 16:30:26 +0800
-Subject: [PATCH] ARM: mmp: add platform_device head file in gplugd
-Message-ID: <1363336226-23175-1-git-send-email-haojian.zhuang@linaro.org>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Fri, 15 Mar 2013 16:36:10 +0800
+Subject: [GIT PULL][for 3.9] pull request from fix branch in pxa git tree
+Message-ID: <CAN1soZzTVtg0HJFDiOFMfMngqz0yNs6Le+hvuNUxQ=Ka9dUaHQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arch/arm/mach-mmp/gplugd.c: In function ?gplugd_init?:
-arch/arm/mach-mmp/gplugd.c:188:2: error: implicit declaration of
-function ?platform_device_register?
-[-Werror=implicit-function-declaration]
-cc1: some warnings being treated as errors
-make[1]: *** [arch/arm/mach-mmp/gplugd.o] Error 1
-make: *** [arch/arm/mach-mmp] Error 2
+Hi Arnd & Olof,
 
-So append platform_device.h to resolve build issue.
+Please help to merge fix branch from pxa git tree.
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
----
+Regards
+Haojian
+
+The following changes since commit f6161aa153581da4a3867a2d1a7caf4be19b6ec9:
+
+  Linux 3.9-rc2 (2013-03-10 16:54:19 -0700)
+
+are available in the git repository at:
+
+  git://github.com/hzhuang1/linux.git armsoc/fix
+
+for you to fetch changes up to e71dc5f787f3908b8b8158103fc7d74a78a22cd1:
+
+  ARM: mmp: add platform_device head file in gplugd (2013-03-15 16:27:53 +0800)
+
+----------------------------------------------------------------
+Haojian Zhuang (1):
+      ARM: mmp: add platform_device head file in gplugd
+
  arch/arm/mach-mmp/gplugd.c |    1 +
  1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/mach-mmp/gplugd.c b/arch/arm/mach-mmp/gplugd.c
-index d1e2d59..f62b68d 100644
---- a/arch/arm/mach-mmp/gplugd.c
-+++ b/arch/arm/mach-mmp/gplugd.c
-@@ -9,6 +9,7 @@
-  */
- 
- #include <linux/init.h>
-+#include <linux/platform_device.h>
- #include <linux/gpio.h>
- 
- #include <asm/mach/arch.h>
--- 
-1.7.10.4
