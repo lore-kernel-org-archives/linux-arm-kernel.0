@@ -1,38 +1,34 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Fri, 15 Mar 2013 12:25:06 -0700
-Subject: [RFC] USB: EHCI: hot-fix OMAP and Orion multiplatform config
-In-Reply-To: <Pine.LNX.4.44L0.1303151516170.1414-100000@iolanthe.rowland.org>
-References: <201303151700.27231.arnd@arndb.de>
- <Pine.LNX.4.44L0.1303151516170.1414-100000@iolanthe.rowland.org>
-Message-ID: <20130315192506.GA26618@kroah.com>
+From: gerlando.falauto@keymile.com (Gerlando Falauto)
+Date: Fri, 15 Mar 2013 20:36:13 +0100
+Subject: [PATCH v2 0/2] refactoring for mask_cache
+In-Reply-To: <1363277430-21325-1-git-send-email-holger.brunck@keymile.com>
+References: <1363277430-21325-1-git-send-email-holger.brunck@keymile.com>
+Message-ID: <1363376175-22312-1-git-send-email-gerlando.falauto@keymile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 15, 2013 at 03:19:08PM -0400, Alan Stern wrote:
-> On Fri, 15 Mar 2013, Arnd Bergmann wrote:
-> 
-> > On Friday 15 March 2013, Alan Stern wrote:
-> > > Roger just submitted my patch to split out ehci-omap.
-> > 
-> > Ok, if we can merge that for 3.9, the main issue will be resolved, because
-> > an OMAP+Orion config is much more interesting in practice than adding
-> > VT8500 to the mix.
-> 
-> I just got an automated message from Greg:
-> 
-> --------------------------------------------------------------------------
-> This is a note to let you know that I've just added the patch titled
-> 
->     USB: EHCI: split ehci-omap out to a separate driver
-> 
-> to my usb git tree which can be found at
->     git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/usb.git
-> in the usb-next branch.
-> --------------------------------------------------------------------------
-> 
-> Unless something is changed, this patch won't get into 3.9-final.  
-> Do you want Greg to move it to his usb-linus branch?
+Hi everyone,
+here is a 2-patch set to address the issue found with Orion,
+hoping I understood correctly what Thomas meant.
+Even though I'm also providing changes for mvebu, I only
+tested the patch on a 3.0.40 kernel with the plat-orion/gpio.c driver.
+We currently do not have a working 3.6+ configuration for our Kirkwood
+boards (3.6 is apparently where this mvebu gpio driver was introduced),
+so I would be glad if someone could give it a try.
+I also have no idea whether the three Marvell variants all have separate
+mask registers.
 
-It's a bit too "big" for 3.9-final, sorry.
+Gerlando Falauto (2):
+  genirq: cosmetic: remove cur_regs
+  genirq: move mask_cache into struct irq_chip_type
 
-greg k-h
+ arch/arm/plat-orion/gpio.c            |    3 +-
+ arch/arm/plat-samsung/irq-vic-timer.c |    6 ++--
+ arch/mips/jz4740/irq.c                |    3 +-
+ drivers/gpio/gpio-mvebu.c             |   23 +++++++------
+ include/linux/irq.h                   |    7 ++--
+ kernel/irq/generic-chip.c             |   57 +++++++++++++++++++++------------
+ 6 files changed, 63 insertions(+), 36 deletions(-)
+
+-- 
+1.7.10.1
