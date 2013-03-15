@@ -1,56 +1,41 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Fri, 15 Mar 2013 10:37:27 +0900
-Subject: [PATCH] ARM: dts: add usb 2.0 clock references to exynos5250
- device tree
-In-Reply-To: <1363195099-15919-1-git-send-email-dianders@chromium.org>
-References: <1363195099-15919-1-git-send-email-dianders@chromium.org>
-Message-ID: <006301ce211d$a6caa670$f45ff350$%han@samsung.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 14 Mar 2013 20:31:37 -0700
+Subject: [PATCH 1/3] ARM: msm: Stop counting before reprogramming clockevent
+In-Reply-To: <1363318299-10814-1-git-send-email-sboyd@codeaurora.org>
+References: <1363318299-10814-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1363318299-10814-2-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+If the clockevent is forcibly reprogrammed to have a different
+match value we mistakenly assume the timer is not ticking and
+program a new match value while the timer is running. Although we
+clear the timer before programming a new match, it's better to
+stop the timer before clearing it so that we're sure the proper
+amount of ticks are counted. Failure to do so can lead to missed
+ticks and system hangs.
 
-On Thursday, March 14, 2013 2:18 AM, Doug Anderson wrote:
-> 
-> This is a fixup to two device tree nodes that have already landed but
-> without clock nodes since the transition to common clock happened at
-> the same time.
-> 
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ arch/arm/mach-msm/timer.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-The clock number and name are right.
-
-Reviewed-by: Jingoo Han <jg1.han@samsung.com>
-
-
-Best regards,
-Jingoo Han
-
-> ---
->  arch/arm/boot/dts/exynos5250.dtsi | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-> index 24c52e6..59be603 100644
-> --- a/arch/arm/boot/dts/exynos5250.dtsi
-> +++ b/arch/arm/boot/dts/exynos5250.dtsi
-> @@ -402,12 +402,18 @@
->  		compatible = "samsung,exynos4210-ehci";
->  		reg = <0x12110000 0x100>;
->  		interrupts = <0 71 0>;
-> +
-> +		clocks = <&clock 285>;
-> +		clock-names = "usbhost";
->  	};
-> 
->  	usb at 12120000 {
->  		compatible = "samsung,exynos4210-ohci";
->  		reg = <0x12120000 0x100>;
->  		interrupts = <0 71 0>;
-> +
-> +		clocks = <&clock 285>;
-> +		clock-names = "usbhost";
->  	};
-> 
->  	amba {
-> --
-> 1.8.1.3
+diff --git a/arch/arm/mach-msm/timer.c b/arch/arm/mach-msm/timer.c
+index 2969027..f9fd77e 100644
+--- a/arch/arm/mach-msm/timer.c
++++ b/arch/arm/mach-msm/timer.c
+@@ -62,7 +62,10 @@ static int msm_timer_set_next_event(unsigned long cycles,
+ {
+ 	u32 ctrl = readl_relaxed(event_base + TIMER_ENABLE);
+ 
+-	writel_relaxed(0, event_base + TIMER_CLEAR);
++	ctrl &= ~TIMER_ENABLE_EN;
++	writel_relaxed(ctrl, event_base + TIMER_ENABLE);
++
++	writel_relaxed(ctrl, event_base + TIMER_CLEAR);
+ 	writel_relaxed(cycles, event_base + TIMER_MATCH_VAL);
+ 	writel_relaxed(ctrl | TIMER_ENABLE_EN, event_base + TIMER_ENABLE);
+ 	return 0;
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
