@@ -1,32 +1,54 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 15 Mar 2013 01:12:11 +0000
-Subject: [PATCH 08/10] ASoC: dmaengine_pcm: Add open function for DT DMA
- request
-In-Reply-To: <20130314060442.GB27654@S2101-09.ap.freescale.net>
-References: <1362940391-8338-1-git-send-email-mpa@pengutronix.de>
- <1362940391-8338-9-git-send-email-mpa@pengutronix.de>
- <20130312190206.GY19942@opensource.wolfsonmicro.com>
- <20130313021712.GD27461@S2101-09.ap.freescale.net>
- <20130313104945.GI25610@opensource.wolfsonmicro.com>
- <20130314060442.GB27654@S2101-09.ap.freescale.net>
-Message-ID: <20130315011210.GB4931@opensource.wolfsonmicro.com>
+From: bilhuang@nvidia.com (Bill Huang)
+Date: Thu, 14 Mar 2013 18:20:54 -0700
+Subject: [RFC 1/1] clk: Add notifier support in
+ clk_prepare_enable/clk_disable_unprepare
+In-Reply-To: <51420EBB.7080503@wwwdotorg.org>
+References: <1363091861-21534-1-git-send-email-bilhuang@nvidia.com>
+ <20130312134032.GU4977@n2100.arm.linux.org.uk>
+ <1363139273.21694.11.camel@bilhuang-vm1> <514003B6.8020904@wwwdotorg.org>
+ <1363151317.3311.9.camel@bilhuang-vm1> <51400D9D.9060305@wwwdotorg.org>
+ <1363153204.3311.14.camel@bilhuang-vm1> <5140C12A.4060900@wwwdotorg.org>
+ <1363227311.3311.30.camel@bilhuang-vm1>
+ <20130314092132.GE18519@tbergstrom-lnx.Nvidia.com>
+ <1363253287.3311.32.camel@bilhuang-vm1> <51420EBB.7080503@wwwdotorg.org>
+Message-ID: <1363310454.3311.44.camel@bilhuang-vm1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 14, 2013 at 02:04:45PM +0800, Shawn Guo wrote:
-
-> I just double checked my mailbox and can only see the conversation
-> between you and rmk, nothing particularly on the removal of the const
-> from the name parameter.  Or I'm still missing something?
-
-You're missing the bit where I complained about you doing that - you
-should be adding the const to the dmaengine side, not removing it from
-the client side.  Unless there's some reason it should be modifiable,
-but that'd be very surprising.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130315/04bedaa3/attachment.sig>
+On Fri, 2013-03-15 at 01:54 +0800, Stephen Warren wrote:
+> On 03/14/2013 03:28 AM, Bill Huang wrote:
+> > On Thu, 2013-03-14 at 17:21 +0800, Peter De Schrijver wrote:
+> >> On Thu, Mar 14, 2013 at 03:15:11AM +0100, Bill Huang wrote:
+> >>
+> >>> I don't think deferring will work either, considering the usage of DVFS,
+> >>> device voltage is tightly coupled with frequency, when clock rate is
+> >>> about to increase, we have to boost voltage first and we can lower the
+> >>> voltage after the clock rate has decreased. All the above sequence have
+> >>> to be guaranteed or you might crash, so deferring not only make thing
+> >>> complicated in controlling the order but also hurt performance.
+> >>
+> >> But we could use notifiers in clk_prepare/clk_unprepare to set the voltage no?
+> >> As clk_prepare/clk_unprepare have to be called before clk_enable or after
+> >> clk_disable, the voltage can be raised to a safe level, before the clock
+> >> becomes active.
+> > 
+> > Thanks Peter, actually I'm just about to propose my v2 RFC which add
+> > notifier in clk_prepare/clk_unprepare.
+> 
+> Can't clk_set_rate() be called while the clock is prepared, or even
+> enabled? I don't see how your proposal would work.
+> 
+I think it works with just a little sacrifice on saving more power but
+that's related minor. Taking clk_prepare as an indicator on that clock
+will be enabled later, so we can raise the voltage to a safe level
+(according to the current rate or maybe default rate when clk_prepare is
+called, some time late when clk_set_rate() is called we can adjust again
+according to the requested rate change) but there should be case that
+clock will not be enabled after clk_prepare (I'm not sure is normal
+though), that the case power might be wasted. Similarly, taking
+clk_unprepare as an indicator on clock has been disabled but there might
+be case clock is disabled but do not call clk_unprepare any time soon,
+this is another case power is wasted but this should not be normal case.
+So the point is, we can get notified on runtime clock change events (no
+matter it is clock enable/disable or clock rate change) and act (get
+best balance on power saving and system stability) accordingly.
