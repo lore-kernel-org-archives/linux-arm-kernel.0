@@ -1,185 +1,275 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 15 Mar 2013 10:21:10 -0500
-Subject: [PATCH V3 12/18] ARM: OMAP2+: Add additional GPMC timing parameters
+Date: Fri, 15 Mar 2013 10:21:09 -0500
+Subject: [PATCH V3 11/18] ARM: OMAP2+: Add device-tree support for NOR flash
 In-Reply-To: <1363360876-13617-1-git-send-email-jon-hunter@ti.com>
 References: <1363360876-13617-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <1363360876-13617-13-git-send-email-jon-hunter@ti.com>
+Message-ID: <1363360876-13617-12-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some of the GPMC timings parameters are currently missing from the GPMC
-device-tree binding. Add these parameters to the binding documentation
-as well as code to read them.
+NOR flash is not currently supported when booting with device-tree
+on OMAP2+ devices. Add support to detect and configure NOR devices
+when booting with device-tree.
 
-The existing code in gpmc_read_timings_dt() is checking the value of
-of_property_read_u32() and only is successful storing the value read
-in the gpmc_timings structure. Checking the return value in this case
-is not necessary and we can simply read the value, if present, and
-store directly in the gpmc_timings structure. Therefore, simplify the
-code by removing these checks.
-
-The comment in the gpmc_read_timings_dt() function, "only for OMAP3430"
-is also incorrect as it is applicable to all OMAP3+ devices. So correct
-this too.
+Add documentation for the TI GPMC NOR binding.
 
 Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 ---
- Documentation/devicetree/bindings/bus/ti-gpmc.txt |   25 +++++-
- arch/arm/mach-omap2/gpmc.c                        |   93 ++++++++++-----------
- 2 files changed, 66 insertions(+), 52 deletions(-)
+ Documentation/devicetree/bindings/mtd/gpmc-nor.txt |   98 +++++++++++++++++
+ arch/arm/mach-omap2/gpmc.c                         |  115 ++++++++++++++++++++
+ 2 files changed, 213 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mtd/gpmc-nor.txt
 
-diff --git a/Documentation/devicetree/bindings/bus/ti-gpmc.txt b/Documentation/devicetree/bindings/bus/ti-gpmc.txt
-index 6fde1cf..a63bd93 100644
---- a/Documentation/devicetree/bindings/bus/ti-gpmc.txt
-+++ b/Documentation/devicetree/bindings/bus/ti-gpmc.txt
-@@ -56,10 +56,27 @@ Timing properties for child nodes. All are optional and default to 0.
-  - gpmc,oe-off:		Deassertion time
- 
-  Access time and cycle time timings corresponding to GPMC_CONFIG5:
-- - gpmc,page-burst-access: Multiple access word delay
-- - gpmc,access:		Start-cycle to first data valid delay
-- - gpmc,rd-cycle:	Total read cycle time
-- - gpmc,wr-cycle:	Total write cycle time
-+ - gpmc,page-burst-access: 	Multiple access word delay
-+ - gpmc,access:			Start-cycle to first data valid delay
-+ - gpmc,rd-cycle:		Total read cycle time
-+ - gpmc,wr-cycle:		Total write cycle time
-+ - gpmc,bus-turnaround:		Turn-around time between successive accesses
-+ - gpmc,cycle2cycle-delay:	Delay between chip-select pulses
-+ - gpmc,clk-activation: 	GPMC clock activation time
-+ - gpmc,wait-monitoring:	Start of wait monitoring with regard to valid
-+				data
+diff --git a/Documentation/devicetree/bindings/mtd/gpmc-nor.txt b/Documentation/devicetree/bindings/mtd/gpmc-nor.txt
+new file mode 100644
+index 0000000..8c638fc
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mtd/gpmc-nor.txt
+@@ -0,0 +1,98 @@
++Device tree bindings for NOR flash connect to TI GPMC
 +
-+Boolean timing parameters. If property is present parameter enabled and
-+disabled if omitted:
-+ - gpmc,adv-extra-delay:	ADV signal is delayed by half GPMC clock
-+ - gpmc,cs-extra-delay:		CS signal is delayed by half GPMC clock
-+ - gpmc,cycle2cycle-diffcsen:	Add "cycle2cycle-delay" between successive
-+				accesses to a different CS
-+ - gpmc,cycle2cycle-samecsen:	Add "cycle2cycle-delay" between successive
-+				accesses to the same CS
-+ - gpmc,oe-extra-delay:		OE signal is delayed by half GPMC clock
-+ - gpmc,we-extra-delay:		WE signal is delayed by half GPMC clock
-+ - gpmc,time-para-granularity:	Multiply all access times by 2
- 
- The following are only applicable to OMAP3+ and AM335x:
-  - gpmc,wr-access
++NOR flash connected to the TI GPMC (found on OMAP boards) are represented as
++child nodes of the GPMC controller with a name of "nor".
++
++All timing relevant properties as well as generic GPMC child properties are
++explained in a separate documents. Please refer to
++Documentation/devicetree/bindings/bus/ti-gpmc.txt
++
++Required properties:
++- bank-width: 		Width of NOR flash in bytes. GPMC supports 8-bit and
++			16-bit devices and so must be either 1 or 2 bytes.
++- compatible:		Documentation/devicetree/bindings/mtd/mtd-physmap.txt
++- gpmc,cs-on:		Chip-select assertion time
++- gpmc,cs-rd-off:	Chip-select de-assertion time for reads
++- gpmc,cs-wr-off:	Chip-select de-assertion time for writes
++- gpmc,oe-on:		Output-enable assertion time
++- gpmc,oe-off		Output-enable de-assertion time
++- gpmc,we-on:		Write-enable assertion time
++- gpmc,we-off:		Write-enable de-assertion time
++- gpmc,access:		Start cycle to first data capture (read access)
++- gpmc,rd-cycle:	Total read cycle time
++- gpmc,wr-cycle:	Total write cycle time
++- linux,mtd-name:	Documentation/devicetree/bindings/mtd/mtd-physmap.txt
++- reg:			Chip-select, base address (relative to chip-select)
++			and size of NOR flash. Note that base address will be
++			typically 0 as this is the start of the chip-select.
++
++Optional properties:
++- gpmc,XXX		Additional GPMC timings and settings parameters. See
++			Documentation/devicetree/bindings/bus/ti-gpmc.txt
++
++Optional properties for partiton table parsing:
++- #address-cells: should be set to 1
++- #size-cells: should be set to 1
++
++Example:
++
++gpmc: gpmc at 6e000000 {
++	compatible = "ti,omap3430-gpmc", "simple-bus";
++	ti,hwmods = "gpmc";
++	reg = <0x6e000000 0x1000>;
++	interrupts = <20>;
++	gpmc,num-cs = <8>;
++	gpmc,num-waitpins = <4>;
++	#address-cells = <2>;
++	#size-cells = <1>;
++
++	ranges = <0 0 0x10000000 0x08000000>;
++
++	nor at 0,0 {
++		compatible = "cfi-flash";
++		linux,mtd-name= "intel,pf48f6000m0y1be";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		reg = <0 0 0x08000000>;
++		bank-width = <2>;
++
++		gpmc,mux-add-data;
++		gpmc,cs-on = <0>;
++		gpmc,cs-rd-off = <186>;
++		gpmc,cs-wr-off = <186>;
++		gpmc,adv-on = <12>;
++		gpmc,adv-rd-off = <48>;
++		gpmc,adv-wr-off = <48>;
++		gpmc,oe-on = <54>;
++		gpmc,oe-off = <168>;
++		gpmc,we-on = <54>;
++		gpmc,we-off = <168>;
++		gpmc,rd-cycle = <186>;
++		gpmc,wr-cycle = <186>;
++		gpmc,access = <114>;
++		gpmc,page-burst-access = <6>;
++		gpmc,bus-turnaround = <12>;
++		gpmc,cycle2cycle-delay = <18>;
++		gpmc,wr-data-mux-bus = <90>;
++		gpmc,wr-access = <186>;
++		gpmc,cycle2cycle-samecsen;
++		gpmc,cycle2cycle-diffcsen;
++
++		partition at 0 {
++			label = "bootloader-nor";
++			reg = <0 0x40000>;
++		};
++		partition at 0x40000 {
++			label = "params-nor";
++			reg = <0x40000 0x40000>;
++		};
++		partition at 0x80000 {
++			label = "kernel-nor";
++			reg = <0x80000 0x200000>;
++		};
++		partition at 0x280000 {
++			label = "filesystem-nor";
++			reg = <0x240000 0x7d80000>;
++		};
++	};
++};
 diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-index 85b1a35..c928a8c 100644
+index 1e7eef3..85b1a35 100644
 --- a/arch/arm/mach-omap2/gpmc.c
 +++ b/arch/arm/mach-omap2/gpmc.c
-@@ -1274,67 +1274,64 @@ void gpmc_read_settings_dt(struct device_node *np, struct gpmc_settings *p)
- static void __maybe_unused gpmc_read_timings_dt(struct device_node *np,
- 						struct gpmc_timings *gpmc_t)
- {
--	u32 val;
--
- 	memset(gpmc_t, 0, sizeof(*gpmc_t));
- 
- 	/* minimum clock period for syncronous mode */
--	if (!of_property_read_u32(np, "gpmc,sync-clk", &val))
--		gpmc_t->sync_clk = val;
-+	of_property_read_u32(np, "gpmc,sync-clk", &gpmc_t->sync_clk);
- 
- 	/* chip select timtings */
--	if (!of_property_read_u32(np, "gpmc,cs-on", &val))
--		gpmc_t->cs_on = val;
--
--	if (!of_property_read_u32(np, "gpmc,cs-rd-off", &val))
--		gpmc_t->cs_rd_off = val;
--
--	if (!of_property_read_u32(np, "gpmc,cs-wr-off", &val))
--		gpmc_t->cs_wr_off = val;
-+	of_property_read_u32(np, "gpmc,cs-on", &gpmc_t->cs_on);
-+	of_property_read_u32(np, "gpmc,cs-rd-off", &gpmc_t->cs_rd_off);
-+	of_property_read_u32(np, "gpmc,cs-wr-off", &gpmc_t->cs_wr_off);
- 
- 	/* ADV signal timings */
--	if (!of_property_read_u32(np, "gpmc,adv-on", &val))
--		gpmc_t->adv_on = val;
--
--	if (!of_property_read_u32(np, "gpmc,adv-rd-off", &val))
--		gpmc_t->adv_rd_off = val;
--
--	if (!of_property_read_u32(np, "gpmc,adv-wr-off", &val))
--		gpmc_t->adv_wr_off = val;
-+	of_property_read_u32(np, "gpmc,adv-on", &gpmc_t->adv_on);
-+	of_property_read_u32(np, "gpmc,adv-rd-off", &gpmc_t->adv_rd_off);
-+	of_property_read_u32(np, "gpmc,adv-wr-off", &gpmc_t->adv_wr_off);
- 
- 	/* WE signal timings */
--	if (!of_property_read_u32(np, "gpmc,we-on", &val))
--		gpmc_t->we_on = val;
--
--	if (!of_property_read_u32(np, "gpmc,we-off", &val))
--		gpmc_t->we_off = val;
-+	of_property_read_u32(np, "gpmc,we-on", &gpmc_t->we_on);
-+	of_property_read_u32(np, "gpmc,we-off", &gpmc_t->we_off);
- 
- 	/* OE signal timings */
--	if (!of_property_read_u32(np, "gpmc,oe-on", &val))
--		gpmc_t->oe_on = val;
--
--	if (!of_property_read_u32(np, "gpmc,oe-off", &val))
--		gpmc_t->oe_off = val;
-+	of_property_read_u32(np, "gpmc,oe-on", &gpmc_t->oe_on);
-+	of_property_read_u32(np, "gpmc,oe-off", &gpmc_t->oe_off);
- 
- 	/* access and cycle timings */
--	if (!of_property_read_u32(np, "gpmc,page-burst-access", &val))
--		gpmc_t->page_burst_access = val;
--
--	if (!of_property_read_u32(np, "gpmc,access", &val))
--		gpmc_t->access = val;
--
--	if (!of_property_read_u32(np, "gpmc,rd-cycle", &val))
--		gpmc_t->rd_cycle = val;
--
--	if (!of_property_read_u32(np, "gpmc,wr-cycle", &val))
--		gpmc_t->wr_cycle = val;
--
--	/* only for OMAP3430 */
--	if (!of_property_read_u32(np, "gpmc,wr-access", &val))
--		gpmc_t->wr_access = val;
--
--	if (!of_property_read_u32(np, "gpmc,wr-data-mux-bus", &val))
--		gpmc_t->wr_data_mux_bus = val;
-+	of_property_read_u32(np, "gpmc,page-burst-access",
-+			     &gpmc_t->page_burst_access);
-+	of_property_read_u32(np, "gpmc,access", &gpmc_t->access);
-+	of_property_read_u32(np, "gpmc,rd-cycle", &gpmc_t->rd_cycle);
-+	of_property_read_u32(np, "gpmc,wr-cycle", &gpmc_t->wr_cycle);
-+	of_property_read_u32(np, "gpmc,bus-turnaround",
-+			     &gpmc_t->bus_turnaround);
-+	of_property_read_u32(np, "gpmc,cycle2cycle-delay",
-+			     &gpmc_t->cycle2cycle_delay);
-+	of_property_read_u32(np, "gpmc,wait-monitoring",
-+			     &gpmc_t->wait_monitoring);
-+	of_property_read_u32(np, "gpmc,clk-activation",
-+			     &gpmc_t->clk_activation);
-+
-+	/* only applicable to OMAP3+ */
-+	of_property_read_u32(np, "gpmc,wr-access", &gpmc_t->wr_access);
-+	of_property_read_u32(np, "gpmc,wr-data-mux-bus",
-+			     &gpmc_t->wr_data_mux_bus);
-+
-+	/* bool timing parameters */
-+	if (of_find_property(np, "gpmc,cycle2cycle-diffcsen", NULL))
-+		gpmc_t->bool_timings.cycle2cyclediffcsen = true;
-+	if (of_find_property(np, "gpmc,cycle2cycle-samecsen", NULL))
-+		gpmc_t->bool_timings.cycle2cyclesamecsen = true;
-+	if (of_find_property(np, "gpmc,we-extra-delay", NULL))
-+		gpmc_t->bool_timings.we_extra_delay = true;
-+	if (of_find_property(np, "gpmc,oe-extra-delay", NULL))
-+		gpmc_t->bool_timings.oe_extra_delay = true;
-+	if (of_find_property(np, "gpmc,adv-extra-delay", NULL))
-+		gpmc_t->bool_timings.adv_extra_delay = true;
-+	if (of_find_property(np, "gpmc,cs-extra-delay", NULL))
-+		gpmc_t->bool_timings.cs_extra_delay = true;
-+	if (of_find_property(np, "gpmc,time-para-granularity", NULL))
-+		gpmc_t->bool_timings.time_para_granularity = true;
+@@ -26,6 +26,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/platform_device.h>
+ #include <linux/of.h>
++#include <linux/of_address.h>
+ #include <linux/of_mtd.h>
+ #include <linux/of_device.h>
+ #include <linux/mtd/nand.h>
+@@ -499,6 +500,37 @@ static int gpmc_cs_delete_mem(int cs)
+ 	return r;
  }
  
- #ifdef CONFIG_MTD_NAND
++/**
++ * gpmc_cs_remap - remaps a chip-select physical base address
++ * @cs:		chip-select to remap
++ * @base:	physical base address to re-map chip-select to
++ *
++ * Re-maps a chip-select to a new physical base address specified by
++ * "base". Returns 0 on success and appropriate negative error code
++ * on failure.
++ */
++static int gpmc_cs_remap(int cs, u32 base)
++{
++	int ret;
++	u32 old_base, size;
++
++	if (cs > GPMC_CS_NUM)
++		return -ENODEV;
++	gpmc_cs_get_memconf(cs, &old_base, &size);
++	if (base == old_base)
++		return 0;
++	gpmc_cs_disable_mem(cs);
++	ret = gpmc_cs_delete_mem(cs);
++	if (ret < 0)
++		return ret;
++	ret = gpmc_cs_insert_mem(cs, base, size);
++	if (ret < 0)
++		return ret;
++	gpmc_cs_enable_mem(cs, base, size);
++
++	return 0;
++}
++
+ int gpmc_cs_request(int cs, unsigned long size, unsigned long *base)
+ {
+ 	struct resource *res = &gpmc_cs_mem[cs];
+@@ -1398,6 +1430,80 @@ static int gpmc_probe_onenand_child(struct platform_device *pdev,
+ }
+ #endif
+ 
++/**
++ * gpmc_probe_nor_child - configures the gpmc for a nor device
++ * @pdev:	pointer to gpmc platform device
++ * @child:	pointer to device-tree node for nor device
++ *
++ * Allocates and configures a GPMC chip-select for a NOR flash device.
++ * Returns 0 on success and appropriate negative error code on failure.
++ */
++static int gpmc_probe_nor_child(struct platform_device *pdev,
++				struct device_node *child)
++{
++	struct gpmc_settings gpmc_s;
++	struct gpmc_timings gpmc_t;
++	struct resource res;
++	unsigned long base;
++	int ret, cs;
++
++	if (of_property_read_u32(child, "reg", &cs) < 0) {
++		dev_err(&pdev->dev, "%s has no 'reg' property\n",
++			child->full_name);
++		return -ENODEV;
++	}
++
++	if (of_address_to_resource(child, 0, &res) < 0) {
++		dev_err(&pdev->dev, "%s has malformed 'reg' property\n",
++			child->full_name);
++		return -ENODEV;
++	}
++
++	ret = gpmc_cs_request(cs, resource_size(&res), &base);
++	if (ret < 0) {
++		dev_err(&pdev->dev, "cannot request GPMC CS %d\n", cs);
++		return ret;
++	}
++
++	/*
++	 * FIXME: gpmc_cs_request() will map the CS to an arbitary
++	 * location in the gpmc address space. When booting with
++	 * device-tree we want the NOR flash to be mapped to the
++	 * location specified in the device-tree blob. So remap the
++	 * CS to this location. Once DT migration is complete should
++	 * just make gpmc_cs_request() map a specific address.
++	 */
++	ret = gpmc_cs_remap(cs, res.start);
++	if (ret < 0) {
++		dev_err(&pdev->dev, "cannot remap GPMC CS %d to 0x%x\n",
++			cs, res.start);
++		goto err;
++	}
++
++	gpmc_read_settings_dt(child, &gpmc_s);
++
++	ret = of_property_read_u32(child, "bank-width", &gpmc_s.device_width);
++	if (ret < 0)
++		goto err;
++
++	ret = gpmc_cs_program_settings(cs, &gpmc_s);
++	if (ret < 0)
++		goto err;
++
++	gpmc_read_timings_dt(child, &gpmc_t);
++	gpmc_cs_set_timings(cs, &gpmc_t);
++
++	if (of_platform_device_create(child, NULL, &pdev->dev))
++		return 0;
++
++	dev_err(&pdev->dev, "failed to create gpmc child %s\n", child->name);
++
++err:
++	gpmc_cs_free(cs);
++
++	return ret;
++}
++
+ static int gpmc_probe_dt(struct platform_device *pdev)
+ {
+ 	int ret;
+@@ -1430,6 +1536,15 @@ static int gpmc_probe_dt(struct platform_device *pdev)
+ 			return ret;
+ 		}
+ 	}
++
++	for_each_node_by_name(child, "nor") {
++		ret = gpmc_probe_nor_child(pdev, child);
++		if (ret < 0) {
++			of_node_put(child);
++			return ret;
++		}
++	}
++
+ 	return 0;
+ }
+ #else
 -- 
 1.7.10.4
