@@ -1,181 +1,221 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 15 Mar 2013 08:57:41 -0500
-Subject: [PATCH V2 8/8] ARM: dts: OMAP3: Add support for OMAP3430 SDP board
+Date: Fri, 15 Mar 2013 08:57:39 -0500
+Subject: [PATCH V2 6/8] ARM: dts: OMAP3+: Correct gpio #interrupts-cells
+ property
 In-Reply-To: <1363355861-11773-1-git-send-email-jon-hunter@ti.com>
 References: <1363355861-11773-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <1363355861-11773-9-git-send-email-jon-hunter@ti.com>
+Message-ID: <1363355861-11773-7-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds basic device-tree support for OMAP3430 SDP board which has 256MB
-of RAM, 128MB ONENAND flash, 256MB NAND flash and uses the TWL4030
-power management IC.
+The OMAP gpio binding documention [1] states that the #interrupts-cells
+property for gpio controllers should be 2. Currently, for OMAP3+ devices
+the #interrupt-cells is set to 1. By setting this property to 2, it
+allows clients to pass a 2nd parameter indicating the sensitivity (level
+or edge) and polarity (high or low) of the interrupt. The OMAP gpio
+controllers support these options and so update the #interrupt-cells
+property for OMAP3+ devices to 2.
+
+[1] Documentation/devicetree/bindings/gpio/gpio-omap.txt
 
 Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 ---
- arch/arm/boot/dts/Makefile         |    1 +
- arch/arm/boot/dts/omap3430-sdp.dts |  141 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 142 insertions(+)
- create mode 100644 arch/arm/boot/dts/omap3430-sdp.dts
+ arch/arm/boot/dts/omap3.dtsi |   12 ++++++------
+ arch/arm/boot/dts/omap4.dtsi |   12 ++++++------
+ arch/arm/boot/dts/omap5.dtsi |   16 ++++++++--------
+ 3 files changed, 20 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index de29da5..a38dcd4 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -115,6 +115,7 @@ dtb-$(CONFIG_ARCH_MXS) += imx23-evk.dtb \
- 	imx28-tx28.dtb
- dtb-$(CONFIG_ARCH_NOMADIK) += ste-nomadik-s8815.dtb
- dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
-+	omap3430-sdp.dtb \
- 	omap3-beagle.dtb \
- 	omap3-beagle-xm.dtb \
- 	omap3-evm.dtb \
-diff --git a/arch/arm/boot/dts/omap3430-sdp.dts b/arch/arm/boot/dts/omap3430-sdp.dts
-new file mode 100644
-index 0000000..535a6f9
---- /dev/null
-+++ b/arch/arm/boot/dts/omap3430-sdp.dts
-@@ -0,0 +1,141 @@
-+/*
-+ * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+/dts-v1/;
-+
-+/include/ "omap3.dtsi"
-+
-+/ {
-+	model = "TI OMAP3430 SDP";
-+	compatible = "ti,omap3430-sdp", "ti,omap3";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x80000000 0x10000000>; /* 256 MB */
-+	};
-+};
-+
-+&i2c1 {
-+	clock-frequency = <2600000>;
-+
-+	twl: twl at 48 {
-+		reg = <0x48>;
-+		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
-+	};
-+};
-+
-+/include/ "twl4030.dtsi"
-+
-+&mmc1 {
-+	vmmc-supply = <&vmmc1>;
-+	vmmc_aux-supply = <&vsim>;
-+	bus-width = <8>;
-+};
-+
-+&mmc2 {
-+	status = "disabled";
-+};
-+
-+&mmc3 {
-+	status = "disabled";
-+};
-+
-+&gpmc {
-+	ranges = <1 0 0x28000000 0x08000000>,
-+		 <2 0 0x20000000 0x10000000>;
-+
-+	nand at 1,0 {
-+		linux,mtd-name= "micron,mt29f1g08abb";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		reg = <1 0 0x08000000>;
-+		nand-bus-width = <8>;
-+
-+		ti,nand-ecc-opt = "sw";
-+		gpmc,device-nand;
-+		gpmc,cs-on = <0>;
-+		gpmc,cs-rd-off = <36>;
-+		gpmc,cs-wr-off = <36>;
-+		gpmc,adv-on = <6>;
-+		gpmc,adv-rd-off = <24>;
-+		gpmc,adv-wr-off = <36>;
-+		gpmc,oe-on = <6>;
-+		gpmc,oe-off = <48>;
-+		gpmc,we-on = <6>;
-+		gpmc,we-off = <30>;
-+		gpmc,rd-cycle = <72>;
-+		gpmc,wr-cycle = <72>;
-+		gpmc,access = <54>;
-+		gpmc,wr-access = <30>;
-+
-+		partition at 0 {
-+			label = "xloader-nand";
-+			reg = <0 0x80000>;
-+		};
-+		partition at 0x80000 {
-+			label = "bootloader-nand";
-+			reg = <0x80000 0x140000>;
-+		};
-+		partition at 0x1c0000 {
-+			label = "params-nand";
-+			reg = <0x1c0000 0xc0000>;
-+		};
-+		partition at 0x280000 {
-+			label = "kernel-nand";
-+			reg = <0x280000 0x500000>;
-+		};
-+		partition at 0x780000 {
-+			label = "filesystem-nand";
-+			reg = <0x780000 0x7880000>;
-+		};
-+	};
-+
-+	onenand at 2,0 {
-+		linux,mtd-name= "samsung,kfm2g16q2m-deb8";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		reg = <2 0 0x10000000>;
-+
-+		gpmc,device-width = <2>;
-+		gpmc,mux-add-data = <2>;
-+		gpmc,cs-on = <0>;
-+		gpmc,cs-rd-off = <84>;
-+		gpmc,cs-wr-off = <72>;
-+		gpmc,adv-on = <0>;
-+		gpmc,adv-rd-off = <18>;
-+		gpmc,adv-wr-off = <18>;
-+		gpmc,oe-on = <30>;
-+		gpmc,oe-off = <84>;
-+		gpmc,we-on = <0>;
-+		gpmc,we-off = <42>;
-+		gpmc,rd-cycle = <108>;
-+		gpmc,wr-cycle = <96>;
-+		gpmc,access = <78>;
-+		gpmc,wr-data-mux-bus = <30>;
-+
-+		partition at 0 {
-+			label = "xloader-onenand";
-+			reg = <0 0x80000>;
-+		};
-+		partition at 0x80000 {
-+			label = "bootloader-onenand";
-+			reg = <0x80000 0x40000>;
-+		};
-+		partition at 0xc0000 {
-+			label = "params-onenand";
-+			reg = <0xc0000 0x20000>;
-+		};
-+		partition at 0xe0000 {
-+			label = "kernel-onenand";
-+			reg = <0xe0000 0x200000>;
-+		};
-+		partition at 0x2e0000 {
-+			label = "filesystem-onenand";
-+			reg = <0x2e0000 0xfd20000>;
-+		};
-+	};
-+};
+diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+index 1dc72ea..badedc8 100644
+--- a/arch/arm/boot/dts/omap3.dtsi
++++ b/arch/arm/boot/dts/omap3.dtsi
+@@ -117,7 +117,7 @@
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+-			#interrupt-cells = <1>;
++			#interrupt-cells = <2>;
+ 		};
+ 
+ 		gpio2: gpio at 49050000 {
+@@ -126,7 +126,7 @@
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+-			#interrupt-cells = <1>;
++			#interrupt-cells = <2>;
+ 		};
+ 
+ 		gpio3: gpio at 49052000 {
+@@ -135,7 +135,7 @@
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+-			#interrupt-cells = <1>;
++			#interrupt-cells = <2>;
+ 		};
+ 
+ 		gpio4: gpio at 49054000 {
+@@ -144,7 +144,7 @@
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+-			#interrupt-cells = <1>;
++			#interrupt-cells = <2>;
+ 		};
+ 
+ 		gpio5: gpio at 49056000 {
+@@ -153,7 +153,7 @@
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+-			#interrupt-cells = <1>;
++			#interrupt-cells = <2>;
+ 		};
+ 
+ 		gpio6: gpio at 49058000 {
+@@ -162,7 +162,7 @@
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+-			#interrupt-cells = <1>;
++			#interrupt-cells = <2>;
+ 		};
+ 
+ 		uart1: serial at 4806a000 {
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index bcd64f5..bed47c5 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -138,7 +138,7 @@
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+-			#interrupt-cells = <1>;
++			#interrupt-cells = <2>;
+ 		};
+ 
+ 		gpio2: gpio at 48055000 {
+@@ -149,7 +149,7 @@
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+-			#interrupt-cells = <1>;
++			#interrupt-cells = <2>;
+ 		};
+ 
+ 		gpio3: gpio at 48057000 {
+@@ -160,7 +160,7 @@
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+-			#interrupt-cells = <1>;
++			#interrupt-cells = <2>;
+ 		};
+ 
+ 		gpio4: gpio at 48059000 {
+@@ -171,7 +171,7 @@
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+-			#interrupt-cells = <1>;
++			#interrupt-cells = <2>;
+ 		};
+ 
+ 		gpio5: gpio at 4805b000 {
+@@ -182,7 +182,7 @@
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+-			#interrupt-cells = <1>;
++			#interrupt-cells = <2>;
+ 		};
+ 
+ 		gpio6: gpio at 4805d000 {
+@@ -193,7 +193,7 @@
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+-			#interrupt-cells = <1>;
++			#interrupt-cells = <2>;
+ 		};
+ 
+ 		gpmc: gpmc at 50000000 {
+diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+index 61cbd1c..b4d2eb9 100644
+--- a/arch/arm/boot/dts/omap5.dtsi
++++ b/arch/arm/boot/dts/omap5.dtsi
+@@ -128,7 +128,7 @@
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+-			#interrupt-cells = <1>;
++			#interrupt-cells = <2>;
+ 		};
+ 
+ 		gpio2: gpio at 48055000 {
+@@ -139,7 +139,7 @@
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+-			#interrupt-cells = <1>;
++			#interrupt-cells = <2>;
+ 		};
+ 
+ 		gpio3: gpio at 48057000 {
+@@ -150,7 +150,7 @@
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+-			#interrupt-cells = <1>;
++			#interrupt-cells = <2>;
+ 		};
+ 
+ 		gpio4: gpio at 48059000 {
+@@ -161,7 +161,7 @@
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+-			#interrupt-cells = <1>;
++			#interrupt-cells = <2>;
+ 		};
+ 
+ 		gpio5: gpio at 4805b000 {
+@@ -172,7 +172,7 @@
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+-			#interrupt-cells = <1>;
++			#interrupt-cells = <2>;
+ 		};
+ 
+ 		gpio6: gpio at 4805d000 {
+@@ -183,7 +183,7 @@
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+-			#interrupt-cells = <1>;
++			#interrupt-cells = <2>;
+ 		};
+ 
+ 		gpio7: gpio at 48051000 {
+@@ -194,7 +194,7 @@
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+-			#interrupt-cells = <1>;
++			#interrupt-cells = <2>;
+ 		};
+ 
+ 		gpio8: gpio at 48053000 {
+@@ -205,7 +205,7 @@
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+-			#interrupt-cells = <1>;
++			#interrupt-cells = <2>;
+ 		};
+ 
+ 		gpmc: gpmc at 50000000 {
 -- 
 1.7.10.4
