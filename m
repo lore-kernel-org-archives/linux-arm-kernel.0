@@ -1,90 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 15 Mar 2013 22:39:17 +0000
-Subject: [PATCH 1/6] serial: 8250_dw: add support for clk api
-In-Reply-To: <1363377988-4966-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1363377988-4966-1-git-send-email-maxime.ripard@free-electrons.com>
- <1363377988-4966-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20130315223917.GZ4977@n2100.arm.linux.org.uk>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Sat, 16 Mar 2013 10:11:48 +1100
+Subject: ep93xx irq-vic regression
+In-Reply-To: <ADE657CA350FB648AAC2C43247A983F0020980106C9F@AUSP01VMBX24.collaborationhost.net>
+References: <ADE657CA350FB648AAC2C43247A983F0020980106C9F@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <5143AAB4.6020406@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 15, 2013 at 09:06:23PM +0100, Maxime Ripard wrote:
-> +	/* clock got configured through clk api, all done */
-> +	if (p->uartclk)
+On 16/03/13 08:46, H Hartley Sweeten wrote:
 
-	if (IS_ERR(p->uartclk))
-
-> +		return 0;
-> +
-> +	/* try to find out clock frequency from DT as fallback */
->  	if (of_property_read_u32(np, "clock-frequency", &val)) {
-> -		dev_err(p->dev, "no clock-frequency property set\n");
-> +		dev_err(p->dev, "clk or clock-frequency not defined\n");
->  		return -EINVAL;
->  	}
->  	p->uartclk = val;
-> @@ -294,9 +301,21 @@ static int dw8250_probe(struct platform_device *pdev)
->  	if (!uart.port.membase)
->  		return -ENOMEM;
->  
-> +	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
-> +	if (!data)
-> +		return -ENOMEM;
-> +
-> +	data->clk = devm_clk_get(&pdev->dev, NULL);
-> +	if (IS_ERR(data->clk))
-> +		data->clk = NULL;
-> +	else
-> +		clk_prepare_enable(data->clk);
-
-	if (!IS_ERR(data->clk))
-		clk_prepare_enable(data->clk);
-
-> +
->  	uart.port.iotype = UPIO_MEM;
->  	uart.port.serial_in = dw8250_serial_in;
->  	uart.port.serial_out = dw8250_serial_out;
-> +	uart.port.private_data = data;
-> +	uart.port.uartclk = clk_get_rate(data->clk);
-
-What if data->clk is invalid?
-
-	if (!IS_ERR(data->clk)
-		uart.port.uartclk = clk_get_rate(data->clk);
-
->  
->  	dw8250_setup_port(&uart);
->  
-> @@ -312,12 +331,6 @@ static int dw8250_probe(struct platform_device *pdev)
->  		return -ENODEV;
->  	}
->  
-> -	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
-> -	if (!data)
-> -		return -ENOMEM;
-> -
-> -	uart.port.private_data = data;
-> -
->  	data->line = serial8250_register_8250_port(&uart);
->  	if (data->line < 0)
->  		return data->line;
-> @@ -333,6 +346,8 @@ static int dw8250_remove(struct platform_device *pdev)
->  
->  	serial8250_unregister_port(data->line);
->  
-
-	if (!IS_ERR(data->clk)
-
-> +	clk_disable_unprepare(data->clk);
-> +
->  	return 0;
->  }
->  
-> -- 
-> 1.7.10.4
+>  Hello all,
 > 
+> Yesterday I tried upgrading my ep93xx system from 3.6.6 to 3.8.3.
+> The kernel compiles fine but the machine would not boot. It just
+> hangs when the bootloader (RedBoot) tries to exec the kernel.
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> I then tried 3.7.0 and it works fine.
+> 
+> I did a bisect and got down to this commit:
+> 
+> $ git bisect bad
+> 07c9249f1fa90cc8189bed44c0bcece664596a72 is the first bad commit
+> commit 07c9249f1fa90cc8189bed44c0bcece664596a72
+> Author: Linus Walleij <linus.walleij@linaro.org>
+> Date:   Tue Oct 16 18:50:00 2012 +0100
+> 
+>     ARM: 7554/1: VIC: use irq_domain_add_simple()
+> 
+> Any ideas on what might be the problem?
+
+
+I don't know the code very well, but looking at the change we go
+from being having the first vic bank being registered with
+irq_domain_add_legacy to irq_domain_add_linear (since first_irq
+is zero). It looks like the linear domain needs to have it's
+revmap initialised with a call to either irq_domain_associate_many
+or irq_create_strict_mappings, which I can't find a call to. Are
+we left with the first vic bank having no revmap? That's from a
+ten minute, uninformed glance at the code though, so I might be
+off base :-).
+
+~Ryan
