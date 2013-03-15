@@ -1,23 +1,35 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Fri, 15 Mar 2013 11:08:56 -0700
-Subject: [PATCH 0/8] memory: emif: miscellaneous bug fixes for EMIF driver
-In-Reply-To: <1362978365-5593-1-git-send-email-lokeshvutla@ti.com>
-References: <1362978365-5593-1-git-send-email-lokeshvutla@ti.com>
-Message-ID: <20130315180856.GA30236@kroah.com>
+From: fabio.porcedda@gmail.com (Fabio Porcedda)
+Date: Fri, 15 Mar 2013 19:09:18 +0100
+Subject: [PATCH 10/10] drivers: misc: use module_platform_driver_probe()
+In-Reply-To: <201303151128.48432.arnd@arndb.de>
+References: <1363266691-15757-1-git-send-email-fabio.porcedda@gmail.com>
+ <20130314140631.GM1906@pengutronix.de>
+ <CAHkwnC9nGsdgOTQZ6VpeDyPWXw7tpP+2oHvnLv6LEr1cNdnrsg@mail.gmail.com>
+ <201303151128.48432.arnd@arndb.de>
+Message-ID: <CAHkwnC_4kVGcs03_6RVNrye21aUHsCWf9rQe=2JP_Nkjk8Yczw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 11, 2013 at 10:35:57AM +0530, Lokesh Vutla wrote:
-> This series resolves a few minor issues for EMIF driver.
-> 
-> Tested all patches on OMAP4430-sdp.
-> Patch : "memory: emif: setup LP settings on freq update"
-> is tested on a local tree, since freq update cannot be
-> tested on mainline.
+On Fri, Mar 15, 2013 at 12:28 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 15 March 2013, Fabio Porcedda wrote:
+>> >> * Regarding the use of module_platform_driver_probe, I'm a little worried about
+>> >>   the interactions with deferred probing. I don't think there are any regressions,
+>> >>   but we should probably make people aware that one cannot return -EPROBE_DEFER
+>> >>   from a platform_driver_probe function.
+>>
+>> The use of module_platform_driver_probe() doesn't change anything about that,
+>> it's exactly the same thing as using "return platform_driver_probe()".
+>> I'm right or I'm missing something? Maybe are you just speaking about
+>> the misuse of "platform_driver_probe"?
+>
+> Yes, that was what I meant. The point is that if we need to review or remove
+> all uses of platform_driver_probe, it would be better not to introduce a
+> module_platform_driver_probe() interface to make it easier to use.
 
-Can you please resend these with all of the requested changes made, and
-acks added?
+Just to let you know, the module_platform_driver_probe() macro is
+already in v3.9-rc1 and is already used by some drivers.
+In linux-next there are already many patches that use that macro.
 
-thanks,
-
-greg k-h
+Best regards
+--
+Fabio Porcedda
