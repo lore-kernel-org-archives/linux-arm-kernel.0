@@ -1,19 +1,90 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 Mar 2013 22:17:50 +0000
-Subject: [GIT PULL] at91: cleanup + soc for 3.10 #1
-In-Reply-To: <51432265.2060905@atmel.com>
-References: <51432265.2060905@atmel.com>
-Message-ID: <201303152217.50432.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 15 Mar 2013 22:39:17 +0000
+Subject: [PATCH 1/6] serial: 8250_dw: add support for clk api
+In-Reply-To: <1363377988-4966-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1363377988-4966-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1363377988-4966-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20130315223917.GZ4977@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 March 2013, Nicolas Ferre wrote:
-> This is a pull-request targeted to do some cleanup in AT91 Kconfig
-> and board-dt-xxx.c files. It will prepare the coming introduction of
-> our SAMA5D3 family (Atmel new Cortex-A5) that we will stack on top
-> of these modifications soon.
+On Fri, Mar 15, 2013 at 09:06:23PM +0100, Maxime Ripard wrote:
+> +	/* clock got configured through clk api, all done */
+> +	if (p->uartclk)
+
+	if (IS_ERR(p->uartclk))
+
+> +		return 0;
+> +
+> +	/* try to find out clock frequency from DT as fallback */
+>  	if (of_property_read_u32(np, "clock-frequency", &val)) {
+> -		dev_err(p->dev, "no clock-frequency property set\n");
+> +		dev_err(p->dev, "clk or clock-frequency not defined\n");
+>  		return -EINVAL;
+>  	}
+>  	p->uartclk = val;
+> @@ -294,9 +301,21 @@ static int dw8250_probe(struct platform_device *pdev)
+>  	if (!uart.port.membase)
+>  		return -ENOMEM;
+>  
+> +	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
+> +	if (!data)
+> +		return -ENOMEM;
+> +
+> +	data->clk = devm_clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(data->clk))
+> +		data->clk = NULL;
+> +	else
+> +		clk_prepare_enable(data->clk);
+
+	if (!IS_ERR(data->clk))
+		clk_prepare_enable(data->clk);
+
+> +
+>  	uart.port.iotype = UPIO_MEM;
+>  	uart.port.serial_in = dw8250_serial_in;
+>  	uart.port.serial_out = dw8250_serial_out;
+> +	uart.port.private_data = data;
+> +	uart.port.uartclk = clk_get_rate(data->clk);
+
+What if data->clk is invalid?
+
+	if (!IS_ERR(data->clk)
+		uart.port.uartclk = clk_get_rate(data->clk);
+
+>  
+>  	dw8250_setup_port(&uart);
+>  
+> @@ -312,12 +331,6 @@ static int dw8250_probe(struct platform_device *pdev)
+>  		return -ENODEV;
+>  	}
+>  
+> -	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
+> -	if (!data)
+> -		return -ENOMEM;
+> -
+> -	uart.port.private_data = data;
+> -
+>  	data->line = serial8250_register_8250_port(&uart);
+>  	if (data->line < 0)
+>  		return data->line;
+> @@ -333,6 +346,8 @@ static int dw8250_remove(struct platform_device *pdev)
+>  
+>  	serial8250_unregister_port(data->line);
+>  
+
+	if (!IS_ERR(data->clk)
+
+> +	clk_disable_unprepare(data->clk);
+> +
+>  	return 0;
+>  }
+>  
+> -- 
+> 1.7.10.4
 > 
-
-Pulled into next/cleanup branch
-
-	Arnd
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
