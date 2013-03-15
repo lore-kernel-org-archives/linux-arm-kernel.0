@@ -1,44 +1,57 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 15 Mar 2013 10:38:58 +0530
-Subject: [PATCH 2/3] ARM: davinci: da850: Enable EHRPWM TBCLK from
- CFG_CHIP1
-In-Reply-To: <518397C60809E147AF5323E0420B992E3EA97355@DBDE01.ent.ti.com>
-References: <1363257453-24747-1-git-send-email-avinashphilip@ti.com>
- <1363257453-24747-3-git-send-email-avinashphilip@ti.com>
- <5141CA40.9010005@ti.com>
- <518397C60809E147AF5323E0420B992E3EA97355@DBDE01.ent.ti.com>
-Message-ID: <5142ACEA.4060305@ti.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 15 Mar 2013 10:48:57 +0530
+Subject: [PATCH 0/8] ARM: OMAP3+: Switch to use DT based cpu0-cpufreq
+ driver
+In-Reply-To: <1363294695-658-1-git-send-email-nm@ti.com>
+References: <1363294695-658-1-git-send-email-nm@ti.com>
+Message-ID: <5142AF41.7070003@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/15/2013 10:27 AM, Philip, Avinash wrote:
-> On Thu, Mar 14, 2013 at 18:31:52, Nori, Sekhar wrote:
->> On 3/14/2013 4:07 PM, Philip Avinash wrote:
->>> da850 platforms require TBCLK synchronization in CFG_CHIP1 register for
->>> TBCLK enable in EHRPWM modules. Enabling of TBCLK is done only if EHRPWM
->>> DT node status is set to "okay" DT blob.
->>> Also adds macro definitions for DA8XX_EHRPWM_TBCLKSYNC and
->>> DA8XX_CFGCHIP1_REG.
->>
->> So there is actually a TBCLK in DA850 - it's just not modeled as a clock
->> similar to the way it is done on AM335x? If yes, then instead of adding
->> a dummy clock node and doing the TBCLK enable as part of init, why not
->> model TBCLK in clock tree even on DA850?
+On Friday 15 March 2013 02:28 AM, Nishanth Menon wrote:
+> The following series arose from trying to use BeagleBoard-XM (OMAP3 variant)
+> for doing CPU DVFS using cpufreq-cpu0. This series will eventually result in
+> migrating the cpufreq support only through device tree (part of the effort
+> to migrate away from non-DT configurations for OMAP). Unfortunately, as already
+> known, we have a bunch of legacy code and mutually dependent device tree
+> conversion that is pending.
+> Key features pending:
+> A) clock framework transition to DT - this should happen soon, so this series hacks
+> the clock node for the time being as suggested in review of original series
+> B) on processors that use voltage controller, voltage processor (VC/VP hardware
+> loop using I2C_SR path) - we have started work on transitioning them to regulator
+> framework driven by DT.
+> C) Adaptive Body Bias and SmartReflex AVS conversion to DT.
 > 
+> As a result of these pending features:
+> - OMAP4 TWL6030 and TPS62361 which set voltage ONLY over I2C_SR have no regulators
+> associated at the moment - fortunately, we boot at highest voltage, so things still
+> work.
+> - Missing ABB and AVS implies that for few of the SoCs (3630, OMAP4), I have not added
+> those OPPs in DT yet - this also needs alignment with iMX, AM series like pending work,
+> where certain OPPs need enabling based on efuse programmed bit sequences - since it
+> is an add-on work, it is not addressed here.
 > 
-> TBCLK enabling should done from platform specific way. In DA850 it is done at
-> CFGCHIP1 register. Unfortunately Davinci clock frame work will support only
-> clock nodes inside PLLC and PSC modules. Handling of CFGCHP1 require
+Thanks for looking into it.
 
-That's true at the moment, but that can be fixed.
-
-> modifications in clock frame work.
+> Note: Somewhere in the future, when we have regulators driven off CCF and OMAP
+> converted to CCF, we could remove the DT regulator requirements there as well.
 > 
-> Hence handling it as part of initialization.
+> Key benefit of the series is to allow all relevant TI platforms now to use a single
+> cpufreq driver and equivalent frameworks in addition be part of the transition to
+> DT. As a result of this series, CPUFreq feature will not be available for non-DT
+> boot systems.
+> 
+As commented by Jon on internal thread, I am also against the idea of dropping
+non-DT support now. Till we migrate to 100 % DT, it is best to keep support
+alive. Especial OMAP3 based devices.
 
-I am curious as to how this clock is handled in am335x. I searched for
-tbclk in arch/arm/ of linux-next but could not find any references.
-Where should I be looking?
+Why don't you take phased approach and have both supported for time being.
+Then once we move to DT only, we just drop the non-DT support as we plan
+to do for many more stuff.
 
-Thanks,
-Sekhar
+BTW, we are using only CPUFreq driver before this series as well. I guess you
+mean the common CPUFReq drivers used by other ARM SOCs.
+
+Regards,
+Santosh
