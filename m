@@ -1,27 +1,40 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 15 Mar 2013 10:11:14 +0100
-Subject: [PATCH] omap2: twl-common: Add default power configuration
-In-Reply-To: <20130312165705.GA22059@atomide.com>
-References: <1358967038-6615-1-git-send-email-matthias.bgg@gmail.com>
- <CAOCHtYjufr+MS1=6Cnsn-EgvkPs+Y5oWejAG98aLkVjdQbu1ZA@mail.gmail.com>
- <20130201224242.GE22517@atomide.com>
- <CABuKBe+NrMiX0nuEgwnHBqu-DqHST+uGG_Zyc7Ek=4WCOV1T6g@mail.gmail.com>
- <512355CF.6070605@ti.com>
- <CABuKBeLFfvCVyt9VhvwHVGuVGA7RDx9bZH_6gHk7yhfe-nmH5A@mail.gmail.com>
- <20130312165705.GA22059@atomide.com>
-Message-ID: <5142E5B2.6090008@ti.com>
+From: andrea.adami@gmail.com (Andrea Adami)
+Date: Fri, 15 Mar 2013 10:31:33 +0100
+Subject: [Suggestion] Latest randconfig build errors for Head.S
+In-Reply-To: <514270D2.9010205@asianux.com>
+References: <51415428.1070401@asianux.com>
+ <20130314234323.GD4977@n2100.arm.linux.org.uk>
+ <514270D2.9010205@asianux.com>
+Message-ID: <CAAQYJAvXLV38shKncAKKqgQ9G0SnXjh+=aJHBdhd29yzVtL80A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On Fri, Mar 15, 2013 at 1:52 AM, Chen Gang <gang.chen@asianux.com> wrote:
+> ? 2013?03?15? 07:43, Russell King - ARM Linux ??:
+>> So our wonderful toolchain has decided to start producing NULL warnings
+>> for every "mcr     p15, 0, rX, c7, c10, 4" instruction?  I'd just ignore
+>> them and hope that the toolchain people fix it.
 
-On 03/12/2013 05:57 PM, Tony Lindgren wrote:
-> Sorry looks like this got missed. I suggest Peter collects the twl
-> patches and then provides me + mfd + asoc and whoever needs the
-> pull requests.
+AFAIK Arnd is aware and waiting for feedback about his patch:
 
-OK. Lets get things going forward. I have sent a pull request for you with
-this patch.
+ARM: compressed/head.S: work around new binutils warning   Arnd Bergmann
 
--- 
-P?ter
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/144846.html
+
+Regards
+
+Andrea
+>
+>   ok, thanks.
+>
+>   :-)
+>
+> --
+> Chen Gang
+>
+> Asianux Corporation
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
