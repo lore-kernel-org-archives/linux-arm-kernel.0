@@ -1,36 +1,58 @@
-From: chen.gang.flying.transformer@gmail.com (Chen Gang F T)
-Date: Fri, 15 Mar 2013 19:11:36 +0800
-Subject: [Suggestion] Latest randconfig build errors for Head.S
-In-Reply-To: <201303151056.55819.arnd@arndb.de>
-References: <51415428.1070401@asianux.com> <514270D2.9010205@asianux.com>
- <CAAQYJAvXLV38shKncAKKqgQ9G0SnXjh+=aJHBdhd29yzVtL80A@mail.gmail.com>
- <201303151056.55819.arnd@arndb.de>
-Message-ID: <514301E8.9040201@gmail.com>
+From: fabio.porcedda@gmail.com (Fabio Porcedda)
+Date: Fri, 15 Mar 2013 12:18:53 +0100
+Subject: [PATCH 10/10] drivers: misc: use module_platform_driver_probe()
+In-Reply-To: <20130314140631.GM1906@pengutronix.de>
+References: <1363266691-15757-1-git-send-email-fabio.porcedda@gmail.com>
+ <1363266691-15757-12-git-send-email-fabio.porcedda@gmail.com>
+ <201303141358.05616.arnd@arndb.de> <20130314140631.GM1906@pengutronix.de>
+Message-ID: <CAHkwnC9nGsdgOTQZ6VpeDyPWXw7tpP+2oHvnLv6LEr1cNdnrsg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2013?03?15? 18:56, Arnd Bergmann ??:
-> Right. The fact that as prints a warning for those instructions makes sense
-> given that we are telling it we want to run on *all* ARM architectures,
-> and that ARMv8 has deprecated them officially.
-> 
-> Of course, what is bogus about this is the "NULL" part rather than printing
-> the text that was meant to come out to explain the situation.  I don't
-> know how to report that bug other than what I tried before, but if it gets
-> fixed by printing the right text, we will still want to build a kernel
-> without getting any warnings.
+On Thu, Mar 14, 2013 at 3:06 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> On Thu, Mar 14, 2013 at 01:58:05PM +0000, Arnd Bergmann wrote:
+>> On Thursday 14 March 2013, Fabio Porcedda wrote:
+>> > This patch converts the drivers to use the
+>> > module_platform_driver_probe() macro which makes the code smaller and
+>> > a bit simpler.
+>> >
+>> > Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
+>> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>> > Cc: Arnd Bergmann <arnd@arndb.de>
+>> > ---
+>> >  drivers/misc/atmel_pwm.c  | 12 +-----------
+>> >  drivers/misc/ep93xx_pwm.c | 13 +------------
+>> >  2 files changed, 2 insertions(+), 23 deletions(-)
+>>
+>> The patch itself seems fine, but there are two issues around it:
+>>
+>> * The PWM drivers should really get moved to drivers/pwm and converted to the new
+>>   PWM subsystem. I don't know if Hartley or Hans-Christian have plans to do
+>>   that already.
+>>
+>> * Regarding the use of module_platform_driver_probe, I'm a little worried about
+>>   the interactions with deferred probing. I don't think there are any regressions,
+>>   but we should probably make people aware that one cannot return -EPROBE_DEFER
+>>   from a platform_driver_probe function.
 
-  excuse me, my English is not quite well.
+The use of module_platform_driver_probe() doesn't change anything about that,
+it's exactly the same thing as using "return platform_driver_probe()".
+I'm right or I'm missing something? Maybe are you just speaking about
+the misuse of "platform_driver_probe"?
 
-  I guess your meaning is:
-    "that bug" means the toolchain's bug (need toolchain people fix it).
-    prefer to apply your patch, before "that bug" is fixed (we don't know when)
+Best regards
+Fabio Porcedda
 
-  is it correct ?
+>
+> I'm worried about this aswell. I think platform_driver_probe shouldn't
+> be used anymore. Even if a driver does not explicitly make use of
+> -EPROBE_DEFER, it leaks in very quickly if a driver for example uses a
+> regulator and just returns the error value from regulator_get.
 
-  thanks.
-
--- 
-Chen Gang
-
-Flying Transformer
+> Sascha
+>
+> --
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
