@@ -1,123 +1,67 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 15 Mar 2013 16:05:18 +0100
-Subject: [PATCH 0/2] Device Tree support for CMA (Contiguous Memory
- Allocator)
-In-Reply-To: <20130214213013.GG1906@pengutronix.de>
-References: <1360845928-8107-1-git-send-email-m.szyprowski@samsung.com>
- <20130214213013.GG1906@pengutronix.de>
-Message-ID: <514338AE.60402@samsung.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 15 Mar 2013 16:07:53 +0100
+Subject: [RFC patch 02/11] cpuidle / arm : a single cpuidle driver
+In-Reply-To: <201303151447.06150.arnd@arndb.de>
+References: <1363357630-22214-1-git-send-email-daniel.lezcano@linaro.org>
+ <1363357630-22214-3-git-send-email-daniel.lezcano@linaro.org>
+ <201303151447.06150.arnd@arndb.de>
+Message-ID: <51433949.1030204@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 03/15/2013 03:47 PM, Arnd Bergmann wrote:
+> On Friday 15 March 2013, Daniel Lezcano wrote:
+>> The cpuidle drivers are duplicating a lot of code and in most
+>> of the case there is a common pattern we can factor out:
+>>
+>>         * setup the broadcast timers
+>>         * register the driver
+>>         * register the devices
+>>
+>> This arm driver is the common part between all the ARM cpuidle drivers,
+>> with the code factored out.
+>>
+>> It does not handle the coupled idle state for now but it is the first
+>> step to have everyone to converge to the same code pattern.
+>>
+>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> 
+> Unfortunately, I missed the session in Hong Kong, but I'd like to understand
+> what part of this driver is actually ARM specific. I assume there is nothing
+> in it that depends on 32 bit ARM hardware, right?
 
-It took me some time to get back to this topic due to my holidays and other
-urgent issues. I hope that this I will be able to participate a bit more 
-actively.
+What depends on the 32bits ARM hardware is the drivers themselves. This
+ARM driver is the first step to consolidate all SoC cpuidle specific
+code we find in arch/arm. The code is designated to factor out these
+drivers, as a first step. The second step is to consolidate more this
+driver (eg. moving the code in arch/arm/kernel/cpuidle.c in this driver).
 
-On 2/14/2013 10:30 PM, Sascha Hauer wrote:
-> Hi Marek,
->
-> On Thu, Feb 14, 2013 at 01:45:26PM +0100, Marek Szyprowski wrote:
-> > Hello,
-> >
-> > Here is my initial proposal for device tree integration for Contiguous
-> > Memory Allocator. The code is quite straightforward, however I expect
-> > that the memory bindings require some discussion.
-> >
-> > The proposed bindings allows to define contiguous memory regions of
-> > specified base address and size. Then, the defined regions can be
-> > assigned to the given device(s) by adding a property with a phanle to
-> > the defined contiguous memory region. From the device tree perspective
-> > that's all. Once the bindings are added, all the memory allocations from
-> > dma-mapping subsystem will be served from the defined contiguous memory
-> > regions.
-> >
->
-> I think CMA regions should not be described in the devicetre at all. The
-> devicetree is about hardware description and it should be OS agnostic,
-> but CMA is only a Linux specific implementation detail. It's not even
-> specific to a particular board, it's specific to a particular usecase of
-> a board.
+The last man standing algorithm we have in mach-ux500 and mach-imx is
+the same, and will be moved in the ARM cpuidle driver.
 
-Well, I see your point. The main problem is the fact that board files 
-consisted
-of both hw related definitions AND particular kernel configuration for 
-the device
-drivers (like the dma_declare_contiguous() calls for example). Now hw 
-related
-definitions are being moved to device tree, but what should we do with the
-kernel configuration data, which was previously in the board files? I 
-know that
-in the ideal scenario there should be no such data at all and all 
-drivers should
-be able to automatically configure all related parameters or give 
-userspace a
-method for changing them in runtime. The real world is not ideal 
-however. There
-is a set of kernel configuration data/parameters which can be set only once,
-usually early in the boot process. How should we handle it?
+The more it will be consolidated, the more it will be ARM specific.
 
-There is kernel command line parameter (surprisingly stored also in 
-device tree,
-which should not have such data...), but it intended mainly for 
-debug/development
-purposes and simple, usually one value parameters.
+The final step will be to use the device tree to be passed to this
+driver and do the cpuidle driver initialization from there.
 
-There have been discussion about CMA configuration via kernel cmd line 
-long time
-ago (in early CMA development days), but such attempt has been rejected, 
-because
-it introduced too complicated kernel parameters, see
-http://thread.gmane.org/gmane.linux.kernel.mm/50669/focus=50679
+> Would the same code be used with arch/arm64?
 
-So we need another solution. I'm aware of the idea that DT should be 
-limited to
-hw description. This principle is good and it might let us to find some 
-better,
-more generic approach. However, we already have some of Linux kernel 
-specific
-attributes ("git grep 'linux,' -- Documentation/devicetree | wc -l" 
-gives 71,
-most of them are in keypad and buttons drivers).
+I can't tell but IIUC, a single ARM driver will be used based on the
+psci for ARM64, but it does not exist for now. It is possible some code
+pattern could be used from the ARM32 cpuidle driver.
 
-Are there any KNOWN use cases for using exiting DTS from Linux kernel 
-with other
-operating systems? I believe that 99% of the DTS files will be both 
-developed and
-used only together with Linux kernel. I'm also seeing the DT as a generic
-way of describing different variants of the same hardware (what is quite 
-common
-in the development process) and a method for standardizing the hw 
-description
-to ease the developers (for a good example please just compare some old 
-OMAP and
-Exynos board files - each used completely different way of describing 
-the same
-things).
+> What about other architectures that want to share a cpuidle driver
+> with and ARM SoC using the same hardware? We have a lot of examples
+> of SoC vendors that use similar components on ARM and non-ARM SoCs
+> based on SH, AVR32, Hexagon, C6x, MIPS or PowerPC.
 
-The CMA DT patches are quite short and lets anyone to put the required 
-kernel
-configuration together with the respective HW definitions in a very 
-convenient
-way. Especially referencing regions and device entries by phandle 
-pointers allows
-us to avoid any text-based config entries and in-kernel parsers for them.
+I guess if they share the same code, it could probably go to the cpuidle
+core framework instead of a specific driver.
 
-If the presented approach is definitely prohibited then what way should 
-we go?
 
-As an alternative I'm thinking about extending 'chosen' node for such cases.
-Embedding the CMA configuration data into a few sub-nodes and attributes 
-there
-should not be a problem. It would also keep all the config related 
-entries in
-a single place. The another advantage I see is the possibility to update
-'chosen' node from the extended dt-aware bootloaders, which might also 
-let one
-to edit them. What's your opinion?
-
-Best regards
 -- 
-Marek Szyprowski
-Samsung Poland R&D Center
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
