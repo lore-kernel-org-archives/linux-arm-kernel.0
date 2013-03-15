@@ -1,104 +1,93 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 15 Mar 2013 11:36:40 +0800
-Subject: [PATCH 1/2] dmaengine: add const for name parameter
+Date: Fri, 15 Mar 2013 11:36:41 +0800
+Subject: [PATCH 2/2] ASoC: dmaengine_pcm: add snd_dmaengine_generic_pcm_open()
 In-Reply-To: <1363318601-31505-1-git-send-email-shawn.guo@linaro.org>
 References: <1363318601-31505-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1363318601-31505-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1363318601-31505-3-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark name parameter of generic device tree helpers as const, as it
-shouldn't be changed anyway.
+With generic DMA device tree binding and helper function
+dma_request_slave_channel() in place, dmaengine_pcm should support
+that in requesting DMA channel for users that support generic DMA
+device tree binding.
+
+Add a new API snd_dmaengine_generic_pcm_open() as the variant of
+snd_dmaengine_pcm_open().  It takes DMA client struct device pointer
+and slave channel name as arguments and calls generic DMA helper
+dma_request_slave_channel() to request DMA channel from dmaengine.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Cc: alsa-devel at alsa-project.org
+Reviewed-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/dma/dmaengine.c   |    2 +-
- drivers/dma/of-dma.c      |    6 +++---
- include/linux/dmaengine.h |    7 ++++---
- include/linux/of_dma.h    |    2 +-
- 4 files changed, 9 insertions(+), 8 deletions(-)
+ include/sound/dmaengine_pcm.h |    2 ++
+ sound/soc/soc-dmaengine-pcm.c |   39 +++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 41 insertions(+)
 
-diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
-index b2728d6..2cbfefe 100644
---- a/drivers/dma/dmaengine.c
-+++ b/drivers/dma/dmaengine.c
-@@ -555,7 +555,7 @@ EXPORT_SYMBOL_GPL(__dma_request_channel);
-  * @dev:	pointer to client device structure
-  * @name:	slave channel name
-  */
--struct dma_chan *dma_request_slave_channel(struct device *dev, char *name)
-+struct dma_chan *dma_request_slave_channel(struct device *dev, const char *name)
- {
- 	/* If device-tree is present get slave info from here */
- 	if (dev->of_node)
-diff --git a/drivers/dma/of-dma.c b/drivers/dma/of-dma.c
-index 69d04d2..6036cd0 100644
---- a/drivers/dma/of-dma.c
-+++ b/drivers/dma/of-dma.c
-@@ -172,8 +172,8 @@ EXPORT_SYMBOL_GPL(of_dma_controller_free);
-  * specifiers, matches the name provided. Returns 0 if the name matches and
-  * a valid pointer to the DMA specifier is found. Otherwise returns -ENODEV.
-  */
--static int of_dma_match_channel(struct device_node *np, char *name, int index,
--				struct of_phandle_args *dma_spec)
-+static int of_dma_match_channel(struct device_node *np, const char *name,
-+				int index, struct of_phandle_args *dma_spec)
- {
- 	const char *s;
+diff --git a/include/sound/dmaengine_pcm.h b/include/sound/dmaengine_pcm.h
+index b877334..452df15 100644
+--- a/include/sound/dmaengine_pcm.h
++++ b/include/sound/dmaengine_pcm.h
+@@ -43,6 +43,8 @@ snd_pcm_uframes_t snd_dmaengine_pcm_pointer_no_residue(struct snd_pcm_substream
  
-@@ -198,7 +198,7 @@ static int of_dma_match_channel(struct device_node *np, char *name, int index,
-  * Returns pointer to appropriate dma channel on success or NULL on error.
-  */
- struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
--					      char *name)
-+					      const char *name)
- {
- 	struct of_phandle_args	dma_spec;
- 	struct of_dma		*ofdma;
-diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
-index 91ac8da..68b4252 100644
---- a/include/linux/dmaengine.h
-+++ b/include/linux/dmaengine.h
-@@ -968,7 +968,8 @@ enum dma_status dma_sync_wait(struct dma_chan *chan, dma_cookie_t cookie);
- enum dma_status dma_wait_for_async_tx(struct dma_async_tx_descriptor *tx);
- void dma_issue_pending_all(void);
- struct dma_chan *__dma_request_channel(dma_cap_mask_t *mask, dma_filter_fn fn, void *fn_param);
--struct dma_chan *dma_request_slave_channel(struct device *dev, char *name);
-+struct dma_chan *dma_request_slave_channel(struct device *dev,
-+					   const char *name);
- void dma_release_channel(struct dma_chan *chan);
- #else
- static inline enum dma_status dma_wait_for_async_tx(struct dma_async_tx_descriptor *tx)
-@@ -984,7 +985,7 @@ static inline struct dma_chan *__dma_request_channel(dma_cap_mask_t *mask,
- 	return NULL;
- }
- static inline struct dma_chan *dma_request_slave_channel(struct device *dev,
--							 char *name)
-+							 const char *name)
- {
- 	return NULL;
- }
-@@ -1007,7 +1008,7 @@ struct dma_chan *net_dma_find_channel(void);
- static inline struct dma_chan
- *__dma_request_slave_channel_compat(dma_cap_mask_t *mask, dma_filter_fn fn,
- 				  void *fn_param, struct device *dev,
--				  char *name)
-+				  const char *name)
- {
- 	struct dma_chan *chan;
+ int snd_dmaengine_pcm_open(struct snd_pcm_substream *substream,
+ 	dma_filter_fn filter_fn, void *filter_data);
++int snd_dmaengine_generic_pcm_open(struct snd_pcm_substream *substream,
++				   struct device *dev, const char *name);
+ int snd_dmaengine_pcm_close(struct snd_pcm_substream *substream);
  
-diff --git a/include/linux/of_dma.h b/include/linux/of_dma.h
-index d15073e..0c4a82e 100644
---- a/include/linux/of_dma.h
-+++ b/include/linux/of_dma.h
-@@ -40,7 +40,7 @@ extern int of_dma_controller_register(struct device_node *np,
- 		void *data);
- extern int of_dma_controller_free(struct device_node *np);
- extern struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
--						     char *name);
-+						     const char *name);
- extern struct dma_chan *of_dma_simple_xlate(struct of_phandle_args *dma_spec,
- 		struct of_dma *ofdma);
- #else
+ struct dma_chan *snd_dmaengine_pcm_get_chan(struct snd_pcm_substream *substream);
+diff --git a/sound/soc/soc-dmaengine-pcm.c b/sound/soc/soc-dmaengine-pcm.c
+index 111b7d92..970eb2b 100644
+--- a/sound/soc/soc-dmaengine-pcm.c
++++ b/sound/soc/soc-dmaengine-pcm.c
+@@ -304,6 +304,45 @@ int snd_dmaengine_pcm_open(struct snd_pcm_substream *substream,
+ EXPORT_SYMBOL_GPL(snd_dmaengine_pcm_open);
+ 
+ /**
++ * snd_dmaengine_generic_pcm_open - Open a dmaengine based PCM substream
++ * @substream: PCM substream
++ * @dev: pointer to DMA client device structure
++ * @name: DMA slave channel name
++ *
++ * Returns 0 on success, a negative error code otherwise.
++ *
++ * This function is a variant of snd_dmaengine_pcm_open(). It takes different
++ * parameters and calls generic DMA helper dma_request_slave_channel() to
++ * request a DMA channel from dmaengine.
++ */
++int snd_dmaengine_generic_pcm_open(struct snd_pcm_substream *substream,
++				   struct device *dev, const char *name)
++{
++	struct dmaengine_pcm_runtime_data *prtd;
++	int ret;
++
++	ret = snd_pcm_hw_constraint_integer(substream->runtime,
++					    SNDRV_PCM_HW_PARAM_PERIODS);
++	if (ret < 0)
++		return ret;
++
++	prtd = kzalloc(sizeof(*prtd), GFP_KERNEL);
++	if (!prtd)
++		return -ENOMEM;
++
++	prtd->dma_chan = dma_request_slave_channel(dev, name);
++	if (!prtd->dma_chan) {
++		kfree(prtd);
++		return -ENXIO;
++	}
++
++	substream->runtime->private_data = prtd;
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(snd_dmaengine_generic_pcm_open);
++
++/**
+  * snd_dmaengine_pcm_close - Close a dmaengine based PCM substream
+  * @substream: PCM substream
+  */
 -- 
 1.7.9.5
