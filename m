@@ -1,22 +1,31 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 Mar 2013 22:05:13 +0000
-Subject: [GIT PULL] ARM: mvebu: DT changes for v3.10
-In-Reply-To: <20130312134736.GH12700@titan.lakedaemon.net>
-References: <20130312134736.GH12700@titan.lakedaemon.net>
-Message-ID: <201303152205.13483.arnd@arndb.de>
+Date: Fri, 15 Mar 2013 22:07:34 +0000
+Subject: [GIT PULL][for 3.10] pull request from hi3xxx branch in pxa git
+ tree
+In-Reply-To: <CAN1soZwU34C8K1eShDU4hY5-39AWEg2Sb=mBopMHX9+zg6KVqw@mail.gmail.com>
+References: <CAN1soZwU34C8K1eShDU4hY5-39AWEg2Sb=mBopMHX9+zg6KVqw@mail.gmail.com>
+Message-ID: <201303152207.35091.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 12 March 2013, Jason Cooper wrote:
-> The following changes since commit f6161aa153581da4a3867a2d1a7caf4be19b6ec9:
-> 
->   Linux 3.9-rc2 (2013-03-10 16:54:19 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.infradead.org/users/jcooper/linux.git tags/mvebu_dt_for_v3.10
-> 
+On Friday 15 March 2013, Haojian Zhuang wrote:
+> Please help to pull armsoc/hi3xxx branch from pxa git tree. Since
+> these patches are
+> relied on Rob's sp804 implementation. I submitted all of them into my
+> git tree too.
 
-Pulled into next/dt, thanks!
+Hmm, I believe the sp804 patches are still under discussion, or they are
+getting merged through the clocksource tree.
+
+Either way, I don't have the dependencies in the arm-soc tree yet, I only
+have
+
+Rob Herring (4):
+      clocksource: add empty version of clocksource_of_init
+      clocksource: pass DT node pointer to init functions
+      clocksource: tegra20: use the device_node pointer passed to init
+      ARM: smp_twd: convert to use CLKSRC_OF init
+
+which Rob submitted earlier. Rob, what is your plan for the sp804 patches?
 
 	Arnd
