@@ -1,30 +1,64 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 15 Mar 2013 12:20:54 +0000
-Subject: [PATCH v3 03/11] clocksource: sp804: add device tree support
-In-Reply-To: <51408A71.9090501@gmail.com>
-References: <1363151142-32162-1-git-send-email-haojian.zhuang@linaro.org>
- <1363151142-32162-4-git-send-email-haojian.zhuang@linaro.org>
- <1363172730.3100.17.camel@hornet> <51408A71.9090501@gmail.com>
-Message-ID: <20130315122054.GI4977@n2100.arm.linux.org.uk>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Fri, 15 Mar 2013 20:26:59 +0800
+Subject: [PATCH 14/14] usb: udc-core: add judgement logic for
+ usb_gadget_connect
+In-Reply-To: <20130315103701.GA21445@arwen.pp.htv.fi>
+References: <1363240242-25775-1-git-send-email-peter.chen@freescale.com>
+ <1363240242-25775-15-git-send-email-peter.chen@freescale.com>
+ <20130314090005.GB14443@arwen.pp.htv.fi>
+ <20130314092438.GB26420@nchen-desktop>
+ <20130314101904.GD32369@arwen.pp.htv.fi>
+ <20130315060615.GB28361@nchen-desktop>
+ <20130315075128.GF5074@arwen.pp.htv.fi>
+ <20130315100408.GG28361@nchen-desktop>
+ <20130315103701.GA21445@arwen.pp.htv.fi>
+Message-ID: <20130315122658.GB32470@nchen-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 13, 2013 at 09:17:21AM -0500, Rob Herring wrote:
-> How about:
+On Fri, Mar 15, 2013 at 12:37:01PM +0200, Felipe Balbi wrote:
+> >   */
+> >  static inline int usb_gadget_disconnect(struct usb_gadget *gadget)
+> >  {
+> > +	int ret = 0;
+> > +
+> >  	if (!gadget->ops->pullup)
+> >  		return -EOPNOTSUPP;
+> > -	return gadget->ops->pullup(gadget, 0);
+> > +
+> > +	if (gadget->connection == 1)
+> > +		ret = gadget->ops->pullup(gadget, 0);
+> > +
+> > +	if (!ret)
+> > +		gadget->connection --;
+> > +
+> > +	return ret;
+> >  }
 > 
-> 1 irq - TIMINT1
-> 2 irqs w/ same source # - TIMINTC
-> 2 irqs w/ different source # - TIMINT1 and TIMINT2
+> this might be a good idea. But we already have something similar,
+> although it's managed at composite device level.
+
+Yes, I know, it should only be managed at one place at last.
+
+> Maybe we need to move
+> that to the gadget layer. Still, I don't want to let UDC drivers call
+> usb_gadget_connect()/disconnect() directly.
 > 
-> I'm not completely sure if Linux and the irq domain code handles the
-> same interrupt source repeated. It should because that is basically a
-> shared irq line.
+> It's easy enough for udc-core to handle that.
 
-I think you're missing something here.  Any particular platform will
-generally only wire either the common interrupt, or the individual
-interrupts.  Very few, if any, will wire both.
 
-It's just like stuff such as MMCI and the UARTs.  They have a combined
-interrupt out, and individual interrupt outs.  However, they're all
-written for the combined interrupt only, because practically no one
-uses the individal interrupts.
+Below are all cases I can think about pullup_dp
+
+1. No vbus interrupt support udc driver, manage pullup at load/unload
+gadget module.
+2. For vbus interrupt supported udc driver, manage pullup at vbus interrupt
+3. For gadget module, like uvc, it will call pullup_dp through its app.
+
+Are there any cases? We need to design one solution to cover all
+cases, then, we can try to delete the duplicate pullup calling at
+all udc drivers, and make it be generic.
+
+-- 
+
+Best Regards,
+Peter Chen
