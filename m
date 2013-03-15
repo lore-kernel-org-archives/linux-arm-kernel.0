@@ -1,64 +1,49 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 15 Mar 2013 15:27:03 +0100
-Subject: [RFC patch 04/11] cpuidle / omap3 : use common ARM cpuidle driver
+Date: Fri, 15 Mar 2013 15:27:05 +0100
+Subject: [RFC patch 06/11] cpuidle / at91 : use common ARM cpuidle driver
 In-Reply-To: <1363357630-22214-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1363357630-22214-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1363357630-22214-5-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1363357630-22214-7-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- arch/arm/mach-omap2/cpuidle34xx.c |   18 ++----------------
- 1 file changed, 2 insertions(+), 16 deletions(-)
+ arch/arm/mach-at91/cpuidle.c |   15 +--------------
+ 1 file changed, 1 insertion(+), 14 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
-index 80392fc..0112da3c 100644
---- a/arch/arm/mach-omap2/cpuidle34xx.c
-+++ b/arch/arm/mach-omap2/cpuidle34xx.c
-@@ -26,6 +26,7 @@
- #include <linux/cpuidle.h>
- #include <linux/export.h>
- #include <linux/cpu_pm.h>
-+#include <asm/cpuidle.h>
+diff --git a/arch/arm/mach-at91/cpuidle.c b/arch/arm/mach-at91/cpuidle.c
+index 0c63815..9dc4f6f 100644
+--- a/arch/arm/mach-at91/cpuidle.c
++++ b/arch/arm/mach-at91/cpuidle.c
+@@ -27,8 +27,6 @@
  
- #include "powerdomain.h"
- #include "clockdomain.h"
-@@ -271,8 +272,6 @@ static int omap3_enter_idle_bm(struct cpuidle_device *dev,
- 	return ret;
- }
+ #define AT91_MAX_STATES	2
  
--static DEFINE_PER_CPU(struct cpuidle_device, omap3_idle_dev);
+-static DEFINE_PER_CPU(struct cpuidle_device, at91_cpuidle_device);
 -
- static struct cpuidle_driver omap3_idle_driver = {
- 	.name =		"omap3_idle",
- 	.owner =	THIS_MODULE,
-@@ -348,8 +347,6 @@ static struct cpuidle_driver omap3_idle_driver = {
-  */
- int __init omap3_idle_init(void)
+ /* Actual code that puts the SoC in different idle states */
+ static int at91_enter_idle(struct cpuidle_device *dev,
+ 			struct cpuidle_driver *drv,
+@@ -63,18 +61,7 @@ static struct cpuidle_driver at91_idle_driver = {
+ /* Initialize CPU idle by registering the idle states */
+ static int at91_init_cpuidle(void)
  {
--	struct cpuidle_device *dev;
+-	struct cpuidle_device *device;
 -
- 	mpu_pd = pwrdm_lookup("mpu_pwrdm");
- 	core_pd = pwrdm_lookup("core_pwrdm");
- 	per_pd = pwrdm_lookup("per_pwrdm");
-@@ -358,16 +355,5 @@ int __init omap3_idle_init(void)
- 	if (!mpu_pd || !core_pd || !per_pd || !cam_pd)
- 		return -ENODEV;
- 
--	cpuidle_register_driver(&omap3_idle_driver);
+-	device = &per_cpu(at91_cpuidle_device, smp_processor_id());
+-	device->state_count = AT91_MAX_STATES;
 -
--	dev = &per_cpu(omap3_idle_dev, smp_processor_id());
--	dev->cpu = 0;
+-	cpuidle_register_driver(&at91_idle_driver);
 -
--	if (cpuidle_register_device(dev)) {
--		printk(KERN_ERR "%s: CPUidle register device failed\n",
--		       __func__);
+-	if (cpuidle_register_device(device)) {
+-		printk(KERN_ERR "at91_init_cpuidle: Failed registering\n");
 -		return -EIO;
 -	}
--
 -	return 0;
-+	return arm_idle_init(&omap3_idle_driver);
++	return arm_idle_init(&at91_idle_driver);
  }
+ 
+ device_initcall(at91_init_cpuidle);
 -- 
 1.7.9.5
