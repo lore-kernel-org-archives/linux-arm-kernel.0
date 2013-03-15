@@ -1,34 +1,45 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 15 Mar 2013 08:56:55 -0500
-Subject: [PATCH 2/8] ARM: dts: OMAP36xx: move CPU OPP tables to device tree
-In-Reply-To: <514244B4.9050808@ti.com>
-References: <1363294695-658-1-git-send-email-nm@ti.com>
- <1363294695-658-3-git-send-email-nm@ti.com>
- <514244B4.9050808@ti.com>
-Message-ID: <20130315135655.GA2939@kahuna>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 15 Mar 2013 14:57:45 +0100
+Subject: [GIT PULL] i.MX fixes for -rc
+Message-ID: <20130315135745.GF1906@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16:44-20130314, Jon Hunter wrote:
-> 
-> On 03/14/2013 03:58 PM, Nishanth Menon wrote:
-> > Add DT OPP table for OMAP36xx family of devices. This data is
-> > decoded by OF with of_init_opp_table() helper function. This
-> > overrides the default OMAP34xx CPU OPP table definition.
-> 
-> Not sure I following the last sentence. The tables are in a different
-> dtsi file and only the relevant file should be included, right?
-omap3630.dsi includes omap3.dtsi (which is meant for OMAP34xx).
-The opp tables introduced by this patch in omap36xx.dtsi will override
-the ones defined on omap3.dtsi. Will the following rephrase help clarify
-this?
+Hi Arnd, Olof,
 
-Original:
-This overrides the default OMAP34xx CPU OPP table definition.
-Suggested;
-This overrides the default OMAP34xx CPU OPP table definition in
-omap3.dtsi.
+Please pull the following i.MX fixes for -rc.
 
+Thanks
+ Sascha
+
+The following changes since commit f6161aa153581da4a3867a2d1a7caf4be19b6ec9:
+
+  Linux 3.9-rc2 (2013-03-10 16:54:19 -0700)
+
+are available in the git repository at:
+
+  git://git.pengutronix.de/git/imx/linux-2.6.git tags/arm-imx-fixes-for-3.9-rc
+
+for you to fetch changes up to 5dc2eb7da1e387e31ce54f54af580c6a6f512ca6:
+
+  ARM: i.MX35: enable MAX clock (2013-03-15 14:52:54 +0100)
+
+----------------------------------------------------------------
+Two small ARM i.MX fixes for v3.9-rc
+
+- Fix i.MX25 DT compilation
+- Enable MAX clk on i.MX35
+
+----------------------------------------------------------------
+Sascha Hauer (2):
+      ARM: i.MX25: Fix DT compilation
+      ARM: i.MX35: enable MAX clock
+
+ arch/arm/mach-imx/clk-imx35.c | 1 +
+ arch/arm/mach-imx/imx25-dt.c  | 5 +++++
+ 2 files changed, 6 insertions(+)
 -- 
-Regards,
-Nishanth Menon
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
