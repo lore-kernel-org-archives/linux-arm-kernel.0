@@ -1,54 +1,30 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 15 Mar 2013 19:47:35 +0530
+From: mugunthanvnm@ti.com (Mugunthan V N)
+Date: Fri, 15 Mar 2013 19:47:40 +0530
 Subject: DaVinci platform unable to boot via NFS
 In-Reply-To: <CA+V-a8sNLBi1zB942ZbK26POrzcq7oOpNW9yPG5dG_gX7ZZ1oQ@mail.gmail.com>
 References: <CA+V-a8sNLBi1zB942ZbK26POrzcq7oOpNW9yPG5dG_gX7ZZ1oQ@mail.gmail.com>
-Message-ID: <51432D7F.4090001@ti.com>
+Message-ID: <51432D84.10202@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Prabhakar,
-
 On 3/15/2013 7:11 PM, Prabhakar Lad wrote:
 > Hi Mugunthan,
-> 
+>
 > With 3.9 release I am not able to boot any davinci board via nfs, finally
 > digging Into I found that there were recent changes for Ethernet davinci.
 > Finally I reverting this to some safe commit I was able to boot via nfs.
 > I reverted back as following:-
 > git checkout  f9a8f83b04e0c362a2fc660dbad980d24af209fc  drivers/net/ethernet/ti/
-> 
+>
 > Can you please take a look at and fix it.
-> 
+>
 > Cheers,
 > --Prabhakar Lad
 > http://in.linkedin.com/pub/prabhakar-lad/19/92b/955
-> 
+The issue is also reported in CPSW driver and is fixed already. I have
+posted the patch for Davinci EMAC in the below link.
 
-A similar bug was reported on cpsw and the following patch from Daniel 
-seems to have helped.
+http://patchwork.ozlabs.org/patch/228003/
 
-https://git.kernel.org/cgit/linux/kernel/git/davem/net.git/commit/?id=d35162f89b8f00537d7b240b76d2d0e8b8d29aa0
-
-I made a similar fix for davinci_emac.c and the resulting diff is below 
-(not tested or built).
-
-Can you please check if this helps in DaVinci case?
-
-Thanks,
-Sekhar
-
-----8<----
-diff --git a/drivers/net/ethernet/ti/davinci_emac.c b/drivers/net/ethernet/ti/davinci_emac.c
-index 52c0536..ae1b77a 100644
---- a/drivers/net/ethernet/ti/davinci_emac.c
-+++ b/drivers/net/ethernet/ti/davinci_emac.c
-@@ -1102,7 +1102,7 @@ static int emac_dev_xmit(struct sk_buff *skb, struct net_device *ndev)
-        /* If there is no more tx desc left free then we need to
-         * tell the kernel to stop sending us tx frames.
-         */
--       if (unlikely(cpdma_check_free_tx_desc(priv->txchan)))
-+       if (unlikely(!cpdma_check_free_tx_desc(priv->txchan)))
-                netif_stop_queue(ndev);
-
-        return NETDEV_TX_OK;
+Regards
+Mugunthan V N
