@@ -1,292 +1,162 @@
-From: jack@suse.cz (Jan Kara)
-Date: Fri, 15 Mar 2013 11:01:05 +0100
-Subject: [PATCH] bounce:fix bug, avoid to flush dcache on slab page
- from jbd2.
-In-Reply-To: <20130314224243.GI5313@blackbox.djwong.org>
-References: <5139DB90.5090302@gmail.com>
- <20130312153221.0d26fe5599d4885e51bb0c7c@linux-foundation.org>
- <20130313011020.GA5313@blackbox.djwong.org>
- <20130313085021.GA29730@quack.suse.cz>
- <20130313194429.GE5313@blackbox.djwong.org>
- <20130313210216.GA7754@quack.suse.cz>
- <20130314224243.GI5313@blackbox.djwong.org>
-Message-ID: <20130315100105.GA4889@quack.suse.cz>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Fri, 15 Mar 2013 18:04:08 +0800
+Subject: [PATCH 14/14] usb: udc-core: add judgement logic for
+ usb_gadget_connect
+In-Reply-To: <20130315075128.GF5074@arwen.pp.htv.fi>
+References: <1363240242-25775-1-git-send-email-peter.chen@freescale.com>
+ <1363240242-25775-15-git-send-email-peter.chen@freescale.com>
+ <20130314090005.GB14443@arwen.pp.htv.fi>
+ <20130314092438.GB26420@nchen-desktop>
+ <20130314101904.GD32369@arwen.pp.htv.fi>
+ <20130315060615.GB28361@nchen-desktop>
+ <20130315075128.GF5074@arwen.pp.htv.fi>
+Message-ID: <20130315100408.GG28361@nchen-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 14-03-13 15:42:43, Darrick J. Wong wrote:
-> On Wed, Mar 13, 2013 at 10:02:16PM +0100, Jan Kara wrote:
-> > On Wed 13-03-13 12:44:29, Darrick J. Wong wrote:
-> > > On Wed, Mar 13, 2013 at 09:50:21AM +0100, Jan Kara wrote:
-> > > > On Tue 12-03-13 18:10:20, Darrick J. Wong wrote:
-> > > > > On Tue, Mar 12, 2013 at 03:32:21PM -0700, Andrew Morton wrote:
-> > > > > > On Fri, 08 Mar 2013 20:37:36 +0800 Shuge <shugelinux@gmail.com> wrote:
-> > > > > > 
-> > > > > > > The bounce accept slab pages from jbd2, and flush dcache on them.
-> > > > > > > When enabling VM_DEBUG, it will tigger VM_BUG_ON in page_mapping().
-> > > > > > > So, check PageSlab to avoid it in __blk_queue_bounce().
-> > > > > > > 
-> > > > > > > Bug URL: http://lkml.org/lkml/2013/3/7/56
-> > > > > > > 
-> > > > > > > ...
-> > > > > > >
-> > > > > > > --- a/mm/bounce.c
-> > > > > > > +++ b/mm/bounce.c
-> > > > > > > @@ -214,7 +214,8 @@ static void __blk_queue_bounce(struct request_queue 
-> > > > > > > *q, struct bio **bio_orig,
-> > > > > > >   		if (rw == WRITE) {
-> > > > > > >   			char *vto, *vfrom;
-> > > > > > >   -			flush_dcache_page(from->bv_page);
-> > > > > > > +			if (unlikely(!PageSlab(from->bv_page)))
-> > > > > > > +				flush_dcache_page(from->bv_page);
-> > > > > > >   			vto = page_address(to->bv_page) + to->bv_offset;
-> > > > > > >   			vfrom = kmap(from->bv_page) + from->bv_offset;
-> > > > > > >   			memcpy(vto, vfrom, to->bv_len);
-> > > > > > 
-> > > > > > I guess this is triggered by Catalin's f1a0c4aa0937975b ("arm64: Cache
-> > > > > > maintenance routines"), which added a page_mapping() call to arm64's
-> > > > > > arch/arm64/mm/flush.c:flush_dcache_page().
-> > > > > > 
-> > > > > > What's happening is that jbd2 is using kmalloc() to allocate buffer_head
-> > > > > > data.  That gets submitted down the BIO layer and __blk_queue_bounce()
-> > > > > > calls flush_dcache_page() which in the arm64 case calls page_mapping()
-> > > > > > and page_mapping() does VM_BUG_ON(PageSlab) and splat.
-> > > > > > 
-> > > > > > The unusual thing about all of this is that the payload for some disk
-> > > > > > IO is coming from kmalloc, rather than being a user page.  It's oddball
-> > > > > > but we've done this for ages and should continue to support it.
-> > > > > > 
-> > > > > > 
-> > > > > > Now, the page from kmalloc() cannot be in highmem, so why did the
-> > > > > > bounce code decide to bounce it?
-> > > > > > 
-> > > > > > __blk_queue_bounce() does
-> > > > > > 
-> > > > > > 		/*
-> > > > > > 		 * is destination page below bounce pfn?
-> > > > > > 		 */
-> > > > > > 		if (page_to_pfn(page) <= queue_bounce_pfn(q) && !force)
-> > > > > > 			continue;
-> > > > > > 
-> > > > > > and `force' comes from must_snapshot_stable_pages().  But
-> > > > > > must_snapshot_stable_pages() must have returned false, because if it
-> > > > > > had returned true then it would have been must_snapshot_stable_pages()
-> > > > > > which went BUG, because must_snapshot_stable_pages() calls page_mapping().
-> > > > > > 
-> > > > > > So my tentative diagosis is that arm64 is fishy.  A page which was
-> > > > > > allocated via jbd2_alloc(GFP_NOFS)->kmem_cache_alloc() ended up being
-> > > > > > above arm64's queue_bounce_pfn().  Can you please do a bit of
-> > > > > > investigation to work out if this is what is happening?  Find out why
-> > > > > > __blk_queue_bounce() decided to bounce a page which shouldn't have been
-> > > > > > bounced?
-> > > > > 
-> > > > > That sure is strange.  I didn't see any obvious reasons why we'd end up with a
-> > > > > kmalloc above queue_bounce_pfn().  But then I don't have any arm64s either.
-> > > > > 
-> > > > > > This is all terribly fragile :( afaict if someone sets
-> > > > > > bdi_cap_stable_pages_required() against that jbd2 queue, we're going to
-> > > > > > hit that BUG_ON() again, via must_snapshot_stable_pages()'s
-> > > > > > page_mapping() call.  (Darrick, this means you ;))
-> > > > > 
-> > > > > Wheeee.  You're right, we shouldn't be calling page_mapping on slab pages.
-> > > > > We can keep walking the bio segments to find a non-slab page that can tell us
-> > > > > MS_SNAP_STABLE is set, since we probably won't need the bounce buffer anyway.
-> > > > > 
-> > > > > How does something like this look?  (+ the patch above)
-> > > >   Umm, this won't quite work. We can have a bio which has just PageSlab
-> > > > page attached and so you won't be able to get to the superblock. Heh, isn't
-> > > > the whole page_mapping() thing in must_snapshot_stable_pages() wrong? When we
-> > > > do direct IO, these pages come directly from userspace and hell knows where
-> > > > they come from. Definitely their page_mapping() doesn't give us anything
-> > > > useful... Sorry for not realizing this earlier when reviewing the patch.
-> > > > 
-> > > > ... remembering why we need to get to sb and why ext3 needs this ... So
-> > > > maybe a better solution would be to have a bio flag meaning that pages need
-> > > > bouncing? And we would set it from filesystems that need it - in case of
-> > > > ext3 only writeback of data from kjournald actually needs to bounce the
-> > > > pages. Thoughts?
-> > > 
-> > > What about dirty pages that don't result in journal transactions?  I think
-> > > ext3_sync_file() eventually calls ext3_ordered_writepage, which then calls
-> > > __block_write_full_page, which in turn calls submit_bh().
-> >   So here we have two options:
-> > Either we let ext3 wait the same way as other filesystems when stable pages
-> > are required. Then only data IO from kjournald needs to be bounced (all
-> > other IO is properly protected by PageWriteback bit).
+On Fri, Mar 15, 2013 at 09:51:29AM +0200, Felipe Balbi wrote:
+> 
+> that's all wrong and needs to be fixed. UDC-core has to be the central
+> point for all these details. We start with the easiest way (call connect
+> unconditionally after gadget driver is loaded) and optimize it as we go
+> (making sure that there is VBUS before connecting pullups); but we can't
+> bypass UDC-core and call usb_gadget_connect() directly from UDC driver.
+
+I have an idea that let the gadget driver call usb_gadget_connect/disconnect,
+and make a refcount for calling .pullup at usb_gadget_connect/disconnect.
+Below is an initial idea for it, I think it can also cover both udc 
+and uvc case.
+
+ drivers/usb/chipidea/udc.c     |    6 ++----
+ drivers/usb/gadget/composite.c |    6 ++++++
+ include/linux/usb/gadget.h     |   21 +++++++++++++++++++--
+ 3 files changed, 27 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
+index 81184b9..4b6b2d8 100644
+--- a/drivers/usb/chipidea/udc.c
++++ b/drivers/usb/chipidea/udc.c
+@@ -1386,17 +1386,15 @@ static int ci13xxx_vbus_session(struct usb_gadget *_gadget, int is_active)
+ 			pm_runtime_get_sync(&_gadget->dev);
+ 			hw_device_reset(ci, USBMODE_CM_DC);
+ 			hw_device_state(ci, ci->ep0out->qh.dma);
+-			ci13xxx_pullup(_gadget, true);
++			ci->driver->connect(&ci->gadget);
+ 			dev_dbg(ci->dev, "Connected to host\n");
+ 		} else {
+-			if (ci->driver)
+-				ci->driver->disconnect(&ci->gadget);
++			ci->driver->disconnect(&ci->gadget);
+ 			hw_device_state(ci, 0);
+ 			if (ci->platdata->notify_event)
+ 				ci->platdata->notify_event(ci,
+ 				CI13XXX_CONTROLLER_STOPPED_EVENT);
+ 			_gadget_stop_activity(&ci->gadget);
+-			ci13xxx_pullup(_gadget, false);
+ 			pm_runtime_put_sync(&_gadget->dev);
+ 			dev_dbg(ci->dev, "Disconnected from host\n");
+ 		}
+diff --git a/drivers/usb/gadget/composite.c b/drivers/usb/gadget/composite.c
+index 7c821de..b7bf5ae 100644
+--- a/drivers/usb/gadget/composite.c
++++ b/drivers/usb/gadget/composite.c
+@@ -1479,6 +1479,11 @@ done:
+ 	return value;
+ }
+ 
++void composite_connect(struct usb_gadget *gadget)
++{
++	usb_gadget_connect(gadget);
++}
++
+ void composite_disconnect(struct usb_gadget *gadget)
+ {
+ 	struct usb_composite_dev	*cdev = get_gadget_data(gadget);
+@@ -1492,6 +1497,7 @@ void composite_disconnect(struct usb_gadget *gadget)
+ 		reset_config(cdev);
+ 	if (cdev->driver->disconnect)
+ 		cdev->driver->disconnect(cdev);
++	usb_gadget_disconnect(gadget);
+ 	spin_unlock_irqrestore(&cdev->lock, flags);
+ }
+ 
+diff --git a/include/linux/usb/gadget.h b/include/linux/usb/gadget.h
+index 7e373a2..7f7e6bf 100644
+--- a/include/linux/usb/gadget.h
++++ b/include/linux/usb/gadget.h
+@@ -536,6 +536,7 @@ struct usb_gadget {
+ 	struct device			dev;
+ 	unsigned			out_epnum;
+ 	unsigned			in_epnum;
++	int				connection;
+ };
+ 
+ static inline void set_gadget_data(struct usb_gadget *gadget, void *data)
+@@ -722,9 +723,16 @@ static inline int usb_gadget_vbus_disconnect(struct usb_gadget *gadget)
+  */
+ static inline int usb_gadget_connect(struct usb_gadget *gadget)
+ {
++	int ret = 0;
+ 	if (!gadget->ops->pullup)
+ 		return -EOPNOTSUPP;
+-	return gadget->ops->pullup(gadget, 1);
++
++	if (gadget->connection == 0)
++		ret = gadget->ops->pullup(gadget, 1);
++	if (!ret)
++		gadget->connection ++;
++
++	return ret;
+ }
+ 
+ /**
+@@ -744,9 +752,18 @@ static inline int usb_gadget_connect(struct usb_gadget *gadget)
+  */
+ static inline int usb_gadget_disconnect(struct usb_gadget *gadget)
+ {
++	int ret = 0;
++
+ 	if (!gadget->ops->pullup)
+ 		return -EOPNOTSUPP;
+-	return gadget->ops->pullup(gadget, 0);
++
++	if (gadget->connection == 1)
++		ret = gadget->ops->pullup(gadget, 0);
++
++	if (!ret)
++		gadget->connection --;
++
++	return ret;
+ }
+ 
 > > 
-> > Or we won't let ext3 wait (as it is now), keep the superblock flag that fs
-> > needs bouncing, and set the bio flag in __block_write_full_page() and
-> > kjournald based on the sb flag.
+> > In that case, the pullup will not be called, it will check if gadget
+> > module is loaded.
+> 
+> I don't see that in your patch.
+
+At each udc driver, it makes sure it, maybe we can move it to usb_gaget_connect
+/usb_gadget_disconnect or its abstract layer.
+
 > > 
-> > I think the first option is slightly better but I don't feel strongly
-> > about that.
+> > I am not familiar with SRP, but I think vbus is pre-condition.
 > 
-> I like that first option -- it contains the kludgery to jbd instead of
-> spreading it around.  Here's a patch that passes a quick smoke test on ext[34],
-> xfs, and vfat.  What do you think of this one?  Should I create a
-> submit_snapshot_bh() instead of letting callers stuff in arbitrary dangerous
-> BH_ flags?
-  Thanks for writing the patch. I think _submit_bh() is OK as you did it. I
-have just two comments below.
-
-> ---
-> From: Darrick J. Wong <darrick.wong@oracle.com>
-> Subject: [PATCH] mm: Make snapshotting pages for stable writes a per-bio operation
+> hehe, google SRP.
 > 
-> Walking a bio's page mappings has proved problematic, so create a new bio flag
-> to indicate that a bio's data needs to be snapshotted in order to guarantee
-> stable pages during writeback.  Next, for the one user (ext3/jbd) of
-> snapshotting, hook all the places where writes can be initiated without
-> PG_writeback set, and set BIO_SNAP_STABLE there.  Finally, the MS_SNAP_STABLE
-> mount flag (only used by ext3) is now superfluous, so get rid of it.
+> Nah, I'll save you the trouble. SRP is a mechanism for the USB
+> peripheral to ask the host to enable VBUS. This means that we can keep
+> the VBUS charge pump disabled, and thus save power, until peripheral
+> requests for a session.
+
+Thanks.
+
 > 
-> Signed-off-by: Darrick J. Wong <darrick.wong@oracle.com>
-> ---
->  fs/buffer.c                 |    9 ++++++++-
->  fs/ext3/super.c             |    1 -
->  fs/jbd/commit.c             |    4 ++--
->  include/linux/blk_types.h   |    3 ++-
->  include/linux/buffer_head.h |    1 +
->  include/uapi/linux/fs.h     |    1 -
->  mm/bounce.c                 |   21 +--------------------
->  mm/page-writeback.c         |    4 ----
->  8 files changed, 14 insertions(+), 30 deletions(-)
-> 
-...
-> diff --git a/fs/jbd/commit.c b/fs/jbd/commit.c
-> index 86b39b1..b91b688 100644
-> --- a/fs/jbd/commit.c
-> +++ b/fs/jbd/commit.c
-> @@ -163,7 +163,7 @@ static void journal_do_submit_data(struct buffer_head **wbuf, int bufs,
->  	for (i = 0; i < bufs; i++) {
->  		wbuf[i]->b_end_io = end_buffer_write_sync;
->  		/* We use-up our safety reference in submit_bh() */
-> -		submit_bh(write_op, wbuf[i]);
-> +		_submit_bh(write_op, wbuf[i], 1 << BIO_SNAP_STABLE);
-  Please add a comment here why we need BIO_SNAP_STABLE. Something like:
-/*
- * Here we write back pagecache data that may be mmaped. Since we cannot
- * afford to clean the page and set PageWriteback here due to lock ordering
- * (page lock ranks above transaction start), the data can change while IO is
- * in flight. Tell the block layer it should bounce the bio pages if stable
- * data during write is required.
- */
+> -- 
+> balbi
 
->  	}
->  }
->  
-> @@ -667,7 +667,7 @@ start_journal_io:
->  				clear_buffer_dirty(bh);
->  				set_buffer_uptodate(bh);
->  				bh->b_end_io = journal_end_buffer_io_sync;
-> -				submit_bh(write_op, bh);
-> +				_submit_bh(write_op, bh, 1 << BIO_SNAP_STABLE);
-  And this isn't needed. Here we write out only metadata and JBD already
-handles copying those / waiting for IO in flight for metadata.
 
-The rest of the patch looks OK and I like it much more than the previous
-version :)
 
-									Honza
->  			}
->  			cond_resched();
->  
-> diff --git a/include/linux/blk_types.h b/include/linux/blk_types.h
-> index cdf1119..22990cf 100644
-> --- a/include/linux/blk_types.h
-> +++ b/include/linux/blk_types.h
-> @@ -111,12 +111,13 @@ struct bio {
->  #define BIO_FS_INTEGRITY 9	/* fs owns integrity data, not block layer */
->  #define BIO_QUIET	10	/* Make BIO Quiet */
->  #define BIO_MAPPED_INTEGRITY 11/* integrity metadata has been remapped */
-> +#define BIO_SNAP_STABLE	12	/* bio data must be snapshotted during write */
->  
->  /*
->   * Flags starting here get preserved by bio_reset() - this includes
->   * BIO_POOL_IDX()
->   */
-> -#define BIO_RESET_BITS	12
-> +#define BIO_RESET_BITS	13
->  
->  #define bio_flagged(bio, flag)	((bio)->bi_flags & (1 << (flag)))
->  
-> diff --git a/include/linux/buffer_head.h b/include/linux/buffer_head.h
-> index 5afc4f9..714d5d9 100644
-> --- a/include/linux/buffer_head.h
-> +++ b/include/linux/buffer_head.h
-> @@ -181,6 +181,7 @@ void ll_rw_block(int, int, struct buffer_head * bh[]);
->  int sync_dirty_buffer(struct buffer_head *bh);
->  int __sync_dirty_buffer(struct buffer_head *bh, int rw);
->  void write_dirty_buffer(struct buffer_head *bh, int rw);
-> +int _submit_bh(int, struct buffer_head *, unsigned long);
->  int submit_bh(int, struct buffer_head *);
->  void write_boundary_block(struct block_device *bdev,
->  			sector_t bblock, unsigned blocksize);
-> diff --git a/include/uapi/linux/fs.h b/include/uapi/linux/fs.h
-> index c7fc1e6..a4ed56c 100644
-> --- a/include/uapi/linux/fs.h
-> +++ b/include/uapi/linux/fs.h
-> @@ -88,7 +88,6 @@ struct inodes_stat_t {
->  #define MS_STRICTATIME	(1<<24) /* Always perform atime updates */
->  
->  /* These sb flags are internal to the kernel */
-> -#define MS_SNAP_STABLE	(1<<27) /* Snapshot pages during writeback, if needed */
->  #define MS_NOSEC	(1<<28)
->  #define MS_BORN		(1<<29)
->  #define MS_ACTIVE	(1<<30)
-> diff --git a/mm/bounce.c b/mm/bounce.c
-> index 5f89017..a5c2ec3 100644
-> --- a/mm/bounce.c
-> +++ b/mm/bounce.c
-> @@ -181,32 +181,13 @@ static void bounce_end_io_read_isa(struct bio *bio, int err)
->  #ifdef CONFIG_NEED_BOUNCE_POOL
->  static int must_snapshot_stable_pages(struct request_queue *q, struct bio *bio)
->  {
-> -	struct page *page;
-> -	struct backing_dev_info *bdi;
-> -	struct address_space *mapping;
-> -	struct bio_vec *from;
-> -	int i;
-> -
->  	if (bio_data_dir(bio) != WRITE)
->  		return 0;
->  
->  	if (!bdi_cap_stable_pages_required(&q->backing_dev_info))
->  		return 0;
->  
-> -	/*
-> -	 * Based on the first page that has a valid mapping, decide whether or
-> -	 * not we have to employ bounce buffering to guarantee stable pages.
-> -	 */
-> -	bio_for_each_segment(from, bio, i) {
-> -		page = from->bv_page;
-> -		mapping = page_mapping(page);
-> -		if (!mapping)
-> -			continue;
-> -		bdi = mapping->backing_dev_info;
-> -		return mapping->host->i_sb->s_flags & MS_SNAP_STABLE;
-> -	}
-> -
-> -	return 0;
-> +	return test_bit(BIO_SNAP_STABLE, &bio->bi_flags);
->  }
->  #else
->  static int must_snapshot_stable_pages(struct request_queue *q, struct bio *bio)
-> diff --git a/mm/page-writeback.c b/mm/page-writeback.c
-> index efe6814..4514ad7 100644
-> --- a/mm/page-writeback.c
-> +++ b/mm/page-writeback.c
-> @@ -2311,10 +2311,6 @@ void wait_for_stable_page(struct page *page)
->  
->  	if (!bdi_cap_stable_pages_required(bdi))
->  		return;
-> -#ifdef CONFIG_NEED_BOUNCE_POOL
-> -	if (mapping->host->i_sb->s_flags & MS_SNAP_STABLE)
-> -		return;
-> -#endif /* CONFIG_NEED_BOUNCE_POOL */
->  
->  	wait_on_page_writeback(page);
->  }
 -- 
-Jan Kara <jack@suse.cz>
-SUSE Labs, CR
+
+Best Regards,
+Peter Chen
