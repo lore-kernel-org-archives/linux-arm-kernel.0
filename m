@@ -1,23 +1,53 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 15 Mar 2013 16:59:47 +0000
-Subject: [RFC 1/1] clk: Add notifier support in
- clk_prepare_enable/clk_disable_unprepare
-In-Reply-To: <514003B6.8020904@wwwdotorg.org>
-References: <1363091861-21534-1-git-send-email-bilhuang@nvidia.com>
- <20130312134032.GU4977@n2100.arm.linux.org.uk>
- <1363139273.21694.11.camel@bilhuang-vm1> <514003B6.8020904@wwwdotorg.org>
-Message-ID: <20130315165947.GL4977@n2100.arm.linux.org.uk>
+From: cooloney@gmail.com (Bryan Wu)
+Date: Fri, 15 Mar 2013 10:08:57 -0700
+Subject: [PATCH v3 3/3] leds: leds-pwm: Defer led_pwm_set() if PWM can
+ sleep
+In-Reply-To: <513EFE17.6030203@epfl.ch>
+References: <1359381659-24454-1-git-send-email-florian.vaussard@epfl.ch>
+ <1359381659-24454-4-git-send-email-florian.vaussard@epfl.ch>
+ <20130130081728.GC13568@avionic-0098.mockup.avionic-design.de>
+ <512E2F98.6070404@epfl.ch> <51347B06.8090604@epfl.ch>
+ <20130304105806.GA28735@avionic-0098.mockup.avionic-design.de>
+ <513EFE17.6030203@epfl.ch>
+Message-ID: <CAK5ve-+TfHmvx8fiim2yyZhKbhgieO-WDqd+HG7ViLm=Fk3zNA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 12, 2013 at 10:42:30PM -0600, Stephen Warren wrote:
-> I believe the point Russell is making is not that the idea behind this
-> patch is wrong, but simply that the function where you put the hooks is
-> wrong. The hooks should at least be in clk_enable/clk_disable and not
+On Tue, Mar 12, 2013 at 3:06 AM, Florian Vaussard
+<florian.vaussard@epfl.ch> wrote:
+> Hi Bryan,
+>
+>
+>>>>>
+>>>>> Bryan, I assume that you'll be taking this? It doesn't apply cleanly to
+>>>>> my tree, probably because of Peter's recent changes that you took
+>>>>> through your tree and Florian based his patches on top of that. The
+>>>>> conflict resolution should be trivial, though.
+>>>>>
+>>>>
+>>>> It seems that this patch was not taken. Could you pull it, as the other
+>>>> part is already in linux-pwm? Or is there any show stopper?
+>>>>
+>>>
+>>> Ping? Who should merge this?
+>>
+>>
+>> I assume Bryan will take it through the LED tree? Patches 1 & 2 went
+>> into v3.9-rc1 through the PWM tree.
+>>
+>
+> Ping ?
+>
 
-Indeed, remembering that clk_enable/clk_disable can be called from
-atomic contexts.
+Hi Florian and Thierry,
 
-If the hook needs to be non-atomic (iow, it can schedule) then it can't
-go into clk_enable/clk_disable, and must go into clk_prepare/clk_unprepare,
-which is the schedulable half of that API.
+Sorry, guys. My bad! I'm using GMAIL filtering my emails. This email
+goes into my arm-linux mail list archive and I totally missed it.
+
+I can merge this patch into my for-next branch, but it will be in 3.10
+not 3.9-rcX.
+
+Or Thierry, can you merge that to 3.9-rcX through your tree with my Ack?
+
+Thanks,
+-Bryan
