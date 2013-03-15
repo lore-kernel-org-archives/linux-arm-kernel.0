@@ -1,101 +1,46 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 15 Mar 2013 21:47:23 +0100 (CET)
-Subject: [PATCH 2/2] genirq: move mask_cache into struct irq_chip_type
-In-Reply-To: <1363376175-22312-3-git-send-email-gerlando.falauto@keymile.com>
-References: <1363277430-21325-1-git-send-email-holger.brunck@keymile.com><1363376175-22312-1-git-send-email-gerlando.falauto@keymile.com>
- <1363376175-22312-3-git-send-email-gerlando.falauto@keymile.com>
-Message-ID: <alpine.LFD.2.02.1303152101080.22263@ionos>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 15 Mar 2013 21:49:59 +0100
+Subject: [PATCH 0/5] ARM: sunxi: Add support for A10 Ethernet controller
+Message-ID: <1363380605-6577-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gerlando,
+Hi,
 
-On Fri, 15 Mar 2013, Gerlando Falauto wrote:
+The Allwinner A10 SoC has an ethernet that is said to be coming from
+Davicom embedded in it. This IP has no public documentation, so exact
+details are quite sparse, and this code come from refactored allwinner
+code.
 
-> This fixes a regression introduced by e59347a
-> "arm: orion: Use generic irq chip".
-> 
-> The same interrupt mask cache (stored within struct irq_chip_generic)
-> is shared between all the irq_chip_type instances. As each irq_chip_type
-> can use a distinct mask register, sharing a single mask cache may not be
-> correct. For instance in the case of Orion SoCs, which have separate
-> mask registers for edge and level interrupts.
-> 
-> This patch moves mask_cache from struct irq_chip_generic into struct
-> irq_chip_type. Note that the interrupt support for Samsung SoCs is also
-> slightly affected.
-
-The patch is correct, but we want a more incremental approach.
-
-Step 1: 
-     Add the pointer and the mask_cache to ct
-     init all ct->pointers in the setup code to gc->mask_cache
-     switch core code over to use the ct->pointer
-
-     Functional equivilent!
-
-Step 2:
-     Convert each user out of core to the ct->pointer (separate patches)
-
-     Functional equivilent!
-
-Step 3:
-     Rename gc->mask_cache to gc->shared_mask_cache
-
-     And we keep that instead of using ct[0].mask_cache simply because
-     it makes the code simpler to understand.
-
-Step 4:
-     Add the extra flag and the initializer for the separate mask_caches
-
-Step5:
-     Convert the affected SOCs (separate patches)
-
-Otherwise I only have a coding style related request:
-
-> @@ -246,9 +246,21 @@ void irq_setup_generic_chip(struct irq_chip_generic *gc, u32 msk,
->  	list_add_tail(&gc->list, &gc_list);
->  	raw_spin_unlock(&gc_lock);
->  
-> -	/* Init mask cache ? */
-> -	if (flags & IRQ_GC_INIT_MASK_CACHE)
-> -		gc->mask_cache = irq_reg_readl(gc->reg_base + ct->regs.mask);
-> +	for (i = 0; i < gc->num_ct; i++) {
-> +		if (flags & IRQ_GC_SEPARATE_MASK_REGISTERS)
-> +			/* Define mask cache pointer */
-> +			ct[i].pmask_cache = &ct[i].mask_cache;
-> +		else
-> +			/* They all point to the same mask cache */
-> +			ct[i].pmask_cache = &ct[0].mask_cache;
-> +
-> +		/* Init mask cache ? */
-> +		if ((flags & IRQ_GC_INIT_MASK_CACHE)
-> +		 && ((flags & IRQ_GC_SEPARATE_MASK_REGISTER)
-> +		  || (i == 0)))
-> +			*ct[i].pmask_cache =
-> +				irq_reg_readl(gc->reg_base + ct[i].regs.mask);
-> +	}
-
-My eyes are burning, my head is spinning and I have a hard time not to
-use swearwords.
-
-	bool mskperct = flags & IRQ_GC_SEPARATE_MASK_REGISTERS;
-	bool mskinit = flags & IRQ_GC_INIT_MASK_CACHE;
-	u32 *shmsk = &gc->shared_mask_cache;
-
-	if (!mskperct && mskinit)
-	     	*shmsk = irq_reg_readl(gc->reg_base + ct->regs.mask);
-
-	for (i = 0; i < gc->num_ct: i++, ct++) {
-	       ct->pmask_cache = mskperct ? &ct->mask_cache : shmsk;
-	       
-	       if (mskperct && mskinit)
-	       	  	ct->mask_cache = irq_reg_readl(gc->reg_base +
-				       	 	       ct->regs.mask);
-	}
-
-Or something like that, perhaps ?
+Since we don't have any clock support yet for the Allwinner SoCs, we
+rely on the bootloader to enable the wemac clock.
 
 Thanks,
+Maxime
 
-	tglx
+Maxime Ripard (3):
+  ARM: sunxi: Add wemac to sun4i dtsi
+  ARM: sun4i: Add muxing options for the ethernet controller
+  ARM: hackberry: dt: Add Ethernet controller to the Hackberry device
+    tree
+
+Stefan Roese (2):
+  net: Add davicom wemac ethernet driver found on Allwinner A10 SoC's
+  ARM: cubieboard: Enable ethernet (WEMAC) support in dts
+
+ .../devicetree/bindings/net/davicom-wemac.txt      |   20 +
+ arch/arm/boot/dts/sun4i-a10-cubieboard.dts         |    6 +
+ arch/arm/boot/dts/sun4i-a10-hackberry.dts          |   19 +
+ arch/arm/boot/dts/sun4i-a10.dtsi                   |   18 +
+ drivers/net/ethernet/Makefile                      |    2 +-
+ drivers/net/ethernet/davicom/Kconfig               |   31 +
+ drivers/net/ethernet/davicom/Makefile              |    1 +
+ drivers/net/ethernet/davicom/wemac.c               | 1033 ++++++++++++++++++++
+ drivers/net/ethernet/davicom/wemac.h               |  130 +++
+ 9 files changed, 1259 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/net/davicom-wemac.txt
+ create mode 100644 drivers/net/ethernet/davicom/wemac.c
+ create mode 100644 drivers/net/ethernet/davicom/wemac.h
+
+-- 
+1.7.10.4
