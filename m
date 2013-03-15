@@ -1,50 +1,46 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 15 Mar 2013 11:42:48 +0800
-Subject: [PATCH 08/10] ASoC: dmaengine_pcm: Add open function for DT DMA
- request
-In-Reply-To: <20130314130832.GE32452@pengutronix.de>
-References: <1362940391-8338-1-git-send-email-mpa@pengutronix.de>
- <1362940391-8338-9-git-send-email-mpa@pengutronix.de>
- <20130312190206.GY19942@opensource.wolfsonmicro.com>
- <20130313021712.GD27461@S2101-09.ap.freescale.net>
- <20130314130832.GE32452@pengutronix.de>
-Message-ID: <20130315034246.GA18039@S2101-09.ap.freescale.net>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 15 Mar 2013 09:55:57 +0530
+Subject: [PATCH 2/3] pwm: pwm-tiecap: Add device-tree binding support
+ for da850 SOC
+In-Reply-To: <87txoe56lk.fsf@dell.be.48ers.dk>
+References: <1363257158-11615-1-git-send-email-avinashphilip@ti.com>
+ <1363257158-11615-3-git-send-email-avinashphilip@ti.com>
+ <5141B7CC.7000700@ti.com> <87txoe56lk.fsf@dell.be.48ers.dk>
+Message-ID: <5142A2D5.5090009@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 14, 2013 at 02:08:32PM +0100, Markus Pargmann wrote:
-> On Wed, Mar 13, 2013 at 10:18:29AM +0800, Shawn Guo wrote:
-> > On Tue, Mar 12, 2013 at 07:02:07PM +0000, Mark Brown wrote:
-> > > On Sun, Mar 10, 2013 at 07:33:09PM +0100, Markus Pargmann wrote:
-> > > > Add a function to open a DMA PCM substream using devicetree data
-> > > > provided via the client device node. The patch introduces a public
-> > > > function and a private subfunction that is called by both open
-> > > > functions.
-> > > 
-> > > Someone (I think it was Shawn) sent a very similar patch just recently
-> > > which appears to have fallen out of my inbox unfortunately - can you
-> > > please check what's going on there and coordinate with them?  Let me
-> > > know if you can't find the patch and I'll dig it out.
-> > 
-> > It's here, Markus.
-> > 
-> > http://thread.gmane.org/gmane.linux.alsa.devel/106027/focus=106031
-> > 
+On 3/14/2013 9:14 PM, Peter Korsgaard wrote:
+>>>>>> "Sekhar" == Sekhar Nori <nsekhar@ti.com> writes:
 > 
-> Thanks. Do you already have a patch for the non-generic function which I
-> could use instead?
+>  >> Required properties:
+>  >> -- compatible: Must be "ti,am33xx-ecap"
+>  >> +- compatible: Must be "ti,am33xx-ecap" or "ti,da850-ecap"
+>  >> - #pwm-cells: Should be 3. Number of cells being used to specify PWM property.
+>  >> First cell specifies the per-chip index of the PWM to use, the second
+>  >> cell is the period in nanoseconds and bit 0 in the third cell is used to
+>  >> diff --git a/drivers/pwm/pwm-tiecap.c b/drivers/pwm/pwm-tiecap.c
+>  >> index 22e96e2..e0d96c8 100644
+>  >> --- a/drivers/pwm/pwm-tiecap.c
+>  >> +++ b/drivers/pwm/pwm-tiecap.c
+>  >> @@ -197,6 +197,7 @@ static const struct pwm_ops ecap_pwm_ops = {
+>  >> 
+>  >> static const struct of_device_id ecap_of_match[] = {
+>  >> { .compatible	= "ti,am33xx-ecap" },
+>  >> +	{ .compatible	= "ti,da850-ecap" },
+>  >> {},
 > 
-I do not follow.  With my patch in place, there will be two
-dmaengine_pcm APIs.
+>  Sekhar> You add a new compatible, but don't really show any changes in
+>  Sekhar> driver in this series. So why can't we simply use
+>  Sekhar> ti,am33xx-ecap on DA850 too?
+> 
+> Indeed, if the hardware block is identical the dts should simply list:
+> 
+> compatible = "ti,da850-ecap", "ti,am33xx-ecap"
+> 
+> And the driver only bind to ti,am33xx-ecap (unless there ever needs to
+> be a da850 specific workarounde.
 
-int snd_dmaengine_pcm_open(struct snd_pcm_substream *substream,
-        dma_filter_fn filter_fn, void *filter_data)
+Okay, so this is to future proof the DA850 DT blob. Makes sense. Thanks!
 
-int snd_dmaengine_generic_pcm_open(struct snd_pcm_substream *substream,
-                                   struct device *dev, const char *name)
-
-The first one is for users that their dmaengine driver hasn't converted
-to generic device tree bindings, and the second one is for users that
-their dmaengine driver is converted to generic device tree bindings.
-
-Shawn
+~Sekhar
