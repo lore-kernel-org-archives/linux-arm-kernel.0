@@ -1,22 +1,76 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 15 Mar 2013 16:06:35 +0530
-Subject: [RESEND 0/2] davinci: Add device tree data for tps6507x.
-In-Reply-To: <1362637581-12673-1-git-send-email-manishv.b@ti.com>
-References: <1362637581-12673-1-git-send-email-manishv.b@ti.com>
-Message-ID: <5142F9B3.3050800@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 15 Mar 2013 11:37:02 +0100
+Subject: [PATCH] ARM: at91/dt: gpio-keys: remove address-cells and size-cells
+ properties
+In-Reply-To: <CAGhQ9Vx9D_4LnXOgveQ_vnTa-QfgwTkuLrU=_Et1Z2fD_hDCNg@mail.gmail.com>
+References: <CAGhQ9Vx9D_4LnXOgveQ_vnTa-QfgwTkuLrU=_Et1Z2fD_hDCNg@mail.gmail.com>
+Message-ID: <1363343822-25938-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Gpio-keys nodes are not using the "reg" property in their sub nodes.
+So, there is no need to define #address-cells and #size-cells properties
+in gpio-keys nodes: we remove them.
 
-On 3/7/2013 11:56 AM, Vishwanathrao Badarkhe, Manish wrote:
-> Add device tree data for regulator via tps6507x mfd device 
-> in da850-evm.
-> Applies on top of v3.9-rc1 of linus tree.
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/boot/dts/at91sam9263ek.dts         | 2 --
+ arch/arm/boot/dts/at91sam9g20ek_common.dtsi | 2 --
+ arch/arm/boot/dts/at91sam9m10g45ek.dts      | 2 --
+ arch/arm/boot/dts/at91sam9n12ek.dts         | 2 --
+ 4 files changed, 8 deletions(-)
 
-I would like to take this series via the davinci tree to manage
-dependencies with rest of the DT patches. Any comments/objections on
-this series? It will be nice to get your Acked-by/Reviewed-by.
-
-Thanks,
-Sekhar
+diff --git a/arch/arm/boot/dts/at91sam9263ek.dts b/arch/arm/boot/dts/at91sam9263ek.dts
+index 1eb0872..aa0e184 100644
+--- a/arch/arm/boot/dts/at91sam9263ek.dts
++++ b/arch/arm/boot/dts/at91sam9263ek.dts
+@@ -155,8 +155,6 @@
+ 
+ 	gpio_keys {
+ 		compatible = "gpio-keys";
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+ 
+ 		left_click {
+ 			label = "left_click";
+diff --git a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
+index da15e83..e041b72 100644
+--- a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
++++ b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
+@@ -167,8 +167,6 @@
+ 
+ 	gpio_keys {
+ 		compatible = "gpio-keys";
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+ 
+ 		btn3 {
+ 			label = "Button 3";
+diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts b/arch/arm/boot/dts/at91sam9m10g45ek.dts
+index 20c3191..c795bfb 100644
+--- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
++++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
+@@ -162,8 +162,6 @@
+ 
+ 	gpio_keys {
+ 		compatible = "gpio-keys";
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+ 
+ 		left_click {
+ 			label = "left_click";
+diff --git a/arch/arm/boot/dts/at91sam9n12ek.dts b/arch/arm/boot/dts/at91sam9n12ek.dts
+index d400f8d..7117c05 100644
+--- a/arch/arm/boot/dts/at91sam9n12ek.dts
++++ b/arch/arm/boot/dts/at91sam9n12ek.dts
+@@ -104,8 +104,6 @@
+ 
+ 	gpio_keys {
+ 		compatible = "gpio-keys";
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+ 
+ 		enter {
+ 			label = "Enter";
+-- 
+1.8.0
