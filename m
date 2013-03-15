@@ -1,40 +1,80 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 15 Mar 2013 08:55:10 -0400 (EDT)
-Subject: [PATCH 0/4] mv643xx_eth: use mvmdio MDIO bus driver
-In-Reply-To: <20130315.085321.1047694772636447477.davem@davemloft.net>
-References: <1359473048-26551-1-git-send-email-florian@openwrt.org>
- <1363284515-9865-1-git-send-email-florian@openwrt.org>
- <20130315.085321.1047694772636447477.davem@davemloft.net>
-Message-ID: <20130315.085510.974056254781971889.davem@davemloft.net>
+From: heikki.krogerus@linux.intel.com (Heikki Krogerus)
+Date: Fri, 15 Mar 2013 14:56:15 +0200
+Subject: [PATCH 1/6] serial: 8250_dw: add support for clocks property
+ when using DeviceTree
+In-Reply-To: <1362694460-1919-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1362694460-1919-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1362694460-1919-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20130315125615.GA27560@xps8300>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: David Miller <davem@davemloft.net>
-Date: Fri, 15 Mar 2013 08:53:21 -0400 (EDT)
+Hi,
 
-> From: Florian Fainelli <florian@openwrt.org>
-> Date: Thu, 14 Mar 2013 19:08:31 +0100
+On Thu, Mar 07, 2013 at 11:14:15PM +0100, Maxime Ripard wrote:
+> From: Emilio L?pez <emilio@elopez.com.ar>
 > 
->> This patch converts the mv643xx_eth driver to use the mvmdio MDIO bus driver
->> instead of rolling its own implementation. As a result, all users of this
->> mv643xx_eth driver are converted to register an "orion-mdio" platform_device.
->> The mvmdio driver is also updated to support an interrupt line which reports
->> SMI error/completion, and to allow traditionnal platform device registration
->> instead of just device tree.
->> 
->> David, I think it makes sense for you to merge all of this, since we do
->> not want the architecture files to be desynchronized from the mv643xx_eth to
->> avoid runtime breakage. The potential for merge conflicts should be very small.
+> This commit implements support for using the "clocks" DT property, instead
+> of having to use clock-frequency.
 > 
-> All applied to net-next, thanks.
+> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+> ---
+>  drivers/tty/serial/8250/8250_dw.c |   32 ++++++++++++++++++++++----------
+>  1 file changed, 22 insertions(+), 10 deletions(-)
 
-Actually, reverted.  Please send me code which actually compiles:
+<snip>
 
-drivers/net/ethernet/marvell/mvmdio.c: In function ?orion_mdio_wait_ready?:
-drivers/net/ethernet/marvell/mvmdio.c:70:28: error: ?NO_IRQ? undeclared (first use in this function)
-drivers/net/ethernet/marvell/mvmdio.c:70:28: note: each undeclared identifier is reported only once for each function it appears in
-drivers/net/ethernet/marvell/mvmdio.c: In function ?orion_mdio_probe?:
-drivers/net/ethernet/marvell/mvmdio.c:242:24: error: ?NO_IRQ? undeclared (first use in this function)
-make[4]: *** [drivers/net/ethernet/marvell/mvmdio.o] Error 1
+> @@ -137,8 +140,15 @@ static int dw8250_probe_of(struct uart_port *p)
+>  		p->regshift = val;
+>  
+>  	if (of_property_read_u32(np, "clock-frequency", &val)) {
+> -		dev_err(p->dev, "no clock-frequency property set\n");
+> -		return -EINVAL;
+> +		/* Get clk rate through clk driver if present */
+> +		data->clk = clk_get(p->dev, NULL);
+> +		if (IS_ERR(data->clk)) {
+> +			dev_err(p->dev, "clk or clock-frequency not defined\n");
+> +			return -EINVAL;
+> +		}
+> +
+> +		clk_prepare_enable(data->clk);
+> +		val = clk_get_rate(data->clk);
 
-And don't use Kconfig dependencies to work around this, fix it properly.
+Don't get the clk here..
+
+>  	}
+>  	p->uartclk = val;
+>  
+> @@ -300,6 +310,12 @@ static int dw8250_probe(struct platform_device *pdev)
+
+Get it here so it is then handled for also others besides DT users.
+And prefer devm_clk_get(). Something like this:
+
+        ...
+        uart.port.membase = ioremap(regs->start, resource_size(regs));
+        if (!uart.port.membase)
+                return -ENOMEM;
+
++       data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
++       if (!data)
++       	return -ENOMEM;
++        
++       data->clk = devm_clk_get(&pdev->dev, NULL);
++       clk_prepare_enable(data->clk);
++
+        uart.port.iotype = UPIO_MEM;
+        uart.port.serial_in = dw8250_serial_in;
+        uart.port.serial_out = dw8250_serial_out;
++       uart.port.private_data = data;
++       uart.port.uartclk = clk_get_rate(data->clk);
+
+  	dw8250_setup_port(&uart);
+        ... 
+
+Then in dw8250_probe_of() you need to use the "clock-frequency"
+property only when p->uartclk is 0.
+
+Thanks,
+
+-- 
+heikki
