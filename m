@@ -1,119 +1,84 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 15 Mar 2013 16:21:47 +0100
-Subject: [Linaro-mm-sig] [PATCH 2/2] drivers: dma-contiguous: add
- initialization from device tree
-In-Reply-To: <511D586A.5060902@codeaurora.org>
-References: <1360845928-8107-1-git-send-email-m.szyprowski@samsung.com>
- <1360845928-8107-3-git-send-email-m.szyprowski@samsung.com>
- <511D586A.5060902@codeaurora.org>
-Message-ID: <51433C8B.20607@samsung.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Fri, 15 Mar 2013 10:21:15 -0500
+Subject: [PATCH V3 17/18] ARM: OMAP2+: Allow GPMC probe to complete even if CS
+ mapping fails
+In-Reply-To: <1363360876-13617-1-git-send-email-jon-hunter@ti.com>
+References: <1363360876-13617-1-git-send-email-jon-hunter@ti.com>
+Message-ID: <1363360876-13617-18-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+When the GPMC driver is probed, we call gpmc_mem_init() to see which
+chip-selects have already been configured and enabled by the boot-loader
+and allocate space for them. If we fail to allocate space for one
+chip-select, then we return failure from the probe and the GPMC driver
+will not be available.
 
-On 2/14/2013 10:34 PM, Laura Abbott wrote:
->
-> On 2/14/2013 4:45 AM, Marek Szyprowski wrote:
-> <snip>
->> +name:        an name given to the defined region.
->> +base-address:    the base address of the defined region.
->> +size:        the size of the memory region.
->> +linux,contiguous-region: property indicating that the defined memory
->> +        region is used for contiguous memory allocations,
->> +        Linux specific (optional)
->> +linux,default-contiguous-region: property indicating that the region
->> +        is the default region for all contiguous memory
->> +        allocations, Linux specific (optional)
->> +
->> +
->
-> I don't see any code actually implementing the 
-> default-contiguous-region binding. Currently on ARM systems we will 
-> still setup the default region based on the Kconfig. Is this intentional?
+Rather than render the GPMC useless for all GPMC devices, if we fail to
+allocate space for one chip-select print a warning and disable the
+chip-select. This way other GPMC clients can still be used.
 
-Nope, this was my fault. I've missed the fixup which added support for
-default-contiguous-region (it was just a few lines more to cma_fdt_scan()
-function).
+There is no downside to this approach, because all GPMC clients need to
+request a chip-select before they can use the GPMC and on requesting a
+chip-select, if memory has not already been reserved for the chip-select
+then it will be.
 
->> diff --git a/drivers/base/dma-contiguous.c 
->> b/drivers/base/dma-contiguous.c
->> index 085389c..5761f73 100644
->> --- a/drivers/base/dma-contiguous.c
->> +++ b/drivers/base/dma-contiguous.c
->> @@ -24,6 +24,9 @@
->>
->>   #include <linux/memblock.h>
->>   #include <linux/err.h>
->> +#include <linux/of.h>
->> +#include <linux/of_fdt.h>
->> +#include <linux/of_platform.h>
->>   #include <linux/mm.h>
->>   #include <linux/mutex.h>
->>   #include <linux/page-isolation.h>
->> @@ -177,6 +180,35 @@ no_mem:
->>       return ERR_PTR(ret);
->>   }
->>
->> +/*****************************************************************************/ 
->>
->> +
->> +#ifdef CONFIG_OF
->> +int __init cma_fdt_scan(unsigned long node, const char *uname,
->> +                int depth, void *data)
->> +{
->> +    phys_addr_t base, size;
->> +    unsigned long len;
->> +    __be32 *prop;
->> +
->> +    if (strncmp(uname, "region@", 7) != 0 || depth != 2 ||
->> +        !of_get_flat_dt_prop(node, "contiguous-region", NULL))
->
-> The documentation says "linux,contiguous-region"
->
+Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+---
+ arch/arm/mach-omap2/gpmc.c |   24 +++++++-----------------
+ 1 file changed, 7 insertions(+), 17 deletions(-)
 
-Right, lack of another fixup. It looks that I posted an incomplete 
-version, I'm sorry.
-I hurried that time (it was my last day in the office before going for 
-holidays).
-
->
->> +#ifdef CONFIG_OF
->> +static void cma_assign_device_from_dt(struct device *dev)
->> +{
->> +    struct device_node *node;
->> +    struct cma *cma;
->> +    u32 value;
->> +
->> +    node = of_parse_phandle(dev->of_node, "linux,contiguous-region", 
->> 0);
->> +    if (!node)
->> +        return;
->> +    if (of_property_read_u32(node, "reg", &value) && !value)
->> +        return;
->> +    cma = cma_get_area(value);
->> +    if (!cma)
->> +        return;
->> +
->> +    dev_set_cma_area(dev, cma);
->> +    pr_info("Assigned CMA region at %lx to %s device\n", (unsigned 
->> long)value, dev_name(dev));
->> +}
->> +
->
-> This scheme of associating devices with CMA regions by base does not 
-> work if you want to let CMA figure out where to place the region (base 
-> = 0). Can we use the name to associate the device with the region? I 
-> had been working on something similar internally and that was the only 
-> solution I had come up with to associate arbitrary CMA nodes with devices.
-
-Right, support for base = 0 requires different handling, but I thought 
-that if
-we use the device tree approach, the designer already knows the complete 
-memory
-configuration, so providing the correct base address is not that hard.
-
-Best regards
+diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+index 5239d47..ee6601c 100644
+--- a/arch/arm/mach-omap2/gpmc.c
++++ b/arch/arm/mach-omap2/gpmc.c
+@@ -785,9 +785,9 @@ static void gpmc_mem_exit(void)
+ 
+ }
+ 
+-static int gpmc_mem_init(void)
++static void gpmc_mem_init(void)
+ {
+-	int cs, rc;
++	int cs;
+ 
+ 	/*
+ 	 * The first 1MB of GPMC address space is typically mapped to
+@@ -804,16 +804,12 @@ static int gpmc_mem_init(void)
+ 		if (!gpmc_cs_mem_enabled(cs))
+ 			continue;
+ 		gpmc_cs_get_memconf(cs, &base, &size);
+-		rc = gpmc_cs_insert_mem(cs, base, size);
+-		if (rc < 0) {
+-			while (--cs >= 0)
+-				if (gpmc_cs_mem_enabled(cs))
+-					gpmc_cs_delete_mem(cs);
+-			return rc;
++		if (gpmc_cs_insert_mem(cs, base, size)) {
++			pr_warn("%s: disabling cs %d mapped at 0x%x-0x%x\n",
++				__func__, cs, base, base + size);
++			gpmc_cs_disable_mem(cs);
+ 		}
+ 	}
+-
+-	return 0;
+ }
+ 
+ static u32 gpmc_round_ps_to_sync_clk(u32 time_ps, u32 sync_clk)
+@@ -1620,13 +1616,7 @@ static int gpmc_probe(struct platform_device *pdev)
+ 	dev_info(gpmc_dev, "GPMC revision %d.%d\n", GPMC_REVISION_MAJOR(l),
+ 		 GPMC_REVISION_MINOR(l));
+ 
+-	rc = gpmc_mem_init();
+-	if (rc < 0) {
+-		clk_disable_unprepare(gpmc_l3_clk);
+-		clk_put(gpmc_l3_clk);
+-		dev_err(gpmc_dev, "failed to reserve memory\n");
+-		return rc;
+-	}
++	gpmc_mem_init();
+ 
+ 	if (gpmc_setup_irq() < 0)
+ 		dev_warn(gpmc_dev, "gpmc_setup_irq failed\n");
 -- 
-Marek Szyprowski
-Samsung Poland R&D Center
+1.7.10.4
