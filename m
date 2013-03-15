@@ -1,26 +1,26 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 15 Mar 2013 17:12:00 +0000
-Subject: [RFC 1/1] clk: Add notifier support in
- clk_prepare_enable/clk_disable_unprepare
-In-Reply-To: <5142B027.4040403@wwwdotorg.org>
-References: <1363151317.3311.9.camel@bilhuang-vm1>
- <51400D9D.9060305@wwwdotorg.org> <1363153204.3311.14.camel@bilhuang-vm1>
- <5140C12A.4060900@wwwdotorg.org> <1363227311.3311.30.camel@bilhuang-vm1>
- <20130314092132.GE18519@tbergstrom-lnx.Nvidia.com>
- <1363253287.3311.32.camel@bilhuang-vm1> <51420EBB.7080503@wwwdotorg.org>
- <1363310454.3311.44.camel@bilhuang-vm1> <5142B027.4040403@wwwdotorg.org>
-Message-ID: <20130315171200.GN4977@n2100.arm.linux.org.uk>
+Date: Fri, 15 Mar 2013 17:23:10 +0000
+Subject: [PATCH 1/3] ARM: allow platforms to use generic headers
+ without ARCH_MULTIPLATFORM
+In-Reply-To: <1363193598-28116-2-git-send-email-jonathan.austin@arm.com>
+References: <1363193598-28116-1-git-send-email-jonathan.austin@arm.com>
+ <1363193598-28116-2-git-send-email-jonathan.austin@arm.com>
+Message-ID: <20130315172310.GO4977@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 14, 2013 at 11:22:47PM -0600, Stephen Warren wrote:
-> Is clk_set_rate() only legal to call in non-atomic contexts then? The
-> header file doesn't say, although I guess since many other functions
-> explicitly say they can't, then by omission it can...
+On Wed, Mar 13, 2013 at 04:53:16PM +0000, Jonathan Austin wrote:
+> diff --git a/arch/arm/boot/compressed/misc.c b/arch/arm/boot/compressed/misc.c
+> index df89983..5c6fd05 100644
+> --- a/arch/arm/boot/compressed/misc.c
+> +++ b/arch/arm/boot/compressed/misc.c
+> @@ -25,7 +25,7 @@ unsigned int __machine_arch_type;
+>  static void putstr(const char *ptr);
+>  extern void error(char *x);
+>  
+> -#ifdef CONFIG_ARCH_MULTIPLATFORM
+> +#ifdef CONFIG_ARM_GENERIC_HEADERS
 
-I think when all this was discussed alongside the clk_prepare/clk_unprepare
-stuff, that yes, it was decided that clk_set_rate() was non-atomic only.
-
-And yes, that is most definitely the case, because the first thing 
-clk_set_rate() does is take a mutex - which will trigger a might_sleep()
-complaint if ever called from an atomic context.
+Note that this will conflict with patches I've just merged.  I wouldn't
+suggest you rely on those patches yet until they've had some wider
+testing, so I'd recommend you hold off with these for a while.
