@@ -1,104 +1,79 @@
 From: nschichan@freebox.fr (Nicolas Schichan)
-Date: Fri, 15 Mar 2013 19:28:43 +0100
-Subject: [PATCH RFC 3/3] ARM: net: bpf_jit: add support for jitted seccomp
+Date: Fri, 15 Mar 2013 19:39:19 +0100
+Subject: [PATCH RFC 1/3] seccomp: add generic code for jitted seccomp
  filters.
-In-Reply-To: <1363372123-8861-1-git-send-email-nschichan@freebox.fr>
+In-Reply-To: <1363372123-8861-2-git-send-email-nschichan@freebox.fr>
 References: <1363372123-8861-1-git-send-email-nschichan@freebox.fr>
-Message-ID: <1363372123-8861-4-git-send-email-nschichan@freebox.fr>
+ <1363372123-8861-2-git-send-email-nschichan@freebox.fr>
+Message-ID: <51436AD7.1050205@freebox.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch selects HAVE_SECCOMP_FILTER_JIT in the ARM Kconfig file,
-implements and seccomp_jit_compile() and seccomp_jit_free(), and adds
-support for BPF_S_ANC_SECCOMP_LD_W instruction.
+On 03/15/2013 07:28 PM, Nicolas Schichan wrote:
+[Sorry, I forgot to put the mailing lists as the receivers of the introductory 
+message]
 
-BPF_S_ANC_SECCOMP_LD_W instructions trigger the generation of a call
-to C function jit_get_seccomp_w(). which is a wrapper around
-seccomp_bpf_load().
+Hi,
 
-Signed-off-by: Nicolas Schichan <nschichan@freebox.fr>
----
- arch/arm/Kconfig          |    1 +
- arch/arm/net/bpf_jit_32.c |   44 ++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 45 insertions(+)
+This patch serie adds support for jitted seccomp BPF filters, with the
+required modifications to make it work on the ARM architecture.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index dedf02b..b3dce17 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -24,6 +24,7 @@ config ARM
- 	select HAVE_ARCH_SECCOMP_FILTER
- 	select HAVE_ARCH_TRACEHOOK
- 	select HAVE_BPF_JIT
-+	select HAVE_SECCOMP_FILTER_JIT
- 	select HAVE_C_RECORDMCOUNT
- 	select HAVE_DEBUG_KMEMLEAK
- 	select HAVE_DMA_API_DEBUG
-diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
-index 0ea29e0..5af21be 100644
---- a/arch/arm/net/bpf_jit_32.c
-+++ b/arch/arm/net/bpf_jit_32.c
-@@ -103,6 +103,13 @@ static u64 jit_get_skb_w(struct sk_buff *skb, unsigned offset)
- 	return (u64)err << 32 | ntohl(ret);
- }
- 
-+#ifdef CONFIG_SECCOMP_FILTER_JIT
-+static u64 jit_get_seccomp_w(struct sk_buff *skb, unsigned int offset)
-+{
-+	return seccomp_bpf_load(offset);
-+}
-+#endif
-+
- /*
-  * Wrapper that handles both OABI and EABI and assures Thumb2 interworking
-  * (where the assembly routines like __aeabi_uidiv could cause problems).
-@@ -548,6 +555,16 @@ load_common:
- 			emit_err_ret(ARM_COND_NE, ctx);
- 			emit(ARM_MOV_R(r_A, ARM_R0), ctx);
- 			break;
-+#ifdef CONFIG_SECCOMP_FILTER_JIT
-+		case BPF_S_ANC_SECCOMP_LD_W:
-+			ctx->seen |= SEEN_CALL;
-+			emit_mov_i(ARM_R3, (u32)jit_get_seccomp_w, ctx);
-+			emit_mov_i(ARM_R0, 0, ctx);
-+			emit_mov_i(ARM_R1, k, ctx);
-+			emit_blx_r(ARM_R3, ctx);
-+			emit(ARM_MOV_R(r_A, ARM_R0), ctx);
-+			break;
-+#endif
- 		case BPF_S_LD_W_IND:
- 			load_order = 2;
- 			goto load_ind;
-@@ -956,3 +973,30 @@ void bpf_jit_free(struct sk_filter *fp)
- 		schedule_work(work);
- 	}
- }
-+
-+#ifdef CONFIG_SECCOMP_FILTER_JIT
-+void seccomp_jit_compile(struct seccomp_filter *fp)
-+{
-+	struct jit_ctx ctx;
-+
-+	memset(&ctx, 0, sizeof(ctx));
-+	ctx.prog_len = fp->len;
-+	ctx.prog_insns = fp->insns;
-+
-+	__bpf_jit_compile(&ctx);
-+	if (ctx.target)
-+		fp->bpf_func = (void*)ctx.target;
-+}
-+
-+void seccomp_jit_free(struct seccomp_filter *fp)
-+{
-+	struct work_struct *work;
-+
-+	if (fp->bpf_func != sk_run_filter) {
-+		work = (struct work_struct *)fp->bpf_func;
-+
-+		INIT_WORK(work, bpf_jit_free_worker);
-+		schedule_work(work);
-+	}
-+}
-+#endif
+- The first patch in the serie adds the required boiler plate in the
+   core kernel seccomp code to invoke the JIT compilation/free code.
+
+- The second patch reworks the ARM BPF JIT code to make the generation
+   process less dependent on struct sk_filter.
+
+- The last patch actually implements the ARM part in the BPF jit code.
+
+Some benchmarks, on a 1.6Ghz 88f6282 CPU:
+
+Each system call is tested in two way (fast/slow):
+
+  - on the fast version, the tested system call is accepted immediately
+    after checking the architecture (5 BPF instructions).
+
+  - on the slow version, the tested system call is accepted after
+    previously checking for 85 syscall (90 instructions, including the
+    architecture check).
+
+The tested syscall is invoked in a loop 1000000 time, the reported
+time is the time spent in the loop in seconds.
+
+Without Seccomp JIT:
+
+Syscall		Time-Fast  Time-Slow
+--------------- ---------- ----------
+gettimeofday	0.389	   1.633
+getpid		0.406	   1.688
+getresuid	1.003	   2.266
+getcwd		1.342	   2.128
+
+With Seccomp JIT:
+
+Syscall		Time-Fast  Time-Slow
+--------------- ----------- ---------
+gettimeofday	0.348	    0.428
+getpid		0.365	    0.480
+getresuid	0.981	    1.060
+getcwd		1.237	    1.294
+
+For reference, the same code without any seccomp filter:
+
+Syscall		Time
+--------------- -----
+gettimeofday	0.119
+getpid		0.137
+getresuid	0.747
+getcwd		1.021
+
+The activation of the BPF JIT for seccomp is still controled with the
+/proc/sys/net/core/bpf_jit_enable sysctl knob.
+
+Those changes are based on the latest rmk-for-next branch.
+
+Regards,
+
 -- 
-1.7.10.4
+Nicolas Schichan
+Freebox SAS
