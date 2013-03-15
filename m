@@ -1,31 +1,30 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 15 Mar 2013 08:16:59 -0400 (EDT)
-Subject: [PATCH] isdn: hisax: netjet requires VIRT_TO_BUS
-In-Reply-To: <201303151015.00746.arnd@arndb.de>
-References: <1363298204-8014-4-git-send-email-arnd@arndb.de>
- <CAMuHMdVhjnX_hag5Y5VvDWVcjPK8tMM-qx-TQ2x=M88yTZQwYg@mail.gmail.com>
- <201303151015.00746.arnd@arndb.de>
-Message-ID: <20130315.081659.636423702994054939.davem@davemloft.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 15 Mar 2013 12:20:54 +0000
+Subject: [PATCH v3 03/11] clocksource: sp804: add device tree support
+In-Reply-To: <51408A71.9090501@gmail.com>
+References: <1363151142-32162-1-git-send-email-haojian.zhuang@linaro.org>
+ <1363151142-32162-4-git-send-email-haojian.zhuang@linaro.org>
+ <1363172730.3100.17.camel@hornet> <51408A71.9090501@gmail.com>
+Message-ID: <20130315122054.GI4977@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Fri, 15 Mar 2013 10:15:00 +0000
-
-> David Howells brought up the topic of endian checks recently, noting
-> that the way we define __BIG_ENDIAN and __LITTLE_ENDIAN in the kernel
-> is incompatible to how do it in user space, and not much better either.
+On Wed, Mar 13, 2013 at 09:17:21AM -0500, Rob Herring wrote:
+> How about:
 > 
-> A few architectures that are bi-endian (arc, arm, c6x, mips, sh) already
-> have CONFIG_CPU_IS_LITTLE_ENDIAN and CONFIG_CPU_IS_BIG_ENDIAN. I guess
-> it would be a good idea to provide these on all architectures.
+> 1 irq - TIMINT1
+> 2 irqs w/ same source # - TIMINTC
+> 2 irqs w/ different source # - TIMINT1 and TIMINT2
+> 
+> I'm not completely sure if Linux and the irq domain code handles the
+> same interrupt source repeated. It should because that is basically a
+> shared irq line.
 
-I do not want to see us add such a Kconfig dependency knob.
+I think you're missing something here.  Any particular platform will
+generally only wire either the common interrupt, or the individual
+interrupts.  Very few, if any, will wire both.
 
-Then the real tendency will exist to make new drivers little-endian
-only, refuse to fix endian-broken old drivers, etc.
-
-Which means that allmodconfig on my architecture will have build
-coverage on less code, which is really the only thing that matters
-for me.  I want all drivers that could be effected by my changes
-to be compile testable on as many platforms as possible.
+It's just like stuff such as MMCI and the UARTs.  They have a combined
+interrupt out, and individual interrupt outs.  However, they're all
+written for the combined interrupt only, because practically no one
+uses the individal interrupts.
