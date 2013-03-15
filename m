@@ -1,97 +1,89 @@
-From: bilhuang@nvidia.com (Bill Huang)
-Date: Fri, 15 Mar 2013 05:06:46 -0700
-Subject: [RFC 1/1] clk: Add notifier support in
- clk_prepare_enable/clk_disable_unprepare
-In-Reply-To: <CAPDyKFoBJpraMz8i1FmFqG7=Zsv0DTQ0PKVOQJ-+iEsKpb3Hdg@mail.gmail.com>
-References: <1363151317.3311.9.camel@bilhuang-vm1>
- <51400D9D.9060305@wwwdotorg.org>	<1363153204.3311.14.camel@bilhuang-vm1>
- <5140C12A.4060900@wwwdotorg.org>	<1363227311.3311.30.camel@bilhuang-vm1>
- <20130314092132.GE18519@tbergstrom-lnx.Nvidia.com>
- <1363253287.3311.32.camel@bilhuang-vm1>	<51420EBB.7080503@wwwdotorg.org>
- <1363310454.3311.44.camel@bilhuang-vm1>	<5142B027.4040403@wwwdotorg.org>
- <20130315093951.GV18519@tbergstrom-lnx.Nvidia.com>
- <CAPDyKFoBJpraMz8i1FmFqG7=Zsv0DTQ0PKVOQJ-+iEsKpb3Hdg@mail.gmail.com>
-Message-ID: <1363349206.5827.10.camel@bilhuang-vm1>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 15 Mar 2013 12:15:54 +0000
+Subject: [PATCH v2 05/14] ARM: integrator: use clocksource_of_init for
+ sp804
+In-Reply-To: <CACRpkdZjddrHgTu+fjYVOb0Pk+1VYUU=S7LU_O_vdNKYH_vjiw@mail.gmail.com>
+References: <1363108124-17484-1-git-send-email-haojian.zhuang@linaro.org>
+ <1363108124-17484-6-git-send-email-haojian.zhuang@linaro.org>
+ <513F7EBD.80207@gmail.com> <201303121933.47994.arnd@arndb.de>
+ <513F9597.8050000@gmail.com>
+ <CAD6h2NTNFZM4cgDmCJG+NrNbd27MdXGGsRCTpC1bJGeMAgcP-g@mail.gmail.com>
+ <CACRpkdbCJd-ag1gLrJqJZ1D6+E5eX2tNuuNAtiKgtuBsxmrpmA@mail.gmail.com>
+ <CAD6h2NRDJuGTTZ1B0iy__2SYYw7R18NRqQcwjsSvMJ3gA4E_WQ@mail.gmail.com>
+ <CACRpkdZjddrHgTu+fjYVOb0Pk+1VYUU=S7LU_O_vdNKYH_vjiw@mail.gmail.com>
+Message-ID: <20130315121554.GH4977@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-03-15 at 18:08 +0800, Ulf Hansson wrote:
-> On 15 March 2013 10:39, Peter De Schrijver <pdeschrijver@nvidia.com> wrote:
-> > On Fri, Mar 15, 2013 at 06:22:47AM +0100, Stephen Warren wrote:
-> >> On 03/14/2013 07:20 PM, Bill Huang wrote:
-> >> > On Fri, 2013-03-15 at 01:54 +0800, Stephen Warren wrote:
-> >> >> On 03/14/2013 03:28 AM, Bill Huang wrote:
-> >> >>> On Thu, 2013-03-14 at 17:21 +0800, Peter De Schrijver wrote:
-> >> >>>> On Thu, Mar 14, 2013 at 03:15:11AM +0100, Bill Huang wrote:
-> >> >>>>
-> >> >>>>> I don't think deferring will work either, considering the usage of DVFS,
-> >> >>>>> device voltage is tightly coupled with frequency, when clock rate is
-> >> >>>>> about to increase, we have to boost voltage first and we can lower the
-> >> >>>>> voltage after the clock rate has decreased. All the above sequence have
-> >> >>>>> to be guaranteed or you might crash, so deferring not only make thing
-> >> >>>>> complicated in controlling the order but also hurt performance.
-> >> >>>>
-> >> >>>> But we could use notifiers in clk_prepare/clk_unprepare to set the voltage no?
-> >> >>>> As clk_prepare/clk_unprepare have to be called before clk_enable or after
-> >> >>>> clk_disable, the voltage can be raised to a safe level, before the clock
-> >> >>>> becomes active.
-> >> >>>
-> >> >>> Thanks Peter, actually I'm just about to propose my v2 RFC which add
-> >> >>> notifier in clk_prepare/clk_unprepare.
-> >> >>
-> >> >> Can't clk_set_rate() be called while the clock is prepared, or even
-> >> >> enabled? I don't see how your proposal would work.
-> >> >
-> >> > I think it works with just a little sacrifice on saving more power but
-> >> > that's related minor. Taking clk_prepare as an indicator on that clock
-> >> > will be enabled later, so we can raise the voltage to a safe level
-> >> > (according to the current rate or maybe default rate when clk_prepare is
-> >> > called, some time late when clk_set_rate() is called we can adjust again
-> >> > according to the requested rate change)
-> >>
-> >> Is clk_set_rate() only legal to call in non-atomic contexts then? The
-> >> header file doesn't say, although I guess since many other functions
-> >> explicitly say they can't, then by omission it can...
-> >
-> > Yes. Only clk_enable() and clk_disable() can be called in an atomic context.
-> >
-> > Cheers,
-> >
-> > Peter.
-> >
-> > _______________________________________________
-> > linaro-dev mailing list
-> > linaro-dev at lists.linaro.org
-> > http://lists.linaro.org/mailman/listinfo/linaro-dev
+On Wed, Mar 13, 2013 at 10:00:14AM +0100, Linus Walleij wrote:
+> Then the Integrator/AP timer has this code in the
+> integrator_clockevent_init() function:
 > 
-> Just wanted to add my reflection on this topic;
+> 	clkevt_base = base;
+> 	/* Calculate and program a divisor */
+> 	if (rate > 0x100000 * HZ) {
+> 		rate /= 256;
+> 		ctrl |= TIMER_CTRL_DIV256;
+> 	} else if (rate > 0x10000 * HZ) {
+> 		rate /= 16;
+> 		ctrl |= TIMER_CTRL_DIV16;
+> 	}
 > 
-> Some prerequisites; I think am in favor of using the clk API to
-> trigger DVFS changes and then I agree on that clk_prepare|unprepare
-> needs to be possible to track from a DVFS perspective. clk_set_rate is
-> not enough.
+> It appears the SP804 has no code to handle this
+> divisor/prescaler at all. Which means that you regress
+> the Integrator/AP again.
 > 
-> So if we decide to do the above (using the clk API to trigger DVFS
-> changes), I believe we should discuss two possible solutions;
-> - clk notifiers or..
-> - dvfs clock type.
+> It appears (from arm_timer.h) that the SP804 actually
+> has this prescaler, but then first make a separate patch
+> to make the SP804 driver use that divisor (like above) so
+> you don't degrade the quality of the AP timer. The prescaler
+> make it possible to let the system sleep for longer times
+> when using NO_HZ so it's *pretty* important (and it will
+> increas the quality of all SP804-based machines as well).
 > 
-> I am trying to make up my mind of what I think is the best solution.
-> Have you considered "dvfs clock type"?
-> I put some comments about this for "[PATCH 2/5] clk: notifier handler
-> for dynamic voltage scaling" recently as well.
+> As you surely understand, since the counter on the
+> Integrator/AP is only 16 bit this is very important, since
+> we don't want it to wake up too often.
 > 
-> What could the advantages/disadvantages be between the two options?
+> Then the clocksource init function has this:
+> 
+> 	if (rate >= 1500000) {
+> 		rate /= 16;
+> 		ctrl |= TIMER_CTRL_DIV16;
+> 	}
+> 
+> Here I'm more uncertain. As I know from extensive
+> discussions with John and Thomas, there are many many
+> factors to decide the clocksource. Basically the above lines
+> limits the precision of the clocksource in exchange for a
+> longer time until wrap-around. Again, the 16bit nature of the
+> Integrator/AP timer is a factor here.
 
-I personally prefer clk notifiers since that's easy and all the existing
-device drivers don't need to be modified, a new clock or API might be
-more thoroughly considered (and hence maybe more graceful) but that
-means we need more time to cook and many drivers need to plug into that
-API when it comes out, a lot of test/verification or maybe chaos
-follows, I'm not sure will that be a little overkill.
+Integrator/AP selects the prescaler based on the fact that it is only a
+16-bit counter, which has to be clocked at a rate which gives us our
+desired periodic tick interval.
 
-I'm not against designing a more robust API, I'm just suggesting before
-we have that defined we should at least let clk notifiers work.
-> 
-> Kind regards
-> Ulf Hansson
+SP804 does not do this because, being a 32-bit counter, it is completely
+unnecessary to use the prescaler - and using the prescaler will result
+in loss of fine-grained timing accuracy.  Making use of the prescaler
+there is absurd - the timer will run to 4000 odd seconds before wrapping
+with a prescaler of 1.
+
+You end up needing 64-bit arithmetic if you try to apply the Integrator/AP
+logic to SP804 - it becomes this:
+
+ 	if (rate > 0x1000000000 * HZ) {
+ 		rate /= 256;
+ 		ctrl |= TIMER_CTRL_DIV256;
+ 	} else if (rate > 0x100000000 * HZ) {
+ 		rate /= 16;
+ 		ctrl |= TIMER_CTRL_DIV16;
+ 	}
+
+or more precisely:
+	if (rate > HZ * 0x100 * ((unsigned long long)wrap + 1)) {
+...
+ 	} else if (rate > HZ * 0x10 * ((unsigned long long)wrap + 1)) {
+...
+
+You need that wrap value anyway for clockevents_config_and_register.
