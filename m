@@ -1,69 +1,33 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Fri, 15 Mar 2013 11:26:51 +0100
-Subject: [PATCH v3 0/7] ARM: dts: omap: Add dts data for USB
-In-Reply-To: <514042BF.2090207@ti.com>
-References: <1362663320-23799-1-git-send-email-kishon@ti.com>
- <514042BF.2090207@ti.com>
-Message-ID: <5142F76B.2010907@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 15 Mar 2013 10:28:03 +0000
+Subject: [GIT PULL][for 3.9] pull request from fix branch in pxa git tree
+In-Reply-To: <CAN1soZzTVtg0HJFDiOFMfMngqz0yNs6Le+hvuNUxQ=Ka9dUaHQ@mail.gmail.com>
+References: <CAN1soZzTVtg0HJFDiOFMfMngqz0yNs6Le+hvuNUxQ=Ka9dUaHQ@mail.gmail.com>
+Message-ID: <201303151028.03796.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
-
-On 03/13/2013 10:11 AM, kishon wrote:
-> Benoit,
+On Friday 15 March 2013, Haojian Zhuang wrote:
+> are available in the git repository at:
 > 
-> Will you be queuing this patch series?
-
-I'm reviewing them right now.
-
-Regards,
-Benoit
-
+>   git://github.com/hzhuang1/linux.git armsoc/fix
 > 
-> Thanks
-> Kishon
+
+Pulled into fixes branch.
+
+> for you to fetch changes up to e71dc5f787f3908b8b8158103fc7d74a78a22cd1:
 > 
-> On Thursday 07 March 2013 07:05 PM, Kishon Vijay Abraham I wrote:
->> Hi Benoit,
->>
->> Here are the dt data patches to get usb device functional in OMAP
->> platforms.
->>
->> All the patches deal with modifying arch/arm/boot except one which
->> modifies
->> Documentation/../usb/omap-usb.txt
->>
->> Changes from v2:
->> * squashed the dt data for dwc3-omap with dwc3 core into a single patch.
->>
->> Changes from v1:
->> Patch *ARM: dts: omap: Add usb_otg and glue data* has some properties
->> with
->> names that has "_". It's replaced with a "-" here.
->>
->> This patch is developed on Linux 3.9-rc1.
->>
->> Kishon Vijay Abraham I (7):
->>    ARM: dts: omap: Add omap control usb data
->>    ARM: dts: omap: Add omap-usb2 dt data
->>    ARM: dts: omap: Add usb_otg and glue data
->>    ARM: dts: omap5: Add omap control usb data
->>    ARM: dts: omap5: Add ocp2scp data
->>    ARM: dts: omap5: Add omap-usb3 and omap-usb2 dt data
->>    ARM: dts: omap5: add dwc3 omap and dwc3 core dt data
->>
->>   Documentation/devicetree/bindings/usb/omap-usb.txt |    1 +
->>   arch/arm/boot/dts/omap3-beagle-xm.dts              |    6 +++
->>   arch/arm/boot/dts/omap3-evm.dts                    |    6 +++
->>   arch/arm/boot/dts/omap3-overo.dtsi                 |    6 +++
->>   arch/arm/boot/dts/omap3.dtsi                       |   12 +++++
->>   arch/arm/boot/dts/omap4-panda.dts                  |    6 +++
->>   arch/arm/boot/dts/omap4-sdp.dts                    |    6 +++
->>   arch/arm/boot/dts/omap4.dtsi                       |   26 +++++++++++
->>   arch/arm/boot/dts/omap5.dtsi                       |   48
->> ++++++++++++++++++++
->>   arch/arm/boot/dts/twl4030.dtsi                     |    2 +-
->>   10 files changed, 118 insertions(+), 1 deletion(-)
->>
+>   ARM: mmp: add platform_device head file in gplugd (2013-03-15 16:27:53 +0800)
 > 
+> ----------------------------------------------------------------
+> Haojian Zhuang (1):
+>       ARM: mmp: add platform_device head file in gplugd
+
+I did not see that problem with my usual defconfig builds. Can you submit
+a patch for 3.10 that will enable all mmp boards in pxa168_defconfig
+or pxa910_defconfig?
+
+In particular, the lack of the DT based configurations in the defconfig
+files should be fixed.
+
+	Arnd
