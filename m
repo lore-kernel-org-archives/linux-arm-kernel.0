@@ -1,31 +1,73 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 Mar 2013 22:07:34 +0000
-Subject: [GIT PULL][for 3.10] pull request from hi3xxx branch in pxa git
- tree
-In-Reply-To: <CAN1soZwU34C8K1eShDU4hY5-39AWEg2Sb=mBopMHX9+zg6KVqw@mail.gmail.com>
-References: <CAN1soZwU34C8K1eShDU4hY5-39AWEg2Sb=mBopMHX9+zg6KVqw@mail.gmail.com>
-Message-ID: <201303152207.35091.arnd@arndb.de>
+Date: Fri, 15 Mar 2013 22:13:30 +0000
+Subject: [GIT PULL] at91: framebuffer enhancements for 3.10
+In-Reply-To: <5142F3DE.1060209@atmel.com>
+References: <5142F3DE.1060209@atmel.com>
+Message-ID: <201303152213.31100.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 March 2013, Haojian Zhuang wrote:
-> Please help to pull armsoc/hi3xxx branch from pxa git tree. Since
-> these patches are
-> relied on Rob's sp804 implementation. I submitted all of them into my
-> git tree too.
+On Friday 15 March 2013, Nicolas Ferre wrote:
+> Arnd, Olof,
+> 
+> Following our conversation about these framebuffer patches for
+> Atmel LCD driver, here are the remaining three patches that can be
+> pushed for 3.10. As suggested by Arnd, I have kept them on top of last
+> commit concerning this topic that have already been merged in arm-soc 3.9
+> fixes branch.
+> Thanks a lot for taking care of these modifications.
 
-Hmm, I believe the sp804 patches are still under discussion, or they are
-getting merged through the clocksource tree.
+I think it's reasonable to take the patches through the arm-soc tree here,
+because you did not manage to get any feedback on them from Florian
+and he also didn't pull them into his framebuffer tree.
 
-Either way, I don't have the dependencies in the arm-soc tree yet, I only
-have
+However, if you are bypassing a maintainer, you should not do that silently,
+and you should note that I don't have any intention of taking all framebuffer
+patches in the future.
 
-Rob Herring (4):
-      clocksource: add empty version of clocksource_of_init
-      clocksource: pass DT node pointer to init functions
-      clocksource: tegra20: use the device_node pointer passed to init
-      ARM: smp_twd: convert to use CLKSRC_OF init
+I've taken Florian and the linux-fbdev list on Cc. If there are any objections
+to me taking these through the arm-soc tree, please let us know and we can
+revert them to find a better way.
 
-which Rob submitted earlier. Rob, what is your plan for the sp804 patches?
+I have applied them to the next/drivers branch in the arm-soc tree now.
 
 	Arnd
+
+
+> The following changes since commit 67cf9c0a00bd88443adb7d6c3efa8b18d03f97c5:
+> 
+>   ARM: at91: fix LCD-wiring mode (2013-03-13 11:05:04 +0100)
+> 
+> are available in the git repository at:
+> 
+>   git://github.com/at91linux/linux-at91.git tags/at91-driversLCD
+> 
+> for you to fetch changes up to bbd44f6bd9d1aa735b180b29b5719d63a8e87b55:
+> 
+>   ARM: at91/avr32/atmel_lcdfb: add platform device-id table (2013-03-13 11:05:12 +0100)
+> 
+> ----------------------------------------------------------------
+> Some Atmel framebuffer driver enhancements with modification
+> of configuration data in ARM/AT91 and AVR32/AP7 trees.
+> A merge of these modifications seems easier through arm-soc
+> git tree nowadays.
+> 
+> ----------------------------------------------------------------
+> Johan Hovold (3):
+>       ARM: at91/avr32/atmel_lcdfb: add bus-clock entry
+>       atmel_lcdfb: move lcdcon2 register access to compute_hozval
+>       ARM: at91/avr32/atmel_lcdfb: add platform device-id table
+> 
+>  arch/arm/mach-at91/at91sam9261.c         |   2 +
+>  arch/arm/mach-at91/at91sam9261_devices.c |   6 +-
+>  arch/arm/mach-at91/at91sam9263.c         |   1 +
+>  arch/arm/mach-at91/at91sam9263_devices.c |   2 +-
+>  arch/arm/mach-at91/at91sam9g45.c         |   2 +
+>  arch/arm/mach-at91/at91sam9g45_devices.c |   6 +-
+>  arch/arm/mach-at91/at91sam9rl.c          |   1 +
+>  arch/arm/mach-at91/at91sam9rl_devices.c  |   2 +-
+>  arch/avr32/mach-at32ap/at32ap700x.c      |   6 +-
+>  drivers/video/atmel_lcdfb.c              | 120 +++++++++++++++++++++++++++--------
+>  include/video/atmel_lcdc.h               |   4 +-
+>  11 files changed, 117 insertions(+), 35 deletions(-)
+> 
