@@ -1,46 +1,33 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 15 Mar 2013 21:49:59 +0100
-Subject: [PATCH 0/5] ARM: sunxi: Add support for A10 Ethernet controller
-Message-ID: <1363380605-6577-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Fri, 15 Mar 2013 21:50:01 +0100
+Subject: [PATCH 2/5] ARM: sunxi: Add wemac to sun4i dtsi
+In-Reply-To: <1363380605-6577-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1363380605-6577-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1363380605-6577-3-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/boot/dts/sun4i-a10.dtsi |    7 +++++++
+ 1 file changed, 7 insertions(+)
 
-The Allwinner A10 SoC has an ethernet that is said to be coming from
-Davicom embedded in it. This IP has no public documentation, so exact
-details are quite sparse, and this code come from refactored allwinner
-code.
-
-Since we don't have any clock support yet for the Allwinner SoCs, we
-rely on the bootloader to enable the wemac clock.
-
-Thanks,
-Maxime
-
-Maxime Ripard (3):
-  ARM: sunxi: Add wemac to sun4i dtsi
-  ARM: sun4i: Add muxing options for the ethernet controller
-  ARM: hackberry: dt: Add Ethernet controller to the Hackberry device
-    tree
-
-Stefan Roese (2):
-  net: Add davicom wemac ethernet driver found on Allwinner A10 SoC's
-  ARM: cubieboard: Enable ethernet (WEMAC) support in dts
-
- .../devicetree/bindings/net/davicom-wemac.txt      |   20 +
- arch/arm/boot/dts/sun4i-a10-cubieboard.dts         |    6 +
- arch/arm/boot/dts/sun4i-a10-hackberry.dts          |   19 +
- arch/arm/boot/dts/sun4i-a10.dtsi                   |   18 +
- drivers/net/ethernet/Makefile                      |    2 +-
- drivers/net/ethernet/davicom/Kconfig               |   31 +
- drivers/net/ethernet/davicom/Makefile              |    1 +
- drivers/net/ethernet/davicom/wemac.c               | 1033 ++++++++++++++++++++
- drivers/net/ethernet/davicom/wemac.h               |  130 +++
- 9 files changed, 1259 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/net/davicom-wemac.txt
- create mode 100644 drivers/net/ethernet/davicom/wemac.c
- create mode 100644 drivers/net/ethernet/davicom/wemac.h
-
+diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+index 03d2b53..f3c2158 100644
+--- a/arch/arm/boot/dts/sun4i-a10.dtsi
++++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+@@ -47,5 +47,12 @@
+ 				allwinner,pull = <0>;
+ 			};
+ 		};
++
++		wemac: ethernet at 01c0b000 {
++			compatible = "davicom,wemac";
++			reg = <0x01c0b000 0x1000>;
++			interrupts = <55>;
++			status = "disabled";
++		};
+ 	};
+ };
 -- 
 1.7.10.4
