@@ -1,64 +1,63 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Fri, 15 Mar 2013 12:25:56 -0400 (EDT)
-Subject: [RFC] USB: EHCI: hot-fix OMAP and Orion multiplatform config
-In-Reply-To: <1363362247-9542-1-git-send-email-arnd@arndb.de>
-Message-ID: <Pine.LNX.4.44L0.1303151220500.1414-100000@iolanthe.rowland.org>
+From: gerlando.falauto@keymile.com (Gerlando Falauto)
+Date: Fri, 15 Mar 2013 17:26:42 +0100
+Subject: [PATCH] genirq: allow an alternative setup for the mask cache
+In-Reply-To: <20130314174559.GO21620@kw.sim.vm.gnt>
+References: <1363277430-21325-1-git-send-email-holger.brunck@keymile.com>
+ <20130314174559.GO21620@kw.sim.vm.gnt>
+Message-ID: <51434BC2.70105@keymile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 15 Mar 2013, Arnd Bergmann wrote:
+Hi Simon,
 
-> A number of ARM platforms were changed in linux-3.9 so they can be enabled
-> at a single kernel configuration. Unfortunately, the necessary changes for
-> the EHCI driver were not ready in time and the first attempt to split out
-> the EHCI bus glues into separate modules had to get reverted before the
-> merge window.
-> 
-> This means we are still stuck with a situation where enabling any
-> combination of more than one of the OMAP, MVEBU/Orion and VT8500/WM8x50
-> platforms at the same time leaves us with an EHCI driver that does
-> not work properly and spits out this build warning:
-> 
-> ehci-hcd.c:1277:0: warning: "PLATFORM_DRIVER" redefined [enabled by default]
-> ehci-hcd.c:1257:0: note: this is the location of the previous definition
-> ehci-hcd.c:1297:0: warning: "PLATFORM_DRIVER" redefined [enabled by default]
-> ehci-hcd.c:1277:0: note: this is the location of the previous definition
-> In file included from ehci-hcd.c:1256:0:
-> ehci-omap.c:311:31: warning: 'ehci_hcd_omap_driver' defined but not used [-Wunused-variable]
-> In file included from ehci-hcd.c:1276:0:
-> ehci-orion.c:334:31: warning: 'ehci_orion_driver' defined but not used [-Wunused-variable]
-> ehci-hcd.c:1277:0: warning: "PLATFORM_DRIVER" redefined [enabled by default]
-> ehci-hcd.c:1257:0: note: this is the location of the previous definition
-> ehci-hcd.c:1297:0: warning: "PLATFORM_DRIVER" redefined [enabled by default]
-> ehci-hcd.c:1277:0: note: this is the location of the previous definition
+On 03/14/2013 06:45 PM, Simon Guinot wrote:
+> On Thu, Mar 14, 2013 at 05:10:30PM +0100, Holger Brunck wrote:
+>> @@ -243,9 +243,12 @@ void irq_setup_generic_chip(struct irq_chip_generic *gc, u32 msk,
+>>   	list_add_tail(&gc->list, &gc_list);
+>>   	raw_spin_unlock(&gc_lock);
+>>
+>> +	/* Setup pointer to mask_cache */
+>> +	gc->pmask_cache = &gc->mask_cache;
+>
+> You need a flag here to choose between gc->mask_cache and
+> ct->mask_cache.
 
-Roger just submitted my patch to split out ehci-omap.
+I'm sorry, I don't understand...
+Shouldn't pmask_cache be a pointer within ct, so that the pointers for 
+all instances could either be the same (in case of a single register) or 
+all different (in case of multiple registers)?
+I already have a patch which seems to work, but I'm afraid I've come to 
+YAM (Yet Another Misunderstanding (R) ) in regards to Thomas' suggestion.
 
-> This is the simplest patch I could come up with that will restore some
-> sanity in multiplatform configuration and allow us to build an ARM
-> allyesconfig kernel. Disallowing the broken configuration in Kconfig
-> would actually end up in a larger patch and more regression potential
-> than this one.
-> 
-> We had a similar situation in 3.8 with a conflict between Orion and MXC,
-> and Alan Stern objected to the simple hack back then and instead provided
-> a better full conversion of the MXC backend in patch dba63b2f7. A proper
-> patch for OMAP was submitted in January but also did not make it into 3.9,
-> see https://patchwork.kernel.org/patch/2055131.
-> 
-> I expect that for 3.10 we will be able to do this correctly and
-> turn all ARM bus glues into separate modules, ripping out the
-> code that this patch changes.
+>> +
+>>   	/* Init mask cache ? */
+>>   	if (flags & IRQ_GC_INIT_MASK_CACHE)
+>> -		gc->mask_cache = irq_reg_readl(gc->reg_base + ct->regs.mask);
+>> +		*gc->pmask_cache = irq_reg_readl(gc->reg_base + ct->regs.mask);
+>>
+>>   	for (i = gc->irq_base; msk; msk >>= 1, i++) {
+>>   		if (!(msk & 0x01))
+>> @@ -275,6 +278,8 @@ int irq_setup_alt_chip(struct irq_data *d, unsigned int type)
+>>   	struct irq_chip_type *ct = gc->chip_types;
+>>   	unsigned int i;
+>>
+>> +	/* Setup pointer to the mask_cache */
+>> +	gc->pmask_cache = &ct->mask_cache;
+>
+> You also need to check the flag here, to know if you need to switch
+> pmask_cache on ct->mask_cache.
+>
+>>   	for (i = 0; i < gc->num_ct; i++, ct++) {
+>>   		if (ct->type & type) {
+>>   			d->chip = &ct->chip;
+>
+> Additionally, you need to update drivers/gpio/gpio-mvebu.c which use
+> gc->mask_cache. The gpio-mvebu driver is also impacted by the bug.
 
-What happened to Manjunath Goudar?  I haven't heard from him since his 
-first round of submissions a month ago.  Fixing them up shouldn't be 
-too much work.
+I understand gpio-mvebu.c is a new driver for all three variants of 
+Marvell Chips (Orion, MV78200, ArmadaXP).
+Which ones are affected by this bug (i.e. have separate mask registers)? 
+Definitely Orion, but what about the other two?
 
-As far as I can tell, your scheme should be okay for now.  It would be 
-good to hear from other people, though.
-
-I'd guess that the only reason it wasn't done this way from the
-beginning is that nobody considered the possibility of building a
-multi-platform driver.
-
-Alan Stern
+Thanks a lot,
+Gerlando
