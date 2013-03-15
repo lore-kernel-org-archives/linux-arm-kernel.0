@@ -1,91 +1,87 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 15 Mar 2013 10:21:04 -0500
-Subject: [PATCH V3 06/18] ARM: OMAP2+: Convert NAND to use
+Date: Fri, 15 Mar 2013 10:21:05 -0500
+Subject: [PATCH V3 07/18] ARM: OMAP2+: Convert SMC91x to use
  gpmc_cs_program_settings()
 In-Reply-To: <1363360876-13617-1-git-send-email-jon-hunter@ti.com>
 References: <1363360876-13617-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <1363360876-13617-7-git-send-email-jon-hunter@ti.com>
+Message-ID: <1363360876-13617-8-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert the OMAP2+ NAND code to use the gpmc_cs_program_settings()
+Convert the OMAP2+ SMC91x code to use the gpmc_cs_program_settings()
 function for configuring the various GPMC options instead of directly
 programming the CONFIG1 register.
 
-This moves the configuration of some GPMC options outside the
-nand_gpmc_retime() because these options should only need to be set once
-regardless of whether the gpmc timing is changing dynamically at runtime.
-The programming of where the wait-pin is also moved slightly, but this
-will not have any impact to existing devices as no boards are currently
-setting the dev_ready variable.
+Move configuration of the GPMC settings outside retime function and
+this does not need to be done if the timings are changed dynamically
+at runtime.
 
 Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 ---
- arch/arm/mach-omap2/gpmc-nand.c |   35 +++++++++++++++++++++++------------
- 1 file changed, 23 insertions(+), 12 deletions(-)
+ arch/arm/mach-omap2/gpmc-smc91x.c |   30 +++++++++++++++++-------------
+ 1 file changed, 17 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/gpmc-nand.c b/arch/arm/mach-omap2/gpmc-nand.c
-index e50e438..75feb95 100644
---- a/arch/arm/mach-omap2/gpmc-nand.c
-+++ b/arch/arm/mach-omap2/gpmc-nand.c
-@@ -74,14 +74,6 @@ static int omap2_nand_gpmc_retime(
- 	t.cs_wr_off = gpmc_t->cs_wr_off;
- 	t.wr_cycle = gpmc_t->wr_cycle;
+diff --git a/arch/arm/mach-omap2/gpmc-smc91x.c b/arch/arm/mach-omap2/gpmc-smc91x.c
+index 4b78338..61a0635 100644
+--- a/arch/arm/mach-omap2/gpmc-smc91x.c
++++ b/arch/arm/mach-omap2/gpmc-smc91x.c
+@@ -49,6 +49,10 @@ static struct platform_device gpmc_smc91x_device = {
+ 	.resource	= gpmc_smc91x_resources,
+ };
  
--	/* Configure GPMC */
--	if (gpmc_nand_data->devsize == NAND_BUSWIDTH_16)
--		gpmc_cs_configure(gpmc_nand_data->cs, GPMC_CONFIG_DEV_SIZE, 1);
--	else
--		gpmc_cs_configure(gpmc_nand_data->cs, GPMC_CONFIG_DEV_SIZE, 0);
--	gpmc_cs_configure(gpmc_nand_data->cs,
--			GPMC_CONFIG_DEV_TYPE, GPMC_DEVICETYPE_NAND);
--	gpmc_cs_configure(gpmc_nand_data->cs, GPMC_CONFIG_WP, 0);
- 	err = gpmc_cs_set_timings(gpmc_nand_data->cs, &t);
- 	if (err)
- 		return err;
-@@ -115,8 +107,11 @@ int gpmc_nand_init(struct omap_nand_platform_data *gpmc_nand_data,
- 		   struct gpmc_timings *gpmc_t)
- {
- 	int err	= 0;
-+	struct gpmc_settings s;
- 	struct device *dev = &gpmc_nand_device.dev;
++static struct gpmc_settings smc91x_settings = {
++	.device_width = GPMC_DEVWIDTH_16BIT,
++};
++
+ /*
+  * Set the gpmc timings for smc91c96. The timings are taken
+  * from the data sheet available at:
+@@ -67,18 +71,6 @@ static int smc91c96_gpmc_retime(void)
+ 	const int t7 = 5;	/* Figure 12.4 write */
+ 	const int t8 = 5;	/* Figure 12.4 write */
+ 	const int t20 = 185;	/* Figure 12.2 read and 12.4 write */
+-	u32 l;
+-
+-	l = GPMC_CONFIG1_DEVICESIZE_16;
+-	if (gpmc_cfg->flags & GPMC_MUX_ADD_DATA)
+-		l |= GPMC_CONFIG1_MUXADDDATA;
+-	if (gpmc_cfg->flags & GPMC_READ_MON)
+-		l |= GPMC_CONFIG1_WAIT_READ_MON;
+-	if (gpmc_cfg->flags & GPMC_WRITE_MON)
+-		l |= GPMC_CONFIG1_WAIT_WRITE_MON;
+-	if (gpmc_cfg->wait_pin)
+-		l |= GPMC_CONFIG1_WAIT_PIN_SEL(gpmc_cfg->wait_pin);
+-	gpmc_cs_write_reg(gpmc_cfg->cs, GPMC_CS_CONFIG1, l);
  
-+	memset(&s, 0, sizeof(struct gpmc_settings));
-+
- 	gpmc_nand_device.dev.platform_data = gpmc_nand_data;
+ 	/*
+ 	 * FIXME: Calculate the address and data bus muxed timings.
+@@ -104,7 +96,7 @@ static int smc91c96_gpmc_retime(void)
+ 	dev_t.t_cez_w = t4_w * 1000;
+ 	dev_t.t_wr_cycle = (t20 - t3) * 1000;
  
- 	err = gpmc_cs_request(gpmc_nand_data->cs, NAND_IO_SIZE,
-@@ -141,11 +136,27 @@ int gpmc_nand_init(struct omap_nand_platform_data *gpmc_nand_data,
- 			dev_err(dev, "Unable to set gpmc timings: %d\n", err);
- 			return err;
- 		}
--	}
+-	gpmc_calc_timings(&t, NULL, &dev_t);
++	gpmc_calc_timings(&t, &smc91x_settings, &dev_t);
  
--	/* Enable RD PIN Monitoring Reg */
--	if (gpmc_nand_data->dev_ready) {
--		gpmc_cs_configure(gpmc_nand_data->cs, GPMC_CONFIG_RDY_BSY, 1);
-+		s.device_nand = true;
-+
-+		/* Enable RD PIN Monitoring Reg */
-+		if (gpmc_nand_data->dev_ready) {
-+			s.wait_on_read = true;
-+			s.wait_on_write = true;
-+		}
-+
-+		if (gpmc_nand_data->devsize == NAND_BUSWIDTH_16)
-+			s.device_width = GPMC_DEVWIDTH_16BIT;
-+		else
-+			s.device_width = GPMC_DEVWIDTH_8BIT;
-+
-+		err = gpmc_cs_program_settings(gpmc_nand_data->cs, &s);
-+		if (err < 0)
-+			goto out_free_cs;
-+
-+		err = gpmc_cs_configure(gpmc_nand_data->cs, GPMC_CONFIG_WP, 0);
-+		if (err < 0)
-+			goto out_free_cs;
- 	}
+ 	return gpmc_cs_set_timings(gpmc_cfg->cs, &t);
+ }
+@@ -133,6 +125,18 @@ void __init gpmc_smc91x_init(struct omap_smc91x_platform_data *board_data)
+ 	gpmc_smc91x_resources[0].end = cs_mem_base + 0x30f;
+ 	gpmc_smc91x_resources[1].flags |= (gpmc_cfg->flags & IRQF_TRIGGER_MASK);
  
- 	gpmc_update_nand_reg(&gpmc_nand_data->reg, gpmc_nand_data->cs);
++	if (gpmc_cfg->flags & GPMC_MUX_ADD_DATA)
++		smc91x_settings.mux_add_data = GPMC_MUX_AD;
++	if (gpmc_cfg->flags & GPMC_READ_MON)
++		smc91x_settings.wait_on_read = true;
++	if (gpmc_cfg->flags & GPMC_WRITE_MON)
++		smc91x_settings.wait_on_write = true;
++	if (gpmc_cfg->wait_pin)
++		smc91x_settings.wait_pin = gpmc_cfg->wait_pin;
++	ret = gpmc_cs_program_settings(gpmc_cfg->cs, &smc91x_settings);
++	if (ret < 0)
++		goto free1;
++
+ 	if (gpmc_cfg->retime) {
+ 		ret = gpmc_cfg->retime();
+ 		if (ret != 0)
 -- 
 1.7.10.4
