@@ -1,45 +1,50 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 15 Mar 2013 14:57:45 +0100
-Subject: [GIT PULL] i.MX fixes for -rc
-Message-ID: <20130315135745.GF1906@pengutronix.de>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Fri, 15 Mar 2013 08:57:33 -0500
+Subject: [PATCH V2 0/8] ARM: dts: Various OMAP2+ device-tree updates
+Message-ID: <1363355861-11773-1-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+Various OMAP device-tree updates for PMU, DMA, GPIO, GPMC and boards.
 
-Please pull the following i.MX fixes for -rc.
+The DMA, PMU and OMAP3430 SDP board changes have been sent before
+individually but re-sending here as a complete series for v3.10.
 
-Thanks
- Sascha
+This is based upon Benoit's for_3.10/dts branch [1]. Branch available
+here [2].
 
-The following changes since commit f6161aa153581da4a3867a2d1a7caf4be19b6ec9:
+V2 changes:
+- Rebased on Benoit's for_3.10/dts branch
+- Squashed patches adding support for OMAP3430 SDP board and patch
+  to add flash support for OMAP3430 SDP board.
 
-  Linux 3.9-rc2 (2013-03-10 16:54:19 -0700)
+[1] http://git.kernel.org/cgit/linux/kernel/git/bcousson/linux-omap-dt.git/log/?h=for_3.10/dts
+[2] git://github.com/jonhunter/linux.git omap-dt-for-v3.10
 
-are available in the git repository at:
+Jon Hunter (8):
+  ARM: OMAP2+: Prepare for device-tree PMU support
+  ARM: dts: OMAP2+: Add PMU nodes
+  ARM: dts: OMAP2+: Add SDMA controller bindings and nodes
+  ARM: dts: Add GPMC node for OMAP2, OMAP4 and OMAP5
+  ARM: dts: Add OMAP2 gpio bindings
+  ARM: dts: OMAP3+: Correct gpio #interrupts-cells property
+  ARM: dts: OMAP3: Add reg and interrupt properties for gpio
+  ARM: dts: OMAP3: Add support for OMAP3430 SDP board
 
-  git://git.pengutronix.de/git/imx/linux-2.6.git tags/arm-imx-fixes-for-3.9-rc
+ arch/arm/boot/dts/Makefile           |    1 +
+ arch/arm/boot/dts/omap2.dtsi         |   17 ++++
+ arch/arm/boot/dts/omap2420.dtsi      |   55 +++++++++++++
+ arch/arm/boot/dts/omap2430.dtsi      |   66 ++++++++++++++++
+ arch/arm/boot/dts/omap3.dtsi         |   70 +++++++++++++++--
+ arch/arm/boot/dts/omap3430-sdp.dts   |  141 ++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/omap4-panda-es.dts |    2 +
+ arch/arm/boot/dts/omap4.dtsi         |   64 +++++++++++++--
+ arch/arm/boot/dts/omap4460.dtsi      |   18 +++++
+ arch/arm/boot/dts/omap5.dtsi         |   68 ++++++++++++++--
+ arch/arm/mach-omap2/pmu.c            |   14 +++-
+ 11 files changed, 493 insertions(+), 23 deletions(-)
+ create mode 100644 arch/arm/boot/dts/omap3430-sdp.dts
+ create mode 100644 arch/arm/boot/dts/omap4460.dtsi
 
-for you to fetch changes up to 5dc2eb7da1e387e31ce54f54af580c6a6f512ca6:
-
-  ARM: i.MX35: enable MAX clock (2013-03-15 14:52:54 +0100)
-
-----------------------------------------------------------------
-Two small ARM i.MX fixes for v3.9-rc
-
-- Fix i.MX25 DT compilation
-- Enable MAX clk on i.MX35
-
-----------------------------------------------------------------
-Sascha Hauer (2):
-      ARM: i.MX25: Fix DT compilation
-      ARM: i.MX35: enable MAX clock
-
- arch/arm/mach-imx/clk-imx35.c | 1 +
- arch/arm/mach-imx/imx25-dt.c  | 5 +++++
- 2 files changed, 6 insertions(+)
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.10.4
