@@ -1,44 +1,41 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 15 Mar 2013 09:24:11 -0500
-Subject: [PATCH 8/8] cpufreq: omap: remove omap-cpufreq
-In-Reply-To: <CAOh2x=kCWHL-e9wZxgE97BuNpj0uu67t6SwqghBkyZKL5hugDg@mail.gmail.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Fri, 15 Mar 2013 09:26:28 -0500
+Subject: [PATCH 2/8] ARM: dts: OMAP36xx: move CPU OPP tables to device tree
+In-Reply-To: <20130315135655.GA2939@kahuna>
 References: <1363294695-658-1-git-send-email-nm@ti.com>
- <1363294695-658-9-git-send-email-nm@ti.com>
- <CAOh2x=kCWHL-e9wZxgE97BuNpj0uu67t6SwqghBkyZKL5hugDg@mail.gmail.com>
-Message-ID: <CAGo_u6obQhDyKo=f+Gn37epSf9+QgxqxdR_qQnz-YLUJRS5p1Q@mail.gmail.com>
+ <1363294695-658-3-git-send-email-nm@ti.com> <514244B4.9050808@ti.com>
+ <20130315135655.GA2939@kahuna>
+Message-ID: <51432F94.7000306@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 14, 2013 at 11:51 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> On Fri, Mar 15, 2013 at 2:28 AM, Nishanth Menon <nm@ti.com> wrote:
->> We can now use cpufreq-cpu0 driver using DT entries.
->> remove the redundant omap-cpufreq driver from the tree.
->> Remove MAINTAINERS file entry for the same as well.
+
+On 03/15/2013 08:56 AM, Nishanth Menon wrote:
+> On 16:44-20130314, Jon Hunter wrote:
 >>
->> Cc: Kevin Hilman <khilman@deeprootsystems.com>
->> Cc: "Beno?t Cousson" <b-cousson@ti.com>
->> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> Cc: Shawn Guo <shawn.guo@linaro.org>
->> Cc: Keerthy <j-keerthy@ti.com>
->> Cc: linux-omap at vger.kernel.org
->> Cc: devicetree-discuss at lists.ozlabs.org
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: cpufreq at vger.kernel.org
->> Cc: linux-pm at vger.kernel.org
+>> On 03/14/2013 03:58 PM, Nishanth Menon wrote:
+>>> Add DT OPP table for OMAP36xx family of devices. This data is
+>>> decoded by OF with of_init_opp_table() helper function. This
+>>> overrides the default OMAP34xx CPU OPP table definition.
 >>
->> Signed-off-by: Nishanth Menon <nm@ti.com>
->> ---
->>  MAINTAINERS                    |    1 -
->>  drivers/cpufreq/Kconfig.arm    |    6 -
->>  drivers/cpufreq/Makefile       |    1 -
->>  drivers/cpufreq/omap-cpufreq.c |  291 ----------------------------------------
->>  4 files changed, 299 deletions(-)
->>  delete mode 100644 drivers/cpufreq/omap-cpufreq.c
->
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-Thanks Viresh, but based on the direction of the discussion going on
-(keeping this driver active for non-DT configuration),
-I will have to drop this patch in it's entirety.
----
-Regards,
-Nishanth Menon
+>> Not sure I following the last sentence. The tables are in a different
+>> dtsi file and only the relevant file should be included, right?
+> omap3630.dsi includes omap3.dtsi (which is meant for OMAP34xx).
+> The opp tables introduced by this patch in omap36xx.dtsi will override
+> the ones defined on omap3.dtsi. Will the following rephrase help clarify
+> this?
+> 
+> Original:
+> This overrides the default OMAP34xx CPU OPP table definition.
+> Suggested;
+> This overrides the default OMAP34xx CPU OPP table definition in
+> omap3.dtsi.
+
+Sorry, I just missed that the omap3430 opps were in omap3.dtsi and not
+omap34xx.dtsi. I guess I am not familiar with how the DTC overrides
+nodes, however, at least from a readability standpoint it would seem
+nice to have the omap3430 opps in a omap3430 specific dtsi and not
+omap3.dtsi. However, thats just my opinion.
+
+Cheers
+Jon
