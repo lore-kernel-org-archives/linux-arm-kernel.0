@@ -1,20 +1,45 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 15 Mar 2013 18:16:14 +0000
-Subject: [PATCH 1/2] ARM: vexpress: Enable regulator framework when
- MMCI is in use
-In-Reply-To: <1363365540-23001-2-git-send-email-pawel.moll@arm.com>
-References: <1363365540-23001-1-git-send-email-pawel.moll@arm.com>
- <1363365540-23001-2-git-send-email-pawel.moll@arm.com>
-Message-ID: <20130315181614.GY4977@n2100.arm.linux.org.uk>
+Date: Fri, 15 Mar 2013 18:12:46 +0000
+Subject: Fwd: [PATCH] Turn off -Wmaybe-uninitialized when building with -Os
+In-Reply-To: <201303151455.38917.arnd@arndb.de>
+References: <201303151455.38917.arnd@arndb.de>
+Message-ID: <20130315181246.GW4977@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 15, 2013 at 04:38:59PM +0000, Pawel Moll wrote:
-> As the MMCI driver obtains some of the platform data from
-> a regulator (described by the device tree), the framework must
-> be present - otherwise device's initialisation will fail.
+On Fri, Mar 15, 2013 at 02:55:38PM +0000, Arnd Bergmann wrote:
+> I forgot to put the linux-kbuild list on Cc, that is probably the
+> best place to discuss this patch.
+> 
+> ----------  Forwarded Message  ----------
+> 
+> Subject: [PATCH] Turn off -Wmaybe-uninitialized when building with -Os
+> Date: Thursday 14 March 2013
+> From: Arnd Bergmann <arnd@arndb.de>
+> To: linux-arch at vger.kernel.org, linux-arm-kernel at lists.infradead.org, linux-kernel at vger.kernel.org
+> 
+> gcc-4.7 and higher add a lot of false positive warnings about
+> potential uses of uninitialized warnings, but only when optimizing
+> for size (-Os). This is the default when building allyesconfig,
+> which turns on CONFIG_CC_OPTIMIZE_FOR_SIZE.
+> 
+> In order to avoid getting a lot of patches that initialize such
+> variables and accidentally hide real errors along the way, let's
+> just turn off this warning on the respective gcc versions
+> when building with size optimizations. The -Wmaybe-uninitialized
+> option was introduced in the same gcc version (4.7) that is now
+> causing the false positives, so there is no effect on older compilers.
+> 
+> A side effect is that when building with CONFIG_CC_OPTIMIZE_FOR_SIZE,
+> we might now see /fewer/ warnings about possibly uninitialized
+> warnings than with -O2, but that is still much better than seeing
+> warnings known to be bogus.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: stable at vger.kernel.org
+> --
+> I'd like to merge this for 3.9 and also for the stable kernels,
+> if people agree this is a good idea.
 
-More description is required here.  How does it fail.  Please describe
-the problem fully.
-
-MMCI should work without regulator support.
+I think I replied to your previous version recently asking whether
+this affects real uninitialized variables too.
