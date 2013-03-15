@@ -1,48 +1,25 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 15 Mar 2013 16:51:23 +0400
-Subject: [PATCH 2/7] ARM: shmobile: marzen: add USB EHCI driver support
-In-Reply-To: <87boal32nh.wl%kuninori.morimoto.gx@renesas.com>
-References: <1352446306-19945-1-git-send-email-horms@verge.net.au>
- <1352446306-19945-3-git-send-email-horms@verge.net.au>
- <5140F35F.3090702@cogentembedded.com>
- <87li9q4ydj.wl%kuninori.morimoto.gx@renesas.com>
- <5141D3C6.4090806@cogentembedded.com>
- <87boal32nh.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <5143194B.2040600@cogentembedded.com>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 15 Mar 2013 08:53:21 -0400 (EDT)
+Subject: [PATCH 0/4] mv643xx_eth: use mvmdio MDIO bus driver
+In-Reply-To: <1363284515-9865-1-git-send-email-florian@openwrt.org>
+References: <1359473048-26551-1-git-send-email-florian@openwrt.org>
+ <1363284515-9865-1-git-send-email-florian@openwrt.org>
+Message-ID: <20130315.085321.1047694772636447477.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+From: Florian Fainelli <florian@openwrt.org>
+Date: Thu, 14 Mar 2013 19:08:31 +0100
 
-On 15-03-2013 4:52, Kuninori Morimoto wrote:
+> This patch converts the mv643xx_eth driver to use the mvmdio MDIO bus driver
+> instead of rolling its own implementation. As a result, all users of this
+> mv643xx_eth driver are converted to register an "orion-mdio" platform_device.
+> The mvmdio driver is also updated to support an interrupt line which reports
+> SMI error/completion, and to allow traditionnal platform device registration
+> instead of just device tree.
+> 
+> David, I think it makes sense for you to merge all of this, since we do
+> not want the architecture files to be desynchronized from the mv643xx_eth to
+> avoid runtime breakage. The potential for merge conflicts should be very small.
 
->>> I forgot detail of it, but these usb is using callback function,
->>> and it is using *phy*.
-
->>     But this PHY also belongs to SoC.
-
->>> This phy came from marzen_init_late() with usb_get_phy(USB_PHY_TYPE_USB2);
->>> This usb_get_phy() is not needed if board doesn't have USB.
-
->>      Anyway, there should be ways to separate the board specific platform code
->> and the SoC specific one. That's what other subarches do.
-
->>> You can modify it if you want
-
->>      Yes, I definitely would like to try.
-
-> I checked CPG :: MSTP for USB0/1/2 and USB Host/Function,
-> and GIC number for it.
-> It seems no conflict each other
-> I guess EHCI/OHCI goes to setup seems no problem.
-
-> But, as you pointed on USB ML,
-> USB-PHY :: USBPCTRL0 depends on platform
-> (Host/Function selection, and OVC pin setting)
-
-> rcar_usb_phy driver belongs to platform
-
-    No, it doesn't. Only it's (future) platform data will belong to the board --
-that's what they were designed for.
-
-WBR, Sergei
+All applied to net-next, thanks.
