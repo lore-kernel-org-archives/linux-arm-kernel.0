@@ -1,60 +1,88 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 Mar 2013 14:55:38 +0000
-Subject: Fwd: [PATCH] Turn off -Wmaybe-uninitialized when building with -Os
-Message-ID: <201303151455.38917.arnd@arndb.de>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Fri, 15 Mar 2013 09:56:19 -0500
+Subject: [PATCH 0/8] ARM: OMAP3+: Switch to use DT based cpu0-cpufreq
+ driver
+In-Reply-To: <20130315142157.GC2939@kahuna>
+References: <1363294695-658-1-git-send-email-nm@ti.com>
+ <5142AF41.7070003@ti.com> <20130315142157.GC2939@kahuna>
+Message-ID: <51433693.2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I forgot to put the linux-kbuild list on Cc, that is probably the
-best place to discuss this patch.
 
-----------  Forwarded Message  ----------
+On 03/15/2013 09:21 AM, Nishanth Menon wrote:
+> On 10:48-20130315, Santosh Shilimkar wrote:
+>> On Friday 15 March 2013 02:28 AM, Nishanth Menon wrote:
+>>> The following series arose from trying to use BeagleBoard-XM (OMAP3 variant)
+>>> for doing CPU DVFS using cpufreq-cpu0. This series will eventually result in
+>>> migrating the cpufreq support only through device tree (part of the effort
+>>> to migrate away from non-DT configurations for OMAP). Unfortunately, as already
+>>> known, we have a bunch of legacy code and mutually dependent device tree
+>>> conversion that is pending.
+>>> Key features pending:
+>>> A) clock framework transition to DT - this should happen soon, so this series hacks
+>>> the clock node for the time being as suggested in review of original series
+>>> B) on processors that use voltage controller, voltage processor (VC/VP hardware
+>>> loop using I2C_SR path) - we have started work on transitioning them to regulator
+>>> framework driven by DT.
+>>> C) Adaptive Body Bias and SmartReflex AVS conversion to DT.
+>>>
+>>> As a result of these pending features:
+>>> - OMAP4 TWL6030 and TPS62361 which set voltage ONLY over I2C_SR have no regulators
+>>> associated at the moment - fortunately, we boot at highest voltage, so things still
+>>> work.
+>>> - Missing ABB and AVS implies that for few of the SoCs (3630, OMAP4), I have not added
+>>> those OPPs in DT yet - this also needs alignment with iMX, AM series like pending work,
+>>> where certain OPPs need enabling based on efuse programmed bit sequences - since it
+>>> is an add-on work, it is not addressed here.
+>>>
+>> Thanks for looking into it.
+> Yes, this should be the next stage to solve.
+>>
+>>> Note: Somewhere in the future, when we have regulators driven off CCF and OMAP
+>>> converted to CCF, we could remove the DT regulator requirements there as well.
+>>>
+>>> Key benefit of the series is to allow all relevant TI platforms now to use a single
+>>> cpufreq driver and equivalent frameworks in addition be part of the transition to
+>>> DT. As a result of this series, CPUFreq feature will not be available for non-DT
+>>> boot systems.
+>>>
+>> As commented by Jon on internal thread, I am also against the idea of dropping
+>> non-DT support now. Till we migrate to 100 % DT, it is best to keep support
+>> alive. Especial OMAP3 based devices.
+>>
+>> Why don't you take phased approach and have both supported for time being.
+>> Then once we move to DT only, we just drop the non-DT support as we plan
+>> to do for many more stuff.
+>>
+>> BTW, we are using only CPUFreq driver before this series as well. I guess you
+>> mean the common CPUFReq drivers used by other ARM SOCs.
+> I had removed the entries for OPPs and clock nodes used by
+> omap-cpufreq.c and deleted the omap-cpufreq.c as well - so the statement
+> "CPUFreq wont work in non-DT" configuration was accurate.
+> 
+> My intent was as follows:
+> - This series is driven mainly from maintenance angle - having to maintain
+> two different drivers (legacy omap-cpufreq.c and cpufreq-cpu0.c),
+> ensuring the data is proper in both OPP tables in kernel and DT entries
+> is sure to cause mayhem sometime. This is not just an pain for OMAP
+> community, but for cpufreq community as well (since there is absolutely
+> no reason other than OMAP legacy burden for making cpu0-cpufreq work in non-DT
+> world).
+> - as long as non-DT supported boot provides all features, there is no
+> real feature incentive to move to DT.
 
-Subject: [PATCH] Turn off -Wmaybe-uninitialized when building with -Os
-Date: Thursday 14 March 2013
-From: Arnd Bergmann <arnd@arndb.de>
-To: linux-arch at vger.kernel.org, linux-arm-kernel at lists.infradead.org, linux-kernel at vger.kernel.org
+You are missing the point. Before you can migrate people over to DT, you
+need to be ready. IMO OMAP is still not quite ready unfortunately.
 
-gcc-4.7 and higher add a lot of false positive warnings about
-potential uses of uninitialized warnings, but only when optimizing
-for size (-Os). This is the default when building allyesconfig,
-which turns on CONFIG_CC_OPTIMIZE_FOR_SIZE.
+> But, that said, there is one path I see possible:
+> - keep omap-cpufreq alive (BUT I will add a patch that will not let it init
+>   when in DT entries are present)
+> - add DT entries for all relevant OMAPs - in DT mode, we will *only*
+> support cpufreq-cpu0
+> - All future SoCs will continue to use cpufreq-cpu0 using DT, as was the
+> alignment I believe.
 
-In order to avoid getting a lot of patches that initialize such
-variables and accidentally hide real errors along the way, let's
-just turn off this warning on the respective gcc versions
-when building with size optimizations. The -Wmaybe-uninitialized
-option was introduced in the same gcc version (4.7) that is now
-causing the false positives, so there is no effect on older compilers.
+Yes that is what we are doing for other drivers and should be done here.
 
-A side effect is that when building with CONFIG_CC_OPTIMIZE_FOR_SIZE,
-we might now see /fewer/ warnings about possibly uninitialized
-warnings than with -O2, but that is still much better than seeing
-warnings known to be bogus.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: stable at vger.kernel.org
---
-I'd like to merge this for 3.9 and also for the stable kernels,
-if people agree this is a good idea.
-
-diff --git a/Makefile b/Makefile
-index 10fb6c7..caea2d1 100644
---- a/Makefile
-+++ b/Makefile
-@@ -570,7 +570,7 @@ endif # $(dot-config)
- all: vmlinux
- 
- ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
--KBUILD_CFLAGS	+= -Os
-+KBUILD_CFLAGS	+= -Os $(call cc-disable-warning,maybe-uninitialized,)
- else
- KBUILD_CFLAGS	+= -O2
- endif
-
---
-To unsubscribe from this list: send the line "unsubscribe linux-arch" in
-the body of a message to majordomo at vger.kernel.org
-More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
--------------------------------------------------------
+Jon
