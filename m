@@ -1,35 +1,51 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Fri, 15 Mar 2013 17:46:57 +0100
-Subject: [PATCH 2/3] mfd: Make AB8500_CORE select POWER_SUPPLY to fix
- build error
-In-Reply-To: <201303151018.13518.arnd@arndb.de>
-References: <1363298204-8014-1-git-send-email-arnd@arndb.de>
- <1363298204-8014-2-git-send-email-arnd@arndb.de>
- <20130315064436.GD12559@zurbaran>
- <201303151018.13518.arnd@arndb.de>
-Message-ID: <20130315164657.GA29606@zurbaran>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 15 Mar 2013 09:20:50 -0700
+Subject: [PATCH 2/2] ARM: OMAP2+: clocks: Pass static parent pointers
+ to common clock core
+In-Reply-To: <514313B6.4050905@ti.com>
+References: <1363264618-5071-1-git-send-email-rnayak@ti.com>
+ <1363264618-5071-3-git-send-email-rnayak@ti.com>
+ <20130314170601.GH26093@atomide.com> <514313B6.4050905@ti.com>
+Message-ID: <20130315162049.GB9370@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On Fri, Mar 15, 2013 at 10:18:13AM +0000, Arnd Bergmann wrote:
-> On Friday 15 March 2013, Samuel Ortiz wrote:
-> > On Thu, Mar 14, 2013 at 10:56:39PM +0100, Arnd Bergmann wrote:
-> > > 
-> > > Please apply to MFD tree for 3.9
-> > Already applied to mfd-fixes.
+* Rajendra Nayak <rnayak@ti.com> [130315 05:31]:
+> On Thursday 14 March 2013 10:36 PM, Tony Lindgren wrote:
+> > * Rajendra Nayak <rnayak@ti.com> [130314 05:44]:
+> >> OMAP clock inits happen quite early, even before the slab is available.
+> >> As part of the clock init, the common clock core tries to cache parent
+> >> pointers (if not passed by the caller registering the clock) which
+> >> fails in case of OMAP since the slab isn't initied.
+> >> Without CONFIG_DEBUG_SLAB enabled, this just results in the common clock core
+> >> retrying the caching attempt at some point later.
+> >> However with CONFIG_DEBUG_SLAB enabled this results in a BUG() as reported
+> >> in the link below by Tony..
+> >> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg85932.html
+> >>
+> >> Fix this by passing static parent pointers to the common clock core
+> >> while registering clocks.
 > > 
+> > I wonder if we could easily fix this by initializing only some of the
+> > clocks that early?
 > 
-> For some reason I did not see it when I rebased my patches on top of linux-next
-> to make sure I don't send any patches again that are already queued up.
+> We actually don't need any clocks that early (I mean even before slab init)
+> We only need them before timer init.
+
+Yes and only the timer clocks at that point. The others could be initialized
+later on so we get console error messages without having to turn on DEBUG_LL
+and earlyprintk.
+ 
+> This isn't something specific to OMAP so I started looking at what others
+> in drivers/clk seem to do.
 > 
-> Is there a reason why mfd-fixes is not part of linux-next?
-No valid reasons, you're right. I'll ping Stephen about it.
+> I found imx, spear, mvebu all do their clk inits within .init_time callbacks.
+> tegra seems to even do it within .init_irq callback.
+> 
+> Either one would work for us too :)
 
-Cheers,
-Samuel.
+Well I suggest init_irq as that's when we need the first clocks for timer.
 
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+Regards,
+
+Tony
