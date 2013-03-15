@@ -1,74 +1,193 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 15 Mar 2013 15:27:00 +0100
-Subject: [RFC patch 01/11] cpuidle : handle clockevent notify from the cpuidle
- framework
+Date: Fri, 15 Mar 2013 15:27:01 +0100
+Subject: [RFC patch 02/11] cpuidle / arm : a single cpuidle driver
 In-Reply-To: <1363357630-22214-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1363357630-22214-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1363357630-22214-2-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1363357630-22214-3-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a cpu enters a deep idle state, the local timers are stopped and
-the time framework falls back to the timer device used as a broadcast
-timer.
+The cpuidle drivers are duplicating a lot of code and in most
+of the case there is a common pattern we can factor out:
 
-The different cpuidle drivers are calling clockevents_notify ENTER/EXIT
-when the idle state stops the local timer.
+	* setup the broadcast timers
+	* register the driver
+	* register the devices
 
-The proposed patch introduces a new flag CPUIDLE_FLAG_TIMER_STOP to let
-the cpuidle framework to call clockevents_notify instead of duplicating
-again and again these lines in all the cpuidle drivers.
+This arm driver is the common part between all the ARM cpuidle drivers,
+with the code factored out.
+
+It does not handle the coupled idle state for now but it is the first
+step to have everyone to converge to the same code pattern.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/cpuidle/cpuidle.c |    9 +++++++++
- include/linux/cpuidle.h   |    1 +
- 2 files changed, 10 insertions(+)
+ MAINTAINERS                    |    6 +++
+ arch/arm/include/asm/cpuidle.h |    3 ++
+ drivers/cpuidle/Makefile       |    1 +
+ drivers/cpuidle/arm-idle.c     |  112 ++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 122 insertions(+)
+ create mode 100644 drivers/cpuidle/arm-idle.c
 
-diff --git a/drivers/cpuidle/cpuidle.c b/drivers/cpuidle/cpuidle.c
-index eba6929..c500370 100644
---- a/drivers/cpuidle/cpuidle.c
-+++ b/drivers/cpuidle/cpuidle.c
-@@ -8,6 +8,7 @@
-  * This code is licenced under the GPL.
-  */
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 9561658..2c13cf3 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -2212,6 +2212,12 @@ S:	Maintained
+ F:	arch/x86/kernel/cpuid.c
+ F:	arch/x86/kernel/msr.c
  
++CPUIDLE FOR ARM
++M:	Daniel Lezcano <daniel.lezcano@linaro.org>
++L:	linux-pm at vger.kernel.org
++S:	Maintained
++F:	drivers/cpuidle/arm-idle.c
++
+ CPU POWER MONITORING SUBSYSTEM
+ M:	Dominik Brodowski <linux@dominikbrodowski.net>
+ M:	Thomas Renninger <trenn@suse.de>
+diff --git a/arch/arm/include/asm/cpuidle.h b/arch/arm/include/asm/cpuidle.h
+index 2fca60a..107cf23 100644
+--- a/arch/arm/include/asm/cpuidle.h
++++ b/arch/arm/include/asm/cpuidle.h
+@@ -9,6 +9,9 @@ static inline int arm_cpuidle_simple_enter(struct cpuidle_device *dev,
+ 		struct cpuidle_driver *drv, int index) { return -ENODEV; }
+ #endif
+ 
++extern int arm_idle_init(struct cpuidle_driver *drv);
++extern void arm_idle_exit(struct cpuidle_driver *drv);
++
+ /* Common ARM WFI state */
+ #define ARM_CPUIDLE_WFI_STATE_PWR(p) {\
+ 	.enter                  = arm_cpuidle_simple_enter,\
+diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
+index d1aba71..4816a78 100644
+--- a/drivers/cpuidle/Makefile
++++ b/drivers/cpuidle/Makefile
+@@ -5,5 +5,6 @@
+ obj-y += cpuidle.o driver.o governor.o sysfs.o governors/
+ obj-$(CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED) += coupled.o
+ 
++obj-$(CONFIG_ARM) += arm-idle.o
+ obj-$(CONFIG_ARCH_HIGHBANK) += cpuidle-calxeda.o
+ obj-$(CONFIG_ARCH_KIRKWOOD) += cpuidle-kirkwood.o
+diff --git a/drivers/cpuidle/arm-idle.c b/drivers/cpuidle/arm-idle.c
+new file mode 100644
+index 0000000..397ff4c
+--- /dev/null
++++ b/drivers/cpuidle/arm-idle.c
+@@ -0,0 +1,112 @@
++/*
++ * Copyright 2012 Linaro Ltd: : Daniel Lezcano <daniel.lezcano@linaro.org>
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
 +#include <linux/clockchips.h>
- #include <linux/kernel.h>
- #include <linux/mutex.h>
- #include <linux/sched.h>
-@@ -146,12 +147,20 @@ int cpuidle_idle_call(void)
- 
- 	trace_cpu_idle_rcuidle(next_state, dev->cpu);
- 
-+	if (drv->states[next_state].flags & CPUIDLE_FLAG_TIMER_STOP)
-+		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER,
-+				   &dev->cpu);
++#include <linux/module.h>
++#include <linux/cpuidle.h>
 +
- 	if (cpuidle_state_is_coupled(dev, drv, next_state))
- 		entered_state = cpuidle_enter_state_coupled(dev, drv,
- 							    next_state);
- 	else
- 		entered_state = cpuidle_enter_state(dev, drv, next_state);
- 
-+	if (drv->states[next_state].flags & CPUIDLE_FLAG_TIMER_STOP)
-+		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT,
-+				   &dev->cpu);
++static DEFINE_PER_CPU(struct cpuidle_device, cpuidle_device);
++static bool use_broadcast_timer = false;
 +
- 	trace_cpu_idle_rcuidle(PWR_EVENT_EXIT, dev->cpu);
- 
- 	/* give the governor an opportunity to reflect on the outcome */
-diff --git a/include/linux/cpuidle.h b/include/linux/cpuidle.h
-index 480c14d..a837b33 100644
---- a/include/linux/cpuidle.h
-+++ b/include/linux/cpuidle.h
-@@ -57,6 +57,7 @@ struct cpuidle_state {
- /* Idle State Flags */
- #define CPUIDLE_FLAG_TIME_VALID	(0x01) /* is residency time measurable? */
- #define CPUIDLE_FLAG_COUPLED	(0x02) /* state applies to multiple cpus */
-+#define CPUIDLE_FLAG_TIMER_STOP (0x04)  /* timer is stopped on this state */
- 
- #define CPUIDLE_DRIVER_FLAGS_MASK (0xFFFF0000)
- 
++#ifdef CONFIG_GENERIC_CLOCKEVENTS
++static void setup_broadcast_timer(void *arg)
++{
++        int cpu = smp_processor_id();
++        clockevents_notify((int)(arg), &cpu);
++}
++
++static bool __init arm_idle_use_broadcast(struct cpuidle_driver *drv)
++{
++	int i;
++
++	for (i = 0; i < drv->state_count; i++)
++		if (drv->states[i].flags & CPUIDLE_FLAG_TIMER_STOP)
++			return true;
++	return false;
++}
++
++static inline void arm_idle_timer_broadcast(bool enable)
++{
++	on_each_cpu(setup_broadcast_timer, enable ?
++		    (void *)CLOCK_EVT_NOTIFY_BROADCAST_ON:
++		    (void *)CLOCK_EVT_NOTIFY_BROADCAST_OFF, 1);
++}
++#else
++static inline bool __init arm_idle_use_broadcast(struct cpuidle_driver *drv)
++{
++	return false;
++}
++
++static inline void arm_idle_timer_broadcast(bool enable)
++{
++	;
++}
++#endif
++
++int __init arm_idle_init(struct cpuidle_driver *drv)
++{
++	int ret, cpu;
++	struct cpuidle_device *device;
++
++	use_broadcast_timer = arm_idle_use_broadcast(drv);
++
++	if (use_broadcast_timer)
++		arm_idle_timer_broadcast(true);
++
++	ret = cpuidle_register_driver(drv);
++	if (ret) {
++		printk(KERN_ERR "failed to register idle driver '%s'\n",
++			drv->name);
++		return ret;
++	}
++
++	for_each_online_cpu(cpu) {
++
++		device = &per_cpu(cpuidle_device, cpu);
++		device->cpu = cpu;
++		ret = cpuidle_register_device(device);
++		if (ret) {
++			printk(KERN_ERR "Failed to register cpuidle "
++			       "device for cpu%d\n", cpu);
++			goto out_unregister;
++		}
++	}
++
++out:
++	return ret;
++
++out_unregister:
++	for_each_online_cpu(cpu) {
++		device = &per_cpu(cpuidle_device, cpu);
++		cpuidle_unregister_device(device);
++	}
++
++	cpuidle_unregister_driver(drv);
++	goto out;
++}
++EXPORT_SYMBOL_GPL(arm_idle_init);
++
++void __exit arm_idle_exit(struct cpuidle_driver *drv)
++{
++	int cpu;
++	struct cpuidle_device *device;
++
++	for_each_online_cpu(cpu) {
++		device = &per_cpu(cpuidle_device, cpu);
++		cpuidle_unregister_device(device);
++	}
++
++	cpuidle_unregister_driver(drv);
++
++	if (use_broadcast_timer)
++		arm_idle_timer_broadcast(false);
++}
++EXPORT_SYMBOL_GPL(arm_idle_exit);
 -- 
 1.7.9.5
