@@ -1,35 +1,45 @@
-From: fabio.porcedda@gmail.com (Fabio Porcedda)
-Date: Fri, 15 Mar 2013 19:09:18 +0100
-Subject: [PATCH 10/10] drivers: misc: use module_platform_driver_probe()
-In-Reply-To: <201303151128.48432.arnd@arndb.de>
-References: <1363266691-15757-1-git-send-email-fabio.porcedda@gmail.com>
- <20130314140631.GM1906@pengutronix.de>
- <CAHkwnC9nGsdgOTQZ6VpeDyPWXw7tpP+2oHvnLv6LEr1cNdnrsg@mail.gmail.com>
- <201303151128.48432.arnd@arndb.de>
-Message-ID: <CAHkwnC_4kVGcs03_6RVNrye21aUHsCWf9rQe=2JP_Nkjk8Yczw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 15 Mar 2013 18:10:09 +0000
+Subject: [PATCH v3 06/11] ARM: vexpress: use clocksource_of_init for sp804
+In-Reply-To: <1363352312.3100.175.camel@hornet>
+References: <CAD6h2NQWB3+1QepQjBE0BZiG44YAQRi7e-9+oZvVYpYV8QycDA@mail.gmail.com>
+ <1363175175.3100.37.camel@hornet>
+ <CAD6h2NSUyFvhoqMsYqT=rzFZ--MWv+0vHOCtAV9n-5YO+LNTMA@mail.gmail.com>
+ <1363186087.3100.72.camel@hornet>
+ <CAD6h2NRkS4qk+iqbWhaOpBHmjSYOB=YBbfNkn0X3jzNawzgNEA@mail.gmail.com>
+ <1363187979.3100.93.camel@hornet>
+ <CAD6h2NTufx2rRwbwsgGHN42t7+_KL418++zk_C++EvFKU+ZwLg@mail.gmail.com>
+ <5140AA01.1010007@gmail.com> <20130315123408.GJ4977@n2100.arm.linux.org.uk>
+ <1363352312.3100.175.camel@hornet>
+Message-ID: <20130315181009.GV4977@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 15, 2013 at 12:28 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 15 March 2013, Fabio Porcedda wrote:
->> >> * Regarding the use of module_platform_driver_probe, I'm a little worried about
->> >>   the interactions with deferred probing. I don't think there are any regressions,
->> >>   but we should probably make people aware that one cannot return -EPROBE_DEFER
->> >>   from a platform_driver_probe function.
->>
->> The use of module_platform_driver_probe() doesn't change anything about that,
->> it's exactly the same thing as using "return platform_driver_probe()".
->> I'm right or I'm missing something? Maybe are you just speaking about
->> the misuse of "platform_driver_probe"?
->
-> Yes, that was what I meant. The point is that if we need to review or remove
-> all uses of platform_driver_probe, it would be better not to introduce a
-> module_platform_driver_probe() interface to make it easier to use.
+On Fri, Mar 15, 2013 at 12:58:32PM +0000, Pawel Moll wrote:
+> On Fri, 2013-03-15 at 12:34 +0000, Russell King - ARM Linux wrote:
+> > However, for SP804 selection, there are cases where it matters, such as
+> > on Versatile Express where you have to select the right set of SP804 to
+> > have a working system (because ARM didn't fully document the SP804 setup
+> > there) and we have no way to switch some of those timers from their
+> > 32kHz clock source.  But then we could just omit the clock source for
+> > the "bad" SP804s which would prevent them being used.
+> 
+> Both VE motherboard's SP804s TIMCLKENx inputs are fed by the SP810's
+> outputs:
 
-Just to let you know, the module_platform_driver_probe() macro is
-already in v3.9-rc1 and is already used by some drivers.
-In linux-next there are already many patches that use that macro.
+Sigh.
 
-Best regards
---
-Fabio Porcedda
+You do remember who (re)wrote the Versatile Express support that's in
+mainline... I know that the motherboard SP804s are clocked from the
+SP810 (which has no published documentation) and these are selectable
+between 1MHz and 32kHz.
+
+What I was referring to is the SP804s on the CT9x4 tile, which seem
+to be clocked at 32kHz with no way to change them, and it's that which
+has been totally and utterly undocumented (believe me, when I did that
+work above, I searched the available documentation many times.)
+
+It may be that as a result of my complaints to ARM about that, the
+documentation has since been fixed.  Whether it makes sense to use
+the CT9x4 SP804s over the motherboards, I've no idea because I've been
+forced out of the loop on Versatile Express.
