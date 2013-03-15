@@ -1,35 +1,36 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Fri, 15 Mar 2013 12:07:12 +0100
-Subject: [PATCH 4/4 v2] mv643xx_eth: convert to use the Marvell Orion
- MDIO driver
-In-Reply-To: <1363284515-9865-5-git-send-email-florian@openwrt.org>
-References: <1359473048-26551-1-git-send-email-florian@openwrt.org>
- <1363284515-9865-1-git-send-email-florian@openwrt.org>
- <1363284515-9865-5-git-send-email-florian@openwrt.org>
-Message-ID: <514300E0.2030108@openwrt.org>
+From: chen.gang.flying.transformer@gmail.com (Chen Gang F T)
+Date: Fri, 15 Mar 2013 19:11:36 +0800
+Subject: [Suggestion] Latest randconfig build errors for Head.S
+In-Reply-To: <201303151056.55819.arnd@arndb.de>
+References: <51415428.1070401@asianux.com> <514270D2.9010205@asianux.com>
+ <CAAQYJAvXLV38shKncAKKqgQ9G0SnXjh+=aJHBdhd29yzVtL80A@mail.gmail.com>
+ <201303151056.55819.arnd@arndb.de>
+Message-ID: <514301E8.9040201@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 03/14/13 19:08, Florian Fainelli a ?crit :
-> This patch converts the Marvell MV643XX ethernet driver to use the
-> Marvell Orion MDIO driver. As a result, PowerPC and ARM platforms
-> registering the Marvell MV643XX ethernet driver are also updated to
-> register a Marvell Orion MDIO driver. This driver voluntarily overlaps
-> with the Marvell Ethernet shared registers because it will use a subset
-> of this shared register (shared_base + 0x4 - shared_base + 0x84). The
-> Ethernet driver is also updated to look up for a PHY device using the
-> Orion MDIO bus driver.
+? 2013?03?15? 18:56, Arnd Bergmann ??:
+> Right. The fact that as prints a warning for those instructions makes sense
+> given that we are telling it we want to run on *all* ARM architectures,
+> and that ARMv8 has deprecated them officially.
+> 
+> Of course, what is bogus about this is the "NULL" part rather than printing
+> the text that was meant to come out to explain the situation.  I don't
+> know how to report that bug other than what I tried before, but if it gets
+> fixed by printing the right text, we will still want to build a kernel
+> without getting any warnings.
 
-Thanks to the help of Andrew Lunn, there is at least two known issues 
-with this patch version:
+  excuse me, my English is not quite well.
 
-- we need to move up the mvmdio line in 
-drivers/net/ethernet/marvell/Makefile to make sure that configs having 
-both mvmdio and mv643xx_eth built-in get the probing order right
-- the bus name used by mv643xx_eth is not the right now (orion-mdio.0 vs 
-expected orion-mdio) so the PHY device will not be found during 
-phy_connect()
+  I guess your meaning is:
+    "that bug" means the toolchain's bug (need toolchain people fix it).
+    prefer to apply your patch, before "that bug" is fixed (we don't know when)
 
-I will fix these two issues in the next version of the patchset.
---
-Florian
+  is it correct ?
+
+  thanks.
+
+-- 
+Chen Gang
+
+Flying Transformer
