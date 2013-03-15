@@ -1,29 +1,28 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 15 Mar 2013 17:58:08 +0000
-Subject: [PATCH] Turn off -Wmaybe-uninitialized when building with -Os
-In-Reply-To: <7534695.eTHcH0enMV@wuerfel>
-References: <7534695.eTHcH0enMV@wuerfel>
-Message-ID: <20130315175808.GT4977@n2100.arm.linux.org.uk>
+Date: Fri, 15 Mar 2013 18:05:03 +0000
+Subject: [PATCH 3/4 v2] net: mvmdio: enhance driver to support SMI
+ error/done interrupts
+In-Reply-To: <1363284515-9865-4-git-send-email-florian@openwrt.org>
+References: <1359473048-26551-1-git-send-email-florian@openwrt.org>
+ <1363284515-9865-1-git-send-email-florian@openwrt.org>
+ <1363284515-9865-4-git-send-email-florian@openwrt.org>
+Message-ID: <20130315180503.GU4977@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 14, 2013 at 11:01:35PM +0100, Arnd Bergmann wrote:
-> gcc-4.7 and higher add a lot of false positive warnings about
-> potential uses of uninitialized warnings, but only when optimizing
-> for size (-Os). This is the default when building allyesconfig,
-> which turns on CONFIG_CC_OPTIMIZE_FOR_SIZE.
-> 
-> In order to avoid getting a lot of patches that initialize such
-> variables and accidentally hide real errors along the way, let's
-> just turn off this warning on the respective gcc versions
-> when building with size optimizations. The -Wmaybe-uninitialized
-> option was introduced in the same gcc version (4.7) that is now
-> causing the false positives, so there is no effect on older compilers.
-> 
-> A side effect is that when building with CONFIG_CC_OPTIMIZE_FOR_SIZE,
-> we might now see /fewer/ warnings about possibly uninitialized
-> warnings than with -O2, but that is still much better than seeing
-> warnings known to be bogus.
+On Thu, Mar 14, 2013 at 07:08:34PM +0100, Florian Fainelli wrote:
+> +	if (dev->err_interrupt == NO_IRQ) {
+...
+> +	init_waitqueue_head(&dev->smi_busy_wait);
+> +
+> +	dev->err_interrupt = platform_get_irq(pdev, 0);
+> +	if (dev->err_interrupt != -ENXIO) {
+...
+> +	} else
+> +		dev->err_interrupt = NO_IRQ;
 
-What about truely uninitialized uses of variables?  Will this hide
-their warning too?
+
+FYI, NO_IRQ is not supposed to be used anymore (we're supposed to be
+removing it).  platform_get_irq() returns negative numbers for failure,
+so why not test for < 0 in both the above tests, or maybe <= 0 (as
+IRQ0 is also not supposed to be valid.)?
