@@ -1,67 +1,46 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 15 Mar 2013 16:07:53 +0100
-Subject: [RFC patch 02/11] cpuidle / arm : a single cpuidle driver
-In-Reply-To: <201303151447.06150.arnd@arndb.de>
-References: <1363357630-22214-1-git-send-email-daniel.lezcano@linaro.org>
- <1363357630-22214-3-git-send-email-daniel.lezcano@linaro.org>
- <201303151447.06150.arnd@arndb.de>
-Message-ID: <51433949.1030204@linaro.org>
+From: prabhakar.csengg@gmail.com (Prabhakar lad)
+Date: Fri, 15 Mar 2013 20:41:41 +0530
+Subject: [PATCH v6 0/2] ARM: davinci: add support for dm365 vpbe display
+Message-ID: <1363360303-15521-1-git-send-email-prabhakar.csengg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/15/2013 03:47 PM, Arnd Bergmann wrote:
-> On Friday 15 March 2013, Daniel Lezcano wrote:
->> The cpuidle drivers are duplicating a lot of code and in most
->> of the case there is a common pattern we can factor out:
->>
->>         * setup the broadcast timers
->>         * register the driver
->>         * register the devices
->>
->> This arm driver is the common part between all the ARM cpuidle drivers,
->> with the code factored out.
->>
->> It does not handle the coupled idle state for now but it is the first
->> step to have everyone to converge to the same code pattern.
->>
->> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> 
-> Unfortunately, I missed the session in Hong Kong, but I'd like to understand
-> what part of this driver is actually ARM specific. I assume there is nothing
-> in it that depends on 32 bit ARM hardware, right?
+From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
 
-What depends on the 32bits ARM hardware is the drivers themselves. This
-ARM driver is the first step to consolidate all SoC cpuidle specific
-code we find in arch/arm. The code is designated to factor out these
-drivers, as a first step. The second step is to consolidate more this
-driver (eg. moving the code in arch/arm/kernel/cpuidle.c in this driver).
+This patch series enables VPBE display driver on DM365.
 
-The last man standing algorithm we have in mach-ux500 and mach-imx is
-the same, and will be moved in the ARM cpuidle driver.
+This patch is work on on following pull request from Hans
+http://davinci-linux-open-source.1494791.n2.nabble.com/GIT-PULL-FOR-v3-10-tvp7002-davinci-blackfin-legacy-cleanups-td7582451.html
 
-The more it will be consolidated, the more it will be ARM specific.
+Changes for v6:
+1: Fixed review comments pointed by Sekhar.
 
-The final step will be to use the device tree to be passed to this
-driver and do the cpuidle driver initialization from there.
+Changes for v5:
+1: pass different platform names to handle different ip's.
+2: Fixed review comments pointed by Sekhar.
 
-> Would the same code be used with arch/arm64?
+Changes for v4:
+1: Replaced the obsolete preset API by timings API.
 
-I can't tell but IIUC, a single ARM driver will be used based on the
-psci for ARM64, but it does not exist for now. It is possible some code
-pattern could be used from the ARM32 cpuidle driver.
+Changes for v3:
+1: Removed VPSS clock alias for master and slave which was
+   sent for VPSS driver. since this patch was dependent on
+   patch[1]. I will revist this patch once MC(captrure driver)
+   goes into mainline.
+[1] http://www.spinics.net/lists/linux-media/msg50562.html
 
-> What about other architectures that want to share a cpuidle driver
-> with and ARM SoC using the same hardware? We have a lot of examples
-> of SoC vendors that use similar components on ARM and non-ARM SoCs
-> based on SH, AVR32, Hexagon, C6x, MIPS or PowerPC.
+Changes for v2:
+1: Added VPSS clock so that capture and display
+   can work independent.
 
-I guess if they share the same code, it could probably go to the cpuidle
-core framework instead of a specific driver.
+Lad, Prabhakar (2):
+  ARM: davinci: dm365: add support for v4l2 video display
+  ARM: davinci: dm365 EVM: add support for VPBE display
 
+ arch/arm/mach-davinci/board-dm365-evm.c |  166 +++++++++++++++++++++++++-
+ arch/arm/mach-davinci/davinci.h         |    2 +-
+ arch/arm/mach-davinci/dm365.c           |  203 +++++++++++++++++++++++++++++--
+ 3 files changed, 357 insertions(+), 14 deletions(-)
 
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.7.4.1
