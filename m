@@ -1,84 +1,93 @@
-From: bilhuang@nvidia.com (Bill Huang)
-Date: Fri, 15 Mar 2013 18:58:23 -0700
-Subject: [RFC v2 1/1] clk: Add notifier support in
- clk_prepare/clk_unprepare
-In-Reply-To: <51437BB6.3040607@wwwdotorg.org>
-References: <1363253464-3200-1-git-send-email-bilhuang@nvidia.com>
- <20130315174558.GS4977@n2100.arm.linux.org.uk>
- <51437BB6.3040607@wwwdotorg.org>
-Message-ID: <1363399103.2879.6.camel@bilhuang-vm1>
+From: smoch@web.de (Soeren Moch)
+Date: Sat, 16 Mar 2013 03:10:45 +0100
+Subject: [PATCH] USB: EHCI: fix for leaking isochronous data
+In-Reply-To: <Pine.LNX.4.44L0.1303141719450.1194-100000@iolanthe.rowland.org>
+References: <Pine.LNX.4.44L0.1303141719450.1194-100000@iolanthe.rowland.org>
+Message-ID: <5143D4A5.4080002@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2013-03-16 at 03:51 +0800, Stephen Warren wrote:
-> On 03/15/2013 11:45 AM, Russell King - ARM Linux wrote:
-> > On Thu, Mar 14, 2013 at 02:31:04AM -0700, Bill Huang wrote:
-> >> Add the below two notifier events so drivers which are interested in
-> >> knowing the clock status can act accordingly. This is extremely useful
-> >> in some of the DVFS (Dynamic Voltage Frequency Scaling) design.
-> >>
-> >> CLK_PREPARED
-> >> CLK_UNPREPARED
-> >>
-> >> Signed-off-by: Bill Huang <bilhuang@nvidia.com>
-> >> ---
-> >>  drivers/clk/clk.c   |    3 +++
-> >>  include/linux/clk.h |    2 ++
-> >>  2 files changed, 5 insertions(+)
-> >>
-> >> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> >> index ed87b24..3292cec 100644
-> >> --- a/drivers/clk/clk.c
-> >> +++ b/drivers/clk/clk.c
-> >> @@ -550,6 +550,7 @@ void clk_unprepare(struct clk *clk)
-> >>  {
-> >>  	mutex_lock(&prepare_lock);
-> >>  	__clk_unprepare(clk);
-> >> +	__clk_notify(clk, CLK_UNPREPARED, clk->rate, clk->rate);
-> >>  	mutex_unlock(&prepare_lock);
-> >>  }
-> >>  EXPORT_SYMBOL_GPL(clk_unprepare);
-> >> @@ -598,6 +599,8 @@ int clk_prepare(struct clk *clk)
-> >>  
-> >>  	mutex_lock(&prepare_lock);
-> >>  	ret = __clk_prepare(clk);
-> >> +	if (!ret)
-> >> +		__clk_notify(clk, CLK_PREPARED, clk->rate, clk->rate);
-> > 
-> > So, on prepare, we notify after we've prepared the clock.  On unprepare,
-> > we notify after the clock has been shut down.  Are you sure that's the
-> > correct ordering?  Would it not be better to view it in a stack-like
-> > fashion, iow:
-> 
-> > get
-> > 	prepare
-> > 		notify-prepare
-> > 			enable
-> > 			disable
-> > 		notify-unprepare
-> > 	unprepare
-> > put
-> 
-> Yes, these should be stacked/nested better for consistency.
-> 
-> But for DVFS, the voltage needs to be raised before the prepare body is
-> run, so that if clk_prepare actually enables the clock, the voltage is
-> already at the safe level required by that clock. Similarly, for
-> unprepare, you can only lower the voltage after having turned off the
-> clock, which is guaranteed after the unprepare body. So, I think you
-> want to move the notifier for prepare in the code above (and rename it
-> to pre/before_prepare?), rather than the notifier for unprepare.
+On 14.03.2013 22:33, Alan Stern wrote:
+> Maybe a better way to go about this is, instead of printing out every
+> allocation and deallocation, to keep a running counter.  You could have
+> the driver print out the value of this counter every minute or so.  Any
+> time the device isn't in use, the counter should be 0.
 
-Oh yes I should raised notify before prepare body is run.
-> 
-> In order to cover more cases, you might have both
-> {pre,post}_{un,}prepare notifiers, although I'm not sure when you'd use
-> the other two options.
+I implemented the counter. The max value is sampled at the beginning of 
+end_free_itds(), the current counter value is sampled at the end of this 
+function. Counter values w/o a max number are from the error path in 
+itd_urb_transaction().
+The number of allocated iTDs can grow to higher values (why?), but 
+normally the iTDs are freed during normal operation. Due to some reason 
+the number of iTDs suddenly increases until coherent pool exhaustion. 
+There is no permanent memory leak, all iTDs are released when the user 
+application ends. But imho several thousands of iTDs cannot be the 
+intended behavior...
 
-Right, maybe {pre,post}_{un,}prepare will be useful.
-> 
-> >> diff --git a/include/linux/clk.h b/include/linux/clk.h
-> 
-> >> +#define CLK_PREPARED			BIT(3)
-> >> +#define CLK_UNPREPARED			BIT(4)
-> 
+   Soeren
+
+
+Mar 16 01:12:52 guruvdr kernel: itd_counter:42 (max:174)
+Mar 16 01:12:52 guruvdr kernel: itd_counter:0 (max:174)
+Mar 16 01:13:13 guruvdr kernel: itd_counter:42 (max:174)
+Mar 16 01:13:13 guruvdr kernel: itd_counter:0 (max:174)
+Mar 16 01:13:34 guruvdr kernel: itd_counter:87 (max:174)
+Mar 16 01:13:34 guruvdr kernel: itd_counter:0 (max:174)
+Mar 16 01:13:55 guruvdr kernel: itd_counter:42 (max:426)
+Mar 16 01:13:55 guruvdr kernel: itd_counter:0 (max:426)
+Mar 16 01:15:14 guruvdr kernel: itd_counter:249 (max:1441)
+Mar 16 01:15:14 guruvdr kernel: itd_counter:0 (max:1441)
+[...]
+Mar 16 02:03:33 guruvdr kernel: itd_counter:0 (max:1441)
+Mar 16 02:04:15 guruvdr kernel: itd_counter:150 (max:1441)
+Mar 16 02:04:15 guruvdr kernel: itd_counter:0 (max:1441)
+Mar 16 02:04:36 guruvdr kernel: itd_counter:42 (max:1441)
+Mar 16 02:04:36 guruvdr kernel: itd_counter:0 (max:1441)
+Mar 16 02:04:57 guruvdr kernel: itd_counter:42 (max:1441)
+Mar 16 02:04:57 guruvdr kernel: itd_counter:0 (max:1441)
+Mar 16 02:05:18 guruvdr kernel: itd_counter:42 (max:1441)
+Mar 16 02:05:18 guruvdr kernel: itd_counter:0 (max:1441)
+Mar 16 02:05:39 guruvdr kernel: itd_counter:42 (max:1441)
+Mar 16 02:05:39 guruvdr kernel: itd_counter:0 (max:1441)
+Mar 16 02:06:43 guruvdr kernel: itd_counter:254 (max:1441)
+Mar 16 02:07:44 guruvdr kernel: itd_counter:968 (max:1469)
+Mar 16 02:08:04 guruvdr kernel: itd_counter:1192 (max:1469)
+Mar 16 02:08:46 guruvdr kernel: itd_counter:1812 (max:1854)
+Mar 16 02:09:07 guruvdr kernel: itd_counter:2117 (max:2159)
+Mar 16 02:09:28 guruvdr kernel: itd_counter:2482 (max:2524)
+Mar 16 02:09:49 guruvdr kernel: itd_counter:2791 (max:2833)
+Mar 16 02:10:10 guruvdr kernel: itd_counter:3088 (max:3409)
+Mar 16 02:10:31 guruvdr kernel: itd_counter:3402 (max:3444)
+Mar 16 02:10:52 guruvdr kernel: itd_counter:3689 (max:3731)
+Mar 16 02:11:13 guruvdr kernel: itd_counter:3950 (max:4073)
+Mar 16 02:11:34 guruvdr kernel: itd_counter:4264 (max:4306)
+Mar 16 02:11:55 guruvdr kernel: itd_counter:4525 (max:4567)
+Mar 16 02:12:16 guruvdr kernel: itd_counter:4803 (max:4845)
+Mar 16 02:12:37 guruvdr kernel: itd_counter:5028 (max:5070)
+Mar 16 02:13:19 guruvdr kernel: itd_counter:5549 (max:5843)
+Mar 16 02:13:40 guruvdr kernel: itd_counter:5836 (max:5878)
+Mar 16 02:14:01 guruvdr kernel: itd_counter:6133 (max:6238)
+Mar 16 02:14:06 guruvdr kernel: ERROR: 1024 KiB atomic DMA coherent pool 
+is too small!
+Mar 16 02:14:06 guruvdr kernel: Please increase it with coherent_pool= 
+kernel parameter!
+Mar 16 02:14:06 guruvdr kernel: itd_counter:6275
+Mar 16 02:14:06 guruvdr kernel: orion-ehci orion-ehci.0: can't init itds
+Mar 16 02:14:06 guruvdr kernel: itd_counter:6275
+Mar 16 02:14:06 guruvdr kernel: orion-ehci orion-ehci.0: can't init itds
+Mar 16 02:14:06 guruvdr kernel: itd_counter:6275
+Mar 16 02:14:06 guruvdr kernel: orion-ehci orion-ehci.0: can't init itds
+Mar 16 02:14:06 guruvdr kernel: itd_counter:6275
+Mar 16 02:14:06 guruvdr kernel: orion-ehci orion-ehci.0: can't init itds
+Mar 16 02:14:07 guruvdr kernel: itd_counter:6275
+Mar 16 02:14:07 guruvdr kernel: orion-ehci orion-ehci.0: can't init itds
+Mar 16 02:14:07 guruvdr kernel: itd_counter:6275
+Mar 16 02:14:07 guruvdr kernel: orion-ehci orion-ehci.0: can't init itds
+Mar 16 02:14:07 guruvdr kernel: itd_counter:6275
+Mar 16 02:14:07 guruvdr kernel: orion-ehci orion-ehci.0: can't init itds
+Mar 16 02:14:07 guruvdr kernel: itd_counter:6275
+Mar 16 02:14:07 guruvdr kernel: orion-ehci orion-ehci.0: can't init itds
+Mar 16 02:14:08 guruvdr kernel: itd_counter:6275
+Mar 16 02:14:08 guruvdr kernel: orion-ehci orion-ehci.0: can't init itds
+Mar 16 02:14:08 guruvdr kernel: itd_counter:78 (max:6275)
+Mar 16 02:14:22 guruvdr kernel: itd_counter:0 (max:6275)
