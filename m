@@ -1,40 +1,31 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Sat, 16 Mar 2013 12:32:44 -0700
-Subject: [PATCHv2] ARM: Push selects for TWD/SCU into machine entries
-In-Reply-To: <201303052234.32723.arnd@arndb.de>
-References: <1362007694-3419-1-git-send-email-sboyd@codeaurora.org>
- <512E9A39.3070207@wwwdotorg.org> <51354E35.1080804@codeaurora.org>
- <201303052234.32723.arnd@arndb.de>
-Message-ID: <5144C8DC.9010104@codeaurora.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 16 Mar 2013 17:09:05 -0300
+Subject: Shifted framebuffer after X11 starts on mx28
+Message-ID: <CAOMZO5CDuODRrJEEaDKm5nepfkuvuF77ZQmarB69hL6gg386ww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/5/2013 2:34 PM, Arnd Bergmann wrote:
-> On Tuesday 05 March 2013, Stephen Boyd wrote:
->> On 02/27/13 15:43, Stephen Warren wrote:
->>> Seems simple enough it doesn't really need many, but for Tegra,
->>> Acked-by: Stephen Warren <swarren@nvidia.com>
->>>
->>> Which kernel is this going into? It's possible Tegra will get converted
->>> to multi-platform in 3.10, which might move that main ARCH_TEGRA block
->>> from arch/arm/Kconfig into arch/arm/mach-tegra/Kconfig, although I
->>> suppose it doesn't have to move it. I think some/all(?) other
->>> multi-platform conversions have moved their main Kconfig option like
->>> that though.
->> Thanks. I'm hoping that Arnd/Olof can pick this up. I'm not sure which
->> version it will go into.
->>
-> Hmm, it certainly looks useful to me. I think it should go into the next
-> cleanup branch as a base, so others can build on top of it. We will
-> also need it for the Exynos multiplatform patches that I hope can land
-> in 3.10 as well.
->
-> Sneaking it in through the fixes branch would make life easier for us,
-> but it doesn't feel right.
+Hi,
 
-Arnd, can you pick this up into the arm-soc tree now? It would be good
-to get this into next so that conflicts are avoided later on.
+I am running 3.8.2 kernel on a mx28evk and when I start X11 I get a
+"shifted" framebuffer.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+The framebuffer works well if X11 is not called.
+
+There is no issue with X11 when running with Freescale  2.6.35 kernel.
+
+Looking at drivers/video/mxsfb.c there is the following comment:
+
+	/*
+	 * It seems, you can't re-program the controller if it is still running.
+	 * This may lead into shifted pictures (FIFO issue?).
+	 * So, first stop the controller and drain its FIFOs
+	 */
+
+So, it looks like that I am still facing this issue when X11 starts.
+
+If anyone has any suggestions, please let me know.
+
+Thanks,
+
+Fabio Estevam
