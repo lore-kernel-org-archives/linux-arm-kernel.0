@@ -1,80 +1,52 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Sat, 16 Mar 2013 17:59:17 -0300
-Subject: [PATCH V3 02/18] ARM: OMAP2+: Add variable to store number of
- GPMC waitpins
-In-Reply-To: <1363360876-13617-3-git-send-email-jon-hunter@ti.com>
-References: <1363360876-13617-1-git-send-email-jon-hunter@ti.com>
- <1363360876-13617-3-git-send-email-jon-hunter@ti.com>
-Message-ID: <20130316205916.GA3290@localhost>
+From: marex@denx.de (Marek Vasut)
+Date: Sat, 16 Mar 2013 22:00:38 +0100
+Subject: Shifted framebuffer after X11 starts on mx28
+In-Reply-To: <201303162155.28230.marex@denx.de>
+References: <CAOMZO5CDuODRrJEEaDKm5nepfkuvuF77ZQmarB69hL6gg386ww@mail.gmail.com>
+ <201303162155.28230.marex@denx.de>
+Message-ID: <201303162200.38990.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
+Dear Marek Vasut,
 
-On Fri, Mar 15, 2013 at 10:21:00AM -0500, Jon Hunter wrote:
-> The GPMC has wait-pin signals that can be assigned to a chip-select
-> to monitor the ready signal of an external device. Add a variable to
-> indicate the total number of wait-pins for a given device. This will
-> allow us to detect if the wait-pin being selected is valid or not.
+> Dear Fabio Estevam,
 > 
-> When booting with device-tree read the number of wait-pins from the
-> device-tree blob. When device-tree is not used set the number of
-> wait-pins to 4 which is valid for OMAP2-5 devices. Newer devices
-> that have less wait-pins (such as AM335x) only support booting with
-> device-tree and so hard-coding the wait-pin number when not using
-> device-tree is fine.
+> > Hi,
+> > 
+> > I am running 3.8.2 kernel on a mx28evk and when I start X11 I get a
+> > "shifted" framebuffer.
+> > 
+> > The framebuffer works well if X11 is not called.
+> > 
+> > There is no issue with X11 when running with Freescale  2.6.35 kernel.
+> > 
+> > Looking at drivers/video/mxsfb.c there is the following comment:
+> > 	/*
+> > 	
+> > 	 * It seems, you can't re-program the controller if it is still running.
+> > 	 * This may lead into shifted pictures (FIFO issue?).
+> > 	 * So, first stop the controller and drain its FIFOs
+> > 	 */
+> > 
+> > So, it looks like that I am still facing this issue when X11 starts.
+> > 
+> > If anyone has any suggestions, please let me know.
 > 
-> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-> ---
->  arch/arm/mach-omap2/gpmc.c |   16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
+> This is not it, I almost hunted the bug down. Hang on.
 > 
-> diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-> index ef655d9..88a261c 100644
-> --- a/arch/arm/mach-omap2/gpmc.c
-> +++ b/arch/arm/mach-omap2/gpmc.c
-> @@ -108,6 +108,8 @@
->  #define	GPMC_HAS_WR_ACCESS		0x1
->  #define	GPMC_HAS_WR_DATA_MUX_BUS	0x2
->  
-> +#define GPMC_NR_WAITPINS		4
-> +
->  /* XXX: Only NAND irq has been considered,currently these are the only ones used
->   */
->  #define	GPMC_NR_IRQ		2
-> @@ -153,6 +155,7 @@ static struct resource	gpmc_cs_mem[GPMC_CS_NUM];
->  static DEFINE_SPINLOCK(gpmc_mem_lock);
->  /* Define chip-selects as reserved by default until probe completes */
->  static unsigned int gpmc_cs_map = ((1 << GPMC_CS_NUM) - 1);
-> +static unsigned int gpmc_nr_waitpins;
->  static struct device *gpmc_dev;
->  static int gpmc_irq;
->  static resource_size_t phys_base, mem_size;
-> @@ -1297,6 +1300,13 @@ static int gpmc_probe_dt(struct platform_device *pdev)
->  	if (!of_id)
->  		return 0;
->  
-> +	ret = of_property_read_u32(pdev->dev.of_node, "gpmc,num-waitpins",
-> +				   &gpmc_nr_waitpins);
-> +	if (ret < 0) {
-> +		pr_err("%s: number of wait pins not found!\n", __func__);
-> +		return ret;
-> +	}
-> +
->  	for_each_node_by_name(child, "nand") {
->  		ret = gpmc_probe_nand_child(pdev, child);
->  		if (ret < 0) {
-> @@ -1372,6 +1382,12 @@ static int gpmc_probe(struct platform_device *pdev)
->  	if (gpmc_setup_irq() < 0)
->  		dev_warn(gpmc_dev, "gpmc_setup_irq failed\n");
->  
-> +	/* Now the GPMC is initialised, unreserve the chip-selects */
-> +	gpmc_cs_map = 0;
+> Basically check mxsfb_set_par() and observe fb_info->var.sync . It's set to
+> "something" during regular framebuffer operation and it's set to "something
+> else" during Xorg operation. And that's what causes it to get broken. I
+> forced fb_info->var.sync to the "something" value by hardcoding it in
+> kernel just now for a quick test and X works for me.
 
-The above seems to be a remanent of another patch.
-I think you already sent that one, right?
+Uh, being in hacking-mode and replying to email doesn't work well together :-)
 
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+In my case, fb_info->var.sync is set to FB_SYNC_DATA_ENABLE_HIGH_ACT during 
+regular operation (framebuffer console), but if X11 starts, this fb_info-
+>var.sync is forced to value 0 which causes the malfunction. Now back into 
+hacking-mode ;-)
+
+Best regards,
+Marek Vasut
