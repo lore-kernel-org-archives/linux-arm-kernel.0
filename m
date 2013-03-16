@@ -1,72 +1,40 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Sat, 16 Mar 2013 13:39:38 -0400 (EDT)
-Subject: [PATCH] USB: EHCI: fix for leaking isochronous data
-In-Reply-To: <5143D4A5.4080002@web.de>
-Message-ID: <Pine.LNX.4.44L0.1303161303500.7276-100000@netrider.rowland.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Sat, 16 Mar 2013 12:32:44 -0700
+Subject: [PATCHv2] ARM: Push selects for TWD/SCU into machine entries
+In-Reply-To: <201303052234.32723.arnd@arndb.de>
+References: <1362007694-3419-1-git-send-email-sboyd@codeaurora.org>
+ <512E9A39.3070207@wwwdotorg.org> <51354E35.1080804@codeaurora.org>
+ <201303052234.32723.arnd@arndb.de>
+Message-ID: <5144C8DC.9010104@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 16 Mar 2013, Soeren Moch wrote:
+On 3/5/2013 2:34 PM, Arnd Bergmann wrote:
+> On Tuesday 05 March 2013, Stephen Boyd wrote:
+>> On 02/27/13 15:43, Stephen Warren wrote:
+>>> Seems simple enough it doesn't really need many, but for Tegra,
+>>> Acked-by: Stephen Warren <swarren@nvidia.com>
+>>>
+>>> Which kernel is this going into? It's possible Tegra will get converted
+>>> to multi-platform in 3.10, which might move that main ARCH_TEGRA block
+>>> from arch/arm/Kconfig into arch/arm/mach-tegra/Kconfig, although I
+>>> suppose it doesn't have to move it. I think some/all(?) other
+>>> multi-platform conversions have moved their main Kconfig option like
+>>> that though.
+>> Thanks. I'm hoping that Arnd/Olof can pick this up. I'm not sure which
+>> version it will go into.
+>>
+> Hmm, it certainly looks useful to me. I think it should go into the next
+> cleanup branch as a base, so others can build on top of it. We will
+> also need it for the Exynos multiplatform patches that I hope can land
+> in 3.10 as well.
+>
+> Sneaking it in through the fixes branch would make life easier for us,
+> but it doesn't feel right.
 
-> I implemented the counter. The max value is sampled at the beginning of 
-> end_free_itds(), the current counter value is sampled at the end of this 
-> function. Counter values w/o a max number are from the error path in 
-> itd_urb_transaction().
-> The number of allocated iTDs can grow to higher values (why?), but 
-> normally the iTDs are freed during normal operation. Due to some reason 
-> the number of iTDs suddenly increases until coherent pool exhaustion. 
-> There is no permanent memory leak, all iTDs are released when the user 
-> application ends. But imho several thousands of iTDs cannot be the 
-> intended behavior...
+Arnd, can you pick this up into the arm-soc tree now? It would be good
+to get this into next so that conflicts are avoided later on.
 
-No, it's not.  Here's how it's supposed to work:
-
-Each ehci_iso_stream structure corresponds to a single isochronous
-endpoint.  The structure has a free list of iTDs that aren't currently
-in use; when an URB is submitted, its iTDs are taken from the start of
-this free list if possible.  Otherwise new iTDs are allocated from the
-DMA pool.
-
-iTDs on the free list aren't always available.  This is because the 
-hardware can continue to access an iTD for up to 1 ms after the iTD has 
-completed.  itd->frame stores the frame number (one frame per ms) for 
-when the iTD completes, and ehci->now_frame contains a best estimate of 
-the current frame number.  This explains the logic in 
-itd_urb_transaction().  Near the end of itd_complete() you can see 
-where a completed iTD gets added back to the end of the free list.
-
-At the very end of itd_complete() is a section of code that takes the
-entries on the iso_stream's free list and moves them to a global free
-list (ehci->cached_itd_list).  This happens only when the endpoint is
-no longer in use, i.e., no iTDs are queued for it.  The end_free_itds()  
-routine in ehci_timer.c takes iTDs from this global list and releases
-them back to the DMA pool.  The routine doesn't run until at least 1 ms
-after start_free_itds() is called, to wait for the hardware to stop
-accessing the iTDs on the list.
-
-The idea is that during normal use we will quickly reach a steady
-state, where an endpoint always has about N URBs queued for it, each
-URB uses about M iTDs, and there are one or two URB's worth of unused
-iTDs.  Thus there will be N*M iTDs in use plus maybe another 2*M iTDs
-on the iso_stream's free list.  Once we reach this point, every new URB
-should be able to get the iTDs it needs from the free list (assuming a
-new URB is submitted every time an URB completes).  When the URBs stop
-being submitted, the pipeline will empty out and after a couple more
-milliseconds, all (N+2)*M iTDs should be released back to the pool.
-
-In your case the situation is complicated by the fact that you're using
-two devices, each of which has up to four isochronous endpoints.  This
-makes it harder to see what's going on.  Probably not all of the 
-endpoints were being used for data transfers.  But even if they were, 
-there should not have been more then 800 iTDs allocated at any time 
-(figure that N is around 5 and M is 9).  You could simplify the testing 
-by using only one device -- it might not exhaust the pool but your iTD
-counter would still indicate if something wasn't right.
-
-I'm not sure how to figure out what's causing the problem.  Maybe you
-can think of a good way to see where the actual operation differs from
-the description above.  Perhaps start by keeping track of the number of
-iTDs on each iso_stream's free list and the number in use by each
-iso_stream.
-
-Alan Stern
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
