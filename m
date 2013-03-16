@@ -1,30 +1,54 @@
 From: gwenhael.goavec-merou@armadeus.com (Gwenhael Goavec-Merou)
-Date: Sat, 16 Mar 2013 16:49:59 +0100
-Subject: [PATCH] ARM: imx1: mm: add call to mxc_device_init
-Message-ID: <1363448999-3936-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
+Date: Sat, 16 Mar 2013 16:53:54 +0100
+Subject: [PATCH] ARM: imx: apf51dev: add ecspi1, ecspi2 and i2c2 support
+Message-ID: <1363449234-4038-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mxc_device_init() is mandatory for mxc_aips and mxc_ahb bus registration, needed 
-as parents, at least, for gpio and dma.
-
 Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
 ---
- arch/arm/mach-imx/mm-imx1.c | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/boot/dts/imx51-apf51dev.dtsp | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
-diff --git a/arch/arm/mach-imx/mm-imx1.c b/arch/arm/mach-imx/mm-imx1.c
-index 7a14667..3c609c5 100644
---- a/arch/arm/mach-imx/mm-imx1.c
-+++ b/arch/arm/mach-imx/mm-imx1.c
-@@ -51,6 +51,8 @@ void __init mx1_init_irq(void)
+diff --git a/arch/arm/boot/dts/imx51-apf51dev.dtsp b/arch/arm/boot/dts/imx51-apf51dev.dtsp
+index cf02bff..8eb2995 100644
+--- a/arch/arm/boot/dts/imx51-apf51dev.dtsp
++++ b/arch/arm/boot/dts/imx51-apf51dev.dtsp
+@@ -37,6 +37,22 @@
+ 	};
+ };
  
- void __init imx1_soc_init(void)
- {
-+	mxc_device_init();
++&ecspi1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_ecspi1_1>;
++	fsl,spi-num-chipselects = <2>;
++	cs-gpios = <&gpio4 24 0>, <&gpio4 25 0>;
++	status = "okay";
++};
 +
- 	mxc_register_gpio("imx1-gpio", 0, MX1_GPIO1_BASE_ADDR, SZ_256,
- 						MX1_GPIO_INT_PORTA, 0);
- 	mxc_register_gpio("imx1-gpio", 1, MX1_GPIO2_BASE_ADDR, SZ_256,
++&ecspi2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_ecspi2_1>;
++	fsl,spi-num-chipselects = <2>;
++	cs-gpios = <&gpio3 28 1>, <&gpio3 27 1>;
++	status = "okay";
++};
++
+ &esdhc1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_esdhc1_1>;
+@@ -53,6 +69,12 @@
+ 	status = "okay";
+ };
+ 
++&i2c2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c2_2>;
++	status = "okay";
++};
++
+ &iomuxc {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_hog>;
 -- 
 1.8.1.5
