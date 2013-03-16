@@ -1,93 +1,42 @@
-From: smoch@web.de (Soeren Moch)
-Date: Sat, 16 Mar 2013 03:10:45 +0100
-Subject: [PATCH] USB: EHCI: fix for leaking isochronous data
-In-Reply-To: <Pine.LNX.4.44L0.1303141719450.1194-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1303141719450.1194-100000@iolanthe.rowland.org>
-Message-ID: <5143D4A5.4080002@web.de>
+From: bilhuang@nvidia.com (Bill Huang)
+Date: Fri, 15 Mar 2013 19:23:19 -0700
+Subject: [RFC 1/1] clk: Add notifier support in
+ clk_prepare_enable/clk_disable_unprepare
+In-Reply-To: <CAPDyKFpHz6KCNbVe2AsDuzZw-oN7NyRzCA=RatWA+9iMaQ7C+Q@mail.gmail.com>
+References: <1363151317.3311.9.camel@bilhuang-vm1>
+ <51400D9D.9060305@wwwdotorg.org>	<1363153204.3311.14.camel@bilhuang-vm1>
+ <5140C12A.4060900@wwwdotorg.org>	<1363227311.3311.30.camel@bilhuang-vm1>
+ <20130314092132.GE18519@tbergstrom-lnx.Nvidia.com>
+ <1363253287.3311.32.camel@bilhuang-vm1>	<51420EBB.7080503@wwwdotorg.org>
+ <1363310454.3311.44.camel@bilhuang-vm1>	<5142B027.4040403@wwwdotorg.org>
+ <20130315093951.GV18519@tbergstrom-lnx.Nvidia.com>
+ <CAPDyKFoBJpraMz8i1FmFqG7=Zsv0DTQ0PKVOQJ-+iEsKpb3Hdg@mail.gmail.com>
+ <1363349206.5827.10.camel@bilhuang-vm1>
+ <CAPDyKFpHz6KCNbVe2AsDuzZw-oN7NyRzCA=RatWA+9iMaQ7C+Q@mail.gmail.com>
+Message-ID: <1363400599.2879.18.camel@bilhuang-vm1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14.03.2013 22:33, Alan Stern wrote:
-> Maybe a better way to go about this is, instead of printing out every
-> allocation and deallocation, to keep a running counter.  You could have
-> the driver print out the value of this counter every minute or so.  Any
-> time the device isn't in use, the counter should be 0.
+On Fri, 2013-03-15 at 20:33 +0800, Ulf Hansson wrote:
+> I guess you did not fully got what I meant with "dvfs clock type". It
+> will not affect the clock API. But instead the dvfs is handled by
+> implementing a specific clk hw type. So the same thing is accomplished
+> as with clk notifiers, no changes should be needed to device drivers.
+> 
+> The difference is only that no notifiers will be needed, and all the
+> dvfs stuff will be handled in the clk hw instead. It will mean that we
+> will bundle dvfs stuff into the clock drivers, instead of separating
+> the code outside the clock drivers. But, on the other hand no
+> notifiers will be needed.
+> 
+Oh yes I misunderstand your origin point, but my thought is using
+existing devfreq framework as frequency/voltage policy driver instead of
+creating another one in clock driver and that's why I think we need the
+notifier work. 
 
-I implemented the counter. The max value is sampled at the beginning of 
-end_free_itds(), the current counter value is sampled at the end of this 
-function. Counter values w/o a max number are from the error path in 
-itd_urb_transaction().
-The number of allocated iTDs can grow to higher values (why?), but 
-normally the iTDs are freed during normal operation. Due to some reason 
-the number of iTDs suddenly increases until coherent pool exhaustion. 
-There is no permanent memory leak, all iTDs are released when the user 
-application ends. But imho several thousands of iTDs cannot be the 
-intended behavior...
+By the way, some centralized DVFS implementation like Tegra's VDD_CORE
+rail has association with tens of clocks which will need to be taken
+care specially if we're doing those in clock driver I think.
 
-   Soeren
-
-
-Mar 16 01:12:52 guruvdr kernel: itd_counter:42 (max:174)
-Mar 16 01:12:52 guruvdr kernel: itd_counter:0 (max:174)
-Mar 16 01:13:13 guruvdr kernel: itd_counter:42 (max:174)
-Mar 16 01:13:13 guruvdr kernel: itd_counter:0 (max:174)
-Mar 16 01:13:34 guruvdr kernel: itd_counter:87 (max:174)
-Mar 16 01:13:34 guruvdr kernel: itd_counter:0 (max:174)
-Mar 16 01:13:55 guruvdr kernel: itd_counter:42 (max:426)
-Mar 16 01:13:55 guruvdr kernel: itd_counter:0 (max:426)
-Mar 16 01:15:14 guruvdr kernel: itd_counter:249 (max:1441)
-Mar 16 01:15:14 guruvdr kernel: itd_counter:0 (max:1441)
-[...]
-Mar 16 02:03:33 guruvdr kernel: itd_counter:0 (max:1441)
-Mar 16 02:04:15 guruvdr kernel: itd_counter:150 (max:1441)
-Mar 16 02:04:15 guruvdr kernel: itd_counter:0 (max:1441)
-Mar 16 02:04:36 guruvdr kernel: itd_counter:42 (max:1441)
-Mar 16 02:04:36 guruvdr kernel: itd_counter:0 (max:1441)
-Mar 16 02:04:57 guruvdr kernel: itd_counter:42 (max:1441)
-Mar 16 02:04:57 guruvdr kernel: itd_counter:0 (max:1441)
-Mar 16 02:05:18 guruvdr kernel: itd_counter:42 (max:1441)
-Mar 16 02:05:18 guruvdr kernel: itd_counter:0 (max:1441)
-Mar 16 02:05:39 guruvdr kernel: itd_counter:42 (max:1441)
-Mar 16 02:05:39 guruvdr kernel: itd_counter:0 (max:1441)
-Mar 16 02:06:43 guruvdr kernel: itd_counter:254 (max:1441)
-Mar 16 02:07:44 guruvdr kernel: itd_counter:968 (max:1469)
-Mar 16 02:08:04 guruvdr kernel: itd_counter:1192 (max:1469)
-Mar 16 02:08:46 guruvdr kernel: itd_counter:1812 (max:1854)
-Mar 16 02:09:07 guruvdr kernel: itd_counter:2117 (max:2159)
-Mar 16 02:09:28 guruvdr kernel: itd_counter:2482 (max:2524)
-Mar 16 02:09:49 guruvdr kernel: itd_counter:2791 (max:2833)
-Mar 16 02:10:10 guruvdr kernel: itd_counter:3088 (max:3409)
-Mar 16 02:10:31 guruvdr kernel: itd_counter:3402 (max:3444)
-Mar 16 02:10:52 guruvdr kernel: itd_counter:3689 (max:3731)
-Mar 16 02:11:13 guruvdr kernel: itd_counter:3950 (max:4073)
-Mar 16 02:11:34 guruvdr kernel: itd_counter:4264 (max:4306)
-Mar 16 02:11:55 guruvdr kernel: itd_counter:4525 (max:4567)
-Mar 16 02:12:16 guruvdr kernel: itd_counter:4803 (max:4845)
-Mar 16 02:12:37 guruvdr kernel: itd_counter:5028 (max:5070)
-Mar 16 02:13:19 guruvdr kernel: itd_counter:5549 (max:5843)
-Mar 16 02:13:40 guruvdr kernel: itd_counter:5836 (max:5878)
-Mar 16 02:14:01 guruvdr kernel: itd_counter:6133 (max:6238)
-Mar 16 02:14:06 guruvdr kernel: ERROR: 1024 KiB atomic DMA coherent pool 
-is too small!
-Mar 16 02:14:06 guruvdr kernel: Please increase it with coherent_pool= 
-kernel parameter!
-Mar 16 02:14:06 guruvdr kernel: itd_counter:6275
-Mar 16 02:14:06 guruvdr kernel: orion-ehci orion-ehci.0: can't init itds
-Mar 16 02:14:06 guruvdr kernel: itd_counter:6275
-Mar 16 02:14:06 guruvdr kernel: orion-ehci orion-ehci.0: can't init itds
-Mar 16 02:14:06 guruvdr kernel: itd_counter:6275
-Mar 16 02:14:06 guruvdr kernel: orion-ehci orion-ehci.0: can't init itds
-Mar 16 02:14:06 guruvdr kernel: itd_counter:6275
-Mar 16 02:14:06 guruvdr kernel: orion-ehci orion-ehci.0: can't init itds
-Mar 16 02:14:07 guruvdr kernel: itd_counter:6275
-Mar 16 02:14:07 guruvdr kernel: orion-ehci orion-ehci.0: can't init itds
-Mar 16 02:14:07 guruvdr kernel: itd_counter:6275
-Mar 16 02:14:07 guruvdr kernel: orion-ehci orion-ehci.0: can't init itds
-Mar 16 02:14:07 guruvdr kernel: itd_counter:6275
-Mar 16 02:14:07 guruvdr kernel: orion-ehci orion-ehci.0: can't init itds
-Mar 16 02:14:07 guruvdr kernel: itd_counter:6275
-Mar 16 02:14:07 guruvdr kernel: orion-ehci orion-ehci.0: can't init itds
-Mar 16 02:14:08 guruvdr kernel: itd_counter:6275
-Mar 16 02:14:08 guruvdr kernel: orion-ehci orion-ehci.0: can't init itds
-Mar 16 02:14:08 guruvdr kernel: itd_counter:78 (max:6275)
-Mar 16 02:14:22 guruvdr kernel: itd_counter:0 (max:6275)
+> Kind regards
+> Ulf Hansson
