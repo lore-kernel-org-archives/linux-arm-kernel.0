@@ -1,96 +1,48 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Sat, 16 Mar 2013 11:46:47 +0530
-Subject: [PATCH V2 7/8] memory: emif: errata i743: Prohibit usage of
- Power-Down mode
-In-Reply-To: <1363414608-7448-1-git-send-email-lokeshvutla@ti.com>
-References: <1363414608-7448-1-git-send-email-lokeshvutla@ti.com>
-Message-ID: <1363414608-7448-8-git-send-email-lokeshvutla@ti.com>
+From: James.Bottomley@HansenPartnership.com (James Bottomley)
+Date: Sat, 16 Mar 2013 08:56:14 +0000
+Subject: Fwd: [PATCH] Turn off -Wmaybe-uninitialized when building with -Os
+In-Reply-To: <201303151943.45980.arnd@arndb.de>
+References: <201303151455.38917.arnd@arndb.de>
+ <20130315181246.GW4977@n2100.arm.linux.org.uk>
+ <201303151943.45980.arnd@arndb.de>
+Message-ID: <1363424174.2459.15.camel@dabdike>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Grygorii Strashko <grygorii.strashko@ti.com>
+On Fri, 2013-03-15 at 19:43 +0000, Arnd Bergmann wrote:
+> On Friday 15 March 2013, Russell King - ARM Linux wrote:
+> > On Fri, Mar 15, 2013 at 02:55:38PM +0000, Arnd Bergmann wrote:
+> 
+> > > I'd like to merge this for 3.9 and also for the stable kernels,
+> > > if people agree this is a good idea.
+> > 
+> > I think I replied to your previous version recently asking whether
+> > this affects real uninitialized variables too.
+> 
+> If gcc can prove that there is a code path in which the variable is
+> used uninitialized, it will still warn with this patch, since we are
+> leaving -Wuninitialized enabled but only disable -Wmaybe-uninitilized.
+> There are obviously some cases where gcc correctly warns today but
+> cannot prove whether or not this is actually possible. I don't have
+> any data about how often we'd see one or the other, but I would expect
+> the first one to be more common.
+> 
+> We'd also still see all valid warnings with the Kconfig default of
+> building with -O2 rather than -Os, and as gcc gets smarter over time,
+> it should show more of the real bugs with -Wuninitialized.
+> 
+> I think the real trade-off is that not applying this patch will cause
+> more patches to get merged that add bogus initializations, which
+> definitely prevent gcc from warning about a real uninitialized
+> variable bug in that function again. I have done some of those
+> patches myself in the past, but it always feels really wrong to
+> do those.
 
-ERRATA DESCRIPTION :
-The EMIF supports power-down state for low power. The EMIF
-automatically puts the SDRAM into power-down after the memory is
-not accessed for a defined number of cycles and the
-EMIF_PWR_MGMT_CTRL[10:8] REG_LP_MODE bit field is set to 0x4.
-As the EMIF supports automatic output impedance calibration, a ZQ
-calibration long command is issued every time it exits active
-power-down and precharge power-down modes. The EMIF waits and
-blocks any other command during this calibration.
-The EMIF does not allow selective disabling of ZQ calibration upon
-exit of power-down mode. Due to very short periods of power-down
-cycles, ZQ calibration overhead creates bandwidth issues and
-increases overall system power consumption. On the other hand,
-issuing ZQ calibration long commands when exiting self-refresh is
-still required.
+I always reject any set variable to zero (or mark it uninitialised) just
+because gcc warns patches precisely because they would hide future
+errors; all the checkers we care about have a false positive matching
+system now.  The thing this would cut down on is the number of newbie "I
+compiled the kernel myself and this fixes the warning I found" type
+patches, which I do see as a net benefit.
 
-WORKAROUND :
-Because there is no power consumption benefit of the power-down due
-to the calibration and there is a performance risk, the guideline
-is to not allow power-down state and, therefore, to not have set
-the EMIF_PWR_MGMT_CTRL[10:8] REG_LP_MODE bit field to 0x4.
-
-This is applicable only for EMIF4D IP used in OMAP4 Soc's.
-
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-Signed-off-by: Vitaly Chernooky <vitaly.chernooky@ti.com>
-Signed-off-by: Oleksandr Dmytryshyn <oleksandr.dmytryshyn@ti.com>
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
-Changes since V1: 
-	Updated the change log and fixed a typo in a comment.
-
- drivers/memory/emif.c |   35 +++++++++++++++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
-
-diff --git a/drivers/memory/emif.c b/drivers/memory/emif.c
-index d27111e..9b27c2b 100644
---- a/drivers/memory/emif.c
-+++ b/drivers/memory/emif.c
-@@ -257,6 +257,41 @@ static void set_lpmode(struct emif_data *emif, u8 lpmode)
- 	u32 temp;
- 	void __iomem *base = emif->base;
- 
-+	/*
-+	 * Workaround for errata i743 - LPDDR2 Power-Down State is Not
-+	 * Efficient
-+	 *
-+	 * i743 DESCRIPTION:
-+	 * The EMIF supports power-down state for low power. The EMIF
-+	 * automatically puts the SDRAM into power-down after the memory is
-+	 * not accessed for a defined number of cycles and the
-+	 * EMIF_PWR_MGMT_CTRL[10:8] REG_LP_MODE bit field is set to 0x4.
-+	 * As the EMIF supports automatic output impedance calibration, a ZQ
-+	 * calibration long command is issued every time it exits active
-+	 * power-down and precharge power-down modes. The EMIF waits and
-+	 * blocks any other command during this calibration.
-+	 * The EMIF does not allow selective disabling of ZQ calibration upon
-+	 * exit of power-down mode. Due to very short periods of power-down
-+	 * cycles, ZQ calibration overhead creates bandwidth issues and
-+	 * increases overall system power consumption. On the other hand,
-+	 * issuing ZQ calibration long commands when exiting self-refresh is
-+	 * still required.
-+	 *
-+	 * WORKAROUND
-+	 * Because there is no power consumption benefit of the power-down due
-+	 * to the calibration and there is a performance risk, the guideline
-+	 * is to not allow power-down state and, therefore, to not have set
-+	 * the EMIF_PWR_MGMT_CTRL[10:8] REG_LP_MODE bit field to 0x4.
-+	 */
-+	if ((emif->plat_data->ip_rev == EMIF_4D) &&
-+	    (EMIF_LP_MODE_PWR_DN == lpmode)) {
-+		WARN_ONCE(1,
-+			  "REG_LP_MODE = LP_MODE_PWR_DN(4) is prohibited by"
-+			  "erratum i743 switch to LP_MODE_SELF_REFRESH(2)\n");
-+		/* rollback LP_MODE to Self-refresh mode */
-+		lpmode = EMIF_LP_MODE_SELF_REFRESH;
-+	}
-+
- 	temp = readl(base + EMIF_POWER_MANAGEMENT_CONTROL);
- 	temp &= ~LP_MODE_MASK;
- 	temp |= (lpmode << LP_MODE_SHIFT);
--- 
-1.7.9.5
+James
