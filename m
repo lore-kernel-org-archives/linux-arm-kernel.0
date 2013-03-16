@@ -1,34 +1,22 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Fri, 15 Mar 2013 17:55:56 -0700
-Subject: [PATCH 05/29] arm64: KVM: Basic ESR_EL2 helpers and vcpu
- register access
-In-Reply-To: <1362455265-24165-6-git-send-email-marc.zyngier@arm.com>
-References: <1362455265-24165-1-git-send-email-marc.zyngier@arm.com>
- <1362455265-24165-6-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1363395356.3155.84.camel@smoke>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Fri, 15 Mar 2013 18:00:18 -0700
+Subject: [PATCH 0/3] arm: ep93xx driver cleanup
+Message-ID: <201303151800.18192.hartleys@visionengravers.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Fix a couple section mismatch warnings and convert two of the ep93xx
+drivers to use module_platform_driver.
 
-On Tue, 2013-03-05 at 03:47 +0000, Marc Zyngier wrote:
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/kvm_emulate.h
-...
+H Hartley Sweeten (3):
+  backlight: ep93xx_bl: fix section mismatch
+  video: ep93xx-fb.c: fix section mismatch and use module_platform_driver
+  video: ep93xx_pwm.c: fix section mismatch and use module_platform_driver
 
-> +static inline bool vcpu_mode_is_32bit(struct kvm_vcpu *vcpu)
-> +{
-> +	return false;	/* 32bit? Bahhh... */
-> +}
-> +
-> +static inline bool kvm_condition_valid(struct kvm_vcpu *vcpu)
-> +{
-> +	return true;	/* No conditionals on arm64 */
-> +}
+ drivers/misc/ep93xx_pwm.c           | 21 +++++----------------
+ drivers/video/backlight/ep93xx_bl.c |  3 +--
+ drivers/video/ep93xx-fb.c           | 18 +++---------------
+ 3 files changed, 9 insertions(+), 33 deletions(-)
 
-
-Does it make sense to have these routines take a const object?
-
-  static inline bool vcpu_mode_is_32bit(struct kvm_vcpu const *vcpu)
-
--Geoff
+-- 
+1.8.1.4
