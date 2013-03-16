@@ -1,44 +1,65 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Fri, 15 Mar 2013 20:09:28 -0500
-Subject: [PATCH 0/3] arm: ep93xx driver cleanup
-In-Reply-To: <201303151800.18192.hartleys@visionengravers.com>
-References: <201303151800.18192.hartleys@visionengravers.com>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F0020980106CBE@AUSP01VMBX24.collaborationhost.net>
+From: bilhuang@nvidia.com (Bill Huang)
+Date: Fri, 15 Mar 2013 18:54:20 -0700
+Subject: [RFC 1/1] clk: Add notifier support in
+ clk_prepare_enable/clk_disable_unprepare
+In-Reply-To: <514378CB.1060605@wwwdotorg.org>
+References: <1363151317.3311.9.camel@bilhuang-vm1>
+ <51400D9D.9060305@wwwdotorg.org> <1363153204.3311.14.camel@bilhuang-vm1>
+ <5140C12A.4060900@wwwdotorg.org> <1363227311.3311.30.camel@bilhuang-vm1>
+ <20130314092132.GE18519@tbergstrom-lnx.Nvidia.com>
+ <1363253287.3311.32.camel@bilhuang-vm1> <51420EBB.7080503@wwwdotorg.org>
+ <1363310454.3311.44.camel@bilhuang-vm1> <5142B027.4040403@wwwdotorg.org>
+ <20130315093951.GV18519@tbergstrom-lnx.Nvidia.com>
+ <CAPDyKFoBJpraMz8i1FmFqG7=Zsv0DTQ0PKVOQJ-+iEsKpb3Hdg@mail.gmail.com>
+ <1363349206.5827.10.camel@bilhuang-vm1>
+ <CAPDyKFpHz6KCNbVe2AsDuzZw-oN7NyRzCA=RatWA+9iMaQ7C+Q@mail.gmail.com>
+ <514378CB.1060605@wwwdotorg.org>
+Message-ID: <1363398860.2879.2.camel@bilhuang-vm1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Oops... sent to the wrong list.
+On Sat, 2013-03-16 at 03:38 +0800, Stephen Warren wrote:
+> On 03/15/2013 06:33 AM, Ulf Hansson wrote:
+> > On 15 March 2013 13:06, Bill Huang <bilhuang@nvidia.com> wrote:
+> >> On Fri, 2013-03-15 at 18:08 +0800, Ulf Hansson wrote:
+> ...
+> >>> Some prerequisites; I think am in favor of using the clk API to
+> >>> trigger DVFS changes and then I agree on that clk_prepare|unprepare
+> >>> needs to be possible to track from a DVFS perspective. clk_set_rate is
+> >>> not enough.
+> >>>
+> >>> So if we decide to do the above (using the clk API to trigger DVFS
+> >>> changes), I believe we should discuss two possible solutions;
+> >>> - clk notifiers or..
+> >>> - dvfs clock type.
+> >>>
+> >>> I am trying to make up my mind of what I think is the best solution.
+> >>> Have you considered "dvfs clock type"?
+> >>> I put some comments about this for "[PATCH 2/5] clk: notifier handler
+> >>> for dynamic voltage scaling" recently as well.
+> >>>
+> >>> What could the advantages/disadvantages be between the two options?
+> >>
+> >> I personally prefer clk notifiers since that's easy and all the existing
+> >> device drivers don't need to be modified, a new clock or API might be
+> >> more thoroughly considered (and hence maybe more graceful) but that
+> >> means we need more time to cook and many drivers need to plug into that
+> >> API when it comes out, a lot of test/verification or maybe chaos
+> >> follows, I'm not sure will that be a little overkill.
+> > 
+> > I guess you did not fully got what I meant with "dvfs clock type". It
+> > will not affect the clock API. But instead the dvfs is handled by
+> > implementing a specific clk hw type. So the same thing is accomplished
+> > as with clk notifiers, no changes should be needed to device drivers.
+> > 
+> > The difference is only that no notifiers will be needed, and all the
+> > dvfs stuff will be handled in the clk hw instead. It will mean that we
+> > will bundle dvfs stuff into the clock drivers, instead of separating
+> > the code outside the clock drivers. But, on the other hand no
+> > notifiers will be needed.
+> 
+> The advantage here is that I assume that a notifier would continually
+> have to check whether the clock being modified was one that the DVFS
+> notifier cared about. By integrating the CVFS logic into the clk_hw
 
-Please ignore.
-
-Regards,
-Hartley
-
------Original Message-----
-From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of H Hartley Sweeten
-Sent: Friday, March 15, 2013 6:00 PM
-To: ARM Kernel
-Cc: Ryan Mallon
-Subject: [PATCH 0/3] arm: ep93xx driver cleanup
-
-Fix a couple section mismatch warnings and convert two of the ep93xx
-drivers to use module_platform_driver.
-
-H Hartley Sweeten (3):
-  backlight: ep93xx_bl: fix section mismatch
-  video: ep93xx-fb.c: fix section mismatch and use module_platform_driver
-  video: ep93xx_pwm.c: fix section mismatch and use module_platform_driver
-
- drivers/misc/ep93xx_pwm.c           | 21 +++++----------------
- drivers/video/backlight/ep93xx_bl.c |  3 +--
- drivers/video/ep93xx-fb.c           | 18 +++---------------
- 3 files changed, 9 insertions(+), 33 deletions(-)
-
--- 
-1.8.1.4
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel at lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Actually, we can register notifier only on clocks that DVFS care about.
