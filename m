@@ -1,28 +1,29 @@
-From: anilk4.v@gmail.com (Anil Kumar)
-Date: Sat, 16 Mar 2013 10:14:09 +0530
-Subject: Getting kernel uImage build issue on omap2+
-Message-ID: <CABYxbz6ydTtHmLW1xETanHa9uZzZ5M=4wv3Wj5aNDE2Db1b2Rw@mail.gmail.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Sat, 16 Mar 2013 11:43:50 +0530
+Subject: [PATCH 0/8] memory: emif: miscellaneous bug fixes for EMIF driver
+In-Reply-To: <20130315180856.GA30236@kroah.com>
+References: <1362978365-5593-1-git-send-email-lokeshvutla@ti.com>
+ <20130315180856.GA30236@kroah.com>
+Message-ID: <51440D9E.3060202@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-I am getting kernel uImage build issue on omap2+ log[1]
-
-Taken kernel branch "for_3.10/dts" from
-https://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git
-
-Taking reference from
-https://kernel.googlesource.com/pub/scm/linux/kernel/git/tmlind/linux-omap/+/omap-for-v3.9/multiplatform-enable-signed-v2
-
-Am I missing some thing ?
-
-[1]
-anil at anil-laptop:~/Anil/omap3/bcousson$  mkimage -A arm -O linux -T
-kernel -C none -a 0x80008000 -e 0x80008000 -n "Linux" -d
-zImage-omap2plus uImage-omap2plus
-mkimage: Can't open zImage-omap2plus: No such file or directory
-anil at anil-laptop:~/Anil/omap3/bcousson$
-
+On Friday 15 March 2013 11:38 PM, Greg KH wrote:
+> On Mon, Mar 11, 2013 at 10:35:57AM +0530, Lokesh Vutla wrote:
+>> This series resolves a few minor issues for EMIF driver.
+>>
+>> Tested all patches on OMAP4430-sdp.
+>> Patch : "memory: emif: setup LP settings on freq update"
+>> is tested on a local tree, since freq update cannot be
+>> tested on mainline.
+>
+> Can you please resend these with all of the requested changes made, and
+> acks added?
+Ok ill send V2 with necessary changes and acks added..
 Thanks,
-Anil
+Lokesh
+>
+> thanks,
+>
+> greg k-h
+>
