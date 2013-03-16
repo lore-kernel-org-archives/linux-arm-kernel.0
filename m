@@ -1,85 +1,34 @@
-From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
-Date: Fri, 15 Mar 2013 21:40:47 -0300
-Subject: [PATCH 1/6] serial: 8250_dw: add support for clk api
-In-Reply-To: <20130316002952.GA4977@n2100.arm.linux.org.uk>
-References: <1363377988-4966-1-git-send-email-maxime.ripard@free-electrons.com>
- <1363377988-4966-2-git-send-email-maxime.ripard@free-electrons.com>
- <20130315223917.GZ4977@n2100.arm.linux.org.uk>
- <BLU0-SMTP4156A39670AA58651B05028AEE0@phx.gbl>
- <20130316002952.GA4977@n2100.arm.linux.org.uk>
-Message-ID: <BLU0-SMTP18236DF570FFD5F879EC61B8AEE0@phx.gbl>
+From: geoff@infradead.org (Geoff Levand)
+Date: Fri, 15 Mar 2013 17:55:56 -0700
+Subject: [PATCH 05/29] arm64: KVM: Basic ESR_EL2 helpers and vcpu
+ register access
+In-Reply-To: <1362455265-24165-6-git-send-email-marc.zyngier@arm.com>
+References: <1362455265-24165-1-git-send-email-marc.zyngier@arm.com>
+ <1362455265-24165-6-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1363395356.3155.84.camel@smoke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-El 15/03/13 21:29, Russell King - ARM Linux escribi?:
-> On Fri, Mar 15, 2013 at 09:15:11PM -0300, Emilio L?pez wrote:
->> Hello Russell,
->>
->> El 15/03/13 19:39, Russell King - ARM Linux escribi?:
->>> On Fri, Mar 15, 2013 at 09:06:23PM +0100, Maxime Ripard wrote:
->>>> +	/* clock got configured through clk api, all done */
->>>> +	if (p->uartclk)
->>>
->>> 	if (IS_ERR(p->uartclk))
->>>
->>
->> Isn't IS_ERR for pointers? p->uartclk is an unsigned int
-> 
-> Right, sorry, ignore that.
-> 
->>>> +		return 0;
->>>> +
->>>> +	/* try to find out clock frequency from DT as fallback */
->>>>  	if (of_property_read_u32(np, "clock-frequency", &val)) {
->>>> -		dev_err(p->dev, "no clock-frequency property set\n");
->>>> +		dev_err(p->dev, "clk or clock-frequency not defined\n");
->>>>  		return -EINVAL;
->>>>  	}
->>>>  	p->uartclk = val;
->>>> @@ -294,9 +301,21 @@ static int dw8250_probe(struct platform_device *pdev)
->>>>  	if (!uart.port.membase)
->>>>  		return -ENOMEM;
->>>>  
->>>> +	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
->>>> +	if (!data)
->>>> +		return -ENOMEM;
->>>> +
->>>> +	data->clk = devm_clk_get(&pdev->dev, NULL);
->>>> +	if (IS_ERR(data->clk))
->>>> +		data->clk = NULL;
->>>> +	else
->>>> +		clk_prepare_enable(data->clk);
->>>
->>> 	if (!IS_ERR(data->clk))
->>> 		clk_prepare_enable(data->clk);
->>>
->>
->> See below
->>
->>>> +
->>>>  	uart.port.iotype = UPIO_MEM;
->>>>  	uart.port.serial_in = dw8250_serial_in;
->>>>  	uart.port.serial_out = dw8250_serial_out;
->>>> +	uart.port.private_data = data;
->>>> +	uart.port.uartclk = clk_get_rate(data->clk);
->>>
->>> What if data->clk is invalid?
->>>
->>> 	if (!IS_ERR(data->clk)
->>> 		uart.port.uartclk = clk_get_rate(data->clk);
->>>
->>
->> I'm not sure if it is coincidental or the way it is supposed to be, but
->> when using the common clock framework, if you pass a NULL to
->> clk_get_rate, the function explicitly checks for it and returns 0. I
->> relied on that behaviour when implementing this; see the if..else block
->> above. Is this not always the case on other clock drivers?
-> 
-> That's something that the common clock framework decided to do.  It's
-> not a defined part of the API though, so drivers shouldn't rely on
-> this behaviour meaning anything special.
+Hi Marc,
 
-Ok then, I'll rework the error checking on the clock calls and get a new
-patch sent. Thanks for the clarification.
+On Tue, 2013-03-05 at 03:47 +0000, Marc Zyngier wrote:
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/kvm_emulate.h
+...
 
-Emilio
+> +static inline bool vcpu_mode_is_32bit(struct kvm_vcpu *vcpu)
+> +{
+> +	return false;	/* 32bit? Bahhh... */
+> +}
+> +
+> +static inline bool kvm_condition_valid(struct kvm_vcpu *vcpu)
+> +{
+> +	return true;	/* No conditionals on arm64 */
+> +}
+
+
+Does it make sense to have these routines take a const object?
+
+  static inline bool vcpu_mode_is_32bit(struct kvm_vcpu const *vcpu)
+
+-Geoff
