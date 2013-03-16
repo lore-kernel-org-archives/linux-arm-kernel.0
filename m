@@ -1,52 +1,48 @@
-From: marex@denx.de (Marek Vasut)
-Date: Sat, 16 Mar 2013 22:00:38 +0100
-Subject: Shifted framebuffer after X11 starts on mx28
-In-Reply-To: <201303162155.28230.marex@denx.de>
-References: <CAOMZO5CDuODRrJEEaDKm5nepfkuvuF77ZQmarB69hL6gg386ww@mail.gmail.com>
- <201303162155.28230.marex@denx.de>
-Message-ID: <201303162200.38990.marex@denx.de>
+From: lukas-x@zapletalovi.com (Lukas Zapletal)
+Date: Sat, 16 Mar 2013 20:48:13 +0000 (UTC)
+Subject: Kirkwood NSA 310 does not boot with 3.8.3
+Message-ID: <loom.20130316T213930-150@post.gmane.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Marek Vasut,
+Hello all,
 
-> Dear Fabio Estevam,
-> 
-> > Hi,
-> > 
-> > I am running 3.8.2 kernel on a mx28evk and when I start X11 I get a
-> > "shifted" framebuffer.
-> > 
-> > The framebuffer works well if X11 is not called.
-> > 
-> > There is no issue with X11 when running with Freescale  2.6.35 kernel.
-> > 
-> > Looking at drivers/video/mxsfb.c there is the following comment:
-> > 	/*
-> > 	
-> > 	 * It seems, you can't re-program the controller if it is still running.
-> > 	 * This may lead into shifted pictures (FIFO issue?).
-> > 	 * So, first stop the controller and drain its FIFOs
-> > 	 */
-> > 
-> > So, it looks like that I am still facing this issue when X11 starts.
-> > 
-> > If anyone has any suggestions, please let me know.
-> 
-> This is not it, I almost hunted the bug down. Hang on.
-> 
-> Basically check mxsfb_set_par() and observe fb_info->var.sync . It's set to
-> "something" during regular framebuffer operation and it's set to "something
-> else" during Xorg operation. And that's what causes it to get broken. I
-> forced fb_info->var.sync to the "something" value by hardcoding it in
-> kernel just now for a quick test and X works for me.
+I have noticed that in the latest stable (3.8) kernels, support for NSA 310 
+(Marwell based NAS) has been added.
 
-Uh, being in hacking-mode and replying to email doesn't work well together :-)
+I tried to boot a kernel with Marwell DT and NSA310 enabled and it can't boot up 
+with strange error:
 
-In my case, fb_info->var.sync is set to FB_SYNC_DATA_ENABLE_HIGH_ACT during 
-regular operation (framebuffer console), but if X11 starts, this fb_info-
->var.sync is forced to value 0 which causes the malfunction. Now back into 
-hacking-mode ;-)
+<snip>
+## Booting image at 00800000 ...
+   Image Name:   Linux-3.8.3
+   Created:      2013-03-16  20:35:06 UTC
+   Image Type:   ARM Linux Kernel Image (uncompressed)
+   Data Size:    3646704 Bytes =  3.5 MB
+   Load Address: 00008000
+   Entry Point:  00008000
+   Verifying Checksum ... OK
+OK
 
-Best regards,
-Marek Vasut
+Starting kernel ...
+
+Uncompressing Linux... done, booting the kernel.
+
+Error: unrecognized/unsupported machine ID (r1 = 0x00000d0b).
+                                                             
+Available machine support:
+                          
+ID (hex)        NAME
+ffffffff        Marvell Kirkwood (Flattened Device Tree)
+                                                        
+Please check your kernel config and/or bootloader.
+</snip>
+
+Particularly, I dont understand the ID code - it really does not look right. 
+This is vanilla 3.8.3. Is there an ARM-dedicated git branch I should rather use 
+for early support for NSA310?
+
+Here is my full kernel config: 
+http://lzap.fedorapeople.org/patches/nsa310/config-3.8.3-vanilla-no-boot
+
+I hope this is the right mailing list to ask, I apologize otherwise.
