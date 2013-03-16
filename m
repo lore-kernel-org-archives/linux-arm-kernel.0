@@ -1,31 +1,42 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 16 Mar 2013 17:09:05 -0300
+From: marex@denx.de (Marek Vasut)
+Date: Sat, 16 Mar 2013 21:55:27 +0100
 Subject: Shifted framebuffer after X11 starts on mx28
-Message-ID: <CAOMZO5CDuODRrJEEaDKm5nepfkuvuF77ZQmarB69hL6gg386ww@mail.gmail.com>
+In-Reply-To: <CAOMZO5CDuODRrJEEaDKm5nepfkuvuF77ZQmarB69hL6gg386ww@mail.gmail.com>
+References: <CAOMZO5CDuODRrJEEaDKm5nepfkuvuF77ZQmarB69hL6gg386ww@mail.gmail.com>
+Message-ID: <201303162155.28230.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Dear Fabio Estevam,
 
-I am running 3.8.2 kernel on a mx28evk and when I start X11 I get a
-"shifted" framebuffer.
+> Hi,
+> 
+> I am running 3.8.2 kernel on a mx28evk and when I start X11 I get a
+> "shifted" framebuffer.
+> 
+> The framebuffer works well if X11 is not called.
+> 
+> There is no issue with X11 when running with Freescale  2.6.35 kernel.
+> 
+> Looking at drivers/video/mxsfb.c there is the following comment:
+> 
+> 	/*
+> 	 * It seems, you can't re-program the controller if it is still running.
+> 	 * This may lead into shifted pictures (FIFO issue?).
+> 	 * So, first stop the controller and drain its FIFOs
+> 	 */
+> 
+> So, it looks like that I am still facing this issue when X11 starts.
+> 
+> If anyone has any suggestions, please let me know.
 
-The framebuffer works well if X11 is not called.
+This is not it, I almost hunted the bug down. Hang on.
 
-There is no issue with X11 when running with Freescale  2.6.35 kernel.
+Basically check mxsfb_set_par() and observe fb_info->var.sync . It's set to 
+"something" during regular framebuffer operation and it's set to "something 
+else" during Xorg operation. And that's what causes it to get broken. I forced 
+fb_info->var.sync to the "something" value by hardcoding it in kernel just now 
+for a quick test and X works for me.
 
-Looking at drivers/video/mxsfb.c there is the following comment:
-
-	/*
-	 * It seems, you can't re-program the controller if it is still running.
-	 * This may lead into shifted pictures (FIFO issue?).
-	 * So, first stop the controller and drain its FIFOs
-	 */
-
-So, it looks like that I am still facing this issue when X11 starts.
-
-If anyone has any suggestions, please let me know.
-
-Thanks,
-
-Fabio Estevam
+Best regards,
+Marek Vasut
