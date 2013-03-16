@@ -1,356 +1,279 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Sat, 16 Mar 2013 18:20:01 +0530
-Subject: [PATCH] clk: let mxs specific clk-div clock type be a generic clock
- type
-Message-ID: <1363438201-24938-1-git-send-email-thomas.abraham@linaro.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Sat, 16 Mar 2013 14:09:36 +0100
+Subject: [PATCH] clk: add DT test clock consumer driver
+Message-ID: <1363439376-21294-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mxs platform specific clk-div clock is an extended version of the
-basic integer divider clock type that supports checking the stability
-status of the divider clock output. This type of clock is found on
-some of the Samsung platforms as well. So let the mxs specfic clk-div
-clock type be a generic clock type that all platforms can utilize.
+This driver adds a DT test clock consumer that exposes debugfs files to
+enable/disable and set/get rate of the attached programmable clock.
+During development of a i2c-attached clock generator I found it useful
+to debug the clock generator's internal pll settings by enforcing clock
+rates through debugfs.
 
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Mike Turquette <mturquette@linaro.org>
-Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
- drivers/clk/Makefile             |    1 +
- drivers/clk/clk-divider-status.c |  119 ++++++++++++++++++++++++++++++++++++++
- drivers/clk/mxs/Makefile         |    2 +-
- drivers/clk/mxs/clk-div.c        |  110 -----------------------------------
- drivers/clk/mxs/clk.h            |   12 +++-
- include/linux/clk-provider.h     |   21 +++++++
- 6 files changed, 151 insertions(+), 114 deletions(-)
- create mode 100644 drivers/clk/clk-divider-status.c
- delete mode 100644 drivers/clk/mxs/clk-div.c
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Rob Landley <rob@landley.net>
+Cc: Mike Turquette <mturquette@linaro.org>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: devicetree-discuss at lists.ozlabs.org
+Cc: linux-doc at vger.kernel.org
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ .../bindings/clock/test-clock-consumer.txt         |   19 ++
+ drivers/clk/Kconfig                                |    6 +
+ drivers/clk/Makefile                               |    3 +
+ drivers/clk/clk-test.c                             |  183 ++++++++++++++++++++
+ 4 files changed, 211 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/test-clock-consumer.txt
+ create mode 100644 drivers/clk/clk-test.c
 
+diff --git a/Documentation/devicetree/bindings/clock/test-clock-consumer.txt b/Documentation/devicetree/bindings/clock/test-clock-consumer.txt
+new file mode 100644
+index 0000000..3e228ed
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/test-clock-consumer.txt
+@@ -0,0 +1,19 @@
++* Test Clock Consumer
++
++The test clock consumer allows to debug clock providers by exposing
++debugfs files to enable/disable and set/get rate of attached clock
++respectively. It is especially useful for checking programmable clock
++generators, e.g. enforcing target clock rates to debug clock generator's
++pll settings. Currently, there is only one clock per test clock consumer
++supported but more than one test clock consumer can be added.
++
++Required properties:
++- compatible : shall be "test-clock-consumer"
++- clocks : phandle of the clock to debug
++
++Example:
++
++clock-consumer {
++	compatible = "test-clock-consumer";
++	clocks = <&programmable_clock>;
++};
+diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+index a47e6ee..e23e471 100644
+--- a/drivers/clk/Kconfig
++++ b/drivers/clk/Kconfig
+@@ -33,6 +33,12 @@ config COMMON_CLK_DEBUG
+ 	  clk_flags, clk_prepare_count, clk_enable_count &
+ 	  clk_notifier_count.
+ 
++config COMMON_CLK_TEST_CONSUMER
++	tristate "Clock consumer test driver"
++	---help---
++	  This is a clock consumer test driver to allow testing clock
++	  provider through user space.
++
+ config COMMON_CLK_WM831X
+ 	tristate "Clock driver for WM831x/2x PMICs"
+ 	depends on MFD_WM831X
 diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index 0147022..0ac851a 100644
+index 300d477..095899e 100644
 --- a/drivers/clk/Makefile
 +++ b/drivers/clk/Makefile
-@@ -7,6 +7,7 @@ obj-$(CONFIG_COMMON_CLK)	+= clk-fixed-factor.o
- obj-$(CONFIG_COMMON_CLK)	+= clk-fixed-rate.o
- obj-$(CONFIG_COMMON_CLK)	+= clk-gate.o
- obj-$(CONFIG_COMMON_CLK)	+= clk-mux.o
-+obj-$(CONFIG_COMMON_CLK)	+= clk-divider-status.o
- 
- # SoCs specific
- obj-$(CONFIG_ARCH_BCM2835)	+= clk-bcm2835.o
-diff --git a/drivers/clk/clk-divider-status.c b/drivers/clk/clk-divider-status.c
+@@ -34,3 +34,6 @@ obj-$(CONFIG_X86)		+= x86/
+ obj-$(CONFIG_COMMON_CLK_WM831X) += clk-wm831x.o
+ obj-$(CONFIG_COMMON_CLK_MAX77686) += clk-max77686.o
+ obj-$(CONFIG_CLK_TWL6040)	+= clk-twl6040.o
++
++# Debug drivers
++obj-$(CONFIG_COMMON_CLK_TEST_CONSUMER) += clk-test.o
+diff --git a/drivers/clk/clk-test.c b/drivers/clk/clk-test.c
 new file mode 100644
-index 0000000..1d66059
+index 0000000..08dd66b
 --- /dev/null
-+++ b/drivers/clk/clk-divider-status.c
-@@ -0,0 +1,119 @@
++++ b/drivers/clk/clk-test.c
+@@ -0,0 +1,183 @@
 +/*
-+ * Copyright 2012 Freescale Semiconductor, Inc.
++ * clk-test.c: Common Clock Framework Test Clock Consumer
 + *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
++ * (c) 2012 Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 + *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ *
-+ * Extension to the adjustable divider clock implementation with support for
-+ * divider clock stability checks.
++ *  This program is free software; you can redistribute  it and/or modify it
++ *  under  the terms of  the GNU General  Public License as published by the
++ *  Free Software Foundation;  either version 2 of the  License, or (at your
++ *  option) any later version.
 + */
 +
-+#include <linux/clk.h>
 +#include <linux/module.h>
++#include <linux/kernel.h>
++#include <linux/clk.h>
 +#include <linux/clk-provider.h>
++#include <linux/debugfs.h>
 +#include <linux/err.h>
-+#include <linux/slab.h>
-+#include <linux/io.h>
-+#include <linux/jiffies.h>
++#include <linux/errno.h>
++#include <linux/of_platform.h>
 +
-+/*
-+ * DOC: Adjustable divider clock with support for divider stability check
-+ *
-+ * Traits of this clock:
-+ * prepare - clk_prepare only ensures that parents are prepared
-+ * enable - clk_enable only ensures that parents are enabled
-+ * rate - rate is adjustable.  clk->rate = parent->rate / divisor
-+ * parent - fixed parent.  No clk_set_parent support
-+ */
++struct clock_consumer_data {
++	struct clk	*clk;
++	struct dentry	*clkdir;
++	const char	*name;
++	unsigned int	enabled;
++};
 +
-+static inline struct clk_divider_status *to_clk_div(struct clk_hw *hw)
++static struct dentry *rootdir;
++
++static int clock_consumer_debug_rate_set(void *data, u64 val)
 +{
-+	struct clk_divider *divider = container_of(hw, struct clk_divider, hw);
++	struct clock_consumer_data *ccdata = (struct clock_consumer_data *)data;
 +
-+	return container_of(divider, struct clk_divider_status, divider);
++	if (!ccdata->enabled)
++		return -EBUSY;
++
++	return clk_set_rate(ccdata->clk, (unsigned long)val);
 +}
 +
-+static unsigned long clk_divider_status_recalc_rate(struct clk_hw *hw,
-+					 unsigned long parent_rate)
++static int clock_consumer_debug_rate_get(void *data, u64 *val)
 +{
-+	struct clk_divider_status *div = to_clk_div(hw);
++	struct clock_consumer_data *ccdata = (struct clock_consumer_data *)data;
 +
-+	return div->ops->recalc_rate(&div->divider.hw, parent_rate);
++	if (!ccdata->enabled)
++		return -EBUSY;
++
++	*val = clk_get_rate(ccdata->clk);
++
++	return 0;
 +}
 +
-+static long clk_divider_status_round_rate(struct clk_hw *hw, unsigned long rate,
-+			       unsigned long *prate)
++static int clock_consumer_debug_enable_set(void *data, u64 val)
 +{
-+	struct clk_divider_status *div = to_clk_div(hw);
++	struct clock_consumer_data *ccdata = (struct clock_consumer_data *)data;
 +
-+	return div->ops->round_rate(&div->divider.hw, rate, prate);
++	if ((val == ccdata->enabled) || (!val && !ccdata->enabled))
++		return 0;
++
++	ccdata->enabled = (val) ? 1 : 0;
++
++	if (ccdata->enabled)
++		return clk_prepare_enable(ccdata->clk);
++
++	clk_disable_unprepare(ccdata->clk);
++	return 0;
 +}
 +
-+static int clk_divider_status_set_rate(struct clk_hw *hw, unsigned long rate,
-+			    unsigned long parent_rate)
++static int clock_consumer_debug_enable_get(void *data, u64 *val)
 +{
-+	struct clk_divider_status *div = to_clk_div(hw);
++	struct clock_consumer_data *ccdata = (struct clock_consumer_data *)data;
++	*val = ccdata->enabled;
++	return 0;
++}
++
++DEFINE_SIMPLE_ATTRIBUTE(clock_consumer_debug_ops_enable,
++			clock_consumer_debug_enable_get,
++			clock_consumer_debug_enable_set, "%llu\n");
++DEFINE_SIMPLE_ATTRIBUTE(clock_consumer_debug_ops_rate,
++			clock_consumer_debug_rate_get,
++			clock_consumer_debug_rate_set, "%llu\n");
++
++static int clock_consumer_debug_create_one(struct platform_device *pdev)
++{
++	struct clock_consumer_data *ccdata = platform_get_drvdata(pdev);
++	struct dentry *d;
++
++	if (!rootdir) {
++		rootdir = debugfs_create_dir("clk_consumer", NULL);
++		if (WARN_ON(IS_ERR_OR_NULL(rootdir)))
++			return -ENOMEM;
++	}
++
++	ccdata->clkdir = debugfs_create_dir(ccdata->name, rootdir);
++	if (WARN_ON(IS_ERR_OR_NULL(ccdata->clkdir)))
++		return -ENOMEM;
++
++	d = debugfs_create_file("enable", S_IRUGO | S_IWUGO, ccdata->clkdir,
++				ccdata, &clock_consumer_debug_ops_enable);
++	if (WARN_ON(IS_ERR_OR_NULL(d)))
++		goto err_out;
++
++	d = debugfs_create_file("rate", S_IRUGO | S_IWUGO, ccdata->clkdir,
++				ccdata, &clock_consumer_debug_ops_rate);
++	if (WARN_ON(IS_ERR_OR_NULL(d)))
++		goto err_out;
++
++	return 0;
++
++err_out:
++	debugfs_remove(ccdata->clkdir);
++	return -ENOMEM;
++}
++
++static struct of_device_id clock_consumer_of_match[] = {
++	{ .compatible = "test-clock-consumer", },
++	{ }
++};
++
++static int clock_consumer_probe(struct platform_device *pdev)
++{
++	struct clock_consumer_data *ccdata;
 +	int ret;
 +
-+	ret = div->ops->set_rate(&div->divider.hw, rate, parent_rate);
-+	if (!ret) {
-+		unsigned long timeout = jiffies + msecs_to_jiffies(10);
++	ccdata = devm_kzalloc(&pdev->dev, sizeof(struct clock_consumer_data),
++			      GFP_KERNEL);
++	if (WARN_ON(!ccdata))
++		return -ENOMEM;
 +
-+		while (readl_relaxed(div->reg) & (1 << div->busy)) {
-+			if (time_after(jiffies, timeout))
-+				return -ETIMEDOUT;
-+		}
++	ccdata->clk = devm_clk_get(&pdev->dev, NULL);
++	if (IS_ERR(ccdata->clk)) {
++		dev_err(&pdev->dev, "unable to get parent clock");
++		return PTR_RET(ccdata->clk);
 +	}
 +
-+	return ret;
++	platform_set_drvdata(pdev, ccdata);
++	ccdata->name = pdev->dev.of_node->name;
++
++	ret = clock_consumer_debug_create_one(pdev);
++	if (ret)
++		return ret;
++
++	dev_info(&pdev->dev, "installed clock consumer %s\n",
++		 ccdata->name);
++
++	return 0;
 +}
 +
-+static struct clk_ops clk_divider_status_ops = {
-+	.recalc_rate = clk_divider_status_recalc_rate,
-+	.round_rate = clk_divider_status_round_rate,
-+	.set_rate = clk_divider_status_set_rate,
-+};
-+EXPORT_SYMBOL_GPL(clk_divider_status_ops);
-+
-+struct clk *clk_register_divider_status(struct device *dev, const char *name,
-+		const char *parent_name, unsigned long flags, void __iomem *reg,
-+		u8 shift, u8 width, u8 clk_divider_flags,
-+		void __iomem *reg_status, u8 shift_status, spinlock_t *lock)
++static int clock_consumer_remove(struct platform_device *pdev)
 +{
-+	struct clk_divider_status *div;
-+	struct clk *clk;
-+	struct clk_init_data init;
++	struct clock_consumer_data *ccdata = platform_get_drvdata(pdev);
 +
-+	div = kzalloc(sizeof(*div), GFP_KERNEL);
-+	if (!div) {
-+		pr_err("%s: could not allocate divider-status clk\n", __func__);
-+		return ERR_PTR(-ENOMEM);
-+	}
++	if (!ccdata || !ccdata->clkdir)
++		return 0;
 +
-+	init.name = name;
-+	init.ops = &clk_divider_status_ops;
-+	init.flags = flags;
-+	init.parent_names = (parent_name ? &parent_name : NULL);
-+	init.num_parents = (parent_name ? 1 : 0);
++	debugfs_remove_recursive(ccdata->clkdir);
++	if (!IS_ERR(ccdata->clk) && ccdata->enabled)
++		clk_disable_unprepare(ccdata->clk);
 +
-+	div->reg = reg_status;
-+	div->busy = shift_status;
-+	div->ops = &clk_divider_ops;
++	dev_info(&pdev->dev, "removed clock consumer %s\n", ccdata->name);
 +
-+	div->divider.reg = reg;
-+	div->divider.shift = shift;
-+	div->divider.width = width;
-+	div->divider.flags = clk_divider_flags;
-+	div->divider.lock = lock;
-+	div->divider.hw.init = &init;
++	if (rootdir && list_empty(&rootdir->d_subdirs))
++		debugfs_remove_recursive(rootdir);
 +
-+	clk = clk_register(NULL, &div->divider.hw);
-+	if (IS_ERR(clk))
-+		kfree(div);
++	platform_set_drvdata(pdev, NULL);
 +
-+	return clk;
-+}
-diff --git a/drivers/clk/mxs/Makefile b/drivers/clk/mxs/Makefile
-index a6a2223..8f8f1b3 100644
---- a/drivers/clk/mxs/Makefile
-+++ b/drivers/clk/mxs/Makefile
-@@ -2,7 +2,7 @@
- # Makefile for mxs specific clk
- #
- 
--obj-y += clk.o clk-pll.o clk-ref.o clk-div.o clk-frac.o clk-ssp.o
-+obj-y += clk.o clk-pll.o clk-ref.o clk-frac.o clk-ssp.o
- 
- obj-$(CONFIG_SOC_IMX23) += clk-imx23.o
- obj-$(CONFIG_SOC_IMX28) += clk-imx28.o
-diff --git a/drivers/clk/mxs/clk-div.c b/drivers/clk/mxs/clk-div.c
-deleted file mode 100644
-index 90e1da9..0000000
---- a/drivers/clk/mxs/clk-div.c
-+++ /dev/null
-@@ -1,110 +0,0 @@
--/*
-- * Copyright 2012 Freescale Semiconductor, Inc.
-- *
-- * The code contained herein is licensed under the GNU General Public
-- * License. You may obtain a copy of the GNU General Public License
-- * Version 2 or later at the following locations:
-- *
-- * http://www.opensource.org/licenses/gpl-license.html
-- * http://www.gnu.org/copyleft/gpl.html
-- */
--
--#include <linux/clk.h>
--#include <linux/clk-provider.h>
--#include <linux/err.h>
--#include <linux/slab.h>
--#include "clk.h"
--
--/**
-- * struct clk_div - mxs integer divider clock
-- * @divider: the parent class
-- * @ops: pointer to clk_ops of parent class
-- * @reg: register address
-- * @busy: busy bit shift
-- *
-- * The mxs divider clock is a subclass of basic clk_divider with an
-- * addtional busy bit.
-- */
--struct clk_div {
--	struct clk_divider divider;
--	const struct clk_ops *ops;
--	void __iomem *reg;
--	u8 busy;
--};
--
--static inline struct clk_div *to_clk_div(struct clk_hw *hw)
--{
--	struct clk_divider *divider = container_of(hw, struct clk_divider, hw);
--
--	return container_of(divider, struct clk_div, divider);
--}
--
--static unsigned long clk_div_recalc_rate(struct clk_hw *hw,
--					 unsigned long parent_rate)
--{
--	struct clk_div *div = to_clk_div(hw);
--
--	return div->ops->recalc_rate(&div->divider.hw, parent_rate);
--}
--
--static long clk_div_round_rate(struct clk_hw *hw, unsigned long rate,
--			       unsigned long *prate)
--{
--	struct clk_div *div = to_clk_div(hw);
--
--	return div->ops->round_rate(&div->divider.hw, rate, prate);
--}
--
--static int clk_div_set_rate(struct clk_hw *hw, unsigned long rate,
--			    unsigned long parent_rate)
--{
--	struct clk_div *div = to_clk_div(hw);
--	int ret;
--
--	ret = div->ops->set_rate(&div->divider.hw, rate, parent_rate);
--	if (!ret)
--		ret = mxs_clk_wait(div->reg, div->busy);
--
--	return ret;
--}
--
--static struct clk_ops clk_div_ops = {
--	.recalc_rate = clk_div_recalc_rate,
--	.round_rate = clk_div_round_rate,
--	.set_rate = clk_div_set_rate,
--};
--
--struct clk *mxs_clk_div(const char *name, const char *parent_name,
--			void __iomem *reg, u8 shift, u8 width, u8 busy)
--{
--	struct clk_div *div;
--	struct clk *clk;
--	struct clk_init_data init;
--
--	div = kzalloc(sizeof(*div), GFP_KERNEL);
--	if (!div)
--		return ERR_PTR(-ENOMEM);
--
--	init.name = name;
--	init.ops = &clk_div_ops;
--	init.flags = CLK_SET_RATE_PARENT;
--	init.parent_names = (parent_name ? &parent_name: NULL);
--	init.num_parents = (parent_name ? 1 : 0);
--
--	div->reg = reg;
--	div->busy = busy;
--
--	div->divider.reg = reg;
--	div->divider.shift = shift;
--	div->divider.width = width;
--	div->divider.flags = CLK_DIVIDER_ONE_BASED;
--	div->divider.lock = &mxs_lock;
--	div->divider.hw.init = &init;
--	div->ops = &clk_divider_ops;
--
--	clk = clk_register(NULL, &div->divider.hw);
--	if (IS_ERR(clk))
--		kfree(div);
--
--	return clk;
--}
-diff --git a/drivers/clk/mxs/clk.h b/drivers/clk/mxs/clk.h
-index 81421e2..865f495 100644
---- a/drivers/clk/mxs/clk.h
-+++ b/drivers/clk/mxs/clk.h
-@@ -29,9 +29,6 @@ struct clk *mxs_clk_pll(const char *name, const char *parent_name,
- struct clk *mxs_clk_ref(const char *name, const char *parent_name,
- 			void __iomem *reg, u8 idx);
- 
--struct clk *mxs_clk_div(const char *name, const char *parent_name,
--			void __iomem *reg, u8 shift, u8 width, u8 busy);
--
- struct clk *mxs_clk_frac(const char *name, const char *parent_name,
- 			 void __iomem *reg, u8 shift, u8 width, u8 busy);
- 
-@@ -63,4 +60,13 @@ static inline struct clk *mxs_clk_fixed_factor(const char *name,
- 					 CLK_SET_RATE_PARENT, mult, div);
- }
- 
-+static inline struct clk *mxs_clk_div(const char *name,
-+			const char *parent_name, void __iomem *reg, u8 shift,
-+			u8 width, u8 busy)
-+{
-+	return clk_register_divider_status(NULL, name, parent_name,
-+				CLK_SET_RATE_PARENT, reg, shift, width,
-+				CLK_DIVIDER_ONE_BASED, reg, busy, &mxs_lock);
++	return 0;
 +}
 +
- #endif /* __MXS_CLK_H */
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 7f197d7..6309335 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -268,6 +268,27 @@ struct clk *clk_register_divider_table(struct device *dev, const char *name,
- 		spinlock_t *lock);
- 
- /**
-+ * struct clk_divider_status - integer divider clock with additional status bit
-+ * @divider: the parent class
-+ * @ops: pointer to clk_ops of parent class
-+ * @reg: register containing the divider status bit
-+ * @busy: divider busy bit shift
-+ *
-+ * This clock is a subclass of basic clk_divider with an addtional busy bit.
-+ */
-+struct clk_divider_status {
-+	struct clk_divider divider;
-+	const struct clk_ops *ops;
-+	void __iomem *reg;
-+	u8 busy;
++static struct platform_driver clock_consumer_driver = {
++	.driver = {
++		.name = "clock-consumer",
++		.owner = THIS_MODULE,
++		.of_match_table = of_match_ptr(clock_consumer_of_match),
++	},
++	.probe = clock_consumer_probe,
++	.remove = clock_consumer_remove,
 +};
 +
-+struct clk *clk_register_divider_status(struct device *dev, const char *name,
-+		const char *parent_name, unsigned long flags, void __iomem *reg,
-+		u8 shift, u8 width, u8 clk_divider_flags,
-+		void __iomem *reg_status, u8 shift_status, spinlock_t *lock);
++module_platform_driver(clock_consumer_driver);
 +
-+/**
-  * struct clk_mux - multiplexer clock
-  *
-  * @hw:		handle between common and hardware-specific interfaces
++MODULE_AUTHOR("Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>");
++MODULE_DESCRIPTION("Common clock framwork test clock consumer driver");
++MODULE_LICENSE("GPL v2");
 -- 
-1.7.5.4
+1.7.10.4
