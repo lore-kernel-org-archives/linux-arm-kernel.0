@@ -1,24 +1,44 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Fri, 15 Mar 2013 18:03:14 -0700
-Subject: [PATCH 06/29] arm64: KVM: fault injection into a guest
-In-Reply-To: <1362455265-24165-7-git-send-email-marc.zyngier@arm.com>
-References: <1362455265-24165-1-git-send-email-marc.zyngier@arm.com>
- <1362455265-24165-7-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1363395794.3155.87.camel@smoke>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Fri, 15 Mar 2013 20:09:28 -0500
+Subject: [PATCH 0/3] arm: ep93xx driver cleanup
+In-Reply-To: <201303151800.18192.hartleys@visionengravers.com>
+References: <201303151800.18192.hartleys@visionengravers.com>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F0020980106CBE@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Oops... sent to the wrong list.
 
-On Tue, 2013-03-05 at 03:47 +0000, Marc Zyngier wrote:
-> --- /dev/null
-> +++ b/arch/arm64/kvm/inject_fault.c
-> @@ -0,0 +1,117 @@
+Please ignore.
 
-...
+Regards,
+Hartley
 
-> + * kvm_inject_undefined - inject a undefined instruction into the guest
+-----Original Message-----
+From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of H Hartley Sweeten
+Sent: Friday, March 15, 2013 6:00 PM
+To: ARM Kernel
+Cc: Ryan Mallon
+Subject: [PATCH 0/3] arm: ep93xx driver cleanup
 
-s/ a undefined/ an undefined/
+Fix a couple section mismatch warnings and convert two of the ep93xx
+drivers to use module_platform_driver.
 
--Geoff
+H Hartley Sweeten (3):
+  backlight: ep93xx_bl: fix section mismatch
+  video: ep93xx-fb.c: fix section mismatch and use module_platform_driver
+  video: ep93xx_pwm.c: fix section mismatch and use module_platform_driver
+
+ drivers/misc/ep93xx_pwm.c           | 21 +++++----------------
+ drivers/video/backlight/ep93xx_bl.c |  3 +--
+ drivers/video/ep93xx-fb.c           | 18 +++---------------
+ 3 files changed, 9 insertions(+), 33 deletions(-)
+
+-- 
+1.8.1.4
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel at lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
