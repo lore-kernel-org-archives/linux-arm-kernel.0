@@ -1,83 +1,53 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Sun, 17 Mar 2013 22:23:54 +0100
-Subject: [PATCH] ARM: kirkwood: Add support for NETGEAR ReadyNAS Duo v2
- using DT
-In-Reply-To: <20130317205047.GU21478@lunn.ch> (Andrew Lunn's message of "Sun,
- 17 Mar 2013 21:50:47 +0100")
-References: <8738vt3h11.fsf@natisbad.org> <20130317205047.GU21478@lunn.ch>
-Message-ID: <87li9l200l.fsf@natisbad.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Sun, 17 Mar 2013 21:46:42 +0000
+Subject: [PATCH v2, part3 02/12] mm/ARM64: kill poison_init_mem()
+In-Reply-To: <1363453413-8139-3-git-send-email-jiang.liu@huawei.com>
+References: <1363453413-8139-1-git-send-email-jiang.liu@huawei.com>
+ <1363453413-8139-3-git-send-email-jiang.liu@huawei.com>
+Message-ID: <20130317214642.GA20875@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew and Jason,
+On Sat, Mar 16, 2013 at 05:03:23PM +0000, Jiang Liu wrote:
+> Use free_reserved_area() to kill poison_init_mem() on ARM64.
+> 
+> Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  arch/arm64/mm/init.c |   17 +++--------------
+>  1 file changed, 3 insertions(+), 14 deletions(-)
+> 
+> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> index e58dd7f..b87bdb8 100644
+> --- a/arch/arm64/mm/init.c
+> +++ b/arch/arm64/mm/init.c
+> @@ -197,14 +197,6 @@ void __init bootmem_init(void)
+>  	max_pfn = max_low_pfn = max;
+>  }
+>  
+> -/*
+> - * Poison init memory with an undefined instruction (0x0).
+> - */
+> -static inline void poison_init_mem(void *s, size_t count)
+> -{
+> -	memset(s, 0, count);
+> -}
+> -
+>  #ifndef CONFIG_SPARSEMEM_VMEMMAP
+>  static inline void free_memmap(unsigned long start_pfn, unsigned long end_pfn)
+>  {
+> @@ -386,8 +378,7 @@ void __init mem_init(void)
+>  
+>  void free_initmem(void)
+>  {
+> -	poison_init_mem(__init_begin, __init_end - __init_begin);
+> -	free_initmem_default(-1);
+> +	free_initmem_default(0);
 
-Jason, I have taken your comments into account.
+This change looks unrelated to $subject. We should probably just poison with
+0 from the outset, when free_initmem_default is introduced.
 
-Andrew Lunn <andrew@lunn.ch> writes:
-
-> Hi Arnaud
->
->> +
->> +		thermal at 10078 {
->> +			compatible = "marvell,kirkwood-thermal";
->> +			reg = <0x10078 0x4>;
->> +			status = "okay";
->> +		};
->
-> This should not be needed. All 6282 have the thermal sensor, so the
-> kirkwood-6282.dtsi will contain this. For 3.9 we submitted the DT
-> change too late, so it did not make it in, but for 3.10 it should be
-> there.
-
-Understood, will remove it.
-
-
->> +void __init netgear_readynas_init(void)
->> +{
->> +	u32 val;
->> +
->> +	kirkwood_ge00_init(&netgear_readynas_ge00_data);
->> +	kirkwood_pcie_init(KW_PCIE0);
->> +
->> +	/* USB 3.0 controller power on */
->> +	mdelay(3000);
->> +	val = readl(GPIO_HIGH_VIRT_BASE + 0x4);
->> +	writel(val & ~(0x1 << 14), GPIO_HIGH_VIRT_BASE + 0x4);
->> +	val = readl(GPIO_HIGH_VIRT_BASE);
->> +	writel(val | (0x1 << 14), GPIO_HIGH_VIRT_BASE);
->
-> As Jason said, you can use a fixed regulator, in DT. Something like:
->
->         regulators {
->                 compatible = "simple-bus";
->                 #address-cells = <1>;
->                 #size-cells = <0>;
->
->                 usb_power: regulator at 1 {
->                         compatible = "regulator-fixed";
->                         reg = <1>;
->                         regulator-name = "USB Power";
->                         regulator-min-microvolt = <5000000>;
->                         regulator-max-microvolt = <5000000>;
->                         enable-active-high;
->                         regulator-always-on;
->                         regulator-boot-on;
->                         gpio = <&gpio0 14 0>;
->                 };
->         };
-
-Thanks for providing this to bootstrap with. Tomorrow, I will test if it
-works and report results.
-
-
-> Is the mdelay() really required?
-
-It was in NETGEAR's kernel (heavily patched 2.6.31.8) and thought people
-who wrote the code had reasons (documentation) to put it here but I will
-check if it is needed.
-
-Thanks for your time,
-
-Cheers,
-
-a+
+Will
