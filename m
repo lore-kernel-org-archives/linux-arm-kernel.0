@@ -1,48 +1,23 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Sun, 17 Mar 2013 15:48:19 +0100
-Subject: ep93xx irq-vic regression
-In-Reply-To: <51450905.8030108@gmail.com>
-References: <ADE657CA350FB648AAC2C43247A983F0020980106C9F@AUSP01VMBX24.collaborationhost.net>
- <201303161449.03823.florian@openwrt.org> <51450905.8030108@gmail.com>
-Message-ID: <1659668.cz5sPBWP0g@bender>
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Sun, 17 Mar 2013 16:32:30 +0100
+Subject: [PATCH] ARM: mach-moxart: platform port for MOXA ART SoC
+In-Reply-To: <201303151125.53999.arnd@arndb.de>
+References: <CACmBeS1NLFUYHBOVL28aCCzRrgXYGPZF9t3qj6AdcgaMkrPGoQ@mail.gmail.com>
+ <CACmBeS05cyT8N9nZeqbJUPMSGeZYLWjL0Tu1GSZ-ms+Hjc0UoQ@mail.gmail.com>
+ <5140C6B2.7040702@gmail.com> <201303151125.53999.arnd@arndb.de>
+Message-ID: <CACmBeS3aXs9vhc5ZYPbz5bjsYsSa6EzM12H4uPv706x0zU_5iw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 17 March 2013 11:06:29 Ryan Mallon wrote:
-[snip]
-> >> From: H Hartley Sweeten <hsweeten@visionengravers.com>
-> >> Subject: [PATCH] arm: ep93xx: fix wait for UART FIFO to be empty
-> >>
-> >> commit 210dce5f "ARM: ep93xx: properly wait for UART FIFO to be empty"
-> >>
-> >> Removed the timeout loop while waiting for the uart transmit fifo to
-> >> empty. Some bootloaders leave the uart in a state where there might
-> >> be bytes in the uart that are not transmitted when execution is handed
-> >> over to the kernel. This results in a deadlocked system while waiting
-> >> for the fifo to empty.
-> >>
-> >> Add back the timeout wait to prevent the deadlock.
-> >>
-> >> Increase the wait time to hopefully prevent the decompressor corruption
-> >> that lead to commit 210dce5f. This corruption was probably due to a
-> >> slow uart baudrate. The 10* increase in the wait time should be enough
-> >> for all cases.
-> > 
-> > Ok, your solution seems like it would work, when I come accross this bug I 
-> > initially ended up doing the same thing and incrementing the number of 
-> > iterations in the loop. I was not quite happy with that as it would still 
-be 
-> > highly depending on the clocking. Anyway, sorry for breaking your system 
-with 
-> > this commit.
-> 
-> 
-> Do you want to add an Acked/Reviewed-by Florian? I'll queue this
-> up in my tree if you are happy with it.
+Thank you for the feedback.
 
-Yes, I just re-tested with 10000 as a loop value, and it fixes the corruption I 
-was seeing, you can add my Acked-by: Florian Fainelli <florian@openwrt.org>
+Some of the changes are sure to be a challenge for me, but I want to
+move this forward, and having a list helps.
 
-Thanks to both of you!
--- 
-Florian
+3.2.40 is as far as it'll go right now, nothing prints to UART
+starting with 3.3.8 (last tested, it's somewhere around there).
+
+I have been advised to enable early_printk (by landley on freenode IRC #edev).
+
+Best regards,
+Jonas
