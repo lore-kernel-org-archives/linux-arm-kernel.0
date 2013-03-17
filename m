@@ -1,151 +1,94 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Sun, 17 Mar 2013 10:35:41 +0530
-Subject: [PATCH V6] ARM: LPAE: Fix mapping in alloc_init_section for unaligned
- addresses
-Message-ID: <1363496741-3427-1-git-send-email-r.sricharan@ti.com>
+From: anilk4.v@gmail.com (Anil Kumar)
+Date: Sun, 17 Mar 2013 10:53:36 +0530
+Subject: [PATCH V4] ARM: dts: add minimal DT support for DevKit8000.
+In-Reply-To: <513838F2.60101@ti.com>
+References: <F3DBB1B3EF102E4994C89758CFCA32412CC4E9@DBDE01.ent.ti.com>
+ <CABYxbz5GyxYaHANgdpwBNaaR6tnu=6LJuUNSvL7DEzU=4CPHcA@mail.gmail.com>
+ <F3DBB1B3EF102E4994C89758CFCA32412CC74F@DBDE01.ent.ti.com>
+ <CABYxbz62JrMB95p5i9iu2G=B4ETXLrYbLsyFEFR5F+WVD6YNnQ@mail.gmail.com>
+ <20130306175313.GQ11806@atomide.com> <513838F2.60101@ti.com>
+Message-ID: <CABYxbz7bLZxX-6U3O9nRsKxAXbg0nEta55eO-ERuotPnw=X5BQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: R Sricharan <r.sricharan@ti.com>
+Hi Benoit,
 
-With LPAE enabled, alloc_init_section() does not map the entire
-address space for unaligned addresses.
+On Thu, Mar 7, 2013 at 12:21 PM, Benoit Cousson <b-cousson@ti.com> wrote:
+> Hi,
+>
+> On 03/06/2013 06:53 PM, Tony Lindgren wrote:
+>> * Anil Kumar <anilk4.v@gmail.com> [130305 18:40]:
+>>> Hi Tony,
+>>>
+>>>>> From: linux-arm-kernel [mailto:linux-arm-kernel-
+>>>>> bounces at lists.infradead.org] On Behalf Of Anil Kumar
+>>>>> Sent: Wednesday, February 27, 2013 8:03 AM
+>>>>> To: devicetree-discuss at lists.ozlabs.org; linux-omap at vger.kernel.org;
+>>>>> linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+>>>>> Cc: linux at arm.linux.org.uk; Cousson, Benoit; Tony Lindgren; Grant
+>>>>> Likely; Anil Kumar; thomas at tomweber.eu
+>>>>> Subject: Re: FW: [PATCH V4] ARM: dts: add minimal DT support for
+>>>>> DevKit8000.
+>>>>>
+>>>>> Hi,
+>>>>>>
+>>>>>> DevKit8000 is a beagle board clone from Timll, sold by
+>>>>>> armkits.com. The DevKit8000 has RS232 serial port, LCD, DVI-D,
+>>>>>> S-Video, Ethernet, SD/MMC, keyboard, camera, SPI, I2C, USB and
+>>>>>> JTAG interface.
+>>>>>>
+>>>>>> This patch adds the basic DT support for devkit8000. At this time,
+>>>>> Information
+>>>>>> of twl4030 (PMIC), MMC1, I2C1 and leds are added.
+>>>>>>
+>>>>>> Signed-off-by: Anil Kumar <anilk4.v@gmail.com>
+>>>>>> Tested-by: Thomas Weber <thomas@tomweber.eu>
+>>>>>
+>>>>> Gentle Ping. As there are no review comments on this patch,
+>>>>> Could you please pull this patch ?
+>>>
+>>> Gentle Ping.
+>>>
+>>> This patch also got Reviewed-by: Manish Badarkhe <badarkhe.manish@gmail.com>
+>>> and as patch "ARM: dts: omap3-devkit8000: Enable audio support"  has already got
+>>> "Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>" but it is on the
+>>> top of this patch.
+>>> So, Could you please pull this patch in one of your omap branch? or
+>>> you want me to
+>>> do rebase this patch on top of v3.9-rc1 ?
+>>
+>> Let's wait for Benoit to queue it as he has a bunch of .dts changes already
+>> applied. Too bad we missed v3.9 merge window for those, but hopefully
+>> we can get them queued early for v3.10.
+>
+> Yep, sorry for having missed 3.9, I was a little bit sick at the wrong
+> moment :-(
+>
+> I'm starting queuing the pending patches, and should have enough to push
+> to you just after Linaro Connect.
 
-The issue also reproduced with CMA + LPAE. CMA tries to map 16MB
-with page granularity mappings during boot. alloc_init_pte()
-is called and out of 16MB, only 2MB gets mapped and rest remains
-unaccessible.
+I think you missed below patch which is needed for gpmc nand to work fine.
 
-Because of this OMAP5 boot is broken with CMA + LPAE enabled.
-Fix the issue by ensuring that the entire addresses are
-mapped.
+Jon Hunter:-
+  ARM: OMAP2+: Fix-up gpmc merge error
 
-Signed-off-by: R Sricharan <r.sricharan@ti.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Christoffer Dall <chris@cloudcar.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Tested-by: Laura Abbott <lauraa@codeaurora.org>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
----
- [V2] Moved the loop to alloc_init_pte as per Russell's
-     feedback and changed the subject accordingly.
-     Using PMD_XXX instead of SECTION_XXX to avoid
-     different loop increments with/without LPAE.
+I have re based my changes on top of your repository to make pull
+easier for you.
+I hope you will pull these changes for 3.10.
 
- [v3] Removed the dummy variable phys and updated
-      the commit log for CMA case.
+The following changes since Commit a7f7881de9c0b58de3b3aea8f01a8aef906d4ade
 
- [v4] Resending with updated change log and
-      updating the tags.
+are available in the git repository at:
 
- [v5] Renamed alloc_init_section to alloc_init_pmd
-      and moved the loop back there. Also introduced
-      map_init_section as per Catalin's comments.
+git://gitorious.org/devkit8000-for_3-10/devkit8000-for_3-10.git
+branch for_3.10/dts
 
- [v6] Corrected tags and updated the comments for code.
+for you to fetch changes up to Commit 975abc8b2e7ec4ff7324d726c9775958945ccc5e
 
- arch/arm/mm/mmu.c |   73 ++++++++++++++++++++++++++++++++++-------------------
- 1 file changed, 47 insertions(+), 26 deletions(-)
+Anil Kumar:
+ARM: dts: add minimal DT support for DevKit8000
+ARM: dts: omap3-devkit8000: Enable audio support
+ARM: dts: omap3-devkit8000: add nand dt node
 
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index e95a996..7897894 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -598,39 +598,60 @@ static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
- 	} while (pte++, addr += PAGE_SIZE, addr != end);
- }
- 
--static void __init alloc_init_section(pud_t *pud, unsigned long addr,
--				      unsigned long end, phys_addr_t phys,
--				      const struct mem_type *type)
-+static void __init map_init_section(pmd_t *pmd, unsigned long addr,
-+			unsigned long end, phys_addr_t phys,
-+			const struct mem_type *type)
- {
--	pmd_t *pmd = pmd_offset(pud, addr);
--
-+#ifndef CONFIG_ARM_LPAE
- 	/*
--	 * Try a section mapping - end, addr and phys must all be aligned
--	 * to a section boundary.  Note that PMDs refer to the individual
--	 * L1 entries, whereas PGDs refer to a group of L1 entries making
--	 * up one logical pointer to an L2 table.
-+	 * In classic MMU format, puds and pmds are folded in to
-+	 * the pgds. pmd_offset gives the PGD entry. PGDs refer to a
-+	 * group of L1 entries making up one logical pointer to
-+	 * an L2 table (2MB), where as PMDs refer to the individual
-+	 * L1 entries (1MB). Hence increment to get the correct
-+	 * offset for odd 1MB sections.
-+	 * (See arch/arm/include/asm/pgtable-2level.h)
- 	 */
--	if (type->prot_sect && ((addr | end | phys) & ~SECTION_MASK) == 0) {
--		pmd_t *p = pmd;
--
--#ifndef CONFIG_ARM_LPAE
--		if (addr & SECTION_SIZE)
--			pmd++;
-+	if (addr & SECTION_SIZE)
-+		pmd++;
- #endif
-+	do {
-+		*pmd = __pmd(phys | type->prot_sect);
-+		phys += SECTION_SIZE;
-+	} while (pmd++, addr += SECTION_SIZE, addr != end);
- 
--		do {
--			*pmd = __pmd(phys | type->prot_sect);
--			phys += SECTION_SIZE;
--		} while (pmd++, addr += SECTION_SIZE, addr != end);
-+	flush_pmd_entry(pmd);
-+}
- 
--		flush_pmd_entry(p);
--	} else {
-+static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
-+				      unsigned long end, phys_addr_t phys,
-+				      const struct mem_type *type)
-+{
-+	pmd_t *pmd = pmd_offset(pud, addr);
-+	unsigned long next;
-+
-+	do {
- 		/*
--		 * No need to loop; pte's aren't interested in the
--		 * individual L1 entries.
-+		 * With LPAE, we must loop over to map
-+		 * all the pmds for the given range.
- 		 */
--		alloc_init_pte(pmd, addr, end, __phys_to_pfn(phys), type);
--	}
-+		next = pmd_addr_end(addr, end);
-+
-+		/*
-+		 * Try a section mapping - addr, next and phys must all be
-+		 * aligned to a section boundary.
-+		 */
-+		if (type->prot_sect &&
-+				((addr | next | phys) & ~SECTION_MASK) == 0) {
-+			map_init_section(pmd, addr, next, phys, type);
-+		} else {
-+			alloc_init_pte(pmd, addr, next,
-+						__phys_to_pfn(phys), type);
-+		}
-+
-+		phys += next - addr;
-+
-+	} while (pmd++, addr = next, addr != end);
- }
- 
- static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
-@@ -641,7 +662,7 @@ static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
- 
- 	do {
- 		next = pud_addr_end(addr, end);
--		alloc_init_section(pud, addr, next, phys, type);
-+		alloc_init_pmd(pud, addr, next, phys, type);
- 		phys += next - addr;
- 	} while (pud++, addr = next, addr != end);
- }
--- 
-1.7.9.5
+Thanks,
+Anil
