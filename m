@@ -1,42 +1,39 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Sun, 17 Mar 2013 13:39:53 -0400 (EDT)
-Subject: [PATCH] USB: EHCI: fix for leaking isochronous data
-In-Reply-To: <Pine.LNX.4.44L0.1303171320560.26486-100000@netrider.rowland.org>
-Message-ID: <Pine.LNX.4.44L0.1303171338270.26486-100000@netrider.rowland.org>
+From: pavel@denx.de (Pavel Machek)
+Date: Sun, 17 Mar 2013 19:13:43 +0100
+Subject: [PATCHv1 0/2] ARM: socfpga: Soft reset, hotplug and device
+ tree clocks
+In-Reply-To: <5141220A.7050008@gmail.com>
+References: <1363211722-27237-1-git-send-email-dinguyen@altera.com>
+ <5141220A.7050008@gmail.com>
+Message-ID: <20130317181343.GB4394@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 17 Mar 2013, Alan Stern wrote:
+Hi!
 
-> On Sun, 17 Mar 2013, Soeren Moch wrote:
+> > From: Dinh Nguyen <dinguyen@altera.com>
+> > 
+> > Hi Arnd/Olof,
+> > 
+> > Just 2 patches for mach-socfpga:
+> > 
+> > 0001: ARM: socfpga: Enable hotplug and soft reset
+> > 	- Able to hotplug CPU1 by putting it into reset and bringing back online.
+> > 
 > 
-> > For each device only one isochronous endpoint is used (EP IN4, 1x 940 
-> > Bytes, Interval 1).
-> > When the ENOMEM error occurs, a huge number of iTDs is in the free_list 
-> > of one stream. This number is much higher than the 2*M entries, which 
-> > should be there according to your description.
-> 
-> Okay, but how did they get there?  With each URB requiring 9 iTDs, and
-> about 5 URBs active at any time, there should be about 5*9 = 45 iTDs in
-> use and 2*9 = 18 iTDs on the free list.  By the time each URB
-> completes, it should have released all 9 iTDs back to the free list,
-> and each time an URB is submitted, it should be able to acquire all 9
-> of the iTDs that it needs from the free list -- it shouldn't have to 
-> allocate any from the DMA pool.
-> 
-> Looks like you'll have to investigate what's going on inside
-> itd_urb_transaction().  Print out some useful information whenever the
-> size of stream->free_list is above 50, such as the value of num_itds,
-> how many of the loop iterations could get an iTD from the free list,
-> and the value of itd->frame in the case where the "goto alloc_itd"
-> statement is followed.
-> 
-> It might be a good idea also to print out the size of the free list in
-> itd_complete(), where it calls ehci_urb_done(), and include the value
-> of ehci->now_frame.
+> Have you seen the discussion on PSCI? There's an ARM doc on it and
+> Linaro session from last week. Is there a possibility you can use that?
+> You would need to be able to run in non-secure mode and implement
+> smc calls.
 
-One thing I forgot to mention: It would help to have millisecond
-precision for the timestamps in the system log, for comparison of frame
-number values.  Please enable CONFIG_PRINTK_TIME for the next test.
+What would be the advantage?
 
-Alan Stern
+We do not have suitable hypervisor at the moment. Nor I see why it
+would be good to push power management into it.
+
+(Plus, the implementation seems pretty incomplete for arm32.).
+
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
