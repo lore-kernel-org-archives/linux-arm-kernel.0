@@ -1,62 +1,35 @@
-From: rmallon@gmail.com (Ryan Mallon)
-Date: Sun, 17 Mar 2013 11:06:29 +1100
-Subject: ep93xx irq-vic regression
-In-Reply-To: <201303161449.03823.florian@openwrt.org>
-References: <ADE657CA350FB648AAC2C43247A983F0020980106C9F@AUSP01VMBX24.collaborationhost.net>
- <5143AAB4.6020406@gmail.com>
- <ADE657CA350FB648AAC2C43247A983F0020980106CB7@AUSP01VMBX24.collaborationhost.net>
- <201303161449.03823.florian@openwrt.org>
-Message-ID: <51450905.8030108@gmail.com>
+From: lznuaa@gmail.com (Frank Li)
+Date: Sun, 17 Mar 2013 09:15:52 +0800
+Subject: Anyone implement Cortex A9 FIQ
+In-Reply-To: <5142FBF5.3010307@arm.com>
+References: <CAHrpEqSQ1n_WUfxoraKZFS2A8NjdP_MCcWmJdCjcon_QwgX4Hw@mail.gmail.com>
+ <5142FBF5.3010307@arm.com>
+Message-ID: <CAHrpEqSO89Lx=EGTJJ_XOFwkHqL=heoOUQCtJUzm6D7mEAbWiw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/03/13 00:49, Florian Fainelli wrote:
+2013/3/15 Jonathan Austin <jonathan.austin@arm.com>:
+> Hi Frank,
+>
+>
+> On 15/03/13 07:38, Frank Li wrote:
+>>
+>> All:
+>>              Recently, we need real time work run in cortex A9.
+>>              Did anyone use FIQ on Cortex A9?
+>>
+>
+> What are you actually trying to do? There's quite a lot more complexity to
+> being able to do real-time work on an A-class processor than just using FIQ,
+> and much of that would be platform specific. For example on ARMv7A, we
+> generally can't assume that FIQ can be used by the non-secure world...
 
-> Hello,
-> 
-> Le samedi 16 mars 2013 01:16:52, H Hartley Sweeten a ?crit :
-> [snip]
-> 
->>
->>     ARM: ep93xx: properly wait for UART FIFO to be empty
->>
->> Reverting that one allows my system to boot with 3.9.0-rc2.
->>
->> Instead of removing the wait loop completely I propose this
->> patch instead. I can repost this patch in a new thread if
->> necessary.
->>
->> Regards,
->> Hartley
->>
->> ---
->>
->> From: H Hartley Sweeten <hsweeten@visionengravers.com>
->> Subject: [PATCH] arm: ep93xx: fix wait for UART FIFO to be empty
->>
->> commit 210dce5f "ARM: ep93xx: properly wait for UART FIFO to be empty"
->>
->> Removed the timeout loop while waiting for the uart transmit fifo to
->> empty. Some bootloaders leave the uart in a state where there might
->> be bytes in the uart that are not transmitted when execution is handed
->> over to the kernel. This results in a deadlocked system while waiting
->> for the fifo to empty.
->>
->> Add back the timeout wait to prevent the deadlock.
->>
->> Increase the wait time to hopefully prevent the decompressor corruption
->> that lead to commit 210dce5f. This corruption was probably due to a
->> slow uart baudrate. The 10* increase in the wait time should be enough
->> for all cases.
-> 
-> Ok, your solution seems like it would work, when I come accross this bug I 
-> initially ended up doing the same thing and incrementing the number of 
-> iterations in the loop. I was not quite happy with that as it would still be 
-> highly depending on the clocking. Anyway, sorry for breaking your system with 
-> this commit.
+There are period task run every 125us.
+Task is quick simply, just put virtual multi DMA queue to real DMA queue.
+Small memory copy and set some hardware register.
 
 
-Do you want to add an Acked/Reviewed-by Florian? I'll queue this
-up in my tree if you are happy with it.
-
-~Ryan
+>
+>
+> Jonny
+>
