@@ -1,114 +1,61 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Sun, 17 Mar 2013 19:35:08 +0100
-Subject: [PATCHv1 2/2] ARM: socfpga: Add clock entries into device tree
-In-Reply-To: <1363211722-27237-3-git-send-email-dinguyen@altera.com>
-References: <1363211722-27237-1-git-send-email-dinguyen@altera.com>
- <1363211722-27237-3-git-send-email-dinguyen@altera.com>
-Message-ID: <20130317183508.GD4394@amd.pavel.ucw.cz>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sun, 17 Mar 2013 14:59:41 -0400
+Subject: [PATCH v2 for 3.10] Introduce a Marvell EBU MBus driver
+In-Reply-To: <1362589205-4726-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1362589205-4726-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20130317185941.GA13280@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Thomas,
 
-> Adds the main PLL clock groups for SOCFPGA into device tree file
-> so that the clock framework to query the clock and clock rates
-
-insert "works" here?
-
-> appropriately.
+On Wed, Mar 06, 2013 at 05:59:55PM +0100, Thomas Petazzoni wrote:
+...
+> Summary of the patch set:
 > 
+>  * Patch 1 makes the compilation of plat-orion/addr-map.c conditional
+>    on a per-SoC family basis. This allows patches 5 to 9 to
+>    progressively move each SoC family to use the mvebu-mbus driver
+>    instead of the mach-<foo>/addr-map.c + plat-orion/addr-map.c
+>    code. Notice that the plat-orion/addr-map.c code cannot be compiled
+>    in a kernel that has the mvebu-mbus, due to the namespace conflict
+>    on the mv_mbus_dram_info() function.
+> 
+>  * Patch 2 and 3 ensures that all places that need to have access to
+>    the list of DRAM address decoding windows do so by using the public
+>    mv_mbus_dram_info() rather than directly accessing an internal
+>    structure.
 
-> diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-clk-manager.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-clk-manager.txt
-> new file mode 100644
-> index 0000000..38cf62b
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-clk-manager.txt
-> @@ -0,0 +1,11 @@
-> +Altera SOCFPGA Clock Manager
-> +
-> +Required properties:
-> +- compatible : "altr,clk-mgr"
-> +- reg : Should contain 1 register ranges(address and length)
+applied to mvebu/cleanup
 
-"1 register range (address"... ?
+>  * Patch 4 introduces the mvebu-mbus driver itself, with the support
+>    for all 5 Marvell EBU SoC families. Note that the driver is
+>    compiled through a blind option, because we don't want the driver
+>    to be compiled in unless the corresponding sub-architecture has
+>    been migrated to use it: as explained above, compiling the driver
+>    conflicts with compiling the plat-orion/addr-map.c code.
 
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/altr_socfpga.txt
-> @@ -0,0 +1,15 @@
-> +- reg : shall be the control register offset from CLOCK_MANAGER's base for the clock.
-> +- clocks : shall be the input parent clock phandle for the clock. This is
-> +	either an oscillator or a pll output.
-> +- #clock-cells : from common clock binding; shall be set to 0.
-> \ No newline at end of file
+applied to mvebu/drivers as there doesn't appear to be a drivers/bus
+maintainer other than arm-soc contributions...
 
-Newline would be nice :-).
+>  * Patch 5 to 9 moves each Marvell EBU sub-architecture to use the
+>    mvebu-mbus driver.
 
-> diff --git a/drivers/clk/socfpga/clk.c b/drivers/clk/socfpga/clk.c
-> index 2c855a6..9379b1c 100644
-> --- a/drivers/clk/socfpga/clk.c
-> +++ b/drivers/clk/socfpga/clk.c
-> @@ -1,5 +1,5 @@
->  /*
-> - *  Copyright (C) 2012 Altera Corporation <www.altera.com>
-> + *  Copyright (C) 2012-2013 Altera Corporation <www.altera.com>
->   *
->   * This program is free software; you can redistribute it and/or modify
->   * it under the terms of the GNU General Public License as published by
-> @@ -11,41 +11,173 @@
->   * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->   * GNU General Public License for more details.
->   *
-> + * Based from clk-highbank.c
+small note: I had to remove line 9 '/dts-v1/;' from orion5x-88f5182.dtsi
+in order to get orion5x-lacie-ethernet-disk-mini-v2.dts to build.
 
-"Based on"? Does it make sense to add
- * Copyright 2011-2012 Calxeda, Inc.
-?
+I squashed this change into:
 
-> +extern void __iomem *clk_mgr_base_addr;
-> +
-> +struct socfpga_clk {
-> +	struct clk_hw hw;
-> +	void __iomem	*reg;
-> +	char *parent_name;
-> +};
+  arm: mach-orion5x: convert to use mvebu-mbus driver
 
-Either align all fields using tabs, or none. This looks weird.
+>  * Patch 10 removes the now unused plat-orion/addr-map.c code.
 
-> +static unsigned long clk_pll_recalc_rate(struct clk_hw *hwclk,
-> +					 unsigned long parent_rate)
-> +{
-> +	struct socfpga_clk *socfpgaclk = to_socfpga_clk(hwclk);
-> +	unsigned long divf, divq, vco_freq, reg;
-> +	unsigned long bypass;
-> +
-> +	reg = readl(socfpgaclk->reg);
-> +	bypass = readl(clk_mgr_base_addr + CLKMGR_BYPASS);
+applied patches 5-10 to mvebu/soc
 
-Would it make sense to create structure for clk_mgr_base_addr, too? At
-least code would be consistent that way.
 
-> +static unsigned long clk_periclk_recalc_rate(struct clk_hw *hwclk,
-> +					     unsigned long parent_rate)
-> +{
-> +	struct socfpga_clk *socfpgaclk = to_socfpga_clk(hwclk);
-> +	u32 div;
-> +
-> +	/* mpuclk, mainclk, and dbg_base_clk divisors are fixed.*/
-> +	if (strcmp(hwclk->init->name, "mpuclk") == 0)
-> +		div = 2;
-> +	else if ((strcmp(hwclk->init->name, "mainclk") == 0) ||
-> +			(strcmp(hwclk->init->name, "dbg_base_clk") == 0))
-> +		div = 4;
-> +	else
-> +		div = ((readl(socfpgaclk->reg) & 0x1ff) + 1);
+Very well organized to facilitate import and reduce dependency
+headaches, Thanks!
 
-Would it make sense to cache have div value in struct socfpga_clk
-... so that it does not have to be recomputed based on strcmp?
+thx,
 
-Otherwise it looks good to me.
-
-Thanks,
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Jason.
