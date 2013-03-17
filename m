@@ -1,206 +1,156 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Sun, 17 Mar 2013 20:38:58 +0100
-Subject: [RFC PATCH 1/8] s5p-fimc: Add Exynos4x12 FIMC-IS driver
-In-Reply-To: <201303121527.00571.hverkuil@xs4all.nl>
-References: <1363031092-29950-1-git-send-email-s.nawrocki@samsung.com>
- <1363031092-29950-2-git-send-email-s.nawrocki@samsung.com>
- <201303121527.00571.hverkuil@xs4all.nl>
-Message-ID: <51461BD2.8080905@gmail.com>
+From: chris@cloudcar.com (Christoffer Dall)
+Date: Sun, 17 Mar 2013 12:52:43 -0700
+Subject: [PATCH V6] ARM: LPAE: Fix mapping in alloc_init_section for
+ unaligned addresses
+In-Reply-To: <1363496741-3427-1-git-send-email-r.sricharan@ti.com>
+References: <1363496741-3427-1-git-send-email-r.sricharan@ti.com>
+Message-ID: <CANOGCgPKwcDVVUBxbhKemTtvjye=3ZDP+wexfZfunt3BTJeerw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
-
-On 03/12/2013 03:27 PM, Hans Verkuil wrote:
-> On Mon 11 March 2013 20:44:45 Sylwester Nawrocki wrote:
-[...]
->> +
->> +/* Supported manual ISO values */
->> +static const s64 iso_qmenu[] = {
->> +	50, 100, 200, 400, 800,
->> +};
->> +
->> +static int __ctrl_set_iso(struct fimc_is *is, int value)
->> +{
->> +	unsigned int idx, iso;
->> +
->> +	if (value == V4L2_ISO_SENSITIVITY_AUTO) {
->> +		__is_set_isp_iso(is, ISP_ISO_COMMAND_AUTO, 0);
->> +		return 0;
->> +	}
->> +	idx = is->isp.ctrls.iso->val;
->> +	if (idx>= ARRAY_SIZE(iso_qmenu))
->> +		return -EINVAL;
->> +
->> +	iso = iso_qmenu[idx];
->> +	__is_set_isp_iso(is, ISP_ISO_COMMAND_MANUAL, iso);
->> +	return 0;
->> +}
-[...]
->> +int fimc_isp_subdev_create(struct fimc_isp *isp)
->> +{
->> +	const struct v4l2_ctrl_ops *ops =&fimc_isp_ctrl_ops;
->> +	struct v4l2_ctrl_handler *handler =&isp->ctrls.handler;
->> +	struct v4l2_subdev *sd =&isp->subdev;
->> +	struct fimc_isp_ctrls *ctrls =&isp->ctrls;
->> +	int ret;
->> +
->> +	mutex_init(&isp->subdev_lock);
->> +
->> +	v4l2_subdev_init(sd,&fimc_is_subdev_ops);
->> +	sd->grp_id = GRP_ID_FIMC_IS;
->> +	sd->flags = V4L2_SUBDEV_FL_HAS_DEVNODE;
->> +	snprintf(sd->name, sizeof(sd->name), "FIMC-IS-ISP");
->> +
->> +	isp->subdev_pads[FIMC_IS_SD_PAD_SINK].flags = MEDIA_PAD_FL_SINK;
->> +	isp->subdev_pads[FIMC_IS_SD_PAD_SRC_FIFO].flags = MEDIA_PAD_FL_SOURCE;
->> +	isp->subdev_pads[FIMC_IS_SD_PAD_SRC_DMA].flags = MEDIA_PAD_FL_SOURCE;
->> +	ret = media_entity_init(&sd->entity, FIMC_IS_SD_PADS_NUM,
->> +				isp->subdev_pads, 0);
->> +	if (ret)
->> +		return ret;
->> +
->> +	v4l2_ctrl_handler_init(handler, 20);
->> +
->> +	ctrls->saturation = v4l2_ctrl_new_std(handler, ops, V4L2_CID_SATURATION,
->> +						-2, 2, 1, 0);
->> +	ctrls->brightness = v4l2_ctrl_new_std(handler, ops, V4L2_CID_BRIGHTNESS,
->> +						-4, 4, 1, 0);
->> +	ctrls->contrast = v4l2_ctrl_new_std(handler, ops, V4L2_CID_CONTRAST,
->> +						-2, 2, 1, 0);
->> +	ctrls->sharpness = v4l2_ctrl_new_std(handler, ops, V4L2_CID_SHARPNESS,
->> +						-2, 2, 1, 0);
->> +	ctrls->hue = v4l2_ctrl_new_std(handler, ops, V4L2_CID_HUE,
->> +						-2, 2, 1, 0);
->> +
->> +	ctrls->auto_wb = v4l2_ctrl_new_std_menu(handler, ops,
->> +					V4L2_CID_AUTO_N_PRESET_WHITE_BALANCE,
->> +					8, ~0x14e, V4L2_WHITE_BALANCE_AUTO);
->> +
->> +	ctrls->exposure = v4l2_ctrl_new_std(handler, ops,
->> +					V4L2_CID_EXPOSURE_ABSOLUTE,
->> +					-4, 4, 1, 0);
->> +
->> +	ctrls->exp_metering = v4l2_ctrl_new_std_menu(handler, ops,
->> +					V4L2_CID_EXPOSURE_METERING, 3,
->> +					~0xf, V4L2_EXPOSURE_METERING_AVERAGE);
->> +
->> +	v4l2_ctrl_new_std_menu(handler, ops, V4L2_CID_POWER_LINE_FREQUENCY,
->> +					V4L2_CID_POWER_LINE_FREQUENCY_AUTO, 0,
->> +					V4L2_CID_POWER_LINE_FREQUENCY_AUTO);
->> +	/* ISO sensitivity */
->> +	ctrls->auto_iso = v4l2_ctrl_new_std_menu(handler, ops,
->> +			V4L2_CID_ISO_SENSITIVITY_AUTO, 1, 0,
->> +			V4L2_ISO_SENSITIVITY_AUTO);
->> +
->> +	ctrls->iso = v4l2_ctrl_new_int_menu(handler, ops,
->> +			V4L2_CID_ISO_SENSITIVITY, ARRAY_SIZE(iso_qmenu) - 1,
->> +			ARRAY_SIZE(iso_qmenu)/2 - 1, iso_qmenu);
->> +
->> +	ctrls->aewb_lock = v4l2_ctrl_new_std(handler, ops,
->> +					V4L2_CID_3A_LOCK, 0, 0x3, 0, 0);
->> +
->> +	/* FIXME: Adjust the enabled controls mask according
->> +	   to the ISP capabilities */
->> +	v4l2_ctrl_new_std_menu(handler, ops, V4L2_CID_COLORFX,
->> +					V4L2_COLORFX_ANTIQUE,
->> +					0, V4L2_COLORFX_NONE);
->> +	if (handler->error) {
->> +		media_entity_cleanup(&sd->entity);
->> +		return handler->error;
->> +	}
->> +
->> +	ctrls->auto_iso->flags |= V4L2_CTRL_FLAG_VOLATILE |
->> +				  V4L2_CTRL_FLAG_UPDATE;
+On Sat, Mar 16, 2013 at 10:05 PM, Sricharan R <r.sricharan@ti.com> wrote:
+> From: R Sricharan <r.sricharan@ti.com>
 >
-> Why would auto_iso be volatile? I would expect the iso to be volatile
-> (in which case the 'false' argument below would be 'true'). Also,
-> v4l2_ctrl_auto_cluster already sets the UPDATE flag.
-
-Thanks for spotting this. I should have removed this flags set up
-since the g_volatile_ctrl op is not currently supported and as far
-as I know the firmware doesn't support reading actual ISO value in
-auto mode. I'll need to check if there are any commands available
-for that.
-
-Anyway auto_iso is not supposed to have the flags set up like this
-and that also tells me that I need to inspect my other driver where
-this code originally came from. :)
-
->> +	v4l2_ctrl_auto_cluster(2,&ctrls->auto_iso, 0, false);
->> +
->> +	sd->ctrl_handler = handler;
->> +	sd->internal_ops =&fimc_is_subdev_internal_ops;
->> +	sd->entity.ops =&fimc_is_subdev_media_ops;
->> +	v4l2_set_subdevdata(sd, isp);
->> +
->> +	return 0;
->> +}
-
->> diff --git a/drivers/media/platform/s5p-fimc/fimc-isp.h b/drivers/media/platform/s5p-fimc/fimc-isp.h
->> new file mode 100644
->> index 0000000..654039e
->> --- /dev/null
->> +++ b/drivers/media/platform/s5p-fimc/fimc-isp.h
->> @@ -0,0 +1,205 @@
-[...]
->> +struct fimc_isp_ctrls {
->> +	struct v4l2_ctrl_handler handler;
->> +	/* Internal mode selection */
->> +	struct v4l2_ctrl *scenario;
->> +	/* Frame rate */
->> +	struct v4l2_ctrl *fps;
->> +	/* Touch AF position */
->> +	struct v4l2_ctrl *af_position_x;
->> +	struct v4l2_ctrl *af_position_y;
->> +	/* Auto white balance */
->> +	struct v4l2_ctrl *auto_wb;
->> +	/* ISO sensitivity */
->> +	struct v4l2_ctrl *auto_iso;
->> +	struct v4l2_ctrl *iso;
+> With LPAE enabled, alloc_init_section() does not map the entire
+> address space for unaligned addresses.
 >
-> I suggest putting this in an anonymous struct:
+> The issue also reproduced with CMA + LPAE. CMA tries to map 16MB
+> with page granularity mappings during boot. alloc_init_pte()
+> is called and out of 16MB, only 2MB gets mapped and rest remains
+> unaccessible.
 >
-> 	struct { /* Auto ISO control cluster */
-> 		struct v4l2_ctrl *auto_iso;
-> 		struct v4l2_ctrl *iso;
-> 	};
+> Because of this OMAP5 boot is broken with CMA + LPAE enabled.
+> Fix the issue by ensuring that the entire addresses are
+> mapped.
 >
-> That way you visually emphasize that these belong together and that you
-> shouldn't move them around.
-
-Agreed. I'll make them grouped in separate structs wherever a cluster
-is used.
-
->> +	struct v4l2_ctrl *contrast;
->> +	struct v4l2_ctrl *saturation;
->> +	struct v4l2_ctrl *sharpness;
->> +	/* Auto/manual exposure */
->> +	struct v4l2_ctrl *auto_exp;
->> +	/* Manual exposure value */
->> +	struct v4l2_ctrl *exposure;
->> +	/* Adjust - brightness */
->> +	struct v4l2_ctrl *brightness;
->> +	/* Adjust - hue */
->> +	struct v4l2_ctrl *hue;
->> +	/* Exposure metering mode */
->> +	struct v4l2_ctrl *exp_metering;
->> +	/* AFC */
->> +	struct v4l2_ctrl *afc;
->> +	/* AE/AWB lock/unlock */
->> +	struct v4l2_ctrl *aewb_lock;
->> +	/* AF */
->> +	struct v4l2_ctrl *focus_mode;
->> +	/* AF status */
->> +	struct v4l2_ctrl *af_status;
->> +};
-[...]
+> Signed-off-by: R Sricharan <r.sricharan@ti.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Christoffer Dall <chris@cloudcar.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Tested-by: Laura Abbott <lauraa@codeaurora.org>
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> ---
+>  [V2] Moved the loop to alloc_init_pte as per Russell's
+>      feedback and changed the subject accordingly.
+>      Using PMD_XXX instead of SECTION_XXX to avoid
+>      different loop increments with/without LPAE.
 >
-> Otherwise this patch looks very clean and I really have no other comments.
-
-Thanks a lot for a prompt review!
-
---
-
-Regards,
-Sylwester
+>  [v3] Removed the dummy variable phys and updated
+>       the commit log for CMA case.
+>
+>  [v4] Resending with updated change log and
+>       updating the tags.
+>
+>  [v5] Renamed alloc_init_section to alloc_init_pmd
+>       and moved the loop back there. Also introduced
+>       map_init_section as per Catalin's comments.
+>
+>  [v6] Corrected tags and updated the comments for code.
+>
+>  arch/arm/mm/mmu.c |   73 ++++++++++++++++++++++++++++++++++-------------------
+>  1 file changed, 47 insertions(+), 26 deletions(-)
+>
+> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+> index e95a996..7897894 100644
+> --- a/arch/arm/mm/mmu.c
+> +++ b/arch/arm/mm/mmu.c
+> @@ -598,39 +598,60 @@ static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
+>         } while (pte++, addr += PAGE_SIZE, addr != end);
+>  }
+>
+> -static void __init alloc_init_section(pud_t *pud, unsigned long addr,
+> -                                     unsigned long end, phys_addr_t phys,
+> -                                     const struct mem_type *type)
+> +static void __init map_init_section(pmd_t *pmd, unsigned long addr,
+> +                       unsigned long end, phys_addr_t phys,
+> +                       const struct mem_type *type)
+>  {
+> -       pmd_t *pmd = pmd_offset(pud, addr);
+> -
+> +#ifndef CONFIG_ARM_LPAE
+>         /*
+> -        * Try a section mapping - end, addr and phys must all be aligned
+> -        * to a section boundary.  Note that PMDs refer to the individual
+> -        * L1 entries, whereas PGDs refer to a group of L1 entries making
+> -        * up one logical pointer to an L2 table.
+> +        * In classic MMU format, puds and pmds are folded in to
+> +        * the pgds. pmd_offset gives the PGD entry. PGDs refer to a
+> +        * group of L1 entries making up one logical pointer to
+> +        * an L2 table (2MB), where as PMDs refer to the individual
+> +        * L1 entries (1MB). Hence increment to get the correct
+> +        * offset for odd 1MB sections.
+> +        * (See arch/arm/include/asm/pgtable-2level.h)
+>          */
+> -       if (type->prot_sect && ((addr | end | phys) & ~SECTION_MASK) == 0) {
+> -               pmd_t *p = pmd;
+> -
+> -#ifndef CONFIG_ARM_LPAE
+> -               if (addr & SECTION_SIZE)
+> -                       pmd++;
+> +       if (addr & SECTION_SIZE)
+> +               pmd++;
+>  #endif
+> +       do {
+> +               *pmd = __pmd(phys | type->prot_sect);
+> +               phys += SECTION_SIZE;
+> +       } while (pmd++, addr += SECTION_SIZE, addr != end);
+>
+> -               do {
+> -                       *pmd = __pmd(phys | type->prot_sect);
+> -                       phys += SECTION_SIZE;
+> -               } while (pmd++, addr += SECTION_SIZE, addr != end);
+> +       flush_pmd_entry(pmd);
+> +}
+>
+> -               flush_pmd_entry(p);
+> -       } else {
+> +static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
+> +                                     unsigned long end, phys_addr_t phys,
+> +                                     const struct mem_type *type)
+> +{
+> +       pmd_t *pmd = pmd_offset(pud, addr);
+> +       unsigned long next;
+> +
+> +       do {
+>                 /*
+> -                * No need to loop; pte's aren't interested in the
+> -                * individual L1 entries.
+> +                * With LPAE, we must loop over to map
+> +                * all the pmds for the given range.
+>                  */
+> -               alloc_init_pte(pmd, addr, end, __phys_to_pfn(phys), type);
+> -       }
+> +               next = pmd_addr_end(addr, end);
+> +
+> +               /*
+> +                * Try a section mapping - addr, next and phys must all be
+> +                * aligned to a section boundary.
+> +                */
+> +               if (type->prot_sect &&
+> +                               ((addr | next | phys) & ~SECTION_MASK) == 0) {
+> +                       map_init_section(pmd, addr, next, phys, type);
+> +               } else {
+> +                       alloc_init_pte(pmd, addr, next,
+> +                                               __phys_to_pfn(phys), type);
+> +               }
+> +
+> +               phys += next - addr;
+> +
+> +       } while (pmd++, addr = next, addr != end);
+>  }
+>
+>  static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
+> @@ -641,7 +662,7 @@ static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
+>
+>         do {
+>                 next = pud_addr_end(addr, end);
+> -               alloc_init_section(pud, addr, next, phys, type);
+> +               alloc_init_pmd(pud, addr, next, phys, type);
+>                 phys += next - addr;
+>         } while (pud++, addr = next, addr != end);
+>  }
+> --
+> 1.7.9.5
+>
+Acked-by: Christoffer Dall <chris@cloudcar.com>
