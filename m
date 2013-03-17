@@ -1,41 +1,62 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 16 Mar 2013 19:38:57 -0300
-Subject: [PATCH] ARM: video: mxs: Fix mxsfb misconfiguring VDCTRL0
-In-Reply-To: <1363471581-10132-1-git-send-email-marex@denx.de>
-References: <CAOMZO5CDuODRrJEEaDKm5nepfkuvuF77ZQmarB69hL6gg386ww@mail.gmail.com>
- <1363471581-10132-1-git-send-email-marex@denx.de>
-Message-ID: <CAOMZO5AwD7Q3G+xp9DW0vioZnHZJX538nFeE9F-P+jbHMHPqoQ@mail.gmail.com>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Sun, 17 Mar 2013 11:06:29 +1100
+Subject: ep93xx irq-vic regression
+In-Reply-To: <201303161449.03823.florian@openwrt.org>
+References: <ADE657CA350FB648AAC2C43247A983F0020980106C9F@AUSP01VMBX24.collaborationhost.net>
+ <5143AAB4.6020406@gmail.com>
+ <ADE657CA350FB648AAC2C43247A983F0020980106CB7@AUSP01VMBX24.collaborationhost.net>
+ <201303161449.03823.florian@openwrt.org>
+Message-ID: <51450905.8030108@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 16, 2013 at 7:06 PM, Marek Vasut <marex@denx.de> wrote:
-> The issue fixed by this patch manifests only then using X11
-> with mxsfb driver. The X11 will display either shifted image
-> or otherwise distorted image on the LCD.
->
-> The problem is that the X11 tries to reconfigure the framebuffer
-> and along the way call fb_ops.fb_set_par() with it's configuration
-> values. The field of particular interest is fb_info->var.sync which
-> contains non-standard values if configured by kernel. These are
-> FB_SYNC_DATA_ENABLE_HIGH_ACT and FB_SYNC_DOTCLK_FAILING_ACT defined
-> in include/linux/mxsfb.h . The driver interprets those and configures
-> the LCD controller accordingly. Yet X11 only has access to standard
-> values for this field defined in include/uapi/linux/fb.h and thus
-> omits these special values. This results in distorted image on the
-> LCD.
->
-> This patch moves these non-standard values into new field of the
-> mxsfb_platform_data structure so the driver can in turn check this
-> field instead of the video mode field for these specific portions.
->
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Fabio Estevam <fabio.estavem@freescale.com>
-> Cc: Linux ARM <linux-arm-kernel@lists.infradead.org>
-> Cc: Linux FBDEV <linux-fbdev@vger.kernel.org>
-> Cc: Lothar Wa?mann <LW@karo-electronics.de>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
+On 17/03/13 00:49, Florian Fainelli wrote:
 
-This fixes the X11 offset issue on my mx28evk, thanks!
+> Hello,
+> 
+> Le samedi 16 mars 2013 01:16:52, H Hartley Sweeten a ?crit :
+> [snip]
+> 
+>>
+>>     ARM: ep93xx: properly wait for UART FIFO to be empty
+>>
+>> Reverting that one allows my system to boot with 3.9.0-rc2.
+>>
+>> Instead of removing the wait loop completely I propose this
+>> patch instead. I can repost this patch in a new thread if
+>> necessary.
+>>
+>> Regards,
+>> Hartley
+>>
+>> ---
+>>
+>> From: H Hartley Sweeten <hsweeten@visionengravers.com>
+>> Subject: [PATCH] arm: ep93xx: fix wait for UART FIFO to be empty
+>>
+>> commit 210dce5f "ARM: ep93xx: properly wait for UART FIFO to be empty"
+>>
+>> Removed the timeout loop while waiting for the uart transmit fifo to
+>> empty. Some bootloaders leave the uart in a state where there might
+>> be bytes in the uart that are not transmitted when execution is handed
+>> over to the kernel. This results in a deadlocked system while waiting
+>> for the fifo to empty.
+>>
+>> Add back the timeout wait to prevent the deadlock.
+>>
+>> Increase the wait time to hopefully prevent the decompressor corruption
+>> that lead to commit 210dce5f. This corruption was probably due to a
+>> slow uart baudrate. The 10* increase in the wait time should be enough
+>> for all cases.
+> 
+> Ok, your solution seems like it would work, when I come accross this bug I 
+> initially ended up doing the same thing and incrementing the number of 
+> iterations in the loop. I was not quite happy with that as it would still be 
+> highly depending on the clocking. Anyway, sorry for breaking your system with 
+> this commit.
 
-Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
+
+Do you want to add an Acked/Reviewed-by Florian? I'll queue this
+up in my tree if you are happy with it.
+
+~Ryan
