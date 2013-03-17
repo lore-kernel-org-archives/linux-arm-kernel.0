@@ -1,43 +1,38 @@
-From: anilk4.v@gmail.com (Anil Kumar)
-Date: Sun, 17 Mar 2013 15:05:09 +0530
-Subject: [PATCH V2 0/8] ARM: dts: Various OMAP2+ device-tree updates
-In-Reply-To: <51433094.1000104@ti.com>
-References: <1363355861-11773-1-git-send-email-jon-hunter@ti.com>
- <51433094.1000104@ti.com>
-Message-ID: <CABYxbz5cW0Jt12SGcMpN5L0n18C6Mis0gRoBgSHWnxuAz6chGA@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Sun, 17 Mar 2013 14:04:05 +0100
+Subject: [PATCH v3 0/6] move s3c24xx-irq to drivers/irqchip and add dt support
+Message-ID: <201303171404.06146.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
+In contrast to the previous versions, this variant gets rid of the irq
+mappings in the dt files and provides individual compatible properties
+for the different s3c24xx variants and therefore does not need to
+introduce any new dt-properties.
 
-On Fri, Mar 15, 2013 at 8:00 PM, Benoit Cousson <b-cousson@ti.com> wrote:
-> Hi Jon,
->
-> On 03/15/2013 02:57 PM, Jon Hunter wrote:
->> Various OMAP device-tree updates for PMU, DMA, GPIO, GPMC and boards.
->>
->> The DMA, PMU and OMAP3430 SDP board changes have been sent before
->> individually but re-sending here as a complete series for v3.10.
->>
->> This is based upon Benoit's for_3.10/dts branch [1]. Branch available
->> here [2].
->>
->> V2 changes:
->> - Rebased on Benoit's for_3.10/dts branch
->> - Squashed patches adding support for OMAP3430 SDP board and patch
->>   to add flash support for OMAP3430 SDP board.
->>
->> [1] http://git.kernel.org/cgit/linux/kernel/git/bcousson/linux-omap-dt.git/log/?h=for_3.10/dts
->> [2] git://github.com/jonhunter/linux.git omap-dt-for-v3.10
->
-> Thanks for the repost. I've just applied your branch in my for_3.10/dts
-> branch.
+It also now encapsulates the different sub-controllers inside a
+node to make it possible to map the register region completely.
 
-I think you missed below patch which is needed for gpmc nand to work fine.
-Without this patch nand will not work on OMAP3430 SDP board.
+This series depends on the latest s3c24xx-irq changes currently in the
+linux-samsung tree, and should therefore probably go thru there.
 
-Jon Hunter:-
-  ARM: OMAP2+: Fix-up gpmc merge error
+Tested on a s3c2416-based machine with preliminary dt support.
 
-Thanks,
-Anil
+Heiko Stuebner (6):
+  ARM: S3C24XX: move irq driver to drivers/irqchip
+  irqchip: s3c24xx: fix comments on some camera interrupts
+  irqchip: s3c24xx: fix irqlist of second s3c2416 controller
+  irqchip: s3c24xx: use irq_create_mapping for parent irqs
+  irqchip: s3c24xx: add devicetree support
+  irqchip: s3c24xx: add s3c2450 interrupt definitions
+
+ .../interrupt-controller/samsung,s3c24xx-irq.txt   |   54 ++++
+ arch/arm/mach-s3c24xx/Makefile                     |    2 +-
+ drivers/irqchip/Makefile                           |    1 +
+ .../irq.c => drivers/irqchip/irq-s3c24xx.c         |  293 +++++++++++++++++++-
+ 4 files changed, 342 insertions(+), 8 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/samsung,s3c24xx-irq.txt
+ rename arch/arm/mach-s3c24xx/irq.c => drivers/irqchip/irq-s3c24xx.c (80%)
+
+-- 
+1.7.2.3
