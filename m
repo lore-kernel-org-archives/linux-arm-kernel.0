@@ -1,80 +1,151 @@
 From: r.sricharan@ti.com (Sricharan R)
-Date: Sun, 17 Mar 2013 10:30:25 +0530
-Subject: [PATCH V6] ARM: LPAE: Fix mapping in alloc_init_section for
- unaligned addresses
-In-Reply-To: <CANOGCgNDRb5OT9_D2Kny1_VrKWUVr9B5hjnmJvHpvve7mjidOg@mail.gmail.com>
-References: <1360574009-12429-1-git-send-email-r.sricharan@ti.com>
- <20130211131230.GA5676@MacBook-Pro.local> <5118F796.3080308@ti.com>
- <51261288.5030806@ti.com> <51414AFB.9080403@ti.com>
- <20130315173630.GR4977@n2100.arm.linux.org.uk>
- <CANOGCgNDRb5OT9_D2Kny1_VrKWUVr9B5hjnmJvHpvve7mjidOg@mail.gmail.com>
-Message-ID: <51454DE9.2070202@ti.com>
+Date: Sun, 17 Mar 2013 10:35:41 +0530
+Subject: [PATCH V6] ARM: LPAE: Fix mapping in alloc_init_section for unaligned
+ addresses
+Message-ID: <1363496741-3427-1-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+From: R Sricharan <r.sricharan@ti.com>
 
-On Friday 15 March 2013 11:38 PM, Christoffer Dall wrote:
-> On Fri, Mar 15, 2013 at 10:36 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
->> On Thu, Mar 14, 2013 at 09:28:51AM +0530, Sricharan R wrote:
->>> On Thursday 21 February 2013 05:56 PM, R Sricharan wrote:
->>>> Hi,
->>>> On Monday 11 February 2013 07:22 PM, R Sricharan wrote:
->>>>> Hi Russell,
->>>>>
->>>>> On Monday 11 February 2013 06:42 PM, Catalin Marinas wrote:
->>>>>> On Mon, Feb 11, 2013 at 09:13:29AM +0000, R Sricharan wrote:
->>>>>>> +static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
->>>>>>> +                      unsigned long end, phys_addr_t phys,
->>>>>>> +                      const struct mem_type *type)
->>>>>>> +{
->>>>>>> +    pmd_t *pmd = pmd_offset(pud, addr);
->>>>>>> +    unsigned long next;
->>>>>>> +
->>>>>>> +    do {
->>>>>>>           /*
->>>>>>> -         * No need to loop; pte's aren't interested in the
->>>>>>> -         * individual L1 entries.
->>>>>>> +         * With LPAE, we must loop over to map
->>>>>>> +         * all the pmds for the given range.
->>>>>>>            */
->>>>>>> -        alloc_init_pte(pmd, addr, end, __phys_to_pfn(phys), type);
->>>>>>> -    }
->>>>>>> +        next = pmd_addr_end(addr, end);
->>>>>>> +
->>>>>>> +        /*
->>>>>>> +         * Try a section mapping - end, addr and phys must all be
->>>>>>> +         * aligned to a section boundary.posted 
->>>>>>> +         */
->>>>>>
->>>>>> Should this read "next, addr and phys" instead of "end..."?
->>>>>>
->>>>>> Otherwise:
->>>>>>
->>>>>> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
->>>>>>
->>>>>   Can I put this in to patch system ?
->>>>
->>>>    Ping..
->>>>
->>>> Regards,
->>>>  Sricharan
->>>  Ping again..
->>
->> Do we have a winner out of all the patches which have been posted yet?
-> 
-> I was fine with the latest version if my comments were addressed, but
-> I don't remember seeing this version posted.
-> 
-> Sricharan, can you please post a new complete patch that we can ack,
-> and please remember cc'ing me directly so I don't miss it.
+With LPAE enabled, alloc_init_section() does not map the entire
+address space for unaligned addresses.
 
-  I posted a version after addressing your comments and Catalin
-  acked that as well. I will repost again now.
+The issue also reproduced with CMA + LPAE. CMA tries to map 16MB
+with page granularity mappings during boot. alloc_init_pte()
+is called and out of 16MB, only 2MB gets mapped and rest remains
+unaccessible.
 
-Regards,
- Sricharan
+Because of this OMAP5 boot is broken with CMA + LPAE enabled.
+Fix the issue by ensuring that the entire addresses are
+mapped.
 
+Signed-off-by: R Sricharan <r.sricharan@ti.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Christoffer Dall <chris@cloudcar.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Tested-by: Laura Abbott <lauraa@codeaurora.org>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ [V2] Moved the loop to alloc_init_pte as per Russell's
+     feedback and changed the subject accordingly.
+     Using PMD_XXX instead of SECTION_XXX to avoid
+     different loop increments with/without LPAE.
 
-  
+ [v3] Removed the dummy variable phys and updated
+      the commit log for CMA case.
+
+ [v4] Resending with updated change log and
+      updating the tags.
+
+ [v5] Renamed alloc_init_section to alloc_init_pmd
+      and moved the loop back there. Also introduced
+      map_init_section as per Catalin's comments.
+
+ [v6] Corrected tags and updated the comments for code.
+
+ arch/arm/mm/mmu.c |   73 ++++++++++++++++++++++++++++++++++-------------------
+ 1 file changed, 47 insertions(+), 26 deletions(-)
+
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index e95a996..7897894 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -598,39 +598,60 @@ static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
+ 	} while (pte++, addr += PAGE_SIZE, addr != end);
+ }
+ 
+-static void __init alloc_init_section(pud_t *pud, unsigned long addr,
+-				      unsigned long end, phys_addr_t phys,
+-				      const struct mem_type *type)
++static void __init map_init_section(pmd_t *pmd, unsigned long addr,
++			unsigned long end, phys_addr_t phys,
++			const struct mem_type *type)
+ {
+-	pmd_t *pmd = pmd_offset(pud, addr);
+-
++#ifndef CONFIG_ARM_LPAE
+ 	/*
+-	 * Try a section mapping - end, addr and phys must all be aligned
+-	 * to a section boundary.  Note that PMDs refer to the individual
+-	 * L1 entries, whereas PGDs refer to a group of L1 entries making
+-	 * up one logical pointer to an L2 table.
++	 * In classic MMU format, puds and pmds are folded in to
++	 * the pgds. pmd_offset gives the PGD entry. PGDs refer to a
++	 * group of L1 entries making up one logical pointer to
++	 * an L2 table (2MB), where as PMDs refer to the individual
++	 * L1 entries (1MB). Hence increment to get the correct
++	 * offset for odd 1MB sections.
++	 * (See arch/arm/include/asm/pgtable-2level.h)
+ 	 */
+-	if (type->prot_sect && ((addr | end | phys) & ~SECTION_MASK) == 0) {
+-		pmd_t *p = pmd;
+-
+-#ifndef CONFIG_ARM_LPAE
+-		if (addr & SECTION_SIZE)
+-			pmd++;
++	if (addr & SECTION_SIZE)
++		pmd++;
+ #endif
++	do {
++		*pmd = __pmd(phys | type->prot_sect);
++		phys += SECTION_SIZE;
++	} while (pmd++, addr += SECTION_SIZE, addr != end);
+ 
+-		do {
+-			*pmd = __pmd(phys | type->prot_sect);
+-			phys += SECTION_SIZE;
+-		} while (pmd++, addr += SECTION_SIZE, addr != end);
++	flush_pmd_entry(pmd);
++}
+ 
+-		flush_pmd_entry(p);
+-	} else {
++static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
++				      unsigned long end, phys_addr_t phys,
++				      const struct mem_type *type)
++{
++	pmd_t *pmd = pmd_offset(pud, addr);
++	unsigned long next;
++
++	do {
+ 		/*
+-		 * No need to loop; pte's aren't interested in the
+-		 * individual L1 entries.
++		 * With LPAE, we must loop over to map
++		 * all the pmds for the given range.
+ 		 */
+-		alloc_init_pte(pmd, addr, end, __phys_to_pfn(phys), type);
+-	}
++		next = pmd_addr_end(addr, end);
++
++		/*
++		 * Try a section mapping - addr, next and phys must all be
++		 * aligned to a section boundary.
++		 */
++		if (type->prot_sect &&
++				((addr | next | phys) & ~SECTION_MASK) == 0) {
++			map_init_section(pmd, addr, next, phys, type);
++		} else {
++			alloc_init_pte(pmd, addr, next,
++						__phys_to_pfn(phys), type);
++		}
++
++		phys += next - addr;
++
++	} while (pmd++, addr = next, addr != end);
+ }
+ 
+ static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
+@@ -641,7 +662,7 @@ static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
+ 
+ 	do {
+ 		next = pud_addr_end(addr, end);
+-		alloc_init_section(pud, addr, next, phys, type);
++		alloc_init_pmd(pud, addr, next, phys, type);
+ 		phys += next - addr;
+ 	} while (pud++, addr = next, addr != end);
+ }
+-- 
+1.7.9.5
