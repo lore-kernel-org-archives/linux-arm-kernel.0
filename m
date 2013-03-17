@@ -1,156 +1,58 @@
-From: chris@cloudcar.com (Christoffer Dall)
-Date: Sun, 17 Mar 2013 12:52:43 -0700
-Subject: [PATCH V6] ARM: LPAE: Fix mapping in alloc_init_section for
- unaligned addresses
-In-Reply-To: <1363496741-3427-1-git-send-email-r.sricharan@ti.com>
-References: <1363496741-3427-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <CANOGCgPKwcDVVUBxbhKemTtvjye=3ZDP+wexfZfunt3BTJeerw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 17 Mar 2013 19:57:10 +0000
+Subject: Linux 3.8.3
+In-Reply-To: <20130317193321.GA15102@arwen.pp.htv.fi>
+References: <20130314184702.GA17860@kroah.com>
+ <CAE8XmWoYXyNFQ14e6X+2rkWQyRA=kSdc4J+DNu2Sv+6e9rvZRg@mail.gmail.com>
+ <20130317193321.GA15102@arwen.pp.htv.fi>
+Message-ID: <20130317195709.GC4977@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 16, 2013 at 10:05 PM, Sricharan R <r.sricharan@ti.com> wrote:
-> From: R Sricharan <r.sricharan@ti.com>
->
-> With LPAE enabled, alloc_init_section() does not map the entire
-> address space for unaligned addresses.
->
-> The issue also reproduced with CMA + LPAE. CMA tries to map 16MB
-> with page granularity mappings during boot. alloc_init_pte()
-> is called and out of 16MB, only 2MB gets mapped and rest remains
-> unaccessible.
->
-> Because of this OMAP5 boot is broken with CMA + LPAE enabled.
-> Fix the issue by ensuring that the entire addresses are
-> mapped.
->
-> Signed-off-by: R Sricharan <r.sricharan@ti.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Christoffer Dall <chris@cloudcar.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Tested-by: Laura Abbott <lauraa@codeaurora.org>
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> ---
->  [V2] Moved the loop to alloc_init_pte as per Russell's
->      feedback and changed the subject accordingly.
->      Using PMD_XXX instead of SECTION_XXX to avoid
->      different loop increments with/without LPAE.
->
->  [v3] Removed the dummy variable phys and updated
->       the commit log for CMA case.
->
->  [v4] Resending with updated change log and
->       updating the tags.
->
->  [v5] Renamed alloc_init_section to alloc_init_pmd
->       and moved the loop back there. Also introduced
->       map_init_section as per Catalin's comments.
->
->  [v6] Corrected tags and updated the comments for code.
->
->  arch/arm/mm/mmu.c |   73 ++++++++++++++++++++++++++++++++++-------------------
->  1 file changed, 47 insertions(+), 26 deletions(-)
->
-> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-> index e95a996..7897894 100644
-> --- a/arch/arm/mm/mmu.c
-> +++ b/arch/arm/mm/mmu.c
-> @@ -598,39 +598,60 @@ static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
->         } while (pte++, addr += PAGE_SIZE, addr != end);
->  }
->
-> -static void __init alloc_init_section(pud_t *pud, unsigned long addr,
-> -                                     unsigned long end, phys_addr_t phys,
-> -                                     const struct mem_type *type)
-> +static void __init map_init_section(pmd_t *pmd, unsigned long addr,
-> +                       unsigned long end, phys_addr_t phys,
-> +                       const struct mem_type *type)
->  {
-> -       pmd_t *pmd = pmd_offset(pud, addr);
-> -
-> +#ifndef CONFIG_ARM_LPAE
->         /*
-> -        * Try a section mapping - end, addr and phys must all be aligned
-> -        * to a section boundary.  Note that PMDs refer to the individual
-> -        * L1 entries, whereas PGDs refer to a group of L1 entries making
-> -        * up one logical pointer to an L2 table.
-> +        * In classic MMU format, puds and pmds are folded in to
-> +        * the pgds. pmd_offset gives the PGD entry. PGDs refer to a
-> +        * group of L1 entries making up one logical pointer to
-> +        * an L2 table (2MB), where as PMDs refer to the individual
-> +        * L1 entries (1MB). Hence increment to get the correct
-> +        * offset for odd 1MB sections.
-> +        * (See arch/arm/include/asm/pgtable-2level.h)
->          */
-> -       if (type->prot_sect && ((addr | end | phys) & ~SECTION_MASK) == 0) {
-> -               pmd_t *p = pmd;
-> -
-> -#ifndef CONFIG_ARM_LPAE
-> -               if (addr & SECTION_SIZE)
-> -                       pmd++;
-> +       if (addr & SECTION_SIZE)
-> +               pmd++;
->  #endif
-> +       do {
-> +               *pmd = __pmd(phys | type->prot_sect);
-> +               phys += SECTION_SIZE;
-> +       } while (pmd++, addr += SECTION_SIZE, addr != end);
->
-> -               do {
-> -                       *pmd = __pmd(phys | type->prot_sect);
-> -                       phys += SECTION_SIZE;
-> -               } while (pmd++, addr += SECTION_SIZE, addr != end);
-> +       flush_pmd_entry(pmd);
-> +}
->
-> -               flush_pmd_entry(p);
-> -       } else {
-> +static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
-> +                                     unsigned long end, phys_addr_t phys,
-> +                                     const struct mem_type *type)
-> +{
-> +       pmd_t *pmd = pmd_offset(pud, addr);
-> +       unsigned long next;
-> +
-> +       do {
->                 /*
-> -                * No need to loop; pte's aren't interested in the
-> -                * individual L1 entries.
-> +                * With LPAE, we must loop over to map
-> +                * all the pmds for the given range.
->                  */
-> -               alloc_init_pte(pmd, addr, end, __phys_to_pfn(phys), type);
-> -       }
-> +               next = pmd_addr_end(addr, end);
-> +
-> +               /*
-> +                * Try a section mapping - addr, next and phys must all be
-> +                * aligned to a section boundary.
-> +                */
-> +               if (type->prot_sect &&
-> +                               ((addr | next | phys) & ~SECTION_MASK) == 0) {
-> +                       map_init_section(pmd, addr, next, phys, type);
-> +               } else {
-> +                       alloc_init_pte(pmd, addr, next,
-> +                                               __phys_to_pfn(phys), type);
-> +               }
-> +
-> +               phys += next - addr;
-> +
-> +       } while (pmd++, addr = next, addr != end);
->  }
->
->  static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
-> @@ -641,7 +662,7 @@ static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
->
->         do {
->                 next = pud_addr_end(addr, end);
-> -               alloc_init_section(pud, addr, next, phys, type);
-> +               alloc_init_pmd(pud, addr, next, phys, type);
->                 phys += next - addr;
->         } while (pud++, addr = next, addr != end);
->  }
-> --
-> 1.7.9.5
->
-Acked-by: Christoffer Dall <chris@cloudcar.com>
+On Sun, Mar 17, 2013 at 09:33:21PM +0200, Felipe Balbi wrote:
+> Hi,
+> 
+> On Sun, Mar 17, 2013 at 10:00:08PM +0800, Dongsheng Song wrote:
+> > ?make ARCH=arm menuconfig?  no complains,  but "make ARCH=arm
+> > CROSS_COMPILE=arm-linux-gnueabihf-" failed:
+> > 
+> > $ make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
+> >   CHK     include/generated/uapi/linux/version.h
+> >   CHK     include/generated/utsrelease.h
+> > make[1]: `include/generated/mach-types.h' is up to date.
+> >   CALL    scripts/checksyscalls.sh
+> >   CHK     include/generated/compile.h
+> >   CHK     kernel/config_data.h
+> >   Kernel: arch/arm/boot/Image is ready
+> >   Kernel: arch/arm/boot/zImage is ready
+> >   Building modules, stage 2.
+> >   MODPOST 1904 modules
+> > ERROR: "flush_tlb_kernel_range" [drivers/staging/zsmalloc/zsmalloc.ko]
+> > undefined!
+> > make[1]: *** [__modpost] Error 1
+> > make: *** [modules] Error 2
+> > 
+> > Please find the attachment with .config.gz file.
+> 
+> linux-arm-kernel might have more information about this.
+
+Sigh.
+
+At times, I really don't know why I bother wasting my time commenting on
+patches if they just go and agree with them, and promptly ignore them.
+I pointed out what this should be:
+
+http://marc.info/?l=linux-kernel&m=135972750522902&w=2
+
+And it was agreed:
+
+http://marc.info/?l=linux-kernel&m=135993546317541&w=2
+
+But for some reason the wrong patch got merged:
+
+http://marc.info/?l=git-commits-head&m=136147889001219&w=2
+
+Maybe because it was "simpler" ?  Don't know.  But... well, we now know
+what the outcome of it was.  Let's try a different technique.  I'm going
+to say nothing of any real help and hopefully it will get fixed properly.
+Maybe that'll work.
