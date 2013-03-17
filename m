@@ -1,53 +1,54 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Sun, 17 Mar 2013 21:46:42 +0000
-Subject: [PATCH v2, part3 02/12] mm/ARM64: kill poison_init_mem()
-In-Reply-To: <1363453413-8139-3-git-send-email-jiang.liu@huawei.com>
-References: <1363453413-8139-1-git-send-email-jiang.liu@huawei.com>
- <1363453413-8139-3-git-send-email-jiang.liu@huawei.com>
-Message-ID: <20130317214642.GA20875@mudshark.cambridge.arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Sun, 17 Mar 2013 23:26:10 +0100
+Subject: [GIT PULL 3/3] ARM: mvebu: soc for v3.10
+In-Reply-To: <1363551341.10D8ED563.32562@triton>
+References: <1363551341.10D8ED563.32562@triton>
+Message-ID: <51464302.5000906@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 16, 2013 at 05:03:23PM +0000, Jiang Liu wrote:
-> Use free_reserved_area() to kill poison_init_mem() on ARM64.
-> 
-> Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  arch/arm64/mm/init.c |   17 +++--------------
->  1 file changed, 3 insertions(+), 14 deletions(-)
-> 
-> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> index e58dd7f..b87bdb8 100644
-> --- a/arch/arm64/mm/init.c
-> +++ b/arch/arm64/mm/init.c
-> @@ -197,14 +197,6 @@ void __init bootmem_init(void)
->  	max_pfn = max_low_pfn = max;
->  }
->  
-> -/*
-> - * Poison init memory with an undefined instruction (0x0).
-> - */
-> -static inline void poison_init_mem(void *s, size_t count)
-> -{
-> -	memset(s, 0, count);
-> -}
-> -
->  #ifndef CONFIG_SPARSEMEM_VMEMMAP
->  static inline void free_memmap(unsigned long start_pfn, unsigned long end_pfn)
->  {
-> @@ -386,8 +378,7 @@ void __init mem_init(void)
->  
->  void free_initmem(void)
->  {
-> -	poison_init_mem(__init_begin, __init_end - __init_begin);
-> -	free_initmem_default(-1);
-> +	free_initmem_default(0);
+Hi Jason,
 
-This change looks unrelated to $subject. We should probably just poison with
-0 from the outset, when free_initmem_default is introduced.
+On 03/17/2013 09:15 PM, Jason Cooper wrote:
+> The following changes since commit 207b6b8da3195dafe3e0d2143262640ddace74af:
+> 
+>   Merge branch 'mvebu/drivers' into mvebu/soc
+> 
+> are available in the git repository at:
+> 
+>   git://git.infradead.org/users/jcooper/linux.git tags/soc_changes_for_v3.10
+> 
+> for you to fetch changes up to c135394ade12b00be1fdd04f68ff8470207a9b32:
+> 
+>   arm: plat-orion: remove addr-map code
+> 
+> ----------------------------------------------------------------
+> mvebu soc changes for v3.10
+>     
+>      - use mvebu-mbus driver for:
+>         - kirkwood
+>         - dove
+>         - orion5x
+>         - mv78xx
+>         - mvebu
+>     
+>      - depends
+>         - tags/cleanup_for_v3.10 (mvebu/cleanup)
+>         - tags/drivers_for_v3.10 (mvebu/drivers)
+> ----------------------------------------------------------------
+> Thomas Petazzoni (6):
+>       arm: mach-mvebu: convert to use mvebu-mbus driver
+>       arm: mach-kirkwood: convert to use mvebu-mbus driver
+>       arm: mach-dove: convert to use mvebu-mbus driver
+>       arm: mach-orion5x: convert to use mvebu-mbus driver
+>       arm: mach-mv78xx0: convert to use the mvebu-mbus driver
 
-Will
+Could you hold on this one?
+
+I managed to test Thomas patch set for a mv78x00 based board on Friday,
+and I found a small bug. Thomas has a fix for it and he plans to send
+a V3 with this fix next week.
+
+Thanks,
+
+Gregory
