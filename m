@@ -1,54 +1,68 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Sun, 17 Mar 2013 23:26:10 +0100
-Subject: [GIT PULL 3/3] ARM: mvebu: soc for v3.10
-In-Reply-To: <1363551341.10D8ED563.32562@triton>
-References: <1363551341.10D8ED563.32562@triton>
-Message-ID: <51464302.5000906@free-electrons.com>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Sun, 17 Mar 2013 23:37:02 +0100
+Subject: [PATCH v3 5/6] irqchip: s3c24xx: add devicetree support
+In-Reply-To: <201303171407.59128.heiko@sntech.de>
+References: <201303171404.06146.heiko@sntech.de>
+ <201303171407.59128.heiko@sntech.de>
+Message-ID: <201303172337.02642.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
+Am Sonntag, 17. M?rz 2013, 14:07:58 schrieb Heiko St?bner:
+> Add the necessary code to initialize the interrupt controller
+> thru devicetree data using the irqchip infrastructure.
+> 
+> On dt machines the eint-type interrupts in the main interrupt controller
+> get mapped as regular edge-types, as their wakeup and interrupt type
+> properties will be handled by the upcoming pinctrl driver.
+> 
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+>  .../interrupt-controller/samsung,s3c24xx-irq.txt   |   54 +++++
+>  drivers/irqchip/irq-s3c24xx.c                      |  222
+> ++++++++++++++++++++ 2 files changed, 276 insertions(+), 0 deletions(-)
+>  create mode 100644
+> Documentation/devicetree/bindings/interrupt-controller/samsung,s3c24xx-irq
+> .txt
+> 
+> diff --git
+> a/Documentation/devicetree/bindings/interrupt-controller/samsung,s3c24xx-i
+> rq.txt
+> b/Documentation/devicetree/bindings/interrupt-controller/samsung,s3c24xx-i
+> rq.txt new file mode 100644
+> index 0000000..be5dead
+> --- /dev/null
+> +++
+> b/Documentation/devicetree/bindings/interrupt-controller/samsung,s3c24xx-i
+> rq.txt @@ -0,0 +1,54 @@
+> +Samsung S3C24XX Interrupt Controllers
+> +
+> +The S3C24XX SoCs contain a custom set of interrupt controllers providing a
+> +varying number of interrupt sources. The set consists of a main- and sub-
+> +controller and on newer SoCs even a second main controller.
+> +
+> +Required properties:
+> +- compatible: Compatible property value should be one of
+> "samsung,s3c2410-irq", +  "samsung,s3c2412-irq", "samsung,s3c2416-irq",
+> "samsung,s3c2440-irq", +  "samsung,s3c2442-irq", "samsung,s3c2443-irq"
+> depending on the SoC variant. +
+> +- reg: Physical base address of the controller and length of memory mapped
+> +  region.
+> +
+> +- interrupt-controller : Identifies the node as an interrupt controller
+> +
+> +Sub-controllers as child nodes:
+> +  The interrupt controllers that should be referenced by device nodes are
+> +  represented by child nodes. Valid names are intc, subintc and intc2.
+> +  The interrupt values in device nodes are then mapped directly to the
+> +  bit-numbers of the pending register of the named interrupt controller.
+> +
+> +Required properties:
+> +- interrupt-controller : Identifies the node as an interrupt controller
+> +
+> +- #interrupt-cells : Specifies the number of cells needed to encode an
+> +  interrupt source. The value shall be 2.
 
-On 03/17/2013 09:15 PM, Jason Cooper wrote:
-> The following changes since commit 207b6b8da3195dafe3e0d2143262640ddace74af:
-> 
->   Merge branch 'mvebu/drivers' into mvebu/soc
-> 
-> are available in the git repository at:
-> 
->   git://git.infradead.org/users/jcooper/linux.git tags/soc_changes_for_v3.10
-> 
-> for you to fetch changes up to c135394ade12b00be1fdd04f68ff8470207a9b32:
-> 
->   arm: plat-orion: remove addr-map code
-> 
-> ----------------------------------------------------------------
-> mvebu soc changes for v3.10
->     
->      - use mvebu-mbus driver for:
->         - kirkwood
->         - dove
->         - orion5x
->         - mv78xx
->         - mvebu
->     
->      - depends
->         - tags/cleanup_for_v3.10 (mvebu/cleanup)
->         - tags/drivers_for_v3.10 (mvebu/drivers)
-> ----------------------------------------------------------------
-> Thomas Petazzoni (6):
->       arm: mach-mvebu: convert to use mvebu-mbus driver
->       arm: mach-kirkwood: convert to use mvebu-mbus driver
->       arm: mach-dove: convert to use mvebu-mbus driver
->       arm: mach-orion5x: convert to use mvebu-mbus driver
->       arm: mach-mv78xx0: convert to use the mvebu-mbus driver
-
-Could you hold on this one?
-
-I managed to test Thomas patch set for a mv78x00 based board on Friday,
-and I found a small bug. Thomas has a fix for it and he plans to send
-a V3 with this fix next week.
-
-Thanks,
-
-Gregory
+just noticed, that with the eint handling moving to the pinctrl driver, there 
+are no interrupt trigger settings to be made here anymore, so this can 
+probably move to xlate_onecell and #interrupt-cells to <1>.
