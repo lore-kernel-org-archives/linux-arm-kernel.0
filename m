@@ -1,73 +1,212 @@
 From: hechtb@gmail.com (Bastian Hecht)
-Date: Sun, 17 Mar 2013 16:43:45 +0100
-Subject: [PATCH v3 1/7] ARM: shmobile: Define DT bindings for timer devices
-Message-ID: <1363535031-21402-1-git-send-email-hechtb+renesas@gmail.com>
+Date: Sun, 17 Mar 2013 16:43:47 +0100
+Subject: [PATCH v3 3/7] clocksource: sh_tmu: Add OF support
+In-Reply-To: <1363535031-21402-1-git-send-email-hechtb+renesas@gmail.com>
+References: <1363535031-21402-1-git-send-email-hechtb+renesas@gmail.com>
+Message-ID: <1363535031-21402-3-git-send-email-hechtb+renesas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SH mobile series currently features 3 timer devices in the kernel:
-Compare Match Timer (CMT), Timer Unit (TMU) and MTU2. These devices
-share register layout characteristics amongst each that enable us to
-define common DT bindings for them.
+We add the capabilty to probe SH CMT timer devices using Device Tree
+setup.
 
 Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
 ---
-v3: same (only patch 0003 changed)
+v3: trivial fix: assign config values to driver data.
 
- .../devicetree/bindings/timer/renesas,timer.txt    |   45 ++++++++++++++++++++
- 1 file changed, 45 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/timer/renesas,timer.txt
+ drivers/clocksource/sh_tmu.c |   96 +++++++++++++++++++++++++++++++++++++-----
+ 1 file changed, 85 insertions(+), 11 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/timer/renesas,timer.txt b/Documentation/devicetree/bindings/timer/renesas,timer.txt
-new file mode 100644
-index 0000000..2c001bf
---- /dev/null
-+++ b/Documentation/devicetree/bindings/timer/renesas,timer.txt
-@@ -0,0 +1,45 @@
-+* Renesas SH Mobile Timer
+diff --git a/drivers/clocksource/sh_tmu.c b/drivers/clocksource/sh_tmu.c
+index b4502edc..98a3c3c 100644
+--- a/drivers/clocksource/sh_tmu.c
++++ b/drivers/clocksource/sh_tmu.c
+@@ -34,10 +34,13 @@
+ #include <linux/module.h>
+ #include <linux/pm_domain.h>
+ #include <linux/pm_runtime.h>
++#include <linux/of.h>
+ 
+ struct sh_tmu_priv {
+ 	void __iomem *mapbase;
+ 	struct clk *clk;
++	long channel_offset;
++	int timer_bit;
+ 	struct irqaction irqaction;
+ 	struct platform_device *pdev;
+ 	unsigned long rate;
+@@ -57,12 +60,11 @@ static DEFINE_RAW_SPINLOCK(sh_tmu_lock);
+ 
+ static inline unsigned long sh_tmu_read(struct sh_tmu_priv *p, int reg_nr)
+ {
+-	struct sh_timer_config *cfg = p->pdev->dev.platform_data;
+ 	void __iomem *base = p->mapbase;
+ 	unsigned long offs;
+ 
+ 	if (reg_nr == TSTR)
+-		return ioread8(base - cfg->channel_offset);
++		return ioread8(base - p->channel_offset);
+ 
+ 	offs = reg_nr << 2;
+ 
+@@ -75,12 +77,11 @@ static inline unsigned long sh_tmu_read(struct sh_tmu_priv *p, int reg_nr)
+ static inline void sh_tmu_write(struct sh_tmu_priv *p, int reg_nr,
+ 				unsigned long value)
+ {
+-	struct sh_timer_config *cfg = p->pdev->dev.platform_data;
+ 	void __iomem *base = p->mapbase;
+ 	unsigned long offs;
+ 
+ 	if (reg_nr == TSTR) {
+-		iowrite8(value, base - cfg->channel_offset);
++		iowrite8(value, base - p->channel_offset);
+ 		return;
+ 	}
+ 
+@@ -94,7 +95,6 @@ static inline void sh_tmu_write(struct sh_tmu_priv *p, int reg_nr,
+ 
+ static void sh_tmu_start_stop_ch(struct sh_tmu_priv *p, int start)
+ {
+-	struct sh_timer_config *cfg = p->pdev->dev.platform_data;
+ 	unsigned long flags, value;
+ 
+ 	/* start stop register shared by multiple timer channels */
+@@ -102,9 +102,9 @@ static void sh_tmu_start_stop_ch(struct sh_tmu_priv *p, int start)
+ 	value = sh_tmu_read(p, TSTR);
+ 
+ 	if (start)
+-		value |= 1 << cfg->timer_bit;
++		value |= 1 << p->timer_bit;
+ 	else
+-		value &= ~(1 << cfg->timer_bit);
++		value &= ~(1 << p->timer_bit);
+ 
+ 	sh_tmu_write(p, TSTR, value);
+ 	raw_spin_unlock_irqrestore(&sh_tmu_lock, flags);
+@@ -421,9 +421,75 @@ static int sh_tmu_register(struct sh_tmu_priv *p, char *name,
+ 	return 0;
+ }
+ 
+-static int sh_tmu_setup(struct sh_tmu_priv *p, struct platform_device *pdev)
++static const struct of_device_id of_sh_tmu_match[] = {
++	{ .compatible = "renesas,tmu-timer" },
++	{},
++};
++MODULE_DEVICE_TABLE(of, of_sh_tmu_match);
 +
-+Bindings for several timer devices from Renesas including CMT, TMU and MTU2.
++#define TMU_OFFSET_MULTIPLIER	0xc
++#define TMU_MAX_CHANNELS	3
 +
-+Required properties:
-+- compatible : Should be "renesas,{device}-timer",
-+  whereas device is "cmt", "tmu" or "mtu2".
-+- reg : Address and length of the register set for the device
-+- interrupts : Timer interrupt
-+- renesas,device-id : The ID of the timer device
-+- renesas,channel-id : The channel ID of the timer device
-+- renesas,source-quality : The viability to use this device as a free
-+  running clock. From 0 (do not use) to 10 (best possible clock).
-+- renesas,event-quality : The viability to use this device as an event
-+  generator. From 0 (do not use) to 10 (best possible clock).
++static struct sh_timer_config *sh_tmu_parse_dt(struct device *dev)
++{
++	struct sh_timer_config *cfg;
++	struct device_node *np = dev->of_node;
++	u32 channel_id, rating;
 +
-+The properties renesas,{source,event}-quality reflect the situation that the
-+usability of the timer devices depend on the location within their SoCs. E.g.
-+the power domain affinty affects power management, some mux-ed lines might be
-+preferred to be assigned to other functions and other constraints.
++	if (!IS_ENABLED(CONFIG_OF) || !np)
++		return NULL;
 +
-+Example for CMT1 channel 0 on the R8A7740 SoC:
++	cfg = devm_kzalloc(dev, sizeof(struct sh_timer_config), GFP_KERNEL);
++	if (!cfg) {
++		dev_err(dev, "failed to allocate DT config data\n");
++		return NULL;
++	}
 +
-+	timer at e6138010 {
-+		compatible = "renesas,cmt-timer";
-+		interrupt-parent = <&intca>;
-+		reg = <0xe6138010 0xc>;
-+		interrupts = <0x0b00>;
-+		renesas,device-id = <1>;
-+		renesas,channel-id = <0>;
-+		renesas,source-quality = <3>;
-+		renesas,event-quality = <3>;
-+	};
++	if (of_property_read_u32(np, "renesas,channel-id", &channel_id)) {
++		dev_err(dev, "channel id missing\n");
++		return NULL;
++	}
++	if (channel_id >= TMU_MAX_CHANNELS) {
++		dev_err(dev, "invalid channel id\n");
++		return NULL;
++	}
 +
-+Example for TMU0 channel 1 on the SH7372 SoC:
-+	timer at fff60014 {
-+		compatible = "renesas,tmu-timer";
-+		interrupt-parent = <&intcs>;
-+		reg = <0xfff60014 0xc>;
-+		interrupts = <0xea0>;
-+		renesas,device-id = <0>;
-+		renesas,channel-id = <1>;
-+		renesas,source-quality = <4>;
-+		renesas,event-quality = <0>;
-+	};
++	cfg->channel_offset = channel_id * TMU_OFFSET_MULTIPLIER + 4;
++	cfg->timer_bit = channel_id;
++
++	/*
++	 * We convert the {source,event}-quality DT properties to linux specific
++	 * clock{source,event}_ratings.
++	 */
++	if (!of_property_read_u32(np, "renesas,source-quality", &rating)) {
++		if (rating > 10) {
++			dev_err(dev, "invalid source-quality\n");
++			return NULL;
++		}
++		if (rating)
++			cfg->clocksource_rating = rating * 50 - 1;
++	}
++
++	if (!of_property_read_u32(np, "renesas,event-quality", &rating)) {
++		if (rating > 10) {
++			dev_err(dev, "invalid event-quality\n");
++			return NULL;
++		}
++		if (rating)
++			cfg->clockevent_rating = rating * 50 - 1;
++	}
++
++	if (!cfg->clocksource_rating && !cfg->clockevent_rating) {
++		dev_err(dev, "source- and event-quality 0, timer is unused\n");
++		return NULL;
++	}
++
++	return cfg;
++}
++
++static int sh_tmu_setup(struct sh_tmu_priv *p, struct platform_device *pdev,
++						struct sh_timer_config *cfg)
+ {
+-	struct sh_timer_config *cfg = pdev->dev.platform_data;
+ 	struct resource *res;
+ 	int irq, ret;
+ 	ret = -ENXIO;
+@@ -474,6 +540,8 @@ static int sh_tmu_setup(struct sh_tmu_priv *p, struct platform_device *pdev)
+ 	}
+ 	p->cs_enabled = false;
+ 	p->enable_count = 0;
++	p->channel_offset = cfg->channel_offset;
++	p->timer_bit = cfg->timer_bit;
+ 
+ 	return sh_tmu_register(p, (char *)dev_name(&p->pdev->dev),
+ 			       cfg->clockevent_rating,
+@@ -487,7 +555,7 @@ static int sh_tmu_setup(struct sh_tmu_priv *p, struct platform_device *pdev)
+ static int sh_tmu_probe(struct platform_device *pdev)
+ {
+ 	struct sh_tmu_priv *p = platform_get_drvdata(pdev);
+-	struct sh_timer_config *cfg = pdev->dev.platform_data;
++	struct sh_timer_config *cfg;
+ 	int ret;
+ 
+ 	if (!is_early_platform_device(pdev)) {
+@@ -495,6 +563,11 @@ static int sh_tmu_probe(struct platform_device *pdev)
+ 		pm_runtime_enable(&pdev->dev);
+ 	}
+ 
++	if (pdev->dev.of_node)
++		cfg = sh_tmu_parse_dt(&pdev->dev);
++	else
++		cfg = pdev->dev.platform_data;
++
+ 	if (p) {
+ 		dev_info(&pdev->dev, "kept as earlytimer\n");
+ 		goto out;
+@@ -506,7 +579,7 @@ static int sh_tmu_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 	}
+ 
+-	ret = sh_tmu_setup(p, pdev);
++	ret = sh_tmu_setup(p, pdev, cfg);
+ 	if (ret) {
+ 		kfree(p);
+ 		platform_set_drvdata(pdev, NULL);
+@@ -535,6 +608,7 @@ static struct platform_driver sh_tmu_device_driver = {
+ 	.remove		= sh_tmu_remove,
+ 	.driver		= {
+ 		.name	= "sh_tmu",
++		.of_match_table = of_sh_tmu_match,
+ 	}
+ };
+ 
 -- 
 1.7.9.5
