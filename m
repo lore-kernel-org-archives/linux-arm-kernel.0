@@ -1,23 +1,73 @@
-From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Sun, 17 Mar 2013 16:32:30 +0100
-Subject: [PATCH] ARM: mach-moxart: platform port for MOXA ART SoC
-In-Reply-To: <201303151125.53999.arnd@arndb.de>
-References: <CACmBeS1NLFUYHBOVL28aCCzRrgXYGPZF9t3qj6AdcgaMkrPGoQ@mail.gmail.com>
- <CACmBeS05cyT8N9nZeqbJUPMSGeZYLWjL0Tu1GSZ-ms+Hjc0UoQ@mail.gmail.com>
- <5140C6B2.7040702@gmail.com> <201303151125.53999.arnd@arndb.de>
-Message-ID: <CACmBeS3aXs9vhc5ZYPbz5bjsYsSa6EzM12H4uPv706x0zU_5iw@mail.gmail.com>
+From: hechtb@gmail.com (Bastian Hecht)
+Date: Sun, 17 Mar 2013 16:43:45 +0100
+Subject: [PATCH v3 1/7] ARM: shmobile: Define DT bindings for timer devices
+Message-ID: <1363535031-21402-1-git-send-email-hechtb+renesas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thank you for the feedback.
+The SH mobile series currently features 3 timer devices in the kernel:
+Compare Match Timer (CMT), Timer Unit (TMU) and MTU2. These devices
+share register layout characteristics amongst each that enable us to
+define common DT bindings for them.
 
-Some of the changes are sure to be a challenge for me, but I want to
-move this forward, and having a list helps.
+Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
+---
+v3: same (only patch 0003 changed)
 
-3.2.40 is as far as it'll go right now, nothing prints to UART
-starting with 3.3.8 (last tested, it's somewhere around there).
+ .../devicetree/bindings/timer/renesas,timer.txt    |   45 ++++++++++++++++++++
+ 1 file changed, 45 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/timer/renesas,timer.txt
 
-I have been advised to enable early_printk (by landley on freenode IRC #edev).
-
-Best regards,
-Jonas
+diff --git a/Documentation/devicetree/bindings/timer/renesas,timer.txt b/Documentation/devicetree/bindings/timer/renesas,timer.txt
+new file mode 100644
+index 0000000..2c001bf
+--- /dev/null
++++ b/Documentation/devicetree/bindings/timer/renesas,timer.txt
+@@ -0,0 +1,45 @@
++* Renesas SH Mobile Timer
++
++Bindings for several timer devices from Renesas including CMT, TMU and MTU2.
++
++Required properties:
++- compatible : Should be "renesas,{device}-timer",
++  whereas device is "cmt", "tmu" or "mtu2".
++- reg : Address and length of the register set for the device
++- interrupts : Timer interrupt
++- renesas,device-id : The ID of the timer device
++- renesas,channel-id : The channel ID of the timer device
++- renesas,source-quality : The viability to use this device as a free
++  running clock. From 0 (do not use) to 10 (best possible clock).
++- renesas,event-quality : The viability to use this device as an event
++  generator. From 0 (do not use) to 10 (best possible clock).
++
++The properties renesas,{source,event}-quality reflect the situation that the
++usability of the timer devices depend on the location within their SoCs. E.g.
++the power domain affinty affects power management, some mux-ed lines might be
++preferred to be assigned to other functions and other constraints.
++
++Example for CMT1 channel 0 on the R8A7740 SoC:
++
++	timer at e6138010 {
++		compatible = "renesas,cmt-timer";
++		interrupt-parent = <&intca>;
++		reg = <0xe6138010 0xc>;
++		interrupts = <0x0b00>;
++		renesas,device-id = <1>;
++		renesas,channel-id = <0>;
++		renesas,source-quality = <3>;
++		renesas,event-quality = <3>;
++	};
++
++Example for TMU0 channel 1 on the SH7372 SoC:
++	timer at fff60014 {
++		compatible = "renesas,tmu-timer";
++		interrupt-parent = <&intcs>;
++		reg = <0xfff60014 0xc>;
++		interrupts = <0xea0>;
++		renesas,device-id = <0>;
++		renesas,channel-id = <1>;
++		renesas,source-quality = <4>;
++		renesas,event-quality = <0>;
++	};
+-- 
+1.7.9.5
