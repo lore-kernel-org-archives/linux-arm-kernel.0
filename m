@@ -1,35 +1,27 @@
-From: lznuaa@gmail.com (Frank Li)
-Date: Sun, 17 Mar 2013 09:15:52 +0800
-Subject: Anyone implement Cortex A9 FIQ
-In-Reply-To: <5142FBF5.3010307@arm.com>
-References: <CAHrpEqSQ1n_WUfxoraKZFS2A8NjdP_MCcWmJdCjcon_QwgX4Hw@mail.gmail.com>
- <5142FBF5.3010307@arm.com>
-Message-ID: <CAHrpEqSO89Lx=EGTJJ_XOFwkHqL=heoOUQCtJUzm6D7mEAbWiw@mail.gmail.com>
+From: chen.gang.flying.transformer@gmail.com (Chen Gang F T)
+Date: Sun, 17 Mar 2013 10:31:07 +0800
+Subject: [Suggestion] Latest randconfig build errors for Head.S
+In-Reply-To: <201303151129.43542.arnd@arndb.de>
+References: <51415428.1070401@asianux.com> <201303151056.55819.arnd@arndb.de>
+ <514301E8.9040201@gmail.com> <201303151129.43542.arnd@arndb.de>
+Message-ID: <51452AEB.6010806@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/3/15 Jonathan Austin <jonathan.austin@arm.com>:
-> Hi Frank,
->
->
-> On 15/03/13 07:38, Frank Li wrote:
->>
->> All:
->>              Recently, we need real time work run in cortex A9.
->>              Did anyone use FIQ on Cortex A9?
->>
->
-> What are you actually trying to do? There's quite a lot more complexity to
-> being able to do real-time work on an A-class processor than just using FIQ,
-> and much of that would be platform specific. For example on ARMv7A, we
-> generally can't assume that FIQ can be used by the non-secure world...
+On 2013?03?15? 19:29, Arnd Bergmann wrote:
+> On Friday 15 March 2013, Chen Gang F T wrote:
+>> >   excuse me, my English is not quite well.
+>> > 
+>> >   I guess your meaning is:
+>> >     "that bug" means the toolchain's bug (need toolchain people fix it).
+>> >     prefer to apply your patch, before "that bug" is fixed (we don't know when)
+>> > 
+>> >   is it correct ?
+> Yes, correct.
 
-There are period task run every 125us.
-Task is quick simply, just put virtual multi DMA queue to real DMA queue.
-Small memory copy and set some hardware register.
+  thanks, and I support you.
 
+-- 
+Chen Gang
 
->
->
-> Jonny
->
+Flying Transformer
