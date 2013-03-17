@@ -1,39 +1,39 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Sun, 17 Mar 2013 19:13:43 +0100
-Subject: [PATCHv1 0/2] ARM: socfpga: Soft reset, hotplug and device
- tree clocks
-In-Reply-To: <5141220A.7050008@gmail.com>
-References: <1363211722-27237-1-git-send-email-dinguyen@altera.com>
- <5141220A.7050008@gmail.com>
-Message-ID: <20130317181343.GB4394@amd.pavel.ucw.cz>
+From: tanmay.upadhyay@einfochips.com (Tanmay Upadhyay)
+Date: Sun, 17 Mar 2013 13:16:46 -0500
+Subject: [PATCH 0/4] Add SD support for PXA168 & gplugD
+Message-ID: <1363544206-3671-1-git-send-email-tanmay.upadhyay@einfochips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+This patch series adds support for on-chip SD controller on PXA168
 
-> > From: Dinh Nguyen <dinguyen@altera.com>
-> > 
-> > Hi Arnd/Olof,
-> > 
-> > Just 2 patches for mach-socfpga:
-> > 
-> > 0001: ARM: socfpga: Enable hotplug and soft reset
-> > 	- Able to hotplug CPU1 by putting it into reset and bringing back online.
-> > 
-> 
-> Have you seen the discussion on PSCI? There's an ARM doc on it and
-> Linaro session from last week. Is there a possibility you can use that?
-> You would need to be able to run in non-secure mode and implement
-> smc calls.
+Tanmay Upadhyay (4):
+  mmc: sdhci-pxa: Trivial fix in Kconfig
+  ARM: pxa168: Add SDHCI support
+  mmc: sdhci-pxa: Add SDHCI driver for PXA16x
+  ARM: pxa168/gplugd: Add support for SD port 1
 
-What would be the advantage?
+ arch/arm/mach-mmp/Kconfig               |    1 -
+ arch/arm/mach-mmp/clock-pxa168.c        |   47 +++++++++++++++++++++++++++++++
+ arch/arm/mach-mmp/gplugd.c              |    6 ++++
+ arch/arm/mach-mmp/include/mach/pxa168.h |   20 +++++++++++++
+ arch/arm/mach-mmp/pxa168.c              |    4 +++
+ drivers/mmc/host/Kconfig                |   11 ++++----
+ drivers/mmc/host/sdhci-pxav2.c          |   30 +++++++++++++++++++-
+ drivers/mmc/host/sdhci.c                |    3 ++
+ drivers/mmc/host/sdhci.h                |    1 +
+ include/linux/platform_data/pxa_sdhci.h |    2 ++
+ 10 files changed, 118 insertions(+), 7 deletions(-)
 
-We do not have suitable hypervisor at the moment. Nor I see why it
-would be good to push power management into it.
-
-(Plus, the implementation seems pretty incomplete for arm32.).
-
-									Pavel
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+1.7.9.5
+
+*************************************************************************************************************************************************************
+eInfochips Business Disclaimer : This e-mail message and all attachments transmitted with it are intended solely for the use of the addressee and may contain legally privileged and confidential information. If the reader of this message is not the intended recipient, or an employee or agent responsible for delivering this message to the intended recipient, you are hereby notified that any dissemination, distribution, copying, or other use of this message or its attachments is strictly prohibited. If you have received this message in error, please notify the sender immediately by replying to this message and please delete it from your computer. Any views expressed in this message are those of the individual sender unless otherwise stated. Company has taken enough precautions to prevent the spread of viruses. However the company accepts no liability for any damage caused by any virus transmitted by this email.
+*************************************************************************************************************************************************************
+
+
+---------------------------------------------------------------------------------------------
+Notice: 
+This message has been scanned by Trend Micro Mail Security scanner and is believed to be clean
+---------------------------------------------------------------------------------------------
