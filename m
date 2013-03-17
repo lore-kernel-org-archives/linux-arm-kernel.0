@@ -1,69 +1,43 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Sun, 17 Mar 2013 14:36:24 +0000
-Subject: [PATCH 2/3] ARM: Detect support for SDIV/UDIV from ISAR0 register
-In-Reply-To: <1363138321-27849-3-git-send-email-sboyd@codeaurora.org>
-References: <1363138321-27849-1-git-send-email-sboyd@codeaurora.org>
- <1363138321-27849-3-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20130317143624.GE19071@mudshark.cambridge.arm.com>
+Date: Sun, 17 Mar 2013 14:40:30 +0000
+Subject: [Suggestion] Latest randconfig build errors for CONFIG_MMU=no
+In-Reply-To: <5141CFE4.2030909@arm.com>
+References: <514147A0.2060002@asianux.com>
+ <5141CFE4.2030909@arm.com>
+Message-ID: <20130317144030.GF19071@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 13, 2013 at 01:32:00AM +0000, Stephen Boyd wrote:
-> The ISAR0 register indicates support for the SDIV and UDIV
-> instructions in both the Thumb and ARM instruction set. Read the
-> register to detect the supported instructions and update the
-> elf_hwcap mask as appropriate. This is better than adding more
-> and more cpuid checks in proc-v7.S for each new cpu variant that
-> supports these instructions.
+On Thu, Mar 14, 2013 at 01:25:56PM +0000, Jonathan Austin wrote:
+> On 14/03/13 03:44, Chen Gang wrote:
+> > Hello Maintainers:
+> >
+> >    when use randconfig:
+> >      make V=1 EXTRA_CFLAGS=-W ARCH=arm randconfig
+> >        (and "grep CONFIG_MMU .config" outputs "# CONFIG_MMU is not set")
+> >
+> >    the error information:
+> >      arch/arm/kernel/suspend.c: ????cpu_suspend??:
+> >      arch/arm/kernel/suspend.c:56:32: ???????????????
+> >      arch/arm/kernel/suspend.c:70:3: ??????????cpu_switch_mm? [-Werror=implicit-function-declaration]
+> >      arch/arm/kernel/suspend.c:71:3: ??????????local_flush_bp_all? [-Werror=implicit-function-declaration]
+> >      arch/arm/kernel/suspend.c:72:3: ??????????local_flush_tlb_all? [-Werror=implicit-function-declaration]
+> >
+> >    I want to be sure whether we can bear it ?
+> >
 > 
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Stepan Moskovchenko <stepanm@codeaurora.org>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  arch/arm/kernel/setup.c | 20 ++++++++++++++++++++
->  arch/arm/mm/proc-v7.S   |  4 ++--
->  2 files changed, 22 insertions(+), 2 deletions(-)
+> You're right that at the moment that suspend code is broken for NOMMU.
 > 
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index e2c8bbf..bd27a70 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -353,6 +353,23 @@ void __init early_print(const char *str, ...)
->  	printk("%s", buf);
->  }
->  
-> +static void __init idiv_setup(void)
-> +{
-> +	unsigned int divide_instrs;
-> +
-> +	if (cpu_architecture() < CPU_ARCH_ARMv7)
-> +		return;
-> +
-> +	divide_instrs = (read_cpuid_ext(CPUID_EXT_ISAR0) & 0x0f000000) >> 24;
-> +
-> +	switch (divide_instrs) {
-> +	case 2:
-> +		elf_hwcap |= HWCAP_IDIVA;
-> +	case 1:
-> +		elf_hwcap |= HWCAP_IDIVT;
-> +	}
-> +}
-> +
->  static void __init feat_v6_fixup(void)
->  {
->  	int id = read_cpuid_id();
-> @@ -483,6 +500,9 @@ static void __init setup_processor(void)
->  	snprintf(elf_platform, ELF_PLATFORM_SIZE, "%s%c",
->  		 list->elf_name, ENDIANNESS);
->  	elf_hwcap = list->elf_hwcap;
-> +
-> +	idiv_setup();
+> However, Will Deacon has a patch to fix it in his nommu branch on 
+> kernel.org:
+> 
+> https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/commit/?h=nommu
+> 
+> I'll let Will comment on how/when he might look at proposing that code 
+> to be merged.
 
-Perhaps give this a more generic name (cpuid_init_hwcaps) so we can add more
-probing later on (we could probe swp, for example).
-
-With that minor change:
-
-  Acked-by: Will Deacon <will.deacon@arm.com>
+I can probably bring that up to speed with -rc2 if people are interested.
+The tricky part is testing -- I used a software model that had a magic
+control block for killing off CPUs when I wrote this originally.
 
 Will
