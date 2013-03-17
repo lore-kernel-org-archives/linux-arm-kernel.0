@@ -1,21 +1,83 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 17 Mar 2013 21:13:08 +0000
-Subject: [PATCH 3.9-rc1] clk: vt8500: Fix variable name '*prate' compile
- error
-In-Reply-To: <20130317210123.8663.84457@quantum>
-References: <1361900052-66917-1-git-send-email-tim.gardner@canonical.com>
- <201303112207.32619.arnd@arndb.de> <20130317210123.8663.84457@quantum>
-Message-ID: <201303172113.08997.arnd@arndb.de>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Sun, 17 Mar 2013 22:23:54 +0100
+Subject: [PATCH] ARM: kirkwood: Add support for NETGEAR ReadyNAS Duo v2
+ using DT
+In-Reply-To: <20130317205047.GU21478@lunn.ch> (Andrew Lunn's message of "Sun,
+ 17 Mar 2013 21:50:47 +0100")
+References: <8738vt3h11.fsf@natisbad.org> <20130317205047.GU21478@lunn.ch>
+Message-ID: <87li9l200l.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 17 March 2013, Mike Turquette wrote:
-> Yes it is.  I haven't pushed a new branch out since 3.9-rc1 due to LCE
-> and vacation after that.  This fix and other pending patches will get
-> pulled in this week.
-> 
+Hi Andrew and Jason,
 
-I've actually put it into the arm-soc bug fix queue now, since I did not
-hear back from you and it never showed up in linux-next.
+Jason, I have taken your comments into account.
 
-	Arnd
+Andrew Lunn <andrew@lunn.ch> writes:
+
+> Hi Arnaud
+>
+>> +
+>> +		thermal at 10078 {
+>> +			compatible = "marvell,kirkwood-thermal";
+>> +			reg = <0x10078 0x4>;
+>> +			status = "okay";
+>> +		};
+>
+> This should not be needed. All 6282 have the thermal sensor, so the
+> kirkwood-6282.dtsi will contain this. For 3.9 we submitted the DT
+> change too late, so it did not make it in, but for 3.10 it should be
+> there.
+
+Understood, will remove it.
+
+
+>> +void __init netgear_readynas_init(void)
+>> +{
+>> +	u32 val;
+>> +
+>> +	kirkwood_ge00_init(&netgear_readynas_ge00_data);
+>> +	kirkwood_pcie_init(KW_PCIE0);
+>> +
+>> +	/* USB 3.0 controller power on */
+>> +	mdelay(3000);
+>> +	val = readl(GPIO_HIGH_VIRT_BASE + 0x4);
+>> +	writel(val & ~(0x1 << 14), GPIO_HIGH_VIRT_BASE + 0x4);
+>> +	val = readl(GPIO_HIGH_VIRT_BASE);
+>> +	writel(val | (0x1 << 14), GPIO_HIGH_VIRT_BASE);
+>
+> As Jason said, you can use a fixed regulator, in DT. Something like:
+>
+>         regulators {
+>                 compatible = "simple-bus";
+>                 #address-cells = <1>;
+>                 #size-cells = <0>;
+>
+>                 usb_power: regulator at 1 {
+>                         compatible = "regulator-fixed";
+>                         reg = <1>;
+>                         regulator-name = "USB Power";
+>                         regulator-min-microvolt = <5000000>;
+>                         regulator-max-microvolt = <5000000>;
+>                         enable-active-high;
+>                         regulator-always-on;
+>                         regulator-boot-on;
+>                         gpio = <&gpio0 14 0>;
+>                 };
+>         };
+
+Thanks for providing this to bootstrap with. Tomorrow, I will test if it
+works and report results.
+
+
+> Is the mdelay() really required?
+
+It was in NETGEAR's kernel (heavily patched 2.6.31.8) and thought people
+who wrote the code had reasons (documentation) to put it here but I will
+check if it is needed.
+
+Thanks for your time,
+
+Cheers,
+
+a+
