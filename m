@@ -1,61 +1,44 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 17 Mar 2013 21:50:47 +0100
-Subject: [PATCH] ARM: kirkwood: Add support for NETGEAR ReadyNAS Duo v2
- using DT
-In-Reply-To: <8738vt3h11.fsf@natisbad.org>
-References: <8738vt3h11.fsf@natisbad.org>
-Message-ID: <20130317205047.GU21478@lunn.ch>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Sun, 17 Mar 2013 14:01:23 -0700
+Subject: [PATCH 3.9-rc1] clk: vt8500: Fix variable name '*prate' compile
+ error
+In-Reply-To: <201303112207.32619.arnd@arndb.de>
+References: <1361900052-66917-1-git-send-email-tim.gardner@canonical.com>
+ <20130226192958.14870.54664@quantum> <201303112207.32619.arnd@arndb.de>
+Message-ID: <20130317210123.8663.84457@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnaud
+Quoting Arnd Bergmann (2013-03-11 15:07:32)
+> On Tuesday 26 February 2013, Mike Turquette wrote:
+> > Quoting Tim Gardner (2013-02-26 09:34:12)
+> > > commit 72480014b86c8b51fb51c5c6a0525876055c37c7 (clk: vt8500: Fix device clock
+> > > divisor calculations) introduced a compile error in the naming of a variable in
+> > > vt8500_dclk_set_rate(). It looks like a simple cut and paste error.
+> > > 
+> > > Cc: Mike Turquette <mturquette@linaro.org>
+> > > Cc: linux-arm-kernel at lists.infradead.org
+> > > Signed-off-by: Tim Gardner <tim.gardner@canonical.com>
+> > 
+> > Tim,
+> > 
+> > Thanks for the fix.  I already have a fix for this issue in my clk-fixes
+> > branch.  In fact I forgot to bundle this one and another mxs fix in my
+> > 3.9 pull request so I'll send a follow-up bugfix branch after 3.9-rc1 is
+> > out.
+> > 
+> 
+> It seems this hasn't happened yet. I also don't see the patch in linux-next.
+> Is this patch still on your radar?
+> 
 
-> +
-> +		thermal at 10078 {
-> +			compatible = "marvell,kirkwood-thermal";
-> +			reg = <0x10078 0x4>;
-> +			status = "okay";
-> +		};
+Arnd,
 
-This should not be needed. All 6282 have the thermal sensor, so the
-kirkwood-6282.dtsi will contain this. For 3.9 we submitted the DT
-change too late, so it did not make it in, but for 3.10 it should be
-there.
+Yes it is.  I haven't pushed a new branch out since 3.9-rc1 due to LCE
+and vacation after that.  This fix and other pending patches will get
+pulled in this week.
 
-> +void __init netgear_readynas_init(void)
-> +{
-> +	u32 val;
-> +
-> +	kirkwood_ge00_init(&netgear_readynas_ge00_data);
-> +	kirkwood_pcie_init(KW_PCIE0);
-> +
-> +	/* USB 3.0 controller power on */
-> +	mdelay(3000);
-> +	val = readl(GPIO_HIGH_VIRT_BASE + 0x4);
-> +	writel(val & ~(0x1 << 14), GPIO_HIGH_VIRT_BASE + 0x4);
-> +	val = readl(GPIO_HIGH_VIRT_BASE);
-> +	writel(val | (0x1 << 14), GPIO_HIGH_VIRT_BASE);
+Regards,
+Mike
 
-As Jason said, you can use a fixed regulator, in DT. Something like:
-
-        regulators {
-                compatible = "simple-bus";
-                #address-cells = <1>;
-                #size-cells = <0>;
-
-                usb_power: regulator at 1 {
-                        compatible = "regulator-fixed";
-                        reg = <1>;
-                        regulator-name = "USB Power";
-                        regulator-min-microvolt = <5000000>;
-                        regulator-max-microvolt = <5000000>;
-                        enable-active-high;
-                        regulator-always-on;
-                        regulator-boot-on;
-                        gpio = <&gpio0 14 0>;
-                };
-        };
-
-Is the mdelay() really required?
-
-   Andrew
+>         Arnd
