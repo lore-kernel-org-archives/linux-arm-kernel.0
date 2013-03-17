@@ -1,43 +1,48 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Sun, 17 Mar 2013 14:40:30 +0000
-Subject: [Suggestion] Latest randconfig build errors for CONFIG_MMU=no
-In-Reply-To: <5141CFE4.2030909@arm.com>
-References: <514147A0.2060002@asianux.com>
- <5141CFE4.2030909@arm.com>
-Message-ID: <20130317144030.GF19071@mudshark.cambridge.arm.com>
+From: florian@openwrt.org (Florian Fainelli)
+Date: Sun, 17 Mar 2013 15:48:19 +0100
+Subject: ep93xx irq-vic regression
+In-Reply-To: <51450905.8030108@gmail.com>
+References: <ADE657CA350FB648AAC2C43247A983F0020980106C9F@AUSP01VMBX24.collaborationhost.net>
+ <201303161449.03823.florian@openwrt.org> <51450905.8030108@gmail.com>
+Message-ID: <1659668.cz5sPBWP0g@bender>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 14, 2013 at 01:25:56PM +0000, Jonathan Austin wrote:
-> On 14/03/13 03:44, Chen Gang wrote:
-> > Hello Maintainers:
-> >
-> >    when use randconfig:
-> >      make V=1 EXTRA_CFLAGS=-W ARCH=arm randconfig
-> >        (and "grep CONFIG_MMU .config" outputs "# CONFIG_MMU is not set")
-> >
-> >    the error information:
-> >      arch/arm/kernel/suspend.c: ????cpu_suspend??:
-> >      arch/arm/kernel/suspend.c:56:32: ???????????????
-> >      arch/arm/kernel/suspend.c:70:3: ??????????cpu_switch_mm? [-Werror=implicit-function-declaration]
-> >      arch/arm/kernel/suspend.c:71:3: ??????????local_flush_bp_all? [-Werror=implicit-function-declaration]
-> >      arch/arm/kernel/suspend.c:72:3: ??????????local_flush_tlb_all? [-Werror=implicit-function-declaration]
-> >
-> >    I want to be sure whether we can bear it ?
-> >
+On Sunday 17 March 2013 11:06:29 Ryan Mallon wrote:
+[snip]
+> >> From: H Hartley Sweeten <hsweeten@visionengravers.com>
+> >> Subject: [PATCH] arm: ep93xx: fix wait for UART FIFO to be empty
+> >>
+> >> commit 210dce5f "ARM: ep93xx: properly wait for UART FIFO to be empty"
+> >>
+> >> Removed the timeout loop while waiting for the uart transmit fifo to
+> >> empty. Some bootloaders leave the uart in a state where there might
+> >> be bytes in the uart that are not transmitted when execution is handed
+> >> over to the kernel. This results in a deadlocked system while waiting
+> >> for the fifo to empty.
+> >>
+> >> Add back the timeout wait to prevent the deadlock.
+> >>
+> >> Increase the wait time to hopefully prevent the decompressor corruption
+> >> that lead to commit 210dce5f. This corruption was probably due to a
+> >> slow uart baudrate. The 10* increase in the wait time should be enough
+> >> for all cases.
+> > 
+> > Ok, your solution seems like it would work, when I come accross this bug I 
+> > initially ended up doing the same thing and incrementing the number of 
+> > iterations in the loop. I was not quite happy with that as it would still 
+be 
+> > highly depending on the clocking. Anyway, sorry for breaking your system 
+with 
+> > this commit.
 > 
-> You're right that at the moment that suspend code is broken for NOMMU.
 > 
-> However, Will Deacon has a patch to fix it in his nommu branch on 
-> kernel.org:
-> 
-> https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/commit/?h=nommu
-> 
-> I'll let Will comment on how/when he might look at proposing that code 
-> to be merged.
+> Do you want to add an Acked/Reviewed-by Florian? I'll queue this
+> up in my tree if you are happy with it.
 
-I can probably bring that up to speed with -rc2 if people are interested.
-The tricky part is testing -- I used a software model that had a magic
-control block for killing off CPUs when I wrote this originally.
+Yes, I just re-tested with 10000 as a loop value, and it fixes the corruption I 
+was seeing, you can add my Acked-by: Florian Fainelli <florian@openwrt.org>
 
-Will
+Thanks to both of you!
+-- 
+Florian
