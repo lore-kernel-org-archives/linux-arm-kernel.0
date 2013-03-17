@@ -1,39 +1,55 @@
-From: tanmay.upadhyay@einfochips.com (Tanmay Upadhyay)
-Date: Sun, 17 Mar 2013 13:16:46 -0500
-Subject: [PATCH 0/4] Add SD support for PXA168 & gplugD
-Message-ID: <1363544206-3671-1-git-send-email-tanmay.upadhyay@einfochips.com>
+From: pavel@denx.de (Pavel Machek)
+Date: Sun, 17 Mar 2013 19:18:14 +0100
+Subject: [PATCHv1 1/2] ARM: socfpga: Enable hotplug and soft reset
+In-Reply-To: <1363211722-27237-2-git-send-email-dinguyen@altera.com>
+References: <1363211722-27237-1-git-send-email-dinguyen@altera.com>
+ <1363211722-27237-2-git-send-email-dinguyen@altera.com>
+Message-ID: <20130317181814.GC4394@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds support for on-chip SD controller on PXA168
+Hi!
 
-Tanmay Upadhyay (4):
-  mmc: sdhci-pxa: Trivial fix in Kconfig
-  ARM: pxa168: Add SDHCI support
-  mmc: sdhci-pxa: Add SDHCI driver for PXA16x
-  ARM: pxa168/gplugd: Add support for SD port 1
+> Put CPU1 into reset when it is hotplugged.
+> Enable a cold or warm reset to the HW from userspace.
+> 
+> Also fix a few sparse errors:
+> 
+> warning: symbol 'sys_manager_base_addr' was not declared. Should it be static?
+> warning: symbol 'rst_manager_base_addr' was not declared. Should it be static?
+> 
+> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
 
- arch/arm/mach-mmp/Kconfig               |    1 -
- arch/arm/mach-mmp/clock-pxa168.c        |   47 +++++++++++++++++++++++++++++++
- arch/arm/mach-mmp/gplugd.c              |    6 ++++
- arch/arm/mach-mmp/include/mach/pxa168.h |   20 +++++++++++++
- arch/arm/mach-mmp/pxa168.c              |    4 +++
- drivers/mmc/host/Kconfig                |   11 ++++----
- drivers/mmc/host/sdhci-pxav2.c          |   30 +++++++++++++++++++-
- drivers/mmc/host/sdhci.c                |    3 ++
- drivers/mmc/host/sdhci.h                |    1 +
- include/linux/platform_data/pxa_sdhci.h |    2 ++
- 10 files changed, 118 insertions(+), 7 deletions(-)
+It seems pretty good.
 
+> --- a/arch/arm/mach-socfpga/core.h
+> +++ b/arch/arm/mach-socfpga/core.h
+> +/*MPU Module Reset Register */
+> +#define RSTMGR_MPUMODRST_CPU0	0x1	/*CPU0 Reset*/
+> +#define RSTMGR_MPUMODRST_CPU1	0x2	/*CPU1 Reset*/
+> +#define RSTMGR_MPUMODRST_WDS		0x4	/*Watchdog Reset*/
+> +#define RSTMGR_MPUMODRST_SCUPER	0x8	/*SCU and periphs reset*/
+> +#define RSTMGR_MPUMODRST_L2		0x10	/*L2 Cache reset*/
+> +
+
+I'd include space after /* and before */.
+
+> @@ -100,6 +97,12 @@ static void __init socfpga_smp_prepare_cpus(unsigned int max_cpus)
+>   */
+>  static void socfpga_cpu_die(unsigned int cpu)
+>  {
+> +	/* Flush the L1 data cache. */
+> +	flush_cache_all();
+> +
+> +	/* This will put CPU1 into reset.*/
+> +	__raw_writel(RSTMGR_MPUMODRST_CPU1, rst_manager_base_addr + 0x10);
+
+Is there reason to do __raw_* operations? I believe we want the memory
+barriers etc, so we should use plain writel(). Same for actual reset
+code.
+
+Thanks,
+									Pavel
 -- 
-1.7.9.5
-
-*************************************************************************************************************************************************************
-eInfochips Business Disclaimer : This e-mail message and all attachments transmitted with it are intended solely for the use of the addressee and may contain legally privileged and confidential information. If the reader of this message is not the intended recipient, or an employee or agent responsible for delivering this message to the intended recipient, you are hereby notified that any dissemination, distribution, copying, or other use of this message or its attachments is strictly prohibited. If you have received this message in error, please notify the sender immediately by replying to this message and please delete it from your computer. Any views expressed in this message are those of the individual sender unless otherwise stated. Company has taken enough precautions to prevent the spread of viruses. However the company accepts no liability for any damage caused by any virus transmitted by this email.
-*************************************************************************************************************************************************************
-
-
----------------------------------------------------------------------------------------------
-Notice: 
-This message has been scanned by Trend Micro Mail Security scanner and is believed to be clean
----------------------------------------------------------------------------------------------
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
