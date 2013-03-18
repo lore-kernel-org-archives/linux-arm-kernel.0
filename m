@@ -1,92 +1,51 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 18 Mar 2013 16:26:23 +0800
-Subject: [PATCH v2 2/4] net: freescale: fec: add support for optional enet_out
- clk
-In-Reply-To: <1363595185-12302-1-git-send-email-shawn.guo@linaro.org>
-References: <1363595185-12302-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1363595185-12302-3-git-send-email-shawn.guo@linaro.org>
+Date: Mon, 18 Mar 2013 16:26:21 +0800
+Subject: [PATCH v2 0/4] ARM: mxs: sanitize enet_out clock handling
+Message-ID: <1363595185-12302-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wolfram Sang <w.sang@pengutronix.de>
+Handling enet_out on MX28 is cumbersome at the moment. Most boards need
+it enabled and for that, they have to add code to mach-mxs.c (see sps1
+as an example). Since this is board specific, we better encode it in
+the devicetree, that is the reason it was made for.
 
-Some MX28 boards need the internal enet_out clock to be enabled. So, do
-this in the driver iff the clock was referenced via devicetree.
+The seres propose to have enet_out clock defined in device tree and
+have fec driver to enable the clock if found.  This will make adding
+new board easier, since we don't have to touch mach-mxs.c for this
+case. It scales much better.
 
-Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- drivers/net/ethernet/freescale/fec.c |   10 ++++++++++
+Changes since v1:
+ * Rebased on v3.9-rc1
+ * Add a patch to have clk_ptp handled in the same way that enet_out
+   is done
+ * Add enet_out into imx28.dtsi and overwrite clocks and clock-names
+   for m28evk board where the clock is absent
+ * Remove unneeded enet_out clk initialization from board code
+
+David,
+
+If the series looks good to you, I hope I can have your ACK on the
+first 2 patches to have the series go via arm-soc tree for sake of
+git bisect.  Alternatively, please apply the first 2 on your tree
+for 3.10 and we will queue the platform patches for 3.11.
+
+Shawn
+
+Shawn Guo (2):
+  net: fec: handle optional clk_ptp more gracefully
+  ARM: mxs: remove unneeded enet_out clk initialization
+
+Wolfram Sang (2):
+  net: freescale: fec: add support for optional enet_out clk
+  ARM: dts: mxs: add enet_out clock to devicetree
+
+ arch/arm/boot/dts/imx28-m28evk.dts   |    2 ++
+ arch/arm/boot/dts/imx28.dtsi         |    4 ++--
+ arch/arm/mach-mxs/mach-mxs.c         |   12 ------------
+ drivers/net/ethernet/freescale/fec.c |   18 +++++++++++++-----
  drivers/net/ethernet/freescale/fec.h |    1 +
- 2 files changed, 11 insertions(+)
+ 5 files changed, 18 insertions(+), 19 deletions(-)
 
-diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
-index d2a9851..2297283 100644
---- a/drivers/net/ethernet/freescale/fec.c
-+++ b/drivers/net/ethernet/freescale/fec.c
-@@ -1800,6 +1800,11 @@ fec_probe(struct platform_device *pdev)
- 		goto failed_clk;
- 	}
- 
-+	/* enet_out is optional, depends on board */
-+	fep->clk_enet_out = devm_clk_get(&pdev->dev, "enet_out");
-+	if (IS_ERR(fep->clk_enet_out))
-+		fep->clk_enet_out = NULL;
-+
- 	fep->clk_ptp = devm_clk_get(&pdev->dev, "ptp");
- 	fep->bufdesc_ex =
- 		pdev->id_entry->driver_data & FEC_QUIRK_HAS_BUFDESC_EX;
-@@ -1810,6 +1815,7 @@ fec_probe(struct platform_device *pdev)
- 
- 	clk_prepare_enable(fep->clk_ahb);
- 	clk_prepare_enable(fep->clk_ipg);
-+	clk_prepare_enable(fep->clk_enet_out);
- 	clk_prepare_enable(fep->clk_ptp);
- 
- 	reg_phy = devm_regulator_get(&pdev->dev, "phy");
-@@ -1875,6 +1881,7 @@ failed_irq:
- failed_regulator:
- 	clk_disable_unprepare(fep->clk_ahb);
- 	clk_disable_unprepare(fep->clk_ipg);
-+	clk_disable_unprepare(fep->clk_enet_out);
- 	clk_disable_unprepare(fep->clk_ptp);
- failed_pin:
- failed_clk:
-@@ -1901,6 +1908,7 @@ fec_drv_remove(struct platform_device *pdev)
- 	clk_disable_unprepare(fep->clk_ptp);
- 	if (fep->ptp_clock)
- 		ptp_clock_unregister(fep->ptp_clock);
-+	clk_disable_unprepare(fep->clk_enet_out);
- 	clk_disable_unprepare(fep->clk_ahb);
- 	clk_disable_unprepare(fep->clk_ipg);
- 	for (i = 0; i < FEC_IRQ_NUM; i++) {
-@@ -1931,6 +1939,7 @@ fec_suspend(struct device *dev)
- 		fec_stop(ndev);
- 		netif_device_detach(ndev);
- 	}
-+	clk_disable_unprepare(fep->clk_enet_out);
- 	clk_disable_unprepare(fep->clk_ahb);
- 	clk_disable_unprepare(fep->clk_ipg);
- 
-@@ -1943,6 +1952,7 @@ fec_resume(struct device *dev)
- 	struct net_device *ndev = dev_get_drvdata(dev);
- 	struct fec_enet_private *fep = netdev_priv(ndev);
- 
-+	clk_prepare_enable(fep->clk_enet_out);
- 	clk_prepare_enable(fep->clk_ahb);
- 	clk_prepare_enable(fep->clk_ipg);
- 	if (netif_running(ndev)) {
-diff --git a/drivers/net/ethernet/freescale/fec.h b/drivers/net/ethernet/freescale/fec.h
-index 01579b8..becb7bd 100644
---- a/drivers/net/ethernet/freescale/fec.h
-+++ b/drivers/net/ethernet/freescale/fec.h
-@@ -208,6 +208,7 @@ struct fec_enet_private {
- 
- 	struct clk *clk_ipg;
- 	struct clk *clk_ahb;
-+	struct clk *clk_enet_out;
- 	struct clk *clk_ptp;
- 
- 	/* The saved address of a sent-in-place packet/buffer, for skfree(). */
 -- 
 1.7.9.5
