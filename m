@@ -1,24 +1,52 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 17 Mar 2013 21:07:26 -0400
-Subject: [GIT PULL 3/3] ARM: mvebu: soc for v3.10
-In-Reply-To: <51464302.5000906@free-electrons.com>
-References: <1363551341.10D8ED563.32562@triton>
- <51464302.5000906@free-electrons.com>
-Message-ID: <20130318010726.GF13280@titan.lakedaemon.net>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Mon, 18 Mar 2013 09:09:18 +0800
+Subject: [PATCH v2 4/4] ARM: pxa168/gplugd: Add support for SD port 1
+In-Reply-To: <1363544406-3837-1-git-send-email-tanmay.upadhyay@einfochips.com>
+References: <1363544206-3671-1-git-send-email-tanmay.upadhyay@einfochips.com>
+ <1363544406-3837-1-git-send-email-tanmay.upadhyay@einfochips.com>
+Message-ID: <CAN1soZyNjaG8b6aU+3FF1z_1Q3h8BTSzuBSa5vDctWWfJsRKmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 17, 2013 at 11:26:10PM +0100, Gregory CLEMENT wrote:
-> I managed to test Thomas patch set for a mv78x00 based board on Friday,
-> and I found a small bug. Thomas has a fix for it and he plans to send
-> a V3 with this fix next week.
+On Mon, Mar 18, 2013 at 2:20 AM, Tanmay Upadhyay
+<tanmay.upadhyay@einfochips.com> wrote:
+> v2 - after sdhci-pxav1 driver is merged with sdhci-pxav2, pass
+>      pxav1_controller = 1
+>    - as sdhci device numbering now starts from 1, call
+>      pxa168_add_sdh accordingly
+>
+> Signed-off-by: Tanmay Upadhyay <tanmay.upadhyay@einfochips.com>
+> Reviewed-by: Philip Rakity <prakity@marvell.com>
+> ---
+>  arch/arm/mach-mmp/gplugd.c |    6 ++++++
+>  1 file changed, 6 insertions(+)
+>
+> diff --git a/arch/arm/mach-mmp/gplugd.c b/arch/arm/mach-mmp/gplugd.c
+> index 5c3d61e..d821368 100644
+> --- a/arch/arm/mach-mmp/gplugd.c
+> +++ b/arch/arm/mach-mmp/gplugd.c
+> @@ -155,6 +155,11 @@ struct pxa168_eth_platform_data gplugd_eth_platform_data = {
+>         .init        = gplugd_eth_init,
+>  };
+>
+> +struct sdhci_pxa_platdata gplugd_sdh_platdata = {
+> +       .delay_in_ms = 5,
+> +       .pxav1_controller = 1,
+> +};
+> +
+>  static void __init select_disp_freq(void)
+>  {
+>         /* set GPIO 35 & clear GPIO 85 to set LCD External Clock to 74.25 MHz */
+> @@ -188,6 +193,7 @@ static void __init gplugd_init(void)
+>         platform_device_register(&pxa168_device_gpio);
+>
+>         pxa168_add_eth(&gplugd_eth_platform_data);
+> +       pxa168_add_sdh(1, &gplugd_sdh_platdata);
+>  }
+>
+>  MACHINE_START(GPLUGD, "PXA168-based GuruPlug Display (gplugD) Platform")
+> --
+> 1.7.9.5
+>
 
-A reply to the V2 patch would have been appreciated.  The series has
-been on lakml since Mar 6th, with no comments...
-
-Please just send a new version of the mv78xx0 patch.  No need for a new
-series.
-
-thx,
-
-Jason.
+Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
