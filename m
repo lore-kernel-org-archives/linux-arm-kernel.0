@@ -1,65 +1,118 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 18 Mar 2013 20:06:58 +0900
-Subject: [PATCH 122/142] sh-pfc: r8a7779: Remove INTC function GPIOS
+Date: Mon, 18 Mar 2013 20:06:20 +0900
+Subject: [PATCH 084/142] ARM: shmobile: armadillo800eva: Register pinctrl
+ mappings for SDHI and MMCIF
 In-Reply-To: <1363604838-29359-1-git-send-email-horms+renesas@verge.net.au>
 References: <1363604838-29359-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1363604838-29359-123-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1363604838-29359-85-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-All r8a7779 platforms now use the pinctrl API to control the INTC pins,
-the corresponding function GPIOS are unused. Remove them.
+Replace the GPIO-based SDHI and MMCIF pinmux configuration by pinctrl
+mappings.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/pinctrl/sh-pfc/pfc-r8a7779.c |   15 +++++++--------
- 1 file changed, 7 insertions(+), 8 deletions(-)
+ arch/arm/mach-shmobile/board-armadillo800eva.c |   58 ++++++++++--------------
+ 1 file changed, 25 insertions(+), 33 deletions(-)
 
-diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7779.c b/drivers/pinctrl/sh-pfc/pfc-r8a7779.c
-index 5d65499..1d7b0df 100644
---- a/drivers/pinctrl/sh-pfc/pfc-r8a7779.c
-+++ b/drivers/pinctrl/sh-pfc/pfc-r8a7779.c
-@@ -2826,12 +2826,11 @@ static const struct pinmux_func pinmux_func_gpios[] = {
- 	GPIO_FN(SSI_WS6), GPIO_FN(ADICHS1), GPIO_FN(CAN0_RX), GPIO_FN(IETX_B),
- 	GPIO_FN(SSI_SDATA6), GPIO_FN(ADICHS2), GPIO_FN(CAN_CLK),
- 	GPIO_FN(IECLK_B), GPIO_FN(SSI_SCK78), GPIO_FN(CAN_DEBUGOUT13),
--	GPIO_FN(IRQ0_B), GPIO_FN(SSI_SCK9_B),
--	GPIO_FN(SSI_WS78), GPIO_FN(CAN_DEBUGOUT14), GPIO_FN(IRQ1_B),
-+	GPIO_FN(SSI_SCK9_B),
-+	GPIO_FN(SSI_WS78), GPIO_FN(CAN_DEBUGOUT14),
- 	GPIO_FN(SSI_WS9_B), GPIO_FN(SSI_SDATA7),
--	GPIO_FN(CAN_DEBUGOUT15), GPIO_FN(IRQ2_B), GPIO_FN(TCLK1_C),
-+	GPIO_FN(CAN_DEBUGOUT15), GPIO_FN(TCLK1_C),
- 	GPIO_FN(SSI_SDATA8), GPIO_FN(VSP),
--	GPIO_FN(IRQ3_B),
- 	GPIO_FN(ATACS01), GPIO_FN(ATACS11),
- 	GPIO_FN(CC5_TDO), GPIO_FN(ATADIR1),
- 	GPIO_FN(CC5_TRST), GPIO_FN(ATAG1),
-@@ -2870,8 +2869,8 @@ static const struct pinmux_func pinmux_func_gpios[] = {
- 	GPIO_FN(VI0_DATA5_VI0_B5), GPIO_FN(VI0_DATA6_VI0_B6),
- 	GPIO_FN(ARM_TRACEDATA_0), GPIO_FN(VI0_DATA7_VI0_B7),
- 	GPIO_FN(ARM_TRACEDATA_1), GPIO_FN(VI0_G0),
--	GPIO_FN(SSI_SCK78_C), GPIO_FN(IRQ0), GPIO_FN(ARM_TRACEDATA_2),
--	GPIO_FN(VI0_G1), GPIO_FN(SSI_WS78_C), GPIO_FN(IRQ1),
-+	GPIO_FN(SSI_SCK78_C), GPIO_FN(ARM_TRACEDATA_2),
-+	GPIO_FN(VI0_G1), GPIO_FN(SSI_WS78_C),
- 	GPIO_FN(ARM_TRACEDATA_3), GPIO_FN(VI0_G2), GPIO_FN(ETH_TXD1),
- 	GPIO_FN(ARM_TRACEDATA_4), GPIO_FN(TS_SPSYNC0),
- 	GPIO_FN(VI0_G3), GPIO_FN(ETH_CRS_DV),
-@@ -2887,9 +2886,9 @@ static const struct pinmux_func pinmux_func_gpios[] = {
- 	GPIO_FN(DREQ1_B), GPIO_FN(ARM_TRACEDATA_10), GPIO_FN(DREQ0_C),
- 	GPIO_FN(VI0_R1), GPIO_FN(SSI_SDATA8_C), GPIO_FN(DACK1_B),
- 	GPIO_FN(ARM_TRACEDATA_11), GPIO_FN(DACK0_C), GPIO_FN(DRACK0_C),
--	GPIO_FN(VI0_R2), GPIO_FN(ETH_LINK), GPIO_FN(IRQ2),
-+	GPIO_FN(VI0_R2), GPIO_FN(ETH_LINK),
- 	GPIO_FN(ARM_TRACEDATA_12), GPIO_FN(VI0_R3), GPIO_FN(ETH_MAGIC),
--	GPIO_FN(IRQ3), GPIO_FN(ARM_TRACEDATA_13),
-+	GPIO_FN(ARM_TRACEDATA_13),
- 	GPIO_FN(VI0_R4), GPIO_FN(ETH_REFCLK),
- 	GPIO_FN(ARM_TRACEDATA_14), GPIO_FN(MT1_CLK),
- 	GPIO_FN(TS_SCK0), GPIO_FN(VI0_R5), GPIO_FN(ETH_TXD0),
+diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
+index aa812cf..04eff93 100644
+--- a/arch/arm/mach-shmobile/board-armadillo800eva.c
++++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
+@@ -657,6 +657,17 @@ static struct platform_device sdhi1_device = {
+ 	.resource	= sdhi1_resources,
+ };
+ 
++static const struct pinctrl_map eva_sdhi1_pinctrl_map[] = {
++	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.1", "pfc-r8a7740",
++				  "sdhi1_data4", "sdhi1"),
++	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.1", "pfc-r8a7740",
++				  "sdhi1_ctrl", "sdhi1"),
++	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.1", "pfc-r8a7740",
++				  "sdhi1_cd", "sdhi1"),
++	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.1", "pfc-r8a7740",
++				  "sdhi1_wp", "sdhi1"),
++};
++
+ /* MMCIF */
+ static struct sh_mmcif_plat_data sh_mmcif_plat = {
+ 	.sup_pclk	= 0,
+@@ -923,6 +934,18 @@ static const struct pinctrl_map eva_pinctrl_map[] = {
+ 				  "lcd0_lclk_1", "lcd0"),
+ 	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_lcdc_fb.0", "pfc-r8a7740",
+ 				  "lcd0_sync", "lcd0"),
++	/* MMCIF */
++	PIN_MAP_MUX_GROUP_DEFAULT("sh_mmcif.0", "pfc-r8a7740",
++				  "mmc0_data8_1", "mmc0"),
++	PIN_MAP_MUX_GROUP_DEFAULT("sh_mmcif.0", "pfc-r8a7740",
++				  "mmc0_ctrl_1", "mmc0"),
++	/* SDHI0 */
++	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7740",
++				  "sdhi0_data4", "sdhi0"),
++	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7740",
++				  "sdhi0_ctrl", "sdhi0"),
++	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7740",
++				  "sdhi0_wp", "sdhi0"),
+ };
+ 
+ static void __init eva_clock_init(void)
+@@ -1036,37 +1059,12 @@ static void __init eva_init(void)
+ 	}
+ 
+ 	/* SDHI0 */
+-	gpio_request(GPIO_FN_SDHI0_CMD, NULL);
+-	gpio_request(GPIO_FN_SDHI0_CLK, NULL);
+-	gpio_request(GPIO_FN_SDHI0_D0, NULL);
+-	gpio_request(GPIO_FN_SDHI0_D1, NULL);
+-	gpio_request(GPIO_FN_SDHI0_D2, NULL);
+-	gpio_request(GPIO_FN_SDHI0_D3, NULL);
+-	gpio_request(GPIO_FN_SDHI0_WP, NULL);
+-
+ 	gpio_request_one(17, GPIOF_OUT_INIT_LOW, NULL);  /* SDHI0_18/33_B */
+ 	gpio_request_one(74, GPIOF_OUT_INIT_HIGH, NULL); /* SDHI0_PON */
+ 	gpio_request_one(75, GPIOF_OUT_INIT_HIGH, NULL); /* SDSLOT1_PON */
+ 
+ 	/* we can use GPIO_FN_IRQ31_PORT167 here for SDHI0 CD irq */
+ 
+-	/*
+-	 * MMCIF
+-	 *
+-	 * Here doesn't care SW1.4 status,
+-	 * since CON2 is not mounted.
+-	 */
+-	gpio_request(GPIO_FN_MMC1_CLK_PORT103,	NULL);
+-	gpio_request(GPIO_FN_MMC1_CMD_PORT104,	NULL);
+-	gpio_request(GPIO_FN_MMC1_D0_PORT149,	NULL);
+-	gpio_request(GPIO_FN_MMC1_D1_PORT148,	NULL);
+-	gpio_request(GPIO_FN_MMC1_D2_PORT147,	NULL);
+-	gpio_request(GPIO_FN_MMC1_D3_PORT146,	NULL);
+-	gpio_request(GPIO_FN_MMC1_D4_PORT145,	NULL);
+-	gpio_request(GPIO_FN_MMC1_D5_PORT144,	NULL);
+-	gpio_request(GPIO_FN_MMC1_D6_PORT143,	NULL);
+-	gpio_request(GPIO_FN_MMC1_D7_PORT142,	NULL);
+-
+ 	/* CEU0 */
+ 	gpio_request(GPIO_FN_VIO0_D7,		NULL);
+ 	gpio_request(GPIO_FN_VIO0_D6,		NULL);
+@@ -1124,14 +1122,8 @@ static void __init eva_init(void)
+ 		/* CON14 enable */
+ 	} else {
+ 		/* CON8 (SDHI1) enable */
+-		gpio_request(GPIO_FN_SDHI1_CLK,	NULL);
+-		gpio_request(GPIO_FN_SDHI1_CMD,	NULL);
+-		gpio_request(GPIO_FN_SDHI1_D0,	NULL);
+-		gpio_request(GPIO_FN_SDHI1_D1,	NULL);
+-		gpio_request(GPIO_FN_SDHI1_D2,	NULL);
+-		gpio_request(GPIO_FN_SDHI1_D3,	NULL);
+-		gpio_request(GPIO_FN_SDHI1_CD,	NULL);
+-		gpio_request(GPIO_FN_SDHI1_WP,	NULL);
++		pinctrl_register_mappings(eva_sdhi1_pinctrl_map,
++					  ARRAY_SIZE(eva_sdhi1_pinctrl_map));
+ 
+ 		/* SDSLOT2_PON */
+ 		gpio_request_one(16, GPIOF_OUT_INIT_HIGH, NULL);
 -- 
 1.7.10.4
