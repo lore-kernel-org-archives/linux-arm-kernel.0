@@ -1,17 +1,16 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 18 Mar 2013 22:02:28 +0900
-Subject: [PATCH 02/12] clocksource: sh_cmt: Initialize 'max_match_value' and
- 'lock' in sh_cmt_setup()
+Date: Mon, 18 Mar 2013 22:02:30 +0900
+Subject: [PATCH 04/12] clocksource: sh_cmt: Consolidate platform_set_drvdata()
+ call
 In-Reply-To: <1363611758-6655-1-git-send-email-horms+renesas@verge.net.au>
 References: <1363611758-6655-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1363611758-6655-3-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1363611758-6655-5-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Move the setup of spinlock and max_match_value to sh_cmt_setup().
-There's no need to defer those steps until sh_cmt_register().
+Cleanup the use of platform_set_drvdata() to reduce code size
 
 Signed-off-by: Shinya Kuribayashi <shinya.kuribayashi.px@renesas.com>
 Signed-off-by: Magnus Damm <damm@opensource.se>
@@ -19,42 +18,38 @@ Acked-by: John Stultz <john.stultz@linaro.org>
 Tested-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/clocksource/sh_cmt.c |   16 ++++++++--------
- 1 file changed, 8 insertions(+), 8 deletions(-)
+ drivers/clocksource/sh_cmt.c |    5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/clocksource/sh_cmt.c b/drivers/clocksource/sh_cmt.c
-index 4b8d296..2e49684 100644
+index 94fd3ab..a2f8023 100644
 --- a/drivers/clocksource/sh_cmt.c
 +++ b/drivers/clocksource/sh_cmt.c
-@@ -625,14 +625,6 @@ static int sh_cmt_register(struct sh_cmt_priv *p, char *name,
- 			   unsigned long clockevent_rating,
- 			   unsigned long clocksource_rating)
- {
--	if (p->width == (sizeof(p->max_match_value) * 8))
--		p->max_match_value = ~0;
--	else
--		p->max_match_value = (1 << p->width) - 1;
--
--	p->match_value = p->max_match_value;
--	raw_spin_lock_init(&p->lock);
--
- 	if (clockevent_rating)
- 		sh_cmt_register_clockevent(p, name, clockevent_rating);
- 
-@@ -703,6 +695,14 @@ static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev)
- 		p->clear_bits = ~0xc000;
+@@ -688,8 +688,6 @@ static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev)
+ 		goto err0;
  	}
  
-+	if (p->width == (sizeof(p->max_match_value) * 8))
-+		p->max_match_value = ~0;
-+	else
-+		p->max_match_value = (1 << p->width) - 1;
+-	platform_set_drvdata(pdev, p);
+-
+ 	res = platform_get_resource(p->pdev, IORESOURCE_MEM, 0);
+ 	if (!res) {
+ 		dev_err(&p->pdev->dev, "failed to get I/O memory\n");
+@@ -757,6 +755,8 @@ static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev)
+ 		goto err2;
+ 	}
+ 
++	platform_set_drvdata(pdev, p);
 +
-+	p->match_value = p->max_match_value;
-+	raw_spin_lock_init(&p->lock);
-+
- 	ret = sh_cmt_register(p, (char *)dev_name(&p->pdev->dev),
- 			      cfg->clockevent_rating,
- 			      cfg->clocksource_rating);
+ 	return 0;
+ err2:
+ 	clk_put(p->clk);
+@@ -792,7 +792,6 @@ static int sh_cmt_probe(struct platform_device *pdev)
+ 	ret = sh_cmt_setup(p, pdev);
+ 	if (ret) {
+ 		kfree(p);
+-		platform_set_drvdata(pdev, NULL);
+ 		pm_runtime_idle(&pdev->dev);
+ 		return ret;
+ 	}
 -- 
 1.7.10.4
