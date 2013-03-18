@@ -1,88 +1,79 @@
-From: nschichan@freebox.fr (Nicolas Schichan)
-Date: Mon, 18 Mar 2013 15:50:32 +0100
-Subject: [PATCH V2 3/3] ARM: net: bpf_jit: add support for jitted seccomp
- filters.
-In-Reply-To: <1363618233-6375-1-git-send-email-nschichan@freebox.fr>
-References: <1363618233-6375-1-git-send-email-nschichan@freebox.fr>
-Message-ID: <1363618233-6375-4-git-send-email-nschichan@freebox.fr>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Mon, 18 Mar 2013 15:39:22 +0100
+Subject: [PATCH v3 0/9] refactoring for mask_cache
+In-Reply-To: <20130318142817.GU21620@kw.sim.vm.gnt>
+References: <1363277430-21325-1-git-send-email-holger.brunck@keymile.com>
+ <1363615255-18200-1-git-send-email-gerlando.falauto@keymile.com>
+ <20130318142817.GU21620@kw.sim.vm.gnt>
+Message-ID: <20130318143922.GA30735@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch selects HAVE_SECCOMP_FILTER_JIT in the ARM Kconfig file,
-implements and seccomp_jit_compile() and seccomp_jit_free(), and adds
-support for BPF_S_ANC_SECCOMP_LD_W instruction.
+On Mon, Mar 18, 2013 at 03:28:17PM +0100, Simon Guinot wrote:
+> On Mon, Mar 18, 2013 at 03:00:46PM +0100, Gerlando Falauto wrote:
+> > Hi everyone,
+> > here is a patchset to address the issue found with Orion, in incremental
+> > stages as Thomas suggested.
+> > a) we introduce the new fields and pointer (though only the shared one is used)
+> > b) we convert all drivers to use it 
+> > c) we rename the field so to force the use of the per-ct pointer
+> > d) we add per-ct mask cache, provided the new flag 
+> >    IRQ_GC_SEPARATE_MASK_REGISTERS is enabled
+> > e) we enable the flag for orion-gpio and mvebu drivers
+> > 
+> > So even though I'm also providing changes for mvebu, I only
+> > tested the patch on a 3.0.40 kernel with the plat-orion/gpio.c driver.
+> > We currently do not have a working 3.6+ configuration for our Kirkwood
+> > boards (3.6 is apparently where this mvebu gpio driver was introduced),
+> > so I would be glad if someone could give it a try.
+> > I also have no idea whether the three Marvell variants all have separate
+> > mask registers (which is what the last patch assumes).
+> 
+> Accordingly to MV78230/78x60 (Armada-XP) functional specification, we
+> have separate mask registers for the GPIO level and edge interrupts.
+> 
+> I believe that the GPIO mask register is only shared on Orion and
+> Kirkwood based SoCs.
 
-BPF_S_ANC_SECCOMP_LD_W instructions trigger the generation of a call
-to C function seccomp_bpf_load().
+Of course, I was meaning that all the three Marvell variants (Orion,
+Kirkwood and Armada) are using separate mask registers for the GPIO
+interrupts :)
 
-Signed-off-by: Nicolas Schichan <nschichan@freebox.fr>
----
- arch/arm/Kconfig          |    1 +
- arch/arm/net/bpf_jit_32.c |   36 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 37 insertions(+)
+Simon
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index dedf02b..b3dce17 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -24,6 +24,7 @@ config ARM
- 	select HAVE_ARCH_SECCOMP_FILTER
- 	select HAVE_ARCH_TRACEHOOK
- 	select HAVE_BPF_JIT
-+	select HAVE_SECCOMP_FILTER_JIT
- 	select HAVE_C_RECORDMCOUNT
- 	select HAVE_DEBUG_KMEMLEAK
- 	select HAVE_DMA_API_DEBUG
-diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
-index 0ea29e0..86e3b78 100644
---- a/arch/arm/net/bpf_jit_32.c
-+++ b/arch/arm/net/bpf_jit_32.c
-@@ -548,6 +548,15 @@ load_common:
- 			emit_err_ret(ARM_COND_NE, ctx);
- 			emit(ARM_MOV_R(r_A, ARM_R0), ctx);
- 			break;
-+#ifdef CONFIG_SECCOMP_FILTER_JIT
-+		case BPF_S_ANC_SECCOMP_LD_W:
-+			ctx->seen |= SEEN_CALL;
-+			emit_mov_i(ARM_R3, (u32)seccomp_bpf_load, ctx);
-+			emit_mov_i(ARM_R0, k, ctx);
-+			emit_blx_r(ARM_R3, ctx);
-+			emit(ARM_MOV_R(r_A, ARM_R0), ctx);
-+			break;
-+#endif
- 		case BPF_S_LD_W_IND:
- 			load_order = 2;
- 			goto load_ind;
-@@ -956,3 +965,30 @@ void bpf_jit_free(struct sk_filter *fp)
- 		schedule_work(work);
- 	}
- }
-+
-+#ifdef CONFIG_SECCOMP_FILTER_JIT
-+void seccomp_jit_compile(struct seccomp_filter *fp)
-+{
-+	struct jit_ctx ctx;
-+
-+	memset(&ctx, 0, sizeof(ctx));
-+	ctx.prog_len = fp->len;
-+	ctx.prog_insns = fp->insns;
-+
-+	__bpf_jit_compile(&ctx);
-+	if (ctx.target)
-+		fp->bpf_func = (void*)ctx.target;
-+}
-+
-+void seccomp_jit_free(struct seccomp_filter *fp)
-+{
-+	struct work_struct *work;
-+
-+	if (fp->bpf_func != sk_run_filter) {
-+		work = (struct work_struct *)fp->bpf_func;
-+
-+		INIT_WORK(work, bpf_jit_free_worker);
-+		schedule_work(work);
-+	}
-+}
-+#endif
--- 
-1.7.10.4
+> 
+> Regards,
+> 
+> Simon
+> 
+> > 
+> > Gerlando Falauto (9):
+> >   genirq: cosmetic: remove cur_regs
+> >   genirq: add mask_cache and pmask_cache into struct irq_chip_type
+> >   gpio: mvebu: convert to usage of *pmask_cache within irq_chip_type
+> >   MIPS: JZ4740: convert to usage of *pmask_cache within irq_chip_type
+> >   ARM: SAMSUNG: convert to usage of *pmask_cache within irq_chip_type
+> >   genirq: rename mask_cache to shared_mask_cache
+> >   genirq: handle separate mask registers
+> >   orion-gpio: enable IRQ_GC_SEPARATE_MASK_REGISTERS
+> >   gpio: mvebu: enable IRQ_GC_SEPARATE_MASK_REGISTERS
+> > 
+> >  arch/arm/plat-orion/gpio.c            |    3 +-
+> >  arch/arm/plat-samsung/irq-vic-timer.c |    6 ++--
+> >  arch/mips/jz4740/irq.c                |    3 +-
+> >  drivers/gpio/gpio-mvebu.c             |   23 ++++++++------
+> >  include/linux/irq.h                   |    9 ++++--
+> >  kernel/irq/generic-chip.c             |   55 +++++++++++++++++++++------------
+> >  6 files changed, 64 insertions(+), 35 deletions(-)
+> > 
+> > -- 
+> > 1.7.10.1
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130318/cc8bb7cc/attachment-0001.sig>
