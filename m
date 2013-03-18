@@ -1,82 +1,40 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 18 Mar 2013 20:47:03 +0900
-Subject: [PATCH 11/43] ARM: shmobile: Kill off r8a7779 scu_base_addr() function
+Date: Mon, 18 Mar 2013 20:47:09 +0900
+Subject: [PATCH 17/43] ARM: shmobile: sh73a0: fix Z and ZG clock hierarchy
 In-Reply-To: <1363607255-6385-1-git-send-email-horms+renesas@verge.net.au>
 References: <1363607255-6385-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1363607255-6385-12-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1363607255-6385-18-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 
-Replace scu_base_addr() with a static shmobile_scu_base
-variable and introduce R8A7779_SCU_BASE.
+Z and ZG clocks on sh73a0 have pll0 as their parent, not pll1.
 
-Later in the series the shmobile_scu_base variable will be
-made into a global variable so this is preparation only.
-
-Signed-off-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/smp-r8a7779.c |   17 ++++++++---------
- 1 file changed, 8 insertions(+), 9 deletions(-)
+ arch/arm/mach-shmobile/clock-sh73a0.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/smp-r8a7779.c b/arch/arm/mach-shmobile/smp-r8a7779.c
-index f46b516..d92188d 100644
---- a/arch/arm/mach-shmobile/smp-r8a7779.c
-+++ b/arch/arm/mach-shmobile/smp-r8a7779.c
-@@ -31,6 +31,9 @@
- #include <asm/smp_twd.h>
+diff --git a/arch/arm/mach-shmobile/clock-sh73a0.c b/arch/arm/mach-shmobile/clock-sh73a0.c
+index 5fa106b..71843dd 100644
+--- a/arch/arm/mach-shmobile/clock-sh73a0.c
++++ b/arch/arm/mach-shmobile/clock-sh73a0.c
+@@ -265,12 +265,12 @@ enum { DIV4_I, DIV4_ZG, DIV4_M3, DIV4_B, DIV4_M1, DIV4_M2,
  
- #define AVECR IOMEM(0xfe700040)
-+#define R8A7779_SCU_BASE IOMEM(0xf0000000)
-+
-+static void __iomem *shmobile_scu_base;
- 
- static struct r8a7779_pm_ch r8a7779_ch_cpu1 = {
- 	.chan_offs = 0x40, /* PWRSR0 .. PWRER0 */
-@@ -56,11 +59,6 @@ static struct r8a7779_pm_ch *r8a7779_ch_cpu[4] = {
- 	[3] = &r8a7779_ch_cpu3,
- };
- 
--static void __iomem *scu_base_addr(void)
--{
--	return (void __iomem *)0xf0000000;
--}
--
- static DEFINE_SPINLOCK(scu_lock);
- static unsigned long tmp;
- 
-@@ -75,7 +73,7 @@ void __init r8a7779_register_twd(void)
- 
- static void modify_scu_cpu_psr(unsigned long set, unsigned long clr)
- {
--	void __iomem *scu_base = scu_base_addr();
-+	void __iomem *scu_base = shmobile_scu_base;
- 
- 	spin_lock(&scu_lock);
- 	tmp = __raw_readl(scu_base + 8);
-@@ -153,7 +151,7 @@ static void __init r8a7779_smp_prepare_cpus(unsigned int max_cpus)
- {
- 	int cpu = cpu_logical_map(0);
- 
--	scu_enable(scu_base_addr());
-+	scu_enable(shmobile_scu_base);
- 
- 	/* Map the reset vector (in headsmp.S) */
- 	__raw_writel(__pa(shmobile_secondary_vector), AVECR);
-@@ -171,9 +169,10 @@ static void __init r8a7779_smp_prepare_cpus(unsigned int max_cpus)
- 
- static void __init r8a7779_smp_init_cpus(void)
- {
--	unsigned int ncores = scu_get_core_count(scu_base_addr());
-+	/* setup r8a7779 specific SCU base */
-+	shmobile_scu_base = R8A7779_SCU_BASE;
- 
--	shmobile_smp_init_cpus(ncores);
-+	shmobile_smp_init_cpus(scu_get_core_count(shmobile_scu_base));
- }
- 
- struct smp_operations r8a7779_smp_ops  __initdata = {
+ static struct clk div4_clks[DIV4_NR] = {
+ 	[DIV4_I] = DIV4(FRQCRA, 20, 0xdff, CLK_ENABLE_ON_INIT),
+-	[DIV4_ZG] = DIV4(FRQCRA, 16, 0xd7f, CLK_ENABLE_ON_INIT),
++	[DIV4_ZG] = SH_CLK_DIV4(&pll0_clk, FRQCRA, 16, 0xd7f, CLK_ENABLE_ON_INIT),
+ 	[DIV4_M3] = DIV4(FRQCRA, 12, 0x1dff, CLK_ENABLE_ON_INIT),
+ 	[DIV4_B] = DIV4(FRQCRA, 8, 0xdff, CLK_ENABLE_ON_INIT),
+ 	[DIV4_M1] = DIV4(FRQCRA, 4, 0x1dff, 0),
+ 	[DIV4_M2] = DIV4(FRQCRA, 0, 0x1dff, 0),
+-	[DIV4_Z] = DIV4(FRQCRB, 24, 0x97f, 0),
++	[DIV4_Z] = SH_CLK_DIV4(&pll0_clk, FRQCRB, 24, 0x97f, 0),
+ 	[DIV4_ZTR] = DIV4(FRQCRB, 20, 0xdff, 0),
+ 	[DIV4_ZT] = DIV4(FRQCRB, 16, 0xdff, 0),
+ 	[DIV4_ZX] = DIV4(FRQCRB, 12, 0xdff, 0),
 -- 
 1.7.10.4
