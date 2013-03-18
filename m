@@ -1,93 +1,38 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Mon, 18 Mar 2013 16:54:11 +0800
-Subject: [PATCH] i2c: sirf: get the i2c pin group by pinctrl api
-In-Reply-To: <5146D326.1090409@ti.com>
-References: <1363591361-5992-1-git-send-email-Barry.Song@csr.com>
- <5146C9C6.2030507@ti.com>
- <CAGsJ_4yAhUKyH14UEq8WBUmHAq7ZzhNLyX-zcEehR-wr5H6NUA@mail.gmail.com>
- <5146D326.1090409@ti.com>
-Message-ID: <CAGsJ_4wj_K0Viz0HcyAV7rnV0wuKQezCJOZZiCtc86NMGX6YVg@mail.gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 18 Mar 2013 09:56:07 +0100 (CET)
+Subject: [PATCH 2/2] genirq: move mask_cache into struct irq_chip_type
+In-Reply-To: <5146C95C.3000509@keymile.com>
+References: <1363277430-21325-1-git-send-email-holger.brunck@keymile.com><1363376175-22312-1-git-send-email-gerlando.falauto@keymile.com>
+ <1363376175-22312-3-git-send-email-gerlando.falauto@keymile.com>
+ <alpine.LFD.2.02.1303152101080.22263@ionos>
+ <5146C95C.3000509@keymile.com>
+Message-ID: <alpine.LFD.2.02.1303180954470.22263@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/3/18 Sourav Poddar <sourav.poddar@ti.com>:
-> Hi,
->
-> On Monday 18 March 2013 01:53 PM, Barry Song wrote:
->>
->> 2013/3/18 Sourav Poddar<sourav.poddar@ti.com>:
->>>
->>> Hi,
->>>
->>> On Monday 18 March 2013 12:52 PM, Barry Song wrote:
->>>>
->>>> From: Barry Song<Baohua.Song@csr.com>
->>>>
->>>> hardcode set i2c pin group to i2c function before, here we
->>>> move to use standard pinctrl API to get pins of the group.
->>>>
->>>> Signed-off-by: Barry Song<Baohua.Song@csr.com>
->>>> Cc: Linus Walleij<linus.walleij@linaro.org>
->>>> ---
->>>>    drivers/i2c/busses/i2c-sirf.c |    9 +++++++++
->>>>    1 files changed, 9 insertions(+), 0 deletions(-)
->>>>
->>>> diff --git a/drivers/i2c/busses/i2c-sirf.c
->>>> b/drivers/i2c/busses/i2c-sirf.c
->>>> index 5a7ad24..dd4004e 100644
->>>> --- a/drivers/i2c/busses/i2c-sirf.c
->>>> +++ b/drivers/i2c/busses/i2c-sirf.c
->>>> @@ -16,6 +16,7 @@
->>>>    #include<linux/clk.h>
->>>>    #include<linux/err.h>
->>>>    #include<linux/io.h>
->>>> +#include<linux/pinctrl/consumer.h>
->>>>
->>>>    #define SIRFSOC_I2C_CLK_CTRL          0x00
->>>>    #define SIRFSOC_I2C_STATUS            0x0C
->>>> @@ -265,6 +266,7 @@ static int i2c_sirfsoc_probe(struct platform_device
->>>> *pdev)
->>>>          struct i2c_adapter *adap;
->>>>          struct resource *mem_res;
->>>>          struct clk *clk;
->>>> +       struct pinctrl *pinctrl;
->>>>          int bitrate;
->>>>          int ctrl_speed;
->>>>          int irq;
->>>> @@ -272,6 +274,12 @@ static int i2c_sirfsoc_probe(struct platform_device
->>>> *pdev)
->>>>          int err;
->>>>          u32 regval;
->>>>
->>>> +       pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
->>>> +       if (IS_ERR(pinctrl)) {
->>>> +               err = PTR_ERR(pinctrl);
->>>> +               goto failed_pin;
->>>> +       }
->>>> +
->>>
->>> I think,  you should also add an "EPROBE_DEFER" check here ?
->>
->> why would the driver require a probe retry since getting the pinctrl
->> has returned an error? before the driver executes, pinctrl driver has
->> run earlier and DT has been extended.
->>
-> There might be modules who need some early pinctrl muxing. Some
-> drivers might also use subsys_initcall instead of module_init. In such
-> cases,
-> "EPROBE_DEFER" might be useful.
+On Mon, 18 Mar 2013, Gerlando Falauto wrote:
+> On 03/15/2013 09:47 PM, Thomas Gleixner wrote:
+> You're right... and I appreciate you NOT using such words. :-)
 
-yes. that is right. here these is no this issue.
-in my case, sirf pinctrl is initialized by arch_initcall, i2c probing
-is handled by module_init.
-that makes i2c is a later user of pinctrl.
+I try hard :)
+ 
+> Just one question:
+> 
+> > 	bool mskperct = flags & IRQ_GC_SEPARATE_MASK_REGISTERS;
+> > 	bool mskinit = flags & IRQ_GC_INIT_MASK_CACHE;
+> > 	u32 *shmsk = &gc->shared_mask_cache;
+> > 
+> > 	if (!mskperct && mskinit)
+> > 	     	*shmsk = irq_reg_readl(gc->reg_base + ct->regs.mask);
+> > 
+> > 	for (i = 0; i < gc->num_ct: i++, ct++) {
+> > 	       ct->pmask_cache = mskperct ? &ct->mask_cache : shmsk;
+> 
+> What is wrong with using ct[i] instead? I find it a bit more readable.
 
->
->> all people are using  IS_ERR(pinctrl) to check the ret of
->> devm_pinctrl_get_select_default.
->>
-> Yes, we will keep using this check. DEFER check will be embedded inside
-> this.
-> Something like below, which has been done for omap i2c..
+Either way is fine. I like the pointers more, but that's my personal
+preference and I let you chose whatever you want
 
--barry
+Thanks,
+
+	tglx
