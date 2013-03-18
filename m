@@ -1,7 +1,7 @@
 From: marex@denx.de (Marek Vasut)
-Date: Mon, 18 Mar 2013 19:23:17 +0100
+Date: Mon, 18 Mar 2013 19:24:02 +0100
 Subject: [PATCH] ARM: video: mxs: Fix mxsfb misconfiguring VDCTRL0
-Message-ID: <1363630997-5254-1-git-send-email-marex@denx.de>
+Message-ID: <1363631042-5321-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -40,18 +40,15 @@ Cc: Sascha Hauer <kernel@pengutronix.de>
 Cc: Shawn Guo <shawn.guo@linaro.org>
 Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/mach-mxs/mach-mxs.c |   22 +++++++++++-----------
+ arch/arm/mach-mxs/mach-mxs.c |   25 +++++++++++++------------
  drivers/video/mxsfb.c        |    7 +++++--
  include/linux/mxsfb.h        |    7 +++++--
- 3 files changed, 21 insertions(+), 15 deletions(-)
+ 3 files changed, 23 insertions(+), 16 deletions(-)
 
-NOTE: This is the version for stable v3.8.3, so I'm sending it to -stable.
-      I will send adjusted version for mainline 3.9-rc , since there is
-      one more board in mainline and therefore the versions of the patch
-      must differ.
+NOTE: This is the version for mainline, I'm not CCing stable.
 
 diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
-index c66129b..ebf592c 100644
+index 3218f1f..cc8d704 100644
 --- a/arch/arm/mach-mxs/mach-mxs.c
 +++ b/arch/arm/mach-mxs/mach-mxs.c
 @@ -41,8 +41,6 @@ static struct fb_videomode mx23evk_video_modes[] = {
@@ -102,7 +99,15 @@ index c66129b..ebf592c 100644
  	},
  };
  
-@@ -250,6 +241,8 @@ static void __init imx23_evk_init(void)
+@@ -132,7 +123,6 @@ static struct fb_videomode cfa10049_video_modes[] = {
+ 		.lower_margin	= 2,
+ 		.hsync_len	= 15,
+ 		.vsync_len	= 15,
+-		.sync		= FB_SYNC_DATA_ENABLE_HIGH_ACT
+ 	},
+ };
+ 
+@@ -259,6 +249,8 @@ static void __init imx23_evk_init(void)
  	mxsfb_pdata.mode_count = ARRAY_SIZE(mx23evk_video_modes);
  	mxsfb_pdata.default_bpp = 32;
  	mxsfb_pdata.ld_intf_width = STMLCDIF_24BIT;
@@ -111,7 +116,7 @@ index c66129b..ebf592c 100644
  }
  
  static inline void enable_clk_enet_out(void)
-@@ -269,6 +262,8 @@ static void __init imx28_evk_init(void)
+@@ -278,6 +270,8 @@ static void __init imx28_evk_init(void)
  	mxsfb_pdata.mode_count = ARRAY_SIZE(mx28evk_video_modes);
  	mxsfb_pdata.default_bpp = 32;
  	mxsfb_pdata.ld_intf_width = STMLCDIF_24BIT;
@@ -120,7 +125,7 @@ index c66129b..ebf592c 100644
  
  	mxs_saif_clkmux_select(MXS_DIGCTL_SAIF_CLKMUX_EXTMSTR0);
  }
-@@ -288,6 +283,7 @@ static void __init m28evk_init(void)
+@@ -297,6 +291,7 @@ static void __init m28evk_init(void)
  	mxsfb_pdata.mode_count = ARRAY_SIZE(m28evk_video_modes);
  	mxsfb_pdata.default_bpp = 16;
  	mxsfb_pdata.ld_intf_width = STMLCDIF_18BIT;
@@ -128,7 +133,7 @@ index c66129b..ebf592c 100644
  }
  
  static void __init sc_sps1_init(void)
-@@ -313,6 +309,8 @@ static void __init apx4devkit_init(void)
+@@ -322,6 +317,8 @@ static void __init apx4devkit_init(void)
  	mxsfb_pdata.mode_count = ARRAY_SIZE(apx4devkit_video_modes);
  	mxsfb_pdata.default_bpp = 32;
  	mxsfb_pdata.ld_intf_width = STMLCDIF_24BIT;
@@ -137,7 +142,16 @@ index c66129b..ebf592c 100644
  }
  
  #define ENET0_MDC__GPIO_4_0	MXS_GPIO_NR(4, 0)
-@@ -403,6 +401,8 @@ static void __init apf28_init(void)
+@@ -407,6 +404,8 @@ static void __init cfa10049_init(void)
+ 	mxsfb_pdata.mode_count = ARRAY_SIZE(cfa10049_video_modes);
+ 	mxsfb_pdata.default_bpp = 32;
+ 	mxsfb_pdata.ld_intf_width = STMLCDIF_18BIT;
++	mxsfb_pdata.sync = MXSFB_SYNC_DATA_ENABLE_HIGH_ACT;
++
+ }
+ 
+ static void __init cfa10037_init(void)
+@@ -423,6 +422,8 @@ static void __init apf28_init(void)
  	mxsfb_pdata.mode_count = ARRAY_SIZE(apf28dev_video_modes);
  	mxsfb_pdata.default_bpp = 16;
  	mxsfb_pdata.ld_intf_width = STMLCDIF_16BIT;
