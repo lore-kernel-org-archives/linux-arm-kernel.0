@@ -1,58 +1,70 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 18 Mar 2013 20:06:49 +0900
-Subject: [PATCH 113/142] sh-pfc: sh73a0: Remove IrDA function GPIOS
+Date: Mon, 18 Mar 2013 20:06:50 +0900
+Subject: [PATCH 114/142] sh-pfc: r8a7740: Remove LCD0 and LCD1 function GPIOS
 In-Reply-To: <1363604838-29359-1-git-send-email-horms+renesas@verge.net.au>
 References: <1363604838-29359-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1363604838-29359-114-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1363604838-29359-115-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-All sh73a0 platforms now use the pinctrl API to control the IrDA pins,
-the corresponding function GPIOS are unused. Remove them.
+All r8a7740 platforms now use the pinctrl API to control the LCD0 and
+LCD1 pins, the corresponding function GPIOS are unused. Remove them.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/pinctrl/sh-pfc/pfc-sh73a0.c |    6 ------
- 1 file changed, 6 deletions(-)
+ drivers/pinctrl/sh-pfc/pfc-r8a7740.c |   37 ----------------------------------
+ 1 file changed, 37 deletions(-)
 
-diff --git a/drivers/pinctrl/sh-pfc/pfc-sh73a0.c b/drivers/pinctrl/sh-pfc/pfc-sh73a0.c
-index 273345c..cde4387 100644
---- a/drivers/pinctrl/sh-pfc/pfc-sh73a0.c
-+++ b/drivers/pinctrl/sh-pfc/pfc-sh73a0.c
-@@ -2979,7 +2979,6 @@ static const struct pinmux_func pinmux_func_gpios[] = {
- 	GPIO_FN(XWUP),
- 	GPIO_FN(VACK),
- 	GPIO_FN(XTAL1L),
--	GPIO_FN(PORT49_IRDA_OUT), \
- 	GPIO_FN(PORT49_IROUT), \
- 	GPIO_FN(BBIF2_TSYNC2), \
- 	GPIO_FN(TPU2TO2), \
-@@ -2987,9 +2986,7 @@ static const struct pinmux_func pinmux_func_gpios[] = {
- 	GPIO_FN(BBIF2_TSCK2), \
- 	GPIO_FN(TPU2TO3), \
- 	GPIO_FN(BBIF2_TXD2),
--	GPIO_FN(PORT53_IRDA_IN), \
- 	GPIO_FN(TPU3TO3), \
--	GPIO_FN(PORT54_IRDA_FIRSEL), \
- 	GPIO_FN(TPU3TO2), \
- 	GPIO_FN(TPU0TO0),
- 	GPIO_FN(A0), \
-@@ -3188,13 +3185,10 @@ static const struct pinmux_func pinmux_func_gpios[] = {
- 	GPIO_FN(VIO2_FIELD2), \
- 	GPIO_FN(MSIOF1_SS2), \
- 	GPIO_FN(VIO2_HD2), \
--	GPIO_FN(PORT241_IRDA_OUT), \
- 	GPIO_FN(PORT241_IROUT), \
- 	GPIO_FN(MFG4_OUT1), \
- 	GPIO_FN(TPU4TO0),
--	GPIO_FN(PORT242_IRDA_IN), \
- 	GPIO_FN(MFG4_IN2),
--	GPIO_FN(PORT243_IRDA_FIRSEL), \
- 	GPIO_FN(PORT243_VIO_CKO2),
- 	GPIO_FN(MFG2_IN1), \
- 	GPIO_FN(MSIOF2R_RXD),
+diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7740.c b/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
+index a2f909a..de1212d 100644
+--- a/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
++++ b/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
+@@ -2313,43 +2313,6 @@ static const struct pinmux_func pinmux_func_gpios[] = {
+ 	GPIO_FN(SCIFB_RTS_PORT172),
+ 	GPIO_FN(SCIFB_CTS_PORT173),
+ 
+-	/* LCD0 */
+-	GPIO_FN(LCD0_D0),	GPIO_FN(LCD0_D1),	GPIO_FN(LCD0_D2),
+-	GPIO_FN(LCD0_D3),	GPIO_FN(LCD0_D4),	GPIO_FN(LCD0_D5),
+-	GPIO_FN(LCD0_D6),	GPIO_FN(LCD0_D7),	GPIO_FN(LCD0_D8),
+-	GPIO_FN(LCD0_D9),	GPIO_FN(LCD0_D10),	GPIO_FN(LCD0_D11),
+-	GPIO_FN(LCD0_D12),	GPIO_FN(LCD0_D13),	GPIO_FN(LCD0_D14),
+-	GPIO_FN(LCD0_D15),	GPIO_FN(LCD0_D16),	GPIO_FN(LCD0_D17),
+-	GPIO_FN(LCD0_DON),	GPIO_FN(LCD0_VCPWC),	GPIO_FN(LCD0_VEPWC),
+-	GPIO_FN(LCD0_DCK),	GPIO_FN(LCD0_VSYN),
+-	GPIO_FN(LCD0_HSYN),	GPIO_FN(LCD0_DISP),
+-	GPIO_FN(LCD0_WR),	GPIO_FN(LCD0_RD),
+-	GPIO_FN(LCD0_CS),	GPIO_FN(LCD0_RS),
+-
+-	GPIO_FN(LCD0_D18_PORT163),	GPIO_FN(LCD0_D19_PORT162),
+-	GPIO_FN(LCD0_D20_PORT161),	GPIO_FN(LCD0_D21_PORT158),
+-	GPIO_FN(LCD0_D22_PORT160),	GPIO_FN(LCD0_D23_PORT159),
+-	GPIO_FN(LCD0_LCLK_PORT165),	/* MSEL5CR_6_1 */
+-
+-	GPIO_FN(LCD0_D18_PORT40),	GPIO_FN(LCD0_D19_PORT4),
+-	GPIO_FN(LCD0_D20_PORT3),	GPIO_FN(LCD0_D21_PORT2),
+-	GPIO_FN(LCD0_D22_PORT0),	GPIO_FN(LCD0_D23_PORT1),
+-	GPIO_FN(LCD0_LCLK_PORT102),	/* MSEL5CR_6_0 */
+-
+-	/* LCD1 */
+-	GPIO_FN(LCD1_D0),	GPIO_FN(LCD1_D1),	GPIO_FN(LCD1_D2),
+-	GPIO_FN(LCD1_D3),	GPIO_FN(LCD1_D4),	GPIO_FN(LCD1_D5),
+-	GPIO_FN(LCD1_D6),	GPIO_FN(LCD1_D7),	GPIO_FN(LCD1_D8),
+-	GPIO_FN(LCD1_D9),	GPIO_FN(LCD1_D10),	GPIO_FN(LCD1_D11),
+-	GPIO_FN(LCD1_D12),	GPIO_FN(LCD1_D13),	GPIO_FN(LCD1_D14),
+-	GPIO_FN(LCD1_D15),	GPIO_FN(LCD1_D16),	GPIO_FN(LCD1_D17),
+-	GPIO_FN(LCD1_D18),	GPIO_FN(LCD1_D19),	GPIO_FN(LCD1_D20),
+-	GPIO_FN(LCD1_D21),	GPIO_FN(LCD1_D22),	GPIO_FN(LCD1_D23),
+-	GPIO_FN(LCD1_RS),	GPIO_FN(LCD1_RD),	GPIO_FN(LCD1_CS),
+-	GPIO_FN(LCD1_WR),	GPIO_FN(LCD1_DCK),	GPIO_FN(LCD1_DON),
+-	GPIO_FN(LCD1_VCPWC),	GPIO_FN(LCD1_LCLK),	GPIO_FN(LCD1_HSYN),
+-	GPIO_FN(LCD1_VSYN),	GPIO_FN(LCD1_VEPWC),	GPIO_FN(LCD1_DISP),
+-
+ 	/* RSPI */
+ 	GPIO_FN(RSPI_SSL0_A),	GPIO_FN(RSPI_SSL1_A),	GPIO_FN(RSPI_SSL2_A),
+ 	GPIO_FN(RSPI_SSL3_A),	GPIO_FN(RSPI_CK_A),	GPIO_FN(RSPI_MOSI_A),
 -- 
 1.7.10.4
