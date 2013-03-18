@@ -1,99 +1,97 @@
 From: chao.xie@marvell.com (Chao Xie)
-Date: Mon, 18 Mar 2013 03:55:29 -0400
-Subject: [PATCH 2/6] usb: otg: mv_otg: remove unused clock
+Date: Mon, 18 Mar 2013 03:55:30 -0400
+Subject: [PATCH 3/6] usb: ehci: mv_ehci: remove unused clock
 In-Reply-To: <1363593333-6077-1-git-send-email-chao.xie@marvell.com>
 References: <1363593333-6077-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1363593333-6077-3-git-send-email-chao.xie@marvell.com>
+Message-ID: <1363593333-6077-4-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The origianl understanding of clock is wrong. The OTG controller
+The origianl understanding of clock is wrong. The EHCI controller
 only have one clock input.
 Passing clock name by pdata is wrong. The clock is defined by device
 iteself.
 
 Signed-off-by: Chao Xie <chao.xie@marvell.com>
 ---
- drivers/usb/otg/mv_otg.c |   28 +++++++---------------------
- drivers/usb/otg/mv_otg.h |    3 +--
- 2 files changed, 8 insertions(+), 23 deletions(-)
+ drivers/usb/host/ehci-mv.c |   35 ++++++++++-------------------------
+ 1 files changed, 10 insertions(+), 25 deletions(-)
 
-diff --git a/drivers/usb/otg/mv_otg.c b/drivers/usb/otg/mv_otg.c
-index b6a9be3..ee66283 100644
---- a/drivers/usb/otg/mv_otg.c
-+++ b/drivers/usb/otg/mv_otg.c
-@@ -237,18 +237,12 @@ static void mv_otg_start_periphrals(struct mv_otg *mvotg, int on)
+diff --git a/drivers/usb/host/ehci-mv.c b/drivers/usb/host/ehci-mv.c
+index 3065809..c390827 100644
+--- a/drivers/usb/host/ehci-mv.c
++++ b/drivers/usb/host/ehci-mv.c
+@@ -33,25 +33,17 @@ struct ehci_hcd_mv {
  
- static void otg_clock_enable(struct mv_otg *mvotg)
- {
--	unsigned int i;
--
--	for (i = 0; i < mvotg->clknum; i++)
--		clk_prepare_enable(mvotg->clk[i]);
-+	clk_prepare_enable(mvotg->clk);
- }
+ 	struct mv_usb_platform_data *pdata;
  
- static void otg_clock_disable(struct mv_otg *mvotg)
- {
--	unsigned int i;
--
--	for (i = 0; i < mvotg->clknum; i++)
--		clk_disable_unprepare(mvotg->clk[i]);
-+	clk_disable_unprepare(mvotg->clk);
- }
- 
- static int mv_otg_enable_internal(struct mv_otg *mvotg)
-@@ -684,16 +678,14 @@ static int mv_otg_probe(struct platform_device *pdev)
- 	struct mv_otg *mvotg;
- 	struct usb_otg *otg;
- 	struct resource *r;
--	int retval = 0, clk_i, i;
--	size_t size;
-+	int retval = 0, i;
- 
- 	if (pdata == NULL) {
- 		dev_err(&pdev->dev, "failed to get platform data\n");
- 		return -ENODEV;
- 	}
- 
--	size = sizeof(*mvotg) + sizeof(struct clk *) * pdata->clknum;
--	mvotg = devm_kzalloc(&pdev->dev, size, GFP_KERNEL);
-+	mvotg = devm_kzalloc(&pdev->dev, sizeof(*mvotg), GFP_KERNEL);
- 	if (!mvotg) {
- 		dev_err(&pdev->dev, "failed to allocate memory!\n");
- 		return -ENOMEM;
-@@ -708,15 +700,9 @@ static int mv_otg_probe(struct platform_device *pdev)
- 	mvotg->pdev = pdev;
- 	mvotg->pdata = pdata;
- 
--	mvotg->clknum = pdata->clknum;
--	for (clk_i = 0; clk_i < mvotg->clknum; clk_i++) {
--		mvotg->clk[clk_i] = devm_clk_get(&pdev->dev,
--						pdata->clkname[clk_i]);
--		if (IS_ERR(mvotg->clk[clk_i])) {
--			retval = PTR_ERR(mvotg->clk[clk_i]);
--			return retval;
--		}
--	}
-+	mvotg->clk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(mvotg->clk))
-+		return PTR_ERR(mvotg->clk);
- 
- 	mvotg->qwork = create_singlethread_workqueue("mv_otg_queue");
- 	if (!mvotg->qwork) {
-diff --git a/drivers/usb/otg/mv_otg.h b/drivers/usb/otg/mv_otg.h
-index 8a9e351..551da6e 100644
---- a/drivers/usb/otg/mv_otg.h
-+++ b/drivers/usb/otg/mv_otg.h
-@@ -158,8 +158,7 @@ struct mv_otg {
- 
- 	unsigned int active;
- 	unsigned int clock_gating;
+-	/* clock source and total clock number */
 -	unsigned int clknum;
 -	struct clk *clk[0];
 +	struct clk *clk;
  };
  
- #endif
+ static void ehci_clock_enable(struct ehci_hcd_mv *ehci_mv)
+ {
+-	unsigned int i;
+-
+-	for (i = 0; i < ehci_mv->clknum; i++)
+-		clk_prepare_enable(ehci_mv->clk[i]);
++	clk_prepare_enable(ehci_mv->clk);
+ }
+ 
+ static void ehci_clock_disable(struct ehci_hcd_mv *ehci_mv)
+ {
+-	unsigned int i;
+-
+-	for (i = 0; i < ehci_mv->clknum; i++)
+-		clk_disable_unprepare(ehci_mv->clk[i]);
++	clk_disable_unprepare(ehci_mv->clk);
+ }
+ 
+ static int mv_ehci_enable(struct ehci_hcd_mv *ehci_mv)
+@@ -144,9 +136,8 @@ static int mv_ehci_probe(struct platform_device *pdev)
+ 	struct ehci_hcd *ehci;
+ 	struct ehci_hcd_mv *ehci_mv;
+ 	struct resource *r;
+-	int clk_i, retval = -ENODEV;
++	int retval = -ENODEV;
+ 	u32 offset;
+-	size_t size;
+ 
+ 	if (!pdata) {
+ 		dev_err(&pdev->dev, "missing platform_data\n");
+@@ -160,8 +151,7 @@ static int mv_ehci_probe(struct platform_device *pdev)
+ 	if (!hcd)
+ 		return -ENOMEM;
+ 
+-	size = sizeof(*ehci_mv) + sizeof(struct clk *) * pdata->clknum;
+-	ehci_mv = devm_kzalloc(&pdev->dev, size, GFP_KERNEL);
++	ehci_mv = devm_kzalloc(&pdev->dev, sizeof(*ehci_mv), GFP_KERNEL);
+ 	if (ehci_mv == NULL) {
+ 		dev_err(&pdev->dev, "cannot allocate ehci_hcd_mv\n");
+ 		retval = -ENOMEM;
+@@ -172,16 +162,11 @@ static int mv_ehci_probe(struct platform_device *pdev)
+ 	ehci_mv->pdata = pdata;
+ 	ehci_mv->hcd = hcd;
+ 
+-	ehci_mv->clknum = pdata->clknum;
+-	for (clk_i = 0; clk_i < ehci_mv->clknum; clk_i++) {
+-		ehci_mv->clk[clk_i] =
+-		    devm_clk_get(&pdev->dev, pdata->clkname[clk_i]);
+-		if (IS_ERR(ehci_mv->clk[clk_i])) {
+-			dev_err(&pdev->dev, "error get clck \"%s\"\n",
+-				pdata->clkname[clk_i]);
+-			retval = PTR_ERR(ehci_mv->clk[clk_i]);
+-			goto err_clear_drvdata;
+-		}
++	ehci_mv->clk = devm_clk_get(&pdev->dev, NULL);
++	if (IS_ERR(ehci_mv->clk)) {
++		dev_err(&pdev->dev, "error get clock\n");
++		retval = PTR_ERR(ehci_mv->clk);
++		goto err_clear_drvdata;
+ 	}
+ 
+ 	r = platform_get_resource_byname(pdev, IORESOURCE_MEM, "phyregs");
 -- 
 1.7.4.1
