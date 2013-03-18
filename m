@@ -1,62 +1,19 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 18 Mar 2013 23:32:41 +0900
-Subject: [PATCH 04/04] ARM: shmobile: r8a73a4 PFC support
-In-Reply-To: <20130318143203.26687.98180.sendpatchset@w520>
-References: <20130318143203.26687.98180.sendpatchset@w520>
-Message-ID: <20130318143241.26687.75018.sendpatchset@w520>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 18 Mar 2013 22:31:30 +0800
+Subject: [PATCH] ARM: video: mxs: Fix mxsfb misconfiguring VDCTRL0
+In-Reply-To: <201303181518.14171.marex@denx.de>
+References: <CAOMZO5CDuODRrJEEaDKm5nepfkuvuF77ZQmarB69hL6gg386ww@mail.gmail.com>
+ <201303181458.17656.marex@denx.de>
+ <20130318140633.GF12462@S2101-09.ap.freescale.net>
+ <201303181518.14171.marex@denx.de>
+Message-ID: <20130318143129.GG12462@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+On Mon, Mar 18, 2013 at 03:18:13PM +0100, Marek Vasut wrote:
+> Did you manage to test it please?
 
-Add a platform device for the r8a73a4 PFC.
+I do not have X11 environment handy to test, but framework console
+seems still working.
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
-
- No build time dependency, but requires PFC tables
- in separate patch series to actually do something.
-
- arch/arm/mach-shmobile/Kconfig                |    1 +
- arch/arm/mach-shmobile/include/mach/r8a73a4.h |    1 +
- arch/arm/mach-shmobile/setup-r8a73a4.c        |   10 ++++++++++
- 3 files changed, 12 insertions(+)
-
---- 0005/arch/arm/mach-shmobile/Kconfig
-+++ work/arch/arm/mach-shmobile/Kconfig	2013-03-18 18:51:13.000000000 +0900
-@@ -20,6 +20,7 @@ config ARCH_SH73A0
- 
- config ARCH_R8A73A4
- 	bool "R-Mobile APE6 (R8A73A40)"
-+	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select ARM_GIC
- 	select CPU_V7
- 	select ARM_ARCH_TIMER
---- 0003/arch/arm/mach-shmobile/include/mach/r8a73a4.h
-+++ work/arch/arm/mach-shmobile/include/mach/r8a73a4.h	2013-03-18 18:51:13.000000000 +0900
-@@ -3,5 +3,6 @@
- 
- void r8a73a4_add_standard_devices(void);
- void r8a73a4_clock_init(void);
-+void r8a73a4_pinmux_init(void);
- 
- #endif /* __ASM_R8A73A4_H__ */
---- 0005/arch/arm/mach-shmobile/setup-r8a73a4.c
-+++ work/arch/arm/mach-shmobile/setup-r8a73a4.c	2013-03-18 18:53:50.000000000 +0900
-@@ -28,6 +28,16 @@
- #include <mach/r8a73a4.h>
- #include <asm/mach/arch.h>
- 
-+static const struct resource pfc_resources[] = {
-+	DEFINE_RES_MEM(0xe6050000, 0x9000),
-+};
-+
-+void __init r8a73a4_pinmux_init(void)
-+{
-+	platform_device_register_simple("pfc-r8a73a4", -1, pfc_resources,
-+					ARRAY_SIZE(pfc_resources));
-+}
-+
- #define SCIF_COMMON(scif_type, baseaddr, irq)			\
- 	.type		= PORT_SCIFA,				\
- 	.mapbase	= baseaddr,				\
+Shawn
