@@ -1,43 +1,39 @@
-From: lukas-x@zapletalovi.com (Lukas Zapletal)
-Date: Mon, 18 Mar 2013 09:16:34 +0000 (UTC)
-Subject: Kirkwood NSA 310 does not boot with 3.8.3
-References: <loom.20130316T213930-150@post.gmane.org>
- <20130316215530.GZ12700@titan.lakedaemon.net>
-Message-ID: <loom.20130318T094229-725@post.gmane.org>
+From: miloody@gmail.com (loody)
+Date: Mon, 18 Mar 2013 17:38:11 +0800
+Subject: some question about monitor mode support in arm
+In-Reply-To: <5141D298.6010401@codeaurora.org>
+References: <CANudz+tPrFxUEhzbpdVYnhnzKnJJ2wsJ7s_3YAWiOUJjJhQ3YA@mail.gmail.com>
+ <5141D298.6010401@codeaurora.org>
+Message-ID: <CANudz+u2kEJRu0P1oVv84AhuGXM8RW-inr=LrPp4WJSKYQ3iJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason Cooper <jason <at> lakedaemon.net> writes:
-> You'll need to enable ARM_APPENDED_DTB, concatenate your dtb onto your
-> zImage, then run mkimage on the result to get the uImage.
+hi Christopher:
 
-Jason, thanks for help. It worked great, just for completenes for googlers:
+2013/3/14 Christopher Covington <cov@codeaurora.org>:
+> Hi,
+>
+> On 03/14/2013 05:43 AM, loody wrote:
+>> Hi all:
+>> Does linux kernel support monitor mode handling?
+>
+> It does not, but hypervisor mode support was recently added, which has pretty
+> similar mechanics.
+>
+>> I grep the keyword 'smc' but it only show how switch to, such as
+>> mach-highbank/smc.S,
+>> but not seem where to handle it.
+>
+> You can take a look at __hyp_set_vectors in arch/arm/kernel/hyp-stub.S for one
+> example of setting up exception vectors.
+I grep what you mentioned.
+But it seems nothing about __hyp_set_vectors you described
+in arch/arm/kernel/hyp-stub.S
+ENTRY(__hyp_set_vectors)
+        __HVC(0)
+        mov     pc, lr
+ENDPROC(__hyp_set_vectors)
 
-# grep "ARM_APPENDED_DTB|NSA" .config
-CONFIG_ARM_APPENDED_DTB=y
-CONFIG_MACH_NSA310_DT=y
 
-# make zImage
-
-# make dtbs
-
-# cat arch/arm/boot/zImage arch/arm/boot/dts/kirkwood-nsa310.dtb > /tmp/X
-# mv /tmp/X arch/arm/boot/zImage
-
-# make uImage
-
-...
-Image Type:   ARM Linux Kernel Image (uncompressed)
-Data Size:    3684110 Bytes = 3597.76 kB = 3.51 MB
-Load Address: 00008000
-Entry Point:  00008000
-Image arch/arm/boot/uImage is ready
-
-# cp arch/arm/boot/uImage /boot/uImage-nsa310
-
-UBOOT# ide reset; ext2load ide 0:1 0x800000 /uImage-nsa310; bootm 0x800000
-
-Compared to my patched NSA310 3.6 kernel I don't see console anymore, I guess is 
-is just an config option I miss. And LEDs are not working yet.
-
-Thank you
+-- 
+Thanks for your help,
