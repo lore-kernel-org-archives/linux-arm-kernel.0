@@ -1,77 +1,84 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 18 Mar 2013 14:35:06 -0700
-Subject: [PATCH 1/5] clk: allow reentrant calls into the clk framework
-In-Reply-To: <20130318210011.GL4977@n2100.arm.linux.org.uk>
-References: <1362026969-11457-1-git-send-email-mturquette@linaro.org>
- <1362026969-11457-2-git-send-email-mturquette@linaro.org>
- <CAPDyKFqhGjduuSRvgZXJBUnbqS9L9aFw_nYc2VfkY1Ljgxrp+g@mail.gmail.com>
- <20130318201551.8663.22731@quantum>
- <20130318210011.GL4977@n2100.arm.linux.org.uk>
-Message-ID: <20130318213506.8663.82637@quantum>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 18 Mar 2013 22:31:22 +0100
+Subject: [PATCH] ARM: video: mxs: Fix mxsfb misconfiguring VDCTRL0
+In-Reply-To: <20130318185810.GA11040@kroah.com>
+References: <1363630997-5254-1-git-send-email-marex@denx.de>
+ <20130318185810.GA11040@kroah.com>
+Message-ID: <201303182231.22749.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Russell King - ARM Linux (2013-03-18 14:00:11)
-> On Mon, Mar 18, 2013 at 01:15:51PM -0700, Mike Turquette wrote:
-> > Quoting Ulf Hansson (2013-02-28 01:54:34)
-> > > On 28 February 2013 05:49, Mike Turquette <mturquette@linaro.org> wrote:
-> > > > @@ -703,10 +744,29 @@ int clk_enable(struct clk *clk)
-> > > >         unsigned long flags;
-> > > >         int ret;
-> > > >
-> > > > +       /* this call re-enters if it is from the same context */
-> > > > +       if (spin_is_locked(&enable_lock) || mutex_is_locked(&prepare_lock)) {
-> > > > +               if ((void *) atomic_read(&context) == get_current()) {
-> > > > +                       ret = __clk_enable(clk);
-> > > > +                       goto out;
-> > > > +               }
-> > > > +       }
-> > > 
-> > > I beleive the clk_enable|disable code will be racy. What do you think
-> > > about this scenario:
-> > > 
-> > > 1. Thread 1, calls clk_prepare -> clk is not reentrant -> mutex_lock
-> > > -> set_context to thread1.
-> > > 2. Thread 2, calls clk_enable -> above "if" will mean that get_current
-> > > returns thread 1 context and then clk_enable continues ->
-> > > spin_lock_irqsave -> set_context to thread 2.
-> > > 3. Thread 1 continues and triggers a reentancy for clk_prepare -> clk
-> > > is not reentrant (since thread 2 has set a new context) -> mutex_lock
-> > > and we will hang forever.
-> > > 
-> > > Do you think above scenario could happen?
-> > > 
-> > > I think the solution would be to invent another "static atomic_t
-> > > context;" which is used only for fast path functions
-> > > (clk_enable|disable). That should do the trick I think.
+Hi Greg,
+
+[...]
+
+> > NOTE: This is the version for stable v3.8.3, so I'm sending it to
+> > -stable.
 > > 
-> > Ulf,
-> > 
-> > You are correct.  In fact I have a branch that has two separate context
-> > pointers, one for mutex-protected functions and one for
-> > spinlock-protected functions.  Somehow I managed to discard that change
-> > before settling on the final version that was published.
+> >       I will send adjusted version for mainline 3.9-rc , since there is
+> >       one more board in mainline and therefore the versions of the patch
+> >       must differ.
 > 
-> Err.
+> <formletter>
 > 
-> Do not forget one very important point.
-> 
-> Any clock which has clk_enable() called on it must have had clk_prepare()
-> already called _and_ completed.  A second clk_prepare() call on the same
-> clock should be a no-op other than to increase the prepare reference count
-> on it.
-> 
-> If you do anything else, you are going to get into sticky problems.
+> This is not the correct way to submit patches for inclusion in the
+> stable kernel tree.  Please read Documentation/stable_kernel_rules.txt
+> for how to do this properly.
 
-Correct usage of the api is of course still necessary.  The reentrancy
-patch doesn't change api usage by drivers and does not violate the
-sequencing of clk_prepare/clk_enable and clk_disable/clk_unprepare.  In
-Ulf's example thread 2 should have already called clk_prepare before
-calling clk_enable.
+I'm somewhat sure I violated a few (see below), I won't argue there as you 
+surely are much more experienced, but let me dissect the rules so I can learn 
+which one to be careful about. Please help me if I did not understand something 
+properly.
 
-Ulf has correctly pointed out a bug in the locking/context logic due to
-having two distinct lock's for fast/slow operations.  It will be fixed
-in the next verison.
+ - It must be obviously correct and tested.
+YES, Fabio tested it on MX28EVK, me on M28EVK (two different devices)
 
-Thanks,
-Mike
+ - It cannot be bigger than 100 lines, with context.
+NO, but I see no way to compress it under 100 lines.
+
+ - It must fix only one thing.
+YES, it fixes broken X11 on MX28
+
+ - It must fix a real bug that bothers people (not a, "This could be a
+   problem..." type thing).
+YES, it fixes broken X11 on MX28
+
+ - It must fix a problem that causes a build error (but not for things
+   marked CONFIG_BROKEN), an oops, a hang, data corruption, a real
+   security issue, or some "oh, that's not good" issue.  In short, something
+   critical.
+YES, it fixes broken X11 on MX28
+
+ - Serious issues as reported by a user of a distribution kernel may also
+   be considered if they fix a notable performance or interactivity issue.
+   As these fixes are not as obvious and have a higher risk of a subtle
+   regression they should only be submitted by a distribution kernel
+   maintainer and include an addendum linking to a bugzilla entry if it 
+   exists and additional information on the user-visible impact.
+This doesn't apply I guess?
+
+ - New device IDs and quirks are also accepted.
+This doesn't apply for sure.
+
+ - No "theoretical race condition" issues, unless an explanation of how the
+   race can be exploited is also provided.
+This doesn't apply for sure.
+
+ - It cannot contain any "trivial" fixes in it (spelling changes,
+   whitespace cleanups, etc).
+This doesn't apply for sure.
+
+ - It must follow the Documentation/SubmittingPatches rules.
+I believe it does. It has one checkpatch warning, but to keep the amount of 
+changes to bare minimum, I left it in there.
+
+ - It or an equivalent fix must already exist in Linus' tree (upstream).
+This can not happen, the fix in Linus' tree will have to be different since in 
+v3.9 there is one more MX28 platform which also needs fixing. I suppose I will 
+now wait for Shawn to merge the patch for 3.9-rc, get it mainline and then this 
+one can be merged?
+
+Thank you!
+
+Best regards,
+Marek Vasut
