@@ -1,54 +1,75 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 18 Mar 2013 16:26:22 +0800
-Subject: [PATCH v2 1/4] net: fec: handle optional clk_ptp more gracefully
+Date: Mon, 18 Mar 2013 16:26:25 +0800
+Subject: [PATCH v2 4/4] ARM: mxs: remove unneeded enet_out clk initialization
 In-Reply-To: <1363595185-12302-1-git-send-email-shawn.guo@linaro.org>
 References: <1363595185-12302-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1363595185-12302-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1363595185-12302-5-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the optional clk_ptp is absent, we can just set it to NULL, and
-clk API will just handle it gracefully.  It saves us from checking
-clk_ptp whenever calling into clk API.
-
-Also since clk_ptp is optional, the "ret" variable shouldn't be set
-in case that the clock is absent.
+With fec driver taking care of enet_out clk, most of board setup
+do not need to enable enet_out clk.  So remove them.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- drivers/net/ethernet/freescale/fec.c |    8 +++-----
- 1 file changed, 3 insertions(+), 5 deletions(-)
+ arch/arm/mach-mxs/mach-mxs.c |   12 ------------
+ 1 file changed, 12 deletions(-)
 
-diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
-index fccc3bf..d2a9851 100644
---- a/drivers/net/ethernet/freescale/fec.c
-+++ b/drivers/net/ethernet/freescale/fec.c
-@@ -1804,14 +1804,13 @@ fec_probe(struct platform_device *pdev)
- 	fep->bufdesc_ex =
- 		pdev->id_entry->driver_data & FEC_QUIRK_HAS_BUFDESC_EX;
- 	if (IS_ERR(fep->clk_ptp)) {
--		ret = PTR_ERR(fep->clk_ptp);
-+		fep->clk_ptp = NULL;
- 		fep->bufdesc_ex = 0;
- 	}
+diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
+index 0521867..026edfc 100644
+--- a/arch/arm/mach-mxs/mach-mxs.c
++++ b/arch/arm/mach-mxs/mach-mxs.c
+@@ -271,7 +271,6 @@ static inline void enable_clk_enet_out(void)
  
- 	clk_prepare_enable(fep->clk_ahb);
- 	clk_prepare_enable(fep->clk_ipg);
--	if (!IS_ERR(fep->clk_ptp))
--		clk_prepare_enable(fep->clk_ptp);
-+	clk_prepare_enable(fep->clk_ptp);
+ static void __init imx28_evk_init(void)
+ {
+-	enable_clk_enet_out();
+ 	update_fec_mac_prop(OUI_FSL);
  
- 	reg_phy = devm_regulator_get(&pdev->dev, "phy");
- 	if (!IS_ERR(reg_phy)) {
-@@ -1876,8 +1875,7 @@ failed_irq:
- failed_regulator:
- 	clk_disable_unprepare(fep->clk_ahb);
- 	clk_disable_unprepare(fep->clk_ipg);
--	if (!IS_ERR(fep->clk_ptp))
--		clk_disable_unprepare(fep->clk_ptp);
-+	clk_disable_unprepare(fep->clk_ptp);
- failed_pin:
- failed_clk:
- 	iounmap(fep->hwp);
+ 	mxsfb_pdata.mode_list = mx28evk_video_modes;
+@@ -299,11 +298,6 @@ static void __init m28evk_init(void)
+ 	mxsfb_pdata.ld_intf_width = STMLCDIF_18BIT;
+ }
+ 
+-static void __init sc_sps1_init(void)
+-{
+-	enable_clk_enet_out();
+-}
+-
+ static int apx4devkit_phy_fixup(struct phy_device *phy)
+ {
+ 	phy->dev_flags |= MICREL_PHY_50MHZ_CLK;
+@@ -400,13 +394,11 @@ static void __init tx28_post_init(void)
+ 
+ static void __init cfa10049_init(void)
+ {
+-	enable_clk_enet_out();
+ 	update_fec_mac_prop(OUI_CRYSTALFONTZ);
+ }
+ 
+ static void __init cfa10037_init(void)
+ {
+-	enable_clk_enet_out();
+ 	update_fec_mac_prop(OUI_CRYSTALFONTZ);
+ 
+ 	mxsfb_pdata.mode_list = cfa10049_video_modes;
+@@ -417,8 +409,6 @@ static void __init cfa10037_init(void)
+ 
+ static void __init apf28_init(void)
+ {
+-	enable_clk_enet_out();
+-
+ 	mxsfb_pdata.mode_list = apf28dev_video_modes;
+ 	mxsfb_pdata.mode_count = ARRAY_SIZE(apf28dev_video_modes);
+ 	mxsfb_pdata.default_bpp = 16;
+@@ -441,8 +431,6 @@ static void __init mxs_machine_init(void)
+ 		cfa10049_init();
+ 	else if (of_machine_is_compatible("armadeus,imx28-apf28"))
+ 		apf28_init();
+-	else if (of_machine_is_compatible("schulercontrol,imx28-sps1"))
+-		sc_sps1_init();
+ 
+ 	of_platform_populate(NULL, of_default_bus_match_table,
+ 			     mxs_auxdata_lookup, NULL);
 -- 
 1.7.9.5
