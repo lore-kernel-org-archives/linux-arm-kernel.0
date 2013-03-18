@@ -1,145 +1,141 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 18 Mar 2013 20:05:24 +0900
-Subject: [PATCH 028/142] ARM: shmobile: mackerel: Replace GPIO_PORTx enum with
- GPIO port numbers
+Date: Mon, 18 Mar 2013 20:05:49 +0900
+Subject: [PATCH 053/142] sh-pfc: Convert message printing from pr_* to dev_*
 In-Reply-To: <1363604838-29359-1-git-send-email-horms+renesas@verge.net.au>
 References: <1363604838-29359-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1363604838-29359-29-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1363604838-29359-54-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-The PFC GPIO API implementation moved to using port numbers. Replace all
-GPIO_PORTx enum usage with the corresponding port number. The GPIO_PORTx
-enum values are identical to the port number on this platform.
-
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-shmobile/board-mackerel.c |   34 +++++++++++++++----------------
- 1 file changed, 17 insertions(+), 17 deletions(-)
+ drivers/pinctrl/sh-pfc/core.c    |   14 +++++++-------
+ drivers/pinctrl/sh-pfc/gpio.c    |   16 ++++++++++------
+ drivers/pinctrl/sh-pfc/pinctrl.c |    5 +++--
+ 3 files changed, 20 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-mackerel.c b/arch/arm/mach-shmobile/board-mackerel.c
-index db968a5..172d472 100644
---- a/arch/arm/mach-shmobile/board-mackerel.c
-+++ b/arch/arm/mach-shmobile/board-mackerel.c
-@@ -363,7 +363,7 @@ static struct fb_videomode mackerel_lcdc_modes[] = {
+diff --git a/drivers/pinctrl/sh-pfc/core.c b/drivers/pinctrl/sh-pfc/core.c
+index a04c497..feef897 100644
+--- a/drivers/pinctrl/sh-pfc/core.c
++++ b/drivers/pinctrl/sh-pfc/core.c
+@@ -10,7 +10,6 @@
+  */
  
- static int mackerel_set_brightness(int brightness)
- {
--	gpio_set_value(GPIO_PORT31, brightness);
-+	gpio_set_value(31, brightness);
+ #define DRV_NAME "sh-pfc"
+-#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
+ #include <linux/bitops.h>
+ #include <linux/err.h>
+@@ -173,9 +172,9 @@ static void sh_pfc_write_config_reg(struct sh_pfc *pfc,
+ 
+ 	sh_pfc_config_reg_helper(pfc, crp, field, &mapped_reg, &mask, &pos);
+ 
+-	pr_debug("write_reg addr = %lx, value = %ld, field = %ld, "
+-		 "r_width = %ld, f_width = %ld\n",
+-		 crp->reg, value, field, crp->reg_width, crp->field_width);
++	dev_dbg(pfc->dev, "write_reg addr = %lx, value = %ld, field = %ld, "
++		"r_width = %ld, f_width = %ld\n",
++		crp->reg, value, field, crp->reg_width, crp->field_width);
+ 
+ 	mask = ~(mask << pos);
+ 	value = value << pos;
+@@ -254,7 +253,8 @@ static int sh_pfc_mark_to_enum(struct sh_pfc *pfc, pinmux_enum_t mark, int pos,
+ 		}
+ 	}
+ 
+-	pr_err("cannot locate data/mark enum_id for mark %d\n", mark);
++	dev_err(pfc->dev, "cannot locate data/mark enum_id for mark %d\n",
++		mark);
+ 	return -EINVAL;
+ }
+ 
+@@ -396,13 +396,13 @@ static int sh_pfc_probe(struct platform_device *pdev)
+ 		 * PFC state as it is, given that there are already
+ 		 * extant users of it that have succeeded by this point.
+ 		 */
+-		pr_notice("failed to init GPIO chip, ignoring...\n");
++		dev_notice(pfc->dev, "failed to init GPIO chip, ignoring...\n");
+ 	}
+ #endif
+ 
+ 	platform_set_drvdata(pdev, pfc);
+ 
+-	pr_info("%s support registered\n", info->name);
++	dev_info(pfc->dev, "%s support registered\n", info->name);
  
  	return 0;
  }
-@@ -819,22 +819,22 @@ static struct platform_device usbhs1_device = {
- static struct gpio_led mackerel_leds[] = {
- 	{
- 		.name		= "led0",
--		.gpio		= GPIO_PORT0,
-+		.gpio		= 0,
- 		.default_state	= LEDS_GPIO_DEFSTATE_ON,
- 	},
- 	{
- 		.name		= "led1",
--		.gpio		= GPIO_PORT1,
-+		.gpio		= 1,
- 		.default_state	= LEDS_GPIO_DEFSTATE_ON,
- 	},
- 	{
- 		.name		= "led2",
--		.gpio		= GPIO_PORT2,
-+		.gpio		= 2,
- 		.default_state	= LEDS_GPIO_DEFSTATE_ON,
- 	},
- 	{
- 		.name		= "led3",
--		.gpio		= GPIO_PORT159,
-+		.gpio		= 159,
- 		.default_state	= LEDS_GPIO_DEFSTATE_ON,
+diff --git a/drivers/pinctrl/sh-pfc/gpio.c b/drivers/pinctrl/sh-pfc/gpio.c
+index e299f14..d7acb06 100644
+--- a/drivers/pinctrl/sh-pfc/gpio.c
++++ b/drivers/pinctrl/sh-pfc/gpio.c
+@@ -9,8 +9,6 @@
+  * for more details.
+  */
+ 
+-#define pr_fmt(fmt) KBUILD_MODNAME " gpio: " fmt
+-
+ #include <linux/device.h>
+ #include <linux/gpio.h>
+ #include <linux/init.h>
+@@ -273,12 +271,18 @@ static int gpio_pin_setup(struct sh_pfc_chip *chip)
+ 
+ static int gpio_function_request(struct gpio_chip *gc, unsigned offset)
+ {
++	static bool __print_once;
+ 	struct sh_pfc *pfc = gpio_to_pfc(gc);
+ 	unsigned int mark = pfc->info->func_gpios[offset].enum_id;
+ 	unsigned long flags;
+ 	int ret;
+ 
+-	pr_notice_once("Use of GPIO API for function requests is deprecated, convert to pinctrl\n");
++	if (!__print_once) {
++		dev_notice(pfc->dev,
++			   "Use of GPIO API for function requests is deprecated."
++			   " Convert to pinctrl\n");
++		__print_once = true;
++	}
+ 
+ 	if (mark == 0)
+ 		return -EINVAL;
+@@ -334,9 +338,9 @@ sh_pfc_add_gpiochip(struct sh_pfc *pfc, int(*setup)(struct sh_pfc_chip *))
+ 	if (unlikely(ret < 0))
+ 		return ERR_PTR(ret);
+ 
+-	pr_info("%s handling gpio %u -> %u\n",
+-		chip->gpio_chip.label, chip->gpio_chip.base,
+-		chip->gpio_chip.base + chip->gpio_chip.ngpio - 1);
++	dev_info(pfc->dev, "%s handling gpio %u -> %u\n",
++		 chip->gpio_chip.label, chip->gpio_chip.base,
++		 chip->gpio_chip.base + chip->gpio_chip.ngpio - 1);
+ 
+ 	return chip;
+ }
+diff --git a/drivers/pinctrl/sh-pfc/pinctrl.c b/drivers/pinctrl/sh-pfc/pinctrl.c
+index 82e4fb2..52179bb 100644
+--- a/drivers/pinctrl/sh-pfc/pinctrl.c
++++ b/drivers/pinctrl/sh-pfc/pinctrl.c
+@@ -9,7 +9,6 @@
+  */
+ 
+ #define DRV_NAME "sh-pfc"
+-#define pr_fmt(fmt) KBUILD_MODNAME " pinctrl: " fmt
+ 
+ #include <linux/device.h>
+ #include <linux/err.h>
+@@ -176,7 +175,9 @@ static int sh_pfc_gpio_request_enable(struct pinctrl_dev *pctldev,
+ 	spin_lock_irqsave(&pfc->lock, flags);
+ 
+ 	if (cfg->type != PINMUX_TYPE_NONE) {
+-		pr_err("Pin %u is busy, can't configure it as GPIO.\n", offset);
++		dev_err(pfc->dev,
++			"Pin %u is busy, can't configure it as GPIO.\n",
++			offset);
+ 		ret = -EBUSY;
+ 		goto done;
  	}
- };
-@@ -964,11 +964,11 @@ static struct platform_device nand_flash_device = {
- 
- /*
-  * The card detect pin of the top SD/MMC slot (CN7) is active low and is
-- * connected to GPIO A22 of SH7372 (GPIO_PORT41).
-+ * connected to GPIO A22 of SH7372 (GPIO 41).
-  */
- static int slot_cn7_get_cd(struct platform_device *pdev)
- {
--	return !gpio_get_value(GPIO_PORT41);
-+	return !gpio_get_value(41);
- }
- 
- /* SDHI0 */
-@@ -977,7 +977,7 @@ static struct sh_mobile_sdhi_info sdhi0_info = {
- 	.dma_slave_rx	= SHDMA_SLAVE_SDHI0_RX,
- 	.tmio_flags	= TMIO_MMC_USE_GPIO_CD,
- 	.tmio_caps	= MMC_CAP_SD_HIGHSPEED | MMC_CAP_SDIO_IRQ,
--	.cd_gpio	= GPIO_PORT172,
-+	.cd_gpio	= 172,
- };
- 
- static struct resource sdhi0_resources[] = {
-@@ -1060,11 +1060,11 @@ static struct platform_device sdhi1_device = {
- 
- /*
-  * The card detect pin of the top SD/MMC slot (CN23) is active low and is
-- * connected to GPIO SCIFB_SCK of SH7372 (GPIO_PORT162).
-+ * connected to GPIO SCIFB_SCK of SH7372 (162).
-  */
- static int slot_cn23_get_cd(struct platform_device *pdev)
- {
--	return !gpio_get_value(GPIO_PORT162);
-+	return !gpio_get_value(162);
- }
- 
- /* SDHI2 */
-@@ -1403,9 +1403,9 @@ static void __init mackerel_init(void)
- 	gpio_request(GPIO_FN_LCDDCK,   NULL);
- 
- 	/* backlight, off by default */
--	gpio_request_one(GPIO_PORT31, GPIOF_OUT_INIT_LOW, NULL);
-+	gpio_request_one(31, GPIOF_OUT_INIT_LOW, NULL);
- 
--	gpio_request_one(GPIO_PORT151, GPIOF_OUT_INIT_HIGH, NULL); /* LCDDON */
-+	gpio_request_one(151, GPIOF_OUT_INIT_HIGH, NULL); /* LCDDON */
- 
- 	/* USBHS0 */
- 	gpio_request(GPIO_FN_VBUS0_0, NULL);
-@@ -1421,10 +1421,10 @@ static void __init mackerel_init(void)
- 	gpio_request(GPIO_FN_FSIAILR,	NULL);
- 	gpio_request(GPIO_FN_FSIAISLD,	NULL);
- 	gpio_request(GPIO_FN_FSIAOSLD,	NULL);
--	gpio_request_one(GPIO_PORT161, GPIOF_OUT_INIT_LOW, NULL); /* slave */
-+	gpio_request_one(161, GPIOF_OUT_INIT_LOW, NULL); /* slave */
- 
--	gpio_request(GPIO_PORT9,  NULL);
--	gpio_request(GPIO_PORT10, NULL);
-+	gpio_request(9,  NULL);
-+	gpio_request(10, NULL);
- 	gpio_direction_none(GPIO_PORT9CR);  /* FSIAOBT needs no direction */
- 	gpio_direction_none(GPIO_PORT10CR); /* FSIAOLR needs no direction */
- 
-@@ -1475,7 +1475,7 @@ static void __init mackerel_init(void)
- 	gpio_request(GPIO_FN_SDHID1_0, NULL);
- #endif
- 	/* card detect pin for MMC slot (CN7) */
--	gpio_request_one(GPIO_PORT41, GPIOF_IN, NULL);
-+	gpio_request_one(41, GPIOF_IN, NULL);
- 
- 	/* enable SDHI2 */
- 	gpio_request(GPIO_FN_SDHICMD2, NULL);
-@@ -1486,7 +1486,7 @@ static void __init mackerel_init(void)
- 	gpio_request(GPIO_FN_SDHID2_0, NULL);
- 
- 	/* card detect pin for microSD slot (CN23) */
--	gpio_request_one(GPIO_PORT162, GPIOF_IN, NULL);
-+	gpio_request_one(162, GPIOF_IN, NULL);
- 
- 	/* MMCIF */
- 	gpio_request(GPIO_FN_MMCD0_0, NULL);
 -- 
 1.7.10.4
