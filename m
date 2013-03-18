@@ -1,51 +1,65 @@
-From: mgr@pengutronix.de (Michael Grzeschik)
-Date: Mon, 18 Mar 2013 14:30:00 +0100
-Subject: [PATCH v4 0/6] support other fsl SoCs with usbmisc + small fixes
-In-Reply-To: <20130307225403.GI29785@pengutronix.de>
-References: <1354033021-10585-1-git-send-email-m.grzeschik@pengutronix.de>
- <20121128025217.GC18593@nchen-desktop>
- <87ip6mor1e.fsf@ashishki-desk.ger.corp.intel.com>
- <20130307225403.GI29785@pengutronix.de>
-Message-ID: <20130318133000.GA16342@pengutronix.de>
+From: gautamvivek1987@gmail.com (Vivek Gautam)
+Date: Mon, 18 Mar 2013 19:11:57 +0530
+Subject: [PATCH] ARM: dts: add usb 2.0 clock references to exynos5250
+ device tree
+In-Reply-To: <006301ce211d$a6caa670$f45ff350$%han@samsung.com>
+References: <1363195099-15919-1-git-send-email-dianders@chromium.org>
+ <006301ce211d$a6caa670$f45ff350$%han@samsung.com>
+Message-ID: <CAFp+6iFXd-4uFfc4v_kWf_FTBmeHkNwsEV0QoyHCzza8evgd9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 07, 2013 at 11:54:03PM +0100, Michael Grzeschik wrote:
-> Hey Alex,
-> 
-> On Thu, Jan 24, 2013 at 11:42:53AM +0200, Alexander Shishkin wrote:
-> > Peter Chen <peter.chen@freescale.com> writes:
-> > 
-> > > On Tue, Nov 27, 2012 at 05:16:55PM +0100, Michael Grzeschik wrote:
-> > >> Nearly every SoC from Freescale has this non-core usb registers. This series
-> > >> adds support for more users of this driver.
-> > >> 
-> > >> This series is based on Peter Chen's work. Its needed to merge his master branch
-> > >> before applying this series:
-> > >> 
-> > >> https://github.com/hzpeterchen/linux-usb.git
-> > >
-> > > I have tested it at i.mx6q sabrelite board, it works good.
-> > >
-> > > I have pushed your commit to my git, please cc me
-> > > your coming chipidea patches, thanks.
-> > >
-> > > Alex, please add:
-> > >
-> > > Reviewed-by: Peter Chen <peter.chen@freescale.com>
-> > > Tested-by: Peter Chen <peter.chen@freescale.com>
-> > 
-> > Looks good, queueing this one for submission.
-> 
-> Now that you have your git-tree [1], could you queue that for
-> submission?
-> 
-> [1] git://github.com/virtuoso/linux-ci.git ci-for-greg
+Hi,
 
-Ping!
+
+On Fri, Mar 15, 2013 at 7:07 AM, Jingoo Han <jg1.han@samsung.com> wrote:
+>
+> On Thursday, March 14, 2013 2:18 AM, Doug Anderson wrote:
+>>
+>> This is a fixup to two device tree nodes that have already landed but
+>> without clock nodes since the transition to common clock happened at
+>> the same time.
+>>
+>> Signed-off-by: Doug Anderson <dianders@chromium.org>
+>
+> The clock number and name are right.
+>
+> Reviewed-by: Jingoo Han <jg1.han@samsung.com>
+>
+>
+> Best regards,
+> Jingoo Han
+>
+>> ---
+>>  arch/arm/boot/dts/exynos5250.dtsi | 6 ++++++
+>>  1 file changed, 6 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+>> index 24c52e6..59be603 100644
+>> --- a/arch/arm/boot/dts/exynos5250.dtsi
+>> +++ b/arch/arm/boot/dts/exynos5250.dtsi
+>> @@ -402,12 +402,18 @@
+>>               compatible = "samsung,exynos4210-ehci";
+>>               reg = <0x12110000 0x100>;
+>>               interrupts = <0 71 0>;
+>> +
+>> +             clocks = <&clock 285>;
+>> +             clock-names = "usbhost";
+>>       };
+>>
+>>       usb at 12120000 {
+>>               compatible = "samsung,exynos4210-ohci";
+>>               reg = <0x12120000 0x100>;
+>>               interrupts = <0 71 0>;
+>> +
+>> +             clocks = <&clock 285>;
+>> +             clock-names = "usbhost";
+
+tested this patch with smdk5250 h/w.
+
+Tested-by: Vivek Gautam <gautam.vivek@samsung.com>
+
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thanks & Regards
+Vivek
