@@ -1,89 +1,100 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 18 Mar 2013 20:05:00 +0900
-Subject: [PATCH 004/142] sh-pfc: Drop the sh_pfc_pinctrl spinlock
+Date: Mon, 18 Mar 2013 20:04:58 +0900
+Subject: [PATCH 002/142] sh-pfc: Don't define the per-device pinctrl struct
+ instances as global
 In-Reply-To: <1363604838-29359-1-git-send-email-horms+renesas@verge.net.au>
 References: <1363604838-29359-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1363604838-29359-5-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1363604838-29359-3-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-The spinlock is used to protect data that is only accessed sequentially
-during initialization. Remove it.
+The pinctrl_desc and pinctrl_gpio_range structures registered with the
+pinctrl core are per-device instances. Move them to the dynamically
+allocated sh_pfc_pinctrl structure and initialize them at runtime.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/pinctrl/sh-pfc/pinctrl.c |   13 -------------
- 1 file changed, 13 deletions(-)
+ drivers/pinctrl/sh-pfc/pinctrl.c |   40 +++++++++++++++++---------------------
+ 1 file changed, 18 insertions(+), 22 deletions(-)
 
 diff --git a/drivers/pinctrl/sh-pfc/pinctrl.c b/drivers/pinctrl/sh-pfc/pinctrl.c
-index d113746..9bd0a83 100644
+index 887930e..d113746 100644
 --- a/drivers/pinctrl/sh-pfc/pinctrl.c
 +++ b/drivers/pinctrl/sh-pfc/pinctrl.c
-@@ -37,8 +37,6 @@ struct sh_pfc_pinctrl {
+@@ -27,6 +27,9 @@
  
- 	struct pinctrl_pin_desc *pads;
- 	unsigned int nr_pads;
--
--	spinlock_t lock;
+ struct sh_pfc_pinctrl {
+ 	struct pinctrl_dev *pctl;
++	struct pinctrl_desc pctl_desc;
++	struct pinctrl_gpio_range range;
++
+ 	struct sh_pfc *pfc;
+ 
+ 	struct pinmux_gpio **functions;
+@@ -314,19 +317,6 @@ static const struct pinconf_ops sh_pfc_pinconf_ops = {
+ 	.pin_config_dbg_show	= sh_pfc_pinconf_dbg_show,
  };
  
- static int sh_pfc_get_groups_count(struct pinctrl_dev *pctldev)
-@@ -321,7 +319,6 @@ static void sh_pfc_map_one_gpio(struct sh_pfc *pfc, struct sh_pfc_pinctrl *pmx,
+-static struct pinctrl_gpio_range sh_pfc_gpio_range = {
+-	.name		= DRV_NAME,
+-	.id		= 0,
+-};
+-
+-static struct pinctrl_desc sh_pfc_pinctrl_desc = {
+-	.name		= DRV_NAME,
+-	.owner		= THIS_MODULE,
+-	.pctlops	= &sh_pfc_pinctrl_ops,
+-	.pmxops		= &sh_pfc_pinmux_ops,
+-	.confops	= &sh_pfc_pinconf_ops,
+-};
+-
+ static void sh_pfc_map_one_gpio(struct sh_pfc *pfc, struct sh_pfc_pinctrl *pmx,
  				struct pinmux_gpio *gpio, unsigned offset)
  {
- 	struct pinmux_data_reg *dummy;
--	unsigned long flags;
- 	int bit;
+@@ -386,9 +376,6 @@ static int sh_pfc_map_gpios(struct sh_pfc *pfc, struct sh_pfc_pinctrl *pmx)
  
- 	gpio->flags &= ~PINMUX_FLAG_TYPE;
-@@ -330,10 +327,7 @@ static void sh_pfc_map_one_gpio(struct sh_pfc *pfc, struct sh_pfc_pinctrl *pmx,
- 		gpio->flags |= PINMUX_TYPE_GPIO;
- 	else {
- 		gpio->flags |= PINMUX_TYPE_FUNCTION;
--
--		spin_lock_irqsave(&pmx->lock, flags);
- 		pmx->nr_functions++;
--		spin_unlock_irqrestore(&pmx->lock, flags);
- 	}
- }
+ 	spin_unlock_irqrestore(&pfc->lock, flags);
  
-@@ -381,7 +375,6 @@ static int sh_pfc_map_gpios(struct sh_pfc *pfc, struct sh_pfc_pinctrl *pmx)
- 
- static int sh_pfc_map_functions(struct sh_pfc *pfc, struct sh_pfc_pinctrl *pmx)
- {
--	unsigned long flags;
- 	int i, fn;
- 
- 	pmx->functions = devm_kzalloc(pfc->dev, pmx->nr_functions *
-@@ -389,8 +382,6 @@ static int sh_pfc_map_functions(struct sh_pfc *pfc, struct sh_pfc_pinctrl *pmx)
- 	if (unlikely(!pmx->functions))
- 		return -ENOMEM;
- 
--	spin_lock_irqsave(&pmx->lock, flags);
--
- 	for (i = fn = 0; i < pmx->nr_pads; i++) {
- 		struct pinmux_gpio *gpio = pfc->info->gpios + i;
- 
-@@ -398,8 +389,6 @@ static int sh_pfc_map_functions(struct sh_pfc *pfc, struct sh_pfc_pinctrl *pmx)
- 			pmx->functions[fn++] = gpio;
- 	}
- 
--	spin_unlock_irqrestore(&pmx->lock, flags);
+-	sh_pfc_pinctrl_desc.pins = pmx->pads;
+-	sh_pfc_pinctrl_desc.npins = pmx->nr_pads;
 -
  	return 0;
  }
  
-@@ -412,8 +401,6 @@ int sh_pfc_register_pinctrl(struct sh_pfc *pfc)
- 	if (unlikely(!pmx))
- 		return -ENOMEM;
+@@ -438,16 +425,25 @@ int sh_pfc_register_pinctrl(struct sh_pfc *pfc)
+ 	if (unlikely(ret != 0))
+ 		return ret;
  
--	spin_lock_init(&pmx->lock);
--
- 	pmx->pfc = pfc;
- 	pfc->pinctrl = pmx;
+-	pmx->pctl = pinctrl_register(&sh_pfc_pinctrl_desc, pfc->dev, pmx);
++	pmx->pctl_desc.name = DRV_NAME;
++	pmx->pctl_desc.owner = THIS_MODULE;
++	pmx->pctl_desc.pctlops = &sh_pfc_pinctrl_ops;
++	pmx->pctl_desc.pmxops = &sh_pfc_pinmux_ops;
++	pmx->pctl_desc.confops = &sh_pfc_pinconf_ops;
++	pmx->pctl_desc.pins = pmx->pads;
++	pmx->pctl_desc.npins = pmx->nr_pads;
++
++	pmx->pctl = pinctrl_register(&pmx->pctl_desc, pfc->dev, pmx);
+ 	if (IS_ERR(pmx->pctl))
+ 		return PTR_ERR(pmx->pctl);
  
+-	sh_pfc_gpio_range.npins = pfc->info->last_gpio
+-				- pfc->info->first_gpio + 1;
+-	sh_pfc_gpio_range.base = pfc->info->first_gpio;
+-	sh_pfc_gpio_range.pin_base = pfc->info->first_gpio;
++	pmx->range.name = DRV_NAME,
++	pmx->range.id = 0;
++	pmx->range.npins = pfc->info->last_gpio - pfc->info->first_gpio + 1;
++	pmx->range.base = pfc->info->first_gpio;
++	pmx->range.pin_base = pfc->info->first_gpio;
+ 
+-	pinctrl_add_gpio_range(pmx->pctl, &sh_pfc_gpio_range);
++	pinctrl_add_gpio_range(pmx->pctl, &pmx->range);
+ 
+ 	return 0;
+ }
 -- 
 1.7.10.4
