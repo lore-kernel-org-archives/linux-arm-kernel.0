@@ -1,35 +1,50 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 18 Mar 2013 12:26:16 -0400
-Subject: [PATCH v2 for 3.10] Introduce a Marvell EBU MBus driver
-In-Reply-To: <201303181558.59608.arnd@arndb.de>
-References: <1362589205-4726-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <201303181459.10954.arnd@arndb.de> <20130318162411.11c9e3ab@skate>
- <201303181558.59608.arnd@arndb.de>
-Message-ID: <20130318162616.GJ13280@titan.lakedaemon.net>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 18 Mar 2013 17:27:18 +0100
+Subject: [PATCH 04/10] bus: introduce an Marvell EBU MBus driver
+In-Reply-To: <20130308172950.GC4094@obsidianresearch.com>
+References: <20130306190821.GA4689@obsidianresearch.com>
+ <20130306202710.15a6aa2c@skate>
+ <20130306202447.GA4916@obsidianresearch.com>
+ <20130306214036.62fc93b9@skate>
+ <20130306215031.GB4916@obsidianresearch.com>
+ <20130306222712.GP23237@titan.lakedaemon.net>
+ <20130306230412.GA5870@obsidianresearch.com>
+ <20130307222004.GA2450@localhost>
+ <20130307230516.GA28975@obsidianresearch.com>
+ <20130308091052.18612729@skate>
+ <20130308172950.GC4094@obsidianresearch.com>
+Message-ID: <20130318172718.4f8f45b9@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd,
+Dear Jason Gunthorpe,
 
-On Mon, Mar 18, 2013 at 03:58:59PM +0000, Arnd Bergmann wrote:
-> On Monday 18 March 2013, Thomas Petazzoni wrote:
-> > So even the DT-only sub-architecture (such as mvebu) should hard-code
-> > the register base addresses?
-> > 
-> > The proposed DT binding in the current patch is very minimal, and I
-> > don't see why the more elaborate DT binding that you proposed could not
-> > be implemented as an improvement of it: the DT binding you proposed
-> > seems backward compatible with the one currently implemented, no?
+On Fri, 8 Mar 2013 10:29:50 -0700, Jason Gunthorpe wrote:
+
+> > Sorry, but we _do_ want the kernel to be able to set those timings
+> > parameters, and therefore, a Device Bus driver will be needed,
+> > regardless of whether it creates the address window or not.
 > 
-> It's quite possible that it could be done in a backward compatible
-> way, I just like to be on the safe side in case it's not.
+> See the very good idea from Maxime Bizon about autoprobing the ONFI
+> timings directly from the NAND chip.
 
-We do have a bit more latitude here.  There isn't a single shipping
-mvebu device with a fdt enabled bootloader.  So, as long as we aren't
-impacting other SoCs/drivers, I'm comfortable with taking a release or
-two to shake it out.  I understand we prefer not to do that, but in this
-case, I don't want to hold up everything else in the pipeline.
+ONFI (Open NAND Firmware Interface) is about NAND, while the Device Bus
+driver submitted by Ezequiel is about NOR. I don't think NORs have a
+standard way of exposing their memory timings requirements. And the
+Device Bus driver is not only for NORs, but also for example for FPGAs
+connected on the memory bus.
 
-thx,
+Ezequiel followed the work done by Jon Hunter on the GPMC driver for
+the memory bus of OMAP SoCs, which includes the definition of timings
+in the Device Tree. To me, it seems like defining the timings in the
+Device Tree do make sense, and "ONFI" is not a good enough answer to
+get rid of the Device Bus driver submitted by Ezequiel.
 
-Jason.
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
