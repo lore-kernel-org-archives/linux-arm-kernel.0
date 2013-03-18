@@ -1,31 +1,40 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 18 Mar 2013 14:51:14 +0200
-Subject: [PATCH v3 0/4] ARM: OMAP2+: Adapt to ehci-omap changes for 3.10
-Message-ID: <1363611078-13002-1-git-send-email-rogerq@ti.com>
+Date: Mon, 18 Mar 2013 14:51:15 +0200
+Subject: [PATCH v3 1/4] usb: phy: nop: Add some parameters to platform data
+In-Reply-To: <1363611078-13002-1-git-send-email-rogerq@ti.com>
+References: <1363611078-13002-1-git-send-email-rogerq@ti.com>
+Message-ID: <1363611078-13002-2-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Add clk_rate parameter to platform data. If supplied, the
+NOP phy driver will program the clock to that rate during probe.
 
-I've revised the patches based on your comments. For now I've just
-adapted Panda and Beagleboard.
-If this looks OK then I can adapt the other boards as well.
+Also add 2 flags, needs_vcc and needs_reset.
+If the flag is set and the regulator couldn't be found
+then the driver will bail out with -EPROBE_DEFER.
 
-cheers,
--roger
+Signed-off-by: Roger Quadros <rogerq@ti.com>
+Acked-by: Felipe Balbi <balbi@ti.com>
+---
+ include/linux/usb/nop-usb-xceiv.h |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
 
-Roger Quadros (4):
-  usb: phy: nop: Add some parameters to platform data
-  ARM: OMAP2+: omap-usb-host: Add usbhs_init_phys()
-  ARM: OMAP2+: omap4panda: Adapt to ehci-omap changes
-  ARM: OMAP3: Beagle: Adapt to ehci-omap changes
-
- arch/arm/mach-omap2/board-omap3beagle.c |   32 ++++--
- arch/arm/mach-omap2/board-omap4panda.c  |   55 ++++------
- arch/arm/mach-omap2/usb-host.c          |  177 ++++++++++++++++++++++++++++++-
- arch/arm/mach-omap2/usb.h               |    9 ++
- include/linux/usb/nop-usb-xceiv.h       |    5 +
- 5 files changed, 232 insertions(+), 46 deletions(-)
-
+diff --git a/include/linux/usb/nop-usb-xceiv.h b/include/linux/usb/nop-usb-xceiv.h
+index 28884c7..148d351 100644
+--- a/include/linux/usb/nop-usb-xceiv.h
++++ b/include/linux/usb/nop-usb-xceiv.h
+@@ -5,6 +5,11 @@
+ 
+ struct nop_usb_xceiv_platform_data {
+ 	enum usb_phy_type type;
++	unsigned long clk_rate;
++
++	/* if set fails with -EPROBE_DEFER if can't get regulator */
++	unsigned int needs_vcc:1;
++	unsigned int needs_reset:1;
+ };
+ 
+ #if defined(CONFIG_NOP_USB_XCEIV) || (defined(CONFIG_NOP_USB_XCEIV_MODULE) && defined(MODULE))
 -- 
 1.7.4.1
