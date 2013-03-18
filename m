@@ -1,50 +1,45 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 18 Mar 2013 20:47:18 +0900
-Subject: [PATCH 26/43] ARM: shmobile: Rework SH73A0_SCU_BASE IOMEM() usage
+Date: Mon, 18 Mar 2013 20:47:17 +0900
+Subject: [PATCH 25/43] ARM: shmobile: Fix base address readout in headsmp-scu.S
 In-Reply-To: <1363607255-6385-1-git-send-email-horms+renesas@verge.net.au>
 References: <1363607255-6385-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1363607255-6385-27-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1363607255-6385-26-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Rework the IOMEM() usage for the SCU base address in the
-case of sh73a0. Removes recently introduced build warnings:
+Rework the early SCU setup code in headsmp-scu.S to read
+the base address in the same way as we use to fetch the
+address of the invalidation function.
 
-arch/arm/mach-shmobile/smp-sh73a0.c:45:15: warning: initialization makes integer from pointer without a cast [enabled by default]
-arch/arm/mach-shmobile/smp-sh73a0.c:45:15: warning: (near initialization for 'twd_local_timer.res[0].start') [enabled by default]
-arch/arm/mach-shmobile/smp-sh73a0.c:45:15: warning: initialization makes integer from pointer without a cast [enabled by default]
-/arch/arm/mach-shmobile/smp-sh73a0.c:45:15: warning: (near initialization for 'twd_local_timer.res[0].end') [enabled by default]
-
-Reported-by: Arnd Bergmann <arnd@arndb.de>
+Reported-by: Bastian Hecht <hechtb@gmail.com>
 Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/smp-sh73a0.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-shmobile/headsmp-scu.S |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/smp-sh73a0.c b/arch/arm/mach-shmobile/smp-sh73a0.c
-index 2244fd0..593f8de 100644
---- a/arch/arm/mach-shmobile/smp-sh73a0.c
-+++ b/arch/arm/mach-shmobile/smp-sh73a0.c
-@@ -39,7 +39,7 @@
+diff --git a/arch/arm/mach-shmobile/headsmp-scu.S b/arch/arm/mach-shmobile/headsmp-scu.S
+index 0b93170..7d113f8 100644
+--- a/arch/arm/mach-shmobile/headsmp-scu.S
++++ b/arch/arm/mach-shmobile/headsmp-scu.S
+@@ -39,7 +39,7 @@ ENTRY(shmobile_secondary_vector_scu)
+ 	mrc     p15, 0, r0, c0, c0, 5	@ read MIPDR
+ 	and	r0, r0, #3		@ mask out cpu ID
+ 	lsl	r0, r0, #3		@ we will shift by cpu_id * 8 bits
+-	ldr	r1, =shmobile_scu_base
++	ldr	r1, 2f
+ 	ldr	r1, [r1]		@ SCU base address
+ 	ldr	r2, [r1, #8]		@ SCU Power Status Register
+ 	mov	r3, #3
+@@ -48,6 +48,7 @@ ENTRY(shmobile_secondary_vector_scu)
  
- #define PSTR_SHUTDOWN_MODE	3
+ 	ldr	pc, 1f
+ 1:	.long shmobile_invalidate_start - PAGE_OFFSET + PLAT_PHYS_OFFSET
++2:	.long shmobile_scu_base - PAGE_OFFSET + PLAT_PHYS_OFFSET
+ ENDPROC(shmobile_secondary_vector_scu)
  
--#define SH73A0_SCU_BASE IOMEM(0xf0000000)
-+#define SH73A0_SCU_BASE 0xf0000000
- 
- #ifdef CONFIG_HAVE_ARM_TWD
- static DEFINE_TWD_LOCAL_TIMER(twd_local_timer, SH73A0_SCU_BASE + 0x600, 29);
-@@ -81,7 +81,7 @@ static void __init sh73a0_smp_prepare_cpus(unsigned int max_cpus)
- static void __init sh73a0_smp_init_cpus(void)
- {
- 	/* setup sh73a0 specific SCU base */
--	shmobile_scu_base = SH73A0_SCU_BASE;
-+	shmobile_scu_base = IOMEM(SH73A0_SCU_BASE);
- 
- 	shmobile_smp_init_cpus(scu_get_core_count(shmobile_scu_base));
- }
+ 	.text
 -- 
 1.7.10.4
