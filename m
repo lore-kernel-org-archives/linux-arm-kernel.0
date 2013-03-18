@@ -1,64 +1,151 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 18 Mar 2013 21:32:17 +0900
-Subject: [PATCH 07/43] ARM: shmobile: add MMCIF and SDHI DT clock aliases to
- sh73a0 and r8a7740
+Date: Mon, 18 Mar 2013 21:32:18 +0900
+Subject: [PATCH 08/43] ARM: mach-shmobile: r8a7779: Allow initialisation of
+ GIC by DT
 In-Reply-To: <1363609973-31086-1-git-send-email-horms+renesas@verge.net.au>
 References: <1363609973-31086-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1363609973-31086-8-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1363609973-31086-9-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+This allows the GIC interrupt controller of the  r8a7779 SoC to be
+initialised using a flattened device tree blob.
 
-Add clock lookup entries for SDHI and MMCIF device names, for the FDT case.
-
-Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-[horms+renesas at verge.net.au: resolved trivial conflict in clock-r8a7740.c]
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/clock-r8a7740.c |    4 ++++
- arch/arm/mach-shmobile/clock-sh73a0.c  |    3 +++
- 2 files changed, 7 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7740.c b/arch/arm/mach-shmobile/clock-r8a7740.c
-index 19ce885..1a9b9a2 100644
---- a/arch/arm/mach-shmobile/clock-r8a7740.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7740.c
-@@ -611,11 +611,15 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("i2c-sh_mobile.1",	&mstp_clks[MSTP323]),
- 	CLKDEV_DEV_ID("renesas_usbhs",		&mstp_clks[MSTP320]),
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.0",	&mstp_clks[MSTP314]),
-+	CLKDEV_DEV_ID("e6850000.sdhi",          &mstp_clks[MSTP314]),
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.1",	&mstp_clks[MSTP313]),
-+	CLKDEV_DEV_ID("e6860000.sdhi",          &mstp_clks[MSTP313]),
- 	CLKDEV_DEV_ID("sh_mmcif",		&mstp_clks[MSTP312]),
-+	CLKDEV_DEV_ID("e6bd0000.mmcif",         &mstp_clks[MSTP312]),
- 	CLKDEV_DEV_ID("sh-eth",			&mstp_clks[MSTP309]),
+---
+
+v3
+* Fix copy-paste error and use unique reg values for each CPU
+
+v2
+As suggested by Mark Rutland
+* Add reg and device_type to cpus
+* Remove #address-cells from gic
+---
+ arch/arm/boot/dts/r8a7779.dtsi               |   50 ++++++++++++++++++++++++++
+ arch/arm/mach-shmobile/include/mach/common.h |    1 +
+ arch/arm/mach-shmobile/intc-r8a7779.c        |   27 ++++++++++----
+ 3 files changed, 72 insertions(+), 6 deletions(-)
+ create mode 100644 arch/arm/boot/dts/r8a7779.dtsi
+
+diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
+new file mode 100644
+index 0000000..8c6d52c
+--- /dev/null
++++ b/arch/arm/boot/dts/r8a7779.dtsi
+@@ -0,0 +1,50 @@
++/*
++ * Device Tree Source for Renesas r8a7740
++ *
++ * Copyright (C) 2013 Renesas Solutions Corp.
++ * Copyright (C) 2013 Simon Horman
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
++
++/include/ "skeleton.dtsi"
++
++/ {
++	compatible = "renesas,r8a7779";
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			reg = <0>;
++		};
++		cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			reg = <1>;
++		};
++		cpu at 2 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			reg = <2>;
++		};
++		cpu at 3 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			reg = <3>;
++		};
++	};
++
++        gic: interrupt-controller at f0001000 {
++                compatible = "arm,cortex-a9-gic";
++                #interrupt-cells = <3>;
++                interrupt-controller;
++                reg = <0xf0001000 0x1000>,
++                      <0xf0000100 0x100>;
++        };
++};
+diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
+index e48606d..3f06710 100644
+--- a/arch/arm/mach-shmobile/include/mach/common.h
++++ b/arch/arm/mach-shmobile/include/mach/common.h
+@@ -59,6 +59,7 @@ extern void r8a7740_pinmux_init(void);
+ extern void r8a7740_pm_init(void);
  
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.2",	&mstp_clks[MSTP415]),
-+	CLKDEV_DEV_ID("e6870000.sdhi",          &mstp_clks[MSTP415]),
+ extern void r8a7779_init_irq(void);
++extern void r8a7779_init_irq_dt(void);
+ extern void r8a7779_map_io(void);
+ extern void r8a7779_earlytimer_init(void);
+ extern void r8a7779_add_early_devices(void);
+diff --git a/arch/arm/mach-shmobile/intc-r8a7779.c b/arch/arm/mach-shmobile/intc-r8a7779.c
+index 8807c27..f9cc4bc 100644
+--- a/arch/arm/mach-shmobile/intc-r8a7779.c
++++ b/arch/arm/mach-shmobile/intc-r8a7779.c
+@@ -24,6 +24,7 @@
+ #include <linux/io.h>
+ #include <linux/irqchip/arm-gic.h>
+ #include <mach/common.h>
++#include <linux/irqchip.h>
+ #include <mach/intc.h>
+ #include <mach/r8a7779.h>
+ #include <asm/mach-types.h>
+@@ -43,13 +44,8 @@ static int r8a7779_set_wake(struct irq_data *data, unsigned int on)
+ 	return 0; /* always allow wakeup */
+ }
  
- 	/* ICK */
- 	CLKDEV_ICK_ID("host",	"renesas_usbhs",	&mstp_clks[MSTP416]),
-diff --git a/arch/arm/mach-shmobile/clock-sh73a0.c b/arch/arm/mach-shmobile/clock-sh73a0.c
-index afa5423..5fa106b 100644
---- a/arch/arm/mach-shmobile/clock-sh73a0.c
-+++ b/arch/arm/mach-shmobile/clock-sh73a0.c
-@@ -581,10 +581,13 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("e6822000.i2c", &mstp_clks[MSTP323]), /* I2C1 */
- 	CLKDEV_DEV_ID("renesas_usbhs", &mstp_clks[MSTP322]), /* USB */
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.0", &mstp_clks[MSTP314]), /* SDHI0 */
-+	CLKDEV_DEV_ID("ee100000.sdhi", &mstp_clks[MSTP314]), /* SDHI0 */
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.1", &mstp_clks[MSTP313]), /* SDHI1 */
-+	CLKDEV_DEV_ID("ee120000.sdhi", &mstp_clks[MSTP313]), /* SDHI1 */
- 	CLKDEV_DEV_ID("sh_mmcif.0", &mstp_clks[MSTP312]), /* MMCIF0 */
- 	CLKDEV_DEV_ID("e6bd0000.mmcif", &mstp_clks[MSTP312]), /* MMCIF0 */
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.2", &mstp_clks[MSTP311]), /* SDHI2 */
-+	CLKDEV_DEV_ID("ee140000.sdhi", &mstp_clks[MSTP311]), /* SDHI2 */
- 	CLKDEV_DEV_ID("leds-renesas-tpu.12", &mstp_clks[MSTP303]), /* TPU1 */
- 	CLKDEV_DEV_ID("leds-renesas-tpu.21", &mstp_clks[MSTP302]), /* TPU2 */
- 	CLKDEV_DEV_ID("leds-renesas-tpu.30", &mstp_clks[MSTP301]), /* TPU3 */
+-void __init r8a7779_init_irq(void)
++static void __init r8a7779_init_irq_common(void)
+ {
+-	void __iomem *gic_dist_base = IOMEM(0xf0001000);
+-	void __iomem *gic_cpu_base = IOMEM(0xf0000100);
+-
+-	/* use GIC to handle interrupts */
+-	gic_init(0, 29, gic_dist_base, gic_cpu_base);
+ 	gic_arch_extn.irq_set_wake = r8a7779_set_wake;
+ 
+ 	/* route all interrupts to ARM */
+@@ -63,3 +59,22 @@ void __init r8a7779_init_irq(void)
+ 	__raw_writel(0xbffffffc, INT2SMSKCR3);
+ 	__raw_writel(0x003fee3f, INT2SMSKCR4);
+ }
++
++void __init r8a7779_init_irq(void)
++{
++	void __iomem *gic_dist_base = IOMEM(0xf0001000);
++	void __iomem *gic_cpu_base = IOMEM(0xf0000100);
++
++	/* use GIC to handle interrupts */
++	gic_init(0, 29, gic_dist_base, gic_cpu_base);
++
++	r8a7779_init_irq_common();
++}
++
++#ifdef CONFIG_OF
++void __init r8a7779_init_irq_dt(void)
++{
++	irqchip_init();
++	r8a7779_init_irq_common();
++}
++#endif
 -- 
 1.7.10.4
