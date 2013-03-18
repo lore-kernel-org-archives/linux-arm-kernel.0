@@ -1,38 +1,86 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 18 Mar 2013 09:56:07 +0100 (CET)
-Subject: [PATCH 2/2] genirq: move mask_cache into struct irq_chip_type
-In-Reply-To: <5146C95C.3000509@keymile.com>
-References: <1363277430-21325-1-git-send-email-holger.brunck@keymile.com><1363376175-22312-1-git-send-email-gerlando.falauto@keymile.com>
- <1363376175-22312-3-git-send-email-gerlando.falauto@keymile.com>
- <alpine.LFD.2.02.1303152101080.22263@ionos>
- <5146C95C.3000509@keymile.com>
-Message-ID: <alpine.LFD.2.02.1303180954470.22263@ionos>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Mon, 18 Mar 2013 14:39:17 +0530
+Subject: [PATCH v5 1/2] ARM: davinci: dm355: add support for v4l2 video
+ display
+In-Reply-To: <5146D326.4080905@ti.com>
+References: <1363429052-1081-1-git-send-email-prabhakar.csengg@gmail.com>
+ <1363429052-1081-2-git-send-email-prabhakar.csengg@gmail.com>
+ <5146D326.4080905@ti.com>
+Message-ID: <CA+V-a8sFeMOnd=iKWran+Y8pTcSD1pxEF+pcAWqgY6pw6Fq7Zg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 18 Mar 2013, Gerlando Falauto wrote:
-> On 03/15/2013 09:47 PM, Thomas Gleixner wrote:
-> You're right... and I appreciate you NOT using such words. :-)
+Sekhar,
 
-I try hard :)
- 
-> Just one question:
-> 
-> > 	bool mskperct = flags & IRQ_GC_SEPARATE_MASK_REGISTERS;
-> > 	bool mskinit = flags & IRQ_GC_INIT_MASK_CACHE;
-> > 	u32 *shmsk = &gc->shared_mask_cache;
-> > 
-> > 	if (!mskperct && mskinit)
-> > 	     	*shmsk = irq_reg_readl(gc->reg_base + ct->regs.mask);
-> > 
-> > 	for (i = 0; i < gc->num_ct: i++, ct++) {
-> > 	       ct->pmask_cache = mskperct ? &ct->mask_cache : shmsk;
-> 
-> What is wrong with using ct[i] instead? I find it a bit more readable.
+On Mon, Mar 18, 2013 at 2:11 PM, Sekhar Nori <nsekhar@ti.com> wrote:
+> On 3/16/2013 3:47 PM, Prabhakar lad wrote:
+>> From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+>>
+>> Create platform devices for various video modules like venc,osd,
+>> vpbe and v4l2 driver for dm355.
+>>
+>> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+>
+> Comments on the DM365 series apply to this one too. In addition:
+>
+OK.
 
-Either way is fine. I like the pointers more, but that's my personal
-preference and I let you chose whatever you want
+>> +static int dm355_vpbe_setup_pinmux(enum v4l2_mbus_pixelcode if_type,
+>> +                         int field)
+>>  {
+>> -     vpfe_capture_dev.dev.platform_data = cfg;
+>> +     switch (if_type) {
+>> +     case V4L2_MBUS_FMT_SGRBG8_1X8:
+>> +             davinci_cfg_reg(DM355_VOUT_FIELD_G70);
+>> +             break;
+>> +
+>> +     case V4L2_MBUS_FMT_YUYV10_1X20:
+>> +             /*
+>> +              * This was VPBE_DIGITAL_IF_YCC16. Replace the enum
+>
+> "was VPBE_DIGITAL_IF_YCC16" when? This is the first time this code is
+> getting in.
+>
+>> +              * accordingly when the right one gets into open source
+>
+> What is the "right one"? And "open source" == kernel? Then may be just
+> call it that.
+>
+Ah this comment doesn't make any sense ' V4L2_MBUS_FMT_YUYV10_1X20'
+is the correct one itself. I'll remove this comment.
 
-Thanks,
+>> +              */
+>> +             if (field)
+>> +                     davinci_cfg_reg(DM355_VOUT_FIELD);
+>> +             else
+>> +                     davinci_cfg_reg(DM355_VOUT_FIELD_G70);
+>> +             break;
+>> +
+>> +     default:
+>> +             return -EINVAL;
+>> +     }
+>> +
+>> +     davinci_cfg_reg(DM355_VOUT_COUTL_EN);
+>> +     davinci_cfg_reg(DM355_VOUT_COUTH_EN);
+>> +
+>> +     return 0;
+>>  }
+>>
+>> +static inline u32 dm355_reg_modify(void *reg, u32 val, u32 mask)
+>> +{
+>> +     u32 new_val = (readl(reg) & ~mask) | (val & mask);
+>> +
+>> +     writel(new_val, reg);
+>> +
+>> +     return new_val;
+>> +}
+>
+> This function needs to be removed.
+>
+Ah missed, I wonder how the compiler didn't catch it!
 
-	tglx
+Regards,
+--Prabhakar
+
+> Thanks,
+> Sekhar
