@@ -1,46 +1,33 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 19 Mar 2013 00:09:53 +0900
-Subject: [PATCH 00/03] ARM: shmobile: r8a73a4 APE6EVM board support V2
-Message-ID: <20130318150953.28231.73454.sendpatchset@w520>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 18 Mar 2013 15:03:49 +0000
+Subject: [PATCH] ARM: mach-moxart: platform port for MOXA ART SoC
+In-Reply-To: <CACmBeS3aXs9vhc5ZYPbz5bjsYsSa6EzM12H4uPv706x0zU_5iw@mail.gmail.com>
+References: <CACmBeS1NLFUYHBOVL28aCCzRrgXYGPZF9t3qj6AdcgaMkrPGoQ@mail.gmail.com>
+ <201303151125.53999.arnd@arndb.de>
+ <CACmBeS3aXs9vhc5ZYPbz5bjsYsSa6EzM12H4uPv706x0zU_5iw@mail.gmail.com>
+Message-ID: <201303181503.49491.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM: shmobile: r8a73a4 APE6EVM board support V2
+On Sunday 17 March 2013, Jonas Jensen wrote:
+> Thank you for the feedback.
+> 
+> Some of the changes are sure to be a challenge for me, but I want to
+> move this forward, and having a list helps.
+> 
+> 3.2.40 is as far as it'll go right now, nothing prints to UART
+> starting with 3.3.8 (last tested, it's somewhere around there).
+> 
+> I have been advised to enable early_printk (by landley on freenode IRC #edev).
 
-[PATCH 01/03] ARM: shmobile: APE6EVM base support V2
-[PATCH 02/03] ARM: shmobile: APE6EVM PFC support
-[PATCH 03/03] ARM: shmobile: APE6EVM LAN9220 support
+Yes, that is a good idea. I would also suggest that you don't try to port
+all the code at once a few kernel versions at a time, but that you instead
+move straight to the latest kernel, and basically start a new port one driver
+at a time. Take one of the newer ports (highbank, virt, bcm, ...) as examples.
 
-This series is V2 of initial support for the APE6EVM board.
+Since most of the code is now in drivers/ directories rather than arch/arm,
+you can actually start getting stuff upstream before you have completed all
+of it. If you have questions, I recommend asking on the #armlinux channel
+on freenode, or here on the mailing list.
 
-The APE6EVM board makes use of the r8a73a4 SoC and has a
-couple of different I/O devices on board, but with this
-series only support for the SCIFA0 UART and the Ethernet
-chip is included.
-
-In the future support for more I/O devices will be added as
-incremental feature patches.
-
-Changes since V1:
-- Went from single patch to series
-- Use ape6evm_add_standard_devices() to setup SoC devices and clocks
-- Use PFC to configure SCIFA0
-- Add Ethernet support including PFC support
-
-For more details please see the individual patches.
-
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
-
- Written against "next" renesas.git 811689afc214564c4a5f238ecf4d8bdc0e52b615
- 
- Depends on the following two series:
- [PATCH 00/04] ARM: shmobile: r8a73a4 SoC support V2
- [PATCH 00/02] sh-pfc: Initial r8a73a4 PFC support
-
- arch/arm/boot/dts/Makefile             |    1 
- arch/arm/boot/dts/r8a73a4-ape6evm.dts  |   47 ++++++++++++++++
- arch/arm/mach-shmobile/Kconfig         |   10 +++
- arch/arm/mach-shmobile/Makefile        |    1 
- arch/arm/mach-shmobile/board-ape6evm.c |   89 ++++++++++++++++++++++++++++++++
- 5 files changed, 147 insertions(+), 1 deletion(-)
+	Arnd
