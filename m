@@ -1,107 +1,113 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 18 Mar 2013 20:47:07 +0900
-Subject: [PATCH 15/43] ARM: shmobile: Update EMEV2 to use scu_power_mode()
+Date: Mon, 18 Mar 2013 20:47:14 +0900
+Subject: [PATCH 22/43] ARM: shmobile: r8a7779: Do not use early devices with
+ DT reference
 In-Reply-To: <1363607255-6385-1-git-send-email-horms+renesas@verge.net.au>
 References: <1363607255-6385-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1363607255-6385-16-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1363607255-6385-23-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+Do not initialise any early devices when using the minimal DT reference
+code. Only the delay needs to be initialised.
 
-Update the SMP code for EMEV2 to make use of the
-shared SCU function scu_power_mode() together with
-the early setup code in shmobile_secondary_vector_scu.
-
-With this patch in place the secondary CPUs modify the
-SCU setting during early boot instead of letting other
-CPUs deal with the coherency setting before boot. In
-other words, we used to setup coherency before boot
-in emev2_boot_secondary() but that bit is now instead
-handled by the code in shmobile_secondary_vector_scu.
-
-Signed-off-by: Magnus Damm <damm@opensource.se>
+Cc: Magnus Damm <magnus.damm@gmail.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/smp-emev2.c |   42 +++++++-----------------------------
- 1 file changed, 8 insertions(+), 34 deletions(-)
+ arch/arm/mach-shmobile/include/mach/common.h |    2 +-
+ arch/arm/mach-shmobile/setup-r8a7779.c       |   25 +++++++++----------------
+ 2 files changed, 10 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/smp-emev2.c b/arch/arm/mach-shmobile/smp-emev2.c
-index bc8e071..8225c16 100644
---- a/arch/arm/mach-shmobile/smp-emev2.c
-+++ b/arch/arm/mach-shmobile/smp-emev2.c
-@@ -28,27 +28,9 @@
- #include <mach/emev2.h>
- #include <asm/smp_plat.h>
- #include <asm/smp_scu.h>
--#include <asm/cacheflush.h>
+diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
+index 44cdecc..b8a4872 100644
+--- a/arch/arm/mach-shmobile/include/mach/common.h
++++ b/arch/arm/mach-shmobile/include/mach/common.h
+@@ -58,12 +58,12 @@ extern void r8a7740_clock_init(u8 md_ck);
+ extern void r8a7740_pinmux_init(void);
+ extern void r8a7740_pm_init(void);
  
- #define EMEV2_SCU_BASE 0x1e000000
++extern void r8a7779_init_delay(void);
+ extern void r8a7779_init_irq(void);
+ extern void r8a7779_init_irq_dt(void);
+ extern void r8a7779_map_io(void);
+ extern void r8a7779_earlytimer_init(void);
+ extern void r8a7779_add_early_devices(void);
+-extern void r8a7779_add_early_devices_dt(void);
+ extern void r8a7779_add_standard_devices(void);
+ extern void r8a7779_add_standard_devices_dt(void);
+ extern void r8a7779_clock_init(void);
+diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
+index 922dd4d..b1f7a45 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7779.c
++++ b/arch/arm/mach-shmobile/setup-r8a7779.c
+@@ -322,7 +322,7 @@ static struct platform_device i2c3_device = {
+ 	.num_resources	= ARRAY_SIZE(rcar_i2c3_res),
+ };
  
--static DEFINE_SPINLOCK(scu_lock);
--
--static void modify_scu_cpu_psr(unsigned long set, unsigned long clr)
--{
--	unsigned long tmp;
--
--	/* we assume this code is running on a different cpu
--	 * than the one that is changing coherency setting */
--	spin_lock(&scu_lock);
--	tmp = readl(shmobile_scu_base + 8);
--	tmp &= ~clr;
--	tmp |= set;
--	writel(tmp, shmobile_scu_base + 8);
--	spin_unlock(&scu_lock);
--
--}
--
- static void __cpuinit emev2_secondary_init(unsigned int cpu)
+-static struct platform_device *r8a7779_early_devices_dt[] __initdata = {
++static struct platform_device *r8a7779_devices_dt[] __initdata = {
+ 	&scif0_device,
+ 	&scif1_device,
+ 	&scif2_device,
+@@ -350,8 +350,8 @@ void __init r8a7779_add_standard_devices(void)
+ 
+ 	r8a7779_init_pm_domains();
+ 
+-	platform_add_devices(r8a7779_early_devices_dt,
+-			    ARRAY_SIZE(r8a7779_early_devices_dt));
++	platform_add_devices(r8a7779_devices_dt,
++			    ARRAY_SIZE(r8a7779_devices_dt));
+ 	platform_add_devices(r8a7779_early_devices,
+ 			    ARRAY_SIZE(r8a7779_early_devices));
+ }
+@@ -368,8 +368,8 @@ void __init r8a7779_earlytimer_init(void)
+ 
+ void __init r8a7779_add_early_devices(void)
  {
- 	gic_secondary_init(0);
-@@ -56,36 +38,28 @@ static void __cpuinit emev2_secondary_init(unsigned int cpu)
+-	early_platform_add_devices(r8a7779_early_devices_dt,
+-				   ARRAY_SIZE(r8a7779_early_devices_dt));
++	early_platform_add_devices(r8a7779_devices_dt,
++				   ARRAY_SIZE(r8a7779_devices_dt));
+ 	early_platform_add_devices(r8a7779_early_devices,
+ 				   ARRAY_SIZE(r8a7779_early_devices));
  
- static int __cpuinit emev2_boot_secondary(unsigned int cpu, struct task_struct *idle)
- {
--	cpu = cpu_logical_map(cpu);
--
--	/* enable cache coherency */
--	modify_scu_cpu_psr(0, 3 << (cpu * 8));
--
--	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
-+	arch_send_wakeup_ipi_mask(cpumask_of(cpu_logical_map(cpu)));
- 	return 0;
+@@ -391,16 +391,9 @@ void __init r8a7779_add_early_devices(void)
  }
  
- static void __init emev2_smp_prepare_cpus(unsigned int max_cpus)
+ #ifdef CONFIG_USE_OF
+-void __init r8a7779_add_early_devices_dt(void)
++void __init r8a7779_init_delay(void)
  {
--	int cpu = cpu_logical_map(0);
+ 	shmobile_setup_delay(1000, 2, 4); /* Cortex-A9 @ 1000MHz */
 -
- 	scu_enable(shmobile_scu_base);
- 
--	/* Tell ROM loader about our vector (in headsmp.S) */
--	emev2_set_boot_vector(__pa(shmobile_secondary_vector));
-+	/* Tell ROM loader about our vector (in headsmp-scu.S) */
-+	emev2_set_boot_vector(__pa(shmobile_secondary_vector_scu));
- 
--	/* enable cache coherency on CPU0 */
--	modify_scu_cpu_psr(0, 3 << (cpu * 8));
-+	/* enable cache coherency on booting CPU */
-+	scu_power_mode(shmobile_scu_base, SCU_PM_NORMAL);
+-	early_platform_add_devices(r8a7779_early_devices_dt,
+-				   ARRAY_SIZE(r8a7779_early_devices_dt));
+-
+-	/* Early serial console setup is not included here.
+-	 * See comment in r8a7779_add_early_devices().
+-	 */
  }
  
- static void __init emev2_smp_init_cpus(void)
- {
- 	unsigned int ncores;
+ static const struct of_dev_auxdata r8a7779_auxdata_lookup[] __initconst = {
+@@ -412,8 +405,8 @@ void __init r8a7779_add_standard_devices_dt(void)
+ 	/* clocks are setup late during boot in the case of DT */
+ 	r8a7779_clock_init();
  
--	if (!shmobile_scu_base) {
--		shmobile_scu_base = ioremap(EMEV2_SCU_BASE, PAGE_SIZE);
--		emev2_clock_init(); /* need ioremapped SMU */
--	}
-+	/* setup EMEV2 specific SCU base */
-+	shmobile_scu_base = ioremap(EMEV2_SCU_BASE, PAGE_SIZE);
-+	emev2_clock_init(); /* need ioremapped SMU */
+-	platform_add_devices(r8a7779_early_devices_dt,
+-			    ARRAY_SIZE(r8a7779_early_devices_dt));
++	platform_add_devices(r8a7779_devices_dt,
++			     ARRAY_SIZE(r8a7779_devices_dt));
+ 	of_platform_populate(NULL, of_default_bus_match_table,
+ 			     r8a7779_auxdata_lookup, NULL);
+ }
+@@ -425,7 +418,7 @@ static const char *r8a7779_compat_dt[] __initdata = {
  
- 	ncores = shmobile_scu_base ? scu_get_core_count(shmobile_scu_base) : 1;
- 
+ DT_MACHINE_START(SH73A0_DT, "Generic R8A7779 (Flattened Device Tree)")
+ 	.map_io		= r8a7779_map_io,
+-	.init_early	= r8a7779_add_early_devices_dt,
++	.init_early	= r8a7779_init_delay,
+ 	.nr_irqs	= NR_IRQS_LEGACY,
+ 	.init_irq	= r8a7779_init_irq_dt,
+ 	.init_machine	= r8a7779_add_standard_devices_dt,
 -- 
 1.7.10.4
