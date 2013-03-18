@@ -1,31 +1,53 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Mon, 18 Mar 2013 09:41:24 +0800
-Subject: [Suggestion] Latest randconfig build errors for CONFIG_MMU=no
-In-Reply-To: <20130317144030.GF19071@mudshark.cambridge.arm.com>
-References: <514147A0.2060002@asianux.com> <5141CFE4.2030909@arm.com>
- <20130317144030.GF19071@mudshark.cambridge.arm.com>
-Message-ID: <514670C4.8010801@asianux.com>
+From: hughd@google.com (Hugh Dickins)
+Date: Sun, 17 Mar 2013 19:33:25 -0700 (PDT)
+Subject: mmap sync issue
+In-Reply-To: <CANN689HX9rhecNv3RsDn8QZO8iUrMsQQBgnhUDb5AdyfWgyFag@mail.gmail.com>
+References: <DEACCBA4C6A9D145A6A68B5F5BE581B80FC057AB@HKXPRD0310MB353.apcprd03.prod.outlook.com>
+ <514502B6.2090804@gmail.com>
+ <CANN689HX9rhecNv3RsDn8QZO8iUrMsQQBgnhUDb5AdyfWgyFag@mail.gmail.com>
+Message-ID: <alpine.LNX.2.00.1303171906050.1676@eggly.anvils>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013?03?17? 22:40, Will Deacon wrote:
-> I can probably bring that up to speed with -rc2 if people are interested.
-> The tricky part is testing -- I used a software model that had a magic
-> control block for killing off CPUs when I wrote this originally.
+On Sat, 16 Mar 2013, Michel Lespinasse wrote:
+> On Sat, Mar 16, 2013 at 4:39 PM, Will Huck <will.huckk@gmail.com> wrote:
+> > On 03/15/2013 07:39 PM, Gil Weber wrote:
+> >> I am experiencing an issue with my device driver. I am using mmap and
+> >> ioctl to share information with my user space application.
+> >> The thing is that the shared memory does not seems to be synced. Do check
+> >> this, I have done a simple test:
+> 
+> So if I got this right, the issue is that the vmalloc_area is
+> virtually aliased between the kernel and the user space mapping, so
+> that coherency is not guaranteed on architectures that use virtually
+> aliased caches.
+> 
+> fs/aio.c does something similar to what you want with their ring
+> buffer. The kernel doesn't access the ring buffer through a vmalloc
+> area like you're trying to do; instead it uses kmap_atomic() ..
+> kunmap_atomic() whenever it wants to access it.
+> 
+> I don't actually consider myself an expert in this area but I believe
+> the above should solve your problem :)
 
-  excuse me, I am not familiar with ARM, so can not provide more ideas.
+I don't think so: kmap_atomic() provides a temporary kernel mapping for
+a page when not all memory is direct-mapped, but it's close to a no-op
+when there's no highmem.  This question isn't about highmem.
 
-  but at least for me, I think what you said seems valuable.
+I can't point to what solves the problem for the aio ringbuffer:
+for all I know, that's not even used on such architectures.
 
-  welcome any ARM experts to reply.
+The usual solution is flush_dcache_page(): see Documentation/cachetlb.txt.
+Which mostly describes the common page cache case, but a driver like
+yours may also need it.
 
+Each architecture has its own implementation, and often its own way of
+minimizing the overhead of flush_dcache_page(): if you're using it in
+a new context, you might need to be careful about such optimizations,
+and the page flags used to control them.
 
-  thanks.
+But better to ask on the (moderated) linux-arm-kernel list if it's not
+clear to you how to use it: being a no-op on x86, those of us who know
+little beyond x86 are apt to give bad advice.
 
-  :-)
-
-
--- 
-Chen Gang
-
-Asianux Corporation
+Hugh
