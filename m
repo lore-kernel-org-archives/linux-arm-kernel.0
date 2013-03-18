@@ -1,52 +1,63 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 18 Mar 2013 21:05:58 +0900
-Subject: [PATCH 14/14] irqchip: irqc: Add DT support
+Date: Mon, 18 Mar 2013 21:05:55 +0900
+Subject: [PATCH 11/14] ARM: shmobile: Make sh73a0 INTC irqpin platform data
+ static
 In-Reply-To: <1363608358-24215-1-git-send-email-horms+renesas@verge.net.au>
 References: <1363608358-24215-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1363608358-24215-15-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1363608358-24215-12-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Add DT support to the IRQC External IRQ Pin driver.
+The platform data for the INTC irq pin driver
+seems to be global symbols, make it static to
+allow multi-soc build.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/irqchip/irq-renesas-irqc.c |    9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm/mach-shmobile/setup-sh73a0.c |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/irqchip/irq-renesas-irqc.c b/drivers/irqchip/irq-renesas-irqc.c
-index 95d69bf..927bff3 100644
---- a/drivers/irqchip/irq-renesas-irqc.c
-+++ b/drivers/irqchip/irq-renesas-irqc.c
-@@ -145,6 +145,7 @@ static int irqc_irq_domain_map(struct irq_domain *h, unsigned int virq,
- 
- static struct irq_domain_ops irqc_irq_domain_ops = {
- 	.map	= irqc_irq_domain_map,
-+	.xlate  = irq_domain_xlate_twocell,
+diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
+index 638735f..e8cd93a 100644
+--- a/arch/arm/mach-shmobile/setup-sh73a0.c
++++ b/arch/arm/mach-shmobile/setup-sh73a0.c
+@@ -812,7 +812,7 @@ static struct platform_device ipmmu_device = {
+ 	.num_resources  = ARRAY_SIZE(ipmmu_resources),
  };
  
- static int irqc_probe(struct platform_device *pdev)
-@@ -273,11 +274,19 @@ static int irqc_remove(struct platform_device *pdev)
- 	return 0;
- }
+-struct renesas_intc_irqpin_config irqpin0_platform_data = {
++static struct renesas_intc_irqpin_config irqpin0_platform_data = {
+ 	.irq_base = irq_pin(0), /* IRQ0 -> IRQ7 */
+ };
  
-+static const struct of_device_id irqc_dt_ids[] = {
-+	{ .compatible = "renesas,irqc", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, irqc_dt_ids);
-+
- static struct platform_driver irqc_device_driver = {
- 	.probe		= irqc_probe,
- 	.remove		= irqc_remove,
- 	.driver		= {
- 		.name	= "renesas_irqc",
-+		.of_match_table	= irqc_dt_ids,
-+		.owner	= THIS_MODULE,
- 	}
+@@ -842,7 +842,7 @@ static struct platform_device irqpin0_device = {
+ 	},
+ };
+ 
+-struct renesas_intc_irqpin_config irqpin1_platform_data = {
++static struct renesas_intc_irqpin_config irqpin1_platform_data = {
+ 	.irq_base = irq_pin(8), /* IRQ8 -> IRQ15 */
+ 	.control_parent = true, /* Disable spurious IRQ10 */
+ };
+@@ -873,7 +873,7 @@ static struct platform_device irqpin1_device = {
+ 	},
+ };
+ 
+-struct renesas_intc_irqpin_config irqpin2_platform_data = {
++static struct renesas_intc_irqpin_config irqpin2_platform_data = {
+ 	.irq_base = irq_pin(16), /* IRQ16 -> IRQ23 */
+ };
+ 
+@@ -903,7 +903,7 @@ static struct platform_device irqpin2_device = {
+ 	},
+ };
+ 
+-struct renesas_intc_irqpin_config irqpin3_platform_data = {
++static struct renesas_intc_irqpin_config irqpin3_platform_data = {
+ 	.irq_base = irq_pin(24), /* IRQ24 -> IRQ31 */
  };
  
 -- 
