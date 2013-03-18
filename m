@@ -1,84 +1,70 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 18 Mar 2013 17:06:49 +0000
-Subject: [PATCH] ARM: hw_breakpoint: Enable debug powerdown only if
- system supports 'has_ossr'
-In-Reply-To: <514736D4.4070906@ti.com>
-References: <1363157553-21085-1-git-send-email-lokeshvutla@ti.com>
- <51406BA7.8010306@arm.com> <51407120.7030709@ti.com>
- <51417E58.5050501@ti.com> <20130315050014.GA15706@tiny-lites>
- <5146B972.1010002@ti.com>
- <20130318150724.GC28585@mudshark.cambridge.arm.com>
- <514736D4.4070906@ti.com>
-Message-ID: <20130318170649.GA29585@mudshark.cambridge.arm.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 18 Mar 2013 10:13:16 -0700
+Subject: [PATCH 2/3] ARM: Detect support for SDIV/UDIV from ISAR0 register
+In-Reply-To: <20130317143624.GE19071@mudshark.cambridge.arm.com>
+References: <1363138321-27849-1-git-send-email-sboyd@codeaurora.org>
+ <1363138321-27849-3-git-send-email-sboyd@codeaurora.org>
+ <20130317143624.GE19071@mudshark.cambridge.arm.com>
+Message-ID: <51474B2C.6030508@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 18, 2013 at 03:46:28PM +0000, Santosh Shilimkar wrote:
-> On Monday 18 March 2013 08:37 PM, Will Deacon wrote:
-> > That really sucks :( Does this affect all OMAP-based boards?
-> > 
-> All OMAP4 based boards..
+On 03/17/13 07:36, Will Deacon wrote:
+> On Wed, Mar 13, 2013 at 01:32:00AM +0000, Stephen Boyd wrote:
+>> The ISAR0 register indicates support for the SDIV and UDIV
+>> instructions in both the Thumb and ARM instruction set. Read the
+>> register to detect the supported instructions and update the
+>> elf_hwcap mask as appropriate. This is better than adding more
+>> and more cpuid checks in proc-v7.S for each new cpu variant that
+>> supports these instructions.
+>>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Cc: Stepan Moskovchenko <stepanm@codeaurora.org>
+>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>> ---
+>>  arch/arm/kernel/setup.c | 20 ++++++++++++++++++++
+>>  arch/arm/mm/proc-v7.S   |  4 ++--
+>>  2 files changed, 22 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+>> index e2c8bbf..bd27a70 100644
+>> --- a/arch/arm/kernel/setup.c
+>> +++ b/arch/arm/kernel/setup.c
+>> @@ -353,6 +353,23 @@ void __init early_print(const char *str, ...)
+>>  	printk("%s", buf);
+>>  }
+>>  
+>> +static void __init idiv_setup(void)
+>> +{
+>> +	unsigned int divide_instrs;
+>> +
+>> +	if (cpu_architecture() < CPU_ARCH_ARMv7)
+>> +		return;
+>> +
+>> +	divide_instrs = (read_cpuid_ext(CPUID_EXT_ISAR0) & 0x0f000000) >> 24;
+>> +
+>> +	switch (divide_instrs) {
+>> +	case 2:
+>> +		elf_hwcap |= HWCAP_IDIVA;
+>> +	case 1:
+>> +		elf_hwcap |= HWCAP_IDIVT;
+>> +	}
+>> +}
+>> +
+>>  static void __init feat_v6_fixup(void)
+>>  {
+>>  	int id = read_cpuid_id();
+>> @@ -483,6 +500,9 @@ static void __init setup_processor(void)
+>>  	snprintf(elf_platform, ELF_PLATFORM_SIZE, "%s%c",
+>>  		 list->elf_name, ENDIANNESS);
+>>  	elf_hwcap = list->elf_hwcap;
+>> +
+>> +	idiv_setup();
+> Perhaps give this a more generic name (cpuid_init_hwcaps) so we can add more
+> probing later on (we could probe swp, for example).
 
-Brilliant. Is there any way that the secure code can be fixed in future
-products?
+No problem. Thanks for the review.
 
-> >> +	/* Check if we have access to CPU debug features */
-> >> +	ARM_DBG_READ(c7, c14, 6, val);
-> >> +	if ((val & 0x1) == 0) {
-> >> +		pr_warn_once("CPU %d debug is unavailable\n", cpu);
-> >> +		cpumask_or(&debug_err_mask, &debug_err_mask, cpumask_of(cpu));
-> >> +		return;
-> >> +	}
-> > 
-> > There are a few of problems here:
-> > 
-> > 	1. That is only checking for non-secure access, which precludes
-> > 	   running Linux in secure mode.
-> > 
-> We can check bit 4 as well to take care linux running in secure mode.
-
-It still doesn't help unless we know whether Linux is running secure or
-non-secure.
-
-> > 	2. DBGAUTHSTATUS accesses are UNPREDICTABLE when the double-lock is
-> > 	   set for v7.1 processors.
-> >
-> > 	3. DBGAUTHSTATUS doesn't exist in ARMv6.
-> > 
-> We cans skip the code for these versions like...
-> 	if (!ARM_DEBUG_ARCH_V7_ECP14 == get_debug_arch())
-> 		goto skip_dbgsts_read;
-
-Sure, I was just pointing out that the code needs fixing for this.
-
-> > 	4. CPUs without the security extensions have DBGAUTHSTATUS.NSE == 0
-> >
-> Which bit is that ? I don't find this bit in Cortex-A9 docs. With all
-> these checks, may be a separate function like 'is_debug_available()'
-> would be better.
-
-NSE is bit 0 (the one you're checking).
-
->  
-> > 	5. Accessing DBGAUTHSTATUS requires DBGEN to be driven high.
-> > 	   Assuming that your pr_warn_once is emitted, this implies that
-> > 	   DBGEN is driven high from cold boot, yet the NSE bit is low,
-> > 	   implying that DBGEN is also low. That's contradictory, so I have
-> > 	   no idea what's going on...
-> >
-> Me neither. The warning is emitted at least.
-
-Any chance you could follow up with your firmware/hardware guys about this
-please? I'd really like to understand how we end up in this state in case we
-can do something in the architecture to stop it from happening in future.
-
-> > Apart from that, it's fine!
-> > 
-> If you agree, I can update patch accordingly.
-> BTW, do you have any better trick to take care of
-> above scenraio ?
-
-Well, we could just add the warn_once prints but that doesn't stop debug
-from breaking after the first pm/suspend/hotplug operation.
-
-Will
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
