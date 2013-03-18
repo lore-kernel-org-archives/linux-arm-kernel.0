@@ -1,47 +1,53 @@
-From: fabio.porcedda@gmail.com (Fabio Porcedda)
-Date: Mon, 18 Mar 2013 11:03:18 +0100
-Subject: [PATCH 10/10] drivers: misc: use module_platform_driver_probe()
-In-Reply-To: <201303152018.09094.arnd@arndb.de>
-References: <1363266691-15757-1-git-send-email-fabio.porcedda@gmail.com>
- <201303141358.05616.arnd@arndb.de>
- <ADE657CA350FB648AAC2C43247A983F0020980106B9E@AUSP01VMBX24.collaborationhost.net>
- <201303152018.09094.arnd@arndb.de>
-Message-ID: <CAHkwnC9YFTw8gVzyZB3_gZCgM5zMA6tLch15EDqcA2F4CAOpAQ@mail.gmail.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Mon, 18 Mar 2013 11:14:15 +0100
+Subject: [PATCH V2 0/8] ARM: dts: Various OMAP2+ device-tree updates
+In-Reply-To: <CABYxbz5cW0Jt12SGcMpN5L0n18C6Mis0gRoBgSHWnxuAz6chGA@mail.gmail.com>
+References: <1363355861-11773-1-git-send-email-jon-hunter@ti.com>
+ <51433094.1000104@ti.com>
+ <CABYxbz5cW0Jt12SGcMpN5L0n18C6Mis0gRoBgSHWnxuAz6chGA@mail.gmail.com>
+Message-ID: <5146E8F7.8080008@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 15, 2013 at 9:18 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 15 March 2013, H Hartley Sweeten wrote:
->> Arnd,
+Hi Anil,
+
+On 03/17/2013 10:35 AM, Anil Kumar wrote:
+> Hi Benoit,
+> 
+> On Fri, Mar 15, 2013 at 8:00 PM, Benoit Cousson <b-cousson@ti.com> wrote:
+>> Hi Jon,
 >>
->> Ill look at converting the ep93xx pwm driver to the PWM subsystem. The only issue is
->> the current driver exposes a sysfs interface that I think is not available in that subsystem.
->
-> You can probably keep providing that interface if you have active users.
->
->> >* Regarding the use of module_platform_driver_probe, I'm a little worried about
->> >  the interactions with deferred probing. I don't think there are any regressions,
->> >  but we should probably make people aware that one cannot return -EPROBE_DEFER
->> >  from a platform_driver_probe function.
+>> On 03/15/2013 02:57 PM, Jon Hunter wrote:
+>>> Various OMAP device-tree updates for PMU, DMA, GPIO, GPMC and boards.
+>>>
+>>> The DMA, PMU and OMAP3430 SDP board changes have been sent before
+>>> individually but re-sending here as a complete series for v3.10.
+>>>
+>>> This is based upon Benoit's for_3.10/dts branch [1]. Branch available
+>>> here [2].
+>>>
+>>> V2 changes:
+>>> - Rebased on Benoit's for_3.10/dts branch
+>>> - Squashed patches adding support for OMAP3430 SDP board and patch
+>>>   to add flash support for OMAP3430 SDP board.
+>>>
+>>> [1] http://git.kernel.org/cgit/linux/kernel/git/bcousson/linux-omap-dt.git/log/?h=for_3.10/dts
+>>> [2] git://github.com/jonhunter/linux.git omap-dt-for-v3.10
 >>
->> The ep93xx pwm driver does not need to use platform_driver_probe(). It can be changed
->> to use module_platform_driver() by just moving the .probe to the platform_driver. This
->> driver was added before module_platform_driver() was available and I used the
->> platform_driver_probe() thinking it would save a couple lines of code.
+>> Thanks for the repost. I've just applied your branch in my for_3.10/dts
+>> branch.
+> 
+> I think you missed below patch which is needed for gpmc nand to work fine.
+> Without this patch nand will not work on OMAP3430 SDP board.
+> 
+> Jon Hunter:-
+>   ARM: OMAP2+: Fix-up gpmc merge error
 
-Since by using platform_driver_probe() the  function
-ep93xx_pwm_probe() is freed after initialization,
-is better to use module_platform_drive_probe().
-IMHO i don't see any good reason to use module_platform_driver() for
-this driver.
+Well, that patch is not part of Jon's series and it looks like it was
+posted for 3.9-rc3.
+BTW, Paul W is just reporting a regression about that patch.
 
-Best regards
-Fabio Porcedda
+Anyway, I'll rebase on top of -rc3 to get the latest fixes.
 
->> I'll change this in a bit. Right now I'm trying to work out why kernel 3.8 is not booting
->> on the ep93xx. I had 3.6.6 on my development board and 3.7 works fine but 3.8 hangs
->> without uncompressing the kernel.
->
-> Ok, thanks!
->
->         Arnd
+Regards,
+Benoit
