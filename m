@@ -1,134 +1,20 @@
-From: dahuang@nvidia.com (Danny Huang)
-Date: Mon, 18 Mar 2013 14:38:02 +0800
-Subject: [PATCH] ARM: tegra114: add speedo-based process identification
-In-Reply-To: <51435C08.2030402@wwwdotorg.org>
-References: <1363246822-14597-1-git-send-email-dahuang@nvidia.com>
- <51435C08.2030402@wwwdotorg.org>
-Message-ID: <1363588682.4994.223.camel@dahuang-vm>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 18 Mar 2013 14:40:24 +0800
+Subject: [RFC 0/3] arm: mxs: sanitize enet_out clock handling
+In-Reply-To: <CA+7tXiinVCjs7NAdGd+0KyUL+kfwWUi_XAPYdMHiugT3W2Xz4w@mail.gmail.com>
+References: <1359470773-14290-1-git-send-email-w.sang@pengutronix.de>
+ <CA+7tXiinVCjs7NAdGd+0KyUL+kfwWUi_XAPYdMHiugT3W2Xz4w@mail.gmail.com>
+Message-ID: <20130318064021.GA4713@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2013-03-16 at 01:36 +0800, Stephen Warren wrote:
-> On 03/14/2013 01:40 AM, Danny Huang wrote:
-> > Add speedo-based process identifictaion for Tegra114.
-> > 
-> > Based on the work by:
-> > Alex Frid <afrid@nvidia.com>
-> 
-> This code is surprisingly quite a bit simpler than the existing
-> tegra30_speedo.c. Are you sure it's complete?
+On Fri, Mar 15, 2013 at 02:27:35PM -0700, Trent Piepho wrote:
+> But as you say most boards need enet_out (AFAICT, all but the Denx
+> board).  So wouldn't it make more sense to add enet_out to the dtsi
+> file and then just override it in the one board that doesn't need it,
+> instead of overriding in every board except that one?
 
-It's complete and working for now. But It may need update if we have
-more sku/chip revision in the future.
+Yes, sounds reasonable.  Since I'm not sure Wolfram is still interested
+in the work, I will pick it up from here.
 
-> > diff --git a/arch/arm/mach-tegra/fuse.c b/arch/arm/mach-tegra/fuse.c
-> 
-> > @@ -137,6 +138,9 @@ void tegra_init_fuse(void)
-> >  		tegra_fuse_spare_bit = TEGRA30_FUSE_SPARE_BIT;
-> >  		tegra_init_speedo_data = &tegra30_init_speedo_data;
-> >  		break;
-> > +	case TEGRA114:
-> > +		tegra_init_speedo_data = &tegra114_init_speedo_data;
-> > +		break;
-> 
-> Don't you need to set tegra_fuse_spare_bit there just like all the other
-> paths do?
-> 
-
-There is no need of spare fuse access for Tegra114 for now.
-
-> > diff --git a/arch/arm/mach-tegra/tegra114_speedo.c b/arch/arm/mach-tegra/tegra114_speedo.c
-> 
-> > +#define CORE_PROCESS_CORNERS_NUM	2
-> > +#define CPU_PROCESS_CORNERS_NUM		2
-> > +
-> > +enum {
-> > +	THRESHOLD_INDEX_0,
-> > +	THRESHOLD_INDEX_1,
-> > +	THRESHOLD_INDEX_COUNT,
-> > +};
-> > +
-> > +static const u32 core_process_speedos[THRESHOLD_INDEX_COUNT]
-> > +	[CORE_PROCESS_CORNERS_NUM] = {
-> > +	{1123,     UINT_MAX},
-> > +	{0,        UINT_MAX},
-> > +};
-> > +
-> > +static const u32 cpu_process_speedos[THRESHOLD_INDEX_COUNT]
-> > +	[CPU_PROCESS_CORNERS_NUM] = {
-> > +	{1695,     UINT_MAX},
-> > +	{0,        UINT_MAX},
-> > +};
-> 
-> Those enums/tables are a lot smaller than Tegra30. I'm surprised if we
-> end up making new chips simpler rather than more complex in this area.
-> Are those tables complete?
-
-That's currently all I have. I think we can add some more data in the
-future when needed.
-
-> 
-> > +static void rev_sku_to_speedo_ids(int rev, int sku, int *threshold)
-> > +{
-> > +	u32 tmp;
-> > +
-> > +	switch (sku) {
-> > +	case 0x00:
-> > +	case 0x10:
-> > +	case 0x05:
-> > +	case 0x06:
-> > +		tegra_cpu_speedo_id = 1;
-> > +		tegra_soc_speedo_id = 0;
-> > +		*threshold = THRESHOLD_INDEX_0;
-> > +		break;
-> > +
-> > +	case 0x03:
-> > +	case 0x04:
-> > +		tegra_cpu_speedo_id = 2;
-> > +		tegra_soc_speedo_id = 1;
-> > +		*threshold = THRESHOLD_INDEX_1;
-> > +		break;
-> > +
-> > +	default:
-> > +		pr_err("Tegra114 Unknown SKU %d\n", sku);
-> > +		tegra_cpu_speedo_id = 0;
-> > +		tegra_soc_speedo_id = 0;
-> > +		*threshold = THRESHOLD_INDEX_0;
-> > +		break;
-> > +	}
-> > +
-> > +	if (rev == TEGRA_REVISION_A01) {
-> > +		tmp = tegra_fuse_readl(0x270) << 1;
-> > +		tmp |= tegra_fuse_readl(0x26c);
-> > +		if (!tmp)
-> > +			tegra_cpu_speedo_id = 0;
-> > +	}
-> > +}
-> 
-> That's also a lot simpler than Tegra30. Are all those SKUs really valid
-> for all chip revisions including A01 where the 0x270/0x26c fuses are clear?
-
-Yes, currently the 0x26c/0x270 value affects all sku of A01 chips.
-
-> If life really is this simple, then I should be happy:-) But I just want
-> to check that this code really is accurate.
-> 
-> > +void tegra114_init_speedo_data(void)
-> 
-> The Tegra30 code has a couple BUILD_BUG_ON() here to ensure that the
-> size of the {cpu,core}_process_speedos arrays match
-> THRESHOLD_INDEX_COUNT. It'd be good to be consistent here.
-
-I'll put the BUILD_BUG_ON back and make them consistent with Tegra30 in
-next version. Thanks.
-
-> 
-> In general, the implementation of tegra114_init_speedo_data() is quite
-> different from that of the existing tegra30_init_speedo_data(). It'd be
-> nice if they were as similar as possible in structure so they could be
-> easily compared. Can you take a look at the two and see if any changes
-> are warranted in this patch?
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Shawn
