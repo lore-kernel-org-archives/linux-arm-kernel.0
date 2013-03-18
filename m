@@ -1,217 +1,43 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Mon, 18 Mar 2013 14:46:10 +0530
-Subject: [PATCH v6 1/2] ARM: davinci: dm365: add support for v4l2 video
- display
-In-Reply-To: <5146CDC5.9000702@ti.com>
-References: <1363360303-15521-1-git-send-email-prabhakar.csengg@gmail.com>
- <1363360303-15521-2-git-send-email-prabhakar.csengg@gmail.com>
- <5146CDC5.9000702@ti.com>
-Message-ID: <CA+V-a8umwxKFHjSQ=yDwfp8VWTQyn0dyp-=ESSUvRPXawt01Jg@mail.gmail.com>
+From: lukas-x@zapletalovi.com (Lukas Zapletal)
+Date: Mon, 18 Mar 2013 09:16:34 +0000 (UTC)
+Subject: Kirkwood NSA 310 does not boot with 3.8.3
+References: <loom.20130316T213930-150@post.gmane.org>
+ <20130316215530.GZ12700@titan.lakedaemon.net>
+Message-ID: <loom.20130318T094229-725@post.gmane.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sekhar,
+Jason Cooper <jason <at> lakedaemon.net> writes:
+> You'll need to enable ARM_APPENDED_DTB, concatenate your dtb onto your
+> zImage, then run mkimage on the result to get the uImage.
 
-On Mon, Mar 18, 2013 at 1:48 PM, Sekhar Nori <nsekhar@ti.com> wrote:
-> On 3/15/2013 8:41 PM, Prabhakar lad wrote:
->> From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
->>
->> Create platform devices for various video modules like venc,osd,
->> vpbe and v4l2 driver for dm365.
->>
->> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
->> ---
->>  arch/arm/mach-davinci/board-dm365-evm.c |    4 +-
->>  arch/arm/mach-davinci/davinci.h         |    2 +-
->>  arch/arm/mach-davinci/dm365.c           |  203 +++++++++++++++++++++++++++++--
->>  3 files changed, 195 insertions(+), 14 deletions(-)
->
->> diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
->> index 6c39805..ec8b06e 100644
->> --- a/arch/arm/mach-davinci/dm365.c
->> +++ b/arch/arm/mach-davinci/dm365.c
->> @@ -40,10 +40,16 @@
->>
->>  #define DM365_REF_FREQ               24000000        /* 24 MHz on the DM365 EVM */
->>
->> +#define DM3XX_VDAC_CONFIG            0x01c4002c
->
-> DM365_VDAC_CONFIG since this is a DM365 specific file and to be
-> consistent with rest of the names?
->
-OK
+Jason, thanks for help. It worked great, just for completenes for googlers:
 
->> +
->> +#define DM365_RTC_BASE                       0x01c69000
->> +
->>  /* Base of key scan register bank */
->>  #define DM365_KEYSCAN_BASE           0x01c69400
->>
->> -#define DM365_RTC_BASE                       0x01c69000
->> +#define DM365_OSD_BASE                       0x01c71c00
->> +
->> +#define DM365_VENC_REG_BASE          0x01c71e00
->>
->>  #define DAVINCI_DM365_VC_BASE                0x01d0c000
->>  #define DAVINCI_DMA_VC_TX            2
->> @@ -56,6 +62,11 @@
->>  #define DM365_EMAC_CNTRL_RAM_OFFSET  0x1000
->>  #define DM365_EMAC_CNTRL_RAM_SIZE    0x2000
->>
->> +#define DM365_VPSS_CLK_CTRL_ADDR             0x44
->> +#define DM365_VPSS_VENCCLKEN_ENABLE          BIT(3)
->> +#define DM365_VPSS_DACCLKEN_ENABLE           BIT(4)
->> +#define DM365_VPSS_PLLC2SYSCLK5_ENABLE               BIT(5)
->> +
->>  static struct pll_data pll1_data = {
->>       .num            = 1,
->>       .phys_base      = DAVINCI_PLL1_BASE,
->> @@ -1226,6 +1237,186 @@ static struct platform_device dm365_isif_dev = {
->>       },
->>  };
->>
->> +static struct resource dm365_osd_resources[] = {
->> +     {
->> +             .start = DM365_OSD_BASE,
->> +             .end   = DM365_OSD_BASE + 0x100,
->> +             .flags = IORESOURCE_MEM,
->> +     },
->> +};
->> +
->> +static u64 dm365_video_dma_mask = DMA_BIT_MASK(32);
->> +
->> +static struct platform_device dm365_osd_dev = {
->> +     .name           = DM365_VPBE_OSD_SUBDEV_NAME,
->> +     .id             = -1,
->> +     .num_resources  = ARRAY_SIZE(dm365_osd_resources),
->> +     .resource       = dm365_osd_resources,
->> +     .dev            = {
->> +             .dma_mask               = &dm365_video_dma_mask,
->> +             .coherent_dma_mask      = DMA_BIT_MASK(32),
->> +     },
->> +};
->> +
->> +static struct resource dm365_venc_resources[] = {
->> +     {
->> +             .start = IRQ_VENCINT,
->> +             .end   = IRQ_VENCINT,
->> +             .flags = IORESOURCE_IRQ,
->> +     },
->> +     /* venc registers io space */
->> +     {
->> +             .start = DM365_VENC_REG_BASE,
->> +             .end   = DM365_VENC_REG_BASE + 0x180,
->> +             .flags = IORESOURCE_MEM,
->> +     },
->> +     /* vdaccfg registers io space */
->> +     {
->> +             .start = DM3XX_VDAC_CONFIG,
->> +             .end   = DM3XX_VDAC_CONFIG + 4,
->
-> DM3XX_VDAC_CONFIG + 3. Check for similar errors in rest of the patch.
->
->> +             .flags = IORESOURCE_MEM,
->> +     },
->> +};
->> +
->> +static struct resource dm365_v4l2_disp_resources[] = {
->> +     {
->> +             .start = IRQ_VENCINT,
->> +             .end   = IRQ_VENCINT,
->> +             .flags = IORESOURCE_IRQ,
->> +     },
->> +     /* venc registers io space */
->> +     {
->> +             .start = DM365_VENC_REG_BASE,
->> +             .end   = DM365_VENC_REG_BASE + 0x180,
->> +             .flags = IORESOURCE_MEM,
->> +     },
->> +};
->> +
->
-> [...]
->
->> +static int dm365_venc_setup_clock(enum vpbe_enc_timings_type type,
->> +                               unsigned int pclock)
->> +{
->> +     void __iomem *vpss_clkctl_reg;
->> +     u32 val;
->> +
->> +     vpss_clkctl_reg = DAVINCI_SYSMOD_VIRT(DM365_VPSS_CLK_CTRL_ADDR);
->> +
->> +     switch (type) {
->> +     case VPBE_ENC_STD:
->> +             vpss_enable_clock(VPSS_VENC_CLOCK_SEL, 1);
->
-> So as you found out, it is not correct to call driver functions from
-> platform code. I suggesting moving this function to driver altogether.
-> You just need access to DM365_VPSS_CLK_CTRL_ADDR which you can pass
-> using resource structures.
->
-OK
+# grep "ARM_APPENDED_DTB|NSA" .config
+CONFIG_ARM_APPENDED_DTB=y
+CONFIG_MACH_NSA310_DT=y
 
->> +             vpss_enable_clock(VPSS_VPBE_CLOCK, 1);
->> +             val = DM365_VPSS_VENCCLKEN_ENABLE | DM365_VPSS_DACCLKEN_ENABLE;
->> +             break;
->> +
->> +     case VPBE_ENC_DV_TIMINGS:
->> +             if (pclock <= 27000000) {
->> +                     vpss_enable_clock(VPSS_VENC_CLOCK_SEL, 1);
->> +                     vpss_enable_clock(VPSS_VPBE_CLOCK, 1);
->> +                     val = DM365_VPSS_VENCCLKEN_ENABLE |
->> +                           DM365_VPSS_DACCLKEN_ENABLE;
->> +             } else {
->> +                     /* set sysclk4 to output 74.25 MHz from pll1 */
->> +                     val = DM365_VPSS_PLLC2SYSCLK5_ENABLE |
->> +                           DM365_VPSS_DACCLKEN_ENABLE |
->> +                           DM365_VPSS_VENCCLKEN_ENABLE;
->> +             }
->> +             break;
->> +
->> +     default:
->> +             return -EINVAL;
->> +     }
->> +     writel(val, vpss_clkctl_reg);
->> +
->> +     return 0;
->> +}
->
-> [...]
->
->> +int __init dm365_init_video(struct vpfe_config *vpfe_cfg,
->> +                             struct vpbe_config *vpbe_cfg)
->> +{
->> +     if (vpfe_cfg || vpbe_cfg)
->> +             platform_device_register(&dm365_vpss_device);
->> +
->> +     if (vpfe_cfg) {
->> +             vpfe_capture_dev.dev.platform_data = vpfe_cfg;
->> +             /* Add isif clock alias */
->
-> This comment is useless. Instead please document why the aliases are
-> needed. I know you are just moving code here, but lets do a clean-up job
-> while at it.
->
-by document you mean to add a file in Documentation folder ?
+# make zImage
 
-Regards,
---Prabhakar
+# make dtbs
 
->> +             clk_add_alias("master", dm365_isif_dev.name,
->> +                           "vpss_master", NULL);
->> +             platform_device_register(&dm365_isif_dev);
->> +             platform_device_register(&vpfe_capture_dev);
->> +     }
->> +     if (vpbe_cfg) {
->> +             dm365_vpbe_dev.dev.platform_data = vpbe_cfg;
->> +             platform_device_register(&dm365_osd_dev);
->> +             platform_device_register(&dm365_venc_dev);
->> +             platform_device_register(&dm365_vpbe_dev);
->> +             platform_device_register(&dm365_vpbe_display);
->> +     }
->> +
->> +     return 0;
->> +}
->
-> Thanks,
-> Sekhar
+# cat arch/arm/boot/zImage arch/arm/boot/dts/kirkwood-nsa310.dtb > /tmp/X
+# mv /tmp/X arch/arm/boot/zImage
+
+# make uImage
+
+...
+Image Type:   ARM Linux Kernel Image (uncompressed)
+Data Size:    3684110 Bytes = 3597.76 kB = 3.51 MB
+Load Address: 00008000
+Entry Point:  00008000
+Image arch/arm/boot/uImage is ready
+
+# cp arch/arm/boot/uImage /boot/uImage-nsa310
+
+UBOOT# ide reset; ext2load ide 0:1 0x800000 /uImage-nsa310; bootm 0x800000
+
+Compared to my patched NSA310 3.6 kernel I don't see console anymore, I guess is 
+is just an config option I miss. And LEDs are not working yet.
+
+Thank you
