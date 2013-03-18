@@ -1,51 +1,37 @@
-From: trini@ti.com (Tom Rini)
-Date: Mon, 18 Mar 2013 14:29:54 -0400
-Subject: [U-Boot] [RFC] Kbuild support for ARM FIT images
-In-Reply-To: <20130318163648.GA3722@amd.pavel.ucw.cz>
-References: <CAD=GYpbF_3uRzhUnV=MwDiy-ekvZKJztJbkhNM0u_pvG-UCw4w@mail.gmail.com>
- <20130222160044.GA16357@quad.lixom.net>
- <20130318163648.GA3722@amd.pavel.ucw.cz>
-Message-ID: <20130318182954.GB25919@bill-the-cat>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 18 Mar 2013 18:34:36 +0000
+Subject: [PATCHv2 3/3] ARM: Work around faulty ISAR0 register in some
+ Krait CPUs
+In-Reply-To: <1363631337-13816-4-git-send-email-sboyd@codeaurora.org>
+References: <1363631337-13816-1-git-send-email-sboyd@codeaurora.org>
+ <1363631337-13816-4-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20130318183435.GD31193@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 18, 2013 at 05:36:53PM +0100, Pavel Machek wrote:
-> On Fri 2013-02-22 08:00:44, Olof Johansson wrote:
-> > On Wed, Feb 20, 2013 at 07:37:10PM -0600, Joel A Fernandes wrote:
-> > > Any comments on this approach? Is it better to merge mkfitsrc.sh with
-> > > mkuboot.sh?
-> > 
-> > I know this was discussed quite extensively yesterday, but here is my take on
-> > it:
-> > 
-> > Given the recent complications from multiplatform, we really saw a strong
-> > reason to _not_ do the final boot wrapping in the kernel build system.
-> > Produce the zImage and the DTB files, and have a surrounding script that
-> > bundles the two in a format that your particular device needs.
-> > 
-> > Most distros have scripts to handle the "make install" step of a kernel build.
-> > That's where this belongs, not in the actual build step.
+On Mon, Mar 18, 2013 at 06:28:57PM +0000, Stephen Boyd wrote:
+> From: Stepan Moskovchenko <stepanm@codeaurora.org>
 > 
-> Not sure I agree here:
+> Some early versions of the Krait CPU design incorrectly indicate
+> that they only support the UDIV and SDIV instructions in Thumb
+> mode when they actually support them in ARM and Thumb mode. It
+> seems that these CPUs follow the DDI0406B ARM ARM which has two
+> possible values for the divide instructions field, instead of the
+> DDI0406C document which has three possible values.
+> 
+> Work around this problem by checking the MIDR against Krait CPUs
+> with this faulty ISAR0 register and force the hwcaps to indicate
+> support in both modes.
+> 
+> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
+> [sboyd: Rewrote commit text to reflect real reasoning now that
+> 	we autodetect udiv/sdiv]
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  arch/arm/mm/proc-v7.S | 15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
 
-Lets try and stop this again here.  I think perhaps the KVM tool example
-is instructive here.  For the various reasons that close association
-with the kernel can be helpful for things (the exposure and ease of
-being found), it would be nice if the tooling to expand single kernel
-image into single "bootable" image was with the kernel.  But it's not a
-requirement.  And it's not even necessarily the best for the tooling
-either.  So, lets drop the idea of getting this into the kernel and if
-people really do wish to extend FIT such that we can easily spit out a
-FIT image that works on omap* and tegra* or what have you, and add a FIT
-parser to GRUB, great, get to work.  No need to be tied to the kernel
-for this.
+Acked-by: Will Deacon <will.deacon@arm.com>
 
--- 
-Tom
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130318/894ff183/attachment-0001.sig>
+Will
