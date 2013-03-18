@@ -1,37 +1,56 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 18 Mar 2013 18:34:36 +0000
-Subject: [PATCHv2 3/3] ARM: Work around faulty ISAR0 register in some
- Krait CPUs
-In-Reply-To: <1363631337-13816-4-git-send-email-sboyd@codeaurora.org>
-References: <1363631337-13816-1-git-send-email-sboyd@codeaurora.org>
- <1363631337-13816-4-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20130318183435.GD31193@mudshark.cambridge.arm.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Mon, 18 Mar 2013 11:45:26 -0700
+Subject: [PATCH 1/2] driver: serial-omap: move max uart count into generic
+ header file.
+In-Reply-To: <1363604206-11264-1-git-send-email-sourav.poddar@ti.com> (Sourav
+ Poddar's message of "Mon, 18 Mar 2013 16:26:46 +0530")
+References: <1363604206-11264-1-git-send-email-sourav.poddar@ti.com>
+Message-ID: <87r4jcim2h.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 18, 2013 at 06:28:57PM +0000, Stephen Boyd wrote:
-> From: Stepan Moskovchenko <stepanm@codeaurora.org>
-> 
-> Some early versions of the Krait CPU design incorrectly indicate
-> that they only support the UDIV and SDIV instructions in Thumb
-> mode when they actually support them in ARM and Thumb mode. It
-> seems that these CPUs follow the DDI0406B ARM ARM which has two
-> possible values for the divide instructions field, instead of the
-> DDI0406C document which has three possible values.
-> 
-> Work around this problem by checking the MIDR against Krait CPUs
-> with this faulty ISAR0 register and force the hwcaps to indicate
-> support in both modes.
-> 
-> Cc: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
-> [sboyd: Rewrote commit text to reflect real reasoning now that
-> 	we autodetect udiv/sdiv]
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Sourav Poddar <sourav.poddar@ti.com> writes:
+
+> OMAP_MAX_HSUART_PORTS is moved to omap_serial header file.
+
+Why?  
+
+You started to explain it in the cover letter, but a full description
+belongs here for the permanent git history.
+
+Kevin
+
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: Rajendra nayak <rnayak@ti.com>
+> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
 > ---
->  arch/arm/mm/proc-v7.S | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
-
-Acked-by: Will Deacon <will.deacon@arm.com>
-
-Will
+>  drivers/tty/serial/omap-serial.c          |    2 --
+>  include/linux/platform_data/serial-omap.h |    1 +
+>  2 files changed, 1 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+> index 5722eaf..4c2ba9f 100644
+> --- a/drivers/tty/serial/omap-serial.c
+> +++ b/drivers/tty/serial/omap-serial.c
+> @@ -43,8 +43,6 @@
+>  #include <linux/pinctrl/consumer.h>
+>  #include <linux/platform_data/serial-omap.h>
+>  
+> -#define OMAP_MAX_HSUART_PORTS	6
+> -
+>  #define UART_BUILD_REVISION(x, y)	(((x) << 8) | (y))
+>  
+>  #define OMAP_UART_REV_42 0x0402
+> diff --git a/include/linux/platform_data/serial-omap.h b/include/linux/platform_data/serial-omap.h
+> index ff9b0aa..92c48c2 100644
+> --- a/include/linux/platform_data/serial-omap.h
+> +++ b/include/linux/platform_data/serial-omap.h
+> @@ -29,6 +29,7 @@
+>   * is used as console uart.
+>   */
+>  #define OMAP_SERIAL_NAME	"ttyO"
+> +#define OMAP_MAX_HSUART_PORTS   6
+>  
+>  struct omap_uart_port_info {
+>  	bool			dma_enabled;	/* To specify DMA Mode */
