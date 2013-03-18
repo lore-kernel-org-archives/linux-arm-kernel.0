@@ -1,61 +1,37 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 18 Mar 2013 11:28:57 -0700
-Subject: [PATCHv2 3/3] ARM: Work around faulty ISAR0 register in some Krait
- CPUs
+Date: Mon, 18 Mar 2013 11:28:55 -0700
+Subject: [PATCHv2 1/3] ARM: Clear IDIVT hwcap if CONFIG_ARM_THUMB=n
 In-Reply-To: <1363631337-13816-1-git-send-email-sboyd@codeaurora.org>
 References: <1363631337-13816-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1363631337-13816-4-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1363631337-13816-2-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stepan Moskovchenko <stepanm@codeaurora.org>
+Don't advertise support for the SDIV/UDIV thumb instructions if
+the kernel is not compiled with support for thumb userspace. This
+is in line with how we remove the THUMB hwcap in these
+configurations.
 
-Some early versions of the Krait CPU design incorrectly indicate
-that they only support the UDIV and SDIV instructions in Thumb
-mode when they actually support them in ARM and Thumb mode. It
-seems that these CPUs follow the DDI0406B ARM ARM which has two
-possible values for the divide instructions field, instead of the
-DDI0406C document which has three possible values.
-
-Work around this problem by checking the MIDR against Krait CPUs
-with this faulty ISAR0 register and force the hwcaps to indicate
-support in both modes.
-
-Cc: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
-[sboyd: Rewrote commit text to reflect real reasoning now that
-	we autodetect udiv/sdiv]
+Acked-by: Will Deacon <will.deacon@arm.com>
+Cc: Stepan Moskovchenko <stepanm@codeaurora.org>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/mm/proc-v7.S | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ arch/arm/kernel/setup.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index bcd3d48..f584d3f 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -434,6 +434,21 @@ __v7_ca15mp_proc_info:
- 	.size	__v7_ca15mp_proc_info, . - __v7_ca15mp_proc_info
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 3f6cbb2..e2c8bbf 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -484,7 +484,7 @@ static void __init setup_processor(void)
+ 		 list->elf_name, ENDIANNESS);
+ 	elf_hwcap = list->elf_hwcap;
+ #ifndef CONFIG_ARM_THUMB
+-	elf_hwcap &= ~HWCAP_THUMB;
++	elf_hwcap &= ~(HWCAP_THUMB | HWCAP_IDIVT);
+ #endif
  
- 	/*
-+	 * Qualcomm Inc. Krait processors.
-+	 */
-+	.type	__krait_proc_info, #object
-+__krait_proc_info:
-+	.long	0x510f0400		@ Required ID value
-+	.long	0xff0ffc00		@ Mask for ID
-+	/*
-+	 * Some Krait processors don't indicate support for SDIV and UDIV
-+	 * instructions in the ARM instruction set, even though they actually
-+	 * do support them.
-+	 */
-+	__v7_proc __v7_setup, hwcaps = HWCAP_IDIV
-+	.size	__krait_proc_info, . - __krait_proc_info
-+
-+	/*
- 	 * Match any ARMv7 processor core.
- 	 */
- 	.type	__v7_proc_info, #object
+ 	feat_v6_fixup();
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
