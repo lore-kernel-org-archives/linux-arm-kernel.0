@@ -1,74 +1,113 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 18 Mar 2013 20:06:01 +0900
-Subject: [PATCH 065/142] sh-pfc: sh73a0: Add IrDA pin groups and functions
+Date: Mon, 18 Mar 2013 20:05:47 +0900
+Subject: [PATCH 051/142] sh-pfc: Merge sh_pfc_reconfig_pin() into
+ sh_pfc_gpio_set_direction()
 In-Reply-To: <1363604838-29359-1-git-send-email-horms+renesas@verge.net.au>
 References: <1363604838-29359-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1363604838-29359-66-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1363604838-29359-52-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
+The sh_pfc_reconfig_pin() is only called from a single location. Merge
+it into its call site to make the code easier to follow.
+
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/pinctrl/sh-pfc/pfc-sh73a0.c |   23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+ drivers/pinctrl/sh-pfc/pinctrl.c |   71 +++++++++++++++++---------------------
+ 1 file changed, 32 insertions(+), 39 deletions(-)
 
-diff --git a/drivers/pinctrl/sh-pfc/pfc-sh73a0.c b/drivers/pinctrl/sh-pfc/pfc-sh73a0.c
-index 61c682a..8fc5eb0 100644
---- a/drivers/pinctrl/sh-pfc/pfc-sh73a0.c
-+++ b/drivers/pinctrl/sh-pfc/pfc-sh73a0.c
-@@ -2169,6 +2169,21 @@ static const unsigned int i2c3_2_pins[] = {
- static const unsigned int i2c3_2_mux[] = {
- 	PORT115_I2C_SCL3_MARK, PORT116_I2C_SDA3_MARK,
- };
-+/* - IrDA ------------------------------------------------------------------- */
-+static const unsigned int irda_0_pins[] = {
-+	/* OUT, IN, FIRSEL */
-+	241, 242, 243,
-+};
-+static const unsigned int irda_0_mux[] = {
-+	PORT241_IRDA_OUT_MARK, PORT242_IRDA_IN_MARK, PORT243_IRDA_FIRSEL_MARK,
-+};
-+static const unsigned int irda_1_pins[] = {
-+	/* OUT, IN, FIRSEL */
-+	49, 53, 54,
-+};
-+static const unsigned int irda_1_mux[] = {
-+	PORT49_IRDA_OUT_MARK, PORT53_IRDA_IN_MARK, PORT54_IRDA_FIRSEL_MARK,
-+};
- /* - KEYSC ------------------------------------------------------------------ */
- static const unsigned int keysc_in5_pins[] = {
- 	/* KEYIN[0:4] */
-@@ -2963,6 +2978,8 @@ static const struct sh_pfc_pin_group pinmux_groups[] = {
- 	SH_PFC_PIN_GROUP(i2c3_0),
- 	SH_PFC_PIN_GROUP(i2c3_1),
- 	SH_PFC_PIN_GROUP(i2c3_2),
-+	SH_PFC_PIN_GROUP(irda_0),
-+	SH_PFC_PIN_GROUP(irda_1),
- 	SH_PFC_PIN_GROUP(keysc_in5),
- 	SH_PFC_PIN_GROUP(keysc_in6),
- 	SH_PFC_PIN_GROUP(keysc_in7),
-@@ -3125,6 +3142,11 @@ static const char * const i2c3_groups[] = {
- 	"i2c3_2",
- };
+diff --git a/drivers/pinctrl/sh-pfc/pinctrl.c b/drivers/pinctrl/sh-pfc/pinctrl.c
+index 79fa170..36f08f8 100644
+--- a/drivers/pinctrl/sh-pfc/pinctrl.c
++++ b/drivers/pinctrl/sh-pfc/pinctrl.c
+@@ -135,43 +135,6 @@ static void sh_pfc_func_disable(struct pinctrl_dev *pctldev, unsigned selector,
+ {
+ }
  
-+static const char * const irda_groups[] = {
-+	"irda_0",
-+	"irda_1",
-+};
+-static int sh_pfc_reconfig_pin(struct sh_pfc_pinctrl *pmx, unsigned offset,
+-			       int new_type)
+-{
+-	struct sh_pfc *pfc = pmx->pfc;
+-	int idx = sh_pfc_get_pin_index(pfc, offset);
+-	struct sh_pfc_pin_config *cfg = &pmx->configs[idx];
+-	const struct sh_pfc_pin *pin = &pfc->info->pins[idx];
+-	unsigned int mark = pin->enum_id;
+-	unsigned long flags;
+-	int ret;
+-
+-	spin_lock_irqsave(&pfc->lock, flags);
+-
+-	switch (cfg->type) {
+-	case PINMUX_TYPE_GPIO:
+-	case PINMUX_TYPE_OUTPUT:
+-	case PINMUX_TYPE_INPUT:
+-	case PINMUX_TYPE_INPUT_PULLUP:
+-	case PINMUX_TYPE_INPUT_PULLDOWN:
+-		break;
+-	default:
+-		ret = -EINVAL;
+-		goto done;
+-	}
+-
+-	ret = sh_pfc_config_mux(pfc, mark, new_type);
+-	if (ret < 0)
+-		goto done;
+-
+-	cfg->type = new_type;
+-
+-done:
+-	spin_unlock_irqrestore(&pfc->lock, flags);
+-
+-	return ret;
+-}
+-
+ static int sh_pfc_gpio_request_enable(struct pinctrl_dev *pctldev,
+ 				      struct pinctrl_gpio_range *range,
+ 				      unsigned offset)
+@@ -216,9 +179,39 @@ static int sh_pfc_gpio_set_direction(struct pinctrl_dev *pctldev,
+ 				     unsigned offset, bool input)
+ {
+ 	struct sh_pfc_pinctrl *pmx = pinctrl_dev_get_drvdata(pctldev);
+-	int type = input ? PINMUX_TYPE_INPUT : PINMUX_TYPE_OUTPUT;
++	struct sh_pfc *pfc = pmx->pfc;
++	int new_type = input ? PINMUX_TYPE_INPUT : PINMUX_TYPE_OUTPUT;
++	int idx = sh_pfc_get_pin_index(pfc, offset);
++	struct sh_pfc_pin_config *cfg = &pmx->configs[idx];
++	const struct sh_pfc_pin *pin = &pfc->info->pins[idx];
++	unsigned int mark = pin->enum_id;
++	unsigned long flags;
++	int ret;
+ 
+-	return sh_pfc_reconfig_pin(pmx, offset, type);
++	spin_lock_irqsave(&pfc->lock, flags);
 +
- static const char * const keysc_groups[] = {
- 	"keysc_in5",
- 	"keysc_in6",
-@@ -3280,6 +3302,7 @@ static const struct sh_pfc_function pinmux_functions[] = {
- 	SH_PFC_FUNCTION(fsid),
- 	SH_PFC_FUNCTION(i2c2),
- 	SH_PFC_FUNCTION(i2c3),
-+	SH_PFC_FUNCTION(irda),
- 	SH_PFC_FUNCTION(keysc),
- 	SH_PFC_FUNCTION(lcd),
- 	SH_PFC_FUNCTION(lcd2),
++	switch (cfg->type) {
++	case PINMUX_TYPE_GPIO:
++	case PINMUX_TYPE_OUTPUT:
++	case PINMUX_TYPE_INPUT:
++	case PINMUX_TYPE_INPUT_PULLUP:
++	case PINMUX_TYPE_INPUT_PULLDOWN:
++		break;
++	default:
++		ret = -EINVAL;
++		goto done;
++	}
++
++	ret = sh_pfc_config_mux(pfc, mark, new_type);
++	if (ret < 0)
++		goto done;
++
++	cfg->type = new_type;
++
++done:
++	spin_unlock_irqrestore(&pfc->lock, flags);
++
++	return ret;
+ }
+ 
+ static const struct pinmux_ops sh_pfc_pinmux_ops = {
 -- 
 1.7.10.4
