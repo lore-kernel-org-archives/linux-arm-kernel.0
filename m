@@ -1,53 +1,35 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Mon, 18 Mar 2013 18:49:32 +0100
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 18 Mar 2013 17:57:46 +0000
 Subject: [RFC] Kbuild support for ARM FIT images
-In-Reply-To: <20130318164426.GI30923@n2100.arm.linux.org.uk>
+In-Reply-To: <20130318174931.GB4230@amd.pavel.ucw.cz>
 References: <CAD=GYpbF_3uRzhUnV=MwDiy-ekvZKJztJbkhNM0u_pvG-UCw4w@mail.gmail.com>
  <20130222160044.GA16357@quad.lixom.net>
  <20130318163648.GA3722@amd.pavel.ucw.cz>
  <20130318164426.GI30923@n2100.arm.linux.org.uk>
-Message-ID: <20130318174931.GB4230@amd.pavel.ucw.cz>
+ <20130318174931.GB4230@amd.pavel.ucw.cz>
+Message-ID: <20130318175746.GJ30923@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 2013-03-18 16:44:26, Russell King - ARM Linux wrote:
-> On Mon, Mar 18, 2013 at 05:36:53PM +0100, Pavel Machek wrote:
-> > On Fri 2013-02-22 08:00:44, Olof Johansson wrote:
-> > > On Wed, Feb 20, 2013 at 07:37:10PM -0600, Joel A Fernandes wrote:
-> > > > Any comments on this approach? Is it better to merge mkfitsrc.sh with
-> > > > mkuboot.sh?
-> > > 
-> > > I know this was discussed quite extensively yesterday, but here is my take on
-> > > it:
-> > > 
-> > > Given the recent complications from multiplatform, we really saw a strong
-> > > reason to _not_ do the final boot wrapping in the kernel build system.
-> > > Produce the zImage and the DTB files, and have a surrounding script that
-> > > bundles the two in a format that your particular device needs.
-> > > 
-> > > Most distros have scripts to handle the "make install" step of a kernel build.
-> > > That's where this belongs, not in the actual build step.
-> > 
-> > Not sure I agree here:
-> > 
-> > 1) zImage was designed to boot from floppy, without any kind of
-> > bootloader on i386
-> 
-> zImage on x86 != zImage on ARM.
-> 
-> They only share the fact that they're both compressed and self-extracting.
-> 
-> ARM has never supported any kind of floppy based boot - mainly because
-> floppies have never been "executable" like they are on x86; all that
-> previous boot loaders ever did was load the kernel into RAM using
-> some
+On Mon, Mar 18, 2013 at 06:49:32PM +0100, Pavel Machek wrote:
+> What I wanted to say is that kernel build traditionaly produced
+> something useful, something bootloader can actually boot. Currently,
+> make uImage produces u-boot image. Please keep that capability.
 
-Yes, I know. That's why I said "on i386". 
+Unfortunately, there is a fundamental problem with uImage.  It encodes
+the load address, and that is utterly incompatible with the goal of
+having a kernel image which boots on multiple platforms.
 
-What I wanted to say is that kernel build traditionaly produced
-something useful, something bootloader can actually boot. Currently,
-make uImage produces u-boot image. Please keep that capability.
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+uImage isn't going anywhere for the time being, but you will find
+that:
+
+a) recent kernels will just wrap the zImage without a DTB, so
+   appended DTBs can't be used with it
+b) it won't work with MULTIPLATFORM-enabled kernels, unless you
+   provide make with a LOADADDR= argument to tell it where the
+   uImage is to be loaded - which is platform specific.
+
+(b) fundamentally can't be solved in kbuild.  If you want to use
+uImage with multiple platforms from the same zImage, then you need
+to generate multiple uImage files with different load addresses.
+That's purely - and solely - down to the dysfunctional uImage format.
