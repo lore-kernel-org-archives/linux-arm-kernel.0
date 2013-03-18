@@ -1,120 +1,61 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 18 Mar 2013 14:22:14 +0000
-Subject: [GIT PULL] arm-soc fixes for v3.9-rc3
-Message-ID: <201303181422.14942.arnd@arndb.de>
+From: pavel@denx.de (Pavel Machek)
+Date: Mon, 18 Mar 2013 15:24:32 +0100
+Subject: [PATCHv1 0/2] ARM: socfpga: Soft reset, hotplug and device
+ tree clocks
+In-Reply-To: <51471046.1010102@gmail.com>
+References: <1363211722-27237-1-git-send-email-dinguyen@altera.com>
+ <5141220A.7050008@gmail.com>
+ <20130317181343.GB4394@amd.pavel.ucw.cz>
+ <51471046.1010102@gmail.com>
+Message-ID: <20130318142432.GA4110@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 27f423fe120df3a7488dd750b4e0508f03c325b6:
+Hi!
 
-  ARM: spear3xx: Use correct pl080 header file (2013-03-12 10:56:32 +0100)
+> >>> Just 2 patches for mach-socfpga:
+> >>>
+> >>> 0001: ARM: socfpga: Enable hotplug and soft reset
+> >>> 	- Able to hotplug CPU1 by putting it into reset and bringing back online.
+> >>>
+> >>
+> >> Have you seen the discussion on PSCI? There's an ARM doc on it and
+> >> Linaro session from last week. Is there a possibility you can use that?
+> >> You would need to be able to run in non-secure mode and implement
+> >> smc calls.
+> > 
+> > What would be the advantage?
+> 
+> It gets rid of some platform code. If you do an A15 part, it abstracts
+> out the differences between the cores on entering/exiting coherency. It
+> should also save you from writing suspend/resume and cpuidle support for
+> your platform.
 
-are available in the git repository at:
+I don't see how PSCI would be useful at this point. Clock framework is
+needed for basic MMC and Ethernet support; PSCI would not help there. 
 
-  git+ssh://gitolite at ra.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes
+> > We do not have suitable hypervisor at the moment. Nor I see why it
+> > would be good to push power management into it.
+> 
+> It's not a hypervisor. A minimal implementation is only about 100 lines
+> of assembly.
 
-for you to fetch changes up to b4811bacbc68f6e17d442df88f98afaa9394d4f5:
+So... we could reduce some complexity of the kernel by inventing
+another component, inventing API, and putting the complex code into
+the newly invented component... when no other arm32 architecture does
+that. (Where would you put the 100 lines? u-boot?)
 
-  ARM: fix CONFIG_VIRT_TO_BUS handling (2013-03-18 13:49:57 +0000)
+> > (Plus, the implementation seems pretty incomplete for arm32.).
+> 
+> That's the point. The linux side is simple. The secure monitor side is
+> also simplified somewhat. When you enter secure monitor mode, you are
+> automatically running with the cache and mmu off. This avoids the side
+> effects of cache allocations while trying to flush the caches.
 
-----------------------------------------------------------------
-arm-soc: bug fixes for 3.9-rc3
-
-Things are calming down for arm-soc as well. This set of bug fixes is
-dominated in size by the at91 platform bug fixes. Some of them were
-meant to go through the framebuffer tree during the merge window, but
-since the framebuffer maintainer could not be reached, I offered to
-take them here. The other notable at91 change is the addition of pinctrl
-definitions to fix the NAND controller.
-
-The rest are mostly simple regression fixes:
-
-* Our removal of VIRT_TO_BUS conflicted with Stephen Rothwell's
-  renaming of the Kconfig symbol. You will get a trivial merge conflict
-  here, we still want to remove it.
-* missing bits for clocks on imx and s5pv210
-* missing header inclusions in mmp and shmobile
-* typos in s5pv210 camera and vt8500 clock support code
-
-and three trivial fixes for pre-3.8 bugs:
-
-* an old bogus build warning in the joystick driver
-* a misleading Kconfig description
-* a NULL pointer check on davinci
-----------------------------------------------------------------
-Please note that the branch is based on the previous fixes tag that got
-pulled into v3.9-rc3, since some of the patches were applied before 
-the old tag got merged.
-
-----------------------------------------------------------------
-
-Arnd Bergmann (12):
-      Merge tag 'davinci-for-v3.9-rc/fixes' of git://git.kernel.org/.../nsekhar/linux-davinci into fixes
-      clk: vt8500: Fix "fix device clock divisor calculations"
-      [media] s5p-fimc: fix s5pv210 build
-      input/joystick: use get_cycles on ARM
-      Merge tag 'at91-fixes' of git://github.com/at91linux/linux-at91 into fixes
-      Merge branch 'v3.9-samsung-fixes-1' of git://git.kernel.org/.../kgene/linux-samsung into fixes
-      Merge at91 lcdfb bug fixes into fixes
-      Merge branch 'armsoc/fix' of git://github.com/hzhuang1/linux into fixes
-      Merge tag 'arm-imx-fixes-for-3.9-rc' of git://git.pengutronix.de/git/imx/linux-2.6 into fixes
-      Merge tag 'renesas-fixes-for-v3.9' of git://git.kernel.org/.../horms/renesas into fixes
-      ARM: fix CONFIG_VIRT_TO_BUS handling
-      Merge tag 'v3.9-rc3' into fixes
-
-
-Haojian Zhuang (1):
-      ARM: mmp: add platform_device head file in gplugd
-
-Johan Hovold (2):
-      atmel_lcdfb: fix 16-bpp modes on older SOCs
-      ARM: at91: fix LCD-wiring mode
-
-Ludovic Desroches (2):
-      ARM: at91: add gpio suspend/resume support when using pinctrl
-      ARM: at91: fix infinite loop in at91_irq_suspend/resume
-
-Matt Porter (1):
-      ARM: davinci: edma: fix dmaengine induced null pointer dereference on da830
-
-Padmavathi Venna (1):
-      ARM: EXYNOS: Add #dma-cells for generic dma binding support for PL330
-
-Richard Genoud (2):
-      ARM: at91: dt: at91sam9x5: correct NAND pins comments
-      ARM: at91: dt: at91sam9x5: complete NAND pinctrl
-
-Sascha Hauer (2):
-      ARM: i.MX25: Fix DT compilation
-      ARM: i.MX35: enable MAX clock
-
-Simon Horman (1):
-      ARM: shmobile: marzen: Include mmc/host.h
-
-Stephen Boyd (1):
-      ARM: Scorpion is a v7 architecture, not v6
-
-Sylwester Nawrocki (1):
-      ARM: S5PV210: Fix PL330 DMA controller clkdev entries
-
- arch/arm/Kconfig                       | 11 ++++-------
- arch/arm/boot/dts/at91sam9x5.dtsi      | 28 ++++++++++++++++++++++++++--
- arch/arm/boot/dts/exynos4.dtsi         |  9 +++++++++
- arch/arm/boot/dts/exynos5440.dtsi      |  6 ++++++
- arch/arm/mach-at91/include/mach/gpio.h |  8 ++++++++
- arch/arm/mach-at91/irq.c               | 20 ++++++++------------
- arch/arm/mach-at91/pm.c                | 10 ++++++++--
- arch/arm/mach-davinci/dma.c            |  3 +++
- arch/arm/mach-footbridge/Kconfig       |  1 +
- arch/arm/mach-imx/clk-imx35.c          |  1 +
- arch/arm/mach-imx/imx25-dt.c           |  5 +++++
- arch/arm/mach-mmp/gplugd.c             |  1 +
- arch/arm/mach-s5pv210/clock.c          | 36 ++++++++++++++++++------------------
- arch/arm/mach-s5pv210/mach-goni.c      |  2 +-
- arch/arm/mach-shmobile/board-marzen.c  |  1 +
- drivers/clk/clk-vt8500.c               |  2 +-
- drivers/input/joystick/analog.c        |  8 ++------
- drivers/pinctrl/pinctrl-at91.c         | 61 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-
- drivers/video/atmel_lcdfb.c            | 22 +++++++++++++++-------
- include/video/atmel_lcdc.h             |  2 +-
- 20 files changed, 179 insertions(+), 58 deletions(-)
+This is clock framework. It does not touch any caches, and does not
+have problems with MMU. Even if we would implement PSCI in future,
+this code would stay the same AFAICT.
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
