@@ -1,34 +1,39 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 18 Mar 2013 15:33:35 -0400
-Subject: [PATCH 1/1] ARM: kirkwood: Fix chip-delay for GoFlex Net
-In-Reply-To: <51476198.2080100@gmail.com>
-References: <51476198.2080100@gmail.com>
-Message-ID: <20130318193335.GK13280@titan.lakedaemon.net>
+From: wd@denx.de (Wolfgang Denk)
+Date: Mon, 18 Mar 2013 20:51:29 +0100
+Subject: [RFC] Kbuild support for ARM FIT images
+In-Reply-To: <20130318175746.GJ30923@n2100.arm.linux.org.uk>
+References: <CAD=GYpbF_3uRzhUnV=MwDiy-ekvZKJztJbkhNM0u_pvG-UCw4w@mail.gmail.com>
+ <20130222160044.GA16357@quad.lixom.net>
+ <20130318163648.GA3722@amd.pavel.ucw.cz>
+ <20130318164426.GI30923@n2100.arm.linux.org.uk>
+ <20130318174931.GB4230@amd.pavel.ucw.cz>
+ <20130318175746.GJ30923@n2100.arm.linux.org.uk>
+Message-ID: <20130318195129.D6BC22014B1@gemini.denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 18, 2013 at 07:48:56PM +0100, Eric Hutter wrote:
-> Hi,
-> 
-> This fixes "Too few good blocks within range" issues on GoFlex Net
-> by setting chip-delay to 40. I've been using this patch on my device
-> for quite a while now (accessing uboot vars is not possible without it).
-> The basic problem was discussed at
-> http://forum.doozan.com/read.php?2,7451 and I think this fix
-> should go mainstream.
-> 
-> Greetings
-> 
-> Eric Hutter
-> 
-> 
-> Signed-off-by: Eric Hutter <hutter.eric@gmail.com>
-> ---
->  arch/arm/boot/dts/kirkwood-goflexnet.dts | 1 +
->  1 file changed, 1 insertion(+)
+Dear Russell,
 
-Nice catch!  I'll include this in the next round of fixes I push.
+In message <20130318175746.GJ30923@n2100.arm.linux.org.uk> you wrote:
+>
+> Unfortunately, there is a fundamental problem with uImage.  It encodes
+> the load address, and that is utterly incompatible with the goal of
+> having a kernel image which boots on multiple platforms.
 
-thx,
+I'm not sure if you are aware that U-Boot supports uImages that can be
+run from _any_ load address (using the IH_TYPE_KERNEL_NOLOAD image
+type).  If anybody was willing to keep uImage support in the kernel
+this would probably be a convenient way to go.
 
-Jason.
+But in any case, the uImage format is deprecated.  Support for FIT
+images was added more than five years ago, and new developments should
+rather focus on supporting these.
+
+Best regards,
+
+Wolfgang Denk
+
+-- 
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
