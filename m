@@ -1,43 +1,61 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 18 Mar 2013 15:45:17 +0000
-Subject: [RFC] USB: EHCI: hot-fix OMAP and Orion multiplatform config
-In-Reply-To: <20130316000936.GB10166@kroah.com>
-References: <201303151700.27231.arnd@arndb.de>
- <201303152113.52258.arnd@arndb.de> <20130316000936.GB10166@kroah.com>
-Message-ID: <201303181545.18083.arnd@arndb.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 18 Mar 2013 09:47:27 -0600
+Subject: [PATCH 1/7] kbuild: create an "include chroot" for DT bindings
+In-Reply-To: <20130318151348.GB4713@S2101-09.ap.freescale.net>
+References: <1362594183-21523-1-git-send-email-swarren@wwwdotorg.org>
+ <20130318151348.GB4713@S2101-09.ap.freescale.net>
+Message-ID: <5147370F.9030500@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 16 March 2013, Greg Kroah-Hartman wrote:
-> On Fri, Mar 15, 2013 at 09:13:52PM +0000, Arnd Bergmann wrote:
-> > On Friday 15 March 2013, Greg Kroah-Hartman wrote:
-> > > > Unless something is changed, this patch won't get into 3.9-final.  
-> > > > Do you want Greg to move it to his usb-linus branch?
-> > > 
-> > > It's a bit too "big" for 3.9-final, sorry.
-> > 
-> > Would you consider the hot fix at the start of this thread for 3.9
-> > then? I can resubmit it as a patch for inclusion with the missing
-> > hunk added in if there are no objections.
+On 03/18/2013 09:13 AM, Shawn Guo wrote:
+> On Wed, Mar 06, 2013 at 11:22:57AM -0700, Stephen Warren wrote:
+>> From: Stephen Warren <swarren@nvidia.com>
+>>
+>> The recent dtc+cpp support allows header files and C pre-processor
+>> defines/macros to be used when compiling device tree files. These
+>> headers will typically define various constants that are part of the
+>> device tree bindings.
+>>
+>> The original patch which set up the dtc+cpp include path only considered
+>> using those headers from device tree files. However, most are also
+>> useful for kernel code which needs to interpret the device tree.
+>>
+>> In both the DT files and the kernel, I'd like to include the DT-related
+>> headers in the same way, for example, <dt-bindings/gpio/tegra-gpio.h>.
+>> That will simplify any text which discusses the DT header locations.
+>>
+>> Creating a <dt-bindings/> for kernel source to use is as simple as
+>> placing files into include/dt-bindings/.
+>>
+>> However, when compiling DT files, the include path should be restricted
+>> so that only the dt-bindings path is available; arbitrary kernel headers
+>> shouldn't be exposed. For this reason, create a specific include
+>> directory for use by dtc+cpp, and symlink dt-bindings from there to the
+>> actual location of include/dt-bindings/. For want of a better location,
+>> place this "include chroot" into the existing dts/ directory.
+>>
+>> arch/*/boot/dts/include/dt-bindings -> ../../../../../include/dt-bindings
+>>
+>> Some headers used by device tree files may not be useful to the kernel;
+>> they may be used simply to aid in constructing the DT file (e.g. macros
+>> to create a node), but not define any information that the kernel needs
+>> to share. These may be placed directly into arch/*/boot/dts/ along with
+>> the DT files themselves.
+>>
+>> Cc: Shawn Guo <shawn.guo@linaro.org>
+>> Cc: Hiroshi Doyu <hdoyu@nvidia.com>
+>> Acked-by: Michal Marek <mmarek@suse.cz>
+>> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+>> Acked-by: Rob Herring <rob.herring@calxeda.com>
+>> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+>> ---
+>> This first patch was previously posted separately as V2. I'm including
+>> it here to keep it with the whole series. I hope this series can be
+>> applied as a topic branch in arm-soc.
 > 
-> Feel free to resend, but remember, I am very leery of pushing this
-> type of patch in at the moment, given my past history with it...
+> So no comments on the series means that we can start maintain it on
+> a topic branch, so that people can base their works on it?
 
-Sure, it's your decision. I just don't want to be accused of abandoning the
-issue that I caused. It's not strictly a regression because no configuration
-that was working in 3.8 is broken in 3.9, and embedded systems won't normally
-run a multiplatform kernel anyway. Also, the patch is really an ugly hack,
-which is probably enough reason not to take it. ;-)
-
-The only situation I can think of that is broken without the hotfix is
-distribution kernels that were already running multiplatform on Armada XP
-(mvebu/orion) and now want to add OMAP support without breaking the
-platforms that are already working. Peter Robinson is doing this on for
-Fedora right now[1] and I assume the Debian/Ubuntu/OpenSUSE/Gentoo
-people will be in a similar situation, but they can all apply the patch
-manually if it doesn't make it into 3.9. It won't be the only patch they
-need to get there, it's just the only one for 3.9 we already know about.
-
-	Arnd
-
-[1] https://plus.google.com/117898952501074015902/posts/VgnDhJBxbU4
+I was thinking of reposting the series today due to lack of responses,
+so that the content was freshly available in people's inboxes.
