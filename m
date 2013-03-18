@@ -1,226 +1,139 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 18 Mar 2013 20:47:01 +0900
-Subject: [PATCH 09/43] ARM: mach-shmobile: r8a7779: Minimal setup using DT
+Date: Mon, 18 Mar 2013 20:47:05 +0900
+Subject: [PATCH 13/43] ARM: shmobile: Move headsmp-sh73a0.S to headsmp-scu.S
 In-Reply-To: <1363607255-6385-1-git-send-email-horms+renesas@verge.net.au>
 References: <1363607255-6385-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1363607255-6385-10-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1363607255-6385-14-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow a minimal setup of the r8a7779 SoC using a flattened device tree.
-In particular, configure the i2c and ethernet controllers using a
-flattened device tree.
+From: Magnus Damm <damm@opensource.se>
 
-SCI serial controller and TMU clock source, whose drivers do not yet
-support configuration using a flattened device tree, are still configured
-using C code in order to allow booting of a board with this SoC.
+Rename headsmp-sh73a0.S into headsmp-scu.S and
+introduce shmobile_secondary_vector_scu().
 
-The ethernet controller also requires a regulator which is a board property.
-A sample snippet DT for the marzen board is as follows:
+The goal is to be able to share the function
+above between all mach-shmobile SoCs that use
+SCU for SMP. So far only sh73a0 use this.
 
-/dts-v1/;
-/include/ "r8a7779.dtsi"
+At this time the SCU base address is still hard
+coded in headsmp-scu.S to 0xf0000000, but this
+will be changed in the future.
 
-/ {
-	fixedregulator3v3: fixedregulator at 0 {
-		compatible = "regulator-fixed";
-		regulator-name = "fixed-3.3V";
-		regulator-min-microvolt = <3300000>;
-		regulator-max-microvolt = <3300000>;
-		regulator-boot-on;
-		regulator-always-on;
-	};
-};
-
-&lan0 {
-	vddvario-supply = <&fixedregulator3v3>;
-	vdd33a-supply = <&fixedregulator3v3>;
-};
-
+Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7779.dtsi               |   45 ++++++++++++++++++++
- arch/arm/mach-shmobile/include/mach/common.h |    2 +
- arch/arm/mach-shmobile/setup-r8a7779.c       |   59 +++++++++++++++++++++++---
- 3 files changed, 100 insertions(+), 6 deletions(-)
+ arch/arm/mach-shmobile/Makefile              |    2 +-
+ arch/arm/mach-shmobile/headsmp-scu.S         |   50 ++++++++++++++++++++++++++
+ arch/arm/mach-shmobile/include/mach/common.h |    2 +-
+ arch/arm/mach-shmobile/smp-sh73a0.c          |    4 +--
+ 4 files changed, 54 insertions(+), 4 deletions(-)
+ create mode 100644 arch/arm/mach-shmobile/headsmp-scu.S
 
-diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
-index 8c6d52c..2913759 100644
---- a/arch/arm/boot/dts/r8a7779.dtsi
-+++ b/arch/arm/boot/dts/r8a7779.dtsi
-@@ -47,4 +47,49 @@
-                 reg = <0xf0001000 0x1000>,
-                       <0xf0000100 0x100>;
-         };
+diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
+index e1fac57..245a873 100644
+--- a/arch/arm/mach-shmobile/Makefile
++++ b/arch/arm/mach-shmobile/Makefile
+@@ -15,7 +15,7 @@ obj-$(CONFIG_ARCH_EMEV2)	+= setup-emev2.o clock-emev2.o
+ # SMP objects
+ smp-y				:= platsmp.o headsmp.o
+ smp-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
+-smp-$(CONFIG_ARCH_SH73A0)	+= smp-sh73a0.o headsmp-sh73a0.o
++smp-$(CONFIG_ARCH_SH73A0)	+= smp-sh73a0.o headsmp-scu.o
+ smp-$(CONFIG_ARCH_R8A7779)	+= smp-r8a7779.o
+ smp-$(CONFIG_ARCH_EMEV2)	+= smp-emev2.o
+ 
+diff --git a/arch/arm/mach-shmobile/headsmp-scu.S b/arch/arm/mach-shmobile/headsmp-scu.S
+new file mode 100644
+index 0000000..4ee287d
+--- /dev/null
++++ b/arch/arm/mach-shmobile/headsmp-scu.S
+@@ -0,0 +1,50 @@
++/*
++ * Shared SCU setup for mach-shmobile
++ *
++ * Copyright (C) 2012 Bastian Hecht
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation; either version 2 of
++ * the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR /PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
++ * MA 02111-1307 USA
++ */
 +
-+	i2c0: i2c at 0xffc70000 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "renesas,rmobile-iic";
-+		reg = <0xffc70000 0x1000>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 79 0x4>;
-+	};
++#include <linux/linkage.h>
++#include <linux/init.h>
++#include <asm/memory.h>
 +
-+	i2c1: i2c at 0xffc71000 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "renesas,rmobile-iic";
-+		reg = <0xffc71000 0x1000>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 82 0x4>;
-+	};
++	__CPUINIT
++/*
++ * Reset vector for secondary CPUs.
++ *
++ * First we turn on L1 cache coherency for our CPU. Then we jump to
++ * shmobile_invalidate_start that invalidates the cache and hands over control
++ * to the common ARM startup code.
++ * This function will be mapped to address 0 by the SBAR register.
++ * A normal branch is out of range here so we need a long jump. We jump to
++ * the physical address as the MMU is still turned off.
++ */
++	.align	12
++ENTRY(shmobile_secondary_vector_scu)
++	mrc     p15, 0, r0, c0, c0, 5	@ read MIPDR
++	and	r0, r0, #3		@ mask out cpu ID
++	lsl	r0, r0, #3		@ we will shift by cpu_id * 8 bits
++	mov	r1, #0xf0000000		@ SCU base address
++	ldr	r2, [r1, #8]		@ SCU Power Status Register
++	mov	r3, #3
++	bic	r2, r2, r3, lsl r0	@ Clear bits of our CPU (Run Mode)
++	str	r2, [r1, #8]		@ write back
 +
-+	i2c2: i2c at 0xffc72000 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "renesas,rmobile-iic";
-+		reg = <0xffc72000 0x1000>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 80 0x4>;
-+	};
-+
-+	i2c3: i2c at 0xffc73000 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "renesas,rmobile-iic";
-+		reg = <0xffc73000 0x1000>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 81 0x4>;
-+	};
-+
-+	lan0: lan0 at 18000000 {
-+		compatible = "smsc,lan9220", "smsc,lan9115";
-+		reg = <0x18000000 0x100>;
-+		phy-mode = "mii";
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 28 0x4>;
-+		reg-io-width = <4>;
-+	};
- };
++	ldr	pc, 1f
++1:	.long shmobile_invalidate_start - PAGE_OFFSET + PLAT_PHYS_OFFSET
++ENDPROC(shmobile_secondary_vector_scu)
 diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
-index 3f06710..c72d301 100644
+index c72d301..20acf00 100644
 --- a/arch/arm/mach-shmobile/include/mach/common.h
 +++ b/arch/arm/mach-shmobile/include/mach/common.h
-@@ -63,7 +63,9 @@ extern void r8a7779_init_irq_dt(void);
- extern void r8a7779_map_io(void);
- extern void r8a7779_earlytimer_init(void);
- extern void r8a7779_add_early_devices(void);
-+extern void r8a7779_add_early_devices_dt(void);
- extern void r8a7779_add_standard_devices(void);
-+extern void r8a7779_add_standard_devices_dt(void);
- extern void r8a7779_clock_init(void);
- extern void r8a7779_pinmux_init(void);
- extern void r8a7779_pm_init(void);
-diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
-index c54ff9b..922dd4d 100644
---- a/arch/arm/mach-shmobile/setup-r8a7779.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7779.c
-@@ -21,6 +21,7 @@
- #include <linux/init.h>
- #include <linux/interrupt.h>
- #include <linux/irq.h>
-+#include <linux/of_platform.h>
- #include <linux/platform_device.h>
- #include <linux/delay.h>
- #include <linux/input.h>
-@@ -321,7 +322,7 @@ static struct platform_device i2c3_device = {
- 	.num_resources	= ARRAY_SIZE(rcar_i2c3_res),
- };
- 
--static struct platform_device *r8a7779_early_devices[] __initdata = {
-+static struct platform_device *r8a7779_early_devices_dt[] __initdata = {
- 	&scif0_device,
- 	&scif1_device,
- 	&scif2_device,
-@@ -330,15 +331,15 @@ static struct platform_device *r8a7779_early_devices[] __initdata = {
- 	&scif5_device,
- 	&tmu00_device,
- 	&tmu01_device,
-+};
-+
-+static struct platform_device *r8a7779_early_devices[] __initdata = {
- 	&i2c0_device,
- 	&i2c1_device,
- 	&i2c2_device,
- 	&i2c3_device,
- };
- 
--static struct platform_device *r8a7779_late_devices[] __initdata = {
--};
--
- void __init r8a7779_add_standard_devices(void)
+@@ -8,6 +8,7 @@ extern void shmobile_setup_delay(unsigned int max_cpu_core_mhz,
+ struct twd_local_timer;
+ extern void shmobile_setup_console(void);
+ extern void shmobile_secondary_vector(void);
++extern void shmobile_secondary_vector_scu(void);
+ struct clk;
+ extern int shmobile_clk_init(void);
+ extern void shmobile_handle_irq_intc(struct pt_regs *);
+@@ -44,7 +45,6 @@ extern void sh73a0_add_standard_devices_dt(void);
+ extern void sh73a0_clock_init(void);
+ extern void sh73a0_pinmux_init(void);
+ extern void sh73a0_pm_init(void);
+-extern void sh73a0_secondary_vector(void);
+ extern struct clk sh73a0_extal1_clk;
+ extern struct clk sh73a0_extal2_clk;
+ extern struct clk sh73a0_extcki_clk;
+diff --git a/arch/arm/mach-shmobile/smp-sh73a0.c b/arch/arm/mach-shmobile/smp-sh73a0.c
+index 0757f4a..de7518f 100644
+--- a/arch/arm/mach-shmobile/smp-sh73a0.c
++++ b/arch/arm/mach-shmobile/smp-sh73a0.c
+@@ -72,9 +72,9 @@ static void __init sh73a0_smp_prepare_cpus(unsigned int max_cpus)
  {
- #ifdef CONFIG_CACHE_L2X0
-@@ -349,10 +350,10 @@ void __init r8a7779_add_standard_devices(void)
+ 	scu_enable(shmobile_scu_base);
  
- 	r8a7779_init_pm_domains();
+-	/* Map the reset vector (in headsmp-sh73a0.S) */
++	/* Map the reset vector (in headsmp-scu.S) */
+ 	__raw_writel(0, APARMBAREA);      /* 4k */
+-	__raw_writel(__pa(sh73a0_secondary_vector), SBAR);
++	__raw_writel(__pa(shmobile_secondary_vector_scu), SBAR);
  
-+	platform_add_devices(r8a7779_early_devices_dt,
-+			    ARRAY_SIZE(r8a7779_early_devices_dt));
- 	platform_add_devices(r8a7779_early_devices,
- 			    ARRAY_SIZE(r8a7779_early_devices));
--	platform_add_devices(r8a7779_late_devices,
--			    ARRAY_SIZE(r8a7779_late_devices));
- }
- 
- /* do nothing for !CONFIG_SMP or !CONFIG_HAVE_TWD */
-@@ -367,6 +368,8 @@ void __init r8a7779_earlytimer_init(void)
- 
- void __init r8a7779_add_early_devices(void)
- {
-+	early_platform_add_devices(r8a7779_early_devices_dt,
-+				   ARRAY_SIZE(r8a7779_early_devices_dt));
- 	early_platform_add_devices(r8a7779_early_devices,
- 				   ARRAY_SIZE(r8a7779_early_devices));
- 
-@@ -386,3 +389,47 @@ void __init r8a7779_add_early_devices(void)
- 	 * command line in case of the marzen board.
- 	 */
- }
-+
-+#ifdef CONFIG_USE_OF
-+void __init r8a7779_add_early_devices_dt(void)
-+{
-+	shmobile_setup_delay(1000, 2, 4); /* Cortex-A9 @ 1000MHz */
-+
-+	early_platform_add_devices(r8a7779_early_devices_dt,
-+				   ARRAY_SIZE(r8a7779_early_devices_dt));
-+
-+	/* Early serial console setup is not included here.
-+	 * See comment in r8a7779_add_early_devices().
-+	 */
-+}
-+
-+static const struct of_dev_auxdata r8a7779_auxdata_lookup[] __initconst = {
-+	{},
-+};
-+
-+void __init r8a7779_add_standard_devices_dt(void)
-+{
-+	/* clocks are setup late during boot in the case of DT */
-+	r8a7779_clock_init();
-+
-+	platform_add_devices(r8a7779_early_devices_dt,
-+			    ARRAY_SIZE(r8a7779_early_devices_dt));
-+	of_platform_populate(NULL, of_default_bus_match_table,
-+			     r8a7779_auxdata_lookup, NULL);
-+}
-+
-+static const char *r8a7779_compat_dt[] __initdata = {
-+	"renesas,r8a7779",
-+	NULL,
-+};
-+
-+DT_MACHINE_START(SH73A0_DT, "Generic R8A7779 (Flattened Device Tree)")
-+	.map_io		= r8a7779_map_io,
-+	.init_early	= r8a7779_add_early_devices_dt,
-+	.nr_irqs	= NR_IRQS_LEGACY,
-+	.init_irq	= r8a7779_init_irq_dt,
-+	.init_machine	= r8a7779_add_standard_devices_dt,
-+	.init_time	= shmobile_timer_init,
-+	.dt_compat	= r8a7779_compat_dt,
-+MACHINE_END
-+#endif /* CONFIG_USE_OF */
+ 	/* enable cache coherency on booting CPU */
+ 	scu_power_mode(shmobile_scu_base, SCU_PM_NORMAL);
 -- 
 1.7.10.4
