@@ -1,67 +1,81 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Mon, 18 Mar 2013 13:50:43 +0530
-Subject: [PATCH 2/2] ARM: OMAP2+: clocks: Pass static parent pointers
- to common clock core
-In-Reply-To: <20130315162049.GB9370@atomide.com>
-References: <1363264618-5071-1-git-send-email-rnayak@ti.com>
- <1363264618-5071-3-git-send-email-rnayak@ti.com>
- <20130314170601.GH26093@atomide.com> <514313B6.4050905@ti.com>
- <20130315162049.GB9370@atomide.com>
-Message-ID: <5146CE5B.6090705@ti.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Mon, 18 Mar 2013 16:23:35 +0800
+Subject: [PATCH] i2c: sirf: get the i2c pin group by pinctrl api
+In-Reply-To: <5146C9C6.2030507@ti.com>
+References: <1363591361-5992-1-git-send-email-Barry.Song@csr.com>
+ <5146C9C6.2030507@ti.com>
+Message-ID: <CAGsJ_4yAhUKyH14UEq8WBUmHAq7ZzhNLyX-zcEehR-wr5H6NUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 March 2013 09:50 PM, Tony Lindgren wrote:
-> * Rajendra Nayak <rnayak@ti.com> [130315 05:31]:
->> On Thursday 14 March 2013 10:36 PM, Tony Lindgren wrote:
->>> * Rajendra Nayak <rnayak@ti.com> [130314 05:44]:
->>>> OMAP clock inits happen quite early, even before the slab is available.
->>>> As part of the clock init, the common clock core tries to cache parent
->>>> pointers (if not passed by the caller registering the clock) which
->>>> fails in case of OMAP since the slab isn't initied.
->>>> Without CONFIG_DEBUG_SLAB enabled, this just results in the common clock core
->>>> retrying the caching attempt at some point later.
->>>> However with CONFIG_DEBUG_SLAB enabled this results in a BUG() as reported
->>>> in the link below by Tony..
->>>> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg85932.html
->>>>
->>>> Fix this by passing static parent pointers to the common clock core
->>>> while registering clocks.
->>>
->>> I wonder if we could easily fix this by initializing only some of the
->>> clocks that early?
+2013/3/18 Sourav Poddar <sourav.poddar@ti.com>:
+> Hi,
+>
+> On Monday 18 March 2013 12:52 PM, Barry Song wrote:
 >>
->> We actually don't need any clocks that early (I mean even before slab init)
->> We only need them before timer init.
-> 
-> Yes and only the timer clocks at that point. The others could be initialized
-> later on so we get console error messages without having to turn on DEBUG_LL
-> and earlyprintk.
-
-but that wouldn't be possible with the hwmod dependency on clocks. We would
-need to move the hwmod inits further down too.
-
->  
->> This isn't something specific to OMAP so I started looking at what others
->> in drivers/clk seem to do.
+>> From: Barry Song<Baohua.Song@csr.com>
 >>
->> I found imx, spear, mvebu all do their clk inits within .init_time callbacks.
->> tegra seems to even do it within .init_irq callback.
+>> hardcode set i2c pin group to i2c function before, here we
+>> move to use standard pinctrl API to get pins of the group.
 >>
->> Either one would work for us too :)
-> 
-> Well I suggest init_irq as that's when we need the first clocks for timer.
+>> Signed-off-by: Barry Song<Baohua.Song@csr.com>
+>> Cc: Linus Walleij<linus.walleij@linaro.org>
+>> ---
+>>   drivers/i2c/busses/i2c-sirf.c |    9 +++++++++
+>>   1 files changed, 9 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/drivers/i2c/busses/i2c-sirf.c b/drivers/i2c/busses/i2c-sirf.c
+>> index 5a7ad24..dd4004e 100644
+>> --- a/drivers/i2c/busses/i2c-sirf.c
+>> +++ b/drivers/i2c/busses/i2c-sirf.c
+>> @@ -16,6 +16,7 @@
+>>   #include<linux/clk.h>
+>>   #include<linux/err.h>
+>>   #include<linux/io.h>
+>> +#include<linux/pinctrl/consumer.h>
+>>
+>>   #define SIRFSOC_I2C_CLK_CTRL          0x00
+>>   #define SIRFSOC_I2C_STATUS            0x0C
+>> @@ -265,6 +266,7 @@ static int i2c_sirfsoc_probe(struct platform_device
+>> *pdev)
+>>         struct i2c_adapter *adap;
+>>         struct resource *mem_res;
+>>         struct clk *clk;
+>> +       struct pinctrl *pinctrl;
+>>         int bitrate;
+>>         int ctrl_speed;
+>>         int irq;
+>> @@ -272,6 +274,12 @@ static int i2c_sirfsoc_probe(struct platform_device
+>> *pdev)
+>>         int err;
+>>         u32 regval;
+>>
+>> +       pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
+>> +       if (IS_ERR(pinctrl)) {
+>> +               err = PTR_ERR(pinctrl);
+>> +               goto failed_pin;
+>> +       }
+>> +
+>
+> I think,  you should also add an "EPROBE_DEFER" check here ?
 
-For which platforms? I instead see them being needed only by init_timer, so
-was thinking thats a better place instead.
+why would the driver require a probe retry since getting the pinctrl
+has returned an error? before the driver executes, pinctrl driver has
+run earlier and DT has been extended.
 
-For the -rc fix to fix the crash with DEBUG_SLAB, is it fine if I move *all*
-clock inits down to init_timer (or init_irq).
+all people are using  IS_ERR(pinctrl) to check the ret of
+devm_pinctrl_get_select_default.
 
-Splitting clocks alone would not work for now, without hwmod being moved down also.
+>
+>>         clk = clk_get(&pdev->dev, NULL);
+>>         if (IS_ERR(clk)) {
+>>                 err = PTR_ERR(clk);
+>> @@ -385,6 +393,7 @@ err_clk_en:
+>>   err_clk_prep:
+>>         clk_put(clk);
+>>   err_get_clk:
+>> +failed_pin:
+>>         return err;
+>>   }
 
-> 
-> Regards,
-> 
-> Tony
-> 
+-barry
