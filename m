@@ -1,45 +1,40 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 18 Mar 2013 20:53:12 +0900
-Subject: [GIT PULL] Renesas ARM-based SoC defconfig updates for v3.10
-Message-ID: <1363607601-20366-1-git-send-email-horms+renesas@verge.net.au>
+Date: Mon, 18 Mar 2013 20:53:17 +0900
+Subject: [PATCH 5/9] ARM: shmobile: armadillo800eva: enable branch prediction
+ on defconfig
+In-Reply-To: <1363607601-20366-1-git-send-email-horms+renesas@verge.net.au>
+References: <1363607601-20366-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1363607601-20366-6-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Arnd,
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-The following changes since commit f6161aa153581da4a3867a2d1a7caf4be19b6ec9:
+Because defconfig disabled ARM branch prediction
+by CONFIG_CPU_BPREDICT_DISABLE,
+Armadillo800eva's Bogomips and Loop were not good performance.
+This patch enabled Arm branch prediction.
+Special thanks to Ishiyama-san
 
-  Linux 3.9-rc2 (2013-03-10 16:54:19 -0700)
+Reported-by: Kiyoshi Ishiyama <kiyoshi.ishiyama.wg@renesas.com>
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Acked-by: Kiyoshi Ishiyama <kiyoshi.ishiyama.wg@renesas.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/configs/armadillo800eva_defconfig |    1 -
+ 1 file changed, 1 deletion(-)
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig-for-v3.10
-
-for you to fetch changes up to db30abdf3c07c564d4af0f991bb7f38b728f9035:
-
-  ARM: mach-shmobile: marzen: add SATA support (2013-03-14 10:28:07 +0100)
-
-----------------------------------------------------------------
-Renesas ARM-based SoC defconfig updates for v3.10
-
-----------------------------------------------------------------
-Kuninori Morimoto (3):
-      ARM: shmobile: armadillo800eva: enable branch prediction on defconfig
-      ARM: shmobile: armadillo800eva: enable NEON on defconfig
-      ARM: shmobile: armadillo800eva: enable all errata for cache on defconfig
-
-Simon Horman (5):
-      ARM: mach-shmobile: mackerel: enable MMCIF and SDHI in defconfig
-      ARM: mach-shmobile: mackerel: enable REGULATOR in defconfig
-      ARM: mach-shmobile: armadillo800eva: enable REGULATOR in defconfig
-      ARM: shmobile: kzm9g: defconfig: do not enable PREEMPT
-      ARM: mach-shmobile: kzm9g: do not enable REGULATOR_DUMMY in defconfig
-
-Vladimir Barinov (1):
-      ARM: mach-shmobile: marzen: add SATA support
-
- arch/arm/configs/armadillo800eva_defconfig |    8 +++++++-
- arch/arm/configs/kzm9g_defconfig           |    2 --
- arch/arm/configs/mackerel_defconfig        |    4 ++++
- arch/arm/configs/marzen_defconfig          |    4 ++++
- 4 files changed, 15 insertions(+), 3 deletions(-)
+diff --git a/arch/arm/configs/armadillo800eva_defconfig b/arch/arm/configs/armadillo800eva_defconfig
+index 0cc8014..c402294 100644
+--- a/arch/arm/configs/armadillo800eva_defconfig
++++ b/arch/arm/configs/armadillo800eva_defconfig
+@@ -20,7 +20,6 @@ CONFIG_ARCH_R8A7740=y
+ CONFIG_MACH_ARMADILLO800EVA=y
+ # CONFIG_SH_TIMER_TMU is not set
+ CONFIG_ARM_THUMB=y
+-CONFIG_CPU_BPREDICT_DISABLE=y
+ CONFIG_CACHE_L2X0=y
+ CONFIG_ARM_ERRATA_430973=y
+ CONFIG_ARM_ERRATA_458693=y
+-- 
+1.7.10.4
