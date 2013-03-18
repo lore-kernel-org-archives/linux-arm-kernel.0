@@ -1,39 +1,47 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 18 Mar 2013 15:17:54 +0530
-Subject: [PATCH v6 1/2] ARM: davinci: dm365: add support for v4l2 video
- display
-In-Reply-To: <CA+V-a8umwxKFHjSQ=yDwfp8VWTQyn0dyp-=ESSUvRPXawt01Jg@mail.gmail.com>
-References: <1363360303-15521-1-git-send-email-prabhakar.csengg@gmail.com>
- <1363360303-15521-2-git-send-email-prabhakar.csengg@gmail.com>
- <5146CDC5.9000702@ti.com>
- <CA+V-a8umwxKFHjSQ=yDwfp8VWTQyn0dyp-=ESSUvRPXawt01Jg@mail.gmail.com>
-Message-ID: <5146E2CA.8000109@ti.com>
+From: fabio.porcedda@gmail.com (Fabio Porcedda)
+Date: Mon, 18 Mar 2013 11:03:18 +0100
+Subject: [PATCH 10/10] drivers: misc: use module_platform_driver_probe()
+In-Reply-To: <201303152018.09094.arnd@arndb.de>
+References: <1363266691-15757-1-git-send-email-fabio.porcedda@gmail.com>
+ <201303141358.05616.arnd@arndb.de>
+ <ADE657CA350FB648AAC2C43247A983F0020980106B9E@AUSP01VMBX24.collaborationhost.net>
+ <201303152018.09094.arnd@arndb.de>
+Message-ID: <CAHkwnC9YFTw8gVzyZB3_gZCgM5zMA6tLch15EDqcA2F4CAOpAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 3/18/2013 2:46 PM, Prabhakar Lad wrote:
-> On Mon, Mar 18, 2013 at 1:48 PM, Sekhar Nori <nsekhar@ti.com> wrote:
->> On 3/15/2013 8:41 PM, Prabhakar lad wrote:
-
->>> +int __init dm365_init_video(struct vpfe_config *vpfe_cfg,
->>> +                             struct vpbe_config *vpbe_cfg)
->>> +{
->>> +     if (vpfe_cfg || vpbe_cfg)
->>> +             platform_device_register(&dm365_vpss_device);
->>> +
->>> +     if (vpfe_cfg) {
->>> +             vpfe_capture_dev.dev.platform_data = vpfe_cfg;
->>> +             /* Add isif clock alias */
+On Fri, Mar 15, 2013 at 9:18 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 15 March 2013, H Hartley Sweeten wrote:
+>> Arnd,
 >>
->> This comment is useless. Instead please document why the aliases are
->> needed. I know you are just moving code here, but lets do a clean-up job
->> while at it.
+>> Ill look at converting the ep93xx pwm driver to the PWM subsystem. The only issue is
+>> the current driver exposes a sysfs interface that I think is not available in that subsystem.
+>
+> You can probably keep providing that interface if you have active users.
+>
+>> >* Regarding the use of module_platform_driver_probe, I'm a little worried about
+>> >  the interactions with deferred probing. I don't think there are any regressions,
+>> >  but we should probably make people aware that one cannot return -EPROBE_DEFER
+>> >  from a platform_driver_probe function.
 >>
-> by document you mean to add a file in Documentation folder ?
+>> The ep93xx pwm driver does not need to use platform_driver_probe(). It can be changed
+>> to use module_platform_driver() by just moving the .probe to the platform_driver. This
+>> driver was added before module_platform_driver() was available and I used the
+>> platform_driver_probe() thinking it would save a couple lines of code.
 
-No, just modify the comment to talk about why the aliases are needed.
+Since by using platform_driver_probe() the  function
+ep93xx_pwm_probe() is freed after initialization,
+is better to use module_platform_drive_probe().
+IMHO i don't see any good reason to use module_platform_driver() for
+this driver.
 
-Thanks,
-Sekhar
+Best regards
+Fabio Porcedda
+
+>> I'll change this in a bit. Right now I'm trying to work out why kernel 3.8 is not booting
+>> on the ep93xx. I had 3.6.6 on my development board and 3.7 works fine but 3.8 hangs
+>> without uncompressing the kernel.
+>
+> Ok, thanks!
+>
+>         Arnd
