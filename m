@@ -1,9 +1,9 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 18 Mar 2013 20:05:59 +0900
-Subject: [PATCH 063/142] sh-pfc: sh73a0: Add BSC pin groups and functions
+Date: Mon, 18 Mar 2013 20:06:07 +0900
+Subject: [PATCH 071/142] sh-pfc: r8a7779: Add HSPI pin groups and functions
 In-Reply-To: <1363604838-29359-1-git-send-email-horms+renesas@verge.net.au>
 References: <1363604838-29359-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1363604838-29359-64-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1363604838-29359-72-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,164 +12,126 @@ From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/pinctrl/sh-pfc/pfc-sh73a0.c |  124 +++++++++++++++++++++++++++++++++++
- 1 file changed, 124 insertions(+)
+ drivers/pinctrl/sh-pfc/pfc-r8a7779.c |   79 +++++++++++++++++++++++++++++++++-
+ 1 file changed, 78 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/pinctrl/sh-pfc/pfc-sh73a0.c b/drivers/pinctrl/sh-pfc/pfc-sh73a0.c
-index aad8004..76674af 100644
---- a/drivers/pinctrl/sh-pfc/pfc-sh73a0.c
-+++ b/drivers/pinctrl/sh-pfc/pfc-sh73a0.c
-@@ -1852,6 +1852,100 @@ static const struct pinmux_range pinmux_ranges[] = {
-  */
- #define PIN_NUMBER(row, col)		(1000+((row)-1)*34+(col)-1)
- 
-+/* - BSC -------------------------------------------------------------------- */
-+static const unsigned int bsc_data_0_7_pins[] = {
-+	/* D[0:7] */
-+	74, 75, 76, 77, 78, 79, 80, 81,
+diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7779.c b/drivers/pinctrl/sh-pfc/pfc-r8a7779.c
+index a01adea..361b162 100644
+--- a/drivers/pinctrl/sh-pfc/pfc-r8a7779.c
++++ b/drivers/pinctrl/sh-pfc/pfc-r8a7779.c
+@@ -1575,6 +1575,58 @@ static const unsigned int du1_cde_pins[] = {
+ static const unsigned int du1_cde_mux[] = {
+ 	DU1_CDE_MARK
+ };
++/* - HSPI0 ------------------------------------------------------------------ */
++static const unsigned int hspi0_pins[] = {
++	/* CLK, CS, RX, TX */
++	150, 151, 153, 152,
 +};
-+static const unsigned int bsc_data_0_7_mux[] = {
-+	D0_NAF0_MARK, D1_NAF1_MARK, D2_NAF2_MARK, D3_NAF3_MARK,
-+	D4_NAF4_MARK, D5_NAF5_MARK, D6_NAF6_MARK, D7_NAF7_MARK,
++static const unsigned int hspi0_mux[] = {
++	HSPI_CLK0_MARK, HSPI_CS0_MARK, HSPI_RX0_MARK, HSPI_TX0_MARK,
 +};
-+static const unsigned int bsc_data_8_15_pins[] = {
-+	/* D[8:15] */
-+	82, 83, 84, 85, 86, 87, 88, 89,
++/* - HSPI1 ------------------------------------------------------------------ */
++static const unsigned int hspi1_pins[] = {
++	/* CLK, CS, RX, TX */
++	63, 58, 64, 62,
 +};
-+static const unsigned int bsc_data_8_15_mux[] = {
-+	D8_NAF8_MARK, D9_NAF9_MARK, D10_NAF10_MARK, D11_NAF11_MARK,
-+	D12_NAF12_MARK, D13_NAF13_MARK, D14_NAF14_MARK, D15_NAF15_MARK,
++static const unsigned int hspi1_mux[] = {
++	HSPI_CLK1_MARK, HSPI_CS1_MARK, HSPI_RX1_MARK, HSPI_TX1_MARK,
 +};
-+static const unsigned int bsc_cs4_pins[] = {
-+	/* CS */
-+	90,
++static const unsigned int hspi1_b_pins[] = {
++	/* CLK, CS, RX, TX */
++	90, 91, 93, 92,
 +};
-+static const unsigned int bsc_cs4_mux[] = {
-+	CS4__MARK,
++static const unsigned int hspi1_b_mux[] = {
++	HSPI_CLK1_B_MARK, HSPI_CS1_B_MARK, HSPI_RX1_B_MARK, HSPI_TX1_B_MARK,
 +};
-+static const unsigned int bsc_cs5_a_pins[] = {
-+	/* CS */
-+	91,
++static const unsigned int hspi1_c_pins[] = {
++	/* CLK, CS, RX, TX */
++	141, 142, 144, 143,
 +};
-+static const unsigned int bsc_cs5_a_mux[] = {
-+	CS5A__MARK,
++static const unsigned int hspi1_c_mux[] = {
++	HSPI_CLK1_C_MARK, HSPI_CS1_C_MARK, HSPI_RX1_C_MARK, HSPI_TX1_C_MARK,
 +};
-+static const unsigned int bsc_cs5_b_pins[] = {
-+	/* CS */
-+	92,
++static const unsigned int hspi1_d_pins[] = {
++	/* CLK, CS, RX, TX */
++	101, 102, 104, 103,
 +};
-+static const unsigned int bsc_cs5_b_mux[] = {
-+	CS5B__MARK,
++static const unsigned int hspi1_d_mux[] = {
++	HSPI_CLK1_D_MARK, HSPI_CS1_D_MARK, HSPI_RX1_D_MARK, HSPI_TX1_D_MARK,
 +};
-+static const unsigned int bsc_cs6_a_pins[] = {
-+	/* CS */
-+	94,
++/* - HSPI2 ------------------------------------------------------------------ */
++static const unsigned int hspi2_pins[] = {
++	/* CLK, CS, RX, TX */
++	9, 10, 11, 14,
 +};
-+static const unsigned int bsc_cs6_a_mux[] = {
-+	CS6A__MARK,
++static const unsigned int hspi2_mux[] = {
++	HSPI_CLK2_MARK, HSPI_CS2_MARK, HSPI_RX2_MARK, HSPI_TX2_MARK,
 +};
-+static const unsigned int bsc_cs6_b_pins[] = {
-+	/* CS */
-+	93,
++static const unsigned int hspi2_b_pins[] = {
++	/* CLK, CS, RX, TX */
++	7, 13, 8, 6,
 +};
-+static const unsigned int bsc_cs6_b_mux[] = {
-+	CS6B__MARK,
++static const unsigned int hspi2_b_mux[] = {
++	HSPI_CLK2_B_MARK, HSPI_CS2_B_MARK, HSPI_RX2_B_MARK, HSPI_TX2_B_MARK,
 +};
-+static const unsigned int bsc_rd_pins[] = {
-+	/* RD */
-+	96,
-+};
-+static const unsigned int bsc_rd_mux[] = {
-+	RD__FSC_MARK,
-+};
-+static const unsigned int bsc_rdwr_0_pins[] = {
-+	/* RDWR */
-+	91,
-+};
-+static const unsigned int bsc_rdwr_0_mux[] = {
-+	PORT91_RDWR_MARK,
-+};
-+static const unsigned int bsc_rdwr_1_pins[] = {
-+	/* RDWR */
-+	97,
-+};
-+static const unsigned int bsc_rdwr_1_mux[] = {
-+	RDWR_FWE_MARK,
-+};
-+static const unsigned int bsc_rdwr_2_pins[] = {
-+	/* RDWR */
-+	149,
-+};
-+static const unsigned int bsc_rdwr_2_mux[] = {
-+	PORT149_RDWR_MARK,
-+};
-+static const unsigned int bsc_we0_pins[] = {
-+	/* WE0 */
-+	97,
-+};
-+static const unsigned int bsc_we0_mux[] = {
-+	WE0__FWE_MARK,
-+};
-+static const unsigned int bsc_we1_pins[] = {
-+	/* WE1 */
-+	98,
-+};
-+static const unsigned int bsc_we1_mux[] = {
-+	WE1__MARK,
-+};
- /* - FSIA ------------------------------------------------------------------- */
- static const unsigned int fsia_mclk_in_pins[] = {
- 	/* CK */
-@@ -2817,6 +2911,19 @@ static const unsigned int sdhi2_ctrl_mux[] = {
+ /* - MMCIF ------------------------------------------------------------------ */
+ static const unsigned int mmc0_data1_pins[] = {
+ 	/* D[0] */
+@@ -1605,7 +1657,6 @@ static const unsigned int mmc0_ctrl_pins[] = {
+ static const unsigned int mmc0_ctrl_mux[] = {
+ 	MMC0_CMD_MARK, MMC0_CLK_MARK,
+ };
+-
+ static const unsigned int mmc1_data1_pins[] = {
+ 	/* D[0] */
+ 	72,
+@@ -2160,6 +2211,13 @@ static const struct sh_pfc_pin_group pinmux_groups[] = {
+ 	SH_PFC_PIN_GROUP(du1_sync_1),
+ 	SH_PFC_PIN_GROUP(du1_oddf),
+ 	SH_PFC_PIN_GROUP(du1_cde),
++	SH_PFC_PIN_GROUP(hspi0),
++	SH_PFC_PIN_GROUP(hspi1),
++	SH_PFC_PIN_GROUP(hspi1_b),
++	SH_PFC_PIN_GROUP(hspi1_c),
++	SH_PFC_PIN_GROUP(hspi1_d),
++	SH_PFC_PIN_GROUP(hspi2),
++	SH_PFC_PIN_GROUP(hspi2_b),
+ 	SH_PFC_PIN_GROUP(mmc0_data1),
+ 	SH_PFC_PIN_GROUP(mmc0_data4),
+ 	SH_PFC_PIN_GROUP(mmc0_data8),
+@@ -2262,6 +2320,22 @@ static const char * const du1_groups[] = {
+ 	"du1_cde",
  };
  
- static const struct sh_pfc_pin_group pinmux_groups[] = {
-+	SH_PFC_PIN_GROUP(bsc_data_0_7),
-+	SH_PFC_PIN_GROUP(bsc_data_8_15),
-+	SH_PFC_PIN_GROUP(bsc_cs4),
-+	SH_PFC_PIN_GROUP(bsc_cs5_a),
-+	SH_PFC_PIN_GROUP(bsc_cs5_b),
-+	SH_PFC_PIN_GROUP(bsc_cs6_a),
-+	SH_PFC_PIN_GROUP(bsc_cs6_b),
-+	SH_PFC_PIN_GROUP(bsc_rd),
-+	SH_PFC_PIN_GROUP(bsc_rdwr_0),
-+	SH_PFC_PIN_GROUP(bsc_rdwr_1),
-+	SH_PFC_PIN_GROUP(bsc_rdwr_2),
-+	SH_PFC_PIN_GROUP(bsc_we0),
-+	SH_PFC_PIN_GROUP(bsc_we1),
- 	SH_PFC_PIN_GROUP(fsia_mclk_in),
- 	SH_PFC_PIN_GROUP(fsia_mclk_out),
- 	SH_PFC_PIN_GROUP(fsia_sclk_in),
-@@ -2945,6 +3052,22 @@ static const struct sh_pfc_pin_group pinmux_groups[] = {
- 	SH_PFC_PIN_GROUP(sdhi2_ctrl),
- };
- 
-+static const char * const bsc_groups[] = {
-+	"bsc_data_0_7",
-+	"bsc_data_8_15",
-+	"bsc_cs4",
-+	"bsc_cs5_a",
-+	"bsc_cs5_b",
-+	"bsc_cs6_a",
-+	"bsc_cs6_b",
-+	"bsc_rd",
-+	"bsc_rdwr_0",
-+	"bsc_rdwr_1",
-+	"bsc_rdwr_2",
-+	"bsc_we0",
-+	"bsc_we1",
++static const char * const hspi0_groups[] = {
++	"hspi0",
 +};
 +
- static const char * const fsia_groups[] = {
- 	"fsia_mclk_in",
- 	"fsia_mclk_out",
-@@ -3137,6 +3260,7 @@ static const char * const sdhi2_groups[] = {
- };
- 
++static const char * const hspi1_groups[] = {
++	"hspi1",
++	"hspi1_b",
++	"hspi1_c",
++	"hspi1_d",
++};
++
++static const char * const hspi2_groups[] = {
++	"hspi2",
++	"hspi2_b",
++};
++
+ static const char * const mmc0_groups[] = {
+ 	"mmc0_data1",
+ 	"mmc0_data4",
+@@ -2380,6 +2454,9 @@ static const char * const sdhi3_groups[] = {
  static const struct sh_pfc_function pinmux_functions[] = {
-+	SH_PFC_FUNCTION(bsc),
- 	SH_PFC_FUNCTION(fsia),
- 	SH_PFC_FUNCTION(fsib),
- 	SH_PFC_FUNCTION(fsic),
+ 	SH_PFC_FUNCTION(du0),
+ 	SH_PFC_FUNCTION(du1),
++	SH_PFC_FUNCTION(hspi0),
++	SH_PFC_FUNCTION(hspi1),
++	SH_PFC_FUNCTION(hspi2),
+ 	SH_PFC_FUNCTION(mmc0),
+ 	SH_PFC_FUNCTION(mmc1),
+ 	SH_PFC_FUNCTION(sdhi0),
 -- 
 1.7.10.4
