@@ -1,47 +1,26 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 18 Mar 2013 18:54:58 +0000
-Subject: [PATCH v2 1/2] ARM: vexpress: Enable regulator framework when
- MMCI is in use
-In-Reply-To: <1363630617.3054.19.camel@hornet>
-References: <20130315181614.GY4977@n2100.arm.linux.org.uk>
- <1363629655-28917-1-git-send-email-pawel.moll@arm.com>
- <20130318180328.GJ4977@n2100.arm.linux.org.uk>
- <1363630617.3054.19.camel@hornet>
-Message-ID: <20130318185458.GK4977@n2100.arm.linux.org.uk>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Mon, 18 Mar 2013 14:56:42 -0400
+Subject: [PATCH 29/29] arm64: KVM: enable initialization of a 32bit vcpu
+In-Reply-To: <1362455265-24165-30-git-send-email-marc.zyngier@arm.com>
+References: <1362455265-24165-1-git-send-email-marc.zyngier@arm.com>
+ <1362455265-24165-30-git-send-email-marc.zyngier@arm.com>
+Message-ID: <5147636A.2010309@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 18, 2013 at 06:16:57PM +0000, Pawel Moll wrote:
-> On Mon, 2013-03-18 at 18:03 +0000, Russell King - ARM Linux wrote:
-> > > Without the regulator framework present there are no valid operating
-> > > voltages reported and the device initialisation fails:
-> > > 
-> > > mmci-pl18x 1c050000.mmci: mmc0: PL180 manf 41 rev0 at 0x1c050000 irq 41,42 (pio)
-> > > mmc0: host doesn't support card's voltages
-> > > mmc0: error -22 whilst initialising MMC card
-> > 
-> > Okay, this isn't going to work, because this means it's broken on a whole
-> > load of platforms.  What it means is that this commit:
-> > 
-> > commit 599c1d5c750ddf528c7c6d3cdc466708f0502e66
-> > Author: Ulf Hansson <ulf.hansson@linaro.org>
-> > Date:   Mon Jan 7 16:22:50 2013 +0100
-> > 
-> >     ARM: 7620/1: mmc: mmci: Convert to use mmc_regulator_get_supply
-> >     
-> >     By using the mmc_regulator_get_supply API we are able to do some
-> >     cleanups of the regulator code. Additionally let the regulator
-> >     API handle the error printing.
-> >     
-> >     Cc: Chris Ball <cjb@laptop.org>
-> >     Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> >     Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > 
-> > is actually wrong and probably needs reverting.
+On 03/04/2013 10:47 PM, Marc Zyngier wrote:
+> Wire the init of a 32bit vcpu by allowing 32bit modes in pstate,
+> and providing sensible defaults out of reset state.
 > 
-> Reverting it will not change anything as the driver had the same
-> dependency before, just using :
+> This feature is of course conditionned by the presence of 32bit
 
-Umm.  If CONFIG_REGULATOR is not set with the patch reverted, the
-regulator support is not used at all, and the ocrmask comes from
-the platform data.
+conditioned
+
+> capability on the physical CPU.
+
+[...]
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by
+the Linux Foundation
