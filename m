@@ -1,40 +1,77 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 18 Mar 2013 20:47:12 +0900
-Subject: [PATCH 20/43] ARM: shmobile: sh73a0: Remove warning about SMP
+Date: Mon, 18 Mar 2013 20:47:04 +0900
+Subject: [PATCH 12/43] ARM: shmobile: Rework EMEV2 scu_base variable
 In-Reply-To: <1363607255-6385-1-git-send-email-horms+renesas@verge.net.au>
 References: <1363607255-6385-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1363607255-6385-21-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1363607255-6385-13-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove warning about SMP not working with the
-clock initialisation sheme used for reference DT.
+From: Magnus Damm <damm@opensource.se>
 
-This is resolved by not selecting CONFIG_PREEMPT.
+Rename the static scu_base variable into shmobile_scu_base.
 
+Later in the series the shmobile_scu_base variable will be
+made into a global variable so this is preparation only.
+
+Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/setup-sh73a0.c |    8 --------
- 1 file changed, 8 deletions(-)
+ arch/arm/mach-shmobile/smp-emev2.c |   15 ++++++++-------
+ 1 file changed, 8 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
-index c7630aa..37baa48 100644
---- a/arch/arm/mach-shmobile/setup-sh73a0.c
-+++ b/arch/arm/mach-shmobile/setup-sh73a0.c
-@@ -879,14 +879,6 @@ void __init sh73a0_add_early_devices(void)
+diff --git a/arch/arm/mach-shmobile/smp-emev2.c b/arch/arm/mach-shmobile/smp-emev2.c
+index 4ede413..136867e 100644
+--- a/arch/arm/mach-shmobile/smp-emev2.c
++++ b/arch/arm/mach-shmobile/smp-emev2.c
+@@ -32,8 +32,9 @@
  
- #ifdef CONFIG_USE_OF
+ #define EMEV2_SCU_BASE 0x1e000000
  
--/* Please note that the clock initialisation shcheme used in
-- * sh73a0_add_early_devices_dt() and sh73a0_add_standard_devices_dt()
-- * does not work with SMP as there is a yet to be resolved lock-up in
-- * workqueue initialisation.
-- *
-- * CONFIG_SMP should be disabled when using this code.
-- */
--
- void __init sh73a0_add_early_devices_dt(void)
++static void __iomem *shmobile_scu_base;
++
+ static DEFINE_SPINLOCK(scu_lock);
+-static void __iomem *scu_base;
+ 
+ static void modify_scu_cpu_psr(unsigned long set, unsigned long clr)
  {
- 	shmobile_setup_delay(1196, 44, 46); /* Cortex-A9 @ 1196MHz */
+@@ -42,10 +43,10 @@ static void modify_scu_cpu_psr(unsigned long set, unsigned long clr)
+ 	/* we assume this code is running on a different cpu
+ 	 * than the one that is changing coherency setting */
+ 	spin_lock(&scu_lock);
+-	tmp = readl(scu_base + 8);
++	tmp = readl(shmobile_scu_base + 8);
+ 	tmp &= ~clr;
+ 	tmp |= set;
+-	writel(tmp, scu_base + 8);
++	writel(tmp, shmobile_scu_base + 8);
+ 	spin_unlock(&scu_lock);
+ 
+ }
+@@ -70,7 +71,7 @@ static void __init emev2_smp_prepare_cpus(unsigned int max_cpus)
+ {
+ 	int cpu = cpu_logical_map(0);
+ 
+-	scu_enable(scu_base);
++	scu_enable(shmobile_scu_base);
+ 
+ 	/* Tell ROM loader about our vector (in headsmp.S) */
+ 	emev2_set_boot_vector(__pa(shmobile_secondary_vector));
+@@ -83,12 +84,12 @@ static void __init emev2_smp_init_cpus(void)
+ {
+ 	unsigned int ncores;
+ 
+-	if (!scu_base) {
+-		scu_base = ioremap(EMEV2_SCU_BASE, PAGE_SIZE);
++	if (!shmobile_scu_base) {
++		shmobile_scu_base = ioremap(EMEV2_SCU_BASE, PAGE_SIZE);
+ 		emev2_clock_init(); /* need ioremapped SMU */
+ 	}
+ 
+-	ncores = scu_base ? scu_get_core_count(scu_base) : 1;
++	ncores = shmobile_scu_base ? scu_get_core_count(shmobile_scu_base) : 1;
+ 
+ 	shmobile_smp_init_cpus(ncores);
+ }
 -- 
 1.7.10.4
