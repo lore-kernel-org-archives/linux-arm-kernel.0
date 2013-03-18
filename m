@@ -1,168 +1,54 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 18 Mar 2013 20:05:14 +0900
-Subject: [PATCH 018/142] sh-pfc: Share the PORT_10_REV,
- PORT_32 and PORT_32_REV definitions
+Date: Mon, 18 Mar 2013 20:05:33 +0900
+Subject: [PATCH 037/142] sh: sh7757: Add pin control resources
 In-Reply-To: <1363604838-29359-1-git-send-email-horms+renesas@verge.net.au>
 References: <1363604838-29359-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1363604838-29359-19-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1363604838-29359-38-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-The macros are defined identically and used in two SoC-specific files,
-share them.
+Add memory resources for the pin control platform device to let the
+sh-pfc driver ioremap() registers properly instead of evily casting
+register physical addresses to virtual addresses.
+
+The memory resource address range has been extracted from the config and
+data registes lists in the sh-pfc driver.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/pinctrl/sh-pfc/pfc-r8a7779.c |   34 ++++++++--------------------------
- drivers/pinctrl/sh-pfc/pfc-sh7734.c  |   31 +++++++------------------------
- drivers/pinctrl/sh-pfc/sh_pfc.h      |   17 +++++++++++++++++
- 3 files changed, 32 insertions(+), 50 deletions(-)
+ arch/sh/kernel/cpu/sh4a/pinmux-sh7757.c |   13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7779.c b/drivers/pinctrl/sh-pfc/pfc-r8a7779.c
-index 0e53674..e9a7ead 100644
---- a/drivers/pinctrl/sh-pfc/pfc-r8a7779.c
-+++ b/drivers/pinctrl/sh-pfc/pfc-r8a7779.c
-@@ -23,11 +23,6 @@
+diff --git a/arch/sh/kernel/cpu/sh4a/pinmux-sh7757.c b/arch/sh/kernel/cpu/sh4a/pinmux-sh7757.c
+index cda6bd1..567745d 100644
+--- a/arch/sh/kernel/cpu/sh4a/pinmux-sh7757.c
++++ b/arch/sh/kernel/cpu/sh4a/pinmux-sh7757.c
+@@ -13,12 +13,23 @@
+  * for more details.
+  */
  
- #include "sh_pfc.h"
++#include <linux/bug.h>
+ #include <linux/init.h>
+ #include <linux/kernel.h>
++#include <linux/ioport.h>
+ #include <cpu/pfc.h>
  
--#define CPU_32_PORT(fn, pfx, sfx)				\
--	PORT_10(fn, pfx, sfx), PORT_10(fn, pfx##1, sfx),	\
--	PORT_10(fn, pfx##2, sfx), PORT_1(fn, pfx##30, sfx),	\
--	PORT_1(fn, pfx##31, sfx)
--
- #define CPU_32_PORT6(fn, pfx, sfx)				\
- 	PORT_1(fn, pfx##0, sfx), PORT_1(fn, pfx##1, sfx),	\
- 	PORT_1(fn, pfx##2, sfx), PORT_1(fn, pfx##3, sfx),	\
-@@ -36,12 +31,12 @@
- 	PORT_1(fn, pfx##8, sfx)
- 
- #define CPU_ALL_PORT(fn, pfx, sfx)				\
--	CPU_32_PORT(fn, pfx##_0_, sfx),				\
--	CPU_32_PORT(fn, pfx##_1_, sfx),				\
--	CPU_32_PORT(fn, pfx##_2_, sfx),				\
--	CPU_32_PORT(fn, pfx##_3_, sfx),				\
--	CPU_32_PORT(fn, pfx##_4_, sfx),				\
--	CPU_32_PORT(fn, pfx##_5_, sfx),				\
-+	PORT_32(fn, pfx##_0_, sfx),				\
-+	PORT_32(fn, pfx##_1_, sfx),				\
-+	PORT_32(fn, pfx##_2_, sfx),				\
-+	PORT_32(fn, pfx##_3_, sfx),				\
-+	PORT_32(fn, pfx##_4_, sfx),				\
-+	PORT_32(fn, pfx##_5_, sfx),				\
- 	CPU_32_PORT6(fn, pfx##_6_, sfx)
- 
- #define _GP_GPIO(pfx, sfx) PINMUX_GPIO(GPIO_GP##pfx, GP##pfx##_DATA)
-@@ -55,21 +50,8 @@
- #define PINMUX_GPIO_GP_ALL()	CPU_ALL_PORT(_GP_GPIO, , unused)
- #define PINMUX_DATA_GP_ALL()	CPU_ALL_PORT(_GP_DATA, , unused)
- 
--
--#define PORT_10_REV(fn, pfx, sfx)				\
--	PORT_1(fn, pfx##9, sfx), PORT_1(fn, pfx##8, sfx),	\
--	PORT_1(fn, pfx##7, sfx), PORT_1(fn, pfx##6, sfx),	\
--	PORT_1(fn, pfx##5, sfx), PORT_1(fn, pfx##4, sfx),	\
--	PORT_1(fn, pfx##3, sfx), PORT_1(fn, pfx##2, sfx),	\
--	PORT_1(fn, pfx##1, sfx), PORT_1(fn, pfx##0, sfx)
--
--#define CPU_32_PORT_REV(fn, pfx, sfx)					\
--	PORT_1(fn, pfx##31, sfx), PORT_1(fn, pfx##30, sfx),		\
--	PORT_10_REV(fn, pfx##2, sfx), PORT_10_REV(fn, pfx##1, sfx),	\
--	PORT_10_REV(fn, pfx, sfx)
--
--#define GP_INOUTSEL(bank) CPU_32_PORT_REV(_GP_INOUTSEL, _##bank##_, unused)
--#define GP_INDT(bank) CPU_32_PORT_REV(_GP_INDT, _##bank##_, unused)
-+#define GP_INOUTSEL(bank) PORT_32_REV(_GP_INOUTSEL, _##bank##_, unused)
-+#define GP_INDT(bank) PORT_32_REV(_GP_INDT, _##bank##_, unused)
- 
- #define PINMUX_IPSR_DATA(ipsr, fn) PINMUX_DATA(fn##_MARK, FN_##ipsr, FN_##fn)
- #define PINMUX_IPSR_MODSEL_DATA(ipsr, fn, ms) PINMUX_DATA(fn##_MARK, FN_##ms, \
-diff --git a/drivers/pinctrl/sh-pfc/pfc-sh7734.c b/drivers/pinctrl/sh-pfc/pfc-sh7734.c
-index 20c44dd..99ea220 100644
---- a/drivers/pinctrl/sh-pfc/pfc-sh7734.c
-+++ b/drivers/pinctrl/sh-pfc/pfc-sh7734.c
-@@ -14,11 +14,6 @@
- 
- #include "sh_pfc.h"
- 
--#define CPU_32_PORT(fn, pfx, sfx)				\
--	PORT_10(fn, pfx, sfx), PORT_10(fn, pfx##1, sfx),	\
--	PORT_10(fn, pfx##2, sfx), PORT_1(fn, pfx##30, sfx),	\
--	PORT_1(fn, pfx##31, sfx)
--
- #define CPU_32_PORT5(fn, pfx, sfx)				\
- 	PORT_1(fn, pfx##0, sfx), PORT_1(fn, pfx##1, sfx),	\
- 	PORT_1(fn, pfx##2, sfx), PORT_1(fn, pfx##3, sfx),	\
-@@ -29,11 +24,11 @@
- 
- /* GPSR0 - GPSR5 */
- #define CPU_ALL_PORT(fn, pfx, sfx)				\
--	CPU_32_PORT(fn, pfx##_0_, sfx),			\
--	CPU_32_PORT(fn, pfx##_1_, sfx),				\
--	CPU_32_PORT(fn, pfx##_2_, sfx),				\
--	CPU_32_PORT(fn, pfx##_3_, sfx),				\
--	CPU_32_PORT(fn, pfx##_4_, sfx),				\
-+	PORT_32(fn, pfx##_0_, sfx),			\
-+	PORT_32(fn, pfx##_1_, sfx),				\
-+	PORT_32(fn, pfx##_2_, sfx),				\
-+	PORT_32(fn, pfx##_3_, sfx),				\
-+	PORT_32(fn, pfx##_4_, sfx),				\
- 	CPU_32_PORT5(fn, pfx##_5_, sfx)
- 
- #define _GP_GPIO(pfx, sfx) PINMUX_GPIO(GPIO_GP##pfx, GP##pfx##_DATA)
-@@ -47,20 +42,8 @@
- #define PINMUX_GPIO_GP_ALL()	CPU_ALL_PORT(_GP_GPIO, , unused)
- #define PINMUX_DATA_GP_ALL()	CPU_ALL_PORT(_GP_DATA, , unused)
- 
--#define PORT_10_REV(fn, pfx, sfx)	\
--	PORT_1(fn, pfx##9, sfx), PORT_1(fn, pfx##8, sfx),	\
--	PORT_1(fn, pfx##7, sfx), PORT_1(fn, pfx##6, sfx),	\
--	PORT_1(fn, pfx##5, sfx), PORT_1(fn, pfx##4, sfx),	\
--	PORT_1(fn, pfx##3, sfx), PORT_1(fn, pfx##2, sfx),	\
--	PORT_1(fn, pfx##1, sfx), PORT_1(fn, pfx##0, sfx)
--
--#define CPU_32_PORT_REV(fn, pfx, sfx)	\
--	PORT_1(fn, pfx##31, sfx), PORT_1(fn, pfx##30, sfx),	\
--	PORT_10_REV(fn, pfx##2, sfx), PORT_10_REV(fn, pfx##1, sfx),	\
--	PORT_10_REV(fn, pfx, sfx)
--
--#define GP_INOUTSEL(bank) CPU_32_PORT_REV(_GP_INOUTSEL, _##bank##_, unused)
--#define GP_INDT(bank) CPU_32_PORT_REV(_GP_INDT, _##bank##_, unused)
-+#define GP_INOUTSEL(bank) PORT_32_REV(_GP_INOUTSEL, _##bank##_, unused)
-+#define GP_INDT(bank) PORT_32_REV(_GP_INDT, _##bank##_, unused)
- 
- #define PINMUX_IPSR_DATA(ipsr, fn) PINMUX_DATA(fn##_MARK, FN_##ipsr, FN_##fn)
- #define PINMUX_IPSR_MODSEL_DATA(ipsr, fn, ms) PINMUX_DATA(fn##_MARK, FN_##ms, \
-diff --git a/drivers/pinctrl/sh-pfc/sh_pfc.h b/drivers/pinctrl/sh-pfc/sh_pfc.h
-index f9d4480..43c858d 100644
---- a/drivers/pinctrl/sh-pfc/sh_pfc.h
-+++ b/drivers/pinctrl/sh-pfc/sh_pfc.h
-@@ -138,6 +138,23 @@ enum { GPIO_CFG_DRYRUN, GPIO_CFG_REQ, GPIO_CFG_FREE };
- 	PORT_1(fn, pfx##6, sfx), PORT_1(fn, pfx##7, sfx),	\
- 	PORT_1(fn, pfx##8, sfx), PORT_1(fn, pfx##9, sfx)
- 
-+#define PORT_10_REV(fn, pfx, sfx)	\
-+	PORT_1(fn, pfx##9, sfx), PORT_1(fn, pfx##8, sfx),	\
-+	PORT_1(fn, pfx##7, sfx), PORT_1(fn, pfx##6, sfx),	\
-+	PORT_1(fn, pfx##5, sfx), PORT_1(fn, pfx##4, sfx),	\
-+	PORT_1(fn, pfx##3, sfx), PORT_1(fn, pfx##2, sfx),	\
-+	PORT_1(fn, pfx##1, sfx), PORT_1(fn, pfx##0, sfx)
++static struct resource sh7757_pfc_resources[] = {
++	[0] = {
++		.start	= 0xffec0000,
++		.end	= 0xffec008f,
++		.flags	= IORESOURCE_MEM,
++	},
++};
 +
-+#define PORT_32(fn, pfx, sfx)					\
-+	PORT_10(fn, pfx, sfx), PORT_10(fn, pfx##1, sfx),	\
-+	PORT_10(fn, pfx##2, sfx), PORT_1(fn, pfx##30, sfx),	\
-+	PORT_1(fn, pfx##31, sfx)
-+
-+#define PORT_32_REV(fn, pfx, sfx)					\
-+	PORT_1(fn, pfx##31, sfx), PORT_1(fn, pfx##30, sfx),		\
-+	PORT_10_REV(fn, pfx##2, sfx), PORT_10_REV(fn, pfx##1, sfx),	\
-+	PORT_10_REV(fn, pfx, sfx)
-+
- #define PORT_90(fn, pfx, sfx) \
- 	PORT_10(fn, pfx##1, sfx), PORT_10(fn, pfx##2, sfx),	\
- 	PORT_10(fn, pfx##3, sfx), PORT_10(fn, pfx##4, sfx),	\
+ static int __init plat_pinmux_setup(void)
+ {
+-	return sh_pfc_register("pfc-sh7757", NULL, 0);
++	return sh_pfc_register("pfc-sh7757", sh7757_pfc_resources,
++			       ARRAY_SIZE(sh7757_pfc_resources));
+ }
+ arch_initcall(plat_pinmux_setup);
 -- 
 1.7.10.4
