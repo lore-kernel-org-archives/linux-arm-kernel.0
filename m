@@ -1,37 +1,27 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 18 Mar 2013 10:54:21 +0000
-Subject: [PATCH] clk: vexpress: Add separate SP810 driver
-In-Reply-To: <1363358409-5693-1-git-send-email-pawel.moll@arm.com>
-References: <1363358409-5693-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <20130318105421.GB29353@arm.com>
+From: sourav.poddar@ti.com (Sourav Poddar)
+Date: Mon, 18 Mar 2013 16:24:41 +0530
+Subject: [PATCH 0/2] omap serial fix.
+Message-ID: <1363604081-11169-1-git-send-email-sourav.poddar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 15, 2013 at 02:40:09PM +0000, Pawel Moll wrote:
-> Factor out the SP810 clocking code into a separate driver,
-> selecting better (faster) parent at clk_prepare() time.
-> This is to avoid problems with clocking infrastructure
-> initialisation order, in particular to avoid dependency
-> of fixed clock being initialized before SP810. It also
-> makes vexpress platform OF-based clock initialisation code
-> unnecessary.
-> 
-> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
-> ---
->  arch/arm/mach-vexpress/v2m.c         |    8 +-
->  drivers/clk/versatile/Makefile       |    2 +-
->  drivers/clk/versatile/clk-sp810.c    |  172 ++++++++++++++++++++++++++++++++++
->  drivers/clk/versatile/clk-vexpress.c |   49 ----------
->  4 files changed, 180 insertions(+), 51 deletions(-)
->  create mode 100644 drivers/clk/versatile/clk-sp810.c
-> 
-> Hi Mike,
-> 
-> I'd like to get this merged in 3.10. After this arm64
-> will be able to avoid any platform clocking code. And
-> in case of v7 this will happen once Rob's SP804 work
-> is done.
+The first patch is a rearrangement of a macro "OMAP_MAX_HSUART_PORTS"
+to a header file so that it can be used in other file. 
+The second patch fixes the wakeup from uart issue while using "no_console_suspend" in the
+bootargs.
 
-FWIW, I'm using this patch on the ARMv8 model (arm64).
+These patches are developed on 3.8 custom kernel containing omap5 supend/resume support.
 
-Tested-by: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Felipe Balbi <balbi@ti.com>
+Cc: Rajendra nayak <rnayak@ti.com>
+
+Sourav Poddar (2):
+  driver: serial-omap: move max uart count into generic header file.
+  arm: mach-omap2: prevent UART console idle on suspend while using
+    "no_console_suspend"
+
+ arch/arm/mach-omap2/omap_device.c         |   36 ++++++++++++++++++++++++++++-
+ drivers/tty/serial/omap-serial.c          |    2 -
+ include/linux/platform_data/serial-omap.h |    1 +
+ 3 files changed, 36 insertions(+), 3 deletions(-)
