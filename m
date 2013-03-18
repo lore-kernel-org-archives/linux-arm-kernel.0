@@ -1,87 +1,51 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 18 Mar 2013 11:28:56 -0700
-Subject: [PATCHv2 2/3] ARM: Detect support for SDIV/UDIV from ISAR0 register
-In-Reply-To: <1363631337-13816-1-git-send-email-sboyd@codeaurora.org>
-References: <1363631337-13816-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1363631337-13816-3-git-send-email-sboyd@codeaurora.org>
+From: trini@ti.com (Tom Rini)
+Date: Mon, 18 Mar 2013 14:29:54 -0400
+Subject: [U-Boot] [RFC] Kbuild support for ARM FIT images
+In-Reply-To: <20130318163648.GA3722@amd.pavel.ucw.cz>
+References: <CAD=GYpbF_3uRzhUnV=MwDiy-ekvZKJztJbkhNM0u_pvG-UCw4w@mail.gmail.com>
+ <20130222160044.GA16357@quad.lixom.net>
+ <20130318163648.GA3722@amd.pavel.ucw.cz>
+Message-ID: <20130318182954.GB25919@bill-the-cat>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ISAR0 register indicates support for the SDIV and UDIV
-instructions in both the Thumb and ARM instruction set. Read the
-register to detect the supported instructions and update the
-elf_hwcap mask as appropriate. This is better than adding more
-and more cpuid checks in proc-v7.S for each new cpu variant that
-supports these instructions.
+On Mon, Mar 18, 2013 at 05:36:53PM +0100, Pavel Machek wrote:
+> On Fri 2013-02-22 08:00:44, Olof Johansson wrote:
+> > On Wed, Feb 20, 2013 at 07:37:10PM -0600, Joel A Fernandes wrote:
+> > > Any comments on this approach? Is it better to merge mkfitsrc.sh with
+> > > mkuboot.sh?
+> > 
+> > I know this was discussed quite extensively yesterday, but here is my take on
+> > it:
+> > 
+> > Given the recent complications from multiplatform, we really saw a strong
+> > reason to _not_ do the final boot wrapping in the kernel build system.
+> > Produce the zImage and the DTB files, and have a surrounding script that
+> > bundles the two in a format that your particular device needs.
+> > 
+> > Most distros have scripts to handle the "make install" step of a kernel build.
+> > That's where this belongs, not in the actual build step.
+> 
+> Not sure I agree here:
 
-Acked-by: Will Deacon <will.deacon@arm.com>
-Cc: Stepan Moskovchenko <stepanm@codeaurora.org>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/kernel/setup.c | 20 ++++++++++++++++++++
- arch/arm/mm/proc-v7.S   |  4 ++--
- 2 files changed, 22 insertions(+), 2 deletions(-)
+Lets try and stop this again here.  I think perhaps the KVM tool example
+is instructive here.  For the various reasons that close association
+with the kernel can be helpful for things (the exposure and ease of
+being found), it would be nice if the tooling to expand single kernel
+image into single "bootable" image was with the kernel.  But it's not a
+requirement.  And it's not even necessarily the best for the tooling
+either.  So, lets drop the idea of getting this into the kernel and if
+people really do wish to extend FIT such that we can easily spit out a
+FIT image that works on omap* and tegra* or what have you, and add a FIT
+parser to GRUB, great, get to work.  No need to be tied to the kernel
+for this.
 
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index e2c8bbf..f3ac13f 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -353,6 +353,23 @@ void __init early_print(const char *str, ...)
- 	printk("%s", buf);
- }
- 
-+static void __init cpuid_init_hwcaps(void)
-+{
-+	unsigned int divide_instrs;
-+
-+	if (cpu_architecture() < CPU_ARCH_ARMv7)
-+		return;
-+
-+	divide_instrs = (read_cpuid_ext(CPUID_EXT_ISAR0) & 0x0f000000) >> 24;
-+
-+	switch (divide_instrs) {
-+	case 2:
-+		elf_hwcap |= HWCAP_IDIVA;
-+	case 1:
-+		elf_hwcap |= HWCAP_IDIVT;
-+	}
-+}
-+
- static void __init feat_v6_fixup(void)
- {
- 	int id = read_cpuid_id();
-@@ -483,6 +500,9 @@ static void __init setup_processor(void)
- 	snprintf(elf_platform, ELF_PLATFORM_SIZE, "%s%c",
- 		 list->elf_name, ENDIANNESS);
- 	elf_hwcap = list->elf_hwcap;
-+
-+	cpuid_init_hwcaps();
-+
- #ifndef CONFIG_ARM_THUMB
- 	elf_hwcap &= ~(HWCAP_THUMB | HWCAP_IDIVT);
- #endif
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index 3a3c015..bcd3d48 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -420,7 +420,7 @@ __v7_pj4b_proc_info:
- __v7_ca7mp_proc_info:
- 	.long	0x410fc070
- 	.long	0xff0ffff0
--	__v7_proc __v7_ca7mp_setup, hwcaps = HWCAP_IDIV
-+	__v7_proc __v7_ca7mp_setup
- 	.size	__v7_ca7mp_proc_info, . - __v7_ca7mp_proc_info
- 
- 	/*
-@@ -430,7 +430,7 @@ __v7_ca7mp_proc_info:
- __v7_ca15mp_proc_info:
- 	.long	0x410fc0f0
- 	.long	0xff0ffff0
--	__v7_proc __v7_ca15mp_setup, hwcaps = HWCAP_IDIV
-+	__v7_proc __v7_ca15mp_setup
- 	.size	__v7_ca15mp_proc_info, . - __v7_ca15mp_proc_info
- 
- 	/*
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Tom
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130318/894ff183/attachment-0001.sig>
