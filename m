@@ -1,59 +1,73 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Mon, 18 Mar 2013 11:18:26 -0600
-Subject: [PATCH 04/10] bus: introduce an Marvell EBU MBus driver
-In-Reply-To: <20130318172718.4f8f45b9@skate>
-References: <20130306202447.GA4916@obsidianresearch.com>
- <20130306214036.62fc93b9@skate>
- <20130306215031.GB4916@obsidianresearch.com>
- <20130306222712.GP23237@titan.lakedaemon.net>
- <20130306230412.GA5870@obsidianresearch.com>
- <20130307222004.GA2450@localhost>
- <20130307230516.GA28975@obsidianresearch.com>
- <20130308091052.18612729@skate>
- <20130308172950.GC4094@obsidianresearch.com>
- <20130318172718.4f8f45b9@skate>
-Message-ID: <20130318171826.GA30886@obsidianresearch.com>
+From: liuj97@gmail.com (Jiang Liu)
+Date: Tue, 19 Mar 2013 01:21:50 +0800
+Subject: [PATCH v2, part3 02/12] mm/ARM64: kill poison_init_mem()
+In-Reply-To: <20130317214642.GA20875@mudshark.cambridge.arm.com>
+References: <1363453413-8139-1-git-send-email-jiang.liu@huawei.com>
+ <1363453413-8139-3-git-send-email-jiang.liu@huawei.com>
+ <20130317214642.GA20875@mudshark.cambridge.arm.com>
+Message-ID: <51474D2E.7060709@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 18, 2013 at 05:27:18PM +0100, Thomas Petazzoni wrote:
-> Dear Jason Gunthorpe,
+On 03/18/2013 05:46 AM, Will Deacon wrote:
+> On Sat, Mar 16, 2013 at 05:03:23PM +0000, Jiang Liu wrote:
+>> Use free_reserved_area() to kill poison_init_mem() on ARM64.
+>>
+>> Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Cc: linux-kernel at vger.kernel.org
+>> ---
+>>  arch/arm64/mm/init.c |   17 +++--------------
+>>  1 file changed, 3 insertions(+), 14 deletions(-)
+>>
+>> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+>> index e58dd7f..b87bdb8 100644
+>> --- a/arch/arm64/mm/init.c
+>> +++ b/arch/arm64/mm/init.c
+>> @@ -197,14 +197,6 @@ void __init bootmem_init(void)
+>>  	max_pfn = max_low_pfn = max;
+>>  }
+>>  
+>> -/*
+>> - * Poison init memory with an undefined instruction (0x0).
+>> - */
+>> -static inline void poison_init_mem(void *s, size_t count)
+>> -{
+>> -	memset(s, 0, count);
+>> -}
+>> -
+>>  #ifndef CONFIG_SPARSEMEM_VMEMMAP
+>>  static inline void free_memmap(unsigned long start_pfn, unsigned long end_pfn)
+>>  {
+>> @@ -386,8 +378,7 @@ void __init mem_init(void)
+>>  
+>>  void free_initmem(void)
+>>  {
+>> -	poison_init_mem(__init_begin, __init_end - __init_begin);
+>> -	 free_initmem_default(-1);
+>> +	free_initmem_default(0);
 > 
-> On Fri, 8 Mar 2013 10:29:50 -0700, Jason Gunthorpe wrote:
+> This change looks unrelated to $subject. We should probably just poison with
+> 0 from the outset, when free_initmem_default is introduced.
+Hi Will,
+	As you have suggested, this patch should be merged into patchset which
+introduces free_initmem_default(). I have a plan to merge it in v3, but the v2
+patchset has been merged into -mm tree, so I generated another patch against the
+mm tree.
+	free_initmem_default(-1) doesn't poison the freed memory and 
+free_initmem_default(0) poisons the freed memory with 0, so it's needed to
+kill poison_init_mem().
+
+regards!
+Gerry
+
 > 
-> > > Sorry, but we _do_ want the kernel to be able to set those timings
-> > > parameters, and therefore, a Device Bus driver will be needed,
-> > > regardless of whether it creates the address window or not.
-> > 
-> > See the very good idea from Maxime Bizon about autoprobing the ONFI
-> > timings directly from the NAND chip.
+> Will
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
 > 
-> ONFI (Open NAND Firmware Interface) is about NAND, while the Device Bus
-> driver submitted by Ezequiel is about NOR. I don't think NORs have a
-> standard way of exposing their memory timings requirements. And the
-> Device Bus driver is not only for NORs, but also for example for FPGAs
-> connected on the memory bus.
-
-Right, AFAIK there is no CFI property for device timings, and there is
-a lot of variation of optimal timings between pin-compatible
-parts.
-
-Some kind of out-of-band indication of the flash chip and speed grade
-is necessary to get optimal timings, unfortunately - no idea how you'd
-fit that sensibly into a DT framework.
-
-> Ezequiel followed the work done by Jon Hunter on the GPMC driver for
-> the memory bus of OMAP SoCs, which includes the definition of timings
-> in the Device Tree. To me, it seems like defining the timings in the
-> Device Tree do make sense, and "ONFI" is not a good enough answer to
-> get rid of the Device Bus driver submitted by Ezequiel.
-
-As I said, I think that is fine - there is nothing wrong with a driver
-to set the bus timings. But, if there are no bus timings in the DT
-then the driver should not be involved at all..
-
-Similarly the driver should require all the timings, re-using timings
-left in the register with timings from the DT seems very strange..
-
-Regards,
-Jason
