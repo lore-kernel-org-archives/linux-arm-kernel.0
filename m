@@ -1,73 +1,168 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 18 Mar 2013 15:31:40 +1100
-Subject: linux-next: manual merge of the tegra tree with the arm-soc tree
-Message-ID: <20130318153140.100bdf364d5614ce31f12eae@canb.auug.org.au>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Mon, 18 Mar 2013 11:20:47 +0530
+Subject: [PATCH V6] ARM: LPAE: Fix mapping in alloc_init_section for
+ unaligned addresses
+In-Reply-To: <CANOGCgPKwcDVVUBxbhKemTtvjye=3ZDP+wexfZfunt3BTJeerw@mail.gmail.com>
+References: <1363496741-3427-1-git-send-email-r.sricharan@ti.com>
+ <CANOGCgPKwcDVVUBxbhKemTtvjye=3ZDP+wexfZfunt3BTJeerw@mail.gmail.com>
+Message-ID: <5146AB37.9060307@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Hi Russell,
 
-Today's linux-next merge of the tegra tree got a conflict in
-drivers/clocksource/tegra20_timer.c between commit 1d16cfb3aeba
-("clocksource: tegra20: use the device_node pointer passed to init") from
-the arm-soc tree and commit 6f88fb8af6c6 ("clocksource: tegra: move to
-of_clk_get") from the tegra tree.
+On Monday 18 March 2013 01:22 AM, Christoffer Dall wrote:
+> On Sat, Mar 16, 2013 at 10:05 PM, Sricharan R <r.sricharan@ti.com> wrote:
+>> From: R Sricharan <r.sricharan@ti.com>
+>>
+>> With LPAE enabled, alloc_init_section() does not map the entire
+>> address space for unaligned addresses.
+>>
+>> The issue also reproduced with CMA + LPAE. CMA tries to map 16MB
+>> with page granularity mappings during boot. alloc_init_pte()
+>> is called and out of 16MB, only 2MB gets mapped and rest remains
+>> unaccessible.
+>>
+>> Because of this OMAP5 boot is broken with CMA + LPAE enabled.
+>> Fix the issue by ensuring that the entire addresses are
+>> mapped.
+>>
+>> Signed-off-by: R Sricharan <r.sricharan@ti.com>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Cc: Christoffer Dall <chris@cloudcar.com>
+>> Cc: Russell King <linux@arm.linux.org.uk>
+>> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> Tested-by: Laura Abbott <lauraa@codeaurora.org>
+>> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+>> ---
+>>  [V2] Moved the loop to alloc_init_pte as per Russell's
+>>      feedback and changed the subject accordingly.
+>>      Using PMD_XXX instead of SECTION_XXX to avoid
+>>      different loop increments with/without LPAE.
+>>
+>>  [v3] Removed the dummy variable phys and updated
+>>       the commit log for CMA case.
+>>
+>>  [v4] Resending with updated change log and
+>>       updating the tags.
+>>
+>>  [v5] Renamed alloc_init_section to alloc_init_pmd
+>>       and moved the loop back there. Also introduced
+>>       map_init_section as per Catalin's comments.
+>>
+>>  [v6] Corrected tags and updated the comments for code.
+>>
+>>  arch/arm/mm/mmu.c |   73 ++++++++++++++++++++++++++++++++++-------------------
+>>  1 file changed, 47 insertions(+), 26 deletions(-)
+>>
+>> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+>> index e95a996..7897894 100644
+>> --- a/arch/arm/mm/mmu.c
+>> +++ b/arch/arm/mm/mmu.c
+>> @@ -598,39 +598,60 @@ static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
+>>         } while (pte++, addr += PAGE_SIZE, addr != end);
+>>  }
+>>
+>> -static void __init alloc_init_section(pud_t *pud, unsigned long addr,
+>> -                                     unsigned long end, phys_addr_t phys,
+>> -                                     const struct mem_type *type)
+>> +static void __init map_init_section(pmd_t *pmd, unsigned long addr,
+>> +                       unsigned long end, phys_addr_t phys,
+>> +                       const struct mem_type *type)
+>>  {
+>> -       pmd_t *pmd = pmd_offset(pud, addr);
+>> -
+>> +#ifndef CONFIG_ARM_LPAE
+>>         /*
+>> -        * Try a section mapping - end, addr and phys must all be aligned
+>> -        * to a section boundary.  Note that PMDs refer to the individual
+>> -        * L1 entries, whereas PGDs refer to a group of L1 entries making
+>> -        * up one logical pointer to an L2 table.
+>> +        * In classic MMU format, puds and pmds are folded in to
+>> +        * the pgds. pmd_offset gives the PGD entry. PGDs refer to a
+>> +        * group of L1 entries making up one logical pointer to
+>> +        * an L2 table (2MB), where as PMDs refer to the individual
+>> +        * L1 entries (1MB). Hence increment to get the correct
+>> +        * offset for odd 1MB sections.
+>> +        * (See arch/arm/include/asm/pgtable-2level.h)
+>>          */
+>> -       if (type->prot_sect && ((addr | end | phys) & ~SECTION_MASK) == 0) {
+>> -               pmd_t *p = pmd;
+>> -
+>> -#ifndef CONFIG_ARM_LPAE
+>> -               if (addr & SECTION_SIZE)
+>> -                       pmd++;
+>> +       if (addr & SECTION_SIZE)
+>> +               pmd++;
+>>  #endif
+>> +       do {
+>> +               *pmd = __pmd(phys | type->prot_sect);
+>> +               phys += SECTION_SIZE;
+>> +       } while (pmd++, addr += SECTION_SIZE, addr != end);
+>>
+>> -               do {
+>> -                       *pmd = __pmd(phys | type->prot_sect);
+>> -                       phys += SECTION_SIZE;
+>> -               } while (pmd++, addr += SECTION_SIZE, addr != end);
+>> +       flush_pmd_entry(pmd);
+>> +}
+>>
+>> -               flush_pmd_entry(p);
+>> -       } else {
+>> +static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
+>> +                                     unsigned long end, phys_addr_t phys,
+>> +                                     const struct mem_type *type)
+>> +{
+>> +       pmd_t *pmd = pmd_offset(pud, addr);
+>> +       unsigned long next;
+>> +
+>> +       do {
+>>                 /*
+>> -                * No need to loop; pte's aren't interested in the
+>> -                * individual L1 entries.
+>> +                * With LPAE, we must loop over to map
+>> +                * all the pmds for the given range.
+>>                  */
+>> -               alloc_init_pte(pmd, addr, end, __phys_to_pfn(phys), type);
+>> -       }
+>> +               next = pmd_addr_end(addr, end);
+>> +
+>> +               /*
+>> +                * Try a section mapping - addr, next and phys must all be
+>> +                * aligned to a section boundary.
+>> +                */
+>> +               if (type->prot_sect &&
+>> +                               ((addr | next | phys) & ~SECTION_MASK) == 0) {
+>> +                       map_init_section(pmd, addr, next, phys, type);
+>> +               } else {
+>> +                       alloc_init_pte(pmd, addr, next,
+>> +                                               __phys_to_pfn(phys), type);
+>> +               }
+>> +
+>> +               phys += next - addr;
+>> +
+>> +       } while (pmd++, addr = next, addr != end);
+>>  }
+>>
+>>  static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
+>> @@ -641,7 +662,7 @@ static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
+>>
+>>         do {
+>>                 next = pud_addr_end(addr, end);
+>> -               alloc_init_section(pud, addr, next, phys, type);
+>> +               alloc_init_pmd(pud, addr, next, phys, type);
+>>                 phys += next - addr;
+>>         } while (pud++, addr = next, addr != end);
+>>  }
+>> --
+>> 1.7.9.5
+>>
+> Acked-by: Christoffer Dall <chris@cloudcar.com>
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
+I am not able to add this in to the patch system because my login fails.
+I was trying using the credentials registered with linux-arm-kernel
+ mailing list. Can you please help me here ?
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-
-diff --cc drivers/clocksource/tegra20_timer.c
-index 2e4d8a6,bc4b8ad..0000000
---- a/drivers/clocksource/tegra20_timer.c
-+++ b/drivers/clocksource/tegra20_timer.c
-@@@ -218,34 -259,12 +218,34 @@@ static void __init tegra20_init_timer(s
-  	tegra_clockevent.irq = tegra_timer_irq.irq;
-  	clockevents_config_and_register(&tegra_clockevent, 1000000,
-  					0x1, 0x1fffffff);
- -#ifdef CONFIG_HAVE_ARM_TWD
- -	twd_local_timer_of_register();
- -#endif
- +}
- +CLOCKSOURCE_OF_DECLARE(tegra20_timer, "nvidia,tegra20-timer", tegra20_init_timer);
- +
- +static void __init tegra20_init_rtc(struct device_node *np)
- +{
- +	struct clk *clk;
- +
- +	rtc_base = of_iomap(np, 0);
- +	if (!rtc_base) {
- +		pr_err("Can't map RTC registers");
- +		BUG();
- +	}
- +
- +	/*
- +	 * rtc registers are used by read_persistent_clock, keep the rtc clock
- +	 * enabled
- +	 */
-- 	clk = clk_get_sys("rtc-tegra", NULL);
-++	clk = of_clk_get(np, 0);
- +	if (IS_ERR(clk))
- +		pr_warn("Unable to get rtc-tegra clock\n");
- +	else
- +		clk_prepare_enable(clk);
- +
- +	of_node_put(np);
- +
-  	register_persistent_clock(NULL, tegra_read_persistent_clock);
-  }
- -CLOCKSOURCE_OF_DECLARE(tegra20, "nvidia,tegra20-timer", tegra20_init_timer);
- +CLOCKSOURCE_OF_DECLARE(tegra20_rtc, "nvidia,tegra20-rtc", tegra20_init_rtc);
-  
-  #ifdef CONFIG_PM
-  static u32 usec_config;
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130318/cca713cf/attachment-0001.sig>
+Regards,
+ Sricharan
+ 
