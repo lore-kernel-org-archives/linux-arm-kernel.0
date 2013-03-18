@@ -1,66 +1,68 @@
-From: dinguyen@altera.com (Dinh Nguyen)
-Date: Mon, 18 Mar 2013 09:39:02 -0500
-Subject: [PATCHv1 0/2] ARM: socfpga: Soft reset, hotplug and device tree
- clocks
-In-Reply-To: <20130318142432.GA4110@amd.pavel.ucw.cz>
-References: <1363211722-27237-1-git-send-email-dinguyen@altera.com>
- <5141220A.7050008@gmail.com> <20130317181343.GB4394@amd.pavel.ucw.cz>
- <51471046.1010102@gmail.com> <20130318142432.GA4110@amd.pavel.ucw.cz>
-Message-ID: <1363617542.8044.0.camel@linux-builds1>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Mon, 18 Mar 2013 15:28:17 +0100
+Subject: [PATCH v3 0/9] refactoring for mask_cache
+In-Reply-To: <1363615255-18200-1-git-send-email-gerlando.falauto@keymile.com>
+References: <1363277430-21325-1-git-send-email-holger.brunck@keymile.com>
+ <1363615255-18200-1-git-send-email-gerlando.falauto@keymile.com>
+Message-ID: <20130318142817.GU21620@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
+On Mon, Mar 18, 2013 at 03:00:46PM +0100, Gerlando Falauto wrote:
+> Hi everyone,
+> here is a patchset to address the issue found with Orion, in incremental
+> stages as Thomas suggested.
+> a) we introduce the new fields and pointer (though only the shared one is used)
+> b) we convert all drivers to use it 
+> c) we rename the field so to force the use of the per-ct pointer
+> d) we add per-ct mask cache, provided the new flag 
+>    IRQ_GC_SEPARATE_MASK_REGISTERS is enabled
+> e) we enable the flag for orion-gpio and mvebu drivers
+> 
+> So even though I'm also providing changes for mvebu, I only
+> tested the patch on a 3.0.40 kernel with the plat-orion/gpio.c driver.
+> We currently do not have a working 3.6+ configuration for our Kirkwood
+> boards (3.6 is apparently where this mvebu gpio driver was introduced),
+> so I would be glad if someone could give it a try.
+> I also have no idea whether the three Marvell variants all have separate
+> mask registers (which is what the last patch assumes).
 
-On Mon, 2013-03-18 at 15:24 +0100, ZY - pavel wrote:
-> Hi!
-> 
-> > >>> Just 2 patches for mach-socfpga:
-> > >>>
-> > >>> 0001: ARM: socfpga: Enable hotplug and soft reset
-> > >>> 	- Able to hotplug CPU1 by putting it into reset and bringing back online.
-> > >>>
-> > >>
-> > >> Have you seen the discussion on PSCI? There's an ARM doc on it and
-> > >> Linaro session from last week. Is there a possibility you can use that?
-> > >> You would need to be able to run in non-secure mode and implement
-> > >> smc calls.
-> > > 
-> > > What would be the advantage?
-> > 
-> > It gets rid of some platform code. If you do an A15 part, it abstracts
-> > out the differences between the cores on entering/exiting coherency. It
-> > should also save you from writing suspend/resume and cpuidle support for
-> > your platform.
-> 
-> I don't see how PSCI would be useful at this point. Clock framework is
-> needed for basic MMC and Ethernet support; PSCI would not help there. 
-> 
-> > > We do not have suitable hypervisor at the moment. Nor I see why it
-> > > would be good to push power management into it.
-> > 
-> > It's not a hypervisor. A minimal implementation is only about 100 lines
-> > of assembly.
-> 
-> So... we could reduce some complexity of the kernel by inventing
-> another component, inventing API, and putting the complex code into
-> the newly invented component... when no other arm32 architecture does
-> that. (Where would you put the 100 lines? u-boot?)
+Accordingly to MV78230/78x60 (Armada-XP) functional specification, we
+have separate mask registers for the GPIO level and edge interrupts.
 
-Let me just rework the patches to have just the clock framework and a
-soft reset support for SOCFPGA. I'll work on add PSCI for hotplug in a
-separate patch.
+I believe that the GPIO mask register is only shared on Orion and
+Kirkwood based SoCs.
 
-Dinh
+Regards,
+
+Simon
+
 > 
-> > > (Plus, the implementation seems pretty incomplete for arm32.).
-> > 
-> > That's the point. The linux side is simple. The secure monitor side is
-> > also simplified somewhat. When you enter secure monitor mode, you are
-> > automatically running with the cache and mmu off. This avoids the side
-> > effects of cache allocations while trying to flush the caches.
+> Gerlando Falauto (9):
+>   genirq: cosmetic: remove cur_regs
+>   genirq: add mask_cache and pmask_cache into struct irq_chip_type
+>   gpio: mvebu: convert to usage of *pmask_cache within irq_chip_type
+>   MIPS: JZ4740: convert to usage of *pmask_cache within irq_chip_type
+>   ARM: SAMSUNG: convert to usage of *pmask_cache within irq_chip_type
+>   genirq: rename mask_cache to shared_mask_cache
+>   genirq: handle separate mask registers
+>   orion-gpio: enable IRQ_GC_SEPARATE_MASK_REGISTERS
+>   gpio: mvebu: enable IRQ_GC_SEPARATE_MASK_REGISTERS
 > 
-> This is clock framework. It does not touch any caches, and does not
-> have problems with MMU. Even if we would implement PSCI in future,
-> this code would stay the same AFAICT.
-> 									Pavel
+>  arch/arm/plat-orion/gpio.c            |    3 +-
+>  arch/arm/plat-samsung/irq-vic-timer.c |    6 ++--
+>  arch/mips/jz4740/irq.c                |    3 +-
+>  drivers/gpio/gpio-mvebu.c             |   23 ++++++++------
+>  include/linux/irq.h                   |    9 ++++--
+>  kernel/irq/generic-chip.c             |   55 +++++++++++++++++++++------------
+>  6 files changed, 64 insertions(+), 35 deletions(-)
+> 
+> -- 
+> 1.7.10.1
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130318/e0391611/attachment-0001.sig>
