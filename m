@@ -1,90 +1,54 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 18 Mar 2013 20:06:21 +0900
-Subject: [PATCH 085/142] ARM: shmobile: bonito: Register pinctrl mappings for
- LCDC0
+Date: Mon, 18 Mar 2013 20:05:32 +0900
+Subject: [PATCH 036/142] sh: sh7724: Add pin control resources
 In-Reply-To: <1363604838-29359-1-git-send-email-horms+renesas@verge.net.au>
 References: <1363604838-29359-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1363604838-29359-86-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1363604838-29359-37-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Replace the GPIO-based LCDC0 pinmux configuration by pinctrl mappings.
+Add memory resources for the pin control platform device to let the
+sh-pfc driver ioremap() registers properly instead of evily casting
+register physical addresses to virtual addresses.
+
+The memory resource address range has been extracted from the config and
+data registes lists in the sh-pfc driver.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- arch/arm/mach-shmobile/board-bonito.c |   44 +++++++++++----------------------
- 1 file changed, 14 insertions(+), 30 deletions(-)
+ arch/sh/kernel/cpu/sh4a/pinmux-sh7724.c |   13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/board-bonito.c b/arch/arm/mach-shmobile/board-bonito.c
-index d363526..70d992c 100644
---- a/arch/arm/mach-shmobile/board-bonito.c
-+++ b/arch/arm/mach-shmobile/board-bonito.c
-@@ -24,6 +24,7 @@
- #include <linux/init.h>
- #include <linux/interrupt.h>
- #include <linux/irq.h>
-+#include <linux/pinctrl/machine.h>
- #include <linux/platform_device.h>
- #include <linux/gpio.h>
- #include <linux/regulator/fixed.h>
-@@ -288,6 +289,16 @@ static struct platform_device lcdc0_device = {
- 	},
- };
+diff --git a/arch/sh/kernel/cpu/sh4a/pinmux-sh7724.c b/arch/sh/kernel/cpu/sh4a/pinmux-sh7724.c
+index 5c3541d..63be474 100644
+--- a/arch/sh/kernel/cpu/sh4a/pinmux-sh7724.c
++++ b/arch/sh/kernel/cpu/sh4a/pinmux-sh7724.c
+@@ -13,12 +13,23 @@
+  * for more details.
+  */
  
-+static const struct pinctrl_map lcdc0_pinctrl_map[] = {
-+	/* LCD0 */
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_lcdc_fb.0", "pfc-r8a7740",
-+				  "lcd0_data24_1", "lcd0"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_lcdc_fb.0", "pfc-r8a7740",
-+				  "lcd0_lclk_1", "lcd0"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_lcdc_fb.0", "pfc-r8a7740",
-+				  "lcd0_sync", "lcd0"),
++#include <linux/bug.h>
+ #include <linux/init.h>
+ #include <linux/kernel.h>
++#include <linux/ioport.h>
+ #include <cpu/pfc.h>
+ 
++static struct resource sh7724_pfc_resources[] = {
++	[0] = {
++		.start	= 0xa4050100,
++		.end	= 0xa405016f,
++		.flags	= IORESOURCE_MEM,
++	},
 +};
 +
- /*
-  * SMSC 9221
-  */
-@@ -430,36 +441,9 @@ static void __init bonito_init(void)
- 		 */
- 		if (BIT_ON(bsw2, 3) &&	/* S38.1 = OFF */
- 		    BIT_ON(bsw2, 2)) {	/* S38.2 = OFF */
--			gpio_request(GPIO_FN_LCDC0_SELECT,	NULL);
--			gpio_request(GPIO_FN_LCD0_D0,		NULL);
--			gpio_request(GPIO_FN_LCD0_D1,		NULL);
--			gpio_request(GPIO_FN_LCD0_D2,		NULL);
--			gpio_request(GPIO_FN_LCD0_D3,		NULL);
--			gpio_request(GPIO_FN_LCD0_D4,		NULL);
--			gpio_request(GPIO_FN_LCD0_D5,		NULL);
--			gpio_request(GPIO_FN_LCD0_D6,		NULL);
--			gpio_request(GPIO_FN_LCD0_D7,		NULL);
--			gpio_request(GPIO_FN_LCD0_D8,		NULL);
--			gpio_request(GPIO_FN_LCD0_D9,		NULL);
--			gpio_request(GPIO_FN_LCD0_D10,		NULL);
--			gpio_request(GPIO_FN_LCD0_D11,		NULL);
--			gpio_request(GPIO_FN_LCD0_D12,		NULL);
--			gpio_request(GPIO_FN_LCD0_D13,		NULL);
--			gpio_request(GPIO_FN_LCD0_D14,		NULL);
--			gpio_request(GPIO_FN_LCD0_D15,		NULL);
--			gpio_request(GPIO_FN_LCD0_D16,		NULL);
--			gpio_request(GPIO_FN_LCD0_D17,		NULL);
--			gpio_request(GPIO_FN_LCD0_D18_PORT163,	NULL);
--			gpio_request(GPIO_FN_LCD0_D19_PORT162,	NULL);
--			gpio_request(GPIO_FN_LCD0_D20_PORT161,	NULL);
--			gpio_request(GPIO_FN_LCD0_D21_PORT158,	NULL);
--			gpio_request(GPIO_FN_LCD0_D22_PORT160,	NULL);
--			gpio_request(GPIO_FN_LCD0_D23_PORT159,	NULL);
--			gpio_request(GPIO_FN_LCD0_DCK,		NULL);
--			gpio_request(GPIO_FN_LCD0_VSYN,		NULL);
--			gpio_request(GPIO_FN_LCD0_HSYN,		NULL);
--			gpio_request(GPIO_FN_LCD0_DISP,		NULL);
--			gpio_request(GPIO_FN_LCD0_LCLK_PORT165,	NULL);
-+			pinctrl_register_mappings(lcdc0_pinctrl_map,
-+						  ARRAY_SIZE(lcdc0_pinctrl_map));
-+			gpio_request(GPIO_FN_LCDC0_SELECT, NULL);
- 
- 			gpio_request_one(61, GPIOF_OUT_INIT_HIGH,
- 					 NULL); /* LCDDON */
+ static int __init plat_pinmux_setup(void)
+ {
+-	return sh_pfc_register("pfc-sh7724", NULL, 0);
++	return sh_pfc_register("pfc-sh7724", sh7724_pfc_resources,
++			       ARRAY_SIZE(sh7724_pfc_resources));
+ }
+ arch_initcall(plat_pinmux_setup);
 -- 
 1.7.10.4
