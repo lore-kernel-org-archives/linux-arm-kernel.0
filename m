@@ -1,107 +1,44 @@
-From: sourav.poddar@ti.com (Sourav Poddar)
-Date: Mon, 18 Mar 2013 16:27:13 +0530
-Subject: [PATCH 2/2] arm: mach-omap2: prevent UART console idle on suspend
- while using "no_console_suspend"
-Message-ID: <1363604233-11295-1-git-send-email-sourav.poddar@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 18 Mar 2013 10:57:21 +0000
+Subject: [GIT PULL] Renesas ARM-based SoC fixes for v3.9
+In-Reply-To: <20130318103511.GB18676@verge.net.au>
+References: <1362757104-7498-1-git-send-email-horms+renesas@verge.net.au>
+ <20130318103511.GB18676@verge.net.au>
+Message-ID: <201303181057.21955.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With dt boot on omap5, uart wakeup after suspend is non functional while using
-"no_console_suspend" in the bootargs. With "no_console_suspend" used, od->flags
-should be ORed with "OMAP_DEVICE_NO_IDLE_ON_SUSPEND", thereby not allowing the console
-to idle in the suspend path. For non-dt case, this was taken care by platform data.
+On Monday 18 March 2013, Simon Horman wrote:
+> On Fri, Mar 08, 2013 at 04:38:23PM +0100, Simon Horman wrote:
+> > Hi Olof, Hi Arnd,
+> > 
+> > The following changes since commit 6dbe51c251a327e012439c4772097a13df43c5b8:
+> > 
+> >   Linux 3.9-rc1 (2013-03-03 15:11:05 -0800)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git 
+> > 
+> > for you to fetch changes up to 44e9ac45754a182e8121bf137368452365d4cc4b:
+> > 
+> >   ARM: shmobile: marzen: Include mmc/host.h (2013-03-08 16:29:23 +0100)
+> > 
+> > ----------------------------------------------------------------
+> > Resolve a build failure present since v3.9-rc1
+> > 
+> > ----------------------------------------------------------------
+> > Simon Horman (1):
+> >       ARM: shmobile: marzen: Include mmc/host.h
+> 
+> Ping.
 
-Tested on omap5430evm, omap4430sdp.
+Ah, just in time. I think I tried pulling from the URL you listed
+above before, and git said "Already up-to-date.", so I didn't bother
+to look further.
 
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Cc: Felipe Balbi <balbi@ti.com>
-Cc: Rajendra nayak <rnayak@ti.com>
-Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
----
- arch/arm/mach-omap2/omap_device.c |   35 ++++++++++++++++++++++++++++++++++-
- 1 files changed, 34 insertions(+), 1 deletions(-)
+Upon closer inspection, you seem to have missed the tag name. I have
+pulled your renesas-fixes-for-v3.9 tag into the arm-soc fixes branch
+now and will include it in my pull request to Linus today.
 
-diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
-index e065daa..ed3404c 100644
---- a/arch/arm/mach-omap2/omap_device.c
-+++ b/arch/arm/mach-omap2/omap_device.c
-@@ -88,6 +88,7 @@
- #include <linux/pm_runtime.h>
- #include <linux/of.h>
- #include <linux/notifier.h>
-+#include <linux/platform_data/serial-omap.h>
- 
- #include "omap_device.h"
- #include "omap_hwmod.h"
-@@ -96,6 +97,11 @@
- #define USE_WAKEUP_LAT			0
- #define IGNORE_WAKEUP_LAT		1
- 
-+#define MAX_UART_HWMOD_NAME_LEN         16
-+
-+static u8 no_console_suspend;
-+static u8 console_uart_num;
-+
- static int omap_early_device_register(struct platform_device *pdev);
- 
- static struct omap_device_pm_latency omap_default_latency[] = {
-@@ -307,6 +313,12 @@ static void _add_hwmod_clocks_clkdev(struct omap_device *od,
- 		_add_clkdev(od, oh->opt_clks[i].role, oh->opt_clks[i].clk);
- }
- 
-+static char *cmdline_find_option(char *str)
-+{
-+	extern char *saved_command_line;
-+
-+	return strstr(saved_command_line, str);
-+}
- 
- /**
-  * omap_device_build_from_dt - build an omap_device with multiple hwmods
-@@ -331,6 +343,7 @@ static int omap_device_build_from_dt(struct platform_device *pdev)
- 	struct device_node *node = pdev->dev.of_node;
- 	const char *oh_name;
- 	int oh_cnt, i, ret = 0;
-+	static u8 console_uart_id;
- 
- 	oh_cnt = of_property_count_strings(node, "ti,hwmods");
- 	if (!oh_cnt || IS_ERR_VALUE(oh_cnt)) {
-@@ -372,7 +385,13 @@ static int omap_device_build_from_dt(struct platform_device *pdev)
- 			r->name = dev_name(&pdev->dev);
- 	}
- 
--	if (of_get_property(node, "ti,no_idle_on_suspend", NULL))
-+	if (no_console_suspend && !strncmp(oh->name, "uart", 4)) {
-+		if (console_uart_num == console_uart_id)
-+			omap_device_disable_idle_on_suspend(pdev);
-+		else
-+			console_uart_id++;
-+	}
-+	else if (of_get_property(node, "ti,no_idle_on_suspend", NULL))
- 		omap_device_disable_idle_on_suspend(pdev);
- 
- 	pdev->dev.pm_domain = &omap_device_pm_domain;
-@@ -1256,7 +1275,21 @@ static struct notifier_block platform_nb = {
- 
- static int __init omap_device_init(void)
- {
-+	int i;
-+	char uart_name[MAX_UART_HWMOD_NAME_LEN];
-+
- 	bus_register_notifier(&platform_bus_type, &platform_nb);
-+
-+	if (cmdline_find_option("no_console_suspend")) {
-+		no_console_suspend = true;
-+		for (i = 0; i < OMAP_MAX_HSUART_PORTS; i++) {
-+			snprintf(uart_name, MAX_UART_HWMOD_NAME_LEN,
-+				"%s%d", OMAP_SERIAL_NAME, i);
-+			if (cmdline_find_option(uart_name))
-+				console_uart_num = i;
-+		}
-+	}
-+
- 	return 0;
- }
- core_initcall(omap_device_init);
--- 
-1.7.1
+	Arnd
