@@ -1,21 +1,66 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Mon, 18 Mar 2013 09:09:36 +0200
-Subject: [PATCH 6/6] mtd: remove h720x flash support
-In-Reply-To: <1363299178-8241-7-git-send-email-arnd@arndb.de>
-References: <1363299178-8241-1-git-send-email-arnd@arndb.de>
- <1363299178-8241-7-git-send-email-arnd@arndb.de>
-Message-ID: <1363590576.20738.8.camel@sauron.fi.intel.com>
+From: Barry.Song@csr.com (Barry Song)
+Date: Mon, 18 Mar 2013 15:22:41 +0800
+Subject: [PATCH] i2c: sirf: get the i2c pin group by pinctrl api
+Message-ID: <1363591361-5992-1-git-send-email-Barry.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-03-14 at 23:12 +0100, Arnd Bergmann wrote:
-> The h720x platform support is going away in linux-3.10, so the
-> MTD driver will also not be needed any more.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+From: Barry Song <Baohua.Song@csr.com>
 
-Pushed to l2-mtd.git, thanks!
+hardcode set i2c pin group to i2c function before, here we
+move to use standard pinctrl API to get pins of the group.
 
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/i2c/busses/i2c-sirf.c |    9 +++++++++
+ 1 files changed, 9 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/i2c/busses/i2c-sirf.c b/drivers/i2c/busses/i2c-sirf.c
+index 5a7ad24..dd4004e 100644
+--- a/drivers/i2c/busses/i2c-sirf.c
++++ b/drivers/i2c/busses/i2c-sirf.c
+@@ -16,6 +16,7 @@
+ #include <linux/clk.h>
+ #include <linux/err.h>
+ #include <linux/io.h>
++#include <linux/pinctrl/consumer.h>
+ 
+ #define SIRFSOC_I2C_CLK_CTRL		0x00
+ #define SIRFSOC_I2C_STATUS		0x0C
+@@ -265,6 +266,7 @@ static int i2c_sirfsoc_probe(struct platform_device *pdev)
+ 	struct i2c_adapter *adap;
+ 	struct resource *mem_res;
+ 	struct clk *clk;
++	struct pinctrl *pinctrl;
+ 	int bitrate;
+ 	int ctrl_speed;
+ 	int irq;
+@@ -272,6 +274,12 @@ static int i2c_sirfsoc_probe(struct platform_device *pdev)
+ 	int err;
+ 	u32 regval;
+ 
++	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
++	if (IS_ERR(pinctrl)) {
++		err = PTR_ERR(pinctrl);
++		goto failed_pin;
++	}
++
+ 	clk = clk_get(&pdev->dev, NULL);
+ 	if (IS_ERR(clk)) {
+ 		err = PTR_ERR(clk);
+@@ -385,6 +393,7 @@ err_clk_en:
+ err_clk_prep:
+ 	clk_put(clk);
+ err_get_clk:
++failed_pin:
+ 	return err;
+ }
+ 
 -- 
-Best Regards,
-Artem Bityutskiy
+1.7.5.4
+
+
+
+Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
+More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
