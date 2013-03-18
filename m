@@ -1,186 +1,47 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 18 Mar 2013 20:05:45 +0900
-Subject: [PATCH 049/142] sh-pfc: Use proper error codes
+Date: Mon, 18 Mar 2013 20:06:17 +0900
+Subject: [PATCH 081/142] ARM: shmobile: ag5evm: Register pinctrl mappings for
+ IrDA
 In-Reply-To: <1363604838-29359-1-git-send-email-horms+renesas@verge.net.au>
 References: <1363604838-29359-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1363604838-29359-50-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1363604838-29359-82-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Return proper error codes instead of -1, and propagate the error codes.
+Replace the GPIO-based IrDA pinmux configuration by pinctrl mappings.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/pinctrl/sh-pfc/core.c    |   19 ++++++++++---------
- drivers/pinctrl/sh-pfc/gpio.c    |   13 ++++---------
- drivers/pinctrl/sh-pfc/pinctrl.c |   24 +++++++++++-------------
- 3 files changed, 25 insertions(+), 31 deletions(-)
+ arch/arm/mach-shmobile/board-ag5evm.c |    8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/pinctrl/sh-pfc/core.c b/drivers/pinctrl/sh-pfc/core.c
-index 3a94946..a04c497 100644
---- a/drivers/pinctrl/sh-pfc/core.c
-+++ b/drivers/pinctrl/sh-pfc/core.c
-@@ -93,7 +93,7 @@ int sh_pfc_get_pin_index(struct sh_pfc *pfc, unsigned int pin)
- 		offset += range->end - range->begin + 1;
- 	}
+diff --git a/arch/arm/mach-shmobile/board-ag5evm.c b/arch/arm/mach-shmobile/board-ag5evm.c
+index 22b9655..c754071 100644
+--- a/arch/arm/mach-shmobile/board-ag5evm.c
++++ b/arch/arm/mach-shmobile/board-ag5evm.c
+@@ -571,6 +571,9 @@ static const struct pinctrl_map ag5evm_pinctrl_map[] = {
+ 				  "i2c2_0", "i2c2"),
+ 	PIN_MAP_MUX_GROUP_DEFAULT("i2c-sh_mobile.3", "pfc-sh73a0",
+ 				  "i2c3_0", "i2c3"),
++	/* IrDA */
++	PIN_MAP_MUX_GROUP_DEFAULT("sh_irda.0", "pfc-sh73a0",
++				  "irda_0", "irda"),
+ 	/* KEYSC */
+ 	PIN_MAP_MUX_GROUP_DEFAULT("sh_keysc.0", "pfc-sh73a0",
+ 				  "keysc_in8", "keysc"),
+@@ -639,11 +642,6 @@ static void __init ag5evm_init(void)
+ 	gpio_request_one(144, GPIOF_IN, NULL); /* PINTA2 */
+ 	gpio_request_one(145, GPIOF_OUT_INIT_HIGH, NULL); /* RESET */
  
--	return -1;
-+	return -EINVAL;
- }
- 
- static int sh_pfc_enum_in_range(pinmux_enum_t enum_id,
-@@ -233,7 +233,7 @@ static int sh_pfc_get_config_reg(struct sh_pfc *pfc, pinmux_enum_t enum_id,
- 		k++;
- 	}
- 
--	return -1;
-+	return -EINVAL;
- }
- 
- static int sh_pfc_mark_to_enum(struct sh_pfc *pfc, pinmux_enum_t mark, int pos,
-@@ -255,7 +255,7 @@ static int sh_pfc_mark_to_enum(struct sh_pfc *pfc, pinmux_enum_t mark, int pos,
- 	}
- 
- 	pr_err("cannot locate data/mark enum_id for mark %d\n", mark);
--	return -1;
-+	return -EINVAL;
- }
- 
- int sh_pfc_config_mux(struct sh_pfc *pfc, unsigned mark, int pinmux_type)
-@@ -264,6 +264,7 @@ int sh_pfc_config_mux(struct sh_pfc *pfc, unsigned mark, int pinmux_type)
- 	pinmux_enum_t enum_id;
- 	const struct pinmux_range *range;
- 	int in_range, pos, field, value;
-+	int ret;
- 
- 	switch (pinmux_type) {
- 
-@@ -288,7 +289,7 @@ int sh_pfc_config_mux(struct sh_pfc *pfc, unsigned mark, int pinmux_type)
- 		break;
- 
- 	default:
--		return -1;
-+		return -EINVAL;
- 	}
- 
- 	pos = 0;
-@@ -297,8 +298,8 @@ int sh_pfc_config_mux(struct sh_pfc *pfc, unsigned mark, int pinmux_type)
- 	value = 0;
- 	while (1) {
- 		pos = sh_pfc_mark_to_enum(pfc, mark, pos, &enum_id);
--		if (pos <= 0)
--			return -1;
-+		if (pos < 0)
-+			return pos;
- 
- 		if (!enum_id)
- 			break;
-@@ -341,9 +342,9 @@ int sh_pfc_config_mux(struct sh_pfc *pfc, unsigned mark, int pinmux_type)
- 		if (!in_range)
- 			continue;
- 
--		if (sh_pfc_get_config_reg(pfc, enum_id, &cr,
--					  &field, &value) != 0)
--			return -1;
-+		ret = sh_pfc_get_config_reg(pfc, enum_id, &cr, &field, &value);
-+		if (ret < 0)
-+			return ret;
- 
- 		sh_pfc_write_config_reg(pfc, cr, field, value);
- 	}
-diff --git a/drivers/pinctrl/sh-pfc/gpio.c b/drivers/pinctrl/sh-pfc/gpio.c
-index 480beae..e299f14 100644
---- a/drivers/pinctrl/sh-pfc/gpio.c
-+++ b/drivers/pinctrl/sh-pfc/gpio.c
-@@ -276,22 +276,17 @@ static int gpio_function_request(struct gpio_chip *gc, unsigned offset)
- 	struct sh_pfc *pfc = gpio_to_pfc(gc);
- 	unsigned int mark = pfc->info->func_gpios[offset].enum_id;
- 	unsigned long flags;
--	int ret = -EINVAL;
-+	int ret;
- 
- 	pr_notice_once("Use of GPIO API for function requests is deprecated, convert to pinctrl\n");
- 
- 	if (mark == 0)
--		return ret;
-+		return -EINVAL;
- 
- 	spin_lock_irqsave(&pfc->lock, flags);
+-	/* IrDA */
+-	gpio_request(GPIO_FN_PORT241_IRDA_OUT, NULL);
+-	gpio_request(GPIO_FN_PORT242_IRDA_IN,  NULL);
+-	gpio_request(GPIO_FN_PORT243_IRDA_FIRSEL, NULL);
 -
--	if (sh_pfc_config_mux(pfc, mark, PINMUX_TYPE_FUNCTION))
--		goto done;
--
--	ret = 0;
--
--done:
-+	ret = sh_pfc_config_mux(pfc, mark, PINMUX_TYPE_FUNCTION);
- 	spin_unlock_irqrestore(&pfc->lock, flags);
-+
- 	return ret;
- }
- 
-diff --git a/drivers/pinctrl/sh-pfc/pinctrl.c b/drivers/pinctrl/sh-pfc/pinctrl.c
-index b4960df..c150910 100644
---- a/drivers/pinctrl/sh-pfc/pinctrl.c
-+++ b/drivers/pinctrl/sh-pfc/pinctrl.c
-@@ -114,18 +114,16 @@ static int sh_pfc_func_enable(struct pinctrl_dev *pctldev, unsigned selector,
- 	const struct sh_pfc_pin_group *grp = &pfc->info->groups[group];
- 	unsigned long flags;
- 	unsigned int i;
--	int ret = -EINVAL;
-+	int ret = 0;
- 
- 	spin_lock_irqsave(&pfc->lock, flags);
- 
- 	for (i = 0; i < grp->nr_pins; ++i) {
--		if (sh_pfc_config_mux(pfc, grp->mux[i], PINMUX_TYPE_FUNCTION))
--			goto done;
-+		ret = sh_pfc_config_mux(pfc, grp->mux[i], PINMUX_TYPE_FUNCTION);
-+		if (ret < 0)
-+			break;
- 	}
- 
--	ret = 0;
--
--done:
- 	spin_unlock_irqrestore(&pfc->lock, flags);
- 	return ret;
- }
-@@ -144,7 +142,7 @@ static int sh_pfc_reconfig_pin(struct sh_pfc_pinctrl *pmx, unsigned offset,
- 	const struct sh_pfc_pin *pin = &pfc->info->pins[idx];
- 	unsigned int mark = pin->enum_id;
- 	unsigned long flags;
--	int ret = -EINVAL;
-+	int ret;
- 
- 	spin_lock_irqsave(&pfc->lock, flags);
- 
-@@ -156,17 +154,17 @@ static int sh_pfc_reconfig_pin(struct sh_pfc_pinctrl *pmx, unsigned offset,
- 	case PINMUX_TYPE_INPUT_PULLDOWN:
- 		break;
- 	default:
--		goto err;
-+		ret = -EINVAL;
-+		goto done;
- 	}
- 
--	if (sh_pfc_config_mux(pfc, mark, new_type) != 0)
--		goto err;
-+	ret = sh_pfc_config_mux(pfc, mark, new_type);
-+	if (ret < 0)
-+		goto done;
- 
- 	cfg->type = new_type;
- 
--	ret = 0;
--
--err:
-+done:
- 	spin_unlock_irqrestore(&pfc->lock, flags);
- 
- 	return ret;
+ 	/* LCD panel */
+ 	gpio_request_one(217, GPIOF_OUT_INIT_LOW, NULL); /* RESET */
+ 	mdelay(1);
 -- 
 1.7.10.4
