@@ -1,21 +1,62 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 18 Mar 2013 20:50:36 +0000
-Subject: [GIT PULL 3/3] ARM: mvebu: soc for v3.10
-In-Reply-To: <20130318171824.44814271@skate>
-References: <1363551341.10D8ED563.32562@triton>
- <20130318010726.GF13280@titan.lakedaemon.net> <20130318171824.44814271@skate>
-Message-ID: <201303182050.36925.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 18 Mar 2013 21:00:11 +0000
+Subject: [PATCH 1/5] clk: allow reentrant calls into the clk framework
+In-Reply-To: <20130318201551.8663.22731@quantum>
+References: <1362026969-11457-1-git-send-email-mturquette@linaro.org>
+ <1362026969-11457-2-git-send-email-mturquette@linaro.org>
+ <CAPDyKFqhGjduuSRvgZXJBUnbqS9L9aFw_nYc2VfkY1Ljgxrp+g@mail.gmail.com>
+ <20130318201551.8663.22731@quantum>
+Message-ID: <20130318210011.GL4977@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 18 March 2013, Thomas Petazzoni wrote:
-> > Please just send a new version of the mv78xx0 patch.  No need for a new
-> > series.
+On Mon, Mar 18, 2013 at 01:15:51PM -0700, Mike Turquette wrote:
+> Quoting Ulf Hansson (2013-02-28 01:54:34)
+> > On 28 February 2013 05:49, Mike Turquette <mturquette@linaro.org> wrote:
+> > > @@ -703,10 +744,29 @@ int clk_enable(struct clk *clk)
+> > >         unsigned long flags;
+> > >         int ret;
+> > >
+> > > +       /* this call re-enters if it is from the same context */
+> > > +       if (spin_is_locked(&enable_lock) || mutex_is_locked(&prepare_lock)) {
+> > > +               if ((void *) atomic_read(&context) == get_current()) {
+> > > +                       ret = __clk_enable(clk);
+> > > +                       goto out;
+> > > +               }
+> > > +       }
+> > 
+> > I beleive the clk_enable|disable code will be racy. What do you think
+> > about this scenario:
+> > 
+> > 1. Thread 1, calls clk_prepare -> clk is not reentrant -> mutex_lock
+> > -> set_context to thread1.
+> > 2. Thread 2, calls clk_enable -> above "if" will mean that get_current
+> > returns thread 1 context and then clk_enable continues ->
+> > spin_lock_irqsave -> set_context to thread 2.
+> > 3. Thread 1 continues and triggers a reentancy for clk_prepare -> clk
+> > is not reentrant (since thread 2 has set a new context) -> mutex_lock
+> > and we will hang forever.
+> > 
+> > Do you think above scenario could happen?
+> > 
+> > I think the solution would be to invent another "static atomic_t
+> > context;" which is used only for fast path functions
+> > (clk_enable|disable). That should do the trick I think.
 > 
-> Seeing the discussion with Arnd, it seems like a new series will be
-> needed. Not because of mv78xx0, but because Arnd wants a non-DT driver.
+> Ulf,
+> 
+> You are correct.  In fact I have a branch that has two separate context
+> pointers, one for mutex-protected functions and one for
+> spinlock-protected functions.  Somehow I managed to discard that change
+> before settling on the final version that was published.
 
-You could do the patch to remove the DT binding on top if that makes your
-life easier, as long it's gone by the time of the merge window.
+Err.
 
-	Arnd
+Do not forget one very important point.
+
+Any clock which has clk_enable() called on it must have had clk_prepare()
+already called _and_ completed.  A second clk_prepare() call on the same
+clock should be a no-op other than to increase the prepare reference count
+on it.
+
+If you do anything else, you are going to get into sticky problems.
