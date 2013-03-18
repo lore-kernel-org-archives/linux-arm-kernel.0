@@ -1,37 +1,43 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Mon, 18 Mar 2013 15:05:58 -0600
-Subject: [PATCH 1/1] ARM: kirkwood: Fix chip-delay for GoFlex Net
-In-Reply-To: <20130318192653.GZ21478@lunn.ch>
-References: <51476198.2080100@gmail.com>
- <20130318192653.GZ21478@lunn.ch>
-Message-ID: <20130318210558.GB31817@obsidianresearch.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 18 Mar 2013 22:31:49 +0100
+Subject: [PATCH 0/6] pinctrl: Add support for pin control on S3C64xx
+Message-ID: <1363642315-10331-1-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 18, 2013 at 08:26:53PM +0100, Andrew Lunn wrote:
-> On Mon, Mar 18, 2013 at 07:48:56PM +0100, Eric Hutter wrote:
-> > Hi,
-> > 
-> > This fixes "Too few good blocks within range" issues on GoFlex Net
-> > by setting chip-delay to 40.
-> 
-> Hi Eric
-> 
-> Its a problem seen by a couple of other boards as well, e.g. dns320
-> and dns325.
+This series makes necessary preparations to add support for pin controller
+available on Samsung S3C64xx using pinctrl-samsung driver and then adds
+pinctrl-s3c64xx driver which implements SoC-specific part of the code.
 
-The MTD core default of 20us is too small for modern NAND flash.. This
-number is based on the chip's datahseet, it should be the longest
-non-programming command BUSY interval. Eric, if you haven't already,
-it is worth a quick check of the datasheet to verify. Eg the Micron
-flash on my Kirkwood system should be 70us.
+It has been tested on a tiny6410 (mini6410-compatible) board with my patches
+for samsung-time cleanup and S3C64xx Device Tree support:
+ - http://thread.gmane.org/gmane.linux.kernel.samsung-soc/16664
+ - http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg16325.html
 
-u-boot can sometimes get away with a smaller value because it only
-uses a limited set of commands.
+Just the driver is added for now, as this is the part that can safely go
+through Linus' pinctrl tree. I will post appropriate enablement patches
+after all the dependencies get merged to Kgene's tree.
 
-It is on my TODO list to implement ONFI READY/BUSY# pin support in the
-orion-nand driver via a GPIO - could other systems make use of this as
-well?
+See particular patches for more detailed description of all changes.
 
-Regards,
-Jason
+Tomasz Figa (6):
+  pinctrl: samsung: Protect bank registers with a spinlock
+  pinctrl: samsung: Include pinctrl-exynos driver data conditionally
+  pinctrl: samsung: Split pin bank description into two structures
+  pinctrl: samsung: Remove hardcoded register offsets
+  pinctrl: samsung: Handle banks with two configuration registers
+  pinctrl: Add pinctrl-s3c64xx driver
+
+ .../bindings/pinctrl/samsung-pinctrl.txt           |   3 +
+ drivers/pinctrl/Kconfig                            |   5 +
+ drivers/pinctrl/Makefile                           |   1 +
+ drivers/pinctrl/pinctrl-exynos.c                   |  36 +-
+ drivers/pinctrl/pinctrl-exynos.h                   |  16 +-
+ drivers/pinctrl/pinctrl-s3c64xx.c                  | 817 +++++++++++++++++++++
+ drivers/pinctrl/pinctrl-samsung.c                  |  99 ++-
+ drivers/pinctrl/pinctrl-samsung.h                  |  42 +-
+ 8 files changed, 947 insertions(+), 72 deletions(-)
+ create mode 100644 drivers/pinctrl/pinctrl-s3c64xx.c
+
+-- 
+1.8.1.5
