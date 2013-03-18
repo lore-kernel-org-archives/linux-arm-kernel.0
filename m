@@ -1,141 +1,69 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 18 Mar 2013 20:05:49 +0900
-Subject: [PATCH 053/142] sh-pfc: Convert message printing from pr_* to dev_*
+Date: Mon, 18 Mar 2013 20:06:52 +0900
+Subject: [PATCH 116/142] sh-pfc: r8a7779: Remove DU1_DOTCLKOUT1 GPIO
 In-Reply-To: <1363604838-29359-1-git-send-email-horms+renesas@verge.net.au>
 References: <1363604838-29359-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1363604838-29359-54-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1363604838-29359-117-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
+The function is not documented in the r8a7779 datasheet. Remove it.
+
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/pinctrl/sh-pfc/core.c    |   14 +++++++-------
- drivers/pinctrl/sh-pfc/gpio.c    |   16 ++++++++++------
- drivers/pinctrl/sh-pfc/pinctrl.c |    5 +++--
- 3 files changed, 20 insertions(+), 15 deletions(-)
+ drivers/pinctrl/sh-pfc/pfc-r8a7779.c |    9 ++++-----
+ 1 file changed, 4 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/pinctrl/sh-pfc/core.c b/drivers/pinctrl/sh-pfc/core.c
-index a04c497..feef897 100644
---- a/drivers/pinctrl/sh-pfc/core.c
-+++ b/drivers/pinctrl/sh-pfc/core.c
-@@ -10,7 +10,6 @@
-  */
+diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7779.c b/drivers/pinctrl/sh-pfc/pfc-r8a7779.c
+index 5b498ff..f1fa355 100644
+--- a/drivers/pinctrl/sh-pfc/pfc-r8a7779.c
++++ b/drivers/pinctrl/sh-pfc/pfc-r8a7779.c
+@@ -353,7 +353,7 @@ enum {
+ 	FN_VI1_DATA6_VI1_B6, FN_SD2_CD, FN_MT0_VCXO, FN_SPA_TMS,
+ 	FN_HSPI_TX1_D, FN_VI1_DATA7_VI1_B7, FN_SD2_WP, FN_MT0_PWM,
+ 	FN_SPA_TDI, FN_HSPI_RX1_D, FN_VI1_G0, FN_VI3_DATA0,
+-	FN_DU1_DOTCLKOUT1, FN_TS_SCK1, FN_DREQ2_B, FN_TX2,
++	FN_TS_SCK1, FN_DREQ2_B, FN_TX2,
+ 	FN_SPA_TDO, FN_HCTS0_B, FN_VI1_G1, FN_VI3_DATA1,
+ 	FN_SSI_SCK1, FN_TS_SDEN1, FN_DACK2_B, FN_RX2, FN_HRTS0_B,
  
- #define DRV_NAME "sh-pfc"
--#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
- 
- #include <linux/bitops.h>
- #include <linux/err.h>
-@@ -173,9 +172,9 @@ static void sh_pfc_write_config_reg(struct sh_pfc *pfc,
- 
- 	sh_pfc_config_reg_helper(pfc, crp, field, &mapped_reg, &mask, &pos);
- 
--	pr_debug("write_reg addr = %lx, value = %ld, field = %ld, "
--		 "r_width = %ld, f_width = %ld\n",
--		 crp->reg, value, field, crp->reg_width, crp->field_width);
-+	dev_dbg(pfc->dev, "write_reg addr = %lx, value = %ld, field = %ld, "
-+		"r_width = %ld, f_width = %ld\n",
-+		crp->reg, value, field, crp->reg_width, crp->field_width);
- 
- 	mask = ~(mask << pos);
- 	value = value << pos;
-@@ -254,7 +253,8 @@ static int sh_pfc_mark_to_enum(struct sh_pfc *pfc, pinmux_enum_t mark, int pos,
- 		}
- 	}
- 
--	pr_err("cannot locate data/mark enum_id for mark %d\n", mark);
-+	dev_err(pfc->dev, "cannot locate data/mark enum_id for mark %d\n",
-+		mark);
- 	return -EINVAL;
- }
- 
-@@ -396,13 +396,13 @@ static int sh_pfc_probe(struct platform_device *pdev)
- 		 * PFC state as it is, given that there are already
- 		 * extant users of it that have succeeded by this point.
- 		 */
--		pr_notice("failed to init GPIO chip, ignoring...\n");
-+		dev_notice(pfc->dev, "failed to init GPIO chip, ignoring...\n");
- 	}
- #endif
- 
- 	platform_set_drvdata(pdev, pfc);
- 
--	pr_info("%s support registered\n", info->name);
-+	dev_info(pfc->dev, "%s support registered\n", info->name);
- 
- 	return 0;
- }
-diff --git a/drivers/pinctrl/sh-pfc/gpio.c b/drivers/pinctrl/sh-pfc/gpio.c
-index e299f14..d7acb06 100644
---- a/drivers/pinctrl/sh-pfc/gpio.c
-+++ b/drivers/pinctrl/sh-pfc/gpio.c
-@@ -9,8 +9,6 @@
-  * for more details.
-  */
- 
--#define pr_fmt(fmt) KBUILD_MODNAME " gpio: " fmt
--
- #include <linux/device.h>
- #include <linux/gpio.h>
- #include <linux/init.h>
-@@ -273,12 +271,18 @@ static int gpio_pin_setup(struct sh_pfc_chip *chip)
- 
- static int gpio_function_request(struct gpio_chip *gc, unsigned offset)
- {
-+	static bool __print_once;
- 	struct sh_pfc *pfc = gpio_to_pfc(gc);
- 	unsigned int mark = pfc->info->func_gpios[offset].enum_id;
- 	unsigned long flags;
- 	int ret;
- 
--	pr_notice_once("Use of GPIO API for function requests is deprecated, convert to pinctrl\n");
-+	if (!__print_once) {
-+		dev_notice(pfc->dev,
-+			   "Use of GPIO API for function requests is deprecated."
-+			   " Convert to pinctrl\n");
-+		__print_once = true;
-+	}
- 
- 	if (mark == 0)
- 		return -EINVAL;
-@@ -334,9 +338,9 @@ sh_pfc_add_gpiochip(struct sh_pfc *pfc, int(*setup)(struct sh_pfc_chip *))
- 	if (unlikely(ret < 0))
- 		return ERR_PTR(ret);
- 
--	pr_info("%s handling gpio %u -> %u\n",
--		chip->gpio_chip.label, chip->gpio_chip.base,
--		chip->gpio_chip.base + chip->gpio_chip.ngpio - 1);
-+	dev_info(pfc->dev, "%s handling gpio %u -> %u\n",
-+		 chip->gpio_chip.label, chip->gpio_chip.base,
-+		 chip->gpio_chip.base + chip->gpio_chip.ngpio - 1);
- 
- 	return chip;
- }
-diff --git a/drivers/pinctrl/sh-pfc/pinctrl.c b/drivers/pinctrl/sh-pfc/pinctrl.c
-index 82e4fb2..52179bb 100644
---- a/drivers/pinctrl/sh-pfc/pinctrl.c
-+++ b/drivers/pinctrl/sh-pfc/pinctrl.c
-@@ -9,7 +9,6 @@
-  */
- 
- #define DRV_NAME "sh-pfc"
--#define pr_fmt(fmt) KBUILD_MODNAME " pinctrl: " fmt
- 
- #include <linux/device.h>
- #include <linux/err.h>
-@@ -176,7 +175,9 @@ static int sh_pfc_gpio_request_enable(struct pinctrl_dev *pctldev,
- 	spin_lock_irqsave(&pfc->lock, flags);
- 
- 	if (cfg->type != PINMUX_TYPE_NONE) {
--		pr_err("Pin %u is busy, can't configure it as GPIO.\n", offset);
-+		dev_err(pfc->dev,
-+			"Pin %u is busy, can't configure it as GPIO.\n",
-+			offset);
- 		ret = -EBUSY;
- 		goto done;
- 	}
+@@ -615,7 +615,7 @@ enum {
+ 	HSPI_CS1_D_MARK, ADICHS2_B_MARK, VI1_DATA6_VI1_B6_MARK, SD2_CD_MARK,
+ 	MT0_VCXO_MARK, SPA_TMS_MARK, HSPI_TX1_D_MARK, VI1_DATA7_VI1_B7_MARK,
+ 	SD2_WP_MARK, MT0_PWM_MARK, SPA_TDI_MARK, HSPI_RX1_D_MARK,
+-	VI1_G0_MARK, VI3_DATA0_MARK, DU1_DOTCLKOUT1_MARK, TS_SCK1_MARK,
++	VI1_G0_MARK, VI3_DATA0_MARK, TS_SCK1_MARK,
+ 	DREQ2_B_MARK, TX2_MARK,	SPA_TDO_MARK, HCTS0_B_MARK,
+ 	VI1_G1_MARK, VI3_DATA1_MARK, SSI_SCK1_MARK, TS_SDEN1_MARK,
+ 	DACK2_B_MARK, RX2_MARK, HRTS0_B_MARK,
+@@ -1385,7 +1385,6 @@ static const pinmux_enum_t pinmux_data[] = {
+ 	PINMUX_IPSR_MODSEL_DATA(IP11_23_21, HSPI_RX1_D, SEL_HSPI1_3),
+ 	PINMUX_IPSR_DATA(IP11_26_24, VI1_G0),
+ 	PINMUX_IPSR_DATA(IP11_26_24, VI3_DATA0),
+-	PINMUX_IPSR_DATA(IP11_26_24, DU1_DOTCLKOUT1),
+ 	PINMUX_IPSR_DATA(IP11_26_24, TS_SCK1),
+ 	PINMUX_IPSR_MODSEL_DATA(IP11_26_24, DREQ2_B, SEL_EXBUS2_1),
+ 	PINMUX_IPSR_DATA(IP11_26_24, TX2),
+@@ -2926,7 +2925,7 @@ static const struct pinmux_func pinmux_func_gpios[] = {
+ 	GPIO_FN(SD2_CD), GPIO_FN(MT0_VCXO), GPIO_FN(SPA_TMS),
+ 	GPIO_FN(HSPI_TX1_D), GPIO_FN(VI1_DATA7_VI1_B7), GPIO_FN(SD2_WP),
+ 	GPIO_FN(MT0_PWM), GPIO_FN(SPA_TDI), GPIO_FN(HSPI_RX1_D),
+-	GPIO_FN(VI1_G0), GPIO_FN(VI3_DATA0), GPIO_FN(DU1_DOTCLKOUT1),
++	GPIO_FN(VI1_G0), GPIO_FN(VI3_DATA0),
+ 	GPIO_FN(TS_SCK1), GPIO_FN(DREQ2_B), GPIO_FN(TX2), GPIO_FN(SPA_TDO),
+ 	GPIO_FN(HCTS0_B), GPIO_FN(VI1_G1), GPIO_FN(VI3_DATA1),
+ 	GPIO_FN(SSI_SCK1), GPIO_FN(TS_SDEN1), GPIO_FN(DACK2_B), GPIO_FN(RX2),
+@@ -3634,7 +3633,7 @@ static const struct pinmux_cfg_reg pinmux_config_regs[] = {
+ 	    FN_VI1_G1, FN_VI3_DATA1, FN_SSI_SCK1, FN_TS_SDEN1,
+ 	    FN_DACK2_B, FN_RX2, FN_HRTS0_B, 0,
+ 	    /* IP11_26_24 [3] */
+-	    FN_VI1_G0, FN_VI3_DATA0, FN_DU1_DOTCLKOUT1, FN_TS_SCK1,
++	    FN_VI1_G0, FN_VI3_DATA0, 0, FN_TS_SCK1,
+ 	    FN_DREQ2_B, FN_TX2, FN_SPA_TDO, FN_HCTS0_B,
+ 	    /* IP11_23_21 [3] */
+ 	    FN_VI1_DATA7_VI1_B7, FN_SD2_WP, FN_MT0_PWM, FN_SPA_TDI,
 -- 
 1.7.10.4
