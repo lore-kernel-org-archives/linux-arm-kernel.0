@@ -1,55 +1,35 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 18 Mar 2013 20:06:57 +0900
-Subject: [PATCH 121/142] sh-pfc: r8a7779: Remove LBSC function GPIOS
-In-Reply-To: <1363604838-29359-1-git-send-email-horms+renesas@verge.net.au>
-References: <1363604838-29359-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1363604838-29359-122-git-send-email-horms+renesas@verge.net.au>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 18 Mar 2013 11:28:45 +0000
+Subject: [PATCH 10/10] drivers: misc: use module_platform_driver_probe()
+In-Reply-To: <CAHkwnC-aHwd24S5MyLhnVzTqqQj2L7MMuVX9dirhS-G830jZcw@mail.gmail.com>
+References: <1363266691-15757-1-git-send-email-fabio.porcedda@gmail.com>
+ <201303181058.51641.arnd@arndb.de>
+ <CAHkwnC-aHwd24S5MyLhnVzTqqQj2L7MMuVX9dirhS-G830jZcw@mail.gmail.com>
+Message-ID: <201303181128.45215.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+On Monday 18 March 2013, Fabio Porcedda wrote:
+> 
+> On Mon, Mar 18, 2013 at 11:58 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Monday 18 March 2013, Fabio Porcedda wrote:
+> >> Since by using platform_driver_probe() the  function
+> >> ep93xx_pwm_probe() is freed after initialization,
+> >> is better to use module_platform_drive_probe().
+> >> IMHO i don't see any good reason to use module_platform_driver() for
+> >> this driver.
+> >
+> > As I commented earlier, the platform_driver_probe() and
+> > module_platform_drive_probe() interfaces are rather dangerous in combination
+> > with deferred probing, I would much prefer Harley's patch.
+> 
+> Since those drivers don't use -EPROBE_DEFER i was thinking that they don't use
+> deferred probing.
+> I'm missing something?
 
-All r8a7779 platforms now use the pinctrl API to control the LBSC pins,
-the corresponding function GPIOS are unused. Remove them.
+clk_get() may return -EPROBE_DEFER after ep93xx is converted to use the
+common clk API. We currently return the value of clk_get from the probe()
+function, which will automatically do the right thing as long as the probe
+function remains reachable.
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/pinctrl/sh-pfc/pfc-r8a7779.c |   14 ++++++--------
- 1 file changed, 6 insertions(+), 8 deletions(-)
-
-diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7779.c b/drivers/pinctrl/sh-pfc/pfc-r8a7779.c
-index 6f8cc53..5d65499 100644
---- a/drivers/pinctrl/sh-pfc/pfc-r8a7779.c
-+++ b/drivers/pinctrl/sh-pfc/pfc-r8a7779.c
-@@ -2690,22 +2690,20 @@ static const struct pinmux_func pinmux_func_gpios[] = {
- 	GPIO_FN(SSI_WS78_B), GPIO_FN(A25),
- 	GPIO_FN(FD5), GPIO_FN(VI1_R3),
- 	GPIO_FN(SSI_SDATA7_B), GPIO_FN(CLKOUT),
--	GPIO_FN(PWM0_B), GPIO_FN(CS0),
--	GPIO_FN(CS1_A26),
-+	GPIO_FN(PWM0_B),
- 	GPIO_FN(SDSELF_B), GPIO_FN(RD_WR), GPIO_FN(FWE), GPIO_FN(ATAG0),
- 	GPIO_FN(VI1_R7), GPIO_FN(HRTS1),
- 
- 	/* IPSR1 */
--	GPIO_FN(EX_CS0),
--	GPIO_FN(FD6), GPIO_FN(EX_CS1), GPIO_FN(FD7),
--	GPIO_FN(EX_CS2), GPIO_FN(FALE),
--	GPIO_FN(ATACS00), GPIO_FN(EX_CS3),
-+	GPIO_FN(FD6), GPIO_FN(FD7),
-+	GPIO_FN(FALE),
-+	GPIO_FN(ATACS00),
- 	GPIO_FN(FRE), GPIO_FN(ATACS10), GPIO_FN(VI1_R4),
- 	GPIO_FN(HSCK1), GPIO_FN(SSI_SDATA8_B),
--	GPIO_FN(SSI_SDATA9), GPIO_FN(EX_CS4),
-+	GPIO_FN(SSI_SDATA9),
- 	GPIO_FN(FD0), GPIO_FN(ATARD0), GPIO_FN(VI1_R5),
- 	GPIO_FN(HTX1),
--	GPIO_FN(SSI_SCK9), GPIO_FN(EX_CS5),
-+	GPIO_FN(SSI_SCK9),
- 	GPIO_FN(FD1),	GPIO_FN(ATAWR0), GPIO_FN(VI1_R6),
- 	GPIO_FN(HRX1), GPIO_FN(SSI_WS9),
- 	GPIO_FN(MLB_CLK), GPIO_FN(PWM2), GPIO_FN(MLB_SIG),
--- 
-1.7.10.4
+	Arnd
