@@ -1,40 +1,59 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 18 Mar 2013 20:47:09 +0900
-Subject: [PATCH 17/43] ARM: shmobile: sh73a0: fix Z and ZG clock hierarchy
+Date: Mon, 18 Mar 2013 20:47:10 +0900
+Subject: [PATCH 18/43] ARM: shmobile: sh73a0: Remove sh73a0_init_irq_dt()
 In-Reply-To: <1363607255-6385-1-git-send-email-horms+renesas@verge.net.au>
 References: <1363607255-6385-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1363607255-6385-18-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1363607255-6385-19-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+This is not needed as irq_set_wake is
+only used for suspend to ram which is not
+a requirement for bringing up boards using DT.
 
-Z and ZG clocks on sh73a0 have pll0 as their parent, not pll1.
-
-Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+Reported-by: Magnus Damm <magnus.damm@gmail.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-sh73a0.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-shmobile/intc-sh73a0.c  |    8 --------
+ arch/arm/mach-shmobile/setup-sh73a0.c |    3 ++-
+ 2 files changed, 2 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/clock-sh73a0.c b/arch/arm/mach-shmobile/clock-sh73a0.c
-index 5fa106b..71843dd 100644
---- a/arch/arm/mach-shmobile/clock-sh73a0.c
-+++ b/arch/arm/mach-shmobile/clock-sh73a0.c
-@@ -265,12 +265,12 @@ enum { DIV4_I, DIV4_ZG, DIV4_M3, DIV4_B, DIV4_M1, DIV4_M2,
- 
- static struct clk div4_clks[DIV4_NR] = {
- 	[DIV4_I] = DIV4(FRQCRA, 20, 0xdff, CLK_ENABLE_ON_INIT),
--	[DIV4_ZG] = DIV4(FRQCRA, 16, 0xd7f, CLK_ENABLE_ON_INIT),
-+	[DIV4_ZG] = SH_CLK_DIV4(&pll0_clk, FRQCRA, 16, 0xd7f, CLK_ENABLE_ON_INIT),
- 	[DIV4_M3] = DIV4(FRQCRA, 12, 0x1dff, CLK_ENABLE_ON_INIT),
- 	[DIV4_B] = DIV4(FRQCRA, 8, 0xdff, CLK_ENABLE_ON_INIT),
- 	[DIV4_M1] = DIV4(FRQCRA, 4, 0x1dff, 0),
- 	[DIV4_M2] = DIV4(FRQCRA, 0, 0x1dff, 0),
--	[DIV4_Z] = DIV4(FRQCRB, 24, 0x97f, 0),
-+	[DIV4_Z] = SH_CLK_DIV4(&pll0_clk, FRQCRB, 24, 0x97f, 0),
- 	[DIV4_ZTR] = DIV4(FRQCRB, 20, 0xdff, 0),
- 	[DIV4_ZT] = DIV4(FRQCRB, 16, 0xdff, 0),
- 	[DIV4_ZX] = DIV4(FRQCRB, 12, 0xdff, 0),
+diff --git a/arch/arm/mach-shmobile/intc-sh73a0.c b/arch/arm/mach-shmobile/intc-sh73a0.c
+index 91faba6..a81a1d8 100644
+--- a/arch/arm/mach-shmobile/intc-sh73a0.c
++++ b/arch/arm/mach-shmobile/intc-sh73a0.c
+@@ -460,11 +460,3 @@ void __init sh73a0_init_irq(void)
+ 	sh73a0_pint1_cascade.handler = sh73a0_pint1_demux;
+ 	setup_irq(gic_spi(34), &sh73a0_pint1_cascade);
+ }
+-
+-#ifdef CONFIG_OF
+-void __init sh73a0_init_irq_dt(void)
+-{
+-	irqchip_init();
+-	gic_arch_extn.irq_set_wake = sh73a0_set_wake;
+-}
+-#endif
+diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
+index bdab575..49483f4 100644
+--- a/arch/arm/mach-shmobile/setup-sh73a0.c
++++ b/arch/arm/mach-shmobile/setup-sh73a0.c
+@@ -22,6 +22,7 @@
+ #include <linux/init.h>
+ #include <linux/interrupt.h>
+ #include <linux/irq.h>
++#include <linux/irqchip.h>
+ #include <linux/platform_device.h>
+ #include <linux/of_platform.h>
+ #include <linux/delay.h>
+@@ -921,7 +922,7 @@ DT_MACHINE_START(SH73A0_DT, "Generic SH73A0 (Flattened Device Tree)")
+ 	.map_io		= sh73a0_map_io,
+ 	.init_early	= sh73a0_add_early_devices_dt,
+ 	.nr_irqs	= NR_IRQS_LEGACY,
+-	.init_irq	= sh73a0_init_irq_dt,
++	.init_irq	= irqchip_init,
+ 	.init_machine	= sh73a0_add_standard_devices_dt,
+ 	.init_time	= shmobile_timer_init,
+ 	.dt_compat	= sh73a0_boards_compat_dt,
 -- 
 1.7.10.4
