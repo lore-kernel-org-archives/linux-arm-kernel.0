@@ -1,43 +1,40 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 18 Mar 2013 22:31:49 +0100
-Subject: [PATCH 0/6] pinctrl: Add support for pin control on S3C64xx
-Message-ID: <1363642315-10331-1-git-send-email-tomasz.figa@gmail.com>
+Date: Mon, 18 Mar 2013 22:31:51 +0100
+Subject: [PATCH 2/6] pinctrl: samsung: Include pinctrl-exynos driver data
+ conditionally
+In-Reply-To: <1363642315-10331-1-git-send-email-tomasz.figa@gmail.com>
+References: <1363642315-10331-1-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <1363642315-10331-3-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series makes necessary preparations to add support for pin controller
-available on Samsung S3C64xx using pinctrl-samsung driver and then adds
-pinctrl-s3c64xx driver which implements SoC-specific part of the code.
+Since pinctrl-samsung is a common part of the pin control support for
+several Samsung SoCs, it can be compiled without Exynos support enabled.
 
-It has been tested on a tiny6410 (mini6410-compatible) board with my patches
-for samsung-time cleanup and S3C64xx Device Tree support:
- - http://thread.gmane.org/gmane.linux.kernel.samsung-soc/16664
- - http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg16325.html
+This patch surrounds Exynos-specific driver data with ifdefs to include
+them only when support for Exynos is enabled.
 
-Just the driver is added for now, as this is the part that can safely go
-through Linus' pinctrl tree. I will post appropriate enablement patches
-after all the dependencies get merged to Kgene's tree.
+Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+---
+ drivers/pinctrl/pinctrl-samsung.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-See particular patches for more detailed description of all changes.
-
-Tomasz Figa (6):
-  pinctrl: samsung: Protect bank registers with a spinlock
-  pinctrl: samsung: Include pinctrl-exynos driver data conditionally
-  pinctrl: samsung: Split pin bank description into two structures
-  pinctrl: samsung: Remove hardcoded register offsets
-  pinctrl: samsung: Handle banks with two configuration registers
-  pinctrl: Add pinctrl-s3c64xx driver
-
- .../bindings/pinctrl/samsung-pinctrl.txt           |   3 +
- drivers/pinctrl/Kconfig                            |   5 +
- drivers/pinctrl/Makefile                           |   1 +
- drivers/pinctrl/pinctrl-exynos.c                   |  36 +-
- drivers/pinctrl/pinctrl-exynos.h                   |  16 +-
- drivers/pinctrl/pinctrl-s3c64xx.c                  | 817 +++++++++++++++++++++
- drivers/pinctrl/pinctrl-samsung.c                  |  99 ++-
- drivers/pinctrl/pinctrl-samsung.h                  |  42 +-
- 8 files changed, 947 insertions(+), 72 deletions(-)
- create mode 100644 drivers/pinctrl/pinctrl-s3c64xx.c
-
+diff --git a/drivers/pinctrl/pinctrl-samsung.c b/drivers/pinctrl/pinctrl-samsung.c
+index b1d4ac8..f1fb562 100644
+--- a/drivers/pinctrl/pinctrl-samsung.c
++++ b/drivers/pinctrl/pinctrl-samsung.c
+@@ -968,10 +968,12 @@ static int samsung_pinctrl_probe(struct platform_device *pdev)
+ }
+ 
+ static const struct of_device_id samsung_pinctrl_dt_match[] = {
++#ifdef CONFIG_PINCTRL_EXYNOS4
+ 	{ .compatible = "samsung,exynos4210-pinctrl",
+ 		.data = (void *)exynos4210_pin_ctrl },
+ 	{ .compatible = "samsung,exynos4x12-pinctrl",
+ 		.data = (void *)exynos4x12_pin_ctrl },
++#endif
+ 	{},
+ };
+ MODULE_DEVICE_TABLE(of, samsung_pinctrl_dt_match);
 -- 
 1.8.1.5
