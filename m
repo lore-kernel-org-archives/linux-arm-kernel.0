@@ -1,40 +1,112 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 18 Mar 2013 14:51:15 +0200
-Subject: [PATCH v3 1/4] usb: phy: nop: Add some parameters to platform data
+Date: Mon, 18 Mar 2013 14:51:17 +0200
+Subject: [PATCH v3 3/4] ARM: OMAP2+: omap4panda: Adapt to ehci-omap changes
 In-Reply-To: <1363611078-13002-1-git-send-email-rogerq@ti.com>
 References: <1363611078-13002-1-git-send-email-rogerq@ti.com>
-Message-ID: <1363611078-13002-2-git-send-email-rogerq@ti.com>
+Message-ID: <1363611078-13002-4-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add clk_rate parameter to platform data. If supplied, the
-NOP phy driver will program the clock to that rate during probe.
+Use usbhs_init_phys() to register the PHY's VCC and RESET
+regulators and the NOP PHY device.
 
-Also add 2 flags, needs_vcc and needs_reset.
-If the flag is set and the regulator couldn't be found
-then the driver will bail out with -EPROBE_DEFER.
+Get rid of managing the PHY clock as it will be done by the PHY driver.
+For that to work we create a clock alias that links the PHY clock name
+to the PHY device name.
 
 Signed-off-by: Roger Quadros <rogerq@ti.com>
-Acked-by: Felipe Balbi <balbi@ti.com>
 ---
- include/linux/usb/nop-usb-xceiv.h |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/board-omap4panda.c |   55 ++++++++++++-------------------
+ 1 files changed, 21 insertions(+), 34 deletions(-)
 
-diff --git a/include/linux/usb/nop-usb-xceiv.h b/include/linux/usb/nop-usb-xceiv.h
-index 28884c7..148d351 100644
---- a/include/linux/usb/nop-usb-xceiv.h
-+++ b/include/linux/usb/nop-usb-xceiv.h
-@@ -5,6 +5,11 @@
- 
- struct nop_usb_xceiv_platform_data {
- 	enum usb_phy_type type;
-+	unsigned long clk_rate;
-+
-+	/* if set fails with -EPROBE_DEFER if can't get regulator */
-+	unsigned int needs_vcc:1;
-+	unsigned int needs_reset:1;
+diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
+index b02c2f0..a71ad34 100644
+--- a/arch/arm/mach-omap2/board-omap4panda.c
++++ b/arch/arm/mach-omap2/board-omap4panda.c
+@@ -31,6 +31,7 @@
+ #include <linux/ti_wilink_st.h>
+ #include <linux/usb/musb.h>
+ #include <linux/usb/phy.h>
++#include <linux/usb/nop-usb-xceiv.h>
+ #include <linux/wl12xx.h>
+ #include <linux/irqchip/arm-gic.h>
+ #include <linux/platform_data/omap-abe-twl6040.h>
+@@ -132,6 +133,22 @@ static struct platform_device btwilink_device = {
+ 	.id	= -1,
  };
  
- #if defined(CONFIG_NOP_USB_XCEIV) || (defined(CONFIG_NOP_USB_XCEIV_MODULE) && defined(MODULE))
++/* PHY device on HS USB Port 1 i.e. nop_usb_xceiv.1 */
++static struct nop_usb_xceiv_platform_data hsusb1_phy_data = {
++	/* FREF_CLK3 provides the 19.2 MHz reference clock to the PHY */
++	.clk_rate = 19200000,
++};
++
++static struct usbhs_phy_data phy_data[] __initdata = {
++	{
++		.port = 1,
++		.reset_gpio = GPIO_HUB_NRESET,
++		.vcc_gpio = GPIO_HUB_POWER,
++		.vcc_polarity = 1,
++		.platform_data = &hsusb1_phy_data,
++	},
++};
++
+ static struct platform_device *panda_devices[] __initdata = {
+ 	&leds_gpio,
+ 	&wl1271_device,
+@@ -142,49 +159,19 @@ static struct platform_device *panda_devices[] __initdata = {
+ 
+ static struct usbhs_omap_platform_data usbhs_bdata __initdata = {
+ 	.port_mode[0] = OMAP_EHCI_PORT_MODE_PHY,
+-	.port_mode[1] = OMAP_USBHS_PORT_MODE_UNUSED,
+-	.port_mode[2] = OMAP_USBHS_PORT_MODE_UNUSED,
+-	.phy_reset  = false,
+-	.reset_gpio_port[0]  = -EINVAL,
+-	.reset_gpio_port[1]  = -EINVAL,
+-	.reset_gpio_port[2]  = -EINVAL
+-};
+-
+-static struct gpio panda_ehci_gpios[] __initdata = {
+-	{ GPIO_HUB_POWER,	GPIOF_OUT_INIT_LOW,  "hub_power"  },
+-	{ GPIO_HUB_NRESET,	GPIOF_OUT_INIT_LOW,  "hub_nreset" },
+ };
+ 
+ static void __init omap4_ehci_init(void)
+ {
+ 	int ret;
+-	struct clk *phy_ref_clk;
+ 
+ 	/* FREF_CLK3 provides the 19.2 MHz reference clock to the PHY */
+-	phy_ref_clk = clk_get(NULL, "auxclk3_ck");
+-	if (IS_ERR(phy_ref_clk)) {
+-		pr_err("Cannot request auxclk3\n");
+-		return;
+-	}
+-	clk_set_rate(phy_ref_clk, 19200000);
+-	clk_prepare_enable(phy_ref_clk);
+-
+-	/* disable the power to the usb hub prior to init and reset phy+hub */
+-	ret = gpio_request_array(panda_ehci_gpios,
+-				 ARRAY_SIZE(panda_ehci_gpios));
+-	if (ret) {
+-		pr_err("Unable to initialize EHCI power/reset\n");
+-		return;
+-	}
+-
+-	gpio_export(GPIO_HUB_POWER, 0);
+-	gpio_export(GPIO_HUB_NRESET, 0);
+-	gpio_set_value(GPIO_HUB_NRESET, 1);
++	ret = clk_add_alias("main_clk", "nop_usb_xceiv.1", "auxclk3_ck", NULL);
++	if (ret)
++		pr_err("Failed to add main_clk alias to auxclk3_ck\n");
+ 
++	usbhs_init_phys(phy_data, ARRAY_SIZE(phy_data));
+ 	usbhs_init(&usbhs_bdata);
+-
+-	/* enable power to hub */
+-	gpio_set_value(GPIO_HUB_POWER, 1);
+ }
+ 
+ static struct omap_musb_board_data musb_board_data = {
 -- 
 1.7.4.1
