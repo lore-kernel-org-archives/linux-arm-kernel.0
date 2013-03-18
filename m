@@ -1,54 +1,23 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 18 Mar 2013 13:15:51 -0700
-Subject: [PATCH 1/5] clk: allow reentrant calls into the clk framework
-In-Reply-To: <CAPDyKFqhGjduuSRvgZXJBUnbqS9L9aFw_nYc2VfkY1Ljgxrp+g@mail.gmail.com>
-References: <1362026969-11457-1-git-send-email-mturquette@linaro.org>
- <1362026969-11457-2-git-send-email-mturquette@linaro.org>
- <CAPDyKFqhGjduuSRvgZXJBUnbqS9L9aFw_nYc2VfkY1Ljgxrp+g@mail.gmail.com>
-Message-ID: <20130318201551.8663.22731@quantum>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 18 Mar 2013 21:21:33 +0100
+Subject: ep93xx irq-vic regression
+In-Reply-To: <ADE657CA350FB648AAC2C43247A983F0020980106CB7@AUSP01VMBX24.collaborationhost.net>
+References: <ADE657CA350FB648AAC2C43247A983F0020980106C9F@AUSP01VMBX24.collaborationhost.net>
+ <5143AAB4.6020406@gmail.com>
+ <ADE657CA350FB648AAC2C43247A983F0020980106CB7@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <CACRpkdb9tpeTxEc8A24vTkcUsfd=gQpMub0KpgaKJjrGf-fSvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Ulf Hansson (2013-02-28 01:54:34)
-> On 28 February 2013 05:49, Mike Turquette <mturquette@linaro.org> wrote:
-> > @@ -703,10 +744,29 @@ int clk_enable(struct clk *clk)
-> >         unsigned long flags;
-> >         int ret;
-> >
-> > +       /* this call re-enters if it is from the same context */
-> > +       if (spin_is_locked(&enable_lock) || mutex_is_locked(&prepare_lock)) {
-> > +               if ((void *) atomic_read(&context) == get_current()) {
-> > +                       ret = __clk_enable(clk);
-> > +                       goto out;
-> > +               }
-> > +       }
-> 
-> I beleive the clk_enable|disable code will be racy. What do you think
-> about this scenario:
-> 
-> 1. Thread 1, calls clk_prepare -> clk is not reentrant -> mutex_lock
-> -> set_context to thread1.
-> 2. Thread 2, calls clk_enable -> above "if" will mean that get_current
-> returns thread 1 context and then clk_enable continues ->
-> spin_lock_irqsave -> set_context to thread 2.
-> 3. Thread 1 continues and triggers a reentancy for clk_prepare -> clk
-> is not reentrant (since thread 2 has set a new context) -> mutex_lock
-> and we will hang forever.
-> 
-> Do you think above scenario could happen?
-> 
-> I think the solution would be to invent another "static atomic_t
-> context;" which is used only for fast path functions
-> (clk_enable|disable). That should do the trick I think.
+On Sat, Mar 16, 2013 at 1:16 AM, H Hartley Sweeten
+<hartleys@visionengravers.com> wrote:
 
-Ulf,
+> It looks like the commit above _did_ have a couple bugs but they were
+> fixed:
 
-You are correct.  In fact I have a branch that has two separate context
-pointers, one for mutex-protected functions and one for
-spinlock-protected functions.  Somehow I managed to discard that change
-before settling on the final version that was published.
+Oh thanks, I already was scared I had broken something again.
+The irqdomain stuff is a bit fragile, everytime I refactor something
+it blows up in my face. I hope there are no remaining problems.
 
-I'll add the change back in.
-
-Thanks for the review,
-Mike
+Yours,
+Linus Walleij
