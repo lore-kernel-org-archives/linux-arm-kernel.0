@@ -1,55 +1,32 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 18 Mar 2013 22:58:18 +0900
-Subject: [PATCH/RFC] ARM: shmobile: Disallow PINCTRL without GPIOLIB
-Message-ID: <20130318135818.23765.51686.sendpatchset@w520>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 18 Mar 2013 14:58:17 +0100
+Subject: [PATCH] ARM: video: mxs: Fix mxsfb misconfiguring VDCTRL0
+In-Reply-To: <20130318130108.GE12462@S2101-09.ap.freescale.net>
+References: <CAOMZO5CDuODRrJEEaDKm5nepfkuvuF77ZQmarB69hL6gg386ww@mail.gmail.com>
+ <51471293.5070105@freescale.com>
+ <20130318130108.GE12462@S2101-09.ap.freescale.net>
+Message-ID: <201303181458.17656.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+Dear Shawn Guo,
 
-Modify mach-shmobile to only select PINCTRL in case of
-ARCH_WANT_OPTIONAL_GPIOLIB is set.
+> On Mon, Mar 18, 2013 at 10:11:47AM -0300, Fabio Estevam wrote:
+> > Shawn Guo wrote:
+> > > Since it touches mach-mxs as well, let me send it through arm-soc tree
+> > > as fix for 3.9.
+> > 
+> > Please CC stable as well, so that we can have X11 functional with 3.8.
+> 
+> Ok, done.
 
-This fixes a build error triggered when adding a new SoC
-lacking GPIO software support (ARCH_WANT_OPTIONAL_GPIOLIB=n):
+Shawn, I think this patch applies to 3.9-rc but there's one more platform in 
+mach-mxs.c in 3.9-rc thus this will have compile issue. Just renaming those two 
+FB_SYNC_ values to MXSFB_SYNC_ fixes the compile issue on 3.9-rc. Also the 
+commit log doesn't look all that cool .... I probably should have marked the 
+patch as RFC.
 
- CC      drivers/tty/vt/keyboard.o
-In file included from drivers/pinctrl/core.c:30:0:
-include/asm-generic/gpio.h: In function 'gpio_get_value_cansleep':
-include/asm-generic/gpio.h:270:2: error: implicit declaration of function '__gpio_get_value'
-include/asm-generic/gpio.h: In function 'gpio_set_value_cansleep':
-include/asm-generic/gpio.h:276:2: error: implicit declaration of function '__gpio_set_value'
-drivers/pinctrl/core.c: In function 'pinctrl_ready_for_gpio_range':
-drivers/pinctrl/core.c:297:9: error: implicit declaration of function 'gpio_to_chip'
-drivers/pinctrl/core.c:297:27: warning: initialization makes pointer from integer without a cast
-drivers/pinctrl/core.c:304:45: error: dereferencing pointer to incomplete type
-drivers/pinctrl/core.c:305:26: error: dereferencing pointer to incomplete type
-drivers/pinctrl/core.c:305:39: error: dereferencing pointer to incomplete type
-make[2]: *** [drivers/pinctrl/core.o] Error 1
-make[1]: *** [drivers/pinctrl] Error 2
-make[1]: *** Waiting for unfinished jobs....
-  LD      drivers/sh/built-in.o
+Shall I send you one for 3.9-rc and one for stable maybe ?
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
-
- Using renesas.git "next" 811689afc214564c4a5f238ecf4d8bdc0e52b615
-
- Trigger using the r8a73a4 patches that lack GPIO and PFC support.
-
- I am more than happy to replace this patch with something cleaner.
-
- arch/arm/Kconfig |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
---- 0001/arch/arm/Kconfig
-+++ work/arch/arm/Kconfig	2013-03-18 14:56:17.000000000 +0900
-@@ -725,7 +725,7 @@ config ARCH_SHMOBILE
- 	select MULTI_IRQ_HANDLER
- 	select NEED_MACH_MEMORY_H
- 	select NO_IOPORT
--	select PINCTRL
-+	select PINCTRL if ARCH_WANT_OPTIONAL_GPIOLIB
- 	select PM_GENERIC_DOMAINS if PM
- 	select SPARSE_IRQ
- 	help
+Best regards,
+Marek Vasut
