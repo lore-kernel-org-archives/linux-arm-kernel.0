@@ -1,23 +1,21 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 18 Mar 2013 21:21:33 +0100
-Subject: ep93xx irq-vic regression
-In-Reply-To: <ADE657CA350FB648AAC2C43247A983F0020980106CB7@AUSP01VMBX24.collaborationhost.net>
-References: <ADE657CA350FB648AAC2C43247A983F0020980106C9F@AUSP01VMBX24.collaborationhost.net>
- <5143AAB4.6020406@gmail.com>
- <ADE657CA350FB648AAC2C43247A983F0020980106CB7@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <CACRpkdb9tpeTxEc8A24vTkcUsfd=gQpMub0KpgaKJjrGf-fSvg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 18 Mar 2013 20:50:36 +0000
+Subject: [GIT PULL 3/3] ARM: mvebu: soc for v3.10
+In-Reply-To: <20130318171824.44814271@skate>
+References: <1363551341.10D8ED563.32562@triton>
+ <20130318010726.GF13280@titan.lakedaemon.net> <20130318171824.44814271@skate>
+Message-ID: <201303182050.36925.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 16, 2013 at 1:16 AM, H Hartley Sweeten
-<hartleys@visionengravers.com> wrote:
+On Monday 18 March 2013, Thomas Petazzoni wrote:
+> > Please just send a new version of the mv78xx0 patch.  No need for a new
+> > series.
+> 
+> Seeing the discussion with Arnd, it seems like a new series will be
+> needed. Not because of mv78xx0, but because Arnd wants a non-DT driver.
 
-> It looks like the commit above _did_ have a couple bugs but they were
-> fixed:
+You could do the patch to remove the DT binding on top if that makes your
+life easier, as long it's gone by the time of the merge window.
 
-Oh thanks, I already was scared I had broken something again.
-The irqdomain stuff is a bit fragile, everytime I refactor something
-it blows up in my face. I hope there are no remaining problems.
-
-Yours,
-Linus Walleij
+	Arnd
