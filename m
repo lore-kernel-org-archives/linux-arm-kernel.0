@@ -1,121 +1,58 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 18 Mar 2013 15:07:24 +0000
-Subject: [PATCH] ARM: hw_breakpoint: Enable debug powerdown only if
- system supports 'has_ossr'
-In-Reply-To: <5146B972.1010002@ti.com>
-References: <1363157553-21085-1-git-send-email-lokeshvutla@ti.com>
- <51406BA7.8010306@arm.com> <51407120.7030709@ti.com>
- <51417E58.5050501@ti.com> <20130315050014.GA15706@tiny-lites>
- <5146B972.1010002@ti.com>
-Message-ID: <20130318150724.GC28585@mudshark.cambridge.arm.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 18 Mar 2013 23:13:50 +0800
+Subject: [PATCH 1/7] kbuild: create an "include chroot" for DT bindings
+In-Reply-To: <1362594183-21523-1-git-send-email-swarren@wwwdotorg.org>
+References: <1362594183-21523-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20130318151348.GB4713@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Santosh,
-
-On Mon, Mar 18, 2013 at 06:51:30AM +0000, Santosh Shilimkar wrote:
-> On Friday 15 March 2013 10:30 AM, Will Deacon wrote:
-> > Furthermore, I was under the impression that hw_breakpoint did actually
-> > work on panda, which implies that a cold boot *does* manage to reset the
-> > registers (can you please confirm this by looking in your dmesg during
-> > boot?). In that case, it seems as though a PM cycle is powering down a
-> > bunch of debug logic that was powered up during boot, and then we trip over
-> > because we can't access the register bank.
-> > 
-> Actually it seems to be without PM. Thanks to analysis from Lokesh, the issue
-> can be seen even with just suspend or cpu hotplug. So cold boot as such is
-> fine.
-
-Right, so what you're saying is that monitor-mode hardware debug only works
-until the first pm/suspend/hotplug operation, then it's dead in the water?
-
-> > The proper solution to this problem requires us to establish exactly what is
-> > turning off the debug registers, and then having an OMAP PM notifier to
-> > enable it again. Assuming this has always been the case, I expect hardware
-> > debug across PM fails silently with older kernels.
-> > 
-> This has been always the case it seems with CPU power cycle.
-> After the CPU is power cycled, 'DBGAUTHSTATUS' reads '0xaa' rather
-> than '0xaf' which means 'DBGEN = 0' and hence code fails to enable
-> monitor mode. This happens on both secure and GP devices and it can not
-> be patched since the secure code is ROM'ed. We didn't notice so far
-> because hw_breakpoint support was not default enabled on OMAP till the
-> multi-platform build.
-
-That really sucks :( Does this affect all OMAP-based boards?
-
-> >> I was also wondering whether we should just warn once rather
-> >> than continuous warnings in the notifier. Patch is end of the
-> >> email.
-> > 
-> > Could do, but I'd like to see a fix for the real issue before we simply hide
-> > the warnings :)
-> > 
-> Agree here too. As evident above, the feature won't work on OMAP4
-> devices with PM and hence some solution is needed.
+On Wed, Mar 06, 2013 at 11:22:57AM -0700, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
 > 
-> What you think of below ?
-
-Comments inline...
-
+> The recent dtc+cpp support allows header files and C pre-processor
+> defines/macros to be used when compiling device tree files. These
+> headers will typically define various constants that are part of the
+> device tree bindings.
 > 
-> From d74b4264f6a5967b0f7ada96aad77ab0ac30dbed Mon Sep 17 00:00:00 2001
-> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Date: Mon, 18 Mar 2013 11:59:04 +0530
-> Subject: [PATCH] ARM: hw_breakpoints: Check for CPU debug availability before
->  enabling it
+> The original patch which set up the dtc+cpp include path only considered
+> using those headers from device tree files. However, most are also
+> useful for kernel code which needs to interpret the device tree.
 > 
-> CPU debug features like hardware break, watchpoints can be used only when
-> the debug mode is enabled and available for non-secure mode.
+> In both the DT files and the kernel, I'd like to include the DT-related
+> headers in the same way, for example, <dt-bindings/gpio/tegra-gpio.h>.
+> That will simplify any text which discusses the DT header locations.
 > 
-> Hence check 'DBGAUTHSTATUS.DBGEN' before proceeding to enable the
-> features.
+> Creating a <dt-bindings/> for kernel source to use is as simple as
+> placing files into include/dt-bindings/.
 > 
-> Thanks to Will for pointers and Lokesh for the analysis of the issue on
-> OMAP4 where after a CPU power cycle, debug mode gets disabled.
+> However, when compiling DT files, the include path should be restricted
+> so that only the dt-bindings path is available; arbitrary kernel headers
+> shouldn't be exposed. For this reason, create a specific include
+> directory for use by dtc+cpp, and symlink dt-bindings from there to the
+> actual location of include/dt-bindings/. For want of a better location,
+> place this "include chroot" into the existing dts/ directory.
 > 
-> Cc: Will Deacon <Will.Deacon@arm.com>
+> arch/*/boot/dts/include/dt-bindings -> ../../../../../include/dt-bindings
 > 
-> Tested-by: Lokesh Vutla <lokeshvutla@ti.com>
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Some headers used by device tree files may not be useful to the kernel;
+> they may be used simply to aid in constructing the DT file (e.g. macros
+> to create a node), but not define any information that the kernel needs
+> to share. These may be placed directly into arch/*/boot/dts/ along with
+> the DT files themselves.
+> 
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Hiroshi Doyu <hdoyu@nvidia.com>
+> Acked-by: Michal Marek <mmarek@suse.cz>
+> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+> Acked-by: Rob Herring <rob.herring@calxeda.com>
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
 > ---
->  arch/arm/kernel/hw_breakpoint.c |    8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
-> index 96093b7..683a7cf 100644
-> --- a/arch/arm/kernel/hw_breakpoint.c
-> +++ b/arch/arm/kernel/hw_breakpoint.c
-> @@ -930,6 +930,14 @@ static void reset_ctrl_regs(void *unused)
->  	int i, raw_num_brps, err = 0, cpu = smp_processor_id();
->  	u32 val;
->  
-> +	/* Check if we have access to CPU debug features */
-> +	ARM_DBG_READ(c7, c14, 6, val);
-> +	if ((val & 0x1) == 0) {
-> +		pr_warn_once("CPU %d debug is unavailable\n", cpu);
-> +		cpumask_or(&debug_err_mask, &debug_err_mask, cpumask_of(cpu));
-> +		return;
-> +	}
+> This first patch was previously posted separately as V2. I'm including
+> it here to keep it with the whole series. I hope this series can be
+> applied as a topic branch in arm-soc.
 
-There are a few of problems here:
+So no comments on the series means that we can start maintain it on
+a topic branch, so that people can base their works on it?
 
-	1. That is only checking for non-secure access, which precludes
-	   running Linux in secure mode.
-
-	2. DBGAUTHSTATUS accesses are UNPREDICTABLE when the double-lock is
-	   set for v7.1 processors.
-
-	3. DBGAUTHSTATUS doesn't exist in ARMv6.
-
-	4. CPUs without the security extensions have DBGAUTHSTATUS.NSE == 0
-
-	5. Accessing DBGAUTHSTATUS requires DBGEN to be driven high.
-	   Assuming that your pr_warn_once is emitted, this implies that
-	   DBGEN is driven high from cold boot, yet the NSE bit is low,
-	   implying that DBGEN is also low. That's contradictory, so I have
-	   no idea what's going on...
-
-Apart from that, it's fine!
-
-Will
+Shawn
