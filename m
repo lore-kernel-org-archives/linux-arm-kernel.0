@@ -1,48 +1,31 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 18 Mar 2013 21:32:40 +0900
-Subject: [PATCH 30/43] ARM: shmobile: Use sh73a0-specific cpu disable code
+Date: Mon, 18 Mar 2013 21:32:29 +0900
+Subject: [PATCH 19/43] ARM: shmobile: sh73a0: Add smp ops to DT_MACHINE_START
 In-Reply-To: <1363609973-31086-1-git-send-email-horms+renesas@verge.net.au>
 References: <1363609973-31086-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1363609973-31086-31-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1363609973-31086-20-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+This a board to be brought up with SMP enabled
+without a board file present.
 
-Convert the sh73a0 CPU Hotplug code to use a local
-implementation of ->cpu_disable(). With this change
-in place the sh73a0 SMP code does no longer depend
-on hotplug.c.
-
-Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/smp-sh73a0.c |    7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ arch/arm/mach-shmobile/setup-sh73a0.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-shmobile/smp-sh73a0.c b/arch/arm/mach-shmobile/smp-sh73a0.c
-index 593f8de..5ae502b 100644
---- a/arch/arm/mach-shmobile/smp-sh73a0.c
-+++ b/arch/arm/mach-shmobile/smp-sh73a0.c
-@@ -124,6 +124,11 @@ static void sh73a0_cpu_die(unsigned int cpu)
- 	/* Enter shutdown mode */
- 	cpu_do_idle();
- }
-+
-+static int sh73a0_cpu_disable(unsigned int cpu)
-+{
-+	return 0; /* CPU0 and CPU1 supported */
-+}
- #endif /* CONFIG_HOTPLUG_CPU */
- 
- struct smp_operations sh73a0_smp_ops __initdata = {
-@@ -134,6 +139,6 @@ struct smp_operations sh73a0_smp_ops __initdata = {
- #ifdef CONFIG_HOTPLUG_CPU
- 	.cpu_kill		= sh73a0_cpu_kill,
- 	.cpu_die		= sh73a0_cpu_die,
--	.cpu_disable		= shmobile_cpu_disable_any,
-+	.cpu_disable		= sh73a0_cpu_disable,
- #endif
+diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
+index 49483f4..c7630aa 100644
+--- a/arch/arm/mach-shmobile/setup-sh73a0.c
++++ b/arch/arm/mach-shmobile/setup-sh73a0.c
+@@ -919,6 +919,7 @@ static const char *sh73a0_boards_compat_dt[] __initdata = {
  };
+ 
+ DT_MACHINE_START(SH73A0_DT, "Generic SH73A0 (Flattened Device Tree)")
++	.smp		= smp_ops(sh73a0_smp_ops),
+ 	.map_io		= sh73a0_map_io,
+ 	.init_early	= sh73a0_add_early_devices_dt,
+ 	.nr_irqs	= NR_IRQS_LEGACY,
 -- 
 1.7.10.4
