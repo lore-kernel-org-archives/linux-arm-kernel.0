@@ -1,52 +1,40 @@
-From: fabio.baltieri@linaro.org (Fabio Baltieri)
-Date: Mon, 18 Mar 2013 12:00:57 +0100
-Subject: [PATCH] ARM: ux500: select WATCHDOG and MUSB for ux500
-Message-ID: <1363604457-17112-1-git-send-email-fabio.baltieri@linaro.org>
+From: gerlando.falauto@keymile.com (Gerlando Falauto)
+Date: Mon, 18 Mar 2013 12:05:08 +0100
+Subject: [PATCH] genirq: allow an alternative setup for the mask cache
+In-Reply-To: <CALF0-+WPb-WcQPaRJ_oyS44Aq9=zMemSGZnkvKY2OXfPz8uy=w@mail.gmail.com>
+References: <1363277430-21325-1-git-send-email-holger.brunck@keymile.com>
+ <CALF0-+WPb-WcQPaRJ_oyS44Aq9=zMemSGZnkvKY2OXfPz8uy=w@mail.gmail.com>
+Message-ID: <5146F4E4.2000001@keymile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable ux500 specific USB and watchdog drivers by default on
-u8500_defconfig.
+Hi Ezequiel,
 
-Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
----
+On 03/14/2013 08:42 PM, Ezequiel Garcia wrote:
+> Hi,
+>
+> On Thu, Mar 14, 2013 at 1:10 PM, Holger Brunck
+> <holger.brunck@keymile.com> wrote:
+>> The same interrupt mask cache (stored within struct irq_chip_generic)
+>> is shared between all the irq_chip_type instances by default. But this
+>> does not work on Orion SOCs which have separate mask registers for edge
+>> and level interrupts. Therefore refactor the code that we always use a
+>> pointer to access the mask register. By default it points to
+>> gc->mask_cache for Orion SOCs it points to ct->mask_cache which is
+>> setup in irq_setup_alt_chip().
+>>
+>
+> When you say this does not work for Orion SoC, are you aware there
+> are two GPIO drivers? One at plat-orion and *another* one at drivers/gpio?
 
-Hello Linus,
+Yes, we are now aware of that, but apparently this was new driver was 
+introduced around 3.6 which we are not yet using.
 
-ux500 watchdog support was introduced during this merge window and USB
-was fixed too, so I'm sending a defconfig update to enable those two
-drivers by default, so that those get some more testing.
+> Have you tried and reproduced this regression with both of them?
 
-Thanks,
-Fabio
+No, not really. Would you be able to test this?
+BTW, do you know whether all three variants of Marvell Chipsets use 
+separate registers, or it's only the Orion?
 
- arch/arm/configs/u8500_defconfig | 6 ++++++
- 1 file changed, 6 insertions(+)
-
-diff --git a/arch/arm/configs/u8500_defconfig b/arch/arm/configs/u8500_defconfig
-index 426270f..92b1347 100644
---- a/arch/arm/configs/u8500_defconfig
-+++ b/arch/arm/configs/u8500_defconfig
-@@ -71,6 +71,7 @@ CONFIG_GPIO_TC3589X=y
- # CONFIG_AB8500_BATTERY_THERM_ON_BATCTRL is not set
- CONFIG_THERMAL=y
- CONFIG_CPU_THERMAL=y
-+CONFIG_WATCHDOG=y
- CONFIG_MFD_STMPE=y
- CONFIG_MFD_TC3589X=y
- CONFIG_AB5500_CORE=y
-@@ -80,7 +81,12 @@ CONFIG_REGULATOR_AB8500=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
- CONFIG_REGULATOR_GPIO=y
- # CONFIG_HID_SUPPORT is not set
-+CONFIG_USB=y
-+CONFIG_USB_MUSB_HDRC=y
-+CONFIG_USB_MUSB_UX500=y
- CONFIG_USB_GADGET=y
-+CONFIG_USB_GADGET_MUSB_HDRC=y
-+CONFIG_USB_ETH=m
- CONFIG_AB8500_USB=y
- CONFIG_MMC=y
- CONFIG_MMC_CLKGATE=y
--- 
-1.8.1.3
+Thank you,
+Gerlando
