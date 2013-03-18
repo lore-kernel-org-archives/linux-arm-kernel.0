@@ -1,124 +1,121 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 19 Mar 2013 00:10:21 +0900
-Subject: [PATCH 03/03] ARM: shmobile: APE6EVM LAN9220 support
-In-Reply-To: <20130318150953.28231.73454.sendpatchset@w520>
-References: <20130318150953.28231.73454.sendpatchset@w520>
-Message-ID: <20130318151021.28231.51294.sendpatchset@w520>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 18 Mar 2013 15:07:24 +0000
+Subject: [PATCH] ARM: hw_breakpoint: Enable debug powerdown only if
+ system supports 'has_ossr'
+In-Reply-To: <5146B972.1010002@ti.com>
+References: <1363157553-21085-1-git-send-email-lokeshvutla@ti.com>
+ <51406BA7.8010306@arm.com> <51407120.7030709@ti.com>
+ <51417E58.5050501@ti.com> <20130315050014.GA15706@tiny-lites>
+ <5146B972.1010002@ti.com>
+Message-ID: <20130318150724.GC28585@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+Hi Santosh,
 
-Add LAN9220 support to the APE6EVM board using C and DT.
-At this point the PFC lacks DT bindings so to configure
-the pinmux we need to use C.
+On Mon, Mar 18, 2013 at 06:51:30AM +0000, Santosh Shilimkar wrote:
+> On Friday 15 March 2013 10:30 AM, Will Deacon wrote:
+> > Furthermore, I was under the impression that hw_breakpoint did actually
+> > work on panda, which implies that a cold boot *does* manage to reset the
+> > registers (can you please confirm this by looking in your dmesg during
+> > boot?). In that case, it seems as though a PM cycle is powering down a
+> > bunch of debug logic that was powered up during boot, and then we trip over
+> > because we can't access the register bank.
+> > 
+> Actually it seems to be without PM. Thanks to analysis from Lokesh, the issue
+> can be seen even with just suspend or cpu hotplug. So cold boot as such is
+> fine.
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
+Right, so what you're saying is that monitor-mode hardware debug only works
+until the first pm/suspend/hotplug operation, then it's dead in the water?
 
- Written against "next" renesas.git 811689afc214564c4a5f238ecf4d8bdc0e52b615
- 
- Depends on the following two series:
- [PATCH 00/04] ARM: shmobile: r8a73a4 SoC support V2
- [PATCH 00/02] sh-pfc: Initial r8a73a4 PFC support
+> > The proper solution to this problem requires us to establish exactly what is
+> > turning off the debug registers, and then having an OMAP PM notifier to
+> > enable it again. Assuming this has always been the case, I expect hardware
+> > debug across PM fails silently with older kernels.
+> > 
+> This has been always the case it seems with CPU power cycle.
+> After the CPU is power cycled, 'DBGAUTHSTATUS' reads '0xaa' rather
+> than '0xaf' which means 'DBGEN = 0' and hence code fails to enable
+> monitor mode. This happens on both secure and GP devices and it can not
+> be patched since the secure code is ROM'ed. We didn't notice so far
+> because hw_breakpoint support was not default enabled on OMAP till the
+> multi-platform build.
 
- arch/arm/boot/dts/r8a73a4-ape6evm.dts  |   21 ++++++++++++++++++
- arch/arm/mach-shmobile/Kconfig         |    1 
- arch/arm/mach-shmobile/board-ape6evm.c |   36 ++++++++++++++++++++++++++++++++
- 3 files changed, 58 insertions(+)
+That really sucks :( Does this affect all OMAP-based boards?
 
---- 0009/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-+++ work/arch/arm/boot/dts/r8a73a4-ape6evm.dts	2013-03-18 22:13:31.000000000 +0900
-@@ -23,4 +23,25 @@
- 		device_type = "memory";
- 		reg = <0x40000000 0x40000000>;
- 	};
-+
-+	ape6evm_fixed_3v3: fixedregulator at 0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "3V3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-always-on;
-+	};
-+
-+	ethernet at 8000000 {
-+		compatible = "smsc,lan9118", "smsc,lan9115";
-+		reg = <0x08000000 0x1000>;
-+		interrupt-parent = <&irqc1>;
-+		interrupts = <8 0x4>;
-+		phy-mode = "mii";
-+		reg-io-width = <4>;
-+		smsc,irq-active-high;
-+		smsc,irq-push-pull;
-+		vdd33a-supply = <&ape6evm_fixed_3v3>;
-+		vddvario-supply = <&ape6evm_fixed_3v3>;
-+	};
- };
---- 0010/arch/arm/mach-shmobile/Kconfig
-+++ work/arch/arm/mach-shmobile/Kconfig	2013-03-18 22:13:44.000000000 +0900
-@@ -83,6 +83,7 @@ config MACH_APE6EVM
- 	bool "APE6EVM board"
- 	depends on ARCH_R8A73A4
- 	select ARCH_REQUIRE_GPIOLIB
-+	select REGULATOR_FIXED_VOLTAGE if REGULATOR
- 	select USE_OF
- 
- config MACH_MACKEREL
---- 0010/arch/arm/mach-shmobile/board-ape6evm.c
-+++ work/arch/arm/mach-shmobile/board-ape6evm.c	2013-03-18 22:13:31.000000000 +0900
-@@ -23,11 +23,36 @@
- #include <linux/irqchip.h>
- #include <linux/kernel.h>
- #include <linux/platform_device.h>
-+#include <linux/regulator/fixed.h>
-+#include <linux/regulator/machine.h>
-+#include <linux/smsc911x.h>
- #include <mach/common.h>
-+#include <mach/irqs.h>
- #include <mach/r8a73a4.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- 
-+/* Dummy supplies, where voltage doesn't matter */
-+static struct regulator_consumer_supply dummy_supplies[] = {
-+	REGULATOR_SUPPLY("vddvario", "smsc911x"),
-+	REGULATOR_SUPPLY("vdd33a", "smsc911x"),
-+};
-+
-+/* SMSC LAN9220 */
-+static const struct resource lan9220_res[] = {
-+	DEFINE_RES_MEM(0x08000000, 0x1000),
-+	{
-+		.start	= irq_pin(40), /* IRQ40 */
-+		.flags	= IORESOURCE_IRQ | IRQF_TRIGGER_HIGH,
-+	},
-+};
-+
-+static const struct smsc911x_platform_config lan9220_data = {
-+	.flags		= SMSC911X_USE_32BIT,
-+	.irq_type	= SMSC911X_IRQ_TYPE_PUSH_PULL,
-+	.irq_polarity	= SMSC911X_IRQ_POLARITY_ACTIVE_HIGH,
-+};
-+
- static void __init ape6evm_add_standard_devices(void)
- {
- 	r8a73a4_clock_init();
-@@ -38,6 +63,17 @@ static void __init ape6evm_add_standard_
- 	gpio_request(GPIO_FN_SCIFA0_RXD, NULL);
- 
- 	r8a73a4_add_standard_devices();
-+
-+	/* LAN9220 ethernet */
-+	gpio_request(GPIO_FN_IRQ40, NULL);      /* smsc9220 IRQ */
-+	gpio_request(GPIO_PORT270, NULL);       /* smsc9220 RESET */
-+	gpio_direction_output(GPIO_PORT270, 1);
-+
-+	regulator_register_fixed(0, dummy_supplies, ARRAY_SIZE(dummy_supplies));
-+
-+	platform_device_register_resndata(&platform_bus, "smsc911x", -1,
-+					  lan9220_res, ARRAY_SIZE(lan9220_res),
-+					  &lan9220_data, sizeof(lan9220_data));
- }
- 
- static const char *ape6evm_boards_compat_dt[] __initdata = {
+> >> I was also wondering whether we should just warn once rather
+> >> than continuous warnings in the notifier. Patch is end of the
+> >> email.
+> > 
+> > Could do, but I'd like to see a fix for the real issue before we simply hide
+> > the warnings :)
+> > 
+> Agree here too. As evident above, the feature won't work on OMAP4
+> devices with PM and hence some solution is needed.
+> 
+> What you think of below ?
+
+Comments inline...
+
+> 
+> From d74b4264f6a5967b0f7ada96aad77ab0ac30dbed Mon Sep 17 00:00:00 2001
+> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Date: Mon, 18 Mar 2013 11:59:04 +0530
+> Subject: [PATCH] ARM: hw_breakpoints: Check for CPU debug availability before
+>  enabling it
+> 
+> CPU debug features like hardware break, watchpoints can be used only when
+> the debug mode is enabled and available for non-secure mode.
+> 
+> Hence check 'DBGAUTHSTATUS.DBGEN' before proceeding to enable the
+> features.
+> 
+> Thanks to Will for pointers and Lokesh for the analysis of the issue on
+> OMAP4 where after a CPU power cycle, debug mode gets disabled.
+> 
+> Cc: Will Deacon <Will.Deacon@arm.com>
+> 
+> Tested-by: Lokesh Vutla <lokeshvutla@ti.com>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> ---
+>  arch/arm/kernel/hw_breakpoint.c |    8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
+> index 96093b7..683a7cf 100644
+> --- a/arch/arm/kernel/hw_breakpoint.c
+> +++ b/arch/arm/kernel/hw_breakpoint.c
+> @@ -930,6 +930,14 @@ static void reset_ctrl_regs(void *unused)
+>  	int i, raw_num_brps, err = 0, cpu = smp_processor_id();
+>  	u32 val;
+>  
+> +	/* Check if we have access to CPU debug features */
+> +	ARM_DBG_READ(c7, c14, 6, val);
+> +	if ((val & 0x1) == 0) {
+> +		pr_warn_once("CPU %d debug is unavailable\n", cpu);
+> +		cpumask_or(&debug_err_mask, &debug_err_mask, cpumask_of(cpu));
+> +		return;
+> +	}
+
+There are a few of problems here:
+
+	1. That is only checking for non-secure access, which precludes
+	   running Linux in secure mode.
+
+	2. DBGAUTHSTATUS accesses are UNPREDICTABLE when the double-lock is
+	   set for v7.1 processors.
+
+	3. DBGAUTHSTATUS doesn't exist in ARMv6.
+
+	4. CPUs without the security extensions have DBGAUTHSTATUS.NSE == 0
+
+	5. Accessing DBGAUTHSTATUS requires DBGEN to be driven high.
+	   Assuming that your pr_warn_once is emitted, this implies that
+	   DBGEN is driven high from cold boot, yet the NSE bit is low,
+	   implying that DBGEN is also low. That's contradictory, so I have
+	   no idea what's going on...
+
+Apart from that, it's fine!
+
+Will
