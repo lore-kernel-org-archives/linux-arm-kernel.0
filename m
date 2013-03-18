@@ -1,74 +1,163 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Tue, 19 Mar 2013 00:10:46 +0100
-Subject: [PATCH] ARM: kirkwood: Add support for NETGEAR ReadyNAS Duo v2
- using DT
-References: <8738vt3h11.fsf@natisbad.org> <20130317205047.GU21478@lunn.ch>
-Message-ID: <87mwu0pamh.fsf@natisbad.org>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Tue, 19 Mar 2013 00:34:49 +0100
+Subject: [PATCH v3 6/6] irqchip: s3c24xx: add s3c2450 interrupt definitions
+In-Reply-To: <514791DC.9070600@gmail.com>
+References: <201303171404.06146.heiko@sntech.de>
+ <201303181753.16547.heiko@sntech.de> <514791DC.9070600@gmail.com>
+Message-ID: <201303190034.49875.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi guys,
+Am Montag, 18. M?rz 2013, 23:14:52 schrieb Rob Herring:
+> On 03/18/2013 11:53 AM, Heiko St?bner wrote:
+> > Hi Rob,
+> > 
+> > Am Montag, 18. M?rz 2013, 16:54:03 schrieb Rob Herring:
+> >> On 03/17/2013 08:09 AM, Heiko St?bner wrote:
+> >>> The s3c2450 is special in that it shares the cpu identification with
+> >>> the s3c2416 but provides more interrupts for its additional
+> >>> components.
+> >>> 
+> >>> It also shares the layout of the main interrupt register with the
+> >>> s3c2443 and therefore reuses this definition.
+> >>> 
+> >>> As no non-dt boards are present, the s3c2450 irqs will only be
+> >>> accessible thru devicetree.
+> 
+> [snip]
+> 
+> >>> +	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 17 }, /* DMA4 */
+> >>> +	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 17 }, /* DMA5 */
+> >>> +	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 18 }, /* UART3-RX */
+> >>> +	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 18 }, /* UART3-TX */
+> >>> +	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 18 }, /* UART3-ERR */
+> >>> +	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 9 }, /* WDT */
+> >>> +	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 9 }, /* AC97 */
+> >>> +	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 17 }, /* DMA6 */
+> >>> +	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 17 }, /* DMA7 */
+> >> 
+> >> This all seems like information that should come from DT.
+> > 
+> > In the first iterations [0] of theis series it was done this way, but was
+> > suggested that these informations _might_ be implementation specific and
+> > not describing the hardware.
+> > 
+> > As I didn't get any "final" feedback on the matter, I tried it this way
+> > this time. Personally I also did like the previous variant better, as
+> > the driver could loose all the declaration stuff when platforms move to
+> > dt.
+> > 
+> > I would be glad for a hint if the first approach was the correct one.
+> > 
+> > 
+> > [0] "irqchip: irq-s3c24xx: add devicetree support" from 2013-02-18, also
+> > with you in the recipient list
+> 
+> I'm inclined to say the prior way is more in the right direction.
+> However, I'm not really clear what you are trying to describe.
+> 
+> > +		s3c24xx,irqlist = <2 0 /* 2D */
+> > +				   2 0 /* IIC1 */
+> > +				   0 0 /* reserved */
+> > +				   0 0 /* reserved */
+> > +				   2 0 /* PCM0 */
+> > +				   2 0 /* PCM1 */
+> > +				   2 0 /* I2S0 */
+> > +				   2 0>; /* I2S1 */
 
-Andrew Lunn <andrew@lunn.ch> writes:
+The s3c24xx SoCs contain one (or two) main interrupt controllers. That are the 
+nodes that gets checked by handle_irq. Additionally they contain something 
+called a sub-register which provides more specific irq for some of them.
 
->> +void __init netgear_readynas_init(void)
->> +{
->> +	u32 val;
->> +
->> +	kirkwood_ge00_init(&netgear_readynas_ge00_data);
->> +	kirkwood_pcie_init(KW_PCIE0);
->> +
->> +	/* USB 3.0 controller power on */
->> +	mdelay(3000);
->> +	val = readl(GPIO_HIGH_VIRT_BASE + 0x4);
->> +	writel(val & ~(0x1 << 14), GPIO_HIGH_VIRT_BASE + 0x4);
->> +	val = readl(GPIO_HIGH_VIRT_BASE);
->> +	writel(val | (0x1 << 14), GPIO_HIGH_VIRT_BASE);
->
-> As Jason said, you can use a fixed regulator, in DT. Something like:
->
->         regulators {
->                 compatible = "simple-bus";
->                 #address-cells = <1>;
->                 #size-cells = <0>;
->
->                 usb_power: regulator at 1 {
->                         compatible = "regulator-fixed";
->                         reg = <1>;
->                         regulator-name = "USB Power";
->                         regulator-min-microvolt = <5000000>;
->                         regulator-max-microvolt = <5000000>;
->                         enable-active-high;
->                         regulator-always-on;
->                         regulator-boot-on;
->                         gpio = <&gpio0 14 0>;
->                 };
->         };
+The list you quoted, is meant to describe which bits of the interrupt register 
+contain a valid interrupt at all (!= 0), which handler should be used (2 for 
+the edge handler, 3 for level handler). The second argument contains the bit 
+in the parent interrupt register that contains the parent interrupt, that gets 
+checked in the irq_entry function.
 
-I spent a lot of time on this, trying various things and reading various
-elements of Docomentation/ but for some reason, it does not work, i.e. I
-always end up w/ something lik: 
+The original code (which I reworked into this more declarative form) 
+distinguished very much between using the edge handler for some and the level 
+handler for other interrupts.
 
-[    7.599773] USB Power: Failed to request enable GPIO14: -517
-[    7.605963] reg-fixed-voltage 1.regulator: Failed to register regulator: -517
-[    7.613163] platform 1.regulator: Driver reg-fixed-voltage requests probe deferral
+This list is essentially the same representation of the list you quoted above 
+and which also can be found in [0]
 
-I must confess I am not familiar enough with the inner working of
-regulators and dt-exposed options to map the following correctly to
-a dts entry.
+Going this way makes it easy to map datasheet values to interrupt number. When 
+I read the ac97 interrupt is in bit 28 of the sub-register I can simply 
+reference it as
+		interrupt-parent = <&subintc>;
+		interrupts = <28>;
 
-	val = readl(GPIO_HIGH_VIRT_BASE + 0x4);
-	writel(val & ~(0x1 << 14), GPIO_HIGH_VIRT_BASE + 0x4);
-	val = readl(GPIO_HIGH_VIRT_BASE);
-	writel(val | (0x1 << 14), GPIO_HIGH_VIRT_BASE);
 
-If you have any ideas/directions, I would be happy to dig and test.
+So these lists only desribe the internal structure of the interrupt controller 
+registers, which vary for each s3c24xx variant.
 
-> Is the mdelay() really required?
 
-It does not seem to be required, i.e. removing it still allows me to
-plug a usb key and mount it.
+> My first thought here is this information should not be centralized in
+> the controller node, but placed with each source node (2D, I2C1, etc).
 
-Cheers,
+I'm not sure I can follow currently :-)
 
-a+
+I'll try an example:
+
+The s3c serial driver expects the interrupts for uart tx and rx and the dt 
+entry would look like:
+
+	serial at 50000000 {
+		compatible = "samsung,s3c2410-uart";
+		reg = <0x50000000 0x4000>;
+		interrupt-parent = <&subintc>;
+		interrupts = <0>, <1>;
+	};
+
+the map for these in the subintc looks like
+               s3c24xx,irqlist = <3 28 /* UART0-RX */
+                                  3 28 /* UART0-TX */
+                                  3 28 /* UART0-ERR */
+
+marking them as using the level-handler and being children of the interrupt in 
+bit 28 of the intc handler.
+
+So the irq_entry would check the intc, see the waiting interrupt in bit 28, 
+jump to the demux function which would then handle which ever of rx,tx or err 
+would be waiting, which then get sent to the serial driver.
+
+These mappings between sub- and parent irqs also vary very much between the 
+different s3c24xx variants, as can be seen by the multitude of lists in [0] 
+and the parent interrupts are only used for demuxing purposes.
+
+-----
+A notable speciality are the AC97 (sound) and watchdog interrupts (bits 27 and 
+28 of the subregister), as they share a common parent interrupt (bit 9 of the 
+main interrupt register).
+
+So irq_entry checks the main register, sees bit 9 (ac97/watchdog), demuxes it 
+to either coming from the ac97 or watchdog and sends it to the relevant 
+driver.
+
+I don't think this should be exposed to the drivers@all :-) .
+-------
+
+So I'm not sure, how this would be able to go in the driver nodes.
+
+
+The only thing I could think of, would be to make the handler adjustable via 
+the regular interrupts properties (i.e. as two_cell) which would bring the 
+list down to only list the parent relationships.
+
+Hmm ... and this parent list might be doable via the regular interrupts 
+property, so the subintc would look like:
+
+subintc: subintc = {
+	interrupt-parent = <&intc>;
+	interrupts = <28 0>, <28 0>, <28 0>, <23 0>, <23 0>, .....
+	/*		     bit0    bit1    bit2    bit3    bit4   ..... */
+}
+
+i.e. naming the parent interrupt for each of the interrupt bits of the sub-
+controller. Would this be the right direction?
+
+
+
+[0] https://git.kernel.org/cgit/linux/kernel/git/kgene/linux-
+samsung.git/tree/arch/arm/mach-s3c24xx/irq.c?h=for-next#n603
