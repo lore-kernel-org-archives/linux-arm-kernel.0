@@ -1,57 +1,30 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 18 Mar 2013 19:44:53 -0400
-Subject: [PATCH] ARM: kirkwood: Add support for NETGEAR ReadyNAS Duo v2
- using DT
-In-Reply-To: <87mwu0pamh.fsf@natisbad.org>
-References: <8738vt3h11.fsf@natisbad.org> <20130317205047.GU21478@lunn.ch>
- <87mwu0pamh.fsf@natisbad.org>
-Message-ID: <20130318234453.GN13280@titan.lakedaemon.net>
+From: mchehab@redhat.com (Mauro Carvalho Chehab)
+Date: Mon, 18 Mar 2013 20:54:03 -0300
+Subject: [PATCH] [media] ir: IR_RX51 only works on OMAP2
+In-Reply-To: <1363298204-8014-7-git-send-email-arnd@arndb.de>
+References: <1363298204-8014-1-git-send-email-arnd@arndb.de>
+ <1363298204-8014-7-git-send-email-arnd@arndb.de>
+Message-ID: <20130318205403.4203e2fe@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnaud,
+Em Thu, 14 Mar 2013 22:56:44 +0100
+Arnd Bergmann <arnd@arndb.de> escreveu:
 
-On Tue, Mar 19, 2013 at 12:10:46AM +0100, Arnaud Ebalard wrote:
-> Hi guys,
+> This driver can be enabled on OMAP1 at the moment, which breaks
+> allyesconfig for that platform. Let's mark it OMAP2PLUS-only
+> in Kconfig, since that is the only thing it builds on.
 > 
-> Andrew Lunn <andrew@lunn.ch> writes:
-> 
-> >> +void __init netgear_readynas_init(void)
-> >> +{
-> >> +	u32 val;
-> >> +
-> >> +	kirkwood_ge00_init(&netgear_readynas_ge00_data);
-> >> +	kirkwood_pcie_init(KW_PCIE0);
-> >> +
-> >> +	/* USB 3.0 controller power on */
-> >> +	mdelay(3000);
-> >> +	val = readl(GPIO_HIGH_VIRT_BASE + 0x4);
-> >> +	writel(val & ~(0x1 << 14), GPIO_HIGH_VIRT_BASE + 0x4);
-> >> +	val = readl(GPIO_HIGH_VIRT_BASE);
-> >> +	writel(val | (0x1 << 14), GPIO_HIGH_VIRT_BASE);
-> >
-> > As Jason said, you can use a fixed regulator, in DT. Something like:
-> >
-> >         regulators {
-> >                 compatible = "simple-bus";
-> >                 #address-cells = <1>;
-> >                 #size-cells = <0>;
-> >
-> >                 usb_power: regulator at 1 {
-> >                         compatible = "regulator-fixed";
-> >                         reg = <1>;
-> >                         regulator-name = "USB Power";
-> >                         regulator-min-microvolt = <5000000>;
-> >                         regulator-max-microvolt = <5000000>;
-> >                         enable-active-high;
-> >                         regulator-always-on;
-> >                         regulator-boot-on;
-> >                         gpio = <&gpio0 14 0>;
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
+> Cc: Timo Kokkonen <timo.t.kokkonen@iki.fi>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Cc: linux-media at vger.kernel.org
+> ---
+> Mauro, please apply for 3.9
 
-			    gpio = <&gpio1 14 0>;
+OK, I'm applying it on my 3.9 branch right now.
 
-GPIO_HIGH_VIRT_BASE is the second bank of gpios.
-
-hth,
-
-Jason.
+Thanks!
+Mauro
