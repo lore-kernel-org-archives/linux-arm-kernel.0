@@ -1,39 +1,34 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 18 Mar 2013 20:53:18 +0900
-Subject: [PATCH 6/9] ARM: shmobile: armadillo800eva: enable NEON on defconfig
+Date: Mon, 18 Mar 2013 20:53:19 +0900
+Subject: [PATCH 7/9] ARM: mach-shmobile: kzm9g: do not enable REGULATOR_DUMMY
+ in defconfig
 In-Reply-To: <1363607601-20366-1-git-send-email-horms+renesas@verge.net.au>
 References: <1363607601-20366-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1363607601-20366-7-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1363607601-20366-8-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Don't enable REGULATOR_DUMMY, it is only intended for development / testing.
+There doesn't seem to be any value in setting it here and doing
+so was an error on my part.
 
-The application / library will be stopped by illegal instruction
-on current Armaddilo800eva board,
-since defconfig doesn't have CONFIG_NEON.
-This patch enabled it.
-Special thanks to Ishiyama-san
-
-Reported-by: Kiyoshi Ishiyama <kiyoshi.ishiyama.wg@renesas.com>
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Acked-by: Kiyoshi Ishiyama <kiyoshi.ishiyama.wg@renesas.com>
+Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/configs/armadillo800eva_defconfig |    1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/configs/kzm9g_defconfig |    1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/configs/armadillo800eva_defconfig b/arch/arm/configs/armadillo800eva_defconfig
-index c402294..468c616 100644
---- a/arch/arm/configs/armadillo800eva_defconfig
-+++ b/arch/arm/configs/armadillo800eva_defconfig
-@@ -36,6 +36,7 @@ CONFIG_ZBOOT_ROM_BSS=0x0
- CONFIG_ARM_APPENDED_DTB=y
- CONFIG_KEXEC=y
- CONFIG_VFP=y
-+CONFIG_NEON=y
- # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
- CONFIG_PM_RUNTIME=y
- CONFIG_NET=y
+diff --git a/arch/arm/configs/kzm9g_defconfig b/arch/arm/configs/kzm9g_defconfig
+index 84ac68c..f6e585b 100644
+--- a/arch/arm/configs/kzm9g_defconfig
++++ b/arch/arm/configs/kzm9g_defconfig
+@@ -85,7 +85,6 @@ CONFIG_I2C_SH_MOBILE=y
+ CONFIG_GPIO_PCF857X=y
+ # CONFIG_HWMON is not set
+ CONFIG_REGULATOR=y
+-CONFIG_REGULATOR_DUMMY=y
+ CONFIG_FB=y
+ CONFIG_FB_SH_MOBILE_LCDC=y
+ CONFIG_FRAMEBUFFER_CONSOLE=y
 -- 
 1.7.10.4
