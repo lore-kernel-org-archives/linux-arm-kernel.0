@@ -1,50 +1,83 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 18 Mar 2013 22:02:34 +0900
-Subject: [PATCH 08/12] clocksource: sh_cmt: Add CMT register layout comment
+Date: Mon, 18 Mar 2013 22:02:33 +0900
+Subject: [PATCH 07/12] clocksource: sh_cmt: Add control register callbacks
 In-Reply-To: <1363611758-6655-1-git-send-email-horms+renesas@verge.net.au>
 References: <1363611758-6655-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1363611758-6655-9-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1363611758-6655-8-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Add a comment about different register layouts
-supported by the CMT driver.
+This patch adds control register callbacks for the CMT
+driver. At this point only 16-bit access is supported
+but in the future this will be updated to allow 32-bit
+access as well.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 Acked-by: John Stultz <john.stultz@linaro.org>
 Tested-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/clocksource/sh_cmt.c |   15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ drivers/clocksource/sh_cmt.c |   16 ++++++++++++----
+ 1 file changed, 12 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/clocksource/sh_cmt.c b/drivers/clocksource/sh_cmt.c
-index 7108963..b72b724 100644
+index da904d7..7108963 100644
 --- a/drivers/clocksource/sh_cmt.c
 +++ b/drivers/clocksource/sh_cmt.c
-@@ -66,6 +66,21 @@ struct sh_cmt_priv {
- 			    unsigned long value);
- };
+@@ -55,6 +55,11 @@ struct sh_cmt_priv {
+ 	unsigned long total_cycles;
+ 	bool cs_enabled;
  
-+/* Examples of supported CMT timer register layouts and I/O access widths:
-+ *
-+ * "16-bit counter and 16-bit control" as found on sh7263:
-+ * CMSTR 0xfffec000 16-bit
-+ * CMCSR 0xfffec002 16-bit
-+ * CMCNT 0xfffec004 16-bit
-+ * CMCOR 0xfffec006 16-bit
-+ *
-+ * "32-bit counter and 16-bit control" as found on sh7372, sh73a0, r8a7740:
-+ * CMSTR 0xffca0000 16-bit
-+ * CMCSR 0xffca0060 16-bit
-+ * CMCNT 0xffca0064 32-bit
-+ * CMCOR 0xffca0068 32-bit
-+ */
++	/* callbacks for CMSTR and CMCSR access */
++	unsigned long (*read_control)(void __iomem *base, unsigned long offs);
++	void (*write_control)(void __iomem *base, unsigned long offs,
++			      unsigned long value);
 +
- static unsigned long sh_cmt_read16(void __iomem *base, unsigned long offs)
+ 	/* callbacks for CMCNT and CMCOR access */
+ 	unsigned long (*read_count)(void __iomem *base, unsigned long offs);
+ 	void (*write_count)(void __iomem *base, unsigned long offs,
+@@ -91,12 +96,12 @@ static inline unsigned long sh_cmt_read_cmstr(struct sh_cmt_priv *p)
  {
- 	return ioread16(base + (offs << 1));
+ 	struct sh_timer_config *cfg = p->pdev->dev.platform_data;
+ 
+-	return sh_cmt_read16(p->mapbase - cfg->channel_offset, 0);
++	return p->read_control(p->mapbase - cfg->channel_offset, 0);
+ }
+ 
+ static inline unsigned long sh_cmt_read_cmcsr(struct sh_cmt_priv *p)
+ {
+-	return sh_cmt_read16(p->mapbase, CMCSR);
++	return p->read_control(p->mapbase, CMCSR);
+ }
+ 
+ static inline unsigned long sh_cmt_read_cmcnt(struct sh_cmt_priv *p)
+@@ -109,13 +114,13 @@ static inline void sh_cmt_write_cmstr(struct sh_cmt_priv *p,
+ {
+ 	struct sh_timer_config *cfg = p->pdev->dev.platform_data;
+ 
+-	sh_cmt_write16(p->mapbase - cfg->channel_offset, 0, value);
++	p->write_control(p->mapbase - cfg->channel_offset, 0, value);
+ }
+ 
+ static inline void sh_cmt_write_cmcsr(struct sh_cmt_priv *p,
+ 				      unsigned long value)
+ {
+-	sh_cmt_write16(p->mapbase, CMCSR, value);
++	p->write_control(p->mapbase, CMCSR, value);
+ }
+ 
+ static inline void sh_cmt_write_cmcnt(struct sh_cmt_priv *p,
+@@ -702,6 +707,9 @@ static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev)
+ 		goto err1;
+ 	}
+ 
++	p->read_control = sh_cmt_read16;
++	p->write_control = sh_cmt_write16;
++
+ 	if (resource_size(res) == 6) {
+ 		p->width = 16;
+ 		p->read_count = sh_cmt_read16;
 -- 
 1.7.10.4
