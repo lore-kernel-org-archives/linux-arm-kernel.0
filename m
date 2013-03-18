@@ -1,74 +1,64 @@
-From: gerlando.falauto@keymile.com (Gerlando Falauto)
-Date: Mon, 18 Mar 2013 08:59:24 +0100
-Subject: [PATCH 2/2] genirq: move mask_cache into struct irq_chip_type
-In-Reply-To: <alpine.LFD.2.02.1303152101080.22263@ionos>
-References: <1363277430-21325-1-git-send-email-holger.brunck@keymile.com><1363376175-22312-1-git-send-email-gerlando.falauto@keymile.com>
- <1363376175-22312-3-git-send-email-gerlando.falauto@keymile.com>
- <alpine.LFD.2.02.1303152101080.22263@ionos>
-Message-ID: <5146C95C.3000509@keymile.com>
+From: sourav.poddar@ti.com (Sourav Poddar)
+Date: Mon, 18 Mar 2013 13:31:10 +0530
+Subject: [PATCH] i2c: sirf: get the i2c pin group by pinctrl api
+In-Reply-To: <1363591361-5992-1-git-send-email-Barry.Song@csr.com>
+References: <1363591361-5992-1-git-send-email-Barry.Song@csr.com>
+Message-ID: <5146C9C6.2030507@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
-
-On 03/15/2013 09:47 PM, Thomas Gleixner wrote:
-> Gerlando,
+Hi,
+On Monday 18 March 2013 12:52 PM, Barry Song wrote:
+> From: Barry Song<Baohua.Song@csr.com>
 >
-> On Fri, 15 Mar 2013, Gerlando Falauto wrote:
-
-[...]
+> hardcode set i2c pin group to i2c function before, here we
+> move to use standard pinctrl API to get pins of the group.
 >
-> The patch is correct, but we want a more incremental approach.
-
-OK, will do.
-
-> Otherwise I only have a coding style related request:
+> Signed-off-by: Barry Song<Baohua.Song@csr.com>
+> Cc: Linus Walleij<linus.walleij@linaro.org>
+> ---
+>   drivers/i2c/busses/i2c-sirf.c |    9 +++++++++
+>   1 files changed, 9 insertions(+), 0 deletions(-)
 >
->> @@ -246,9 +246,21 @@ void irq_setup_generic_chip(struct irq_chip_generic *gc, u32 msk,
->>   	list_add_tail(&gc->list, &gc_list);
->>   	raw_spin_unlock(&gc_lock);
->>
->> -	/* Init mask cache ? */
->> -	if (flags & IRQ_GC_INIT_MASK_CACHE)
->> -		gc->mask_cache = irq_reg_readl(gc->reg_base + ct->regs.mask);
->> +	for (i = 0; i < gc->num_ct; i++) {
->> +		if (flags & IRQ_GC_SEPARATE_MASK_REGISTERS)
->> +			/* Define mask cache pointer */
->> +			ct[i].pmask_cache = &ct[i].mask_cache;
->> +		else
->> +			/* They all point to the same mask cache */
->> +			ct[i].pmask_cache = &ct[0].mask_cache;
->> +
->> +		/* Init mask cache ? */
->> +		if ((flags & IRQ_GC_INIT_MASK_CACHE)
->> +		 && ((flags & IRQ_GC_SEPARATE_MASK_REGISTER)
->> +		  || (i == 0)))
->> +			*ct[i].pmask_cache =
->> +				irq_reg_readl(gc->reg_base + ct[i].regs.mask);
->> +	}
+> diff --git a/drivers/i2c/busses/i2c-sirf.c b/drivers/i2c/busses/i2c-sirf.c
+> index 5a7ad24..dd4004e 100644
+> --- a/drivers/i2c/busses/i2c-sirf.c
+> +++ b/drivers/i2c/busses/i2c-sirf.c
+> @@ -16,6 +16,7 @@
+>   #include<linux/clk.h>
+>   #include<linux/err.h>
+>   #include<linux/io.h>
+> +#include<linux/pinctrl/consumer.h>
 >
-> My eyes are burning, my head is spinning and I have a hard time not to
-> use swearwords.
-
-You're right... and I appreciate you NOT using such words. :-)
-
-Just one question:
-
-> 	bool mskperct = flags & IRQ_GC_SEPARATE_MASK_REGISTERS;
-> 	bool mskinit = flags & IRQ_GC_INIT_MASK_CACHE;
-> 	u32 *shmsk = &gc->shared_mask_cache;
+>   #define SIRFSOC_I2C_CLK_CTRL		0x00
+>   #define SIRFSOC_I2C_STATUS		0x0C
+> @@ -265,6 +266,7 @@ static int i2c_sirfsoc_probe(struct platform_device *pdev)
+>   	struct i2c_adapter *adap;
+>   	struct resource *mem_res;
+>   	struct clk *clk;
+> +	struct pinctrl *pinctrl;
+>   	int bitrate;
+>   	int ctrl_speed;
+>   	int irq;
+> @@ -272,6 +274,12 @@ static int i2c_sirfsoc_probe(struct platform_device *pdev)
+>   	int err;
+>   	u32 regval;
 >
-> 	if (!mskperct && mskinit)
-> 	     	*shmsk = irq_reg_readl(gc->reg_base + ct->regs.mask);
+> +	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
+> +	if (IS_ERR(pinctrl)) {
+> +		err = PTR_ERR(pinctrl);
+> +		goto failed_pin;
+> +	}
+> +
+I think,  you should also add an "EPROBE_DEFER" check here ?
+>   	clk = clk_get(&pdev->dev, NULL);
+>   	if (IS_ERR(clk)) {
+>   		err = PTR_ERR(clk);
+> @@ -385,6 +393,7 @@ err_clk_en:
+>   err_clk_prep:
+>   	clk_put(clk);
+>   err_get_clk:
+> +failed_pin:
+>   	return err;
+>   }
 >
-> 	for (i = 0; i < gc->num_ct: i++, ct++) {
-> 	       ct->pmask_cache = mskperct ? &ct->mask_cache : shmsk;
-
-What is wrong with using ct[i] instead? I find it a bit more readable.
-
-> Or something like that, perhaps ?
-
-Totally agree.
-
-Thanks a lot for your patience!
-Gerlando
