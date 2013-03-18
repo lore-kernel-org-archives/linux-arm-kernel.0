@@ -1,73 +1,186 @@
 From: nschichan@freebox.fr (Nicolas Schichan)
-Date: Mon, 18 Mar 2013 15:50:29 +0100
-Subject: [PATCH RFC] Support for JIT in Seccomp BPF filters.
-Message-ID: <1363618233-6375-1-git-send-email-nschichan@freebox.fr>
+Date: Mon, 18 Mar 2013 15:50:30 +0100
+Subject: [PATCH V2 1/3] seccomp: add generic code for jitted seccomp filters.
+In-Reply-To: <1363618233-6375-1-git-send-email-nschichan@freebox.fr>
+References: <1363618233-6375-1-git-send-email-nschichan@freebox.fr>
+Message-ID: <1363618233-6375-2-git-send-email-nschichan@freebox.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Architecture must select HAVE_SECCOMP_FILTER_JIT and implement
+seccomp_jit_compile() and seccomp_jit_free() if they intend to support
+jitted seccomp filters.
 
-This patch serie adds support for jitted seccomp BPF filters, with the
-required modifications to make it work on the ARM architecture.
+struct seccomp_filter has been moved to <linux/seccomp.h> to make its
+content available to the jit compilation code.
 
-- The first patch in the serie adds the required boiler plate in the
-  core kernel seccomp code to invoke the JIT compilation/free code.
+In a way similar to the net BPF, the jit compilation code is expected
+to updates struct seccomp_filter.bpf_func pointer to the generated
+code.
 
-- The second patch reworks the ARM BPF JIT code to make the generation
-  process less dependent on struct sk_filter.
+Signed-off-by: Nicolas Schichan <nschichan@freebox.fr>
+---
+ arch/Kconfig            |   14 ++++++++++++++
+ include/linux/seccomp.h |   41 +++++++++++++++++++++++++++++++++++++++++
+ kernel/seccomp.c        |   34 +++++-----------------------------
+ 3 files changed, 60 insertions(+), 29 deletions(-)
 
-- The last patch actually implements the ARM part in the BPF jit code.
-
-Some benchmarks, on a 1.6Ghz 88f6282 CPU:
-
-Each system call is tested in two way (fast/slow):
-
- - on the fast version, the tested system call is accepted immediately
-   after checking the architecture (5 BPF instructions).
-
- - on the slow version, the tested system call is accepted after
-   previously checking for 85 syscall (90 instructions, including the
-   architecture check).
-
-The tested syscall is invoked in a loop 1000000 time, the reported
-time is the time spent in the loop in seconds.
-
-Without Seccomp JIT:
-
-Syscall		Time-Fast  Time-Slow
---------------- ---------- ----------
-gettimeofday	0.389	   1.633
-getpid		0.406	   1.688
-getresuid	1.003	   2.266
-getcwd		1.342	   2.128
-
-With Seccomp JIT:
-
-Syscall		Time-Fast  Time-Slow
---------------- ----------- ---------
-gettimeofday	0.348	    0.428
-getpid		0.365	    0.480
-getresuid	0.981	    1.060
-getcwd		1.237	    1.294
-
-For reference, the same code without any seccomp filter:
-
-Syscall		Time
---------------- -----
-gettimeofday	0.119
-getpid		0.137
-getresuid	0.747
-getcwd		1.021
-
-The activation of the BPF JIT for seccomp is still controled with the
-/proc/sys/net/core/bpf_jit_enable sysctl knob.
-
-Those changes are based on the latest rmk-for-next branch.
-
-V2 Changes:
-- Document the @bpf_func field in struct seccomp_filter as recommended
-  by Kees Cook.
-- Invoke seccomp_bpf_load directly from generated code without going
-  via a wrapper.
-
-Regards,
+diff --git a/arch/Kconfig b/arch/Kconfig
+index 5a1779c..1284367 100644
+--- a/arch/Kconfig
++++ b/arch/Kconfig
+@@ -339,6 +339,10 @@ config HAVE_ARCH_SECCOMP_FILTER
+ 	  - secure_computing return value is checked and a return value of -1
+ 	    results in the system call being skipped immediately.
+ 
++# Used by archs to tell that they support SECCOMP_FILTER_JIT
++config HAVE_SECCOMP_FILTER_JIT
++	bool
++
+ config SECCOMP_FILTER
+ 	def_bool y
+ 	depends on HAVE_ARCH_SECCOMP_FILTER && SECCOMP && NET
+@@ -349,6 +353,16 @@ config SECCOMP_FILTER
+ 
+ 	  See Documentation/prctl/seccomp_filter.txt for details.
+ 
++config SECCOMP_FILTER_JIT
++	bool "enable Seccomp filter Just In Time compiler"
++	depends on HAVE_SECCOMP_FILTER_JIT && BPF_JIT && SECCOMP_FILTER
++	help
++	  Seccomp syscall filtering capabilities are normally handled
++	  by an interpreter. This option allows kernel to generate a native
++	  code when filter is loaded in memory. This should speedup
++	  syscall filtering. Note : Admin should enable this feature
++	  changing /proc/sys/net/core/bpf_jit_enable
++
+ config HAVE_CONTEXT_TRACKING
+ 	bool
+ 	help
+diff --git a/include/linux/seccomp.h b/include/linux/seccomp.h
+index 6f19cfd..a216ab7 100644
+--- a/include/linux/seccomp.h
++++ b/include/linux/seccomp.h
+@@ -6,6 +6,7 @@
+ #ifdef CONFIG_SECCOMP
+ 
+ #include <linux/thread_info.h>
++#include <linux/filter.h>
+ #include <asm/seccomp.h>
+ 
+ struct seccomp_filter;
+@@ -47,6 +48,46 @@ static inline int seccomp_mode(struct seccomp *s)
+ 	return s->mode;
+ }
+ 
++/**
++ * struct seccomp_filter - container for seccomp BPF programs
++ *
++ * @usage: reference count to manage the object lifetime.
++ *         get/put helpers should be used when accessing an instance
++ *         outside of a lifetime-guarded section.  In general, this
++ *         is only needed for handling filters shared across tasks.
++ * @prev: points to a previously installed, or inherited, filter
++ * @len: the number of instructions in the program
++ * @bpc_func: points to either sk_run_filter or the code generated
++ *         by the BPF JIT.
++ * @insns: the BPF program instructions to evaluate
++ *
++ * seccomp_filter objects are organized in a tree linked via the @prev
++ * pointer.  For any task, it appears to be a singly-linked list starting
++ * with current->seccomp.filter, the most recently attached or inherited filter.
++ * However, multiple filters may share a @prev node, by way of fork(), which
++ * results in a unidirectional tree existing in memory.  This is similar to
++ * how namespaces work.
++ *
++ * seccomp_filter objects should never be modified after being attached
++ * to a task_struct (other than @usage).
++ */
++struct seccomp_filter {
++	atomic_t usage;
++	struct seccomp_filter *prev;
++	unsigned short len;  /* Instruction count */
++	unsigned int (*bpf_func)(const struct sk_buff *skb,
++				 const struct sock_filter *filter);
++	struct sock_filter insns[];
++};
++
++#ifdef CONFIG_SECCOMP_FILTER_JIT
++extern void seccomp_jit_compile(struct seccomp_filter *fp);
++extern void seccomp_jit_free(struct seccomp_filter *fp);
++#else
++static inline void seccomp_jit_compile(struct seccomp_filter *fp) { }
++static inline void seccomp_jit_free(struct seccomp_filter *fp) { }
++#endif
++
+ #else /* CONFIG_SECCOMP */
+ 
+ #include <linux/errno.h>
+diff --git a/kernel/seccomp.c b/kernel/seccomp.c
+index b7a1004..a1aadaa 100644
+--- a/kernel/seccomp.c
++++ b/kernel/seccomp.c
+@@ -30,34 +30,6 @@
+ #include <linux/tracehook.h>
+ #include <linux/uaccess.h>
+ 
+-/**
+- * struct seccomp_filter - container for seccomp BPF programs
+- *
+- * @usage: reference count to manage the object lifetime.
+- *         get/put helpers should be used when accessing an instance
+- *         outside of a lifetime-guarded section.  In general, this
+- *         is only needed for handling filters shared across tasks.
+- * @prev: points to a previously installed, or inherited, filter
+- * @len: the number of instructions in the program
+- * @insns: the BPF program instructions to evaluate
+- *
+- * seccomp_filter objects are organized in a tree linked via the @prev
+- * pointer.  For any task, it appears to be a singly-linked list starting
+- * with current->seccomp.filter, the most recently attached or inherited filter.
+- * However, multiple filters may share a @prev node, by way of fork(), which
+- * results in a unidirectional tree existing in memory.  This is similar to
+- * how namespaces work.
+- *
+- * seccomp_filter objects should never be modified after being attached
+- * to a task_struct (other than @usage).
+- */
+-struct seccomp_filter {
+-	atomic_t usage;
+-	struct seccomp_filter *prev;
+-	unsigned short len;  /* Instruction count */
+-	struct sock_filter insns[];
+-};
+-
+ /* Limit any path through the tree to 256KB worth of instructions. */
+ #define MAX_INSNS_PER_PATH ((1 << 18) / sizeof(struct sock_filter))
+ 
+@@ -213,7 +185,7 @@ static u32 seccomp_run_filters(int syscall)
+ 	 * value always takes priority (ignoring the DATA).
+ 	 */
+ 	for (f = current->seccomp.filter; f; f = f->prev) {
+-		u32 cur_ret = sk_run_filter(NULL, f->insns);
++		u32 cur_ret = f->bpf_func(NULL, f->insns);
+ 		if ((cur_ret & SECCOMP_RET_ACTION) < (ret & SECCOMP_RET_ACTION))
+ 			ret = cur_ret;
+ 	}
+@@ -275,6 +247,9 @@ static long seccomp_attach_filter(struct sock_fprog *fprog)
+ 	if (ret)
+ 		goto fail;
+ 
++	filter->bpf_func = sk_run_filter;
++	seccomp_jit_compile(filter);
++
+ 	/*
+ 	 * If there is an existing filter, make it the prev and don't drop its
+ 	 * task reference.
+@@ -332,6 +307,7 @@ void put_seccomp_filter(struct task_struct *tsk)
+ 	while (orig && atomic_dec_and_test(&orig->usage)) {
+ 		struct seccomp_filter *freeme = orig;
+ 		orig = orig->prev;
++		seccomp_jit_free(freeme);
+ 		kfree(freeme);
+ 	}
+ }
+-- 
+1.7.10.4
