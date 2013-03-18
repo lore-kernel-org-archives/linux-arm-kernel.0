@@ -1,37 +1,45 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 18 Mar 2013 21:32:34 +0900
-Subject: [PATCH 24/43] ARM: shmobile: r8a7779: Remove lan from dtsi
+Date: Mon, 18 Mar 2013 21:32:35 +0900
+Subject: [PATCH 25/43] ARM: shmobile: Fix base address readout in headsmp-scu.S
 In-Reply-To: <1363609973-31086-1-git-send-email-horms+renesas@verge.net.au>
 References: <1363609973-31086-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1363609973-31086-25-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1363609973-31086-26-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ethernet controller is not part of the r8a7779 SoC.
+From: Magnus Damm <damm@opensource.se>
 
-Cc: Magnus Damm <magnus.damm@gmail.com>
+Rework the early SCU setup code in headsmp-scu.S to read
+the base address in the same way as we use to fetch the
+address of the invalidation function.
+
+Reported-by: Bastian Hecht <hechtb@gmail.com>
+Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7779.dtsi |    9 ---------
- 1 file changed, 9 deletions(-)
+ arch/arm/mach-shmobile/headsmp-scu.S |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
-index 2913759..0016302 100644
---- a/arch/arm/boot/dts/r8a7779.dtsi
-+++ b/arch/arm/boot/dts/r8a7779.dtsi
-@@ -83,13 +83,4 @@
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 81 0x4>;
- 	};
--
--	lan0: lan0 at 18000000 {
--		compatible = "smsc,lan9220", "smsc,lan9115";
--		reg = <0x18000000 0x100>;
--		phy-mode = "mii";
--		interrupt-parent = <&gic>;
--		interrupts = <0 28 0x4>;
--		reg-io-width = <4>;
--	};
- };
+diff --git a/arch/arm/mach-shmobile/headsmp-scu.S b/arch/arm/mach-shmobile/headsmp-scu.S
+index 0b93170..7d113f8 100644
+--- a/arch/arm/mach-shmobile/headsmp-scu.S
++++ b/arch/arm/mach-shmobile/headsmp-scu.S
+@@ -39,7 +39,7 @@ ENTRY(shmobile_secondary_vector_scu)
+ 	mrc     p15, 0, r0, c0, c0, 5	@ read MIPDR
+ 	and	r0, r0, #3		@ mask out cpu ID
+ 	lsl	r0, r0, #3		@ we will shift by cpu_id * 8 bits
+-	ldr	r1, =shmobile_scu_base
++	ldr	r1, 2f
+ 	ldr	r1, [r1]		@ SCU base address
+ 	ldr	r2, [r1, #8]		@ SCU Power Status Register
+ 	mov	r3, #3
+@@ -48,6 +48,7 @@ ENTRY(shmobile_secondary_vector_scu)
+ 
+ 	ldr	pc, 1f
+ 1:	.long shmobile_invalidate_start - PAGE_OFFSET + PLAT_PHYS_OFFSET
++2:	.long shmobile_scu_base - PAGE_OFFSET + PLAT_PHYS_OFFSET
+ ENDPROC(shmobile_secondary_vector_scu)
+ 
+ 	.text
 -- 
 1.7.10.4
