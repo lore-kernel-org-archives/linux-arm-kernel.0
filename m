@@ -1,51 +1,53 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 18 Mar 2013 16:26:21 +0800
-Subject: [PATCH v2 0/4] ARM: mxs: sanitize enet_out clock handling
-Message-ID: <1363595185-12302-1-git-send-email-shawn.guo@linaro.org>
+Date: Mon, 18 Mar 2013 16:26:24 +0800
+Subject: [PATCH v2 3/4] ARM: dts: mxs: add enet_out clock to devicetree
+In-Reply-To: <1363595185-12302-1-git-send-email-shawn.guo@linaro.org>
+References: <1363595185-12302-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1363595185-12302-4-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Handling enet_out on MX28 is cumbersome at the moment. Most boards need
-it enabled and for that, they have to add code to mach-mxs.c (see sps1
-as an example). Since this is board specific, we better encode it in
-the devicetree, that is the reason it was made for.
+From: Wolfram Sang <w.sang@pengutronix.de>
 
-The seres propose to have enet_out clock defined in device tree and
-have fec driver to enable the clock if found.  This will make adding
-new board easier, since we don't have to touch mach-mxs.c for this
-case. It scales much better.
+Put the clock to the devicetree, so the driver can take care of it
+later. Then, we don't have to do the enabling as a workaround in board
+init.
 
-Changes since v1:
- * Rebased on v3.9-rc1
- * Add a patch to have clk_ptp handled in the same way that enet_out
-   is done
- * Add enet_out into imx28.dtsi and overwrite clocks and clock-names
-   for m28evk board where the clock is absent
- * Remove unneeded enet_out clk initialization from board code
+Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+[shawn.guo: add enet_out into imx28.dtsi and overwrite it for m28evk]
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/boot/dts/imx28-m28evk.dts |    2 ++
+ arch/arm/boot/dts/imx28.dtsi       |    4 ++--
+ 2 files changed, 4 insertions(+), 2 deletions(-)
 
-David,
-
-If the series looks good to you, I hope I can have your ACK on the
-first 2 patches to have the series go via arm-soc tree for sake of
-git bisect.  Alternatively, please apply the first 2 on your tree
-for 3.10 and we will queue the platform patches for 3.11.
-
-Shawn
-
-Shawn Guo (2):
-  net: fec: handle optional clk_ptp more gracefully
-  ARM: mxs: remove unneeded enet_out clk initialization
-
-Wolfram Sang (2):
-  net: freescale: fec: add support for optional enet_out clk
-  ARM: dts: mxs: add enet_out clock to devicetree
-
- arch/arm/boot/dts/imx28-m28evk.dts   |    2 ++
- arch/arm/boot/dts/imx28.dtsi         |    4 ++--
- arch/arm/mach-mxs/mach-mxs.c         |   12 ------------
- drivers/net/ethernet/freescale/fec.c |   18 +++++++++++++-----
- drivers/net/ethernet/freescale/fec.h |    1 +
- 5 files changed, 18 insertions(+), 19 deletions(-)
-
+diff --git a/arch/arm/boot/dts/imx28-m28evk.dts b/arch/arm/boot/dts/imx28-m28evk.dts
+index 6ce3d17..3d2e1a4 100644
+--- a/arch/arm/boot/dts/imx28-m28evk.dts
++++ b/arch/arm/boot/dts/imx28-m28evk.dts
+@@ -221,6 +221,8 @@
+ 			phy-mode = "rmii";
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&mac0_pins_a>;
++			clocks = <&clks 57>, <&clks 57>;
++			clock-names = "ipg", "ahb";
+ 			status = "okay";
+ 		};
+ 
+diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+index 7ba4966..dc1203d 100644
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -940,8 +940,8 @@
+ 			compatible = "fsl,imx28-fec";
+ 			reg = <0x800f0000 0x4000>;
+ 			interrupts = <101>;
+-			clocks = <&clks 57>, <&clks 57>;
+-			clock-names = "ipg", "ahb";
++			clocks = <&clks 57>, <&clks 57>, <&clks 64>;
++			clock-names = "ipg", "ahb", "enet_out";
+ 			status = "disabled";
+ 		};
+ 
 -- 
 1.7.9.5
