@@ -1,42 +1,51 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 18 Mar 2013 21:32:44 +0900
-Subject: [PATCH 34/43] ARM: shmobile: add gic_iid macro for ICCIAR / interrupt
- ID
+Date: Mon, 18 Mar 2013 21:32:53 +0900
+Subject: [PATCH 43/43] r8a7779: Add Display Unit clock support
 In-Reply-To: <1363609973-31086-1-git-send-email-horms+renesas@verge.net.au>
 References: <1363609973-31086-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1363609973-31086-35-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1363609973-31086-44-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Phil Edworthy <phil.edworthy@renesas.com>
 
-R-Car H1 datasheet GIC number is indicating
-GIC ICCIAR / interrupt ID number, not SPI number,
-but current marzen board code is using gic_spi() with
-un-understandable calculation.
-
-This patch adds new gic_iid() macro which means
-ICCIAR / interrupt ID, and used the number
-currently written on datasheet.
-
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-[ horms+renesas at verge.net.au: Split board-marzen.c portion into a separate patch ]
+Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
+[Rename device from to rcarfb to rcar-du]
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+[Manual conflict resolution]
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/include/mach/irqs.h |    1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/mach-shmobile/clock-r8a7779.c |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/include/mach/irqs.h b/arch/arm/mach-shmobile/include/mach/irqs.h
-index 06a5da3..992ed21 100644
---- a/arch/arm/mach-shmobile/include/mach/irqs.h
-+++ b/arch/arm/mach-shmobile/include/mach/irqs.h
-@@ -5,6 +5,7 @@
+diff --git a/arch/arm/mach-shmobile/clock-r8a7779.c b/arch/arm/mach-shmobile/clock-r8a7779.c
+index 0f66d35..d9edeaf 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7779.c
++++ b/arch/arm/mach-shmobile/clock-r8a7779.c
+@@ -88,7 +88,7 @@ static struct clk div4_clks[DIV4_NR] = {
  
- /* GIC */
- #define gic_spi(nr)		((nr) + 32)
-+#define gic_iid(nr)		(nr) /* ICCIAR / interrupt ID */
+ enum { MSTP323, MSTP322, MSTP321, MSTP320,
+ 	MSTP115,
+-	MSTP101, MSTP100,
++	MSTP103, MSTP101, MSTP100,
+ 	MSTP030,
+ 	MSTP029, MSTP028, MSTP027, MSTP026, MSTP025, MSTP024, MSTP023, MSTP022, MSTP021,
+ 	MSTP016, MSTP015, MSTP014,
+@@ -101,6 +101,7 @@ static struct clk mstp_clks[MSTP_NR] = {
+ 	[MSTP321] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR3, 21, 0), /* SDHI2 */
+ 	[MSTP320] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR3, 20, 0), /* SDHI3 */
+ 	[MSTP115] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR1, 15, 0), /* SATA */
++	[MSTP103] = SH_CLK_MSTP32(&div4_clks[DIV4_S], MSTPCR1,  3, 0), /* DU */
+ 	[MSTP101] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR1,  1, 0), /* USB2 */
+ 	[MSTP100] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR1,  0, 0), /* USB0/1 */
+ 	[MSTP030] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR0, 30, 0), /* I2C0 */
+@@ -184,6 +185,7 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("sh_mobile_sdhi.1", &mstp_clks[MSTP322]), /* SDHI1 */
+ 	CLKDEV_DEV_ID("sh_mobile_sdhi.2", &mstp_clks[MSTP321]), /* SDHI2 */
+ 	CLKDEV_DEV_ID("sh_mobile_sdhi.3", &mstp_clks[MSTP320]), /* SDHI3 */
++	CLKDEV_DEV_ID("rcar-du.0", &mstp_clks[MSTP103]), /* DU */
+ };
  
- /* INTCS */
- #define INTCS_VECT_BASE		0x3400
+ void __init r8a7779_clock_init(void)
 -- 
 1.7.10.4
