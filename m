@@ -1,49 +1,90 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Sun, 17 Mar 2013 19:51:23 -0700
-Subject: Linux 3.8.3
-In-Reply-To: <87ip4p4wjh.fsf@nemi.mork.no>
-References: <20130314184702.GA17860@kroah.com>
- <CAE8XmWoYXyNFQ14e6X+2rkWQyRA=kSdc4J+DNu2Sv+6e9rvZRg@mail.gmail.com>
- <20130317193321.GA15102@arwen.pp.htv.fi>
- <20130317195709.GC4977@n2100.arm.linux.org.uk>
- <87ip4p4wjh.fsf@nemi.mork.no>
-Message-ID: <20130318025123.GC3028@kroah.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Mon, 18 Mar 2013 12:10:10 +0900
+Subject: [PATCH v2 6/8] drivers: mfd: use module_platform_driver_probe()
+In-Reply-To: <1363280978-24051-7-git-send-email-fabio.porcedda@gmail.com>
+References: <1363280978-24051-1-git-send-email-fabio.porcedda@gmail.com>
+ <1363280978-24051-7-git-send-email-fabio.porcedda@gmail.com>
+Message-ID: <018b01ce2386$19ba9090$4d2fb1b0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 17, 2013 at 09:10:42PM +0100, Bj?rn Mork wrote:
-> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+On Friday, March 15, 2013 2:10 AM, Fabio Porcedda wrote:
 > 
-> > Sigh.
-> >
-> > At times, I really don't know why I bother wasting my time commenting on
-> > patches if they just go and agree with them, and promptly ignore them.
-> > I pointed out what this should be:
-> >
-> > http://marc.info/?l=linux-kernel&m=135972750522902&w=2
-> >
-> > And it was agreed:
-> >
-> > http://marc.info/?l=linux-kernel&m=135993546317541&w=2
-> >
-> > But for some reason the wrong patch got merged:
-> >
-> > http://marc.info/?l=git-commits-head&m=136147889001219&w=2
-> >
-> > Maybe because it was "simpler" ?  Don't know.  But... well, we now know
-> > what the outcome of it was.  Let's try a different technique.  I'm going
-> > to say nothing of any real help and hopefully it will get fixed properly.
-> > Maybe that'll work.
+> This patch converts the drivers to use the
+> module_platform_driver_probe() macro which makes the code smaller and
+> a bit simpler.
 > 
-> To be fair, looking at the commitdate of that commit it was already in
-> Greg's tree when you commented on it.  So the discussion you had would
-> have to be about a followup-fix to this, and not about that particular
-> patch.
+> Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Samuel Ortiz <sameo@linux.intel.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> ---
+>  drivers/mfd/davinci_voicecodec.c | 12 +-----------
+>  drivers/mfd/htc-pasic3.c         | 13 +------------
+>  2 files changed, 2 insertions(+), 23 deletions(-)
 
-Yes, I thought someone was going to send me a follow-on patch to fix
-this, that is what Minchan said, after I had committed it.
+I already submitted the patch 2 weeks ago.
 
-Anyway, it's a staging driver, if it doesn't build, that's not a big
-deal.
+https://patchwork.kernel.org/patch/2217301/
+https://patchwork.kernel.org/patch/2217291/
 
-greg k-h
+
+Best regards,
+Jingoo Han
+
+> 
+> diff --git a/drivers/mfd/davinci_voicecodec.c b/drivers/mfd/davinci_voicecodec.c
+> index c0bcc87..c60ab0c 100644
+> --- a/drivers/mfd/davinci_voicecodec.c
+> +++ b/drivers/mfd/davinci_voicecodec.c
+> @@ -177,17 +177,7 @@ static struct platform_driver davinci_vc_driver = {
+>  	.remove	= davinci_vc_remove,
+>  };
+> 
+> -static int __init davinci_vc_init(void)
+> -{
+> -	return platform_driver_probe(&davinci_vc_driver, davinci_vc_probe);
+> -}
+> -module_init(davinci_vc_init);
+> -
+> -static void __exit davinci_vc_exit(void)
+> -{
+> -	platform_driver_unregister(&davinci_vc_driver);
+> -}
+> -module_exit(davinci_vc_exit);
+> +module_platform_driver_probe(davinci_vc_driver, davinci_vc_probe);
+> 
+>  MODULE_AUTHOR("Miguel Aguilar");
+>  MODULE_DESCRIPTION("Texas Instruments DaVinci Voice Codec Core Interface");
+> diff --git a/drivers/mfd/htc-pasic3.c b/drivers/mfd/htc-pasic3.c
+> index 9e5453d..0285fce 100644
+> --- a/drivers/mfd/htc-pasic3.c
+> +++ b/drivers/mfd/htc-pasic3.c
+> @@ -208,18 +208,7 @@ static struct platform_driver pasic3_driver = {
+>  	.remove		= pasic3_remove,
+>  };
+> 
+> -static int __init pasic3_base_init(void)
+> -{
+> -	return platform_driver_probe(&pasic3_driver, pasic3_probe);
+> -}
+> -
+> -static void __exit pasic3_base_exit(void)
+> -{
+> -	platform_driver_unregister(&pasic3_driver);
+> -}
+> -
+> -module_init(pasic3_base_init);
+> -module_exit(pasic3_base_exit);
+> +module_platform_driver_probe(pasic3_driver, pasic3_probe);
+> 
+>  MODULE_AUTHOR("Philipp Zabel <philipp.zabel@gmail.com>");
+>  MODULE_DESCRIPTION("Core driver for HTC PASIC3");
+> --
+> 1.8.1.5
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-fbdev" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
