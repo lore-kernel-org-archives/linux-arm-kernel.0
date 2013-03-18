@@ -1,32 +1,37 @@
 From: chao.xie@marvell.com (Chao Xie)
-Date: Mon, 18 Mar 2013 03:55:27 -0400
-Subject: [PATCH 0/6] remove the clock name from pdata
-Message-ID: <1363593333-6077-1-git-send-email-chao.xie@marvell.com>
+Date: Mon, 18 Mar 2013 03:55:31 -0400
+Subject: [PATCH 4/6] arm: mmp: remove clock from usb pdata for aspenite
+In-Reply-To: <1363593333-6077-1-git-send-email-chao.xie@marvell.com>
+References: <1363593333-6077-1-git-send-email-chao.xie@marvell.com>
+Message-ID: <1363593333-6077-5-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clock is defined by device, so the driver knows how many
-clocks needed by the device.
-The orignal way that passing the clock name by pdata is not correct.
-The following patches fix it.
+The clock name will directly get by driver. Removing
+the name from pdata.
 
-Chao Xie (6):
-  usb: gadget: mv_udc_core: remove unused clock
-  usb: otg: mv_otg: remove unused clock
-  usb: ehci: mv_ehci: remove unused clock
-  arm: mmp: remove clock from usb pdata for aspenite
-  arm: mmp: remove clock name from usb pdata for ttc
-  usb: mv_usb: remove clock name from pdata
+Signed-off-by: Chao Xie <chao.xie@marvell.com>
+---
+ arch/arm/mach-mmp/aspenite.c |    6 ------
+ 1 files changed, 0 insertions(+), 6 deletions(-)
 
- arch/arm/mach-mmp/aspenite.c         |    6 -----
- arch/arm/mach-mmp/ttc_dkb.c          |    6 -----
- drivers/usb/gadget/mv_udc.h          |    3 +-
- drivers/usb/gadget/mv_udc_core.c     |   27 ++++++-------------------
- drivers/usb/host/ehci-mv.c           |   35 +++++++++------------------------
- drivers/usb/otg/mv_otg.c             |   28 ++++++--------------------
- drivers/usb/otg/mv_otg.h             |    3 +-
- include/linux/platform_data/mv_usb.h |    2 -
- 8 files changed, 26 insertions(+), 84 deletions(-)
-
+diff --git a/arch/arm/mach-mmp/aspenite.c b/arch/arm/mach-mmp/aspenite.c
+index 9f64d56..76901f4 100644
+--- a/arch/arm/mach-mmp/aspenite.c
++++ b/arch/arm/mach-mmp/aspenite.c
+@@ -223,13 +223,7 @@ static struct pxa27x_keypad_platform_data aspenite_keypad_info __initdata = {
+ };
+ 
+ #if defined(CONFIG_USB_EHCI_MV)
+-static char *pxa168_sph_clock_name[] = {
+-	[0] = "PXA168-USBCLK",
+-};
+-
+ static struct mv_usb_platform_data pxa168_sph_pdata = {
+-	.clknum         = 1,
+-	.clkname        = pxa168_sph_clock_name,
+ 	.mode           = MV_USB_MODE_HOST,
+ 	.phy_init	= pxa_usb_phy_init,
+ 	.phy_deinit	= pxa_usb_phy_deinit,
 -- 
 1.7.4.1
