@@ -1,37 +1,87 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 18 Mar 2013 11:28:55 -0700
-Subject: [PATCHv2 1/3] ARM: Clear IDIVT hwcap if CONFIG_ARM_THUMB=n
+Date: Mon, 18 Mar 2013 11:28:56 -0700
+Subject: [PATCHv2 2/3] ARM: Detect support for SDIV/UDIV from ISAR0 register
 In-Reply-To: <1363631337-13816-1-git-send-email-sboyd@codeaurora.org>
 References: <1363631337-13816-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1363631337-13816-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1363631337-13816-3-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Don't advertise support for the SDIV/UDIV thumb instructions if
-the kernel is not compiled with support for thumb userspace. This
-is in line with how we remove the THUMB hwcap in these
-configurations.
+The ISAR0 register indicates support for the SDIV and UDIV
+instructions in both the Thumb and ARM instruction set. Read the
+register to detect the supported instructions and update the
+elf_hwcap mask as appropriate. This is better than adding more
+and more cpuid checks in proc-v7.S for each new cpu variant that
+supports these instructions.
 
 Acked-by: Will Deacon <will.deacon@arm.com>
 Cc: Stepan Moskovchenko <stepanm@codeaurora.org>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/kernel/setup.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/kernel/setup.c | 20 ++++++++++++++++++++
+ arch/arm/mm/proc-v7.S   |  4 ++--
+ 2 files changed, 22 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 3f6cbb2..e2c8bbf 100644
+index e2c8bbf..f3ac13f 100644
 --- a/arch/arm/kernel/setup.c
 +++ b/arch/arm/kernel/setup.c
-@@ -484,7 +484,7 @@ static void __init setup_processor(void)
+@@ -353,6 +353,23 @@ void __init early_print(const char *str, ...)
+ 	printk("%s", buf);
+ }
+ 
++static void __init cpuid_init_hwcaps(void)
++{
++	unsigned int divide_instrs;
++
++	if (cpu_architecture() < CPU_ARCH_ARMv7)
++		return;
++
++	divide_instrs = (read_cpuid_ext(CPUID_EXT_ISAR0) & 0x0f000000) >> 24;
++
++	switch (divide_instrs) {
++	case 2:
++		elf_hwcap |= HWCAP_IDIVA;
++	case 1:
++		elf_hwcap |= HWCAP_IDIVT;
++	}
++}
++
+ static void __init feat_v6_fixup(void)
+ {
+ 	int id = read_cpuid_id();
+@@ -483,6 +500,9 @@ static void __init setup_processor(void)
+ 	snprintf(elf_platform, ELF_PLATFORM_SIZE, "%s%c",
  		 list->elf_name, ENDIANNESS);
  	elf_hwcap = list->elf_hwcap;
++
++	cpuid_init_hwcaps();
++
  #ifndef CONFIG_ARM_THUMB
--	elf_hwcap &= ~HWCAP_THUMB;
-+	elf_hwcap &= ~(HWCAP_THUMB | HWCAP_IDIVT);
+ 	elf_hwcap &= ~(HWCAP_THUMB | HWCAP_IDIVT);
  #endif
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index 3a3c015..bcd3d48 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -420,7 +420,7 @@ __v7_pj4b_proc_info:
+ __v7_ca7mp_proc_info:
+ 	.long	0x410fc070
+ 	.long	0xff0ffff0
+-	__v7_proc __v7_ca7mp_setup, hwcaps = HWCAP_IDIV
++	__v7_proc __v7_ca7mp_setup
+ 	.size	__v7_ca7mp_proc_info, . - __v7_ca7mp_proc_info
  
- 	feat_v6_fixup();
+ 	/*
+@@ -430,7 +430,7 @@ __v7_ca7mp_proc_info:
+ __v7_ca15mp_proc_info:
+ 	.long	0x410fc0f0
+ 	.long	0xff0ffff0
+-	__v7_proc __v7_ca15mp_setup, hwcaps = HWCAP_IDIV
++	__v7_proc __v7_ca15mp_setup
+ 	.size	__v7_ca15mp_proc_info, . - __v7_ca15mp_proc_info
+ 
+ 	/*
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
