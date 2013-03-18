@@ -1,99 +1,26 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Mon, 18 Mar 2013 16:21:55 +0100
-Subject: [PATCH V4] ARM: dts: add minimal DT support for DevKit8000.
-In-Reply-To: <CABYxbz7bLZxX-6U3O9nRsKxAXbg0nEta55eO-ERuotPnw=X5BQ@mail.gmail.com>
-References: <F3DBB1B3EF102E4994C89758CFCA32412CC4E9@DBDE01.ent.ti.com>
- <CABYxbz5GyxYaHANgdpwBNaaR6tnu=6LJuUNSvL7DEzU=4CPHcA@mail.gmail.com>
- <F3DBB1B3EF102E4994C89758CFCA32412CC74F@DBDE01.ent.ti.com>
- <CABYxbz62JrMB95p5i9iu2G=B4ETXLrYbLsyFEFR5F+WVD6YNnQ@mail.gmail.com>
- <20130306175313.GQ11806@atomide.com> <513838F2.60101@ti.com>
- <CABYxbz7bLZxX-6U3O9nRsKxAXbg0nEta55eO-ERuotPnw=X5BQ@mail.gmail.com>
-Message-ID: <51473113.9060109@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 18 Mar 2013 09:23:37 -0600
+Subject: linux-next: manual merge of the tegra tree with the arm-soc tree
+In-Reply-To: <20130318153140.100bdf364d5614ce31f12eae@canb.auug.org.au>
+References: <20130318153140.100bdf364d5614ce31f12eae@canb.auug.org.au>
+Message-ID: <51473179.2030306@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anil,
+On 03/17/2013 10:31 PM, Stephen Rothwell wrote:
+> Hi all,
+> 
+> Today's linux-next merge of the tegra tree got a conflict in 
+> drivers/clocksource/tegra20_timer.c between commit 1d16cfb3aeba 
+> ("clocksource: tegra20: use the device_node pointer passed to
+> init") from the arm-soc tree and commit 6f88fb8af6c6 ("clocksource:
+> tegra: move to of_clk_get") from the tegra tree.
+> 
+> I fixed it up (see below) and can carry the fix as necessary (no
+> action is required).
 
-On 03/17/2013 06:23 AM, Anil Kumar wrote:
-> Hi Benoit,
-> 
-> On Thu, Mar 7, 2013 at 12:21 PM, Benoit Cousson <b-cousson@ti.com> wrote:
->> Hi,
->>
->> On 03/06/2013 06:53 PM, Tony Lindgren wrote:
->>> * Anil Kumar <anilk4.v@gmail.com> [130305 18:40]:
->>>> Hi Tony,
->>>>
->>>>>> From: linux-arm-kernel [mailto:linux-arm-kernel-
->>>>>> bounces at lists.infradead.org] On Behalf Of Anil Kumar
->>>>>> Sent: Wednesday, February 27, 2013 8:03 AM
->>>>>> To: devicetree-discuss at lists.ozlabs.org; linux-omap at vger.kernel.org;
->>>>>> linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
->>>>>> Cc: linux at arm.linux.org.uk; Cousson, Benoit; Tony Lindgren; Grant
->>>>>> Likely; Anil Kumar; thomas at tomweber.eu
->>>>>> Subject: Re: FW: [PATCH V4] ARM: dts: add minimal DT support for
->>>>>> DevKit8000.
->>>>>>
->>>>>> Hi,
->>>>>>>
->>>>>>> DevKit8000 is a beagle board clone from Timll, sold by
->>>>>>> armkits.com. The DevKit8000 has RS232 serial port, LCD, DVI-D,
->>>>>>> S-Video, Ethernet, SD/MMC, keyboard, camera, SPI, I2C, USB and
->>>>>>> JTAG interface.
->>>>>>>
->>>>>>> This patch adds the basic DT support for devkit8000. At this time,
->>>>>> Information
->>>>>>> of twl4030 (PMIC), MMC1, I2C1 and leds are added.
->>>>>>>
->>>>>>> Signed-off-by: Anil Kumar <anilk4.v@gmail.com>
->>>>>>> Tested-by: Thomas Weber <thomas@tomweber.eu>
->>>>>>
->>>>>> Gentle Ping. As there are no review comments on this patch,
->>>>>> Could you please pull this patch ?
->>>>
->>>> Gentle Ping.
->>>>
->>>> This patch also got Reviewed-by: Manish Badarkhe <badarkhe.manish@gmail.com>
->>>> and as patch "ARM: dts: omap3-devkit8000: Enable audio support"  has already got
->>>> "Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>" but it is on the
->>>> top of this patch.
->>>> So, Could you please pull this patch in one of your omap branch? or
->>>> you want me to
->>>> do rebase this patch on top of v3.9-rc1 ?
->>>
->>> Let's wait for Benoit to queue it as he has a bunch of .dts changesfor_3.10/dts already
->>> applied. Too bad we missed v3.9 merge window for those, but hopefully
->>> we can get them queued early for v3.10.
->>
->> Yep, sorry for having missed 3.9, I was a little bit sick at the wrong
->> moment :-(
->>
->> I'm starting queuing the pending patches, and should have enough to push
->> to you just after Linaro Connect.
-> 
-> I think you missed below patch which is needed for gpmc nand to work fine.
-> 
-> Jon Hunter:-
->   ARM: OMAP2+: Fix-up gpmc merge error
-> 
-> I have re based my changes on top of your repository to make pull
-> easier for you.
-> I hope you will pull these changes for 3.10.
-> 
-> The following changes since Commit a7f7881de9c0b58de3b3aea8f01a8aef906d4ade
-> 
-> are available in the git repository at:
-> 
-> git://gitorious.org/devkit8000-for_3-10/devkit8000-for_3-10.git
-> branch for_3.10/dts
-> 
-> for you to fetch changes up to Commit 975abc8b2e7ec4ff7324d726c9775958945ccc5e
+Thanks. This resolution looks fine.
 
-Thanks, I pulled the patches and rebased that on top of -rc3 to get the
-missing fix from Jon.
-
-I cleaned as well some changelog / subject and pushed then in my
-for_3.10/dts branch.
-
-Regards,
-Benoit
+Arnd/Olof, do you want me to rebase the Tegra branch onto some arm-soc
+branch to resolve this conflict, or are you happy to simply resolve it
+as below when pulling the Tegra branches into arm-soc for 3.10?
