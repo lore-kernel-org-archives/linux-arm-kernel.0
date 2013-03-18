@@ -1,204 +1,67 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 18 Mar 2013 13:48:13 +0530
-Subject: [PATCH v6 1/2] ARM: davinci: dm365: add support for v4l2 video
- display
-In-Reply-To: <1363360303-15521-2-git-send-email-prabhakar.csengg@gmail.com>
-References: <1363360303-15521-1-git-send-email-prabhakar.csengg@gmail.com>
- <1363360303-15521-2-git-send-email-prabhakar.csengg@gmail.com>
-Message-ID: <5146CDC5.9000702@ti.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Mon, 18 Mar 2013 13:50:43 +0530
+Subject: [PATCH 2/2] ARM: OMAP2+: clocks: Pass static parent pointers
+ to common clock core
+In-Reply-To: <20130315162049.GB9370@atomide.com>
+References: <1363264618-5071-1-git-send-email-rnayak@ti.com>
+ <1363264618-5071-3-git-send-email-rnayak@ti.com>
+ <20130314170601.GH26093@atomide.com> <514313B6.4050905@ti.com>
+ <20130315162049.GB9370@atomide.com>
+Message-ID: <5146CE5B.6090705@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/15/2013 8:41 PM, Prabhakar lad wrote:
-> From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+On Friday 15 March 2013 09:50 PM, Tony Lindgren wrote:
+> * Rajendra Nayak <rnayak@ti.com> [130315 05:31]:
+>> On Thursday 14 March 2013 10:36 PM, Tony Lindgren wrote:
+>>> * Rajendra Nayak <rnayak@ti.com> [130314 05:44]:
+>>>> OMAP clock inits happen quite early, even before the slab is available.
+>>>> As part of the clock init, the common clock core tries to cache parent
+>>>> pointers (if not passed by the caller registering the clock) which
+>>>> fails in case of OMAP since the slab isn't initied.
+>>>> Without CONFIG_DEBUG_SLAB enabled, this just results in the common clock core
+>>>> retrying the caching attempt at some point later.
+>>>> However with CONFIG_DEBUG_SLAB enabled this results in a BUG() as reported
+>>>> in the link below by Tony..
+>>>> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg85932.html
+>>>>
+>>>> Fix this by passing static parent pointers to the common clock core
+>>>> while registering clocks.
+>>>
+>>> I wonder if we could easily fix this by initializing only some of the
+>>> clocks that early?
+>>
+>> We actually don't need any clocks that early (I mean even before slab init)
+>> We only need them before timer init.
 > 
-> Create platform devices for various video modules like venc,osd,
-> vpbe and v4l2 driver for dm365.
+> Yes and only the timer clocks at that point. The others could be initialized
+> later on so we get console error messages without having to turn on DEBUG_LL
+> and earlyprintk.
+
+but that wouldn't be possible with the hwmod dependency on clocks. We would
+need to move the hwmod inits further down too.
+
+>  
+>> This isn't something specific to OMAP so I started looking at what others
+>> in drivers/clk seem to do.
+>>
+>> I found imx, spear, mvebu all do their clk inits within .init_time callbacks.
+>> tegra seems to even do it within .init_irq callback.
+>>
+>> Either one would work for us too :)
 > 
-> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
-> ---
->  arch/arm/mach-davinci/board-dm365-evm.c |    4 +-
->  arch/arm/mach-davinci/davinci.h         |    2 +-
->  arch/arm/mach-davinci/dm365.c           |  203 +++++++++++++++++++++++++++++--
->  3 files changed, 195 insertions(+), 14 deletions(-)
+> Well I suggest init_irq as that's when we need the first clocks for timer.
 
-> diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
-> index 6c39805..ec8b06e 100644
-> --- a/arch/arm/mach-davinci/dm365.c
-> +++ b/arch/arm/mach-davinci/dm365.c
-> @@ -40,10 +40,16 @@
->  
->  #define DM365_REF_FREQ		24000000	/* 24 MHz on the DM365 EVM */
->  
-> +#define DM3XX_VDAC_CONFIG		0x01c4002c
+For which platforms? I instead see them being needed only by init_timer, so
+was thinking thats a better place instead.
 
-DM365_VDAC_CONFIG since this is a DM365 specific file and to be
-consistent with rest of the names?
+For the -rc fix to fix the crash with DEBUG_SLAB, is it fine if I move *all*
+clock inits down to init_timer (or init_irq).
 
-> +
-> +#define DM365_RTC_BASE			0x01c69000
-> +
->  /* Base of key scan register bank */
->  #define DM365_KEYSCAN_BASE		0x01c69400
->  
-> -#define DM365_RTC_BASE			0x01c69000
-> +#define DM365_OSD_BASE			0x01c71c00
-> +
-> +#define DM365_VENC_REG_BASE		0x01c71e00
->  
->  #define DAVINCI_DM365_VC_BASE		0x01d0c000
->  #define DAVINCI_DMA_VC_TX		2
-> @@ -56,6 +62,11 @@
->  #define DM365_EMAC_CNTRL_RAM_OFFSET	0x1000
->  #define DM365_EMAC_CNTRL_RAM_SIZE	0x2000
->  
-> +#define DM365_VPSS_CLK_CTRL_ADDR		0x44
-> +#define DM365_VPSS_VENCCLKEN_ENABLE		BIT(3)
-> +#define DM365_VPSS_DACCLKEN_ENABLE		BIT(4)
-> +#define DM365_VPSS_PLLC2SYSCLK5_ENABLE		BIT(5)
-> +
->  static struct pll_data pll1_data = {
->  	.num		= 1,
->  	.phys_base	= DAVINCI_PLL1_BASE,
-> @@ -1226,6 +1237,186 @@ static struct platform_device dm365_isif_dev = {
->  	},
->  };
->  
-> +static struct resource dm365_osd_resources[] = {
-> +	{
-> +		.start = DM365_OSD_BASE,
-> +		.end   = DM365_OSD_BASE + 0x100,
-> +		.flags = IORESOURCE_MEM,
-> +	},
-> +};
-> +
-> +static u64 dm365_video_dma_mask = DMA_BIT_MASK(32);
-> +
-> +static struct platform_device dm365_osd_dev = {
-> +	.name		= DM365_VPBE_OSD_SUBDEV_NAME,
-> +	.id		= -1,
-> +	.num_resources	= ARRAY_SIZE(dm365_osd_resources),
-> +	.resource	= dm365_osd_resources,
-> +	.dev		= {
-> +		.dma_mask		= &dm365_video_dma_mask,
-> +		.coherent_dma_mask	= DMA_BIT_MASK(32),
-> +	},
-> +};
-> +
-> +static struct resource dm365_venc_resources[] = {
-> +	{
-> +		.start = IRQ_VENCINT,
-> +		.end   = IRQ_VENCINT,
-> +		.flags = IORESOURCE_IRQ,
-> +	},
-> +	/* venc registers io space */
-> +	{
-> +		.start = DM365_VENC_REG_BASE,
-> +		.end   = DM365_VENC_REG_BASE + 0x180,
-> +		.flags = IORESOURCE_MEM,
-> +	},
-> +	/* vdaccfg registers io space */
-> +	{
-> +		.start = DM3XX_VDAC_CONFIG,
-> +		.end   = DM3XX_VDAC_CONFIG + 4,
+Splitting clocks alone would not work for now, without hwmod being moved down also.
 
-DM3XX_VDAC_CONFIG + 3. Check for similar errors in rest of the patch.
-
-> +		.flags = IORESOURCE_MEM,
-> +	},
-> +};
-> +
-> +static struct resource dm365_v4l2_disp_resources[] = {
-> +	{
-> +		.start = IRQ_VENCINT,
-> +		.end   = IRQ_VENCINT,
-> +		.flags = IORESOURCE_IRQ,
-> +	},
-> +	/* venc registers io space */
-> +	{
-> +		.start = DM365_VENC_REG_BASE,
-> +		.end   = DM365_VENC_REG_BASE + 0x180,
-> +		.flags = IORESOURCE_MEM,
-> +	},
-> +};
-> +
-
-[...]
-
-> +static int dm365_venc_setup_clock(enum vpbe_enc_timings_type type,
-> +				  unsigned int pclock)
-> +{
-> +	void __iomem *vpss_clkctl_reg;
-> +	u32 val;
-> +
-> +	vpss_clkctl_reg = DAVINCI_SYSMOD_VIRT(DM365_VPSS_CLK_CTRL_ADDR);
-> +
-> +	switch (type) {
-> +	case VPBE_ENC_STD:
-> +		vpss_enable_clock(VPSS_VENC_CLOCK_SEL, 1);
-
-So as you found out, it is not correct to call driver functions from
-platform code. I suggesting moving this function to driver altogether.
-You just need access to DM365_VPSS_CLK_CTRL_ADDR which you can pass
-using resource structures.
-
-> +		vpss_enable_clock(VPSS_VPBE_CLOCK, 1);
-> +		val = DM365_VPSS_VENCCLKEN_ENABLE | DM365_VPSS_DACCLKEN_ENABLE;
-> +		break;
-> +
-> +	case VPBE_ENC_DV_TIMINGS:
-> +		if (pclock <= 27000000) {
-> +			vpss_enable_clock(VPSS_VENC_CLOCK_SEL, 1);
-> +			vpss_enable_clock(VPSS_VPBE_CLOCK, 1);
-> +			val = DM365_VPSS_VENCCLKEN_ENABLE |
-> +			      DM365_VPSS_DACCLKEN_ENABLE;
-> +		} else {
-> +			/* set sysclk4 to output 74.25 MHz from pll1 */
-> +			val = DM365_VPSS_PLLC2SYSCLK5_ENABLE |
-> +			      DM365_VPSS_DACCLKEN_ENABLE |
-> +			      DM365_VPSS_VENCCLKEN_ENABLE;
-> +		}
-> +		break;
-> +
-> +	default:
-> +		return -EINVAL;
-> +	}
-> +	writel(val, vpss_clkctl_reg);
-> +
-> +	return 0;
-> +}
-
-[...]
-
-> +int __init dm365_init_video(struct vpfe_config *vpfe_cfg,
-> +				struct vpbe_config *vpbe_cfg)
-> +{
-> +	if (vpfe_cfg || vpbe_cfg)
-> +		platform_device_register(&dm365_vpss_device);
-> +
-> +	if (vpfe_cfg) {
-> +		vpfe_capture_dev.dev.platform_data = vpfe_cfg;
-> +		/* Add isif clock alias */
-
-This comment is useless. Instead please document why the aliases are
-needed. I know you are just moving code here, but lets do a clean-up job
-while at it.
-
-> +		clk_add_alias("master", dm365_isif_dev.name,
-> +			      "vpss_master", NULL);
-> +		platform_device_register(&dm365_isif_dev);
-> +		platform_device_register(&vpfe_capture_dev);
-> +	}
-> +	if (vpbe_cfg) {
-> +		dm365_vpbe_dev.dev.platform_data = vpbe_cfg;
-> +		platform_device_register(&dm365_osd_dev);
-> +		platform_device_register(&dm365_venc_dev);
-> +		platform_device_register(&dm365_vpbe_dev);
-> +		platform_device_register(&dm365_vpbe_display);
-> +	}
-> +
-> +	return 0;
-> +}
-
-Thanks,
-Sekhar
+> 
+> Regards,
+> 
+> Tony
+> 
