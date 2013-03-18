@@ -1,144 +1,112 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 18 Mar 2013 21:32:41 +0900
-Subject: [PATCH 31/43] ARM: shmobile: Rearrange r8a7779 cpu hotplug code
+Date: Mon, 18 Mar 2013 21:32:31 +0900
+Subject: [PATCH 21/43] ARM: shmobile: sh73a0: Do not use early devices with DT
+ reference
 In-Reply-To: <1363609973-31086-1-git-send-email-horms+renesas@verge.net.au>
 References: <1363609973-31086-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1363609973-31086-32-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1363609973-31086-22-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+Do not initialise any early devices when using the minimal DT reference
+code. Only the delay needs to be initialised.
 
-Update the r8a7779 SMP code and CPU Hotplug in particular
-to follow the same style as sh73a0. This means dropping
-__maybe_unused for #ifdef CONFIG_HOTPLUG_CPU.
-
-Signed-off-by: Magnus Damm <damm@opensource.se>
+Cc: Magnus Damm <magnus.damm@gmail.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/smp-r8a7779.c |   96 +++++++++++++++++-----------------
- 1 file changed, 49 insertions(+), 47 deletions(-)
+ arch/arm/mach-shmobile/include/mach/common.h |    2 +-
+ arch/arm/mach-shmobile/setup-sh73a0.c        |   24 +++++++++---------------
+ 2 files changed, 10 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/smp-r8a7779.c b/arch/arm/mach-shmobile/smp-r8a7779.c
-index bdd3809..ea4535a 100644
---- a/arch/arm/mach-shmobile/smp-r8a7779.c
-+++ b/arch/arm/mach-shmobile/smp-r8a7779.c
-@@ -66,16 +66,6 @@ void __init r8a7779_register_twd(void)
- }
- #endif
+diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
+index 84dcaa4..44cdecc 100644
+--- a/arch/arm/mach-shmobile/include/mach/common.h
++++ b/arch/arm/mach-shmobile/include/mach/common.h
+@@ -34,12 +34,12 @@ extern int sh7372_do_idle_sysc(unsigned long sleep_mode);
+ extern struct clk sh7372_extal1_clk;
+ extern struct clk sh7372_extal2_clk;
  
--static int r8a7779_scu_psr_core_disabled(int cpu)
--{
--	unsigned long mask = 3 << (cpu * 8);
--
--	if ((__raw_readl(shmobile_scu_base + 8) & mask) == mask)
--		return 1;
--
--	return 0;
--}
--
- static int r8a7779_platform_cpu_kill(unsigned int cpu)
++extern void sh73a0_init_delay(void);
+ extern void sh73a0_init_irq(void);
+ extern void sh73a0_init_irq_dt(void);
+ extern void sh73a0_map_io(void);
+ extern void sh73a0_earlytimer_init(void);
+ extern void sh73a0_add_early_devices(void);
+-extern void sh73a0_add_early_devices_dt(void);
+ extern void sh73a0_add_standard_devices(void);
+ extern void sh73a0_add_standard_devices_dt(void);
+ extern void sh73a0_clock_init(void);
+diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
+index 37baa48..2257a91 100644
+--- a/arch/arm/mach-shmobile/setup-sh73a0.c
++++ b/arch/arm/mach-shmobile/setup-sh73a0.c
+@@ -811,7 +811,7 @@ static struct platform_device ipmmu_device = {
+ 	.num_resources  = ARRAY_SIZE(ipmmu_resources),
+ };
+ 
+-static struct platform_device *sh73a0_early_devices_dt[] __initdata = {
++static struct platform_device *sh73a0_devices_dt[] __initdata = {
+ 	&scif0_device,
+ 	&scif1_device,
+ 	&scif2_device,
+@@ -848,8 +848,8 @@ void __init sh73a0_add_standard_devices(void)
+ 	/* Clear software reset bit on SY-DMAC module */
+ 	__raw_writel(__raw_readl(SRCR2) & ~(1 << 18), SRCR2);
+ 
+-	platform_add_devices(sh73a0_early_devices_dt,
+-			    ARRAY_SIZE(sh73a0_early_devices_dt));
++	platform_add_devices(sh73a0_devices_dt,
++			    ARRAY_SIZE(sh73a0_devices_dt));
+ 	platform_add_devices(sh73a0_early_devices,
+ 			    ARRAY_SIZE(sh73a0_early_devices));
+ 	platform_add_devices(sh73a0_late_devices,
+@@ -868,8 +868,8 @@ void __init sh73a0_earlytimer_init(void)
+ 
+ void __init sh73a0_add_early_devices(void)
  {
- 	struct r8a7779_pm_ch *ch = NULL;
-@@ -92,43 +82,6 @@ static int r8a7779_platform_cpu_kill(unsigned int cpu)
- 	return ret ? ret : 1;
- }
+-	early_platform_add_devices(sh73a0_early_devices_dt,
+-				   ARRAY_SIZE(sh73a0_early_devices_dt));
++	early_platform_add_devices(sh73a0_devices_dt,
++				   ARRAY_SIZE(sh73a0_devices_dt));
+ 	early_platform_add_devices(sh73a0_early_devices,
+ 				   ARRAY_SIZE(sh73a0_early_devices));
  
--static int __maybe_unused r8a7779_cpu_kill(unsigned int cpu)
--{
--	int k;
--
--	/* this function is running on another CPU than the offline target,
--	 * here we need wait for shutdown code in platform_cpu_die() to
--	 * finish before asking SoC-specific code to power off the CPU core.
--	 */
--	for (k = 0; k < 1000; k++) {
--		if (r8a7779_scu_psr_core_disabled(cpu))
--			return r8a7779_platform_cpu_kill(cpu);
--
--		mdelay(1);
--	}
--
--	return 0;
--}
--
--static void __maybe_unused r8a7779_cpu_die(unsigned int cpu)
--{
--	dsb();
--	flush_cache_all();
--
--	/* disable cache coherency */
--	scu_power_mode(shmobile_scu_base, SCU_PM_POWEROFF);
--
--	/* Endless loop until power off from r8a7779_cpu_kill() */
--	while (1)
--		cpu_do_idle();
--}
--
--static int __maybe_unused r8a7779_cpu_disable(unsigned int cpu)
--{
--	/* only CPU1->3 have power domains, do not allow hotplug of CPU0 */
--	return cpu == 0 ? -EPERM : 0;
--}
--
- static void __cpuinit r8a7779_secondary_init(unsigned int cpu)
+@@ -879,15 +879,9 @@ void __init sh73a0_add_early_devices(void)
+ 
+ #ifdef CONFIG_USE_OF
+ 
+-void __init sh73a0_add_early_devices_dt(void)
++void __init sh73a0_init_delay(void)
  {
- 	gic_secondary_init(0);
-@@ -176,6 +129,55 @@ static void __init r8a7779_smp_init_cpus(void)
- 	shmobile_smp_init_cpus(scu_get_core_count(shmobile_scu_base));
+ 	shmobile_setup_delay(1196, 44, 46); /* Cortex-A9 @ 1196MHz */
+-
+-	early_platform_add_devices(sh73a0_early_devices_dt,
+-				   ARRAY_SIZE(sh73a0_early_devices_dt));
+-
+-	/* setup early console here as well */
+-	shmobile_setup_console();
  }
  
-+#ifdef CONFIG_HOTPLUG_CPU
-+static int r8a7779_scu_psr_core_disabled(int cpu)
-+{
-+	unsigned long mask = 3 << (cpu * 8);
-+
-+	if ((__raw_readl(shmobile_scu_base + 8) & mask) == mask)
-+		return 1;
-+
-+	return 0;
-+}
-+
-+static int r8a7779_cpu_kill(unsigned int cpu)
-+{
-+	int k;
-+
-+	/* this function is running on another CPU than the offline target,
-+	 * here we need wait for shutdown code in platform_cpu_die() to
-+	 * finish before asking SoC-specific code to power off the CPU core.
-+	 */
-+	for (k = 0; k < 1000; k++) {
-+		if (r8a7779_scu_psr_core_disabled(cpu))
-+			return r8a7779_platform_cpu_kill(cpu);
-+
-+		mdelay(1);
-+	}
-+
-+	return 0;
-+}
-+
-+static void r8a7779_cpu_die(unsigned int cpu)
-+{
-+	dsb();
-+	flush_cache_all();
-+
-+	/* disable cache coherency */
-+	scu_power_mode(shmobile_scu_base, SCU_PM_POWEROFF);
-+
-+	/* Endless loop until power off from r8a7779_cpu_kill() */
-+	while (1)
-+		cpu_do_idle();
-+}
-+
-+static int r8a7779_cpu_disable(unsigned int cpu)
-+{
-+	/* only CPU1->3 have power domains, do not allow hotplug of CPU0 */
-+	return cpu == 0 ? -EPERM : 0;
-+}
-+#endif /* CONFIG_HOTPLUG_CPU */
-+
- struct smp_operations r8a7779_smp_ops  __initdata = {
- 	.smp_init_cpus		= r8a7779_smp_init_cpus,
- 	.smp_prepare_cpus	= r8a7779_smp_prepare_cpus,
+ static const struct of_dev_auxdata sh73a0_auxdata_lookup[] __initconst = {
+@@ -899,8 +893,8 @@ void __init sh73a0_add_standard_devices_dt(void)
+ 	/* clocks are setup late during boot in the case of DT */
+ 	sh73a0_clock_init();
+ 
+-	platform_add_devices(sh73a0_early_devices_dt,
+-			     ARRAY_SIZE(sh73a0_early_devices_dt));
++	platform_add_devices(sh73a0_devices_dt,
++			     ARRAY_SIZE(sh73a0_devices_dt));
+ 	of_platform_populate(NULL, of_default_bus_match_table,
+ 			     sh73a0_auxdata_lookup, NULL);
+ }
+@@ -913,7 +907,7 @@ static const char *sh73a0_boards_compat_dt[] __initdata = {
+ DT_MACHINE_START(SH73A0_DT, "Generic SH73A0 (Flattened Device Tree)")
+ 	.smp		= smp_ops(sh73a0_smp_ops),
+ 	.map_io		= sh73a0_map_io,
+-	.init_early	= sh73a0_add_early_devices_dt,
++	.init_early	= sh73a0_init_delay,
+ 	.nr_irqs	= NR_IRQS_LEGACY,
+ 	.init_irq	= irqchip_init,
+ 	.init_machine	= sh73a0_add_standard_devices_dt,
 -- 
 1.7.10.4
