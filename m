@@ -1,81 +1,54 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Mon, 18 Mar 2013 16:23:35 +0800
-Subject: [PATCH] i2c: sirf: get the i2c pin group by pinctrl api
-In-Reply-To: <5146C9C6.2030507@ti.com>
-References: <1363591361-5992-1-git-send-email-Barry.Song@csr.com>
- <5146C9C6.2030507@ti.com>
-Message-ID: <CAGsJ_4yAhUKyH14UEq8WBUmHAq7ZzhNLyX-zcEehR-wr5H6NUA@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 18 Mar 2013 16:26:22 +0800
+Subject: [PATCH v2 1/4] net: fec: handle optional clk_ptp more gracefully
+In-Reply-To: <1363595185-12302-1-git-send-email-shawn.guo@linaro.org>
+References: <1363595185-12302-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1363595185-12302-2-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/3/18 Sourav Poddar <sourav.poddar@ti.com>:
-> Hi,
->
-> On Monday 18 March 2013 12:52 PM, Barry Song wrote:
->>
->> From: Barry Song<Baohua.Song@csr.com>
->>
->> hardcode set i2c pin group to i2c function before, here we
->> move to use standard pinctrl API to get pins of the group.
->>
->> Signed-off-by: Barry Song<Baohua.Song@csr.com>
->> Cc: Linus Walleij<linus.walleij@linaro.org>
->> ---
->>   drivers/i2c/busses/i2c-sirf.c |    9 +++++++++
->>   1 files changed, 9 insertions(+), 0 deletions(-)
->>
->> diff --git a/drivers/i2c/busses/i2c-sirf.c b/drivers/i2c/busses/i2c-sirf.c
->> index 5a7ad24..dd4004e 100644
->> --- a/drivers/i2c/busses/i2c-sirf.c
->> +++ b/drivers/i2c/busses/i2c-sirf.c
->> @@ -16,6 +16,7 @@
->>   #include<linux/clk.h>
->>   #include<linux/err.h>
->>   #include<linux/io.h>
->> +#include<linux/pinctrl/consumer.h>
->>
->>   #define SIRFSOC_I2C_CLK_CTRL          0x00
->>   #define SIRFSOC_I2C_STATUS            0x0C
->> @@ -265,6 +266,7 @@ static int i2c_sirfsoc_probe(struct platform_device
->> *pdev)
->>         struct i2c_adapter *adap;
->>         struct resource *mem_res;
->>         struct clk *clk;
->> +       struct pinctrl *pinctrl;
->>         int bitrate;
->>         int ctrl_speed;
->>         int irq;
->> @@ -272,6 +274,12 @@ static int i2c_sirfsoc_probe(struct platform_device
->> *pdev)
->>         int err;
->>         u32 regval;
->>
->> +       pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
->> +       if (IS_ERR(pinctrl)) {
->> +               err = PTR_ERR(pinctrl);
->> +               goto failed_pin;
->> +       }
->> +
->
-> I think,  you should also add an "EPROBE_DEFER" check here ?
+When the optional clk_ptp is absent, we can just set it to NULL, and
+clk API will just handle it gracefully.  It saves us from checking
+clk_ptp whenever calling into clk API.
 
-why would the driver require a probe retry since getting the pinctrl
-has returned an error? before the driver executes, pinctrl driver has
-run earlier and DT has been extended.
+Also since clk_ptp is optional, the "ret" variable shouldn't be set
+in case that the clock is absent.
 
-all people are using  IS_ERR(pinctrl) to check the ret of
-devm_pinctrl_get_select_default.
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ drivers/net/ethernet/freescale/fec.c |    8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
 
->
->>         clk = clk_get(&pdev->dev, NULL);
->>         if (IS_ERR(clk)) {
->>                 err = PTR_ERR(clk);
->> @@ -385,6 +393,7 @@ err_clk_en:
->>   err_clk_prep:
->>         clk_put(clk);
->>   err_get_clk:
->> +failed_pin:
->>         return err;
->>   }
-
--barry
+diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
+index fccc3bf..d2a9851 100644
+--- a/drivers/net/ethernet/freescale/fec.c
++++ b/drivers/net/ethernet/freescale/fec.c
+@@ -1804,14 +1804,13 @@ fec_probe(struct platform_device *pdev)
+ 	fep->bufdesc_ex =
+ 		pdev->id_entry->driver_data & FEC_QUIRK_HAS_BUFDESC_EX;
+ 	if (IS_ERR(fep->clk_ptp)) {
+-		ret = PTR_ERR(fep->clk_ptp);
++		fep->clk_ptp = NULL;
+ 		fep->bufdesc_ex = 0;
+ 	}
+ 
+ 	clk_prepare_enable(fep->clk_ahb);
+ 	clk_prepare_enable(fep->clk_ipg);
+-	if (!IS_ERR(fep->clk_ptp))
+-		clk_prepare_enable(fep->clk_ptp);
++	clk_prepare_enable(fep->clk_ptp);
+ 
+ 	reg_phy = devm_regulator_get(&pdev->dev, "phy");
+ 	if (!IS_ERR(reg_phy)) {
+@@ -1876,8 +1875,7 @@ failed_irq:
+ failed_regulator:
+ 	clk_disable_unprepare(fep->clk_ahb);
+ 	clk_disable_unprepare(fep->clk_ipg);
+-	if (!IS_ERR(fep->clk_ptp))
+-		clk_disable_unprepare(fep->clk_ptp);
++	clk_disable_unprepare(fep->clk_ptp);
+ failed_pin:
+ failed_clk:
+ 	iounmap(fep->hwp);
+-- 
+1.7.9.5
