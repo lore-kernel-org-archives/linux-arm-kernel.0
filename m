@@ -1,66 +1,75 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 18 Mar 2013 20:06:25 +0900
-Subject: [PATCH 089/142] ARM: shmobile: kota2: Register pinctrl mappings for
- BSC
+Date: Mon, 18 Mar 2013 20:06:43 +0900
+Subject: [PATCH 107/142] sh-pfc: sh73a0: Remove I2C function GPIOS
 In-Reply-To: <1363604838-29359-1-git-send-email-horms+renesas@verge.net.au>
 References: <1363604838-29359-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1363604838-29359-90-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1363604838-29359-108-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Replace the GPIO-based BSC pinmux configuration by pinctrl mappings.
+All sh73a0 platforms now use the pinctrl API to control the I2C pins,
+the corresponding function GPIOS are unused. Remove them.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-shmobile/board-kota2.c |   27 +++++++++------------------
- 1 file changed, 9 insertions(+), 18 deletions(-)
+ drivers/pinctrl/sh-pfc/pfc-sh73a0.c |   12 ------------
+ 1 file changed, 12 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-kota2.c b/arch/arm/mach-shmobile/board-kota2.c
-index 3f36557..ef5ca0e 100644
---- a/arch/arm/mach-shmobile/board-kota2.c
-+++ b/arch/arm/mach-shmobile/board-kota2.c
-@@ -503,6 +503,15 @@ static const struct pinctrl_map kota2_pinctrl_map[] = {
- 				      "sdhi1_data4", pin_pullup_conf),
- 	PIN_MAP_CONFIGS_PIN_DEFAULT("sh_mobile_sdhi.1", "pfc-sh73a0",
- 				    "PORT263", pin_pullup_conf),
-+	/* SMSC911X */
-+	PIN_MAP_MUX_GROUP_DEFAULT("smsc911x.0", "pfc-sh73a0",
-+				  "bsc_data_0_7", "bsc"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("smsc911x.0", "pfc-sh73a0",
-+				  "bsc_data_8_15", "bsc"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("smsc911x.0", "pfc-sh73a0",
-+				  "bsc_cs5_a", "bsc"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("smsc911x.0", "pfc-sh73a0",
-+				  "bsc_we0", "bsc"),
- };
- 
- static void __init kota2_init(void)
-@@ -518,24 +527,6 @@ static void __init kota2_init(void)
- 	sh73a0_pinmux_init();
- 
- 	/* SMSC911X */
--	gpio_request(GPIO_FN_D0_NAF0, NULL);
--	gpio_request(GPIO_FN_D1_NAF1, NULL);
--	gpio_request(GPIO_FN_D2_NAF2, NULL);
--	gpio_request(GPIO_FN_D3_NAF3, NULL);
--	gpio_request(GPIO_FN_D4_NAF4, NULL);
--	gpio_request(GPIO_FN_D5_NAF5, NULL);
--	gpio_request(GPIO_FN_D6_NAF6, NULL);
--	gpio_request(GPIO_FN_D7_NAF7, NULL);
--	gpio_request(GPIO_FN_D8_NAF8, NULL);
--	gpio_request(GPIO_FN_D9_NAF9, NULL);
--	gpio_request(GPIO_FN_D10_NAF10, NULL);
--	gpio_request(GPIO_FN_D11_NAF11, NULL);
--	gpio_request(GPIO_FN_D12_NAF12, NULL);
--	gpio_request(GPIO_FN_D13_NAF13, NULL);
--	gpio_request(GPIO_FN_D14_NAF14, NULL);
--	gpio_request(GPIO_FN_D15_NAF15, NULL);
--	gpio_request(GPIO_FN_CS5A_, NULL);
--	gpio_request(GPIO_FN_WE0__FWE, NULL);
- 	gpio_request_one(144, GPIOF_IN, NULL); /* PINTA2 */
- 	gpio_request_one(145, GPIOF_OUT_INIT_HIGH, NULL); /* RESET */
- 
+diff --git a/drivers/pinctrl/sh-pfc/pfc-sh73a0.c b/drivers/pinctrl/sh-pfc/pfc-sh73a0.c
+index 6d36ebb..13bd138 100644
+--- a/drivers/pinctrl/sh-pfc/pfc-sh73a0.c
++++ b/drivers/pinctrl/sh-pfc/pfc-sh73a0.c
+@@ -3354,13 +3354,9 @@ static const struct pinmux_func pinmux_func_gpios[] = {
+ 	GPIO_FN(VINT),
+ 	GPIO_FN(TCKON),
+ 	GPIO_FN(XDVFS1), \
+-	GPIO_FN(PORT27_I2C_SCL2), \
+-	GPIO_FN(PORT27_I2C_SCL3), \
+ 	GPIO_FN(MFG0_OUT1), \
+ 	GPIO_FN(PORT27_IROUT),
+ 	GPIO_FN(XDVFS2), \
+-	GPIO_FN(PORT28_I2C_SDA2), \
+-	GPIO_FN(PORT28_I2C_SDA3), \
+ 	GPIO_FN(PORT28_TPU1TO1),
+ 	GPIO_FN(SIM_RST), \
+ 	GPIO_FN(PORT29_TPU1TO1),
+@@ -3517,12 +3513,8 @@ static const struct pinmux_func pinmux_func_gpios[] = {
+ 	GPIO_FN(BBIF1_TXD),
+ 	GPIO_FN(HSI_RX_READY), \
+ 	GPIO_FN(BBIF1_RSCK), \
+-	GPIO_FN(PORT115_I2C_SCL2), \
+-	GPIO_FN(PORT115_I2C_SCL3),
+ 	GPIO_FN(HSI_RX_WAKE), \
+ 	GPIO_FN(BBIF1_RSYNC), \
+-	GPIO_FN(PORT116_I2C_SDA2), \
+-	GPIO_FN(PORT116_I2C_SDA3),
+ 	GPIO_FN(HSI_RX_FLAG), \
+ 	GPIO_FN(BBIF1_SS1), \
+ 	GPIO_FN(BBIF1_FLOW),
+@@ -3670,9 +3662,7 @@ static const struct pinmux_func pinmux_func_gpios[] = {
+ 	GPIO_FN(MFG1_IN2), \
+ 	GPIO_FN(VIO2_VD2), \
+ 	GPIO_FN(MSIOF1_MCK0), \
+-	GPIO_FN(PORT236_I2C_SDA2),
+ 	GPIO_FN(MSIOF1_MCK1), \
+-	GPIO_FN(PORT237_I2C_SCL2),
+ 	GPIO_FN(MSIOF1_SS1), \
+ 	GPIO_FN(VIO2_FIELD2), \
+ 	GPIO_FN(MSIOF1_SS2), \
+@@ -3695,11 +3685,9 @@ static const struct pinmux_func pinmux_func_gpios[] = {
+ 	GPIO_FN(TPU3TO1),
+ 	GPIO_FN(MFG2_OUT1), \
+ 	GPIO_FN(TPU2TO0), \
+-	GPIO_FN(PORT248_I2C_SCL3), \
+ 	GPIO_FN(MSIOF2R_TSCK),
+ 	GPIO_FN(PORT249_IROUT), \
+ 	GPIO_FN(MFG4_IN1), \
+-	GPIO_FN(PORT249_I2C_SDA3), \
+ 	GPIO_FN(MSIOF2R_TSYNC),
+ 	GPIO_FN(SDHICLK0),
+ 	GPIO_FN(SDHICD0),
 -- 
 1.7.10.4
