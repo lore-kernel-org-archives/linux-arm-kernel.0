@@ -1,48 +1,54 @@
-From: wd@denx.de (Wolfgang Denk)
-Date: Mon, 18 Mar 2013 20:57:25 +0100
-Subject: [U-Boot] [RFC] Kbuild support for ARM FIT images
-In-Reply-To: <51475997.2060008@wwwdotorg.org>
-References: <CAD=GYpbF_3uRzhUnV=MwDiy-ekvZKJztJbkhNM0u_pvG-UCw4w@mail.gmail.com>
- <20130222160044.GA16357@quad.lixom.net>
- <20130318163648.GA3722@amd.pavel.ucw.cz>
- <20130318164426.GI30923@n2100.arm.linux.org.uk>
- <20130318174931.GB4230@amd.pavel.ucw.cz>
- <20130318175746.GJ30923@n2100.arm.linux.org.uk>
- <20130318180458.GC4230@amd.pavel.ucw.cz> <51475997.2060008@wwwdotorg.org>
-Message-ID: <20130318195725.CA8132014B1@gemini.denx.de>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 18 Mar 2013 13:15:51 -0700
+Subject: [PATCH 1/5] clk: allow reentrant calls into the clk framework
+In-Reply-To: <CAPDyKFqhGjduuSRvgZXJBUnbqS9L9aFw_nYc2VfkY1Ljgxrp+g@mail.gmail.com>
+References: <1362026969-11457-1-git-send-email-mturquette@linaro.org>
+ <1362026969-11457-2-git-send-email-mturquette@linaro.org>
+ <CAPDyKFqhGjduuSRvgZXJBUnbqS9L9aFw_nYc2VfkY1Ljgxrp+g@mail.gmail.com>
+Message-ID: <20130318201551.8663.22731@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Stephen,
+Quoting Ulf Hansson (2013-02-28 01:54:34)
+> On 28 February 2013 05:49, Mike Turquette <mturquette@linaro.org> wrote:
+> > @@ -703,10 +744,29 @@ int clk_enable(struct clk *clk)
+> >         unsigned long flags;
+> >         int ret;
+> >
+> > +       /* this call re-enters if it is from the same context */
+> > +       if (spin_is_locked(&enable_lock) || mutex_is_locked(&prepare_lock)) {
+> > +               if ((void *) atomic_read(&context) == get_current()) {
+> > +                       ret = __clk_enable(clk);
+> > +                       goto out;
+> > +               }
+> > +       }
+> 
+> I beleive the clk_enable|disable code will be racy. What do you think
+> about this scenario:
+> 
+> 1. Thread 1, calls clk_prepare -> clk is not reentrant -> mutex_lock
+> -> set_context to thread1.
+> 2. Thread 2, calls clk_enable -> above "if" will mean that get_current
+> returns thread 1 context and then clk_enable continues ->
+> spin_lock_irqsave -> set_context to thread 2.
+> 3. Thread 1 continues and triggers a reentancy for clk_prepare -> clk
+> is not reentrant (since thread 2 has set a new context) -> mutex_lock
+> and we will hang forever.
+> 
+> Do you think above scenario could happen?
+> 
+> I think the solution would be to invent another "static atomic_t
+> context;" which is used only for fast path functions
+> (clk_enable|disable). That should do the trick I think.
 
-In message <51475997.2060008@wwwdotorg.org> you wrote:
->
-> Raw zImage /is/ the useful format that should be adopted.
+Ulf,
 
-This "one size fits all" approch does fit everywhere.  There are a
-number of users (including _big_ commercial ones, with _large_ numebrs
-of systems in the field) that have simple requirements like:
+You are correct.  In fact I have a branch that has two separate context
+pointers, one for mutex-protected functions and one for
+spinlock-protected functions.  Somehow I managed to discard that change
+before settling on the final version that was published.
 
-- how can I find out if the image I just loaded to RAM in OK (OK
-  maning some checksum is correct, or some crypto-key could be
-  verified, or ...) ?
+I'll add the change back in.
 
-- how can I find out which version of image is installed on this
-  device in the flash?  Can I print something like an ID string, or a
-  build timestamp, etc?
-
-etc. etc.
-
-zImage may work well in many cases, but there are also many cases
-where in image format that allows for additional meta-data is
-mandatory.
-
-Best regards,
-
-Wolfgang Denk
-
--- 
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
-Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
-Minds are like parachutes - they only function when open.
+Thanks for the review,
+Mike
