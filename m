@@ -1,35 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 18 Mar 2013 17:57:46 +0000
-Subject: [RFC] Kbuild support for ARM FIT images
-In-Reply-To: <20130318174931.GB4230@amd.pavel.ucw.cz>
-References: <CAD=GYpbF_3uRzhUnV=MwDiy-ekvZKJztJbkhNM0u_pvG-UCw4w@mail.gmail.com>
- <20130222160044.GA16357@quad.lixom.net>
- <20130318163648.GA3722@amd.pavel.ucw.cz>
- <20130318164426.GI30923@n2100.arm.linux.org.uk>
- <20130318174931.GB4230@amd.pavel.ucw.cz>
-Message-ID: <20130318175746.GJ30923@n2100.arm.linux.org.uk>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Mon, 18 Mar 2013 18:00:55 +0000
+Subject: [PATCH v2 1/2] ARM: vexpress: Enable regulator framework when MMCI is
+ in use
+In-Reply-To: <20130315181614.GY4977@n2100.arm.linux.org.uk>
+References: <20130315181614.GY4977@n2100.arm.linux.org.uk>
+Message-ID: <1363629655-28917-1-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 18, 2013 at 06:49:32PM +0100, Pavel Machek wrote:
-> What I wanted to say is that kernel build traditionaly produced
-> something useful, something bootloader can actually boot. Currently,
-> make uImage produces u-boot image. Please keep that capability.
+The MMCI driver, when used with a Device Tree described device, relies
+on the "vmmc" voltage regulator supply to set the OCR register voltage bits,
+using MMC core's mmc_regulator_get_supply() function.
 
-Unfortunately, there is a fundamental problem with uImage.  It encodes
-the load address, and that is utterly incompatible with the goal of
-having a kernel image which boots on multiple platforms.
+Without the regulator framework present there are no valid operating
+voltages reported and the device initialisation fails:
 
-uImage isn't going anywhere for the time being, but you will find
-that:
+mmci-pl18x 1c050000.mmci: mmc0: PL180 manf 41 rev0 at 0x1c050000 irq 41,42 (pio)
+mmc0: host doesn't support card's voltages
+mmc0: error -22 whilst initialising MMC card
 
-a) recent kernels will just wrap the zImage without a DTB, so
-   appended DTBs can't be used with it
-b) it won't work with MULTIPLATFORM-enabled kernels, unless you
-   provide make with a LOADADDR= argument to tell it where the
-   uImage is to be loaded - which is platform specific.
+Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+---
+ arch/arm/mach-vexpress/Kconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-(b) fundamentally can't be solved in kbuild.  If you want to use
-uImage with multiple platforms from the same zImage, then you need
-to generate multiple uImage files with different load addresses.
-That's purely - and solely - down to the dysfunctional uImage format.
+diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
+index 52d315b..46ab88d 100644
+--- a/arch/arm/mach-vexpress/Kconfig
++++ b/arch/arm/mach-vexpress/Kconfig
+@@ -17,6 +17,7 @@ config ARCH_VEXPRESS
+ 	select NO_IOPORT
+ 	select PLAT_VERSATILE
+ 	select PLAT_VERSATILE_CLCD
++	select REGULATOR if MMC_ARMMMCI
+ 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
+ 	select VEXPRESS_CONFIG
+ 	help
+-- 
+1.7.10.4
