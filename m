@@ -1,61 +1,152 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 18 Mar 2013 09:47:27 -0600
-Subject: [PATCH 1/7] kbuild: create an "include chroot" for DT bindings
-In-Reply-To: <20130318151348.GB4713@S2101-09.ap.freescale.net>
-References: <1362594183-21523-1-git-send-email-swarren@wwwdotorg.org>
- <20130318151348.GB4713@S2101-09.ap.freescale.net>
-Message-ID: <5147370F.9030500@wwwdotorg.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 18 Mar 2013 15:48:09 +0000
+Subject: [PATCH v2] USB: EHCI: hot-fix OMAP and Orion multiplatform config
+In-Reply-To: <201303181545.18083.arnd@arndb.de>
+References: <201303151700.27231.arnd@arndb.de>
+ <20130316000936.GB10166@kroah.com> <201303181545.18083.arnd@arndb.de>
+Message-ID: <201303181548.10140.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/18/2013 09:13 AM, Shawn Guo wrote:
-> On Wed, Mar 06, 2013 at 11:22:57AM -0700, Stephen Warren wrote:
->> From: Stephen Warren <swarren@nvidia.com>
->>
->> The recent dtc+cpp support allows header files and C pre-processor
->> defines/macros to be used when compiling device tree files. These
->> headers will typically define various constants that are part of the
->> device tree bindings.
->>
->> The original patch which set up the dtc+cpp include path only considered
->> using those headers from device tree files. However, most are also
->> useful for kernel code which needs to interpret the device tree.
->>
->> In both the DT files and the kernel, I'd like to include the DT-related
->> headers in the same way, for example, <dt-bindings/gpio/tegra-gpio.h>.
->> That will simplify any text which discusses the DT header locations.
->>
->> Creating a <dt-bindings/> for kernel source to use is as simple as
->> placing files into include/dt-bindings/.
->>
->> However, when compiling DT files, the include path should be restricted
->> so that only the dt-bindings path is available; arbitrary kernel headers
->> shouldn't be exposed. For this reason, create a specific include
->> directory for use by dtc+cpp, and symlink dt-bindings from there to the
->> actual location of include/dt-bindings/. For want of a better location,
->> place this "include chroot" into the existing dts/ directory.
->>
->> arch/*/boot/dts/include/dt-bindings -> ../../../../../include/dt-bindings
->>
->> Some headers used by device tree files may not be useful to the kernel;
->> they may be used simply to aid in constructing the DT file (e.g. macros
->> to create a node), but not define any information that the kernel needs
->> to share. These may be placed directly into arch/*/boot/dts/ along with
->> the DT files themselves.
->>
->> Cc: Shawn Guo <shawn.guo@linaro.org>
->> Cc: Hiroshi Doyu <hdoyu@nvidia.com>
->> Acked-by: Michal Marek <mmarek@suse.cz>
->> Acked-by: Shawn Guo <shawn.guo@linaro.org>
->> Acked-by: Rob Herring <rob.herring@calxeda.com>
->> Signed-off-by: Stephen Warren <swarren@nvidia.com>
->> ---
->> This first patch was previously posted separately as V2. I'm including
->> it here to keep it with the whole series. I hope this series can be
->> applied as a topic branch in arm-soc.
-> 
-> So no comments on the series means that we can start maintain it on
-> a topic branch, so that people can base their works on it?
+A number of ARM platforms were changed in linux-3.9 so they can be enabled
+at a single kernel configuration. Unfortunately, the necessary changes for
+the EHCI driver were not ready in time and the first attempt to split out
+the EHCI bus glues into separate modules had to get reverted before the
+merge window.
 
-I was thinking of reposting the series today due to lack of responses,
-so that the content was freshly available in people's inboxes.
+This means we are still stuck with a situation where enabling any
+combination of more than one of the OMAP, MVEBU/Orion and VT8500/WM8x50
+platforms at the same time leaves us with an EHCI driver that does
+not work properly and spits out this build warning:
+
+ehci-hcd.c:1277:0: warning: "PLATFORM_DRIVER" redefined [enabled by default]
+ehci-hcd.c:1257:0: note: this is the location of the previous definition
+ehci-hcd.c:1297:0: warning: "PLATFORM_DRIVER" redefined [enabled by default]
+ehci-hcd.c:1277:0: note: this is the location of the previous definition
+In file included from ehci-hcd.c:1256:0:
+ehci-omap.c:311:31: warning: 'ehci_hcd_omap_driver' defined but not used [-Wunused-variable]
+In file included from ehci-hcd.c:1276:0:
+ehci-orion.c:334:31: warning: 'ehci_orion_driver' defined but not used [-Wunused-variable]
+ehci-hcd.c:1277:0: warning: "PLATFORM_DRIVER" redefined [enabled by default]
+ehci-hcd.c:1257:0: note: this is the location of the previous definition
+ehci-hcd.c:1297:0: warning: "PLATFORM_DRIVER" redefined [enabled by default]
+ehci-hcd.c:1277:0: note: this is the location of the previous definition
+
+This is the simplest patch I could come up with that will restore some
+sanity in multiplatform configuration and allow us to build an ARM
+allyesconfig kernel. Disallowing the broken configuration in Kconfig
+would actually end up in a larger patch and more regression potential
+than this one.
+
+We had a similar situation in 3.8 with a conflict between Orion and MXC,
+and Alan Stern objected to the simple hack back then and instead provided
+a better full conversion of the MXC backend in patch dba63b2f7. A proper
+patch for OMAP was submitted in January but also did not make it into 3.9,
+see https://patchwork.kernel.org/patch/2055131.
+
+I expect that for 3.10 we will be able to do this correctly and
+turn all ARM bus glues into separate modules, ripping out the
+code that this patch changes.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Alan Stern <stern@rowland.harvard.edu>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Roger Quadros <rogerq@ti.com>
+Cc: Andrew Lunn <andrew@lunn.ch>
+CC: Jason Cooper <jason@lakedaemon.net>
+---
+changes since RFC v1:
+
+* fix ORION_PLATFORM_DRIVER registration
+* rebase on top of usb-linus branch
+
+  drivers/usb/host/ehci-hcd.c | 32 +++++++++++++++++++++++++++++---
+ 1 file changed, 29 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/usb/host/ehci-hcd.c b/drivers/usb/host/ehci-hcd.c
+index 416a6dc..f98f2a2 100644
+--- a/drivers/usb/host/ehci-hcd.c
++++ b/drivers/usb/host/ehci-hcd.c
+@@ -1253,7 +1253,7 @@ MODULE_LICENSE ("GPL");
+ 
+ #ifdef CONFIG_USB_EHCI_HCD_OMAP
+ #include "ehci-omap.c"
+-#define        PLATFORM_DRIVER         ehci_hcd_omap_driver
++#define	OMAP_PLATFORM_DRIVER	ehci_hcd_omap_driver
+ #endif
+ 
+ #ifdef CONFIG_PPC_PS3
+@@ -1273,7 +1273,7 @@ MODULE_LICENSE ("GPL");
+ 
+ #ifdef CONFIG_PLAT_ORION
+ #include "ehci-orion.c"
+-#define	PLATFORM_DRIVER		ehci_orion_driver
++#define	ORION_PLATFORM_DRIVER	ehci_orion_driver
+ #endif
+ 
+ #ifdef CONFIG_USB_W90X900_EHCI
+@@ -1385,6 +1385,12 @@ static int __init ehci_hcd_init(void)
+ 		goto clean0;
+ #endif
+ 
++#ifdef ORION_PLATFORM_DRIVER
++	retval = platform_driver_register(&ORION_PLATFORM_DRIVER);
++	if (retval < 0)
++		goto clean1;
++#endif
++
+ #ifdef PS3_SYSTEM_BUS_DRIVER
+ 	retval = ps3_ehci_driver_register(&PS3_SYSTEM_BUS_DRIVER);
+ 	if (retval < 0)
+@@ -1402,10 +1408,20 @@ static int __init ehci_hcd_init(void)
+ 	if (retval < 0)
+ 		goto clean4;
+ #endif
++
++#ifdef OMAP_PLATFORM_DRIVER
++	retval = platform_driver_register(&OMAP_PLATFORM_DRIVER);
++	if (retval < 0)
++		goto clean5;
++#endif
+ 	return retval;
+ 
++#ifdef OMAP_PLATFORM_DRIVER
++	/* platform_driver_unregister(&OMAP_PLATFORM_DRIVER); */
++clean5:
++#endif
+ #ifdef XILINX_OF_PLATFORM_DRIVER
+-	/* platform_driver_unregister(&XILINX_OF_PLATFORM_DRIVER); */
++	platform_driver_unregister(&XILINX_OF_PLATFORM_DRIVER);
+ clean4:
+ #endif
+ #ifdef OF_PLATFORM_DRIVER
+@@ -1416,6 +1432,10 @@ clean3:
+ 	ps3_ehci_driver_unregister(&PS3_SYSTEM_BUS_DRIVER);
+ clean2:
+ #endif
++#ifdef ORION_PLATFORM_DRIVER
++	platform_driver_unregister(&ORION_PLATFORM_DRIVER);
++clean1:
++#endif
+ #ifdef PLATFORM_DRIVER
+ 	platform_driver_unregister(&PLATFORM_DRIVER);
+ clean0:
+@@ -1432,12 +1452,18 @@ module_init(ehci_hcd_init);
+ 
+ static void __exit ehci_hcd_cleanup(void)
+ {
++#ifdef OMAP_PLATFORM_DRIVER
++	platform_driver_unregister(&OMAP_PLATFORM_DRIVER);
++#endif
+ #ifdef XILINX_OF_PLATFORM_DRIVER
+ 	platform_driver_unregister(&XILINX_OF_PLATFORM_DRIVER);
+ #endif
+ #ifdef OF_PLATFORM_DRIVER
+ 	platform_driver_unregister(&OF_PLATFORM_DRIVER);
+ #endif
++#ifdef ORION_PLATFORM_DRIVER
++	platform_driver_unregister(&ORION_PLATFORM_DRIVER);
++#endif
+ #ifdef PLATFORM_DRIVER
+ 	platform_driver_unregister(&PLATFORM_DRIVER);
+ #endif
