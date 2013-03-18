@@ -1,105 +1,83 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 18 Mar 2013 21:32:10 +0900
-Subject: [GIT PULL v2] Renesas ARM-based SoC updates for v3.10
-Message-ID: <1363609973-31086-1-git-send-email-horms+renesas@verge.net.au>
+Date: Mon, 18 Mar 2013 21:32:20 +0900
+Subject: [PATCH 10/43] ARM: shmobile: Kill off sh73a0 scu_base_addr() function
+In-Reply-To: <1363609973-31086-1-git-send-email-horms+renesas@verge.net.au>
+References: <1363609973-31086-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1363609973-31086-11-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Arnd,
+From: Magnus Damm <damm@opensource.se>
 
-The following changes since commit f6161aa153581da4a3867a2d1a7caf4be19b6ec9:
+Replace scu_base_addr() with a static shmobile_scu_base
+variable and introduce SH73A0_SCU_BASE.
 
-  Linux 3.9-rc2 (2013-03-10 16:54:19 -0700)
+Later in the series the shmobile_scu_base variable will be
+made into a global variable so this is preparation only.
 
-are available in the git repository at:
+Signed-off-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/smp-sh73a0.c |   20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-for-v3.10
-
-for you to fetch changes up to d75bc78b508d0a95d7738290d8ec9923691f4301:
-
-  r8a7779: Add Display Unit clock support (2013-03-18 21:22:34 +0900)
-
-----------------------------------------------------------------
-Renesas ARM-based SoC updates for v3.10
-
-----------------------------------------------------------------
-Bastian Hecht (1):
-      ARM: mach-shmobile: r8a7740: Add DT names to clock list
-
-Guennadi Liakhovetski (2):
-      ARM: shmobile: add MMCIF and SDHI DT clock aliases to sh73a0 and r8a7740
-      ARM: shmobile: sh73a0: fix Z and ZG clock hierarchy
-
-Kuninori Morimoto (6):
-      ARM: shmobile: add gic_iid macro for ICCIAR / interrupt ID
-      ARM: shmobile: r8a7779: fixup dtsi typo
-      ARM: shmobile: r8a7779: fixup DT machine name
-      ARM: shmobile: r8a7779: use gic_iid macro
-      ARM: shmobile: tidyup chip series definition order for r8a7740/r8a7779
-      ARM: shmobile: r8a7779: add Thermal support on DT
-
-Magnus Damm (21):
-      ARM: shmobile: Remove unused headers from hotplug.c
-      ARM: shmobile: Remove partial CPU Hotplug from EMEV2
-      ARM: shmobile: Move EMEV2 CPU boot vector setup code
-      ARM: shmobile: Remove sh73a0_get_core_count()
-      ARM: shmobile: Remove r8a7779_get_core_count()
-      ARM: shmobile: Remove emev2_get_core_count()
-      ARM: shmobile: Kill off sh73a0 scu_base_addr() function
-      ARM: shmobile: Kill off r8a7779 scu_base_addr() function
-      ARM: shmobile: Rework EMEV2 scu_base variable
-      ARM: shmobile: Move headsmp-sh73a0.S to headsmp-scu.S
-      ARM: shmobile: Common shmobile_scu_base in headsmp-scu.S
-      ARM: shmobile: Update EMEV2 to use scu_power_mode()
-      ARM: shmobile: Make EMEV2 setup functions static
-      ARM: shmobile: Fix base address readout in headsmp-scu.S
-      ARM: shmobile: Rework SH73A0_SCU_BASE IOMEM() usage
-      ARM: shmobile: Use R8A7779_SCU_BASE with TWD
-      ARM: shmobile: Update r8a7779 to check SCU for hotplug
-      ARM: shmobile: Update r8a7779 to use scu_power_mode()
-      ARM: shmobile: Use sh73a0-specific cpu disable code
-      ARM: shmobile: Rearrange r8a7779 cpu hotplug code
-      ARM: shmobile: Remove unused hotplug.c
-
-Phil Edworthy (1):
-      r8a7779: Add Display Unit clock support
-
-Sergei Shtylyov (1):
-      ARM: shmobile: R8A7779: use gic_iid() in SATA IRQ resource
-
-Simon Horman (9):
-      ARM: mach-shmobile: r8a7779: Allow initialisation of GIC by DT
-      ARM: mach-shmobile: r8a7779: Minimal setup using DT
-      ARM: shmobile: sh73a0: Remove sh73a0_init_irq_dt()
-      ARM: shmobile: sh73a0: Add smp ops to DT_MACHINE_START
-      ARM: shmobile: sh73a0: Remove warning about SMP
-      ARM: shmobile: sh73a0: Do not use early devices with DT reference
-      ARM: shmobile: r8a7779: Do not use early devices with DT reference
-      ARM: shmobile: r8a7779: Do not initialise i2c as an early device
-      ARM: shmobile: r8a7779: Remove lan from dtsi
-
-Vladimir Barinov (2):
-      ARM: mach-shmobile: r8a7779: SATA DT configuration
-      ARM: mach-shmobile: r8a7779: add SATA support
-
- arch/arm/boot/dts/r8a7779.dtsi                     |   98 +++++++++++++++
- arch/arm/mach-shmobile/Makefile                    |    7 +-
- arch/arm/mach-shmobile/clock-r8a7740.c             |   13 ++
- arch/arm/mach-shmobile/clock-r8a7779.c             |    8 +-
- arch/arm/mach-shmobile/clock-sh73a0.c              |    7 +-
- .../{headsmp-sh73a0.S => headsmp-scu.S}            |   15 ++-
- arch/arm/mach-shmobile/hotplug.c                   |   68 -----------
- arch/arm/mach-shmobile/include/mach/common.h       |   21 ++--
- arch/arm/mach-shmobile/include/mach/irqs.h         |    1 +
- arch/arm/mach-shmobile/intc-r8a7779.c              |   27 +++-
- arch/arm/mach-shmobile/intc-sh73a0.c               |    8 --
- arch/arm/mach-shmobile/setup-emev2.c               |    4 +-
- arch/arm/mach-shmobile/setup-r8a7779.c             |  104 +++++++++++++---
- arch/arm/mach-shmobile/setup-sh73a0.c              |   36 ++----
- arch/arm/mach-shmobile/smp-emev2.c                 |   86 ++-----------
- arch/arm/mach-shmobile/smp-r8a7779.c               |  129 ++++++++++----------
- arch/arm/mach-shmobile/smp-sh73a0.c                |   36 +++---
- 17 files changed, 355 insertions(+), 313 deletions(-)
- create mode 100644 arch/arm/boot/dts/r8a7779.dtsi
- rename arch/arm/mach-shmobile/{headsmp-sh73a0.S => headsmp-scu.S} (85%)
- delete mode 100644 arch/arm/mach-shmobile/hotplug.c
+diff --git a/arch/arm/mach-shmobile/smp-sh73a0.c b/arch/arm/mach-shmobile/smp-sh73a0.c
+index 81c0f4b..0757f4a 100644
+--- a/arch/arm/mach-shmobile/smp-sh73a0.c
++++ b/arch/arm/mach-shmobile/smp-sh73a0.c
+@@ -39,13 +39,12 @@
+ 
+ #define PSTR_SHUTDOWN_MODE	3
+ 
+-static void __iomem *scu_base_addr(void)
+-{
+-	return (void __iomem *)0xf0000000;
+-}
++#define SH73A0_SCU_BASE IOMEM(0xf0000000)
++
++static void __iomem *shmobile_scu_base;
+ 
+ #ifdef CONFIG_HAVE_ARM_TWD
+-static DEFINE_TWD_LOCAL_TIMER(twd_local_timer, 0xf0000600, 29);
++static DEFINE_TWD_LOCAL_TIMER(twd_local_timer, SH73A0_SCU_BASE + 0x600, 29);
+ void __init sh73a0_register_twd(void)
+ {
+ 	twd_local_timer_register(&twd_local_timer);
+@@ -71,21 +70,22 @@ static int __cpuinit sh73a0_boot_secondary(unsigned int cpu, struct task_struct
+ 
+ static void __init sh73a0_smp_prepare_cpus(unsigned int max_cpus)
+ {
+-	scu_enable(scu_base_addr());
++	scu_enable(shmobile_scu_base);
+ 
+ 	/* Map the reset vector (in headsmp-sh73a0.S) */
+ 	__raw_writel(0, APARMBAREA);      /* 4k */
+ 	__raw_writel(__pa(sh73a0_secondary_vector), SBAR);
+ 
+ 	/* enable cache coherency on booting CPU */
+-	scu_power_mode(scu_base_addr(), SCU_PM_NORMAL);
++	scu_power_mode(shmobile_scu_base, SCU_PM_NORMAL);
+ }
+ 
+ static void __init sh73a0_smp_init_cpus(void)
+ {
+-	unsigned int ncores = scu_get_core_count(scu_base_addr());
++	/* setup sh73a0 specific SCU base */
++	shmobile_scu_base = SH73A0_SCU_BASE;
+ 
+-	shmobile_smp_init_cpus(ncores);
++	shmobile_smp_init_cpus(scu_get_core_count(shmobile_scu_base));
+ }
+ 
+ #ifdef CONFIG_HOTPLUG_CPU
+@@ -121,7 +121,7 @@ static void sh73a0_cpu_die(unsigned int cpu)
+ 	flush_cache_all();
+ 
+ 	/* Set power off mode. This takes the CPU out of the MP cluster */
+-	scu_power_mode(scu_base_addr(), SCU_PM_POWEROFF);
++	scu_power_mode(shmobile_scu_base, SCU_PM_POWEROFF);
+ 
+ 	/* Enter shutdown mode */
+ 	cpu_do_idle();
+-- 
+1.7.10.4
