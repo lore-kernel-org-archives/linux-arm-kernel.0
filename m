@@ -1,239 +1,116 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 18 Mar 2013 20:05:46 +0900
-Subject: [PATCH 050/142] sh-pfc: Implement generic pinconf support
+Date: Mon, 18 Mar 2013 20:05:55 +0900
+Subject: [PATCH 059/142] sh-pfc: sh73a0: Add I2C2 and I2C3 pin groups and
+ functions
 In-Reply-To: <1363604838-29359-1-git-send-email-horms+renesas@verge.net.au>
 References: <1363604838-29359-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1363604838-29359-51-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1363604838-29359-60-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-The existing PFC pinconf implementation, tied to the PFC-specific pin
-types, isn't used by drivers or boards. Replace it with the generic
-pinconf types to implement bias (pull-up/down) setup. Other pin
-configuration options can be implemented later if needed.
-
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/pinctrl/sh-pfc/Kconfig   |    1 +
- drivers/pinctrl/sh-pfc/pinctrl.c |  123 ++++++++++++++++++++++++++++----------
- drivers/pinctrl/sh-pfc/sh_pfc.h  |   16 +++++
- 3 files changed, 110 insertions(+), 30 deletions(-)
+ drivers/pinctrl/sh-pfc/pfc-sh73a0.c |   64 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 64 insertions(+)
 
-diff --git a/drivers/pinctrl/sh-pfc/Kconfig b/drivers/pinctrl/sh-pfc/Kconfig
-index c3340f5..af16f8f 100644
---- a/drivers/pinctrl/sh-pfc/Kconfig
-+++ b/drivers/pinctrl/sh-pfc/Kconfig
-@@ -10,6 +10,7 @@ config PINCTRL_SH_PFC
- 	select GPIO_SH_PFC if ARCH_REQUIRE_GPIOLIB
- 	select PINMUX
- 	select PINCONF
-+	select GENERIC_PINCONF
- 	def_bool y
- 	help
- 	  This enables pin control drivers for SH and SH Mobile platforms
-diff --git a/drivers/pinctrl/sh-pfc/pinctrl.c b/drivers/pinctrl/sh-pfc/pinctrl.c
-index c150910..79fa170 100644
---- a/drivers/pinctrl/sh-pfc/pinctrl.c
-+++ b/drivers/pinctrl/sh-pfc/pinctrl.c
-@@ -24,6 +24,8 @@
- #include <linux/spinlock.h>
- 
- #include "core.h"
-+#include "../core.h"
-+#include "../pinconf.h"
- 
- struct sh_pfc_pin_config {
- 	u32 type;
-@@ -230,57 +232,118 @@ static const struct pinmux_ops sh_pfc_pinmux_ops = {
- 	.gpio_set_direction	= sh_pfc_gpio_set_direction,
+diff --git a/drivers/pinctrl/sh-pfc/pfc-sh73a0.c b/drivers/pinctrl/sh-pfc/pfc-sh73a0.c
+index 4b0a349..fad11d7 100644
+--- a/drivers/pinctrl/sh-pfc/pfc-sh73a0.c
++++ b/drivers/pinctrl/sh-pfc/pfc-sh73a0.c
+@@ -1846,6 +1846,50 @@ static const struct pinmux_range pinmux_ranges[] = {
+ 	{.begin = 288, .end = 309,},
  };
  
-+/* Check whether the requested parameter is supported for a pin. */
-+static bool sh_pfc_pinconf_validate(struct sh_pfc *pfc, unsigned int _pin,
-+				    enum pin_config_param param)
-+{
-+	int idx = sh_pfc_get_pin_index(pfc, _pin);
-+	const struct sh_pfc_pin *pin = &pfc->info->pins[idx];
-+
-+	switch (param) {
-+	case PIN_CONFIG_BIAS_DISABLE:
-+		return true;
-+
-+	case PIN_CONFIG_BIAS_PULL_UP:
-+		return pin->configs & SH_PFC_PIN_CFG_PULL_UP;
-+
-+	case PIN_CONFIG_BIAS_PULL_DOWN:
-+		return pin->configs & SH_PFC_PIN_CFG_PULL_DOWN;
-+
-+	default:
-+		return false;
-+	}
-+}
-+
- static int sh_pfc_pinconf_get(struct pinctrl_dev *pctldev, unsigned _pin,
- 			      unsigned long *config)
- {
- 	struct sh_pfc_pinctrl *pmx = pinctrl_dev_get_drvdata(pctldev);
- 	struct sh_pfc *pfc = pmx->pfc;
--	int idx = sh_pfc_get_pin_index(pfc, _pin);
--	struct sh_pfc_pin_config *cfg = &pmx->configs[idx];
-+	enum pin_config_param param = pinconf_to_config_param(*config);
-+	unsigned long flags;
-+	unsigned int bias;
-+
-+	if (!sh_pfc_pinconf_validate(pfc, _pin, param))
-+		return -ENOTSUPP;
- 
--	*config = cfg->type;
-+	switch (param) {
-+	case PIN_CONFIG_BIAS_DISABLE:
-+	case PIN_CONFIG_BIAS_PULL_UP:
-+	case PIN_CONFIG_BIAS_PULL_DOWN:
-+		if (!pfc->info->ops || !pfc->info->ops->get_bias)
-+			return -ENOTSUPP;
-+
-+		spin_lock_irqsave(&pfc->lock, flags);
-+		bias = pfc->info->ops->get_bias(pfc, _pin);
-+		spin_unlock_irqrestore(&pfc->lock, flags);
-+
-+		if (bias != param)
-+			return -EINVAL;
-+
-+		*config = 0;
-+		break;
-+
-+	default:
-+		return -ENOTSUPP;
-+	}
- 
- 	return 0;
- }
- 
--static int sh_pfc_pinconf_set(struct pinctrl_dev *pctldev, unsigned pin,
-+static int sh_pfc_pinconf_set(struct pinctrl_dev *pctldev, unsigned _pin,
- 			      unsigned long config)
- {
- 	struct sh_pfc_pinctrl *pmx = pinctrl_dev_get_drvdata(pctldev);
-+	struct sh_pfc *pfc = pmx->pfc;
-+	enum pin_config_param param = pinconf_to_config_param(config);
-+	unsigned long flags;
- 
--	/* Validate the new type */
--	if (config >= PINMUX_FLAG_TYPE)
--		return -EINVAL;
-+	if (!sh_pfc_pinconf_validate(pfc, _pin, param))
-+		return -ENOTSUPP;
- 
--	return sh_pfc_reconfig_pin(pmx, pin, config);
-+	switch (param) {
-+	case PIN_CONFIG_BIAS_PULL_UP:
-+	case PIN_CONFIG_BIAS_PULL_DOWN:
-+	case PIN_CONFIG_BIAS_DISABLE:
-+		if (!pfc->info->ops || !pfc->info->ops->set_bias)
-+			return -ENOTSUPP;
-+
-+		spin_lock_irqsave(&pfc->lock, flags);
-+		pfc->info->ops->set_bias(pfc, _pin, param);
-+		spin_unlock_irqrestore(&pfc->lock, flags);
-+
-+		break;
-+
-+	default:
-+		return -ENOTSUPP;
-+	}
-+
-+	return 0;
- }
- 
--static void sh_pfc_pinconf_dbg_show(struct pinctrl_dev *pctldev,
--				    struct seq_file *s, unsigned pin)
-+static int sh_pfc_pinconf_group_set(struct pinctrl_dev *pctldev, unsigned group,
-+				    unsigned long config)
- {
--	const char *pinmux_type_str[] = {
--		[PINMUX_TYPE_NONE]		= "none",
--		[PINMUX_TYPE_FUNCTION]		= "function",
--		[PINMUX_TYPE_GPIO]		= "gpio",
--		[PINMUX_TYPE_OUTPUT]		= "output",
--		[PINMUX_TYPE_INPUT]		= "input",
--		[PINMUX_TYPE_INPUT_PULLUP]	= "input bias pull up",
--		[PINMUX_TYPE_INPUT_PULLDOWN]	= "input bias pull down",
--	};
--	unsigned long config;
--	int rc;
--
--	rc = sh_pfc_pinconf_get(pctldev, pin, &config);
--	if (unlikely(rc != 0))
--		return;
--
--	seq_printf(s, " %s", pinmux_type_str[config]);
-+	struct sh_pfc_pinctrl *pmx = pinctrl_dev_get_drvdata(pctldev);
-+	const unsigned int *pins;
-+	unsigned int num_pins;
-+	unsigned int i;
-+
-+	pins = pmx->pfc->info->groups[group].pins;
-+	num_pins = pmx->pfc->info->groups[group].nr_pins;
-+
-+	for (i = 0; i < num_pins; ++i)
-+		sh_pfc_pinconf_set(pctldev, pins[i], config);
-+
-+	return 0;
- }
- 
- static const struct pinconf_ops sh_pfc_pinconf_ops = {
--	.pin_config_get		= sh_pfc_pinconf_get,
--	.pin_config_set		= sh_pfc_pinconf_set,
--	.pin_config_dbg_show	= sh_pfc_pinconf_dbg_show,
-+	.is_generic			= true,
-+	.pin_config_get			= sh_pfc_pinconf_get,
-+	.pin_config_set			= sh_pfc_pinconf_set,
-+	.pin_config_group_set		= sh_pfc_pinconf_group_set,
-+	.pin_config_config_dbg_show	= pinconf_generic_dump_config,
++/* - I2C2 ------------------------------------------------------------------- */
++static const unsigned int i2c2_0_pins[] = {
++	/* SCL, SDA */
++	237, 236,
++};
++static const unsigned int i2c2_0_mux[] = {
++	PORT237_I2C_SCL2_MARK, PORT236_I2C_SDA2_MARK,
++};
++static const unsigned int i2c2_1_pins[] = {
++	/* SCL, SDA */
++	27, 28,
++};
++static const unsigned int i2c2_1_mux[] = {
++	PORT27_I2C_SCL2_MARK, PORT28_I2C_SDA2_MARK,
++};
++static const unsigned int i2c2_2_pins[] = {
++	/* SCL, SDA */
++	115, 116,
++};
++static const unsigned int i2c2_2_mux[] = {
++	PORT115_I2C_SCL2_MARK, PORT116_I2C_SDA2_MARK,
++};
++/* - I2C3 ------------------------------------------------------------------- */
++static const unsigned int i2c3_0_pins[] = {
++	/* SCL, SDA */
++	248, 249,
++};
++static const unsigned int i2c3_0_mux[] = {
++	PORT248_I2C_SCL3_MARK, PORT249_I2C_SDA3_MARK,
++};
++static const unsigned int i2c3_1_pins[] = {
++	/* SCL, SDA */
++	27, 28,
++};
++static const unsigned int i2c3_1_mux[] = {
++	PORT27_I2C_SCL3_MARK, PORT28_I2C_SDA3_MARK,
++};
++static const unsigned int i2c3_2_pins[] = {
++	/* SCL, SDA */
++	115, 116,
++};
++static const unsigned int i2c3_2_mux[] = {
++	PORT115_I2C_SCL3_MARK, PORT116_I2C_SDA3_MARK,
++};
+ /* - LCD -------------------------------------------------------------------- */
+ static const unsigned int lcd_data8_pins[] = {
+ 	/* D[0:7] */
+@@ -2289,6 +2333,12 @@ static const unsigned int scifb_ctrl_1_mux[] = {
  };
  
- /* PFC ranges -> pinctrl pin descs */
-diff --git a/drivers/pinctrl/sh-pfc/sh_pfc.h b/drivers/pinctrl/sh-pfc/sh_pfc.h
-index b250dac..3b785fc 100644
---- a/drivers/pinctrl/sh-pfc/sh_pfc.h
-+++ b/drivers/pinctrl/sh-pfc/sh_pfc.h
-@@ -31,9 +31,15 @@ enum {
- 	PINMUX_FLAG_TYPE,	/* must be last */
+ static const struct sh_pfc_pin_group pinmux_groups[] = {
++	SH_PFC_PIN_GROUP(i2c2_0),
++	SH_PFC_PIN_GROUP(i2c2_1),
++	SH_PFC_PIN_GROUP(i2c2_2),
++	SH_PFC_PIN_GROUP(i2c3_0),
++	SH_PFC_PIN_GROUP(i2c3_1),
++	SH_PFC_PIN_GROUP(i2c3_2),
+ 	SH_PFC_PIN_GROUP(lcd_data8),
+ 	SH_PFC_PIN_GROUP(lcd_data9),
+ 	SH_PFC_PIN_GROUP(lcd_data12),
+@@ -2345,6 +2395,18 @@ static const struct sh_pfc_pin_group pinmux_groups[] = {
+ 	SH_PFC_PIN_GROUP(scifb_ctrl_1),
  };
  
-+#define SH_PFC_PIN_CFG_INPUT		(1 << 0)
-+#define SH_PFC_PIN_CFG_OUTPUT		(1 << 1)
-+#define SH_PFC_PIN_CFG_PULL_UP		(1 << 2)
-+#define SH_PFC_PIN_CFG_PULL_DOWN	(1 << 3)
-+
- struct sh_pfc_pin {
- 	const pinmux_enum_t enum_id;
- 	const char *name;
-+	unsigned int configs;
- };
- 
- #define SH_PFC_PIN_GROUP(n)				\
-@@ -120,8 +126,18 @@ struct pinmux_range {
- 	pinmux_enum_t force;
- };
- 
-+struct sh_pfc;
-+
-+struct sh_pfc_soc_operations {
-+	unsigned int (*get_bias)(struct sh_pfc *pfc, unsigned int pin);
-+	void (*set_bias)(struct sh_pfc *pfc, unsigned int pin,
-+			 unsigned int bias);
++static const char * const i2c2_groups[] = {
++	"i2c2_0",
++	"i2c2_1",
++	"i2c2_2",
 +};
 +
- struct sh_pfc_soc_info {
- 	const char *name;
-+	const struct sh_pfc_soc_operations *ops;
++static const char * const i2c3_groups[] = {
++	"i2c3_0",
++	"i2c3_1",
++	"i2c3_2",
++};
 +
- 	struct pinmux_range input;
- 	struct pinmux_range input_pd;
- 	struct pinmux_range input_pu;
+ static const char * const lcd_groups[] = {
+ 	"lcd_data8",
+ 	"lcd_data9",
+@@ -2433,6 +2495,8 @@ static const char * const scifb_groups[] = {
+ };
+ 
+ static const struct sh_pfc_function pinmux_functions[] = {
++	SH_PFC_FUNCTION(i2c2),
++	SH_PFC_FUNCTION(i2c3),
+ 	SH_PFC_FUNCTION(lcd),
+ 	SH_PFC_FUNCTION(lcd2),
+ 	SH_PFC_FUNCTION(scifa0),
 -- 
 1.7.10.4
