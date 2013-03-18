@@ -1,29 +1,24 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Sun, 17 Mar 2013 16:35:43 -0700
-Subject: [PATCH 3.9-rc1] clk: vt8500: Fix variable name '*prate' compile
- error
-In-Reply-To: <201303172113.08997.arnd@arndb.de>
-References: <1361900052-66917-1-git-send-email-tim.gardner@canonical.com>
- <201303112207.32619.arnd@arndb.de> <20130317210123.8663.84457@quantum>
- <201303172113.08997.arnd@arndb.de>
-Message-ID: <20130317233543.8663.65116@quantum>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sun, 17 Mar 2013 21:07:26 -0400
+Subject: [GIT PULL 3/3] ARM: mvebu: soc for v3.10
+In-Reply-To: <51464302.5000906@free-electrons.com>
+References: <1363551341.10D8ED563.32562@triton>
+ <51464302.5000906@free-electrons.com>
+Message-ID: <20130318010726.GF13280@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Arnd Bergmann (2013-03-17 14:13:08)
-> On Sunday 17 March 2013, Mike Turquette wrote:
-> > Yes it is.  I haven't pushed a new branch out since 3.9-rc1 due to LCE
-> > and vacation after that.  This fix and other pending patches will get
-> > pulled in this week.
-> > 
-> 
-> I've actually put it into the arm-soc bug fix queue now, since I did not
-> hear back from you and it never showed up in linux-next.
-> 
+On Sun, Mar 17, 2013 at 11:26:10PM +0100, Gregory CLEMENT wrote:
+> I managed to test Thomas patch set for a mv78x00 based board on Friday,
+> and I found a small bug. Thomas has a fix for it and he plans to send
+> a V3 with this fix next week.
 
-That is fine by me.
+A reply to the V2 patch would have been appreciated.  The series has
+been on lakml since Mar 6th, with no comments...
 
-Thanks,
-Mike
+Please just send a new version of the mv78xx0 patch.  No need for a new
+series.
 
->         Arnd
+thx,
+
+Jason.
