@@ -1,32 +1,32 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 18 Mar 2013 15:54:55 +0000
-Subject: [GIT PULL] arm-soc fixes for v3.9-rc3
-In-Reply-To: <CA+55aFx9NF-+dt5r_hOpUfZxd6Ky+OBL2echeeM50ZE6UAaAdA@mail.gmail.com>
-References: <201303181422.14942.arnd@arndb.de>
- <CA+55aFx9NF-+dt5r_hOpUfZxd6Ky+OBL2echeeM50ZE6UAaAdA@mail.gmail.com>
-Message-ID: <201303181554.55853.arnd@arndb.de>
+Date: Mon, 18 Mar 2013 15:58:59 +0000
+Subject: [PATCH v2 for 3.10] Introduce a Marvell EBU MBus driver
+In-Reply-To: <20130318162411.11c9e3ab@skate>
+References: <1362589205-4726-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201303181459.10954.arnd@arndb.de> <20130318162411.11c9e3ab@skate>
+Message-ID: <201303181558.59608.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 18 March 2013, Linus Torvalds wrote:
-> On Mon, Mar 18, 2013 at 7:22 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> >
-> > are available in the git repository at:
-> >
-> >   git+ssh://gitolite at ra.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes
+On Monday 18 March 2013, Thomas Petazzoni wrote:
+> So even the DT-only sub-architecture (such as mvebu) should hard-code
+> the register base addresses?
 > 
-> What the heck happened to your script?
-> 
-> Please use the public address so that others could look at it if they
-> want to (and so that my merge messages make sense in a public
-> setting).
-> 
-> I fixed it up, but please fix your script for next time.
+> The proposed DT binding in the current patch is very minimal, and I
+> don't see why the more elaborate DT binding that you proposed could not
+> be implemented as an improvement of it: the DT binding you proposed
+> seems backward compatible with the one currently implemented, no?
 
-Thanks for fixing it up, it was no script this time, but a manual copy-paste
-mistake. git-request-pull got confused by the fact I had commits both before
-and after -rc2 in the branch, and was listing lots of changes that you had
-already merged in the list, so I tried to construct the output in the
-way that was supposed to look, and failed.
+It's quite possible that it could be done in a backward compatible
+way, I just like to be on the safe side in case it's not.
+
+> Anyway, whatever your decision is, I can submit an updated patch set
+> that implements this, and also fix the mv78xx0 patch (my colleague
+> Gregory Clement found a problem with the mv78xx0 when testing on real
+> hardware).
+
+Ok, please do that. I already pulled the first set of patches from
+"[GIT PULL 1/3] ARM: mvebu: cleanup for v3.10", so make sure you
+don't rebase anything that is already part of 3e762c86b337f.
 
 	Arnd
