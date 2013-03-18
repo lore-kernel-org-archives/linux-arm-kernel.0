@@ -1,33 +1,45 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 18 Mar 2013 20:53:13 +0900
-Subject: [PATCH 1/9] ARM: mach-shmobile: mackerel: enable MMCIF and SDHI in
- defconfig
-In-Reply-To: <1363607601-20366-1-git-send-email-horms+renesas@verge.net.au>
-References: <1363607601-20366-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1363607601-20366-2-git-send-email-horms+renesas@verge.net.au>
+Date: Mon, 18 Mar 2013 20:53:12 +0900
+Subject: [GIT PULL] Renesas ARM-based SoC defconfig updates for v3.10
+Message-ID: <1363607601-20366-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'm unsure why this isn't already the case.
+Hi Olof, Hi Arnd,
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/configs/mackerel_defconfig |    3 +++
- 1 file changed, 3 insertions(+)
+The following changes since commit f6161aa153581da4a3867a2d1a7caf4be19b6ec9:
 
-diff --git a/arch/arm/configs/mackerel_defconfig b/arch/arm/configs/mackerel_defconfig
-index 7594b3a..ec8e605 100644
---- a/arch/arm/configs/mackerel_defconfig
-+++ b/arch/arm/configs/mackerel_defconfig
-@@ -94,6 +94,9 @@ CONFIG_USB_RENESAS_USBHS=y
- CONFIG_USB_STORAGE=y
- CONFIG_USB_GADGET=y
- CONFIG_USB_RENESAS_USBHS_UDC=y
-+CONFIG_MMC=y
-+CONFIG_MMC_SDHI=y
-+CONFIG_MMC_SH_MMCIF=y
- CONFIG_DMADEVICES=y
- CONFIG_SH_DMAE=y
- CONFIG_EXT2_FS=y
--- 
-1.7.10.4
+  Linux 3.9-rc2 (2013-03-10 16:54:19 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig-for-v3.10
+
+for you to fetch changes up to db30abdf3c07c564d4af0f991bb7f38b728f9035:
+
+  ARM: mach-shmobile: marzen: add SATA support (2013-03-14 10:28:07 +0100)
+
+----------------------------------------------------------------
+Renesas ARM-based SoC defconfig updates for v3.10
+
+----------------------------------------------------------------
+Kuninori Morimoto (3):
+      ARM: shmobile: armadillo800eva: enable branch prediction on defconfig
+      ARM: shmobile: armadillo800eva: enable NEON on defconfig
+      ARM: shmobile: armadillo800eva: enable all errata for cache on defconfig
+
+Simon Horman (5):
+      ARM: mach-shmobile: mackerel: enable MMCIF and SDHI in defconfig
+      ARM: mach-shmobile: mackerel: enable REGULATOR in defconfig
+      ARM: mach-shmobile: armadillo800eva: enable REGULATOR in defconfig
+      ARM: shmobile: kzm9g: defconfig: do not enable PREEMPT
+      ARM: mach-shmobile: kzm9g: do not enable REGULATOR_DUMMY in defconfig
+
+Vladimir Barinov (1):
+      ARM: mach-shmobile: marzen: add SATA support
+
+ arch/arm/configs/armadillo800eva_defconfig |    8 +++++++-
+ arch/arm/configs/kzm9g_defconfig           |    2 --
+ arch/arm/configs/mackerel_defconfig        |    4 ++++
+ arch/arm/configs/marzen_defconfig          |    4 ++++
+ 4 files changed, 15 insertions(+), 3 deletions(-)
