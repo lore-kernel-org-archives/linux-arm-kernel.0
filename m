@@ -1,64 +1,46 @@
-From: sourav.poddar@ti.com (Sourav Poddar)
-Date: Mon, 18 Mar 2013 13:31:10 +0530
-Subject: [PATCH] i2c: sirf: get the i2c pin group by pinctrl api
-In-Reply-To: <1363591361-5992-1-git-send-email-Barry.Song@csr.com>
-References: <1363591361-5992-1-git-send-email-Barry.Song@csr.com>
-Message-ID: <5146C9C6.2030507@ti.com>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Mon, 18 Mar 2013 16:09:57 +0800
+Subject: [PATCH V2 1/3] ARM: dts: tegra: add clock source for PMC
+In-Reply-To: <1363594199-10974-1-git-send-email-josephl@nvidia.com>
+References: <1363594199-10974-1-git-send-email-josephl@nvidia.com>
+Message-ID: <1363594199-10974-2-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-On Monday 18 March 2013 12:52 PM, Barry Song wrote:
-> From: Barry Song<Baohua.Song@csr.com>
->
-> hardcode set i2c pin group to i2c function before, here we
-> move to use standard pinctrl API to get pins of the group.
->
-> Signed-off-by: Barry Song<Baohua.Song@csr.com>
-> Cc: Linus Walleij<linus.walleij@linaro.org>
-> ---
->   drivers/i2c/busses/i2c-sirf.c |    9 +++++++++
->   1 files changed, 9 insertions(+), 0 deletions(-)
->
-> diff --git a/drivers/i2c/busses/i2c-sirf.c b/drivers/i2c/busses/i2c-sirf.c
-> index 5a7ad24..dd4004e 100644
-> --- a/drivers/i2c/busses/i2c-sirf.c
-> +++ b/drivers/i2c/busses/i2c-sirf.c
-> @@ -16,6 +16,7 @@
->   #include<linux/clk.h>
->   #include<linux/err.h>
->   #include<linux/io.h>
-> +#include<linux/pinctrl/consumer.h>
->
->   #define SIRFSOC_I2C_CLK_CTRL		0x00
->   #define SIRFSOC_I2C_STATUS		0x0C
-> @@ -265,6 +266,7 @@ static int i2c_sirfsoc_probe(struct platform_device *pdev)
->   	struct i2c_adapter *adap;
->   	struct resource *mem_res;
->   	struct clk *clk;
-> +	struct pinctrl *pinctrl;
->   	int bitrate;
->   	int ctrl_speed;
->   	int irq;
-> @@ -272,6 +274,12 @@ static int i2c_sirfsoc_probe(struct platform_device *pdev)
->   	int err;
->   	u32 regval;
->
-> +	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
-> +	if (IS_ERR(pinctrl)) {
-> +		err = PTR_ERR(pinctrl);
-> +		goto failed_pin;
-> +	}
-> +
-I think,  you should also add an "EPROBE_DEFER" check here ?
->   	clk = clk_get(&pdev->dev, NULL);
->   	if (IS_ERR(clk)) {
->   		err = PTR_ERR(clk);
-> @@ -385,6 +393,7 @@ err_clk_en:
->   err_clk_prep:
->   	clk_put(clk);
->   err_get_clk:
-> +failed_pin:
->   	return err;
->   }
->
+The clock source of PMC is PCLK. Adding it into DTS for Tegra20 and Tegra30.
+
+Signed-off-by: Joseph Lo <josephl@nvidia.com>
+---
+V2:
+* new in this change
+---
+ arch/arm/boot/dts/tegra20.dtsi | 1 +
+ arch/arm/boot/dts/tegra30.dtsi | 1 +
+ 2 files changed, 2 insertions(+)
+
+diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+index 3183581..4ba9c7b 100644
+--- a/arch/arm/boot/dts/tegra20.dtsi
++++ b/arch/arm/boot/dts/tegra20.dtsi
+@@ -419,6 +419,7 @@
+ 	pmc {
+ 		compatible = "nvidia,tegra20-pmc";
+ 		reg = <0x7000e400 0x400>;
++		clocks = <&tegra_car 110>;
+ 	};
+ 
+ 	memory-controller at 7000f000 {
+diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
+index 11d04fe..7299014 100644
+--- a/arch/arm/boot/dts/tegra30.dtsi
++++ b/arch/arm/boot/dts/tegra30.dtsi
+@@ -428,6 +428,7 @@
+ 	pmc {
+ 		compatible = "nvidia,tegra30-pmc";
+ 		reg = <0x7000e400 0x400>;
++		clocks = <&tegra_car 218>;
+ 	};
+ 
+ 	memory-controller {
+-- 
+1.8.1.5
