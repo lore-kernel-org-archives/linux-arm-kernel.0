@@ -1,61 +1,49 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Mon, 18 Mar 2013 15:24:32 +0100
-Subject: [PATCHv1 0/2] ARM: socfpga: Soft reset, hotplug and device
- tree clocks
-In-Reply-To: <51471046.1010102@gmail.com>
-References: <1363211722-27237-1-git-send-email-dinguyen@altera.com>
- <5141220A.7050008@gmail.com>
- <20130317181343.GB4394@amd.pavel.ucw.cz>
- <51471046.1010102@gmail.com>
-Message-ID: <20130318142432.GA4110@amd.pavel.ucw.cz>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Mon, 18 Mar 2013 23:32:03 +0900
+Subject: [PATCH 00/04] ARM: shmobile: r8a73a4 SoC support V2
+Message-ID: <20130318143203.26687.98180.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+ARM: shmobile: r8a73a4 SoC support V2
 
-> >>> Just 2 patches for mach-socfpga:
-> >>>
-> >>> 0001: ARM: socfpga: Enable hotplug and soft reset
-> >>> 	- Able to hotplug CPU1 by putting it into reset and bringing back online.
-> >>>
-> >>
-> >> Have you seen the discussion on PSCI? There's an ARM doc on it and
-> >> Linaro session from last week. Is there a possibility you can use that?
-> >> You would need to be able to run in non-secure mode and implement
-> >> smc calls.
-> > 
-> > What would be the advantage?
-> 
-> It gets rid of some platform code. If you do an A15 part, it abstracts
-> out the differences between the cores on entering/exiting coherency. It
-> should also save you from writing suspend/resume and cpuidle support for
-> your platform.
+[PATCH 01/04] ARM: shmobile: Initial r8a73a4 SoC support V2
+[PATCH 02/04] ARM: shmobile: r8a73a4 SCIF support V2
+[PATCH 03/04] ARM: shmobile: r8a73a4 IRQC support V2
+[PATCH 04/04] ARM: shmobile: r8a73a4 PFC support
 
-I don't see how PSCI would be useful at this point. Clock framework is
-needed for basic MMC and Ethernet support; PSCI would not help there. 
+This series is V2 of initial support for the r8a73a4 SoC. The SoC
+is known as r8a73a4 which is built around Cortex-A15 and makes use
+of SCIF for serial, IRQC interrupt controller for external IRQs and
+PFC for combined support for pinmux and GPIO.
 
-> > We do not have suitable hypervisor at the moment. Nor I see why it
-> > would be good to push power management into it.
-> 
-> It's not a hypervisor. A minimal implementation is only about 100 lines
-> of assembly.
+Changes in V2:
+- Move away from static platform devices
+- Use platform_device_register_data/resndata/simple
+- Add PFC support (tables excluded)
+- About 150 lines smaller than V1 but without board code
 
-So... we could reduce some complexity of the kernel by inventing
-another component, inventing API, and putting the complex code into
-the newly invented component... when no other arm32 architecture does
-that. (Where would you put the 100 lines? u-boot?)
+For more details please see the individual patches.
 
-> > (Plus, the implementation seems pretty incomplete for arm32.).
-> 
-> That's the point. The linux side is simple. The secure monitor side is
-> also simplified somewhat. When you enter secure monitor mode, you are
-> automatically running with the cache and mmu off. This avoids the side
-> effects of cache allocations while trying to flush the caches.
+The previous patch set included APE6EVM board support, but from now
+board support will be submitted separately as an independent series.
 
-This is clock framework. It does not touch any caches, and does not
-have problems with MMU. Even if we would implement PSCI in future,
-this code would stay the same AFAICT.
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Also, this series makes use of PFC if available, but actual PFC tables
+will be submitted separately.
+
+Many thanks to Arnd Bergmann for his kind support!
+
+Signed-off-by: Magnus Damm <damm@opensource.se>
+---
+
+ Written against "next" renesas.git 811689afc214564c4a5f238ecf4d8bdc0e52b615
+ [PATCH 01/04] requires [PATCH] ARM: shmobile: Disallow PINCTRL without GPIOLIB
+ [PATCH 03/04] requires the IRQC driver to build
+
+ arch/arm/boot/dts/r8a73a4.dtsi                |   87 +++++++++++
+ arch/arm/mach-shmobile/Kconfig                |    9 +
+ arch/arm/mach-shmobile/Makefile               |    1 
+ arch/arm/mach-shmobile/clock-r8a73a4.c        |  104 +++++++++++++
+ arch/arm/mach-shmobile/include/mach/r8a73a4.h |    8 +
+ arch/arm/mach-shmobile/setup-r8a73a4.c        |  187 +++++++++++++++++++++++++
+ 6 files changed, 395 insertions(+), 1 deletion(-)
