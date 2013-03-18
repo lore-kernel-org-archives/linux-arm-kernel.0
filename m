@@ -1,99 +1,99 @@
 From: chao.xie@marvell.com (Chao Xie)
-Date: Mon, 18 Mar 2013 03:55:28 -0400
-Subject: [PATCH 1/6] usb: gadget: mv_udc_core: remove unused clock
+Date: Mon, 18 Mar 2013 03:55:29 -0400
+Subject: [PATCH 2/6] usb: otg: mv_otg: remove unused clock
 In-Reply-To: <1363593333-6077-1-git-send-email-chao.xie@marvell.com>
 References: <1363593333-6077-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1363593333-6077-2-git-send-email-chao.xie@marvell.com>
+Message-ID: <1363593333-6077-3-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The origianl understanding of clock is wrong. The UDC controller
+The origianl understanding of clock is wrong. The OTG controller
 only have one clock input.
 Passing clock name by pdata is wrong. The clock is defined by device
 iteself.
 
 Signed-off-by: Chao Xie <chao.xie@marvell.com>
 ---
- drivers/usb/gadget/mv_udc.h      |    3 +--
- drivers/usb/gadget/mv_udc_core.c |   27 +++++++--------------------
- 2 files changed, 8 insertions(+), 22 deletions(-)
+ drivers/usb/otg/mv_otg.c |   28 +++++++---------------------
+ drivers/usb/otg/mv_otg.h |    3 +--
+ 2 files changed, 8 insertions(+), 23 deletions(-)
 
-diff --git a/drivers/usb/gadget/mv_udc.h b/drivers/usb/gadget/mv_udc.h
-index 9073436..be77f20 100644
---- a/drivers/usb/gadget/mv_udc.h
-+++ b/drivers/usb/gadget/mv_udc.h
-@@ -222,8 +222,7 @@ struct mv_udc {
- 	struct mv_usb_platform_data     *pdata;
+diff --git a/drivers/usb/otg/mv_otg.c b/drivers/usb/otg/mv_otg.c
+index b6a9be3..ee66283 100644
+--- a/drivers/usb/otg/mv_otg.c
++++ b/drivers/usb/otg/mv_otg.c
+@@ -237,18 +237,12 @@ static void mv_otg_start_periphrals(struct mv_otg *mvotg, int on)
  
- 	/* some SOC has mutiple clock sources for USB*/
--	unsigned int    clknum;
--	struct clk      *clk[0];
-+	struct clk      *clk;
- };
- 
- /* endpoint data structure */
-diff --git a/drivers/usb/gadget/mv_udc_core.c b/drivers/usb/gadget/mv_udc_core.c
-index c8cf959..988e94a 100644
---- a/drivers/usb/gadget/mv_udc_core.c
-+++ b/drivers/usb/gadget/mv_udc_core.c
-@@ -1006,18 +1006,12 @@ static struct usb_ep_ops mv_ep_ops = {
- 
- static void udc_clock_enable(struct mv_udc *udc)
+ static void otg_clock_enable(struct mv_otg *mvotg)
  {
 -	unsigned int i;
 -
--	for (i = 0; i < udc->clknum; i++)
--		clk_prepare_enable(udc->clk[i]);
-+	clk_prepare_enable(udc->clk);
+-	for (i = 0; i < mvotg->clknum; i++)
+-		clk_prepare_enable(mvotg->clk[i]);
++	clk_prepare_enable(mvotg->clk);
  }
  
- static void udc_clock_disable(struct mv_udc *udc)
+ static void otg_clock_disable(struct mv_otg *mvotg)
  {
 -	unsigned int i;
 -
--	for (i = 0; i < udc->clknum; i++)
--		clk_disable_unprepare(udc->clk[i]);
-+	clk_disable_unprepare(udc->clk);
+-	for (i = 0; i < mvotg->clknum; i++)
+-		clk_disable_unprepare(mvotg->clk[i]);
++	clk_disable_unprepare(mvotg->clk);
  }
  
- static void udc_stop(struct mv_udc *udc)
-@@ -2151,7 +2145,6 @@ static int mv_udc_probe(struct platform_device *pdev)
- 	struct mv_usb_platform_data *pdata = pdev->dev.platform_data;
- 	struct mv_udc *udc;
- 	int retval = 0;
--	int clk_i = 0;
+ static int mv_otg_enable_internal(struct mv_otg *mvotg)
+@@ -684,16 +678,14 @@ static int mv_otg_probe(struct platform_device *pdev)
+ 	struct mv_otg *mvotg;
+ 	struct usb_otg *otg;
  	struct resource *r;
- 	size_t size;
+-	int retval = 0, clk_i, i;
+-	size_t size;
++	int retval = 0, i;
  
-@@ -2160,8 +2153,7 @@ static int mv_udc_probe(struct platform_device *pdev)
+ 	if (pdata == NULL) {
+ 		dev_err(&pdev->dev, "failed to get platform data\n");
  		return -ENODEV;
  	}
  
--	size = sizeof(*udc) + sizeof(struct clk *) * pdata->clknum;
--	udc = devm_kzalloc(&pdev->dev, size, GFP_KERNEL);
-+	udc = devm_kzalloc(&pdev->dev, sizeof(*udc), GFP_KERNEL);
- 	if (udc == NULL) {
- 		dev_err(&pdev->dev, "failed to allocate memory for udc\n");
+-	size = sizeof(*mvotg) + sizeof(struct clk *) * pdata->clknum;
+-	mvotg = devm_kzalloc(&pdev->dev, size, GFP_KERNEL);
++	mvotg = devm_kzalloc(&pdev->dev, sizeof(*mvotg), GFP_KERNEL);
+ 	if (!mvotg) {
+ 		dev_err(&pdev->dev, "failed to allocate memory!\n");
  		return -ENOMEM;
-@@ -2184,15 +2176,10 @@ static int mv_udc_probe(struct platform_device *pdev)
- 	}
- #endif
+@@ -708,15 +700,9 @@ static int mv_otg_probe(struct platform_device *pdev)
+ 	mvotg->pdev = pdev;
+ 	mvotg->pdata = pdata;
  
--	udc->clknum = pdata->clknum;
--	for (clk_i = 0; clk_i < udc->clknum; clk_i++) {
--		udc->clk[clk_i] = devm_clk_get(&pdev->dev,
--					pdata->clkname[clk_i]);
--		if (IS_ERR(udc->clk[clk_i])) {
--			retval = PTR_ERR(udc->clk[clk_i]);
+-	mvotg->clknum = pdata->clknum;
+-	for (clk_i = 0; clk_i < mvotg->clknum; clk_i++) {
+-		mvotg->clk[clk_i] = devm_clk_get(&pdev->dev,
+-						pdata->clkname[clk_i]);
+-		if (IS_ERR(mvotg->clk[clk_i])) {
+-			retval = PTR_ERR(mvotg->clk[clk_i]);
 -			return retval;
 -		}
 -	}
-+	/* udc only have one sysclk. */
-+	udc->clk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(udc->clk))
-+		return PTR_ERR(udc->clk);
++	mvotg->clk = devm_clk_get(&pdev->dev, NULL);
++	if (IS_ERR(mvotg->clk))
++		return PTR_ERR(mvotg->clk);
  
- 	r = platform_get_resource_byname(udc->dev, IORESOURCE_MEM, "capregs");
- 	if (r == NULL) {
+ 	mvotg->qwork = create_singlethread_workqueue("mv_otg_queue");
+ 	if (!mvotg->qwork) {
+diff --git a/drivers/usb/otg/mv_otg.h b/drivers/usb/otg/mv_otg.h
+index 8a9e351..551da6e 100644
+--- a/drivers/usb/otg/mv_otg.h
++++ b/drivers/usb/otg/mv_otg.h
+@@ -158,8 +158,7 @@ struct mv_otg {
+ 
+ 	unsigned int active;
+ 	unsigned int clock_gating;
+-	unsigned int clknum;
+-	struct clk *clk[0];
++	struct clk *clk;
+ };
+ 
+ #endif
 -- 
 1.7.4.1
