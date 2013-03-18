@@ -1,46 +1,38 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Mon, 18 Mar 2013 16:09:57 +0800
-Subject: [PATCH V2 1/3] ARM: dts: tegra: add clock source for PMC
-In-Reply-To: <1363594199-10974-1-git-send-email-josephl@nvidia.com>
-References: <1363594199-10974-1-git-send-email-josephl@nvidia.com>
-Message-ID: <1363594199-10974-2-git-send-email-josephl@nvidia.com>
+Date: Mon, 18 Mar 2013 16:09:56 +0800
+Subject: [PATCH V2 0/3] ARM: tegra: add clock source for PMC
+Message-ID: <1363594199-10974-1-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clock source of PMC is PCLK. Adding it into DTS for Tegra20 and Tegra30.
+This series was original introduced to clean up the PM related code after
+the system suspending support series. The information about the origianl
+patch set is below.
 
-Signed-off-by: Joseph Lo <josephl@nvidia.com>
----
-V2:
-* new in this change
----
- arch/arm/boot/dts/tegra20.dtsi | 1 +
- arch/arm/boot/dts/tegra30.dtsi | 1 +
- 2 files changed, 2 insertions(+)
+[1/3] ARM: tegra: moving the CPU power timer function to PMC driver
+[2/3] ARM: tegra: refactor the pmc_pm_set function
+[3/3] ARM: tegra: cpuidle: remove redundant parameters for powered-down mode
 
-diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
-index 3183581..4ba9c7b 100644
---- a/arch/arm/boot/dts/tegra20.dtsi
-+++ b/arch/arm/boot/dts/tegra20.dtsi
-@@ -419,6 +419,7 @@
- 	pmc {
- 		compatible = "nvidia,tegra20-pmc";
- 		reg = <0x7000e400 0x400>;
-+		clocks = <&tegra_car 110>;
- 	};
- 
- 	memory-controller at 7000f000 {
-diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
-index 11d04fe..7299014 100644
---- a/arch/arm/boot/dts/tegra30.dtsi
-+++ b/arch/arm/boot/dts/tegra30.dtsi
-@@ -428,6 +428,7 @@
- 	pmc {
- 		compatible = "nvidia,tegra30-pmc";
- 		reg = <0x7000e400 0x400>;
-+		clocks = <&tegra_car 218>;
- 	};
- 
- 	memory-controller {
+I split them up in V2. The [1/3] is integrated into this series. And should
+be merged before the system suspending support series.
+
+The [2/3] is squashed into the system suspending support series.
+
+The [3/3] become a stand alone clean up patah right after the system suspending
+support series.
+
+Joseph Lo (3):
+  ARM: dts: tegra: add clock source for PMC
+  ARM: tegra: get PMC clock source from DT
+  ARM: tegra: moving the CPU power timer function to PMC driver
+
+ arch/arm/boot/dts/tegra20.dtsi |  1 +
+ arch/arm/boot/dts/tegra30.dtsi |  1 +
+ arch/arm/mach-tegra/common.c   |  2 +-
+ arch/arm/mach-tegra/pm.c       | 37 +------------------------------------
+ arch/arm/mach-tegra/pmc.c      | 36 ++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-tegra/pmc.h      |  4 ++++
+ 6 files changed, 44 insertions(+), 37 deletions(-)
+
 -- 
 1.8.1.5
