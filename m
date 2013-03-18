@@ -1,41 +1,47 @@
-From: hutter.eric@gmail.com (Eric Hutter)
-Date: Mon, 18 Mar 2013 19:48:56 +0100
-Subject: [PATCH 1/1] ARM: kirkwood: Fix chip-delay for GoFlex Net
-Message-ID: <51476198.2080100@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 18 Mar 2013 18:54:58 +0000
+Subject: [PATCH v2 1/2] ARM: vexpress: Enable regulator framework when
+ MMCI is in use
+In-Reply-To: <1363630617.3054.19.camel@hornet>
+References: <20130315181614.GY4977@n2100.arm.linux.org.uk>
+ <1363629655-28917-1-git-send-email-pawel.moll@arm.com>
+ <20130318180328.GJ4977@n2100.arm.linux.org.uk>
+ <1363630617.3054.19.camel@hornet>
+Message-ID: <20130318185458.GK4977@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Mar 18, 2013 at 06:16:57PM +0000, Pawel Moll wrote:
+> On Mon, 2013-03-18 at 18:03 +0000, Russell King - ARM Linux wrote:
+> > > Without the regulator framework present there are no valid operating
+> > > voltages reported and the device initialisation fails:
+> > > 
+> > > mmci-pl18x 1c050000.mmci: mmc0: PL180 manf 41 rev0 at 0x1c050000 irq 41,42 (pio)
+> > > mmc0: host doesn't support card's voltages
+> > > mmc0: error -22 whilst initialising MMC card
+> > 
+> > Okay, this isn't going to work, because this means it's broken on a whole
+> > load of platforms.  What it means is that this commit:
+> > 
+> > commit 599c1d5c750ddf528c7c6d3cdc466708f0502e66
+> > Author: Ulf Hansson <ulf.hansson@linaro.org>
+> > Date:   Mon Jan 7 16:22:50 2013 +0100
+> > 
+> >     ARM: 7620/1: mmc: mmci: Convert to use mmc_regulator_get_supply
+> >     
+> >     By using the mmc_regulator_get_supply API we are able to do some
+> >     cleanups of the regulator code. Additionally let the regulator
+> >     API handle the error printing.
+> >     
+> >     Cc: Chris Ball <cjb@laptop.org>
+> >     Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> >     Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > 
+> > is actually wrong and probably needs reverting.
+> 
+> Reverting it will not change anything as the driver had the same
+> dependency before, just using :
 
-This fixes "Too few good blocks within range" issues on GoFlex Net
-by setting chip-delay to 40. I've been using this patch on my device
-for quite a while now (accessing uboot vars is not possible without it).
-The basic problem was discussed at
-http://forum.doozan.com/read.php?2,7451 and I think this fix
-should go mainstream.
-
-Greetings
-
-Eric Hutter
-
-
-Signed-off-by: Eric Hutter <hutter.eric@gmail.com>
----
-  arch/arm/boot/dts/kirkwood-goflexnet.dts | 1 +
-  1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/boot/dts/kirkwood-goflexnet.dts 
-b/arch/arm/boot/dts/kirkwood-goflexnet.dts
-index bd83b8f..c3573be 100644
---- a/arch/arm/boot/dts/kirkwood-goflexnet.dts
-+++ b/arch/arm/boot/dts/kirkwood-goflexnet.dts
-@@ -77,6 +77,7 @@
-          };
-
-          nand at 3000000 {
-+            chip-delay = <40>;
-              status = "okay";
-
-              partition at 0 {
--- 
-1.8.1.4
+Umm.  If CONFIG_REGULATOR is not set with the patch reverted, the
+regulator support is not used at all, and the ocrmask comes from
+the platform data.
