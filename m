@@ -1,44 +1,44 @@
-From: jonathan.austin@arm.com (Jonathan Austin)
-Date: Mon, 18 Mar 2013 19:02:58 +0000
-Subject: Anyone implement Cortex A9 FIQ
-In-Reply-To: <CAHrpEqSO89Lx=EGTJJ_XOFwkHqL=heoOUQCtJUzm6D7mEAbWiw@mail.gmail.com>
-References: <CAHrpEqSQ1n_WUfxoraKZFS2A8NjdP_MCcWmJdCjcon_QwgX4Hw@mail.gmail.com>
- <5142FBF5.3010307@arm.com>
- <CAHrpEqSO89Lx=EGTJJ_XOFwkHqL=heoOUQCtJUzm6D7mEAbWiw@mail.gmail.com>
-Message-ID: <514764E2.6040101@arm.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 18 Mar 2013 20:26:53 +0100
+Subject: [PATCH 1/1] ARM: kirkwood: Fix chip-delay for GoFlex Net
+In-Reply-To: <51476198.2080100@gmail.com>
+References: <51476198.2080100@gmail.com>
+Message-ID: <20130318192653.GZ21478@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/03/13 01:15, Frank Li wrote:
-> 2013/3/15 Jonathan Austin <jonathan.austin@arm.com>:
->> Hi Frank,
->>
->>
->> On 15/03/13 07:38, Frank Li wrote:
->>>
->>> All:
->>>               Recently, we need real time work run in cortex A9.
->>>               Did anyone use FIQ on Cortex A9?
->>>
->>
->> What are you actually trying to do? There's quite a lot more complexity to
->> being able to do real-time work on an A-class processor than just using FIQ,
->> and much of that would be platform specific. For example on ARMv7A, we
->> generally can't assume that FIQ can be used by the non-secure world...
->
-> There are period task run every 125us.
-> Task is quick simply, just put virtual multi DMA queue to real DMA queue.
-> Small memory copy and set some hardware register.
->
+On Mon, Mar 18, 2013 at 07:48:56PM +0100, Eric Hutter wrote:
+> Hi,
+> 
+> This fixes "Too few good blocks within range" issues on GoFlex Net
+> by setting chip-delay to 40.
 
-Whether this is feasible will really depend on what platform you're on - 
-if there's a secure monitor then FIQs are out of the question anyway. 
-Can you tell us more about the system?
+Hi Eric
 
-If your average interrupt latency is low then you should just be able to 
-do this with normal IRQs (have you got threaded interrupt handlers?)
+Its a problem seen by a couple of other boards as well, e.g. dns320
+and dns325.
 
-What is it about the situation that leads you to believe that you *need* 
-FIQ?
+Acked-by: Andrew Lunn <andrew@lunn.ch>
 
-Jonny
+> Signed-off-by: Eric Hutter <hutter.eric@gmail.com>
+> ---
+>  arch/arm/boot/dts/kirkwood-goflexnet.dts | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/boot/dts/kirkwood-goflexnet.dts
+> b/arch/arm/boot/dts/kirkwood-goflexnet.dts
+> index bd83b8f..c3573be 100644
+> --- a/arch/arm/boot/dts/kirkwood-goflexnet.dts
+> +++ b/arch/arm/boot/dts/kirkwood-goflexnet.dts
+> @@ -77,6 +77,7 @@
+>          };
+> 
+>          nand at 3000000 {
+> +            chip-delay = <40>;
+>              status = "okay";
+> 
+>              partition at 0 {
+> -- 
+> 1.8.1.4
+> 
+> 
