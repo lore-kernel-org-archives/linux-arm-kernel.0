@@ -1,21 +1,29 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 18 Mar 2013 09:19:29 -0600
-Subject: linux-next: manual merge of the bcm2835 tree with the arm-soc tree
-In-Reply-To: <20130318150415.7a9db62e8cfe03623a411ae9@canb.auug.org.au>
-References: <20130318150415.7a9db62e8cfe03623a411ae9@canb.auug.org.au>
-Message-ID: <51473081.2040607@wwwdotorg.org>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 18 Mar 2013 16:19:52 +0100
+Subject: [PATCH] ARM: video: mxs: Fix mxsfb misconfiguring VDCTRL0
+In-Reply-To: <20130318143129.GG12462@S2101-09.ap.freescale.net>
+References: <CAOMZO5CDuODRrJEEaDKm5nepfkuvuF77ZQmarB69hL6gg386ww@mail.gmail.com>
+ <201303181518.14171.marex@denx.de>
+ <20130318143129.GG12462@S2101-09.ap.freescale.net>
+Message-ID: <201303181619.52377.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/17/2013 10:04 PM, Stephen Rothwell wrote:
-> Hi Stephen,
-> 
-> Today's linux-next merge of the bcm2835 tree got a conflict in 
-> arch/arm/Kconfig between commit 15bc1fe67f66 ("ARM: cns3xxx:
-> enable multiplatform support") from the arm-soc tree and commit
-> f1ac922dec7e ("ARM: bcm2835: convert to multi-platform") from the
-> bcm2835 tree.
+Dear Shawn Guo,
 
-Thanks. The resolution for the two bcm2835/arm-soc conflicts looks
-fine. These conflicts should go away once I send bcm2835 pull requests
-to arm-soc for inclusion in 3.10.
+> On Mon, Mar 18, 2013 at 03:18:13PM +0100, Marek Vasut wrote:
+> > Did you manage to test it please?
+> 
+> I do not have X11 environment handy to test, but framework console
+> seems still working.
+
+Even after me poking in it, lol :-)
+
+You can grab [1], extract it onto card or NFS and just use it as root 
+filesystem, the X11 will come up automagically.
+
+[1] ftp://ftp.denx.de/pub/eldk/5.3/targets/armv5te/core-image-sato-sdk-generic-
+armv5te.tar.gz
+
+Best regards,
+Marek Vasut
