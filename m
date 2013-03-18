@@ -1,50 +1,51 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 18 Mar 2013 21:05:53 +0900
-Subject: [PATCH 09/14] irqchip: intc-irqpin: GPL header for platform data
+Date: Mon, 18 Mar 2013 21:05:51 +0900
+Subject: [PATCH 07/14] irqchip: intc-irqpin: Add force comments
 In-Reply-To: <1363608358-24215-1-git-send-email-horms+renesas@verge.net.au>
 References: <1363608358-24215-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1363608358-24215-10-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1363608358-24215-8-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Add GPL header to platform data include file.
+Add comments to describe the special case for
+"force" versions of enable and disable functions.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
 Tested-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- .../linux/platform_data/irq-renesas-intc-irqpin.h   |   19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ drivers/irqchip/irq-renesas-intc-irqpin.c |    9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/include/linux/platform_data/irq-renesas-intc-irqpin.h b/include/linux/platform_data/irq-renesas-intc-irqpin.h
-index 00ccac3..e4cb911 100644
---- a/include/linux/platform_data/irq-renesas-intc-irqpin.h
-+++ b/include/linux/platform_data/irq-renesas-intc-irqpin.h
-@@ -1,3 +1,22 @@
-+/*
-+ * Renesas INTC External IRQ Pin Driver
-+ *
-+ *  Copyright (C) 2013 Magnus Damm
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-+ */
-+
- #ifndef __IRQ_RENESAS_INTC_IRQPIN_H__
- #define __IRQ_RENESAS_INTC_IRQPIN_H__
+diff --git a/drivers/irqchip/irq-renesas-intc-irqpin.c b/drivers/irqchip/irq-renesas-intc-irqpin.c
+index 0ac2bf6..59c0cbc 100644
+--- a/drivers/irqchip/irq-renesas-intc-irqpin.c
++++ b/drivers/irqchip/irq-renesas-intc-irqpin.c
+@@ -199,6 +199,11 @@ static void intc_irqpin_irq_enable_force(struct irq_data *d)
+ 	int irq = p->irq[irqd_to_hwirq(d)].requested_irq;
  
+ 	intc_irqpin_irq_enable(d);
++
++	/* enable interrupt through parent interrupt controller,
++	 * assumes non-shared interrupt with 1:1 mapping
++	 * needed for busted IRQs on some SoCs like sh73a0
++	 */
+ 	irq_get_chip(irq)->irq_unmask(irq_get_irq_data(irq));
+ }
+ 
+@@ -207,6 +212,10 @@ static void intc_irqpin_irq_disable_force(struct irq_data *d)
+ 	struct intc_irqpin_priv *p = irq_data_get_irq_chip_data(d);
+ 	int irq = p->irq[irqd_to_hwirq(d)].requested_irq;
+ 
++	/* disable interrupt through parent interrupt controller,
++	 * assumes non-shared interrupt with 1:1 mapping
++	 * needed for busted IRQs on some SoCs like sh73a0
++	 */
+ 	irq_get_chip(irq)->irq_mask(irq_get_irq_data(irq));
+ 	intc_irqpin_irq_disable(d);
+ }
 -- 
 1.7.10.4
