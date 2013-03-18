@@ -1,40 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 18 Mar 2013 14:59:10 +0000
-Subject: [PATCH v2 for 3.10] Introduce a Marvell EBU MBus driver
-In-Reply-To: <51422AD5.9020203@free-electrons.com>
-References: <1362589205-4726-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <51422AD5.9020203@free-electrons.com>
-Message-ID: <201303181459.10954.arnd@arndb.de>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Tue, 19 Mar 2013 00:09:53 +0900
+Subject: [PATCH 00/03] ARM: shmobile: r8a73a4 APE6EVM board support V2
+Message-ID: <20130318150953.28231.73454.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 14 March 2013, Gregory CLEMENT wrote:
-> Will you agree to take this patch set as is ?(modulo some fixes needed
-> for the not yet tested platforms).
-> 
-> This patch set is a great step in the right way to move code outside
-> arch/arm. I know that Arnd would like a greater step and a more
-> radical approach to have a more accurate device tree bindings.
-> However the purpose of this patch set was initially to ease the merge
-> of the PCIe support not to delay it! And I fear that the large number
-> of files to change and the resulting conflicts will prevent this patch
-> set to be merged in a single release.
-> 
-> I agree that the bindings could be improve but can we consider this
-> patch set as a first step ?
+ARM: shmobile: r8a73a4 APE6EVM board support V2
 
-I would prefer not to merge the DT binding, but I'm fine with the
-current implementation, as in the pull request that Jason sent
-me. How about this:
+[PATCH 01/03] ARM: shmobile: APE6EVM base support V2
+[PATCH 02/03] ARM: shmobile: APE6EVM PFC support
+[PATCH 03/03] ARM: shmobile: APE6EVM LAN9220 support
 
-* You remove the Documentation/devicetree/bindings/arm/mvebu-mbus.txt file
-  that is the main source of disagreement, along with the mvebu_mbus_dt_init
-  function.
-* All conversion patches get changed to not add properties to the soc
-  node but instead call mvebu_mbus_init directly. That code is there
-  already.
+This series is V2 of initial support for the APE6EVM board.
 
-I can take those patches, and we can work on a better DT binding for
-a later release without having to hold up other conversions.
+The APE6EVM board makes use of the r8a73a4 SoC and has a
+couple of different I/O devices on board, but with this
+series only support for the SCIFA0 UART and the Ethernet
+chip is included.
 
-	Arnd
+In the future support for more I/O devices will be added as
+incremental feature patches.
+
+Changes since V1:
+- Went from single patch to series
+- Use ape6evm_add_standard_devices() to setup SoC devices and clocks
+- Use PFC to configure SCIFA0
+- Add Ethernet support including PFC support
+
+For more details please see the individual patches.
+
+Signed-off-by: Magnus Damm <damm@opensource.se>
+---
+
+ Written against "next" renesas.git 811689afc214564c4a5f238ecf4d8bdc0e52b615
+ 
+ Depends on the following two series:
+ [PATCH 00/04] ARM: shmobile: r8a73a4 SoC support V2
+ [PATCH 00/02] sh-pfc: Initial r8a73a4 PFC support
+
+ arch/arm/boot/dts/Makefile             |    1 
+ arch/arm/boot/dts/r8a73a4-ape6evm.dts  |   47 ++++++++++++++++
+ arch/arm/mach-shmobile/Kconfig         |   10 +++
+ arch/arm/mach-shmobile/Makefile        |    1 
+ arch/arm/mach-shmobile/board-ape6evm.c |   89 ++++++++++++++++++++++++++++++++
+ 5 files changed, 147 insertions(+), 1 deletion(-)
