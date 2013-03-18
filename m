@@ -1,53 +1,24 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Mon, 18 Mar 2013 12:03:35 -0400 (EDT)
-Subject: [RFC] USB: EHCI: hot-fix OMAP and Orion multiplatform config
-In-Reply-To: <201303152011.26414.arnd@arndb.de>
-Message-ID: <Pine.LNX.4.44L0.1303181156150.1922-100000@iolanthe.rowland.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 18 Mar 2013 16:12:37 +0000
+Subject: [PATCH 3/6] ARM: remove fa526 CPU support
+In-Reply-To: <5146FB70.9000706@openwrt.org>
+References: <1363299178-8241-1-git-send-email-arnd@arndb.de>
+ <514318DE.8060601@openwrt.org>
+ <CACmBeS2tbV9Z_c3mCuk4G_+kYpVpVpUKWq3GK=gqBF+ECNhTbg@mail.gmail.com>
+ <201303181116.17369.arnd@arndb.de> <5146FB70.9000706@openwrt.org>
+Message-ID: <20130318161237.GI4977@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 15 Mar 2013, Arnd Bergmann wrote:
+On Mon, Mar 18, 2013 at 12:33:04PM +0100, Florian Fainelli wrote:
+> Debian is still kind enough to provide an ARMv4t and higher port  
 
-> > Instead of adding these tests for non-NULL pdata all over the place, 
-> > you could define a static structure with default settings and store a 
-> > pointer to it if pdata wasn't set initially.
-> 
-> Yes, good idea. Here is a new version. Maybe Alexey or Tony can verify if
-> that works for them on wm8850. That should be independent of the decision
-> into which kernel to merge this patch.
+And I still build some ARMv4 OABI Fedora RPMs myself - but I don't
+distribute them because then people expect _me_ do fix their problems
+with them.
 
-On the whole this looks good (and a lot nicer than the first version).  
-However there is one bug...
-
-> +static struct usb_ehci_pdata ehci_platform_defaults;
-> +
->  static int ehci_platform_probe(struct platform_device *dev)
->  {
->  	struct usb_hcd *hcd;
->  	struct resource *res_mem;
-> -	struct usb_ehci_pdata *pdata = dev->dev.platform_data;
-> +	struct usb_ehci_pdata *pdata;
->  	int irq;
->  	int err = -ENOMEM;
->  
-> -	if (!pdata) {
-> -		WARN_ON(1);
-> -		return -ENODEV;
-> -	}
-> -
->  	if (usb_disabled())
->  		return -ENODEV;
->  
-> +	if (!dev->dev.platform_data) {
-> +		dev->dev.platform_data = &ehci_platform_defaults;
-
-If the ehci-platform module is unloaded and then reloaded at a
-different address, the stale pointer will cause an invalid memory
-reference.  ehci_platform_remove() needs to set dev->dev.platform_data
-back to NULL if it is equal to &ehci_platform_defaults.
-
-Once that is fixed, you can add
-
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
-
-Alan Stern
+lists.arm.linux.org.uk / firewall / servers here are all still OABI,
+and I don't see any possible upgrade path away from OABI - which is
+something I brought up when EABI first reared its ugly head.  Now,
+we have N different versions of EABI too.  I'm sure its time we were
+discussing NABI - "Next ABI". :)
