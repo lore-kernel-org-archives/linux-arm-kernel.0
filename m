@@ -1,53 +1,48 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 18 Mar 2013 21:32:33 +0900
-Subject: [PATCH 23/43] ARM: shmobile: r8a7779: Do not initialise i2c as an
- early device
+Date: Mon, 18 Mar 2013 21:32:40 +0900
+Subject: [PATCH 30/43] ARM: shmobile: Use sh73a0-specific cpu disable code
 In-Reply-To: <1363609973-31086-1-git-send-email-horms+renesas@verge.net.au>
 References: <1363609973-31086-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1363609973-31086-24-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1363609973-31086-31-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is sufficient to initialise i2c as a late device.
+From: Magnus Damm <damm@opensource.se>
 
-Cc: Magnus Damm <magnus.damm@gmail.com>
+Convert the sh73a0 CPU Hotplug code to use a local
+implementation of ->cpu_disable(). With this change
+in place the sh73a0 SMP code does no longer depend
+on hotplug.c.
+
+Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/setup-r8a7779.c |    8 +++-----
- 1 file changed, 3 insertions(+), 5 deletions(-)
+ arch/arm/mach-shmobile/smp-sh73a0.c |    7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
-index b1f7a45..7f8daf1 100644
---- a/arch/arm/mach-shmobile/setup-r8a7779.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7779.c
-@@ -333,7 +333,7 @@ static struct platform_device *r8a7779_devices_dt[] __initdata = {
- 	&tmu01_device,
- };
- 
--static struct platform_device *r8a7779_early_devices[] __initdata = {
-+static struct platform_device *r8a7779_late_devices[] __initdata = {
- 	&i2c0_device,
- 	&i2c1_device,
- 	&i2c2_device,
-@@ -352,8 +352,8 @@ void __init r8a7779_add_standard_devices(void)
- 
- 	platform_add_devices(r8a7779_devices_dt,
- 			    ARRAY_SIZE(r8a7779_devices_dt));
--	platform_add_devices(r8a7779_early_devices,
--			    ARRAY_SIZE(r8a7779_early_devices));
-+	platform_add_devices(r8a7779_late_devices,
-+			    ARRAY_SIZE(r8a7779_late_devices));
+diff --git a/arch/arm/mach-shmobile/smp-sh73a0.c b/arch/arm/mach-shmobile/smp-sh73a0.c
+index 593f8de..5ae502b 100644
+--- a/arch/arm/mach-shmobile/smp-sh73a0.c
++++ b/arch/arm/mach-shmobile/smp-sh73a0.c
+@@ -124,6 +124,11 @@ static void sh73a0_cpu_die(unsigned int cpu)
+ 	/* Enter shutdown mode */
+ 	cpu_do_idle();
  }
++
++static int sh73a0_cpu_disable(unsigned int cpu)
++{
++	return 0; /* CPU0 and CPU1 supported */
++}
+ #endif /* CONFIG_HOTPLUG_CPU */
  
- /* do nothing for !CONFIG_SMP or !CONFIG_HAVE_TWD */
-@@ -370,8 +370,6 @@ void __init r8a7779_add_early_devices(void)
- {
- 	early_platform_add_devices(r8a7779_devices_dt,
- 				   ARRAY_SIZE(r8a7779_devices_dt));
--	early_platform_add_devices(r8a7779_early_devices,
--				   ARRAY_SIZE(r8a7779_early_devices));
- 
- 	/* Early serial console setup is not included here due to
- 	 * memory map collisions. The SCIF serial ports in r8a7779
+ struct smp_operations sh73a0_smp_ops __initdata = {
+@@ -134,6 +139,6 @@ struct smp_operations sh73a0_smp_ops __initdata = {
+ #ifdef CONFIG_HOTPLUG_CPU
+ 	.cpu_kill		= sh73a0_cpu_kill,
+ 	.cpu_die		= sh73a0_cpu_die,
+-	.cpu_disable		= shmobile_cpu_disable_any,
++	.cpu_disable		= sh73a0_cpu_disable,
+ #endif
+ };
 -- 
 1.7.10.4
