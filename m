@@ -1,47 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 18 Mar 2013 17:32:18 +0000
-Subject: [RFC] USB: EHCI: hot-fix OMAP and Orion multiplatform config
-In-Reply-To: <878v5kd503.fsf@lebrac.rtp-net.org>
-References: <201303151700.27231.arnd@arndb.de>
- <201303181545.18083.arnd@arndb.de> <878v5kd503.fsf@lebrac.rtp-net.org>
-Message-ID: <201303181732.18438.arnd@arndb.de>
+From: pavel@denx.de (Pavel Machek)
+Date: Mon, 18 Mar 2013 18:49:32 +0100
+Subject: [RFC] Kbuild support for ARM FIT images
+In-Reply-To: <20130318164426.GI30923@n2100.arm.linux.org.uk>
+References: <CAD=GYpbF_3uRzhUnV=MwDiy-ekvZKJztJbkhNM0u_pvG-UCw4w@mail.gmail.com>
+ <20130222160044.GA16357@quad.lixom.net>
+ <20130318163648.GA3722@amd.pavel.ucw.cz>
+ <20130318164426.GI30923@n2100.arm.linux.org.uk>
+Message-ID: <20130318174931.GB4230@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 18 March 2013, Arnaud Patard wrote:
-> Arnd Bergmann <arnd@arndb.de> writes:
-
-> > Sure, it's your decision. I just don't want to be accused of abandoning the
-> > issue that I caused. It's not strictly a regression because no configuration
-> > that was working in 3.8 is broken in 3.9, and embedded systems won't normally
-> > run a multiplatform kernel anyway. Also, the patch is really an ugly hack,
-> > which is probably enough reason not to take it. ;-)
+On Mon 2013-03-18 16:44:26, Russell King - ARM Linux wrote:
+> On Mon, Mar 18, 2013 at 05:36:53PM +0100, Pavel Machek wrote:
+> > On Fri 2013-02-22 08:00:44, Olof Johansson wrote:
+> > > On Wed, Feb 20, 2013 at 07:37:10PM -0600, Joel A Fernandes wrote:
+> > > > Any comments on this approach? Is it better to merge mkfitsrc.sh with
+> > > > mkuboot.sh?
+> > > 
+> > > I know this was discussed quite extensively yesterday, but here is my take on
+> > > it:
+> > > 
+> > > Given the recent complications from multiplatform, we really saw a strong
+> > > reason to _not_ do the final boot wrapping in the kernel build system.
+> > > Produce the zImage and the DTB files, and have a surrounding script that
+> > > bundles the two in a format that your particular device needs.
+> > > 
+> > > Most distros have scripts to handle the "make install" step of a kernel build.
+> > > That's where this belongs, not in the actual build step.
+> > 
+> > Not sure I agree here:
+> > 
+> > 1) zImage was designed to boot from floppy, without any kind of
+> > bootloader on i386
 > 
-> Given that the omap patch has been accepted and that the patch is an
-> "ugly hack", how hard it would be to provide a working patch for mvebu
-> (well, orion usb driver) ?
-
-The OMAP patch was accepted for 3.10, and I'm sure we will have good
-patches for the other bus glues as well, but the bug is also present on
-3.9, and the proper patches are too invasive now to get merged there.
-
-> > platforms that are already working. Peter Robinson is doing this on for
-> > Fedora right now[1] and I assume the Debian/Ubuntu/OpenSUSE/Gentoo
-> > people will be in a similar situation, but they can all apply the
-> > patch
+> zImage on x86 != zImage on ARM.
 > 
-> fwiw, I've mentionned this usb issue few days ago when talking about
-> multiplatform on the debian-arm ml.
-
-Yes, we've known about it for a long time, but failed to get the proper
-patches out in time :(
-
-> > manually if it doesn't make it into 3.9. It won't be the only patch they
+> They only share the fact that they're both compressed and self-extracting.
 > 
-> it can applied in the debian kernel, as long as the patch is merged
-> upstream.
+> ARM has never supported any kind of floppy based boot - mainly because
+> floppies have never been "executable" like they are on x86; all that
+> previous boot loaders ever did was load the kernel into RAM using
+> some
 
-It won't be merged in 3.10, but in that case Debian can backport the proper
-patches from 3.10.
+Yes, I know. That's why I said "on i386". 
 
-	Arnd
+What I wanted to say is that kernel build traditionaly produced
+something useful, something bootloader can actually boot. Currently,
+make uImage produces u-boot image. Please keep that capability.
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
