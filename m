@@ -1,69 +1,57 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 18 Mar 2013 20:07:06 +0900
-Subject: [PATCH 130/142] ARM: shmobile: sh73a0: Remove BSC function GPIOs
+Date: Mon, 18 Mar 2013 20:06:56 +0900
+Subject: [PATCH 120/142] sh-pfc: r8a7779: Remove USB function GPIOS
 In-Reply-To: <1363604838-29359-1-git-send-email-horms+renesas@verge.net.au>
 References: <1363604838-29359-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1363604838-29359-131-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1363604838-29359-121-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Those GPIOs have been deprecated by the pinctrl API. They are unused and
-unneeded, remove them.
+All r8a7779 platforms now use the pinctrl API to control the USB pins,
+the corresponding function GPIOS are unused. Remove them.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-shmobile/include/mach/sh73a0.h |   29 ++++----------------------
- 1 file changed, 4 insertions(+), 25 deletions(-)
+ drivers/pinctrl/sh-pfc/pfc-r8a7779.c |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/include/mach/sh73a0.h b/arch/arm/mach-shmobile/include/mach/sh73a0.h
-index f1b85ff..218e6b7 100644
---- a/arch/arm/mach-shmobile/include/mach/sh73a0.h
-+++ b/arch/arm/mach-shmobile/include/mach/sh73a0.h
-@@ -149,31 +149,10 @@ enum {
- 	GPIO_FN_A24, GPIO_FN_MSIOF0_RXD,
- 	GPIO_FN_A25, GPIO_FN_MSIOF0_SS2,
- 	GPIO_FN_A26,
--	GPIO_FN_D0_NAF0,
--	GPIO_FN_D1_NAF1,
--	GPIO_FN_D2_NAF2,
--	GPIO_FN_D3_NAF3,
--	GPIO_FN_D4_NAF4,
--	GPIO_FN_D5_NAF5,
--	GPIO_FN_D6_NAF6,
--	GPIO_FN_D7_NAF7,
--	GPIO_FN_D8_NAF8,
--	GPIO_FN_D9_NAF9,
--	GPIO_FN_D10_NAF10,
--	GPIO_FN_D11_NAF11,
--	GPIO_FN_D12_NAF12,
--	GPIO_FN_D13_NAF13,
--	GPIO_FN_D14_NAF14,
--	GPIO_FN_D15_NAF15,
--	GPIO_FN_CS4_,
--	GPIO_FN_CS5A_, GPIO_FN_PORT91_RDWR,
--	GPIO_FN_CS5B_, GPIO_FN_FCE1_,
--	GPIO_FN_CS6B_, GPIO_FN_DACK0,
--	GPIO_FN_FCE0_, GPIO_FN_CS6A_,
-+	GPIO_FN_FCE1_,
-+	GPIO_FN_DACK0,
-+	GPIO_FN_FCE0_,
- 	GPIO_FN_WAIT_, GPIO_FN_DREQ0,
--	GPIO_FN_RD__FSC,
--	GPIO_FN_WE0__FWE, GPIO_FN_RDWR_FWE,
--	GPIO_FN_WE1_,
- 	GPIO_FN_FRB,
- 	GPIO_FN_CKO,
- 	GPIO_FN_NBRSTOUT_,
-@@ -219,7 +198,7 @@ enum {
- 	GPIO_FN_VIO2_CLK,
- 	GPIO_FN_VIO_FIELD, GPIO_FN_VIO2_FIELD,
- 	GPIO_FN_VIO_CKO,
--	GPIO_FN_A27, GPIO_FN_PORT149_RDWR, GPIO_FN_MFG0_IN1, \
-+	GPIO_FN_A27, GPIO_FN_MFG0_IN1,
- 	GPIO_FN_MFG0_IN2,
- 	GPIO_FN_TS_SPSYNC3, GPIO_FN_MSIOF2_RSCK,
- 	GPIO_FN_TS_SDAT3, GPIO_FN_MSIOF2_RSYNC,
+diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7779.c b/drivers/pinctrl/sh-pfc/pfc-r8a7779.c
+index ca59a18..6f8cc53 100644
+--- a/drivers/pinctrl/sh-pfc/pfc-r8a7779.c
++++ b/drivers/pinctrl/sh-pfc/pfc-r8a7779.c
+@@ -2677,7 +2677,7 @@ static const struct pinmux_func pinmux_func_gpios[] = {
+ 	GPIO_FN(A19),
+ 
+ 	/* IPSR0 */
+-	GPIO_FN(USB_PENC2), GPIO_FN(PWM1), GPIO_FN(PWMFSW0),
++	GPIO_FN(PWM1), GPIO_FN(PWMFSW0),
+ 	GPIO_FN(SCIF_CLK), GPIO_FN(TCLK0_C), GPIO_FN(BS),
+ 	GPIO_FN(FD2), GPIO_FN(ATADIR0), GPIO_FN(SDSELF),
+ 	GPIO_FN(HCTS1), GPIO_FN(A0),
+@@ -2802,7 +2802,7 @@ static const struct pinmux_func pinmux_func_gpios[] = {
+ 	GPIO_FN(VI1_FIELD),
+ 	GPIO_FN(VI3_FIELD), GPIO_FN(AUDIO_CLKOUT),
+ 	GPIO_FN(GPS_CLK_C), GPIO_FN(GPS_CLK_D), GPIO_FN(AUDIO_CLKA),
+-	GPIO_FN(CAN_TXCLK), GPIO_FN(AUDIO_CLKB), GPIO_FN(USB_OVC2),
++	GPIO_FN(CAN_TXCLK), GPIO_FN(AUDIO_CLKB),
+ 	GPIO_FN(CAN_DEBUGOUT0), GPIO_FN(MOUT0),
+ 
+ 	/* IPSR6 */
+@@ -2843,10 +2843,10 @@ static const struct pinmux_func pinmux_func_gpios[] = {
+ 	GPIO_FN(DACK2),
+ 
+ 	/* IPSR8 */
+-	GPIO_FN(USB_OVC0), GPIO_FN(AD_CLK),
++	GPIO_FN(AD_CLK),
+ 	GPIO_FN(CC5_STATE4), GPIO_FN(CC5_STATE12), GPIO_FN(CC5_STATE20),
+ 	GPIO_FN(CC5_STATE28), GPIO_FN(CC5_STATE36),
+-	GPIO_FN(USB_OVC1), GPIO_FN(AD_DI),
++	GPIO_FN(AD_DI),
+ 	GPIO_FN(CC5_STATE5), GPIO_FN(CC5_STATE13), GPIO_FN(CC5_STATE21),
+ 	GPIO_FN(CC5_STATE29), GPIO_FN(CC5_STATE37),
+ 	GPIO_FN(CAN_DEBUG_HW_TRIGGER), GPIO_FN(AD_DO),
 -- 
 1.7.10.4
