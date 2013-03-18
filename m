@@ -1,100 +1,204 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Mon, 18 Mar 2013 16:14:31 +0800
-Subject: [PATCH V2] ARM: tegra: cpuidle: remove redundant parameters for
- powered-down mode
-Message-ID: <1363594471-11918-1-git-send-email-josephl@nvidia.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 18 Mar 2013 13:48:13 +0530
+Subject: [PATCH v6 1/2] ARM: davinci: dm365: add support for v4l2 video
+ display
+In-Reply-To: <1363360303-15521-2-git-send-email-prabhakar.csengg@gmail.com>
+References: <1363360303-15521-1-git-send-email-prabhakar.csengg@gmail.com>
+ <1363360303-15521-2-git-send-email-prabhakar.csengg@gmail.com>
+Message-ID: <5146CDC5.9000702@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After the patch series for system suspending support, tegra_idle_lp2_last()
-no longer uses its parameters cpu_on_time or cpu_off_time, so remove them.
+On 3/15/2013 8:41 PM, Prabhakar lad wrote:
+> From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+> 
+> Create platform devices for various video modules like venc,osd,
+> vpbe and v4l2 driver for dm365.
+> 
+> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+> ---
+>  arch/arm/mach-davinci/board-dm365-evm.c |    4 +-
+>  arch/arm/mach-davinci/davinci.h         |    2 +-
+>  arch/arm/mach-davinci/dm365.c           |  203 +++++++++++++++++++++++++++++--
+>  3 files changed, 195 insertions(+), 14 deletions(-)
 
-Signed-off-by: Joseph Lo <josephl@nvidia.com>
----
-V2:
-* rebased on the top of "ARM: tegra: add clock source for PMC" and "ARM:
-  tegra: add platform suspend support"
-* no physical change from V1
----
- arch/arm/mach-tegra/cpuidle-tegra20.c | 6 +-----
- arch/arm/mach-tegra/cpuidle-tegra30.c | 6 +-----
- arch/arm/mach-tegra/pm.c              | 2 +-
- arch/arm/mach-tegra/pm.h              | 2 +-
- 4 files changed, 4 insertions(+), 12 deletions(-)
+> diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
+> index 6c39805..ec8b06e 100644
+> --- a/arch/arm/mach-davinci/dm365.c
+> +++ b/arch/arm/mach-davinci/dm365.c
+> @@ -40,10 +40,16 @@
+>  
+>  #define DM365_REF_FREQ		24000000	/* 24 MHz on the DM365 EVM */
+>  
+> +#define DM3XX_VDAC_CONFIG		0x01c4002c
 
-diff --git a/arch/arm/mach-tegra/cpuidle-tegra20.c b/arch/arm/mach-tegra/cpuidle-tegra20.c
-index 825ced4..8bbbdeb 100644
---- a/arch/arm/mach-tegra/cpuidle-tegra20.c
-+++ b/arch/arm/mach-tegra/cpuidle-tegra20.c
-@@ -130,10 +130,6 @@ static bool tegra20_cpu_cluster_power_down(struct cpuidle_device *dev,
- 					   struct cpuidle_driver *drv,
- 					   int index)
- {
--	struct cpuidle_state *state = &drv->states[index];
--	u32 cpu_on_time = state->exit_latency;
--	u32 cpu_off_time = state->target_residency - state->exit_latency;
--
- 	while (tegra20_cpu_is_resettable_soon())
- 		cpu_relax();
- 
-@@ -142,7 +138,7 @@ static bool tegra20_cpu_cluster_power_down(struct cpuidle_device *dev,
- 
- 	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &dev->cpu);
- 
--	tegra_idle_lp2_last(cpu_on_time, cpu_off_time);
-+	tegra_idle_lp2_last();
- 
- 	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &dev->cpu);
- 
-diff --git a/arch/arm/mach-tegra/cpuidle-tegra30.c b/arch/arm/mach-tegra/cpuidle-tegra30.c
-index 80445ed..c0931c8 100644
---- a/arch/arm/mach-tegra/cpuidle-tegra30.c
-+++ b/arch/arm/mach-tegra/cpuidle-tegra30.c
-@@ -72,10 +72,6 @@ static bool tegra30_cpu_cluster_power_down(struct cpuidle_device *dev,
- 					   struct cpuidle_driver *drv,
- 					   int index)
- {
--	struct cpuidle_state *state = &drv->states[index];
--	u32 cpu_on_time = state->exit_latency;
--	u32 cpu_off_time = state->target_residency - state->exit_latency;
--
- 	/* All CPUs entering LP2 is not working.
- 	 * Don't let CPU0 enter LP2 when any secondary CPU is online.
- 	 */
-@@ -86,7 +82,7 @@ static bool tegra30_cpu_cluster_power_down(struct cpuidle_device *dev,
- 
- 	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &dev->cpu);
- 
--	tegra_idle_lp2_last(cpu_on_time, cpu_off_time);
-+	tegra_idle_lp2_last();
- 
- 	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &dev->cpu);
- 
-diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c
-index 3a3318a..84d8742 100644
---- a/arch/arm/mach-tegra/pm.c
-+++ b/arch/arm/mach-tegra/pm.c
-@@ -140,7 +140,7 @@ static int tegra_sleep_cpu(unsigned long v2p)
- 	return 0;
- }
- 
--void tegra_idle_lp2_last(u32 cpu_on_time, u32 cpu_off_time)
-+void tegra_idle_lp2_last(void)
- {
- 	tegra_pmc_pm_set(TEGRA_SUSPEND_LP2);
- 
-diff --git a/arch/arm/mach-tegra/pm.h b/arch/arm/mach-tegra/pm.h
-index 73a45f1..9d2d038 100644
---- a/arch/arm/mach-tegra/pm.h
-+++ b/arch/arm/mach-tegra/pm.h
-@@ -31,7 +31,7 @@ void restore_cpu_arch_register(void);
- void tegra_clear_cpu_in_lp2(int phy_cpu_id);
- bool tegra_set_cpu_in_lp2(int phy_cpu_id);
- 
--void tegra_idle_lp2_last(u32 cpu_on_time, u32 cpu_off_time);
-+void tegra_idle_lp2_last(void);
- extern void (*tegra_tear_down_cpu)(void);
- 
- #ifdef CONFIG_PM_SLEEP
--- 
-1.8.1.5
+DM365_VDAC_CONFIG since this is a DM365 specific file and to be
+consistent with rest of the names?
+
+> +
+> +#define DM365_RTC_BASE			0x01c69000
+> +
+>  /* Base of key scan register bank */
+>  #define DM365_KEYSCAN_BASE		0x01c69400
+>  
+> -#define DM365_RTC_BASE			0x01c69000
+> +#define DM365_OSD_BASE			0x01c71c00
+> +
+> +#define DM365_VENC_REG_BASE		0x01c71e00
+>  
+>  #define DAVINCI_DM365_VC_BASE		0x01d0c000
+>  #define DAVINCI_DMA_VC_TX		2
+> @@ -56,6 +62,11 @@
+>  #define DM365_EMAC_CNTRL_RAM_OFFSET	0x1000
+>  #define DM365_EMAC_CNTRL_RAM_SIZE	0x2000
+>  
+> +#define DM365_VPSS_CLK_CTRL_ADDR		0x44
+> +#define DM365_VPSS_VENCCLKEN_ENABLE		BIT(3)
+> +#define DM365_VPSS_DACCLKEN_ENABLE		BIT(4)
+> +#define DM365_VPSS_PLLC2SYSCLK5_ENABLE		BIT(5)
+> +
+>  static struct pll_data pll1_data = {
+>  	.num		= 1,
+>  	.phys_base	= DAVINCI_PLL1_BASE,
+> @@ -1226,6 +1237,186 @@ static struct platform_device dm365_isif_dev = {
+>  	},
+>  };
+>  
+> +static struct resource dm365_osd_resources[] = {
+> +	{
+> +		.start = DM365_OSD_BASE,
+> +		.end   = DM365_OSD_BASE + 0x100,
+> +		.flags = IORESOURCE_MEM,
+> +	},
+> +};
+> +
+> +static u64 dm365_video_dma_mask = DMA_BIT_MASK(32);
+> +
+> +static struct platform_device dm365_osd_dev = {
+> +	.name		= DM365_VPBE_OSD_SUBDEV_NAME,
+> +	.id		= -1,
+> +	.num_resources	= ARRAY_SIZE(dm365_osd_resources),
+> +	.resource	= dm365_osd_resources,
+> +	.dev		= {
+> +		.dma_mask		= &dm365_video_dma_mask,
+> +		.coherent_dma_mask	= DMA_BIT_MASK(32),
+> +	},
+> +};
+> +
+> +static struct resource dm365_venc_resources[] = {
+> +	{
+> +		.start = IRQ_VENCINT,
+> +		.end   = IRQ_VENCINT,
+> +		.flags = IORESOURCE_IRQ,
+> +	},
+> +	/* venc registers io space */
+> +	{
+> +		.start = DM365_VENC_REG_BASE,
+> +		.end   = DM365_VENC_REG_BASE + 0x180,
+> +		.flags = IORESOURCE_MEM,
+> +	},
+> +	/* vdaccfg registers io space */
+> +	{
+> +		.start = DM3XX_VDAC_CONFIG,
+> +		.end   = DM3XX_VDAC_CONFIG + 4,
+
+DM3XX_VDAC_CONFIG + 3. Check for similar errors in rest of the patch.
+
+> +		.flags = IORESOURCE_MEM,
+> +	},
+> +};
+> +
+> +static struct resource dm365_v4l2_disp_resources[] = {
+> +	{
+> +		.start = IRQ_VENCINT,
+> +		.end   = IRQ_VENCINT,
+> +		.flags = IORESOURCE_IRQ,
+> +	},
+> +	/* venc registers io space */
+> +	{
+> +		.start = DM365_VENC_REG_BASE,
+> +		.end   = DM365_VENC_REG_BASE + 0x180,
+> +		.flags = IORESOURCE_MEM,
+> +	},
+> +};
+> +
+
+[...]
+
+> +static int dm365_venc_setup_clock(enum vpbe_enc_timings_type type,
+> +				  unsigned int pclock)
+> +{
+> +	void __iomem *vpss_clkctl_reg;
+> +	u32 val;
+> +
+> +	vpss_clkctl_reg = DAVINCI_SYSMOD_VIRT(DM365_VPSS_CLK_CTRL_ADDR);
+> +
+> +	switch (type) {
+> +	case VPBE_ENC_STD:
+> +		vpss_enable_clock(VPSS_VENC_CLOCK_SEL, 1);
+
+So as you found out, it is not correct to call driver functions from
+platform code. I suggesting moving this function to driver altogether.
+You just need access to DM365_VPSS_CLK_CTRL_ADDR which you can pass
+using resource structures.
+
+> +		vpss_enable_clock(VPSS_VPBE_CLOCK, 1);
+> +		val = DM365_VPSS_VENCCLKEN_ENABLE | DM365_VPSS_DACCLKEN_ENABLE;
+> +		break;
+> +
+> +	case VPBE_ENC_DV_TIMINGS:
+> +		if (pclock <= 27000000) {
+> +			vpss_enable_clock(VPSS_VENC_CLOCK_SEL, 1);
+> +			vpss_enable_clock(VPSS_VPBE_CLOCK, 1);
+> +			val = DM365_VPSS_VENCCLKEN_ENABLE |
+> +			      DM365_VPSS_DACCLKEN_ENABLE;
+> +		} else {
+> +			/* set sysclk4 to output 74.25 MHz from pll1 */
+> +			val = DM365_VPSS_PLLC2SYSCLK5_ENABLE |
+> +			      DM365_VPSS_DACCLKEN_ENABLE |
+> +			      DM365_VPSS_VENCCLKEN_ENABLE;
+> +		}
+> +		break;
+> +
+> +	default:
+> +		return -EINVAL;
+> +	}
+> +	writel(val, vpss_clkctl_reg);
+> +
+> +	return 0;
+> +}
+
+[...]
+
+> +int __init dm365_init_video(struct vpfe_config *vpfe_cfg,
+> +				struct vpbe_config *vpbe_cfg)
+> +{
+> +	if (vpfe_cfg || vpbe_cfg)
+> +		platform_device_register(&dm365_vpss_device);
+> +
+> +	if (vpfe_cfg) {
+> +		vpfe_capture_dev.dev.platform_data = vpfe_cfg;
+> +		/* Add isif clock alias */
+
+This comment is useless. Instead please document why the aliases are
+needed. I know you are just moving code here, but lets do a clean-up job
+while at it.
+
+> +		clk_add_alias("master", dm365_isif_dev.name,
+> +			      "vpss_master", NULL);
+> +		platform_device_register(&dm365_isif_dev);
+> +		platform_device_register(&vpfe_capture_dev);
+> +	}
+> +	if (vpbe_cfg) {
+> +		dm365_vpbe_dev.dev.platform_data = vpbe_cfg;
+> +		platform_device_register(&dm365_osd_dev);
+> +		platform_device_register(&dm365_venc_dev);
+> +		platform_device_register(&dm365_vpbe_dev);
+> +		platform_device_register(&dm365_vpbe_display);
+> +	}
+> +
+> +	return 0;
+> +}
+
+Thanks,
+Sekhar
