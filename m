@@ -1,186 +1,22 @@
-From: nschichan@freebox.fr (Nicolas Schichan)
-Date: Mon, 18 Mar 2013 15:50:30 +0100
-Subject: [PATCH V2 1/3] seccomp: add generic code for jitted seccomp filters.
-In-Reply-To: <1363618233-6375-1-git-send-email-nschichan@freebox.fr>
-References: <1363618233-6375-1-git-send-email-nschichan@freebox.fr>
-Message-ID: <1363618233-6375-2-git-send-email-nschichan@freebox.fr>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 18 Mar 2013 14:50:58 +0000
+Subject: [GIT PULL 1/3] ARM: mvebu: cleanup for v3.10
+In-Reply-To: <1363551341.b0ae2871.32562@triton>
+References: <1363551341.b0ae2871.32562@triton>
+Message-ID: <201303181450.58767.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Architecture must select HAVE_SECCOMP_FILTER_JIT and implement
-seccomp_jit_compile() and seccomp_jit_free() if they intend to support
-jitted seccomp filters.
+On Sunday 17 March 2013, Jason Cooper wrote:
+> The following changes since commit f6161aa153581da4a3867a2d1a7caf4be19b6ec9:
+> 
+>   Linux 3.9-rc2
+> 
+> are available in the git repository at:
+> 
+>   git://git.infradead.org/users/jcooper/linux.git tags/cleanup_for_v3.10
+> 
 
-struct seccomp_filter has been moved to <linux/seccomp.h> to make its
-content available to the jit compilation code.
+Pulled into cleanup branch, thanks!
 
-In a way similar to the net BPF, the jit compilation code is expected
-to updates struct seccomp_filter.bpf_func pointer to the generated
-code.
-
-Signed-off-by: Nicolas Schichan <nschichan@freebox.fr>
----
- arch/Kconfig            |   14 ++++++++++++++
- include/linux/seccomp.h |   41 +++++++++++++++++++++++++++++++++++++++++
- kernel/seccomp.c        |   34 +++++-----------------------------
- 3 files changed, 60 insertions(+), 29 deletions(-)
-
-diff --git a/arch/Kconfig b/arch/Kconfig
-index 5a1779c..1284367 100644
---- a/arch/Kconfig
-+++ b/arch/Kconfig
-@@ -339,6 +339,10 @@ config HAVE_ARCH_SECCOMP_FILTER
- 	  - secure_computing return value is checked and a return value of -1
- 	    results in the system call being skipped immediately.
- 
-+# Used by archs to tell that they support SECCOMP_FILTER_JIT
-+config HAVE_SECCOMP_FILTER_JIT
-+	bool
-+
- config SECCOMP_FILTER
- 	def_bool y
- 	depends on HAVE_ARCH_SECCOMP_FILTER && SECCOMP && NET
-@@ -349,6 +353,16 @@ config SECCOMP_FILTER
- 
- 	  See Documentation/prctl/seccomp_filter.txt for details.
- 
-+config SECCOMP_FILTER_JIT
-+	bool "enable Seccomp filter Just In Time compiler"
-+	depends on HAVE_SECCOMP_FILTER_JIT && BPF_JIT && SECCOMP_FILTER
-+	help
-+	  Seccomp syscall filtering capabilities are normally handled
-+	  by an interpreter. This option allows kernel to generate a native
-+	  code when filter is loaded in memory. This should speedup
-+	  syscall filtering. Note : Admin should enable this feature
-+	  changing /proc/sys/net/core/bpf_jit_enable
-+
- config HAVE_CONTEXT_TRACKING
- 	bool
- 	help
-diff --git a/include/linux/seccomp.h b/include/linux/seccomp.h
-index 6f19cfd..a216ab7 100644
---- a/include/linux/seccomp.h
-+++ b/include/linux/seccomp.h
-@@ -6,6 +6,7 @@
- #ifdef CONFIG_SECCOMP
- 
- #include <linux/thread_info.h>
-+#include <linux/filter.h>
- #include <asm/seccomp.h>
- 
- struct seccomp_filter;
-@@ -47,6 +48,46 @@ static inline int seccomp_mode(struct seccomp *s)
- 	return s->mode;
- }
- 
-+/**
-+ * struct seccomp_filter - container for seccomp BPF programs
-+ *
-+ * @usage: reference count to manage the object lifetime.
-+ *         get/put helpers should be used when accessing an instance
-+ *         outside of a lifetime-guarded section.  In general, this
-+ *         is only needed for handling filters shared across tasks.
-+ * @prev: points to a previously installed, or inherited, filter
-+ * @len: the number of instructions in the program
-+ * @bpc_func: points to either sk_run_filter or the code generated
-+ *         by the BPF JIT.
-+ * @insns: the BPF program instructions to evaluate
-+ *
-+ * seccomp_filter objects are organized in a tree linked via the @prev
-+ * pointer.  For any task, it appears to be a singly-linked list starting
-+ * with current->seccomp.filter, the most recently attached or inherited filter.
-+ * However, multiple filters may share a @prev node, by way of fork(), which
-+ * results in a unidirectional tree existing in memory.  This is similar to
-+ * how namespaces work.
-+ *
-+ * seccomp_filter objects should never be modified after being attached
-+ * to a task_struct (other than @usage).
-+ */
-+struct seccomp_filter {
-+	atomic_t usage;
-+	struct seccomp_filter *prev;
-+	unsigned short len;  /* Instruction count */
-+	unsigned int (*bpf_func)(const struct sk_buff *skb,
-+				 const struct sock_filter *filter);
-+	struct sock_filter insns[];
-+};
-+
-+#ifdef CONFIG_SECCOMP_FILTER_JIT
-+extern void seccomp_jit_compile(struct seccomp_filter *fp);
-+extern void seccomp_jit_free(struct seccomp_filter *fp);
-+#else
-+static inline void seccomp_jit_compile(struct seccomp_filter *fp) { }
-+static inline void seccomp_jit_free(struct seccomp_filter *fp) { }
-+#endif
-+
- #else /* CONFIG_SECCOMP */
- 
- #include <linux/errno.h>
-diff --git a/kernel/seccomp.c b/kernel/seccomp.c
-index b7a1004..a1aadaa 100644
---- a/kernel/seccomp.c
-+++ b/kernel/seccomp.c
-@@ -30,34 +30,6 @@
- #include <linux/tracehook.h>
- #include <linux/uaccess.h>
- 
--/**
-- * struct seccomp_filter - container for seccomp BPF programs
-- *
-- * @usage: reference count to manage the object lifetime.
-- *         get/put helpers should be used when accessing an instance
-- *         outside of a lifetime-guarded section.  In general, this
-- *         is only needed for handling filters shared across tasks.
-- * @prev: points to a previously installed, or inherited, filter
-- * @len: the number of instructions in the program
-- * @insns: the BPF program instructions to evaluate
-- *
-- * seccomp_filter objects are organized in a tree linked via the @prev
-- * pointer.  For any task, it appears to be a singly-linked list starting
-- * with current->seccomp.filter, the most recently attached or inherited filter.
-- * However, multiple filters may share a @prev node, by way of fork(), which
-- * results in a unidirectional tree existing in memory.  This is similar to
-- * how namespaces work.
-- *
-- * seccomp_filter objects should never be modified after being attached
-- * to a task_struct (other than @usage).
-- */
--struct seccomp_filter {
--	atomic_t usage;
--	struct seccomp_filter *prev;
--	unsigned short len;  /* Instruction count */
--	struct sock_filter insns[];
--};
--
- /* Limit any path through the tree to 256KB worth of instructions. */
- #define MAX_INSNS_PER_PATH ((1 << 18) / sizeof(struct sock_filter))
- 
-@@ -213,7 +185,7 @@ static u32 seccomp_run_filters(int syscall)
- 	 * value always takes priority (ignoring the DATA).
- 	 */
- 	for (f = current->seccomp.filter; f; f = f->prev) {
--		u32 cur_ret = sk_run_filter(NULL, f->insns);
-+		u32 cur_ret = f->bpf_func(NULL, f->insns);
- 		if ((cur_ret & SECCOMP_RET_ACTION) < (ret & SECCOMP_RET_ACTION))
- 			ret = cur_ret;
- 	}
-@@ -275,6 +247,9 @@ static long seccomp_attach_filter(struct sock_fprog *fprog)
- 	if (ret)
- 		goto fail;
- 
-+	filter->bpf_func = sk_run_filter;
-+	seccomp_jit_compile(filter);
-+
- 	/*
- 	 * If there is an existing filter, make it the prev and don't drop its
- 	 * task reference.
-@@ -332,6 +307,7 @@ void put_seccomp_filter(struct task_struct *tsk)
- 	while (orig && atomic_dec_and_test(&orig->usage)) {
- 		struct seccomp_filter *freeme = orig;
- 		orig = orig->prev;
-+		seccomp_jit_free(freeme);
- 		kfree(freeme);
- 	}
- }
--- 
-1.7.10.4
+	Arnd
