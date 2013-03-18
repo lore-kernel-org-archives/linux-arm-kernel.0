@@ -1,79 +1,40 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Mon, 18 Mar 2013 15:39:22 +0100
-Subject: [PATCH v3 0/9] refactoring for mask_cache
-In-Reply-To: <20130318142817.GU21620@kw.sim.vm.gnt>
-References: <1363277430-21325-1-git-send-email-holger.brunck@keymile.com>
- <1363615255-18200-1-git-send-email-gerlando.falauto@keymile.com>
- <20130318142817.GU21620@kw.sim.vm.gnt>
-Message-ID: <20130318143922.GA30735@kw.sim.vm.gnt>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 18 Mar 2013 14:59:10 +0000
+Subject: [PATCH v2 for 3.10] Introduce a Marvell EBU MBus driver
+In-Reply-To: <51422AD5.9020203@free-electrons.com>
+References: <1362589205-4726-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <51422AD5.9020203@free-electrons.com>
+Message-ID: <201303181459.10954.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 18, 2013 at 03:28:17PM +0100, Simon Guinot wrote:
-> On Mon, Mar 18, 2013 at 03:00:46PM +0100, Gerlando Falauto wrote:
-> > Hi everyone,
-> > here is a patchset to address the issue found with Orion, in incremental
-> > stages as Thomas suggested.
-> > a) we introduce the new fields and pointer (though only the shared one is used)
-> > b) we convert all drivers to use it 
-> > c) we rename the field so to force the use of the per-ct pointer
-> > d) we add per-ct mask cache, provided the new flag 
-> >    IRQ_GC_SEPARATE_MASK_REGISTERS is enabled
-> > e) we enable the flag for orion-gpio and mvebu drivers
-> > 
-> > So even though I'm also providing changes for mvebu, I only
-> > tested the patch on a 3.0.40 kernel with the plat-orion/gpio.c driver.
-> > We currently do not have a working 3.6+ configuration for our Kirkwood
-> > boards (3.6 is apparently where this mvebu gpio driver was introduced),
-> > so I would be glad if someone could give it a try.
-> > I also have no idea whether the three Marvell variants all have separate
-> > mask registers (which is what the last patch assumes).
+On Thursday 14 March 2013, Gregory CLEMENT wrote:
+> Will you agree to take this patch set as is ?(modulo some fixes needed
+> for the not yet tested platforms).
 > 
-> Accordingly to MV78230/78x60 (Armada-XP) functional specification, we
-> have separate mask registers for the GPIO level and edge interrupts.
+> This patch set is a great step in the right way to move code outside
+> arch/arm. I know that Arnd would like a greater step and a more
+> radical approach to have a more accurate device tree bindings.
+> However the purpose of this patch set was initially to ease the merge
+> of the PCIe support not to delay it! And I fear that the large number
+> of files to change and the resulting conflicts will prevent this patch
+> set to be merged in a single release.
 > 
-> I believe that the GPIO mask register is only shared on Orion and
-> Kirkwood based SoCs.
+> I agree that the bindings could be improve but can we consider this
+> patch set as a first step ?
 
-Of course, I was meaning that all the three Marvell variants (Orion,
-Kirkwood and Armada) are using separate mask registers for the GPIO
-interrupts :)
+I would prefer not to merge the DT binding, but I'm fine with the
+current implementation, as in the pull request that Jason sent
+me. How about this:
 
-Simon
+* You remove the Documentation/devicetree/bindings/arm/mvebu-mbus.txt file
+  that is the main source of disagreement, along with the mvebu_mbus_dt_init
+  function.
+* All conversion patches get changed to not add properties to the soc
+  node but instead call mvebu_mbus_init directly. That code is there
+  already.
 
-> 
-> Regards,
-> 
-> Simon
-> 
-> > 
-> > Gerlando Falauto (9):
-> >   genirq: cosmetic: remove cur_regs
-> >   genirq: add mask_cache and pmask_cache into struct irq_chip_type
-> >   gpio: mvebu: convert to usage of *pmask_cache within irq_chip_type
-> >   MIPS: JZ4740: convert to usage of *pmask_cache within irq_chip_type
-> >   ARM: SAMSUNG: convert to usage of *pmask_cache within irq_chip_type
-> >   genirq: rename mask_cache to shared_mask_cache
-> >   genirq: handle separate mask registers
-> >   orion-gpio: enable IRQ_GC_SEPARATE_MASK_REGISTERS
-> >   gpio: mvebu: enable IRQ_GC_SEPARATE_MASK_REGISTERS
-> > 
-> >  arch/arm/plat-orion/gpio.c            |    3 +-
-> >  arch/arm/plat-samsung/irq-vic-timer.c |    6 ++--
-> >  arch/mips/jz4740/irq.c                |    3 +-
-> >  drivers/gpio/gpio-mvebu.c             |   23 ++++++++------
-> >  include/linux/irq.h                   |    9 ++++--
-> >  kernel/irq/generic-chip.c             |   55 +++++++++++++++++++++------------
-> >  6 files changed, 64 insertions(+), 35 deletions(-)
-> > 
-> > -- 
-> > 1.7.10.1
+I can take those patches, and we can work on a better DT binding for
+a later release without having to hold up other conversions.
 
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130318/cc8bb7cc/attachment-0001.sig>
+	Arnd
