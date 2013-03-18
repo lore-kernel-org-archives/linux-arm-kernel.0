@@ -1,62 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 18 Mar 2013 21:00:11 +0000
-Subject: [PATCH 1/5] clk: allow reentrant calls into the clk framework
-In-Reply-To: <20130318201551.8663.22731@quantum>
-References: <1362026969-11457-1-git-send-email-mturquette@linaro.org>
- <1362026969-11457-2-git-send-email-mturquette@linaro.org>
- <CAPDyKFqhGjduuSRvgZXJBUnbqS9L9aFw_nYc2VfkY1Ljgxrp+g@mail.gmail.com>
- <20130318201551.8663.22731@quantum>
-Message-ID: <20130318210011.GL4977@n2100.arm.linux.org.uk>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Mon, 18 Mar 2013 15:05:58 -0600
+Subject: [PATCH 1/1] ARM: kirkwood: Fix chip-delay for GoFlex Net
+In-Reply-To: <20130318192653.GZ21478@lunn.ch>
+References: <51476198.2080100@gmail.com>
+ <20130318192653.GZ21478@lunn.ch>
+Message-ID: <20130318210558.GB31817@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 18, 2013 at 01:15:51PM -0700, Mike Turquette wrote:
-> Quoting Ulf Hansson (2013-02-28 01:54:34)
-> > On 28 February 2013 05:49, Mike Turquette <mturquette@linaro.org> wrote:
-> > > @@ -703,10 +744,29 @@ int clk_enable(struct clk *clk)
-> > >         unsigned long flags;
-> > >         int ret;
-> > >
-> > > +       /* this call re-enters if it is from the same context */
-> > > +       if (spin_is_locked(&enable_lock) || mutex_is_locked(&prepare_lock)) {
-> > > +               if ((void *) atomic_read(&context) == get_current()) {
-> > > +                       ret = __clk_enable(clk);
-> > > +                       goto out;
-> > > +               }
-> > > +       }
+On Mon, Mar 18, 2013 at 08:26:53PM +0100, Andrew Lunn wrote:
+> On Mon, Mar 18, 2013 at 07:48:56PM +0100, Eric Hutter wrote:
+> > Hi,
 > > 
-> > I beleive the clk_enable|disable code will be racy. What do you think
-> > about this scenario:
-> > 
-> > 1. Thread 1, calls clk_prepare -> clk is not reentrant -> mutex_lock
-> > -> set_context to thread1.
-> > 2. Thread 2, calls clk_enable -> above "if" will mean that get_current
-> > returns thread 1 context and then clk_enable continues ->
-> > spin_lock_irqsave -> set_context to thread 2.
-> > 3. Thread 1 continues and triggers a reentancy for clk_prepare -> clk
-> > is not reentrant (since thread 2 has set a new context) -> mutex_lock
-> > and we will hang forever.
-> > 
-> > Do you think above scenario could happen?
-> > 
-> > I think the solution would be to invent another "static atomic_t
-> > context;" which is used only for fast path functions
-> > (clk_enable|disable). That should do the trick I think.
+> > This fixes "Too few good blocks within range" issues on GoFlex Net
+> > by setting chip-delay to 40.
 > 
-> Ulf,
+> Hi Eric
 > 
-> You are correct.  In fact I have a branch that has two separate context
-> pointers, one for mutex-protected functions and one for
-> spinlock-protected functions.  Somehow I managed to discard that change
-> before settling on the final version that was published.
+> Its a problem seen by a couple of other boards as well, e.g. dns320
+> and dns325.
 
-Err.
+The MTD core default of 20us is too small for modern NAND flash.. This
+number is based on the chip's datahseet, it should be the longest
+non-programming command BUSY interval. Eric, if you haven't already,
+it is worth a quick check of the datasheet to verify. Eg the Micron
+flash on my Kirkwood system should be 70us.
 
-Do not forget one very important point.
+u-boot can sometimes get away with a smaller value because it only
+uses a limited set of commands.
 
-Any clock which has clk_enable() called on it must have had clk_prepare()
-already called _and_ completed.  A second clk_prepare() call on the same
-clock should be a no-op other than to increase the prepare reference count
-on it.
+It is on my TODO list to implement ONFI READY/BUSY# pin support in the
+orion-nand driver via a GPIO - could other systems make use of this as
+well?
 
-If you do anything else, you are going to get into sticky problems.
+Regards,
+Jason
