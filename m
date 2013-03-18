@@ -1,223 +1,299 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 18 Mar 2013 22:31:50 +0100
-Subject: [PATCH 1/6] pinctrl: samsung: Protect bank registers with a spinlock
+Date: Mon, 18 Mar 2013 22:31:52 +0100
+Subject: [PATCH 3/6] pinctrl: samsung: Split pin bank description into two
+ structures
 In-Reply-To: <1363642315-10331-1-git-send-email-tomasz.figa@gmail.com>
 References: <1363642315-10331-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <1363642315-10331-2-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <1363642315-10331-4-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Certain pin control registers can be accessed from different contexts,
-i.e. pinctrl, gpio and irq functions. This makes the locking provided by
-pin control core insufficient.
+This patch splits pin bank description into two structures, one
+describing bank type (currently only bitfield widths), which can be
+shared across multiple banks and second containing bank-specific
+parameters including a pointer to a bank type struct.
 
-This patch adds necessary locking using a per bank spinlock as it was
-done in the old Samsung GPIO driver.
+It is a prerequisite for further patch removing the statically hardcoded
+register offsets, making it impossible to support SoCs with different
+set and order of pin control registers.
 
 Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
 ---
- drivers/pinctrl/pinctrl-exynos.c  | 11 +++++++++++
- drivers/pinctrl/pinctrl-samsung.c | 24 ++++++++++++++++++++++++
- drivers/pinctrl/pinctrl-samsung.h |  2 ++
- 3 files changed, 37 insertions(+)
+ drivers/pinctrl/pinctrl-exynos.c  | 19 +++++++++++++++----
+ drivers/pinctrl/pinctrl-exynos.h  | 16 +++-------------
+ drivers/pinctrl/pinctrl-samsung.c | 24 +++++++++++++++---------
+ drivers/pinctrl/pinctrl-samsung.h | 26 ++++++++++++++++----------
+ 4 files changed, 49 insertions(+), 36 deletions(-)
 
 diff --git a/drivers/pinctrl/pinctrl-exynos.c b/drivers/pinctrl/pinctrl-exynos.c
-index 538b9dd..cf7700e 100644
+index cf7700e..b5dbb87 100644
 --- a/drivers/pinctrl/pinctrl-exynos.c
 +++ b/drivers/pinctrl/pinctrl-exynos.c
-@@ -26,6 +26,7 @@
- #include <linux/of_irq.h>
- #include <linux/io.h>
- #include <linux/slab.h>
-+#include <linux/spinlock.h>
- #include <linux/err.h>
+@@ -34,6 +34,15 @@
+ #include "pinctrl-samsung.h"
+ #include "pinctrl-exynos.h"
  
- #include <asm/mach/irq.h>
-@@ -81,6 +82,7 @@ static int exynos_gpio_irq_set_type(struct irq_data *irqd, unsigned int type)
- 	unsigned int shift = EXYNOS_EINT_CON_LEN * pin;
- 	unsigned int con, trig_type;
- 	unsigned long reg_con = ctrl->geint_con + bank->eint_offset;
-+	unsigned long flags;
- 	unsigned int mask;
- 
- 	switch (type) {
-@@ -118,11 +120,15 @@ static int exynos_gpio_irq_set_type(struct irq_data *irqd, unsigned int type)
- 	shift = pin * bank->func_width;
- 	mask = (1 << bank->func_width) - 1;
- 
-+	spin_lock_irqsave(&bank->slock, flags);
 +
- 	con = readl(d->virt_base + reg_con);
- 	con &= ~(mask << shift);
- 	con |= EXYNOS_EINT_FUNC << shift;
++static struct samsung_pin_bank_type bank_type_off = {
++	.fld_width = { 4, 1, 2, 2, 2, 2, },
++};
++
++static struct samsung_pin_bank_type bank_type_alive = {
++	.fld_width = { 4, 1, 2, 2, },
++};
++
+ /* list of external wakeup controllers supported */
+ static const struct of_device_id exynos_wkup_irq_ids[] = {
+ 	{ .compatible = "samsung,exynos4210-wakeup-eint", },
+@@ -76,6 +85,7 @@ static void exynos_gpio_irq_ack(struct irq_data *irqd)
+ static int exynos_gpio_irq_set_type(struct irq_data *irqd, unsigned int type)
+ {
+ 	struct samsung_pin_bank *bank = irq_data_get_irq_chip_data(irqd);
++	struct samsung_pin_bank_type *bank_type = bank->type;
+ 	struct samsung_pinctrl_drv_data *d = bank->drvdata;
+ 	struct samsung_pin_ctrl *ctrl = d->ctrl;
+ 	unsigned int pin = irqd->hwirq;
+@@ -117,8 +127,8 @@ static int exynos_gpio_irq_set_type(struct irq_data *irqd, unsigned int type)
  	writel(con, d->virt_base + reg_con);
  
-+	spin_unlock_irqrestore(&bank->slock, flags);
-+
- 	return 0;
- }
+ 	reg_con = bank->pctl_offset;
+-	shift = pin * bank->func_width;
+-	mask = (1 << bank->func_width) - 1;
++	shift = pin * bank_type->fld_width[PINCFG_TYPE_FUNC];
++	mask = (1 << bank_type->fld_width[PINCFG_TYPE_FUNC]) - 1;
  
-@@ -258,6 +264,7 @@ static int exynos_wkup_irq_set_type(struct irq_data *irqd, unsigned int type)
+ 	spin_lock_irqsave(&bank->slock, flags);
+ 
+@@ -259,6 +269,7 @@ static void exynos_wkup_irq_ack(struct irq_data *irqd)
+ static int exynos_wkup_irq_set_type(struct irq_data *irqd, unsigned int type)
+ {
+ 	struct samsung_pin_bank *bank = irq_data_get_irq_chip_data(irqd);
++	struct samsung_pin_bank_type *bank_type = bank->type;
+ 	struct samsung_pinctrl_drv_data *d = bank->drvdata;
+ 	unsigned int pin = irqd->hwirq;
  	unsigned long reg_con = d->ctrl->weint_con + bank->eint_offset;
- 	unsigned long shift = EXYNOS_EINT_CON_LEN * pin;
- 	unsigned long con, trig_type;
-+	unsigned long flags;
- 	unsigned int mask;
- 
- 	switch (type) {
-@@ -295,11 +302,15 @@ static int exynos_wkup_irq_set_type(struct irq_data *irqd, unsigned int type)
- 	shift = pin * bank->func_width;
- 	mask = (1 << bank->func_width) - 1;
- 
-+	spin_lock_irqsave(&bank->slock, flags);
-+
- 	con = readl(d->virt_base + reg_con);
- 	con &= ~(mask << shift);
- 	con |= EXYNOS_EINT_FUNC << shift;
+@@ -299,8 +310,8 @@ static int exynos_wkup_irq_set_type(struct irq_data *irqd, unsigned int type)
  	writel(con, d->virt_base + reg_con);
  
-+	spin_unlock_irqrestore(&bank->slock, flags);
-+
- 	return 0;
- }
+ 	reg_con = bank->pctl_offset;
+-	shift = pin * bank->func_width;
+-	mask = (1 << bank->func_width) - 1;
++	shift = pin * bank_type->fld_width[PINCFG_TYPE_FUNC];
++	mask = (1 << bank_type->fld_width[PINCFG_TYPE_FUNC]) - 1;
  
+ 	spin_lock_irqsave(&bank->slock, flags);
+ 
+diff --git a/drivers/pinctrl/pinctrl-exynos.h b/drivers/pinctrl/pinctrl-exynos.h
+index 0a70889..9b1f77a 100644
+--- a/drivers/pinctrl/pinctrl-exynos.h
++++ b/drivers/pinctrl/pinctrl-exynos.h
+@@ -48,26 +48,18 @@
+ 
+ #define EXYNOS_PIN_BANK_EINTN(pins, reg, id)		\
+ 	{						\
++		.type		= &bank_type_off,	\
+ 		.pctl_offset	= reg,			\
+ 		.nr_pins	= pins,			\
+-		.func_width	= 4,			\
+-		.pud_width	= 2,			\
+-		.drv_width	= 2,			\
+-		.conpdn_width	= 2,			\
+-		.pudpdn_width	= 2,			\
+ 		.eint_type	= EINT_TYPE_NONE,	\
+ 		.name		= id			\
+ 	}
+ 
+ #define EXYNOS_PIN_BANK_EINTG(pins, reg, id, offs)	\
+ 	{						\
++		.type		= &bank_type_off,	\
+ 		.pctl_offset	= reg,			\
+ 		.nr_pins	= pins,			\
+-		.func_width	= 4,			\
+-		.pud_width	= 2,			\
+-		.drv_width	= 2,			\
+-		.conpdn_width	= 2,			\
+-		.pudpdn_width	= 2,			\
+ 		.eint_type	= EINT_TYPE_GPIO,	\
+ 		.eint_offset	= offs,			\
+ 		.name		= id			\
+@@ -75,11 +67,9 @@
+ 
+ #define EXYNOS_PIN_BANK_EINTW(pins, reg, id, offs)	\
+ 	{						\
++		.type		= &bank_type_alive,	\
+ 		.pctl_offset	= reg,			\
+ 		.nr_pins	= pins,			\
+-		.func_width	= 4,			\
+-		.pud_width	= 2,			\
+-		.drv_width	= 2,			\
+ 		.eint_type	= EINT_TYPE_WKUP,	\
+ 		.eint_offset	= offs,			\
+ 		.name		= id			\
 diff --git a/drivers/pinctrl/pinctrl-samsung.c b/drivers/pinctrl/pinctrl-samsung.c
-index 3475b92..b1d4ac8 100644
+index f1fb562..ac428ff 100644
 --- a/drivers/pinctrl/pinctrl-samsung.c
 +++ b/drivers/pinctrl/pinctrl-samsung.c
-@@ -27,6 +27,7 @@
- #include <linux/err.h>
- #include <linux/gpio.h>
- #include <linux/irqdomain.h>
-+#include <linux/spinlock.h>
+@@ -300,10 +300,13 @@ static void samsung_pinmux_setup(struct pinctrl_dev *pctldev, unsigned selector,
+ 	 * pin function number in the config register.
+ 	 */
+ 	for (cnt = 0; cnt < drvdata->pin_groups[group].num_pins; cnt++) {
++		struct samsung_pin_bank_type *type;
++
+ 		pin_to_reg_bank(drvdata, pins[cnt] - drvdata->ctrl->base,
+ 				&reg, &pin_offset, &bank);
+-		mask = (1 << bank->func_width) - 1;
+-		shift = pin_offset * bank->func_width;
++		type = bank->type;
++		mask = (1 << type->fld_width[PINCFG_TYPE_FUNC]) - 1;
++		shift = pin_offset * type->fld_width[PINCFG_TYPE_FUNC];
  
- #include "core.h"
- #include "pinctrl-samsung.h"
-@@ -289,6 +290,7 @@ static void samsung_pinmux_setup(struct pinctrl_dev *pctldev, unsigned selector,
+ 		spin_lock_irqsave(&bank->slock, flags);
+ 
+@@ -340,6 +343,7 @@ static void samsung_pinmux_disable(struct pinctrl_dev *pctldev,
+ static int samsung_pinmux_gpio_set_direction(struct pinctrl_dev *pctldev,
+ 		struct pinctrl_gpio_range *range, unsigned offset, bool input)
+ {
++	struct samsung_pin_bank_type *type;
  	struct samsung_pin_bank *bank;
- 	void __iomem *reg;
- 	u32 mask, shift, data, pin_offset, cnt;
-+	unsigned long flags;
- 
- 	drvdata = pinctrl_dev_get_drvdata(pctldev);
- 	pins = drvdata->pin_groups[group].pins;
-@@ -303,11 +305,15 @@ static void samsung_pinmux_setup(struct pinctrl_dev *pctldev, unsigned selector,
- 		mask = (1 << bank->func_width) - 1;
- 		shift = pin_offset * bank->func_width;
- 
-+		spin_lock_irqsave(&bank->slock, flags);
-+
- 		data = readl(reg);
- 		data &= ~(mask << shift);
- 		if (enable)
- 			data |= drvdata->pin_groups[group].func << shift;
- 		writel(data, reg);
-+
-+		spin_unlock_irqrestore(&bank->slock, flags);
- 	}
- }
- 
-@@ -338,6 +344,7 @@ static int samsung_pinmux_gpio_set_direction(struct pinctrl_dev *pctldev,
  	struct samsung_pinctrl_drv_data *drvdata;
  	void __iomem *reg;
- 	u32 data, pin_offset, mask, shift;
-+	unsigned long flags;
+@@ -347,13 +351,14 @@ static int samsung_pinmux_gpio_set_direction(struct pinctrl_dev *pctldev,
+ 	unsigned long flags;
  
  	bank = gc_to_pin_bank(range->gc);
++	type = bank->type;
  	drvdata = pinctrl_dev_get_drvdata(pctldev);
-@@ -348,11 +355,16 @@ static int samsung_pinmux_gpio_set_direction(struct pinctrl_dev *pctldev,
- 	mask = (1 << bank->func_width) - 1;
- 	shift = pin_offset * bank->func_width;
  
-+	spin_lock_irqsave(&bank->slock, flags);
-+
- 	data = readl(reg);
- 	data &= ~(mask << shift);
- 	if (!input)
- 		data |= FUNC_OUTPUT << shift;
- 	writel(data, reg);
-+
-+	spin_unlock_irqrestore(&bank->slock, flags);
-+
- 	return 0;
- }
+ 	pin_offset = offset - bank->pin_base;
+ 	reg = drvdata->virt_base + bank->pctl_offset;
  
-@@ -376,6 +388,7 @@ static int samsung_pinconf_rw(struct pinctrl_dev *pctldev, unsigned int pin,
+-	mask = (1 << bank->func_width) - 1;
+-	shift = pin_offset * bank->func_width;
++	mask = (1 << type->fld_width[PINCFG_TYPE_FUNC]) - 1;
++	shift = pin_offset * type->fld_width[PINCFG_TYPE_FUNC];
+ 
+ 	spin_lock_irqsave(&bank->slock, flags);
+ 
+@@ -383,6 +388,7 @@ static int samsung_pinconf_rw(struct pinctrl_dev *pctldev, unsigned int pin,
+ 				unsigned long *config, bool set)
+ {
+ 	struct samsung_pinctrl_drv_data *drvdata;
++	struct samsung_pin_bank_type *type;
+ 	struct samsung_pin_bank *bank;
+ 	void __iomem *reg_base;
  	enum pincfg_type cfg_type = PINCFG_UNPACK_TYPE(*config);
- 	u32 data, width, pin_offset, mask, shift;
- 	u32 cfg_value, cfg_reg;
-+	unsigned long flags;
- 
+@@ -393,22 +399,19 @@ static int samsung_pinconf_rw(struct pinctrl_dev *pctldev, unsigned int pin,
  	drvdata = pinctrl_dev_get_drvdata(pctldev);
  	pin_to_reg_bank(drvdata, pin - drvdata->ctrl->base, &reg_base,
-@@ -406,6 +419,8 @@ static int samsung_pinconf_rw(struct pinctrl_dev *pctldev, unsigned int pin,
- 	if (!width)
+ 					&pin_offset, &bank);
++	type = bank->type;
+ 
+ 	switch (cfg_type) {
+ 	case PINCFG_TYPE_PUD:
+-		width = bank->pud_width;
+ 		cfg_reg = PUD_REG;
+ 		break;
+ 	case PINCFG_TYPE_DRV:
+-		width = bank->drv_width;
+ 		cfg_reg = DRV_REG;
+ 		break;
+ 	case PINCFG_TYPE_CON_PDN:
+-		width = bank->conpdn_width;
+ 		cfg_reg = CONPDN_REG;
+ 		break;
+ 	case PINCFG_TYPE_PUD_PDN:
+-		width = bank->pudpdn_width;
+ 		cfg_reg = PUDPDN_REG;
+ 		break;
+ 	default:
+@@ -416,9 +419,11 @@ static int samsung_pinconf_rw(struct pinctrl_dev *pctldev, unsigned int pin,
+ 		return -EINVAL;
+ 	}
+ 
+-	if (!width)
++	if (cfg_type >= PINCFG_TYPE_NUM || !type->fld_width[cfg_type])
  		return -EINVAL;
  
-+	spin_lock_irqsave(&bank->slock, flags);
++	width = type->fld_width[cfg_type];
 +
- 	mask = (1 << width) - 1;
- 	shift = pin_offset * width;
- 	data = readl(reg_base + cfg_reg);
-@@ -420,6 +435,9 @@ static int samsung_pinconf_rw(struct pinctrl_dev *pctldev, unsigned int pin,
- 		data &= mask;
- 		*config = PINCFG_PACK(cfg_type, data);
- 	}
-+
-+	spin_unlock_irqrestore(&bank->slock, flags);
-+
- 	return 0;
- }
+ 	spin_lock_irqsave(&bank->slock, flags);
  
-@@ -479,16 +497,21 @@ static const struct pinconf_ops samsung_pinconf_ops = {
+ 	mask = (1 << width) - 1;
+@@ -497,6 +502,7 @@ static const struct pinconf_ops samsung_pinconf_ops = {
  static void samsung_gpio_set(struct gpio_chip *gc, unsigned offset, int value)
  {
  	struct samsung_pin_bank *bank = gc_to_pin_bank(gc);
-+	unsigned long flags;
++	struct samsung_pin_bank_type *type = bank->type;
+ 	unsigned long flags;
  	void __iomem *reg;
  	u32 data;
- 
- 	reg = bank->drvdata->virt_base + bank->pctl_offset;
- 
-+	spin_lock_irqsave(&bank->slock, flags);
-+
- 	data = readl(reg + DAT_REG);
- 	data &= ~(1 << offset);
- 	if (value)
- 		data |= 1 << offset;
- 	writel(data, reg + DAT_REG);
-+
-+	spin_unlock_irqrestore(&bank->slock, flags);
- }
- 
- /* gpiolib gpio_get callback function */
-@@ -859,6 +882,7 @@ static struct samsung_pin_ctrl *samsung_pinctrl_get_soc_data(
- 
- 	bank = ctrl->pin_banks;
- 	for (i = 0; i < ctrl->nr_banks; ++i, ++bank) {
-+		spin_lock_init(&bank->slock);
- 		bank->drvdata = d;
- 		bank->pin_base = ctrl->nr_pins;
- 		ctrl->nr_pins += bank->nr_pins;
 diff --git a/drivers/pinctrl/pinctrl-samsung.h b/drivers/pinctrl/pinctrl-samsung.h
-index e2d4e67..b9dbe79 100644
+index b9dbe79..1c590f7 100644
 --- a/drivers/pinctrl/pinctrl-samsung.h
 +++ b/drivers/pinctrl/pinctrl-samsung.h
-@@ -119,6 +119,7 @@ struct samsung_pinctrl_drv_data;
-  * @irq_domain: IRQ domain of the bank.
-  * @gpio_chip: GPIO chip of the bank.
-  * @grange: linux gpio pin range supported by this bank.
-+ * @slock: spinlock protecting bank registers
-  */
- struct samsung_pin_bank {
- 	u32		pctl_offset;
-@@ -137,6 +138,7 @@ struct samsung_pin_bank {
- 	struct irq_domain *irq_domain;
- 	struct gpio_chip gpio_chip;
- 	struct pinctrl_gpio_range grange;
-+	spinlock_t slock;
- };
+@@ -37,16 +37,22 @@
  
  /**
+  * enum pincfg_type - possible pin configuration types supported.
++ * @PINCFG_TYPE_FUNC: Function configuration.
++ * @PINCFG_TYPE_DAT: Pin value configuration.
+  * @PINCFG_TYPE_PUD: Pull up/down configuration.
+  * @PINCFG_TYPE_DRV: Drive strength configuration.
+  * @PINCFG_TYPE_CON_PDN: Pin function in power down mode.
+  * @PINCFG_TYPE_PUD_PDN: Pull up/down configuration in power down mode.
+  */
+ enum pincfg_type {
++	PINCFG_TYPE_FUNC,
++	PINCFG_TYPE_DAT,
+ 	PINCFG_TYPE_PUD,
+ 	PINCFG_TYPE_DRV,
+ 	PINCFG_TYPE_CON_PDN,
+ 	PINCFG_TYPE_PUD_PDN,
++
++	PINCFG_TYPE_NUM
+ };
+ 
+ /*
+@@ -103,15 +109,19 @@ enum eint_type {
+ struct samsung_pinctrl_drv_data;
+ 
+ /**
++ * struct samsung_pin_bank_type: pin bank type description
++ * @fld_width: widths of configuration bitfields (0 if unavailable)
++ */
++struct samsung_pin_bank_type {
++	u8 fld_width[PINCFG_TYPE_NUM];
++};
++
++/**
+  * struct samsung_pin_bank: represent a controller pin-bank.
++ * @type: type of the bank (register offsets and bitfield widths)
+  * @pctl_offset: starting offset of the pin-bank registers.
+  * @pin_base: starting pin number of the bank.
+  * @nr_pins: number of pins included in this bank.
+- * @func_width: width of the function selector bit field.
+- * @pud_width: width of the pin pull up/down selector bit field.
+- * @drv_width: width of the pin driver strength selector bit field.
+- * @conpdn_width: width of the sleep mode function selector bin field.
+- * @pudpdn_width: width of the sleep mode pull up/down selector bit field.
+  * @eint_type: type of the external interrupt supported by the bank.
+  * @name: name to be prefixed for each pin in this pin bank.
+  * @of_node: OF node of the bank.
+@@ -122,14 +132,10 @@ struct samsung_pinctrl_drv_data;
+  * @slock: spinlock protecting bank registers
+  */
+ struct samsung_pin_bank {
++	struct samsung_pin_bank_type *type;
+ 	u32		pctl_offset;
+ 	u32		pin_base;
+ 	u8		nr_pins;
+-	u8		func_width;
+-	u8		pud_width;
+-	u8		drv_width;
+-	u8		conpdn_width;
+-	u8		pudpdn_width;
+ 	enum eint_type	eint_type;
+ 	u32		eint_offset;
+ 	char		*name;
 -- 
 1.8.1.5
