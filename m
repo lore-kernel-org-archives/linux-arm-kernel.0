@@ -1,175 +1,84 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Mon, 18 Mar 2013 13:04:01 -0400
-Subject: [PATCH 24/29] arm64: KVM: 32bit conditional execution emulation
-In-Reply-To: <1362455265-24165-25-git-send-email-marc.zyngier@arm.com>
-References: <1362455265-24165-1-git-send-email-marc.zyngier@arm.com>
- <1362455265-24165-25-git-send-email-marc.zyngier@arm.com>
-Message-ID: <51474901.1010404@codeaurora.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 18 Mar 2013 17:06:49 +0000
+Subject: [PATCH] ARM: hw_breakpoint: Enable debug powerdown only if
+ system supports 'has_ossr'
+In-Reply-To: <514736D4.4070906@ti.com>
+References: <1363157553-21085-1-git-send-email-lokeshvutla@ti.com>
+ <51406BA7.8010306@arm.com> <51407120.7030709@ti.com>
+ <51417E58.5050501@ti.com> <20130315050014.GA15706@tiny-lites>
+ <5146B972.1010002@ti.com>
+ <20130318150724.GC28585@mudshark.cambridge.arm.com>
+ <514736D4.4070906@ti.com>
+Message-ID: <20130318170649.GA29585@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On Mon, Mar 18, 2013 at 03:46:28PM +0000, Santosh Shilimkar wrote:
+> On Monday 18 March 2013 08:37 PM, Will Deacon wrote:
+> > That really sucks :( Does this affect all OMAP-based boards?
+> > 
+> All OMAP4 based boards..
 
-On 03/04/2013 10:47 PM, Marc Zyngier wrote:
-> As conditionnal instructions can trap on AArch32, add the thinest
+Brilliant. Is there any way that the secure code can be fixed in future
+products?
 
-conditional
+> >> +	/* Check if we have access to CPU debug features */
+> >> +	ARM_DBG_READ(c7, c14, 6, val);
+> >> +	if ((val & 0x1) == 0) {
+> >> +		pr_warn_once("CPU %d debug is unavailable\n", cpu);
+> >> +		cpumask_or(&debug_err_mask, &debug_err_mask, cpumask_of(cpu));
+> >> +		return;
+> >> +	}
+> > 
+> > There are a few of problems here:
+> > 
+> > 	1. That is only checking for non-secure access, which precludes
+> > 	   running Linux in secure mode.
+> > 
+> We can check bit 4 as well to take care linux running in secure mode.
 
-> possible emulation layer to keep 32bit guests happy.
+It still doesn't help unless we know whether Linux is running secure or
+non-secure.
 
-[...]
+> > 	2. DBGAUTHSTATUS accesses are UNPREDICTABLE when the double-lock is
+> > 	   set for v7.1 processors.
+> >
+> > 	3. DBGAUTHSTATUS doesn't exist in ARMv6.
+> > 
+> We cans skip the code for these versions like...
+> 	if (!ARM_DEBUG_ARCH_V7_ECP14 == get_debug_arch())
+> 		goto skip_dbgsts_read;
 
-> diff --git a/arch/arm64/kvm/emulate.c b/arch/arm64/kvm/emulate.c
-> new file mode 100644
-> index 0000000..6b3dbc3
-> --- /dev/null
-> +++ b/arch/arm64/kvm/emulate.c
-> @@ -0,0 +1,154 @@
-> +/*
-> + * (not much of an) Emulation layer for 32bit guests.
-> + *
-> + * Copyright (C) 2012 - Virtual Open Systems and Columbia University
-> + * Author: Christoffer Dall <c.dall@virtualopensystems.com>
-> + *
-> + * This program is free software: you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#include <linux/kvm_host.h>
-> +#include <asm/kvm_emulate.h>
-> +
-> +/*
-> + * stolen from arch/arm/kernel/opcodes.c
-> + *
-> + * condition code lookup table
-> + * index into the table is test code: EQ, NE, ... LT, GT, AL, NV
-> + *
-> + * bit position in short is condition code: NZCV
-> + */
-> +static const unsigned short cc_map[16] = {
-> +	0xF0F0,			/* EQ == Z set            */
-> +	0x0F0F,			/* NE                     */
-> +	0xCCCC,			/* CS == C set            */
-> +	0x3333,			/* CC                     */
-> +	0xFF00,			/* MI == N set            */
-> +	0x00FF,			/* PL                     */
-> +	0xAAAA,			/* VS == V set            */
-> +	0x5555,			/* VC                     */
-> +	0x0C0C,			/* HI == C set && Z clear */
-> +	0xF3F3,			/* LS == C clear || Z set */
-> +	0xAA55,			/* GE == (N==V)           */
-> +	0x55AA,			/* LT == (N!=V)           */
-> +	0x0A05,			/* GT == (!Z && (N==V))   */
-> +	0xF5FA,			/* LE == (Z || (N!=V))    */
-> +	0xFFFF,			/* AL always              */
-> +	0			/* NV                     */
-> +};
-> +
-> +static int kvm_vcpu_get_condition(struct kvm_vcpu *vcpu)
-> +{
-> +	u32 esr = kvm_vcpu_get_hsr(vcpu);
-> +
-> +	if (esr & ESR_EL2_CV)
-> +		return (esr & ESR_EL2_COND) >> ESR_EL2_COND_SHIFT;
-> +
-> +	return -1;
-> +}
-> +
-> +/*
-> + * Check if a trapped instruction should have been executed or not.
-> + */
-> +bool kvm_condition_valid32(struct kvm_vcpu *vcpu)
-> +{
-> +	unsigned long cpsr;
-> +	u32 cpsr_cond;
-> +	int cond;
-> +
-> +	/* Top two bits non-zero?  Unconditional. */
-> +	if (kvm_vcpu_get_hsr(vcpu) >> 30)
-> +		return true;
-> +
-> +	/* Is condition field valid? */
-> +	cond = kvm_vcpu_get_condition(vcpu);
-> +	if (cond == 0xE)
-> +		return true;
-> +
-> +	cpsr = *vcpu_cpsr(vcpu);
-> +
-> +	if (cond < 0) {
-> +		/* This can happen in Thumb mode: examine IT state. */
-> +		unsigned long it;
-> +
-> +		it = ((cpsr >> 8) & 0xFC) | ((cpsr >> 25) & 0x3);
-> +
-> +		/* it == 0 => unconditional. */
-> +		if (it == 0)
-> +			return true;
-> +
-> +		/* The cond for this insn works out as the top 4 bits. */
-> +		cond = (it >> 4);
-> +	}
-> +
-> +	cpsr_cond = cpsr >> 28;
-> +
-> +	if (!((cc_map[cond] >> cpsr_cond) & 1))
-> +		return false;
-> +
-> +	return true;
-> +}
-> +
-> +/**
-> + * adjust_itstate - adjust ITSTATE when emulating instructions in IT-block
-> + * @vcpu:	The VCPU pointer
-> + *
-> + * When exceptions occur while instructions are executed in Thumb IF-THEN
-> + * blocks, the ITSTATE field of the CPSR is not advanved (updated), so we have
-> + * to do this little bit of work manually. The fields map like this:
-> + *
-> + * IT[7:0] -> CPSR[26:25],CPSR[15:10]
-> + */
-> +static void kvm_adjust_itstate(struct kvm_vcpu *vcpu)
-> +{
-> +	unsigned long itbits, cond;
-> +	unsigned long cpsr = *vcpu_cpsr(vcpu);
-> +	bool is_arm = !(cpsr & COMPAT_PSR_T_BIT);
-> +
-> +	BUG_ON(is_arm && (cpsr & COMPAT_PSR_IT_MASK));
-> +
-> +	if (!(cpsr & COMPAT_PSR_IT_MASK))
-> +		return;
-> +
-> +	cond = (cpsr & 0xe000) >> 13;
-> +	itbits = (cpsr & 0x1c00) >> (10 - 2);
-> +	itbits |= (cpsr & (0x3 << 25)) >> 25;
-> +
-> +	/* Perform ITAdvance (see page A-52 in ARM DDI 0406C) */
-> +	if ((itbits & 0x7) == 0)
-> +		itbits = cond = 0;
-> +	else
-> +		itbits = (itbits << 1) & 0x1f;
-> +
-> +	cpsr &= ~COMPAT_PSR_IT_MASK;
-> +	cpsr |= cond << 13;
-> +	cpsr |= (itbits & 0x1c) << (10 - 2);
-> +	cpsr |= (itbits & 0x3) << 25;
-> +	*vcpu_cpsr(vcpu) = cpsr;
-> +}
+Sure, I was just pointing out that the code needs fixing for this.
 
-Maybe I'm spoiled by the breadth of the 64-bit definitions, but I wonder if
-fewer magic numbers in the 32-bit emulation might make it an easier read.
+> > 	4. CPUs without the security extensions have DBGAUTHSTATUS.NSE == 0
+> >
+> Which bit is that ? I don't find this bit in Cortex-A9 docs. With all
+> these checks, may be a separate function like 'is_debug_available()'
+> would be better.
 
-Christopher
+NSE is bit 0 (the one you're checking).
 
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by
-the Linux Foundation
+>  
+> > 	5. Accessing DBGAUTHSTATUS requires DBGEN to be driven high.
+> > 	   Assuming that your pr_warn_once is emitted, this implies that
+> > 	   DBGEN is driven high from cold boot, yet the NSE bit is low,
+> > 	   implying that DBGEN is also low. That's contradictory, so I have
+> > 	   no idea what's going on...
+> >
+> Me neither. The warning is emitted at least.
+
+Any chance you could follow up with your firmware/hardware guys about this
+please? I'd really like to understand how we end up in this state in case we
+can do something in the architecture to stop it from happening in future.
+
+> > Apart from that, it's fine!
+> > 
+> If you agree, I can update patch accordingly.
+> BTW, do you have any better trick to take care of
+> above scenraio ?
+
+Well, we could just add the warn_once prints but that doesn't stop debug
+from breaking after the first pm/suspend/hotplug operation.
+
+Will
