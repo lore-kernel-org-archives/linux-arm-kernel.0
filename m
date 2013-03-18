@@ -1,39 +1,39 @@
-From: miloody@gmail.com (loody)
-Date: Mon, 18 Mar 2013 17:38:11 +0800
-Subject: some question about monitor mode support in arm
-In-Reply-To: <5141D298.6010401@codeaurora.org>
-References: <CANudz+tPrFxUEhzbpdVYnhnzKnJJ2wsJ7s_3YAWiOUJjJhQ3YA@mail.gmail.com>
- <5141D298.6010401@codeaurora.org>
-Message-ID: <CANudz+u2kEJRu0P1oVv84AhuGXM8RW-inr=LrPp4WJSKYQ3iJQ@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 18 Mar 2013 15:17:54 +0530
+Subject: [PATCH v6 1/2] ARM: davinci: dm365: add support for v4l2 video
+ display
+In-Reply-To: <CA+V-a8umwxKFHjSQ=yDwfp8VWTQyn0dyp-=ESSUvRPXawt01Jg@mail.gmail.com>
+References: <1363360303-15521-1-git-send-email-prabhakar.csengg@gmail.com>
+ <1363360303-15521-2-git-send-email-prabhakar.csengg@gmail.com>
+ <5146CDC5.9000702@ti.com>
+ <CA+V-a8umwxKFHjSQ=yDwfp8VWTQyn0dyp-=ESSUvRPXawt01Jg@mail.gmail.com>
+Message-ID: <5146E2CA.8000109@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Christopher:
-
-2013/3/14 Christopher Covington <cov@codeaurora.org>:
-> Hi,
->
-> On 03/14/2013 05:43 AM, loody wrote:
->> Hi all:
->> Does linux kernel support monitor mode handling?
->
-> It does not, but hypervisor mode support was recently added, which has pretty
-> similar mechanics.
->
->> I grep the keyword 'smc' but it only show how switch to, such as
->> mach-highbank/smc.S,
->> but not seem where to handle it.
->
-> You can take a look at __hyp_set_vectors in arch/arm/kernel/hyp-stub.S for one
-> example of setting up exception vectors.
-I grep what you mentioned.
-But it seems nothing about __hyp_set_vectors you described
-in arch/arm/kernel/hyp-stub.S
-ENTRY(__hyp_set_vectors)
-        __HVC(0)
-        mov     pc, lr
-ENDPROC(__hyp_set_vectors)
 
 
--- 
-Thanks for your help,
+On 3/18/2013 2:46 PM, Prabhakar Lad wrote:
+> On Mon, Mar 18, 2013 at 1:48 PM, Sekhar Nori <nsekhar@ti.com> wrote:
+>> On 3/15/2013 8:41 PM, Prabhakar lad wrote:
+
+>>> +int __init dm365_init_video(struct vpfe_config *vpfe_cfg,
+>>> +                             struct vpbe_config *vpbe_cfg)
+>>> +{
+>>> +     if (vpfe_cfg || vpbe_cfg)
+>>> +             platform_device_register(&dm365_vpss_device);
+>>> +
+>>> +     if (vpfe_cfg) {
+>>> +             vpfe_capture_dev.dev.platform_data = vpfe_cfg;
+>>> +             /* Add isif clock alias */
+>>
+>> This comment is useless. Instead please document why the aliases are
+>> needed. I know you are just moving code here, but lets do a clean-up job
+>> while at it.
+>>
+> by document you mean to add a file in Documentation folder ?
+
+No, just modify the comment to talk about why the aliases are needed.
+
+Thanks,
+Sekhar
