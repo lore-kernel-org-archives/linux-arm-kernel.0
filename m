@@ -1,70 +1,26 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 18 Mar 2013 10:13:16 -0700
-Subject: [PATCH 2/3] ARM: Detect support for SDIV/UDIV from ISAR0 register
-In-Reply-To: <20130317143624.GE19071@mudshark.cambridge.arm.com>
-References: <1363138321-27849-1-git-send-email-sboyd@codeaurora.org>
- <1363138321-27849-3-git-send-email-sboyd@codeaurora.org>
- <20130317143624.GE19071@mudshark.cambridge.arm.com>
-Message-ID: <51474B2C.6030508@codeaurora.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 18 Mar 2013 17:17:43 +0000 (UTC)
+Subject: OMAP baseline test results for v3.9-rc3
+In-Reply-To: <alpine.DEB.2.00.1303181633120.29332@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1303181536230.29332@utopia.booyaka.com>
+ <CAJL_dMsA+J6C4uJS_BXGJLvJiS1+YxTaW_j9=EdF70qDnQbwUg@mail.gmail.com>
+ <alpine.DEB.2.00.1303181633120.29332@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.00.1303181716160.12554@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/17/13 07:36, Will Deacon wrote:
-> On Wed, Mar 13, 2013 at 01:32:00AM +0000, Stephen Boyd wrote:
->> The ISAR0 register indicates support for the SDIV and UDIV
->> instructions in both the Thumb and ARM instruction set. Read the
->> register to detect the supported instructions and update the
->> elf_hwcap mask as appropriate. This is better than adding more
->> and more cpuid checks in proc-v7.S for each new cpu variant that
->> supports these instructions.
->>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Cc: Stepan Moskovchenko <stepanm@codeaurora.org>
->> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
->> ---
->>  arch/arm/kernel/setup.c | 20 ++++++++++++++++++++
->>  arch/arm/mm/proc-v7.S   |  4 ++--
->>  2 files changed, 22 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
->> index e2c8bbf..bd27a70 100644
->> --- a/arch/arm/kernel/setup.c
->> +++ b/arch/arm/kernel/setup.c
->> @@ -353,6 +353,23 @@ void __init early_print(const char *str, ...)
->>  	printk("%s", buf);
->>  }
->>  
->> +static void __init idiv_setup(void)
->> +{
->> +	unsigned int divide_instrs;
->> +
->> +	if (cpu_architecture() < CPU_ARCH_ARMv7)
->> +		return;
->> +
->> +	divide_instrs = (read_cpuid_ext(CPUID_EXT_ISAR0) & 0x0f000000) >> 24;
->> +
->> +	switch (divide_instrs) {
->> +	case 2:
->> +		elf_hwcap |= HWCAP_IDIVA;
->> +	case 1:
->> +		elf_hwcap |= HWCAP_IDIVT;
->> +	}
->> +}
->> +
->>  static void __init feat_v6_fixup(void)
->>  {
->>  	int id = read_cpuid_id();
->> @@ -483,6 +500,9 @@ static void __init setup_processor(void)
->>  	snprintf(elf_platform, ELF_PLATFORM_SIZE, "%s%c",
->>  		 list->elf_name, ENDIANNESS);
->>  	elf_hwcap = list->elf_hwcap;
->> +
->> +	idiv_setup();
-> Perhaps give this a more generic name (cpuid_init_hwcaps) so we can add more
-> probing later on (we could probe swp, for example).
+On Mon, 18 Mar 2013, Paul Walmsley wrote:
 
-No problem. Thanks for the review.
+> On Mon, 18 Mar 2013, Anca Emanuel wrote:
+> 
+> > You are not planning any resources to solve this ?
+> > You are listing this for a number of months now. It is time to solve them.
+> 
+> Absolutely, thanks for volunteering!  Patches welcome.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Also, if you are a TI customer, you can probably contact your TI rep and 
+put pressure on them to put more resources into their upstream kernel 
+support.
+
+
+- Paul
