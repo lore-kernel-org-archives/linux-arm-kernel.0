@@ -1,45 +1,42 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 18 Mar 2013 21:32:35 +0900
-Subject: [PATCH 25/43] ARM: shmobile: Fix base address readout in headsmp-scu.S
+Date: Mon, 18 Mar 2013 21:32:44 +0900
+Subject: [PATCH 34/43] ARM: shmobile: add gic_iid macro for ICCIAR / interrupt
+ ID
 In-Reply-To: <1363609973-31086-1-git-send-email-horms+renesas@verge.net.au>
 References: <1363609973-31086-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1363609973-31086-26-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1363609973-31086-35-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Rework the early SCU setup code in headsmp-scu.S to read
-the base address in the same way as we use to fetch the
-address of the invalidation function.
+R-Car H1 datasheet GIC number is indicating
+GIC ICCIAR / interrupt ID number, not SPI number,
+but current marzen board code is using gic_spi() with
+un-understandable calculation.
 
-Reported-by: Bastian Hecht <hechtb@gmail.com>
-Signed-off-by: Magnus Damm <damm@opensource.se>
+This patch adds new gic_iid() macro which means
+ICCIAR / interrupt ID, and used the number
+currently written on datasheet.
+
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+[ horms+renesas at verge.net.au: Split board-marzen.c portion into a separate patch ]
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/headsmp-scu.S |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/mach-shmobile/include/mach/irqs.h |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-shmobile/headsmp-scu.S b/arch/arm/mach-shmobile/headsmp-scu.S
-index 0b93170..7d113f8 100644
---- a/arch/arm/mach-shmobile/headsmp-scu.S
-+++ b/arch/arm/mach-shmobile/headsmp-scu.S
-@@ -39,7 +39,7 @@ ENTRY(shmobile_secondary_vector_scu)
- 	mrc     p15, 0, r0, c0, c0, 5	@ read MIPDR
- 	and	r0, r0, #3		@ mask out cpu ID
- 	lsl	r0, r0, #3		@ we will shift by cpu_id * 8 bits
--	ldr	r1, =shmobile_scu_base
-+	ldr	r1, 2f
- 	ldr	r1, [r1]		@ SCU base address
- 	ldr	r2, [r1, #8]		@ SCU Power Status Register
- 	mov	r3, #3
-@@ -48,6 +48,7 @@ ENTRY(shmobile_secondary_vector_scu)
+diff --git a/arch/arm/mach-shmobile/include/mach/irqs.h b/arch/arm/mach-shmobile/include/mach/irqs.h
+index 06a5da3..992ed21 100644
+--- a/arch/arm/mach-shmobile/include/mach/irqs.h
++++ b/arch/arm/mach-shmobile/include/mach/irqs.h
+@@ -5,6 +5,7 @@
  
- 	ldr	pc, 1f
- 1:	.long shmobile_invalidate_start - PAGE_OFFSET + PLAT_PHYS_OFFSET
-+2:	.long shmobile_scu_base - PAGE_OFFSET + PLAT_PHYS_OFFSET
- ENDPROC(shmobile_secondary_vector_scu)
+ /* GIC */
+ #define gic_spi(nr)		((nr) + 32)
++#define gic_iid(nr)		(nr) /* ICCIAR / interrupt ID */
  
- 	.text
+ /* INTCS */
+ #define INTCS_VECT_BASE		0x3400
 -- 
 1.7.10.4
