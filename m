@@ -1,47 +1,31 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 18 Mar 2013 20:44:24 +0800
-Subject: [PATCH] ARM: video: mxs: Fix mxsfb misconfiguring VDCTRL0
-In-Reply-To: <1363471581-10132-1-git-send-email-marex@denx.de>
-References: <CAOMZO5CDuODRrJEEaDKm5nepfkuvuF77ZQmarB69hL6gg386ww@mail.gmail.com>
- <1363471581-10132-1-git-send-email-marex@denx.de>
-Message-ID: <20130318122650.GD12462@S2101-09.ap.freescale.net>
+From: rogerq@ti.com (Roger Quadros)
+Date: Mon, 18 Mar 2013 14:51:14 +0200
+Subject: [PATCH v3 0/4] ARM: OMAP2+: Adapt to ehci-omap changes for 3.10
+Message-ID: <1363611078-13002-1-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 16, 2013 at 11:06:21PM +0100, Marek Vasut wrote:
-> The issue fixed by this patch manifests only then using X11
-> with mxsfb driver. The X11 will display either shifted image
-> or otherwise distorted image on the LCD.
-> 
-> The problem is that the X11 tries to reconfigure the framebuffer
-> and along the way call fb_ops.fb_set_par() with it's configuration
-> values. The field of particular interest is fb_info->var.sync which
-> contains non-standard values if configured by kernel. These are
-> FB_SYNC_DATA_ENABLE_HIGH_ACT and FB_SYNC_DOTCLK_FAILING_ACT defined
-> in include/linux/mxsfb.h . The driver interprets those and configures
-> the LCD controller accordingly. Yet X11 only has access to standard
-> values for this field defined in include/uapi/linux/fb.h and thus
-> omits these special values. This results in distorted image on the
-> LCD.
-> 
-> This patch moves these non-standard values into new field of the
-> mxsfb_platform_data structure so the driver can in turn check this
-> field instead of the video mode field for these specific portions.
-> 
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Fabio Estevam <fabio.estavem@freescale.com>
-> Cc: Linux ARM <linux-arm-kernel@lists.infradead.org>
-> Cc: Linux FBDEV <linux-fbdev@vger.kernel.org>
-> Cc: Lothar Wa?mann <LW@karo-electronics.de>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  arch/arm/mach-mxs/mach-mxs.c |   22 +++++++++++-----------
->  drivers/video/mxsfb.c        |    7 +++++--
->  include/linux/mxsfb.h        |    7 +++++--
->  3 files changed, 21 insertions(+), 15 deletions(-)
+Hi Tony,
 
-Since it touches mach-mxs as well, let me send it through arm-soc tree
-as fix for 3.9.
+I've revised the patches based on your comments. For now I've just
+adapted Panda and Beagleboard.
+If this looks OK then I can adapt the other boards as well.
 
-Shawn
+cheers,
+-roger
+
+Roger Quadros (4):
+  usb: phy: nop: Add some parameters to platform data
+  ARM: OMAP2+: omap-usb-host: Add usbhs_init_phys()
+  ARM: OMAP2+: omap4panda: Adapt to ehci-omap changes
+  ARM: OMAP3: Beagle: Adapt to ehci-omap changes
+
+ arch/arm/mach-omap2/board-omap3beagle.c |   32 ++++--
+ arch/arm/mach-omap2/board-omap4panda.c  |   55 ++++------
+ arch/arm/mach-omap2/usb-host.c          |  177 ++++++++++++++++++++++++++++++-
+ arch/arm/mach-omap2/usb.h               |    9 ++
+ include/linux/usb/nop-usb-xceiv.h       |    5 +
+ 5 files changed, 232 insertions(+), 46 deletions(-)
+
+-- 
+1.7.4.1
