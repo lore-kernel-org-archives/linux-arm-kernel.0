@@ -1,82 +1,64 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 18 Mar 2013 21:32:21 +0900
-Subject: [PATCH 11/43] ARM: shmobile: Kill off r8a7779 scu_base_addr() function
+Date: Mon, 18 Mar 2013 21:32:17 +0900
+Subject: [PATCH 07/43] ARM: shmobile: add MMCIF and SDHI DT clock aliases to
+ sh73a0 and r8a7740
 In-Reply-To: <1363609973-31086-1-git-send-email-horms+renesas@verge.net.au>
 References: <1363609973-31086-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1363609973-31086-12-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1363609973-31086-8-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 
-Replace scu_base_addr() with a static shmobile_scu_base
-variable and introduce R8A7779_SCU_BASE.
+Add clock lookup entries for SDHI and MMCIF device names, for the FDT case.
 
-Later in the series the shmobile_scu_base variable will be
-made into a global variable so this is preparation only.
-
-Signed-off-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+[horms+renesas at verge.net.au: resolved trivial conflict in clock-r8a7740.c]
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/smp-r8a7779.c |   17 ++++++++---------
- 1 file changed, 8 insertions(+), 9 deletions(-)
+ arch/arm/mach-shmobile/clock-r8a7740.c |    4 ++++
+ arch/arm/mach-shmobile/clock-sh73a0.c  |    3 +++
+ 2 files changed, 7 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/smp-r8a7779.c b/arch/arm/mach-shmobile/smp-r8a7779.c
-index f46b516..d92188d 100644
---- a/arch/arm/mach-shmobile/smp-r8a7779.c
-+++ b/arch/arm/mach-shmobile/smp-r8a7779.c
-@@ -31,6 +31,9 @@
- #include <asm/smp_twd.h>
+diff --git a/arch/arm/mach-shmobile/clock-r8a7740.c b/arch/arm/mach-shmobile/clock-r8a7740.c
+index 19ce885..1a9b9a2 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7740.c
++++ b/arch/arm/mach-shmobile/clock-r8a7740.c
+@@ -611,11 +611,15 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("i2c-sh_mobile.1",	&mstp_clks[MSTP323]),
+ 	CLKDEV_DEV_ID("renesas_usbhs",		&mstp_clks[MSTP320]),
+ 	CLKDEV_DEV_ID("sh_mobile_sdhi.0",	&mstp_clks[MSTP314]),
++	CLKDEV_DEV_ID("e6850000.sdhi",          &mstp_clks[MSTP314]),
+ 	CLKDEV_DEV_ID("sh_mobile_sdhi.1",	&mstp_clks[MSTP313]),
++	CLKDEV_DEV_ID("e6860000.sdhi",          &mstp_clks[MSTP313]),
+ 	CLKDEV_DEV_ID("sh_mmcif",		&mstp_clks[MSTP312]),
++	CLKDEV_DEV_ID("e6bd0000.mmcif",         &mstp_clks[MSTP312]),
+ 	CLKDEV_DEV_ID("sh-eth",			&mstp_clks[MSTP309]),
  
- #define AVECR IOMEM(0xfe700040)
-+#define R8A7779_SCU_BASE IOMEM(0xf0000000)
-+
-+static void __iomem *shmobile_scu_base;
+ 	CLKDEV_DEV_ID("sh_mobile_sdhi.2",	&mstp_clks[MSTP415]),
++	CLKDEV_DEV_ID("e6870000.sdhi",          &mstp_clks[MSTP415]),
  
- static struct r8a7779_pm_ch r8a7779_ch_cpu1 = {
- 	.chan_offs = 0x40, /* PWRSR0 .. PWRER0 */
-@@ -56,11 +59,6 @@ static struct r8a7779_pm_ch *r8a7779_ch_cpu[4] = {
- 	[3] = &r8a7779_ch_cpu3,
- };
- 
--static void __iomem *scu_base_addr(void)
--{
--	return (void __iomem *)0xf0000000;
--}
--
- static DEFINE_SPINLOCK(scu_lock);
- static unsigned long tmp;
- 
-@@ -75,7 +73,7 @@ void __init r8a7779_register_twd(void)
- 
- static void modify_scu_cpu_psr(unsigned long set, unsigned long clr)
- {
--	void __iomem *scu_base = scu_base_addr();
-+	void __iomem *scu_base = shmobile_scu_base;
- 
- 	spin_lock(&scu_lock);
- 	tmp = __raw_readl(scu_base + 8);
-@@ -153,7 +151,7 @@ static void __init r8a7779_smp_prepare_cpus(unsigned int max_cpus)
- {
- 	int cpu = cpu_logical_map(0);
- 
--	scu_enable(scu_base_addr());
-+	scu_enable(shmobile_scu_base);
- 
- 	/* Map the reset vector (in headsmp.S) */
- 	__raw_writel(__pa(shmobile_secondary_vector), AVECR);
-@@ -171,9 +169,10 @@ static void __init r8a7779_smp_prepare_cpus(unsigned int max_cpus)
- 
- static void __init r8a7779_smp_init_cpus(void)
- {
--	unsigned int ncores = scu_get_core_count(scu_base_addr());
-+	/* setup r8a7779 specific SCU base */
-+	shmobile_scu_base = R8A7779_SCU_BASE;
- 
--	shmobile_smp_init_cpus(ncores);
-+	shmobile_smp_init_cpus(scu_get_core_count(shmobile_scu_base));
- }
- 
- struct smp_operations r8a7779_smp_ops  __initdata = {
+ 	/* ICK */
+ 	CLKDEV_ICK_ID("host",	"renesas_usbhs",	&mstp_clks[MSTP416]),
+diff --git a/arch/arm/mach-shmobile/clock-sh73a0.c b/arch/arm/mach-shmobile/clock-sh73a0.c
+index afa5423..5fa106b 100644
+--- a/arch/arm/mach-shmobile/clock-sh73a0.c
++++ b/arch/arm/mach-shmobile/clock-sh73a0.c
+@@ -581,10 +581,13 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("e6822000.i2c", &mstp_clks[MSTP323]), /* I2C1 */
+ 	CLKDEV_DEV_ID("renesas_usbhs", &mstp_clks[MSTP322]), /* USB */
+ 	CLKDEV_DEV_ID("sh_mobile_sdhi.0", &mstp_clks[MSTP314]), /* SDHI0 */
++	CLKDEV_DEV_ID("ee100000.sdhi", &mstp_clks[MSTP314]), /* SDHI0 */
+ 	CLKDEV_DEV_ID("sh_mobile_sdhi.1", &mstp_clks[MSTP313]), /* SDHI1 */
++	CLKDEV_DEV_ID("ee120000.sdhi", &mstp_clks[MSTP313]), /* SDHI1 */
+ 	CLKDEV_DEV_ID("sh_mmcif.0", &mstp_clks[MSTP312]), /* MMCIF0 */
+ 	CLKDEV_DEV_ID("e6bd0000.mmcif", &mstp_clks[MSTP312]), /* MMCIF0 */
+ 	CLKDEV_DEV_ID("sh_mobile_sdhi.2", &mstp_clks[MSTP311]), /* SDHI2 */
++	CLKDEV_DEV_ID("ee140000.sdhi", &mstp_clks[MSTP311]), /* SDHI2 */
+ 	CLKDEV_DEV_ID("leds-renesas-tpu.12", &mstp_clks[MSTP303]), /* TPU1 */
+ 	CLKDEV_DEV_ID("leds-renesas-tpu.21", &mstp_clks[MSTP302]), /* TPU2 */
+ 	CLKDEV_DEV_ID("leds-renesas-tpu.30", &mstp_clks[MSTP301]), /* TPU3 */
 -- 
 1.7.10.4
