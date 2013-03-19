@@ -1,88 +1,190 @@
 From: achew@nvidia.com (Andrew Chew)
-Date: Tue, 19 Mar 2013 11:59:26 -0700
-Subject: [PATCH V4 2/9] ARM: S3C24XX: Provide regulator to pwm-backlight
+Date: Tue, 19 Mar 2013 11:59:33 -0700
+Subject: [PATCH V4 9/9] pwm_bl: Add mandatory backlight enable regulator
 In-Reply-To: <1363719573-20926-1-git-send-email-achew@nvidia.com>
 References: <1363719573-20926-1-git-send-email-achew@nvidia.com>
-Message-ID: <1363719573-20926-3-git-send-email-achew@nvidia.com>
+Message-ID: <1363719573-20926-10-git-send-email-achew@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pwm-backlight driver now takes a mandatory regulator that is gotten
-during driver probe.  Initialize a dummy regulator to satisfy this
-requirement.
+Many backlights need to be explicitly enabled.  Typically, this is done
+with a GPIO.  For flexibility, we generalize the enable mechanism to a
+regulator.
+
+If an enable regulator is not needed, then a dummy regulator can be given
+to the backlight driver.  If a GPIO is used to enable the backlight,
+then a fixed regulator can be instantiated to control the GPIO.
+
+The backlight enable regulator can be specified in the device tree node
+for the backlight, or can be done with legacy board setup code in the
+usual way.
 
 Signed-off-by: Andrew Chew <achew@nvidia.com>
+Reviewed-by: Alexandre Courbot <acourbot@nvidia.com>
+Tested-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/mach-s3c24xx/mach-h1940.c  | 8 ++++++++
- arch/arm/mach-s3c24xx/mach-rx1950.c | 9 +++++++++
- 2 files changed, 17 insertions(+)
+ .../bindings/video/backlight/pwm-backlight.txt     | 14 +++++
+ drivers/video/backlight/pwm_bl.c                   | 59 ++++++++++++++++++----
+ 2 files changed, 63 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/mach-s3c24xx/mach-h1940.c b/arch/arm/mach-s3c24xx/mach-h1940.c
-index 8dd6601..d2594b8 100644
---- a/arch/arm/mach-s3c24xx/mach-h1940.c
-+++ b/arch/arm/mach-s3c24xx/mach-h1940.c
-@@ -24,6 +24,8 @@
- #include <linux/gpio.h>
- #include <linux/input.h>
- #include <linux/gpio_keys.h>
-+#include <linux/regulator/machine.h>
-+#include <linux/regulator/fixed.h>
- #include <linux/pwm_backlight.h>
- #include <linux/i2c.h>
- #include <linux/leds.h>
-@@ -497,6 +499,9 @@ static void h1940_backlight_exit(struct device *dev)
- 	gpio_set_value(H1940_LATCH_MAX1698_nSHUTDOWN, 0);
- }
+diff --git a/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt b/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt
+index 1e4fc72..7e2e089 100644
+--- a/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt
++++ b/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt
+@@ -10,6 +10,11 @@ Required properties:
+       last value in the array represents a 100% duty cycle (brightest).
+   - default-brightness-level: the default brightness level (index into the
+       array defined by the "brightness-levels" property)
++  - enable-supply: A phandle to the regulator device tree node. This
++      regulator will be turned on and off as the pwm is enabled and disabled.
++      Many backlights are enabled via a GPIO. In this case, we instantiate
++      a fixed regulator and give that to enable-supply. If a regulator
++      is not needed, then provide a dummy fixed regulator.
  
-+/* Dummy regulator for pwm-backlight driver */
-+static struct regulator_consumer_supply backlight_supply =
-+	REGULATOR_SUPPLY("enable", "pwm-backlight");
+ Optional properties:
+   - pwm-names: a list of names for the PWM devices specified in the
+@@ -19,10 +24,19 @@ Optional properties:
  
- static struct platform_pwm_backlight_data backlight_data = {
- 	.pwm_id         = 0,
-@@ -720,6 +725,9 @@ static void __init h1940_init(void)
- 	gpio_request(H1940_LATCH_SD_POWER, "SD power");
- 	gpio_direction_output(H1940_LATCH_SD_POWER, 0);
+ Example:
  
-+	regulator_register_always_on(-1, "backlight-enable",
-+				     &backlight_supply, 1, 0);
++	bl_en: fixed-regulator {
++                compatible = "regulator-fixed";
++                regulator-name = "bl-en-supply";
++                regulator-boot-on;
++                gpio = <&some_gpio>;
++                enable-active-high;
++	};
 +
- 	platform_add_devices(h1940_devices, ARRAY_SIZE(h1940_devices));
+ 	backlight {
+ 		compatible = "pwm-backlight";
+ 		pwms = <&pwm 0 5000000>;
  
- 	gpio_request(S3C2410_GPA(1), "Red LED blink");
-diff --git a/arch/arm/mach-s3c24xx/mach-rx1950.c b/arch/arm/mach-s3c24xx/mach-rx1950.c
-index e4d67a3..ac674b6 100644
---- a/arch/arm/mach-s3c24xx/mach-rx1950.c
-+++ b/arch/arm/mach-s3c24xx/mach-rx1950.c
-@@ -25,6 +25,8 @@
- #include <linux/gpio_keys.h>
- #include <linux/device.h>
- #include <linux/pda_power.h>
-+#include <linux/regulator/machine.h>
-+#include <linux/regulator/fixed.h>
- #include <linux/pwm_backlight.h>
+ 		brightness-levels = <0 4 8 16 32 64 128 255>;
+ 		default-brightness-level = <6>;
++		enable-supply = <&bl_en>;
+ 	};
+diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
+index 1fea627..e4922f5 100644
+--- a/drivers/video/backlight/pwm_bl.c
++++ b/drivers/video/backlight/pwm_bl.c
+@@ -20,10 +20,13 @@
  #include <linux/pwm.h>
- #include <linux/s3c_adc_battery.h>
-@@ -518,6 +520,10 @@ static int rx1950_backlight_notify(struct device *dev, int brightness)
- 	return brightness;
+ #include <linux/pwm_backlight.h>
+ #include <linux/slab.h>
++#include <linux/regulator/consumer.h>
+ 
+ struct pwm_bl_data {
+ 	struct pwm_device	*pwm;
+ 	struct device		*dev;
++	bool			enabled;
++	struct regulator	*enable_supply;
+ 	unsigned int		period;
+ 	unsigned int		lth_brightness;
+ 	unsigned int		*levels;
+@@ -35,6 +38,42 @@ struct pwm_bl_data {
+ 	void			(*exit)(struct device *);
+ };
+ 
++static void pwm_backlight_enable(struct backlight_device *bl)
++{
++	struct pwm_bl_data *pb = dev_get_drvdata(&bl->dev);
++	int ret;
++
++	/* Bail if we are already enabled. */
++	if (pb->enabled)
++		return;
++
++	pwm_enable(pb->pwm);
++
++	ret = regulator_enable(pb->enable_supply);
++	if (ret)
++		dev_warn(&bl->dev, "Failed to enable regulator: %d", ret);
++
++	pb->enabled = true;
++}
++
++static void pwm_backlight_disable(struct backlight_device *bl)
++{
++	struct pwm_bl_data *pb = dev_get_drvdata(&bl->dev);
++	int ret;
++
++	/* Bail if we are already disabled. */
++	if (!pb->enabled)
++		return;
++
++	ret = regulator_disable(pb->enable_supply);
++	if (ret)
++		dev_warn(&bl->dev, "Failed to disable regulator: %d", ret);
++
++	pwm_disable(pb->pwm);
++
++	pb->enabled = false;
++}
++
+ static int pwm_backlight_update_status(struct backlight_device *bl)
+ {
+ 	struct pwm_bl_data *pb = bl_get_data(bl);
+@@ -51,7 +90,7 @@ static int pwm_backlight_update_status(struct backlight_device *bl)
+ 
+ 	if (brightness == 0) {
+ 		pwm_config(pb->pwm, 0, pb->period);
+-		pwm_disable(pb->pwm);
++		pwm_backlight_disable(bl);
+ 	} else {
+ 		int duty_cycle;
+ 
+@@ -65,7 +104,7 @@ static int pwm_backlight_update_status(struct backlight_device *bl)
+ 		duty_cycle = pb->lth_brightness +
+ 		     (duty_cycle * (pb->period - pb->lth_brightness) / max);
+ 		pwm_config(pb->pwm, duty_cycle, pb->period);
+-		pwm_enable(pb->pwm);
++		pwm_backlight_enable(bl);
+ 	}
+ 
+ 	if (pb->notify_after)
+@@ -138,12 +177,6 @@ static int pwm_backlight_parse_dt(struct device *dev,
+ 		data->max_brightness--;
+ 	}
+ 
+-	/*
+-	 * TODO: Most users of this driver use a number of GPIOs to control
+-	 *       backlight power. Support for specifying these needs to be
+-	 *       added.
+-	 */
+-
+ 	return 0;
  }
  
-+/* Dummy regulator for pwm-backlight driver */
-+static struct regulator_consumer_supply backlight_supply =
-+	REGULATOR_SUPPLY("enable", "pwm-backlight");
-+
- static struct platform_pwm_backlight_data rx1950_backlight_data = {
- 	.pwm_id = 0,
- 	.max_brightness = 24,
-@@ -795,6 +801,9 @@ static void __init rx1950_init_machine(void)
- 	gpio_direction_output(S3C2410_GPA(4), 0);
- 	gpio_direction_output(S3C2410_GPJ(6), 0);
+@@ -206,6 +239,12 @@ static int pwm_backlight_probe(struct platform_device *pdev)
+ 	pb->exit = data->exit;
+ 	pb->dev = &pdev->dev;
  
-+	regulator_register_always_on(-1, "backlight-enable",
-+				     &backlight_supply, 1, 0);
++	pb->enable_supply = devm_regulator_get(&pdev->dev, "enable");
++	if (IS_ERR(pb->enable_supply)) {
++		ret = PTR_ERR(pb->enable_supply);
++		goto err_alloc;
++	}
 +
- 	platform_add_devices(rx1950_devices, ARRAY_SIZE(rx1950_devices));
+ 	pb->pwm = devm_pwm_get(&pdev->dev, NULL);
+ 	if (IS_ERR(pb->pwm)) {
+ 		dev_err(&pdev->dev, "unable to request PWM, trying legacy API\n");
+@@ -268,7 +307,7 @@ static int pwm_backlight_remove(struct platform_device *pdev)
  
- 	i2c_register_board_info(0, rx1950_i2c_devices,
+ 	backlight_device_unregister(bl);
+ 	pwm_config(pb->pwm, 0, pb->period);
+-	pwm_disable(pb->pwm);
++	pwm_backlight_disable(bl);
+ 	if (pb->exit)
+ 		pb->exit(&pdev->dev);
+ 	return 0;
+@@ -283,7 +322,7 @@ static int pwm_backlight_suspend(struct device *dev)
+ 	if (pb->notify)
+ 		pb->notify(pb->dev, 0);
+ 	pwm_config(pb->pwm, 0, pb->period);
+-	pwm_disable(pb->pwm);
++	pwm_backlight_disable(bl);
+ 	if (pb->notify_after)
+ 		pb->notify_after(pb->dev, 0);
+ 	return 0;
 -- 
 1.8.1.5
