@@ -1,88 +1,50 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Tue, 19 Mar 2013 11:35:45 -0500
-Subject: [PATCH V4 07/18] ARM: OMAP2+: Convert SMC91x to use
- gpmc_cs_program_settings()
+Date: Tue, 19 Mar 2013 11:35:51 -0500
+Subject: [PATCH V4 13/18] ARM: OMAP2+: Convert NAND to retrieve GPMC settings
+ from DT
 In-Reply-To: <1363710956-26773-1-git-send-email-jon-hunter@ti.com>
 References: <1363710956-26773-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <1363710956-26773-8-git-send-email-jon-hunter@ti.com>
+Message-ID: <1363710956-26773-14-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert the OMAP2+ SMC91x code to use the gpmc_cs_program_settings()
-function for configuring the various GPMC options instead of directly
-programming the CONFIG1 register.
-
-Move configuration of the GPMC settings outside retime function and
-this does not need to be done if the timings are changed dynamically
-at runtime.
+When booting with device-tree, retrieve GPMC settings for NAND from
+the device-tree blob. This will allow us to remove all static settings
+stored in the gpmc-nand.c in the future once the migration to
+device-tree is complete.
 
 Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 Tested-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- arch/arm/mach-omap2/gpmc-smc91x.c |   30 +++++++++++++++++-------------
- 1 file changed, 17 insertions(+), 13 deletions(-)
+ arch/arm/mach-omap2/gpmc-nand.c |   16 ++++++++++------
+ 1 file changed, 10 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/gpmc-smc91x.c b/arch/arm/mach-omap2/gpmc-smc91x.c
-index 4b78338..61a0635 100644
---- a/arch/arm/mach-omap2/gpmc-smc91x.c
-+++ b/arch/arm/mach-omap2/gpmc-smc91x.c
-@@ -49,6 +49,10 @@ static struct platform_device gpmc_smc91x_device = {
- 	.resource	= gpmc_smc91x_resources,
- };
+diff --git a/arch/arm/mach-omap2/gpmc-nand.c b/arch/arm/mach-omap2/gpmc-nand.c
+index 12e9753..d9c2719 100644
+--- a/arch/arm/mach-omap2/gpmc-nand.c
++++ b/arch/arm/mach-omap2/gpmc-nand.c
+@@ -137,12 +137,16 @@ int gpmc_nand_init(struct omap_nand_platform_data *gpmc_nand_data,
+ 			return err;
+ 		}
  
-+static struct gpmc_settings smc91x_settings = {
-+	.device_width = GPMC_DEVWIDTH_16BIT,
-+};
-+
- /*
-  * Set the gpmc timings for smc91c96. The timings are taken
-  * from the data sheet available at:
-@@ -67,18 +71,6 @@ static int smc91c96_gpmc_retime(void)
- 	const int t7 = 5;	/* Figure 12.4 write */
- 	const int t8 = 5;	/* Figure 12.4 write */
- 	const int t20 = 185;	/* Figure 12.2 read and 12.4 write */
--	u32 l;
+-		s.device_nand = true;
 -
--	l = GPMC_CONFIG1_DEVICESIZE_16;
--	if (gpmc_cfg->flags & GPMC_MUX_ADD_DATA)
--		l |= GPMC_CONFIG1_MUXADDDATA;
--	if (gpmc_cfg->flags & GPMC_READ_MON)
--		l |= GPMC_CONFIG1_WAIT_READ_MON;
--	if (gpmc_cfg->flags & GPMC_WRITE_MON)
--		l |= GPMC_CONFIG1_WAIT_WRITE_MON;
--	if (gpmc_cfg->wait_pin)
--		l |= GPMC_CONFIG1_WAIT_PIN_SEL(gpmc_cfg->wait_pin);
--	gpmc_cs_write_reg(gpmc_cfg->cs, GPMC_CS_CONFIG1, l);
- 
- 	/*
- 	 * FIXME: Calculate the address and data bus muxed timings.
-@@ -104,7 +96,7 @@ static int smc91c96_gpmc_retime(void)
- 	dev_t.t_cez_w = t4_w * 1000;
- 	dev_t.t_wr_cycle = (t20 - t3) * 1000;
- 
--	gpmc_calc_timings(&t, NULL, &dev_t);
-+	gpmc_calc_timings(&t, &smc91x_settings, &dev_t);
- 
- 	return gpmc_cs_set_timings(gpmc_cfg->cs, &t);
- }
-@@ -133,6 +125,18 @@ void __init gpmc_smc91x_init(struct omap_smc91x_platform_data *board_data)
- 	gpmc_smc91x_resources[0].end = cs_mem_base + 0x30f;
- 	gpmc_smc91x_resources[1].flags |= (gpmc_cfg->flags & IRQF_TRIGGER_MASK);
- 
-+	if (gpmc_cfg->flags & GPMC_MUX_ADD_DATA)
-+		smc91x_settings.mux_add_data = GPMC_MUX_AD;
-+	if (gpmc_cfg->flags & GPMC_READ_MON)
-+		smc91x_settings.wait_on_read = true;
-+	if (gpmc_cfg->flags & GPMC_WRITE_MON)
-+		smc91x_settings.wait_on_write = true;
-+	if (gpmc_cfg->wait_pin)
-+		smc91x_settings.wait_pin = gpmc_cfg->wait_pin;
-+	ret = gpmc_cs_program_settings(gpmc_cfg->cs, &smc91x_settings);
-+	if (ret < 0)
-+		goto free1;
+-		/* Enable RD PIN Monitoring Reg */
+-		if (gpmc_nand_data->dev_ready) {
+-			s.wait_on_read = true;
+-			s.wait_on_write = true;
++		if (gpmc_nand_data->of_node) {
++			gpmc_read_settings_dt(gpmc_nand_data->of_node, &s);
++		} else {
++			s.device_nand = true;
 +
- 	if (gpmc_cfg->retime) {
- 		ret = gpmc_cfg->retime();
- 		if (ret != 0)
++			/* Enable RD PIN Monitoring Reg */
++			if (gpmc_nand_data->dev_ready) {
++				s.wait_on_read = true;
++				s.wait_on_write = true;
++			}
+ 		}
+ 
+ 		if (gpmc_nand_data->devsize == NAND_BUSWIDTH_16)
 -- 
 1.7.10.4
