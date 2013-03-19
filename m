@@ -1,22 +1,28 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 19 Mar 2013 12:05:10 -0600
-Subject: [PATCH] ARM: tegra: fuse: add fuctions to read speedo id and
- process id
-In-Reply-To: <1363660405-10668-1-git-send-email-dahuang@nvidia.com>
-References: <1363660405-10668-1-git-send-email-dahuang@nvidia.com>
-Message-ID: <5148A8D6.8000002@wwwdotorg.org>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Tue, 19 Mar 2013 19:07:28 +0100
+Subject: [PATCH 0/4] led: drivers bug fixes
+Message-ID: <1363716452-18870-1-git-send-email-simon.guinot@sequanux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/18/2013 08:33 PM, Danny Huang wrote:
-> Add functions to read the speedo and process id of both cpu and soc.
-> There might be some drivers need the information as well.
+Here are some bug fixes for the LED drivers leds-ns2, leds-lt3593 and
+leds-renesas-tpu. Note that I don't have tested the patches related with
+the two lasts. I don't have the hardware.
 
-What code wants to use these functions? It'd be best to submit this
-patch with that code, so that something actually uses the functions, and
-they don't look like dead code.
+Regards,
 
-In the past, functions similar to this used to exist. However, they were
-removed and replaced by direct access to the underlying variables. Do we
-actually need functions for this, or can code simply read from the
-variables instead?
+Simon
+
+Simon Guinot (4):
+  leds: leds-ns2: fix oops at module removal
+  leds: leds-ns2: fix devm_gpio_request_one() flags parameter
+  leds: leds-lt3593: fix devm_gpio_request_one() flags parameter
+  leds: renesas: fix devm_gpio_request_one() flags parameter
+
+ drivers/leds/leds-lt3593.c      |    5 +++--
+ drivers/leds/leds-ns2.c         |   44 ++++++++++++++++++++++++++-------------
+ drivers/leds/leds-renesas-tpu.c |    3 ++-
+ 3 files changed, 34 insertions(+), 18 deletions(-)
+
+-- 
+1.7.10.4
