@@ -1,39 +1,47 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 19 Mar 2013 10:13:51 -0500
-Subject: [PATCH 2/2] cpuidle / calxeda: remove redundant Kconfig option
-In-Reply-To: <514877B5.6080200@linaro.org>
-References: <1363080476-26555-1-git-send-email-daniel.lezcano@linaro.org>
- <1363080476-26555-2-git-send-email-daniel.lezcano@linaro.org>
- <51485876.307@gmail.com> <514877B5.6080200@linaro.org>
-Message-ID: <514880AF.7010404@gmail.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Tue, 19 Mar 2013 16:41:37 +0100
+Subject: [PATCH] arm64: Kconfig.debug: Remove unused CONFIG_DEBUG_ERRORS
+Message-ID: <1363707697.1390.13.camel@x61.thuisdomein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/19/2013 09:35 AM, Daniel Lezcano wrote:
-> On 03/19/2013 01:22 PM, Rob Herring wrote:
->> On 03/12/2013 04:27 AM, Daniel Lezcano wrote:
->>> When the CPU_IDLE and the ARCH_HIGHBANK options are set it is
->>> pointless to define a new option CPU_IDLE_CALXEDA because it
->>> is redundant.
->>>
->>> The Makefile drivers directory contains a condition to compile
->>> the cpuidle drivers:
->>>
->>> obj-$(CONFIG_CPU_IDLE)          += cpuidle/
->>>
->>> Hence, if CPU_IDLE is not set we won't enter this directory.
->>>
->>> This patch removes the useless Kconfig option and replaces the
->>> condition in the Makefile by CONFIG_ARCH_HIGHBANK.
->>
->> If I have multiple platforms including highbank compiled in, but want to
->> disable cpuidle just for highbank, then you can't disable it at compile
->> time.
-> 
-> Could you elaborate a bit ? Is it today possible to have multiple
-> platforms in a single kernel ?
+The Kconfig entry for DEBUG_ERRORS is a verbatim copy of the former arm
+entry for that symbol. It got removed in v2.6.39 because it wasn't
+actually used anywhere. There are still no users of DEBUG_ERRORS so
+remove this entry too.
 
-You've heard of single zImage, right? Vexpress, mvebu, highbank, imx,
-omap2+, socfpga, vt8500 off the top of my head as of 3.8.
+Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+---
+0) Eyeball tested.
 
-Rob
+1) The arm entry got removed in commit
+b025a3f836d1e8785ae65b59282a4befef9892bb ("ARM: 6876/1: Kconfig.debug:
+Remove unused CONFIG_DEBUG_ERRORS").
+
+ arch/arm64/Kconfig.debug | 11 -----------
+ 1 file changed, 11 deletions(-)
+
+diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
+index 5149343..1a6bfe9 100644
+--- a/arch/arm64/Kconfig.debug
++++ b/arch/arm64/Kconfig.debug
+@@ -6,17 +6,6 @@ config FRAME_POINTER
+ 	bool
+ 	default y
+ 
+-config DEBUG_ERRORS
+-	bool "Verbose kernel error messages"
+-	depends on DEBUG_KERNEL
+-	help
+-	  This option controls verbose debugging information which can be
+-	  printed when the kernel detects an internal error. This debugging
+-	  information is useful to kernel hackers when tracking down problems,
+-	  but mostly meaningless to other people. It's safe to say Y unless
+-	  you are concerned with the code size or don't want to see these
+-	  messages.
+-
+ config DEBUG_STACK_USAGE
+ 	bool "Enable stack utilization instrumentation"
+ 	depends on DEBUG_KERNEL
+-- 
+1.7.11.7
