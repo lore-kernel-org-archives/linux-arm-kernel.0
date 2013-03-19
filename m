@@ -1,92 +1,86 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 19 Mar 2013 12:42:15 +0900
-Subject: [PATCH v3 1/3] ARM: shmobile: sh73a0: wait for completion when
- kicking the clock
-In-Reply-To: <20130301025222.GA32306@verge.net.au>
-References: <1362054120-8600-1-git-send-email-g.liakhovetski@gmx.de>
- <1362054120-8600-2-git-send-email-g.liakhovetski@gmx.de>
- <20130301025222.GA32306@verge.net.au>
-Message-ID: <20130319034214.GB21444@verge.net.au>
+From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
+Date: Tue, 19 Mar 2013 14:01:27 +0900
+Subject: [PATCH v2] ARM: mm: clean-up in order to reduce to call
+ kmap_high_get()
+Message-ID: <1363669287-9049-1-git-send-email-iamjoonsoo.kim@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 01, 2013 at 11:52:25AM +0900, Simon Horman wrote:
-> On Thu, Feb 28, 2013 at 01:21:58PM +0100, Guennadi Liakhovetski wrote:
-> > To reconfigure clocks, controlled by FRQCRA and FRQCRB, a kick bit has to
-> > be set and to make sure the setting has taken effect, it has to be read
-> > back repeatedly until it is cleared by the hardware. This patch adds the
-> > waiting part, that was missing until now.
-> > 
-> > Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> 
-> This patch seems to be ready to be applied.
-> 
-> Magnus, could I get a review from you?
+In kmap_atomic(), kmap_high_get() is invoked for checking already
+mapped area. In __flush_dcache_page() and dma_cache_maint_page(),
+we explicitly call kmap_high_get() before kmap_atomic()
+when cache_is_vipt(), so kmap_high_get() can be invoked twice.
+This is useless operation, so remove one.
 
-Magnus, ping.
+v2: change cache_is_vipt() to cache_is_vipt_nonaliasing() in order to
+be self-documented
 
-> > ---
-> > 
-> > As noted in patch 0/3, this patch affects existing systems, but AFAICS 
-> > only theoretically - so far nobody is changing clock rates of any of the 
-> > FRQCRA and FRQCRB clocks. Still, please, handle with care.
-> > 
-> >  arch/arm/mach-shmobile/clock-sh73a0.c |   23 +++++++++++++++++------
-> >  1 files changed, 17 insertions(+), 6 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-shmobile/clock-sh73a0.c b/arch/arm/mach-shmobile/clock-sh73a0.c
-> > index 71843dd..34b5c5a 100644
-> > --- a/arch/arm/mach-shmobile/clock-sh73a0.c
-> > +++ b/arch/arm/mach-shmobile/clock-sh73a0.c
-> > @@ -21,6 +21,7 @@
-> >  #include <linux/io.h>
-> >  #include <linux/sh_clk.h>
-> >  #include <linux/clkdev.h>
-> > +#include <asm/processor.h>
-> >  #include <mach/common.h>
-> >  
-> >  #define FRQCRA		IOMEM(0xe6150000)
-> > @@ -234,14 +235,24 @@ static struct clk *main_clks[] = {
-> >  	&sh73a0_extalr_clk,
-> >  };
-> >  
-> > -static void div4_kick(struct clk *clk)
-> > +static int frqcr_kick(void)
-> >  {
-> > -	unsigned long value;
-> > +	int i;
-> > +
-> > +	/* set KICK bit in FRQCRB to update hardware setting, check success */
-> > +	__raw_writel(__raw_readl(FRQCRB) | (1 << 31), FRQCRB);
-> > +	for (i = 1000; i; i--)
-> > +		if (__raw_readl(FRQCRB) & (1 << 31))
-> > +			cpu_relax();
-> > +		else
-> > +			return i;
-> > +
-> > +	return -ETIMEDOUT;
-> > +}
-> >  
-> > -	/* set KICK bit in FRQCRB to update hardware setting */
-> > -	value = __raw_readl(FRQCRB);
-> > -	value |= (1 << 31);
-> > -	__raw_writel(value, FRQCRB);
-> > +static void div4_kick(struct clk *clk)
-> > +{
-> > +	frqcr_kick();
-> >  }
-> >  
-> >  static int divisors[] = { 2, 3, 4, 6, 8, 12, 16, 18,
-> > -- 
-> > 1.7.2.5
-> > 
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Acked-by: Nicolas Pitre <nico@linaro.org>
+Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+---
+Hello Nicolas.
+I maintain your 'Acked-by' while updating this patch to v2.
+Please let me know if there is problem.
+
+Thanks.
+
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index e9db6b4..ef3e0f3 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -823,16 +823,17 @@ static void dma_cache_maint_page(struct page *page, unsigned long offset,
+ 		if (PageHighMem(page)) {
+ 			if (len + offset > PAGE_SIZE)
+ 				len = PAGE_SIZE - offset;
+-			vaddr = kmap_high_get(page);
+-			if (vaddr) {
+-				vaddr += offset;
+-				op(vaddr, len, dir);
+-				kunmap_high(page);
+-			} else if (cache_is_vipt()) {
+-				/* unmapped pages might still be cached */
++
++			if (cache_is_vipt_nonaliasing()) {
+ 				vaddr = kmap_atomic(page);
+ 				op(vaddr + offset, len, dir);
+ 				kunmap_atomic(vaddr);
++			} else {
++				vaddr = kmap_high_get(page);
++				if (vaddr) {
++					op(vaddr + offset, len, dir);
++					kunmap_high(page);
++				}
+ 			}
+ 		} else {
+ 			vaddr = page_address(page) + offset;
+diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+index 1c8f7f5..0d473cc 100644
+--- a/arch/arm/mm/flush.c
++++ b/arch/arm/mm/flush.c
+@@ -170,15 +170,18 @@ void __flush_dcache_page(struct address_space *mapping, struct page *page)
+ 	if (!PageHighMem(page)) {
+ 		__cpuc_flush_dcache_area(page_address(page), PAGE_SIZE);
+ 	} else {
+-		void *addr = kmap_high_get(page);
+-		if (addr) {
+-			__cpuc_flush_dcache_area(addr, PAGE_SIZE);
+-			kunmap_high(page);
+-		} else if (cache_is_vipt()) {
+-			/* unmapped pages might still be cached */
++		void *addr;
++
++		if (cache_is_vipt_nonaliasing()) {
+ 			addr = kmap_atomic(page);
+ 			__cpuc_flush_dcache_area(addr, PAGE_SIZE);
+ 			kunmap_atomic(addr);
++		} else {
++			addr = kmap_high_get(page);
++			if (addr) {
++				__cpuc_flush_dcache_area(addr, PAGE_SIZE);
++				kunmap_high(page);
++			}
+ 		}
+ 	}
+ 
+-- 
+1.7.9.5
