@@ -1,57 +1,33 @@
-From: fabio.baltieri@linaro.org (Fabio Baltieri)
-Date: Tue, 19 Mar 2013 12:55:18 +0100
-Subject: [PATCH] ARM: ux500: select WATCHDOG and MUSB for ux500
-In-Reply-To: <1363604457-17112-1-git-send-email-fabio.baltieri@linaro.org>
-References: <1363604457-17112-1-git-send-email-fabio.baltieri@linaro.org>
-Message-ID: <20130319115518.GA1558@balto.lan>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 19 Mar 2013 07:56:15 -0400
+Subject: [PATCH v3 0/9] refactoring for mask_cache
+In-Reply-To: <20130319114430.GP13280@titan.lakedaemon.net>
+References: <1363277430-21325-1-git-send-email-holger.brunck@keymile.com>
+ <1363615255-18200-1-git-send-email-gerlando.falauto@keymile.com>
+ <20130319100352.GB2419@localhost>
+ <20130319110620.GO13280@titan.lakedaemon.net>
+ <51484793.5020102@keymile.com>
+ <20130319114430.GP13280@titan.lakedaemon.net>
+Message-ID: <20130319115615.GR13280@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
-
-On Mon, Mar 18, 2013 at 12:00:57PM +0100, Fabio Baltieri wrote:
-> Enable ux500 specific USB and watchdog drivers by default on
-> u8500_defconfig.
-
-Please ignore this patch, some new Kconfig menus are being added in
--next so ab8500 USB will need additional options.  I'll send a v2 soon.
-
-Thanks,
-Fabio
-
-> diff --git a/arch/arm/configs/u8500_defconfig b/arch/arm/configs/u8500_defconfig
-> index 426270f..92b1347 100644
-> --- a/arch/arm/configs/u8500_defconfig
-> +++ b/arch/arm/configs/u8500_defconfig
-> @@ -71,6 +71,7 @@ CONFIG_GPIO_TC3589X=y
->  # CONFIG_AB8500_BATTERY_THERM_ON_BATCTRL is not set
->  CONFIG_THERMAL=y
->  CONFIG_CPU_THERMAL=y
-> +CONFIG_WATCHDOG=y
->  CONFIG_MFD_STMPE=y
->  CONFIG_MFD_TC3589X=y
->  CONFIG_AB5500_CORE=y
-> @@ -80,7 +81,12 @@ CONFIG_REGULATOR_AB8500=y
->  CONFIG_REGULATOR_FIXED_VOLTAGE=y
->  CONFIG_REGULATOR_GPIO=y
->  # CONFIG_HID_SUPPORT is not set
-> +CONFIG_USB=y
-> +CONFIG_USB_MUSB_HDRC=y
-> +CONFIG_USB_MUSB_UX500=y
->  CONFIG_USB_GADGET=y
-> +CONFIG_USB_GADGET_MUSB_HDRC=y
-> +CONFIG_USB_ETH=m
->  CONFIG_AB8500_USB=y
->  CONFIG_MMC=y
->  CONFIG_MMC_CLKGATE=y
-> -- 
-> 1.8.1.3
+On Tue, Mar 19, 2013 at 07:44:31AM -0400, Jason Cooper wrote:
+> Those commit IDs are going to change once LinusW (I presume) applies
+> them to his tree, so he'll have to edit each commit message to point the
+> the correct commit.
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> LinusW, do you want me to handle this?
 
--- 
-Fabio Baltieri
+Never mind, coffee underflow to /dev/brain.  One drawback to mutt, can't
+view thread while typing messages...
+
+> If you prefer to take it:
+> 
+> Acked-by: Jason Cooper <jason@lakedaemon.net>
+
+for the plat-orion/gpio.c bits and if it helps, the gpio-mvebu.c bits.
+
+thx,
+
+Jason.
