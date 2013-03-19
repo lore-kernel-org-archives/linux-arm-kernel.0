@@ -1,30 +1,63 @@
-From: mchehab@redhat.com (Mauro Carvalho Chehab)
-Date: Mon, 18 Mar 2013 20:54:03 -0300
-Subject: [PATCH] [media] ir: IR_RX51 only works on OMAP2
-In-Reply-To: <1363298204-8014-7-git-send-email-arnd@arndb.de>
-References: <1363298204-8014-1-git-send-email-arnd@arndb.de>
- <1363298204-8014-7-git-send-email-arnd@arndb.de>
-Message-ID: <20130318205403.4203e2fe@redhat.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Mon, 18 Mar 2013 17:11:05 -0700
+Subject: [PATCH 6/8] SERIAL: OMAP: Remove the slave idle handling from
+ the driver
+In-Reply-To: <51419A3D.1000703@ti.com>
+References: <1361354444-18230-1-git-send-email-santosh.shilimkar@ti.com>
+ <87sj4rqa7r.fsf@linaro.org> <5124EF59.5080206@ti.com>
+ <51419A3D.1000703@ti.com>
+Message-ID: <20130319001105.GA13449@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Thu, 14 Mar 2013 22:56:44 +0100
-Arnd Bergmann <arnd@arndb.de> escreveu:
-
-> This driver can be enabled on OMAP1 at the moment, which breaks
-> allyesconfig for that platform. Let's mark it OMAP2PLUS-only
-> in Kconfig, since that is the only thing it builds on.
+On Thu, Mar 14, 2013 at 03:07:01PM +0530, Santosh Shilimkar wrote:
+> (Looping Greg KH.)
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
-> Cc: Timo Kokkonen <timo.t.kokkonen@iki.fi>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> Cc: linux-media at vger.kernel.org
-> ---
-> Mauro, please apply for 3.9
+> Greg,
+> 
+> On Wednesday 20 February 2013 09:14 PM, Santosh Shilimkar wrote:
+> > On Wednesday 20 February 2013 08:54 PM, Kevin Hilman wrote:
+> >> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+> >>
+> >>> UART IP slave idle handling now taken care by runtime pm backend(hwmod layer)
+> >>> so remove the hackery from the driver.
+> >>>
+> >>> Tested-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+> >>> Tested-by: Sourav Poddar <sourav.poddar@ti.com>
+> >>> Signed-off-by: Rajendra nayak <rnayak@ti.com>
+> >>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> >>>
+> >>> ---
+> >>>   drivers/tty/serial/omap-serial.c |   23 -----------------------
+> >>>   1 file changed, 23 deletions(-)
+> >>
+> >> This patch should also remove the hooks from
+> >> <linux/platform_data/serial-omap.h>
+> >>
+> > Right. Will fix that in next version. Thanks.
+> > 
+> Sorry for not CC'ing first place
+> The subject patch is part of the series which cleans up the slave
+> idle handling from OMAP serial driver. It will be best to queue
+> it along with rest of the patches with your ack on $subject patch.
+> 
+> Here is the updated version which also removed the hooks
+> from 'linux/platform_data/serial-omap.h' as per Kevin suggestion.
+> 
+> >From 92916b8e0d895962c88fefbf99284967a4b94426 Mon Sep 17 00:00:00 2001
+> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Date: Fri, 15 Feb 2013 15:50:37 +0530
+> Subject: [PATCH 6/8] SERIAL: OMAP: Remove the slave idle handling from the
+>  driver
+> 
+> UART IP slave idle handling now taken care by runtime pm backend(hwmod layer)
+> so remove the hackery from the driver.
+> 
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> 
+> Tested-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+> Tested-by: Sourav Poddar <sourav.poddar@ti.com>
+> Signed-off-by: Rajendra nayak <rnayak@ti.com>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-OK, I'm applying it on my 3.9 branch right now.
-
-Thanks!
-Mauro
+Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
