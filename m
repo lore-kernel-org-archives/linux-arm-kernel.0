@@ -1,78 +1,57 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 19 Mar 2013 12:49:12 +0100
-Subject: [PATCH 2/2] cpuidle / calxeda: remove redundant Kconfig option
-In-Reply-To: <1363080476-26555-2-git-send-email-daniel.lezcano@linaro.org>
-References: <1363080476-26555-1-git-send-email-daniel.lezcano@linaro.org>
- <1363080476-26555-2-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <514850B8.70707@linaro.org>
+From: fabio.baltieri@linaro.org (Fabio Baltieri)
+Date: Tue, 19 Mar 2013 12:55:18 +0100
+Subject: [PATCH] ARM: ux500: select WATCHDOG and MUSB for ux500
+In-Reply-To: <1363604457-17112-1-git-send-email-fabio.baltieri@linaro.org>
+References: <1363604457-17112-1-git-send-email-fabio.baltieri@linaro.org>
+Message-ID: <20130319115518.GA1558@balto.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/12/2013 10:27 AM, Daniel Lezcano wrote:
-> When the CPU_IDLE and the ARCH_HIGHBANK options are set it is
-> pointless to define a new option CPU_IDLE_CALXEDA because it
-> is redundant.
-> 
-> The Makefile drivers directory contains a condition to compile
-> the cpuidle drivers:
-> 
-> obj-$(CONFIG_CPU_IDLE)          += cpuidle/
-> 
-> Hence, if CPU_IDLE is not set we won't enter this directory.
-> 
-> This patch removes the useless Kconfig option and replaces the
-> condition in the Makefile by CONFIG_ARCH_HIGHBANK.
-> 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> ---
+Hi Linus,
 
-Hi Rob,
+On Mon, Mar 18, 2013 at 12:00:57PM +0100, Fabio Baltieri wrote:
+> Enable ux500 specific USB and watchdog drivers by default on
+> u8500_defconfig.
 
-sorry I missed to add you in Cc for this patch.
+Please ignore this patch, some new Kconfig menus are being added in
+-next so ab8500 USB will need additional options.  I'll send a v2 soon.
 
-Regards
-  -- Daniel
+Thanks,
+Fabio
 
-
->  drivers/cpuidle/Kconfig  |   10 ----------
->  drivers/cpuidle/Makefile |    2 +-
->  2 files changed, 1 insertion(+), 11 deletions(-)
+> diff --git a/arch/arm/configs/u8500_defconfig b/arch/arm/configs/u8500_defconfig
+> index 426270f..92b1347 100644
+> --- a/arch/arm/configs/u8500_defconfig
+> +++ b/arch/arm/configs/u8500_defconfig
+> @@ -71,6 +71,7 @@ CONFIG_GPIO_TC3589X=y
+>  # CONFIG_AB8500_BATTERY_THERM_ON_BATCTRL is not set
+>  CONFIG_THERMAL=y
+>  CONFIG_CPU_THERMAL=y
+> +CONFIG_WATCHDOG=y
+>  CONFIG_MFD_STMPE=y
+>  CONFIG_MFD_TC3589X=y
+>  CONFIG_AB5500_CORE=y
+> @@ -80,7 +81,12 @@ CONFIG_REGULATOR_AB8500=y
+>  CONFIG_REGULATOR_FIXED_VOLTAGE=y
+>  CONFIG_REGULATOR_GPIO=y
+>  # CONFIG_HID_SUPPORT is not set
+> +CONFIG_USB=y
+> +CONFIG_USB_MUSB_HDRC=y
+> +CONFIG_USB_MUSB_UX500=y
+>  CONFIG_USB_GADGET=y
+> +CONFIG_USB_GADGET_MUSB_HDRC=y
+> +CONFIG_USB_ETH=m
+>  CONFIG_AB8500_USB=y
+>  CONFIG_MMC=y
+>  CONFIG_MMC_CLKGATE=y
+> -- 
+> 1.8.1.3
 > 
-> diff --git a/drivers/cpuidle/Kconfig b/drivers/cpuidle/Kconfig
-> index c4cc27e..234ae65 100644
-> --- a/drivers/cpuidle/Kconfig
-> +++ b/drivers/cpuidle/Kconfig
-> @@ -30,13 +30,3 @@ config CPU_IDLE_GOV_MENU
->  
->  config ARCH_NEEDS_CPU_IDLE_COUPLED
->  	def_bool n
-> -
-> -if CPU_IDLE
-> -
-> -config CPU_IDLE_CALXEDA
-> -	bool "CPU Idle Driver for Calxeda processors"
-> -	depends on ARCH_HIGHBANK
-> -	help
-> -	  Select this to enable cpuidle on Calxeda processors.
-> -
-> -endif
-> diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
-> index 0d8bd55..d1aba71 100644
-> --- a/drivers/cpuidle/Makefile
-> +++ b/drivers/cpuidle/Makefile
-> @@ -5,5 +5,5 @@
->  obj-y += cpuidle.o driver.o governor.o sysfs.o governors/
->  obj-$(CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED) += coupled.o
->  
-> -obj-$(CONFIG_CPU_IDLE_CALXEDA) += cpuidle-calxeda.o
-> +obj-$(CONFIG_ARCH_HIGHBANK) += cpuidle-calxeda.o
->  obj-$(CONFIG_ARCH_KIRKWOOD) += cpuidle-kirkwood.o
 > 
-
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Fabio Baltieri
