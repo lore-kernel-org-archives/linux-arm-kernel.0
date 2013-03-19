@@ -1,85 +1,84 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Tue, 19 Mar 2013 11:35:55 -0500
-Subject: [PATCH V4 17/18] ARM: OMAP2+: Allow GPMC probe to complete even if CS
- mapping fails
+Date: Tue, 19 Mar 2013 11:35:53 -0500
+Subject: [PATCH V4 15/18] ARM: OMAP2+: Detect incorrectly aligned GPMC base
+ address
 In-Reply-To: <1363710956-26773-1-git-send-email-jon-hunter@ti.com>
 References: <1363710956-26773-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <1363710956-26773-18-git-send-email-jon-hunter@ti.com>
+Message-ID: <1363710956-26773-16-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the GPMC driver is probed, we call gpmc_mem_init() to see which
-chip-selects have already been configured and enabled by the boot-loader
-and allocate space for them. If we fail to allocate space for one
-chip-select, then we return failure from the probe and the GPMC driver
-will not be available.
+Each GPMC chip-select can be configured to map 16MB, 32MB, 64MB or 128MB
+of address space. The physical base address where a chip-select starts
+is also configurable and must be aligned on a boundary that is equal to
+or greater than the size of the address space mapped bt the chip-select.
+When enabling a GPMC chip-select, ensure that the base address is aligned
+to the appropriate boundary.
 
-Rather than render the GPMC useless for all GPMC devices, if we fail to
-allocate space for one chip-select print a warning and disable the
-chip-select. This way other GPMC clients can still be used.
-
-There is no downside to this approach, because all GPMC clients need to
-request a chip-select before they can use the GPMC and on requesting a
-chip-select, if memory has not already been reserved for the chip-select
-then it will be.
-
+Reported-by: Mark Jackson <mpfj-list@mimc.co.uk>
 Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 Tested-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- arch/arm/mach-omap2/gpmc.c |   24 +++++++-----------------
- 1 file changed, 7 insertions(+), 17 deletions(-)
+ arch/arm/mach-omap2/gpmc.c |   22 +++++++++++++++++++---
+ 1 file changed, 19 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-index ebb88cf..9208d8e 100644
+index 94624bf..9797f46 100644
 --- a/arch/arm/mach-omap2/gpmc.c
 +++ b/arch/arm/mach-omap2/gpmc.c
-@@ -785,9 +785,9 @@ static void gpmc_mem_exit(void)
- 
+@@ -403,11 +403,18 @@ int gpmc_cs_set_timings(int cs, const struct gpmc_timings *t)
+ 	return 0;
  }
  
--static int gpmc_mem_init(void)
-+static void gpmc_mem_init(void)
+-static void gpmc_cs_enable_mem(int cs, u32 base, u32 size)
++static int gpmc_cs_enable_mem(int cs, u32 base, u32 size)
  {
--	int cs, rc;
-+	int cs;
+ 	u32 l;
+ 	u32 mask;
  
- 	/*
- 	 * The first 1MB of GPMC address space is typically mapped to
-@@ -804,16 +804,12 @@ static int gpmc_mem_init(void)
- 		if (!gpmc_cs_mem_enabled(cs))
- 			continue;
- 		gpmc_cs_get_memconf(cs, &base, &size);
--		rc = gpmc_cs_insert_mem(cs, base, size);
--		if (rc < 0) {
--			while (--cs >= 0)
--				if (gpmc_cs_mem_enabled(cs))
--					gpmc_cs_delete_mem(cs);
--			return rc;
-+		if (gpmc_cs_insert_mem(cs, base, size)) {
-+			pr_warn("%s: disabling cs %d mapped at 0x%x-0x%x\n",
-+				__func__, cs, base, base + size);
-+			gpmc_cs_disable_mem(cs);
- 		}
- 	}
--
--	return 0;
++	/*
++	 * Ensure that base address is aligned on a
++	 * boundary equal to or greater than size.
++	 */
++	if (base & (size - 1))
++		return -EINVAL;
++
+ 	mask = (1 << GPMC_SECTION_SHIFT) - size;
+ 	l = gpmc_cs_read_reg(cs, GPMC_CS_CONFIG7);
+ 	l &= ~0x3f;
+@@ -416,6 +423,8 @@ static void gpmc_cs_enable_mem(int cs, u32 base, u32 size)
+ 	l |= ((mask >> GPMC_CHUNK_SHIFT) & 0x0f) << 8;
+ 	l |= GPMC_CONFIG7_CSVALID;
+ 	gpmc_cs_write_reg(cs, GPMC_CS_CONFIG7, l);
++
++	return 0;
  }
  
- static u32 gpmc_round_ps_to_sync_clk(u32 time_ps, u32 sync_clk)
-@@ -1611,13 +1607,7 @@ static int gpmc_probe(struct platform_device *pdev)
- 	dev_info(gpmc_dev, "GPMC revision %d.%d\n", GPMC_REVISION_MAJOR(l),
- 		 GPMC_REVISION_MINOR(l));
+ static void gpmc_cs_disable_mem(int cs)
+@@ -526,7 +535,9 @@ static int gpmc_cs_remap(int cs, u32 base)
+ 	ret = gpmc_cs_insert_mem(cs, base, size);
+ 	if (ret < 0)
+ 		return ret;
+-	gpmc_cs_enable_mem(cs, base, size);
++	ret = gpmc_cs_enable_mem(cs, base, size);
++	if (ret < 0)
++		return ret;
  
--	rc = gpmc_mem_init();
--	if (rc < 0) {
--		clk_disable_unprepare(gpmc_l3_clk);
--		clk_put(gpmc_l3_clk);
--		dev_err(gpmc_dev, "failed to reserve memory\n");
--		return rc;
--	}
-+	gpmc_mem_init();
+ 	return 0;
+ }
+@@ -556,7 +567,12 @@ int gpmc_cs_request(int cs, unsigned long size, unsigned long *base)
+ 	if (r < 0)
+ 		goto out;
  
- 	if (gpmc_setup_irq() < 0)
- 		dev_warn(gpmc_dev, "gpmc_setup_irq failed\n");
+-	gpmc_cs_enable_mem(cs, res->start, resource_size(res));
++	r = gpmc_cs_enable_mem(cs, res->start, resource_size(res));
++	if (r < 0) {
++		release_resource(res);
++		goto out;
++	}
++
+ 	*base = res->start;
+ 	gpmc_cs_set_reserved(cs, 1);
+ out:
 -- 
 1.7.10.4
