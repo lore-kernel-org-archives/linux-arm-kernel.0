@@ -1,79 +1,232 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 19 Mar 2013 11:07:41 -0600
-Subject: [PATCH V4 4/9] ARM: tegra: pm: add platform suspend support
-In-Reply-To: <1363594400-11663-5-git-send-email-josephl@nvidia.com>
-References: <1363594400-11663-1-git-send-email-josephl@nvidia.com>
- <1363594400-11663-5-git-send-email-josephl@nvidia.com>
-Message-ID: <51489B5D.3050101@wwwdotorg.org>
+From: mfuzzey@parkeon.com (Martin Fuzzey)
+Date: Tue, 19 Mar 2013 18:09:33 +0100
+Subject: [RFC PATCH] CLK: Allow parent clock and rate to be configured in DT.
+Message-ID: <20130319170933.28337.50448.stgit@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/18/2013 02:13 AM, Joseph Lo wrote:
-> Adding suspend to RAM support for Tegra platform. There are three suspend
-> mode for Tegra. The difference were below.
-> 
-> * LP2: CPU voltage off
-> * LP1: CPU voltage off, DRAM in self-refresh
-> * LP0: CPU + Core voltage off, DRAM in self-refresh
-> 
-> After this patch, the LP2 suspend mode will be supported.
+Even on platforms where the entire clock tree is not represented in the DT
+it can still be useful to allow parents and rates to be set from the DT.
 
-> diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
-> index c84505c..024f355 100644
-> --- a/arch/arm/mach-tegra/common.c
-> +++ b/arch/arm/mach-tegra/common.c
-> @@ -66,6 +66,7 @@ void __init tegra_dt_init_irq(void)
->  	tegra_init_irq();
->  	irqchip_init();
->  	tegra_legacy_irq_syscore_init();
-> +	tegra_init_suspend();
+An example of such a case is when a multiplexable clock output from a SOC
+is used to supply external chips (eg an audio codec connected to the i.MX53
+cko1 pin).
 
-Does that have to be part of tegra_dt_init_irq()? Can't we initialize
-suspend support in some later hook. init_irq() should just initialize IRQs.
+The cko1 pin can output various internal clock signals but, in
+order to obtain a suitable frequency for the codec, an appropriate parent must
+be selected.
 
-> diff --git a/arch/arm/mach-tegra/pmc.c b/arch/arm/mach-tegra/pmc.c
+Another example is setting root clock dividers.
 
-> -void set_power_timers(unsigned long us_on, unsigned long us_off)
-> +static void set_power_timers(u32 us_on, u32 us_off, unsigned long rate)
->  {
->  	unsigned long long ticks;
->  	unsigned long long pclk;
-> -	unsigned long rate;
->  	static unsigned long tegra_last_pclk;
->  
-> -	rate = clk_get_rate(tegra_pclk);
-> -
->  	if (WARN_ON_ONCE(rate <= 0))
->  		pclk = 100000000;
->  	else
+This is board specific rather than device driver or platform clock framework
+specific information and thus would be better in the DT.
 
-I don't think the code compiles after that?
+Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
+---
+Sending as RFC for the moment in a single patch together with an example
+for i.MX53.  Will split if this goes anywhere.
+---
+ .../bindings/clock/clock-configuration.txt         |   35 +++++++++
+ arch/arm/mach-imx/clk-imx51-imx53.c                |    9 +-
+ drivers/clk/Makefile                               |    1 
+ drivers/clk/clk-configuration.c                    |   79 ++++++++++++++++++++
+ include/linux/clk.h                                |    5 +
+ 5 files changed, 122 insertions(+), 7 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/clock-configuration.txt
+ create mode 100644 drivers/clk/clk-configuration.c
 
-The code must both compile and execute correctly after each patch is
-applied, without relying on any future patches.
-
-> +void tegra_pmc_pm_set(enum tegra_suspend_mode mode)
-> +{
-> +	u32 reg;
-> +	unsigned long rate = 0;
-> +
-> +	reg = tegra_pmc_readl(PMC_CTRL);
-> +	reg |= TEGRA_POWER_CPU_PWRREQ_OE;
-> +	reg &= ~TEGRA_POWER_EFFECT_LP0;
-> +
-> +	switch (mode) {
-> +	case TEGRA_SUSPEND_LP2:
-> +		rate = clk_get_rate(tegra_pclk);
-
-That isn't used anywhere.
-
-> +void tegra_pmc_suspend_init(void)
-> +{
-> +	u32 reg;
-> +
-> +	/* Always enable CPU power request; just normal polarity is supported */
-> +	reg = tegra_pmc_readl(PMC_CTRL);
-> +	BUG_ON(reg & TEGRA_POWER_CPU_PWRREQ_POLARITY);
-
-Why is that comment true? What does it take to support arbitrary
-polarity; just flipping the OE bit in the register?
+diff --git a/Documentation/devicetree/bindings/clock/clock-configuration.txt b/Documentation/devicetree/bindings/clock/clock-configuration.txt
+new file mode 100644
+index 0000000..482b0ff
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/clock-configuration.txt
+@@ -0,0 +1,35 @@
++This binding allows clocks to configured by setting their parent and/or rate.
++
++Configurations are specified subnodes of nodes with
++compatible="clock-configuration"
++
++The subnode properties are:
++
++Required properties:
++clocks: 		phandle of clock to configure in clock consumer format
++
++Optional properties:
++parent:			phandle of clock to use as parent in clock consumer format
++clock-rate:		clock rate to use
++
++
++For example:
++	clock-configuration {
++		compatible = "clock-configuration";
++		clko1 {
++			clocks = <&clks 160>; /* cko1_sel */
++			parent = <&clks 114>; /* pll3_sw */
++		};
++
++		esdhca {
++			clocks = <&clks 102>; /* esdhc_a_podf */
++			clock-frequency = <200000000>;
++		};
++
++		esdhcb {
++			clocks = <&clks 103>; /* esdhc_b_podf */
++			clock-frequency = <200000000>;
++		};
++	};
++
++
+diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+index 872a7bc..fd74795 100644
+--- a/arch/arm/mach-imx/clk-imx51-imx53.c
++++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+@@ -432,7 +432,7 @@ int __init mx51_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
+ 	val |= 1 << 23;
+ 	writel(val, MXC_CCM_CLPCR);
+ 
+-	return 0;
++	return of_clk_configure();
+ }
+ 
+ int __init mx53_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
+@@ -523,10 +523,6 @@ int __init mx53_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
+ 	clk_register_clkdev(clk[dummy], "ahb", "sdhci-esdhc-imx53.3");
+ 	clk_register_clkdev(clk[esdhc4_per_gate], "per", "sdhci-esdhc-imx53.3");
+ 
+-	/* set SDHC root clock to 200MHZ*/
+-	clk_set_rate(clk[esdhc_a_podf], 200000000);
+-	clk_set_rate(clk[esdhc_b_podf], 200000000);
+-
+ 	/* System timer */
+ 	mxc_timer_init(MX53_IO_ADDRESS(MX53_GPT1_BASE_ADDR), MX53_INT_GPT);
+ 
+@@ -536,8 +532,7 @@ int __init mx53_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
+ 
+ 	r = clk_round_rate(clk[usboh3_per_gate], 54000000);
+ 	clk_set_rate(clk[usboh3_per_gate], r);
+-
+-	return 0;
++	return of_clk_configure();
+ }
+ 
+ #ifdef CONFIG_OF
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index 300d477..bf364dd 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -7,6 +7,7 @@ obj-$(CONFIG_COMMON_CLK)	+= clk-fixed-factor.o
+ obj-$(CONFIG_COMMON_CLK)	+= clk-fixed-rate.o
+ obj-$(CONFIG_COMMON_CLK)	+= clk-gate.o
+ obj-$(CONFIG_COMMON_CLK)	+= clk-mux.o
++obj-$(CONFIG_COMMON_CLK)	+= clk-configuration.o
+ 
+ # SoCs specific
+ obj-$(CONFIG_ARCH_BCM2835)	+= clk-bcm2835.o
+diff --git a/drivers/clk/clk-configuration.c b/drivers/clk/clk-configuration.c
+new file mode 100644
+index 0000000..ee70619
+--- /dev/null
++++ b/drivers/clk/clk-configuration.c
+@@ -0,0 +1,79 @@
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * Device tree clock parent, rate configuration
++ */
++
++#include <linux/clk.h>
++#include <linux/of.h>
++
++
++static int configure_one_clock(struct clk *clk, struct device_node *np)
++{
++	int ret;
++	struct of_phandle_args clkspec;
++	struct clk *parent;
++	u32 rate;
++
++	ret = of_parse_phandle_with_args(np, "parent", "#clock-cells", 0,
++					&clkspec);
++	if (!ret) {
++		parent = of_clk_get_from_provider(&clkspec);
++		if (!IS_ERR(parent)) {
++			ret = clk_set_parent(clk, parent);
++			clk_put(parent);
++		}
++		of_node_put(clkspec.np);
++		if (ret)
++			goto err;
++	}
++
++	ret = 0;
++	if (!of_property_read_u32(np, "clock-frequency", &rate))
++		ret = clk_set_rate(clk, rate);
++
++err:
++	return ret;
++
++}
++
++/**
++ * of_clk_configure - configure clocks from device tree
++ *
++ * Allows parent and rate to be set from nodes having
++ * clock-configuration compatible property.
++ *
++ * See binding documentation for example
++ *
++ * Returns 0 on success, -EERROR otherwise.
++ */
++int of_clk_configure()
++{
++	struct device_node *config_node, *np;
++	struct clk *clk;
++	int err_count = 0;
++	int ret = 0;
++
++	for_each_compatible_node(config_node, NULL, "clock-configuration") {
++		for_each_child_of_node(config_node, np) {
++			clk = of_clk_get(np, 0);
++			if (IS_ERR(clk)) {
++				pr_warn("%s: Failed to obtain clock configuration for %s : %d\n", __func__, np->name);
++				err_count++;
++			} else {
++				if (configure_one_clock(clk, np))
++					err_count++;
++				clk_put(clk);
++			}
++		}
++	}
++
++	if (err_count) {
++		pr_warn("%s: Failed %d clocks\n", __func__, err_count);
++		ret = -EINVAL;
++	}
++	return ret;
++}
++EXPORT_SYMBOL_GPL(of_clk_configure);
+diff --git a/include/linux/clk.h b/include/linux/clk.h
+index b3ac22d..4f7f605 100644
+--- a/include/linux/clk.h
++++ b/include/linux/clk.h
+@@ -368,6 +368,7 @@ struct of_phandle_args;
+ struct clk *of_clk_get(struct device_node *np, int index);
+ struct clk *of_clk_get_by_name(struct device_node *np, const char *name);
+ struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec);
++int of_clk_configure(void);
+ #else
+ static inline struct clk *of_clk_get(struct device_node *np, int index)
+ {
+@@ -378,6 +379,10 @@ static inline struct clk *of_clk_get_by_name(struct device_node *np,
+ {
+ 	return ERR_PTR(-ENOENT);
+ }
++static inline int of_clk_configure(void)
++{
++	return 0;
++}
+ #endif
+ 
+ #endif
