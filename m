@@ -1,69 +1,80 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 19 Mar 2013 14:50:38 -0700
-Subject: [PATCH v6 00/16] clk: exynos4/5: migrate to common clock framework
-In-Reply-To: <201303192212.16877.heiko@sntech.de>
-References: <1361175686-19400-1-git-send-email-thomas.abraham@linaro.org>
- <20130319184938.8663.18115@quantum> <201303192212.16877.heiko@sntech.de>
-Message-ID: <20130319215038.8663.83548@quantum>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Tue, 19 Mar 2013 22:50:51 +0100
+Subject: [PATCHv2] ARM: kirkwood: Add support for NETGEAR ReadyNAS Duo v2
+ using DT
+In-Reply-To: <20130319211607.GE21478@lunn.ch> (Andrew Lunn's message of "Tue,
+ 19 Mar 2013 22:16:07 +0100")
+References: <8738vt3h11.fsf@natisbad.org> <20130317205047.GU21478@lunn.ch>
+ <87mwtzcgbl.fsf@natisbad.org> <20130319211607.GE21478@lunn.ch>
+Message-ID: <87d2uvcb44.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Heiko St?bner (2013-03-19 14:12:16)
-> Am Dienstag, 19. M?rz 2013, 19:49:38 schrieb Mike Turquette:
-> > Quoting Thomas Abraham (2013-02-18 00:21:10)
-> > 
-> > > Changes since v5:
-> > > - Squashed several Exynos4 fixes patch from Tomasz Figa
-> > > - Included support for Exynos5250 and Exynos5440, thus converting all
-> > > 
-> > >   Exynos4 and Exynos5 platforms to common clock framework.
-> > > 
-> > > - Depends on the following patch series.
-> > > 
-> > >   -
-> > >   http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg15849
-> > >   .html -
-> > >   http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg15852
-> > >   .html
-> > > 
-> > > Changes since v4:
-> > > - Rebased to linux-3.8-rc1.
-> > > 
-> > > Changes since v3:
-> > > - Includes changes suggested by Tomasz Figa <tomasz.figa@gmail.com>
-> > > 
-> > > This patch series migrates the Samsung Exynos4/5 SoC clock code to adopt
-> > > the common clock framework. The use of Samsung specific clock structures
-> > > has been removed and all board support code has been updated. imx-style
-> > > of clock registration and lookup has been adopted for device tree based
-> > > exynos4/5 platforms.
-> > 
-> > Thomas,
-> > 
-> > Are you planning a V7 series which includes the clock alias bits from
-> > patch #1?
-> 
-> Kukjin has already applied this series into the linux-samsung tree [0].
-> 
+Hi,
 
-That really is too much code to go into drivers/clk without my ACK.  I
-have not made much noise about this in the past but there has been more
-and more "bonus" code slipping into drivers/clk each merge window.
-Let's not do that any more.
+Andrew Lunn <andrew@lunn.ch> writes:
 
-Regards,
-Mike
+> On Tue, Mar 19, 2013 at 08:58:22PM +0100, Arnaud Ebalard wrote:
+>> Hi,
+>> 
+>> Add support for NETGEAR ReadyNAS Duo v2 (Hardware specs available
+>> here: http://natisbad.org/NAS/).
+>
+> Hi Arnaud
+>
+> Thats a nice description of the hardware. There is another device
+> using the same power supply controller, the USI Topkick. A few of the
+> maintainers have these, so there would be the possibility of
+> cooperating on a driver. It does not seem that complex a device. The
+> topkick also seems to do Wake-on-LAN using this controller. There was
+> a patch added recently which may allow this to work, depending on the
+> PHY.
 
-> The alias changes are available in the series "clk: samsung: pm fixes
-> and multiple aliases" from last wednesday to on top, which you should
-> hopefully also have received.
-> 
-> This v2 series implements the changes discussed in the previous v1 
-> "clk: samsung: small fixes and enhancements" from 2013-03-12, but didn't
-> get any responses yet.
-> 
-> 
-> Heiko
-> 
-> 
-> [0] https://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/log/?h=next/clk-exynos
+Does not come as a surprise. Netgear's 2.6.31.8 kernel contains a lot of
+the following:
+ 
+ This kernel which derived from kernel-2.6.31-topkick1281p2 used for
+ both Netgear DUOv3 and NV+v4. It is based on kernel 2.6.31.8 and
+ Marvell 5.1.3 patch. Specially the USB3.0 driver come from kernel
+ 2.6.39.
+
+Note: everything in it is marked DUOv3 even though the device is branded
+      Duo v2. Don't know why.
+
+>> index 13482ea..511cd7d 100644
+>> --- a/arch/arm/configs/kirkwood_defconfig
+>> +++ b/arch/arm/configs/kirkwood_defconfig
+>> @@ -35,6 +35,7 @@ CONFIG_MACH_NETSPACE_LITE_V2_DT=y
+>>  CONFIG_MACH_NETSPACE_MINI_V2_DT=y
+>>  CONFIG_MACH_OPENBLOCKS_A6_DT=y
+>>  CONFIG_MACH_TOPKICK_DT=y
+>> +CONFIG_MACH_READYNAS_DT=y
+>>  CONFIG_MACH_TS219=y
+>>  CONFIG_MACH_TS41X=y
+>>  CONFIG_MACH_DOCKSTAR=y
+>
+> Keeping with alphabetic ordering, it should be one place higher....
+
+Damned, I saw TS followed by DOCKSTAR and thought the rule did not
+apply. Will resend a v3 with corrected ordering ...
+
+
+>> diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+>> +
+>> +#include <linux/kernel.h>
+>> +#include <linux/init.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/mv643xx_eth.h>
+>> +#include <linux/delay.h>
+>> +#include <asm/io.h>
+>> +#include <mach/kirkwood.h>
+>> +#include "common.h"
+>
+> Now that the msleep() has gone, delay.h is probably not needed.  Maybe
+> also io.h is not needed any more with the regulator DT?
+
+... and that one too. Good catch.
+
+Thanks,
+
+a+
