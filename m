@@ -1,84 +1,28 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 19 Mar 2013 09:46:38 -0700
-Subject: [PATCHv2 2/2] ARM: socfpga: Add clock entries into device tree
-In-Reply-To: <1363707936-17769-2-git-send-email-dinguyen@altera.com>
-References: <1363707936-17769-1-git-send-email-dinguyen@altera.com>
- <1363707936-17769-2-git-send-email-dinguyen@altera.com>
-Message-ID: <20130319164638.8663.89508@quantum>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 19 Mar 2013 16:48:31 +0000
+Subject: [PATCH 10/10] drivers: misc: use module_platform_driver_probe()
+In-Reply-To: <CAMuHMdVS56HRDSvr7XCpVEjEWnGti+V=J_m4qQzEid=23ON_fQ@mail.gmail.com>
+References: <1363266691-15757-1-git-send-email-fabio.porcedda@gmail.com>
+ <CAHkwnC9fg7_uhLM2KD3vvj_oFx3EBoQfw8mCN=V9pyV5=k37aA@mail.gmail.com>
+ <CAMuHMdVS56HRDSvr7XCpVEjEWnGti+V=J_m4qQzEid=23ON_fQ@mail.gmail.com>
+Message-ID: <201303191648.31527.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting dinguyen at altera.com (2013-03-19 08:45:36)
-> From: Dinh Nguyen <dinguyen@altera.com>
-> 
-> Adds the main PLL clock groups for SOCFPGA into device tree file
-> so that the clock framework to query the clock and clock rates
-> appropriately.
-> 
-> $cat /sys/kernel/debug/clk/clk_summary
->    clock                        enable_cnt  prepare_cnt  rate
-> ---------------------------------------------------------------------
->  osc1                           2           2            25000000
->     sdram_pll                   0           0            400000000
->        s2f_usr2_clk             0           0            66666666
->        ddr_dq_clk               0           0            200000000
->        ddr_2x_dqs_clk           0           0            400000000
->        ddr_dqs_clk              0           0            200000000
->     periph_pll                  2           2            500000000
->        s2f_usr1_clk             0           0            50000000
->        per_base_clk             4           4            100000000
->        per_nand_mmc_clk         0           0            25000000
->        per_qsi_clk              0           0            250000000
->        emac1_clk                1           1            125000000
->        emac0_clk                0           0            125000000
->     main_pll                    1           1            1600000000
->        cfg_s2f_usr0_clk         0           0            100000000
->        main_nand_sdmmc_clk      0           0            100000000
->        main_qspi_clk            0           0            400000000
->        dbg_base_clk             0           0            400000000
->        mainclk                  0           0            400000000
->        mpuclk                   1           1            800000000
->           smp_twd               1           1            200000000
-> 
-> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+On Tuesday 19 March 2013, Geert Uytterhoeven wrote:
+> Hmm, so we may have drivers that (now) work perfectly fine with
+> module_platform_driver_probe()/platform_driver_probe(), but will start
+> failing suddenly in the future?
 
-There is a lot going on in this one patch.  I would prefer to see the
-clock driver broken out separately.
+They will fail if someone changes the initialization order. That would
+already break drivers before deferred probing support (and was the reason
+we added feature in the first place), but now we can be much more liberal
+with the order in which drivers are initialized, except when they are
+using platform_driver_probe()
 
-<snip>
+> I guess we need a big fat WARN_ON(-EPROBE_DEFER) in
+> platform_driver_probe() to catch these?
 
-> diff --git a/drivers/clk/socfpga/clk.c b/drivers/clk/socfpga/clk.c
-> index 2c855a6..da6b461 100644
-> --- a/drivers/clk/socfpga/clk.c
-> +++ b/drivers/clk/socfpga/clk.c
-<snip>
-> +static int clk_pll_enable(struct clk_hw *hwclk)
-> +{
-> +       struct socfpga_clk *socfpgaclk = to_socfpga_clk(hwclk);
-> +       u32 reg;
-> +
-> +       reg = readl(socfpgaclk->reg);
-> +       reg |= SOCFPGA_PLL_EXT_ENA;
-> +       writel(reg, socfpgaclk->reg);
-> +
-> +       return 0;
-> +}
-> +
-> +static void clk_pll_disable(struct clk_hw *hwclk)
->  {
-> +       struct socfpga_clk *socfpgaclk = to_socfpga_clk(hwclk);
-> +       u32 reg;
-> +
-> +       reg = readl(socfpgaclk->reg);
-> +       reg &= ~SOCFPGA_PLL_EXT_ENA;
-> +       writel(reg, socfpgaclk->reg);
-> +}
-> +
+Yes, very good idea.
 
-For a simple enable which just sets a bit, you might want to re-use the
-basic gate clock type.  This can be done similar to the composite clock
-patches (currently on the list) by stuffing a clk_gate structure into
-your custom socfpga_clk type.
-
-Regards,
-Mike
+	Arnd
