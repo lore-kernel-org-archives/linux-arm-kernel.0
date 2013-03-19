@@ -1,76 +1,73 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 19 Mar 2013 08:40:26 -0400 (EDT)
-Subject: [RFC PATCH] ARM: mm: disable kmap_high_get() for SMP
-In-Reply-To: <20130319050503.GA8858@lge.com>
-References: <1362372667-953-1-git-send-email-iamjoonsoo.kim@lge.com>
- <alpine.LFD.2.03.1303051642110.28820@syhkavp.arg>
- <20130307081258.GA14839@lge.com>
- <alpine.LFD.2.03.1303071721540.28820@syhkavp.arg>
- <CAAmzW4NjefPV7tryvySfLXPy6Zcz3BLTvfxD=UnTKCqrRB3voQ@mail.gmail.com>
- <20130319050503.GA8858@lge.com>
-Message-ID: <alpine.LFD.2.03.1303190838490.3069@syhkavp.arg>
+From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
+Date: Tue, 19 Mar 2013 22:12:37 +0900
+Subject: [BUG][mvebu] mvneta: cannot request irq 25 on openblocks-ax3
+Message-ID: <51486445.8040506@hitachi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 19 Mar 2013, Joonsoo Kim wrote:
+Hi,
 
-> On Thu, Mar 07, 2013 at 07:35:51PM +0900, JoonSoo Kim wrote:
-> > 2013/3/7 Nicolas Pitre <nicolas.pitre@linaro.org>:
-> > > On Thu, 7 Mar 2013, Joonsoo Kim wrote:
-> > >
-> > >> Hello, Nicolas.
-> > >>
-> > >> On Tue, Mar 05, 2013 at 05:36:12PM +0800, Nicolas Pitre wrote:
-> > >> > On Mon, 4 Mar 2013, Joonsoo Kim wrote:
-> > >> >
-> > >> > > With SMP and enabling kmap_high_get(), it makes users of kmap_atomic()
-> > >> > > sequential ordered, because kmap_high_get() use global kmap_lock().
-> > >> > > It is not welcome situation, so turn off this optimization for SMP.
-> > >> >
-> > >> > I'm not sure I understand the problem.
-> > >> >
-> > >> > The lock taken by kmap_high_get() is released right away before that
-> > >> > function returns and therefore this is not actually serializing
-> > >> > anything.
-> > >>
-> > >> Yes, you understand what I want to say correctly.
-> > >> Sorry for bad explanation.
-> > >>
-> > >> Following is reasons why I send this patch with RFC tag.
-> > >>
-> > >> If we have more cpus, performance degration is possible although
-> > >> it is very short time to holding the lock in kmap_high_get().
-> > >>
-> > >> And kmap has maximum 512 entries(512 * 4K = 2M) and some mobile devices
-> > >> has 2G memory(highmem 1G>), so probability for finding matched entry
-> > >> is approximately < 1/512. This probability can be more decreasing
-> > >> for device which have more memory. So I think that waste time to find
-> > >> matched entry is more than saved time.
-> > >>
-> > >> Above is my humble opinion, so please let me know what I am missing.
-> > >
-> > > Please look at the kmap_high_get() code again.  It performs no
-> > > searching at all.  What it does is:
-> > 
-> > If page is not highmem, it may be already filtered in kmap_atomic().
-> > So we only consider highmem page.
-> > 
-> > For highmem page, it perform searching.
-> > In kmap_high_get(), page_address() is called.
-> > In page_address(), it hash PA and iterate a list for this hashed value.
-> > 
-> > And another advantage of disabling ARCH_NEEDS_KMAP_HIGH_GET is
-> > that kmap(), kunmap() works without irq disabled.
-> > 
-> > Thanks.
-> 
-> Hello, Nicolas.
-> 
-> For just confirm, you don't agree with this, right?
+Here I've hit a bug on the recent kernel. As far as I know, this bug
+exists on 3.9-rc1 too.
 
-Right, I don't agree.  I don't believe the saving you claim are bigger 
-than the advantages from this functionality.
+When I tried the latest mvebu for-next tree
+(git://git.infradead.org/users/jcooper/linux.git mvebu/for-next),
+I got below warning at bootup time and mvneta didn't work (link was never up).
+I ensured that "ifconfig ethX up" always caused that.
 
+Does anyone succeed to boot openblocks-ax3 recently or hit same
+trouble?
 
+------------[ cut here ]------------
+WARNING: at /ssd/ksrc/linux-3/kernel/irq/manage.c:1417
+request_threaded_irq+0x64/0x124()
+Modules linked in:
+Backtrace:
+[<c00119a4>] (dump_backtrace+0x0/0x110) from [<c04b2bac>] (dump_stack+0x18/0x1c)
+ r6:c05ad11a r5:00000589 r4:00000000 r3:ed80e000
+[<c04b2b94>] (dump_stack+0x0/0x1c) from [<c0021484>]
+(warn_slowpath_common+0x54/0x70)
+[<c0021430>] (warn_slowpath_common+0x0/0x70) from [<c00214c4>]
+(warn_slowpath_null+0x24/0x2c)
+ r8:00000000 r7:ef0a4600 r6:ee9c4d40 r5:00000000 r4:c037378c
+r3:00000009
+[<c00214a0>] (warn_slowpath_null+0x0/0x2c) from [<c0084bb8>]
+(request_threaded_irq+0x64/0x124)
+[<c0084b54>] (request_threaded_irq+0x0/0x124) from [<c037418c>]
+(mvneta_open+0x80/0x15c)
+[<c037410c>] (mvneta_open+0x0/0x15c) from [<c03c9e3c>] (__dev_open+0xa0/0xf4)
+ r6:00001002 r5:c050bb24 r4:ee9c4800
+[<c03c9d9c>] (__dev_open+0x0/0xf4) from [<c03ca070>] (__dev_change_flags+0x94/0x118)
+ r7:00000001 r6:00001002 r5:00001003 r4:ee9c4800
+[<c03c9fdc>] (__dev_change_flags+0x0/0x118) from [<c03ca170>]
+(dev_change_flags+0x18/0x4c)
+ r7:00000000 r6:edd0d380 r5:00001002 r4:ee9c4800
+[<c03ca158>] (dev_change_flags+0x0/0x4c) from [<c03d6168>] (do_setlink+0x2a4/0x7a0)
+ r6:edd0d380 r5:ed80fb4c r4:ee9c4800 r3:00001002
+[<c03d5ec4>] (do_setlink+0x0/0x7a0) from [<c03d72d8>] (rtnl_newlink+0x248/0x45c)
+[<c03d7090>] (rtnl_newlink+0x0/0x45c) from [<c03d7060>]
+(rtnetlink_rcv_msg+0x248/0x278)
+[<c03d6e18>] (rtnetlink_rcv_msg+0x0/0x278) from [<c03ead78>]
+(netlink_rcv_skb+0x58/0xb4)
+[<c03ead20>] (netlink_rcv_skb+0x0/0xb4) from [<c03d5d28>] (rtnetlink_rcv+0x20/0x2c)
+ r6:eea75c00 r5:eea87240 r4:eea87240 r3:c03d5d08
+[<c03d5d08>] (rtnetlink_rcv+0x0/0x2c) from [<c03ea780>]
+(netlink_unicast+0x15c/0x214)
+ r4:ef0a3000 r3:c03d5d08
+[<c03ea624>] (netlink_unicast+0x0/0x214) from [<c03eab94>]
+(netlink_sendmsg+0x2b8/0x348)
+[<c03ea8dc>] (netlink_sendmsg+0x0/0x348) from [<c03b2dbc>] (sock_sendmsg+0x88/0xa4)
+[<c03b2d34>] (sock_sendmsg+0x0/0xa4) from [<c03b3330>] (__sys_sendmsg+0x1c8/0x25c)
+ r7:00000000 r6:00000020 r5:eefccc80 r4:ed80ff64
+[<c03b3168>] (__sys_sendmsg+0x0/0x25c) from [<c03b4f30>] (sys_sendmsg+0x44/0x68)
+[<c03b4eec>] (sys_sendmsg+0x0/0x68) from [<c000daa0>] (ret_fast_syscall+0x0/0x30)
+ r6:be9f367c r5:00000000 r4:5146f675
+---[ end trace a8ceb54233e388b5 ]---
+mvneta d0070000.ethernet eth0: cannot request irq 25
 
-Nicolas
+Thank you,
+-- 
+Masami HIRAMATSU
+IT Management Research Dept. Linux Technology Center
+Hitachi, Ltd., Yokohama Research Laboratory
+E-mail: masami.hiramatsu.pt at hitachi.com
