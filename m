@@ -1,59 +1,81 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 19 Mar 2013 08:19:29 -0300
-Subject: [PATCH v3 0/9] refactoring for mask_cache
-In-Reply-To: <20130319110620.GO13280@titan.lakedaemon.net>
-References: <1363277430-21325-1-git-send-email-holger.brunck@keymile.com>
- <1363615255-18200-1-git-send-email-gerlando.falauto@keymile.com>
- <20130319100352.GB2419@localhost>
- <20130319110620.GO13280@titan.lakedaemon.net>
-Message-ID: <20130319111928.GB3137@localhost>
+From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
+Date: Tue, 19 Mar 2013 12:23:38 +0100
+Subject: [PATCH 4/4] ARM: at91: introduce SAMA5 support
+In-Reply-To: <51420885.60006@arm.com>
+References: <1363280736-23624-1-git-send-email-ludovic.desroches@atmel.com>
+ <1363280736-23624-5-git-send-email-ludovic.desroches@atmel.com>
+ <51420885.60006@arm.com>
+Message-ID: <20130319112338.GE2522@ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
-
-On Tue, Mar 19, 2013 at 07:06:20AM -0400, Jason Cooper wrote:
-> On Tue, Mar 19, 2013 at 07:03:53AM -0300, Ezequiel Garcia wrote:
-> > On Mon, Mar 18, 2013 at 03:00:46PM +0100, Gerlando Falauto wrote:
-> > > here is a patchset to address the issue found with Orion, in incremental
-> > > stages as Thomas suggested.
-> > > a) we introduce the new fields and pointer (though only the shared one is used)
-> > > b) we convert all drivers to use it 
-> > > c) we rename the field so to force the use of the per-ct pointer
-> > > d) we add per-ct mask cache, provided the new flag 
-> > >    IRQ_GC_SEPARATE_MASK_REGISTERS is enabled
-> > > e) we enable the flag for orion-gpio and mvebu drivers
-> > > 
-> > > So even though I'm also providing changes for mvebu, I only
-> > > tested the patch on a 3.0.40 kernel with the plat-orion/gpio.c driver.
+On Thu, Mar 14, 2013 at 05:27:33PM +0000, Marc Zyngier wrote:
+> On 14/03/13 17:05, ludovic.desroches at atmel.com wrote:
+> > From: Ludovic Desroches <ludovic.desroches@atmel.com>
 > > 
-> > Great job! Since this is a really old bug you're fixing I believe that the
-> > patchset applies for stable as well as mainline.
+> > This patch introduces the SAMA5 support. It also updates the PMC driver to
+> > manage clock division which is a requirement since some peripherals can't work
+> > at the bus frequency on SAMA5.
 > > 
-> > According to Documentation/stable_kernel_rules.txt all you need to do
-> > is add a 'Cc: stable at vger.kernel.org' tag in your sign-off area.
-> > 
-> > Stable people will take care of picking the patch when it hits
-> > mainline. You should receive a mail notification about patches
-> > being included in stable kernels.
+> > Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> > Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> > Tested-by: Robert Nelson <robertcnelson@gmail.com>
+> > ---
+> >  arch/arm/boot/dts/Makefile                 |    5 +
+> >  arch/arm/boot/dts/sama5d3.dtsi             | 1031 ++++++++++++++++++++++++++++
+> >  arch/arm/boot/dts/sama5d31ek.dts           |   51 ++
+> >  arch/arm/boot/dts/sama5d33ek.dts           |   44 ++
+> >  arch/arm/boot/dts/sama5d34ek.dts           |   61 ++
+> >  arch/arm/boot/dts/sama5d35ek.dts           |   56 ++
+> >  arch/arm/boot/dts/sama5d3xcm.dtsi          |   91 +++
+> >  arch/arm/boot/dts/sama5d3xdm.dtsi          |   42 ++
+> >  arch/arm/boot/dts/sama5d3xmb.dtsi          |  166 +++++
+> >  arch/arm/configs/sama5_defconfig           |  181 +++++
+> >  arch/arm/mach-at91/Kconfig                 |   33 +
+> >  arch/arm/mach-at91/Makefile                |    4 +
+> >  arch/arm/mach-at91/board-dt-sama5.c        |   86 +++
+> >  arch/arm/mach-at91/clock.c                 |  109 ++-
+> >  arch/arm/mach-at91/clock.h                 |    2 +
+> >  arch/arm/mach-at91/include/mach/at91_pmc.h |   18 +-
+> >  arch/arm/mach-at91/include/mach/cpu.h      |   20 +
+> >  arch/arm/mach-at91/include/mach/sama5d3.h  |   73 ++
+> >  arch/arm/mach-at91/sama5d3.c               |  377 ++++++++++
+> >  arch/arm/mach-at91/setup.c                 |   27 +
+> >  arch/arm/mach-at91/soc.h                   |    5 +
+> >  21 files changed, 2453 insertions(+), 29 deletions(-)
+> >  create mode 100644 arch/arm/boot/dts/sama5d3.dtsi
+> >  create mode 100644 arch/arm/boot/dts/sama5d31ek.dts
+> >  create mode 100644 arch/arm/boot/dts/sama5d33ek.dts
+> >  create mode 100644 arch/arm/boot/dts/sama5d34ek.dts
+> >  create mode 100644 arch/arm/boot/dts/sama5d35ek.dts
+> >  create mode 100644 arch/arm/boot/dts/sama5d3xcm.dtsi
+> >  create mode 100644 arch/arm/boot/dts/sama5d3xdm.dtsi
+> >  create mode 100644 arch/arm/boot/dts/sama5d3xmb.dtsi
+> >  create mode 100644 arch/arm/configs/sama5_defconfig
+> >  create mode 100644 arch/arm/mach-at91/board-dt-sama5.c
+> >  create mode 100644 arch/arm/mach-at91/include/mach/sama5d3.h
+> >  create mode 100644 arch/arm/mach-at91/sama5d3.c
 > 
-> Yes, and if you have an idea of when the regression was introduced,
-> perhaps even which commit, that would be *extremely* helpful.
-> Otherwise, the stable folks have to expend a lot of time tracking it
-> down.
+> So I haven't started reviewing this yet, but looking at the diffstat, I
+> can't help but think this patch could use some splitting to be more
+> easily reviewable.
+> 
+> How about having one patch for the clock stuff, one for the config, one
+> for the DT, and finally one for the SoC support itself?
 > 
 
-Gerlando explains the problematic commit in the changelog of patch 8/9
-of this series:
+Hello Marc,
 
-  enable handling of separate mask registers for Orion SoC GPIOs,
-  fixing indeed the regression introduced by e59347a
-  "arm: orion: Use generic irq chip".
+As you said I can split dts/dtsi, defconf to have a more easily reviewable
+patch. On the other side, I know that some people prefer to have the whole
+'functionnality' in one patch.
 
-@Gerlando, perhaps you should add this comment to the cover-letter?
-After all, this fix is the whole point of the patchset.
+Concerning clock stuff and SoC support, they are tied:
+- I use cpu_is_sama5d3 macro in clock.c
+- in sama5d3.c I am using the new fields (div and pid) introduced by the clock.c
+update.
 
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Regards
+
+Ludovic
