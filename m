@@ -1,69 +1,143 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 19 Mar 2013 11:19:22 +0900
-Subject: [GIT PULL v2] Renesas INTC External IRQ pin driver
-Message-ID: <1363659576-6333-1-git-send-email-horms+renesas@verge.net.au>
+Date: Tue, 19 Mar 2013 11:19:26 +0900
+Subject: [PATCH 04/14] ARM: shmobile: INTC External IRQ pin driver on r8a7779
+In-Reply-To: <1363659576-6333-1-git-send-email-horms+renesas@verge.net.au>
+References: <1363659576-6333-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1363659576-6333-5-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit d75bc78b508d0a95d7738290d8ec9923691f4301:
+From: Magnus Damm <damm@opensource.se>
 
-  r8a7779: Add Display Unit clock support (2013-03-18 21:22:34 +0900)
+Update the r8a7779 IRQ code to make use of the
+INTC External IRQ pin driver for external
+interrupt pins IRQ0 -> IRQ3.
 
-are available in the git repository at:
+The r8a7779 SoC can like older SH SoCs configure
+to use the IRQ0 -> IRQ3 signals as individual
+interrupts or a combined IRL mode.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git intc-external-irq
+Without this patch the r8a7779 SoC code does
+not fully support external IRQ pins in individual
+IRQ mode. The r8a7779 PFC code does not yet have
+gpio_to_irq() support so no need to update such
+code.
 
-for you to fetch changes up to 3b8dfa7c2f8af7613dae28ac0f3419bf75ead5d0:
+At this point the DT reference implementations
+are not covered. In the future such code shall
+tie in the INTC External IRQ pin driver via
+DT, so this kind of verbose code is not needed
+for the long term DT case.
 
-  irqchip: irqc: Add DT support (2013-03-18 21:26:07 +0900)
+Signed-off-by: Magnus Damm <damm@opensource.se>
+Tested-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/Kconfig               |    1 +
+ arch/arm/mach-shmobile/include/mach/common.h |    1 +
+ arch/arm/mach-shmobile/intc-r8a7779.c        |   53 +++++++++++++++++++++++++-
+ 3 files changed, 54 insertions(+), 1 deletion(-)
 
-----------------------------------------------------------------
-Renesas INTC External IRQ pin driver
-
-This provides two new INTC drivers for use with Renesas ARM-based SoCs and
-makes use of them on the r8a7779 and sh73a0 SoCs.
-
-It has been agreed by the relevant parties, Thomas Gleixner, Magnus Damm,
-and myself that it would be best to merge this code through the renesas
-tree and thus through the arm-soc tree.
-
-This is based on:
-
-git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git renesas-soc-v3.10
-
-----------------------------------------------------------------
-Magnus Damm (14):
-      irqchip: Renesas INTC External IRQ pin driver
-      ARM: shmobile: irq_pin() for static IRQ pin assignment
-      ARM: shmobile: INTC External IRQ pin driver on sh73a0
-      ARM: shmobile: INTC External IRQ pin driver on r8a7779
-      irqchip: intc-irqpin: Whitespace fixes
-      irqchip: intc-irqpin: Cache mapped IRQ
-      irqchip: intc-irqpin: Add force comments
-      irqchip: intc-irqpin: Make use of devm functions
-      irqchip: intc-irqpin: GPL header for platform data
-      irqchip: Renesas IRQC driver
-      ARM: shmobile: Make sh73a0 INTC irqpin platform data static
-      ARM: shmobile: Make r8a7779 INTC irqpin platform data static
-      irqchip: intc-irqpin: Initial DT support
-      irqchip: irqc: Add DT support
-
- arch/arm/mach-shmobile/Kconfig                     |    2 +
- arch/arm/mach-shmobile/board-kzm9g.c               |   14 +-
- arch/arm/mach-shmobile/include/mach/common.h       |    1 +
- arch/arm/mach-shmobile/include/mach/irqs.h         |    4 +
- arch/arm/mach-shmobile/intc-r8a7779.c              |   53 ++-
- arch/arm/mach-shmobile/intc-sh73a0.c               |  117 -----
- arch/arm/mach-shmobile/setup-sh73a0.c              |  126 ++++++
- drivers/irqchip/Kconfig                            |    8 +
- drivers/irqchip/Makefile                           |    2 +
- drivers/irqchip/irq-renesas-intc-irqpin.c          |  471 ++++++++++++++++++++
- drivers/irqchip/irq-renesas-irqc.c                 |  307 +++++++++++++
- drivers/pinctrl/sh-pfc/pfc-sh73a0.c                |    6 +-
- .../linux/platform_data/irq-renesas-intc-irqpin.h  |   29 ++
- include/linux/platform_data/irq-renesas-irqc.h     |   27 ++
- 14 files changed, 1039 insertions(+), 128 deletions(-)
- create mode 100644 drivers/irqchip/irq-renesas-intc-irqpin.c
- create mode 100644 drivers/irqchip/irq-renesas-irqc.c
- create mode 100644 include/linux/platform_data/irq-renesas-intc-irqpin.h
- create mode 100644 include/linux/platform_data/irq-renesas-irqc.h
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index f964accb..75d413c 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -32,6 +32,7 @@ config ARCH_R8A7779
+ 	select SH_CLK_CPG
+ 	select USB_ARCH_HAS_EHCI
+ 	select USB_ARCH_HAS_OHCI
++	select RENESAS_INTC_IRQPIN
+ 
+ config ARCH_EMEV2
+ 	bool "Emma Mobile EV2"
+diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
+index 86fcdf9..03f73de 100644
+--- a/arch/arm/mach-shmobile/include/mach/common.h
++++ b/arch/arm/mach-shmobile/include/mach/common.h
+@@ -61,6 +61,7 @@ extern void r8a7740_pm_init(void);
+ 
+ extern void r8a7779_init_delay(void);
+ extern void r8a7779_init_irq(void);
++extern void r8a7779_init_irq_extpin(int irlm);
+ extern void r8a7779_init_irq_dt(void);
+ extern void r8a7779_map_io(void);
+ extern void r8a7779_earlytimer_init(void);
+diff --git a/arch/arm/mach-shmobile/intc-r8a7779.c b/arch/arm/mach-shmobile/intc-r8a7779.c
+index f9cc4bc..fb0363c 100644
+--- a/arch/arm/mach-shmobile/intc-r8a7779.c
++++ b/arch/arm/mach-shmobile/intc-r8a7779.c
+@@ -19,13 +19,16 @@
+  */
+ #include <linux/kernel.h>
+ #include <linux/init.h>
++#include <linux/platform_device.h>
+ #include <linux/interrupt.h>
+ #include <linux/irq.h>
+ #include <linux/io.h>
+ #include <linux/irqchip/arm-gic.h>
+-#include <mach/common.h>
++#include <linux/platform_data/irq-renesas-intc-irqpin.h>
+ #include <linux/irqchip.h>
++#include <mach/common.h>
+ #include <mach/intc.h>
++#include <mach/irqs.h>
+ #include <mach/r8a7779.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+@@ -39,6 +42,54 @@
+ #define INT2NTSR0 IOMEM(0xfe700060)
+ #define INT2NTSR1 IOMEM(0xfe700064)
+ 
++struct renesas_intc_irqpin_config irqpin0_platform_data = {
++	.irq_base = irq_pin(0), /* IRQ0 -> IRQ3 */
++	.sense_bitfield_width = 2,
++};
++
++static struct resource irqpin0_resources[] = {
++	DEFINE_RES_MEM(0xfe78001c, 4), /* ICR1 */
++	DEFINE_RES_MEM(0xfe780010, 4), /* INTPRI */
++	DEFINE_RES_MEM(0xfe780024, 4), /* INTREQ */
++	DEFINE_RES_MEM(0xfe780044, 4), /* INTMSK0 */
++	DEFINE_RES_MEM(0xfe780064, 4), /* INTMSKCLR0 */
++	DEFINE_RES_IRQ(gic_spi(27)), /* IRQ0 */
++	DEFINE_RES_IRQ(gic_spi(28)), /* IRQ1 */
++	DEFINE_RES_IRQ(gic_spi(29)), /* IRQ2 */
++	DEFINE_RES_IRQ(gic_spi(30)), /* IRQ3 */
++};
++
++static struct platform_device irqpin0_device = {
++	.name		= "renesas_intc_irqpin",
++	.id		= 0,
++	.resource	= irqpin0_resources,
++	.num_resources	= ARRAY_SIZE(irqpin0_resources),
++	.dev		= {
++		.platform_data	= &irqpin0_platform_data,
++	},
++};
++
++void __init r8a7779_init_irq_extpin(int irlm)
++{
++	void __iomem *icr0 = ioremap_nocache(0xfe780000, PAGE_SIZE);
++	unsigned long tmp;
++
++	if (icr0) {
++		tmp = ioread32(icr0);
++		if (irlm)
++			tmp |= 1 << 23; /* IRQ0 -> IRQ3 as individual pins */
++		else
++			tmp &= ~(1 << 23); /* IRL mode - not supported */
++		tmp |= (1 << 21); /* LVLMODE = 1 */
++		iowrite32(tmp, icr0);
++		iounmap(icr0);
++
++		if (irlm)
++			platform_device_register(&irqpin0_device);
++	} else
++		pr_warn("r8a7779: unable to setup external irq pin mode\n");
++}
++
+ static int r8a7779_set_wake(struct irq_data *data, unsigned int on)
+ {
+ 	return 0; /* always allow wakeup */
+-- 
+1.7.10.4
