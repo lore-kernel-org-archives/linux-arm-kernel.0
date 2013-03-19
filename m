@@ -1,146 +1,84 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Tue, 19 Mar 2013 15:47:16 +0800
-Subject: [PATCH v7 08/14] spi/spi-atmel: fix spi-atmel driver to adapt to
- slave_config changes
-In-Reply-To: <1363678866-3567-1-git-send-email-wenyou.yang@atmel.com>
-References: <1363678866-3567-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1363679236-3973-1-git-send-email-wenyou.yang@atmel.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 19 Mar 2013 16:50:54 +0900
+Subject: [PATCH 01/03] ARM: shmobile: APE6EVM base support V2
+In-Reply-To: <20130319072532.GA19741@verge.net.au>
+References: <20130318150953.28231.73454.sendpatchset@w520>
+ <20130318151002.28231.37531.sendpatchset@w520>
+ <20130319072532.GA19741@verge.net.au>
+Message-ID: <20130319075053.GA14668@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Richard Genoud <richard.genoud@gmail.com>
+On Tue, Mar 19, 2013 at 04:25:33PM +0900, Simon Horman wrote:
+> On Tue, Mar 19, 2013 at 12:10:02AM +0900, Magnus Damm wrote:
+> > From: Magnus Damm <damm@opensource.se>
+> > 
+> > V2 of APE6EVM base board support making use of
+> > 1 GiB of memory, the SCIFA0 serial port and 
+> > ARM architected timer.
+> > 
+> > Signed-off-by: Magnus Damm <damm@opensource.se>
+> > ---
+> > 
+> >  Changes since V1:
+> >  - Sorted headers
+> >  - Use ape6evm_add_standard_devices() to setup SoC devices and clocks
+> > 
+> >   Written against "next" renesas.git 811689afc214564c4a5f238ecf4d8bdc0e52b615
+> >  
+> >  Depends on the following series:
+> >  [PATCH 00/04] ARM: shmobile: r8a73a4 SoC support V2
+> > 
+> >  Does not depend on:
+> >  [PATCH 00/02] sh-pfc: Initial r8a73a4 PFC support
+> > 
+> > arch/arm/boot/dts/Makefile             |    1 
+> >  arch/arm/boot/dts/r8a73a4-ape6evm.dts  |   26 ++++++++++++++++++
+> >  arch/arm/mach-shmobile/Kconfig         |    8 ++++-
+> >  arch/arm/mach-shmobile/Makefile        |    1 
+> >  arch/arm/mach-shmobile/board-ape6evm.c |   46 ++++++++++++++++++++++++++++++++
+> >  5 files changed, 81 insertions(+), 1 deletion(-)
+> > 
+> > --- 0001/arch/arm/boot/dts/Makefile
+> > +++ work/arch/arm/boot/dts/Makefile	2013-03-18 21:44:34.000000000 +0900
+> > @@ -139,6 +139,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE) += emev2-kzm
+> >  	r8a7779-marzen-reference.dtb \
+> >  	sh73a0-kzm9g.dtb \
+> >  	sh73a0-kzm9g-reference.dtb \
+> > +	r8a73a4-ape6evm.dtb \
+> >  	sh7372-mackerel.dtb
+> >  dtb-$(CONFIG_ARCH_SOCFPGA) += socfpga_cyclone5.dtb \
+> >  	socfpga_vt.dtb
+> > --- /dev/null
+> > +++ work/arch/arm/boot/dts/r8a73a4-ape6evm.dts	2013-03-18 21:44:35.000000000 +0900
+> > @@ -0,0 +1,26 @@
+> > +/*
+> > + * Device Tree Source for the APE6EVM board
+> > + *
+> > + * Copyright (C) 2013 Renesas Solutions Corp.
+> > + *
+> > + * This file is licensed under the terms of the GNU General Public License
+> > + * version 2.  This program is licensed "as is" without any warranty of any
+> > + * kind, whether express or implied.
+> > + */
+> > +
+> > +/dts-v1/;
+> > +/include/ "r8a73a4.dtsi"
+> > +
+> > +/ {
+> > +	model = "APE6EVM";
+> > +	compatible = "renesas,ape6evm", "renesas,r8a73a4";
+> > +
+> > +	chosen {
+> > +		bootargs = "console=ttySC0,115200 ignore_loglevel";
+> 
+> I think that earlyprintk=sh-sci.0,11520 go in here.
 
-This is the following of the patch e2b35f3dbfc080f15b72834d08f04f0269dbe9be
+Also, to be consistent with the dts of other shmobile boards
+could you add root=/dev/nfs ip=dhcp. This history behind this
+is that many boards defaulted to using nfsroot in their defconfigs,
+a reasonable default IMHO, and recently the command line for all
+boards that boot using DT was moved from their defconfig
+to their .dtsi in preparation for defconfig consolidation.
 
-Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
-[wenyou.yang at atmel.com: BUG: dmaengine mode when enable both spi0 and spi1, spi0 doesn't work]
-[wenyou.yang at atmel.com: submit the patch]
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-Cc: spi-devel-general at lists.sourceforge.net
-Cc: linux-kernel at vger.kernel.org
----
- drivers/spi/spi-atmel.c |   61 +++++++++++++++++++++++++++++++++++++++--------
- 1 file changed, 51 insertions(+), 10 deletions(-)
-
-diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-index 8fab62f..d724c03 100644
---- a/drivers/spi/spi-atmel.c
-+++ b/drivers/spi/spi-atmel.c
-@@ -387,6 +387,37 @@ static inline int atmel_spi_xfer_can_be_chained(struct spi_transfer *xfer)
- 	return xfer->delay_usecs == 0 && !xfer->cs_change;
- }
- 
-+static int atmel_spi_dma_slave_config(struct atmel_spi *as,
-+				struct dma_slave_config *slave_config)
-+{
-+	int err = 0;
-+
-+	slave_config->dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-+	slave_config->src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-+
-+	slave_config->dst_addr = (dma_addr_t)as->phybase + SPI_TDR;
-+	slave_config->src_addr = (dma_addr_t)as->phybase + SPI_RDR;
-+	slave_config->src_maxburst = 1;
-+	slave_config->dst_maxburst = 1;
-+	slave_config->device_fc = false;
-+
-+	slave_config->direction = DMA_MEM_TO_DEV;
-+	if (dmaengine_slave_config(as->dma.chan_tx, slave_config)) {
-+		dev_err(&as->pdev->dev,
-+			"failed to configure tx dma channel\n");
-+		err = -EINVAL;
-+	}
-+
-+	slave_config->direction = DMA_DEV_TO_MEM;
-+	if (dmaengine_slave_config(as->dma.chan_rx, slave_config)) {
-+		dev_err(&as->pdev->dev,
-+			"failed to configure rx dma channel\n");
-+		err = -EINVAL;
-+	}
-+
-+	return err;
-+}
-+
- static bool filter(struct dma_chan *chan, void *slave)
- {
- 	struct	at_dma_slave *sl = slave;
-@@ -402,14 +433,12 @@ static bool filter(struct dma_chan *chan, void *slave)
- static int atmel_spi_configure_dma(struct atmel_spi *as)
- {
- 	struct at_dma_slave *sdata = &as->dma.dma_slave;
-+	struct dma_slave_config	slave_config;
-+	int err;
- 
- 	if (sdata && sdata->dma_dev) {
- 		dma_cap_mask_t mask;
- 
--		/* setup DMA addresses */
--		sdata->rx_reg = (dma_addr_t)as->phybase + SPI_RDR;
--		sdata->tx_reg = (dma_addr_t)as->phybase + SPI_TDR;
--
- 		/* Try to grab two DMA channels */
- 		dma_cap_zero(mask);
- 		dma_cap_set(DMA_SLAVE, mask);
-@@ -419,21 +448,27 @@ static int atmel_spi_configure_dma(struct atmel_spi *as)
- 				dma_request_channel(mask, filter, sdata);
- 	}
- 	if (!as->dma.chan_rx || !as->dma.chan_tx) {
--		if (as->dma.chan_rx)
--			dma_release_channel(as->dma.chan_rx);
--		if (as->dma.chan_tx)
--			dma_release_channel(as->dma.chan_tx);
- 		dev_err(&as->pdev->dev,
- 			"DMA channel not available, unable to use SPI\n");
--		return -EBUSY;
-+		err = -EBUSY;
-+		goto error;
- 	}
- 
-+	err = atmel_spi_dma_slave_config(as, &slave_config);
-+	if (err)
-+		goto error;
-+
- 	dev_info(&as->pdev->dev,
- 			"Using %s (tx) and %s (rx) for DMA transfers\n",
- 			dma_chan_name(as->dma.chan_tx),
- 			dma_chan_name(as->dma.chan_rx));
--
- 	return 0;
-+error:
-+	if (as->dma.chan_rx)
-+		dma_release_channel(as->dma.chan_rx);
-+	if (as->dma.chan_tx)
-+		dma_release_channel(as->dma.chan_tx);
-+	return err;
- }
- 
- static void atmel_spi_stop_dma(struct atmel_spi *as)
-@@ -510,6 +545,7 @@ static int atmel_spi_next_xfer_dma_submit(struct spi_master *master,
- 	struct dma_chan		*txchan = as->dma.chan_tx;
- 	struct dma_async_tx_descriptor *rxdesc;
- 	struct dma_async_tx_descriptor *txdesc;
-+	struct dma_slave_config	slave_config;
- 	dma_cookie_t		cookie;
- 	u32	len = *plen;
- 
-@@ -548,6 +584,10 @@ static int atmel_spi_next_xfer_dma_submit(struct spi_master *master,
- 
- 	*plen = len;
- 
-+	if (atmel_spi_dma_slave_config(as, &slave_config))
-+		goto err_exit;
-+
-+
- 	/* Send both scatterlists */
- 	rxdesc = rxchan->device->device_prep_slave_sg(rxchan,
- 					&as->dma.sgrx,
-@@ -596,6 +636,7 @@ static int atmel_spi_next_xfer_dma_submit(struct spi_master *master,
- err_dma:
- 	spi_writel(as, IDR, SPI_BIT(OVRES));
- 	atmel_spi_stop_dma(as);
-+err_exit:
- 	atmel_spi_lock(as);
- 	return -ENOMEM;
- }
--- 
-1.7.9.5
+[snip]
