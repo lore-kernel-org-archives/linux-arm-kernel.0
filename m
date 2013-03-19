@@ -1,602 +1,72 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Tue, 19 Mar 2013 12:38:18 -0500
-Subject: [PATCH 4/5] ARM: dts: OMAP2+: Update DMTIMER compatibility property
-In-Reply-To: <1363714699-29622-1-git-send-email-jon-hunter@ti.com>
-References: <1363714699-29622-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <1363714699-29622-5-git-send-email-jon-hunter@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 19 Mar 2013 17:38:19 +0000
+Subject: [PATCH v3 0/4] Preparatory GIC patches for arm64 support
+Message-ID: <1363714703-9629-1-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the DMTIMER compatibility property to reflect the register level
-compatibilty between devices and update the various OMAP/AM timer
-bindings with the appropriate compatibility string.
+Hi,
 
-By doing this we can add platform specific data applicable to specific
-timer versions to the driver. For example, errata flags can be populated
-for the timer versions that are impacted.
+That's the third version of the GIC clean-up patches required to support
+arm64. This is based on 3.9-rc3 and covers new platform code that has
+been merged into 3.9-rc1.
 
-Signed-off-by: Jon Hunter <jon-hunter@ti.com>
----
- .../devicetree/bindings/arm/omap/timer.txt         |   17 ++++++++++++--
- arch/arm/boot/dts/am33xx.dtsi                      |   14 ++++++------
- arch/arm/boot/dts/omap2.dtsi                       |   22 +++++++++---------
- arch/arm/boot/dts/omap2420.dtsi                    |    2 +-
- arch/arm/boot/dts/omap2430.dtsi                    |    2 +-
- arch/arm/boot/dts/omap3.dtsi                       |   24 ++++++++++----------
- arch/arm/boot/dts/omap4.dtsi                       |   22 +++++++++---------
- arch/arm/boot/dts/omap5.dtsi                       |   22 +++++++++---------
- arch/arm/mach-omap2/timer.c                        |    7 +++++-
- arch/arm/plat-omap/dmtimer.c                       |    7 +++++-
- 10 files changed, 81 insertions(+), 58 deletions(-)
+The patches touch mostly SoC code, drivers/ and arch/arm/ functions
+moved out into include/linux/.
 
-diff --git a/Documentation/devicetree/bindings/arm/omap/timer.txt b/Documentation/devicetree/bindings/arm/omap/timer.txt
-index 8732d4d..d02e27c 100644
---- a/Documentation/devicetree/bindings/arm/omap/timer.txt
-+++ b/Documentation/devicetree/bindings/arm/omap/timer.txt
-@@ -1,7 +1,20 @@
- OMAP Timer bindings
- 
- Required properties:
--- compatible:		Must be "ti,omap2-timer" for OMAP2+ controllers.
-+- compatible:		Should be set to one of the below. Please note that
-+			OMAP44xx devices have timer instances that are 100%
-+			register compatible with OMAP3xxx devices as well as
-+			newer timers that are not 100% register compatible.
-+			So for OMAP44xx devices timer instances may use
-+			different compatible strings.
-+
-+			ti,omap2420-timer (applicable to OMAP24xx devices)
-+			ti,omap3430-timer (applicable to OMAP3xxx/44xx devices)
-+			ti,omap4430-timer (applicable to OMAP44xx devices)
-+			ti,omap5430-timer (applicable to OMAP543x devices)
-+			ti,am335x-timer	(applicable to AM335x devices)
-+			ti,am335x-timer-1ms (applicable to AM335x devices)
-+
- - reg:			Contains timer register address range (base address and
- 			length).
- - interrupts: 		Contains the interrupt information for the timer. The
-@@ -22,7 +35,7 @@ Optional properties:
- Example:
- 
- timer12: timer at 48304000 {
--	compatible = "ti,omap2-timer";
-+	compatible = "ti,omap3430-timer";
- 	reg = <0x48304000 0x400>;
- 	interrupts = <95>;
- 	ti,hwmods = "timer12"
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index 0957645..e82c58d 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -239,7 +239,7 @@
- 		};
- 
- 		timer1: timer at 44e31000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,am335x-timer-1ms";
- 			reg = <0x44e31000 0x400>;
- 			interrupts = <67>;
- 			ti,hwmods = "timer1";
-@@ -247,21 +247,21 @@
- 		};
- 
- 		timer2: timer at 48040000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,am335x-timer";
- 			reg = <0x48040000 0x400>;
- 			interrupts = <68>;
- 			ti,hwmods = "timer2";
- 		};
- 
- 		timer3: timer at 48042000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,am335x-timer";
- 			reg = <0x48042000 0x400>;
- 			interrupts = <69>;
- 			ti,hwmods = "timer3";
- 		};
- 
- 		timer4: timer at 48044000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,am335x-timer";
- 			reg = <0x48044000 0x400>;
- 			interrupts = <92>;
- 			ti,hwmods = "timer4";
-@@ -269,7 +269,7 @@
- 		};
- 
- 		timer5: timer at 48046000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,am335x-timer";
- 			reg = <0x48046000 0x400>;
- 			interrupts = <93>;
- 			ti,hwmods = "timer5";
-@@ -277,7 +277,7 @@
- 		};
- 
- 		timer6: timer at 48048000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,am335x-timer";
- 			reg = <0x48048000 0x400>;
- 			interrupts = <94>;
- 			ti,hwmods = "timer6";
-@@ -285,7 +285,7 @@
- 		};
- 
- 		timer7: timer at 4804a000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,am335x-timer";
- 			reg = <0x4804a000 0x400>;
- 			interrupts = <95>;
- 			ti,hwmods = "timer7";
-diff --git a/arch/arm/boot/dts/omap2.dtsi b/arch/arm/boot/dts/omap2.dtsi
-index 761c4b6..8279b5f 100644
---- a/arch/arm/boot/dts/omap2.dtsi
-+++ b/arch/arm/boot/dts/omap2.dtsi
-@@ -68,28 +68,28 @@
- 		};
- 
- 		timer2: timer at 4802a000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,omap2420-timer";
- 			reg = <0x4802a000 0x400>;
- 			interrupts = <38>;
- 			ti,hwmods = "timer2";
- 		};
- 
- 		timer3: timer at 48078000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,omap2420-timer";
- 			reg = <0x48078000 0x400>;
- 			interrupts = <39>;
- 			ti,hwmods = "timer3";
- 		};
- 
- 		timer4: timer at 4807a000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,omap2420-timer";
- 			reg = <0x4807a000 0x400>;
- 			interrupts = <40>;
- 			ti,hwmods = "timer4";
- 		};
- 
- 		timer5: timer at 4807c000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,omap2420-timer";
- 			reg = <0x4807c000 0x400>;
- 			interrupts = <41>;
- 			ti,hwmods = "timer5";
-@@ -97,7 +97,7 @@
- 		};
- 
- 		timer6: timer at 4807e000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,omap2420-timer";
- 			reg = <0x4807e000 0x400>;
- 			interrupts = <42>;
- 			ti,hwmods = "timer6";
-@@ -105,7 +105,7 @@
- 		};
- 
- 		timer7: timer at 48080000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,omap2420-timer";
- 			reg = <0x48080000 0x400>;
- 			interrupts = <43>;
- 			ti,hwmods = "timer7";
-@@ -113,7 +113,7 @@
- 		};
- 
- 		timer8: timer at 48082000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,omap2420-timer";
- 			reg = <0x48082000 0x400>;
- 			interrupts = <44>;
- 			ti,hwmods = "timer8";
-@@ -121,7 +121,7 @@
- 		};
- 
- 		timer9: timer at 48084000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,omap2420-timer";
- 			reg = <0x48084000 0x400>;
- 			interrupts = <45>;
- 			ti,hwmods = "timer9";
-@@ -129,7 +129,7 @@
- 		};
- 
- 		timer10: timer at 48086000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,omap2420-timer";
- 			reg = <0x48086000 0x400>;
- 			interrupts = <46>;
- 			ti,hwmods = "timer10";
-@@ -137,7 +137,7 @@
- 		};
- 
- 		timer11: timer at 48088000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,omap2420-timer";
- 			reg = <0x48088000 0x400>;
- 			interrupts = <47>;
- 			ti,hwmods = "timer11";
-@@ -145,7 +145,7 @@
- 		};
- 
- 		timer12: timer at 4808a000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,omap2420-timer";
- 			reg = <0x4808a000 0x400>;
- 			interrupts = <48>;
- 			ti,hwmods = "timer12";
-diff --git a/arch/arm/boot/dts/omap2420.dtsi b/arch/arm/boot/dts/omap2420.dtsi
-index af65609..aa58896 100644
---- a/arch/arm/boot/dts/omap2420.dtsi
-+++ b/arch/arm/boot/dts/omap2420.dtsi
-@@ -50,7 +50,7 @@
- 		};
- 
- 		timer1: timer at 48028000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,omap2420-timer";
- 			reg = <0x48028000 0x400>;
- 			interrupts = <37>;
- 			ti,hwmods = "timer1";
-diff --git a/arch/arm/boot/dts/omap2430.dtsi b/arch/arm/boot/dts/omap2430.dtsi
-index c392445..07065b4 100644
---- a/arch/arm/boot/dts/omap2430.dtsi
-+++ b/arch/arm/boot/dts/omap2430.dtsi
-@@ -91,7 +91,7 @@
- 		};
- 
- 		timer1: timer at 49018000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,omap2420-timer";
- 			reg = <0x49018000 0x400>;
- 			interrupts = <37>;
- 			ti,hwmods = "timer1";
-diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-index 1acc261..2477ce3 100644
---- a/arch/arm/boot/dts/omap3.dtsi
-+++ b/arch/arm/boot/dts/omap3.dtsi
-@@ -304,7 +304,7 @@
- 		};
- 
- 		timer1: timer at 48318000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,omap3430-timer";
- 			reg = <0x48318000 0x400>;
- 			interrupts = <37>;
- 			ti,hwmods = "timer1";
-@@ -312,28 +312,28 @@
- 		};
- 
- 		timer2: timer at 49032000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,omap3430-timer";
- 			reg = <0x49032000 0x400>;
- 			interrupts = <38>;
- 			ti,hwmods = "timer2";
- 		};
- 
- 		timer3: timer at 49034000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,omap3430-timer";
- 			reg = <0x49034000 0x400>;
- 			interrupts = <39>;
- 			ti,hwmods = "timer3";
- 		};
- 
- 		timer4: timer at 49036000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,omap3430-timer";
- 			reg = <0x49036000 0x400>;
- 			interrupts = <40>;
- 			ti,hwmods = "timer4";
- 		};
- 
- 		timer5: timer at 49038000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,omap3430-timer";
- 			reg = <0x49038000 0x400>;
- 			interrupts = <41>;
- 			ti,hwmods = "timer5";
-@@ -341,7 +341,7 @@
- 		};
- 
- 		timer6: timer at 4903a000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,omap3430-timer";
- 			reg = <0x4903a000 0x400>;
- 			interrupts = <42>;
- 			ti,hwmods = "timer6";
-@@ -349,7 +349,7 @@
- 		};
- 
- 		timer7: timer at 4903c000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,omap3430-timer";
- 			reg = <0x4903c000 0x400>;
- 			interrupts = <43>;
- 			ti,hwmods = "timer7";
-@@ -357,7 +357,7 @@
- 		};
- 
- 		timer8: timer at 4903e000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,omap3430-timer";
- 			reg = <0x4903e000 0x400>;
- 			interrupts = <44>;
- 			ti,hwmods = "timer8";
-@@ -366,7 +366,7 @@
- 		};
- 
- 		timer9: timer at 49040000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,omap3430-timer";
- 			reg = <0x49040000 0x400>;
- 			interrupts = <45>;
- 			ti,hwmods = "timer9";
-@@ -374,7 +374,7 @@
- 		};
- 
- 		timer10: timer at 48086000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,omap3430-timer";
- 			reg = <0x48086000 0x400>;
- 			interrupts = <46>;
- 			ti,hwmods = "timer10";
-@@ -382,7 +382,7 @@
- 		};
- 
- 		timer11: timer at 48088000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,omap3430-timer";
- 			reg = <0x48088000 0x400>;
- 			interrupts = <47>;
- 			ti,hwmods = "timer11";
-@@ -390,7 +390,7 @@
- 		};
- 
- 		timer12: timer at 48304000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,omap3430-timer";
- 			reg = <0x48304000 0x400>;
- 			interrupts = <95>;
- 			ti,hwmods = "timer12";
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index 739bb79..bd14384 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -441,7 +441,7 @@
- 		};
- 
- 		timer1: timer at 4a318000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,omap3430-timer";
- 			reg = <0x4a318000 0x80>;
- 			interrupts = <0 37 0x4>;
- 			ti,hwmods = "timer1";
-@@ -449,28 +449,28 @@
- 		};
- 
- 		timer2: timer at 48032000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,omap3430-timer";
- 			reg = <0x48032000 0x80>;
- 			interrupts = <0 38 0x4>;
- 			ti,hwmods = "timer2";
- 		};
- 
- 		timer3: timer at 48034000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,omap4430-timer";
- 			reg = <0x48034000 0x80>;
- 			interrupts = <0 39 0x4>;
- 			ti,hwmods = "timer3";
- 		};
- 
- 		timer4: timer at 48036000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,omap4430-timer";
- 			reg = <0x48036000 0x80>;
- 			interrupts = <0 40 0x4>;
- 			ti,hwmods = "timer4";
- 		};
- 
- 		timer5: timer at 40138000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,omap4430-timer";
- 			reg = <0x40138000 0x80>,
- 			      <0x49038000 0x80>;
- 			interrupts = <0 41 0x4>;
-@@ -479,7 +479,7 @@
- 		};
- 
- 		timer6: timer at 4013a000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,omap4430-timer";
- 			reg = <0x4013a000 0x80>,
- 			      <0x4903a000 0x80>;
- 			interrupts = <0 42 0x4>;
-@@ -488,7 +488,7 @@
- 		};
- 
- 		timer7: timer at 4013c000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,omap4430-timer";
- 			reg = <0x4013c000 0x80>,
- 			      <0x4903c000 0x80>;
- 			interrupts = <0 43 0x4>;
-@@ -497,7 +497,7 @@
- 		};
- 
- 		timer8: timer at 4013e000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,omap4430-timer";
- 			reg = <0x4013e000 0x80>,
- 			      <0x4903e000 0x80>;
- 			interrupts = <0 44 0x4>;
-@@ -507,7 +507,7 @@
- 		};
- 
- 		timer9: timer at 4803e000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,omap4430-timer";
- 			reg = <0x4803e000 0x80>;
- 			interrupts = <0 45 0x4>;
- 			ti,hwmods = "timer9";
-@@ -515,7 +515,7 @@
- 		};
- 
- 		timer10: timer at 48086000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,omap3430-timer";
- 			reg = <0x48086000 0x80>;
- 			interrupts = <0 46 0x4>;
- 			ti,hwmods = "timer10";
-@@ -523,7 +523,7 @@
- 		};
- 
- 		timer11: timer at 48088000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,omap4430-timer";
- 			reg = <0x48088000 0x80>;
- 			interrupts = <0 47 0x4>;
- 			ti,hwmods = "timer11";
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index 790bb2a..31f5a5f 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -387,7 +387,7 @@
- 		};
- 
- 		timer1: timer at 4ae18000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,omap5430-timer";
- 			reg = <0x4ae18000 0x80>;
- 			interrupts = <0 37 0x4>;
- 			ti,hwmods = "timer1";
-@@ -395,28 +395,28 @@
- 		};
- 
- 		timer2: timer at 48032000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,omap5430-timer";
- 			reg = <0x48032000 0x80>;
- 			interrupts = <0 38 0x4>;
- 			ti,hwmods = "timer2";
- 		};
- 
- 		timer3: timer at 48034000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,omap5430-timer";
- 			reg = <0x48034000 0x80>;
- 			interrupts = <0 39 0x4>;
- 			ti,hwmods = "timer3";
- 		};
- 
- 		timer4: timer at 48036000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,omap5430-timer";
- 			reg = <0x48036000 0x80>;
- 			interrupts = <0 40 0x4>;
- 			ti,hwmods = "timer4";
- 		};
- 
- 		timer5: timer at 40138000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,omap5430-timer";
- 			reg = <0x40138000 0x80>,
- 			      <0x49038000 0x80>;
- 			interrupts = <0 41 0x4>;
-@@ -425,7 +425,7 @@
- 		};
- 
- 		timer6: timer at 4013a000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,omap5430-timer";
- 			reg = <0x4013a000 0x80>,
- 			      <0x4903a000 0x80>;
- 			interrupts = <0 42 0x4>;
-@@ -435,7 +435,7 @@
- 		};
- 
- 		timer7: timer at 4013c000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,omap5430-timer";
- 			reg = <0x4013c000 0x80>,
- 			      <0x4903c000 0x80>;
- 			interrupts = <0 43 0x4>;
-@@ -444,7 +444,7 @@
- 		};
- 
- 		timer8: timer at 4013e000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,omap5430-timer";
- 			reg = <0x4013e000 0x80>,
- 			      <0x4903e000 0x80>;
- 			interrupts = <0 44 0x4>;
-@@ -454,21 +454,21 @@
- 		};
- 
- 		timer9: timer at 4803e000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,omap5430-timer";
- 			reg = <0x4803e000 0x80>;
- 			interrupts = <0 45 0x4>;
- 			ti,hwmods = "timer9";
- 		};
- 
- 		timer10: timer at 48086000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,omap5430-timer";
- 			reg = <0x48086000 0x80>;
- 			interrupts = <0 46 0x4>;
- 			ti,hwmods = "timer10";
- 		};
- 
- 		timer11: timer at 48088000 {
--			compatible = "ti,omap2-timer";
-+			compatible = "ti,omap5430-timer";
- 			reg = <0x48088000 0x80>;
- 			interrupts = <0 47 0x4>;
- 			ti,hwmods = "timer11";
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index 2bdd4cf..14b89af 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -143,7 +143,12 @@ static struct property device_disabled = {
- };
- 
- static struct of_device_id omap_timer_match[] __initdata = {
--	{ .compatible = "ti,omap2-timer", },
-+	{ .compatible = "ti,omap2420-timer", },
-+	{ .compatible = "ti,omap3430-timer", },
-+	{ .compatible = "ti,omap4430-timer", },
-+	{ .compatible = "ti,omap5430-timer", },
-+	{ .compatible = "ti,am335x-timer", },
-+	{ .compatible = "ti,am335x-timer-1ms", },
- 	{ }
- };
- 
-diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
-index 05efb37..b50d478 100644
---- a/arch/arm/plat-omap/dmtimer.c
-+++ b/arch/arm/plat-omap/dmtimer.c
-@@ -895,7 +895,12 @@ static int omap_dm_timer_remove(struct platform_device *pdev)
- }
- 
- static const struct of_device_id omap_timer_match[] = {
--	{ .compatible = "ti,omap2-timer", },
-+	{ .compatible = "ti,omap2420-timer", },
-+	{ .compatible = "ti,omap3430-timer", },
-+	{ .compatible = "ti,omap4430-timer", },
-+	{ .compatible = "ti,omap5430-timer", },
-+	{ .compatible = "ti,am335x-timer", },
-+	{ .compatible = "ti,am335x-timer-1ms", },
- 	{},
- };
- MODULE_DEVICE_TABLE(of, omap_timer_match);
--- 
-1.7.10.4
+Russell, what's your preferred way of getting these patches upstream?
+Ack'ing them and me sending pull request to arm-soc or you would rather
+merge them via your tree? Either way works for me at the moment since
+the code is based on mainline.
+
+Thanks.
+
+
+Catalin Marinas (4):
+  arm: Move the set_handle_irq and handle_arch_irq declarations to
+    asm/irq.h
+  arm: Move chained_irq_(enter|exit) to a generic file
+  irqchip: gic: Call handle_bad_irq() directly
+  irqchip: gic: Perform the gic_secondary_init() call via CPU notifier
+
+ arch/arm/include/asm/irq.h                  |  5 +++
+ arch/arm/include/asm/mach/irq.h             | 36 --------------------
+ arch/arm/mach-at91/gpio.c                   |  3 +-
+ arch/arm/mach-exynos/common.c               |  1 +
+ arch/arm/mach-exynos/platsmp.c              |  8 -----
+ arch/arm/mach-highbank/platsmp.c            |  7 ----
+ arch/arm/mach-imx/platsmp.c                 | 12 -------
+ arch/arm/mach-msm/platsmp.c                 |  8 -----
+ arch/arm/mach-omap2/omap-smp.c              |  7 ----
+ arch/arm/mach-prima2/platsmp.c              |  8 -----
+ arch/arm/mach-s3c24xx/irq.c                 |  1 +
+ arch/arm/mach-shmobile/smp-emev2.c          |  7 ----
+ arch/arm/mach-shmobile/smp-r8a7779.c        |  7 ----
+ arch/arm/mach-shmobile/smp-sh73a0.c         |  7 ----
+ arch/arm/mach-socfpga/platsmp.c             | 12 -------
+ arch/arm/mach-spear13xx/platsmp.c           |  8 -----
+ arch/arm/mach-tegra/platsmp.c               |  8 -----
+ arch/arm/mach-ux500/platsmp.c               |  8 -----
+ arch/arm/mach-virt/platsmp.c                |  8 -----
+ arch/arm/plat-samsung/irq-vic-timer.c       |  3 +-
+ arch/arm/plat-samsung/s5p-irq-gpioint.c     |  3 +-
+ arch/arm/plat-versatile/platsmp.c           |  8 -----
+ drivers/gpio/gpio-msm-v2.c                  |  3 +-
+ drivers/gpio/gpio-mxc.c                     |  2 +-
+ drivers/gpio/gpio-omap.c                    |  3 +-
+ drivers/gpio/gpio-pl061.c                   |  2 +-
+ drivers/gpio/gpio-pxa.c                     |  3 +-
+ drivers/gpio/gpio-tegra.c                   |  3 +-
+ drivers/irqchip/exynos-combiner.c           |  1 +
+ drivers/irqchip/irq-gic.c                   | 32 +++++++++++++-----
+ drivers/irqchip/irq-vic.c                   |  2 +-
+ drivers/pinctrl/pinctrl-at91.c              |  3 +-
+ drivers/pinctrl/pinctrl-exynos.c            |  3 +-
+ drivers/pinctrl/pinctrl-nomadik.c           |  2 +-
+ drivers/pinctrl/pinctrl-sirf.c              |  2 +-
+ drivers/pinctrl/spear/pinctrl-plgpio.c      |  2 +-
+ drivers/staging/imx-drm/ipu-v3/ipu-common.c |  2 +-
+ include/linux/irqchip/arm-gic.h             |  1 -
+ include/linux/irqchip/chained_irq.h         | 52 +++++++++++++++++++++++++++++
+ 39 files changed, 99 insertions(+), 194 deletions(-)
+ create mode 100644 include/linux/irqchip/chained_irq.h
