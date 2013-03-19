@@ -1,81 +1,41 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
-Date: Tue, 19 Mar 2013 12:23:38 +0100
-Subject: [PATCH 4/4] ARM: at91: introduce SAMA5 support
-In-Reply-To: <51420885.60006@arm.com>
-References: <1363280736-23624-1-git-send-email-ludovic.desroches@atmel.com>
- <1363280736-23624-5-git-send-email-ludovic.desroches@atmel.com>
- <51420885.60006@arm.com>
-Message-ID: <20130319112338.GE2522@ludovic.desroches@atmel.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 19 Mar 2013 08:25:15 -0300
+Subject: [PATCH v3 0/9] refactoring for mask_cache
+In-Reply-To: <51483960.3030903@keymile.com>
+References: <1363277430-21325-1-git-send-email-holger.brunck@keymile.com>
+ <1363615255-18200-1-git-send-email-gerlando.falauto@keymile.com>
+ <20130319100352.GB2419@localhost> <51483960.3030903@keymile.com>
+Message-ID: <20130319112514.GC3137@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 14, 2013 at 05:27:33PM +0000, Marc Zyngier wrote:
-> On 14/03/13 17:05, ludovic.desroches at atmel.com wrote:
-> > From: Ludovic Desroches <ludovic.desroches@atmel.com>
-> > 
-> > This patch introduces the SAMA5 support. It also updates the PMC driver to
-> > manage clock division which is a requirement since some peripherals can't work
-> > at the bus frequency on SAMA5.
-> > 
-> > Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> > Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> > Tested-by: Robert Nelson <robertcnelson@gmail.com>
-> > ---
-> >  arch/arm/boot/dts/Makefile                 |    5 +
-> >  arch/arm/boot/dts/sama5d3.dtsi             | 1031 ++++++++++++++++++++++++++++
-> >  arch/arm/boot/dts/sama5d31ek.dts           |   51 ++
-> >  arch/arm/boot/dts/sama5d33ek.dts           |   44 ++
-> >  arch/arm/boot/dts/sama5d34ek.dts           |   61 ++
-> >  arch/arm/boot/dts/sama5d35ek.dts           |   56 ++
-> >  arch/arm/boot/dts/sama5d3xcm.dtsi          |   91 +++
-> >  arch/arm/boot/dts/sama5d3xdm.dtsi          |   42 ++
-> >  arch/arm/boot/dts/sama5d3xmb.dtsi          |  166 +++++
-> >  arch/arm/configs/sama5_defconfig           |  181 +++++
-> >  arch/arm/mach-at91/Kconfig                 |   33 +
-> >  arch/arm/mach-at91/Makefile                |    4 +
-> >  arch/arm/mach-at91/board-dt-sama5.c        |   86 +++
-> >  arch/arm/mach-at91/clock.c                 |  109 ++-
-> >  arch/arm/mach-at91/clock.h                 |    2 +
-> >  arch/arm/mach-at91/include/mach/at91_pmc.h |   18 +-
-> >  arch/arm/mach-at91/include/mach/cpu.h      |   20 +
-> >  arch/arm/mach-at91/include/mach/sama5d3.h  |   73 ++
-> >  arch/arm/mach-at91/sama5d3.c               |  377 ++++++++++
-> >  arch/arm/mach-at91/setup.c                 |   27 +
-> >  arch/arm/mach-at91/soc.h                   |    5 +
-> >  21 files changed, 2453 insertions(+), 29 deletions(-)
-> >  create mode 100644 arch/arm/boot/dts/sama5d3.dtsi
-> >  create mode 100644 arch/arm/boot/dts/sama5d31ek.dts
-> >  create mode 100644 arch/arm/boot/dts/sama5d33ek.dts
-> >  create mode 100644 arch/arm/boot/dts/sama5d34ek.dts
-> >  create mode 100644 arch/arm/boot/dts/sama5d35ek.dts
-> >  create mode 100644 arch/arm/boot/dts/sama5d3xcm.dtsi
-> >  create mode 100644 arch/arm/boot/dts/sama5d3xdm.dtsi
-> >  create mode 100644 arch/arm/boot/dts/sama5d3xmb.dtsi
-> >  create mode 100644 arch/arm/configs/sama5_defconfig
-> >  create mode 100644 arch/arm/mach-at91/board-dt-sama5.c
-> >  create mode 100644 arch/arm/mach-at91/include/mach/sama5d3.h
-> >  create mode 100644 arch/arm/mach-at91/sama5d3.c
+On Tue, Mar 19, 2013 at 11:09:36AM +0100, Gerlando Falauto wrote:
 > 
-> So I haven't started reviewing this yet, but looking at the diffstat, I
-> can't help but think this patch could use some splitting to be more
-> easily reviewable.
-> 
-> How about having one patch for the clock stuff, one for the config, one
-> for the DT, and finally one for the SoC support itself?
+> thanks for the information!
 > 
 
-Hello Marc,
+You're welcome :-)
 
-As you said I can split dts/dtsi, defconf to have a more easily reviewable
-patch. On the other side, I know that some people prefer to have the whole
-'functionnality' in one patch.
+> > Stable people will take care of picking the patch when it hits
+> > mainline. You should receive a mail notification about patches
+> > being included in stable kernels.
+> 
+> Thank you so much. I guess I'd rather have to wait for Thomas' blessing 
+> first (maybe in the form of an Acked-By), don't I?
+> 
 
-Concerning clock stuff and SoC support, they are tied:
-- I use cpu_is_sama5d3 macro in clock.c
-- in sama5d3.c I am using the new fields (div and pid) introduced by the clock.c
-update.
+AFAIK no, you don't have to wait for Thomas.
 
-Regards
+The stable rules are like this:
+You submit a patch you think it applies for stable (see Documentation/stable_kernel_rules)
+adding a 'Cc: stable at vger.kernel.org' tag. If the suitable maintainer accepts the patch,
+it will eventually get merged, and when it hits mainline, the stable tag will tell stable
+people to add this patch into their trees (anyone please correct me if I'm wrong).
 
-Ludovic
+As Jason suggests, you should also state which commit is your patch fixing.
+
+Thanks,
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
