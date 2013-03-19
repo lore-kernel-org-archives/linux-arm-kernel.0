@@ -1,38 +1,79 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Tue, 19 Mar 2013 12:03:34 -0500
-Subject: ep93xx irq-vic regression
-In-Reply-To: <CACRpkdb9tpeTxEc8A24vTkcUsfd=gQpMub0KpgaKJjrGf-fSvg@mail.gmail.com>
-References: <ADE657CA350FB648AAC2C43247A983F0020980106C9F@AUSP01VMBX24.collaborationhost.net>
- <5143AAB4.6020406@gmail.com>
- <ADE657CA350FB648AAC2C43247A983F0020980106CB7@AUSP01VMBX24.collaborationhost.net>
- <CACRpkdb9tpeTxEc8A24vTkcUsfd=gQpMub0KpgaKJjrGf-fSvg@mail.gmail.com>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F0020980107047@AUSP01VMBX24.collaborationhost.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 19 Mar 2013 11:07:41 -0600
+Subject: [PATCH V4 4/9] ARM: tegra: pm: add platform suspend support
+In-Reply-To: <1363594400-11663-5-git-send-email-josephl@nvidia.com>
+References: <1363594400-11663-1-git-send-email-josephl@nvidia.com>
+ <1363594400-11663-5-git-send-email-josephl@nvidia.com>
+Message-ID: <51489B5D.3050101@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, March 18, 2013 1:22 PM, Linus Walleij wrote:
-> On Sat, Mar 16, 2013 at 1:16 AM, H Hartley Sweeten <hartleys@visionengravers.com> wrote:
->
->> It looks like the commit above _did_ have a couple bugs but they were
->> fixed:
->
-> Oh thanks, I already was scared I had broken something again.
-> The irqdomain stuff is a bit fragile, everytime I refactor something
-> it blows up in my face. I hope there are no remaining problems.
+On 03/18/2013 02:13 AM, Joseph Lo wrote:
+> Adding suspend to RAM support for Tegra platform. There are three suspend
+> mode for Tegra. The difference were below.
+> 
+> * LP2: CPU voltage off
+> * LP1: CPU voltage off, DRAM in self-refresh
+> * LP0: CPU + Core voltage off, DRAM in self-refresh
+> 
+> After this patch, the LP2 suspend mode will be supported.
 
-Linus,
+> diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
+> index c84505c..024f355 100644
+> --- a/arch/arm/mach-tegra/common.c
+> +++ b/arch/arm/mach-tegra/common.c
+> @@ -66,6 +66,7 @@ void __init tegra_dt_init_irq(void)
+>  	tegra_init_irq();
+>  	irqchip_init();
+>  	tegra_legacy_irq_syscore_init();
+> +	tegra_init_suspend();
 
-Sorry about not putting you in the loop with this.
+Does that have to be part of tegra_dt_init_irq()? Can't we initialize
+suspend support in some later hook. init_irq() should just initialize IRQs.
 
-The vic driver works fine on the ep93xx. As I stated, there _was_ a
-couple bugs in the driver but they have been fixed.
+> diff --git a/arch/arm/mach-tegra/pmc.c b/arch/arm/mach-tegra/pmc.c
 
-It appears I was chasing a red herring with the vic driver. It ends up that
-my system was not booting due to a patch to the ep93xx uncompress.h
-header that was causing a deadlock in the early printk support.
+> -void set_power_timers(unsigned long us_on, unsigned long us_off)
+> +static void set_power_timers(u32 us_on, u32 us_off, unsigned long rate)
+>  {
+>  	unsigned long long ticks;
+>  	unsigned long long pclk;
+> -	unsigned long rate;
+>  	static unsigned long tegra_last_pclk;
+>  
+> -	rate = clk_get_rate(tegra_pclk);
+> -
+>  	if (WARN_ON_ONCE(rate <= 0))
+>  		pclk = 100000000;
+>  	else
 
-This has been fixed and Ryan Mallon has merged the patch into his
-ep93xx-fixes branch.
+I don't think the code compiles after that?
 
-Regards,
-Hartley
+The code must both compile and execute correctly after each patch is
+applied, without relying on any future patches.
+
+> +void tegra_pmc_pm_set(enum tegra_suspend_mode mode)
+> +{
+> +	u32 reg;
+> +	unsigned long rate = 0;
+> +
+> +	reg = tegra_pmc_readl(PMC_CTRL);
+> +	reg |= TEGRA_POWER_CPU_PWRREQ_OE;
+> +	reg &= ~TEGRA_POWER_EFFECT_LP0;
+> +
+> +	switch (mode) {
+> +	case TEGRA_SUSPEND_LP2:
+> +		rate = clk_get_rate(tegra_pclk);
+
+That isn't used anywhere.
+
+> +void tegra_pmc_suspend_init(void)
+> +{
+> +	u32 reg;
+> +
+> +	/* Always enable CPU power request; just normal polarity is supported */
+> +	reg = tegra_pmc_readl(PMC_CTRL);
+> +	BUG_ON(reg & TEGRA_POWER_CPU_PWRREQ_POLARITY);
+
+Why is that comment true? What does it take to support arbitrary
+polarity; just flipping the OE bit in the register?
