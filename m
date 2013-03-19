@@ -1,110 +1,71 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Tue, 19 Mar 2013 17:34:19 +0530
-Subject: [PATCH V2] clk: Add composite clock type
-In-Reply-To: <2953843.6tCZYDlhTN@amdc1227>
-References: <1359965482-29655-1-git-send-email-pgaikwad@nvidia.com>
- <512F0E2F.4000104@nvidia.com> <512F9FEF.4010304@wwwdotorg.org>
- <2953843.6tCZYDlhTN@amdc1227>
-Message-ID: <51485443.6060603@nvidia.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 19 Mar 2013 07:22:14 -0500
+Subject: [PATCH 2/2] cpuidle / calxeda: remove redundant Kconfig option
+In-Reply-To: <1363080476-26555-2-git-send-email-daniel.lezcano@linaro.org>
+References: <1363080476-26555-1-git-send-email-daniel.lezcano@linaro.org>
+ <1363080476-26555-2-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <51485876.307@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 13 March 2013 10:00 PM, Tomasz Figa wrote:
-> Hi Prashant,
->
-> On Thursday 28 of February 2013 11:20:31 Stephen Warren wrote:
->> On 02/28/2013 12:58 AM, Prashant Gaikwad wrote:
->>> On Wednesday 06 February 2013 03:36 PM, Tomasz Figa wrote:
->>>> On Wednesday 06 of February 2013 08:34:32 Prashant Gaikwad wrote:
->>>>> On Tuesday 05 February 2013 03:45 PM, Tomasz Figa wrote:
->>>>>> Hi Prashant,
->>>>>>
->>>>>> Thank you for your patch. Please see some comments inline.
->>>>>>
->>>>>> On Monday 04 of February 2013 13:41:22 Prashant Gaikwad wrote:
->>>>>>> Not all clocks are required to be decomposed into basic clock
->>>>>>> types but at the same time want to use the functionality
->>>>>>> provided by these basic clock types instead of duplicating.
->>>>>>>
->>>>>>> For example, Tegra SoC has ~100 clocks which can be decomposed
->>>>>>> into Mux -> Div -> Gate clock types making the clock count to
->>>>>>> ~300. Also, parent change operation can not be performed on gate
->>>>>>> clock which forces to use mux clock in driver if want to change
->>>>>>> the parent.
->>>>>>>
->>>>>>> Instead aggregate the basic clock types functionality into one
->>>>>>> clock and just use this clock for all operations. This clock
->>>>>>> type re-uses the functionality of basic clock types and not
->>>>>>> limited to basic clock types but any hardware-specific
->>>>>>> implementation.
->>>>>>>
->>>>>>> diff --git a/drivers/clk/clk-composite.c
->>>>>>>
->>>>>>> +static u8 clk_composite_get_parent(struct clk_hw *hw)
->>>>>>> +{
->>>>>>> +     struct clk_composite *composite = to_clk_composite(hw);
->>>>>>> +     const struct clk_ops *mux_ops = composite->mux_ops;
->>>>>>> +     struct clk_hw *mux_hw = composite->mux_hw;
->>>>>>> +
->>>>>>> +     mux_hw->clk = hw->clk;
->>>>>> Why is this needed? Looks like this filed is already being initialized
->>>>>> in clk_register_composite.
->>>>> Some ops will get called during clk_init where this clk is not populated
->>>>> hence doing here. I have done it for all ops to make sure that any
->>>>> future change in clock framework don't break this clock.
->>>>> Now, why duplicate it in clk_register_composite? It is possible that
->>>>> none of these ops get called in clk_init.
->>>>> For example, recalc_rate is called during init and this ops is supported
->>>>> by div clock type, but what if div clock is not added.
->>>>>
->>>>> I hope this explains the need.
->>>> Sorry, I don't understand your explanation.
->>>>
->>>> I have asked why mux_hw->clk field has to be reinitialized in all the
->>>> ops.
->>>>
->>>> In other words, is it even possible that this clk pointer changes since
->>>> calling clk_register from clk_register_composite and if yes, why?
->>> Tomasz,
->>>
->>> calling sequence is as
->>>
->>> clk_register(struct clk_hw *hw)
->>>
->>>      clk_init(struct clk_hw *hw)
->>>      
->>>          .
->>>          .
->>>          hw->clk = clk;
->>>          clk->ops.recalc_rate(hw) => clk_composite_recalc_rate(hw) =>
->>>
->>> composite->div_ops.recalc_rate(div_hw) => clk_divider_recalc_rate(hw)
->>>
->>> Now if clk_divider_recalc_rate tries to access clk from hw then it will
->>> get NULL since this is not assigned yet and that is what I am doing in
->>> clk_composite_recalc_rate.
->>>
->>> I am doing it in all ops because I can not assume which one will get
->>> called first and always. If in future something changes the calling
->>> sequence in ccf framework then it will break this clock.
->> Surely the CCF core should be taking care of this as part of
->> clk_register() or clk_init()?
-> Any news on this? It would be nice if this patch could be merged soon, because
-> we'd like to rework Exynos clock code to use composite clocks before merge
-> window, to have that merged for 3.10.
->
-> If you don't have time to work on this, would you mind if I made any necessary
-> fixes, added my sign-off next to yours and posted next version myself?
+On 03/12/2013 04:27 AM, Daniel Lezcano wrote:
+> When the CPU_IDLE and the ARCH_HIGHBANK options are set it is
+> pointless to define a new option CPU_IDLE_CALXEDA because it
+> is redundant.
+> 
+> The Makefile drivers directory contains a condition to compile
+> the cpuidle drivers:
+> 
+> obj-$(CONFIG_CPU_IDLE)          += cpuidle/
+> 
+> Hence, if CPU_IDLE is not set we won't enter this directory.
+> 
+> This patch removes the useless Kconfig option and replaces the
+> condition in the Makefile by CONFIG_ARCH_HIGHBANK.
 
-Tomasz,
+If I have multiple platforms including highbank compiled in, but want to
+disable cpuidle just for highbank, then you can't disable it at compile
+time.
 
-Sorry for delayed reply. I will send the updated patch in next 2-3 days. 
-After that if any rework required you can make the changes and add your 
-sign-off.
+Also, with my PSCI support patches for highbank, it is no longer
+dependent on ARCH_HIGHBANK which gives us better compile test coverage.
 
-Thanks for the patience!!
+Rob
 
-Regards,
-PrashantG
-
-> Best regards,
+> 
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> ---
+>  drivers/cpuidle/Kconfig  |   10 ----------
+>  drivers/cpuidle/Makefile |    2 +-
+>  2 files changed, 1 insertion(+), 11 deletions(-)
+> 
+> diff --git a/drivers/cpuidle/Kconfig b/drivers/cpuidle/Kconfig
+> index c4cc27e..234ae65 100644
+> --- a/drivers/cpuidle/Kconfig
+> +++ b/drivers/cpuidle/Kconfig
+> @@ -30,13 +30,3 @@ config CPU_IDLE_GOV_MENU
+>  
+>  config ARCH_NEEDS_CPU_IDLE_COUPLED
+>  	def_bool n
+> -
+> -if CPU_IDLE
+> -
+> -config CPU_IDLE_CALXEDA
+> -	bool "CPU Idle Driver for Calxeda processors"
+> -	depends on ARCH_HIGHBANK
+> -	help
+> -	  Select this to enable cpuidle on Calxeda processors.
+> -
+> -endif
+> diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
+> index 0d8bd55..d1aba71 100644
+> --- a/drivers/cpuidle/Makefile
+> +++ b/drivers/cpuidle/Makefile
+> @@ -5,5 +5,5 @@
+>  obj-y += cpuidle.o driver.o governor.o sysfs.o governors/
+>  obj-$(CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED) += coupled.o
+>  
+> -obj-$(CONFIG_CPU_IDLE_CALXEDA) += cpuidle-calxeda.o
+> +obj-$(CONFIG_ARCH_HIGHBANK) += cpuidle-calxeda.o
+>  obj-$(CONFIG_ARCH_KIRKWOOD) += cpuidle-kirkwood.o
+> 
