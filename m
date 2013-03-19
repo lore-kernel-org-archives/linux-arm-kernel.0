@@ -1,139 +1,193 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 19 Mar 2013 22:16:07 +0100
-Subject: [PATCHv2] ARM: kirkwood: Add support for NETGEAR ReadyNAS Duo v2
- using DT
-In-Reply-To: <87mwtzcgbl.fsf@natisbad.org>
-References: <8738vt3h11.fsf@natisbad.org> <20130317205047.GU21478@lunn.ch>
- <87mwtzcgbl.fsf@natisbad.org>
-Message-ID: <20130319211607.GE21478@lunn.ch>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 19 Mar 2013 14:20:53 -0700
+Subject: [RESEND PATCH 1/3] clk: Remove _clk_reparent from API and
+ restructure code
+In-Reply-To: <1363116050-3882-2-git-send-email-ulf.hansson@stericsson.com>
+References: <1363116050-3882-1-git-send-email-ulf.hansson@stericsson.com>
+ <1363116050-3882-2-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <20130319212053.8663.63425@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 19, 2013 at 08:58:22PM +0100, Arnaud Ebalard wrote:
-> Hi,
+Quoting Ulf Hansson (2013-03-12 12:20:48)
+> From: Ulf Hansson <ulf.hansson@linaro.org>
 > 
-> Add support for NETGEAR ReadyNAS Duo v2 (Hardware specs available
-> here: http://natisbad.org/NAS/).
+> There shall be no reason for keeping this API available for clock
+> providers. So we remove it from the API and restrcuture the code so
+> for example the COMMON_CLK_DEBUG part is separated.
+> 
 
-Hi Arnaud
+Hi Ulf,
 
-Thats a nice description of the hardware. There is another device
-using the same power supply controller, the USI Topkick. A few of the
-maintainers have these, so there would be the possibility of
-cooperating on a driver. It does not seem that complex a device. The
-topkick also seems to do Wake-on-LAN using this controller. There was
-a patch added recently which may allow this to work, depending on the
-PHY.
+There is one reason to keep this api.  OMAP currently uses it to change
+the parent of a PLL during .set_rate.  This is kind of a legacy
+mechanism however, and the reentrancy series I posted actually takes
+care of this one corner case:
+http://article.gmane.org/gmane.linux.kernel/1448449
 
-> index 13482ea..511cd7d 100644
-> --- a/arch/arm/configs/kirkwood_defconfig
-> +++ b/arch/arm/configs/kirkwood_defconfig
-> @@ -35,6 +35,7 @@ CONFIG_MACH_NETSPACE_LITE_V2_DT=y
->  CONFIG_MACH_NETSPACE_MINI_V2_DT=y
->  CONFIG_MACH_OPENBLOCKS_A6_DT=y
->  CONFIG_MACH_TOPKICK_DT=y
-> +CONFIG_MACH_READYNAS_DT=y
->  CONFIG_MACH_TS219=y
->  CONFIG_MACH_TS41X=y
->  CONFIG_MACH_DOCKSTAR=y
+Let me see how the OMAP folks feel about taking that patch in, which
+eliminates the only external user of the API.  +Rajendra & Benoit
 
-Keeping with alphabetic ordering, it should be one place higher....
+Thanks,
+Mike
 
-> diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
-> index 7b6a64b..94df386 100644
-> --- a/arch/arm/mach-kirkwood/Kconfig
-> +++ b/arch/arm/mach-kirkwood/Kconfig
-> @@ -108,6 +108,15 @@ config MACH_TS219_DT
->  	  or MV6282. If you have the wrong one, the buttons will not
->  	  work.
->  
-> +config MACH_READYNAS_DT
-> +	bool "NETGEAR ReadyNAS Duo v2 (Flattened Device Tree)"
-> +	select ARCH_KIRKWOOD_DT
-> +	select ARM_APPENDED_DTB
-> +	select ARM_ATAG_DTB_COMPAT
-> +	help
-> +	  Say 'Y' here if you want your kernel to support the
-> +	  NETGEAR ReadyNAS Duo v2 using Fattened Device Tree.
-> +
-
-Again, should be a bit earlier.
-
->  config MACH_DOCKSTAR_DT
->  	bool "Seagate FreeAgent Dockstar (Flattened Device Tree)"
->  	select ARCH_KIRKWOOD_DT
-> diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
-> index 4cc4bee..b9108ea 100644
-> --- a/arch/arm/mach-kirkwood/Makefile
-> +++ b/arch/arm/mach-kirkwood/Makefile
-> @@ -26,6 +26,7 @@ obj-$(CONFIG_MACH_ICONNECT_DT)		+= board-iconnect.o
->  obj-$(CONFIG_MACH_DLINK_KIRKWOOD_DT)	+= board-dnskw.o
->  obj-$(CONFIG_MACH_IB62X0_DT)		+= board-ib62x0.o
->  obj-$(CONFIG_MACH_TS219_DT)		+= board-ts219.o tsx1x-common.o
-> +obj-$(CONFIG_MACH_READYNAS_DT)		+= board-readynas.o
->  obj-$(CONFIG_MACH_DOCKSTAR_DT)		+= board-dockstar.o
->  obj-$(CONFIG_MACH_GOFLEXNET_DT)		+= board-goflexnet.o
->  obj-$(CONFIG_MACH_LSXL_DT)		+= board-lsxl.o
-
-Yes, you can guess.... Where ever you have inserted something, make
-sure it follows the given ordering. The issue here is merge
-conflicts. If we get another device contributed that is also added at
-the end, we get conflicts. If merges happening in the middle, the
-likelihood of a conflict is much smaller. 
-
-> diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-> index 2e73e9d..a29f2ee 100644
-> --- a/arch/arm/mach-kirkwood/board-dt.c
-> +++ b/arch/arm/mach-kirkwood/board-dt.c
-> @@ -144,6 +144,9 @@ static void __init kirkwood_dt_init(void)
->  	if (of_machine_is_compatible("usi,topkick"))
->  		usi_topkick_init();
->  
-> +	if (of_machine_is_compatible("netgear,readynas-duo-v2"))
-> +		netgear_readynas_init();
-> +
->  	of_platform_populate(NULL, kirkwood_dt_match_table, NULL, NULL);
+> This patch will also make it possible to hold the spinlock over the
+> actual update of the clock tree topology, which could not be done
+> before when both debugfs updates and clock rate updates was done
+> within the same function.
+> 
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> ---
+>  drivers/clk/clk.c            |   82 ++++++++++++++++++++++++------------------
+>  include/linux/clk-provider.h |    1 -
+>  2 files changed, 48 insertions(+), 35 deletions(-)
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 593a2e4..2e10cc1 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -284,6 +284,39 @@ out:
 >  }
 >  
-> @@ -169,6 +172,7 @@ static const char * const kirkwood_dt_board_compat[] = {
->  	"plathome,openblocks-a6",
->  	"usi,topkick",
->  	"zyxel,nsa310",
-> +	"netgear,readynas-duo-v2",
->  	NULL
->  };
->  
-> diff --git a/arch/arm/mach-kirkwood/board-readynas.c b/arch/arm/mach-kirkwood/board-readynas.c
-> new file mode 100644
-> index 0000000..47bc25e
-> --- /dev/null
-> +++ b/arch/arm/mach-kirkwood/board-readynas.c
-> @@ -0,0 +1,30 @@
-> +/*
-> + * NETGEAR ReadyNAS Duo v2 Board setup for drivers not already
-> + * converted to DT.
+>  /**
+> + * clk_debug_reparent - reparent clk node in the debugfs clk tree
+> + * @clk: the clk being reparented
+> + * @new_parent: the new clk parent, may be NULL
 > + *
-> + * Copyright (C) 2013, Arnaud EBALARD <arno@natisbad.org>
+> + * Rename clk entry in the debugfs clk tree if debugfs has been
+> + * initialized.  Otherwise it bails out early since the debugfs clk tree
+> + * will be created lazily by clk_debug_init as part of a late_initcall.
 > + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License
-> + * as published by the Free Software Foundation; either version
-> + * 2 of the License, or (at your option) any later version.
+> + * Caller must hold prepare_lock.
 > + */
+> +static void clk_debug_reparent(struct clk *clk, struct clk *new_parent)
+> +{
+> +       struct dentry *d;
+> +       struct dentry *new_parent_d;
 > +
-> +#include <linux/kernel.h>
-> +#include <linux/init.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/mv643xx_eth.h>
-> +#include <linux/delay.h>
-> +#include <asm/io.h>
-> +#include <mach/kirkwood.h>
-> +#include "common.h"
-
-Now that the msleep() has gone, delay.h is probably not needed.  Maybe
-also io.h is not needed any more with the regulator DT?
-
-These are all minor issues. The code is good otherwise.
-
-      Thanks
-	Andrew
+> +       if (!inited)
+> +               return;
+> +
+> +       if (new_parent)
+> +               new_parent_d = new_parent->dentry;
+> +       else
+> +               new_parent_d = orphandir;
+> +
+> +       d = debugfs_rename(clk->dentry->d_parent, clk->dentry,
+> +                       new_parent_d, clk->name);
+> +       if (d)
+> +               clk->dentry = d;
+> +       else
+> +               pr_debug("%s: failed to rename debugfs entry for %s\n",
+> +                               __func__, clk->name);
+> +}
+> +
+> +/**
+>   * clk_debug_init - lazily create the debugfs clk tree visualization
+>   *
+>   * clks are often initialized very early during boot before memory can
+> @@ -338,6 +371,9 @@ static int __init clk_debug_init(void)
+>  late_initcall(clk_debug_init);
+>  #else
+>  static inline int clk_debug_register(struct clk *clk) { return 0; }
+> +static inline void clk_debug_reparent(struct clk *clk, struct clk *new_parent)
+> +{
+> +}
+>  #endif
+>  
+>  /* caller must hold prepare_lock */
+> @@ -1179,16 +1215,8 @@ out:
+>         return ret;
+>  }
+>  
+> -void __clk_reparent(struct clk *clk, struct clk *new_parent)
+> +static void clk_reparent(struct clk *clk, struct clk *new_parent)
+>  {
+> -#ifdef CONFIG_COMMON_CLK_DEBUG
+> -       struct dentry *d;
+> -       struct dentry *new_parent_d;
+> -#endif
+> -
+> -       if (!clk || !new_parent)
+> -               return;
+> -
+>         hlist_del(&clk->child_node);
+>  
+>         if (new_parent)
+> @@ -1196,28 +1224,7 @@ void __clk_reparent(struct clk *clk, struct clk *new_parent)
+>         else
+>                 hlist_add_head(&clk->child_node, &clk_orphan_list);
+>  
+> -#ifdef CONFIG_COMMON_CLK_DEBUG
+> -       if (!inited)
+> -               goto out;
+> -
+> -       if (new_parent)
+> -               new_parent_d = new_parent->dentry;
+> -       else
+> -               new_parent_d = orphandir;
+> -
+> -       d = debugfs_rename(clk->dentry->d_parent, clk->dentry,
+> -                       new_parent_d, clk->name);
+> -       if (d)
+> -               clk->dentry = d;
+> -       else
+> -               pr_debug("%s: failed to rename debugfs entry for %s\n",
+> -                               __func__, clk->name);
+> -out:
+> -#endif
+> -
+>         clk->parent = new_parent;
+> -
+> -       __clk_recalc_rates(clk, POST_RATE_CHANGE);
+>  }
+>  
+>  static int __clk_set_parent(struct clk *clk, struct clk *parent)
+> @@ -1329,7 +1336,9 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
+>         }
+>  
+>         /* propagate rate recalculation downstream */
+> -       __clk_reparent(clk, parent);
+> +       clk_reparent(clk, parent);
+> +       clk_debug_reparent(clk, parent);
+> +       __clk_recalc_rates(clk, POST_RATE_CHANGE);
+>  
+>  out:
+>         mutex_unlock(&prepare_lock);
+> @@ -1453,14 +1462,19 @@ int __clk_init(struct device *dev, struct clk *clk)
+>         hlist_for_each_entry_safe(orphan, tmp, tmp2, &clk_orphan_list, child_node) {
+>                 if (orphan->ops->get_parent) {
+>                         i = orphan->ops->get_parent(orphan->hw);
+> -                       if (!strcmp(clk->name, orphan->parent_names[i]))
+> -                               __clk_reparent(orphan, clk);
+> +                       if (!strcmp(clk->name, orphan->parent_names[i])) {
+> +                               clk_reparent(orphan, clk);
+> +                               clk_debug_reparent(orphan, clk);
+> +                               __clk_recalc_rates(orphan, POST_RATE_CHANGE);
+> +                       }
+>                         continue;
+>                 }
+>  
+>                 for (i = 0; i < orphan->num_parents; i++)
+>                         if (!strcmp(clk->name, orphan->parent_names[i])) {
+> -                               __clk_reparent(orphan, clk);
+> +                               clk_reparent(orphan, clk);
+> +                               clk_debug_reparent(orphan, clk);
+> +                               __clk_recalc_rates(orphan, POST_RATE_CHANGE);
+>                                 break;
+>                         }
+>          }
+> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> index 4989b8a..87a7c2c 100644
+> --- a/include/linux/clk-provider.h
+> +++ b/include/linux/clk-provider.h
+> @@ -359,7 +359,6 @@ struct clk *__clk_lookup(const char *name);
+>   */
+>  int __clk_prepare(struct clk *clk);
+>  void __clk_unprepare(struct clk *clk);
+> -void __clk_reparent(struct clk *clk, struct clk *new_parent);
+>  unsigned long __clk_round_rate(struct clk *clk, unsigned long rate);
+>  
+>  struct of_device_id;
+> -- 
+> 1.7.10
