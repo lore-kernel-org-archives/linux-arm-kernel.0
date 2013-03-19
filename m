@@ -1,258 +1,76 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Tue, 19 Mar 2013 15:52:15 +0800
-Subject: [PATCH v7 14/14] ARM: dts: add pinctrl property for spi node for
- atmel SoC
-In-Reply-To: <1363678866-3567-1-git-send-email-wenyou.yang@atmel.com>
-References: <1363678866-3567-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1363679535-4280-1-git-send-email-wenyou.yang@atmel.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 19 Mar 2013 09:19:05 +0100
+Subject: [PATCH] clk: add DT test clock consumer driver
+In-Reply-To: <20130319015425.8663.84827@quantum>
+References: <1363439376-21294-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <201303161456.54246.arnd@arndb.de> <20130319015425.8663.84827@quantum>
+Message-ID: <51481F79.40304@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-Cc: linux at arm.linux.org.uk
-Cc: linux-kernel at vger.kernel.org
----
- arch/arm/boot/dts/at91sam9260.dtsi |   22 ++++++++++++++++++++++
- arch/arm/boot/dts/at91sam9263.dtsi |   22 ++++++++++++++++++++++
- arch/arm/boot/dts/at91sam9g45.dtsi |   22 ++++++++++++++++++++++
- arch/arm/boot/dts/at91sam9n12.dtsi |   22 ++++++++++++++++++++++
- arch/arm/boot/dts/at91sam9x5.dtsi  |   22 ++++++++++++++++++++++
- 5 files changed, 110 insertions(+)
+On 03/19/2013 02:54 AM, Mike Turquette wrote:
+> Quoting Arnd Bergmann (2013-03-16 07:56:54)
+>> On Saturday 16 March 2013, Sebastian Hesselbarth wrote:
+>>> This driver adds a DT test clock consumer that exposes debugfs files to
+>>> enable/disable and set/get rate of the attached programmable clock.
+>>> During development of a i2c-attached clock generator I found it useful
+>>> to debug the clock generator's internal pll settings by enforcing clock
+>>> rates through debugfs.
+>>>
+>>> Signed-off-by: Sebastian Hesselbarth<sebastian.hesselbarth@gmail.com>
+>>
+>> It sounds a little clumsy to have a device driver to match a device that
+>> you create just for matching the driver.
+>>
+>> Would it be possible to separate the debugging logic from the platform
+>> device logic? I think it may be useful to have a debugfs or sysfs
+>> inteface for all clocks in the system, even if that is disabled by
+>> default or only available after manually loading a module implementing
+>> that functionality.
+>>
+>
+> I agree that a generic approach is needed here.  I have been meaning to
+> break the existing debugfs stuff out into clk-debug.c.  I'll do that
+> soon and maybe you can add a new Kconfig entry for
+> COMMON_CLK_DEBUG_USERSPACE (or something like that) which implements
+> this?
 
-diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
-index 6e31dc8..39253b9 100644
---- a/arch/arm/boot/dts/at91sam9260.dtsi
-+++ b/arch/arm/boot/dts/at91sam9260.dtsi
-@@ -322,6 +322,24 @@
- 					};
- 				};
- 
-+				spi0 {
-+					pinctrl_spi0: spi0-0 {
-+						atmel,pins =
-+							<0 0 0x1 0x0	/* PA0 periph A SPI0_MISO pin */
-+							 0 1 0x1 0x0	/* PA1 periph A SPI0_MOSI pin */
-+							 0 2 0x1 0x0>;	/* PA2 periph A SPI0_SPCK pin */
-+					};
-+				};
-+
-+				spi1 {
-+					pinctrl_spi1: spi1-0 {
-+						atmel,pins =
-+							<1 0 0x1 0x0	/* PB0 periph A SPI1_MISO pin */
-+							 1 1 0x1 0x0	/* PB1 periph A SPI1_MOSI pin */
-+							 1 2 0x1 0x0>;	/* PB2 periph A SPI1_SPCK pin */
-+					};
-+				};
-+
- 				pioA: gpio at fffff400 {
- 					compatible = "atmel,at91rm9200-gpio";
- 					reg = <0xfffff400 0x200>;
-@@ -477,6 +495,8 @@
- 				compatible = "atmel,at91rm9200-spi";
- 				reg = <0xfffc8000 0x200>;
- 				interrupts = <12 4 3>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_spi0>;
- 				status = "disabled";
- 			};
- 
-@@ -486,6 +506,8 @@
- 				compatible = "atmel,at91rm9200-spi";
- 				reg = <0xfffcc000 0x200>;
- 				interrupts = <13 4 3>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_spi1>;
- 				status = "disabled";
- 			};
- 
-diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
-index 6c6d9ae..94b58ab 100644
---- a/arch/arm/boot/dts/at91sam9263.dtsi
-+++ b/arch/arm/boot/dts/at91sam9263.dtsi
-@@ -303,6 +303,24 @@
- 					};
- 				};
- 
-+				spi0 {
-+					pinctrl_spi0: spi0-0 {
-+						atmel,pins =
-+							<0 0 0x2 0x0	/* PA0 periph B SPI0_MISO pin */
-+							 0 1 0x2 0x0	/* PA1 periph B SPI0_MOSI pin */
-+							 0 2 0x2 0x0>;	/* PA2 periph B SPI0_SPCK pin */
-+					};
-+				};
-+
-+				spi1 {
-+					pinctrl_spi1: spi1-0 {
-+						atmel,pins =
-+							<1 12 0x1 0x0	/* PB12 periph A SPI1_MISO pin */
-+							 1 13 0x1 0x0	/* PB13 periph A SPI1_MOSI pin */
-+							 1 14 0x1 0x0>;	/* PB14 periph A SPI1_SPCK pin */
-+					};
-+				};
-+
- 				pioA: gpio at fffff200 {
- 					compatible = "atmel,at91rm9200-gpio";
- 					reg = <0xfffff200 0x200>;
-@@ -469,6 +487,8 @@
- 				compatible = "atmel,at91rm9200-spi";
- 				reg = <0xfffa4000 0x200>;
- 				interrupts = <14 4 3>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_spi0>;
- 				status = "disabled";
- 			};
- 
-@@ -478,6 +498,8 @@
- 				compatible = "atmel,at91rm9200-spi";
- 				reg = <0xfffa8000 0x200>;
- 				interrupts = <15 4 3>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_spi1>;
- 				status = "disabled";
- 			};
- 		};
-diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-index e085b8a..cfdf429 100644
---- a/arch/arm/boot/dts/at91sam9g45.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-@@ -322,6 +322,24 @@
- 					};
- 				};
- 
-+				spi0 {
-+					pinctrl_spi0: spi0-0 {
-+						atmel,pins =
-+							<1 0 0x1 0x0	/* PB0 periph A SPI0_MISO pin */
-+							 1 1 0x1 0x0	/* PB1 periph A SPI0_MOSI pin */
-+							 1 2 0x1 0x0>;	/* PB2 periph A SPI0_SPCK pin */
-+					};
-+				};
-+
-+				spi1 {
-+					pinctrl_spi1: spi1-0 {
-+						atmel,pins =
-+							<1 14 0x1 0x0	/* PB14 periph A SPI1_MISO pin */
-+							 1 15 0x1 0x0	/* PB15 periph A SPI1_MOSI pin */
-+							 1 16 0x1 0x0>;	/* PB16 periph A SPI1_SPCK pin */
-+					};
-+				};
-+
- 				pioA: gpio at fffff200 {
- 					compatible = "atmel,at91rm9200-gpio";
- 					reg = <0xfffff200 0x200>;
-@@ -538,6 +556,8 @@
- 				compatible = "atmel,at91rm9200-spi";
- 				reg = <0xfffa4000 0x200>;
- 				interrupts = <14 4 3>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_spi0>;
- 				status = "disabled";
- 			};
- 
-@@ -547,6 +567,8 @@
- 				compatible = "atmel,at91rm9200-spi";
- 				reg = <0xfffa8000 0x200>;
- 				interrupts = <15 4 3>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_spi1>;
- 				status = "disabled";
- 			};
- 		};
-diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
-index f3f87ef3..b2961f1 100644
---- a/arch/arm/boot/dts/at91sam9n12.dtsi
-+++ b/arch/arm/boot/dts/at91sam9n12.dtsi
-@@ -261,6 +261,24 @@
- 					};
- 				};
- 
-+				spi0 {
-+					pinctrl_spi0: spi0-0 {
-+						atmel,pins =
-+							<0 11 0x1 0x0	/* PA11 periph A SPI0_MISO pin */
-+							 0 12 0x1 0x0	/* PA12 periph A SPI0_MOSI pin */
-+							 0 13 0x1 0x0>;	/* PA13 periph A SPI0_SPCK pin */
-+					};
-+				};
-+
-+				spi1 {
-+					pinctrl_spi1: spi1-0 {
-+						atmel,pins =
-+							<0 21 0x2 0x0	/* PA21 periph B SPI1_MISO pin */
-+							 0 22 0x2 0x0	/* PA22 periph B SPI1_MOSI pin */
-+							 0 23 0x2 0x0>;	/* PA23 periph B SPI1_SPCK pin */
-+					};
-+				};
-+
- 				pioA: gpio at fffff400 {
- 					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
- 					reg = <0xfffff400 0x200>;
-@@ -380,6 +398,8 @@
- 				compatible = "atmel,at91rm9200-spi";
- 				reg = <0xf0000000 0x100>;
- 				interrupts = <13 4 3>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_spi0>;
- 				status = "disabled";
- 			};
- 
-@@ -389,6 +409,8 @@
- 				compatible = "atmel,at91rm9200-spi";
- 				reg = <0xf0004000 0x100>;
- 				interrupts = <14 4 3>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_spi1>;
- 				status = "disabled";
- 			};
- 		};
-diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-index 83a4889..04fbf9d 100644
---- a/arch/arm/boot/dts/at91sam9x5.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-@@ -319,6 +319,24 @@
- 					};
- 				};
- 
-+				spi0 {
-+					pinctrl_spi0: spi0-0 {
-+						atmel,pins =
-+							<0 11 0x1 0x0	/* PA11 periph A SPI0_MISO pin */
-+							 0 12 0x1 0x0	/* PA12 periph A SPI0_MOSI pin */
-+							 0 13 0x1 0x0>;	/* PA13 periph A SPI0_SPCK pin */
-+					};
-+				};
-+
-+				spi1 {
-+					pinctrl_spi1: spi1-0 {
-+						atmel,pins =
-+							<0 21 0x2 0x0	/* PA21 periph B SPI1_MISO pin */
-+							 0 22 0x2 0x0	/* PA22 periph B SPI1_MOSI pin */
-+							 0 23 0x2 0x0>;	/* PA23 periph B SPI1_SPCK pin */
-+					};
-+				};
-+
- 				pioA: gpio at fffff400 {
- 					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
- 					reg = <0xfffff400 0x200>;
-@@ -512,6 +530,8 @@
- 				compatible = "atmel,at91rm9200-spi";
- 				reg = <0xf0000000 0x100>;
- 				interrupts = <13 4 3>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_spi0>;
- 				status = "disabled";
- 			};
- 
-@@ -521,6 +541,8 @@
- 				compatible = "atmel,at91rm9200-spi";
- 				reg = <0xf0004000 0x100>;
- 				interrupts = <14 4 3>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_spi1>;
- 				status = "disabled";
- 			};
- 		};
--- 
-1.7.9.5
+Mike,
+
+I agree with you and Arnd about clumsiness and a generic approach, but
+this driver is a little different from controlling _all_ clocks within
+the tree. It just adds one consumer that can _request_ a new rate.
+
+Nevertheless, I can have a look at clk-debug and adding the functionality.
+
+> On the other hand this sort of stuff really scares me.  I know for a
+> fact that a debug interface to enable/disable clocks and set clock rate
+> would ship on real devices.  Quite likely some android phones out there
+> would be controlling hardware clocks from some horrible userspace
+> utility.
+>
+> *shudder*
+
+This will happen for sure.
+
+> Sebastian, another small nitpick, can you change the "enable" attribute
+> to be named "prepare_enable"?  This more accurately reflects what is
+> going on.
+
+On a generic approach I would rather have a look at the actual ops that
+are provided and name the files accordingly. That will also allow us
+_not_ to set the rate of crystal oscillators ;)
+
+> I also wonder how simple it would be to add a "parent" attribute here
+> that allows one to call clk_set_parent from the debugfs interface?  To
+> make it easy on you, the interface could accept an integer as the index
+> of the clk->parents[] array.  This is a bad interface design as it
+> requires the user to look into the code to know which index corresponds
+> to which parent clock; however I do not want people to use this
+> interface for anything other than debug/testing, so I am ok with this
+> interface being a PITA to use.
+
+Sure, but it will not help much against userspace hardware clock
+utilities ;)
+
+Sebastian
