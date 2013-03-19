@@ -1,45 +1,37 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Tue, 19 Mar 2013 12:38:14 -0500
-Subject: [PATCH 0/5] ARM: OMAP: DMTIMER updates for v3.10
-Message-ID: <1363714699-29622-1-git-send-email-jon-hunter@ti.com>
+Date: Tue, 19 Mar 2013 12:38:16 -0500
+Subject: [PATCH 2/5] ARM: OMAP: Force dmtimer restore if context loss is not
+ detectable
+In-Reply-To: <1363714699-29622-1-git-send-email-jon-hunter@ti.com>
+References: <1363714699-29622-1-git-send-email-jon-hunter@ti.com>
+Message-ID: <1363714699-29622-3-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Includes:
-- A couple fixes for DMTIMER context loss handling.
-- Populating DMTIMER errata when booting with device-tree.
-- A new function for requesting a DMTIMER by device-tree node.
+When booting with device-tree the function pointer for detecting context
+loss is not populated. Ideally, the pm_runtime framework should be
+enhanced to allow a means for reporting context/state loss and we could
+avoid populating such function pointers altogether. In the interim until
+a generic non-device specific solution is in place, force a restore of
+the dmtimer when enabling the timer.
 
-Based upon v3.9-rc3.
+Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+---
+ arch/arm/plat-omap/dmtimer.c |    2 ++
+ 1 file changed, 2 insertions(+)
 
-Tested on OMAP5912 OSK, OMAP2420 H4, OMAP3430 SDP, OMAP4430 Blaze
-and AM335x EVM. Testing includes ...
-1. Booting kernel on above boards
-2. Testing of various DMTIMER request APIs
-3. Testing the timer overflow and match interrupts.
-4. Using different clock sources to operate the timer with.
-
-Jon Hunter (4):
-  ARM: OMAP: Force dmtimer restore if context loss is not detectable
-  ARM: OMAP: Add function to request timer by node
-  ARM: dts: OMAP2+: Update DMTIMER compatibility property
-  ARM: OMAP2+: Populate DMTIMER errata when using device-tree
-
-NeilBrown (1):
-  ARM: OMAP: Simplify dmtimer context-loss handling
-
- .../devicetree/bindings/arm/omap/timer.txt         |   17 +-
- arch/arm/boot/dts/am33xx.dtsi                      |   14 +-
- arch/arm/boot/dts/omap2.dtsi                       |   22 +-
- arch/arm/boot/dts/omap2420.dtsi                    |    2 +-
- arch/arm/boot/dts/omap2430.dtsi                    |    2 +-
- arch/arm/boot/dts/omap3.dtsi                       |   24 +-
- arch/arm/boot/dts/omap4.dtsi                       |   22 +-
- arch/arm/boot/dts/omap5.dtsi                       |   22 +-
- arch/arm/mach-omap2/timer.c                        |    7 +-
- arch/arm/plat-omap/dmtimer.c                       |  241 ++++++++++++--------
- arch/arm/plat-omap/include/plat/dmtimer.h          |    1 +
- 11 files changed, 220 insertions(+), 154 deletions(-)
-
+diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
+index 5cae1dd..725d972 100644
+--- a/arch/arm/plat-omap/dmtimer.c
++++ b/arch/arm/plat-omap/dmtimer.c
+@@ -326,6 +326,8 @@ void omap_dm_timer_enable(struct omap_dm_timer *timer)
+ 				omap_timer_restore_context(timer);
+ 				timer->ctx_loss_count = c;
+ 			}
++		} else {
++			omap_timer_restore_context(timer);
+ 		}
+ 	}
+ }
 -- 
 1.7.10.4
