@@ -1,42 +1,41 @@
-From: fabio.porcedda@gmail.com (Fabio Porcedda)
-Date: Tue, 19 Mar 2013 09:55:11 +0100
-Subject: [PATCH 10/10] drivers: misc: use module_platform_driver_probe()
-In-Reply-To: <201303181128.45215.arnd@arndb.de>
-References: <1363266691-15757-1-git-send-email-fabio.porcedda@gmail.com>
- <201303181058.51641.arnd@arndb.de>
- <CAHkwnC-aHwd24S5MyLhnVzTqqQj2L7MMuVX9dirhS-G830jZcw@mail.gmail.com>
- <201303181128.45215.arnd@arndb.de>
-Message-ID: <CAHkwnC9fg7_uhLM2KD3vvj_oFx3EBoQfw8mCN=V9pyV5=k37aA@mail.gmail.com>
+From: kaloz@openwrt.org (Imre Kaloz)
+Date: Tue, 19 Mar 2013 10:00:54 +0100
+Subject: [PATCH 3/6] ARM: remove fa526 CPU support
+In-Reply-To: <5146FB70.9000706@openwrt.org>
+References: <1363299178-8241-1-git-send-email-arnd@arndb.de>
+ <514318DE.8060601@openwrt.org>
+ <CACmBeS2tbV9Z_c3mCuk4G_+kYpVpVpUKWq3GK=gqBF+ECNhTbg@mail.gmail.com>
+ <201303181116.17369.arnd@arndb.de> <5146FB70.9000706@openwrt.org>
+Message-ID: <op.wt6rbsvq2s3iss@ecaz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 18, 2013 at 12:28 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 18 March 2013, Fabio Porcedda wrote:
+Hi,
+
+On Mon, 18 Mar 2013 12:33:04 +0100, Florian Fainelli <florian@openwrt.org> wrote:
+
+> Le 03/18/13 12:16, Arnd Bergmann a ?crit :
+>> On Monday 18 March 2013, Jonas Jensen wrote:
+>>>
+
+<snip>
+
+>>> The port is not near mainline but I think I'd prefer if CPU_FA526
+>>> wasn't removed. If someone stepped up to maintain ARCH_GEMINI (so I
+>>> could peek at the changes) that would be even better :)
 >>
->> On Mon, Mar 18, 2013 at 11:58 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > On Monday 18 March 2013, Fabio Porcedda wrote:
->> >> Since by using platform_driver_probe() the  function
->> >> ep93xx_pwm_probe() is freed after initialization,
->> >> is better to use module_platform_drive_probe().
->> >> IMHO i don't see any good reason to use module_platform_driver() for
->> >> this driver.
->> >
->> > As I commented earlier, the platform_driver_probe() and
->> > module_platform_drive_probe() interfaces are rather dangerous in combination
->> > with deferred probing, I would much prefer Harley's patch.
->>
->> Since those drivers don't use -EPROBE_DEFER i was thinking that they don't use
->> deferred probing.
->> I'm missing something?
+>> I've tried before to find someone who is still interested in Gemini,
+>> but it seems nobody has the hardware any more.
 >
-> clk_get() may return -EPROBE_DEFER after ep93xx is converted to use the
-> common clk API. We currently return the value of clk_get from the probe()
-> function, which will automatically do the right thing as long as the probe
-> function remains reachable.
+> Imre Kaloz is supposed to have some, if you want to get some hardware
+> yourself it seems that the mainline boards (WBD111, WBD222, NAS4420) are
+> the only hardware devices that OpenWrt also supports. The OpenWrt
+> patches we have add support for Ethernet, watchdog, USB, PCI, but have
+> not been submitted mainline.
 
-Thanks for the explanation.
+I have two wbd111 boards, but their bootloader is fubared - for whatever reason the bootloader's ethernet support works horribly for me, as in an image transfer takes well over 10 mins, and 90% of the time it fails meantime. I have another gemini based board, which doesn't have mainline support, yet.
 
-Regards
-Fabio Porcedda
+So for gemini, what I can offer is digging up the wbd111 and testing your patches this weekend - if that works, it can stay in mainline for another kernel release, and I can try to add support for the other board (so there would be a sane platform to test on). If you are going to drop it, I will likely keep it working in OpenWrt as long as those boards don't die on me.
 
->         Arnd
+
+Imre
