@@ -1,20 +1,24 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Tue, 19 Mar 2013 12:53:04 -0500
-Subject: [PATCH V2 2/8] ARM: dts: OMAP36xx: Add CPU OPP table
+Date: Tue, 19 Mar 2013 12:53:06 -0500
+Subject: [PATCH V2 4/8] ARM: dts: OMAP443x: Add CPU OPP table
 In-Reply-To: <1363715590-5131-1-git-send-email-nm@ti.com>
 References: <1363715590-5131-1-git-send-email-nm@ti.com>
-Message-ID: <1363715590-5131-3-git-send-email-nm@ti.com>
+Message-ID: <1363715590-5131-5-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT OPP table for OMAP36xx/37xx family of devices. This data is
+Add DT OPP table for OMAP443x family of devices. This data is
 decoded by OF with of_init_opp_table() helper function.
 
-OPP data here is based on existing opp3xxx_data.c
+OPP data here is based on existing opp4xxx_data.c
+
+Since the omap4460 OPP tables would be different from OMAP443x,
+introduce an new omap443x.dtsi for 443x specific entries and use
+existing omap4.dtsi as the common dtsi file for all OMAP4 platforms.
 
 This is in preparation to use generic cpufreq-cpu0 driver for device
 tree enabled boot. Legacy non device tree enabled boot continues to
-use omap-cpufreq.c and opp3xxx_data.c.
+use omap-cpufreq.c and opp4xxx_data.c.
 
 Cc: Kevin Hilman <khilman@deeprootsystems.com>
 Cc: Jon Hunter <jon-hunter@ti.com>
@@ -31,36 +35,89 @@ Cc: linux-pm at vger.kernel.org
 Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
 Changes in V2:
-	- donot delete the OPP table entries in omap3xxx_data.c
+	- introduce omap443x.dtsi
+	- donot delete the OPP table entries in omap4xxx_data.c
 	- little more verbose commit log
-V1: https://patchwork.kernel.org/patch/2273681/
+V1: https://patchwork.kernel.org/patch/2273581/
 
- arch/arm/boot/dts/omap36xx.dtsi |   13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm/boot/dts/omap4-panda.dts   |    2 +-
+ arch/arm/boot/dts/omap4-sdp.dts     |    2 +-
+ arch/arm/boot/dts/omap4-var-som.dts |    2 +-
+ arch/arm/boot/dts/omap443x.dtsi     |   27 +++++++++++++++++++++++++++
+ 4 files changed, 30 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/boot/dts/omap443x.dtsi
 
-diff --git a/arch/arm/boot/dts/omap36xx.dtsi b/arch/arm/boot/dts/omap36xx.dtsi
-index 96bf028..b89233e 100644
---- a/arch/arm/boot/dts/omap36xx.dtsi
-+++ b/arch/arm/boot/dts/omap36xx.dtsi
-@@ -15,6 +15,19 @@
- 		serial3 = &uart4;
- 	};
+diff --git a/arch/arm/boot/dts/omap4-panda.dts b/arch/arm/boot/dts/omap4-panda.dts
+index 1751a25..e05b1b0 100644
+--- a/arch/arm/boot/dts/omap4-panda.dts
++++ b/arch/arm/boot/dts/omap4-panda.dts
+@@ -7,7 +7,7 @@
+  */
+ /dts-v1/;
  
+-/include/ "omap4.dtsi"
++/include/ "omap443x.dtsi"
+ /include/ "elpida_ecb240abacn.dtsi"
+ 
+ / {
+diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
+index a93a19d..c387bdc 100644
+--- a/arch/arm/boot/dts/omap4-sdp.dts
++++ b/arch/arm/boot/dts/omap4-sdp.dts
+@@ -7,7 +7,7 @@
+  */
+ /dts-v1/;
+ 
+-/include/ "omap4.dtsi"
++/include/ "omap443x.dtsi"
+ /include/ "elpida_ecb240abacn.dtsi"
+ 
+ / {
+diff --git a/arch/arm/boot/dts/omap4-var-som.dts b/arch/arm/boot/dts/omap4-var-som.dts
+index 6601e6a..222a413 100644
+--- a/arch/arm/boot/dts/omap4-var-som.dts
++++ b/arch/arm/boot/dts/omap4-var-som.dts
+@@ -7,7 +7,7 @@
+  */
+ /dts-v1/;
+ 
+-/include/ "omap4.dtsi"
++/include/ "omap443x.dtsi"
+ 
+ / {
+ 	model = "Variscite OMAP4 SOM";
+diff --git a/arch/arm/boot/dts/omap443x.dtsi b/arch/arm/boot/dts/omap443x.dtsi
+new file mode 100644
+index 0000000..cccf39a
+--- /dev/null
++++ b/arch/arm/boot/dts/omap443x.dtsi
+@@ -0,0 +1,27 @@
++/*
++ * Device Tree Source for OMAP443x SoC
++ *
++ * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
++
++/include/ "omap4.dtsi"
++
++/ {
 +	cpus {
-+		/* OMAP3630/OMAP37xx 'standard device' variants OPP50 to OPP130 */
 +		cpu at 0 {
++			/* OMAP443x variants OPP50-OPPNT */
 +			operating-points = <
 +				/* kHz    uV */
-+				300000   975000
-+				600000  1075000
-+				800000  1200000
++				300000  1025000
++				600000  1200000
++				800000  1313000
++				1008000 1375000
 +			>;
 +			clock-latency = <300000>; /* From legacy driver */
 +		};
 +	};
-+
- 	ocp {
- 		uart4: serial at 49042000 {
- 			compatible = "ti,omap3-uart";
++};
 -- 
 1.7.9.5
