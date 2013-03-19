@@ -1,44 +1,37 @@
-From: hechtb@gmail.com (Bastian Hecht)
-Date: Tue, 19 Mar 2013 11:30:19 +0100
-Subject: [PATCH] ARM: shmobile: r8a7740: Add CPU Core Standby Mode
-In-Reply-To: <20130319032051.GA18272@verge.net.au>
-References: <1362419645-3116-1-git-send-email-hechtb+renesas@gmail.com>
- <1362419645-3116-2-git-send-email-hechtb+renesas@gmail.com>
- <20130306164032.GN17833@n2100.arm.linux.org.uk>
- <20130319032051.GA18272@verge.net.au>
-Message-ID: <CABYn4sym+Yv11G7Y3hWgwhe8rNK=qGkVuQA9ewwqYj55V7JX_A@mail.gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 19 Mar 2013 11:33:33 +0100
+Subject: [PATCH] ARM: video: mxs: Fix mxsfb misconfiguring VDCTRL0
+In-Reply-To: <20130319054846.GI12462@S2101-09.ap.freescale.net>
+References: <CAOMZO5CDuODRrJEEaDKm5nepfkuvuF77ZQmarB69hL6gg386ww@mail.gmail.com>
+ <201303181619.52377.marex@denx.de>
+ <20130319054846.GI12462@S2101-09.ap.freescale.net>
+Message-ID: <201303191133.33879.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello!
+Dear Shawn Guo,
 
-2013/3/19 Simon Horman <horms@verge.net.au>:
-> On Wed, Mar 06, 2013 at 04:40:33PM +0000, Russell King - ARM Linux wrote:
->> On Mon, Mar 04, 2013 at 06:54:05PM +0100, Bastian Hecht wrote:
->> > diff --git a/arch/arm/mach-shmobile/pm-r8a7740.c b/arch/arm/mach-shmobile/pm-r8a7740.c
->> > index 40b87aa..ee3d713 100644
->> > --- a/arch/arm/mach-shmobile/pm-r8a7740.c
->> > +++ b/arch/arm/mach-shmobile/pm-r8a7740.c
->> > @@ -10,9 +10,29 @@
->> >   */
->> >  #include <linux/console.h>
->> >  #include <linux/suspend.h>
->> > +#include <asm/io.h>
->>
->> It's spelled linux/io.h, not asm/io.h
->
-> Bastian, other than the requested change above, what is the status of this
-> patch?
+> On Mon, Mar 18, 2013 at 04:19:52PM +0100, Marek Vasut wrote:
+> > Dear Shawn Guo,
+> > 
+> > > On Mon, Mar 18, 2013 at 03:18:13PM +0100, Marek Vasut wrote:
+> > > > Did you manage to test it please?
+> > > 
+> > > I do not have X11 environment handy to test, but framework console
+> > > seems still working.
+> > 
+> > Even after me poking in it, lol :-)
+> > 
+> > You can grab [1], extract it onto card or NFS and just use it as root
+> > filesystem, the X11 will come up automagically.
+> 
+> Thanks, Marek.  Yeah, now I can see the problem and your patch does fix
+> it.
 
-Yep thanks Russell, will fix it in upcoming versions.
+Whew, cool. Can you please apply it and push mainline so I can re-send the one 
+for -stable then?
 
-Simon, I'm still tinkering with the L2 - it shouldn't be needed to be
-flushed, but I found out that at some point it gets disabled (ROM boot
-loader?). Further I've got additional sleep modes ready. I will post a
-v2 when the L2 issue is clear. Maybe early next week.
+Thank you!
 
-Thanks,
-
- Bastian
-
-> Also, please CC me on shmobile patches.
+Best regards,
+Marek Vasut
