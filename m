@@ -1,48 +1,32 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 19 Mar 2013 19:00:51 +0530
-Subject: [PATCH v2 05/11] ARM: dts: OMAP5: Update the timer and gic nodes for
- HYP kernel support
+Date: Tue, 19 Mar 2013 19:00:52 +0530
+Subject: [PATCH v2 06/11] ARM: dts: OMAP5: Update keypad reg property
 In-Reply-To: <1363699857-5505-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1363699857-5505-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1363699857-5505-6-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1363699857-5505-7-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To be able to run kernel in HYP mode, virtual timer and gic node information
-needs to be popullated.
+Add missing OMAP keypad reg property information.
 
 Cc: Benoit Cousson <b-cousson@ti.com>
 
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/boot/dts/omap5.dtsi |    8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/omap5.dtsi |    1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index 4701244..ff09720 100644
+index ff09720..e539258 100644
 --- a/arch/arm/boot/dts/omap5.dtsi
 +++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -46,7 +46,9 @@
- 		compatible = "arm,armv7-timer";
- 		/* PPI secure/nonsecure IRQ, active low level-sensitive */
- 		interrupts = <1 13 0x308>,
--			     <1 14 0x308>;
-+			     <1 14 0x308>,
-+			     <1 11 0x308>,
-+			     <1 10 0x308>;
- 		clock-frequency = <6144000>;
- 	};
+@@ -427,6 +427,7 @@
  
-@@ -55,7 +57,9 @@
- 		interrupt-controller;
- 		#interrupt-cells = <3>;
- 		reg = <0x48211000 0x1000>,
--		      <0x48212000 0x1000>;
-+		      <0x48212000 0x1000>,
-+		      <0x48214000 0x2000>,
-+		      <0x48216000 0x2000>;
- 	};
+ 		keypad: keypad at 4ae1c000 {
+ 			compatible = "ti,omap4-keypad";
++			reg = <0x4ae1c000 0x400>;
+ 			ti,hwmods = "kbd";
+ 		};
  
- 	/*
 -- 
 1.7.9.5
