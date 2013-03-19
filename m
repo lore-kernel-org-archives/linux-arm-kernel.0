@@ -1,82 +1,106 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 19 Mar 2013 19:18:18 +0900
-Subject: [PATCH 01/03] ARM: shmobile: APE6EVM base support V2
-In-Reply-To: <20130319075053.GA14668@verge.net.au>
-References: <20130318150953.28231.73454.sendpatchset@w520>
- <20130318151002.28231.37531.sendpatchset@w520>
- <20130319072532.GA19741@verge.net.au>
- <20130319075053.GA14668@verge.net.au>
-Message-ID: <CANqRtoRkKB-5GxWN_uXN6ansA33koX743Gr0EsBeEVSd0uwgMg@mail.gmail.com>
+From: hechtb@gmail.com (Bastian Hecht)
+Date: Tue, 19 Mar 2013 11:19:38 +0100
+Subject: [PATCH v3 1/7] ARM: shmobile: Define DT bindings for timer devices
+In-Reply-To: <20130319032822.GB18272@verge.net.au>
+References: <1363535031-21402-1-git-send-email-hechtb+renesas@gmail.com>
+ <20130319032822.GB18272@verge.net.au>
+Message-ID: <CABYn4swepOahUXUR3sfj1NG4am5RWo9FzY+X_Jxr_US2_9tZbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 19, 2013 at 4:50 PM, Simon Horman <horms@verge.net.au> wrote:
-> On Tue, Mar 19, 2013 at 04:25:33PM +0900, Simon Horman wrote:
->> On Tue, Mar 19, 2013 at 12:10:02AM +0900, Magnus Damm wrote:
->> > From: Magnus Damm <damm@opensource.se>
->> >
->> > V2 of APE6EVM base board support making use of
->> > 1 GiB of memory, the SCIFA0 serial port and
->> > ARM architected timer.
->> >
->> > Signed-off-by: Magnus Damm <damm@opensource.se>
->> > ---
->> >
->> >  Changes since V1:
->> >  - Sorted headers
->> >  - Use ape6evm_add_standard_devices() to setup SoC devices and clocks
->> >
->> >   Written against "next" renesas.git 811689afc214564c4a5f238ecf4d8bdc0e52b615
->> >
->> >  Depends on the following series:
->> >  [PATCH 00/04] ARM: shmobile: r8a73a4 SoC support V2
->> >
->> >  Does not depend on:
->> >  [PATCH 00/02] sh-pfc: Initial r8a73a4 PFC support
->> >
->> > arch/arm/boot/dts/Makefile             |    1
->> >  arch/arm/boot/dts/r8a73a4-ape6evm.dts  |   26 ++++++++++++++++++
->> >  arch/arm/mach-shmobile/Kconfig         |    8 ++++-
->> >  arch/arm/mach-shmobile/Makefile        |    1
->> >  arch/arm/mach-shmobile/board-ape6evm.c |   46 ++++++++++++++++++++++++++++++++
->> >  5 files changed, 81 insertions(+), 1 deletion(-)
->> >
->> > --- /dev/null
->> > +++ work/arch/arm/boot/dts/r8a73a4-ape6evm.dts      2013-03-18 21:44:35.000000000 +0900
->> > @@ -0,0 +1,26 @@
->> > +/*
->> > + * Device Tree Source for the APE6EVM board
->> > + *
->> > + * Copyright (C) 2013 Renesas Solutions Corp.
->> > + *
->> > + * This file is licensed under the terms of the GNU General Public License
->> > + * version 2.  This program is licensed "as is" without any warranty of any
->> > + * kind, whether express or implied.
->> > + */
->> > +
->> > +/dts-v1/;
->> > +/include/ "r8a73a4.dtsi"
->> > +
->> > +/ {
->> > +   model = "APE6EVM";
->> > +   compatible = "renesas,ape6evm", "renesas,r8a73a4";
->> > +
->> > +   chosen {
->> > +           bootargs = "console=ttySC0,115200 ignore_loglevel";
->>
->> I think that earlyprintk=sh-sci.0,11520 go in here.
->
-> Also, to be consistent with the dts of other shmobile boards
-> could you add root=/dev/nfs ip=dhcp. This history behind this
-> is that many boards defaulted to using nfsroot in their defconfigs,
-> a reasonable default IMHO, and recently the command line for all
-> boards that boot using DT was moved from their defconfig
-> to their .dtsi in preparation for defconfig consolidation.
+Hello Simon!
 
-Sounds like a good idea. Network is however not existing until pretty
-late in the series. How about adding it in that patch that includes
-SMSC ethernet support?
+2013/3/19 Simon Horman <horms@verge.net.au>:
+> On Sun, Mar 17, 2013 at 04:43:45PM +0100, Bastian Hecht wrote:
+>> The SH mobile series currently features 3 timer devices in the kernel:
+>> Compare Match Timer (CMT), Timer Unit (TMU) and MTU2. These devices
+>> share register layout characteristics amongst each that enable us to
+>> define common DT bindings for them.
+>
+> Bastian, could you comment on the status of these changes.
+> I see no outstanding objections to them.
+
+Yes I think they are fine as they are now and ready to be merged.
 
 Thanks,
 
-/ magnus
+ Bastian
+
+
+> Magnus, ditto.
+>
+> Paul, how do you want to handle merging these?
+> There are several shmobile changes so it could
+> be logical for me request arm-soc to take them.
+>
+>> Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
+>> ---
+>> v3: same (only patch 0003 changed)
+>>
+>>  .../devicetree/bindings/timer/renesas,timer.txt    |   45 ++++++++++++++++++++
+>>  1 file changed, 45 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/timer/renesas,timer.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/timer/renesas,timer.txt b/Documentation/devicetree/bindings/timer/renesas,timer.txt
+>> new file mode 100644
+>> index 0000000..2c001bf
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/timer/renesas,timer.txt
+>> @@ -0,0 +1,45 @@
+>> +* Renesas SH Mobile Timer
+>> +
+>> +Bindings for several timer devices from Renesas including CMT, TMU and MTU2.
+>> +
+>> +Required properties:
+>> +- compatible : Should be "renesas,{device}-timer",
+>> +  whereas device is "cmt", "tmu" or "mtu2".
+>> +- reg : Address and length of the register set for the device
+>> +- interrupts : Timer interrupt
+>> +- renesas,device-id : The ID of the timer device
+>> +- renesas,channel-id : The channel ID of the timer device
+>> +- renesas,source-quality : The viability to use this device as a free
+>> +  running clock. From 0 (do not use) to 10 (best possible clock).
+>> +- renesas,event-quality : The viability to use this device as an event
+>> +  generator. From 0 (do not use) to 10 (best possible clock).
+>> +
+>> +The properties renesas,{source,event}-quality reflect the situation that the
+>> +usability of the timer devices depend on the location within their SoCs. E.g.
+>> +the power domain affinty affects power management, some mux-ed lines might be
+>> +preferred to be assigned to other functions and other constraints.
+>> +
+>> +Example for CMT1 channel 0 on the R8A7740 SoC:
+>> +
+>> +     timer at e6138010 {
+>> +             compatible = "renesas,cmt-timer";
+>> +             interrupt-parent = <&intca>;
+>> +             reg = <0xe6138010 0xc>;
+>> +             interrupts = <0x0b00>;
+>> +             renesas,device-id = <1>;
+>> +             renesas,channel-id = <0>;
+>> +             renesas,source-quality = <3>;
+>> +             renesas,event-quality = <3>;
+>> +     };
+>> +
+>> +Example for TMU0 channel 1 on the SH7372 SoC:
+>> +     timer at fff60014 {
+>> +             compatible = "renesas,tmu-timer";
+>> +             interrupt-parent = <&intcs>;
+>> +             reg = <0xfff60014 0xc>;
+>> +             interrupts = <0xea0>;
+>> +             renesas,device-id = <0>;
+>> +             renesas,channel-id = <1>;
+>> +             renesas,source-quality = <4>;
+>> +             renesas,event-quality = <0>;
+>> +     };
+>> --
+>> 1.7.9.5
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
