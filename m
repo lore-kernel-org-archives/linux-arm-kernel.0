@@ -1,52 +1,28 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 19 Mar 2013 10:40:51 -0600
-Subject: [PATCH V2 2/3] ARM: tegra: get PMC clock source from DT
-In-Reply-To: <1363594199-10974-3-git-send-email-josephl@nvidia.com>
+Date: Tue, 19 Mar 2013 10:42:46 -0600
+Subject: [PATCH V2 1/3] ARM: dts: tegra: add clock source for PMC
+In-Reply-To: <1363594199-10974-2-git-send-email-josephl@nvidia.com>
 References: <1363594199-10974-1-git-send-email-josephl@nvidia.com>
- <1363594199-10974-3-git-send-email-josephl@nvidia.com>
-Message-ID: <51489513.1020107@wwwdotorg.org>
+ <1363594199-10974-2-git-send-email-josephl@nvidia.com>
+Message-ID: <51489586.9090605@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 03/18/2013 02:09 AM, Joseph Lo wrote:
-> The clock source of PMC should be PCLK and gotten from DT.
-> 
-> Signed-off-by: Joseph Lo <josephl@nvidia.com>
-> ---
-> V2:
-> * new in this change
+> The clock source of PMC is PCLK. Adding it into DTS for Tegra20 and Tegra30.
 
-s/change/series/ ???
+> diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
 
-> diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
+>  	pmc {
+>  		compatible = "nvidia,tegra20-pmc";
+>  		reg = <0x7000e400 0x400>;
+> +		clocks = <&tegra_car 110>;
+>  	};
 
->  void __init tegra_dt_init_irq(void)
->  {
->  	tegra_clocks_init();
-> +	tegra_pmc_init();
->  	tegra_init_irq();
->  	irqchip_init();
->  }
-> @@ -100,7 +101,6 @@ void __init tegra_init_early(void)
->  	tegra_apb_io_init();
->  	tegra_init_fuse();
->  	tegra_init_cache();
-> -	tegra_pmc_init();
+The DT binding documentation needs to list the set of clocks that must
+be present.
 
-This change isn't mentioned in the commit description.
-
-Why is this change needed? We should minimize the amount of code in
-tegra_dt_init_irq(), not add more code there.
-
-> diff --git a/arch/arm/mach-tegra/pmc.c b/arch/arm/mach-tegra/pmc.c
-
-> @@ -151,6 +153,8 @@ static void tegra_pmc_parse_dt(void)
->  
->  	tegra_pmc_invert_interrupt = of_property_read_bool(np,
->  				     "nvidia,invert-interrupt");
-> +	tegra_pclk = of_clk_get(np, 0);
-> +	WARN_ON_ONCE(IS_ERR(tegra_pclk));
-
-Why WARN_ON_ONCE(); is tegra_pmc_parse_dt() called more than once?
-
-Can the code continue if IS_ERR(tegra_pclk), or is that fatal?
+Doesn't the PMC also receive a "clk32k_in" from the PMIC, or is that
+routed into the CAR, and then into the PMC? Either way, the PMC module
+receives that clock somehow. Since there are multiple clocks, that also
+means that a clock-names property is required.
