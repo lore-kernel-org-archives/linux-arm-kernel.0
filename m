@@ -1,63 +1,86 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Mon, 18 Mar 2013 17:11:05 -0700
-Subject: [PATCH 6/8] SERIAL: OMAP: Remove the slave idle handling from
- the driver
-In-Reply-To: <51419A3D.1000703@ti.com>
-References: <1361354444-18230-1-git-send-email-santosh.shilimkar@ti.com>
- <87sj4rqa7r.fsf@linaro.org> <5124EF59.5080206@ti.com>
- <51419A3D.1000703@ti.com>
-Message-ID: <20130319001105.GA13449@kroah.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 18 Mar 2013 18:23:40 -0700
+Subject: [PATCH 2/2] ARM: OMAP2+: clocks: Pass static parent pointers to
+ common clock core
+In-Reply-To: <20130318163757.GD9462@atomide.com>
+References: <1363264618-5071-1-git-send-email-rnayak@ti.com>
+ <1363264618-5071-3-git-send-email-rnayak@ti.com>
+ <20130314170601.GH26093@atomide.com> <514313B6.4050905@ti.com>
+ <20130315162049.GB9370@atomide.com> <5146CE5B.6090705@ti.com>
+ <20130318163757.GD9462@atomide.com>
+Message-ID: <20130319012340.8663.43189@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 14, 2013 at 03:07:01PM +0530, Santosh Shilimkar wrote:
-> (Looping Greg KH.)
-> 
-> Greg,
-> 
-> On Wednesday 20 February 2013 09:14 PM, Santosh Shilimkar wrote:
-> > On Wednesday 20 February 2013 08:54 PM, Kevin Hilman wrote:
-> >> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
-> >>
-> >>> UART IP slave idle handling now taken care by runtime pm backend(hwmod layer)
-> >>> so remove the hackery from the driver.
-> >>>
-> >>> Tested-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
-> >>> Tested-by: Sourav Poddar <sourav.poddar@ti.com>
-> >>> Signed-off-by: Rajendra nayak <rnayak@ti.com>
-> >>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> >>>
-> >>> ---
-> >>>   drivers/tty/serial/omap-serial.c |   23 -----------------------
-> >>>   1 file changed, 23 deletions(-)
-> >>
-> >> This patch should also remove the hooks from
-> >> <linux/platform_data/serial-omap.h>
-> >>
-> > Right. Will fix that in next version. Thanks.
+Quoting Tony Lindgren (2013-03-18 09:37:58)
+> * Rajendra Nayak <rnayak@ti.com> [130318 01:25]:
+> > On Friday 15 March 2013 09:50 PM, Tony Lindgren wrote:
+> > > * Rajendra Nayak <rnayak@ti.com> [130315 05:31]:
+> > >> On Thursday 14 March 2013 10:36 PM, Tony Lindgren wrote:
+> > >>> * Rajendra Nayak <rnayak@ti.com> [130314 05:44]:
+> > >>>> OMAP clock inits happen quite early, even before the slab is available.
+> > >>>> As part of the clock init, the common clock core tries to cache parent
+> > >>>> pointers (if not passed by the caller registering the clock) which
+> > >>>> fails in case of OMAP since the slab isn't initied.
+> > >>>> Without CONFIG_DEBUG_SLAB enabled, this just results in the common clock core
+> > >>>> retrying the caching attempt at some point later.
+> > >>>> However with CONFIG_DEBUG_SLAB enabled this results in a BUG() as reported
+> > >>>> in the link below by Tony..
+> > >>>> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg85932.html
+> > >>>>
+> > >>>> Fix this by passing static parent pointers to the common clock core
+> > >>>> while registering clocks.
+> > >>>
+> > >>> I wonder if we could easily fix this by initializing only some of the
+> > >>> clocks that early?
+> > >>
+> > >> We actually don't need any clocks that early (I mean even before slab init)
+> > >> We only need them before timer init.
+> > > 
+> > > Yes and only the timer clocks at that point. The others could be initialized
+> > > later on so we get console error messages without having to turn on DEBUG_LL
+> > > and earlyprintk.
 > > 
-> Sorry for not CC'ing first place
-> The subject patch is part of the series which cleans up the slave
-> idle handling from OMAP serial driver. It will be best to queue
-> it along with rest of the patches with your ack on $subject patch.
+> > but that wouldn't be possible with the hwmod dependency on clocks. We would
+> > need to move the hwmod inits further down too.
+> > 
+> > >  
+> > >> This isn't something specific to OMAP so I started looking at what others
+> > >> in drivers/clk seem to do.
+> > >>
+> > >> I found imx, spear, mvebu all do their clk inits within .init_time callbacks.
+> > >> tegra seems to even do it within .init_irq callback.
+> > >>
+> > >> Either one would work for us too :)
+> > > 
+> > > Well I suggest init_irq as that's when we need the first clocks for timer.
+> > 
+> > For which platforms? I instead see them being needed only by init_timer, so
+> > was thinking thats a better place instead.
+> > 
+> > For the -rc fix to fix the crash with DEBUG_SLAB, is it fine if I move *all*
+> > clock inits down to init_timer (or init_irq).
 > 
-> Here is the updated version which also removed the hooks
-> from 'linux/platform_data/serial-omap.h' as per Kevin suggestion.
+> Sounds good to me for the -rc series. How about initialize omap_clk_init()
+> function pointer in the SoC specific omap*_init_early() then just call
+> omap_clk_init() in timer_init?
+>  
+> > Splitting clocks alone would not work for now, without hwmod being moved down also.
 > 
-> >From 92916b8e0d895962c88fefbf99284967a4b94426 Mon Sep 17 00:00:00 2001
-> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Date: Fri, 15 Feb 2013 15:50:37 +0530
-> Subject: [PATCH 6/8] SERIAL: OMAP: Remove the slave idle handling from the
->  driver
+> Good point. For the -rc series the sounds like your suggestion is the
+> least intrusive fix and also gets us started removing few more early
+> boot time dependencies.
 > 
-> UART IP slave idle handling now taken care by runtime pm backend(hwmod layer)
-> so remove the hackery from the driver.
-> 
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> 
-> Tested-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
-> Tested-by: Sourav Poddar <sourav.poddar@ti.com>
-> Signed-off-by: Rajendra nayak <rnayak@ti.com>
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
++1 for removing the early init dependencies.  hwmod initialization was
+the original impetus for all this static struct clk stuff.  If the
+initialization for hwmod and the omap clocks can be moved to a later
+callback then it is the first step in removing the static data and
+getting rid of clk-private.h usage.
+
+Regards,
+Mike
+
+> Regards,
+> 
+> Tony
