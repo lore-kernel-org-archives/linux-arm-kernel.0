@@ -1,42 +1,44 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 19 Mar 2013 10:28:03 +0000
-Subject: [PATCH] ARM: hw_breakpoint: Enable debug powerdown only if
- system supports 'has_ossr'
-In-Reply-To: <5148082A.3060503@ti.com>
-References: <1363157553-21085-1-git-send-email-lokeshvutla@ti.com>
- <51406BA7.8010306@arm.com> <51407120.7030709@ti.com>
- <51417E58.5050501@ti.com> <20130315050014.GA15706@tiny-lites>
- <5146B972.1010002@ti.com>
- <20130318150724.GC28585@mudshark.cambridge.arm.com>
- <514736D4.4070906@ti.com>
- <20130318170649.GA29585@mudshark.cambridge.arm.com>
- <5148082A.3060503@ti.com>
-Message-ID: <20130319102803.GB22452@mudshark.cambridge.arm.com>
+From: hechtb@gmail.com (Bastian Hecht)
+Date: Tue, 19 Mar 2013 11:30:19 +0100
+Subject: [PATCH] ARM: shmobile: r8a7740: Add CPU Core Standby Mode
+In-Reply-To: <20130319032051.GA18272@verge.net.au>
+References: <1362419645-3116-1-git-send-email-hechtb+renesas@gmail.com>
+ <1362419645-3116-2-git-send-email-hechtb+renesas@gmail.com>
+ <20130306164032.GN17833@n2100.arm.linux.org.uk>
+ <20130319032051.GA18272@verge.net.au>
+Message-ID: <CABYn4sym+Yv11G7Y3hWgwhe8rNK=qGkVuQA9ewwqYj55V7JX_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 19, 2013 at 06:39:38AM +0000, Santosh Shilimkar wrote:
-> On Monday 18 March 2013 10:36 PM, Will Deacon wrote:
-> > Any chance you could follow up with your firmware/hardware guys about this
-> > please? I'd really like to understand how we end up in this state in case we
-> > can do something in the architecture to stop it from happening in future.
-> > 
-> I will check on this part and update you when I hear from them.
+Hello!
 
-Ok, thanks.
+2013/3/19 Simon Horman <horms@verge.net.au>:
+> On Wed, Mar 06, 2013 at 04:40:33PM +0000, Russell King - ARM Linux wrote:
+>> On Mon, Mar 04, 2013 at 06:54:05PM +0100, Bastian Hecht wrote:
+>> > diff --git a/arch/arm/mach-shmobile/pm-r8a7740.c b/arch/arm/mach-shmobile/pm-r8a7740.c
+>> > index 40b87aa..ee3d713 100644
+>> > --- a/arch/arm/mach-shmobile/pm-r8a7740.c
+>> > +++ b/arch/arm/mach-shmobile/pm-r8a7740.c
+>> > @@ -10,9 +10,29 @@
+>> >   */
+>> >  #include <linux/console.h>
+>> >  #include <linux/suspend.h>
+>> > +#include <asm/io.h>
+>>
+>> It's spelled linux/io.h, not asm/io.h
+>
+> Bastian, other than the requested change above, what is the status of this
+> patch?
 
-Dietmar -- I seem to remember that you thought GDB did actually work with
-hardware breakpoints on Pandaboard across low-power states. Can you
-confirm/deny this please?
+Yep thanks Russell, will fix it in upcoming versions.
 
-> > Well, we could just add the warn_once prints but that doesn't stop debug
-> > from breaking after the first pm/suspend/hotplug operation.
-> > 
-> Probably we should drop the $subject patch approach and use warn_once
-> at least for current rc. Ofcourse it doesn't help to get working
-> hw_breakpoint support. Patch end of the email with warn_once.
+Simon, I'm still tinkering with the L2 - it shouldn't be needed to be
+flushed, but I found out that at some point it gets disabled (ROM boot
+loader?). Further I've got additional sleep modes ready. I will post a
+v2 when the L2 issue is clear. Maybe early next week.
 
-Yeah, I'll merge that, but it's a real shame that this breaks hardware debug
-on one of the few platforms where it was reported to work.
+Thanks,
 
-Will
+ Bastian
+
+> Also, please CC me on shmobile patches.
