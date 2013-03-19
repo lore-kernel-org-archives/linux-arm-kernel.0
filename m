@@ -1,89 +1,90 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Tue, 19 Mar 2013 12:28:22 +0900
-Subject: [PATCH v3 1/7] ARM: shmobile: Define DT bindings for timer devices
-In-Reply-To: <1363535031-21402-1-git-send-email-hechtb+renesas@gmail.com>
-References: <1363535031-21402-1-git-send-email-hechtb+renesas@gmail.com>
-Message-ID: <20130319032822.GB18272@verge.net.au>
+Date: Tue, 19 Mar 2013 12:42:15 +0900
+Subject: [PATCH v3 1/3] ARM: shmobile: sh73a0: wait for completion when
+ kicking the clock
+In-Reply-To: <20130301025222.GA32306@verge.net.au>
+References: <1362054120-8600-1-git-send-email-g.liakhovetski@gmx.de>
+ <1362054120-8600-2-git-send-email-g.liakhovetski@gmx.de>
+ <20130301025222.GA32306@verge.net.au>
+Message-ID: <20130319034214.GB21444@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 17, 2013 at 04:43:45PM +0100, Bastian Hecht wrote:
-> The SH mobile series currently features 3 timer devices in the kernel:
-> Compare Match Timer (CMT), Timer Unit (TMU) and MTU2. These devices
-> share register layout characteristics amongst each that enable us to
-> define common DT bindings for them.
-
-Bastian, could you comment on the status of these changes.
-I see no outstanding objections to them.
-
-Magnus, ditto.
-
-Paul, how do you want to handle merging these?
-There are several shmobile changes so it could
-be logical for me request arm-soc to take them.
-
-> Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
-> ---
-> v3: same (only patch 0003 changed)
+On Fri, Mar 01, 2013 at 11:52:25AM +0900, Simon Horman wrote:
+> On Thu, Feb 28, 2013 at 01:21:58PM +0100, Guennadi Liakhovetski wrote:
+> > To reconfigure clocks, controlled by FRQCRA and FRQCRB, a kick bit has to
+> > be set and to make sure the setting has taken effect, it has to be read
+> > back repeatedly until it is cleared by the hardware. This patch adds the
+> > waiting part, that was missing until now.
+> > 
+> > Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 > 
->  .../devicetree/bindings/timer/renesas,timer.txt    |   45 ++++++++++++++++++++
->  1 file changed, 45 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/timer/renesas,timer.txt
+> This patch seems to be ready to be applied.
 > 
-> diff --git a/Documentation/devicetree/bindings/timer/renesas,timer.txt b/Documentation/devicetree/bindings/timer/renesas,timer.txt
-> new file mode 100644
-> index 0000000..2c001bf
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/timer/renesas,timer.txt
-> @@ -0,0 +1,45 @@
-> +* Renesas SH Mobile Timer
-> +
-> +Bindings for several timer devices from Renesas including CMT, TMU and MTU2.
-> +
-> +Required properties:
-> +- compatible : Should be "renesas,{device}-timer",
-> +  whereas device is "cmt", "tmu" or "mtu2".
-> +- reg : Address and length of the register set for the device
-> +- interrupts : Timer interrupt
-> +- renesas,device-id : The ID of the timer device
-> +- renesas,channel-id : The channel ID of the timer device
-> +- renesas,source-quality : The viability to use this device as a free
-> +  running clock. From 0 (do not use) to 10 (best possible clock).
-> +- renesas,event-quality : The viability to use this device as an event
-> +  generator. From 0 (do not use) to 10 (best possible clock).
-> +
-> +The properties renesas,{source,event}-quality reflect the situation that the
-> +usability of the timer devices depend on the location within their SoCs. E.g.
-> +the power domain affinty affects power management, some mux-ed lines might be
-> +preferred to be assigned to other functions and other constraints.
-> +
-> +Example for CMT1 channel 0 on the R8A7740 SoC:
-> +
-> +	timer at e6138010 {
-> +		compatible = "renesas,cmt-timer";
-> +		interrupt-parent = <&intca>;
-> +		reg = <0xe6138010 0xc>;
-> +		interrupts = <0x0b00>;
-> +		renesas,device-id = <1>;
-> +		renesas,channel-id = <0>;
-> +		renesas,source-quality = <3>;
-> +		renesas,event-quality = <3>;
-> +	};
-> +
-> +Example for TMU0 channel 1 on the SH7372 SoC:
-> +	timer at fff60014 {
-> +		compatible = "renesas,tmu-timer";
-> +		interrupt-parent = <&intcs>;
-> +		reg = <0xfff60014 0xc>;
-> +		interrupts = <0xea0>;
-> +		renesas,device-id = <0>;
-> +		renesas,channel-id = <1>;
-> +		renesas,source-quality = <4>;
-> +		renesas,event-quality = <0>;
-> +	};
-> -- 
-> 1.7.9.5
-> 
+> Magnus, could I get a review from you?
+
+Magnus, ping.
+
+> > ---
+> > 
+> > As noted in patch 0/3, this patch affects existing systems, but AFAICS 
+> > only theoretically - so far nobody is changing clock rates of any of the 
+> > FRQCRA and FRQCRB clocks. Still, please, handle with care.
+> > 
+> >  arch/arm/mach-shmobile/clock-sh73a0.c |   23 +++++++++++++++++------
+> >  1 files changed, 17 insertions(+), 6 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-shmobile/clock-sh73a0.c b/arch/arm/mach-shmobile/clock-sh73a0.c
+> > index 71843dd..34b5c5a 100644
+> > --- a/arch/arm/mach-shmobile/clock-sh73a0.c
+> > +++ b/arch/arm/mach-shmobile/clock-sh73a0.c
+> > @@ -21,6 +21,7 @@
+> >  #include <linux/io.h>
+> >  #include <linux/sh_clk.h>
+> >  #include <linux/clkdev.h>
+> > +#include <asm/processor.h>
+> >  #include <mach/common.h>
+> >  
+> >  #define FRQCRA		IOMEM(0xe6150000)
+> > @@ -234,14 +235,24 @@ static struct clk *main_clks[] = {
+> >  	&sh73a0_extalr_clk,
+> >  };
+> >  
+> > -static void div4_kick(struct clk *clk)
+> > +static int frqcr_kick(void)
+> >  {
+> > -	unsigned long value;
+> > +	int i;
+> > +
+> > +	/* set KICK bit in FRQCRB to update hardware setting, check success */
+> > +	__raw_writel(__raw_readl(FRQCRB) | (1 << 31), FRQCRB);
+> > +	for (i = 1000; i; i--)
+> > +		if (__raw_readl(FRQCRB) & (1 << 31))
+> > +			cpu_relax();
+> > +		else
+> > +			return i;
+> > +
+> > +	return -ETIMEDOUT;
+> > +}
+> >  
+> > -	/* set KICK bit in FRQCRB to update hardware setting */
+> > -	value = __raw_readl(FRQCRB);
+> > -	value |= (1 << 31);
+> > -	__raw_writel(value, FRQCRB);
+> > +static void div4_kick(struct clk *clk)
+> > +{
+> > +	frqcr_kick();
+> >  }
+> >  
+> >  static int divisors[] = { 2, 3, 4, 6, 8, 12, 16, 18,
+> > -- 
+> > 1.7.2.5
+> > 
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > 
 > --
 > To unsubscribe from this list: send the line "unsubscribe linux-sh" in
 > the body of a message to majordomo at vger.kernel.org
