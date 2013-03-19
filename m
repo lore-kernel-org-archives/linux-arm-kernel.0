@@ -1,124 +1,37 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Tue, 19 Mar 2013 15:46:03 +0800
-Subject: [PATCH v7 06/14] spi/spi-atmel: add flag to controller data for lock
- operations
-In-Reply-To: <1363678866-3567-1-git-send-email-wenyou.yang@atmel.com>
-References: <1363678866-3567-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1363679163-3897-1-git-send-email-wenyou.yang@atmel.com>
+From: lznuaa@gmail.com (Frank Li)
+Date: Tue, 19 Mar 2013 15:49:50 +0800
+Subject: Anyone implement Cortex A9 FIQ
+In-Reply-To: <514764E2.6040101@arm.com>
+References: <CAHrpEqSQ1n_WUfxoraKZFS2A8NjdP_MCcWmJdCjcon_QwgX4Hw@mail.gmail.com>
+ <5142FBF5.3010307@arm.com>
+ <CAHrpEqSO89Lx=EGTJJ_XOFwkHqL=heoOUQCtJUzm6D7mEAbWiw@mail.gmail.com>
+ <514764E2.6040101@arm.com>
+Message-ID: <CAHrpEqT9SSbHYK62i0ZteEd4SfZaa_nw+T0SHunP2W+MUEqmrg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nicolas Ferre <nicolas.ferre@atmel.com>
+>
+> Whether this is feasible will really depend on what platform you're on - if
+> there's a secure monitor then FIQs are out of the question anyway. Can you
+> tell us more about the system?
 
-Will allow to drop the lock during DMA operations.
+Freescale MX6Q.
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: spi-devel-general at lists.sourceforge.net
-Cc: linux-kernel at vger.kernel.org
-[wenyou.yang at atmel.com: submit the patch]
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
----
- drivers/spi/spi-atmel.c |   31 +++++++++++++++++++------------
- 1 file changed, 19 insertions(+), 12 deletions(-)
+>
+> If your average interrupt latency is low then you should just be able to do
+> this with normal IRQs (have you got threaded interrupt handlers?)
 
-diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-index 4692f1f..f28ce22 100644
---- a/drivers/spi/spi-atmel.c
-+++ b/drivers/spi/spi-atmel.c
-@@ -195,6 +195,7 @@ struct atmel_spi_caps {
-  */
- struct atmel_spi {
- 	spinlock_t		lock;
-+	unsigned long		flags;
- 
- 	resource_size_t		phybase;
- 	void __iomem		*regs;
-@@ -333,6 +334,16 @@ static void cs_deactivate(struct atmel_spi *as, struct spi_device *spi)
- 		gpio_set_value(asd->npcs_pin, !active);
- }
- 
-+static void atmel_spi_lock(struct atmel_spi *as)
-+{
-+		spin_lock_irqsave(&as->lock, as->flags);
-+}
-+
-+static void atmel_spi_unlock(struct atmel_spi *as)
-+{
-+		spin_unlock_irqrestore(&as->lock, as->flags);
-+}
-+
- static inline int atmel_spi_xfer_is_last(struct spi_message *msg,
- 					struct spi_transfer *xfer)
- {
-@@ -569,9 +580,9 @@ atmel_spi_msg_done(struct spi_master *master, struct atmel_spi *as,
- 		"xfer complete: %u bytes transferred\n",
- 		msg->actual_length);
- 
--	spin_unlock(&as->lock);
-+	atmel_spi_unlock(as);
- 	msg->complete(msg->context);
--	spin_lock(&as->lock);
-+	atmel_spi_lock(as);
- 
- 	as->current_transfer = NULL;
- 	as->next_transfer = NULL;
-@@ -802,13 +813,11 @@ static int atmel_spi_setup(struct spi_device *spi)
- 		spi->controller_state = asd;
- 		gpio_direction_output(npcs_pin, !(spi->mode & SPI_CS_HIGH));
- 	} else {
--		unsigned long		flags;
--
--		spin_lock_irqsave(&as->lock, flags);
-+		atmel_spi_lock(as);
- 		if (as->stay == spi)
- 			as->stay = NULL;
- 		cs_deactivate(as, spi);
--		spin_unlock_irqrestore(&as->lock, flags);
-+		atmel_spi_unlock(as);
- 	}
- 
- 	asd->csr = csr;
-@@ -827,7 +836,6 @@ static int atmel_spi_transfer(struct spi_device *spi, struct spi_message *msg)
- {
- 	struct atmel_spi	*as;
- 	struct spi_transfer	*xfer;
--	unsigned long		flags;
- 	struct device		*controller = spi->master->dev.parent;
- 	u8			bits;
- 	struct atmel_spi_device	*asd;
-@@ -892,11 +900,11 @@ static int atmel_spi_transfer(struct spi_device *spi, struct spi_message *msg)
- 	msg->status = -EINPROGRESS;
- 	msg->actual_length = 0;
- 
--	spin_lock_irqsave(&as->lock, flags);
-+	atmel_spi_lock(as);
- 	list_add_tail(&msg->queue, &as->queue);
- 	if (!as->current_transfer)
- 		atmel_spi_next_message(spi->master);
--	spin_unlock_irqrestore(&as->lock, flags);
-+	atmel_spi_unlock(as);
- 
- 	return 0;
- }
-@@ -906,17 +914,16 @@ static void atmel_spi_cleanup(struct spi_device *spi)
- 	struct atmel_spi	*as = spi_master_get_devdata(spi->master);
- 	struct atmel_spi_device	*asd = spi->controller_state;
- 	unsigned		gpio = (unsigned) spi->controller_data;
--	unsigned long		flags;
- 
- 	if (!asd)
- 		return;
- 
--	spin_lock_irqsave(&as->lock, flags);
-+	atmel_spi_lock(as);
- 	if (as->stay == spi) {
- 		as->stay = NULL;
- 		cs_deactivate(as, spi);
- 	}
--	spin_unlock_irqrestore(&as->lock, flags);
-+	atmel_spi_unlock(as);
- 
- 	spi->controller_state = NULL;
- 	gpio_free(gpio);
--- 
-1.7.9.5
+Not all drivers use threaded interrupt handler.
+
+>
+> What is it about the situation that leads you to believe that you *need*
+> FIQ?
+
+FIQ can be executed even in spin_lock_saveirq.
+We want do very small hardware set at related precision period (every 125us).
+
+>
+> Jonny
+>
+>
+>
