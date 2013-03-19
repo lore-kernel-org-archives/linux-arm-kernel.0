@@ -1,41 +1,99 @@
-From: kaloz@openwrt.org (Imre Kaloz)
-Date: Tue, 19 Mar 2013 10:00:54 +0100
-Subject: [PATCH 3/6] ARM: remove fa526 CPU support
-In-Reply-To: <5146FB70.9000706@openwrt.org>
-References: <1363299178-8241-1-git-send-email-arnd@arndb.de>
- <514318DE.8060601@openwrt.org>
- <CACmBeS2tbV9Z_c3mCuk4G_+kYpVpVpUKWq3GK=gqBF+ECNhTbg@mail.gmail.com>
- <201303181116.17369.arnd@arndb.de> <5146FB70.9000706@openwrt.org>
-Message-ID: <op.wt6rbsvq2s3iss@ecaz>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Tue, 19 Mar 2013 18:03:40 +0900
+Subject: [PATCH] ARM: shmobile: ape6evm: add defconfig
+Message-ID: <1363683820-26640-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add defconfig for ape6evm. This is based loosely
+on the kzm9g defconfig with fewer devices enabled.
 
-On Mon, 18 Mar 2013 12:33:04 +0100, Florian Fainelli <florian@openwrt.org> wrote:
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/configs/ape6evm_defconfig |   75 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 75 insertions(+)
+ create mode 100644 arch/arm/configs/ape6evm_defconfig
 
-> Le 03/18/13 12:16, Arnd Bergmann a ?crit :
->> On Monday 18 March 2013, Jonas Jensen wrote:
->>>
-
-<snip>
-
->>> The port is not near mainline but I think I'd prefer if CPU_FA526
->>> wasn't removed. If someone stepped up to maintain ARCH_GEMINI (so I
->>> could peek at the changes) that would be even better :)
->>
->> I've tried before to find someone who is still interested in Gemini,
->> but it seems nobody has the hardware any more.
->
-> Imre Kaloz is supposed to have some, if you want to get some hardware
-> yourself it seems that the mainline boards (WBD111, WBD222, NAS4420) are
-> the only hardware devices that OpenWrt also supports. The OpenWrt
-> patches we have add support for Ethernet, watchdog, USB, PCI, but have
-> not been submitted mainline.
-
-I have two wbd111 boards, but their bootloader is fubared - for whatever reason the bootloader's ethernet support works horribly for me, as in an image transfer takes well over 10 mins, and 90% of the time it fails meantime. I have another gemini based board, which doesn't have mainline support, yet.
-
-So for gemini, what I can offer is digging up the wbd111 and testing your patches this weekend - if that works, it can stay in mainline for another kernel release, and I can try to add support for the other board (so there would be a sane platform to test on). If you are going to drop it, I will likely keep it working in OpenWrt as long as those boards don't die on me.
-
-
-Imre
+diff --git a/arch/arm/configs/ape6evm_defconfig b/arch/arm/configs/ape6evm_defconfig
+new file mode 100644
+index 0000000..dfa45bb
+--- /dev/null
++++ b/arch/arm/configs/ape6evm_defconfig
+@@ -0,0 +1,75 @@
++CONFIG_SYSVIPC=y
++CONFIG_POSIX_MQUEUE=y
++CONFIG_NO_HZ=y
++CONFIG_HIGH_RES_TIMERS=y
++CONFIG_BSD_PROCESS_ACCT=y
++CONFIG_RCU_FANOUT=32
++CONFIG_IKCONFIG=y
++CONFIG_IKCONFIG_PROC=y
++CONFIG_LOG_BUF_SHIFT=16
++CONFIG_CGROUPS=y
++CONFIG_CGROUP_SCHED=y
++CONFIG_KALLSYMS_ALL=y
++CONFIG_EMBEDDED=y
++CONFIG_SLAB=y
++# CONFIG_BLOCK is not set
++CONFIG_SMP=y
++# CONFIG_COMPACTION is not set
++# CONFIG_CROSS_MEMORY_ATTACH is not set
++# CONFIG_SECCOMP is not set
++CONFIG_BINFMT_MISC=y
++CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_XFRM_USER=y
++CONFIG_NET_KEY=y
++CONFIG_NET_KEY_MIGRATE=y
++CONFIG_INET=y
++CONFIG_IP_MULTICAST=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++# CONFIG_INET_LRO is not set
++# CONFIG_IPV6_SIT is not set
++CONFIG_NETFILTER=y
++CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++# CONFIG_FW_LOADER_USER_HELPER is not set
++CONFIG_NETDEVICES=y
++CONFIG_MII=y
++# CONFIG_NET_CADENCE is not set
++CONFIG_PHYLIB=y
++# CONFIG_INPUT_MOUSEDEV is not set
++# CONFIG_INPUT_KEYBOARD is not set
++# CONFIG_INPUT_MOUSE is not set
++# CONFIG_SERIO is not set
++CONFIG_SERIAL_NONSTANDARD=y
++CONFIG_GPIOLIB=y
++# CONFIG_HWMON is not set
++CONFIG_REGULATOR=y
++CONFIG_REGULATOR_FIXED_VOLTAGE=y
++# CONFIG_HID is not set
++# CONFIG_USB_SUPPORT is not set
++# CONFIG_IOMMU_SUPPORT is not set
++# CONFIG_DNOTIFY is not set
++CONFIG_TMPFS=y
++# CONFIG_MISC_FILESYSTEMS is not set
++CONFIG_NFS_FS=y
++CONFIG_NFS_V3_ACL=y
++CONFIG_NFS_V4=y
++CONFIG_NFS_V4_1=y
++CONFIG_ROOT_NFS=y
++CONFIG_FRAME_WARN=1024
++CONFIG_MAGIC_SYSRQ=y
++# CONFIG_UNUSED_SYMBOLS is not set
++CONFIG_ENABLE_DEFAULT_TRACERS=y
++CONFIG_CRYPTO_CBC=y
++CONFIG_CRYPTO_ECB=y
++CONFIG_CRYPTO_MD5=y
++CONFIG_CRYPTO_MICHAEL_MIC=y
++CONFIG_CRYPTO_TWOFISH=y
++# CONFIG_VIRTUALIZATION is not set
++CONFIG_CRC_CCITT=y
++CONFIG_CRC16=y
++CONFIG_CRC_T10DIF=y
++CONFIG_CRC_ITU_T=y
++CONFIG_CRC7=y
++CONFIG_LIBCRC32C=y
+-- 
+1.7.10.4
