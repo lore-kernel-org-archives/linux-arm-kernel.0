@@ -1,9 +1,10 @@
 From: achew@nvidia.com (Andrew Chew)
-Date: Tue, 19 Mar 2013 11:59:32 -0700
-Subject: [PATCH V4 8/9] ARM: tegra: Provide regulator to pwm-backlight
+Date: Tue, 19 Mar 2013 11:59:25 -0700
+Subject: [PATCH V4 1/9] ARM: OMAP: board-4430sdp: Provide regulator to
+ pwm-backlight
 In-Reply-To: <1363719573-20926-1-git-send-email-achew@nvidia.com>
 References: <1363719573-20926-1-git-send-email-achew@nvidia.com>
-Message-ID: <1363719573-20926-9-git-send-email-achew@nvidia.com>
+Message-ID: <1363719573-20926-2-git-send-email-achew@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,32 +13,34 @@ during driver probe.  Initialize a dummy regulator to satisfy this
 requirement.
 
 Signed-off-by: Andrew Chew <achew@nvidia.com>
+Tested-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/boot/dts/tegra20-medcom-wide.dts | 6 ++++++
+ arch/arm/mach-omap2/board-4430sdp.c | 6 ++++++
  1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/boot/dts/tegra20-medcom-wide.dts b/arch/arm/boot/dts/tegra20-medcom-wide.dts
-index a2d6d65..bf7fdd7 100644
---- a/arch/arm/boot/dts/tegra20-medcom-wide.dts
-+++ b/arch/arm/boot/dts/tegra20-medcom-wide.dts
-@@ -26,12 +26,18 @@
- 		};
- 	};
+diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
+index 35f3ad0..a01a39a 100644
+--- a/arch/arm/mach-omap2/board-4430sdp.c
++++ b/arch/arm/mach-omap2/board-4430sdp.c
+@@ -291,6 +291,10 @@ static struct platform_device sdp4430_leds_pwm = {
+ 	},
+ };
  
-+	bl_en: fixed-regulator {
-+		compatible = "regulator-fixed";
-+		regulator-name = "bl-en-supply";
-+	};
++/* Dummy regulator for pwm-backlight driver */
++static struct regulator_consumer_supply backlight_supply =
++	REGULATOR_SUPPLY("enable", "pwm-backlight");
 +
- 	backlight {
- 		compatible = "pwm-backlight";
- 		pwms = <&pwm 0 5000000>;
+ static struct platform_pwm_backlight_data sdp4430_backlight_data = {
+ 	.max_brightness = 127,
+ 	.dft_brightness = 127,
+@@ -718,6 +722,8 @@ static void __init omap_4430sdp_init(void)
  
- 		brightness-levels = <0 4 8 16 32 64 128 255>;
- 		default-brightness-level = <6>;
-+		enable-supply = <&bl_en>;
- 	};
- 
- 	sound {
+ 	omap4_i2c_init();
+ 	omap_sfh7741prox_init();
++	regulator_register_always_on(-1, "backlight-enable",
++				     &backlight_supply, 1, 0);
+ 	platform_add_devices(sdp4430_devices, ARRAY_SIZE(sdp4430_devices));
+ 	omap_serial_init();
+ 	omap_sdrc_init(NULL, NULL);
 -- 
 1.8.1.5
