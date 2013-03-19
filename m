@@ -1,37 +1,45 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 19 Mar 2013 11:26:21 -0600
-Subject: [PATCH V4 3/9] ARM: dt: tegra: add bindings of power management
- configurations for PMC
-In-Reply-To: <5148999A.90102@wwwdotorg.org>
-References: <1363594400-11663-1-git-send-email-josephl@nvidia.com>
- <1363594400-11663-4-git-send-email-josephl@nvidia.com>
- <5148999A.90102@wwwdotorg.org>
-Message-ID: <51489FBD.5060107@wwwdotorg.org>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Tue, 19 Mar 2013 12:38:14 -0500
+Subject: [PATCH 0/5] ARM: OMAP: DMTIMER updates for v3.10
+Message-ID: <1363714699-29622-1-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/19/2013 11:00 AM, Stephen Warren wrote:
-> On 03/18/2013 02:13 AM, Joseph Lo wrote:
->> The PMC mostly controls the entry and exit of the system from different
->> sleep modes. Different platform or system may have different configurations.
->> The power management configurations of PMC is represented as some properties.
->> The system needs to define the properties when the system supports deep sleep
->> mode (i.e. suspend).
-> 
->> diff --git a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
-> 
->> +- nvidia,suspend-mode : The suspend mode that the platform should use.
->> +  Valid values are 0, 1 and 2:
->> +  0 (LP0): CPU + Core voltage off and DRAM in self-refresh
->> +  1 (LP1): CPU vlotage off and DRAM in self-refresh
-> 
-> s/vlotage/voltage/
-> 
-> BTW, checkpatch spews hundreds of lines of errors because these patches
-> have DOS-style line-endings. Can you please generate and send them
-> directly from Linux to fix this. There are also a couple of trailing
-> whitespace errors.
+Includes:
+- A couple fixes for DMTIMER context loss handling.
+- Populating DMTIMER errata when booting with device-tree.
+- A new function for requesting a DMTIMER by device-tree node.
 
-Oops. The DOS-style line-endings was a mistake in my work-flow, so you
-can ignore that. There were a few other checkpatch errors though that
-need fixing.
+Based upon v3.9-rc3.
+
+Tested on OMAP5912 OSK, OMAP2420 H4, OMAP3430 SDP, OMAP4430 Blaze
+and AM335x EVM. Testing includes ...
+1. Booting kernel on above boards
+2. Testing of various DMTIMER request APIs
+3. Testing the timer overflow and match interrupts.
+4. Using different clock sources to operate the timer with.
+
+Jon Hunter (4):
+  ARM: OMAP: Force dmtimer restore if context loss is not detectable
+  ARM: OMAP: Add function to request timer by node
+  ARM: dts: OMAP2+: Update DMTIMER compatibility property
+  ARM: OMAP2+: Populate DMTIMER errata when using device-tree
+
+NeilBrown (1):
+  ARM: OMAP: Simplify dmtimer context-loss handling
+
+ .../devicetree/bindings/arm/omap/timer.txt         |   17 +-
+ arch/arm/boot/dts/am33xx.dtsi                      |   14 +-
+ arch/arm/boot/dts/omap2.dtsi                       |   22 +-
+ arch/arm/boot/dts/omap2420.dtsi                    |    2 +-
+ arch/arm/boot/dts/omap2430.dtsi                    |    2 +-
+ arch/arm/boot/dts/omap3.dtsi                       |   24 +-
+ arch/arm/boot/dts/omap4.dtsi                       |   22 +-
+ arch/arm/boot/dts/omap5.dtsi                       |   22 +-
+ arch/arm/mach-omap2/timer.c                        |    7 +-
+ arch/arm/plat-omap/dmtimer.c                       |  241 ++++++++++++--------
+ arch/arm/plat-omap/include/plat/dmtimer.h          |    1 +
+ 11 files changed, 220 insertions(+), 154 deletions(-)
+
+-- 
+1.7.10.4
