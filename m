@@ -1,51 +1,69 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 19 Mar 2013 11:19:29 +0900
-Subject: [PATCH 07/14] irqchip: intc-irqpin: Add force comments
+Date: Tue, 19 Mar 2013 11:19:27 +0900
+Subject: [PATCH 05/14] irqchip: intc-irqpin: Whitespace fixes
 In-Reply-To: <1363659576-6333-1-git-send-email-horms+renesas@verge.net.au>
 References: <1363659576-6333-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1363659576-6333-8-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1363659576-6333-6-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Add comments to describe the special case for
-"force" versions of enable and disable functions.
+Remove whitespace damage and add newline
+between variables and code.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
 Tested-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/irqchip/irq-renesas-intc-irqpin.c |    9 +++++++++
- 1 file changed, 9 insertions(+)
+ drivers/irqchip/irq-renesas-intc-irqpin.c |    8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/irqchip/irq-renesas-intc-irqpin.c b/drivers/irqchip/irq-renesas-intc-irqpin.c
-index 0ac2bf6..59c0cbc 100644
+index 1e5058a..4b5933f 100644
 --- a/drivers/irqchip/irq-renesas-intc-irqpin.c
 +++ b/drivers/irqchip/irq-renesas-intc-irqpin.c
-@@ -199,6 +199,11 @@ static void intc_irqpin_irq_enable_force(struct irq_data *d)
- 	int irq = p->irq[irqd_to_hwirq(d)].requested_irq;
+@@ -57,13 +57,13 @@ struct intc_irqpin_iomem {
+ 	unsigned long (*read)(void __iomem *iomem);
+ 	void (*write)(void __iomem *iomem, unsigned long data);
+ 	int width;
+-};  
++};
  
- 	intc_irqpin_irq_enable(d);
+ struct intc_irqpin_irq {
+ 	int hw_irq;
+ 	int irq;
+ 	struct intc_irqpin_priv *p;
+-};  
++};
+ 
+ struct intc_irqpin_priv {
+ 	struct intc_irqpin_iomem iomem[INTC_IRQPIN_REG_NR];
+@@ -99,6 +99,7 @@ static inline unsigned long intc_irqpin_read(struct intc_irqpin_priv *p,
+ 					     int reg)
+ {
+ 	struct intc_irqpin_iomem *i = &p->iomem[reg];
 +
-+	/* enable interrupt through parent interrupt controller,
-+	 * assumes non-shared interrupt with 1:1 mapping
-+	 * needed for busted IRQs on some SoCs like sh73a0
-+	 */
- 	irq_get_chip(irq)->irq_unmask(irq_get_irq_data(irq));
+ 	return i->read(i->iomem);
  }
  
-@@ -207,6 +212,10 @@ static void intc_irqpin_irq_disable_force(struct irq_data *d)
- 	struct intc_irqpin_priv *p = irq_data_get_irq_chip_data(d);
- 	int irq = p->irq[irqd_to_hwirq(d)].requested_irq;
- 
-+	/* disable interrupt through parent interrupt controller,
-+	 * assumes non-shared interrupt with 1:1 mapping
-+	 * needed for busted IRQs on some SoCs like sh73a0
-+	 */
- 	irq_get_chip(irq)->irq_mask(irq_get_irq_data(irq));
- 	intc_irqpin_irq_disable(d);
+@@ -106,6 +107,7 @@ static inline void intc_irqpin_write(struct intc_irqpin_priv *p,
+ 				     int reg, unsigned long data)
+ {
+ 	struct intc_irqpin_iomem *i = &p->iomem[reg];
++
+ 	i->write(i->iomem, data);
  }
+ 
+@@ -405,7 +407,7 @@ static int intc_irqpin_probe(struct platform_device *pdev)
+ 			dev_warn(&pdev->dev, "irq base mismatch (%d/%d)\n",
+ 				 p->config.irq_base, k);
+ 	}
+-	
++
+ 	return 0;
+ 
+ err3:
 -- 
 1.7.10.4
