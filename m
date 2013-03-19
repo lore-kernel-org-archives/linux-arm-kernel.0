@@ -1,36 +1,34 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 19 Mar 2013 11:35:13 +0100
-Subject: [PATCH 4/7] ARM: sunxi: dt: Move uart0 to sun4i-a10.dtsi
+Date: Tue, 19 Mar 2013 11:35:14 +0100
+Subject: [PATCH 5/7] ARM: sunxi: dt: Add uart3 dt node
 In-Reply-To: <1363689316-7847-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1363689316-7847-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1363689316-7847-5-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1363689316-7847-6-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The UART0 is only available on the Allwinner A10 SoCs, and not on the
-A13, so move the uart0 node to sun4i-a10.dtsi.
+Both A10 and A13 Allwinner SoCs have a Synopsys APB uart3 device
+available, so add it to the sunxi.dtsi file
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 Acked-by: Emilio L?pez <emilio@elopez.com.ar>
-Tested-by: Emilio L?pez <emilio@elopez.com.ar>
 ---
- arch/arm/boot/dts/sun4i-a10.dtsi |   10 ++++++++++
- arch/arm/boot/dts/sunxi.dtsi     |   10 ----------
- 2 files changed, 10 insertions(+), 10 deletions(-)
+ arch/arm/boot/dts/sunxi.dtsi |   10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index 03d2b53..b605672 100644
---- a/arch/arm/boot/dts/sun4i-a10.dtsi
-+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -47,5 +47,15 @@
- 				allwinner,pull = <0>;
- 			};
+diff --git a/arch/arm/boot/dts/sunxi.dtsi b/arch/arm/boot/dts/sunxi.dtsi
+index cf53c43..a85030b 100644
+--- a/arch/arm/boot/dts/sunxi.dtsi
++++ b/arch/arm/boot/dts/sunxi.dtsi
+@@ -68,5 +68,15 @@
+ 			clocks = <&osc>;
+ 			status = "disabled";
  		};
 +
-+		uart0: serial at 01c28000 {
++		uart3: serial at 01c28c00 {
 +			compatible = "snps,dw-apb-uart";
-+			reg = <0x01c28000 0x400>;
-+			interrupts = <1>;
++			reg = <0x01c28c00 0x400>;
++			interrupts = <4>;
 +			reg-shift = <2>;
 +			reg-io-width = <4>;
 +			clocks = <&osc>;
@@ -38,26 +36,5 @@ index 03d2b53..b605672 100644
 +		};
  	};
  };
-diff --git a/arch/arm/boot/dts/sunxi.dtsi b/arch/arm/boot/dts/sunxi.dtsi
-index 1e0f4b5..cf53c43 100644
---- a/arch/arm/boot/dts/sunxi.dtsi
-+++ b/arch/arm/boot/dts/sunxi.dtsi
-@@ -59,16 +59,6 @@
- 			#interrupt-cells = <1>;
- 		};
- 
--		uart0: serial at 01c28000 {
--			compatible = "snps,dw-apb-uart";
--			reg = <0x01c28000 0x400>;
--			interrupts = <1>;
--			reg-shift = <2>;
--			reg-io-width = <4>;
--			clocks = <&osc>;
--			status = "disabled";
--		};
--
- 		uart1: serial at 01c28400 {
- 			compatible = "snps,dw-apb-uart";
- 			reg = <0x01c28400 0x400>;
 -- 
 1.7.10.4
