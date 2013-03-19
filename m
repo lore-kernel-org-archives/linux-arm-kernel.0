@@ -1,57 +1,50 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 19 Mar 2013 10:04:32 +0100
-Subject: [PATCH 10/10] drivers: misc: use module_platform_driver_probe()
-In-Reply-To: <CAHkwnC9fg7_uhLM2KD3vvj_oFx3EBoQfw8mCN=V9pyV5=k37aA@mail.gmail.com>
-References: <1363266691-15757-1-git-send-email-fabio.porcedda@gmail.com>
- <201303181058.51641.arnd@arndb.de>
- <CAHkwnC-aHwd24S5MyLhnVzTqqQj2L7MMuVX9dirhS-G830jZcw@mail.gmail.com>
- <201303181128.45215.arnd@arndb.de>
- <CAHkwnC9fg7_uhLM2KD3vvj_oFx3EBoQfw8mCN=V9pyV5=k37aA@mail.gmail.com>
-Message-ID: <CAMuHMdVS56HRDSvr7XCpVEjEWnGti+V=J_m4qQzEid=23ON_fQ@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 19 Mar 2013 10:11:27 +0100
+Subject: [GIT PULL] ux500 core changes for v3.10
+Message-ID: <CACRpkdaWq_hyNfPhY+_pyj7fZuQ5hbep6KoOO_+guize_trtDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 19, 2013 at 9:55 AM, Fabio Porcedda
-<fabio.porcedda@gmail.com> wrote:
-> On Mon, Mar 18, 2013 at 12:28 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> On Monday 18 March 2013, Fabio Porcedda wrote:
->>> On Mon, Mar 18, 2013 at 11:58 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->>> > On Monday 18 March 2013, Fabio Porcedda wrote:
->>> >> Since by using platform_driver_probe() the  function
->>> >> ep93xx_pwm_probe() is freed after initialization,
->>> >> is better to use module_platform_drive_probe().
->>> >> IMHO i don't see any good reason to use module_platform_driver() for
->>> >> this driver.
->>> >
->>> > As I commented earlier, the platform_driver_probe() and
->>> > module_platform_drive_probe() interfaces are rather dangerous in combination
->>> > with deferred probing, I would much prefer Harley's patch.
->>>
->>> Since those drivers don't use -EPROBE_DEFER i was thinking that they don't use
->>> deferred probing.
->>> I'm missing something?
->>
->> clk_get() may return -EPROBE_DEFER after ep93xx is converted to use the
->> common clk API. We currently return the value of clk_get from the probe()
->> function, which will automatically do the right thing as long as the probe
->> function remains reachable.
->
-> Thanks for the explanation.
+Hi Arnd, Olof,
 
-Hmm, so we may have drivers that (now) work perfectly fine with
-module_platform_driver_probe()/platform_driver_probe(), but will start
-failing suddenly in the future?
+here are two ux500 core patches that have been littering my tree,
+they need to go upstream into some unspecified ux500 core branch.
+These have been circulated on the list.
 
-I guess we need a big fat WARN_ON(-EPROBE_DEFER) in
-platform_driver_probe() to catch these?
+They are not causing any immediate regression so target is v3.10.
 
-Gr{oetje,eeting}s,
+Please pull them in!
 
-                        Geert
+Yours,
+Linus Walleij
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+The following changes since commit f6161aa153581da4a3867a2d1a7caf4be19b6ec9:
+
+  Linux 3.9-rc2 (2013-03-10 16:54:19 -0700)
+
+are available in the git repository at:
+
+  http://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+tags/ux500-core-v3.10
+
+for you to fetch changes up to 0f2fa40e464c955e928979331625b5485c292bf0:
+
+  ARM: mach-ux500: enable 128KB way L2 cache on DB8540 (2013-03-18
+13:49:58 +0100)
+
+----------------------------------------------------------------
+Two fixes to the ux500 core machine:
+- Enable the 128KB cache on DB8540
+- Bump the number of IRQs to the correct value
+
+----------------------------------------------------------------
+Linus Walleij (1):
+      ARM: ux500: bump arch nr of GPIOs
+
+Maxime Coquelin (1):
+      ARM: mach-ux500: enable 128KB way L2 cache on DB8540
+
+ arch/arm/Kconfig                 | 2 +-
+ arch/arm/mach-ux500/cache-l2x0.c | 4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
