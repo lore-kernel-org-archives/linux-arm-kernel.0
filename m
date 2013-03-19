@@ -1,29 +1,64 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 19 Mar 2013 14:00:59 +0800
-Subject: [GIT PULL] imx fixes for 3.9, take 3
-Message-ID: <20130319060055.GK12462@S2101-09.ap.freescale.net>
+From: sourav.poddar@ti.com (Sourav Poddar)
+Date: Tue, 19 Mar 2013 11:30:34 +0530
+Subject: [PATCH 1/2] driver: serial-omap: move max uart count into generic
+ header file.
+In-Reply-To: <87r4jcim2h.fsf@linaro.org>
+References: <1363604206-11264-1-git-send-email-sourav.poddar@ti.com>
+ <87r4jcim2h.fsf@linaro.org>
+Message-ID: <5147FF02.1070900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit a937536b868b8369b98967929045f1df54234323:
-
-  Linux 3.9-rc3 (2013-03-17 15:59:32 -0700)
-
-are available in the git repository at:
-
-  git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-fixes-3.9-3
-
-for you to fetch changes up to 287939a3690c8da6fd3310d7593ff0448cb9447c:
-
-  ARM: imx: add dependency check for DEBUG_IMX_UART_PORT (2013-03-19 13:56:05 +0800)
-
-----------------------------------------------------------------
-The imx fixes for 3.9, take 3:
- - Add the lost dependency check for DEBUG_IMX_UART_PORT back
-
-----------------------------------------------------------------
-Shawn Guo (1):
-      ARM: imx: add dependency check for DEBUG_IMX_UART_PORT
-
- arch/arm/Kconfig.debug |    1 +
- 1 file changed, 1 insertion(+)
+Hi Kevin,
+On Tuesday 19 March 2013 12:15 AM, Kevin Hilman wrote:
+> Sourav Poddar<sourav.poddar@ti.com>  writes:
+>
+>> OMAP_MAX_HSUART_PORTS is moved to omap_serial header file.
+> Why?
+>
+The patch is a prerequisitive for the next patch in the series, where I am
+making use of the max number of uarts, omap device supports. Hence, I
+am rearranging the macro from a driver file to a header file. So, it can 
+be used at
+multiple places.
+> You started to explain it in the cover letter, but a full description
+> belongs here for the permanent git history.
+>
+Sure, I will add the complete description for this here itself in my next
+version.
+> Kevin
+>
+>> Cc: Santosh Shilimkar<santosh.shilimkar@ti.com>
+>> Cc: Felipe Balbi<balbi@ti.com>
+>> Cc: Rajendra nayak<rnayak@ti.com>
+>> Signed-off-by: Sourav Poddar<sourav.poddar@ti.com>
+>> ---
+>>   drivers/tty/serial/omap-serial.c          |    2 --
+>>   include/linux/platform_data/serial-omap.h |    1 +
+>>   2 files changed, 1 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+>> index 5722eaf..4c2ba9f 100644
+>> --- a/drivers/tty/serial/omap-serial.c
+>> +++ b/drivers/tty/serial/omap-serial.c
+>> @@ -43,8 +43,6 @@
+>>   #include<linux/pinctrl/consumer.h>
+>>   #include<linux/platform_data/serial-omap.h>
+>>
+>> -#define OMAP_MAX_HSUART_PORTS	6
+>> -
+>>   #define UART_BUILD_REVISION(x, y)	(((x)<<  8) | (y))
+>>
+>>   #define OMAP_UART_REV_42 0x0402
+>> diff --git a/include/linux/platform_data/serial-omap.h b/include/linux/platform_data/serial-omap.h
+>> index ff9b0aa..92c48c2 100644
+>> --- a/include/linux/platform_data/serial-omap.h
+>> +++ b/include/linux/platform_data/serial-omap.h
+>> @@ -29,6 +29,7 @@
+>>    * is used as console uart.
+>>    */
+>>   #define OMAP_SERIAL_NAME	"ttyO"
+>> +#define OMAP_MAX_HSUART_PORTS   6
+>>
+>>   struct omap_uart_port_info {
+>>   	bool			dma_enabled;	/* To specify DMA Mode */
