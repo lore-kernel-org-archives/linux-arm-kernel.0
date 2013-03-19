@@ -1,45 +1,85 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 19 Mar 2013 10:33:04 -0400
-Subject: [BUG][mvebu] mvneta: cannot request irq 25 on openblocks-ax3
-In-Reply-To: <514873D9.6060704@hitachi.com>
-References: <51486445.8040506@hitachi.com>
- <20130319133324.GS13280@titan.lakedaemon.net>
- <514873D9.6060704@hitachi.com>
-Message-ID: <20130319143304.GT13280@titan.lakedaemon.net>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 19 Mar 2013 15:35:33 +0100
+Subject: [PATCH 2/2] cpuidle / calxeda: remove redundant Kconfig option
+In-Reply-To: <51485876.307@gmail.com>
+References: <1363080476-26555-1-git-send-email-daniel.lezcano@linaro.org>
+ <1363080476-26555-2-git-send-email-daniel.lezcano@linaro.org>
+ <51485876.307@gmail.com>
+Message-ID: <514877B5.6080200@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 19, 2013 at 11:19:05PM +0900, Masami Hiramatsu wrote:
-> Hi Jason,
+On 03/19/2013 01:22 PM, Rob Herring wrote:
+> On 03/12/2013 04:27 AM, Daniel Lezcano wrote:
+>> When the CPU_IDLE and the ARCH_HIGHBANK options are set it is
+>> pointless to define a new option CPU_IDLE_CALXEDA because it
+>> is redundant.
+>>
+>> The Makefile drivers directory contains a condition to compile
+>> the cpuidle drivers:
+>>
+>> obj-$(CONFIG_CPU_IDLE)          += cpuidle/
+>>
+>> Hence, if CPU_IDLE is not set we won't enter this directory.
+>>
+>> This patch removes the useless Kconfig option and replaces the
+>> condition in the Makefile by CONFIG_ARCH_HIGHBANK.
 > 
-> (2013/03/19 22:33), Jason Cooper wrote:
-> > On Tue, Mar 19, 2013 at 10:12:37PM +0900, Masami Hiramatsu wrote:
-> >> Hi,
-> >>
-> >> Here I've hit a bug on the recent kernel. As far as I know, this bug
-> >> exists on 3.9-rc1 too.
-> >>
-> >> When I tried the latest mvebu for-next tree
-> >> (git://git.infradead.org/users/jcooper/linux.git mvebu/for-next),
-> > 
-> > FYI: that branch isn't stable, it's used as a merge-test of
-> > arm-soc/for-next (also not stable) and any branches I am trying to push
-> > upstream that day.
+> If I have multiple platforms including highbank compiled in, but want to
+> disable cpuidle just for highbank, then you can't disable it at compile
+> time.
+
+Could you elaborate a bit ? Is it today possible to have multiple
+platforms in a single kernel ?
+
+> Also, with my PSCI support patches for highbank, it is no longer
+> dependent on ARCH_HIGHBANK which gives us better compile test coverage.
+
+
+
+
+>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> ---
+>>  drivers/cpuidle/Kconfig  |   10 ----------
+>>  drivers/cpuidle/Makefile |    2 +-
+>>  2 files changed, 1 insertion(+), 11 deletions(-)
+>>
+>> diff --git a/drivers/cpuidle/Kconfig b/drivers/cpuidle/Kconfig
+>> index c4cc27e..234ae65 100644
+>> --- a/drivers/cpuidle/Kconfig
+>> +++ b/drivers/cpuidle/Kconfig
+>> @@ -30,13 +30,3 @@ config CPU_IDLE_GOV_MENU
+>>  
+>>  config ARCH_NEEDS_CPU_IDLE_COUPLED
+>>  	def_bool n
+>> -
+>> -if CPU_IDLE
+>> -
+>> -config CPU_IDLE_CALXEDA
+>> -	bool "CPU Idle Driver for Calxeda processors"
+>> -	depends on ARCH_HIGHBANK
+>> -	help
+>> -	  Select this to enable cpuidle on Calxeda processors.
+>> -
+>> -endif
+>> diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
+>> index 0d8bd55..d1aba71 100644
+>> --- a/drivers/cpuidle/Makefile
+>> +++ b/drivers/cpuidle/Makefile
+>> @@ -5,5 +5,5 @@
+>>  obj-y += cpuidle.o driver.o governor.o sysfs.o governors/
+>>  obj-$(CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED) += coupled.o
+>>  
+>> -obj-$(CONFIG_CPU_IDLE_CALXEDA) += cpuidle-calxeda.o
+>> +obj-$(CONFIG_ARCH_HIGHBANK) += cpuidle-calxeda.o
+>>  obj-$(CONFIG_ARCH_KIRKWOOD) += cpuidle-kirkwood.o
+>>
 > 
-> Thanks! could you tell me which branch is stable?
-> (however, I'd like to try new fixes/features on my device too :))
 
-Generally, we advise using one of Linus' tags (eg v3.9-rc3).  Only if
-that doesn't work, seek out a branch containing the fix/feature.  When
-in doubt, I'll do:
 
-$ ./scripts/get_maintainer.pl -f drivers/net/ethernet/marvell/mvneta.c
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-and ask those listed which branch might contain a fix or feature.
-
-In this case, it'll probably go through David Miller and the netdev
-mailinglist, but it isn't there yet.  ;-)
-
-hth,
-
-Jason.
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
