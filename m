@@ -1,119 +1,104 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Tue, 19 Mar 2013 19:38:28 +0100
-Subject: [PATCH v3 6/6] irqchip: s3c24xx: add s3c2450 interrupt definitions
-In-Reply-To: <5147CD6B.80107@gmail.com>
-References: <201303171404.06146.heiko@sntech.de>
- <201303190034.49875.heiko@sntech.de> <5147CD6B.80107@gmail.com>
-Message-ID: <201303191938.29099.heiko@sntech.de>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Tue, 19 Mar 2013 13:45:50 -0500
+Subject: [PATCHv2 2/2] ARM: socfpga: Add clock entries into device tree
+In-Reply-To: <20130319164638.8663.89508@quantum>
+References: <1363707936-17769-1-git-send-email-dinguyen@altera.com>
+ <1363707936-17769-2-git-send-email-dinguyen@altera.com>
+ <20130319164638.8663.89508@quantum>
+Message-ID: <1363718750.17844.5.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 19. M?rz 2013, 03:28:59 schrieb Rob Herring:
-> On 03/18/2013 06:34 PM, Heiko St?bner wrote:
-> > Am Montag, 18. M?rz 2013, 23:14:52 schrieb Rob Herring:
-> >> On 03/18/2013 11:53 AM, Heiko St?bner wrote:
+Hi Mike,
 
-[...]
-
-> >> My first thought here is this information should not be centralized in
-> >> the controller node, but placed with each source node (2D, I2C1, etc).
+On Tue, 2013-03-19 at 09:46 -0700, Mike Turquette wrote:
+> Quoting dinguyen at altera.com (2013-03-19 08:45:36)
+> > From: Dinh Nguyen <dinguyen@altera.com>
 > > 
-> > I'm not sure I can follow currently :-)
+> > Adds the main PLL clock groups for SOCFPGA into device tree file
+> > so that the clock framework to query the clock and clock rates
+> > appropriately.
 > > 
-> > I'll try an example:
+> > $cat /sys/kernel/debug/clk/clk_summary
+> >    clock                        enable_cnt  prepare_cnt  rate
+> > ---------------------------------------------------------------------
+> >  osc1                           2           2            25000000
+> >     sdram_pll                   0           0            400000000
+> >        s2f_usr2_clk             0           0            66666666
+> >        ddr_dq_clk               0           0            200000000
+> >        ddr_2x_dqs_clk           0           0            400000000
+> >        ddr_dqs_clk              0           0            200000000
+> >     periph_pll                  2           2            500000000
+> >        s2f_usr1_clk             0           0            50000000
+> >        per_base_clk             4           4            100000000
+> >        per_nand_mmc_clk         0           0            25000000
+> >        per_qsi_clk              0           0            250000000
+> >        emac1_clk                1           1            125000000
+> >        emac0_clk                0           0            125000000
+> >     main_pll                    1           1            1600000000
+> >        cfg_s2f_usr0_clk         0           0            100000000
+> >        main_nand_sdmmc_clk      0           0            100000000
+> >        main_qspi_clk            0           0            400000000
+> >        dbg_base_clk             0           0            400000000
+> >        mainclk                  0           0            400000000
+> >        mpuclk                   1           1            800000000
+> >           smp_twd               1           1            200000000
 > > 
-> > The s3c serial driver expects the interrupts for uart tx and rx and the
-> > dt
-> > 
-> > entry would look like:
-> > 	serial at 50000000 {
-> > 	
-> > 		compatible = "samsung,s3c2410-uart";
-> > 		reg = <0x50000000 0x4000>;
-> > 		interrupt-parent = <&subintc>;
-> > 		interrupts = <0>, <1>;
+> > Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
 > 
-> So what does 0 and 1 correspond to? These are the bits in the subintc?
+> There is a lot going on in this one patch.  I would prefer to see the
+> clock driver broken out separately.
 
-Yep, the bits in the subintc register.
+Not sure what you mean by breaking out the clock driver separately. The
+patch is only touching the clocks for mach-socfpga.
 
+The patch is
+7 files changed, 366 insertions(+), 21 deletions(-)
 
-> > 	};
-> > 
-> > the map for these in the subintc looks like
-> > 
-> >                s3c24xx,irqlist = <3 28 /* UART0-RX */
-> >                
-> >                                   3 28 /* UART0-TX */
-> >                                   3 28 /* UART0-ERR */
-> > 
-> > marking them as using the level-handler and being children of the
-> > interrupt in bit 28 of the intc handler.
-> > 
-> > So the irq_entry would check the intc, see the waiting interrupt in bit
-> > 28, jump to the demux function which would then handle which ever of
-> > rx,tx or err would be waiting, which then get sent to the serial driver.
-> > 
-> > These mappings between sub- and parent irqs also vary very much between
-> > the different s3c24xx variants, as can be seen by the multitude of lists
-> > in [0] and the parent interrupts are only used for demuxing purposes.
-> > 
-> > -----
-> > A notable speciality are the AC97 (sound) and watchdog interrupts (bits
-> > 27 and 28 of the subregister), as they share a common parent interrupt
-> > (bit 9 of the main interrupt register).
-> > 
-> > So irq_entry checks the main register, sees bit 9 (ac97/watchdog),
-> > demuxes it to either coming from the ac97 or watchdog and sends it to
-> > the relevant driver.
-> > 
-> > I don't think this should be exposed to the drivers at all :-) .
-> > -------
-> > 
-> > So I'm not sure, how this would be able to go in the driver nodes.
+while the patch to enable clk-highbank was:
+8 files changed, 463 insertions(+), 64 deletions(-)
+
+> <snip>
 > 
-> The information in an interrupts property is transparent to the driver,
-> but can contain extra cells with whatever information you need. The GIC
-> binding has SPI or PPI interrupt type information for example.
-
-so you mean something like <bit flags parent-bit>, right?
-
-
-> > The only thing I could think of, would be to make the handler adjustable
-> > via the regular interrupts properties (i.e. as two_cell) which would
-> > bring the list down to only list the parent relationships.
-> > 
-> > Hmm ... and this parent list might be doable via the regular interrupts
-> > property, so the subintc would look like:
-> > 
-> > subintc: subintc = {
-> > 
-> > 	interrupt-parent = <&intc>;
-> > 	interrupts = <28 0>, <28 0>, <28 0>, <23 0>, <23 0>, .....
-> > 	/*		     bit0    bit1    bit2    bit3    bit4   ..... */
-> > 
-> > }
-> > 
-> > i.e. naming the parent interrupt for each of the interrupt bits of the
-> > sub- controller. Would this be the right direction?
+> > diff --git a/drivers/clk/socfpga/clk.c b/drivers/clk/socfpga/clk.c
+> > index 2c855a6..da6b461 100644
+> > --- a/drivers/clk/socfpga/clk.c
+> > +++ b/drivers/clk/socfpga/clk.c
+> <snip>
+> > +static int clk_pll_enable(struct clk_hw *hwclk)
+> > +{
+> > +       struct socfpga_clk *socfpgaclk = to_socfpga_clk(hwclk);
+> > +       u32 reg;
+> > +
+> > +       reg = readl(socfpgaclk->reg);
+> > +       reg |= SOCFPGA_PLL_EXT_ENA;
+> > +       writel(reg, socfpgaclk->reg);
+> > +
+> > +       return 0;
+> > +}
+> > +
+> > +static void clk_pll_disable(struct clk_hw *hwclk)
+> >  {
+> > +       struct socfpga_clk *socfpgaclk = to_socfpga_clk(hwclk);
+> > +       u32 reg;
+> > +
+> > +       reg = readl(socfpgaclk->reg);
+> > +       reg &= ~SOCFPGA_PLL_EXT_ENA;
+> > +       writel(reg, socfpgaclk->reg);
+> > +}
+> > +
 > 
-> I think you may want to use an interrupt-map property. That should allow
-> you to do arbitrary mappings from one interrupt controller's numbering
-> to another's numbering. The VExpress and several PPC platforms have
-> examples.
+> For a simple enable which just sets a bit, you might want to re-use the
+> basic gate clock type.  This can be done similar to the composite clock
+> patches (currently on the list) by stuffing a clk_gate structure into
+> your custom socfpga_clk type.
 
-Yep, I've read the examples and also a bit more in-depth on devicetree.org and 
-it seems, as you suggested, interrupt-maps are the right concept to describe 
-such mappings.
+I'll take a look at the list about this.
 
+Thanks for the review.
 
-In general, what would be the preferred way to solve this?
-Like described above, having the parent bit encoded in the interrupt property 
-or doing it with a mapping of sorts like we discussed down here?
-
-I don't have a preference for one or the other right now and both look like 
-interesting concepts.
-
-
-Thanks
-Heiko
+Dinh
+> 
+> Regards,
+> Mike
+> 
