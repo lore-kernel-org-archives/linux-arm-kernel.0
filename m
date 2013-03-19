@@ -1,66 +1,55 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Tue, 19 Mar 2013 15:43:01 +0800
-Subject: [PATCH v7 02/14] spi/spi-atmel: add support transfer on CS1, 2, 3,
- not only on CS0
-In-Reply-To: <1363678866-3567-1-git-send-email-wenyou.yang@atmel.com>
-References: <1363678866-3567-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1363678981-3724-1-git-send-email-wenyou.yang@atmel.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 19 Mar 2013 08:46:49 +0100
+Subject: [PATCH v2 1/2] ARM: vexpress: Enable regulator framework when
+ MMCI is in use
+In-Reply-To: <201303182140.23623.arnd@arndb.de>
+References: <20130315181614.GY4977@n2100.arm.linux.org.uk>
+ <1363630617.3054.19.camel@hornet>
+ <20130318185458.GK4977@n2100.arm.linux.org.uk>
+ <201303182140.23623.arnd@arndb.de>
+Message-ID: <CAPDyKFpOSEERW5piVRh8b0Zx0Bj6KpXiXD8MHR8yvco9BMM6MA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-Cc: spi-devel-general at lists.sourceforge.net
-Cc: linux-kernel at vger.kernel.org
----
- drivers/spi/spi-atmel.c |   25 ++++++++++++-------------
- 1 file changed, 12 insertions(+), 13 deletions(-)
+On 18 March 2013 22:40, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 18 March 2013, Russell King - ARM Linux wrote:
+>> On Mon, Mar 18, 2013 at 06:16:57PM +0000, Pawel Moll wrote:
+>> >
+>> > Reverting it will not change anything as the driver had the same
+>> > dependency before, just using :
+>>
+>> Umm.  If CONFIG_REGULATOR is not set with the patch reverted, the
+>> regulator support is not used at all, and the ocrmask comes from
+>> the platform data.
+>
+> I think the point is that case of DT booting, the platform data has
+> a zero ocrmask, because Versatile Express has no auxdata to set
+> a platform_data pointer for the mmci device, and the default allocated
+> mmci device driver does not initialize the ocrmask unless the
+> regulator API is used.
+>
+> This took me a while to figure out, the point being that this is not
+> actually a regression, it never worked as far as I can tell.
+>
+> I don't think that selecting the regulator API is a good idea, for
+> the reasons that you mentioned, and I still wouldn't take the
+> patch. In theory we could do a workaround by adding a DT property
+> to the mmci node that describes the fixed voltage supplied to the
+> card if there are no regulators, but then again we already describe
+> the voltage using the regulator binding and I would not want to
+> duplicate that information.
+>
+> What I think we should have though is a better diagnostic here:
+> If neither the platform data nor the DT contain a valid description
+> of the voltage supplied to the card, the probe should fail saying
+> that the information is missing, not that the card is incompatible.
+>
+>         Arnd
 
-diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-index 0928dee..64e2795 100644
---- a/drivers/spi/spi-atmel.c
-+++ b/drivers/spi/spi-atmel.c
-@@ -255,11 +255,6 @@ static bool atmel_spi_is_v2(struct atmel_spi *as)
-  * Master on Chip Select 0.")  No workaround exists for that ... so for
-  * nCS0 on that chip, we (a) don't use the GPIO, (b) can't support CS_HIGH,
-  * and (c) will trigger that first erratum in some cases.
-- *
-- * TODO: Test if the atmel_spi_is_v2() branch below works on
-- * AT91RM9200 if we use some other register than CSR0. However, don't
-- * do this unconditionally since AP7000 has an errata where the BITS
-- * field in CSR0 overrides all other CSRs.
-  */
- 
- static void cs_activate(struct atmel_spi *as, struct spi_device *spi)
-@@ -269,18 +264,22 @@ static void cs_activate(struct atmel_spi *as, struct spi_device *spi)
- 	u32 mr;
- 
- 	if (atmel_spi_is_v2(as)) {
--		/*
--		 * Always use CSR0. This ensures that the clock
--		 * switches to the correct idle polarity before we
--		 * toggle the CS.
-+		spi_writel(as, CSR0 + 4 * spi->chip_select, asd->csr);
-+		/* For the low SPI version, there is a issue that PDC transfer
-+		 * on CS1,2,3 needs SPI_CSR0.BITS config as SPI_CSR1,2,3.BITS
- 		 */
- 		spi_writel(as, CSR0, asd->csr);
- 		if (as->caps.has_wdrbt) {
--			spi_writel(as, MR, SPI_BF(PCS, 0x0e) | SPI_BIT(WDRBT)
--				| SPI_BIT(MODFDIS) | SPI_BIT(MSTR));
-+			spi_writel(as, MR,
-+					SPI_BF(PCS, ~(0x01 << spi->chip_select))
-+					| SPI_BIT(WDRBT)
-+					| SPI_BIT(MODFDIS)
-+					| SPI_BIT(MSTR));
- 		} else {
--			spi_writel(as, MR, SPI_BF(PCS, 0x0e) | SPI_BIT(MODFDIS)
--				| SPI_BIT(MSTR));
-+			spi_writel(as, MR,
-+					SPI_BF(PCS, ~(0x01 << spi->chip_select))
-+					| SPI_BIT(MODFDIS)
-+					| SPI_BIT(MSTR));
- 		}
- 		mr = spi_readl(as, MR);
- 		gpio_set_value(asd->npcs_pin, active);
--- 
-1.7.9.5
+I agree Arnd.
+
+If mmci during probe, don't get a regulator and don't have an OCR mask
+from dt/platform data, probe should fail.
+
+Kind regards
+Ulf Hansson
