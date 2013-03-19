@@ -1,33 +1,46 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 19 Mar 2013 12:24:37 +0530
-Subject: [PATCH 0/2] omap serial fix.
-In-Reply-To: <1363604081-11169-1-git-send-email-sourav.poddar@ti.com>
-References: <1363604081-11169-1-git-send-email-sourav.poddar@ti.com>
-Message-ID: <51480BAD.2040902@ti.com>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Tue, 19 Mar 2013 07:59:20 +0100
+Subject: [PATCH] ARM: kirkwood: Add support for NETGEAR ReadyNAS Duo v2
+ using DT
+In-Reply-To: <20130319060750.GD21478@lunn.ch> (Andrew Lunn's message of "Tue,
+ 19 Mar 2013 07:07:50 +0100")
+References: <8738vt3h11.fsf@natisbad.org> <20130317205047.GU21478@lunn.ch>
+ <87mwu0pamh.fsf@natisbad.org> <20130319060750.GD21478@lunn.ch>
+Message-ID: <87zjxzvprr.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 18 March 2013 04:24 PM, Sourav Poddar wrote:
-> The first patch is a rearrangement of a macro "OMAP_MAX_HSUART_PORTS"
-> to a header file so that it can be used in other file. 
-> The second patch fixes the wakeup from uart issue while using "no_console_suspend" in the
-> bootargs.
-> 
-> These patches are developed on 3.8 custom kernel containing omap5 supend/resume support.
-> 
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Thanks Sourav for sorting out the issue. With update of changelog
-suggested by Kevin on patch 1, Feel free to add,
-Acked-Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Thanks guys,
 
+Andrew Lunn <andrew@lunn.ch> writes:
 
-> Sourav Poddar (2):
->   driver: serial-omap: move max uart count into generic header file.
->   arm: mach-omap2: prevent UART console idle on suspend while using
->     "no_console_suspend"
-> 
->  arch/arm/mach-omap2/omap_device.c         |   36 ++++++++++++++++++++++++++++-
->  drivers/tty/serial/omap-serial.c          |    2 -
->  include/linux/platform_data/serial-omap.h |    1 +
->  3 files changed, 36 insertions(+), 3 deletions(-)
-> 
+>> [    7.599773] USB Power: Failed to request enable GPIO14: -517
+>> [    7.605963] reg-fixed-voltage 1.regulator: Failed to register regulator: -517
+>> [    7.613163] platform 1.regulator: Driver reg-fixed-voltage requests probe deferral
+>
+> Although this is quite noisy, it is actually not an error. What it is
+> saying is that it failed to get the gpio and it will try again
+> later. -517 is EDEFERE. It failed, because at this point, the GPIO
+> driver has not yet loaded. Later in the boot the gpio driver
+> loaded. It around the time you see:
+>
+> kirkwood-pinctrl f1010000.pinctrl: registered pinctrl driver
+>
+> At some point, the kernel will retry again to load all drivers which
+> failed with EDEFER and the second time the regulator driver should
+> load.
+
+Stupid me: I first tried w/ "gpio = <&gpio0 14 0>;", plugged a key to
+notice it was not seen, then looked at the logs to discover what seems
+to be an error message. Then, I noticed I was addressing gpio0 (as Jason
+also pointer) and thought this was the reason changed it for gpio1. At
+that point, I should have tested w/ a USB key but instead looked at the
+log to check if the message was still here.
+
+Bottome line: it works! I'll resubmit a v2 later this day.
+
+Thanks again.
+
+Cheers,
+
+a+
