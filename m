@@ -1,107 +1,198 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Tue, 19 Mar 2013 15:41:06 +0800
-Subject: [PATCH v7 00/14] spi/spi-atmel: add dmaengine support for atmel spi
- controller and to test the device tree support
-Message-ID: <1363678866-3567-1-git-send-email-wenyou.yang@atmel.com>
+Date: Tue, 19 Mar 2013 15:42:15 +0800
+Subject: [PATCH v7 01/14] spi/spi-atmel: detect the capabilities of SPI core
+ by reading the VERSION register.
+In-Reply-To: <1363678866-3567-1-git-send-email-wenyou.yang@atmel.com>
+References: <1363678866-3567-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1363678935-3665-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All, 
+The "has_dma_support" needed for future use with dmaengine driver.
 
-This set of patches is to add dmaengine support for atmel spi and to test device tree support.
+Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+Cc: spi-devel-general at lists.sourceforge.net
+Cc: linux-kernel at vger.kernel.org
+---
+ drivers/spi/spi-atmel.c |   66 +++++++++++++++++++++++++++++++++++------------
+ 1 file changed, 50 insertions(+), 16 deletions(-)
 
-The work is based on Nicolas and Richard's work.
-
-Because the dma engine device tree support isn't available now, to at91sam9x5ek and at91sam9n12ek
-with dma support, it doesn't work on the dmaengine mode, only on PIO mode so far.
-
-It has been tested as below:
- 1./tested on v3.9-rc3, by using mtd utils, "mount", "umount" and "cp" commands.
- 2./tested on "spi/next" git tree after changing master->num_chipselect which fixed in v3.9-rc1.
- 3./tested by using Documentation/spi/spidev_test.c on "/dev/spidev".
- 4./tested on on at91sam9x5ek, at91sam9m10g45ek, at91sam9263ek and at91sam9g20ek boards.
-
-It is based on v3.9-rc3 + Joachim Eastwood's spi/atmel: fix speed_hz check in atmel_spi_transfer().
-
-Changelog:
-v7:
-     1./ remove patch: fix probing failure after xfer->speed_hz set.
-     2./ remove patch: add pinctrl support for atmel spi.
-
-v6:
-     1./ remove: fix master->num_chipselect wrongly set patch which isn't a issue in v3.9-rc1.
-     2./ fix probing failure after xfer->speed_hz set.
-
-v5:
-     1./ add pinctrl patches.
-     2./ detect capabilities by reading spi version register to replace multiple compatiles.
-     3./ change the "cs-gpios" property of spi node.
-     4./ rebase on v3.8.
-
-v4:
-     1./ Take Joe Perches's adivce, rewrite atmel_spi_is_v2(struct atmel_spi *as) 
-         and atmel_spi_use_dma(struct atmel_spi *as),
-	 and remove atmel_spi_use_pdc(struct atmel_spi *as).
-     2./ Rebase on v3.8-rc3.
-
-V3:
-     1./ Rebase on v3.8-rc2.
-     2./ Remove some Jean-Christophe's patches which has been applied on v3.8-rc2.
-     3./ Remove spi property "cs-gpios" from the SoC dtsi files to the board dts files
-         to avoid some useless pin conflicts.
-
-v2: 
-     1./ Remove the patch :PATCH]mtd: m25p80: change the m25p80_read to reading page to page
-	 which purpose to fix the BUG: when run "flashcp /bin/busybox /dev/mtdX" in the at91sam9g25ek
-	 with DMA mode, it arises a OOPS. Now fix it in this patch:
-	    [PATHC] spi/atmel_spi: add dmaengine support changing to fix the [BUG].
-     2./ Remove two patches:
-   	    which purpose to read dts property to select SPI IP version and DMA mode
-	    Now they will be gat from device tree different compatile.
-     3./ Fix DMA: when enable both spi0 AND spi1, the spi0 doesn't work BUG.
-     4./ Rebase v3.7-rc8.
-
-Best Regards,
-Wenyou Yang.
-
-
-Nicolas Ferre (5):
-  spi/spi-atmel: add physical base address
-  spi/spi-atmel: call unmapping on transfers buffers
-  spi/spi-atmel: status information passed through controller data
-  spi/spi-atmel: add flag to controller data for lock operations
-  spi/spi-atmel: add dmaengine support
-
-Richard Genoud (6):
-  spi/spi-atmel: fix spi-atmel driver to adapt to slave_config changes
-  spi/spi-atmel: correct 16 bits transfers using PIO
-  spi/spi-atmel: correct 16 bits transfers with DMA
-  ARM: at91: add clocks for spi dt entries
-  ARM: dts: add spi nodes for atmel SoC
-  ARM: dts: add spi nodes for the atmel boards
-
-Wenyou Yang (3):
-  spi/spi-atmel: detect the capabilities of SPI core by reading the
-    VERSION register.
-  spi/spi-atmel: add support transfer on CS1,2,3, not only on CS0
-  ARM: dts: add pinctrl property for spi node for atmel SoC
-
- arch/arm/boot/dts/at91sam9260.dtsi          |   40 ++
- arch/arm/boot/dts/at91sam9263.dtsi          |   40 ++
- arch/arm/boot/dts/at91sam9263ek.dts         |   10 +
- arch/arm/boot/dts/at91sam9g20ek_common.dtsi |   10 +
- arch/arm/boot/dts/at91sam9g45.dtsi          |   40 ++
- arch/arm/boot/dts/at91sam9m10g45ek.dts      |   10 +
- arch/arm/boot/dts/at91sam9n12.dtsi          |   40 ++
- arch/arm/boot/dts/at91sam9n12ek.dts         |   10 +
- arch/arm/boot/dts/at91sam9x5.dtsi           |   40 ++
- arch/arm/boot/dts/at91sam9x5ek.dtsi         |   10 +
- arch/arm/mach-at91/at91sam9260.c            |    2 +
- arch/arm/mach-at91/at91sam9g45.c            |    2 +
- arch/arm/mach-at91/at91sam9n12.c            |    2 +
- arch/arm/mach-at91/at91sam9x5.c             |    2 +
- drivers/spi/spi-atmel.c                     |  753 ++++++++++++++++++++++++---
- 15 files changed, 945 insertions(+), 66 deletions(-)
-
+diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+index 80f5867..0928dee 100644
+--- a/drivers/spi/spi-atmel.c
++++ b/drivers/spi/spi-atmel.c
+@@ -22,9 +22,8 @@
+ #include <linux/platform_data/atmel.h>
+ #include <linux/of.h>
+ 
+-#include <asm/io.h>
+-#include <asm/gpio.h>
+-#include <mach/cpu.h>
++#include <linux/io.h>
++#include <linux/gpio.h>
+ 
+ /* SPI register offsets */
+ #define SPI_CR					0x0000
+@@ -39,6 +38,7 @@
+ #define SPI_CSR1				0x0034
+ #define SPI_CSR2				0x0038
+ #define SPI_CSR3				0x003c
++#define SPI_VERSION				0x00fc
+ #define SPI_RPR					0x0100
+ #define SPI_RCR					0x0104
+ #define SPI_TPR					0x0108
+@@ -71,6 +71,8 @@
+ #define SPI_FDIV_SIZE				1
+ #define SPI_MODFDIS_OFFSET			4
+ #define SPI_MODFDIS_SIZE			1
++#define SPI_WDRBT_OFFSET			5
++#define SPI_WDRBT_SIZE				1
+ #define SPI_LLB_OFFSET				7
+ #define SPI_LLB_SIZE				1
+ #define SPI_PCS_OFFSET				16
+@@ -180,6 +182,11 @@
+ #define spi_writel(port,reg,value) \
+ 	__raw_writel((value), (port)->regs + SPI_##reg)
+ 
++struct atmel_spi_caps {
++	bool	is_spi2;
++	bool	has_wdrbt;
++	bool	has_dma_support;
++};
+ 
+ /*
+  * The core SPI transfer engine just talks to a register bank to set up
+@@ -204,6 +211,8 @@ struct atmel_spi {
+ 
+ 	void			*buffer;
+ 	dma_addr_t		buffer_dma;
++
++	struct atmel_spi_caps	caps;
+ };
+ 
+ /* Controller-specific per-slave state */
+@@ -222,14 +231,10 @@ struct atmel_spi_device {
+  *  - SPI_SR.TXEMPTY, SPI_SR.NSSR (and corresponding irqs)
+  *  - SPI_CSRx.CSAAT
+  *  - SPI_CSRx.SBCR allows faster clocking
+- *
+- * We can determine the controller version by reading the VERSION
+- * register, but I haven't checked that it exists on all chips, and
+- * this is cheaper anyway.
+  */
+-static bool atmel_spi_is_v2(void)
++static bool atmel_spi_is_v2(struct atmel_spi *as)
+ {
+-	return !cpu_is_at91rm9200();
++	return as->caps.is_spi2;
+ }
+ 
+ /*
+@@ -263,15 +268,20 @@ static void cs_activate(struct atmel_spi *as, struct spi_device *spi)
+ 	unsigned active = spi->mode & SPI_CS_HIGH;
+ 	u32 mr;
+ 
+-	if (atmel_spi_is_v2()) {
++	if (atmel_spi_is_v2(as)) {
+ 		/*
+ 		 * Always use CSR0. This ensures that the clock
+ 		 * switches to the correct idle polarity before we
+ 		 * toggle the CS.
+ 		 */
+ 		spi_writel(as, CSR0, asd->csr);
+-		spi_writel(as, MR, SPI_BF(PCS, 0x0e) | SPI_BIT(MODFDIS)
++		if (as->caps.has_wdrbt) {
++			spi_writel(as, MR, SPI_BF(PCS, 0x0e) | SPI_BIT(WDRBT)
++				| SPI_BIT(MODFDIS) | SPI_BIT(MSTR));
++		} else {
++			spi_writel(as, MR, SPI_BF(PCS, 0x0e) | SPI_BIT(MODFDIS)
+ 				| SPI_BIT(MSTR));
++		}
+ 		mr = spi_readl(as, MR);
+ 		gpio_set_value(asd->npcs_pin, active);
+ 	} else {
+@@ -318,7 +328,7 @@ static void cs_deactivate(struct atmel_spi *as, struct spi_device *spi)
+ 			asd->npcs_pin, active ? " (low)" : "",
+ 			mr);
+ 
+-	if (atmel_spi_is_v2() || spi->chip_select != 0)
++	if (atmel_spi_is_v2(as) || spi->chip_select != 0)
+ 		gpio_set_value(asd->npcs_pin, !active);
+ }
+ 
+@@ -719,7 +729,7 @@ static int atmel_spi_setup(struct spi_device *spi)
+ 	}
+ 
+ 	/* see notes above re chipselect */
+-	if (!atmel_spi_is_v2()
++	if (!atmel_spi_is_v2(as)
+ 			&& spi->chip_select == 0
+ 			&& (spi->mode & SPI_CS_HIGH)) {
+ 		dev_dbg(&spi->dev, "setup: can't be active-high\n");
+@@ -728,7 +738,7 @@ static int atmel_spi_setup(struct spi_device *spi)
+ 
+ 	/* v1 chips start out at half the peripheral bus speed. */
+ 	bus_hz = clk_get_rate(as->clk);
+-	if (!atmel_spi_is_v2())
++	if (!atmel_spi_is_v2(as))
+ 		bus_hz /= 2;
+ 
+ 	if (spi->max_speed_hz) {
+@@ -804,7 +814,7 @@ static int atmel_spi_setup(struct spi_device *spi)
+ 		"setup: %lu Hz bpw %u mode 0x%x -> csr%d %08x\n",
+ 		bus_hz / scbr, bits, spi->mode, spi->chip_select, csr);
+ 
+-	if (!atmel_spi_is_v2())
++	if (!atmel_spi_is_v2(as))
+ 		spi_writel(as, CSR0 + 4 * spi->chip_select, csr);
+ 
+ 	return 0;
+@@ -910,6 +920,23 @@ static void atmel_spi_cleanup(struct spi_device *spi)
+ 	kfree(asd);
+ }
+ 
++static inline unsigned int atmel_get_version(struct atmel_spi *as)
++{
++	return spi_readl(as, VERSION) & 0x00000fff;
++}
++
++static void atmel_get_caps(struct atmel_spi *as)
++{
++	unsigned int version;
++
++	version = atmel_get_version(as);
++	dev_info(&as->pdev->dev, "version: 0x%x\n", version);
++
++	as->caps.is_spi2 = (version > 0x121) ? true : false;
++	as->caps.has_wdrbt = (version >= 0x210) ? true : false;
++	as->caps.has_dma_support = (version >= 0x212) ? true : false;
++}
++
+ /*-------------------------------------------------------------------------*/
+ 
+ static int atmel_spi_probe(struct platform_device *pdev)
+@@ -970,6 +997,8 @@ static int atmel_spi_probe(struct platform_device *pdev)
+ 	as->irq = irq;
+ 	as->clk = clk;
+ 
++	atmel_get_caps(as);
++
+ 	ret = request_irq(irq, atmel_spi_interrupt, 0,
+ 			dev_name(&pdev->dev), master);
+ 	if (ret)
+@@ -979,7 +1008,12 @@ static int atmel_spi_probe(struct platform_device *pdev)
+ 	clk_enable(clk);
+ 	spi_writel(as, CR, SPI_BIT(SWRST));
+ 	spi_writel(as, CR, SPI_BIT(SWRST)); /* AT91SAM9263 Rev B workaround */
+-	spi_writel(as, MR, SPI_BIT(MSTR) | SPI_BIT(MODFDIS));
++	if (as->caps.has_wdrbt) {
++		spi_writel(as, MR, SPI_BIT(WDRBT) | SPI_BIT(MODFDIS)
++				| SPI_BIT(MSTR));
++	} else {
++		spi_writel(as, MR, SPI_BIT(MSTR) | SPI_BIT(MODFDIS));
++	}
+ 	spi_writel(as, PTCR, SPI_BIT(RXTDIS) | SPI_BIT(TXTDIS));
+ 	spi_writel(as, CR, SPI_BIT(SPIEN));
+ 
 -- 
 1.7.9.5
