@@ -1,33 +1,110 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 19 Mar 2013 07:56:15 -0400
-Subject: [PATCH v3 0/9] refactoring for mask_cache
-In-Reply-To: <20130319114430.GP13280@titan.lakedaemon.net>
-References: <1363277430-21325-1-git-send-email-holger.brunck@keymile.com>
- <1363615255-18200-1-git-send-email-gerlando.falauto@keymile.com>
- <20130319100352.GB2419@localhost>
- <20130319110620.GO13280@titan.lakedaemon.net>
- <51484793.5020102@keymile.com>
- <20130319114430.GP13280@titan.lakedaemon.net>
-Message-ID: <20130319115615.GR13280@titan.lakedaemon.net>
+From: pgaikwad@nvidia.com (Prashant Gaikwad)
+Date: Tue, 19 Mar 2013 17:34:19 +0530
+Subject: [PATCH V2] clk: Add composite clock type
+In-Reply-To: <2953843.6tCZYDlhTN@amdc1227>
+References: <1359965482-29655-1-git-send-email-pgaikwad@nvidia.com>
+ <512F0E2F.4000104@nvidia.com> <512F9FEF.4010304@wwwdotorg.org>
+ <2953843.6tCZYDlhTN@amdc1227>
+Message-ID: <51485443.6060603@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 19, 2013 at 07:44:31AM -0400, Jason Cooper wrote:
-> Those commit IDs are going to change once LinusW (I presume) applies
-> them to his tree, so he'll have to edit each commit message to point the
-> the correct commit.
-> 
-> LinusW, do you want me to handle this?
+On Wednesday 13 March 2013 10:00 PM, Tomasz Figa wrote:
+> Hi Prashant,
+>
+> On Thursday 28 of February 2013 11:20:31 Stephen Warren wrote:
+>> On 02/28/2013 12:58 AM, Prashant Gaikwad wrote:
+>>> On Wednesday 06 February 2013 03:36 PM, Tomasz Figa wrote:
+>>>> On Wednesday 06 of February 2013 08:34:32 Prashant Gaikwad wrote:
+>>>>> On Tuesday 05 February 2013 03:45 PM, Tomasz Figa wrote:
+>>>>>> Hi Prashant,
+>>>>>>
+>>>>>> Thank you for your patch. Please see some comments inline.
+>>>>>>
+>>>>>> On Monday 04 of February 2013 13:41:22 Prashant Gaikwad wrote:
+>>>>>>> Not all clocks are required to be decomposed into basic clock
+>>>>>>> types but at the same time want to use the functionality
+>>>>>>> provided by these basic clock types instead of duplicating.
+>>>>>>>
+>>>>>>> For example, Tegra SoC has ~100 clocks which can be decomposed
+>>>>>>> into Mux -> Div -> Gate clock types making the clock count to
+>>>>>>> ~300. Also, parent change operation can not be performed on gate
+>>>>>>> clock which forces to use mux clock in driver if want to change
+>>>>>>> the parent.
+>>>>>>>
+>>>>>>> Instead aggregate the basic clock types functionality into one
+>>>>>>> clock and just use this clock for all operations. This clock
+>>>>>>> type re-uses the functionality of basic clock types and not
+>>>>>>> limited to basic clock types but any hardware-specific
+>>>>>>> implementation.
+>>>>>>>
+>>>>>>> diff --git a/drivers/clk/clk-composite.c
+>>>>>>>
+>>>>>>> +static u8 clk_composite_get_parent(struct clk_hw *hw)
+>>>>>>> +{
+>>>>>>> +     struct clk_composite *composite = to_clk_composite(hw);
+>>>>>>> +     const struct clk_ops *mux_ops = composite->mux_ops;
+>>>>>>> +     struct clk_hw *mux_hw = composite->mux_hw;
+>>>>>>> +
+>>>>>>> +     mux_hw->clk = hw->clk;
+>>>>>> Why is this needed? Looks like this filed is already being initialized
+>>>>>> in clk_register_composite.
+>>>>> Some ops will get called during clk_init where this clk is not populated
+>>>>> hence doing here. I have done it for all ops to make sure that any
+>>>>> future change in clock framework don't break this clock.
+>>>>> Now, why duplicate it in clk_register_composite? It is possible that
+>>>>> none of these ops get called in clk_init.
+>>>>> For example, recalc_rate is called during init and this ops is supported
+>>>>> by div clock type, but what if div clock is not added.
+>>>>>
+>>>>> I hope this explains the need.
+>>>> Sorry, I don't understand your explanation.
+>>>>
+>>>> I have asked why mux_hw->clk field has to be reinitialized in all the
+>>>> ops.
+>>>>
+>>>> In other words, is it even possible that this clk pointer changes since
+>>>> calling clk_register from clk_register_composite and if yes, why?
+>>> Tomasz,
+>>>
+>>> calling sequence is as
+>>>
+>>> clk_register(struct clk_hw *hw)
+>>>
+>>>      clk_init(struct clk_hw *hw)
+>>>      
+>>>          .
+>>>          .
+>>>          hw->clk = clk;
+>>>          clk->ops.recalc_rate(hw) => clk_composite_recalc_rate(hw) =>
+>>>
+>>> composite->div_ops.recalc_rate(div_hw) => clk_divider_recalc_rate(hw)
+>>>
+>>> Now if clk_divider_recalc_rate tries to access clk from hw then it will
+>>> get NULL since this is not assigned yet and that is what I am doing in
+>>> clk_composite_recalc_rate.
+>>>
+>>> I am doing it in all ops because I can not assume which one will get
+>>> called first and always. If in future something changes the calling
+>>> sequence in ccf framework then it will break this clock.
+>> Surely the CCF core should be taking care of this as part of
+>> clk_register() or clk_init()?
+> Any news on this? It would be nice if this patch could be merged soon, because
+> we'd like to rework Exynos clock code to use composite clocks before merge
+> window, to have that merged for 3.10.
+>
+> If you don't have time to work on this, would you mind if I made any necessary
+> fixes, added my sign-off next to yours and posted next version myself?
 
-Never mind, coffee underflow to /dev/brain.  One drawback to mutt, can't
-view thread while typing messages...
+Tomasz,
 
-> If you prefer to take it:
-> 
-> Acked-by: Jason Cooper <jason@lakedaemon.net>
+Sorry for delayed reply. I will send the updated patch in next 2-3 days. 
+After that if any rework required you can make the changes and add your 
+sign-off.
 
-for the plat-orion/gpio.c bits and if it helps, the gpio-mvebu.c bits.
+Thanks for the patience!!
 
-thx,
+Regards,
+PrashantG
 
-Jason.
+> Best regards,
