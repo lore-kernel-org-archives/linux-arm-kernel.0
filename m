@@ -1,33 +1,33 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 19 Mar 2013 11:35:16 +0100
-Subject: [PATCH 7/7] ARM: sunxi: hackberry: Add UART muxing
-In-Reply-To: <1363689316-7847-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1363689316-7847-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1363689316-7847-8-git-send-email-maxime.ripard@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 19 Mar 2013 10:35:45 +0000
+Subject: [PATCH 3/6] ARM: remove fa526 CPU support
+In-Reply-To: <op.wt6rbsvq2s3iss@ecaz>
+References: <1363299178-8241-1-git-send-email-arnd@arndb.de>
+ <5146FB70.9000706@openwrt.org> <op.wt6rbsvq2s3iss@ecaz>
+Message-ID: <201303191035.45874.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We previously relied on the bootloader to do the muxing of the UART for
-the Hackberry. Don't rely on it anymore and use pinctrl.
+On Tuesday 19 March 2013, Imre Kaloz wrote:
+> I have two wbd111 boards, but their bootloader is fubared - for whatever
+> reason the bootloader's ethernet support works horribly for me, as in an
+> image transfer takes well over 10 mins, and 90% of the time it fails
+> meantime. I have another gemini based board, which doesn't have mainline
+> support, yet.
+> 
+> So for gemini, what I can offer is digging up the wbd111 and testing your
+> patches this weekend - if that works, it can stay in mainline for another
+> kernel release, and I can try to add support for the other board (so
+> there would be a sane platform to test on). If you are going to drop it,
+> I will likely keep it working in OpenWrt as long as those boards don't
+> die on me.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Emilio L?pez <emilio@elopez.com.ar>
----
- arch/arm/boot/dts/sun4i-a10-hackberry.dts |    2 ++
- 1 file changed, 2 insertions(+)
+Sounds good. If you are still interested in keeping the code alive, we
+shouldn't drop it upstream. Can you also add a defconfig file that
+enables all the gemini specific Kconfig code plus whatever you use
+in OpenWRT?
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-hackberry.dts b/arch/arm/boot/dts/sun4i-a10-hackberry.dts
-index 9ab6875..2046000 100644
---- a/arch/arm/boot/dts/sun4i-a10-hackberry.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-hackberry.dts
-@@ -24,6 +24,8 @@
- 
- 	soc {
- 		uart0: serial at 01c28000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&uart0_pins_a>;
- 			status = "okay";
- 		};
- 	};
--- 
-1.7.10.4
+Part of the reason why the platform was so broken is that it never had
+a defconfig, and we didn't notice the bitrot.
+
+	Arnd
