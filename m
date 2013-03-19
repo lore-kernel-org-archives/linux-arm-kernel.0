@@ -1,83 +1,79 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 19 Mar 2013 15:00:35 -0400 (EDT)
-Subject: ARM: 7653/2: do not scale loops_per_jiffy when using a constant
- delay clock
-In-Reply-To: <20130319181616.GB26713@mudshark.cambridge.arm.com>
-References: <20130306022308.GA21539@mudshark.cambridge.arm.com>
- <20130306183751.GV17833@n2100.arm.linux.org.uk>
- <20130307033221.GC25137@mudshark.cambridge.arm.com>
- <alpine.LFD.2.03.1303071417260.28820@syhkavp.arg>
- <20130319181616.GB26713@mudshark.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.03.1303191454560.3069@syhkavp.arg>
+From: achew@nvidia.com (Andrew Chew)
+Date: Tue, 19 Mar 2013 11:59:28 -0700
+Subject: [PATCH V4 4/9] ARM: EXYNOS: Provide regulator to pwm-backlight
+In-Reply-To: <1363719573-20926-1-git-send-email-achew@nvidia.com>
+References: <1363719573-20926-1-git-send-email-achew@nvidia.com>
+Message-ID: <1363719573-20926-5-git-send-email-achew@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 19 Mar 2013, Will Deacon wrote:
+The pwm-backlight driver now takes a mandatory regulator that is gotten
+during driver probe.  Initialize a dummy regulator to satisfy this
+requirement.
 
-> On Thu, Mar 07, 2013 at 06:37:30AM +0000, Nicolas Pitre wrote:
-> > On Thu, 7 Mar 2013, Will Deacon wrote:
-> > 
-> > > On the topic of this patch: I still think that we should revert it and
-> > > require cpufreq drivers to pass CPUFREQ_CONST_LOOPS in their flags (I guess
-> > > the cpu0 platform data may need extending to take some flags).
-> > 
-> > I must disagree.  The constness here is a property of the timer source 
-> > used to implement one of the udelay() providers.  Constness has no 
-> > relation with cpufreq which may or may not impact a given udelay 
-> > implementation.
-> > 
-> > > Longer term, we might want to assess the binding between timer-based 
-> > > delays and loops_per_jiffy, but that's an entirely new problem.
-> > 
-> > Actually I do think that the lpj should always be scaled regardless, as 
-> > this has meaning only for a CPU loop.  This is even more important if 
-> > there is the possibility for switching between different 
-> > implementations. The local timer based udelay implementation should 
-> > simply never factor in lpj into its delay evaluation.
-> > 
-> > So the current patch is a stop gap to fix the problem today.  When 
-> > something better is proposed we can remove this fix.
-> 
-> Ok, how about a simple change like the one below?
-> 
-> Will
-> 
-> --->8
-> 
-> diff --git a/arch/arm/include/asm/delay.h b/arch/arm/include/asm/delay.h
-> index 720799f..06777b9 100644
-> --- a/arch/arm/include/asm/delay.h
-> +++ b/arch/arm/include/asm/delay.h
-> @@ -24,7 +24,7 @@ extern struct arm_delay_ops {
->         void (*delay)(unsigned long);
->         void (*const_udelay)(unsigned long);
->         void (*udelay)(unsigned long);
-> -       bool const_clock;
-> +       unsigned long lpj;
+Signed-off-by: Andrew Chew <achew@nvidia.com>
+---
+ arch/arm/mach-exynos/mach-nuri.c      | 7 +++++++
+ arch/arm/plat-samsung/dev-backlight.c | 9 +++++++++
+ 2 files changed, 16 insertions(+)
 
-What about calling this ticks_per_jiffy so to make sure this is not 
-confused with the other lpj?
-
-
-
->  } arm_delay_ops;
->  
->  #define __delay(n)             arm_delay_ops.delay(n)
-> diff --git a/arch/arm/lib/delay.c b/arch/arm/lib/delay.c
-> index 6b93f6a..0d90ed8 100644
-> --- a/arch/arm/lib/delay.c
-> +++ b/arch/arm/lib/delay.c
-> @@ -58,7 +58,7 @@ static void __timer_delay(unsigned long cycles)
->  static void __timer_const_udelay(unsigned long xloops)
->  {
->         unsigned long long loops = xloops;
-> -       loops *= loops_per_jiffy;
-> +       loops *= arm_delay_ops.lpj;
-
-... and here that could be ticks *= arm_delay_ops.ticks_per_jiffy to 
-make it clearer as well.
-
-Otherwise this is fine with me.
-
-
-Nicolas
+diff --git a/arch/arm/mach-exynos/mach-nuri.c b/arch/arm/mach-exynos/mach-nuri.c
+index 1ea7973..35e881e 100644
+--- a/arch/arm/mach-exynos/mach-nuri.c
++++ b/arch/arm/mach-exynos/mach-nuri.c
+@@ -294,6 +294,10 @@ static void nuri_bl_exit(struct device *dev)
+ 	gpio_free(EXYNOS4_GPE2(3));
+ }
+ 
++/* Dummy regulator for pwm-backlight driver */
++static struct regulator_consumer_supply backlight_supply =
++	REGULATOR_SUPPLY("enable", "pwm-backlight");
++
+ /* nuri pwm backlight */
+ static struct platform_pwm_backlight_data nuri_backlight_data = {
+ 	.pwm_id			= 0,
+@@ -1368,6 +1372,9 @@ static void __init nuri_machine_init(void)
+ 	nuri_ehci_init();
+ 	s3c_hsotg_set_platdata(&nuri_hsotg_pdata);
+ 
++	regulator_register_always_on(-1, "backlight-enable",
++				     &backlight_supply, 1, 0);
++
+ 	/* Last */
+ 	platform_add_devices(nuri_devices, ARRAY_SIZE(nuri_devices));
+ }
+diff --git a/arch/arm/plat-samsung/dev-backlight.c b/arch/arm/plat-samsung/dev-backlight.c
+index 5f197dc..7277821 100644
+--- a/arch/arm/plat-samsung/dev-backlight.c
++++ b/arch/arm/plat-samsung/dev-backlight.c
+@@ -14,12 +14,18 @@
+ #include <linux/platform_device.h>
+ #include <linux/slab.h>
+ #include <linux/io.h>
++#include <linux/regulator/machine.h>
++#include <linux/regulator/fixed.h>
+ #include <linux/pwm_backlight.h>
+ 
+ #include <plat/devs.h>
+ #include <plat/gpio-cfg.h>
+ #include <plat/backlight.h>
+ 
++/* Dummy regulator for pwm-backlight driver */
++static struct regulator_consumer_supply backlight_supply =
++	REGULATOR_SUPPLY("enable", "pwm-backlight");
++
+ static int samsung_bl_init(struct device *dev)
+ {
+ 	int ret = 0;
+@@ -37,6 +43,9 @@ static int samsung_bl_init(struct device *dev)
+ 	/* Configure GPIO pin with specific GPIO function for PWM timer */
+ 	s3c_gpio_cfgpin(bl_gpio_info->no, bl_gpio_info->func);
+ 
++	regulator_register_always_on(-1, "backlight-enable",
++				     &backlight_supply, 1, 0);
++
+ 	return 0;
+ }
+ 
+-- 
+1.8.1.5
