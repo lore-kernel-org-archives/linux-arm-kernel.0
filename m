@@ -1,97 +1,85 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Tue, 19 Mar 2013 11:35:52 -0500
-Subject: [PATCH V4 14/18] ARM: OMAP2+: Convert ONENAND to retrieve GPMC
- settings from DT
+Date: Tue, 19 Mar 2013 11:35:55 -0500
+Subject: [PATCH V4 17/18] ARM: OMAP2+: Allow GPMC probe to complete even if CS
+ mapping fails
 In-Reply-To: <1363710956-26773-1-git-send-email-jon-hunter@ti.com>
 References: <1363710956-26773-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <1363710956-26773-15-git-send-email-jon-hunter@ti.com>
+Message-ID: <1363710956-26773-18-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When booting with device-tree, retrieve GPMC settings for ONENAND from
-the device-tree blob. This will allow us to remove all static settings
-stored in the gpmc-nand.c in the future once the migration to
-device-tree is complete.
+When the GPMC driver is probed, we call gpmc_mem_init() to see which
+chip-selects have already been configured and enabled by the boot-loader
+and allocate space for them. If we fail to allocate space for one
+chip-select, then we return failure from the probe and the GPMC driver
+will not be available.
 
-The user must now specify the ONENAND device width in the device-tree
-binding so that the GPMC can be programmed correctly. Therefore, update
-the device-tree binding documentation for ONENAND devices connected to
-the GPMC to reflect this.
+Rather than render the GPMC useless for all GPMC devices, if we fail to
+allocate space for one chip-select print a warning and disable the
+chip-select. This way other GPMC clients can still be used.
 
-Please note that this does not include GPMC timings for ONENAND. The
-timings are being calculated at runtime.
-
-There is some legacy code that only enables read wait monitoring for
-non-OMAP3 devices. There are no known OMAP3 device issues that prevent
-this feature being enabled and so when booting with device-tree use the
-wait-monitoring settings described in the device-tree blob.
+There is no downside to this approach, because all GPMC clients need to
+request a chip-select before they can use the GPMC and on requesting a
+chip-select, if memory has not already been reserved for the chip-select
+then it will be.
 
 Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 Tested-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- .../devicetree/bindings/mtd/gpmc-onenand.txt       |    3 +++
- arch/arm/mach-omap2/gpmc-onenand.c                 |   21 ++++++++++++++------
- 2 files changed, 18 insertions(+), 6 deletions(-)
+ arch/arm/mach-omap2/gpmc.c |   24 +++++++-----------------
+ 1 file changed, 7 insertions(+), 17 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/mtd/gpmc-onenand.txt b/Documentation/devicetree/bindings/mtd/gpmc-onenand.txt
-index deec9da..b752942 100644
---- a/Documentation/devicetree/bindings/mtd/gpmc-onenand.txt
-+++ b/Documentation/devicetree/bindings/mtd/gpmc-onenand.txt
-@@ -10,6 +10,8 @@ Documentation/devicetree/bindings/bus/ti-gpmc.txt
- Required properties:
+diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+index ebb88cf..9208d8e 100644
+--- a/arch/arm/mach-omap2/gpmc.c
++++ b/arch/arm/mach-omap2/gpmc.c
+@@ -785,9 +785,9 @@ static void gpmc_mem_exit(void)
  
-  - reg:			The CS line the peripheral is connected to
-+ - gpmc,device-width	Width of the ONENAND device connected to the GPMC
-+			in bytes. Must be 1 or 2.
+ }
  
- Optional properties:
+-static int gpmc_mem_init(void)
++static void gpmc_mem_init(void)
+ {
+-	int cs, rc;
++	int cs;
  
-@@ -34,6 +36,7 @@ Example for an OMAP3430 board:
- 
- 		onenand at 0 {
- 			reg = <0 0 0>; /* CS0, offset 0 */
-+			gpmc,device-width = <2>;
- 
- 			#address-cells = <1>;
- 			#size-cells = <1>;
-diff --git a/arch/arm/mach-omap2/gpmc-onenand.c b/arch/arm/mach-omap2/gpmc-onenand.c
-index 46aac83..64b5a83 100644
---- a/arch/arm/mach-omap2/gpmc-onenand.c
-+++ b/arch/arm/mach-omap2/gpmc-onenand.c
-@@ -272,6 +272,10 @@ static int omap2_onenand_setup_async(void __iomem *onenand_base)
- 	struct gpmc_timings t;
- 	int ret;
- 
-+	if (gpmc_onenand_data->of_node)
-+		gpmc_read_settings_dt(gpmc_onenand_data->of_node,
-+				      &onenand_async);
-+
- 	omap2_onenand_set_async_mode(onenand_base);
- 
- 	omap2_onenand_calc_async_timings(&t);
-@@ -300,12 +304,17 @@ static int omap2_onenand_setup_sync(void __iomem *onenand_base, int *freq_ptr)
- 		set_onenand_cfg(onenand_base);
+ 	/*
+ 	 * The first 1MB of GPMC address space is typically mapped to
+@@ -804,16 +804,12 @@ static int gpmc_mem_init(void)
+ 		if (!gpmc_cs_mem_enabled(cs))
+ 			continue;
+ 		gpmc_cs_get_memconf(cs, &base, &size);
+-		rc = gpmc_cs_insert_mem(cs, base, size);
+-		if (rc < 0) {
+-			while (--cs >= 0)
+-				if (gpmc_cs_mem_enabled(cs))
+-					gpmc_cs_delete_mem(cs);
+-			return rc;
++		if (gpmc_cs_insert_mem(cs, base, size)) {
++			pr_warn("%s: disabling cs %d mapped at 0x%x-0x%x\n",
++				__func__, cs, base, base + size);
++			gpmc_cs_disable_mem(cs);
+ 		}
  	}
+-
+-	return 0;
+ }
  
--	/*
--	 * FIXME: Appears to be legacy code from initial ONENAND commit.
--	 * Unclear what boards this is for and if this can be removed.
--	 */
--	if (!cpu_is_omap34xx())
--		onenand_sync.wait_on_read = true;
-+	if (gpmc_onenand_data->of_node) {
-+		gpmc_read_settings_dt(gpmc_onenand_data->of_node,
-+				      &onenand_sync);
-+	} else {
-+		/*
-+		 * FIXME: Appears to be legacy code from initial ONENAND commit.
-+		 * Unclear what boards this is for and if this can be removed.
-+		 */
-+		if (!cpu_is_omap34xx())
-+			onenand_sync.wait_on_read = true;
-+	}
+ static u32 gpmc_round_ps_to_sync_clk(u32 time_ps, u32 sync_clk)
+@@ -1611,13 +1607,7 @@ static int gpmc_probe(struct platform_device *pdev)
+ 	dev_info(gpmc_dev, "GPMC revision %d.%d\n", GPMC_REVISION_MAJOR(l),
+ 		 GPMC_REVISION_MINOR(l));
  
- 	omap2_onenand_calc_sync_timings(&t, gpmc_onenand_data->flags, freq);
+-	rc = gpmc_mem_init();
+-	if (rc < 0) {
+-		clk_disable_unprepare(gpmc_l3_clk);
+-		clk_put(gpmc_l3_clk);
+-		dev_err(gpmc_dev, "failed to reserve memory\n");
+-		return rc;
+-	}
++	gpmc_mem_init();
  
+ 	if (gpmc_setup_irq() < 0)
+ 		dev_warn(gpmc_dev, "gpmc_setup_irq failed\n");
 -- 
 1.7.10.4
