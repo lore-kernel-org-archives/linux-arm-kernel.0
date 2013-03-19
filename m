@@ -1,172 +1,107 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 19 Mar 2013 16:25:33 +0900
-Subject: [PATCH 01/03] ARM: shmobile: APE6EVM base support V2
-In-Reply-To: <20130318151002.28231.37531.sendpatchset@w520>
-References: <20130318150953.28231.73454.sendpatchset@w520>
- <20130318151002.28231.37531.sendpatchset@w520>
-Message-ID: <20130319072532.GA19741@verge.net.au>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Tue, 19 Mar 2013 15:41:06 +0800
+Subject: [PATCH v7 00/14] spi/spi-atmel: add dmaengine support for atmel spi
+ controller and to test the device tree support
+Message-ID: <1363678866-3567-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 19, 2013 at 12:10:02AM +0900, Magnus Damm wrote:
-> From: Magnus Damm <damm@opensource.se>
-> 
-> V2 of APE6EVM base board support making use of
-> 1 GiB of memory, the SCIFA0 serial port and 
-> ARM architected timer.
-> 
-> Signed-off-by: Magnus Damm <damm@opensource.se>
-> ---
-> 
->  Changes since V1:
->  - Sorted headers
->  - Use ape6evm_add_standard_devices() to setup SoC devices and clocks
-> 
->   Written against "next" renesas.git 811689afc214564c4a5f238ecf4d8bdc0e52b615
->  
->  Depends on the following series:
->  [PATCH 00/04] ARM: shmobile: r8a73a4 SoC support V2
-> 
->  Does not depend on:
->  [PATCH 00/02] sh-pfc: Initial r8a73a4 PFC support
-> 
-> arch/arm/boot/dts/Makefile             |    1 
->  arch/arm/boot/dts/r8a73a4-ape6evm.dts  |   26 ++++++++++++++++++
->  arch/arm/mach-shmobile/Kconfig         |    8 ++++-
->  arch/arm/mach-shmobile/Makefile        |    1 
->  arch/arm/mach-shmobile/board-ape6evm.c |   46 ++++++++++++++++++++++++++++++++
->  5 files changed, 81 insertions(+), 1 deletion(-)
-> 
-> --- 0001/arch/arm/boot/dts/Makefile
-> +++ work/arch/arm/boot/dts/Makefile	2013-03-18 21:44:34.000000000 +0900
-> @@ -139,6 +139,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE) += emev2-kzm
->  	r8a7779-marzen-reference.dtb \
->  	sh73a0-kzm9g.dtb \
->  	sh73a0-kzm9g-reference.dtb \
-> +	r8a73a4-ape6evm.dtb \
->  	sh7372-mackerel.dtb
->  dtb-$(CONFIG_ARCH_SOCFPGA) += socfpga_cyclone5.dtb \
->  	socfpga_vt.dtb
-> --- /dev/null
-> +++ work/arch/arm/boot/dts/r8a73a4-ape6evm.dts	2013-03-18 21:44:35.000000000 +0900
-> @@ -0,0 +1,26 @@
-> +/*
-> + * Device Tree Source for the APE6EVM board
-> + *
-> + * Copyright (C) 2013 Renesas Solutions Corp.
-> + *
-> + * This file is licensed under the terms of the GNU General Public License
-> + * version 2.  This program is licensed "as is" without any warranty of any
-> + * kind, whether express or implied.
-> + */
-> +
-> +/dts-v1/;
-> +/include/ "r8a73a4.dtsi"
-> +
-> +/ {
-> +	model = "APE6EVM";
-> +	compatible = "renesas,ape6evm", "renesas,r8a73a4";
-> +
-> +	chosen {
-> +		bootargs = "console=ttySC0,115200 ignore_loglevel";
+Hi All, 
 
-I think that earlyprintk=sh-sci.0,11520 go in here.
+This set of patches is to add dmaengine support for atmel spi and to test device tree support.
 
-> +	};
-> +
-> +	memory at 40000000 {
-> +		device_type = "memory";
-> +		reg = <0x40000000 0x40000000>;
-> +	};
-> +};
-> --- 0007/arch/arm/mach-shmobile/Kconfig
-> +++ work/arch/arm/mach-shmobile/Kconfig	2013-03-18 21:44:34.000000000 +0900
-> @@ -79,6 +79,11 @@ config MACH_AG5EVM
->  	select REGULATOR_FIXED_VOLTAGE if REGULATOR
->  	select SH_LCD_MIPI_DSI
->  
-> +config MACH_APE6EVM
-> +	bool "APE6EVM board"
-> +	depends on ARCH_R8A73A4
-> +	select USE_OF
-> +
->  config MACH_MACKEREL
->  	bool "mackerel board"
->  	depends on ARCH_SH7372
-> @@ -166,7 +171,7 @@ config MEMORY_START
->  	hex "Physical memory start address"
->  	default "0x40000000" if MACH_AP4EVB || MACH_AG5EVM || \
->  				MACH_MACKEREL || MACH_BONITO || \
-> -				MACH_ARMADILLO800EVA
-> +				MACH_ARMADILLO800EVA || MACH_APE6EVM
->  	default "0x41000000" if MACH_KOTA2
->  	default "0x00000000"
->  	---help---
-> @@ -176,6 +181,7 @@ config MEMORY_START
->  
->  config MEMORY_SIZE
->  	hex "Physical memory size"
-> +	default "0x40000000" if MACH_APE6EVM
->  	default "0x20000000" if MACH_AG5EVM || MACH_BONITO || \
->  				MACH_ARMADILLO800EVA
->  	default "0x1e000000" if MACH_KOTA2
-> --- 0003/arch/arm/mach-shmobile/Makefile
-> +++ work/arch/arm/mach-shmobile/Makefile	2013-03-18 21:44:34.000000000 +0900
-> @@ -35,6 +35,7 @@ obj-$(CONFIG_ARCH_SH73A0)	+= pm-sh73a0.o
->  # Board objects
->  obj-$(CONFIG_MACH_AP4EVB)	+= board-ap4evb.o
->  obj-$(CONFIG_MACH_AG5EVM)	+= board-ag5evm.o
-> +obj-$(CONFIG_MACH_APE6EVM)	+= board-ape6evm.o
->  obj-$(CONFIG_MACH_MACKEREL)	+= board-mackerel.o
->  obj-$(CONFIG_MACH_KOTA2)	+= board-kota2.o
->  obj-$(CONFIG_MACH_BONITO)	+= board-bonito.o
-> --- /dev/null
-> +++ work/arch/arm/mach-shmobile/board-ape6evm.c	2013-03-18 21:45:34.000000000 +0900
-> @@ -0,0 +1,46 @@
-> +/*
-> + * APE6EVM board support
-> + *
-> + * Copyright (C) 2013  Renesas Solutions Corp.
-> + * Copyright (C) 2013  Magnus Damm
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; version 2 of the License.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-> + */
-> +
-> +#include <linux/interrupt.h>
-> +#include <linux/irqchip.h>
-> +#include <linux/kernel.h>
-> +#include <linux/platform_device.h>
-> +#include <mach/common.h>
-> +#include <mach/r8a73a4.h>
-> +#include <asm/mach-types.h>
-> +#include <asm/mach/arch.h>
-> +
-> +static void __init ape6evm_add_standard_devices(void)
-> +{
-> +	r8a73a4_clock_init();
-> +	r8a73a4_add_standard_devices();
-> +}
-> +
-> +static const char *ape6evm_boards_compat_dt[] __initdata = {
-> +	"renesas,ape6evm",
-> +	NULL,
-> +};
-> +
-> +DT_MACHINE_START(APE6EVM_DT, "ape6evm")
-> +	.init_irq	= irqchip_init,
-> +	.init_time	= shmobile_timer_init,
-> +	.init_machine	= ape6evm_add_standard_devices,
-> +	.dt_compat	= ape6evm_boards_compat_dt,
-> +MACHINE_END
-> 
+The work is based on Nicolas and Richard's work.
+
+Because the dma engine device tree support isn't available now, to at91sam9x5ek and at91sam9n12ek
+with dma support, it doesn't work on the dmaengine mode, only on PIO mode so far.
+
+It has been tested as below:
+ 1./tested on v3.9-rc3, by using mtd utils, "mount", "umount" and "cp" commands.
+ 2./tested on "spi/next" git tree after changing master->num_chipselect which fixed in v3.9-rc1.
+ 3./tested by using Documentation/spi/spidev_test.c on "/dev/spidev".
+ 4./tested on on at91sam9x5ek, at91sam9m10g45ek, at91sam9263ek and at91sam9g20ek boards.
+
+It is based on v3.9-rc3 + Joachim Eastwood's spi/atmel: fix speed_hz check in atmel_spi_transfer().
+
+Changelog:
+v7:
+     1./ remove patch: fix probing failure after xfer->speed_hz set.
+     2./ remove patch: add pinctrl support for atmel spi.
+
+v6:
+     1./ remove: fix master->num_chipselect wrongly set patch which isn't a issue in v3.9-rc1.
+     2./ fix probing failure after xfer->speed_hz set.
+
+v5:
+     1./ add pinctrl patches.
+     2./ detect capabilities by reading spi version register to replace multiple compatiles.
+     3./ change the "cs-gpios" property of spi node.
+     4./ rebase on v3.8.
+
+v4:
+     1./ Take Joe Perches's adivce, rewrite atmel_spi_is_v2(struct atmel_spi *as) 
+         and atmel_spi_use_dma(struct atmel_spi *as),
+	 and remove atmel_spi_use_pdc(struct atmel_spi *as).
+     2./ Rebase on v3.8-rc3.
+
+V3:
+     1./ Rebase on v3.8-rc2.
+     2./ Remove some Jean-Christophe's patches which has been applied on v3.8-rc2.
+     3./ Remove spi property "cs-gpios" from the SoC dtsi files to the board dts files
+         to avoid some useless pin conflicts.
+
+v2: 
+     1./ Remove the patch :PATCH]mtd: m25p80: change the m25p80_read to reading page to page
+	 which purpose to fix the BUG: when run "flashcp /bin/busybox /dev/mtdX" in the at91sam9g25ek
+	 with DMA mode, it arises a OOPS. Now fix it in this patch:
+	    [PATHC] spi/atmel_spi: add dmaengine support changing to fix the [BUG].
+     2./ Remove two patches:
+   	    which purpose to read dts property to select SPI IP version and DMA mode
+	    Now they will be gat from device tree different compatile.
+     3./ Fix DMA: when enable both spi0 AND spi1, the spi0 doesn't work BUG.
+     4./ Rebase v3.7-rc8.
+
+Best Regards,
+Wenyou Yang.
+
+
+Nicolas Ferre (5):
+  spi/spi-atmel: add physical base address
+  spi/spi-atmel: call unmapping on transfers buffers
+  spi/spi-atmel: status information passed through controller data
+  spi/spi-atmel: add flag to controller data for lock operations
+  spi/spi-atmel: add dmaengine support
+
+Richard Genoud (6):
+  spi/spi-atmel: fix spi-atmel driver to adapt to slave_config changes
+  spi/spi-atmel: correct 16 bits transfers using PIO
+  spi/spi-atmel: correct 16 bits transfers with DMA
+  ARM: at91: add clocks for spi dt entries
+  ARM: dts: add spi nodes for atmel SoC
+  ARM: dts: add spi nodes for the atmel boards
+
+Wenyou Yang (3):
+  spi/spi-atmel: detect the capabilities of SPI core by reading the
+    VERSION register.
+  spi/spi-atmel: add support transfer on CS1,2,3, not only on CS0
+  ARM: dts: add pinctrl property for spi node for atmel SoC
+
+ arch/arm/boot/dts/at91sam9260.dtsi          |   40 ++
+ arch/arm/boot/dts/at91sam9263.dtsi          |   40 ++
+ arch/arm/boot/dts/at91sam9263ek.dts         |   10 +
+ arch/arm/boot/dts/at91sam9g20ek_common.dtsi |   10 +
+ arch/arm/boot/dts/at91sam9g45.dtsi          |   40 ++
+ arch/arm/boot/dts/at91sam9m10g45ek.dts      |   10 +
+ arch/arm/boot/dts/at91sam9n12.dtsi          |   40 ++
+ arch/arm/boot/dts/at91sam9n12ek.dts         |   10 +
+ arch/arm/boot/dts/at91sam9x5.dtsi           |   40 ++
+ arch/arm/boot/dts/at91sam9x5ek.dtsi         |   10 +
+ arch/arm/mach-at91/at91sam9260.c            |    2 +
+ arch/arm/mach-at91/at91sam9g45.c            |    2 +
+ arch/arm/mach-at91/at91sam9n12.c            |    2 +
+ arch/arm/mach-at91/at91sam9x5.c             |    2 +
+ drivers/spi/spi-atmel.c                     |  753 ++++++++++++++++++++++++---
+ 15 files changed, 945 insertions(+), 66 deletions(-)
+
+-- 
+1.7.9.5
