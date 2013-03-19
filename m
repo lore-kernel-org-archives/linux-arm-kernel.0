@@ -1,473 +1,560 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 19 Mar 2013 17:38:21 +0000
-Subject: [PATCH v3 2/4] arm: Move chained_irq_(enter|exit) to a generic file
+Date: Tue, 19 Mar 2013 17:38:23 +0000
+Subject: [PATCH v3 4/4] irqchip: gic: Perform the gic_secondary_init() call
+ via CPU notifier
 In-Reply-To: <1363714703-9629-1-git-send-email-catalin.marinas@arm.com>
 References: <1363714703-9629-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1363714703-9629-3-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1363714703-9629-5-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These functions have been introduced by commit 10a8c383 (irq: introduce
-entry and exit functions for chained handlers) in asm/mach/irq.h. This
-patch moves them to linux/irqchip/chained_irq.h so that generic irqchip
-drivers do not rely on architecture specific header files.
+All the calls to gic_secondary_init() pass 0 as the first argument.
+Since this function is called on each CPU when starting, it can be done
+in a platform-independent way via a CPU notifier registered by the GIC
+code.
 
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Acked-by: Stephen Warren <swarren@nvidia.com>
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Acked-by: Rob Herring <rob.herring@calxeda.com>
+Acked-by: Simon Horman <horms+renesas@verge.net.au>
+Tested-by: Simon Horman <horms+renesas@verge.net.au>
+Acked-by: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
+Tested-by: Dinh Nguyen <dinguyen@altera.com>
+Acked-by: Nicolas Pitre <nico@linaro.org>
 Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: David Brown <davidb@codeaurora.org>
+Cc: Bryan Huntsman <bryanh@codeaurora.org>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Magnus Damm <magnus.damm@gmail.com>
+Cc: Shiraz Hashim <shiraz.hashim@st.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Barry Song <baohua.song@csr.com>
 ---
- arch/arm/include/asm/mach/irq.h             | 31 -----------------
- arch/arm/mach-at91/gpio.c                   |  3 +-
- arch/arm/mach-exynos/common.c               |  1 +
- arch/arm/mach-s3c24xx/irq.c                 |  1 +
- arch/arm/plat-samsung/irq-vic-timer.c       |  3 +-
- arch/arm/plat-samsung/s5p-irq-gpioint.c     |  3 +-
- drivers/gpio/gpio-msm-v2.c                  |  3 +-
- drivers/gpio/gpio-mxc.c                     |  2 +-
- drivers/gpio/gpio-omap.c                    |  3 +-
- drivers/gpio/gpio-pl061.c                   |  2 +-
- drivers/gpio/gpio-pxa.c                     |  3 +-
- drivers/gpio/gpio-tegra.c                   |  3 +-
- drivers/irqchip/exynos-combiner.c           |  1 +
- drivers/irqchip/irq-gic.c                   |  1 +
- drivers/pinctrl/pinctrl-at91.c              |  3 +-
- drivers/pinctrl/pinctrl-exynos.c            |  3 +-
- drivers/pinctrl/pinctrl-nomadik.c           |  2 +-
- drivers/pinctrl/pinctrl-sirf.c              |  2 +-
- drivers/pinctrl/spear/pinctrl-plgpio.c      |  2 +-
- drivers/staging/imx-drm/ipu-v3/ipu-common.c |  2 +-
- include/linux/irqchip/chained_irq.h         | 52 +++++++++++++++++++++++++++++
- 21 files changed, 71 insertions(+), 55 deletions(-)
- create mode 100644 include/linux/irqchip/chained_irq.h
+ arch/arm/mach-exynos/platsmp.c       |  8 --------
+ arch/arm/mach-highbank/platsmp.c     |  7 -------
+ arch/arm/mach-imx/platsmp.c          | 12 ------------
+ arch/arm/mach-msm/platsmp.c          |  8 --------
+ arch/arm/mach-omap2/omap-smp.c       |  7 -------
+ arch/arm/mach-prima2/platsmp.c       |  8 --------
+ arch/arm/mach-shmobile/smp-emev2.c   |  7 -------
+ arch/arm/mach-shmobile/smp-r8a7779.c |  7 -------
+ arch/arm/mach-shmobile/smp-sh73a0.c  |  7 -------
+ arch/arm/mach-socfpga/platsmp.c      | 12 ------------
+ arch/arm/mach-spear13xx/platsmp.c    |  8 --------
+ arch/arm/mach-tegra/platsmp.c        |  8 --------
+ arch/arm/mach-ux500/platsmp.c        |  8 --------
+ arch/arm/mach-virt/platsmp.c         |  8 --------
+ arch/arm/plat-versatile/platsmp.c    |  8 --------
+ drivers/irqchip/irq-gic.c            | 28 +++++++++++++++++++++-------
+ include/linux/irqchip/arm-gic.h      |  1 -
+ 17 files changed, 21 insertions(+), 131 deletions(-)
 
-diff --git a/arch/arm/include/asm/mach/irq.h b/arch/arm/include/asm/mach/irq.h
-index 749d505..2092ee1 100644
---- a/arch/arm/include/asm/mach/irq.h
-+++ b/arch/arm/include/asm/mach/irq.h
-@@ -30,35 +30,4 @@ do {							\
- 	raw_spin_unlock(&desc->lock);			\
- } while(0)
- 
--#ifndef __ASSEMBLY__
--/*
-- * Entry/exit functions for chained handlers where the primary IRQ chip
-- * may implement either fasteoi or level-trigger flow control.
-- */
--static inline void chained_irq_enter(struct irq_chip *chip,
--				     struct irq_desc *desc)
--{
--	/* FastEOI controllers require no action on entry. */
--	if (chip->irq_eoi)
--		return;
--
--	if (chip->irq_mask_ack) {
--		chip->irq_mask_ack(&desc->irq_data);
--	} else {
--		chip->irq_mask(&desc->irq_data);
--		if (chip->irq_ack)
--			chip->irq_ack(&desc->irq_data);
--	}
--}
--
--static inline void chained_irq_exit(struct irq_chip *chip,
--				    struct irq_desc *desc)
--{
--	if (chip->irq_eoi)
--		chip->irq_eoi(&desc->irq_data);
--	else
--		chip->irq_unmask(&desc->irq_data);
--}
--#endif
--
- #endif
-diff --git a/arch/arm/mach-at91/gpio.c b/arch/arm/mach-at91/gpio.c
-index c5d7e1e..a5afcf7 100644
---- a/arch/arm/mach-at91/gpio.c
-+++ b/arch/arm/mach-at91/gpio.c
-@@ -22,10 +22,9 @@
- #include <linux/module.h>
+diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+index 60f7c5b..95e04bd 100644
+--- a/arch/arm/mach-exynos/platsmp.c
++++ b/arch/arm/mach-exynos/platsmp.c
+@@ -20,7 +20,6 @@
+ #include <linux/jiffies.h>
+ #include <linux/smp.h>
  #include <linux/io.h>
- #include <linux/irqdomain.h>
-+#include <linux/irqchip/chained_irq.h>
- #include <linux/of_address.h>
+-#include <linux/irqchip/arm-gic.h>
  
--#include <asm/mach/irq.h>
--
- #include <mach/hardware.h>
- #include <mach/at91_pio.h>
- 
-diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-index d63d399..7bc0f9a 100644
---- a/arch/arm/mach-exynos/common.c
-+++ b/arch/arm/mach-exynos/common.c
-@@ -26,6 +26,7 @@
- #include <linux/irqchip.h>
- #include <linux/of_address.h>
- #include <linux/irqchip/arm-gic.h>
-+#include <linux/irqchip/chained_irq.h>
- 
- #include <asm/proc-fns.h>
- #include <asm/exception.h>
-diff --git a/arch/arm/mach-s3c24xx/irq.c b/arch/arm/mach-s3c24xx/irq.c
-index cb9f5e0..b6fac28 100644
---- a/arch/arm/mach-s3c24xx/irq.c
-+++ b/arch/arm/mach-s3c24xx/irq.c
-@@ -25,6 +25,7 @@
- #include <linux/ioport.h>
- #include <linux/device.h>
- #include <linux/irqdomain.h>
-+#include <linux/irqchip/chained_irq.h>
- 
- #include <asm/mach/irq.h>
- 
-diff --git a/arch/arm/plat-samsung/irq-vic-timer.c b/arch/arm/plat-samsung/irq-vic-timer.c
-index f980cf3..5d205e7 100644
---- a/arch/arm/plat-samsung/irq-vic-timer.c
-+++ b/arch/arm/plat-samsung/irq-vic-timer.c
-@@ -16,6 +16,7 @@
- #include <linux/kernel.h>
- #include <linux/interrupt.h>
- #include <linux/irq.h>
-+#include <linux/irqchip/chained_irq.h>
- #include <linux/io.h>
- 
- #include <mach/map.h>
-@@ -23,8 +24,6 @@
- #include <plat/irq-vic-timer.h>
- #include <plat/regs-timer.h>
- 
--#include <asm/mach/irq.h>
--
- static void s3c_irq_demux_vic_timer(unsigned int irq, struct irq_desc *desc)
+ #include <asm/cacheflush.h>
+ #include <asm/smp_plat.h>
+@@ -76,13 +75,6 @@ static DEFINE_SPINLOCK(boot_lock);
+ static void __cpuinit exynos_secondary_init(unsigned int cpu)
  {
- 	struct irq_chip *chip = irq_get_chip(irq);
-diff --git a/arch/arm/plat-samsung/s5p-irq-gpioint.c b/arch/arm/plat-samsung/s5p-irq-gpioint.c
-index bae5613..fafdb05 100644
---- a/arch/arm/plat-samsung/s5p-irq-gpioint.c
-+++ b/arch/arm/plat-samsung/s5p-irq-gpioint.c
-@@ -14,6 +14,7 @@
- #include <linux/kernel.h>
- #include <linux/interrupt.h>
- #include <linux/irq.h>
-+#include <linux/irqchip/chained_irq.h>
- #include <linux/io.h>
- #include <linux/gpio.h>
- #include <linux/slab.h>
-@@ -22,8 +23,6 @@
- #include <plat/gpio-core.h>
- #include <plat/gpio-cfg.h>
- 
--#include <asm/mach/irq.h>
+ 	/*
+-	 * if any interrupts are already enabled for the primary
+-	 * core (e.g. timer irq), then they will not have been enabled
+-	 * for us: do so
+-	 */
+-	gic_secondary_init(0);
 -
- #define GPIO_BASE(chip)		((void __iomem *)((unsigned long)((chip)->base) & 0xFFFFF000u))
- 
- #define CON_OFFSET		0x700
-diff --git a/drivers/gpio/gpio-msm-v2.c b/drivers/gpio/gpio-msm-v2.c
-index 55a7e77..dd2edde 100644
---- a/drivers/gpio/gpio-msm-v2.c
-+++ b/drivers/gpio/gpio-msm-v2.c
-@@ -23,13 +23,12 @@
+-	/*
+ 	 * let the primary processor know we're out of the
+ 	 * pen, then head off into the C entry point
+ 	 */
+diff --git a/arch/arm/mach-highbank/platsmp.c b/arch/arm/mach-highbank/platsmp.c
+index 8797a70..a984573 100644
+--- a/arch/arm/mach-highbank/platsmp.c
++++ b/arch/arm/mach-highbank/platsmp.c
+@@ -17,7 +17,6 @@
  #include <linux/init.h>
- #include <linux/interrupt.h>
+ #include <linux/smp.h>
  #include <linux/io.h>
-+#include <linux/irqchip/chained_irq.h>
- #include <linux/irq.h>
- #include <linux/module.h>
- #include <linux/platform_device.h>
- #include <linux/spinlock.h>
+-#include <linux/irqchip/arm-gic.h>
  
--#include <asm/mach/irq.h>
+ #include <asm/smp_scu.h>
+ 
+@@ -25,11 +24,6 @@
+ 
+ extern void secondary_startup(void);
+ 
+-static void __cpuinit highbank_secondary_init(unsigned int cpu)
+-{
+-	gic_secondary_init(0);
+-}
 -
- #include <mach/msm_gpiomux.h>
- #include <mach/msm_iomap.h>
+ static int __cpuinit highbank_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ {
+ 	highbank_set_cpu_jump(cpu, secondary_startup);
+@@ -67,7 +61,6 @@ static void __init highbank_smp_prepare_cpus(unsigned int max_cpus)
+ struct smp_operations highbank_smp_ops __initdata = {
+ 	.smp_init_cpus		= highbank_smp_init_cpus,
+ 	.smp_prepare_cpus	= highbank_smp_prepare_cpus,
+-	.smp_secondary_init	= highbank_secondary_init,
+ 	.smp_boot_secondary	= highbank_boot_secondary,
+ #ifdef CONFIG_HOTPLUG_CPU
+ 	.cpu_die		= highbank_cpu_die,
+diff --git a/arch/arm/mach-imx/platsmp.c b/arch/arm/mach-imx/platsmp.c
+index 7c0b03f..77e9a25 100644
+--- a/arch/arm/mach-imx/platsmp.c
++++ b/arch/arm/mach-imx/platsmp.c
+@@ -12,7 +12,6 @@
  
-diff --git a/drivers/gpio/gpio-mxc.c b/drivers/gpio/gpio-mxc.c
-index 7877335..7176743 100644
---- a/drivers/gpio/gpio-mxc.c
-+++ b/drivers/gpio/gpio-mxc.c
-@@ -24,6 +24,7 @@
+ #include <linux/init.h>
+ #include <linux/smp.h>
+-#include <linux/irqchip/arm-gic.h>
+ #include <asm/page.h>
+ #include <asm/smp_scu.h>
+ #include <asm/mach/map.h>
+@@ -52,16 +51,6 @@ void imx_scu_standby_enable(void)
+ 	writel_relaxed(val, scu_base);
+ }
+ 
+-static void __cpuinit imx_secondary_init(unsigned int cpu)
+-{
+-	/*
+-	 * if any interrupts are already enabled for the primary
+-	 * core (e.g. timer irq), then they will not have been enabled
+-	 * for us: do so
+-	 */
+-	gic_secondary_init(0);
+-}
+-
+ static int __cpuinit imx_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ {
+ 	imx_set_cpu_jump(cpu, v7_secondary_startup);
+@@ -96,7 +85,6 @@ static void __init imx_smp_prepare_cpus(unsigned int max_cpus)
+ struct smp_operations  imx_smp_ops __initdata = {
+ 	.smp_init_cpus		= imx_smp_init_cpus,
+ 	.smp_prepare_cpus	= imx_smp_prepare_cpus,
+-	.smp_secondary_init	= imx_secondary_init,
+ 	.smp_boot_secondary	= imx_boot_secondary,
+ #ifdef CONFIG_HOTPLUG_CPU
+ 	.cpu_die		= imx_cpu_die,
+diff --git a/arch/arm/mach-msm/platsmp.c b/arch/arm/mach-msm/platsmp.c
+index 42932865..00cdb0a 100644
+--- a/arch/arm/mach-msm/platsmp.c
++++ b/arch/arm/mach-msm/platsmp.c
+@@ -15,7 +15,6 @@
+ #include <linux/jiffies.h>
+ #include <linux/smp.h>
  #include <linux/io.h>
- #include <linux/irq.h>
- #include <linux/irqdomain.h>
-+#include <linux/irqchip/chained_irq.h>
- #include <linux/gpio.h>
- #include <linux/platform_device.h>
- #include <linux/slab.h>
-@@ -32,7 +33,6 @@
- #include <linux/of_device.h>
- #include <linux/module.h>
- #include <asm-generic/bug.h>
--#include <asm/mach/irq.h>
+-#include <linux/irqchip/arm-gic.h>
  
- enum mxc_gpio_hwtype {
- 	IMX1_GPIO,	/* runs on i.mx1 */
-diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index 159f5c5..a612ea1 100644
---- a/drivers/gpio/gpio-omap.c
-+++ b/drivers/gpio/gpio-omap.c
-@@ -25,11 +25,10 @@
+ #include <asm/cacheflush.h>
+ #include <asm/cputype.h>
+@@ -42,13 +41,6 @@ static inline int get_core_count(void)
+ static void __cpuinit msm_secondary_init(unsigned int cpu)
+ {
+ 	/*
+-	 * if any interrupts are already enabled for the primary
+-	 * core (e.g. timer irq), then they will not have been enabled
+-	 * for us: do so
+-	 */
+-	gic_secondary_init(0);
+-
+-	/*
+ 	 * let the primary processor know we're out of the
+ 	 * pen, then head off into the C entry point
+ 	 */
+diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
+index d972721..e7a4497 100644
+--- a/arch/arm/mach-omap2/omap-smp.c
++++ b/arch/arm/mach-omap2/omap-smp.c
+@@ -67,13 +67,6 @@ static void __cpuinit omap4_secondary_init(unsigned int cpu)
+ 							4, 0, 0, 0, 0, 0);
+ 
+ 	/*
+-	 * If any interrupts are already enabled for the primary
+-	 * core (e.g. timer irq), then they will not have been enabled
+-	 * for us: do so
+-	 */
+-	gic_secondary_init(0);
+-
+-	/*
+ 	 * Synchronise with the boot thread.
+ 	 */
+ 	spin_lock(&boot_lock);
+diff --git a/arch/arm/mach-prima2/platsmp.c b/arch/arm/mach-prima2/platsmp.c
+index 4b78831..c7c92e7 100644
+--- a/arch/arm/mach-prima2/platsmp.c
++++ b/arch/arm/mach-prima2/platsmp.c
+@@ -11,7 +11,6 @@
+ #include <linux/delay.h>
  #include <linux/of.h>
- #include <linux/of_device.h>
- #include <linux/irqdomain.h>
-+#include <linux/irqchip/chained_irq.h>
- #include <linux/gpio.h>
- #include <linux/platform_data/gpio-omap.h>
- 
--#include <asm/mach/irq.h>
--
- #define OFF_MODE	1
- 
- static LIST_HEAD(omap_gpio_list);
-diff --git a/drivers/gpio/gpio-pl061.c b/drivers/gpio/gpio-pl061.c
-index b820869..2976336 100644
---- a/drivers/gpio/gpio-pl061.c
-+++ b/drivers/gpio/gpio-pl061.c
-@@ -15,6 +15,7 @@
- #include <linux/io.h>
- #include <linux/ioport.h>
- #include <linux/irq.h>
-+#include <linux/irqchip/chained_irq.h>
- #include <linux/bitops.h>
- #include <linux/workqueue.h>
- #include <linux/gpio.h>
-@@ -23,7 +24,6 @@
- #include <linux/amba/pl061.h>
- #include <linux/slab.h>
- #include <linux/pm.h>
--#include <asm/mach/irq.h>
- 
- #define GPIODIR 0x400
- #define GPIOIS  0x404
-diff --git a/drivers/gpio/gpio-pxa.c b/drivers/gpio/gpio-pxa.c
-index 9cc108d..7523b6d 100644
---- a/drivers/gpio/gpio-pxa.c
-+++ b/drivers/gpio/gpio-pxa.c
-@@ -19,6 +19,7 @@
- #include <linux/init.h>
- #include <linux/irq.h>
- #include <linux/irqdomain.h>
-+#include <linux/irqchip/chained_irq.h>
- #include <linux/io.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
-@@ -26,8 +27,6 @@
- #include <linux/syscore_ops.h>
- #include <linux/slab.h>
- 
--#include <asm/mach/irq.h>
--
- #include <mach/irqs.h>
- 
- /*
-diff --git a/drivers/gpio/gpio-tegra.c b/drivers/gpio/gpio-tegra.c
-index 414ad91..8e21555 100644
---- a/drivers/gpio/gpio-tegra.c
-+++ b/drivers/gpio/gpio-tegra.c
-@@ -27,11 +27,10 @@
- #include <linux/platform_device.h>
- #include <linux/module.h>
- #include <linux/irqdomain.h>
-+#include <linux/irqchip/chained_irq.h>
- #include <linux/pinctrl/consumer.h>
- #include <linux/pm.h>
- 
--#include <asm/mach/irq.h>
--
- #define GPIO_BANK(x)		((x) >> 5)
- #define GPIO_PORT(x)		(((x) >> 3) & 0x3)
- #define GPIO_BIT(x)		((x) & 0x7)
-diff --git a/drivers/irqchip/exynos-combiner.c b/drivers/irqchip/exynos-combiner.c
-index 04d86a9..6a52013 100644
---- a/drivers/irqchip/exynos-combiner.c
-+++ b/drivers/irqchip/exynos-combiner.c
-@@ -13,6 +13,7 @@
- #include <linux/init.h>
- #include <linux/io.h>
- #include <linux/irqdomain.h>
-+#include <linux/irqchip/chained_irq.h>
  #include <linux/of_address.h>
- #include <linux/of_irq.h>
- #include <asm/mach/irq.h>
+-#include <linux/irqchip/arm-gic.h>
+ #include <asm/page.h>
+ #include <asm/mach/map.h>
+ #include <asm/smp_plat.h>
+@@ -49,13 +48,6 @@ void __init sirfsoc_map_scu(void)
+ static void __cpuinit sirfsoc_secondary_init(unsigned int cpu)
+ {
+ 	/*
+-	 * if any interrupts are already enabled for the primary
+-	 * core (e.g. timer irq), then they will not have been enabled
+-	 * for us: do so
+-	 */
+-	gic_secondary_init(0);
+-
+-	/*
+ 	 * let the primary processor know we're out of the
+ 	 * pen, then head off into the C entry point
+ 	 */
+diff --git a/arch/arm/mach-shmobile/smp-emev2.c b/arch/arm/mach-shmobile/smp-emev2.c
+index 953eb1f..384e27d 100644
+--- a/arch/arm/mach-shmobile/smp-emev2.c
++++ b/arch/arm/mach-shmobile/smp-emev2.c
+@@ -23,7 +23,6 @@
+ #include <linux/spinlock.h>
+ #include <linux/io.h>
+ #include <linux/delay.h>
+-#include <linux/irqchip/arm-gic.h>
+ #include <mach/common.h>
+ #include <mach/emev2.h>
+ #include <asm/smp_plat.h>
+@@ -85,11 +84,6 @@ static int __maybe_unused emev2_cpu_kill(unsigned int cpu)
+ }
+ 
+ 
+-static void __cpuinit emev2_secondary_init(unsigned int cpu)
+-{
+-	gic_secondary_init(0);
+-}
+-
+ static int __cpuinit emev2_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ {
+ 	cpu = cpu_logical_map(cpu);
+@@ -124,7 +118,6 @@ static void __init emev2_smp_init_cpus(void)
+ struct smp_operations emev2_smp_ops __initdata = {
+ 	.smp_init_cpus		= emev2_smp_init_cpus,
+ 	.smp_prepare_cpus	= emev2_smp_prepare_cpus,
+-	.smp_secondary_init	= emev2_secondary_init,
+ 	.smp_boot_secondary	= emev2_boot_secondary,
+ #ifdef CONFIG_HOTPLUG_CPU
+ 	.cpu_kill		= emev2_cpu_kill,
+diff --git a/arch/arm/mach-shmobile/smp-r8a7779.c b/arch/arm/mach-shmobile/smp-r8a7779.c
+index 3a4acf2..9949065 100644
+--- a/arch/arm/mach-shmobile/smp-r8a7779.c
++++ b/arch/arm/mach-shmobile/smp-r8a7779.c
+@@ -23,7 +23,6 @@
+ #include <linux/spinlock.h>
+ #include <linux/io.h>
+ #include <linux/delay.h>
+-#include <linux/irqchip/arm-gic.h>
+ #include <mach/common.h>
+ #include <mach/r8a7779.h>
+ #include <asm/smp_plat.h>
+@@ -132,11 +131,6 @@ static int __maybe_unused r8a7779_cpu_kill(unsigned int cpu)
+ }
+ 
+ 
+-static void __cpuinit r8a7779_secondary_init(unsigned int cpu)
+-{
+-	gic_secondary_init(0);
+-}
+-
+ static int __cpuinit r8a7779_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ {
+ 	struct r8a7779_pm_ch *ch = NULL;
+@@ -186,7 +180,6 @@ static void __init r8a7779_smp_init_cpus(void)
+ struct smp_operations r8a7779_smp_ops  __initdata = {
+ 	.smp_init_cpus		= r8a7779_smp_init_cpus,
+ 	.smp_prepare_cpus	= r8a7779_smp_prepare_cpus,
+-	.smp_secondary_init	= r8a7779_secondary_init,
+ 	.smp_boot_secondary	= r8a7779_boot_secondary,
+ #ifdef CONFIG_HOTPLUG_CPU
+ 	.cpu_kill		= r8a7779_cpu_kill,
+diff --git a/arch/arm/mach-shmobile/smp-sh73a0.c b/arch/arm/mach-shmobile/smp-sh73a0.c
+index acb46a9..d0f9aca 100644
+--- a/arch/arm/mach-shmobile/smp-sh73a0.c
++++ b/arch/arm/mach-shmobile/smp-sh73a0.c
+@@ -23,7 +23,6 @@
+ #include <linux/spinlock.h>
+ #include <linux/io.h>
+ #include <linux/delay.h>
+-#include <linux/irqchip/arm-gic.h>
+ #include <mach/common.h>
+ #include <asm/cacheflush.h>
+ #include <asm/smp_plat.h>
+@@ -59,11 +58,6 @@ static unsigned int __init sh73a0_get_core_count(void)
+ 	return scu_get_core_count(scu_base);
+ }
+ 
+-static void __cpuinit sh73a0_secondary_init(unsigned int cpu)
+-{
+-	gic_secondary_init(0);
+-}
+-
+ static int __cpuinit sh73a0_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ {
+ 	cpu = cpu_logical_map(cpu);
+@@ -138,7 +132,6 @@ static void sh73a0_cpu_die(unsigned int cpu)
+ struct smp_operations sh73a0_smp_ops __initdata = {
+ 	.smp_init_cpus		= sh73a0_smp_init_cpus,
+ 	.smp_prepare_cpus	= sh73a0_smp_prepare_cpus,
+-	.smp_secondary_init	= sh73a0_secondary_init,
+ 	.smp_boot_secondary	= sh73a0_boot_secondary,
+ #ifdef CONFIG_HOTPLUG_CPU
+ 	.cpu_kill		= sh73a0_cpu_kill,
+diff --git a/arch/arm/mach-socfpga/platsmp.c b/arch/arm/mach-socfpga/platsmp.c
+index 84c60fa..ca14d1d 100644
+--- a/arch/arm/mach-socfpga/platsmp.c
++++ b/arch/arm/mach-socfpga/platsmp.c
+@@ -22,7 +22,6 @@
+ #include <linux/io.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+-#include <linux/irqchip/arm-gic.h>
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/smp_scu.h>
+@@ -33,16 +32,6 @@
+ extern void __iomem *sys_manager_base_addr;
+ extern void __iomem *rst_manager_base_addr;
+ 
+-static void __cpuinit socfpga_secondary_init(unsigned int cpu)
+-{
+-	/*
+-	 * if any interrupts are already enabled for the primary
+-	 * core (e.g. timer irq), then they will not have been enabled
+-	 * for us: do so
+-	 */
+-	gic_secondary_init(0);
+-}
+-
+ static int __cpuinit socfpga_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ {
+ 	int trampoline_size = &secondary_trampoline_end - &secondary_trampoline;
+@@ -109,7 +98,6 @@ static void socfpga_cpu_die(unsigned int cpu)
+ struct smp_operations socfpga_smp_ops __initdata = {
+ 	.smp_init_cpus		= socfpga_smp_init_cpus,
+ 	.smp_prepare_cpus	= socfpga_smp_prepare_cpus,
+-	.smp_secondary_init	= socfpga_secondary_init,
+ 	.smp_boot_secondary	= socfpga_boot_secondary,
+ #ifdef CONFIG_HOTPLUG_CPU
+ 	.cpu_die		= socfpga_cpu_die,
+diff --git a/arch/arm/mach-spear13xx/platsmp.c b/arch/arm/mach-spear13xx/platsmp.c
+index af4ade6..551c69c 100644
+--- a/arch/arm/mach-spear13xx/platsmp.c
++++ b/arch/arm/mach-spear13xx/platsmp.c
+@@ -15,7 +15,6 @@
+ #include <linux/jiffies.h>
+ #include <linux/io.h>
+ #include <linux/smp.h>
+-#include <linux/irqchip/arm-gic.h>
+ #include <asm/cacheflush.h>
+ #include <asm/smp_scu.h>
+ #include <mach/spear.h>
+@@ -28,13 +27,6 @@ static void __iomem *scu_base = IOMEM(VA_SCU_BASE);
+ static void __cpuinit spear13xx_secondary_init(unsigned int cpu)
+ {
+ 	/*
+-	 * if any interrupts are already enabled for the primary
+-	 * core (e.g. timer irq), then they will not have been enabled
+-	 * for us: do so
+-	 */
+-	gic_secondary_init(0);
+-
+-	/*
+ 	 * let the primary processor know we're out of the
+ 	 * pen, then head off into the C entry point
+ 	 */
+diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
+index 2c6b3d5..9348d3c 100644
+--- a/arch/arm/mach-tegra/platsmp.c
++++ b/arch/arm/mach-tegra/platsmp.c
+@@ -18,7 +18,6 @@
+ #include <linux/jiffies.h>
+ #include <linux/smp.h>
+ #include <linux/io.h>
+-#include <linux/irqchip/arm-gic.h>
+ #include <linux/clk/tegra.h>
+ 
+ #include <asm/cacheflush.h>
+@@ -44,13 +43,6 @@ static cpumask_t tegra_cpu_init_mask;
+ 
+ static void __cpuinit tegra_secondary_init(unsigned int cpu)
+ {
+-	/*
+-	 * if any interrupts are already enabled for the primary
+-	 * core (e.g. timer irq), then they will not have been enabled
+-	 * for us: do so
+-	 */
+-	gic_secondary_init(0);
+-
+ 	cpumask_set_cpu(cpu, &tegra_cpu_init_mask);
+ }
+ 
+diff --git a/arch/arm/mach-ux500/platsmp.c b/arch/arm/mach-ux500/platsmp.c
+index 18f7af3..152b130 100644
+--- a/arch/arm/mach-ux500/platsmp.c
++++ b/arch/arm/mach-ux500/platsmp.c
+@@ -16,7 +16,6 @@
+ #include <linux/device.h>
+ #include <linux/smp.h>
+ #include <linux/io.h>
+-#include <linux/irqchip/arm-gic.h>
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/smp_plat.h>
+@@ -58,13 +57,6 @@ static DEFINE_SPINLOCK(boot_lock);
+ static void __cpuinit ux500_secondary_init(unsigned int cpu)
+ {
+ 	/*
+-	 * if any interrupts are already enabled for the primary
+-	 * core (e.g. timer irq), then they will not have been enabled
+-	 * for us: do so
+-	 */
+-	gic_secondary_init(0);
+-
+-	/*
+ 	 * let the primary processor know we're out of the
+ 	 * pen, then head off into the C entry point
+ 	 */
+diff --git a/arch/arm/mach-virt/platsmp.c b/arch/arm/mach-virt/platsmp.c
+index 8badaab..f4143f5 100644
+--- a/arch/arm/mach-virt/platsmp.c
++++ b/arch/arm/mach-virt/platsmp.c
+@@ -21,8 +21,6 @@
+ #include <linux/smp.h>
+ #include <linux/of.h>
+ 
+-#include <linux/irqchip/arm-gic.h>
+-
+ #include <asm/psci.h>
+ #include <asm/smp_plat.h>
+ 
+@@ -45,14 +43,8 @@ static int __cpuinit virt_boot_secondary(unsigned int cpu,
+ 	return -ENODEV;
+ }
+ 
+-static void __cpuinit virt_secondary_init(unsigned int cpu)
+-{
+-	gic_secondary_init(0);
+-}
+-
+ struct smp_operations __initdata virt_smp_ops = {
+ 	.smp_init_cpus		= virt_smp_init_cpus,
+ 	.smp_prepare_cpus	= virt_smp_prepare_cpus,
+-	.smp_secondary_init	= virt_secondary_init,
+ 	.smp_boot_secondary	= virt_boot_secondary,
+ };
+diff --git a/arch/arm/plat-versatile/platsmp.c b/arch/arm/plat-versatile/platsmp.c
+index f2ac155..1e1b2d7 100644
+--- a/arch/arm/plat-versatile/platsmp.c
++++ b/arch/arm/plat-versatile/platsmp.c
+@@ -14,7 +14,6 @@
+ #include <linux/device.h>
+ #include <linux/jiffies.h>
+ #include <linux/smp.h>
+-#include <linux/irqchip/arm-gic.h>
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/smp_plat.h>
+@@ -37,13 +36,6 @@ static DEFINE_SPINLOCK(boot_lock);
+ void __cpuinit versatile_secondary_init(unsigned int cpu)
+ {
+ 	/*
+-	 * if any interrupts are already enabled for the primary
+-	 * core (e.g. timer irq), then they will not have been enabled
+-	 * for us: do so
+-	 */
+-	gic_secondary_init(0);
+-
+-	/*
+ 	 * let the primary processor know we're out of the
+ 	 * pen, then head off into the C entry point
+ 	 */
 diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index a32e0d5..0b1c0af 100644
+index 974f77c..add1fd8 100644
 --- a/drivers/irqchip/irq-gic.c
 +++ b/drivers/irqchip/irq-gic.c
-@@ -38,6 +38,7 @@
- #include <linux/interrupt.h>
- #include <linux/percpu.h>
- #include <linux/slab.h>
-+#include <linux/irqchip/chained_irq.h>
- #include <linux/irqchip/arm-gic.h>
- 
- #include <asm/irq.h>
-diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-index 75933a6..5cbadc9 100644
---- a/drivers/pinctrl/pinctrl-at91.c
-+++ b/drivers/pinctrl/pinctrl-at91.c
-@@ -18,6 +18,7 @@
- #include <linux/interrupt.h>
- #include <linux/irq.h>
- #include <linux/irqdomain.h>
-+#include <linux/irqchip/chained_irq.h>
- #include <linux/io.h>
- #include <linux/gpio.h>
- #include <linux/pinctrl/machine.h>
-@@ -27,8 +28,6 @@
- /* Since we request GPIOs from ourself */
- #include <linux/pinctrl/consumer.h>
- 
--#include <asm/mach/irq.h>
--
- #include <mach/hardware.h>
- #include <mach/at91_pio.h>
- 
-diff --git a/drivers/pinctrl/pinctrl-exynos.c b/drivers/pinctrl/pinctrl-exynos.c
-index 538b9dd..7265e55 100644
---- a/drivers/pinctrl/pinctrl-exynos.c
-+++ b/drivers/pinctrl/pinctrl-exynos.c
-@@ -23,13 +23,12 @@
- #include <linux/interrupt.h>
- #include <linux/irqdomain.h>
- #include <linux/irq.h>
-+#include <linux/irqchip/chained_irq.h>
- #include <linux/of_irq.h>
- #include <linux/io.h>
- #include <linux/slab.h>
- #include <linux/err.h>
- 
--#include <asm/mach/irq.h>
--
- #include "pinctrl-samsung.h"
- #include "pinctrl-exynos.h"
- 
-diff --git a/drivers/pinctrl/pinctrl-nomadik.c b/drivers/pinctrl/pinctrl-nomadik.c
-index 36d2029..93eba97 100644
---- a/drivers/pinctrl/pinctrl-nomadik.c
-+++ b/drivers/pinctrl/pinctrl-nomadik.c
-@@ -23,6 +23,7 @@
- #include <linux/interrupt.h>
- #include <linux/irq.h>
- #include <linux/irqdomain.h>
-+#include <linux/irqchip/chained_irq.h>
- #include <linux/slab.h>
- #include <linux/of_device.h>
- #include <linux/of_address.h>
-@@ -33,7 +34,6 @@
- /* Since we request GPIOs from ourself */
- #include <linux/pinctrl/consumer.h>
- #include <linux/platform_data/pinctrl-nomadik.h>
--#include <asm/mach/irq.h>
- #include "pinctrl-nomadik.h"
- #include "core.h"
- 
-diff --git a/drivers/pinctrl/pinctrl-sirf.c b/drivers/pinctrl/pinctrl-sirf.c
-index d02498b..ab26b4b 100644
---- a/drivers/pinctrl/pinctrl-sirf.c
-+++ b/drivers/pinctrl/pinctrl-sirf.c
-@@ -14,6 +14,7 @@
- #include <linux/slab.h>
- #include <linux/err.h>
- #include <linux/irqdomain.h>
-+#include <linux/irqchip/chained_irq.h>
- #include <linux/pinctrl/pinctrl.h>
- #include <linux/pinctrl/pinmux.h>
- #include <linux/pinctrl/consumer.h>
-@@ -25,7 +26,6 @@
- #include <linux/bitops.h>
- #include <linux/gpio.h>
- #include <linux/of_gpio.h>
--#include <asm/mach/irq.h>
- 
- #define DRIVER_NAME "pinmux-sirf"
- 
-diff --git a/drivers/pinctrl/spear/pinctrl-plgpio.c b/drivers/pinctrl/spear/pinctrl-plgpio.c
-index 295b349..a4908ec 100644
---- a/drivers/pinctrl/spear/pinctrl-plgpio.c
-+++ b/drivers/pinctrl/spear/pinctrl-plgpio.c
-@@ -15,12 +15,12 @@
- #include <linux/io.h>
- #include <linux/irq.h>
- #include <linux/irqdomain.h>
-+#include <linux/irqchip/chained_irq.h>
+@@ -28,6 +28,7 @@
  #include <linux/module.h>
- #include <linux/pinctrl/consumer.h>
- #include <linux/platform_device.h>
- #include <linux/pm.h>
- #include <linux/spinlock.h>
--#include <asm/mach/irq.h>
- 
- #define MAX_GPIO_PER_REG		32
- #define PIN_OFFSET(pin)			(pin % MAX_GPIO_PER_REG)
-diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-common.c b/drivers/staging/imx-drm/ipu-v3/ipu-common.c
-index 366f259..6efe4e1 100644
---- a/drivers/staging/imx-drm/ipu-v3/ipu-common.c
-+++ b/drivers/staging/imx-drm/ipu-v3/ipu-common.c
-@@ -25,8 +25,8 @@
- #include <linux/clk.h>
  #include <linux/list.h>
- #include <linux/irq.h>
-+#include <linux/irqchip/chained_irq.h>
- #include <linux/of_device.h>
--#include <asm/mach/irq.h>
+ #include <linux/smp.h>
++#include <linux/cpu.h>
+ #include <linux/cpu_pm.h>
+ #include <linux/cpumask.h>
+ #include <linux/io.h>
+@@ -699,6 +700,25 @@ static int gic_irq_domain_xlate(struct irq_domain *d,
+ 	return 0;
+ }
  
- #include "imx-ipu-v3.h"
- #include "ipu-prv.h"
-diff --git a/include/linux/irqchip/chained_irq.h b/include/linux/irqchip/chained_irq.h
-new file mode 100644
-index 0000000..adf4c30
---- /dev/null
-+++ b/include/linux/irqchip/chained_irq.h
-@@ -0,0 +1,52 @@
-+/*
-+ * Chained IRQ handlers support.
-+ *
-+ * Copyright (C) 2011 ARM Ltd.
-+ *
-+ * This program is free software: you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#ifndef __IRQCHIP_CHAINED_IRQ_H
-+#define __IRQCHIP_CHAINED_IRQ_H
-+
-+#include <linux/irq.h>
-+
-+/*
-+ * Entry/exit functions for chained handlers where the primary IRQ chip
-+ * may implement either fasteoi or level-trigger flow control.
-+ */
-+static inline void chained_irq_enter(struct irq_chip *chip,
-+				     struct irq_desc *desc)
++#ifdef CONFIG_SMP
++static int __cpuinit gic_secondary_init(struct notifier_block *nfb,
++					unsigned long action, void *hcpu)
 +{
-+	/* FastEOI controllers require no action on entry. */
-+	if (chip->irq_eoi)
-+		return;
-+
-+	if (chip->irq_mask_ack) {
-+		chip->irq_mask_ack(&desc->irq_data);
-+	} else {
-+		chip->irq_mask(&desc->irq_data);
-+		if (chip->irq_ack)
-+			chip->irq_ack(&desc->irq_data);
-+	}
++	if (action == CPU_STARTING)
++		gic_cpu_init(&gic_data[0]);
++	return NOTIFY_OK;
 +}
 +
-+static inline void chained_irq_exit(struct irq_chip *chip,
-+				    struct irq_desc *desc)
-+{
-+	if (chip->irq_eoi)
-+		chip->irq_eoi(&desc->irq_data);
-+	else
-+		chip->irq_unmask(&desc->irq_data);
-+}
++/*
++ * Notifier for enabling the GIC CPU interface. Set an arbitrarily high
++ * priority because the GIC needs to be up before the ARM generic timers.
++ */
++static struct notifier_block __cpuinitdata gic_cpu_notifier = {
++	.notifier_call = gic_secondary_init,
++	.priority = 100,
++};
++#endif
 +
-+#endif /* __IRQCHIP_CHAINED_IRQ_H */
+ const struct irq_domain_ops gic_irq_domain_ops = {
+ 	.map = gic_irq_domain_map,
+ 	.xlate = gic_irq_domain_xlate,
+@@ -789,6 +809,7 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+ 
+ #ifdef CONFIG_SMP
+ 	set_smp_cross_call(gic_raise_softirq);
++	register_cpu_notifier(&gic_cpu_notifier);
+ #endif
+ 
+ 	set_handle_irq(gic_handle_irq);
+@@ -799,13 +820,6 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+ 	gic_pm_init(gic);
+ }
+ 
+-void __cpuinit gic_secondary_init(unsigned int gic_nr)
+-{
+-	BUG_ON(gic_nr >= MAX_GIC_NR);
+-
+-	gic_cpu_init(&gic_data[gic_nr]);
+-}
+-
+ #ifdef CONFIG_OF
+ static int gic_cnt __initdata = 0;
+ 
+diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
+index 3fd8e42..3e203eb 100644
+--- a/include/linux/irqchip/arm-gic.h
++++ b/include/linux/irqchip/arm-gic.h
+@@ -65,7 +65,6 @@ extern struct irq_chip gic_arch_extn;
+ 
+ void gic_init_bases(unsigned int, int, void __iomem *, void __iomem *,
+ 		    u32 offset, struct device_node *);
+-void gic_secondary_init(unsigned int);
+ void gic_cascade_irq(unsigned int gic_nr, unsigned int irq);
+ 
+ static inline void gic_init(unsigned int nr, int start,
