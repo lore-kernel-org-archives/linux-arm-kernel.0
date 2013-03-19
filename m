@@ -1,37 +1,38 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 19 Mar 2013 22:35:05 +0100
-Subject: [PATCH V4 6/9] ARM: mxs: Provide regulator to pwm-backlight
-In-Reply-To: <643E69AA4436674C8F39DCC2C05F7638629CD2FDF4@HQMAIL03.nvidia.com>
-References: <1363719573-20926-1-git-send-email-achew@nvidia.com>
- <201303192227.21717.marex@denx.de>
- <643E69AA4436674C8F39DCC2C05F7638629CD2FDF4@HQMAIL03.nvidia.com>
-Message-ID: <201303192235.06137.marex@denx.de>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 19 Mar 2013 14:37:06 -0700
+Subject: [PATCH] clk: add table lookup to mux
+In-Reply-To: <513F79BA.7000608@wwwdotorg.org>
+References: <1363113747-6572-1-git-send-email-pdeschrijver@nvidia.com>
+ <513F79BA.7000608@wwwdotorg.org>
+Message-ID: <20130319213706.8663.87186@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew Chew,
-
-> > Dear Andrew Chew,
+Quoting Stephen Warren (2013-03-12 11:53:46)
+> On 03/12/2013 12:42 PM, Peter De Schrijver wrote:
+> > Add a table lookup feature to the mux clock. Also allow arbitrary masks
+> > instead of the width. This will be used by some clocks on Tegra114. Also
+> > adapt the tegra periph clk because it uses struct clk_mux directly.
 > > 
-> > > The pwm-backlight driver now takes a mandatory regulator that is
-> > > gotten during driver probe.  Initialize a dummy regulator to satisfy
-> > > this requirement.
-> > > 
-> > > Signed-off-by: Andrew Chew <achew@nvidia.com>
+> > Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
 > > 
-> > Do we really need a mandatory regulator? Why can't it be optional?
+> > --
+> > Mike,
 > > 
-> > Best regards,
-> > Marek Vasut
+> > This is the same patch I posted before which implements a table lookup
+> > feature for the mux clock. I squashed both the changes to clk-mux.c and
+> > tegra/clk.h together in order to make the patch bisectable.
 > 
-> Because for those using board setup code (and not devicetree), it was
-> not possible to distinguish between opting out of the regulator, and
-> deferred probe, without adding something to the platform data that
-> board setup code needed to fill in anyway.
+> For the record in this thread, this is a dependency of the Tegra114
+> clock driver. Can this patch be added to a stable branch in the clk or
+> arm-soc trees, which I can merge before applying the Tegra114 clock
+> driver? Thanks.
 
-Sure, but this adds a bit of overhead for the DT platforms, no?
+Yes.  I don't have an immutable branch today, but I will have one by
+-rc4.  It will be named clk-for-3.10.
 
-Other than this curiosity, I have no problems with this stuff.
+I have a pending question about the ugly width/mask issue, otherwise
+I'll let you know when I take this patch into clk-next.
 
-Best regards,
-Marek Vasut
+Regards,
+Mike
