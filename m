@@ -1,86 +1,66 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 18 Mar 2013 18:23:40 -0700
-Subject: [PATCH 2/2] ARM: OMAP2+: clocks: Pass static parent pointers to
- common clock core
-In-Reply-To: <20130318163757.GD9462@atomide.com>
-References: <1363264618-5071-1-git-send-email-rnayak@ti.com>
- <1363264618-5071-3-git-send-email-rnayak@ti.com>
- <20130314170601.GH26093@atomide.com> <514313B6.4050905@ti.com>
- <20130315162049.GB9370@atomide.com> <5146CE5B.6090705@ti.com>
- <20130318163757.GD9462@atomide.com>
-Message-ID: <20130319012340.8663.43189@quantum>
+Date: Mon, 18 Mar 2013 18:54:25 -0700
+Subject: [PATCH] clk: add DT test clock consumer driver
+In-Reply-To: <201303161456.54246.arnd@arndb.de>
+References: <1363439376-21294-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <201303161456.54246.arnd@arndb.de>
+Message-ID: <20130319015425.8663.84827@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Tony Lindgren (2013-03-18 09:37:58)
-> * Rajendra Nayak <rnayak@ti.com> [130318 01:25]:
-> > On Friday 15 March 2013 09:50 PM, Tony Lindgren wrote:
-> > > * Rajendra Nayak <rnayak@ti.com> [130315 05:31]:
-> > >> On Thursday 14 March 2013 10:36 PM, Tony Lindgren wrote:
-> > >>> * Rajendra Nayak <rnayak@ti.com> [130314 05:44]:
-> > >>>> OMAP clock inits happen quite early, even before the slab is available.
-> > >>>> As part of the clock init, the common clock core tries to cache parent
-> > >>>> pointers (if not passed by the caller registering the clock) which
-> > >>>> fails in case of OMAP since the slab isn't initied.
-> > >>>> Without CONFIG_DEBUG_SLAB enabled, this just results in the common clock core
-> > >>>> retrying the caching attempt at some point later.
-> > >>>> However with CONFIG_DEBUG_SLAB enabled this results in a BUG() as reported
-> > >>>> in the link below by Tony..
-> > >>>> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg85932.html
-> > >>>>
-> > >>>> Fix this by passing static parent pointers to the common clock core
-> > >>>> while registering clocks.
-> > >>>
-> > >>> I wonder if we could easily fix this by initializing only some of the
-> > >>> clocks that early?
-> > >>
-> > >> We actually don't need any clocks that early (I mean even before slab init)
-> > >> We only need them before timer init.
-> > > 
-> > > Yes and only the timer clocks at that point. The others could be initialized
-> > > later on so we get console error messages without having to turn on DEBUG_LL
-> > > and earlyprintk.
+Quoting Arnd Bergmann (2013-03-16 07:56:54)
+> On Saturday 16 March 2013, Sebastian Hesselbarth wrote:
+> > This driver adds a DT test clock consumer that exposes debugfs files to
+> > enable/disable and set/get rate of the attached programmable clock.
+> > During development of a i2c-attached clock generator I found it useful
+> > to debug the clock generator's internal pll settings by enforcing clock
+> > rates through debugfs.
 > > 
-> > but that wouldn't be possible with the hwmod dependency on clocks. We would
-> > need to move the hwmod inits further down too.
-> > 
-> > >  
-> > >> This isn't something specific to OMAP so I started looking at what others
-> > >> in drivers/clk seem to do.
-> > >>
-> > >> I found imx, spear, mvebu all do their clk inits within .init_time callbacks.
-> > >> tegra seems to even do it within .init_irq callback.
-> > >>
-> > >> Either one would work for us too :)
-> > > 
-> > > Well I suggest init_irq as that's when we need the first clocks for timer.
-> > 
-> > For which platforms? I instead see them being needed only by init_timer, so
-> > was thinking thats a better place instead.
-> > 
-> > For the -rc fix to fix the crash with DEBUG_SLAB, is it fine if I move *all*
-> > clock inits down to init_timer (or init_irq).
+> > Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 > 
-> Sounds good to me for the -rc series. How about initialize omap_clk_init()
-> function pointer in the SoC specific omap*_init_early() then just call
-> omap_clk_init() in timer_init?
->  
-> > Splitting clocks alone would not work for now, without hwmod being moved down also.
+> It sounds a little clumsy to have a device driver to match a device that
+> you create just for matching the driver.
 > 
-> Good point. For the -rc series the sounds like your suggestion is the
-> least intrusive fix and also gets us started removing few more early
-> boot time dependencies.
+> Would it be possible to separate the debugging logic from the platform
+> device logic? I think it may be useful to have a debugfs or sysfs
+> inteface for all clocks in the system, even if that is disabled by
+> default or only available after manually loading a module implementing
+> that functionality.
 > 
 
-+1 for removing the early init dependencies.  hwmod initialization was
-the original impetus for all this static struct clk stuff.  If the
-initialization for hwmod and the omap clocks can be moved to a later
-callback then it is the first step in removing the static data and
-getting rid of clk-private.h usage.
+I agree that a generic approach is needed here.  I have been meaning to
+break the existing debugfs stuff out into clk-debug.c.  I'll do that
+soon and maybe you can add a new Kconfig entry for
+COMMON_CLK_DEBUG_USERSPACE (or something like that) which implements
+this?
+
+On the other hand this sort of stuff really scares me.  I know for a
+fact that a debug interface to enable/disable clocks and set clock rate
+would ship on real devices.  Quite likely some android phones out there
+would be controlling hardware clocks from some horrible userspace
+utility.
+
+*shudder*
+
+Sebastian, another small nitpick, can you change the "enable" attribute
+to be named "prepare_enable"?  This more accurately reflects what is
+going on.
+
+I also wonder how simple it would be to add a "parent" attribute here
+that allows one to call clk_set_parent from the debugfs interface?  To
+make it easy on you, the interface could accept an integer as the index
+of the clk->parents[] array.  This is a bad interface design as it
+requires the user to look into the code to know which index corresponds
+to which parent clock; however I do not want people to use this
+interface for anything other than debug/testing, so I am ok with this
+interface being a PITA to use.
 
 Regards,
 Mike
 
-> Regards,
+>         Arnd
 > 
-> Tony
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
