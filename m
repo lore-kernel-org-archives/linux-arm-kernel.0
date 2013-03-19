@@ -1,44 +1,88 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 19 Mar 2013 11:35:11 +0100
-Subject: [PATCH 2/7] ARM: sunxi: dt: Use clocks property instead of
- clock-frequency for the UARTs
+Date: Tue, 19 Mar 2013 11:35:12 +0100
+Subject: [PATCH 3/7] ARM: sunxi: Rename uart nodes to serial
 In-Reply-To: <1363689316-7847-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1363689316-7847-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1363689316-7847-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1363689316-7847-4-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It will be especially useful when we will have the clock definitions in
-the device tree.
+The other architecture use serial at address for their uart nodes, so
+rename our uart dt nodes to be consistent
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Emilio L?pez <emilio@elopez.com.ar>
-Tested-by: Emilio L?pez <emilio@elopez.com.ar>
 ---
- arch/arm/boot/dts/sunxi.dtsi |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/sun4i-a10-cubieboard.dts |    4 ++--
+ arch/arm/boot/dts/sun4i-a10-hackberry.dts  |    2 +-
+ arch/arm/boot/dts/sun5i-a13-olinuxino.dts  |    2 +-
+ arch/arm/boot/dts/sunxi.dtsi               |    4 ++--
+ 4 files changed, 6 insertions(+), 6 deletions(-)
 
+diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+index 88e2dc1..cd06a3c 100644
+--- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
++++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+@@ -36,11 +36,11 @@
+ 			};
+ 		};
+ 
+-		uart0: uart at 01c28000 {
++		uart0: serial at 01c28000 {
+ 			status = "okay";
+ 		};
+ 
+-		uart1: uart at 01c28400 {
++		uart1: serial at 01c28400 {
+ 			status = "okay";
+ 		};
+ 	};
+diff --git a/arch/arm/boot/dts/sun4i-a10-hackberry.dts b/arch/arm/boot/dts/sun4i-a10-hackberry.dts
+index f84549a..9ab6875 100644
+--- a/arch/arm/boot/dts/sun4i-a10-hackberry.dts
++++ b/arch/arm/boot/dts/sun4i-a10-hackberry.dts
+@@ -23,7 +23,7 @@
+ 	};
+ 
+ 	soc {
+-		uart0: uart at 01c28000 {
++		uart0: serial at 01c28000 {
+ 			status = "okay";
+ 		};
+ 	};
+diff --git a/arch/arm/boot/dts/sun5i-a13-olinuxino.dts b/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
+index 33d1c7e..f1579a8 100644
+--- a/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
++++ b/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
+@@ -32,7 +32,7 @@
+ 			};
+ 		};
+ 
+-		uart1: uart at 01c28400 {
++		uart1: serial at 01c28400 {
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&uart1_pins_b>;
+ 			status = "okay";
 diff --git a/arch/arm/boot/dts/sunxi.dtsi b/arch/arm/boot/dts/sunxi.dtsi
-index 8b36abe..791c02a 100644
+index 791c02a..1e0f4b5 100644
 --- a/arch/arm/boot/dts/sunxi.dtsi
 +++ b/arch/arm/boot/dts/sunxi.dtsi
-@@ -65,7 +65,7 @@
+@@ -59,7 +59,7 @@
+ 			#interrupt-cells = <1>;
+ 		};
+ 
+-		uart0: uart at 01c28000 {
++		uart0: serial at 01c28000 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c28000 0x400>;
  			interrupts = <1>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clock-frequency = <24000000>;
-+			clocks = <&osc>;
+@@ -69,7 +69,7 @@
  			status = "disabled";
  		};
  
-@@ -75,7 +75,7 @@
+-		uart1: uart at 01c28400 {
++		uart1: serial at 01c28400 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c28400 0x400>;
  			interrupts = <2>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clock-frequency = <24000000>;
-+			clocks = <&osc>;
- 			status = "disabled";
- 		};
- 	};
 -- 
 1.7.10.4
