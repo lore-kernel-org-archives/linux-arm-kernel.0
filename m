@@ -1,26 +1,38 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Tue, 19 Mar 2013 20:48:41 +0100
-Subject: [BUG][mvebu] mvneta: cannot request irq 25 on openblocks-ax3
-In-Reply-To: <514895C5.40706@free-electrons.com>
-References: <51486445.8040506@hitachi.com> <514873FB.5050202@hitachi.com>
- <514895C5.40706@free-electrons.com>
-Message-ID: <2482565.pAEcuMH9qj@bender>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 19 Mar 2013 20:41:41 +0100
+Subject: [PATCH] pinctrl: mvebu: fix checking for SoC specific controls
+In-Reply-To: <1363720062-21395-1-git-send-email-simon.guinot@sequanux.org>
+References: <1363720062-21395-1-git-send-email-simon.guinot@sequanux.org>
+Message-ID: <5148BF75.8080204@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 19 March 2013 17:43:49 Gregory CLEMENT wrote:
-> 
-> Hi Masami,
-> 
-> You can try this patch if you want.
-> I don't have the hardware today so I didn't test it.
-> If you (and also Florian and Ezequiel) can test it and if it fixed
-> the bug, then I will be able send a proper email for it,
+On 03/19/2013 08:07 PM, Simon Guinot wrote:
+> This patch fixes a minor bug (probably due to a typo) while checking
+> the SoC specific controls in mvebu_pinctrl_probe().
+>
+> Signed-off-by: Simon Guinot<simon.guinot@sequanux.org>
 
-I just tested your patch on RD-A370-A1 and DB-MV784MP-GP and it works fine, 
-thanks! Feel free to add my Tested-by: Florian Fainelli <florian@openwrt.org> 
-to your next submission.
+Simon,
 
-Thanks!
--- 
-Florian
+good catch! The patch looks sane to me, so
+
+Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+
+> ---
+>   drivers/pinctrl/mvebu/pinctrl-mvebu.c |    2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/pinctrl/mvebu/pinctrl-mvebu.c b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
+> index c689c04..2d2f0a4 100644
+> --- a/drivers/pinctrl/mvebu/pinctrl-mvebu.c
+> +++ b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
+> @@ -620,7 +620,7 @@ int mvebu_pinctrl_probe(struct platform_device *pdev)
+>
+>   		/* special soc specific control */
+>   		if (ctrl->mpp_get || ctrl->mpp_set) {
+> -			if (!ctrl->name || !ctrl->mpp_set || !ctrl->mpp_set) {
+> +			if (!ctrl->name || !ctrl->mpp_get || !ctrl->mpp_set) {
+>   				dev_err(&pdev->dev, "wrong soc control info\n");
+>   				return -EINVAL;
+>   			}
