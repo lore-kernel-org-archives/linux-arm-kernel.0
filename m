@@ -1,78 +1,84 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 19 Mar 2013 16:46:05 +0000 (UTC)
-Subject: [GIT PULL] ARM: OMAP2+: clkdev flags removal for 3.10 cleanup
-Message-ID: <alpine.DEB.2.00.1303191645030.20326@utopia.booyaka.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 19 Mar 2013 09:46:38 -0700
+Subject: [PATCHv2 2/2] ARM: socfpga: Add clock entries into device tree
+In-Reply-To: <1363707936-17769-2-git-send-email-dinguyen@altera.com>
+References: <1363707936-17769-1-git-send-email-dinguyen@altera.com>
+ <1363707936-17769-2-git-send-email-dinguyen@altera.com>
+Message-ID: <20130319164638.8663.89508@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
+Quoting dinguyen at altera.com (2013-03-19 08:45:36)
+> From: Dinh Nguyen <dinguyen@altera.com>
+> 
+> Adds the main PLL clock groups for SOCFPGA into device tree file
+> so that the clock framework to query the clock and clock rates
+> appropriately.
+> 
+> $cat /sys/kernel/debug/clk/clk_summary
+>    clock                        enable_cnt  prepare_cnt  rate
+> ---------------------------------------------------------------------
+>  osc1                           2           2            25000000
+>     sdram_pll                   0           0            400000000
+>        s2f_usr2_clk             0           0            66666666
+>        ddr_dq_clk               0           0            200000000
+>        ddr_2x_dqs_clk           0           0            400000000
+>        ddr_dqs_clk              0           0            200000000
+>     periph_pll                  2           2            500000000
+>        s2f_usr1_clk             0           0            50000000
+>        per_base_clk             4           4            100000000
+>        per_nand_mmc_clk         0           0            25000000
+>        per_qsi_clk              0           0            250000000
+>        emac1_clk                1           1            125000000
+>        emac0_clk                0           0            125000000
+>     main_pll                    1           1            1600000000
+>        cfg_s2f_usr0_clk         0           0            100000000
+>        main_nand_sdmmc_clk      0           0            100000000
+>        main_qspi_clk            0           0            400000000
+>        dbg_base_clk             0           0            400000000
+>        mainclk                  0           0            400000000
+>        mpuclk                   1           1            800000000
+>           smp_twd               1           1            200000000
+> 
+> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
 
-Hi Tony
+There is a lot going on in this one patch.  I would prefer to see the
+clock driver broken out separately.
 
-The following changes since commit a937536b868b8369b98967929045f1df54234323:
+<snip>
 
-  Linux 3.9-rc3 (2013-03-17 15:59:32 -0700)
+> diff --git a/drivers/clk/socfpga/clk.c b/drivers/clk/socfpga/clk.c
+> index 2c855a6..da6b461 100644
+> --- a/drivers/clk/socfpga/clk.c
+> +++ b/drivers/clk/socfpga/clk.c
+<snip>
+> +static int clk_pll_enable(struct clk_hw *hwclk)
+> +{
+> +       struct socfpga_clk *socfpgaclk = to_socfpga_clk(hwclk);
+> +       u32 reg;
+> +
+> +       reg = readl(socfpgaclk->reg);
+> +       reg |= SOCFPGA_PLL_EXT_ENA;
+> +       writel(reg, socfpgaclk->reg);
+> +
+> +       return 0;
+> +}
+> +
+> +static void clk_pll_disable(struct clk_hw *hwclk)
+>  {
+> +       struct socfpga_clk *socfpgaclk = to_socfpga_clk(hwclk);
+> +       u32 reg;
+> +
+> +       reg = readl(socfpgaclk->reg);
+> +       reg &= ~SOCFPGA_PLL_EXT_ENA;
+> +       writel(reg, socfpgaclk->reg);
+> +}
+> +
 
-are available in the git repository at:
+For a simple enable which just sets a bit, you might want to re-use the
+basic gate clock type.  This can be done similar to the composite clock
+patches (currently on the list) by stuffing a clk_gate structure into
+your custom socfpga_clk type.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/omap-cleanup-a-for-3.10
-
-for you to fetch changes up to 78e52e026d288aad88b46bff0d94b05e145c4583:
-
-  ARM: OMAP2+: clock data: Remove CK_* flags (2013-03-18 09:57:39 -0600)
-
-- ----------------------------------------------------------------
-In the OMAP2+ clock data, replace the flags that determine whether a
-clock should be registered on a given SoC with per-SoC lists.
-
-Basic build, boot, and power management test results are available at:
-
-http://www.pwsan.com/omap/testlogs/jk_clock_flags_cleanup_3.10/20130318100504/
-
-- ----------------------------------------------------------------
-vmlinux object size
-(delta in bytes from test_v3.9-rc3 (a937536b868b8369b98967929045f1df54234323)):
-   text     data      bss    total  kernel
-     -8      +16        0       +8  n800_multi_omap2xxx
-    +40        0        0      +40  n800_only_a
-      0        0        0        0  omap1_defconfig
-      0        0        0        0  omap1_defconfig_1510innovator_only
-    -76      -24        0     -100  omap2plus_defconfig
-    -76      +16        0      -60  omap2plus_defconfig_cpupm
-    -76      -16        0      -92  omap2plus_defconfig_no_pm
-    -48       +8        0      -40  omap2plus_defconfig_omap2_4_only
-    +28        0        0      +28  omap2plus_defconfig_omap3_4_only
-    -60      -16      -16      -92  rmk_omap3430_ldp_allnoconfig
-    +52      -24        0      +28  rmk_omap3430_ldp_oldconfig
-    -60      -16      -16      -92  rmk_omap4430_sdp_allnoconfig
-    -12      -16        0      -28  rmk_omap4430_sdp_oldconfig
-
-J Keerthy (1):
-      ARM: OMAP2+: clock data: Remove CK_* flags
-
- arch/arm/mach-omap2/cclock2420_data.c |  283 +++++++-------
- arch/arm/mach-omap2/cclock2430_data.c |  311 ++++++++-------
- arch/arm/mach-omap2/cclock33xx_data.c |  165 ++++----
- arch/arm/mach-omap2/cclock3xxx_data.c |  685 ++++++++++++++++++---------------
- arch/arm/mach-omap2/cclock44xx_data.c |  515 ++++++++++++-------------
- arch/arm/mach-omap2/clock.c           |   17 +-
- arch/arm/mach-omap2/clock.h           |   20 +-
- 7 files changed, 1008 insertions(+), 988 deletions(-)
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1.4.12 (GNU/Linux)
-
-iQIcBAEBAgAGBQJRSJX+AAoJEMePsQ0LvSpL0vMP/iYJ5fFhNKzbXHNynKZ+jkQq
-q6ffM3kDxEZDZi01jdpAxBIgHfcbNB4I4oXaJcHksmBnT8IsFC0KTwh47W1R63oZ
-38h9MdotCnP5B3agh5dmJa8BYhsn8n00ulIqnnXNsAtyenQl98HS7cpNXFkIPhWC
-cKgDj9gmww3mMD4otlv8z40WZnLYbMOeea6E14JZfIWgtry3RXLjYrAcnoC9Ov8c
-LRXySYFvd8yGD7QMpGZFmevUf8JJ9gQ4uy2/ZPJWc3OlpFzfReasl+CWt2Ws9P21
-hluV8sfUaXUiNSrR6Ba8NyhwyBqf++fcvA0z0anMCizuRWceUo21bfpV2zuhMb9e
-XzKokt0eagPzpzbWvNSjj4z1STXg4DbrINvAEG3lgQY3eqH+amMdR2itNRVsSWhd
-uAsRAaS990ZTE7Q629izKWqDbGtB0SUi0Mk4e5Wnc6Z9Lg7rkAWO0Oh8ZWlHZRP6
-uPPS8pqKD4UccuNVae/LGbhrw80y9KOZoQTT+eKF07W5BvPDiRgZ3RfQQaIk12eR
-eoysCA3OMV2KVrCKUAUi48zrmrzuSuui9YucoF+ftZDrOOGvd3Xl2h/Jf/yVn+CI
-ld85uiG/LeFJs8hRS6AHCEQaqgm9nujyXfMnw81fAe4N75EndMZi3NKyELG7isqv
-njxUmXx4GvK9Jdp3h7rV
-=NqW/
------END PGP SIGNATURE-----
+Regards,
+Mike
