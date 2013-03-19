@@ -1,28 +1,24 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 19 Mar 2013 16:48:31 +0000
-Subject: [PATCH 10/10] drivers: misc: use module_platform_driver_probe()
-In-Reply-To: <CAMuHMdVS56HRDSvr7XCpVEjEWnGti+V=J_m4qQzEid=23ON_fQ@mail.gmail.com>
-References: <1363266691-15757-1-git-send-email-fabio.porcedda@gmail.com>
- <CAHkwnC9fg7_uhLM2KD3vvj_oFx3EBoQfw8mCN=V9pyV5=k37aA@mail.gmail.com>
- <CAMuHMdVS56HRDSvr7XCpVEjEWnGti+V=J_m4qQzEid=23ON_fQ@mail.gmail.com>
-Message-ID: <201303191648.31527.arnd@arndb.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 19 Mar 2013 10:51:11 -0600
+Subject: [PATCH V4 0/9] ARM: tegra: add platform suspend support
+In-Reply-To: <1363594400-11663-1-git-send-email-josephl@nvidia.com>
+References: <1363594400-11663-1-git-send-email-josephl@nvidia.com>
+Message-ID: <5148977F.7000700@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 19 March 2013, Geert Uytterhoeven wrote:
-> Hmm, so we may have drivers that (now) work perfectly fine with
-> module_platform_driver_probe()/platform_driver_probe(), but will start
-> failing suddenly in the future?
+On 03/18/2013 02:13 AM, Joseph Lo wrote:
+> This series introduces a basic functionality for Tegra to support the
+> platform suspend and resume.
+> 
+> Note: This series only adds the support for Tegra20 and Tegra30. The
+> Tegra114 will be supported later.
+> 
+> This series needs the patch below that not yet be merged into linux-mmc tree
+> to make the system suspend/resume function work correctly.
+> "mmc: tegra: use mmc_of_parse to get the support of standard MMC DT bindings"
 
-They will fail if someone changes the initialization order. That would
-already break drivers before deferred probing support (and was the reason
-we added feature in the first place), but now we can be much more liberal
-with the order in which drivers are initialized, except when they are
-using platform_driver_probe()
-
-> I guess we need a big fat WARN_ON(-EPROBE_DEFER) in
-> platform_driver_probe() to catch these?
-
-Yes, very good idea.
-
-	Arnd
+I assume this series needs to be applied after the 3-long series you
+posted just before it, containing "ARM: dts: tegra: add clock source for
+PMC", "ARM: tegra: get PMC clock source from DT", and "ARM: tegra:
+moving the CPU power timer function to PMC driver"?
