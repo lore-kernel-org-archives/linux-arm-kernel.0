@@ -1,79 +1,39 @@
-From: dahuang@nvidia.com (Danny Huang)
-Date: Tue, 19 Mar 2013 10:33:25 +0800
-Subject: [PATCH] ARM: tegra: fuse: add fuctions to read speedo id and process
- id
-Message-ID: <1363660405-10668-1-git-send-email-dahuang@nvidia.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Tue, 19 Mar 2013 12:00:27 +0900
+Subject: [PATCH 03/04] ARM: shmobile: r8a73a4 IRQC support V2
+In-Reply-To: <201303181432.20107.arnd@arndb.de>
+References: <20130318143203.26687.98180.sendpatchset@w520>
+ <20130318143231.26687.41252.sendpatchset@w520>
+ <201303181432.20107.arnd@arndb.de>
+Message-ID: <CANqRtoQjU+tKw=VVdSUgiau_=RE+YdcekVF4dw9S+z4gRRzX2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add functions to read the speedo and process id of both cpu and soc.
-There might be some drivers need the information as well.
+Hi Arnd,
 
-Signed-off-by: Danny Huang <dahuang@nvidia.com>
----
- arch/arm/mach-tegra/fuse.c | 24 ++++++++++++++++++++++++
- include/linux/tegra-soc.h  |  6 +++++-
- 2 files changed, 29 insertions(+), 1 deletion(-)
+On Mon, Mar 18, 2013 at 11:32 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 18 March 2013, Magnus Damm wrote:
+>> Both platform devices and DT devices are added in this
+>> patch. The platform device versions are used to provide
+>> a static interrupt map configuration for board code
+>> written in C.
+>
+> I had not noticed this part with the first version. Why is this required?
+> I thought you would always have the DTS in there, so that can be used to
+> provide the resources even for static platform devices.
 
-diff --git a/arch/arm/mach-tegra/fuse.c b/arch/arm/mach-tegra/fuse.c
-index f7db078..f0e356e 100644
---- a/arch/arm/mach-tegra/fuse.c
-+++ b/arch/arm/mach-tegra/fuse.c
-@@ -2,6 +2,7 @@
-  * arch/arm/mach-tegra/fuse.c
-  *
-  * Copyright (C) 2010 Google, Inc.
-+ * Copyright (c) 2013, NVIDIA CORPORATION.  All rights reserved.
-  *
-  * Author:
-  *	Colin Cross <ccross@android.com>
-@@ -161,3 +162,26 @@ unsigned long long tegra_chip_uid(void)
- 	return (hi << 32ull) | lo;
- }
- EXPORT_SYMBOL(tegra_chip_uid);
-+
-+int tegra_get_cpu_process_id(void)
-+{
-+	return tegra_cpu_process_id;
-+}
-+
-+int tegra_get_core_process_id(void)
-+{
-+	return tegra_core_process_id;
-+}
-+
-+int tegra_get_cpu_speedo_id(void)
-+{
-+	if (tegra_chip_id == TEGRA20)
-+		return -EINVAL;
-+
-+	return tegra_cpu_speedo_id;
-+}
-+
-+int tegra_get_soc_speedo_id(void)
-+{
-+	return tegra_soc_speedo_id;
-+}
-diff --git a/include/linux/tegra-soc.h b/include/linux/tegra-soc.h
-index 95f611d..b3e4b74 100644
---- a/include/linux/tegra-soc.h
-+++ b/include/linux/tegra-soc.h
-@@ -1,5 +1,5 @@
- /*
-- * Copyright (c) 2012, NVIDIA CORPORATION.  All rights reserved.
-+ * Copyright (c) 2012,2013, NVIDIA CORPORATION.  All rights reserved.
-  *
-  * This program is free software; you can redistribute it and/or modify it
-  * under the terms and conditions of the GNU General Public License,
-@@ -18,5 +18,9 @@
- #define __LINUX_TEGRA_SOC_H_
- 
- u32 tegra_read_chipid(void);
-+int tegra_get_cpu_process_id(void);
-+int tegra_get_core_process_id(void);
-+int tegra_get_cpu_speedo_id(void);
-+int tegra_get_soc_speedo_id(void);
- 
- #endif /* __LINUX_TEGRA_SOC_H_ */
--- 
-1.8.2
+Right now there is an intentional difference between the "C" version
+of the board code and the DT-only version:
+
+The "C" version of board code relies on DTS for architected timer and
+GIC. Besides that, platform devices are used. Other devices in DTS are
+not used at this point.
+
+The DT version (DT_MACHINE_START in setup-r8a73a4.c) is using DTS only.
+
+Would you like me to  change to "C" version of the code to use DTS to
+describe more devices?
+
+Thanks,
+
+/ magnus
