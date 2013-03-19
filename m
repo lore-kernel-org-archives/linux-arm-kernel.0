@@ -1,63 +1,54 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 19 Mar 2013 11:19:33 +0900
-Subject: [PATCH 11/14] ARM: shmobile: Make sh73a0 INTC irqpin platform data
- static
+Date: Tue, 19 Mar 2013 11:19:35 +0900
+Subject: [PATCH 13/14] irqchip: intc-irqpin: Initial DT support
 In-Reply-To: <1363659576-6333-1-git-send-email-horms+renesas@verge.net.au>
 References: <1363659576-6333-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1363659576-6333-12-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1363659576-6333-14-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-The platform data for the INTC irq pin driver
-seems to be global symbols, make it static to
-allow multi-soc build.
+Add initial DT support to the INTC External IRQ Pin
+driver. At this point only hardware with 4-bit wide
+sense registers is supported via DT.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/setup-sh73a0.c |    8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/irqchip/irq-renesas-intc-irqpin.c |    9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
-index 638735f..e8cd93a 100644
---- a/arch/arm/mach-shmobile/setup-sh73a0.c
-+++ b/arch/arm/mach-shmobile/setup-sh73a0.c
-@@ -812,7 +812,7 @@ static struct platform_device ipmmu_device = {
- 	.num_resources  = ARRAY_SIZE(ipmmu_resources),
+diff --git a/drivers/irqchip/irq-renesas-intc-irqpin.c b/drivers/irqchip/irq-renesas-intc-irqpin.c
+index 21f4602..fd5dabc 100644
+--- a/drivers/irqchip/irq-renesas-intc-irqpin.c
++++ b/drivers/irqchip/irq-renesas-intc-irqpin.c
+@@ -278,6 +278,7 @@ static int intc_irqpin_irq_domain_map(struct irq_domain *h, unsigned int virq,
+ 
+ static struct irq_domain_ops intc_irqpin_irq_domain_ops = {
+ 	.map	= intc_irqpin_irq_domain_map,
++	.xlate  = irq_domain_xlate_twocell,
  };
  
--struct renesas_intc_irqpin_config irqpin0_platform_data = {
-+static struct renesas_intc_irqpin_config irqpin0_platform_data = {
- 	.irq_base = irq_pin(0), /* IRQ0 -> IRQ7 */
- };
+ static int intc_irqpin_probe(struct platform_device *pdev)
+@@ -437,11 +438,19 @@ static int intc_irqpin_remove(struct platform_device *pdev)
+ 	return 0;
+ }
  
-@@ -842,7 +842,7 @@ static struct platform_device irqpin0_device = {
- 	},
- };
- 
--struct renesas_intc_irqpin_config irqpin1_platform_data = {
-+static struct renesas_intc_irqpin_config irqpin1_platform_data = {
- 	.irq_base = irq_pin(8), /* IRQ8 -> IRQ15 */
- 	.control_parent = true, /* Disable spurious IRQ10 */
- };
-@@ -873,7 +873,7 @@ static struct platform_device irqpin1_device = {
- 	},
- };
- 
--struct renesas_intc_irqpin_config irqpin2_platform_data = {
-+static struct renesas_intc_irqpin_config irqpin2_platform_data = {
- 	.irq_base = irq_pin(16), /* IRQ16 -> IRQ23 */
- };
- 
-@@ -903,7 +903,7 @@ static struct platform_device irqpin2_device = {
- 	},
- };
- 
--struct renesas_intc_irqpin_config irqpin3_platform_data = {
-+static struct renesas_intc_irqpin_config irqpin3_platform_data = {
- 	.irq_base = irq_pin(24), /* IRQ24 -> IRQ31 */
++static const struct of_device_id intc_irqpin_dt_ids[] = {
++	{ .compatible = "renesas,intc-irqpin", },
++	{},
++};
++MODULE_DEVICE_TABLE(of, intc_irqpin_dt_ids);
++
+ static struct platform_driver intc_irqpin_device_driver = {
+ 	.probe		= intc_irqpin_probe,
+ 	.remove		= intc_irqpin_remove,
+ 	.driver		= {
+ 		.name	= "renesas_intc_irqpin",
++		.of_match_table = intc_irqpin_dt_ids,
++		.owner  = THIS_MODULE,
+ 	}
  };
  
 -- 
