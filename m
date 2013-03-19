@@ -1,37 +1,93 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 19 Mar 2013 14:15:29 +0900
-Subject: [PATCH v3 1/3] ARM: shmobile: sh73a0: wait for completion when
- kicking the clock
-In-Reply-To: <20130319034214.GB21444@verge.net.au>
-References: <1362054120-8600-1-git-send-email-g.liakhovetski@gmx.de>
- <1362054120-8600-2-git-send-email-g.liakhovetski@gmx.de>
- <20130301025222.GA32306@verge.net.au>
- <20130319034214.GB21444@verge.net.au>
-Message-ID: <CANqRtoSk9PQWsU2E5b_CuO9AaE69fZ7GMzSjUz7DjjCY+Xcr2g@mail.gmail.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Tue, 19 Mar 2013 10:46:50 +0530
+Subject: [PATCH 2/2] ARM: OMAP2+: clocks: Pass static parent pointers
+ to common clock core
+In-Reply-To: <20130319012340.8663.43189@quantum>
+References: <1363264618-5071-1-git-send-email-rnayak@ti.com>
+ <1363264618-5071-3-git-send-email-rnayak@ti.com>
+ <20130314170601.GH26093@atomide.com> <514313B6.4050905@ti.com>
+ <20130315162049.GB9370@atomide.com> <5146CE5B.6090705@ti.com>
+ <20130318163757.GD9462@atomide.com> <20130319012340.8663.43189@quantum>
+Message-ID: <5147F4C2.5050307@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 19, 2013 at 12:42 PM, Simon Horman <horms@verge.net.au> wrote:
-> On Fri, Mar 01, 2013 at 11:52:25AM +0900, Simon Horman wrote:
->> On Thu, Feb 28, 2013 at 01:21:58PM +0100, Guennadi Liakhovetski wrote:
->> > To reconfigure clocks, controlled by FRQCRA and FRQCRB, a kick bit has to
->> > be set and to make sure the setting has taken effect, it has to be read
->> > back repeatedly until it is cleared by the hardware. This patch adds the
->> > waiting part, that was missing until now.
->> >
->> > Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+On Tuesday 19 March 2013 06:53 AM, Mike Turquette wrote:
+> Quoting Tony Lindgren (2013-03-18 09:37:58)
+>> * Rajendra Nayak <rnayak@ti.com> [130318 01:25]:
+>>> On Friday 15 March 2013 09:50 PM, Tony Lindgren wrote:
+>>>> * Rajendra Nayak <rnayak@ti.com> [130315 05:31]:
+>>>>> On Thursday 14 March 2013 10:36 PM, Tony Lindgren wrote:
+>>>>>> * Rajendra Nayak <rnayak@ti.com> [130314 05:44]:
+>>>>>>> OMAP clock inits happen quite early, even before the slab is available.
+>>>>>>> As part of the clock init, the common clock core tries to cache parent
+>>>>>>> pointers (if not passed by the caller registering the clock) which
+>>>>>>> fails in case of OMAP since the slab isn't initied.
+>>>>>>> Without CONFIG_DEBUG_SLAB enabled, this just results in the common clock core
+>>>>>>> retrying the caching attempt at some point later.
+>>>>>>> However with CONFIG_DEBUG_SLAB enabled this results in a BUG() as reported
+>>>>>>> in the link below by Tony..
+>>>>>>> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg85932.html
+>>>>>>>
+>>>>>>> Fix this by passing static parent pointers to the common clock core
+>>>>>>> while registering clocks.
+>>>>>>
+>>>>>> I wonder if we could easily fix this by initializing only some of the
+>>>>>> clocks that early?
+>>>>>
+>>>>> We actually don't need any clocks that early (I mean even before slab init)
+>>>>> We only need them before timer init.
+>>>>
+>>>> Yes and only the timer clocks at that point. The others could be initialized
+>>>> later on so we get console error messages without having to turn on DEBUG_LL
+>>>> and earlyprintk.
+>>>
+>>> but that wouldn't be possible with the hwmod dependency on clocks. We would
+>>> need to move the hwmod inits further down too.
+>>>
+>>>>  
+>>>>> This isn't something specific to OMAP so I started looking at what others
+>>>>> in drivers/clk seem to do.
+>>>>>
+>>>>> I found imx, spear, mvebu all do their clk inits within .init_time callbacks.
+>>>>> tegra seems to even do it within .init_irq callback.
+>>>>>
+>>>>> Either one would work for us too :)
+>>>>
+>>>> Well I suggest init_irq as that's when we need the first clocks for timer.
+>>>
+>>> For which platforms? I instead see them being needed only by init_timer, so
+>>> was thinking thats a better place instead.
+>>>
+>>> For the -rc fix to fix the crash with DEBUG_SLAB, is it fine if I move *all*
+>>> clock inits down to init_timer (or init_irq).
 >>
->> This patch seems to be ready to be applied.
+>> Sounds good to me for the -rc series. How about initialize omap_clk_init()
+>> function pointer in the SoC specific omap*_init_early() then just call
+>> omap_clk_init() in timer_init?
+>>  
+>>> Splitting clocks alone would not work for now, without hwmod being moved down also.
 >>
->> Magnus, could I get a review from you?
->
-> Magnus, ping.
+>> Good point. For the -rc series the sounds like your suggestion is the
+>> least intrusive fix and also gets us started removing few more early
+>> boot time dependencies.
+>>
+> 
+> +1 for removing the early init dependencies.  hwmod initialization was
+> the original impetus for all this static struct clk stuff.  If the
+> initialization for hwmod and the omap clocks can be moved to a later
+> callback then it is the first step in removing the static data and
+> getting rid of clk-private.h usage.
 
-Thanks for the ping. This patch looks good to me.
+I am working on that stuff to get rid of the dependency on clk-private.h
+Will post some RFC soon once I have omap4 working and if the approach seems
+fine, will move over all of omap so you can delete the clk-private.h
+completely :)
 
-Acked-by: Magnus Damm <damm@opensource.se>
-
-Now if we could do the same thing for the MSTP bits too then that
-would be excellent...
-
-/ magnus
+> 
+> Regards,
+> Mike
+> 
+>> Regards,
+>>
+>> Tony
