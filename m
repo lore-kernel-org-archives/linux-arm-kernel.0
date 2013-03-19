@@ -1,85 +1,38 @@
-From: mfuzzey@parkeon.com (Martin Fuzzey)
-Date: Tue, 19 Mar 2013 18:03:22 +0100
-Subject: [PATCH] Sound: sgtl5000 Allow codec clock frequency to be set.
-Message-ID: <20130319170322.27828.7691.stgit@localhost>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Tue, 19 Mar 2013 12:03:34 -0500
+Subject: ep93xx irq-vic regression
+In-Reply-To: <CACRpkdb9tpeTxEc8A24vTkcUsfd=gQpMub0KpgaKJjrGf-fSvg@mail.gmail.com>
+References: <ADE657CA350FB648AAC2C43247A983F0020980106C9F@AUSP01VMBX24.collaborationhost.net>
+ <5143AAB4.6020406@gmail.com>
+ <ADE657CA350FB648AAC2C43247A983F0020980106CB7@AUSP01VMBX24.collaborationhost.net>
+ <CACRpkdb9tpeTxEc8A24vTkcUsfd=gQpMub0KpgaKJjrGf-fSvg@mail.gmail.com>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F0020980107047@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If both clocks and clock-frequency DT properties are given set
-the clock frequency.
+On Monday, March 18, 2013 1:22 PM, Linus Walleij wrote:
+> On Sat, Mar 16, 2013 at 1:16 AM, H Hartley Sweeten <hartleys@visionengravers.com> wrote:
+>
+>> It looks like the commit above _did_ have a couple bugs but they were
+>> fixed:
+>
+> Oh thanks, I already was scared I had broken something again.
+> The irqdomain stuff is a bit fragile, everytime I refactor something
+> it blows up in my face. I hope there are no remaining problems.
 
-This is useful when a programmable clock is used as the codec clock.
+Linus,
 
-Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
----
- .../devicetree/bindings/sound/sgtl5000.txt         |   14 ++++++++++++++
- sound/soc/fsl/imx-sgtl5000.c                       |   20 ++++++++++++++++----
- 2 files changed, 30 insertions(+), 4 deletions(-)
+Sorry about not putting you in the loop with this.
 
-diff --git a/Documentation/devicetree/bindings/sound/sgtl5000.txt b/Documentation/devicetree/bindings/sound/sgtl5000.txt
-index 9cc4444..31e82f0 100644
---- a/Documentation/devicetree/bindings/sound/sgtl5000.txt
-+++ b/Documentation/devicetree/bindings/sound/sgtl5000.txt
-@@ -5,9 +5,23 @@ Required properties:
- 
- - reg : the I2C address of the device
- 
-+Optional properties:
-+- clocks:		phandle to of codec clock
-+- clock-frequency:	clock frequency to set or use (see below)
-+
-+If a clock is provided, clock-frequency is optional
-+
-+If no clock is provided clock-frequency is required (this represents the codec
-+being clocked by an external signal not present in the clock tree)
-+
-+If both a clock and clock-frequency are provided the clock's rate will be set.
-+
-+
- Example:
- 
- codec: sgtl5000 at 0a {
- 	compatible = "fsl,sgtl5000";
- 	reg = <0x0a>;
-+	clock-frequency = <20000000>;
-+	clocks = <&clks 162>; /* cko1 */
- };
-diff --git a/sound/soc/fsl/imx-sgtl5000.c b/sound/soc/fsl/imx-sgtl5000.c
-index 424347e..71ce1f6 100644
---- a/sound/soc/fsl/imx-sgtl5000.c
-+++ b/sound/soc/fsl/imx-sgtl5000.c
-@@ -128,18 +128,30 @@ static int imx_sgtl5000_probe(struct platform_device *pdev)
- 		goto fail;
- 	}
- 
-+	ret = of_property_read_u32(codec_np, "clock-frequency",
-+					&data->clk_frequency);
- 	data->codec_clk = clk_get(&codec_dev->dev, NULL);
-+
- 	if (IS_ERR(data->codec_clk)) {
--		/* assuming clock enabled by default */
-+		/* assuming clock enabled by default (frequency required) */
- 		data->codec_clk = NULL;
--		ret = of_property_read_u32(codec_np, "clock-frequency",
--					&data->clk_frequency);
--		if (ret) {
-+		if (!data->clk_frequency) {
- 			dev_err(&codec_dev->dev,
- 				"clock-frequency missing or invalid\n");
- 			goto fail;
- 		}
- 	} else {
-+		if (data->clk_frequency) {
-+			ret = clk_set_rate(
-+					data->codec_clk, data->clk_frequency);
-+			if (ret) {
-+				dev_err(&codec_dev->dev,
-+					"failed to set clock-frequency to %u\n",
-+					data->clk_frequency);
-+				goto fail;
-+			}
-+		}
-+
- 		data->clk_frequency = clk_get_rate(data->codec_clk);
- 		clk_prepare_enable(data->codec_clk);
- 	}
+The vic driver works fine on the ep93xx. As I stated, there _was_ a
+couple bugs in the driver but they have been fixed.
+
+It appears I was chasing a red herring with the vic driver. It ends up that
+my system was not booting due to a patch to the ep93xx uncompress.h
+header that was causing a deadlock in the early printk support.
+
+This has been fixed and Ryan Mallon has merged the patch into his
+ep93xx-fixes branch.
+
+Regards,
+Hartley
