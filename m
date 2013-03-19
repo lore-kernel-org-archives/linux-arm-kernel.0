@@ -1,71 +1,76 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 19 Mar 2013 07:22:14 -0500
-Subject: [PATCH 2/2] cpuidle / calxeda: remove redundant Kconfig option
-In-Reply-To: <1363080476-26555-2-git-send-email-daniel.lezcano@linaro.org>
-References: <1363080476-26555-1-git-send-email-daniel.lezcano@linaro.org>
- <1363080476-26555-2-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <51485876.307@gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 19 Mar 2013 08:40:26 -0400 (EDT)
+Subject: [RFC PATCH] ARM: mm: disable kmap_high_get() for SMP
+In-Reply-To: <20130319050503.GA8858@lge.com>
+References: <1362372667-953-1-git-send-email-iamjoonsoo.kim@lge.com>
+ <alpine.LFD.2.03.1303051642110.28820@syhkavp.arg>
+ <20130307081258.GA14839@lge.com>
+ <alpine.LFD.2.03.1303071721540.28820@syhkavp.arg>
+ <CAAmzW4NjefPV7tryvySfLXPy6Zcz3BLTvfxD=UnTKCqrRB3voQ@mail.gmail.com>
+ <20130319050503.GA8858@lge.com>
+Message-ID: <alpine.LFD.2.03.1303190838490.3069@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/12/2013 04:27 AM, Daniel Lezcano wrote:
-> When the CPU_IDLE and the ARCH_HIGHBANK options are set it is
-> pointless to define a new option CPU_IDLE_CALXEDA because it
-> is redundant.
-> 
-> The Makefile drivers directory contains a condition to compile
-> the cpuidle drivers:
-> 
-> obj-$(CONFIG_CPU_IDLE)          += cpuidle/
-> 
-> Hence, if CPU_IDLE is not set we won't enter this directory.
-> 
-> This patch removes the useless Kconfig option and replaces the
-> condition in the Makefile by CONFIG_ARCH_HIGHBANK.
+On Tue, 19 Mar 2013, Joonsoo Kim wrote:
 
-If I have multiple platforms including highbank compiled in, but want to
-disable cpuidle just for highbank, then you can't disable it at compile
-time.
-
-Also, with my PSCI support patches for highbank, it is no longer
-dependent on ARCH_HIGHBANK which gives us better compile test coverage.
-
-Rob
-
+> On Thu, Mar 07, 2013 at 07:35:51PM +0900, JoonSoo Kim wrote:
+> > 2013/3/7 Nicolas Pitre <nicolas.pitre@linaro.org>:
+> > > On Thu, 7 Mar 2013, Joonsoo Kim wrote:
+> > >
+> > >> Hello, Nicolas.
+> > >>
+> > >> On Tue, Mar 05, 2013 at 05:36:12PM +0800, Nicolas Pitre wrote:
+> > >> > On Mon, 4 Mar 2013, Joonsoo Kim wrote:
+> > >> >
+> > >> > > With SMP and enabling kmap_high_get(), it makes users of kmap_atomic()
+> > >> > > sequential ordered, because kmap_high_get() use global kmap_lock().
+> > >> > > It is not welcome situation, so turn off this optimization for SMP.
+> > >> >
+> > >> > I'm not sure I understand the problem.
+> > >> >
+> > >> > The lock taken by kmap_high_get() is released right away before that
+> > >> > function returns and therefore this is not actually serializing
+> > >> > anything.
+> > >>
+> > >> Yes, you understand what I want to say correctly.
+> > >> Sorry for bad explanation.
+> > >>
+> > >> Following is reasons why I send this patch with RFC tag.
+> > >>
+> > >> If we have more cpus, performance degration is possible although
+> > >> it is very short time to holding the lock in kmap_high_get().
+> > >>
+> > >> And kmap has maximum 512 entries(512 * 4K = 2M) and some mobile devices
+> > >> has 2G memory(highmem 1G>), so probability for finding matched entry
+> > >> is approximately < 1/512. This probability can be more decreasing
+> > >> for device which have more memory. So I think that waste time to find
+> > >> matched entry is more than saved time.
+> > >>
+> > >> Above is my humble opinion, so please let me know what I am missing.
+> > >
+> > > Please look at the kmap_high_get() code again.  It performs no
+> > > searching at all.  What it does is:
+> > 
+> > If page is not highmem, it may be already filtered in kmap_atomic().
+> > So we only consider highmem page.
+> > 
+> > For highmem page, it perform searching.
+> > In kmap_high_get(), page_address() is called.
+> > In page_address(), it hash PA and iterate a list for this hashed value.
+> > 
+> > And another advantage of disabling ARCH_NEEDS_KMAP_HIGH_GET is
+> > that kmap(), kunmap() works without irq disabled.
+> > 
+> > Thanks.
 > 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> ---
->  drivers/cpuidle/Kconfig  |   10 ----------
->  drivers/cpuidle/Makefile |    2 +-
->  2 files changed, 1 insertion(+), 11 deletions(-)
+> Hello, Nicolas.
 > 
-> diff --git a/drivers/cpuidle/Kconfig b/drivers/cpuidle/Kconfig
-> index c4cc27e..234ae65 100644
-> --- a/drivers/cpuidle/Kconfig
-> +++ b/drivers/cpuidle/Kconfig
-> @@ -30,13 +30,3 @@ config CPU_IDLE_GOV_MENU
->  
->  config ARCH_NEEDS_CPU_IDLE_COUPLED
->  	def_bool n
-> -
-> -if CPU_IDLE
-> -
-> -config CPU_IDLE_CALXEDA
-> -	bool "CPU Idle Driver for Calxeda processors"
-> -	depends on ARCH_HIGHBANK
-> -	help
-> -	  Select this to enable cpuidle on Calxeda processors.
-> -
-> -endif
-> diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
-> index 0d8bd55..d1aba71 100644
-> --- a/drivers/cpuidle/Makefile
-> +++ b/drivers/cpuidle/Makefile
-> @@ -5,5 +5,5 @@
->  obj-y += cpuidle.o driver.o governor.o sysfs.o governors/
->  obj-$(CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED) += coupled.o
->  
-> -obj-$(CONFIG_CPU_IDLE_CALXEDA) += cpuidle-calxeda.o
-> +obj-$(CONFIG_ARCH_HIGHBANK) += cpuidle-calxeda.o
->  obj-$(CONFIG_ARCH_KIRKWOOD) += cpuidle-kirkwood.o
-> 
+> For just confirm, you don't agree with this, right?
+
+Right, I don't agree.  I don't believe the saving you claim are bigger 
+than the advantages from this functionality.
+
+
+
+Nicolas
