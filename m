@@ -1,44 +1,39 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 19 Mar 2013 16:46:49 +0200
-Subject: USB: simplify clock lookup for mv ehci/otg/udc
-In-Reply-To: <2174936.bGhG5fu0iO@wuerfel>
-References: <2174936.bGhG5fu0iO@wuerfel>
-Message-ID: <20130319144649.GA21922@arwen.pp.htv.fi>
+From: kaloz@openwrt.org (Imre Kaloz)
+Date: Tue, 19 Mar 2013 15:55:18 +0100
+Subject: [PATCH 3/6] ARM: remove fa526 CPU support
+In-Reply-To: <201303191035.45874.arnd@arndb.de>
+References: <1363299178-8241-1-git-send-email-arnd@arndb.de>
+ <5146FB70.9000706@openwrt.org> <op.wt6rbsvq2s3iss@ecaz>
+ <201303191035.45874.arnd@arndb.de>
+Message-ID: <op.wt67qgso2s3iss@ecaz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, 19 Mar 2013 11:35:45 +0100, Arnd Bergmann <arnd@arndb.de> wrote:
 
-On Tue, Mar 19, 2013 at 02:44:46PM +0100, Arnd Bergmann wrote:
-> While going over the suggested changes for the ehci-mv separation patch,
-> we noticed that the driver uses a variable number of clock names it gets
-> passed from the platform code, which is highly unusual behavior and adds
-> a lot of extra complexity.
-> 
-> Even though there is a comment in the mv_udc driver stating that some SoCs
-> require multiple clocks, none of the code in the upstream kernel provides
-> more than one, and even if an out of tree SoC port needs multiple clocks,
-> it is still wrong to pass them them through platform data, since they are
-> a property of the device, not a property of the platform.
-> 
-> This patch attempts to clean up the situation by turning the one clock
-> that is passed into the ehci/udc/otg devices into an anomymous one and
-> removing the clkname array from the platform data. Another simplification
-> is to always call clk_prepare_enable/clk_disable_unprepare directly,
-> since that is a valid operation on a NULL clk pointer if the platform
-> has not attacked a clk to the device.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> On Tuesday 19 March 2013, Imre Kaloz wrote:
+>> I have two wbd111 boards, but their bootloader is fubared - for whatever
+>> reason the bootloader's ethernet support works horribly for me, as in an
+>> image transfer takes well over 10 mins, and 90% of the time it fails
+>> meantime. I have another gemini based board, which doesn't have mainline
+>> support, yet.
+>>
+>> So for gemini, what I can offer is digging up the wbd111 and testing your
+>> patches this weekend - if that works, it can stay in mainline for another
+>> kernel release, and I can try to add support for the other board (so
+>> there would be a sane platform to test on). If you are going to drop it,
+>> I will likely keep it working in OpenWrt as long as those boards don't
+>> die on me.
+>
+> Sounds good. If you are still interested in keeping the code alive, we
+> shouldn't drop it upstream. Can you also add a defconfig file that
+> enables all the gemini specific Kconfig code plus whatever you use
+> in OpenWRT?
+>
+> Part of the reason why the platform was so broken is that it never had
+> a defconfig, and we didn't notice the bitrot.
 
-needs to be rebased on my -next branch. Also, it would be really good if
-dependencies between drivers and arch code would be cut to a minimum.
+Sure, I'll try to get all of this done this weekend.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130319/327c63d9/attachment.sig>
+
+Imre
