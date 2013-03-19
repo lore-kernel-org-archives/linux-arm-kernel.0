@@ -1,39 +1,106 @@
-From: kaloz@openwrt.org (Imre Kaloz)
-Date: Tue, 19 Mar 2013 15:55:18 +0100
-Subject: [PATCH 3/6] ARM: remove fa526 CPU support
-In-Reply-To: <201303191035.45874.arnd@arndb.de>
-References: <1363299178-8241-1-git-send-email-arnd@arndb.de>
- <5146FB70.9000706@openwrt.org> <op.wt6rbsvq2s3iss@ecaz>
- <201303191035.45874.arnd@arndb.de>
-Message-ID: <op.wt67qgso2s3iss@ecaz>
+From: hechtb@gmail.com (Bastian Hecht)
+Date: Tue, 19 Mar 2013 16:10:57 +0100
+Subject: [PATCH v6 1/3] serial: sh-sci: Add OF support
+In-Reply-To: <1527167.zrgCvGiAzu@avalon>
+References: <1362569437-11133-1-git-send-email-hechtb+renesas@gmail.com>
+ <1689352.QAdqes1IG8@avalon> <20130312082038.GC3553@linux-sh.org>
+ <1527167.zrgCvGiAzu@avalon>
+Message-ID: <CABYn4sxAobmCZRfwdsbsrHqEqWFeW=+fFkPfZwCdvoDCN4sfAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 19 Mar 2013 11:35:45 +0100, Arnd Bergmann <arnd@arndb.de> wrote:
+Hi,
 
-> On Tuesday 19 March 2013, Imre Kaloz wrote:
->> I have two wbd111 boards, but their bootloader is fubared - for whatever
->> reason the bootloader's ethernet support works horribly for me, as in an
->> image transfer takes well over 10 mins, and 90% of the time it fails
->> meantime. I have another gemini based board, which doesn't have mainline
->> support, yet.
+2013/3/12 Laurent Pinchart <laurent.pinchart@ideasonboard.com>:
+> Hi Paul,
+>
+> On Tuesday 12 March 2013 17:20:39 Paul Mundt wrote:
+>> On Mon, Mar 11, 2013 at 11:32:31PM +0100, Laurent Pinchart wrote:
+>> > On Thursday 07 March 2013 11:26:29 Bastian Hecht wrote:
+>> > > >> +- renesas,scscr : Should contain a bitfield used by the Serial
+>> > > >> Control
+>> > > >> Register.
+>> > > >> +  b7 = SCSCR_TIE
+>> > > >> +  b6 = SCSCR_RIE
+>> > > >> +  b5 = SCSCR_TE
+>> > > >> +  b4 = SCSCR_RE
+>> > > >> +  b3 = SCSCR_REIE
+>> > > >> +  b2 = SCSCR_TOIE
+>> > > >> +  b1 = SCSCR_CKE1
+>> > > >> +  b0 = SCSCR_CKE0
+>> > > >
+>> > > > What is that for exactly ?
+>> > >
+>> > > What I can see from 3 different datasheets (sh7372, sh73a0, r8a7740)
+>> > > the first 2 bits differ in meaning.
+>> > >
+>> > > On r8a7740 it depends: In asynchronous mode the first 2 bits CKE0/1
+>> > > define whether you want to use an external clock to drive the baud
+>> > > generator or if you want to use the internal SUB clock. If you use the
+>> > > SUB clock you can further define if you want to use a subscaled SUB
+>> > > clock in the SCSMR register. In synchronous mode you must rely on the
+>> > > internal clock for the baud generator and can select if the SCK pin is
+>> > > used as clock input or output.
+>> >
+>> > What about adding an optional source clock property to the bindings, that
+>> > would contain the phandle of the source clock ? If the property is absent
+>> > then the internal clock would be used.
 >>
->> So for gemini, what I can offer is digging up the wbd111 and testing your
->> patches this weekend - if that works, it can stay in mainline for another
->> kernel release, and I can try to add support for the other board (so
->> there would be a sane platform to test on). If you are going to drop it,
->> I will likely keep it working in OpenWrt as long as those boards don't
->> die on me.
+>> We can't really use the internal oscillator at the moment, it's one of
+>> the things that is blocked on adoption of the common struct clk work. The
+>> baud rate generator algo will likewise differ depending on whether it's
+>> using an internally generated clock or not, which also makes a different
+>> set of baud rates available.
+>>
+>> My plan originally was to wait until the common struct clk stuff came
+>> along well enough that we could provide a clock dynamically depending on
+>> the target baud (or for avoiding cpufreq pre/post-change notifier
+>> chains), but this obviously hasn't happened yet.
+>>
+>> I think your idea for the abstraction with the phandle sounds like the
+>> right approach, but we aren't presently in a state where we can handle
+>> that.
 >
-> Sounds good. If you are still interested in keeping the code alive, we
-> shouldn't drop it upstream. Can you also add a defconfig file that
-> enables all the gemini specific Kconfig code plus whatever you use
-> in OpenWRT?
+> Do the platforms that will be converted to DT currently need to make the clock
+> source configurable ? If not we could just leave it out of the DT bindings
+> until needed. Hopefully by then we'll have a common clock framework
+> implementation.
+
+The r8a7779 does use the external clock (according to my r8a7740
+datasheet) while the other mainline SoCs use the internal one.
+
+>> > > Bit 2 and 3 don't exist in my datasheets.
+>> > >
+>> > > The other bits define under which conditions you receive interrupts
+>> > > (send FIFO empty, receive FIFO full) and which bits you need to start
+>> > > transfers (one bit to start sending, one receiving). The bits 8 to 31
+>> > > are used to set up DMA transfers and various interrupt events like
+>> > > error status and finish transfers. I haven't included them as they are
+>> > > not used in the driver.
+>> >
+>> > If they're not used maybe we can drop them :-)
+>>
+>> Obviously they're used, otherwise they wouldn't be defined in the common
+>> header. Whether they are used by these specific CPUs or not isn't
+>> relevant, as there are plenty of cases where they are. grep harder.
 >
-> Part of the reason why the platform was so broken is that it never had
-> a defconfig, and we didn't notice the bitrot.
+> My point is that if they're only used by arm/sh/* SoCs we don't need to
+> support them in DT.
 
-Sure, I'll try to get all of this done this weekend.
+Assuming that SCSCR_TE and SCSCR_RE are always used and we could
+handle the clock flags with a phandle and the other flags are only
+used in the realtime domain (where we don't want DT support?), I
+suppose we could indeed drop the whole property - but we would have to
+wait. Otherwise it's not so shiny but we could get it merged now. I
+don't know how to proceed now, any decision makers here?
+
+Cheers,
+
+ Bastian
 
 
-Imre
+> --
+> Regards,
+>
+> Laurent Pinchart
+>
