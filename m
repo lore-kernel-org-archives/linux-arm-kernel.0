@@ -1,105 +1,43 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 19 Mar 2013 19:00:56 +0530
-Subject: [PATCH v2 10/11] ARM: OMAP2+: hwmod: extract module address space
- from DT blob
+Date: Tue, 19 Mar 2013 19:00:57 +0530
+Subject: [PATCH v2 11/11] ARM: OMAP2+: omap_hwmod: Don't call
+ _init_mpu_rt_base if no sysc
 In-Reply-To: <1363699857-5505-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1363699857-5505-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1363699857-5505-11-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1363699857-5505-12-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch adds the code for extracting the module ocp address space from device
-tree blob in case the hwmod address space look up fails.
+OMAP hwmod layer does the reset of the IPs in early code so that
+we have SOC in sane state. To do the soft-reset, it needs to ioremap()
+the ip address space to be able to write to sysconfig registers.
 
-The idea is to remove the address space data from hwmod and extract it from
-DT blob.
+But there are few hwmod which doesn't have sysconfig registers and hence
+no need to ioremap() them in early init code.
+
+So this patch makes prevet calling the _init_mpu_rt_base() conditional
+based on sysc availability.
 
 Cc: Benoit Cousson <b-cousson@ti.com>
 
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod.c |   45 +++++++++++++++++++++++++++++++++++---
- 1 file changed, 42 insertions(+), 3 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index c2c798c..4501038 100644
+index 4501038..1a1f0a4 100644
 --- a/arch/arm/mach-omap2/omap_hwmod.c
 +++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -138,6 +138,8 @@
- #include <linux/spinlock.h>
- #include <linux/slab.h>
- #include <linux/bootmem.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
+@@ -2449,7 +2449,8 @@ static int __init _init(struct omap_hwmod *oh, void *data)
+ 	if (oh->_state != _HWMOD_STATE_REGISTERED)
+ 		return 0;
  
- #include <asm/system_misc.h>
+-	_init_mpu_rt_base(oh, NULL);
++	if (oh->class->sysc)
++		_init_mpu_rt_base(oh, NULL);
  
-@@ -2350,6 +2352,34 @@ static int _shutdown(struct omap_hwmod *oh)
- }
- 
- /**
-+ * of_dev_hwmod_lookup - look up needed hwmod from dt blob
-+ * @np: struct device_node *
-+ * @oh: struct omap_hwmod *
-+ *
-+ * Parse the dt blob and find out needed hwmod. Recursive function is
-+ * implemented to take care hierarchical dt blob parsing.
-+ * Return: The device node on success or NULL on failure.
-+ */
-+static struct device_node *of_dev_hwmod_lookup(struct device_node *np,
-+						struct omap_hwmod *oh)
-+{
-+	struct device_node *np0 = NULL, *np1 = NULL;
-+	const char *p;
-+
-+	for_each_child_of_node(np, np0) {
-+		if (of_find_property(np0, "ti,hwmods", NULL)) {
-+			p = of_get_property(np0, "ti,hwmods", NULL);
-+			if (!strcmp(p, oh->name))
-+				return np0;
-+			np1 = of_dev_hwmod_lookup(np0, oh);
-+			if (np1)
-+				return np1;
-+		}
-+	}
-+	return NULL;
-+}
-+
-+/**
-  * _init_mpu_rt_base - populate the virtual address for a hwmod
-  * @oh: struct omap_hwmod * to locate the virtual address
-  *
-@@ -2361,7 +2391,8 @@ static int _shutdown(struct omap_hwmod *oh)
- static void __init _init_mpu_rt_base(struct omap_hwmod *oh, void *data)
- {
- 	struct omap_hwmod_addr_space *mem;
--	void __iomem *va_start;
-+	void __iomem *va_start = NULL;
-+	struct device_node *np;
- 
- 	if (!oh)
- 		return;
-@@ -2375,10 +2406,18 @@ static void __init _init_mpu_rt_base(struct omap_hwmod *oh, void *data)
- 	if (!mem) {
- 		pr_debug("omap_hwmod: %s: no MPU register target found\n",
- 			 oh->name);
--		return;
-+
-+		/* Extract the IO space from device tree blob */
-+		if (!of_have_populated_dt())
-+			return;
-+
-+		np = of_dev_hwmod_lookup(of_find_node_by_name(NULL, "ocp"), oh);
-+		if (np)
-+			va_start = of_iomap(np, 0);
-+	} else {
-+		va_start = ioremap(mem->pa_start, mem->pa_end - mem->pa_start);
- 	}
- 
--	va_start = ioremap(mem->pa_start, mem->pa_end - mem->pa_start);
- 	if (!va_start) {
- 		pr_err("omap_hwmod: %s: Could not ioremap\n", oh->name);
- 		return;
+ 	r = _init_clocks(oh, NULL);
+ 	if (IS_ERR_VALUE(r)) {
 -- 
 1.7.9.5
