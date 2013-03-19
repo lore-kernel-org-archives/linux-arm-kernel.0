@@ -1,30 +1,26 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Tue, 19 Mar 2013 20:07:42 +0100
-Subject: [PATCH] pinctrl: mvebu: fix checking for SoC specific controls
-Message-ID: <1363720062-21395-1-git-send-email-simon.guinot@sequanux.org>
+From: florian@openwrt.org (Florian Fainelli)
+Date: Tue, 19 Mar 2013 20:48:41 +0100
+Subject: [BUG][mvebu] mvneta: cannot request irq 25 on openblocks-ax3
+In-Reply-To: <514895C5.40706@free-electrons.com>
+References: <51486445.8040506@hitachi.com> <514873FB.5050202@hitachi.com>
+ <514895C5.40706@free-electrons.com>
+Message-ID: <2482565.pAEcuMH9qj@bender>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes a minor bug (probably due to a typo) while checking
-the SoC specific controls in mvebu_pinctrl_probe().
+On Tuesday 19 March 2013 17:43:49 Gregory CLEMENT wrote:
+> 
+> Hi Masami,
+> 
+> You can try this patch if you want.
+> I don't have the hardware today so I didn't test it.
+> If you (and also Florian and Ezequiel) can test it and if it fixed
+> the bug, then I will be able send a proper email for it,
 
-Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
----
- drivers/pinctrl/mvebu/pinctrl-mvebu.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I just tested your patch on RD-A370-A1 and DB-MV784MP-GP and it works fine, 
+thanks! Feel free to add my Tested-by: Florian Fainelli <florian@openwrt.org> 
+to your next submission.
 
-diff --git a/drivers/pinctrl/mvebu/pinctrl-mvebu.c b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
-index c689c04..2d2f0a4 100644
---- a/drivers/pinctrl/mvebu/pinctrl-mvebu.c
-+++ b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
-@@ -620,7 +620,7 @@ int mvebu_pinctrl_probe(struct platform_device *pdev)
- 
- 		/* special soc specific control */
- 		if (ctrl->mpp_get || ctrl->mpp_set) {
--			if (!ctrl->name || !ctrl->mpp_set || !ctrl->mpp_set) {
-+			if (!ctrl->name || !ctrl->mpp_get || !ctrl->mpp_set) {
- 				dev_err(&pdev->dev, "wrong soc control info\n");
- 				return -EINVAL;
- 			}
+Thanks!
 -- 
-1.7.10.4
+Florian
