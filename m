@@ -1,40 +1,48 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 19 Mar 2013 14:17:38 +0900
-Subject: [PATCH 00/04] ARM: shmobile: TWD update
-In-Reply-To: <20130319031100.GA16504@verge.net.au>
-References: <20130306002214.5430.43766.sendpatchset@w520>
- <20130306015121.GE20819@verge.net.au>
- <20130319031100.GA16504@verge.net.au>
-Message-ID: <CANqRtoQw+dHcdHv1++WJbo=BWx+ez-Et++ZSLqitDss6PK361w@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 19 Mar 2013 05:39:53 +0000 (UTC)
+Subject: OMAP baseline test results for v3.9-rc2
+In-Reply-To: <alpine.DEB.2.00.1303141858320.28203@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1303141858320.28203@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.00.1303190537230.11826@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 19, 2013 at 12:11 PM, Simon Horman <horms@verge.net.au> wrote:
-> On Wed, Mar 06, 2013 at 10:51:22AM +0900, Simon Horman wrote:
->> On Wed, Mar 06, 2013 at 09:22:14AM +0900, Magnus Damm wrote:
->> > ARM: shmobile: TWD update
->> > [PATCH 01/04] ARM: shmobile: Register DT TWD from timer.c
->> > [PATCH 02/04] ARM: shmobile: Add EMEV2 specific timer_init
->> > [PATCH 03/04] ARM: shmobile: Add EMEV2 TWD support
->> > [PATCH 04/04] ARM: shmobile: Remove r8a7779_register_twd() from common.
->> >
->> > These patches are the first attempt to update the state of
->> > mach-shmobile TWD support. Patch 01/04 adds shared mach-shmobile
->> > code to allow TWD support via DT, patch 02/04 and 03/04 add TWD
->> > support to EMEV2 and the KZM9D board. Finally patch 04/04 removes
->> > unnecessary forward declaration.
->>
->> Hi Magnus,
->>
->> these seem fine to me. Let me know when they have stabilised.
->
-> Ping.
+Hi,
 
-Please wait with these for now. TWD by itself is OK, but it seems that
-the combination of TWD and STI doesn't work as I expected. Need to
-look into the clocks on EMEV2 in more detail, but no time for that at
-this point.
+restating these to reflect some bugfixes in the test log parsing scripts.
 
-Thanks,
+On Thu, 14 Mar 2013, Paul Walmsley wrote:
 
-/ magnus
+> vmlinux object size
+> (delta in bytes from test_v3.9-rc1 
+> (6dbe51c251a327e012439c4772097a13df43c5b8)):
+>    text     data      bss    total  kernel
+>  +13528      +64        0   +13592  omap1_defconfig
+>   +9440     +120        0    +9560  omap2plus_defconfig
+>  +13472     +128        0   +13600  omap2plus_defconfig_cpupm
+>  +13472     +128        0   +13600  omap2plus_defconfig_omap2_4_only
+>   +9756     +120        0    +9876  omap2plus_defconfig_omap3_4_only
+>    +704      -64     -188     +452  rmk_omap3430_ldp_allnoconfig
+>    +556      -64        0     +492  rmk_omap4430_sdp_oldconfig
+
+The correct and complete delta should be:
+
+vmlinux object size
+(delta in bytes from test_v3.9-rc1 
+(6dbe51c251a327e012439c4772097a13df43c5b8)):
+   text     data      bss    total  kernel
+   +620      -72       +4     +552  n800_multi_omap2xxx
+  +5860     +648      +12    +6520  n800_only_a
+  +9180      +88        0    +9268  omap1_defconfig_1510innovator_only
+  +9440     +120        0    +9560  omap2plus_defconfig
+ +13472     +128        0   +13600  omap2plus_defconfig_cpupm
+ +13528      +64        0   +13592  omap2plus_defconfig_no_pm
+ +13472     +128        0   +13600  omap2plus_defconfig_omap2_4_only
+  +9756     +120        0    +9876  omap2plus_defconfig_omap3_4_only
+   +704      -64     -188     +452  rmk_omap3430_ldp_allnoconfig
+   +656      -64        0     +592  rmk_omap3430_ldp_oldconfig
+   +704      -64     -188     +452  rmk_omap4430_sdp_allnoconfig
+   +556      -64        0     +492  rmk_omap4430_sdp_oldconfig
+
+
+- Paul
