@@ -1,105 +1,44 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 19 Mar 2013 11:52:49 +0100
-Subject: [PATCH] serial: 8250_dw: add support for clk api
-In-Reply-To: <1363689316-7847-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1363689316-7847-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1363690369-8067-1-git-send-email-maxime.ripard@free-electrons.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 19 Mar 2013 16:27:09 +0530
+Subject: [PATCH v3 02/11] clk: davinci - add PSC clock driver
+In-Reply-To: <CACRpkdaNfv13xxHyA0p9M7oqRqb7j0J9gvyYvYhgCs7-z4ifhQ@mail.gmail.com>
+References: <1351181518-11882-1-git-send-email-m-karicheri2@ti.com>
+ <1351181518-11882-3-git-send-email-m-karicheri2@ti.com>
+ <CACRpkdaNfv13xxHyA0p9M7oqRqb7j0J9gvyYvYhgCs7-z4ifhQ@mail.gmail.com>
+Message-ID: <51484485.3090503@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Emilio L?pez <emilio@elopez.com.ar>
+On 10/29/2012 12:54 AM, Linus Walleij wrote:
+> On Thu, Oct 25, 2012 at 6:11 PM, Murali Karicheri <m-karicheri2@ti.com> wrote:
+> 
+>> This is the driver for the Power Sleep Controller (PSC) hardware
+>> found on DM SoCs as well Keystone SoCs (c6x). This driver borrowed
+>> code from arch/arm/mach-davinci/psc.c and implemented the driver
+>> as per common clock provider API. The PSC module is responsible for
+>> enabling/disabling the Power Domain and Clock domain for different IPs
+>> present in the SoC. The driver is configured through the clock data
+>> passed to the driver through struct clk_psc_data.
+>>
+>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+> 
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> Here is some pedantic stuff if you're really bored:
+> 
+>> diff --git a/drivers/clk/davinci/clk-psc.c b/drivers/clk/davinci/clk-psc.c
+> (...)
+>> +               ptcmd = 1 << domain;
+> 
+> ptcmd = BIT(domain);
+> 
+>> +               pdctl = readl(psc_base + PDCTL + 4 * domain);
+>> +               pdctl |= 0x100;
+> 
+> pdctl |= BIT(8); /* and here a comment explaing what on earth that means */
 
-This commit implements support for using the clk api; this lets us use
-the "clocks" property with device tree, instead of having to use
-clock-frequency.
+It turns out this piece of code is superfluous and the exact same thing
+is being done again just down below.
 
-Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
----
- drivers/tty/serial/8250/8250_dw.c |   33 ++++++++++++++++++++++++---------
- 1 file changed, 24 insertions(+), 9 deletions(-)
-
-diff --git a/drivers/tty/serial/8250/8250_dw.c b/drivers/tty/serial/8250/8250_dw.c
-index db0e66f..3dedd24 100644
---- a/drivers/tty/serial/8250/8250_dw.c
-+++ b/drivers/tty/serial/8250/8250_dw.c
-@@ -26,6 +26,7 @@
- #include <linux/platform_device.h>
- #include <linux/slab.h>
- #include <linux/acpi.h>
-+#include <linux/clk.h>
- 
- #include "8250.h"
- 
-@@ -55,8 +56,9 @@
- 
- 
- struct dw8250_data {
--	int	last_lcr;
--	int	line;
-+	int		last_lcr;
-+	int		line;
-+	struct clk	*clk;
- };
- 
- static void dw8250_serial_out(struct uart_port *p, int offset, int value)
-@@ -136,8 +138,13 @@ static int dw8250_probe_of(struct uart_port *p)
- 	if (!of_property_read_u32(np, "reg-shift", &val))
- 		p->regshift = val;
- 
-+	/* clock got configured through clk api, all done */
-+	if (p->uartclk)
-+		return 0;
-+
-+	/* try to find out clock frequency from DT as fallback */
- 	if (of_property_read_u32(np, "clock-frequency", &val)) {
--		dev_err(p->dev, "no clock-frequency property set\n");
-+		dev_err(p->dev, "clk or clock-frequency not defined\n");
- 		return -EINVAL;
- 	}
- 	p->uartclk = val;
-@@ -294,9 +301,20 @@ static int dw8250_probe(struct platform_device *pdev)
- 	if (!uart.port.membase)
- 		return -ENOMEM;
- 
-+	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
-+	if (!data)
-+		return -ENOMEM;
-+
-+	data->clk = devm_clk_get(&pdev->dev, NULL);
-+	if (!IS_ERR(data->clk)) {
-+		clk_prepare_enable(data->clk);
-+		uart.port.uartclk = clk_get_rate(data->clk);
-+	}
-+
- 	uart.port.iotype = UPIO_MEM;
- 	uart.port.serial_in = dw8250_serial_in;
- 	uart.port.serial_out = dw8250_serial_out;
-+	uart.port.private_data = data;
- 
- 	dw8250_setup_port(&uart);
- 
-@@ -312,12 +330,6 @@ static int dw8250_probe(struct platform_device *pdev)
- 		return -ENODEV;
- 	}
- 
--	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
--	if (!data)
--		return -ENOMEM;
--
--	uart.port.private_data = data;
--
- 	data->line = serial8250_register_8250_port(&uart);
- 	if (data->line < 0)
- 		return data->line;
-@@ -333,6 +345,9 @@ static int dw8250_remove(struct platform_device *pdev)
- 
- 	serial8250_unregister_port(data->line);
- 
-+	if (!IS_ERR(data->clk))
-+		clk_disable_unprepare(data->clk);
-+
- 	return 0;
- }
- 
--- 
-1.7.10.4
+Thanks,
+Sekhar
