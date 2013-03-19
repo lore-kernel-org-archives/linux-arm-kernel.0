@@ -1,69 +1,79 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Tue, 19 Mar 2013 15:49:01 +0800
-Subject: [PATCH v7 10/14] spi/spi-atmel: correct 16 bits transfers with DMA
+Date: Tue, 19 Mar 2013 15:49:57 +0800
+Subject: [PATCH v7 11/14] ARM: at91: add clocks for spi dt entries
 In-Reply-To: <1363678866-3567-1-git-send-email-wenyou.yang@atmel.com>
 References: <1363678866-3567-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1363679341-4087-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1363679397-4125-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Richard Genoud <richard.genoud@gmail.com>
 
 Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
-Cc: spi-devel-general at lists.sourceforge.net
-Cc: linux-kernel at vger.kernel.org
+[<wenyou.yang at atmel.com: declare the spi clocks for sam9260, at91sam9g45, and at91sam9n12]
 [wenyou.yang at atmel.com: submit the patch]
 Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+Cc: linux at arm.linux.org.uk
+Cc: linux at maxim.org.za
+Cc: linux-kernel at vger.kernel.org
 ---
- drivers/spi/spi-atmel.c |   17 +++++++++++------
- 1 file changed, 11 insertions(+), 6 deletions(-)
+ arch/arm/mach-at91/at91sam9260.c |    2 ++
+ arch/arm/mach-at91/at91sam9g45.c |    2 ++
+ arch/arm/mach-at91/at91sam9n12.c |    2 ++
+ arch/arm/mach-at91/at91sam9x5.c  |    2 ++
+ 4 files changed, 8 insertions(+)
 
-diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-index 3aa3809..e6539b7 100644
---- a/drivers/spi/spi-atmel.c
-+++ b/drivers/spi/spi-atmel.c
-@@ -388,12 +388,18 @@ static inline int atmel_spi_xfer_can_be_chained(struct spi_transfer *xfer)
- }
- 
- static int atmel_spi_dma_slave_config(struct atmel_spi *as,
--				struct dma_slave_config *slave_config)
-+				struct dma_slave_config *slave_config,
-+				u8 bits_per_word)
- {
- 	int err = 0;
- 
--	slave_config->dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
--	slave_config->src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-+	if (bits_per_word > 8) {
-+		slave_config->dst_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
-+		slave_config->src_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
-+	} else {
-+		slave_config->dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-+		slave_config->src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-+	}
- 
- 	slave_config->dst_addr = (dma_addr_t)as->phybase + SPI_TDR;
- 	slave_config->src_addr = (dma_addr_t)as->phybase + SPI_RDR;
-@@ -454,7 +460,7 @@ static int atmel_spi_configure_dma(struct atmel_spi *as)
- 		goto error;
- 	}
- 
--	err = atmel_spi_dma_slave_config(as, &slave_config);
-+	err = atmel_spi_dma_slave_config(as, &slave_config, 8);
- 	if (err)
- 		goto error;
- 
-@@ -588,10 +594,9 @@ static int atmel_spi_next_xfer_dma_submit(struct spi_master *master,
- 
- 	*plen = len;
- 
--	if (atmel_spi_dma_slave_config(as, &slave_config))
-+	if (atmel_spi_dma_slave_config(as, &slave_config, 8))
- 		goto err_exit;
- 
--
- 	/* Send both scatterlists */
- 	rxdesc = rxchan->device->device_prep_slave_sg(rxchan,
- 					&as->dma.sgrx,
+diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
+index b67cd53..44199bc 100644
+--- a/arch/arm/mach-at91/at91sam9260.c
++++ b/arch/arm/mach-at91/at91sam9260.c
+@@ -232,6 +232,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
+ 	CLKDEV_CON_DEV_ID("t2_clk", "fffdc000.timer", &tc5_clk),
+ 	CLKDEV_CON_DEV_ID("hclk", "500000.ohci", &ohci_clk),
+ 	CLKDEV_CON_DEV_ID("mci_clk", "fffa8000.mmc", &mmc_clk),
++	CLKDEV_CON_DEV_ID("spi_clk", "fffc8000.spi", &spi0_clk),
++	CLKDEV_CON_DEV_ID("spi_clk", "fffcc000.spi", &spi1_clk),
+ 	/* fake hclk clock */
+ 	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &ohci_clk),
+ 	CLKDEV_CON_ID("pioA", &pioA_clk),
+diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
+index d3addee..2ec5efe 100644
+--- a/arch/arm/mach-at91/at91sam9g45.c
++++ b/arch/arm/mach-at91/at91sam9g45.c
+@@ -262,6 +262,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
+ 	CLKDEV_CON_DEV_ID("mci_clk", "fffd0000.mmc", &mmc1_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "fff84000.i2c", &twi0_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "fff88000.i2c", &twi1_clk),
++	CLKDEV_CON_DEV_ID("spi_clk", "fffa4000.spi", &spi0_clk),
++	CLKDEV_CON_DEV_ID("spi_clk", "fffa8000.spi", &spi1_clk),
+ 	/* fake hclk clock */
+ 	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &uhphs_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "fffff200.gpio", &pioA_clk),
+diff --git a/arch/arm/mach-at91/at91sam9n12.c b/arch/arm/mach-at91/at91sam9n12.c
+index 5dfc8fd..ccd0783 100644
+--- a/arch/arm/mach-at91/at91sam9n12.c
++++ b/arch/arm/mach-at91/at91sam9n12.c
+@@ -172,6 +172,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
+ 	CLKDEV_CON_DEV_ID("dma_clk", "ffffec00.dma-controller", &dma_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "f8010000.i2c", &twi0_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "f8014000.i2c", &twi1_clk),
++	CLKDEV_CON_DEV_ID("spi_clk", "f0000000.spi", &spi0_clk),
++	CLKDEV_CON_DEV_ID("spi_clk", "f0004000.spi", &spi1_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "fffff400.gpio", &pioAB_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "fffff600.gpio", &pioAB_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "fffff800.gpio", &pioCD_clk),
+diff --git a/arch/arm/mach-at91/at91sam9x5.c b/arch/arm/mach-at91/at91sam9x5.c
+index 44a9a62..a200d8a 100644
+--- a/arch/arm/mach-at91/at91sam9x5.c
++++ b/arch/arm/mach-at91/at91sam9x5.c
+@@ -237,6 +237,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
+ 	CLKDEV_CON_DEV_ID(NULL, "f8010000.i2c", &twi0_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "f8014000.i2c", &twi1_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "f8018000.i2c", &twi2_clk),
++	CLKDEV_CON_DEV_ID("spi_clk", "f0000000.spi", &spi0_clk),
++	CLKDEV_CON_DEV_ID("spi_clk", "f0004000.spi", &spi1_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "fffff400.gpio", &pioAB_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "fffff600.gpio", &pioAB_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "fffff800.gpio", &pioCD_clk),
 -- 
 1.7.9.5
