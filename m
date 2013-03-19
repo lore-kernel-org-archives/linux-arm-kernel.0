@@ -1,137 +1,134 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 19 Mar 2013 11:19:28 +0900
-Subject: [PATCH 06/14] irqchip: intc-irqpin: Cache mapped IRQ
+Date: Tue, 19 Mar 2013 11:19:30 +0900
+Subject: [PATCH 08/14] irqchip: intc-irqpin: Make use of devm functions
 In-Reply-To: <1363659576-6333-1-git-send-email-horms+renesas@verge.net.au>
 References: <1363659576-6333-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1363659576-6333-7-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1363659576-6333-9-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Cache IRQ in domain_irq variable instead of
-making use of irq_find_mapping(). While at it
-rename the irq variable to requested_irq.
+Use devm_kzalloc(), devm_ioremap_nocache()
+and devm_request_irq() to simplify error
+handling.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
 Tested-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/irqchip/irq-renesas-intc-irqpin.c |   30 +++++++++++++++--------------
- 1 file changed, 16 insertions(+), 14 deletions(-)
+ drivers/irqchip/irq-renesas-intc-irqpin.c |   41 +++++++++--------------------
+ 1 file changed, 13 insertions(+), 28 deletions(-)
 
 diff --git a/drivers/irqchip/irq-renesas-intc-irqpin.c b/drivers/irqchip/irq-renesas-intc-irqpin.c
-index 4b5933f..0ac2bf6 100644
+index 59c0cbc..21f4602 100644
 --- a/drivers/irqchip/irq-renesas-intc-irqpin.c
 +++ b/drivers/irqchip/irq-renesas-intc-irqpin.c
-@@ -61,7 +61,8 @@ struct intc_irqpin_iomem {
+@@ -294,7 +294,7 @@ static int intc_irqpin_probe(struct platform_device *pdev)
+ 	int ret;
+ 	int k;
  
- struct intc_irqpin_irq {
- 	int hw_irq;
--	int irq;
-+	int requested_irq;
-+	int domain_irq;
- 	struct intc_irqpin_priv *p;
- };
- 
-@@ -171,8 +172,7 @@ static int intc_irqpin_set_sense(struct intc_irqpin_priv *p, int irq, int value)
- static void intc_irqpin_dbg(struct intc_irqpin_irq *i, char *str)
- {
- 	dev_dbg(&i->p->pdev->dev, "%s (%d:%d:%d)\n",
--		str, i->irq, i->hw_irq,
--		irq_find_mapping(i->p->irq_domain, i->hw_irq));
-+		str, i->requested_irq, i->hw_irq, i->domain_irq);
- }
- 
- static void intc_irqpin_irq_enable(struct irq_data *d)
-@@ -196,7 +196,7 @@ static void intc_irqpin_irq_disable(struct irq_data *d)
- static void intc_irqpin_irq_enable_force(struct irq_data *d)
- {
- 	struct intc_irqpin_priv *p = irq_data_get_irq_chip_data(d);
--	int irq = p->irq[irqd_to_hwirq(d)].irq;
-+	int irq = p->irq[irqd_to_hwirq(d)].requested_irq;
- 
- 	intc_irqpin_irq_enable(d);
- 	irq_get_chip(irq)->irq_unmask(irq_get_irq_data(irq));
-@@ -205,7 +205,7 @@ static void intc_irqpin_irq_enable_force(struct irq_data *d)
- static void intc_irqpin_irq_disable_force(struct irq_data *d)
- {
- 	struct intc_irqpin_priv *p = irq_data_get_irq_chip_data(d);
--	int irq = p->irq[irqd_to_hwirq(d)].irq;
-+	int irq = p->irq[irqd_to_hwirq(d)].requested_irq;
- 
- 	irq_get_chip(irq)->irq_mask(irq_get_irq_data(irq));
- 	intc_irqpin_irq_disable(d);
-@@ -246,7 +246,7 @@ static irqreturn_t intc_irqpin_irq_handler(int irq, void *dev_id)
- 	if (intc_irqpin_read(p, INTC_IRQPIN_REG_SOURCE) & bit) {
- 		intc_irqpin_write(p, INTC_IRQPIN_REG_SOURCE, ~bit);
- 		intc_irqpin_dbg(i, "demux2");
--		generic_handle_irq(irq_find_mapping(p->irq_domain, i->hw_irq));
-+		generic_handle_irq(i->domain_irq);
- 		return IRQ_HANDLED;
- 	}
- 	return IRQ_NONE;
-@@ -257,6 +257,9 @@ static int intc_irqpin_irq_domain_map(struct irq_domain *h, unsigned int virq,
- {
- 	struct intc_irqpin_priv *p = h->host_data;
- 
-+	p->irq[hw].domain_irq = virq;
-+	p->irq[hw].hw_irq = hw;
-+
- 	intc_irqpin_dbg(&p->irq[hw], "map");
- 	irq_set_chip_data(virq, h->host_data);
- 	irq_set_chip_and_handler(virq, &p->irq_chip, handle_level_irq);
-@@ -314,9 +317,8 @@ static int intc_irqpin_probe(struct platform_device *pdev)
- 		if (!irq)
- 			break;
- 
--		p->irq[k].hw_irq = k;
- 		p->irq[k].p = p;
--		p->irq[k].irq = irq->start;
-+		p->irq[k].requested_irq = irq->start;
+-	p = kzalloc(sizeof(*p), GFP_KERNEL);
++	p = devm_kzalloc(&pdev->dev, sizeof(*p), GFP_KERNEL);
+ 	if (!p) {
+ 		dev_err(&pdev->dev, "failed to allocate driver data\n");
+ 		ret = -ENOMEM;
+@@ -316,7 +316,7 @@ static int intc_irqpin_probe(struct platform_device *pdev)
+ 		if (!io[k]) {
+ 			dev_err(&pdev->dev, "not enough IOMEM resources\n");
+ 			ret = -EINVAL;
+-			goto err1;
++			goto err0;
+ 		}
  	}
  
- 	p->number_of_irqs = k;
-@@ -389,7 +391,8 @@ static int intc_irqpin_probe(struct platform_device *pdev)
+@@ -334,7 +334,7 @@ static int intc_irqpin_probe(struct platform_device *pdev)
+ 	if (p->number_of_irqs < 1) {
+ 		dev_err(&pdev->dev, "not enough IRQ resources\n");
+ 		ret = -EINVAL;
+-		goto err1;
++		goto err0;
+ 	}
+ 
+ 	/* ioremap IOMEM and setup read/write callbacks */
+@@ -355,14 +355,15 @@ static int intc_irqpin_probe(struct platform_device *pdev)
+ 		default:
+ 			dev_err(&pdev->dev, "IOMEM size mismatch\n");
+ 			ret = -EINVAL;
+-			goto err2;
++			goto err0;
+ 		}
+ 
+-		i->iomem = ioremap_nocache(io[k]->start, resource_size(io[k]));
++		i->iomem = devm_ioremap_nocache(&pdev->dev, io[k]->start,
++						resource_size(io[k]));
+ 		if (!i->iomem) {
+ 			dev_err(&pdev->dev, "failed to remap IOMEM\n");
+ 			ret = -ENXIO;
+-			goto err2;
++			goto err0;
+ 		}
+ 	}
+ 
+@@ -395,17 +396,17 @@ static int intc_irqpin_probe(struct platform_device *pdev)
+ 	if (!p->irq_domain) {
+ 		ret = -ENXIO;
+ 		dev_err(&pdev->dev, "cannot initialize irq domain\n");
+-		goto err2;
++		goto err0;
+ 	}
  
  	/* request and set priority on interrupts one by one */
  	for (k = 0; k < p->number_of_irqs; k++) {
--		if (request_irq(p->irq[k].irq, intc_irqpin_irq_handler,
-+		if (request_irq(p->irq[k].requested_irq,
-+				intc_irqpin_irq_handler,
- 				0, name, &p->irq[k])) {
+-		if (request_irq(p->irq[k].requested_irq,
+-				intc_irqpin_irq_handler,
+-				0, name, &p->irq[k])) {
++		if (devm_request_irq(&pdev->dev, p->irq[k].requested_irq,
++				     intc_irqpin_irq_handler,
++				     0, name, &p->irq[k])) {
  			dev_err(&pdev->dev, "failed to request low IRQ\n");
  			ret = -ENOENT;
-@@ -402,17 +405,16 @@ static int intc_irqpin_probe(struct platform_device *pdev)
- 
- 	/* warn in case of mismatch if irq base is specified */
- 	if (p->config.irq_base) {
--		k = irq_find_mapping(p->irq_domain, 0);
--		if (p->config.irq_base != k)
-+		if (p->config.irq_base != p->irq[0].domain_irq)
- 			dev_warn(&pdev->dev, "irq base mismatch (%d/%d)\n",
--				 p->config.irq_base, k);
-+				 p->config.irq_base, p->irq[0].domain_irq);
+-			goto err3;
++			goto err1;
+ 		}
+ 		intc_irqpin_mask_unmask_prio(p, k, 0);
  	}
+@@ -421,16 +422,8 @@ static int intc_irqpin_probe(struct platform_device *pdev)
  
  	return 0;
  
- err3:
- 	for (; k >= 0; k--)
--		free_irq(p->irq[k - 1].irq, &p->irq[k - 1]);
-+		free_irq(p->irq[k - 1].requested_irq, &p->irq[k - 1]);
+-err3:
+-	for (; k >= 0; k--)
+-		free_irq(p->irq[k - 1].requested_irq, &p->irq[k - 1]);
+-
+-	irq_domain_remove(p->irq_domain);
+-err2:
+-	for (k = 0; k < INTC_IRQPIN_REG_NR; k++)
+-		iounmap(p->iomem[k].iomem);
+ err1:
+-	kfree(p);
++	irq_domain_remove(p->irq_domain);
+ err0:
+ 	return ret;
+ }
+@@ -438,17 +431,9 @@ err0:
+ static int intc_irqpin_remove(struct platform_device *pdev)
+ {
+ 	struct intc_irqpin_priv *p = platform_get_drvdata(pdev);
+-	int k;
+-
+-	for (k = 0; k < p->number_of_irqs; k++)
+-		free_irq(p->irq[k].requested_irq, &p->irq[k]);
  
  	irq_domain_remove(p->irq_domain);
- err2:
-@@ -430,7 +432,7 @@ static int intc_irqpin_remove(struct platform_device *pdev)
- 	int k;
  
- 	for (k = 0; k < p->number_of_irqs; k++)
--		free_irq(p->irq[k].irq, &p->irq[k]);
-+		free_irq(p->irq[k].requested_irq, &p->irq[k]);
- 
- 	irq_domain_remove(p->irq_domain);
+-	for (k = 0; k < INTC_IRQPIN_REG_NR; k++)
+-		iounmap(p->iomem[k].iomem);
+-
+-	kfree(p);
+ 	return 0;
+ }
  
 -- 
 1.7.10.4
