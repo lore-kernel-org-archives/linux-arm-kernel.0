@@ -1,93 +1,37 @@
-From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
-Date: Tue, 19 Mar 2013 14:05:03 +0900
-Subject: [RFC PATCH] ARM: mm: disable kmap_high_get() for SMP
-In-Reply-To: <CAAmzW4NjefPV7tryvySfLXPy6Zcz3BLTvfxD=UnTKCqrRB3voQ@mail.gmail.com>
-References: <1362372667-953-1-git-send-email-iamjoonsoo.kim@lge.com>
- <alpine.LFD.2.03.1303051642110.28820@syhkavp.arg>
- <20130307081258.GA14839@lge.com>
- <alpine.LFD.2.03.1303071721540.28820@syhkavp.arg>
- <CAAmzW4NjefPV7tryvySfLXPy6Zcz3BLTvfxD=UnTKCqrRB3voQ@mail.gmail.com>
-Message-ID: <20130319050503.GA8858@lge.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Tue, 19 Mar 2013 14:15:29 +0900
+Subject: [PATCH v3 1/3] ARM: shmobile: sh73a0: wait for completion when
+ kicking the clock
+In-Reply-To: <20130319034214.GB21444@verge.net.au>
+References: <1362054120-8600-1-git-send-email-g.liakhovetski@gmx.de>
+ <1362054120-8600-2-git-send-email-g.liakhovetski@gmx.de>
+ <20130301025222.GA32306@verge.net.au>
+ <20130319034214.GB21444@verge.net.au>
+Message-ID: <CANqRtoSk9PQWsU2E5b_CuO9AaE69fZ7GMzSjUz7DjjCY+Xcr2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 07, 2013 at 07:35:51PM +0900, JoonSoo Kim wrote:
-> 2013/3/7 Nicolas Pitre <nicolas.pitre@linaro.org>:
-> > On Thu, 7 Mar 2013, Joonsoo Kim wrote:
-> >
-> >> Hello, Nicolas.
-> >>
-> >> On Tue, Mar 05, 2013 at 05:36:12PM +0800, Nicolas Pitre wrote:
-> >> > On Mon, 4 Mar 2013, Joonsoo Kim wrote:
-> >> >
-> >> > > With SMP and enabling kmap_high_get(), it makes users of kmap_atomic()
-> >> > > sequential ordered, because kmap_high_get() use global kmap_lock().
-> >> > > It is not welcome situation, so turn off this optimization for SMP.
-> >> >
-> >> > I'm not sure I understand the problem.
-> >> >
-> >> > The lock taken by kmap_high_get() is released right away before that
-> >> > function returns and therefore this is not actually serializing
-> >> > anything.
-> >>
-> >> Yes, you understand what I want to say correctly.
-> >> Sorry for bad explanation.
-> >>
-> >> Following is reasons why I send this patch with RFC tag.
-> >>
-> >> If we have more cpus, performance degration is possible although
-> >> it is very short time to holding the lock in kmap_high_get().
-> >>
-> >> And kmap has maximum 512 entries(512 * 4K = 2M) and some mobile devices
-> >> has 2G memory(highmem 1G>), so probability for finding matched entry
-> >> is approximately < 1/512. This probability can be more decreasing
-> >> for device which have more memory. So I think that waste time to find
-> >> matched entry is more than saved time.
-> >>
-> >> Above is my humble opinion, so please let me know what I am missing.
-> >
-> > Please look at the kmap_high_get() code again.  It performs no
-> > searching at all.  What it does is:
-> 
-> If page is not highmem, it may be already filtered in kmap_atomic().
-> So we only consider highmem page.
-> 
-> For highmem page, it perform searching.
-> In kmap_high_get(), page_address() is called.
-> In page_address(), it hash PA and iterate a list for this hashed value.
-> 
-> And another advantage of disabling ARCH_NEEDS_KMAP_HIGH_GET is
-> that kmap(), kunmap() works without irq disabled.
-> 
-> Thanks.
+On Tue, Mar 19, 2013 at 12:42 PM, Simon Horman <horms@verge.net.au> wrote:
+> On Fri, Mar 01, 2013 at 11:52:25AM +0900, Simon Horman wrote:
+>> On Thu, Feb 28, 2013 at 01:21:58PM +0100, Guennadi Liakhovetski wrote:
+>> > To reconfigure clocks, controlled by FRQCRA and FRQCRB, a kick bit has to
+>> > be set and to make sure the setting has taken effect, it has to be read
+>> > back repeatedly until it is cleared by the hardware. This patch adds the
+>> > waiting part, that was missing until now.
+>> >
+>> > Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+>>
+>> This patch seems to be ready to be applied.
+>>
+>> Magnus, could I get a review from you?
+>
+> Magnus, ping.
 
-Hello, Nicolas.
+Thanks for the ping. This patch looks good to me.
 
-For just confirm, you don't agree with this, right?
+Acked-by: Magnus Damm <damm@opensource.se>
 
-Thanks.
+Now if we could do the same thing for the MSTP bits too then that
+would be excellent...
 
-> 
-> > - lock the kmap array against concurrent changes
-> >
-> > - if the given page is not highmem, unlock and return NULL
-> >
-> > - otherwise increment that page reference count, unlock, and return the
-> >   mapped address for that page.
-> >
-> > There is almost zero cost to this function, independently of the number
-> > of kmap entries, whereas it does save much bigger costs elsewhere when
-> > it is successful.
-> >
-> >
-> > Nicolas
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> > Please read the FAQ at  http://www.tux.org/lkml/
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+/ magnus
