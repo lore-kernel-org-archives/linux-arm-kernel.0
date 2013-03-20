@@ -1,33 +1,35 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 20 Mar 2013 17:54:07 -0500
-Subject: [PATCH 07/11] ARM: versatile: add versatile dtbs to dtbs target
+Date: Wed, 20 Mar 2013 17:54:06 -0500
+Subject: [PATCH 06/11] ARM: dts: vexpress: disable CA9 core tile sp804 timer
 In-Reply-To: <1363820051-24428-1-git-send-email-robherring2@gmail.com>
 References: <1363820051-24428-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1363820051-24428-8-git-send-email-robherring2@gmail.com>
+Message-ID: <1363820051-24428-7-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-Add the versatile platform dtbs to the dtbs make rule.
+The motherboard sp804 timer is used, but core tile sp804 timer is not.
+According to Russell King, the clock configuration is undocumented and
+defaults to 32kHz which is not desireable. So mark core tile sp804 timer
+as disabled.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 ---
- arch/arm/boot/dts/Makefile |    2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/boot/dts/vexpress-v2p-ca9.dts |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 9c62558..08d298d 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -165,6 +165,8 @@ dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harmony.dtb \
- 	tegra30-cardhu-a04.dtb \
- 	tegra114-dalmore.dtb \
- 	tegra114-pluto.dtb
-+dtb-$(CONFIG_ARCH_VERSATILE) += versatile-ab.dtb \
-+	versatile-pb.dtb
- dtb-$(CONFIG_ARCH_VEXPRESS) += vexpress-v2p-ca5s.dtb \
- 	vexpress-v2p-ca9.dtb \
- 	vexpress-v2p-ca15-tc1.dtb \
+diff --git a/arch/arm/boot/dts/vexpress-v2p-ca9.dts b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
+index 1420bb1..62d9b22 100644
+--- a/arch/arm/boot/dts/vexpress-v2p-ca9.dts
++++ b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
+@@ -98,6 +98,7 @@
+ 			     <0 49 4>;
+ 		clocks = <&oscclk2>, <&oscclk2>;
+ 		clock-names = "timclk", "apb_pclk";
++		status = "disabled";
+ 	};
+ 
+ 	watchdog at 100e5000 {
 -- 
 1.7.10.4
