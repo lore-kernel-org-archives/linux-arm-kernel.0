@@ -1,110 +1,69 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 20 Mar 2013 16:09:41 +0100
-Subject: [PATCH] mmc: mvsdio: use dev_*() API instead of pr_*() API
-Message-ID: <1363792181-26512-1-git-send-email-thomas.petazzoni@free-electrons.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 20 Mar 2013 16:09:35 +0100
+Subject: [PATCH for 3.9-rc] arm: mvebu: Use local interrupt only for the timer
+ 0
+Message-ID: <1363792175-3136-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mvsdio driver was already using some dev_*() functions to print
-some messages, but still using pr_*() functions for some others. This
-patch converts all messages to use dev_*() functions.
+The commit 3a6f08a37 "arm: mvebu: Add support for local interrupt",
+managed the 28th first interrupts as local interrupt to match the
+hardware specification. Among these interrupts there are the Gigabits
+Ethernet ones used by the mvneta driver. Unfortunately the state of
+the percpu_irq API prevents the driver to use it.
 
-Many of the pr_*() function calls were printing the output of
-mmc_hostname() to preprend the message with an identifier for the
-device. Since the dev_*() functions do that automatically, this patch
-also gets rid of those string prefixes.
+Indeed the interrupts have to be freed when the .stop() function is
+called. As the free_percpu_irq() function don't disable the interrupt
+line, we have to do it on each CPU before calling this. The function
+disable_percpu_irq() only disable the percpu on the current CPU and
+there is no function which allows to disable a percpu irq on a given
+CPU. Waiting for the extension of the percpu_irq API, this fix allows
+to use again the mvneta driver.
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
-This is for 3.10.
----
- drivers/mmc/host/mvsdio.c |   37 +++++++++++++++----------------------
- 1 file changed, 15 insertions(+), 22 deletions(-)
+ arch/arm/mach-mvebu/irq-armada-370-xp.c |    8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/mmc/host/mvsdio.c b/drivers/mmc/host/mvsdio.c
-index 145cdaf..3cce2de 100644
---- a/drivers/mmc/host/mvsdio.c
-+++ b/drivers/mmc/host/mvsdio.c
-@@ -119,10 +119,8 @@ static int mvsd_setup_data(struct mvsd_host *host, struct mmc_data *data)
- 		host->pio_size = data->blocks * data->blksz;
- 		host->pio_ptr = sg_virt(data->sg);
- 		if (!nodma)
--			pr_debug("%s: fallback to PIO for data "
--					  "at 0x%p size %d\n",
--					  mmc_hostname(host->mmc),
--					  host->pio_ptr, host->pio_size);
-+			dev_dbg(host->dev, "fallback to PIO for data at 0x%p size %d\n",
-+				host->pio_ptr, host->pio_size);
- 		return 1;
- 	} else {
- 		dma_addr_t phys_addr;
-@@ -473,8 +471,8 @@ static irqreturn_t mvsd_irq(int irq, void *dev)
- 		if (mrq->data)
- 			err_status = mvsd_finish_data(host, mrq->data, err_status);
- 		if (err_status) {
--			pr_err("%s: unhandled error status %#04x\n",
--					mmc_hostname(host->mmc), err_status);
-+			dev_err(host->dev, "unhandled error status %#04x\n",
-+				err_status);
- 			cmd->error = -ENOMSG;
- 		}
+diff --git a/arch/arm/mach-mvebu/irq-armada-370-xp.c b/arch/arm/mach-mvebu/irq-armada-370-xp.c
+index 274ff58..6a9195e 100644
+--- a/arch/arm/mach-mvebu/irq-armada-370-xp.c
++++ b/arch/arm/mach-mvebu/irq-armada-370-xp.c
+@@ -44,6 +44,8 @@
  
-@@ -491,9 +489,8 @@ static irqreturn_t mvsd_irq(int irq, void *dev)
- 	if (irq_handled)
- 		return IRQ_HANDLED;
+ #define ARMADA_370_XP_MAX_PER_CPU_IRQS		(28)
  
--	pr_err("%s: unhandled interrupt status=0x%04x en=0x%04x "
--			"pio=%d\n", mmc_hostname(host->mmc), intr_status,
--			host->intr_en, host->pio_size);
-+	dev_err(host->dev, "%s: unhandled interrupt status=0x%04x en=0x%04x pio=%d\n",
-+		intr_status, host->intr_en, host->pio_size);
- 	return IRQ_NONE;
- }
++#define ARMADA_370_XP_TIMER0_PER_CPU_IRQ	(5)
++
+ #define ACTIVE_DOORBELLS			(8)
  
-@@ -507,13 +504,11 @@ static void mvsd_timeout_timer(unsigned long data)
- 	spin_lock_irqsave(&host->lock, flags);
- 	mrq = host->mrq;
- 	if (mrq) {
--		pr_err("%s: Timeout waiting for hardware interrupt.\n",
--				mmc_hostname(host->mmc));
--		pr_err("%s: hw_state=0x%04x, intr_status=0x%04x "
--				"intr_en=0x%04x\n", mmc_hostname(host->mmc),
--				mvsd_read(MVSD_HW_STATE),
--				mvsd_read(MVSD_NOR_INTR_STATUS),
--				mvsd_read(MVSD_NOR_INTR_EN));
-+		dev_err(host->dev, "Timeout waiting for hardware interrupt.\n");
-+		dev_err(host->dev, "hw_state=0x%04x, intr_status=0x%04x intr_en=0x%04x\n",
-+			mvsd_read(MVSD_HW_STATE),
-+			mvsd_read(MVSD_NOR_INTR_STATUS),
-+			mvsd_read(MVSD_NOR_INTR_EN));
+ static DEFINE_RAW_SPINLOCK(irq_controller_lock);
+@@ -62,7 +64,7 @@ static void armada_370_xp_irq_mask(struct irq_data *d)
+ #ifdef CONFIG_SMP
+ 	irq_hw_number_t hwirq = irqd_to_hwirq(d);
  
- 		host->mrq = NULL;
- 
-@@ -778,7 +773,7 @@ static int __init mvsd_probe(struct platform_device *pdev)
- 
- 	ret = devm_request_irq(&pdev->dev, irq, mvsd_irq, 0, DRIVER_NAME, host);
- 	if (ret) {
--		pr_err("%s: cannot assign irq %d\n", DRIVER_NAME, irq);
-+		dev_err(&pdev->dev, "cannot assign irq %d\n", irq);
- 		goto out;
- 	}
- 
-@@ -797,13 +792,11 @@ static int __init mvsd_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto out;
- 
--	pr_notice("%s: %s driver initialized, ",
--			   mmc_hostname(mmc), DRIVER_NAME);
- 	if (!(mmc->caps & MMC_CAP_NEEDS_POLL))
--		printk("using GPIO %d for card detection\n",
--		       gpio_card_detect);
-+		dev_notice(&pdev->dev, "using GPIO %d for card detection\n",
-+			   gpio_card_detect);
+-	if (hwirq > ARMADA_370_XP_MAX_PER_CPU_IRQS)
++	if (hwirq != ARMADA_370_XP_TIMER0_PER_CPU_IRQ)
+ 		writel(hwirq, main_int_base +
+ 				ARMADA_370_XP_INT_CLEAR_ENABLE_OFFS);
  	else
--		printk("lacking card detect (fall back to polling)\n");
-+		dev_notice(&pdev->dev, "lacking card detect (fall back to polling)\n");
- 	return 0;
+@@ -79,7 +81,7 @@ static void armada_370_xp_irq_unmask(struct irq_data *d)
+ #ifdef CONFIG_SMP
+ 	irq_hw_number_t hwirq = irqd_to_hwirq(d);
  
- out:
+-	if (hwirq > ARMADA_370_XP_MAX_PER_CPU_IRQS)
++	if (hwirq != ARMADA_370_XP_TIMER0_PER_CPU_IRQ)
+ 		writel(hwirq, main_int_base +
+ 				ARMADA_370_XP_INT_SET_ENABLE_OFFS);
+ 	else
+@@ -147,7 +149,7 @@ static int armada_370_xp_mpic_irq_map(struct irq_domain *h,
+ 	writel(hw, main_int_base + ARMADA_370_XP_INT_SET_ENABLE_OFFS);
+ 	irq_set_status_flags(virq, IRQ_LEVEL);
+ 
+-	if (hw < ARMADA_370_XP_MAX_PER_CPU_IRQS) {
++	if (hw == ARMADA_370_XP_TIMER0_PER_CPU_IRQ) {
+ 		irq_set_percpu_devid(virq);
+ 		irq_set_chip_and_handler(virq, &armada_370_xp_irq_chip,
+ 					handle_percpu_devid_irq);
 -- 
 1.7.9.5
