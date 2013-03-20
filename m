@@ -1,43 +1,27 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Wed, 20 Mar 2013 12:13:31 +0100
-Subject: [PATCH] S3C24XX: remove unneeded "config SMDK2440_CPU2442"
-Message-ID: <1363778011.1390.96.camel@x61.thuisdomein>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 20 Mar 2013 11:13:46 +0000
+Subject: [PATCH 0/2] arm: prima2: add support for CSR SiRFatlas6 SoC
+In-Reply-To: <1363590279-5656-1-git-send-email-Barry.Song@csr.com>
+References: <1363590279-5656-1-git-send-email-Barry.Song@csr.com>
+Message-ID: <201303201113.47164.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Kconfig entry for SMDK2440_CPU2442 was moved from one Kconfig file
-to another in commit acf2d41d8595829eb0ac7bf6891f4875a78d4d6e ("ARM:
-S3C24XX: Move mach-s3c2440/ pll into mach-s3c24xx/"). In that move it
-also lost its statement to select CPU_S3C2442. That was not needed
-anymore because it now depended on that same symbol.
+On Monday 18 March 2013, Barry Song wrote:
+> SiRFatlas6 is much similar with SiRFprimaII with some changes about:
+> 1. deleted l2 cache, sdmmc4, multimedia and so on
+> 2. changed pinmux layout and clock layout
+> 3. DMA access limitation disappears, that makes us not need DMA_ZONE
+>    on atlas6
+> 
+> Barry Song (2):
+>   arm: prima2: add new SiRFatlas6 machine in common board
+>   ARM/dts: prima2: add .dtsi for atlas6 and .dts for atla6-evb board
+> 
 
-But without its select this entry became a nop: enabling it has no
-effect, as it changes no code. It can safely be removed.
+It seems I forgot to reply here when I applied these to the next/soc branch.
 
-Fix a related, and trivial, comment typo too.
+I have also prepared a series on top of your patches to update mach-prima2
+for multiplatform support that I'll send out for review in a bit.
 
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
----
-Untested.
-
- arch/arm/mach-s3c24xx/Kconfig | 5 +----
- 1 file changed, 1 insertion(+), 4 deletions(-)
-
-diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
-index 37f513d..92c07a2 100644
---- a/arch/arm/mach-s3c24xx/Kconfig
-+++ b/arch/arm/mach-s3c24xx/Kconfig
-@@ -663,10 +663,7 @@ config MACH_RX1950
- 	help
- 	   Say Y here if you're using HP iPAQ rx1950
- 
--config SMDK2440_CPU2442
--	bool "SMDM2440 with S3C2442 CPU module"
--
--endif	# CPU_S3C2440
-+endif	# CPU_S3C2442
- 
- if CPU_S3C2443 || CPU_S3C2416
- 
--- 
-1.7.11.7
+	Arnd
