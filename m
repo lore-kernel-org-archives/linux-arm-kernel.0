@@ -1,45 +1,41 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Wed, 20 Mar 2013 22:28:23 +0800
-Subject: [PATCH 1/8] pinctrl: sirf: convert to linear irq domain
-In-Reply-To: <1363779679-16880-2-git-send-email-arnd@arndb.de>
-References: <1363779679-16880-1-git-send-email-arnd@arndb.de>
- <1363779679-16880-2-git-send-email-arnd@arndb.de>
-Message-ID: <CAGsJ_4zRhRX+g9Xf6RSPFtXrer+_7-hg2WCsVjAtRpY=q7tqtg@mail.gmail.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Wed, 20 Mar 2013 23:36:04 +0900
+Subject: [PATCH 00/04] ARM: shmobile: r8a7790 SoC and Lager board support
+Message-ID: <20130320143604.32377.32634.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+ARM: shmobile: r8a7790 SoC and Lager board support
 
-2013/3/20 Arnd Bergmann <arnd@arndb.de>:
-> The sirf platforms use no hardcoded IRQ numbers, so there is no reason to
-> use the legacy domain, and by converting to the linear domain, we get
-> a more efficient representation of sparse IRQs and remove the dependency
-> on the mach/irqs.h header file.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
+[PATCH 01/04] ARM: shmobile: Initial r8a7790 SoC support
+[PATCH 02/04] ARM: shmobile: r8a7790 SCIF support
+[PATCH 03/04] ARM: shmobile: r8a7790 IRQC support
+[PATCH 04/04] ARM: shmobile: Lager support
 
-a dependency issue is recently i sent a patch for re-arch sirf
-pinctrl, pull the soc-specific pin/group/functionality layout out of
-the drivers/pinctrl/pinctrl-sirf.c, and created new seperate
-soc-layout files for prima2 and atlas6 in drivers/pinctrl/sirf.
-Barry Song:
-[PATCH]pinctrl:sirf:re-arch and add support for new SiRFatlas6 SoC
-http://www.spinics.net/lists/arm-kernel/msg230700.html
-i will merge yours with that.
+This series adds initial support for r8a7790 and Lager. The SoC
+is known as r8a7790 which is built around Cortex-A15 and makes use
+of SCIF for serial and IRQC interrupt controller for external IRQs.
 
-Hi Linus,
-would you give some comments about that sirf re-arch patch, i hope all
-of them could be in 3.10.
+This initial SoC and board support is providing limited DT-only
+support and a very basic C-version of board support. In the future
+improved PINCTRL and clock framework support will be added, followed
+by SMP support.
 
-> ---
->  drivers/pinctrl/pinctrl-sirf.c | 10 +++-------
->  1 file changed, 3 insertions(+), 7 deletions(-)
->
-> diff --git a/drivers/pinctrl/pinctrl-sirf.c b/drivers/pinctrl/pinctrl-sirf.c
-> index d02498b..a0bc78b 100644
-> --- a/drivers/pinctrl/pinctrl-sirf.c
-> +++ b/drivers/pinctrl/pinctrl-sirf.c
-> @@ -1485,7 +1485,6 @@ static void sirfsoc_gpio_handle_irq(unsigned int irq, struct irq_desc *desc)
+Implemented in same style as r8a73a4 SoC V2 and APE6EVM Board V2.
 
--barry
+Signed-off-by: Magnus Damm <damm@opensource.se>
+---
+
+ Written against all+next in renesas.git plus r8a73a4 patches
+ [PATCH 03/04] requires the IRQC driver to build
+
+ arch/arm/boot/dts/Makefile                    |    1 
+ arch/arm/boot/dts/r8a7790-lager.dts           |   26 +++++
+ arch/arm/boot/dts/r8a7790.dtsi                |   63 ++++++++++++
+ arch/arm/mach-shmobile/Kconfig                |   17 +++
+ arch/arm/mach-shmobile/Makefile               |    2 
+ arch/arm/mach-shmobile/board-lager.c          |   46 +++++++++
+ arch/arm/mach-shmobile/clock-r8a7790.c        |   95 ++++++++++++++++++
+ arch/arm/mach-shmobile/include/mach/r8a7790.h |    7 +
+ arch/arm/mach-shmobile/setup-r8a7790.c        |  127 +++++++++++++++++++++++++
+ 9 files changed, 382 insertions(+), 2 deletions(-)
