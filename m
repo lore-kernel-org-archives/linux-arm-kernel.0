@@ -1,61 +1,46 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 19 Mar 2013 21:27:06 -0500
-Subject: [PATCH] ARM: cache-l2x0: fix masking of RTL revision numbering
-Message-ID: <1363746426-14921-1-git-send-email-robherring2@gmail.com>
+From: bilhuang@nvidia.com (Bill Huang)
+Date: Tue, 19 Mar 2013 19:55:49 -0700
+Subject: [PATCH 1/1] clk: Add notifier support in clk_prepare/clk_unprepare
+In-Reply-To: <20130319170140.8663.93388@quantum>
+References: <1363699712-8124-1-git-send-email-bilhuang@nvidia.com>
+ <20130319170140.8663.93388@quantum>
+Message-ID: <1363748149.8815.16.camel@bilhuang-vm1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
-
-Commit b8db6b8 (ARM: 7547/4: cache-l2x0: add support for Aurora L2 cache
-ctrl) moved the masking of the part ID which caused the RTL version to be
-lost. This breaks commit 74ddcdb (ARM: 7608/1: l2x0: Only set .set_debug
-on PL310 r3p0 and earlier) which uses the RTL version to apply a
-work-around. This also caused the printed cache ID to be missing the
-version information.
-
-The cache-id-part DT property does not set the RTL bits so masking them
-should have no effect.
-
-Reported-by: Paolo Pisati <paolo.pisati@canonical.com>
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Cc: Yehuda Yitschak <yehuday@marvell.com>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/mm/cache-l2x0.c |    7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index c2f3739..d457653 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -299,7 +299,7 @@ static void l2x0_unlock(u32 cache_id)
- 	int lockregs;
- 	int i;
- 
--	switch (cache_id) {
-+	switch (cache_id & L2X0_CACHE_ID_PART_MASK) {
- 	case L2X0_CACHE_ID_PART_L310:
- 		lockregs = 8;
- 		break;
-@@ -333,15 +333,14 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
- 	if (cache_id_part_number_from_dt)
- 		cache_id = cache_id_part_number_from_dt;
- 	else
--		cache_id = readl_relaxed(l2x0_base + L2X0_CACHE_ID)
--			& L2X0_CACHE_ID_PART_MASK;
-+		cache_id = readl_relaxed(l2x0_base + L2X0_CACHE_ID);
- 	aux = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
- 
- 	aux &= aux_mask;
- 	aux |= aux_val;
- 
- 	/* Determine the number of ways */
--	switch (cache_id) {
-+	switch (cache_id & L2X0_CACHE_ID_PART_MASK) {
- 	case L2X0_CACHE_ID_PART_L310:
- 		if (aux & (1 << 16))
- 			ways = 16;
--- 
-1.7.10.4
+On Wed, 2013-03-20 at 01:01 +0800, Mike Turquette wrote:
+> Quoting Bill Huang (2013-03-19 06:28:32)
+> > Add notifier calls in clk_prepare and clk_unprepare so drivers which are
+> > interested in knowing that clk_prepare/unprepare call can act accordingly.
+> > 
+> > The existing "clk_set_rate" notifier is not enough for normal DVFS
+> > inplementation since clock might be enabled/disabled at runtime. Adding
+> > these notifiers is useful on DVFS core which take clk_prepare as a hint
+> > on that the notified clock might be enabled later so it can raise voltage
+> > to a safe level before enabling the clock, and take clk_unprepare as a
+> > hint that the clock has been disabled and is safe to lower the voltage.
+> > 
+> > The added notifier events are:
+> > 
+> > PRE_CLK_PREPARE
+> > POST_CLK_PREPARE
+> > ABORT_CLK_PREPARE
+> > PRE_CLK_UNPREPARE
+> > POST_CLK_UNPREPARE
+> > 
+> > Signed-off-by: Bill Huang <bilhuang@nvidia.com>
+> 
+> I'm still not sure about this approach.  Based on feedback I got from
+> Linaro Connect I am not convinced that scaling voltage through clk
+> rate-change notifiers is the right way to go.  As I understand it this
+> patch only exists for that single purpose, so if the voltage-notifier
+> idea gets dropped then I will not take this patch in.
+> 
+Thanks Mike, actually we won't use your "clk: notifier handler for
+dynamic voltage scaling" patch instead we are trying to port our DVFS
+into Non-CPU DVFS framework "devfreq" which will need to hook those
+notifiers, without the clock notifiers been extended the framework is
+useless for us since we cannot do polling due to the fact that polling
+is not in real time. If it ended up extending the notifiers cannot
+happen then the only choice for us I think would be giving up "devfreq"
+and implement them in Tegra's "clk_hw".
