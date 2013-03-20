@@ -1,19 +1,29 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 20 Mar 2013 10:36:50 -0300
-Subject: [PATCH 1/2] ARM: mach-pca100: Add CONFIG_USB_ULPI dependency
-In-Reply-To: <20130320062026.GD25876@arwen.pp.htv.fi>
-References: <1363743553-17295-1-git-send-email-festevam@gmail.com>
- <20130320062026.GD25876@arwen.pp.htv.fi>
-Message-ID: <CAOMZO5C85WjtWLrk_EPnH=9sGMkkURkEu-EAzd-3yTgQtuAnng@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 20 Mar 2013 22:41:01 +0900
+Subject: [GIT PULL] Renesas ARM-based SoC fixes for v3.9
+In-Reply-To: <201303190840.41141.arnd@arndb.de>
+References: <1362757104-7498-1-git-send-email-horms+renesas@verge.net.au>
+ <201303181057.21955.arnd@arndb.de>
+ <20130319021649.GB4946@verge.net.au>
+ <201303190840.41141.arnd@arndb.de>
+Message-ID: <20130320134101.GO16436@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 20, 2013 at 3:20 AM, Felipe Balbi <balbi@ti.com> wrote:
+On Tue, Mar 19, 2013 at 08:40:40AM +0000, Arnd Bergmann wrote:
+> On Tuesday 19 March 2013, Simon Horman wrote:
+> 
+> > > 
+> > > Upon closer inspection, you seem to have missed the tag name. I have
+> > > pulled your renesas-fixes-for-v3.9 tag into the arm-soc fixes branch
+> > > now and will include it in my pull request to Linus today.
+> > 
+> > Sorry about that. I must have sent the pull request before the
+> > tag hit kernel.org and failed to notice that the tag was missing
+> > from the above email message.
+> > 
+> 
+> No worries, it made it in, and I just screwed up in a similar way
+> when sending a pull request to Linus ....
 
-> how about just providing a static inline nop on <linux/usb/ulpi.h> ??
-
-Good idea. Just sent a patch doing this to the linux-usb list.
-
-Thanks,
-
-Fabio Estevam
+:^)
