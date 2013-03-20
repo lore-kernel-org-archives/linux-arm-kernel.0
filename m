@@ -1,57 +1,89 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 20 Mar 2013 12:41:15 +0100
-Subject: [PATCH 4/8] ARM: sirf: enable sparse IRQ
+Date: Wed, 20 Mar 2013 12:41:16 +0100
+Subject: [PATCH 5/8] ARM: sirf: move debug-macro.S to include/debug/sirf.S
 In-Reply-To: <1363779679-16880-1-git-send-email-arnd@arndb.de>
 References: <1363779679-16880-1-git-send-email-arnd@arndb.de>
-Message-ID: <1363779679-16880-5-git-send-email-arnd@arndb.de>
+Message-ID: <1363779679-16880-6-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that both irqchips for sirf are converted to not rely on
-legacy domains, let's move all of the platform over to sparse
-IRQ.
+The new style ll_debug implementation for multiplatform requires the
+platform glue to be in include/debug, so let's move it there to
+separate the debugging logic from the platform code.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/Kconfig                         |  1 +
- arch/arm/mach-prima2/include/mach/irqs.h | 17 -----------------
- 2 files changed, 1 insertion(+), 17 deletions(-)
- delete mode 100644 arch/arm/mach-prima2/include/mach/irqs.h
+ arch/arm/Kconfig.debug                                  |  1 +
+ .../include/mach/debug-macro.S => include/debug/sirf.S} | 17 +++++++++++++++--
+ arch/arm/mach-prima2/lluart.c                           | 12 +++++++++++-
+ 3 files changed, 27 insertions(+), 3 deletions(-)
+ rename arch/arm/{mach-prima2/include/mach/debug-macro.S => include/debug/sirf.S} (53%)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 5bfd584..c674b32 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -427,6 +427,7 @@ config ARCH_SIRF
- 	select PINCTRL
- 	select PINCTRL_SIRF
- 	select USE_OF
-+	select SPARSE_IRQ
- 	help
- 	  Support for CSR SiRFprimaII/Marco/Polo platforms
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index acdddda..a69334d 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -592,6 +592,7 @@ config DEBUG_LL_INCLUDE
+ 	default "debug/mvebu.S" if DEBUG_MVEBU_UART
+ 	default "debug/omap2plus.S" if DEBUG_OMAP2PLUS_UART
+ 	default "debug/picoxcell.S" if DEBUG_PICOXCELL_UART
++	default "debug/sirf.S" if DEBUG_SIRFPRIMA2_UART1 || DEBUG_SIRFMARCO_UART1
+ 	default "debug/socfpga.S" if DEBUG_SOCFPGA_UART
+ 	default "debug/sunxi.S" if DEBUG_SUNXI_UART0 || DEBUG_SUNXI_UART1
+ 	default "debug/vexpress.S" if DEBUG_VEXPRESS_UART0_DETECT || \
+diff --git a/arch/arm/mach-prima2/include/mach/debug-macro.S b/arch/arm/include/debug/sirf.S
+similarity index 53%
+rename from arch/arm/mach-prima2/include/mach/debug-macro.S
+rename to arch/arm/include/debug/sirf.S
+index cd97492..dbf250c 100644
+--- a/arch/arm/mach-prima2/include/mach/debug-macro.S
++++ b/arch/arm/include/debug/sirf.S
+@@ -6,8 +6,21 @@
+  * Licensed under GPLv2 or later.
+  */
  
-diff --git a/arch/arm/mach-prima2/include/mach/irqs.h b/arch/arm/mach-prima2/include/mach/irqs.h
-deleted file mode 100644
-index b778a0f..0000000
---- a/arch/arm/mach-prima2/include/mach/irqs.h
-+++ /dev/null
-@@ -1,17 +0,0 @@
--/*
-- * arch/arm/mach-prima2/include/mach/irqs.h
-- *
-- * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
-- *
-- * Licensed under GPLv2 or later.
-- */
--
--#ifndef __ASM_ARCH_IRQS_H
--#define __ASM_ARCH_IRQS_H
--
--#define SIRFSOC_INTENAL_IRQ_START  0
--#define SIRFSOC_INTENAL_IRQ_END    127
--#define SIRFSOC_GPIO_IRQ_START     (SIRFSOC_INTENAL_IRQ_END + 1)
--#define NR_IRQS	288
--
--#endif
+-#include <mach/hardware.h>
+-#include <mach/uart.h>
++#if defined(CONFIG_DEBUG_SIRFPRIMA2_UART1)
++#define SIRFSOC_UART1_PA_BASE          0xb0060000
++#elif defined(CONFIG_DEBUG_SIRFMARCO_UART1)
++#define SIRFSOC_UART1_PA_BASE          0xcc060000
++#else
++#define SIRFSOC_UART1_PA_BASE          0
++#endif
++
++#define SIRFSOC_UART1_VA_BASE		0xFEC60000
++
++#define SIRFSOC_UART_TXFIFO_STATUS	0x0114
++#define SIRFSOC_UART_TXFIFO_DATA	0x0118
++
++#define SIRFSOC_UART1_TXFIFO_FULL                       (1 << 5)
++#define SIRFSOC_UART1_TXFIFO_EMPTY			(1 << 6)
+ 
+ 	.macro	addruart, rp, rv, tmp
+ 	ldr	\rp, =SIRFSOC_UART1_PA_BASE		@ physical
+diff --git a/arch/arm/mach-prima2/lluart.c b/arch/arm/mach-prima2/lluart.c
+index a89f9b3..7222481 100644
+--- a/arch/arm/mach-prima2/lluart.c
++++ b/arch/arm/mach-prima2/lluart.c
+@@ -10,7 +10,17 @@
+ #include <asm/page.h>
+ #include <asm/mach/map.h>
+ #include <mach/map.h>
+-#include <mach/uart.h>
++
++#if defined(CONFIG_DEBUG_SIRFPRIMA2_UART1)
++#define SIRFSOC_UART1_PA_BASE          0xb0060000
++#elif defined(CONFIG_DEBUG_SIRFMARCO_UART1)
++#define SIRFSOC_UART1_PA_BASE          0xcc060000
++#else
++#define SIRFSOC_UART1_PA_BASE          0
++#endif
++
++#define SIRFSOC_UART1_VA_BASE          SIRFSOC_VA(0x060000)
++#define SIRFSOC_UART1_SIZE		SZ_4K
+ 
+ void __init sirfsoc_map_lluart(void)
+ {
 -- 
 1.8.1.2
