@@ -1,65 +1,34 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 20 Mar 2013 15:06:23 -0300
-Subject: [PATCH v3 1/1 net-next] NET: FEC: dynamtic check DMA desc buff
- type
-In-Reply-To: <20130320160418.GG20530@pengutronix.de>
-References: <1357265063-30528-1-git-send-email-Frank.Li@freescale.com>
- <20130320160418.GG20530@pengutronix.de>
-Message-ID: <CAOMZO5BZ6Zqowd+gCXFy9QbU0HKD1HAsy+a_-cZuYQujHLgoXg@mail.gmail.com>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Wed, 20 Mar 2013 23:36:22 +0530
+Subject: [PATCH 3/4] ARM: tegra: dalmore: add dt node for TPS65090's
+ regulators
+In-Reply-To: <5149EA8F.6090806@nvidia.com>
+References: <1363787070-14801-1-git-send-email-ldewangan@nvidia.com>
+ <1363787070-14801-4-git-send-email-ldewangan@nvidia.com>
+ <5149EA8F.6090806@nvidia.com>
+Message-ID: <5149FA9E.6010702@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 20, 2013 at 1:04 PM, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
-> Hello,
+On Wednesday 20 March 2013 10:27 PM, Rhyland Klein wrote:
+> On 3/20/2013 9:44 AM, Laxman Dewangan wrote:
+> +			regulators {
+> +				dcdc1 {
+> +					regulator-name = "vdd-sys-5v0";
+> +					regulator-always-on;
+> +					regulator-boot-on;
+> +				};
+> You should also add the tps65090_dcdc1_reg label to dcdc1. I believe you
+> make use of it in patch 4 and this currently causes build breaks.
 >
-> On Fri, Jan 04, 2013 at 10:04:23AM +0800, Frank Li wrote:
->> MX6 and mx28 support enhanced DMA descriptor buff to support 1588
->> ptp. But MX25, MX3x, MX5x can't support enhanced DMA descriptor buff.
->> Check fec type and choose correct DMA descriptor buff type.
->>
->> Remove static config CONFIG_FEC_PTP.
->> ptp function will be auto detected.
-> Your patch (now as ff43da86c69d76a726ffe7d1666148960dc1d108 in v3.9-rc1)
-> breaks building with CONFIG_FEC=m:
->
->         ERROR: "fec_ptp_init" [drivers/net/ethernet/freescale/fec.ko] undefined!
->         ERROR: "fec_ptp_ioctl" [drivers/net/ethernet/freescale/fec.ko] undefined!
->         ERROR: "fec_ptp_start_cyclecounter" [drivers/net/ethernet/freescale/fec.ko] undefined!
 
-What about this fix?
+Actually patch 4 uses this label and I should add on patch 4, not on 
+patch 3.
 
----
- drivers/net/ethernet/freescale/fec_ptp.c |    3 +++
- 1 file changed, 3 insertions(+)
+I removed from patch3 and when cherrypick the patch 4 from different 
+branch to make the patches, I missed the change and hence patch 4 is not 
+getting compiled.
 
-diff --git a/drivers/net/ethernet/freescale/fec_ptp.c
-b/drivers/net/ethernet/freescale/fec_ptp.c
-index 1f17ca0..0d8df40 100644
---- a/drivers/net/ethernet/freescale/fec_ptp.c
-+++ b/drivers/net/ethernet/freescale/fec_ptp.c
-@@ -128,6 +128,7 @@ void fec_ptp_start_cyclecounter(struct net_device *ndev)
+I will fix the issue on next revision.
 
- 	spin_unlock_irqrestore(&fep->tmreg_lock, flags);
- }
-+EXPORT_SYMBOL(fec_ptp_start_cyclecounter);
-
- /**
-  * fec_ptp_adjfreq - adjust ptp cycle frequency
-@@ -318,6 +319,7 @@ int fec_ptp_ioctl(struct net_device *ndev, struct
-ifreq *ifr, int cmd)
- 	return copy_to_user(ifr->ifr_data, &config, sizeof(config)) ?
- 	    -EFAULT : 0;
- }
-+EXPORT_SYMBOL(fec_ptp_ioctl);
-
- /**
-  * fec_time_keep - call timecounter_read every second to avoid timer overrun
-@@ -383,3 +385,4 @@ void fec_ptp_init(struct net_device *ndev, struct
-platform_device *pdev)
- 		pr_info("registered PHC device on %s\n", ndev->name);
- 	}
- }
-+EXPORT_SYMBOL(fec_ptp_init);
--- 
-1.7.9.5
+Sorry for messing up and thins for pointing this.
