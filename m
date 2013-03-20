@@ -1,78 +1,80 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 21 Mar 2013 00:35:52 +0100
-Subject: [PATCH] mxs/spi: Add SPI slave mode operation DT prop
-In-Reply-To: <CA+7tXihDGgkq_FALfGW_2xzcZc4wgm_YiAMepSjT4Y2b1ULd+w@mail.gmail.com>
-References: <1345776161-9778-1-git-send-email-marex@denx.de>
- <CA+7tXihDGgkq_FALfGW_2xzcZc4wgm_YiAMepSjT4Y2b1ULd+w@mail.gmail.com>
-Message-ID: <201303210035.52984.marex@denx.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 20 Mar 2013 18:54:24 -0500
+Subject: Integrator PCI base dilemma
+In-Reply-To: <CACRpkdaOjFhWR21w5x_rR_60ffQF3Ym_MQd2svNyzm0guwOUoQ@mail.gmail.com>
+References: <CACRpkdaOjFhWR21w5x_rR_60ffQF3Ym_MQd2svNyzm0guwOUoQ@mail.gmail.com>
+Message-ID: <514A4C30.9080402@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Trent Piepho,
-
-> On Thu, Aug 23, 2012 at 7:42 PM, Marek Vasut
+On 03/20/2013 06:15 PM, Linus Walleij wrote:
+> When trying to convert the Integrator/AP to use Device Tree
+> for the PCI bridge/hose I run into these two problems:
 > 
-> <marex-ynQEQJNshbs@public.gmane.org> wrote:
-> > This allows user to select the slave mode of operation of the controller.
-> > This is by no means standard, see the binding documentation for details,
-> > there is plenty of them. Sadly, such knowledge is not provided in the
-> > chip documentation. Hopefully, this mode of operation might come useful
-> > for people who do know very well what they are doing, otherwise this
-> > should never be touched.
+> - Unable to assign vga_base early since this should be a virtual
+>   address assigned really early. If I sacrifice this and try to
+>   just remap the stuff, I still run into:
+
+This could be a fixed mapping like we did for the i/o space.
+
+> - Unable to ioremap the PCI memory and config window because
+>   it is 16 MiB big. (I guess this is the problem?)
 > 
-> Thanks for posting this, as it's something I'm trying to get it working
-> too.
+> Part of the code path is called from .map_io() and basically looks
+> like this:
 > 
-> You're right that the Freescale documentation says almost nothing
-> about slave mode.  I found some STMP36xx on the rockbox site,
-> http://www.rockbox.org/wiki/pub/Main/SigmaTelSTMP3xxx/stmp36xx-Datasheet-1-
-> 02_050306.pdf, however it doesn't provide any more information about slave
-> mode than the imx28 RM.  In fact it's virtually the same word for word,
-> other than some bits that are marked reserved in the imx28 are defined in
-> stmp36xx (wonder if the FIFO stuff is still there in the imx28?).
-> What STMP36xx documentation did you find that had more information?
-
-I spammed Freescale with service requests.
-
-> > +		   - If the SPI master generates clock at n MHz, the speed
-> > +		     of the SPI slave controller must be at least 4-8 times
-> > +		     faster, this is due to the controller samples the CLK
+> int __init pci_v3_early_init(void)
+> {
+> 	iotable_init(pci_v3_io_desc, ARRAY_SIZE(pci_v3_io_desc));
+> 	vga_base = PCI_MEMORY_VADDR;
+> 	pci_map_io_early(__phys_to_pfn(PHYS_PCI_IO_BASE));
+> 	return 0;
+> }
 > 
-> When you say the SPI slave clock must be 4x higher than the master
-> clock, do you mean the rate programmed for what would be the SPI clock
-> in master mode: SSP_SCK in the HW_SSP_TIMING register.  Or the rate of
-> the clock to the SSP block: SSPCLK as programmed via the CLKCTRL
-> block's registers, e..g. HW_CLKCTRL_SSP1?
+> The VGA console seems to be the sole user (unsure what
+> pci_map_io_early() is for), and we like to support VGA console.
 
-The SPI clock (aka. sampling clock of the SCK line).
+It's for the same problem you have, but for the i/o space.
 
-> > +		   - The DMA has to wait indefinitelly for the arriving data.
 > 
-> Is there a reason that this must be done?  I'd guess that after the
-> SSP is told to start a transfer in slave mode it waits for the master
-> to assert the SSn line and begin the transfer.  If the completion
-> times out before this happens then it makes sense it wouldn't work.
-> But does it still not work if the SPI transfer completes before the
-> completion timeout?  Or is this necessary because in your application
-> there might be a long wait before the master chooses to initiate a
-> transfer after you program it on the Linux side?
+> The problem is that at this point at iomap the device tree is not yet
+> populated.
+> 
+> We can attempt to do it later but then the kernel hangs when
+> I try to remap the two 16MiB chunks for the non-prefetched
+> memory and the config window.
+> 
+> The iomem table looks like this:
+> 
+> /*
+>  * Static mappings for the PCIv3 bridge
+>  *
+>  * e8000000	40000000	PCI memory		PHYS_PCI_MEM_BASE	(max 512M)
+>  * ec000000	61000000	PCI config space	PHYS_PCI_CONFIG_BASE	(max 16M)
+>  * fee00000	60000000	PCI IO			PHYS_PCI_IO_BASE	(max 16M)
+>  */
+> static struct map_desc pci_v3_io_desc[] __initdata __maybe_unused = {
+> 	{
+> 		.virtual	= (unsigned long)PCI_MEMORY_VADDR,
+> 		.pfn		= __phys_to_pfn(PHYS_PCI_MEM_BASE),
+> 		.length		= SZ_16M,
+> 		.type		= MT_DEVICE
+> 	}, {
+> 		.virtual	= (unsigned long)PCI_CONFIG_VADDR,
+> 		.pfn		= __phys_to_pfn(PHYS_PCI_CONFIG_BASE),
+> 		.length		= SZ_16M,
+> 		.type		= MT_DEVICE
+> 	}
+> };
+> 
+> Does anyone have any hints on how to get out of this need to have the
+> base addresses so early?
 
-The problem is the SPI block in slave mode ignores SS being pulled back up.
+Wouldn't the drivers' ioremap create a mapping with the the memory
+space? The only user of this mapping may be VGA.
 
-> In my case I have a device that is mostly a SPI slave, except it wants
-> to drive the clock itself, most unfortunately.  It doesn't drive the
-> slave select, rather the imx28 will still drive that (I assume I'll
-> need to use a GPIO and loop it back to SSn to trick the SSP into
-> thinking the "master" has asserted the slave select).  So really, I'm
-> doing SPI master transactions on the Linux side, but need to put the
-> SSP into slave mode to get the clock right.  This makes it quite a bit
-> easier to do on Linux than a general slave mode, which is quite the
-> can of worms.  I tried creating an I2C slave mode framework for
-> another application but was never happy with it.  I imagine this is
-> why no one has ever created a general spi slave framework for Linux.
+For the config space, how much do you really need? You could ioremap
+this on demand. I think this issue came up before on another platform
+where the config space was very sparsely accessed.
 
-SPI slave is hard because you can not anticipate the amount of data you will 
-receive. You can not anticipate when you will receive those either.
-
-Best regards,
-Marek Vasut
+Rob
