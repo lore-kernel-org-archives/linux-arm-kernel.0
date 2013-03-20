@@ -1,77 +1,21 @@
-From: prakash.pm@ti.com (Manjunathappa, Prakash)
-Date: Wed, 20 Mar 2013 16:16:59 +0530
-Subject: [PATCH v4 5/5] ARM: davinci: da850-evm: add SPI flash support
-In-Reply-To: <1363776419-10563-1-git-send-email-prakash.pm@ti.com>
-References: <1363776419-10563-1-git-send-email-prakash.pm@ti.com>
-Message-ID: <1363776419-10563-6-git-send-email-prakash.pm@ti.com>
+From: B37400@freescale.com (Singh Sandeep-B37400)
+Date: Wed, 20 Mar 2013 10:51:42 +0000
+Subject: [PATCH 1/4] Device tree entry for Freescale TDM controller
+In-Reply-To: <1362655668-26721-1-git-send-email-Sandeep@freescale.com>
+References: <1362655668-26721-1-git-send-email-Sandeep@freescale.com>
+Message-ID: <3F1D9DCAAB49B94D88DBE05911FA4E6E06FB2040@039-SN1MPN1-001.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable m25p64 SPI flash support on da850-EVM. Also
-add partition information of SPI flash.
+Any comments on this patch set??
 
-Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
----
-Since v2:
-Fixed partition sizes.
+Regards,
+Sandeep
 
-Since v1:
-Look for m25p64 instead of m25p80.
-Corrected the filesystem partition information.
 
- arch/arm/boot/dts/da850-evm.dts |   40 +++++++++++++++++++++++++++++++++++++++
- 1 files changed, 40 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
-index c359872..fe2bbe7 100644
---- a/arch/arm/boot/dts/da850-evm.dts
-+++ b/arch/arm/boot/dts/da850-evm.dts
-@@ -41,6 +41,46 @@
- 		wdt: wdt at 1c21000 {
- 			status = "okay";
- 		};
-+		spi1: spi at 1f0e000 {
-+			status = "okay";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&spi1_pins>;
-+			flash: m25p80 at 0 {
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				compatible = "m25p64";
-+				spi-max-frequency = <30000000>;
-+				reg = <0>;
-+				partition at 0 {
-+					label = "U-Boot-SPL";
-+					reg = <0x00000000 0x00010000>;
-+					read-only;
-+				};
-+				partition at 1 {
-+					label = "U-Boot";
-+					reg = <0x00010000 0x00080000>;
-+					read-only;
-+				};
-+				partition at 2 {
-+					label = "U-Boot-Env";
-+					reg = <0x00090000 0x00010000>;
-+					read-only;
-+				};
-+				partition at 3 {
-+					label = "Kernel";
-+					reg = <0x000a0000 0x00280000>;
-+				};
-+				partition at 4 {
-+					label = "Filesystem";
-+					reg = <0x00320000 0x00400000>;
-+				};
-+				partition at 5 {
-+					label = "MAC-Address";
-+					reg = <0x007f0000 0x00010000>;
-+					read-only;
-+				};
-+			};
-+		};
- 	};
- 	nand_cs3 at 62000000 {
- 		status = "okay";
--- 
-1.7.4.1
+> -----Original Message-----
+> From: Singh Sandeep-B37400
+> Sent: Thursday, March 07, 2013 4:58 PM
+> To: linuxppc-dev at lists.ozlabs.org; linux-arm-kernel at lists.infradead.org
+> Cc: Singh Sandeep-B37400; Aggrwal Poonam-B10812
+> Subject: [PATCH 1/4] Device tree entry for Freescale TDM controller
