@@ -1,33 +1,30 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 19 Mar 2013 22:39:13 -0300
-Subject: [PATCH 2/2] ARM: imx_v4_v5_defconfig: Select CONFIG_USB_PHY
-In-Reply-To: <1363743553-17295-1-git-send-email-festevam@gmail.com>
-References: <1363743553-17295-1-git-send-email-festevam@gmail.com>
-Message-ID: <1363743553-17295-2-git-send-email-festevam@gmail.com>
+From: dahuang@nvidia.com (Danny Huang)
+Date: Wed, 20 Mar 2013 09:42:51 +0800
+Subject: [PATCH v2] ARM: tegra114: add speedo-based process identification
+In-Reply-To: <5148A645.9020009@wwwdotorg.org>
+References: <1363605454-24176-1-git-send-email-dahuang@nvidia.com>
+ <5148A645.9020009@wwwdotorg.org>
+Message-ID: <1363743771.3573.55.camel@dahuang-vm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On Wed, 2013-03-20 at 01:54 +0800, Stephen Warren wrote:
+> On 03/18/2013 05:17 AM, Danny Huang wrote:
+> > Add speedo-based process identifictaion for Tegra114.
+> 
+> I have applied this to Tegra's for-3.10/soc branch, with one addition below:
+> 
+> > diff --git a/arch/arm/mach-tegra/tegra114_speedo.c b/arch/arm/mach-tegra/tegra114_speedo.c
+> 
+> > +#include <linux/kernel.h>
+> 
+> Here, I also added:
+> 
+> #include <linux/bug.h>
+> 
+> That's not needed in the Tegra for-next branch (which is based on
+> 3.9-rc1), but is needed when merged into linux-next, and hence will
+> presumably be needed once this is submitted into 3.10.
 
-Since commit edc7cb2e955f (usb: phy: make it a menuconfig) in order to be able to
-select CONFIG_USB_ULPI, it is necessary to select CONFIG_USB_PHY.  
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/configs/imx_v4_v5_defconfig |    1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
-index 02c657a..d56bedc 100644
---- a/arch/arm/configs/imx_v4_v5_defconfig
-+++ b/arch/arm/configs/imx_v4_v5_defconfig
-@@ -156,6 +156,7 @@ CONFIG_USB_HID=m
- CONFIG_USB=y
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_EHCI_MXC=y
-+CONFIG_USB_PHY=y
- CONFIG_USB_ULPI=y
- CONFIG_MMC=y
- CONFIG_MMC_SDHCI=y
--- 
-1.7.9.5
+Thanks. Does it mean that we have to include the bug.h for all newly
+created file for 3.10?
