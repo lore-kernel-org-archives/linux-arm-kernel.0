@@ -1,31 +1,29 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 20 Mar 2013 15:46:12 +0530
-Subject: [LAKML][Users getting knocked of from list]
-In-Reply-To: <20130320094058.GK30923@n2100.arm.linux.org.uk>
-References: <51495574.4080501@ti.com>
- <20130320094058.GK30923@n2100.arm.linux.org.uk>
-Message-ID: <51498C6C.4040401@ti.com>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Wed, 20 Mar 2013 18:15:09 +0800
+Subject: [PATCH V4 0/9] ARM: tegra: add platform suspend support
+In-Reply-To: <5148977F.7000700@wwwdotorg.org>
+References: <1363594400-11663-1-git-send-email-josephl@nvidia.com>
+ <5148977F.7000700@wwwdotorg.org>
+Message-ID: <1363774509.5697.21.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Looping David
+On Wed, 2013-03-20 at 00:51 +0800, Stephen Warren wrote:
+> On 03/18/2013 02:13 AM, Joseph Lo wrote:
+> > This series introduces a basic functionality for Tegra to support the
+> > platform suspend and resume.
+> > 
+> > Note: This series only adds the support for Tegra20 and Tegra30. The
+> > Tegra114 will be supported later.
+> > 
+> > This series needs the patch below that not yet be merged into linux-mmc tree
+> > to make the system suspend/resume function work correctly.
+> > "mmc: tegra: use mmc_of_parse to get the support of standard MMC DT bindings"
+> 
+> I assume this series needs to be applied after the 3-long series you
+> posted just before it, containing "ARM: dts: tegra: add clock source for
+> PMC", "ARM: tegra: get PMC clock source from DT", and "ARM: tegra:
+> moving the CPU power timer function to PMC driver"?
 
-On Wednesday 20 March 2013 03:10 PM, Russell King - ARM Linux wrote:
-> On Wed, Mar 20, 2013 at 11:51:40AM +0530, Santosh Shilimkar wrote:
->> Russell,
->>
->> In last couple of months, I have observed that users are getting knocked off
->> from LAKML often. I myself faced it 2 times so far and I heard similar complaint
->> at least from 5 more folks.
->>
->> Is there a change in settings or something new which started triggering this ?
-> 
-> Exactly the same thing happened to me earlier this week.  I don't have
-> anything to do with the lists anymore, so I'm not the right person to ask.
-> 
-> David Woodhouse runs the servers, and Vince Sanders does the admin.
-> 
-Thanks Russell for the contact.
-
-Regards,
-Santosh
+Oops, I mentioned this in the cover letter there and forgot to add here.
+Yes, thanks for taking care.
