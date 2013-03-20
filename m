@@ -1,35 +1,40 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 20 Mar 2013 15:03:20 +0100
-Subject: [PATCH V4 6/9] ARM: mxs: Provide regulator to pwm-backlight
-In-Reply-To: <20130320082318.GA28775@opensource.wolfsonmicro.com>
-References: <1363719573-20926-1-git-send-email-achew@nvidia.com>
- <5148E252.9050900@wwwdotorg.org>
- <20130320082318.GA28775@opensource.wolfsonmicro.com>
-Message-ID: <201303201503.20480.marex@denx.de>
+From: rogerq@ti.com (Roger Quadros)
+Date: Wed, 20 Mar 2013 17:44:40 +0200
+Subject: [PATCH v4 01/21] usb: phy: nop: Add some parameters to platform data
+In-Reply-To: <1363794300-31526-1-git-send-email-rogerq@ti.com>
+References: <1363794300-31526-1-git-send-email-rogerq@ti.com>
+Message-ID: <1363794300-31526-2-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Add clk_rate parameter to platform data. If supplied, the
+NOP phy driver will program the clock to that rate during probe.
 
-> On Tue, Mar 19, 2013 at 04:10:26PM -0600, Stephen Warren wrote:
-> > On 03/19/2013 03:27 PM, Marek Vasut wrote:
-> > > Do we really need a mandatory regulator? Why can't it be optional?
-> > 
-> > IIRC, the previous advice I've seen is that if a device (driver) uses a
-> > regulator, it must /require/ a regulator, and if a particular board
-> > doesn't actually have a SW-controlled regulator, then a fixed- or dummy-
-> > regulator should be provided to satisfy this requirement.
-> > 
-> > CC'ing Mark Brown to make sure I really do Recall Correctly.
-> 
-> Yes, and it should be fixed rather than dummy.  The issue is partly that
-> it's probably important that the device has power so we don't want to
-> just ignore errors and partly that this is something which applies to
-> essentially all devices so whatever we do for this case ought to be done
-> by the core so all devices can benefit and we don't have to duplicate
-> lots of code in individual drivers.
+Also add 2 flags, needs_vcc and needs_reset.
+If the flag is set and the regulator couldn't be found
+then the driver will bail out with -EPROBE_DEFER.
 
-Thanks for clearing this!
+Signed-off-by: Roger Quadros <rogerq@ti.com>
+Acked-by: Felipe Balbi <balbi@ti.com>
+---
+ include/linux/usb/nop-usb-xceiv.h |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
 
-Best regards,
-Marek Vasut
+diff --git a/include/linux/usb/nop-usb-xceiv.h b/include/linux/usb/nop-usb-xceiv.h
+index 28884c7..148d351 100644
+--- a/include/linux/usb/nop-usb-xceiv.h
++++ b/include/linux/usb/nop-usb-xceiv.h
+@@ -5,6 +5,11 @@
+ 
+ struct nop_usb_xceiv_platform_data {
+ 	enum usb_phy_type type;
++	unsigned long clk_rate;
++
++	/* if set fails with -EPROBE_DEFER if can't get regulator */
++	unsigned int needs_vcc:1;
++	unsigned int needs_reset:1;
+ };
+ 
+ #if defined(CONFIG_NOP_USB_XCEIV) || (defined(CONFIG_NOP_USB_XCEIV_MODULE) && defined(MODULE))
+-- 
+1.7.4.1
