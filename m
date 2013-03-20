@@ -1,29 +1,21 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 19 Mar 2013 19:50:19 -0600
-Subject: [PATCH] ARM: tegra: fuse: add fuctions to read speedo id and
- process id
-In-Reply-To: <1363743557.3573.50.camel@dahuang-vm>
-References: <1363660405-10668-1-git-send-email-dahuang@nvidia.com>
- <5148A8D6.8000002@wwwdotorg.org> <1363743557.3573.50.camel@dahuang-vm>
-Message-ID: <514915DB.8060206@wwwdotorg.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 20 Mar 2013 10:14:44 +0800
+Subject: [PATCH V4 0/9] Add mandatory regulator for all users of
+ pwm-backlight.
+In-Reply-To: <1363719573-20926-1-git-send-email-achew@nvidia.com>
+References: <1363719573-20926-1-git-send-email-achew@nvidia.com>
+Message-ID: <20130320021442.GB20443@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/19/2013 07:39 PM, Danny Huang wrote:
-> On Wed, 2013-03-20 at 02:05 +0800, Stephen Warren wrote:
->> On 03/18/2013 08:33 PM, Danny Huang wrote:
->>> Add functions to read the speedo and process id of both cpu and soc.
->>> There might be some drivers need the information as well.
->>
->> What code wants to use these functions? It'd be best to submit this
->> patch with that code, so that something actually uses the functions, and
->> they don't look like dead code.
+On Tue, Mar 19, 2013 at 11:59:24AM -0700, Andrew Chew wrote:
+> Many backlights are enabled via GPIO.  We can generalize the GPIO to a
+> fixed regulator.
 > 
-> There are some developing drivers that are located in drivers folder
-> needs those information.
+I think we should push the series of "Runtime Interpreted Power
+Sequences" moving forward, which should be useful this case and many
+other cases as well.
 
-Which drivers?
+http://thread.gmane.org/gmane.linux.kernel/1395912
 
-> I think that they can't include a header file in mach-tegra folder
-
-True.
+Shawn
