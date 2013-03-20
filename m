@@ -1,66 +1,90 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 20 Mar 2013 09:51:41 -0700
-Subject: [PATCH v3 4/6] ARM: OMAP: USB: Add phy binding information
-In-Reply-To: <1363770725-13717-5-git-send-email-kishon@ti.com>
-References: <1363770725-13717-1-git-send-email-kishon@ti.com>
- <1363770725-13717-5-git-send-email-kishon@ti.com>
-Message-ID: <20130320165141.GP16413@atomide.com>
+From: rklein@nvidia.com (Rhyland Klein)
+Date: Wed, 20 Mar 2013 12:57:51 -0400
+Subject: [PATCH 3/4] ARM: tegra: dalmore: add dt node for TPS65090's
+ regulators
+In-Reply-To: <1363787070-14801-4-git-send-email-ldewangan@nvidia.com>
+References: <1363787070-14801-1-git-send-email-ldewangan@nvidia.com>
+ <1363787070-14801-4-git-send-email-ldewangan@nvidia.com>
+Message-ID: <5149EA8F.6090806@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kishon Vijay Abraham I <kishon@ti.com> [130320 02:17]:
+On 3/20/2013 9:44 AM, Laxman Dewangan wrote:
+> NVIDIA's Tegra114 platform, Dalmore, uses the TPS65090 as
+> secondary PMICs which mainly act as voltage switch controlled
+> by I2C communication.
 > 
-> --- a/arch/arm/mach-omap2/board-2430sdp.c
-> +++ b/arch/arm/mach-omap2/board-2430sdp.c
-> @@ -265,6 +266,7 @@ static void __init omap_2430sdp_init(void)
+> Add regulator node for this device.
+> 
+> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+> ---
+>  .../devicetree/bindings/regulator/tps65090.txt     |    4 +-
+>  arch/arm/boot/dts/tegra114-dalmore.dts             |   90 ++++++++++++++++++++
+>  2 files changed, 92 insertions(+), 2 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/regulator/tps65090.txt b/Documentation/devicetree/bindings/regulator/tps65090.txt
+> index 313a60b..8926e2d 100644
+> --- a/Documentation/devicetree/bindings/regulator/tps65090.txt
+> +++ b/Documentation/devicetree/bindings/regulator/tps65090.txt
+> @@ -41,8 +41,8 @@ Example:
+>  		infet5-supply = <&some_reg>;
+>  		infet6-supply = <&some_reg>;
+>  		infet7-supply = <&some_reg>;
+> -		vsys_l1-supply = <&some_reg>;
+> -		vsys_l2-supply = <&some_reg>;
+> +		vsys-l1-supply = <&some_reg>;
+> +		vsys-l2-supply = <&some_reg>;
 >  
->  	omap_mux_init_signal("usb0hs_stp", OMAP_PULL_ENA | OMAP_PULL_UP);
->  	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
-> +	phy_bind("musb-hdrc.0.auto", 0, "twl4030_usb");
->  	usb_musb_init(NULL);
->  
->  	board_smc91x_init();
-> --- a/arch/arm/mach-omap2/board-3430sdp.c
-> +++ b/arch/arm/mach-omap2/board-3430sdp.c
-> @@ -601,6 +602,7 @@ static void __init omap_3430sdp_init(void)
->  	omap_serial_init();
->  	omap_sdrc_init(hyb18m512160af6_sdrc_params, NULL);
->  	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
-> +	phy_bind("musb-hdrc.0.auto", 0, "twl4030_usb");
->  	usb_musb_init(NULL);
->  	board_smc91x_init();
->  	board_flash_init(sdp_flash_partitions, chip_sel_3430, 0);
+>  		regulators {
+>  			dcdc1 {
+> diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
+> index 6be9434..a47c3d2 100644
+> --- a/arch/arm/boot/dts/tegra114-dalmore.dts
+> +++ b/arch/arm/boot/dts/tegra114-dalmore.dts
+> @@ -731,6 +731,82 @@
+>  			regulator-boot-on;
+>  			regulator-always-on;
+>  		};
+> +
+> +		tps65090 at 48 {
+> +			compatible = "ti,tps65090";
+> +			reg = <0x48>;
+> +			interrupt-parent = <&gpio>;
+> +			interrupts = <72 0x04>; /* gpio PJ0 */
+> +
+> +			vsys1-supply = <&vdd_ac_bat_reg>;
+> +			vsys2-supply = <&vdd_ac_bat_reg>;
+> +			vsys3-supply = <&vdd_ac_bat_reg>;
+> +			infet1-supply = <&vdd_ac_bat_reg>;
+> +			infet2-supply = <&vdd_ac_bat_reg>;
+> +			infet3-supply = <&tps65090_dcdc2_reg>;
+> +			infet4-supply = <&tps65090_dcdc2_reg>;
+> +			infet5-supply = <&tps65090_dcdc2_reg>;
+> +			infet6-supply = <&tps65090_dcdc2_reg>;
+> +			infet7-supply = <&tps65090_dcdc2_reg>;
+> +			vsys-l1-supply = <&vdd_ac_bat_reg>;
+> +			vsys-l2-supply = <&vdd_ac_bat_reg>;
+> +
+> +			regulators {
+> +				dcdc1 {
+> +					regulator-name = "vdd-sys-5v0";
+> +					regulator-always-on;
+> +					regulator-boot-on;
+> +				};
 
-Can't you call phy_bind() from usb_musb_init() with the default
-values automatically when usb_musb_init() is passed NULL?
+You should also add the tps65090_dcdc1_reg label to dcdc1. I believe you
+make use of it in patch 4 and this currently causes build breaks.
 
-That way you don't have to patch every board-*.c file with the
-same lines, and don't need to include <linux/phy/phy.h> in each
-board-*.c file.
+> +
+> +				tps65090_dcdc2_reg: dcdc2 {
+> +					regulator-name = "vdd-sys-3v3";
+> +					regulator-always-on;
+> +					regulator-boot-on;
+> +				};
+> +
+> 
 
-> --- a/arch/arm/mach-omap2/board-4430sdp.c
-> +++ b/arch/arm/mach-omap2/board-4430sdp.c
-> @@ -32,6 +32,7 @@
->  #include <linux/platform_data/omap4-keypad.h>
->  #include <linux/usb/musb.h>
->  #include <linux/usb/phy.h>
-> +#include <linux/phy/phy.h>
->  
->  #include <asm/mach-types.h>
->  #include <asm/mach/arch.h>
-> @@ -725,6 +726,7 @@ static void __init omap_4430sdp_init(void)
->  	omap4_twl6030_hsmmc_init(mmc);
->  
->  	usb_bind_phy("musb-hdrc.0.auto", 0, "omap-usb2.1.auto");
-> +	phy_bind("musb-hdrc.0.auto", 0, "omap-usb2.1.auto");
->  	usb_musb_init(&musb_board_data);
->  
->  	status = omap_ethernet_init();
+-rhyland
 
-Here usb_musb_init() gets called with musb_board_data, so
-keeping the phy_bind() in the board-4430sdp.c can then override
-the default in usb_musb_init().
-
-Regards,
-
-Tony
+-- 
+nvpublic
