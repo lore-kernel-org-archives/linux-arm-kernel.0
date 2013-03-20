@@ -1,87 +1,108 @@
-From: bilhuang@nvidia.com (Bill Huang)
-Date: Tue, 19 Mar 2013 21:39:44 -0700
-Subject: [PATCH 1/1] clk: Add notifier support in clk_prepare/clk_unprepare
-In-Reply-To: <20130320033142.11073.30097@quantum>
-References: <1363699712-8124-1-git-send-email-bilhuang@nvidia.com>
- <20130319170140.8663.93388@quantum> <1363748149.8815.16.camel@bilhuang-vm1>
- <20130320033142.11073.30097@quantum>
-Message-ID: <1363754384.8815.42.camel@bilhuang-vm1>
+From: b20788@freescale.com (Anson Huang)
+Date: Wed, 20 Mar 2013 13:39:39 -0400
+Subject: [PATCH 2/3] ARM: imx: enable periphery well bias for suspend
+In-Reply-To: <1363801180-8284-1-git-send-email-b20788@freescale.com>
+References: <1363801180-8284-1-git-send-email-b20788@freescale.com>
+Message-ID: <1363801180-8284-2-git-send-email-b20788@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-03-20 at 11:31 +0800, Mike Turquette wrote:
-> Quoting Bill Huang (2013-03-19 19:55:49)
-> > On Wed, 2013-03-20 at 01:01 +0800, Mike Turquette wrote:
-> > > Quoting Bill Huang (2013-03-19 06:28:32)
-> > > > Add notifier calls in clk_prepare and clk_unprepare so drivers which are
-> > > > interested in knowing that clk_prepare/unprepare call can act accordingly.
-> > > > 
-> > > > The existing "clk_set_rate" notifier is not enough for normal DVFS
-> > > > inplementation since clock might be enabled/disabled at runtime. Adding
-> > > > these notifiers is useful on DVFS core which take clk_prepare as a hint
-> > > > on that the notified clock might be enabled later so it can raise voltage
-> > > > to a safe level before enabling the clock, and take clk_unprepare as a
-> > > > hint that the clock has been disabled and is safe to lower the voltage.
-> > > > 
-> > > > The added notifier events are:
-> > > > 
-> > > > PRE_CLK_PREPARE
-> > > > POST_CLK_PREPARE
-> > > > ABORT_CLK_PREPARE
-> > > > PRE_CLK_UNPREPARE
-> > > > POST_CLK_UNPREPARE
-> > > > 
-> > > > Signed-off-by: Bill Huang <bilhuang@nvidia.com>
-> > > 
-> > > I'm still not sure about this approach.  Based on feedback I got from
-> > > Linaro Connect I am not convinced that scaling voltage through clk
-> > > rate-change notifiers is the right way to go.  As I understand it this
-> > > patch only exists for that single purpose, so if the voltage-notifier
-> > > idea gets dropped then I will not take this patch in.
-> > > 
-> > Thanks Mike, actually we won't use your "clk: notifier handler for
-> > dynamic voltage scaling" patch instead we are trying to port our DVFS
-> > into Non-CPU DVFS framework "devfreq" which will need to hook those
-> > notifiers, without the clock notifiers been extended the framework is
-> > useless for us since we cannot do polling due to the fact that polling
-> > is not in real time. If it ended up extending the notifiers cannot
-> > happen then the only choice for us I think would be giving up "devfreq"
-> > and implement them in Tegra's "clk_hw".
-> 
-> I'm familiar with the devfreq framework.  Can you explain further how
-> you plan to use devfreq with the clock notifiers?  What does the call
-> graph look like?
-> 
-The call graph will look like this, when any DVFS interested clock rate
-changes (including enable and disable) happen -> Tegra devfreq clock
-notifier is called -> call into update_devfreq if needed -> in
-update_devfreq it will call into .get_target_freq in Tegra
-"devfreq_governor" -> and then call into .target of tegra
-devfreq_dev_profile to set voltage and done. More details are as below.
+enable periphery charge pump for well biasing
+at suspend to reduce periphery leakage.
 
-We'll create devfreq driver for Tegra VDD_CORE rail, and the safe
-voltage level of the rail is determined by tens of clocks (2d, 3d,
-mpe,...), all the frequency ladders of those clocks are defined in DT
-also the operating points for VDD_CORE is declared in DT where its
-frequency will be more of a virtual clock or index.
+Signed-off-by: Anson Huang <b20788@freescale.com>
+---
+ arch/arm/mach-imx/clk-imx6q.c |   22 +++++++++++++++++++++-
+ arch/arm/mach-imx/common.h    |    4 ++--
+ arch/arm/mach-imx/pm-imx6q.c  |    4 +++-
+ 3 files changed, 26 insertions(+), 4 deletions(-)
 
-	operating-points = <
-	/* virtual-kHz 	uV */
-	0 	950000
-	1 	1000000
-	2 	1050000
-	3 	1100000
-	4 	1150000
-	5 	1200000
-	6 	1250000
-	7 	1300000
-	8 	1350000
-
-Register a Tegra governor where the callback .get_target_freq is the
-function to determine the overall frequency it can go to, and
-the .target callback in "devfreq_dev_profile" will be the function
-really do the voltage scaling.
-
-Tegra devfreq driver will register clock notifiers on all its interested
-clock and hence when any of those clock rate changes, disabled, enabled,
-we'll specifically call update_devfreq in the notifier.
+diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+index 2f9ff93..b365efc 100644
+--- a/arch/arm/mach-imx/clk-imx6q.c
++++ b/arch/arm/mach-imx/clk-imx6q.c
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright 2011 Freescale Semiconductor, Inc.
++ * Copyright 2011-2013 Freescale Semiconductor, Inc.
+  * Copyright 2011 Linaro Ltd.
+  *
+  * The code contained herein is licensed under the GNU General Public
+@@ -23,6 +23,9 @@
+ #include "clk.h"
+ #include "common.h"
+ 
++#define CCR				0x0
++#define BM_CCR_WB_COUNT			(0x7 << 16)
++
+ #define CCGR0				0x68
+ #define CCGR1				0x6c
+ #define CCGR2				0x70
+@@ -67,6 +70,23 @@ void imx6q_set_chicken_bit(void)
+ 	writel_relaxed(val, ccm_base + CGPR);
+ }
+ 
++void imx6q_set_wb(bool enable)
++{
++	u32 val;
++
++	/* configurate well bias enable bit */
++	val = readl_relaxed(ccm_base + CLPCR);
++	val &= ~BM_CLPCR_WB_PER_AT_LPM;
++	val |= enable ? BM_CLPCR_WB_PER_AT_LPM : 0;
++	writel_relaxed(val, ccm_base + CLPCR);
++
++	/* configurate well bias count */
++	val = readl_relaxed(ccm_base + CCR);
++	val &= ~BM_CCR_WB_COUNT;
++	val |= enable ? BM_CCR_WB_COUNT : 0;
++	writel_relaxed(val, ccm_base + CCR);
++}
++
+ int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode)
+ {
+ 	u32 val = readl_relaxed(ccm_base + CLPCR);
+diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+index 004c2b3..b9125cf 100644
+--- a/arch/arm/mach-imx/common.h
++++ b/arch/arm/mach-imx/common.h
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright 2004-2007 Freescale Semiconductor, Inc. All Rights Reserved.
++ * Copyright 2004-2013 Freescale Semiconductor, Inc. All Rights Reserved.
+  */
+ 
+ /*
+@@ -134,7 +134,7 @@ extern void imx_anatop_pre_suspend(void);
+ extern void imx_anatop_post_resume(void);
+ extern int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode);
+ extern void imx6q_set_chicken_bit(void);
+-
++extern void imx6q_set_wb(bool enable);
+ extern void imx_cpu_die(unsigned int cpu);
+ extern int imx_cpu_kill(unsigned int cpu);
+ 
+diff --git a/arch/arm/mach-imx/pm-imx6q.c b/arch/arm/mach-imx/pm-imx6q.c
+index 05b26cd..57ca274 100644
+--- a/arch/arm/mach-imx/pm-imx6q.c
++++ b/arch/arm/mach-imx/pm-imx6q.c
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright 2011 Freescale Semiconductor, Inc.
++ * Copyright 2011-2013 Freescale Semiconductor, Inc.
+  * Copyright 2011 Linaro Ltd.
+  *
+  * The code contained herein is licensed under the GNU General Public
+@@ -36,8 +36,10 @@ static int imx6q_pm_enter(suspend_state_t state)
+ 		imx_gpc_pre_suspend();
+ 		imx_anatop_pre_suspend();
+ 		imx_set_cpu_jump(0, v7_cpu_resume);
++		imx6q_set_wb(true);
+ 		/* Zzz ... */
+ 		cpu_suspend(0, imx6q_suspend_finish);
++		imx6q_set_wb(false);
+ 		imx_smp_prepare();
+ 		imx_anatop_post_resume();
+ 		imx_gpc_post_resume();
+-- 
+1.7.9.5
