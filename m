@@ -1,245 +1,48 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 20 Mar 2013 08:03:15 -0700
-Subject: [RESEND PATCH 1/3] clk: Remove _clk_reparent from API and
- restructure code
-In-Reply-To: <51498BD0.7010508@ti.com>
-References: <1363116050-3882-1-git-send-email-ulf.hansson@stericsson.com>
- <1363116050-3882-2-git-send-email-ulf.hansson@stericsson.com>
- <20130319212053.8663.63425@quantum>
- <CAPDyKFoon6p4Sgd+oxFra-qCUg_mV_V0Thtb8aim7mu0APUCsA@mail.gmail.com>
- <51498BD0.7010508@ti.com>
-Message-ID: <20130320150315.11073.85260@quantum>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 20 Mar 2013 16:09:03 +0100
+Subject: [BUG][mvebu] mvneta: cannot request irq 25 on openblocks-ax3
+In-Reply-To: <2482565.pAEcuMH9qj@bender>
+References: <51486445.8040506@hitachi.com> <514873FB.5050202@hitachi.com>
+ <514895C5.40706@free-electrons.com> <2482565.pAEcuMH9qj@bender>
+Message-ID: <5149D10F.40605@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Rajendra Nayak (2013-03-20 03:13:36)
-> On Wednesday 20 March 2013 03:15 PM, Ulf Hansson wrote:
-> > On 19 March 2013 22:20, Mike Turquette <mturquette@linaro.org> wrote:
-> >> Quoting Ulf Hansson (2013-03-12 12:20:48)
-> >>> From: Ulf Hansson <ulf.hansson@linaro.org>
-> >>>
-> >>> There shall be no reason for keeping this API available for clock
-> >>> providers. So we remove it from the API and restrcuture the code so
-> >>> for example the COMMON_CLK_DEBUG part is separated.
-> >>>
-> >>
-> >> Hi Ulf,
-> >>
-> >> There is one reason to keep this api.  OMAP currently uses it to change
-> >> the parent of a PLL during .set_rate.  This is kind of a legacy
-> >> mechanism however, and the reentrancy series I posted actually takes
-> >> care of this one corner case:
-> >> http://article.gmane.org/gmane.linux.kernel/1448449
-> > 
-> > Hi Mike,
-> > 
-> > It was a while ago I created this patch, so I guess this has beed
-> > merged without me noticing, sorry.
-> > 
-> >>
-> >> Let me see how the OMAP folks feel about taking that patch in, which
-> >> eliminates the only external user of the API.  +Rajendra & Benoit
-> >>
-> > 
-> > I have no problem rebasing the patch and keep the API, if that is the
-> > easiest way forward.
+On 03/19/2013 08:48 PM, Florian Fainelli wrote:
+> On Tuesday 19 March 2013 17:43:49 Gregory CLEMENT wrote:
+>>
+>> Hi Masami,
+>>
+>> You can try this patch if you want.
+>> I don't have the hardware today so I didn't test it.
+>> If you (and also Florian and Ezequiel) can test it and if it fixed
+>> the bug, then I will be able send a proper email for it,
 > 
-> Ulf, It would be good if you could keep the api for now. I seemed to have
-> missed out on Mikes patch getting rid of the the api from OMAP PLL .set_rate.
-> I will take a stab at that to get rid of that api along with the other OMAP
-> only things that exist today as part of Common clk.
+> I just tested your patch on RD-A370-A1 and DB-MV784MP-GP and it works fine, 
+> thanks! Feel free to add my Tested-by: Florian Fainelli <florian@openwrt.org> 
+> to your next submission.
 > 
-
-Rajendra,
-
-Yeah, the patch I linked to above was actually just "example code"
-showing how to reentrantly call clk_set_parent from within a .set_rate
-callback.  It's no suprise you missed it since the patch $SUBJECT starts
-with "HACK:" ;-)
-
-The trick is to recognize that OMAP's PLLs are mux clocks and have them
-properly support clk_set_parent.  This would have made my life easier in
-the bad days of DPLL cascading back in 2011.
-
-> regards,
-> Rajendra
+> Thanks!
 > 
-> > Although, I guess in the end you want to remove these kind of internal
-> > clk API functions. So, if we get ack from Rajendra & Benoit, it is
-> > better to remove the API right?
-> > 
+Thanks for having tested it, but with this patch there is still an issue when
+we try to release the network interface. In this case the the interrupt line
+is not properly freed.
+Unfortunately the state of the percpu_irq API prevents the driver to use it.
 
-Ulf,
+Indeed the interrupts have to be freed when the .stop() function is
+called. As the free_percpu_irq() function don't disable the interrupt
+line, we have to do it on each CPU before calling this. The function
+disable_percpu_irq() only disable the percpu on the current CPU and
+there is no function which allows to disable a percpu irq on a given
+CPU. Waiting for the extension of the percpu_irq API, this fix allows
+to use again the mvneta driver.
 
-Correct, as we discussed at LCA I do want to get rid of all of these
-internal accessor functions.
+I have just wrote and tested a new patch to fix this issue by just go back
+on the old way we managed the irq for the mvenat as global irq and not
+as local ones.
+
+I am going to send the fix on the LAKML in a few minutes.
 
 Thanks,
-Mike
 
-> > Kind regards
-> > Ulf Hansson
-> > 
-> >> Thanks,
-> >> Mike
-> >>
-> >>> This patch will also make it possible to hold the spinlock over the
-> >>> actual update of the clock tree topology, which could not be done
-> >>> before when both debugfs updates and clock rate updates was done
-> >>> within the same function.
-> >>>
-> >>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> >>> ---
-> >>>  drivers/clk/clk.c            |   82 ++++++++++++++++++++++++------------------
-> >>>  include/linux/clk-provider.h |    1 -
-> >>>  2 files changed, 48 insertions(+), 35 deletions(-)
-> >>>
-> >>> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> >>> index 593a2e4..2e10cc1 100644
-> >>> --- a/drivers/clk/clk.c
-> >>> +++ b/drivers/clk/clk.c
-> >>> @@ -284,6 +284,39 @@ out:
-> >>>  }
-> >>>
-> >>>  /**
-> >>> + * clk_debug_reparent - reparent clk node in the debugfs clk tree
-> >>> + * @clk: the clk being reparented
-> >>> + * @new_parent: the new clk parent, may be NULL
-> >>> + *
-> >>> + * Rename clk entry in the debugfs clk tree if debugfs has been
-> >>> + * initialized.  Otherwise it bails out early since the debugfs clk tree
-> >>> + * will be created lazily by clk_debug_init as part of a late_initcall.
-> >>> + *
-> >>> + * Caller must hold prepare_lock.
-> >>> + */
-> >>> +static void clk_debug_reparent(struct clk *clk, struct clk *new_parent)
-> >>> +{
-> >>> +       struct dentry *d;
-> >>> +       struct dentry *new_parent_d;
-> >>> +
-> >>> +       if (!inited)
-> >>> +               return;
-> >>> +
-> >>> +       if (new_parent)
-> >>> +               new_parent_d = new_parent->dentry;
-> >>> +       else
-> >>> +               new_parent_d = orphandir;
-> >>> +
-> >>> +       d = debugfs_rename(clk->dentry->d_parent, clk->dentry,
-> >>> +                       new_parent_d, clk->name);
-> >>> +       if (d)
-> >>> +               clk->dentry = d;
-> >>> +       else
-> >>> +               pr_debug("%s: failed to rename debugfs entry for %s\n",
-> >>> +                               __func__, clk->name);
-> >>> +}
-> >>> +
-> >>> +/**
-> >>>   * clk_debug_init - lazily create the debugfs clk tree visualization
-> >>>   *
-> >>>   * clks are often initialized very early during boot before memory can
-> >>> @@ -338,6 +371,9 @@ static int __init clk_debug_init(void)
-> >>>  late_initcall(clk_debug_init);
-> >>>  #else
-> >>>  static inline int clk_debug_register(struct clk *clk) { return 0; }
-> >>> +static inline void clk_debug_reparent(struct clk *clk, struct clk *new_parent)
-> >>> +{
-> >>> +}
-> >>>  #endif
-> >>>
-> >>>  /* caller must hold prepare_lock */
-> >>> @@ -1179,16 +1215,8 @@ out:
-> >>>         return ret;
-> >>>  }
-> >>>
-> >>> -void __clk_reparent(struct clk *clk, struct clk *new_parent)
-> >>> +static void clk_reparent(struct clk *clk, struct clk *new_parent)
-> >>>  {
-> >>> -#ifdef CONFIG_COMMON_CLK_DEBUG
-> >>> -       struct dentry *d;
-> >>> -       struct dentry *new_parent_d;
-> >>> -#endif
-> >>> -
-> >>> -       if (!clk || !new_parent)
-> >>> -               return;
-> >>> -
-> >>>         hlist_del(&clk->child_node);
-> >>>
-> >>>         if (new_parent)
-> >>> @@ -1196,28 +1224,7 @@ void __clk_reparent(struct clk *clk, struct clk *new_parent)
-> >>>         else
-> >>>                 hlist_add_head(&clk->child_node, &clk_orphan_list);
-> >>>
-> >>> -#ifdef CONFIG_COMMON_CLK_DEBUG
-> >>> -       if (!inited)
-> >>> -               goto out;
-> >>> -
-> >>> -       if (new_parent)
-> >>> -               new_parent_d = new_parent->dentry;
-> >>> -       else
-> >>> -               new_parent_d = orphandir;
-> >>> -
-> >>> -       d = debugfs_rename(clk->dentry->d_parent, clk->dentry,
-> >>> -                       new_parent_d, clk->name);
-> >>> -       if (d)
-> >>> -               clk->dentry = d;
-> >>> -       else
-> >>> -               pr_debug("%s: failed to rename debugfs entry for %s\n",
-> >>> -                               __func__, clk->name);
-> >>> -out:
-> >>> -#endif
-> >>> -
-> >>>         clk->parent = new_parent;
-> >>> -
-> >>> -       __clk_recalc_rates(clk, POST_RATE_CHANGE);
-> >>>  }
-> >>>
-> >>>  static int __clk_set_parent(struct clk *clk, struct clk *parent)
-> >>> @@ -1329,7 +1336,9 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
-> >>>         }
-> >>>
-> >>>         /* propagate rate recalculation downstream */
-> >>> -       __clk_reparent(clk, parent);
-> >>> +       clk_reparent(clk, parent);
-> >>> +       clk_debug_reparent(clk, parent);
-> >>> +       __clk_recalc_rates(clk, POST_RATE_CHANGE);
-> >>>
-> >>>  out:
-> >>>         mutex_unlock(&prepare_lock);
-> >>> @@ -1453,14 +1462,19 @@ int __clk_init(struct device *dev, struct clk *clk)
-> >>>         hlist_for_each_entry_safe(orphan, tmp, tmp2, &clk_orphan_list, child_node) {
-> >>>                 if (orphan->ops->get_parent) {
-> >>>                         i = orphan->ops->get_parent(orphan->hw);
-> >>> -                       if (!strcmp(clk->name, orphan->parent_names[i]))
-> >>> -                               __clk_reparent(orphan, clk);
-> >>> +                       if (!strcmp(clk->name, orphan->parent_names[i])) {
-> >>> +                               clk_reparent(orphan, clk);
-> >>> +                               clk_debug_reparent(orphan, clk);
-> >>> +                               __clk_recalc_rates(orphan, POST_RATE_CHANGE);
-> >>> +                       }
-> >>>                         continue;
-> >>>                 }
-> >>>
-> >>>                 for (i = 0; i < orphan->num_parents; i++)
-> >>>                         if (!strcmp(clk->name, orphan->parent_names[i])) {
-> >>> -                               __clk_reparent(orphan, clk);
-> >>> +                               clk_reparent(orphan, clk);
-> >>> +                               clk_debug_reparent(orphan, clk);
-> >>> +                               __clk_recalc_rates(orphan, POST_RATE_CHANGE);
-> >>>                                 break;
-> >>>                         }
-> >>>          }
-> >>> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> >>> index 4989b8a..87a7c2c 100644
-> >>> --- a/include/linux/clk-provider.h
-> >>> +++ b/include/linux/clk-provider.h
-> >>> @@ -359,7 +359,6 @@ struct clk *__clk_lookup(const char *name);
-> >>>   */
-> >>>  int __clk_prepare(struct clk *clk);
-> >>>  void __clk_unprepare(struct clk *clk);
-> >>> -void __clk_reparent(struct clk *clk, struct clk *new_parent);
-> >>>  unsigned long __clk_round_rate(struct clk *clk, unsigned long rate);
-> >>>
-> >>>  struct of_device_id;
-> >>> --
-> >>> 1.7.10
+Gregory
