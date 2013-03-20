@@ -1,39 +1,49 @@
-From: prakash.pm@ti.com (Manjunathappa, Prakash)
-Date: Wed, 20 Mar 2013 17:14:12 +0530
-Subject: [PATCH v6 5/5] ARM: davinci: da850: override mmc DT node device name
-In-Reply-To: <1363779852-24083-1-git-send-email-prakash.pm@ti.com>
-References: <1363779852-24083-1-git-send-email-prakash.pm@ti.com>
-Message-ID: <1363779852-24083-6-git-send-email-prakash.pm@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 20 Mar 2013 11:46:07 +0000
+Subject: [PATCH 10/10] drivers: misc: use module_platform_driver_probe()
+In-Reply-To: <CAHkwnC-8FH0nyJ+eT=+7doP+fSdZjNYUW4zzs_r6e9wt3Yt4Fg@mail.gmail.com>
+References: <1363266691-15757-1-git-send-email-fabio.porcedda@gmail.com>
+ <201303201020.14654.arnd@arndb.de>
+ <CAHkwnC-8FH0nyJ+eT=+7doP+fSdZjNYUW4zzs_r6e9wt3Yt4Fg@mail.gmail.com>
+Message-ID: <201303201146.07987.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Populate OF_DEV_AUXDATA with desired device name expected by
-davinci_mmc driver. Without this clk_get of davinci_mmc DT driver
-fails.
+On Wednesday 20 March 2013, Fabio Porcedda wrote:
+> 
+> On Wed, Mar 20, 2013 at 11:20 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Wednesday 20 March 2013, Fabio Porcedda wrote:
+> >> I think we can check inside the  deferred_probe_work_func()
+> >> if the dev->probe function pointer is equal to platform_drv_probe_fail().
+> >
+> > I think it's too late by then, because that would only warn if we try to probe
+> > it again, but when platform_driver_probe() does not succeed immediately, it
+> 
+> Maybe you mean "does succeed immediately" ?
 
-Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
-Cc: linux-mmc at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Cc: davinci-linux-open-source at linux.davincidsp.com
-Cc: devicetree-discuss at lists.ozlabs.org
-Cc: cjb at laptop.org
-Cc: Sekhar Nori <nsekhar@ti.com>
----
- arch/arm/mach-davinci/da8xx-dt.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+I mean in this code (simplified for the sake of discussion)
 
-diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
-index 24146de..f581068 100644
---- a/arch/arm/mach-davinci/da8xx-dt.c
-+++ b/arch/arm/mach-davinci/da8xx-dt.c
-@@ -41,6 +41,7 @@ struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("ti,davinci-i2c", 0x01c22000, "i2c_davinci.1", NULL),
- 	OF_DEV_AUXDATA("ti,davinci-wdt", 0x01c21000, "watchdog", NULL),
- 	OF_DEV_AUXDATA("ti,da830-spi", 0x01f0e000, "spi_davinci.1", NULL),
-+	OF_DEV_AUXDATA("ti,da830-mmc", 0x01c40000, "da830-mmc.0", NULL),
- 	{}
- };
- 
--- 
-1.7.4.1
+int __init_or_module platform_driver_probe(struct platform_driver *drv,
+                int (*probe)(struct platform_device *))
+{
+        int retval, code;
+
+        drv->probe = probe;
+        retval = code = platform_driver_register(drv);
+
+        drv->probe = NULL;
+        if (code == 0 && list_empty(&drv->driver.p->klist_devices.k_list))
+                retval = -ENODEV;
+        drv->driver.probe = platform_drv_probe_fail;
+
+        if (code != retval)
+                platform_driver_unregister(drv);
+        return retval;
+}
+
+we assume that all devices are bound to drivers during the call to
+platform_driver_register, and if the device list is empty afterwards,
+we unregister the driver and will never get to the deferred probing
+stage.
+
+	Arnd
