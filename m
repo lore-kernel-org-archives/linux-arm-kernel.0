@@ -1,60 +1,38 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 20 Mar 2013 17:44:49 +0200
-Subject: [PATCH v4 10/21] ARM: OMAP3: cm-t3517: Adapt to ehci-omap changes
+Date: Wed, 20 Mar 2013 17:44:50 +0200
+Subject: [PATCH v4 11/21] ARM: OMAP: devkit8000: Adapt to ehci-omap changes
 In-Reply-To: <1363794300-31526-1-git-send-email-rogerq@ti.com>
 References: <1363794300-31526-1-git-send-email-rogerq@ti.com>
-Message-ID: <1363794300-31526-11-git-send-email-rogerq@ti.com>
+Message-ID: <1363794300-31526-12-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use usbhs_init_phys() to register the PHY's RESET regulators
-and the NOP PHY devices.
+Remove deprecated USBHS platform data.
 
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- arch/arm/mach-omap2/board-cm-t3517.c |   20 ++++++++++++++------
- 1 files changed, 14 insertions(+), 6 deletions(-)
+ arch/arm/mach-omap2/board-devkit8000.c |    8 --------
+ 1 files changed, 0 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-cm-t3517.c b/arch/arm/mach-omap2/board-cm-t3517.c
-index a66da80..6920f6cf 100644
---- a/arch/arm/mach-omap2/board-cm-t3517.c
-+++ b/arch/arm/mach-omap2/board-cm-t3517.c
-@@ -188,15 +188,22 @@ static inline void cm_t3517_init_rtc(void) {}
- #define HSUSB2_RESET_GPIO	(147)
- #define USB_HUB_RESET_GPIO	(152)
+diff --git a/arch/arm/mach-omap2/board-devkit8000.c b/arch/arm/mach-omap2/board-devkit8000.c
+index 53056c3..42fbf1e 100644
+--- a/arch/arm/mach-omap2/board-devkit8000.c
++++ b/arch/arm/mach-omap2/board-devkit8000.c
+@@ -437,15 +437,7 @@ static struct platform_device *devkit8000_devices[] __initdata = {
+ };
  
-+static struct usbhs_phy_data phy_data[] __initdata = {
-+	{
-+		.port = 1,
-+		.reset_gpio = HSUSB1_RESET_GPIO,
-+		.vcc_gpio = -EINVAL,
-+	},
-+	{
-+		.port = 2,
-+		.reset_gpio = HSUSB2_RESET_GPIO,
-+		.vcc_gpio = -EINVAL,
-+	},
-+};
-+
- static struct usbhs_omap_platform_data cm_t3517_ehci_pdata __initdata = {
+ static struct usbhs_omap_platform_data usbhs_bdata __initdata = {
+-
  	.port_mode[0] = OMAP_EHCI_PORT_MODE_PHY,
- 	.port_mode[1] = OMAP_EHCI_PORT_MODE_PHY,
+-	.port_mode[1] = OMAP_USBHS_PORT_MODE_UNUSED,
 -	.port_mode[2] = OMAP_USBHS_PORT_MODE_UNUSED,
 -
 -	.phy_reset  = true,
--	.reset_gpio_port[0]  = HSUSB1_RESET_GPIO,
--	.reset_gpio_port[1]  = HSUSB2_RESET_GPIO,
--	.reset_gpio_port[2]  = -EINVAL,
+-	.reset_gpio_port[0]  = -EINVAL,
+-	.reset_gpio_port[1]  = -EINVAL,
+-	.reset_gpio_port[2]  = -EINVAL
  };
  
- static int __init cm_t3517_init_usbh(void)
-@@ -213,6 +220,7 @@ static int __init cm_t3517_init_usbh(void)
- 		msleep(1);
- 	}
- 
-+	usbhs_init_phys(phy_data, ARRAY_SIZE(phy_data));
- 	usbhs_init(&cm_t3517_ehci_pdata);
- 
- 	return 0;
+ #ifdef CONFIG_OMAP_MUX
 -- 
 1.7.4.1
