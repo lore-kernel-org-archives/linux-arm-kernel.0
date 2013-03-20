@@ -1,29 +1,20 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Wed, 20 Mar 2013 18:15:09 +0800
-Subject: [PATCH V4 0/9] ARM: tegra: add platform suspend support
-In-Reply-To: <5148977F.7000700@wwwdotorg.org>
-References: <1363594400-11663-1-git-send-email-josephl@nvidia.com>
- <5148977F.7000700@wwwdotorg.org>
-Message-ID: <1363774509.5697.21.camel@jlo-ubuntu-64.nvidia.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 20 Mar 2013 10:20:14 +0000
+Subject: [PATCH 10/10] drivers: misc: use module_platform_driver_probe()
+In-Reply-To: <CAHkwnC-3_dDM3JO8y3yeNFz7=fpP=MtZ9D-3cMH8rNF9C1NZBA@mail.gmail.com>
+References: <1363266691-15757-1-git-send-email-fabio.porcedda@gmail.com>
+ <201303191759.27762.arnd@arndb.de>
+ <CAHkwnC-3_dDM3JO8y3yeNFz7=fpP=MtZ9D-3cMH8rNF9C1NZBA@mail.gmail.com>
+Message-ID: <201303201020.14654.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-03-20 at 00:51 +0800, Stephen Warren wrote:
-> On 03/18/2013 02:13 AM, Joseph Lo wrote:
-> > This series introduces a basic functionality for Tegra to support the
-> > platform suspend and resume.
-> > 
-> > Note: This series only adds the support for Tegra20 and Tegra30. The
-> > Tegra114 will be supported later.
-> > 
-> > This series needs the patch below that not yet be merged into linux-mmc tree
-> > to make the system suspend/resume function work correctly.
-> > "mmc: tegra: use mmc_of_parse to get the support of standard MMC DT bindings"
-> 
-> I assume this series needs to be applied after the 3-long series you
-> posted just before it, containing "ARM: dts: tegra: add clock source for
-> PMC", "ARM: tegra: get PMC clock source from DT", and "ARM: tegra:
-> moving the CPU power timer function to PMC driver"?
+On Wednesday 20 March 2013, Fabio Porcedda wrote:
+> I think we can check inside the  deferred_probe_work_func()
+> if the dev->probe function pointer is equal to platform_drv_probe_fail().
 
-Oops, I mentioned this in the cover letter there and forgot to add here.
-Yes, thanks for taking care.
+I think it's too late by then, because that would only warn if we try to probe
+it again, but when platform_driver_probe() does not succeed immediately, it
+unregisters the driver again, so we never get there.
+
+	Arnd
