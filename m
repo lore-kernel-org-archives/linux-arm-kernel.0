@@ -1,39 +1,40 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 20 Mar 2013 17:04:18 +0100
-Subject: [PATCH v3 1/1 net-next] NET: FEC: dynamtic check DMA desc buff
- type
-In-Reply-To: <1357265063-30528-1-git-send-email-Frank.Li@freescale.com>
-References: <1357265063-30528-1-git-send-email-Frank.Li@freescale.com>
-Message-ID: <20130320160418.GG20530@pengutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 20 Mar 2013 09:13:24 -0700
+Subject: [PATCH v4 01/21] usb: phy: nop: Add some parameters to
+ platform data
+In-Reply-To: <20130320155555.GG1567@arwen.pp.htv.fi>
+References: <1363794300-31526-1-git-send-email-rogerq@ti.com>
+ <1363794300-31526-2-git-send-email-rogerq@ti.com>
+ <20130320155555.GG1567@arwen.pp.htv.fi>
+Message-ID: <20130320161324.GL16413@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Fri, Jan 04, 2013 at 10:04:23AM +0800, Frank Li wrote:
-> MX6 and mx28 support enhanced DMA descriptor buff to support 1588
-> ptp. But MX25, MX3x, MX5x can't support enhanced DMA descriptor buff.
-> Check fec type and choose correct DMA descriptor buff type.
+* Felipe Balbi <balbi@ti.com> [130320 09:00]:
+> On Wed, Mar 20, 2013 at 05:44:40PM +0200, Roger Quadros wrote:
+> > Add clk_rate parameter to platform data. If supplied, the
+> > NOP phy driver will program the clock to that rate during probe.
+> > 
+> > Also add 2 flags, needs_vcc and needs_reset.
+> > If the flag is set and the regulator couldn't be found
+> > then the driver will bail out with -EPROBE_DEFER.
+> > 
+> > Signed-off-by: Roger Quadros <rogerq@ti.com>
+> > Acked-by: Felipe Balbi <balbi@ti.com>
 > 
-> Remove static config CONFIG_FEC_PTP.
-> ptp function will be auto detected.
-Your patch (now as ff43da86c69d76a726ffe7d1666148960dc1d108 in v3.9-rc1)
-breaks building with CONFIG_FEC=m:
+> Hi Tony,
+> 
+> maybe you might prefer to merge commit 1f0972f from my next branch which
+> is exactly this patch. Basically, if you:
+> 
+> $ git fetch git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git next
+> $ git merge 1f0972f
+> 
+> you get $SUBJECT and can apply the others without fear of conflicts
+> later.
 
-	ERROR: "fec_ptp_init" [drivers/net/ethernet/freescale/fec.ko] undefined!
-	ERROR: "fec_ptp_ioctl" [drivers/net/ethernet/freescale/fec.ko] undefined!
-	ERROR: "fec_ptp_start_cyclecounter" [drivers/net/ethernet/freescale/fec.ko] undefined!
+OK thanks will use commit 1f0972f, so let's consider that commit immutable.
 
-IMHO you should build fec.o and fec_ptp.o into the same module as they
-cannot live without each other anyhow.
+Regards,
 
-Having said I wonder if it would be worthwile to support FEC without
-PTP_1588_CLOCK. For example make the above three functions static
-inlines if CONFIG_PTP_1588_CLOCK=n and drop the select on the latter.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Tony
