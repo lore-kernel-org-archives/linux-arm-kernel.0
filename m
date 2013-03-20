@@ -1,70 +1,22 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 21 Mar 2013 00:15:27 +0100
-Subject: Integrator PCI base dilemma
-Message-ID: <CACRpkdaOjFhWR21w5x_rR_60ffQF3Ym_MQd2svNyzm0guwOUoQ@mail.gmail.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Wed, 20 Mar 2013 16:34:24 -0700
+Subject: [PATCH 0/3] ARM: context tracking support prerequisites
+Message-ID: <1363822467-6275-1-git-send-email-khilman@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When trying to convert the Integrator/AP to use Device Tree
-for the PCI bridge/hose I run into these two problems:
+This series is a set of prerequistes for getting the new context
+tracking subsystem, and adaptive tickless support working on ARM.
 
-- Unable to assign vga_base early since this should be a virtual
-  address assigned really early. If I sacrifice this and try to
-  just remap the stuff, I still run into:
+Kevin Hilman (3):
+  cputime_nsecs: use math64.h for nsec resolution conversion helpers
+  init/Kconfig: virt CPU accounting: drop 64-bit requirment
+  ARM: Kconfig: allow virt CPU accounting
 
-- Unable to ioremap the PCI memory and config window because
-  it is 16 MiB big. (I guess this is the problem?)
+ arch/arm/Kconfig                    |  1 +
+ include/asm-generic/cputime_nsecs.h | 28 +++++++++++++++++++---------
+ init/Kconfig                        |  2 +-
+ 3 files changed, 21 insertions(+), 10 deletions(-)
 
-Part of the code path is called from .map_io() and basically looks
-like this:
-
-int __init pci_v3_early_init(void)
-{
-	iotable_init(pci_v3_io_desc, ARRAY_SIZE(pci_v3_io_desc));
-	vga_base = PCI_MEMORY_VADDR;
-	pci_map_io_early(__phys_to_pfn(PHYS_PCI_IO_BASE));
-	return 0;
-}
-
-The VGA console seems to be the sole user (unsure what
-pci_map_io_early() is for), and we like to support VGA console.
-
-The problem is that at this point at iomap the device tree is not yet
-populated.
-
-We can attempt to do it later but then the kernel hangs when
-I try to remap the two 16MiB chunks for the non-prefetched
-memory and the config window.
-
-The iomem table looks like this:
-
-/*
- * Static mappings for the PCIv3 bridge
- *
- * e8000000	40000000	PCI memory		PHYS_PCI_MEM_BASE	(max 512M)
- * ec000000	61000000	PCI config space	PHYS_PCI_CONFIG_BASE	(max 16M)
- * fee00000	60000000	PCI IO			PHYS_PCI_IO_BASE	(max 16M)
- */
-static struct map_desc pci_v3_io_desc[] __initdata __maybe_unused = {
-	{
-		.virtual	= (unsigned long)PCI_MEMORY_VADDR,
-		.pfn		= __phys_to_pfn(PHYS_PCI_MEM_BASE),
-		.length		= SZ_16M,
-		.type		= MT_DEVICE
-	}, {
-		.virtual	= (unsigned long)PCI_CONFIG_VADDR,
-		.pfn		= __phys_to_pfn(PHYS_PCI_CONFIG_BASE),
-		.length		= SZ_16M,
-		.type		= MT_DEVICE
-	}
-};
-
-Does anyone have any hints on how to get out of this need to have the
-base addresses so early?
-
-Or am I doing something wrong when I try to push in this map
-later? I tried to just ioremap() them later but that doesn't
-seem to work at all. Too big?
-
-Yours,
-Linus Walleij
+-- 
+1.8.2
