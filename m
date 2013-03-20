@@ -1,33 +1,29 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 19 Mar 2013 19:49:41 -0600
-Subject: [PATCH v2] ARM: tegra114: add speedo-based process identification
-In-Reply-To: <1363743771.3573.55.camel@dahuang-vm>
-References: <1363605454-24176-1-git-send-email-dahuang@nvidia.com>
- <5148A645.9020009@wwwdotorg.org> <1363743771.3573.55.camel@dahuang-vm>
-Message-ID: <514915B5.7000808@wwwdotorg.org>
+Date: Tue, 19 Mar 2013 19:50:19 -0600
+Subject: [PATCH] ARM: tegra: fuse: add fuctions to read speedo id and
+ process id
+In-Reply-To: <1363743557.3573.50.camel@dahuang-vm>
+References: <1363660405-10668-1-git-send-email-dahuang@nvidia.com>
+ <5148A8D6.8000002@wwwdotorg.org> <1363743557.3573.50.camel@dahuang-vm>
+Message-ID: <514915DB.8060206@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/19/2013 07:42 PM, Danny Huang wrote:
-> On Wed, 2013-03-20 at 01:54 +0800, Stephen Warren wrote:
->> On 03/18/2013 05:17 AM, Danny Huang wrote:
->>> Add speedo-based process identifictaion for Tegra114.
+On 03/19/2013 07:39 PM, Danny Huang wrote:
+> On Wed, 2013-03-20 at 02:05 +0800, Stephen Warren wrote:
+>> On 03/18/2013 08:33 PM, Danny Huang wrote:
+>>> Add functions to read the speedo and process id of both cpu and soc.
+>>> There might be some drivers need the information as well.
 >>
->> I have applied this to Tegra's for-3.10/soc branch, with one addition below:
->>
->>> diff --git a/arch/arm/mach-tegra/tegra114_speedo.c b/arch/arm/mach-tegra/tegra114_speedo.c
->>
->>> +#include <linux/kernel.h>
->>
->> Here, I also added:
->>
->> #include <linux/bug.h>
->>
->> That's not needed in the Tegra for-next branch (which is based on
->> 3.9-rc1), but is needed when merged into linux-next, and hence will
->> presumably be needed once this is submitted into 3.10.
+>> What code wants to use these functions? It'd be best to submit this
+>> patch with that code, so that something actually uses the functions, and
+>> they don't look like dead code.
 > 
-> Thanks. Does it mean that we have to include the bug.h for all newly
-> created file for 3.10?
+> There are some developing drivers that are located in drivers folder
+> needs those information.
 
-It's only needed in files that use its contents.
+Which drivers?
+
+> I think that they can't include a header file in mach-tegra folder
+
+True.
