@@ -1,81 +1,109 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 20 Mar 2013 17:44:52 +0200
-Subject: [PATCH v4 13/21] ARM: OMAP3: omap3evm: Adapt to ehci-omap changes
+Date: Wed, 20 Mar 2013 17:45:00 +0200
+Subject: [PATCH v4 21/21] ARM: dts: omap3-beagle: Add USB Host support
 In-Reply-To: <1363794300-31526-1-git-send-email-rogerq@ti.com>
 References: <1363794300-31526-1-git-send-email-rogerq@ti.com>
-Message-ID: <1363794300-31526-14-git-send-email-rogerq@ti.com>
+Message-ID: <1363794300-31526-22-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use usbhs_init_phys() to register the PHY's RESET regulator
-and the NOP PHY device. VAUX2 supplies the PHY's VCC.
+Provide RESET and Power regulators for the USB PHY,
+the USB Host port mode and the PHY device.
 
+Also provide pin multiplexer information for USB host
+pins.
+
+CC: Beno?t Cousson <b-cousson@ti.com>
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- arch/arm/mach-omap2/board-omap3evm.c |   25 +++++++++++++------------
- 1 files changed, 13 insertions(+), 12 deletions(-)
+ arch/arm/boot/dts/omap3-beagle.dts |   71 ++++++++++++++++++++++++++++++++++++
+ 1 files changed, 71 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-omap3evm.c
-index 48789e0..2de92fa 100644
---- a/arch/arm/mach-omap2/board-omap3evm.c
-+++ b/arch/arm/mach-omap2/board-omap3evm.c
-@@ -496,7 +496,7 @@ struct wl12xx_platform_data omap3evm_wlan_data __initdata = {
- static struct regulator_consumer_supply omap3evm_vaux2_supplies[] = {
- 	REGULATOR_SUPPLY("VDD_CSIPHY1", "omap3isp"),	/* OMAP ISP */
- 	REGULATOR_SUPPLY("VDD_CSIPHY2", "omap3isp"),	/* OMAP ISP */
--	REGULATOR_SUPPLY("hsusb1", "ehci-omap.0"),
-+	REGULATOR_SUPPLY("vcc", "nop_usb_xceiv.2"),	/* hsusb port 2 */
- 	REGULATOR_SUPPLY("vaux2", NULL),
- };
+diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
+index f624dc8..02d23f1 100644
+--- a/arch/arm/boot/dts/omap3-beagle.dts
++++ b/arch/arm/boot/dts/omap3-beagle.dts
+@@ -38,6 +38,57 @@
+ 		};
+ 	};
  
-@@ -539,17 +539,16 @@ static int __init omap3_evm_i2c_init(void)
- 	return 0;
- }
- 
--static struct usbhs_omap_platform_data usbhs_bdata __initdata = {
-+static struct usbhs_phy_data phy_data[] __initdata = {
-+	{
-+		.port = 2,
-+		.reset_gpio = -1,	/* set at runtime */
-+		.vcc_gpio = -EINVAL,
-+	},
-+};
- 
--	.port_mode[0] = OMAP_USBHS_PORT_MODE_UNUSED,
-+static struct usbhs_omap_platform_data usbhs_bdata __initdata = {
- 	.port_mode[1] = OMAP_EHCI_PORT_MODE_PHY,
--	.port_mode[2] = OMAP_USBHS_PORT_MODE_UNUSED,
--
--	.phy_reset  = true,
--	/* PHY reset GPIO will be runtime programmed based on EVM version */
--	.reset_gpio_port[0]  = -EINVAL,
--	.reset_gpio_port[1]  = -EINVAL,
--	.reset_gpio_port[2]  = -EINVAL
- };
- 
- #ifdef CONFIG_OMAP_MUX
-@@ -725,7 +724,7 @@ static void __init omap3_evm_init(void)
- 
- 		/* setup EHCI phy reset config */
- 		omap_mux_init_gpio(21, OMAP_PIN_INPUT_PULLUP);
--		usbhs_bdata.reset_gpio_port[1] = 21;
-+		phy_data[0].reset_gpio = 21;
- 
- 		/* EVM REV >= E can supply 500mA with EXTVBUS programming */
- 		musb_board_data.power = 500;
-@@ -733,10 +732,12 @@ static void __init omap3_evm_init(void)
- 	} else {
- 		/* setup EHCI phy reset on MDC */
- 		omap_mux_init_gpio(135, OMAP_PIN_OUTPUT);
--		usbhs_bdata.reset_gpio_port[1] = 135;
-+		phy_data[0].reset_gpio = 135;
- 	}
- 	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
- 	usb_musb_init(&musb_board_data);
++	/* HS USB Port 2 RESET */
++	hsusb2_reset: hsusb2_reset_reg {
++		compatible = "regulator-fixed";
++		regulator-name = "hsusb2_reset";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&gpio5 19 0>;	/* gpio_147 */
++		startup-delay-us = <70000>;
++		enable-active-high;
++	};
 +
-+	usbhs_init_phys(phy_data, ARRAY_SIZE(phy_data));
- 	usbhs_init(&usbhs_bdata);
- 	board_nand_init(omap3evm_nand_partitions,
- 			ARRAY_SIZE(omap3evm_nand_partitions), NAND_CS,
++	/* HS USB Port 2 Power */
++	hsusb2_power: hsusb2_power_reg {
++		compatible = "regulator-fixed";
++		regulator-name = "hsusb2_vbus";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&twl_gpio 18 0>;	/* GPIO LEDA */
++		startup-delay-us = <70000>;
++	};
++
++	/* HS USB Host PHY on PORT 2 */
++	hsusb2_phy: hsusb2_phy {
++		compatible = "usb-nop-xceiv";
++		reset-supply = <&hsusb2_reset>;
++		vcc-supply = <&hsusb2_power>;
++	};
++};
++
++&omap3_pmx_core {
++	pinctrl-names = "default";
++	pinctrl-0 = <
++			&hsusbb2_pins
++	>;
++
++	hsusbb2_pins: pinmux_hsusbb2_pins {
++		pinctrl-single,pins = <
++			0x5c0 0x3  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_clk OUTPUT */
++			0x5c2 0x3  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_stp OUTPUT */
++			0x5c4 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dir INPUT | PULLDOWN */
++			0x5c6 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_nxt INPUT | PULLDOWN */
++			0x5c8 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat0 INPUT | PULLDOWN */
++			0x5cA 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat1 INPUT | PULLDOWN */
++			0x1a4 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat2 INPUT | PULLDOWN */
++			0x1a6 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat3 INPUT | PULLDOWN */
++			0x1a8 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat4 INPUT | PULLDOWN */
++			0x1aa 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat5 INPUT | PULLDOWN */
++			0x1ac 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat6 INPUT | PULLDOWN */
++			0x1ae 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat7 INPUT | PULLDOWN */
++		>;
++	};
+ };
+ 
+ &i2c1 {
+@@ -65,3 +116,23 @@
+ &mmc3 {
+ 	status = "disabled";
+ };
++
++&usbhshost {
++	port2-mode = "ehci-phy";
++};
++
++&usbhsehci {
++	phys = <0 &hsusb2_phy>;
++};
++
++&twl_gpio {
++	ti,use-leds;
++	/* pullups: BIT(1) */
++	ti,pullups = <0x000002>;
++	/*
++	 * pulldowns:
++	 * BIT(2), BIT(6), BIT(7), BIT(8), BIT(13)
++	 * BIT(15), BIT(16), BIT(17)
++	 */
++	ti,pulldowns = <0x03a1c4>;
++};
 -- 
 1.7.4.1
