@@ -1,7 +1,9 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 20 Mar 2013 14:04:35 +0530
+Date: Wed, 20 Mar 2013 14:04:36 +0530
 Subject: [GIT PULL] ARM: OMAP2+: Serial driver sysc cleanup for 3.10
-Message-ID: <1363768476-17794-1-git-send-email-santosh.shilimkar@ti.com>
+In-Reply-To: <1363768476-17794-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1363768476-17794-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1363768476-17794-2-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
