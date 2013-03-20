@@ -1,48 +1,65 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 20 Mar 2013 16:09:03 +0100
-Subject: [BUG][mvebu] mvneta: cannot request irq 25 on openblocks-ax3
-In-Reply-To: <2482565.pAEcuMH9qj@bender>
-References: <51486445.8040506@hitachi.com> <514873FB.5050202@hitachi.com>
- <514895C5.40706@free-electrons.com> <2482565.pAEcuMH9qj@bender>
-Message-ID: <5149D10F.40605@free-electrons.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 20 Mar 2013 16:09:08 +0100
+Subject: [PATCH v2] mmc: mvsdio: fix non-DT probing of GPIOs
+Message-ID: <1363792148-26405-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/19/2013 08:48 PM, Florian Fainelli wrote:
-> On Tuesday 19 March 2013 17:43:49 Gregory CLEMENT wrote:
->>
->> Hi Masami,
->>
->> You can try this patch if you want.
->> I don't have the hardware today so I didn't test it.
->> If you (and also Florian and Ezequiel) can test it and if it fixed
->> the bug, then I will be able send a proper email for it,
-> 
-> I just tested your patch on RD-A370-A1 and DB-MV784MP-GP and it works fine, 
-> thanks! Feel free to add my Tested-by: Florian Fainelli <florian@openwrt.org> 
-> to your next submission.
-> 
-> Thanks!
-> 
-Thanks for having tested it, but with this patch there is still an issue when
-we try to release the network interface. In this case the the interrupt line
-is not properly freed.
-Unfortunately the state of the percpu_irq API prevents the driver to use it.
+Ralph Droms <rdroms.ietf@gmail.com> reported that 3.9-rc was breaking
+the SDIO interface on his Sheevaplug platform, and that the recent
+changes to the mvsdio driver are responsible for this breakage.
 
-Indeed the interrupts have to be freed when the .stop() function is
-called. As the free_percpu_irq() function don't disable the interrupt
-line, we have to do it on each CPU before calling this. The function
-disable_percpu_irq() only disable the percpu on the current CPU and
-there is no function which allows to disable a percpu irq on a given
-CPU. Waiting for the extension of the percpu_irq API, this fix allows
-to use again the mvneta driver.
+After investigation, is turns out that the Sheevaplug does not have
+any "card detect" GPIO, and the Sheevaplug has not been converted to
+the Device Tree. Therefore, the Sheevaplug board code does not define
+a value for the .gpio_card_detect field of the mvsdio_platform_data
+structure, which means that its value is 0. Unfortunately,
+gpio_is_valid() considers 0 as a valid GPIO, and therefore calls
+mmc_gpio_request_cd(), which fails and makes the entire probing of the
+driver fail.
 
-I have just wrote and tested a new patch to fix this issue by just go back
-on the old way we managed the irq for the mvenat as global irq and not
-as local ones.
+In fact, in the previous mvsdio code, before the Device Tree binding
+was introduced, 0 was not considered as a valid GPIO. Therefore, this
+fix revert back to this behavior in the non-DT case, by setting the
+gpio_card_detect and gpio_write_protect local variables to -EINVAL
+when the corresponding fields of the mvsdio_platform_data structure
+are set to zero (i.e, left undefined). Of course, it prevents to use
+GPIO 0 as a card detect or write protect GPIO, but it was a defiency
+of the previous non-DT code, and the fix moving forward is to convert
+platforms to the Device Tree.
 
-I am going to send the fix on the LAKML in a few minutes.
+The problem has been reproduced successfully on the Kirkwood-based
+Marvell DB-88F6281-BP Development Board (that doesn't use the Device
+Tree) and the fix has proven to work properly, after of course
+removing the gpio_card_detect field of the mvsdio_platform_data
+instance for this board.
 
-Thanks,
+Reported-by: Ralph Droms <rdroms.ietf@gmail.com>
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+This patch should be applied on 3.9-rcX.
 
-Gregory
+Changes between v1 and v2:
+ * Send the patch to the MMC maintainer instead of the Marvell
+   maintainers.
+---
+ drivers/mmc/host/mvsdio.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/mmc/host/mvsdio.c b/drivers/mmc/host/mvsdio.c
+index 145cdaf..1e4d567 100644
+--- a/drivers/mmc/host/mvsdio.c
++++ b/drivers/mmc/host/mvsdio.c
+@@ -741,8 +741,8 @@ static int __init mvsd_probe(struct platform_device *pdev)
+ 			goto out;
+ 		}
+ 		host->base_clock = mvsd_data->clock / 2;
+-		gpio_card_detect = mvsd_data->gpio_card_detect;
+-		gpio_write_protect = mvsd_data->gpio_write_protect;
++		gpio_card_detect = mvsd_data->gpio_card_detect ? : -EINVAL;
++		gpio_write_protect = mvsd_data->gpio_write_protect ? : -EINVAL;
+ 	}
+ 
+ 	mmc->ops = &mvsd_ops;
+-- 
+1.7.9.5
