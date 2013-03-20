@@ -1,82 +1,66 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 20 Mar 2013 21:50:58 +0900
-Subject: [PATCH 01/03] ARM: shmobile: APE6EVM base support V2
-In-Reply-To: <CANqRtoRkKB-5GxWN_uXN6ansA33koX743Gr0EsBeEVSd0uwgMg@mail.gmail.com>
-References: <20130318150953.28231.73454.sendpatchset@w520>
- <20130318151002.28231.37531.sendpatchset@w520>
- <20130319072532.GA19741@verge.net.au>
- <20130319075053.GA14668@verge.net.au>
- <CANqRtoRkKB-5GxWN_uXN6ansA33koX743Gr0EsBeEVSd0uwgMg@mail.gmail.com>
-Message-ID: <20130320125057.GB16436@verge.net.au>
+Date: Wed, 20 Mar 2013 22:05:15 +0900
+Subject: [PATCH/RFC] ARM: shmobile: Disallow PINCTRL without GPIOLIB
+In-Reply-To: <20130318135818.23765.51686.sendpatchset@w520>
+References: <20130318135818.23765.51686.sendpatchset@w520>
+Message-ID: <20130320130514.GI16436@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 19, 2013 at 07:18:18PM +0900, Magnus Damm wrote:
-> On Tue, Mar 19, 2013 at 4:50 PM, Simon Horman <horms@verge.net.au> wrote:
-> > On Tue, Mar 19, 2013 at 04:25:33PM +0900, Simon Horman wrote:
-> >> On Tue, Mar 19, 2013 at 12:10:02AM +0900, Magnus Damm wrote:
-> >> > From: Magnus Damm <damm@opensource.se>
-> >> >
-> >> > V2 of APE6EVM base board support making use of
-> >> > 1 GiB of memory, the SCIFA0 serial port and
-> >> > ARM architected timer.
-> >> >
-> >> > Signed-off-by: Magnus Damm <damm@opensource.se>
-> >> > ---
-> >> >
-> >> >  Changes since V1:
-> >> >  - Sorted headers
-> >> >  - Use ape6evm_add_standard_devices() to setup SoC devices and clocks
-> >> >
-> >> >   Written against "next" renesas.git 811689afc214564c4a5f238ecf4d8bdc0e52b615
-> >> >
-> >> >  Depends on the following series:
-> >> >  [PATCH 00/04] ARM: shmobile: r8a73a4 SoC support V2
-> >> >
-> >> >  Does not depend on:
-> >> >  [PATCH 00/02] sh-pfc: Initial r8a73a4 PFC support
-> >> >
-> >> > arch/arm/boot/dts/Makefile             |    1
-> >> >  arch/arm/boot/dts/r8a73a4-ape6evm.dts  |   26 ++++++++++++++++++
-> >> >  arch/arm/mach-shmobile/Kconfig         |    8 ++++-
-> >> >  arch/arm/mach-shmobile/Makefile        |    1
-> >> >  arch/arm/mach-shmobile/board-ape6evm.c |   46 ++++++++++++++++++++++++++++++++
-> >> >  5 files changed, 81 insertions(+), 1 deletion(-)
-> >> >
-> >> > --- /dev/null
-> >> > +++ work/arch/arm/boot/dts/r8a73a4-ape6evm.dts      2013-03-18 21:44:35.000000000 +0900
-> >> > @@ -0,0 +1,26 @@
-> >> > +/*
-> >> > + * Device Tree Source for the APE6EVM board
-> >> > + *
-> >> > + * Copyright (C) 2013 Renesas Solutions Corp.
-> >> > + *
-> >> > + * This file is licensed under the terms of the GNU General Public License
-> >> > + * version 2.  This program is licensed "as is" without any warranty of any
-> >> > + * kind, whether express or implied.
-> >> > + */
-> >> > +
-> >> > +/dts-v1/;
-> >> > +/include/ "r8a73a4.dtsi"
-> >> > +
-> >> > +/ {
-> >> > +   model = "APE6EVM";
-> >> > +   compatible = "renesas,ape6evm", "renesas,r8a73a4";
-> >> > +
-> >> > +   chosen {
-> >> > +           bootargs = "console=ttySC0,115200 ignore_loglevel";
-> >>
-> >> I think that earlyprintk=sh-sci.0,11520 go in here.
-> >
-> > Also, to be consistent with the dts of other shmobile boards
-> > could you add root=/dev/nfs ip=dhcp. This history behind this
-> > is that many boards defaulted to using nfsroot in their defconfigs,
-> > a reasonable default IMHO, and recently the command line for all
-> > boards that boot using DT was moved from their defconfig
-> > to their .dtsi in preparation for defconfig consolidation.
+On Mon, Mar 18, 2013 at 10:58:18PM +0900, Magnus Damm wrote:
+> From: Magnus Damm <damm@opensource.se>
 > 
-> Sounds like a good idea. Network is however not existing until pretty
-> late in the series. How about adding it in that patch that includes
-> SMSC ethernet support?
+> Modify mach-shmobile to only select PINCTRL in case of
+> ARCH_WANT_OPTIONAL_GPIOLIB is set.
+> 
+> This fixes a build error triggered when adding a new SoC
+> lacking GPIO software support (ARCH_WANT_OPTIONAL_GPIOLIB=n):
+> 
+>  CC      drivers/tty/vt/keyboard.o
+> In file included from drivers/pinctrl/core.c:30:0:
+> include/asm-generic/gpio.h: In function 'gpio_get_value_cansleep':
+> include/asm-generic/gpio.h:270:2: error: implicit declaration of function '__gpio_get_value'
+> include/asm-generic/gpio.h: In function 'gpio_set_value_cansleep':
+> include/asm-generic/gpio.h:276:2: error: implicit declaration of function '__gpio_set_value'
+> drivers/pinctrl/core.c: In function 'pinctrl_ready_for_gpio_range':
+> drivers/pinctrl/core.c:297:9: error: implicit declaration of function 'gpio_to_chip'
+> drivers/pinctrl/core.c:297:27: warning: initialization makes pointer from integer without a cast
+> drivers/pinctrl/core.c:304:45: error: dereferencing pointer to incomplete type
+> drivers/pinctrl/core.c:305:26: error: dereferencing pointer to incomplete type
+> drivers/pinctrl/core.c:305:39: error: dereferencing pointer to incomplete type
+> make[2]: *** [drivers/pinctrl/core.o] Error 1
+> make[1]: *** [drivers/pinctrl] Error 2
+> make[1]: *** Waiting for unfinished jobs....
+>   LD      drivers/sh/built-in.o
+> 
+> Signed-off-by: Magnus Damm <damm@opensource.se>
 
-Yes, that sounds reasonable to me.
+Laurent, could you review this please?
+
+> ---
+> 
+>  Using renesas.git "next" 811689afc214564c4a5f238ecf4d8bdc0e52b615
+> 
+>  Trigger using the r8a73a4 patches that lack GPIO and PFC support.
+> 
+>  I am more than happy to replace this patch with something cleaner.
+> 
+>  arch/arm/Kconfig |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> --- 0001/arch/arm/Kconfig
+> +++ work/arch/arm/Kconfig	2013-03-18 14:56:17.000000000 +0900
+> @@ -725,7 +725,7 @@ config ARCH_SHMOBILE
+>  	select MULTI_IRQ_HANDLER
+>  	select NEED_MACH_MEMORY_H
+>  	select NO_IOPORT
+> -	select PINCTRL
+> +	select PINCTRL if ARCH_WANT_OPTIONAL_GPIOLIB
+>  	select PM_GENERIC_DOMAINS if PM
+>  	select SPARSE_IRQ
+>  	help
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
