@@ -1,40 +1,35 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 20 Mar 2013 16:37:35 +0100
-Subject: [PATCH for 3.9-rc] arm: mvebu: Use local interrupt only for the
- timer 0
-In-Reply-To: <1363792175-3136-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1363792175-3136-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20130320163735.398cce2f@skate>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 20 Mar 2013 15:03:20 +0100
+Subject: [PATCH V4 6/9] ARM: mxs: Provide regulator to pwm-backlight
+In-Reply-To: <20130320082318.GA28775@opensource.wolfsonmicro.com>
+References: <1363719573-20926-1-git-send-email-achew@nvidia.com>
+ <5148E252.9050900@wwwdotorg.org>
+ <20130320082318.GA28775@opensource.wolfsonmicro.com>
+Message-ID: <201303201503.20480.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Mark,
 
-On Wed, 20 Mar 2013 16:09:35 +0100, Gregory CLEMENT wrote:
-> The commit 3a6f08a37 "arm: mvebu: Add support for local interrupt",
-> managed the 28th first interrupts as local interrupt to match the
-> hardware specification. Among these interrupts there are the Gigabits
-> Ethernet ones used by the mvneta driver. Unfortunately the state of
-> the percpu_irq API prevents the driver to use it.
+> On Tue, Mar 19, 2013 at 04:10:26PM -0600, Stephen Warren wrote:
+> > On 03/19/2013 03:27 PM, Marek Vasut wrote:
+> > > Do we really need a mandatory regulator? Why can't it be optional?
+> > 
+> > IIRC, the previous advice I've seen is that if a device (driver) uses a
+> > regulator, it must /require/ a regulator, and if a particular board
+> > doesn't actually have a SW-controlled regulator, then a fixed- or dummy-
+> > regulator should be provided to satisfy this requirement.
+> > 
+> > CC'ing Mark Brown to make sure I really do Recall Correctly.
 > 
-> Indeed the interrupts have to be freed when the .stop() function is
-> called. As the free_percpu_irq() function don't disable the interrupt
-> line, we have to do it on each CPU before calling this. The function
-> disable_percpu_irq() only disable the percpu on the current CPU and
-> there is no function which allows to disable a percpu irq on a given
-> CPU. Waiting for the extension of the percpu_irq API, this fix allows
-> to use again the mvneta driver.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Yes, and it should be fixed rather than dummy.  The issue is partly that
+> it's probably important that the device has power so we don't want to
+> just ignore errors and partly that this is something which applies to
+> essentially all devices so whatever we do for this case ought to be done
+> by the core so all devices can benefit and we don't have to duplicate
+> lots of code in individual drivers.
 
-Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
- (on Armada XP GP board)
+Thanks for clearing this!
 
-Thanks!
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Best regards,
+Marek Vasut
