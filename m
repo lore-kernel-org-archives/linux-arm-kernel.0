@@ -1,55 +1,62 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 20 Mar 2013 17:44:57 +0200
-Subject: [PATCH v4 18/21] ARM: OMAP: zoom: Adapt to ehci-omap changes
+Date: Wed, 20 Mar 2013 17:44:45 +0200
+Subject: [PATCH v4 06/21] ARM: OMAP3: 3630SDP: Adapt to ehci-omap changes
 In-Reply-To: <1363794300-31526-1-git-send-email-rogerq@ti.com>
 References: <1363794300-31526-1-git-send-email-rogerq@ti.com>
-Message-ID: <1363794300-31526-19-git-send-email-rogerq@ti.com>
+Message-ID: <1363794300-31526-7-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use usbhs_init_phys() to register the PHY's RESET regulator
-and the NOP PHY device.
+Use usbhs_init_phys() to register the PHY's RESET regulators
+and the NOP PHY devices.
 
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- arch/arm/mach-omap2/board-zoom.c |   16 ++++++++++------
- 1 files changed, 10 insertions(+), 6 deletions(-)
+ arch/arm/mach-omap2/board-3630sdp.c |   21 +++++++++++++++------
+ 1 files changed, 15 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-zoom.c b/arch/arm/mach-omap2/board-zoom.c
-index 5e4d4c9..1a3dd86 100644
---- a/arch/arm/mach-omap2/board-zoom.c
-+++ b/arch/arm/mach-omap2/board-zoom.c
-@@ -92,14 +92,16 @@ static struct mtd_partition zoom_nand_partitions[] = {
- 	},
- };
+diff --git a/arch/arm/mach-omap2/board-3630sdp.c b/arch/arm/mach-omap2/board-3630sdp.c
+index 67447bd..20d6d81 100644
+--- a/arch/arm/mach-omap2/board-3630sdp.c
++++ b/arch/arm/mach-omap2/board-3630sdp.c
+@@ -53,16 +53,23 @@ static void enable_board_wakeup_source(void)
+ 		OMAP_WAKEUP_EN | OMAP_PIN_INPUT_PULLUP);
+ }
  
 +static struct usbhs_phy_data phy_data[] __initdata = {
 +	{
++		.port = 1,
++		.reset_gpio = 126,
++		.vcc_gpio = -EINVAL,
++	},
++	{
 +		.port = 2,
-+		.reset_gpio = ZOOM3_EHCI_RESET_GPIO,
++		.reset_gpio = 61,
 +		.vcc_gpio = -EINVAL,
 +	},
 +};
 +
  static struct usbhs_omap_platform_data usbhs_bdata __initdata = {
--	.port_mode[0]		= OMAP_USBHS_PORT_MODE_UNUSED,
- 	.port_mode[1]		= OMAP_EHCI_PORT_MODE_PHY,
--	.port_mode[2]		= OMAP_USBHS_PORT_MODE_UNUSED,
--	.phy_reset		= true,
--	.reset_gpio_port[0]	= -EINVAL,
--	.reset_gpio_port[1]	= ZOOM3_EHCI_RESET_GPIO,
--	.reset_gpio_port[2]	= -EINVAL,
+ 
+ 	.port_mode[0] = OMAP_EHCI_PORT_MODE_PHY,
+ 	.port_mode[1] = OMAP_EHCI_PORT_MODE_PHY,
+-	.port_mode[2] = OMAP_USBHS_PORT_MODE_UNUSED,
+-
+-	.phy_reset  = true,
+-	.reset_gpio_port[0]  = 126,
+-	.reset_gpio_port[1]  = 61,
+-	.reset_gpio_port[2]  = -EINVAL
  };
  
- static void __init omap_zoom_init(void)
-@@ -109,6 +111,8 @@ static void __init omap_zoom_init(void)
- 	} else if (machine_is_omap_zoom3()) {
- 		omap3_mux_init(board_mux, OMAP_PACKAGE_CBP);
- 		omap_mux_init_gpio(ZOOM3_EHCI_RESET_GPIO, OMAP_PIN_OUTPUT);
+ #ifdef CONFIG_OMAP_MUX
+@@ -199,6 +206,8 @@ static void __init omap_sdp_init(void)
+ 	board_smc91x_init();
+ 	board_flash_init(sdp_flash_partitions, chip_sel_sdp, NAND_BUSWIDTH_16);
+ 	enable_board_wakeup_source();
 +
-+		usbhs_init_phys(phy_data, ARRAY_SIZE(phy_data));
- 		usbhs_init(&usbhs_bdata);
- 	}
++	usbhs_init_phys(phy_data, ARRAY_SIZE(phy_data));
+ 	usbhs_init(&usbhs_bdata);
+ }
  
 -- 
 1.7.4.1
