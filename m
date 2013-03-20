@@ -1,28 +1,50 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 20 Mar 2013 12:12:47 +0530
-Subject: [LAKML][Users getting knocked of from list]
-In-Reply-To: <51495574.4080501@ti.com>
-References: <51495574.4080501@ti.com>
-Message-ID: <51495A67.80206@ti.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Wed, 20 Mar 2013 20:13:08 +1300
+Subject: [PATCH V4 0/9] Add mandatory regulator for all users of
+ pwm-backlight.
+In-Reply-To: <51491DF0.10408@nvidia.com>
+References: <1363719573-20926-1-git-send-email-achew@nvidia.com>
+ <20130320021442.GB20443@S2101-09.ap.freescale.net>
+ <51491DF0.10408@nvidia.com>
+Message-ID: <1363763588.30752.7.camel@gitbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/20/2013 11:51 AM, Santosh Shilimkar wrote:
-> Russell,
+On Wed, 2013-03-20 at 11:24 +0900, Alex Courbot wrote:
+> On 03/20/2013 11:14 AM, Shawn Guo wrote:
+> > On Tue, Mar 19, 2013 at 11:59:24AM -0700, Andrew Chew wrote:
+> >> Many backlights are enabled via GPIO.  We can generalize the GPIO to a
+> >> fixed regulator.
+> >>
+> > I think we should push the series of "Runtime Interpreted Power
+> > Sequences" moving forward, which should be useful this case and many
+> > other cases as well.
+> >
+> > http://thread.gmane.org/gmane.linux.kernel/1395912
 > 
-> In last couple of months, I have observed that users are getting knocked off
-> from LAKML often. I myself faced it 2 times so far and I heard similar complaint
-> at least from 5 more folks.
+> That's still the medium-term plan. But doing this correctly requires 
+> some improvements to be done in the GPIO subsystem, which I am pushing 
+> at the moment.
 > 
-> Is there a change in settings or something new which started triggering this ?
+> Eventually power sequences should handle this kind of scenario, but by 
+> the meantime it cannot hurt to get the job done.
+> 
+> Alex.
 
-Can you login to mailman at
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel and see if
-provides information on this? I too got knocked out and it was
-apparently because of "too many bounces". It maintains a bounce score
-and mine is currently 2.0 out of total of 5.0.
+I don't mind this patch personally, so take this query as more of a
+'generalization' than a problem with this patch:
 
-I have no clue why my address should bounce.
 
-Thanks,
-Sekhar
+This patch changes the binding for an already used device (by addition
+of a required property), which isn't so bad BUT, as Alex pointed out,
+the binding will probably end up being changed again once power
+sequencing is sorted out.
+
+I realise it's still early days and things need to be tried-and-tested
+first, but wasn't the point of the bindings that they should be
+finalized (as best as possible anyway) the first time, so we don't have
+to worry about incompatibilities between bindings and drivers?
+
+Regards
+
+Tony P
