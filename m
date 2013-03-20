@@ -1,47 +1,84 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 20 Mar 2013 12:00:10 -0600
-Subject: [PATCH V4 9/9] pwm_bl: Add mandatory backlight enable regulator
-In-Reply-To: <1363719573-20926-10-git-send-email-achew@nvidia.com>
-References: <1363719573-20926-1-git-send-email-achew@nvidia.com>
- <1363719573-20926-10-git-send-email-achew@nvidia.com>
-Message-ID: <5149F92A.3070004@wwwdotorg.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 20 Mar 2013 11:00:49 -0700
+Subject: [PATCHv3 09/10] clocksource: time-armada-370-xp: Divorce from
+ local timer API
+In-Reply-To: <5149F579.2080303@free-electrons.com>
+References: <1363198676-30417-1-git-send-email-sboyd@codeaurora.org>
+ <1363198676-30417-10-git-send-email-sboyd@codeaurora.org>
+ <5149ED53.5060002@free-electrons.com> <5149EFFA.1050408@codeaurora.org>
+ <5149F13E.7060901@free-electrons.com> <5149F579.2080303@free-electrons.com>
+Message-ID: <5149F951.8050002@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/19/2013 12:59 PM, Andrew Chew wrote:
-> Many backlights need to be explicitly enabled.  Typically, this is done
-> with a GPIO.  For flexibility, we generalize the enable mechanism to a
-> regulator.
-> 
-> If an enable regulator is not needed, then a dummy regulator can be given
-> to the backlight driver.  If a GPIO is used to enable the backlight,
-> then a fixed regulator can be instantiated to control the GPIO.
-> 
-> The backlight enable regulator can be specified in the device tree node
-> for the backlight, or can be done with legacy board setup code in the
-> usual way.
+On 03/20/13 10:44, Gregory CLEMENT wrote:
+> On 03/20/2013 06:26 PM, Gregory CLEMENT wrote:
+>> On 03/20/2013 06:20 PM, Stephen Boyd wrote:
+>>> On 03/20/13 10:09, Gregory CLEMENT wrote:
+>>>> On 03/13/2013 07:17 PM, Stephen Boyd wrote:
+>>>>> Separate the armada 370xp local timers from the local timer API.
+>>>>> This will allow us to remove ARM local timer support in the near
+>>>>> future and makes this driver multi-architecture friendly.
+>>>> At first view the code looks good, but when I applied your patch set on
+>>>> linux-next, build it and run it on a Armada XP based board (AX3 with 2 cores),
+>>>> it crashed:
+>>> [...]
+>>>> Internal error: Oops - undefined instruction: 0 [#1] SMP ARM
+>>>> Modules linked in:
+>>>> CPU: 0    Not tainted  (3.9.0-rc3-next-20130319-00010-g728b448 #153)
+>>>> PC is at 0xe92d45f0
+>>>> LR is at armada_370_xp_timer_interrupt+0x3c/0x4c
+>>>> pc : [<e92d45f0>]    lr : [<c023c2bc>]    psr: 600001d3
+>>>> sp : c0635eb8  ip : 00000000  fp : c063c3f0
+>>>> r10: 000003ff  r9 : 00000000  r8 : 00000010
+>>>> r7 : c22b3c40  r6 : ef007c00  r5 : c0640fcc  r4 : c0053e30
+>>>> r3 : e92d45f0  r2 : fffffffe  r1 : c22b3c40  r0 : c0053e30
+>>>> Flags: nZCv  IRQs off  FIQs off  Mode SVC_32  ISA ARM  Segment kernel
+>>>> Control: 10c53c7d  Table: 0000406a  DAC: 00000015
+>>>> Process swapper/0 (pid: 0, stack limit = 0xc0634238)
+>>>> Stack: (0xc0635eb8 to 0xc0636000)
+>>>> 5ea0:                                                       ef004c80 c0063224
+>>>> 5ec0: 00000010 00000010 00000000 c0660ac0 c0635f18 c005fcb8 c0632b90 c000ed94
+>>>> 5ee0: c0313c60 60000153 00000001 c00085a8 c0313c54 c0313c60 60000153 ffffffff
+>>>> 5f00: c0635f4c 00000000 562f5842 c06360c0 00000000 c000db60 0000001a ffff8ad0
+>>>> 5f20: ffff8ad0 c06360c0 00000000 00000000 c04379c0 c22ad780 00000000 562f5842
+>>>> 5f40: c06360c0 00000000 60000153 c0635f60 c0313c54 c0313c60 60000153 ffffffff
+>>>> 5f60: 00000021 00000000 00000003 00000004 0000006e c065fcc0 c067924c c063ceb8
+>>>> 5f80: c063cc84 c006d8c0 00000005 c065fcc0 c067924c c0421764 c22ad780 c063c42c
+>>>> 5fa0: 562f5842 c063cca8 c06605c0 c04379c0 c22ad780 00000000 562f5842 00000000
+>>>> 5fc0: 00000000 c0417754 ffffffff ffffffff c04172dc 00000000 00000000 c04379c0
+>>>> 5fe0: 10c53c7d c063c414 c04379bc c063febc 0000406a 00008074 00000000 00000000
+>>>> [<c023c2bc>] (armada_370_xp_timer_interrupt+0x3c/0x4c) from [<c0063224>] (handle_percpu_devid_irq+0x64/0x80)
+>>>> [<c0063224>] (handle_percpu_devid_irq+0x64/0x80) from [<c005fcb8>] (generic_handle_irq+0x20/0x30)
+>>>> [<c005fcb8>] (generic_handle_irq+0x20/0x30) from [<c000ed94>] (handle_IRQ+0x38/0x90)
+>>>> [<c000ed94>] (handle_IRQ+0x38/0x90) from [<c00085a8>] (armada_370_xp_handle_irq+0xa4/0xb0)
+>>>> [<c00085a8>] (armada_370_xp_handle_irq+0xa4/0xb0) from [<c000db60>] (__irq_svc+0x40/0x50)
+>>>> Exception stack(0xc0635f18 to 0xc0635f60)
+>>>> 5f00:                                                       0000001a ffff8ad0
+>>>> 5f20: ffff8ad0 c06360c0 00000000 00000000 c04379c0 c22ad780 00000000 562f5842
+>>>> 5f40: c06360c0 00000000 60000153 c0635f60 c0313c54 c0313c60 60000153 ffffffff
+>>>> [<c000db60>] (__irq_svc+0x40/0x50) from [<c0313c60>] (calibrate_delay+0x378/0x528)
+>>>> [<c0313c60>] (calibrate_delay+0x378/0x528) from [<c0417754>] (start_kernel+0x250/0x2dc)
+>>>> [<c0417754>] (start_kernel+0x250/0x2dc) from [<00008074>] (0x8074)
+>>>> Code: 1fe7deb7 cd5772dd fff5692e ed55f79e (7ed5a5f7)
+>>>>
+>>>>
+>>>>
+>>>> I am trying to figure out what happened.
+>>> Argh. Stupid casting again. Can you try this?
+>> Our emails  must have crossed, your fix is also fine :)
+>>
+> I have also tested the patch set on a Armada 370 based board (Armada 370 DB),
+> and it works well.
+> So with this last chunk you can add my:
+> Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> and also my
+> tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>
 
-> diff --git a/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt b/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt
-> index 1e4fc72..7e2e089 100644
-> --- a/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt
-> +++ b/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt
-> @@ -10,6 +10,11 @@ Required properties:
->        last value in the array represents a 100% duty cycle (brightest).
->    - default-brightness-level: the default brightness level (index into the
->        array defined by the "brightness-levels" property)
-> +  - enable-supply: A phandle to the regulator device tree node. This
-> +      regulator will be turned on and off as the pwm is enabled and disabled.
-> +      Many backlights are enabled via a GPIO. In this case, we instantiate
-> +      a fixed regulator and give that to enable-supply. If a regulator
-> +      is not needed, then provide a dummy fixed regulator.
+Great. Thanks for testing.
 
-"enable" doesn't seem like the right name here; if this really is an
-"enable" input, then it's not a regulator. If you're calling it "enable"
-because the regulator is usually controlled by a GPIO that enables it,
-then what you really have is a regulator that provides power to the
-backlight, and the method that you enable that regulator is irrelevant.
 
-Put another way, wouldn't "power" be a better name, thus making the
-property "power-supply"? Although that property name migth be considered
-to have some negative correlation with other concepts, so if people
-object to that, perhaps e.g. "vdd-supply"?
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
