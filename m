@@ -1,158 +1,222 @@
 From: b20788@freescale.com (Anson Huang)
-Date: Wed, 20 Mar 2013 13:39:38 -0400
-Subject: [PATCH 1/3] ARM: imx: enable anatop suspend/resume
-Message-ID: <1363801180-8284-1-git-send-email-b20788@freescale.com>
+Date: Wed, 20 Mar 2013 13:39:40 -0400
+Subject: [PATCH 3/3] ARM: imx: enable RBC to support anatop LPM mode
+In-Reply-To: <1363801180-8284-1-git-send-email-b20788@freescale.com>
+References: <1363801180-8284-1-git-send-email-b20788@freescale.com>
+Message-ID: <1363801180-8284-3-git-send-email-b20788@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-anatop module have sereval configurations for user
-to reduce the power consumption in suspend, provide
-suspend/resume interface for further use and enable
-fet_odrive to reduce CORE LDO leakage during suspend.
+RBC is to control whether some ANATOP sub modules
+can enter lpm mode when SOC is into STOP mode, if
+RBC is enabled and PMIC_VSTBY_REQ is set, ANATOP
+will have below behaviors:
+
+1. Digital LDOs(CORE, SOC and PU) are bypassed;
+2. Analog LDOs(1P1, 2P5, 3P0) are disabled;
+
+As the 2P5 is necessary for DRAM IO pre-drive in
+STOP mode, so we need to enable weak 2P5 in STOP
+mode when 2P5 LDO is disabled.
+
+For RBC settings, there are some rules as below
+due to hardware designe:
+
+1. All interrupts must be masked during operating
+   RBC registers;
+2. At least 2 CKIL(32K) cycles is needed after the
+   RBC setting is changed.
 
 Signed-off-by: Anson Huang <b20788@freescale.com>
 ---
- arch/arm/mach-imx/Kconfig      |    4 ++++
- arch/arm/mach-imx/Makefile     |    1 +
- arch/arm/mach-imx/anatop.c     |   50 ++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-imx/common.h     |    3 +++
- arch/arm/mach-imx/mach-imx6q.c |    1 +
- arch/arm/mach-imx/pm-imx6q.c   |    2 ++
- 6 files changed, 61 insertions(+)
- create mode 100644 arch/arm/mach-imx/anatop.c
+ arch/arm/mach-imx/anatop.c    |   19 +++++++++++++++++++
+ arch/arm/mach-imx/clk-imx6q.c |   35 +++++++++++++++++++++++++++++++++++
+ arch/arm/mach-imx/common.h    |    3 +++
+ arch/arm/mach-imx/gpc.c       |   21 ++++++++++++++++++++-
+ arch/arm/mach-imx/pm-imx6q.c  |    2 ++
+ 5 files changed, 79 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 4c9c6f9..7abaa6e 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -74,6 +74,9 @@ config HAVE_IMX_MMDC
- config HAVE_IMX_SRC
- 	def_bool y if SMP
- 
-+config HAVE_IMX_ANATOP
-+	bool
-+
- config IMX_HAVE_IOMUX_V1
- 	bool
- 
-@@ -816,6 +819,7 @@ config SOC_IMX6Q
- 	select HAVE_IMX_GPC
- 	select HAVE_IMX_MMDC
- 	select HAVE_IMX_SRC
-+	select HAVE_IMX_ANATOP
- 	select HAVE_SMP
- 	select MFD_SYSCON
- 	select PINCTRL
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index c4ce090..f4badaa 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -95,6 +95,7 @@ obj-$(CONFIG_MACH_VPR200) += mach-vpr200.o
- obj-$(CONFIG_HAVE_IMX_GPC) += gpc.o
- obj-$(CONFIG_HAVE_IMX_MMDC) += mmdc.o
- obj-$(CONFIG_HAVE_IMX_SRC) += src.o
-+obj-$(CONFIG_HAVE_IMX_ANATOP) += anatop.o
- AFLAGS_headsmp.o :=-Wa,-march=armv7-a
- obj-$(CONFIG_SMP) += headsmp.o platsmp.o
- obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
 diff --git a/arch/arm/mach-imx/anatop.c b/arch/arm/mach-imx/anatop.c
-new file mode 100644
-index 0000000..8f6ab27
---- /dev/null
+index 8f6ab27..38b4f44 100644
+--- a/arch/arm/mach-imx/anatop.c
 +++ b/arch/arm/mach-imx/anatop.c
-@@ -0,0 +1,50 @@
-+/*
-+ * Copyright (C) 2013 Freescale Semiconductor, Inc.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/regmap.h>
-+
-+#define REG_SET		0x4
-+#define REG_CLR		0x8
-+#define ANA_REG_CORE	0x140
-+
-+#define BM_ANADIG_REG_CORE_FET_ODRIVE		0x20000000
-+
-+static struct regmap *anatop;
-+
-+void imx_anatop_enable_fet_odrive(bool enable)
+@@ -18,12 +18,29 @@
+ 
+ #define REG_SET		0x4
+ #define REG_CLR		0x8
++#define ANA_MISC0	0x150
+ #define ANA_REG_CORE	0x140
++#define ANA_REG_2P5	0x130
+ 
++#define BM_ANADIG_REG_2P5_ENABLE_WEAK_LINREG	0x40000
++#define BM_ANADIG_ANA_MISC0_STOP_MODE_CONFIG	0x1000
+ #define BM_ANADIG_REG_CORE_FET_ODRIVE		0x20000000
+ 
+ static struct regmap *anatop;
+ 
++void imx_anatop_enable_weak2p5(bool enable)
 +{
-+	regmap_write(anatop, ANA_REG_CORE + (enable ?
-+		REG_SET : REG_CLR), BM_ANADIG_REG_CORE_FET_ODRIVE);
++	u32 val;
++
++	regmap_read(anatop, ANA_MISC0, &val);
++
++	/* can only be enabled when stop_mode_config is clear. */
++	regmap_write(anatop, ANA_REG_2P5 + ((enable &&
++		((val & BM_ANADIG_ANA_MISC0_STOP_MODE_CONFIG)
++		== 0)) ? REG_SET : REG_CLR),
++		BM_ANADIG_REG_2P5_ENABLE_WEAK_LINREG);
 +}
 +
-+void imx_anatop_pre_suspend(void)
+ void imx_anatop_enable_fet_odrive(bool enable)
+ {
+ 	regmap_write(anatop, ANA_REG_CORE + (enable ?
+@@ -32,12 +49,14 @@ void imx_anatop_enable_fet_odrive(bool enable)
+ 
+ void imx_anatop_pre_suspend(void)
+ {
++	imx_anatop_enable_weak2p5(true);
+ 	imx_anatop_enable_fet_odrive(true);
+ }
+ 
+ void imx_anatop_post_resume(void)
+ {
+ 	imx_anatop_enable_fet_odrive(false);
++	imx_anatop_enable_weak2p5(false);
+ }
+ 
+ void __init imx_anatop_init(void)
+diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+index b365efc..646ce12 100644
+--- a/arch/arm/mach-imx/clk-imx6q.c
++++ b/arch/arm/mach-imx/clk-imx6q.c
+@@ -14,6 +14,7 @@
+ #include <linux/types.h>
+ #include <linux/clk.h>
+ #include <linux/clkdev.h>
++#include <linux/delay.h>
+ #include <linux/err.h>
+ #include <linux/io.h>
+ #include <linux/of.h>
+@@ -25,6 +26,8 @@
+ 
+ #define CCR				0x0
+ #define BM_CCR_WB_COUNT			(0x7 << 16)
++#define BM_CCR_RBC_BYPASS_COUNT		(0x3f << 21)
++#define BM_CCR_RBC_EN			(0x1 << 27)
+ 
+ #define CCGR0				0x68
+ #define CCGR1				0x6c
+@@ -70,6 +73,38 @@ void imx6q_set_chicken_bit(void)
+ 	writel_relaxed(val, ccm_base + CGPR);
+ }
+ 
++void imx6q_set_rbc(bool enable)
 +{
-+	imx_anatop_enable_fet_odrive(true);
++	u32 val;
++
++	/*
++	 * need to mask all interrupts in GPC before
++	 * operating RBC configurations
++	 */
++	imx_gpc_mask_all();
++
++	/* configurate RBC enable bit */
++	val = readl_relaxed(ccm_base + CCR);
++	val &= ~BM_CCR_RBC_EN;
++	val |= enable ? BM_CCR_RBC_EN : 0;
++	writel_relaxed(val, ccm_base + CCR);
++
++	/* configurate RBC count */
++	val = readl_relaxed(ccm_base + CCR);
++	val &= ~BM_CCR_RBC_BYPASS_COUNT;
++	val |= enable ? BM_CCR_RBC_BYPASS_COUNT : 0;
++	writel(val, ccm_base + CCR);
++
++	/*
++	 * need to delay@least 2 cycles of CKIL(32K)
++	 * due to hardware design requirement, which is
++	 * ~61us, here we use 65us for safe
++	 */
++	udelay(65);
++	/* restore GPC interrupt mask settings */
++	imx_gpc_restore_all();
 +}
 +
-+void imx_anatop_post_resume(void)
-+{
-+	imx_anatop_enable_fet_odrive(false);
-+}
-+
-+void __init imx_anatop_init(void)
-+{
-+	anatop = syscon_regmap_lookup_by_compatible("fsl,imx6q-anatop");
-+	if (IS_ERR(anatop)) {
-+		pr_err("%s: failed to find imx6q-anatop regmap!\n", __func__);
-+		return;
-+	}
-+}
+ void imx6q_set_wb(bool enable)
+ {
+ 	u32 val;
 diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-index 5a800bf..004c2b3 100644
+index b9125cf..66fe41c 100644
 --- a/arch/arm/mach-imx/common.h
 +++ b/arch/arm/mach-imx/common.h
-@@ -129,6 +129,9 @@ extern void imx_src_prepare_restart(void);
+@@ -129,11 +129,14 @@ extern void imx_src_prepare_restart(void);
  extern void imx_gpc_init(void);
  extern void imx_gpc_pre_suspend(void);
  extern void imx_gpc_post_resume(void);
-+extern void imx_anatop_init(void);
-+extern void imx_anatop_pre_suspend(void);
-+extern void imx_anatop_post_resume(void);
++extern void imx_gpc_mask_all(void);
++extern void imx_gpc_restore_all(void);
+ extern void imx_anatop_init(void);
+ extern void imx_anatop_pre_suspend(void);
+ extern void imx_anatop_post_resume(void);
  extern int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode);
  extern void imx6q_set_chicken_bit(void);
++extern void imx6q_set_rbc(bool enable);
+ extern void imx6q_set_wb(bool enable);
+ extern void imx_cpu_die(unsigned int cpu);
+ extern int imx_cpu_kill(unsigned int cpu);
+diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
+index a96ccc7..504049e 100644
+--- a/arch/arm/mach-imx/gpc.c
++++ b/arch/arm/mach-imx/gpc.c
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright 2011 Freescale Semiconductor, Inc.
++ * Copyright 2011-2013 Freescale Semiconductor, Inc.
+  * Copyright 2011 Linaro Ltd.
+  *
+  * The code contained herein is licensed under the GNU General Public
+@@ -68,6 +68,25 @@ static int imx_gpc_irq_set_wake(struct irq_data *d, unsigned int on)
+ 	return 0;
+ }
  
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index 9ffd103..aa867db 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -197,6 +197,7 @@ static void __init imx6q_init_machine(void)
- 
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- 
-+	imx_anatop_init();
- 	imx6q_pm_init();
- 	imx6q_usb_init();
- 	imx6q_1588_init();
++void imx_gpc_mask_all(void)
++{
++	void __iomem *reg_imr1 = gpc_base + GPC_IMR1;
++	int i;
++
++	for (i = 0; i < IMR_NUM; i++)
++		writel_relaxed(0xffffffff, reg_imr1 + i * 4);
++
++}
++
++void imx_gpc_restore_all(void)
++{
++	void __iomem *reg_imr1 = gpc_base + GPC_IMR1;
++	int i;
++
++	for (i = 0; i < IMR_NUM; i++)
++		writel_relaxed(gpc_saved_imrs[i], reg_imr1 + i * 4);
++}
++
+ static void imx_gpc_irq_unmask(struct irq_data *d)
+ {
+ 	void __iomem *reg;
 diff --git a/arch/arm/mach-imx/pm-imx6q.c b/arch/arm/mach-imx/pm-imx6q.c
-index 5faba7a..05b26cd 100644
+index 57ca274..24ac7bc 100644
 --- a/arch/arm/mach-imx/pm-imx6q.c
 +++ b/arch/arm/mach-imx/pm-imx6q.c
-@@ -34,10 +34,12 @@ static int imx6q_pm_enter(suspend_state_t state)
- 	case PM_SUSPEND_MEM:
- 		imx6q_set_lpm(STOP_POWER_OFF);
+@@ -36,10 +36,12 @@ static int imx6q_pm_enter(suspend_state_t state)
  		imx_gpc_pre_suspend();
-+		imx_anatop_pre_suspend();
+ 		imx_anatop_pre_suspend();
  		imx_set_cpu_jump(0, v7_cpu_resume);
++		imx6q_set_rbc(true);
+ 		imx6q_set_wb(true);
  		/* Zzz ... */
  		cpu_suspend(0, imx6q_suspend_finish);
+ 		imx6q_set_wb(false);
++		imx6q_set_rbc(false);
  		imx_smp_prepare();
-+		imx_anatop_post_resume();
+ 		imx_anatop_post_resume();
  		imx_gpc_post_resume();
- 		imx6q_set_lpm(WAIT_CLOCKED);
- 		break;
 -- 
 1.7.9.5
