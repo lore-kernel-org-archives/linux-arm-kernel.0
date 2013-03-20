@@ -1,61 +1,58 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Wed, 20 Mar 2013 18:00:08 +0800
-Subject: [PATCH V2 2/3] ARM: tegra: get PMC clock source from DT
-In-Reply-To: <51489513.1020107@wwwdotorg.org>
+Date: Wed, 20 Mar 2013 18:12:05 +0800
+Subject: [PATCH V2 1/3] ARM: dts: tegra: add clock source for PMC
+In-Reply-To: <51489586.9090605@wwwdotorg.org>
 References: <1363594199-10974-1-git-send-email-josephl@nvidia.com>
- <1363594199-10974-3-git-send-email-josephl@nvidia.com>
- <51489513.1020107@wwwdotorg.org>
-Message-ID: <1363773608.5697.8.camel@jlo-ubuntu-64.nvidia.com>
+ <1363594199-10974-2-git-send-email-josephl@nvidia.com>
+ <51489586.9090605@wwwdotorg.org>
+Message-ID: <1363774325.5697.19.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-03-20 at 00:40 +0800, Stephen Warren wrote:
+On Wed, 2013-03-20 at 00:42 +0800, Stephen Warren wrote:
 > On 03/18/2013 02:09 AM, Joseph Lo wrote:
-> > The clock source of PMC should be PCLK and gotten from DT.
-> > 
-> > Signed-off-by: Joseph Lo <josephl@nvidia.com>
-> > ---
-> > V2:
-> > * new in this change
+> > The clock source of PMC is PCLK. Adding it into DTS for Tegra20 and Tegra30.
 > 
-> s/change/series/ ???
+> > diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
 > 
-> > diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
+> >  	pmc {
+> >  		compatible = "nvidia,tegra20-pmc";
+> >  		reg = <0x7000e400 0x400>;
+> > +		clocks = <&tegra_car 110>;
+> >  	};
 > 
-> >  void __init tegra_dt_init_irq(void)
-> >  {
-> >  	tegra_clocks_init();
-> > +	tegra_pmc_init();
-> >  	tegra_init_irq();
-> >  	irqchip_init();
-> >  }
-> > @@ -100,7 +101,6 @@ void __init tegra_init_early(void)
-> >  	tegra_apb_io_init();
-> >  	tegra_init_fuse();
-> >  	tegra_init_cache();
-> > -	tegra_pmc_init();
+> The DT binding documentation needs to list the set of clocks that must
+> be present.
 > 
-> This change isn't mentioned in the commit description.
-> 
-> Why is this change needed? We should minimize the amount of code in
-> tegra_dt_init_irq(), not add more code there.
-> 
-The clocks only available after tegra_clocks_init(). If I can keep the
-PMC dt node somewhere in PMC driver, then I can get the clock later.
+> Doesn't the PMC also receive a "clk32k_in" from the PMIC, or is that
+> routed into the CAR, and then into the PMC? Either way, the PMC module
+> receives that clock somehow. Since there are multiple clocks, that also
+> means that a clock-names property is required.
 
-> > diff --git a/arch/arm/mach-tegra/pmc.c b/arch/arm/mach-tegra/pmc.c
-> 
-> > @@ -151,6 +153,8 @@ static void tegra_pmc_parse_dt(void)
-> >  
-> >  	tegra_pmc_invert_interrupt = of_property_read_bool(np,
-> >  				     "nvidia,invert-interrupt");
-> > +	tegra_pclk = of_clk_get(np, 0);
-> > +	WARN_ON_ONCE(IS_ERR(tegra_pclk));
-> 
-> Why WARN_ON_ONCE(); is tegra_pmc_parse_dt() called more than once?
-> 
-> Can the code continue if IS_ERR(tegra_pclk), or is that fatal?
-> 
+Do you mean the DTS below and add it into binding document?
 
-The code is still OK just want to warn people that the PMC DT node
-needs PCLK clock info.
+/ SoC dts including file
+pmc {
+	compatible = "nvidia,tegra20-pmc";
+	reg = <0x7000e400 0x400>;
+	clocks = <&tegra_car 110>, <&clk32k_in>;
+	clock-names= "pclk", "clk32k_in";
+};
+
+/ Tegra board dts file
+
+pmic {
+	...
+	clocks {
+		compatible = "simple-bus";
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		clk32k_in: clock at 0 {
+			compatible = "fixed-clock";
+			reg=<0>;
+			#clock-cells = <0>;
+			clock-frequency = <32768>;
+		};
+	};
+};
