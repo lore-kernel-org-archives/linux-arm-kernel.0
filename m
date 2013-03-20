@@ -1,31 +1,33 @@
-From: dahuang@nvidia.com (Danny Huang)
-Date: Wed, 20 Mar 2013 09:39:17 +0800
-Subject: [PATCH] ARM: tegra: fuse: add fuctions to read speedo id and
- process id
-In-Reply-To: <5148A8D6.8000002@wwwdotorg.org>
-References: <1363660405-10668-1-git-send-email-dahuang@nvidia.com>
- <5148A8D6.8000002@wwwdotorg.org>
-Message-ID: <1363743557.3573.50.camel@dahuang-vm>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 19 Mar 2013 22:39:13 -0300
+Subject: [PATCH 2/2] ARM: imx_v4_v5_defconfig: Select CONFIG_USB_PHY
+In-Reply-To: <1363743553-17295-1-git-send-email-festevam@gmail.com>
+References: <1363743553-17295-1-git-send-email-festevam@gmail.com>
+Message-ID: <1363743553-17295-2-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-03-20 at 02:05 +0800, Stephen Warren wrote:
-> On 03/18/2013 08:33 PM, Danny Huang wrote:
-> > Add functions to read the speedo and process id of both cpu and soc.
-> > There might be some drivers need the information as well.
-> 
-> What code wants to use these functions? It'd be best to submit this
-> patch with that code, so that something actually uses the functions, and
-> they don't look like dead code.
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-There are some developing drivers that are located in drivers folder
-needs those information. I think that they can't include a header file
-in mach-tegra folder. Hence I'd like to provide them such functions for
-their development.
-Is there any better way to do this?
+Since commit edc7cb2e955f (usb: phy: make it a menuconfig) in order to be able to
+select CONFIG_USB_ULPI, it is necessary to select CONFIG_USB_PHY.  
 
-> 
-> In the past, functions similar to this used to exist. However, they were
-> removed and replaced by direct access to the underlying variables. Do we
-> actually need functions for this, or can code simply read from the
-> variables instead?
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/configs/imx_v4_v5_defconfig |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
+index 02c657a..d56bedc 100644
+--- a/arch/arm/configs/imx_v4_v5_defconfig
++++ b/arch/arm/configs/imx_v4_v5_defconfig
+@@ -156,6 +156,7 @@ CONFIG_USB_HID=m
+ CONFIG_USB=y
+ CONFIG_USB_EHCI_HCD=y
+ CONFIG_USB_EHCI_MXC=y
++CONFIG_USB_PHY=y
+ CONFIG_USB_ULPI=y
+ CONFIG_MMC=y
+ CONFIG_MMC_SDHCI=y
+-- 
+1.7.9.5
