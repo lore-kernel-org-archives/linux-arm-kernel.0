@@ -1,40 +1,66 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Wed, 20 Mar 2013 17:48:30 +0100
-Subject: [PATCH v3] clk: add si5351 i2c common clock driver
-In-Reply-To: <6e120226-8a3c-415f-90f2-c44e7b6bbf96@googlegroups.com>
-References: <fa.WZVD0OA/Ooajh6BejiLf7TwBsJ8@ifi.uio.no>
- <fa.iIqrS6k+Vb5mLqAeL7iTsNsbKyo@ifi.uio.no>
- <fa.L0b41q+fYFZG0WOFTGKLhn/cGPA@ifi.uio.no>
- <fa.XCuSmq9Zwp3+wqFO8NEjpwADVZ0@ifi.uio.no>
- <6e120226-8a3c-415f-90f2-c44e7b6bbf96@googlegroups.com>
-Message-ID: <5149E85E.90701@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 20 Mar 2013 09:51:41 -0700
+Subject: [PATCH v3 4/6] ARM: OMAP: USB: Add phy binding information
+In-Reply-To: <1363770725-13717-5-git-send-email-kishon@ti.com>
+References: <1363770725-13717-1-git-send-email-kishon@ti.com>
+ <1363770725-13717-5-git-send-email-kishon@ti.com>
+Message-ID: <20130320165141.GP16413@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michal,
+* Kishon Vijay Abraham I <kishon@ti.com> [130320 02:17]:
+> 
+> --- a/arch/arm/mach-omap2/board-2430sdp.c
+> +++ b/arch/arm/mach-omap2/board-2430sdp.c
+> @@ -265,6 +266,7 @@ static void __init omap_2430sdp_init(void)
+>  
+>  	omap_mux_init_signal("usb0hs_stp", OMAP_PULL_ENA | OMAP_PULL_UP);
+>  	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
+> +	phy_bind("musb-hdrc.0.auto", 0, "twl4030_usb");
+>  	usb_musb_init(NULL);
+>  
+>  	board_smc91x_init();
+> --- a/arch/arm/mach-omap2/board-3430sdp.c
+> +++ b/arch/arm/mach-omap2/board-3430sdp.c
+> @@ -601,6 +602,7 @@ static void __init omap_3430sdp_init(void)
+>  	omap_serial_init();
+>  	omap_sdrc_init(hyb18m512160af6_sdrc_params, NULL);
+>  	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
+> +	phy_bind("musb-hdrc.0.auto", 0, "twl4030_usb");
+>  	usb_musb_init(NULL);
+>  	board_smc91x_init();
+>  	board_flash_init(sdp_flash_partitions, chip_sel_3430, 0);
 
-On 20.03.2013 14:55, michal.bachraty at gmail.com wrote:
-> Thanks for writing this driver! I have tested your si5351 clock 
-> driver and his tuning capabilities. It works well, it generates 
-> proper clock frequency, but when new frequency is generated, little 
-> clock gap (1ms) is generated. Si5351 datasheet and WP claims, clock 
-> tuning can be without gaps - 
-> http://www.silabs.com/Support%20Documents/TechnicalDocs/Si5350-51-Frequency-Shifting-WP.pdf
->
-> I made some tests with Si5351A chip and I found that when tuning touch
-> only Multisynth registers, it can tune without gaps. There is no need
-> for soft PLL reset. I found also, accessing Multisynth registers is not
-> atomic, so there can be another frequency at output, while not all
-> registers are written. Writing only to one register seems to be atomic.
+Can't you call phy_bind() from usb_musb_init() with the default
+values automatically when usb_musb_init() is passed NULL?
 
-Yeah, but limiting possible changes to the PLLs to one single register
-also means that you cannot offer to generate all the frequencies any
-more. What could probably be done is refine the algorithm so that it
-stays 'as close as possible' to the former values, but I'm not sure how
-much work that implies.
+That way you don't have to patch every board-*.c file with the
+same lines, and don't need to include <linux/phy/phy.h> in each
+board-*.c file.
 
-Can you provide a patch against Sebastian's v3 to do that? Then it can
-be cleanly applied on top of the driver later.
+> --- a/arch/arm/mach-omap2/board-4430sdp.c
+> +++ b/arch/arm/mach-omap2/board-4430sdp.c
+> @@ -32,6 +32,7 @@
+>  #include <linux/platform_data/omap4-keypad.h>
+>  #include <linux/usb/musb.h>
+>  #include <linux/usb/phy.h>
+> +#include <linux/phy/phy.h>
+>  
+>  #include <asm/mach-types.h>
+>  #include <asm/mach/arch.h>
+> @@ -725,6 +726,7 @@ static void __init omap_4430sdp_init(void)
+>  	omap4_twl6030_hsmmc_init(mmc);
+>  
+>  	usb_bind_phy("musb-hdrc.0.auto", 0, "omap-usb2.1.auto");
+> +	phy_bind("musb-hdrc.0.auto", 0, "omap-usb2.1.auto");
+>  	usb_musb_init(&musb_board_data);
+>  
+>  	status = omap_ethernet_init();
 
+Here usb_musb_init() gets called with musb_board_data, so
+keeping the phy_bind() in the board-4430sdp.c can then override
+the default in usb_musb_init().
 
-Daniel
+Regards,
+
+Tony
