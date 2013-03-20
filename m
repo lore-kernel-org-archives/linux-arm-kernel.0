@@ -1,299 +1,114 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Wed, 20 Mar 2013 17:30:34 +0530
-Subject: [PATCH V3] clk: Add composite clock type
-Message-ID: <1363780834-1289-1-git-send-email-pgaikwad@nvidia.com>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Wed, 20 Mar 2013 07:24:55 -0500
+Subject: [PATCHv2 2/2] ARM: socfpga: Add clock entries into device tree
+In-Reply-To: <20130319221233.8663.40135@quantum>
+References: <1363707936-17769-1-git-send-email-dinguyen@altera.com>
+ <1363707936-17769-2-git-send-email-dinguyen@altera.com>
+ <20130319164638.8663.89508@quantum>
+ <1363718750.17844.5.camel@linux-builds1>
+ <20130319221233.8663.40135@quantum>
+Message-ID: <1363782295.12746.7.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Not all clocks are required to be decomposed into basic clock
-types but at the same time want to use the functionality
-provided by these basic clock types instead of duplicating.
+Hi Mike,
 
-For example, Tegra SoC has ~100 clocks which can be decomposed
-into Mux -> Div -> Gate clock types making the clock count to
-~300. Also, parent change operation can not be performed on gate
-clock which forces to use mux clock in driver if want to change
-the parent.
+On Tue, 2013-03-19 at 15:12 -0700, Mike Turquette wrote:
+> Quoting Dinh Nguyen (2013-03-19 11:45:50)
+> > Hi Mike,
+> > 
+> > On Tue, 2013-03-19 at 09:46 -0700, Mike Turquette wrote:
+> > > Quoting dinguyen at altera.com (2013-03-19 08:45:36)
+> > > > From: Dinh Nguyen <dinguyen@altera.com>
+> > > > 
+> > > > Adds the main PLL clock groups for SOCFPGA into device tree file
+> > > > so that the clock framework to query the clock and clock rates
+> > > > appropriately.
+> > > >
+>  
 
-Instead aggregate the basic clock types functionality into one
-clock and just use this clock for all operations. This clock
-type re-uses the functionality of basic clock types and not
-limited to basic clock types but any hardware-specific
-implementation.
+<snip>
 
-Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
----
+> > > 
+> > > There is a lot going on in this one patch.  I would prefer to see the
+> > > clock driver broken out separately.
+> > 
+> > Not sure what you mean by breaking out the clock driver separately. The
+> > patch is only touching the clocks for mach-socfpga.
+> > 
+> 
+> I mean breaking the change to drivers/clk/socfpga/clk.c out into a
+> separate patch.
+> 
+> > The patch is
+> > 7 files changed, 366 insertions(+), 21 deletions(-)
+> > 
+> > while the patch to enable clk-highbank was:
+> > 8 files changed, 463 insertions(+), 64 deletions(-)
+> > 
+> 
+> That is a fair comparison.  However I still prefer to see data (e.g. dts
+> changes) separated from logic (clk.c changes).  I think it makes for a
+> cleaner git history and makes patches more readable too.
 
-Changes from V2:
-- Move clk_ops inside clk_composite instead of dynamically allocation.
+I agree that it makes things alot cleaner to split DTS and code into
+separate patches, but at the same time the code is pretty much useless
+without the DTS entries. I apologize if there has already been a similar
+discussion on the list about this. I just want to make sure that I know
+to split up patches in the same manner in the future?
 
----
- drivers/clk/Makefile         |    1 +
- drivers/clk/clk-composite.c  |  201 ++++++++++++++++++++++++++++++++++++++++++
- include/linux/clk-provider.h |   31 +++++++
- 3 files changed, 233 insertions(+), 0 deletions(-)
- create mode 100644 drivers/clk/clk-composite.c
+> 
+> Regards,
+> Mike
+> 
+> > > <snip>
+> > > 
+> > > > diff --git a/drivers/clk/socfpga/clk.c b/drivers/clk/socfpga/clk.c
+> > > > index 2c855a6..da6b461 100644
+> > > > --- a/drivers/clk/socfpga/clk.c
+> > > > +++ b/drivers/clk/socfpga/clk.c
+> > > <snip>
+> > > > +static int clk_pll_enable(struct clk_hw *hwclk)
+> > > > +{
+> > > > +       struct socfpga_clk *socfpgaclk = to_socfpga_clk(hwclk);
+> > > > +       u32 reg;
+> > > > +
+> > > > +       reg = readl(socfpgaclk->reg);
+> > > > +       reg |= SOCFPGA_PLL_EXT_ENA;
+> > > > +       writel(reg, socfpgaclk->reg);
+> > > > +
+> > > > +       return 0;
+> > > > +}
+> > > > +
+> > > > +static void clk_pll_disable(struct clk_hw *hwclk)
+> > > >  {
+> > > > +       struct socfpga_clk *socfpgaclk = to_socfpga_clk(hwclk);
+> > > > +       u32 reg;
+> > > > +
+> > > > +       reg = readl(socfpgaclk->reg);
+> > > > +       reg &= ~SOCFPGA_PLL_EXT_ENA;
+> > > > +       writel(reg, socfpgaclk->reg);
+> > > > +}
+> > > > +
+> > > 
+> > > For a simple enable which just sets a bit, you might want to re-use the
+> > > basic gate clock type.  This can be done similar to the composite clock
+> > > patches (currently on the list) by stuffing a clk_gate structure into
+> > > your custom socfpga_clk type.
+> > 
+> > I'll take a look at the list about this.
 
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index 0147022..097ed01 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -7,6 +7,7 @@ obj-$(CONFIG_COMMON_CLK)	+= clk-fixed-factor.o
- obj-$(CONFIG_COMMON_CLK)	+= clk-fixed-rate.o
- obj-$(CONFIG_COMMON_CLK)	+= clk-gate.o
- obj-$(CONFIG_COMMON_CLK)	+= clk-mux.o
-+obj-$(CONFIG_COMMON_CLK)	+= clk-composite.o
- 
- # SoCs specific
- obj-$(CONFIG_ARCH_BCM2835)	+= clk-bcm2835.o
-diff --git a/drivers/clk/clk-composite.c b/drivers/clk/clk-composite.c
-new file mode 100644
-index 0000000..097dee4
---- /dev/null
-+++ b/drivers/clk/clk-composite.c
-@@ -0,0 +1,201 @@
-+/*
-+ * Copyright (c) 2013 NVIDIA CORPORATION.  All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/clk-provider.h>
-+#include <linux/err.h>
-+#include <linux/slab.h>
-+
-+#define to_clk_composite(_hw) container_of(_hw, struct clk_composite, hw)
-+
-+static u8 clk_composite_get_parent(struct clk_hw *hw)
-+{
-+	struct clk_composite *composite = to_clk_composite(hw);
-+	const struct clk_ops *mux_ops = composite->mux_ops;
-+	struct clk_hw *mux_hw = composite->mux_hw;
-+
-+	mux_hw->clk = hw->clk;
-+
-+	return mux_ops->get_parent(mux_hw);
-+}
-+
-+static int clk_composite_set_parent(struct clk_hw *hw, u8 index)
-+{
-+	struct clk_composite *composite = to_clk_composite(hw);
-+	const struct clk_ops *mux_ops = composite->mux_ops;
-+	struct clk_hw *mux_hw = composite->mux_hw;
-+
-+	mux_hw->clk = hw->clk;
-+
-+	return mux_ops->set_parent(mux_hw, index);
-+}
-+
-+static unsigned long clk_composite_recalc_rate(struct clk_hw *hw,
-+					    unsigned long parent_rate)
-+{
-+	struct clk_composite *composite = to_clk_composite(hw);
-+	const struct clk_ops *div_ops = composite->div_ops;
-+	struct clk_hw *div_hw = composite->div_hw;
-+
-+	div_hw->clk = hw->clk;
-+
-+	return div_ops->recalc_rate(div_hw, parent_rate);
-+}
-+
-+static long clk_composite_round_rate(struct clk_hw *hw, unsigned long rate,
-+				  unsigned long *prate)
-+{
-+	struct clk_composite *composite = to_clk_composite(hw);
-+	const struct clk_ops *div_ops = composite->div_ops;
-+	struct clk_hw *div_hw = composite->div_hw;
-+
-+	div_hw->clk = hw->clk;
-+
-+	return div_ops->round_rate(div_hw, rate, prate);
-+}
-+
-+static int clk_composite_set_rate(struct clk_hw *hw, unsigned long rate,
-+			       unsigned long parent_rate)
-+{
-+	struct clk_composite *composite = to_clk_composite(hw);
-+	const struct clk_ops *div_ops = composite->div_ops;
-+	struct clk_hw *div_hw = composite->div_hw;
-+
-+	div_hw->clk = hw->clk;
-+
-+	return div_ops->set_rate(div_hw, rate, parent_rate);
-+}
-+
-+static int clk_composite_is_enabled(struct clk_hw *hw)
-+{
-+	struct clk_composite *composite = to_clk_composite(hw);
-+	const struct clk_ops *gate_ops = composite->gate_ops;
-+	struct clk_hw *gate_hw = composite->gate_hw;
-+
-+	gate_hw->clk = hw->clk;
-+
-+	return gate_ops->is_enabled(gate_hw);
-+}
-+
-+static int clk_composite_enable(struct clk_hw *hw)
-+{
-+	struct clk_composite *composite = to_clk_composite(hw);
-+	const struct clk_ops *gate_ops = composite->gate_ops;
-+	struct clk_hw *gate_hw = composite->gate_hw;
-+
-+	gate_hw->clk = hw->clk;
-+
-+	return gate_ops->enable(gate_hw);
-+}
-+
-+static void clk_composite_disable(struct clk_hw *hw)
-+{
-+	struct clk_composite *composite = to_clk_composite(hw);
-+	const struct clk_ops *gate_ops = composite->gate_ops;
-+	struct clk_hw *gate_hw = composite->gate_hw;
-+
-+	gate_hw->clk = hw->clk;
-+
-+	gate_ops->disable(gate_hw);
-+}
-+
-+struct clk *clk_register_composite(struct device *dev, const char *name,
-+			const char **parent_names, int num_parents,
-+			struct clk_hw *mux_hw, const struct clk_ops *mux_ops,
-+			struct clk_hw *div_hw, const struct clk_ops *div_ops,
-+			struct clk_hw *gate_hw, const struct clk_ops *gate_ops,
-+			unsigned long flags)
-+{
-+	struct clk *clk;
-+	struct clk_init_data init;
-+	struct clk_composite *composite;
-+	struct clk_ops *clk_composite_ops;
-+
-+	composite = kzalloc(sizeof(*composite), GFP_KERNEL);
-+	if (!composite) {
-+		pr_err("%s: could not allocate composite clk\n", __func__);
-+		return ERR_PTR(-ENOMEM);
-+	}
-+
-+	init.name = name;
-+	init.flags = flags | CLK_IS_BASIC;
-+	init.parent_names = parent_names;
-+	init.num_parents = num_parents;
-+
-+	clk_composite_ops = &composite->ops;
-+
-+	if (mux_hw && mux_ops) {
-+		if (!mux_ops->get_parent || !mux_ops->set_parent) {
-+			clk = ERR_PTR(-EINVAL);
-+			goto err;
-+		}
-+
-+		composite->mux_hw = mux_hw;
-+		composite->mux_ops = mux_ops;
-+		clk_composite_ops->get_parent = clk_composite_get_parent;
-+		clk_composite_ops->set_parent = clk_composite_set_parent;
-+	}
-+
-+	if (div_hw && div_ops) {
-+		if (!div_ops->recalc_rate || !div_ops->round_rate ||
-+		    !div_ops->set_rate) {
-+			clk = ERR_PTR(-EINVAL);
-+			goto err;
-+		}
-+
-+		composite->div_hw = div_hw;
-+		composite->div_ops = div_ops;
-+		clk_composite_ops->recalc_rate = clk_composite_recalc_rate;
-+		clk_composite_ops->round_rate = clk_composite_round_rate;
-+		clk_composite_ops->set_rate = clk_composite_set_rate;
-+	}
-+
-+	if (gate_hw && gate_ops) {
-+		if (!gate_ops->is_enabled || !gate_ops->enable ||
-+		    !gate_ops->disable) {
-+			clk = ERR_PTR(-EINVAL);
-+			goto err;
-+		}
-+
-+		composite->gate_hw = gate_hw;
-+		composite->gate_ops = gate_ops;
-+		clk_composite_ops->is_enabled = clk_composite_is_enabled;
-+		clk_composite_ops->enable = clk_composite_enable;
-+		clk_composite_ops->disable = clk_composite_disable;
-+	}
-+
-+	init.ops = clk_composite_ops;
-+	composite->hw.init = &init;
-+
-+	clk = clk_register(dev, &composite->hw);
-+	if (IS_ERR(clk))
-+		goto err;
-+
-+	if (composite->mux_hw)
-+		composite->mux_hw->clk = clk;
-+
-+	if (composite->div_hw)
-+		composite->div_hw->clk = clk;
-+
-+	if (composite->gate_hw)
-+		composite->gate_hw->clk = clk;
-+
-+	return clk;
-+
-+err:
-+	kfree(composite);
-+	return clk;
-+}
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 7f197d7..33e7e64 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -325,6 +325,37 @@ struct clk *clk_register_fixed_factor(struct device *dev, const char *name,
- 		const char *parent_name, unsigned long flags,
- 		unsigned int mult, unsigned int div);
- 
-+/***
-+ * struct clk_composite - aggregate clock of mux, divider and gate clocks
-+ *
-+ * @hw:		handle between common and hardware-specific interfaces
-+ * @mux_hw:	handle between composite and hardware-specifix mux clock
-+ * @div_hw:	handle between composite and hardware-specifix divider clock
-+ * @gate_hw:	handle between composite and hardware-specifix gate clock
-+ * @mux_ops:	clock ops for mux
-+ * @div_ops:	clock ops for divider
-+ * @gate_ops:	clock ops for gate
-+ */
-+struct clk_composite {
-+	struct clk_hw	hw;
-+	struct clk_ops	ops;
-+
-+	struct clk_hw	*mux_hw;
-+	struct clk_hw	*div_hw;
-+	struct clk_hw	*gate_hw;
-+
-+	const struct clk_ops	*mux_ops;
-+	const struct clk_ops	*div_ops;
-+	const struct clk_ops	*gate_ops;
-+};
-+
-+struct clk *clk_register_composite(struct device *dev, const char *name,
-+		const char **parent_names, int num_parents,
-+		struct clk_hw *mux_hw, const struct clk_ops *mux_ops,
-+		struct clk_hw *div_hw, const struct clk_ops *div_ops,
-+		struct clk_hw *gate_hw, const struct clk_ops *gate_ops,
-+		unsigned long flags);
-+
- /**
-  * clk_register - allocate a new clock, register it and return an opaque cookie
-  * @dev: device that is registering this clock
--- 
-1.7.4.1
+I think mvebu/clk-gating-ctrl.c is doing the same thing you're
+suggesting right?
+
+Thanks,
+Dinh
+> > 
+> > Thanks for the review.
+> > 
+> > Dinh
+> > > 
+> > > Regards,
+> > > Mike
+> > >
+> 
