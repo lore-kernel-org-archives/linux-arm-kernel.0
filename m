@@ -1,37 +1,61 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Wed, 20 Mar 2013 22:22:02 +0800
-Subject: [PATCH 0/2] arm: prima2: add support for CSR SiRFatlas6 SoC
-In-Reply-To: <201303201113.47164.arnd@arndb.de>
-References: <1363590279-5656-1-git-send-email-Barry.Song@csr.com>
- <201303201113.47164.arnd@arndb.de>
-Message-ID: <CAGsJ_4wtBoFdxZa7GdN8AZU_Va-gkLB6Hs3-Ckey27OzOdHfVQ@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 20 Mar 2013 15:25:41 +0100
+Subject: [PATCH] mmc: mvsdio: fix non-DT probing of GPIOs
+Message-ID: <1363789541-15132-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Ralph Droms <rdroms.ietf@gmail.com> reported that 3.9-rc was breaking
+the SDIO interface on his Sheevaplug platform, and that the recent
+changes to the mvsdio driver are responsible for this breakage.
 
-2013/3/20 Arnd Bergmann <arnd@arndb.de>:
-> On Monday 18 March 2013, Barry Song wrote:
->> SiRFatlas6 is much similar with SiRFprimaII with some changes about:
->> 1. deleted l2 cache, sdmmc4, multimedia and so on
->> 2. changed pinmux layout and clock layout
->> 3. DMA access limitation disappears, that makes us not need DMA_ZONE
->>    on atlas6
->>
->> Barry Song (2):
->>   arm: prima2: add new SiRFatlas6 machine in common board
->>   ARM/dts: prima2: add .dtsi for atlas6 and .dts for atla6-evb board
->>
->
-> It seems I forgot to reply here when I applied these to the next/soc branch.
->
-> I have also prepared a series on top of your patches to update mach-prima2
-> for multiplatform support that I'll send out for review in a bit.
+After investigation, is turns out that the Sheevaplug does not have
+any "card detect" GPIO, and the Sheevaplug has not been converted to
+the Device Tree. Therefore, the Sheevaplug board code does not define
+a value for the .gpio_card_detect field of the mvsdio_platform_data
+structure, which means that its value is 0. Unfortunately,
+gpio_is_valid() considers 0 as a valid GPIO, and therefore calls
+mmc_gpio_request_cd(), which fails and makes the entire probing of the
+driver fail.
 
-Thanks very much for your great job on the CSR platform. i will take
-some time to test the patch series.
+In fact, in the previous mvsdio code, before the Device Tree binding
+was introduced, 0 was not considered as a valid GPIO. Therefore, this
+fix revert back to this behavior in the non-DT case, by setting the
+gpio_card_detect and gpio_write_protect local variables to -EINVAL
+when the corresponding fields of the mvsdio_platform_data structure
+are set to zero (i.e, left undefined). Of course, it prevents to use
+GPIO 0 as a card detect or write protect GPIO, but it was a defiency
+of the previous non-DT code, and the fix moving forward is to convert
+platforms to the Device Tree.
 
->
->         Arnd
->
--barry
+The problem has been reproduced successfully on the Kirkwood-based
+Marvell DB-88F6281-BP Development Board (that doesn't use the Device
+Tree) and the fix has proven to work properly, after of course
+removing the gpio_card_detect field of the mvsdio_platform_data
+instance for this board.
+
+Reported-by: Ralph Droms <rdroms.ietf@gmail.com>
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+This patch should be applied on 3.9-rcX.
+---
+ drivers/mmc/host/mvsdio.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/mmc/host/mvsdio.c b/drivers/mmc/host/mvsdio.c
+index 145cdaf..1e4d567 100644
+--- a/drivers/mmc/host/mvsdio.c
++++ b/drivers/mmc/host/mvsdio.c
+@@ -741,8 +741,8 @@ static int __init mvsd_probe(struct platform_device *pdev)
+ 			goto out;
+ 		}
+ 		host->base_clock = mvsd_data->clock / 2;
+-		gpio_card_detect = mvsd_data->gpio_card_detect;
+-		gpio_write_protect = mvsd_data->gpio_write_protect;
++		gpio_card_detect = mvsd_data->gpio_card_detect ? : -EINVAL;
++		gpio_write_protect = mvsd_data->gpio_write_protect ? : -EINVAL;
+ 	}
+ 
+ 	mmc->ops = &mvsd_ops;
+-- 
+1.7.9.5
