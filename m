@@ -1,29 +1,22 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Wed, 20 Mar 2013 11:40:18 +0200
-Subject: [PATCH] clk: add table lookup to mux
-In-Reply-To: <20130319213309.8663.17375@quantum>
-References: <1363113747-6572-1-git-send-email-pdeschrijver@nvidia.com>
- <20130319213309.8663.17375@quantum>
-Message-ID: <20130320094018.GF18519@tbergstrom-lnx.Nvidia.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 20 Mar 2013 09:40:58 +0000
+Subject: [LAKML][Users getting knocked of from list]
+In-Reply-To: <51495574.4080501@ti.com>
+References: <51495574.4080501@ti.com>
+Message-ID: <20130320094058.GK30923@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 19, 2013 at 10:33:09PM +0100, Mike Turquette wrote:
-> Quoting Peter De Schrijver (2013-03-12 11:42:23)
-> > Add a table lookup feature to the mux clock. Also allow arbitrary masks
-> > instead of the width. This will be used by some clocks on Tegra114. Also
-> > adapt the tegra periph clk because it uses struct clk_mux directly.
-> >
-> > Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+On Wed, Mar 20, 2013 at 11:51:40AM +0530, Santosh Shilimkar wrote:
+> Russell,
 > 
-> Do you actually need arbitrary masks instead of a continuous bitfield?
-> Or does this change just make it easier for you to convert existing
-> data?
+> In last couple of months, I have observed that users are getting knocked off
+> from LAKML often. I myself faced it 2 times so far and I heard similar complaint
+> at least from 5 more folks.
 > 
+> Is there a change in settings or something new which started triggering this ?
 
-Yes we need arbitrary masks. We have some clocks where some bits of the mux
-are at the bottom of a 32bit register and other bits are at the top.
+Exactly the same thing happened to me earlier this week.  I don't have
+anything to do with the lists anymore, so I'm not the right person to ask.
 
-Cheers,
-
-Peter.
+David Woodhouse runs the servers, and Vince Sanders does the admin.
