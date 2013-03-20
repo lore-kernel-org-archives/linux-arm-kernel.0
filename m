@@ -1,14 +1,14 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 20 Mar 2013 19:36:25 -0300
-Subject: [PATCH 04/16] thermal: mvebu: Remove unneeded variable initialization
+Date: Wed, 20 Mar 2013 19:36:28 -0300
+Subject: [PATCH 07/16] thermal: mvebu: Fix license declaration
 In-Reply-To: <1363818997-23137-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1363818997-23137-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1363818997-23137-5-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1363818997-23137-8-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This variable is used only after it's properly initialized,
-so there's no need to set it to NULL in its declaration.
+The license text declared in the header explicit says GPL v2 only,
+but the MODULE_LICENSE macro says GPL, which means GPL v2 or later. Fix it.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
@@ -16,17 +16,14 @@ Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
  1 files changed, 1 insertions(+), 1 deletions(-)
 
 diff --git a/drivers/thermal/mvebu_thermal.c b/drivers/thermal/mvebu_thermal.c
-index 77c488c..d54f90c 100644
+index 089b43d..5886a9c 100644
 --- a/drivers/thermal/mvebu_thermal.c
 +++ b/drivers/thermal/mvebu_thermal.c
-@@ -72,7 +72,7 @@ MODULE_DEVICE_TABLE(of, mvebu_thermal_id_table);
+@@ -128,4 +128,4 @@ module_platform_driver(mvebu_thermal_driver);
  
- static int mvebu_thermal_probe(struct platform_device *pdev)
- {
--	struct thermal_zone_device *thermal = NULL;
-+	struct thermal_zone_device *thermal;
- 	struct mvebu_thermal_priv *priv;
- 	struct resource *res;
- 
+ MODULE_AUTHOR("Nobuhiro Iwamatsu <iwamatsu@nigauri.org>");
+ MODULE_DESCRIPTION("mvebu thermal driver");
+-MODULE_LICENSE("GPL");
++MODULE_LICENSE("GPL v2");
 -- 
 1.7.8.6
