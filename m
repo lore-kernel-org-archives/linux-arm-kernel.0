@@ -1,36 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 20 Mar 2013 17:44:17 +0000
-Subject: [PATCHv2 1/2] ARM: socfpga: Enable soft reset
-In-Reply-To: <20130320152915.GA32083@amd.pavel.ucw.cz>
-References: <1363707936-17769-1-git-send-email-dinguyen@altera.com>
- <20130320152915.GA32083@amd.pavel.ucw.cz>
-Message-ID: <20130320174417.GO4977@n2100.arm.linux.org.uk>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 20 Mar 2013 12:00:10 -0600
+Subject: [PATCH V4 9/9] pwm_bl: Add mandatory backlight enable regulator
+In-Reply-To: <1363719573-20926-10-git-send-email-achew@nvidia.com>
+References: <1363719573-20926-1-git-send-email-achew@nvidia.com>
+ <1363719573-20926-10-git-send-email-achew@nvidia.com>
+Message-ID: <5149F92A.3070004@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 20, 2013 at 04:29:15PM +0100, Pavel Machek wrote:
-> Hi!
+On 03/19/2013 12:59 PM, Andrew Chew wrote:
+> Many backlights need to be explicitly enabled.  Typically, this is done
+> with a GPIO.  For flexibility, we generalize the enable mechanism to a
+> regulator.
 > 
-> > From: Dinh Nguyen <dinguyen@altera.com>
-> > 
-> > Enable a cold or warm reset to the HW from userspace.
-> > 
-> > Also fix a few sparse errors:
-> > 
-> > warning: symbol 'sys_manager_base_addr' was not declared. Should it be static?
-> > warning: symbol 'rst_manager_base_addr' was not declared. Should it be static?
-> > 
-> > Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+> If an enable regulator is not needed, then a dummy regulator can be given
+> to the backlight driver.  If a GPIO is used to enable the backlight,
+> then a fixed regulator can be instantiated to control the GPIO.
 > 
-> Tested-by: Pavel Machek <pavel@denx.de>
-> 
-> Would it make sense to apply something like this? Struct looks cleaner
-> than offset defines... 
+> The backlight enable regulator can be specified in the device tree node
+> for the backlight, or can be done with legacy board setup code in the
+> usual way.
 
-Structs used to define offsets is technically dodgy according to the C
-standards, so I personally really do not like this practice, and I will
-not use it ever myself where offsets matter.
+> diff --git a/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt b/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt
+> index 1e4fc72..7e2e089 100644
+> --- a/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt
+> +++ b/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt
+> @@ -10,6 +10,11 @@ Required properties:
+>        last value in the array represents a 100% duty cycle (brightest).
+>    - default-brightness-level: the default brightness level (index into the
+>        array defined by the "brightness-levels" property)
+> +  - enable-supply: A phandle to the regulator device tree node. This
+> +      regulator will be turned on and off as the pwm is enabled and disabled.
+> +      Many backlights are enabled via a GPIO. In this case, we instantiate
+> +      a fixed regulator and give that to enable-supply. If a regulator
+> +      is not needed, then provide a dummy fixed regulator.
 
-Your use is fine though, but only because we know how the compiler behaves
-on ARM - and that's a very important point with doing this.  We're reliant
-on that compiler behaviour if we go down this path.
+"enable" doesn't seem like the right name here; if this really is an
+"enable" input, then it's not a regulator. If you're calling it "enable"
+because the regulator is usually controlled by a GPIO that enables it,
+then what you really have is a regulator that provides power to the
+backlight, and the method that you enable that regulator is irrelevant.
+
+Put another way, wouldn't "power" be a better name, thus making the
+property "power-supply"? Although that property name migth be considered
+to have some negative correlation with other concepts, so if people
+object to that, perhaps e.g. "vdd-supply"?
