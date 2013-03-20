@@ -1,35 +1,70 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 20 Mar 2013 18:03:29 -0500
-Subject: [PATCH 0/3] ARM sched_clock selection enhancements
-In-Reply-To: <513F230E.1030307@gmail.com>
-References: <1363055197-17296-1-git-send-email-robherring2@gmail.com>
- <20130312092358.GP4977@n2100.arm.linux.org.uk> <513F230E.1030307@gmail.com>
-Message-ID: <514A4041.9090406@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 21 Mar 2013 00:15:27 +0100
+Subject: Integrator PCI base dilemma
+Message-ID: <CACRpkdaOjFhWR21w5x_rR_60ffQF3Ym_MQd2svNyzm0guwOUoQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+When trying to convert the Integrator/AP to use Device Tree
+for the PCI bridge/hose I run into these two problems:
 
-On 03/12/2013 07:43 AM, Rob Herring wrote:
-> On 03/12/2013 04:23 AM, Russell King - ARM Linux wrote:
->> On Mon, Mar 11, 2013 at 09:26:34PM -0500, Rob Herring wrote:
->>> In preparation to move more timer initialization to use CLKSRC_OF and
->>> out of the platforms, a way to select the timer used for sched_clock is
->>> needed. This series makes the ARM sched_clock support code prefer 64-bit
->>> counters or higher frequency counters. This is sufficient at least on
->>> ARM Ltd boards to use the 24MHz counter rather than sp804 and to always
->>> use the 64-bit architected timer when present. This mechanism can be
->>> extended to DT properties if needed for any non-discoverable h/w feature.
->>
->> No - this stuff is designed specifically to cope with the dilemas of
->> less-than-64-bit sched_clock sources.  If you have 64-bit sources, then
->> that should be dealt with differently - this code will break with 64-bit
->> sources due to the multiplication and shift losing the high order bits.
-> 
-> It is dealt with differently. In the 64-bit case, there is only a
-> multiply and all the code to deal with wrapping of 32-bit counters is
-> skipped. It is exactly the same conversion as arm64.
+- Unable to assign vga_base early since this should be a virtual
+  address assigned really early. If I sacrifice this and try to
+  just remap the stuff, I still run into:
 
-Do you have any further comments?
+- Unable to ioremap the PCI memory and config window because
+  it is 16 MiB big. (I guess this is the problem?)
 
-Rob
+Part of the code path is called from .map_io() and basically looks
+like this:
+
+int __init pci_v3_early_init(void)
+{
+	iotable_init(pci_v3_io_desc, ARRAY_SIZE(pci_v3_io_desc));
+	vga_base = PCI_MEMORY_VADDR;
+	pci_map_io_early(__phys_to_pfn(PHYS_PCI_IO_BASE));
+	return 0;
+}
+
+The VGA console seems to be the sole user (unsure what
+pci_map_io_early() is for), and we like to support VGA console.
+
+The problem is that at this point at iomap the device tree is not yet
+populated.
+
+We can attempt to do it later but then the kernel hangs when
+I try to remap the two 16MiB chunks for the non-prefetched
+memory and the config window.
+
+The iomem table looks like this:
+
+/*
+ * Static mappings for the PCIv3 bridge
+ *
+ * e8000000	40000000	PCI memory		PHYS_PCI_MEM_BASE	(max 512M)
+ * ec000000	61000000	PCI config space	PHYS_PCI_CONFIG_BASE	(max 16M)
+ * fee00000	60000000	PCI IO			PHYS_PCI_IO_BASE	(max 16M)
+ */
+static struct map_desc pci_v3_io_desc[] __initdata __maybe_unused = {
+	{
+		.virtual	= (unsigned long)PCI_MEMORY_VADDR,
+		.pfn		= __phys_to_pfn(PHYS_PCI_MEM_BASE),
+		.length		= SZ_16M,
+		.type		= MT_DEVICE
+	}, {
+		.virtual	= (unsigned long)PCI_CONFIG_VADDR,
+		.pfn		= __phys_to_pfn(PHYS_PCI_CONFIG_BASE),
+		.length		= SZ_16M,
+		.type		= MT_DEVICE
+	}
+};
+
+Does anyone have any hints on how to get out of this need to have the
+base addresses so early?
+
+Or am I doing something wrong when I try to push in this map
+later? I tried to just ioremap() them later but that doesn't
+seem to work at all. Too big?
+
+Yours,
+Linus Walleij
