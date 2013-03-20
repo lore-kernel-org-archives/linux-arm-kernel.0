@@ -1,74 +1,58 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 20 Mar 2013 09:51:33 -0600
-Subject: [PATCH V2 2/3] ARM: tegra: get PMC clock source from DT
-In-Reply-To: <1363773608.5697.8.camel@jlo-ubuntu-64.nvidia.com>
-References: <1363594199-10974-1-git-send-email-josephl@nvidia.com>
- <1363594199-10974-3-git-send-email-josephl@nvidia.com>
- <51489513.1020107@wwwdotorg.org>
- <1363773608.5697.8.camel@jlo-ubuntu-64.nvidia.com>
-Message-ID: <5149DB05.5000906@wwwdotorg.org>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 20 Mar 2013 08:51:58 -0700
+Subject: [PATCH] clk: add table lookup to mux
+In-Reply-To: <20130320094957.GG18519@tbergstrom-lnx.Nvidia.com>
+References: <1363113747-6572-1-git-send-email-pdeschrijver@nvidia.com>
+ <20130319235110.8663.67548@quantum>
+ <20130320094957.GG18519@tbergstrom-lnx.Nvidia.com>
+Message-ID: <20130320155158.11073.43798@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/20/2013 04:00 AM, Joseph Lo wrote:
-> On Wed, 2013-03-20 at 00:40 +0800, Stephen Warren wrote:
->> On 03/18/2013 02:09 AM, Joseph Lo wrote:
->>> The clock source of PMC should be PCLK and gotten from DT.
->>>
->>> Signed-off-by: Joseph Lo <josephl@nvidia.com>
->>> ---
->>> V2:
->>> * new in this change
->>
->> s/change/series/ ???
->>
->>> diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
->>
->>>  void __init tegra_dt_init_irq(void)
->>>  {
->>>  	tegra_clocks_init();
->>> +	tegra_pmc_init();
->>>  	tegra_init_irq();
->>>  	irqchip_init();
->>>  }
->>> @@ -100,7 +101,6 @@ void __init tegra_init_early(void)
->>>  	tegra_apb_io_init();
->>>  	tegra_init_fuse();
->>>  	tegra_init_cache();
->>> -	tegra_pmc_init();
->>
->> This change isn't mentioned in the commit description.
->>
->> Why is this change needed? We should minimize the amount of code in
->> tegra_dt_init_irq(), not add more code there.
->
-> The clocks only available after tegra_clocks_init(). If I can keep the
-> PMC dt node somewhere in PMC driver, then I can get the clock later.
-
-Oh right. For some reason I thought that init_irq was executed before
-init_early.
-
-I guess this is OK for now, but I wonder if we shouldn't create a
-tegra_init_machine() that tegra.c:tegra_dt_init() can call before
-creating all the devices, and have that call both tegra_clocks_init()
-and tegra_pmc_init(). But, we can leave that until a later cleanup patch
-once we've thought it through a bit more.
-
->>> diff --git a/arch/arm/mach-tegra/pmc.c b/arch/arm/mach-tegra/pmc.c
->>
->>> @@ -151,6 +153,8 @@ static void tegra_pmc_parse_dt(void)
->>>  
->>>  	tegra_pmc_invert_interrupt = of_property_read_bool(np,
->>>  				     "nvidia,invert-interrupt");
->>> +	tegra_pclk = of_clk_get(np, 0);
->>> +	WARN_ON_ONCE(IS_ERR(tegra_pclk));
->>
->> Why WARN_ON_ONCE(); is tegra_pmc_parse_dt() called more than once?
->>
->> Can the code continue if IS_ERR(tegra_pclk), or is that fatal?
+Quoting Peter De Schrijver (2013-03-20 02:49:57)
+> On Wed, Mar 20, 2013 at 12:51:10AM +0100, Mike Turquette wrote:
+> > Quoting Peter De Schrijver (2013-03-12 11:42:23)
+> > > diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
+> > > index 9c7f580..53d39c2 100644
+> > > --- a/include/linux/clk-private.h
+> > > +++ b/include/linux/clk-private.h
+> > > @@ -144,12 +144,13 @@ struct clk {
+> > >  
+> > >  #define DEFINE_CLK_MUX(_name, _parent_names, _parents, _flags, \
+> > >                                 _reg, _shift, _width,           \
+> > > -                               _mux_flags, _lock)              \
+> > > +                               _mux_flags, _table, _lock)      \
+> > >         static struct clk _name;                                \
+> > >         static struct clk_mux _name##_hw = {                    \
+> > >                 .hw = {                                         \
+> > >                         .clk = &_name,                          \
+> > >                 },                                              \
+> > > +               .table = _table,                                \
+> > >                 .reg = _reg,                                    \
+> > >                 .shift = _shift,                                \
+> > >                 .width = _width,                                \
+> > 
+> > This breaks OMAP horribly since OMAP already uses this macro.  There are
+> > two options:
+> > 
+> > 1) stop using statically initialized data and no longer use
+> > clk-private.h macros.  I was under the impression that the tegra clock
+> > data no longer required this?
 > 
-> The code is still OK just want to warn people that the PMC DT node
-> needs PCLK clock info.
+> Ok. We don't do that anymore. Maybe I just modified it out of habbit...
+> 
 
-So perhaps s/WARN_ON_ONCE/WARN_ON/? No need to explicitly use a macro
-that only emits the warning once if the code path is only executed once.
+Cool.  Will you send a V2 that drops the macro changes?
+
+Thanks,
+Mike
+
+> > 
+> > 2) if you must continue to use the clk-private.h macros (temporarily!)
+> > then create a new one, DEFINE_CLK_MUX_TABLE.
+> 
+> Hopefully not needed.
+> 
+> Cheers,
+> 
+> Peter.
