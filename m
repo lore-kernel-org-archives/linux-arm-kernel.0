@@ -1,107 +1,59 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 20 Mar 2013 17:54:08 -0500
-Subject: [PATCH 08/11] ARM: versatile: use OF init for sp804 timer
+Date: Wed, 20 Mar 2013 17:54:11 -0500
+Subject: [PATCH 11/11] devtree: add binding documentation for sp804
 In-Reply-To: <1363820051-24428-1-git-send-email-robherring2@gmail.com>
 References: <1363820051-24428-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1363820051-24428-9-git-send-email-robherring2@gmail.com>
+Message-ID: <1363820051-24428-12-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+From: Haojian Zhuang <haojian.zhuang@linaro.org>
 
-Enable DT based init for the sp804 timers on versatile DT platform.
+The sp804 binding is already in use by several platforms. This adds missing
+documentation for the binding and also extends the binding to handle some
+additional possible interrupt configurations.
 
+Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 ---
- arch/arm/boot/dts/versatile-ab.dts     |   12 ++++++++++++
- arch/arm/mach-versatile/core.c         |   26 +++++++++++++-------------
- arch/arm/mach-versatile/versatile_dt.c |    1 -
- 3 files changed, 25 insertions(+), 14 deletions(-)
+ .../devicetree/bindings/timer/arm,sp804.txt        |   29 ++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/timer/arm,sp804.txt
 
-diff --git a/arch/arm/boot/dts/versatile-ab.dts b/arch/arm/boot/dts/versatile-ab.dts
-index e2fe319..dde75ae 100644
---- a/arch/arm/boot/dts/versatile-ab.dts
-+++ b/arch/arm/boot/dts/versatile-ab.dts
-@@ -121,6 +121,18 @@
- 			interrupts = <0>;
- 		};
- 
-+		timer at 101e2000 {
-+			compatible = "arm,sp804", "arm,primecell";
-+			reg = <0x101e2000 0x1000>;
-+			interrupts = <4>;
-+		};
+diff --git a/Documentation/devicetree/bindings/timer/arm,sp804.txt b/Documentation/devicetree/bindings/timer/arm,sp804.txt
+new file mode 100644
+index 0000000..5cd8eee
+--- /dev/null
++++ b/Documentation/devicetree/bindings/timer/arm,sp804.txt
+@@ -0,0 +1,29 @@
++ARM sp804 Dual Timers
++---------------------------------------
 +
-+		timer at 101e3000 {
-+			compatible = "arm,sp804", "arm,primecell";
-+			reg = <0x101e3000 0x1000>;
-+			interrupts = <5>;
-+		};
++Required properties:
++- compatible: Should be "arm,sp804" & "arm,primecell"
++- interrupts: Should contain the list of Dual Timer interrupts. This is the
++	interrupt for timer 1 and timer 2. In the case of a single entry, it is
++	the combined interrupt or if "arm,sp804-has-irq" is present that
++	specifies which timer interrupt is connected.
++- reg: Should contain location and length for dual timer register.
++- clocks: clocks driving the dual timer hardware. This list should be 1 or 3
++	clocks.	With 3 clocks, the order is timer0 clock, timer1 clock,
++	apb_pclk. A single clock can also be specified if the same clock is
++	used for all clock inputs.
 +
- 		gpio0: gpio at 101e4000 {
- 			compatible = "arm,pl061", "arm,primecell";
- 			reg = <0x101e4000 0x1000>;
-diff --git a/arch/arm/mach-versatile/core.c b/arch/arm/mach-versatile/core.c
-index 286303a..5cdfc87 100644
---- a/arch/arm/mach-versatile/core.c
-+++ b/arch/arm/mach-versatile/core.c
-@@ -748,12 +748,25 @@ void versatile_restart(char mode, const char *cmd)
- /* Early initializations */
- void __init versatile_init_early(void)
- {
-+	u32 val;
- 	void __iomem *sys = __io_address(VERSATILE_SYS_BASE);
- 
- 	osc4_clk.vcoreg	= sys + VERSATILE_SYS_OSCCLCD_OFFSET;
- 	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
- 
- 	versatile_sched_clock_init(sys + VERSATILE_SYS_24MHz_OFFSET, 24000000);
++Optional properties:
++- arm,sp804-has-irq = <#>: In the case of only 1 timer irq line connected, this
++	specifies if the irq connection is for timer 1 or timer 2. A value of 1
++	or 2 should be used.
 +
-+	/*
-+	 * set clock frequency:
-+	 *	VERSATILE_REFCLK is 32KHz
-+	 *	VERSATILE_TIMCLK is 1MHz
-+	 */
-+	val = readl(__io_address(VERSATILE_SCTL_BASE));
-+	writel((VERSATILE_TIMCLK << VERSATILE_TIMER1_EnSel) |
-+	       (VERSATILE_TIMCLK << VERSATILE_TIMER2_EnSel) |
-+	       (VERSATILE_TIMCLK << VERSATILE_TIMER3_EnSel) |
-+	       (VERSATILE_TIMCLK << VERSATILE_TIMER4_EnSel) | val,
-+	       __io_address(VERSATILE_SCTL_BASE));
- }
- 
- void __init versatile_init(void)
-@@ -784,19 +797,6 @@ void __init versatile_init(void)
-  */
- void __init versatile_timer_init(void)
- {
--	u32 val;
--
--	/* 
--	 * set clock frequency: 
--	 *	VERSATILE_REFCLK is 32KHz
--	 *	VERSATILE_TIMCLK is 1MHz
--	 */
--	val = readl(__io_address(VERSATILE_SCTL_BASE));
--	writel((VERSATILE_TIMCLK << VERSATILE_TIMER1_EnSel) |
--	       (VERSATILE_TIMCLK << VERSATILE_TIMER2_EnSel) | 
--	       (VERSATILE_TIMCLK << VERSATILE_TIMER3_EnSel) |
--	       (VERSATILE_TIMCLK << VERSATILE_TIMER4_EnSel) | val,
--	       __io_address(VERSATILE_SCTL_BASE));
- 
- 	sp804_clocksource_init(TIMER3_VA_BASE, "timer3");
- 	sp804_clockevents_init(TIMER0_VA_BASE, IRQ_TIMERINT0_1, "timer0");
-diff --git a/arch/arm/mach-versatile/versatile_dt.c b/arch/arm/mach-versatile/versatile_dt.c
-index 2558f2e..3621b00 100644
---- a/arch/arm/mach-versatile/versatile_dt.c
-+++ b/arch/arm/mach-versatile/versatile_dt.c
-@@ -45,7 +45,6 @@ DT_MACHINE_START(VERSATILE_PB, "ARM-Versatile (Device Tree Support)")
- 	.map_io		= versatile_map_io,
- 	.init_early	= versatile_init_early,
- 	.init_irq	= versatile_init_irq,
--	.init_time	= versatile_timer_init,
- 	.init_machine	= versatile_dt_init,
- 	.dt_compat	= versatile_dt_match,
- 	.restart	= versatile_restart,
++Example:
++
++	timer0: timer at fc800000 {
++		compatible = "arm,sp804", "arm,primecell";
++		reg = <0xfc800000 0x1000>;
++		interrupts = <0 0 4>, <0 1 4>;
++		clocks = <&timclk1 &timclk2 &pclk>;
++		clock-names = "timer1", "timer2", "apb_pclk";
++	};
 -- 
 1.7.10.4
