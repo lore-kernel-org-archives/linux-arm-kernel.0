@@ -1,9 +1,9 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 20 Mar 2013 17:44:48 +0200
-Subject: [PATCH v4 09/21] ARM: OMAP3: cm-t35: Adapt to ehci-omap changes
+Date: Wed, 20 Mar 2013 17:44:49 +0200
+Subject: [PATCH v4 10/21] ARM: OMAP3: cm-t3517: Adapt to ehci-omap changes
 In-Reply-To: <1363794300-31526-1-git-send-email-rogerq@ti.com>
 References: <1363794300-31526-1-git-send-email-rogerq@ti.com>
-Message-ID: <1363794300-31526-10-git-send-email-rogerq@ti.com>
+Message-ID: <1363794300-31526-11-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,49 +12,49 @@ and the NOP PHY devices.
 
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- arch/arm/mach-omap2/board-cm-t35.c |   20 ++++++++++++++------
+ arch/arm/mach-omap2/board-cm-t3517.c |   20 ++++++++++++++------
  1 files changed, 14 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-cm-t35.c b/arch/arm/mach-omap2/board-cm-t35.c
-index af2bb21..7fda3f5 100644
---- a/arch/arm/mach-omap2/board-cm-t35.c
-+++ b/arch/arm/mach-omap2/board-cm-t35.c
-@@ -419,15 +419,22 @@ static struct omap2_hsmmc_info mmc[] = {
- 	{}	/* Terminator */
- };
+diff --git a/arch/arm/mach-omap2/board-cm-t3517.c b/arch/arm/mach-omap2/board-cm-t3517.c
+index a66da80..6920f6cf 100644
+--- a/arch/arm/mach-omap2/board-cm-t3517.c
++++ b/arch/arm/mach-omap2/board-cm-t3517.c
+@@ -188,15 +188,22 @@ static inline void cm_t3517_init_rtc(void) {}
+ #define HSUSB2_RESET_GPIO	(147)
+ #define USB_HUB_RESET_GPIO	(152)
  
 +static struct usbhs_phy_data phy_data[] __initdata = {
 +	{
 +		.port = 1,
-+		.reset_gpio = OMAP_MAX_GPIO_LINES + 6,
++		.reset_gpio = HSUSB1_RESET_GPIO,
 +		.vcc_gpio = -EINVAL,
 +	},
 +	{
 +		.port = 2,
-+		.reset_gpio = OMAP_MAX_GPIO_LINES + 7,
++		.reset_gpio = HSUSB2_RESET_GPIO,
 +		.vcc_gpio = -EINVAL,
 +	},
 +};
 +
- static struct usbhs_omap_platform_data usbhs_bdata __initdata = {
+ static struct usbhs_omap_platform_data cm_t3517_ehci_pdata __initdata = {
  	.port_mode[0] = OMAP_EHCI_PORT_MODE_PHY,
  	.port_mode[1] = OMAP_EHCI_PORT_MODE_PHY,
 -	.port_mode[2] = OMAP_USBHS_PORT_MODE_UNUSED,
 -
 -	.phy_reset  = true,
--	.reset_gpio_port[0]  = OMAP_MAX_GPIO_LINES + 6,
--	.reset_gpio_port[1]  = OMAP_MAX_GPIO_LINES + 7,
--	.reset_gpio_port[2]  = -EINVAL
+-	.reset_gpio_port[0]  = HSUSB1_RESET_GPIO,
+-	.reset_gpio_port[1]  = HSUSB2_RESET_GPIO,
+-	.reset_gpio_port[2]  = -EINVAL,
  };
  
- static void  __init cm_t35_init_usbh(void)
-@@ -444,6 +451,7 @@ static void  __init cm_t35_init_usbh(void)
+ static int __init cm_t3517_init_usbh(void)
+@@ -213,6 +220,7 @@ static int __init cm_t3517_init_usbh(void)
  		msleep(1);
  	}
  
 +	usbhs_init_phys(phy_data, ARRAY_SIZE(phy_data));
- 	usbhs_init(&usbhs_bdata);
- }
+ 	usbhs_init(&cm_t3517_ehci_pdata);
  
+ 	return 0;
 -- 
 1.7.4.1
