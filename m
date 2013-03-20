@@ -1,71 +1,85 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Wed, 20 Mar 2013 23:36:19 +0100
-Subject: [PATCH v3 1/6] drivers: phy: add generic PHY framework
-In-Reply-To: <1363770725-13717-2-git-send-email-kishon@ti.com>
-References: <1363770725-13717-1-git-send-email-kishon@ti.com>
- <1363770725-13717-2-git-send-email-kishon@ti.com>
-Message-ID: <514A39E3.6090501@gmail.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Wed, 20 Mar 2013 19:36:21 -0300
+Subject: [PATCH 00/16] Marvell EBU thermal sensor consolidation
+Message-ID: <1363818997-23137-1-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
+This patchset is my first attempt at adding basic thermal sensor
+support on Armada 370 and Armada XP.
 
-On 03/20/2013 10:12 AM, Kishon Vijay Abraham I wrote:
-> The PHY framework provides a set of APIs for the PHY drivers to
-> create/destroy a PHY and APIs for the PHY users to obtain a reference to the
-> PHY with or without using phandle. To obtain a reference to the PHY without
-> using phandle, the platform specfic intialization code (say from board file)
-> should have already called phy_bind with the binding information. The binding
-> information consists of phy's device name, phy user device name and an index.
-> The index is used when the same phy user binds to mulitple phys.
->
-> PHY drivers should create the PHY by passing phy_descriptor that has
-> describes the PHY (label, type etc..) and ops like init, exit, suspend, resume,
-> poweron, shutdown.
->
-> The documentation for the generic PHY framework is added in
-> Documentation/phy.txt and the documentation for the sysfs entry is added
-> in Documentation/ABI/testing/sysfs-class-phy.
->
-> Signed-off-by: Kishon Vijay Abraham I<kishon@ti.com>
-> ---
-[...]
-> +static inline struct phy *phy_get(struct device *dev, int index)
-> +{
-> +	return ERR_PTR(-EOPNOTSUPP);
+Given Armada 370/XP and the other Marvell SoC with thermal support,
+namely Kirkwood and Dove, have fairly similar thermal devices it 
+made sense to integrate all of them into a single driver: mvebu-thermal.
 
-Shouldn't these be -ENOSYS ? EOPNOTSUPP is defined by POSIX as
-"Operation not supported on socket". And EOPNOTSUPP appears to be
-mostly used in the network code in the kernel.
+The patches have been carefully splitted to make the changeset
+as less invasive as possible. These changes can be divided in five stages:
 
-> +}
-> +
-> +static inline struct phy *devm_phy_get(struct device *dev, int index)
-> +{
-> +	return ERR_PTR(-EOPNOTSUPP);
-> +}
-> +
-> +static inline struct phy *of_phy_get(struct device *dev, int index)
-> +{
-> +	return ERR_PTR(-EOPNOTSUPP);
-> +}
-> +
-> +static inline struct phy *devm_of_phy_get(struct device *dev, int index)
-> +{
-> +	return ERR_PTR(-EOPNOTSUPP);
-> +}
-> +
-> +static inline struct phy *of_phy_get_byname(struct device *dev,
-> +	const char *string)
-> +{
-> +	return ERR_PTR(-EOPNOTSUPP);
-> +}
-> +
-> +static inline struct phy *devm_of_phy_get_byname(struct device *dev,
-> +	const char *string)
-> +{
-> +	return ERR_PTR(-EOPNOTSUPP);
-> +}
+  1. Rename 'kirkwood' driver to 'mvebu'
+  2. Some fixes inherited from kirkwood driver applied to new mvebu driver
+  3. Prepare mvebu driver to support multiple SoC
+  4. Add thermal support for each Marvell SoC on top of mvebu driver
+  5. Add device tree nodes for Armada 370 and Armada XP
+  6. Fix defconfigs for all the platforms involved
 
-Thanks,
-Sylwester
+Testing have been done on the following boards:
+
+Kirkwood:   Plat'home Openblocks A6
+Armada 370: Globalscale Mirabox and Marvell Armada 370 RD
+Armada XP:  Plat'home Openblocks AX3 and Marvell Armada XP DB-MV784MP-GP
+
+Dove is *not* tested due to lack of hardware.
+
+Also, please note that the defconfigs for involved platforms have been fixed
+deliberately in a single patch, to ease maintainer's job as the defconfigs
+file goes through one tree and the thermal driver should go through another.
+
+Since I'm merging two existing drivers into a new driver, I retained authorship
+and copyright of the merged drivers and added my own. For this reason, I'd like
+to have Andrew and Nobuhiro Acked (or Nacked, of course).
+
+Any feedback or comments are welcome!
+
+
+Ezequiel Garcia (16):
+  thermal: Rename driver 'kirkwood' -> 'mvebu'
+  thermal: mvebu: Rename symbols 'kirkwood' -> 'mvebu'
+  thermal: mvebu: Move MODULE_DEVICE_TABLE upwards
+  thermal: mvebu: Remove unneeded variable initialization
+  thermal: mvebu: Fix valid check for thermal register
+  thermal: mvebu: Convert to devm_ioremap_resource()
+  thermal: mvebu: Fix license declaration
+  thermal: mvebu: Fix temperature output formula for kirkwood
+  thermal: mvebu: Rename kirkwood definitions to mvebu
+  thermal: mvebu: Add infrastructure to support more multiple SoC
+    variants
+  thermal: mvebu: Add support for Armada XP thermal sensor
+  thermal: mvebu: Add support for Armada 370 thermal sensor
+  thermal: mvebu: Add support for Marvell Dove SoC family
+  ARM: mvebu: Add thermal support to Armada XP device tree
+  ARM: mvebu: Add thermal support to Armada 370 device tree
+  ARM: configs: Update mvebu, dove and kirkwood defconfigs for thermal
+
+ .../devicetree/bindings/thermal/dove-thermal.txt   |   18 -
+ .../bindings/thermal/kirkwood-thermal.txt          |   15 -
+ .../devicetree/bindings/thermal/mvebu-thermal.txt  |   31 ++
+ arch/arm/boot/dts/armada-370.dtsi                  |    6 +
+ arch/arm/boot/dts/armada-xp.dtsi                   |    6 +
+ arch/arm/configs/dove_defconfig                    |    2 +-
+ arch/arm/configs/kirkwood_defconfig                |    2 +-
+ arch/arm/configs/mvebu_defconfig                   |    2 +
+ drivers/thermal/Kconfig                            |   18 +-
+ drivers/thermal/Makefile                           |    3 +-
+ drivers/thermal/dove_thermal.c                     |  209 ------------
+ drivers/thermal/kirkwood_thermal.c                 |  134 --------
+ drivers/thermal/mvebu_thermal.c                    |  342 ++++++++++++++++++++
+ 13 files changed, 395 insertions(+), 393 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/thermal/dove-thermal.txt
+ delete mode 100644 Documentation/devicetree/bindings/thermal/kirkwood-thermal.txt
+ create mode 100644 Documentation/devicetree/bindings/thermal/mvebu-thermal.txt
+ delete mode 100644 drivers/thermal/dove_thermal.c
+ delete mode 100644 drivers/thermal/kirkwood_thermal.c
+ create mode 100644 drivers/thermal/mvebu_thermal.c
+
+-- 
+1.7.8.6
