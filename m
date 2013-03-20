@@ -1,33 +1,40 @@
-From: ryan@presslab.us (Ryan Press)
-Date: Wed, 20 Mar 2013 09:44:42 -0700
-Subject: [PATCH for 3.9-rc] arm: mvebu: Use local interrupt only for the
- timer 0
-In-Reply-To: <1363792175-3136-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1363792175-3136-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <CABx3TkU=y5_WTojbc9z17csaUh4PYxDUszdCdpWhmDM-JUEt5g@mail.gmail.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Wed, 20 Mar 2013 17:48:30 +0100
+Subject: [PATCH v3] clk: add si5351 i2c common clock driver
+In-Reply-To: <6e120226-8a3c-415f-90f2-c44e7b6bbf96@googlegroups.com>
+References: <fa.WZVD0OA/Ooajh6BejiLf7TwBsJ8@ifi.uio.no>
+ <fa.iIqrS6k+Vb5mLqAeL7iTsNsbKyo@ifi.uio.no>
+ <fa.L0b41q+fYFZG0WOFTGKLhn/cGPA@ifi.uio.no>
+ <fa.XCuSmq9Zwp3+wqFO8NEjpwADVZ0@ifi.uio.no>
+ <6e120226-8a3c-415f-90f2-c44e7b6bbf96@googlegroups.com>
+Message-ID: <5149E85E.90701@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 20, 2013 at 8:09 AM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-> The commit 3a6f08a37 "arm: mvebu: Add support for local interrupt",
-> managed the 28th first interrupts as local interrupt to match the
-> hardware specification. Among these interrupts there are the Gigabits
-> Ethernet ones used by the mvneta driver. Unfortunately the state of
-> the percpu_irq API prevents the driver to use it.
+Hi Michal,
+
+On 20.03.2013 14:55, michal.bachraty at gmail.com wrote:
+> Thanks for writing this driver! I have tested your si5351 clock 
+> driver and his tuning capabilities. It works well, it generates 
+> proper clock frequency, but when new frequency is generated, little 
+> clock gap (1ms) is generated. Si5351 datasheet and WP claims, clock 
+> tuning can be without gaps - 
+> http://www.silabs.com/Support%20Documents/TechnicalDocs/Si5350-51-Frequency-Shifting-WP.pdf
 >
-> Indeed the interrupts have to be freed when the .stop() function is
-> called. As the free_percpu_irq() function don't disable the interrupt
-> line, we have to do it on each CPU before calling this. The function
-> disable_percpu_irq() only disable the percpu on the current CPU and
-> there is no function which allows to disable a percpu irq on a given
-> CPU. Waiting for the extension of the percpu_irq API, this fix allows
-> to use again the mvneta driver.
+> I made some tests with Si5351A chip and I found that when tuning touch
+> only Multisynth registers, it can tune without gaps. There is no need
+> for soft PLL reset. I found also, accessing Multisynth registers is not
+> atomic, so there can be another frequency at output, while not all
+> registers are written. Writing only to one register seems to be atomic.
 
-Thanks Gregory!
+Yeah, but limiting possible changes to the PLLs to one single register
+also means that you cannot offer to generate all the frequencies any
+more. What could probably be done is refine the algorithm so that it
+stays 'as close as possible' to the former values, but I'm not sure how
+much work that implies.
 
-I can confirm this patch works for me as well.  I still have the
-problem on my Globalscale Mirabox where only a forced 10Mb link works
-on tx/rx.  With 100Mb only rx works, and 1Gb neither works.
+Can you provide a patch against Sebastian's v3 to do that? Then it can
+be cleanly applied on top of the driver later.
 
-Ryan
+
+Daniel
