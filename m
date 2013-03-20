@@ -1,48 +1,77 @@
-From: bhutchings@solarflare.com (Ben Hutchings)
-Date: Wed, 20 Mar 2013 17:28:35 +0000
-Subject: [PATCH v3 1/1 net-next] NET: FEC: dynamtic check DMA desc buff
- type
-In-Reply-To: <20130320160418.GG20530@pengutronix.de>
-References: <1357265063-30528-1-git-send-email-Frank.Li@freescale.com>
- <20130320160418.GG20530@pengutronix.de>
-Message-ID: <1363800515.2677.13.camel@bwh-desktop.uk.solarflarecom.com>
+From: gerlando.falauto@keymile.com (Gerlando Falauto)
+Date: Wed, 20 Mar 2013 18:40:29 +0100
+Subject: [PATCH v3 0/9] refactoring for mask_cache
+In-Reply-To: <20130319115615.GR13280@titan.lakedaemon.net>
+References: <1363277430-21325-1-git-send-email-holger.brunck@keymile.com><1363615255-18200-1-git-send-email-gerlando.falauto@keymile.com><20130319100352.GB2419@localhost><20130319110620.GO13280@titan.lakedaemon.net><51484793.5020102@keymile.com><20130319114430.GP13280@titan.lakedaemon.net>
+ <20130319115615.GR13280@titan.lakedaemon.net>
+Message-ID: <5149F48D.3030706@keymile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-03-20 at 17:04 +0100, Uwe Kleine-K?nig wrote:
-> Hello,
-> 
-> On Fri, Jan 04, 2013 at 10:04:23AM +0800, Frank Li wrote:
-> > MX6 and mx28 support enhanced DMA descriptor buff to support 1588
-> > ptp. But MX25, MX3x, MX5x can't support enhanced DMA descriptor buff.
-> > Check fec type and choose correct DMA descriptor buff type.
-> > 
-> > Remove static config CONFIG_FEC_PTP.
-> > ptp function will be auto detected.
-> Your patch (now as ff43da86c69d76a726ffe7d1666148960dc1d108 in v3.9-rc1)
-> breaks building with CONFIG_FEC=m:
-> 
-> 	ERROR: "fec_ptp_init" [drivers/net/ethernet/freescale/fec.ko] undefined!
-> 	ERROR: "fec_ptp_ioctl" [drivers/net/ethernet/freescale/fec.ko] undefined!
-> 	ERROR: "fec_ptp_start_cyclecounter" [drivers/net/ethernet/freescale/fec.ko] undefined!
-> 
-> IMHO you should build fec.o and fec_ptp.o into the same module as they
-> cannot live without each other anyhow.
+Hi,
 
-They are in the same module.  So I don't see how that error is possible.
+sorry about the delay (been busy with other stuff).
+First of all thanks for your hints. I have some questions.
+This is my first time, so please be gentle... :-)
 
-> Having said I wonder if it would be worthwile to support FEC without
-> PTP_1588_CLOCK. For example make the above three functions static
-> inlines if CONFIG_PTP_1588_CLOCK=n and drop the select on the latter.
+On 03/19/2013 12:56 PM, Jason Cooper wrote:
+> On Tue, Mar 19, 2013 at 07:44:31AM -0400, Jason Cooper wrote:
+>> Those commit IDs are going to change once LinusW (I presume) applies
+>> them to his tree, so he'll have to edit each commit message to point the
+>> the correct commit.
+>>
+>> LinusW, do you want me to handle this?
+>
+> Never mind, coffee underflow to /dev/brain.  One drawback to mutt, can't
+> view thread while typing messages...
 
-See previous discussions:
-<http://thread.gmane.org/gmane.linux.kernel/1363200/focus=1376659>,
-<http://thread.gmane.org/gmane.linux.network/247963>,
-<http://thread.gmane.org/gmane.linux.network/247823/focus=248173>
+1) I had no idea who LinusW is, I assume Linus Walleij who should be the 
+maintainer of linux-gpio. And linux-gpio should have nothing to do with 
+this discussion... so I should assume you never mentioned him, right?
 
-Ben.
+2) About the SOB part... most of this is inspired by Simon's original 
+(single) patch and Holger's reworking. Should they be given credit or 
+not? If yes, how? If I don't get an answer I would just assume no and 
+I'll take all the blame and credit all by myself. :-)
 
--- 
-Ben Hutchings, Staff Engineer, Solarflare
-Not speaking for my employer; that's the marketing department's job.
-They asked us to note that Solarflare product names are trademarked.
+3) Jason, did you mean you would pull it to 
+http://git.infradead.org/users/jcooper/linux.git? Shall I change the SOB 
+lines and resubmit? Or should I submit it somewhere else instead?
+
+4) About submitting to -stable, I guess it wouldn't make any sense until 
+it gets included upstream 
+(https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/ so to 
+speak). Is that right?
+Or at least to jcooper's tree, through which it should eventually make 
+it mainline through a merge (therefore keeping its commit-id). That right?
+
+I did read Documentation/stable_kernel_rules.txt and what I understand 
+is that it would be enough to submit to stable at vger.kernel.org only the 
+last one, while providing a list of
+
+  Cc: <stable@vger.kernel.org> # 3.0.x: 123456 first patch
+  Cc: <stable@vger.kernel.org> # 3.0.x: 123457 second patch
+  Cc: <stable@vger.kernel.org> # 3.0.x: 123458 third patch
+
+using the mainstream (or jcooper's) commit IDs.
+
+I don't know whether I'd have to repeat that for each version (3.0 will 
+include only a subset of this series, while 3.7 and following will need 
+the whole nine yards, and what's in between... well, something in between).
+
+Please let me know what to do. Again, it's my first time so please be 
+gentle. :-)
+
+Thanks again!
+Gerlando
+
+>> If you prefer to take it:
+>>
+>> Acked-by: Jason Cooper <jason@lakedaemon.net>
+>
+> for the plat-orion/gpio.c bits and if it helps, the gpio-mvebu.c bits.
+>
+> thx,
+>
+> Jason.
+>
