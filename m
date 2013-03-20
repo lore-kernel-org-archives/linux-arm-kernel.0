@@ -1,64 +1,57 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 20 Mar 2013 12:41:12 +0100
-Subject: [PATCH 1/8] pinctrl: sirf: convert to linear irq domain
+Date: Wed, 20 Mar 2013 12:41:15 +0100
+Subject: [PATCH 4/8] ARM: sirf: enable sparse IRQ
 In-Reply-To: <1363779679-16880-1-git-send-email-arnd@arndb.de>
 References: <1363779679-16880-1-git-send-email-arnd@arndb.de>
-Message-ID: <1363779679-16880-2-git-send-email-arnd@arndb.de>
+Message-ID: <1363779679-16880-5-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sirf platforms use no hardcoded IRQ numbers, so there is no reason to
-use the legacy domain, and by converting to the linear domain, we get
-a more efficient representation of sparse IRQs and remove the dependency
-on the mach/irqs.h header file.
+Now that both irqchips for sirf are converted to not rely on
+legacy domains, let's move all of the platform over to sparse
+IRQ.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/pinctrl/pinctrl-sirf.c | 10 +++-------
- 1 file changed, 3 insertions(+), 7 deletions(-)
+ arch/arm/Kconfig                         |  1 +
+ arch/arm/mach-prima2/include/mach/irqs.h | 17 -----------------
+ 2 files changed, 1 insertion(+), 17 deletions(-)
+ delete mode 100644 arch/arm/mach-prima2/include/mach/irqs.h
 
-diff --git a/drivers/pinctrl/pinctrl-sirf.c b/drivers/pinctrl/pinctrl-sirf.c
-index d02498b..a0bc78b 100644
---- a/drivers/pinctrl/pinctrl-sirf.c
-+++ b/drivers/pinctrl/pinctrl-sirf.c
-@@ -1485,7 +1485,6 @@ static void sirfsoc_gpio_handle_irq(unsigned int irq, struct irq_desc *desc)
- 	struct sirfsoc_gpio_bank *bank = irq_get_handler_data(irq);
- 	u32 status, ctrl;
- 	int idx = 0;
--	unsigned int first_irq;
- 	struct irq_chip *chip = irq_get_chip(irq);
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 5bfd584..c674b32 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -427,6 +427,7 @@ config ARCH_SIRF
+ 	select PINCTRL
+ 	select PINCTRL_SIRF
+ 	select USE_OF
++	select SPARSE_IRQ
+ 	help
+ 	  Support for CSR SiRFprimaII/Marco/Polo platforms
  
- 	chained_irq_enter(chip, desc);
-@@ -1499,8 +1498,6 @@ static void sirfsoc_gpio_handle_irq(unsigned int irq, struct irq_desc *desc)
- 		return;
- 	}
- 
--	first_irq = bank->domain->revmap_data.legacy.first_irq;
+diff --git a/arch/arm/mach-prima2/include/mach/irqs.h b/arch/arm/mach-prima2/include/mach/irqs.h
+deleted file mode 100644
+index b778a0f..0000000
+--- a/arch/arm/mach-prima2/include/mach/irqs.h
++++ /dev/null
+@@ -1,17 +0,0 @@
+-/*
+- * arch/arm/mach-prima2/include/mach/irqs.h
+- *
+- * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
+- *
+- * Licensed under GPLv2 or later.
+- */
 -
- 	while (status) {
- 		ctrl = readl(bank->chip.regs + SIRFSOC_GPIO_CTRL(bank->id, idx));
- 
-@@ -1511,7 +1508,7 @@ static void sirfsoc_gpio_handle_irq(unsigned int irq, struct irq_desc *desc)
- 		if ((status & 0x1) && (ctrl & SIRFSOC_GPIO_CTL_INTR_EN_MASK)) {
- 			pr_debug("%s: gpio id %d idx %d happens\n",
- 				__func__, bank->id, idx);
--			generic_handle_irq(first_irq + idx);
-+			generic_handle_irq(irq_find_mapping(bank->domain, idx));
- 		}
- 
- 		idx++;
-@@ -1770,9 +1767,8 @@ static int sirfsoc_gpio_probe(struct device_node *np)
- 			goto out;
- 		}
- 
--		bank->domain = irq_domain_add_legacy(np, SIRFSOC_GPIO_BANK_SIZE,
--			SIRFSOC_GPIO_IRQ_START + i * SIRFSOC_GPIO_BANK_SIZE, 0,
--			&sirfsoc_gpio_irq_simple_ops, bank);
-+		bank->domain = irq_domain_add_linear(np, SIRFSOC_GPIO_BANK_SIZE,
-+						&sirfsoc_gpio_irq_simple_ops, bank);
- 
- 		if (!bank->domain) {
- 			pr_err("%s: Failed to create irqdomain\n", np->full_name);
+-#ifndef __ASM_ARCH_IRQS_H
+-#define __ASM_ARCH_IRQS_H
+-
+-#define SIRFSOC_INTENAL_IRQ_START  0
+-#define SIRFSOC_INTENAL_IRQ_END    127
+-#define SIRFSOC_GPIO_IRQ_START     (SIRFSOC_INTENAL_IRQ_END + 1)
+-#define NR_IRQS	288
+-
+-#endif
 -- 
 1.8.1.2
