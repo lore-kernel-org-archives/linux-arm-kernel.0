@@ -1,27 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 20 Mar 2013 12:31:41 +0000
-Subject: [PATCHv2 2/2] ARM: socfpga: Add clock entries into device tree
-In-Reply-To: <1363782295.12746.7.camel@linux-builds1>
-References: <1363707936-17769-1-git-send-email-dinguyen@altera.com>
- <20130319221233.8663.40135@quantum> <1363782295.12746.7.camel@linux-builds1>
-Message-ID: <201303201231.42241.arnd@arndb.de>
+From: jacmet@sunsite.dk (Peter Korsgaard)
+Date: Wed, 20 Mar 2013 13:47:59 +0100
+Subject: [PATCH v2 3/3] ARM: davinci: da850: add EHRPWM & ECAP DT node
+In-Reply-To: <51499DB4.9080907@ti.com> (Sekhar Nori's message of "Wed, 20 Mar
+ 2013 16:59:56 +0530")
+References: <1363761714-15034-1-git-send-email-avinashphilip@ti.com>
+ <1363761714-15034-4-git-send-email-avinashphilip@ti.com>
+ <51499DB4.9080907@ti.com>
+Message-ID: <87wqt2qlts.fsf@dell.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 20 March 2013, Dinh Nguyen wrote:
-> > That is a fair comparison.  However I still prefer to see data (e.g. dts
-> > changes) separated from logic (clk.c changes).  I think it makes for a
-> > cleaner git history and makes patches more readable too.
-> 
-> I agree that it makes things alot cleaner to split DTS and code into
-> separate patches, but at the same time the code is pretty much useless
-> without the DTS entries. I apologize if there has already been a similar
-> discussion on the list about this. I just want to make sure that I know
-> to split up patches in the same manner in the future?
+>>>>> "Sekhar" == Sekhar Nori <nsekhar@ti.com> writes:
 
-In particular, it would be helpful to merge the dts changes through the
-arm-soc tree and the clk changes through Mike's clock tree. Ideally those
-two should be completely independent of one another, although you obviously
-need both to get the new feature.
+ Sekhar> On 3/20/2013 12:11 PM, Philip Avinash wrote:
+ >> Add da850 EHRPWM & ECAP DT node.
+ >> Also adds OF_DEV_AUXDATA for EHRPWM & ECAP driver to use EHRPWM & ECAP
+ >> clock.
+ >> 
+ >> Signed-off-by: Philip Avinash <avinashphilip@ti.com>
+ >> ---
+ >> Changes since v1:
+ >> - Reusing ti,am33xx<ecap/ehrpwm> as compatible field as both IP's are
+ >> same with am33xx platform and da850 has no platform specific
+ >> dependency.
 
-	Arnd
+ Sekhar> Which is fine, but I think the binding documentation still needs to be
+ Sekhar> updated to document the ti,da850-ehrpwm binding. Looping Peter (it is
+ Sekhar> always a good idea to CC folks who reviewed your patch last time
+ Sekhar> around). Also, please Cc the DT folks and devicetree-discuss list too
+ Sekhar> for their opinion.
+
+Yes, thanks for CC'ing me. I also think da850-* should be
+documented. See Documentation/devicetree/bindings/gpio/8xxx_gpio.txt for
+an similar (old) example.
+
+-- 
+Bye, Peter Korsgaard
