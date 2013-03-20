@@ -1,74 +1,78 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 20 Mar 2013 12:41:11 +0100
-Subject: [PATCH 0/8] SIRF multiplatform support
-Message-ID: <1363779679-16880-1-git-send-email-arnd@arndb.de>
+From: prakash.pm@ti.com (Manjunathappa, Prakash)
+Date: Wed, 20 Mar 2013 17:14:07 +0530
+Subject: [PATCH v6 0/5] Add DT support for davinci_mmc driver
+Message-ID: <1363779852-24083-1-git-send-email-prakash.pm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here goes another one. Since the SIRF platforms are relatively new and
-clean, they are easy to convert to multiplatform, so I did that and
-fixed up a few other things in the process as well.
+Patch set adds DT support for davinci_mmc driver and is
+verified on da850-evm without card_detect/write_protect and
+EDMA support. Also takecare to derive controller IP version from
+platform_device_id table, remove version specification in pdata.
 
-Barry, could you test these and report back if everything still works
-for you?
+Applies on top of below patch series under community review:
+"Enable SPI flash support on da850-evm DT kernel"
+http://www.spinics.net/lists/arm-kernel/msg231546.html
 
-Thomas, John, Linus: Are you ok with the irqchip/clocksource/pinctrl
-changes?
+This series is reviewed and tested by Sekhar Nori, with and
+without DT on da850 EVM.
 
-Arnd Bergmann (8):
-  pinctrl: sirf: convert to linear irq domain
-  ARM: sirf: fix prima2 interrupt lookup
-  ARM: sirf: move irq driver to drivers/irqchip
-  ARM: sirf: enable sparse IRQ
-  ARM: sirf: move debug-macro.S to include/debug/sirf.S
-  ARM: sirf: use clocksource_of infrastructure
-  ARM: sirf: enable multiplatform support
-  ARM: sirf: enable support in multi_v7_defconfig
+Since v5:
+Add below patch to this series.
+"mmc: davinci: allow driver to work without DMA resource"
+Choose smaller device name, da830-mmc instead of davinci-mmc-da830
+and dm6441-mmc instead of davinci-mmc-dm355.
 
- arch/arm/Kconfig                                   |  16 ---
- arch/arm/Kconfig.debug                             |   1 +
- arch/arm/configs/multi_v7_defconfig                |   6 +
- .../include/mach/uart.h => include/debug/sirf.S}   |  29 +++--
- arch/arm/mach-prima2/Kconfig                       |  12 ++
- arch/arm/mach-prima2/Makefile                      |   4 +-
- arch/arm/mach-prima2/common.c                      |  24 ++--
- arch/arm/mach-prima2/common.h                      |   4 +-
- arch/arm/mach-prima2/include/mach/clkdev.h         |  15 ---
- arch/arm/mach-prima2/include/mach/debug-macro.S    |  29 -----
- arch/arm/mach-prima2/include/mach/entry-macro.S    |  22 ----
- arch/arm/mach-prima2/include/mach/hardware.h       |  15 ---
- arch/arm/mach-prima2/include/mach/irqs.h           |  17 ---
- arch/arm/mach-prima2/include/mach/map.h            |  18 ---
- arch/arm/mach-prima2/include/mach/timex.h          |  14 ---
- arch/arm/mach-prima2/include/mach/uncompress.h     |  41 -------
- arch/arm/mach-prima2/irq.c                         | 129 ---------------------
- arch/arm/mach-prima2/lluart.c                      |  14 ++-
- arch/arm/mach-prima2/platsmp.c                     |   1 -
- drivers/clocksource/Makefile                       |   2 +
- .../clocksource}/timer-marco.c                     |  25 +---
- .../clocksource}/timer-prima2.c                    |  42 ++-----
- drivers/irqchip/Makefile                           |   1 +
- drivers/irqchip/irq-sirfsoc.c                      | 123 ++++++++++++++++++++
- drivers/pinctrl/pinctrl-sirf.c                     |  10 +-
- 25 files changed, 210 insertions(+), 404 deletions(-)
- rename arch/arm/{mach-prima2/include/mach/uart.h => include/debug/sirf.S} (55%)
- delete mode 100644 arch/arm/mach-prima2/include/mach/clkdev.h
- delete mode 100644 arch/arm/mach-prima2/include/mach/debug-macro.S
- delete mode 100644 arch/arm/mach-prima2/include/mach/entry-macro.S
- delete mode 100644 arch/arm/mach-prima2/include/mach/hardware.h
- delete mode 100644 arch/arm/mach-prima2/include/mach/irqs.h
- delete mode 100644 arch/arm/mach-prima2/include/mach/map.h
- delete mode 100644 arch/arm/mach-prima2/include/mach/timex.h
- delete mode 100644 arch/arm/mach-prima2/include/mach/uncompress.h
- delete mode 100644 arch/arm/mach-prima2/irq.c
- rename {arch/arm/mach-prima2 => drivers/clocksource}/timer-marco.c (94%)
- rename {arch/arm/mach-prima2 => drivers/clocksource}/timer-prima2.c (90%)
- create mode 100644 drivers/irqchip/irq-sirfsoc.c
+Since v4:
+Minor nit, check on return value for failure of max-frequency property
+parsing.
+Merged patch "ARM: davinci: mmc: derive version information from device name"
+with patch 1/4.
 
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: John Stultz <john.stultz@linaro.org>
+Since v3:
+Added support to derive IP version information from platform_device_id table.
 
+Since v2:
+Modified the default value for bus-width and skipping the property specifications
+for highspeed card capabilties for now. Re-ordered patch 2 and 3.
+
+Since v1:
+Modified the DT parse function to take default values, updated DT binding
+documentation accordingly.
+
+
+Manjunathappa, Prakash (5):
+  mmc: davinci: allow driver to work without DMA resource
+  ARM: davinci: mmc: derive version information from device name
+  mmc: davinci_mmc: add DT support
+  ARM: davinci: da850: add mmc DT entries
+  ARM: davinci: da850: override mmc DT node device name
+
+ .../devicetree/bindings/mmc/davinci_mmc.txt        |   25 ++++++
+ arch/arm/boot/dts/da850-evm.dts                    |    7 ++
+ arch/arm/boot/dts/da850.dtsi                       |   15 +++
+ arch/arm/mach-davinci/board-da830-evm.c            |    1 -
+ arch/arm/mach-davinci/board-da850-evm.c            |    2 -
+ arch/arm/mach-davinci/board-dm355-evm.c            |    1 -
+ arch/arm/mach-davinci/board-dm365-evm.c            |    1 -
+ arch/arm/mach-davinci/board-dm644x-evm.c           |    1 -
+ arch/arm/mach-davinci/board-neuros-osd2.c          |    1 -
+ arch/arm/mach-davinci/board-omapl138-hawk.c        |    1 -
+ arch/arm/mach-davinci/board-tnetv107x-evm.c        |    1 -
+ arch/arm/mach-davinci/da830.c                      |    2 +-
+ arch/arm/mach-davinci/da850.c                      |    4 +-
+ arch/arm/mach-davinci/da8xx-dt.c                   |    1 +
+ arch/arm/mach-davinci/devices-da8xx.c              |    4 +-
+ arch/arm/mach-davinci/devices-tnetv107x.c          |    4 +-
+ arch/arm/mach-davinci/devices.c                    |    6 +-
+ arch/arm/mach-davinci/dm355.c                      |    4 +-
+ arch/arm/mach-davinci/dm365.c                      |    4 +-
+ arch/arm/mach-davinci/dm644x.c                     |    2 +-
+ arch/arm/mach-davinci/tnetv107x.c                  |    4 +-
+ drivers/mmc/host/davinci_mmc.c                     |   92 ++++++++++++++++++--
+ include/linux/platform_data/mmc-davinci.h          |    3 -
+ 23 files changed, 151 insertions(+), 35 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mmc/davinci_mmc.txt
 
 -- 
-1.8.1.2
+1.7.4.1
