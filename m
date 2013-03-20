@@ -1,49 +1,102 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 20 Mar 2013 08:20:42 +0200
-Subject: [PATCH 2/2] ARM: imx_v4_v5_defconfig: Select CONFIG_USB_PHY
-In-Reply-To: <1363743553-17295-2-git-send-email-festevam@gmail.com>
-References: <1363743553-17295-1-git-send-email-festevam@gmail.com>
- <1363743553-17295-2-git-send-email-festevam@gmail.com>
-Message-ID: <20130320062042.GE25876@arwen.pp.htv.fi>
+From: avinashphilip@ti.com (Philip Avinash)
+Date: Wed, 20 Mar 2013 12:09:24 +0530
+Subject: [PATCH v2] pwm: davinci: Add Kconfig support for ECAP & EHRPWM devices
+Message-ID: <1363761564-14814-1-git-send-email-avinashphilip@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 19, 2013 at 10:39:13PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> Since commit edc7cb2e955f (usb: phy: make it a menuconfig) in order to be able to
-> select CONFIG_USB_ULPI, it is necessary to select CONFIG_USB_PHY.  
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Add EHRPWM and ECAP support build support for DAVINCI_DA8XX platforms.
 
-Acked-by: Felipe Balbi <balbi@ti.com>
+Also, since DAVINCI platforms doesn't support TI-PWM-Subsystem module,
+remove the select option for CONFIG_PWM_TIPWMSS.
 
-> ---
->  arch/arm/configs/imx_v4_v5_defconfig |    1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
-> index 02c657a..d56bedc 100644
-> --- a/arch/arm/configs/imx_v4_v5_defconfig
-> +++ b/arch/arm/configs/imx_v4_v5_defconfig
-> @@ -156,6 +156,7 @@ CONFIG_USB_HID=m
->  CONFIG_USB=y
->  CONFIG_USB_EHCI_HCD=y
->  CONFIG_USB_EHCI_MXC=y
-> +CONFIG_USB_PHY=y
->  CONFIG_USB_ULPI=y
->  CONFIG_MMC=y
->  CONFIG_MMC_SDHCI=y
-> -- 
-> 1.7.9.5
-> 
+Also, update CONFIG_PWM_TIPWMSS compiler directive appropriately in
+pwm-tipwmss.h to fix the below compiler error upon removal of
+CONFIG_PWM_TIPWMSS for DAVINCI platforms.
 
+	drivers/pwm/pwm-tiecap.c: In function 'ecap_pwm_probe':
+	drivers/pwm/pwm-tiecap.c:263:4: error: 'PWMSS_ECAPCLK_EN' undeclared
+	(first use in this function)
+	drivers/pwm/pwm-tiecap.c:263:4: note: each undeclared identifier
+	is reported only once for each function it appears in
+	drivers/pwm/pwm-tiecap.c:264:17: error: 'PWMSS_ECAPCLK_EN_ACK'
+	undeclared (first use in this function)
+	drivers/pwm/pwm-tiecap.c: In function 'ecap_pwm_remove':
+	drivers/pwm/pwm-tiecap.c:291:49: error: 'PWMSS_ECAPCLK_STOP_REQ'
+	undeclared (first use in this function)
+	make[2]: *** [drivers/pwm/pwm-tiecap.o] Error 1
+	make[1]: *** [drivers/pwm] Error 2
+	make: *** [drivers] Error 2
+
+Signed-off-by: Philip Avinash <avinashphilip@ti.com>
+---
+Changes Since v1:
+	- Change the Kconfig dependency to ARCH_DAVINCI_DA8XX from
+	  ARCH_DAVINCI_DA850.
+
+This patch series based on [1] and is available at [2].
+
+[1] https://gitorious.org/linux-pwm/linux-pwm/trees/for-next
+[2] https://github.com/avinashphilip/am335x_linux/tree/davinci-for-v3.9_soc_pwm
+
+:100644 100644 0e0bfa0... 115b644... M	drivers/pwm/Kconfig
+:100644 100644 11f76a1... 10ad804... M	drivers/pwm/pwm-tipwmss.h
+ drivers/pwm/Kconfig       |    8 +++-----
+ drivers/pwm/pwm-tipwmss.h |    2 +-
+ 2 files changed, 4 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
+index 0e0bfa0..115b644 100644
+--- a/drivers/pwm/Kconfig
++++ b/drivers/pwm/Kconfig
+@@ -147,8 +147,7 @@ config PWM_TEGRA
+ 
+ config  PWM_TIECAP
+ 	tristate "ECAP PWM support"
+-	depends on SOC_AM33XX
+-	select PWM_TIPWMSS
++	depends on SOC_AM33XX || ARCH_DAVINCI_DA8XX
+ 	help
+ 	  PWM driver support for the ECAP APWM controller found on AM33XX
+ 	  TI SOC
+@@ -158,8 +157,7 @@ config  PWM_TIECAP
+ 
+ config  PWM_TIEHRPWM
+ 	tristate "EHRPWM PWM support"
+-	depends on SOC_AM33XX
+-	select PWM_TIPWMSS
++	depends on SOC_AM33XX || ARCH_DAVINCI_DA8XX
+ 	help
+ 	  PWM driver support for the EHRPWM controller found on AM33XX
+ 	  TI SOC
+@@ -169,7 +167,7 @@ config  PWM_TIEHRPWM
+ 
+ config  PWM_TIPWMSS
+ 	bool
+-	depends on SOC_AM33XX && (PWM_TIEHRPWM || PWM_TIECAP)
++	default y if SOC_AM33XX && (PWM_TIECAP || PWM_TIEHRPWM)
+ 	help
+ 	  PWM Subsystem driver support for AM33xx SOC.
+ 
+diff --git a/drivers/pwm/pwm-tipwmss.h b/drivers/pwm/pwm-tipwmss.h
+index 11f76a1..10ad804 100644
+--- a/drivers/pwm/pwm-tipwmss.h
++++ b/drivers/pwm/pwm-tipwmss.h
+@@ -18,7 +18,6 @@
+ #ifndef __TIPWMSS_H
+ #define __TIPWMSS_H
+ 
+-#ifdef CONFIG_PWM_TIPWMSS
+ /* PWM substem clock gating */
+ #define PWMSS_ECAPCLK_EN	BIT(0)
+ #define PWMSS_ECAPCLK_STOP_REQ	BIT(1)
+@@ -28,6 +27,7 @@
+ #define PWMSS_ECAPCLK_EN_ACK	BIT(0)
+ #define PWMSS_EPWMCLK_EN_ACK	BIT(8)
+ 
++#ifdef CONFIG_PWM_TIPWMSS
+ extern u16 pwmss_submodule_state_change(struct device *dev, int set);
+ #else
+ static inline u16 pwmss_submodule_state_change(struct device *dev, int set)
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130320/538bd93a/attachment.sig>
+1.7.9.5
