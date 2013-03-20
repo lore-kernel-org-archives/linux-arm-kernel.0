@@ -1,73 +1,44 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 20 Mar 2013 09:54:16 -0600
-Subject: [PATCH V2 1/3] ARM: dts: tegra: add clock source for PMC
-In-Reply-To: <1363774325.5697.19.camel@jlo-ubuntu-64.nvidia.com>
-References: <1363594199-10974-1-git-send-email-josephl@nvidia.com>
- <1363594199-10974-2-git-send-email-josephl@nvidia.com>
- <51489586.9090605@wwwdotorg.org>
- <1363774325.5697.19.camel@jlo-ubuntu-64.nvidia.com>
-Message-ID: <5149DBA8.4030308@wwwdotorg.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 20 Mar 2013 17:55:55 +0200
+Subject: [PATCH v4 01/21] usb: phy: nop: Add some parameters to platform
+ data
+In-Reply-To: <1363794300-31526-2-git-send-email-rogerq@ti.com>
+References: <1363794300-31526-1-git-send-email-rogerq@ti.com>
+ <1363794300-31526-2-git-send-email-rogerq@ti.com>
+Message-ID: <20130320155555.GG1567@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/20/2013 04:12 AM, Joseph Lo wrote:
-> On Wed, 2013-03-20 at 00:42 +0800, Stephen Warren wrote:
->> On 03/18/2013 02:09 AM, Joseph Lo wrote:
->>> The clock source of PMC is PCLK. Adding it into DTS for Tegra20 and Tegra30.
->>
->>> diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
->>
->>>  	pmc {
->>>  		compatible = "nvidia,tegra20-pmc";
->>>  		reg = <0x7000e400 0x400>;
->>> +		clocks = <&tegra_car 110>;
->>>  	};
->>
->> The DT binding documentation needs to list the set of clocks that must
->> be present.
->>
->> Doesn't the PMC also receive a "clk32k_in" from the PMIC, or is that
->> routed into the CAR, and then into the PMC? Either way, the PMC module
->> receives that clock somehow. Since there are multiple clocks, that also
->> means that a clock-names property is required.
+On Wed, Mar 20, 2013 at 05:44:40PM +0200, Roger Quadros wrote:
+> Add clk_rate parameter to platform data. If supplied, the
+> NOP phy driver will program the clock to that rate during probe.
 > 
-> Do you mean the DTS below and add it into binding document?
+> Also add 2 flags, needs_vcc and needs_reset.
+> If the flag is set and the regulator couldn't be found
+> then the driver will bail out with -EPROBE_DEFER.
 > 
-> / SoC dts including file
-> pmc {
-> 	compatible = "nvidia,tegra20-pmc";
-> 	reg = <0x7000e400 0x400>;
-> 	clocks = <&tegra_car 110>, <&clk32k_in>;
-> 	clock-names= "pclk", "clk32k_in";
-> };
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> Acked-by: Felipe Balbi <balbi@ti.com>
 
-Yes, that's what should technically be present.
+Hi Tony,
 
-> / Tegra board dts file
-> 
-> pmic {
-> 	...
-> 	clocks {
-> 		compatible = "simple-bus";
-> 		#address-cells = <1>;
-> 		#size-cells = <0>;
-> 
-> 		clk32k_in: clock at 0 {
-> 			compatible = "fixed-clock";
-> 			reg=<0>;
-> 			#clock-cells = <0>;
-> 			clock-frequency = <32768>;
-> 		};
-> 	};
-> };
+maybe you might prefer to merge commit 1f0972f from my next branch which
+is exactly this patch. Basically, if you:
 
-That won't work; the PMIC drivers don't enumerate sub-nodes as busss, so
- that clocks node won't ever be processed. Also, the PMIC drivers aren't
-clock providers in most cases. It's not quite a correct representation
-of the HW, but I would suggest simply creating a top-level "clock" node
-for that fixed clock. If we ever have more top-level clocks, we can move
-them into a top-level "clocks" node at that time.
+$ git fetch git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git next
+$ git merge 1f0972f
 
-Note: If there aren't already any other top-level clock nodes (which I
-think is the case), the node can be named just "clock" rather than
-"clock at 0", since there are no naming conflicts.
+you get $SUBJECT and can apply the others without fear of conflicts
+later.
+
+cheers
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130320/8909c25e/attachment.sig>
