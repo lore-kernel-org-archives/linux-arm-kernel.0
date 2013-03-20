@@ -1,87 +1,117 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
-Date: Wed, 20 Mar 2013 10:32:26 +0100
-Subject: [PATCH] mmc: atmel-mci: pio hang on block errors
-Message-ID: <1363771946-8931-1-git-send-email-ludovic.desroches@atmel.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 20 Mar 2013 10:33:48 +0100
+Subject: [RESEND PATCH 2/4] clk: Unprepare the unused prepared slow clocks
+ at late init
+In-Reply-To: <20130319195752.8663.43172@quantum>
+References: <1363116365-3960-1-git-send-email-ulf.hansson@stericsson.com>
+ <1363116365-3960-3-git-send-email-ulf.hansson@stericsson.com>
+ <20130319195752.8663.43172@quantum>
+Message-ID: <CAPDyKFp=LxhiJhBuqagMdVuBfwE=2WDS6DteTPbJOB6DA2wW3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Terry Barnaby <terry@beam.ltd.uk>
+On 19 March 2013 20:57, Mike Turquette <mturquette@linaro.org> wrote:
+> Quoting Ulf Hansson (2013-03-12 12:26:03)
+>> From: Ulf Hansson <ulf.hansson@linaro.org>
+>>
+>> The unused ungated fast clocks are already being disabled from
+>> clk_disable_unused at late init. This patch extend this sequence
+>> to the slow unused prepared clocks to be unprepared.
+>>
+>> Unless the optional .is_prepared callback is implemented by a
+>> clk_hw the clk_disable_unused sequence will not unprepare any
+>> unused clocks, since it will fall back to use the software
+>> prepare counter.
+>>
+>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>
+> Hi Ulf,
+>
+> I've taken all of these patches into clk-next.  Thanks for the resend.
+>
+> I had to fix up this patch due to commit b67bfe0d, "hlist: drop the node
+> parameter from iterators".  The merged version is below.  Let me know if
+> you have any issues with it.
+>
+> Regards,
+> Mike
+>
+>
+>
+> From ae3865ca119ad82afbf003b4eee38533f32bd0fe Mon Sep 17 00:00:00 2001
+> From: Ulf Hansson <ulf.hansson@linaro.org>
+> Date: Tue, 12 Mar 2013 20:26:03 +0100
+> Subject: [PATCH] clk: Unprepare the unused prepared slow clocks at late init
+>
+> The unused ungated fast clocks are already being disabled from
+> clk_disable_unused at late init. This patch extend this sequence
+> to the slow unused prepared clocks to be unprepared.
+>
+> Unless the optional .is_prepared callback is implemented by a
+> clk_hw the clk_disable_unused sequence will not unprepare any
+> unused clocks, since it will fall back to use the software
+> prepare counter.
+>
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Mike Turquette <mturquette@linaro.org>
+> [mturquette at linaro.org: fixed hlist accessors per b67bfe0d]
+> ---
+>  drivers/clk/clk.c |   28 ++++++++++++++++++++++++++++
+>  1 file changed, 28 insertions(+)
+>
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 7571b50..c0141f3 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -336,6 +336,28 @@ static inline int clk_debug_register(struct clk *clk) { return 0; }
+>  #endif
+>
+>  /* caller must hold prepare_lock */
+> +static void clk_unprepare_unused_subtree(struct clk *clk)
+> +{
+> +       struct clk *child;
+> +
+> +       if (!clk)
+> +               return;
+> +
+> +       hlist_for_each_entry(child, &clk->children, child_node)
+> +               clk_unprepare_unused_subtree(child);
+> +
+> +       if (clk->prepare_count)
+> +               return;
+> +
+> +       if (clk->flags & CLK_IGNORE_UNUSED)
+> +               return;
+> +
+> +       if (__clk_is_prepared(clk))
+> +               if (clk->ops->unprepare)
+> +                       clk->ops->unprepare(clk->hw);
+> +}
+> +
+> +/* caller must hold prepare_lock */
+>  static void clk_disable_unused_subtree(struct clk *clk)
+>  {
+>         struct clk *child;
+> @@ -386,6 +408,12 @@ static int clk_disable_unused(void)
+>         hlist_for_each_entry(clk, &clk_orphan_list, child_node)
+>                 clk_disable_unused_subtree(clk);
+>
+> +       hlist_for_each_entry(clk, &clk_root_list, child_node)
+> +               clk_unprepare_unused_subtree(clk);
+> +
+> +       hlist_for_each_entry(clk, &clk_orphan_list, child_node)
+> +               clk_unprepare_unused_subtree(clk);
+> +
+>         mutex_unlock(&prepare_lock);
+>
+>         return 0;
+> --
+> 1.7.10.4
+>
 
-The driver is doing, by default, multi-block reads. When a block error occurs
-card/block.c instigates a single block read: "mmcblk0: retrying using single
-block read".
-It leaves the sg chain intact and just changes the length attribute for the
-first sg entry and the overall sg_len parameter. When atmci_read_data_pio is
-called to read the single block of data it ignores the sg_len and expects to
-read more than 512 bytes as it sees there are multiple items in the sg list. No
-more data comes as the controller has only been commanded to get one block.
+Thanks Mike, looks good!
 
-Signed-off-by: Terry Barnaby <terry@beam.ltd.uk>
-Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-Cc: stable <stable@vger.kernel.org> # 3.2+
----
- drivers/mmc/host/atmel-mci.c | 14 ++++++++++----
- 1 file changed, 10 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-index 0932024..d98e68e 100644
---- a/drivers/mmc/host/atmel-mci.c
-+++ b/drivers/mmc/host/atmel-mci.c
-@@ -163,6 +163,7 @@ struct atmel_mci {
- 	void __iomem		*regs;
- 
- 	struct scatterlist	*sg;
-+	unsigned int		sg_len;
- 	unsigned int		pio_offset;
- 
- 	struct atmel_mci_slot	*cur_slot;
-@@ -751,6 +752,7 @@ static u32 atmci_prepare_data(struct atmel_mci *host, struct mmc_data *data)
- 	data->error = -EINPROGRESS;
- 
- 	host->sg = data->sg;
-+	host->sg_len = data->sg_len;
- 	host->data = data;
- 	host->data_chan = NULL;
- 
-@@ -1573,7 +1575,8 @@ static void atmci_read_data_pio(struct atmel_mci *host)
- 			if (offset == sg->length) {
- 				flush_dcache_page(sg_page(sg));
- 				host->sg = sg = sg_next(sg);
--				if (!sg)
-+				host->sg_len--;
-+				if (!sg || !host->sg_len)
- 					goto done;
- 
- 				offset = 0;
-@@ -1586,7 +1589,8 @@ static void atmci_read_data_pio(struct atmel_mci *host)
- 
- 			flush_dcache_page(sg_page(sg));
- 			host->sg = sg = sg_next(sg);
--			if (!sg)
-+			host->sg_len--;
-+			if (!sg || !host->sg_len)
- 				goto done;
- 
- 			offset = 4 - remaining;
-@@ -1640,7 +1644,8 @@ static void atmci_write_data_pio(struct atmel_mci *host)
- 			nbytes += 4;
- 			if (offset == sg->length) {
- 				host->sg = sg = sg_next(sg);
--				if (!sg)
-+				host->sg_len--;
-+				if (!sg || !host->sg_len)
- 					goto done;
- 
- 				offset = 0;
-@@ -1654,7 +1659,8 @@ static void atmci_write_data_pio(struct atmel_mci *host)
- 			nbytes += remaining;
- 
- 			host->sg = sg = sg_next(sg);
--			if (!sg) {
-+			host->sg_len--;
-+			if (!sg || !host->sg_len) {
- 				atmci_writel(host, ATMCI_TDR, value);
- 				goto done;
- 			}
--- 
-1.7.11.3
+Kind regards
+Ulf Hansson
