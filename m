@@ -1,84 +1,65 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 20 Mar 2013 11:00:49 -0700
-Subject: [PATCHv3 09/10] clocksource: time-armada-370-xp: Divorce from
- local timer API
-In-Reply-To: <5149F579.2080303@free-electrons.com>
-References: <1363198676-30417-1-git-send-email-sboyd@codeaurora.org>
- <1363198676-30417-10-git-send-email-sboyd@codeaurora.org>
- <5149ED53.5060002@free-electrons.com> <5149EFFA.1050408@codeaurora.org>
- <5149F13E.7060901@free-electrons.com> <5149F579.2080303@free-electrons.com>
-Message-ID: <5149F951.8050002@codeaurora.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 20 Mar 2013 15:06:23 -0300
+Subject: [PATCH v3 1/1 net-next] NET: FEC: dynamtic check DMA desc buff
+ type
+In-Reply-To: <20130320160418.GG20530@pengutronix.de>
+References: <1357265063-30528-1-git-send-email-Frank.Li@freescale.com>
+ <20130320160418.GG20530@pengutronix.de>
+Message-ID: <CAOMZO5BZ6Zqowd+gCXFy9QbU0HKD1HAsy+a_-cZuYQujHLgoXg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/20/13 10:44, Gregory CLEMENT wrote:
-> On 03/20/2013 06:26 PM, Gregory CLEMENT wrote:
->> On 03/20/2013 06:20 PM, Stephen Boyd wrote:
->>> On 03/20/13 10:09, Gregory CLEMENT wrote:
->>>> On 03/13/2013 07:17 PM, Stephen Boyd wrote:
->>>>> Separate the armada 370xp local timers from the local timer API.
->>>>> This will allow us to remove ARM local timer support in the near
->>>>> future and makes this driver multi-architecture friendly.
->>>> At first view the code looks good, but when I applied your patch set on
->>>> linux-next, build it and run it on a Armada XP based board (AX3 with 2 cores),
->>>> it crashed:
->>> [...]
->>>> Internal error: Oops - undefined instruction: 0 [#1] SMP ARM
->>>> Modules linked in:
->>>> CPU: 0    Not tainted  (3.9.0-rc3-next-20130319-00010-g728b448 #153)
->>>> PC is at 0xe92d45f0
->>>> LR is at armada_370_xp_timer_interrupt+0x3c/0x4c
->>>> pc : [<e92d45f0>]    lr : [<c023c2bc>]    psr: 600001d3
->>>> sp : c0635eb8  ip : 00000000  fp : c063c3f0
->>>> r10: 000003ff  r9 : 00000000  r8 : 00000010
->>>> r7 : c22b3c40  r6 : ef007c00  r5 : c0640fcc  r4 : c0053e30
->>>> r3 : e92d45f0  r2 : fffffffe  r1 : c22b3c40  r0 : c0053e30
->>>> Flags: nZCv  IRQs off  FIQs off  Mode SVC_32  ISA ARM  Segment kernel
->>>> Control: 10c53c7d  Table: 0000406a  DAC: 00000015
->>>> Process swapper/0 (pid: 0, stack limit = 0xc0634238)
->>>> Stack: (0xc0635eb8 to 0xc0636000)
->>>> 5ea0:                                                       ef004c80 c0063224
->>>> 5ec0: 00000010 00000010 00000000 c0660ac0 c0635f18 c005fcb8 c0632b90 c000ed94
->>>> 5ee0: c0313c60 60000153 00000001 c00085a8 c0313c54 c0313c60 60000153 ffffffff
->>>> 5f00: c0635f4c 00000000 562f5842 c06360c0 00000000 c000db60 0000001a ffff8ad0
->>>> 5f20: ffff8ad0 c06360c0 00000000 00000000 c04379c0 c22ad780 00000000 562f5842
->>>> 5f40: c06360c0 00000000 60000153 c0635f60 c0313c54 c0313c60 60000153 ffffffff
->>>> 5f60: 00000021 00000000 00000003 00000004 0000006e c065fcc0 c067924c c063ceb8
->>>> 5f80: c063cc84 c006d8c0 00000005 c065fcc0 c067924c c0421764 c22ad780 c063c42c
->>>> 5fa0: 562f5842 c063cca8 c06605c0 c04379c0 c22ad780 00000000 562f5842 00000000
->>>> 5fc0: 00000000 c0417754 ffffffff ffffffff c04172dc 00000000 00000000 c04379c0
->>>> 5fe0: 10c53c7d c063c414 c04379bc c063febc 0000406a 00008074 00000000 00000000
->>>> [<c023c2bc>] (armada_370_xp_timer_interrupt+0x3c/0x4c) from [<c0063224>] (handle_percpu_devid_irq+0x64/0x80)
->>>> [<c0063224>] (handle_percpu_devid_irq+0x64/0x80) from [<c005fcb8>] (generic_handle_irq+0x20/0x30)
->>>> [<c005fcb8>] (generic_handle_irq+0x20/0x30) from [<c000ed94>] (handle_IRQ+0x38/0x90)
->>>> [<c000ed94>] (handle_IRQ+0x38/0x90) from [<c00085a8>] (armada_370_xp_handle_irq+0xa4/0xb0)
->>>> [<c00085a8>] (armada_370_xp_handle_irq+0xa4/0xb0) from [<c000db60>] (__irq_svc+0x40/0x50)
->>>> Exception stack(0xc0635f18 to 0xc0635f60)
->>>> 5f00:                                                       0000001a ffff8ad0
->>>> 5f20: ffff8ad0 c06360c0 00000000 00000000 c04379c0 c22ad780 00000000 562f5842
->>>> 5f40: c06360c0 00000000 60000153 c0635f60 c0313c54 c0313c60 60000153 ffffffff
->>>> [<c000db60>] (__irq_svc+0x40/0x50) from [<c0313c60>] (calibrate_delay+0x378/0x528)
->>>> [<c0313c60>] (calibrate_delay+0x378/0x528) from [<c0417754>] (start_kernel+0x250/0x2dc)
->>>> [<c0417754>] (start_kernel+0x250/0x2dc) from [<00008074>] (0x8074)
->>>> Code: 1fe7deb7 cd5772dd fff5692e ed55f79e (7ed5a5f7)
->>>>
->>>>
->>>>
->>>> I am trying to figure out what happened.
->>> Argh. Stupid casting again. Can you try this?
->> Our emails  must have crossed, your fix is also fine :)
->>
-> I have also tested the patch set on a Armada 370 based board (Armada 370 DB),
-> and it works well.
-> So with this last chunk you can add my:
-> Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> and also my
-> tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+On Wed, Mar 20, 2013 at 1:04 PM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
+> Hello,
 >
+> On Fri, Jan 04, 2013 at 10:04:23AM +0800, Frank Li wrote:
+>> MX6 and mx28 support enhanced DMA descriptor buff to support 1588
+>> ptp. But MX25, MX3x, MX5x can't support enhanced DMA descriptor buff.
+>> Check fec type and choose correct DMA descriptor buff type.
+>>
+>> Remove static config CONFIG_FEC_PTP.
+>> ptp function will be auto detected.
+> Your patch (now as ff43da86c69d76a726ffe7d1666148960dc1d108 in v3.9-rc1)
+> breaks building with CONFIG_FEC=m:
+>
+>         ERROR: "fec_ptp_init" [drivers/net/ethernet/freescale/fec.ko] undefined!
+>         ERROR: "fec_ptp_ioctl" [drivers/net/ethernet/freescale/fec.ko] undefined!
+>         ERROR: "fec_ptp_start_cyclecounter" [drivers/net/ethernet/freescale/fec.ko] undefined!
 
-Great. Thanks for testing.
+What about this fix?
 
+---
+ drivers/net/ethernet/freescale/fec_ptp.c |    3 +++
+ 1 file changed, 3 insertions(+)
 
+diff --git a/drivers/net/ethernet/freescale/fec_ptp.c
+b/drivers/net/ethernet/freescale/fec_ptp.c
+index 1f17ca0..0d8df40 100644
+--- a/drivers/net/ethernet/freescale/fec_ptp.c
++++ b/drivers/net/ethernet/freescale/fec_ptp.c
+@@ -128,6 +128,7 @@ void fec_ptp_start_cyclecounter(struct net_device *ndev)
+
+ 	spin_unlock_irqrestore(&fep->tmreg_lock, flags);
+ }
++EXPORT_SYMBOL(fec_ptp_start_cyclecounter);
+
+ /**
+  * fec_ptp_adjfreq - adjust ptp cycle frequency
+@@ -318,6 +319,7 @@ int fec_ptp_ioctl(struct net_device *ndev, struct
+ifreq *ifr, int cmd)
+ 	return copy_to_user(ifr->ifr_data, &config, sizeof(config)) ?
+ 	    -EFAULT : 0;
+ }
++EXPORT_SYMBOL(fec_ptp_ioctl);
+
+ /**
+  * fec_time_keep - call timecounter_read every second to avoid timer overrun
+@@ -383,3 +385,4 @@ void fec_ptp_init(struct net_device *ndev, struct
+platform_device *pdev)
+ 		pr_info("registered PHC device on %s\n", ndev->name);
+ 	}
+ }
++EXPORT_SYMBOL(fec_ptp_init);
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+1.7.9.5
