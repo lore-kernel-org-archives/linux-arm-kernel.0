@@ -1,41 +1,40 @@
-From: rklein@nvidia.com (Rhyland Klein)
-Date: Wed, 20 Mar 2013 11:31:32 -0400
-Subject: [PATCH] ARM: tegra: Add sbs-battery node to Dalmore
-Message-ID: <1363793492-2019-1-git-send-email-rklein@nvidia.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 20 Mar 2013 16:37:35 +0100
+Subject: [PATCH for 3.9-rc] arm: mvebu: Use local interrupt only for the
+ timer 0
+In-Reply-To: <1363792175-3136-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1363792175-3136-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20130320163735.398cce2f@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the node for the bq20z45 I2C gas gauge which is
-compatible with the sbs-battery power supply driver.
+Hello,
 
-Signed-off-by: Rhyland Klein <rklein@nvidia.com>
----
- arch/arm/boot/dts/tegra114-dalmore.dts |   13 +++++++++++++
- 1 file changed, 13 insertions(+)
+On Wed, 20 Mar 2013 16:09:35 +0100, Gregory CLEMENT wrote:
+> The commit 3a6f08a37 "arm: mvebu: Add support for local interrupt",
+> managed the 28th first interrupts as local interrupt to match the
+> hardware specification. Among these interrupts there are the Gigabits
+> Ethernet ones used by the mvneta driver. Unfortunately the state of
+> the percpu_irq API prevents the driver to use it.
+> 
+> Indeed the interrupts have to be freed when the .stop() function is
+> called. As the free_percpu_irq() function don't disable the interrupt
+> line, we have to do it on each CPU before calling this. The function
+> disable_percpu_irq() only disable the percpu on the current CPU and
+> there is no function which allows to disable a percpu irq on a given
+> CPU. Waiting for the extension of the percpu_irq API, this fix allows
+> to use again the mvneta driver.
+> 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
-index a61974e..6487188 100644
---- a/arch/arm/boot/dts/tegra114-dalmore.dts
-+++ b/arch/arm/boot/dts/tegra114-dalmore.dts
-@@ -718,6 +718,19 @@
- 		clock-frequency = <408000000>;
- 	};
- 
-+	i2c at 7000c000 {
-+		status = "okay";
-+		clock-frequency = <100000>;
-+
-+		battery: smart-battery at b {
-+			compatible = "ti,bq20z45", "sbs,sbs-battery";
-+			reg = <0xb>;
-+			battery-name = "battery";
-+			sbs,i2c-retry-count = <2>;
-+			sbs,poll-retry-count = <100>;
-+		};
-+	};
-+
- 	pmc {
- 		nvidia,invert-interrupt;
- 	};
+Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+ (on Armada XP GP board)
+
+Thanks!
+
+Thomas
 -- 
-1.7.9.5
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
