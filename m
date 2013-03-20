@@ -1,74 +1,48 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 20 Mar 2013 13:50:05 +0900
-Subject: [PATCH v6 00/16] clk: exynos4/5: migrate to common clock
- framework
-In-Reply-To: <20130320025656.11073.90469@quantum>
-References: <1361175686-19400-1-git-send-email-thomas.abraham@linaro.org>
- <20130319184938.8663.18115@quantum> <201303192212.16877.heiko@sntech.de>
- <20130319215038.8663.83548@quantum>
- <116a01ce24fd$e32658b0$a9730a10$%kim@samsung.com>
- <20130320025656.11073.90469@quantum>
-Message-ID: <11af01ce2526$63b0a8f0$2b11fad0$%kim@samsung.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 20 Mar 2013 11:47:50 +0530
+Subject: [PATCH V2 8/8] cpufreq: OMAP: donot allow to be used with device
+ tree
+In-Reply-To: <1363715590-5131-9-git-send-email-nm@ti.com>
+References: <1363715590-5131-1-git-send-email-nm@ti.com>
+ <1363715590-5131-9-git-send-email-nm@ti.com>
+Message-ID: <5149548E.6030405@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mike Turquette wrote:
+On Tuesday 19 March 2013 11:23 PM, Nishanth Menon wrote:
+> We now use Soc generic cpufreq-cpu0 driver using DT entries.
+> However to allow cpufreq-cpu0 and omap-cpufreq drivers to co-exist,
+> we need to ensure the following using the same image:
+> 1. With device tree boot, we use cpufreq-cpu0
+> 2. With non device tree boot, we use omap-cpufreq
 > 
-> Quoting Kukjin Kim (2013-03-19 17:00:09)
-> > Mike Turquette wrote:
-> > >
-> >
-> > [...]
-> >
-> > > > > Thomas,
-> > > > >
-> > > > > Are you planning a V7 series which includes the clock alias bits from
-> > > > > patch #1?
-> > > >
-> > > > Kukjin has already applied this series into the linux-samsung tree [0].
-> > > >
-> > Thanks, Heiko.
-> >
-> > Mike, yes I did, as we discussed before. Since I missed in last window for
-> v3.9, so I merged every common clock stuff for exynos into samsung tree in the
-> early 3.9-rc time for v3.10.
-> > >
-> > > That really is too much code to go into drivers/clk without my ACK.  I
-> > > have not made much noise about this in the past but there has been more
-> > > and more "bonus" code slipping into drivers/clk each merge window.
-> > > Let's not do that any more.
-> > >
-> >
-> > Hmm, I remember you already agreed on previous version, and I thought if any
-> further codes are required, we could do it on top of that.
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2013-
-> January/143429.html
-> >
+> In the case of (1), we will have cpu OPPs and regulator registered
+> as part of the DT, to ensure that omap-cpufreq and cpufreq-cpu0 don't
+> conflict in managing the frequency of the same cpu, we should not
+> permit init to pass in omap-cpufreq.
 > 
-> In the email you linked to my use of the word "merged" did not imply an
-> ACK.  I was asking about merging the two separate exynos4 and exynos5
-> ccf development efforts together.
+> In the case of (2), we will not have the cpufreq-cpu0 device, hence
+> only omap-cpufreq will be active.
 > 
-OK, I see.
-
-> Furthermore if I *had* agreed on the previous version it would still
-> have been appropriate to put my Acked-by on those patches, which is
-> clearly missing today.
+> So, to acommodate both these usage conditions, we fail init of
+> omap-cpufreq when we boot with device tree.
 > 
-BTW, how about following?
-
-http://www.spinics.net/lists/arm-kernel/msg210266.html
-
-In my understanding, it should be your agreement, it cannot be 'ack' though.
-
-> > However, if you don't want current codes to be sent to upstream, let me know,
-> but I don't think it would be better to us though.
+> Cc: Kevin Hilman <khilman@deeprootsystems.com>
+> Cc: Jon Hunter <jon-hunter@ti.com>
+> Cc: "Beno?t Cousson" <b-cousson@ti.com>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Keerthy <j-keerthy@ti.com>
+> Cc: linux-omap at vger.kernel.org
+> Cc: devicetree-discuss at lists.ozlabs.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: cpufreq at vger.kernel.org
+> Cc: linux-pm at vger.kernel.org
 > 
-> No, I am not asking you to revert/drop the patches, but I am using this
-> as a public example.
-> 
-What's the 'public example'?
-
-As I linked, you already said 'sounds good to me' on my asking.
-
-- Kukjin
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> ---
+I haven't followed all the DT binding for opp discussion but
+this patch is inline to keep non-DT cpufreq working till we
+move to DT only build.
+So FWIW,
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
