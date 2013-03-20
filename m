@@ -1,222 +1,74 @@
-From: b20788@freescale.com (Anson Huang)
-Date: Wed, 20 Mar 2013 13:39:40 -0400
-Subject: [PATCH 3/3] ARM: imx: enable RBC to support anatop LPM mode
-In-Reply-To: <1363801180-8284-1-git-send-email-b20788@freescale.com>
-References: <1363801180-8284-1-git-send-email-b20788@freescale.com>
-Message-ID: <1363801180-8284-3-git-send-email-b20788@freescale.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 20 Mar 2013 13:50:05 +0900
+Subject: [PATCH v6 00/16] clk: exynos4/5: migrate to common clock
+ framework
+In-Reply-To: <20130320025656.11073.90469@quantum>
+References: <1361175686-19400-1-git-send-email-thomas.abraham@linaro.org>
+ <20130319184938.8663.18115@quantum> <201303192212.16877.heiko@sntech.de>
+ <20130319215038.8663.83548@quantum>
+ <116a01ce24fd$e32658b0$a9730a10$%kim@samsung.com>
+ <20130320025656.11073.90469@quantum>
+Message-ID: <11af01ce2526$63b0a8f0$2b11fad0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-RBC is to control whether some ANATOP sub modules
-can enter lpm mode when SOC is into STOP mode, if
-RBC is enabled and PMIC_VSTBY_REQ is set, ANATOP
-will have below behaviors:
+Mike Turquette wrote:
+> 
+> Quoting Kukjin Kim (2013-03-19 17:00:09)
+> > Mike Turquette wrote:
+> > >
+> >
+> > [...]
+> >
+> > > > > Thomas,
+> > > > >
+> > > > > Are you planning a V7 series which includes the clock alias bits from
+> > > > > patch #1?
+> > > >
+> > > > Kukjin has already applied this series into the linux-samsung tree [0].
+> > > >
+> > Thanks, Heiko.
+> >
+> > Mike, yes I did, as we discussed before. Since I missed in last window for
+> v3.9, so I merged every common clock stuff for exynos into samsung tree in the
+> early 3.9-rc time for v3.10.
+> > >
+> > > That really is too much code to go into drivers/clk without my ACK.  I
+> > > have not made much noise about this in the past but there has been more
+> > > and more "bonus" code slipping into drivers/clk each merge window.
+> > > Let's not do that any more.
+> > >
+> >
+> > Hmm, I remember you already agreed on previous version, and I thought if any
+> further codes are required, we could do it on top of that.
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2013-
+> January/143429.html
+> >
+> 
+> In the email you linked to my use of the word "merged" did not imply an
+> ACK.  I was asking about merging the two separate exynos4 and exynos5
+> ccf development efforts together.
+> 
+OK, I see.
 
-1. Digital LDOs(CORE, SOC and PU) are bypassed;
-2. Analog LDOs(1P1, 2P5, 3P0) are disabled;
+> Furthermore if I *had* agreed on the previous version it would still
+> have been appropriate to put my Acked-by on those patches, which is
+> clearly missing today.
+> 
+BTW, how about following?
 
-As the 2P5 is necessary for DRAM IO pre-drive in
-STOP mode, so we need to enable weak 2P5 in STOP
-mode when 2P5 LDO is disabled.
+http://www.spinics.net/lists/arm-kernel/msg210266.html
 
-For RBC settings, there are some rules as below
-due to hardware designe:
+In my understanding, it should be your agreement, it cannot be 'ack' though.
 
-1. All interrupts must be masked during operating
-   RBC registers;
-2. At least 2 CKIL(32K) cycles is needed after the
-   RBC setting is changed.
+> > However, if you don't want current codes to be sent to upstream, let me know,
+> but I don't think it would be better to us though.
+> 
+> No, I am not asking you to revert/drop the patches, but I am using this
+> as a public example.
+> 
+What's the 'public example'?
 
-Signed-off-by: Anson Huang <b20788@freescale.com>
----
- arch/arm/mach-imx/anatop.c    |   19 +++++++++++++++++++
- arch/arm/mach-imx/clk-imx6q.c |   35 +++++++++++++++++++++++++++++++++++
- arch/arm/mach-imx/common.h    |    3 +++
- arch/arm/mach-imx/gpc.c       |   21 ++++++++++++++++++++-
- arch/arm/mach-imx/pm-imx6q.c  |    2 ++
- 5 files changed, 79 insertions(+), 1 deletion(-)
+As I linked, you already said 'sounds good to me' on my asking.
 
-diff --git a/arch/arm/mach-imx/anatop.c b/arch/arm/mach-imx/anatop.c
-index 8f6ab27..38b4f44 100644
---- a/arch/arm/mach-imx/anatop.c
-+++ b/arch/arm/mach-imx/anatop.c
-@@ -18,12 +18,29 @@
- 
- #define REG_SET		0x4
- #define REG_CLR		0x8
-+#define ANA_MISC0	0x150
- #define ANA_REG_CORE	0x140
-+#define ANA_REG_2P5	0x130
- 
-+#define BM_ANADIG_REG_2P5_ENABLE_WEAK_LINREG	0x40000
-+#define BM_ANADIG_ANA_MISC0_STOP_MODE_CONFIG	0x1000
- #define BM_ANADIG_REG_CORE_FET_ODRIVE		0x20000000
- 
- static struct regmap *anatop;
- 
-+void imx_anatop_enable_weak2p5(bool enable)
-+{
-+	u32 val;
-+
-+	regmap_read(anatop, ANA_MISC0, &val);
-+
-+	/* can only be enabled when stop_mode_config is clear. */
-+	regmap_write(anatop, ANA_REG_2P5 + ((enable &&
-+		((val & BM_ANADIG_ANA_MISC0_STOP_MODE_CONFIG)
-+		== 0)) ? REG_SET : REG_CLR),
-+		BM_ANADIG_REG_2P5_ENABLE_WEAK_LINREG);
-+}
-+
- void imx_anatop_enable_fet_odrive(bool enable)
- {
- 	regmap_write(anatop, ANA_REG_CORE + (enable ?
-@@ -32,12 +49,14 @@ void imx_anatop_enable_fet_odrive(bool enable)
- 
- void imx_anatop_pre_suspend(void)
- {
-+	imx_anatop_enable_weak2p5(true);
- 	imx_anatop_enable_fet_odrive(true);
- }
- 
- void imx_anatop_post_resume(void)
- {
- 	imx_anatop_enable_fet_odrive(false);
-+	imx_anatop_enable_weak2p5(false);
- }
- 
- void __init imx_anatop_init(void)
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index b365efc..646ce12 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -14,6 +14,7 @@
- #include <linux/types.h>
- #include <linux/clk.h>
- #include <linux/clkdev.h>
-+#include <linux/delay.h>
- #include <linux/err.h>
- #include <linux/io.h>
- #include <linux/of.h>
-@@ -25,6 +26,8 @@
- 
- #define CCR				0x0
- #define BM_CCR_WB_COUNT			(0x7 << 16)
-+#define BM_CCR_RBC_BYPASS_COUNT		(0x3f << 21)
-+#define BM_CCR_RBC_EN			(0x1 << 27)
- 
- #define CCGR0				0x68
- #define CCGR1				0x6c
-@@ -70,6 +73,38 @@ void imx6q_set_chicken_bit(void)
- 	writel_relaxed(val, ccm_base + CGPR);
- }
- 
-+void imx6q_set_rbc(bool enable)
-+{
-+	u32 val;
-+
-+	/*
-+	 * need to mask all interrupts in GPC before
-+	 * operating RBC configurations
-+	 */
-+	imx_gpc_mask_all();
-+
-+	/* configurate RBC enable bit */
-+	val = readl_relaxed(ccm_base + CCR);
-+	val &= ~BM_CCR_RBC_EN;
-+	val |= enable ? BM_CCR_RBC_EN : 0;
-+	writel_relaxed(val, ccm_base + CCR);
-+
-+	/* configurate RBC count */
-+	val = readl_relaxed(ccm_base + CCR);
-+	val &= ~BM_CCR_RBC_BYPASS_COUNT;
-+	val |= enable ? BM_CCR_RBC_BYPASS_COUNT : 0;
-+	writel(val, ccm_base + CCR);
-+
-+	/*
-+	 * need to delay@least 2 cycles of CKIL(32K)
-+	 * due to hardware design requirement, which is
-+	 * ~61us, here we use 65us for safe
-+	 */
-+	udelay(65);
-+	/* restore GPC interrupt mask settings */
-+	imx_gpc_restore_all();
-+}
-+
- void imx6q_set_wb(bool enable)
- {
- 	u32 val;
-diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-index b9125cf..66fe41c 100644
---- a/arch/arm/mach-imx/common.h
-+++ b/arch/arm/mach-imx/common.h
-@@ -129,11 +129,14 @@ extern void imx_src_prepare_restart(void);
- extern void imx_gpc_init(void);
- extern void imx_gpc_pre_suspend(void);
- extern void imx_gpc_post_resume(void);
-+extern void imx_gpc_mask_all(void);
-+extern void imx_gpc_restore_all(void);
- extern void imx_anatop_init(void);
- extern void imx_anatop_pre_suspend(void);
- extern void imx_anatop_post_resume(void);
- extern int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode);
- extern void imx6q_set_chicken_bit(void);
-+extern void imx6q_set_rbc(bool enable);
- extern void imx6q_set_wb(bool enable);
- extern void imx_cpu_die(unsigned int cpu);
- extern int imx_cpu_kill(unsigned int cpu);
-diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
-index a96ccc7..504049e 100644
---- a/arch/arm/mach-imx/gpc.c
-+++ b/arch/arm/mach-imx/gpc.c
-@@ -1,5 +1,5 @@
- /*
-- * Copyright 2011 Freescale Semiconductor, Inc.
-+ * Copyright 2011-2013 Freescale Semiconductor, Inc.
-  * Copyright 2011 Linaro Ltd.
-  *
-  * The code contained herein is licensed under the GNU General Public
-@@ -68,6 +68,25 @@ static int imx_gpc_irq_set_wake(struct irq_data *d, unsigned int on)
- 	return 0;
- }
- 
-+void imx_gpc_mask_all(void)
-+{
-+	void __iomem *reg_imr1 = gpc_base + GPC_IMR1;
-+	int i;
-+
-+	for (i = 0; i < IMR_NUM; i++)
-+		writel_relaxed(0xffffffff, reg_imr1 + i * 4);
-+
-+}
-+
-+void imx_gpc_restore_all(void)
-+{
-+	void __iomem *reg_imr1 = gpc_base + GPC_IMR1;
-+	int i;
-+
-+	for (i = 0; i < IMR_NUM; i++)
-+		writel_relaxed(gpc_saved_imrs[i], reg_imr1 + i * 4);
-+}
-+
- static void imx_gpc_irq_unmask(struct irq_data *d)
- {
- 	void __iomem *reg;
-diff --git a/arch/arm/mach-imx/pm-imx6q.c b/arch/arm/mach-imx/pm-imx6q.c
-index 57ca274..24ac7bc 100644
---- a/arch/arm/mach-imx/pm-imx6q.c
-+++ b/arch/arm/mach-imx/pm-imx6q.c
-@@ -36,10 +36,12 @@ static int imx6q_pm_enter(suspend_state_t state)
- 		imx_gpc_pre_suspend();
- 		imx_anatop_pre_suspend();
- 		imx_set_cpu_jump(0, v7_cpu_resume);
-+		imx6q_set_rbc(true);
- 		imx6q_set_wb(true);
- 		/* Zzz ... */
- 		cpu_suspend(0, imx6q_suspend_finish);
- 		imx6q_set_wb(false);
-+		imx6q_set_rbc(false);
- 		imx_smp_prepare();
- 		imx_anatop_post_resume();
- 		imx_gpc_post_resume();
--- 
-1.7.9.5
+- Kukjin
