@@ -1,283 +1,87 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 20 Mar 2013 17:15:04 +0800
-Subject: [PATCH 3/3] ARM: imx: enable RBC to support anatop LPM mode
-In-Reply-To: <1363801180-8284-3-git-send-email-b20788@freescale.com>
-References: <1363801180-8284-1-git-send-email-b20788@freescale.com>
- <1363801180-8284-3-git-send-email-b20788@freescale.com>
-Message-ID: <20130320085721.GF26941@S2101-09.ap.freescale.net>
+From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
+Date: Wed, 20 Mar 2013 10:32:26 +0100
+Subject: [PATCH] mmc: atmel-mci: pio hang on block errors
+Message-ID: <1363771946-8931-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 20, 2013 at 01:39:40PM -0400, Anson Huang wrote:
-> RBC is to control whether some ANATOP sub modules
-> can enter lpm mode when SOC is into STOP mode, if
-> RBC is enabled and PMIC_VSTBY_REQ is set, ANATOP
-> will have below behaviors:
-> 
-> 1. Digital LDOs(CORE, SOC and PU) are bypassed;
-> 2. Analog LDOs(1P1, 2P5, 3P0) are disabled;
-> 
-> As the 2P5 is necessary for DRAM IO pre-drive in
-> STOP mode, so we need to enable weak 2P5 in STOP
-> mode when 2P5 LDO is disabled.
-> 
-> For RBC settings, there are some rules as below
-> due to hardware designe:
+From: Terry Barnaby <terry@beam.ltd.uk>
 
-s/designe/design
+The driver is doing, by default, multi-block reads. When a block error occurs
+card/block.c instigates a single block read: "mmcblk0: retrying using single
+block read".
+It leaves the sg chain intact and just changes the length attribute for the
+first sg entry and the overall sg_len parameter. When atmci_read_data_pio is
+called to read the single block of data it ignores the sg_len and expects to
+read more than 512 bytes as it sees there are multiple items in the sg list. No
+more data comes as the controller has only been commanded to get one block.
 
-> 
-> 1. All interrupts must be masked during operating
->    RBC registers;
-> 2. At least 2 CKIL(32K) cycles is needed after the
->    RBC setting is changed.
-> 
-> Signed-off-by: Anson Huang <b20788@freescale.com>
-> ---
->  arch/arm/mach-imx/anatop.c    |   19 +++++++++++++++++++
->  arch/arm/mach-imx/clk-imx6q.c |   35 +++++++++++++++++++++++++++++++++++
->  arch/arm/mach-imx/common.h    |    3 +++
->  arch/arm/mach-imx/gpc.c       |   21 ++++++++++++++++++++-
->  arch/arm/mach-imx/pm-imx6q.c  |    2 ++
->  5 files changed, 79 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-imx/anatop.c b/arch/arm/mach-imx/anatop.c
-> index 8f6ab27..38b4f44 100644
-> --- a/arch/arm/mach-imx/anatop.c
-> +++ b/arch/arm/mach-imx/anatop.c
-> @@ -18,12 +18,29 @@
->  
->  #define REG_SET		0x4
->  #define REG_CLR		0x8
-> +#define ANA_MISC0	0x150
->  #define ANA_REG_CORE	0x140
-> +#define ANA_REG_2P5	0x130
+Signed-off-by: Terry Barnaby <terry@beam.ltd.uk>
+Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+Cc: stable <stable@vger.kernel.org> # 3.2+
+---
+ drivers/mmc/host/atmel-mci.c | 14 ++++++++++----
+ 1 file changed, 10 insertions(+), 4 deletions(-)
 
-Please put these registers in acceding offset.
-
->  
-> +#define BM_ANADIG_REG_2P5_ENABLE_WEAK_LINREG	0x40000
-> +#define BM_ANADIG_ANA_MISC0_STOP_MODE_CONFIG	0x1000
->  #define BM_ANADIG_REG_CORE_FET_ODRIVE		0x20000000
->  
->  static struct regmap *anatop;
->  
-> +void imx_anatop_enable_weak2p5(bool enable)
-
-static
-
-> +{
-> +	u32 val;
-> +
-> +	regmap_read(anatop, ANA_MISC0, &val);
-> +
-> +	/* can only be enabled when stop_mode_config is clear. */
-> +	regmap_write(anatop, ANA_REG_2P5 + ((enable &&
-> +		((val & BM_ANADIG_ANA_MISC0_STOP_MODE_CONFIG)
-> +		== 0)) ? REG_SET : REG_CLR),
-> +		BM_ANADIG_REG_2P5_ENABLE_WEAK_LINREG);
-
-It's a little difficult to parse the expression even it's on the same
-line, not mentioning with indentation.  There are so many levels of
-parentheses.
-
-  ((enable && ((val & BM_ANADIG_ANA_MISC0_STOP_MODE_CONFIG) == 0)) ? REG_SET : REG_CLR)
-
-What about rewriting it as below to make it easy for people to read?
-
-        reg = ANA_REG_2P5;
-        reg += (enable && (val & BM_ANADIG_ANA_MISC0_STOP_MODE_CONFIG) == 0) ?
-		REG_SET : REG_CLR;
-        regmap_write(anatop, reg, BM_ANADIG_REG_2P5_ENABLE_WEAK_LINREG);
-
-> +}
-> +
->  void imx_anatop_enable_fet_odrive(bool enable)
->  {
->  	regmap_write(anatop, ANA_REG_CORE + (enable ?
-> @@ -32,12 +49,14 @@ void imx_anatop_enable_fet_odrive(bool enable)
->  
->  void imx_anatop_pre_suspend(void)
->  {
-> +	imx_anatop_enable_weak2p5(true);
->  	imx_anatop_enable_fet_odrive(true);
->  }
->  
->  void imx_anatop_post_resume(void)
->  {
->  	imx_anatop_enable_fet_odrive(false);
-> +	imx_anatop_enable_weak2p5(false);
->  }
->  
->  void __init imx_anatop_init(void)
-> diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-> index b365efc..646ce12 100644
-> --- a/arch/arm/mach-imx/clk-imx6q.c
-> +++ b/arch/arm/mach-imx/clk-imx6q.c
-> @@ -14,6 +14,7 @@
->  #include <linux/types.h>
->  #include <linux/clk.h>
->  #include <linux/clkdev.h>
-> +#include <linux/delay.h>
->  #include <linux/err.h>
->  #include <linux/io.h>
->  #include <linux/of.h>
-> @@ -25,6 +26,8 @@
->  
->  #define CCR				0x0
->  #define BM_CCR_WB_COUNT			(0x7 << 16)
-> +#define BM_CCR_RBC_BYPASS_COUNT		(0x3f << 21)
-> +#define BM_CCR_RBC_EN			(0x1 << 27)
->  
->  #define CCGR0				0x68
->  #define CCGR1				0x6c
-> @@ -70,6 +73,38 @@ void imx6q_set_chicken_bit(void)
->  	writel_relaxed(val, ccm_base + CGPR);
->  }
->  
-> +void imx6q_set_rbc(bool enable)
-
-Same question as imx6q_set_wb, can we manage to call it in
-imx6q_set_lpm()?  The intension behind this is we should try to
-a centralized place to configure CCM registers/bits for suspend
-instead of exporting so many functions to suspend routine to call
-individually.
-
-> +{
-> +	u32 val;
-> +
-> +	/*
-> +	 * need to mask all interrupts in GPC before
-> +	 * operating RBC configurations
-> +	 */
-> +	imx_gpc_mask_all();
-> +
-> +	/* configurate RBC enable bit */
-
-s/configurate/configure
-
-> +	val = readl_relaxed(ccm_base + CCR);
-> +	val &= ~BM_CCR_RBC_EN;
-> +	val |= enable ? BM_CCR_RBC_EN : 0;
-> +	writel_relaxed(val, ccm_base + CCR);
-> +
-> +	/* configurate RBC count */
-
-Ditto
-
-> +	val = readl_relaxed(ccm_base + CCR);
-> +	val &= ~BM_CCR_RBC_BYPASS_COUNT;
-> +	val |= enable ? BM_CCR_RBC_BYPASS_COUNT : 0;
-> +	writel(val, ccm_base + CCR);
-> +
-> +	/*
-> +	 * need to delay at least 2 cycles of CKIL(32K)
-> +	 * due to hardware design requirement, which is
-> +	 * ~61us, here we use 65us for safe
-> +	 */
-> +	udelay(65);
-
-Nit, have a new line here.
-
-> +	/* restore GPC interrupt mask settings */
-> +	imx_gpc_restore_all();
-> +}
-> +
->  void imx6q_set_wb(bool enable)
->  {
->  	u32 val;
-> diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-> index b9125cf..66fe41c 100644
-> --- a/arch/arm/mach-imx/common.h
-> +++ b/arch/arm/mach-imx/common.h
-> @@ -129,11 +129,14 @@ extern void imx_src_prepare_restart(void);
->  extern void imx_gpc_init(void);
->  extern void imx_gpc_pre_suspend(void);
->  extern void imx_gpc_post_resume(void);
-> +extern void imx_gpc_mask_all(void);
-> +extern void imx_gpc_restore_all(void);
->  extern void imx_anatop_init(void);
->  extern void imx_anatop_pre_suspend(void);
->  extern void imx_anatop_post_resume(void);
->  extern int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode);
->  extern void imx6q_set_chicken_bit(void);
-> +extern void imx6q_set_rbc(bool enable);
->  extern void imx6q_set_wb(bool enable);
-
-Since they are taking "enable" parameter, can we rename them as below?
-
- void imx6q_enable_rbc(bool enable);
- void imx6q_enable_wb(bool enable);
-
->  extern void imx_cpu_die(unsigned int cpu);
->  extern int imx_cpu_kill(unsigned int cpu);
-> diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
-> index a96ccc7..504049e 100644
-> --- a/arch/arm/mach-imx/gpc.c
-> +++ b/arch/arm/mach-imx/gpc.c
-> @@ -1,5 +1,5 @@
->  /*
-> - * Copyright 2011 Freescale Semiconductor, Inc.
-> + * Copyright 2011-2013 Freescale Semiconductor, Inc.
->   * Copyright 2011 Linaro Ltd.
->   *
->   * The code contained herein is licensed under the GNU General Public
-> @@ -68,6 +68,25 @@ static int imx_gpc_irq_set_wake(struct irq_data *d, unsigned int on)
->  	return 0;
->  }
->  
-> +void imx_gpc_mask_all(void)
-> +{
-> +	void __iomem *reg_imr1 = gpc_base + GPC_IMR1;
-> +	int i;
-> +
-> +	for (i = 0; i < IMR_NUM; i++)
-> +		writel_relaxed(0xffffffff, reg_imr1 + i * 4);
-> +
-> +}
-> +
-> +void imx_gpc_restore_all(void)
-> +{
-> +	void __iomem *reg_imr1 = gpc_base + GPC_IMR1;
-> +	int i;
-> +
-> +	for (i = 0; i < IMR_NUM; i++)
-> +		writel_relaxed(gpc_saved_imrs[i], reg_imr1 + i * 4);
-> +}
-> +
->  static void imx_gpc_irq_unmask(struct irq_data *d)
->  {
->  	void __iomem *reg;
-> diff --git a/arch/arm/mach-imx/pm-imx6q.c b/arch/arm/mach-imx/pm-imx6q.c
-> index 57ca274..24ac7bc 100644
-> --- a/arch/arm/mach-imx/pm-imx6q.c
-> +++ b/arch/arm/mach-imx/pm-imx6q.c
-> @@ -36,10 +36,12 @@ static int imx6q_pm_enter(suspend_state_t state)
->  		imx_gpc_pre_suspend();
-
-This call saves mask in gpc_saved_imrs and mask all interrupts except
-those wakeup sources ...
-
->  		imx_anatop_pre_suspend();
->  		imx_set_cpu_jump(0, v7_cpu_resume);
-> +		imx6q_set_rbc(true);
-
-At the end of imx6q_set_rbc(), imx_gpc_restore_all() will be called to
-restore mask bits with gpc_saved_imrs, so wakeup source handling gets
-lost, and any in-use interrupt will wake up system, which is
-undesirable.
-
-Shawn
-
->  		imx6q_set_wb(true);
->  		/* Zzz ... */
->  		cpu_suspend(0, imx6q_suspend_finish);
->  		imx6q_set_wb(false);
-> +		imx6q_set_rbc(false);
->  		imx_smp_prepare();
->  		imx_anatop_post_resume();
->  		imx_gpc_post_resume();
-> -- 
-> 1.7.9.5
-> 
-> 
+diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+index 0932024..d98e68e 100644
+--- a/drivers/mmc/host/atmel-mci.c
++++ b/drivers/mmc/host/atmel-mci.c
+@@ -163,6 +163,7 @@ struct atmel_mci {
+ 	void __iomem		*regs;
+ 
+ 	struct scatterlist	*sg;
++	unsigned int		sg_len;
+ 	unsigned int		pio_offset;
+ 
+ 	struct atmel_mci_slot	*cur_slot;
+@@ -751,6 +752,7 @@ static u32 atmci_prepare_data(struct atmel_mci *host, struct mmc_data *data)
+ 	data->error = -EINPROGRESS;
+ 
+ 	host->sg = data->sg;
++	host->sg_len = data->sg_len;
+ 	host->data = data;
+ 	host->data_chan = NULL;
+ 
+@@ -1573,7 +1575,8 @@ static void atmci_read_data_pio(struct atmel_mci *host)
+ 			if (offset == sg->length) {
+ 				flush_dcache_page(sg_page(sg));
+ 				host->sg = sg = sg_next(sg);
+-				if (!sg)
++				host->sg_len--;
++				if (!sg || !host->sg_len)
+ 					goto done;
+ 
+ 				offset = 0;
+@@ -1586,7 +1589,8 @@ static void atmci_read_data_pio(struct atmel_mci *host)
+ 
+ 			flush_dcache_page(sg_page(sg));
+ 			host->sg = sg = sg_next(sg);
+-			if (!sg)
++			host->sg_len--;
++			if (!sg || !host->sg_len)
+ 				goto done;
+ 
+ 			offset = 4 - remaining;
+@@ -1640,7 +1644,8 @@ static void atmci_write_data_pio(struct atmel_mci *host)
+ 			nbytes += 4;
+ 			if (offset == sg->length) {
+ 				host->sg = sg = sg_next(sg);
+-				if (!sg)
++				host->sg_len--;
++				if (!sg || !host->sg_len)
+ 					goto done;
+ 
+ 				offset = 0;
+@@ -1654,7 +1659,8 @@ static void atmci_write_data_pio(struct atmel_mci *host)
+ 			nbytes += remaining;
+ 
+ 			host->sg = sg = sg_next(sg);
+-			if (!sg) {
++			host->sg_len--;
++			if (!sg || !host->sg_len) {
+ 				atmci_writel(host, ATMCI_TDR, value);
+ 				goto done;
+ 			}
+-- 
+1.7.11.3
