@@ -1,143 +1,51 @@
-From: b20788@freescale.com (Anson Huang)
-Date: Wed, 20 Mar 2013 17:29:31 -0400
-Subject: [PATCH 2/3] ARM: imx: enable periphery well bias for suspend
-In-Reply-To: <20130320074905.GD26941@S2101-09.ap.freescale.net>
-References: <1363801180-8284-1-git-send-email-b20788@freescale.com>
- <1363801180-8284-2-git-send-email-b20788@freescale.com>
- <20130320074905.GD26941@S2101-09.ap.freescale.net>
-Message-ID: <20130320212931.GB13929@ubuntu>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 20 Mar 2013 14:04:35 +0530
+Subject: [GIT PULL] ARM: OMAP2+: Serial driver sysc cleanup for 3.10
+Message-ID: <1363768476-17794-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 20, 2013 at 03:49:08PM +0800, Shawn Guo wrote:
-> Forgot mentioning in patch #1, for patches touching arch/arm/, it's
-> good enough to send them to linux-arm-kernel list.  Copying list
-> linux-kernel isn't so necessary.
-Accepted, will pay attention to it.
-> 
-> On Wed, Mar 20, 2013 at 01:39:39PM -0400, Anson Huang wrote:
-> > enable periphery charge pump for well biasing
-> > at suspend to reduce periphery leakage.
-> > 
-> > Signed-off-by: Anson Huang <b20788@freescale.com>
-> > ---
-> >  arch/arm/mach-imx/clk-imx6q.c |   22 +++++++++++++++++++++-
-> >  arch/arm/mach-imx/common.h    |    4 ++--
-> >  arch/arm/mach-imx/pm-imx6q.c  |    4 +++-
-> >  3 files changed, 26 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-> > index 2f9ff93..b365efc 100644
-> > --- a/arch/arm/mach-imx/clk-imx6q.c
-> > +++ b/arch/arm/mach-imx/clk-imx6q.c
-> > @@ -1,5 +1,5 @@
-> >  /*
-> > - * Copyright 2011 Freescale Semiconductor, Inc.
-> > + * Copyright 2011-2013 Freescale Semiconductor, Inc.
-> >   * Copyright 2011 Linaro Ltd.
-> >   *
-> >   * The code contained herein is licensed under the GNU General Public
-> > @@ -23,6 +23,9 @@
-> >  #include "clk.h"
-> >  #include "common.h"
-> >  
-> > +#define CCR				0x0
-> > +#define BM_CCR_WB_COUNT			(0x7 << 16)
-> > +
-> >  #define CCGR0				0x68
-> >  #define CCGR1				0x6c
-> >  #define CCGR2				0x70
-> > @@ -67,6 +70,23 @@ void imx6q_set_chicken_bit(void)
-> >  	writel_relaxed(val, ccm_base + CGPR);
-> >  }
-> >  
-> > +void imx6q_set_wb(bool enable)
-> > +{
-> > +	u32 val;
-> > +
-> > +	/* configurate well bias enable bit */
-> 
-> s/configurate/configure
-Accepted.
-> 
-> > +	val = readl_relaxed(ccm_base + CLPCR);
-> > +	val &= ~BM_CLPCR_WB_PER_AT_LPM;
-> > +	val |= enable ? BM_CLPCR_WB_PER_AT_LPM : 0;
-> > +	writel_relaxed(val, ccm_base + CLPCR);
-> > +
-> > +	/* configurate well bias count */
-> 
-> Ditto
-Accepted.
-> 
-> > +	val = readl_relaxed(ccm_base + CCR);
-> > +	val &= ~BM_CCR_WB_COUNT;
-> > +	val |= enable ? BM_CCR_WB_COUNT : 0;
-> > +	writel_relaxed(val, ccm_base + CCR);
-> > +}
-> > +
-> >  int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode)
-> >  {
-> >  	u32 val = readl_relaxed(ccm_base + CLPCR);
-> > diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-> > index 004c2b3..b9125cf 100644
-> > --- a/arch/arm/mach-imx/common.h
-> > +++ b/arch/arm/mach-imx/common.h
-> > @@ -1,5 +1,5 @@
-> >  /*
-> > - * Copyright 2004-2007 Freescale Semiconductor, Inc. All Rights Reserved.
-> > + * Copyright 2004-2013 Freescale Semiconductor, Inc. All Rights Reserved.
-> >   */
-> >  
-> >  /*
-> > @@ -134,7 +134,7 @@ extern void imx_anatop_pre_suspend(void);
-> >  extern void imx_anatop_post_resume(void);
-> >  extern int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode);
-> >  extern void imx6q_set_chicken_bit(void);
-> > -
-> 
-> Unnecessary new line.
-Accepted.
-> 
-> > +extern void imx6q_set_wb(bool enable);
-> >  extern void imx_cpu_die(unsigned int cpu);
-> >  extern int imx_cpu_kill(unsigned int cpu);
-> >  
-> > diff --git a/arch/arm/mach-imx/pm-imx6q.c b/arch/arm/mach-imx/pm-imx6q.c
-> > index 05b26cd..57ca274 100644
-> > --- a/arch/arm/mach-imx/pm-imx6q.c
-> > +++ b/arch/arm/mach-imx/pm-imx6q.c
-> > @@ -1,5 +1,5 @@
-> >  /*
-> > - * Copyright 2011 Freescale Semiconductor, Inc.
-> > + * Copyright 2011-2013 Freescale Semiconductor, Inc.
-> >   * Copyright 2011 Linaro Ltd.
-> >   *
-> >   * The code contained herein is licensed under the GNU General Public
-> > @@ -36,8 +36,10 @@ static int imx6q_pm_enter(suspend_state_t state)
-> >  		imx_gpc_pre_suspend();
-> >  		imx_anatop_pre_suspend();
-> >  		imx_set_cpu_jump(0, v7_cpu_resume);
-> > +		imx6q_set_wb(true);
-> 
-> Is it possible to have it called inside imx6q_set_lpm()?  If so, we can
-> 
-> 1) Have imx6q_set_wb() be a static function in clk-imx6q.c
-> 2) Apply the function for both STOP and WAIT mode
-Good idea, will move it to imx6q_set_lpm(), but for now, I will only enable
-this well bias for stop mode, if we need to enable it in wait mode, will
-create another patch, as we are not so confident whether it can be applied
-in WAIT mode, many modules are still working in WAIT mode.
-> 
-> Shawn
-> 
-> >  		/* Zzz ... */
-> >  		cpu_suspend(0, imx6q_suspend_finish);
-> > +		imx6q_set_wb(false);
-> >  		imx_smp_prepare();
-> >  		imx_anatop_post_resume();
-> >  		imx_gpc_post_resume();
-> > -- 
-> > 1.7.9.5
-> > 
-> > 
+Tony,
+
+Here is the pull request for OMAP serial driver sysconfig cleanup. The series
+removes all the hackery of sysconfig from UART driver and let runtime backend
+handle it. Without this series serial console is almost un-usable on OMAP5.
+One of the patch touches driver/serial but I got an ack from Greg KH to get
+it queued via OMAP tree.
+
+
+The following changes since commit a937536b868b8369b98967929045f1df54234323:
+
+  Linux 3.9-rc3 (2013-03-17 15:59:32 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux.git for_3.10/omap_serial_sysc_cleanup
+
+for you to fetch changes up to 0f78c88b107a25561d0830c7fb695134ac7e8892:
+
+  ARM: OMAP2+: hwmod: Remove sysc slave idle and auto idle apis (2013-03-19 12:07:49 +0530)
+
+----------------------------------------------------------------
+Rajendra Nayak (4):
+      ARM: OMAP2+: hwmod: Remove unused _HWMOD_WAKEUP_ENABLED flag
+      ARM: OMAP2+: hwmod: Cleanup sidle/mstandby programming
+      ARM: OMAP2+: hwmod: Always have OCP_SYSCONFIG.ENAWAKEUP enabled
+      ARM: OMAP2+: hwmod: Add a new flag to handle SIDLE in SWSUP only in active
+
+Santosh Shilimkar (4):
+      ARM: OMAP2+: hwmod-data: UART IP needs software control to manage sidle modes
+      SERIAL: OMAP: Remove the slave idle handling from the driver
+      ARM: OMAP2+: serial: Remove the un-used slave idle hooks
+      ARM: OMAP2+: hwmod: Remove sysc slave idle and auto idle apis
+
+ arch/arm/mach-omap2/omap_hwmod.c                   |  142 ++++----------------
+ arch/arm/mach-omap2/omap_hwmod.h                   |   13 +-
+ arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |    3 +
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |    6 +
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |    4 +
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |    6 +-
+ arch/arm/mach-omap2/serial.c                       |   31 -----
+ drivers/tty/serial/omap-serial.c                   |   23 ----
+ include/linux/platform_data/serial-omap.h          |    2 -
+ 9 files changed, 50 insertions(+), 180 deletions(-)
