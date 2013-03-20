@@ -1,61 +1,45 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 20 Mar 2013 15:25:41 +0100
-Subject: [PATCH] mmc: mvsdio: fix non-DT probing of GPIOs
-Message-ID: <1363789541-15132-1-git-send-email-thomas.petazzoni@free-electrons.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Wed, 20 Mar 2013 22:28:23 +0800
+Subject: [PATCH 1/8] pinctrl: sirf: convert to linear irq domain
+In-Reply-To: <1363779679-16880-2-git-send-email-arnd@arndb.de>
+References: <1363779679-16880-1-git-send-email-arnd@arndb.de>
+ <1363779679-16880-2-git-send-email-arnd@arndb.de>
+Message-ID: <CAGsJ_4zRhRX+g9Xf6RSPFtXrer+_7-hg2WCsVjAtRpY=q7tqtg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ralph Droms <rdroms.ietf@gmail.com> reported that 3.9-rc was breaking
-the SDIO interface on his Sheevaplug platform, and that the recent
-changes to the mvsdio driver are responsible for this breakage.
+Hi Arnd,
 
-After investigation, is turns out that the Sheevaplug does not have
-any "card detect" GPIO, and the Sheevaplug has not been converted to
-the Device Tree. Therefore, the Sheevaplug board code does not define
-a value for the .gpio_card_detect field of the mvsdio_platform_data
-structure, which means that its value is 0. Unfortunately,
-gpio_is_valid() considers 0 as a valid GPIO, and therefore calls
-mmc_gpio_request_cd(), which fails and makes the entire probing of the
-driver fail.
+2013/3/20 Arnd Bergmann <arnd@arndb.de>:
+> The sirf platforms use no hardcoded IRQ numbers, so there is no reason to
+> use the legacy domain, and by converting to the linear domain, we get
+> a more efficient representation of sparse IRQs and remove the dependency
+> on the mach/irqs.h header file.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
 
-In fact, in the previous mvsdio code, before the Device Tree binding
-was introduced, 0 was not considered as a valid GPIO. Therefore, this
-fix revert back to this behavior in the non-DT case, by setting the
-gpio_card_detect and gpio_write_protect local variables to -EINVAL
-when the corresponding fields of the mvsdio_platform_data structure
-are set to zero (i.e, left undefined). Of course, it prevents to use
-GPIO 0 as a card detect or write protect GPIO, but it was a defiency
-of the previous non-DT code, and the fix moving forward is to convert
-platforms to the Device Tree.
+a dependency issue is recently i sent a patch for re-arch sirf
+pinctrl, pull the soc-specific pin/group/functionality layout out of
+the drivers/pinctrl/pinctrl-sirf.c, and created new seperate
+soc-layout files for prima2 and atlas6 in drivers/pinctrl/sirf.
+Barry Song:
+[PATCH]pinctrl:sirf:re-arch and add support for new SiRFatlas6 SoC
+http://www.spinics.net/lists/arm-kernel/msg230700.html
+i will merge yours with that.
 
-The problem has been reproduced successfully on the Kirkwood-based
-Marvell DB-88F6281-BP Development Board (that doesn't use the Device
-Tree) and the fix has proven to work properly, after of course
-removing the gpio_card_detect field of the mvsdio_platform_data
-instance for this board.
+Hi Linus,
+would you give some comments about that sirf re-arch patch, i hope all
+of them could be in 3.10.
 
-Reported-by: Ralph Droms <rdroms.ietf@gmail.com>
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
-This patch should be applied on 3.9-rcX.
----
- drivers/mmc/host/mvsdio.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+> ---
+>  drivers/pinctrl/pinctrl-sirf.c | 10 +++-------
+>  1 file changed, 3 insertions(+), 7 deletions(-)
+>
+> diff --git a/drivers/pinctrl/pinctrl-sirf.c b/drivers/pinctrl/pinctrl-sirf.c
+> index d02498b..a0bc78b 100644
+> --- a/drivers/pinctrl/pinctrl-sirf.c
+> +++ b/drivers/pinctrl/pinctrl-sirf.c
+> @@ -1485,7 +1485,6 @@ static void sirfsoc_gpio_handle_irq(unsigned int irq, struct irq_desc *desc)
 
-diff --git a/drivers/mmc/host/mvsdio.c b/drivers/mmc/host/mvsdio.c
-index 145cdaf..1e4d567 100644
---- a/drivers/mmc/host/mvsdio.c
-+++ b/drivers/mmc/host/mvsdio.c
-@@ -741,8 +741,8 @@ static int __init mvsd_probe(struct platform_device *pdev)
- 			goto out;
- 		}
- 		host->base_clock = mvsd_data->clock / 2;
--		gpio_card_detect = mvsd_data->gpio_card_detect;
--		gpio_write_protect = mvsd_data->gpio_write_protect;
-+		gpio_card_detect = mvsd_data->gpio_card_detect ? : -EINVAL;
-+		gpio_write_protect = mvsd_data->gpio_write_protect ? : -EINVAL;
- 	}
- 
- 	mmc->ops = &mvsd_ops;
--- 
-1.7.9.5
+-barry
