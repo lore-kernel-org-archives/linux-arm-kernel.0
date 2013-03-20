@@ -1,41 +1,33 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 20 Mar 2013 09:44:38 -0700
-Subject: [PATCH 1/1] documentation: clk: fix couple of misspelling
-In-Reply-To: <1362059947-3706-1-git-send-email-eduardo.valentin@ti.com>
-References: <1362059947-3706-1-git-send-email-eduardo.valentin@ti.com>
-Message-ID: <20130320164438.18043.5312@quantum>
+From: ryan@presslab.us (Ryan Press)
+Date: Wed, 20 Mar 2013 09:44:42 -0700
+Subject: [PATCH for 3.9-rc] arm: mvebu: Use local interrupt only for the
+ timer 0
+In-Reply-To: <1363792175-3136-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1363792175-3136-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <CABx3TkU=y5_WTojbc9z17csaUh4PYxDUszdCdpWhmDM-JUEt5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Eduardo Valentin (2013-02-28 05:59:07)
-> Correcting misspelling inside the clk.txt.
-> 
-> Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
+On Wed, Mar 20, 2013 at 8:09 AM, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
+> The commit 3a6f08a37 "arm: mvebu: Add support for local interrupt",
+> managed the 28th first interrupts as local interrupt to match the
+> hardware specification. Among these interrupts there are the Gigabits
+> Ethernet ones used by the mvneta driver. Unfortunately the state of
+> the percpu_irq API prevents the driver to use it.
+>
+> Indeed the interrupts have to be freed when the .stop() function is
+> called. As the free_percpu_irq() function don't disable the interrupt
+> line, we have to do it on each CPU before calling this. The function
+> disable_percpu_irq() only disable the percpu on the current CPU and
+> there is no function which allows to disable a percpu irq on a given
+> CPU. Waiting for the extension of the percpu_irq API, this fix allows
+> to use again the mvneta driver.
 
-Thanks Eduardo!  Taken into clk-next.
+Thanks Gregory!
 
-Regards,
-Mike
+I can confirm this patch works for me as well.  I still have the
+problem on my Globalscale Mirabox where only a forced 10Mb link works
+on tx/rx.  With 100Mb only rx works, and 1Gb neither works.
 
-> ---
->  Documentation/clk.txt |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/Documentation/clk.txt b/Documentation/clk.txt
-> index 1943fae..4274a54 100644
-> --- a/Documentation/clk.txt
-> +++ b/Documentation/clk.txt
-> @@ -174,9 +174,9 @@ int clk_foo_enable(struct clk_hw *hw)
->  };
->  
->  Below is a matrix detailing which clk_ops are mandatory based upon the
-> -hardware capbilities of that clock.  A cell marked as "y" means
-> +hardware capabilities of that clock.  A cell marked as "y" means
->  mandatory, a cell marked as "n" implies that either including that
-> -callback is invalid or otherwise uneccesary.  Empty cells are either
-> +callback is invalid or otherwise unnecessary.  Empty cells are either
->  optional or must be evaluated on a case-by-case basis.
->  
->                             clock hardware characteristics
-> -- 
-> 1.7.7.1.488.ge8e1c
+Ryan
