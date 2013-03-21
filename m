@@ -1,397 +1,202 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 21 Mar 2013 22:51:07 +0100
-Subject: [PATCH 2/9] ARM: ux500: split out prcmu initialization
-In-Reply-To: <1363902674-6456-1-git-send-email-arnd@arndb.de>
-References: <1363866553-15054-1-git-send-email-linus.walleij@stericsson.com>
- <1363902674-6456-1-git-send-email-arnd@arndb.de>
-Message-ID: <1363902674-6456-3-git-send-email-arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 21 Mar 2013 21:49:08 +0000
+Subject: [PATCH 1/4] ARM: context tracking: add exception support
+In-Reply-To: <1363824121-26169-2-git-send-email-khilman@linaro.org>
+References: <1363824121-26169-1-git-send-email-khilman@linaro.org>
+ <1363824121-26169-2-git-send-email-khilman@linaro.org>
+Message-ID: <20130321214908.GU4977@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This untangles the final bits of the prcmu code from the platform
-code:
+On Wed, Mar 20, 2013 at 05:01:58PM -0700, Kevin Hilman wrote:
+> Add ARM support for the context tracking subsystem by instrumenting
+> exception entry/exit points.
+> 
+> Special thanks to Mats Liljegren for testing, collaboration and adding
+> support for exceptions/faults that were missing in early test versions.
 
-* The IRQ_PRCMU_* definitions move from irqs-db8500.h into prcmu.c
-  because they are only of local significance.
-* u8500_thsens_device goes into the prcmu, because it uses a PRCMU
-  IRQ that the platform does not see.
-* IRQ_DB8500_AB8500 and IRQ_PRCMU_BASE go into the platform data
-  because the PRCMU does not see it.
+Not sure all of these are a good idea or are correct...
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/mach-ux500/board-mop500.c             |  58 ----------
- arch/arm/mach-ux500/devices-db8500.c           |   2 +
- arch/arm/mach-ux500/include/mach/irqs-db8500.h |  25 -----
- drivers/mfd/db8500-prcmu.c                     | 140 ++++++++++++++++++++-----
- include/linux/mfd/dbx500-prcmu.h               |   2 +
- 5 files changed, 115 insertions(+), 112 deletions(-)
+> @@ -405,7 +406,9 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
+>  	unsigned int instr;
+>  	siginfo_t info;
+>  	void __user *pc;
+> +	enum ctx_state prev_state;
+>  
+> +	prev_state = exception_enter();
+>  	pc = (void __user *)instruction_pointer(regs);
+>  
+>  	if (processor_mode(regs) == SVC_MODE) {
+> @@ -433,8 +436,10 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
+>  		goto die_sig;
+>  	}
+>  
+> -	if (call_undef_hook(regs, instr) == 0)
+> +	if (call_undef_hook(regs, instr) == 0) {
+> +		exception_exit(prev_state);
+>  		return;
+> +	}
+>  
+>  die_sig:
+>  #ifdef CONFIG_DEBUG_USER
+> @@ -451,12 +456,17 @@ die_sig:
+>  	info.si_addr  = pc;
+>  
+>  	arm_notify_die("Oops - undefined instruction", regs, &info, 0, 6);
+> +	exception_exit(prev_state);
 
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index 215a389..682b321 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -239,63 +239,6 @@ struct ab8500_platform_data ab8500_platdata = {
- 	.codec		= &ab8500_codec_pdata,
- };
- 
--/*
-- * Thermal Sensor
-- */
--
--static struct resource db8500_thsens_resources[] = {
--	{
--		.name = "IRQ_HOTMON_LOW",
--		.start  = IRQ_PRCMU_HOTMON_LOW,
--		.end    = IRQ_PRCMU_HOTMON_LOW,
--		.flags  = IORESOURCE_IRQ,
--	},
--	{
--		.name = "IRQ_HOTMON_HIGH",
--		.start  = IRQ_PRCMU_HOTMON_HIGH,
--		.end    = IRQ_PRCMU_HOTMON_HIGH,
--		.flags  = IORESOURCE_IRQ,
--	},
--};
--
--static struct db8500_thsens_platform_data db8500_thsens_data = {
--	.trip_points[0] = {
--		.temp = 70000,
--		.type = THERMAL_TRIP_ACTIVE,
--		.cdev_name = {
--			[0] = "thermal-cpufreq-0",
--		},
--	},
--	.trip_points[1] = {
--		.temp = 75000,
--		.type = THERMAL_TRIP_ACTIVE,
--		.cdev_name = {
--			[0] = "thermal-cpufreq-0",
--		},
--	},
--	.trip_points[2] = {
--		.temp = 80000,
--		.type = THERMAL_TRIP_ACTIVE,
--		.cdev_name = {
--			[0] = "thermal-cpufreq-0",
--		},
--	},
--	.trip_points[3] = {
--		.temp = 85000,
--		.type = THERMAL_TRIP_CRITICAL,
--	},
--	.num_trips = 4,
--};
--
--static struct platform_device u8500_thsens_device = {
--	.name           = "db8500-thermal",
--	.resource       = db8500_thsens_resources,
--	.num_resources  = ARRAY_SIZE(db8500_thsens_resources),
--	.dev	= {
--		.platform_data	= &db8500_thsens_data,
--	},
--};
--
- static struct platform_device u8500_cpufreq_cooling_device = {
- 	.name           = "db8500-cpufreq-cooling",
- };
-@@ -656,7 +599,6 @@ static struct platform_device *snowball_platform_devs[] __initdata = {
- 	&snowball_key_dev,
- 	&snowball_sbnet_dev,
- 	&snowball_gpio_en_3v3_regulator_dev,
--	&u8500_thsens_device,
- 	&u8500_cpufreq_cooling_device,
- 	&sdi0_regulator,
- };
-diff --git a/arch/arm/mach-ux500/devices-db8500.c b/arch/arm/mach-ux500/devices-db8500.c
-index 9152aca..3b7599d 100644
---- a/arch/arm/mach-ux500/devices-db8500.c
-+++ b/arch/arm/mach-ux500/devices-db8500.c
-@@ -199,6 +199,8 @@ struct platform_device u8500_ske_keypad_device = {
- 
- struct prcmu_pdata db8500_prcmu_pdata = {
- 	.ab_platdata	= &ab8500_platdata,
-+	.ab_irq		= IRQ_DB8500_AB8500,
-+	.irq_base	= IRQ_PRCMU_BASE,
- 	.version_offset	= DB8500_PRCMU_FW_VERSION_OFFSET,
- 	.legacy_offset	= DB8500_PRCMU_LEGACY_OFFSET,
- };
-diff --git a/arch/arm/mach-ux500/include/mach/irqs-db8500.h b/arch/arm/mach-ux500/include/mach/irqs-db8500.h
-index 68bc149..f3a9d59 100644
---- a/arch/arm/mach-ux500/include/mach/irqs-db8500.h
-+++ b/arch/arm/mach-ux500/include/mach/irqs-db8500.h
-@@ -109,31 +109,6 @@
- 
- /* Virtual interrupts corresponding to the PRCMU wakeups.  */
- #define IRQ_PRCMU_BASE IRQ_SOC_START
--#define NUM_PRCMU_WAKEUPS (IRQ_PRCMU_END - IRQ_PRCMU_BASE)
--
--#define IRQ_PRCMU_RTC (IRQ_PRCMU_BASE)
--#define IRQ_PRCMU_RTT0 (IRQ_PRCMU_BASE + 1)
--#define IRQ_PRCMU_RTT1 (IRQ_PRCMU_BASE + 2)
--#define IRQ_PRCMU_HSI0 (IRQ_PRCMU_BASE + 3)
--#define IRQ_PRCMU_HSI1 (IRQ_PRCMU_BASE + 4)
--#define IRQ_PRCMU_CA_WAKE (IRQ_PRCMU_BASE + 5)
--#define IRQ_PRCMU_USB (IRQ_PRCMU_BASE + 6)
--#define IRQ_PRCMU_ABB (IRQ_PRCMU_BASE + 7)
--#define IRQ_PRCMU_ABB_FIFO (IRQ_PRCMU_BASE + 8)
--#define IRQ_PRCMU_ARM (IRQ_PRCMU_BASE + 9)
--#define IRQ_PRCMU_MODEM_SW_RESET_REQ (IRQ_PRCMU_BASE + 10)
--#define IRQ_PRCMU_GPIO0 (IRQ_PRCMU_BASE + 11)
--#define IRQ_PRCMU_GPIO1 (IRQ_PRCMU_BASE + 12)
--#define IRQ_PRCMU_GPIO2 (IRQ_PRCMU_BASE + 13)
--#define IRQ_PRCMU_GPIO3 (IRQ_PRCMU_BASE + 14)
--#define IRQ_PRCMU_GPIO4 (IRQ_PRCMU_BASE + 15)
--#define IRQ_PRCMU_GPIO5 (IRQ_PRCMU_BASE + 16)
--#define IRQ_PRCMU_GPIO6 (IRQ_PRCMU_BASE + 17)
--#define IRQ_PRCMU_GPIO7 (IRQ_PRCMU_BASE + 18)
--#define IRQ_PRCMU_GPIO8 (IRQ_PRCMU_BASE + 19)
--#define IRQ_PRCMU_CA_SLEEP (IRQ_PRCMU_BASE + 20)
--#define IRQ_PRCMU_HOTMON_LOW (IRQ_PRCMU_BASE + 21)
--#define IRQ_PRCMU_HOTMON_HIGH (IRQ_PRCMU_BASE + 22)
- #define IRQ_PRCMU_END (IRQ_PRCMU_BASE + 23)
- 
- /*
-diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
-index 03e2aed..bc8f870 100644
---- a/drivers/mfd/db8500-prcmu.c
-+++ b/drivers/mfd/db8500-prcmu.c
-@@ -33,7 +33,7 @@
- #include <linux/regulator/machine.h>
- #include <linux/cpufreq.h>
- #include <linux/platform_data/ux500_wdt.h>
--#include <mach/irqs.h>
-+#include <linux/platform_data/db8500_thermal.h>
- #include "dbx500-prcmu-regs.h"
- 
- /* Index of different voltages to be used when accessing AVSData */
-@@ -273,8 +273,34 @@ static struct irq_domain *db8500_irq_domain;
-  * the bits in the bit field are not. (The bits also have a tendency to move
-  * around, to further complicate matters.)
-  */
--#define IRQ_INDEX(_name) ((IRQ_PRCMU_##_name) - IRQ_PRCMU_BASE)
-+#define IRQ_INDEX(_name) ((IRQ_PRCMU_##_name))
- #define IRQ_ENTRY(_name)[IRQ_INDEX(_name)] = (WAKEUP_BIT_##_name)
-+
-+#define IRQ_PRCMU_RTC 0
-+#define IRQ_PRCMU_RTT0 1
-+#define IRQ_PRCMU_RTT1 2
-+#define IRQ_PRCMU_HSI0 3
-+#define IRQ_PRCMU_HSI1 4
-+#define IRQ_PRCMU_CA_WAKE 5
-+#define IRQ_PRCMU_USB 6
-+#define IRQ_PRCMU_ABB 7
-+#define IRQ_PRCMU_ABB_FIFO 8
-+#define IRQ_PRCMU_ARM 9
-+#define IRQ_PRCMU_MODEM_SW_RESET_REQ 10
-+#define IRQ_PRCMU_GPIO0 11
-+#define IRQ_PRCMU_GPIO1 12
-+#define IRQ_PRCMU_GPIO2 13
-+#define IRQ_PRCMU_GPIO3 14
-+#define IRQ_PRCMU_GPIO4 15
-+#define IRQ_PRCMU_GPIO5 16
-+#define IRQ_PRCMU_GPIO6 17
-+#define IRQ_PRCMU_GPIO7 18
-+#define IRQ_PRCMU_GPIO8 19
-+#define IRQ_PRCMU_CA_SLEEP 20
-+#define IRQ_PRCMU_HOTMON_LOW 21
-+#define IRQ_PRCMU_HOTMON_HIGH 22
-+#define NUM_PRCMU_WAKEUPS 23
-+
- static u32 prcmu_irq_bit[NUM_PRCMU_WAKEUPS] = {
- 	IRQ_ENTRY(RTC),
- 	IRQ_ENTRY(RTT0),
-@@ -2649,14 +2675,13 @@ static struct irq_domain_ops db8500_irq_ops = {
- 	.xlate  = irq_domain_xlate_twocell,
- };
- 
--static int db8500_irq_init(struct device_node *np)
-+static int db8500_irq_init(struct device_node *np, int irq_base)
- {
--	int irq_base = 0;
- 	int i;
- 
- 	/* In the device tree case, just take some IRQs */
- 	if (!np)
--		irq_base = IRQ_PRCMU_BASE;
-+		irq_base = 0;
- 
- 	db8500_irq_domain = irq_domain_add_simple(
- 		np, NUM_PRCMU_WAKEUPS, irq_base,
-@@ -2717,7 +2742,7 @@ void __init db8500_prcmu_early_init(u32 phy_base, u32 size)
- 	 * subsequently replaces with a real remap. After the merge of
- 	 * the mailbox subsystem all of this early code goes away, and the
- 	 * clock driver can probe independently. An early initcall will
--	 * still be needed, but it can be diverted into drivers/clk/ux500/*.
-+	 * still be needed, but it can be diverted into drivers/clk/ux500/.
- 	 */
- 	prcmu_base = ioremap(phy_base, size);
- 	if (!prcmu_base)
-@@ -2988,18 +3013,57 @@ static struct regulator_init_data db8500_regulators[DB8500_NUM_REGULATORS] = {
- 	},
- };
- 
--static struct resource ab8500_resources[] = {
--	[0] = {
--		.start	= IRQ_DB8500_AB8500,
--		.end	= IRQ_DB8500_AB8500,
--		.flags	= IORESOURCE_IRQ
--	}
--};
--
- static struct ux500_wdt_data db8500_wdt_pdata = {
- 	.timeout = 600, /* 10 minutes */
- 	.has_28_bits_resolution = true,
- };
-+/*
-+ * Thermal Sensor
-+ */
-+
-+static struct resource db8500_thsens_resources[] = {
-+	{
-+		.name = "IRQ_HOTMON_LOW",
-+		.start  = IRQ_PRCMU_HOTMON_LOW,
-+		.end    = IRQ_PRCMU_HOTMON_LOW,
-+		.flags  = IORESOURCE_IRQ,
-+	},
-+	{
-+		.name = "IRQ_HOTMON_HIGH",
-+		.start  = IRQ_PRCMU_HOTMON_HIGH,
-+		.end    = IRQ_PRCMU_HOTMON_HIGH,
-+		.flags  = IORESOURCE_IRQ,
-+	},
-+};
-+
-+static struct db8500_thsens_platform_data db8500_thsens_data = {
-+	.trip_points[0] = {
-+		.temp = 70000,
-+		.type = THERMAL_TRIP_ACTIVE,
-+		.cdev_name = {
-+			[0] = "thermal-cpufreq-0",
-+		},
-+	},
-+	.trip_points[1] = {
-+		.temp = 75000,
-+		.type = THERMAL_TRIP_ACTIVE,
-+		.cdev_name = {
-+			[0] = "thermal-cpufreq-0",
-+		},
-+	},
-+	.trip_points[2] = {
-+		.temp = 80000,
-+		.type = THERMAL_TRIP_ACTIVE,
-+		.cdev_name = {
-+			[0] = "thermal-cpufreq-0",
-+		},
-+	},
-+	.trip_points[3] = {
-+		.temp = 85000,
-+		.type = THERMAL_TRIP_CRITICAL,
-+	},
-+	.num_trips = 4,
-+};
- 
- static struct mfd_cell db8500_prcmu_devs[] = {
- 	{
-@@ -3021,11 +3085,10 @@ static struct mfd_cell db8500_prcmu_devs[] = {
- 		.id = -1,
- 	},
- 	{
--		.name = "ab8500-core",
--		.of_compatible = "stericsson,ab8500",
--		.num_resources = ARRAY_SIZE(ab8500_resources),
--		.resources = ab8500_resources,
--		.id = AB8500_VERSION_AB8500,
-+		.name = "db8500-thermal",
-+		.num_resources = ARRAY_SIZE(db8500_thsens_resources),
-+		.resources = db8500_thsens_resources,
-+		.platform_data = &db8500_thsens_data,
- 	},
- };
- 
-@@ -3037,6 +3100,24 @@ static void db8500_prcmu_update_cpufreq(void)
- 	}
- }
- 
-+static int db8500_prcmu_register_ab8500(struct device *parent,
-+					struct ab8500_platform_data *pdata,
-+					int irq)
-+{
-+	struct resource ab8500_resource = DEFINE_RES_IRQ(irq);
-+	struct mfd_cell ab8500_cell = {
-+		.name = "ab8500-core",
-+		.of_compatible = "stericsson,ab8500",
-+		.id = AB8500_VERSION_AB8500,
-+		.platform_data = pdata,
-+		.pdata_size = sizeof(struct ab8500_platform_data),
-+		.resources = &ab8500_resource,
-+		.num_resources = 1,
-+	};
-+
-+	return mfd_add_devices(parent, 0, &ab8500_cell, 1, NULL, 0, NULL);
-+}
-+
- /**
-  * prcmu_fw_init - arch init call for the Linux PRCMU fw init logic
-  *
-@@ -3045,7 +3126,7 @@ static int db8500_prcmu_probe(struct platform_device *pdev)
- {
- 	struct device_node *np = pdev->dev.of_node;
- 	struct prcmu_pdata *pdata = dev_get_platdata(&pdev->dev);
--	int irq = 0, err = 0, i;
-+	int irq = 0, err = 0;
- 	struct resource *res;
- 
- 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "prcmu");
-@@ -3086,26 +3167,27 @@ static int db8500_prcmu_probe(struct platform_device *pdev)
- 		goto no_irq_return;
- 	}
- 
--	db8500_irq_init(np);
--
--	for (i = 0; i < ARRAY_SIZE(db8500_prcmu_devs); i++) {
--		if (!strcmp(db8500_prcmu_devs[i].name, "ab8500-core")) {
--			db8500_prcmu_devs[i].platform_data = pdata->ab_platdata;
--			db8500_prcmu_devs[i].pdata_size = sizeof(struct ab8500_platform_data);
--		}
--	}
-+	db8500_irq_init(np, pdata->irq_base);
- 
- 	prcmu_config_esram0_deep_sleep(ESRAM0_DEEP_SLEEP_STATE_RET);
- 
- 	db8500_prcmu_update_cpufreq();
- 
- 	err = mfd_add_devices(&pdev->dev, 0, db8500_prcmu_devs,
--			      ARRAY_SIZE(db8500_prcmu_devs), NULL, 0, NULL);
-+			      ARRAY_SIZE(db8500_prcmu_devs), NULL, 0, db8500_irq_domain);
- 	if (err) {
- 		pr_err("prcmu: Failed to add subdevices\n");
- 		return err;
- 	}
- 
-+	err = db8500_prcmu_register_ab8500(&pdev->dev, pdata->ab_platdata,
-+					   pdata->ab_irq);
-+	if (err) {
-+		mfd_remove_devices(&pdev->dev);
-+		pr_err("prcmu: Failed to add ab8500 subdevice\n");
-+		goto no_irq_return;
-+	}
-+
- 	pr_info("DB8500 PRCMU initialized\n");
- 
- no_irq_return:
-diff --git a/include/linux/mfd/dbx500-prcmu.h b/include/linux/mfd/dbx500-prcmu.h
-index fc43cec..689e6a0 100644
---- a/include/linux/mfd/dbx500-prcmu.h
-+++ b/include/linux/mfd/dbx500-prcmu.h
-@@ -237,6 +237,8 @@ struct prcmu_pdata
- 	bool enable_set_ddr_opp;
- 	bool enable_ape_opp_100_voltage;
- 	struct ab8500_platform_data *ab_platdata;
-+	int ab_irq;
-+	int irq_base;
- 	u32 version_offset;
- 	u32 legacy_offset;
- 	u32 adt_offset;
--- 
-1.8.1.2
+So, FP emulation and VFP support happens via a separate path.  Does this
+also need to be instrumented?
+
+>  }
+>  
+>  asmlinkage void do_unexp_fiq (struct pt_regs *regs)
+>  {
+> +	enum ctx_state prev_state;
+> +
+> +	prev_state = exception_enter();
+>  	printk("Hmm.  Unexpected FIQ received, but trying to continue\n");
+>  	printk("You may have a hardware problem...\n");
+> +	exception_exit(prev_state);
+
+Not a good idea.  If we get here chances are things are really broken.
+
+>  }
+>  
+>  /*
+> @@ -467,6 +477,9 @@ asmlinkage void do_unexp_fiq (struct pt_regs *regs)
+>   */
+>  asmlinkage void bad_mode(struct pt_regs *regs, int reason)
+>  {
+> +	enum ctx_state prev_state;
+> +
+> +	prev_state = exception_enter();
+>  	console_verbose();
+>  
+>  	printk(KERN_CRIT "Bad mode in %s handler detected\n", handler[reason]);
+
+Same here.  If we get here, we're probably about to die a horrid death.
+
+> @@ -746,7 +759,9 @@ baddataabort(int code, unsigned long instr, struct pt_regs *regs)
+>  {
+>  	unsigned long addr = instruction_pointer(regs);
+>  	siginfo_t info;
+> +	enum ctx_state prev_state;
+>  
+> +	prev_state = exception_enter();
+>  #ifdef CONFIG_DEBUG_USER
+>  	if (user_debug & UDBG_BADABORT) {
+>  		printk(KERN_ERR "[%d] %s: bad data abort: code %d instr 0x%08lx\n",
+> @@ -762,6 +777,7 @@ baddataabort(int code, unsigned long instr, struct pt_regs *regs)
+>  	info.si_addr  = (void __user *)addr;
+>  
+>  	arm_notify_die("unknown data abort code", regs, &info, instr, 0);
+> +	exception_exit(prev_state);
+>  }
+>  
+>  void __readwrite_bug(const char *fn)
+> diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+> index 5dbf13f..759b70d 100644
+> --- a/arch/arm/mm/fault.c
+> +++ b/arch/arm/mm/fault.c
+> @@ -19,6 +19,7 @@
+>  #include <linux/sched.h>
+>  #include <linux/highmem.h>
+>  #include <linux/perf_event.h>
+> +#include <linux/context_tracking.h>
+>  
+>  #include <asm/exception.h>
+>  #include <asm/pgtable.h>
+> @@ -424,9 +425,15 @@ do_translation_fault(unsigned long addr, unsigned int fsr,
+>  	pgd_t *pgd, *pgd_k;
+>  	pud_t *pud, *pud_k;
+>  	pmd_t *pmd, *pmd_k;
+> -
+> -	if (addr < TASK_SIZE)
+> -		return do_page_fault(addr, fsr, regs);
+> +	enum ctx_state prev_state;
+> +
+> +	prev_state = exception_enter();
+> +	if (addr < TASK_SIZE) {
+> +		int ret;
+> +		ret = do_page_fault(addr, fsr, regs);
+> +		exception_exit(prev_state);
+> +		return ret;
+> +	}
+>  
+>  	if (user_mode(regs))
+>  		goto bad_area;
+> @@ -472,10 +479,12 @@ do_translation_fault(unsigned long addr, unsigned int fsr,
+>  		goto bad_area;
+>  
+>  	copy_pmd(pmd, pmd_k);
+> +	exception_exit(prev_state);
+>  	return 0;
+>  
+>  bad_area:
+>  	do_bad_area(addr, fsr, regs);
+> +	exception_exit(prev_state);
+>  	return 0;
+>  }
+>  #else					/* CONFIG_MMU */
+> @@ -494,7 +503,12 @@ do_translation_fault(unsigned long addr, unsigned int fsr,
+>  static int
+>  do_sect_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+>  {
+> +	enum ctx_state prev_state;
+> +
+> +	prev_state = exception_enter();
+>  	do_bad_area(addr, fsr, regs);
+> +	exception_exit(prev_state);
+> +
+>  	return 0;
+>  }
+>  
+> @@ -542,9 +556,11 @@ do_DataAbort(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+>  {
+>  	const struct fsr_info *inf = fsr_info + fsr_fs(fsr);
+>  	struct siginfo info;
+> +	enum ctx_state prev_state;
+>  
+> +	prev_state = exception_enter();
+>  	if (!inf->fn(addr, fsr & ~FSR_LNX_PF, regs))
+> -		return;
+> +		goto out;
+>  
+>  	printk(KERN_ALERT "Unhandled fault: %s (0x%03x) at 0x%08lx\n",
+>  		inf->name, fsr, addr);
+> @@ -554,6 +570,8 @@ do_DataAbort(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+>  	info.si_code  = inf->code;
+>  	info.si_addr  = (void __user *)addr;
+>  	arm_notify_die("", regs, &info, fsr, 0);
+> +out:
+> +	exception_exit(prev_state);
+>  }
+>  
+>  void __init
+> @@ -574,9 +592,11 @@ do_PrefetchAbort(unsigned long addr, unsigned int ifsr, struct pt_regs *regs)
+>  {
+>  	const struct fsr_info *inf = ifsr_info + fsr_fs(ifsr);
+>  	struct siginfo info;
+> +	enum ctx_state prev_state;
+>  
+> +	prev_state = exception_enter();
+>  	if (!inf->fn(addr, ifsr | FSR_LNX_PF, regs))
+> -		return;
+> +		goto out;
+>  
+>  	printk(KERN_ALERT "Unhandled prefetch abort: %s (0x%03x) at 0x%08lx\n",
+>  		inf->name, ifsr, addr);
+> @@ -586,6 +606,8 @@ do_PrefetchAbort(unsigned long addr, unsigned int ifsr, struct pt_regs *regs)
+>  	info.si_code  = inf->code;
+>  	info.si_addr  = (void __user *)addr;
+>  	arm_notify_die("", regs, &info, ifsr, 0);
+> +out:
+> +	exception_exit(prev_state);
+>  }
+>  
+>  #ifndef CONFIG_ARM_LPAE
+
+What is the reason for putting all this in the individual functions
+and not in the prefetch/data abort handlers -
+do_PrefetchAbort()/do_DataAbort()?
