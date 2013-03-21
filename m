@@ -1,72 +1,32 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 21 Mar 2013 15:59:09 +0000
-Subject: [PATCH 12/46] regulator: ab8500: Init debug from regulator driver
+Date: Thu, 21 Mar 2013 15:59:10 +0000
+Subject: [PATCH 13/46] ARM: ux500: Add supply for the L3G4200D Gyroscope
 In-Reply-To: <1363881583-15234-1-git-send-email-lee.jones@linaro.org>
 References: <1363881583-15234-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1363881583-15234-13-git-send-email-lee.jones@linaro.org>
+Message-ID: <1363881583-15234-14-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The purpose of this patch is to guarantee that ab8500-debug will
-record the regulator registers before they are modified by the
-ab8500 regulator driver.
+This patch lists the L3G4200D Gyroscope as a consumer of the
+AB8500 VAUX1 regulator.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/regulator/ab8500.c       |   10 ++++++++++
- include/linux/regulator/ab8500.h |   14 ++++++++++++++
- 2 files changed, 24 insertions(+)
+ arch/arm/mach-ux500/board-mop500-regulators.c |    2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/regulator/ab8500.c b/drivers/regulator/ab8500.c
-index dfe191c..74620cc 100644
---- a/drivers/regulator/ab8500.c
-+++ b/drivers/regulator/ab8500.c
-@@ -962,6 +962,11 @@ static int ab8500_regulator_probe(struct platform_device *pdev)
- 		return -EINVAL;
- 	}
+diff --git a/arch/arm/mach-ux500/board-mop500-regulators.c b/arch/arm/mach-ux500/board-mop500-regulators.c
+index 161edbc7..86c2b53 100644
+--- a/arch/arm/mach-ux500/board-mop500-regulators.c
++++ b/arch/arm/mach-ux500/board-mop500-regulators.c
+@@ -73,6 +73,8 @@ static struct regulator_consumer_supply ab8500_vaux1_consumers[] = {
+ 	REGULATOR_SUPPLY("avdd", "3-005d"),
+ 	/* Synaptics RMI4 Touchscreen device */
+ 	REGULATOR_SUPPLY("vdd", "3-004b"),
++	/* L3G4200D Gyroscope device */
++	REGULATOR_SUPPLY("vdd", "2-0068"),
+ };
  
-+	/* initialize debug (initial state is recorded with this call) */
-+	err = ab8500_regulator_debug_init(pdev);
-+	if (err)
-+		return err;
-+
- 	/* initialize registers */
- 	for (i = 0; i < pdata->num_reg_init; i++) {
- 		int id, mask, value;
-@@ -1012,6 +1017,11 @@ static int ab8500_regulator_remove(struct platform_device *pdev)
- 	if (err)
- 		return err;
- 
-+	/* remove regulator debug */
-+	err = ab8500_regulator_debug_exit(pdev);
-+	if (err)
-+		return err;
-+
- 	return 0;
- }
- 
-diff --git a/include/linux/regulator/ab8500.h b/include/linux/regulator/ab8500.h
-index 9a2da6a..094d24c 100644
---- a/include/linux/regulator/ab8500.h
-+++ b/include/linux/regulator/ab8500.h
-@@ -190,4 +190,18 @@ inline int ab8500_ext_regulator_exit(struct platform_device *pdev)
- }
- #endif
- 
-+#ifdef CONFIG_REGULATOR_AB8500_DEBUG
-+int ab8500_regulator_debug_init(struct platform_device *pdev);
-+int ab8500_regulator_debug_exit(struct platform_device *pdev);
-+#else
-+static inline int ab8500_regulator_debug_init(struct platform_device *pdev)
-+{
-+	return 0;
-+}
-+static inline int ab8500_regulator_debug_exit(struct platform_device *pdev)
-+{
-+	return 0;
-+}
-+#endif
-+
- #endif
+ static struct regulator_consumer_supply ab8500_vaux2_consumers[] = {
 -- 
 1.7.10.4
