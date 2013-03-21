@@ -1,27 +1,18 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Thu, 21 Mar 2013 17:55:42 +0800
-Subject: [PATCH v2 3/8] drivers: char: use module_platform_driver_probe()
-In-Reply-To: <1363280978-24051-4-git-send-email-fabio.porcedda@gmail.com>
-References: <1363280978-24051-1-git-send-email-fabio.porcedda@gmail.com>
- <1363280978-24051-4-git-send-email-fabio.porcedda@gmail.com>
-Message-ID: <20130321095542.GH26931@gondor.apana.org.au>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Thu, 21 Mar 2013 10:57:58 +0100
+Subject: [PATCH 1/2] i2c: s3c2410: move mach/regs-iic.h into i2c-s3c2410
+ device driver
+In-Reply-To: <201302080057.00664.heiko@sntech.de>
+References: <201302080057.00664.heiko@sntech.de>
+Message-ID: <20130321095758.GB19297@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 14, 2013 at 06:09:33PM +0100, Fabio Porcedda wrote:
-> This patch converts the drivers to use the
-> module_platform_driver_probe() macro which makes the code smaller and
-> a bit simpler.
+On Fri, Feb 08, 2013 at 12:57:00AM +0100, Heiko St?bner wrote:
+> The register definitions are only used in the driver itself.
+> This also removes the last dependency on plat/ includes from the
+> i2c driver.
 > 
-> Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Matt Mackall <mpm@selenic.com>
-> Cc: Herbert Xu <herbert@gondor.apana.org.au>
-> Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 
-Patch applied.
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+What tree is this against? I can't apply it on top of v3.8 or 3.9-rc3.
