@@ -1,19 +1,105 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 21 Mar 2013 16:33:49 +0000
-Subject: [GIT PULL] ux500 core changes for v3.10
-In-Reply-To: <CACRpkdaWq_hyNfPhY+_pyj7fZuQ5hbep6KoOO_+guize_trtDg@mail.gmail.com>
-References: <CACRpkdaWq_hyNfPhY+_pyj7fZuQ5hbep6KoOO_+guize_trtDg@mail.gmail.com>
-Message-ID: <201303211633.49930.arnd@arndb.de>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Thu, 21 Mar 2013 09:36:14 -0700
+Subject: [PATCH] clk: divider: Use DIV_ROUND_CLOSEST
+In-Reply-To: <20130320185051.GA28349@pengutronix.de>
+References: <2e77dfe8-8d4f-4b77-bf1b-831ad1572c23@VA3EHSMHS046.ehs.local>
+ <20130320001609.8663.21043@quantum>
+ <f3ff0545-52cd-4b7b-967e-f81324ba0152@CH1EHSMHS040.ehs.local>
+ <20130320185051.GA28349@pengutronix.de>
+Message-ID: <d1e87771-73df-4afd-9a02-b294d2ca62a1@AM1EHSMHS002.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 19 March 2013, Linus Walleij wrote:
-> here are two ux500 core patches that have been littering my tree,
-> they need to go upstream into some unspecified ux500 core branch.
-> These have been circulated on the list.
-> 
-> They are not causing any immediate regression so target is v3.10.
- 
-Pulled into next/soc, thanks!
+On Wed, Mar 20, 2013 at 07:50:51PM +0100, Sascha Hauer wrote:
+> On Wed, Mar 20, 2013 at 09:32:51AM -0700, S?ren Brinkmann wrote:
+> > Hi Mike,
+> >
+> > On Tue, Mar 19, 2013 at 05:16:09PM -0700, Mike Turquette wrote:
+> > > Quoting Soren Brinkmann (2013-01-29 17:25:44)
+> > > > Use the DIV_ROUND_CLOSEST macro to calculate divider values and minimize
+> > > > rounding errors.
+> > > >
+> > > > Cc: linux-arm-kernel at lists.infradead.org
+> > > > Cc: linux-kernel at vger.kernel.org
+> > > > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> > > > ---
+> > > > Hi,
+> > > >
+> > > > I just came across this behavior:
+> > > > I'm using the clk-divider as cpuclock which can be scaled through cpufreq.
+> > > > During boot I create an opp table which in this case holds the frequencies [MHz]
+> > > > 666, 333 and 222. To make sure those are actually valid frequencies I call
+> > > > clk_round_rate().
+> > > > I added a debug line in clk-divider.c:clk_divider_bestdiv() before the return
+> > > > in line 163 giving me:
+> > > >         prate:1333333320, rate:333333330, div:4
+> > > > for adding the 333 MHz operating point.
+> > > >
+> > > > In the running system this gives me:
+> > > > zynq:/sys/devices/system/cpu/cpu0/cpufreq # cat scaling_available_frequencies
+> > > > 222222 333333 666666
+> > > > zynq:/sys/devices/system/cpu/cpu0/cpufreq # cat scaling_cur_freq
+> > > >  666666
+> > > >
+> > > >  So far, so good. But now, let's scale the frequency:
+> > > > zynq:/sys/devices/system/cpu/cpu0/cpufreq # echo 333333 > scaling_setspeed
+> > > > zynq:/sys/devices/system/cpu/cpu0/cpufreq # cat scaling_cur_freq
+> > > >  266666
+> > > >
+> > > > And the corresponding debug line:
+> > > >         prate:1333333320, rate:333333000, div:5
+> > > >
+> > > > So, with DIV_ROUND_UP an actual divider of 4.00000396 becomes 5, resulting in a
+> > > > huge error.
+> > > >
+> > >
+> > > Soren,
+> > >
+> > > Thanks for the patch, and apologies for it getting lost for so long.  I
+> > > think that your issue is more about policy.  E.g. should we round the
+> > > divider up or round the divider down?  The correct answer will vary from
+> > > platform to platform and the clk.h api doesn't specify how
+> > > clk_round_rate should round, other than it must specify a rate that the
+> > > clock can actually run at.
+> > Sure, my problem seems to be caused by different subsystems using a different resolution for clock frequencies.
+> >
+> > >
+> > > Unless everyone can agree that DIV_ROUND_CLOSEST gives them what they
+> > > want I'm more inclined to make this behavior a flag specific to struct
+> > > clk-divider.  E.g. CLK_DIVIDER_ROUND_CLOSEST.
+> > My understanding would have been, that clk_round_rate() gives me a
+> > frequency as close to the requested one as possible.
+>
+> clk_round_rate clk_set_rate are implemented to give the closest possible
+> rate that *is not higher* than the desired clock. That was the
+> understanding by the time the clk framework was implemented.
+>
+> > If the caller
+> > doesn't like the returned frequency he can request a different one.
+> > And he's eventually happy with the return value he calls
+> > clk_set_rate() requesting the frequency clk_round_rate() returned.
+> > Always rounding down seems a bit odd to me.
+> >
+> > Another issue with the current implmentation:
+> > clk_divider_round_rate() calls clk_divider_bestdiv(), which uses the ROUND_UP macro, returning a rather low frequency.
+>
+> And that is correct. clk_divider_bestdiv is used to calculate the
+> maximum parent frequency for which a given divider value does not
+> exceed the desired rate.
+That is not what I mean. I was pointing at, that passing the same
+frequency to round_rate and set_rate can return different results, since
+round_rate rounds up whereas set_rate rounds down. Though, it's probably
+fine since you shouldn't call set_rate with a frequency which wasn't returned
+from round_rate.
 
-	Arnd
+>
+> That is, when you want to have a frequency of 100Hz and your divider is
+> 2, then your parent input clock can be between 101Hz and 200Hz,
+> corresponding to a call to DIV_ROUND_UP.
+I was not (yet) looking at cases where CLK_SET_RATE_PARENT is set. Just
+an isolated clk-divider.
+
+        S?ren
+
+
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
