@@ -1,290 +1,243 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 21 Mar 2013 15:59:02 +0000
-Subject: [PATCH 05/46] regulator: ab8500: Another push to synchronise recent
- AB8500 developments
+Date: Thu, 21 Mar 2013 15:59:06 +0000
+Subject: [PATCH 09/46] regulator: ab8500-ext: Add HW request support
 In-Reply-To: <1363881583-15234-1-git-send-email-lee.jones@linaro.org>
 References: <1363881583-15234-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1363881583-15234-6-git-send-email-lee.jones@linaro.org>
+Message-ID: <1363881583-15234-10-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch ensures that many of the recent developments pertaining to
-the AB8500 regulator device are propagated out into the public arena.
-It aims to update some of the existing initialisation values in
-accordance with internal ST-Ericsson code submissions. This single
-patch was originally a collection of updates which have been squashed
-together to aid with clarity.
+From: Bengt Jonsson <bengt.g.jonsson@stericsson.com>
 
+Support for HW request is added in the external regulator
+driver. A flag in the board configuration can be set to
+let HW control the regulator when there is no SW request.
+This means that the regulator will be put in high power
+mode when there is a SW request and in HW-request mode
+otherwise.
+
+Signed-off-by: Bengt Jonsson <bengt.g.jonsson@stericsson.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Reviewed-by: Mattias NILSSON <mattias.i.nilsson@stericsson.com>
+Reviewed-by: Jonas ABERG <jonas.aberg@stericsson.com>
 ---
- arch/arm/mach-ux500/board-mop500-regulators.c |   18 ------
- drivers/regulator/ab8500.c                    |   86 +++++++++++++++----------
- include/linux/regulator/ab8500.h              |   21 +++---
- 3 files changed, 65 insertions(+), 60 deletions(-)
+ drivers/regulator/ab8500-ext.c   |   98 +++++++++++++++++++++++++++-----------
+ include/linux/regulator/ab8500.h |    4 ++
+ 2 files changed, 75 insertions(+), 27 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/board-mop500-regulators.c b/arch/arm/mach-ux500/board-mop500-regulators.c
-index 96dd174..a8141e3 100644
---- a/arch/arm/mach-ux500/board-mop500-regulators.c
-+++ b/arch/arm/mach-ux500/board-mop500-regulators.c
-@@ -239,24 +239,6 @@ ab8500_regulator_reg_init[AB8500_NUM_REGULATOR_REGISTERS] = {
- 	 */
- 	INIT_REGULATOR_REGISTER(AB8500_REGUCTRL1VAMIC,         0x03, 0x00),
- 	/*
--	 * VBBN                     = force OFF
--	 * VBBP                     = force OFF
--	 * NOTE! PRCMU register
--	 */
--	INIT_REGULATOR_REGISTER(AB8500_ARMREGU2,               0x0f, 0x00),
--	/*
--	 * VBBNSel1                 = VBBP = VBBPFB
--	 * VBBPSel1                 = 0 V
--	 * NOTE! PRCMU register
--	 */
--	INIT_REGULATOR_REGISTER(AB8500_VBBSEL1,                0x0f, 0x00),
--	/*
--	 * VBBNSel2                 = VBBP = VBBPFB
--	 * VBBPSel2                 = 0 V
--	 * NOTE! PRCMU register
--	 */
--	INIT_REGULATOR_REGISTER(AB8500_VBBSEL2,                0x0f, 0x00),
--	/*
- 	 * Vsmps1Regu               = HW control
- 	 * Vsmps1SelCtrl            = Vsmps1 voltage defined by Vsmsp1Sel2
- 	 */
-diff --git a/drivers/regulator/ab8500.c b/drivers/regulator/ab8500.c
-index a847744..c7784c4 100644
---- a/drivers/regulator/ab8500.c
-+++ b/drivers/regulator/ab8500.c
-@@ -613,11 +613,19 @@ struct ab8500_reg_init {
- 
- static struct ab8500_reg_init ab8500_reg_init[] = {
- 	/*
--	 * 0x30, VanaRequestCtrl
-+	 * 0x03, VarmRequestCtrl
-+	 * 0x0c, VapeRequestCtrl
-+	 * 0x30, Vsmps1RequestCtrl
-+	 * 0xc0, Vsmps2RequestCtrl
-+	 */
-+	REG_INIT(AB8500_REGUREQUESTCTRL1,	0x03, 0x03, 0xff),
-+	/*
-+	 * 0x03, Vsmps3RequestCtrl
- 	 * 0x0c, VpllRequestCtrl
-+	 * 0x30, VanaRequestCtrl
- 	 * 0xc0, VextSupply1RequestCtrl
- 	 */
--	REG_INIT(AB8500_REGUREQUESTCTRL2,	0x03, 0x04, 0xfc),
-+	REG_INIT(AB8500_REGUREQUESTCTRL2,	0x03, 0x04, 0xff),
- 	/*
- 	 * 0x03, VextSupply2RequestCtrl
- 	 * 0x0c, VextSupply3RequestCtrl
-@@ -642,50 +650,71 @@ static struct ab8500_reg_init ab8500_reg_init[] = {
- 	 */
- 	REG_INIT(AB8500_REGUSYSCLKREQ1HPVALID1,	0x03, 0x07, 0xff),
- 	/*
-+	 * 0x01, VapeSysClkReq1HPValid
-+	 * 0x02, VarmSysClkReq1HPValid
-+	 * 0x04, VbbSysClkReq1HPValid
-+	 * 0x08, VmodSysClkReq1HPValid
- 	 * 0x10, VextSupply1SysClkReq1HPValid
- 	 * 0x20, VextSupply2SysClkReq1HPValid
- 	 * 0x40, VextSupply3SysClkReq1HPValid
- 	 */
--	REG_INIT(AB8500_REGUSYSCLKREQ1HPVALID2,	0x03, 0x08, 0x70),
-+	REG_INIT(AB8500_REGUSYSCLKREQ1HPVALID2,	0x03, 0x08, 0x7f),
- 	/*
-+	 * 0x01, Vsmps1HwHPReq1Valid
-+	 * 0x02, Vsmps2HwHPReq1Valid
-+	 * 0x04, Vsmps3HwHPReq1Valid
- 	 * 0x08, VanaHwHPReq1Valid
-+	 * 0x10, VpllHwHPReq1Valid
- 	 * 0x20, Vaux1HwHPReq1Valid
- 	 * 0x40, Vaux2HwHPReq1Valid
- 	 * 0x80, Vaux3HwHPReq1Valid
- 	 */
--	REG_INIT(AB8500_REGUHWHPREQ1VALID1,	0x03, 0x09, 0xe8),
-+	REG_INIT(AB8500_REGUHWHPREQ1VALID1,	0x03, 0x09, 0xff),
- 	/*
- 	 * 0x01, VextSupply1HwHPReq1Valid
- 	 * 0x02, VextSupply2HwHPReq1Valid
- 	 * 0x04, VextSupply3HwHPReq1Valid
-+	 * 0x08, VmodHwHPReq1Valid
- 	 */
--	REG_INIT(AB8500_REGUHWHPREQ1VALID2,	0x03, 0x0a, 0x07),
-+	REG_INIT(AB8500_REGUHWHPREQ1VALID2,	0x03, 0x0a, 0x0f),
- 	/*
-+	 * 0x01, Vsmps1HwHPReq2Valid
-+	 * 0x02, Vsmps2HwHPReq2Valid
-+	 * 0x03, Vsmps3HwHPReq2Valid
- 	 * 0x08, VanaHwHPReq2Valid
-+	 * 0x10, VpllHwHPReq2Valid
- 	 * 0x20, Vaux1HwHPReq2Valid
- 	 * 0x40, Vaux2HwHPReq2Valid
- 	 * 0x80, Vaux3HwHPReq2Valid
- 	 */
--	REG_INIT(AB8500_REGUHWHPREQ2VALID1,	0x03, 0x0b, 0xe8),
-+	REG_INIT(AB8500_REGUHWHPREQ2VALID1,	0x03, 0x0b, 0xff),
- 	/*
- 	 * 0x01, VextSupply1HwHPReq2Valid
- 	 * 0x02, VextSupply2HwHPReq2Valid
- 	 * 0x04, VextSupply3HwHPReq2Valid
-+	 * 0x08, VmodHwHPReq2Valid
- 	 */
--	REG_INIT(AB8500_REGUHWHPREQ2VALID2,	0x03, 0x0c, 0x07),
-+	REG_INIT(AB8500_REGUHWHPREQ2VALID2,	0x03, 0x0c, 0x0f),
- 	/*
-+	 * 0x01, VapeSwHPReqValid
-+	 * 0x02, VarmSwHPReqValid
-+	 * 0x04, Vsmps1SwHPReqValid
-+	 * 0x08, Vsmps2SwHPReqValid
-+	 * 0x10, Vsmps3SwHPReqValid
- 	 * 0x20, VanaSwHPReqValid
-+	 * 0x40, VpllSwHPReqValid
- 	 * 0x80, Vaux1SwHPReqValid
- 	 */
--	REG_INIT(AB8500_REGUSWHPREQVALID1,	0x03, 0x0d, 0xa0),
-+	REG_INIT(AB8500_REGUSWHPREQVALID1,	0x03, 0x0d, 0xff),
- 	/*
- 	 * 0x01, Vaux2SwHPReqValid
- 	 * 0x02, Vaux3SwHPReqValid
- 	 * 0x04, VextSupply1SwHPReqValid
- 	 * 0x08, VextSupply2SwHPReqValid
- 	 * 0x10, VextSupply3SwHPReqValid
-+	 * 0x20, VmodSwHPReqValid
- 	 */
--	REG_INIT(AB8500_REGUSWHPREQVALID2,	0x03, 0x0e, 0x1f),
-+	REG_INIT(AB8500_REGUSWHPREQVALID2,	0x03, 0x0e, 0x3f),
- 	/*
- 	 * 0x02, SysClkReq2Valid1
- 	 * ...
-@@ -719,36 +748,22 @@ static struct ab8500_reg_init ab8500_reg_init[] = {
- 	 */
- 	REG_INIT(AB8500_REGUCTRL1VAMIC,		0x03, 0x84, 0x03),
- 	/*
--	 * 0x0c, VBBNRegu
--	 * 0x03, VBBPRegu
--	 * NOTE! PRCMU register
--	 */
--	REG_INIT(AB8500_ARMREGU2,		0x04, 0x01, 0x0f),
--	/*
--	 * 0x0c, VBBPSel1
--	 * 0x03, VBBNSel1
--	 * NOTE! PRCMU register
--	 */
--	REG_INIT(AB8500_VBBSEL1,		0x04, 0x11, 0x0f),
--	/*
--	 * 0x0c, VBBNSel2
--	 * 0x03, VBBPSel2
--	 * NOTE! PRCMU register
--	 */
--	REG_INIT(AB8500_VBBSEL2,		0x04, 0x12, 0x0f),
--	/*
- 	 * 0x03, Vsmps1Regu
- 	 * 0x0c, Vsmps1SelCtrl
-+	 * 0x10, Vsmps1AutoMode
-+	 * 0x20, Vsmps1PWMMode
- 	 */
--	REG_INIT(AB8500_VSMPS1REGU,		0x04, 0x03, 0x0f),
-+	REG_INIT(AB8500_VSMPS1REGU,		0x04, 0x03, 0x3f),
- 	/*
- 	 * 0x03, Vsmps2Regu
- 	 * 0x0c, Vsmps2SelCtrl
-+	 * 0x10, Vsmps2AutoMode
-+	 * 0x20, Vsmps2PWMMode
- 	 */
--	REG_INIT(AB8500_VSMPS2REGU,		0x04, 0x04, 0x0f),
-+	REG_INIT(AB8500_VSMPS2REGU,		0x04, 0x04, 0x3f),
- 	/*
--	 * 0x0c, VanaRegu
- 	 * 0x03, VpllRegu
-+	 * 0x0c, VanaRegu
- 	 */
- 	REG_INIT(AB8500_VPLLVANAREGU,		0x04, 0x06, 0x0f),
- 	/*
-@@ -788,13 +803,16 @@ static struct ab8500_reg_init ab8500_reg_init[] = {
- 	REG_INIT(AB8500_VAUX2SEL,		0x04, 0x20, 0x0f),
- 	/*
- 	 * 0x07, Vaux3Sel
-+	 * 0x30, Vrf1Sel
- 	 */
--	REG_INIT(AB8500_VRF1VAUX3SEL,		0x04, 0x21, 0x07),
-+	REG_INIT(AB8500_VRF1VAUX3SEL,		0x04, 0x21, 0x37),
- 	/*
- 	 * 0x01, VextSupply12LP
- 	 */
- 	REG_INIT(AB8500_REGUCTRL2SPARE,		0x04, 0x22, 0x01),
- 	/*
-+	 * 0x01, VpllDisch
-+	 * 0x02, Vrf1Disch
- 	 * 0x04, Vaux1Disch
- 	 * 0x08, Vaux2Disch
- 	 * 0x10, Vaux3Disch
-@@ -802,13 +820,15 @@ static struct ab8500_reg_init ab8500_reg_init[] = {
- 	 * 0x40, VTVoutDisch
- 	 * 0x80, VaudioDisch
- 	 */
--	REG_INIT(AB8500_REGUCTRLDISCH,		0x04, 0x43, 0xfc),
-+	REG_INIT(AB8500_REGUCTRLDISCH,		0x04, 0x43, 0xff),
- 	/*
-+	 * 0x01, VsimDisch
- 	 * 0x02, VanaDisch
- 	 * 0x04, VdmicPullDownEna
-+	 * 0x08, VpllPullDownEna
- 	 * 0x10, VdmicDisch
- 	 */
--	REG_INIT(AB8500_REGUCTRLDISCH2,		0x04, 0x44, 0x16),
-+	REG_INIT(AB8500_REGUCTRLDISCH2,		0x04, 0x44, 0x1f),
+diff --git a/drivers/regulator/ab8500-ext.c b/drivers/regulator/ab8500-ext.c
+index 2157c11..303c02c 100644
+--- a/drivers/regulator/ab8500-ext.c
++++ b/drivers/regulator/ab8500-ext.c
+@@ -28,82 +28,123 @@
+  * @dev: device pointer
+  * @desc: regulator description
+  * @rdev: regulator device
++ * @cfg: regulator configuration (extension of regulator FW configuration)
+  * @is_enabled: status of regulator (on/off)
+  * @fixed_uV: typical voltage (for fixed voltage supplies)
+  * @update_bank: bank to control on/off
+  * @update_reg: register to control on/off
+  * @update_mask: mask to enable/disable and set mode of regulator
+  * @update_val: bits holding the regulator current mode
+- * @update_val_en: bits to set EN pin active (LPn pin deactive)
++ * @update_val_hp: bits to set EN pin active (LPn pin deactive)
+  *                 normally this means high power mode
+- * @update_val_en_lp: bits to set EN pin active and LPn pin active
+- *                    normally this means low power mode
+- * @delay: startup delay in ms
++ * @update_val_lp: bits to set EN pin active and LPn pin active
++ *                 normally this means low power mode
++ * @update_val_hw: bits to set regulator pins in HW control
++ *                 SysClkReq pins and logic will choose mode
+  */
+ struct ab8500_ext_regulator_info {
+ 	struct device *dev;
+ 	struct regulator_desc desc;
+ 	struct regulator_dev *rdev;
++	struct ab8500_ext_regulator_cfg *cfg;
+ 	bool is_enabled;
+ 	int fixed_uV;
+ 	u8 update_bank;
+ 	u8 update_reg;
+ 	u8 update_mask;
+ 	u8 update_val;
+-	u8 update_val_en;
+-	u8 update_val_en_lp;
++	u8 update_val_hp;
++	u8 update_val_lp;
++	u8 update_val_hw;
  };
  
- static int ab8500_regulator_init_registers(struct platform_device *pdev,
+-static int ab8500_ext_regulator_enable(struct regulator_dev *rdev)
++static int enable(struct ab8500_ext_regulator_info *info, u8 *regval)
+ {
+ 	int ret;
+-	struct ab8500_ext_regulator_info *info = rdev_get_drvdata(rdev);
+ 
+-	if (info == NULL) {
+-		dev_err(rdev_get_dev(rdev), "regulator info null pointer\n");
+-		return -EINVAL;
+-	}
++	*regval = info->update_val;
++
++	/*
++	 * To satisfy both HW high power request and SW request, the regulator
++	 * must be on in high power.
++	 */
++	if (info->cfg && info->cfg->hwreq)
++		*regval = info->update_val_hp;
+ 
+ 	ret = abx500_mask_and_set_register_interruptible(info->dev,
+ 		info->update_bank, info->update_reg,
+-		info->update_mask, info->update_val);
++		info->update_mask, *regval);
+ 	if (ret < 0)
+ 		dev_err(rdev_get_dev(info->rdev),
+ 			"couldn't set enable bits for regulator\n");
+ 
+ 	info->is_enabled = true;
+ 
+-	dev_dbg(rdev_get_dev(rdev), "%s-enable (bank, reg, mask, value):"
+-		" 0x%02x, 0x%02x, 0x%02x, 0x%02x\n",
+-		info->desc.name, info->update_bank, info->update_reg,
+-		info->update_mask, info->update_val);
+-
+ 	return ret;
+ }
+ 
+-static int ab8500_ext_regulator_disable(struct regulator_dev *rdev)
++static int ab8500_ext_regulator_enable(struct regulator_dev *rdev)
+ {
+ 	int ret;
+ 	struct ab8500_ext_regulator_info *info = rdev_get_drvdata(rdev);
++	u8 regval;
+ 
+ 	if (info == NULL) {
+ 		dev_err(rdev_get_dev(rdev), "regulator info null pointer\n");
+ 		return -EINVAL;
+ 	}
+ 
++	ret = enable(info, &regval);
++
++	dev_dbg(rdev_get_dev(rdev), "%s-enable (bank, reg, mask, value):"
++		" 0x%02x, 0x%02x, 0x%02x, 0x%02x\n",
++		info->desc.name, info->update_bank, info->update_reg,
++		info->update_mask, regval);
++
++	return ret;
++}
++
++static int disable(struct ab8500_ext_regulator_info *info, u8 *regval)
++{
++	int ret;
++
++	*regval = 0x0;
++
++	/*
++	 * Set the regulator in HW request mode if configured
++	 */
++	if (info->cfg && info->cfg->hwreq)
++		*regval = info->update_val_hw;
++
+ 	ret = abx500_mask_and_set_register_interruptible(info->dev,
+ 		info->update_bank, info->update_reg,
+-		info->update_mask, 0x0);
++		info->update_mask, *regval);
+ 	if (ret < 0)
+ 		dev_err(rdev_get_dev(info->rdev),
+ 			"couldn't set disable bits for regulator\n");
+ 
+ 	info->is_enabled = false;
+ 
++	return ret;
++}
++
++static int ab8500_ext_regulator_disable(struct regulator_dev *rdev)
++{
++	int ret;
++	struct ab8500_ext_regulator_info *info = rdev_get_drvdata(rdev);
++	u8 regval;
++
++	if (info == NULL) {
++		dev_err(rdev_get_dev(rdev), "regulator info null pointer\n");
++		return -EINVAL;
++	}
++
++	ret = disable(info, &regval);
++
+ 	dev_dbg(rdev_get_dev(rdev), "%s-disable (bank, reg, mask, value):"
+ 		" 0x%02x, 0x%02x, 0x%02x, 0x%02x\n",
+ 		info->desc.name, info->update_bank, info->update_reg,
+-		info->update_mask, 0x0);
++		info->update_mask, regval);
+ 
+ 	return ret;
+ }
+@@ -132,7 +173,8 @@ static int ab8500_ext_regulator_is_enabled(struct regulator_dev *rdev)
+ 		info->desc.name, info->update_bank, info->update_reg,
+ 		info->update_mask, regval);
+ 
+-	if (regval & info->update_mask)
++	if (((regval & info->update_mask) == info->update_val_lp) ||
++	    ((regval & info->update_mask) == info->update_val_hp))
+ 		info->is_enabled = true;
+ 	else
+ 		info->is_enabled = false;
+@@ -240,7 +282,6 @@ static struct regulator_ops ab8500_ext_regulator_ops = {
+ 	.list_voltage		= ab8500_ext_list_voltage,
+ };
+ 
+-
+ static struct ab8500_ext_regulator_info
+ 		ab8500_ext_regulator_info[AB8500_NUM_EXT_REGULATORS] = {
+ 	[AB8500_EXT_SUPPLY1] = {
+@@ -293,8 +334,9 @@ static struct ab8500_ext_regulator_info
+ 		.update_reg		= 0x08,
+ 		.update_mask		= 0x30,
+ 		.update_val		= 0x10,
+-		.update_val_en		= 0x10,
+-		.update_val_en_lp	= 0x30,
++		.update_val_hp		= 0x10,
++		.update_val_lp		= 0x30,
++		.update_val_hw		= 0x20,
+ 	},
+ };
+ 
+@@ -334,8 +376,8 @@ int ab8500_ext_regulator_init(struct platform_device *pdev)
+ 		/* VextSupply3LPn is inverted on AB8500 2.x */
+ 		info = &ab8500_ext_regulator_info[AB8500_EXT_SUPPLY3];
+ 		info->update_val = 0x30;
+-		info->update_val_en = 0x30;
+-		info->update_val_en_lp = 0x10;
++		info->update_val_hp = 0x30;
++		info->update_val_lp = 0x10;
+ 	}
+ 
+ 	/* register all regulators */
+@@ -345,6 +387,8 @@ int ab8500_ext_regulator_init(struct platform_device *pdev)
+ 		/* assign per-regulator data */
+ 		info = &ab8500_ext_regulator_info[i];
+ 		info->dev = &pdev->dev;
++		info->cfg = (struct ab8500_ext_regulator_cfg *)
++			pdata->ext_regulator[i].driver_data;
+ 
+ 		/* register regulator with framework */
+ 		info->rdev = regulator_register(&info->desc, &pdev->dev,
 diff --git a/include/linux/regulator/ab8500.h b/include/linux/regulator/ab8500.h
-index a1d245f..dd7944f 100644
+index cefd9de..0a58db2 100644
 --- a/include/linux/regulator/ab8500.h
 +++ b/include/linux/regulator/ab8500.h
-@@ -61,6 +61,7 @@ struct ab8500_regulator_reg_init {
- 
- /* AB8500 registers */
- enum ab8500_regulator_reg {
-+	AB8500_REGUREQUESTCTRL1,
- 	AB8500_REGUREQUESTCTRL2,
- 	AB8500_REGUREQUESTCTRL3,
- 	AB8500_REGUREQUESTCTRL4,
-@@ -77,26 +78,28 @@ enum ab8500_regulator_reg {
- 	AB8500_REGUMISC1,
- 	AB8500_VAUDIOSUPPLY,
- 	AB8500_REGUCTRL1VAMIC,
-+	AB8500_VSMPS1REGU,
-+	AB8500_VSMPS2REGU,
-+	AB8500_VSMPS3REGU, /* NOTE! PRCMU register */
- 	AB8500_VPLLVANAREGU,
- 	AB8500_VREFDDR,
- 	AB8500_EXTSUPPLYREGU,
- 	AB8500_VAUX12REGU,
- 	AB8500_VRF1VAUX3REGU,
-+	AB8500_VSMPS1SEL1,
-+	AB8500_VSMPS1SEL2,
-+	AB8500_VSMPS1SEL3,
-+	AB8500_VSMPS2SEL1,
-+	AB8500_VSMPS2SEL2,
-+	AB8500_VSMPS2SEL3,
-+	AB8500_VSMPS3SEL1, /* NOTE! PRCMU register */
-+	AB8500_VSMPS3SEL2, /* NOTE! PRCMU register */
- 	AB8500_VAUX1SEL,
- 	AB8500_VAUX2SEL,
- 	AB8500_VRF1VAUX3SEL,
- 	AB8500_REGUCTRL2SPARE,
- 	AB8500_REGUCTRLDISCH,
- 	AB8500_REGUCTRLDISCH2,
--	AB8500_ARMREGU2, /* NOTE! PRCMU register */
--	AB8500_VBBSEL1, /* NOTE! PRCMU register */
--	AB8500_VBBSEL2, /* NOTE! PRCMU register */
--	AB8500_VSMPS1REGU,
--	AB8500_VSMPS2REGU,
--	AB8500_VSMPS3REGU, /* NOTE! PRCMU register */
--	AB8500_VSMPS1SEL1,
--	AB8500_VSMPS3SEL1, /* NOTE! PRCMU register */
--	AB8500_VSMPS3SEL2, /* NOTE! PRCMU register */
- 	AB8500_NUM_REGULATOR_REGISTERS,
+@@ -155,6 +155,10 @@ enum ab9540_regulator_reg {
  };
  
+ /* AB8500 external regulators */
++struct ab8500_ext_regulator_cfg {
++	bool hwreq; /* requires hw mode or high power mode */
++};
++
+ enum ab8500_ext_regulator_id {
+ 	AB8500_EXT_SUPPLY1,
+ 	AB8500_EXT_SUPPLY2,
 -- 
 1.7.10.4
