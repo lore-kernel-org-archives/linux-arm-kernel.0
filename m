@@ -1,34 +1,76 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 21 Mar 2013 14:46:41 -0400
-Subject: [PATCH v3 for 3.10] Introduce a Marvell EBU MBus driver
-In-Reply-To: <201303211730.23247.arnd@arndb.de>
-References: <1363885160-6870-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <201303211730.23247.arnd@arndb.de>
-Message-ID: <20130321184641.GB13280@titan.lakedaemon.net>
+Date: Thu, 21 Mar 2013 14:49:49 -0400
+Subject: [PATCH V3] ARM: mvebu: fix RAM size for Armada XP board
+ DB-MV784MP-GP
+In-Reply-To: <1363283162-26041-1-git-send-email-jason@lakedaemon.net>
+References: <20130216164457.GA23237@titan.lakedaemon.net>
+ <1363283162-26041-1-git-send-email-jason@lakedaemon.net>
+Message-ID: <20130321184949.GC13280@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 21, 2013 at 05:30:23PM +0000, Arnd Bergmann wrote:
-> On Thursday 21 March 2013, Thomas Petazzoni wrote:
-> > Changes since v2:
-> > 
-> >  * Remove the DT binding, and use the mvebu_mbus_init() function call
-> >    in all Marvell EBU SoC families. Requested by Arnd Bergmann.
-> > 
-> >  * Fix the MV78xx0 code, after reports of issues by Gregory Clement
-> >    when testing on this platform.
-> > 
-> >  * Remove the 3 patches that have been merged by Arnd in
-> >    arm-soc/mvebu-cleanup.
-> > 
+On Thu, Mar 14, 2013 at 05:46:02PM +0000, Jason Cooper wrote:
+> The board is supplied with a 4GB RAM module.  This value can be
+> overridden by the bootloader based on probed memory size.  We set it to
+> a reasonable value here.
 > 
-> Thanks for the update
+> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+> ---
+> Changes from v2:
+>  - trimmed size to not conflict with internal register addresses, added comment.
+>    Thanks to Jason Gunthorpe for raising this and Gregory Clement for confirming.
 > 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Changes from v1:
+>  - grammatical fix suggested by Sergei Shtylyov
+>  - correct size suggested by several folks (within 32bit, 1 dword)
+> 
+> As promised, catching this fix in the -rc cycle.
+> 
+> For those not familiar, earlier versions of the patch adding this board listed
+> 3GB because that is all that was visible.  I mistaken applied v3 of the patch
+> instead of v4 which properly listed 4GB.  This patch cleans up my error.
+> 
+> 
+>  arch/arm/boot/dts/armada-xp-gp.dts | 12 +++++++-----
+>  1 file changed, 7 insertions(+), 5 deletions(-)
 
-And thanks for turning this around so quickly Thomas, I'll pull it in
-tonight or tomorrow.  Hopefully pcie goes smoothly as well.
+I'm going to hang on to this since there is a pretty good chance the
+LPAE code posted today will make it in this window and supercedes this.
 
 thx,
 
 Jason.
+
+> 
+> diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
+> index 1c8afe2..b2d7804 100644
+> --- a/arch/arm/boot/dts/armada-xp-gp.dts
+> +++ b/arch/arm/boot/dts/armada-xp-gp.dts
+> @@ -28,12 +28,14 @@
+>  		device_type = "memory";
+>  
+>  		/*
+> -		 * 4 GB of plug-in RAM modules by default but only 3GB
+> -		 * are visible, the amount of memory available can be
+> -		 * changed by the bootloader according the size of the
+> -		 * module actually plugged
+> +		 * 4 GB of plug-in RAM modules by default. The amount of memory
+> +		 * available can be changed by the bootloader according to the
+> +		 * size of the module actually plugged
+> +		 *
+> +		 * Clipped at 0xD0000000 since this is the start of the internal
+> +		 * registers.
+>  		 */
+> -		reg = <0x00000000 0xC0000000>;
+> +		reg = <0x00000000 0xD0000000>;
+>  	};
+>  
+>  	soc {
+> -- 
+> 1.8.1.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
