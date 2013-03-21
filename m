@@ -1,105 +1,84 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 21 Mar 2013 15:27:18 +0530
-Subject: [PATCH 2/2] ASoC: dmaengine_pcm: add
- snd_dmaengine_generic_pcm_open()
-In-Reply-To: <1363318601-31505-3-git-send-email-shawn.guo@linaro.org>
-References: <1363318601-31505-1-git-send-email-shawn.guo@linaro.org>
- <1363318601-31505-3-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20130321095718.GO10326@intel.com>
+Date: Thu, 21 Mar 2013 15:37:16 +0530
+Subject: [PATCH] dmaengine:sirf:take clock and enable it while probing
+In-Reply-To: <1363595623-6887-1-git-send-email-Barry.Song@csr.com>
+References: <1363595623-6887-1-git-send-email-Barry.Song@csr.com>
+Message-ID: <20130321100716.GP10326@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 15, 2013 at 11:36:41AM +0800, Shawn Guo wrote:
-> With generic DMA device tree binding and helper function
-> dma_request_slave_channel() in place, dmaengine_pcm should support
-> that in requesting DMA channel for users that support generic DMA
-> device tree binding.
+On Mon, Mar 18, 2013 at 04:33:43PM +0800, Barry Song wrote:
+> From: Barry Song <Baohua.Song@csr.com>
 > 
-> Add a new API snd_dmaengine_generic_pcm_open() as the variant of
-> snd_dmaengine_pcm_open().  It takes DMA client struct device pointer
-> and slave channel name as arguments and calls generic DMA helper
-> dma_request_slave_channel() to request DMA channel from dmaengine.
-NAK
-
-This is why we have dma_request_slave_channel_compat() API. You dont need to
-write two open handlers here, just pass all the arguments and if DT is set it
-will allocate a channel using dma_request_slave_channel() otherwise will do
-dma_request_channel which is what you need.
-
+> there is hardcode which enabled the clock of dmaengine before,
+> this patch takes the clock by standard clock API and enable it
+> in probe.
 > 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> Cc: alsa-devel at alsa-project.org
-> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
 > ---
->  include/sound/dmaengine_pcm.h |    2 ++
->  sound/soc/soc-dmaengine-pcm.c |   39 +++++++++++++++++++++++++++++++++++++++
->  2 files changed, 41 insertions(+)
+>  drivers/dma/sirf-dma.c |   11 +++++++++++
+>  1 files changed, 11 insertions(+), 0 deletions(-)
 > 
-> diff --git a/include/sound/dmaengine_pcm.h b/include/sound/dmaengine_pcm.h
-> index b877334..452df15 100644
-> --- a/include/sound/dmaengine_pcm.h
-> +++ b/include/sound/dmaengine_pcm.h
-> @@ -43,6 +43,8 @@ snd_pcm_uframes_t snd_dmaengine_pcm_pointer_no_residue(struct snd_pcm_substream
+> diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
+> index 1d627e2..c439529 100644
+> --- a/drivers/dma/sirf-dma.c
+> +++ b/drivers/dma/sirf-dma.c
+> @@ -16,6 +16,7 @@
+>  #include <linux/of_address.h>
+>  #include <linux/of_device.h>
+>  #include <linux/of_platform.h>
+> +#include <linux/clk.h>
+>  #include <linux/sirfsoc_dma.h>
 >  
->  int snd_dmaengine_pcm_open(struct snd_pcm_substream *substream,
->  	dma_filter_fn filter_fn, void *filter_data);
-> +int snd_dmaengine_generic_pcm_open(struct snd_pcm_substream *substream,
-> +				   struct device *dev, const char *name);
->  int snd_dmaengine_pcm_close(struct snd_pcm_substream *substream);
+>  #include "dmaengine.h"
+> @@ -78,6 +79,7 @@ struct sirfsoc_dma {
+>  	struct sirfsoc_dma_chan		channels[SIRFSOC_DMA_CHANNELS];
+>  	void __iomem			*base;
+>  	int				irq;
+> +	struct clk			*clk;
+>  	bool				is_marco;
+>  };
 >  
->  struct dma_chan *snd_dmaengine_pcm_get_chan(struct snd_pcm_substream *substream);
-> diff --git a/sound/soc/soc-dmaengine-pcm.c b/sound/soc/soc-dmaengine-pcm.c
-> index 111b7d92..970eb2b 100644
-> --- a/sound/soc/soc-dmaengine-pcm.c
-> +++ b/sound/soc/soc-dmaengine-pcm.c
-> @@ -304,6 +304,45 @@ int snd_dmaengine_pcm_open(struct snd_pcm_substream *substream,
->  EXPORT_SYMBOL_GPL(snd_dmaengine_pcm_open);
+> @@ -639,6 +641,12 @@ static int sirfsoc_dma_probe(struct platform_device *op)
+>  		return -EINVAL;
+>  	}
 >  
->  /**
-> + * snd_dmaengine_generic_pcm_open - Open a dmaengine based PCM substream
-> + * @substream: PCM substream
-> + * @dev: pointer to DMA client device structure
-> + * @name: DMA slave channel name
-> + *
-> + * Returns 0 on success, a negative error code otherwise.
-> + *
-> + * This function is a variant of snd_dmaengine_pcm_open(). It takes different
-> + * parameters and calls generic DMA helper dma_request_slave_channel() to
-> + * request a DMA channel from dmaengine.
-> + */
-> +int snd_dmaengine_generic_pcm_open(struct snd_pcm_substream *substream,
-> +				   struct device *dev, const char *name)
-> +{
-> +	struct dmaengine_pcm_runtime_data *prtd;
-> +	int ret;
-> +
-> +	ret = snd_pcm_hw_constraint_integer(substream->runtime,
-> +					    SNDRV_PCM_HW_PARAM_PERIODS);
-> +	if (ret < 0)
-> +		return ret;
-> +
-> +	prtd = kzalloc(sizeof(*prtd), GFP_KERNEL);
-> +	if (!prtd)
-> +		return -ENOMEM;
-> +
-> +	prtd->dma_chan = dma_request_slave_channel(dev, name);
-> +	if (!prtd->dma_chan) {
-> +		kfree(prtd);
-> +		return -ENXIO;
+> +	sdma->clk = devm_clk_get(dev, NULL);
+NULL? Arent you supposed to send a avlid non global string with. It may work now
+but do you really want to go that path?
+
+> +	if (IS_ERR(sdma->clk)) {
+> +		dev_err(dev, "failed to get a clock.\n");
+> +		return PTR_ERR(sdma->clk);
 > +	}
 > +
-> +	substream->runtime->private_data = prtd;
+>  	ret = of_address_to_resource(dn, 0, &res);
+>  	if (ret) {
+>  		dev_err(dev, "Error parsing memory region!\n");
+> @@ -698,6 +706,8 @@ static int sirfsoc_dma_probe(struct platform_device *op)
+>  
+>  	tasklet_init(&sdma->tasklet, sirfsoc_dma_tasklet, (unsigned long)sdma);
+>  
+> +	clk_prepare_enable(sdma->clk);
+shouldnt you be enabling clock when you start a txn. Keeping clock on in probe
+doesnt seem too smart
+
 > +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(snd_dmaengine_generic_pcm_open);
-> +
-> +/**
->   * snd_dmaengine_pcm_close - Close a dmaengine based PCM substream
->   * @substream: PCM substream
->   */
+>  	/* Register DMA engine */
+>  	dev_set_drvdata(dev, sdma);
+>  	ret = dma_async_device_register(dma);
+> @@ -720,6 +730,7 @@ static int sirfsoc_dma_remove(struct platform_device *op)
+>  	struct device *dev = &op->dev;
+>  	struct sirfsoc_dma *sdma = dev_get_drvdata(dev);
+>  
+> +	clk_disable_unprepare(sdma->clk);
+>  	dma_async_device_unregister(&sdma->dma);
+>  	free_irq(sdma->irq, sdma);
+>  	irq_dispose_mapping(sdma->irq);
 > -- 
-> 1.7.9.5
+> 1.7.5.4
 > 
 > 
+> 
+> Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
+> More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
