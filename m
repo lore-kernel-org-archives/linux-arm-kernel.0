@@ -1,57 +1,73 @@
-From: gerlando.falauto@keymile.com (Gerlando Falauto)
-Date: Thu, 21 Mar 2013 11:37:25 +0100
-Subject: [PATCH v3 0/9] refactoring for mask_cache
-In-Reply-To: <alpine.LFD.2.02.1303202222340.22263@ionos>
-References: <1363277430-21325-1-git-send-email-holger.brunck@keymile.com><1363615255-18200-1-git-send-email-gerlando.falauto@keymile.com><20130319100352.GB2419@localhost><20130319110620.GO13280@titan.lakedaemon.net><51484793.5020102@keymile.com><20130319114430.GP13280@titan.lakedaemon.net>
- <20130319115615.GR13280@titan.lakedaemon.net> <5149F48D.3030706@keymile.com>
- <alpine.LFD.2.02.1303202222340.22263@ionos>
-Message-ID: <514AE2E5.8020700@keymile.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 21 Mar 2013 19:41:29 +0900
+Subject: [PATCH 0/3 v3] ARM: shmobile: add R8A7778 Bock-W board support v3
+In-Reply-To: <878v5hf4zr.wl%kuninori.morimoto.gx@renesas.com>
+References: <87hakhrpmn.wl%kuninori.morimoto.gx@renesas.com>
+ <878v5hf4zr.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <20130321104127.GH2348@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On Thu, Mar 21, 2013 at 06:59:20PM +0900, Kuninori Morimoto wrote:
+> 
+> Hi Simon, Magnus, Arnd
+> 
+> These are v3 patch set of R8A7778 R-Car M1 SoC/board support
+> This SoC/board support have limited DT only.
+> (TMU/SCIF can't use DT at this point)
+> 
+> I will work for external IRQ and SMSC support
+> if these are accepted.
+> 
+> These patches are based on simon/next branch
 
-first of all thanks for your patience.
+Good choice :^)
 
-On 03/20/2013 10:42 PM, Thomas Gleixner wrote:
-> On Wed, 20 Mar 2013, Gerlando Falauto wrote:
->> On 03/19/2013 12:56 PM, Jason Cooper wrote:
->>> On Tue, Mar 19, 2013 at 07:44:31AM -0400, Jason Cooper wrote:
->
->> 3) Jason, did you mean you would pull it to
->> http://git.infradead.org/users/jcooper/linux.git? Shall I change the SOB lines
->> and resubmit? Or should I submit it somewhere else instead?
->
-> That needs to go through my tree, really. And please just post it to
-> LKML with the relevant people CC'ed.
+I have no objections to these changes at this point
+but I would appreciate an ack from Magnus before applying them.
 
-So drop linux-kernel-arm?
-
->> 4) About submitting to -stable, I guess it wouldn't make any sense until it
->> gets included upstream
->
-> Right. Though I'm a bit concerned about the amount of change
-> involved. So it's simpler to do:
->
-> Cc: <stable@vger.kernel.org> # simple resolution will be sent in reply
-
-You mean per-patch (in the SOB area)? Or just in the cover letter? 
-[Since when does the cover letter have a SOB area?]
-Or just adding it as a plain "Cc:" recipient?
-In any case, before waiting for mainstream inclusion?
-
-I'm sorry for such stupid questions, but I'm getting even more confused...
-
-> Then let the people who have this problem reply on that patch series
-> with a simple revert of that generic_chip() conversion commit
-> concering their particular subarchitecture instead of forcing a
-> nightmare of complex (and maybe untested) changes onto stable.
-
-I think I understand the idea, though you've lost me completely as far 
-as the process is concerned...
-
-A pointer to a FMTR (assuming there is one that I could be RTFM-ed to) 
-would be very much appreciated. Sorry again for my newbieness.
-
-Thanks again!
-Gerlando
+> Kuninori Morimoto (3):
+>       ARM: shmobile: add R8A7778 basis support
+>       ARM: shmobile: r8a7778 SCIF support
+>       ARM: shmobile: add R-Car M1A Bock-W platform support
+> 
+>  arch/arm/boot/dts/Makefile                    |    1 +
+>  arch/arm/boot/dts/r8a7778-bockw.dts           |   32 ++++
+>  arch/arm/boot/dts/r8a7778.dtsi                |   35 +++++
+>  arch/arm/configs/bockw_defconfig              |   66 +++++++++
+>  arch/arm/mach-shmobile/Kconfig                |   12 ++
+>  arch/arm/mach-shmobile/Makefile               |    2 +
+>  arch/arm/mach-shmobile/board-bockw.c          |   43 ++++++
+>  arch/arm/mach-shmobile/clock-r8a7778.c        |  104 +++++++++++++
+>  arch/arm/mach-shmobile/include/mach/r8a7778.h |   28 ++++
+>  arch/arm/mach-shmobile/setup-r8a7778.c        |  193 +++++++++++++++++++++++++
+>  10 files changed, 516 insertions(+)
+> 
+> This is my command for DT uImage
+> 
+> PC> make bockw_defconfig
+> PC> make menuconfig
+> PC> make zImage
+> PC> make dtbs
+> PC> duImage r8a7778-bockw-reference
+> PC> cp arch/sh/boot/duImage ${PATH}
+> 
+> ---- duImage --------------------------------
+> #! /bin/sh
+> 
+> # create zImage + dtb = dzImage
+> cat arch/arm/boot/zImage arch/arm/boot/dts/${1}.dtb > arch/arm/boot/dzImage
+> 
+> # create duImage
+> DUIMAGE=`cut -f 3- -d ' ' < arch/arm/boot/.uImage.cmd | sed -e "s/zImage/dzImage/" | sed -e "s/uImage/duImage/"`
+> ${DUIMAGE}%
+> ----------------------------------------------
+> 
+> Best regards
+> ---
+> Kuninori Morimoto
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
