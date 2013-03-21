@@ -1,61 +1,44 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Thu, 21 Mar 2013 18:59:20 +0900
-Subject: [PATCH 0/3 v3] ARM: shmobile: add R8A7778 Bock-W board support v3
-In-Reply-To: <87hakhrpmn.wl%kuninori.morimoto.gx@renesas.com>
-References: <87hakhrpmn.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <878v5hf4zr.wl%kuninori.morimoto.gx@renesas.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Thu, 21 Mar 2013 11:00:32 +0100
+Subject: [PATCH] i2c: s3c24xx: allow device core to setup default pin
+ configuration
+In-Reply-To: <1362404573-30406-1-git-send-email-thomas.abraham@linaro.org>
+References: <1362404573-30406-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <20130321100032.GC19297@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Mar 04, 2013 at 07:12:53PM +0530, Thomas Abraham wrote:
+> With device core now able to setup the default pin configuration,
+> the call to devm_pinctrl_get_select_default can be removed. And
+> the pin configuration code based on the deprecated Samsung specific
+> gpio bindings is also removed.
+> 
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> ---
+> 
+> Hi Heiko, Tomasz,
+> 
+> We have to make a choice on the path forward for pinctrl support
+> on Samsung platforms. We have three cases to deal with.
+> 
+> A. Samsung platforms without DT support.
+> B. Samsung platforms with DT support using old Samsung specific
+>    gpio bindings for pin-configuration (s3c24xx and s3x64xx).
+> C. Samsung platforms with DT support using using pinctrl based
+>    pin-configurations (Exynos4 and Exynos5).
+> 
+> For [A], we just let the platform specific callbacks handle the
+> pin setup. For [B] and [C], based on Linus Walleij's pin grab
+> by device core patch and subsequent discussions with him on the
+> mailing list, would it be acceptable that we discontinue support
+> for [B] in Samsung SoC device drivers. This will impact your
+> current DT work on s3c24xx and s3c64xx platforms. Pinctrl is
+> inevitable and we have to migrate to it. Instead of workarounds
+> to maintain support for [B], it might be better that we migrate
+> s3c24xx and s3c64xx platforms to pinctrl.
+> 
+> Please do let us know your opinion on this.
 
-Hi Simon, Magnus, Arnd
-
-These are v3 patch set of R8A7778 R-Car M1 SoC/board support
-This SoC/board support have limited DT only.
-(TMU/SCIF can't use DT at this point)
-
-I will work for external IRQ and SMSC support
-if these are accepted.
-
-These patches are based on simon/next branch
-
-Kuninori Morimoto (3):
-      ARM: shmobile: add R8A7778 basis support
-      ARM: shmobile: r8a7778 SCIF support
-      ARM: shmobile: add R-Car M1A Bock-W platform support
-
- arch/arm/boot/dts/Makefile                    |    1 +
- arch/arm/boot/dts/r8a7778-bockw.dts           |   32 ++++
- arch/arm/boot/dts/r8a7778.dtsi                |   35 +++++
- arch/arm/configs/bockw_defconfig              |   66 +++++++++
- arch/arm/mach-shmobile/Kconfig                |   12 ++
- arch/arm/mach-shmobile/Makefile               |    2 +
- arch/arm/mach-shmobile/board-bockw.c          |   43 ++++++
- arch/arm/mach-shmobile/clock-r8a7778.c        |  104 +++++++++++++
- arch/arm/mach-shmobile/include/mach/r8a7778.h |   28 ++++
- arch/arm/mach-shmobile/setup-r8a7778.c        |  193 +++++++++++++++++++++++++
- 10 files changed, 516 insertions(+)
-
-This is my command for DT uImage
-
-PC> make bockw_defconfig
-PC> make menuconfig
-PC> make zImage
-PC> make dtbs
-PC> duImage r8a7778-bockw-reference
-PC> cp arch/sh/boot/duImage ${PATH}
-
----- duImage --------------------------------
-#! /bin/sh
-
-# create zImage + dtb = dzImage
-cat arch/arm/boot/zImage arch/arm/boot/dts/${1}.dtb > arch/arm/boot/dzImage
-
-# create duImage
-DUIMAGE=`cut -f 3- -d ' ' < arch/arm/boot/.uImage.cmd | sed -e "s/zImage/dzImage/" | sed -e "s/uImage/duImage/"`
-${DUIMAGE}%
-----------------------------------------------
-
-Best regards
----
-Kuninori Morimoto
+Dropping [B] sounds good, but I think it makes sense to wait with this
+patch until pinctrl support for s3c24xx is in place?
