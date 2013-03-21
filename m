@@ -1,40 +1,40 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 21 Mar 2013 15:48:50 +0530
-Subject: [PATCH] DMA: OF: Check properties value before running
- be32_to_cpup() on it
-In-Reply-To: <20130321094609.GM10326@intel.com>
-References: <0a0ef15d47393fe9d24a395c38068b871f913776.1363337257.git.viresh.kumar@linaro.org>
- <20130321094609.GM10326@intel.com>
-Message-ID: <CAKohpokeZ7Udc2K_vccC1uPL=QAhpJ-vuoyFKRs84ndpDbVfqg@mail.gmail.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Thu, 21 Mar 2013 18:19:13 +0800
+Subject: [PATCH v2 3/8] drivers: char: use module_platform_driver_probe()
+In-Reply-To: <CAHkwnC_AJpeVw2o8oJn+zMvSg1Lbmm1aXRYxCmtDYhkJG9nvig@mail.gmail.com>
+References: <1363280978-24051-1-git-send-email-fabio.porcedda@gmail.com>
+ <1363280978-24051-4-git-send-email-fabio.porcedda@gmail.com>
+ <20130321095542.GH26931@gondor.apana.org.au>
+ <CAHkwnC_AJpeVw2o8oJn+zMvSg1Lbmm1aXRYxCmtDYhkJG9nvig@mail.gmail.com>
+Message-ID: <20130321101912.GA27199@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 March 2013 15:16, Vinod Koul <vinod.koul@intel.com> wrote:
-> On Fri, Mar 15, 2013 at 02:18:20PM +0530, Viresh Kumar wrote:
->> In of_dma_controller_register() routine we are calling of_get_property() as an
->> parameter to be32_to_cpup(). In case the property doesn't exist we will get a
->> crash.
->>
->> This patch changes this code to check if we got a valid property first and then
->> runs be32_to_cpup() on it.
->>
->> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
->> ---
->>
->> My mails are broken, i have pushed this patch here:
-> I noticed you used git send-email. Usually it will send patch properly
-> independent of whatever MUA you use.
+On Thu, Mar 21, 2013 at 11:15:26AM +0100, Fabio Porcedda wrote:
+> On Thu, Mar 21, 2013 at 10:55 AM, Herbert Xu
+> <herbert@gondor.apana.org.au> wrote:
+> > On Thu, Mar 14, 2013 at 06:09:33PM +0100, Fabio Porcedda wrote:
+> >> This patch converts the drivers to use the
+> >> module_platform_driver_probe() macro which makes the code smaller and
+> >> a bit simpler.
+> >>
+> >> Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
+> >> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> >> Cc: Matt Mackall <mpm@selenic.com>
+> >> Cc: Herbert Xu <herbert@gondor.apana.org.au>
+> >> Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> >> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> >
+> > Patch applied.
+> 
+> The patch is already in
+> git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/char-misc.git.
+> Are you speaking about that?
 
-Probably not!! Its the famous (Infamous) Microsoft exchange server working in
-background and it breaks mails without treating mails coming from git send-email
-specially :)
+OK, I'll remove it from my tree.
 
-> So I have the patch and its applied now :)
-
-I have seen this kind of discrimination on breaking patches based on the size of
-patch. If its very small (like this one), you may get a unbroken patch
-but if the size
-is a bit large then nobody can save you :)
-
---
-viresh
+Thanks,
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
