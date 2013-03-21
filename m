@@ -1,60 +1,28 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 21 Mar 2013 10:15:31 +0100
-Subject: [PATCH] clk: divider: Use DIV_ROUND_CLOSEST
-In-Reply-To: <20130320185051.GA28349@pengutronix.de>
-References: <2e77dfe8-8d4f-4b77-bf1b-831ad1572c23@VA3EHSMHS046.ehs.local>
- <20130320001609.8663.21043@quantum>
- <f3ff0545-52cd-4b7b-967e-f81324ba0152@CH1EHSMHS040.ehs.local>
- <20130320185051.GA28349@pengutronix.de>
-Message-ID: <20130321091531.GN20530@pengutronix.de>
+From: xiechao.mail@gmail.com (Chao Xie)
+Date: Thu, 21 Mar 2013 17:16:15 +0800
+Subject: [PATCH 2/6] usb: otg: mv_otg: remove unused clock
+In-Reply-To: <20130320130927.GT29659@arwen.pp.htv.fi>
+References: <1363593333-6077-1-git-send-email-chao.xie@marvell.com>
+ <1363593333-6077-3-git-send-email-chao.xie@marvell.com>
+ <20130320130927.GT29659@arwen.pp.htv.fi>
+Message-ID: <CADApbehYSCqrUkiMic3Qga4L3shFGOyHUr=THO=zadLb7ecr+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Wed, Mar 20, 2013 at 07:50:51PM +0100, Sascha Hauer wrote:
-> On Wed, Mar 20, 2013 at 09:32:51AM -0700, S?ren Brinkmann wrote:
-> > If the caller
-> > doesn't like the returned frequency he can request a different one.
-> > And he's eventually happy with the return value he calls
-> > clk_set_rate() requesting the frequency clk_round_rate() returned.
-> > Always rounding down seems a bit odd to me.
-> > 
-> > Another issue with the current implmentation:
-> > clk_divider_round_rate() calls clk_divider_bestdiv(), which uses the ROUND_UP macro, returning a rather low frequency.
-> 
-> And that is correct. clk_divider_bestdiv is used to calculate the
-> maximum parent frequency for which a given divider value does not
-> exceed the desired rate.
-The reason for that is that the (more?) usual constraint is like: This
-mmc card can handle up to 100 MHz. Or this i2c device can handle up to
-this and that frequency. Of course there are different constraints, e.g.
-for a UART if the target baud speed is 38400 you better run at 38402
-than at 19201.
-
-I wonder if it depends on the clock if you want "best approximation <=
-requested value" or "best approximation" or on the caller. In the former
-case a flag for the clock would be the right thing (as suggested in this
-thread). If however it's the caller of round_rate who knows better which
-rounding is preferred than better extend the clk API.
-
-Extending the API could just be a convenience function that doesn't
-affect the implementations of the clk API. E.g.:
-
-	long clk_round_rate_nearest(struct clk *clk, unsigned long rate)
-	{
-		long lower_limit = clk_round_rate(clk, rate);
-		long upper_limit = clk_round_rate(clk, rate + (rate - lower_limit));
-
-		if (rate - lower_limit < upper_limit - rate)
-			return lower_limit;
-		else
-			return upper_limit;
-	}
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+On Wed, Mar 20, 2013 at 9:09 PM, Felipe Balbi <balbi@ti.com> wrote:
+> On Mon, Mar 18, 2013 at 03:55:29AM -0400, Chao Xie wrote:
+>> The origianl understanding of clock is wrong. The OTG controller
+>> only have one clock input.
+>> Passing clock name by pdata is wrong. The clock is defined by device
+>> iteself.
+>>
+>> Signed-off-by: Chao Xie <chao.xie@marvell.com>
+>
+> please rebase against my 'next' branch.
+>
+> --
+> balbi
+hi
+Do you mean git.kernel.org/pub/scm/linux/kernel/git/gregkh/usb.git -
+branch "usb-next"?
+Or some other git?
