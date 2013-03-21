@@ -1,54 +1,43 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Thu, 21 Mar 2013 11:45:01 +0200
-Subject: [PATCH] clk: add table lookup to mux
-In-Reply-To: <20130320155158.11073.43798@quantum>
-References: <1363113747-6572-1-git-send-email-pdeschrijver@nvidia.com>
- <20130319235110.8663.67548@quantum>
- <20130320094957.GG18519@tbergstrom-lnx.Nvidia.com>
- <20130320155158.11073.43798@quantum>
-Message-ID: <20130321094501.GP18519@tbergstrom-lnx.Nvidia.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 21 Mar 2013 10:46:26 +0100
+Subject: [PATCH] rtc: rtc-at91rm9200: use a variable for storing IMR
+In-Reply-To: <20130320145006.f1431c1528325ff93a298790@linux-foundation.org>
+References: <1363369032-12639-1-git-send-email-nicolas.ferre@atmel.com>
+ <20130320145006.f1431c1528325ff93a298790@linux-foundation.org>
+Message-ID: <514AD6F2.20701@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 20, 2013 at 04:51:58PM +0100, Mike Turquette wrote:
-> Quoting Peter De Schrijver (2013-03-20 02:49:57)
-> > On Wed, Mar 20, 2013 at 12:51:10AM +0100, Mike Turquette wrote:
-> > > Quoting Peter De Schrijver (2013-03-12 11:42:23)
-> > > > diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
-> > > > index 9c7f580..53d39c2 100644
-> > > > --- a/include/linux/clk-private.h
-> > > > +++ b/include/linux/clk-private.h
-> > > > @@ -144,12 +144,13 @@ struct clk {
-> > > >  
-> > > >  #define DEFINE_CLK_MUX(_name, _parent_names, _parents, _flags, \
-> > > >                                 _reg, _shift, _width,           \
-> > > > -                               _mux_flags, _lock)              \
-> > > > +                               _mux_flags, _table, _lock)      \
-> > > >         static struct clk _name;                                \
-> > > >         static struct clk_mux _name##_hw = {                    \
-> > > >                 .hw = {                                         \
-> > > >                         .clk = &_name,                          \
-> > > >                 },                                              \
-> > > > +               .table = _table,                                \
-> > > >                 .reg = _reg,                                    \
-> > > >                 .shift = _shift,                                \
-> > > >                 .width = _width,                                \
-> > > 
-> > > This breaks OMAP horribly since OMAP already uses this macro.  There are
-> > > two options:
-> > > 
-> > > 1) stop using statically initialized data and no longer use
-> > > clk-private.h macros.  I was under the impression that the tegra clock
-> > > data no longer required this?
-> > 
-> > Ok. We don't do that anymore. Maybe I just modified it out of habbit...
-> > 
+On 03/20/2013 10:50 PM, Andrew Morton :
+> On Fri, 15 Mar 2013 18:37:12 +0100 Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
 > 
-> Cool.  Will you send a V2 that drops the macro changes?
+>> On some revisions of AT91 SoCs, the RTC IMR register is not working.
+>> Instead of elaborating a workaround for that specific SoC or IP version,
+>> we simply use a software variable to store the Interrupt Mask Register and
+>> modify it for each enabling/disabling of an interrupt. The overhead of this
+>> is negligible anyway.
 > 
+> This description doesn't really allow me or others to work out whether
+> the fix should be included in 3.9 or backported into earlier kernels.
+> 
+> So please, when fixing a bug do include a full description of the
+> user-visible effects of that bug.  And your opinion regarding the
+> -mainline and -stable decision is always useful.
 
-Yes. Coming soon :)
+Yes, sure.
 
-Cheers,
+Concerning this patch, we can imagine to push it upstream as a bugfix
+for 3.9-rc. It is not a regression because... well... it has never
+worked properly on the affected SoC family.
 
-Peter.
+For -stable, we can add this tag:
+
+Cc: stable <stable@vger.kernel.org> [v3.8+]
+
+
+As this patch applies up to this revision. For other kernel releases, I
+will need to rework the patch a little bit due to files name modifications.
+
+Thanks, best regards,
+-- 
+Nicolas Ferre
