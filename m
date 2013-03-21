@@ -1,104 +1,85 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Thu, 21 Mar 2013 11:59:05 +0100
-Subject: [PATCH v3 0/9] refactoring for mask_cache
-In-Reply-To: <5149F48D.3030706@keymile.com>
-References: <1363277430-21325-1-git-send-email-holger.brunck@keymile.com>
- <1363615255-18200-1-git-send-email-gerlando.falauto@keymile.com>
- <20130319100352.GB2419@localhost>
- <20130319110620.GO13280@titan.lakedaemon.net>
- <51484793.5020102@keymile.com>
- <20130319114430.GP13280@titan.lakedaemon.net>
- <20130319115615.GR13280@titan.lakedaemon.net>
- <5149F48D.3030706@keymile.com>
-Message-ID: <20130321105900.GC16903@kw.sim.vm.gnt>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 21 Mar 2013 16:48:08 +0530
+Subject: [PATCH v2] ARM: OMAP: clocks: Delay clk inits atleast until slab
+ is initialized
+In-Reply-To: <1363863892-6810-1-git-send-email-rnayak@ti.com>
+References: <1363863892-6810-1-git-send-email-rnayak@ti.com>
+Message-ID: <514AEC70.9010801@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 20, 2013 at 06:40:29PM +0100, Gerlando Falauto wrote:
-> Hi,
+On Thursday 21 March 2013 04:34 PM, Rajendra Nayak wrote:
+> clk inits on OMAP happen quite early, even before slab is available.
+> The dependency comes from the fact that the timer init code starts to
+> use clocks and hwmod and we need clocks to be initialized by then.
 > 
-> sorry about the delay (been busy with other stuff).
-> First of all thanks for your hints. I have some questions.
-> This is my first time, so please be gentle... :-)
+> There are various problems doing clk inits this early, one is,
+> not being able to do dynamic clk registrations and hence the
+> dependency on clk-private.h. The other is, inability to debug
+> early kernel crashes without enabling DEBUG_LL and earlyprintk.
 > 
-> On 03/19/2013 12:56 PM, Jason Cooper wrote:
-> >On Tue, Mar 19, 2013 at 07:44:31AM -0400, Jason Cooper wrote:
-> >>Those commit IDs are going to change once LinusW (I presume) applies
-> >>them to his tree, so he'll have to edit each commit message to point the
-> >>the correct commit.
-> >>
-> >>LinusW, do you want me to handle this?
-> >
-> >Never mind, coffee underflow to /dev/brain.  One drawback to mutt, can't
-> >view thread while typing messages...
+> Doing early clk init also exposed another instance of a kernel
+> panic due to a BUG() when CONFIG_DEBUG_SLAB is enabled.
 > 
-> 1) I had no idea who LinusW is, I assume Linus Walleij who should be
-> the maintainer of linux-gpio. And linux-gpio should have nothing to
-> do with this discussion... so I should assume you never mentioned
-> him, right?
+> [    0.000000] Kernel BUG at c01174f8 [verbose debug info unavailable]
+> [    0.000000] Internal error: Oops - BUG: 0 [#1] SMP ARM
+> [    0.000000] Modules linked in:
+> [    0.000000] CPU: 0    Not tainted  (3.9.0-rc1-12179-g72d48f9 #6)
+> [    0.000000] PC is at __kmalloc+0x1d4/0x248
+> [    0.000000] LR is at __clk_init+0x2e0/0x364
+> [    0.000000] pc : [<c01174f8>]    lr : [<c0441f54>]    psr: 600001d3
+> [    0.000000] sp : c076ff28  ip : c065cefc  fp : c0441f54
+> [    0.000000] r10: 0000001c  r9 : 000080d0  r8 : c076ffd4
+> [    0.000000] r7 : c074b578  r6 : c0794d88  r5 : 00000040  r4 : 00000000
+> [    0.000000] r3 : 00000000  r2 : c07cac70  r1 : 000080d0  r0 : 0000001c
+> [    0.000000] Flags: nZCv  IRQs off  FIQs off  Mode SVC_32  ISA ARM  Segment kernel
+> [    0.000000] Control: 10c53c7d  Table: 8000404a  DAC: 00000017
+> [    0.000000] Process swapper (pid: 0, stack limit = 0xc076e240)
+> [    0.000000] Stack: (0xc076ff28 to 0xc0770000)
+> [    0.000000] ff20:                   22222222 c0794ec8 c06546e8 00000000 00000040 c0794d88
+> [    0.000000] ff40: c074b578 c076ffd4 c07951c8 c076e000 00000000 c0441f54 c074b578 c076ffd4
+> [    0.000000] ff60: c0793828 00000040 c0794d88 c074b578 c076ffd4 c0776900 c076e000 c07272ac
+> [    0.000000] ff80: 2f800000 c074c968 c07f93d0 c0719780 c076ffa0 c076ff98 00000000 00000000
+> [    0.000000] ffa0: 00000000 00000000 00000000 00000001 c074cd6c c077b1ec 8000406a c0715724
+> [    0.000000] ffc0: 00000000 00000000 00000000 00000000 00000000 c074c968 10c53c7d c0776974
+> [    0.000000] ffe0: c074cd6c c077b1ec 8000406a 411fc092 00000000 80008074 00000000 00000000
+> [    0.000000] [<c01174f8>] (__kmalloc+0x1d4/0x248) from [<c0441f54>] (__clk_init+0x2e0/0x364)
+> [    0.000000] [<c0441f54>] (__clk_init+0x2e0/0x364) from [<c07272ac>] (omap4xxx_clk_init+0xbc/0x140)
+> [    0.000000] [<c07272ac>] (omap4xxx_clk_init+0xbc/0x140) from [<c0719780>] (setup_arch+0x15c/0x284)
+> [    0.000000] [<c0719780>] (setup_arch+0x15c/0x284) from [<c0715724>] (start_kernel+0x7c/0x334)
+> [    0.000000] [<c0715724>] (start_kernel+0x7c/0x334) from [<80008074>] (0x80008074)
+> [    0.000000] Code: e5883004 e1a00006 e28dd00c e8bd8ff0 (e7f001f2)
+> [    0.000000] ---[ end trace 1b75b31a2719ed1c ]---
+> [    0.000000] Kernel panic - not syncing: Attempted to kill the idle task!
 > 
-> 2) About the SOB part... most of this is inspired by Simon's
-> original (single) patch and Holger's reworking. Should they be given
-> credit or not? If yes, how? If I don't get an answer I would just
-> assume no and I'll take all the blame and credit all by myself. :-)
-
-Please drop all the SOBs with my name. Except for giving up a patch
-almost two years, I am not involved in this patch series development. 
-I am quite sure there is no credit in that :)
-
-Thanks.
-
-Simon
-
+> It was a know issue, that slab allocations would fail when common
+> clock core tries to cache parent pointers for mux clocks on OMAP,
+> and hence a patch 'clk: Allow late cache allocation for clk->parents,
+> commit 7975059d' was added to work this problem around.
+> A BUG() within kmalloc() with CONFIG_DEBUG_SLAB enabled was completely
+> overlooked causing this regression.
 > 
-> 3) Jason, did you mean you would pull it to
-> http://git.infradead.org/users/jcooper/linux.git? Shall I change the
-> SOB lines and resubmit? Or should I submit it somewhere else
-> instead?
+> More details on the issue reported can be found here,
+> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg85932.html
 > 
-> 4) About submitting to -stable, I guess it wouldn't make any sense
-> until it gets included upstream
-> (https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/ so
-> to speak). Is that right?
-> Or at least to jcooper's tree, through which it should eventually
-> make it mainline through a merge (therefore keeping its commit-id).
-> That right?
+> With all these issues around clk inits happening way too early, it
+> makes sense to atleast move them to a point where dynamic memory
+> allocations are possible. So move them to a point just before the
+> timer code starts using clocks and hwmod.
 > 
-> I did read Documentation/stable_kernel_rules.txt and what I
-> understand is that it would be enough to submit to
-> stable at vger.kernel.org only the last one, while providing a list of
+> This should atleast pave way for clk inits on OMAP moving to dynamic
+> clock registrations instead of using the static macros defined in
+> clk-private.h.
 > 
->  Cc: <stable@vger.kernel.org> # 3.0.x: 123456 first patch
->  Cc: <stable@vger.kernel.org> # 3.0.x: 123457 second patch
->  Cc: <stable@vger.kernel.org> # 3.0.x: 123458 third patch
+> The issue with kernel panic while CONFIG_DEBUG_SLAB is enabled
+> was reported by Piotr Haber and Tony Lindgren and this patch
+> fixes the reported issue as well.
 > 
-> using the mainstream (or jcooper's) commit IDs.
+> Reported-by: Piotr Haber <phaber@broadcom.com>
+> Reported-by: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> ---
+> applies on 3.9-rc3 and tested on omap4 pandaES, omap3 beagle XM,
+> and am335x bone.
 > 
-> I don't know whether I'd have to repeat that for each version (3.0
-> will include only a subset of this series, while 3.7 and following
-> will need the whole nine yards, and what's in between... well,
-> something in between).
-> 
-> Please let me know what to do. Again, it's my first time so please
-> be gentle. :-)
-> 
-> Thanks again!
-> Gerlando
-> 
-> >>If you prefer to take it:
-> >>
-> >>Acked-by: Jason Cooper <jason@lakedaemon.net>
-> >
-> >for the plat-orion/gpio.c bits and if it helps, the gpio-mvebu.c bits.
-> >
-> >thx,
-> >
-> >Jason.
-> >
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130321/736911a4/attachment.sig>
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
