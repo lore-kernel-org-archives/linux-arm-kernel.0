@@ -1,32 +1,64 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 21 Mar 2013 15:59:14 +0000
-Subject: [PATCH 17/46] ARM: ux500: regulators: List the MMIO camera as a
- consumer of VAUX1
+Date: Thu, 21 Mar 2013 15:59:22 +0000
+Subject: [PATCH 25/46] regulator: ab8500-ext: Add support for AB9540 regulators
 In-Reply-To: <1363881583-15234-1-git-send-email-lee.jones@linaro.org>
 References: <1363881583-15234-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1363881583-15234-18-git-send-email-lee.jones@linaro.org>
+Message-ID: <1363881583-15234-26-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MMIO camera uses the VAUX1 as it's voltage supply.
+From: Michel JAOUEN <michel.jaouen@stericsson.com>
 
+Add the support for ab9540 external regulators.
+
+Signed-off-by: Michel JAOUEN <michel.jaouen@stericsson.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Reviewed-by: Jonas ABERG <jonas.aberg@stericsson.com>
 ---
- arch/arm/mach-ux500/board-mop500-regulators.c |    2 ++
- 1 file changed, 2 insertions(+)
+ drivers/regulator/ab8500-ext.c |   24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/arch/arm/mach-ux500/board-mop500-regulators.c b/arch/arm/mach-ux500/board-mop500-regulators.c
-index 3d63c8d..b08c8c8 100644
---- a/arch/arm/mach-ux500/board-mop500-regulators.c
-+++ b/arch/arm/mach-ux500/board-mop500-regulators.c
-@@ -81,6 +81,8 @@ static struct regulator_consumer_supply ab8500_vaux1_consumers[] = {
- 	REGULATOR_SUPPLY("vdd", "2-005c"),
- 	/* Cypress TrueTouch Touchscreen device */
- 	REGULATOR_SUPPLY("vcpin", "spi8.0"),
-+	/* Camera device */
-+	REGULATOR_SUPPLY("vaux12v5", "mmio_camera"),
+diff --git a/drivers/regulator/ab8500-ext.c b/drivers/regulator/ab8500-ext.c
+index f3ec867..e5e6453 100644
+--- a/drivers/regulator/ab8500-ext.c
++++ b/drivers/regulator/ab8500-ext.c
+@@ -298,6 +298,16 @@ static struct regulator_ops ab8500_ext_regulator_ops = {
+ 	.list_voltage		= ab8500_ext_list_voltage,
  };
  
- static struct regulator_consumer_supply ab8500_vaux2_consumers[] = {
++static struct regulator_ops ab9540_ext_regulator_ops = {
++	.enable			= ab8500_ext_regulator_enable,
++	.disable		= ab8500_ext_regulator_disable,
++	.is_enabled		= ab8500_ext_regulator_is_enabled,
++	.set_mode		= ab8500_ext_regulator_set_mode,
++	.get_mode		= ab8500_ext_regulator_get_mode,
++	.get_voltage		= ab8500_ext_fixed_get_voltage,
++	.list_voltage		= ab8500_ext_list_voltage,
++};
++
+ static struct ab8500_ext_regulator_info
+ 		ab8500_ext_regulator_info[AB8500_NUM_EXT_REGULATORS] = {
+ 	[AB8500_EXT_SUPPLY1] = {
+@@ -406,6 +416,20 @@ int ab8500_ext_regulator_init(struct platform_device *pdev)
+ 		info->cfg = (struct ab8500_ext_regulator_cfg *)
+ 			pdata->ext_regulator[i].driver_data;
+ 
++		if (is_ab9540(ab8500)) {
++			if (info->desc.id == AB8500_EXT_SUPPLY1) {
++				info->desc.ops = &ab9540_ext_regulator_ops;
++				info->fixed_uV = 4500000;
++			}
++			if (info->desc.id == AB8500_EXT_SUPPLY2)
++				info->desc.ops = &ab9540_ext_regulator_ops;
++
++			if (info->desc.id == AB8500_EXT_SUPPLY3) {
++				info->desc.ops = &ab9540_ext_regulator_ops;
++				info->fixed_uV = 3300000;
++			}
++		}
++
+ 		/* register regulator with framework */
+ 		info->rdev = regulator_register(&info->desc, &pdev->dev,
+ 				&pdata->ext_regulator[i], info, NULL);
 -- 
 1.7.10.4
