@@ -1,29 +1,36 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 21 Mar 2013 10:35:39 -0400
-Subject: [PATCH 05/16] thermal: mvebu: Fix valid check for thermal register
-In-Reply-To: <1363818997-23137-6-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1363818997-23137-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1363818997-23137-6-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20130321143539.GV13280@titan.lakedaemon.net>
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Thu, 21 Mar 2013 15:38:35 +0100
+Subject: [PATCH for 3.8+] drivers/video/ep93xx-fb.c: fix missing declaration
+ of devm_ioremap()
+Message-ID: <1363876715-22039-1-git-send-email-hauke@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ezequiel,
+This fixes the following compile error:
+drivers/video/ep93xx-fb.c: In function 'ep93xxfb_probe':
+drivers/video/ep93xx-fb.c:532:2: error: implicit declaration of function 'devm_ioremap' [-Werror=implicit-function-declaration]
+drivers/video/ep93xx-fb.c:532:17: warning: assignment makes pointer from integer without a cast [enabled by default]
 
-On Wed, Mar 20, 2013 at 07:36:26PM -0300, Ezequiel Garcia wrote:
-> The correct value is obtain by first shifting the register by the offset,
-> later applying the valid mask and finally invert the result.
-> This check was lacking an extra parenthesis to be strictly correct.
-> 
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
->  drivers/thermal/mvebu_thermal.c |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
+Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
+Cc: stable at vger.kernel.org
+---
 
-For the next version of this series, could you please put this fix first
-in the series?  In this state, it can't be applied to v3.9-rcX, nor
--stable.
+This patch should go into kernel 3.8, 3.9 and 3.10.
 
-thx,
+ drivers/video/ep93xx-fb.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-Jason.
+diff --git a/drivers/video/ep93xx-fb.c b/drivers/video/ep93xx-fb.c
+index 3f2519d..e06cd5d 100644
+--- a/drivers/video/ep93xx-fb.c
++++ b/drivers/video/ep93xx-fb.c
+@@ -23,6 +23,7 @@
+ #include <linux/slab.h>
+ #include <linux/clk.h>
+ #include <linux/fb.h>
++#include <linux/io.h>
+ 
+ #include <linux/platform_data/video-ep93xx.h>
+ 
+-- 
+1.7.10.4
