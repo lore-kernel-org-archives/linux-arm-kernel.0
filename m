@@ -1,57 +1,35 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 21 Mar 2013 18:38:32 +0530
-Subject: [RFC][PATCH 1/2] ARM: OMAP4: clock: Add device tree support for
- AUXCLKs
-In-Reply-To: <1363703220-4777-2-git-send-email-rogerq@ti.com>
-References: <1363703220-4777-1-git-send-email-rogerq@ti.com>
- <1363703220-4777-2-git-send-email-rogerq@ti.com>
-Message-ID: <514B0650.5070406@ti.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Thu, 21 Mar 2013 14:10:08 +0100
+Subject: [PATCH 1/2] dmaengine: add const for name parameter
+In-Reply-To: <20130321094753.GN10326@intel.com>
+References: <1363318601-31505-1-git-send-email-shawn.guo@linaro.org>
+ <1363318601-31505-2-git-send-email-shawn.guo@linaro.org>
+ <20130315085346.GA22650@pengutronix.de>
+ <20130321094753.GN10326@intel.com>
+Message-ID: <20130321131008.GA7274@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[]..
+Hi,
 
-> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-> index 0274ff7..23f2064 100644
-> --- a/arch/arm/mach-omap2/board-generic.c
-> +++ b/arch/arm/mach-omap2/board-generic.c
-> @@ -158,7 +158,7 @@ DT_MACHINE_START(OMAP4_DT, "Generic OMAP4 (Flattened Device Tree)")
->  	.init_irq	= omap_gic_of_init,
->  	.init_machine	= omap_generic_init,
->  	.init_late	= omap4430_init_late,
-> -	.init_time	= omap4_local_timer_init,
-> +	.init_time	= omap4_init_time,
->  	.dt_compat	= omap4_boards_compat,
->  	.restart	= omap44xx_restart,
->  MACHINE_END
+On Thu, Mar 21, 2013 at 03:17:53PM +0530, Vinod Koul wrote:
+> On Fri, Mar 15, 2013 at 09:53:46AM +0100, Markus Pargmann wrote:
+> > Hi,
+> > 
+> > I already sent a nearly identical patch:
+> > https://patchwork.kernel.org/patch/2179321/
+> I applied that one a while ago so Markus can you check my tree and see if
+> anything is remaining, looks most of cases are covered
 
-[]..
-> +#ifdef CONFIG_OF
-> +int __init omap4_clk_init_dt(void)
-> +{
-> +	struct device_node *np;
-> +
-> +	np = of_find_compatible_node(NULL, NULL, "ti,omap4-scrm");
-> +	if (np) {
-> +		scrm_data.clks = scrm_clks;
-> +		scrm_data.clk_num = ARRAY_SIZE(scrm_clks);
-> +		of_clk_add_provider(np, of_clk_src_onecell_get,	&scrm_data);
-> +	}
-> +
-> +	return 0;
-> +}
+I looked in your slave-dma tree but can't find the patch there. The
+names are not defined as constant in that tree.
 
-[]..
-> +
-> +void __init omap4_init_time(void)
-> +{
-> +	omap4_clk_init_dt();
-> +	omap4_local_timer_init();
-> +}
+Regards
 
-I guess you did all this because of_clk_add_provider() needs
-slab to be initialized. With the below patch[1], now clk inits
-happen within .init_timer already, so none of this would
-be needed.
+Markus
 
-[1] http://www.spinics.net/lists/arm-kernel/msg231288.html
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
