@@ -1,21 +1,31 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 21 Mar 2013 09:56:04 +0800
-Subject: Request the linux-next inclusion for IMX/MXS tree
-Message-ID: <20130321015602.GA23109@S2101-09.ap.freescale.net>
+From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
+Date: Thu, 21 Mar 2013 10:56:22 +0900
+Subject: [BUG][mvebu] mvneta: cannot request irq 25 on openblocks-ax3
+In-Reply-To: <514895C5.40706@free-electrons.com>
+References: <51486445.8040506@hitachi.com> <20130319133928.GE3137@localhost>
+ <514873FB.5050202@hitachi.com> <514895C5.40706@free-electrons.com>
+Message-ID: <514A68C6.707@hitachi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+(2013/03/20 1:43), Gregory CLEMENT wrote:
+> Hi Masami,
+> 
+> You can try this patch if you want.
+> I don't have the hardware today so I didn't test it.
+> If you (and also Florian and Ezequiel) can test it and if it fixed
+> the bug, then I will be able send a proper email for it,
 
-Can you please help include the following branch into linux-next?
+Hi Gregory,
 
-  git://git.linaro.org/people/shawnguo/linux-2.6.git for-next
+Thank you for giving me the latest patch.
+I've tested it on OpenBlocks-AX4 and that fixed the problem!
 
-I used to rely on arm-soc's for-next branch to expose the IMX/MXS
-patches I collect on linux-next.  But it turns out that the procedure
-takes a longer time than I expect to finish, and it causes that patches
-are not shown on linux-next in time and problems are not found at the
-earliest time.
+Tested-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
 
 Thanks,
-Shawn
+-- 
+Masami HIRAMATSU
+IT Management Research Dept. Linux Technology Center
+Hitachi, Ltd., Yokohama Research Laboratory
+E-mail: masami.hiramatsu.pt at hitachi.com
