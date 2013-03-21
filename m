@@ -1,48 +1,54 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu, 21 Mar 2013 06:43:26 -0300
-Subject: [PATCH 06/16] thermal: mvebu: Convert to devm_ioremap_resource()
-In-Reply-To: <20130321061024.GH21478@lunn.ch>
-References: <1363818997-23137-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1363818997-23137-7-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130321061024.GH21478@lunn.ch>
-Message-ID: <20130321094325.GB2469@localhost>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Thu, 21 Mar 2013 11:45:01 +0200
+Subject: [PATCH] clk: add table lookup to mux
+In-Reply-To: <20130320155158.11073.43798@quantum>
+References: <1363113747-6572-1-git-send-email-pdeschrijver@nvidia.com>
+ <20130319235110.8663.67548@quantum>
+ <20130320094957.GG18519@tbergstrom-lnx.Nvidia.com>
+ <20130320155158.11073.43798@quantum>
+Message-ID: <20130321094501.GP18519@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 21, 2013 at 07:10:24AM +0100, Andrew Lunn wrote:
-> On Wed, Mar 20, 2013 at 07:36:27PM -0300, Ezequiel Garcia wrote:
-> > Convert devm_request_and_ioremap() to the newly introduced
-> > devm_ioremap_resource() which provides more consistent error handling.
+On Wed, Mar 20, 2013 at 04:51:58PM +0100, Mike Turquette wrote:
+> Quoting Peter De Schrijver (2013-03-20 02:49:57)
+> > On Wed, Mar 20, 2013 at 12:51:10AM +0100, Mike Turquette wrote:
+> > > Quoting Peter De Schrijver (2013-03-12 11:42:23)
+> > > > diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
+> > > > index 9c7f580..53d39c2 100644
+> > > > --- a/include/linux/clk-private.h
+> > > > +++ b/include/linux/clk-private.h
+> > > > @@ -144,12 +144,13 @@ struct clk {
+> > > >  
+> > > >  #define DEFINE_CLK_MUX(_name, _parent_names, _parents, _flags, \
+> > > >                                 _reg, _shift, _width,           \
+> > > > -                               _mux_flags, _lock)              \
+> > > > +                               _mux_flags, _table, _lock)      \
+> > > >         static struct clk _name;                                \
+> > > >         static struct clk_mux _name##_hw = {                    \
+> > > >                 .hw = {                                         \
+> > > >                         .clk = &_name,                          \
+> > > >                 },                                              \
+> > > > +               .table = _table,                                \
+> > > >                 .reg = _reg,                                    \
+> > > >                 .shift = _shift,                                \
+> > > >                 .width = _width,                                \
+> > > 
+> > > This breaks OMAP horribly since OMAP already uses this macro.  There are
+> > > two options:
+> > > 
+> > > 1) stop using statically initialized data and no longer use
+> > > clk-private.h macros.  I was under the impression that the tegra clock
+> > > data no longer required this?
 > > 
-> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > ---
-> >  drivers/thermal/mvebu_thermal.c |    6 ++----
-> >  1 files changed, 2 insertions(+), 4 deletions(-)
+> > Ok. We don't do that anymore. Maybe I just modified it out of habbit...
 > > 
-> > diff --git a/drivers/thermal/mvebu_thermal.c b/drivers/thermal/mvebu_thermal.c
-> > index ef04e4e..089b43d 100644
-> > --- a/drivers/thermal/mvebu_thermal.c
-> > +++ b/drivers/thermal/mvebu_thermal.c
-> > @@ -86,11 +86,9 @@ static int mvebu_thermal_probe(struct platform_device *pdev)
-> >  	if (!priv)
-> >  		return -ENOMEM;
-> >  
-> > -	priv->sensor = devm_request_and_ioremap(&pdev->dev, res);
-> > -	if (!priv->sensor) {
-> > -		dev_err(&pdev->dev, "Failed to request_ioremap memory\n");
-> > +	priv->sensor = devm_ioremap_resource(&pdev->dev, res);
-> > +	if (!priv->sensor)
-> >  		return -EADDRNOTAVAIL;
-> > -	}
 > 
-> 
-> It would be better to return priv->sensor, not a fixed error code.
+> Cool.  Will you send a V2 that drops the macro changes?
 > 
 
-Good catch! I missed that.
+Yes. Coming soon :)
 
-Thanks,
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Cheers,
+
+Peter.
