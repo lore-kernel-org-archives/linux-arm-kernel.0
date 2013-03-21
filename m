@@ -1,70 +1,130 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 21 Mar 2013 15:48:25 +0200
-Subject: [PATCH] ARM: OMAP4: clock: Initialize USB DPLL
-Message-ID: <1363873705-3224-1-git-send-email-rogerq@ti.com>
+From: ulf.hansson@stericsson.com (Ulf Hansson)
+Date: Thu, 21 Mar 2013 14:48:13 +0100
+Subject: [PATCH V2 3/3] clk: Fixup locking issues for clk_set_parent
+In-Reply-To: <1363873693-30902-1-git-send-email-ulf.hansson@stericsson.com>
+References: <1363873693-30902-1-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <1363873693-30902-4-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the bootloader doesn't configure USB DPLL (e.g. in u-boot,
-disable CONFIG_USB_EHCI_OMAP), then we get all sorts of problems
-like
-- division by zero errors at boot [1]
-- USB DPLL fails to enter locked state
-- USB EHCI Host is non functional
-- Device can't enter OFF mode
+From: Ulf Hansson <ulf.hansson@linaro.org>
 
-Initializing the USB DPLL fixes all these issues.
+Updating the clock tree topology must be protected with the spinlock
+when doing clk_set_parent, otherwise we can not handle the migration
+of the enable_count in a safe manner.
 
-[1]
+While issuing the .set_parent callback to make the clk-hw perform the
+switch to the new parent, we can not hold the spinlock since it is must
+be allowed to be slow path. This complicates error handling, but is still
+possible to achieve.
 
-[    0.000000] clock: dpll_usb_ck failed transition to 'locked'
-[    0.000000] Division by zero in kernel.
-[    0.000000] [<c001b00c>] (unwind_backtrace+0x0/0xf0) from [<c02b2378>] (Ldiv0+0x8/0x10)
-[    0.000000] [<c02b2378>] (Ldiv0+0x8/0x10) from [<c041cf3c>] (clk_divider_set_rate+0x10/0x124)
-[    0.000000] [<c041cf3c>] (clk_divider_set_rate+0x10/0x124) from [<c041bfc4>] (clk_change_rate+0x3c/0xb4)
-[    0.000000] [<c041bfc4>] (clk_change_rate+0x3c/0xb4) from [<c041c028>] (clk_change_rate+0xa0/0xb4)
-
-Signed-off-by: Roger Quadros <rogerq@ti.com>
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- arch/arm/mach-omap2/cclock44xx_data.c |   19 +++++++++++++++++++
- 1 files changed, 19 insertions(+), 0 deletions(-)
+ drivers/clk/clk.c |   68 +++++++++++++++++++++++++++++++++++++++--------------
+ 1 file changed, 51 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/cclock44xx_data.c b/arch/arm/mach-omap2/cclock44xx_data.c
-index bfc46c1..6127bb9 100644
---- a/arch/arm/mach-omap2/cclock44xx_data.c
-+++ b/arch/arm/mach-omap2/cclock44xx_data.c
-@@ -53,6 +53,12 @@
-  */
- #define OMAP4_DPLL_ABE_DEFFREQ				98304000
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index c7eb0d7..fee7628 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -1300,30 +1300,69 @@ static int __clk_set_parent(struct clk *clk, struct clk *parent, u8 p_index)
+ 	unsigned long flags;
+ 	int ret;
+ 	struct clk *old_parent = clk->parent;
++	bool migrated_enable = false;
  
-+/*
-+ * OMAP4450 TRM Rev X, section "3.6.3.9.5 DPLL_USB Preferred Settings"
-+ * states it must be at 960MHz
-+ */
-+#define OMAP4_DPLL_USB_DEFFREQ				960000000
+-	/* migrate prepare and enable */
++	/* migrate prepare */
+ 	if (clk->prepare_count)
+ 		__clk_prepare(parent);
+ 
+-	/* FIXME replace with clk_is_enabled(clk) someday */
+ 	spin_lock_irqsave(&enable_lock, flags);
+-	if (clk->enable_count)
 +
- /* Root clocks */
- 
- DEFINE_CLK_FIXED_RATE(extalt_clkin_ck, CLK_IS_ROOT, 59000000, 0x0);
-@@ -1729,6 +1735,19 @@ int __init omap4xxx_clk_init(void)
- 	omap2_clk_disable_autoidle_all();
- 
- 	/*
-+	 * Lock USB_DPLL to avoid issues with USB host and OFF mode
-+	 */
-+	rc = clk_set_rate(&dpll_usb_ck, OMAP4_DPLL_USB_DEFFREQ);
-+	if (rc) {
-+		pr_err("%s: failed to configure DPLL_USB: %d\n", __func__, rc);
-+	} else {
-+		rc = clk_set_rate(&dpll_usb_m2_ck, OMAP4_DPLL_USB_DEFFREQ/2);
-+		if (rc)
-+			pr_err("%s: failed to configure DPLL_USB_M2: %d\n",
-+								__func__, rc);
++	/* migrate enable */
++	if (clk->enable_count) {
+ 		__clk_enable(parent);
++		migrated_enable = true;
 +	}
 +
-+	/*
- 	 * On OMAP4460 the ABE DPLL fails to turn on if in idle low-power
- 	 * state when turning the ABE clock domain. Workaround this by
- 	 * locking the ABE DPLL on boot.
++	/* update the clk tree topology */
++	clk_reparent(clk, parent);
++
+ 	spin_unlock_irqrestore(&enable_lock, flags);
+ 
+ 	/* change clock input source */
+ 	ret = clk->ops->set_parent(clk->hw, p_index);
++	if (ret) {
++		/*
++		 * The error handling is tricky due to that we need to release
++		 * the spinlock while issuing the .set_parent callback. This
++		 * means the new parent might have been enabled/disabled in
++		 * between, which must be considered when doing rollback.
++		 */
++		spin_lock_irqsave(&enable_lock, flags);
+ 
+-	/* clean up old prepare and enable */
+-	spin_lock_irqsave(&enable_lock, flags);
+-	if (clk->enable_count)
++		clk_reparent(clk, old_parent);
++
++		if (migrated_enable && clk->enable_count) {
++			__clk_disable(parent);
++		} else if (migrated_enable && (clk->enable_count == 0)) {
++			__clk_disable(old_parent);
++		} else if (!migrated_enable && clk->enable_count) {
++			__clk_disable(parent);
++			__clk_enable(old_parent);
++		}
++
++		spin_unlock_irqrestore(&enable_lock, flags);
++
++		if (clk->prepare_count)
++			__clk_unprepare(parent);
++
++		return ret;
++	}
++
++	/* clean up enable for old parent if migration was done */
++	if (migrated_enable) {
++		spin_lock_irqsave(&enable_lock, flags);
+ 		__clk_disable(old_parent);
+-	spin_unlock_irqrestore(&enable_lock, flags);
++		spin_unlock_irqrestore(&enable_lock, flags);
++	}
+ 
++	/* clean up prepare for old parent if migration was done */
+ 	if (clk->prepare_count)
+ 		__clk_unprepare(old_parent);
+ 
+-	return ret;
++	/* update debugfs with new clk tree topology */
++	clk_debug_reparent(clk, parent);
++	return 0;
+ }
+ 
+ /**
+@@ -1381,16 +1420,11 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
+ 	/* do the re-parent */
+ 	ret = __clk_set_parent(clk, parent, p_index);
+ 
+-	/* propagate ABORT_RATE_CHANGE if .set_parent failed */
+-	if (ret) {
++	/* propagate rate recalculation accordingly */
++	if (ret)
+ 		__clk_recalc_rates(clk, ABORT_RATE_CHANGE);
+-		goto out;
+-	}
+-
+-	/* propagate rate recalculation downstream */
+-	clk_reparent(clk, parent);
+-	clk_debug_reparent(clk, parent);
+-	__clk_recalc_rates(clk, POST_RATE_CHANGE);
++	else
++		__clk_recalc_rates(clk, POST_RATE_CHANGE);
+ 
+ out:
+ 	mutex_unlock(&prepare_lock);
 -- 
-1.7.4.1
+1.7.10
