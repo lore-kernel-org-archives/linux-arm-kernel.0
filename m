@@ -1,131 +1,135 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 21 Mar 2013 07:52:45 -0500
-Subject: [PATCH] ARM: convert arm/arm64 arch timer to use CLKSRC_OF init
-In-Reply-To: <20130321110646.GE15279@e106331-lin.cambridge.arm.com>
-References: <1363818875-15978-1-git-send-email-robherring2@gmail.com>
- <20130321110646.GE15279@e106331-lin.cambridge.arm.com>
-Message-ID: <514B029D.1010409@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 21 Mar 2013 13:02:18 +0000
+Subject: Integrator PCI base dilemma
+In-Reply-To: <CACRpkdaOjFhWR21w5x_rR_60ffQF3Ym_MQd2svNyzm0guwOUoQ@mail.gmail.com>
+References: <CACRpkdaOjFhWR21w5x_rR_60ffQF3Ym_MQd2svNyzm0guwOUoQ@mail.gmail.com>
+Message-ID: <201303211302.19058.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/21/2013 06:06 AM, Mark Rutland wrote:
-> Hi Rob,
+On Wednesday 20 March 2013, Linus Walleij wrote:
+> When trying to convert the Integrator/AP to use Device Tree
+> for the PCI bridge/hose I run into these two problems:
 > 
-> (adding Marc to Cc as he may have comments).
+> - Unable to assign vga_base early since this should be a virtual
+>   address assigned really early. If I sacrifice this and try to
+>   just remap the stuff, I still run into:
 > 
-> On Wed, Mar 20, 2013 at 10:34:35PM +0000, Rob Herring wrote:
->> From: Rob Herring <rob.herring@calxeda.com>
->>
->> This converts arm and arm64 to use CLKSRC_OF DT based initialization for
->> the arch timer. A new function arch_timer_arch_init is added to allow for
->> arch specific setup.
->>
->> This has a side effect of enabling sched_clock on omap5 and exynos5. There
->> should not be any reason not to use the arch timers for sched_clock.
+> - Unable to ioremap the PCI memory and config window because
+>   it is 16 MiB big. (I guess this is the problem?)
 > 
-> Nice! I was just about to post a (slightly updated) version of Thomas Abraham's
-> arch_timer clocksource_of_init patch, but this seems much more comprehensive.
+> Part of the code path is called from .map_io() and basically looks
+> like this:
 > 
-> I have some other arch_timer patches which may clash, but they could be rebased
-> atop of this.
+> int __init pci_v3_early_init(void)
+> {
+> 	iotable_init(pci_v3_io_desc, ARRAY_SIZE(pci_v3_io_desc));
+> 	vga_base = PCI_MEMORY_VADDR;
+> 	pci_map_io_early(__phys_to_pfn(PHYS_PCI_IO_BASE));
+> 	return 0;
+> }
+> 
+> The VGA console seems to be the sole user (unsure what
+> pci_map_io_early() is for), and we like to support VGA console.
 
-[snip]
+Yes, this is certainly required only for the VGA console
 
->> @@ -446,10 +446,7 @@ static void __init v2m_dt_timer_init(void)
->>                                 irq_of_parse_and_map(node, 0));
->>         }
->>
->> -       arch_timer_of_register();
->> -
->> -       if (arch_timer_sched_clock_init() != 0)
->> -               versatile_sched_clock_init(vexpress_get_24mhz_clock_base(),
->> +       versatile_sched_clock_init(vexpress_get_24mhz_clock_base(),
->>                                 24000000);
->>  }
->>
-> 
-> On TC2 this series leads to using the vexpress 24MHz clock as the sched clock
-> in preference to the architected timer:
-> 
->   Architected local timer running at 24.00MHz (virt).
->   Switching to timer-based delay loop
->   Registered arch_counter_get_cntvct+0x0/0x14 as sched_clock source
->   sched_clock: 32 bits at 24MHz, resolution 41ns, wraps every 178956ms
->   Registered versatile_read_sched_clock+0x0/0x28 as sched_clock source
-> 
-> As they both have the same frequency, neither overrides the other, and
-> whichever gets registered last is used as the sched_clock. As accesses to the
-> architected timer are going to have a much lower overhead, this isn't very nice
-> (and it could be better to use it even if it had a lower frequency).
-> 
-> We could move the versatile_sched_clock_init call before the
-> clocksource_of_init, but that doesn't feel like an ideal solution. We may have
-> similar problems elsewhere.
+> The problem is that at this point at iomap the device tree is not yet
+> populated.
 
-The intention was that a 64-bit counter is preferred. This should fix 
-that. It would be nice if we could describe access overhead to make a decision. 
-For now, I think 32 vs. 64 bit is sufficient.
+I think it's fine to leave the static mapping in place for this,
+you don't necessarily have to get it from DT here, since it seems
+like a reasonable use of map_io().
 
-diff --git a/arch/arm/kernel/sched_clock.c b/arch/arm/kernel/sched_clock.c
-index 1708357..aa18e45 100644
---- a/arch/arm/kernel/sched_clock.c
-+++ b/arch/arm/kernel/sched_clock.c
-@@ -115,7 +115,7 @@ void __init setup_sched_clock(u32 (*read)(void), int bits, unsigned long rate)
- 	u64 res, wrap;
- 	char r_unit;
- 
--	if (cd.rate > rate)
-+	if (cd.rate > rate || read_sched_clock_64)
- 		return;
- 
- 	BUG_ON(bits > 32);
-@@ -168,7 +168,7 @@ void __init setup_sched_clock(u32 (*read)(void), int bits, unsigned long rate)
- 
- void __init setup_sched_clock_64(u64 (*read)(void), unsigned long rate)
- {
--	if (cd.rate > rate)
-+	if (read_sched_clock_64 && (cd.rate > rate))
- 		return;
- 
- 	WARN_ON(!irqs_disabled());
-
-
->> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
->> index d7ad425..afb70aa 100644
->> --- a/drivers/clocksource/arm_arch_timer.c
->> +++ b/drivers/clocksource/arm_arch_timer.c
->> @@ -337,24 +337,11 @@ out:
->>         return err;
->>  }
->>
->> -static const struct of_device_id arch_timer_of_match[] __initconst = {
->> -       { .compatible   = "arm,armv7-timer",    },
->> -       { .compatible   = "arm,armv8-timer",    },
->> -       {},
->> -};
->> -
->> -int __init arch_timer_init(void)
->> +static void __init arch_timer_init(struct device_node *np)
->>  {
->> -       struct device_node *np;
->>         u32 freq;
->>         int i;
->>
+> The iomem table looks like this:
 > 
-> If we the following here:
-> 
-> 	if (arch_timer_get_rate()) {
-> 		pr_warn("arch_timer: multiple nodes in dt, skipping\n");
-> 		return;
+> /*
+>  * Static mappings for the PCIv3 bridge
+>  *
+>  * e8000000	40000000	PCI memory		PHYS_PCI_MEM_BASE	(max 512M)
+>  * ec000000	61000000	PCI config space	PHYS_PCI_CONFIG_BASE	(max 16M)
+>  * fee00000	60000000	PCI IO			PHYS_PCI_IO_BASE	(max 16M)
+>  */
+> static struct map_desc pci_v3_io_desc[] __initdata __maybe_unused = {
+> 	{
+> 		.virtual	= (unsigned long)PCI_MEMORY_VADDR,
+> 		.pfn		= __phys_to_pfn(PHYS_PCI_MEM_BASE),
+> 		.length		= SZ_16M,
+> 		.type		= MT_DEVICE
+> 	}, {
+> 		.virtual	= (unsigned long)PCI_CONFIG_VADDR,
+> 		.pfn		= __phys_to_pfn(PHYS_PCI_CONFIG_BASE),
+> 		.length		= SZ_16M,
+> 		.type		= MT_DEVICE
 > 	}
+> };
 > 
-> We may save ourselves a whole world of pain with dts which (erroneously) have
-> multiple timer nodes (though these are now disappearing). Otherwise we could
-> have a memory leak and multiple instances of the cpu0 timer registered, which
-> could lead to all sorts of weirdness. The existing code side-steps this issue
-> by only grabbing the first node, so this would keep things consistent.
+> Does anyone have any hints on how to get out of this need to have the
+> base addresses so early?
 > 
+> Or am I doing something wrong when I try to push in this map
+> later? I tried to just ioremap() them later but that doesn't
+> seem to work at all. Too big?
 
-Okay, I'll add.
+I think the key is the VGA_MAP_MEM() function that can be defined in a number
+of ways:
 
-Rob
+arch/alpha/include/asm/vga.h:#define VGA_MAP_MEM(x,s)   ((unsigned long) ioremap(x, s))
+arch/arm/include/asm/vga.h:#define VGA_MAP_MEM(x,s)     (vga_base + (x))
+arch/ia64/include/asm/vga.h:#define VGA_MAP_MEM(x,s)    ((unsigned long) ioremap_nocache(vga_console_membase + (x
+arch/m32r/include/asm/vga.h:#define VGA_MAP_MEM(x,s) (unsigned long)phys_to_virt(x)
+arch/mips/include/asm/vga.h:#define VGA_MAP_MEM(x, s)   (0xb0000000L + (unsigned long)(x))
+arch/powerpc/include/asm/vga.h:#define VGA_MAP_MEM(x,s) ((unsigned long) ioremap((x), s))
+arch/powerpc/include/asm/vga.h:#define VGA_MAP_MEM(x,s) (x + vgacon_remap_base)
+arch/sparc/include/asm/vga.h:#define VGA_MAP_MEM(x,s) (x)
+arch/tile/include/asm/vga.h:#define VGA_MAP_MEM(x,s)    ((unsigned long) ioremap(x, s))
+arch/x86/include/asm/vga.h:#define VGA_MAP_MEM(x, s) (unsigned long)phys_to_virt(x)
+arch/xtensa/include/asm/vga.h:#define VGA_MAP_MEM(x,s) (unsigned long)phys_to_virt(x)
+
+On xtensa and x86, the low PCI memory addresses are actually mapped into the
+physical address space, so they already have a mapping. It seems the same is
+true on sparc, which apparently also relies on a 1:1 mapping of virtual to physical
+addresses in the kernel. m32r is probably a copy-paste bug since it has no PCI.
+
+Alpha, IA64, PPC64, and Tile use ioremap there, which seems reasonable especially
+given that the at least the vga16fb assumes it can iounmap the pointer returned
+by VGA_MAP_MEM when unloading. Again, I'd assume that tile is incorrectly copied from
+one of the others, but it might actually work. All but ia64 here rely on the VGA
+registers and memory and ROM being mapped into physical addresses 0xA0000-0xC7fff
+as they are on PCs.
+
+ARM, MIPS and PPC32 map the registers at boot time into a fixed or known virtual
+address, but all implementations are really suspicious:
+* On ppc32, nothing is ever assigned to vgacon_remap_base, I assume the last user
+  is long gone, this may have been the PREP platform that got marked as BROKEN
+  in 2005. A NULL vgacon_remap_base cannot work, since that would imply that the
+  VGA memory is mapped into a low virtual address, i.e. user space.
+* On MIPS, this seems to work only on the legacy RM200/300/400 platform, although
+  I don't actually see where it's being mapped, and none of the platform defconfigs
+  enable VGA_CONSOLE.
+* On ARM, we have these definitions:
+
+arch/arm/mach-dove/pcie.c:      vga_base = DOVE_PCIE0_MEM_PHYS_BASE;
+arch/arm/mach-footbridge/dc21285.c:     vga_base = PCIMEM_BASE;
+arch/arm/mach-integrator/integrator_ap.c:       vga_base = PCI_MEMORY_VADDR;
+arch/arm/mach-kirkwood/pcie.c:  vga_base = KIRKWOOD_PCIE_MEM_PHYS_BASE;
+arch/arm/mach-mv78xx0/pcie.c:   vga_base = MV78XX0_PCIE_MEM_PHYS_BASE;
+arch/arm/mach-orion5x/pci.c:    vga_base = ORION5X_PCIE_MEM_PHYS_BASE;
+arch/arm/mach-shark/pci.c:      vga_base = 0xe8000000;
+
+Dove/integrator/kirkwood/mv78xx0/orion5x all put a *physical* address in here,
+which cannot work, since that is not mapped anywhere.
+
+Footbridge and integrator get it right, presumably because Russell was actually
+using that code ;-)
+Shark does not map anything to the vga_base, so that does not work. It used
+to map a lot of registers, but has not mapped the first megabyte of the PCI
+memory space since the start of git history.
+
+Now what does this all tell us? First of all I think you are free to change
+it in any way that does not break footbridge, since everything else is already
+broken. I think the most logical way forward would be to use the same method
+as ia64 and use ioremap() with a platform-specific offset, but keeping the
+static mapping would probably be easier to do.
+
+	Arnd
