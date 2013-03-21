@@ -1,38 +1,50 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 21 Mar 2013 21:37:51 +0100
-Subject: [PATCH 5/5] arm: dts: Convert mvebu device tree files to 64 bits
-In-Reply-To: <20130321212236.1015295d@skate>
-References: <1363883179-1361-1-git-send-email-gregory.clement@free-electrons.com>
- <1363883179-1361-6-git-send-email-gregory.clement@free-electrons.com>
- <20130321201533.GN21478@lunn.ch> <20130321212236.1015295d@skate>
-Message-ID: <20130321203751.GP21478@lunn.ch>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Thu, 21 Mar 2013 17:38:57 -0300
+Subject: [PATCH 08/16] thermal: mvebu: Fix temperature output formula for
+ kirkwood
+In-Reply-To: <20130321192046.GQ4977@n2100.arm.linux.org.uk>
+References: <1363818997-23137-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1363818997-23137-9-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130321192046.GQ4977@n2100.arm.linux.org.uk>
+Message-ID: <20130321203856.GA3366@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 21, 2013 at 09:22:36PM +0100, Thomas Petazzoni wrote:
-> Dear Andrew Lunn,
-> 
-> On Thu, 21 Mar 2013 21:15:33 +0100, Andrew Lunn wrote:
-> 
-> > Could you recommend a document which introduces LPAE.
+On Thu, Mar 21, 2013 at 07:20:46PM +0000, Russell King - ARM Linux wrote:
+> On Wed, Mar 20, 2013 at 07:36:29PM -0300, Ezequiel Garcia wrote:
+> > The temperature formula was taken from the Armada 510 datasheet.
+> > This is wrong because the Kirkwood SoC thermal sensor has
+> > different coefficients.
 > > 
-> > Only being able to address 7GB seems a bit odd to me. I kind of
-> > expected you set up the translation tables to map a page in the 32 bit
-> > address range to any arbitrary page in the 40 bit address range. So
-> > leaving 0xC0000000 to 0xffffffff in the 32bit address range clear is
-> > easy. But why do you loose space in the 40bit address range?
+> > Fix it using values from 88F682/88F683 Kirkwood datasheet.
 > 
-> translation tables convert virtual addresses to physical addresses.
-> Here, we are only talking about physical addresses. There is an overlap
-> between the physical addresses used by the RAM, and the physical
-> addresses at which I/O devices are visible.
+> Err, hang on.  You've changed this from being a Kirkwood specific
+> driver to being a "mvebu" driver, which I had understood was being
+> done to cover all Kirkwood, Dove, etc SoCs.
 > 
-> And I'm not sure the SDRAM address decoding windows allows to split the
-> first 4 GB of RAM into two areas, one that would be mapped starting at
-> physical address 0x0, and another area that would be mapped at a
-> different address (above 4 GB).
+> If that's the case, then this change is wrong because you break it
+> for Dove.
+> 
+> If the coefficients are different between Kirkwood and Dove, then
+> it needs to be adapted at run time depending on whether it's running
+> on Kirkwood or Dove - not just having the coefficients changed at
+> compile time to suit a different set of platforms.
+> 
+> If it's worth making a change, do it *properly*.
 
-So why not map the whole SDRAM above 4GB physical address?
+I'm not sure I'm following you.
 
-   Thanks
-	Andrew
+This patch fixes the Kirkwood formula on a driver that,
+at this point, only supports Kirkwood.
+
+Dove SoC thermal sensor is supported in dove-thermal,
+until it's merged in patch 13/16 (i.e. after this patch).
+
+AFAIK, I'm not breaking support for any platform in any
+point of the patchset.
+
+Perhaps I'm missing something?
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
