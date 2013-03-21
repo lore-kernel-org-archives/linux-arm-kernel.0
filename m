@@ -1,83 +1,122 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 21 Mar 2013 15:59:38 +0000
-Subject: [PATCH 41/46] regulator: ab8500: Remove the need for a 'delay'
- property
+Date: Thu, 21 Mar 2013 15:59:39 +0000
+Subject: [PATCH 42/46] regulator: ab8500: Use regulator_list_voltage_table()
+ to look-up voltages
 In-Reply-To: <1363881583-15234-1-git-send-email-lee.jones@linaro.org>
 References: <1363881583-15234-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1363881583-15234-42-git-send-email-lee.jones@linaro.org>
+Message-ID: <1363881583-15234-43-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The regulator framework now has provisions to read a regulator's
-start-up time via the 'enable_time' attribute. So let's remove all
-'enable_time'/'delay' duplication and just stick with 'enable_time'
-from now on.
+The regulator framework offers a generic regulator_list_voltage_table()
+function which can directly look-up a regulator's voltage capabilities
+using a table provided through the desc structure. This patch ensures
+that information is available.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/regulator/ab8500.c |    8 +-------
- 1 file changed, 1 insertion(+), 7 deletions(-)
+ drivers/regulator/ab8500.c |   19 ++++++-------------
+ 1 file changed, 6 insertions(+), 13 deletions(-)
 
 diff --git a/drivers/regulator/ab8500.c b/drivers/regulator/ab8500.c
-index 324444e..13948c8 100644
+index 13948c8..e82b0ad 100644
 --- a/drivers/regulator/ab8500.c
 +++ b/drivers/regulator/ab8500.c
-@@ -63,7 +63,6 @@ struct ab8500_shared_mode {
-  * @voltage_reg: register to control regulator voltage
-  * @voltage_mask: mask to control regulator voltage
-  * @voltage_shift: shift to control regulator voltage
-- * @delay: startup/set voltage delay in us
-  */
- struct ab8500_regulator_info {
- 	struct device		*dev;
-@@ -87,7 +86,6 @@ struct ab8500_regulator_info {
- 	u8 voltage_reg;
- 	u8 voltage_mask;
- 	u8 voltage_shift;
--	unsigned int delay;
- 	struct {
- 		u8 voltage_limit;
- 		u8 voltage_bank;
-@@ -652,7 +650,7 @@ static int ab8500_regulator_set_voltage_time_sel(struct regulator_dev *rdev,
- {
- 	struct ab8500_regulator_info *info = rdev_get_drvdata(rdev);
+@@ -926,7 +926,7 @@ static struct ab8500_regulator_info
+ 	 * Variable Voltage Regulators
+ 	 *   name, min mV, max mV,
+ 	 *   update bank, reg, mask, enable val
+-	 *   volt bank, reg, mask, table, table length
++	 *   volt bank, reg, mask
+ 	 */
+ 	[AB8505_LDO_AUX1] = {
+ 		.desc = {
+@@ -1140,8 +1140,6 @@ static struct ab8500_regulator_info
+ 		.voltage_reg		= 0x57,
+ 		.voltage_mask		= 0x7,
+ 		.voltage_shift		= 4,
+-		.voltages		= ldo_vaudio_voltages,
+-		.voltages_len		= ARRAY_SIZE(ldo_vaudio_voltages),
+ 	},
+ 	[AB8505_LDO_ANAMIC1] = {
+ 		.desc = {
+@@ -1223,8 +1221,6 @@ static struct ab8500_regulator_info
+ 		.voltage_bank		= 0x04,
+ 		.voltage_reg		= 0x29,
+ 		.voltage_mask		= 0x7,
+-		.voltages		= ldo_vana_voltages,
+-		.voltages_len		= ARRAY_SIZE(ldo_vana_voltages),
+ 	},
+ };
  
--	return info->delay;
-+	return info->desc.enable_time;
- }
+@@ -1235,7 +1231,7 @@ static struct ab8500_regulator_info
+ 	 * Variable Voltage Regulators
+ 	 *   name, min mV, max mV,
+ 	 *   update bank, reg, mask, enable val
+-	 *   volt bank, reg, mask, table, table length
++	 *   volt bank, reg, mask
+ 	 */
+ 	[AB9540_LDO_AUX1] = {
+ 		.desc = {
+@@ -1478,7 +1474,7 @@ static struct ab8500_regulator_info
+ 	 * Variable Voltage Regulators
+ 	 *   name, min mV, max mV,
+ 	 *   update bank, reg, mask, enable val
+-	 *   volt bank, reg, mask, table, table length
++	 *   volt bank, reg, mask
+ 	 */
+ 	[AB8540_LDO_AUX1] = {
+ 		.desc = {
+@@ -1581,6 +1577,7 @@ static struct ab8500_regulator_info
+ 			.id		= AB8540_LDO_AUX5,
+ 			.owner		= THIS_MODULE,
+ 			.n_voltages	= ARRAY_SIZE(ldo_vaux56_ab8540_voltages),
++			.volt_table	= ldo_vaux56_ab8540_voltages,
+ 		},
+ 		.load_lp_uA		= 20000,
+ 		/* values for Vaux5Regu register */
+@@ -1594,8 +1591,6 @@ static struct ab8500_regulator_info
+ 		.voltage_bank		= 0x04,
+ 		.voltage_reg		= 0x33,
+ 		.voltage_mask		= 0x3f,
+-		.voltages		= ldo_vaux56_ab8540_voltages,
+-		.voltages_len		= ARRAY_SIZE(ldo_vaux56_ab8540_voltages),
+ 	},
+ 	[AB8540_LDO_AUX6] = {
+ 		.desc = {
+@@ -1605,6 +1600,7 @@ static struct ab8500_regulator_info
+ 			.id		= AB8540_LDO_AUX6,
+ 			.owner		= THIS_MODULE,
+ 			.n_voltages	= ARRAY_SIZE(ldo_vaux56_ab8540_voltages),
++			.volt_table	= ldo_vaux56_ab8540_voltages,
+ 		},
+ 		.load_lp_uA		= 20000,
+ 		/* values for Vaux6Regu register */
+@@ -1618,8 +1614,6 @@ static struct ab8500_regulator_info
+ 		.voltage_bank		= 0x04,
+ 		.voltage_reg		= 0x36,
+ 		.voltage_mask		= 0x3f,
+-		.voltages		= ldo_vaux56_ab8540_voltages,
+-		.voltages_len		= ARRAY_SIZE(ldo_vaux56_ab8540_voltages),
+ 	},
+ 	[AB8540_LDO_INTCORE] = {
+ 		.desc = {
+@@ -1732,6 +1726,7 @@ static struct ab8500_regulator_info
+ 			.id		= AB8540_LDO_DMIC,
+ 			.owner		= THIS_MODULE,
+ 			.n_voltages	= ARRAY_SIZE(ldo_vdmic_voltages),
++			.volt_table	= ldo_vdmic_voltages,
+ 		},
+ 		.load_lp_uA		= 1000,
+ 		.update_bank		= 0x03,
+@@ -1741,8 +1736,6 @@ static struct ab8500_regulator_info
+ 		.voltage_bank		= 0x03,
+ 		.voltage_reg		= 0x83,
+ 		.voltage_mask		= 0xc0,
+-		.voltages		= ldo_vdmic_voltages,
+-		.voltages_len		= ARRAY_SIZE(ldo_vdmic_voltages),
+ 	},
  
- static struct regulator_ops ab8500_regulator_volt_mode_ops = {
-@@ -829,7 +827,6 @@ static struct ab8500_regulator_info
- 			.volt_table	= fixed_2000000_voltage,
- 			.enable_time	= 500,
- 		},
--		.delay			= 500,
- 		.load_lp_uA		= 1000,
- 		.update_bank		= 0x03,
- 		.update_reg		= 0x80,
-@@ -1100,7 +1097,6 @@ static struct ab8500_regulator_info
- 			.volt_table	= fixed_2000000_voltage,
- 			.enable_time	= 10000,
- 		},
--		.delay			= 10000,
- 		.load_lp_uA		= 1000,
- 		.update_bank		= 0x03,
- 		.update_reg		= 0x80,
-@@ -1366,7 +1362,6 @@ static struct ab8500_regulator_info
- 			.volt_table	= fixed_2000000_voltage,
- 			.enable_time	= 10000,
- 		},
--		.delay			= 10000,
- 		.load_lp_uA		= 1000,
- 		.update_bank		= 0x03,
- 		.update_reg		= 0x80,
-@@ -1664,7 +1659,6 @@ static struct ab8500_regulator_info
- 			.n_voltages	= 1,
- 			.enable_time	= 10000,
- 		},
--		.delay			= 10000,
- 		.load_lp_uA		= 1000,
- 		.update_bank		= 0x03,
- 		.update_reg		= 0x80,
+ 	/*
 -- 
 1.7.10.4
