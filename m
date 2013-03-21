@@ -1,151 +1,451 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu, 21 Mar 2013 12:49:10 +0100
-Subject: [PATCH 3/6] mfd: prcmu: pass a base and size with the early initcall
+Date: Thu, 21 Mar 2013 12:49:09 +0100
+Subject: [PATCH 2/6] clk: ux500: pass clock base adresses in init call
 In-Reply-To: <1363866553-15054-1-git-send-email-linus.walleij@stericsson.com>
 References: <1363866553-15054-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <1363866553-15054-4-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <1363866553-15054-3-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Linus Walleij <linus.walleij@linaro.org>
 
-This patch will make an early remapping of the PRCMU, to be
-used when setting up the clocks, that will call down into parts
-of the PRCMU driver before it is probed.
+The ux500 clock driver was including <mach/db8500-regs.h>
+which will not work when building for multiplatform support
+since <mach/*> is going away.
 
-Going forward this will be removed like this:
+Pass the base adresses in the init call instead.
 
-- The mailbox subsystem need to be merged.
-  http://marc.info/?l=linux-kernel&m=136314559201983&w=2
-
-- At this point the PRCMU clock code can be moved over to the
-  ux500 clock driver in drivers/clk/ux500/* and maintained
-  there in a decentralized manner.
-
-- This early initcall and PRCMU base parameters become part of
-  the ux500_clk_init() call instead.
-
-Cc: Suman Anna <s-anna@ti.com>
-Cc: Loic Pallardy <loic.pallardy@st.com>
-Cc: Samuel Ortiz <sameo@linux.intel.com>
+Cc: Ulf Hansson <ulf.hansson@linaro.org>
+Cc: Mike Turquette <mturquette@linaro.org>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-ux500/cpu.c        | 17 +++++++++++------
- drivers/mfd/db8500-prcmu.c       | 13 ++++++++++++-
- include/linux/mfd/db8500-prcmu.h |  4 ++--
- include/linux/mfd/dbx500-prcmu.h |  6 +++---
- 4 files changed, 28 insertions(+), 12 deletions(-)
+Requesting an ACK from Mike on this to merge it through
+the ARM SoC tree eventually.
+---
+ arch/arm/mach-ux500/cpu.c               |   4 +-
+ drivers/clk/ux500/u8500_clk.c           | 142 ++++++++++++++++----------------
+ include/linux/platform_data/clk-ux500.h |   3 +-
+ 3 files changed, 76 insertions(+), 73 deletions(-)
 
 diff --git a/arch/arm/mach-ux500/cpu.c b/arch/arm/mach-ux500/cpu.c
-index 741d06a..af13b6d 100644
+index 537870d..741d06a 100644
 --- a/arch/arm/mach-ux500/cpu.c
 +++ b/arch/arm/mach-ux500/cpu.c
-@@ -8,7 +8,7 @@
+@@ -72,7 +72,9 @@ void __init ux500_init_irq(void)
+ 		db8500_prcmu_early_init();
  
- #include <linux/platform_device.h>
- #include <linux/io.h>
--#include <linux/mfd/db8500-prcmu.h>
-+#include <linux/mfd/dbx500-prcmu.h>
- #include <linux/clksrc-dbx500-prcmu.h>
- #include <linux/sys_soc.h>
- #include <linux/err.h>
-@@ -68,15 +68,20 @@ void __init ux500_init_irq(void)
- 	 * Init clocks here so that they are available for system timer
- 	 * initialization.
- 	 */
--	if (cpu_is_u8500_family() || cpu_is_u9540())
--		db8500_prcmu_early_init();
--
--	if (cpu_is_u8500_family() || cpu_is_u9540())
-+	if (cpu_is_u8500_family()) {
-+		prcmu_early_init(U8500_PRCMU_BASE, SZ_8K - 1);
- 		u8500_clk_init(U8500_CLKRST1_BASE, U8500_CLKRST2_BASE,
- 			       U8500_CLKRST3_BASE, U8500_CLKRST5_BASE,
- 			       U8500_CLKRST6_BASE);
--	else if (cpu_is_u8540())
-+	} else if (cpu_is_u9540()) {
-+		prcmu_early_init(U8500_PRCMU_BASE, SZ_8K - 1);
+ 	if (cpu_is_u8500_family() || cpu_is_u9540())
+-		u8500_clk_init();
 +		u8500_clk_init(U8500_CLKRST1_BASE, U8500_CLKRST2_BASE,
 +			       U8500_CLKRST3_BASE, U8500_CLKRST5_BASE,
 +			       U8500_CLKRST6_BASE);
-+	} else if (cpu_is_u8540()) {
-+		prcmu_early_init(U8500_PRCMU_BASE, SZ_8K + SZ_4K - 1);
+ 	else if (cpu_is_u8540())
  		u8540_clk_init();
-+	}
  }
+diff --git a/drivers/clk/ux500/u8500_clk.c b/drivers/clk/ux500/u8500_clk.c
+index 6b889a0..0c9b83d 100644
+--- a/drivers/clk/ux500/u8500_clk.c
++++ b/drivers/clk/ux500/u8500_clk.c
+@@ -12,10 +12,10 @@
+ #include <linux/clk-provider.h>
+ #include <linux/mfd/dbx500-prcmu.h>
+ #include <linux/platform_data/clk-ux500.h>
+-#include <mach/db8500-regs.h>
+ #include "clk.h"
  
- void __init ux500_init_late(void)
-diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
-index 21f261b..9166427 100644
---- a/drivers/mfd/db8500-prcmu.c
-+++ b/drivers/mfd/db8500-prcmu.c
-@@ -2825,8 +2825,19 @@ static void dbx500_fw_version_init(struct platform_device *pdev,
- 	}
- }
- 
--void __init db8500_prcmu_early_init(void)
-+void __init db8500_prcmu_early_init(u32 phy_base, u32 size)
+-void u8500_clk_init(void)
++void u8500_clk_init(u32 clkrst1_base, u32 clkrst2_base, u32 clkrst3_base,
++		    u32 clkrst5_base, u32 clkrst6_base)
  {
-+	/*
-+	 * This is a temporary remap to bring up the clocks. It is
-+	 * subsequently replaces with a real remap. After the merge of
-+	 * the mailbox subsystem all of this early code goes away, and the
-+	 * clock driver can probe independently. An early initcall will
-+	 * still be needed, but it can be diverted into drivers/clk/ux500/*.
-+	 */
-+	prcmu_base = ioremap(phy_base, size);
-+	if (!prcmu_base)
-+		pr_err("%s: ioremap() of prcmu registers failed!\n", __func__);
-+
- 	spin_lock_init(&mb0_transfer.lock);
- 	spin_lock_init(&mb0_transfer.dbb_irqs_lock);
- 	mutex_init(&mb0_transfer.ac_wake_lock);
-diff --git a/include/linux/mfd/db8500-prcmu.h b/include/linux/mfd/db8500-prcmu.h
-index 77a46ae..ac943df 100644
---- a/include/linux/mfd/db8500-prcmu.h
-+++ b/include/linux/mfd/db8500-prcmu.h
-@@ -489,7 +489,7 @@ struct prcmu_auto_pm_config {
+ 	struct prcmu_fw_version *fw_version;
+ 	const char *sgaclk_parent = NULL;
+@@ -215,147 +215,147 @@ void u8500_clk_init(void)
+ 	 */
  
- #ifdef CONFIG_MFD_DB8500_PRCMU
+ 	/* PRCC P-clocks */
+-	clk = clk_reg_prcc_pclk("p1_pclk0", "per1clk", U8500_CLKRST1_BASE,
++	clk = clk_reg_prcc_pclk("p1_pclk0", "per1clk", clkrst1_base,
+ 				BIT(0), 0);
+ 	clk_register_clkdev(clk, "apb_pclk", "uart0");
  
--void db8500_prcmu_early_init(void);
-+void db8500_prcmu_early_init(u32 phy_base, u32 size);
- int prcmu_set_rc_a2p(enum romcode_write);
- enum romcode_read prcmu_get_rc_p2a(void);
- enum ap_pwrst prcmu_get_xp70_current_state(void);
-@@ -553,7 +553,7 @@ void db8500_prcmu_write_masked(unsigned int reg, u32 mask, u32 value);
+-	clk = clk_reg_prcc_pclk("p1_pclk1", "per1clk", U8500_CLKRST1_BASE,
++	clk = clk_reg_prcc_pclk("p1_pclk1", "per1clk", clkrst1_base,
+ 				BIT(1), 0);
+ 	clk_register_clkdev(clk, "apb_pclk", "uart1");
  
- #else /* !CONFIG_MFD_DB8500_PRCMU */
+-	clk = clk_reg_prcc_pclk("p1_pclk2", "per1clk", U8500_CLKRST1_BASE,
++	clk = clk_reg_prcc_pclk("p1_pclk2", "per1clk", clkrst1_base,
+ 				BIT(2), 0);
+ 	clk_register_clkdev(clk, "apb_pclk", "nmk-i2c.1");
  
--static inline void db8500_prcmu_early_init(void) {}
-+static inline void db8500_prcmu_early_init(u32 phy_base, u32 size) {}
+-	clk = clk_reg_prcc_pclk("p1_pclk3", "per1clk", U8500_CLKRST1_BASE,
++	clk = clk_reg_prcc_pclk("p1_pclk3", "per1clk", clkrst1_base,
+ 				BIT(3), 0);
+ 	clk_register_clkdev(clk, "apb_pclk", "msp0");
+ 	clk_register_clkdev(clk, "apb_pclk", "ux500-msp-i2s.0");
  
- static inline int prcmu_set_rc_a2p(enum romcode_write code)
- {
-diff --git a/include/linux/mfd/dbx500-prcmu.h b/include/linux/mfd/dbx500-prcmu.h
-index 3abcca9..8c546cb 100644
---- a/include/linux/mfd/dbx500-prcmu.h
-+++ b/include/linux/mfd/dbx500-prcmu.h
-@@ -276,9 +276,9 @@ struct prcmu_fw_version {
+-	clk = clk_reg_prcc_pclk("p1_pclk4", "per1clk", U8500_CLKRST1_BASE,
++	clk = clk_reg_prcc_pclk("p1_pclk4", "per1clk", clkrst1_base,
+ 				BIT(4), 0);
+ 	clk_register_clkdev(clk, "apb_pclk", "msp1");
+ 	clk_register_clkdev(clk, "apb_pclk", "ux500-msp-i2s.1");
  
- #if defined(CONFIG_UX500_SOC_DB8500)
+-	clk = clk_reg_prcc_pclk("p1_pclk5", "per1clk", U8500_CLKRST1_BASE,
++	clk = clk_reg_prcc_pclk("p1_pclk5", "per1clk", clkrst1_base,
+ 				BIT(5), 0);
+ 	clk_register_clkdev(clk, "apb_pclk", "sdi0");
  
--static inline void __init prcmu_early_init(void)
-+static inline void prcmu_early_init(u32 phy_base, u32 size)
- {
--	return db8500_prcmu_early_init();
-+	return db8500_prcmu_early_init(phy_base, size);
+-	clk = clk_reg_prcc_pclk("p1_pclk6", "per1clk", U8500_CLKRST1_BASE,
++	clk = clk_reg_prcc_pclk("p1_pclk6", "per1clk", clkrst1_base,
+ 				BIT(6), 0);
+ 	clk_register_clkdev(clk, "apb_pclk", "nmk-i2c.2");
+ 
+-	clk = clk_reg_prcc_pclk("p1_pclk7", "per1clk", U8500_CLKRST1_BASE,
++	clk = clk_reg_prcc_pclk("p1_pclk7", "per1clk", clkrst1_base,
+ 				BIT(7), 0);
+ 	clk_register_clkdev(clk, NULL, "spi3");
+ 
+-	clk = clk_reg_prcc_pclk("p1_pclk8", "per1clk", U8500_CLKRST1_BASE,
++	clk = clk_reg_prcc_pclk("p1_pclk8", "per1clk", clkrst1_base,
+ 				BIT(8), 0);
+ 	clk_register_clkdev(clk, "apb_pclk", "slimbus0");
+ 
+-	clk = clk_reg_prcc_pclk("p1_pclk9", "per1clk", U8500_CLKRST1_BASE,
++	clk = clk_reg_prcc_pclk("p1_pclk9", "per1clk", clkrst1_base,
+ 				BIT(9), 0);
+ 	clk_register_clkdev(clk, NULL, "gpio.0");
+ 	clk_register_clkdev(clk, NULL, "gpio.1");
+ 	clk_register_clkdev(clk, NULL, "gpioblock0");
+ 
+-	clk = clk_reg_prcc_pclk("p1_pclk10", "per1clk", U8500_CLKRST1_BASE,
++	clk = clk_reg_prcc_pclk("p1_pclk10", "per1clk", clkrst1_base,
+ 				BIT(10), 0);
+ 	clk_register_clkdev(clk, "apb_pclk", "nmk-i2c.4");
+ 
+-	clk = clk_reg_prcc_pclk("p1_pclk11", "per1clk", U8500_CLKRST1_BASE,
++	clk = clk_reg_prcc_pclk("p1_pclk11", "per1clk", clkrst1_base,
+ 				BIT(11), 0);
+ 	clk_register_clkdev(clk, "apb_pclk", "msp3");
+ 	clk_register_clkdev(clk, "apb_pclk", "ux500-msp-i2s.3");
+ 
+-	clk = clk_reg_prcc_pclk("p2_pclk0", "per2clk", U8500_CLKRST2_BASE,
++	clk = clk_reg_prcc_pclk("p2_pclk0", "per2clk", clkrst2_base,
+ 				BIT(0), 0);
+ 	clk_register_clkdev(clk, "apb_pclk", "nmk-i2c.3");
+ 
+-	clk = clk_reg_prcc_pclk("p2_pclk1", "per2clk", U8500_CLKRST2_BASE,
++	clk = clk_reg_prcc_pclk("p2_pclk1", "per2clk", clkrst2_base,
+ 				BIT(1), 0);
+ 	clk_register_clkdev(clk, NULL, "spi2");
+ 
+-	clk = clk_reg_prcc_pclk("p2_pclk2", "per2clk", U8500_CLKRST2_BASE,
++	clk = clk_reg_prcc_pclk("p2_pclk2", "per2clk", clkrst2_base,
+ 				BIT(2), 0);
+ 	clk_register_clkdev(clk, NULL, "spi1");
+ 
+-	clk = clk_reg_prcc_pclk("p2_pclk3", "per2clk", U8500_CLKRST2_BASE,
++	clk = clk_reg_prcc_pclk("p2_pclk3", "per2clk", clkrst2_base,
+ 				BIT(3), 0);
+ 	clk_register_clkdev(clk, NULL, "pwl");
+ 
+-	clk = clk_reg_prcc_pclk("p2_pclk4", "per2clk", U8500_CLKRST2_BASE,
++	clk = clk_reg_prcc_pclk("p2_pclk4", "per2clk", clkrst2_base,
+ 				BIT(4), 0);
+ 	clk_register_clkdev(clk, "apb_pclk", "sdi4");
+ 
+-	clk = clk_reg_prcc_pclk("p2_pclk5", "per2clk", U8500_CLKRST2_BASE,
++	clk = clk_reg_prcc_pclk("p2_pclk5", "per2clk", clkrst2_base,
+ 				BIT(5), 0);
+ 	clk_register_clkdev(clk, "apb_pclk", "msp2");
+ 	clk_register_clkdev(clk, "apb_pclk", "ux500-msp-i2s.2");
+ 
+-	clk = clk_reg_prcc_pclk("p2_pclk6", "per2clk", U8500_CLKRST2_BASE,
++	clk = clk_reg_prcc_pclk("p2_pclk6", "per2clk", clkrst2_base,
+ 				BIT(6), 0);
+ 	clk_register_clkdev(clk, "apb_pclk", "sdi1");
+ 
+-	clk = clk_reg_prcc_pclk("p2_pclk7", "per2clk", U8500_CLKRST2_BASE,
++	clk = clk_reg_prcc_pclk("p2_pclk7", "per2clk", clkrst2_base,
+ 				BIT(7), 0);
+ 	clk_register_clkdev(clk, "apb_pclk", "sdi3");
+ 
+-	clk = clk_reg_prcc_pclk("p2_pclk8", "per2clk", U8500_CLKRST2_BASE,
++	clk = clk_reg_prcc_pclk("p2_pclk8", "per2clk", clkrst2_base,
+ 				BIT(8), 0);
+ 	clk_register_clkdev(clk, NULL, "spi0");
+ 
+-	clk = clk_reg_prcc_pclk("p2_pclk9", "per2clk", U8500_CLKRST2_BASE,
++	clk = clk_reg_prcc_pclk("p2_pclk9", "per2clk", clkrst2_base,
+ 				BIT(9), 0);
+ 	clk_register_clkdev(clk, "hsir_hclk", "ste_hsi.0");
+ 
+-	clk = clk_reg_prcc_pclk("p2_pclk10", "per2clk", U8500_CLKRST2_BASE,
++	clk = clk_reg_prcc_pclk("p2_pclk10", "per2clk", clkrst2_base,
+ 				BIT(10), 0);
+ 	clk_register_clkdev(clk, "hsit_hclk", "ste_hsi.0");
+ 
+-	clk = clk_reg_prcc_pclk("p2_pclk11", "per2clk", U8500_CLKRST2_BASE,
++	clk = clk_reg_prcc_pclk("p2_pclk11", "per2clk", clkrst2_base,
+ 				BIT(11), 0);
+ 	clk_register_clkdev(clk, NULL, "gpio.6");
+ 	clk_register_clkdev(clk, NULL, "gpio.7");
+ 	clk_register_clkdev(clk, NULL, "gpioblock1");
+ 
+-	clk = clk_reg_prcc_pclk("p2_pclk12", "per2clk", U8500_CLKRST2_BASE,
++	clk = clk_reg_prcc_pclk("p2_pclk12", "per2clk", clkrst2_base,
+ 				BIT(12), 0);
+ 
+-	clk = clk_reg_prcc_pclk("p3_pclk0", "per3clk", U8500_CLKRST3_BASE,
++	clk = clk_reg_prcc_pclk("p3_pclk0", "per3clk", clkrst3_base,
+ 				BIT(0), 0);
+ 	clk_register_clkdev(clk, NULL, "fsmc");
+ 
+-	clk = clk_reg_prcc_pclk("p3_pclk1", "per3clk", U8500_CLKRST3_BASE,
++	clk = clk_reg_prcc_pclk("p3_pclk1", "per3clk", clkrst3_base,
+ 				BIT(1), 0);
+ 	clk_register_clkdev(clk, "apb_pclk", "ssp0");
+ 
+-	clk = clk_reg_prcc_pclk("p3_pclk2", "per3clk", U8500_CLKRST3_BASE,
++	clk = clk_reg_prcc_pclk("p3_pclk2", "per3clk", clkrst3_base,
+ 				BIT(2), 0);
+ 	clk_register_clkdev(clk, "apb_pclk", "ssp1");
+ 
+-	clk = clk_reg_prcc_pclk("p3_pclk3", "per3clk", U8500_CLKRST3_BASE,
++	clk = clk_reg_prcc_pclk("p3_pclk3", "per3clk", clkrst3_base,
+ 				BIT(3), 0);
+ 	clk_register_clkdev(clk, "apb_pclk", "nmk-i2c.0");
+ 
+-	clk = clk_reg_prcc_pclk("p3_pclk4", "per3clk", U8500_CLKRST3_BASE,
++	clk = clk_reg_prcc_pclk("p3_pclk4", "per3clk", clkrst3_base,
+ 				BIT(4), 0);
+ 	clk_register_clkdev(clk, "apb_pclk", "sdi2");
+ 
+-	clk = clk_reg_prcc_pclk("p3_pclk5", "per3clk", U8500_CLKRST3_BASE,
++	clk = clk_reg_prcc_pclk("p3_pclk5", "per3clk", clkrst3_base,
+ 				BIT(5), 0);
+ 	clk_register_clkdev(clk, "apb_pclk", "ske");
+ 	clk_register_clkdev(clk, "apb_pclk", "nmk-ske-keypad");
+ 
+-	clk = clk_reg_prcc_pclk("p3_pclk6", "per3clk", U8500_CLKRST3_BASE,
++	clk = clk_reg_prcc_pclk("p3_pclk6", "per3clk", clkrst3_base,
+ 				BIT(6), 0);
+ 	clk_register_clkdev(clk, "apb_pclk", "uart2");
+ 
+-	clk = clk_reg_prcc_pclk("p3_pclk7", "per3clk", U8500_CLKRST3_BASE,
++	clk = clk_reg_prcc_pclk("p3_pclk7", "per3clk", clkrst3_base,
+ 				BIT(7), 0);
+ 	clk_register_clkdev(clk, "apb_pclk", "sdi5");
+ 
+-	clk = clk_reg_prcc_pclk("p3_pclk8", "per3clk", U8500_CLKRST3_BASE,
++	clk = clk_reg_prcc_pclk("p3_pclk8", "per3clk", clkrst3_base,
+ 				BIT(8), 0);
+ 	clk_register_clkdev(clk, NULL, "gpio.2");
+ 	clk_register_clkdev(clk, NULL, "gpio.3");
+@@ -363,45 +363,45 @@ void u8500_clk_init(void)
+ 	clk_register_clkdev(clk, NULL, "gpio.5");
+ 	clk_register_clkdev(clk, NULL, "gpioblock2");
+ 
+-	clk = clk_reg_prcc_pclk("p5_pclk0", "per5clk", U8500_CLKRST5_BASE,
++	clk = clk_reg_prcc_pclk("p5_pclk0", "per5clk", clkrst5_base,
+ 				BIT(0), 0);
+ 	clk_register_clkdev(clk, "usb", "musb-ux500.0");
+ 
+-	clk = clk_reg_prcc_pclk("p5_pclk1", "per5clk", U8500_CLKRST5_BASE,
++	clk = clk_reg_prcc_pclk("p5_pclk1", "per5clk", clkrst5_base,
+ 				BIT(1), 0);
+ 	clk_register_clkdev(clk, NULL, "gpio.8");
+ 	clk_register_clkdev(clk, NULL, "gpioblock3");
+ 
+-	clk = clk_reg_prcc_pclk("p6_pclk0", "per6clk", U8500_CLKRST6_BASE,
++	clk = clk_reg_prcc_pclk("p6_pclk0", "per6clk", clkrst6_base,
+ 				BIT(0), 0);
+ 	clk_register_clkdev(clk, "apb_pclk", "rng");
+ 
+-	clk = clk_reg_prcc_pclk("p6_pclk1", "per6clk", U8500_CLKRST6_BASE,
++	clk = clk_reg_prcc_pclk("p6_pclk1", "per6clk", clkrst6_base,
+ 				BIT(1), 0);
+ 	clk_register_clkdev(clk, NULL, "cryp0");
+ 	clk_register_clkdev(clk, NULL, "cryp1");
+ 
+-	clk = clk_reg_prcc_pclk("p6_pclk2", "per6clk", U8500_CLKRST6_BASE,
++	clk = clk_reg_prcc_pclk("p6_pclk2", "per6clk", clkrst6_base,
+ 				BIT(2), 0);
+ 	clk_register_clkdev(clk, NULL, "hash0");
+ 
+-	clk = clk_reg_prcc_pclk("p6_pclk3", "per6clk", U8500_CLKRST6_BASE,
++	clk = clk_reg_prcc_pclk("p6_pclk3", "per6clk", clkrst6_base,
+ 				BIT(3), 0);
+ 	clk_register_clkdev(clk, NULL, "pka");
+ 
+-	clk = clk_reg_prcc_pclk("p6_pclk4", "per6clk", U8500_CLKRST6_BASE,
++	clk = clk_reg_prcc_pclk("p6_pclk4", "per6clk", clkrst6_base,
+ 				BIT(4), 0);
+ 	clk_register_clkdev(clk, NULL, "hash1");
+ 
+-	clk = clk_reg_prcc_pclk("p6_pclk5", "per6clk", U8500_CLKRST6_BASE,
++	clk = clk_reg_prcc_pclk("p6_pclk5", "per6clk", clkrst6_base,
+ 				BIT(5), 0);
+ 	clk_register_clkdev(clk, NULL, "cfgreg");
+ 
+-	clk = clk_reg_prcc_pclk("p6_pclk6", "per6clk", U8500_CLKRST6_BASE,
++	clk = clk_reg_prcc_pclk("p6_pclk6", "per6clk", clkrst6_base,
+ 				BIT(6), 0);
+ 	clk_register_clkdev(clk, "apb_pclk", "mtu0");
+ 
+-	clk = clk_reg_prcc_pclk("p6_pclk7", "per6clk", U8500_CLKRST6_BASE,
++	clk = clk_reg_prcc_pclk("p6_pclk7", "per6clk", clkrst6_base,
+ 				BIT(7), 0);
+ 	clk_register_clkdev(clk, "apb_pclk", "mtu1");
+ 
+@@ -415,110 +415,110 @@ void u8500_clk_init(void)
+ 
+ 	/* Periph1 */
+ 	clk = clk_reg_prcc_kclk("p1_uart0_kclk", "uartclk",
+-			U8500_CLKRST1_BASE, BIT(0), CLK_SET_RATE_GATE);
++			clkrst1_base, BIT(0), CLK_SET_RATE_GATE);
+ 	clk_register_clkdev(clk, NULL, "uart0");
+ 
+ 	clk = clk_reg_prcc_kclk("p1_uart1_kclk", "uartclk",
+-			U8500_CLKRST1_BASE, BIT(1), CLK_SET_RATE_GATE);
++			clkrst1_base, BIT(1), CLK_SET_RATE_GATE);
+ 	clk_register_clkdev(clk, NULL, "uart1");
+ 
+ 	clk = clk_reg_prcc_kclk("p1_i2c1_kclk", "i2cclk",
+-			U8500_CLKRST1_BASE, BIT(2), CLK_SET_RATE_GATE);
++			clkrst1_base, BIT(2), CLK_SET_RATE_GATE);
+ 	clk_register_clkdev(clk, NULL, "nmk-i2c.1");
+ 
+ 	clk = clk_reg_prcc_kclk("p1_msp0_kclk", "msp02clk",
+-			U8500_CLKRST1_BASE, BIT(3), CLK_SET_RATE_GATE);
++			clkrst1_base, BIT(3), CLK_SET_RATE_GATE);
+ 	clk_register_clkdev(clk, NULL, "msp0");
+ 	clk_register_clkdev(clk, NULL, "ux500-msp-i2s.0");
+ 
+ 	clk = clk_reg_prcc_kclk("p1_msp1_kclk", "msp1clk",
+-			U8500_CLKRST1_BASE, BIT(4), CLK_SET_RATE_GATE);
++			clkrst1_base, BIT(4), CLK_SET_RATE_GATE);
+ 	clk_register_clkdev(clk, NULL, "msp1");
+ 	clk_register_clkdev(clk, NULL, "ux500-msp-i2s.1");
+ 
+ 	clk = clk_reg_prcc_kclk("p1_sdi0_kclk", "sdmmcclk",
+-			U8500_CLKRST1_BASE, BIT(5), CLK_SET_RATE_GATE);
++			clkrst1_base, BIT(5), CLK_SET_RATE_GATE);
+ 	clk_register_clkdev(clk, NULL, "sdi0");
+ 
+ 	clk = clk_reg_prcc_kclk("p1_i2c2_kclk", "i2cclk",
+-			U8500_CLKRST1_BASE, BIT(6), CLK_SET_RATE_GATE);
++			clkrst1_base, BIT(6), CLK_SET_RATE_GATE);
+ 	clk_register_clkdev(clk, NULL, "nmk-i2c.2");
+ 
+ 	clk = clk_reg_prcc_kclk("p1_slimbus0_kclk", "slimclk",
+-			U8500_CLKRST1_BASE, BIT(8), CLK_SET_RATE_GATE);
++			clkrst1_base, BIT(8), CLK_SET_RATE_GATE);
+ 	clk_register_clkdev(clk, NULL, "slimbus0");
+ 
+ 	clk = clk_reg_prcc_kclk("p1_i2c4_kclk", "i2cclk",
+-			U8500_CLKRST1_BASE, BIT(9), CLK_SET_RATE_GATE);
++			clkrst1_base, BIT(9), CLK_SET_RATE_GATE);
+ 	clk_register_clkdev(clk, NULL, "nmk-i2c.4");
+ 
+ 	clk = clk_reg_prcc_kclk("p1_msp3_kclk", "msp1clk",
+-			U8500_CLKRST1_BASE, BIT(10), CLK_SET_RATE_GATE);
++			clkrst1_base, BIT(10), CLK_SET_RATE_GATE);
+ 	clk_register_clkdev(clk, NULL, "msp3");
+ 	clk_register_clkdev(clk, NULL, "ux500-msp-i2s.3");
+ 
+ 	/* Periph2 */
+ 	clk = clk_reg_prcc_kclk("p2_i2c3_kclk", "i2cclk",
+-			U8500_CLKRST2_BASE, BIT(0), CLK_SET_RATE_GATE);
++			clkrst2_base, BIT(0), CLK_SET_RATE_GATE);
+ 	clk_register_clkdev(clk, NULL, "nmk-i2c.3");
+ 
+ 	clk = clk_reg_prcc_kclk("p2_sdi4_kclk", "sdmmcclk",
+-			U8500_CLKRST2_BASE, BIT(2), CLK_SET_RATE_GATE);
++			clkrst2_base, BIT(2), CLK_SET_RATE_GATE);
+ 	clk_register_clkdev(clk, NULL, "sdi4");
+ 
+ 	clk = clk_reg_prcc_kclk("p2_msp2_kclk", "msp02clk",
+-			U8500_CLKRST2_BASE, BIT(3), CLK_SET_RATE_GATE);
++			clkrst2_base, BIT(3), CLK_SET_RATE_GATE);
+ 	clk_register_clkdev(clk, NULL, "msp2");
+ 	clk_register_clkdev(clk, NULL, "ux500-msp-i2s.2");
+ 
+ 	clk = clk_reg_prcc_kclk("p2_sdi1_kclk", "sdmmcclk",
+-			U8500_CLKRST2_BASE, BIT(4), CLK_SET_RATE_GATE);
++			clkrst2_base, BIT(4), CLK_SET_RATE_GATE);
+ 	clk_register_clkdev(clk, NULL, "sdi1");
+ 
+ 	clk = clk_reg_prcc_kclk("p2_sdi3_kclk", "sdmmcclk",
+-			U8500_CLKRST2_BASE, BIT(5), CLK_SET_RATE_GATE);
++			clkrst2_base, BIT(5), CLK_SET_RATE_GATE);
+ 	clk_register_clkdev(clk, NULL, "sdi3");
+ 
+ 	/* Note that rate is received from parent. */
+ 	clk = clk_reg_prcc_kclk("p2_ssirx_kclk", "hsirxclk",
+-			U8500_CLKRST2_BASE, BIT(6),
++			clkrst2_base, BIT(6),
+ 			CLK_SET_RATE_GATE|CLK_SET_RATE_PARENT);
+ 	clk = clk_reg_prcc_kclk("p2_ssitx_kclk", "hsitxclk",
+-			U8500_CLKRST2_BASE, BIT(7),
++			clkrst2_base, BIT(7),
+ 			CLK_SET_RATE_GATE|CLK_SET_RATE_PARENT);
+ 
+ 	/* Periph3 */
+ 	clk = clk_reg_prcc_kclk("p3_ssp0_kclk", "sspclk",
+-			U8500_CLKRST3_BASE, BIT(1), CLK_SET_RATE_GATE);
++			clkrst3_base, BIT(1), CLK_SET_RATE_GATE);
+ 	clk_register_clkdev(clk, NULL, "ssp0");
+ 
+ 	clk = clk_reg_prcc_kclk("p3_ssp1_kclk", "sspclk",
+-			U8500_CLKRST3_BASE, BIT(2), CLK_SET_RATE_GATE);
++			clkrst3_base, BIT(2), CLK_SET_RATE_GATE);
+ 	clk_register_clkdev(clk, NULL, "ssp1");
+ 
+ 	clk = clk_reg_prcc_kclk("p3_i2c0_kclk", "i2cclk",
+-			U8500_CLKRST3_BASE, BIT(3), CLK_SET_RATE_GATE);
++			clkrst3_base, BIT(3), CLK_SET_RATE_GATE);
+ 	clk_register_clkdev(clk, NULL, "nmk-i2c.0");
+ 
+ 	clk = clk_reg_prcc_kclk("p3_sdi2_kclk", "sdmmcclk",
+-			U8500_CLKRST3_BASE, BIT(4), CLK_SET_RATE_GATE);
++			clkrst3_base, BIT(4), CLK_SET_RATE_GATE);
+ 	clk_register_clkdev(clk, NULL, "sdi2");
+ 
+ 	clk = clk_reg_prcc_kclk("p3_ske_kclk", "rtc32k",
+-			U8500_CLKRST3_BASE, BIT(5), CLK_SET_RATE_GATE);
++			clkrst3_base, BIT(5), CLK_SET_RATE_GATE);
+ 	clk_register_clkdev(clk, NULL, "ske");
+ 	clk_register_clkdev(clk, NULL, "nmk-ske-keypad");
+ 
+ 	clk = clk_reg_prcc_kclk("p3_uart2_kclk", "uartclk",
+-			U8500_CLKRST3_BASE, BIT(6), CLK_SET_RATE_GATE);
++			clkrst3_base, BIT(6), CLK_SET_RATE_GATE);
+ 	clk_register_clkdev(clk, NULL, "uart2");
+ 
+ 	clk = clk_reg_prcc_kclk("p3_sdi5_kclk", "sdmmcclk",
+-			U8500_CLKRST3_BASE, BIT(7), CLK_SET_RATE_GATE);
++			clkrst3_base, BIT(7), CLK_SET_RATE_GATE);
+ 	clk_register_clkdev(clk, NULL, "sdi5");
+ 
+ 	/* Periph6 */
+ 	clk = clk_reg_prcc_kclk("p3_rng_kclk", "rngclk",
+-			U8500_CLKRST6_BASE, BIT(0), CLK_SET_RATE_GATE);
++			clkrst6_base, BIT(0), CLK_SET_RATE_GATE);
+ 	clk_register_clkdev(clk, NULL, "rng");
  }
+diff --git a/include/linux/platform_data/clk-ux500.h b/include/linux/platform_data/clk-ux500.h
+index 3af0da1..320d9c3 100644
+--- a/include/linux/platform_data/clk-ux500.h
++++ b/include/linux/platform_data/clk-ux500.h
+@@ -10,7 +10,8 @@
+ #ifndef __CLK_UX500_H
+ #define __CLK_UX500_H
  
- static inline int prcmu_set_power_state(u8 state, bool keep_ulp_clk,
-@@ -500,7 +500,7 @@ static inline int prcmu_config_a9wdog(u8 num, bool sleep_auto_off)
- }
- #else
+-void u8500_clk_init(void);
++void u8500_clk_init(u32 clkrst1_base, u32 clkrst2_base, u32 clkrst3_base,
++		    u32 clkrst5_base, u32 clkrst6_base);
+ void u9540_clk_init(void);
+ void u8540_clk_init(void);
  
--static inline void __init prcmu_early_init(void) {}
-+static inline void prcmu_early_init(u32 phy_base, u32 size) {}
- 
- static inline int prcmu_set_power_state(u8 state, bool keep_ulp_clk,
- 	bool keep_ap_pll)
 -- 
 1.7.11.3
