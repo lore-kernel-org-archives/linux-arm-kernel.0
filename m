@@ -1,44 +1,48 @@
-From: giridhar.maruthy@linaro.org (Giridhar Maruthy)
-Date: Thu, 21 Mar 2013 15:13:17 +0530
-Subject: Fwd: [PATCH] ARM: EXYNOS5440: DTS: Add virtual GIC DT bindings
-In-Reply-To: <1363858839-13578-1-git-send-email-giridhar.maruthy@linaro.org>
-References: <1363858839-13578-1-git-send-email-giridhar.maruthy@linaro.org>
-Message-ID: <CAHuqX+G=LhpO_WuOYSEwVGDOtKU-Nby2j--xt-bLk2P3jyEsyg@mail.gmail.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Thu, 21 Mar 2013 06:43:26 -0300
+Subject: [PATCH 06/16] thermal: mvebu: Convert to devm_ioremap_resource()
+In-Reply-To: <20130321061024.GH21478@lunn.ch>
+References: <1363818997-23137-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1363818997-23137-7-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130321061024.GH21478@lunn.ch>
+Message-ID: <20130321094325.GB2469@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is similar to the ones already submitted by Alexander Graf
-and also in Christoffer's tree in linux-kvm-arm for Arndale board,
-while this is required for exynos5440.
+On Thu, Mar 21, 2013 at 07:10:24AM +0100, Andrew Lunn wrote:
+> On Wed, Mar 20, 2013 at 07:36:27PM -0300, Ezequiel Garcia wrote:
+> > Convert devm_request_and_ioremap() to the newly introduced
+> > devm_ioremap_resource() which provides more consistent error handling.
+> > 
+> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > ---
+> >  drivers/thermal/mvebu_thermal.c |    6 ++----
+> >  1 files changed, 2 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/drivers/thermal/mvebu_thermal.c b/drivers/thermal/mvebu_thermal.c
+> > index ef04e4e..089b43d 100644
+> > --- a/drivers/thermal/mvebu_thermal.c
+> > +++ b/drivers/thermal/mvebu_thermal.c
+> > @@ -86,11 +86,9 @@ static int mvebu_thermal_probe(struct platform_device *pdev)
+> >  	if (!priv)
+> >  		return -ENOMEM;
+> >  
+> > -	priv->sensor = devm_request_and_ioremap(&pdev->dev, res);
+> > -	if (!priv->sensor) {
+> > -		dev_err(&pdev->dev, "Failed to request_ioremap memory\n");
+> > +	priv->sensor = devm_ioremap_resource(&pdev->dev, res);
+> > +	if (!priv->sensor)
+> >  		return -EADDRNOTAVAIL;
+> > -	}
+> 
+> 
+> It would be better to return priv->sensor, not a fixed error code.
+> 
 
+Good catch! I missed that.
 
-
-
-Exynos5440 has GIC which has virtualization support
-in them. These are used by KVM.
-
-Signed-off-by: Giridhar Maruthy <giridhar.m@samsung.com>
----
- arch/arm/boot/dts/exynos5440.dtsi |    6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/exynos5440.dtsi
-b/arch/arm/boot/dts/exynos5440.dtsi
-index c374a31..25c6134 100644
---- a/arch/arm/boot/dts/exynos5440.dtsi
-+++ b/arch/arm/boot/dts/exynos5440.dtsi
-@@ -26,7 +26,11 @@
-                compatible = "arm,cortex-a15-gic";
-                #interrupt-cells = <3>;
-                interrupt-controller;
--               reg = <0x2E1000 0x1000>, <0x2E2000 0x1000>;
-+               reg =   <0x2E1000 0x1000>,
-+                       <0x2E2000 0x1000>,
-+                       <0x2E4000 0x2000>,
-+                       <0x2E6000 0x2000>;
-+               interrupts = <1 9 0xf04>;
-        };
-
-        cpus {
---
-1.7.9.5
+Thanks,
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
