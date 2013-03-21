@@ -1,25 +1,24 @@
 From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Fri, 22 Mar 2013 10:12:03 +1100
-Subject: Request the linux-next inclusion for IMX/MXS tree
-In-Reply-To: <20130321015602.GA23109@S2101-09.ap.freescale.net>
-References: <20130321015602.GA23109@S2101-09.ap.freescale.net>
-Message-ID: <20130322101203.5c986794c37e1d072a2fbcfc@canb.auug.org.au>
+Date: Fri, 22 Mar 2013 10:22:57 +1100
+Subject: [PATCHv3 00/14] drivers: mailbox: framework creation
+In-Reply-To: <1363145021-14339-1-git-send-email-s-anna@ti.com>
+References: <1363145021-14339-1-git-send-email-s-anna@ti.com>
+Message-ID: <20130322102257.89d3fd7c109c32faac4dcc7d@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+Hi Suman,
 
-On Thu, 21 Mar 2013 09:56:04 +0800 Shawn Guo <shawn.guo@linaro.org> wrote:
+On Tue, 12 Mar 2013 22:23:41 -0500 Suman Anna <s-anna@ti.com> wrote:
 >
-> Can you please help include the following branch into linux-next?
-> 
->   git://git.linaro.org/people/shawnguo/linux-2.6.git for-next
-> 
-> I used to rely on arm-soc's for-next branch to expose the IMX/MXS
-> patches I collect on linux-next.  But it turns out that the procedure
-> takes a longer time than I expect to finish, and it causes that patches
-> are not shown on linux-next in time and problems are not found at the
-> earliest time.
+> Stephen,
+> I have hosted the series at [3]. Can you pull this into linux-next
+> sometime next week?
+
+> [3] https://github.com/sumananna/mailbox/commits/dbx500-prcmu-mailbox
+
+Please quote git URLs ... I guessed you meant
+git://github.com/sumananna/mailbox.git, branch dbx500-prcmu-mailbox ?
 
 Added from today.
 
@@ -62,4 +61,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130322/77d93120/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130322/1e76c8d4/attachment-0001.sig>
