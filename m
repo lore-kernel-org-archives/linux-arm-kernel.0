@@ -1,37 +1,29 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 21 Mar 2013 09:26:45 -0500
-Subject: [PATCH 01/11] OF: add empty of_device_is_available for !OF
-In-Reply-To: <20130321141812.GG15279@e106331-lin.cambridge.arm.com>
-References: <1363820051-24428-1-git-send-email-robherring2@gmail.com>
- <1363820051-24428-2-git-send-email-robherring2@gmail.com>
- <20130321141812.GG15279@e106331-lin.cambridge.arm.com>
-Message-ID: <514B18A5.20001@gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 21 Mar 2013 10:35:39 -0400
+Subject: [PATCH 05/16] thermal: mvebu: Fix valid check for thermal register
+In-Reply-To: <1363818997-23137-6-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1363818997-23137-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1363818997-23137-6-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20130321143539.GV13280@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/21/2013 09:18 AM, Mark Rutland wrote:
-> On Wed, Mar 20, 2013 at 10:54:01PM +0000, Rob Herring wrote:
->> From: Rob Herring <rob.herring@calxeda.com>
->>
->> Add an empty version of of_device_is_available.
->>
->> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
->> ---
->>  include/linux/of.h |    5 +++++
->>  1 file changed, 5 insertions(+)
->>
->> diff --git a/include/linux/of.h b/include/linux/of.h
->> index a0f1292..6fe655b 100644
->> --- a/include/linux/of.h
->> +++ b/include/linux/of.h
->> @@ -379,6 +379,11 @@ static inline int of_device_is_compatible(const struct device_node *device,
->>  	return 0;
->>  }
->>  
->> +static inline int of_device_is_available(const struct device_node *device,)
+Ezequiel,
+
+On Wed, Mar 20, 2013 at 07:36:26PM -0300, Ezequiel Garcia wrote:
+> The correct value is obtain by first shifting the register by the offset,
+> later applying the valid mask and finally invert the result.
+> This check was lacking an extra parenthesis to be strictly correct.
 > 
-> I assume that comma shouldn't be there?                                     ^
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+>  drivers/thermal/mvebu_thermal.c |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
 
-Right. I've fixed that up in my git tree.
+For the next version of this series, could you please put this fix first
+in the series?  In this state, it can't be applied to v3.9-rcX, nor
+-stable.
 
-Rob
+thx,
+
+Jason.
