@@ -1,39 +1,49 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 21 Mar 2013 21:15:33 +0100
-Subject: [PATCH 5/5] arm: dts: Convert mvebu device tree files to 64 bits
-In-Reply-To: <1363883179-1361-6-git-send-email-gregory.clement@free-electrons.com>
-References: <1363883179-1361-1-git-send-email-gregory.clement@free-electrons.com>
- <1363883179-1361-6-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20130321201533.GN21478@lunn.ch>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Thu, 21 Mar 2013 17:21:33 -0300
+Subject: [PATCH 06/16] thermal: mvebu: Convert to devm_ioremap_resource()
+In-Reply-To: <20130321191751.GP4977@n2100.arm.linux.org.uk>
+References: <1363818997-23137-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1363818997-23137-7-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130321191751.GP4977@n2100.arm.linux.org.uk>
+Message-ID: <20130321202131.GA3358@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->  		/*
-> -		 * 4 GB of plug-in RAM modules by default but only 3GB
-> -		 * are visible, the amount of memory available can be
-> -		 * changed by the bootloader according the size of the
-> -		 * module actually plugged
-> +		 * 8 GB of plug-in RAM modules by default.The amount
-> +		 * of memory available can be changed by the
-> +		 * bootloader according the size of the module
-> +		 * actually plugged. Only 7GB are usable because
-> +		 * addresses from 0xC0000000 to 0xffffffff are used by
-> +		 * the internal registers of the SoC.
->  		 */
-> -		reg = <0x00000000 0xC0000000>;
-> +		reg = <0x00000000 0x00000000 0x00000000 0xC0000000>,
-> +		      <0x00000001 0x00000000 0x00000001 0x00000000>;
-> +
+On Thu, Mar 21, 2013 at 07:17:51PM +0000, Russell King - ARM Linux wrote:
+> On Wed, Mar 20, 2013 at 07:36:27PM -0300, Ezequiel Garcia wrote:
+> > Convert devm_request_and_ioremap() to the newly introduced
+> > devm_ioremap_resource() which provides more consistent error handling.
+> > 
+> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > ---
+> >  drivers/thermal/mvebu_thermal.c |    6 ++----
+> >  1 files changed, 2 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/drivers/thermal/mvebu_thermal.c b/drivers/thermal/mvebu_thermal.c
+> > index ef04e4e..089b43d 100644
+> > --- a/drivers/thermal/mvebu_thermal.c
+> > +++ b/drivers/thermal/mvebu_thermal.c
+> > @@ -86,11 +86,9 @@ static int mvebu_thermal_probe(struct platform_device *pdev)
+> >  	if (!priv)
+> >  		return -ENOMEM;
+> >  
+> > -	priv->sensor = devm_request_and_ioremap(&pdev->dev, res);
+> > -	if (!priv->sensor) {
+> > -		dev_err(&pdev->dev, "Failed to request_ioremap memory\n");
+> > +	priv->sensor = devm_ioremap_resource(&pdev->dev, res);
+> > +	if (!priv->sensor)
+> >  		return -EADDRNOTAVAIL;
+> 
+> NAK.  It pays to understand the interface that you're using.  In this
+> case, it *doesn't* return NULL on error, so you'll never reach
+> -EADDRNOTAVAIL.  Please look this function up in lib/devres.c and
+> understand its API.
+> 
 
-Hi Gregory
+Yes, you're right, I'll fix this on v2.
 
-Could you recommend a document which introduces LPAE.
-
-Only being able to address 7GB seems a bit odd to me. I kind of
-expected you set up the translation tables to map a page in the 32 bit
-address range to any arbitrary page in the 40 bit address range. So
-leaving 0xC0000000 to 0xffffffff in the 32bit address range clear is
-easy. But why do you loose space in the 40bit address range?
-
-      Thanks
-	Andrew
+Thanks,
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
