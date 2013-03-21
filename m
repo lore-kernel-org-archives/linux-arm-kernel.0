@@ -1,32 +1,26 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 21 Mar 2013 18:10:33 +0100
-Subject: [PATCH 4/6] mfd: db8500-prcmu: get base address from resource
-In-Reply-To: <1669538.W5XG4BgH9e@wuerfel>
-References: <1363866553-15054-1-git-send-email-linus.walleij@stericsson.com>
- <1363866553-15054-5-git-send-email-linus.walleij@stericsson.com>
- <1669538.W5XG4BgH9e@wuerfel>
-Message-ID: <CACRpkdZhyWdwhYaD69n=US31eTA=FDm6xzbZJndBuXAO0qGUbA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 21 Mar 2013 17:18:32 +0000
+Subject: [GIT PULL v2] Renesas ARM-based SoC board updates for v3.10
+In-Reply-To: <1363659481-5922-1-git-send-email-horms+renesas@verge.net.au>
+References: <1363659481-5922-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <201303211718.32981.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 21, 2013 at 1:15 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+On Tuesday 19 March 2013, Simon Horman wrote:
 
-> On Thursday 21 March 2013 12:49:11 Linus Walleij wrote:
->> -#define PRCM_PLLARM_LOCKP       (_PRCMU_BASE + 0x0a8)
->> +#define PRCM_PLLARM_LOCKP       (prcmu_base + 0x0a8)
->>  #define PRCM_PLLARM_LOCKP_PRCM_PLLARM_LOCKP3   0x2
->
-> While this is certainly the least invasive way to get rid of _PRCMU_BASE,
-> it sucks to refer to local variables in macros. How hard would it
-> be to find all users of these macros and put the prcmu_base addition
-> there?
->
-> The rest of this patch looks fine to me.
+> ----------------------------------------------------------------
+> Renesas ARM-based SoC board updates for v3.10
+> 
+> This is based on a merge of the following:
+> 
+> git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git renesas-pinmux-for-v3.10
+> git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git renesas-soc-for-v3.10
 
-Basically I didn't want to disturb Lo?cs work on PRCMU refactoring,
-but if it is require I can surely do this.
+Pulled into next/boards.
 
-Lo?c, are you OK with this?
+Please verify that I have pulled everything you sent me. If not, it my mistake.
 
-Yours,
-Linus Walleij
+Thanks,
+
+	Arnd
