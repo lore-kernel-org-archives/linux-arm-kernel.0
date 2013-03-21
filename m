@@ -1,53 +1,32 @@
-From: dgilbert@interlog.com (Douglas Gilbert)
-Date: Wed, 20 Mar 2013 21:15:23 -0400
-Subject: [PATCH] rtc: rtc-at91rm9200: use a variable for storing IMR
-In-Reply-To: <20130320145006.f1431c1528325ff93a298790@linux-foundation.org>
-References: <1363369032-12639-1-git-send-email-nicolas.ferre@atmel.com>
- <20130320145006.f1431c1528325ff93a298790@linux-foundation.org>
-Message-ID: <514A5F2B.8030707@interlog.com>
+From: timur@tabi.org (Timur Tabi)
+Date: Wed, 20 Mar 2013 20:35:42 -0500
+Subject: [PATCH] Sound: sgtl5000 Allow codec clock frequency to be set.
+In-Reply-To: <20130319170322.27828.7691.stgit@localhost>
+References: <20130319170322.27828.7691.stgit@localhost>
+Message-ID: <514A63EE.7000707@tabi.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-03-20 05:50 PM, Andrew Morton wrote:
-> On Fri, 15 Mar 2013 18:37:12 +0100 Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+Martin Fuzzey wrote:
+> +If a clock is provided, clock-frequency is optional
+> +
+> +If no clock is provided clock-frequency is required (this represents the codec
+> +being clocked by an external signal not present in the clock tree)
+> +
+> +If both a clock and clock-frequency are provided the clock's rate will be set.
+> +
+> +
+>   Example:
 >
->> On some revisions of AT91 SoCs, the RTC IMR register is not working.
->> Instead of elaborating a workaround for that specific SoC or IP version,
->> we simply use a software variable to store the Interrupt Mask Register and
->> modify it for each enabling/disabling of an interrupt. The overhead of this
->> is negligible anyway.
->
-> This description doesn't really allow me or others to work out whether
-> the fix should be included in 3.9 or backported into earlier kernels.
->
-> So please, when fixing a bug do include a full description of the
-> user-visible effects of that bug.  And your opinion regarding the
-> -mainline and -stable decision is always useful.
+>   codec: sgtl5000 at 0a {
+>   	compatible = "fsl,sgtl5000";
+>   	reg = <0x0a>;
+> +	clock-frequency = <20000000>;
+> +	clocks = <&clks 162>; /* cko1 */
 
-The interrupt mask register (IMR) for the RTC is broken
-on the AT91SAM9x5 sub-family of SoCs (good overview of the
-members here: http://www.eewiki.net/display/linuxonarm/AT91SAM9x5 ).
-The "user visible effect" is the RTC doesn't work.
+The code looks okay, but I'm not sure this example is right.  The binding 
+says that clock-frequency is optional if 'clocks' is provided, but here 
+you list both.  You should probably have two examples.
 
-That sub-family is less than two years old and only has devicetree
-(DT) support and came online circa lk 3.7 . The dust is yet to
-settle on the DT stuff at least for AT91 SoCs (translation:
-lots of stuff is still broken, so much that it is hard to know
-where to start).
-
-The fix in the patch is pretty simple: just shadow the silicon
-IMR register with a variable in the driver. Some older SoCs (pre-DT)
-use the the rtc-at91rm9200 driver (e.g. obviously the AT91RM9200)
-and they should not be impacted by the change. There shouldn't
-be a large volume of interrupts associated with a RTC.
-
-
-Compared to a relatively stable kernel subsystem like SCSI, what
-is happening in the ARM architecture with DT is huge and ongoing.
-So I think you either need new rules or suspend some of the stricter
-rules applied to more stable subsystems. Just my two cents worth.
-
-
-Doug Gilbert
-
-who hasn't seen that frill-necked lizard for a while
+-- 
+Timur Tabi
