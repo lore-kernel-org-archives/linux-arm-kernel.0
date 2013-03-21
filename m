@@ -1,34 +1,38 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 21 Mar 2013 17:47:31 +0100
-Subject: [alsa-devel] [PATCH 0/2] ASoC: dmaengine_pcm: support generic
- DMA binding users
-In-Reply-To: <514B34AB.1080107@metafoo.de>
-References: <1363318601-31505-1-git-send-email-shawn.guo@linaro.org>
- <20130321023858.GD6281@S2101-09.ap.freescale.net>
- <514B21F3.90803@metafoo.de>
- <20130321152206.GA14768@opensource.wolfsonmicro.com>
- <514B34AB.1080107@metafoo.de>
-Message-ID: <20130321164731.GB15926@opensource.wolfsonmicro.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 21 Mar 2013 16:51:47 +0000
+Subject: [GIT PULL] Renesas ARM and SH based SoC pinmux update for v3.10
+In-Reply-To: <1363604838-29359-1-git-send-email-horms+renesas@verge.net.au>
+References: <1363604838-29359-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <201303211651.47960.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 21, 2013 at 05:26:19PM +0100, Lars-Peter Clausen wrote:
+On Monday 18 March 2013, Simon Horman wrote:
 
-> a second step. The first step should already help us to get rid of a large
-> portion of redundant code we see in PCM drivers today.
+> ----------------------------------------------------------------
+> Renesas ARM and SH based SoC pinmux update for v3.10
+> 
+> As with changes to the Renesas ARM and SH based SoC pinmux code for v3.9
+> it has been agreed by the relevant parties, Linus Walleij, Laurent Pinchart,
+> Paul Mundt and myself, that it would be best to take these changes through
+> the renesas tree and in turn the arm-soc tree.
+> 
+> This pull is based on a merge of the following in order to provide
+> the required dependencies. This base has been discussed and agreed upon by
+> Linus Walleij, Laurent Pinchart and myself.
+> 
+> git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl devel
+> git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl fixes
+> git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas fixes
 
-Indeed, factor everything we can out into common code and then improve
-the common code in a single place.
+Pulled, thanks!
 
-> There are some other drivers which don't really depend on runtime filter
-> parameters, e.g. tegra, which doesn't use a filter function. So tegra can also
-> easily make use of this new generic dmaengine based PCM driver.
+I'm a bit overwhelmed by the number of patches and pull requests I got from
+you at the same time, so it took a little longer to get an overview of what
+you are actually doing.
 
-Tegra's DT only these days anyway of course.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130321/2d359b73/attachment.sig>
+I've used the next/renesas-pinctrl branch again, keeping this one separate
+from the other next/* branches given how many patches there are in here,
+and given the dependency on the pinctrl tree.
+
+	Arnd
