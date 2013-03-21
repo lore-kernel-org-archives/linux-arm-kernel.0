@@ -1,28 +1,38 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Wed, 20 Mar 2013 17:02:01 -0700
-Subject: [PATCH 4/4] ARM: Kconfig: allow context tracking
-In-Reply-To: <1363824121-26169-1-git-send-email-khilman@linaro.org>
-References: <1363824121-26169-1-git-send-email-khilman@linaro.org>
-Message-ID: <1363824121-26169-5-git-send-email-khilman@linaro.org>
+From: cooloney@gmail.com (Bryan Wu)
+Date: Wed, 20 Mar 2013 17:23:43 -0700
+Subject: [PATCH 0/4] led: drivers bug fixes
+In-Reply-To: <1363716452-18870-1-git-send-email-simon.guinot@sequanux.org>
+References: <1363716452-18870-1-git-send-email-simon.guinot@sequanux.org>
+Message-ID: <CAK5ve-+Qbqjd47JqEtdMNxjVfUeFbq3ANGzT6zdXXheyTOD_Dg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Kevin Hilman <khilman@linaro.org>
----
- arch/arm/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+On Tue, Mar 19, 2013 at 11:07 AM, Simon Guinot
+<simon.guinot@sequanux.org> wrote:
+> Here are some bug fixes for the LED drivers leds-ns2, leds-lt3593 and
+> leds-renesas-tpu. Note that I don't have tested the patches related with
+> the two lasts. I don't have the hardware.
+>
+> Regards,
+>
+> Simon
+>
+> Simon Guinot (4):
+>   leds: leds-ns2: fix oops at module removal
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 9473d55..4028fb2 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -60,6 +60,7 @@ config ARM
- 	select OLD_SIGSUSPEND3
- 	select OLD_SIGACTION
- 	select HAVE_VIRT_CPU_ACCOUNTING
-+	select HAVE_CONTEXT_TRACKING
- 	help
- 	  The ARM series is a line of low-power-consumption RISC chip designs
- 	  licensed by ARM Ltd and targeted at embedded applications and
--- 
-1.8.2
+Thanks, I merged this patch and other 3 patches are already in my git tree.
+
+-Bryan
+
+>   leds: leds-ns2: fix devm_gpio_request_one() flags parameter
+>   leds: leds-lt3593: fix devm_gpio_request_one() flags parameter
+>   leds: renesas: fix devm_gpio_request_one() flags parameter
+>
+>  drivers/leds/leds-lt3593.c      |    5 +++--
+>  drivers/leds/leds-ns2.c         |   44 ++++++++++++++++++++++++++-------------
+>  drivers/leds/leds-renesas-tpu.c |    3 ++-
+>  3 files changed, 34 insertions(+), 18 deletions(-)
+>
+> --
+> 1.7.10.4
+>
