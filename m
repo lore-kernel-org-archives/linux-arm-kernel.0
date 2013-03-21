@@ -1,49 +1,74 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 21 Mar 2013 15:55:32 +0200
-Subject: [PATCH] ARM: OMAP4: clock: Initialize USB DPLL
-In-Reply-To: <1363873705-3224-1-git-send-email-rogerq@ti.com>
-References: <1363873705-3224-1-git-send-email-rogerq@ti.com>
-Message-ID: <514B1154.1020100@ti.com>
+From: rdroms@gmail.com (Ralph Droms)
+Date: Thu, 21 Mar 2013 09:59:22 -0400
+Subject: [PATCH v2] mmc: mvsdio: fix non-DT probing of GPIOs
+In-Reply-To: <1363792148-26405-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1363792148-26405-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <FBE8EA3F-2335-42F3-8203-016E4D41D835@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/21/2013 03:48 PM, Roger Quadros wrote:
-> If the bootloader doesn't configure USB DPLL (e.g. in u-boot,
-> disable CONFIG_USB_EHCI_OMAP), then we get all sorts of problems
-> like
-> - division by zero errors at boot [1]
-> - USB DPLL fails to enter locked state
-> - USB EHCI Host is non functional
-> - Device can't enter OFF mode
-> 
-> Initializing the USB DPLL fixes all these issues.
-> 
-> [1]
-> 
-> [    0.000000] clock: dpll_usb_ck failed transition to 'locked'
-> [    0.000000] Division by zero in kernel.
-> [    0.000000] [<c001b00c>] (unwind_backtrace+0x0/0xf0) from [<c02b2378>] (Ldiv0+0x8/0x10)
-> [    0.000000] [<c02b2378>] (Ldiv0+0x8/0x10) from [<c041cf3c>] (clk_divider_set_rate+0x10/0x124)
-> [    0.000000] [<c041cf3c>] (clk_divider_set_rate+0x10/0x124) from [<c041bfc4>] (clk_change_rate+0x3c/0xb4)
-> [    0.000000] [<c041bfc4>] (clk_change_rate+0x3c/0xb4) from [<c041c028>] (clk_change_rate+0xa0/0xb4)
-> 
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
-> ---
->  arch/arm/mach-omap2/cclock44xx_data.c |   19 +++++++++++++++++++
->  1 files changed, 19 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/cclock44xx_data.c b/arch/arm/mach-omap2/cclock44xx_data.c
-> index bfc46c1..6127bb9 100644
-> --- a/arch/arm/mach-omap2/cclock44xx_data.c
-> +++ b/arch/arm/mach-omap2/cclock44xx_data.c
-> @@ -53,6 +53,12 @@
->   */
->  #define OMAP4_DPLL_ABE_DEFFREQ				98304000
->  
-> +/*
-> + * OMAP4450 TRM Rev X, section "3.6.3.9.5 DPLL_USB Preferred Settings"
+I've tested the patch and it's OK.
 
-4460 actually.
+- Ralph Droms
 
-cheers,
--roger
+On Mar 20, 2013, at 11:09 AM 3/20/13, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+
+Ralph Droms <rdroms.ietf@gmail.com> reported that 3.9-rc was breaking
+the SDIO interface on his Sheevaplug platform, and that the recent
+changes to the mvsdio driver are responsible for this breakage.
+
+After investigation, is turns out that the Sheevaplug does not have
+any "card detect" GPIO, and the Sheevaplug has not been converted to
+the Device Tree. Therefore, the Sheevaplug board code does not define
+a value for the .gpio_card_detect field of the mvsdio_platform_data
+structure, which means that its value is 0. Unfortunately,
+gpio_is_valid() considers 0 as a valid GPIO, and therefore calls
+mmc_gpio_request_cd(), which fails and makes the entire probing of the
+driver fail.
+
+In fact, in the previous mvsdio code, before the Device Tree binding
+was introduced, 0 was not considered as a valid GPIO. Therefore, this
+fix revert back to this behavior in the non-DT case, by setting the
+gpio_card_detect and gpio_write_protect local variables to -EINVAL
+when the corresponding fields of the mvsdio_platform_data structure
+are set to zero (i.e, left undefined). Of course, it prevents to use
+GPIO 0 as a card detect or write protect GPIO, but it was a defiency
+of the previous non-DT code, and the fix moving forward is to convert
+platforms to the Device Tree.
+
+The problem has been reproduced successfully on the Kirkwood-based
+Marvell DB-88F6281-BP Development Board (that doesn't use the Device
+Tree) and the fix has proven to work properly, after of course
+removing the gpio_card_detect field of the mvsdio_platform_data
+instance for this board.
+
+Reported-by: Ralph Droms <rdroms.ietf@gmail.com>
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Tested-by: Ralph Droms <rdroms@gmail.com>
+---
+This patch should be applied on 3.9-rcX.
+
+Changes between v1 and v2:
+* Send the patch to the MMC maintainer instead of the Marvell
+  maintainers.
+---
+drivers/mmc/host/mvsdio.c |    4 ++--
+1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/mmc/host/mvsdio.c b/drivers/mmc/host/mvsdio.c
+index 145cdaf..1e4d567 100644
+--- a/drivers/mmc/host/mvsdio.c
++++ b/drivers/mmc/host/mvsdio.c
+@@ -741,8 +741,8 @@ static int __init mvsd_probe(struct platform_device *pdev)
+			goto out;
+		}
+		host->base_clock = mvsd_data->clock / 2;
+-		gpio_card_detect = mvsd_data->gpio_card_detect;
+-		gpio_write_protect = mvsd_data->gpio_write_protect;
++		gpio_card_detect = mvsd_data->gpio_card_detect ? : -EINVAL;
++		gpio_write_protect = mvsd_data->gpio_write_protect ? : -EINVAL;
+	}
+
+	mmc->ops = &mvsd_ops;
+-- 
+1.7.9.5
