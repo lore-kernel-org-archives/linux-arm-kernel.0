@@ -1,115 +1,65 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 21 Mar 2013 11:35:49 +0000
-Subject: [PATCH] ARM: convert arm/arm64 arch timer to use CLKSRC_OF init
-In-Reply-To: <20130321110646.GE15279@e106331-lin.cambridge.arm.com>
-References: <1363818875-15978-1-git-send-email-robherring2@gmail.com>
- <20130321110646.GE15279@e106331-lin.cambridge.arm.com>
-Message-ID: <514AF095.5060802@arm.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Thu, 21 Mar 2013 12:49:07 +0100
+Subject: [PATCH 0/6] ARM: ux500: first multiplatform series
+Message-ID: <1363866553-15054-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/03/13 11:06, Mark Rutland wrote:
-> Hi Rob,
-> 
-> (adding Marc to Cc as he may have comments).
-> 
-> On Wed, Mar 20, 2013 at 10:34:35PM +0000, Rob Herring wrote:
->> From: Rob Herring <rob.herring@calxeda.com>
->>
->> This converts arm and arm64 to use CLKSRC_OF DT based initialization for
->> the arch timer. A new function arch_timer_arch_init is added to allow for
->> arch specific setup.
->>
->> This has a side effect of enabling sched_clock on omap5 and exynos5. There
->> should not be any reason not to use the arch timers for sched_clock.
-> 
-> Nice! I was just about to post a (slightly updated) version of Thomas Abraham's
-> arch_timer clocksource_of_init patch, but this seems much more comprehensive.
-> 
-> I have some other arch_timer patches which may clash, but they could be rebased
-> atop of this.
-> 
->>
->> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Cc: Kukjin Kim <kgene.kim@samsung.com>
->> Cc: Tony Lindgren <tony@atomide.com>
->> Cc: Simon Horman <horms@verge.net.au>
->> Cc: Magnus Damm <magnus.damm@gmail.com>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Cc: John Stultz <john.stultz@linaro.org>
->> Cc: Thomas Gleixner <tglx@linutronix.de>
->> Cc: linux-samsung-soc at vger.kernel.org
->> Cc: linux-omap at vger.kernel.org
->> Cc: linux-sh at vger.kernel.org
->> ---
->> This is dependent on my CLKSRC_OF clean-up in arm-soc, my 64-bit sched_clock
->> support series, and Arnd's default machine descriptor patch (for default
->> clocksource_of_init call). This is only compile tested on arm.
->>
->> The full series (including sp804 work) is available here:
->> git://sources.calxeda.com/kernel/linux.git arm-timers
->>
->> Rob
->>
-> 
-> [...]
-> 
->> diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
->> index d0ad789..6215717 100644
->> --- a/arch/arm/mach-vexpress/v2m.c
->> +++ b/arch/arm/mach-vexpress/v2m.c
->> @@ -1,6 +1,7 @@
->>  /*
->>   * Versatile Express V2M Motherboard Support
->>   */
->> +#include <linux/clocksource.h>
->>  #include <linux/device.h>
->>  #include <linux/amba/bus.h>
->>  #include <linux/amba/mmci.h>
->> @@ -23,7 +24,6 @@
->>  #include <linux/regulator/machine.h>
->>  #include <linux/vexpress.h>
->>
->> -#include <asm/arch_timer.h>
->>  #include <asm/mach-types.h>
->>  #include <asm/sizes.h>
->>  #include <asm/mach/arch.h>
->> @@ -446,10 +446,7 @@ static void __init v2m_dt_timer_init(void)
->>                                 irq_of_parse_and_map(node, 0));
->>         }
->>
->> -       arch_timer_of_register();
->> -
->> -       if (arch_timer_sched_clock_init() != 0)
->> -               versatile_sched_clock_init(vexpress_get_24mhz_clock_base(),
->> +       versatile_sched_clock_init(vexpress_get_24mhz_clock_base(),
->>                                 24000000);
->>  }
->>
-> 
-> On TC2 this series leads to using the vexpress 24MHz clock as the sched clock
-> in preference to the architected timer:
-> 
->   Architected local timer running at 24.00MHz (virt).
->   Switching to timer-based delay loop
->   Registered arch_counter_get_cntvct+0x0/0x14 as sched_clock source
->   sched_clock: 32 bits at 24MHz, resolution 41ns, wraps every 178956ms
->   Registered versatile_read_sched_clock+0x0/0x28 as sched_clock source
-> 
-> As they both have the same frequency, neither overrides the other, and
-> whichever gets registered last is used as the sched_clock. As accesses to the
-> architected timer are going to have a much lower overhead, this isn't very nice
-> (and it could be better to use it even if it had a lower frequency).
+From: Linus Walleij <linus.walleij@linaro.org>
 
-Indeed. And if I look at it with my KVM hat on, it is even worse (the
-guest will exit all the way to platform emulation in userspace on each
-sched_clock read - a sure performance killer).
+This is the first set in my ux500 multiplatform series.
+As you can see it starts out by getting rid of three
+files in <mach/*>. It's enough stuff to discuss already,
+and relates to my recent question of whether the mailbox
+subsystem can be merged into the ARM SoC tree.
 
-Of course, emulating a VE is not the best option, but that's all we have
-so far when using QEMU as platform emulation.
+Linus Walleij (6):
+  ARM: ux500: move debugmacro to debug includes
+  clk: ux500: pass clock base adresses in init call
+  mfd: prcmu: pass a base and size with the early initcall
+  mfd: db8500-prcmu: get base address from resource
+  ARM: ux500: move PRCMU functions into the CPUidle driver
+  ARM: ux500: get rid of <mach/[hardware|db8500-regs].h>
 
-	M.
+ arch/arm/Kconfig.debug                         |   8 +
+ arch/arm/include/debug/ux500.S                 |  48 ++++++
+ arch/arm/mach-ux500/board-mop500-audio.c       |   1 -
+ arch/arm/mach-ux500/board-mop500-pins.c        |   2 -
+ arch/arm/mach-ux500/board-mop500-sdi.c         |   2 +-
+ arch/arm/mach-ux500/board-mop500-uib.c         |   1 -
+ arch/arm/mach-ux500/board-mop500.c             |   2 +-
+ arch/arm/mach-ux500/cache-l2x0.c               |   2 +-
+ arch/arm/mach-ux500/cpu-db8500.c               |   6 +-
+ arch/arm/mach-ux500/cpu.c                      |  25 +--
+ arch/arm/mach-ux500/cpuidle.c                  | 148 +++++++++++++++++-
+ arch/arm/mach-ux500/db8500-regs.h              | 201 ++++++++++++++++++++++++
+ arch/arm/mach-ux500/devices-common.c           |   1 -
+ arch/arm/mach-ux500/devices-db8500.c           |   8 +-
+ arch/arm/mach-ux500/devices-db8500.h           |   1 +
+ arch/arm/mach-ux500/devices.c                  |   3 +-
+ arch/arm/mach-ux500/id.c                       |   2 +-
+ arch/arm/mach-ux500/include/mach/db8500-regs.h | 173 ---------------------
+ arch/arm/mach-ux500/include/mach/debug-macro.S |  39 -----
+ arch/arm/mach-ux500/include/mach/hardware.h    |  47 ------
+ arch/arm/mach-ux500/include/mach/irqs.h        |   2 -
+ arch/arm/mach-ux500/include/mach/uncompress.h  |   3 +-
+ arch/arm/mach-ux500/platsmp.c                  |   2 +-
+ arch/arm/mach-ux500/timer.c                    |   2 +-
+ arch/arm/mach-ux500/usb.c                      |   2 +-
+ drivers/clk/ux500/clk-prcc.c                   |   1 -
+ drivers/clk/ux500/u8500_clk.c                  | 142 ++++++++---------
+ drivers/clocksource/clksrc-dbx500-prcmu.c      |   1 -
+ drivers/mfd/db8500-prcmu.c                     | 176 +++++----------------
+ drivers/mfd/dbx500-prcmu-regs.h                | 204 +++++++++++--------------
+ include/linux/mfd/db8500-prcmu.h               |  10 +-
+ include/linux/mfd/dbx500-prcmu.h               |  36 +----
+ include/linux/platform_data/clk-ux500.h        |   3 +-
+ 33 files changed, 647 insertions(+), 657 deletions(-)
+ create mode 100644 arch/arm/include/debug/ux500.S
+ create mode 100644 arch/arm/mach-ux500/db8500-regs.h
+ delete mode 100644 arch/arm/mach-ux500/include/mach/db8500-regs.h
+ delete mode 100644 arch/arm/mach-ux500/include/mach/debug-macro.S
+ delete mode 100644 arch/arm/mach-ux500/include/mach/hardware.h
+
 -- 
-Jazz is not dead. It just smells funny...
+1.7.11.3
