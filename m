@@ -1,44 +1,43 @@
-From: ryan@presslab.us (Ryan Press)
-Date: Wed, 20 Mar 2013 16:57:30 -0700
-Subject: [PATCH for 3.9-rc] arm: mvebu: Use local interrupt only for the
- timer 0
-In-Reply-To: <20130320182702.3dc3fa20@skate>
-References: <1363792175-3136-1-git-send-email-gregory.clement@free-electrons.com>
- <CABx3TkU=y5_WTojbc9z17csaUh4PYxDUszdCdpWhmDM-JUEt5g@mail.gmail.com>
- <20130320182702.3dc3fa20@skate>
-Message-ID: <CABx3TkXH_sFzgFkpoZRUkDywsHsMWbTYN-cA=BhvK9y4ogzgOg@mail.gmail.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Wed, 20 Mar 2013 17:01:57 -0700
+Subject: [PATCH 0/4] ARM: add support for context tracking subsystem
+Message-ID: <1363824121-26169-1-git-send-email-khilman@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+commit 91d1aa43 (context_tracking: New context tracking susbsystem)
+generalized parts of the RCU userspace extended quiescent state into
+the context tracking subsystem.  Context tracking is then used 
+to implement adaptive tickless (a.k.a full nohz)
 
-On Wed, Mar 20, 2013 at 10:27 AM, Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com> wrote:
-> Dear Ryan Press,
->
-> On Wed, 20 Mar 2013 09:44:42 -0700, Ryan Press wrote:
->
->> I can confirm this patch works for me as well.  I still have the
->> problem on my Globalscale Mirabox where only a forced 10Mb link works
->> on tx/rx.  With 100Mb only rx works, and 1Gb neither works.
->
-> Did you test both network interfaces? Do you have the problem on both?
-> I know there are issues on the Mirabox with the network interface that
-> wasn't initialized by U-Boot (i.e if you tftp your kernel from
-> interface 0, interface 0 works fine in Linux but not interface 1, if
-> your tftp your kernel from interface 1, it's the opposite).
+Mainline currently only includes x86 support for the context tracking
+susbsystem and the goal of this series is to add ARM support, in order
+to make adaptive tickless functional on ARM.
 
-Ah, yes, so when I initialize the controller in U-Boot by attempting a
-tftp download (and then just ctrl-c out) before booting then I get 1Gb
-link.  At first I suspected the PHY registers being different, but I
-dumped the registers when working vs non-working and they seemed the
-same, but hard to know for sure.  Then I dumped some of the MAC
-registers and I see that 0x2410 is different, it shows that
-MVNETA_GMAC_RX_FLOW_CTRL_ENABLE and MVNETA_GMAC_TX_FLOW_CTRL_ENABLE
-(working 0x2c3b vs non-working 0x2401) bits are set when it is
-working.  0x2410 is just a status word and I don't know how to turn
-the flow control on otherwise, and probably there is more than this
-needed.
+Depends on the prerequistes series: 
+  [PATCH 0/3] ARM: context tracking support prerequisites
+  http://marc.info/?l=linux-kernel&m=136382248131438&w=2
 
-Thanks,
-Ryan
+Both of which are combined on top of Frederic's 3.9-rc1-nohz1 branch
+and available here:
+git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux.git arm-nohz-v2/context-tracking
+
+Using this, I tested adaptive tickless on a 2 CPU ARM SoC (OMAP4
+Panda.)
+
+Kevin Hilman (4):
+  ARM: context tracking: add exception support
+  ARM: context tracking: instrument system calls
+  ARM: context tracking: handle post exception/syscall/IRQ work
+  ARM: Kconfig: allow context tracking
+
+ arch/arm/Kconfig                   |  1 +
+ arch/arm/include/asm/thread_info.h |  4 +++-
+ arch/arm/kernel/ptrace.c           | 11 +++++++++++
+ arch/arm/kernel/signal.c           | 12 +++++++++---
+ arch/arm/kernel/traps.c            | 18 +++++++++++++++++-
+ arch/arm/mm/fault.c                | 32 +++++++++++++++++++++++++++-----
+ 6 files changed, 68 insertions(+), 10 deletions(-)
+
+-- 
+1.8.2
