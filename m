@@ -1,43 +1,24 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Thu, 21 Mar 2013 17:05:44 +0100 (CET)
-Subject: [PATCH 3/3] ARM: shmobile: kzm9g-reference: add ethernet support
-In-Reply-To: <Pine.LNX.4.64.1303211659580.32438@axis700.grange>
-References: <Pine.LNX.4.64.1303211659580.32438@axis700.grange>
-Message-ID: <Pine.LNX.4.64.1303211704370.32438@axis700.grange>
+From: timur@tabi.org (Timur Tabi)
+Date: Thu, 21 Mar 2013 11:11:56 -0500
+Subject: [PATCH] Sound: sgtl5000 Allow codec clock frequency to be set.
+In-Reply-To: <514AC738.6050900@parkeon.com>
+References: <20130319170322.27828.7691.stgit@localhost>
+ <514A63EE.7000707@tabi.org> <514AC738.6050900@parkeon.com>
+Message-ID: <CAOZdJXXv=O3vmSCJ1ojhis+Fn7FJ7yhd2wVt10m77Cixbew2BA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a DT node for the SMSC 9221 ethernet chip, found on kzm9g, to its
-reference implementation.
+On Thu, Mar 21, 2013 at 3:39 AM, Martin Fuzzey <mfuzzey@parkeon.com> wrote:
 
-Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
----
- arch/arm/boot/dts/sh73a0-kzm9g-reference.dts |   13 +++++++++++++
- 1 files changed, 13 insertions(+), 0 deletions(-)
+> With this patch and that DT example the frequency of clock 162 will be _set_
+> to 20MHz
 
-diff --git a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-index f33b5cc..5972abb 100644
---- a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-+++ b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-@@ -44,6 +44,19 @@
- 		regulator-always-on;
- 		regulator-boot-on;
- 	};
-+
-+	lan9220 at 10000000 {
-+		compatible = "smsc,lan9220", "smsc,lan9115";
-+		reg = <0x10000000 0x100>;
-+		phy-mode = "mii";
-+		interrupt-parent = <&irqpin0>;
-+		interrupts = <3 0>;	/* active low */
-+		reg-io-width = <4>;
-+		smsc,irq-push-pull;
-+		smsc,save-mac-address;
-+		vddvario-supply = <&reg_1p8v>;
-+		vdd33a-supply = <&reg_3p3v>;
-+	};
- };
- 
- &mmcif {
--- 
-1.7.2.5
+Does that mean that it ignores the ' clocks' parameter?
+
+> If clock-frequency is omitted the binding is still correct (hence the
+> optional) but the frequency of clock 162 would not be modified.
+>
+> In the documentation I wrote "If both a clock and clock-frequency are
+> provided the clock's rate will be set. " maybe this is not clear enough?
+
+It's not clear what it will be set *to*.
