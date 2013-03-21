@@ -1,61 +1,28 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Thu, 21 Mar 2013 11:50:05 +0100
-Subject: [PATCH] i2c: s3c24xx: allow device core to setup default pin
- configuration
-In-Reply-To: <20130321100032.GC19297@the-dreams.de>
-References: <1362404573-30406-1-git-send-email-thomas.abraham@linaro.org>
- <20130321100032.GC19297@the-dreams.de>
-Message-ID: <201303211150.06891.heiko@sntech.de>
+From: heiko@sntech.de (Heiko =?iso-8859-15?q?St=FCbner?=)
+Date: Thu, 21 Mar 2013 11:51:24 +0100
+Subject: [PATCH 1/2] i2c: s3c2410: move mach/regs-iic.h into i2c-s3c2410
+ device driver
+In-Reply-To: <20130321095758.GB19297@the-dreams.de>
+References: <201302080057.00664.heiko@sntech.de>
+ <20130321095758.GB19297@the-dreams.de>
+Message-ID: <201303211151.24997.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 21. M?rz 2013, 11:00:32 schrieb Wolfram Sang:
-> On Mon, Mar 04, 2013 at 07:12:53PM +0530, Thomas Abraham wrote:
-> > With device core now able to setup the default pin configuration,
-> > the call to devm_pinctrl_get_select_default can be removed. And
-> > the pin configuration code based on the deprecated Samsung specific
-> > gpio bindings is also removed.
+Hi Wolfram,
+
+Am Donnerstag, 21. M?rz 2013, 10:57:58 schrieb Wolfram Sang:
+> On Fri, Feb 08, 2013 at 12:57:00AM +0100, Heiko St?bner wrote:
+> > The register definitions are only used in the driver itself.
+> > This also removes the last dependency on plat/ includes from the
+> > i2c driver.
 > > 
-> > Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> > ---
-> > 
-> > Hi Heiko, Tomasz,
-> > 
-> > We have to make a choice on the path forward for pinctrl support
-> > on Samsung platforms. We have three cases to deal with.
-> > 
-> > A. Samsung platforms without DT support.
-> > B. Samsung platforms with DT support using old Samsung specific
-> > 
-> >    gpio bindings for pin-configuration (s3c24xx and s3x64xx).
-> > 
-> > C. Samsung platforms with DT support using using pinctrl based
-> > 
-> >    pin-configurations (Exynos4 and Exynos5).
-> > 
-> > For [A], we just let the platform specific callbacks handle the
-> > pin setup. For [B] and [C], based on Linus Walleij's pin grab
-> > by device core patch and subsequent discussions with him on the
-> > mailing list, would it be acceptable that we discontinue support
-> > for [B] in Samsung SoC device drivers. This will impact your
-> > current DT work on s3c24xx and s3c64xx platforms. Pinctrl is
-> > inevitable and we have to migrate to it. Instead of workarounds
-> > to maintain support for [B], it might be better that we migrate
-> > s3c24xx and s3c64xx platforms to pinctrl.
-> > 
-> > Please do let us know your opinion on this.
+> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 > 
-> Dropping [B] sounds good, but I think it makes sense to wait with this
-> patch until pinctrl support for s3c24xx is in place?
+> What tree is this against? I can't apply it on top of v3.8 or 3.9-rc3.
 
-s3c24xx does not currently have dt support in mainline at all and the non-dt 
-init is not touched at all. Also it seems the legacy gpio based dt init does 
-not work at all currently, because the pinctrl function are no-ops and 
-therefore the legacy gpio init is never reached on such systems.
-
-So I would vote for dropping [B]. I'm already working a bit on a pinctrl 
-driver for s3c24xx, so when I reintroduce s3c24xx dt support again, it should 
-already have pinctrl support then.
+I'm not sure anymore ... probably some linux-next. I'll redo them on top of 
+your (i2c) for-next branch.
 
 
 Heiko
