@@ -1,41 +1,84 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 21 Mar 2013 07:45:01 +0100
-Subject: [PATCH 00/16] Marvell EBU thermal sensor consolidation
-In-Reply-To: <1363818997-23137-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1363818997-23137-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20130321064501.GK21478@lunn.ch>
+From: avinashphilip@ti.com (Philip, Avinash)
+Date: Thu, 21 Mar 2013 08:01:03 +0000
+Subject: [PATCH v2 3/3] ARM: davinci: da850: add EHRPWM & ECAP DT node
+In-Reply-To: <87wqt2qlts.fsf@dell.be.48ers.dk>
+References: <1363761714-15034-1-git-send-email-avinashphilip@ti.com>
+ <1363761714-15034-4-git-send-email-avinashphilip@ti.com>
+ <51499DB4.9080907@ti.com> <87wqt2qlts.fsf@dell.be.48ers.dk>
+Message-ID: <518397C60809E147AF5323E0420B992E3EA9C651@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 20, 2013 at 07:36:21PM -0300, Ezequiel Garcia wrote:
-> This patchset is my first attempt at adding basic thermal sensor
-> support on Armada 370 and Armada XP.
+On Wed, Mar 20, 2013 at 18:17:59, Peter Korsgaard wrote:
+> >>>>> "Sekhar" == Sekhar Nori <nsekhar@ti.com> writes:
 > 
-> Given Armada 370/XP and the other Marvell SoC with thermal support,
-> namely Kirkwood and Dove, have fairly similar thermal devices it 
-> made sense to integrate all of them into a single driver: mvebu-thermal.
+>  Sekhar> On 3/20/2013 12:11 PM, Philip Avinash wrote:
+>  >> Add da850 EHRPWM & ECAP DT node.
+>  >> Also adds OF_DEV_AUXDATA for EHRPWM & ECAP driver to use EHRPWM & ECAP
+>  >> clock.
+>  >> 
+>  >> Signed-off-by: Philip Avinash <avinashphilip@ti.com>
+>  >> ---
+>  >> Changes since v1:
+>  >> - Reusing ti,am33xx<ecap/ehrpwm> as compatible field as both IP's are
+>  >> same with am33xx platform and da850 has no platform specific
+>  >> dependency.
+> 
+>  Sekhar> Which is fine, but I think the binding documentation still needs to be
+>  Sekhar> updated to document the ti,da850-ehrpwm binding. Looping Peter (it is
+>  Sekhar> always a good idea to CC folks who reviewed your patch last time
+>  Sekhar> around). Also, please Cc the DT folks and devicetree-discuss list too
+>  Sekhar> for their opinion.
+> 
+> Yes, thanks for CC'ing me. I also think da850-* should be
+> documented. See Documentation/devicetree/bindings/gpio/8xxx_gpio.txt for
+> an similar (old) example.
 
-Hi Ezequiel
+Peter,
 
-I went this way to start with, merging Dove, Kirkwood and something
-which nearly worked for 370. But then i looked at the code, at how
-little is actually shared, and went back to separate drivers.
+In this binding file also, only initial compatible field is updated. Later on many
+compatible were added in driver. But not update back to binding doc.
 
-Kirkwood has no control registers, so needs a special case in the probe.
-The bit location of the temperate value moves around in the register.
-Each SoC needs its own initialization sequence.
-Each SoC needs its own is_valid() function.
-Each Soc needs its own formula to convert to milli centigrad.
+<Documentation/devicetree/bindings/gpio/8xxx_gpio.txt>
+---
+	followed by "fsl,mpc8349-gpio" for 83xx, "fsl,mpc8572-gpio" for 85xx and
+	"fsl,mpc8610-gpio" for 86xx.
+---
+<drivers/gpio/gpio-mpc8xxx.c>
+---
+static struct of_device_id mpc8xxx_gpio_ids[] __initdata = {
+        { .compatible = "fsl,mpc8349-gpio", },
+        { .compatible = "fsl,mpc8572-gpio", },
+        { .compatible = "fsl,mpc8610-gpio", },
+        { .compatible = "fsl,mpc5121-gpio", .data = mpc512x_irq_set_type, },
+        { .compatible = "fsl,pq3-gpio",     },
+        { .compatible = "fsl,qoriq-gpio",   },
+        {}
+};
+---
 
-I've never seen the datasheets for 370/XP, just a list of registers for
-370. But i get the impression it has two temperate sensors, so should
-export two values?
+Grant/Rob,
+With respect peters explanation (below), what is your opinion on adding information to 
+binding doc for da850 support?
 
-Also, kirkwood will never be built into the same kernel as
-Dove/370/XP.  So we end up with "bloat" in the driver, or at least a
-collection of #ifdefs.
+Peter --> if the hardware block is identical the dts should simply list:
+Peter --> compatible = "ti,da850-ecap", "ti,am33xx-ecap"
+Peter --> And the driver only bind to ti,am33xx-ecap (unless there ever needs to
+Peter --> be a da850 specific workaround.
 
-In the end, i decided it was simpler and cleaner to just have separate
-drivers. This is something which we should think about and discuss.
+Or
+Should I update both binding doc & the driver to use new compatible option "ti,da830-ecap"
+(as da830 platform has initial IP support)?
+Even with this, platforms da830, da850 and am33xx can reuse "ti,da830-ecap" compatible field.
 
-	 Andrew
+Thanks
+Avinash
+
+> 
+> -- 
+> Bye, Peter Korsgaard
+> _______________________________________________
+> Davinci-linux-open-source mailing list
+> Davinci-linux-open-source at linux.davincidsp.com
+> http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
+> 
