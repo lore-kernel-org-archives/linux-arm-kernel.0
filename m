@@ -1,84 +1,57 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 21 Mar 2013 15:37:16 +0530
-Subject: [PATCH] dmaengine:sirf:take clock and enable it while probing
-In-Reply-To: <1363595623-6887-1-git-send-email-Barry.Song@csr.com>
-References: <1363595623-6887-1-git-send-email-Barry.Song@csr.com>
-Message-ID: <20130321100716.GP10326@intel.com>
+From: gerlando.falauto@keymile.com (Gerlando Falauto)
+Date: Thu, 21 Mar 2013 11:37:25 +0100
+Subject: [PATCH v3 0/9] refactoring for mask_cache
+In-Reply-To: <alpine.LFD.2.02.1303202222340.22263@ionos>
+References: <1363277430-21325-1-git-send-email-holger.brunck@keymile.com><1363615255-18200-1-git-send-email-gerlando.falauto@keymile.com><20130319100352.GB2419@localhost><20130319110620.GO13280@titan.lakedaemon.net><51484793.5020102@keymile.com><20130319114430.GP13280@titan.lakedaemon.net>
+ <20130319115615.GR13280@titan.lakedaemon.net> <5149F48D.3030706@keymile.com>
+ <alpine.LFD.2.02.1303202222340.22263@ionos>
+Message-ID: <514AE2E5.8020700@keymile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 18, 2013 at 04:33:43PM +0800, Barry Song wrote:
-> From: Barry Song <Baohua.Song@csr.com>
-> 
-> there is hardcode which enabled the clock of dmaengine before,
-> this patch takes the clock by standard clock API and enable it
-> in probe.
-> 
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
-> ---
->  drivers/dma/sirf-dma.c |   11 +++++++++++
->  1 files changed, 11 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
-> index 1d627e2..c439529 100644
-> --- a/drivers/dma/sirf-dma.c
-> +++ b/drivers/dma/sirf-dma.c
-> @@ -16,6 +16,7 @@
->  #include <linux/of_address.h>
->  #include <linux/of_device.h>
->  #include <linux/of_platform.h>
-> +#include <linux/clk.h>
->  #include <linux/sirfsoc_dma.h>
->  
->  #include "dmaengine.h"
-> @@ -78,6 +79,7 @@ struct sirfsoc_dma {
->  	struct sirfsoc_dma_chan		channels[SIRFSOC_DMA_CHANNELS];
->  	void __iomem			*base;
->  	int				irq;
-> +	struct clk			*clk;
->  	bool				is_marco;
->  };
->  
-> @@ -639,6 +641,12 @@ static int sirfsoc_dma_probe(struct platform_device *op)
->  		return -EINVAL;
->  	}
->  
-> +	sdma->clk = devm_clk_get(dev, NULL);
-NULL? Arent you supposed to send a avlid non global string with. It may work now
-but do you really want to go that path?
+Hi Thomas,
 
-> +	if (IS_ERR(sdma->clk)) {
-> +		dev_err(dev, "failed to get a clock.\n");
-> +		return PTR_ERR(sdma->clk);
-> +	}
-> +
->  	ret = of_address_to_resource(dn, 0, &res);
->  	if (ret) {
->  		dev_err(dev, "Error parsing memory region!\n");
-> @@ -698,6 +706,8 @@ static int sirfsoc_dma_probe(struct platform_device *op)
->  
->  	tasklet_init(&sdma->tasklet, sirfsoc_dma_tasklet, (unsigned long)sdma);
->  
-> +	clk_prepare_enable(sdma->clk);
-shouldnt you be enabling clock when you start a txn. Keeping clock on in probe
-doesnt seem too smart
+first of all thanks for your patience.
 
-> +
->  	/* Register DMA engine */
->  	dev_set_drvdata(dev, sdma);
->  	ret = dma_async_device_register(dma);
-> @@ -720,6 +730,7 @@ static int sirfsoc_dma_remove(struct platform_device *op)
->  	struct device *dev = &op->dev;
->  	struct sirfsoc_dma *sdma = dev_get_drvdata(dev);
->  
-> +	clk_disable_unprepare(sdma->clk);
->  	dma_async_device_unregister(&sdma->dma);
->  	free_irq(sdma->irq, sdma);
->  	irq_dispose_mapping(sdma->irq);
-> -- 
-> 1.7.5.4
-> 
-> 
-> 
-> Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-> More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
+On 03/20/2013 10:42 PM, Thomas Gleixner wrote:
+> On Wed, 20 Mar 2013, Gerlando Falauto wrote:
+>> On 03/19/2013 12:56 PM, Jason Cooper wrote:
+>>> On Tue, Mar 19, 2013 at 07:44:31AM -0400, Jason Cooper wrote:
+>
+>> 3) Jason, did you mean you would pull it to
+>> http://git.infradead.org/users/jcooper/linux.git? Shall I change the SOB lines
+>> and resubmit? Or should I submit it somewhere else instead?
+>
+> That needs to go through my tree, really. And please just post it to
+> LKML with the relevant people CC'ed.
+
+So drop linux-kernel-arm?
+
+>> 4) About submitting to -stable, I guess it wouldn't make any sense until it
+>> gets included upstream
+>
+> Right. Though I'm a bit concerned about the amount of change
+> involved. So it's simpler to do:
+>
+> Cc: <stable@vger.kernel.org> # simple resolution will be sent in reply
+
+You mean per-patch (in the SOB area)? Or just in the cover letter? 
+[Since when does the cover letter have a SOB area?]
+Or just adding it as a plain "Cc:" recipient?
+In any case, before waiting for mainstream inclusion?
+
+I'm sorry for such stupid questions, but I'm getting even more confused...
+
+> Then let the people who have this problem reply on that patch series
+> with a simple revert of that generic_chip() conversion commit
+> concering their particular subarchitecture instead of forcing a
+> nightmare of complex (and maybe untested) changes onto stable.
+
+I think I understand the idea, though you've lost me completely as far 
+as the process is concerned...
+
+A pointer to a FMTR (assuming there is one that I could be RTFM-ed to) 
+would be very much appreciated. Sorry again for my newbieness.
+
+Thanks again!
+Gerlando
