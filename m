@@ -1,40 +1,33 @@
-From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
-Date: Thu, 21 Mar 2013 11:19:31 +0900
-Subject: [PATCH for 3.9-rc] arm: mvebu: Use local interrupt only for the
- timer 0
-In-Reply-To: <1363792175-3136-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1363792175-3136-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <514A6E33.6060600@hitachi.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 21 Mar 2013 10:22:08 +0800
+Subject: [PATCH V3 3/3] ARM: imx: enable RBC to support anatop LPM mode
+In-Reply-To: <1363877886-26538-1-git-send-email-b20788@freescale.com>
+References: <1363877886-26538-1-git-send-email-b20788@freescale.com>
+Message-ID: <20130321022206.GB23109@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(2013/03/21 0:09), Gregory CLEMENT wrote:
-> The commit 3a6f08a37 "arm: mvebu: Add support for local interrupt",
-> managed the 28th first interrupts as local interrupt to match the
-> hardware specification. Among these interrupts there are the Gigabits
-> Ethernet ones used by the mvneta driver. Unfortunately the state of
-> the percpu_irq API prevents the driver to use it.
+On Thu, Mar 21, 2013 at 10:58:06AM -0400, Anson Huang wrote:
+> RBC is to control whether some ANATOP sub modules
+> can enter lpm mode when SOC is into STOP mode, if
+> RBC is enabled and PMIC_VSTBY_REQ is set, ANATOP
+> will have below behaviors:
 > 
-> Indeed the interrupts have to be freed when the .stop() function is
-> called. As the free_percpu_irq() function don't disable the interrupt
-> line, we have to do it on each CPU before calling this. The function
-> disable_percpu_irq() only disable the percpu on the current CPU and
-> there is no function which allows to disable a percpu irq on a given
-> CPU. Waiting for the extension of the percpu_irq API, this fix allows
-> to use again the mvneta driver.
+> 1. Digital LDOs(CORE, SOC and PU) are bypassed;
+> 2. Analog LDOs(1P1, 2P5, 3P0) are disabled;
 > 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> As the 2P5 is necessary for DRAM IO pre-drive in
+> STOP mode, so we need to enable weak 2P5 in STOP
+> mode when 2P5 LDO is disabled.
+> 
+> For RBC settings, there are some rules as below
+> due to hardware design:
+> 
+> 1. All interrupts must be masked during operating
+>    RBC registers;
+> 2. At least 2 CKIL(32K) cycles is needed after the
+>    RBC setting is changed.
+> 
+> Signed-off-by: Anson Huang <b20788@freescale.com>
 
-Hi,
-
-I've tested this too.
-
-Tested-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
-
-Thank you!
-
--- 
-Masami HIRAMATSU
-IT Management Research Dept. Linux Technology Center
-Hitachi, Ltd., Yokohama Research Laboratory
-E-mail: masami.hiramatsu.pt at hitachi.com
+Applied, thanks.
