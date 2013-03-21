@@ -1,86 +1,53 @@
-From: bilhuang@nvidia.com (Bill Huang)
-Date: Wed, 20 Mar 2013 18:03:09 -0700
-Subject: [PATCH 1/1] clk: Add notifier support in clk_prepare/clk_unprepare
-In-Reply-To: <20130320144752.11073.653@quantum>
-References: <1363699712-8124-1-git-send-email-bilhuang@nvidia.com>
- <20130319170140.8663.93388@quantum> <1363748149.8815.16.camel@bilhuang-vm1>
- <20130320033142.11073.30097@quantum>
- <1363754384.8815.42.camel@bilhuang-vm1> <20130320144752.11073.653@quantum>
-Message-ID: <1363827789.8815.56.camel@bilhuang-vm1>
+From: dgilbert@interlog.com (Douglas Gilbert)
+Date: Wed, 20 Mar 2013 21:15:23 -0400
+Subject: [PATCH] rtc: rtc-at91rm9200: use a variable for storing IMR
+In-Reply-To: <20130320145006.f1431c1528325ff93a298790@linux-foundation.org>
+References: <1363369032-12639-1-git-send-email-nicolas.ferre@atmel.com>
+ <20130320145006.f1431c1528325ff93a298790@linux-foundation.org>
+Message-ID: <514A5F2B.8030707@interlog.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-03-20 at 22:47 +0800, Mike Turquette wrote:
-> Quoting Bill Huang (2013-03-19 21:39:44)
-> > On Wed, 2013-03-20 at 11:31 +0800, Mike Turquette wrote:
-> > > Quoting Bill Huang (2013-03-19 19:55:49)
-> > > > On Wed, 2013-03-20 at 01:01 +0800, Mike Turquette wrote:
-> > > > > I'm still not sure about this approach.  Based on feedback I got from
-> > > > > Linaro Connect I am not convinced that scaling voltage through clk
-> > > > > rate-change notifiers is the right way to go.  As I understand it this
-> > > > > patch only exists for that single purpose, so if the voltage-notifier
-> > > > > idea gets dropped then I will not take this patch in.
-> > > > > 
-> > > > Thanks Mike, actually we won't use your "clk: notifier handler for
-> > > > dynamic voltage scaling" patch instead we are trying to port our DVFS
-> > > > into Non-CPU DVFS framework "devfreq" which will need to hook those
-> > > > notifiers, without the clock notifiers been extended the framework is
-> > > > useless for us since we cannot do polling due to the fact that polling
-> > > > is not in real time. If it ended up extending the notifiers cannot
-> > > > happen then the only choice for us I think would be giving up "devfreq"
-> > > > and implement them in Tegra's "clk_hw".
-> > > 
-> > > I'm familiar with the devfreq framework.  Can you explain further how
-> > > you plan to use devfreq with the clock notifiers?  What does the call
-> > > graph look like?
-> > > 
-> > The call graph will look like this, when any DVFS interested clock rate
-> > changes (including enable and disable) happen -> Tegra devfreq clock
-> > notifier is called -> call into update_devfreq if needed -> in
-> > update_devfreq it will call into .get_target_freq in Tegra
-> > "devfreq_governor" -> and then call into .target of tegra
-> > devfreq_dev_profile to set voltage and done. More details are as below.
-> > 
-> > We'll create devfreq driver for Tegra VDD_CORE rail, and the safe
-> > voltage level of the rail is determined by tens of clocks (2d, 3d,
-> > mpe,...), all the frequency ladders of those clocks are defined in DT
-> > also the operating points for VDD_CORE is declared in DT where its
-> > frequency will be more of a virtual clock or index.
-> > 
-> >         operating-points = <
-> >         /* virtual-kHz  uV */
-> >         0       950000
-> >         1       1000000
-> >         2       1050000
-> >         3       1100000
-> >         4       1150000
-> >         5       1200000
-> >         6       1250000
-> >         7       1300000
-> >         8       1350000
-> > 
-> > Register a Tegra governor where the callback .get_target_freq is the
-> > function to determine the overall frequency it can go to, and
-> > the .target callback in "devfreq_dev_profile" will be the function
-> > really do the voltage scaling.
-> > 
-> > Tegra devfreq driver will register clock notifiers on all its interested
-> > clock and hence when any of those clock rate changes, disabled, enabled,
-> > we'll specifically call update_devfreq in the notifier.
-> 
-> Thank you for the explanation.  Do you plan to use actual devfreq
-> governors (like simple-ondemand, or something custom) for changing OPPs,
-> or do you just plan to use the clock framework as a trigger for DVFS?
-> 
-I think the existing governors are all polling basis that do not work
-for us, we have only single voltage rails and have tens of clocks which
-are used by different device drivers, the voltage has to be boost before
-the frequency is increasing, and it can only be lower after all the
-interested clocks rate are allowing it to or we might crash. Clock
-notifier seem to be the only choice to build association with all those
-interested device driver (in real time) who might make changes on clock
-rate either by using runtime PM or the similar mechanism.
+On 13-03-20 05:50 PM, Andrew Morton wrote:
+> On Fri, 15 Mar 2013 18:37:12 +0100 Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+>
+>> On some revisions of AT91 SoCs, the RTC IMR register is not working.
+>> Instead of elaborating a workaround for that specific SoC or IP version,
+>> we simply use a software variable to store the Interrupt Mask Register and
+>> modify it for each enabling/disabling of an interrupt. The overhead of this
+>> is negligible anyway.
+>
+> This description doesn't really allow me or others to work out whether
+> the fix should be included in 3.9 or backported into earlier kernels.
+>
+> So please, when fixing a bug do include a full description of the
+> user-visible effects of that bug.  And your opinion regarding the
+> -mainline and -stable decision is always useful.
 
-We do use OPP in our devfreq driver, we just need to do some extra work
-on checking all the interested clocks for making sure we will be
-choosing the correct operating point for the power rail.
+The interrupt mask register (IMR) for the RTC is broken
+on the AT91SAM9x5 sub-family of SoCs (good overview of the
+members here: http://www.eewiki.net/display/linuxonarm/AT91SAM9x5 ).
+The "user visible effect" is the RTC doesn't work.
+
+That sub-family is less than two years old and only has devicetree
+(DT) support and came online circa lk 3.7 . The dust is yet to
+settle on the DT stuff at least for AT91 SoCs (translation:
+lots of stuff is still broken, so much that it is hard to know
+where to start).
+
+The fix in the patch is pretty simple: just shadow the silicon
+IMR register with a variable in the driver. Some older SoCs (pre-DT)
+use the the rtc-at91rm9200 driver (e.g. obviously the AT91RM9200)
+and they should not be impacted by the change. There shouldn't
+be a large volume of interrupts associated with a RTC.
+
+
+Compared to a relatively stable kernel subsystem like SCSI, what
+is happening in the ARM architecture with DT is huge and ongoing.
+So I think you either need new rules or suspend some of the stricter
+rules applied to more stable subsystems. Just my two cents worth.
+
+
+Doug Gilbert
+
+who hasn't seen that frill-necked lizard for a while
