@@ -1,100 +1,32 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 21 Mar 2013 11:10:07 -0600
-Subject: [PATCH v3 5/6] ARM: dts: omap: update usb_otg_hs data
-In-Reply-To: <514AA74D.9070506@ti.com>
-References: <1363770725-13717-1-git-send-email-kishon@ti.com>
- <1363770725-13717-6-git-send-email-kishon@ti.com>
- <514A233F.8010105@wwwdotorg.org> <514AA74D.9070506@ti.com>
-Message-ID: <514B3EEF.3080705@wwwdotorg.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 21 Mar 2013 18:10:33 +0100
+Subject: [PATCH 4/6] mfd: db8500-prcmu: get base address from resource
+In-Reply-To: <1669538.W5XG4BgH9e@wuerfel>
+References: <1363866553-15054-1-git-send-email-linus.walleij@stericsson.com>
+ <1363866553-15054-5-git-send-email-linus.walleij@stericsson.com>
+ <1669538.W5XG4BgH9e@wuerfel>
+Message-ID: <CACRpkdZhyWdwhYaD69n=US31eTA=FDm6xzbZJndBuXAO0qGUbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/21/2013 12:23 AM, kishon wrote:
-> Hi,
-> 
-> On Thursday 21 March 2013 02:29 AM, Stephen Warren wrote:
->> On 03/20/2013 03:12 AM, Kishon Vijay Abraham I wrote:
->>> Updated the usb_otg_hs dt data to include the *phy* and *phy-names*
->>> binding in order for the driver to use the new generic PHY framework.
->>> Also updated the Documentation to include the binding information.
->>
->>> diff --git a/Documentation/devicetree/bindings/usb/omap-usb.txt
->>> b/Documentation/devicetree/bindings/usb/omap-usb.txt
->>> index abce256..3d6f9f6 100644
->>> --- a/Documentation/devicetree/bindings/usb/omap-usb.txt
->>> +++ b/Documentation/devicetree/bindings/usb/omap-usb.txt
->>> @@ -19,6 +19,9 @@ OMAP MUSB GLUE
->>>    - power : Should be "50". This signifies the controller can supply
->>> upto
->>>      100mA when operating in host mode.
->>>    - usb-phy : the phandle for the PHY device
->>> + - phy : the phandle for the PHY device (used by generic PHY framework)
->>> + - phy-names : the names of the PHY corresponding to the PHYs
->>> present in the
->>> +   *phy* phandle.
->>
->> If the intent is for those properties to be generic and used by any DT
->> binding that refers to a PHY node, I think you'd want to define those
->> properties in e.g. Documentation/devicetree/bindings/phy/phy.txt, just
->> like common clock/GPIO/... properties are defined in standalone common
->> files.
-> 
-> Ok. Will add it.
->>
->> I think you want to require that DT nodes that represent PHYs have a
->> #phy-cells property, and that the format of the phy property be
->> <&phy_phandle phy_specifier*>, where #phy-cells in the referenced node
->> defines how many cells are part of phy_specifier*, just like (almost)
->> any other DT property that references another node by phandle. That way,
->> if a single DT node represents a HW block that implements e.g. 3 PHYs,
->> it can use #phy-cells = <1>, and the referencing phy property can
->> include a cell that indicates which of those 3 PHYs is being referenced.
-> 
-> Currently, if a single phandle have reference to multiple PHYs, we can
-> get PHY by passing index or by name as give in phy-names.
-> I'm not sure if we have <&phy_phandle phy_specifier*>, what could that
-> phy_specifier be? Maybe phy_type?
+On Thu, Mar 21, 2013 at 1:15 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-I'm not talking about the case where a consumer node references multiple
-PHYs. As you say, that is indeed handled by the driver looking at a
-particular index in the phys property, or using phy-names.
+> On Thursday 21 March 2013 12:49:11 Linus Walleij wrote:
+>> -#define PRCM_PLLARM_LOCKP       (_PRCMU_BASE + 0x0a8)
+>> +#define PRCM_PLLARM_LOCKP       (prcmu_base + 0x0a8)
+>>  #define PRCM_PLLARM_LOCKP_PRCM_PLLARM_LOCKP3   0x2
+>
+> While this is certainly the least invasive way to get rid of _PRCMU_BASE,
+> it sucks to refer to local variables in macros. How hard would it
+> be to find all users of these macros and put the prcmu_base addition
+> there?
+>
+> The rest of this patch looks fine to me.
 
-I'm talking about the case where a single provider provides multiple
-PHYs. For example, consider:
+Basically I didn't want to disturb Lo?cs work on PRCMU refactoring,
+but if it is require I can surely do this.
 
-phys: phy {
-    compatible = "xxx";
-    reg = <...>;
-    #phy-cells = <1>;
-};
+Lo?c, are you OK with this?
 
-That node describes an IP block that implements 3 different PHYs. The
-registers are inter-mixed in such a way that you can't split it into 3
-separate nodes each with a separate device instance. If the consumers
-simply say:
-
-phys = <&phys>;
-
-then which of the 3 PHYs are you referring to?
-
-Instead, the consumer needs to say one of:
-
-phys = <&phys 0>;
-phys = <&phys 1>;
-phys = <&phys 2>;
-
-in order to specify which of the PHYs it refers to.
-
-The number of cells in the phy property after the phandle is specified
-by the #phy-cells property in the node referred to by the phandle. The
-meaning of all those cells is defined by the binding for the phy node.
-This could include both the PHY ID (as in my example here), or whatever
-configuration information or flags the provider needs. For example, both
-GPIOs and interrupts have specifiers than describe both of these things.
-
-For more background, take a look at almost any other binding that uses
-phandles.
-
-By the way, the property in the consumer should probably be "phys" not
-"phy" to be consistent with other similar properties (e.g. gpios,
-interrupts, ... which are all plural).
+Yours,
+Linus Walleij
