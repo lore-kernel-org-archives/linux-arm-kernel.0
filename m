@@ -1,50 +1,84 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Thu, 21 Mar 2013 11:32:51 -0600
-Subject: [PATCH 00/16] Marvell EBU thermal sensor consolidation
-In-Reply-To: <20130321064501.GK21478@lunn.ch>
-References: <1363818997-23137-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130321064501.GK21478@lunn.ch>
-Message-ID: <20130321173251.GA3070@obsidianresearch.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 21 Mar 2013 13:33:24 -0400
+Subject: [PATCH] USB: EHCI: fix for leaking isochronous data
+In-Reply-To: <514B3DBB.3060302@web.de>
+References: <Pine.LNX.4.44L0.1303171320560.26486-100000@netrider.rowland.org>
+ <514B3DBB.3060302@web.de>
+Message-ID: <20130321173324.GY13280@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 21, 2013 at 07:45:01AM +0100, Andrew Lunn wrote:
+On Thu, Mar 21, 2013 at 06:04:59PM +0100, Soeren Moch wrote:
+> On 03/17/13 18:36, Alan Stern wrote:
+> >On Sun, 17 Mar 2013, Soeren Moch wrote:
+> >
+> >>For each device only one isochronous endpoint is used (EP IN4, 1x 940
+> >>Bytes, Interval 1).
+> >>When the ENOMEM error occurs, a huge number of iTDs is in the free_list
+> >>of one stream. This number is much higher than the 2*M entries, which
+> >>should be there according to your description.
+> >
+> >Okay, but how did they get there?  With each URB requiring 9 iTDs, and
+> >about 5 URBs active at any time, there should be about 5*9 = 45 iTDs in
+> >use and 2*9 = 18 iTDs on the free list.  By the time each URB
+> >completes, it should have released all 9 iTDs back to the free list,
+> >and each time an URB is submitted, it should be able to acquire all 9
+> >of the iTDs that it needs from the free list -- it shouldn't have to
+> >allocate any from the DMA pool.
+> >
+> >Looks like you'll have to investigate what's going on inside
+> >itd_urb_transaction().  Print out some useful information whenever the
+> >size of stream->free_list is above 50, such as the value of num_itds,
+> >how many of the loop iterations could get an iTD from the free list,
+> >and the value of itd->frame in the case where the "goto alloc_itd"
+> >statement is followed.
+> >
+> >It might be a good idea also to print out the size of the free list in
+> >itd_complete(), where it calls ehci_urb_done(), and include the value
+> >of ehci->now_frame.
+> >
+> 
+> Now I found out what is going on here:
+> 
+> In itd_urb_transaction() we allocate 9 iTDs for each URB with
+> number_of_packets == 64 in my case. The iTDs are added to
+> sched->td_list. For a frame-aligned scheduling we need 8 iTDs, the
+> 9th one is released back to the front of the streams free_list in
+> iso_sched_free(). This iTD was cleared after allocation and has a
+> frame number of 0 now. So for each allocation when now_frame == 0 we
+> allocate from the dma_pool, not from the free_list. The attached
+> patch invalidates the frame number in each iTD before it is sent to
+> the scheduler. This fixes the problem without the need to iterate
+> over a iTD list.
+> 
+> Signed-off-by: Soeren Moch <smoch@web.de>
 
-> In the end, i decided it was simpler and cleaner to just have separate
-> drivers. This is something which we should think about and discuss.
+Wow!  Great work Soeren!  Talk about a long road to a small fix.  Thanks
+for keeping after it.
 
-When I looked through the merge'd driver I thought the shared code
-really had little to do with Marvell, it was mostly boilerplate that
-would be common to any memory mapped temperature sensor - so maybe the
-drivers should be kept apart and the boiler plate could be factored?
+thx,
 
- thermal_platform_mmio_init(pdev,&ops);
+Jason.
 
-Where ops has the is_valid, init_sensor, get_sensor functions
+> 
+> 
+> 
 
-Or something?
-
-...
-
-BTW, Ezequiel your driver is probably a bit smaller if you do
-
-struct mvebu_ops {
-	/* Initialize the sensor (optional) */
-	void (*init_sensor)(struct mvebu_thermal_priv *);
-
-	/* Test for a valid sensor value (optional) */
-	bool (*is_valid)(struct mvebu_thermal_priv *);
-};
-
-static const struct mvebu_ops kirkwood_ops = {..};
-
-static const struct of_device_id mvebu_thermal_id_table[] = {
-	{
-		.compatible = "marvell,kirkwood-thermal",
-		.data       = &kirkwood_ops,
-	},
-
-And drop the switch statement and the MVEBU_THERMAL_SOC_* constants..
-
-Cheers,
-Jason
+> --- linux-3.9.0-rc3-guru/drivers/usb/host/ehci-sched.c.orig	2013-03-21 17:36:21.000000000 +0100
+> +++ linux-3.9.0-rc3-guru/drivers/usb/host/ehci-sched.c	2013-03-21 17:38:56.000000000 +0100
+> @@ -1214,6 +1214,7 @@ itd_urb_transaction (
+>  
+>  		memset (itd, 0, sizeof *itd);
+>  		itd->itd_dma = itd_dma;
+> +		itd->frame = -1;
+>  		list_add (&itd->itd_list, &sched->td_list);
+>  	}
+>  	spin_unlock_irqrestore (&ehci->lock, flags);
+> @@ -1915,6 +1916,7 @@ sitd_urb_transaction (
+>  
+>  		memset (sitd, 0, sizeof *sitd);
+>  		sitd->sitd_dma = sitd_dma;
+> +		sitd->frame = -1;
+>  		list_add (&sitd->sitd_list, &iso_sched->td_list);
+>  	}
+>  
