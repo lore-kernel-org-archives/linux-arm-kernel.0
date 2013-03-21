@@ -1,31 +1,44 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu, 21 Mar 2013 12:18:40 -0300
-Subject: [PATCH 15/16] ARM: mvebu: Add thermal support to Armada 370
- device tree
-In-Reply-To: <514B1333.4030002@cogentembedded.com>
-References: <1363818997-23137-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1363818997-23137-16-git-send-email-ezequiel.garcia@free-electrons.com>
- <514B1333.4030002@cogentembedded.com>
-Message-ID: <20130321151838.GC24246@localhost>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 21 Mar 2013 16:22:06 +0100
+Subject: [alsa-devel] [PATCH 0/2] ASoC: dmaengine_pcm: support generic
+ DMA binding users
+In-Reply-To: <514B21F3.90803@metafoo.de>
+References: <1363318601-31505-1-git-send-email-shawn.guo@linaro.org>
+ <20130321023858.GD6281@S2101-09.ap.freescale.net>
+ <514B21F3.90803@metafoo.de>
+Message-ID: <20130321152206.GA14768@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+On Thu, Mar 21, 2013 at 04:06:27PM +0100, Lars-Peter Clausen wrote:
 
-On Thu, Mar 21, 2013 at 06:03:31PM +0400, Sergei Shtylyov wrote:
-> On 21-03-2013 2:36, Ezequiel Garcia wrote:
-> 
-> > This patch depends on the patch to add Armada 370 support
-> > in the mvebu_thermal driver:
-> > 'thermal: mvebu: Add support for Armada 370 thermal sensor'
-> 
->    Sch comments should follow the --- tear line, not precede it.
-> 
+> Hm, I only saw this series today would have been good to be on Cc. I've been
+> working on something very similar. My series goes a bit further though, it
+> implements an (almost generic) dmaengine based PCM driver using the of
+> bindings. So you need almost no platform code. The only things that are
+> platform specific at the moment is the pcm_hardware struct, but I'd like to
+> replace that in the future with something that queries the pcm hardware
+> parameter like max_period from the DMA engine driver. And another bit that is
+> still driver specific is a callback that fills the dma_slave_config struct.
 
-Ouch. Yes, that was the original intention!
+FWIW it might be worth looking at the one rmk wrote but has never wanted
+to submit for whatever reason.
 
-Thanks,
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+> In my series the channels are requested at probe time, so it is possible to
+> handle -EPROBE_DEFER properly and also we can allocate the audio buffers with
+> the dma device instead of the sound device, so stupid hacks like
+
+>     card->dev->dma_mask = &dma_mask;
+>     card->dev->coherent_dma_mask = DMA_BIT_MASK(32);
+
+> anymore. I'll try to post the series tomorrow.
+
+This is the main thing his code has got that the library hasn't, it's
+certainly the only issue he keeps mentioning.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130321/13b047e0/attachment.sig>
