@@ -1,37 +1,27 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Thu, 21 Mar 2013 10:02:57 -0400
-Subject: [PATCH 2/3] ARM: sched_clock: support 64-bit counters
-In-Reply-To: <1363055197-17296-3-git-send-email-robherring2@gmail.com>
-References: <1363055197-17296-1-git-send-email-robherring2@gmail.com>
- <1363055197-17296-3-git-send-email-robherring2@gmail.com>
-Message-ID: <514B1311.20308@codeaurora.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 21 Mar 2013 18:03:31 +0400
+Subject: [PATCH 15/16] ARM: mvebu: Add thermal support to Armada 370 device
+ tree
+In-Reply-To: <1363818997-23137-16-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1363818997-23137-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1363818997-23137-16-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <514B1333.4030002@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hello.
 
-On 03/11/2013 10:26 PM, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> With architected timers, we now have 64-bit counters which can be used
-> directly for sched_clock. However, the ARM sched_clock code currently just
-> uses the lower 32-bits and handles wrapping in software. Add support for
-> using the full 64-bit counter values. If multiple counters are registered,
-> a 64-bit counter is preferred.
+On 21-03-2013 2:36, Ezequiel Garcia wrote:
 
-To be more precise, architected timers are anywhere between 56 and 64 bits
-wide, zero-extended to 64-bits. See section B8.1.1 of the ARM ARM rev C.b. I
-don't know if the code really needs to change until someone has a need to
-distinguish more finely between timers, but if you're using access size as an
-approximation for counter width, I feel like it at least deserves a mention in
-the comments.
+> This patch depends on the patch to add Armada 370 support
+> in the mvebu_thermal driver:
+> 'thermal: mvebu: Add support for Armada 370 thermal sensor'
 
-[...]
+   Sch comments should follow the --- tear line, not precede it.
 
-Regards,
-Christopher
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+>   arch/arm/boot/dts/armada-370.dtsi |    6 ++++++
+>   1 files changed, 6 insertions(+), 0 deletions(-)
 
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by
-the Linux Foundation
+WBR, Sergei
