@@ -1,35 +1,43 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 21 Mar 2013 22:16:13 +0100
-Subject: [PATCH 5/5] arm: dts: Convert mvebu device tree files to 64 bits
-In-Reply-To: <20130321203751.GP21478@lunn.ch>
-References: <1363883179-1361-1-git-send-email-gregory.clement@free-electrons.com>
- <1363883179-1361-6-git-send-email-gregory.clement@free-electrons.com>
- <20130321201533.GN21478@lunn.ch> <20130321212236.1015295d@skate>
- <20130321203751.GP21478@lunn.ch>
-Message-ID: <20130321221613.53a48845@skate>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 21 Mar 2013 22:20:33 +0100
+Subject: [PATCH] USB: EHCI: fix for leaking isochronous data
+In-Reply-To: <Pine.LNX.4.44L0.1303211708470.1899-100000@iolanthe.rowland.org>
+References: <Pine.LNX.4.44L0.1303211659080.1899-100000@iolanthe.rowland.org>
+ <Pine.LNX.4.44L0.1303211708470.1899-100000@iolanthe.rowland.org>
+Message-ID: <20130321212033.GQ21478@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew Lunn,
-
-On Thu, 21 Mar 2013 21:37:51 +0100, Andrew Lunn wrote:
-
-> > And I'm not sure the SDRAM address decoding windows allows to split the
-> > first 4 GB of RAM into two areas, one that would be mapped starting at
-> > physical address 0x0, and another area that would be mapped at a
-> > different address (above 4 GB).
+On Thu, Mar 21, 2013 at 05:12:01PM -0400, Alan Stern wrote:
+> On Thu, 21 Mar 2013, Alan Stern wrote:
 > 
-> So why not map the whole SDRAM above 4GB physical address?
+> > On Thu, 21 Mar 2013, Soeren Moch wrote:
+> > 
+> > > Now I found out what is going on here:
+> > > 
+> > > In itd_urb_transaction() we allocate 9 iTDs for each URB with 
+> > > number_of_packets == 64 in my case. The iTDs are added to 
+> > > sched->td_list. For a frame-aligned scheduling we need 8 iTDs, the 9th 
+> > > one is released back to the front of the streams free_list in 
+> > > iso_sched_free(). This iTD was cleared after allocation and has a frame 
+> > > number of 0 now. So for each allocation when now_frame == 0 we allocate 
+> > > from the dma_pool, not from the free_list.
+> > 
+> > Okay, that is a problem.  But it shouldn't be such a big problem,
+> > because now_frame should not be equal to 0 very often.
+> 
+> Oh, wait, now I get it.  We never reach a steady state, because the
+> free list never shrinks, but occasionally it does increase when
+> now_frame is equal to 0.  Even though that doesn't happen very often,
+> the effects add up.
+> 
+> Very good; tomorrow I will send your patch in.
 
-As Lior rightly pointed out to me, this would prevent any device from
-DMA-ing to or from the RAM. Devices can only access the first 32 bits
-of the physical address space. So there must be some RAM below 4 GB.
+Hi Alan, Soeren
 
-Best regards,
+Could you word the description a bit better. If Alan did not get it
+without a bit of thought, few others are going to understand it
+without a better explanation.
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Thanks
+	Andrew
