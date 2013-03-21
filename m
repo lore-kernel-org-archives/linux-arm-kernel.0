@@ -1,43 +1,31 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 21 Mar 2013 19:16:20 +0000
-Subject: [PATCH 4/4] xenvm: add a simple PSCI node and a second cpu
-In-Reply-To: <alpine.DEB.2.02.1303211848150.5135@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1303211848150.5135@kaball.uk.xensource.com>
-Message-ID: <1363893380-14309-4-git-send-email-stefano.stabellini@eu.citrix.com>
+Date: Thu, 21 Mar 2013 19:16:08 +0000
+Subject: xen/arm: move to mach-virt and support SMP
+Message-ID: <alpine.DEB.2.02.1303211848150.5135@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-CC: rob.herring at calxeda.com
-CC: will.deacon at arm.com
-CC: marc.zyngier at arm.com
-CC: arnd at arndb.de
----
- arch/arm/boot/dts/xenvm-4.2.dts |   12 ++++++++++++
- 1 files changed, 12 insertions(+), 0 deletions(-)
+Hi all,
+this patch series, based on 3.9-rc3, moves xenvm to mach-virt and
+implements SMP support in Xen on ARM.
 
-diff --git a/arch/arm/boot/dts/xenvm-4.2.dts b/arch/arm/boot/dts/xenvm-4.2.dts
-index 7a2cf30..66efd22 100644
---- a/arch/arm/boot/dts/xenvm-4.2.dts
-+++ b/arch/arm/boot/dts/xenvm-4.2.dts
-@@ -29,6 +29,18 @@
- 			compatible = "arm,cortex-a15";
- 			reg = <0>;
- 		};
-+
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <1>;
-+		};
-+	};
-+
-+	psci {
-+		compatible      = "arm,psci";
-+		method          = "hvc";
-+		cpu_on          = <2>;
- 	};
- 
- 	memory at 80000000 {
--- 
-1.7.2.5
+
+Stefano Stabellini (4):
+      xen/arm: implement HYPERVISOR_vcpu_op
+      xen/arm: SMP support
+      xen: move the xenvm machine to mach-virt
+      xenvm: add a simple PSCI node and a second cpu
+
+ arch/arm/boot/dts/xenvm-4.2.dts      |   12 +++++++++
+ arch/arm/include/asm/xen/hypercall.h |    1 +
+ arch/arm/mach-vexpress/v2m.c         |    1 -
+ arch/arm/mach-virt/virt.c            |    1 +
+ arch/arm/xen/enlighten.c             |   43 ++++++++++++++++++++++++++++++++-
+ arch/arm/xen/hypercall.S             |    1 +
+ 6 files changed, 56 insertions(+), 3 deletions(-)
+
+git://xenbits.xen.org/people/sstabellini/linux-pvhvm.git 3.9-rc3-smp
+
+Cheers,
+
+Stefano
