@@ -1,130 +1,82 @@
-From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Thu, 21 Mar 2013 14:48:13 +0100
-Subject: [PATCH V2 3/3] clk: Fixup locking issues for clk_set_parent
-In-Reply-To: <1363873693-30902-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1363873693-30902-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <1363873693-30902-4-git-send-email-ulf.hansson@stericsson.com>
+From: fabio.baltieri@linaro.org (Fabio Baltieri)
+Date: Thu, 21 Mar 2013 14:49:44 +0100
+Subject: [PATCH] mfd: ab8500-core: Ignore masked out interrupts
+Message-ID: <1363873784-27378-1-git-send-email-fabio.baltieri@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulf Hansson <ulf.hansson@linaro.org>
+AB8500 asserts LATCH bits for masked out interrupts.  This patch
+explicitly masks those out using the cached mask value to prevent
+handle_nested_irq() being called for masked IRQ on the same register as
+unmasked ones.
 
-Updating the clock tree topology must be protected with the spinlock
-when doing clk_set_parent, otherwise we can not handle the migration
-of the enable_count in a safe manner.
-
-While issuing the .set_parent callback to make the clk-hw perform the
-switch to the new parent, we can not hold the spinlock since it is must
-be allowed to be slow path. This complicates error handling, but is still
-possible to achieve.
-
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
 ---
- drivers/clk/clk.c |   68 +++++++++++++++++++++++++++++++++++++++--------------
- 1 file changed, 51 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index c7eb0d7..fee7628 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -1300,30 +1300,69 @@ static int __clk_set_parent(struct clk *clk, struct clk *parent, u8 p_index)
- 	unsigned long flags;
- 	int ret;
- 	struct clk *old_parent = clk->parent;
-+	bool migrated_enable = false;
+Hello Samuel, Anton,
+
+this is a small fix for the AB8500 irq generation code.  As this depends
+on Lee's patches already merged in the battery tree, this patch is based
+on Anton's repository, and should apply cleanly on it and on next.
+
+Samuel, does it make sense to get your ack for this patch and have it
+merged with the others in the battery tree?
+
+Thanks,
+Fabio
+
+ drivers/mfd/ab8500-core.c | 27 ++++++++++++++-------------
+ 1 file changed, 14 insertions(+), 13 deletions(-)
+
+diff --git a/drivers/mfd/ab8500-core.c b/drivers/mfd/ab8500-core.c
+index f276352..36751f3 100644
+--- a/drivers/mfd/ab8500-core.c
++++ b/drivers/mfd/ab8500-core.c
+@@ -458,22 +458,23 @@ static void update_latch_offset(u8 *offset, int i)
+ static int ab8500_handle_hierarchical_line(struct ab8500 *ab8500,
+ 					int latch_offset, u8 latch_val)
+ {
+-	int int_bit = __ffs(latch_val);
+-	int line, i;
++	int int_bit, line, i;
  
--	/* migrate prepare and enable */
-+	/* migrate prepare */
- 	if (clk->prepare_count)
- 		__clk_prepare(parent);
+-	do {
+-		int_bit = __ffs(latch_val);
++	for (i = 0; i < ab8500->mask_size; i++)
++		if (ab8500->irq_reg_offset[i] == latch_offset)
++			break;
  
--	/* FIXME replace with clk_is_enabled(clk) someday */
- 	spin_lock_irqsave(&enable_lock, flags);
--	if (clk->enable_count)
-+
-+	/* migrate enable */
-+	if (clk->enable_count) {
- 		__clk_enable(parent);
-+		migrated_enable = true;
-+	}
-+
-+	/* update the clk tree topology */
-+	clk_reparent(clk, parent);
-+
- 	spin_unlock_irqrestore(&enable_lock, flags);
- 
- 	/* change clock input source */
- 	ret = clk->ops->set_parent(clk->hw, p_index);
-+	if (ret) {
-+		/*
-+		 * The error handling is tricky due to that we need to release
-+		 * the spinlock while issuing the .set_parent callback. This
-+		 * means the new parent might have been enabled/disabled in
-+		 * between, which must be considered when doing rollback.
-+		 */
-+		spin_lock_irqsave(&enable_lock, flags);
- 
--	/* clean up old prepare and enable */
--	spin_lock_irqsave(&enable_lock, flags);
--	if (clk->enable_count)
-+		clk_reparent(clk, old_parent);
-+
-+		if (migrated_enable && clk->enable_count) {
-+			__clk_disable(parent);
-+		} else if (migrated_enable && (clk->enable_count == 0)) {
-+			__clk_disable(old_parent);
-+		} else if (!migrated_enable && clk->enable_count) {
-+			__clk_disable(parent);
-+			__clk_enable(old_parent);
-+		}
-+
-+		spin_unlock_irqrestore(&enable_lock, flags);
-+
-+		if (clk->prepare_count)
-+			__clk_unprepare(parent);
-+
-+		return ret;
-+	}
-+
-+	/* clean up enable for old parent if migration was done */
-+	if (migrated_enable) {
-+		spin_lock_irqsave(&enable_lock, flags);
- 		__clk_disable(old_parent);
--	spin_unlock_irqrestore(&enable_lock, flags);
-+		spin_unlock_irqrestore(&enable_lock, flags);
+-		for (i = 0; i < ab8500->mask_size; i++)
+-			if (ab8500->irq_reg_offset[i] == latch_offset)
+-				break;
++	if (i >= ab8500->mask_size) {
++		dev_err(ab8500->dev, "Register offset 0x%2x not declared\n",
++				latch_offset);
++		return -ENXIO;
 +	}
  
-+	/* clean up prepare for old parent if migration was done */
- 	if (clk->prepare_count)
- 		__clk_unprepare(old_parent);
+-		if (i >= ab8500->mask_size) {
+-			dev_err(ab8500->dev, "Register offset 0x%2x not declared\n",
+-					latch_offset);
+-			return -ENXIO;
+-		}
++	/* ignore masked out interrupts */
++	latch_val &= ~ab8500->mask[i];
  
--	return ret;
-+	/* update debugfs with new clk tree topology */
-+	clk_debug_reparent(clk, parent);
-+	return 0;
++	while (latch_val) {
++		int_bit = __ffs(latch_val);
+ 		line = (i << 3) + int_bit;
+ 		latch_val &= ~(1 << int_bit);
+ 
+@@ -491,7 +492,7 @@ static int ab8500_handle_hierarchical_line(struct ab8500 *ab8500,
+ 			line += 1;
+ 
+ 		handle_nested_irq(ab8500->irq_base + line);
+-	} while (latch_val);
++	}
+ 
+ 	return 0;
  }
- 
- /**
-@@ -1381,16 +1420,11 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
- 	/* do the re-parent */
- 	ret = __clk_set_parent(clk, parent, p_index);
- 
--	/* propagate ABORT_RATE_CHANGE if .set_parent failed */
--	if (ret) {
-+	/* propagate rate recalculation accordingly */
-+	if (ret)
- 		__clk_recalc_rates(clk, ABORT_RATE_CHANGE);
--		goto out;
--	}
--
--	/* propagate rate recalculation downstream */
--	clk_reparent(clk, parent);
--	clk_debug_reparent(clk, parent);
--	__clk_recalc_rates(clk, POST_RATE_CHANGE);
-+	else
-+		__clk_recalc_rates(clk, POST_RATE_CHANGE);
- 
- out:
- 	mutex_unlock(&prepare_lock);
 -- 
-1.7.10
+1.8.1.3
