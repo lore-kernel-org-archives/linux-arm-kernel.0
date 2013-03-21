@@ -1,62 +1,129 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 21 Mar 2013 15:59:34 +0000
-Subject: [PATCH 37/46] regulator: ab8500-ext: Adapt regulator registration for
- newly changed API
+Date: Thu, 21 Mar 2013 15:59:36 +0000
+Subject: [PATCH 39/46] regulator: ab8500: Introduce aux5,
+ aux6 regulators for AB8540
 In-Reply-To: <1363881583-15234-1-git-send-email-lee.jones@linaro.org>
 References: <1363881583-15234-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1363881583-15234-38-git-send-email-lee.jones@linaro.org>
+Message-ID: <1363881583-15234-40-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gabriel Fernandez <gabriel.fernandez@stericsson.com>
+From: Zhenhua HUANG <zhenhua.huang@stericsson.com>
 
-Instead of using a long list of arguments for registering a new
-regulator, the API has changed to accommodate a new structure
-which is to contain the necessary runtime configuration. This
-patch allows the external regulator to follow suit and continue
-to successfully register itself with the Regulator subsystem.
+Introduce aux5, aux6 into ab8540 regulator framework.
 
-Signed-off-by: Gabriel Fernandez <gabriel.fernandez@stericsson.com>
+Signed-off-by: Zhenhua HUANG <zhenhua.huang@stericsson.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Reviewed-by: Maxime COQUELIN <maxime.coquelin@stericsson.com>
+Reviewed-by: David PARIS <david.paris@stericsson.com>
 Reviewed-by: Philippe LANGLAIS <philippe.langlais@stericsson.com>
-Reviewed-by: Linus WALLEIJ <linus.walleij@stericsson.com>
 ---
- drivers/regulator/ab8500-ext.c |    9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+ drivers/regulator/ab8500.c       |   65 ++++++++++++++++++++++++++++++++++++++
+ include/linux/regulator/ab8500.h |    2 ++
+ 2 files changed, 67 insertions(+)
 
-diff --git a/drivers/regulator/ab8500-ext.c b/drivers/regulator/ab8500-ext.c
-index ce1830f..836b5de 100644
---- a/drivers/regulator/ab8500-ext.c
-+++ b/drivers/regulator/ab8500-ext.c
-@@ -369,6 +369,7 @@ int ab8500_ext_regulator_init(struct platform_device *pdev)
- 	struct ab8500 *ab8500 = dev_get_drvdata(pdev->dev.parent);
- 	struct ab8500_platform_data *ppdata;
- 	struct ab8500_regulator_platform_data *pdata;
-+	struct regulator_config config = { };
- 	int i, err;
+diff --git a/drivers/regulator/ab8500.c b/drivers/regulator/ab8500.c
+index 31aa43d..e6b77a7 100644
+--- a/drivers/regulator/ab8500.c
++++ b/drivers/regulator/ab8500.c
+@@ -151,6 +151,21 @@ static const unsigned int ldo_vaux3_ab8540_voltages[] = {
+ 	3050000,
+ };
  
- 	if (!ab8500) {
-@@ -414,6 +415,10 @@ int ab8500_ext_regulator_init(struct platform_device *pdev)
- 		info->cfg = (struct ab8500_ext_regulator_cfg *)
- 			pdata->ext_regulator[i].driver_data;
- 
-+		config.dev = &pdev->dev;
-+		config.init_data = &pdata->ext_regulator[i];
-+		config.driver_data = info;
++static const unsigned int ldo_vaux56_ab8540_voltages[] = {
++	750000, 760000, 770000, 780000, 790000, 800000,
++	810000, 820000, 830000, 840000, 850000, 860000,
++	870000, 880000, 890000, 900000, 910000, 920000,
++	930000, 940000, 950000, 960000, 970000, 980000,
++	990000, 1000000, 1010000, 1020000, 1030000,
++	1040000, 1050000, 1060000, 1070000, 1080000,
++	1090000, 1100000, 1110000, 1120000, 1130000,
++	1140000, 1150000, 1160000, 1170000, 1180000,
++	1190000, 1200000, 1210000, 1220000, 1230000,
++	1240000, 1250000, 1260000, 1270000, 1280000,
++	1290000, 1300000, 1310000, 1320000, 1330000,
++	1340000, 1350000, 1360000, 1800000, 2790000,
++};
 +
- 		if ((is_ab9540(ab8500)) || (is_ab8540(ab8500))) {
- 			if (info->desc.id == AB8500_EXT_SUPPLY1)
- 				info->desc.ops = &ab9540_ext_regulator_ops;
-@@ -426,8 +431,8 @@ int ab8500_ext_regulator_init(struct platform_device *pdev)
- 		}
- 
- 		/* register regulator with framework */
--		info->rdev = regulator_register(&info->desc, &pdev->dev,
--				&pdata->ext_regulator[i], info, NULL);
-+		info->rdev = regulator_register(&info->desc, &config);
-+
- 		if (IS_ERR(info->rdev)) {
- 			err = PTR_ERR(info->rdev);
- 			dev_err(&pdev->dev, "failed to register regulator %s\n",
+ static const unsigned int ldo_vintcore_voltages[] = {
+ 	1200000,
+ 	1225000,
+@@ -1561,6 +1576,54 @@ static struct ab8500_regulator_info
+ 		.voltage_reg		= 0x2f,
+ 		.voltage_mask		= 0x0f,
+ 	},
++	[AB8540_LDO_AUX5] = {
++		.desc = {
++			.name		= "LDO-AUX5",
++			.ops		= &ab8500_regulator_volt_mode_ops,
++			.type		= REGULATOR_VOLTAGE,
++			.id		= AB8540_LDO_AUX5,
++			.owner		= THIS_MODULE,
++			.n_voltages	= ARRAY_SIZE(ldo_vaux56_ab8540_voltages),
++		},
++		.load_lp_uA		= 20000,
++		/* values for Vaux5Regu register */
++		.update_bank		= 0x04,
++		.update_reg		= 0x32,
++		.update_mask		= 0x03,
++		.update_val		= 0x01,
++		.update_val_idle	= 0x03,
++		.update_val_normal	= 0x01,
++		/* values for Vaux5SEL register */
++		.voltage_bank		= 0x04,
++		.voltage_reg		= 0x33,
++		.voltage_mask		= 0x3f,
++		.voltages		= ldo_vaux56_ab8540_voltages,
++		.voltages_len		= ARRAY_SIZE(ldo_vaux56_ab8540_voltages),
++	},
++	[AB8540_LDO_AUX6] = {
++		.desc = {
++			.name		= "LDO-AUX6",
++			.ops		= &ab8500_regulator_volt_mode_ops,
++			.type		= REGULATOR_VOLTAGE,
++			.id		= AB8540_LDO_AUX6,
++			.owner		= THIS_MODULE,
++			.n_voltages	= ARRAY_SIZE(ldo_vaux56_ab8540_voltages),
++		},
++		.load_lp_uA		= 20000,
++		/* values for Vaux6Regu register */
++		.update_bank		= 0x04,
++		.update_reg		= 0x35,
++		.update_mask		= 0x03,
++		.update_val		= 0x01,
++		.update_val_idle	= 0x03,
++		.update_val_normal	= 0x01,
++		/* values for Vaux6SEL register */
++		.voltage_bank		= 0x04,
++		.voltage_reg		= 0x36,
++		.voltage_mask		= 0x3f,
++		.voltages		= ldo_vaux56_ab8540_voltages,
++		.voltages_len		= ARRAY_SIZE(ldo_vaux56_ab8540_voltages),
++	},
+ 	[AB8540_LDO_INTCORE] = {
+ 		.desc = {
+ 			.name		= "LDO-INTCORE",
+@@ -2971,6 +3034,8 @@ static struct of_regulator_match ab8540_regulator_match[] = {
+ 	{ .name	= "ab8500_ldo_aux2",    .driver_data = (void *) AB8540_LDO_AUX2, },
+ 	{ .name	= "ab8500_ldo_aux3",    .driver_data = (void *) AB8540_LDO_AUX3, },
+ 	{ .name	= "ab8500_ldo_aux4",    .driver_data = (void *) AB8540_LDO_AUX4, },
++	{ .name	= "ab8500_ldo_aux5",    .driver_data = (void *) AB8540_LDO_AUX5, },
++	{ .name	= "ab8500_ldo_aux6",    .driver_data = (void *) AB8540_LDO_AUX6, },
+ 	{ .name	= "ab8500_ldo_intcore", .driver_data = (void *) AB8540_LDO_INTCORE, },
+ 	{ .name	= "ab8500_ldo_tvout",   .driver_data = (void *) AB8540_LDO_TVOUT, },
+ 	{ .name = "ab8500_ldo_audio",   .driver_data = (void *) AB8540_LDO_AUDIO, },
+diff --git a/include/linux/regulator/ab8500.h b/include/linux/regulator/ab8500.h
+index bb0140c..b490a16 100644
+--- a/include/linux/regulator/ab8500.h
++++ b/include/linux/regulator/ab8500.h
+@@ -74,6 +74,8 @@ enum ab8540_regulator_id {
+ 	AB8540_LDO_AUX2,
+ 	AB8540_LDO_AUX3,
+ 	AB8540_LDO_AUX4,
++	AB8540_LDO_AUX5,
++	AB8540_LDO_AUX6,
+ 	AB8540_LDO_INTCORE,
+ 	AB8540_LDO_TVOUT,
+ 	AB8540_LDO_AUDIO,
 -- 
 1.7.10.4
