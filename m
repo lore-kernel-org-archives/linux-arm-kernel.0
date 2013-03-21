@@ -1,46 +1,46 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Thu, 21 Mar 2013 15:41:32 -0600
-Subject: [PATCH 5/5] arm: dts: Convert mvebu device tree files to 64 bits
-In-Reply-To: <20130321221523.7ede6ccc@skate>
-References: <1363883179-1361-1-git-send-email-gregory.clement@free-electrons.com>
- <1363883179-1361-6-git-send-email-gregory.clement@free-electrons.com>
- <20130321201533.GN21478@lunn.ch> <20130321212236.1015295d@skate>
- <20130321205545.GA8358@obsidianresearch.com>
- <20130321221523.7ede6ccc@skate>
-Message-ID: <20130321214132.GB8431@obsidianresearch.com>
+From: smoch@web.de (Soeren Moch)
+Date: Thu, 21 Mar 2013 22:45:16 +0100
+Subject: [PATCH] USB: EHCI: fix for leaking isochronous data
+In-Reply-To: <Pine.LNX.4.44L0.1303211708470.1899-100000@iolanthe.rowland.org>
+References: <Pine.LNX.4.44L0.1303211708470.1899-100000@iolanthe.rowland.org>
+Message-ID: <514B7F6C.2060200@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 21, 2013 at 10:15:23PM +0100, Thomas Petazzoni wrote:
-> Dear Jason Gunthorpe,
-> 
-> On Thu, 21 Mar 2013 14:55:45 -0600, Jason Gunthorpe wrote:
-> 
-> > Or, better, locate all the internal registers above 8G and use
-> > contiguous DRAM mapping from 0 -> 8GB
-> 
-> I see two potential issues with this idea:
-> 
->  *) It only works when LPAE is enabled, so we would have to have
->     different internal register addresses depending on whether LPAE is
->     enabled or not. Probably not impossible, but not very
->     straightforward either.
+On 03/21/13 22:12, Alan Stern wrote:
+> On Thu, 21 Mar 2013, Alan Stern wrote:
+>
+>> On Thu, 21 Mar 2013, Soeren Moch wrote:
+>>
+>>> Now I found out what is going on here:
+>>>
+>>> In itd_urb_transaction() we allocate 9 iTDs for each URB with
+>>> number_of_packets == 64 in my case. The iTDs are added to
+>>> sched->td_list. For a frame-aligned scheduling we need 8 iTDs, the 9th
+>>> one is released back to the front of the streams free_list in
+>>> iso_sched_free(). This iTD was cleared after allocation and has a frame
+>>> number of 0 now. So for each allocation when now_frame == 0 we allocate
+>>> from the dma_pool, not from the free_list.
+>>
+>> Okay, that is a problem.  But it shouldn't be such a big problem,
+>> because now_frame should not be equal to 0 very often.
+>
+> Oh, wait, now I get it.  We never reach a steady state, because the
+> free list never shrinks, but occasionally it does increase when
+> now_frame is equal to 0.  Even though that doesn't happen very often,
+> the effects add up.
 
-Ideally the internal register space address would come from the DT -
-we are getting very close to that on Marvell, I think.. Things like
-earlyprintk should ideally early parse the DT, harder I know :(
+Correct. Approximately twice a second we allocate 9 iTDs from the 
+dma_pool in my case (the frame numbers run from 0 to 511 - not up to 
+2047, which I thought they should). But since we allocate iTDs every 8 
+frames in my case (for each active stream), the pool allocations occur 
+only when we hit the allocation sequence frame 0,8,16,... (not one of 
+the other 7 opportunities frame 1,9,17,... - frame 7,15,23,...)
 
->  *) It would require Linux to change the internal registers address
->     (for now the kernel relies on the bootloader). The problem is that
->     we can't do it early enough to preserve the earlyprintk
->     functionality. Maybe you have suggestions on how to achieve that?
+> Very good; tomorrow I will send your patch in.
+>
+> Alan Stern
+>
+Thank you. And also thanks to all who helped to track down this issue.
 
-I can't forsee how Linux could do this reprogramming - not only do you
-have to move the registers, you'd also have to reprogram the DRAM
-bases, while running from the DRAM. Not only does that have to be done
-early, but the DT would need to describe the DRAM ranks, and the code
-would have to parse it.. On top of that it would have to be very
-careful not to wack any DRAM that has already been touched by the
-kernel.. Tricky stuff :)
-
-Jason
+  Soeren
