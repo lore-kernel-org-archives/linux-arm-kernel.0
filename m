@@ -1,106 +1,47 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 21 Mar 2013 15:09:06 +0530
-Subject: [PATCH V2] DMA: PL330: Add check if device tree compatible
-In-Reply-To: <1362475531-32260-2-git-send-email-padma.v@samsung.com>
-References: <1362475531-32260-1-git-send-email-padma.v@samsung.com>
- <1362475531-32260-2-git-send-email-padma.v@samsung.com>
-Message-ID: <20130321093906.GL10326@intel.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 21 Mar 2013 11:08:52 +0100
+Subject: [PATCH 06/16] thermal: mvebu: Convert to devm_ioremap_resource()
+In-Reply-To: <20130321094325.GB2469@localhost>
+References: <1363818997-23137-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1363818997-23137-7-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130321061024.GH21478@lunn.ch> <20130321094325.GB2469@localhost>
+Message-ID: <20130321100852.GA5627@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 05, 2013 at 02:55:31PM +0530, Padmavathi Venna wrote:
-> This patch register the dma controller with generic dma helpers only
-> in DT case. This also adds some extra error handling in the driver.
+On Thu, Mar 21, 2013 at 06:43:26AM -0300, Ezequiel Garcia wrote:
+> On Thu, Mar 21, 2013 at 07:10:24AM +0100, Andrew Lunn wrote:
+> > On Wed, Mar 20, 2013 at 07:36:27PM -0300, Ezequiel Garcia wrote:
+> > > Convert devm_request_and_ioremap() to the newly introduced
+> > > devm_ioremap_resource() which provides more consistent error handling.
+> > > 
+> > > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > > ---
+> > >  drivers/thermal/mvebu_thermal.c |    6 ++----
+> > >  1 files changed, 2 insertions(+), 4 deletions(-)
+> > > 
+> > > diff --git a/drivers/thermal/mvebu_thermal.c b/drivers/thermal/mvebu_thermal.c
+> > > index ef04e4e..089b43d 100644
+> > > --- a/drivers/thermal/mvebu_thermal.c
+> > > +++ b/drivers/thermal/mvebu_thermal.c
+> > > @@ -86,11 +86,9 @@ static int mvebu_thermal_probe(struct platform_device *pdev)
+> > >  	if (!priv)
+> > >  		return -ENOMEM;
+> > >  
+> > > -	priv->sensor = devm_request_and_ioremap(&pdev->dev, res);
+> > > -	if (!priv->sensor) {
+> > > -		dev_err(&pdev->dev, "Failed to request_ioremap memory\n");
+> > > +	priv->sensor = devm_ioremap_resource(&pdev->dev, res);
+> > > +	if (!priv->sensor)
+> > >  		return -EADDRNOTAVAIL;
+> > > -	}
+> > 
+> > 
+> > It would be better to return priv->sensor, not a fixed error code.
+> > 
 > 
-> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
-> Reported-by: Sachin Kamat <sachin.kamat@linaro.org>
-> ---
-> 
-> Based on Vinod Koul next branch.
-> 
-> Changes since V1:
-> 	- return silently when of_dma_controller_register fails, as
-> 	  suggested by Arnd.
-> 
->  drivers/dma/pl330.c |   38 +++++++++++++++++++++++++++-----------
->  1 files changed, 27 insertions(+), 11 deletions(-)
-> 
-> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-> index 7181531..5dbc594 100644
-> --- a/drivers/dma/pl330.c
-> +++ b/drivers/dma/pl330.c
-> @@ -2882,7 +2882,7 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
->  {
->  	struct dma_pl330_platdata *pdat;
->  	struct dma_pl330_dmac *pdmac;
-> -	struct dma_pl330_chan *pch;
-> +	struct dma_pl330_chan *pch, *_p;
->  	struct pl330_info *pi;
->  	struct dma_device *pd;
->  	struct resource *res;
-> @@ -2984,7 +2984,16 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
->  	ret = dma_async_device_register(pd);
->  	if (ret) {
->  		dev_err(&adev->dev, "unable to register DMAC\n");
-> -		goto probe_err2;
-> +		goto probe_err3;
-> +	}
-> +
-> +	if (adev->dev.of_node) {
-> +		ret = of_dma_controller_register(adev->dev.of_node,
-> +					 of_dma_pl330_xlate, pdmac);
-> +		if (ret) {
-> +			dev_err(&adev->dev,
-> +			"unable to register DMA to the generic DT DMA helpers\n");
-Indent?
-> +		}
->  	}
->  
->  	dev_info(&adev->dev,
-> @@ -2995,16 +3004,21 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
->  		pi->pcfg.data_bus_width / 8, pi->pcfg.num_chan,
->  		pi->pcfg.num_peri, pi->pcfg.num_events);
->  
-> -	ret = of_dma_controller_register(adev->dev.of_node,
-> -					 of_dma_pl330_xlate, pdmac);
-> -	if (ret) {
-> -		dev_err(&adev->dev,
-> -		"unable to register DMA to the generic DT DMA helpers\n");
-> -		goto probe_err2;
-> -	}
-> -
->  	return 0;
-> +probe_err3:
-> +	amba_set_drvdata(adev, NULL);
->  
-> +	/* Idle the DMAC */
-> +	list_for_each_entry_safe(pch, _p, &pdmac->ddma.channels,
-> +			chan.device_node) {
-> +
-> +		/* Remove the channel */
-> +		list_del(&pch->chan.device_node);
-> +
-> +		/* Flush the channel */
-> +		pl330_control(&pch->chan, DMA_TERMINATE_ALL, 0);
-> +		pl330_free_chan_resources(&pch->chan);
-free_chan for error handling in probe?
+> Good catch! I missed that.
 
-> +	}
->  probe_err2:
->  	pl330_del(pi);
->  probe_err1:
-> @@ -3023,8 +3037,10 @@ static int pl330_remove(struct amba_device *adev)
->  	if (!pdmac)
->  		return 0;
->  
-> -	of_dma_controller_free(adev->dev.of_node);
-> +	if (adev->dev.of_node)
-> +		of_dma_controller_free(adev->dev.of_node);
->  
-> +	dma_async_device_unregister(&pdmac->ddma);
->  	amba_set_drvdata(adev, NULL);
->  
->  	/* Idle the DMAC */
-> -- 
-> 1.7.4.4
-> 
+And the same where the priv->control is introduced.
+
+    Andrew
