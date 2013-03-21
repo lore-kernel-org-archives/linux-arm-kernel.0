@@ -1,25 +1,26 @@
 From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Thu, 21 Mar 2013 17:53:54 +0800
-Subject: [PATCH v3 2/2] crypto: sahara: Add driver for SAHARA2 accelerator.
-In-Reply-To: <1362137873-8827-3-git-send-email-javier.martin@vista-silicon.com>
-References: <1362137873-8827-1-git-send-email-javier.martin@vista-silicon.com>
- <1362137873-8827-3-git-send-email-javier.martin@vista-silicon.com>
-Message-ID: <20130321095354.GA26931@gondor.apana.org.au>
+Date: Thu, 21 Mar 2013 17:55:42 +0800
+Subject: [PATCH v2 3/8] drivers: char: use module_platform_driver_probe()
+In-Reply-To: <1363280978-24051-4-git-send-email-fabio.porcedda@gmail.com>
+References: <1363280978-24051-1-git-send-email-fabio.porcedda@gmail.com>
+ <1363280978-24051-4-git-send-email-fabio.porcedda@gmail.com>
+Message-ID: <20130321095542.GH26931@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 01, 2013 at 12:37:53PM +0100, Javier Martin wrote:
-> SAHARA2 HW module is included in the i.MX27 SoC from
-> Freescale. It is capable of performing cipher algorithms
-> such as AES, 3DES..., hashing and RNG too.
+On Thu, Mar 14, 2013 at 06:09:33PM +0100, Fabio Porcedda wrote:
+> This patch converts the drivers to use the
+> module_platform_driver_probe() macro which makes the code smaller and
+> a bit simpler.
 > 
-> This driver provides support for AES-CBC and AES-ECB
-> by now.
-> 
-> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
+> Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Matt Mackall <mpm@selenic.com>
+> Cc: Herbert Xu <herbert@gondor.apana.org.au>
+> Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
 
-Patch applied to cryptodev.
+Patch applied.
 -- 
 Email: Herbert Xu <herbert@gondor.apana.org.au>
 Home Page: http://gondor.apana.org.au/~herbert/
