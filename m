@@ -1,38 +1,122 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 21 Mar 2013 19:10:31 +0000
-Subject: [PATCH] USB: EHCI: fix for leaking isochronous data
-In-Reply-To: <20130321173324.GY13280@titan.lakedaemon.net>
-References: <Pine.LNX.4.44L0.1303171320560.26486-100000@netrider.rowland.org>
- <514B3DBB.3060302@web.de> <20130321173324.GY13280@titan.lakedaemon.net>
-Message-ID: <201303211910.31473.arnd@arndb.de>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 21 Mar 2013 19:16:18 +0000
+Subject: [PATCH 2/4] xen/arm: SMP support
+In-Reply-To: <alpine.DEB.2.02.1303211848150.5135@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1303211848150.5135@kaball.uk.xensource.com>
+Message-ID: <1363893380-14309-2-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 21 March 2013, Jason Cooper wrote:
-> On Thu, Mar 21, 2013 at 06:04:59PM +0100, Soeren Moch wrote:
+Map vcpu_info using VCPUOP_register_vcpu_info on secondary cpus.
 
-> > 
-> > Now I found out what is going on here:
-> > 
-> > In itd_urb_transaction() we allocate 9 iTDs for each URB with
-> > number_of_packets == 64 in my case. The iTDs are added to
-> > sched->td_list. For a frame-aligned scheduling we need 8 iTDs, the
-> > 9th one is released back to the front of the streams free_list in
-> > iso_sched_free(). This iTD was cleared after allocation and has a
-> > frame number of 0 now. So for each allocation when now_frame == 0 we
-> > allocate from the dma_pool, not from the free_list. The attached
-> > patch invalidates the frame number in each iTD before it is sent to
-> > the scheduler. This fixes the problem without the need to iterate
-> > over a iTD list.
-> > 
-> > Signed-off-by: Soeren Moch <smoch@web.de>
-> 
-> Wow!  Great work Soeren!  Talk about a long road to a small fix.  Thanks
-> for keeping after it.
+Call enable_percpu_irq on every cpu.
 
-+1
+Actually pass a percpu variable to request_percpu_irq.
 
-I hardly understand half of the description above, but that much sounds
-plausible. Is this a bug fix that should get backported to stable kernels?
+Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+---
+ arch/arm/xen/enlighten.c |   42 ++++++++++++++++++++++++++++++++++++++++--
+ 1 files changed, 40 insertions(+), 2 deletions(-)
 
-	Arnd
+diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+index 18b0049..ffbedce 100644
+--- a/arch/arm/xen/enlighten.c
++++ b/arch/arm/xen/enlighten.c
+@@ -2,6 +2,7 @@
+ #include <xen/events.h>
+ #include <xen/grant_table.h>
+ #include <xen/hvm.h>
++#include <xen/interface/vcpu.h>
+ #include <xen/interface/xen.h>
+ #include <xen/interface/memory.h>
+ #include <xen/interface/hvm/params.h>
+@@ -32,6 +33,7 @@ struct shared_info xen_dummy_shared_info;
+ struct shared_info *HYPERVISOR_shared_info = (void *)&xen_dummy_shared_info;
+ 
+ DEFINE_PER_CPU(struct vcpu_info *, xen_vcpu);
++DEFINE_PER_CPU(struct vcpu_info, xen_vcpu_info);
+ 
+ /* These are unused until we support booting "pre-ballooned" */
+ unsigned long xen_released_pages;
+@@ -148,6 +150,32 @@ int xen_unmap_domain_mfn_range(struct vm_area_struct *vma,
+ }
+ EXPORT_SYMBOL_GPL(xen_unmap_domain_mfn_range);
+ 
++static int __init xen_secondary_init(unsigned int cpu)
++{
++	struct vcpu_register_vcpu_info info;
++	struct vcpu_info *vcpup;
++	int err;
++
++	if (cpu == 0)
++		return 0;
++
++	pr_info("Xen: initializing cpu%d\n", cpu);
++	vcpup = &per_cpu(xen_vcpu_info, cpu);
++
++	info.mfn = __pa(vcpup) >> PAGE_SHIFT;
++	info.offset = offset_in_page(vcpup);
++
++	err = HYPERVISOR_vcpu_op(VCPUOP_register_vcpu_info, cpu, &info);
++	if (err) {
++		pr_debug("register_vcpu_info failed: err=%d\n", err);
++	} else {
++		/* This cpu is using the registered vcpu info, even if
++		   later ones fail to. */
++		per_cpu(xen_vcpu, cpu) = vcpup;
++	}
++	return 0;
++}
++
+ /*
+  * see Documentation/devicetree/bindings/arm/xen.txt for the
+  * documentation of the Xen Device Tree format.
+@@ -163,6 +191,7 @@ static int __init xen_guest_init(void)
+ 	const char *version = NULL;
+ 	const char *xen_prefix = "xen,xen-";
+ 	struct resource res;
++	int i;
+ 
+ 	node = of_find_compatible_node(NULL, NULL, "xen,xen");
+ 	if (!node) {
+@@ -216,6 +245,8 @@ static int __init xen_guest_init(void)
+ 	 * is required to use VCPUOP_register_vcpu_info to place vcpu info
+ 	 * for secondary CPUs as they are brought up. */
+ 	per_cpu(xen_vcpu, 0) = &HYPERVISOR_shared_info->vcpu_info[0];
++	for_each_online_cpu(i)
++		xen_secondary_init(i);
+ 
+ 	gnttab_init();
+ 	if (!xen_initial_domain())
+@@ -231,20 +262,27 @@ static irqreturn_t xen_arm_callback(int irq, void *arg)
+ 	return IRQ_HANDLED;
+ }
+ 
++static __init void xen_percpu_enable_events(void *unused)
++{
++	enable_percpu_irq(xen_events_irq, 0);
++}
++
+ static int __init xen_init_events(void)
+ {
++	int i;
++
+ 	if (!xen_domain() || xen_events_irq < 0)
+ 		return -ENODEV;
+ 
+ 	xen_init_IRQ();
+ 
+ 	if (request_percpu_irq(xen_events_irq, xen_arm_callback,
+-			"events", xen_vcpu)) {
++			"events", &xen_vcpu)) {
+ 		pr_err("Error requesting IRQ %d\n", xen_events_irq);
+ 		return -EINVAL;
+ 	}
+ 
+-	enable_percpu_irq(xen_events_irq, 0);
++	on_each_cpu(xen_percpu_enable_events, NULL, 0);
+ 
+ 	return 0;
+ }
+-- 
+1.7.2.5
