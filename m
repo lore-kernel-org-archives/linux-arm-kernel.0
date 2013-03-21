@@ -1,31 +1,32 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 21 Mar 2013 14:00:19 -0700
-Subject: [PATCH V2 2/3] clk: Improve errorhandling for clk_set_parent
-In-Reply-To: <1363873693-30902-3-git-send-email-ulf.hansson@stericsson.com>
-References: <1363873693-30902-1-git-send-email-ulf.hansson@stericsson.com>
- <1363873693-30902-3-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <20130321210019.834.12024@quantum>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 21 Mar 2013 17:06:54 -0400 (EDT)
+Subject: [PATCH] USB: EHCI: fix for leaking isochronous data
+In-Reply-To: <514B3DBB.3060302@web.de>
+Message-ID: <Pine.LNX.4.44L0.1303211659080.1899-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Ulf Hansson (2013-03-21 06:48:12)
-> @@ -1344,8 +1341,9 @@ out:
->  int clk_set_parent(struct clk *clk, struct clk *parent)
->  {
->         int ret = 0;
-> +       u8 p_index;
->  
-> -       if (!clk || !clk->ops)
-> +       if (!clk || !clk->ops || !parent)
->                 return -EINVAL;
->  
+On Thu, 21 Mar 2013, Soeren Moch wrote:
 
-A NULL clock is valid according to the clk.h api.  I would like to allow
-parent to be NULL, resulting in a migration from the real clock tree to
-the orphans list.
+> Now I found out what is going on here:
+> 
+> In itd_urb_transaction() we allocate 9 iTDs for each URB with 
+> number_of_packets == 64 in my case. The iTDs are added to 
+> sched->td_list. For a frame-aligned scheduling we need 8 iTDs, the 9th 
+> one is released back to the front of the streams free_list in 
+> iso_sched_free(). This iTD was cleared after allocation and has a frame 
+> number of 0 now. So for each allocation when now_frame == 0 we allocate 
+> from the dma_pool, not from the free_list.
 
-This feature was apparently buggy for some time and Rajagopal sent me a
-patch off-list to fix it.  Rajagopal, can you post your patch publicly?
+Okay, that is a problem.  But it shouldn't be such a big problem,
+because now_frame should not be equal to 0 very often.
 
-Thanks,
-Mike
+>  The attached patch 
+> invalidates the frame number in each iTD before it is sent to the 
+> scheduler. This fixes the problem without the need to iterate over a iTD 
+> list.
+
+The patch looks okay.  However I would like to understand why the 0 
+frame value messes things up so much.
+
+Alan Stern
