@@ -1,52 +1,53 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 21 Mar 2013 19:16:17 +0000
-Subject: [PATCH 1/4] xen/arm: implement HYPERVISOR_vcpu_op
-In-Reply-To: <alpine.DEB.2.02.1303211848150.5135@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1303211848150.5135@kaball.uk.xensource.com>
-Message-ID: <1363893380-14309-1-git-send-email-stefano.stabellini@eu.citrix.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 21 Mar 2013 20:18:07 +0100
+Subject: [PATCH 5/5] arm: dts: Convert mvebu device tree files to 64 bits
+In-Reply-To: <201303211903.52383.arnd@arndb.de>
+References: <1363883179-1361-1-git-send-email-gregory.clement@free-electrons.com>
+ <1363883179-1361-6-git-send-email-gregory.clement@free-electrons.com>
+ <514B4A79.1070501@gmail.com> <201303211903.52383.arnd@arndb.de>
+Message-ID: <20130321201807.7cb04978@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
----
- arch/arm/include/asm/xen/hypercall.h |    1 +
- arch/arm/xen/enlighten.c             |    1 +
- arch/arm/xen/hypercall.S             |    1 +
- 3 files changed, 3 insertions(+), 0 deletions(-)
+Dear Arnd Bergmann,
 
-diff --git a/arch/arm/include/asm/xen/hypercall.h b/arch/arm/include/asm/xen/hypercall.h
-index 8a82325..799f42e 100644
---- a/arch/arm/include/asm/xen/hypercall.h
-+++ b/arch/arm/include/asm/xen/hypercall.h
-@@ -46,6 +46,7 @@ int HYPERVISOR_event_channel_op(int cmd, void *arg);
- unsigned long HYPERVISOR_hvm_op(int op, void *arg);
- int HYPERVISOR_memory_op(unsigned int cmd, void *arg);
- int HYPERVISOR_physdev_op(int cmd, void *arg);
-+int HYPERVISOR_vcpu_op(int cmd, int vcpuid, void *extra_args);
- 
- static inline void
- MULTI_update_va_mapping(struct multicall_entry *mcl, unsigned long va,
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index 8dc0605..18b0049 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -259,4 +259,5 @@ EXPORT_SYMBOL_GPL(HYPERVISOR_sched_op);
- EXPORT_SYMBOL_GPL(HYPERVISOR_hvm_op);
- EXPORT_SYMBOL_GPL(HYPERVISOR_memory_op);
- EXPORT_SYMBOL_GPL(HYPERVISOR_physdev_op);
-+EXPORT_SYMBOL_GPL(HYPERVISOR_vcpu_op);
- EXPORT_SYMBOL_GPL(privcmd_call);
-diff --git a/arch/arm/xen/hypercall.S b/arch/arm/xen/hypercall.S
-index 71f7239..199cb2d 100644
---- a/arch/arm/xen/hypercall.S
-+++ b/arch/arm/xen/hypercall.S
-@@ -87,6 +87,7 @@ HYPERCALL2(event_channel_op);
- HYPERCALL2(hvm_op);
- HYPERCALL2(memory_op);
- HYPERCALL2(physdev_op);
-+HYPERCALL3(vcpu_op);
- 
- ENTRY(privcmd_call)
- 	stmdb sp!, {r4}
+On Thu, 21 Mar 2013 19:03:52 +0000, Arnd Bergmann wrote:
+> On Thursday 21 March 2013, Rob Herring wrote:
+> > >       soc {
+> > > -             #address-cells = <1>;
+> > > -             #size-cells = <1>;
+> > > +             #address-cells = <2>;
+> > > +             #size-cells = <2>;
+> > 
+> > If all the addresses for the soc bus are below 4GB or even within a 4GB
+> > range if using the ranges property, then changing all this and
+> > everything below it is kind of pointless.
+> 
+> Good point. We'll probably also have to change it all again when we add a new
+> binding for that bus in 3.10, so it makes sense to change it only once.
+
+In the mean time can we do something like:
+
+	soc {
+		compatible = "simple-bus";
+		range = <...>;
+
+		[... all the peripherals ...]
+	};
+
+with the range = <...> property converting the peripheral registers
+base address (expressed as offsets in the reg = <...> properties of the
+subnodes) into the absolute physical address?
+
+I'm planning to work on the DT binding for the mvebu-mbus driver as
+soon as the PCIe driver gets accepted, but it would be good to have an
+intermediate solution to get the LPAE support in.
+
+Best regards,
+
+Thomas
 -- 
-1.7.2.5
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
