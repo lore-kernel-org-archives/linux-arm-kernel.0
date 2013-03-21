@@ -1,49 +1,37 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 21 Mar 2013 15:01:43 +0100
-Subject: [PATCH 3/6] mfd: prcmu: pass a base and size with the early
- initcall
-In-Reply-To: <1612996.3qBAFpdrG9@wuerfel>
-References: <1363866553-15054-1-git-send-email-linus.walleij@stericsson.com>
- <1363866553-15054-4-git-send-email-linus.walleij@stericsson.com>
- <1612996.3qBAFpdrG9@wuerfel>
-Message-ID: <CAPDyKFrFiz7tj9GOyhRAfwVRURfGTc2PEZRLPuAn=CWYVtwPGw@mail.gmail.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Thu, 21 Mar 2013 10:02:57 -0400
+Subject: [PATCH 2/3] ARM: sched_clock: support 64-bit counters
+In-Reply-To: <1363055197-17296-3-git-send-email-robherring2@gmail.com>
+References: <1363055197-17296-1-git-send-email-robherring2@gmail.com>
+ <1363055197-17296-3-git-send-email-robherring2@gmail.com>
+Message-ID: <514B1311.20308@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 March 2013 13:11, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 21 March 2013 12:49:10 Linus Walleij wrote:
->>
->> From: Linus Walleij <linus.walleij@linaro.org>
->>
->> This patch will make an early remapping of the PRCMU, to be
->> used when setting up the clocks, that will call down into parts
->> of the PRCMU driver before it is probed.
->>
->> Going forward this will be removed like this:
->>
->> - The mailbox subsystem need to be merged.
->>   http://marc.info/?l=linux-kernel&m=136314559201983&w=2
->>
->> - At this point the PRCMU clock code can be moved over to the
->>   ux500 clock driver in drivers/clk/ux500/* and maintained
->>   there in a decentralized manner.
->>
->> - This early initcall and PRCMU base parameters become part of
->>   the ux500_clk_init() call instead.
->>
->> Cc: Suman Anna <s-anna@ti.com>
->> Cc: Loic Pallardy <loic.pallardy@st.com>
->> Cc: Samuel Ortiz <sameo@linux.intel.com>
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Hi Rob,
 
-Until the clk-prmcu type gets split into register clocks and mailbox
-clocks this patch work very fine!
+On 03/11/2013 10:26 PM, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
+> 
+> With architected timers, we now have 64-bit counters which can be used
+> directly for sched_clock. However, the ARM sched_clock code currently just
+> uses the lower 32-bits and handles wrapping in software. Add support for
+> using the full 64-bit counter values. If multiple counters are registered,
+> a 64-bit counter is preferred.
 
-Acked-by; Ulf Hansson <ulf.hansson@linaro.org>
+To be more precise, architected timers are anywhere between 56 and 64 bits
+wide, zero-extended to 64-bits. See section B8.1.1 of the ARM ARM rev C.b. I
+don't know if the code really needs to change until someone has a need to
+distinguish more finely between timers, but if you're using access size as an
+approximation for counter width, I feel like it at least deserves a mention in
+the comments.
+
+[...]
+
+Regards,
+Christopher
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by
+the Linux Foundation
