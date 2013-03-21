@@ -1,25 +1,35 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 21 Mar 2013 11:13:17 -0700
-Subject: [PATCHv3 01/10] clocksource: add generic dummy timer driver
-In-Reply-To: <20130321180922.GB10716@e106331-lin.cambridge.arm.com>
-References: <1363198676-30417-1-git-send-email-sboyd@codeaurora.org>
- <1363198676-30417-2-git-send-email-sboyd@codeaurora.org>
- <20130321180922.GB10716@e106331-lin.cambridge.arm.com>
-Message-ID: <514B4DBD.4060403@codeaurora.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 21 Mar 2013 19:15:38 +0100
+Subject: [PATCH 10/11] ARM: move sp804 and integrator timers to
+ drivers/clocksource
+In-Reply-To: <1363820051-24428-11-git-send-email-robherring2@gmail.com>
+References: <1363820051-24428-1-git-send-email-robherring2@gmail.com>
+ <1363820051-24428-11-git-send-email-robherring2@gmail.com>
+Message-ID: <CACRpkdYvY9BRAikAyyFHvg8uaWK7msOhVSDFG_zRZQJhG1cuAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/21/13 11:09, Mark Rutland wrote:
-> Hi Stephen,
+On Wed, Mar 20, 2013 at 11:54 PM, Rob Herring <robherring2@gmail.com> wrote:
+
+> From: Rob Herring <rob.herring@calxeda.com>
 >
-> I've just been trying to test the dummy timer, and realised it's broken, as it
-> registers a cpu notifier from a device_initcall (after SMP's been brought up),
-> and doesn't ensure all active CPUs have been set up. Evidently no-one else has
-> attempted to test it thus far, and I'm not able to throughly test it at the
-> moment.
+> Move timer-sp and integrator-ap timer code to drivers/clocksource and
+> update timer-sp.h and arm_timer.h includes.
+>
+> This adds CLKSRC_OF support for the integrator-ap timer and removes the
+> use of "arm,timer-primary" and "arm,timer-secondary" aliases. The timer
+> selection should not be important as all 3 timers are equal capability.
+>
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: John Stultz <john.stultz@linaro.org>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
 
-Would it be sufficient to register as a pre-smp initcall?
+Nice!
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+This looks like it'll work.
+
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+Yours,
+Linus Walleij
