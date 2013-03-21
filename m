@@ -1,36 +1,56 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 21 Mar 2013 17:15:06 -0500
-Subject: [PATCH 2/3] ARM: sched_clock: support 64-bit counters
-In-Reply-To: <514B1311.20308@codeaurora.org>
-References: <1363055197-17296-1-git-send-email-robherring2@gmail.com>
- <1363055197-17296-3-git-send-email-robherring2@gmail.com>
- <514B1311.20308@codeaurora.org>
-Message-ID: <514B866A.3010308@gmail.com>
+From: smoch@web.de (Soeren Moch)
+Date: Thu, 21 Mar 2013 23:16:09 +0100
+Subject: [PATCH] USB: EHCI: fix for leaking isochronous data
+In-Reply-To: <20130321212033.GQ21478@lunn.ch>
+References: <Pine.LNX.4.44L0.1303211659080.1899-100000@iolanthe.rowland.org>
+ <Pine.LNX.4.44L0.1303211708470.1899-100000@iolanthe.rowland.org>
+ <20130321212033.GQ21478@lunn.ch>
+Message-ID: <514B86A9.60401@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/21/2013 09:02 AM, Christopher Covington wrote:
-> Hi Rob,
-> 
-> On 03/11/2013 10:26 PM, Rob Herring wrote:
->> From: Rob Herring <rob.herring@calxeda.com>
+On 21.03.2013 22:20, Andrew Lunn wrote:
+> On Thu, Mar 21, 2013 at 05:12:01PM -0400, Alan Stern wrote:
+>> On Thu, 21 Mar 2013, Alan Stern wrote:
 >>
->> With architected timers, we now have 64-bit counters which can be used
->> directly for sched_clock. However, the ARM sched_clock code currently just
->> uses the lower 32-bits and handles wrapping in software. Add support for
->> using the full 64-bit counter values. If multiple counters are registered,
->> a 64-bit counter is preferred.
-> 
-> To be more precise, architected timers are anywhere between 56 and 64 bits
-> wide, zero-extended to 64-bits. See section B8.1.1 of the ARM ARM rev C.b. I
-> don't know if the code really needs to change until someone has a need to
-> distinguish more finely between timers, but if you're using access size as an
-> approximation for counter width, I feel like it at least deserves a mention in
-> the comments.
+>>> On Thu, 21 Mar 2013, Soeren Moch wrote:
+>>>
+>>>> Now I found out what is going on here:
+>>>>
+>>>> In itd_urb_transaction() we allocate 9 iTDs for each URB with
+>>>> number_of_packets == 64 in my case. The iTDs are added to
+>>>> sched->td_list. For a frame-aligned scheduling we need 8 iTDs, the 9th
+>>>> one is released back to the front of the streams free_list in
+>>>> iso_sched_free(). This iTD was cleared after allocation and has a frame
+>>>> number of 0 now. So for each allocation when now_frame == 0 we allocate
+>>>> from the dma_pool, not from the free_list.
+>>>
+>>> Okay, that is a problem.  But it shouldn't be such a big problem,
+>>> because now_frame should not be equal to 0 very often.
+>>
+>> Oh, wait, now I get it.  We never reach a steady state, because the
+>> free list never shrinks, but occasionally it does increase when
+>> now_frame is equal to 0.  Even though that doesn't happen very often,
+>> the effects add up.
+>>
+>> Very good; tomorrow I will send your patch in.
+>
+> Hi Alan, Soeren
+>
+> Could you word the description a bit better. If Alan did not get it
+> without a bit of thought, few others are going to understand it
+> without a better explanation.
+>
+> Thanks
+> 	Andrew
+>
 
-Is there a defined way to determine the number of active bits?
-setup_sched_clock could be generalized to take any sizes >32 - 64 bits,
-but then we need some threshold as to when we need to worry about
-wrapping or not.
+Alan,
 
-Rob
+can you come up with a better explanation, please? I think your 
+description how it is supposed to work from here
+    http://marc.info/?l=linux-usb&m=136345559432055&w=2
+is required to understand the problem and the fix.
+
+Thanks,
+   Soeren
