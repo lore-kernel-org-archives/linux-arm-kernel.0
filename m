@@ -1,71 +1,96 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 21 Mar 2013 17:59:16 +0100
-Subject: [PATCH v3 3/7] arm: mach-kirkwood: convert to use mvebu-mbus driver
+Date: Thu, 21 Mar 2013 17:59:18 +0100
+Subject: [PATCH v3 5/7] arm: mach-orion5x: convert to use mvebu-mbus driver
 In-Reply-To: <1363885160-6870-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1363885160-6870-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1363885160-6870-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1363885160-6870-6-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit migrates the mach-kirkwood platforms to use the mvebu-mbus
-driver and therefore removes the Kirkwood-specific addr-map code.
+This commit migrates the mach-orion5x platforms to use the mvebu-mbus
+driver and therefore removes the Orion5x-specific addr-map code.
 
-The kirkwood_init_early() function is now responsible for initializing
-the mvebu-mbus driver by calling mvebu_mbus_init().
+The dove_init_early() function now initializes the mvebu-mbus driver
+by calling mvebu_mbus_init().
 
-The address decoding windows are now registered in the
-kirkwood_setup_wins() function. It is worth noting that the four PCIe
+We also convert a number of orion5x_setup_xyz_win() calls to the
+appropriate mvebu_mbus_add_window() calls, as each board was doing its
+own setup for the NOR window or other devices. Ultimately, those
+devices will be probed from the DT.
+
+The common address decoding windows are now registered in the
+orion5x_setup_wins() function. It is worth noting that the four PCIe
 address decoding windows will ultimately no longer have to be
 registered here: it will be done automatically by the PCIe driver once
-Kirkwood has been migrated to use the upcoming mvebu PCIe driver.
+Dove has been migrated to use the upcoming mvebu PCIe driver.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
  arch/arm/Kconfig                               |    1 +
- arch/arm/mach-kirkwood/Makefile                |    2 +-
- arch/arm/mach-kirkwood/addr-map.c              |   91 ------------------------
- arch/arm/mach-kirkwood/board-dt.c              |    2 +-
- arch/arm/mach-kirkwood/common.c                |   38 +++++++++-
- arch/arm/mach-kirkwood/common.h                |    2 +-
- arch/arm/mach-kirkwood/include/mach/kirkwood.h |    7 +-
- arch/arm/mach-kirkwood/pcie.c                  |    1 -
+ arch/arm/mach-orion5x/Makefile                 |    2 +-
+ arch/arm/mach-orion5x/addr-map.c               |  155 ------------------------
+ arch/arm/mach-orion5x/board-dt.c               |    2 +-
+ arch/arm/mach-orion5x/common.c                 |   49 +++++++-
+ arch/arm/mach-orion5x/common.h                 |   13 +-
+ arch/arm/mach-orion5x/d2net-setup.c            |    4 +-
+ arch/arm/mach-orion5x/db88f5281-setup.c        |   13 +-
+ arch/arm/mach-orion5x/dns323-setup.c           |    3 +-
+ arch/arm/mach-orion5x/edmini_v2-setup.c        |    4 +-
+ arch/arm/mach-orion5x/include/mach/orion5x.h   |    6 +-
+ arch/arm/mach-orion5x/kurobox_pro-setup.c      |    8 +-
+ arch/arm/mach-orion5x/ls-chl-setup.c           |    4 +-
+ arch/arm/mach-orion5x/ls_hgl-setup.c           |    4 +-
+ arch/arm/mach-orion5x/lsmini-setup.c           |    4 +-
+ arch/arm/mach-orion5x/mss2-setup.c             |    3 +-
+ arch/arm/mach-orion5x/mv2120-setup.c           |    3 +-
+ arch/arm/mach-orion5x/net2big-setup.c          |    4 +-
+ arch/arm/mach-orion5x/pci.c                    |    7 +-
+ arch/arm/mach-orion5x/rd88f5181l-fxo-setup.c   |    4 +-
+ arch/arm/mach-orion5x/rd88f5181l-ge-setup.c    |    4 +-
+ arch/arm/mach-orion5x/rd88f5182-setup.c        |    7 +-
+ arch/arm/mach-orion5x/terastation_pro2-setup.c |    4 +-
+ arch/arm/mach-orion5x/ts209-setup.c            |    4 +-
+ arch/arm/mach-orion5x/ts409-setup.c            |    4 +-
+ arch/arm/mach-orion5x/wnr854t-setup.c          |    4 +-
+ arch/arm/mach-orion5x/wrt350n-v2-setup.c       |    4 +-
  arch/arm/plat-orion/Makefile                   |    1 -
- 9 files changed, 45 insertions(+), 100 deletions(-)
- delete mode 100644 arch/arm/mach-kirkwood/addr-map.c
+ 28 files changed, 108 insertions(+), 217 deletions(-)
+ delete mode 100644 arch/arm/mach-orion5x/addr-map.c
 
 diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 5b71469..544767b 100644
+index d18a141..e8caf60 100644
 --- a/arch/arm/Kconfig
 +++ b/arch/arm/Kconfig
-@@ -577,6 +577,7 @@ config ARCH_KIRKWOOD
- 	select PINCTRL
- 	select PINCTRL_KIRKWOOD
+@@ -602,6 +602,7 @@ config ARCH_ORION5X
+ 	select GENERIC_CLOCKEVENTS
+ 	select PCI
  	select PLAT_ORION_LEGACY
 +	select MVEBU_MBUS
  	help
- 	  Support for the following Marvell Kirkwood series SoCs:
- 	  88F6180, 88F6192 and 88F6281.
-diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
-index 4cc4bee..d805f80 100644
---- a/arch/arm/mach-kirkwood/Makefile
-+++ b/arch/arm/mach-kirkwood/Makefile
+ 	  Support for the following Marvell Orion 5x series SoCs:
+ 	  Orion-1 (5181), Orion-VoIP (5181L), Orion-NAS (5182),
+diff --git a/arch/arm/mach-orion5x/Makefile b/arch/arm/mach-orion5x/Makefile
+index 9e809a7..45da805 100644
+--- a/arch/arm/mach-orion5x/Makefile
++++ b/arch/arm/mach-orion5x/Makefile
 @@ -1,4 +1,4 @@
--obj-y				+= common.o addr-map.o irq.o pcie.o mpp.o
-+obj-y				+= common.o irq.o pcie.o mpp.o
- 
- obj-$(CONFIG_MACH_DB88F6281_BP)		+= db88f6281-bp-setup.o
- obj-$(CONFIG_MACH_RD88F6192_NAS)	+= rd88f6192-nas-setup.o
-diff --git a/arch/arm/mach-kirkwood/addr-map.c b/arch/arm/mach-kirkwood/addr-map.c
+-obj-y				+= common.o addr-map.o pci.o irq.o mpp.o
++obj-y				+= common.o pci.o irq.o mpp.o
+ obj-$(CONFIG_MACH_DB88F5281)	+= db88f5281-setup.o
+ obj-$(CONFIG_MACH_RD88F5182)	+= rd88f5182-setup.o
+ obj-$(CONFIG_MACH_KUROBOX_PRO)	+= kurobox_pro-setup.o
+diff --git a/arch/arm/mach-orion5x/addr-map.c b/arch/arm/mach-orion5x/addr-map.c
 deleted file mode 100644
-index 8f0d162..0000000
---- a/arch/arm/mach-kirkwood/addr-map.c
+index b5efc0f..0000000
+--- a/arch/arm/mach-orion5x/addr-map.c
 +++ /dev/null
-@@ -1,91 +0,0 @@
+@@ -1,155 +0,0 @@
 -/*
-- * arch/arm/mach-kirkwood/addr-map.c
+- * arch/arm/mach-orion5x/addr-map.c
 - *
-- * Address map functions for Marvell Kirkwood SoCs
+- * Address map functions for Marvell Orion 5x SoCs
+- *
+- * Maintainer: Tzachi Perelstein <tzachi@marvell.com>
 - *
 - * This file is licensed under the terms of the GNU General Public
 - * License version 2.  This program is licensed "as is" without any
@@ -81,222 +106,626 @@ index 8f0d162..0000000
 -#include "common.h"
 -
 -/*
+- * The Orion has fully programmable address map. There's a separate address
+- * map for each of the device _master_ interfaces, e.g. CPU, PCI, PCIe, USB,
+- * Gigabit Ethernet, DMA/XOR engines, etc. Each interface has its own
+- * address decode windows that allow it to access any of the Orion resources.
+- *
+- * CPU address decoding --
+- * Linux assumes that it is the boot loader that already setup the access to
+- * DDR and internal registers.
+- * Setup access to PCI and PCIe IO/MEM space is issued by this file.
+- * Setup access to various devices located on the device bus interface (e.g.
+- * flashes, RTC, etc) should be issued by machine-setup.c according to
+- * specific board population (by using orion5x_setup_*_win()).
+- *
+- * Non-CPU Masters address decoding --
+- * Unlike the CPU, we setup the access from Orion's master interfaces to DDR
+- * banks only (the typical use case).
+- * Setup access for each master to DDR is issued by platform device setup.
+- */
+-
+-/*
 - * Generic Address Decode Windows bit settings
 - */
 -#define TARGET_DEV_BUS		1
--#define TARGET_SRAM		3
+-#define TARGET_PCI		3
 -#define TARGET_PCIE		4
--#define ATTR_DEV_SPI_ROM	0x1e
--#define ATTR_DEV_BOOT		0x1d
--#define ATTR_DEV_NAND		0x2f
--#define ATTR_DEV_CS3		0x37
--#define ATTR_DEV_CS2		0x3b
--#define ATTR_DEV_CS1		0x3d
--#define ATTR_DEV_CS0		0x3e
--#define ATTR_PCIE_IO		0xe0
--#define ATTR_PCIE_MEM		0xe8
--#define ATTR_PCIE1_IO		0xd0
--#define ATTR_PCIE1_MEM		0xd8
--#define ATTR_SRAM		0x01
+-#define TARGET_SRAM		9
+-#define ATTR_PCIE_MEM		0x59
+-#define ATTR_PCIE_IO		0x51
+-#define ATTR_PCIE_WA		0x79
+-#define ATTR_PCI_MEM		0x59
+-#define ATTR_PCI_IO		0x51
+-#define ATTR_DEV_CS0		0x1e
+-#define ATTR_DEV_CS1		0x1d
+-#define ATTR_DEV_CS2		0x1b
+-#define ATTR_DEV_BOOT		0xf
+-#define ATTR_SRAM		0x0
+-
+-static int __initdata win_alloc_count;
+-
+-static int __init cpu_win_can_remap(const struct orion_addr_map_cfg *cfg,
+-		  const int win)
+-{
+-	u32 dev, rev;
+-
+-	orion5x_pcie_id(&dev, &rev);
+-	if ((dev == MV88F5281_DEV_ID && win < 4)
+-	    || (dev == MV88F5182_DEV_ID && win < 2)
+-	    || (dev == MV88F5181_DEV_ID && win < 2)
+-	    || (dev == MV88F6183_DEV_ID && win < 4))
+-		return 1;
+-
+-	return 0;
+-}
 -
 -/*
 - * Description of the windows needed by the platform code
 - */
--static struct __initdata orion_addr_map_cfg addr_map_cfg = {
+-static struct orion_addr_map_cfg addr_map_cfg __initdata = {
 -	.num_wins = 8,
--	.remappable_wins = 4,
--	.bridge_virt_base = BRIDGE_VIRT_BASE,
+-	.cpu_win_can_remap = cpu_win_can_remap,
+-	.bridge_virt_base = ORION5X_BRIDGE_VIRT_BASE,
 -};
 -
 -static const struct __initdata orion_addr_map_info addr_map_info[] = {
 -	/*
--	 * Windows for PCIe IO+MEM space.
+-	 * Setup windows for PCI+PCIe IO+MEM space.
 -	 */
--	{ 0, KIRKWOOD_PCIE_IO_PHYS_BASE, KIRKWOOD_PCIE_IO_SIZE,
--	  TARGET_PCIE, ATTR_PCIE_IO, KIRKWOOD_PCIE_IO_BUS_BASE
+-	{ 0, ORION5X_PCIE_IO_PHYS_BASE, ORION5X_PCIE_IO_SIZE,
+-	  TARGET_PCIE, ATTR_PCIE_IO, ORION5X_PCIE_IO_BUS_BASE
 -	},
--	{ 1, KIRKWOOD_PCIE_MEM_PHYS_BASE, KIRKWOOD_PCIE_MEM_SIZE,
--	  TARGET_PCIE, ATTR_PCIE_MEM, KIRKWOOD_PCIE_MEM_BUS_BASE
+-	{ 1, ORION5X_PCI_IO_PHYS_BASE, ORION5X_PCI_IO_SIZE,
+-	  TARGET_PCI, ATTR_PCI_IO, ORION5X_PCI_IO_BUS_BASE
 -	},
--	{ 2, KIRKWOOD_PCIE1_IO_PHYS_BASE, KIRKWOOD_PCIE1_IO_SIZE,
--	  TARGET_PCIE, ATTR_PCIE1_IO, KIRKWOOD_PCIE1_IO_BUS_BASE
+-	{ 2, ORION5X_PCIE_MEM_PHYS_BASE, ORION5X_PCIE_MEM_SIZE,
+-	  TARGET_PCIE, ATTR_PCIE_MEM, -1
 -	},
--	{ 3, KIRKWOOD_PCIE1_MEM_PHYS_BASE, KIRKWOOD_PCIE1_MEM_SIZE,
--	  TARGET_PCIE, ATTR_PCIE1_MEM, KIRKWOOD_PCIE1_MEM_BUS_BASE
--	},
--	/*
--	 * Window for NAND controller.
--	 */
--	{ 4, KIRKWOOD_NAND_MEM_PHYS_BASE, KIRKWOOD_NAND_MEM_SIZE,
--	  TARGET_DEV_BUS, ATTR_DEV_NAND, -1
--	},
--	/*
--	 * Window for SRAM.
--	 */
--	{ 5, KIRKWOOD_SRAM_PHYS_BASE, KIRKWOOD_SRAM_SIZE,
--	  TARGET_SRAM, ATTR_SRAM, -1
+-	{ 3, ORION5X_PCI_MEM_PHYS_BASE, ORION5X_PCI_MEM_SIZE,
+-	  TARGET_PCI, ATTR_PCI_MEM, -1
 -	},
 -	/* End marker */
 -	{ -1, 0, 0, 0, 0, 0 }
 -};
 -
--void __init kirkwood_setup_cpu_mbus(void)
+-void __init orion5x_setup_cpu_mbus_bridge(void)
 -{
 -	/*
 -	 * Disable, clear and configure windows.
 -	 */
 -	orion_config_wins(&addr_map_cfg, addr_map_info);
+-	win_alloc_count = 4;
 -
 -	/*
 -	 * Setup MBUS dram target info.
 -	 */
 -	orion_setup_cpu_mbus_target(&addr_map_cfg,
--				    (void __iomem *) DDR_WINDOW_CPU_BASE);
+-				    (void __iomem *) ORION5X_DDR_WINDOW_CPU_BASE);
 -}
-diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-index 2e73e9d..ea49476 100644
---- a/arch/arm/mach-kirkwood/board-dt.c
-+++ b/arch/arm/mach-kirkwood/board-dt.c
-@@ -82,7 +82,7 @@ static void __init kirkwood_dt_init(void)
+-
+-void __init orion5x_setup_dev_boot_win(u32 base, u32 size)
+-{
+-	orion_setup_cpu_win(&addr_map_cfg, win_alloc_count++, base, size,
+-			    TARGET_DEV_BUS, ATTR_DEV_BOOT, -1);
+-}
+-
+-void __init orion5x_setup_dev0_win(u32 base, u32 size)
+-{
+-	orion_setup_cpu_win(&addr_map_cfg, win_alloc_count++, base, size,
+-			    TARGET_DEV_BUS, ATTR_DEV_CS0, -1);
+-}
+-
+-void __init orion5x_setup_dev1_win(u32 base, u32 size)
+-{
+-	orion_setup_cpu_win(&addr_map_cfg, win_alloc_count++, base, size,
+-			    TARGET_DEV_BUS, ATTR_DEV_CS1, -1);
+-}
+-
+-void __init orion5x_setup_dev2_win(u32 base, u32 size)
+-{
+-	orion_setup_cpu_win(&addr_map_cfg, win_alloc_count++, base, size,
+-			    TARGET_DEV_BUS, ATTR_DEV_CS2, -1);
+-}
+-
+-void __init orion5x_setup_pcie_wa_win(u32 base, u32 size)
+-{
+-	orion_setup_cpu_win(&addr_map_cfg, win_alloc_count++, base, size,
+-			    TARGET_PCIE, ATTR_PCIE_WA, -1);
+-}
+-
+-void __init orion5x_setup_sram_win(void)
+-{
+-	orion_setup_cpu_win(&addr_map_cfg, win_alloc_count++,
+-			    ORION5X_SRAM_PHYS_BASE, ORION5X_SRAM_SIZE,
+-			    TARGET_SRAM, ATTR_SRAM, -1);
+-}
+diff --git a/arch/arm/mach-orion5x/board-dt.c b/arch/arm/mach-orion5x/board-dt.c
+index 35a8014..6bbc878 100644
+--- a/arch/arm/mach-orion5x/board-dt.c
++++ b/arch/arm/mach-orion5x/board-dt.c
+@@ -41,7 +41,7 @@ static void __init orion5x_dt_init(void)
+ 	/*
+ 	 * Setup Orion address map
  	 */
- 	writel(readl(CPU_CONFIG) & ~CPU_CONFIG_ERROR_PROP, CPU_CONFIG);
+-	orion5x_setup_cpu_mbus_bridge();
++	orion5x_setup_wins();
  
--	kirkwood_setup_cpu_mbus();
-+	kirkwood_setup_wins();
- 
- 	kirkwood_l2_init();
- 
-diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
-index 49792a0..c2cae69 100644
---- a/arch/arm/mach-kirkwood/common.c
-+++ b/arch/arm/mach-kirkwood/common.c
-@@ -33,7 +33,6 @@
+ 	/* Setup root of clk tree */
+ 	clk_init();
+diff --git a/arch/arm/mach-orion5x/common.c b/arch/arm/mach-orion5x/common.c
+index d068f14..8e468e3 100644
+--- a/arch/arm/mach-orion5x/common.c
++++ b/arch/arm/mach-orion5x/common.c
+@@ -34,7 +34,6 @@
  #include <linux/platform_data/usb-ehci-orion.h>
- #include <plat/common.h>
  #include <plat/time.h>
+ #include <plat/common.h>
 -#include <plat/addr-map.h>
- #include <linux/platform_data/dma-mv_xor.h>
  #include "common.h"
  
-@@ -535,6 +534,9 @@ void __init kirkwood_init_early(void)
+ /*****************************************************************************
+@@ -174,7 +173,8 @@ void __init orion5x_xor_init(void)
+  ****************************************************************************/
+ static void __init orion5x_crypto_init(void)
+ {
+-	orion5x_setup_sram_win();
++	mvebu_mbus_add_window("sram", ORION5X_SRAM_PHYS_BASE,
++			      ORION5X_SRAM_SIZE);
+ 	orion_crypto_init(ORION5X_CRYPTO_PHYS_BASE, ORION5X_SRAM_PHYS_BASE,
+ 			  SZ_8K, IRQ_ORION5X_CESA);
+ }
+@@ -193,6 +193,9 @@ void __init orion5x_wdt_init(void)
+  ****************************************************************************/
+ void __init orion5x_init_early(void)
+ {
++	u32 rev, dev;
++	const char *mbus_soc_name;
++
+ 	orion_time_set_base(TIMER_VIRT_BASE);
+ 
+ 	/*
+@@ -201,6 +204,46 @@ void __init orion5x_init_early(void)
  	 * the allocations won't fail.
  	 */
  	init_dma_coherent_pool_size(SZ_1M);
-+	mvebu_mbus_init("marvell,kirkwood-mbus",
-+			BRIDGE_WINS_BASE, BRIDGE_WINS_SZ,
-+			DDR_WINDOW_CPU_BASE, DDR_WINDOW_CPU_SZ);
- }
- 
- int kirkwood_tclk;
-@@ -650,6 +652,38 @@ char * __init kirkwood_id(void)
- 	}
- }
- 
-+void __init kirkwood_setup_wins(void)
++
++	/* Initialize the MBUS driver */
++	orion5x_pcie_id(&dev, &rev);
++	if (dev == MV88F5281_DEV_ID)
++		mbus_soc_name = "marvell,orion5x-88f5281-mbus";
++	else if (dev == MV88F5182_DEV_ID)
++		mbus_soc_name = "marvell,orion5x-88f5182-mbus";
++	else if (dev == MV88F5181_DEV_ID)
++		mbus_soc_name = "marvell,orion5x-88f5181-mbus";
++	else if (dev == MV88F6183_DEV_ID)
++		mbus_soc_name = "marvell,orion5x-88f6183-mbus";
++	else
++		mbus_soc_name = NULL;
++	mvebu_mbus_init(mbus_soc_name, ORION5X_BRIDGE_WINS_BASE,
++			ORION5X_BRIDGE_WINS_SZ,
++			ORION5X_DDR_WINS_BASE, ORION5X_DDR_WINS_SZ);
++}
++
++void orion5x_setup_wins(void)
 +{
 +	/*
 +	 * The PCIe windows will no longer be statically allocated
-+	 * here once Kirkwood is migrated to the pci-mvebu driver.
++	 * here once Orion5x is migrated to the pci-mvebu driver.
 +	 */
-+	mvebu_mbus_add_window_remap_flags("pcie0.0",
-+					  KIRKWOOD_PCIE_IO_PHYS_BASE,
-+					  KIRKWOOD_PCIE_IO_SIZE,
-+					  KIRKWOOD_PCIE_IO_BUS_BASE,
++	mvebu_mbus_add_window_remap_flags("pcie0.0", ORION5X_PCIE_IO_PHYS_BASE,
++					  ORION5X_PCIE_IO_SIZE,
++					  ORION5X_PCIE_IO_BUS_BASE,
 +					  MVEBU_MBUS_PCI_IO);
-+	mvebu_mbus_add_window_remap_flags("pcie0.0",
-+					  KIRKWOOD_PCIE_MEM_PHYS_BASE,
-+					  KIRKWOOD_PCIE_MEM_SIZE,
++	mvebu_mbus_add_window_remap_flags("pcie0.0", ORION5X_PCIE_MEM_PHYS_BASE,
++					  ORION5X_PCIE_MEM_SIZE,
 +					  MVEBU_MBUS_NO_REMAP,
 +					  MVEBU_MBUS_PCI_MEM);
-+	mvebu_mbus_add_window_remap_flags("pcie1.0",
-+					  KIRKWOOD_PCIE1_IO_PHYS_BASE,
-+					  KIRKWOOD_PCIE1_IO_SIZE,
-+					  KIRKWOOD_PCIE1_IO_BUS_BASE,
++	mvebu_mbus_add_window_remap_flags("pci0.0", ORION5X_PCI_IO_PHYS_BASE,
++					  ORION5X_PCI_IO_SIZE,
++					  ORION5X_PCI_IO_BUS_BASE,
 +					  MVEBU_MBUS_PCI_IO);
-+	mvebu_mbus_add_window_remap_flags("pcie1.0",
-+					  KIRKWOOD_PCIE1_MEM_PHYS_BASE,
-+					  KIRKWOOD_PCIE1_MEM_SIZE,
++	mvebu_mbus_add_window_remap_flags("pci0.0", ORION5X_PCI_MEM_PHYS_BASE,
++					  ORION5X_PCI_MEM_SIZE,
 +					  MVEBU_MBUS_NO_REMAP,
 +					  MVEBU_MBUS_PCI_MEM);
-+	mvebu_mbus_add_window("nand", KIRKWOOD_NAND_MEM_PHYS_BASE,
-+			      KIRKWOOD_NAND_MEM_SIZE);
-+	mvebu_mbus_add_window("sram", KIRKWOOD_SRAM_PHYS_BASE,
-+			      KIRKWOOD_SRAM_SIZE);
-+}
-+
- void __init kirkwood_l2_init(void)
- {
- #ifdef CONFIG_CACHE_FEROCEON_L2
-@@ -675,7 +709,7 @@ void __init kirkwood_init(void)
+ }
+ 
+ int orion5x_tclk;
+@@ -282,7 +325,7 @@ void __init orion5x_init(void)
+ 	/*
+ 	 * Setup Orion address map
  	 */
- 	writel(readl(CPU_CONFIG) & ~CPU_CONFIG_ERROR_PROP, CPU_CONFIG);
+-	orion5x_setup_cpu_mbus_bridge();
++	orion5x_setup_wins();
  
--	kirkwood_setup_cpu_mbus();
-+	kirkwood_setup_wins();
+ 	/* Setup root of clk tree */
+ 	clk_init();
+diff --git a/arch/arm/mach-orion5x/common.h b/arch/arm/mach-orion5x/common.h
+index e603457..cdaa01f 100644
+--- a/arch/arm/mach-orion5x/common.h
++++ b/arch/arm/mach-orion5x/common.h
+@@ -17,18 +17,7 @@ void clk_init(void);
+ extern int orion5x_tclk;
+ extern void orion5x_timer_init(void);
  
- 	kirkwood_l2_init();
+-/*
+- * Enumerations and functions for Orion windows mapping. Used by Orion core
+- * functions to map its interfaces and by the machine-setup to map its on-
+- * board devices. Details in /mach-orion/addr-map.c
+- */
+-void orion5x_setup_cpu_mbus_bridge(void);
+-void orion5x_setup_dev_boot_win(u32 base, u32 size);
+-void orion5x_setup_dev0_win(u32 base, u32 size);
+-void orion5x_setup_dev1_win(u32 base, u32 size);
+-void orion5x_setup_dev2_win(u32 base, u32 size);
+-void orion5x_setup_pcie_wa_win(u32 base, u32 size);
+-void orion5x_setup_sram_win(void);
++void orion5x_setup_wins(void);
  
-diff --git a/arch/arm/mach-kirkwood/common.h b/arch/arm/mach-kirkwood/common.h
-index 5ed7056..e24f743 100644
---- a/arch/arm/mach-kirkwood/common.h
-+++ b/arch/arm/mach-kirkwood/common.h
-@@ -30,7 +30,7 @@ void kirkwood_init(void);
- void kirkwood_init_early(void);
- void kirkwood_init_irq(void);
+ void orion5x_ehci0_init(void);
+ void orion5x_ehci1_init(void);
+diff --git a/arch/arm/mach-orion5x/d2net-setup.c b/arch/arm/mach-orion5x/d2net-setup.c
+index 57d0af7..16c88bb 100644
+--- a/arch/arm/mach-orion5x/d2net-setup.c
++++ b/arch/arm/mach-orion5x/d2net-setup.c
+@@ -317,8 +317,8 @@ static void __init d2net_init(void)
+ 	d2net_sata_power_init();
+ 	orion5x_sata_init(&d2net_sata_data);
  
--void kirkwood_setup_cpu_mbus(void);
-+void kirkwood_setup_wins(void);
+-	orion5x_setup_dev_boot_win(D2NET_NOR_BOOT_BASE,
+-				D2NET_NOR_BOOT_SIZE);
++	mvebu_mbus_add_window("devbus-boot", D2NET_NOR_BOOT_BASE,
++			      D2NET_NOR_BOOT_SIZE);
+ 	platform_device_register(&d2net_nor_flash);
  
- void kirkwood_enable_pcie(void);
- void kirkwood_pcie_id(u32 *dev, u32 *rev);
-diff --git a/arch/arm/mach-kirkwood/include/mach/kirkwood.h b/arch/arm/mach-kirkwood/include/mach/kirkwood.h
-index a05563a..92976ce 100644
---- a/arch/arm/mach-kirkwood/include/mach/kirkwood.h
-+++ b/arch/arm/mach-kirkwood/include/mach/kirkwood.h
-@@ -60,8 +60,9 @@
-  * Register Map
-  */
- #define DDR_VIRT_BASE		(KIRKWOOD_REGS_VIRT_BASE + 0x00000)
--#define DDR_PHYS_BASE		(KIRKWOOD_REGS_PHYS_BASE + 0x00000)
--#define  DDR_WINDOW_CPU_BASE	(DDR_VIRT_BASE + 0x1500)
-+#define DDR_PHYS_BASE           (KIRKWOOD_REGS_PHYS_BASE + 0x00000)
-+#define  DDR_WINDOW_CPU_BASE    (DDR_PHYS_BASE + 0x1500)
-+#define  DDR_WINDOW_CPU_SZ      (0x20)
- #define DDR_OPERATION_BASE	(DDR_PHYS_BASE + 0x1418)
+ 	platform_device_register(&d2net_gpio_buttons);
+diff --git a/arch/arm/mach-orion5x/db88f5281-setup.c b/arch/arm/mach-orion5x/db88f5281-setup.c
+index 7666564..4e1263d 100644
+--- a/arch/arm/mach-orion5x/db88f5281-setup.c
++++ b/arch/arm/mach-orion5x/db88f5281-setup.c
+@@ -340,16 +340,19 @@ static void __init db88f5281_init(void)
+ 	orion5x_uart0_init();
+ 	orion5x_uart1_init();
  
- #define DEV_BUS_PHYS_BASE	(KIRKWOOD_REGS_PHYS_BASE + 0x10000)
-@@ -80,6 +81,8 @@
+-	orion5x_setup_dev_boot_win(DB88F5281_NOR_BOOT_BASE,
+-				DB88F5281_NOR_BOOT_SIZE);
++	mvebu_mbus_add_window("devbus-boot", DB88F5281_NOR_BOOT_BASE,
++			      DB88F5281_NOR_BOOT_SIZE);
+ 	platform_device_register(&db88f5281_boot_flash);
  
- #define BRIDGE_VIRT_BASE	(KIRKWOOD_REGS_VIRT_BASE + 0x20000)
- #define BRIDGE_PHYS_BASE	(KIRKWOOD_REGS_PHYS_BASE + 0x20000)
-+#define  BRIDGE_WINS_BASE       (BRIDGE_PHYS_BASE)
-+#define  BRIDGE_WINS_SZ         (0x80)
+-	orion5x_setup_dev0_win(DB88F5281_7SEG_BASE, DB88F5281_7SEG_SIZE);
++	mvebu_mbus_add_window("devbus-cs0", DB88F5281_7SEG_BASE,
++			      DB88F5281_7SEG_SIZE);
  
- #define CRYPTO_PHYS_BASE	(KIRKWOOD_REGS_PHYS_BASE + 0x30000)
+-	orion5x_setup_dev1_win(DB88F5281_NOR_BASE, DB88F5281_NOR_SIZE);
++	mvebu_mbus_add_window("devbus-cs1", DB88F5281_NOR_BASE,
++			      DB88F5281_NOR_SIZE);
+ 	platform_device_register(&db88f5281_nor_flash);
  
-diff --git a/arch/arm/mach-kirkwood/pcie.c b/arch/arm/mach-kirkwood/pcie.c
-index d96ad4c..7f43e6c 100644
---- a/arch/arm/mach-kirkwood/pcie.c
-+++ b/arch/arm/mach-kirkwood/pcie.c
-@@ -17,7 +17,6 @@
- #include <asm/mach/pci.h>
- #include <plat/pcie.h>
- #include <mach/bridge-regs.h>
--#include <plat/addr-map.h>
- #include "common.h"
+-	orion5x_setup_dev2_win(DB88F5281_NAND_BASE, DB88F5281_NAND_SIZE);
++	mvebu_mbus_add_window("devbus-cs2", DB88F5281_NAND_BASE,
++			      DB88F5281_NAND_SIZE);
+ 	platform_device_register(&db88f5281_nand_flash);
  
- static void kirkwood_enable_pcie_clk(const char *port)
+ 	i2c_register_board_info(0, &db88f5281_i2c_rtc, 1);
+diff --git a/arch/arm/mach-orion5x/dns323-setup.c b/arch/arm/mach-orion5x/dns323-setup.c
+index 6eb1732..9e6baf5 100644
+--- a/arch/arm/mach-orion5x/dns323-setup.c
++++ b/arch/arm/mach-orion5x/dns323-setup.c
+@@ -611,7 +611,8 @@ static void __init dns323_init(void)
+ 	/* setup flash mapping
+ 	 * CS3 holds a 8 MB Spansion S29GL064M90TFIR4
+ 	 */
+-	orion5x_setup_dev_boot_win(DNS323_NOR_BOOT_BASE, DNS323_NOR_BOOT_SIZE);
++	mvebu_mbus_add_window("devbus-boot", DNS323_NOR_BOOT_BASE,
++			      DNS323_NOR_BOOT_SIZE);
+ 	platform_device_register(&dns323_nor_flash);
+ 
+ 	/* Sort out LEDs, Buttons and i2c devices */
+diff --git a/arch/arm/mach-orion5x/edmini_v2-setup.c b/arch/arm/mach-orion5x/edmini_v2-setup.c
+index d675e72..1476155 100644
+--- a/arch/arm/mach-orion5x/edmini_v2-setup.c
++++ b/arch/arm/mach-orion5x/edmini_v2-setup.c
+@@ -154,8 +154,8 @@ void __init edmini_v2_init(void)
+ 	orion5x_ehci0_init();
+ 	orion5x_eth_init(&edmini_v2_eth_data);
+ 
+-	orion5x_setup_dev_boot_win(EDMINI_V2_NOR_BOOT_BASE,
+-				EDMINI_V2_NOR_BOOT_SIZE);
++	mvebu_mbus_add_window("devbus-boot", EDMINI_V2_NOR_BOOT_BASE,
++			      EDMINI_V2_NOR_BOOT_SIZE);
+ 	platform_device_register(&edmini_v2_nor_flash);
+ 
+ 	pr_notice("edmini_v2: USB device port, flash write and power-off "
+diff --git a/arch/arm/mach-orion5x/include/mach/orion5x.h b/arch/arm/mach-orion5x/include/mach/orion5x.h
+index d265f54..b78ff32 100644
+--- a/arch/arm/mach-orion5x/include/mach/orion5x.h
++++ b/arch/arm/mach-orion5x/include/mach/orion5x.h
+@@ -66,8 +66,10 @@
+  * Orion Registers Map
+  ******************************************************************************/
+ 
++#define ORION5X_DDR_PHYS_BASE           (ORION5X_REGS_PHYS_BASE + 0x00000)
++#define  ORION5X_DDR_WINS_BASE          (ORION5X_DDR_PHYS_BASE + 0x1500)
++#define  ORION5X_DDR_WINS_SZ            (0x10)
+ #define ORION5X_DDR_VIRT_BASE		(ORION5X_REGS_VIRT_BASE + 0x00000)
+-#define  ORION5X_DDR_WINDOW_CPU_BASE    (ORION5X_DDR_VIRT_BASE + 0x1500)
+ #define ORION5X_DEV_BUS_PHYS_BASE	(ORION5X_REGS_PHYS_BASE + 0x10000)
+ #define ORION5X_DEV_BUS_VIRT_BASE	(ORION5X_REGS_VIRT_BASE + 0x10000)
+ #define ORION5X_DEV_BUS_REG(x)		(ORION5X_DEV_BUS_VIRT_BASE + (x))
+@@ -81,6 +83,8 @@
+ 
+ #define ORION5X_BRIDGE_VIRT_BASE	(ORION5X_REGS_VIRT_BASE + 0x20000)
+ #define ORION5X_BRIDGE_PHYS_BASE	(ORION5X_REGS_PHYS_BASE + 0x20000)
++#define  ORION5X_BRIDGE_WINS_BASE       (ORION5X_BRIDGE_PHYS_BASE)
++#define  ORION5X_BRIDGE_WINS_SZ         (0x80)
+ 
+ #define ORION5X_PCI_VIRT_BASE		(ORION5X_REGS_VIRT_BASE + 0x30000)
+ 
+diff --git a/arch/arm/mach-orion5x/kurobox_pro-setup.c b/arch/arm/mach-orion5x/kurobox_pro-setup.c
+index b984035..aae10e4 100644
+--- a/arch/arm/mach-orion5x/kurobox_pro-setup.c
++++ b/arch/arm/mach-orion5x/kurobox_pro-setup.c
+@@ -359,13 +359,13 @@ static void __init kurobox_pro_init(void)
+ 	orion5x_uart1_init();
+ 	orion5x_xor_init();
+ 
+-	orion5x_setup_dev_boot_win(KUROBOX_PRO_NOR_BOOT_BASE,
+-				   KUROBOX_PRO_NOR_BOOT_SIZE);
++	mvebu_mbus_add_window("devbus-boot", KUROBOX_PRO_NOR_BOOT_BASE,
++			      KUROBOX_PRO_NOR_BOOT_SIZE);
+ 	platform_device_register(&kurobox_pro_nor_flash);
+ 
+ 	if (machine_is_kurobox_pro()) {
+-		orion5x_setup_dev0_win(KUROBOX_PRO_NAND_BASE,
+-				       KUROBOX_PRO_NAND_SIZE);
++		mvebu_mbus_add_window("devbus-cs0", KUROBOX_PRO_NAND_BASE,
++				      KUROBOX_PRO_NAND_SIZE);
+ 		platform_device_register(&kurobox_pro_nand_flash);
+ 	}
+ 
+diff --git a/arch/arm/mach-orion5x/ls-chl-setup.c b/arch/arm/mach-orion5x/ls-chl-setup.c
+index 044da5b..24f4e14 100644
+--- a/arch/arm/mach-orion5x/ls-chl-setup.c
++++ b/arch/arm/mach-orion5x/ls-chl-setup.c
+@@ -294,8 +294,8 @@ static void __init lschl_init(void)
+ 	orion5x_uart0_init();
+ 	orion5x_xor_init();
+ 
+-	orion5x_setup_dev_boot_win(LSCHL_NOR_BOOT_BASE,
+-				   LSCHL_NOR_BOOT_SIZE);
++	mvebu_mbus_add_window("devbus-boot", LSCHL_NOR_BOOT_BASE,
++			      LSCHL_NOR_BOOT_SIZE);
+ 	platform_device_register(&lschl_nor_flash);
+ 
+ 	platform_device_register(&lschl_leds);
+diff --git a/arch/arm/mach-orion5x/ls_hgl-setup.c b/arch/arm/mach-orion5x/ls_hgl-setup.c
+index d49f934..fc653bb 100644
+--- a/arch/arm/mach-orion5x/ls_hgl-setup.c
++++ b/arch/arm/mach-orion5x/ls_hgl-setup.c
+@@ -243,8 +243,8 @@ static void __init ls_hgl_init(void)
+ 	orion5x_uart0_init();
+ 	orion5x_xor_init();
+ 
+-	orion5x_setup_dev_boot_win(LS_HGL_NOR_BOOT_BASE,
+-				   LS_HGL_NOR_BOOT_SIZE);
++	mvebu_mbus_add_window("devbus-boot", LS_HGL_NOR_BOOT_BASE,
++			      LS_HGL_NOR_BOOT_SIZE);
+ 	platform_device_register(&ls_hgl_nor_flash);
+ 
+ 	platform_device_register(&ls_hgl_button_device);
+diff --git a/arch/arm/mach-orion5x/lsmini-setup.c b/arch/arm/mach-orion5x/lsmini-setup.c
+index 8e3965c..18e66e6 100644
+--- a/arch/arm/mach-orion5x/lsmini-setup.c
++++ b/arch/arm/mach-orion5x/lsmini-setup.c
+@@ -244,8 +244,8 @@ static void __init lsmini_init(void)
+ 	orion5x_uart0_init();
+ 	orion5x_xor_init();
+ 
+-	orion5x_setup_dev_boot_win(LSMINI_NOR_BOOT_BASE,
+-				   LSMINI_NOR_BOOT_SIZE);
++	mvebu_mbus_add_window("devbus-boot", LSMINI_NOR_BOOT_BASE,
++			      LSMINI_NOR_BOOT_SIZE);
+ 	platform_device_register(&lsmini_nor_flash);
+ 
+ 	platform_device_register(&lsmini_button_device);
+diff --git a/arch/arm/mach-orion5x/mss2-setup.c b/arch/arm/mach-orion5x/mss2-setup.c
+index 0ec94a1..827acba 100644
+--- a/arch/arm/mach-orion5x/mss2-setup.c
++++ b/arch/arm/mach-orion5x/mss2-setup.c
+@@ -241,7 +241,8 @@ static void __init mss2_init(void)
+ 	orion5x_uart0_init();
+ 	orion5x_xor_init();
+ 
+-	orion5x_setup_dev_boot_win(MSS2_NOR_BOOT_BASE, MSS2_NOR_BOOT_SIZE);
++	mvebu_mbus_add_window("devbus-boot", MSS2_NOR_BOOT_BASE,
++			      MSS2_NOR_BOOT_SIZE);
+ 	platform_device_register(&mss2_nor_flash);
+ 
+ 	platform_device_register(&mss2_button_device);
+diff --git a/arch/arm/mach-orion5x/mv2120-setup.c b/arch/arm/mach-orion5x/mv2120-setup.c
+index 18143f2..92600ae 100644
+--- a/arch/arm/mach-orion5x/mv2120-setup.c
++++ b/arch/arm/mach-orion5x/mv2120-setup.c
+@@ -204,7 +204,8 @@ static void __init mv2120_init(void)
+ 	orion5x_uart0_init();
+ 	orion5x_xor_init();
+ 
+-	orion5x_setup_dev_boot_win(MV2120_NOR_BOOT_BASE, MV2120_NOR_BOOT_SIZE);
++	mvebu_mbus_add_window("devbus-boot", MV2120_NOR_BOOT_BASE,
++			      MV2120_NOR_BOOT_SIZE);
+ 	platform_device_register(&mv2120_nor_flash);
+ 
+ 	platform_device_register(&mv2120_button_device);
+diff --git a/arch/arm/mach-orion5x/net2big-setup.c b/arch/arm/mach-orion5x/net2big-setup.c
+index 282e503..dd0641a 100644
+--- a/arch/arm/mach-orion5x/net2big-setup.c
++++ b/arch/arm/mach-orion5x/net2big-setup.c
+@@ -397,8 +397,8 @@ static void __init net2big_init(void)
+ 	net2big_sata_power_init();
+ 	orion5x_sata_init(&net2big_sata_data);
+ 
+-	orion5x_setup_dev_boot_win(NET2BIG_NOR_BOOT_BASE,
+-				   NET2BIG_NOR_BOOT_SIZE);
++	mvebu_mbus_add_window("devbus-boot", NET2BIG_NOR_BOOT_BASE,
++			      NET2BIG_NOR_BOOT_SIZE);
+ 	platform_device_register(&net2big_nor_flash);
+ 
+ 	platform_device_register(&net2big_gpio_buttons);
+diff --git a/arch/arm/mach-orion5x/pci.c b/arch/arm/mach-orion5x/pci.c
+index 973db98..5033680 100644
+--- a/arch/arm/mach-orion5x/pci.c
++++ b/arch/arm/mach-orion5x/pci.c
+@@ -157,8 +157,11 @@ static int __init pcie_setup(struct pci_sys_data *sys)
+ 	if (dev == MV88F5181_DEV_ID || dev == MV88F5182_DEV_ID) {
+ 		printk(KERN_NOTICE "Applying Orion-1/Orion-NAS PCIe config "
+ 				   "read transaction workaround\n");
+-		orion5x_setup_pcie_wa_win(ORION5X_PCIE_WA_PHYS_BASE,
+-					  ORION5X_PCIE_WA_SIZE);
++		mvebu_mbus_add_window_remap_flags("pcie0.0",
++						  ORION5X_PCIE_WA_PHYS_BASE,
++						  ORION5X_PCIE_WA_SIZE,
++						  MVEBU_MBUS_NO_REMAP,
++						  MVEBU_MBUS_PCI_WA);
+ 		pcie_ops.read = pcie_rd_conf_wa;
+ 	}
+ 
+diff --git a/arch/arm/mach-orion5x/rd88f5181l-fxo-setup.c b/arch/arm/mach-orion5x/rd88f5181l-fxo-setup.c
+index d6e72f6..1c4498b 100644
+--- a/arch/arm/mach-orion5x/rd88f5181l-fxo-setup.c
++++ b/arch/arm/mach-orion5x/rd88f5181l-fxo-setup.c
+@@ -123,8 +123,8 @@ static void __init rd88f5181l_fxo_init(void)
+ 	orion5x_eth_switch_init(&rd88f5181l_fxo_switch_plat_data, NO_IRQ);
+ 	orion5x_uart0_init();
+ 
+-	orion5x_setup_dev_boot_win(RD88F5181L_FXO_NOR_BOOT_BASE,
+-				   RD88F5181L_FXO_NOR_BOOT_SIZE);
++	mvebu_mbus_add_window("devbus-boot", RD88F5181L_FXO_NOR_BOOT_BASE,
++			      RD88F5181L_FXO_NOR_BOOT_SIZE);
+ 	platform_device_register(&rd88f5181l_fxo_nor_boot_flash);
+ }
+ 
+diff --git a/arch/arm/mach-orion5x/rd88f5181l-ge-setup.c b/arch/arm/mach-orion5x/rd88f5181l-ge-setup.c
+index c8b7913..adabe34 100644
+--- a/arch/arm/mach-orion5x/rd88f5181l-ge-setup.c
++++ b/arch/arm/mach-orion5x/rd88f5181l-ge-setup.c
+@@ -130,8 +130,8 @@ static void __init rd88f5181l_ge_init(void)
+ 	orion5x_i2c_init();
+ 	orion5x_uart0_init();
+ 
+-	orion5x_setup_dev_boot_win(RD88F5181L_GE_NOR_BOOT_BASE,
+-				   RD88F5181L_GE_NOR_BOOT_SIZE);
++	mvebu_mbus_add_window("devbus-boot", RD88F5181L_GE_NOR_BOOT_BASE,
++			      RD88F5181L_GE_NOR_BOOT_SIZE);
+ 	platform_device_register(&rd88f5181l_ge_nor_boot_flash);
+ 
+ 	i2c_register_board_info(0, &rd88f5181l_ge_i2c_rtc, 1);
+diff --git a/arch/arm/mach-orion5x/rd88f5182-setup.c b/arch/arm/mach-orion5x/rd88f5182-setup.c
+index f9e1567..66e77ec 100644
+--- a/arch/arm/mach-orion5x/rd88f5182-setup.c
++++ b/arch/arm/mach-orion5x/rd88f5182-setup.c
+@@ -264,10 +264,11 @@ static void __init rd88f5182_init(void)
+ 	orion5x_uart0_init();
+ 	orion5x_xor_init();
+ 
+-	orion5x_setup_dev_boot_win(RD88F5182_NOR_BOOT_BASE,
+-				   RD88F5182_NOR_BOOT_SIZE);
++	mvebu_mbus_add_window("devbus-boot", RD88F5182_NOR_BOOT_BASE,
++			      RD88F5182_NOR_BOOT_SIZE);
+ 
+-	orion5x_setup_dev1_win(RD88F5182_NOR_BASE, RD88F5182_NOR_SIZE);
++	mvebu_mbus_add_window("devbus-cs1", RD88F5182_NOR_BASE,
++			      RD88F5182_NOR_SIZE);
+ 	platform_device_register(&rd88f5182_nor_flash);
+ 	platform_device_register(&rd88f5182_gpio_leds);
+ 
+diff --git a/arch/arm/mach-orion5x/terastation_pro2-setup.c b/arch/arm/mach-orion5x/terastation_pro2-setup.c
+index acc0877..a0bfa53 100644
+--- a/arch/arm/mach-orion5x/terastation_pro2-setup.c
++++ b/arch/arm/mach-orion5x/terastation_pro2-setup.c
+@@ -329,8 +329,8 @@ static void __init tsp2_init(void)
+ 	/*
+ 	 * Configure peripherals.
+ 	 */
+-	orion5x_setup_dev_boot_win(TSP2_NOR_BOOT_BASE,
+-				   TSP2_NOR_BOOT_SIZE);
++	mvebu_mbus_add_window("devbus-boot", TSP2_NOR_BOOT_BASE,
++			      TSP2_NOR_BOOT_SIZE);
+ 	platform_device_register(&tsp2_nor_flash);
+ 
+ 	orion5x_ehci0_init();
+diff --git a/arch/arm/mach-orion5x/ts209-setup.c b/arch/arm/mach-orion5x/ts209-setup.c
+index 9c17f0c..80174f0 100644
+--- a/arch/arm/mach-orion5x/ts209-setup.c
++++ b/arch/arm/mach-orion5x/ts209-setup.c
+@@ -286,8 +286,8 @@ static void __init qnap_ts209_init(void)
+ 	/*
+ 	 * Configure peripherals.
+ 	 */
+-	orion5x_setup_dev_boot_win(QNAP_TS209_NOR_BOOT_BASE,
+-				   QNAP_TS209_NOR_BOOT_SIZE);
++	mvebu_mbus_add_window("devbus-boot", QNAP_TS209_NOR_BOOT_BASE,
++			      QNAP_TS209_NOR_BOOT_SIZE);
+ 	platform_device_register(&qnap_ts209_nor_flash);
+ 
+ 	orion5x_ehci0_init();
+diff --git a/arch/arm/mach-orion5x/ts409-setup.c b/arch/arm/mach-orion5x/ts409-setup.c
+index 8cc5ab6..9259279 100644
+--- a/arch/arm/mach-orion5x/ts409-setup.c
++++ b/arch/arm/mach-orion5x/ts409-setup.c
+@@ -277,8 +277,8 @@ static void __init qnap_ts409_init(void)
+ 	/*
+ 	 * Configure peripherals.
+ 	 */
+-	orion5x_setup_dev_boot_win(QNAP_TS409_NOR_BOOT_BASE,
+-				   QNAP_TS409_NOR_BOOT_SIZE);
++	mvebu_mbus_add_window("devbus-boot", QNAP_TS409_NOR_BOOT_BASE,
++			      QNAP_TS409_NOR_BOOT_SIZE);
+ 	platform_device_register(&qnap_ts409_nor_flash);
+ 
+ 	orion5x_ehci0_init();
+diff --git a/arch/arm/mach-orion5x/wnr854t-setup.c b/arch/arm/mach-orion5x/wnr854t-setup.c
+index 66552ca..6b84863 100644
+--- a/arch/arm/mach-orion5x/wnr854t-setup.c
++++ b/arch/arm/mach-orion5x/wnr854t-setup.c
+@@ -127,8 +127,8 @@ static void __init wnr854t_init(void)
+ 	orion5x_eth_switch_init(&wnr854t_switch_plat_data, NO_IRQ);
+ 	orion5x_uart0_init();
+ 
+-	orion5x_setup_dev_boot_win(WNR854T_NOR_BOOT_BASE,
+-				   WNR854T_NOR_BOOT_SIZE);
++	mvebu_mbus_add_window("devbus-boot", WNR854T_NOR_BOOT_BASE,
++			      WNR854T_NOR_BOOT_SIZE);
+ 	platform_device_register(&wnr854t_nor_flash);
+ }
+ 
+diff --git a/arch/arm/mach-orion5x/wrt350n-v2-setup.c b/arch/arm/mach-orion5x/wrt350n-v2-setup.c
+index 2c5408e..fae684b 100644
+--- a/arch/arm/mach-orion5x/wrt350n-v2-setup.c
++++ b/arch/arm/mach-orion5x/wrt350n-v2-setup.c
+@@ -213,8 +213,8 @@ static void __init wrt350n_v2_init(void)
+ 	orion5x_eth_switch_init(&wrt350n_v2_switch_plat_data, NO_IRQ);
+ 	orion5x_uart0_init();
+ 
+-	orion5x_setup_dev_boot_win(WRT350N_V2_NOR_BOOT_BASE,
+-				   WRT350N_V2_NOR_BOOT_SIZE);
++	mvebu_mbus_add_window("devbus-boot", WRT350N_V2_NOR_BOOT_BASE,
++			      WRT350N_V2_NOR_BOOT_SIZE);
+ 	platform_device_register(&wrt350n_v2_nor_flash);
+ 	platform_device_register(&wrt350n_v2_leds);
+ 	platform_device_register(&wrt350n_v2_button_device);
 diff --git a/arch/arm/plat-orion/Makefile b/arch/arm/plat-orion/Makefile
-index 6cfc89f..58db16d 100644
+index 9fd843e..09711cd 100644
 --- a/arch/arm/plat-orion/Makefile
 +++ b/arch/arm/plat-orion/Makefile
 @@ -3,7 +3,6 @@
  #
  ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include
  
--obj-$(CONFIG_ARCH_KIRKWOOD)       += addr-map.o
- obj-$(CONFIG_ARCH_DOVE)           += addr-map.o
- obj-$(CONFIG_ARCH_ORION5X)        += addr-map.o
+-obj-$(CONFIG_ARCH_ORION5X)        += addr-map.o
  obj-$(CONFIG_ARCH_MV78XX0)        += addr-map.o
+ 
+ orion-gpio-$(CONFIG_GENERIC_GPIO) += gpio.o
 -- 
 1.7.9.5
