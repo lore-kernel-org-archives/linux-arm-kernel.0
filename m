@@ -1,43 +1,40 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 21 Mar 2013 12:40:10 +0100
-Subject: [PATCH v2 0/7] pcmcia: at91_cf: clean up and add DT support
-Message-ID: <cover.1363865228.git.nicolas.ferre@atmel.com>
+Date: Thu, 21 Mar 2013 12:40:11 +0100
+Subject: [PATCH v2 1/7] pcmcia: at91_cf: fix gpio_get_value in
+ at91_cf_get_status
+In-Reply-To: <cover.1363865228.git.nicolas.ferre@atmel.com>
+References: <cover.1363865228.git.nicolas.ferre@atmel.com>
+Message-ID: <4e31a0f657ec3c0154a6a1ee75800459dde45e2d.1363865228.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These patches clean up at91_cf a bit and add DT bindings.
-It is based on a previous series from Joachim Eastwood and other cleanup
-patches by Fabio and Laurent.
-I have collected them together as they are lying around for some time.
+From: Joachim Eastwood <manabian@gmail.com>
 
-Please tell me if It can go through PCMCIA tree or if Andrew or Greg can
-take them.
-Note that they are not bug fixes, so you can stack them for 3.10.
+Commit 80af9e6d (pcmcia at91_cf: fix raw gpio number usage) forgot
+to change the parameter in gpio_get_value after adding gpio
+validation.
 
-Thanks for your help, best regards.
+Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ drivers/pcmcia/at91_cf.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-v2: add 2 more cleanup patches:
-	- move to module_platform_driver_probe()
-	- little trivial indentation fix
-
-Fabio Porcedda (1):
-  pcmcia: at91_cf: use module_platform_driver_probe()
-
-Joachim Eastwood (5):
-  pcmcia: at91_cf: fix gpio_get_value in at91_cf_get_status
-  pcmcia: at91_cf: convert to dev_ print functions
-  pcmcia: at91_cf: use devm_ functions for allocations
-  pcmcia: at91_cf: clean up header includes
-  pcmcia: at91_cf: add support for DT
-
-Laurent Navet (1):
-  pcmcia/trivial: at91_cf: fix checkpatch error
-
- .../devicetree/bindings/ata/atmel-at91_cf.txt      |  19 +++
- drivers/pcmcia/Kconfig                             |   2 +-
- drivers/pcmcia/at91_cf.c                           | 176 ++++++++++-----------
- 3 files changed, 108 insertions(+), 89 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/ata/atmel-at91_cf.txt
-
+diff --git a/drivers/pcmcia/at91_cf.c b/drivers/pcmcia/at91_cf.c
+index 01463c7..1b2c631 100644
+--- a/drivers/pcmcia/at91_cf.c
++++ b/drivers/pcmcia/at91_cf.c
+@@ -100,9 +100,9 @@ static int at91_cf_get_status(struct pcmcia_socket *s, u_int *sp)
+ 		int vcc	= gpio_is_valid(cf->board->vcc_pin);
+ 
+ 		*sp = SS_DETECT | SS_3VCARD;
+-		if (!rdy || gpio_get_value(rdy))
++		if (!rdy || gpio_get_value(cf->board->irq_pin))
+ 			*sp |= SS_READY;
+-		if (!vcc || gpio_get_value(vcc))
++		if (!vcc || gpio_get_value(cf->board->vcc_pin))
+ 			*sp |= SS_POWERON;
+ 	} else
+ 		*sp = 0;
 -- 
 1.8.0
