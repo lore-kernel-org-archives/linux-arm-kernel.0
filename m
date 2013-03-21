@@ -1,151 +1,205 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 21 Mar 2013 22:51:13 +0100
-Subject: [PATCH 8/9] ARM: ux500: move to multiplatform
+Date: Thu, 21 Mar 2013 22:51:12 +0100
+Subject: [PATCH 7/9] ARM: ux500: make remaining headers local
 In-Reply-To: <1363902674-6456-1-git-send-email-arnd@arndb.de>
 References: <1363866553-15054-1-git-send-email-linus.walleij@stericsson.com>
  <1363902674-6456-1-git-send-email-arnd@arndb.de>
-Message-ID: <1363902674-6456-9-git-send-email-arnd@arndb.de>
+Message-ID: <1363902674-6456-8-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nothing is holding us up any more, and we can make ux500 coexist
-with the rest of the platforms. The timex.h and uncompress.h
-headers are no longer needed now.
+mach/setup.h and mach/devices.h are only needed from inside of mach-ux500
+now, so we can simply move them out of the include/mach directory.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/Kconfig                              | 16 --------
- arch/arm/mach-ux500/Kconfig                   | 14 +++++++
- arch/arm/mach-ux500/include/mach/timex.h      |  6 ---
- arch/arm/mach-ux500/include/mach/uncompress.h | 58 ---------------------------
- 4 files changed, 14 insertions(+), 80 deletions(-)
- delete mode 100644 arch/arm/mach-ux500/include/mach/timex.h
- delete mode 100644 arch/arm/mach-ux500/include/mach/uncompress.h
+ arch/arm/mach-ux500/board-mop500-audio.c         | 2 +-
+ arch/arm/mach-ux500/board-mop500-sdi.c           | 2 +-
+ arch/arm/mach-ux500/board-mop500.c               | 4 ++--
+ arch/arm/mach-ux500/cpu-db8500.c                 | 4 ++--
+ arch/arm/mach-ux500/cpu.c                        | 4 ++--
+ arch/arm/mach-ux500/devices-db8500.c             | 2 +-
+ arch/arm/mach-ux500/devices.c                    | 2 +-
+ arch/arm/mach-ux500/{include/mach => }/devices.h | 0
+ arch/arm/mach-ux500/hotplug.c                    | 2 +-
+ arch/arm/mach-ux500/id.c                         | 2 +-
+ arch/arm/mach-ux500/platsmp.c                    | 2 +-
+ arch/arm/mach-ux500/{include/mach => }/setup.h   | 0
+ arch/arm/mach-ux500/timer.c                      | 2 +-
+ drivers/clocksource/clksrc-dbx500-prcmu.c        | 2 --
+ 14 files changed, 14 insertions(+), 16 deletions(-)
+ rename arch/arm/mach-ux500/{include/mach => }/devices.h (100%)
+ rename arch/arm/mach-ux500/{include/mach => }/setup.h (100%)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index a4cfede..2de2084 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -888,22 +888,6 @@ config ARCH_U300
- 	help
- 	  Support for ST-Ericsson U300 series mobile platforms.
+diff --git a/arch/arm/mach-ux500/board-mop500-audio.c b/arch/arm/mach-ux500/board-mop500-audio.c
+index def0637..aba9e56 100644
+--- a/arch/arm/mach-ux500/board-mop500-audio.c
++++ b/arch/arm/mach-ux500/board-mop500-audio.c
+@@ -10,7 +10,7 @@
+ #include <linux/platform_data/pinctrl-nomadik.h>
+ #include <linux/platform_data/dma-ste-dma40.h>
  
--config ARCH_U8500
--	bool "ST-Ericsson U8500 Series"
--	depends on MMU
--	select ARCH_HAS_CPUFREQ
--	select ARCH_REQUIRE_GPIOLIB
--	select ARM_AMBA
--	select CLKDEV_LOOKUP
--	select CPU_V7
--	select GENERIC_CLOCKEVENTS
--	select HAVE_SMP
--	select MIGHT_HAVE_CACHE_L2X0
--	select SPARSE_IRQ
--	help
--	  Support for ST-Ericsson's Ux500 architecture
--
--
- config ARCH_DAVINCI
- 	bool "TI DaVinci"
- 	select ARCH_HAS_HOLES_MEMORYMODEL
-diff --git a/arch/arm/mach-ux500/Kconfig b/arch/arm/mach-ux500/Kconfig
-index 3e5bbd0..eeea3bf 100644
---- a/arch/arm/mach-ux500/Kconfig
-+++ b/arch/arm/mach-ux500/Kconfig
-@@ -1,3 +1,17 @@
-+config ARCH_U8500
-+	bool "ST-Ericsson U8500 Series" if ARCH_MULTI_V7
-+	depends on MMU
-+	select ARCH_HAS_CPUFREQ
-+	select ARCH_REQUIRE_GPIOLIB
-+	select ARM_AMBA
-+	select CLKDEV_LOOKUP
-+	select CPU_V7
-+	select GENERIC_CLOCKEVENTS
-+	select HAVE_SMP
-+	select MIGHT_HAVE_CACHE_L2X0
-+	help
-+	  Support for ST-Ericsson's Ux500 architecture
-+
- if ARCH_U8500
+-#include <mach/devices.h>
++#include "devices.h"
+ #include "irqs.h"
+ #include <linux/platform_data/asoc-ux500-msp.h>
  
- config UX500_SOC_COMMON
-diff --git a/arch/arm/mach-ux500/include/mach/timex.h b/arch/arm/mach-ux500/include/mach/timex.h
-deleted file mode 100644
-index d0942c1..0000000
---- a/arch/arm/mach-ux500/include/mach/timex.h
-+++ /dev/null
-@@ -1,6 +0,0 @@
--#ifndef __ASM_ARCH_TIMEX_H
--#define __ASM_ARCH_TIMEX_H
+diff --git a/arch/arm/mach-ux500/board-mop500-sdi.c b/arch/arm/mach-ux500/board-mop500-sdi.c
+index e71a203..0ef3877 100644
+--- a/arch/arm/mach-ux500/board-mop500-sdi.c
++++ b/arch/arm/mach-ux500/board-mop500-sdi.c
+@@ -14,7 +14,7 @@
+ #include <linux/platform_data/dma-ste-dma40.h>
+ 
+ #include <asm/mach-types.h>
+-#include <mach/devices.h>
++#include "devices.h"
+ 
+ #include "db8500-regs.h"
+ #include "devices-db8500.h"
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index 76d381d..18b1fbd 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -43,8 +43,8 @@
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ 
+-#include <mach/setup.h>
+-#include <mach/devices.h>
++#include "setup.h"
++#include "devices.h"
+ #include "irqs.h"
+ #include <linux/platform_data/crypto-ux500.h>
+ 
+diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
+index 563b77b..a98e3b3 100644
+--- a/arch/arm/mach-ux500/cpu-db8500.c
++++ b/arch/arm/mach-ux500/cpu-db8500.c
+@@ -28,8 +28,8 @@
+ #include <asm/mach/map.h>
+ #include <asm/mach/arch.h>
+ 
+-#include <mach/setup.h>
+-#include <mach/devices.h>
++#include "setup.h"
++#include "devices.h"
+ #include "irqs.h"
+ 
+ #include "devices-db8500.h"
+diff --git a/arch/arm/mach-ux500/cpu.c b/arch/arm/mach-ux500/cpu.c
+index 1754041..5976e14 100644
+--- a/arch/arm/mach-ux500/cpu.c
++++ b/arch/arm/mach-ux500/cpu.c
+@@ -23,8 +23,8 @@
+ 
+ #include <asm/mach/map.h>
+ 
+-#include <mach/setup.h>
+-#include <mach/devices.h>
++#include "setup.h"
++#include "devices.h"
+ 
+ #include "board-mop500.h"
+ #include "db8500-regs.h"
+diff --git a/arch/arm/mach-ux500/devices-db8500.c b/arch/arm/mach-ux500/devices-db8500.c
+index 3a3a582..cdcd010 100644
+--- a/arch/arm/mach-ux500/devices-db8500.c
++++ b/arch/arm/mach-ux500/devices-db8500.c
+@@ -15,7 +15,7 @@
+ #include <linux/platform_data/dma-ste-dma40.h>
+ #include <linux/mfd/dbx500-prcmu.h>
+ 
+-#include <mach/setup.h>
++#include "setup.h"
+ #include "irqs.h"
+ 
+ #include "db8500-regs.h"
+diff --git a/arch/arm/mach-ux500/devices.c b/arch/arm/mach-ux500/devices.c
+index f63a512..0f9e52b 100644
+--- a/arch/arm/mach-ux500/devices.c
++++ b/arch/arm/mach-ux500/devices.c
+@@ -11,7 +11,7 @@
+ #include <linux/io.h>
+ #include <linux/amba/bus.h>
+ 
+-#include <mach/setup.h>
++#include "setup.h"
+ 
+ #include "db8500-regs.h"
+ 
+diff --git a/arch/arm/mach-ux500/include/mach/devices.h b/arch/arm/mach-ux500/devices.h
+similarity index 100%
+rename from arch/arm/mach-ux500/include/mach/devices.h
+rename to arch/arm/mach-ux500/devices.h
+diff --git a/arch/arm/mach-ux500/hotplug.c b/arch/arm/mach-ux500/hotplug.c
+index 2f6af25..87abcf2 100644
+--- a/arch/arm/mach-ux500/hotplug.c
++++ b/arch/arm/mach-ux500/hotplug.c
+@@ -15,7 +15,7 @@
+ #include <asm/cacheflush.h>
+ #include <asm/smp_plat.h>
+ 
+-#include <mach/setup.h>
++#include "setup.h"
+ 
+ /*
+  * platform-specific code to shutdown a CPU
+diff --git a/arch/arm/mach-ux500/id.c b/arch/arm/mach-ux500/id.c
+index a847cf2..0d33d1a 100644
+--- a/arch/arm/mach-ux500/id.c
++++ b/arch/arm/mach-ux500/id.c
+@@ -14,7 +14,7 @@
+ #include <asm/cacheflush.h>
+ #include <asm/mach/map.h>
+ 
+-#include <mach/setup.h>
++#include "setup.h"
+ 
+ #include "db8500-regs.h"
+ #include "id.h"
+diff --git a/arch/arm/mach-ux500/platsmp.c b/arch/arm/mach-ux500/platsmp.c
+index 8a9c070..12ad8ad 100644
+--- a/arch/arm/mach-ux500/platsmp.c
++++ b/arch/arm/mach-ux500/platsmp.c
+@@ -22,7 +22,7 @@
+ #include <asm/smp_plat.h>
+ #include <asm/smp_scu.h>
+ 
+-#include <mach/setup.h>
++#include "setup.h"
+ 
+ #include "db8500-regs.h"
+ #include "id.h"
+diff --git a/arch/arm/mach-ux500/include/mach/setup.h b/arch/arm/mach-ux500/setup.h
+similarity index 100%
+rename from arch/arm/mach-ux500/include/mach/setup.h
+rename to arch/arm/mach-ux500/setup.h
+diff --git a/arch/arm/mach-ux500/timer.c b/arch/arm/mach-ux500/timer.c
+index 5952161..b6bd0ef 100644
+--- a/arch/arm/mach-ux500/timer.c
++++ b/arch/arm/mach-ux500/timer.c
+@@ -14,7 +14,7 @@
+ 
+ #include <asm/smp_twd.h>
+ 
+-#include <mach/setup.h>
++#include "setup.h"
+ #include "irqs.h"
+ 
+ #include "db8500-regs.h"
+diff --git a/drivers/clocksource/clksrc-dbx500-prcmu.c b/drivers/clocksource/clksrc-dbx500-prcmu.c
+index 4f34093..54f3d11 100644
+--- a/drivers/clocksource/clksrc-dbx500-prcmu.c
++++ b/drivers/clocksource/clksrc-dbx500-prcmu.c
+@@ -17,8 +17,6 @@
+ 
+ #include <asm/sched_clock.h>
+ 
+-#include <mach/setup.h>
 -
--#define CLOCK_TICK_RATE		110000000
--
--#endif
-diff --git a/arch/arm/mach-ux500/include/mach/uncompress.h b/arch/arm/mach-ux500/include/mach/uncompress.h
-deleted file mode 100644
-index 533a004..0000000
---- a/arch/arm/mach-ux500/include/mach/uncompress.h
-+++ /dev/null
-@@ -1,58 +0,0 @@
--/*
-- *  Copyright (C) 2009 ST-Ericsson
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-- */
--#ifndef __ASM_ARCH_UNCOMPRESS_H
--#define __ASM_ARCH_UNCOMPRESS_H
--
--#include <asm/setup.h>
--#include <asm/mach-types.h>
--#include <linux/io.h>
--#include <linux/amba/serial.h>
--/* TODO: This goes away in multiplatform boot, this file gets deleted */
--#include "../../db8500-regs.h"
--
--void __iomem *ux500_uart_base;
--
--static void putc(const char c)
--{
--	/* Do nothing if the UART is not enabled. */
--	if (!(__raw_readb(ux500_uart_base + UART011_CR) & 0x1))
--		return;
--
--	if (c == '\n')
--		putc('\r');
--
--	while (__raw_readb(ux500_uart_base + UART01x_FR) & (1 << 5))
--		barrier();
--	__raw_writeb(c, ux500_uart_base + UART01x_DR);
--}
--
--static void flush(void)
--{
--	if (!(__raw_readb(ux500_uart_base + UART011_CR) & 0x1))
--		return;
--	while (__raw_readb(ux500_uart_base + UART01x_FR) & (1 << 3))
--		barrier();
--}
--
--static inline void arch_decomp_setup(void)
--{
--	/* Use machine_is_foo() macro if you need to switch base someday */
--	ux500_uart_base = (void __iomem *)U8500_UART2_BASE;
--}
--
--#endif /* __ASM_ARCH_UNCOMPRESS_H */
+ #define RATE_32K		32768
+ 
+ #define TIMER_MODE_CONTINOUS	0x1
 -- 
 1.8.1.2
