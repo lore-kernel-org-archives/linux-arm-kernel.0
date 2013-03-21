@@ -1,135 +1,234 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 21 Mar 2013 13:02:18 +0000
-Subject: Integrator PCI base dilemma
-In-Reply-To: <CACRpkdaOjFhWR21w5x_rR_60ffQF3Ym_MQd2svNyzm0guwOUoQ@mail.gmail.com>
-References: <CACRpkdaOjFhWR21w5x_rR_60ffQF3Ym_MQd2svNyzm0guwOUoQ@mail.gmail.com>
-Message-ID: <201303211302.19058.arnd@arndb.de>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 21 Mar 2013 22:07:15 +0900
+Subject: [PATCH v3 2/7] clocksource: sh_cmt: Add OF support
+In-Reply-To: <1363535031-21402-2-git-send-email-hechtb+renesas@gmail.com>
+References: <1363535031-21402-1-git-send-email-hechtb+renesas@gmail.com>
+ <1363535031-21402-2-git-send-email-hechtb+renesas@gmail.com>
+Message-ID: <20130321130714.GE24470@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 20 March 2013, Linus Walleij wrote:
-> When trying to convert the Integrator/AP to use Device Tree
-> for the PCI bridge/hose I run into these two problems:
+On Sun, Mar 17, 2013 at 04:43:46PM +0100, Bastian Hecht wrote:
+> We add the capabilty to probe SH CMT timer devices using Device Tree
+> setup.
 > 
-> - Unable to assign vga_base early since this should be a virtual
->   address assigned really early. If I sacrifice this and try to
->   just remap the stuff, I still run into:
+> Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
+> ---
+> v3: same (only patch 0003 changed)
 > 
-> - Unable to ioremap the PCI memory and config window because
->   it is 16 MiB big. (I guess this is the problem?)
+>  drivers/clocksource/sh_cmt.c |  109 +++++++++++++++++++++++++++++++++++++-----
+
+
+This change appears to break booting of kzm9g-reference
+with MMC enabled. I assume because it somehow causes CMT to
+(once again) be initialised after SDHI and/or MMC.
+
+Tested using next with the defconfig + CONFIG_MACH_KZM9G_REFERENCE=y +
+initrd root fs.
+
+>  1 file changed, 96 insertions(+), 13 deletions(-)
 > 
-> Part of the code path is called from .map_io() and basically looks
-> like this:
+> diff --git a/drivers/clocksource/sh_cmt.c b/drivers/clocksource/sh_cmt.c
+> index 08d0c41..79bc526 100644
+> --- a/drivers/clocksource/sh_cmt.c
+> +++ b/drivers/clocksource/sh_cmt.c
+> @@ -34,10 +34,13 @@
+>  #include <linux/module.h>
+>  #include <linux/pm_domain.h>
+>  #include <linux/pm_runtime.h>
+> +#include <linux/of.h>
+>  
+>  struct sh_cmt_priv {
+>  	void __iomem *mapbase;
+>  	struct clk *clk;
+> +	long channel_offset;
+> +	int timer_bit;
+>  	unsigned long width; /* 16 or 32 bit version of hardware block */
+>  	unsigned long overflow_bit;
+>  	unsigned long clear_bits;
+> @@ -109,9 +112,7 @@ static void sh_cmt_write32(void __iomem *base, unsigned long offs,
+>  
+>  static inline unsigned long sh_cmt_read_cmstr(struct sh_cmt_priv *p)
+>  {
+> -	struct sh_timer_config *cfg = p->pdev->dev.platform_data;
+> -
+> -	return p->read_control(p->mapbase - cfg->channel_offset, 0);
+> +	return p->read_control(p->mapbase - p->channel_offset, 0);
+>  }
+>  
+>  static inline unsigned long sh_cmt_read_cmcsr(struct sh_cmt_priv *p)
+> @@ -127,9 +128,7 @@ static inline unsigned long sh_cmt_read_cmcnt(struct sh_cmt_priv *p)
+>  static inline void sh_cmt_write_cmstr(struct sh_cmt_priv *p,
+>  				      unsigned long value)
+>  {
+> -	struct sh_timer_config *cfg = p->pdev->dev.platform_data;
+> -
+> -	p->write_control(p->mapbase - cfg->channel_offset, 0, value);
+> +	p->write_control(p->mapbase - p->channel_offset, 0, value);
+>  }
+>  
+>  static inline void sh_cmt_write_cmcsr(struct sh_cmt_priv *p,
+> @@ -176,7 +175,6 @@ static DEFINE_RAW_SPINLOCK(sh_cmt_lock);
+>  
+>  static void sh_cmt_start_stop_ch(struct sh_cmt_priv *p, int start)
+>  {
+> -	struct sh_timer_config *cfg = p->pdev->dev.platform_data;
+>  	unsigned long flags, value;
+>  
+>  	/* start stop register shared by multiple timer channels */
+> @@ -184,9 +182,9 @@ static void sh_cmt_start_stop_ch(struct sh_cmt_priv *p, int start)
+>  	value = sh_cmt_read_cmstr(p);
+>  
+>  	if (start)
+> -		value |= 1 << cfg->timer_bit;
+> +		value |= 1 << p->timer_bit;
+>  	else
+> -		value &= ~(1 << cfg->timer_bit);
+> +		value &= ~(1 << p->timer_bit);
+>  
+>  	sh_cmt_write_cmstr(p, value);
+>  	raw_spin_unlock_irqrestore(&sh_cmt_lock, flags);
+> @@ -673,9 +671,85 @@ static int sh_cmt_register(struct sh_cmt_priv *p, char *name,
+>  	return 0;
+>  }
+>  
+> -static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev)
+> +static const struct of_device_id of_sh_cmt_match[] = {
+> +	{ .compatible = "renesas,cmt-timer" },
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, of_sh_cmt_match);
+> +
+> +static const int sh_cmt_offset_multiplier[] = { 0x60, 0x10, 0x40, 0x40, 0x40 };
+> +#define CMT_MAX_CHANNELS	6
+> +
+> +static struct sh_timer_config *sh_cmt_parse_dt(struct device *dev)
+> +{
+> +	struct sh_timer_config *cfg;
+> +	struct device_node *np = dev->of_node;
+> +	u32 timer_id, channel_id, rating;
+> +
+> +	if (!IS_ENABLED(CONFIG_OF) || !np)
+> +		return NULL;
+> +
+> +	cfg = devm_kzalloc(dev, sizeof(struct sh_timer_config), GFP_KERNEL);
+> +	if (!cfg) {
+> +		dev_err(dev, "failed to allocate DT config data\n");
+> +		return NULL;
+> +	}
+> +
+> +	if (of_property_read_u32(np, "renesas,device-id", &timer_id)) {
+> +		dev_err(dev, "device id missing\n");
+> +		return NULL;
+> +	}
+> +	if (timer_id >= ARRAY_SIZE(sh_cmt_offset_multiplier)) {
+> +		dev_err(dev, "invalid device id\n");
+> +		return NULL;
+> +	}
+> +
+> +	if (of_property_read_u32(np, "renesas,channel-id", &channel_id)) {
+> +		dev_err(dev, "channel id missing\n");
+> +		return NULL;
+> +	}
+> +	if (channel_id >= CMT_MAX_CHANNELS) {
+> +		dev_err(dev, "invalid channel id\n");
+> +		return NULL;
+> +	}
+> +
+> +	cfg->channel_offset = sh_cmt_offset_multiplier[timer_id] *
+> +							(channel_id + 1);
+> +	cfg->timer_bit = channel_id;
+> +
+> +	/*
+> +	 * We convert the {source,event}-quality DT properties to linux specific
+> +	 * clock{source,event}_ratings.
+> +	 */
+> +	if (!of_property_read_u32(np, "renesas,source-quality", &rating)) {
+> +		if (rating > 10) {
+> +			dev_err(dev, "invalid source-quality\n");
+> +			return NULL;
+> +		}
+> +		if (rating)
+> +			cfg->clocksource_rating = rating * 50 - 1;
+> +	}
+> +
+> +	if (!of_property_read_u32(np, "renesas,event-quality", &rating)) {
+> +		if (rating > 10) {
+> +			dev_err(dev, "invalid event-quality\n");
+> +			return NULL;
+> +		}
+> +		if (rating)
+> +			cfg->clockevent_rating = rating * 50 - 1;
+> +	}
+> +
+> +	if (!cfg->clocksource_rating && !cfg->clockevent_rating) {
+> +		dev_err(dev, "source- and event-quality 0, timer is unused\n");
+> +		return NULL;
+> +	}
+> +
+> +	return cfg;
+> +}
+> +
+> +static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev,
+> +						struct sh_timer_config *cfg)
+>  {
+> -	struct sh_timer_config *cfg = pdev->dev.platform_data;
+>  	struct resource *res;
+>  	int irq, ret;
+>  	ret = -ENXIO;
+> @@ -762,6 +836,9 @@ static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev)
+>  		goto err2;
+>  	}
+>  
+> +	p->channel_offset = cfg->channel_offset;
+> +	p->timer_bit = cfg->timer_bit;
+> +
+>  	platform_set_drvdata(pdev, p);
+>  
+>  	return 0;
+> @@ -777,7 +854,7 @@ err0:
+>  static int sh_cmt_probe(struct platform_device *pdev)
+>  {
+>  	struct sh_cmt_priv *p = platform_get_drvdata(pdev);
+> -	struct sh_timer_config *cfg = pdev->dev.platform_data;
+> +	struct sh_timer_config *cfg;
+>  	int ret;
+>  
+>  	if (!is_early_platform_device(pdev)) {
+> @@ -785,6 +862,11 @@ static int sh_cmt_probe(struct platform_device *pdev)
+>  		pm_runtime_enable(&pdev->dev);
+>  	}
+>  
+> +	if (pdev->dev.of_node)
+> +		cfg = sh_cmt_parse_dt(&pdev->dev);
+> +	else
+> +		cfg = pdev->dev.platform_data;
+> +
+>  	if (p) {
+>  		dev_info(&pdev->dev, "kept as earlytimer\n");
+>  		goto out;
+> @@ -796,7 +878,7 @@ static int sh_cmt_probe(struct platform_device *pdev)
+>  		return -ENOMEM;
+>  	}
+>  
+> -	ret = sh_cmt_setup(p, pdev);
+> +	ret = sh_cmt_setup(p, pdev, cfg);
+>  	if (ret) {
+>  		kfree(p);
+>  		pm_runtime_idle(&pdev->dev);
+> @@ -824,6 +906,7 @@ static struct platform_driver sh_cmt_device_driver = {
+>  	.remove		= sh_cmt_remove,
+>  	.driver		= {
+>  		.name	= "sh_cmt",
+> +		.of_match_table = of_match_ptr(of_sh_cmt_match),
+>  	}
+>  };
+>  
+> -- 
+> 1.7.9.5
 > 
-> int __init pci_v3_early_init(void)
-> {
-> 	iotable_init(pci_v3_io_desc, ARRAY_SIZE(pci_v3_io_desc));
-> 	vga_base = PCI_MEMORY_VADDR;
-> 	pci_map_io_early(__phys_to_pfn(PHYS_PCI_IO_BASE));
-> 	return 0;
-> }
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
-> The VGA console seems to be the sole user (unsure what
-> pci_map_io_early() is for), and we like to support VGA console.
-
-Yes, this is certainly required only for the VGA console
-
-> The problem is that at this point at iomap the device tree is not yet
-> populated.
-
-I think it's fine to leave the static mapping in place for this,
-you don't necessarily have to get it from DT here, since it seems
-like a reasonable use of map_io().
-
-> The iomem table looks like this:
-> 
-> /*
->  * Static mappings for the PCIv3 bridge
->  *
->  * e8000000	40000000	PCI memory		PHYS_PCI_MEM_BASE	(max 512M)
->  * ec000000	61000000	PCI config space	PHYS_PCI_CONFIG_BASE	(max 16M)
->  * fee00000	60000000	PCI IO			PHYS_PCI_IO_BASE	(max 16M)
->  */
-> static struct map_desc pci_v3_io_desc[] __initdata __maybe_unused = {
-> 	{
-> 		.virtual	= (unsigned long)PCI_MEMORY_VADDR,
-> 		.pfn		= __phys_to_pfn(PHYS_PCI_MEM_BASE),
-> 		.length		= SZ_16M,
-> 		.type		= MT_DEVICE
-> 	}, {
-> 		.virtual	= (unsigned long)PCI_CONFIG_VADDR,
-> 		.pfn		= __phys_to_pfn(PHYS_PCI_CONFIG_BASE),
-> 		.length		= SZ_16M,
-> 		.type		= MT_DEVICE
-> 	}
-> };
-> 
-> Does anyone have any hints on how to get out of this need to have the
-> base addresses so early?
-> 
-> Or am I doing something wrong when I try to push in this map
-> later? I tried to just ioremap() them later but that doesn't
-> seem to work at all. Too big?
-
-I think the key is the VGA_MAP_MEM() function that can be defined in a number
-of ways:
-
-arch/alpha/include/asm/vga.h:#define VGA_MAP_MEM(x,s)   ((unsigned long) ioremap(x, s))
-arch/arm/include/asm/vga.h:#define VGA_MAP_MEM(x,s)     (vga_base + (x))
-arch/ia64/include/asm/vga.h:#define VGA_MAP_MEM(x,s)    ((unsigned long) ioremap_nocache(vga_console_membase + (x
-arch/m32r/include/asm/vga.h:#define VGA_MAP_MEM(x,s) (unsigned long)phys_to_virt(x)
-arch/mips/include/asm/vga.h:#define VGA_MAP_MEM(x, s)   (0xb0000000L + (unsigned long)(x))
-arch/powerpc/include/asm/vga.h:#define VGA_MAP_MEM(x,s) ((unsigned long) ioremap((x), s))
-arch/powerpc/include/asm/vga.h:#define VGA_MAP_MEM(x,s) (x + vgacon_remap_base)
-arch/sparc/include/asm/vga.h:#define VGA_MAP_MEM(x,s) (x)
-arch/tile/include/asm/vga.h:#define VGA_MAP_MEM(x,s)    ((unsigned long) ioremap(x, s))
-arch/x86/include/asm/vga.h:#define VGA_MAP_MEM(x, s) (unsigned long)phys_to_virt(x)
-arch/xtensa/include/asm/vga.h:#define VGA_MAP_MEM(x,s) (unsigned long)phys_to_virt(x)
-
-On xtensa and x86, the low PCI memory addresses are actually mapped into the
-physical address space, so they already have a mapping. It seems the same is
-true on sparc, which apparently also relies on a 1:1 mapping of virtual to physical
-addresses in the kernel. m32r is probably a copy-paste bug since it has no PCI.
-
-Alpha, IA64, PPC64, and Tile use ioremap there, which seems reasonable especially
-given that the at least the vga16fb assumes it can iounmap the pointer returned
-by VGA_MAP_MEM when unloading. Again, I'd assume that tile is incorrectly copied from
-one of the others, but it might actually work. All but ia64 here rely on the VGA
-registers and memory and ROM being mapped into physical addresses 0xA0000-0xC7fff
-as they are on PCs.
-
-ARM, MIPS and PPC32 map the registers at boot time into a fixed or known virtual
-address, but all implementations are really suspicious:
-* On ppc32, nothing is ever assigned to vgacon_remap_base, I assume the last user
-  is long gone, this may have been the PREP platform that got marked as BROKEN
-  in 2005. A NULL vgacon_remap_base cannot work, since that would imply that the
-  VGA memory is mapped into a low virtual address, i.e. user space.
-* On MIPS, this seems to work only on the legacy RM200/300/400 platform, although
-  I don't actually see where it's being mapped, and none of the platform defconfigs
-  enable VGA_CONSOLE.
-* On ARM, we have these definitions:
-
-arch/arm/mach-dove/pcie.c:      vga_base = DOVE_PCIE0_MEM_PHYS_BASE;
-arch/arm/mach-footbridge/dc21285.c:     vga_base = PCIMEM_BASE;
-arch/arm/mach-integrator/integrator_ap.c:       vga_base = PCI_MEMORY_VADDR;
-arch/arm/mach-kirkwood/pcie.c:  vga_base = KIRKWOOD_PCIE_MEM_PHYS_BASE;
-arch/arm/mach-mv78xx0/pcie.c:   vga_base = MV78XX0_PCIE_MEM_PHYS_BASE;
-arch/arm/mach-orion5x/pci.c:    vga_base = ORION5X_PCIE_MEM_PHYS_BASE;
-arch/arm/mach-shark/pci.c:      vga_base = 0xe8000000;
-
-Dove/integrator/kirkwood/mv78xx0/orion5x all put a *physical* address in here,
-which cannot work, since that is not mapped anywhere.
-
-Footbridge and integrator get it right, presumably because Russell was actually
-using that code ;-)
-Shark does not map anything to the vga_base, so that does not work. It used
-to map a lot of registers, but has not mapped the first megabyte of the PCI
-memory space since the start of git history.
-
-Now what does this all tell us? First of all I think you are free to change
-it in any way that does not break footbridge, since everything else is already
-broken. I think the most logical way forward would be to use the same method
-as ia64 and use ioremap() with a platform-specific offset, but keeping the
-static mapping would probably be easier to do.
-
-	Arnd
