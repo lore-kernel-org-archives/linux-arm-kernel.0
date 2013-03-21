@@ -1,50 +1,109 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 21 Mar 2013 15:59:37 +0000
-Subject: [PATCH 40/46] regulator: ab8500: Set enable enable_time in
- regulator_desc
-In-Reply-To: <1363881583-15234-1-git-send-email-lee.jones@linaro.org>
-References: <1363881583-15234-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1363881583-15234-41-git-send-email-lee.jones@linaro.org>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Thu, 21 Mar 2013 17:05:36 +0100 (CET)
+Subject: [PATCH 1/3] ARM: shmobile: irqpin: fix handling of spurious interrupts
+ in DT case
+In-Reply-To: <Pine.LNX.4.64.1303211659580.32438@axis700.grange>
+References: <Pine.LNX.4.64.1303211659580.32438@axis700.grange>
+Message-ID: <Pine.LNX.4.64.1303211703490.32438@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow the regulator framework to directly access the time it takes
-any given regulator to settle. This saves time and code because
-without it we would have to implement a dedication function to read
-the value from elsewhere.
+To disable spurious interrupts, that get triggered on certain hardware, the
+irqpin driver masks them on the parent interrupt controller. To specify
+such broken devices a .control_parent parameter can be provided in the
+platform data. In the DT case we need a property, to do the same. However,
+this is not enough to correctly handle spurious interrupts in the DT case.
+In the non-DT case all interrupts get mapped statically during probing,
+therefore, if a spurious interrupt arrives, it can easily be mapped back
+to hardware registers and bits and handled. In the DT case interrupts are
+mapped only when a device, using that interrupt is instantiated from DT.
+So, spurious interrupts occur unmapped and thus cannot be handled properly.
+This patch fixes this by mapping such interrupts as they occur.
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 ---
- drivers/regulator/ab8500.c |    3 +++
- 1 file changed, 3 insertions(+)
+ .../interrupt-controller/renesas,intc-irqpin.txt   |   13 +++++++++++++
+ drivers/irqchip/irq-renesas-intc-irqpin.c          |   13 +++++++++++++
+ 2 files changed, 26 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt
 
-diff --git a/drivers/regulator/ab8500.c b/drivers/regulator/ab8500.c
-index e6b77a7..324444e 100644
---- a/drivers/regulator/ab8500.c
-+++ b/drivers/regulator/ab8500.c
-@@ -1098,6 +1098,7 @@ static struct ab8500_regulator_info
- 			.owner		= THIS_MODULE,
- 			.n_voltages	= 1,
- 			.volt_table	= fixed_2000000_voltage,
-+			.enable_time	= 10000,
- 		},
- 		.delay			= 10000,
- 		.load_lp_uA		= 1000,
-@@ -1363,6 +1364,7 @@ static struct ab8500_regulator_info
- 			.owner		= THIS_MODULE,
- 			.n_voltages	= 1,
- 			.volt_table	= fixed_2000000_voltage,
-+			.enable_time	= 10000,
- 		},
- 		.delay			= 10000,
- 		.load_lp_uA		= 1000,
-@@ -1660,6 +1662,7 @@ static struct ab8500_regulator_info
- 			.id		= AB8540_LDO_TVOUT,
- 			.owner		= THIS_MODULE,
- 			.n_voltages	= 1,
-+			.enable_time	= 10000,
- 		},
- 		.delay			= 10000,
- 		.load_lp_uA		= 1000,
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt b/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt
+new file mode 100644
+index 0000000..e55d183
+--- /dev/null
++++ b/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt
+@@ -0,0 +1,13 @@
++DT bindings for the R-/SH-Mobile irqpin controller
++
++Required properties:
++
++- compatible: has to be "renesas,intc-irqpin"
++- #interrupt-cells: has to be <2>
++
++Optional properties:
++
++- any properties, listed in interrupts.txt in this directory, and any standard
++  resource allocation properties
++- control-parent: disable and enable interrupts on the parent interrupt
++  controller, needed for some broken implementations
+diff --git a/drivers/irqchip/irq-renesas-intc-irqpin.c b/drivers/irqchip/irq-renesas-intc-irqpin.c
+index fd5dabc..82bbe8f 100644
+--- a/drivers/irqchip/irq-renesas-intc-irqpin.c
++++ b/drivers/irqchip/irq-renesas-intc-irqpin.c
+@@ -18,6 +18,7 @@
+  */
+ 
+ #include <linux/init.h>
++#include <linux/of.h>
+ #include <linux/platform_device.h>
+ #include <linux/spinlock.h>
+ #include <linux/interrupt.h>
+@@ -70,6 +71,7 @@ struct intc_irqpin_priv {
+ 	struct intc_irqpin_iomem iomem[INTC_IRQPIN_REG_NR];
+ 	struct intc_irqpin_irq irq[INTC_IRQPIN_MAX];
+ 	struct renesas_intc_irqpin_config config;
++	unsigned int min_irq;
+ 	unsigned int number_of_irqs;
+ 	struct platform_device *pdev;
+ 	struct irq_chip irq_chip;
+@@ -249,6 +251,10 @@ static irqreturn_t intc_irqpin_irq_handler(int irq, void *dev_id)
+ 	struct intc_irqpin_priv *p = i->p;
+ 	unsigned long bit;
+ 
++	if (!i->domain_irq)
++		/* unmapped: spurious IRQ, map it now */
++		irq_create_mapping(p->irq_domain, irq - p->min_irq);
++
+ 	intc_irqpin_dbg(i, "demux1");
+ 	bit = intc_irqpin_hwirq_mask(p, INTC_IRQPIN_REG_SOURCE, i->hw_irq);
+ 
+@@ -321,6 +327,7 @@ static int intc_irqpin_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
++	p->min_irq = INT_MAX;
+ 	/* allow any number of IRQs between 1 and INTC_IRQPIN_MAX */
+ 	for (k = 0; k < INTC_IRQPIN_MAX; k++) {
+ 		irq = platform_get_resource(pdev, IORESOURCE_IRQ, k);
+@@ -329,6 +336,8 @@ static int intc_irqpin_probe(struct platform_device *pdev)
+ 
+ 		p->irq[k].p = p;
+ 		p->irq[k].requested_irq = irq->start;
++		if (p->min_irq > irq->start)
++			p->min_irq = irq->start;
+ 	}
+ 
+ 	p->number_of_irqs = k;
+@@ -372,6 +381,10 @@ static int intc_irqpin_probe(struct platform_device *pdev)
+ 	for (k = 0; k < p->number_of_irqs; k++)
+ 		intc_irqpin_mask_unmask_prio(p, k, 1);
+ 
++	if (!pdata)
++		p->config.control_parent = of_property_read_bool(pdev->dev.of_node,
++								 "control-parent");
++
+ 	/* use more severe masking method if requested */
+ 	if (p->config.control_parent) {
+ 		enable_fn = intc_irqpin_irq_enable_force;
 -- 
-1.7.10.4
+1.7.2.5
