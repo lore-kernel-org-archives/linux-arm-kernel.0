@@ -1,44 +1,48 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 21 Mar 2013 21:22:36 +0100
-Subject: [PATCH 5/5] arm: dts: Convert mvebu device tree files to 64 bits
-In-Reply-To: <20130321201533.GN21478@lunn.ch>
-References: <1363883179-1361-1-git-send-email-gregory.clement@free-electrons.com>
- <1363883179-1361-6-git-send-email-gregory.clement@free-electrons.com>
- <20130321201533.GN21478@lunn.ch>
-Message-ID: <20130321212236.1015295d@skate>
+From: loic.pallardy@st.com (Loic PALLARDY)
+Date: Thu, 21 Mar 2013 21:26:21 +0100
+Subject: [PATCH 4/6] mfd: db8500-prcmu: get base address from resource
+In-Reply-To: <201303211907.49075.arnd@arndb.de>
+References: <1363866553-15054-1-git-send-email-linus.walleij@stericsson.com>
+ <1669538.W5XG4BgH9e@wuerfel>
+ <CACRpkdZhyWdwhYaD69n=US31eTA=FDm6xzbZJndBuXAO0qGUbA@mail.gmail.com>
+ <201303211907.49075.arnd@arndb.de>
+Message-ID: <514B6CED.2030302@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew Lunn,
 
-On Thu, 21 Mar 2013 21:15:33 +0100, Andrew Lunn wrote:
 
-> Could you recommend a document which introduces LPAE.
-> 
-> Only being able to address 7GB seems a bit odd to me. I kind of
-> expected you set up the translation tables to map a page in the 32 bit
-> address range to any arbitrary page in the 40 bit address range. So
-> leaving 0xC0000000 to 0xffffffff in the 32bit address range clear is
-> easy. But why do you loose space in the 40bit address range?
+On 03/21/2013 08:07 PM, Arnd Bergmann wrote:
+> On Thursday 21 March 2013, Linus Walleij wrote:
+>> On Thu, Mar 21, 2013 at 1:15 PM, Arnd Bergmann<arnd@arndb.de>  wrote:
+>>
+>>> On Thursday 21 March 2013 12:49:11 Linus Walleij wrote:
+>>>> -#define PRCM_PLLARM_LOCKP       (_PRCMU_BASE + 0x0a8)
+>>>> +#define PRCM_PLLARM_LOCKP       (prcmu_base + 0x0a8)
+>>>>   #define PRCM_PLLARM_LOCKP_PRCM_PLLARM_LOCKP3   0x2
+>>>
+>>> While this is certainly the least invasive way to get rid of _PRCMU_BASE,
+>>> it sucks to refer to local variables in macros. How hard would it
+>>> be to find all users of these macros and put the prcmu_base addition
+>>> there?
+>>>
+>>> The rest of this patch looks fine to me.
+>>
+>> Basically I didn't want to disturb Lo?cs work on PRCMU refactoring,
+>> but if it is require I can surely do this.
+>
+> That's probably a good enough reason to leave it alone for now, but we
+> should remember to fix it up later.
+>
+> How about adding a comment in the header so we don't forget about it?
+>
+I'll prefer to have same way to access all PRCM registers.
+prcmu_base should be used only in db8500-prcmu.c file and 
+db8500-prcmu-regs.h should contain register offset.
+Register should be accessed in db8500-prcmu.c file like:
+val = readl(prcmu_base + PRCM_XXX);
+Linus, I'll propose you a patch derived from prcmu refactoring stuff.
 
-translation tables convert virtual addresses to physical addresses.
-Here, we are only talking about physical addresses. There is an overlap
-between the physical addresses used by the RAM, and the physical
-addresses at which I/O devices are visible.
+/Loic
 
-And I'm not sure the SDRAM address decoding windows allows to split the
-first 4 GB of RAM into two areas, one that would be mapped starting at
-physical address 0x0, and another area that would be mapped at a
-different address (above 4 GB).
-
-However, I'm unsure why 0xC0000000 was chosen. Why not 0xD0000000,
-where the internal registers currently start?
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> 	Arnd
