@@ -1,122 +1,151 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 21 Mar 2013 15:59:39 +0000
-Subject: [PATCH 42/46] regulator: ab8500: Use regulator_list_voltage_table()
- to look-up voltages
+Date: Thu, 21 Mar 2013 15:59:03 +0000
+Subject: [PATCH 06/46] regulator: ab8500: Separate regulator and MFD platform
+ data
 In-Reply-To: <1363881583-15234-1-git-send-email-lee.jones@linaro.org>
 References: <1363881583-15234-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1363881583-15234-43-git-send-email-lee.jones@linaro.org>
+Message-ID: <1363881583-15234-7-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The regulator framework offers a generic regulator_list_voltage_table()
-function which can directly look-up a regulator's voltage capabilities
-using a table provided through the desc structure. This patch ensures
-that information is available.
+From: Bengt Jonsson <bengt.g.jonsson@stericsson.com>
 
+The ab8500 MFD should not have knowledge about regulator-
+specific platform data like number of regulators and
+regulator registers. As the regulator platform data is
+about to grow with external regulators, this information
+is moved to a new structure provided by the regulator
+driver.
+
+Signed-off-by: Bengt Jonsson <bengt.g.jonsson@stericsson.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Reviewed-by: Yvan FILLION <yvan.fillion@stericsson.com>
 ---
- drivers/regulator/ab8500.c |   19 ++++++-------------
- 1 file changed, 6 insertions(+), 13 deletions(-)
+ arch/arm/mach-ux500/board-mop500-regulators.c |   12 +++++++++---
+ arch/arm/mach-ux500/board-mop500-regulators.h |    4 +---
+ drivers/regulator/ab8500.c                    |   21 +++++++++++++++------
+ include/linux/regulator/ab8500.h              |    7 +++++++
+ 4 files changed, 32 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/regulator/ab8500.c b/drivers/regulator/ab8500.c
-index 13948c8..e82b0ad 100644
---- a/drivers/regulator/ab8500.c
-+++ b/drivers/regulator/ab8500.c
-@@ -926,7 +926,7 @@ static struct ab8500_regulator_info
- 	 * Variable Voltage Regulators
- 	 *   name, min mV, max mV,
- 	 *   update bank, reg, mask, enable val
--	 *   volt bank, reg, mask, table, table length
-+	 *   volt bank, reg, mask
- 	 */
- 	[AB8505_LDO_AUX1] = {
- 		.desc = {
-@@ -1140,8 +1140,6 @@ static struct ab8500_regulator_info
- 		.voltage_reg		= 0x57,
- 		.voltage_mask		= 0x7,
- 		.voltage_shift		= 4,
--		.voltages		= ldo_vaudio_voltages,
--		.voltages_len		= ARRAY_SIZE(ldo_vaudio_voltages),
- 	},
- 	[AB8505_LDO_ANAMIC1] = {
- 		.desc = {
-@@ -1223,8 +1221,6 @@ static struct ab8500_regulator_info
- 		.voltage_bank		= 0x04,
- 		.voltage_reg		= 0x29,
- 		.voltage_mask		= 0x7,
--		.voltages		= ldo_vana_voltages,
--		.voltages_len		= ARRAY_SIZE(ldo_vana_voltages),
- 	},
+diff --git a/arch/arm/mach-ux500/board-mop500-regulators.c b/arch/arm/mach-ux500/board-mop500-regulators.c
+index a8141e3..0fd84d4 100644
+--- a/arch/arm/mach-ux500/board-mop500-regulators.c
++++ b/arch/arm/mach-ux500/board-mop500-regulators.c
+@@ -122,8 +122,7 @@ static struct regulator_consumer_supply ab8500_vana_consumers[] = {
  };
  
-@@ -1235,7 +1231,7 @@ static struct ab8500_regulator_info
- 	 * Variable Voltage Regulators
- 	 *   name, min mV, max mV,
- 	 *   update bank, reg, mask, enable val
--	 *   volt bank, reg, mask, table, table length
-+	 *   volt bank, reg, mask
- 	 */
- 	[AB9540_LDO_AUX1] = {
- 		.desc = {
-@@ -1478,7 +1474,7 @@ static struct ab8500_regulator_info
- 	 * Variable Voltage Regulators
- 	 *   name, min mV, max mV,
- 	 *   update bank, reg, mask, enable val
--	 *   volt bank, reg, mask, table, table length
-+	 *   volt bank, reg, mask
- 	 */
- 	[AB8540_LDO_AUX1] = {
- 		.desc = {
-@@ -1581,6 +1577,7 @@ static struct ab8500_regulator_info
- 			.id		= AB8540_LDO_AUX5,
- 			.owner		= THIS_MODULE,
- 			.n_voltages	= ARRAY_SIZE(ldo_vaux56_ab8540_voltages),
-+			.volt_table	= ldo_vaux56_ab8540_voltages,
- 		},
- 		.load_lp_uA		= 20000,
- 		/* values for Vaux5Regu register */
-@@ -1594,8 +1591,6 @@ static struct ab8500_regulator_info
- 		.voltage_bank		= 0x04,
- 		.voltage_reg		= 0x33,
- 		.voltage_mask		= 0x3f,
--		.voltages		= ldo_vaux56_ab8540_voltages,
--		.voltages_len		= ARRAY_SIZE(ldo_vaux56_ab8540_voltages),
- 	},
- 	[AB8540_LDO_AUX6] = {
- 		.desc = {
-@@ -1605,6 +1600,7 @@ static struct ab8500_regulator_info
- 			.id		= AB8540_LDO_AUX6,
- 			.owner		= THIS_MODULE,
- 			.n_voltages	= ARRAY_SIZE(ldo_vaux56_ab8540_voltages),
-+			.volt_table	= ldo_vaux56_ab8540_voltages,
- 		},
- 		.load_lp_uA		= 20000,
- 		/* values for Vaux6Regu register */
-@@ -1618,8 +1614,6 @@ static struct ab8500_regulator_info
- 		.voltage_bank		= 0x04,
- 		.voltage_reg		= 0x36,
- 		.voltage_mask		= 0x3f,
--		.voltages		= ldo_vaux56_ab8540_voltages,
--		.voltages_len		= ARRAY_SIZE(ldo_vaux56_ab8540_voltages),
- 	},
- 	[AB8540_LDO_INTCORE] = {
- 		.desc = {
-@@ -1732,6 +1726,7 @@ static struct ab8500_regulator_info
- 			.id		= AB8540_LDO_DMIC,
- 			.owner		= THIS_MODULE,
- 			.n_voltages	= ARRAY_SIZE(ldo_vdmic_voltages),
-+			.volt_table	= ldo_vdmic_voltages,
- 		},
- 		.load_lp_uA		= 1000,
- 		.update_bank		= 0x03,
-@@ -1741,8 +1736,6 @@ static struct ab8500_regulator_info
- 		.voltage_bank		= 0x03,
- 		.voltage_reg		= 0x83,
- 		.voltage_mask		= 0xc0,
--		.voltages		= ldo_vdmic_voltages,
--		.voltages_len		= ARRAY_SIZE(ldo_vdmic_voltages),
- 	},
- 
+ /* ab8500 regulator register initialization */
+-struct ab8500_regulator_reg_init
+-ab8500_regulator_reg_init[AB8500_NUM_REGULATOR_REGISTERS] = {
++static struct ab8500_regulator_reg_init ab8500_reg_init[] = {
  	/*
+ 	 * VanaRequestCtrl          = HP/LP depending on VxRequest
+ 	 * VpllRequestCtrl          = HP/LP depending on VxRequest
+@@ -314,7 +313,7 @@ ab8500_regulator_reg_init[AB8500_NUM_REGULATOR_REGISTERS] = {
+ };
+ 
+ /* AB8500 regulators */
+-struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS] = {
++static struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS] = {
+ 	/* supplies to the display/camera */
+ 	[AB8500_LDO_AUX1] = {
+ 		.constraints = {
+@@ -423,3 +422,10 @@ struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS] = {
+ 		.consumer_supplies = ab8500_vana_consumers,
+ 	},
+ };
++
++struct ab8500_regulator_platform_data ab8500_regulator_plat_data = {
++	.reg_init               = ab8500_reg_init,
++	.num_reg_init           = ARRAY_SIZE(ab8500_reg_init),
++	.regulator              = ab8500_regulators,
++	.num_regulator          = ARRAY_SIZE(ab8500_regulators),
++};
+diff --git a/arch/arm/mach-ux500/board-mop500-regulators.h b/arch/arm/mach-ux500/board-mop500-regulators.h
+index 78a0642..9ca4869 100644
+--- a/arch/arm/mach-ux500/board-mop500-regulators.h
++++ b/arch/arm/mach-ux500/board-mop500-regulators.h
+@@ -14,9 +14,7 @@
+ #include <linux/regulator/machine.h>
+ #include <linux/regulator/ab8500.h>
+ 
+-extern struct ab8500_regulator_reg_init
+-ab8500_regulator_reg_init[AB8500_NUM_REGULATOR_REGISTERS];
+-extern struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS];
++extern struct ab8500_regulator_platform_data ab8500_regulator_plat_data;
+ extern struct regulator_init_data tps61052_regulator;
+ extern struct regulator_init_data gpio_en_3v3_regulator;
+ 
+diff --git a/drivers/regulator/ab8500.c b/drivers/regulator/ab8500.c
+index c7784c4..f7d1f53 100644
+--- a/drivers/regulator/ab8500.c
++++ b/drivers/regulator/ab8500.c
+@@ -939,8 +939,9 @@ ab8500_regulator_of_probe(struct platform_device *pdev, struct device_node *np)
+ static int ab8500_regulator_probe(struct platform_device *pdev)
+ {
+ 	struct ab8500 *ab8500 = dev_get_drvdata(pdev->dev.parent);
+-	struct ab8500_platform_data *pdata;
+ 	struct device_node *np = pdev->dev.of_node;
++	struct ab8500_platform_data *ppdata;
++	struct ab8500_regulator_platform_data *pdata;
+ 	int i, err;
+ 
+ 	if (np) {
+@@ -961,7 +962,14 @@ static int ab8500_regulator_probe(struct platform_device *pdev)
+ 		dev_err(&pdev->dev, "null mfd parent\n");
+ 		return -EINVAL;
+ 	}
+-	pdata = dev_get_platdata(ab8500->dev);
++
++	ppdata = dev_get_platdata(ab8500->dev);
++	if (!ppdata) {
++		dev_err(&pdev->dev, "null parent pdata\n");
++		return -EINVAL;
++	}
++
++	pdata = ppdata->regulator;
+ 	if (!pdata) {
+ 		dev_err(&pdev->dev, "null pdata\n");
+ 		return -EINVAL;
+@@ -974,12 +982,12 @@ static int ab8500_regulator_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	/* initialize registers */
+-	for (i = 0; i < pdata->num_regulator_reg_init; i++) {
++	for (i = 0; i < pdata->num_reg_init; i++) {
+ 		int id, mask, value;
+ 
+-		id = pdata->regulator_reg_init[i].id;
+-		mask = pdata->regulator_reg_init[i].mask;
+-		value = pdata->regulator_reg_init[i].value;
++		id = pdata->reg_init[i].id;
++		mask = pdata->reg_init[i].mask;
++		value = pdata->reg_init[i].value;
+ 
+ 		/* check for configuration errors */
+ 		BUG_ON(id >= AB8500_NUM_REGULATOR_REGISTERS);
+@@ -1045,5 +1053,6 @@ module_exit(ab8500_regulator_exit);
+ 
+ MODULE_LICENSE("GPL v2");
+ MODULE_AUTHOR("Sundar Iyer <sundar.iyer@stericsson.com>");
++MODULE_AUTHOR("Bengt Jonsson <bengt.g.jonsson@stericsson.com>");
+ MODULE_DESCRIPTION("Regulator Driver for ST-Ericsson AB8500 Mixed-Sig PMIC");
+ MODULE_ALIAS("platform:ab8500-regulator");
+diff --git a/include/linux/regulator/ab8500.h b/include/linux/regulator/ab8500.h
+index dd7944f..3a8e026 100644
+--- a/include/linux/regulator/ab8500.h
++++ b/include/linux/regulator/ab8500.h
+@@ -152,4 +152,11 @@ enum ab9540_regulator_reg {
+ 	AB9540_NUM_REGULATOR_REGISTERS,
+ };
+ 
++struct ab8500_regulator_platform_data {
++	int num_reg_init;
++	struct ab8500_regulator_reg_init *reg_init;
++	int num_regulator;
++	struct regulator_init_data *regulator;
++};
++
+ #endif
 -- 
 1.7.10.4
