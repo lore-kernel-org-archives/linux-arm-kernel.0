@@ -1,36 +1,43 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 21 Mar 2013 17:26:15 +0100
-Subject: [PATCH 2/5] arm: mvebu: Select DMA_BOUNCE when LPAE is selected in
- Kconfig
+Date: Thu, 21 Mar 2013 17:26:17 +0100
+Subject: [PATCH 4/5] arm: dts: Add a 64 bits version of the skeleton device
+ tree
 In-Reply-To: <1363883179-1361-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1363883179-1361-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1363883179-1361-3-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1363883179-1361-5-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Lior Amsalem <alior@marvell.com>
 
-For mvebu IOs are 32 bits and we have 40 bits memory due to LPAE so
-make sure we give 32 bits addresses to the IOs.
+In order to be able to use more than 4GB address-cells and size-cells
+have to be set to 2
 
-Signed-off-by: Lior Amsalem <alior@marvell.com>
-Tested-by: Franklin <flin@marvell.com>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Signed-off-by: Lior Amsalem <alior@marvell.com>
 ---
- arch/arm/mach-mvebu/Kconfig |    1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/skeleton64.dtsi |   13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+ create mode 100644 arch/arm/boot/dts/skeleton64.dtsi
 
-diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-index 440b13e..617da94 100644
---- a/arch/arm/mach-mvebu/Kconfig
-+++ b/arch/arm/mach-mvebu/Kconfig
-@@ -13,6 +13,7 @@ config ARCH_MVEBU
- 	select MVEBU_CLK_CORE
- 	select MVEBU_CLK_CPU
- 	select MVEBU_CLK_GATING
-+	select DMABOUNCE if ARM_LPAE
- 
- if ARCH_MVEBU
- 
+diff --git a/arch/arm/boot/dts/skeleton64.dtsi b/arch/arm/boot/dts/skeleton64.dtsi
+new file mode 100644
+index 0000000..1599415
+--- /dev/null
++++ b/arch/arm/boot/dts/skeleton64.dtsi
+@@ -0,0 +1,13 @@
++/*
++ * Skeleton device tree in the 64 bits version; the bare minimum
++ * needed to boot; just include and add a compatible value.  The
++ * bootloader will typically populate the memory node.
++ */
++
++/ {
++	#address-cells = <2>;
++	#size-cells = <2>;
++	chosen { };
++	aliases { };
++	memory { device_type = "memory"; reg = <0 0>; };
++};
 -- 
 1.7.9.5
