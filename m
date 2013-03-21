@@ -1,33 +1,40 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 21 Mar 2013 11:30:45 -0600
-Subject: [PATCH V2 1/4] ARM: tegra: dalmore: add cpu regulator node
-In-Reply-To: <514B1412.9060707@cogentembedded.com>
-References: <1363873663-19272-1-git-send-email-ldewangan@nvidia.com>
- <1363873663-19272-2-git-send-email-ldewangan@nvidia.com>
- <514B1412.9060707@cogentembedded.com>
-Message-ID: <514B43C5.6060404@wwwdotorg.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 21 Mar 2013 18:30:20 +0100
+Subject: [PATCH v5 12/17] arm: mvebu: PCIe Device Tree informations for
+ OpenBlocks AX3-4
+In-Reply-To: <1363887025-19931-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1363887025-19931-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1363887025-19931-13-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/21/2013 08:07 AM, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 21-03-2013 17:47, Laxman Dewangan wrote:
-> 
->> Dalmore uses the TPS51632 as CPU regulator. The device is connected
->> on I2C5.
-> 
->> Add DT node for TPS51632.
+The PlatHome OpenBlocks AX3-4 has an internal mini-PCIe slot that can
+be used to plug mini-PCIe devices. We therefore enable the PCIe
+interface that corresponds to this slot.
 
->> diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts |    9 +++++++++
+ 1 file changed, 9 insertions(+)
 
->> +    i2c at 7000d000 {
->> +        status = "okay";
->> +        clock-frequency = <400000>;
->> +
->> +        tps51632 {
-> 
->    Should be named "tps51632 at 43" I think.
-
-The unit-address (i.e. "@43" part) of the node name is typically omitted
-if it isn't required to make the node name unique.
+diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+index 3818a82..5a748bd 100644
+--- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
++++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+@@ -139,5 +139,14 @@
+ 		usb at d0051000 {
+ 			status = "okay";
+ 		};
++
++		pcie-controller {
++			status = "okay";
++			/* Internal mini-PCIe connector */
++			pcie at 1,0 {
++				/* Port 0, Lane 0 */
++				status = "okay";
++			};
++		};
+ 	};
+ };
+-- 
+1.7.9.5
