@@ -1,202 +1,203 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 21 Mar 2013 21:49:08 +0000
-Subject: [PATCH 1/4] ARM: context tracking: add exception support
-In-Reply-To: <1363824121-26169-2-git-send-email-khilman@linaro.org>
-References: <1363824121-26169-1-git-send-email-khilman@linaro.org>
- <1363824121-26169-2-git-send-email-khilman@linaro.org>
-Message-ID: <20130321214908.GU4977@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 21 Mar 2013 22:51:10 +0100
+Subject: [PATCH 5/9] staging: ste_rmi4: kill platform_data hack
+In-Reply-To: <1363902674-6456-1-git-send-email-arnd@arndb.de>
+References: <1363866553-15054-1-git-send-email-linus.walleij@stericsson.com>
+ <1363902674-6456-1-git-send-email-arnd@arndb.de>
+Message-ID: <1363902674-6456-6-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 20, 2013 at 05:01:58PM -0700, Kevin Hilman wrote:
-> Add ARM support for the context tracking subsystem by instrumenting
-> exception entry/exit points.
-> 
-> Special thanks to Mats Liljegren for testing, collaboration and adding
-> support for exceptions/faults that were missing in early test versions.
+There is only one instance of the platform data for synaptics_i2c_rmi4
+in the mainline kernel, so there is no point of pretending its
+variable here. The only member that has a dependency on the platform
+is actually the interrupt number, and there is a field in the
+i2c_client structure that gets initialized from the board info,
+so we can trivially move the board_into into the platform without
+knowledge of the platform_data structure.
 
-Not sure all of these are a good idea or are correct...
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/mach-ux500/board-mop500-u8500uib.c        |  7 +++--
+ drivers/staging/ste_rmi4/Makefile                  |  1 -
+ .../staging/ste_rmi4/board-mop500-u8500uib-rmi4.c  | 31 ----------------------
+ drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c      | 31 +++++++++++++---------
+ drivers/staging/ste_rmi4/synaptics_i2c_rmi4.h      |  1 -
+ 5 files changed, 23 insertions(+), 48 deletions(-)
+ delete mode 100644 drivers/staging/ste_rmi4/board-mop500-u8500uib-rmi4.c
 
-> @@ -405,7 +406,9 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
->  	unsigned int instr;
->  	siginfo_t info;
->  	void __user *pc;
-> +	enum ctx_state prev_state;
->  
-> +	prev_state = exception_enter();
->  	pc = (void __user *)instruction_pointer(regs);
->  
->  	if (processor_mode(regs) == SVC_MODE) {
-> @@ -433,8 +436,10 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
->  		goto die_sig;
->  	}
->  
-> -	if (call_undef_hook(regs, instr) == 0)
-> +	if (call_undef_hook(regs, instr) == 0) {
-> +		exception_exit(prev_state);
->  		return;
-> +	}
->  
->  die_sig:
->  #ifdef CONFIG_DEBUG_USER
-> @@ -451,12 +456,17 @@ die_sig:
->  	info.si_addr  = pc;
->  
->  	arm_notify_die("Oops - undefined instruction", regs, &info, 0, 6);
-> +	exception_exit(prev_state);
-
-So, FP emulation and VFP support happens via a separate path.  Does this
-also need to be instrumented?
-
->  }
->  
->  asmlinkage void do_unexp_fiq (struct pt_regs *regs)
->  {
-> +	enum ctx_state prev_state;
-> +
-> +	prev_state = exception_enter();
->  	printk("Hmm.  Unexpected FIQ received, but trying to continue\n");
->  	printk("You may have a hardware problem...\n");
-> +	exception_exit(prev_state);
-
-Not a good idea.  If we get here chances are things are really broken.
-
->  }
->  
->  /*
-> @@ -467,6 +477,9 @@ asmlinkage void do_unexp_fiq (struct pt_regs *regs)
->   */
->  asmlinkage void bad_mode(struct pt_regs *regs, int reason)
->  {
-> +	enum ctx_state prev_state;
-> +
-> +	prev_state = exception_enter();
->  	console_verbose();
->  
->  	printk(KERN_CRIT "Bad mode in %s handler detected\n", handler[reason]);
-
-Same here.  If we get here, we're probably about to die a horrid death.
-
-> @@ -746,7 +759,9 @@ baddataabort(int code, unsigned long instr, struct pt_regs *regs)
->  {
->  	unsigned long addr = instruction_pointer(regs);
->  	siginfo_t info;
-> +	enum ctx_state prev_state;
->  
-> +	prev_state = exception_enter();
->  #ifdef CONFIG_DEBUG_USER
->  	if (user_debug & UDBG_BADABORT) {
->  		printk(KERN_ERR "[%d] %s: bad data abort: code %d instr 0x%08lx\n",
-> @@ -762,6 +777,7 @@ baddataabort(int code, unsigned long instr, struct pt_regs *regs)
->  	info.si_addr  = (void __user *)addr;
->  
->  	arm_notify_die("unknown data abort code", regs, &info, instr, 0);
-> +	exception_exit(prev_state);
->  }
->  
->  void __readwrite_bug(const char *fn)
-> diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
-> index 5dbf13f..759b70d 100644
-> --- a/arch/arm/mm/fault.c
-> +++ b/arch/arm/mm/fault.c
-> @@ -19,6 +19,7 @@
->  #include <linux/sched.h>
->  #include <linux/highmem.h>
->  #include <linux/perf_event.h>
-> +#include <linux/context_tracking.h>
->  
->  #include <asm/exception.h>
->  #include <asm/pgtable.h>
-> @@ -424,9 +425,15 @@ do_translation_fault(unsigned long addr, unsigned int fsr,
->  	pgd_t *pgd, *pgd_k;
->  	pud_t *pud, *pud_k;
->  	pmd_t *pmd, *pmd_k;
-> -
-> -	if (addr < TASK_SIZE)
-> -		return do_page_fault(addr, fsr, regs);
-> +	enum ctx_state prev_state;
-> +
-> +	prev_state = exception_enter();
-> +	if (addr < TASK_SIZE) {
-> +		int ret;
-> +		ret = do_page_fault(addr, fsr, regs);
-> +		exception_exit(prev_state);
-> +		return ret;
-> +	}
->  
->  	if (user_mode(regs))
->  		goto bad_area;
-> @@ -472,10 +479,12 @@ do_translation_fault(unsigned long addr, unsigned int fsr,
->  		goto bad_area;
->  
->  	copy_pmd(pmd, pmd_k);
-> +	exception_exit(prev_state);
->  	return 0;
->  
->  bad_area:
->  	do_bad_area(addr, fsr, regs);
-> +	exception_exit(prev_state);
->  	return 0;
->  }
->  #else					/* CONFIG_MMU */
-> @@ -494,7 +503,12 @@ do_translation_fault(unsigned long addr, unsigned int fsr,
->  static int
->  do_sect_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
->  {
-> +	enum ctx_state prev_state;
-> +
-> +	prev_state = exception_enter();
->  	do_bad_area(addr, fsr, regs);
-> +	exception_exit(prev_state);
-> +
->  	return 0;
->  }
->  
-> @@ -542,9 +556,11 @@ do_DataAbort(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
->  {
->  	const struct fsr_info *inf = fsr_info + fsr_fs(fsr);
->  	struct siginfo info;
-> +	enum ctx_state prev_state;
->  
-> +	prev_state = exception_enter();
->  	if (!inf->fn(addr, fsr & ~FSR_LNX_PF, regs))
-> -		return;
-> +		goto out;
->  
->  	printk(KERN_ALERT "Unhandled fault: %s (0x%03x) at 0x%08lx\n",
->  		inf->name, fsr, addr);
-> @@ -554,6 +570,8 @@ do_DataAbort(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
->  	info.si_code  = inf->code;
->  	info.si_addr  = (void __user *)addr;
->  	arm_notify_die("", regs, &info, fsr, 0);
-> +out:
-> +	exception_exit(prev_state);
->  }
->  
->  void __init
-> @@ -574,9 +592,11 @@ do_PrefetchAbort(unsigned long addr, unsigned int ifsr, struct pt_regs *regs)
->  {
->  	const struct fsr_info *inf = ifsr_info + fsr_fs(ifsr);
->  	struct siginfo info;
-> +	enum ctx_state prev_state;
->  
-> +	prev_state = exception_enter();
->  	if (!inf->fn(addr, ifsr | FSR_LNX_PF, regs))
-> -		return;
-> +		goto out;
->  
->  	printk(KERN_ALERT "Unhandled prefetch abort: %s (0x%03x) at 0x%08lx\n",
->  		inf->name, ifsr, addr);
-> @@ -586,6 +606,8 @@ do_PrefetchAbort(unsigned long addr, unsigned int ifsr, struct pt_regs *regs)
->  	info.si_code  = inf->code;
->  	info.si_addr  = (void __user *)addr;
->  	arm_notify_die("", regs, &info, ifsr, 0);
-> +out:
-> +	exception_exit(prev_state);
->  }
->  
->  #ifndef CONFIG_ARM_LPAE
-
-What is the reason for putting all this in the individual functions
-and not in the prefetch/data abort handlers -
-do_PrefetchAbort()/do_DataAbort()?
+diff --git a/arch/arm/mach-ux500/board-mop500-u8500uib.c b/arch/arm/mach-ux500/board-mop500-u8500uib.c
+index 6619628..d397c19 100644
+--- a/arch/arm/mach-ux500/board-mop500-u8500uib.c
++++ b/arch/arm/mach-ux500/board-mop500-u8500uib.c
+@@ -16,8 +16,11 @@
+ 
+ #include "board-mop500.h"
+ 
+-/* Dummy data that can be overridden by staging driver */
+-struct i2c_board_info __initdata __weak mop500_i2c3_devices_u8500[] = {
++static struct i2c_board_info __initdata mop500_i2c3_devices_u8500[] = {
++	{
++		I2C_BOARD_INFO("synaptics_rmi4_i2c", 0x4B),
++		.irq = NOMADIK_GPIO_TO_IRQ(84),
++	},
+ };
+ 
+ /*
+diff --git a/drivers/staging/ste_rmi4/Makefile b/drivers/staging/ste_rmi4/Makefile
+index e4c0335..6cce2ed 100644
+--- a/drivers/staging/ste_rmi4/Makefile
++++ b/drivers/staging/ste_rmi4/Makefile
+@@ -2,4 +2,3 @@
+ # Makefile for the RMI4 touchscreen driver.
+ #
+ obj-$(CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI4) += synaptics_i2c_rmi4.o
+-obj-$(CONFIG_MACH_MOP500) += board-mop500-u8500uib-rmi4.o
+diff --git a/drivers/staging/ste_rmi4/board-mop500-u8500uib-rmi4.c b/drivers/staging/ste_rmi4/board-mop500-u8500uib-rmi4.c
+deleted file mode 100644
+index 47439c3..0000000
+--- a/drivers/staging/ste_rmi4/board-mop500-u8500uib-rmi4.c
++++ /dev/null
+@@ -1,31 +0,0 @@
+-/*
+- * Some platform data for the RMI4 touchscreen that will override the __weak
+- * platform data in the Ux500 machine if this driver is activated.
+- */
+-#include <linux/i2c.h>
+-#include <linux/gpio.h>
+-#include <linux/interrupt.h>
+-#include <mach/irqs.h>
+-#include "synaptics_i2c_rmi4.h"
+-
+-/*
+- * Synaptics RMI4 touchscreen interface on the U8500 UIB
+- */
+-
+-/*
+- * Descriptor structure.
+- * Describes the number of i2c devices on the bus that speak RMI.
+- */
+-static struct synaptics_rmi4_platform_data rmi4_i2c_dev_platformdata = {
+-	.irq_number     = NOMADIK_GPIO_TO_IRQ(84),
+-	.irq_type       = (IRQF_TRIGGER_FALLING | IRQF_SHARED),
+-	.x_flip		= false,
+-	.y_flip		= true,
+-};
+-
+-struct i2c_board_info __initdata mop500_i2c3_devices_u8500[] = {
+-	{
+-		I2C_BOARD_INFO("synaptics_rmi4_i2c", 0x4B),
+-		.platform_data = &rmi4_i2c_dev_platformdata,
+-	},
+-};
+diff --git a/drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c b/drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c
+index 6a21f67..2e35307 100644
+--- a/drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c
++++ b/drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c
+@@ -864,6 +864,16 @@ static int synaptics_rmi4_i2c_query_device(struct synaptics_rmi4_data *pdata)
+ 	return 0;
+ }
+ 
++/*
++ * Descriptor structure.
++ * Describes the number of i2c devices on the bus that speak RMI.
++ */
++static struct synaptics_rmi4_platform_data synaptics_rmi4_platformdata = {
++	.irq_type       = (IRQF_TRIGGER_FALLING | IRQF_SHARED),
++	.x_flip		= false,
++	.y_flip		= true,
++};
++
+ /**
+  * synaptics_rmi4_probe() - Initialze the i2c-client touchscreen driver
+  * @i2c: i2c client structure pointer
+@@ -890,10 +900,8 @@ static int synaptics_rmi4_probe
+ 		return -EIO;
+ 	}
+ 
+-	if (!platformdata) {
+-		dev_err(&client->dev, "%s: no platform data\n", __func__);
+-		return -EINVAL;
+-	}
++	if (!platformdata)
++		platformdata = &synaptics_rmi4_platformdata;
+ 
+ 	/* Allocate and initialize the instance data for this client */
+ 	rmi4_data = kcalloc(2, sizeof(struct synaptics_rmi4_data),
+@@ -977,13 +985,13 @@ static int synaptics_rmi4_probe
+ 	synaptics_rmi4_i2c_block_read(rmi4_data,
+ 			rmi4_data->fn01_data_base_addr + 1, intr_status,
+ 				rmi4_data->number_of_interrupt_register);
+-	retval = request_threaded_irq(platformdata->irq_number, NULL,
++	retval = request_threaded_irq(client->irq, NULL,
+ 					synaptics_rmi4_irq,
+ 					platformdata->irq_type,
+ 					DRIVER_NAME, rmi4_data);
+ 	if (retval) {
+ 		dev_err(&client->dev, "%s:Unable to get attn irq %d\n",
+-				__func__, platformdata->irq_number);
++				__func__, client->irq);
+ 		goto err_query_dev;
+ 	}
+ 
+@@ -996,7 +1004,7 @@ static int synaptics_rmi4_probe
+ 	return retval;
+ 
+ err_free_irq:
+-	free_irq(platformdata->irq_number, rmi4_data);
++	free_irq(client->irq, rmi4_data);
+ err_query_dev:
+ 	regulator_disable(rmi4_data->regulator);
+ err_regulator_enable:
+@@ -1019,11 +1027,10 @@ err_input:
+ static int synaptics_rmi4_remove(struct i2c_client *client)
+ {
+ 	struct synaptics_rmi4_data *rmi4_data = i2c_get_clientdata(client);
+-	const struct synaptics_rmi4_platform_data *pdata = rmi4_data->board;
+ 
+ 	rmi4_data->touch_stopped = true;
+ 	wake_up(&rmi4_data->wait);
+-	free_irq(pdata->irq_number, rmi4_data);
++	free_irq(client->irq, rmi4_data);
+ 	input_unregister_device(rmi4_data->input_dev);
+ 	regulator_disable(rmi4_data->regulator);
+ 	regulator_put(rmi4_data->regulator);
+@@ -1046,10 +1053,9 @@ static int synaptics_rmi4_suspend(struct device *dev)
+ 	int retval;
+ 	unsigned char intr_status;
+ 	struct synaptics_rmi4_data *rmi4_data = dev_get_drvdata(dev);
+-	const struct synaptics_rmi4_platform_data *pdata = rmi4_data->board;
+ 
+ 	rmi4_data->touch_stopped = true;
+-	disable_irq(pdata->irq_number);
++	disable_irq(rmi4_data->i2c_client->irq);
+ 
+ 	retval = synaptics_rmi4_i2c_block_read(rmi4_data,
+ 				rmi4_data->fn01_data_base_addr + 1,
+@@ -1080,11 +1086,10 @@ static int synaptics_rmi4_resume(struct device *dev)
+ 	int retval;
+ 	unsigned char intr_status;
+ 	struct synaptics_rmi4_data *rmi4_data = dev_get_drvdata(dev);
+-	const struct synaptics_rmi4_platform_data *pdata = rmi4_data->board;
+ 
+ 	regulator_enable(rmi4_data->regulator);
+ 
+-	enable_irq(pdata->irq_number);
++	enable_irq(rmi4_data->i2c_client->irq);
+ 	rmi4_data->touch_stopped = false;
+ 
+ 	retval = synaptics_rmi4_i2c_block_read(rmi4_data,
+diff --git a/drivers/staging/ste_rmi4/synaptics_i2c_rmi4.h b/drivers/staging/ste_rmi4/synaptics_i2c_rmi4.h
+index 384436e..8c9166b 100644
+--- a/drivers/staging/ste_rmi4/synaptics_i2c_rmi4.h
++++ b/drivers/staging/ste_rmi4/synaptics_i2c_rmi4.h
+@@ -38,7 +38,6 @@
+  * This structure gives platform data for rmi4.
+  */
+ struct synaptics_rmi4_platform_data {
+-	int irq_number;
+ 	int irq_type;
+ 	bool x_flip;
+ 	bool y_flip;
+-- 
+1.8.1.2
