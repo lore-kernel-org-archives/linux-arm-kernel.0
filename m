@@ -1,11 +1,11 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 21 Mar 2013 16:30:26 -0400
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 21 Mar 2013 21:37:51 +0100
 Subject: [PATCH 5/5] arm: dts: Convert mvebu device tree files to 64 bits
 In-Reply-To: <20130321212236.1015295d@skate>
 References: <1363883179-1361-1-git-send-email-gregory.clement@free-electrons.com>
  <1363883179-1361-6-git-send-email-gregory.clement@free-electrons.com>
  <20130321201533.GN21478@lunn.ch> <20130321212236.1015295d@skate>
-Message-ID: <20130321203026.GF13280@titan.lakedaemon.net>
+Message-ID: <20130321203751.GP21478@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -31,13 +31,8 @@ On Thu, Mar 21, 2013 at 09:22:36PM +0100, Thomas Petazzoni wrote:
 > first 4 GB of RAM into two areas, one that would be mapped starting at
 > physical address 0x0, and another area that would be mapped at a
 > different address (above 4 GB).
-> 
-> However, I'm unsure why 0xC0000000 was chosen. Why not 0xD0000000,
-> where the internal registers currently start?
 
-I had the same question earlier but got distracted by other things.
-Thanks for bringing it up.  Gregory, shouldn't this be 0xD0000000?
+So why not map the whole SDRAM above 4GB physical address?
 
-thx,
-
-Jason.
+   Thanks
+	Andrew
