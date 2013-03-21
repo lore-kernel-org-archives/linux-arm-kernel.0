@@ -1,87 +1,54 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 21 Mar 2013 23:40:04 +0000
-Subject: Integrator PCI base dilemma
-In-Reply-To: <201303211302.19058.arnd@arndb.de>
-References: <CACRpkdaOjFhWR21w5x_rR_60ffQF3Ym_MQd2svNyzm0guwOUoQ@mail.gmail.com>
- <201303211302.19058.arnd@arndb.de>
-Message-ID: <20130321234004.GV4977@n2100.arm.linux.org.uk>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Fri, 22 Mar 2013 00:50:56 +0100
+Subject: [PATCH V2] cpufreq: ARM big LITTLE: Add generic cpufreq driver
+ and its DT glue
+In-Reply-To: <CAKohponV8MR=J8bbNFxGF9JXQB0uadv7iDcbW9D-qr2N53U_kQ@mail.gmail.com>
+References: <6cba8f153cfd4b0d3075a34a6dfe287bdec2eb06.1362676407.git.viresh.kumar@linaro.org>
+ <513CAD9B.908@gmail.com>
+ <CAKohponV8MR=J8bbNFxGF9JXQB0uadv7iDcbW9D-qr2N53U_kQ@mail.gmail.com>
+Message-ID: <3782512.fC3ZOYy3MV@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gah.  Wrap failure.
-
-On Thu, Mar 21, 2013 at 01:02:18PM +0000, Arnd Bergmann wrote:
-> Alpha, IA64, PPC64, and Tile use ioremap there, which seems reasonable
-> especially given that the at least the vga16fb assumes it can iounmap
-> the pointer returned by VGA_MAP_MEM when unloading.
-
-Be. Very. Careful. with that.
-
-Look at vgacon.  vgacon gets used on ARM.  vga16fb does not.  vgacon
-does not use VGA_MAP_MEM() in a way compatible with our ioremap() -
-things like the font ops will end up creating multiple mappings which
-will eventually full the ioremap() space if you do go down that route.
-
-> Again, I'd assume that tile is incorrectly copied from
-> one of the others, but it might actually work. All but ia64 here rely
-> on the VGA registers and memory and ROM being mapped into physical
-> addresses 0xA0000-0xC7fff as they are on PCs.
-
-That's because it's pretty much built into the way VGA crud works.
-VGA BIOSes hard code these addresses into themselves.  Really, so does
-the kernel, but non-native architectures are given the chance to offset
-this appropriately - and remember that non-native architectures will
-run the VGA BIOS via an x86 emulator, which you pretty much have to do
-to get VGA cards to initialize properly.
-
-I've tried the manual initialization with a S3 VGA card.  It was
-acceptable but the black level was too high.  I could never sort that
-out until I switched to running the VGA BIOS instead.
-
-> ARM, MIPS and PPC32 map the registers at boot time into a fixed or known
-> virtual address, but all implementations are really suspicious:
-> * On ARM, we have these definitions:
+On Monday, March 11, 2013 08:57:49 AM Viresh Kumar wrote:
+> On 10 March 2013 23:58, Francesco Lavra <francescolavra.fl@gmail.com> wrote:
+> > On 03/07/2013 06:14 PM, Viresh Kumar wrote:
+> >> +void bL_cpufreq_unregister(struct cpufreq_arm_bL_ops *ops)
+> >> +{
+> >> +     if (arm_bL_ops != ops) {
+> >> +             pr_info("%s: Registered with: %s, can't unregister, exiting\n",
+> >> +                             __func__, arm_bL_ops->name);
+> >> +     }
+> >
+> > The code is not doing what the info message says.
 > 
-> arch/arm/mach-dove/pcie.c:      vga_base = DOVE_PCIE0_MEM_PHYS_BASE;
-> arch/arm/mach-footbridge/dc21285.c:     vga_base = PCIMEM_BASE;
-> arch/arm/mach-integrator/integrator_ap.c:       vga_base = PCI_MEMORY_VADDR;
-> arch/arm/mach-kirkwood/pcie.c:  vga_base = KIRKWOOD_PCIE_MEM_PHYS_BASE;
-> arch/arm/mach-mv78xx0/pcie.c:   vga_base = MV78XX0_PCIE_MEM_PHYS_BASE;
-> arch/arm/mach-orion5x/pci.c:    vga_base = ORION5X_PCIE_MEM_PHYS_BASE;
-> arch/arm/mach-shark/pci.c:      vga_base = 0xe8000000;
-> 
-> Dove/integrator/kirkwood/mv78xx0/orion5x all put a *physical* address in here,
-> which cannot work, since that is not mapped anywhere.
+> Yes, following is the improvement:
 
-Erm, no.  Look again at Integrator.  PCI_MEMORY_*V*ADDR.
-arch/arm/mach-integrator/include/mach/platform.h:#define PCI_MEMORY_VADDR IOMEM(0xe8000000)
+Please post a complete update patch if you want me to take it.  I'd also would
+like it to be ACKed by someone involved in the big-LITTLE work on the arch
+side.
 
-And we have a static mapping for that memory space in place - and I've
-had VGA cards (Permedia3) working there when I had an AP system, so it
-has worked in the past.
+Thanks,
+Rafael
 
-DC21285 works (or at least used to) because I have that on the machine
-over -----> there, but its running an old kernel because both IDE and
-ATA subsystems were pretty fscked last time I tried to update it, and
-my network doesn't work very well without that machine working!  I do
-need to try again at some point to upgrade its kernel.
 
-> Footbridge and integrator get it right, presumably because Russell
-> was actually using that code ;-)
-
-... and for Footbridge, still do.  Remember, though that this whole
-vga_base thing is a relatively recent addition due to the single zImage
-project, so any mistakes with the above need proper research to see
-whether they're bugs introduced by that activity.
-
-> Now what does this all tell us? First of all I think you are free to change
-> it in any way that does not break footbridge, since everything else is already
-> broken.
-
-Footbridge and Integrator/AP.
-
-> I think the most logical way forward would be to use the same method
-> as ia64 and use ioremap() with a platform-specific offset, but keeping the
-> static mapping would probably be easier to do.
-
-No, our ioremap() will definitely break here.
+> diff --git a/drivers/cpufreq/arm_big_little.c b/drivers/cpufreq/arm_big_little.c
+> index 8b8b07e..9d449cf 100644
+> --- a/drivers/cpufreq/arm_big_little.c
+> +++ b/drivers/cpufreq/arm_big_little.c
+> @@ -264,8 +264,9 @@ EXPORT_SYMBOL_GPL(bL_cpufreq_register);
+>  void bL_cpufreq_unregister(struct cpufreq_arm_bL_ops *ops)
+>  {
+>         if (arm_bL_ops != ops) {
+> -               pr_info("%s: Registered with: %s, can't unregister, exiting\n",
+> +               pr_err("%s: Registered with: %s, can't unregister, exiting\n",
+>                                 __func__, arm_bL_ops->name);
+> +               return;
+>         }
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
