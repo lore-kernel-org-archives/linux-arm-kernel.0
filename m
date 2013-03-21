@@ -1,64 +1,43 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Fri, 22 Mar 2013 10:22:57 +1100
-Subject: [PATCHv3 00/14] drivers: mailbox: framework creation
-In-Reply-To: <1363145021-14339-1-git-send-email-s-anna@ti.com>
-References: <1363145021-14339-1-git-send-email-s-anna@ti.com>
-Message-ID: <20130322102257.89d3fd7c109c32faac4dcc7d@canb.auug.org.au>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 22 Mar 2013 08:26:24 +0900
+Subject: [PATCH v6 00/16] clk: exynos4/5: migrate to common clock
+ framework
+In-Reply-To: <20130320144000.11073.37741@quantum>
+References: <1361175686-19400-1-git-send-email-thomas.abraham@linaro.org>
+ <20130319184938.8663.18115@quantum> <201303192212.16877.heiko@sntech.de>
+ <20130319215038.8663.83548@quantum>
+ <116a01ce24fd$e32658b0$a9730a10$%kim@samsung.com>
+ <20130320025656.11073.90469@quantum>
+ <11af01ce2526$63b0a8f0$2b11fad0$%kim@samsung.com>
+ <20130320144000.11073.37741@quantum>
+Message-ID: <14d801ce268b$80a8d160$81fa7420$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suman,
+Mike Turquette wrote:
 
-On Tue, 12 Mar 2013 22:23:41 -0500 Suman Anna <s-anna@ti.com> wrote:
->
-> Stephen,
-> I have hosted the series at [3]. Can you pull this into linux-next
-> sometime next week?
+[...]
+> >
+> > > Furthermore if I *had* agreed on the previous version it would still
+> > > have been appropriate to put my Acked-by on those patches, which is
+> > > clearly missing today.
+> > >
+> > BTW, how about following?
+> >
+> > http://www.spinics.net/lists/arm-kernel/msg210266.html
+> >
+> > In my understanding, it should be your agreement, it cannot be 'ack' though.
+> >
+> 
+> I had forgotten about that email from November.  Still my ack should
+> have been added.  If necessary I'll be painfully explicit in the future
 
-> [3] https://github.com/sumananna/mailbox/commits/dbx500-prcmu-mailbox
+Agreed.
 
-Please quote git URLs ... I guessed you meant
-git://github.com/sumananna/mailbox.git, branch dbx500-prcmu-mailbox ?
+> about adding my acked-by.  It's a simple and good rule to follow.
+> 
+Yeah, I know. So if you want to add your ack on drivers/clk stuff for this series in samsung tree, please let me know.
 
-Added from today.
+Thanks, Mike.
 
-Thanks for adding your subsystem tree as a participant of linux-next.  As
-you may know, this is not a judgment of your code.  The purpose of
-linux-next is for integration testing and to lower the impact of
-conflicts between subsystems in the next merge window. 
-
-You will need to ensure that the patches/commits in your tree/series have
-been:
-     * submitted under GPL v2 (or later) and include the Contributor's
-	Signed-off-by,
-     * posted to the relevant mailing list,
-     * reviewed by you (or another maintainer of your subsystem tree),
-     * successfully unit tested, and 
-     * destined for the current or next Linux merge window.
-
-Basically, this should be just what you would send to Linus (or ask him
-to fetch).  It is allowed to be rebased if you deem it necessary.
-
--- 
-Cheers,
-Stephen Rothwell 
-sfr at canb.auug.org.au
-
-Legal Stuff:
-By participating in linux-next, your subsystem tree contributions are
-public and will be included in the linux-next trees.  You may be sent
-e-mail messages indicating errors or other issues when the
-patches/commits from your subsystem tree are merged and tested in
-linux-next.  These messages may also be cross-posted to the linux-next
-mailing list, the linux-kernel mailing list, etc.  The linux-next tree
-project and IBM (my employer) make no warranties regarding the linux-next
-project, the testing procedures, the results, the e-mails, etc.  If you
-don't agree to these ground rules, let me know and I'll remove your tree
-from participation in linux-next.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130322/1e76c8d4/attachment-0001.sig>
+- Kukjin
