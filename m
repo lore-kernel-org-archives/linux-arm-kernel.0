@@ -1,56 +1,81 @@
-From: smoch@web.de (Soeren Moch)
-Date: Thu, 21 Mar 2013 23:16:09 +0100
-Subject: [PATCH] USB: EHCI: fix for leaking isochronous data
-In-Reply-To: <20130321212033.GQ21478@lunn.ch>
-References: <Pine.LNX.4.44L0.1303211659080.1899-100000@iolanthe.rowland.org>
- <Pine.LNX.4.44L0.1303211708470.1899-100000@iolanthe.rowland.org>
- <20130321212033.GQ21478@lunn.ch>
-Message-ID: <514B86A9.60401@web.de>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 21 Mar 2013 14:54:29 -0700
+Subject: [PATCH v2 0/3] clock driver for sunxi
+In-Reply-To: <1361803468-9899-1-git-send-email-emilio@elopez.com.ar>
+References: <1358835176-7197-1-git-send-email-emilio@elopez.com.ar>
+ <1361803468-9899-1-git-send-email-emilio@elopez.com.ar>
+Message-ID: <20130321215429.834.60042@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21.03.2013 22:20, Andrew Lunn wrote:
-> On Thu, Mar 21, 2013 at 05:12:01PM -0400, Alan Stern wrote:
->> On Thu, 21 Mar 2013, Alan Stern wrote:
->>
->>> On Thu, 21 Mar 2013, Soeren Moch wrote:
->>>
->>>> Now I found out what is going on here:
->>>>
->>>> In itd_urb_transaction() we allocate 9 iTDs for each URB with
->>>> number_of_packets == 64 in my case. The iTDs are added to
->>>> sched->td_list. For a frame-aligned scheduling we need 8 iTDs, the 9th
->>>> one is released back to the front of the streams free_list in
->>>> iso_sched_free(). This iTD was cleared after allocation and has a frame
->>>> number of 0 now. So for each allocation when now_frame == 0 we allocate
->>>> from the dma_pool, not from the free_list.
->>>
->>> Okay, that is a problem.  But it shouldn't be such a big problem,
->>> because now_frame should not be equal to 0 very often.
->>
->> Oh, wait, now I get it.  We never reach a steady state, because the
->> free list never shrinks, but occasionally it does increase when
->> now_frame is equal to 0.  Even though that doesn't happen very often,
->> the effects add up.
->>
->> Very good; tomorrow I will send your patch in.
->
-> Hi Alan, Soeren
->
-> Could you word the description a bit better. If Alan did not get it
-> without a bit of thought, few others are going to understand it
-> without a better explanation.
->
-> Thanks
-> 	Andrew
->
+Quoting Emilio L?pez (2013-02-25 06:44:25)
+> Hello everyone,
+> 
+> This patchset adds basic clock support for sunxi devices. Currently, it
+> implements support for the two oscillators, the main PLL, the CPU mux,
+> its three divisor clocks and APB1. With this in place, it is possible to
+> write a cpufreq driver and have it work, and with a little more code,
+> represent the UART clocks correctly (I will be sending a separate
+> patchset for this).
+> 
+> I have tested this driver successfully on a Cubieboard (A10, sun4i)
+> using the cpufreq driver from the linux-sunxi tree after minor
+> modifications (the clock names are not the same).
+> 
+> Any feedback will be highly appreciated
+> 
 
-Alan,
+Emilio,
 
-can you come up with a better explanation, please? I think your 
-description how it is supposed to work from here
-    http://marc.info/?l=linux-usb&m=136345559432055&w=2
-is required to understand the problem and the fix.
+This is a nice series.  I appreciate the amount of comments in the code,
+the kerneldoc and also the added sunxi clock documentation.
+
+Concerning the discussion from the v1 series, I prefer for the struct
+clk instances in the tree to match 1-to-1 with hardware clocks.  As the
+number of clocks in a system scales into the hundreds there are
+certainly advantages to having fewer clocks in the hierarchy, not the
+least of which is more easily associating these objects with hardware
+clocks during a deep debug session.
+
+That can be changed at a later time if you wish.  Do you want me to take
+the series into clk-next or do you just want my ack?
 
 Thanks,
-   Soeren
+Mike
+
+> Thanks,
+> 
+> Emilio
+> 
+> Overview of changes from v1:
+>   * Implement APB1
+>   * Add missing glue for driver that got dropped on torvalds/master
+>   * Drop "fixed gate" code and implement it with two clocks as suggested
+>     by Gregory
+> 
+> Emilio L?pez (3):
+>   clk: arm: sunxi: Add a new clock driver for sunxi SOCs
+>   arm: sunxi: Add clock definitions for the new clock driver
+>   arm: sunxi: Add useful information about sunxi clocks
+> 
+>  Documentation/arm/sunxi/clocks.txt                |  56 ++++
+>  Documentation/devicetree/bindings/clock/sunxi.txt |  44 +++
+>  arch/arm/boot/dts/sunxi.dtsi                      |  83 ++++-
+>  drivers/clk/Makefile                              |   1 +
+>  drivers/clk/sunxi/Makefile                        |   5 +
+>  drivers/clk/sunxi/clk-factors.c                   | 180 +++++++++++
+>  drivers/clk/sunxi/clk-factors.h                   |  27 ++
+>  drivers/clk/sunxi/clk-sunxi.c                     | 362 ++++++++++++++++++++++
+>  drivers/clocksource/sunxi_timer.c                 |   4 +-
+>  include/linux/clk/sunxi.h                         |  22 ++
+>  10 files changed, 779 insertions(+), 5 deletions(-)
+>  create mode 100644 Documentation/arm/sunxi/clocks.txt
+>  create mode 100644 Documentation/devicetree/bindings/clock/sunxi.txt
+>  create mode 100644 drivers/clk/sunxi/Makefile
+>  create mode 100644 drivers/clk/sunxi/clk-factors.c
+>  create mode 100644 drivers/clk/sunxi/clk-factors.h
+>  create mode 100644 drivers/clk/sunxi/clk-sunxi.c
+>  create mode 100644 include/linux/clk/sunxi.h
+> 
+> -- 
+> 1.8.2.rc0
