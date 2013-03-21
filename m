@@ -1,35 +1,38 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 21 Mar 2013 19:07:48 +0000
-Subject: [PATCH 4/6] mfd: db8500-prcmu: get base address from resource
-In-Reply-To: <CACRpkdZhyWdwhYaD69n=US31eTA=FDm6xzbZJndBuXAO0qGUbA@mail.gmail.com>
-References: <1363866553-15054-1-git-send-email-linus.walleij@stericsson.com>
- <1669538.W5XG4BgH9e@wuerfel>
- <CACRpkdZhyWdwhYaD69n=US31eTA=FDm6xzbZJndBuXAO0qGUbA@mail.gmail.com>
-Message-ID: <201303211907.49075.arnd@arndb.de>
+Date: Thu, 21 Mar 2013 19:10:31 +0000
+Subject: [PATCH] USB: EHCI: fix for leaking isochronous data
+In-Reply-To: <20130321173324.GY13280@titan.lakedaemon.net>
+References: <Pine.LNX.4.44L0.1303171320560.26486-100000@netrider.rowland.org>
+ <514B3DBB.3060302@web.de> <20130321173324.GY13280@titan.lakedaemon.net>
+Message-ID: <201303211910.31473.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 21 March 2013, Linus Walleij wrote:
-> On Thu, Mar 21, 2013 at 1:15 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> 
-> > On Thursday 21 March 2013 12:49:11 Linus Walleij wrote:
-> >> -#define PRCM_PLLARM_LOCKP       (_PRCMU_BASE + 0x0a8)
-> >> +#define PRCM_PLLARM_LOCKP       (prcmu_base + 0x0a8)
-> >>  #define PRCM_PLLARM_LOCKP_PRCM_PLLARM_LOCKP3   0x2
-> >
-> > While this is certainly the least invasive way to get rid of _PRCMU_BASE,
-> > it sucks to refer to local variables in macros. How hard would it
-> > be to find all users of these macros and put the prcmu_base addition
-> > there?
-> >
-> > The rest of this patch looks fine to me.
-> 
-> Basically I didn't want to disturb Lo?cs work on PRCMU refactoring,
-> but if it is require I can surely do this.
+On Thursday 21 March 2013, Jason Cooper wrote:
+> On Thu, Mar 21, 2013 at 06:04:59PM +0100, Soeren Moch wrote:
 
-That's probably a good enough reason to leave it alone for now, but we
-should remember to fix it up later.
+> > 
+> > Now I found out what is going on here:
+> > 
+> > In itd_urb_transaction() we allocate 9 iTDs for each URB with
+> > number_of_packets == 64 in my case. The iTDs are added to
+> > sched->td_list. For a frame-aligned scheduling we need 8 iTDs, the
+> > 9th one is released back to the front of the streams free_list in
+> > iso_sched_free(). This iTD was cleared after allocation and has a
+> > frame number of 0 now. So for each allocation when now_frame == 0 we
+> > allocate from the dma_pool, not from the free_list. The attached
+> > patch invalidates the frame number in each iTD before it is sent to
+> > the scheduler. This fixes the problem without the need to iterate
+> > over a iTD list.
+> > 
+> > Signed-off-by: Soeren Moch <smoch@web.de>
+> 
+> Wow!  Great work Soeren!  Talk about a long road to a small fix.  Thanks
+> for keeping after it.
 
-How about adding a comment in the header so we don't forget about it?
++1
+
+I hardly understand half of the description above, but that much sounds
+plausible. Is this a bug fix that should get backported to stable kernels?
 
 	Arnd
