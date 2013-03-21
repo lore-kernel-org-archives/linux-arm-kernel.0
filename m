@@ -1,87 +1,112 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 21 Mar 2013 11:01:35 +0100
-Subject: [PATCH] rtc: at91rm9200: add DT support
-In-Reply-To: <5139ABEF.2000408@atmel.com>
-References: <1360879147-17273-1-git-send-email-manabian@gmail.com>
- <5139ABEF.2000408@atmel.com>
-Message-ID: <514ADA7F.7070303@atmel.com>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Thu, 21 Mar 2013 03:02:38 -0700 (PDT)
+Subject: [PATCH 2/3 v3] ARM: shmobile: r8a7778 SCIF support
+In-Reply-To: <878v5hf4zr.wl%kuninori.morimoto.gx@renesas.com>
+References: <87hakhrpmn.wl%kuninori.morimoto.gx@renesas.com>
+ <878v5hf4zr.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <87620lf4ud.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/08/2013 10:14 AM, Nicolas Ferre :
-> On 02/14/2013 10:59 PM, Joachim Eastwood :
->> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
-> 
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> 
-> Alessandro, do you want to queue this one on your side?
+Add SCIF serial port support to the r8a7778 SoC by
+adding platform devices together with clock bindings.
+DT device description is excluded at this point since
+such bindings are still under development.
 
-Ping?
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+---
+v2 -> v3
 
-Maybe Andrew, you may take this one on your side?
+ - it used platform_device_register_data()
 
-> Best regards,
-> 
->> ---
->>  .../devicetree/bindings/rtc/atmel,at91rm9200-rtc.txt      | 15 +++++++++++++++
->>  drivers/rtc/rtc-at91rm9200.c                              |  9 +++++++++
->>  2 files changed, 24 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/rtc/atmel,at91rm9200-rtc.txt
->>
->> diff --git a/Documentation/devicetree/bindings/rtc/atmel,at91rm9200-rtc.txt b/Documentation/devicetree/bindings/rtc/atmel,at91rm9200-rtc.txt
->> new file mode 100644
->> index 0000000..2a3feab
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/rtc/atmel,at91rm9200-rtc.txt
->> @@ -0,0 +1,15 @@
->> +Atmel AT91RM9200 Real Time Clock
->> +
->> +Required properties:
->> +- compatible: should be: "atmel,at91rm9200-rtc"
->> +- reg: physical base address of the controller and length of memory mapped
->> +  region.
->> +- interrupts: rtc alarm/event interrupt
->> +
->> +Example:
->> +
->> +rtc at fffffe00 {
->> +	compatible = "atmel,at91rm9200-rtc";
->> +	reg = <0xfffffe00 0x100>;
->> +	interrupts = <1 4 7>;
->> +};
->> diff --git a/drivers/rtc/rtc-at91rm9200.c b/drivers/rtc/rtc-at91rm9200.c
->> index b6469e2..2ea0ee3 100644
->> --- a/drivers/rtc/rtc-at91rm9200.c
->> +++ b/drivers/rtc/rtc-at91rm9200.c
->> @@ -28,6 +28,8 @@
->>  #include <linux/ioctl.h>
->>  #include <linux/completion.h>
->>  #include <linux/io.h>
->> +#include <linux/of.h>
->> +#include <linux/of_device.h>
->>  
->>  #include <asm/uaccess.h>
->>  
->> @@ -382,12 +384,19 @@ static const struct dev_pm_ops at91_rtc_pm = {
->>  #define at91_rtc_pm_ptr	NULL
->>  #endif
->>  
->> +static const struct of_device_id at91_rtc_dt_ids[] = {
->> +	{ .compatible = "atmel,at91rm9200-rtc" },
->> +	{ /* sentinel */ }
->> +};
->> +MODULE_DEVICE_TABLE(of, at91_rtc_dt_ids);
->> +
->>  static struct platform_driver at91_rtc_driver = {
->>  	.remove		= __exit_p(at91_rtc_remove),
->>  	.driver		= {
->>  		.name	= "at91_rtc",
->>  		.owner	= THIS_MODULE,
->>  		.pm	= at91_rtc_pm_ptr,
->> +		.of_match_table = of_match_ptr(at91_rtc_dt_ids),
->>  	},
->>  };
+ arch/arm/mach-shmobile/clock-r8a7778.c |   13 +++++++++++++
+ arch/arm/mach-shmobile/setup-r8a7778.c |   26 ++++++++++++++++++++++++++
+ 2 files changed, 39 insertions(+)
 
-
+diff --git a/arch/arm/mach-shmobile/clock-r8a7778.c b/arch/arm/mach-shmobile/clock-r8a7778.c
+index 387e3b7..f1277f4 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7778.c
++++ b/arch/arm/mach-shmobile/clock-r8a7778.c
+@@ -58,16 +58,29 @@ static struct clk *main_clks[] = {
+ };
+ 
+ enum {
++	MSTP026, MSTP025, MSTP024, MSTP023, MSTP022, MSTP021,
+ 	MSTP016, MSTP015,
+ 	MSTP_NR };
+ 
+ static struct clk mstp_clks[MSTP_NR] = {
++	[MSTP026] = SH_CLK_MSTP32(&clkp, MSTPCR0, 26, 0), /* SCIF0 */
++	[MSTP025] = SH_CLK_MSTP32(&clkp, MSTPCR0, 25, 0), /* SCIF1 */
++	[MSTP024] = SH_CLK_MSTP32(&clkp, MSTPCR0, 24, 0), /* SCIF2 */
++	[MSTP023] = SH_CLK_MSTP32(&clkp, MSTPCR0, 23, 0), /* SCIF3 */
++	[MSTP022] = SH_CLK_MSTP32(&clkp, MSTPCR0, 22, 0), /* SCIF4 */
++	[MSTP021] = SH_CLK_MSTP32(&clkp, MSTPCR0, 21, 0), /* SCIF5 */
+ 	[MSTP016] = SH_CLK_MSTP32(&clkp, MSTPCR0, 16, 0), /* TMU0 */
+ 	[MSTP015] = SH_CLK_MSTP32(&clkp, MSTPCR0, 15, 0), /* TMU1 */
+ };
+ 
+ static struct clk_lookup lookups[] = {
+ 	/* MSTP32 clocks */
++	CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP026]), /* SCIF0 */
++	CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP025]), /* SCIF1 */
++	CLKDEV_DEV_ID("sh-sci.2", &mstp_clks[MSTP024]), /* SCIF2 */
++	CLKDEV_DEV_ID("sh-sci.3", &mstp_clks[MSTP023]), /* SCIF3 */
++	CLKDEV_DEV_ID("sh-sci.4", &mstp_clks[MSTP022]), /* SCIF4 */
++	CLKDEV_DEV_ID("sh-sci.5", &mstp_clks[MSTP021]), /* SCIF6 */
+ 	CLKDEV_DEV_ID("sh_tmu.0", &mstp_clks[MSTP016]), /* TMU00 */
+ 	CLKDEV_DEV_ID("sh_tmu.1", &mstp_clks[MSTP015]), /* TMU01 */
+ };
+diff --git a/arch/arm/mach-shmobile/setup-r8a7778.c b/arch/arm/mach-shmobile/setup-r8a7778.c
+index 811ccf3..01c62be 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7778.c
++++ b/arch/arm/mach-shmobile/setup-r8a7778.c
+@@ -25,6 +25,7 @@
+ #include <linux/of_platform.h>
+ #include <linux/platform_device.h>
+ #include <linux/irqchip.h>
++#include <linux/serial_sci.h>
+ #include <linux/sh_timer.h>
+ #include <mach/irqs.h>
+ #include <mach/r8a7778.h>
+@@ -32,6 +33,26 @@
+ #include <asm/mach/arch.h>
+ #include <asm/hardware/cache-l2x0.h>
+ 
++/* SCIF */
++#define SCIF_INFO(baseaddr, irq)				\
++{								\
++	.mapbase	= baseaddr,				\
++	.flags		= UPF_BOOT_AUTOCONF | UPF_IOREMAP,	\
++	.scscr		= SCSCR_RE | SCSCR_TE | SCSCR_CKE1,	\
++	.scbrr_algo_id	= SCBRR_ALGO_2,				\
++	.type		= PORT_SCIF,				\
++	.irqs		= SCIx_IRQ_MUXED(irq),			\
++}
++
++static struct plat_sci_port scif_platform_data[] = {
++	SCIF_INFO(0xffe40000, gic_iid(0x66)),
++	SCIF_INFO(0xffe41000, gic_iid(0x67)),
++	SCIF_INFO(0xffe42000, gic_iid(0x68)),
++	SCIF_INFO(0xffe43000, gic_iid(0x69)),
++	SCIF_INFO(0xffe44000, gic_iid(0x6a)),
++	SCIF_INFO(0xffe45000, gic_iid(0x6b)),
++};
++
+ /* TMU */
+ static struct resource sh_tmu0_resources[] = {
+ 	DEFINE_RES_MEM(0xffd80008, 12),
+@@ -88,6 +109,11 @@ void __init r8a7778_add_standard_devices(void)
+ 	}
+ #endif
+ 
++	for (i = 0; i < ARRAY_SIZE(scif_platform_data); i++)
++		platform_device_register_data(&platform_bus, "sh-sci", i,
++					      &scif_platform_data[i],
++					      sizeof(struct plat_sci_port));
++
+ 	for (i = 0; i < ARRAY_SIZE(platform_devinfo); i++)
+ 		platform_device_register_full(&platform_devinfo[i]);
+ }
 -- 
-Nicolas Ferre
+1.7.9.5
