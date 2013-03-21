@@ -1,28 +1,37 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 21 Mar 2013 10:41:17 -0400
-Subject: [PATCH 08/16] thermal: mvebu: Fix temperature output formula
- for kirkwood
-In-Reply-To: <1363818997-23137-9-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1363818997-23137-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1363818997-23137-9-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20130321144117.GW13280@titan.lakedaemon.net>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Thu, 21 Mar 2013 20:12:17 +0530
+Subject: [PATCH] ARM: OMAP4: Enable fix for Cortex-A9 erratas
+Message-ID: <1363876938-31724-1-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 20, 2013 at 07:36:29PM -0300, Ezequiel Garcia wrote:
-> The temperature formula was taken from the Armada 510 datasheet.
-> This is wrong because the Kirkwood SoC thermal sensor has
-> different coefficients.
-> 
-> Fix it using values from 88F682/88F683 Kirkwood datasheet.
-> 
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
->  drivers/thermal/mvebu_thermal.c |    7 +------
->  1 files changed, 1 insertions(+), 6 deletions(-)
+This enables the fixes for the below erratas
+applicable for OMAP4 Socs.
 
-This is also a fix which should go at the beginning of the series.
+754322: Faulty MMU translations following ASID switch
 
-thx,
+775420: A data cache maintenance operation which aborts,
+        followed by an ISB, without any DSB in-between,
+        might lead to deadlock
 
-Jason.
+Signed-off-by: Sricharan R <r.sricharan@ti.com>
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+ arch/arm/mach-omap2/Kconfig |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index c3477e7..c4a3f3f 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -73,6 +73,8 @@ config ARCH_OMAP4
+ 	select PM_RUNTIME if CPU_IDLE
+ 	select USB_ARCH_HAS_EHCI if USB_SUPPORT
+ 	select COMMON_CLK
++	select ARM_ERRATA_754322
++	select ARM_ERRATA_775420
+ 
+ config SOC_OMAP5
+ 	bool "TI OMAP5"
+-- 
+1.7.9.5
