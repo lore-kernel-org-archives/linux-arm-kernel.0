@@ -1,66 +1,70 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 21 Mar 2013 15:59:07 +0000
-Subject: [PATCH 10/46] regulator: ab8500-ext: Add suspend support
+Date: Thu, 21 Mar 2013 15:59:08 +0000
+Subject: [PATCH 11/46] regulator: ab8500: Remove USB regulator
 In-Reply-To: <1363881583-15234-1-git-send-email-lee.jones@linaro.org>
 References: <1363881583-15234-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1363881583-15234-11-git-send-email-lee.jones@linaro.org>
+Message-ID: <1363881583-15234-12-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bengt Jonsson <bengt.g.jonsson@stericsson.com>
-
-Operations regulator_suspend_enable and regulator_suspend_disable
-are added.
+The USB regulator is controlled by hardware. The software support
+was only needed for early hardware (ED) which is no longer supported.
 
 Signed-off-by: Bengt Jonsson <bengt.g.jonsson@stericsson.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
-Reviewed-by: Mattias NILSSON <mattias.i.nilsson@stericsson.com>
-Reviewed-by: Jonas ABERG <jonas.aberg@stericsson.com>
 ---
- drivers/regulator/ab8500-ext.c |   16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ drivers/regulator/ab8500.c       |   19 -------------------
+ include/linux/regulator/ab8500.h |    1 -
+ 2 files changed, 20 deletions(-)
 
-diff --git a/drivers/regulator/ab8500-ext.c b/drivers/regulator/ab8500-ext.c
-index 303c02c..3af40fd 100644
---- a/drivers/regulator/ab8500-ext.c
-+++ b/drivers/regulator/ab8500-ext.c
-@@ -104,6 +104,13 @@ static int ab8500_ext_regulator_enable(struct regulator_dev *rdev)
- 	return ret;
- }
- 
-+static int ab8500_ext_regulator_set_suspend_enable(struct regulator_dev *rdev)
-+{
-+	dev_dbg(rdev_get_dev(rdev), "suspend: ");
-+
-+	return ab8500_ext_regulator_enable(rdev);
-+}
-+
- static int disable(struct ab8500_ext_regulator_info *info, u8 *regval)
- {
- 	int ret;
-@@ -149,6 +156,13 @@ static int ab8500_ext_regulator_disable(struct regulator_dev *rdev)
- 	return ret;
- }
- 
-+static int ab8500_ext_regulator_set_suspend_disable(struct regulator_dev *rdev)
-+{
-+	dev_dbg(rdev_get_dev(rdev), "suspend: ");
-+
-+	return ab8500_ext_regulator_disable(rdev);
-+}
-+
- static int ab8500_ext_regulator_is_enabled(struct regulator_dev *rdev)
- {
- 	int ret;
-@@ -274,7 +288,9 @@ static int ab8500_ext_list_voltage(struct regulator_dev *rdev,
- 
- static struct regulator_ops ab8500_ext_regulator_ops = {
- 	.enable			= ab8500_ext_regulator_enable,
-+	.set_suspend_enable	= ab8500_ext_regulator_set_suspend_enable,
- 	.disable		= ab8500_ext_regulator_disable,
-+	.set_suspend_disable	= ab8500_ext_regulator_set_suspend_disable,
- 	.is_enabled		= ab8500_ext_regulator_is_enabled,
- 	.set_mode		= ab8500_ext_regulator_set_mode,
- 	.get_mode		= ab8500_ext_regulator_get_mode,
+diff --git a/drivers/regulator/ab8500.c b/drivers/regulator/ab8500.c
+index 7d4006e..dfe191c 100644
+--- a/drivers/regulator/ab8500.c
++++ b/drivers/regulator/ab8500.c
+@@ -494,24 +494,6 @@ static struct ab8500_regulator_info
+ 		.update_val_idle	= 0x82,
+ 		.update_val_normal	= 0x02,
+ 	},
+-	[AB8500_LDO_USB] = {
+-		.desc = {
+-			.name           = "LDO-USB",
+-			.ops            = &ab8500_regulator_fixed_ops,
+-			.type           = REGULATOR_VOLTAGE,
+-			.id             = AB8500_LDO_USB,
+-			.owner          = THIS_MODULE,
+-			.n_voltages     = 1,
+-			.min_uV		= 3300000,
+-		},
+-		.update_bank            = 0x03,
+-		.update_reg             = 0x82,
+-		.update_mask            = 0x03,
+-	},
+-
+-	/*
+-	 * Regulators with fixed voltage and normal mode
+-	 */
+ 	[AB8500_LDO_AUDIO] = {
+ 		.desc = {
+ 			.name		= "LDO-AUDIO",
+@@ -912,7 +894,6 @@ static struct of_regulator_match ab8500_regulator_matches[] = {
+ 	{ .name	= "ab8500_ldo_aux3",    .driver_data = (void *) AB8500_LDO_AUX3, },
+ 	{ .name	= "ab8500_ldo_intcore", .driver_data = (void *) AB8500_LDO_INTCORE, },
+ 	{ .name	= "ab8500_ldo_tvout",   .driver_data = (void *) AB8500_LDO_TVOUT, },
+-	{ .name = "ab8500_ldo_usb",     .driver_data = (void *) AB8500_LDO_USB, },
+ 	{ .name = "ab8500_ldo_audio",   .driver_data = (void *) AB8500_LDO_AUDIO, },
+ 	{ .name	= "ab8500_ldo_anamic1", .driver_data = (void *) AB8500_LDO_ANAMIC1, },
+ 	{ .name	= "ab8500_ldo_amamic2", .driver_data = (void *) AB8500_LDO_ANAMIC2, },
+diff --git a/include/linux/regulator/ab8500.h b/include/linux/regulator/ab8500.h
+index 0a58db2..9a2da6a 100644
+--- a/include/linux/regulator/ab8500.h
++++ b/include/linux/regulator/ab8500.h
+@@ -19,7 +19,6 @@ enum ab8500_regulator_id {
+ 	AB8500_LDO_AUX3,
+ 	AB8500_LDO_INTCORE,
+ 	AB8500_LDO_TVOUT,
+-	AB8500_LDO_USB,
+ 	AB8500_LDO_AUDIO,
+ 	AB8500_LDO_ANAMIC1,
+ 	AB8500_LDO_ANAMIC2,
 -- 
 1.7.10.4
