@@ -1,27 +1,31 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 21 Mar 2013 15:38:50 +0400
-Subject: [PATCH 00/04] ARM: shmobile: r8a7790 SoC and Lager board support
-In-Reply-To: <20130320143604.32377.32634.sendpatchset@w520>
-References: <20130320143604.32377.32634.sendpatchset@w520>
-Message-ID: <514AF14A.4020308@cogentembedded.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 21 Mar 2013 12:39:49 +0100
+Subject: [PATCHv3 00/14] drivers: mailbox: framework creation
+In-Reply-To: <1363145021-14339-1-git-send-email-s-anna@ti.com>
+References: <1363145021-14339-1-git-send-email-s-anna@ti.com>
+Message-ID: <CACRpkdYpJLdTx_sVyLj+MVzXqcyfucyP8qy_b_8jiArU+NSMfQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Wed, Mar 13, 2013 at 4:23 AM, Suman Anna <s-anna@ti.com> wrote:
 
-On 20-03-2013 18:36, Magnus Damm wrote:
+> Please find the updated mailbox patch series for pulling into linux-next.
+> The series is rebased on top of 3.9-rc2, and includes one new patch to
+> rename an existing mailbox.h added as part of the highbank cpufreq
+> support for 3.9 merge window [1].
 
-> ARM: shmobile: r8a7790 SoC and Lager board support
+ARM SoC folks:
 
-> [PATCH 01/04] ARM: shmobile: Initial r8a7790 SoC support
-> [PATCH 02/04] ARM: shmobile: r8a7790 SCIF support
-> [PATCH 03/04] ARM: shmobile: r8a7790 IRQC support
-> [PATCH 04/04] ARM: shmobile: Lager support
->
-> This series adds initial support for r8a7790 and Lager. The SoC
-> is known as r8a7790 which is built around Cortex-A15 and makes use
-> of SCIF for serial and IRQC interrupt controller for external IRQs.
+would you consider pulling this stuff into the ARM SoC tree?
 
-    Is it the same as R-Car H2?
+It turns out that ux500 multiplatform support is sort of relying
+on this refactoring since it helps us to break apart the huge
+PRCMU driver.
 
-WBR, Sergei
+I am proceeding with my multiplatform work but things like
+this not being upstream will make the patches look ugly
+and I cannot quite consider it properly done before this is
+fixed too.
+
+Yours,
+Linus Walleij
