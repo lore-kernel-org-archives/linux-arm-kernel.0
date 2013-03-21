@@ -1,51 +1,50 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Thu, 21 Mar 2013 16:40:55 +0100
-Subject: [PATCH 3/3] ARM: EXYNOS5250: Register architected timers
-In-Reply-To: <51421FDA.8070507@cogentembedded.com>
-References: <1363222742-15220-1-git-send-email-agraf@suse.de>
- <1363222742-15220-4-git-send-email-agraf@suse.de>
- <51421FDA.8070507@cogentembedded.com>
-Message-ID: <FA105342-1A3A-41E5-87B2-31E9802AD31D@suse.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 21 Mar 2013 16:05:45 +0100
+Subject: [PATCH] DTS at91sam9x5ek: i2c1 and i2c2 conflict with macb and lcd
+In-Reply-To: <1363778575-4809-1-git-send-email-richard.genoud@gmail.com>
+References: <1363778575-4809-1-git-send-email-richard.genoud@gmail.com>
+Message-ID: <514B21C9.8050108@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 03/20/2013 12:22 PM, Richard Genoud :
+> on at91sam9x5ek, macb0 is enabled, so it conflicts with i2c2 (PB4)
+> same for i2c1, (conflicts with LCD).
+> Moreover, only i2c0 is used on this board.
+> 
+> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
 
-On 14.03.2013, at 20:07, Sergei Shtylyov wrote:
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-> Hello.
-> 
-> On 14-03-2013 4:59, Alexander Graf wrote:
-> 
->> When running on an exynos 5250 SoC, we don't initialize the architected
->> timers. The chip however supports architected timers.
-> 
->> When we don't initialize them, KVM will try to access them and run into
->> NULL pointer dereferences attempting to do so.
-> 
->> This patch is really more of a hack than a real fix, but does get me
->> working with KVM on Arndale.
-> 
->> Signed-off-by: Alexander Graf <agraf@suse.de>
->> ---
->>  arch/arm/mach-exynos/mct.c |    4 ++++
->>  1 file changed, 4 insertions(+)
-> 
->> diff --git a/arch/arm/mach-exynos/mct.c b/arch/arm/mach-exynos/mct.c
->> index c9d6650..eefb8af 100644
->> --- a/arch/arm/mach-exynos/mct.c
->> +++ b/arch/arm/mach-exynos/mct.c
->> @@ -482,4 +482,8 @@ void __init exynos4_timer_init(void)
->>  	exynos4_timer_resources();
->>  	exynos4_clocksource_init();
->>  	exynos4_clockevent_init();
->> +
->> +	if (soc_is_exynos5250()) {
->> +		arch_timer_of_register();
->> +	}
-> 
->   {} not needed here. scripts/checkpatch.pl should probabl;y warn about it.
+And pushed to at91-3.10-dt branch.
 
-Yeah, I'd leave it to whoever wants to apply this patch to remove the braces :). IMHO it's not worth it to respin just for this.
+Thanks,
+
+> ---
+>  arch/arm/boot/dts/at91sam9x5ek.dtsi |    8 --------
+>  1 files changed, 0 insertions(+), 8 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/at91sam9x5ek.dtsi b/arch/arm/boot/dts/at91sam9x5ek.dtsi
+> index 8a7cf1d..1128565 100644
+> --- a/arch/arm/boot/dts/at91sam9x5ek.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9x5ek.dtsi
+> @@ -61,14 +61,6 @@
+>  				status = "okay";
+>  			};
+>  
+> -			i2c1: i2c at f8014000 {
+> -				status = "okay";
+> -			};
+> -
+> -			i2c2: i2c at f8018000 {
+> -				status = "okay";
+> -			};
+> -
+>  			pinctrl at fffff400 {
+>  				mmc0 {
+>  					pinctrl_board_mmc0: mmc0-board {
+> 
 
 
-Alex
+-- 
+Nicolas Ferre
