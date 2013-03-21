@@ -1,67 +1,66 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Thu, 21 Mar 2013 19:17:43 +0530
-Subject: [PATCH V2 4/4] ARM: tegra: enable Tegra114 based platform PMICs
-In-Reply-To: <1363873663-19272-1-git-send-email-ldewangan@nvidia.com>
-References: <1363873663-19272-1-git-send-email-ldewangan@nvidia.com>
-Message-ID: <1363873663-19272-5-git-send-email-ldewangan@nvidia.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 21 Mar 2013 15:54:06 +0200
+Subject: [RFC][PATCH 1/2] ARM: OMAP4: clock: Add device tree support for
+ AUXCLKs
+In-Reply-To: <514B0650.5070406@ti.com>
+References: <1363703220-4777-1-git-send-email-rogerq@ti.com>
+ <1363703220-4777-2-git-send-email-rogerq@ti.com> <514B0650.5070406@ti.com>
+Message-ID: <514B10FE.1000805@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-NVIDIA's Tegra114 has two reference platforms, Dalmore and Pluto.
-Dalmore uses following PMICs:
-- TPS65913 as primary PMIC.
-- TPS65090 as secondary PMIC used for switch regulators and battery charging.
-- TPS51632 for CPU regulator.
+On 03/21/2013 03:08 PM, Rajendra Nayak wrote:
+> []..
+> 
+>> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+>> index 0274ff7..23f2064 100644
+>> --- a/arch/arm/mach-omap2/board-generic.c
+>> +++ b/arch/arm/mach-omap2/board-generic.c
+>> @@ -158,7 +158,7 @@ DT_MACHINE_START(OMAP4_DT, "Generic OMAP4 (Flattened Device Tree)")
+>>  	.init_irq	= omap_gic_of_init,
+>>  	.init_machine	= omap_generic_init,
+>>  	.init_late	= omap4430_init_late,
+>> -	.init_time	= omap4_local_timer_init,
+>> +	.init_time	= omap4_init_time,
+>>  	.dt_compat	= omap4_boards_compat,
+>>  	.restart	= omap44xx_restart,
+>>  MACHINE_END
+> 
+> []..
+>> +#ifdef CONFIG_OF
+>> +int __init omap4_clk_init_dt(void)
+>> +{
+>> +	struct device_node *np;
+>> +
+>> +	np = of_find_compatible_node(NULL, NULL, "ti,omap4-scrm");
+>> +	if (np) {
+>> +		scrm_data.clks = scrm_clks;
+>> +		scrm_data.clk_num = ARRAY_SIZE(scrm_clks);
+>> +		of_clk_add_provider(np, of_clk_src_onecell_get,	&scrm_data);
+>> +	}
+>> +
+>> +	return 0;
+>> +}
+> 
+> []..
+>> +
+>> +void __init omap4_init_time(void)
+>> +{
+>> +	omap4_clk_init_dt();
+>> +	omap4_local_timer_init();
+>> +}
+> 
+> I guess you did all this because of_clk_add_provider() needs
+> slab to be initialized. With the below patch[1], now clk inits
+> happen within .init_timer already, so none of this would
+> be needed.
+> 
+> [1] http://www.spinics.net/lists/arm-kernel/msg231288.html
+> 
 
-Pluto uses only TPS65913.
+Right. I can then call omap4_clk_init_dt() from within omap4xxx_clk_init().
 
-Enable config variable for these PMICs for Dalomore and Pluto.
+Any comments about the main subject? Does the approach look fine?
 
-Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
----
-Changes from V1:
-- Rearrange patch to make it 4th patch.
-
- arch/arm/configs/tegra_defconfig |    7 +++++++
- 1 files changed, 7 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
-index aba4881..34b9342 100644
---- a/arch/arm/configs/tegra_defconfig
-+++ b/arch/arm/configs/tegra_defconfig
-@@ -126,6 +126,7 @@ CONFIG_SPI=y
- CONFIG_SPI_TEGRA20_SFLASH=y
- CONFIG_SPI_TEGRA20_SLINK=y
- CONFIG_GPIO_PCA953X_IRQ=y
-+CONFIG_GPIO_PALMAS=y
- CONFIG_GPIO_TPS6586X=y
- CONFIG_GPIO_TPS65910=y
- CONFIG_POWER_SUPPLY=y
-@@ -136,12 +137,17 @@ CONFIG_SENSORS_LM90=y
- CONFIG_MFD_TPS6586X=y
- CONFIG_MFD_TPS65910=y
- CONFIG_MFD_MAX8907=y
-+CONFIG_MFD_TPS65090=y
-+CONFIG_MFD_PALMAS=y
- CONFIG_REGULATOR=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
- CONFIG_REGULATOR_VIRTUAL_CONSUMER=y
- CONFIG_REGULATOR_GPIO=y
- CONFIG_REGULATOR_MAX8907=y
-+CONFIG_REGULATOR_PALMAS=y
-+CONFIG_REGULATOR_TPS51632=y
- CONFIG_REGULATOR_TPS62360=y
-+CONFIG_REGULATOR_TPS65090=y
- CONFIG_REGULATOR_TPS6586X=y
- CONFIG_REGULATOR_TPS65910=y
- CONFIG_MEDIA_SUPPORT=y
-@@ -191,6 +197,7 @@ CONFIG_RTC_INTF_SYSFS=y
- CONFIG_RTC_INTF_PROC=y
- CONFIG_RTC_INTF_DEV=y
- CONFIG_RTC_DRV_MAX8907=y
-+CONFIG_RTC_DRV_PALMAS=y
- CONFIG_RTC_DRV_TPS6586X=y
- CONFIG_RTC_DRV_TPS65910=y
- CONFIG_RTC_DRV_EM3027=y
--- 
-1.7.1.1
+cheers,
+-roger
