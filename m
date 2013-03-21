@@ -1,53 +1,44 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 21 Mar 2013 20:18:07 +0100
-Subject: [PATCH 5/5] arm: dts: Convert mvebu device tree files to 64 bits
-In-Reply-To: <201303211903.52383.arnd@arndb.de>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 21 Mar 2013 20:18:05 +0100
+Subject: [PATCH 2/5] arm: mvebu: Select DMA_BOUNCE when LPAE is selected
+ in Kconfig
+In-Reply-To: <1363883179-1361-3-git-send-email-gregory.clement@free-electrons.com>
 References: <1363883179-1361-1-git-send-email-gregory.clement@free-electrons.com>
- <1363883179-1361-6-git-send-email-gregory.clement@free-electrons.com>
- <514B4A79.1070501@gmail.com> <201303211903.52383.arnd@arndb.de>
-Message-ID: <20130321201807.7cb04978@skate>
+ <1363883179-1361-3-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20130321191805.GM21478@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Arnd Bergmann,
-
-On Thu, 21 Mar 2013 19:03:52 +0000, Arnd Bergmann wrote:
-> On Thursday 21 March 2013, Rob Herring wrote:
-> > >       soc {
-> > > -             #address-cells = <1>;
-> > > -             #size-cells = <1>;
-> > > +             #address-cells = <2>;
-> > > +             #size-cells = <2>;
-> > 
-> > If all the addresses for the soc bus are below 4GB or even within a 4GB
-> > range if using the ranges property, then changing all this and
-> > everything below it is kind of pointless.
+On Thu, Mar 21, 2013 at 05:26:15PM +0100, Gregory CLEMENT wrote:
+> From: Lior Amsalem <alior@marvell.com>
 > 
-> Good point. We'll probably also have to change it all again when we add a new
-> binding for that bus in 3.10, so it makes sense to change it only once.
+> For mvebu IOs are 32 bits and we have 40 bits memory due to LPAE so
+> make sure we give 32 bits addresses to the IOs.
 
-In the mean time can we do something like:
+Hi Gregory, Lior
 
-	soc {
-		compatible = "simple-bus";
-		range = <...>;
+I don't really understand what this comment is supposed to mean. I
+would of expect DMA and bounce to appear at least....
 
-		[... all the peripherals ...]
-	};
-
-with the range = <...> property converting the peripheral registers
-base address (expressed as offsets in the reg = <...> properties of the
-subnodes) into the absolute physical address?
-
-I'm planning to work on the DT binding for the mvebu-mbus driver as
-soon as the PCIe driver gets accepted, but it would be good to have an
-intermediate solution to get the LPAE support in.
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> Signed-off-by: Lior Amsalem <alior@marvell.com>
+> Tested-by: Franklin <flin@marvell.com>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  arch/arm/mach-mvebu/Kconfig |    1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+> index 440b13e..617da94 100644
+> --- a/arch/arm/mach-mvebu/Kconfig
+> +++ b/arch/arm/mach-mvebu/Kconfig
+> @@ -13,6 +13,7 @@ config ARCH_MVEBU
+>  	select MVEBU_CLK_CORE
+>  	select MVEBU_CLK_CPU
+>  	select MVEBU_CLK_GATING
+> +	select DMABOUNCE if ARM_LPAE
+>  
+>  if ARCH_MVEBU
+>  
+> -- 
+> 1.7.9.5
+> 
