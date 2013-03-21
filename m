@@ -1,49 +1,66 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 21 Mar 2013 16:08:45 +0530
-Subject: [PATCH] DMA: OF: Check properties value before running
- be32_to_cpup() on it
-In-Reply-To: <CAKohpokeZ7Udc2K_vccC1uPL=QAhpJ-vuoyFKRs84ndpDbVfqg@mail.gmail.com>
-References: <0a0ef15d47393fe9d24a395c38068b871f913776.1363337257.git.viresh.kumar@linaro.org>
- <20130321094609.GM10326@intel.com>
- <CAKohpokeZ7Udc2K_vccC1uPL=QAhpJ-vuoyFKRs84ndpDbVfqg@mail.gmail.com>
-Message-ID: <20130321103845.GR10326@intel.com>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Thu, 21 Mar 2013 11:51:11 +0100
+Subject: [PATCH v3 0/9] refactoring for mask_cache
+In-Reply-To: <1363615255-18200-1-git-send-email-gerlando.falauto@keymile.com>
+References: <1363277430-21325-1-git-send-email-holger.brunck@keymile.com>
+ <1363615255-18200-1-git-send-email-gerlando.falauto@keymile.com>
+Message-ID: <20130321105110.GB16903@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 21, 2013 at 03:48:50PM +0530, Viresh Kumar wrote:
-> On 21 March 2013 15:16, Vinod Koul <vinod.koul@intel.com> wrote:
-> > On Fri, Mar 15, 2013 at 02:18:20PM +0530, Viresh Kumar wrote:
-> >> In of_dma_controller_register() routine we are calling of_get_property() as an
-> >> parameter to be32_to_cpup(). In case the property doesn't exist we will get a
-> >> crash.
-> >>
-> >> This patch changes this code to check if we got a valid property first and then
-> >> runs be32_to_cpup() on it.
-> >>
-> >> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> >> ---
-> >>
-> >> My mails are broken, i have pushed this patch here:
-> > I noticed you used git send-email. Usually it will send patch properly
-> > independent of whatever MUA you use.
+On Mon, Mar 18, 2013 at 03:00:46PM +0100, Gerlando Falauto wrote:
+> Hi everyone,
+> here is a patchset to address the issue found with Orion, in incremental
+> stages as Thomas suggested.
+> a) we introduce the new fields and pointer (though only the shared one is used)
+> b) we convert all drivers to use it 
+> c) we rename the field so to force the use of the per-ct pointer
+> d) we add per-ct mask cache, provided the new flag 
+>    IRQ_GC_SEPARATE_MASK_REGISTERS is enabled
+> e) we enable the flag for orion-gpio and mvebu drivers
 > 
-> Probably not!! Its the famous (Infamous) Microsoft exchange server working in
-> background and it breaks mails without treating mails coming from git send-email
-> specially :)
-I have seen usually receiving patches is a problem, not sending. at least at my
-work place till now my sent patches have not been broken but what I receive has
-thus forcing me to use non exchange accounts for receiving email but somehow situation
-is better for receiving too :)
---
-~Vinod
+> So even though I'm also providing changes for mvebu, I only
+> tested the patch on a 3.0.40 kernel with the plat-orion/gpio.c driver.
+> We currently do not have a working 3.6+ configuration for our Kirkwood
+> boards (3.6 is apparently where this mvebu gpio driver was introduced),
+> so I would be glad if someone could give it a try.
+> I also have no idea whether the three Marvell variants all have separate
+> mask registers (which is what the last patch assumes).
 > 
-> > So I have the patch and its applied now :)
+> Gerlando Falauto (9):
+>   genirq: cosmetic: remove cur_regs
+>   genirq: add mask_cache and pmask_cache into struct irq_chip_type
+>   gpio: mvebu: convert to usage of *pmask_cache within irq_chip_type
+>   MIPS: JZ4740: convert to usage of *pmask_cache within irq_chip_type
+>   ARM: SAMSUNG: convert to usage of *pmask_cache within irq_chip_type
+>   genirq: rename mask_cache to shared_mask_cache
+>   genirq: handle separate mask registers
+>   orion-gpio: enable IRQ_GC_SEPARATE_MASK_REGISTERS
+>   gpio: mvebu: enable IRQ_GC_SEPARATE_MASK_REGISTERS
 > 
-> I have seen this kind of discrimination on breaking patches based on the size of
-> patch. If its very small (like this one), you may get a unbroken patch
-> but if the size
-> is a bit large then nobody can save you :)
+>  arch/arm/plat-orion/gpio.c            |    3 +-
+>  arch/arm/plat-samsung/irq-vic-timer.c |    6 ++--
+>  arch/mips/jz4740/irq.c                |    3 +-
+>  drivers/gpio/gpio-mvebu.c             |   23 ++++++++------
+>  include/linux/irq.h                   |    9 ++++--
+>  kernel/irq/generic-chip.c             |   55 +++++++++++++++++++++------------
+>  6 files changed, 64 insertions(+), 35 deletions(-)
 
-> 
-> --
-> viresh
+Hi Gerlando,
+
+On a Network Space v2 Max board (Kirkwood SoC), I have verified that
+both the GPIO drivers mvebu-gpio and orion-gpio are impacted by the bug.
+
+I have also checked that this patch series fixes the bug for each of
+them.
+
+Thanks
+
+Simon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130321/4a827868/attachment.sig>
