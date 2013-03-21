@@ -1,66 +1,196 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Thu, 21 Mar 2013 11:51:11 +0100
-Subject: [PATCH v3 0/9] refactoring for mask_cache
-In-Reply-To: <1363615255-18200-1-git-send-email-gerlando.falauto@keymile.com>
-References: <1363277430-21325-1-git-send-email-holger.brunck@keymile.com>
- <1363615255-18200-1-git-send-email-gerlando.falauto@keymile.com>
-Message-ID: <20130321105110.GB16903@kw.sim.vm.gnt>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Thu, 21 Mar 2013 16:34:52 +0530
+Subject: [PATCH v2] ARM: OMAP: clocks: Delay clk inits atleast until slab is
+ initialized
+Message-ID: <1363863892-6810-1-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 18, 2013 at 03:00:46PM +0100, Gerlando Falauto wrote:
-> Hi everyone,
-> here is a patchset to address the issue found with Orion, in incremental
-> stages as Thomas suggested.
-> a) we introduce the new fields and pointer (though only the shared one is used)
-> b) we convert all drivers to use it 
-> c) we rename the field so to force the use of the per-ct pointer
-> d) we add per-ct mask cache, provided the new flag 
->    IRQ_GC_SEPARATE_MASK_REGISTERS is enabled
-> e) we enable the flag for orion-gpio and mvebu drivers
-> 
-> So even though I'm also providing changes for mvebu, I only
-> tested the patch on a 3.0.40 kernel with the plat-orion/gpio.c driver.
-> We currently do not have a working 3.6+ configuration for our Kirkwood
-> boards (3.6 is apparently where this mvebu gpio driver was introduced),
-> so I would be glad if someone could give it a try.
-> I also have no idea whether the three Marvell variants all have separate
-> mask registers (which is what the last patch assumes).
-> 
-> Gerlando Falauto (9):
->   genirq: cosmetic: remove cur_regs
->   genirq: add mask_cache and pmask_cache into struct irq_chip_type
->   gpio: mvebu: convert to usage of *pmask_cache within irq_chip_type
->   MIPS: JZ4740: convert to usage of *pmask_cache within irq_chip_type
->   ARM: SAMSUNG: convert to usage of *pmask_cache within irq_chip_type
->   genirq: rename mask_cache to shared_mask_cache
->   genirq: handle separate mask registers
->   orion-gpio: enable IRQ_GC_SEPARATE_MASK_REGISTERS
->   gpio: mvebu: enable IRQ_GC_SEPARATE_MASK_REGISTERS
-> 
->  arch/arm/plat-orion/gpio.c            |    3 +-
->  arch/arm/plat-samsung/irq-vic-timer.c |    6 ++--
->  arch/mips/jz4740/irq.c                |    3 +-
->  drivers/gpio/gpio-mvebu.c             |   23 ++++++++------
->  include/linux/irq.h                   |    9 ++++--
->  kernel/irq/generic-chip.c             |   55 +++++++++++++++++++++------------
->  6 files changed, 64 insertions(+), 35 deletions(-)
+clk inits on OMAP happen quite early, even before slab is available.
+The dependency comes from the fact that the timer init code starts to
+use clocks and hwmod and we need clocks to be initialized by then.
 
-Hi Gerlando,
+There are various problems doing clk inits this early, one is,
+not being able to do dynamic clk registrations and hence the
+dependency on clk-private.h. The other is, inability to debug
+early kernel crashes without enabling DEBUG_LL and earlyprintk.
 
-On a Network Space v2 Max board (Kirkwood SoC), I have verified that
-both the GPIO drivers mvebu-gpio and orion-gpio are impacted by the bug.
+Doing early clk init also exposed another instance of a kernel
+panic due to a BUG() when CONFIG_DEBUG_SLAB is enabled.
 
-I have also checked that this patch series fixes the bug for each of
-them.
+[    0.000000] Kernel BUG at c01174f8 [verbose debug info unavailable]
+[    0.000000] Internal error: Oops - BUG: 0 [#1] SMP ARM
+[    0.000000] Modules linked in:
+[    0.000000] CPU: 0    Not tainted  (3.9.0-rc1-12179-g72d48f9 #6)
+[    0.000000] PC is at __kmalloc+0x1d4/0x248
+[    0.000000] LR is at __clk_init+0x2e0/0x364
+[    0.000000] pc : [<c01174f8>]    lr : [<c0441f54>]    psr: 600001d3
+[    0.000000] sp : c076ff28  ip : c065cefc  fp : c0441f54
+[    0.000000] r10: 0000001c  r9 : 000080d0  r8 : c076ffd4
+[    0.000000] r7 : c074b578  r6 : c0794d88  r5 : 00000040  r4 : 00000000
+[    0.000000] r3 : 00000000  r2 : c07cac70  r1 : 000080d0  r0 : 0000001c
+[    0.000000] Flags: nZCv  IRQs off  FIQs off  Mode SVC_32  ISA ARM  Segment kernel
+[    0.000000] Control: 10c53c7d  Table: 8000404a  DAC: 00000017
+[    0.000000] Process swapper (pid: 0, stack limit = 0xc076e240)
+[    0.000000] Stack: (0xc076ff28 to 0xc0770000)
+[    0.000000] ff20:                   22222222 c0794ec8 c06546e8 00000000 00000040 c0794d88
+[    0.000000] ff40: c074b578 c076ffd4 c07951c8 c076e000 00000000 c0441f54 c074b578 c076ffd4
+[    0.000000] ff60: c0793828 00000040 c0794d88 c074b578 c076ffd4 c0776900 c076e000 c07272ac
+[    0.000000] ff80: 2f800000 c074c968 c07f93d0 c0719780 c076ffa0 c076ff98 00000000 00000000
+[    0.000000] ffa0: 00000000 00000000 00000000 00000001 c074cd6c c077b1ec 8000406a c0715724
+[    0.000000] ffc0: 00000000 00000000 00000000 00000000 00000000 c074c968 10c53c7d c0776974
+[    0.000000] ffe0: c074cd6c c077b1ec 8000406a 411fc092 00000000 80008074 00000000 00000000
+[    0.000000] [<c01174f8>] (__kmalloc+0x1d4/0x248) from [<c0441f54>] (__clk_init+0x2e0/0x364)
+[    0.000000] [<c0441f54>] (__clk_init+0x2e0/0x364) from [<c07272ac>] (omap4xxx_clk_init+0xbc/0x140)
+[    0.000000] [<c07272ac>] (omap4xxx_clk_init+0xbc/0x140) from [<c0719780>] (setup_arch+0x15c/0x284)
+[    0.000000] [<c0719780>] (setup_arch+0x15c/0x284) from [<c0715724>] (start_kernel+0x7c/0x334)
+[    0.000000] [<c0715724>] (start_kernel+0x7c/0x334) from [<80008074>] (0x80008074)
+[    0.000000] Code: e5883004 e1a00006 e28dd00c e8bd8ff0 (e7f001f2)
+[    0.000000] ---[ end trace 1b75b31a2719ed1c ]---
+[    0.000000] Kernel panic - not syncing: Attempted to kill the idle task!
 
-Thanks
+It was a know issue, that slab allocations would fail when common
+clock core tries to cache parent pointers for mux clocks on OMAP,
+and hence a patch 'clk: Allow late cache allocation for clk->parents,
+commit 7975059d' was added to work this problem around.
+A BUG() within kmalloc() with CONFIG_DEBUG_SLAB enabled was completely
+overlooked causing this regression.
 
-Simon
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130321/4a827868/attachment.sig>
+More details on the issue reported can be found here,
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg85932.html
+
+With all these issues around clk inits happening way too early, it
+makes sense to atleast move them to a point where dynamic memory
+allocations are possible. So move them to a point just before the
+timer code starts using clocks and hwmod.
+
+This should atleast pave way for clk inits on OMAP moving to dynamic
+clock registrations instead of using the static macros defined in
+clk-private.h.
+
+The issue with kernel panic while CONFIG_DEBUG_SLAB is enabled
+was reported by Piotr Haber and Tony Lindgren and this patch
+fixes the reported issue as well.
+
+Reported-by: Piotr Haber <phaber@broadcom.com>
+Reported-by: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+---
+applies on 3.9-rc3 and tested on omap4 pandaES, omap3 beagle XM,
+and am335x bone.
+
+v2: updated changelog based on comments from Tony Lindgren
+
+ arch/arm/mach-omap2/common.h |    3 +++
+ arch/arm/mach-omap2/io.c     |   18 ++++++++++++------
+ arch/arm/mach-omap2/timer.c  |    4 ++++
+ 3 files changed, 19 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+index 40f4a03..d6ba13e 100644
+--- a/arch/arm/mach-omap2/common.h
++++ b/arch/arm/mach-omap2/common.h
+@@ -293,5 +293,8 @@ extern void omap_reserve(void);
+ struct omap_hwmod;
+ extern int omap_dss_reset(struct omap_hwmod *);
+ 
++/* SoC specific clock initializer */
++extern int (*omap_clk_init)(void);
++
+ #endif /* __ASSEMBLER__ */
+ #endif /* __ARCH_ARM_MACH_OMAP2PLUS_COMMON_H */
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index 2c3fdd6..5c445ca 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -55,6 +55,12 @@
+ #include "prm44xx.h"
+ 
+ /*
++ * omap_clk_init: points to a function that does the SoC-specific
++ * clock initializations
++ */
++int (*omap_clk_init)(void);
++
++/*
+  * The machine specific code may provide the extra mapping besides the
+  * default mapping provided here.
+  */
+@@ -397,7 +403,7 @@ void __init omap2420_init_early(void)
+ 	omap242x_clockdomains_init();
+ 	omap2420_hwmod_init();
+ 	omap_hwmod_init_postsetup();
+-	omap2420_clk_init();
++	omap_clk_init = omap2420_clk_init;
+ }
+ 
+ void __init omap2420_init_late(void)
+@@ -427,7 +433,7 @@ void __init omap2430_init_early(void)
+ 	omap243x_clockdomains_init();
+ 	omap2430_hwmod_init();
+ 	omap_hwmod_init_postsetup();
+-	omap2430_clk_init();
++	omap_clk_init = omap2430_clk_init;
+ }
+ 
+ void __init omap2430_init_late(void)
+@@ -462,7 +468,7 @@ void __init omap3_init_early(void)
+ 	omap3xxx_clockdomains_init();
+ 	omap3xxx_hwmod_init();
+ 	omap_hwmod_init_postsetup();
+-	omap3xxx_clk_init();
++	omap_clk_init = omap3xxx_clk_init;
+ }
+ 
+ void __init omap3430_init_early(void)
+@@ -500,7 +506,7 @@ void __init ti81xx_init_early(void)
+ 	omap3xxx_clockdomains_init();
+ 	omap3xxx_hwmod_init();
+ 	omap_hwmod_init_postsetup();
+-	omap3xxx_clk_init();
++	omap_clk_init = omap3xxx_clk_init;
+ }
+ 
+ void __init omap3_init_late(void)
+@@ -568,7 +574,7 @@ void __init am33xx_init_early(void)
+ 	am33xx_clockdomains_init();
+ 	am33xx_hwmod_init();
+ 	omap_hwmod_init_postsetup();
+-	am33xx_clk_init();
++	omap_clk_init = am33xx_clk_init;
+ }
+ #endif
+ 
+@@ -593,7 +599,7 @@ void __init omap4430_init_early(void)
+ 	omap44xx_clockdomains_init();
+ 	omap44xx_hwmod_init();
+ 	omap_hwmod_init_postsetup();
+-	omap4xxx_clk_init();
++	omap_clk_init = omap4xxx_clk_init;
+ }
+ 
+ void __init omap4430_init_late(void)
+diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+index 2bdd4cf..f62b509 100644
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -547,6 +547,8 @@ static inline void __init realtime_counter_init(void)
+ 			       clksrc_nr, clksrc_src)			\
+ void __init omap##name##_gptimer_timer_init(void)			\
+ {									\
++	if (omap_clk_init)						\
++		omap_clk_init();					\
+ 	omap_dmtimer_init();						\
+ 	omap2_gp_clockevent_init((clkev_nr), clkev_src, clkev_prop);	\
+ 	omap2_gptimer_clocksource_init((clksrc_nr), clksrc_src);	\
+@@ -556,6 +558,8 @@ void __init omap##name##_gptimer_timer_init(void)			\
+ 				clksrc_nr, clksrc_src)			\
+ void __init omap##name##_sync32k_timer_init(void)		\
+ {									\
++	if (omap_clk_init)						\
++		omap_clk_init();					\
+ 	omap_dmtimer_init();						\
+ 	omap2_gp_clockevent_init((clkev_nr), clkev_src, clkev_prop);	\
+ 	/* Enable the use of clocksource="gp_timer" kernel parameter */	\
+-- 
+1.7.9.5
