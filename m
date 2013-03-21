@@ -1,37 +1,57 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Thu, 21 Mar 2013 12:25:41 +0100
-Subject: [PATCH] ARM: SAMSUNG: Remove useless Samsung GPIO related CONFIG
-Message-ID: <1363865141.1390.120.camel@x61.thuisdomein>
+From: amit.kucheria@linaro.org (Amit Kucheria)
+Date: Thu, 21 Mar 2013 16:55:49 +0530
+Subject: [PATCH] DMA: OF: Check properties value before running
+ be32_to_cpup() on it
+In-Reply-To: <20130321103845.GR10326@intel.com>
+References: <0a0ef15d47393fe9d24a395c38068b871f913776.1363337257.git.viresh.kumar@linaro.org>
+ <20130321094609.GM10326@intel.com>
+ <CAKohpokeZ7Udc2K_vccC1uPL=QAhpJ-vuoyFKRs84ndpDbVfqg@mail.gmail.com>
+ <20130321103845.GR10326@intel.com>
+Message-ID: <CAP245DU68ncXrCTkkO58o6ocmNk8OuiNWH4ZqVr5dOCf3AsMJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Kconfig entry for S3C_GPIO_CFG_S3C64XX was missed by commit
-5ec7414494ed1204c9e2ed0b8232b29860d0986f ("ARM: SAMSUNG: Remove useless
-Samsung GPIO related CONFIGs"). Remove it now.
+On Thu, Mar 21, 2013 at 4:08 PM, Vinod Koul <vinod.koul@intel.com> wrote:
+> On Thu, Mar 21, 2013 at 03:48:50PM +0530, Viresh Kumar wrote:
+>> On 21 March 2013 15:16, Vinod Koul <vinod.koul@intel.com> wrote:
+>> > On Fri, Mar 15, 2013 at 02:18:20PM +0530, Viresh Kumar wrote:
+>> >> In of_dma_controller_register() routine we are calling of_get_property() as an
+>> >> parameter to be32_to_cpup(). In case the property doesn't exist we will get a
+>> >> crash.
+>> >>
+>> >> This patch changes this code to check if we got a valid property first and then
+>> >> runs be32_to_cpup() on it.
+>> >>
+>> >> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+>> >> ---
+>> >>
+>> >> My mails are broken, i have pushed this patch here:
+>> > I noticed you used git send-email. Usually it will send patch properly
+>> > independent of whatever MUA you use.
+>>
+>> Probably not!! Its the famous (Infamous) Microsoft exchange server working in
+>> background and it breaks mails without treating mails coming from git send-email
+>> specially :)
+> I have seen usually receiving patches is a problem, not sending. at least at my
+> work place till now my sent patches have not been broken but what I receive has
+> thus forcing me to use non exchange accounts for receiving email but somehow situation
+> is better for receiving too :)
+> --
+> ~Vinod
+>>
+>> > So I have the patch and its applied now :)
+>>
+>> I have seen this kind of discrimination on breaking patches based on the size of
+>> patch. If its very small (like this one), you may get a unbroken patch
+>> but if the size
+>> is a bit large then nobody can save you :)
 
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
----
-Untested.
+I've seen the Exchange bug in both forms[1]  - munging incoming
+patches as well as outgoing ones. It almost feels like the Exchange
+team's benevolent ploy to get companies to migrate away from Exchange
+so they can end-of-life those servers and stop developing Exchange
+further for the general betterment of humankind.[2]
 
- arch/arm/plat-samsung/Kconfig | 6 ------
- 1 file changed, 6 deletions(-)
-
-diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
-index 663c54f..91c2d72 100644
---- a/arch/arm/plat-samsung/Kconfig
-+++ b/arch/arm/plat-samsung/Kconfig
-@@ -117,12 +117,6 @@ config SAMSUNG_GPIOLIB_4BIT
- 	  configuration. GPIOlib shall be compiled only for S3C64XX and S5P
- 	  series of processors.
- 
--config S3C_GPIO_CFG_S3C64XX
--	bool
--	help
--	  Internal configuration to enable S3C64XX style GPIO configuration
--	  functions.
--
- config S5P_GPIO_DRVSTR
- 	bool
- 	help
--- 
-1.7.11.7
+[1] Since as far back as 8 years ago!
+[2] That or they get bonuses based on how much they disrupt open
+source communities. ;-)
