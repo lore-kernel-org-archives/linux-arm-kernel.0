@@ -1,112 +1,235 @@
 From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Thu, 21 Mar 2013 03:02:38 -0700 (PDT)
-Subject: [PATCH 2/3 v3] ARM: shmobile: r8a7778 SCIF support
+Date: Thu, 21 Mar 2013 03:03:38 -0700 (PDT)
+Subject: [PATCH 3/3 v3] ARM: shmobile: add R-Car M1A Bock-W platform support
 In-Reply-To: <878v5hf4zr.wl%kuninori.morimoto.gx@renesas.com>
 References: <87hakhrpmn.wl%kuninori.morimoto.gx@renesas.com>
  <878v5hf4zr.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <87620lf4ud.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <874ng5f4sq.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add SCIF serial port support to the r8a7778 SoC by
-adding platform devices together with clock bindings.
-DT device description is excluded at this point since
-such bindings are still under development.
+Add basic Bock-W board support
+
+More devices will be added on top of this patch after
+PICNTRL and clock framework are in better shape.
 
 Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 ---
 v2 -> v3
 
- - it used platform_device_register_data()
+ - fixup compatible name
+ - r8a7778_clock_init() is called from board code
 
- arch/arm/mach-shmobile/clock-r8a7778.c |   13 +++++++++++++
- arch/arm/mach-shmobile/setup-r8a7778.c |   26 ++++++++++++++++++++++++++
- 2 files changed, 39 insertions(+)
+ arch/arm/boot/dts/Makefile           |    1 +
+ arch/arm/boot/dts/r8a7778-bockw.dts  |   32 +++++++++++++++++
+ arch/arm/configs/bockw_defconfig     |   66 ++++++++++++++++++++++++++++++++++
+ arch/arm/mach-shmobile/Kconfig       |    6 ++++
+ arch/arm/mach-shmobile/Makefile      |    1 +
+ arch/arm/mach-shmobile/board-bockw.c |   43 ++++++++++++++++++++++
+ 6 files changed, 149 insertions(+)
+ create mode 100644 arch/arm/boot/dts/r8a7778-bockw.dts
+ create mode 100644 arch/arm/configs/bockw_defconfig
+ create mode 100644 arch/arm/mach-shmobile/board-bockw.c
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7778.c b/arch/arm/mach-shmobile/clock-r8a7778.c
-index 387e3b7..f1277f4 100644
---- a/arch/arm/mach-shmobile/clock-r8a7778.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7778.c
-@@ -58,16 +58,29 @@ static struct clk *main_clks[] = {
- };
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index ee9fbe4..363fa507 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -136,6 +136,7 @@ dtb-$(CONFIG_ARCH_U8500) += snowball.dtb \
+ 	ccu9540.dtb
+ dtb-$(CONFIG_ARCH_SHMOBILE) += emev2-kzm9d.dtb \
+ 	r8a7740-armadillo800eva.dtb \
++	r8a7778-bockw.dtb \
+ 	r8a7779-marzen-reference.dtb \
+ 	sh73a0-kzm9g.dtb \
+ 	sh73a0-kzm9g-reference.dtb \
+diff --git a/arch/arm/boot/dts/r8a7778-bockw.dts b/arch/arm/boot/dts/r8a7778-bockw.dts
+new file mode 100644
+index 0000000..735c964
+--- /dev/null
++++ b/arch/arm/boot/dts/r8a7778-bockw.dts
+@@ -0,0 +1,32 @@
++/*
++ * Reference Device Tree Source for the Bock-W board
++ *
++ * Copyright (C) 2013  Renesas Solutions Corp.
++ * Copyright (C) 2013  Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
++ *
++ * based on r8a7779
++ *
++ * Copyright (C) 2013 Renesas Solutions Corp.
++ * Copyright (C) 2013 Simon Horman
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
++
++/dts-v1/;
++/include/ "r8a7778.dtsi"
++
++/ {
++	model = "bockw";
++	compatible = "renesas,bockw", "renesas,r8a7778";
++
++	chosen {
++		bootargs = "console=ttySC0,115200 ignore_loglevel";
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0x60000000 0x10000000>;
++	};
++};
+diff --git a/arch/arm/configs/bockw_defconfig b/arch/arm/configs/bockw_defconfig
+new file mode 100644
+index 0000000..6037705
+--- /dev/null
++++ b/arch/arm/configs/bockw_defconfig
+@@ -0,0 +1,66 @@
++# CONFIG_ARM_PATCH_PHYS_VIRT is not set
++CONFIG_KERNEL_LZMA=y
++CONFIG_NO_HZ=y
++CONFIG_IKCONFIG=y
++CONFIG_IKCONFIG_PROC=y
++CONFIG_LOG_BUF_SHIFT=16
++CONFIG_SYSCTL_SYSCALL=y
++CONFIG_EMBEDDED=y
++CONFIG_SLAB=y
++# CONFIG_IOSCHED_CFQ is not set
++CONFIG_ARCH_SHMOBILE=y
++CONFIG_ARCH_R8A7778=y
++CONFIG_MACH_BOCKW=y
++CONFIG_MEMORY_START=0x60000000
++CONFIG_MEMORY_SIZE=0x10000000
++CONFIG_SHMOBILE_TIMER_HZ=1024
++# CONFIG_SH_TIMER_CMT is not set
++# CONFIG_EM_TIMER_STI is not set
++CONFIG_ARM_ERRATA_430973=y
++CONFIG_ARM_ERRATA_458693=y
++CONFIG_ARM_ERRATA_460075=y
++CONFIG_ARM_ERRATA_743622=y
++CONFIG_ARM_ERRATA_754322=y
++CONFIG_AEABI=y
++# CONFIG_OABI_COMPAT is not set
++CONFIG_HIGHMEM=y
++CONFIG_ZBOOT_ROM_TEXT=0x0
++CONFIG_ZBOOT_ROM_BSS=0x0
++CONFIG_ARM_APPENDED_DTB=y
++CONFIG_CMDLINE="console=ttySC0,115200 ignore_loglevel"
++CONFIG_CMDLINE_FORCE=y
++# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
++# CONFIG_SUSPEND is not set
++CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++# CONFIG_STANDALONE is not set
++# CONFIG_PREVENT_FIRMWARE_BUILD is not set
++# CONFIG_FW_LOADER is not set
++# CONFIG_INPUT is not set
++# CONFIG_SERIO is not set
++# CONFIG_VT is not set
++# CONFIG_LEGACY_PTYS is not set
++# CONFIG_DEVKMEM is not set
++CONFIG_SERIAL_SH_SCI=y
++CONFIG_SERIAL_SH_SCI_NR_UARTS=6
++CONFIG_SERIAL_SH_SCI_CONSOLE=y
++# CONFIG_HW_RANDOM is not set
++# CONFIG_HWMON is not set
++# CONFIG_USB_SUPPORT is not set
++CONFIG_UIO=y
++CONFIG_UIO_PDRV_GENIRQ=y
++# CONFIG_IOMMU_SUPPORT is not set
++# CONFIG_DNOTIFY is not set
++# CONFIG_INOTIFY_USER is not set
++CONFIG_TMPFS=y
++# CONFIG_MISC_FILESYSTEMS is not set
++# CONFIG_ENABLE_WARN_DEPRECATED is not set
++# CONFIG_ENABLE_MUST_CHECK is not set
++# CONFIG_SCHED_DEBUG is not set
++# CONFIG_DEBUG_BUGVERBOSE is not set
++# CONFIG_FTRACE is not set
++# CONFIG_ARM_UNWIND is not set
++CONFIG_KEYS=y
++CONFIG_CRYPTO=y
++CONFIG_AVERAGE=y
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index aa273a5..e5cd4d8 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -104,6 +104,12 @@ config MACH_ARMADILLO800EVA
+ 	select SND_SOC_WM8978 if SND_SIMPLE_CARD
+ 	select USE_OF
  
- enum {
-+	MSTP026, MSTP025, MSTP024, MSTP023, MSTP022, MSTP021,
- 	MSTP016, MSTP015,
- 	MSTP_NR };
- 
- static struct clk mstp_clks[MSTP_NR] = {
-+	[MSTP026] = SH_CLK_MSTP32(&clkp, MSTPCR0, 26, 0), /* SCIF0 */
-+	[MSTP025] = SH_CLK_MSTP32(&clkp, MSTPCR0, 25, 0), /* SCIF1 */
-+	[MSTP024] = SH_CLK_MSTP32(&clkp, MSTPCR0, 24, 0), /* SCIF2 */
-+	[MSTP023] = SH_CLK_MSTP32(&clkp, MSTPCR0, 23, 0), /* SCIF3 */
-+	[MSTP022] = SH_CLK_MSTP32(&clkp, MSTPCR0, 22, 0), /* SCIF4 */
-+	[MSTP021] = SH_CLK_MSTP32(&clkp, MSTPCR0, 21, 0), /* SCIF5 */
- 	[MSTP016] = SH_CLK_MSTP32(&clkp, MSTPCR0, 16, 0), /* TMU0 */
- 	[MSTP015] = SH_CLK_MSTP32(&clkp, MSTPCR0, 15, 0), /* TMU1 */
- };
- 
- static struct clk_lookup lookups[] = {
- 	/* MSTP32 clocks */
-+	CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP026]), /* SCIF0 */
-+	CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP025]), /* SCIF1 */
-+	CLKDEV_DEV_ID("sh-sci.2", &mstp_clks[MSTP024]), /* SCIF2 */
-+	CLKDEV_DEV_ID("sh-sci.3", &mstp_clks[MSTP023]), /* SCIF3 */
-+	CLKDEV_DEV_ID("sh-sci.4", &mstp_clks[MSTP022]), /* SCIF4 */
-+	CLKDEV_DEV_ID("sh-sci.5", &mstp_clks[MSTP021]), /* SCIF6 */
- 	CLKDEV_DEV_ID("sh_tmu.0", &mstp_clks[MSTP016]), /* TMU00 */
- 	CLKDEV_DEV_ID("sh_tmu.1", &mstp_clks[MSTP015]), /* TMU01 */
- };
-diff --git a/arch/arm/mach-shmobile/setup-r8a7778.c b/arch/arm/mach-shmobile/setup-r8a7778.c
-index 811ccf3..01c62be 100644
---- a/arch/arm/mach-shmobile/setup-r8a7778.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7778.c
-@@ -25,6 +25,7 @@
- #include <linux/of_platform.h>
- #include <linux/platform_device.h>
- #include <linux/irqchip.h>
-+#include <linux/serial_sci.h>
- #include <linux/sh_timer.h>
- #include <mach/irqs.h>
- #include <mach/r8a7778.h>
-@@ -32,6 +33,26 @@
- #include <asm/mach/arch.h>
- #include <asm/hardware/cache-l2x0.h>
- 
-+/* SCIF */
-+#define SCIF_INFO(baseaddr, irq)				\
-+{								\
-+	.mapbase	= baseaddr,				\
-+	.flags		= UPF_BOOT_AUTOCONF | UPF_IOREMAP,	\
-+	.scscr		= SCSCR_RE | SCSCR_TE | SCSCR_CKE1,	\
-+	.scbrr_algo_id	= SCBRR_ALGO_2,				\
-+	.type		= PORT_SCIF,				\
-+	.irqs		= SCIx_IRQ_MUXED(irq),			\
++config MACH_BOCKW
++	bool "BOCK-W platform"
++	depends on ARCH_R8A7778
++	select ARCH_REQUIRE_GPIOLIB
++	select USE_OF
++
+ config MACH_MARZEN
+ 	bool "MARZEN board"
+ 	depends on ARCH_R8A7779
+diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
+index 0f50a3c..b6cf0f4 100644
+--- a/arch/arm/mach-shmobile/Makefile
++++ b/arch/arm/mach-shmobile/Makefile
+@@ -38,6 +38,7 @@ obj-$(CONFIG_MACH_AG5EVM)	+= board-ag5evm.o
+ obj-$(CONFIG_MACH_MACKEREL)	+= board-mackerel.o
+ obj-$(CONFIG_MACH_KOTA2)	+= board-kota2.o
+ obj-$(CONFIG_MACH_BONITO)	+= board-bonito.o
++obj-$(CONFIG_MACH_BOCKW)	+= board-bockw.o
+ obj-$(CONFIG_MACH_MARZEN)	+= board-marzen.o
+ obj-$(CONFIG_MACH_MARZEN_REFERENCE)	+= board-marzen-reference.o
+ obj-$(CONFIG_MACH_ARMADILLO800EVA)	+= board-armadillo800eva.o
+diff --git a/arch/arm/mach-shmobile/board-bockw.c b/arch/arm/mach-shmobile/board-bockw.c
+new file mode 100644
+index 0000000..56ab56e
+--- /dev/null
++++ b/arch/arm/mach-shmobile/board-bockw.c
+@@ -0,0 +1,43 @@
++/*
++ * Bock-W board support
++ *
++ * Copyright (C) 2013  Renesas Solutions Corp.
++ * Copyright (C) 2013  Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; version 2 of the License.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
++ */
++
++#include <linux/platform_device.h>
++#include <mach/common.h>
++#include <mach/r8a7778.h>
++#include <asm/mach/arch.h>
++
++static void __init bockw_init(void)
++{
++	r8a7778_clock_init();
++	r8a7778_add_standard_devices();
 +}
 +
-+static struct plat_sci_port scif_platform_data[] = {
-+	SCIF_INFO(0xffe40000, gic_iid(0x66)),
-+	SCIF_INFO(0xffe41000, gic_iid(0x67)),
-+	SCIF_INFO(0xffe42000, gic_iid(0x68)),
-+	SCIF_INFO(0xffe43000, gic_iid(0x69)),
-+	SCIF_INFO(0xffe44000, gic_iid(0x6a)),
-+	SCIF_INFO(0xffe45000, gic_iid(0x6b)),
++static const char *bockw_boards_compat_dt[] __initdata = {
++	"renesas,bockw",
++	NULL,
 +};
 +
- /* TMU */
- static struct resource sh_tmu0_resources[] = {
- 	DEFINE_RES_MEM(0xffd80008, 12),
-@@ -88,6 +109,11 @@ void __init r8a7778_add_standard_devices(void)
- 	}
- #endif
- 
-+	for (i = 0; i < ARRAY_SIZE(scif_platform_data); i++)
-+		platform_device_register_data(&platform_bus, "sh-sci", i,
-+					      &scif_platform_data[i],
-+					      sizeof(struct plat_sci_port));
-+
- 	for (i = 0; i < ARRAY_SIZE(platform_devinfo); i++)
- 		platform_device_register_full(&platform_devinfo[i]);
- }
++DT_MACHINE_START(BOCKW_DT, "bockw")
++	.init_early	= r8a7778_init_delay,
++	.init_irq	= r8a7778_init_irq_dt,
++	.init_machine	= bockw_init,
++	.init_time	= shmobile_timer_init,
++	.dt_compat	= bockw_boards_compat_dt,
++MACHINE_END
 -- 
 1.7.9.5
