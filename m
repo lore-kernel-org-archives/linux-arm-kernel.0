@@ -1,96 +1,151 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 21 Mar 2013 22:51:06 +0100
-Subject: [PATCH 1/9] ARM: ux500: move mach/msp.h to
- include/linux/platform_data.h
+Date: Thu, 21 Mar 2013 22:51:13 +0100
+Subject: [PATCH 8/9] ARM: ux500: move to multiplatform
 In-Reply-To: <1363902674-6456-1-git-send-email-arnd@arndb.de>
 References: <1363866553-15054-1-git-send-email-linus.walleij@stericsson.com>
  <1363902674-6456-1-git-send-email-arnd@arndb.de>
-Message-ID: <1363902674-6456-2-git-send-email-arnd@arndb.de>
+Message-ID: <1363902674-6456-9-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This header file only contains platform data structure definitions,
-so it's straightforward to move.
+Nothing is holding us up any more, and we can make ux500 coexist
+with the rest of the platforms. The timex.h and uncompress.h
+headers are no longer needed now.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-ux500/board-mop500-audio.c                                | 2 +-
- arch/arm/mach-ux500/board-mop500.h                                      | 2 +-
- .../include/mach/msp.h => include/linux/platform_data/asoc-ux500-msp.h  | 0
- sound/soc/ux500/ux500_msp_dai.c                                         | 2 +-
- sound/soc/ux500/ux500_msp_i2s.c                                         | 2 +-
- sound/soc/ux500/ux500_msp_i2s.h                                         | 2 +-
- 6 files changed, 5 insertions(+), 5 deletions(-)
- rename arch/arm/mach-ux500/include/mach/msp.h => include/linux/platform_data/asoc-ux500-msp.h (100%)
+ arch/arm/Kconfig                              | 16 --------
+ arch/arm/mach-ux500/Kconfig                   | 14 +++++++
+ arch/arm/mach-ux500/include/mach/timex.h      |  6 ---
+ arch/arm/mach-ux500/include/mach/uncompress.h | 58 ---------------------------
+ 4 files changed, 14 insertions(+), 80 deletions(-)
+ delete mode 100644 arch/arm/mach-ux500/include/mach/timex.h
+ delete mode 100644 arch/arm/mach-ux500/include/mach/uncompress.h
 
-diff --git a/arch/arm/mach-ux500/board-mop500-audio.c b/arch/arm/mach-ux500/board-mop500-audio.c
-index c8167bf..96e62ef 100644
---- a/arch/arm/mach-ux500/board-mop500-audio.c
-+++ b/arch/arm/mach-ux500/board-mop500-audio.c
-@@ -12,7 +12,7 @@
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index a4cfede..2de2084 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -888,22 +888,6 @@ config ARCH_U300
+ 	help
+ 	  Support for ST-Ericsson U300 series mobile platforms.
  
- #include <mach/devices.h>
- #include <mach/irqs.h>
--#include <mach/msp.h>
-+#include <linux/platform_data/asoc-ux500-msp.h>
+-config ARCH_U8500
+-	bool "ST-Ericsson U8500 Series"
+-	depends on MMU
+-	select ARCH_HAS_CPUFREQ
+-	select ARCH_REQUIRE_GPIOLIB
+-	select ARM_AMBA
+-	select CLKDEV_LOOKUP
+-	select CPU_V7
+-	select GENERIC_CLOCKEVENTS
+-	select HAVE_SMP
+-	select MIGHT_HAVE_CACHE_L2X0
+-	select SPARSE_IRQ
+-	help
+-	  Support for ST-Ericsson's Ux500 architecture
+-
+-
+ config ARCH_DAVINCI
+ 	bool "TI DaVinci"
+ 	select ARCH_HAS_HOLES_MEMORYMODEL
+diff --git a/arch/arm/mach-ux500/Kconfig b/arch/arm/mach-ux500/Kconfig
+index 3e5bbd0..eeea3bf 100644
+--- a/arch/arm/mach-ux500/Kconfig
++++ b/arch/arm/mach-ux500/Kconfig
+@@ -1,3 +1,17 @@
++config ARCH_U8500
++	bool "ST-Ericsson U8500 Series" if ARCH_MULTI_V7
++	depends on MMU
++	select ARCH_HAS_CPUFREQ
++	select ARCH_REQUIRE_GPIOLIB
++	select ARM_AMBA
++	select CLKDEV_LOOKUP
++	select CPU_V7
++	select GENERIC_CLOCKEVENTS
++	select HAVE_SMP
++	select MIGHT_HAVE_CACHE_L2X0
++	help
++	  Support for ST-Ericsson's Ux500 architecture
++
+ if ARCH_U8500
  
- #include "ste-dma40-db8500.h"
- #include "board-mop500.h"
-diff --git a/arch/arm/mach-ux500/board-mop500.h b/arch/arm/mach-ux500/board-mop500.h
-index eaa605f..eb81caf1 100644
---- a/arch/arm/mach-ux500/board-mop500.h
-+++ b/arch/arm/mach-ux500/board-mop500.h
-@@ -9,7 +9,7 @@
- 
- /* For NOMADIK_NR_GPIO */
- #include <mach/irqs.h>
--#include <mach/msp.h>
-+#include <linux/platform_data/asoc-ux500-msp.h>
- #include <linux/amba/mmci.h>
- 
- /* Snowball specific GPIO assignments, this board has no GPIO expander */
-diff --git a/arch/arm/mach-ux500/include/mach/msp.h b/include/linux/platform_data/asoc-ux500-msp.h
-similarity index 100%
-rename from arch/arm/mach-ux500/include/mach/msp.h
-rename to include/linux/platform_data/asoc-ux500-msp.h
-diff --git a/sound/soc/ux500/ux500_msp_dai.c b/sound/soc/ux500/ux500_msp_dai.c
-index 94a3e57..1e671f4 100644
---- a/sound/soc/ux500/ux500_msp_dai.c
-+++ b/sound/soc/ux500/ux500_msp_dai.c
-@@ -21,7 +21,7 @@
- #include <linux/mfd/dbx500-prcmu.h>
- 
- #include <mach/hardware.h>
--#include <mach/msp.h>
-+#include <linux/platform_data/asoc-ux500-msp.h>
- 
- #include <sound/soc.h>
- #include <sound/soc-dai.h>
-diff --git a/sound/soc/ux500/ux500_msp_i2s.c b/sound/soc/ux500/ux500_msp_i2s.c
-index a26c6bf..124a78a 100644
---- a/sound/soc/ux500/ux500_msp_i2s.c
-+++ b/sound/soc/ux500/ux500_msp_i2s.c
-@@ -22,7 +22,7 @@
- #include <linux/of.h>
- 
- #include <mach/hardware.h>
--#include <mach/msp.h>
-+#include <linux/platform_data/asoc-ux500-msp.h>
- 
- #include <sound/soc.h>
- 
-diff --git a/sound/soc/ux500/ux500_msp_i2s.h b/sound/soc/ux500/ux500_msp_i2s.h
-index 1311c0d..31223ca 100644
---- a/sound/soc/ux500/ux500_msp_i2s.h
-+++ b/sound/soc/ux500/ux500_msp_i2s.h
-@@ -17,7 +17,7 @@
- 
- #include <linux/platform_device.h>
- 
--#include <mach/msp.h>
-+#include <linux/platform_data/asoc-ux500-msp.h>
- 
- #define MSP_INPUT_FREQ_APB 48000000
- 
+ config UX500_SOC_COMMON
+diff --git a/arch/arm/mach-ux500/include/mach/timex.h b/arch/arm/mach-ux500/include/mach/timex.h
+deleted file mode 100644
+index d0942c1..0000000
+--- a/arch/arm/mach-ux500/include/mach/timex.h
++++ /dev/null
+@@ -1,6 +0,0 @@
+-#ifndef __ASM_ARCH_TIMEX_H
+-#define __ASM_ARCH_TIMEX_H
+-
+-#define CLOCK_TICK_RATE		110000000
+-
+-#endif
+diff --git a/arch/arm/mach-ux500/include/mach/uncompress.h b/arch/arm/mach-ux500/include/mach/uncompress.h
+deleted file mode 100644
+index 533a004..0000000
+--- a/arch/arm/mach-ux500/include/mach/uncompress.h
++++ /dev/null
+@@ -1,58 +0,0 @@
+-/*
+- *  Copyright (C) 2009 ST-Ericsson
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- */
+-#ifndef __ASM_ARCH_UNCOMPRESS_H
+-#define __ASM_ARCH_UNCOMPRESS_H
+-
+-#include <asm/setup.h>
+-#include <asm/mach-types.h>
+-#include <linux/io.h>
+-#include <linux/amba/serial.h>
+-/* TODO: This goes away in multiplatform boot, this file gets deleted */
+-#include "../../db8500-regs.h"
+-
+-void __iomem *ux500_uart_base;
+-
+-static void putc(const char c)
+-{
+-	/* Do nothing if the UART is not enabled. */
+-	if (!(__raw_readb(ux500_uart_base + UART011_CR) & 0x1))
+-		return;
+-
+-	if (c == '\n')
+-		putc('\r');
+-
+-	while (__raw_readb(ux500_uart_base + UART01x_FR) & (1 << 5))
+-		barrier();
+-	__raw_writeb(c, ux500_uart_base + UART01x_DR);
+-}
+-
+-static void flush(void)
+-{
+-	if (!(__raw_readb(ux500_uart_base + UART011_CR) & 0x1))
+-		return;
+-	while (__raw_readb(ux500_uart_base + UART01x_FR) & (1 << 3))
+-		barrier();
+-}
+-
+-static inline void arch_decomp_setup(void)
+-{
+-	/* Use machine_is_foo() macro if you need to switch base someday */
+-	ux500_uart_base = (void __iomem *)U8500_UART2_BASE;
+-}
+-
+-#endif /* __ASM_ARCH_UNCOMPRESS_H */
 -- 
 1.8.1.2
