@@ -1,40 +1,36 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 21 Mar 2013 14:35:12 -0700
-Subject: [PATCH] clk:SPEAr1340: Correct parent clock configuration
-In-Reply-To: <CAOh2x=nOgvPzojJ_xCgpCbqkiK4W9ovGm-j5shdjadhfCSOA3g@mail.gmail.com>
-References: <9c65c93de3e7269bfc6e31bcdddc2ecd64338761.1362639296.git.vipulkumar.samar@st.com>
- <CAOh2x=nOgvPzojJ_xCgpCbqkiK4W9ovGm-j5shdjadhfCSOA3g@mail.gmail.com>
-Message-ID: <20130321213512.834.66394@quantum>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Thu, 21 Mar 2013 22:36:09 +0100
+Subject: [PATCH] ARM: OMAP1: remove "config MACH_OMAP_HTCWIZARD"
+Message-ID: <1363901769.1390.159.camel@x61.thuisdomein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Viresh Kumar (2013-03-07 20:42:03)
-> On Thu, Mar 7, 2013 at 3:05 PM, Vipul Kumar Samar
-> <vipulkumar.samar@st.com> wrote:
-> > This patch corrects wrongly configured parent clock for following
-> > devices:
-> >
-> >    * Video enc/decoder
-> >    * Video ip
-> >    * Pin control
-> >    * ACP
-> >    * camx
-> >
-> > Signed-off-by: Vipul Kumar Samar <vipulkumar.samar@st.com>
-> > Reviewed-by: Shiraz Hashim <shiraz.hashim@st.com>
-> > ---
-> >  drivers/clk/spear/spear1340_clock.c |   18 +++++++++---------
-> >  1 files changed, 9 insertions(+), 9 deletions(-)
-> 
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> 
+The Kconfig symbol MACH_OMAP_HTCWIZARD got added in v2.6.30. It has
+never been used. Its entry can safely be removed.
 
-Taken into clk-next.
+Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+---
+Untested.
 
-Thanks,
-Mike
+ arch/arm/mach-omap1/Kconfig | 6 ------
+ 1 file changed, 6 deletions(-)
 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm/mach-omap1/Kconfig b/arch/arm/mach-omap1/Kconfig
+index 903da8e..cdd05f2 100644
+--- a/arch/arm/mach-omap1/Kconfig
++++ b/arch/arm/mach-omap1/Kconfig
+@@ -55,12 +55,6 @@ config MACH_OMAP_H3
+ 	  TI OMAP 1710 H3 board support. Say Y here if you have such
+ 	  a board.
+ 
+-config MACH_OMAP_HTCWIZARD
+-	bool "HTC Wizard"
+-	depends on ARCH_OMAP850
+-	help
+-	  HTC Wizard smartphone support (AKA QTEK 9100, ...)
+-
+ config MACH_HERALD
+ 	bool "HTC Herald"
+ 	depends on ARCH_OMAP850
+-- 
+1.7.11.7
