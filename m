@@ -1,40 +1,131 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu, 21 Mar 2013 09:35:58 -0300
-Subject: [PATCH 00/16] Marvell EBU thermal sensor consolidation
-In-Reply-To: <20130321064501.GK21478@lunn.ch>
-References: <1363818997-23137-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130321064501.GK21478@lunn.ch>
-Message-ID: <20130321123556.GC22714@localhost>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 21 Mar 2013 07:52:45 -0500
+Subject: [PATCH] ARM: convert arm/arm64 arch timer to use CLKSRC_OF init
+In-Reply-To: <20130321110646.GE15279@e106331-lin.cambridge.arm.com>
+References: <1363818875-15978-1-git-send-email-robherring2@gmail.com>
+ <20130321110646.GE15279@e106331-lin.cambridge.arm.com>
+Message-ID: <514B029D.1010409@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 21, 2013 at 07:45:01AM +0100, Andrew Lunn wrote:
-> On Wed, Mar 20, 2013 at 07:36:21PM -0300, Ezequiel Garcia wrote:
-> > This patchset is my first attempt at adding basic thermal sensor
-> > support on Armada 370 and Armada XP.
-> > 
-> > Given Armada 370/XP and the other Marvell SoC with thermal support,
-> > namely Kirkwood and Dove, have fairly similar thermal devices it 
-> > made sense to integrate all of them into a single driver: mvebu-thermal.
+On 03/21/2013 06:06 AM, Mark Rutland wrote:
+> Hi Rob,
 > 
-> I went this way to start with, merging Dove, Kirkwood and something
-> which nearly worked for 370. But then i looked at the code, at how
-> little is actually shared, and went back to separate drivers.
+> (adding Marc to Cc as he may have comments).
 > 
-> Kirkwood has no control registers, so needs a special case in the probe.
-> The bit location of the temperate value moves around in the register.
-> Each SoC needs its own initialization sequence.
-> Each SoC needs its own is_valid() function.
-> Each Soc needs its own formula to convert to milli centigrad.
+> On Wed, Mar 20, 2013 at 10:34:35PM +0000, Rob Herring wrote:
+>> From: Rob Herring <rob.herring@calxeda.com>
+>>
+>> This converts arm and arm64 to use CLKSRC_OF DT based initialization for
+>> the arch timer. A new function arch_timer_arch_init is added to allow for
+>> arch specific setup.
+>>
+>> This has a side effect of enabling sched_clock on omap5 and exynos5. There
+>> should not be any reason not to use the arch timers for sched_clock.
 > 
-> I've never seen the datasheets for 370/XP, just a list of registers for
-> 370. But i get the impression it has two temperate sensors, so should
-> export two values?
+> Nice! I was just about to post a (slightly updated) version of Thomas Abraham's
+> arch_timer clocksource_of_init patch, but this seems much more comprehensive.
+> 
+> I have some other arch_timer patches which may clash, but they could be rebased
+> atop of this.
+
+[snip]
+
+>> @@ -446,10 +446,7 @@ static void __init v2m_dt_timer_init(void)
+>>                                 irq_of_parse_and_map(node, 0));
+>>         }
+>>
+>> -       arch_timer_of_register();
+>> -
+>> -       if (arch_timer_sched_clock_init() != 0)
+>> -               versatile_sched_clock_init(vexpress_get_24mhz_clock_base(),
+>> +       versatile_sched_clock_init(vexpress_get_24mhz_clock_base(),
+>>                                 24000000);
+>>  }
+>>
+> 
+> On TC2 this series leads to using the vexpress 24MHz clock as the sched clock
+> in preference to the architected timer:
+> 
+>   Architected local timer running at 24.00MHz (virt).
+>   Switching to timer-based delay loop
+>   Registered arch_counter_get_cntvct+0x0/0x14 as sched_clock source
+>   sched_clock: 32 bits at 24MHz, resolution 41ns, wraps every 178956ms
+>   Registered versatile_read_sched_clock+0x0/0x28 as sched_clock source
+> 
+> As they both have the same frequency, neither overrides the other, and
+> whichever gets registered last is used as the sched_clock. As accesses to the
+> architected timer are going to have a much lower overhead, this isn't very nice
+> (and it could be better to use it even if it had a lower frequency).
+> 
+> We could move the versatile_sched_clock_init call before the
+> clocksource_of_init, but that doesn't feel like an ideal solution. We may have
+> similar problems elsewhere.
+
+The intention was that a 64-bit counter is preferred. This should fix 
+that. It would be nice if we could describe access overhead to make a decision. 
+For now, I think 32 vs. 64 bit is sufficient.
+
+diff --git a/arch/arm/kernel/sched_clock.c b/arch/arm/kernel/sched_clock.c
+index 1708357..aa18e45 100644
+--- a/arch/arm/kernel/sched_clock.c
++++ b/arch/arm/kernel/sched_clock.c
+@@ -115,7 +115,7 @@ void __init setup_sched_clock(u32 (*read)(void), int bits, unsigned long rate)
+ 	u64 res, wrap;
+ 	char r_unit;
+ 
+-	if (cd.rate > rate)
++	if (cd.rate > rate || read_sched_clock_64)
+ 		return;
+ 
+ 	BUG_ON(bits > 32);
+@@ -168,7 +168,7 @@ void __init setup_sched_clock(u32 (*read)(void), int bits, unsigned long rate)
+ 
+ void __init setup_sched_clock_64(u64 (*read)(void), unsigned long rate)
+ {
+-	if (cd.rate > rate)
++	if (read_sched_clock_64 && (cd.rate > rate))
+ 		return;
+ 
+ 	WARN_ON(!irqs_disabled());
+
+
+>> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+>> index d7ad425..afb70aa 100644
+>> --- a/drivers/clocksource/arm_arch_timer.c
+>> +++ b/drivers/clocksource/arm_arch_timer.c
+>> @@ -337,24 +337,11 @@ out:
+>>         return err;
+>>  }
+>>
+>> -static const struct of_device_id arch_timer_of_match[] __initconst = {
+>> -       { .compatible   = "arm,armv7-timer",    },
+>> -       { .compatible   = "arm,armv8-timer",    },
+>> -       {},
+>> -};
+>> -
+>> -int __init arch_timer_init(void)
+>> +static void __init arch_timer_init(struct device_node *np)
+>>  {
+>> -       struct device_node *np;
+>>         u32 freq;
+>>         int i;
+>>
+> 
+> If we the following here:
+> 
+> 	if (arch_timer_get_rate()) {
+> 		pr_warn("arch_timer: multiple nodes in dt, skipping\n");
+> 		return;
+> 	}
+> 
+> We may save ourselves a whole world of pain with dts which (erroneously) have
+> multiple timer nodes (though these are now disappearing). Otherwise we could
+> have a memory leak and multiple instances of the cpu0 timer registered, which
+> could lead to all sorts of weirdness. The existing code side-steps this issue
+> by only grabbing the first node, so this would keep things consistent.
 > 
 
-Why do you think it has two sensors?
+Okay, I'll add.
 
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Rob
