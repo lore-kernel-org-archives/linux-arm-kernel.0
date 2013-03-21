@@ -1,235 +1,106 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Thu, 21 Mar 2013 03:03:38 -0700 (PDT)
-Subject: [PATCH 3/3 v3] ARM: shmobile: add R-Car M1A Bock-W platform support
-In-Reply-To: <878v5hf4zr.wl%kuninori.morimoto.gx@renesas.com>
-References: <87hakhrpmn.wl%kuninori.morimoto.gx@renesas.com>
- <878v5hf4zr.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <874ng5f4sq.wl%kuninori.morimoto.gx@renesas.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 21 Mar 2013 15:09:06 +0530
+Subject: [PATCH V2] DMA: PL330: Add check if device tree compatible
+In-Reply-To: <1362475531-32260-2-git-send-email-padma.v@samsung.com>
+References: <1362475531-32260-1-git-send-email-padma.v@samsung.com>
+ <1362475531-32260-2-git-send-email-padma.v@samsung.com>
+Message-ID: <20130321093906.GL10326@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add basic Bock-W board support
+On Tue, Mar 05, 2013 at 02:55:31PM +0530, Padmavathi Venna wrote:
+> This patch register the dma controller with generic dma helpers only
+> in DT case. This also adds some extra error handling in the driver.
+> 
+> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+> Reported-by: Sachin Kamat <sachin.kamat@linaro.org>
+> ---
+> 
+> Based on Vinod Koul next branch.
+> 
+> Changes since V1:
+> 	- return silently when of_dma_controller_register fails, as
+> 	  suggested by Arnd.
+> 
+>  drivers/dma/pl330.c |   38 +++++++++++++++++++++++++++-----------
+>  1 files changed, 27 insertions(+), 11 deletions(-)
+> 
+> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+> index 7181531..5dbc594 100644
+> --- a/drivers/dma/pl330.c
+> +++ b/drivers/dma/pl330.c
+> @@ -2882,7 +2882,7 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+>  {
+>  	struct dma_pl330_platdata *pdat;
+>  	struct dma_pl330_dmac *pdmac;
+> -	struct dma_pl330_chan *pch;
+> +	struct dma_pl330_chan *pch, *_p;
+>  	struct pl330_info *pi;
+>  	struct dma_device *pd;
+>  	struct resource *res;
+> @@ -2984,7 +2984,16 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+>  	ret = dma_async_device_register(pd);
+>  	if (ret) {
+>  		dev_err(&adev->dev, "unable to register DMAC\n");
+> -		goto probe_err2;
+> +		goto probe_err3;
+> +	}
+> +
+> +	if (adev->dev.of_node) {
+> +		ret = of_dma_controller_register(adev->dev.of_node,
+> +					 of_dma_pl330_xlate, pdmac);
+> +		if (ret) {
+> +			dev_err(&adev->dev,
+> +			"unable to register DMA to the generic DT DMA helpers\n");
+Indent?
+> +		}
+>  	}
+>  
+>  	dev_info(&adev->dev,
+> @@ -2995,16 +3004,21 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+>  		pi->pcfg.data_bus_width / 8, pi->pcfg.num_chan,
+>  		pi->pcfg.num_peri, pi->pcfg.num_events);
+>  
+> -	ret = of_dma_controller_register(adev->dev.of_node,
+> -					 of_dma_pl330_xlate, pdmac);
+> -	if (ret) {
+> -		dev_err(&adev->dev,
+> -		"unable to register DMA to the generic DT DMA helpers\n");
+> -		goto probe_err2;
+> -	}
+> -
+>  	return 0;
+> +probe_err3:
+> +	amba_set_drvdata(adev, NULL);
+>  
+> +	/* Idle the DMAC */
+> +	list_for_each_entry_safe(pch, _p, &pdmac->ddma.channels,
+> +			chan.device_node) {
+> +
+> +		/* Remove the channel */
+> +		list_del(&pch->chan.device_node);
+> +
+> +		/* Flush the channel */
+> +		pl330_control(&pch->chan, DMA_TERMINATE_ALL, 0);
+> +		pl330_free_chan_resources(&pch->chan);
+free_chan for error handling in probe?
 
-More devices will be added on top of this patch after
-PICNTRL and clock framework are in better shape.
-
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
----
-v2 -> v3
-
- - fixup compatible name
- - r8a7778_clock_init() is called from board code
-
- arch/arm/boot/dts/Makefile           |    1 +
- arch/arm/boot/dts/r8a7778-bockw.dts  |   32 +++++++++++++++++
- arch/arm/configs/bockw_defconfig     |   66 ++++++++++++++++++++++++++++++++++
- arch/arm/mach-shmobile/Kconfig       |    6 ++++
- arch/arm/mach-shmobile/Makefile      |    1 +
- arch/arm/mach-shmobile/board-bockw.c |   43 ++++++++++++++++++++++
- 6 files changed, 149 insertions(+)
- create mode 100644 arch/arm/boot/dts/r8a7778-bockw.dts
- create mode 100644 arch/arm/configs/bockw_defconfig
- create mode 100644 arch/arm/mach-shmobile/board-bockw.c
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index ee9fbe4..363fa507 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -136,6 +136,7 @@ dtb-$(CONFIG_ARCH_U8500) += snowball.dtb \
- 	ccu9540.dtb
- dtb-$(CONFIG_ARCH_SHMOBILE) += emev2-kzm9d.dtb \
- 	r8a7740-armadillo800eva.dtb \
-+	r8a7778-bockw.dtb \
- 	r8a7779-marzen-reference.dtb \
- 	sh73a0-kzm9g.dtb \
- 	sh73a0-kzm9g-reference.dtb \
-diff --git a/arch/arm/boot/dts/r8a7778-bockw.dts b/arch/arm/boot/dts/r8a7778-bockw.dts
-new file mode 100644
-index 0000000..735c964
---- /dev/null
-+++ b/arch/arm/boot/dts/r8a7778-bockw.dts
-@@ -0,0 +1,32 @@
-+/*
-+ * Reference Device Tree Source for the Bock-W board
-+ *
-+ * Copyright (C) 2013  Renesas Solutions Corp.
-+ * Copyright (C) 2013  Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-+ *
-+ * based on r8a7779
-+ *
-+ * Copyright (C) 2013 Renesas Solutions Corp.
-+ * Copyright (C) 2013 Simon Horman
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
-+
-+/dts-v1/;
-+/include/ "r8a7778.dtsi"
-+
-+/ {
-+	model = "bockw";
-+	compatible = "renesas,bockw", "renesas,r8a7778";
-+
-+	chosen {
-+		bootargs = "console=ttySC0,115200 ignore_loglevel";
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x60000000 0x10000000>;
-+	};
-+};
-diff --git a/arch/arm/configs/bockw_defconfig b/arch/arm/configs/bockw_defconfig
-new file mode 100644
-index 0000000..6037705
---- /dev/null
-+++ b/arch/arm/configs/bockw_defconfig
-@@ -0,0 +1,66 @@
-+# CONFIG_ARM_PATCH_PHYS_VIRT is not set
-+CONFIG_KERNEL_LZMA=y
-+CONFIG_NO_HZ=y
-+CONFIG_IKCONFIG=y
-+CONFIG_IKCONFIG_PROC=y
-+CONFIG_LOG_BUF_SHIFT=16
-+CONFIG_SYSCTL_SYSCALL=y
-+CONFIG_EMBEDDED=y
-+CONFIG_SLAB=y
-+# CONFIG_IOSCHED_CFQ is not set
-+CONFIG_ARCH_SHMOBILE=y
-+CONFIG_ARCH_R8A7778=y
-+CONFIG_MACH_BOCKW=y
-+CONFIG_MEMORY_START=0x60000000
-+CONFIG_MEMORY_SIZE=0x10000000
-+CONFIG_SHMOBILE_TIMER_HZ=1024
-+# CONFIG_SH_TIMER_CMT is not set
-+# CONFIG_EM_TIMER_STI is not set
-+CONFIG_ARM_ERRATA_430973=y
-+CONFIG_ARM_ERRATA_458693=y
-+CONFIG_ARM_ERRATA_460075=y
-+CONFIG_ARM_ERRATA_743622=y
-+CONFIG_ARM_ERRATA_754322=y
-+CONFIG_AEABI=y
-+# CONFIG_OABI_COMPAT is not set
-+CONFIG_HIGHMEM=y
-+CONFIG_ZBOOT_ROM_TEXT=0x0
-+CONFIG_ZBOOT_ROM_BSS=0x0
-+CONFIG_ARM_APPENDED_DTB=y
-+CONFIG_CMDLINE="console=ttySC0,115200 ignore_loglevel"
-+CONFIG_CMDLINE_FORCE=y
-+# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
-+# CONFIG_SUSPEND is not set
-+CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+CONFIG_DEVTMPFS=y
-+CONFIG_DEVTMPFS_MOUNT=y
-+# CONFIG_STANDALONE is not set
-+# CONFIG_PREVENT_FIRMWARE_BUILD is not set
-+# CONFIG_FW_LOADER is not set
-+# CONFIG_INPUT is not set
-+# CONFIG_SERIO is not set
-+# CONFIG_VT is not set
-+# CONFIG_LEGACY_PTYS is not set
-+# CONFIG_DEVKMEM is not set
-+CONFIG_SERIAL_SH_SCI=y
-+CONFIG_SERIAL_SH_SCI_NR_UARTS=6
-+CONFIG_SERIAL_SH_SCI_CONSOLE=y
-+# CONFIG_HW_RANDOM is not set
-+# CONFIG_HWMON is not set
-+# CONFIG_USB_SUPPORT is not set
-+CONFIG_UIO=y
-+CONFIG_UIO_PDRV_GENIRQ=y
-+# CONFIG_IOMMU_SUPPORT is not set
-+# CONFIG_DNOTIFY is not set
-+# CONFIG_INOTIFY_USER is not set
-+CONFIG_TMPFS=y
-+# CONFIG_MISC_FILESYSTEMS is not set
-+# CONFIG_ENABLE_WARN_DEPRECATED is not set
-+# CONFIG_ENABLE_MUST_CHECK is not set
-+# CONFIG_SCHED_DEBUG is not set
-+# CONFIG_DEBUG_BUGVERBOSE is not set
-+# CONFIG_FTRACE is not set
-+# CONFIG_ARM_UNWIND is not set
-+CONFIG_KEYS=y
-+CONFIG_CRYPTO=y
-+CONFIG_AVERAGE=y
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index aa273a5..e5cd4d8 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -104,6 +104,12 @@ config MACH_ARMADILLO800EVA
- 	select SND_SOC_WM8978 if SND_SIMPLE_CARD
- 	select USE_OF
- 
-+config MACH_BOCKW
-+	bool "BOCK-W platform"
-+	depends on ARCH_R8A7778
-+	select ARCH_REQUIRE_GPIOLIB
-+	select USE_OF
-+
- config MACH_MARZEN
- 	bool "MARZEN board"
- 	depends on ARCH_R8A7779
-diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index 0f50a3c..b6cf0f4 100644
---- a/arch/arm/mach-shmobile/Makefile
-+++ b/arch/arm/mach-shmobile/Makefile
-@@ -38,6 +38,7 @@ obj-$(CONFIG_MACH_AG5EVM)	+= board-ag5evm.o
- obj-$(CONFIG_MACH_MACKEREL)	+= board-mackerel.o
- obj-$(CONFIG_MACH_KOTA2)	+= board-kota2.o
- obj-$(CONFIG_MACH_BONITO)	+= board-bonito.o
-+obj-$(CONFIG_MACH_BOCKW)	+= board-bockw.o
- obj-$(CONFIG_MACH_MARZEN)	+= board-marzen.o
- obj-$(CONFIG_MACH_MARZEN_REFERENCE)	+= board-marzen-reference.o
- obj-$(CONFIG_MACH_ARMADILLO800EVA)	+= board-armadillo800eva.o
-diff --git a/arch/arm/mach-shmobile/board-bockw.c b/arch/arm/mach-shmobile/board-bockw.c
-new file mode 100644
-index 0000000..56ab56e
---- /dev/null
-+++ b/arch/arm/mach-shmobile/board-bockw.c
-@@ -0,0 +1,43 @@
-+/*
-+ * Bock-W board support
-+ *
-+ * Copyright (C) 2013  Renesas Solutions Corp.
-+ * Copyright (C) 2013  Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; version 2 of the License.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-+ */
-+
-+#include <linux/platform_device.h>
-+#include <mach/common.h>
-+#include <mach/r8a7778.h>
-+#include <asm/mach/arch.h>
-+
-+static void __init bockw_init(void)
-+{
-+	r8a7778_clock_init();
-+	r8a7778_add_standard_devices();
-+}
-+
-+static const char *bockw_boards_compat_dt[] __initdata = {
-+	"renesas,bockw",
-+	NULL,
-+};
-+
-+DT_MACHINE_START(BOCKW_DT, "bockw")
-+	.init_early	= r8a7778_init_delay,
-+	.init_irq	= r8a7778_init_irq_dt,
-+	.init_machine	= bockw_init,
-+	.init_time	= shmobile_timer_init,
-+	.dt_compat	= bockw_boards_compat_dt,
-+MACHINE_END
--- 
-1.7.9.5
+> +	}
+>  probe_err2:
+>  	pl330_del(pi);
+>  probe_err1:
+> @@ -3023,8 +3037,10 @@ static int pl330_remove(struct amba_device *adev)
+>  	if (!pdmac)
+>  		return 0;
+>  
+> -	of_dma_controller_free(adev->dev.of_node);
+> +	if (adev->dev.of_node)
+> +		of_dma_controller_free(adev->dev.of_node);
+>  
+> +	dma_async_device_unregister(&pdmac->ddma);
+>  	amba_set_drvdata(adev, NULL);
+>  
+>  	/* Idle the DMAC */
+> -- 
+> 1.7.4.4
+> 
