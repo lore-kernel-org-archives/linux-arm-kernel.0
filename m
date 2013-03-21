@@ -1,94 +1,85 @@
-From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Thu, 21 Mar 2013 15:10:13 +0100
-Subject: [PATCH v2 2/2] i2c: s3c2410: fixup the styling of the newly moved
- register definitions
-In-Reply-To: <201303211509.25607.heiko@sntech.de>
-References: <201303211509.25607.heiko@sntech.de>
-Message-ID: <201303211510.13547.heiko@sntech.de>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 21 Mar 2013 16:11:17 +0200
+Subject: [RFC][PATCH 1/2] ARM: OMAP4: clock: Add device tree support for
+ AUXCLKs
+In-Reply-To: <514B1383.1070102@ti.com>
+References: <1363703220-4777-1-git-send-email-rogerq@ti.com>
+ <1363703220-4777-2-git-send-email-rogerq@ti.com> <514B0650.5070406@ti.com>
+ <514B10FE.1000805@ti.com> <514B1383.1070102@ti.com>
+Message-ID: <514B1505.30409@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make them conform more to established standards.
+On 03/21/2013 04:04 PM, Rajendra Nayak wrote:
+> On Thursday 21 March 2013 07:24 PM, Roger Quadros wrote:
+>> On 03/21/2013 03:08 PM, Rajendra Nayak wrote:
+>>> []..
+>>>
+>>>> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+>>>> index 0274ff7..23f2064 100644
+>>>> --- a/arch/arm/mach-omap2/board-generic.c
+>>>> +++ b/arch/arm/mach-omap2/board-generic.c
+>>>> @@ -158,7 +158,7 @@ DT_MACHINE_START(OMAP4_DT, "Generic OMAP4 (Flattened Device Tree)")
+>>>>  	.init_irq	= omap_gic_of_init,
+>>>>  	.init_machine	= omap_generic_init,
+>>>>  	.init_late	= omap4430_init_late,
+>>>> -	.init_time	= omap4_local_timer_init,
+>>>> +	.init_time	= omap4_init_time,
+>>>>  	.dt_compat	= omap4_boards_compat,
+>>>>  	.restart	= omap44xx_restart,
+>>>>  MACHINE_END
+>>>
+>>> []..
+>>>> +#ifdef CONFIG_OF
+>>>> +int __init omap4_clk_init_dt(void)
+>>>> +{
+>>>> +	struct device_node *np;
+>>>> +
+>>>> +	np = of_find_compatible_node(NULL, NULL, "ti,omap4-scrm");
+>>>> +	if (np) {
+>>>> +		scrm_data.clks = scrm_clks;
+>>>> +		scrm_data.clk_num = ARRAY_SIZE(scrm_clks);
+>>>> +		of_clk_add_provider(np, of_clk_src_onecell_get,	&scrm_data);
+>>>> +	}
+>>>> +
+>>>> +	return 0;
+>>>> +}
+>>>
+>>> []..
+>>>> +
+>>>> +void __init omap4_init_time(void)
+>>>> +{
+>>>> +	omap4_clk_init_dt();
+>>>> +	omap4_local_timer_init();
+>>>> +}
+>>>
+>>> I guess you did all this because of_clk_add_provider() needs
+>>> slab to be initialized. With the below patch[1], now clk inits
+>>> happen within .init_timer already, so none of this would
+>>> be needed.
+>>>
+>>> [1] http://www.spinics.net/lists/arm-kernel/msg231288.html
+>>>
+>>
+>> Right. I can then call omap4_clk_init_dt() from within omap4xxx_clk_init().
+>>
+>> Any comments about the main subject? Does the approach look fine?
+> 
+> It looks fine, except for the fact that I was wondering if the clock
+> provider needs to restrict itself to SCRM.
+> Nishant Menon brought up a need for specifying the mpu clock source
+> from within DT, to be able to use a generic cpufreq driver.
+> It could be a provider (not specific to scrm, but having only scrm
+> clocks for now) which we could add clocks as and when we see a need for
+> them to be specified from DT.
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
-changes since v1: none
+OK, I will revise the patch to not make it SCRM specific.
 
- drivers/i2c/busses/i2c-s3c2410.c |   50 ++++++++++++++++++-------------------
- 1 files changed, 24 insertions(+), 26 deletions(-)
+> 
+> Btw, you need to copy Paul Walmsley for any clock related patches as
+> he is the OMAP clock maintainer.
 
-diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
-index 216fea1..0a81f1f 100644
---- a/drivers/i2c/busses/i2c-s3c2410.c
-+++ b/drivers/i2c/busses/i2c-s3c2410.c
-@@ -46,35 +46,33 @@
- 
- /* see s3c2410x user guide, v1.1, section 9 (p447) for more info */
- 
--#define S3C2410_IICREG(x) (x)
--
--#define S3C2410_IICCON    S3C2410_IICREG(0x00)
--#define S3C2410_IICSTAT   S3C2410_IICREG(0x04)
--#define S3C2410_IICADD    S3C2410_IICREG(0x08)
--#define S3C2410_IICDS     S3C2410_IICREG(0x0C)
--#define S3C2440_IICLC	  S3C2410_IICREG(0x10)
--
--#define S3C2410_IICCON_ACKEN		(1<<7)
--#define S3C2410_IICCON_TXDIV_16		(0<<6)
--#define S3C2410_IICCON_TXDIV_512	(1<<6)
--#define S3C2410_IICCON_IRQEN		(1<<5)
--#define S3C2410_IICCON_IRQPEND		(1<<4)
--#define S3C2410_IICCON_SCALE(x)		((x)&15)
-+#define S3C2410_IICCON			0x00
-+#define S3C2410_IICSTAT			0x04
-+#define S3C2410_IICADD			0x08
-+#define S3C2410_IICDS			0x0C
-+#define S3C2440_IICLC			0x10
-+
-+#define S3C2410_IICCON_ACKEN		(1 << 7)
-+#define S3C2410_IICCON_TXDIV_16		(0 << 6)
-+#define S3C2410_IICCON_TXDIV_512	(1 << 6)
-+#define S3C2410_IICCON_IRQEN		(1 << 5)
-+#define S3C2410_IICCON_IRQPEND		(1 << 4)
-+#define S3C2410_IICCON_SCALE(x)		((x) & 0xf)
- #define S3C2410_IICCON_SCALEMASK	(0xf)
- 
--#define S3C2410_IICSTAT_MASTER_RX	(2<<6)
--#define S3C2410_IICSTAT_MASTER_TX	(3<<6)
--#define S3C2410_IICSTAT_SLAVE_RX	(0<<6)
--#define S3C2410_IICSTAT_SLAVE_TX	(1<<6)
--#define S3C2410_IICSTAT_MODEMASK	(3<<6)
-+#define S3C2410_IICSTAT_MASTER_RX	(2 << 6)
-+#define S3C2410_IICSTAT_MASTER_TX	(3 << 6)
-+#define S3C2410_IICSTAT_SLAVE_RX	(0 << 6)
-+#define S3C2410_IICSTAT_SLAVE_TX	(1 << 6)
-+#define S3C2410_IICSTAT_MODEMASK	(3 << 6)
- 
--#define S3C2410_IICSTAT_START		(1<<5)
--#define S3C2410_IICSTAT_BUSBUSY		(1<<5)
--#define S3C2410_IICSTAT_TXRXEN		(1<<4)
--#define S3C2410_IICSTAT_ARBITR		(1<<3)
--#define S3C2410_IICSTAT_ASSLAVE		(1<<2)
--#define S3C2410_IICSTAT_ADDR0		(1<<1)
--#define S3C2410_IICSTAT_LASTBIT		(1<<0)
-+#define S3C2410_IICSTAT_START		(1 << 5)
-+#define S3C2410_IICSTAT_BUSBUSY		(1 << 5)
-+#define S3C2410_IICSTAT_TXRXEN		(1 << 4)
-+#define S3C2410_IICSTAT_ARBITR		(1 << 3)
-+#define S3C2410_IICSTAT_ASSLAVE		(1 << 2)
-+#define S3C2410_IICSTAT_ADDR0		(1 << 1)
-+#define S3C2410_IICSTAT_LASTBIT		(1 << 0)
- 
- #define S3C2410_IICLC_SDA_DELAY0	(0 << 0)
- #define S3C2410_IICLC_SDA_DELAY5	(1 << 0)
-@@ -82,7 +80,7 @@
- #define S3C2410_IICLC_SDA_DELAY15	(3 << 0)
- #define S3C2410_IICLC_SDA_DELAY_MASK	(3 << 0)
- 
--#define S3C2410_IICLC_FILTER_ON		(1<<2)
-+#define S3C2410_IICLC_FILTER_ON		(1 << 2)
- 
- /* Treat S3C2410 as baseline hardware, anything else is supported via quirks */
- #define QUIRK_S3C2440		(1 << 0)
--- 
-1.7.2.3
+OK. Thanks for letting know.
+
+cheers,
+-roger
