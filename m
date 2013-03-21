@@ -1,33 +1,39 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 21 Mar 2013 17:12:01 -0400 (EDT)
-Subject: [PATCH] USB: EHCI: fix for leaking isochronous data
-In-Reply-To: <Pine.LNX.4.44L0.1303211659080.1899-100000@iolanthe.rowland.org>
-Message-ID: <Pine.LNX.4.44L0.1303211708470.1899-100000@iolanthe.rowland.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 21 Mar 2013 22:15:23 +0100
+Subject: [PATCH 5/5] arm: dts: Convert mvebu device tree files to 64 bits
+In-Reply-To: <20130321205545.GA8358@obsidianresearch.com>
+References: <1363883179-1361-1-git-send-email-gregory.clement@free-electrons.com>
+ <1363883179-1361-6-git-send-email-gregory.clement@free-electrons.com>
+ <20130321201533.GN21478@lunn.ch> <20130321212236.1015295d@skate>
+ <20130321205545.GA8358@obsidianresearch.com>
+Message-ID: <20130321221523.7ede6ccc@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 21 Mar 2013, Alan Stern wrote:
+Dear Jason Gunthorpe,
 
-> On Thu, 21 Mar 2013, Soeren Moch wrote:
-> 
-> > Now I found out what is going on here:
-> > 
-> > In itd_urb_transaction() we allocate 9 iTDs for each URB with 
-> > number_of_packets == 64 in my case. The iTDs are added to 
-> > sched->td_list. For a frame-aligned scheduling we need 8 iTDs, the 9th 
-> > one is released back to the front of the streams free_list in 
-> > iso_sched_free(). This iTD was cleared after allocation and has a frame 
-> > number of 0 now. So for each allocation when now_frame == 0 we allocate 
-> > from the dma_pool, not from the free_list.
-> 
-> Okay, that is a problem.  But it shouldn't be such a big problem,
-> because now_frame should not be equal to 0 very often.
+On Thu, 21 Mar 2013 14:55:45 -0600, Jason Gunthorpe wrote:
 
-Oh, wait, now I get it.  We never reach a steady state, because the
-free list never shrinks, but occasionally it does increase when
-now_frame is equal to 0.  Even though that doesn't happen very often,
-the effects add up.
+> Or, better, locate all the internal registers above 8G and use
+> contiguous DRAM mapping from 0 -> 8GB
 
-Very good; tomorrow I will send your patch in.
+I see two potential issues with this idea:
 
-Alan Stern
+ *) It only works when LPAE is enabled, so we would have to have
+    different internal register addresses depending on whether LPAE is
+    enabled or not. Probably not impossible, but not very
+    straightforward either.
+
+ *) It would require Linux to change the internal registers address
+    (for now the kernel relies on the bootloader). The problem is that
+    we can't do it early enough to preserve the earlyprintk
+    functionality. Maybe you have suggestions on how to achieve that?
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
