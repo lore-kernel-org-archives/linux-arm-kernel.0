@@ -1,46 +1,32 @@
-From: smoch@web.de (Soeren Moch)
-Date: Thu, 21 Mar 2013 22:45:16 +0100
-Subject: [PATCH] USB: EHCI: fix for leaking isochronous data
-In-Reply-To: <Pine.LNX.4.44L0.1303211708470.1899-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1303211708470.1899-100000@iolanthe.rowland.org>
-Message-ID: <514B7F6C.2060200@web.de>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Thu, 21 Mar 2013 15:46:07 -0600
+Subject: [PATCH 5/5] arm: dts: Convert mvebu device tree files to 64 bits
+In-Reply-To: <EE71107DF0D1F24FA2D95041E64AB9E801A56C7B6D24@IL-MB01.marvell.com>
+References: <1363883179-1361-1-git-send-email-gregory.clement@free-electrons.com>
+ <1363883179-1361-6-git-send-email-gregory.clement@free-electrons.com>
+ <20130321201533.GN21478@lunn.ch> <20130321212236.1015295d@skate>
+ <20130321205545.GA8358@obsidianresearch.com>
+ <20130321221523.7ede6ccc@skate>
+ <EE71107DF0D1F24FA2D95041E64AB9E801A56C7B6D24@IL-MB01.marvell.com>
+Message-ID: <20130321214607.GC8431@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/21/13 22:12, Alan Stern wrote:
-> On Thu, 21 Mar 2013, Alan Stern wrote:
->
->> On Thu, 21 Mar 2013, Soeren Moch wrote:
->>
->>> Now I found out what is going on here:
->>>
->>> In itd_urb_transaction() we allocate 9 iTDs for each URB with
->>> number_of_packets == 64 in my case. The iTDs are added to
->>> sched->td_list. For a frame-aligned scheduling we need 8 iTDs, the 9th
->>> one is released back to the front of the streams free_list in
->>> iso_sched_free(). This iTD was cleared after allocation and has a frame
->>> number of 0 now. So for each allocation when now_frame == 0 we allocate
->>> from the dma_pool, not from the free_list.
->>
->> Okay, that is a problem.  But it shouldn't be such a big problem,
->> because now_frame should not be equal to 0 very often.
->
-> Oh, wait, now I get it.  We never reach a steady state, because the
-> free list never shrinks, but occasionally it does increase when
-> now_frame is equal to 0.  Even though that doesn't happen very often,
-> the effects add up.
+On Thu, Mar 21, 2013 at 11:35:21PM +0200, Lior Amsalem wrote:
 
-Correct. Approximately twice a second we allocate 9 iTDs from the 
-dma_pool in my case (the frame numbers run from 0 to 511 - not up to 
-2047, which I thought they should). But since we allocate iTDs every 8 
-frames in my case (for each active stream), the pool allocations occur 
-only when we hit the allocation sequence frame 0,8,16,... (not one of 
-the other 7 opportunities frame 1,9,17,... - frame 7,15,23,...)
+> >  *) It would require Linux to change the internal registers address
+> >     (for now the kernel relies on the bootloader). The problem is that
+> >     we can't do it early enough to preserve the earlyprintk
+> >     functionality. Maybe you have suggestions on how to achieve that?
+> 
+> Please note that all registers and IOs are still 32bit, the 40bit
+> extension is on the CPU to DRAM path (windows) only.
 
-> Very good; tomorrow I will send your patch in.
->
-> Alan Stern
->
-Thank you. And also thanks to all who helped to track down this issue.
+Ah, I did wonder, since Ezequiel's MBUS driver was the same as on
+prior families. I guess it is also the case that all on board DMA and
+DMA from PCI-E devices are restricted to the low 32 bits as well?
 
-  Soeren
+I think lots of Linux workloads will really struggle under those
+conditions..
+
+Jason
