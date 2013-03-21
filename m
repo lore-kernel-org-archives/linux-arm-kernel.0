@@ -1,42 +1,51 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 21 Mar 2013 11:24:00 -0400
-Subject: [PATCH 05/16] thermal: mvebu: Fix valid check for thermal register
-In-Reply-To: <20130321151609.GA24246@localhost>
-References: <1363818997-23137-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1363818997-23137-6-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130321143539.GV13280@titan.lakedaemon.net>
- <20130321151609.GA24246@localhost>
-Message-ID: <20130321152400.GX13280@titan.lakedaemon.net>
+From: agraf@suse.de (Alexander Graf)
+Date: Thu, 21 Mar 2013 16:40:55 +0100
+Subject: [PATCH 3/3] ARM: EXYNOS5250: Register architected timers
+In-Reply-To: <51421FDA.8070507@cogentembedded.com>
+References: <1363222742-15220-1-git-send-email-agraf@suse.de>
+ <1363222742-15220-4-git-send-email-agraf@suse.de>
+ <51421FDA.8070507@cogentembedded.com>
+Message-ID: <FA105342-1A3A-41E5-87B2-31E9802AD31D@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 21, 2013 at 12:16:10PM -0300, Ezequiel Garcia wrote:
-> Hi Jason,
-> 
-> On Thu, Mar 21, 2013 at 10:35:39AM -0400, Jason Cooper wrote:
-> > On Wed, Mar 20, 2013 at 07:36:26PM -0300, Ezequiel Garcia wrote:
-> > > The correct value is obtain by first shifting the register by the offset,
-> > > later applying the valid mask and finally invert the result.
-> > > This check was lacking an extra parenthesis to be strictly correct.
-> > > 
-> > > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > > ---
-> > >  drivers/thermal/mvebu_thermal.c |    4 ++--
-> > >  1 files changed, 2 insertions(+), 2 deletions(-)
-> > 
-> > For the next version of this series, could you please put this fix first
-> > in the series?  In this state, it can't be applied to v3.9-rcX, nor
-> > -stable.
-> > 
-> 
-> Given we're still discussing the aproach of this patchset.
-> I think I prefer to send the fixes now, not as part of the
-> current series but as independent patches.
-> 
-> What do you think?
 
-I agree.
+On 14.03.2013, at 20:07, Sergei Shtylyov wrote:
 
-thx,
+> Hello.
+> 
+> On 14-03-2013 4:59, Alexander Graf wrote:
+> 
+>> When running on an exynos 5250 SoC, we don't initialize the architected
+>> timers. The chip however supports architected timers.
+> 
+>> When we don't initialize them, KVM will try to access them and run into
+>> NULL pointer dereferences attempting to do so.
+> 
+>> This patch is really more of a hack than a real fix, but does get me
+>> working with KVM on Arndale.
+> 
+>> Signed-off-by: Alexander Graf <agraf@suse.de>
+>> ---
+>>  arch/arm/mach-exynos/mct.c |    4 ++++
+>>  1 file changed, 4 insertions(+)
+> 
+>> diff --git a/arch/arm/mach-exynos/mct.c b/arch/arm/mach-exynos/mct.c
+>> index c9d6650..eefb8af 100644
+>> --- a/arch/arm/mach-exynos/mct.c
+>> +++ b/arch/arm/mach-exynos/mct.c
+>> @@ -482,4 +482,8 @@ void __init exynos4_timer_init(void)
+>>  	exynos4_timer_resources();
+>>  	exynos4_clocksource_init();
+>>  	exynos4_clockevent_init();
+>> +
+>> +	if (soc_is_exynos5250()) {
+>> +		arch_timer_of_register();
+>> +	}
+> 
+>   {} not needed here. scripts/checkpatch.pl should probabl;y warn about it.
 
-Jason.
+Yeah, I'd leave it to whoever wants to apply this patch to remove the braces :). IMHO it's not worth it to respin just for this.
+
+
+Alex
