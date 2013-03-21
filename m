@@ -1,76 +1,75 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 21 Mar 2013 14:49:49 -0400
-Subject: [PATCH V3] ARM: mvebu: fix RAM size for Armada XP board
- DB-MV784MP-GP
-In-Reply-To: <1363283162-26041-1-git-send-email-jason@lakedaemon.net>
-References: <20130216164457.GA23237@titan.lakedaemon.net>
- <1363283162-26041-1-git-send-email-jason@lakedaemon.net>
-Message-ID: <20130321184949.GC13280@titan.lakedaemon.net>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 21 Mar 2013 11:50:51 -0700
+Subject: [RFC 1/8] RFC: CLK: OMAP: Add basic infrastructure for OMAP clocks
+In-Reply-To: <1363887347-4686-2-git-send-email-t-kristo@ti.com>
+References: <1363887347-4686-1-git-send-email-t-kristo@ti.com>
+ <1363887347-4686-2-git-send-email-t-kristo@ti.com>
+Message-ID: <20130321185051.834.97551@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 14, 2013 at 05:46:02PM +0000, Jason Cooper wrote:
-> The board is supplied with a 4GB RAM module.  This value can be
-> overridden by the bootloader based on probed memory size.  We set it to
-> a reasonable value here.
+Quoting Tero Kristo (2013-03-21 10:35:40)
+> This patch adds basic infrastructure support for registering clocks
+> under common clock framework. This patch is done in preparation for
+> moving clock data from arch/arm/mach-omap2/ folder under /drivers/clk/omap.
 > 
-> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
-> ---
-> Changes from v2:
->  - trimmed size to not conflict with internal register addresses, added comment.
->    Thanks to Jason Gunthorpe for raising this and Gregory Clement for confirming.
-> 
-> Changes from v1:
->  - grammatical fix suggested by Sergei Shtylyov
->  - correct size suggested by several folks (within 32bit, 1 dword)
-> 
-> As promised, catching this fix in the -rc cycle.
-> 
-> For those not familiar, earlier versions of the patch adding this board listed
-> 3GB because that is all that was visible.  I mistaken applied v3 of the patch
-> instead of v4 which properly listed 4GB.  This patch cleans up my error.
-> 
-> 
->  arch/arm/boot/dts/armada-xp-gp.dts | 12 +++++++-----
->  1 file changed, 7 insertions(+), 5 deletions(-)
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> Cc: Mike Turquette <mturquette@linaro.org>
 
-I'm going to hang on to this since there is a pretty good chance the
-LPAE code posted today will make it in this window and supercedes this.
+Thanks for taking a crack at this Tero!  This is a great step towards
+getting rid of clk-private.h.
 
-thx,
+Regarding the long-term roadmap of the omap clock code:
 
-Jason.
+In general all of the changes to the omap clock code for using the
+common struct clk have been very incremental.  We still have the old
+legacy struct clk definition, the name of that struct was changed to
+clk_hw_omap, but it is still a fairly large, monolithic structure.  Are
+there plans to break the clock types up into smaller, more focused clock
+types?  E.g. get rid of struct dpll_data and have a dedicated dpll clock
+type.
 
-> 
-> diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
-> index 1c8afe2..b2d7804 100644
-> --- a/arch/arm/boot/dts/armada-xp-gp.dts
-> +++ b/arch/arm/boot/dts/armada-xp-gp.dts
-> @@ -28,12 +28,14 @@
->  		device_type = "memory";
->  
->  		/*
-> -		 * 4 GB of plug-in RAM modules by default but only 3GB
-> -		 * are visible, the amount of memory available can be
-> -		 * changed by the bootloader according the size of the
-> -		 * module actually plugged
-> +		 * 4 GB of plug-in RAM modules by default. The amount of memory
-> +		 * available can be changed by the bootloader according to the
-> +		 * size of the module actually plugged
-> +		 *
-> +		 * Clipped at 0xD0000000 since this is the start of the internal
-> +		 * registers.
->  		 */
-> -		reg = <0x00000000 0xC0000000>;
-> +		reg = <0x00000000 0xD0000000>;
->  	};
->  
->  	soc {
-> -- 
-> 1.8.1.5
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+The question above is not reason to block this patch since it is a
+fairly large refactoring effort, but it is something to consider.
+
+Some comments below.
+
+<snip>
+
+> +struct omap_clk {
+> +       u16                             cpu;
+> +       const char                      *dev_id;
+> +       const char                      *con_id;
+> +       struct omap_init_clk            *clk;
+> +};
+> +
+> +#define CLK(dev, con, ck, cp)          \
+> +       {                               \
+> +               .cpu = cp,              \
+> +               .dev_id = dev,          \
+> +               .con_id = con,          \
+> +               .clk = ck,              \
+> +       }       
+> +
+
+IS omap_clk and CLK really necessary today?  I thought that the move to
+separate clocks out by tables got rid of this macro/structure?
+
+> +#define OMAP_CLK_FIXED_RATE(_name, _flags, _rate, _ignore)     \
+> +       static struct omap_init_clk _name __initdata = {        \
+> +               .name = #_name,                                 \
+> +               .clk_flags = _flags,                            \
+> +               .rate = _rate,                                  \
+> +               .clk_register = omap_clk_register_fixed_rate,   \
+> +       };
+> +
+
+These macros are unreadable.  They were originally born out of the nasty
+clk-private.h stuff which included forward declarations of struct clk
+and all sorts of ugliness.  I know it saves you LoC to use them now but
+I really prefer to use designated initializers for the sake of
+readability.  Do you plan to convert the OMAP clock code back to how it
+was, pre-macros?
+
+Regards,
+Mike
