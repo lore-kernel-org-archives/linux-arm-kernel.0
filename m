@@ -1,109 +1,113 @@
 From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Thu, 21 Mar 2013 17:05:36 +0100 (CET)
-Subject: [PATCH 1/3] ARM: shmobile: irqpin: fix handling of spurious interrupts
- in DT case
+Date: Thu, 21 Mar 2013 17:05:40 +0100 (CET)
+Subject: [PATCH 2/3] ARM: shmobile: sh73a0: add irqpin DT nodes
 In-Reply-To: <Pine.LNX.4.64.1303211659580.32438@axis700.grange>
 References: <Pine.LNX.4.64.1303211659580.32438@axis700.grange>
-Message-ID: <Pine.LNX.4.64.1303211703490.32438@axis700.grange>
+Message-ID: <Pine.LNX.4.64.1303211704130.32438@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To disable spurious interrupts, that get triggered on certain hardware, the
-irqpin driver masks them on the parent interrupt controller. To specify
-such broken devices a .control_parent parameter can be provided in the
-platform data. In the DT case we need a property, to do the same. However,
-this is not enough to correctly handle spurious interrupts in the DT case.
-In the non-DT case all interrupts get mapped statically during probing,
-therefore, if a spurious interrupt arrives, it can easily be mapped back
-to hardware registers and bits and handled. In the DT case interrupts are
-mapped only when a device, using that interrupt is instantiated from DT.
-So, spurious interrupts occur unmapped and thus cannot be handled properly.
-This patch fixes this by mapping such interrupts as they occur.
+Add DT nodes for the 4 irqpin interrupt controllers on sh73a0. We add them
+to sh73a0.dtsi, which is also used by configurations, doing all their
+device instantiation from board the .c code. We rely on the fact, that
+such configurations don't instantiate devices from the device-tree.
 
 Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 ---
- .../interrupt-controller/renesas,intc-irqpin.txt   |   13 +++++++++++++
- drivers/irqchip/irq-renesas-intc-irqpin.c          |   13 +++++++++++++
- 2 files changed, 26 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt
+ arch/arm/boot/dts/sh73a0.dtsi |   81 +++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 81 insertions(+), 0 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt b/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt
-new file mode 100644
-index 0000000..e55d183
---- /dev/null
-+++ b/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt
-@@ -0,0 +1,13 @@
-+DT bindings for the R-/SH-Mobile irqpin controller
+diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
+index 3e4d383..ec40bf7 100644
+--- a/arch/arm/boot/dts/sh73a0.dtsi
++++ b/arch/arm/boot/dts/sh73a0.dtsi
+@@ -38,6 +38,87 @@
+ 		      <0xf0000100 0x100>;
+ 	};
+ 
++	irqpin0: irqpin at e6900000 {
++		compatible = "renesas,intc-irqpin";
++		#interrupt-cells = <2>;
++		interrupt-controller;
++		reg = <0xe6900000 4>,
++			<0xe6900010 4>,
++			<0xe6900020 1>,
++			<0xe6900040 1>,
++			<0xe6900060 1>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 1 0x4
++			      0 2 0x4
++			      0 3 0x4
++			      0 4 0x4
++			      0 5 0x4
++			      0 6 0x4
++			      0 7 0x4
++			      0 8 0x4>;
++	};
 +
-+Required properties:
++	irqpin1: irqpin at e6900004 {
++		compatible = "renesas,intc-irqpin";
++		#interrupt-cells = <2>;
++		interrupt-controller;
++		reg = <0xe6900004 4>,
++			<0xe6900014 4>,
++			<0xe6900024 1>,
++			<0xe6900044 1>,
++			<0xe6900064 1>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 9 0x4
++			      0 10 0x4
++			      0 11 0x4
++			      0 12 0x4
++			      0 13 0x4
++			      0 14 0x4
++			      0 15 0x4
++			      0 16 0x4>;
++		control-parent;
++	};
 +
-+- compatible: has to be "renesas,intc-irqpin"
-+- #interrupt-cells: has to be <2>
++	irqpin2: irqpin at e6900008 {
++		compatible = "renesas,intc-irqpin";
++		#interrupt-cells = <2>;
++		interrupt-controller;
++		reg = <0xe6900008 4>,
++			<0xe6900018 4>,
++			<0xe6900028 1>,
++			<0xe6900048 1>,
++			<0xe6900068 1>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 17 0x4
++			      0 18 0x4
++			      0 19 0x4
++			      0 20 0x4
++			      0 21 0x4
++			      0 22 0x4
++			      0 23 0x4
++			      0 24 0x4>;
++	};
 +
-+Optional properties:
++	irqpin3: irqpin at e690000c {
++		compatible = "renesas,intc-irqpin";
++		#interrupt-cells = <2>;
++		interrupt-controller;
++		reg = <0xe690000c 4>,
++			<0xe690001c 4>,
++			<0xe690002c 1>,
++			<0xe690004c 1>,
++			<0xe690006c 1>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 25 0x4
++			      0 26 0x4
++			      0 27 0x4
++			      0 28 0x4
++			      0 29 0x4
++			      0 30 0x4
++			      0 31 0x4
++			      0 32 0x4>;
++	};
 +
-+- any properties, listed in interrupts.txt in this directory, and any standard
-+  resource allocation properties
-+- control-parent: disable and enable interrupts on the parent interrupt
-+  controller, needed for some broken implementations
-diff --git a/drivers/irqchip/irq-renesas-intc-irqpin.c b/drivers/irqchip/irq-renesas-intc-irqpin.c
-index fd5dabc..82bbe8f 100644
---- a/drivers/irqchip/irq-renesas-intc-irqpin.c
-+++ b/drivers/irqchip/irq-renesas-intc-irqpin.c
-@@ -18,6 +18,7 @@
-  */
- 
- #include <linux/init.h>
-+#include <linux/of.h>
- #include <linux/platform_device.h>
- #include <linux/spinlock.h>
- #include <linux/interrupt.h>
-@@ -70,6 +71,7 @@ struct intc_irqpin_priv {
- 	struct intc_irqpin_iomem iomem[INTC_IRQPIN_REG_NR];
- 	struct intc_irqpin_irq irq[INTC_IRQPIN_MAX];
- 	struct renesas_intc_irqpin_config config;
-+	unsigned int min_irq;
- 	unsigned int number_of_irqs;
- 	struct platform_device *pdev;
- 	struct irq_chip irq_chip;
-@@ -249,6 +251,10 @@ static irqreturn_t intc_irqpin_irq_handler(int irq, void *dev_id)
- 	struct intc_irqpin_priv *p = i->p;
- 	unsigned long bit;
- 
-+	if (!i->domain_irq)
-+		/* unmapped: spurious IRQ, map it now */
-+		irq_create_mapping(p->irq_domain, irq - p->min_irq);
-+
- 	intc_irqpin_dbg(i, "demux1");
- 	bit = intc_irqpin_hwirq_mask(p, INTC_IRQPIN_REG_SOURCE, i->hw_irq);
- 
-@@ -321,6 +327,7 @@ static int intc_irqpin_probe(struct platform_device *pdev)
- 		}
- 	}
- 
-+	p->min_irq = INT_MAX;
- 	/* allow any number of IRQs between 1 and INTC_IRQPIN_MAX */
- 	for (k = 0; k < INTC_IRQPIN_MAX; k++) {
- 		irq = platform_get_resource(pdev, IORESOURCE_IRQ, k);
-@@ -329,6 +336,8 @@ static int intc_irqpin_probe(struct platform_device *pdev)
- 
- 		p->irq[k].p = p;
- 		p->irq[k].requested_irq = irq->start;
-+		if (p->min_irq > irq->start)
-+			p->min_irq = irq->start;
- 	}
- 
- 	p->number_of_irqs = k;
-@@ -372,6 +381,10 @@ static int intc_irqpin_probe(struct platform_device *pdev)
- 	for (k = 0; k < p->number_of_irqs; k++)
- 		intc_irqpin_mask_unmask_prio(p, k, 1);
- 
-+	if (!pdata)
-+		p->config.control_parent = of_property_read_bool(pdev->dev.of_node,
-+								 "control-parent");
-+
- 	/* use more severe masking method if requested */
- 	if (p->config.control_parent) {
- 		enable_fn = intc_irqpin_irq_enable_force;
+ 	i2c0: i2c at 0xe6820000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
 -- 
 1.7.2.5
