@@ -1,72 +1,40 @@
-From: kishon@ti.com (kishon)
-Date: Thu, 21 Mar 2013 11:18:12 +0530
-Subject: [PATCH v3 4/6] ARM: OMAP: USB: Add phy binding information
-In-Reply-To: <20130320165141.GP16413@atomide.com>
-References: <1363770725-13717-1-git-send-email-kishon@ti.com>
- <1363770725-13717-5-git-send-email-kishon@ti.com>
- <20130320165141.GP16413@atomide.com>
-Message-ID: <514A9F1C.6080609@ti.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 21 Mar 2013 07:10:24 +0100
+Subject: [PATCH 06/16] thermal: mvebu: Convert to devm_ioremap_resource()
+In-Reply-To: <1363818997-23137-7-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1363818997-23137-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1363818997-23137-7-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20130321061024.GH21478@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Mar 20, 2013 at 07:36:27PM -0300, Ezequiel Garcia wrote:
+> Convert devm_request_and_ioremap() to the newly introduced
+> devm_ioremap_resource() which provides more consistent error handling.
+> 
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+>  drivers/thermal/mvebu_thermal.c |    6 ++----
+>  1 files changed, 2 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/thermal/mvebu_thermal.c b/drivers/thermal/mvebu_thermal.c
+> index ef04e4e..089b43d 100644
+> --- a/drivers/thermal/mvebu_thermal.c
+> +++ b/drivers/thermal/mvebu_thermal.c
+> @@ -86,11 +86,9 @@ static int mvebu_thermal_probe(struct platform_device *pdev)
+>  	if (!priv)
+>  		return -ENOMEM;
+>  
+> -	priv->sensor = devm_request_and_ioremap(&pdev->dev, res);
+> -	if (!priv->sensor) {
+> -		dev_err(&pdev->dev, "Failed to request_ioremap memory\n");
+> +	priv->sensor = devm_ioremap_resource(&pdev->dev, res);
+> +	if (!priv->sensor)
+>  		return -EADDRNOTAVAIL;
+> -	}
 
-On Wednesday 20 March 2013 10:21 PM, Tony Lindgren wrote:
-> * Kishon Vijay Abraham I <kishon@ti.com> [130320 02:17]:
->>
->> --- a/arch/arm/mach-omap2/board-2430sdp.c
->> +++ b/arch/arm/mach-omap2/board-2430sdp.c
->> @@ -265,6 +266,7 @@ static void __init omap_2430sdp_init(void)
->>
->>   	omap_mux_init_signal("usb0hs_stp", OMAP_PULL_ENA | OMAP_PULL_UP);
->>   	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
->> +	phy_bind("musb-hdrc.0.auto", 0, "twl4030_usb");
->>   	usb_musb_init(NULL);
->>
->>   	board_smc91x_init();
->> --- a/arch/arm/mach-omap2/board-3430sdp.c
->> +++ b/arch/arm/mach-omap2/board-3430sdp.c
->> @@ -601,6 +602,7 @@ static void __init omap_3430sdp_init(void)
->>   	omap_serial_init();
->>   	omap_sdrc_init(hyb18m512160af6_sdrc_params, NULL);
->>   	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
->> +	phy_bind("musb-hdrc.0.auto", 0, "twl4030_usb");
->>   	usb_musb_init(NULL);
->>   	board_smc91x_init();
->>   	board_flash_init(sdp_flash_partitions, chip_sel_3430, 0);
->
-> Can't you call phy_bind() from usb_musb_init() with the default
-> values automatically when usb_musb_init() is passed NULL?
->
-> That way you don't have to patch every board-*.c file with the
-> same lines, and don't need to include <linux/phy/phy.h> in each
-> board-*.c file.
->
->> --- a/arch/arm/mach-omap2/board-4430sdp.c
->> +++ b/arch/arm/mach-omap2/board-4430sdp.c
->> @@ -32,6 +32,7 @@
->>   #include <linux/platform_data/omap4-keypad.h>
->>   #include <linux/usb/musb.h>
->>   #include <linux/usb/phy.h>
->> +#include <linux/phy/phy.h>
->>
->>   #include <asm/mach-types.h>
->>   #include <asm/mach/arch.h>
->> @@ -725,6 +726,7 @@ static void __init omap_4430sdp_init(void)
->>   	omap4_twl6030_hsmmc_init(mmc);
->>
->>   	usb_bind_phy("musb-hdrc.0.auto", 0, "omap-usb2.1.auto");
->> +	phy_bind("musb-hdrc.0.auto", 0, "omap-usb2.1.auto");
->>   	usb_musb_init(&musb_board_data);
->>
->>   	status = omap_ethernet_init();
->
-> Here usb_musb_init() gets called with musb_board_data, so
-> keeping the phy_bind() in the board-4430sdp.c can then override
-> the default in usb_musb_init().
+Hi Ezequiel
 
-Currently phy_bind has a limitation to do that. Will change phy_bind() 
-and have your comment incorporated.
+It would be better to return priv->sensor, not a fixed error code.
 
-Thanks
-Kishon
+   Andrew
