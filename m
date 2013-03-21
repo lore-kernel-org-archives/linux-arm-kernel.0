@@ -1,51 +1,62 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Thu, 21 Mar 2013 16:13:20 +0100
-Subject: [PATCH] DTS at91sam9x5ek: i2c1 and i2c2 conflict with macb and lcd
-In-Reply-To: <1363778575-4809-1-git-send-email-richard.genoud@gmail.com>
-References: <1363778575-4809-1-git-send-email-richard.genoud@gmail.com>
-Message-ID: <20130321151320.GB2490@ludovic.desroches@atmel.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 21 Mar 2013 16:26:58 +0100
+Subject: [GIT PULL] at91: dt for 3.10 #1
+Message-ID: <514B26C2.5020804@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 20, 2013 at 12:22:54PM +0100, Richard Genoud wrote:
-> on at91sam9x5ek, macb0 is enabled, so it conflicts with i2c2 (PB4)
-> same for i2c1, (conflicts with LCD).
-> Moreover, only i2c0 is used on this board.
-> 
-> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+Arnd, Olof,
 
-Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+This is an AT91 pull-request about Device Tree material for -next.
 
-Thanks
 
-> ---
->  arch/arm/boot/dts/at91sam9x5ek.dtsi |    8 --------
->  1 files changed, 0 insertions(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/at91sam9x5ek.dtsi b/arch/arm/boot/dts/at91sam9x5ek.dtsi
-> index 8a7cf1d..1128565 100644
-> --- a/arch/arm/boot/dts/at91sam9x5ek.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9x5ek.dtsi
-> @@ -61,14 +61,6 @@
->  				status = "okay";
->  			};
->  
-> -			i2c1: i2c at f8014000 {
-> -				status = "okay";
-> -			};
-> -
-> -			i2c2: i2c at f8018000 {
-> -				status = "okay";
-> -			};
-> -
->  			pinctrl at fffff400 {
->  				mmc0 {
->  					pinctrl_board_mmc0: mmc0-board {
-> -- 
-> 1.7.2.5
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+The following changes since commit a937536b868b8369b98967929045f1df54234323:
+
+  Linux 3.9-rc3 (2013-03-17 15:59:32 -0700)
+
+are available in the git repository at:
+
+  git://github.com/at91linux/linux-at91.git tags/at91-dt
+
+for you to fetch changes up to 6901d947be5ba1245a0f63271355b95f9056a362:
+
+  ARM: at91/at91sam9x5cm: add 1-wire chip on CM board (2013-03-21 16:07:15 +0100)
+
+----------------------------------------------------------------
+DT modifications for at91rm9200 and at91sam9x5 SoCs, mainly around
+I2C. Also some cleanup of some unneeded properties and conflicting
+nodes.
+One more DT-only board based on at91rm9200.
+
+----------------------------------------------------------------
+Joachim Eastwood (3):
+      ARM: at91: add TWI bindings to RM9200 DT
+      ARM: at91: add pinctrl nodes to i2c-gpio on RM92000 DT
+      ARM: at91: add MPA 1600 DT board
+
+Nicolas Ferre (1):
+      ARM: at91/dt: gpio-keys: remove address-cells and size-cells properties
+
+Richard Genoud (4):
+      ARM: at91: dt: at91sam9x5: add i2c pinctrl
+      ARM: at91: dt: at91sam9x5: add i2c-gpio pinctrl
+      ARM: at91/at91sam9x5ek: i2c1 and i2c2 conflict with macb and lcd
+      ARM: at91/at91sam9x5cm: add 1-wire chip on CM board
+
+ arch/arm/boot/dts/Makefile                  |  1 +
+ arch/arm/boot/dts/at91rm9200.dtsi           | 28 ++++++++++++++
+ arch/arm/boot/dts/at91sam9263ek.dts         |  2 -
+ arch/arm/boot/dts/at91sam9g20ek_common.dtsi |  2 -
+ arch/arm/boot/dts/at91sam9m10g45ek.dts      |  2 -
+ arch/arm/boot/dts/at91sam9n12ek.dts         |  2 -
+ arch/arm/boot/dts/at91sam9x5.dtsi           | 60 ++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/at91sam9x5cm.dtsi         | 20 ++++++++++
+ arch/arm/boot/dts/at91sam9x5ek.dtsi         |  8 ----
+ arch/arm/boot/dts/mpa1600.dts               | 69 +++++++++++++++++++++++++++++++++++
+ arch/arm/mach-at91/at91rm9200.c             |  1 +
+ 11 files changed, 179 insertions(+), 16 deletions(-)
+ create mode 100644 arch/arm/boot/dts/mpa1600.dts
+
+Thanks, best regards,
+-- 
+Nicolas Ferre
