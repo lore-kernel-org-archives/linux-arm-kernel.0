@@ -1,40 +1,105 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Thu, 21 Mar 2013 18:19:13 +0800
-Subject: [PATCH v2 3/8] drivers: char: use module_platform_driver_probe()
-In-Reply-To: <CAHkwnC_AJpeVw2o8oJn+zMvSg1Lbmm1aXRYxCmtDYhkJG9nvig@mail.gmail.com>
-References: <1363280978-24051-1-git-send-email-fabio.porcedda@gmail.com>
- <1363280978-24051-4-git-send-email-fabio.porcedda@gmail.com>
- <20130321095542.GH26931@gondor.apana.org.au>
- <CAHkwnC_AJpeVw2o8oJn+zMvSg1Lbmm1aXRYxCmtDYhkJG9nvig@mail.gmail.com>
-Message-ID: <20130321101912.GA27199@gondor.apana.org.au>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 21 Mar 2013 15:27:18 +0530
+Subject: [PATCH 2/2] ASoC: dmaengine_pcm: add
+ snd_dmaengine_generic_pcm_open()
+In-Reply-To: <1363318601-31505-3-git-send-email-shawn.guo@linaro.org>
+References: <1363318601-31505-1-git-send-email-shawn.guo@linaro.org>
+ <1363318601-31505-3-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20130321095718.GO10326@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 21, 2013 at 11:15:26AM +0100, Fabio Porcedda wrote:
-> On Thu, Mar 21, 2013 at 10:55 AM, Herbert Xu
-> <herbert@gondor.apana.org.au> wrote:
-> > On Thu, Mar 14, 2013 at 06:09:33PM +0100, Fabio Porcedda wrote:
-> >> This patch converts the drivers to use the
-> >> module_platform_driver_probe() macro which makes the code smaller and
-> >> a bit simpler.
-> >>
-> >> Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
-> >> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> >> Cc: Matt Mackall <mpm@selenic.com>
-> >> Cc: Herbert Xu <herbert@gondor.apana.org.au>
-> >> Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> >> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> >
-> > Patch applied.
+On Fri, Mar 15, 2013 at 11:36:41AM +0800, Shawn Guo wrote:
+> With generic DMA device tree binding and helper function
+> dma_request_slave_channel() in place, dmaengine_pcm should support
+> that in requesting DMA channel for users that support generic DMA
+> device tree binding.
 > 
-> The patch is already in
-> git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/char-misc.git.
-> Are you speaking about that?
+> Add a new API snd_dmaengine_generic_pcm_open() as the variant of
+> snd_dmaengine_pcm_open().  It takes DMA client struct device pointer
+> and slave channel name as arguments and calls generic DMA helper
+> dma_request_slave_channel() to request DMA channel from dmaengine.
+NAK
 
-OK, I'll remove it from my tree.
+This is why we have dma_request_slave_channel_compat() API. You dont need to
+write two open handlers here, just pass all the arguments and if DT is set it
+will allocate a channel using dma_request_slave_channel() otherwise will do
+dma_request_channel which is what you need.
 
-Thanks,
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> Cc: alsa-devel at alsa-project.org
+> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  include/sound/dmaengine_pcm.h |    2 ++
+>  sound/soc/soc-dmaengine-pcm.c |   39 +++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 41 insertions(+)
+> 
+> diff --git a/include/sound/dmaengine_pcm.h b/include/sound/dmaengine_pcm.h
+> index b877334..452df15 100644
+> --- a/include/sound/dmaengine_pcm.h
+> +++ b/include/sound/dmaengine_pcm.h
+> @@ -43,6 +43,8 @@ snd_pcm_uframes_t snd_dmaengine_pcm_pointer_no_residue(struct snd_pcm_substream
+>  
+>  int snd_dmaengine_pcm_open(struct snd_pcm_substream *substream,
+>  	dma_filter_fn filter_fn, void *filter_data);
+> +int snd_dmaengine_generic_pcm_open(struct snd_pcm_substream *substream,
+> +				   struct device *dev, const char *name);
+>  int snd_dmaengine_pcm_close(struct snd_pcm_substream *substream);
+>  
+>  struct dma_chan *snd_dmaengine_pcm_get_chan(struct snd_pcm_substream *substream);
+> diff --git a/sound/soc/soc-dmaengine-pcm.c b/sound/soc/soc-dmaengine-pcm.c
+> index 111b7d92..970eb2b 100644
+> --- a/sound/soc/soc-dmaengine-pcm.c
+> +++ b/sound/soc/soc-dmaengine-pcm.c
+> @@ -304,6 +304,45 @@ int snd_dmaengine_pcm_open(struct snd_pcm_substream *substream,
+>  EXPORT_SYMBOL_GPL(snd_dmaengine_pcm_open);
+>  
+>  /**
+> + * snd_dmaengine_generic_pcm_open - Open a dmaengine based PCM substream
+> + * @substream: PCM substream
+> + * @dev: pointer to DMA client device structure
+> + * @name: DMA slave channel name
+> + *
+> + * Returns 0 on success, a negative error code otherwise.
+> + *
+> + * This function is a variant of snd_dmaengine_pcm_open(). It takes different
+> + * parameters and calls generic DMA helper dma_request_slave_channel() to
+> + * request a DMA channel from dmaengine.
+> + */
+> +int snd_dmaengine_generic_pcm_open(struct snd_pcm_substream *substream,
+> +				   struct device *dev, const char *name)
+> +{
+> +	struct dmaengine_pcm_runtime_data *prtd;
+> +	int ret;
+> +
+> +	ret = snd_pcm_hw_constraint_integer(substream->runtime,
+> +					    SNDRV_PCM_HW_PARAM_PERIODS);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	prtd = kzalloc(sizeof(*prtd), GFP_KERNEL);
+> +	if (!prtd)
+> +		return -ENOMEM;
+> +
+> +	prtd->dma_chan = dma_request_slave_channel(dev, name);
+> +	if (!prtd->dma_chan) {
+> +		kfree(prtd);
+> +		return -ENXIO;
+> +	}
+> +
+> +	substream->runtime->private_data = prtd;
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(snd_dmaengine_generic_pcm_open);
+> +
+> +/**
+>   * snd_dmaengine_pcm_close - Close a dmaengine based PCM substream
+>   * @substream: PCM substream
+>   */
+> -- 
+> 1.7.9.5
+> 
+> 
