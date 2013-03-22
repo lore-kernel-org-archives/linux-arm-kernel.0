@@ -1,7 +1,7 @@
 From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Fri, 22 Mar 2013 13:54:58 +0200
+Date: Fri, 22 Mar 2013 14:02:33 +0200
 Subject: [PATCH] clk: tegra: Don't enable PLLs during early boot
-Message-ID: <1363953308-28828-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <1363953762-29783-1-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
