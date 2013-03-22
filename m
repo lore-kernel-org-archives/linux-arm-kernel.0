@@ -1,156 +1,61 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 22 Mar 2013 12:39:38 -0400
-Subject: [PATCH v3] pinctrl: mvebu: prevent walking off the end of
- group array
-In-Reply-To: <1363434272-23172-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1363196884-20193-1-git-send-email-jason@lakedaemon.net>
- <1363434272-23172-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20130322163938.GL13280@titan.lakedaemon.net>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 22 Mar 2013 09:40:54 -0700
+Subject: [PATCH v2 0/3] clock driver for sunxi
+In-Reply-To: <514C30E1.2020203@free-electrons.com>
+References: <1358835176-7197-1-git-send-email-emilio@elopez.com.ar>
+ <1361803468-9899-1-git-send-email-emilio@elopez.com.ar>
+ <20130321215429.834.60042@quantum> <514C30E1.2020203@free-electrons.com>
+Message-ID: <20130322164054.834.64867@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus,
+Quoting Maxime Ripard (2013-03-22 03:22:25)
+> Hi Mike,
+> 
+> Le 21/03/2013 22:54, Mike Turquette a ?crit :
+> > Quoting Emilio L?pez (2013-02-25 06:44:25)
+> >> Hello everyone,
+> >>
+> >> This patchset adds basic clock support for sunxi devices. Currently, it
+> >> implements support for the two oscillators, the main PLL, the CPU mux,
+> >> its three divisor clocks and APB1. With this in place, it is possible to
+> >> write a cpufreq driver and have it work, and with a little more code,
+> >> represent the UART clocks correctly (I will be sending a separate
+> >> patchset for this).
+> >>
+> >> I have tested this driver successfully on a Cubieboard (A10, sun4i)
+> >> using the cpufreq driver from the linux-sunxi tree after minor
+> >> modifications (the clock names are not the same).
+> >>
+> >> Any feedback will be highly appreciated
+> >>
+> > 
+> > Emilio,
+> > 
+> > This is a nice series.  I appreciate the amount of comments in the code,
+> > the kerneldoc and also the added sunxi clock documentation.
+> > 
+> > Concerning the discussion from the v1 series, I prefer for the struct
+> > clk instances in the tree to match 1-to-1 with hardware clocks.  As the
+> > number of clocks in a system scales into the hundreds there are
+> > certainly advantages to having fewer clocks in the hierarchy, not the
+> > least of which is more easily associating these objects with hardware
+> > clocks during a deep debug session.
+> > 
+> > That can be changed at a later time if you wish.  Do you want me to take
+> > the series into clk-next or do you just want my ack?
+> 
+> Thanks for your feedback!
+> 
+> Unless you have some objection, I was planning to merge it through my
+> tree, with your Acked-by, of course.
+> 
 
-On Sat, Mar 16, 2013 at 12:44:32PM +0100, Sebastian Hesselbarth wrote:
-> From: David Woodhouse <dwmw2@infradead.org>
-> 
-> While investigating (ab)use of krealloc, David found this bug.  It's
-> unlikely to occur, but now we detect the condition and error out
-> appropriately.
-> 
-> Signed-off-by: David Woodhouse <David.Woodhouse@intel.com>
-> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-> Jason, David,
-> 
-> I tested the patch on Dove and fixed all remaining issues.
-> 
-> Thomas, Gregory, Andrew should test on their platforms, too.
-> 
-> Sebastian
-> 
-> Changes from v2:
->  - fix counting of available array space
->  - fix return code handling
-> 
-> Changes from v1:
->  - correct typo (s/ nt / int /) I should've caught before sending.
-> 
->  drivers/pinctrl/mvebu/pinctrl-mvebu.c |   33 +++++++++++++++++++++------------
->  1 file changed, 21 insertions(+), 12 deletions(-)
+Acked-by: Mike Turquette <mturquette@linaro.org>
 
-Does this look good to you?
-
-fwiw,
-
-Acked-by: Jason Cooper <jason@lakedaemon.net>
-
-thx,
-
-Jason.
-
-> ---
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: David Woodhouse <dwmw2@infradead.org>
-> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Gregory Clement <gregory.clement@free-electrons.com>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> Cc: Linux ARM Kernel <linux-arm-kernel@lists.infradead.org>
-> Cc: linux-kernel at vger.kernel.org
-> ---
-> diff --git a/drivers/pinctrl/mvebu/pinctrl-mvebu.c b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
-> index c689c04..aa77fb7a 100644
-> --- a/drivers/pinctrl/mvebu/pinctrl-mvebu.c
-> +++ b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
-> @@ -478,8 +478,12 @@ static struct pinctrl_ops mvebu_pinctrl_ops = {
->  	.dt_free_map = mvebu_pinctrl_dt_free_map,
->  };
->  
-> -static int _add_function(struct mvebu_pinctrl_function *funcs, const char *name)
-> +static int _add_function(struct mvebu_pinctrl_function *funcs, int *funcsize,
-> +			const char *name)
->  {
-> +	if (*funcsize <= 0)
-> +		return -EOVERFLOW;
-> +
->  	while (funcs->num_groups) {
->  		/* function already there */
->  		if (strcmp(funcs->name, name) == 0) {
-> @@ -488,8 +492,12 @@ static int _add_function(struct mvebu_pinctrl_function *funcs, const char *name)
->  		}
->  		funcs++;
->  	}
-> +
-> +	/* append new unique function */
->  	funcs->name = name;
->  	funcs->num_groups = 1;
-> +	(*funcsize)--;
-> +
->  	return 0;
->  }
->  
-> @@ -497,12 +505,12 @@ static int mvebu_pinctrl_build_functions(struct platform_device *pdev,
->  					 struct mvebu_pinctrl *pctl)
->  {
->  	struct mvebu_pinctrl_function *funcs;
-> -	int num = 0;
-> +	int num = 0, funcsize = pctl->desc.npins;
->  	int n, s;
->  
->  	/* we allocate functions for number of pins and hope
-> -	 * there are less unique functions than pins available */
-> -	funcs = devm_kzalloc(&pdev->dev, pctl->desc.npins *
-> +	 * there are fewer unique functions than pins available */
-> +	funcs = devm_kzalloc(&pdev->dev, funcsize *
->  			     sizeof(struct mvebu_pinctrl_function), GFP_KERNEL);
->  	if (!funcs)
->  		return -ENOMEM;
-> @@ -510,26 +518,27 @@ static int mvebu_pinctrl_build_functions(struct platform_device *pdev,
->  	for (n = 0; n < pctl->num_groups; n++) {
->  		struct mvebu_pinctrl_group *grp = &pctl->groups[n];
->  		for (s = 0; s < grp->num_settings; s++) {
-> +			int ret;
-> +
->  			/* skip unsupported settings on this variant */
->  			if (pctl->variant &&
->  			    !(pctl->variant & grp->settings[s].variant))
->  				continue;
->  
->  			/* check for unique functions and count groups */
-> -			if (_add_function(funcs, grp->settings[s].name))
-> +			ret = _add_function(funcs, &funcsize,
-> +					    grp->settings[s].name);
-> +			if (ret == -EOVERFLOW)
-> +				dev_err(&pdev->dev,
-> +					"More functions than pins(%d)\n",
-> +					pctl->desc.npins);
-> +			if (ret < 0)
->  				continue;
->  
->  			num++;
->  		}
->  	}
->  
-> -	/* with the number of unique functions and it's groups known,
-> -	   reallocate functions and assign group names */
-> -	funcs = krealloc(funcs, num * sizeof(struct mvebu_pinctrl_function),
-> -			 GFP_KERNEL);
-> -	if (!funcs)
-> -		return -ENOMEM;
-> -
->  	pctl->num_functions = num;
->  	pctl->functions = funcs;
->  
+> Maxime
+> 
 > -- 
-> 1.7.10.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
