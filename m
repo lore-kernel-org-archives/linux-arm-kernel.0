@@ -1,35 +1,58 @@
-From: wd@denx.de (Wolfgang Denk)
-Date: Fri, 22 Mar 2013 22:13:39 +0100
-Subject: Integrator PCI base dilemma
-In-Reply-To: <CACRpkdb5Q+EtM0GGaLFNUj1A12zVrcyUxzRvfEOpcH4-pVuasA@mail.gmail.com>
-References: <CACRpkdaOjFhWR21w5x_rR_60ffQF3Ym_MQd2svNyzm0guwOUoQ@mail.gmail.com>
- <201303211302.19058.arnd@arndb.de>
- <20130321234004.GV4977@n2100.arm.linux.org.uk>
- <201303220948.28092.arnd@arndb.de>
- <20130322103740.GW4977@n2100.arm.linux.org.uk>
- <CACRpkdb5Q+EtM0GGaLFNUj1A12zVrcyUxzRvfEOpcH4-pVuasA@mail.gmail.com>
-Message-ID: <20130322211339.7A5F82014CE@gemini.denx.de>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Fri, 22 Mar 2013 22:21:17 +0100
+Subject: [PATCH v4 0/5] move s3c24xx-irq to drivers/irqchip and add dt
+ support
+In-Reply-To: <201303222104.54225.arnd@arndb.de>
+References: <201303221843.37668.heiko@sntech.de>
+ <201303222104.54225.arnd@arndb.de>
+Message-ID: <201303222221.18605.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Linus Walleij,
+Am Freitag, 22. M?rz 2013, 22:04:54 schrieb Arnd Bergmann:
+> On Friday 22 March 2013, Heiko St?bner wrote:
+> > As suggested by Rob Herring move back to get the parent releationship
+> > from dt like in the first versions, but set the handler from the
+> > interrupt property rather than from a specific list.
+> > 
+> > This version also implements (hopefully correctly) an idea from him and
+> > Arnd Bergmann to have the parent relationship not described in the
+> > controller node but the device nodes instead.
+> > 
+> > Therefore the main controller continues to use a two-cell descriptor to
+> > set hwirq and trigger type but the sub-controller switches to a
+> > three-cell descriptor where the third bit describes the hwirq of its
+> > parent irq in the main controller.
+> > 
+> > As a result a serial node would then look like:
+> >         serial at 50000000 {
+> >         
+> >                 compatible = "samsung,s3c2410-uart";
+> >                 reg = <0x50000000 0x4000>;
+> >                 interrupt-parent = <&subintc>;
+> >                 interrupts = <0 4 28>, <1 4 28>;
+> >         
+> >         };
+> > 
+> > Tested on a s3c2416-based board.
+> > 
+> > As it depends on changes already pending for 3.10 it should probably go
+> > thru the samsung tree.
+> 
+> Hi Heiko,
+> 
+> I should probably read the original discussion thread again. I already
+> commented on the binding here, but I may have missed something important
+> that led to it being the way it is now.
 
-In message <CACRpkdb5Q+EtM0GGaLFNUj1A12zVrcyUxzRvfEOpcH4-pVuasA@mail.gmail.com> you wrote:
->
-> I'm on U-boot for this thing, I wonder if that can do x86
-> emulation to initialize VGA card. I guess I'm about to learn.
+Hi Arnd,
 
-Guess what the code in  drivers/bios_emulator  might be good for...
+Not really ... it's only my current interpretation of your short suggestion to 
+handle the parent relationship in the interrupt descriptor of the device node 
+and not in the controller node itself.
 
-Best regards,
+Your other mail did contain a lot of interesting thoughts on how to improve 
+the current state - thanks for them.
 
-Wolfgang Denk
 
--- 
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
-Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
-... The things love can drive a man to -- the  ecstasies,  the  mise-
-ries,  the broken rules, the desperate chances, the glorious failures
-and the glorious victories.
-	-- McCoy, "Requiem for Methuselah", stardate 5843.7
+Heiko
