@@ -1,74 +1,50 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 22 Mar 2013 14:30:23 +0100
-Subject: [PATCH for 3.9 v3] mmc: mvsdio: fix non-DT probing of GPIOs
-Message-ID: <1363959023-25661-1-git-send-email-thomas.petazzoni@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 22 Mar 2013 13:34:07 +0000
+Subject: [PATCH 0/9] More ux500 multiplatform stuff
+In-Reply-To: <CACRpkdbaRyHxeJM=JT+9CtVf-_u90wCzjePDvsNq-EQd_NxLdg@mail.gmail.com>
+References: <1363866553-15054-1-git-send-email-linus.walleij@stericsson.com>
+ <1363902674-6456-1-git-send-email-arnd@arndb.de>
+ <CACRpkdbaRyHxeJM=JT+9CtVf-_u90wCzjePDvsNq-EQd_NxLdg@mail.gmail.com>
+Message-ID: <201303221334.07330.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ralph Droms <rdroms@gmail.com> reported that 3.9-rc was breaking the
-SDIO interface on his Sheevaplug platform, and that the recent changes
-to the mvsdio driver are responsible for this breakage. Precisely, the
-regression has been introduced by 07728b77c03d (mmc: mvsdio: use
-slot-gpio for card detect gpio).
+On Friday 22 March 2013, Linus Walleij wrote:
+> On Thu, Mar 21, 2013 at 10:51 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > This is
+> > what I came up with, on top of your patches. Feel free to take what
+> > you need if you don't already have the same patches.
+> >
+> > I've successfully built "allmodconfig" with all the other v6/v7
+> > platforms enabled as well.
+> 
+> Unfortunately the platform stops booting after
+> 2/9 "ARM: ux500: split out prcmu initialization"
+> so I will look closer at this.
 
-After investigation, is turns out that the Sheevaplug does not have
-any "card detect" GPIO, and the Sheevaplug has not been converted to
-the Device Tree. Therefore, the Sheevaplug board code does not define
-a value for the .gpio_card_detect field of the mvsdio_platform_data
-structure, which means that its value is 0. Unfortunately,
-gpio_is_valid() considers 0 as a valid GPIO, and therefore calls
-mmc_gpio_request_cd(), which fails and makes the entire probing of the
-driver fail.
+Yes, I can see how it has potential for introducing bugs. I hope it's
+something obvious that you can find easily.
 
-In fact, in the previous mvsdio code, before the Device Tree binding
-was introduced, 0 was not considered as a valid GPIO. Therefore, this
-fix revert back to this behavior in the non-DT case, by setting the
-gpio_card_detect and gpio_write_protect local variables to -EINVAL
-when the corresponding fields of the mvsdio_platform_data structure
-are set to zero (i.e, left undefined). Of course, it prevents to use
-GPIO 0 as a card detect or write protect GPIO, but it was a defiency
-of the previous non-DT code, and the fix moving forward is to convert
-platforms to the Device Tree.
+> This patch:
+> "ARM: ux500: kill mach/hardware.h some more"
+> I will squash into the actual removal patch, it's just
+> some sloppy work by me :-/
 
-The problem has been reproduced successfully on the Kirkwood-based
-Marvell DB-88F6281-BP Development Board (that doesn't use the Device
-Tree) and the fix has proven to work properly, after of course
-removing the gpio_card_detect field of the mvsdio_platform_data
-instance for this board.
+Yes, I expected that.
 
-Reported-by: Ralph Droms <rdroms@gmail.com>
-Tested-by: Ralph Droms <rdroms@gmail.com>
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
-This patch should be applied on 3.9-rcX.
+> I will try to move some of the patches to the
+> front of the series so we only have the tricky stuff to
+> fix.
 
-Changes between v2 and v3:
- * Add a reference to the commit introducing the regression. Suggested
-   by Russell King.
- * Fix the e-mail address from Ralph Droms, and add his Tested-by.
- * No code change.
+Ok.
 
-Changes between v1 and v2:
- * Send the patch to the MMC maintainer instead of the Marvell
-   maintainers.
----
- drivers/mmc/host/mvsdio.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+> And there are some non-bisectable patches due to the
+> driver in staging (which was put there because Synaptics would
+> submit another driver "real soon now" and that was something like
+> two years ago), so I might have to squash some of them together to one.
 
-diff --git a/drivers/mmc/host/mvsdio.c b/drivers/mmc/host/mvsdio.c
-index 145cdaf..1e4d567 100644
---- a/drivers/mmc/host/mvsdio.c
-+++ b/drivers/mmc/host/mvsdio.c
-@@ -741,8 +741,8 @@ static int __init mvsd_probe(struct platform_device *pdev)
- 			goto out;
- 		}
- 		host->base_clock = mvsd_data->clock / 2;
--		gpio_card_detect = mvsd_data->gpio_card_detect;
--		gpio_write_protect = mvsd_data->gpio_write_protect;
-+		gpio_card_detect = mvsd_data->gpio_card_detect ? : -EINVAL;
-+		gpio_write_protect = mvsd_data->gpio_write_protect ? : -EINVAL;
- 	}
- 
- 	mmc->ops = &mvsd_ops;
--- 
-1.7.9.5
+What breaks bisection here? The "[PATCH 5/9] staging: ste_rmi4: kill
+platform_data hack" patch should be independent of everything else,
+it just touches more files than we'd like.
+
+	Arnd
