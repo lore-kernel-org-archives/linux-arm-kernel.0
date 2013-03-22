@@ -1,20 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 22 Mar 2013 19:34:08 +0000
-Subject: [PATCH v2 09/13] ARM: spear: make clock driver independent of
- headers
-In-Reply-To: <20130322185149.834.73861@quantum>
-References: <1363106816-9603-1-git-send-email-arnd@arndb.de>
- <1363106816-9603-10-git-send-email-arnd@arndb.de>
- <20130322185149.834.73861@quantum>
-Message-ID: <201303221934.08811.arnd@arndb.de>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 22 Mar 2013 15:51:45 -0400
+Subject: [PATCH 1/2] gpio: mvebu: add dbg_show function
+In-Reply-To: <1363978188-31200-2-git-send-email-simon.guinot@sequanux.org>
+References: <1363978188-31200-1-git-send-email-simon.guinot@sequanux.org>
+ <1363978188-31200-2-git-send-email-simon.guinot@sequanux.org>
+Message-ID: <20130322195145.GM13280@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 22 March 2013, Mike Turquette wrote:
-> Do you want this patch to go through clk-next, or all together with the
-> rest of the series?
+Linus,
 
-I would prefer to keep this together with the other patches, since last
-patch depends on all earlier ones.
+On Fri, Mar 22, 2013 at 07:49:47PM +0100, Simon Guinot wrote:
+> This patch adds a dedicated dbg_show function to the gpio-mvebu driver.
+> In addition to the generic gpiolib informations, this function displays
+> informations related with the specific Marvell registers (blink enable,
+> data in polarity, interrupt masks and cause).
+> 
+> Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+> ---
+>  drivers/gpio/gpio-mvebu.c |   59 +++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 59 insertions(+)
 
-	Arnd
+It'd probably be easiest to split this series up since the two patches
+don't really depend on one another at all.
+
+If you agree, I'll pull in the plat-orion/ patch.
+
+thx,
+
+Jason.
