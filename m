@@ -1,50 +1,60 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Fri, 22 Mar 2013 11:45:08 +0100
-Subject: [PATCH v2] pwm: davinci: Add Kconfig support for ECAP & EHRPWM
- devices
-In-Reply-To: <1363761564-14814-1-git-send-email-avinashphilip@ti.com>
-References: <1363761564-14814-1-git-send-email-avinashphilip@ti.com>
-Message-ID: <20130322104508.GA9804@avionic-0098.mockup.avionic-design.de>
+From: andrew.murray@arm.com (Andrew Murray)
+Date: Fri, 22 Mar 2013 10:00:37 +0000
+Subject: [PATCH v5 01/17] of/pci: Provide support for parsing PCI DT
+ ranges property
+In-Reply-To: <1363887025-19931-2-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1363887025-19931-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1363887025-19931-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20130322100037.GA1401@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 20, 2013 at 12:09:24PM +0530, Philip Avinash wrote:
-> Add EHRPWM and ECAP support build support for DAVINCI_DA8XX platforms.
+On Thu, Mar 21, 2013 at 05:30:09PM +0000, Thomas Petazzoni wrote:
+> From: Andrew Murray <Andrew.Murray@arm.com>
 > 
-> Also, since DAVINCI platforms doesn't support TI-PWM-Subsystem module,
-> remove the select option for CONFIG_PWM_TIPWMSS.
+> This patch factors out common implementations patterns to reduce overall kernel
+> code and provide a means for host bridge drivers to directly obtain struct
+> resources from the DT's ranges property without relying on architecture specific
+> DT handling. This will make it easier to write archiecture independent host bridge
+> drivers and mitigate against further duplication of DT parsing code.
 > 
-> Also, update CONFIG_PWM_TIPWMSS compiler directive appropriately in
-> pwm-tipwmss.h to fix the below compiler error upon removal of
-> CONFIG_PWM_TIPWMSS for DAVINCI platforms.
+> This patch can be used in the following way:
 > 
-> 	drivers/pwm/pwm-tiecap.c: In function 'ecap_pwm_probe':
-> 	drivers/pwm/pwm-tiecap.c:263:4: error: 'PWMSS_ECAPCLK_EN' undeclared
-> 	(first use in this function)
-> 	drivers/pwm/pwm-tiecap.c:263:4: note: each undeclared identifier
-> 	is reported only once for each function it appears in
-> 	drivers/pwm/pwm-tiecap.c:264:17: error: 'PWMSS_ECAPCLK_EN_ACK'
-> 	undeclared (first use in this function)
-> 	drivers/pwm/pwm-tiecap.c: In function 'ecap_pwm_remove':
-> 	drivers/pwm/pwm-tiecap.c:291:49: error: 'PWMSS_ECAPCLK_STOP_REQ'
-> 	undeclared (first use in this function)
-> 	make[2]: *** [drivers/pwm/pwm-tiecap.o] Error 1
-> 	make[1]: *** [drivers/pwm] Error 2
-> 	make: *** [drivers] Error 2
+>         struct of_pci_range_iter iter;
+>         for_each_of_pci_range(&iter, np) {
 > 
-> Signed-off-by: Philip Avinash <avinashphilip@ti.com>
+>                 //directly access properties of the address range, e.g.:
+>                 //iter.pci_space, iter.pci_addr, iter.cpu_addr, iter.size or
+>                 //iter.flags
+> 
+>                 //alternatively obtain a struct resource, e.g.:
+>                 //struct resource res;
+>                 //range_iter_fill_resource(iter, np, res);
+>         }
+> 
+> Additionally the implementation takes care of adjacent ranges and merges them
+> into a single range (as was the case with powerpc and microblaze).
+> 
+> The modifications to microblaze, mips and powerpc have not been tested.
+> 
+> Signed-off-by: Andrew Murray <Andrew.Murray@arm.com>
+> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 > ---
-> Changes Since v1:
-> 	- Change the Kconfig dependency to ARCH_DAVINCI_DA8XX from
-> 	  ARCH_DAVINCI_DA850.
+> 
+> Compared to the v2 sent by Andrew Murray, Thomas Petazzoni did:
+> 
+>  * Add a memset() on the struct of_pci_range_iter when starting the
+>    for loop in for_each_pci_range(). Otherwise, with an uninitialized
+>    of_pci_range_iter, of_pci_process_ranges() may crash.
+> 
+>  * Add parenthesis around 'res', 'np' and 'iter' in the
+>    for_each_of_pci_range macro definitions. Otherwise, passing
+>    something like &foobar as 'res' didn't work.
+> 
+>  * Rebased on top of 3.9-rc2, which required fixing a few conflicts in
+>    the Microblaze code.
+> 
+The changes here against my v2 look good to me.
 
-Applied, thanks.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130322/29dd0474/attachment.sig>
+Acked-by: Andrew Murray <andrew.murray@arm.com>
