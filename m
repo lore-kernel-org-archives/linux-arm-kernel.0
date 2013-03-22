@@ -1,32 +1,32 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri, 22 Mar 2013 09:49:28 +0900
-Subject: [GIT PULL] Renesas ARM-based SoC updates for v3.10
-In-Reply-To: <201303211701.03882.arnd@arndb.de>
-References: <1363607255-6385-1-git-send-email-horms+renesas@verge.net.au>
- <201303211701.03882.arnd@arndb.de>
-Message-ID: <20130322004928.GE1689@verge.net.au>
+Date: Fri, 22 Mar 2013 09:50:57 +0900
+Subject: [GIT PULL v2] Renesas INTC External IRQ pin driver
+In-Reply-To: <201303211709.30419.arnd@arndb.de>
+References: <1363659576-6333-1-git-send-email-horms+renesas@verge.net.au>
+ <201303211709.30419.arnd@arndb.de>
+Message-ID: <20130322005057.GF1689@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 21, 2013 at 05:01:03PM +0000, Arnd Bergmann wrote:
-> On Monday 18 March 2013, Simon Horman wrote:
-> > The following changes since commit f6161aa153581da4a3867a2d1a7caf4be19b6ec9:
+On Thu, Mar 21, 2013 at 05:09:30PM +0000, Arnd Bergmann wrote:
+> On Tuesday 19 March 2013, Simon Horman wrote:
+> > The following changes since commit d75bc78b508d0a95d7738290d8ec9923691f4301:
 > > 
-> >   Linux 3.9-rc2 (2013-03-10 16:54:19 -0700)
+> >   r8a7779: Add Display Unit clock support (2013-03-18 21:22:34 +0900)
 > > 
 > > are available in the git repository at:
 > > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-for-v3.10
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git intc-external-irq
 > > 
-> > for you to fetch changes up to da8288d03cd9e22036c759c1bfb5ec91e4ad01fd:
+> > for you to fetch changes up to 3b8dfa7c2f8af7613dae28ac0f3419bf75ead5d0:
 > > 
-> >   ARM: shmobile: fix kzm9g-reference compile breakage (2013-03-14 00:00:14 +0900)
-> > 
-> > ----------------------------------------------------------------
-> > Renesas ARM-based SoC updates for v3.10
 > 
-> Pulled into next/soc, thanks!
+> Pulled into next/drivers.
 > 
-> It would be nice to have a bit more verbose changelog text in the tag here.
+> I have also made sure that I got the right version of the "soc" branch.
 
-Thanks, I'll try not to be so economical with my words next time.
+Thanks.
+
+I am trying to make use of tags in order to make things a bit clearer.
+Please let me know if there is anything else I could be doing to make
+things easier for you.
