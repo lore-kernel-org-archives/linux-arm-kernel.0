@@ -1,61 +1,227 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 22 Mar 2013 09:32:16 +0900
-Subject: [GIT PULL v2] Renesas ARM-based SoC board updates for v3.10
-In-Reply-To: <201303211922.57037.arnd@arndb.de>
-References: <1363659481-5922-1-git-send-email-horms+renesas@verge.net.au>
- <201303211718.32981.arnd@arndb.de>
- <201303211922.57037.arnd@arndb.de>
-Message-ID: <20130322003216.GB30936@verge.net.au>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 21 Mar 2013 17:33:58 -0700
+Subject: [PATCH 1/4] ARM: context tracking: add exception support
+In-Reply-To: <20130321214908.GU4977@n2100.arm.linux.org.uk> (Russell King's
+ message of "Thu, 21 Mar 2013 21:49:08 +0000")
+References: <1363824121-26169-1-git-send-email-khilman@linaro.org>
+ <1363824121-26169-2-git-send-email-khilman@linaro.org>
+ <20130321214908.GU4977@n2100.arm.linux.org.uk>
+Message-ID: <87620kff2h.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 21, 2013 at 07:22:56PM +0000, Arnd Bergmann wrote:
-> On Thursday 21 March 2013, Arnd Bergmann wrote:
-> > On Tuesday 19 March 2013, Simon Horman wrote:
-> 
-> > Pulled into next/boards.
-> > 
-> > Please verify that I have pulled everything you sent me. If not, it my mistake.
-> 
-> With everything applied, I now get one build failure and a new build warning:
-> 
-> ==> build/mackerel_defconfig/faillog <==
-> /git/arm-soc/arch/arm/mach-shmobile/board-mackerel.c: In function 'mackerel_init':
-> /git/arm-soc/arch/arm/mach-shmobile/board-mackerel.c:1476:15: error: 'GPIO_FN_MMCD0_0' undeclared (first use in this function)
-> /git/arm-soc/arch/arm/mach-shmobile/board-mackerel.c:1476:15: note: each undeclared identifier is reported only once for each function it appears in
-> /git/arm-soc/arch/arm/mach-shmobile/board-mackerel.c:1477:15: error: 'GPIO_FN_MMCD0_1' undeclared (first use in this function)
-> /git/arm-soc/arch/arm/mach-shmobile/board-mackerel.c:1478:15: error: 'GPIO_FN_MMCD0_2' undeclared (first use in this function)
-> /git/arm-soc/arch/arm/mach-shmobile/board-mackerel.c:1479:15: error: 'GPIO_FN_MMCD0_3' undeclared (first use in this function)
-> /git/arm-soc/arch/arm/mach-shmobile/board-mackerel.c:1480:15: error: 'GPIO_FN_MMCD0_4' undeclared (first use in this function)
-> /git/arm-soc/arch/arm/mach-shmobile/board-mackerel.c:1481:15: error: 'GPIO_FN_MMCD0_5' undeclared (first use in this function)
-> /git/arm-soc/arch/arm/mach-shmobile/board-mackerel.c:1482:15: error: 'GPIO_FN_MMCD0_6' undeclared (first use in this function)
-> /git/arm-soc/arch/arm/mach-shmobile/board-mackerel.c:1483:15: error: 'GPIO_FN_MMCD0_7' undeclared (first use in this function)
-> /git/arm-soc/arch/arm/mach-shmobile/board-mackerel.c:1484:15: error: 'GPIO_FN_MMCCMD0' undeclared (first use in this function)
-> /git/arm-soc/arch/arm/mach-shmobile/board-mackerel.c:1485:15: error: 'GPIO_FN_MMCCLK0' undeclared (first use in this function)
-> /git/arm-soc/arch/arm/mach-shmobile/board-mackerel.c:1489:15: error: 'GPIO_FN_SDHICMD2' undeclared (first use in this function)
-> /git/arm-soc/arch/arm/mach-shmobile/board-mackerel.c:1490:15: error: 'GPIO_FN_SDHICLK2' undeclared (first use in this function)
-> /git/arm-soc/arch/arm/mach-shmobile/board-mackerel.c:1491:15: error: 'GPIO_FN_SDHID2_3' undeclared (first use in this function)
-> /git/arm-soc/arch/arm/mach-shmobile/board-mackerel.c:1492:15: error: 'GPIO_FN_SDHID2_2' undeclared (first use in this function)
-> /git/arm-soc/arch/arm/mach-shmobile/board-mackerel.c:1493:15: error: 'GPIO_FN_SDHID2_1' undeclared (first use in this function)
-> /git/arm-soc/arch/arm/mach-shmobile/board-mackerel.c:1494:15: error: 'GPIO_FN_SDHID2_0' undeclared (first use in this function)
-> make[3]: *** [arch/arm/mach-shmobile/board-mackerel.o] Error 1
-> make[3]: Target `__build' not remade because of errors.
-> make[2]: *** [arch/arm/mach-shmobile] Error 2
-> make[2]: Target `_all' not remade because of errors.
-> make[1]: *** [sub-make] Error 2
-> make[1]: Target `_all' not remade because of errors.
-> 
-> ==> build/marzen_defconfig/faillog <==
-> In file included from /git/arm-soc/arch/arm/mach-shmobile/setup-r8a7779.c:24:0:
-> /git/arm-soc/include/linux/of_platform.h:107:13: warning: 'struct of_device_id' declared inside parameter list [enabled by default]
-> /git/arm-soc/include/linux/of_platform.h:107:13: warning: its scope is only this definition or declaration, which is probably not what you want [enabled by default]
-> /git/arm-soc/include/linux/of_platform.h:107:13: warning: 'struct device_node' declared inside parameter list [enabled by default]
-> 
-> 
-> I have not tried bisecting the problems. Could you find out what is going on
-> and send bug fixes to apply on top?
+Hi Russell,
 
-Thanks Arnd,
+Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
 
-I noticed this only slightly before you did and I apologise for not catching it earlier.
-I have a fix queued up and will send you a pull request shortly.
+> On Wed, Mar 20, 2013 at 05:01:58PM -0700, Kevin Hilman wrote:
+>> Add ARM support for the context tracking subsystem by instrumenting
+>> exception entry/exit points.
+>> 
+>> Special thanks to Mats Liljegren for testing, collaboration and adding
+>> support for exceptions/faults that were missing in early test versions.
+>
+> Not sure all of these are a good idea or are correct...
+
+Thanks for the review.
+
+>> @@ -405,7 +406,9 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
+>>  	unsigned int instr;
+>>  	siginfo_t info;
+>>  	void __user *pc;
+>> +	enum ctx_state prev_state;
+>>  
+>> +	prev_state = exception_enter();
+>>  	pc = (void __user *)instruction_pointer(regs);
+>>  
+>>  	if (processor_mode(regs) == SVC_MODE) {
+>> @@ -433,8 +436,10 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
+>>  		goto die_sig;
+>>  	}
+>>  
+>> -	if (call_undef_hook(regs, instr) == 0)
+>> +	if (call_undef_hook(regs, instr) == 0) {
+>> +		exception_exit(prev_state);
+>>  		return;
+>> +	}
+>>  
+>>  die_sig:
+>>  #ifdef CONFIG_DEBUG_USER
+>> @@ -451,12 +456,17 @@ die_sig:
+>>  	info.si_addr  = pc;
+>>  
+>>  	arm_notify_die("Oops - undefined instruction", regs, &info, 0, 6);
+>> +	exception_exit(prev_state);
+>
+> So, FP emulation and VFP support happens via a separate path.  Does this
+> also need to be instrumented?
+
+Yes, those will need to be instrumented too. I haven't looked at the
+floating point stuff (and am obviously not testing any FP userspace
+currently.)  Thanks for the reminder, I'll look at that next (feel free
+to point me in the right direction if you have suggestions about where
+to best instrument those.  I've not yet looked closely at how either are
+handled.)
+
+>>  }
+>>  
+>>  asmlinkage void do_unexp_fiq (struct pt_regs *regs)
+>>  {
+>> +	enum ctx_state prev_state;
+>> +
+>> +	prev_state = exception_enter();
+>>  	printk("Hmm.  Unexpected FIQ received, but trying to continue\n");
+>>  	printk("You may have a hardware problem...\n");
+>> +	exception_exit(prev_state);
+>
+> Not a good idea.  If we get here chances are things are really broken.
+>
+>>  }
+>>  
+>>  /*
+>> @@ -467,6 +477,9 @@ asmlinkage void do_unexp_fiq (struct pt_regs *regs)
+>>   */
+>>  asmlinkage void bad_mode(struct pt_regs *regs, int reason)
+>>  {
+>> +	enum ctx_state prev_state;
+>> +
+>> +	prev_state = exception_enter();
+>>  	console_verbose();
+>>  
+>>  	printk(KERN_CRIT "Bad mode in %s handler detected\n", handler[reason]);
+>
+> Same here.  If we get here, we're probably about to die a horrid death.
+
+Yeah, I was wondering if I should bother with these "about to die"
+scenarios.  I'll drop them since they may cause more problems than
+they're worth.
+
+>> @@ -746,7 +759,9 @@ baddataabort(int code, unsigned long instr, struct pt_regs *regs)
+>>  {
+>>  	unsigned long addr = instruction_pointer(regs);
+>>  	siginfo_t info;
+>> +	enum ctx_state prev_state;
+>>  
+>> +	prev_state = exception_enter();
+>>  #ifdef CONFIG_DEBUG_USER
+>>  	if (user_debug & UDBG_BADABORT) {
+>>  		printk(KERN_ERR "[%d] %s: bad data abort: code %d instr 0x%08lx\n",
+>> @@ -762,6 +777,7 @@ baddataabort(int code, unsigned long instr, struct pt_regs *regs)
+>>  	info.si_addr  = (void __user *)addr;
+>>  
+>>  	arm_notify_die("unknown data abort code", regs, &info, instr, 0);
+>> +	exception_exit(prev_state);
+>>  }
+>>  
+>>  void __readwrite_bug(const char *fn)
+>> diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+>> index 5dbf13f..759b70d 100644
+>> --- a/arch/arm/mm/fault.c
+>> +++ b/arch/arm/mm/fault.c
+>> @@ -19,6 +19,7 @@
+>>  #include <linux/sched.h>
+>>  #include <linux/highmem.h>
+>>  #include <linux/perf_event.h>
+>> +#include <linux/context_tracking.h>
+>>  
+>>  #include <asm/exception.h>
+>>  #include <asm/pgtable.h>
+>> @@ -424,9 +425,15 @@ do_translation_fault(unsigned long addr, unsigned int fsr,
+>>  	pgd_t *pgd, *pgd_k;
+>>  	pud_t *pud, *pud_k;
+>>  	pmd_t *pmd, *pmd_k;
+>> -
+>> -	if (addr < TASK_SIZE)
+>> -		return do_page_fault(addr, fsr, regs);
+>> +	enum ctx_state prev_state;
+>> +
+>> +	prev_state = exception_enter();
+>> +	if (addr < TASK_SIZE) {
+>> +		int ret;
+>> +		ret = do_page_fault(addr, fsr, regs);
+>> +		exception_exit(prev_state);
+>> +		return ret;
+>> +	}
+>>  
+>>  	if (user_mode(regs))
+>>  		goto bad_area;
+>> @@ -472,10 +479,12 @@ do_translation_fault(unsigned long addr, unsigned int fsr,
+>>  		goto bad_area;
+>>  
+>>  	copy_pmd(pmd, pmd_k);
+>> +	exception_exit(prev_state);
+>>  	return 0;
+>>  
+>>  bad_area:
+>>  	do_bad_area(addr, fsr, regs);
+>> +	exception_exit(prev_state);
+>>  	return 0;
+>>  }
+>>  #else					/* CONFIG_MMU */
+>> @@ -494,7 +503,12 @@ do_translation_fault(unsigned long addr, unsigned int fsr,
+>>  static int
+>>  do_sect_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+>>  {
+>> +	enum ctx_state prev_state;
+>> +
+>> +	prev_state = exception_enter();
+>>  	do_bad_area(addr, fsr, regs);
+>> +	exception_exit(prev_state);
+>> +
+>>  	return 0;
+>>  }
+>>  
+>> @@ -542,9 +556,11 @@ do_DataAbort(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+>>  {
+>>  	const struct fsr_info *inf = fsr_info + fsr_fs(fsr);
+>>  	struct siginfo info;
+>> +	enum ctx_state prev_state;
+>>  
+>> +	prev_state = exception_enter();
+>>  	if (!inf->fn(addr, fsr & ~FSR_LNX_PF, regs))
+>> -		return;
+>> +		goto out;
+>>  
+>>  	printk(KERN_ALERT "Unhandled fault: %s (0x%03x) at 0x%08lx\n",
+>>  		inf->name, fsr, addr);
+>> @@ -554,6 +570,8 @@ do_DataAbort(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+>>  	info.si_code  = inf->code;
+>>  	info.si_addr  = (void __user *)addr;
+>>  	arm_notify_die("", regs, &info, fsr, 0);
+>> +out:
+>> +	exception_exit(prev_state);
+>>  }
+>>  
+>>  void __init
+>> @@ -574,9 +592,11 @@ do_PrefetchAbort(unsigned long addr, unsigned int ifsr, struct pt_regs *regs)
+>>  {
+>>  	const struct fsr_info *inf = ifsr_info + fsr_fs(ifsr);
+>>  	struct siginfo info;
+>> +	enum ctx_state prev_state;
+>>  
+>> +	prev_state = exception_enter();
+>>  	if (!inf->fn(addr, ifsr | FSR_LNX_PF, regs))
+>> -		return;
+>> +		goto out;
+>>  
+>>  	printk(KERN_ALERT "Unhandled prefetch abort: %s (0x%03x) at 0x%08lx\n",
+>>  		inf->name, ifsr, addr);
+>> @@ -586,6 +606,8 @@ do_PrefetchAbort(unsigned long addr, unsigned int ifsr, struct pt_regs *regs)
+>>  	info.si_code  = inf->code;
+>>  	info.si_addr  = (void __user *)addr;
+>>  	arm_notify_die("", regs, &info, ifsr, 0);
+>> +out:
+>> +	exception_exit(prev_state);
+>>  }
+>>  
+>>  #ifndef CONFIG_ARM_LPAE
+>
+> What is the reason for putting all this in the individual functions
+> and not in the prefetch/data abort handlers -
+> do_PrefetchAbort()/do_DataAbort()?
+
+Ugh, I instrumented the main prefetch/data abort handlers but then added
+in some of the individual functions.  I'll drop all the individual ones
+that go through the fsr table anyways.  Thanks for catching that.
+
+Kevin
