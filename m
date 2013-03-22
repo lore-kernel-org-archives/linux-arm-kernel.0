@@ -1,49 +1,42 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Fri, 22 Mar 2013 10:26:23 +0100
-Subject: [PATCH] ARM: mvebu: Add button on Armada 370 Reference Design
- board
-In-Reply-To: <1363894988-3181-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1363894988-3181-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <514C23BF.10504@openwrt.org>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 22 Mar 2013 11:32:34 +0200
+Subject: [RFC 0/8]: omap4: clk: move clock data under drivers/clk
+In-Reply-To: <514BEC05.3050105@ti.com>
+References: <1363887347-4686-1-git-send-email-t-kristo@ti.com>
+ <514BEC05.3050105@ti.com>
+Message-ID: <1363944754.15426.186.camel@sokoban>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Ezequiel,
+On Fri, 2013-03-22 at 10:58 +0530, Rajendra Nayak wrote:
+> Tero,
+> 
+> On Thursday 21 March 2013 11:05 PM, Tero Kristo wrote:
+> > Hi,
+> > 
+> > This is an RFC version of the clock data move under drivers/clk.
+> > Tested under 3.8 and boots fine, but don't try this out unless
+> > you are experimental sort (I quickly tried with 3.9-rc3 and it failed to
+> > boot with that.)
+> > 
+> > The approach taken here has minimal impact on the clock data
+> > and should make it easy to transfer clock data for omap2 / omap3 and
+> > omap5 also. omap4 was only done as a proof of concept.
+> > 
+> > Any comments appreciated.
+> 
+> I strangely only see the cover letter delivered to me and no
+> patches. Do you have a branch with the patches which you can
+> share?
 
-Le 03/21/13 20:43, Ezequiel Garcia a ?crit :
-> The Marvell Armada 370 Reference Design board has a software-controlled
-> button on the front side, marked as "SW".
-> This patch adds minimal support for this button.
+Keerthy had a similar question. It looks like TI people have had
+problems with mailing list subscriptions as of late, and I am actually
+also getting moderator bounces for my emails from linux-arm-kernel list
+atm.
 
-This is also what I found out while playing with gpio exporting, looks good!
+Anyway, I just pushed a branch here:
 
->
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+git://gitorious.org/~kristo/omap-pm/omap-pm-work.git
+branch: linux-3.8-omap4-clk-move
 
-Acked-by: Florian Fainelli <florian@openwrt.org>
-
-> ---
->   arch/arm/boot/dts/armada-370-rd.dts |   11 +++++++++++
->   1 files changed, 11 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/armada-370-rd.dts b/arch/arm/boot/dts/armada-370-rd.dts
-> index f8e4855..df3fdf4 100644
-> --- a/arch/arm/boot/dts/armada-370-rd.dts
-> +++ b/arch/arm/boot/dts/armada-370-rd.dts
-> @@ -65,4 +65,15 @@
->   			/* No CD or WP GPIOs */
->   		};
->   	};
-> +
-> +	gpio-keys {
-> +		compatible = "gpio-keys";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		button at 1 {
-> +			label = "Software Button";
-> +			linux,code = <116>;
-> +			gpios = <&gpio0 6 1>;
-> +		};
-> +	};
->   };
->
+-Tero
