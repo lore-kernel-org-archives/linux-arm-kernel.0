@@ -1,81 +1,54 @@
 From: ian@slimlogic.co.uk (Ian Lartey)
-Date: Fri, 22 Mar 2013 14:55:10 +0000
-Subject: [PATCH v10 0/12] Palmas updates
-Message-ID: <1363964122-19201-1-git-send-email-ian@slimlogic.co.uk>
+Date: Fri, 22 Mar 2013 14:55:12 +0000
+Subject: [PATCH v10 02/12] mfd: palmas: is_palmas_charger needed by multiple
+ drivers
+In-Reply-To: <1363964122-19201-1-git-send-email-ian@slimlogic.co.uk>
+References: <1363964122-19201-1-git-send-email-ian@slimlogic.co.uk>
+Message-ID: <1363964122-19201-3-git-send-email-ian@slimlogic.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds to the support for the Palmas series of PMIC chips.
+is_palmas_charger checks for the presence of charging
+functionality in the device
 
-Some of the patches have previously been submitted individually.
-The DT bindings doc has been added first due to comments that it was missing.
+Signed-off-by: Graeme Gregory <gg@slimlogic.co.uk>
+Signed-off-by: Ian Lartey <ian@slimlogic.co.uk>
+Acked-by: Laxman Dewangani <ldewangan@nvidia.com>
+---
+ include/linux/mfd/palmas.h |   12 +++++++++++-
+ 1 files changed, 11 insertions(+), 1 deletions(-)
 
-Patches based on linux-next-20130319
-
-Changes since v9
-Added in missing [PATCH 01/12] mfd: DT bindings.
-Now all patch sequence numbers with the v9 changes below are correct.
-Please refer to the changes below as they have not been reviewed.
-
-Changes since v8
-The .compatible = "palmas-charger-xxx" has been removed from the DT 
-for all palmas source files as the charger driver is not yet present.
-
-[PATCH 01/12] mfd: DT bindings... - Added in missing descriptions for 
-properties and added in properties that were missing
-
-[PATCH 08/12] gpio: Palmas.... - Added
-palmas_gpio_(read|write|update)  gpio parameter renamed to offset
-palmas_gpio_write   renamed to palmas_gpio_clear_and_set  
-as it no longer takes a data value instead it always sets the
-offset bit and clears all other bits -
-this is how it was being used by the callers
-
-[PATCH 09/12] leds: Add support... -  Combined patches for 
-drivers/leds/leds-palmas.c, drivers/leds/Kconfig and drivers/leds/Makefile.
-palmas_dt_to_pdata - added bounds checking for DT values and
-removed use of child node.
-palmas_led.on_time and palmas_led.period both changed to enums.
-palmas_get_crtl_and_period added which contains factored code 
-from palmas_leds_work for maintainability.
-
-[PATCH 10/12] clk: Add a clock... -  clock names taken from DT if provided
-
-palmas-regulator not in patchset - patch Now applied by Mark Brown
-
-[PATCH 12/12] regulator: palmas-charger-pmic removed from DT compatible list
-
-
- .../devicetree/bindings/clock/palmas-clk.txt       |   27 +
- .../devicetree/bindings/gpio/gpio-palmas.txt       |   35 ++
- .../devicetree/bindings/input/palmas-pwrbutton.txt |   26 +
- .../devicetree/bindings/leds/leds-palmas.txt       |   36 ++
- Documentation/devicetree/bindings/mfd/palmas.txt   |   81 +++
- .../devicetree/bindings/regulator/palmas-pmic.txt  |  168 ++++++
- .../devicetree/bindings/rtc/palmas-rtc.txt         |   21 +
- .../devicetree/bindings/watchdog/palmas-wdt.txt    |   21 +
- drivers/clk/Kconfig                                |    8 +
- drivers/clk/Makefile                               |    1 +
- drivers/clk/clk-palmas.c                           |  275 ++++++++++
- drivers/gpio/gpio-palmas.c                         |   90 +++-
- drivers/leds/Kconfig                               |    9 +
- drivers/leds/Makefile                              |    1 +
- drivers/leds/leds-palmas.c                         |  561 ++++++++++++++++++++
- drivers/mfd/palmas.c                               |  102 +++-
- drivers/regulator/palmas-regulator.c               |    1 -
- drivers/watchdog/Kconfig                           |    8 +
- drivers/watchdog/Makefile                          |    1 +
- drivers/watchdog/palmas_wdt.c                      |  169 ++++++
- include/linux/mfd/palmas.h                         |  139 +++++-
- 21 files changed, 1739 insertions(+), 41 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/palmas-clk.txt
- create mode 100644 Documentation/devicetree/bindings/gpio/gpio-palmas.txt
- create mode 100644 Documentation/devicetree/bindings/input/palmas-pwrbutton.txt
- create mode 100644 Documentation/devicetree/bindings/leds/leds-palmas.txt
- create mode 100644 Documentation/devicetree/bindings/mfd/palmas.txt
- create mode 100644 Documentation/devicetree/bindings/regulator/palmas-pmic.txt
- create mode 100644 Documentation/devicetree/bindings/rtc/palmas-rtc.txt
- create mode 100644 Documentation/devicetree/bindings/watchdog/palmas-wdt.txt
- create mode 100644 drivers/clk/clk-palmas.c
- create mode 100644 drivers/leds/leds-palmas.c
- create mode 100644 drivers/watchdog/palmas_wdt.c
+diff --git a/include/linux/mfd/palmas.h b/include/linux/mfd/palmas.h
+index 3bbda22..4a066d0 100644
+--- a/include/linux/mfd/palmas.h
++++ b/include/linux/mfd/palmas.h
+@@ -1,9 +1,10 @@
+ /*
+  * TI Palmas
+  *
+- * Copyright 2011 Texas Instruments Inc.
++ * Copyright 2011-2013 Texas Instruments Inc.
+  *
+  * Author: Graeme Gregory <gg@slimlogic.co.uk>
++ * Author: Ian Lartey <ian@slimlogic.co.uk>
+  *
+  *  This program is free software; you can redistribute it and/or modify it
+  *  under  the terms of the GNU General  Public License as published by the
+@@ -22,6 +23,15 @@
+ 
+ #define PALMAS_NUM_CLIENTS		3
+ 
++/* The ID_REVISION NUMBERS */
++#define PALMAS_CHIP_OLD_ID		0x0000
++#define PALMAS_CHIP_ID			0xC035
++#define PALMAS_CHIP_CHARGER_ID		0xC036
++
++#define is_palmas(a)	(((a) == PALMAS_CHIP_OLD_ID) || \
++			((a) == PALMAS_CHIP_ID))
++#define is_palmas_charger(a) ((a) == PALMAS_CHIP_CHARGER_ID)
++
+ struct palmas_pmic;
+ struct palmas_gpadc;
+ struct palmas_resource;
+-- 
+1.7.0.4
