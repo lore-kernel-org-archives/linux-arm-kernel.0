@@ -1,66 +1,34 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri, 22 Mar 2013 19:25:14 -0300
-Subject: [PATCH v2 14/14] ARM: configs: Update mvebu,
- dove and kirkwood defconfigs for thermal
-In-Reply-To: <1363991114-4225-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1363991114-4225-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1363991114-4225-15-git-send-email-ezequiel.garcia@free-electrons.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 22 Mar 2013 23:35:54 +0100
+Subject: Integrator PCI base dilemma
+In-Reply-To: <20130322211339.7A5F82014CE@gemini.denx.de>
+References: <CACRpkdaOjFhWR21w5x_rR_60ffQF3Ym_MQd2svNyzm0guwOUoQ@mail.gmail.com>
+ <201303211302.19058.arnd@arndb.de>
+ <20130321234004.GV4977@n2100.arm.linux.org.uk>
+ <201303220948.28092.arnd@arndb.de>
+ <20130322103740.GW4977@n2100.arm.linux.org.uk>
+ <CACRpkdb5Q+EtM0GGaLFNUj1A12zVrcyUxzRvfEOpcH4-pVuasA@mail.gmail.com>
+ <20130322211339.7A5F82014CE@gemini.denx.de>
+Message-ID: <CACRpkdY_qj7VBKBSCsK3mnx=V5DURY-g1fHGVwDBz2WUheB=Nw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver for Dove, Kirkwood and Armada XP/370 SoC
-has been integrated in a single driver called mvebu-thermal.
-Update the defconfig for each platform to reflect this.
+On Fri, Mar 22, 2013 at 10:13 PM, Wolfgang Denk <wd@denx.de> wrote:
+> Dear Linus Walleij,
+>
+> In message <CACRpkdb5Q+EtM0GGaLFNUj1A12zVrcyUxzRvfEOpcH4-pVuasA@mail.gmail.com> you wrote:
+>>
+>> I'm on U-boot for this thing, I wonder if that can do x86
+>> emulation to initialize VGA card. I guess I'm about to learn.
+>
+> Guess what the code in  drivers/bios_emulator  might be good for...
 
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
-Please note that this change was done independentely from the
-thermal driver patch in order to facilitate its merge by the
-respective maintainers.
+Thanks Wolfgang!
 
- arch/arm/configs/dove_defconfig     |    2 +-
- arch/arm/configs/kirkwood_defconfig |    2 +-
- arch/arm/configs/mvebu_defconfig    |    2 ++
- 3 files changed, 4 insertions(+), 2 deletions(-)
+I hacked around a bit and actually got it to compile for ARM.
 
-diff --git a/arch/arm/configs/dove_defconfig b/arch/arm/configs/dove_defconfig
-index 4364eff..2136442 100644
---- a/arch/arm/configs/dove_defconfig
-+++ b/arch/arm/configs/dove_defconfig
-@@ -76,7 +76,7 @@ CONFIG_SPI=y
- CONFIG_SPI_ORION=y
- # CONFIG_HWMON is not set
- CONFIG_THERMAL=y
--CONFIG_DOVE_THERMAL=y
-+CONFIG_MVEBU_THERMAL=y
- CONFIG_USB=y
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_EHCI_ROOT_HUB_TT=y
-diff --git a/arch/arm/configs/kirkwood_defconfig b/arch/arm/configs/kirkwood_defconfig
-index 8f0065b..081d39f 100644
---- a/arch/arm/configs/kirkwood_defconfig
-+++ b/arch/arm/configs/kirkwood_defconfig
-@@ -120,7 +120,7 @@ CONFIG_SPI_ORION=y
- CONFIG_GPIO_SYSFS=y
- # CONFIG_HWMON is not set
- CONFIG_THERMAL=y
--CONFIG_KIRKWOOD_THERMAL=y
-+CONFIG_MVEBU_THERMAL=y
- CONFIG_WATCHDOG=y
- CONFIG_ORION_WATCHDOG=y
- CONFIG_HID_DRAGONRISE=y
-diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
-index 2ec8119..f2ac593 100644
---- a/arch/arm/configs/mvebu_defconfig
-+++ b/arch/arm/configs/mvebu_defconfig
-@@ -49,6 +49,8 @@ CONFIG_MTD_M25P80=y
- CONFIG_SERIAL_8250_DW=y
- CONFIG_GPIOLIB=y
- CONFIG_GPIO_SYSFS=y
-+CONFIG_THERMAL=y
-+CONFIG_MVEBU_THERMAL=y
- CONFIG_USB_SUPPORT=y
- CONFIG_USB=y
- CONFIG_USB_EHCI_HCD=y
--- 
-1.7.8.6
+Now I just need to write an S3 driver or find an ATI Radeon
+card since that seems to be supported already.
+
+Yours,
+Linus Walleij
