@@ -1,51 +1,32 @@
-From: mgr@pengutronix.de (Michael Grzeschik)
-Date: Fri, 22 Mar 2013 18:12:36 +0100
-Subject: [PATCH v4 0/6] support other fsl SoCs with usbmisc + small fixes
-In-Reply-To: <20130307225403.GI29785@pengutronix.de>
-References: <1354033021-10585-1-git-send-email-m.grzeschik@pengutronix.de>
- <20121128025217.GC18593@nchen-desktop>
- <87ip6mor1e.fsf@ashishki-desk.ger.corp.intel.com>
- <20130307225403.GI29785@pengutronix.de>
-Message-ID: <20130322171236.GG8737@pengutronix.de>
+From: cjb@laptop.org (Chris Ball)
+Date: Fri, 22 Mar 2013 13:13:15 -0400
+Subject: [PATCH] mmc: mvsdio: use dev_*() API instead of pr_*() API
+In-Reply-To: <1363792181-26512-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ (Thomas Petazzoni's message of "Wed, 20 Mar 2013 16:09:41 +0100")
+References: <1363792181-26512-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <87k3ozl5n8.fsf@octavius.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 07, 2013 at 11:54:03PM +0100, Michael Grzeschik wrote:
-> Hey Alex,
-> 
-> On Thu, Jan 24, 2013 at 11:42:53AM +0200, Alexander Shishkin wrote:
-> > Peter Chen <peter.chen@freescale.com> writes:
-> > 
-> > > On Tue, Nov 27, 2012 at 05:16:55PM +0100, Michael Grzeschik wrote:
-> > >> Nearly every SoC from Freescale has this non-core usb registers. This series
-> > >> adds support for more users of this driver.
-> > >> 
-> > >> This series is based on Peter Chen's work. Its needed to merge his master branch
-> > >> before applying this series:
-> > >> 
-> > >> https://github.com/hzpeterchen/linux-usb.git
-> > >
-> > > I have tested it at i.mx6q sabrelite board, it works good.
-> > >
-> > > I have pushed your commit to my git, please cc me
-> > > your coming chipidea patches, thanks.
-> > >
-> > > Alex, please add:
-> > >
-> > > Reviewed-by: Peter Chen <peter.chen@freescale.com>
-> > > Tested-by: Peter Chen <peter.chen@freescale.com>
-> > 
-> > Looks good, queueing this one for submission.
-> 
-> Now that you have your git-tree [1], could you queue that for
-> submission?
-> 
-> [1] git://github.com/virtuoso/linux-ci.git ci-for-greg
+Hi,
 
-PING!
+On Wed, Mar 20 2013, Thomas Petazzoni wrote:
+> The mvsdio driver was already using some dev_*() functions to print
+> some messages, but still using pr_*() functions for some others. This
+> patch converts all messages to use dev_*() functions.
+>
+> Many of the pr_*() function calls were printing the output of
+> mmc_hostname() to preprend the message with an identifier for the
+> device. Since the dev_*() functions do that automatically, this patch
+> also gets rid of those string prefixes.
+>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+> This is for 3.10.
 
+Thanks, pushed to mmc-next for 3.10.
+
+- Chris.
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
