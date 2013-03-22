@@ -1,34 +1,30 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 22 Mar 2013 15:23:32 +0100
-Subject: [PATCH 0/4] ARM: at91: little DT fixes
-Message-ID: <cover.1363960549.git.nicolas.ferre@atmel.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Fri, 22 Mar 2013 10:24:08 -0400 (EDT)
+Subject: [PATCH] USB: EHCI: fix for leaking isochronous data
+In-Reply-To: <514B86A9.60401@web.de>
+Message-ID: <Pine.LNX.4.44L0.1303221023310.1294-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, 21 Mar 2013, Soeren Moch wrote:
 
-Here are some little fixes found while adding device tree boards.
-I plan to request a pull on this material early next week.
+> > Hi Alan, Soeren
+> >
+> > Could you word the description a bit better. If Alan did not get it
+> > without a bit of thought, few others are going to understand it
+> > without a better explanation.
+> >
+> > Thanks
+> > 	Andrew
+> >
+> 
+> Alan,
+> 
+> can you come up with a better explanation, please? I think your 
+> description how it is supposed to work from here
+>     http://marc.info/?l=linux-usb&m=136345559432055&w=2
+> is required to understand the problem and the fix.
 
+Okay, I will rewrite your patch description.
 
-Nicolas Ferre (4):
-  ARM: at91/dt: fix macb node declaration
-  ARM: at91/trivial: typos in compatible property
-  ARM: at91/trivial: fix model name for SAM9G15-EK
-  ARM: at91: remove partial parameter in bootargs for at91sam9x5ek.dtsi
-
- arch/arm/boot/dts/at91sam9g15.dtsi  |  2 +-
- arch/arm/boot/dts/at91sam9g15ek.dts |  2 +-
- arch/arm/boot/dts/at91sam9g25.dtsi  |  2 +-
- arch/arm/boot/dts/at91sam9g25ek.dts |  9 +++++++++
- arch/arm/boot/dts/at91sam9g35.dtsi  |  2 +-
- arch/arm/boot/dts/at91sam9g35ek.dts |  9 +++++++++
- arch/arm/boot/dts/at91sam9x25.dtsi  |  2 +-
- arch/arm/boot/dts/at91sam9x25ek.dts | 14 ++++++++++++++
- arch/arm/boot/dts/at91sam9x35.dtsi  |  2 +-
- arch/arm/boot/dts/at91sam9x35ek.dts |  9 +++++++++
- arch/arm/boot/dts/at91sam9x5ek.dtsi |  7 +------
- 11 files changed, 48 insertions(+), 12 deletions(-)
-
--- 
-1.8.0
+Alan Stern
