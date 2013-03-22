@@ -1,100 +1,64 @@
-From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
-Date: Fri, 22 Mar 2013 11:20:39 -0300
-Subject: [PATCH 3/6] arm: sunxi: use the right clock phandles for UARTs
-In-Reply-To: <1363962042-29536-1-git-send-email-emilio@elopez.com.ar>
-References: <1363962042-29536-1-git-send-email-emilio@elopez.com.ar>
-Message-ID: <1363962042-29536-4-git-send-email-emilio@elopez.com.ar>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Fri, 22 Mar 2013 11:23:31 -0300
+Subject: [PATCH 00/16] Marvell EBU thermal sensor consolidation
+In-Reply-To: <20130321173251.GA3070@obsidianresearch.com>
+References: <1363818997-23137-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130321064501.GK21478@lunn.ch>
+ <20130321173251.GA3070@obsidianresearch.com>
+Message-ID: <20130322142330.GA31661@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All the UARTs are connected to clock gates; now that our clock driver
-is able to handle them, make the switch.
+On Thu, Mar 21, 2013 at 11:32:51AM -0600, Jason Gunthorpe wrote:
+> On Thu, Mar 21, 2013 at 07:45:01AM +0100, Andrew Lunn wrote:
+> 
+> > In the end, i decided it was simpler and cleaner to just have separate
+> > drivers. This is something which we should think about and discuss.
+> 
+> When I looked through the merge'd driver I thought the shared code
+> really had little to do with Marvell, it was mostly boilerplate that
+> would be common to any memory mapped temperature sensor - so maybe the
+> drivers should be kept apart and the boiler plate could be factored?
+> 
+>  thermal_platform_mmio_init(pdev,&ops);
+> 
+> Where ops has the is_valid, init_sensor, get_sensor functions
+> 
+> Or something?
+> 
 
-Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
----
- arch/arm/boot/dts/sun4i-a10.dtsi | 12 ++++++------
- arch/arm/boot/dts/sunxi.dtsi     |  4 ++--
- 2 files changed, 8 insertions(+), 8 deletions(-)
+Mmm... I'm not entirely sure. It might make sense if we could have
+thermal drivers for mor SoC than just Marvell's.
 
-diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index 68a27fc..6b3a6b2 100644
---- a/arch/arm/boot/dts/sun4i-a10.dtsi
-+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -54,7 +54,7 @@
- 			interrupts = <1>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clocks = <&osc>;
-+			clocks = <&apb1_gates 16>;
- 			status = "disabled";
- 		};
- 
-@@ -64,7 +64,7 @@
- 			interrupts = <3>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clocks = <&osc>;
-+			clocks = <&apb1_gates 18>;
- 			status = "disabled";
- 		};
- 
-@@ -74,7 +74,7 @@
- 			interrupts = <17>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clocks = <&osc>;
-+			clocks = <&apb1_gates 20>;
- 			status = "disabled";
- 		};
- 
-@@ -84,7 +84,7 @@
- 			interrupts = <18>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clocks = <&osc>;
-+			clocks = <&apb1_gates 21>;
- 			status = "disabled";
- 		};
- 
-@@ -94,7 +94,7 @@
- 			interrupts = <19>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clocks = <&osc>;
-+			clocks = <&apb1_gates 22>;
- 			status = "disabled";
- 		};
- 
-@@ -104,7 +104,7 @@
- 			interrupts = <20>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clocks = <&osc>;
-+			clocks = <&apb1_gates 23>;
- 			status = "disabled";
- 		};
- 	};
-diff --git a/arch/arm/boot/dts/sunxi.dtsi b/arch/arm/boot/dts/sunxi.dtsi
-index 22f0d9d..27a4fe2 100644
---- a/arch/arm/boot/dts/sunxi.dtsi
-+++ b/arch/arm/boot/dts/sunxi.dtsi
-@@ -191,7 +191,7 @@
- 			interrupts = <2>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clocks = <&osc>;
-+			clocks = <&apb1_gates 17>;
- 			status = "disabled";
- 		};
- 
-@@ -201,7 +201,7 @@
- 			interrupts = <4>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clocks = <&osc>;
-+			clocks = <&apb1_gates 19>;
- 			status = "disabled";
- 		};
- 	};
+Is it judicious to have a thermal-mmio based on Marvell-only devices?
+
+> ...
+> 
+> BTW, Ezequiel your driver is probably a bit smaller if you do
+> 
+> struct mvebu_ops {
+> 	/* Initialize the sensor (optional) */
+> 	void (*init_sensor)(struct mvebu_thermal_priv *);
+> 
+> 	/* Test for a valid sensor value (optional) */
+> 	bool (*is_valid)(struct mvebu_thermal_priv *);
+> };
+> 
+> static const struct mvebu_ops kirkwood_ops = {..};
+> 
+> static const struct of_device_id mvebu_thermal_id_table[] = {
+> 	{
+> 		.compatible = "marvell,kirkwood-thermal",
+> 		.data       = &kirkwood_ops,
+> 	},
+> 
+> And drop the switch statement and the MVEBU_THERMAL_SOC_* constants..
+> 
+
+Yes, this sounds like a very good idea. I'll try it and see what happens.
+
+Thanks,
 -- 
-1.8.2
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
