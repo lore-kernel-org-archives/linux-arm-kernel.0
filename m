@@ -1,40 +1,33 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri, 22 Mar 2013 19:25:03 -0300
-Subject: [PATCH v2 03/14] thermal: mvebu: Move MODULE_DEVICE_TABLE upwards
+Date: Fri, 22 Mar 2013 19:25:04 -0300
+Subject: [PATCH v2 04/14] thermal: mvebu: Remove unneeded variable
+ initialization
 In-Reply-To: <1363991114-4225-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1363991114-4225-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1363991114-4225-4-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1363991114-4225-5-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This table will be needed by mvebu_thermal_probe() so we move
-it just below the declaration of the compatible device table.
+This variable is used only after it's properly initialized,
+so there's no need to set it to NULL in its declaration.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- drivers/thermal/mvebu_thermal.c |    3 +--
- 1 files changed, 1 insertions(+), 2 deletions(-)
+ drivers/thermal/mvebu_thermal.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
 diff --git a/drivers/thermal/mvebu_thermal.c b/drivers/thermal/mvebu_thermal.c
-index 9ba9e4d..031f94d 100644
+index 031f94d..1f502ed 100644
 --- a/drivers/thermal/mvebu_thermal.c
 +++ b/drivers/thermal/mvebu_thermal.c
-@@ -68,6 +68,7 @@ static const struct of_device_id mvebu_thermal_id_table[] = {
- 	{ .compatible = "marvell,kirkwood-thermal" },
- 	{}
- };
-+MODULE_DEVICE_TABLE(of, mvebu_thermal_id_table);
+@@ -72,7 +72,7 @@ MODULE_DEVICE_TABLE(of, mvebu_thermal_id_table);
  
  static int mvebu_thermal_probe(struct platform_device *pdev)
  {
-@@ -115,8 +116,6 @@ static int mvebu_thermal_exit(struct platform_device *pdev)
- 	return 0;
- }
+-	struct thermal_zone_device *thermal = NULL;
++	struct thermal_zone_device *thermal;
+ 	struct mvebu_thermal_priv *priv;
+ 	struct resource *res;
  
--MODULE_DEVICE_TABLE(of, mvebu_thermal_id_table);
--
- static struct platform_driver mvebu_thermal_driver = {
- 	.probe = mvebu_thermal_probe,
- 	.remove = mvebu_thermal_exit,
 -- 
 1.7.8.6
