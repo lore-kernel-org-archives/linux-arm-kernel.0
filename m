@@ -1,35 +1,25 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Fri, 22 Mar 2013 14:39:18 +0200
-Subject: [PATCH v8 01/14] clk: tegra: provide dummy cpu car ops
-In-Reply-To: <1363956029-31873-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1363956029-31873-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <1363956029-31873-2-git-send-email-pdeschrijver@nvidia.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 22 Mar 2013 12:43:03 +0000
+Subject: [GIT PULL] Renesas ARM-based SoC board updates for v3.10 #2
+In-Reply-To: <1363915432-21720-1-git-send-email-horms+renesas@verge.net.au>
+References: <1363915432-21720-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <201303221243.03664.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tegra_boot_secondary() relies on some of the car ops. This means having an
-uninitialized tegra_cpu_car_ops will lead to an early boot panic.
-Providing a dummy struct avoids this and makes adding Tegra114 clock support
-in a bisectable way a lot easier.
+On Friday 22 March 2013, Simon Horman wrote:
+> 
+> Hi Arnd, Hi Olof,
+> 
+> The following changes since commit 48296a13e7f411402f080d0603724623fa3eee14:
+> 
+>   ARM: shmobile: kzm9g: correct smsc regulator registration (2013-03-18 21:27:03 +0900)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-boards2-for-v3.10
+> 
 
-Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
----
- drivers/clk/tegra/clk.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+Pulled into next/boards, thanks!
 
-diff --git a/drivers/clk/tegra/clk.c b/drivers/clk/tegra/clk.c
-index a603b9a..a6f2fa6 100644
---- a/drivers/clk/tegra/clk.c
-+++ b/drivers/clk/tegra/clk.c
-@@ -22,7 +22,8 @@
- #include "clk.h"
- 
- /* Global data of Tegra CPU CAR ops */
--struct tegra_cpu_car_ops *tegra_cpu_car_ops;
-+static struct tegra_cpu_car_ops dummy_car_ops;
-+struct tegra_cpu_car_ops *tegra_cpu_car_ops = &dummy_car_ops;
- 
- void __init tegra_init_dup_clks(struct tegra_clk_duplicate *dup_list,
- 				struct clk *clks[], int clk_max)
--- 
-1.7.7.rc0.72.g4b5ea.dirty
+	Arnd
