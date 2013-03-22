@@ -1,137 +1,265 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 22 Mar 2013 10:23:51 +0900
-Subject: [PATCH 5/6] ARM: shmobile: kzm9g-reference: fix device-tree bindings
- and device names
+Date: Fri, 22 Mar 2013 10:23:52 +0900
+Subject: [PATCH 6/6] Revert "ARM: shmobile: streamline mackerel SD and MMC
+ devices"
 In-Reply-To: <1363915432-21720-1-git-send-email-horms+renesas@verge.net.au>
 References: <1363915432-21720-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1363915432-21720-6-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1363915432-21720-7-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+This reverts commit 626a645eb75415255aad3162f4da3f6988f0c8ec.
 
-Fix several device-tree bindings, that haven't been updated for newest
-versions of respective drivers, and device names and pin numbers, left over
-from non-DT and old pinctrl versions.
+This appears to be incompatible with
+"ARM: shmobile: sh7372: Remove SDHI and MMCIF function GPIOs"
 
-Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Reverting this change resolves the following build failure:
+
+arch/arm/mach-shmobile/board-mackerel.c: In function ?mackerel_init?:
+arch/arm/mach-shmobile/board-mackerel.c:1468: error: ?GPIO_FN_SDHICMD1? undeclared (first use in this function)
+arch/arm/mach-shmobile/board-mackerel.c:1468: error: (Each undeclared identifier is reported only once
+arch/arm/mach-shmobile/board-mackerel.c:1468: error: for each function it appears in.)
+arch/arm/mach-shmobile/board-mackerel.c:1469: error: ?GPIO_FN_SDHICLK1? undeclared (first use in this function)
+arch/arm/mach-shmobile/board-mackerel.c:1470: error: ?GPIO_FN_SDHID1_3? undeclared (first use in this function)
+arch/arm/mach-shmobile/board-mackerel.c:1471: error: ?GPIO_FN_SDHID1_2? undeclared (first use in this function)
+arch/arm/mach-shmobile/board-mackerel.c:1472: error: ?GPIO_FN_SDHID1_1? undeclared (first use in this function)
+arch/arm/mach-shmobile/board-mackerel.c:1473: error: ?GPIO_FN_SDHID1_0? undeclared (first use in this function)
+arch/arm/mach-shmobile/board-mackerel.c:1489: error: ?GPIO_FN_SDHICMD2? undeclared (first use in this function)
+arch/arm/mach-shmobile/board-mackerel.c:1490: error: ?GPIO_FN_SDHICLK2? undeclared (first use in this function)
+arch/arm/mach-shmobile/board-mackerel.c:1491: error: ?GPIO_FN_SDHID2_3? undeclared (first use in this function)
+arch/arm/mach-shmobile/board-mackerel.c:1492: error: ?GPIO_FN_SDHID2_2? undeclared (first use in this function)
+arch/arm/mach-shmobile/board-mackerel.c:1493: error: ?GPIO_FN_SDHID2_1? undeclared (first use in this function)
+arch/arm/mach-shmobile/board-mackerel.c:1494: error: ?GPIO_FN_SDHID2_0? undeclared (first use in this function)
+
+Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/sh73a0.dtsi                  |   12 +++++------
- arch/arm/mach-shmobile/board-kzm9g-reference.c |   27 ++++++++++++------------
- 2 files changed, 19 insertions(+), 20 deletions(-)
+ arch/arm/mach-shmobile/board-mackerel.c |  113 +++++++++++++++----------------
+ 1 file changed, 56 insertions(+), 57 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
-index c89be38..3e4d383 100644
---- a/arch/arm/boot/dts/sh73a0.dtsi
-+++ b/arch/arm/boot/dts/sh73a0.dtsi
-@@ -109,36 +109,36 @@
- 	};
- 
- 	sdhi0: sdhi at 0xee100000 {
--		compatible = "renesas,shmobile-sdhi";
-+		compatible = "renesas,r8a7740-sdhi";
- 		reg = <0xee100000 0x100>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 83 4
- 				0 84 4
- 				0 85 4>;
--		toshiba,mmc-has-idle-wait;
-+		cap-sd-highspeed;
- 		status = "disabled";
- 	};
- 
- 	/* SDHI1 and SDHI2 have no CD pins, no need for CD IRQ */
- 	sdhi1: sdhi at 0xee120000 {
--		compatible = "renesas,shmobile-sdhi";
-+		compatible = "renesas,r8a7740-sdhi";
- 		reg = <0xee120000 0x100>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 88 4
- 				0 89 4>;
- 		toshiba,mmc-wrprotect-disable;
--		toshiba,mmc-has-idle-wait;
-+		cap-sd-highspeed;
- 		status = "disabled";
- 	};
- 
- 	sdhi2: sdhi at 0xee140000 {
--		compatible = "renesas,shmobile-sdhi";
-+		compatible = "renesas,r8a7740-sdhi";
- 		reg = <0xee140000 0x100>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 104 4
- 				0 105 4>;
- 		toshiba,mmc-wrprotect-disable;
--		toshiba,mmc-has-idle-wait;
-+		cap-sd-highspeed;
- 		status = "disabled";
- 	};
- };
-diff --git a/arch/arm/mach-shmobile/board-kzm9g-reference.c b/arch/arm/mach-shmobile/board-kzm9g-reference.c
-index e93473c..aefa50d 100644
---- a/arch/arm/mach-shmobile/board-kzm9g-reference.c
-+++ b/arch/arm/mach-shmobile/board-kzm9g-reference.c
-@@ -40,16 +40,16 @@ static unsigned long pin_pullup_conf[] = {
+diff --git a/arch/arm/mach-shmobile/board-mackerel.c b/arch/arm/mach-shmobile/board-mackerel.c
+index ef22ec4..1a9c753 100644
+--- a/arch/arm/mach-shmobile/board-mackerel.c
++++ b/arch/arm/mach-shmobile/board-mackerel.c
+@@ -963,6 +963,15 @@ static struct platform_device nand_flash_device = {
+ 	},
  };
  
- static const struct pinctrl_map kzm_pinctrl_map[] = {
--	PIN_MAP_MUX_GROUP_DEFAULT("i2c-sh_mobile.3", "pfc-sh73a0",
-+	PIN_MAP_MUX_GROUP_DEFAULT("e6826000.i2c", "pfc-sh73a0",
- 				  "i2c3_1", "i2c3"),
- 	/* MMCIF */
--	PIN_MAP_MUX_GROUP_DEFAULT("sh_mmcif.0", "pfc-sh73a0",
-+	PIN_MAP_MUX_GROUP_DEFAULT("e6bd0000.mmcif", "pfc-sh73a0",
- 				  "mmc0_data8_0", "mmc0"),
--	PIN_MAP_MUX_GROUP_DEFAULT("sh_mmcif.0", "pfc-sh73a0",
-+	PIN_MAP_MUX_GROUP_DEFAULT("e6bd0000.mmcif", "pfc-sh73a0",
- 				  "mmc0_ctrl_0", "mmc0"),
--	PIN_MAP_CONFIGS_PIN_DEFAULT("sh_mmcif.0", "pfc-sh73a0",
-+	PIN_MAP_CONFIGS_PIN_DEFAULT("e6bd0000.mmcif", "pfc-sh73a0",
- 				    "PORT279", pin_pullup_conf),
--	PIN_MAP_CONFIGS_GROUP_DEFAULT("sh_mmcif.0", "pfc-sh73a0",
-+	PIN_MAP_CONFIGS_GROUP_DEFAULT("e6bd0000.mmcif", "pfc-sh73a0",
- 				      "mmc0_data8_0", pin_pullup_conf),
- 	/* SCIFA4 */
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.4", "pfc-sh73a0",
-@@ -57,18 +57,18 @@ static const struct pinctrl_map kzm_pinctrl_map[] = {
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.4", "pfc-sh73a0",
- 				  "scifa4_ctrl", "scifa4"),
- 	/* SDHI0 */
--	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-sh73a0",
-+	PIN_MAP_MUX_GROUP_DEFAULT("ee100000.sdhi", "pfc-sh73a0",
- 				  "sdhi0_data4", "sdhi0"),
--	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-sh73a0",
-+	PIN_MAP_MUX_GROUP_DEFAULT("ee100000.sdhi", "pfc-sh73a0",
- 				  "sdhi0_ctrl", "sdhi0"),
--	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-sh73a0",
-+	PIN_MAP_MUX_GROUP_DEFAULT("ee100000.sdhi", "pfc-sh73a0",
- 				  "sdhi0_cd", "sdhi0"),
--	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-sh73a0",
-+	PIN_MAP_MUX_GROUP_DEFAULT("ee100000.sdhi", "pfc-sh73a0",
- 				  "sdhi0_wp", "sdhi0"),
- 	/* SDHI2 */
--	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.2", "pfc-sh73a0",
-+	PIN_MAP_MUX_GROUP_DEFAULT("ee140000.sdhi", "pfc-sh73a0",
- 				  "sdhi2_data4", "sdhi2"),
--	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.2", "pfc-sh73a0",
-+	PIN_MAP_MUX_GROUP_DEFAULT("ee140000.sdhi", "pfc-sh73a0",
- 				  "sdhi2_ctrl", "sdhi2"),
++/*
++ * The card detect pin of the top SD/MMC slot (CN7) is active low and is
++ * connected to GPIO A22 of SH7372 (GPIO 41).
++ */
++static int slot_cn7_get_cd(struct platform_device *pdev)
++{
++	return !gpio_get_value(41);
++}
++
+ /* SDHI0 */
+ static struct sh_mobile_sdhi_info sdhi0_info = {
+ 	.dma_slave_tx	= SHDMA_SLAVE_SDHI0_TX,
+@@ -973,21 +982,21 @@ static struct sh_mobile_sdhi_info sdhi0_info = {
  };
  
-@@ -80,10 +80,9 @@ static void __init kzm_init(void)
+ static struct resource sdhi0_resources[] = {
+-	{
++	[0] = {
+ 		.name	= "SDHI0",
+ 		.start	= 0xe6850000,
+ 		.end	= 0xe68500ff,
+ 		.flags	= IORESOURCE_MEM,
+-	}, {
+-		.name	= SH_MOBILE_SDHI_IRQ_CARD_DETECT,
++	},
++	[1] = {
+ 		.start	= evt2irq(0x0e00) /* SDHI0_SDHI0I0 */,
+ 		.flags	= IORESOURCE_IRQ,
+-	}, {
+-		.name	= SH_MOBILE_SDHI_IRQ_SDCARD,
++	},
++	[2] = {
+ 		.start	= evt2irq(0x0e20) /* SDHI0_SDHI0I1 */,
+ 		.flags	= IORESOURCE_IRQ,
+-	}, {
+-		.name	= SH_MOBILE_SDHI_IRQ_SDIO,
++	},
++	[3] = {
+ 		.start	= evt2irq(0x0e40) /* SDHI0_SDHI0I2 */,
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+@@ -1005,28 +1014,34 @@ static struct platform_device sdhi0_device = {
  
- 	/* enable SD */
- 	gpio_request(GPIO_FN_SDHI0_VCCQ_MC0_ON,	NULL);
--	gpio_request_one(GPIO_PORT15, GPIOF_OUT_INIT_HIGH, NULL); /* power */
-+	gpio_request_one(15, GPIOF_OUT_INIT_HIGH, NULL); /* power */
+ #if !defined(CONFIG_MMC_SH_MMCIF) && !defined(CONFIG_MMC_SH_MMCIF_MODULE)
+ /* SDHI1 */
+-
+-/* GPIO_PORT41 can trigger IRQ8, but it is used by USBHS1, we have to poll */
+ static struct sh_mobile_sdhi_info sdhi1_info = {
+ 	.dma_slave_tx	= SHDMA_SLAVE_SDHI1_TX,
+ 	.dma_slave_rx	= SHDMA_SLAVE_SDHI1_RX,
+-	.tmio_flags	= TMIO_MMC_WRPROTECT_DISABLE | TMIO_MMC_USE_GPIO_CD,
++	.tmio_ocr_mask	= MMC_VDD_165_195,
++	.tmio_flags	= TMIO_MMC_WRPROTECT_DISABLE,
+ 	.tmio_caps	= MMC_CAP_SD_HIGHSPEED | MMC_CAP_SDIO_IRQ |
+ 			  MMC_CAP_NEEDS_POLL,
+-	.cd_gpio	= GPIO_PORT41,
++	.get_cd		= slot_cn7_get_cd,
+ };
  
--	gpio_request(GPIO_FN_SDHICLK2,		NULL);
--	gpio_request_one(GPIO_PORT14, GPIOF_OUT_INIT_HIGH, NULL); /* power */
-+	gpio_request_one(14, GPIOF_OUT_INIT_HIGH, NULL); /* power */
+ static struct resource sdhi1_resources[] = {
+-	{
++	[0] = {
+ 		.name	= "SDHI1",
+ 		.start	= 0xe6860000,
+ 		.end	= 0xe68600ff,
+ 		.flags	= IORESOURCE_MEM,
+-	}, {
++	},
++	[1] = {
++		.name	= SH_MOBILE_SDHI_IRQ_CARD_DETECT,
++		.start	= evt2irq(0x0e80), /* SDHI1_SDHI1I0 */
++		.flags	= IORESOURCE_IRQ,
++	},
++	[2] = {
+ 		.name	= SH_MOBILE_SDHI_IRQ_SDCARD,
+ 		.start	= evt2irq(0x0ea0), /* SDHI1_SDHI1I1 */
+ 		.flags	= IORESOURCE_IRQ,
+-	}, {
++	},
++	[3] = {
+ 		.name	= SH_MOBILE_SDHI_IRQ_SDIO,
+ 		.start	= evt2irq(0x0ec0), /* SDHI1_SDHI1I2 */
+ 		.flags	= IORESOURCE_IRQ,
+@@ -1044,32 +1059,43 @@ static struct platform_device sdhi1_device = {
+ };
+ #endif
  
- #ifdef CONFIG_CACHE_L2X0
- 	/* Early BRESP enable, Shared attribute override enable, 64K*8way */
+-/* SDHI2 */
+-
+ /*
+  * The card detect pin of the top SD/MMC slot (CN23) is active low and is
+- * connected to GPIO SCIFB_SCK of SH7372 (GPIO_PORT162).
++ * connected to GPIO SCIFB_SCK of SH7372 (162).
+  */
++static int slot_cn23_get_cd(struct platform_device *pdev)
++{
++	return !gpio_get_value(162);
++}
++
++/* SDHI2 */
+ static struct sh_mobile_sdhi_info sdhi2_info = {
+ 	.dma_slave_tx	= SHDMA_SLAVE_SDHI2_TX,
+ 	.dma_slave_rx	= SHDMA_SLAVE_SDHI2_RX,
+-	.tmio_flags	= TMIO_MMC_WRPROTECT_DISABLE | TMIO_MMC_USE_GPIO_CD,
++	.tmio_flags	= TMIO_MMC_WRPROTECT_DISABLE,
+ 	.tmio_caps	= MMC_CAP_SD_HIGHSPEED | MMC_CAP_SDIO_IRQ |
+ 			  MMC_CAP_NEEDS_POLL,
+-	.cd_gpio	= GPIO_PORT162,
++	.get_cd		= slot_cn23_get_cd,
+ };
+ 
+ static struct resource sdhi2_resources[] = {
+-	{
++	[0] = {
+ 		.name	= "SDHI2",
+ 		.start	= 0xe6870000,
+ 		.end	= 0xe68700ff,
+ 		.flags	= IORESOURCE_MEM,
+-	}, {
++	},
++	[1] = {
++		.name	= SH_MOBILE_SDHI_IRQ_CARD_DETECT,
++		.start	= evt2irq(0x1200), /* SDHI2_SDHI2I0 */
++		.flags	= IORESOURCE_IRQ,
++	},
++	[2] = {
+ 		.name	= SH_MOBILE_SDHI_IRQ_SDCARD,
+ 		.start	= evt2irq(0x1220), /* SDHI2_SDHI2I1 */
+ 		.flags	= IORESOURCE_IRQ,
+-	}, {
++	},
++	[3] = {
+ 		.name	= SH_MOBILE_SDHI_IRQ_SDIO,
+ 		.start	= evt2irq(0x1240), /* SDHI2_SDHI2I2 */
+ 		.flags	= IORESOURCE_IRQ,
+@@ -1108,12 +1134,11 @@ static struct resource sh_mmcif_resources[] = {
+ 
+ static struct sh_mmcif_plat_data sh_mmcif_plat = {
+ 	.sup_pclk	= 0,
++	.ocr		= MMC_VDD_165_195 | MMC_VDD_32_33 | MMC_VDD_33_34,
+ 	.caps		= MMC_CAP_4_BIT_DATA |
+ 			  MMC_CAP_8_BIT_DATA |
+ 			  MMC_CAP_NEEDS_POLL,
+-	.use_cd_gpio	= true,
+-	/* card detect pin for SD/MMC slot (CN7) */
+-	.cd_gpio	= GPIO_PORT41,
++	.get_cd		= slot_cn7_get_cd,
+ 	.slave_id_tx	= SHDMA_SLAVE_MMCIF_TX,
+ 	.slave_id_rx	= SHDMA_SLAVE_MMCIF_RX,
+ };
+@@ -1238,10 +1263,9 @@ static struct platform_device *mackerel_devices[] __initdata = {
+ 	&sdhi0_device,
+ #if !defined(CONFIG_MMC_SH_MMCIF) && !defined(CONFIG_MMC_SH_MMCIF_MODULE)
+ 	&sdhi1_device,
+-#else
+-	&sh_mmcif_device,
+ #endif
+ 	&sdhi2_device,
++	&sh_mmcif_device,
+ 	&ceu_device,
+ 	&mackerel_camera,
+ 	&hdmi_device,
+@@ -1348,11 +1372,10 @@ static void __init mackerel_init(void)
+ 		{ "A3SP", &usbhs0_device, },
+ 		{ "A3SP", &usbhs1_device, },
+ 		{ "A3SP", &nand_flash_device, },
++		{ "A3SP", &sh_mmcif_device, },
+ 		{ "A3SP", &sdhi0_device, },
+ #if !defined(CONFIG_MMC_SH_MMCIF) && !defined(CONFIG_MMC_SH_MMCIF_MODULE)
+ 		{ "A3SP", &sdhi1_device, },
+-#else
+-		{ "A3SP", &sh_mmcif_device, },
+ #endif
+ 		{ "A3SP", &sdhi2_device, },
+ 		{ "A4R", &ceu_device, },
+@@ -1463,35 +1486,11 @@ static void __init mackerel_init(void)
+ 	/* SDHI0 PORT172 card-detect IRQ26 */
+ 	gpio_request(GPIO_FN_IRQ26_172, NULL);
+ 
+-#if !defined(CONFIG_MMC_SH_MMCIF) && !defined(CONFIG_MMC_SH_MMCIF_MODULE)
+-	/* enable SDHI1 */
+-	gpio_request(GPIO_FN_SDHICMD1, NULL);
+-	gpio_request(GPIO_FN_SDHICLK1, NULL);
+-	gpio_request(GPIO_FN_SDHID1_3, NULL);
+-	gpio_request(GPIO_FN_SDHID1_2, NULL);
+-	gpio_request(GPIO_FN_SDHID1_1, NULL);
+-	gpio_request(GPIO_FN_SDHID1_0, NULL);
+-#else
+-	/* MMCIF */
+-	gpio_request(GPIO_FN_MMCD0_0, NULL);
+-	gpio_request(GPIO_FN_MMCD0_1, NULL);
+-	gpio_request(GPIO_FN_MMCD0_2, NULL);
+-	gpio_request(GPIO_FN_MMCD0_3, NULL);
+-	gpio_request(GPIO_FN_MMCD0_4, NULL);
+-	gpio_request(GPIO_FN_MMCD0_5, NULL);
+-	gpio_request(GPIO_FN_MMCD0_6, NULL);
+-	gpio_request(GPIO_FN_MMCD0_7, NULL);
+-	gpio_request(GPIO_FN_MMCCMD0, NULL);
+-	gpio_request(GPIO_FN_MMCCLK0, NULL);
+-#endif
++	/* card detect pin for MMC slot (CN7) */
++	gpio_request_one(41, GPIOF_IN, NULL);
+ 
+-	/* enable SDHI2 */
+-	gpio_request(GPIO_FN_SDHICMD2, NULL);
+-	gpio_request(GPIO_FN_SDHICLK2, NULL);
+-	gpio_request(GPIO_FN_SDHID2_3, NULL);
+-	gpio_request(GPIO_FN_SDHID2_2, NULL);
+-	gpio_request(GPIO_FN_SDHID2_1, NULL);
+-	gpio_request(GPIO_FN_SDHID2_0, NULL);
++	/* card detect pin for microSD slot (CN23) */
++	gpio_request_one(162, GPIOF_IN, NULL);
+ 
+ 	/* FLCTL */
+ 	gpio_request(GPIO_FN_D0_NAF0, NULL);
 -- 
 1.7.10.4
