@@ -1,37 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 22 Mar 2013 15:25:43 +0000
-Subject: [PATCH 0/9] More ux500 multiplatform stuff
-In-Reply-To: <CACRpkdbdmJrM48dPyV3zWpi6QLnVYcSTnkZbTDTXRSrd+pyVew@mail.gmail.com>
-References: <1363866553-15054-1-git-send-email-linus.walleij@stericsson.com>
- <201303221334.07330.arnd@arndb.de>
- <CACRpkdbdmJrM48dPyV3zWpi6QLnVYcSTnkZbTDTXRSrd+pyVew@mail.gmail.com>
-Message-ID: <201303221525.43901.arnd@arndb.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 22 Mar 2013 15:27:41 +0000
+Subject: [PATCH 1/5] ARM: ux500: Add machine support for ccu8540
+Message-ID: <1363966065-2478-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 22 March 2013, Linus Walleij wrote:
+Inform the kernel of a new machine type, so when detected it
+knows which initialisation route to travel though.
 
-> diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
-> index bc8f870..8eb8c49 100644
-> --- a/drivers/mfd/db8500-prcmu.c
-> +++ b/drivers/mfd/db8500-prcmu.c
-> @@ -2680,7 +2680,7 @@ static int db8500_irq_init(struct device_node
-> *np, int irq_base)
->         int i;
-> 
->         /* In the device tree case, just take some IRQs */
-> -       if (!np)
-> +       if (np)
->                 irq_base = 0;
-> 
->         db8500_irq_domain = irq_domain_add_simple(
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ arch/arm/mach-ux500/board-mop500.c |    9 +++++++++
+ arch/arm/tools/mach-types          |    1 +
+ 2 files changed, 10 insertions(+)
 
-I think I dreamed about this bug last night but didn't remember
-until now, and I had not looked there to confirm ;-)
-
-> After this the U8500 and U8520 boot to prompt with all the patches
-> applied!
-
-Ah, very good.
-
-	Arnd
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index b034578..4fade16 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -740,6 +740,15 @@ MACHINE_START(U8500, "ST-Ericsson MOP500 platform")
+ 	.init_late	= ux500_init_late,
+ MACHINE_END
+ 
++MACHINE_START(U8540, "ST-Ericsson U8540 Platform ccu8540")
++	.atag_offset	= 0x100,
++	.map_io		= u8500_map_io,
++	.init_irq	= ux500_init_irq,
++	.init_time	= ux500_timer_init,
++	.init_machine	= mop500_init_machine,
++	.init_late	= ux500_init_late,
++MACHINE_END
++
+ MACHINE_START(U8520, "ST-Ericsson U8520 Platform HREFP520")
+ 	.atag_offset	= 0x100,
+ 	.map_io		= u8500_map_io,
+diff --git a/arch/arm/tools/mach-types b/arch/arm/tools/mach-types
+index 831e1fd..1c9d0be 100644
+--- a/arch/arm/tools/mach-types
++++ b/arch/arm/tools/mach-types
+@@ -1204,3 +1204,4 @@ baileys			MACH_BAILEYS		BAILEYS			4169
+ familybox		MACH_FAMILYBOX		FAMILYBOX		4170
+ ensemble_mx35		MACH_ENSEMBLE_MX35	ENSEMBLE_MX35		4171
+ sc_sps_1		MACH_SC_SPS_1		SC_SPS_1		4172
++u8540			MACH_U8540		U8540			4211
+-- 
+1.7.10.4
