@@ -1,45 +1,103 @@
 From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Fri, 22 Mar 2013 14:39:29 +0200
-Subject: [PATCH v8 12/14] clk: tegra: devicetree match for nvidia, tegra114-car
+Date: Fri, 22 Mar 2013 14:39:30 +0200
+Subject: [PATCH v8 13/14] ARM: dt: Add references to tegra_car clocks
 In-Reply-To: <1363956029-31873-1-git-send-email-pdeschrijver@nvidia.com>
 References: <1363956029-31873-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <1363956029-31873-13-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <1363956029-31873-14-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add references to tegra_car clocks for the basic device nodes. Also remove
+the clock-frequency property of the serial node as the UART driver can now
+use the clock framework to obtain the frequency.
+
 Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
 ---
- drivers/clk/tegra/clk.c |    1 +
- drivers/clk/tegra/clk.h |    7 +++++++
- 2 files changed, 8 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/tegra114-dalmore.dts |    1 -
+ arch/arm/boot/dts/tegra114-pluto.dts   |    1 -
+ arch/arm/boot/dts/tegra114.dtsi        |    8 +++++++-
+ 3 files changed, 7 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/clk/tegra/clk.c b/drivers/clk/tegra/clk.c
-index a6f2fa6..2a8e424 100644
---- a/drivers/clk/tegra/clk.c
-+++ b/drivers/clk/tegra/clk.c
-@@ -77,6 +77,7 @@ void __init tegra_init_from_table(struct tegra_clk_init_table *tbl,
- static const struct of_device_id tegra_dt_clk_match[] = {
- 	{ .compatible = "nvidia,tegra20-car", .data = tegra20_clock_init },
- 	{ .compatible = "nvidia,tegra30-car", .data = tegra30_clock_init },
-+	{ .compatible = "nvidia,tegra114-car", .data = tegra114_clock_init },
- 	{ }
- };
+diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
+index a61974e..52f1b45 100644
+--- a/arch/arm/boot/dts/tegra114-dalmore.dts
++++ b/arch/arm/boot/dts/tegra114-dalmore.dts
+@@ -715,7 +715,6 @@
  
-diff --git a/drivers/clk/tegra/clk.h b/drivers/clk/tegra/clk.h
-index fd8ada2..14acd48 100644
---- a/drivers/clk/tegra/clk.h
-+++ b/drivers/clk/tegra/clk.h
-@@ -583,4 +583,11 @@ void tegra30_clock_init(struct device_node *np);
- static inline void tegra30_clock_init(struct device_node *np) {}
- #endif /* CONFIG_ARCH_TEGRA_3x_SOC */
+ 	serial at 70006300 {
+ 		status = "okay";
+-		clock-frequency = <408000000>;
+ 	};
  
-+#ifdef CONFIG_ARCH_TEGRA_114_SOC
-+void tegra114_clock_init(struct device_node *np);
-+#else
-+static inline void tegra114_clock_init(struct device_node *np) {}
-+#endif /* CONFIG_ARCH_TEGRA114_SOC */
-+
-+
- #endif /* TEGRA_CLK_H */
+ 	pmc {
+diff --git a/arch/arm/boot/dts/tegra114-pluto.dts b/arch/arm/boot/dts/tegra114-pluto.dts
+index 9bea8f5..31955d7 100644
+--- a/arch/arm/boot/dts/tegra114-pluto.dts
++++ b/arch/arm/boot/dts/tegra114-pluto.dts
+@@ -12,7 +12,6 @@
+ 
+ 	serial at 70006300 {
+ 		status = "okay";
+-		clock-frequency = <408000000>;
+ 	};
+ 
+ 	pmc {
+diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
+index 5302044..33831a0 100644
+--- a/arch/arm/boot/dts/tegra114.dtsi
++++ b/arch/arm/boot/dts/tegra114.dtsi
+@@ -31,10 +31,11 @@
+ 			      0 42 0x04
+ 			      0 121 0x04
+ 			      0 122 0x04>;
++		clocks = <&tegra_car 5>;
+ 	};
+ 
+ 	tegra_car: clock {
+-		compatible = "nvidia,tegra114-car, nvidia,tegra30-car";
++		compatible = "nvidia,tegra114-car";
+ 		reg = <0x60006000 0x1000>;
+ 		#clock-cells = <1>;
+ 	};
+@@ -120,6 +121,7 @@
+ 		interrupts = <0 36 0x04>;
+ 		nvidia,dma-request-selector = <&apbdma 8>;
+ 		status = "disabled";
++		clocks = <&tegra_car 6>;
+ 	};
+ 
+ 	uartb: serial at 70006040 {
+@@ -129,6 +131,7 @@
+ 		interrupts = <0 37 0x04>;
+ 		nvidia,dma-request-selector = <&apbdma 9>;
+ 		status = "disabled";
++		clocks = <&tegra_car 192>;
+ 	};
+ 
+ 	uartc: serial at 70006200 {
+@@ -138,6 +141,7 @@
+ 		interrupts = <0 46 0x04>;
+ 		nvidia,dma-request-selector = <&apbdma 10>;
+ 		status = "disabled";
++		clocks = <&tegra_car 55>;
+ 	};
+ 
+ 	uartd: serial at 70006300 {
+@@ -147,6 +151,7 @@
+ 		interrupts = <0 90 0x04>;
+ 		nvidia,dma-request-selector = <&apbdma 19>;
+ 		status = "disabled";
++		clocks = <&tegra_car 65>;
+ 	};
+ 
+ 	pwm: pwm {
+@@ -288,6 +293,7 @@
+ 		compatible = "nvidia,tegra114-rtc", "nvidia,tegra20-rtc";
+ 		reg = <0x7000e000 0x100>;
+ 		interrupts = <0 2 0x04>;
++		clocks = <&tegra_car 4>;
+ 	};
+ 
+ 	kbc {
 -- 
 1.7.7.rc0.72.g4b5ea.dirty
