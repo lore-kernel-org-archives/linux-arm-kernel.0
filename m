@@ -1,57 +1,47 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 22 Mar 2013 11:22:25 +0100
-Subject: [PATCH v2 0/3] clock driver for sunxi
-In-Reply-To: <20130321215429.834.60042@quantum>
-References: <1358835176-7197-1-git-send-email-emilio@elopez.com.ar>
- <1361803468-9899-1-git-send-email-emilio@elopez.com.ar>
- <20130321215429.834.60042@quantum>
-Message-ID: <514C30E1.2020203@free-electrons.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Fri, 22 Mar 2013 11:29:30 +0100
+Subject: [PATCH V4 8/9] ARM: tegra: Provide regulator to pwm-backlight
+In-Reply-To: <1363719573-20926-9-git-send-email-achew@nvidia.com>
+References: <1363719573-20926-1-git-send-email-achew@nvidia.com>
+ <1363719573-20926-9-git-send-email-achew@nvidia.com>
+Message-ID: <20130322102930.GA4567@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
-
-Le 21/03/2013 22:54, Mike Turquette a ?crit :
-> Quoting Emilio L?pez (2013-02-25 06:44:25)
->> Hello everyone,
->>
->> This patchset adds basic clock support for sunxi devices. Currently, it
->> implements support for the two oscillators, the main PLL, the CPU mux,
->> its three divisor clocks and APB1. With this in place, it is possible to
->> write a cpufreq driver and have it work, and with a little more code,
->> represent the UART clocks correctly (I will be sending a separate
->> patchset for this).
->>
->> I have tested this driver successfully on a Cubieboard (A10, sun4i)
->> using the cpufreq driver from the linux-sunxi tree after minor
->> modifications (the clock names are not the same).
->>
->> Any feedback will be highly appreciated
->>
+On Tue, Mar 19, 2013 at 11:59:32AM -0700, Andrew Chew wrote:
+> The pwm-backlight driver now takes a mandatory regulator that is gotten
+> during driver probe.  Initialize a dummy regulator to satisfy this
+> requirement.
 > 
-> Emilio,
+> Signed-off-by: Andrew Chew <achew@nvidia.com>
+> ---
+>  arch/arm/boot/dts/tegra20-medcom-wide.dts | 6 ++++++
+>  1 file changed, 6 insertions(+)
 > 
-> This is a nice series.  I appreciate the amount of comments in the code,
-> the kerneldoc and also the added sunxi clock documentation.
-> 
-> Concerning the discussion from the v1 series, I prefer for the struct
-> clk instances in the tree to match 1-to-1 with hardware clocks.  As the
-> number of clocks in a system scales into the hundreds there are
-> certainly advantages to having fewer clocks in the hierarchy, not the
-> least of which is more easily associating these objects with hardware
-> clocks during a deep debug session.
-> 
-> That can be changed at a later time if you wish.  Do you want me to take
-> the series into clk-next or do you just want my ack?
+> diff --git a/arch/arm/boot/dts/tegra20-medcom-wide.dts b/arch/arm/boot/dts/tegra20-medcom-wide.dts
+> index a2d6d65..bf7fdd7 100644
+> --- a/arch/arm/boot/dts/tegra20-medcom-wide.dts
+> +++ b/arch/arm/boot/dts/tegra20-medcom-wide.dts
+> @@ -26,12 +26,18 @@
+>  		};
+>  	};
+>  
+> +	bl_en: fixed-regulator {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "bl-en-supply";
+> +	};
 
-Thanks for your feedback!
+This should go into the top-level regulators node which this DTS
+inherits from tegra20-tamonten.dtsi.
 
-Unless you have some objection, I was planning to merge it through my
-tree, with your Acked-by, of course.
+I think it'd be nice to rename it to something like backlight_reg for
+consistency with other regulators in that node.
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130322/b3014e2c/attachment.sig>
