@@ -1,87 +1,51 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 22 Mar 2013 10:11:41 -0700
-Subject: [PATCH RFC] clk: divider: Tolerate 0 divider for one based
- dividers
-In-Reply-To: <dbceb80f-0303-4ba0-acd8-336dd85444ae@DB8EHSMHS017.ehs.local>
-References: <dbceb80f-0303-4ba0-acd8-336dd85444ae@DB8EHSMHS017.ehs.local>
-Message-ID: <20130322171141.834.32801@quantum>
+From: mgr@pengutronix.de (Michael Grzeschik)
+Date: Fri, 22 Mar 2013 18:12:36 +0100
+Subject: [PATCH v4 0/6] support other fsl SoCs with usbmisc + small fixes
+In-Reply-To: <20130307225403.GI29785@pengutronix.de>
+References: <1354033021-10585-1-git-send-email-m.grzeschik@pengutronix.de>
+ <20121128025217.GC18593@nchen-desktop>
+ <87ip6mor1e.fsf@ashishki-desk.ger.corp.intel.com>
+ <20130307225403.GI29785@pengutronix.de>
+Message-ID: <20130322171236.GG8737@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Soren Brinkmann (2013-03-11 14:13:37)
-> Handle a zero divider value as one/bypass for dividers which have the
-> CLK_DIVIDER_ONE_BASED flag set.
+On Thu, Mar 07, 2013 at 11:54:03PM +0100, Michael Grzeschik wrote:
+> Hey Alex,
 > 
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> ---
-> In Zynq we have a lot of dividers which are one based, but at the same time
-> zero is a valid value which is handled as one/bypass. Also, the reset value of
-> some of these registers is zero, resulting in warnings when the clock framework
-> encounters this.
+> On Thu, Jan 24, 2013 at 11:42:53AM +0200, Alexander Shishkin wrote:
+> > Peter Chen <peter.chen@freescale.com> writes:
+> > 
+> > > On Tue, Nov 27, 2012 at 05:16:55PM +0100, Michael Grzeschik wrote:
+> > >> Nearly every SoC from Freescale has this non-core usb registers. This series
+> > >> adds support for more users of this driver.
+> > >> 
+> > >> This series is based on Peter Chen's work. Its needed to merge his master branch
+> > >> before applying this series:
+> > >> 
+> > >> https://github.com/hzpeterchen/linux-usb.git
+> > >
+> > > I have tested it at i.mx6q sabrelite board, it works good.
+> > >
+> > > I have pushed your commit to my git, please cc me
+> > > your coming chipidea patches, thanks.
+> > >
+> > > Alex, please add:
+> > >
+> > > Reviewed-by: Peter Chen <peter.chen@freescale.com>
+> > > Tested-by: Peter Chen <peter.chen@freescale.com>
+> > 
+> > Looks good, queueing this one for submission.
 > 
-> So, my question here is: Are our dividers odd? Does it make sense to allow zero
-> for all one based dividers, as shown in this patch? Or does this behavior
-> qualify for another flag for the divider clocks (e.g. CLK_DIVIDER_ZERO_OKAY)?
+> Now that you have your git-tree [1], could you queue that for
+> submission?
 > 
+> [1] git://github.com/virtuoso/linux-ci.git ci-for-greg
 
-Everyone's dividers are odd ;)
+PING!
 
-For the case where a bitfield value of zero or one translates into
-divide-by-one, then I think a flag can be introduced.
-
-But handling bypass and reset is likely to not be as generic or common
-across implementation, so you might need your own custom clk_hw_foo for
-that.
-
-The basic clk_divider type is meant to do exactly what the name says:
-divide an incoming clock rate.  If your clock does more than that then
-you might need to cook up your own clock type.
-
->         Thanks,
->         S?ren
-> 
->  drivers/clk/clk-divider.c    | 5 +++--
->  include/linux/clk-provider.h | 4 ++--
->  2 files changed, 5 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-> index 68b4021..6c2a431 100644
-> --- a/drivers/clk/clk-divider.c
-> +++ b/drivers/clk/clk-divider.c
-> @@ -109,8 +109,9 @@ static unsigned long clk_divider_recalc_rate(struct clk_hw *hw,
->  
->         div = _get_div(divider, val);
->         if (!div) {
-> -               WARN(1, "%s: Invalid divisor for clock %s\n", __func__,
-> -                                               __clk_get_name(hw->clk));
-> +               WARN(!(divider->flags & CLK_DIVIDER_ONE_BASED),
-> +                               "%s: Invalid divisor for clock %s\n", __func__,
-> +                               __clk_get_name(hw->clk));
-
-div in this code is not the value programmed into the divider, but the
-numerical divider applied to the parent clock rate.  Thus dividing by
-zero never makes sense here.
-
-Regards,
-Mike
-
->                 return parent_rate;
->         }
->  
-> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> index 7f197d7..5b19b13 100644
-> --- a/include/linux/clk-provider.h
-> +++ b/include/linux/clk-provider.h
-> @@ -238,8 +238,8 @@ struct clk_div_table {
->   * Flags:
->   * CLK_DIVIDER_ONE_BASED - by default the divisor is the value read from the
->   *     register plus one.  If CLK_DIVIDER_ONE_BASED is set then the divider is
-> - *     the raw value read from the register, with the value of zero considered
-> - *     invalid
-> + *     the raw value read from the register. A zero divider is considered to be
-> + *     the same as the a value of one.
->   * CLK_DIVIDER_POWER_OF_TWO - clock divisor is 2 raised to the value read from
->   *     the hardware register
->   */
-> -- 
-> 1.8.1.5
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
