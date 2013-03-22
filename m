@@ -1,29 +1,73 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 22 Mar 2013 15:43:13 +0000
-Subject: [PATCH 5/5] ARM: ux500: Do not supply DMA platform data when
- booting u8540 platform
-In-Reply-To: <1363966065-2478-5-git-send-email-lee.jones@linaro.org>
-References: <1363966065-2478-1-git-send-email-lee.jones@linaro.org>
- <1363966065-2478-5-git-send-email-lee.jones@linaro.org>
-Message-ID: <201303221543.14165.arnd@arndb.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 22 Mar 2013 16:44:40 +0100
+Subject: [PATCH 2/3] arm: kirkwood: factor pinmux descriptors for
+ OpenBlocks A6
+In-Reply-To: <20130306181648.GE3904@lunn.ch>
+References: <1362587021-32762-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1362587021-32762-3-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130306181648.GE3904@lunn.ch>
+Message-ID: <20130322164440.5e5735d7@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 22 March 2013, Lee Jones wrote:
->         /* automatically probe child nodes of db8500 device */
->         of_platform_populate(NULL, u8500_local_bus_nodes, u8500_auxdata_lookup, parent);
-> +
-> +       if (of_machine_is_compatible("st-ericsson,u8540"))
-> +               of_platform_populate(NULL, u8500_local_bus_nodes,
-> +                                    u8540_auxdata_uart_lookup, parent);
-> +       else
-> +               of_platform_populate(NULL, u8500_local_bus_nodes,
-> +                                    u8500_auxdata_uart_lookup, parent);
->  }
->  
+Dear Andrew Lunn,
 
-Does this still work on u8500? I did not think you could call 
-of_platform_populate twice on the root node and still get the result
-you want.
+On Wed, 6 Mar 2013 19:16:48 +0100, Andrew Lunn wrote:
+> On Wed, Mar 06, 2013 at 05:23:40PM +0100, Thomas Petazzoni wrote:
+> > The OpenBlocks A6 .dts file was using a long list of pinmux
+> > descriptors to select each GPIO of the external GPIO connector and the
+> > internal DIP switch, for no apparent reason. This commit factors those
+> > GPIO pins into two descriptors: one for the external GPIO connector
+> > and one for the internal DIP switch.
+> 
+> Hi Thomas
+> 
+> There is no need to pinmux gpio pins at all. The pinctrl driver does
+> it when the gpio driver requests the pins.
+> 
+> This stems from an error i made. I also didn't know this and added
+> hogs for gpio pins as i converted some boards. Others have then just
+> cut/paste my error.....
 
-	Arnd
+I was looking at this today to send an updated version of those
+patches. However, it turns out that having the pinctrl-0 property to
+associate pinmux configurations to a device has an advantage: pinctrl
+knows about this association.
+
+If you keep the pinctrl-0 property in gpio-leds and gpio-keys,
+then /sys/kernel/debug/pinctrl/f1010000.pinctrl/pinmux-pins looks like
+this:
+
+======================================================================
+pin 38 (PIN38): gpio_keys.2 mvebu-gpio:38 function gpio group mpp38
+pin 39 (PIN39): (MUX UNCLAIMED) (GPIO UNCLAIMED)
+pin 40 (PIN40): (MUX UNCLAIMED) (GPIO UNCLAIMED)
+pin 41 (PIN41): gpio-leds.1 mvebu-gpio:41 function gpio group mpp41
+pin 42 (PIN42): gpio-leds.1 mvebu-gpio:42 function gpio group mpp42
+pin 43 (PIN43): gpio-leds.1 mvebu-gpio:43 function gpio group mpp43
+======================================================================
+
+On the other hand, if you remove the pinctrl-0 property, the same file
+looks like this:
+
+======================================================================
+pin 38 (PIN38): (MUX UNCLAIMED) mvebu-gpio:38
+pin 39 (PIN39): (MUX UNCLAIMED) (GPIO UNCLAIMED)
+pin 40 (PIN40): (MUX UNCLAIMED) (GPIO UNCLAIMED)
+pin 41 (PIN41): (MUX UNCLAIMED) mvebu-gpio:41
+pin 42 (PIN42): (MUX UNCLAIMED) mvebu-gpio:42
+pin 43 (PIN43): (MUX UNCLAIMED) mvebu-gpio:43
+======================================================================
+
+So you no longer know by what device the pin is claimed. It is not
+horrible of course, but I find it quite nice to be able to see which
+pin is used by what device.
+
+What do you think?
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
