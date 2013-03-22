@@ -1,111 +1,54 @@
 From: prabhakar.csengg@gmail.com (Prabhakar lad)
-Date: Fri, 22 Mar 2013 13:23:13 +0530
-Subject: [PATCH 2/2] media: davinci: vpbe: venc: move the enabling of vpss
- clocks to driver
-In-Reply-To: <1363938793-22246-1-git-send-email-prabhakar.csengg@gmail.com>
-References: <1363938793-22246-1-git-send-email-prabhakar.csengg@gmail.com>
-Message-ID: <1363938793-22246-3-git-send-email-prabhakar.csengg@gmail.com>
+Date: Fri, 22 Mar 2013 13:33:06 +0530
+Subject: [PATCH v7 0/2] ARM: davinci: add support for dm365 vpbe display
+Message-ID: <1363939388-22412-1-git-send-email-prabhakar.csengg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
 
-The vpss clocks were enabled by calling a exported function from a driver
-in a machine code. calling driver code from platform code is incorrect way.
 
-This patch fixes this issue and calls the function from driver code itself.
+This patch series enables VPBE display driver on DM365.
 
-Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
----
- Note: This patch is based on the comment from Sekhar
-      (https://patchwork-mail1.kernel.org/patch/2278441/).
-      Shekar I haven't completely removed the callback, I just added
-      the function calls after the callback. As you mentioned just to
-      pass the VPSS_CLK_CTRL as a resource to venc but the VPSS_CLK_CTRL
-      is already being used by VPSS driver. I'll take this cleanup task later
-      point of time.
+This patch is work on on following pull request from Hans
+http://davinci-linux-open-source.1494791.n2.nabble.com/GIT-PULL-FOR-v3-10-tvp7002-davinci-blackfin-legacy-cleanups-td7582451.html
++ http://www.mail-archive.com/davinci-linux-open-source at linux.davincidsp.com/msg25499.html (from me)
++ http://linux.davincidsp.com/pipermail/davinci-linux-open-source/2013-March/026639.html (from me)
 
- drivers/media/platform/davinci/vpbe_venc.c |   26 ++++++++++++++++++++++++++
- 1 files changed, 26 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/media/platform/davinci/vpbe_venc.c b/drivers/media/platform/davinci/vpbe_venc.c
-index f15f211..26bdf9b 100644
---- a/drivers/media/platform/davinci/vpbe_venc.c
-+++ b/drivers/media/platform/davinci/vpbe_venc.c
-@@ -202,6 +202,26 @@ static void venc_enabledigitaloutput(struct v4l2_subdev *sd, int benable)
- 	}
- }
- 
-+static void
-+venc_enable_vpss_clock(int venc_type,
-+		       enum vpbe_enc_timings_type type,
-+		       unsigned int pclock)
-+{
-+	if (venc_type == VPBE_VERSION_1)
-+		return;
-+
-+	if (venc_type == VPBE_VERSION_2 && (type == VPBE_ENC_STD ||
-+	    (type == VPBE_ENC_DV_TIMINGS && pclock <= 27000000))) {
-+		vpss_enable_clock(VPSS_VENC_CLOCK_SEL, 1);
-+		vpss_enable_clock(VPSS_VPBE_CLOCK, 1);
-+		return;
-+	}
-+
-+	if (venc_type == VPBE_VERSION_3 && type == VPBE_ENC_STD)
-+		vpss_enable_clock(VPSS_VENC_CLOCK_SEL, 0);
-+
-+}
-+
- #define VDAC_CONFIG_SD_V3	0x0E21A6B6
- #define VDAC_CONFIG_SD_V2	0x081141CF
- /*
-@@ -220,6 +240,7 @@ static int venc_set_ntsc(struct v4l2_subdev *sd)
- 	if (pdata->setup_clock(VPBE_ENC_STD, V4L2_STD_525_60) < 0)
- 		return -EINVAL;
- 
-+	venc_enable_vpss_clock(venc->venc_type, VPBE_ENC_STD, V4L2_STD_525_60);
- 	venc_enabledigitaloutput(sd, 0);
- 
- 	if (venc->venc_type == VPBE_VERSION_3) {
-@@ -265,6 +286,7 @@ static int venc_set_pal(struct v4l2_subdev *sd)
- 	if (venc->pdata->setup_clock(VPBE_ENC_STD, V4L2_STD_625_50) < 0)
- 		return -EINVAL;
- 
-+	venc_enable_vpss_clock(venc->venc_type, VPBE_ENC_STD, V4L2_STD_625_50);
- 	venc_enabledigitaloutput(sd, 0);
- 
- 	if (venc->venc_type == VPBE_VERSION_3) {
-@@ -319,6 +341,7 @@ static int venc_set_480p59_94(struct v4l2_subdev *sd)
- 	if (pdata->setup_clock(VPBE_ENC_DV_TIMINGS, 27000000) < 0)
- 		return -EINVAL;
- 
-+	venc_enable_vpss_clock(venc->venc_type, VPBE_ENC_DV_TIMINGS, 27000000);
- 	venc_enabledigitaloutput(sd, 0);
- 
- 	if (venc->venc_type == VPBE_VERSION_2)
-@@ -366,6 +389,7 @@ static int venc_set_576p50(struct v4l2_subdev *sd)
- 	if (pdata->setup_clock(VPBE_ENC_DV_TIMINGS, 27000000) < 0)
- 		return -EINVAL;
- 
-+	venc_enable_vpss_clock(venc->venc_type, VPBE_ENC_DV_TIMINGS, 27000000);
- 	venc_enabledigitaloutput(sd, 0);
- 
- 	if (venc->venc_type == VPBE_VERSION_2)
-@@ -406,6 +430,7 @@ static int venc_set_720p60_internal(struct v4l2_subdev *sd)
- 	if (pdata->setup_clock(VPBE_ENC_DV_TIMINGS, 74250000) < 0)
- 		return -EINVAL;
- 
-+	venc_enable_vpss_clock(venc->venc_type, VPBE_ENC_DV_TIMINGS, 74250000);
- 	venc_enabledigitaloutput(sd, 0);
- 
- 	venc_write(sd, VENC_OSDCLK0, 0);
-@@ -434,6 +459,7 @@ static int venc_set_1080i30_internal(struct v4l2_subdev *sd)
- 	if (pdata->setup_clock(VPBE_ENC_DV_TIMINGS, 74250000) < 0)
- 		return -EINVAL;
- 
-+	venc_enable_vpss_clock(venc->venc_type, VPBE_ENC_DV_TIMINGS, 74250000);
- 	venc_enabledigitaloutput(sd, 0);
- 
- 	venc_write(sd, VENC_OSDCLK0, 0);
+Changes for v7:
+1: Fixed nits pointed by Sekhar.
+
+Changes for v6:
+1: Fixed review comments pointed by Sekhar.
+
+Changes for v5:
+1: pass different platform names to handle different ip's.
+2: Fixed review comments pointed by Sekhar.
+
+Changes for v4:
+1: Replaced the obsolete preset API by timings API.
+
+Changes for v3:
+1: Removed VPSS clock alias for master and slave which was
+   sent for VPSS driver. since this patch was dependent on
+   patch[1]. I will revist this patch once MC(captrure driver)
+   goes into mainline.
+[1] http://www.spinics.net/lists/linux-media/msg50562.html
+
+Changes for v2:
+1: Added VPSS clock so that capture and display
+   can work independent.
+
+
+Lad, Prabhakar (2):
+  ARM: davinci: dm365: add support for v4l2 video display
+  ARM: davinci: dm365 EVM: add support for VPBE display
+
+ arch/arm/mach-davinci/board-dm365-evm.c |  166 ++++++++++++++++++++++++++-
+ arch/arm/mach-davinci/davinci.h         |    2 +-
+ arch/arm/mach-davinci/dm365.c           |  194 +++++++++++++++++++++++++++++--
+ 3 files changed, 350 insertions(+), 12 deletions(-)
+
 -- 
 1.7.4.1
