@@ -1,208 +1,74 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
-Date: Fri, 22 Mar 2013 14:24:14 +0100
-Subject: [PATCH 6/6] ARM: at91: add defconfig for SAMA5
-In-Reply-To: <1363958654-7713-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1363958654-7713-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1363958654-7713-7-git-send-email-ludovic.desroches@atmel.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 22 Mar 2013 14:30:23 +0100
+Subject: [PATCH for 3.9 v3] mmc: mvsdio: fix non-DT probing of GPIOs
+Message-ID: <1363959023-25661-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Desroches <ludovic.desroches@atmel.com>
+Ralph Droms <rdroms@gmail.com> reported that 3.9-rc was breaking the
+SDIO interface on his Sheevaplug platform, and that the recent changes
+to the mvsdio driver are responsible for this breakage. Precisely, the
+regression has been introduced by 07728b77c03d (mmc: mvsdio: use
+slot-gpio for card detect gpio).
 
-Defconfig file for SAMA5 devices. It covers the SAMA5D3 family.
+After investigation, is turns out that the Sheevaplug does not have
+any "card detect" GPIO, and the Sheevaplug has not been converted to
+the Device Tree. Therefore, the Sheevaplug board code does not define
+a value for the .gpio_card_detect field of the mvsdio_platform_data
+structure, which means that its value is 0. Unfortunately,
+gpio_is_valid() considers 0 as a valid GPIO, and therefore calls
+mmc_gpio_request_cd(), which fails and makes the entire probing of the
+driver fail.
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+In fact, in the previous mvsdio code, before the Device Tree binding
+was introduced, 0 was not considered as a valid GPIO. Therefore, this
+fix revert back to this behavior in the non-DT case, by setting the
+gpio_card_detect and gpio_write_protect local variables to -EINVAL
+when the corresponding fields of the mvsdio_platform_data structure
+are set to zero (i.e, left undefined). Of course, it prevents to use
+GPIO 0 as a card detect or write protect GPIO, but it was a defiency
+of the previous non-DT code, and the fix moving forward is to convert
+platforms to the Device Tree.
+
+The problem has been reproduced successfully on the Kirkwood-based
+Marvell DB-88F6281-BP Development Board (that doesn't use the Device
+Tree) and the fix has proven to work properly, after of course
+removing the gpio_card_detect field of the mvsdio_platform_data
+instance for this board.
+
+Reported-by: Ralph Droms <rdroms@gmail.com>
+Tested-by: Ralph Droms <rdroms@gmail.com>
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/configs/sama5_defconfig | 181 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 181 insertions(+)
- create mode 100644 arch/arm/configs/sama5_defconfig
+This patch should be applied on 3.9-rcX.
 
-diff --git a/arch/arm/configs/sama5_defconfig b/arch/arm/configs/sama5_defconfig
-new file mode 100644
-index 0000000..4d0dc3c
---- /dev/null
-+++ b/arch/arm/configs/sama5_defconfig
-@@ -0,0 +1,181 @@
-+# CONFIG_LOCALVERSION_AUTO is not set
-+# CONFIG_SWAP is not set
-+CONFIG_SYSVIPC=y
-+CONFIG_IRQ_DOMAIN_DEBUG=y
-+CONFIG_LOG_BUF_SHIFT=14
-+CONFIG_SYSFS_DEPRECATED=y
-+CONFIG_SYSFS_DEPRECATED_V2=y
-+CONFIG_BLK_DEV_INITRD=y
-+CONFIG_EMBEDDED=y
-+CONFIG_SLAB=y
-+CONFIG_MODULES=y
-+CONFIG_MODULE_FORCE_LOAD=y
-+CONFIG_MODULE_UNLOAD=y
-+CONFIG_MODULE_FORCE_UNLOAD=y
-+# CONFIG_LBDAF is not set
-+# CONFIG_BLK_DEV_BSG is not set
-+# CONFIG_IOSCHED_DEADLINE is not set
-+# CONFIG_IOSCHED_CFQ is not set
-+CONFIG_ARCH_AT91=y
-+CONFIG_SOC_SAM_V7=y
-+CONFIG_SOC_SAMA5D3=y
-+CONFIG_MACH_SAMA5_DT=y
-+CONFIG_AT91_PROGRAMMABLE_CLOCKS=y
-+CONFIG_AEABI=y
-+# CONFIG_OABI_COMPAT is not set
-+CONFIG_UACCESS_WITH_MEMCPY=y
-+CONFIG_ZBOOT_ROM_TEXT=0x0
-+CONFIG_ZBOOT_ROM_BSS=0x0
-+CONFIG_CMDLINE="console=ttyS0,115200 initrd=0x21100000,25165824 root=/dev/ram0 rw"
-+CONFIG_AUTO_ZRELADDR=y
-+CONFIG_VFP=y
-+# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
-+CONFIG_PM_RUNTIME=y
-+CONFIG_PM_DEBUG=y
-+CONFIG_PM_ADVANCED_DEBUG=y
-+CONFIG_NET=y
-+CONFIG_PACKET=y
-+CONFIG_UNIX=y
-+CONFIG_INET=y
-+CONFIG_IP_MULTICAST=y
-+CONFIG_IP_PNP=y
-+# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
-+# CONFIG_INET_XFRM_MODE_TUNNEL is not set
-+# CONFIG_INET_XFRM_MODE_BEET is not set
-+# CONFIG_INET_LRO is not set
-+# CONFIG_INET_DIAG is not set
-+CONFIG_IPV6=y
-+# CONFIG_INET6_XFRM_MODE_TRANSPORT is not set
-+# CONFIG_INET6_XFRM_MODE_TUNNEL is not set
-+# CONFIG_INET6_XFRM_MODE_BEET is not set
-+CONFIG_IPV6_SIT_6RD=y
-+CONFIG_CAN=y
-+CONFIG_CAN_AT91=y
-+CONFIG_CFG80211=y
-+CONFIG_MAC80211=y
-+CONFIG_MAC80211_LEDS=y
-+CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+CONFIG_DEVTMPFS=y
-+CONFIG_DEVTMPFS_MOUNT=y
-+# CONFIG_STANDALONE is not set
-+# CONFIG_PREVENT_FIRMWARE_BUILD is not set
-+CONFIG_MTD=y
-+CONFIG_MTD_CMDLINE_PARTS=y
-+CONFIG_MTD_CHAR=y
-+CONFIG_MTD_BLOCK=y
-+CONFIG_MTD_CFI=y
-+CONFIG_MTD_M25P80=y
-+CONFIG_MTD_NAND=y
-+CONFIG_MTD_NAND_ATMEL=y
-+CONFIG_MTD_UBI=y
-+CONFIG_BLK_DEV_LOOP=y
-+CONFIG_BLK_DEV_RAM=y
-+CONFIG_BLK_DEV_RAM_COUNT=4
-+CONFIG_BLK_DEV_RAM_SIZE=8192
-+CONFIG_ATMEL_TCLIB=y
-+CONFIG_ATMEL_SSC=y
-+CONFIG_EEPROM_AT24=y
-+CONFIG_SCSI=y
-+CONFIG_BLK_DEV_SD=y
-+CONFIG_SCSI_MULTI_LUN=y
-+# CONFIG_SCSI_LOWLEVEL is not set
-+CONFIG_NETDEVICES=y
-+CONFIG_MII=y
-+CONFIG_MACB=y
-+# CONFIG_NET_VENDOR_BROADCOM is not set
-+# CONFIG_NET_VENDOR_CIRRUS is not set
-+# CONFIG_NET_VENDOR_FARADAY is not set
-+# CONFIG_NET_VENDOR_INTEL is not set
-+# CONFIG_NET_VENDOR_MARVELL is not set
-+# CONFIG_NET_VENDOR_MICREL is not set
-+# CONFIG_NET_VENDOR_MICROCHIP is not set
-+# CONFIG_NET_VENDOR_NATSEMI is not set
-+# CONFIG_NET_VENDOR_SEEQ is not set
-+# CONFIG_NET_VENDOR_SMSC is not set
-+# CONFIG_NET_VENDOR_STMICRO is not set
-+# CONFIG_NET_VENDOR_WIZNET is not set
-+CONFIG_MICREL_PHY=y
-+# CONFIG_WLAN is not set
-+# CONFIG_INPUT_MOUSEDEV is not set
-+CONFIG_INPUT_EVDEV=y
-+# CONFIG_KEYBOARD_ATKBD is not set
-+CONFIG_KEYBOARD_QT1070=y
-+CONFIG_KEYBOARD_GPIO=y
-+# CONFIG_INPUT_MOUSE is not set
-+CONFIG_INPUT_TOUCHSCREEN=y
-+CONFIG_TOUCHSCREEN_ATMEL_MXT=y
-+CONFIG_TOUCHSCREEN_ATMEL_TSADCC=y
-+# CONFIG_SERIO is not set
-+CONFIG_LEGACY_PTY_COUNT=4
-+CONFIG_SERIAL_ATMEL=y
-+CONFIG_SERIAL_ATMEL_CONSOLE=y
-+CONFIG_HW_RANDOM=y
-+CONFIG_I2C=y
-+CONFIG_I2C_CHARDEV=y
-+CONFIG_I2C_AT91=y
-+CONFIG_I2C_GPIO=y
-+CONFIG_SPI=y
-+CONFIG_SPI_ATMEL=y
-+CONFIG_SPI_GPIO=y
-+CONFIG_GPIO_SYSFS=y
-+# CONFIG_HWMON is not set
-+CONFIG_SSB=m
-+CONFIG_FB=y
-+CONFIG_BACKLIGHT_LCD_SUPPORT=y
-+# CONFIG_LCD_CLASS_DEVICE is not set
-+CONFIG_BACKLIGHT_CLASS_DEVICE=y
-+# CONFIG_BACKLIGHT_GENERIC is not set
-+CONFIG_FRAMEBUFFER_CONSOLE=y
-+# CONFIG_HID_GENERIC is not set
-+CONFIG_USB=y
-+CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
-+CONFIG_USB_EHCI_HCD=y
-+CONFIG_USB_OHCI_HCD=y
-+CONFIG_USB_ACM=y
-+CONFIG_USB_STORAGE=y
-+CONFIG_USB_GADGET=y
-+CONFIG_USB_AT91=y
-+CONFIG_USB_MASS_STORAGE=m
-+CONFIG_MMC=y
-+# CONFIG_MMC_BLOCK_BOUNCE is not set
-+CONFIG_MMC_ATMELMCI=y
-+CONFIG_NEW_LEDS=y
-+CONFIG_LEDS_CLASS=y
-+CONFIG_LEDS_GPIO=y
-+CONFIG_LEDS_TRIGGER_TIMER=y
-+CONFIG_LEDS_TRIGGER_HEARTBEAT=y
-+CONFIG_LEDS_TRIGGER_GPIO=y
-+CONFIG_RTC_CLASS=y
-+CONFIG_RTC_DRV_AT91RM9200=y
-+CONFIG_DMADEVICES=y
-+# CONFIG_IOMMU_SUPPORT is not set
-+CONFIG_IIO=y
-+CONFIG_AT91_ADC=y
-+CONFIG_EXT2_FS=y
-+CONFIG_FANOTIFY=y
-+CONFIG_VFAT_FS=y
-+CONFIG_TMPFS=y
-+CONFIG_JFFS2_FS=y
-+CONFIG_JFFS2_SUMMARY=y
-+CONFIG_UBIFS_FS=y
-+CONFIG_NFS_FS=y
-+CONFIG_ROOT_NFS=y
-+CONFIG_NLS_CODEPAGE_437=y
-+CONFIG_NLS_CODEPAGE_850=y
-+CONFIG_NLS_ISO8859_1=y
-+CONFIG_STRIP_ASM_SYMS=y
-+CONFIG_DEBUG_FS=y
-+# CONFIG_SCHED_DEBUG is not set
-+CONFIG_DEBUG_MEMORY_INIT=y
-+# CONFIG_FTRACE is not set
-+CONFIG_DEBUG_USER=y
-+CONFIG_DEBUG_LL=y
-+CONFIG_EARLY_PRINTK=y
-+# CONFIG_CRYPTO_ANSI_CPRNG is not set
-+CONFIG_CRYPTO_USER_API_HASH=m
-+CONFIG_CRYPTO_USER_API_SKCIPHER=m
-+CONFIG_CRYPTO_DEV_ATMEL_AES=y
-+CONFIG_CRYPTO_DEV_ATMEL_TDES=y
-+CONFIG_CRYPTO_DEV_ATMEL_SHA=y
-+CONFIG_CRC_CCITT=m
-+CONFIG_CRC_ITU_T=m
+Changes between v2 and v3:
+ * Add a reference to the commit introducing the regression. Suggested
+   by Russell King.
+ * Fix the e-mail address from Ralph Droms, and add his Tested-by.
+ * No code change.
+
+Changes between v1 and v2:
+ * Send the patch to the MMC maintainer instead of the Marvell
+   maintainers.
+---
+ drivers/mmc/host/mvsdio.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/mmc/host/mvsdio.c b/drivers/mmc/host/mvsdio.c
+index 145cdaf..1e4d567 100644
+--- a/drivers/mmc/host/mvsdio.c
++++ b/drivers/mmc/host/mvsdio.c
+@@ -741,8 +741,8 @@ static int __init mvsd_probe(struct platform_device *pdev)
+ 			goto out;
+ 		}
+ 		host->base_clock = mvsd_data->clock / 2;
+-		gpio_card_detect = mvsd_data->gpio_card_detect;
+-		gpio_write_protect = mvsd_data->gpio_write_protect;
++		gpio_card_detect = mvsd_data->gpio_card_detect ? : -EINVAL;
++		gpio_write_protect = mvsd_data->gpio_write_protect ? : -EINVAL;
+ 	}
+ 
+ 	mmc->ops = &mvsd_ops;
 -- 
-1.7.11.3
+1.7.9.5
