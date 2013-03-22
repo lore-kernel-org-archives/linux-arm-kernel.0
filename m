@@ -1,111 +1,136 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 22 Mar 2013 14:50:05 +0530
-Subject: [PATCH v3 5/6] ARM: dts: omap: update usb_otg_hs data
-In-Reply-To: <514B3EEF.3080705@wwwdotorg.org>
-References: <1363770725-13717-1-git-send-email-kishon@ti.com>
- <1363770725-13717-6-git-send-email-kishon@ti.com>
- <514A233F.8010105@wwwdotorg.org> <514AA74D.9070506@ti.com>
- <514B3EEF.3080705@wwwdotorg.org>
-Message-ID: <514C2245.4080506@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 22 Mar 2013 10:26:06 +0100
+Subject: [PATCH v7 00/14] spi/spi-atmel: add dmaengine support for atmel
+ spi controller and to test the device tree support
+In-Reply-To: <514AD3A2.50203@atmel.com>
+References: <1363678866-3567-1-git-send-email-wenyou.yang@atmel.com>
+ <514AD3A2.50203@atmel.com>
+Message-ID: <514C23AE.7080101@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thursday 21 March 2013 10:40 PM, Stephen Warren wrote:
-> On 03/21/2013 12:23 AM, kishon wrote:
->> Hi,
+On 03/21/2013 10:32 AM, Nicolas Ferre :
+> On 03/19/2013 08:41 AM, Wenyou Yang :
+>> Hi All, 
 >>
->> On Thursday 21 March 2013 02:29 AM, Stephen Warren wrote:
->>> On 03/20/2013 03:12 AM, Kishon Vijay Abraham I wrote:
->>>> Updated the usb_otg_hs dt data to include the *phy* and *phy-names*
->>>> binding in order for the driver to use the new generic PHY framework.
->>>> Also updated the Documentation to include the binding information.
->>>
->>>> diff --git a/Documentation/devicetree/bindings/usb/omap-usb.txt
->>>> b/Documentation/devicetree/bindings/usb/omap-usb.txt
->>>> index abce256..3d6f9f6 100644
->>>> --- a/Documentation/devicetree/bindings/usb/omap-usb.txt
->>>> +++ b/Documentation/devicetree/bindings/usb/omap-usb.txt
->>>> @@ -19,6 +19,9 @@ OMAP MUSB GLUE
->>>>     - power : Should be "50". This signifies the controller can supply
->>>> upto
->>>>       100mA when operating in host mode.
->>>>     - usb-phy : the phandle for the PHY device
->>>> + - phy : the phandle for the PHY device (used by generic PHY framework)
->>>> + - phy-names : the names of the PHY corresponding to the PHYs
->>>> present in the
->>>> +   *phy* phandle.
->>>
->>> If the intent is for those properties to be generic and used by any DT
->>> binding that refers to a PHY node, I think you'd want to define those
->>> properties in e.g. Documentation/devicetree/bindings/phy/phy.txt, just
->>> like common clock/GPIO/... properties are defined in standalone common
->>> files.
+>> This set of patches is to add dmaengine support for atmel spi and to test device tree support.
 >>
->> Ok. Will add it.
->>>
->>> I think you want to require that DT nodes that represent PHYs have a
->>> #phy-cells property, and that the format of the phy property be
->>> <&phy_phandle phy_specifier*>, where #phy-cells in the referenced node
->>> defines how many cells are part of phy_specifier*, just like (almost)
->>> any other DT property that references another node by phandle. That way,
->>> if a single DT node represents a HW block that implements e.g. 3 PHYs,
->>> it can use #phy-cells = <1>, and the referencing phy property can
->>> include a cell that indicates which of those 3 PHYs is being referenced.
+>> The work is based on Nicolas and Richard's work.
 >>
->> Currently, if a single phandle have reference to multiple PHYs, we can
->> get PHY by passing index or by name as give in phy-names.
->> I'm not sure if we have <&phy_phandle phy_specifier*>, what could that
->> phy_specifier be? Maybe phy_type?
->
-> I'm not talking about the case where a consumer node references multiple
-> PHYs. As you say, that is indeed handled by the driver looking at a
-> particular index in the phys property, or using phy-names.
->
-> I'm talking about the case where a single provider provides multiple
-> PHYs. For example, consider:
->
-> phys: phy {
->      compatible = "xxx";
->      reg = <...>;
->      #phy-cells = <1>;
-> };
->
-> That node describes an IP block that implements 3 different PHYs. The
-> registers are inter-mixed in such a way that you can't split it into 3
-> separate nodes each with a separate device instance. If the consumers
-> simply say:
->
-> phys = <&phys>;
->
-> then which of the 3 PHYs are you referring to?
->
-> Instead, the consumer needs to say one of:
->
-> phys = <&phys 0>;
-> phys = <&phys 1>;
-> phys = <&phys 2>;
->
-> in order to specify which of the PHYs it refers to.
->
-> The number of cells in the phy property after the phandle is specified
-> by the #phy-cells property in the node referred to by the phandle. The
-> meaning of all those cells is defined by the binding for the phy node.
-> This could include both the PHY ID (as in my example here), or whatever
-> configuration information or flags the provider needs. For example, both
-> GPIOs and interrupts have specifiers than describe both of these things.
+>> Because the dma engine device tree support isn't available now, to at91sam9x5ek and at91sam9n12ek
+>> with dma support, it doesn't work on the dmaengine mode, only on PIO mode so far.
+>>
+>> It has been tested as below:
+>>  1./tested on v3.9-rc3, by using mtd utils, "mount", "umount" and "cp" commands.
+>>  2./tested on "spi/next" git tree after changing master->num_chipselect which fixed in v3.9-rc1.
+>>  3./tested by using Documentation/spi/spidev_test.c on "/dev/spidev".
+>>  4./tested on on at91sam9x5ek, at91sam9m10g45ek, at91sam9263ek and at91sam9g20ek boards.
+>>
+>> It is based on v3.9-rc3 + Joachim Eastwood's spi/atmel: fix speed_hz check in atmel_spi_transfer().
+>>
+>> Changelog:
+>> v7:
+>>      1./ remove patch: fix probing failure after xfer->speed_hz set.
+>>      2./ remove patch: add pinctrl support for atmel spi.
+> 
+> 
+> It it makes sense, you can add my:
+> 
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> 
+> on patches that I did not acknowledged yet.
+> 
+> Grant,
+> 
+> Can we move forward with this patch series so that we can build on solid
+> bases for future developments on atmel SPI.
 
-Thanks for the explanation. I'll add it in my next version.
->
-> For more background, take a look at almost any other binding that uses
-> phandles.
->
-> By the way, the property in the consumer should probably be "phys" not
-> "phy" to be consistent with other similar properties (e.g. gpios,
-> interrupts, ... which are all plural).
->
-Ok.
+Moreover, if it can ease the process, I can take patches 11, 12, 13 and
+14 with at91-dt branch and submit that to arm-soc.
 
-Thanks
-Kishon
+Tell me if you feel it is better...
+
+Bye,
+
+
+>> v6:
+>>      1./ remove: fix master->num_chipselect wrongly set patch which isn't a issue in v3.9-rc1.
+>>      2./ fix probing failure after xfer->speed_hz set.
+>>
+>> v5:
+>>      1./ add pinctrl patches.
+>>      2./ detect capabilities by reading spi version register to replace multiple compatiles.
+>>      3./ change the "cs-gpios" property of spi node.
+>>      4./ rebase on v3.8.
+>>
+>> v4:
+>>      1./ Take Joe Perches's adivce, rewrite atmel_spi_is_v2(struct atmel_spi *as) 
+>>          and atmel_spi_use_dma(struct atmel_spi *as),
+>> 	 and remove atmel_spi_use_pdc(struct atmel_spi *as).
+>>      2./ Rebase on v3.8-rc3.
+>>
+>> V3:
+>>      1./ Rebase on v3.8-rc2.
+>>      2./ Remove some Jean-Christophe's patches which has been applied on v3.8-rc2.
+>>      3./ Remove spi property "cs-gpios" from the SoC dtsi files to the board dts files
+>>          to avoid some useless pin conflicts.
+>>
+>> v2: 
+>>      1./ Remove the patch :PATCH]mtd: m25p80: change the m25p80_read to reading page to page
+>> 	 which purpose to fix the BUG: when run "flashcp /bin/busybox /dev/mtdX" in the at91sam9g25ek
+>> 	 with DMA mode, it arises a OOPS. Now fix it in this patch:
+>> 	    [PATHC] spi/atmel_spi: add dmaengine support changing to fix the [BUG].
+>>      2./ Remove two patches:
+>>    	    which purpose to read dts property to select SPI IP version and DMA mode
+>> 	    Now they will be gat from device tree different compatile.
+>>      3./ Fix DMA: when enable both spi0 AND spi1, the spi0 doesn't work BUG.
+>>      4./ Rebase v3.7-rc8.
+>>
+>> Best Regards,
+>> Wenyou Yang.
+>>
+>>
+>> Nicolas Ferre (5):
+>>   spi/spi-atmel: add physical base address
+>>   spi/spi-atmel: call unmapping on transfers buffers
+>>   spi/spi-atmel: status information passed through controller data
+>>   spi/spi-atmel: add flag to controller data for lock operations
+>>   spi/spi-atmel: add dmaengine support
+>>
+>> Richard Genoud (6):
+>>   spi/spi-atmel: fix spi-atmel driver to adapt to slave_config changes
+>>   spi/spi-atmel: correct 16 bits transfers using PIO
+>>   spi/spi-atmel: correct 16 bits transfers with DMA
+>>   ARM: at91: add clocks for spi dt entries
+>>   ARM: dts: add spi nodes for atmel SoC
+>>   ARM: dts: add spi nodes for the atmel boards
+>>
+>> Wenyou Yang (3):
+>>   spi/spi-atmel: detect the capabilities of SPI core by reading the
+>>     VERSION register.
+>>   spi/spi-atmel: add support transfer on CS1,2,3, not only on CS0
+>>   ARM: dts: add pinctrl property for spi node for atmel SoC
+>>
+>>  arch/arm/boot/dts/at91sam9260.dtsi          |   40 ++
+>>  arch/arm/boot/dts/at91sam9263.dtsi          |   40 ++
+>>  arch/arm/boot/dts/at91sam9263ek.dts         |   10 +
+>>  arch/arm/boot/dts/at91sam9g20ek_common.dtsi |   10 +
+>>  arch/arm/boot/dts/at91sam9g45.dtsi          |   40 ++
+>>  arch/arm/boot/dts/at91sam9m10g45ek.dts      |   10 +
+>>  arch/arm/boot/dts/at91sam9n12.dtsi          |   40 ++
+>>  arch/arm/boot/dts/at91sam9n12ek.dts         |   10 +
+>>  arch/arm/boot/dts/at91sam9x5.dtsi           |   40 ++
+>>  arch/arm/boot/dts/at91sam9x5ek.dtsi         |   10 +
+>>  arch/arm/mach-at91/at91sam9260.c            |    2 +
+>>  arch/arm/mach-at91/at91sam9g45.c            |    2 +
+>>  arch/arm/mach-at91/at91sam9n12.c            |    2 +
+>>  arch/arm/mach-at91/at91sam9x5.c             |    2 +
+>>  drivers/spi/spi-atmel.c                     |  753 ++++++++++++++++++++++++---
+>>  15 files changed, 945 insertions(+), 66 deletions(-)
+>>
+> 
+> 
+
+
+-- 
+Nicolas Ferre
