@@ -1,24 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 22 Mar 2013 20:30:53 +0000
-Subject: [PATCH] ARM: tegra: fix register address of slink controller
-In-Reply-To: <1363977306-7548-1-git-send-email-swarren@wwwdotorg.org>
-References: <1363977306-7548-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <201303222030.53942.arnd@arndb.de>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 22 Mar 2013 13:37:15 -0700
+Subject: [PATCH v3 02/11] clk: davinci - add PSC clock driver
+In-Reply-To: <514C3E7C.3000705@ti.com>
+References: <1351181518-11882-1-git-send-email-m-karicheri2@ti.com>
+ <1351181518-11882-3-git-send-email-m-karicheri2@ti.com>
+ <50950908.1060302@ti.com> <5097D6FC.7040202@ti.com>
+ <20121110022254.18014.31873@nucleus> <50B4D6B1.3000903@ti.com>
+ <20121127172900.21126.89528@nucleus> <50B6101C.30502@ti.com>
+ <514C3E7C.3000705@ti.com>
+Message-ID: <20130322203715.834.30085@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 22 March 2013, Stephen Warren wrote:
-> From: Laxman Dewangan <ldewangan@nvidia.com>
+Quoting Sekhar Nori (2013-03-22 04:20:28)
+> Mike,
 > 
-> Fix typo on register address of slink3 controller where register
-> address is wrongly set as 0x7000d480 but it is 0x7000d800.
+> On 11/28/2012 6:52 PM, Sekhar Nori wrote:
+> > On 11/27/2012 10:59 PM, Mike Turquette wrote:
 > 
-> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
-> Cc: <stable@vger.kernel.org>
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
-> Arnd, Olof, this is a fix for v3.9.
+> >> Also have you looked into regmap?  Since you are defining your own clock
+> >> type that might be something nice for you.
+> > 
+> > No, haven't looked at regmap yet. Will look at that.
+> 
+> I could get to this only now. regmap needs a valid struct device. We
+> aren't modelling psc clocks as device so regmap cannot be used here.
+> 
 
-Applied to fixes branch, thanks!
+According to Murali's reply back in November it was still not known if
+the PTCMD register was going to be concurrently accessed by sources
+outside the clock framework.  If this is so then neither the existing
+framework-level lock (e.g. enable_lock) nor the shared clock driver lock
+(e.g. spinlock in struct clk_psc) are adequate.  You may need a device
+driver which represents the PSC and use accessor functions to write to
+those register which provide coordination.
 
-	Arnd
+Regards,
+Mike
+
+> Thanks,
+> Sekhar
