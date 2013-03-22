@@ -1,39 +1,57 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Fri, 22 Mar 2013 13:18:13 -0400
-Subject: [PATCH for 3.10 v2] mmc: mvsdio: use dev_*() API instead of
- pr_*() API
-In-Reply-To: <1363959441-30744-1-git-send-email-thomas.petazzoni@free-electrons.com>
- (Thomas Petazzoni's message of "Fri, 22 Mar 2013 14:37:21 +0100")
-References: <1363959441-30744-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <87zjxvjqui.fsf@octavius.laptop.org>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 22 Mar 2013 10:21:37 -0700
+Subject: [PATCH] clk: prima2: fix return value check in
+ sirfsoc_of_clk_init()
+In-Reply-To: <CAPgLHd82XEZEP4eDvmvPjdHHz6u40+16W1GZeCWWw6Cj3SAwCg@mail.gmail.com>
+References: <CAPgLHd82XEZEP4eDvmvPjdHHz6u40+16W1GZeCWWw6Cj3SAwCg@mail.gmail.com>
+Message-ID: <20130322172137.834.44023@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Fri, Mar 22 2013, Thomas Petazzoni wrote:
-> The mvsdio driver was already using some dev_*() functions to print
-> some messages, but still using pr_*() functions for some others. This
-> patch converts all messages to use dev_*() functions.
->
-> Many of the pr_*() function calls were printing the output of
-> mmc_hostname() to preprend the message with an identifier for the
-> device. Since the dev_*() functions do that automatically, this patch
-> also gets rid of those string prefixes.
->
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Quoting Wei Yongjun (2013-03-11 08:55:18)
+> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> 
+> In case of error, the function clk_get() returns ERR_PTR()
+> not NULL. The NULL test in the return value check should
+> be replaced with IS_ERR().
+> 
+> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 > ---
-> This is for 3.10.
->
-> Changes between v1 and v2:
->
->  * Fix incorrect format string. A "%s" was left, even though the
->    mmc_hostname() argument was removed due to the conversion to the
->    dev_*() API.
+>  drivers/clk/clk-prima2.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clk/clk-prima2.c b/drivers/clk/clk-prima2.c
+> index f8e9d0c..b208665 100644
+> --- a/drivers/clk/clk-prima2.c
+> +++ b/drivers/clk/clk-prima2.c
+> @@ -1113,7 +1113,7 @@ void __init sirfsoc_of_clk_init(void)
+>  
+>         for (i = pll1; i < maxclk; i++) {
+>                 prima2_clks[i] = clk_register(NULL, prima2_clk_hw_array[i]);
+> -               BUG_ON(!prima2_clks[i]);
+> +               BUG_ON(IS_ERR(prima2_clks[i]);
+>         }
+>         clk_register_clkdev(prima2_clks[cpu], NULL, "cpu");
+>         clk_register_clkdev(prima2_clks[io],  NULL, "io");
 
-Thanks, I've updated to v2 in mmc-next for 3.10.
+This patch failed to compile.  Fix is below and applied to clk-next.
+Let me know if you have any issue with it:
 
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+Regards,
+Mike
+
+
+
+diff --git a/drivers/clk/clk-prima2.c b/drivers/clk/clk-prima2.c
+index b208665..643ca65 100644
+--- a/drivers/clk/clk-prima2.c
++++ b/drivers/clk/clk-prima2.c
+@@ -1113,7 +1113,7 @@ void __init sirfsoc_of_clk_init(void)
+ 
+ 	for (i = pll1; i < maxclk; i++) {
+ 		prima2_clks[i] = clk_register(NULL, prima2_clk_hw_array[i]);
+-		BUG_ON(IS_ERR(prima2_clks[i]);
++		BUG_ON(IS_ERR(prima2_clks[i]));
+ 	}
+ 	clk_register_clkdev(prima2_clks[cpu], NULL, "cpu");
+ 	clk_register_clkdev(prima2_clks[io],  NULL, "io");
