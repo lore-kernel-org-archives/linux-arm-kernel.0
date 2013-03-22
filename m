@@ -1,42 +1,54 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 22 Mar 2013 13:37:15 -0700
-Subject: [PATCH v3 02/11] clk: davinci - add PSC clock driver
-In-Reply-To: <514C3E7C.3000705@ti.com>
-References: <1351181518-11882-1-git-send-email-m-karicheri2@ti.com>
- <1351181518-11882-3-git-send-email-m-karicheri2@ti.com>
- <50950908.1060302@ti.com> <5097D6FC.7040202@ti.com>
- <20121110022254.18014.31873@nucleus> <50B4D6B1.3000903@ti.com>
- <20121127172900.21126.89528@nucleus> <50B6101C.30502@ti.com>
- <514C3E7C.3000705@ti.com>
-Message-ID: <20130322203715.834.30085@quantum>
+Date: Fri, 22 Mar 2013 13:39:32 -0700
+Subject: [PATCH V2 1/3] clk: Restructure code for __clk_reparent
+In-Reply-To: <CAPDyKFr3yE6-=OFX=SSfiew95mXQELJTCsGCiXZMZc8G1gdA=w@mail.gmail.com>
+References: <1363873693-30902-1-git-send-email-ulf.hansson@stericsson.com>
+ <1363873693-30902-2-git-send-email-ulf.hansson@stericsson.com>
+ <20130321205310.834.2857@quantum>
+ <CAPDyKFr3yE6-=OFX=SSfiew95mXQELJTCsGCiXZMZc8G1gdA=w@mail.gmail.com>
+Message-ID: <20130322203932.834.71282@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sekhar Nori (2013-03-22 04:20:28)
-> Mike,
+Quoting Ulf Hansson (2013-03-22 04:08:09)
+> On 21 March 2013 21:53, Mike Turquette <mturquette@linaro.org> wrote:
+> > Quoting Ulf Hansson (2013-03-21 06:48:11)
+> >> +void __clk_reparent(struct clk *clk, struct clk *new_parent)
+> >> +{
+> >> +       clk_reparent(clk, new_parent);
+> >> +       clk_debug_reparent(clk, new_parent);
+> >>         __clk_recalc_rates(clk, POST_RATE_CHANGE);
+> >>  }
+> >>
+> >> @@ -1364,7 +1378,9 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
+> >>         }
+> >>
+> >>         /* propagate rate recalculation downstream */
+> >> -       __clk_reparent(clk, parent);
+> >> +       clk_reparent(clk, parent);
+> >> +       clk_debug_reparent(clk, parent);
+> >> +       __clk_recalc_rates(clk, POST_RATE_CHANGE);
+> >>
+> >
+> > This is an interesting change.  Why not call __clk_reparent here instead
+> > of open coding an identical sequence?
 > 
-> On 11/28/2012 6:52 PM, Sekhar Nori wrote:
-> > On 11/27/2012 10:59 PM, Mike Turquette wrote:
+> By lazyness when rebasing patches I decided to keep it. :-) Well, my
+> idea here was also to make it visible how these three calls will be
+> split out to be called from three different places.
 > 
-> >> Also have you looked into regmap?  Since you are defining your own clock
-> >> type that might be something nice for you.
-> > 
-> > No, haven't looked at regmap yet. Will look at that.
-> 
-> I could get to this only now. regmap needs a valid struct device. We
-> aren't modelling psc clocks as device so regmap cannot be used here.
+> Do you want me to fixup?
 > 
 
-According to Murali's reply back in November it was still not known if
-the PTCMD register was going to be concurrently accessed by sources
-outside the clock framework.  If this is so then neither the existing
-framework-level lock (e.g. enable_lock) nor the shared clock driver lock
-(e.g. spinlock in struct clk_psc) are adequate.  You may need a device
-driver which represents the PSC and use accessor functions to write to
-those register which provide coordination.
+Please do.  It seems you'll be sending another version anyways so just
+roll it in :)
 
-Regards,
+Thanks much,
 Mike
 
-> Thanks,
-> Sekhar
+> Br
+> Uffe
+> 
+> >
+> > Regards,
+> > Mike
