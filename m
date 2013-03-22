@@ -1,52 +1,26 @@
-From: rickard.andersson@stericsson.com (Rickard Andersson)
-Date: Fri, 22 Mar 2013 09:30:32 +0100
-Subject: [PATCH 5/6] ARM: ux500: move PRCMU functions into the CPUidle
- driver
-In-Reply-To: <514AFD67.20205@linaro.org>
-References: <1363866553-15054-1-git-send-email-linus.walleij@stericsson.com>
- <1363866553-15054-6-git-send-email-linus.walleij@stericsson.com>
- <514AF99F.7040100@stericsson.com> <514AFD67.20205@linaro.org>
-Message-ID: <514C16A8.2080002@stericsson.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 22 Mar 2013 16:39:09 +0800
+Subject: [PATCH 2/2] ASoC: dmaengine_pcm: add
+ snd_dmaengine_generic_pcm_open()
+In-Reply-To: <514C1139.6050309@ti.com>
+References: <1363318601-31505-1-git-send-email-shawn.guo@linaro.org>
+ <1363318601-31505-3-git-send-email-shawn.guo@linaro.org>
+ <20130321095718.GO10326@intel.com>
+ <20130321145258.GC23109@S2101-09.ap.freescale.net>
+ <514C1139.6050309@ti.com>
+Message-ID: <20130322083906.GE6281@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/21/2013 01:30 PM, Daniel Lezcano wrote:
-> On 03/21/2013 01:14 PM, Rickard Andersson wrote:
->> On 03/21/2013 12:49 PM, Linus WALLEIJ wrote:
->>> From: Linus Walleij<linus.walleij@linaro.org>
->>>
->>> We are trying to decompose and decentralize the code in
->>> the DB8500 PRCMU out into subdrivers. The CPUidle code is
->>> calling down into the PRCMU driver basically just to access
->>> these registers, so let's remap them locally in the CPUidle
->>> driver and move the code there, simply. Besides, the PRCMU
->>> code was poking around in the GIC which is the responsibility
->>> of the machine.
->>>
->>> Cc: Daniel Lezcano<daniel.lezcano@linaro.org>
->>> Cc: Rickard Andersson<rickard.andersson@stericsson.com>
->>> Cc: Samuel Ortiz<sameo@linux.intel.com>
->>> Signed-off-by: Linus Walleij<linus.walleij@linaro.org>
->>> ---
->>> Sam, I'm requesting an ACK for taking this through the
->>> ARM SoC tree.
->>> ---
->> This functionality will be used by the platform suspend operation also
->> which I am currently working on. So I would prefer if you can move it to
->> a separate file instead so it can be used by suspend as well. I
->> recommend to have it the same way we have it in our internal track i.e.
->> a file called pm.c in the machine.
-> That would be nice to move this driver to drivers/cpuidle.
->
-> If you are ok with that, I can take care of moving the driver to this
-> directory and then create the pm.c file in the mach-ux500 to move the
-> prcmu specific code inside. Meanwhile this patch can be merged to group
-> the prcmu code needed for the driver and can be easily identified.
->
->
->
->
-It is ok to me.
+On Fri, Mar 22, 2013 at 09:07:21AM +0100, Sebastien Guiriec wrote:
+> Now I will wait Lars serie to check again on OMAP and let Mark
+> comment on the best approach. Whereas update current API like you
+> propose or wait Lars series and move on according to the different
+> comments done on open function. As OMAP audio DMA binding are
+> depending on the chosen solution.
 
-BR
-Rickard
+This the case for everyone else who is moving their audio driver to
+generic DMA bindings.  For mxs platform that I'm working on, audio
+becomes the only one not moving to generic DMA bindings.
+
+Shawn
