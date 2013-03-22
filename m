@@ -1,51 +1,46 @@
 From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Fri, 22 Mar 2013 18:44:18 +0100
-Subject: [PATCH v4 1/5] ARM: S3C24XX: move irq driver to drivers/irqchip
+Date: Fri, 22 Mar 2013 18:44:47 +0100
+Subject: [PATCH v4 2/5] irqchip: s3c24xx: fix comments on some camera
+ interrupts
 In-Reply-To: <201303221843.37668.heiko@sntech.de>
 References: <201303221843.37668.heiko@sntech.de>
-Message-ID: <201303221844.18826.heiko@sntech.de>
+Message-ID: <201303221844.48086.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This move is necessary to make use of the irqchip infrastructure
-for the following devicetree support for s3c24xx architectures.
+Might be confusing for people to read the code without having the
+datasheet nearby.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- arch/arm/mach-s3c24xx/Makefile                     |    2 +-
- drivers/irqchip/Makefile                           |    1 +
- .../irq.c => drivers/irqchip/irq-s3c24xx.c         |    0
- 3 files changed, 2 insertions(+), 1 deletions(-)
- rename arch/arm/mach-s3c24xx/irq.c => drivers/irqchip/irq-s3c24xx.c (100%)
+ drivers/irqchip/irq-s3c24xx.c |    8 ++++----
+ 1 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-s3c24xx/Makefile b/arch/arm/mach-s3c24xx/Makefile
-index be6e4d0..6f46ecf 100644
---- a/arch/arm/mach-s3c24xx/Makefile
-+++ b/arch/arm/mach-s3c24xx/Makefile
-@@ -14,7 +14,7 @@ obj-				:=
+diff --git a/drivers/irqchip/irq-s3c24xx.c b/drivers/irqchip/irq-s3c24xx.c
+index 5c9f8b7..84afbc1 100644
+--- a/drivers/irqchip/irq-s3c24xx.c
++++ b/drivers/irqchip/irq-s3c24xx.c
+@@ -916,8 +916,8 @@ static struct s3c_irq_data init_s3c2440subint[32] = {
+ 	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 15 }, /* UART2-ERR */
+ 	{ .type = S3C_IRQTYPE_EDGE, .parent_irq = 31 }, /* TC */
+ 	{ .type = S3C_IRQTYPE_EDGE, .parent_irq = 31 }, /* ADC */
+-	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 6 }, /* TC */
+-	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 6 }, /* ADC */
++	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 6 }, /* CAM_C */
++	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 6 }, /* CAM_P */
+ 	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 9 }, /* WDT */
+ 	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 9 }, /* AC97 */
+ };
+@@ -991,8 +991,8 @@ static struct s3c_irq_data init_s3c2442subint[32] = {
+ 	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 15 }, /* UART2-ERR */
+ 	{ .type = S3C_IRQTYPE_EDGE, .parent_irq = 31 }, /* TC */
+ 	{ .type = S3C_IRQTYPE_EDGE, .parent_irq = 31 }, /* ADC */
+-	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 6 }, /* TC */
+-	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 6 }, /* ADC */
++	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 6 }, /* CAM_C */
++	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 6 }, /* CAM_P */
+ };
  
- # core
- 
--obj-y				+= common.o irq.o
-+obj-y				+= common.o
- 
- obj-$(CONFIG_CPU_S3C2410)	+= s3c2410.o
- obj-$(CONFIG_S3C2410_CPUFREQ)	+= cpufreq-s3c2410.o
-diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-index 98e3b87..4d65a21 100644
---- a/drivers/irqchip/Makefile
-+++ b/drivers/irqchip/Makefile
-@@ -2,6 +2,7 @@ obj-$(CONFIG_IRQCHIP)			+= irqchip.o
- 
- obj-$(CONFIG_ARCH_BCM2835)		+= irq-bcm2835.o
- obj-$(CONFIG_ARCH_EXYNOS)		+= exynos-combiner.o
-+obj-$(CONFIG_ARCH_S3C24XX)		+= irq-s3c24xx.o
- obj-$(CONFIG_METAG)			+= irq-metag-ext.o
- obj-$(CONFIG_METAG_PERFCOUNTER_IRQS)	+= irq-metag.o
- obj-$(CONFIG_ARCH_SUNXI)		+= irq-sunxi.o
-diff --git a/arch/arm/mach-s3c24xx/irq.c b/drivers/irqchip/irq-s3c24xx.c
-similarity index 100%
-rename from arch/arm/mach-s3c24xx/irq.c
-rename to drivers/irqchip/irq-s3c24xx.c
+ void __init s3c2442_init_irq(void)
 -- 
 1.7.2.3
