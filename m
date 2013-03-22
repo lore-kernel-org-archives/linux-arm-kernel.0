@@ -1,21 +1,24 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 22 Mar 2013 11:35:48 -0600
-Subject: [PATCH] ARM: tegra: Add sbs-battery node to Dalmore
-In-Reply-To: <1363793492-2019-1-git-send-email-rklein@nvidia.com>
-References: <1363793492-2019-1-git-send-email-rklein@nvidia.com>
-Message-ID: <514C9674.905@wwwdotorg.org>
+Date: Fri, 22 Mar 2013 11:37:16 -0600
+Subject: [PATCH V2 0/4] ARM: tegra: dalmore: add regulators
+In-Reply-To: <1363873663-19272-1-git-send-email-ldewangan@nvidia.com>
+References: <1363873663-19272-1-git-send-email-ldewangan@nvidia.com>
+Message-ID: <514C96CC.8000904@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/20/2013 09:31 AM, Rhyland Klein wrote:
-> This patch adds the node for the bq20z45 I2C gas gauge which is
-> compatible with the sbs-battery power supply driver.
+On 03/21/2013 07:47 AM, Laxman Dewangan wrote:
+> This series add the regulators for Dalmore platform.
+> Dalmore also have the Palma PMIC as primary PMIC but 
+> dt population will be send later once DT documentation
+> finalize.
 
-Applied to Tegra's for-3.10/dt branch.
+The series is applied. The first 3 patches to Tegra's for-3.10/dt
+branch, and patch 4 to Tegra's for-3.10/defconfig banch.
 
-> diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
+In patch 2,
 
-> +		battery: smart-battery at b {
+> +		tps65090 at 48 {
 
-I removed "@b" here, since the unit-address isn't necessary to make the
+I removed "@48" there, since the unit-address isn't required to make the
 node name unique.
