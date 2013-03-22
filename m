@@ -1,28 +1,27 @@
-From: anton.vorontsov@linaro.org (Anton Vorontsov)
-Date: Fri, 22 Mar 2013 08:16:37 -0700
-Subject: [PATCH 6/9] power: pm2301_charger: remove __devinit annotations
-In-Reply-To: <CACRpkdZ0mYeNVQ16CkV_S-tO3p2PPd5cgEjiCNQskh4YXkBHjw@mail.gmail.com>
-References: <1363866553-15054-1-git-send-email-linus.walleij@stericsson.com>
- <1363902674-6456-1-git-send-email-arnd@arndb.de>
- <1363902674-6456-7-git-send-email-arnd@arndb.de>
- <CACRpkdZ0mYeNVQ16CkV_S-tO3p2PPd5cgEjiCNQskh4YXkBHjw@mail.gmail.com>
-Message-ID: <20130322151637.GA16221@lizard.gateway.2wire.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 22 Mar 2013 15:20:58 +0000
+Subject: [PATCH 2/3] ARM: sched_clock: support 64-bit counters
+In-Reply-To: <514C557F.1090101@gmail.com>
+References: <1363055197-17296-1-git-send-email-robherring2@gmail.com>
+ <1363055197-17296-3-git-send-email-robherring2@gmail.com>
+ <514B1311.20308@codeaurora.org> <514B866A.3010308@gmail.com>
+ <514C487B.4020208@codeaurora.org> <514C557F.1090101@gmail.com>
+Message-ID: <20130322152057.GE4977@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 22, 2013 at 01:14:55PM +0100, Linus Walleij wrote:
-> On Thu, Mar 21, 2013 at 10:51 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> 
-> > These got missed in the treewide changes because they came in through
-> > a new branch, and it now breaks allmodconfig builds.
-> >
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> Anton can you pick this fix directly to the power subsystem
-> tree?
+On Fri, Mar 22, 2013 at 07:58:39AM -0500, Rob Herring wrote:
+> The ARM ARM also says the roll-over time must be greater than 40 years.
+> So if you have fewer bits, then it needs to run at lower frequency. So I
+> think we should be fine.
 
-Yup, will do. Thanks!
+Well, we have a problem with 32-bit systems in about 19 years time when
+32-bit Unix timestamps wrap.  Of course, by that time we'll all be
+64-bit won't we. :)
 
-Anton
+Another issue here is whether it's likely that a system will have an
+uptime of 40+ years.  Probably not.  The longest I can think of which
+I have come across is the digital public address system on the London
+Jubilee Line (Waterloo to Stratford section) which was specified to
+have a life of 20 to 30 years... Hmm, I wonder of my Linux based system
+activity logger is still in the Stratford PA racks. :)
