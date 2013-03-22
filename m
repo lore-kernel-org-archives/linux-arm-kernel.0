@@ -1,59 +1,67 @@
-From: ccross@google.com (Colin Cross)
-Date: Thu, 21 Mar 2013 17:06:25 -0700
-Subject: [PATCH 1/1] clk: Add notifier support in clk_prepare/clk_unprepare
-In-Reply-To: <20130321223619.834.31998@quantum>
-References: <1363699712-8124-1-git-send-email-bilhuang@nvidia.com>
- <20130319170140.8663.93388@quantum>
- <1363748149.8815.16.camel@bilhuang-vm1>
- <20130320033142.11073.30097@quantum>
- <1363754384.8815.42.camel@bilhuang-vm1>
- <20130320144752.11073.653@quantum>
- <CAPDyKFr+Hqi8Dge3Hn55JXbqEP358F3Eq1OHdYy=2JxucJHtJg@mail.gmail.com>
- <20130321223619.834.31998@quantum>
-Message-ID: <CAMbhsRSSknsEX_gwAzPtV8b8kGdZyTpLEoT2uXaDKoCbpr3cJg@mail.gmail.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Fri, 22 Mar 2013 01:15:02 +0100
+Subject: [PATCH] cpuimx27 and mbimx27: prepend CONFIG_ to Kconfig macro
+Message-ID: <1363911302.1390.167.camel@x61.thuisdomein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 21, 2013 at 3:36 PM, Mike Turquette <mturquette@linaro.org> wrote:
-> To my knowledge, devfreq performs one task: implements an algorithm
-> (typically one that loops/polls) and applies this heuristic towards a
-> dvfs transition.
->
-> It is a policy layer, a high level layer.  It should not be used as a
-> lower-level mechanism.  Please correct me if my understanding is wrong.
->
-> I think the very idea of the clk framework calling into devfreq is
-> backwards.  Ideally a devfreq driver would call clk_set_rate as part of
-> it's target callback.  This is analogous to a cpufreq .target callback
-> which calls clk_set_rate and regulator_set_voltage.  Can you imagine the
-> clock framework cross-calling into cpufreq when clk_set_rate is called?
-> I think that would be strange.
->
-> I think that all of this discussion highlights the fact that there is a
-> missing piece of infrastructure.  It isn't devfreq or clock rate-change
-> notifiers.  It is that there is not a dvfs mechanism which neatly builds
-> on top of these lower-level frameworks (clocks & regulators).  Clearly
-> some higher-level abstraction layer is needed.
+Commit 2d66c7803595da0d4bcd949825d598575f5de9e6 ("cpuimx27 and mbimx27:
+allow fine control of UART4 and SDHC2 usage") added the Kconfig symbol
+MACH_EUKREA_CPUIMX27_USEUART4. But it forgot to prepend CONFIG_ to the
+use of its macro. Add that prefix now.
 
-I went through all of this on Tegra2.  For a while I had a
-dvfs_set_rate api for drivers that needed to modify the voltage when
-they updated a clock, but I ended up dropping it.  Drivers rarely care
-about the voltage, all they want to do is set their clock rate.  The
-voltage necessary to support that clock is an implementation detail of
-the silicon that is irrelevant to the driver (I know TI liked to
-specify voltage/frequency combos for the blocks, but their chips still
-had to support running at a lower clock speed for the voltage than
-specified in the OPP because that case always occurs during a dvfs
-change).
+Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+---
+Untested. This needs testing, obviously. Or a rethink, because these
+typos have been in the tree since v2.6.36!
 
-For Tegra2, before clk_prepare/clk_unprepare existed, I hacked dvfs
-into the clk framework by using a mixture of mutex locked clocks and
-spinlock locked clocks.  The main issue is accidentally recursive
-locking the main clock locks when the call path is
-clk->dvfs->regulator set->i2c->clk.  I think if you could guarantee
-that clocks required for dvfs were always in the "prepared" state
-(maybe a flag on the clock, kind of like WQ_MEM_RECLAIM marks
-"special" workqueues, or just have the machine call clk_prepare), and
-that clk_prepare on an already-prepared clock avoided taking the mutex
-(atomic op fastpath plus mutex slow path?), then the existing
-notifiers would be perfect for dvfs.
+ arch/arm/mach-imx/eukrea_mbimx27-baseboard.c | 4 ++--
+ arch/arm/mach-imx/mach-cpuimx27.c            | 4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c b/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
+index b4c7002..b2f08bf 100644
+--- a/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
++++ b/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
+@@ -46,7 +46,7 @@ static const int eukrea_mbimx27_pins[] __initconst = {
+ 	PE10_PF_UART3_CTS,
+ 	PE11_PF_UART3_RTS,
+ 	/* UART4 */
+-#if !defined(MACH_EUKREA_CPUIMX27_USEUART4)
++#if !defined(CONFIG_MACH_EUKREA_CPUIMX27_USEUART4)
+ 	PB26_AF_UART4_RTS,
+ 	PB28_AF_UART4_TXD,
+ 	PB29_AF_UART4_CTS,
+@@ -306,7 +306,7 @@ void __init eukrea_mbimx27_baseboard_init(void)
+ 
+ 	imx27_add_imx_uart1(&uart_pdata);
+ 	imx27_add_imx_uart2(&uart_pdata);
+-#if !defined(MACH_EUKREA_CPUIMX27_USEUART4)
++#if !defined(CONFIG_MACH_EUKREA_CPUIMX27_USEUART4)
+ 	imx27_add_imx_uart3(&uart_pdata);
+ #endif
+ 
+diff --git a/arch/arm/mach-imx/mach-cpuimx27.c b/arch/arm/mach-imx/mach-cpuimx27.c
+index 1465593..ea50870 100644
+--- a/arch/arm/mach-imx/mach-cpuimx27.c
++++ b/arch/arm/mach-imx/mach-cpuimx27.c
+@@ -48,7 +48,7 @@ static const int eukrea_cpuimx27_pins[] __initconst = {
+ 	PE14_PF_UART1_CTS,
+ 	PE15_PF_UART1_RTS,
+ 	/* UART4 */
+-#if defined(MACH_EUKREA_CPUIMX27_USEUART4)
++#if defined(CONFIG_MACH_EUKREA_CPUIMX27_USEUART4)
+ 	PB26_AF_UART4_RTS,
+ 	PB28_AF_UART4_TXD,
+ 	PB29_AF_UART4_CTS,
+@@ -272,7 +272,7 @@ static void __init eukrea_cpuimx27_init(void)
+ 	/* SDHC2 can be used for Wifi */
+ 	imx27_add_mxc_mmc(1, NULL);
+ #endif
+-#if defined(MACH_EUKREA_CPUIMX27_USEUART4)
++#if defined(CONFIG_MACH_EUKREA_CPUIMX27_USEUART4)
+ 	/* in which case UART4 is also used for Bluetooth */
+ 	imx27_add_imx_uart3(&uart_pdata);
+ #endif
+-- 
+1.7.11.7
