@@ -1,196 +1,28 @@
-From: ian@slimlogic.co.uk (Ian Lartey)
-Date: Fri, 22 Mar 2013 13:36:07 +0000
-Subject: [PATCH v9 05/11] gpio: palmas: add in GPIO support for palmas charger
-In-Reply-To: <1363959373-10671-1-git-send-email-ian@slimlogic.co.uk>
-References: <1363959373-10671-1-git-send-email-ian@slimlogic.co.uk>
-Message-ID: <1363959373-10671-6-git-send-email-ian@slimlogic.co.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 22 Mar 2013 14:36:28 +0100
+Subject: [PATCH 0/9] More ux500 multiplatform stuff
+In-Reply-To: <201303221334.07330.arnd@arndb.de>
+References: <1363866553-15054-1-git-send-email-linus.walleij@stericsson.com>
+ <1363902674-6456-1-git-send-email-arnd@arndb.de>
+ <CACRpkdbaRyHxeJM=JT+9CtVf-_u90wCzjePDvsNq-EQd_NxLdg@mail.gmail.com>
+ <201303221334.07330.arnd@arndb.de>
+Message-ID: <CACRpkdYUZQt+PTOf0+ReQFWgSjitXM-CXMUfVAiQsL3QxDTi5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Palmas charger has 16 GPIOs
-add palmas_gpio_[read|write|update] api to take account
-second bank of GPIOs
+On Fri, Mar 22, 2013 at 2:34 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> [Me]
+>> And there are some non-bisectable patches due to the
+>> driver in staging (which was put there because Synaptics would
+>> submit another driver "real soon now" and that was something like
+>> two years ago), so I might have to squash some of them together to one.
+>
+> What breaks bisection here? The "[PATCH 5/9] staging: ste_rmi4: kill
+> platform_data hack" patch should be independent of everything else,
+> it just touches more files than we'd like.
 
-Signed-off-by: Ian Lartey <ian@slimlogic.co.uk>
-Signed-off-by: Graeme Gregory <gg@slimlogic.co.uk>
----
- drivers/gpio/gpio-palmas.c |   77 ++++++++++++++++++++++++++++++++++++--------
- include/linux/mfd/palmas.h |   12 ++++++-
- 2 files changed, 74 insertions(+), 15 deletions(-)
+It includes <mach/irqs.h> that is removed by earlier patches, so
+it stops compiling before this patch.
 
-diff --git a/drivers/gpio/gpio-palmas.c b/drivers/gpio/gpio-palmas.c
-index e3a4e56..636648c 100644
---- a/drivers/gpio/gpio-palmas.c
-+++ b/drivers/gpio/gpio-palmas.c
-@@ -1,7 +1,7 @@
- /*
-- * TI Palma series PMIC's GPIO driver.
-+ * TI Palmas series PMIC's GPIO driver.
-  *
-- * Copyright (c) 2012, NVIDIA CORPORATION.  All rights reserved.
-+ * Copyright (c) 2012-2012, NVIDIA CORPORATION.  All rights reserved.
-  *
-  * Author: Laxman Dewangan <ldewangan@nvidia.com>
-  *
-@@ -31,6 +31,36 @@ struct palmas_gpio {
- 	struct palmas *palmas;
- };
- 
-+static int palmas_gpio_read(struct palmas *palmas, unsigned int reg,
-+		int gpio, unsigned int *dest)
-+{
-+	/* registers for second bank are identical and offset by 0x9 */
-+	if (gpio > 7)
-+		reg += PALMAS_GPIO_DATA_IN2;
-+
-+	return palmas_read(palmas, PALMAS_GPIO_BASE, reg, dest);
-+}
-+
-+static int palmas_gpio_write(struct palmas *palmas, unsigned int reg,
-+		int gpio, unsigned int data)
-+{
-+	/* registers for second bank are identical and offset by 0x9 */
-+	if (gpio > 7)
-+		reg += PALMAS_GPIO_DATA_IN2;
-+
-+	return palmas_write(palmas, PALMAS_GPIO_BASE, reg, data);
-+}
-+
-+static int palmas_gpio_update_bits(struct palmas *palmas, unsigned int reg,
-+		int gpio, unsigned int mask, unsigned int data)
-+{
-+	/* registers for second bank are identical and offset by 0x9 */
-+	if (gpio > 7)
-+		reg += PALMAS_GPIO_DATA_IN2;
-+
-+	return palmas_update_bits(palmas, PALMAS_GPIO_BASE, reg, mask, data);
-+}
-+
- static inline struct palmas_gpio *to_palmas_gpio(struct gpio_chip *chip)
- {
- 	return container_of(chip, struct palmas_gpio, gpio_chip);
-@@ -43,12 +73,12 @@ static int palmas_gpio_get(struct gpio_chip *gc, unsigned offset)
- 	unsigned int val;
- 	int ret;
- 
--	ret = palmas_read(palmas, PALMAS_GPIO_BASE, PALMAS_GPIO_DATA_IN, &val);
-+	ret = palmas_gpio_read(palmas, PALMAS_GPIO_DATA_IN, offset, &val);
- 	if (ret < 0) {
- 		dev_err(gc->dev, "GPIO_DATA_IN read failed, err = %d\n", ret);
- 		return ret;
- 	}
--	return !!(val & BIT(offset));
-+	return !!(val & BIT(offset % 8));
- }
- 
- static void palmas_gpio_set(struct gpio_chip *gc, unsigned offset,
-@@ -59,11 +89,11 @@ static void palmas_gpio_set(struct gpio_chip *gc, unsigned offset,
- 	int ret;
- 
- 	if (value)
--		ret = palmas_write(palmas, PALMAS_GPIO_BASE,
--				PALMAS_GPIO_SET_DATA_OUT, BIT(offset));
-+		ret = palmas_gpio_write(palmas, PALMAS_GPIO_SET_DATA_OUT,
-+				offset, BIT(offset % 8));
- 	else
--		ret = palmas_write(palmas, PALMAS_GPIO_BASE,
--				PALMAS_GPIO_CLEAR_DATA_OUT, BIT(offset));
-+		ret = palmas_gpio_write(palmas, PALMAS_GPIO_CLEAR_DATA_OUT,
-+				offset, BIT(offset % 8));
- 	if (ret < 0)
- 		dev_err(gc->dev, "%s write failed, err = %d\n",
- 			(value) ? "GPIO_SET_DATA_OUT" : "GPIO_CLEAR_DATA_OUT",
-@@ -80,8 +110,8 @@ static int palmas_gpio_output(struct gpio_chip *gc, unsigned offset,
- 	/* Set the initial value */
- 	palmas_gpio_set(gc, offset, value);
- 
--	ret = palmas_update_bits(palmas, PALMAS_GPIO_BASE,
--		PALMAS_GPIO_DATA_DIR, BIT(offset), BIT(offset));
-+	ret = palmas_gpio_update_bits(palmas, PALMAS_GPIO_DATA_DIR,
-+			offset, 1 << (offset % 8), 1 << (offset % 8));
- 	if (ret < 0)
- 		dev_err(gc->dev, "GPIO_DATA_DIR write failed, err = %d\n", ret);
- 	return ret;
-@@ -93,8 +123,8 @@ static int palmas_gpio_input(struct gpio_chip *gc, unsigned offset)
- 	struct palmas *palmas = pg->palmas;
- 	int ret;
- 
--	ret = palmas_update_bits(palmas, PALMAS_GPIO_BASE,
--		PALMAS_GPIO_DATA_DIR, BIT(offset), 0);
-+	ret =  palmas_gpio_update_bits(palmas, PALMAS_GPIO_DATA_DIR,
-+				offset, 1 << (offset % 8), 0);
- 	if (ret < 0)
- 		dev_err(gc->dev, "GPIO_DATA_DIR write failed, err = %d\n", ret);
- 	return ret;
-@@ -108,7 +138,21 @@ static int palmas_gpio_to_irq(struct gpio_chip *gc, unsigned offset)
- 	return palmas_irq_get_virq(palmas, PALMAS_GPIO_0_IRQ + offset);
- }
- 
--static int palmas_gpio_probe(struct platform_device *pdev)
-+static int palmas_gpio_set_debounce(struct gpio_chip *gc, unsigned offset,
-+				    unsigned debounce)
-+{
-+	struct palmas_gpio *palmas_gpio = to_palmas_gpio(gc);
-+	struct palmas *palmas = palmas_gpio->palmas;
-+	unsigned int data = 0;
-+
-+	if (debounce)
-+		data = 0xff;
-+
-+	return palmas_gpio_update_bits(palmas, PALMAS_GPIO_DEBOUNCE_EN,
-+			offset, 1 << (offset % 8), data);
-+}
-+
-+static int  palmas_gpio_probe(struct platform_device *pdev)
- {
- 	struct palmas *palmas = dev_get_drvdata(pdev->dev.parent);
- 	struct palmas_platform_data *palmas_pdata;
-@@ -125,10 +169,15 @@ static int palmas_gpio_probe(struct platform_device *pdev)
- 	palmas_gpio->palmas = palmas;
- 	palmas_gpio->gpio_chip.owner = THIS_MODULE;
- 	palmas_gpio->gpio_chip.label = dev_name(&pdev->dev);
--	palmas_gpio->gpio_chip.ngpio = 8;
-+	/* palmas charger has 16 gpios */
-+	if (is_palmas_charger(palmas->product_id))
-+		palmas_gpio->gpio_chip.ngpio = 16;
-+	else
-+		palmas_gpio->gpio_chip.ngpio = 8;
- 	palmas_gpio->gpio_chip.can_sleep = 1;
- 	palmas_gpio->gpio_chip.direction_input = palmas_gpio_input;
- 	palmas_gpio->gpio_chip.direction_output = palmas_gpio_output;
-+	palmas_gpio->gpio_chip.set_debounce = palmas_gpio_set_debounce,
- 	palmas_gpio->gpio_chip.to_irq = palmas_gpio_to_irq;
- 	palmas_gpio->gpio_chip.set	= palmas_gpio_set;
- 	palmas_gpio->gpio_chip.get	= palmas_gpio_get;
-diff --git a/include/linux/mfd/palmas.h b/include/linux/mfd/palmas.h
-index 4cffe31..d8c303b 100644
---- a/include/linux/mfd/palmas.h
-+++ b/include/linux/mfd/palmas.h
-@@ -244,7 +244,7 @@ struct palmas_platform_data {
- 	 * then the two value to load into the registers if true
- 	 */
- 	int mux_from_pdata;
--	u8 pad1, pad2;
-+	u8 pad1, pad2, pad3, pad4;
- 
- 	struct palmas_pmic_platform_data *pmic_pdata;
- 	struct palmas_gpadc_platform_data *gpadc_pdata;
-@@ -2513,6 +2513,16 @@ enum usb_irq_events {
- #define PALMAS_PU_PD_GPIO_CTRL1					0x6
- #define PALMAS_PU_PD_GPIO_CTRL2					0x7
- #define PALMAS_OD_OUTPUT_GPIO_CTRL				0x8
-+#define PALMAS_GPIO_DATA_IN2					0x9
-+#define PALMAS_GPIO_DATA_DIR2					0xA
-+#define PALMAS_GPIO_DATA_OUT2					0xB
-+#define PALMAS_GPIO_DEBOUNCE_EN2				0xC
-+#define PALMAS_GPIO_CLEAR_DATA_OUT2				0xD
-+#define PALMAS_GPIO_SET_DATA_OUT2				0xE
-+#define PALMAS_PU_PD_GPIO_CTRL3					0xF
-+#define PALMAS_PU_PD_GPIO_CTRL4					0x10
-+#define PALMAS_OD_OUTPUT_GPIO_CTRL2				0x11
-+#define PALMAS_GPO_CTRL						0x12
- 
- /* Bit definitions for GPIO_DATA_IN */
- #define PALMAS_GPIO_DATA_IN_GPIO_7_IN				0x80
--- 
-1.7.0.4
+Yours,
+Linus Walleij
