@@ -1,173 +1,153 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 22 Mar 2013 10:23:48 +0900
-Subject: [PATCH 2/6] ARM: shmobile: sh73a0: move SDHI and MMCIF DT nodes to
- sh73a0.dtsi
+Date: Fri, 22 Mar 2013 10:23:50 +0900
+Subject: [PATCH 4/6] ARM: shmobile: kzm9g: add fixed voltage regulators for
+ SDHI0 and SDHI2
 In-Reply-To: <1363915432-21720-1-git-send-email-horms+renesas@verge.net.au>
 References: <1363915432-21720-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1363915432-21720-3-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1363915432-21720-5-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 
-To avoid having to repeat common DT node properties in all .dts files
-move them to SoC's .dtsi file, setting their status to "disabled."
-Individual boards will pick up devices, that they want to use and
-change their DT node status to enabled.
+Both SDHI0 and SDHI2 power supplies on kzm9g can be switched on and off. In
+the current version this is not used and the regulators are hard-wired to
+"on." This patch switches SDHI0 and SDHI2 to proper fixed-voltage
+regulators, using GPIOs to enable and disable them. Both ports shall
+now be specifying the MMC_CAP_POWER_OFF_CARD MMC capability. Only SDHI0
+has been tested with an SDIO card, since SDHI2 is a microSD slot.
 
 Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/sh73a0-kzm9g-reference.dts |   41 +++++++++---------------
- arch/arm/boot/dts/sh73a0-reference.dtsi      |   24 --------------
- arch/arm/boot/dts/sh73a0.dtsi                |   44 ++++++++++++++++++++++++++
- 3 files changed, 59 insertions(+), 50 deletions(-)
- delete mode 100644 arch/arm/boot/dts/sh73a0-reference.dtsi
+ arch/arm/mach-shmobile/board-kzm9g.c |   76 +++++++++++++++++++++++++++-------
+ 1 file changed, 62 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-index cadcf30..f33b5cc 100644
---- a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-+++ b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-@@ -12,7 +12,7 @@
-  */
- 
- /dts-v1/;
--/include/ "sh73a0-reference.dtsi"
-+/include/ "sh73a0.dtsi"
- 
- / {
- 	model = "KZM-A9-GT";
-@@ -44,34 +44,23 @@
- 		regulator-always-on;
- 		regulator-boot-on;
- 	};
--
--	sdhi0: sdhi at 0xee100000 {
--		compatible = "renesas,shmobile-sdhi";
--		reg = <0xee100000 0x100>;
--		interrupt-parent = <&gic>;
--		interrupts = <0 83 4
--				0 84 4
--				0 85 4>;
--		vmmc-supply = <&reg_3p3v>;
--		bus-width = <4>;
--		toshiba,mmc-has-idle-wait;
--	};
--
--	sdhi2: sdhi at 0xee140000 {
--		compatible = "renesas,shmobile-sdhi";
--		reg = <0xee140000 0x100>;
--		interrupt-parent = <&gic>;
--		interrupts = <0 104 4
--				0 105 4>;
--		vmmc-supply = <&reg_3p3v>;
--		bus-width = <4>;
--		broken-cd;
--		toshiba,mmc-wrprotect-disable;
--		toshiba,mmc-has-idle-wait;
--	};
+diff --git a/arch/arm/mach-shmobile/board-kzm9g.c b/arch/arm/mach-shmobile/board-kzm9g.c
+index e924b81..77a66ac 100644
+--- a/arch/arm/mach-shmobile/board-kzm9g.c
++++ b/arch/arm/mach-shmobile/board-kzm9g.c
+@@ -375,13 +375,64 @@ static struct platform_device mmc_device = {
+ 	.resource	= sh_mmcif_resources,
  };
  
- &mmcif {
- 	bus-width = <8>;
- 	vmmc-supply = <&reg_1p8v>;
-+	status = "okay";
+-/* Fixed 3.3V regulators to be used by SDHI0 and SDHI2 */
+-static struct regulator_consumer_supply fixed3v3_power_consumers[] =
++/* Fixed 3.3V regulators to be used by SDHI0 */
++static struct regulator_consumer_supply vcc_sdhi0_consumers[] =
+ {
+ 	REGULATOR_SUPPLY("vmmc", "sh_mobile_sdhi.0"),
+-	REGULATOR_SUPPLY("vqmmc", "sh_mobile_sdhi.0"),
 +};
 +
-+&sdhi0 {
-+	vmmc-supply = <&reg_3p3v>;
-+	bus-width = <4>;
-+	status = "okay";
++static struct regulator_init_data vcc_sdhi0_init_data = {
++	.constraints = {
++		.valid_ops_mask = REGULATOR_CHANGE_STATUS,
++	},
++	.num_consumer_supplies  = ARRAY_SIZE(vcc_sdhi0_consumers),
++	.consumer_supplies      = vcc_sdhi0_consumers,
 +};
 +
-+&sdhi2 {
-+	vmmc-supply = <&reg_3p3v>;
-+	bus-width = <4>;
-+	broken-cd;
-+	status = "okay";
++static struct fixed_voltage_config vcc_sdhi0_info = {
++	.supply_name = "SDHI0 Vcc",
++	.microvolts = 3300000,
++	.gpio = 15,
++	.enable_high = 1,
++	.init_data = &vcc_sdhi0_init_data,
++};
++
++static struct platform_device vcc_sdhi0 = {
++	.name = "reg-fixed-voltage",
++	.id   = 0,
++	.dev  = {
++		.platform_data = &vcc_sdhi0_info,
++	},
++};
++
++/* Fixed 3.3V regulators to be used by SDHI2 */
++static struct regulator_consumer_supply vcc_sdhi2_consumers[] =
++{
+ 	REGULATOR_SUPPLY("vmmc", "sh_mobile_sdhi.2"),
+-	REGULATOR_SUPPLY("vqmmc", "sh_mobile_sdhi.2"),
++};
++
++static struct regulator_init_data vcc_sdhi2_init_data = {
++	.constraints = {
++		.valid_ops_mask = REGULATOR_CHANGE_STATUS,
++	},
++	.num_consumer_supplies  = ARRAY_SIZE(vcc_sdhi2_consumers),
++	.consumer_supplies      = vcc_sdhi2_consumers,
++};
++
++static struct fixed_voltage_config vcc_sdhi2_info = {
++	.supply_name = "SDHI2 Vcc",
++	.microvolts = 3300000,
++	.gpio = 14,
++	.enable_high = 1,
++	.init_data = &vcc_sdhi2_init_data,
++};
++
++static struct platform_device vcc_sdhi2 = {
++	.name = "reg-fixed-voltage",
++	.id   = 1,
++	.dev  = {
++		.platform_data = &vcc_sdhi2_info,
++	},
  };
-diff --git a/arch/arm/boot/dts/sh73a0-reference.dtsi b/arch/arm/boot/dts/sh73a0-reference.dtsi
-deleted file mode 100644
-index d4bb012..0000000
---- a/arch/arm/boot/dts/sh73a0-reference.dtsi
-+++ /dev/null
-@@ -1,24 +0,0 @@
--/*
-- * Device Tree Source for the SH73A0 SoC
-- *
-- * Copyright (C) 2012 Renesas Solutions Corp.
-- *
-- * This file is licensed under the terms of the GNU General Public License
-- * version 2.  This program is licensed "as is" without any warranty of any
-- * kind, whether express or implied.
-- */
--
--/include/ "sh73a0.dtsi"
--
--/ {
--	compatible = "renesas,sh73a0";
--
--	mmcif: mmcif at 0x10010000 {
--		compatible = "renesas,sh-mmcif";
--		reg = <0xe6bd0000 0x100>;
--		interrupt-parent = <&gic>;
--		interrupts = <0 140 0x4
--			      0 141 0x4>;
--		reg-io-width = <4>;
--	};
--};
-diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
-index 8a59465..c89be38 100644
---- a/arch/arm/boot/dts/sh73a0.dtsi
-+++ b/arch/arm/boot/dts/sh73a0.dtsi
-@@ -97,4 +97,48 @@
- 			      0 189 0x4
- 			      0 190 0x4>;
- 	};
-+
-+	mmcif: mmcif at 0x10010000 {
-+		compatible = "renesas,sh-mmcif";
-+		reg = <0xe6bd0000 0x100>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 140 0x4
-+			      0 141 0x4>;
-+		reg-io-width = <4>;
-+		status = "disabled";
-+	};
-+
-+	sdhi0: sdhi at 0xee100000 {
-+		compatible = "renesas,shmobile-sdhi";
-+		reg = <0xee100000 0x100>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 83 4
-+				0 84 4
-+				0 85 4>;
-+		toshiba,mmc-has-idle-wait;
-+		status = "disabled";
-+	};
-+
-+	/* SDHI1 and SDHI2 have no CD pins, no need for CD IRQ */
-+	sdhi1: sdhi at 0xee120000 {
-+		compatible = "renesas,shmobile-sdhi";
-+		reg = <0xee120000 0x100>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 88 4
-+				0 89 4>;
-+		toshiba,mmc-wrprotect-disable;
-+		toshiba,mmc-has-idle-wait;
-+		status = "disabled";
-+	};
-+
-+	sdhi2: sdhi at 0xee140000 {
-+		compatible = "renesas,shmobile-sdhi";
-+		reg = <0xee140000 0x100>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 104 4
-+				0 105 4>;
-+		toshiba,mmc-wrprotect-disable;
-+		toshiba,mmc-has-idle-wait;
-+		status = "disabled";
-+	};
+ 
+ /* SDHI */
+@@ -389,7 +440,8 @@ static struct sh_mobile_sdhi_info sdhi0_info = {
+ 	.dma_slave_tx	= SHDMA_SLAVE_SDHI0_TX,
+ 	.dma_slave_rx	= SHDMA_SLAVE_SDHI0_RX,
+ 	.tmio_flags	= TMIO_MMC_HAS_IDLE_WAIT,
+-	.tmio_caps	= MMC_CAP_SD_HIGHSPEED,
++	.tmio_caps	= MMC_CAP_SD_HIGHSPEED | MMC_CAP_SDIO_IRQ |
++			  MMC_CAP_POWER_OFF_CARD,
  };
+ 
+ static struct resource sdhi0_resources[] = {
+@@ -432,7 +484,7 @@ static struct sh_mobile_sdhi_info sdhi2_info = {
+ 	.tmio_flags	= TMIO_MMC_HAS_IDLE_WAIT |
+ 			  TMIO_MMC_USE_GPIO_CD |
+ 			  TMIO_MMC_WRPROTECT_DISABLE,
+-	.tmio_caps	= MMC_CAP_SD_HIGHSPEED,
++	.tmio_caps	= MMC_CAP_SD_HIGHSPEED | MMC_CAP_POWER_OFF_CARD,
+ 	.cd_gpio	= 13,
+ };
+ 
+@@ -592,6 +644,8 @@ static struct platform_device *kzm_devices[] __initdata = {
+ 	&usbhs_device,
+ 	&lcdc_device,
+ 	&mmc_device,
++	&vcc_sdhi0,
++	&vcc_sdhi2,
+ 	&sdhi0_device,
+ 	&sdhi2_device,
+ 	&gpio_keys_device,
+@@ -712,11 +766,9 @@ device_initcall(as3711_enable_lcdc_backlight);
+ 
+ static void __init kzm_init(void)
+ {
+-	regulator_register_always_on(0, "fixed-1.8V", fixed1v8_power_consumers,
++	regulator_register_always_on(2, "fixed-1.8V", fixed1v8_power_consumers,
+ 				     ARRAY_SIZE(fixed1v8_power_consumers), 1800000);
+-	regulator_register_always_on(1, "fixed-3.3V", fixed3v3_power_consumers,
+-				     ARRAY_SIZE(fixed3v3_power_consumers), 3300000);
+-	regulator_register_fixed(2, dummy_supplies, ARRAY_SIZE(dummy_supplies));
++	regulator_register_fixed(3, dummy_supplies, ARRAY_SIZE(dummy_supplies));
+ 
+ 	pinctrl_register_mappings(kzm_pinctrl_map, ARRAY_SIZE(kzm_pinctrl_map));
+ 
+@@ -734,10 +786,6 @@ static void __init kzm_init(void)
+ 
+ 	/* enable SD */
+ 	gpio_request(GPIO_FN_SDHI0_VCCQ_MC0_ON,	NULL);
+-	gpio_request_one(15, GPIOF_OUT_INIT_HIGH, NULL); /* power */
+-
+-	/* enable Micro SD */
+-	gpio_request_one(14, GPIOF_OUT_INIT_HIGH, NULL); /* power */
+ 
+ #ifdef CONFIG_CACHE_L2X0
+ 	/* Early BRESP enable, Shared attribute override enable, 64K*8way */
 -- 
 1.7.10.4
