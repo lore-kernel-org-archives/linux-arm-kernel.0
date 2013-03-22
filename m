@@ -1,53 +1,65 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 22 Mar 2013 07:27:39 -0700
-Subject: [PATCH v6 00/16] clk: exynos4/5: migrate to common
- clock framework
-In-Reply-To: <14d801ce268b$80a8d160$81fa7420$%kim@samsung.com>
-References: <1361175686-19400-1-git-send-email-thomas.abraham@linaro.org>
- <20130319184938.8663.18115@quantum> <201303192212.16877.heiko@sntech.de>
- <20130319215038.8663.83548@quantum>
- <116a01ce24fd$e32658b0$a9730a10$%kim@samsung.com>
- <20130320025656.11073.90469@quantum>
- <11af01ce2526$63b0a8f0$2b11fad0$%kim@samsung.com>
- <20130320144000.11073.37741@quantum>
- <14d801ce268b$80a8d160$81fa7420$%kim@samsung.com>
-Message-ID: <20130322142739.834.2721@quantum>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 22 Mar 2013 10:29:24 -0400
+Subject: [PATCH 0/4 v3] mv643xx_eth: use mvmdio MDIO bus driver
+In-Reply-To: <514C69B7.8090106@openwrt.org>
+References: <1363284515-9865-1-git-send-email-florian@openwrt.org>
+ <1363959568-16976-1-git-send-email-florian@openwrt.org>
+ <20130322141423.GJ13280@titan.lakedaemon.net>
+ <514C69B7.8090106@openwrt.org>
+Message-ID: <20130322142924.GK13280@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Kukjin Kim (2013-03-21 16:26:24)
-> Mike Turquette wrote:
+On Fri, Mar 22, 2013 at 03:24:55PM +0100, Florian Fainelli wrote:
+> Le 03/22/13 15:14, Jason Cooper a ?crit :
+> >On Fri, Mar 22, 2013 at 02:39:24PM +0100, Florian Fainelli wrote:
+> >>Hi all,
+> >>
+> >>This patch converts the mv643xx_eth driver to use the mvmdio MDIO bus driver
+> >>instead of rolling its own implementation. As a result, all users of this
+> >>mv643xx_eth driver are converted to register an "orion-mdio" platform_device.
+> >>The mvmdio driver is also updated to support an interrupt line which reports
+> >>SMI error/completion, and to allow traditionnal platform device registration
+> >>instead of just device tree.
+> >>
+> >>David, I think it makes sense for you to merge all of this, since we do
+> >>not want the architecture files to be desynchronized from the mv643xx_eth to
+> >>avoid runtime breakage. The potential for merge conflicts should be very small.
+> >>
+> >>Florian Fainelli (4):
+> >>   net: mvmdio: allow platform device style registration
+> >>   net: mvmdio: rename base register cookie from smireg to regs
+> >>   net: mvmdio: enhance driver to support SMI error/done interrupts
+> >>   mv643xx_eth: convert to use the Marvell Orion MDIO driver
+> >>
+> >>  .../devicetree/bindings/net/marvell-orion-mdio.txt |    3 +
+> >>  arch/arm/plat-orion/common.c                       |   54 +++---
+> >>  arch/powerpc/platforms/chrp/pegasos_eth.c          |   20 ++
+> >>  arch/powerpc/sysdev/mv64x60_dev.c                  |   16 +-
+> >>  drivers/net/ethernet/marvell/Kconfig               |    5 +-
+> >>  drivers/net/ethernet/marvell/Makefile              |    2 +-
+> >>  drivers/net/ethernet/marvell/mv643xx_eth.c         |  195 ++------------------
+> >>  drivers/net/ethernet/marvell/mvmdio.c              |  130 ++++++++++---
+> >>  include/linux/mv643xx_eth.h                        |    1 -
+> >>  9 files changed, 187 insertions(+), 239 deletions(-)
+> >
+> >Whole series applied on top of v3.9-rc3 and tested on dreamplug
+> >(kirkwood DT boot with legacy mv643xx_eth init)
 > 
-> [...]
-> > >
-> > > > Furthermore if I *had* agreed on the previous version it would still
-> > > > have been appropriate to put my Acked-by on those patches, which is
-> > > > clearly missing today.
-> > > >
-> > > BTW, how about following?
-> > >
-> > > http://www.spinics.net/lists/arm-kernel/msg210266.html
-> > >
-> > > In my understanding, it should be your agreement, it cannot be 'ack' though.
-> > >
-> > 
-> > I had forgotten about that email from November.  Still my ack should
-> > have been added.  If necessary I'll be painfully explicit in the future
-> 
-> Agreed.
-> 
-> > about adding my acked-by.  It's a simple and good rule to follow.
-> > 
-> Yeah, I know. So if you want to add your ack on drivers/clk stuff for this series in samsung tree, please let me know.
-> 
+> Ok, thanks! Does that mean that you want these changes to go via
+> your tree? David initially applied my v2 of this patchset, and since
+> it thouches mostly ethernet driver stuff, I would rather make it go
+> via his tree if both of you agree.
 
-The patches are in pretty good shape.  Please add my ack if you are able
-to rebase comfortably.  But if rebasing causes you and your downstream
-users a lot of pain then don't do it.
+Yeah, I thought I should have reworded that after I hit send :)  I
+simply meant it applied cleanly against v3.9-rc3, booted, and worked.  I
+Acked it so David could take the whole series through his tree.  Sorry
+for the confusion.
 
-Regards,
-Mike
+Now that I can build mv643xx_eth DT on top of this, I'll structure it so
+those changes go on top of yours (in David's tree) and try to avoid the
+external dependency for the DT bits going though arm-soc.
 
-> Thanks, Mike.
-> 
-> - Kukjin
+thx,
+
+Jason.
