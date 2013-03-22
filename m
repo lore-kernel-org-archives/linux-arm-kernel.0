@@ -1,73 +1,72 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 22 Mar 2013 15:27:45 +0000
-Subject: [PATCH 5/5] ARM: ux500: Do not supply DMA platform data when booting
- u8540 platform
-In-Reply-To: <1363966065-2478-1-git-send-email-lee.jones@linaro.org>
-References: <1363966065-2478-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1363966065-2478-5-git-send-email-lee.jones@linaro.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 22 Mar 2013 09:33:53 -0600
+Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
+In-Reply-To: <CACRpkdYHj-rEF3Rk_CWnmmMw_Amr7m8SgQ=-2zsDYuLeuu3azw@mail.gmail.com>
+References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
+ <1329321854-24490-4-git-send-email-b-cousson@ti.com>
+ <4F44FA56.7020000@gmail.com> <4F44FC37.2000701@ti.com>
+ <4F452484.5080503@gmail.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF17BD8BC6C1@HQMAIL01.nvidia.com>
+ <4F47AD08.4030504@ti.com>
+ <CAAwP0s0cB368R2mtbJpTZJreR-5GSRLfxC+8DJLo5nw3_OwBuA@mail.gmail.com>
+ <512D39DA.7020306@ti.com> <512D3AB1.1080202@wwwdotorg.org>
+ <512D3EC2.6050408@ti.com> <20130302200524.D230F3E1571@localhost>
+ <51391F41.5000303@ti.com>
+ <CAAwP0s1CFRO-rf==p5sYs1n0gigMif7wuT8Yv0N_iLUDMrtcOg@mail.gmail.com>
+ <CACRpkdYHj-rEF3Rk_CWnmmMw_Amr7m8SgQ=-2zsDYuLeuu3azw@mail.gmail.com>
+Message-ID: <514C79E1.4090106@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The u8540 platform DMA settings are not currently supported. In this
-patch we ensure they are not passed to the serial driver during boot.
-This allows us to reach a terminal when booting with Device Tree
-enabled.
+On 03/22/2013 02:10 AM, Linus Walleij wrote:
+> On Fri, Mar 15, 2013 at 12:21 PM, Javier Martinez Canillas
+> <martinez.javier@gmail.com> wrote:
+> 
+>> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+>> index 159f5c5..f5feb43 100644
+>> --- a/drivers/gpio/gpio-omap.c
+>> +++ b/drivers/gpio/gpio-omap.c
+>> @@ -807,6 +807,13 @@ static void gpio_unmask_irq(struct irq_data *d)
+>>         spin_unlock_irqrestore(&bank->lock, flags);
+>>  }
+>>
+>> +static int gpio_irq_request(struct irq_data *d)
+>> +{
+>> +       struct gpio_bank *bank = irq_data_get_irq_chip_data(d);
+>> +
+>> +       return gpio_request(irq_to_gpio(bank, d->irq), "gpio-irq");
+>> +}
+>> +
+>>  static struct irq_chip gpio_irq_chip = {
+>>         .name           = "GPIO",
+>>         .irq_shutdown   = gpio_irq_shutdown,
+>> @@ -815,6 +822,7 @@ static struct irq_chip gpio_irq_chip = {
+>>         .irq_unmask     = gpio_unmask_irq,
+>>         .irq_set_type   = gpio_irq_type,
+>>         .irq_set_wake   = gpio_wake_enable,
+>> +       .irq_request    = gpio_irq_request,
+>>  };
+> 
+> This is just turning everything on it's head. The normal order of things
+> is this sequence for GPIO 14 something like:
+> 
+> gpio_request(14);
+> int irq = gpio_to_irq(14);
+> request_any_context_irq(irq);
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/mach-ux500/cpu-db8500.c |   26 +++++++++++++++++++++++---
- 1 file changed, 23 insertions(+), 3 deletions(-)
+That doesn't make any sense at all. Drivers don't want to care whether
+the IRQ number they receive is a GPIO-that-can-act-like-an-IRQ or a pure
+dedicated IRQ input.
 
-diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-index 19235cf..da425f7 100644
---- a/arch/arm/mach-ux500/cpu-db8500.c
-+++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@ -257,9 +257,6 @@ static struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
- 	/* Requires call-back bindings. */
- 	OF_DEV_AUXDATA("arm,cortex-a9-pmu", 0, "arm-pmu", &db8500_pmu_platdata),
- 	/* Requires DMA bindings. */
--	OF_DEV_AUXDATA("arm,pl011", 0x80120000, "uart0", &uart0_plat),
--	OF_DEV_AUXDATA("arm,pl011", 0x80121000, "uart1", &uart1_plat),
--	OF_DEV_AUXDATA("arm,pl011", 0x80007000, "uart2", &uart2_plat),
- 	OF_DEV_AUXDATA("arm,pl022", 0x80002000, "ssp0",  &ssp0_plat),
- 	OF_DEV_AUXDATA("arm,pl18x", 0x80126000, "sdi0",  &mop500_sdi0_data),
- 	OF_DEV_AUXDATA("arm,pl18x", 0x80118000, "sdi1",  &mop500_sdi1_data),
-@@ -297,6 +294,22 @@ static struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
- 	{},
- };
- 
-+static struct of_dev_auxdata u8500_auxdata_uart_lookup[] __initdata = {
-+	/* Requires DMA bindings. */
-+	OF_DEV_AUXDATA("arm,pl011", 0x80120000, "uart0", &uart0_plat),
-+	OF_DEV_AUXDATA("arm,pl011", 0x80121000, "uart1", &uart1_plat),
-+	OF_DEV_AUXDATA("arm,pl011", 0x80007000, "uart2", &uart2_plat),
-+	{},
-+};
-+
-+static struct of_dev_auxdata u8540_auxdata_uart_lookup[] __initdata = {
-+	/* Requires DMA bindings. */
-+	OF_DEV_AUXDATA("arm,pl011", 0x80120000, "uart0", NULL),
-+	OF_DEV_AUXDATA("arm,pl011", 0x80121000, "uart1", NULL),
-+	OF_DEV_AUXDATA("arm,pl011", 0x80007000, "uart2", NULL),
-+	{},
-+};
-+
- static const struct of_device_id u8500_local_bus_nodes[] = {
- 	/* only create devices below soc node */
- 	{ .compatible = "stericsson,db8500", },
-@@ -324,6 +337,13 @@ static void __init u8500_init_machine(void)
- 
- 	/* automatically probe child nodes of db8500 device */
- 	of_platform_populate(NULL, u8500_local_bus_nodes, u8500_auxdata_lookup, parent);
-+
-+	if (of_machine_is_compatible("st-ericsson,u8540"))
-+		of_platform_populate(NULL, u8500_local_bus_nodes,
-+				     u8540_auxdata_uart_lookup, parent);
-+	else
-+		of_platform_populate(NULL, u8500_local_bus_nodes,
-+				     u8500_auxdata_uart_lookup, parent);
- }
- 
- static const char * stericsson_dt_platform_compat[] = {
--- 
-1.7.10.4
+To fully support the model you proprose, a driver would have to:
+
+if (gpio_is_valid(pdata->gpio)) {
+	gpio_request_one(pdata->gpio, GPIOF_IN, "foo irq");
+	irq = gpio_to_irq(pdata->gpio);
+} else
+	irq = pdata->irq;
+request_irq(...);
+
+which means complex code in each driver, plus requiring some indication
+in platform data and/or device tree re: whether the IRQ is hosted by a
+GPIO or not.
