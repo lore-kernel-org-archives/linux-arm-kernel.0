@@ -1,33 +1,34 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 22 Mar 2013 15:23:36 +0100
-Subject: [PATCH 4/4] ARM: at91: remove partial parameter in bootargs for
- at91sam9x5ek.dtsi
-In-Reply-To: <cover.1363960549.git.nicolas.ferre@atmel.com>
-References: <cover.1363960549.git.nicolas.ferre@atmel.com>
-Message-ID: <5a15207e14a48d92754a4bce9a5ef6117b493f6d.1363960549.git.nicolas.ferre@atmel.com>
+Date: Fri, 22 Mar 2013 15:23:32 +0100
+Subject: [PATCH 0/4] ARM: at91: little DT fixes
+Message-ID: <cover.1363960549.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the malformed "mem=" bootargs parameter in at91sam9x5ek.dtsi
+Hi,
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: stable <stable@vger.kernel.org> # 3.8+
----
- arch/arm/boot/dts/at91sam9x5ek.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Here are some little fixes found while adding device tree boards.
+I plan to request a pull on this material early next week.
 
-diff --git a/arch/arm/boot/dts/at91sam9x5ek.dtsi b/arch/arm/boot/dts/at91sam9x5ek.dtsi
-index f7841f6..a0b4ff9 100644
---- a/arch/arm/boot/dts/at91sam9x5ek.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5ek.dtsi
-@@ -13,7 +13,7 @@
- 	compatible = "atmel,at91sam9x5ek", "atmel,at91sam9x5", "atmel,at91sam9";
- 
- 	chosen {
--		bootargs = "128M console=ttyS0,115200 root=/dev/mtdblock1 rw rootfstype=ubifs ubi.mtd=1 root=ubi0:rootfs";
-+		bootargs = "console=ttyS0,115200 root=/dev/mtdblock1 rw rootfstype=ubifs ubi.mtd=1 root=ubi0:rootfs";
- 	};
- 
- 	ahb {
+
+Nicolas Ferre (4):
+  ARM: at91/dt: fix macb node declaration
+  ARM: at91/trivial: typos in compatible property
+  ARM: at91/trivial: fix model name for SAM9G15-EK
+  ARM: at91: remove partial parameter in bootargs for at91sam9x5ek.dtsi
+
+ arch/arm/boot/dts/at91sam9g15.dtsi  |  2 +-
+ arch/arm/boot/dts/at91sam9g15ek.dts |  2 +-
+ arch/arm/boot/dts/at91sam9g25.dtsi  |  2 +-
+ arch/arm/boot/dts/at91sam9g25ek.dts |  9 +++++++++
+ arch/arm/boot/dts/at91sam9g35.dtsi  |  2 +-
+ arch/arm/boot/dts/at91sam9g35ek.dts |  9 +++++++++
+ arch/arm/boot/dts/at91sam9x25.dtsi  |  2 +-
+ arch/arm/boot/dts/at91sam9x25ek.dts | 14 ++++++++++++++
+ arch/arm/boot/dts/at91sam9x35.dtsi  |  2 +-
+ arch/arm/boot/dts/at91sam9x35ek.dts |  9 +++++++++
+ arch/arm/boot/dts/at91sam9x5ek.dtsi |  7 +------
+ 11 files changed, 48 insertions(+), 12 deletions(-)
+
 -- 
 1.8.0
