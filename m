@@ -1,73 +1,37 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 22 Mar 2013 16:44:40 +0100
-Subject: [PATCH 2/3] arm: kirkwood: factor pinmux descriptors for
- OpenBlocks A6
-In-Reply-To: <20130306181648.GE3904@lunn.ch>
-References: <1362587021-32762-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1362587021-32762-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130306181648.GE3904@lunn.ch>
-Message-ID: <20130322164440.5e5735d7@skate>
+From: james.hogan@imgtec.com (James Hogan)
+Date: Fri, 22 Mar 2013 15:43:48 +0000
+Subject: [RFC PATCH v1 0/3] clk: implement remuxing during set_rate
+Message-ID: <1363967031-22781-1-git-send-email-james.hogan@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew Lunn,
+This patchset adds support for automatic selection of the best parent
+for a clock mux, i.e. the one which can provide the closest clock rate
+to that requested. It can be controlled by a new CLK_SET_RATE_REMUX flag
+so that it doesn't happen unless explicitly allowed.
 
-On Wed, 6 Mar 2013 19:16:48 +0100, Andrew Lunn wrote:
-> On Wed, Mar 06, 2013 at 05:23:40PM +0100, Thomas Petazzoni wrote:
-> > The OpenBlocks A6 .dts file was using a long list of pinmux
-> > descriptors to select each GPIO of the external GPIO connector and the
-> > internal DIP switch, for no apparent reason. This commit factors those
-> > GPIO pins into two descriptors: one for the external GPIO connector
-> > and one for the internal DIP switch.
-> 
-> Hi Thomas
-> 
-> There is no need to pinmux gpio pins at all. The pinctrl driver does
-> it when the gpio driver requests the pins.
-> 
-> This stems from an error i made. I also didn't know this and added
-> hogs for gpio pins as i converted some boards. Others have then just
-> cut/paste my error.....
+This works by way of adding a parameter to the round_rate clock op which
+allows the clock driver to optionally select a different parent index.
+This is used in clk_calc_new_rates to decide whether to initiate a
+set_parent operation. This would obviously require the argument to be
+added to all users of round_rate, something this patchset doesn't do as
+I'm not sure if it's really the preferred method (hence the RFC).
 
-I was looking at this today to send an updated version of those
-patches. However, it turns out that having the pinctrl-0 property to
-associate pinmux configurations to a device has an advantage: pinctrl
-knows about this association.
+An alternative would be to add a new callback, but that would complicate
+the code in clk.c somewhat. I suppose it would also be possible for the
+round_rate callback to call a function to set a struct clk member to
+mark that the parent should change (it's all within mutex protected
+code after all). Comments anyone?
 
-If you keep the pinctrl-0 property in gpio-leds and gpio-keys,
-then /sys/kernel/debug/pinctrl/f1010000.pinctrl/pinmux-pins looks like
-this:
+James Hogan (3):
+  clk: abstract parent cache
+  clk: add support for clock remuxing
+  clk: clk-mux: implement remuxing
 
-======================================================================
-pin 38 (PIN38): gpio_keys.2 mvebu-gpio:38 function gpio group mpp38
-pin 39 (PIN39): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-pin 40 (PIN40): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-pin 41 (PIN41): gpio-leds.1 mvebu-gpio:41 function gpio group mpp41
-pin 42 (PIN42): gpio-leds.1 mvebu-gpio:42 function gpio group mpp42
-pin 43 (PIN43): gpio-leds.1 mvebu-gpio:43 function gpio group mpp43
-======================================================================
+ drivers/clk/clk-mux.c        |  47 ++++++++++++++++++
+ drivers/clk/clk.c            | 115 ++++++++++++++++++++++++++++++-------------
+ include/linux/clk-provider.h |   7 ++-
+ 3 files changed, 133 insertions(+), 36 deletions(-)
 
-On the other hand, if you remove the pinctrl-0 property, the same file
-looks like this:
-
-======================================================================
-pin 38 (PIN38): (MUX UNCLAIMED) mvebu-gpio:38
-pin 39 (PIN39): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-pin 40 (PIN40): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-pin 41 (PIN41): (MUX UNCLAIMED) mvebu-gpio:41
-pin 42 (PIN42): (MUX UNCLAIMED) mvebu-gpio:42
-pin 43 (PIN43): (MUX UNCLAIMED) mvebu-gpio:43
-======================================================================
-
-So you no longer know by what device the pin is claimed. It is not
-horrible of course, but I find it quite nice to be able to see which
-pin is used by what device.
-
-What do you think?
-
-Thomas
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.8.1.2
