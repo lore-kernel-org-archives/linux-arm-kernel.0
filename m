@@ -1,67 +1,61 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Fri, 22 Mar 2013 01:15:02 +0100
-Subject: [PATCH] cpuimx27 and mbimx27: prepend CONFIG_ to Kconfig macro
-Message-ID: <1363911302.1390.167.camel@x61.thuisdomein>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 22 Mar 2013 09:32:16 +0900
+Subject: [GIT PULL v2] Renesas ARM-based SoC board updates for v3.10
+In-Reply-To: <201303211922.57037.arnd@arndb.de>
+References: <1363659481-5922-1-git-send-email-horms+renesas@verge.net.au>
+ <201303211718.32981.arnd@arndb.de>
+ <201303211922.57037.arnd@arndb.de>
+Message-ID: <20130322003216.GB30936@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 2d66c7803595da0d4bcd949825d598575f5de9e6 ("cpuimx27 and mbimx27:
-allow fine control of UART4 and SDHC2 usage") added the Kconfig symbol
-MACH_EUKREA_CPUIMX27_USEUART4. But it forgot to prepend CONFIG_ to the
-use of its macro. Add that prefix now.
+On Thu, Mar 21, 2013 at 07:22:56PM +0000, Arnd Bergmann wrote:
+> On Thursday 21 March 2013, Arnd Bergmann wrote:
+> > On Tuesday 19 March 2013, Simon Horman wrote:
+> 
+> > Pulled into next/boards.
+> > 
+> > Please verify that I have pulled everything you sent me. If not, it my mistake.
+> 
+> With everything applied, I now get one build failure and a new build warning:
+> 
+> ==> build/mackerel_defconfig/faillog <==
+> /git/arm-soc/arch/arm/mach-shmobile/board-mackerel.c: In function 'mackerel_init':
+> /git/arm-soc/arch/arm/mach-shmobile/board-mackerel.c:1476:15: error: 'GPIO_FN_MMCD0_0' undeclared (first use in this function)
+> /git/arm-soc/arch/arm/mach-shmobile/board-mackerel.c:1476:15: note: each undeclared identifier is reported only once for each function it appears in
+> /git/arm-soc/arch/arm/mach-shmobile/board-mackerel.c:1477:15: error: 'GPIO_FN_MMCD0_1' undeclared (first use in this function)
+> /git/arm-soc/arch/arm/mach-shmobile/board-mackerel.c:1478:15: error: 'GPIO_FN_MMCD0_2' undeclared (first use in this function)
+> /git/arm-soc/arch/arm/mach-shmobile/board-mackerel.c:1479:15: error: 'GPIO_FN_MMCD0_3' undeclared (first use in this function)
+> /git/arm-soc/arch/arm/mach-shmobile/board-mackerel.c:1480:15: error: 'GPIO_FN_MMCD0_4' undeclared (first use in this function)
+> /git/arm-soc/arch/arm/mach-shmobile/board-mackerel.c:1481:15: error: 'GPIO_FN_MMCD0_5' undeclared (first use in this function)
+> /git/arm-soc/arch/arm/mach-shmobile/board-mackerel.c:1482:15: error: 'GPIO_FN_MMCD0_6' undeclared (first use in this function)
+> /git/arm-soc/arch/arm/mach-shmobile/board-mackerel.c:1483:15: error: 'GPIO_FN_MMCD0_7' undeclared (first use in this function)
+> /git/arm-soc/arch/arm/mach-shmobile/board-mackerel.c:1484:15: error: 'GPIO_FN_MMCCMD0' undeclared (first use in this function)
+> /git/arm-soc/arch/arm/mach-shmobile/board-mackerel.c:1485:15: error: 'GPIO_FN_MMCCLK0' undeclared (first use in this function)
+> /git/arm-soc/arch/arm/mach-shmobile/board-mackerel.c:1489:15: error: 'GPIO_FN_SDHICMD2' undeclared (first use in this function)
+> /git/arm-soc/arch/arm/mach-shmobile/board-mackerel.c:1490:15: error: 'GPIO_FN_SDHICLK2' undeclared (first use in this function)
+> /git/arm-soc/arch/arm/mach-shmobile/board-mackerel.c:1491:15: error: 'GPIO_FN_SDHID2_3' undeclared (first use in this function)
+> /git/arm-soc/arch/arm/mach-shmobile/board-mackerel.c:1492:15: error: 'GPIO_FN_SDHID2_2' undeclared (first use in this function)
+> /git/arm-soc/arch/arm/mach-shmobile/board-mackerel.c:1493:15: error: 'GPIO_FN_SDHID2_1' undeclared (first use in this function)
+> /git/arm-soc/arch/arm/mach-shmobile/board-mackerel.c:1494:15: error: 'GPIO_FN_SDHID2_0' undeclared (first use in this function)
+> make[3]: *** [arch/arm/mach-shmobile/board-mackerel.o] Error 1
+> make[3]: Target `__build' not remade because of errors.
+> make[2]: *** [arch/arm/mach-shmobile] Error 2
+> make[2]: Target `_all' not remade because of errors.
+> make[1]: *** [sub-make] Error 2
+> make[1]: Target `_all' not remade because of errors.
+> 
+> ==> build/marzen_defconfig/faillog <==
+> In file included from /git/arm-soc/arch/arm/mach-shmobile/setup-r8a7779.c:24:0:
+> /git/arm-soc/include/linux/of_platform.h:107:13: warning: 'struct of_device_id' declared inside parameter list [enabled by default]
+> /git/arm-soc/include/linux/of_platform.h:107:13: warning: its scope is only this definition or declaration, which is probably not what you want [enabled by default]
+> /git/arm-soc/include/linux/of_platform.h:107:13: warning: 'struct device_node' declared inside parameter list [enabled by default]
+> 
+> 
+> I have not tried bisecting the problems. Could you find out what is going on
+> and send bug fixes to apply on top?
 
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
----
-Untested. This needs testing, obviously. Or a rethink, because these
-typos have been in the tree since v2.6.36!
+Thanks Arnd,
 
- arch/arm/mach-imx/eukrea_mbimx27-baseboard.c | 4 ++--
- arch/arm/mach-imx/mach-cpuimx27.c            | 4 ++--
- 2 files changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c b/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
-index b4c7002..b2f08bf 100644
---- a/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
-+++ b/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
-@@ -46,7 +46,7 @@ static const int eukrea_mbimx27_pins[] __initconst = {
- 	PE10_PF_UART3_CTS,
- 	PE11_PF_UART3_RTS,
- 	/* UART4 */
--#if !defined(MACH_EUKREA_CPUIMX27_USEUART4)
-+#if !defined(CONFIG_MACH_EUKREA_CPUIMX27_USEUART4)
- 	PB26_AF_UART4_RTS,
- 	PB28_AF_UART4_TXD,
- 	PB29_AF_UART4_CTS,
-@@ -306,7 +306,7 @@ void __init eukrea_mbimx27_baseboard_init(void)
- 
- 	imx27_add_imx_uart1(&uart_pdata);
- 	imx27_add_imx_uart2(&uart_pdata);
--#if !defined(MACH_EUKREA_CPUIMX27_USEUART4)
-+#if !defined(CONFIG_MACH_EUKREA_CPUIMX27_USEUART4)
- 	imx27_add_imx_uart3(&uart_pdata);
- #endif
- 
-diff --git a/arch/arm/mach-imx/mach-cpuimx27.c b/arch/arm/mach-imx/mach-cpuimx27.c
-index 1465593..ea50870 100644
---- a/arch/arm/mach-imx/mach-cpuimx27.c
-+++ b/arch/arm/mach-imx/mach-cpuimx27.c
-@@ -48,7 +48,7 @@ static const int eukrea_cpuimx27_pins[] __initconst = {
- 	PE14_PF_UART1_CTS,
- 	PE15_PF_UART1_RTS,
- 	/* UART4 */
--#if defined(MACH_EUKREA_CPUIMX27_USEUART4)
-+#if defined(CONFIG_MACH_EUKREA_CPUIMX27_USEUART4)
- 	PB26_AF_UART4_RTS,
- 	PB28_AF_UART4_TXD,
- 	PB29_AF_UART4_CTS,
-@@ -272,7 +272,7 @@ static void __init eukrea_cpuimx27_init(void)
- 	/* SDHC2 can be used for Wifi */
- 	imx27_add_mxc_mmc(1, NULL);
- #endif
--#if defined(MACH_EUKREA_CPUIMX27_USEUART4)
-+#if defined(CONFIG_MACH_EUKREA_CPUIMX27_USEUART4)
- 	/* in which case UART4 is also used for Bluetooth */
- 	imx27_add_imx_uart3(&uart_pdata);
- #endif
--- 
-1.7.11.7
+I noticed this only slightly before you did and I apologise for not catching it earlier.
+I have a fix queued up and will send you a pull request shortly.
