@@ -1,31 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 22 Mar 2013 09:55:17 +0000
-Subject: [PATCH 5/5] arm: dts: Convert mvebu device tree files to 64 bits
-In-Reply-To: <20130321214132.GB8431@obsidianresearch.com>
-References: <1363883179-1361-1-git-send-email-gregory.clement@free-electrons.com>
- <20130321221523.7ede6ccc@skate> <20130321214132.GB8431@obsidianresearch.com>
-Message-ID: <201303220955.17821.arnd@arndb.de>
+From: rajagopal.venkat@linaro.org (Rajagopal Venkat)
+Date: Fri, 22 Mar 2013 15:29:17 +0530
+Subject: [PATCH V2 2/3] clk: Improve errorhandling for clk_set_parent
+In-Reply-To: <20130321210019.834.12024@quantum>
+References: <1363873693-30902-1-git-send-email-ulf.hansson@stericsson.com>
+ <1363873693-30902-3-git-send-email-ulf.hansson@stericsson.com>
+ <20130321210019.834.12024@quantum>
+Message-ID: <CA+Z25wWnGFFK9d+zdL+6iDDmS=0PKGDtU=+rePeGTv8PMtgSOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 21 March 2013, Jason Gunthorpe wrote:
-> On Thu, Mar 21, 2013 at 10:15:23PM +0100, Thomas Petazzoni wrote:
-> > Dear Jason Gunthorpe,
+On 22 March 2013 02:30, Mike Turquette <mturquette@linaro.org> wrote:
+> Quoting Ulf Hansson (2013-03-21 06:48:12)
+>> @@ -1344,8 +1341,9 @@ out:
+>>  int clk_set_parent(struct clk *clk, struct clk *parent)
+>>  {
+>>         int ret = 0;
+>> +       u8 p_index;
+>>
+>> -       if (!clk || !clk->ops)
+>> +       if (!clk || !clk->ops || !parent)
+>>                 return -EINVAL;
+>>
+>
+> A NULL clock is valid according to the clk.h api.  I would like to allow
+> parent to be NULL, resulting in a migration from the real clock tree to
+> the orphans list.
+>
+> This feature was apparently buggy for some time and Rajagopal sent me a
+> patch off-list to fix it.  Rajagopal, can you post your patch publicly?
+>
 
-> > 
-> >  *) It only works when LPAE is enabled, so we would have to have
-> >     different internal register addresses depending on whether LPAE is
-> >     enabled or not. Probably not impossible, but not very
-> >     straightforward either.
-> 
-> Ideally the internal register space address would come from the DT -
-> we are getting very close to that on Marvell, I think.. Things like
-> earlyprintk should ideally early parse the DT, harder I know :(
+Patch is available at https://patchwork.kernel.org/patch/2012221/
+Do you want me to rebase it on top of this patchset?
 
-Let's not worry about earlyprintk for now. earlyprintk is supposed to be
-really really simple, and the solution that we are using now works
-well enough: You pick a hardcoded implementation at build time when
-you are debugging, but disable debug_ll for a multiplatform release
-kernel.
+> Thanks,
+> Mike
 
-	Arnd
+
+
+-- 
+Regards,
+Rajagopal
