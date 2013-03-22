@@ -1,31 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 22 Mar 2013 14:16:42 +0000
-Subject: [PATCH 0/9] More ux500 multiplatform stuff
-In-Reply-To: <CACRpkdYUZQt+PTOf0+ReQFWgSjitXM-CXMUfVAiQsL3QxDTi5w@mail.gmail.com>
-References: <1363866553-15054-1-git-send-email-linus.walleij@stericsson.com>
- <201303221334.07330.arnd@arndb.de>
- <CACRpkdYUZQt+PTOf0+ReQFWgSjitXM-CXMUfVAiQsL3QxDTi5w@mail.gmail.com>
-Message-ID: <201303221416.42217.arnd@arndb.de>
+From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
+Date: Fri, 22 Mar 2013 11:20:36 -0300
+Subject: [PATCH 0/6] clk: sunxi: gates support
+Message-ID: <1363962042-29536-1-git-send-email-emilio@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 22 March 2013, Linus Walleij wrote:
-> On Fri, Mar 22, 2013 at 2:34 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > [Me]
-> >> And there are some non-bisectable patches due to the
-> >> driver in staging (which was put there because Synaptics would
-> >> submit another driver "real soon now" and that was something like
-> >> two years ago), so I might have to squash some of them together to one.
-> >
-> > What breaks bisection here? The "[PATCH 5/9] staging: ste_rmi4: kill
-> > platform_data hack" patch should be independent of everything else,
-> > it just touches more files than we'd like.
-> 
-> It includes <mach/irqs.h> that is removed by earlier patches, so
-> it stops compiling before this patch.
-> 
+Hi,
 
-Ah right. I think I reordered the patches in the end and must have gotten
-that one wrong.
+This patchset adds support for the main sunxi gates; namely, those found 
+on AXI, AHB, APB0 and APB1 clocks. The series depends on Maxime's UART 
+rework and on the basic sunxi clock driver by me.
 
-	Arnd
+Patches 1 and 2 implement the actual gate support, and patch 3 switches 
+the UARTs to use the correct gates now that they are available.
+
+Patch 4 and 5 add clock support to our pinctrl driver, as we need to 
+keep the pio clock running for gpio to work.
+
+Patch 6 drops the ignore flags; now that we have actual clock users that 
+will keep the important clocks running.
+
+Thanks,
+
+Emilio
+
+Emilio L?pez (6):
+  clk: sunxi: Add support for AXI, AHB, APB0 and APB1 gates
+  arm: sunxi: Add clock definitions for AXI, AHB, APB0, APB1 gates
+  arm: sunxi: use the right clock phandles for UARTs
+  pinctrl: sunxi: add clock support
+  arm: sunxi: Add clock to pinctrl node
+  clk: sunxi: drop CLK_IGNORE_UNUSED
+
+ Documentation/devicetree/bindings/clock/sunxi.txt | 108 +++++++++++++++++++++-
+ arch/arm/boot/dts/sun4i-a10.dtsi                  |  13 +--
+ arch/arm/boot/dts/sun5i-a13.dtsi                  |   1 +
+ arch/arm/boot/dts/sunxi.dtsi                      |  53 ++++++++++-
+ drivers/clk/sunxi/clk-sunxi.c                     |  98 +++++++++++++++++++-
+ drivers/pinctrl/pinctrl-sunxi.c                   |   8 ++
+ 6 files changed, 267 insertions(+), 14 deletions(-)
+
+-- 
+1.8.2
