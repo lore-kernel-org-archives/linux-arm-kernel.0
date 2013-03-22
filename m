@@ -1,76 +1,274 @@
-From: s-guiriec@ti.com (Sebastien Guiriec)
-Date: Fri, 22 Mar 2013 09:07:21 +0100
-Subject: [PATCH 2/2] ASoC: dmaengine_pcm: add
- snd_dmaengine_generic_pcm_open()
-In-Reply-To: <20130321145258.GC23109@S2101-09.ap.freescale.net>
-References: <1363318601-31505-1-git-send-email-shawn.guo@linaro.org>
- <1363318601-31505-3-git-send-email-shawn.guo@linaro.org>
- <20130321095718.GO10326@intel.com>
- <20130321145258.GC23109@S2101-09.ap.freescale.net>
-Message-ID: <514C1139.6050309@ti.com>
+From: prabhakar.csengg@gmail.com (Prabhakar lad)
+Date: Fri, 22 Mar 2013 13:39:28 +0530
+Subject: [PATCH v6 1/2] ARM: davinci: dm355: add support for v4l2 video display
+In-Reply-To: <1363939769-22506-1-git-send-email-prabhakar.csengg@gmail.com>
+References: <1363939769-22506-1-git-send-email-prabhakar.csengg@gmail.com>
+Message-ID: <1363939769-22506-2-git-send-email-prabhakar.csengg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/21/2013 03:53 PM, Shawn Guo wrote:
-> On Thu, Mar 21, 2013 at 03:27:18PM +0530, Vinod Koul wrote:
->> On Fri, Mar 15, 2013 at 11:36:41AM +0800, Shawn Guo wrote:
->>> With generic DMA device tree binding and helper function
->>> dma_request_slave_channel() in place, dmaengine_pcm should support
->>> that in requesting DMA channel for users that support generic DMA
->>> device tree binding.
->>>
->>> Add a new API snd_dmaengine_generic_pcm_open() as the variant of
->>> snd_dmaengine_pcm_open().  It takes DMA client struct device pointer
->>> and slave channel name as arguments and calls generic DMA helper
->>> dma_request_slave_channel() to request DMA channel from dmaengine.
->> NAK
->>
->> This is why we have dma_request_slave_channel_compat() API. You dont need to
->> write two open handlers here, just pass all the arguments and if DT is set it
->> will allocate a channel using dma_request_slave_channel() otherwise will do
->> dma_request_channel which is what you need.
->
-> I do not quite follow your comment.  Let me try to understand it.  Are
-> you suggesting that instead of the current call path:
->
-> 	snd_dmaengine_pcm_open()
-> 		dmaengine_pcm_request_channel()
-> 			dma_request_channel()
->
-> we should change it as below?
->
-> 	snd_dmaengine_pcm_open()
-> 		dmaengine_pcm_request_channel()
-> 			dma_request_slave_channel_compat()
->
-> If that's the case, you are fundamentally requesting to change the
-> fingerprint of API snd_dmaengine_pcm_open() from the existing:
->
-> int snd_dmaengine_pcm_open(struct snd_pcm_substream *substream,
-> 			   dma_filter_fn filter_fn, void *filter_data)
->
-> to something like:
->
-> int snd_dmaengine_pcm_open(struct snd_pcm_substream *substream,
-> 			   dma_filter_fn filter_fn, void *filter_data,
-> 			   struct device *dev, const char *name)
->
-> So every single user of snd_dmaengine_pcm_open() needs to adapt to the
-> interface change.
->
-> Is my understanding correct?  Or have I misunderstood your comment?
+From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
 
-This is what has been done on OMAP for other IPs. I have tested this 
-solution for Audio before you submit your first series and it is working.
+Create platform devices for various video modules like venc,osd,
+vpbe and v4l2 driver for dm355.
 
-Now I will wait Lars serie to check again on OMAP and let Mark comment 
-on the best approach. Whereas update current API like you propose or 
-wait Lars series and move on according to the different comments done on 
-open function. As OMAP audio DMA binding are depending on the chosen 
-solution.
+Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+---
+ arch/arm/mach-davinci/board-dm355-evm.c |    4 +-
+ arch/arm/mach-davinci/davinci.h         |    2 +-
+ arch/arm/mach-davinci/dm355.c           |  181 ++++++++++++++++++++++++++++++-
+ 3 files changed, 179 insertions(+), 8 deletions(-)
 
-Sebastien.
->
-> Shawn
->
->
+diff --git a/arch/arm/mach-davinci/board-dm355-evm.c b/arch/arm/mach-davinci/board-dm355-evm.c
+index 147b8e1..37d12cc 100644
+--- a/arch/arm/mach-davinci/board-dm355-evm.c
++++ b/arch/arm/mach-davinci/board-dm355-evm.c
+@@ -253,8 +253,6 @@ static struct davinci_uart_config uart_config __initdata = {
+ 
+ static void __init dm355_evm_map_io(void)
+ {
+-	/* setup input configuration for VPFE input devices */
+-	dm355_set_vpfe_config(&vpfe_cfg);
+ 	dm355_init();
+ }
+ 
+@@ -344,6 +342,8 @@ static __init void dm355_evm_init(void)
+ 	davinci_setup_mmc(0, &dm355evm_mmc_config);
+ 	davinci_setup_mmc(1, &dm355evm_mmc_config);
+ 
++	dm355_init_video(&vpfe_cfg, NULL);
++
+ 	dm355_init_spi0(BIT(0), dm355_evm_spi_info,
+ 			ARRAY_SIZE(dm355_evm_spi_info));
+ 
+diff --git a/arch/arm/mach-davinci/davinci.h b/arch/arm/mach-davinci/davinci.h
+index 1c2670f..acfe0bb 100644
+--- a/arch/arm/mach-davinci/davinci.h
++++ b/arch/arm/mach-davinci/davinci.h
+@@ -74,7 +74,7 @@ void __init dm355_init(void);
+ void dm355_init_spi0(unsigned chipselect_mask,
+ 		const struct spi_board_info *info, unsigned len);
+ void __init dm355_init_asp1(u32 evt_enable, struct snd_platform_data *pdata);
+-void dm355_set_vpfe_config(struct vpfe_config *cfg);
++int __init dm355_init_video(struct vpfe_config *, struct vpbe_config *);
+ 
+ /* DM365 function declarations */
+ void __init dm365_init(void);
+diff --git a/arch/arm/mach-davinci/dm355.c b/arch/arm/mach-davinci/dm355.c
+index a917983..20fc75c 100644
+--- a/arch/arm/mach-davinci/dm355.c
++++ b/arch/arm/mach-davinci/dm355.c
+@@ -36,6 +36,17 @@
+ 
+ #define DM355_UART2_BASE	(IO_PHYS + 0x206000)
+ 
++#define DM355_VDAC_CONFIG		0x01c4002c
++
++#define DM355_OSD_BASE			0x01c70200
++
++#define DM355_VENC_BASE			0x01c70400
++
++#define DM355_VPSS_CLK_CTRL_ADDR		0x44
++#define DM355_VPSS_MUXSEL_EXTCLK_ENABLE		BIT(1)
++#define DM355_VPSS_VENCCLKEN_ENABLE		BIT(3)
++#define DM355_VPSS_DACCLKEN_ENABLE		BIT(4)
++
+ /*
+  * Device specific clocks
+  */
+@@ -744,11 +755,151 @@ static struct platform_device vpfe_capture_dev = {
+ 	},
+ };
+ 
+-void dm355_set_vpfe_config(struct vpfe_config *cfg)
++static struct resource dm355_osd_resources[] = {
++	{
++		.start	= DM355_OSD_BASE,
++		.end	= DM355_OSD_BASE + 0x180,
++		.flags	= IORESOURCE_MEM,
++	},
++};
++
++static struct platform_device dm355_osd_dev = {
++	.name		= DM355_VPBE_OSD_SUBDEV_NAME,
++	.id		= -1,
++	.num_resources	= ARRAY_SIZE(dm355_osd_resources),
++	.resource	= dm355_osd_resources,
++	.dev		= {
++		.dma_mask		= &vpfe_capture_dma_mask,
++		.coherent_dma_mask	= DMA_BIT_MASK(32),
++	},
++};
++
++static struct resource dm355_venc_resources[] = {
++	{
++		.start	= IRQ_VENCINT,
++		.end	= IRQ_VENCINT,
++		.flags	= IORESOURCE_IRQ,
++	},
++	/* venc registers io space */
++	{
++		.start	= DM355_VENC_BASE,
++		.end	= DM355_VENC_BASE + 0x180,
++		.flags	= IORESOURCE_MEM,
++	},
++	/* VDAC config register io space */
++	{
++		.start	= DM355_VDAC_CONFIG,
++		.end	= DM355_VDAC_CONFIG + 3,
++		.flags	= IORESOURCE_MEM,
++	},
++};
++
++static struct resource dm355_v4l2_disp_resources[] = {
++	{
++		.start	= IRQ_VENCINT,
++		.end	= IRQ_VENCINT,
++		.flags	= IORESOURCE_IRQ,
++	},
++	/* venc registers io space */
++	{
++		.start	= DM355_VENC_BASE,
++		.end	= DM355_VENC_BASE + 0x180,
++		.flags	= IORESOURCE_MEM,
++	},
++};
++
++static int dm355_vpbe_setup_pinmux(enum v4l2_mbus_pixelcode if_type,
++			    int field)
+ {
+-	vpfe_capture_dev.dev.platform_data = cfg;
++	switch (if_type) {
++	case V4L2_MBUS_FMT_SGRBG8_1X8:
++		davinci_cfg_reg(DM355_VOUT_FIELD_G70);
++		break;
++
++	case V4L2_MBUS_FMT_YUYV10_1X20:
++		if (field)
++			davinci_cfg_reg(DM355_VOUT_FIELD);
++		else
++			davinci_cfg_reg(DM355_VOUT_FIELD_G70);
++		break;
++
++	default:
++		return -EINVAL;
++	}
++
++	davinci_cfg_reg(DM355_VOUT_COUTL_EN);
++	davinci_cfg_reg(DM355_VOUT_COUTH_EN);
++
++	return 0;
++}
++
++static int dm355_venc_setup_clock(enum vpbe_enc_timings_type type,
++				   unsigned int pclock)
++{
++	void __iomem *vpss_clk_ctrl_reg;
++
++	vpss_clk_ctrl_reg = DAVINCI_SYSMOD_VIRT(DM355_VPSS_CLK_CTRL_ADDR);
++
++	switch (type) {
++	case VPBE_ENC_STD:
++		writel(DM355_VPSS_DACCLKEN_ENABLE |
++		       DM355_VPSS_VENCCLKEN_ENABLE, vpss_clk_ctrl_reg);
++		break;
++
++	case VPBE_ENC_DV_TIMINGS:
++		if (pclock > 27000000)
++			/*
++			 * For HD, use external clock source since we cannot
++			 * support HD mode with internal clocks.
++			 */
++			writel(DM355_VPSS_MUXSEL_EXTCLK_ENABLE,
++			       vpss_clk_ctrl_reg);
++		break;
++
++	default:
++		return -EINVAL;
++	}
++
++	return 0;
+ }
+ 
++static struct platform_device dm355_vpbe_display = {
++	.name		= "vpbe-v4l2",
++	.id		= -1,
++	.num_resources	= ARRAY_SIZE(dm355_v4l2_disp_resources),
++	.resource	= dm355_v4l2_disp_resources,
++	.dev		= {
++		.dma_mask		= &vpfe_capture_dma_mask,
++		.coherent_dma_mask	= DMA_BIT_MASK(32),
++	},
++};
++
++struct venc_platform_data dm355_venc_pdata = {
++	.setup_pinmux	= dm355_vpbe_setup_pinmux,
++	.setup_clock	= dm355_venc_setup_clock,
++};
++
++static struct platform_device dm355_venc_dev = {
++	.name		= DM355_VPBE_VENC_SUBDEV_NAME,
++	.id		= -1,
++	.num_resources	= ARRAY_SIZE(dm355_venc_resources),
++	.resource	= dm355_venc_resources,
++	.dev		= {
++		.dma_mask		= &vpfe_capture_dma_mask,
++		.coherent_dma_mask	= DMA_BIT_MASK(32),
++		.platform_data		= (void *)&dm355_venc_pdata,
++	},
++};
++
++static struct platform_device dm355_vpbe_dev = {
++	.name		= "vpbe_controller",
++	.id		= -1,
++	.dev		= {
++		.dma_mask		= &vpfe_capture_dma_mask,
++		.coherent_dma_mask	= DMA_BIT_MASK(32),
++	},
++};
++
+ /*----------------------------------------------------------------------*/
+ 
+ static struct map_desc dm355_io_desc[] = {
+@@ -868,6 +1019,29 @@ void __init dm355_init(void)
+ 	davinci_map_sysmod();
+ }
+ 
++int __init dm355_init_video(struct vpfe_config *vpfe_cfg,
++				struct vpbe_config *vpbe_cfg)
++{
++	if (vpfe_cfg || vpbe_cfg)
++		platform_device_register(&dm355_vpss_device);
++
++	if (vpfe_cfg) {
++		vpfe_capture_dev.dev.platform_data = vpfe_cfg;
++		platform_device_register(&dm355_ccdc_dev);
++		platform_device_register(&vpfe_capture_dev);
++	}
++
++	if (vpbe_cfg) {
++		dm355_vpbe_dev.dev.platform_data = vpbe_cfg;
++		platform_device_register(&dm355_osd_dev);
++		platform_device_register(&dm355_venc_dev);
++		platform_device_register(&dm355_vpbe_dev);
++		platform_device_register(&dm355_vpbe_display);
++	}
++
++	return 0;
++}
++
+ static int __init dm355_init_devices(void)
+ {
+ 	if (!cpu_is_davinci_dm355())
+@@ -875,9 +1049,6 @@ static int __init dm355_init_devices(void)
+ 
+ 	davinci_cfg_reg(DM355_INT_EDMA_CC);
+ 	platform_device_register(&dm355_edma_device);
+-	platform_device_register(&dm355_vpss_device);
+-	platform_device_register(&dm355_ccdc_dev);
+-	platform_device_register(&vpfe_capture_dev);
+ 
+ 	return 0;
+ }
+-- 
+1.7.4.1
