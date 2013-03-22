@@ -1,67 +1,67 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 22 Mar 2013 16:00:45 +0000
-Subject: [PATCH 03/04] ARM: shmobile: r8a73a4 IRQC support
-In-Reply-To: <CANqRtoTQhbk0sjZfvCY3qR2-x5p1gvZ0F+o3ZkAddufddYUk+g@mail.gmail.com>
-References: <20130312045559.19701.77841.sendpatchset@w520>
- <201303141343.04328.arnd@arndb.de>
- <CANqRtoTQhbk0sjZfvCY3qR2-x5p1gvZ0F+o3ZkAddufddYUk+g@mail.gmail.com>
-Message-ID: <201303221600.45844.arnd@arndb.de>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 22 Mar 2013 11:01:30 -0500
+Subject: [PATCH v2] cpufreq: instantiate cpufreq-cpu0 as a platform_driver
+In-Reply-To: <Pine.LNX.4.64.1303221600060.12375@axis700.grange>
+References: <1359428020-21068-1-git-send-email-shawn.guo@linaro.org>
+ <Pine.LNX.4.64.1303221600060.12375@axis700.grange>
+Message-ID: <20130322160038.GA4146@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 March 2013, Magnus Damm wrote:
-> On Thu, Mar 14, 2013 at 10:43 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Thursday 14 March 2013, Magnus Damm wrote:
+-Anil as the mail id does not seem to be accepted by TI mail server
+anymore.
 
-> > Coming back to INTC, are you planning to use the same binding for A and C?
+On 16:47-20130322, Guennadi Liakhovetski wrote:
+> On Tue, 29 Jan 2013, Shawn Guo wrote:
 > 
-> I was not planning on that, no. To be honest, at this point I am not
-> sure which way forward is best for A).
+> > As multiplatform build is being adopted by more and more ARM platforms,
+> > initcall function should be used very carefully.  For example, when
+> > GENERIC_CPUFREQ_CPU0 is built in the kernel, cpu0_cpufreq_driver_init()
+> > will be called on all the platforms to initialize cpufreq-cpu0 driver.
+> > 
+> > To eliminate this undesired the effect, the patch changes cpufreq-cpu0
+> > driver to have it instantiated as a platform_driver.  Then it will only
+> > run on platforms that create the platform_device "cpufreq-cpu0".
 > 
-> > Which of them the binding you posted earlier for?
+> Sorry, confused. Before this used to be a generic cpufreq driver, usable 
+> on all (DT-enabled only) platforms. You just had to provide an OPP table, 
+> a clock, a regulator, similar to this
 > 
-> Regarding A), I wrote some local DT prototype patches for INTC a year
-> or two ago, showing how things could be done and how we can start
-> using DT. Then I handed the job over to other people. However, from
-> there my advice of incremental development was ignored and instead
-> more complete bindings were developed directly without much review. So
-> I wouldn't say that I posted the bindings myself. Right now I'm very
-> hands-off in that area.
+> http://thread.gmane.org/gmane.linux.kernel.cpufreq/9510/focus=9509
+> 
+> (also see the complete thread for more information). Now this won't work 
+> obviously. Instead we now need a pseudo platform device to instantiate 
+> cpufreq-cpu0. This device cannot be put in DT, because it doesn't describe 
+> real hardware. So, we have to add register it from the board specific .c 
+> code, which we actually want to get rid of... Is this really what we want?
+> 
+> What about other cpufreq drivers? They have the same problem on 
+> multiplatform builds, right? Say, s3c2416-cpufreq.c. It also just 
+> initialises itself and starts looking for a clock, names "msysclk" with a 
+> NULL device pointer etc. Don't we need a common approach for cpufreq 
+> driver initialisation?
+> 
+> The decision which cpufreq driver to use is SoC-specific, right? We're 
+> unlikely to have several boards, using the same SoC, wishing to use 
+> different cpufreq drivers? The decision _whether_ or not to enable it and 
+> _which_ resources to use might be board-specific. So, how about adding a 
+> cpufreq call something like
+> 
+> cpufreq_driver_request("cpufreq-driver-name");
+> 
+> to be called by SoC-specific code. You can say it is not much different 
+> from adding a virtual device, but firstly I think such a use of a platform 
+> device is really an overkill. Secondly you still run a danger, that 
+> several platforms, built into a single image, register several devices for 
+> different cpufreq drivers, or even for one... With a special call you know 
+> there can be only one and you return -EBUSY to all further calls to that 
+> function.
 
-Ok.
+Just an note on this specific patch - I made this generic handling for
+OMAP OPP handling in my series:
+http://marc.info/?l=linux-omap&m=136371580826031&w=2
+Handling non-DT and DT enabled boots are key for us as well here.
 
-> As for C), those DT bindings were done by me. They are however not
-> compatible with A). The hardware is different. C) is basically a
-> special case subset of A).
-
-Makes sense.
-
-> > When I looked at the existing code, I had the impression that doing a
-> > binding for just the SH-Mobile SoCs that have an ARM core in them
-> > (including those that also have an SH core) would be much easier than
-> > doing a binding that also covers the older SH SoCs, since those are
-> > much less uniform.
-> 
-> I agree that in some cases it may make sense to split the SH bits from
-> ARM, but I wonder how much we would win for the INTC.
-> 
-> Right now I'm considering converting r8a7740 to use B) and C) (if
-> possible), and if so then the only ARM SoC using A) for main interrupt
-> controller left is sh7372.
-> 
-> For sh7372 we could simply try to use C) for board-level interrupts
-> (and board level DT) but keep the SoC portion in C with A) until the
-> SoC is being phased out. Or we could have a simple compatible
-> "renesas,intc-sh7372" with tables in C using irq domain to support DT,
-> but that would be exactly as my first incremental development task
-> that wasn't followed...
-> 
-> What would you do?
-
-Both of htese approaches sound fine. If there is only a single odd
-one out, it makes sense to have a hardwired implementation for that
-one. I rejected that approach originally because I wanted something
-more generic, and it seems you have done exactly that with the
-irq-renesas-intc-irqpin driver.
-
-	Arnd
+-- 
+Regards,
+Nishanth Menon
