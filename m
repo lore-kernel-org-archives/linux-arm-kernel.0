@@ -1,57 +1,33 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 22 Mar 2013 12:23:11 +0000
-Subject: [PATCH 3/4] xen: move the xenvm machine to mach-virt
-In-Reply-To: <1363893380-14309-3-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1303211848150.5135@kaball.uk.xensource.com>
- <1363893380-14309-3-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <514C4D2F.8030100@arm.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Fri, 22 Mar 2013 09:23:01 -0300
+Subject: [PATCH for 3.9 0/2] thermal: Marvell SoC thermal formula fixes
+Message-ID: <1363954983-30822-1-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/03/13 19:16, Stefano Stabellini wrote:
-> xenvm is based on mach-vexpress, move it to mach-virt.
-> 
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> CC: marc.zyngier at arm.com
-> CC: will.deacon at arm.com
-> CC: arnd at arndb.de
-> CC: rob.herring at calxeda.com
+This is a small patchset that fixes thermal sensor formulas for Kirkwood
+and Dove thermal driver. The old formulas had been taken from 88AP510 public
+datasheets which appears to be slightly wrong.
 
-Awesome!
+The current formula comes from Marvell internal documentation
+and has been confirmed by Lior Amsalem.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+This has been tested on a Kirkwood board (Openblocks A6) only.
+If at all possible, I would like to have the Dove fix tested
+before this is merged.
 
-> ---
->  arch/arm/mach-vexpress/v2m.c |    1 -
->  arch/arm/mach-virt/virt.c    |    1 +
->  2 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
-> index 915683c..c43ec78 100644
-> --- a/arch/arm/mach-vexpress/v2m.c
-> +++ b/arch/arm/mach-vexpress/v2m.c
-> @@ -469,7 +469,6 @@ static void __init v2m_dt_init(void)
->  
->  static const char * const v2m_dt_match[] __initconst = {
->  	"arm,vexpress",
-> -	"xen,xenvm",
->  	NULL,
->  };
->  
-> diff --git a/arch/arm/mach-virt/virt.c b/arch/arm/mach-virt/virt.c
-> index 31666f6..528c05e 100644
-> --- a/arch/arm/mach-virt/virt.c
-> +++ b/arch/arm/mach-virt/virt.c
-> @@ -40,6 +40,7 @@ static void __init virt_timer_init(void)
->  
->  static const char *virt_dt_match[] = {
->  	"linux,dummy-virt",
-> +	"xen,xenvm",
->  	NULL
->  };
->  
-> 
+Please note that this fix was previously part of a bigger thermal
+patchset [1]. I've taken this out so it can be applied on v3.9 first.
 
+[1] http://www.spinics.net/lists/arm-kernel/msg231697.html
+
+Ezequiel Garcia (2):
+  thermal: kirkwood: Fix thermal sensor formula
+  thermal: dove: Fix thermal sensor formula
+
+ drivers/thermal/dove_thermal.c     |    7 ++++---
+ drivers/thermal/kirkwood_thermal.c |    8 ++++----
+ 2 files changed, 8 insertions(+), 7 deletions(-)
 
 -- 
-Jazz is not dead. It just smells funny...
+1.7.8.6
