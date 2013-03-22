@@ -1,67 +1,62 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 22 Mar 2013 15:27:42 +0000
-Subject: [PATCH 2/5] ARM: ux500: Allow the ccu8540 to register its serial
- devices without pdata
+Date: Fri, 22 Mar 2013 15:27:44 +0000
+Subject: [PATCH 4/5] ARM: ux500: Supply a DTS file for the u8540 platform
 In-Reply-To: <1363966065-2478-1-git-send-email-lee.jones@linaro.org>
 References: <1363966065-2478-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1363966065-2478-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <1363966065-2478-4-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The u8540 doesn't have DMA support yet, so in order to enable
-serial and receive post-bootconsole output, we cannot supply the same
-platform data as we would for the u8500.
+This is a skeleton DTS file which only enables serial. Just using
+this simple file yields a terminal when booting u8540.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/board-mop500.c |   21 ++++++++++++++++++++-
- 1 file changed, 20 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/u8540.dts |   36 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
+ create mode 100644 arch/arm/boot/dts/u8540.dts
 
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index 4fade16..c22550d 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -611,6 +611,13 @@ static void __init mop500_uart_init(struct device *parent)
- 	db8500_add_uart2(parent, &uart2_plat);
- }
- 
-+static void __init ccu8540_uart_init(struct device *parent)
-+{
-+	db8500_add_uart0(parent, NULL);
-+	db8500_add_uart1(parent, NULL);
-+	db8500_add_uart2(parent, NULL);
-+}
+diff --git a/arch/arm/boot/dts/u8540.dts b/arch/arm/boot/dts/u8540.dts
+new file mode 100644
+index 0000000..02e8e1a
+--- /dev/null
++++ b/arch/arm/boot/dts/u8540.dts
+@@ -0,0 +1,36 @@
++/*
++ * Copyright 2013 ST-Ericsson AB
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
 +
- static void __init u8500_cryp1_hash1_init(struct device *parent)
- {
- 	db8500_add_cryp1(parent, &u8500_cryp1_platform_data);
-@@ -662,6 +669,18 @@ static void __init mop500_init_machine(void)
- 	regulator_has_full_constraints();
- }
- 
-+static void __init ccu8540_init_machine(void)
-+{
-+	struct device *parent = NULL;
++/dts-v1/;
++/include/ "dbx5x0.dtsi"
 +
-+	parent = u8500_init_devices(&ab8500_platdata);
++/ {
++	model = "ST-Ericsson U8540 platform with Device Tree";
++	compatible = "st-ericsson,u8540";
 +
-+	ccu8540_uart_init(parent);
++	memory {
++		reg = <0x00000000 0x20000000>;
++	};
 +
-+	/* This board has full regulator constraints */
-+	regulator_has_full_constraints();
-+}
++	soc-u9500 {
++		uart at 80120000 {
++			status = "okay";
++		};
 +
- static void __init snowball_init_machine(void)
- {
- 	struct device *parent = NULL;
-@@ -745,7 +764,7 @@ MACHINE_START(U8540, "ST-Ericsson U8540 Platform ccu8540")
- 	.map_io		= u8500_map_io,
- 	.init_irq	= ux500_init_irq,
- 	.init_time	= ux500_timer_init,
--	.init_machine	= mop500_init_machine,
-+	.init_machine	= ccu8540_init_machine,
- 	.init_late	= ux500_init_late,
- MACHINE_END
- 
++		uart at 80121000 {
++			status = "okay";
++		};
++
++		uart at 80007000 {
++			status = "okay";
++		};
++	};
++};
 -- 
 1.7.10.4
