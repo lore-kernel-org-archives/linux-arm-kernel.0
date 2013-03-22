@@ -1,44 +1,79 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 22 Mar 2013 14:21:28 +0100
-Subject: [PATCH 0/9] More ux500 multiplatform stuff
-In-Reply-To: <1363902674-6456-1-git-send-email-arnd@arndb.de>
-References: <1363866553-15054-1-git-send-email-linus.walleij@stericsson.com>
- <1363902674-6456-1-git-send-email-arnd@arndb.de>
-Message-ID: <CACRpkdbaRyHxeJM=JT+9CtVf-_u90wCzjePDvsNq-EQd_NxLdg@mail.gmail.com>
+From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
+Date: Fri, 22 Mar 2013 14:24:08 +0100
+Subject: [PATCH v3 0/6] introduce support for Atmel Cortex-A5 devices
+Message-ID: <1363958654-7713-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 21, 2013 at 10:51 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+From: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-> Your patches from this morning made me curious about how much is still
-> missing to actually enable multiplatform support on ux500.
+Hello,
 
-On the surface of it, not that much as you see :-D
+Updated set of patches for SAMA5D3 family support, based on
+Jean-Christophe ARM: at91: Kconfig cleanup for prepare add of Cortex-A5 Sama5
+patches.
 
-> This is
-> what I came up with, on top of your patches. Feel free to take what
-> you need if you don't already have the same patches.
->
-> I've successfully built "allmodconfig" with all the other v6/v7
-> platforms enabled as well.
+v3 changes:
+- put device tree files and defconfig file in separate patches
 
-Unfortunately the platform stops booting after
-2/9 "ARM: ux500: split out prcmu initialization"
-so I will look closer at this.
+v2 changes:
+- remove ARM: at91: fix infinite loop in at91_irq_suspend/resume taken as 3.9
+fix
+- add missing patch: ARM: at91: change name template in AT91_SOC_START macro
+- remove select HAVE_NET_MACB
 
-This patch:
-"ARM: ux500: kill mach/hardware.h some more"
-I will squash into the actual removal patch, it's just
-some sloppy work by me :-/
+Ludovic Desroches (6):
+  ARM: at91: change name template in AT91_SOC_START macro
+  ARM: at91: add AT91_SAM9_TIME entry to select at91sam926x_time.c
+    compilation
+  ARM: at91: introduce the core type choice to split ARMv4/5 and ARMv7
+    arch
+  ARM: at91: introduce SAMA5 support
+  ARM: at91: dt: add device tree files for SAMA5D3 family
+  ARM: at91: add defconfig for SAMA5
 
-I will try to move some of the patches to the
-front of the series so we only have the tricky stuff to
-fix.
+ arch/arm/boot/dts/Makefile                 |    5 +
+ arch/arm/boot/dts/sama5d3.dtsi             | 1031 ++++++++++++++++++++++++++++
+ arch/arm/boot/dts/sama5d31ek.dts           |   51 ++
+ arch/arm/boot/dts/sama5d33ek.dts           |   44 ++
+ arch/arm/boot/dts/sama5d34ek.dts           |   61 ++
+ arch/arm/boot/dts/sama5d35ek.dts           |   56 ++
+ arch/arm/boot/dts/sama5d3xcm.dtsi          |   91 +++
+ arch/arm/boot/dts/sama5d3xdm.dtsi          |   42 ++
+ arch/arm/boot/dts/sama5d3xmb.dtsi          |  166 +++++
+ arch/arm/configs/sama5_defconfig           |  181 +++++
+ arch/arm/mach-at91/Kconfig                 |   59 +-
+ arch/arm/mach-at91/Makefile                |    7 +-
+ arch/arm/mach-at91/at91rm9200.c            |    2 +-
+ arch/arm/mach-at91/at91sam9260.c           |    2 +-
+ arch/arm/mach-at91/at91sam9261.c           |    2 +-
+ arch/arm/mach-at91/at91sam9263.c           |    2 +-
+ arch/arm/mach-at91/at91sam9g45.c           |    2 +-
+ arch/arm/mach-at91/at91sam9n12.c           |    2 +-
+ arch/arm/mach-at91/at91sam9rl.c            |    2 +-
+ arch/arm/mach-at91/at91sam9x5.c            |    2 +-
+ arch/arm/mach-at91/board-dt-sama5.c        |   86 +++
+ arch/arm/mach-at91/clock.c                 |  109 ++-
+ arch/arm/mach-at91/clock.h                 |    2 +
+ arch/arm/mach-at91/include/mach/at91_pmc.h |   18 +-
+ arch/arm/mach-at91/include/mach/cpu.h      |   20 +
+ arch/arm/mach-at91/include/mach/sama5d3.h  |   73 ++
+ arch/arm/mach-at91/sama5d3.c               |  377 ++++++++++
+ arch/arm/mach-at91/setup.c                 |   27 +
+ arch/arm/mach-at91/soc.h                   |    7 +-
+ 29 files changed, 2486 insertions(+), 43 deletions(-)
+ create mode 100644 arch/arm/boot/dts/sama5d3.dtsi
+ create mode 100644 arch/arm/boot/dts/sama5d31ek.dts
+ create mode 100644 arch/arm/boot/dts/sama5d33ek.dts
+ create mode 100644 arch/arm/boot/dts/sama5d34ek.dts
+ create mode 100644 arch/arm/boot/dts/sama5d35ek.dts
+ create mode 100644 arch/arm/boot/dts/sama5d3xcm.dtsi
+ create mode 100644 arch/arm/boot/dts/sama5d3xdm.dtsi
+ create mode 100644 arch/arm/boot/dts/sama5d3xmb.dtsi
+ create mode 100644 arch/arm/configs/sama5_defconfig
+ create mode 100644 arch/arm/mach-at91/board-dt-sama5.c
+ create mode 100644 arch/arm/mach-at91/include/mach/sama5d3.h
+ create mode 100644 arch/arm/mach-at91/sama5d3.c
 
-And there are some non-bisectable patches due to the
-driver in staging (which was put there because Synaptics would
-submit another driver "real soon now" and that was something like
-two years ago), so I might have to squash some of them together to one.
-
-Thanks!
-Linus Walleij
+-- 
+1.7.11.3
