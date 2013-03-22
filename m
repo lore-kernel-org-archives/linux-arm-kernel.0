@@ -1,53 +1,118 @@
-From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
-Date: Fri, 22 Mar 2013 11:20:40 -0300
-Subject: [PATCH 4/6] pinctrl: sunxi: add clock support
-In-Reply-To: <1363962042-29536-1-git-send-email-emilio@elopez.com.ar>
-References: <1363962042-29536-1-git-send-email-emilio@elopez.com.ar>
-Message-ID: <1363962042-29536-5-git-send-email-emilio@elopez.com.ar>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 22 Mar 2013 15:23:33 +0100
+Subject: [PATCH 1/4] ARM: at91/dt: fix macb node declaration
+In-Reply-To: <cover.1363960549.git.nicolas.ferre@atmel.com>
+References: <cover.1363960549.git.nicolas.ferre@atmel.com>
+Message-ID: <de2f34900ed05369639eb613ee183949411d9f77.1363960549.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For the port controller to work, we need to enable the apb0_pio gate.
-This commit adds the ability to enable one clock specified on the device
-tree to the pinctrl driver.
+Macb0 node cannot be activated in generic sam9x5ek.dtsi file
+as the sam9g15 does not have one.
+Move the macb0 & macb1 activation in board .dts file that
+support them.
 
-Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- drivers/pinctrl/pinctrl-sunxi.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/at91sam9g25ek.dts |  9 +++++++++
+ arch/arm/boot/dts/at91sam9g35ek.dts |  9 +++++++++
+ arch/arm/boot/dts/at91sam9x25ek.dts | 14 ++++++++++++++
+ arch/arm/boot/dts/at91sam9x35ek.dts |  9 +++++++++
+ arch/arm/boot/dts/at91sam9x5ek.dtsi |  5 -----
+ 5 files changed, 41 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/pinctrl/pinctrl-sunxi.c b/drivers/pinctrl/pinctrl-sunxi.c
-index 3e41cd1..a1e2af7 100644
---- a/drivers/pinctrl/pinctrl-sunxi.c
-+++ b/drivers/pinctrl/pinctrl-sunxi.c
-@@ -11,6 +11,7 @@
-  */
- 
- #include <linux/io.h>
-+#include <linux/clk.h>
- #include <linux/gpio.h>
- #include <linux/module.h>
- #include <linux/of.h>
-@@ -1917,6 +1918,7 @@ static int sunxi_pinctrl_probe(struct platform_device *pdev)
- 	struct pinctrl_pin_desc *pins;
- 	struct sunxi_pinctrl *pctl;
- 	int i, ret, last_pin;
-+	struct clk *clk;
- 
- 	pctl = devm_kzalloc(&pdev->dev, sizeof(*pctl), GFP_KERNEL);
- 	if (!pctl)
-@@ -1987,6 +1989,12 @@ static int sunxi_pinctrl_probe(struct platform_device *pdev)
- 			goto gpiochip_error;
- 	}
- 
-+	clk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(clk))
-+		goto gpiochip_error;
+diff --git a/arch/arm/boot/dts/at91sam9g25ek.dts b/arch/arm/boot/dts/at91sam9g25ek.dts
+index c5ab16f..a1c511f 100644
+--- a/arch/arm/boot/dts/at91sam9g25ek.dts
++++ b/arch/arm/boot/dts/at91sam9g25ek.dts
+@@ -13,4 +13,13 @@
+ / {
+ 	model = "Atmel AT91SAM9G25-EK";
+ 	compatible = "atmel,at91sam9g25ek", "atmel,at91sam9x5ek", "atmel,at91sam9x5", "atmel,at91sam9";
 +
-+	clk_prepare_enable(clk);
++	ahb {
++		apb {
++			macb0: ethernet at f802c000 {
++				phy-mode = "rmii";
++				status = "okay";
++			};
++		};
++	};
+ };
+diff --git a/arch/arm/boot/dts/at91sam9g35ek.dts b/arch/arm/boot/dts/at91sam9g35ek.dts
+index 95944bd..6f58ab8 100644
+--- a/arch/arm/boot/dts/at91sam9g35ek.dts
++++ b/arch/arm/boot/dts/at91sam9g35ek.dts
+@@ -13,4 +13,13 @@
+ / {
+ 	model = "Atmel AT91SAM9G35-EK";
+ 	compatible = "atmel,at91sam9g35ek", "atmel,at91sam9x5ek", "atmel,at91sam9x5", "atmel,at91sam9";
 +
- 	dev_info(&pdev->dev, "initialized sunXi PIO driver\n");
++	ahb {
++		apb {
++			macb0: ethernet at f802c000 {
++				phy-mode = "rmii";
++				status = "okay";
++			};
++		};
++	};
+ };
+diff --git a/arch/arm/boot/dts/at91sam9x25ek.dts b/arch/arm/boot/dts/at91sam9x25ek.dts
+index af907ea..3b40d11 100644
+--- a/arch/arm/boot/dts/at91sam9x25ek.dts
++++ b/arch/arm/boot/dts/at91sam9x25ek.dts
+@@ -13,4 +13,18 @@
+ / {
+ 	model = "Atmel AT91SAM9G25-EK";
+ 	compatible = "atmel,at91sam9x25ek", "atmel,at91sam9x5ek", "atmel,at91sam9x5", "atmel,at91sam9";
++
++	ahb {
++		apb {
++			macb0: ethernet at f802c000 {
++				phy-mode = "rmii";
++				status = "okay";
++			};
++
++			macb1: ethernet at f8030000 {
++				phy-mode = "rmii";
++				status = "okay";
++			};
++		};
++	};
+ };
+diff --git a/arch/arm/boot/dts/at91sam9x35ek.dts b/arch/arm/boot/dts/at91sam9x35ek.dts
+index 5ccb607..6ad19a0 100644
+--- a/arch/arm/boot/dts/at91sam9x35ek.dts
++++ b/arch/arm/boot/dts/at91sam9x35ek.dts
+@@ -13,4 +13,13 @@
+ / {
+ 	model = "Atmel AT91SAM9X35-EK";
+ 	compatible = "atmel,at91sam9x35ek", "atmel,at91sam9x5ek", "atmel,at91sam9x5", "atmel,at91sam9";
++
++	ahb {
++		apb {
++			macb0: ethernet at f802c000 {
++				phy-mode = "rmii";
++				status = "okay";
++			};
++		};
++	};
+ };
+diff --git a/arch/arm/boot/dts/at91sam9x5ek.dtsi b/arch/arm/boot/dts/at91sam9x5ek.dtsi
+index 8a7cf1d..f7841f6 100644
+--- a/arch/arm/boot/dts/at91sam9x5ek.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5ek.dtsi
+@@ -52,11 +52,6 @@
+ 				status = "okay";
+ 			};
  
- 	return 0;
+-			macb0: ethernet at f802c000 {
+-				phy-mode = "rmii";
+-				status = "okay";
+-			};
+-
+ 			i2c0: i2c at f8010000 {
+ 				status = "okay";
+ 			};
 -- 
-1.8.2
+1.8.0
