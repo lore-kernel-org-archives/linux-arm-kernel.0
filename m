@@ -1,59 +1,17 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 22 Mar 2013 11:20:59 +0100
-Subject: [PATCH v5 01/17] of/pci: Provide support for parsing PCI DT
- ranges property
-In-Reply-To: <20130322101238.GA22929@avionic-0098.mockup.avionic-design.de>
-References: <1363887025-19931-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1363887025-19931-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130322101238.GA22929@avionic-0098.mockup.avionic-design.de>
-Message-ID: <20130322112059.35675858@skate>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 22 Mar 2013 11:20:58 +0100
+Subject: [PATCH] MAINTAINERS: add maintainer entry for atmel i2c driver
+In-Reply-To: <1363361577-7770-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1363361577-7770-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <20130322102058.GE8240@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Mar 15, 2013 at 04:32:57PM +0100, ludovic.desroches at atmel.com wrote:
+> From: Ludovic Desroches <ludovic.desroches@atmel.com>
+> 
+> Create an entry for atmel i2c driver: i2c-at91.c
+> 
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-On Fri, 22 Mar 2013 11:12:39 +0100, Thierry Reding wrote:
-
-> This sounds like you're trying to do too much within the for loop. When
-> we discussed this previously I had a vague idea that this functionality
-> could be wrapped into something a bit more object-like.
-> 
-> What I had in mind was something like:
-> 
-> 	struct of_pci_range_parser;
-> 	struct of_pci_range;
-> 
-> 	struct of_pci_range_parser parser;
-> 	struct of_pci_range range;
-> 
-> 	err = of_pci_range_parser(&parser, np);
-> 	if (err < 0)
-> 		return err;
-> 
-> 	for_each_of_pci_range(range, parser) {
-> 		struct resource res;
-> 
-> 		...
-> 		usage of range similar to iterator
-> 		...
-> 
-> 		of_pci_range_to_resource(&res, &range);
-> 	}
-> 
-> In the above the of_pci_range structure pretty much replaces the
-> iterator and the whole is wrapped up within a parser structure to give
-> some extra flexibility and provides for easier (or more structured)
-> setup compared to doing all of it within the loop statement.
-> 
-> But aside from the (perceived?) increased robustness there's not a lot
-> of technical benefit over your implementation, so it isn't a very hard
-> objection. I find it to be a little more encapsulated and therefore
-> easier to work with, but that's possibly just a matter of taste.
-
-I don't have a strong opinion on this. Andrew, what do you think?
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Applied to for-current, thanks!
