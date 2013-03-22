@@ -1,21 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 22 Mar 2013 11:09:07 +0000
-Subject: [PATCH 2/3] ARM: sched_clock: support 64-bit counters
-In-Reply-To: <514B1311.20308@codeaurora.org>
-References: <1363055197-17296-1-git-send-email-robherring2@gmail.com>
- <1363055197-17296-3-git-send-email-robherring2@gmail.com>
- <514B1311.20308@codeaurora.org>
-Message-ID: <20130322110907.GY4977@n2100.arm.linux.org.uk>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 22 Mar 2013 12:13:44 +0100
+Subject: [PATCH V2 2/3] clk: Improve errorhandling for clk_set_parent
+In-Reply-To: <20130321210019.834.12024@quantum>
+References: <1363873693-30902-1-git-send-email-ulf.hansson@stericsson.com>
+ <1363873693-30902-3-git-send-email-ulf.hansson@stericsson.com>
+ <20130321210019.834.12024@quantum>
+Message-ID: <CAPDyKFoy88aQ1XCQUdUWBBMmxYtUrCaYx_zV0uT4Eef+cq4aNg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 21, 2013 at 10:02:57AM -0400, Christopher Covington wrote:
-> To be more precise, architected timers are anywhere between 56 and 64 bits
-> wide, zero-extended to 64-bits. See section B8.1.1 of the ARM ARM rev C.b. I
-> don't know if the code really needs to change until someone has a need to
-> distinguish more finely between timers, but if you're using access size as an
-> approximation for counter width, I feel like it at least deserves a mention in
-> the comments.
+On 21 March 2013 22:00, Mike Turquette <mturquette@linaro.org> wrote:
+> Quoting Ulf Hansson (2013-03-21 06:48:12)
+>> @@ -1344,8 +1341,9 @@ out:
+>>  int clk_set_parent(struct clk *clk, struct clk *parent)
+>>  {
+>>         int ret = 0;
+>> +       u8 p_index;
+>>
+>> -       if (!clk || !clk->ops)
+>> +       if (!clk || !clk->ops || !parent)
+>>                 return -EINVAL;
+>>
+>
+> A NULL clock is valid according to the clk.h api.  I would like to allow
+> parent to be NULL, resulting in a migration from the real clock tree to
+> the orphans list.
 
-If the counter is such that it doesn't produce a full 64-bit nsec value
-from sched_clock(), then it needs to be extended to 64-bit.
+Sorry, did not think of this. Will correct.
+
+>
+> This feature was apparently buggy for some time and Rajagopal sent me a
+> patch off-list to fix it.  Rajagopal, can you post your patch publicly?
+
+So, that is also why I removed this. Anyway, I guess it is somewhat
+easier for me to make a fixup so we can accept NULL as parents. I give
+it a try.
+
+>
+> Thanks,
+> Mike
