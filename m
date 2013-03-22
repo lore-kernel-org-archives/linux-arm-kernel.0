@@ -1,34 +1,43 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 22 Mar 2013 12:19:09 -0700
-Subject: [PATCH 1/1] clk: Fix incorrect return type in clk.c
-In-Reply-To: <CADTbHxrF5M++Y5ku90uN7n6Jx=o80qY+dFX+B_s0udSC06D-PQ@mail.gmail.com>
-References: <1363168069-11331-1-git-send-email-sachin.kamat@linaro.org>
- <CADTbHxrF5M++Y5ku90uN7n6Jx=o80qY+dFX+B_s0udSC06D-PQ@mail.gmail.com>
-Message-ID: <20130322191909.834.66730@quantum>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 22 Mar 2013 20:22:48 +0100
+Subject: Integrator PCI base dilemma
+In-Reply-To: <20130322103740.GW4977@n2100.arm.linux.org.uk>
+References: <CACRpkdaOjFhWR21w5x_rR_60ffQF3Ym_MQd2svNyzm0guwOUoQ@mail.gmail.com>
+ <201303211302.19058.arnd@arndb.de>
+ <20130321234004.GV4977@n2100.arm.linux.org.uk>
+ <201303220948.28092.arnd@arndb.de>
+ <20130322103740.GW4977@n2100.arm.linux.org.uk>
+Message-ID: <CACRpkdb5Q+EtM0GGaLFNUj1A12zVrcyUxzRvfEOpcH4-pVuasA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Pankaj Jangra (2013-03-13 10:09:18)
-> Hi.
-> 
-> On Wed, Mar 13, 2013 at 3:17 PM, Sachin Kamat <sachin.kamat@linaro.org> wrote:
-> > Return type of function clk_propagate_rate_change is a pointer.
-> > But 0 was being returned. Change it to NULL.
-> > Silences the following warning:
-> > drivers/clk/clk.c:977:24: warning: Using plain integer as NULL pointer
-> >
-> > Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
-> > ---
-> >  drivers/clk/clk.c |    2 +-
-> 
-> Looks good to me.
-> Reviewed-by: Pankaj Jangra <jangra.pankaj9@gmail.com>
-> 
+On Fri, Mar 22, 2013 at 11:37 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
 
-Thanks for the fix.  Taken into clk-next.
+> On Fri, Mar 22, 2013 at 09:48:27AM +0000, Arnd Bergmann wrote:
+>> Yes, I was assuming that Linus would keep Integrator/AP working since that is
+>> what he uses.
+>
+> It's entirely possible that Linus doesn't use a VGA card with Integrator/AP
+> if Linus is not using MILO - because MILO was the only boot loader for
+> that platform which had an x86 emulator built in to run the VGA BIOS to
+> initialize the VGA card.
 
-Regards,
-Mike
+You are right, or, well, I have had an S3 VGA card plugged in and been
+scratching my head wondering how I should get the damned thing to
+work.
 
-> Regards,
-> Pankaj Jangra
+Now I *know* there is not really a way for me to make this work
+with the kernel only.
+
+> There are two boot loaders I'm aware of which are capable of doing this,
+> and those are MILO and my boot loader for Footbridge platforms (which,
+> incidentally, now runs ATA card BIOSes too complete with input support
+> and can push out the VGA output via serial and accept keypresses via
+> serial) - and that doesn't work on Integrator/AP.
+
+I'm on U-boot for this thing, I wonder if that can do x86
+emulation to initialize VGA card. I guess I'm about to learn.
+
+Yours,
+Linus Walleij
