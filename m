@@ -1,52 +1,25 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Fri, 22 Mar 2013 15:24:55 +0100
+From: davem@davemloft.net (David Miller)
+Date: Fri, 22 Mar 2013 10:26:26 -0400 (EDT)
 Subject: [PATCH 0/4 v3] mv643xx_eth: use mvmdio MDIO bus driver
-In-Reply-To: <20130322141423.GJ13280@titan.lakedaemon.net>
+In-Reply-To: <1363959568-16976-1-git-send-email-florian@openwrt.org>
 References: <1363284515-9865-1-git-send-email-florian@openwrt.org>
  <1363959568-16976-1-git-send-email-florian@openwrt.org>
- <20130322141423.GJ13280@titan.lakedaemon.net>
-Message-ID: <514C69B7.8090106@openwrt.org>
+Message-ID: <20130322.102626.1889236227505288422.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 03/22/13 15:14, Jason Cooper a ?crit :
-> On Fri, Mar 22, 2013 at 02:39:24PM +0100, Florian Fainelli wrote:
->> Hi all,
->>
->> This patch converts the mv643xx_eth driver to use the mvmdio MDIO bus driver
->> instead of rolling its own implementation. As a result, all users of this
->> mv643xx_eth driver are converted to register an "orion-mdio" platform_device.
->> The mvmdio driver is also updated to support an interrupt line which reports
->> SMI error/completion, and to allow traditionnal platform device registration
->> instead of just device tree.
->>
->> David, I think it makes sense for you to merge all of this, since we do
->> not want the architecture files to be desynchronized from the mv643xx_eth to
->> avoid runtime breakage. The potential for merge conflicts should be very small.
->>
->> Florian Fainelli (4):
->>    net: mvmdio: allow platform device style registration
->>    net: mvmdio: rename base register cookie from smireg to regs
->>    net: mvmdio: enhance driver to support SMI error/done interrupts
->>    mv643xx_eth: convert to use the Marvell Orion MDIO driver
->>
->>   .../devicetree/bindings/net/marvell-orion-mdio.txt |    3 +
->>   arch/arm/plat-orion/common.c                       |   54 +++---
->>   arch/powerpc/platforms/chrp/pegasos_eth.c          |   20 ++
->>   arch/powerpc/sysdev/mv64x60_dev.c                  |   16 +-
->>   drivers/net/ethernet/marvell/Kconfig               |    5 +-
->>   drivers/net/ethernet/marvell/Makefile              |    2 +-
->>   drivers/net/ethernet/marvell/mv643xx_eth.c         |  195 ++------------------
->>   drivers/net/ethernet/marvell/mvmdio.c              |  130 ++++++++++---
->>   include/linux/mv643xx_eth.h                        |    1 -
->>   9 files changed, 187 insertions(+), 239 deletions(-)
->
-> Whole series applied on top of v3.9-rc3 and tested on dreamplug
-> (kirkwood DT boot with legacy mv643xx_eth init)
+From: Florian Fainelli <florian@openwrt.org>
+Date: Fri, 22 Mar 2013 14:39:24 +0100
 
-Ok, thanks! Does that mean that you want these changes to go via your 
-tree? David initially applied my v2 of this patchset, and since it 
-thouches mostly ethernet driver stuff, I would rather make it go via his 
-tree if both of you agree.
---
-Florian
+> This patch converts the mv643xx_eth driver to use the mvmdio MDIO bus driver
+> instead of rolling its own implementation. As a result, all users of this
+> mv643xx_eth driver are converted to register an "orion-mdio" platform_device.
+> The mvmdio driver is also updated to support an interrupt line which reports
+> SMI error/completion, and to allow traditionnal platform device registration
+> instead of just device tree.
+> 
+> David, I think it makes sense for you to merge all of this, since we do
+> not want the architecture files to be desynchronized from the mv643xx_eth to
+> avoid runtime breakage. The potential for merge conflicts should be very small.
+
+Series applied to net-next, thanks Florian.
