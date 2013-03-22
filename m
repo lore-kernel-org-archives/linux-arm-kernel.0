@@ -1,30 +1,46 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Fri, 22 Mar 2013 10:24:08 -0400 (EDT)
-Subject: [PATCH] USB: EHCI: fix for leaking isochronous data
-In-Reply-To: <514B86A9.60401@web.de>
-Message-ID: <Pine.LNX.4.44L0.1303221023310.1294-100000@iolanthe.rowland.org>
+From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
+Date: Fri, 22 Mar 2013 11:20:42 -0300
+Subject: [PATCH 6/6] clk: sunxi: drop CLK_IGNORE_UNUSED
+In-Reply-To: <1363962042-29536-1-git-send-email-emilio@elopez.com.ar>
+References: <1363962042-29536-1-git-send-email-emilio@elopez.com.ar>
+Message-ID: <1363962042-29536-7-git-send-email-emilio@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 21 Mar 2013, Soeren Moch wrote:
+This flag was in place to prevent important clocks from getting gated
+while they had no users. Now that the UART driver supports clocks
+properly, we can drop this.
 
-> > Hi Alan, Soeren
-> >
-> > Could you word the description a bit better. If Alan did not get it
-> > without a bit of thought, few others are going to understand it
-> > without a better explanation.
-> >
-> > Thanks
-> > 	Andrew
-> >
-> 
-> Alan,
-> 
-> can you come up with a better explanation, please? I think your 
-> description how it is supposed to work from here
->     http://marc.info/?l=linux-usb&m=136345559432055&w=2
-> is required to understand the problem and the fix.
+Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+---
+ drivers/clk/sunxi/clk-sunxi.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-Okay, I will rewrite your patch description.
-
-Alan Stern
+diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+index 30d71f4..44c32fc 100644
+--- a/drivers/clk/sunxi/clk-sunxi.c
++++ b/drivers/clk/sunxi/clk-sunxi.c
+@@ -41,8 +41,8 @@ static void __init sunxi_osc_clk_setup(struct device_node *node)
+ 
+ 	parent = of_clk_get_parent_name(node, 0);
+ 
+-	clk = clk_register_gate(NULL, clk_name, parent, CLK_IGNORE_UNUSED,
+-				reg, SUNXI_OSC24M_GATE, 0, &clk_lock);
++	clk = clk_register_gate(NULL, clk_name, parent, 0, reg,
++				SUNXI_OSC24M_GATE, 0, &clk_lock);
+ 
+ 	if (clk) {
+ 		of_clk_add_provider(node, of_clk_src_simple_get, clk);
+@@ -198,8 +198,8 @@ static void __init sunxi_factors_clk_setup(struct device_node *node,
+ 
+ 	parent = of_clk_get_parent_name(node, 0);
+ 
+-	clk = clk_register_factors(NULL, clk_name, parent, CLK_IGNORE_UNUSED,
+-				   reg, data->table, data->getter, &clk_lock);
++	clk = clk_register_factors(NULL, clk_name, parent, 0, reg,
++				   data->table, data->getter, &clk_lock);
+ 
+ 	if (clk) {
+ 		of_clk_add_provider(node, of_clk_src_simple_get, clk);
+-- 
+1.8.2
