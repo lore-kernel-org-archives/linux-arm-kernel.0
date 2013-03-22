@@ -1,20 +1,24 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 22 Mar 2013 20:28:14 +0000
-Subject: [PATCH 1/5] ARM: ux500: Add machine support for ccu8540
-In-Reply-To: <20130322172911.GH4977@n2100.arm.linux.org.uk>
-References: <1363966065-2478-1-git-send-email-lee.jones@linaro.org>
- <20130322172346.GG4977@n2100.arm.linux.org.uk>
- <20130322172911.GH4977@n2100.arm.linux.org.uk>
-Message-ID: <201303222028.14953.arnd@arndb.de>
+Date: Fri, 22 Mar 2013 20:30:53 +0000
+Subject: [PATCH] ARM: tegra: fix register address of slink controller
+In-Reply-To: <1363977306-7548-1-git-send-email-swarren@wwwdotorg.org>
+References: <1363977306-7548-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <201303222030.53942.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 22 March 2013, Russell King - ARM Linux wrote:
-> As I've said before, do not remove entries from this file because
-> they will get replaced when it gets updated from the website version.
+On Friday 22 March 2013, Stephen Warren wrote:
+> From: Laxman Dewangan <ldewangan@nvidia.com>
+> 
+> Fix typo on register address of slink3 controller where register
+> address is wrongly set as 0x7000d480 but it is 0x7000d800.
+> 
+> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+> Cc: <stable@vger.kernel.org>
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+> Arnd, Olof, this is a fix for v3.9.
 
-Sorry about that. For some reason when I merged those patches, I thought
-your script would automatically remove entries that are no longer used
-in the kernel.
+Applied to fixes branch, thanks!
 
 	Arnd
