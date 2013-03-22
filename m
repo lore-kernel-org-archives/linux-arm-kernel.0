@@ -1,52 +1,64 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Fri, 22 Mar 2013 08:03:07 -0400
-Subject: [PATCH 2/3] ARM: sched_clock: support 64-bit counters
-In-Reply-To: <514B866A.3010308@gmail.com>
-References: <1363055197-17296-1-git-send-email-robherring2@gmail.com>
- <1363055197-17296-3-git-send-email-robherring2@gmail.com>
- <514B1311.20308@codeaurora.org> <514B866A.3010308@gmail.com>
-Message-ID: <514C487B.4020208@codeaurora.org>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Fri, 22 Mar 2013 14:06:25 +0200
+Subject: [PATCH] clk: tegra: Don't enable PLLs during early boot
+Message-ID: <1363953995-29889-1-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+The PLL code relies on udelay() which is not available when CCF is
+initialized. Hence we can't enable any PLL during this phase.
 
-On 03/21/2013 06:15 PM, Rob Herring wrote:
-> On 03/21/2013 09:02 AM, Christopher Covington wrote:
->> Hi Rob,
->>
->> On 03/11/2013 10:26 PM, Rob Herring wrote:
->>> From: Rob Herring <rob.herring@calxeda.com>
->>>
->>> With architected timers, we now have 64-bit counters which can be used
->>> directly for sched_clock. However, the ARM sched_clock code currently just
->>> uses the lower 32-bits and handles wrapping in software. Add support for
->>> using the full 64-bit counter values. If multiple counters are registered,
->>> a 64-bit counter is preferred.
->>
->> To be more precise, architected timers are anywhere between 56 and 64 bits
->> wide, zero-extended to 64-bits. See section B8.1.1 of the ARM ARM rev C.b. I
->> don't know if the code really needs to change until someone has a need to
->> distinguish more finely between timers, but if you're using access size as an
->> approximation for counter width, I feel like it at least deserves a mention in
->> the comments.
-> 
-> Is there a defined way to determine the number of active bits?
-> setup_sched_clock could be generalized to take any sizes >32 - 64 bits,
-> but then we need some threshold as to when we need to worry about
-> wrapping or not.
+Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
 
-An easy way isn't clear to me. As a thought experiment, one might be able to
-write all ones to the CNTCV and see what sticks, or if that doesn't work,
-write 56 ones, turn the timer on and see if that rolls over, and if not check
-57 ones, etc. However, the write(s) are only possible using the memory-mapped
-interface from the secure world while the timer is off. Perhaps the width
-could be enumerated in the device tree entry.
+--
 
-Regards,
-Christopher
+Stephen,
 
+Can you confirm this is ok for the audio drivers?
+
+We used to be lucky that this has worked up to now, but I will introduce some
+changes to the pll lock check code which cause this to fail due to the
+slight differences in timing.
+
+---
+ drivers/clk/tegra/clk-tegra20.c |    4 ++--
+ drivers/clk/tegra/clk-tegra30.c |    8 ++++----
+ 2 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/clk/tegra/clk-tegra20.c b/drivers/clk/tegra/clk-tegra20.c
+index b92d48b..7cc76b0 100644
+--- a/drivers/clk/tegra/clk-tegra20.c
++++ b/drivers/clk/tegra/clk-tegra20.c
+@@ -1230,8 +1230,8 @@ static __initdata struct tegra_clk_init_table init_table[] = {
+ 	{usbd, clk_max, 12000000, 0},
+ 	{usb2, clk_max, 12000000, 0},
+ 	{usb3, clk_max, 12000000, 0},
+-	{pll_a, clk_max, 56448000, 1},
+-	{pll_a_out0, clk_max, 11289600, 1},
++	{pll_a, clk_max, 56448000, 0},
++	{pll_a_out0, clk_max, 11289600, 0},
+ 	{cdev1, clk_max, 0, 1},
+ 	{blink, clk_max, 32768, 1},
+ 	{i2s1, pll_a_out0, 11289600, 0},
+diff --git a/drivers/clk/tegra/clk-tegra30.c b/drivers/clk/tegra/clk-tegra30.c
+index ba6f51b..b705408 100644
+--- a/drivers/clk/tegra/clk-tegra30.c
++++ b/drivers/clk/tegra/clk-tegra30.c
+@@ -1882,11 +1882,11 @@ static __initdata struct tegra_clk_init_table init_table[] = {
+ 	{uartc, pll_p, 408000000, 0},
+ 	{uartd, pll_p, 408000000, 0},
+ 	{uarte, pll_p, 408000000, 0},
+-	{pll_a, clk_max, 564480000, 1},
+-	{pll_a_out0, clk_max, 11289600, 1},
+-	{extern1, pll_a_out0, 0, 1},
++	{pll_a, clk_max, 564480000, 0},
++	{pll_a_out0, clk_max, 11289600, 0},
++	{extern1, pll_a_out0, 0, 0},
+ 	{clk_out_1_mux, extern1, 0, 0},
+-	{clk_out_1, clk_max, 0, 1},
++	{clk_out_1, clk_max, 0, 0},
+ 	{blink, clk_max, 0, 1},
+ 	{i2s0, pll_a_out0, 11289600, 0},
+ 	{i2s1, pll_a_out0, 11289600, 0},
 -- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+1.7.7.rc0.72.g4b5ea.dirty
