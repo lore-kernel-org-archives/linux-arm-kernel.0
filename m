@@ -1,218 +1,76 @@
-From: prabhakar.csengg@gmail.com (Prabhakar lad)
-Date: Fri, 22 Mar 2013 13:33:08 +0530
-Subject: [PATCH v7 2/2] ARM: davinci: dm365 EVM: add support for VPBE display
-In-Reply-To: <1363939388-22412-1-git-send-email-prabhakar.csengg@gmail.com>
-References: <1363939388-22412-1-git-send-email-prabhakar.csengg@gmail.com>
-Message-ID: <1363939388-22412-3-git-send-email-prabhakar.csengg@gmail.com>
+From: s-guiriec@ti.com (Sebastien Guiriec)
+Date: Fri, 22 Mar 2013 09:07:21 +0100
+Subject: [PATCH 2/2] ASoC: dmaengine_pcm: add
+ snd_dmaengine_generic_pcm_open()
+In-Reply-To: <20130321145258.GC23109@S2101-09.ap.freescale.net>
+References: <1363318601-31505-1-git-send-email-shawn.guo@linaro.org>
+ <1363318601-31505-3-git-send-email-shawn.guo@linaro.org>
+ <20130321095718.GO10326@intel.com>
+ <20130321145258.GC23109@S2101-09.ap.freescale.net>
+Message-ID: <514C1139.6050309@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+On 03/21/2013 03:53 PM, Shawn Guo wrote:
+> On Thu, Mar 21, 2013 at 03:27:18PM +0530, Vinod Koul wrote:
+>> On Fri, Mar 15, 2013 at 11:36:41AM +0800, Shawn Guo wrote:
+>>> With generic DMA device tree binding and helper function
+>>> dma_request_slave_channel() in place, dmaengine_pcm should support
+>>> that in requesting DMA channel for users that support generic DMA
+>>> device tree binding.
+>>>
+>>> Add a new API snd_dmaengine_generic_pcm_open() as the variant of
+>>> snd_dmaengine_pcm_open().  It takes DMA client struct device pointer
+>>> and slave channel name as arguments and calls generic DMA helper
+>>> dma_request_slave_channel() to request DMA channel from dmaengine.
+>> NAK
+>>
+>> This is why we have dma_request_slave_channel_compat() API. You dont need to
+>> write two open handlers here, just pass all the arguments and if DT is set it
+>> will allocate a channel using dma_request_slave_channel() otherwise will do
+>> dma_request_channel which is what you need.
+>
+> I do not quite follow your comment.  Let me try to understand it.  Are
+> you suggesting that instead of the current call path:
+>
+> 	snd_dmaengine_pcm_open()
+> 		dmaengine_pcm_request_channel()
+> 			dma_request_channel()
+>
+> we should change it as below?
+>
+> 	snd_dmaengine_pcm_open()
+> 		dmaengine_pcm_request_channel()
+> 			dma_request_slave_channel_compat()
+>
+> If that's the case, you are fundamentally requesting to change the
+> fingerprint of API snd_dmaengine_pcm_open() from the existing:
+>
+> int snd_dmaengine_pcm_open(struct snd_pcm_substream *substream,
+> 			   dma_filter_fn filter_fn, void *filter_data)
+>
+> to something like:
+>
+> int snd_dmaengine_pcm_open(struct snd_pcm_substream *substream,
+> 			   dma_filter_fn filter_fn, void *filter_data,
+> 			   struct device *dev, const char *name)
+>
+> So every single user of snd_dmaengine_pcm_open() needs to adapt to the
+> interface change.
+>
+> Is my understanding correct?  Or have I misunderstood your comment?
 
-add support for V4L2 video display to DM365 EVM.
-Support for SD and ED modes is provided, along with Composite
-and Component outputs.
+This is what has been done on OMAP for other IPs. I have tested this 
+solution for Audio before you submit your first series and it is working.
 
-Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
----
- arch/arm/mach-davinci/board-dm365-evm.c |  164 ++++++++++++++++++++++++++++++-
- 1 files changed, 163 insertions(+), 1 deletions(-)
+Now I will wait Lars serie to check again on OMAP and let Mark comment 
+on the best approach. Whereas update current API like you propose or 
+wait Lars series and move on according to the different comments done on 
+open function. As OMAP audio DMA binding are depending on the chosen 
+solution.
 
-diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
-index cf77c46..0518ce5 100644
---- a/arch/arm/mach-davinci/board-dm365-evm.c
-+++ b/arch/arm/mach-davinci/board-dm365-evm.c
-@@ -27,6 +27,7 @@
- #include <linux/input.h>
- #include <linux/spi/spi.h>
- #include <linux/spi/eeprom.h>
-+#include <linux/v4l2-dv-timings.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -39,6 +40,7 @@
- #include <linux/platform_data/mtd-davinci.h>
- #include <linux/platform_data/keyscan-davinci.h>
- 
-+#include <media/ths7303.h>
- #include <media/tvp514x.h>
- 
- #include "davinci.h"
-@@ -374,6 +376,166 @@ static struct vpfe_config vpfe_cfg = {
- 	.ccdc = "ISIF",
- };
- 
-+/* venc standards timings */
-+static struct vpbe_enc_mode_info dm365evm_enc_std_timing[] = {
-+	{
-+		.name		= "ntsc",
-+		.timings_type	= VPBE_ENC_STD,
-+		.std_id		= V4L2_STD_525_60,
-+		.interlaced	= 1,
-+		.xres		= 720,
-+		.yres		= 480,
-+		.aspect		= {11, 10},
-+		.fps		= {30000, 1001},
-+		.left_margin	= 0x79,
-+		.upper_margin	= 0x10,
-+	},
-+	{
-+		.name		= "pal",
-+		.timings_type	= VPBE_ENC_STD,
-+		.std_id		= V4L2_STD_625_50,
-+		.interlaced	= 1,
-+		.xres		= 720,
-+		.yres		= 576,
-+		.aspect		= {54, 59},
-+		.fps		= {25, 1},
-+		.left_margin	= 0x7E,
-+		.upper_margin	= 0x16,
-+	},
-+};
-+
-+/* venc dv timings */
-+static struct vpbe_enc_mode_info dm365evm_enc_preset_timing[] = {
-+	{
-+		.name		= "480p59_94",
-+		.timings_type	= VPBE_ENC_DV_TIMINGS,
-+		.dv_timings	= V4L2_DV_BT_CEA_720X480P59_94,
-+		.interlaced	= 0,
-+		.xres		= 720,
-+		.yres		= 480,
-+		.aspect		= {1, 1},
-+		.fps		= {5994, 100},
-+		.left_margin	= 0x8F,
-+		.upper_margin	= 0x2D,
-+	},
-+	{
-+		.name		= "576p50",
-+		.timings_type	= VPBE_ENC_DV_TIMINGS,
-+		.dv_timings	= V4L2_DV_BT_CEA_720X576P50,
-+		.interlaced	= 0,
-+		.xres		= 720,
-+		.yres		= 576,
-+		.aspect		= {1, 1},
-+		.fps		= {50, 1},
-+		.left_margin	= 0x8C,
-+		.upper_margin   = 0x36,
-+	},
-+	{
-+		.name		= "720p60",
-+		.timings_type	= VPBE_ENC_DV_TIMINGS,
-+		.dv_timings	= V4L2_DV_BT_CEA_1280X720P60,
-+		.interlaced	= 0,
-+		.xres		= 1280,
-+		.yres		= 720,
-+		.aspect		= {1, 1},
-+		.fps		= {60, 1},
-+		.left_margin	= 0x117,
-+		.right_margin	= 70,
-+		.upper_margin	= 38,
-+		.lower_margin	= 3,
-+		.hsync_len	= 80,
-+		.vsync_len	= 5,
-+	},
-+	{
-+		.name		= "1080i60",
-+		.timings_type	= VPBE_ENC_DV_TIMINGS,
-+		.dv_timings	= V4L2_DV_BT_CEA_1920X1080I60,
-+		.interlaced	= 1,
-+		.xres		= 1920,
-+		.yres		= 1080,
-+		.aspect		= {1, 1},
-+		.fps		= {30, 1},
-+		.left_margin	= 0xc9,
-+		.right_margin	= 80,
-+		.upper_margin	= 30,
-+		.lower_margin	= 3,
-+		.hsync_len	= 88,
-+		.vsync_len	= 5,
-+	},
-+};
-+
-+#define VENC_STD_ALL	(V4L2_STD_NTSC | V4L2_STD_PAL)
-+
-+/*
-+ * The outputs available from VPBE + ecnoders. Keep the
-+ * the order same as that of encoders. First those from venc followed by that
-+ * from encoders. Index in the output refers to index on a particular
-+ * encoder.Driver uses this index to pass it to encoder when it supports more
-+ * than one output. Application uses index of the array to set an output.
-+ */
-+static struct vpbe_output dm365evm_vpbe_outputs[] = {
-+	{
-+		.output		= {
-+			.index		= 0,
-+			.name		= "Composite",
-+			.type		= V4L2_OUTPUT_TYPE_ANALOG,
-+			.std		= VENC_STD_ALL,
-+			.capabilities	= V4L2_OUT_CAP_STD,
-+		},
-+		.subdev_name	= DM365_VPBE_VENC_SUBDEV_NAME,
-+		.default_mode	= "ntsc",
-+		.num_modes	= ARRAY_SIZE(dm365evm_enc_std_timing),
-+		.modes		= dm365evm_enc_std_timing,
-+		.if_params	= V4L2_MBUS_FMT_FIXED,
-+	},
-+	{
-+		.output		= {
-+			.index		= 1,
-+			.name		= "Component",
-+			.type		= V4L2_OUTPUT_TYPE_ANALOG,
-+			.capabilities	= V4L2_OUT_CAP_DV_TIMINGS,
-+		},
-+		.subdev_name	= DM365_VPBE_VENC_SUBDEV_NAME,
-+		.default_mode	= "480p59_94",
-+		.num_modes	= ARRAY_SIZE(dm365evm_enc_preset_timing),
-+		.modes		= dm365evm_enc_preset_timing,
-+		.if_params	= V4L2_MBUS_FMT_FIXED,
-+	},
-+};
-+
-+/*
-+ * Amplifiers on the board
-+ */
-+struct ths7303_platform_data ths7303_pdata = {
-+	.ch_1 = 3,
-+	.ch_2 = 3,
-+	.ch_3 = 3,
-+	.init_enable = 1,
-+};
-+
-+static struct amp_config_info vpbe_amp = {
-+	.module_name	= "ths7303",
-+	.is_i2c		= 1,
-+	.board_info	= {
-+		I2C_BOARD_INFO("ths7303", 0x2c),
-+		.platform_data = &ths7303_pdata,
-+	}
-+};
-+
-+static struct vpbe_config dm365evm_display_cfg = {
-+	.module_name	= "dm365-vpbe-display",
-+	.i2c_adapter_id	= 1,
-+	.amp		= &vpbe_amp,
-+	.osd		= {
-+		.module_name	= DM365_VPBE_OSD_SUBDEV_NAME,
-+	},
-+	.venc		= {
-+		.module_name	= DM365_VPBE_VENC_SUBDEV_NAME,
-+	},
-+	.num_outputs	= ARRAY_SIZE(dm365evm_vpbe_outputs),
-+	.outputs	= dm365evm_vpbe_outputs,
-+};
-+
- static void __init evm_init_i2c(void)
- {
- 	davinci_init_i2c(&i2c_pdata);
-@@ -595,7 +757,7 @@ static __init void dm365_evm_init(void)
- 
- 	davinci_setup_mmc(0, &dm365evm_mmc_config);
- 
--	dm365_init_video(&vpfe_cfg, NULL);
-+	dm365_init_video(&vpfe_cfg, &dm365evm_display_cfg);
- 
- 	/* maybe setup mmc1/etc ... _after_ mmc0 */
- 	evm_init_cpld();
--- 
-1.7.4.1
+Sebastien.
+>
+> Shawn
+>
+>
