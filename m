@@ -1,32 +1,23 @@
 From: cjb@laptop.org (Chris Ball)
-Date: Fri, 22 Mar 2013 13:14:51 -0400
-Subject: [PATCH] sdhci: sirf: add mmc host sdhci-pltfm based driver for
- SiRF SoCs
-In-Reply-To: <1605490.1WxfNfZQTh@wuerfel> (Arnd Bergmann's message of "Thu, 21
- Mar 2013 11:13:34 +0100")
-References: <1363854439-6859-1-git-send-email-Barry.Song@csr.com>
- <1605490.1WxfNfZQTh@wuerfel>
-Message-ID: <87fvznl5kk.fsf@octavius.laptop.org>
+Date: Fri, 22 Mar 2013 13:17:50 -0400
+Subject: [PATCH for 3.9 v3] mmc: mvsdio: fix non-DT probing of GPIOs
+In-Reply-To: <1363959023-25661-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ (Thomas Petazzoni's message of "Fri, 22 Mar 2013 14:30:23 +0100")
+References: <1363959023-25661-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <874ng3l5fl.fsf@octavius.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Thu, Mar 21 2013, Arnd Bergmann wrote:
-> On Thursday 21 March 2013 16:27:19 Barry Song wrote:
->> From: Barry Song <Baohua.Song@csr.com>
->> 
->> this patch adds the new driver for CSR SiRF SoCs:
->> SiRFprimaII: unicore ARM Cortex-A9
->> SiRFatlas6: unicore ARM Cortex-A9
->> SiRFmarco: dual core ARM Cortex-A9 SMP
->> 
->> Signed-off-by: Barry Song <Baohua.Song@csr.com>
->> Signed-off-by: Bin Shi <Bin.Shi@csr.com>
->
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+On Fri, Mar 22 2013, Thomas Petazzoni wrote:
+> Ralph Droms <rdroms@gmail.com> reported that 3.9-rc was breaking the
+> SDIO interface on his Sheevaplug platform, and that the recent changes
+> to the mvsdio driver are responsible for this breakage. Precisely, the
+> regression has been introduced by 07728b77c03d (mmc: mvsdio: use
+> slot-gpio for card detect gpio).
 
-Thanks, pushed to mmc-next for 3.10.
+Thanks, pushed to mmc-next for 3.9-rc.
 
 - Chris.
 -- 
