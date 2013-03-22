@@ -1,36 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 22 Mar 2013 06:55:25 +0000
-Subject: [PATCH 5/5] arm: dts: Convert mvebu device tree files to 64 bits
-In-Reply-To: <EE71107DF0D1F24FA2D95041E64AB9E801A56C7B6D25@IL-MB01.marvell.com>
-References: <1363883179-1361-1-git-send-email-gregory.clement@free-electrons.com>
- <20130321214607.GC8431@obsidianresearch.com>
- <EE71107DF0D1F24FA2D95041E64AB9E801A56C7B6D25@IL-MB01.marvell.com>
-Message-ID: <201303220655.25882.arnd@arndb.de>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Fri, 22 Mar 2013 00:13:31 -0700 (PDT)
+Subject: [PATCH 0/3] ARM: shmobile: Add SMSC support on Bock-W
+Message-ID: <87zjxvewko.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 21 March 2013, Lior Amsalem wrote:
-> > From: Jason Gunthorpe [mailto:jgunthorpe at obsidianresearch.com]
-> > Sent: Thursday, March 21, 2013 11:46 PM
-> >
-> > On Thu, Mar 21, 2013 at 11:35:21PM +0200, Lior Amsalem wrote:
-> > 
-> > > >  *) It would require Linux to change the internal registers address
-> > > >     (for now the kernel relies on the bootloader). The problem is that
-> > > >     we can't do it early enough to preserve the earlyprintk
-> > > >     functionality. Maybe you have suggestions on how to achieve that?
-> > >
-> > > Please note that all registers and IOs are still 32bit, the 40bit
-> > > extension is on the CPU to DRAM path (windows) only.
-> > 
-> > Ah, I did wonder, since Ezequiel's MBUS driver was the same as on prior
-> > families. I guess it is also the case that all on board DMA and DMA from PCI-E
-> > devices are restricted to the low 32 bits as well?
-> 
-> Correct, that's why we sets DMABOUNCE config.
-> 
 
-IIRC, DMABOUNCE does not work well in a multiplatform configuration. Have you tried
-using swiotlb instead?
+Hi Arnd, Simon, Magnus
 
-	Arnd
+These patch set add extpin support on r8a7778,
+and enable SMSC ether on Bock-W board
+
+This patch set is based on simon/next + my previous Bock-W patch set
+
+Kuninori Morimoto (3):
+      ARM: shmobile: define PLATFORM_xxx_INFO()
+      ARM: shmobile: r8a7778: add r8a7778_init_irq_extpin()
+      ARM: shmobile: bockw: add SMSC ethernet support
+
+ arch/arm/boot/dts/r8a7778-bockw.dts           |    2 +-
+ arch/arm/configs/bockw_defconfig              |   34 ++++++++-
+ arch/arm/mach-shmobile/Kconfig                |    1 +
+ arch/arm/mach-shmobile/board-bockw.c          |   37 ++++++++++
+ arch/arm/mach-shmobile/include/mach/common.h  |   20 ++++++
+ arch/arm/mach-shmobile/include/mach/r8a7778.h |    1 +
+ arch/arm/mach-shmobile/setup-r8a7778.c        |   92 +++++++++++++++++--------
+ 7 files changed, 156 insertions(+), 31 deletions(-)
+
+
+Best regards
+---
+Kuninori Morimoto
