@@ -1,101 +1,111 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 22 Mar 2013 10:39:08 +0200
-Subject: [RFC 1/8] RFC: CLK: OMAP: Add basic infrastructure for OMAP clocks
-In-Reply-To: <20130321185051.834.97551@quantum>
-References: <1363887347-4686-1-git-send-email-t-kristo@ti.com>
- <1363887347-4686-2-git-send-email-t-kristo@ti.com>
- <20130321185051.834.97551@quantum>
-Message-ID: <1363941548.15426.181.camel@sokoban>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 22 Mar 2013 14:50:05 +0530
+Subject: [PATCH v3 5/6] ARM: dts: omap: update usb_otg_hs data
+In-Reply-To: <514B3EEF.3080705@wwwdotorg.org>
+References: <1363770725-13717-1-git-send-email-kishon@ti.com>
+ <1363770725-13717-6-git-send-email-kishon@ti.com>
+ <514A233F.8010105@wwwdotorg.org> <514AA74D.9070506@ti.com>
+ <514B3EEF.3080705@wwwdotorg.org>
+Message-ID: <514C2245.4080506@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-03-21 at 11:50 -0700, Mike Turquette wrote:
-> Quoting Tero Kristo (2013-03-21 10:35:40)
-> > This patch adds basic infrastructure support for registering clocks
-> > under common clock framework. This patch is done in preparation for
-> > moving clock data from arch/arm/mach-omap2/ folder under /drivers/clk/omap.
-> > 
-> > Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> > Cc: Mike Turquette <mturquette@linaro.org>
-> 
-> Thanks for taking a crack at this Tero!  This is a great step towards
-> getting rid of clk-private.h.
+Hi,
 
-Hi Mike,
+On Thursday 21 March 2013 10:40 PM, Stephen Warren wrote:
+> On 03/21/2013 12:23 AM, kishon wrote:
+>> Hi,
+>>
+>> On Thursday 21 March 2013 02:29 AM, Stephen Warren wrote:
+>>> On 03/20/2013 03:12 AM, Kishon Vijay Abraham I wrote:
+>>>> Updated the usb_otg_hs dt data to include the *phy* and *phy-names*
+>>>> binding in order for the driver to use the new generic PHY framework.
+>>>> Also updated the Documentation to include the binding information.
+>>>
+>>>> diff --git a/Documentation/devicetree/bindings/usb/omap-usb.txt
+>>>> b/Documentation/devicetree/bindings/usb/omap-usb.txt
+>>>> index abce256..3d6f9f6 100644
+>>>> --- a/Documentation/devicetree/bindings/usb/omap-usb.txt
+>>>> +++ b/Documentation/devicetree/bindings/usb/omap-usb.txt
+>>>> @@ -19,6 +19,9 @@ OMAP MUSB GLUE
+>>>>     - power : Should be "50". This signifies the controller can supply
+>>>> upto
+>>>>       100mA when operating in host mode.
+>>>>     - usb-phy : the phandle for the PHY device
+>>>> + - phy : the phandle for the PHY device (used by generic PHY framework)
+>>>> + - phy-names : the names of the PHY corresponding to the PHYs
+>>>> present in the
+>>>> +   *phy* phandle.
+>>>
+>>> If the intent is for those properties to be generic and used by any DT
+>>> binding that refers to a PHY node, I think you'd want to define those
+>>> properties in e.g. Documentation/devicetree/bindings/phy/phy.txt, just
+>>> like common clock/GPIO/... properties are defined in standalone common
+>>> files.
+>>
+>> Ok. Will add it.
+>>>
+>>> I think you want to require that DT nodes that represent PHYs have a
+>>> #phy-cells property, and that the format of the phy property be
+>>> <&phy_phandle phy_specifier*>, where #phy-cells in the referenced node
+>>> defines how many cells are part of phy_specifier*, just like (almost)
+>>> any other DT property that references another node by phandle. That way,
+>>> if a single DT node represents a HW block that implements e.g. 3 PHYs,
+>>> it can use #phy-cells = <1>, and the referencing phy property can
+>>> include a cell that indicates which of those 3 PHYs is being referenced.
+>>
+>> Currently, if a single phandle have reference to multiple PHYs, we can
+>> get PHY by passing index or by name as give in phy-names.
+>> I'm not sure if we have <&phy_phandle phy_specifier*>, what could that
+>> phy_specifier be? Maybe phy_type?
+>
+> I'm not talking about the case where a consumer node references multiple
+> PHYs. As you say, that is indeed handled by the driver looking at a
+> particular index in the phys property, or using phy-names.
+>
+> I'm talking about the case where a single provider provides multiple
+> PHYs. For example, consider:
+>
+> phys: phy {
+>      compatible = "xxx";
+>      reg = <...>;
+>      #phy-cells = <1>;
+> };
+>
+> That node describes an IP block that implements 3 different PHYs. The
+> registers are inter-mixed in such a way that you can't split it into 3
+> separate nodes each with a separate device instance. If the consumers
+> simply say:
+>
+> phys = <&phys>;
+>
+> then which of the 3 PHYs are you referring to?
+>
+> Instead, the consumer needs to say one of:
+>
+> phys = <&phys 0>;
+> phys = <&phys 1>;
+> phys = <&phys 2>;
+>
+> in order to specify which of the PHYs it refers to.
+>
+> The number of cells in the phy property after the phandle is specified
+> by the #phy-cells property in the node referred to by the phandle. The
+> meaning of all those cells is defined by the binding for the phy node.
+> This could include both the PHY ID (as in my example here), or whatever
+> configuration information or flags the provider needs. For example, both
+> GPIOs and interrupts have specifiers than describe both of these things.
 
-Thanks for the quick comments.
+Thanks for the explanation. I'll add it in my next version.
+>
+> For more background, take a look at almost any other binding that uses
+> phandles.
+>
+> By the way, the property in the consumer should probably be "phys" not
+> "phy" to be consistent with other similar properties (e.g. gpios,
+> interrupts, ... which are all plural).
+>
+Ok.
 
-> 
-> Regarding the long-term roadmap of the omap clock code:
-> 
-> In general all of the changes to the omap clock code for using the
-> common struct clk have been very incremental.  We still have the old
-> legacy struct clk definition, the name of that struct was changed to
-> clk_hw_omap, but it is still a fairly large, monolithic structure.  Are
-> there plans to break the clock types up into smaller, more focused clock
-> types?  E.g. get rid of struct dpll_data and have a dedicated dpll clock
-> type.
-
-I think this sounds like a fair approach to me, currently the struct is
-huge and we register almost everything under it. This RFC set only tries
-to tackle with the most immediate problem, removing the dependency to
-clk-private.h and moving the clock data out from mach-omap2.
-
-> 
-> The question above is not reason to block this patch since it is a
-> fairly large refactoring effort, but it is something to consider.
-> 
-> Some comments below.
-> 
-> <snip>
-> 
-> > +struct omap_clk {
-> > +       u16                             cpu;
-> > +       const char                      *dev_id;
-> > +       const char                      *con_id;
-> > +       struct omap_init_clk            *clk;
-> > +};
-> > +
-> > +#define CLK(dev, con, ck, cp)          \
-> > +       {                               \
-> > +               .cpu = cp,              \
-> > +               .dev_id = dev,          \
-> > +               .con_id = con,          \
-> > +               .clk = ck,              \
-> > +       }       
-> > +
-> 
-> IS omap_clk and CLK really necessary today?  I thought that the move to
-> separate clocks out by tables got rid of this macro/structure?
-
-Well, it looks like we have a few clocks which actually use same clock
-nodes, like dpll_mpu_ck is declared twice with different dev / con ids
-here. It is possible to get rid of this in most cases and incorporate
-the data from omap_clk to the omap_init_clk. Maybe for the special cases
-we can just add a static clk registration in the code.
-
-> 
-> > +#define OMAP_CLK_FIXED_RATE(_name, _flags, _rate, _ignore)     \
-> > +       static struct omap_init_clk _name __initdata = {        \
-> > +               .name = #_name,                                 \
-> > +               .clk_flags = _flags,                            \
-> > +               .rate = _rate,                                  \
-> > +               .clk_register = omap_clk_register_fixed_rate,   \
-> > +       };
-> > +
-> 
-> These macros are unreadable.  They were originally born out of the nasty
-> clk-private.h stuff which included forward declarations of struct clk
-> and all sorts of ugliness.  I know it saves you LoC to use them now but
-> I really prefer to use designated initializers for the sake of
-> readability.  Do you plan to convert the OMAP clock code back to how it
-> was, pre-macros?
-
-Yea, I think we should do this eventually once we also split the
-different clock types to their own init structs. Then we can get rid of
-these macros at the same point. However, I decided not to do this at
-this step, as this simple data conversion allows us to convert also
-omap2 / omap3 clocks rather easily, for which we don't have auto
-generation available.
-
--Tero
+Thanks
+Kishon
