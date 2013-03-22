@@ -1,34 +1,34 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 22 Mar 2013 13:05:21 -0600
-Subject: [PATCH v8 00/14] Tegra114 clockframework
-In-Reply-To: <1363956029-31873-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1363956029-31873-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <514CAB71.7020005@wwwdotorg.org>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 22 Mar 2013 12:19:09 -0700
+Subject: [PATCH 1/1] clk: Fix incorrect return type in clk.c
+In-Reply-To: <CADTbHxrF5M++Y5ku90uN7n6Jx=o80qY+dFX+B_s0udSC06D-PQ@mail.gmail.com>
+References: <1363168069-11331-1-git-send-email-sachin.kamat@linaro.org>
+ <CADTbHxrF5M++Y5ku90uN7n6Jx=o80qY+dFX+B_s0udSC06D-PQ@mail.gmail.com>
+Message-ID: <20130322191909.834.66730@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/22/2013 06:39 AM, Peter De Schrijver wrote:
-> This is the eight version of the Tegra114 clockframework. It is based on the
-> next-20130320-fixed branch of
-> git://nv-tegra.nvidia.com/user/swarren/linux-2.6.git,
+Quoting Pankaj Jangra (2013-03-13 10:09:18)
+> Hi.
+> 
+> On Wed, Mar 13, 2013 at 3:17 PM, Sachin Kamat <sachin.kamat@linaro.org> wrote:
+> > Return type of function clk_propagate_rate_change is a pointer.
+> > But 0 was being returned. Change it to NULL.
+> > Silences the following warning:
+> > drivers/clk/clk.c:977:24: warning: Using plain integer as NULL pointer
+> >
+> > Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+> > ---
+> >  drivers/clk/clk.c |    2 +-
+> 
+> Looks good to me.
+> Reviewed-by: Pankaj Jangra <jangra.pankaj9@gmail.com>
+> 
 
-Hmmm. Basing this on v3.9-rcX would be better, since when I apply it to
-the Tegra tree, that's what it will be based on. Luckily, it applies
-there with trivial conflicts.
+Thanks for the fix.  Taken into clk-next.
 
-> http://patchwork.ozlabs.org/patch/229972/ and
-> http://patchwork.ozlabs.org/patch/229978/
+Regards,
+Mike
 
-The series,
-
-Tested-by: Stephen Warren <swarren@nvidia.com>
-
-(based on my personal next-20130318-fixed branch, without
-http://patchwork.ozlabs.org/patch/229972/ applied, but instead with the
-audio clocks initialized per the patch I posted yesterday to do this).
-
-I tested: serial console, eMMC for the root filesystem, audio playback
-using different pll_a rates, reboot, and shutdown.
-
-This version also solves the hard hang I was seeing with V7 during
-shutdown or reboot. Now I don't have to rely on my filesystem journal:-)
+> Regards,
+> Pankaj Jangra
