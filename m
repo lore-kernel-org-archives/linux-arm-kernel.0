@@ -1,48 +1,82 @@
-From: Frank.Li@freescale.com (Frank Li)
-Date: Fri, 22 Mar 2013 09:19:53 +0800
-Subject: [PATCH 1/1 v2 net-next] net: fec: fix the build as module
-Message-ID: <1363915193-22179-1-git-send-email-Frank.Li@freescale.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 21 Mar 2013 21:31:01 -0500
+Subject: [PATCH 03/11] ARM: timer-sp: convert to use CLKSRC_OF init
+In-Reply-To: <20130321193549.GS4977@n2100.arm.linux.org.uk>
+References: <1363820051-24428-1-git-send-email-robherring2@gmail.com>
+ <1363820051-24428-4-git-send-email-robherring2@gmail.com>
+ <20130321193549.GS4977@n2100.arm.linux.org.uk>
+Message-ID: <514BC265.7080204@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit ff43da86c69 (NET: FEC: dynamtic check DMA desc buff type) the
-following build error happens when CONFIG_FEC=m
+On 03/21/2013 02:35 PM, Russell King - ARM Linux wrote:
+> On Wed, Mar 20, 2013 at 05:54:03PM -0500, Rob Herring wrote:
+>> +	clk0 = of_clk_get(np, 0);
+>> +	if (IS_ERR(clk0))
+>> +		clk0 = NULL;
+>> +
+>> +	/* Get the 2nd clock if the timer has 2 timer clocks */
+>> +	if (of_count_phandle_with_args(np, "clocks", "#clock-cells") == 3) {
+>> +		clk1 = of_clk_get(np, 1);
+>> +		if (IS_ERR(clk1)) {
+>> +			pr_err("sp804: %s clock not found: %d\n", np->name,
+>> +				(int)PTR_ERR(clk1));
+>> +			return;
+>> +		}
+>> +	} else
+>> +		clk1 = clk0;
+>> +
+>> +	irq = irq_of_parse_and_map(np, 0);
+>> +	if (irq <= 0)
+>> +		return;
+>> +
+>> +	of_property_read_u32(np, "arm,sp804-has-irq", &irq_num);
+>> +	if (irq_num == 2)
+>> +		tmr2_evt = true;
+>> +
+>> +	__sp804_clockevents_init(base + (tmr2_evt ? TIMER_2_BASE : 0),
+>> +				 irq, tmr2_evt ? clk1 : clk0, name);
+>> +	__sp804_clocksource_and_sched_clock_init(base + (tmr2_evt ? 0 : TIMER_2_BASE),
+>> +						 name, tmr2_evt ? clk0 : clk1, 1);
+> 
+> This just looks totally screwed to me.
+> 
+> A SP804 cell has two timers, and has one clock input and two clock
+> enable inputs.  The clock input is common to both timers.  The timers
+> only count on the rising edge of the clock input when the enable
+> input is high.  (the APB PCLK also matters too...)
+> 
+> Now, the clock enable inputs are controlled by the SP810 system
+> controller to achieve different clock rates for each.  So, we *can*
+> view an SP804 as having two clock inputs.
 
-ERROR: "fec_ptp_init" [drivers/net/ethernet/freescale/fec.ko] undefined!
-ERROR: "fec_ptp_ioctl" [drivers/net/ethernet/freescale/fec.ko] undefined!
-ERROR: "fec_ptp_start_cyclecounter" [drivers/net/ethernet/freescale/fec.ko] undefined!
+Exactly. Effectively, the TIMCLKENx are just dividers of the clock input.
 
-rename fec.c to fec_main.c
-Build fec.o and fec_ptp.o into one fec.ko
+> However, the two clock inputs do not depend on whether one or the
+> other has an IRQ or not.  Timer 1 is always clocked by TIMCLK &
+> TIMCLKEN1.  Timer 2 is always clocked by TIMCLK & TIMCLKEN2.
+> 
+> Using the logic above, the clocks depend on how the IRQs are wired
+> up... really?  Can you see from my description above why that is
+> screwed?  What bearing does the IRQ have on the wiring of the
+> clock inputs?
 
-Reported-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Signed-off-by: Frank Li <Frank.Li@freescale.com>
----
-Change from V1 to V2
-1. Use -M option to create patch
+No. I'm simply swapping which timer is used for clksrc vs. clkevt based
+on the irq connection DT describes. If only timer 2's irq being hooked
+up, then timer 2 is the clkevt. Otherwise I always use timer 1 for the
+clkevt because I either have a combined interrupt or timer 1 interrupt
+hooked up.
 
- drivers/net/ethernet/freescale/Makefile            |    3 ++-
- .../net/ethernet/freescale/{fec.c => fec_main.c}   |    0
- 2 files changed, 2 insertions(+), 1 deletions(-)
- rename drivers/net/ethernet/freescale/{fec.c => fec_main.c} (100%)
+Perhaps re-writing it like this would be more clear:
 
-diff --git a/drivers/net/ethernet/freescale/Makefile b/drivers/net/ethernet/freescale/Makefile
-index b7d58fe..549ce13 100644
---- a/drivers/net/ethernet/freescale/Makefile
-+++ b/drivers/net/ethernet/freescale/Makefile
-@@ -2,7 +2,8 @@
- # Makefile for the Freescale network device drivers.
- #
- 
--obj-$(CONFIG_FEC) += fec.o fec_ptp.o
-+obj-$(CONFIG_FEC) += fec.o
-+fec-objs :=fec_main.o fec_ptp.o
- obj-$(CONFIG_FEC_MPC52xx) += fec_mpc52xx.o
- ifeq ($(CONFIG_FEC_MPC52xx_MDIO),y)
- 	obj-$(CONFIG_FEC_MPC52xx) += fec_mpc52xx_phy.o
-diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec_main.c
-similarity index 100%
-rename from drivers/net/ethernet/freescale/fec.c
-rename to drivers/net/ethernet/freescale/fec_main.c
--- 
-1.7.1
+if (irq_num == 2){
+	__sp804_clockevents_init(base + TIMER_2_BASE, irq, clk1, name);
+	__sp804_clocksource_and_sched_clock_init(base, name, clk0, 1);
+} else {
+	__sp804_clockevents_init(base, irq, clk0, name);
+	__sp804_clocksource_and_sched_clock_init(base + TIMER_2_BASE,
+						name, clk1, 1);
+}
+
+
+Rob
