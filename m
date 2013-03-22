@@ -1,44 +1,29 @@
-From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
-Date: Fri, 22 Mar 2013 11:20:41 -0300
-Subject: [PATCH 5/6] arm: sunxi: Add clock to pinctrl node
-In-Reply-To: <1363962042-29536-1-git-send-email-emilio@elopez.com.ar>
-References: <1363962042-29536-1-git-send-email-emilio@elopez.com.ar>
-Message-ID: <1363962042-29536-6-git-send-email-emilio@elopez.com.ar>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 22 Mar 2013 15:23:35 +0100
+Subject: [PATCH 3/4] ARM: at91/trivial: fix model name for SAM9G15-EK
+In-Reply-To: <cover.1363960549.git.nicolas.ferre@atmel.com>
+References: <cover.1363960549.git.nicolas.ferre@atmel.com>
+Message-ID: <9c592c90cf8b8ed46073e46be36cecac1a8f5256.1363960549.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The port controller needs the apb0_pio clock enabled to be able to
-work. This commit declares that on the device tree.
-
-Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: stable <stable@vger.kernel.org> # 3.8+
 ---
- arch/arm/boot/dts/sun4i-a10.dtsi | 1 +
- arch/arm/boot/dts/sun5i-a13.dtsi | 1 +
- 2 files changed, 2 insertions(+)
+ arch/arm/boot/dts/at91sam9g15ek.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index 6b3a6b2..f640520 100644
---- a/arch/arm/boot/dts/sun4i-a10.dtsi
-+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -21,6 +21,7 @@
- 		pio: pinctrl at 01c20800 {
- 			compatible = "allwinner,sun4i-a10-pinctrl";
- 			reg = <0x01c20800 0x400>;
-+			clocks = <&apb0_gates 5>;
- 			gpio-controller;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
-index 945bfac..10ee8ee 100644
---- a/arch/arm/boot/dts/sun5i-a13.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a13.dtsi
-@@ -22,6 +22,7 @@
- 		pio: pinctrl at 01c20800 {
- 			compatible = "allwinner,sun5i-a13-pinctrl";
- 			reg = <0x01c20800 0x400>;
-+			clocks = <&apb0_gates 5>;
- 			gpio-controller;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
+diff --git a/arch/arm/boot/dts/at91sam9g15ek.dts b/arch/arm/boot/dts/at91sam9g15ek.dts
+index 86dd3f6..5427b2d 100644
+--- a/arch/arm/boot/dts/at91sam9g15ek.dts
++++ b/arch/arm/boot/dts/at91sam9g15ek.dts
+@@ -11,6 +11,6 @@
+ /include/ "at91sam9x5ek.dtsi"
+ 
+ / {
+-	model = "Atmel AT91SAM9G25-EK";
++	model = "Atmel AT91SAM9G15-EK";
+ 	compatible = "atmel,at91sam9g15ek", "atmel,at91sam9x5ek", "atmel,at91sam9x5", "atmel,at91sam9";
+ };
 -- 
-1.8.2
+1.8.0
