@@ -1,42 +1,29 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 22 Mar 2013 15:39:39 +0000
-Subject: [GIT PULL v2] Renesas ARM-based SoC board updates for v3.10
-In-Reply-To: <20130322135217.GB4220@verge.net.au>
-References: <1363659481-5922-1-git-send-email-horms+renesas@verge.net.au>
- <201303221240.53835.arnd@arndb.de> <20130322135217.GB4220@verge.net.au>
-Message-ID: <201303221539.39742.arnd@arndb.de>
+Date: Fri, 22 Mar 2013 15:43:13 +0000
+Subject: [PATCH 5/5] ARM: ux500: Do not supply DMA platform data when
+ booting u8540 platform
+In-Reply-To: <1363966065-2478-5-git-send-email-lee.jones@linaro.org>
+References: <1363966065-2478-1-git-send-email-lee.jones@linaro.org>
+ <1363966065-2478-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <201303221543.14165.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 22 March 2013, Simon Horman wrote:
-> On Fri, Mar 22, 2013 at 12:40:53PM +0000, Arnd Bergmann wrote:
-> > On Friday 22 March 2013, Simon Horman wrote:
-> > > Sorry about sending so many all at once. There were quite a few changes
-> > > queued up and it might have been better if I flushed some of them out
-> > > a bit earlier.
-> > > 
-> > > Of the batch that I sent last week, I think you are missing the following one:
-> > > 
-> > 
-> > Right, I've pulled it into next/drivers now. Thanks for checking this.
-> 
-> Thanks. I now have no outstanding pull requests.
-> 
-> I do have a few new patches in my tree.
-> I plan to let a few more accumulate before sending the next pull request(s).
+On Friday 22 March 2013, Lee Jones wrote:
+>         /* automatically probe child nodes of db8500 device */
+>         of_platform_populate(NULL, u8500_local_bus_nodes, u8500_auxdata_lookup, parent);
+> +
+> +       if (of_machine_is_compatible("st-ericsson,u8540"))
+> +               of_platform_populate(NULL, u8500_local_bus_nodes,
+> +                                    u8540_auxdata_uart_lookup, parent);
+> +       else
+> +               of_platform_populate(NULL, u8500_local_bus_nodes,
+> +                                    u8500_auxdata_uart_lookup, parent);
+>  }
+>  
 
-Ok, sounds good.
-
-One general question about your plans (probably more for Magnus than for you):
-What is your expected time line for moving shmobile under
-CONFIG_ARCH_MULTIPLATFORM? It seems you are making great progress, but
-there is also still a lot to be done.
-
-I expect that in 3.10, we will have all ARMv6 and ARMv7 platforms converted,
-with the exception of realview, mmp, s5p, msm, and shmobile. I'm sure we
-can do realview and mmp for 3.11, possibly also s5p. For shmobile, I think
-most of the work would be changing drivers/sh/clk to integrate into the common
-clk framework, and you need to find a way to enable ARM_PATCH_PHYS_VIRT and
-AUTO_ZRELADDR. Are those things you think can be done for 3.11?
+Does this still work on u8500? I did not think you could call 
+of_platform_populate twice on the root node and still get the result
+you want.
 
 	Arnd
