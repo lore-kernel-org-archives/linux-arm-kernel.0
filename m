@@ -1,40 +1,51 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 22 Mar 2013 17:43:38 +0000
-Subject: [PULL] VGIC fixes for KVM/ARM
-Message-ID: <514C984A.4020800@arm.com>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Fri, 22 Mar 2013 18:43:37 +0100
+Subject: [PATCH v4 0/5] move s3c24xx-irq to drivers/irqchip and add dt support
+Message-ID: <201303221843.37668.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+As suggested by Rob Herring move back to get the parent releationship from dt
+like in the first versions, but set the handler from the interrupt property
+rather than from a specific list.
 
-Please find below a pull request for a couple of important VGIC fixes
-for KVM on ARM. If you could merge them as part of your next batch of
-fixes for the upcoming -rc, it would be much appreciated.
+This version also implements (hopefully correctly) an idea from him and
+Arnd Bergmann to have the parent relationship not described in the controller
+node but the device nodes instead.
 
-Thanks,
+Therefore the main controller continues to use a two-cell descriptor to set
+hwirq and trigger type but the sub-controller switches to a three-cell
+descriptor where the third bit describes the hwirq of its parent irq in the
+main controller.
 
-	M.
+As a result a serial node would then look like:
+	serial at 50000000 {
+		compatible = "samsung,s3c2410-uart";
+		reg = <0x50000000 0x4000>;
+		interrupt-parent = <&subintc>;
+		interrupts = <0 4 28>, <1 4 28>;
+	};
 
-The following changes since commit 2ef14f465b9e096531343f5b734cffc5f759f4a6:
+Tested on a s3c2416-based board.
 
-  Merge branch 'x86-mm-for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip (2013-02-21 18:06:55 -0800)
+As it depends on changes already pending for 3.10 it should probably go thru
+the samsung tree.
 
-are available in the git repository at:
 
+Heiko Stuebner (5):
+  ARM: S3C24XX: move irq driver to drivers/irqchip
+  irqchip: s3c24xx: fix comments on some camera interrupts
+  irqchip: s3c24xx: fix irqlist of second s3c2416 controller
+  irqchip: s3c24xx: add irq_set_type callback for basic interrupt types
+  irqchip: s3c24xx: add devicetree support
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm/vgic-fixes
-
-for you to fetch changes up to 33c83cb3c1d84b76c8270abe5487e77f83a81b22:
-
-  ARM: KVM: vgic: take distributor lock on sync_hwstate path (2013-02-22 13:29:38 +0000)
-
-----------------------------------------------------------------
-Marc Zyngier (2):
-      ARM: KVM: vgic: force EOIed LRs to the empty state
-      ARM: KVM: vgic: take distributor lock on sync_hwstate path
-
- arch/arm/kvm/vgic.c | 35 ++++++++++++++---------------------
- 1 file changed, 14 insertions(+), 21 deletions(-)
+ .../interrupt-controller/samsung,s3c24xx-irq.txt   |   64 ++++++
+ arch/arm/mach-s3c24xx/Makefile                     |    2 +-
+ drivers/irqchip/Makefile                           |    1 +
+ .../irq.c => drivers/irqchip/irq-s3c24xx.c         |  218 +++++++++++++++++++-
+ 4 files changed, 277 insertions(+), 8 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/samsung,s3c24xx-irq.txt
+ rename arch/arm/mach-s3c24xx/irq.c => drivers/irqchip/irq-s3c24xx.c (87%)
 
 -- 
-Jazz is not dead. It just smells funny...
+1.7.2.3
