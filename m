@@ -1,41 +1,42 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Fri, 22 Mar 2013 13:25:55 +0100
-Subject: [RFC PATCH v3 6/6] ARM: sched: clear SD_SHARE_POWERDOMAIN
-In-Reply-To: <1363955155-18382-1-git-send-email-vincent.guittot@linaro.org>
-References: <1363955155-18382-1-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <1363955155-18382-7-git-send-email-vincent.guittot@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 22 Mar 2013 12:34:59 +0000
+Subject: Integrator PCI base dilemma
+In-Reply-To: <20130322121218.GD4977@n2100.arm.linux.org.uk>
+References: <CACRpkdaOjFhWR21w5x_rR_60ffQF3Ym_MQd2svNyzm0guwOUoQ@mail.gmail.com>
+ <201303221152.07569.arnd@arndb.de>
+ <20130322121218.GD4977@n2100.arm.linux.org.uk>
+Message-ID: <201303221234.59289.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM platforms take advantage of packing small tasks on few cores.
-This is true even when the cores of a cluster can't be power gated
-independantly. So we clear SD_SHARE_POWERDOMAIN at MC and CPU level.
+On Friday 22 March 2013, Russell King - ARM Linux wrote:
+> > Also, in many cases, you don't even have the choice in the kernel between
+> > the two options, either PCI is identity mapped or mapped starting at
+> > address zero based on whatever the soc or board designer thought, and the
+> > only thing we can do is tell the kernel what the hardware does.
+> 
+> Exactly which is why you're wrong. :)  If the hardware enforces a
+> separation of the physical address space from the PCI address space
+> by way of an offset translation, then you have no option but to have
+> a non-zero mem_offset.
 
-Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
-Reviewed-by: Morten Rasmussen <morten.rasmussen@arm.com>
----
- arch/arm/kernel/topology.c |    9 +++++++++
- 1 file changed, 9 insertions(+)
+I still think we are in complete agreement about the facts here, at least
+I was trying to say the same thing above that you replied with.
 
-diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
-index 79282eb..f89a4a2 100644
---- a/arch/arm/kernel/topology.c
-+++ b/arch/arm/kernel/topology.c
-@@ -201,6 +201,15 @@ static inline void update_cpu_power(unsigned int cpuid, unsigned int mpidr) {}
-  */
- struct cputopo_arm cpu_topology[NR_CPUS];
- 
-+int arch_sd_local_flags(int level)
-+{
-+	/* Powergate at threading level doesn't make sense */
-+	if (level & SD_SHARE_CPUPOWER)
-+		return 1*SD_SHARE_POWERDOMAIN;
-+
-+	return 0*SD_SHARE_POWERDOMAIN;
-+}
-+
- const struct cpumask *cpu_coregroup_mask(int cpu)
- {
- 	return &cpu_topology[cpu].core_sibling;
--- 
-1.7.9.5
+> > It looks like cns3xxx, tegra, versatile and ks8695 are all hardwired to a
+> > zero mem_offset, while dc21285, integrator, it8152 and sa1100/pci-nanoengine
+> > map the PCI bus starting at bus address 0.
+> 
+> Don't read too much into the versatile stuff.  All that is very very much
+> untested and fragile.  It's fairly buggered at the moment as it stands,
+> and as far as I can tell there's absolutely no way to know what the right
+> solution is - because the ARM documentation is extremely poor and all the
+> real hardware has been stuffed through the mincer.
+> 
+> So that leaves cns3xxx, tegra and ks8695 being the non-plat ones which
+> are "different" from the majority on ARM.
+
+Well, those and all the ones that chose to set up their windows in the
+same way like the plat-orion based ones.
+
+	Arnd
