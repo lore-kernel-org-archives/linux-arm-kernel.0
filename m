@@ -1,103 +1,89 @@
-From: avinashphilip@ti.com (Philip, Avinash)
-Date: Fri, 22 Mar 2013 08:08:40 +0000
-Subject: [PATCH v2 3/3] ARM: davinci: da850: add EHRPWM & ECAP DT node
-In-Reply-To: <514BF1DC.60003@ti.com>
-References: <1363761714-15034-1-git-send-email-avinashphilip@ti.com>
- <1363761714-15034-4-git-send-email-avinashphilip@ti.com>
- <51499DB4.9080907@ti.com> <87wqt2qlts.fsf@dell.be.48ers.dk>
- <518397C60809E147AF5323E0420B992E3EA9C651@DBDE01.ent.ti.com>
- <514BF1DC.60003@ti.com>
-Message-ID: <518397C60809E147AF5323E0420B992E3EA9DE1A@DBDE01.ent.ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 22 Mar 2013 09:10:58 +0100
+Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
+In-Reply-To: <CAAwP0s1CFRO-rf==p5sYs1n0gigMif7wuT8Yv0N_iLUDMrtcOg@mail.gmail.com>
+References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
+ <1329321854-24490-4-git-send-email-b-cousson@ti.com>
+ <4F44FA56.7020000@gmail.com> <4F44FC37.2000701@ti.com>
+ <4F452484.5080503@gmail.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF17BD8BC6C1@HQMAIL01.nvidia.com>
+ <4F47AD08.4030504@ti.com>
+ <CAAwP0s0cB368R2mtbJpTZJreR-5GSRLfxC+8DJLo5nw3_OwBuA@mail.gmail.com>
+ <512D39DA.7020306@ti.com> <512D3AB1.1080202@wwwdotorg.org>
+ <512D3EC2.6050408@ti.com> <20130302200524.D230F3E1571@localhost>
+ <51391F41.5000303@ti.com>
+ <CAAwP0s1CFRO-rf==p5sYs1n0gigMif7wuT8Yv0N_iLUDMrtcOg@mail.gmail.com>
+Message-ID: <CACRpkdYHj-rEF3Rk_CWnmmMw_Amr7m8SgQ=-2zsDYuLeuu3azw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 22, 2013 at 11:23:32, Nori, Sekhar wrote:
-> On 3/21/2013 1:31 PM, Philip, Avinash wrote:
-> > On Wed, Mar 20, 2013 at 18:17:59, Peter Korsgaard wrote:
-> >>>>>>> "Sekhar" == Sekhar Nori <nsekhar@ti.com> writes:
-> >>
-> >>  Sekhar> On 3/20/2013 12:11 PM, Philip Avinash wrote:
-> >>  >> Add da850 EHRPWM & ECAP DT node.
-> >>  >> Also adds OF_DEV_AUXDATA for EHRPWM & ECAP driver to use EHRPWM & ECAP
-> >>  >> clock.
-> >>  >> 
-> >>  >> Signed-off-by: Philip Avinash <avinashphilip@ti.com>
-> >>  >> ---
-> >>  >> Changes since v1:
-> >>  >> - Reusing ti,am33xx<ecap/ehrpwm> as compatible field as both IP's are
-> >>  >> same with am33xx platform and da850 has no platform specific
-> >>  >> dependency.
-> >>
-> >>  Sekhar> Which is fine, but I think the binding documentation still needs to be
-> >>  Sekhar> updated to document the ti,da850-ehrpwm binding. Looping Peter (it is
-> >>  Sekhar> always a good idea to CC folks who reviewed your patch last time
-> >>  Sekhar> around). Also, please Cc the DT folks and devicetree-discuss list too
-> >>  Sekhar> for their opinion.
-> >>
-> >> Yes, thanks for CC'ing me. I also think da850-* should be
-> >> documented. See Documentation/devicetree/bindings/gpio/8xxx_gpio.txt for
-> >> an similar (old) example.
-> > 
-> > Peter,
-> > 
-> > In this binding file also, only initial compatible field is updated. Later on many
-> > compatible were added in driver. But not update back to binding doc.
-> 
-> Probably someone forgot to keep updating the binding doc after a point.
-> 
-> > 
-> > <Documentation/devicetree/bindings/gpio/8xxx_gpio.txt>
-> > ---
-> > 	followed by "fsl,mpc8349-gpio" for 83xx, "fsl,mpc8572-gpio" for 85xx and
-> > 	"fsl,mpc8610-gpio" for 86xx.
-> > ---
-> > <drivers/gpio/gpio-mpc8xxx.c>
-> > ---
-> > static struct of_device_id mpc8xxx_gpio_ids[] __initdata = {
-> >         { .compatible = "fsl,mpc8349-gpio", },
-> >         { .compatible = "fsl,mpc8572-gpio", },
-> >         { .compatible = "fsl,mpc8610-gpio", },
-> >         { .compatible = "fsl,mpc5121-gpio", .data = mpc512x_irq_set_type, },
-> >         { .compatible = "fsl,pq3-gpio",     },
-> >         { .compatible = "fsl,qoriq-gpio",   },
-> >         {}
-> > };
-> > ---
-> > 
-> > Grant/Rob,
-> > With respect peters explanation (below), what is your opinion on adding information to 
-> > binding doc for da850 support?
-> > 
-> > Peter --> if the hardware block is identical the dts should simply list:
-> > Peter --> compatible = "ti,da850-ecap", "ti,am33xx-ecap"
-> > Peter --> And the driver only bind to ti,am33xx-ecap (unless there ever needs to
-> > Peter --> be a da850 specific workaround.
-> > 
-> > Or
-> > Should I update both binding doc & the driver to use new compatible option "ti,da830-ecap"
-> > (as da830 platform has initial IP support)?
-> > Even with this, platforms da830, da850 and am33xx can reuse "ti,da830-ecap" compatible field.
-> 
-> To me updating the driver to keep adding a .compatible even when not
-> using it elsewhere in code is not required. Adding the new binding in
-> .dts file is must since you may need to do something specific to da830
-> at a later time (and the .dtb should be considered ROM'ed so you wont be
-> able to change it then).
+On Fri, Mar 15, 2013 at 12:21 PM, Javier Martinez Canillas
+<martinez.javier@gmail.com> wrote:
 
-Thanks for the explanation.
-I will add "ti,da850-ecap" for da850.dtsi along with "ti,am33xx-ecap" as
-compatible fields.
+> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+> index 159f5c5..f5feb43 100644
+> --- a/drivers/gpio/gpio-omap.c
+> +++ b/drivers/gpio/gpio-omap.c
+> @@ -807,6 +807,13 @@ static void gpio_unmask_irq(struct irq_data *d)
+>         spin_unlock_irqrestore(&bank->lock, flags);
+>  }
+>
+> +static int gpio_irq_request(struct irq_data *d)
+> +{
+> +       struct gpio_bank *bank = irq_data_get_irq_chip_data(d);
+> +
+> +       return gpio_request(irq_to_gpio(bank, d->irq), "gpio-irq");
+> +}
+> +
+>  static struct irq_chip gpio_irq_chip = {
+>         .name           = "GPIO",
+>         .irq_shutdown   = gpio_irq_shutdown,
+> @@ -815,6 +822,7 @@ static struct irq_chip gpio_irq_chip = {
+>         .irq_unmask     = gpio_unmask_irq,
+>         .irq_set_type   = gpio_irq_type,
+>         .irq_set_wake   = gpio_wake_enable,
+> +       .irq_request    = gpio_irq_request,
+>  };
 
-> Adding documentation for the binding is also
-> required to help anyone wanting to know more about the binding after
-> reading the .dts file.
+This is just turning everything on it's head. The normal order of things
+is this sequence for GPIO 14 something like:
 
-I will adding documentation part for "ti,da850-ecap".
+gpio_request(14);
+int irq = gpio_to_irq(14);
+request_any_context_irq(irq);
 
-Thanks
-Avinash
+I understand that the approach take make things easier for device tree
+but it screws up the semantics of the entire kernel (the lockdep etc
+warnings are just a symptom), we are locked to the above semantic
+sequence: you know the GPIO, *then* you get the IRQ, not the
+other way around.
 
-> 
-> Thanks,
-> Sekhar
-> 
+irq_to_gpio has been deemed a legacy thing that we want to get
+rid of. The reason being that it is ambiguous on most every GPIO
+expander out there. It is not supported by GPIOLIB. This is the
+reason to why the implementation in the GPIOLIB in
+<linux/gpio.h> looks like this:
+
+static inline int irq_to_gpio(unsigned int irq)
+{
+        return -EINVAL;
+}
+
+The only chance to have the function is in a non-gpiolib platform
+that override it.
+
+The irq_to_gpio() in gpio-omap.c overrides this and should
+cause compile warnings, does it not?
+
+There is a reason every other driver in drivers/gpio has renamed
+this function to things like pxa_irq_to_gpio, msm_irq_to_gpio:
+we just don't support it generically.
+
+I know I'm not very helpful, I can just say this is not going to work. :-/
+
+It seems you need a way to get the GPIO corresponding to a certain
+IRQ from the device tree, not from the kernel as is done here, then
+follow the mentioned sequence.
+
+Yours,
+Linus Walleij
