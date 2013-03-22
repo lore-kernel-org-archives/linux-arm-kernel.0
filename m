@@ -1,53 +1,31 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 22 Mar 2013 10:14:23 -0400
-Subject: [PATCH 0/4 v3] mv643xx_eth: use mvmdio MDIO bus driver
-In-Reply-To: <1363959568-16976-1-git-send-email-florian@openwrt.org>
-References: <1363284515-9865-1-git-send-email-florian@openwrt.org>
- <1363959568-16976-1-git-send-email-florian@openwrt.org>
-Message-ID: <20130322141423.GJ13280@titan.lakedaemon.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 22 Mar 2013 14:16:42 +0000
+Subject: [PATCH 0/9] More ux500 multiplatform stuff
+In-Reply-To: <CACRpkdYUZQt+PTOf0+ReQFWgSjitXM-CXMUfVAiQsL3QxDTi5w@mail.gmail.com>
+References: <1363866553-15054-1-git-send-email-linus.walleij@stericsson.com>
+ <201303221334.07330.arnd@arndb.de>
+ <CACRpkdYUZQt+PTOf0+ReQFWgSjitXM-CXMUfVAiQsL3QxDTi5w@mail.gmail.com>
+Message-ID: <201303221416.42217.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 22, 2013 at 02:39:24PM +0100, Florian Fainelli wrote:
-> Hi all,
+On Friday 22 March 2013, Linus Walleij wrote:
+> On Fri, Mar 22, 2013 at 2:34 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > [Me]
+> >> And there are some non-bisectable patches due to the
+> >> driver in staging (which was put there because Synaptics would
+> >> submit another driver "real soon now" and that was something like
+> >> two years ago), so I might have to squash some of them together to one.
+> >
+> > What breaks bisection here? The "[PATCH 5/9] staging: ste_rmi4: kill
+> > platform_data hack" patch should be independent of everything else,
+> > it just touches more files than we'd like.
 > 
-> This patch converts the mv643xx_eth driver to use the mvmdio MDIO bus driver
-> instead of rolling its own implementation. As a result, all users of this
-> mv643xx_eth driver are converted to register an "orion-mdio" platform_device.
-> The mvmdio driver is also updated to support an interrupt line which reports
-> SMI error/completion, and to allow traditionnal platform device registration
-> instead of just device tree.
+> It includes <mach/irqs.h> that is removed by earlier patches, so
+> it stops compiling before this patch.
 > 
-> David, I think it makes sense for you to merge all of this, since we do
-> not want the architecture files to be desynchronized from the mv643xx_eth to
-> avoid runtime breakage. The potential for merge conflicts should be very small.
-> 
-> Florian Fainelli (4):
->   net: mvmdio: allow platform device style registration
->   net: mvmdio: rename base register cookie from smireg to regs
->   net: mvmdio: enhance driver to support SMI error/done interrupts
->   mv643xx_eth: convert to use the Marvell Orion MDIO driver
-> 
->  .../devicetree/bindings/net/marvell-orion-mdio.txt |    3 +
->  arch/arm/plat-orion/common.c                       |   54 +++---
->  arch/powerpc/platforms/chrp/pegasos_eth.c          |   20 ++
->  arch/powerpc/sysdev/mv64x60_dev.c                  |   16 +-
->  drivers/net/ethernet/marvell/Kconfig               |    5 +-
->  drivers/net/ethernet/marvell/Makefile              |    2 +-
->  drivers/net/ethernet/marvell/mv643xx_eth.c         |  195 ++------------------
->  drivers/net/ethernet/marvell/mvmdio.c              |  130 ++++++++++---
->  include/linux/mv643xx_eth.h                        |    1 -
->  9 files changed, 187 insertions(+), 239 deletions(-)
 
-Whole series applied on top of v3.9-rc3 and tested on dreamplug
-(kirkwood DT boot with legacy mv643xx_eth init)
+Ah right. I think I reordered the patches in the end and must have gotten
+that one wrong.
 
-Tested-by: Jason Cooper <jason@lakedaemon.net>
-
-also, for the bits changing plat-orion:
-
-Acked-by: Jason Cooper <jason@lakedaemon.net>
-
-thx,
-
-Jason.
+	Arnd
