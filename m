@@ -1,42 +1,34 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 22 Mar 2013 17:14:13 +0000
-Subject: [PATCH 5/5] ARM: ux500: Do not supply DMA platform data when
- booting u8540 platform
-In-Reply-To: <201303221543.14165.arnd@arndb.de>
-References: <1363966065-2478-1-git-send-email-lee.jones@linaro.org>
- <1363966065-2478-5-git-send-email-lee.jones@linaro.org>
- <201303221543.14165.arnd@arndb.de>
-Message-ID: <20130322171413.GA2960@gmail.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Fri, 22 Mar 2013 13:14:51 -0400
+Subject: [PATCH] sdhci: sirf: add mmc host sdhci-pltfm based driver for
+ SiRF SoCs
+In-Reply-To: <1605490.1WxfNfZQTh@wuerfel> (Arnd Bergmann's message of "Thu, 21
+ Mar 2013 11:13:34 +0100")
+References: <1363854439-6859-1-git-send-email-Barry.Song@csr.com>
+ <1605490.1WxfNfZQTh@wuerfel>
+Message-ID: <87fvznl5kk.fsf@octavius.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 22 Mar 2013, Arnd Bergmann wrote:
+Hi,
 
-> On Friday 22 March 2013, Lee Jones wrote:
-> >         /* automatically probe child nodes of db8500 device */
-> >         of_platform_populate(NULL, u8500_local_bus_nodes, u8500_auxdata_lookup, parent);
-> > +
-> > +       if (of_machine_is_compatible("st-ericsson,u8540"))
-> > +               of_platform_populate(NULL, u8500_local_bus_nodes,
-> > +                                    u8540_auxdata_uart_lookup, parent);
-> > +       else
-> > +               of_platform_populate(NULL, u8500_local_bus_nodes,
-> > +                                    u8500_auxdata_uart_lookup, parent);
-> >  }
-> >  
-> 
-> Does this still work on u8500? I did not think you could call 
-> of_platform_populate twice on the root node and still get the result
-> you want.
+On Thu, Mar 21 2013, Arnd Bergmann wrote:
+> On Thursday 21 March 2013 16:27:19 Barry Song wrote:
+>> From: Barry Song <Baohua.Song@csr.com>
+>> 
+>> this patch adds the new driver for CSR SiRF SoCs:
+>> SiRFprimaII: unicore ARM Cortex-A9
+>> SiRFatlas6: unicore ARM Cortex-A9
+>> SiRFmarco: dual core ARM Cortex-A9 SMP
+>> 
+>> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+>> Signed-off-by: Bin Shi <Bin.Shi@csr.com>
+>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-I haven't checked.
+Thanks, pushed to mmc-next for 3.10.
 
-I'll look into the inner workings of of_platform_populate() on Monday.
-
-Thanks for the pointer.
-
+- Chris.
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
