@@ -1,52 +1,31 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 22 Mar 2013 13:41:12 -0700
-Subject: [PATCH V2 2/3] clk: Improve errorhandling for clk_set_parent
-In-Reply-To: <CA+Z25wWnGFFK9d+zdL+6iDDmS=0PKGDtU=+rePeGTv8PMtgSOg@mail.gmail.com>
-References: <1363873693-30902-1-git-send-email-ulf.hansson@stericsson.com>
- <1363873693-30902-3-git-send-email-ulf.hansson@stericsson.com>
- <20130321210019.834.12024@quantum>
- <CA+Z25wWnGFFK9d+zdL+6iDDmS=0PKGDtU=+rePeGTv8PMtgSOg@mail.gmail.com>
-Message-ID: <20130322204112.834.21029@quantum>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 22 Mar 2013 14:42:06 -0600
+Subject: [PATCH REPOST v2] clk: add table lookup to mux
+In-Reply-To: <20130322202522.834.24639@quantum>
+References: <1363954078-29952-1-git-send-email-pdeschrijver@nvidia.com>
+ <514C813E.1070603@wwwdotorg.org> <20130322202522.834.24639@quantum>
+Message-ID: <514CC21E.40206@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Rajagopal Venkat (2013-03-22 02:59:17)
-> On 22 March 2013 02:30, Mike Turquette <mturquette@linaro.org> wrote:
-> > Quoting Ulf Hansson (2013-03-21 06:48:12)
-> >> @@ -1344,8 +1341,9 @@ out:
-> >>  int clk_set_parent(struct clk *clk, struct clk *parent)
-> >>  {
-> >>         int ret = 0;
-> >> +       u8 p_index;
-> >>
-> >> -       if (!clk || !clk->ops)
-> >> +       if (!clk || !clk->ops || !parent)
-> >>                 return -EINVAL;
-> >>
-> >
-> > A NULL clock is valid according to the clk.h api.  I would like to allow
-> > parent to be NULL, resulting in a migration from the real clock tree to
-> > the orphans list.
-> >
-> > This feature was apparently buggy for some time and Rajagopal sent me a
-> > patch off-list to fix it.  Rajagopal, can you post your patch publicly?
-> >
+On 03/22/2013 02:25 PM, Mike Turquette wrote:
+> Quoting Stephen Warren (2013-03-22 09:05:18)
+>> On 03/22/2013 06:07 AM, Peter De Schrijver wrote:
+>>> Add a table lookup feature to the mux clock. Also allow arbitrary masks
+>>> instead of the width. This will be used by some clocks on Tegra114. Also
+>>> adapt the tegra periph clk because it uses struct clk_mux directly.
+>>>
+>>> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+>>
+>> Tested-by: Stephen Warren <swarren@nvidia.com>
 > 
-> Patch is available at https://patchwork.kernel.org/patch/2012221/
-> Do you want me to rebase it on top of this patchset?
-> 
+> Thanks for the patch.  Taken into clk-next.
 
-Maybe.  Let's see what Ulf's next version of the clk_set_parent locking
-patch looks like.
-
-Thanks,
-Mike
-
-> > Thanks,
-> > Mike
-> 
-> 
-> 
-> -- 
-> Regards,
-> Rajagopal
+Great. Recall this is a dependency for the Tegra114 clock series that I
+was planning on taking through the Tegra tree. Should I just merge your
+whole clk-next into the Tegra tree as a basis for the Tegra114 clock
+branch, or should this one patch be put into a separate topic branch so
+I don't pick up everything? The latter would reduce the
+inter-dependencies, and allow the merge to happen earlier. Obviously,
+I'll wait until you let me know the appropriate branch is stable before
+doing the merge. Thanks.
