@@ -1,25 +1,21 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 22 Mar 2013 13:14:55 +0100
-Subject: [PATCH 6/9] power: pm2301_charger: remove __devinit annotations
-In-Reply-To: <1363902674-6456-7-git-send-email-arnd@arndb.de>
-References: <1363866553-15054-1-git-send-email-linus.walleij@stericsson.com>
- <1363902674-6456-1-git-send-email-arnd@arndb.de>
- <1363902674-6456-7-git-send-email-arnd@arndb.de>
-Message-ID: <CACRpkdZ0mYeNVQ16CkV_S-tO3p2PPd5cgEjiCNQskh4YXkBHjw@mail.gmail.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Fri, 22 Mar 2013 14:15:07 +0200
+Subject: [PATCH REPOST v2] clk: add table lookup to mux
+In-Reply-To: <1363954078-29952-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1363954078-29952-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <20130322121507.GX18519@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 21, 2013 at 10:51 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+On Fri, Mar 22, 2013 at 01:07:53PM +0100, Peter De Schrijver wrote:
+> Add a table lookup feature to the mux clock. Also allow arbitrary masks
+> instead of the width. This will be used by some clocks on Tegra114. Also
+> adapt the tegra periph clk because it uses struct clk_mux directly.
+> 
+> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
 
-> These got missed in the treewide changes because they came in through
-> a new branch, and it now breaks allmodconfig builds.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+This is actually the first post, despite the subject.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Thanks,
 
-Anton can you pick this fix directly to the power subsystem
-tree?
-
-Yours,
-Linus Walleij
+Peter.
