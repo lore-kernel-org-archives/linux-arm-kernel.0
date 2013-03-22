@@ -1,25 +1,53 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 22 Mar 2013 10:26:26 -0400 (EDT)
-Subject: [PATCH 0/4 v3] mv643xx_eth: use mvmdio MDIO bus driver
-In-Reply-To: <1363959568-16976-1-git-send-email-florian@openwrt.org>
-References: <1363284515-9865-1-git-send-email-florian@openwrt.org>
- <1363959568-16976-1-git-send-email-florian@openwrt.org>
-Message-ID: <20130322.102626.1889236227505288422.davem@davemloft.net>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 22 Mar 2013 07:27:39 -0700
+Subject: [PATCH v6 00/16] clk: exynos4/5: migrate to common
+ clock framework
+In-Reply-To: <14d801ce268b$80a8d160$81fa7420$%kim@samsung.com>
+References: <1361175686-19400-1-git-send-email-thomas.abraham@linaro.org>
+ <20130319184938.8663.18115@quantum> <201303192212.16877.heiko@sntech.de>
+ <20130319215038.8663.83548@quantum>
+ <116a01ce24fd$e32658b0$a9730a10$%kim@samsung.com>
+ <20130320025656.11073.90469@quantum>
+ <11af01ce2526$63b0a8f0$2b11fad0$%kim@samsung.com>
+ <20130320144000.11073.37741@quantum>
+ <14d801ce268b$80a8d160$81fa7420$%kim@samsung.com>
+Message-ID: <20130322142739.834.2721@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Florian Fainelli <florian@openwrt.org>
-Date: Fri, 22 Mar 2013 14:39:24 +0100
-
-> This patch converts the mv643xx_eth driver to use the mvmdio MDIO bus driver
-> instead of rolling its own implementation. As a result, all users of this
-> mv643xx_eth driver are converted to register an "orion-mdio" platform_device.
-> The mvmdio driver is also updated to support an interrupt line which reports
-> SMI error/completion, and to allow traditionnal platform device registration
-> instead of just device tree.
+Quoting Kukjin Kim (2013-03-21 16:26:24)
+> Mike Turquette wrote:
 > 
-> David, I think it makes sense for you to merge all of this, since we do
-> not want the architecture files to be desynchronized from the mv643xx_eth to
-> avoid runtime breakage. The potential for merge conflicts should be very small.
+> [...]
+> > >
+> > > > Furthermore if I *had* agreed on the previous version it would still
+> > > > have been appropriate to put my Acked-by on those patches, which is
+> > > > clearly missing today.
+> > > >
+> > > BTW, how about following?
+> > >
+> > > http://www.spinics.net/lists/arm-kernel/msg210266.html
+> > >
+> > > In my understanding, it should be your agreement, it cannot be 'ack' though.
+> > >
+> > 
+> > I had forgotten about that email from November.  Still my ack should
+> > have been added.  If necessary I'll be painfully explicit in the future
+> 
+> Agreed.
+> 
+> > about adding my acked-by.  It's a simple and good rule to follow.
+> > 
+> Yeah, I know. So if you want to add your ack on drivers/clk stuff for this series in samsung tree, please let me know.
+> 
 
-Series applied to net-next, thanks Florian.
+The patches are in pretty good shape.  Please add my ack if you are able
+to rebase comfortably.  But if rebasing causes you and your downstream
+users a lot of pain then don't do it.
+
+Regards,
+Mike
+
+> Thanks, Mike.
+> 
+> - Kukjin
