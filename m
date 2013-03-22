@@ -1,27 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 22 Mar 2013 15:20:58 +0000
-Subject: [PATCH 2/3] ARM: sched_clock: support 64-bit counters
-In-Reply-To: <514C557F.1090101@gmail.com>
-References: <1363055197-17296-1-git-send-email-robherring2@gmail.com>
- <1363055197-17296-3-git-send-email-robherring2@gmail.com>
- <514B1311.20308@codeaurora.org> <514B866A.3010308@gmail.com>
- <514C487B.4020208@codeaurora.org> <514C557F.1090101@gmail.com>
-Message-ID: <20130322152057.GE4977@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 22 Mar 2013 15:25:43 +0000
+Subject: [PATCH 0/9] More ux500 multiplatform stuff
+In-Reply-To: <CACRpkdbdmJrM48dPyV3zWpi6QLnVYcSTnkZbTDTXRSrd+pyVew@mail.gmail.com>
+References: <1363866553-15054-1-git-send-email-linus.walleij@stericsson.com>
+ <201303221334.07330.arnd@arndb.de>
+ <CACRpkdbdmJrM48dPyV3zWpi6QLnVYcSTnkZbTDTXRSrd+pyVew@mail.gmail.com>
+Message-ID: <201303221525.43901.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 22, 2013 at 07:58:39AM -0500, Rob Herring wrote:
-> The ARM ARM also says the roll-over time must be greater than 40 years.
-> So if you have fewer bits, then it needs to run at lower frequency. So I
-> think we should be fine.
+On Friday 22 March 2013, Linus Walleij wrote:
 
-Well, we have a problem with 32-bit systems in about 19 years time when
-32-bit Unix timestamps wrap.  Of course, by that time we'll all be
-64-bit won't we. :)
+> diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
+> index bc8f870..8eb8c49 100644
+> --- a/drivers/mfd/db8500-prcmu.c
+> +++ b/drivers/mfd/db8500-prcmu.c
+> @@ -2680,7 +2680,7 @@ static int db8500_irq_init(struct device_node
+> *np, int irq_base)
+>         int i;
+> 
+>         /* In the device tree case, just take some IRQs */
+> -       if (!np)
+> +       if (np)
+>                 irq_base = 0;
+> 
+>         db8500_irq_domain = irq_domain_add_simple(
 
-Another issue here is whether it's likely that a system will have an
-uptime of 40+ years.  Probably not.  The longest I can think of which
-I have come across is the digital public address system on the London
-Jubilee Line (Waterloo to Stratford section) which was specified to
-have a life of 20 to 30 years... Hmm, I wonder of my Linux based system
-activity logger is still in the Stratford PA racks. :)
+I think I dreamed about this bug last night but didn't remember
+until now, and I had not looked there to confirm ;-)
+
+> After this the U8500 and U8520 boot to prompt with all the patches
+> applied!
+
+Ah, very good.
+
+	Arnd
