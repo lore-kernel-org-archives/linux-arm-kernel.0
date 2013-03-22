@@ -1,70 +1,40 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Fri, 22 Mar 2013 11:43:00 -0600
-Subject: [PATCH 5/5] arm: dts: Convert mvebu device tree files to 64 bits
-In-Reply-To: <20130322062854.GS21478@lunn.ch>
-References: <1363883179-1361-1-git-send-email-gregory.clement@free-electrons.com>
- <1363883179-1361-6-git-send-email-gregory.clement@free-electrons.com>
- <20130321201533.GN21478@lunn.ch> <20130321212236.1015295d@skate>
- <20130321205545.GA8358@obsidianresearch.com>
- <20130322062854.GS21478@lunn.ch>
-Message-ID: <20130322174300.GA10230@obsidianresearch.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 22 Mar 2013 17:43:38 +0000
+Subject: [PULL] VGIC fixes for KVM/ARM
+Message-ID: <514C984A.4020800@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 22, 2013 at 07:28:54AM +0100, Andrew Lunn wrote:
+Hi Russell,
 
-> IO space needs to stay where it is, somewhere in the top 1GB, because
-> it is limited to the 32bit address space.
+Please find below a pull request for a couple of important VGIC fixes
+for KVM on ARM. If you could merge them as part of your next batch of
+fixes for the upcoming -rc, it would be much appreciated.
 
-Yes
- 
-> We must have some SDRAM in the bottom of the 40bit address range in
-> order that DMA works. Bounce buffers are used for anything which is
-> outside of the bottom 32bits.
+Thanks,
 
-Yes :(
- 
-> SDRAM can only be split on ranks. I assume this is also a synonym for
-> chip select? 
+	M.
 
-Yes, rank is the JEDEC term. All CS inputs on every DRAM die in a rank
-should be asserted at once. Note that splitting the SDRAM address map
-by rank is only one choice, other chipsets can do bank interleaving
-across ranks for greater performance..
+The following changes since commit 2ef14f465b9e096531343f5b734cffc5f759f4a6:
 
-> Ideally we want the boot loader to setup the split, since it is not
-> very easy to move stuff around in a running system. Alternatively,
-> the
+  Merge branch 'x86-mm-for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip (2013-02-21 18:06:55 -0800)
 
-Yes, there are several possibilities, but they will all require the DT
-to describe the ranks on the DRAM bus directly.
+are available in the git repository at:
 
-> It might be possible, in theory, to copy code into the SRAM and run
-> from SRAM while moving the SDRAM around. But i get the feeling its not
-> very easy.
 
-This doesn't help, the issue is the kernel has already started and is
-already placed in SDRAM, so you can't really touch the mapping that
-contains the kernel. The work is more of a complexity to determine
-what the bootloader did and re-do it in a way that dosen't move any
-memory the kernel has touched up to that point.
+  git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm/vgic-fixes
 
-> If there is 4GB in the system, it is probably going to be split with
-> 2GB low and 2GB high. This is probably the most important use case,
-> since throwing away 1/4 of your SDRAM is much worse than 1/8, or 1/16.
+for you to fetch changes up to 33c83cb3c1d84b76c8270abe5487e77f83a81b22:
 
-Think about things in terms of rank size. A 4GB system could have 1, 2
-or 4 GB ranks, and each is a different case. 1GB ranks should have a
-3/1 split, 2GB ranks a 2/2 or 3/0 split, and 4GB ranks are forced into
-a 2/0 split (due to alignment needs).
+  ARM: KVM: vgic: take distributor lock on sync_hwstate path (2013-02-22 13:29:38 +0000)
 
-> With 16GB, there is no choice other than 4GB/12GB with 1GB discarded.
+----------------------------------------------------------------
+Marc Zyngier (2):
+      ARM: KVM: vgic: force EOIed LRs to the empty state
+      ARM: KVM: vgic: take distributor lock on sync_hwstate path
 
-4x4GB ranks would be a 2/12GB split with 2GB of discard, a rank size
-must be a power of two.
+ arch/arm/kvm/vgic.c | 35 ++++++++++++++---------------------
+ 1 file changed, 14 insertions(+), 21 deletions(-)
 
-At a certain point low mem exhaustion becomes a serious issue for
-Linux, a system that can't DMA to 85% of its memory is incredibly
-broken, IMHO.
-
-Jason
+-- 
+Jazz is not dead. It just smells funny...
