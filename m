@@ -1,56 +1,73 @@
 From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Sat, 23 Mar 2013 13:37:13 +0100
-Subject: [PATCH] ARM: zynq: add smp_twd timer
-Message-ID: <1364042233-16583-1-git-send-email-s.trumtrar@pengutronix.de>
+Date: Sat, 23 Mar 2013 13:38:15 +0100
+Subject: [PATCH] ARM: zynq: add gem support
+Message-ID: <1364042295-16710-1-git-send-email-s.trumtrar@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The zynq has a Cortex-A9 with the corresponding smp_twd timers. Use them.
+The zynq includes a Cadence GEM IP core. This is compatible with the macb driver.
+Add it to the zynq-7000 DT.
 
 Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
 Cc: Michal Simek <michal.simek@xilinx.com>
 Cc: Josh Cartwright <josh.cartwright@ni.com>
 ---
- arch/arm/boot/dts/zynq-7000.dtsi | 7 +++++++
- arch/arm/mach-zynq/common.c      | 2 ++
- 2 files changed, 9 insertions(+)
+ arch/arm/boot/dts/zynq-7000.dtsi | 36 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
 diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
-index 5914b56..0dd2dc7 100644
+index 0dd2dc7..88564fa 100644
 --- a/arch/arm/boot/dts/zynq-7000.dtsi
 +++ b/arch/arm/boot/dts/zynq-7000.dtsi
-@@ -162,5 +162,12 @@
- 				interrupts = <0 39 4>;
- 			};
+@@ -54,6 +54,26 @@
+ 			clocks = <&uart_clk 1>;
  		};
-+
-+		timer: timer at f8f00600 {
-+			compatible = "arm,cortex-a9-twd-timer";
-+			reg = <0xf8f00600 0x20>;
-+			clocks = <&cpu_clk 1>;
-+			interrupts = <1 13 0xf01>;
+ 
++		gem0: ethernet at e000b000 {
++			compatible = "cdns,gem";
++			reg = <0xe000b000 0x4000>;
++			status = "disabled";
++			interrupts = <0 22 4>;
++			clocks = <&gem0_clk 0>, <&gem0_clk 0>;
++			clock-names = "pclk", "hclk";
++			phy-mode = "rgmii";
 +		};
- 	};
- };
-diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
-index 5c89832..920e20a 100644
---- a/arch/arm/mach-zynq/common.c
-+++ b/arch/arm/mach-zynq/common.c
-@@ -32,6 +32,7 @@
- #include <asm/mach-types.h>
- #include <asm/page.h>
- #include <asm/pgtable.h>
-+#include <asm/smp_twd.h>
- #include <asm/hardware/cache-l2x0.h>
- 
- #include "common.h"
-@@ -77,6 +78,7 @@ static void __init xilinx_zynq_timer_init(void)
- 
- 	xilinx_zynq_clocks_init(slcr);
- 
-+	twd_local_timer_of_register();
- 	xttcps_timer_init();
- }
- 
++
++		gem1: ethernet at e000c000 {
++			compatible = "cdns,gem";
++			reg = <0xe000c000 0x4000>;
++			status = "disabled";
++			interrupts = <0 45 4>;
++			clocks = <&gem1_clk 0>, <&gem1_clk 0>;
++			clock-names = "pclk", "hclk";
++			phy-mode = "rgmii";
++		};
++
+ 		slcr: slcr at f8000000 {
+ 			compatible = "xlnx,zynq-slcr";
+ 			reg = <0xF8000000 0x1000>;
+@@ -89,6 +109,22 @@
+ 					reg = <0x108 0x118>;
+ 					clock-output-names = "iopll";
+ 				};
++				gem0_clk: gem0_clk {
++					#clock-cells = <1>;
++					compatible = "xlnx,zynq-periph-clock";
++					clocks = <&iopll &armpll &ddrpll>;
++					reg = <0x140>;
++					clock-output-names = "gem0_ref_clk1",
++							     "gem0_ref_clk2";
++				};
++				gem1_clk: gem1_clk {
++					#clock-cells = <1>;
++					compatible = "xlnx,zynq-periph-clock";
++					clocks = <&iopll &armpll &ddrpll>;
++					reg = <0x144>;
++					clock-output-names = "gem1_ref_clk1",
++							     "gem1_ref_clk2";
++				};
+ 				uart_clk: uart_clk {
+ 					#clock-cells = <1>;
+ 					compatible = "xlnx,zynq-periph-clock";
 -- 
 1.8.2.rc2
