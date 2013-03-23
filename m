@@ -1,19 +1,16 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Sat, 23 Mar 2013 16:29:26 +0100
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 23 Mar 2013 15:43:18 +0000
 Subject: [PATCH 1/2] gpio: mvebu: add dbg_show function
 In-Reply-To: <20130323162118.7bb6bbe3@skate>
 References: <1363978188-31200-1-git-send-email-simon.guinot@sequanux.org>
  <1363978188-31200-2-git-send-email-simon.guinot@sequanux.org>
  <20130323162118.7bb6bbe3@skate>
-Message-ID: <20130323152926.GD16903@kw.sim.vm.gnt>
+Message-ID: <20130323154317.GN4977@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Sat, Mar 23, 2013 at 04:21:18PM +0100, Thomas Petazzoni wrote:
 > Dear Simon Guinot,
-
-Hi Thomas,
-
 > 
 > On Fri, 22 Mar 2013 19:49:47 +0100, Simon Guinot wrote:
 > > +	for (i = 0; i < chip->ngpio; i++) {
@@ -29,14 +26,6 @@ Hi Thomas,
 > > +		is_out = !(io_conf & msk);
 > 
 > Maybe instead of using 'msk' you could use test_bit() ?
-
-test_bit implies more extra bit shifting which are not needed.
-But maybe it makes the function more readable.
-
-Your call :)
-
-Simon
-
 > 
 > 		is_out = !test_bit(i, io_conf);
 > 
@@ -51,24 +40,15 @@ Simon
 > > +				   blink & msk ? "(blink )" : "");
 > 
 > 				   test_bit(i, blink) ? "(blink )" : ""
-> 
-> etc.
-> 
-> Thomas
-> -- 
-> Thomas Petazzoni, Free Electrons
-> Kernel, drivers, real-time and embedded Linux
-> development, consulting, training and support.
-> http://free-electrons.com
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130323/969ef853/attachment.sig>
+
+I don't think this is a good idea - and it's wrong.  test_bit() operates
+on an array of bits, and needs to be passed an unsigned long pointer.
+blink etc are "u32"s which aren't unsigned long.
+
+Moreover, what if ngpio becomes greater than 32 (for whatever reason)?
+test_bit(), when used correctly, will access the following word, which
+is probably a bad thing.  The original won't have that behaviour,
+which is safer.
+
+Last point on the original - msk wants to also be of type 'u32' as well
+to match io_conf/out/blink.
