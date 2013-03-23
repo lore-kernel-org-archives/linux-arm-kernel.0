@@ -1,67 +1,58 @@
 From: jg1.han@samsung.com (Jingoo Han)
-Date: Sat, 23 Mar 2013 13:05:56 +0900
-Subject: [PATCH 2/6] of/pci: Add of_pci_parse_bus_range() function
+Date: Sat, 23 Mar 2013 13:06:50 +0900
+Subject: [PATCH 3/6] pci: infrastructure to add drivers in drivers/pci/host
 In-Reply-To: <00c001ce277b$92b26ab0$b8174010$%han@samsung.com>
 References: <00c001ce277b$92b26ab0$b8174010$%han@samsung.com>
-Message-ID: <00c101ce277b$b8835b00$298a1100$%han@samsung.com>
+Message-ID: <00c201ce277b$d88be2f0$89a3a8d0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <thierry.reding@avionic-design.de>
+From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-This function can be used to parse a bus-range property as specified by
-device nodes representing PCI bridges.
+As agreed by the community, PCI host drivers will now be stored in
+drivers/pci/host. This commit adds this directory and the related
+Kconfig/Makefile changes to allow new drivers to be added in this
+directory.
 
-Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Signed-off-by: Jingoo Han <jg1.han@samsung.com>
 ---
- drivers/of/of_pci.c    |   25 +++++++++++++++++++++++++
- include/linux/of_pci.h |    1 +
- 2 files changed, 26 insertions(+), 0 deletions(-)
+ drivers/pci/Kconfig      |    2 ++
+ drivers/pci/Makefile     |    3 +++
+ drivers/pci/host/Kconfig |    4 ++++
+ 3 files changed, 9 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/pci/host/Kconfig
 
-diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-index 13e37e2..4ca7837 100644
---- a/drivers/of/of_pci.c
-+++ b/drivers/of/of_pci.c
-@@ -40,3 +40,28 @@ struct device_node *of_pci_find_child_device(struct device_node *parent,
- 	return NULL;
- }
- EXPORT_SYMBOL_GPL(of_pci_find_child_device);
+diff --git a/drivers/pci/Kconfig b/drivers/pci/Kconfig
+index 6d51aa6..ac45398 100644
+--- a/drivers/pci/Kconfig
++++ b/drivers/pci/Kconfig
+@@ -119,3 +119,5 @@ config PCI_IOAPIC
+ config PCI_LABEL
+ 	def_bool y if (DMI || ACPI)
+ 	select NLS
 +
-+/**
-+ * of_pci_parse_bus_range() - parse the bus-range property of a PCI device
-+ * @node: device node
-+ * @res: address to a struct resource to return the bus-range
-+ *
-+ * Returns 0 on success or a negative error-code on failure.
-+ */
-+int of_pci_parse_bus_range(struct device_node *node, struct resource *res)
-+{
-+	const __be32 *values;
-+	int len;
-+
-+	values = of_get_property(node, "bus-range", &len);
-+	if (!values || len < sizeof(*values) * 2)
-+		return -EINVAL;
-+
-+	res->name = node->name;
-+	res->start = be32_to_cpup(values++);
-+	res->end = be32_to_cpup(values);
-+	res->flags = IORESOURCE_BUS;
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(of_pci_parse_bus_range);
-diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
-index bb115de..178a5cc 100644
---- a/include/linux/of_pci.h
-+++ b/include/linux/of_pci.h
-@@ -10,5 +10,6 @@ int of_irq_map_pci(const struct pci_dev *pdev, struct of_irq *out_irq);
- struct device_node;
- struct device_node *of_pci_find_child_device(struct device_node *parent,
- 					     unsigned int devfn);
-+int of_pci_parse_bus_range(struct device_node *node, struct resource *res);
++source "drivers/pci/host/Kconfig"
+diff --git a/drivers/pci/Makefile b/drivers/pci/Makefile
+index 0c3efcf..6ebf5bf 100644
+--- a/drivers/pci/Makefile
++++ b/drivers/pci/Makefile
+@@ -67,3 +67,6 @@ obj-$(CONFIG_XEN_PCIDEV_FRONTEND) += xen-pcifront.o
+ obj-$(CONFIG_OF) += of.o
  
- #endif
+ ccflags-$(CONFIG_PCI_DEBUG) := -DDEBUG
++
++# PCI host controller drivers
++obj-y += host/
+diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+new file mode 100644
+index 0000000..cc3a1af
+--- /dev/null
++++ b/drivers/pci/host/Kconfig
+@@ -0,0 +1,4 @@
++menu "PCI host controller drivers"
++	depends on PCI
++
++endmenu
 -- 
 1.7.2.5
