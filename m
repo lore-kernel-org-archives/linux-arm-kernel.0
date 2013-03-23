@@ -1,46 +1,41 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 23 Mar 2013 15:09:52 -0300
-Subject: [PATCH 1/3] ARM: dts: imx28-evk: Enable touchscreen support
-In-Reply-To: <20130323135608.GG6281@S2101-09.ap.freescale.net>
-References: <1360337803-19858-1-git-send-email-festevam@gmail.com>
- <20130304031716.GC30431@S2101-09.ap.freescale.net>
- <CAOMZO5Ai-msRVeAqQFiRhfAxkb2DMTYJvTcYihBhFt6GMCFwPQ@mail.gmail.com>
- <20130323135608.GG6281@S2101-09.ap.freescale.net>
-Message-ID: <CAOMZO5BvT3CUhPECTQZQq_Q2YEqMJzmXPL5pj-3Qmq35jnvm1A@mail.gmail.com>
+From: alex@digriz.org.uk (Alexander Clouter)
+Date: Sat, 23 Mar 2013 18:09:01 +0000
+Subject: [PATCH 2/3] arm: orion5x: add ehci bindings to dtsi
+In-Reply-To: <1364062142-28117-1-git-send-email-alex@digriz.org.uk>
+References: <1364062142-28117-1-git-send-email-alex@digriz.org.uk>
+Message-ID: <1364062142-28117-3-git-send-email-alex@digriz.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 23, 2013 at 10:56 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Fri, Mar 22, 2013 at 03:07:29PM -0300, Fabio Estevam wrote:
->> Shawn,
->>
->> On Mon, Mar 4, 2013 at 12:17 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
->>
->> > I do not understand why.  But it seems to me that applying the patch on
->> > top of v3.9-rc1 results in a silent audio playback on my imx28-evk
->> > board.  Can you confirm that on your side?
->>
->> Can you please re-try against linux-next 20130322?
->>
-> Does it even boot for you?  On my side, it stops at the point below.
->
-> [    1.600867] ci_hdrc ci_hdrc.0: doesn't support gadget
-> [    1.606282] ci_hdrc ci_hdrc.0: EHCI Host Controller
-> [    1.613522] ci_hdrc ci_hdrc.0: new USB bus registered, assigned bus number 1
+Signed-off-by: Alexander Clouter <alex@digriz.org.uk>
+---
+ arch/arm/boot/dts/orion5x.dtsi |   14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-Same here. I forgot to mention I had to disable USB in order to
-complete the boot. This USB issue should be addressed separately
-though.
-
->
->> I tried it here and audio playback is normal with touchscreen enabled.
->
-> You must have both patches below applied.
->
->  1) ARM: mxs_defconfig: Build CONFIG_INPUT_EVDEV as built-in
->  2) ARM: dts: imx28-evk: Enable touchscreen support
->
-> I found that applying either one of the two without applying the other
-> will result in a broken audio playback.
-
-With the USB support disabled, I don't see audio playback failure.
+diff --git a/arch/arm/boot/dts/orion5x.dtsi b/arch/arm/boot/dts/orion5x.dtsi
+index 9bde027..e304f11 100644
+--- a/arch/arm/boot/dts/orion5x.dtsi
++++ b/arch/arm/boot/dts/orion5x.dtsi
+@@ -72,6 +72,20 @@
+ 			status = "okay";
+ 		};
+ 
++		ehci at 50000 {
++			compatible = "marvell,orion-ehci";
++			reg = <0x50000 0x1000>;
++			interrupts = <17>;
++			status = "disabled";
++		};
++
++		ehci at a0000 {
++			compatible = "marvell,orion-ehci";
++			reg = <0xa0000 0x1000>;
++			interrupts = <12>;
++			status = "disabled";
++		};
++
+ 		sata at 80000 {
+ 			compatible = "marvell,orion-sata";
+ 			reg = <0x80000 0x5000>;
+-- 
+1.7.10.4
