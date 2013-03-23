@@ -1,65 +1,24 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 23 Mar 2013 23:30:14 +0100
-Subject: [PATCH 5/5] ARM: hackberry: dt: Add Ethernet controller to the
- Hackberry device tree
-In-Reply-To: <1364077814-2233-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1364077814-2233-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1364077814-2233-6-git-send-email-maxime.ripard@free-electrons.com>
+From: alex@digriz.org.uk (Alexander Clouter)
+Date: Sat, 23 Mar 2013 22:29:53 +0000
+Subject: [PATCHv2 0/4] arm: orion5x: devicetree fixups and additions
+Message-ID: <1364077797-21206-1-git-send-email-alex@digriz.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Hackberry has a PHY that needs to be powered up through a GPIO, so
-we need to use a fixed regulator here.
+Fixups and additional DT bindings for orion5x.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/boot/dts/sun4i-a10-hackberry.dts |   32 +++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+Changelog:
+ v2 - included descriptions to patches
+    - added 'correct IRQ used in dtsi for mv_cesa' patch
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-hackberry.dts b/arch/arm/boot/dts/sun4i-a10-hackberry.dts
-index f84549a..072d51f 100644
---- a/arch/arm/boot/dts/sun4i-a10-hackberry.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-hackberry.dts
-@@ -23,8 +23,40 @@
- 	};
- 
- 	soc {
-+		pio: pinctrl at 01c20800 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&hackberry_hogs>;
-+
-+			hackberry_hogs: hogs at 0 {
-+				allwinner,pins = "PH19";
-+				allwinner,function = "gpio_out";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
-+		};
-+
- 		uart0: uart at 01c28000 {
- 			status = "okay";
- 		};
-+
-+		emac: ethernet at 01c0b000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&emac_pins_a>;
-+			phy-supply = <&reg_emac_3v3>;
-+			status = "okay";
-+		};
-+	};
-+
-+	regulators {
-+		compatible = "simple-bus";
-+
-+		reg_emac_3v3: emac-3v3 {
-+			compatible = "regulator-fixed";
-+			regulator-name = "emac-3v3";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			enable-active-high;
-+			gpio = <&pio 7 19 0>;
-+		};
- 	};
- };
+Alexander Clouter (4):
+  arm: orion5x: fix orion5x.dtsi gpio parameters
+  arm: orion5x: add ehci bindings to dtsi
+  arm: orion5x: enable xor for orion5x platform
+  arm: orion5x: correct IRQ used in dtsi for mv_cesa
+
+ arch/arm/boot/dts/orion5x.dtsi |   40 ++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 38 insertions(+), 2 deletions(-)
+
 -- 
 1.7.10.4
