@@ -1,51 +1,58 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 23 Mar 2013 23:19:30 +0100
-Subject: [GIT PULL] sunxi drivers additions for 3.10, take 1
-In-Reply-To: <201303231006.02970.arnd@arndb.de>
-References: <514D7B30.7080002@free-electrons.com>
- <201303231006.02970.arnd@arndb.de>
-Message-ID: <514E2A72.80707@free-electrons.com>
+Date: Sat, 23 Mar 2013 23:30:09 +0100
+Subject: [PATCHv2 0/5] ARM: sunxi: Add support for A10 Ethernet controller
+Message-ID: <1364077814-2233-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi,
 
-Le 23/03/2013 11:06, Arnd Bergmann a ?crit :
-> On Saturday 23 March 2013, Maxime Ripard wrote:
->> Please consider pulling the following pull request that contains
->> drivers to be included in 3.10. The only addition for now is the clock
->> driver for the Allwinner A10 and A13.
->>
-> 
-> Hi Maxime,
-> 
-> I see the patches have been Acked by Mike Turquette, so I assume he's
-> ok with getting them merged through the arm-soc tree, but I don't
-> actually see a reason why it shouldn't just go through his tree.
-> If there is something I'm missing, that is probably information
-> that belongs into the tag description.
-> 
-> I don't mind pulling this if there is a good reason, such as later
-> pull requests for 3.10 depending on it, but I'd prefer to not just
-> get a pull request for something that is not in my area without
-> an explanation why that is necessary, and without having the
-> real subsystem maintainer on Cc.
+The Allwinner A10 SoC has an ethernet controller that seem to be specific to
+Allwinner. This IP has no public documentation, so exact
+details are quite sparse, and this code come from refactored Allwinner
+code.
 
-There will probably be further merge depending on this, but I don't
-think there will be more than clock gates patches and some rework that I
-plan to begin support for the next chip, so I'm fine with it going
-through Mike's tree.
+Since we don't have any clock support yet for the Allwinner SoCs, we
+rely on the bootloader to enable and gate the EMAC clock.
 
-I just took it in my tree to avoid similar merge problems than the one
-we encountered, and since I had to merge some of the patches in this
-series...
-
-Anyway, like I said, if you prefer to see this going through Mike's
-tree, I'm fine with it.
-
+Thanks,
 Maxime
 
+Changes from v1:
+  - Use phylib for the phy-related functions
+  - Use an optional regulator to power up the phy
+  - Rename the driver from Davicom Wemac to Allwinner EMAC, since it's the name
+    mentionned in the datasheet, and we have no strong evidence of a
+    relationship with Davicom
+  - Fix various small things around the driver: add defines for undocumented
+    values, fix documentation name and compatible example, etc.
+
+Maxime Ripard (3):
+  ARM: sunxi: Add EMAC controller node to sun4i DTSI
+  ARM: sun4i: Add muxing options for the ethernet controller
+  ARM: hackberry: dt: Add Ethernet controller to the Hackberry device
+    tree
+
+Stefan Roese (2):
+  net: Add EMAC ethernet driver found on Allwinner A10 SoC's
+  ARM: cubieboard: Enable ethernet (WEMAC) support in dts
+
+ .../bindings/net/allwinner,sun4i-emac.txt          |   19 +
+ arch/arm/boot/dts/sun4i-a10-cubieboard.dts         |    6 +
+ arch/arm/boot/dts/sun4i-a10-hackberry.dts          |   32 +
+ arch/arm/boot/dts/sun4i-a10.dtsi                   |   18 +
+ drivers/net/ethernet/Kconfig                       |    1 +
+ drivers/net/ethernet/Makefile                      |    1 +
+ drivers/net/ethernet/allwinner/Kconfig             |   36 +
+ drivers/net/ethernet/allwinner/Makefile            |    5 +
+ drivers/net/ethernet/allwinner/sun4i-emac.c        | 1033 ++++++++++++++++++++
+ drivers/net/ethernet/allwinner/sun4i-emac.h        |  114 +++
+ 10 files changed, 1265 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/net/allwinner,sun4i-emac.txt
+ create mode 100644 drivers/net/ethernet/allwinner/Kconfig
+ create mode 100644 drivers/net/ethernet/allwinner/Makefile
+ create mode 100644 drivers/net/ethernet/allwinner/sun4i-emac.c
+ create mode 100644 drivers/net/ethernet/allwinner/sun4i-emac.h
+
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.7.10.4
