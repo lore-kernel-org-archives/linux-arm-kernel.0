@@ -1,23 +1,36 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 23 Mar 2013 15:12:06 -0300
-Subject: [PATCH 1/1 v2 net-next] net: fec: fix the build as module
-In-Reply-To: <CAHrpEqQU9e-qAYvtHmB9bDhXafHmG=yWJxxv96f94FxVq9QYgQ@mail.gmail.com>
-References: <1363915193-22179-1-git-send-email-Frank.Li@freescale.com>
- <CAOMZO5D1p-QJ=7N-QrLbjcwK0b=280QEFuxNkbmYsmTeRitv+w@mail.gmail.com>
- <CAHrpEqQU9e-qAYvtHmB9bDhXafHmG=yWJxxv96f94FxVq9QYgQ@mail.gmail.com>
-Message-ID: <CAOMZO5Cn4xG38fB9snS2cJSjZDzaWQJSGLp3+hFyxTXmOkO7BQ@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 23 Mar 2013 14:16:38 -0400
+Subject: [PATCH v2 00/14] Marvell EBU thermal sensor consolidation
+In-Reply-To: <1363991114-4225-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1363991114-4225-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20130323181638.GN13280@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 21, 2013 at 11:39 PM, Frank Li <lznuaa@gmail.com> wrote:
->>
->> This error does not not happen in 'net-next' anymore.
->
-> what's your suggestion? change commit message or request apply to 3.9
+On Fri, Mar 22, 2013 at 07:25:00PM -0300, Ezequiel Garcia wrote:
+...
+> Ezequiel Garcia (14):
+>   thermal: Rename driver 'kirkwood' -> 'mvebu'
+>   thermal: mvebu: Rename symbols 'kirkwood' -> 'mvebu'
+>   thermal: mvebu: Move MODULE_DEVICE_TABLE upwards
+>   thermal: mvebu: Remove unneeded variable initialization
+>   thermal: mvebu: Convert to devm_ioremap_resource()
+>   thermal: mvebu: Fix license declaration
+>   thermal: mvebu: Rename kirkwood definitions to mvebu
+>   thermal: mvebu: Add infrastructure to support more multiple SoC
+>     variants
+>   thermal: mvebu: Add support for Armada XP thermal sensor
+>   thermal: mvebu: Add support for Armada 370 thermal sensor
+>   thermal: mvebu: Add support for Marvell Dove SoC family
 
-Your motivation now is to generate a single kernel module instead of
-two for the fec, rather than fixing the the build error.
+Once the thermal maintainers agree to take this in, I'll take the three
+below through mvebu/arm-soc.  This shouldn't cause any dependency
+headaches, and will reduce the possibility of merge conflicts.
 
-So you need to adjust the Subject and commit log.
+>   ARM: mvebu: Add thermal support to Armada XP device tree
+>   ARM: mvebu: Add thermal support to Armada 370 device tree
+>   ARM: configs: Update mvebu, dove and kirkwood defconfigs for thermal
 
-I am not sure if we really need to rename fec.c though.
+thx,
+
+Jason.
