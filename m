@@ -1,72 +1,36 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sat, 23 Mar 2013 13:56:58 +0100
-Subject: [PATCH] ARM: Kirkwood: fix unused mvsdio gpio pins
-Message-ID: <1364043420-17641-1-git-send-email-sebastian.hesselbarth@gmail.com>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Sat, 23 Mar 2013 13:57:27 +0100
+Subject: [PATCH 0/3] ARM: zynq: add SMP support for zynq7000
+Message-ID: <1364043450-18700-1-git-send-email-s.trumtrar@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mvsdio_platform_data allows to pass card detect and write protect gpio
-numbers to the driver. Some kirkwood boards don't use both pins as they
-are not connected, and don't set the corresponding value in platform_data.
+Hi!
 
-This will leave the unset values in platform_data initialized as 0, which
-is in fact a valid gpio pin. mvsdio will grab that pin and configure it as
-gpio, which in turn breaks nand controller as mpp0 also carries nand_io2.
+This series adds SMP support for the Zynq SoCs.
+It goes along the lines of socfpga: the jump goes via RAM.
+Other CortexA9 based SoCs seem to go via some sort of general purpose register.
+These two SoCs do not have that.
 
-This patch fixes the above by initializing unused gpio functions in the
-platform_data with an invalid (-1) value.
+This series was tested on a ZedBoard which has 2 cores.
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Reported-by: Soeren Moch <smoch@web.de>
----
-Cc: Soeren Moch <smoch@web.de>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- arch/arm/mach-kirkwood/guruplug-setup.c  |    2 ++
- arch/arm/mach-kirkwood/openrd-setup.c    |    1 +
- arch/arm/mach-kirkwood/rd88f6281-setup.c |    1 +
- 3 files changed, 4 insertions(+)
+Regards,
+Steffen
 
-diff --git a/arch/arm/mach-kirkwood/guruplug-setup.c b/arch/arm/mach-kirkwood/guruplug-setup.c
-index 1c6e736..08dd739 100644
---- a/arch/arm/mach-kirkwood/guruplug-setup.c
-+++ b/arch/arm/mach-kirkwood/guruplug-setup.c
-@@ -53,6 +53,8 @@ static struct mv_sata_platform_data guruplug_sata_data = {
- 
- static struct mvsdio_platform_data guruplug_mvsdio_data = {
- 	/* unfortunately the CD signal has not been connected */
-+	.gpio_card_detect = -1,
-+	.gpio_write_protect = -1,
- };
- 
- static struct gpio_led guruplug_led_pins[] = {
-diff --git a/arch/arm/mach-kirkwood/openrd-setup.c b/arch/arm/mach-kirkwood/openrd-setup.c
-index 8ddd69f..6a6eb54 100644
---- a/arch/arm/mach-kirkwood/openrd-setup.c
-+++ b/arch/arm/mach-kirkwood/openrd-setup.c
-@@ -55,6 +55,7 @@ static struct mv_sata_platform_data openrd_sata_data = {
- 
- static struct mvsdio_platform_data openrd_mvsdio_data = {
- 	.gpio_card_detect = 29,	/* MPP29 used as SD card detect */
-+	.gpio_write_protect = -1,
- };
- 
- static unsigned int openrd_mpp_config[] __initdata = {
-diff --git a/arch/arm/mach-kirkwood/rd88f6281-setup.c b/arch/arm/mach-kirkwood/rd88f6281-setup.c
-index c7d93b4..d242231 100644
---- a/arch/arm/mach-kirkwood/rd88f6281-setup.c
-+++ b/arch/arm/mach-kirkwood/rd88f6281-setup.c
-@@ -69,6 +69,7 @@ static struct mv_sata_platform_data rd88f6281_sata_data = {
- 
- static struct mvsdio_platform_data rd88f6281_mvsdio_data = {
- 	.gpio_card_detect = 28,
-+	.gpio_write_protect = -1,
- };
- 
- static unsigned int rd88f6281_mpp_config[] __initdata = {
+Steffen Trumtrar (3):
+  ARM: zynq: read scu base from SoC
+  ARM: zynq: get slcr base earlier
+  ARM: zynq: add SMP support
+
+ arch/arm/boot/dts/zynq-7000.dtsi |  19 +++++++
+ arch/arm/mach-zynq/Makefile      |   2 +
+ arch/arm/mach-zynq/common.c      |  56 +++++++++++++-------
+ arch/arm/mach-zynq/common.h      |  14 +++++
+ arch/arm/mach-zynq/headsmp.S     |  20 +++++++
+ arch/arm/mach-zynq/platsmp.c     | 110 +++++++++++++++++++++++++++++++++++++++
+ 6 files changed, 203 insertions(+), 18 deletions(-)
+ create mode 100644 arch/arm/mach-zynq/headsmp.S
+ create mode 100644 arch/arm/mach-zynq/platsmp.c
+
 -- 
-1.7.10.4
+1.8.2.rc2
