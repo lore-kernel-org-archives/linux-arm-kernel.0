@@ -1,73 +1,72 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Sat, 23 Mar 2013 13:38:15 +0100
-Subject: [PATCH] ARM: zynq: add gem support
-Message-ID: <1364042295-16710-1-git-send-email-s.trumtrar@pengutronix.de>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Sat, 23 Mar 2013 13:56:58 +0100
+Subject: [PATCH] ARM: Kirkwood: fix unused mvsdio gpio pins
+Message-ID: <1364043420-17641-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The zynq includes a Cadence GEM IP core. This is compatible with the macb driver.
-Add it to the zynq-7000 DT.
+mvsdio_platform_data allows to pass card detect and write protect gpio
+numbers to the driver. Some kirkwood boards don't use both pins as they
+are not connected, and don't set the corresponding value in platform_data.
 
-Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-Cc: Michal Simek <michal.simek@xilinx.com>
-Cc: Josh Cartwright <josh.cartwright@ni.com>
+This will leave the unset values in platform_data initialized as 0, which
+is in fact a valid gpio pin. mvsdio will grab that pin and configure it as
+gpio, which in turn breaks nand controller as mpp0 also carries nand_io2.
+
+This patch fixes the above by initializing unused gpio functions in the
+platform_data with an invalid (-1) value.
+
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Reported-by: Soeren Moch <smoch@web.de>
 ---
- arch/arm/boot/dts/zynq-7000.dtsi | 36 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
+Cc: Soeren Moch <smoch@web.de>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+ arch/arm/mach-kirkwood/guruplug-setup.c  |    2 ++
+ arch/arm/mach-kirkwood/openrd-setup.c    |    1 +
+ arch/arm/mach-kirkwood/rd88f6281-setup.c |    1 +
+ 3 files changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
-index 0dd2dc7..88564fa 100644
---- a/arch/arm/boot/dts/zynq-7000.dtsi
-+++ b/arch/arm/boot/dts/zynq-7000.dtsi
-@@ -54,6 +54,26 @@
- 			clocks = <&uart_clk 1>;
- 		};
+diff --git a/arch/arm/mach-kirkwood/guruplug-setup.c b/arch/arm/mach-kirkwood/guruplug-setup.c
+index 1c6e736..08dd739 100644
+--- a/arch/arm/mach-kirkwood/guruplug-setup.c
++++ b/arch/arm/mach-kirkwood/guruplug-setup.c
+@@ -53,6 +53,8 @@ static struct mv_sata_platform_data guruplug_sata_data = {
  
-+		gem0: ethernet at e000b000 {
-+			compatible = "cdns,gem";
-+			reg = <0xe000b000 0x4000>;
-+			status = "disabled";
-+			interrupts = <0 22 4>;
-+			clocks = <&gem0_clk 0>, <&gem0_clk 0>;
-+			clock-names = "pclk", "hclk";
-+			phy-mode = "rgmii";
-+		};
-+
-+		gem1: ethernet at e000c000 {
-+			compatible = "cdns,gem";
-+			reg = <0xe000c000 0x4000>;
-+			status = "disabled";
-+			interrupts = <0 45 4>;
-+			clocks = <&gem1_clk 0>, <&gem1_clk 0>;
-+			clock-names = "pclk", "hclk";
-+			phy-mode = "rgmii";
-+		};
-+
- 		slcr: slcr at f8000000 {
- 			compatible = "xlnx,zynq-slcr";
- 			reg = <0xF8000000 0x1000>;
-@@ -89,6 +109,22 @@
- 					reg = <0x108 0x118>;
- 					clock-output-names = "iopll";
- 				};
-+				gem0_clk: gem0_clk {
-+					#clock-cells = <1>;
-+					compatible = "xlnx,zynq-periph-clock";
-+					clocks = <&iopll &armpll &ddrpll>;
-+					reg = <0x140>;
-+					clock-output-names = "gem0_ref_clk1",
-+							     "gem0_ref_clk2";
-+				};
-+				gem1_clk: gem1_clk {
-+					#clock-cells = <1>;
-+					compatible = "xlnx,zynq-periph-clock";
-+					clocks = <&iopll &armpll &ddrpll>;
-+					reg = <0x144>;
-+					clock-output-names = "gem1_ref_clk1",
-+							     "gem1_ref_clk2";
-+				};
- 				uart_clk: uart_clk {
- 					#clock-cells = <1>;
- 					compatible = "xlnx,zynq-periph-clock";
+ static struct mvsdio_platform_data guruplug_mvsdio_data = {
+ 	/* unfortunately the CD signal has not been connected */
++	.gpio_card_detect = -1,
++	.gpio_write_protect = -1,
+ };
+ 
+ static struct gpio_led guruplug_led_pins[] = {
+diff --git a/arch/arm/mach-kirkwood/openrd-setup.c b/arch/arm/mach-kirkwood/openrd-setup.c
+index 8ddd69f..6a6eb54 100644
+--- a/arch/arm/mach-kirkwood/openrd-setup.c
++++ b/arch/arm/mach-kirkwood/openrd-setup.c
+@@ -55,6 +55,7 @@ static struct mv_sata_platform_data openrd_sata_data = {
+ 
+ static struct mvsdio_platform_data openrd_mvsdio_data = {
+ 	.gpio_card_detect = 29,	/* MPP29 used as SD card detect */
++	.gpio_write_protect = -1,
+ };
+ 
+ static unsigned int openrd_mpp_config[] __initdata = {
+diff --git a/arch/arm/mach-kirkwood/rd88f6281-setup.c b/arch/arm/mach-kirkwood/rd88f6281-setup.c
+index c7d93b4..d242231 100644
+--- a/arch/arm/mach-kirkwood/rd88f6281-setup.c
++++ b/arch/arm/mach-kirkwood/rd88f6281-setup.c
+@@ -69,6 +69,7 @@ static struct mv_sata_platform_data rd88f6281_sata_data = {
+ 
+ static struct mvsdio_platform_data rd88f6281_mvsdio_data = {
+ 	.gpio_card_detect = 28,
++	.gpio_write_protect = -1,
+ };
+ 
+ static unsigned int rd88f6281_mpp_config[] __initdata = {
 -- 
-1.8.2.rc2
+1.7.10.4
