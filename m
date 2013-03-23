@@ -1,75 +1,38 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sat, 23 Mar 2013 13:58:09 +0100
-Subject: [PATCH] ARM: kirkwood: make use of DT mvsdio on guruplug board
-Message-ID: <1364043489-17683-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Date: Sat, 23 Mar 2013 13:58:22 +0100
+Subject: [PATCH] ARM: kirkwood: add MACH_GURUPLUG_DT to defconfig
+Message-ID: <1364043502-17716-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Device tree based guruplug boards still use mvsdio platform_data and
-kirkwood_sdio_init to enable sdio. DT support for sdio is already there,
-so make use of it.
-
-This also fixes mvsdio accidentially breaking nand by configuring mpp0
-to gpio, while used also by nand (nand_io2 on mpp0).
+This patch just adds the missing MACH_GURUPLUG_DT to kirkwood_defconfig.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Tested-by: Soeren Moch <smoch@web.de>
+Reported-by: Soeren Moch <smoch@web.de>
 ---
 Cc: Soeren Moch <smoch@web.de>
 Cc: Jason Cooper <jason@lakedaemon.net>
 Cc: Andrew Lunn <andrew@lunn.ch>
 Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Willy Tarreau <w@1wt.eu>
+Cc: Stefan Peter <s.peter@mpl.ch>
+Cc: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- arch/arm/boot/dts/kirkwood-guruplug-server-plus.dts |    4 ++++
- arch/arm/mach-kirkwood/board-guruplug.c             |    6 ------
- 2 files changed, 4 insertions(+), 6 deletions(-)
+ arch/arm/configs/kirkwood_defconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/kirkwood-guruplug-server-plus.dts b/arch/arm/boot/dts/kirkwood-guruplug-server-plus.dts
-index 9555a86..44fd97d 100644
---- a/arch/arm/boot/dts/kirkwood-guruplug-server-plus.dts
-+++ b/arch/arm/boot/dts/kirkwood-guruplug-server-plus.dts
-@@ -69,6 +69,10 @@
- 			status = "okay";
- 			nr-ports = <1>;
- 		};
-+
-+		mvsdio at 90000 {
-+			status = "okay";
-+		};
- 	};
- 
- 	gpio-leds {
-diff --git a/arch/arm/mach-kirkwood/board-guruplug.c b/arch/arm/mach-kirkwood/board-guruplug.c
-index 0a0df45..a857163 100644
---- a/arch/arm/mach-kirkwood/board-guruplug.c
-+++ b/arch/arm/mach-kirkwood/board-guruplug.c
-@@ -13,7 +13,6 @@
- #include <linux/init.h>
- #include <linux/mv643xx_eth.h>
- #include <linux/gpio.h>
--#include <linux/platform_data/mmc-mvsdio.h>
- #include "common.h"
- 
- static struct mv643xx_eth_platform_data guruplug_ge00_data = {
-@@ -24,10 +23,6 @@ static struct mv643xx_eth_platform_data guruplug_ge01_data = {
- 	.phy_addr	= MV643XX_ETH_PHY_ADDR(1),
- };
- 
--static struct mvsdio_platform_data guruplug_mvsdio_data = {
--	/* unfortunately the CD signal has not been connected */
--};
--
- void __init guruplug_dt_init(void)
- {
- 	/*
-@@ -35,5 +30,4 @@ void __init guruplug_dt_init(void)
- 	 */
- 	kirkwood_ge00_init(&guruplug_ge00_data);
- 	kirkwood_ge01_init(&guruplug_ge01_data);
--	kirkwood_sdio_init(&guruplug_mvsdio_data);
- }
+diff --git a/arch/arm/configs/kirkwood_defconfig b/arch/arm/configs/kirkwood_defconfig
+index 13482ea..5e40f96 100644
+--- a/arch/arm/configs/kirkwood_defconfig
++++ b/arch/arm/configs/kirkwood_defconfig
+@@ -24,6 +24,7 @@ CONFIG_MACH_IB62X0_DT=y
+ CONFIG_MACH_TS219_DT=y
+ CONFIG_MACH_DOCKSTAR_DT=y
+ CONFIG_MACH_GOFLEXNET_DT=y
++CONFIG_MACH_GURUPLUG_DT=y
+ CONFIG_MACH_LSXL_DT=y
+ CONFIG_MACH_IOMEGA_IX2_200_DT=y
+ CONFIG_MACH_KM_KIRKWOOD_DT=y
 -- 
 1.7.10.4
