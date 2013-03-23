@@ -1,53 +1,37 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 23 Mar 2013 10:41:56 +0000
-Subject: [PATCH 1/6] of/pci: Provide support for parsing PCI DT ranges
- property
-In-Reply-To: <00c001ce277b$92b26ab0$b8174010$%han@samsung.com>
-References: <00c001ce277b$92b26ab0$b8174010$%han@samsung.com>
-Message-ID: <20130323104156.GL4977@n2100.arm.linux.org.uk>
+Date: Sat, 23 Mar 2013 10:44:02 +0000
+Subject: [PATCHv2 2/7] arm: vt8500: Increase available GPIOs on arch-vt8500
+In-Reply-To: <1364015633-18580-3-git-send-email-linux@prisktech.co.nz>
+References: <1364015633-18580-1-git-send-email-linux@prisktech.co.nz>
+ <1364015633-18580-3-git-send-email-linux@prisktech.co.nz>
+Message-ID: <20130323104402.GM4977@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 23, 2013 at 01:04:53PM +0900, Jingoo Han wrote:
-> -		switch ((pci_space >> 24) & 0x3) {
-> -		case 1:		/* PCI IO space */
-> +		if (iter.flags & IORESOURCE_IO) {
+On Sat, Mar 23, 2013 at 06:13:48PM +1300, Tony Prisk wrote:
+> With the inclusion of the pin control driver, more GPIO pins have been
+> identified on the arch-vt8500 SoCs requiring an increase in the available
+> GPIOs.
+> 
+> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+> ---
+>  arch/arm/Kconfig |    3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 5b71469..c5dd0c2 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1661,9 +1661,10 @@ config ARCH_NR_GPIO
+>  	int
+>  	default 1024 if ARCH_SHMOBILE || ARCH_TEGRA
+>  	default 355 if ARCH_U8500
+> +	default 352 if ARCH_VT8500
+>  	default 264 if MACH_H4700
+>  	default 512 if SOC_OMAP5
+> -	default 288 if ARCH_VT8500 || ARCH_SUNXI
+> +	default 288 if ARCH_SUNXI
 
-Please look at how IORESOURCE_* stuff is defined:
-#define IORESOURCE_TYPE_BITS    0x00001f00      /* Resource type */
-#define IORESOURCE_IO           0x00000100      /* PCI/ISA I/O ports */
-#define IORESOURCE_MEM          0x00000200
-#define IORESOURCE_REG          0x00000300      /* Register offsets */
-#define IORESOURCE_IRQ          0x00000400
-#define IORESOURCE_DMA          0x00000800
-#define IORESOURCE_BUS          0x00001000
-
-Notice that it's not an array of bits.
-
-So this should be:
-		if ((iter.flags & IORESOURCE_TYPE_BITS) == IORESOURCE_IO) {
-
-> +			iter.cpu_addr = iter.pci_addr;
-> +		} else if (iter.flags & IORESOURCE_MEM) {
-
-And this should be:
-		} else if ((iter.flags & IORESOURCE_TYPE_BITS) == IORESOURCE_MEM) {
-
-> +		if (iter.flags & IORESOURCE_IO) {
-
-Same here.
-
-> +		} else if (iter.flags & IORESOURCE_MEM) {
-
-And again here.
-
-> -		switch ((pci_space >> 24) & 0x3) {
-> -		case 1:		/* PCI IO space */
-> +		if (iter.flags & IORESOURCE_IO) {
-
-ditto.
-
-> +			iter.cpu_addr = iter.pci_addr;
-> +		} else if (flags & IORESOURCE_MEM) {
-
-ditto.
+Note that the ordering of this has been fixed in -rc, so the above will
+cause a merge conflict.  You may wish to consider basing your patch set
+on a later kernel version.
