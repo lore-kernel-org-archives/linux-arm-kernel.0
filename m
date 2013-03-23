@@ -1,38 +1,83 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sat, 23 Mar 2013 13:58:22 +0100
-Subject: [PATCH] ARM: kirkwood: add MACH_GURUPLUG_DT to defconfig
-Message-ID: <1364043502-17716-1-git-send-email-sebastian.hesselbarth@gmail.com>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Sat, 23 Mar 2013 14:04:23 +0100
+Subject: [PATCH] ARM: zynq: add support for ZedBoard
+Message-ID: <1364043863-20669-1-git-send-email-s.trumtrar@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch just adds the missing MACH_GURUPLUG_DT to kirkwood_defconfig.
+Support the Avnet ZedBoard.
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Reported-by: Soeren Moch <smoch@web.de>
+Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
 ---
-Cc: Soeren Moch <smoch@web.de>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Stefan Peter <s.peter@mpl.ch>
-Cc: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- arch/arm/configs/kirkwood_defconfig |    1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/Makefile          |  3 ++-
+ arch/arm/boot/dts/zynq-zedboard.dts | 45 +++++++++++++++++++++++++++++++++++++
+ 2 files changed, 47 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/zynq-zedboard.dts
 
-diff --git a/arch/arm/configs/kirkwood_defconfig b/arch/arm/configs/kirkwood_defconfig
-index 13482ea..5e40f96 100644
---- a/arch/arm/configs/kirkwood_defconfig
-+++ b/arch/arm/configs/kirkwood_defconfig
-@@ -24,6 +24,7 @@ CONFIG_MACH_IB62X0_DT=y
- CONFIG_MACH_TS219_DT=y
- CONFIG_MACH_DOCKSTAR_DT=y
- CONFIG_MACH_GOFLEXNET_DT=y
-+CONFIG_MACH_GURUPLUG_DT=y
- CONFIG_MACH_LSXL_DT=y
- CONFIG_MACH_IOMEGA_IX2_200_DT=y
- CONFIG_MACH_KM_KIRKWOOD_DT=y
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 9c62558..1d36a4c 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -174,7 +174,8 @@ dtb-$(CONFIG_ARCH_VT8500) += vt8500-bv07.dtb \
+ 	wm8505-ref.dtb \
+ 	wm8650-mid.dtb \
+ 	wm8850-w70v2.dtb
+-dtb-$(CONFIG_ARCH_ZYNQ) += zynq-zc702.dtb
++dtb-$(CONFIG_ARCH_ZYNQ) += zynq-zc702.dtb \
++	zynq-zedboard.dtb
+ 
+ targets += dtbs
+ targets += $(dtb-y)
+diff --git a/arch/arm/boot/dts/zynq-zedboard.dts b/arch/arm/boot/dts/zynq-zedboard.dts
+new file mode 100644
+index 0000000..1b024c7
+--- /dev/null
++++ b/arch/arm/boot/dts/zynq-zedboard.dts
+@@ -0,0 +1,45 @@
++/*
++ *  Copyright (C) 2013 Steffen Trumrar <s.trumtrar@pengutronix.de>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++/dts-v1/;
++/include/ "zynq-7000.dtsi"
++
++/ {
++	model = "Zynq ZedBoard";
++	compatible = "xlnx,zynq-zed", "xlnx,zynq-7000";
++
++	memory {
++		device_type = "memory";
++		reg = <0x0 0x20000000>;
++	};
++};
++
++&gem0 {
++	status = "okay";
++};
++
++&uart0 {
++	status = "okay";
++};
++
++&uart1 {
++	status = "okay";
++};
++
++&ps_clk {
++	clock-frequency = <33333330>;
++};
++
++&ttc0_0 {
++	status = "okay";
++	compatible = "xlnx,ttc-counter-clockevent";
++};
 -- 
-1.7.10.4
+1.8.2.rc2
