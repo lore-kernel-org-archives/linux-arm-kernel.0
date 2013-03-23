@@ -1,43 +1,44 @@
 From: alex@digriz.org.uk (Alexander Clouter)
-Date: Sat, 23 Mar 2013 22:29:54 +0000
-Subject: [PATCHv2 1/4] arm: orion5x: fix orion5x.dtsi gpio parameters
+Date: Sat, 23 Mar 2013 22:29:55 +0000
+Subject: [PATCHv2 2/4] arm: orion5x: add ehci bindings to dtsi
 In-Reply-To: <1364077797-21206-1-git-send-email-alex@digriz.org.uk>
 References: <1364077797-21206-1-git-send-email-alex@digriz.org.uk>
-Message-ID: <1364077797-21206-2-git-send-email-alex@digriz.org.uk>
+Message-ID: <1364077797-21206-3-git-send-email-alex@digriz.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-orion5x.dtsi is missing the gpio alias as well as including a typo
-('ngpio' instead of 'ngpios') that prevented the orion-gpio driver
-from loading.  This patches resolves this.
+The orion5x SoC also includes a USB EHCI componment so lets add that
+to the dtsi (disable by default incase the pins are not broken out).
 
 Signed-off-by: Alexander Clouter <alex@digriz.org.uk>
 ---
- arch/arm/boot/dts/orion5x.dtsi |    5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/orion5x.dtsi |   14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
 diff --git a/arch/arm/boot/dts/orion5x.dtsi b/arch/arm/boot/dts/orion5x.dtsi
-index 8aad00f..9bde027 100644
+index 9bde027..e304f11 100644
 --- a/arch/arm/boot/dts/orion5x.dtsi
 +++ b/arch/arm/boot/dts/orion5x.dtsi
-@@ -13,6 +13,9 @@
- 	compatible = "marvell,orion5x";
- 	interrupt-parent = <&intc>;
- 
-+	aliases {
-+		gpio0 = &gpio0;
-+	};
- 	intc: interrupt-controller {
- 		compatible = "marvell,orion-intc", "marvell,intc";
- 		interrupt-controller;
-@@ -32,7 +35,7 @@
- 			#gpio-cells = <2>;
- 			gpio-controller;
- 			reg = <0x10100 0x40>;
--			ngpio = <32>;
-+			ngpios = <32>;
- 			interrupts = <6>, <7>, <8>, <9>;
+@@ -72,6 +72,20 @@
+ 			status = "okay";
  		};
  
++		ehci at 50000 {
++			compatible = "marvell,orion-ehci";
++			reg = <0x50000 0x1000>;
++			interrupts = <17>;
++			status = "disabled";
++		};
++
++		ehci at a0000 {
++			compatible = "marvell,orion-ehci";
++			reg = <0xa0000 0x1000>;
++			interrupts = <12>;
++			status = "disabled";
++		};
++
+ 		sata at 80000 {
+ 			compatible = "marvell,orion-sata";
+ 			reg = <0x80000 0x5000>;
 -- 
 1.7.10.4
