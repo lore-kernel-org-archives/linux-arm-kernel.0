@@ -1,67 +1,51 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Sat, 23 Mar 2013 23:10:49 +0100
-Subject: [PATCH] ARM: add unwind annotations to ftrace asm
-Message-ID: <1364076649-16841-1-git-send-email-rabin@rab.in>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 23 Mar 2013 23:19:30 +0100
+Subject: [GIT PULL] sunxi drivers additions for 3.10, take 1
+In-Reply-To: <201303231006.02970.arnd@arndb.de>
+References: <514D7B30.7080002@free-electrons.com>
+ <201303231006.02970.arnd@arndb.de>
+Message-ID: <514E2A72.80707@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add unwind annotations to the ftrace assembly code so that the function
-tracer's stacktracing options (func_stack_trace, etc.) work when
-CONFIG_ARM_UNWIND is enabled.
+Hi Arnd,
 
-Signed-off-by: Rabin Vincent <rabin@rab.in>
----
- arch/arm/kernel/entry-common.S |   12 ++++++++++++
- 1 file changed, 12 insertions(+)
+Le 23/03/2013 11:06, Arnd Bergmann a ?crit :
+> On Saturday 23 March 2013, Maxime Ripard wrote:
+>> Please consider pulling the following pull request that contains
+>> drivers to be included in 3.10. The only addition for now is the clock
+>> driver for the Allwinner A10 and A13.
+>>
+> 
+> Hi Maxime,
+> 
+> I see the patches have been Acked by Mike Turquette, so I assume he's
+> ok with getting them merged through the arm-soc tree, but I don't
+> actually see a reason why it shouldn't just go through his tree.
+> If there is something I'm missing, that is probably information
+> that belongs into the tag description.
+> 
+> I don't mind pulling this if there is a good reason, such as later
+> pull requests for 3.10 depending on it, but I'd prefer to not just
+> get a pull request for something that is not in my area without
+> an explanation why that is necessary, and without having the
+> real subsystem maintainer on Cc.
 
-diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-index 3248cde..fefd7f9 100644
---- a/arch/arm/kernel/entry-common.S
-+++ b/arch/arm/kernel/entry-common.S
-@@ -276,7 +276,13 @@ ENDPROC(ftrace_graph_caller_old)
-  */
- 
- .macro mcount_enter
-+/*
-+ * This pad compensates for the push {lr} at the call site.  Note that we are
-+ * unable to unwind through a function which does not otherwise save its lr.
-+ */
-+ UNWIND(.pad	#4)
- 	stmdb	sp!, {r0-r3, lr}
-+ UNWIND(.save	{r0-r3, lr})
- .endm
- 
- .macro mcount_get_lr reg
-@@ -289,6 +295,7 @@ ENDPROC(ftrace_graph_caller_old)
- .endm
- 
- ENTRY(__gnu_mcount_nc)
-+UNWIND(.fnstart)
- #ifdef CONFIG_DYNAMIC_FTRACE
- 	mov	ip, lr
- 	ldmia	sp!, {lr}
-@@ -296,17 +303,22 @@ ENTRY(__gnu_mcount_nc)
- #else
- 	__mcount
- #endif
-+UNWIND(.fnend)
- ENDPROC(__gnu_mcount_nc)
- 
- #ifdef CONFIG_DYNAMIC_FTRACE
- ENTRY(ftrace_caller)
-+UNWIND(.fnstart)
- 	__ftrace_caller
-+UNWIND(.fnend)
- ENDPROC(ftrace_caller)
- #endif
- 
- #ifdef CONFIG_FUNCTION_GRAPH_TRACER
- ENTRY(ftrace_graph_caller)
-+UNWIND(.fnstart)
- 	__ftrace_graph_caller
-+UNWIND(.fnend)
- ENDPROC(ftrace_graph_caller)
- #endif
- 
+There will probably be further merge depending on this, but I don't
+think there will be more than clock gates patches and some rework that I
+plan to begin support for the next chip, so I'm fine with it going
+through Mike's tree.
+
+I just took it in my tree to avoid similar merge problems than the one
+we encountered, and since I had to merge some of the patches in this
+series...
+
+Anyway, like I said, if you prefer to see this going through Mike's
+tree, I'm fine with it.
+
+Maxime
+
 -- 
-1.7.10.4
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
