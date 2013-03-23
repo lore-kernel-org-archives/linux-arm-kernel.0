@@ -1,58 +1,33 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 23 Mar 2013 23:30:09 +0100
-Subject: [PATCHv2 0/5] ARM: sunxi: Add support for A10 Ethernet controller
-Message-ID: <1364077814-2233-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Sat, 23 Mar 2013 23:30:11 +0100
+Subject: [PATCH 2/5] ARM: sunxi: Add EMAC controller node to sun4i DTSI
+In-Reply-To: <1364077814-2233-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1364077814-2233-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1364077814-2233-3-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/boot/dts/sun4i-a10.dtsi |    7 +++++++
+ 1 file changed, 7 insertions(+)
 
-The Allwinner A10 SoC has an ethernet controller that seem to be specific to
-Allwinner. This IP has no public documentation, so exact
-details are quite sparse, and this code come from refactored Allwinner
-code.
-
-Since we don't have any clock support yet for the Allwinner SoCs, we
-rely on the bootloader to enable and gate the EMAC clock.
-
-Thanks,
-Maxime
-
-Changes from v1:
-  - Use phylib for the phy-related functions
-  - Use an optional regulator to power up the phy
-  - Rename the driver from Davicom Wemac to Allwinner EMAC, since it's the name
-    mentionned in the datasheet, and we have no strong evidence of a
-    relationship with Davicom
-  - Fix various small things around the driver: add defines for undocumented
-    values, fix documentation name and compatible example, etc.
-
-Maxime Ripard (3):
-  ARM: sunxi: Add EMAC controller node to sun4i DTSI
-  ARM: sun4i: Add muxing options for the ethernet controller
-  ARM: hackberry: dt: Add Ethernet controller to the Hackberry device
-    tree
-
-Stefan Roese (2):
-  net: Add EMAC ethernet driver found on Allwinner A10 SoC's
-  ARM: cubieboard: Enable ethernet (WEMAC) support in dts
-
- .../bindings/net/allwinner,sun4i-emac.txt          |   19 +
- arch/arm/boot/dts/sun4i-a10-cubieboard.dts         |    6 +
- arch/arm/boot/dts/sun4i-a10-hackberry.dts          |   32 +
- arch/arm/boot/dts/sun4i-a10.dtsi                   |   18 +
- drivers/net/ethernet/Kconfig                       |    1 +
- drivers/net/ethernet/Makefile                      |    1 +
- drivers/net/ethernet/allwinner/Kconfig             |   36 +
- drivers/net/ethernet/allwinner/Makefile            |    5 +
- drivers/net/ethernet/allwinner/sun4i-emac.c        | 1033 ++++++++++++++++++++
- drivers/net/ethernet/allwinner/sun4i-emac.h        |  114 +++
- 10 files changed, 1265 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/net/allwinner,sun4i-emac.txt
- create mode 100644 drivers/net/ethernet/allwinner/Kconfig
- create mode 100644 drivers/net/ethernet/allwinner/Makefile
- create mode 100644 drivers/net/ethernet/allwinner/sun4i-emac.c
- create mode 100644 drivers/net/ethernet/allwinner/sun4i-emac.h
-
+diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+index 03d2b53..a6bd36a 100644
+--- a/arch/arm/boot/dts/sun4i-a10.dtsi
++++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+@@ -47,5 +47,12 @@
+ 				allwinner,pull = <0>;
+ 			};
+ 		};
++
++		emac: ethernet at 01c0b000 {
++			compatible = "allwinner,sun4i-emac";
++			reg = <0x01c0b000 0x1000>;
++			interrupts = <55>;
++			status = "disabled";
++		};
+ 	};
+ };
 -- 
 1.7.10.4
