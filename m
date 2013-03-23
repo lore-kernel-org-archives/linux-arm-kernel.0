@@ -1,83 +1,43 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Sat, 23 Mar 2013 14:04:23 +0100
-Subject: [PATCH] ARM: zynq: add support for ZedBoard
-Message-ID: <1364043863-20669-1-git-send-email-s.trumtrar@pengutronix.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sat, 23 Mar 2013 14:37:04 +0100
+Subject: [PATCH 1/6] of/pci: Provide support for parsing PCI DT ranges
+ property
+In-Reply-To: <20130323104156.GL4977@n2100.arm.linux.org.uk>
+References: <00c001ce277b$92b26ab0$b8174010$%han@samsung.com>
+ <20130323104156.GL4977@n2100.arm.linux.org.uk>
+Message-ID: <20130323143704.5da5d20c@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support the Avnet ZedBoard.
 
-Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
----
- arch/arm/boot/dts/Makefile          |  3 ++-
- arch/arm/boot/dts/zynq-zedboard.dts | 45 +++++++++++++++++++++++++++++++++++++
- 2 files changed, 47 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/zynq-zedboard.dts
+On Sat, 23 Mar 2013 10:41:56 +0000, Russell King - ARM Linux wrote:
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 9c62558..1d36a4c 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -174,7 +174,8 @@ dtb-$(CONFIG_ARCH_VT8500) += vt8500-bv07.dtb \
- 	wm8505-ref.dtb \
- 	wm8650-mid.dtb \
- 	wm8850-w70v2.dtb
--dtb-$(CONFIG_ARCH_ZYNQ) += zynq-zc702.dtb
-+dtb-$(CONFIG_ARCH_ZYNQ) += zynq-zc702.dtb \
-+	zynq-zedboard.dtb
- 
- targets += dtbs
- targets += $(dtb-y)
-diff --git a/arch/arm/boot/dts/zynq-zedboard.dts b/arch/arm/boot/dts/zynq-zedboard.dts
-new file mode 100644
-index 0000000..1b024c7
---- /dev/null
-+++ b/arch/arm/boot/dts/zynq-zedboard.dts
-@@ -0,0 +1,45 @@
-+/*
-+ *  Copyright (C) 2013 Steffen Trumrar <s.trumtrar@pengutronix.de>
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+/dts-v1/;
-+/include/ "zynq-7000.dtsi"
-+
-+/ {
-+	model = "Zynq ZedBoard";
-+	compatible = "xlnx,zynq-zed", "xlnx,zynq-7000";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x0 0x20000000>;
-+	};
-+};
-+
-+&gem0 {
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	status = "okay";
-+};
-+
-+&ps_clk {
-+	clock-frequency = <33333330>;
-+};
-+
-+&ttc0_0 {
-+	status = "okay";
-+	compatible = "xlnx,ttc-counter-clockevent";
-+};
+> Please look at how IORESOURCE_* stuff is defined:
+> #define IORESOURCE_TYPE_BITS    0x00001f00      /* Resource type */
+> #define IORESOURCE_IO           0x00000100      /* PCI/ISA I/O ports */
+> #define IORESOURCE_MEM          0x00000200
+> #define IORESOURCE_REG          0x00000300      /* Register offsets */
+> #define IORESOURCE_IRQ          0x00000400
+> #define IORESOURCE_DMA          0x00000800
+> #define IORESOURCE_BUS          0x00001000
+> 
+> Notice that it's not an array of bits.
+> 
+> So this should be:
+> 		if ((iter.flags & IORESOURCE_TYPE_BITS) == IORESOURCE_IO) {
+
+What I've done for the Marvell PCIe driver is:
+
++	for_each_of_pci_range(&iter, np) {
++		unsigned long restype = iter.flags & IORESOURCE_TYPE_BITS;
++		if (restype == IORESOURCE_IO) {
+[...]
++		if (restype == IORESOURCE_MEM) {
+[...]
+
+Thomas
 -- 
-1.8.2.rc2
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
