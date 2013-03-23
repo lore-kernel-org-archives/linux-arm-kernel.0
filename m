@@ -1,36 +1,104 @@
 From: linux@prisktech.co.nz (Tony Prisk)
-Date: Sat, 23 Mar 2013 18:13:48 +1300
-Subject: [PATCHv2 2/7] arm: vt8500: Increase available GPIOs on arch-vt8500
+Date: Sat, 23 Mar 2013 18:13:47 +1300
+Subject: [PATCHv2 1/7] of: Add support for reading a u32 from a multi-value
+ property.
 In-Reply-To: <1364015633-18580-1-git-send-email-linux@prisktech.co.nz>
 References: <1364015633-18580-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <1364015633-18580-3-git-send-email-linux@prisktech.co.nz>
+Message-ID: <1364015633-18580-2-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the inclusion of the pin control driver, more GPIO pins have been
-identified on the arch-vt8500 SoCs requiring an increase in the available
-GPIOs.
+This patch adds an of_property_read_u32_index() function to allow
+reading a single indexed u32 value from a property containing multiple
+u32 values.
 
 Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
 ---
- arch/arm/Kconfig |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+cc: Grant Likely <grant.likely@secretlab.ca>
+cc: Rob Herring <rob.herring@calxeda.com>
+cc: devicetree-discuss at lists.ozlabs.org
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 5b71469..c5dd0c2 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1661,9 +1661,10 @@ config ARCH_NR_GPIO
- 	int
- 	default 1024 if ARCH_SHMOBILE || ARCH_TEGRA
- 	default 355 if ARCH_U8500
-+	default 352 if ARCH_VT8500
- 	default 264 if MACH_H4700
- 	default 512 if SOC_OMAP5
--	default 288 if ARCH_VT8500 || ARCH_SUNXI
-+	default 288 if ARCH_SUNXI
- 	default 0
- 	help
- 	  Maximum number of GPIOs in the system.
+Hi Rob/Grant,
+After a review of my pinctrl driver, it was suggested that one of the helper
+functions be moved into the OF subsystem. Could you review and ack this patch
+if you're happy with it.
+Regards
+Tony P
+
+ drivers/of/base.c  |   33 +++++++++++++++++++++++++++++++++
+ include/linux/of.h |    9 +++++++++
+ 2 files changed, 42 insertions(+)
+
+diff --git a/drivers/of/base.c b/drivers/of/base.c
+index 321d3ef..7dc001e 100644
+--- a/drivers/of/base.c
++++ b/drivers/of/base.c
+@@ -746,6 +746,39 @@ struct device_node *of_find_node_by_phandle(phandle handle)
+ EXPORT_SYMBOL(of_find_node_by_phandle);
+ 
+ /**
++ * of_property_read_u32_index - Find and read a u32 from a multi-value property.
++ *
++ * @np:		device node from which the property value is to be read.
++ * @propname:	name of the property to be searched.
++ * @index:	index of the u32 in the list of values
++ * @out_value:	pointer to return value, modified only if no error.
++ *
++ * Search for a property in a device node and read nth 32-bit value from
++ * it. Returns 0 on success, -EINVAL if the property does not exist,
++ * -ENODATA if property does not have a value, and -EOVERFLOW if the
++ * property data isn't large enough.
++ *
++ * The out_value is modified only if a valid u32 value can be decoded.
++ */
++int of_property_read_u32_index(const struct device_node *np,
++				       const char *propname,
++				       u32 index, u32 *out_value)
++{
++	struct property *prop = of_find_property(np, propname, NULL);
++
++	if (!prop)
++		return -EINVAL;
++	if (!prop->value)
++		return -ENODATA;
++	if ((index * sizeof(*out_value)) > prop->length)
++		return -EOVERFLOW;
++
++	*out_value = be32_to_cpup(((__be32 *)prop->value) + index);
++	return 0;
++}
++EXPORT_SYMBOL_GPL(of_property_read_u32_index);
++
++/**
+  * of_property_read_u8_array - Find and read an array of u8 from a property.
+  *
+  * @np:		device node from which the property value is to be read.
+diff --git a/include/linux/of.h b/include/linux/of.h
+index a0f1292..c0747a4 100644
+--- a/include/linux/of.h
++++ b/include/linux/of.h
+@@ -235,6 +235,9 @@ extern struct device_node *of_find_node_with_property(
+ extern struct property *of_find_property(const struct device_node *np,
+ 					 const char *name,
+ 					 int *lenp);
++extern int of_property_read_u32_index(const struct device_node *np,
++				       const char *propname,
++				       u32 index, u32 *out_value);
+ extern int of_property_read_u8_array(const struct device_node *np,
+ 			const char *propname, u8 *out_values, size_t sz);
+ extern int of_property_read_u16_array(const struct device_node *np,
+@@ -394,6 +397,12 @@ static inline struct device_node *of_find_compatible_node(
+ 	return NULL;
+ }
+ 
++static inline int of_property_read_u32_index(const struct device_node *np,
++			const char *propname, u32 index, u32 *out_value)
++{
++	return -ENOSYS;
++}
++
+ static inline int of_property_read_u8_array(const struct device_node *np,
+ 			const char *propname, u8 *out_values, size_t sz)
+ {
 -- 
 1.7.9.5
