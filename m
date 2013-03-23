@@ -1,33 +1,26 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Sat, 23 Mar 2013 12:25:28 +0530
-Subject: [PATCH 4/4] dmaengine: dw_dmac: simplify master selection
-In-Reply-To: <1363963401-7924-5-git-send-email-andriy.shevchenko@linux.intel.com>
-References: <1363963401-7924-1-git-send-email-andriy.shevchenko@linux.intel.com>
- <1363963401-7924-5-git-send-email-andriy.shevchenko@linux.intel.com>
-Message-ID: <CAKohpo=ebMW97YhxFT+MpQtJF9M4pa8KNqpLWiDCuQtFPD+LnQ@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 23 Mar 2013 10:27:20 +0100
+Subject: [PATCH v2 0/3] clock driver for sunxi
+In-Reply-To: <20130322164054.834.64867@quantum>
+References: <1358835176-7197-1-git-send-email-emilio@elopez.com.ar>
+ <1361803468-9899-1-git-send-email-emilio@elopez.com.ar>
+ <20130321215429.834.60042@quantum> <514C30E1.2020203@free-electrons.com>
+ <20130322164054.834.64867@quantum>
+Message-ID: <514D7578.10602@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 March 2013 20:13, Andy Shevchenko
-<andriy.shevchenko@linux.intel.com> wrote:
-> From: Arnd Bergmann <arnd@arndb.de>
->
-> The patch to add the common DMA binding added a dummy dw_dma_slave
-> structure into the dw_dma_chan structure in order to configure the
-> masters correctly. It turns out that this can be simplified if we
-> pick the DMA masters in the dwc_alloc_chan_resources function instead
-> and save them in the dw_dma_chan structure directly.
->
-> This could be simplified further once all users that today use
-> dw_dma_slave for configuration get converted to device tree based
-> setup instead.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> ---
->  drivers/dma/dw_dmac.c      | 76 ++++++++++++++++++----------------------------
->  drivers/dma/dw_dmac_regs.h |  5 ++-
->  2 files changed, 33 insertions(+), 48 deletions(-)
+Le 22/03/2013 17:40, Mike Turquette a ?crit :
+> Acked-by: Mike Turquette <mturquette@linaro.org>
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Thanks Mike,
+
+Applied it, and it will be part of the pull request I'll send in a few
+minutes.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
