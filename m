@@ -1,47 +1,46 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Sun, 24 Mar 2013 07:04:51 +1300
-Subject: [PATCHv2 2/7] arm: vt8500: Increase available GPIOs on arch-vt8500
-In-Reply-To: <20130323104402.GM4977@n2100.arm.linux.org.uk>
-References: <1364015633-18580-1-git-send-email-linux@prisktech.co.nz>
- <1364015633-18580-3-git-send-email-linux@prisktech.co.nz>
- <20130323104402.GM4977@n2100.arm.linux.org.uk>
-Message-ID: <1364061891.27511.2.camel@gitbox>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 23 Mar 2013 15:09:52 -0300
+Subject: [PATCH 1/3] ARM: dts: imx28-evk: Enable touchscreen support
+In-Reply-To: <20130323135608.GG6281@S2101-09.ap.freescale.net>
+References: <1360337803-19858-1-git-send-email-festevam@gmail.com>
+ <20130304031716.GC30431@S2101-09.ap.freescale.net>
+ <CAOMZO5Ai-msRVeAqQFiRhfAxkb2DMTYJvTcYihBhFt6GMCFwPQ@mail.gmail.com>
+ <20130323135608.GG6281@S2101-09.ap.freescale.net>
+Message-ID: <CAOMZO5BvT3CUhPECTQZQq_Q2YEqMJzmXPL5pj-3Qmq35jnvm1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2013-03-23 at 10:44 +0000, Russell King - ARM Linux wrote:
-> On Sat, Mar 23, 2013 at 06:13:48PM +1300, Tony Prisk wrote:
-> > With the inclusion of the pin control driver, more GPIO pins have been
-> > identified on the arch-vt8500 SoCs requiring an increase in the available
-> > GPIOs.
-> > 
-> > Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
-> > ---
-> >  arch/arm/Kconfig |    3 ++-
-> >  1 file changed, 2 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > index 5b71469..c5dd0c2 100644
-> > --- a/arch/arm/Kconfig
-> > +++ b/arch/arm/Kconfig
-> > @@ -1661,9 +1661,10 @@ config ARCH_NR_GPIO
-> >  	int
-> >  	default 1024 if ARCH_SHMOBILE || ARCH_TEGRA
-> >  	default 355 if ARCH_U8500
-> > +	default 352 if ARCH_VT8500
-> >  	default 264 if MACH_H4700
-> >  	default 512 if SOC_OMAP5
-> > -	default 288 if ARCH_VT8500 || ARCH_SUNXI
-> > +	default 288 if ARCH_SUNXI
-> 
-> Note that the ordering of this has been fixed in -rc, so the above will
-> cause a merge conflict.  You may wish to consider basing your patch set
-> on a later kernel version.
+On Sat, Mar 23, 2013 at 10:56 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Fri, Mar 22, 2013 at 03:07:29PM -0300, Fabio Estevam wrote:
+>> Shawn,
+>>
+>> On Mon, Mar 4, 2013 at 12:17 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+>>
+>> > I do not understand why.  But it seems to me that applying the patch on
+>> > top of v3.9-rc1 results in a silent audio playback on my imx28-evk
+>> > board.  Can you confirm that on your side?
+>>
+>> Can you please re-try against linux-next 20130322?
+>>
+> Does it even boot for you?  On my side, it stops at the point below.
+>
+> [    1.600867] ci_hdrc ci_hdrc.0: doesn't support gadget
+> [    1.606282] ci_hdrc ci_hdrc.0: EHCI Host Controller
+> [    1.613522] ci_hdrc ci_hdrc.0: new USB bus registered, assigned bus number 1
 
-Thanks Russell,
+Same here. I forgot to mention I had to disable USB in order to
+complete the boot. This USB issue should be addressed separately
+though.
 
-I didn't think to check for -rc3 just yet. My bad. Will rebase to -rc3+
-before I post the next version.
+>
+>> I tried it here and audio playback is normal with touchscreen enabled.
+>
+> You must have both patches below applied.
+>
+>  1) ARM: mxs_defconfig: Build CONFIG_INPUT_EVDEV as built-in
+>  2) ARM: dts: imx28-evk: Enable touchscreen support
+>
+> I found that applying either one of the two without applying the other
+> will result in a broken audio playback.
 
-Regards
-Tony P
+With the USB support disabled, I don't see audio playback failure.
