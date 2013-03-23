@@ -1,30 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 23 Mar 2013 10:06:02 +0000
-Subject: [GIT PULL] sunxi drivers additions for 3.10, take 1
-In-Reply-To: <514D7B30.7080002@free-electrons.com>
-References: <514D7B30.7080002@free-electrons.com>
-Message-ID: <201303231006.02970.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 23 Mar 2013 10:41:56 +0000
+Subject: [PATCH 1/6] of/pci: Provide support for parsing PCI DT ranges
+ property
+In-Reply-To: <00c001ce277b$92b26ab0$b8174010$%han@samsung.com>
+References: <00c001ce277b$92b26ab0$b8174010$%han@samsung.com>
+Message-ID: <20130323104156.GL4977@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 23 March 2013, Maxime Ripard wrote:
-> Please consider pulling the following pull request that contains
-> drivers to be included in 3.10. The only addition for now is the clock
-> driver for the Allwinner A10 and A13.
-> 
+On Sat, Mar 23, 2013 at 01:04:53PM +0900, Jingoo Han wrote:
+> -		switch ((pci_space >> 24) & 0x3) {
+> -		case 1:		/* PCI IO space */
+> +		if (iter.flags & IORESOURCE_IO) {
 
-Hi Maxime,
+Please look at how IORESOURCE_* stuff is defined:
+#define IORESOURCE_TYPE_BITS    0x00001f00      /* Resource type */
+#define IORESOURCE_IO           0x00000100      /* PCI/ISA I/O ports */
+#define IORESOURCE_MEM          0x00000200
+#define IORESOURCE_REG          0x00000300      /* Register offsets */
+#define IORESOURCE_IRQ          0x00000400
+#define IORESOURCE_DMA          0x00000800
+#define IORESOURCE_BUS          0x00001000
 
-I see the patches have been Acked by Mike Turquette, so I assume he's
-ok with getting them merged through the arm-soc tree, but I don't
-actually see a reason why it shouldn't just go through his tree.
-If there is something I'm missing, that is probably information
-that belongs into the tag description.
+Notice that it's not an array of bits.
 
-I don't mind pulling this if there is a good reason, such as later
-pull requests for 3.10 depending on it, but I'd prefer to not just
-get a pull request for something that is not in my area without
-an explanation why that is necessary, and without having the
-real subsystem maintainer on Cc.
+So this should be:
+		if ((iter.flags & IORESOURCE_TYPE_BITS) == IORESOURCE_IO) {
 
-	Arnd
+> +			iter.cpu_addr = iter.pci_addr;
+> +		} else if (iter.flags & IORESOURCE_MEM) {
+
+And this should be:
+		} else if ((iter.flags & IORESOURCE_TYPE_BITS) == IORESOURCE_MEM) {
+
+> +		if (iter.flags & IORESOURCE_IO) {
+
+Same here.
+
+> +		} else if (iter.flags & IORESOURCE_MEM) {
+
+And again here.
+
+> -		switch ((pci_space >> 24) & 0x3) {
+> -		case 1:		/* PCI IO space */
+> +		if (iter.flags & IORESOURCE_IO) {
+
+ditto.
+
+> +			iter.cpu_addr = iter.pci_addr;
+> +		} else if (flags & IORESOURCE_MEM) {
+
+ditto.
