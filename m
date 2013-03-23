@@ -1,107 +1,81 @@
-From: tpiepho@gmail.com (Trent Piepho)
-Date: Fri, 22 Mar 2013 23:20:22 -0700
-Subject: [PATCH] mxs/spi: Add SPI slave mode operation DT prop
-In-Reply-To: <201303210035.52984.marex@denx.de>
-References: <1345776161-9778-1-git-send-email-marex@denx.de>
- <CA+7tXihDGgkq_FALfGW_2xzcZc4wgm_YiAMepSjT4Y2b1ULd+w@mail.gmail.com>
- <201303210035.52984.marex@denx.de>
-Message-ID: <CA+7tXiheWUsKstWRYOR-kQoTrkDSivnYrxVuxNSNYE+rk6u79w@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat, 23 Mar 2013 14:32:17 +0800
+Subject: [PATCH v2] cpufreq: instantiate cpufreq-cpu0 as a platform_driver
+In-Reply-To: <Pine.LNX.4.64.1303221600060.12375@axis700.grange>
+References: <1359428020-21068-1-git-send-email-shawn.guo@linaro.org>
+ <Pine.LNX.4.64.1303221600060.12375@axis700.grange>
+Message-ID: <20130323063215.GF6281@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 20, 2013 at 4:35 PM, Marek Vasut <marex@denx.de> wrote:
->> On Thu, Aug 23, 2012 at 7:42 PM, Marek Vasut
->> > +              - The DMA has to wait indefinitelly for the arriving data.
->>
->> Is there a reason that this must be done?  I'd guess that after the
->> SSP is told to start a transfer in slave mode it waits for the master
->> to assert the SSn line and begin the transfer.  If the completion
->> times out before this happens then it makes sense it wouldn't work.
->> But does it still not work if the SPI transfer completes before the
->> completion timeout?  Or is this necessary because in your application
->> there might be a long wait before the master chooses to initiate a
->> transfer after you program it on the Linux side?
->
-> The problem is the SPI block in slave mode ignores SS being pulled back up.
+On Fri, Mar 22, 2013 at 04:47:17PM +0100, Guennadi Liakhovetski wrote:
+> Sorry, confused. Before this used to be a generic cpufreq driver, usable 
+> on all (DT-enabled only) platforms. You just had to provide an OPP table, 
+> a clock, a regulator, similar to this
+> 
+> http://thread.gmane.org/gmane.linux.kernel.cpufreq/9510/focus=9509
+> 
+> (also see the complete thread for more information). Now this won't work 
+> obviously. Instead we now need a pseudo platform device to instantiate 
+> cpufreq-cpu0. This device cannot be put in DT, because it doesn't describe 
+> real hardware. So, we have to add register it from the board specific .c 
+> code, which we actually want to get rid of... Is this really what we want?
+> 
+Yes, that's what we want.  We are moving to multiplatform build, and we
+do not want the driver get instantiated on very single platform that is
+part of multiplatform.  Some of them may not support cpufreq at all and
+others may have operating-points defined in device tree but need to work
+with platform specific cpufreq driver.
 
-I've setup a board with a spi-gpio port looped to a spi-mxs port in
-slave mode so I can test this.  I did not need to change the DMA
-timeout to get it to work.  If the master does not send enough within
-the SSP timeout the slave transaction will timeout.  It does not seem
-to ignore SS, but rather the DMA will not finish until all the
-requested words are received, no matter how many SS pulses that
-happens to take.  For general purpose slave support it would of course
-be nice to be able to end the message when the master drops SS, but
-the SSP either doesn't support this or a different technique is
-needed.
+In an ideal DT world, there shouldn't be any board specific .c code but
+only SoC specific code.  Whether or not support cpufreq is a SoC
+specific decision, and it's perfectly fine to make the decision in SoC
+specific code.
 
-I've found that if PHASE = 0, the SSP expects the SS to be pulsed high
-between each word (w/ current driver, word == 8 bits).  This is
-slightly alluded to in the imx28 manual, where the PHASE = 0
-descriptions in sections 17.5.3 and 17.5.5 contain, "... in the case
-of continuous back-to-back transmissions, the SSn signal must be
-pulsed high between each data word[.]"  While for the PHASE = 1
-descriptions in sections 17.5.4 and 17.5.6 it says, "For continuous
-back-to-back transfers, the SSn pin is held low between successive
-data words[.]"
+> What about other cpufreq drivers? They have the same problem on 
+> multiplatform builds, right? Say, s3c2416-cpufreq.c. It also just 
+> initialises itself and starts looking for a clock, names "msysclk" with a 
+> NULL device pointer etc. Don't we need a common approach for cpufreq 
+> driver initialisation?
+> 
+The s3c2416 is not part of multiplatform build yet.  And any platform
+that wants to be part of multiplatform build needs to fix those global
+initcalls.  Two approaches are being used to do that.
 
-One would think this is talking about master mode like the rest of the
-section, but it seems to only apply to slave mode.  In master mode one
-can easily produce a SPI signal without SS pulsed between each word
-with either phase setting.
+- Call of_machine_is_compatible() to check target platform at the
+  beginning of the initcall, and return immediately if it's not the
+  target platform.  See drivers/cpufreq/highbank-cpufreq.c for example.
 
-Testing with the master TX sending 1 byte per SS asserted period:
-$ echo abcd1234ABCDwxyz | dd of=/dev/spidev4.0 bs=1
+- Remove global initcalls and use platform_device/driver mechanism for
+  instantiation.  See drivers/cpufreq/imx6q-cpufreq.c for example.
 
-Slave RX receives the first four bytes:
-$ dd if=/dev/spidev2.0 count=1 bs=4 | hd
-[  638.673625] spidev spi2.0: Start POL 0 PHA 0
-00000000  61 62 63 64                                       |abcd|
+I like the second one which is more scalable, and choose to use it for
+cpufreq-cpu0 driver.
 
-Trying with 4 bytes per SS assertion:
-$ echo abcd1234ABCDwxyz | dd of=/dev/spidev4.0 bs=4
-$ dd if=/dev/spidev2.0 count=1 bs=4 | hd
-00000000  61 31 41 77                                       |a1Aw|
+> The decision which cpufreq driver to use is SoC-specific, right? We're 
+> unlikely to have several boards, using the same SoC, wishing to use 
+> different cpufreq drivers? The decision _whether_ or not to enable it and 
+> _which_ resources to use might be board-specific. So, how about adding a 
+> cpufreq call something like
+> 
+> cpufreq_driver_request("cpufreq-driver-name");
+> 
+> to be called by SoC-specific code. You can say it is not much different 
+> from adding a virtual device, but firstly I think such a use of a platform 
+> device is really an overkill.
 
-The slave receives the first byte of each SS assertion pulse.  If I
-change the protocol to PHASE=1, then this case works as well and I
-receive the first four bytes.  I didn't need to set POLARITY to 1,
-just phase.
+I do not see why this is an overkill.  It's pretty common to use the
+approach for instantiating particular driver on particular target.
 
-$ dd if=/dev/spidev2.0 count=1 bs=16 | hd
-[  261.277000] spidev spi2.0: Start POL 0 PHA 1
-$ echo abcd1234ABCDwxyz | dd of=/dev/spidev4.0 bs=4
-00000000  61 62 63 64 31 32 33 34  41 42 43 44 77 78 79 7a  |abcd1234ABCDwxyz|
+> Secondly you still run a danger, that 
+> several platforms, built into a single image, register several devices for 
+> different cpufreq drivers, or even for one... With a special call you know 
+> there can be only one and you return -EBUSY to all further calls to that 
+> function.
 
-The same thing happens if the bs for the master size is to 1, 2, 8, or
-16.  Setting it to another values like 3, 5, 32 doesn't work.  Maybe
-the slave ignores extra SS pulses in the middle of a transfer, but
-will fail to complete the transfer if it doesn't get SS de-asserted at
-the end as expected?
+I do not see how this could happen.  The cpufreq device gets added in
+target specific init function which will only be invoked when the kernel
+is running on this target.  Check arch/arm/mach-imx/mach-imx6q.c or the
+OMAP example given by Nishanth to see how this should be done.
 
->> another application but was never happy with it.  I imagine this is
->> why no one has ever created a general spi slave framework for Linux.
->
-> SPI slave is hard because you can not anticipate the amount of data you will
-> receive. You can not anticipate when you will receive those either.
-
-The same can be said for a serial UART or an ethernet MAC, yet those
-don't seem to be too hard.  I think the problem is that these devices
-usually have things like FIFOs, IRQ trigger levels, pools of buffer
-descriptors, etc. that are designed to handle this.  The design of
-slave mode in SPI and I2C controllers seems to be more of an
-afterthought, with none of the features one would except to deal with
-it.  Also, the slave protocol design for things like EEPROMs often
-have nanosecond scale latencies that are nearly impossible to achieve
-in a general purpose CPU running a multitasking OS.  No one would
-design a network protocol that requires an ACK packet within 10 ns of
-receiving a REQ, and expect the CPU to handle that.  Yet that can be
-expected of a SPI EEPROM.
-
-However, there are applications where one can predict what the master
-will do ahead of time and don't have these problems.  In my case I
-know what and when the master will do something and can prime the SSP
-with a matching slave mode transaction before the master initiates.  I
-know I'm not the first person who has needed to do this on Linux.  So
-maybe it's worthwhile to add a limited slave support system without
-solving the problem of general purpose slave support.
+Shawn
