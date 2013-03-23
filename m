@@ -1,47 +1,45 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 23 Mar 2013 21:56:11 +0800
-Subject: [PATCH 1/3] ARM: dts: imx28-evk: Enable touchscreen support
-In-Reply-To: <CAOMZO5Ai-msRVeAqQFiRhfAxkb2DMTYJvTcYihBhFt6GMCFwPQ@mail.gmail.com>
-References: <1360337803-19858-1-git-send-email-festevam@gmail.com>
- <20130304031716.GC30431@S2101-09.ap.freescale.net>
- <CAOMZO5Ai-msRVeAqQFiRhfAxkb2DMTYJvTcYihBhFt6GMCFwPQ@mail.gmail.com>
-Message-ID: <20130323135608.GG6281@S2101-09.ap.freescale.net>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sat, 23 Mar 2013 18:18:33 +0400
+Subject: [PATCH v2 13/14] ARM: mvebu: Add thermal support to Armada 370
+ device tree
+In-Reply-To: <1363991114-4225-14-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1363991114-4225-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1363991114-4225-14-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <514DB9B9.8090601@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 22, 2013 at 03:07:29PM -0300, Fabio Estevam wrote:
-> Shawn,
-> 
-> On Mon, Mar 4, 2013 at 12:17 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> 
-> > I do not understand why.  But it seems to me that applying the patch on
-> > top of v3.9-rc1 results in a silent audio playback on my imx28-evk
-> > board.  Can you confirm that on your side?
-> 
-> Can you please re-try against linux-next 20130322?
-> 
-Does it even boot for you?  On my side, it stops at the point below.
+Hello.
 
-[    1.600867] ci_hdrc ci_hdrc.0: doesn't support gadget
-[    1.606282] ci_hdrc ci_hdrc.0: EHCI Host Controller
-[    1.613522] ci_hdrc ci_hdrc.0: new USB bus registered, assigned bus number 1
+On 23-03-2013 2:25, Ezequiel Garcia wrote:
 
-> I tried it here and audio playback is normal with touchscreen enabled.
+> This patch adds support for the thermal controller available in
+> all Armada 370 boards. This controller has two 4-byte registers:
+> one to read the thermal sensor, the other for sensor initialization.
 
-You must have both patches below applied.
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+> This patch depends on the patch to add Armada 370 support
+> in the mvebu_thermal driver:
+> 'thermal: mvebu: Add support for Armada 370 thermal sensor'
 
- 1) ARM: mxs_defconfig: Build CONFIG_INPUT_EVDEV as built-in
- 2) ARM: dts: imx28-evk: Enable touchscreen support
+>   arch/arm/boot/dts/armada-370.dtsi |    6 ++++++
+>   1 files changed, 6 insertions(+), 0 deletions(-)
 
-I found that applying either one of the two without applying the other
-will result in a broken audio playback.
+> diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+> index 8188d13..5831994 100644
+> --- a/arch/arm/boot/dts/armada-370.dtsi
+> +++ b/arch/arm/boot/dts/armada-370.dtsi
+> @@ -153,5 +153,11 @@
+>   			clocks = <&coreclk 0>;
+>   		};
+>
+> +		thermal at d0018300 {
+> +			compatible = "marvell,armada370-thermal";
+> +			reg = <0xd0018300 0x4
+> +			       0xd0018304 0x4>;
 
-That said, my mxs/soc branch gets a broken audio playback, and
-next-20130322 should be the same case, because both have the second
-patch not applied.
+    As the two registers are adjacent to each other, why have two register 
+regions ISO one?
 
-I'm going to drop CONFIG_INPUT_EVDEV patch from my mxs/soc branch, and
-will not apply either of the two until the root cause of the broken
-audio playback gets identified.
-
-Shawn
+WBR, Sergei
