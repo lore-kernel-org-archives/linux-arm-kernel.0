@@ -1,64 +1,49 @@
-From: khc@pm.waw.pl (Krzysztof Halasa)
-Date: Sat, 23 Mar 2013 20:35:46 +0100
-Subject: [PATCH] Fix IXP4xx coherent allocations
-Message-ID: <m3obe9lxil.fsf@intrepid.localdomain>
+From: illia.ragozin@grapecom.com (Elijah Ragozin)
+Date: Sat, 23 Mar 2013 22:15:44 +0200
+Subject: [PATCH] [ARM] Feroceon: fix kexec by setting outer_cache.inv_all
+Message-ID: <514E0D70.3060202@grapecom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM core code currently requires coherent DMA mask to be set. Make sure
-we limit PCI devices to 64 MiB while allowing on-chip devices to access
-the whole 4 GiB address space.
+Hello,
 
-This fixes a v3.7+ regression which broke IXP4xx built-in network devices.
+I have a simple fix for kexec on Marvell Feroceon SoC.
+Originally created and tested on kernel version 2.6.39.2,
+but appliable for the 3.9 kernel as well.
+Could you pls review. The patch is below.
 
-Signed-off-by: Krzysztof Ha?asa <khc@pm.waw.pl>
-Cc: <stable@vger.kernel.org>
+From: Illia Ragozin <illia.ragozin@grapecom.com>
+Subject: [PATCH] [ARM] Feroceon: fix kexec by setting outer_cache.inv_all
 
-diff --git a/arch/arm/mach-ixp4xx/common-pci.c b/arch/arm/mach-ixp4xx/common-pci.c
-index ea1933d..8629fc9 100644
---- a/arch/arm/mach-ixp4xx/common-pci.c
-+++ b/arch/arm/mach-ixp4xx/common-pci.c
-@@ -454,10 +454,15 @@ int ixp4xx_setup(int nr, struct pci_sys_data *sys)
- 
- int dma_set_coherent_mask(struct device *dev, u64 mask)
- {
--	if (mask >= SZ_64M - 1)
--		return 0;
-+	if ((mask & DMA_BIT_MASK(26)) != DMA_BIT_MASK(26))
-+		return -EIO;
-+
-+	/* PCI devices are limited to 64 MiB */
-+	if (dev_is_pci(dev))
-+		mask &= DMA_BIT_MASK(26); /* Use DMA region */
- 
--	return -EIO;
-+	dev->coherent_dma_mask = mask;
-+	return 0;
- }
- 
- EXPORT_SYMBOL(ixp4xx_pci_read);
-diff --git a/drivers/net/ethernet/xscale/ixp4xx_eth.c b/drivers/net/ethernet/xscale/ixp4xx_eth.c
-index 6958a5e..7c08269 100644
---- a/drivers/net/ethernet/xscale/ixp4xx_eth.c
-+++ b/drivers/net/ethernet/xscale/ixp4xx_eth.c
-@@ -1423,7 +1423,7 @@ static int eth_init_one(struct platform_device *pdev)
- 	dev->netdev_ops = &ixp4xx_netdev_ops;
- 	dev->ethtool_ops = &ixp4xx_ethtool_ops;
- 	dev->tx_queue_len = 100;
--
-+	dma_set_coherent_mask(&dev->dev, DMA_BIT_MASK(32));
- 	netif_napi_add(dev, &port->napi, eth_poll, NAPI_WEIGHT);
- 
- 	if (!(port->npe = npe_request(NPE_ID(port->id)))) {
-diff --git a/drivers/net/wan/ixp4xx_hss.c b/drivers/net/wan/ixp4xx_hss.c
-index 95d0451..83b4597 100644
---- a/drivers/net/wan/ixp4xx_hss.c
-+++ b/drivers/net/wan/ixp4xx_hss.c
-@@ -1367,6 +1367,7 @@ static int hss_init_one(struct platform_device *pdev)
- 	port->id = pdev->id;
- 	port->dev = &pdev->dev;
- 	port->plat = pdev->dev.platform_data;
-+	dma_set_coherent_mask(&dev->dev, DMA_BIT_MASK(32));
- 	netif_napi_add(dev, &port->napi, hss_hdlc_poll, NAPI_WEIGHT);
- 
- 	if ((err = register_hdlc_device(dev)))
+Before the calling kexec l2 cache must be invalidated,
+this is done by outer_cache.inv_all()
+For Feroceon SoC inv_all function does not set in outer_cache structure
+and new kernel unpacking failed due to l2 cache still was not invalidated
+at this point.
+
+Setting outer_cache.inv_all fixes the issue.
+
+Signed-off-by: Illia Ragozin <illia.ragozin@grapecom.com>
+---
+  arch/arm/mm/cache-feroceon-l2.c | 1 +
+  1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/mm/cache-feroceon-l2.c 
+b/arch/arm/mm/cache-feroceon-l2.c
+index e0b0e7a..09f8851 100644
+--- a/arch/arm/mm/cache-feroceon-l2.c
++++ b/arch/arm/mm/cache-feroceon-l2.c
+@@ -342,6 +342,7 @@ void __init feroceon_l2_init(int __l2_wt_override)
+         outer_cache.inv_range = feroceon_l2_inv_range;
+         outer_cache.clean_range = feroceon_l2_clean_range;
+         outer_cache.flush_range = feroceon_l2_flush_range;
++       outer_cache.inv_all = l2_inv_all;
+
+         enable_l2();
+
+-- 
+1.8.1.4
+
+-- 
+Best Regards,
+Illia Ragozin.
