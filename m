@@ -1,43 +1,47 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sat, 23 Mar 2013 14:37:04 +0100
-Subject: [PATCH 1/6] of/pci: Provide support for parsing PCI DT ranges
- property
-In-Reply-To: <20130323104156.GL4977@n2100.arm.linux.org.uk>
-References: <00c001ce277b$92b26ab0$b8174010$%han@samsung.com>
- <20130323104156.GL4977@n2100.arm.linux.org.uk>
-Message-ID: <20130323143704.5da5d20c@skate>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat, 23 Mar 2013 21:56:11 +0800
+Subject: [PATCH 1/3] ARM: dts: imx28-evk: Enable touchscreen support
+In-Reply-To: <CAOMZO5Ai-msRVeAqQFiRhfAxkb2DMTYJvTcYihBhFt6GMCFwPQ@mail.gmail.com>
+References: <1360337803-19858-1-git-send-email-festevam@gmail.com>
+ <20130304031716.GC30431@S2101-09.ap.freescale.net>
+ <CAOMZO5Ai-msRVeAqQFiRhfAxkb2DMTYJvTcYihBhFt6GMCFwPQ@mail.gmail.com>
+Message-ID: <20130323135608.GG6281@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On Sat, 23 Mar 2013 10:41:56 +0000, Russell King - ARM Linux wrote:
-
-> Please look at how IORESOURCE_* stuff is defined:
-> #define IORESOURCE_TYPE_BITS    0x00001f00      /* Resource type */
-> #define IORESOURCE_IO           0x00000100      /* PCI/ISA I/O ports */
-> #define IORESOURCE_MEM          0x00000200
-> #define IORESOURCE_REG          0x00000300      /* Register offsets */
-> #define IORESOURCE_IRQ          0x00000400
-> #define IORESOURCE_DMA          0x00000800
-> #define IORESOURCE_BUS          0x00001000
+On Fri, Mar 22, 2013 at 03:07:29PM -0300, Fabio Estevam wrote:
+> Shawn,
 > 
-> Notice that it's not an array of bits.
+> On Mon, Mar 4, 2013 at 12:17 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
 > 
-> So this should be:
-> 		if ((iter.flags & IORESOURCE_TYPE_BITS) == IORESOURCE_IO) {
+> > I do not understand why.  But it seems to me that applying the patch on
+> > top of v3.9-rc1 results in a silent audio playback on my imx28-evk
+> > board.  Can you confirm that on your side?
+> 
+> Can you please re-try against linux-next 20130322?
+> 
+Does it even boot for you?  On my side, it stops at the point below.
 
-What I've done for the Marvell PCIe driver is:
+[    1.600867] ci_hdrc ci_hdrc.0: doesn't support gadget
+[    1.606282] ci_hdrc ci_hdrc.0: EHCI Host Controller
+[    1.613522] ci_hdrc ci_hdrc.0: new USB bus registered, assigned bus number 1
 
-+	for_each_of_pci_range(&iter, np) {
-+		unsigned long restype = iter.flags & IORESOURCE_TYPE_BITS;
-+		if (restype == IORESOURCE_IO) {
-[...]
-+		if (restype == IORESOURCE_MEM) {
-[...]
+> I tried it here and audio playback is normal with touchscreen enabled.
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+You must have both patches below applied.
+
+ 1) ARM: mxs_defconfig: Build CONFIG_INPUT_EVDEV as built-in
+ 2) ARM: dts: imx28-evk: Enable touchscreen support
+
+I found that applying either one of the two without applying the other
+will result in a broken audio playback.
+
+That said, my mxs/soc branch gets a broken audio playback, and
+next-20130322 should be the same case, because both have the second
+patch not applied.
+
+I'm going to drop CONFIG_INPUT_EVDEV patch from my mxs/soc branch, and
+will not apply either of the two until the root cause of the broken
+audio playback gets identified.
+
+Shawn
