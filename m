@@ -1,240 +1,75 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Sat, 23 Mar 2013 13:57:30 +0100
-Subject: [PATCH 3/3] ARM: zynq: add SMP support
-In-Reply-To: <1364043450-18700-1-git-send-email-s.trumtrar@pengutronix.de>
-References: <1364043450-18700-1-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <1364043450-18700-4-git-send-email-s.trumtrar@pengutronix.de>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Sat, 23 Mar 2013 13:58:09 +0100
+Subject: [PATCH] ARM: kirkwood: make use of DT mvsdio on guruplug board
+Message-ID: <1364043489-17683-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Zynq7000 has a CortexA9 with at least 2 cores. Add support to boot them all.
-To do this a trampoline is needed. At runtime the jump address and two
-instructions are copied to RAM by CPU0 and then executed by CPU1.
+Device tree based guruplug boards still use mvsdio platform_data and
+kirkwood_sdio_init to enable sdio. DT support for sdio is already there,
+so make use of it.
 
-Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-Cc: Michal Simek <michal.simek@xilinx.com>
+This also fixes mvsdio accidentially breaking nand by configuring mpp0
+to gpio, while used also by nand (nand_io2 on mpp0).
+
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Tested-by: Soeren Moch <smoch@web.de>
 ---
- arch/arm/boot/dts/zynq-7000.dtsi |  14 +++++
- arch/arm/mach-zynq/Makefile      |   2 +
- arch/arm/mach-zynq/common.c      |   1 +
- arch/arm/mach-zynq/common.h      |  14 +++++
- arch/arm/mach-zynq/headsmp.S     |  20 +++++++
- arch/arm/mach-zynq/platsmp.c     | 110 +++++++++++++++++++++++++++++++++++++++
- 6 files changed, 161 insertions(+)
- create mode 100644 arch/arm/mach-zynq/headsmp.S
- create mode 100644 arch/arm/mach-zynq/platsmp.c
+Cc: Soeren Moch <smoch@web.de>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Willy Tarreau <w@1wt.eu>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+ arch/arm/boot/dts/kirkwood-guruplug-server-plus.dts |    4 ++++
+ arch/arm/mach-kirkwood/board-guruplug.c             |    6 ------
+ 2 files changed, 4 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
-index c103082..258b6c9 100644
---- a/arch/arm/boot/dts/zynq-7000.dtsi
-+++ b/arch/arm/boot/dts/zynq-7000.dtsi
-@@ -15,6 +15,20 @@
- / {
- 	compatible = "xlnx,zynq-7000";
- 
-+	cpus {
-+		cpu at 0 {
-+			compatible = "arm,cortex-a9";
-+			next-level-cache = <&L2>;
-+			clocks = <&armpll 0>;
-+		};
+diff --git a/arch/arm/boot/dts/kirkwood-guruplug-server-plus.dts b/arch/arm/boot/dts/kirkwood-guruplug-server-plus.dts
+index 9555a86..44fd97d 100644
+--- a/arch/arm/boot/dts/kirkwood-guruplug-server-plus.dts
++++ b/arch/arm/boot/dts/kirkwood-guruplug-server-plus.dts
+@@ -69,6 +69,10 @@
+ 			status = "okay";
+ 			nr-ports = <1>;
+ 		};
 +
-+		cpu at 1 {
-+			compatible = "arm,cortex-a9";
-+			next-level-cache = <&L2>;
-+			clocks = <&armpll 0>;
++		mvsdio at 90000 {
++			status = "okay";
 +		};
-+	};
-+
- 	amba {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
-diff --git a/arch/arm/mach-zynq/Makefile b/arch/arm/mach-zynq/Makefile
-index 397268c..906d199 100644
---- a/arch/arm/mach-zynq/Makefile
-+++ b/arch/arm/mach-zynq/Makefile
-@@ -4,3 +4,5 @@
+ 	};
  
- # Common support
- obj-y				:= common.o timer.o
-+AFLAGS_headsmp.o :=-Wa,-march=armv7-a
-+obj-$(CONFIG_SMP) += headsmp.o platsmp.o
-diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
-index 1b9bb3d..4053962 100644
---- a/arch/arm/mach-zynq/common.c
-+++ b/arch/arm/mach-zynq/common.c
-@@ -117,6 +117,7 @@ static const char *xilinx_dt_match[] = {
+ 	gpio-leds {
+diff --git a/arch/arm/mach-kirkwood/board-guruplug.c b/arch/arm/mach-kirkwood/board-guruplug.c
+index 0a0df45..a857163 100644
+--- a/arch/arm/mach-kirkwood/board-guruplug.c
++++ b/arch/arm/mach-kirkwood/board-guruplug.c
+@@ -13,7 +13,6 @@
+ #include <linux/init.h>
+ #include <linux/mv643xx_eth.h>
+ #include <linux/gpio.h>
+-#include <linux/platform_data/mmc-mvsdio.h>
+ #include "common.h"
+ 
+ static struct mv643xx_eth_platform_data guruplug_ge00_data = {
+@@ -24,10 +23,6 @@ static struct mv643xx_eth_platform_data guruplug_ge01_data = {
+ 	.phy_addr	= MV643XX_ETH_PHY_ADDR(1),
  };
  
- MACHINE_START(XILINX_EP107, "Xilinx Zynq Platform")
-+	.smp		= smp_ops(zynq_smp_ops),
- 	.map_io		= xilinx_map_io,
- 	.init_irq	= xilinx_irqchip_init,
- 	.init_machine	= xilinx_init_machine,
-diff --git a/arch/arm/mach-zynq/common.h b/arch/arm/mach-zynq/common.h
-index 8b4dbba..451d386 100644
---- a/arch/arm/mach-zynq/common.h
-+++ b/arch/arm/mach-zynq/common.h
-@@ -19,4 +19,18 @@
- 
- void __init xttcps_timer_init(void);
- 
-+#ifdef CONFIG_SMP
-+extern void secondary_startup(void);
-+extern char secondary_trampoline, secondary_trampoline_end;
-+#endif
-+
-+extern struct smp_operations __initdata zynq_smp_ops;
-+extern void __iomem *slcr_base_addr;
-+extern void __iomem *scu_base;
-+
-+#define SLCR_UNLOCK_MAGIC	0xdf0d
-+
-+#define SLCR_UNLOCK		0x8
-+#define SLCR_A9_CPU_RST_CTRL	0x244
-+
- #endif
-diff --git a/arch/arm/mach-zynq/headsmp.S b/arch/arm/mach-zynq/headsmp.S
-new file mode 100644
-index 0000000..145bbae
---- /dev/null
-+++ b/arch/arm/mach-zynq/headsmp.S
-@@ -0,0 +1,20 @@
-+/*
-+ *  Copyright (c) 2013 Steffen Trumtrar <s.trumtrar@pengutronix.de>
-+ *
-+ * based on mach-socfpga/headsmp.S
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#include <linux/linkage.h>
-+#include <linux/init.h>
-+
-+	__CPUINIT
-+	.arch	armv7-a
-+
-+ENTRY(secondary_trampoline)
-+	ldr	r0, [pc]
-+	mov	pc, r0
-+
-+ENTRY(secondary_trampoline_end)
-diff --git a/arch/arm/mach-zynq/platsmp.c b/arch/arm/mach-zynq/platsmp.c
-new file mode 100644
-index 0000000..1ea3d4f
---- /dev/null
-+++ b/arch/arm/mach-zynq/platsmp.c
-@@ -0,0 +1,110 @@
-+/*
-+ * Copyright (c) 2013 Steffen Trumtrar <s.trumtrar@pengutronix.de>
-+ *
-+ * based on
-+ *  linux/arch/arm/mach-zynq/platsmp.c Copyright (C) 2011 Xilinx
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#include <linux/delay.h>
-+#include <linux/errno.h>
-+#include <linux/init.h>
-+#include <linux/irqchip/arm-gic.h>
-+#include <linux/io.h>
-+#include <linux/jiffies.h>
-+#include <linux/smp.h>
-+
-+#include <asm/cacheflush.h>
-+#include <asm/mach/arch.h>
-+#include <asm/mach/map.h>
-+#include <asm/smp_scu.h>
-+
-+#include "common.h"
-+
-+#define A9_RST_MASK	(1 << 0)
-+#define A9_CLKSTOP_MASK	(1 << 4)
-+
-+static DEFINE_SPINLOCK(boot_lock);
-+
-+static void __cpuinit zynq_smp_secondary_init(unsigned int cpu)
-+{
-+	/*
-+	 * if any interrupts are already enabled for the primary
-+	 * core (e.g. timer irq), then they will not have been enabled
-+	 * for us: do so
-+	 */
-+	gic_secondary_init(0);
-+
-+	/*
-+	 * Synchronise with the boot thread.
-+	 */
-+	spin_lock(&boot_lock);
-+	spin_unlock(&boot_lock);
-+}
-+
-+static inline void zynq_set_cpu_jump(int cpu, void *jump_addr)
-+{
-+	if (jump_addr) {
-+		int trampoline_size = &secondary_trampoline_end - &secondary_trampoline;
-+
-+		writel(virt_to_phys(jump_addr), phys_to_virt(8));
-+		memcpy(phys_to_virt(0), &secondary_trampoline, trampoline_size);
-+
-+		flush_cache_all();
-+		outer_flush_all();
-+		smp_wmb();
-+	}
-+}
-+
-+static void zynq_enable_cpu(int cpu, bool enable)
-+{
-+	writel(A9_CLKSTOP_MASK << cpu, slcr_base_addr + SLCR_A9_CPU_RST_CTRL);
-+	writel(0, slcr_base_addr + SLCR_A9_CPU_RST_CTRL);
-+}
-+
-+int __cpuinit zynq_smp_boot_secondary(unsigned int cpu, struct task_struct *idle)
-+{
-+	writel(SLCR_UNLOCK_MAGIC, slcr_base_addr + SLCR_UNLOCK);
-+	writel((A9_CLKSTOP_MASK | A9_RST_MASK) << cpu,
-+		slcr_base_addr + SLCR_A9_CPU_RST_CTRL);
-+
-+	zynq_set_cpu_jump(cpu, secondary_startup);
-+	zynq_enable_cpu(cpu, true);
-+
-+	return 0;
-+}
-+
-+/*
-+ * Initialise the CPU possible map early - this describes the CPUs
-+ * which may be present or become present in the system.
-+ */
-+static void __init zynq_smp_init_cpus(void)
-+{
-+	unsigned int ncores, i;
-+
-+	ncores = scu_get_core_count(scu_base);
-+
-+	for (i = 0; i < ncores; ++i)
-+		set_cpu_possible(i, true);
-+
-+	/* sanity check */
-+	if (ncores > num_possible_cpus()) {
-+		pr_warn("zynq: no. of cores (%d) greater than configured"
-+			"maximum of %d - clipping\n", ncores, num_possible_cpus());
-+		ncores = num_possible_cpus();
-+	}
-+}
-+
-+static void __init zynq_smp_prepare_cpus(unsigned int max_cpus)
-+{
-+	scu_enable(scu_base);
-+}
-+
-+struct smp_operations __initdata zynq_smp_ops = {
-+	.smp_init_cpus		= zynq_smp_init_cpus,
-+	.smp_prepare_cpus	= zynq_smp_prepare_cpus,
-+	.smp_secondary_init	= zynq_smp_secondary_init,
-+	.smp_boot_secondary	= zynq_smp_boot_secondary,
-+};
+-static struct mvsdio_platform_data guruplug_mvsdio_data = {
+-	/* unfortunately the CD signal has not been connected */
+-};
+-
+ void __init guruplug_dt_init(void)
+ {
+ 	/*
+@@ -35,5 +30,4 @@ void __init guruplug_dt_init(void)
+ 	 */
+ 	kirkwood_ge00_init(&guruplug_ge00_data);
+ 	kirkwood_ge01_init(&guruplug_ge01_data);
+-	kirkwood_sdio_init(&guruplug_mvsdio_data);
+ }
 -- 
-1.8.2.rc2
+1.7.10.4
