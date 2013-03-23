@@ -1,118 +1,94 @@
 From: linux@prisktech.co.nz (Tony Prisk)
-Date: Sat, 23 Mar 2013 18:13:53 +1300
-Subject: [PATCHv2 7/7] arm: vt8500: Remove pinmux configuration from
- mach-vt8500/vt8500.c
+Date: Sat, 23 Mar 2013 18:13:51 +1300
+Subject: [PATCHv2 5/7] arm: vt8500: Remove gpio devicetree nodes
 In-Reply-To: <1364015633-18580-1-git-send-email-linux@prisktech.co.nz>
 References: <1364015633-18580-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <1364015633-18580-8-git-send-email-linux@prisktech.co.nz>
+Message-ID: <1364015633-18580-6-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the new pinctrl driver and wm,pinmux property the configuration
-code required for initializing the framebuffer hardware can be removed
-from vt8500.c and configured in devicetree with pinctrl driver properties.
+Remove the gpio related devicetree nodes as these are no longer required
+with the move to a combined pinctrl/gpio driver.
 
 Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
 ---
- arch/arm/mach-vt8500/vt8500.c |   70 +----------------------------------------
- 1 file changed, 1 insertion(+), 69 deletions(-)
+ arch/arm/boot/dts/vt8500.dtsi |    7 -------
+ arch/arm/boot/dts/wm8505.dtsi |    7 -------
+ arch/arm/boot/dts/wm8650.dtsi |    7 -------
+ arch/arm/boot/dts/wm8850.dtsi |    7 -------
+ 4 files changed, 28 deletions(-)
 
-diff --git a/arch/arm/mach-vt8500/vt8500.c b/arch/arm/mach-vt8500/vt8500.c
-index 49e8005..b06b7fc 100644
---- a/arch/arm/mach-vt8500/vt8500.c
-+++ b/arch/arm/mach-vt8500/vt8500.c
-@@ -34,12 +34,8 @@
+diff --git a/arch/arm/boot/dts/vt8500.dtsi b/arch/arm/boot/dts/vt8500.dtsi
+index 16388c2..e0ce0b9 100644
+--- a/arch/arm/boot/dts/vt8500.dtsi
++++ b/arch/arm/boot/dts/vt8500.dtsi
+@@ -25,13 +25,6 @@
+ 			#interrupt-cells = <1>;
+ 		};
  
- #include "common.h"
+-		gpio: gpio-controller at d8110000 {
+-			compatible = "via,vt8500-gpio";
+-			gpio-controller;
+-			reg = <0xd8110000 0x10000>;
+-			#gpio-cells = <3>;
+-		};
+-
+ 		pinctrl: pinctrl at d8110000 {
+ 			compatible = "via,vt8500-pinctrl";
+ 			gpio-controller;
+diff --git a/arch/arm/boot/dts/wm8505.dtsi b/arch/arm/boot/dts/wm8505.dtsi
+index c5aa4c9..5c7ad12 100644
+--- a/arch/arm/boot/dts/wm8505.dtsi
++++ b/arch/arm/boot/dts/wm8505.dtsi
+@@ -40,13 +40,6 @@
+ 			interrupts = <56 57 58 59 60 61 62 63>;
+ 		};
  
--#define LEGACY_GPIO_BASE	0xD8110000
- #define LEGACY_PMC_BASE		0xD8130000
+-		gpio: gpio-controller at d8110000 {
+-			compatible = "wm,wm8505-gpio";
+-			gpio-controller;
+-			reg = <0xd8110000 0x10000>;
+-			#gpio-cells = <3>;
+-		};
+-
+ 		pinctrl: pinctrl at d8110000 {
+ 			compatible = "wm,wm8505-pinctrl";
+ 			gpio-controller;
+diff --git a/arch/arm/boot/dts/wm8650.dtsi b/arch/arm/boot/dts/wm8650.dtsi
+index 99c45e5..984d0ed 100644
+--- a/arch/arm/boot/dts/wm8650.dtsi
++++ b/arch/arm/boot/dts/wm8650.dtsi
+@@ -34,13 +34,6 @@
+ 			interrupts = <56 57 58 59 60 61 62 63>;
+ 		};
  
--/* Registers in GPIO Controller */
--#define VT8500_GPIO_MUX_REG	0x200
+-		gpio: gpio-controller at d8110000 {
+-			compatible = "wm,wm8650-gpio";
+-			gpio-controller;
+-			reg = <0xd8110000 0x10000>;
+-			#gpio-cells = <3>;
+-		};
 -
- /* Registers in Power Management Controller */
- #define VT8500_HCR_REG		0x12
- #define VT8500_PMSR_REG		0x60
-@@ -77,71 +73,6 @@ static void vt8500_power_off(void)
- void __init vt8500_init(void)
- {
- 	struct device_node *np;
--#if defined(CONFIG_FB_VT8500) || defined(CONFIG_FB_WM8505)
--	struct device_node *fb;
--	void __iomem *gpio_base;
--#endif
--
--#ifdef CONFIG_FB_VT8500
--	fb = of_find_compatible_node(NULL, NULL, "via,vt8500-fb");
--	if (fb) {
--		np = of_find_compatible_node(NULL, NULL, "via,vt8500-gpio");
--		if (np) {
--			gpio_base = of_iomap(np, 0);
--
--			if (!gpio_base)
--				pr_err("%s: of_iomap(gpio_mux) failed\n",
--								__func__);
--
--			of_node_put(np);
--		} else {
--			gpio_base = ioremap(LEGACY_GPIO_BASE, 0x1000);
--			if (!gpio_base)
--				pr_err("%s: ioremap(legacy_gpio_mux) failed\n",
--								__func__);
--		}
--		if (gpio_base) {
--			writel(readl(gpio_base + VT8500_GPIO_MUX_REG) | 1,
--				gpio_base + VT8500_GPIO_MUX_REG);
--			iounmap(gpio_base);
--		} else
--			pr_err("%s: Could not remap GPIO mux\n", __func__);
--
--		of_node_put(fb);
--	}
--#endif
--
--#ifdef CONFIG_FB_WM8505
--	fb = of_find_compatible_node(NULL, NULL, "wm,wm8505-fb");
--	if (fb) {
--		np = of_find_compatible_node(NULL, NULL, "wm,wm8505-gpio");
--		if (!np)
--			np = of_find_compatible_node(NULL, NULL,
--							"wm,wm8650-gpio");
--		if (np) {
--			gpio_base = of_iomap(np, 0);
--
--			if (!gpio_base)
--				pr_err("%s: of_iomap(gpio_mux) failed\n",
--								__func__);
--
--			of_node_put(np);
--		} else {
--			gpio_base = ioremap(LEGACY_GPIO_BASE, 0x1000);
--			if (!gpio_base)
--				pr_err("%s: ioremap(legacy_gpio_mux) failed\n",
--								__func__);
--		}
--		if (gpio_base) {
--			writel(readl(gpio_base + VT8500_GPIO_MUX_REG) |
--				0x80000000, gpio_base + VT8500_GPIO_MUX_REG);
--			iounmap(gpio_base);
--		} else
--			pr_err("%s: Could not remap GPIO mux\n", __func__);
--
--		of_node_put(fb);
--	}
--#endif
+ 		pinctrl: pinctrl at d8110000 {
+ 			compatible = "wm,wm8650-pinctrl";
+ 			gpio-controller;
+diff --git a/arch/arm/boot/dts/wm8850.dtsi b/arch/arm/boot/dts/wm8850.dtsi
+index 60094cd..01d67bf 100644
+--- a/arch/arm/boot/dts/wm8850.dtsi
++++ b/arch/arm/boot/dts/wm8850.dtsi
+@@ -41,13 +41,6 @@
+ 			interrupts = <56 57 58 59 60 61 62 63>;
+ 		};
  
- 	np = of_find_compatible_node(NULL, NULL, "via,vt8500-pmc");
- 	if (np) {
-@@ -156,6 +87,7 @@ void __init vt8500_init(void)
- 		if (!pmc_base)
- 			pr_err("%s:ioremap(power_off) failed\n", __func__);
- 	}
-+
- 	if (pmc_base)
- 		pm_power_off = &vt8500_power_off;
- 	else
+-		gpio: gpio-controller at d8110000 {
+-			compatible = "wm,wm8650-gpio";
+-			gpio-controller;
+-			reg = <0xd8110000 0x10000>;
+-			#gpio-cells = <3>;
+-		};
+-
+ 		pinctrl: pinctrl at d8110000 {
+ 			compatible = "wm,wm8850-pinctrl";
+ 			gpio-controller;
 -- 
 1.7.9.5
