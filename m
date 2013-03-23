@@ -1,39 +1,23 @@
-From: alex@digriz.org.uk (Alexander Clouter)
-Date: Sat, 23 Mar 2013 18:09:00 +0000
-Subject: [PATCH 1/3] arm: orion5x: fix orion5x.dtsi gpio parameters
-In-Reply-To: <1364062142-28117-1-git-send-email-alex@digriz.org.uk>
-References: <1364062142-28117-1-git-send-email-alex@digriz.org.uk>
-Message-ID: <1364062142-28117-2-git-send-email-alex@digriz.org.uk>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 23 Mar 2013 15:12:06 -0300
+Subject: [PATCH 1/1 v2 net-next] net: fec: fix the build as module
+In-Reply-To: <CAHrpEqQU9e-qAYvtHmB9bDhXafHmG=yWJxxv96f94FxVq9QYgQ@mail.gmail.com>
+References: <1363915193-22179-1-git-send-email-Frank.Li@freescale.com>
+ <CAOMZO5D1p-QJ=7N-QrLbjcwK0b=280QEFuxNkbmYsmTeRitv+w@mail.gmail.com>
+ <CAHrpEqQU9e-qAYvtHmB9bDhXafHmG=yWJxxv96f94FxVq9QYgQ@mail.gmail.com>
+Message-ID: <CAOMZO5Cn4xG38fB9snS2cJSjZDzaWQJSGLp3+hFyxTXmOkO7BQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Alexander Clouter <alex@digriz.org.uk>
----
- arch/arm/boot/dts/orion5x.dtsi |    5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+On Thu, Mar 21, 2013 at 11:39 PM, Frank Li <lznuaa@gmail.com> wrote:
+>>
+>> This error does not not happen in 'net-next' anymore.
+>
+> what's your suggestion? change commit message or request apply to 3.9
 
-diff --git a/arch/arm/boot/dts/orion5x.dtsi b/arch/arm/boot/dts/orion5x.dtsi
-index 8aad00f..9bde027 100644
---- a/arch/arm/boot/dts/orion5x.dtsi
-+++ b/arch/arm/boot/dts/orion5x.dtsi
-@@ -13,6 +13,9 @@
- 	compatible = "marvell,orion5x";
- 	interrupt-parent = <&intc>;
- 
-+	aliases {
-+		gpio0 = &gpio0;
-+	};
- 	intc: interrupt-controller {
- 		compatible = "marvell,orion-intc", "marvell,intc";
- 		interrupt-controller;
-@@ -32,7 +35,7 @@
- 			#gpio-cells = <2>;
- 			gpio-controller;
- 			reg = <0x10100 0x40>;
--			ngpio = <32>;
-+			ngpios = <32>;
- 			interrupts = <6>, <7>, <8>, <9>;
- 		};
- 
--- 
-1.7.10.4
+Your motivation now is to generate a single kernel module instead of
+two for the fec, rather than fixing the the build error.
+
+So you need to adjust the Subject and commit log.
+
+I am not sure if we really need to rename fec.c though.
