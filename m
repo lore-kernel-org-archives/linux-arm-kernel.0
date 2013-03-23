@@ -1,46 +1,64 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sat, 23 Mar 2013 19:38:10 +0100
-Subject: [PATCH v2 00/14] Marvell EBU thermal sensor consolidation
-In-Reply-To: <20130323183140.GO13280@titan.lakedaemon.net>
-References: <1363991114-4225-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130323181638.GN13280@titan.lakedaemon.net> <514DF463.5040506@gmail.com>
- <20130323183140.GO13280@titan.lakedaemon.net>
-Message-ID: <514DF692.8030204@gmail.com>
+From: khc@pm.waw.pl (Krzysztof Halasa)
+Date: Sat, 23 Mar 2013 20:35:46 +0100
+Subject: [PATCH] Fix IXP4xx coherent allocations
+Message-ID: <m3obe9lxil.fsf@intrepid.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/23/2013 07:31 PM, Jason Cooper wrote:
-> On Sat, Mar 23, 2013 at 07:28:51PM +0100, Sebastian Hesselbarth wrote:
->> On 03/23/2013 07:16 PM, Jason Cooper wrote:
->>> On Fri, Mar 22, 2013 at 07:25:00PM -0300, Ezequiel Garcia wrote:
->>> ...
->>>> Ezequiel Garcia (14):
->>>>    thermal: Rename driver 'kirkwood' ->   'mvebu'
->>>>    thermal: mvebu: Rename symbols 'kirkwood' ->   'mvebu'
->>>>    thermal: mvebu: Move MODULE_DEVICE_TABLE upwards
->>>>    thermal: mvebu: Remove unneeded variable initialization
->>>>    thermal: mvebu: Convert to devm_ioremap_resource()
->>>>    thermal: mvebu: Fix license declaration
->>>>    thermal: mvebu: Rename kirkwood definitions to mvebu
->>>>    thermal: mvebu: Add infrastructure to support more multiple SoC
->>>>      variants
->>>>    thermal: mvebu: Add support for Armada XP thermal sensor
->>>>    thermal: mvebu: Add support for Armada 370 thermal sensor
->>>>    thermal: mvebu: Add support for Marvell Dove SoC family
->>>
->>> Once the thermal maintainers agree to take this in, I'll take the three
->
-> ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
->
-> Was I not clear?
+ARM core code currently requires coherent DMA mask to be set. Make sure
+we limit PCI devices to 64 MiB while allowing on-chip devices to access
+the whole 4 GiB address space.
 
-Just wanted to make sure you or one of the other maintainers didn't
-see my note on Patch 11/14. I don't want to send a follow up patch
-just because of that ;)
+This fixes a v3.7+ regression which broke IXP4xx built-in network devices.
 
-Sebastian
+Signed-off-by: Krzysztof Ha?asa <khc@pm.waw.pl>
+Cc: <stable@vger.kernel.org>
 
->>> below through mvebu/arm-soc.  This shouldn't cause any dependency
->>> headaches, and will reduce the possibility of merge conflicts.
->>
->> NACK. This patch set breaks thermal on Dove. I sent a mail earlier.
+diff --git a/arch/arm/mach-ixp4xx/common-pci.c b/arch/arm/mach-ixp4xx/common-pci.c
+index ea1933d..8629fc9 100644
+--- a/arch/arm/mach-ixp4xx/common-pci.c
++++ b/arch/arm/mach-ixp4xx/common-pci.c
+@@ -454,10 +454,15 @@ int ixp4xx_setup(int nr, struct pci_sys_data *sys)
+ 
+ int dma_set_coherent_mask(struct device *dev, u64 mask)
+ {
+-	if (mask >= SZ_64M - 1)
+-		return 0;
++	if ((mask & DMA_BIT_MASK(26)) != DMA_BIT_MASK(26))
++		return -EIO;
++
++	/* PCI devices are limited to 64 MiB */
++	if (dev_is_pci(dev))
++		mask &= DMA_BIT_MASK(26); /* Use DMA region */
+ 
+-	return -EIO;
++	dev->coherent_dma_mask = mask;
++	return 0;
+ }
+ 
+ EXPORT_SYMBOL(ixp4xx_pci_read);
+diff --git a/drivers/net/ethernet/xscale/ixp4xx_eth.c b/drivers/net/ethernet/xscale/ixp4xx_eth.c
+index 6958a5e..7c08269 100644
+--- a/drivers/net/ethernet/xscale/ixp4xx_eth.c
++++ b/drivers/net/ethernet/xscale/ixp4xx_eth.c
+@@ -1423,7 +1423,7 @@ static int eth_init_one(struct platform_device *pdev)
+ 	dev->netdev_ops = &ixp4xx_netdev_ops;
+ 	dev->ethtool_ops = &ixp4xx_ethtool_ops;
+ 	dev->tx_queue_len = 100;
+-
++	dma_set_coherent_mask(&dev->dev, DMA_BIT_MASK(32));
+ 	netif_napi_add(dev, &port->napi, eth_poll, NAPI_WEIGHT);
+ 
+ 	if (!(port->npe = npe_request(NPE_ID(port->id)))) {
+diff --git a/drivers/net/wan/ixp4xx_hss.c b/drivers/net/wan/ixp4xx_hss.c
+index 95d0451..83b4597 100644
+--- a/drivers/net/wan/ixp4xx_hss.c
++++ b/drivers/net/wan/ixp4xx_hss.c
+@@ -1367,6 +1367,7 @@ static int hss_init_one(struct platform_device *pdev)
+ 	port->id = pdev->id;
+ 	port->dev = &pdev->dev;
+ 	port->plat = pdev->dev.platform_data;
++	dma_set_coherent_mask(&dev->dev, DMA_BIT_MASK(32));
+ 	netif_napi_add(dev, &port->napi, hss_hdlc_poll, NAPI_WEIGHT);
+ 
+ 	if ((err = register_hdlc_device(dev)))
