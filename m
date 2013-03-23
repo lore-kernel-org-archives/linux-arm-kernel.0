@@ -1,81 +1,33 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 23 Mar 2013 14:32:17 +0800
-Subject: [PATCH v2] cpufreq: instantiate cpufreq-cpu0 as a platform_driver
-In-Reply-To: <Pine.LNX.4.64.1303221600060.12375@axis700.grange>
-References: <1359428020-21068-1-git-send-email-shawn.guo@linaro.org>
- <Pine.LNX.4.64.1303221600060.12375@axis700.grange>
-Message-ID: <20130323063215.GF6281@S2101-09.ap.freescale.net>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Sat, 23 Mar 2013 19:46:28 +1300
+Subject: [PATCH 0/5] video: vt8500 patches for 3.10
+Message-ID: <1364021193-19835-1-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 22, 2013 at 04:47:17PM +0100, Guennadi Liakhovetski wrote:
-> Sorry, confused. Before this used to be a generic cpufreq driver, usable 
-> on all (DT-enabled only) platforms. You just had to provide an OPP table, 
-> a clock, a regulator, similar to this
-> 
-> http://thread.gmane.org/gmane.linux.kernel.cpufreq/9510/focus=9509
-> 
-> (also see the complete thread for more information). Now this won't work 
-> obviously. Instead we now need a pseudo platform device to instantiate 
-> cpufreq-cpu0. This device cannot be put in DT, because it doesn't describe 
-> real hardware. So, we have to add register it from the board specific .c 
-> code, which we actually want to get rid of... Is this really what we want?
-> 
-Yes, that's what we want.  We are moving to multiplatform build, and we
-do not want the driver get instantiated on very single platform that is
-part of multiplatform.  Some of them may not support cpufreq at all and
-others may have operating-points defined in device tree but need to work
-with platform specific cpufreq driver.
+Hi Florian,
 
-In an ideal DT world, there shouldn't be any board specific .c code but
-only SoC specific code.  Whether or not support cpufreq is a SoC
-specific decision, and it's perfectly fine to make the decision in SoC
-specific code.
+These patches were posted for 3.9, but I didn't recieve any reply back at the
+time. Reposting for 3.10 - based on 3.9-rc2
 
-> What about other cpufreq drivers? They have the same problem on 
-> multiplatform builds, right? Say, s3c2416-cpufreq.c. It also just 
-> initialises itself and starts looking for a clock, names "msysclk" with a 
-> NULL device pointer etc. Don't we need a common approach for cpufreq 
-> driver initialisation?
-> 
-The s3c2416 is not part of multiplatform build yet.  And any platform
-that wants to be part of multiplatform build needs to fix those global
-initcalls.  Two approaches are being used to do that.
+Regards
+Tony P
 
-- Call of_machine_is_compatible() to check target platform at the
-  beginning of the initcall, and return immediately if it's not the
-  target platform.  See drivers/cpufreq/highbank-cpufreq.c for example.
+Julia Lawall (1):
+  drivers/video/wm8505fb.c: use devm_ functions
 
-- Remove global initcalls and use platform_device/driver mechanism for
-  instantiation.  See drivers/cpufreq/imx6q-cpufreq.c for example.
+Tony Prisk (4):
+  video: vt8500: Make wmt_ge_rops optional
+  video: vt8500: Remove unused platform_data/video-vt8500lcdfb.h
+  video: vt8500: Correct descriptions in video/Kconfig
+  video: vt8500: Adjust contrast in wm8505 framebuffer driver.
 
-I like the second one which is more scalable, and choose to use it for
-cpufreq-cpu0 driver.
+ drivers/video/Kconfig                           |   31 ++++----
+ drivers/video/vt8500lcdfb.c                     |   17 +++-
+ drivers/video/wm8505fb.c                        |   96 ++++++++---------------
+ include/linux/platform_data/video-vt8500lcdfb.h |   31 --------
+ 4 files changed, 66 insertions(+), 109 deletions(-)
+ delete mode 100644 include/linux/platform_data/video-vt8500lcdfb.h
 
-> The decision which cpufreq driver to use is SoC-specific, right? We're 
-> unlikely to have several boards, using the same SoC, wishing to use 
-> different cpufreq drivers? The decision _whether_ or not to enable it and 
-> _which_ resources to use might be board-specific. So, how about adding a 
-> cpufreq call something like
-> 
-> cpufreq_driver_request("cpufreq-driver-name");
-> 
-> to be called by SoC-specific code. You can say it is not much different 
-> from adding a virtual device, but firstly I think such a use of a platform 
-> device is really an overkill.
-
-I do not see why this is an overkill.  It's pretty common to use the
-approach for instantiating particular driver on particular target.
-
-> Secondly you still run a danger, that 
-> several platforms, built into a single image, register several devices for 
-> different cpufreq drivers, or even for one... With a special call you know 
-> there can be only one and you return -EBUSY to all further calls to that 
-> function.
-
-I do not see how this could happen.  The cpufreq device gets added in
-target specific init function which will only be invoked when the kernel
-is running on this target.  Check arch/arm/mach-imx/mach-imx6q.c or the
-OMAP example given by Nishanth to see how this should be done.
-
-Shawn
+-- 
+1.7.9.5
