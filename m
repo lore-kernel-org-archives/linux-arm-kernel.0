@@ -1,132 +1,640 @@
 From: linux@prisktech.co.nz (Tony Prisk)
-Date: Sun, 24 Mar 2013 14:12:25 +1300
-Subject: [PATCH RESEND] irqchip: vt8500: Convert arch-vt8500 to new irqchip
- infrastructure
-Message-ID: <1364087545-8388-1-git-send-email-linux@prisktech.co.nz>
+Date: Sun, 24 Mar 2013 17:49:47 +1300
+Subject: [PATCH] video: fb: vt8500: Convert framebuffer drivers to
+ standardized binding
+Message-ID: <1364100587-9320-1-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch moves the arch-vt8500 irq code to drivers/irqchip and converts
-it to use the new IRQCHIP_DECLARE and irqchip_init. This allows the removal
-of some more functions from common.h
+Now that a display timing binding is available, convert our almost identical
+binding to use the standard binding.
+
+This patch converts the vt8500 and wm8505 framebuffer drivers and
+associated dts/dtsi files to use the standard binding as defined in
+bindings/video/display-timing.txt.
+
+There are two side-effects of making this conversion:
+
+1) The fb node should now be in the board file, rather than the soc file as
+the display-timing node is a child of the fb node.
+
+2) We still require a bits per pixel property to initialize the framebuffer
+for the different lcd panels. Rather than including this as part of the
+display timing, it is moved into the framebuffer node.
+
+I have also taken the opportunity to alphabetise the includes of each
+driver to avoid double-ups.
 
 Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
 ---
-Resend due to incorrect arm mailing list address in original git-send.
+Hi Florian,
 
- arch/arm/mach-vt8500/Makefile                      |    2 +-
- arch/arm/mach-vt8500/common.h                      |    6 ------
- arch/arm/mach-vt8500/vt8500.c                      |   14 ++------------
- drivers/irqchip/Makefile                           |    1 +
- .../irq.c => drivers/irqchip/irq-vt8500.c          |    6 ++++++
- 5 files changed, 10 insertions(+), 19 deletions(-)
- rename arch/arm/mach-vt8500/irq.c => drivers/irqchip/irq-vt8500.c (97%)
+This patch is based on top of the previous patchset (0/5 video: vt8500 patches
+for 3.10). It could be considered patch 6 of the same set.
 
-diff --git a/arch/arm/mach-vt8500/Makefile b/arch/arm/mach-vt8500/Makefile
-index 92ceb24..4c8a846 100644
---- a/arch/arm/mach-vt8500/Makefile
-+++ b/arch/arm/mach-vt8500/Makefile
-@@ -1 +1 @@
--obj-$(CONFIG_ARCH_VT8500) += irq.o vt8500.o
-+obj-$(CONFIG_ARCH_VT8500) += vt8500.o
-diff --git a/arch/arm/mach-vt8500/common.h b/arch/arm/mach-vt8500/common.h
-index 77611a6..087787a 100644
---- a/arch/arm/mach-vt8500/common.h
-+++ b/arch/arm/mach-vt8500/common.h
-@@ -18,13 +18,7 @@
+Regards
+Tony P
+
+ .../devicetree/bindings/video/via,vt8500-fb.txt    |   48 ++++----------
+ .../devicetree/bindings/video/wm,wm8505-fb.txt     |   32 +++++----
+ arch/arm/boot/dts/vt8500-bv07.dts                  |   24 +++----
+ arch/arm/boot/dts/vt8500.dtsi                      |    8 ---
+ arch/arm/boot/dts/wm8505-ref.dts                   |   21 +++---
+ arch/arm/boot/dts/wm8505.dtsi                      |    7 --
+ arch/arm/boot/dts/wm8650-mid.dts                   |   21 +++---
+ arch/arm/boot/dts/wm8650.dtsi                      |    7 --
+ arch/arm/boot/dts/wm8850-w70v2.dts                 |   21 +++---
+ arch/arm/boot/dts/wm8850.dtsi                      |    7 --
+ drivers/video/Kconfig                              |    6 ++
+ drivers/video/vt8500lcdfb.c                        |   53 ++++++---------
+ drivers/video/wm8505fb.c                           |   68 ++++++++------------
+ 13 files changed, 130 insertions(+), 193 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/video/via,vt8500-fb.txt b/Documentation/devicetree/bindings/video/via,vt8500-fb.txt
+index c870b64..2871e21 100644
+--- a/Documentation/devicetree/bindings/video/via,vt8500-fb.txt
++++ b/Documentation/devicetree/bindings/video/via,vt8500-fb.txt
+@@ -5,58 +5,32 @@ Required properties:
+ - compatible : "via,vt8500-fb"
+ - reg : Should contain 1 register ranges(address and length)
+ - interrupts : framebuffer controller interrupt
+-- display: a phandle pointing to the display node
++- bits-per-pixel : bit depth of framebuffer (16 or 32)
  
- #include <linux/of.h>
+-Required nodes:
+-- display: a display node is required to initialize the lcd panel
+-	This should be in the board dts.
+-- default-mode: a videomode within the display with timing parameters
+-	as specified below.
++Required subnodes:
++- display-timings: see display-timing.txt for information
  
--int __init vt8500_irq_init(struct device_node *node,
--				struct device_node *parent);
+ Example:
+ 
+-	fb at d800e400 {
++	fb at d8050800 {
+ 		compatible = "via,vt8500-fb";
+ 		reg = <0xd800e400 0x400>;
+ 		interrupts = <12>;
+-		display = <&display>;
+-		default-mode = <&mode0>;
+-	};
 -
- /* defined in drivers/clk/clk-vt8500.c */
- void __init vtwm_clk_init(void __iomem *pmc_base);
- 
--/* defined in irq.c */
--asmlinkage void vt8500_handle_irq(struct pt_regs *regs);
+-VIA VT8500 Display
+------------------------------------------------------
+-Required properties (as per of_videomode_helper):
 -
- #endif
-diff --git a/arch/arm/mach-vt8500/vt8500.c b/arch/arm/mach-vt8500/vt8500.c
-index 49e8005..1dd281e 100644
---- a/arch/arm/mach-vt8500/vt8500.c
-+++ b/arch/arm/mach-vt8500/vt8500.c
-@@ -20,6 +20,7 @@
- 
- #include <linux/clocksource.h>
- #include <linux/io.h>
-+#include <linux/irqchip.h>
- #include <linux/pm.h>
- 
- #include <asm/mach-types.h>
-@@ -166,16 +167,6 @@ void __init vt8500_init(void)
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
- 
--static const struct of_device_id vt8500_irq_match[] __initconst = {
--	{ .compatible = "via,vt8500-intc", .data = vt8500_irq_init, },
--	{ /* sentinel */ },
--};
+- - hactive, vactive: Display resolution
+- - hfront-porch, hback-porch, hsync-len: Horizontal Display timing parameters
+-   in pixels
+-   vfront-porch, vback-porch, vsync-len: Vertical display timing parameters in
+-   lines
+- - clock: displayclock in Hz
+- - bpp: lcd panel bit-depth.
+-	<16> for RGB565, <32> for RGB888
 -
--static void __init vt8500_init_irq(void)
--{
--	of_irq_init(vt8500_irq_match);
--};
--
- static const char * const vt8500_dt_compat[] = {
- 	"via,vt8500",
- 	"wm,wm8650",
-@@ -187,10 +178,9 @@ static const char * const vt8500_dt_compat[] = {
- DT_MACHINE_START(WMT_DT, "VIA/Wondermedia SoC (Device Tree Support)")
- 	.dt_compat	= vt8500_dt_compat,
- 	.map_io		= vt8500_map_io,
--	.init_irq	= vt8500_init_irq,
-+	.init_irq	= irqchip_init,
- 	.init_machine	= vt8500_init,
- 	.init_time	= clocksource_of_init,
- 	.restart	= vt8500_restart,
--	.handle_irq	= vt8500_handle_irq,
- MACHINE_END
+-Optional properties (as per of_videomode_helper):
+- - width-mm, height-mm: Display dimensions in mm
+- - hsync-active-high (bool): Hsync pulse is active high
+- - vsync-active-high (bool): Vsync pulse is active high
+- - interlaced (bool): This is an interlaced mode
+- - doublescan (bool): This is a doublescan mode
++		bits-per-pixel = <16>;
  
-diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-index 98e3b87..b563535 100644
---- a/drivers/irqchip/Makefile
-+++ b/drivers/irqchip/Makefile
-@@ -9,3 +9,4 @@ obj-$(CONFIG_ARCH_SPEAR3XX)		+= spear-shirq.o
- obj-$(CONFIG_ARM_GIC)			+= irq-gic.o
- obj-$(CONFIG_ARM_VIC)			+= irq-vic.o
- obj-$(CONFIG_VERSATILE_FPGA_IRQ)	+= irq-versatile-fpga.o
-+obj-$(CONFIG_ARCH_VT8500)		+= irq-vt8500.o
-diff --git a/arch/arm/mach-vt8500/irq.c b/drivers/irqchip/irq-vt8500.c
-similarity index 97%
-rename from arch/arm/mach-vt8500/irq.c
-rename to drivers/irqchip/irq-vt8500.c
-index b9cf5ce..d970595 100644
---- a/arch/arm/mach-vt8500/irq.c
-+++ b/drivers/irqchip/irq-vt8500.c
-@@ -37,6 +37,9 @@
- 
- #include <asm/irq.h>
- #include <asm/exception.h>
-+#include <asm/mach/irq.h>
+-Example:
+-	display: display at 0 {
+-		modes {
+-			mode0: mode at 0 {
++		display-timings {
++			native-mode = <&timing0>;
++			timing0: 800x480 {
++				clock-frequency = <0>; /* unused but required */
+ 				hactive = <800>;
+ 				vactive = <480>;
+-				hback-porch = <88>;
+ 				hfront-porch = <40>;
++				hback-porch = <88>;
+ 				hsync-len = <0>;
+ 				vback-porch = <32>;
+ 				vfront-porch = <11>;
+ 				vsync-len = <1>;
+-				clock = <0>;	/* unused but required */
+-				bpp = <16>;	/* non-standard but required */
+ 			};
+ 		};
+ 	};
 +
-+#include "irqchip.h"
+diff --git a/Documentation/devicetree/bindings/video/wm,wm8505-fb.txt b/Documentation/devicetree/bindings/video/wm,wm8505-fb.txt
+index 3d325e1..0bcadb2 100644
+--- a/Documentation/devicetree/bindings/video/wm,wm8505-fb.txt
++++ b/Documentation/devicetree/bindings/video/wm,wm8505-fb.txt
+@@ -4,20 +4,30 @@ Wondermedia WM8505 Framebuffer
+ Required properties:
+ - compatible : "wm,wm8505-fb"
+ - reg : Should contain 1 register ranges(address and length)
+-- via,display: a phandle pointing to the display node
++- bits-per-pixel : bit depth of framebuffer (16 or 32)
  
- #define VT8500_ICPC_IRQ		0x20
- #define VT8500_ICPC_FIQ		0x24
-@@ -225,6 +228,8 @@ int __init vt8500_irq_init(struct device_node *node, struct device_node *parent)
- 		goto out;
+-Required nodes:
+-- display: a display node is required to initialize the lcd panel
+-	This should be in the board dts. See definition in
+-	Documentation/devicetree/bindings/video/via,vt8500-fb.txt
+-- default-mode: a videomode node as specified in
+-	Documentation/devicetree/bindings/video/via,vt8500-fb.txt
++Required subnodes:
++- display-timings: see display-timing.txt for information
+ 
+ Example:
+ 
+-	fb at d8050800 {
++	fb at d8051700 {
+ 		compatible = "wm,wm8505-fb";
+-		reg = <0xd8050800 0x200>;
+-		display = <&display>;
+-		default-mode = <&mode0>;
++		reg = <0xd8051700 0x200>;
++		bits-per-pixel = <16>;
++
++		display-timings {
++			native-mode = <&timing0>;
++			timing0: 800x480 {
++				clock-frequency = <0>; /* unused but required */
++				hactive = <800>;
++				vactive = <480>;
++				hfront-porch = <40>;
++				hback-porch = <88>;
++				hsync-len = <0>;
++				vback-porch = <32>;
++				vfront-porch = <11>;
++				vsync-len = <1>;
++			};
++		};
+ 	};
+diff --git a/arch/arm/boot/dts/vt8500-bv07.dts b/arch/arm/boot/dts/vt8500-bv07.dts
+index 567cf4e..7ec9a41 100644
+--- a/arch/arm/boot/dts/vt8500-bv07.dts
++++ b/arch/arm/boot/dts/vt8500-bv07.dts
+@@ -12,24 +12,26 @@
+ / {
+ 	model = "Benign BV07 Netbook";
+ 
+-	/*
+-	 * Display node is based on Sascha Hauer's patch on dri-devel.
+-	 * Added a bpp property to calculate the size of the framebuffer
+-	 * until the binding is formalized.
+-	 */
+-	display: display at 0 {
+-		modes {
+-			mode0: mode at 0 {
++	interrupt-parent = <&intc>;
++
++	fb at d8050800 {
++		compatible = "via,vt8500-fb";
++		reg = <0xd800e400 0x400>;
++		interrupts = <12>;
++		bits-per-pixel = <16>;
++
++		display-timings {
++			native-mode = <&timing0>;
++			timing0: 800x480 {
++				clock-frequency = <0>; /* unused but required */
+ 				hactive = <800>;
+ 				vactive = <480>;
+-				hback-porch = <88>;
+ 				hfront-porch = <40>;
++				hback-porch = <88>;
+ 				hsync-len = <0>;
+ 				vback-porch = <32>;
+ 				vfront-porch = <11>;
+ 				vsync-len = <1>;
+-				clock = <0>;	/* unused but required */
+-				bpp = <16>;	/* non-standard but required */
+ 			};
+ 		};
+ 	};
+diff --git a/arch/arm/boot/dts/vt8500.dtsi b/arch/arm/boot/dts/vt8500.dtsi
+index cf31ced..fc25d9f 100644
+--- a/arch/arm/boot/dts/vt8500.dtsi
++++ b/arch/arm/boot/dts/vt8500.dtsi
+@@ -98,14 +98,6 @@
+ 			interrupts = <43>;
+ 		};
+ 
+-		fb at d800e400 {
+-			compatible = "via,vt8500-fb";
+-			reg = <0xd800e400 0x400>;
+-			interrupts = <12>;
+-			display = <&display>;
+-			default-mode = <&mode0>;
+-		};
+-
+ 		ge_rops at d8050400 {
+ 			compatible = "wm,prizm-ge-rops";
+ 			reg = <0xd8050400 0x100>;
+diff --git a/arch/arm/boot/dts/wm8505-ref.dts b/arch/arm/boot/dts/wm8505-ref.dts
+index fd4e248..a600572 100644
+--- a/arch/arm/boot/dts/wm8505-ref.dts
++++ b/arch/arm/boot/dts/wm8505-ref.dts
+@@ -12,24 +12,23 @@
+ / {
+ 	model = "Wondermedia WM8505 Netbook";
+ 
+-	/*
+-	 * Display node is based on Sascha Hauer's patch on dri-devel.
+-	 * Added a bpp property to calculate the size of the framebuffer
+-	 * until the binding is formalized.
+-	 */
+-	display: display at 0 {
+-		modes {
+-			mode0: mode at 0 {
++	fb at d8050800 {
++		compatible = "wm,wm8505-fb";
++		reg = <0xd8050800 0x200>;
++		bits-per-pixel = <32>;
++
++		display-timings {
++			native-mode = <&timing0>;
++			timing0: 800x480 {
++				clock-frequency = <0>; /* unused but required */
+ 				hactive = <800>;
+ 				vactive = <480>;
+-				hback-porch = <88>;
+ 				hfront-porch = <40>;
++				hback-porch = <88>;
+ 				hsync-len = <0>;
+ 				vback-porch = <32>;
+ 				vfront-porch = <11>;
+ 				vsync-len = <1>;
+-				clock = <0>;	/* unused but required */
+-				bpp = <32>;	/* non-standard but required */
+ 			};
+ 		};
+ 	};
+diff --git a/arch/arm/boot/dts/wm8505.dtsi b/arch/arm/boot/dts/wm8505.dtsi
+index e74a1c0..826bd8d 100644
+--- a/arch/arm/boot/dts/wm8505.dtsi
++++ b/arch/arm/boot/dts/wm8505.dtsi
+@@ -128,13 +128,6 @@
+ 			interrupts = <0>;
+ 		};
+ 
+-		fb at d8050800 {
+-			compatible = "wm,wm8505-fb";
+-			reg = <0xd8050800 0x200>;
+-			display = <&display>;
+-			default-mode = <&mode0>;
+-		};
+-
+ 		ge_rops at d8050400 {
+ 			compatible = "wm,prizm-ge-rops";
+ 			reg = <0xd8050400 0x100>;
+diff --git a/arch/arm/boot/dts/wm8650-mid.dts b/arch/arm/boot/dts/wm8650-mid.dts
+index cefd938..d77bf22 100644
+--- a/arch/arm/boot/dts/wm8650-mid.dts
++++ b/arch/arm/boot/dts/wm8650-mid.dts
+@@ -12,24 +12,23 @@
+ / {
+ 	model = "Wondermedia WM8650-MID Tablet";
+ 
+-	/*
+-	 * Display node is based on Sascha Hauer's patch on dri-devel.
+-	 * Added a bpp property to calculate the size of the framebuffer
+-	 * until the binding is formalized.
+-	 */
+-	display: display at 0 {
+-		modes {
+-			mode0: mode at 0 {
++	fb at d8050800 {
++		compatible = "wm,wm8505-fb";
++		reg = <0xd8050800 0x200>;
++		bits-per-pixel = <16>;
++
++		display-timings {
++			native-mode = <&timing0>;
++			timing0: 800x480 {
++				clock-frequency = <0>; /* unused but required */
+ 				hactive = <800>;
+ 				vactive = <480>;
+-				hback-porch = <88>;
+ 				hfront-porch = <40>;
++				hback-porch = <88>;
+ 				hsync-len = <0>;
+ 				vback-porch = <32>;
+ 				vfront-porch = <11>;
+ 				vsync-len = <1>;
+-				clock = <0>;	/* unused but required */
+-				bpp = <16>;	/* non-standard but required */
+ 			};
+ 		};
+ 	};
+diff --git a/arch/arm/boot/dts/wm8650.dtsi b/arch/arm/boot/dts/wm8650.dtsi
+index db3c0a1..2073963 100644
+--- a/arch/arm/boot/dts/wm8650.dtsi
++++ b/arch/arm/boot/dts/wm8650.dtsi
+@@ -128,13 +128,6 @@
+ 			interrupts = <43>;
+ 		};
+ 
+-		fb at d8050800 {
+-			compatible = "wm,wm8505-fb";
+-			reg = <0xd8050800 0x200>;
+-			display = <&display>;
+-			default-mode = <&mode0>;
+-		};
+-
+ 		ge_rops at d8050400 {
+ 			compatible = "wm,prizm-ge-rops";
+ 			reg = <0xd8050400 0x100>;
+diff --git a/arch/arm/boot/dts/wm8850-w70v2.dts b/arch/arm/boot/dts/wm8850-w70v2.dts
+index fcc660c..9b56701 100644
+--- a/arch/arm/boot/dts/wm8850-w70v2.dts
++++ b/arch/arm/boot/dts/wm8850-w70v2.dts
+@@ -15,24 +15,23 @@
+ / {
+ 	model = "Wondermedia WM8850-W70v2 Tablet";
+ 
+-	/*
+-	 * Display node is based on Sascha Hauer's patch on dri-devel.
+-	 * Added a bpp property to calculate the size of the framebuffer
+-	 * until the binding is formalized.
+-	 */
+-	display: display at 0 {
+-		modes {
+-			mode0: mode at 0 {
++	fb at d8051700 {
++		compatible = "wm,wm8505-fb";
++		reg = <0xd8051700 0x200>;
++		bits-per-pixel = <16>;
++
++		display-timings {
++			native-mode = <&timing0>;
++			timing0: 800x480 {
++				clock-frequency = <0>; /* unused but required */
+ 				hactive = <800>;
+ 				vactive = <480>;
+-				hback-porch = <88>;
+ 				hfront-porch = <40>;
++				hback-porch = <88>;
+ 				hsync-len = <0>;
+ 				vback-porch = <32>;
+ 				vfront-porch = <11>;
+ 				vsync-len = <1>;
+-				clock = <0>;	/* unused but required */
+-				bpp = <16>;	/* non-standard but required */
+ 			};
+ 		};
+ 	};
+diff --git a/arch/arm/boot/dts/wm8850.dtsi b/arch/arm/boot/dts/wm8850.dtsi
+index e8cbfdc..dfc50a4 100644
+--- a/arch/arm/boot/dts/wm8850.dtsi
++++ b/arch/arm/boot/dts/wm8850.dtsi
+@@ -135,13 +135,6 @@
+ 			};
+ 		};
+ 
+-		fb at d8051700 {
+-			compatible = "wm,wm8505-fb";
+-			reg = <0xd8051700 0x200>;
+-			display = <&display>;
+-			default-mode = <&mode0>;
+-		};
+-
+ 		ge_rops at d8050400 {
+ 			compatible = "wm,prizm-ge-rops";
+ 			reg = <0xd8050400 0x100>;
+diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
+index ad762ed..d0c932a 100644
+--- a/drivers/video/Kconfig
++++ b/drivers/video/Kconfig
+@@ -1794,6 +1794,9 @@ config FB_VT8500
+ 	select FB_SYS_FILLRECT if (!FB_WMT_GE_ROPS)
+ 	select FB_SYS_COPYAREA if (!FB_WMT_GE_ROPS)
+ 	select FB_SYS_IMAGEBLIT
++	select FB_MODE_HELPERS
++	select OF_DISPLAY_TIMING
++	select OF_VIDEOMODE
+ 	help
+ 	  This is the framebuffer driver for VIA VT8500 integrated LCD
+ 	  controller.
+@@ -1804,6 +1807,9 @@ config FB_WM8505
+ 	select FB_SYS_FILLRECT if (!FB_WMT_GE_ROPS)
+ 	select FB_SYS_COPYAREA if (!FB_WMT_GE_ROPS)
+ 	select FB_SYS_IMAGEBLIT
++	select FB_MODE_HELPERS
++	select OF_DISPLAY_TIMING
++	select OF_VIDEOMODE
+ 	help
+ 	  This is the framebuffer driver for WonderMedia WM8xxx-series
+ 	  integrated LCD controller. This driver covers the WM8505, WM8650
+diff --git a/drivers/video/vt8500lcdfb.c b/drivers/video/vt8500lcdfb.c
+index 1c34821..816e8ce 100644
+--- a/drivers/video/vt8500lcdfb.c
++++ b/drivers/video/vt8500lcdfb.c
+@@ -15,20 +15,21 @@
+  * GNU General Public License for more details.
+  */
+ 
+-#include <linux/module.h>
+-#include <linux/kernel.h>
+-#include <linux/errno.h>
+-#include <linux/string.h>
+-#include <linux/mm.h>
+-#include <linux/slab.h>
+ #include <linux/delay.h>
++#include <linux/dma-mapping.h>
++#include <linux/errno.h>
+ #include <linux/fb.h>
+ #include <linux/init.h>
+ #include <linux/interrupt.h>
+ #include <linux/io.h>
+-#include <linux/dma-mapping.h>
++#include <linux/kernel.h>
++#include <linux/mm.h>
++#include <linux/module.h>
+ #include <linux/platform_device.h>
++#include <linux/slab.h>
++#include <linux/string.h>
+ #include <linux/wait.h>
++#include <video/of_display_timing.h>
+ 
+ #include "vt8500lcdfb.h"
+ 
+@@ -290,11 +291,11 @@ static int vt8500lcd_probe(struct platform_device *pdev)
+ {
+ 	struct vt8500lcd_info *fbi;
+ 	struct resource *res;
++	struct display_timings *disp_timing;
+ 	void *addr;
+ 	int irq, ret;
+ 
+ 	struct fb_videomode	of_mode;
+-	struct device_node	*np;
+ 	u32			bpp;
+ 	dma_addr_t fb_mem_phys;
+ 	unsigned long fb_mem_len;
+@@ -359,31 +360,19 @@ static int vt8500lcd_probe(struct platform_device *pdev)
+ 		goto failed_free_res;
  	}
  
-+	set_handle_irq(vt8500_handle_irq);
+-	np = of_parse_phandle(pdev->dev.of_node, "default-mode", 0);
+-	if (!np) {
+-		pr_err("%s: No display description in Device Tree\n", __func__);
+-		ret = -EINVAL;
+-		goto failed_free_res;
+-	}
++	disp_timing = of_get_display_timings(pdev->dev.of_node);
++	if (!disp_timing)
++		return -EINVAL;
 +
- 	vt8500_init_irq_hw(intc[active_cnt].base);
++	ret = of_get_fb_videomode(pdev->dev.of_node, &of_mode,
++							OF_USE_NATIVE_MODE);
++	if (ret)
++		return ret;
++
++	ret = of_property_read_u32(pdev->dev.of_node, "bits-per-pixel", &bpp);
++	if (ret)
++		return ret;
  
- 	pr_info("vt8500-irq: Added interrupt controller\n");
-@@ -251,3 +256,4 @@ out:
- 	return 0;
- }
+-	/*
+-	 * This code is copied from Sascha Hauer's of_videomode helper
+-	 * and can be replaced with a call to the helper once mainlined
+-	 */
+-	ret = 0;
+-	ret |= of_property_read_u32(np, "hactive", &of_mode.xres);
+-	ret |= of_property_read_u32(np, "vactive", &of_mode.yres);
+-	ret |= of_property_read_u32(np, "hback-porch", &of_mode.left_margin);
+-	ret |= of_property_read_u32(np, "hfront-porch", &of_mode.right_margin);
+-	ret |= of_property_read_u32(np, "hsync-len", &of_mode.hsync_len);
+-	ret |= of_property_read_u32(np, "vback-porch", &of_mode.upper_margin);
+-	ret |= of_property_read_u32(np, "vfront-porch", &of_mode.lower_margin);
+-	ret |= of_property_read_u32(np, "vsync-len", &of_mode.vsync_len);
+-	ret |= of_property_read_u32(np, "bpp", &bpp);
+-	if (ret) {
+-		pr_err("%s: Unable to read display properties\n", __func__);
+-		goto failed_free_res;
+-	}
+ 	of_mode.vmode = FB_VMODE_NONINTERLACED;
  
-+IRQCHIP_DECLARE(vt8500_irq, "via,vt8500-intc", vt8500_irq_init);
+ 	/* try allocating the framebuffer */
+diff --git a/drivers/video/wm8505fb.c b/drivers/video/wm8505fb.c
+index 5057457..ab112ad 100644
+--- a/drivers/video/wm8505fb.c
++++ b/drivers/video/wm8505fb.c
+@@ -14,23 +14,24 @@
+  * GNU General Public License for more details.
+  */
+ 
+-#include <linux/module.h>
+-#include <linux/kernel.h>
+-#include <linux/errno.h>
+-#include <linux/string.h>
+-#include <linux/mm.h>
+-#include <linux/slab.h>
+ #include <linux/delay.h>
++#include <linux/dma-mapping.h>
+ #include <linux/fb.h>
++#include <linux/errno.h>
+ #include <linux/init.h>
+ #include <linux/interrupt.h>
+ #include <linux/io.h>
+-#include <linux/dma-mapping.h>
+-#include <linux/platform_device.h>
+-#include <linux/wait.h>
++#include <linux/kernel.h>
++#include <linux/memblock.h>
++#include <linux/mm.h>
++#include <linux/module.h>
+ #include <linux/of.h>
+ #include <linux/of_fdt.h>
+-#include <linux/memblock.h>
++#include <linux/platform_device.h>
++#include <linux/slab.h>
++#include <linux/string.h>
++#include <linux/wait.h>
++#include <video/of_display_timing.h>
+ 
+ #include "wm8505fb_regs.h"
+ 
+@@ -276,12 +277,12 @@ static struct fb_ops wm8505fb_ops = {
+ static int wm8505fb_probe(struct platform_device *pdev)
+ {
+ 	struct wm8505fb_info	*fbi;
+-	struct resource		*res;
++	struct resource	*res;
++	struct display_timings *disp_timing;
+ 	void			*addr;
+ 	int ret;
+ 
+-	struct fb_videomode	of_mode;
+-	struct device_node	*np;
++	struct fb_videomode	mode;
+ 	u32			bpp;
+ 	dma_addr_t fb_mem_phys;
+ 	unsigned long fb_mem_len;
+@@ -321,33 +322,20 @@ static int wm8505fb_probe(struct platform_device *pdev)
+ 	if (fbi->regbase == NULL)
+ 		return -EBUSY;
+ 
+-	np = of_parse_phandle(pdev->dev.of_node, "default-mode", 0);
+-	if (!np) {
+-		pr_err("%s: No display description in Device Tree\n", __func__);
++	disp_timing = of_get_display_timings(pdev->dev.of_node);
++	if (!disp_timing)
+ 		return -EINVAL;
+-	}
+ 
+-	/*
+-	 * This code is copied from Sascha Hauer's of_videomode helper
+-	 * and can be replaced with a call to the helper once mainlined
+-	 */
+-	ret = 0;
+-	ret |= of_property_read_u32(np, "hactive", &of_mode.xres);
+-	ret |= of_property_read_u32(np, "vactive", &of_mode.yres);
+-	ret |= of_property_read_u32(np, "hback-porch", &of_mode.left_margin);
+-	ret |= of_property_read_u32(np, "hfront-porch", &of_mode.right_margin);
+-	ret |= of_property_read_u32(np, "hsync-len", &of_mode.hsync_len);
+-	ret |= of_property_read_u32(np, "vback-porch", &of_mode.upper_margin);
+-	ret |= of_property_read_u32(np, "vfront-porch", &of_mode.lower_margin);
+-	ret |= of_property_read_u32(np, "vsync-len", &of_mode.vsync_len);
+-	ret |= of_property_read_u32(np, "bpp", &bpp);
+-	if (ret) {
+-		pr_err("%s: Unable to read display properties\n", __func__);
+-		return -EINVAL;
+-	}
++	ret = of_get_fb_videomode(pdev->dev.of_node, &mode, OF_USE_NATIVE_MODE);
++	if (ret)
++		return ret;
++
++	ret = of_property_read_u32(pdev->dev.of_node, "bits-per-pixel", &bpp);
++	if (ret)
++		return ret;
+ 
+-	of_mode.vmode = FB_VMODE_NONINTERLACED;
+-	fb_videomode_to_var(&fbi->fb.var, &of_mode);
++	mode.vmode = FB_VMODE_NONINTERLACED;
++	fb_videomode_to_var(&fbi->fb.var, &mode);
+ 
+ 	fbi->fb.var.nonstd		= 0;
+ 	fbi->fb.var.activate		= FB_ACTIVATE_NOW;
+@@ -356,7 +344,7 @@ static int wm8505fb_probe(struct platform_device *pdev)
+ 	fbi->fb.var.width		= -1;
+ 
+ 	/* try allocating the framebuffer */
+-	fb_mem_len = of_mode.xres * of_mode.yres * 2 * (bpp / 8);
++	fb_mem_len = mode.xres * mode.yres * 2 * (bpp / 8);
+ 	fb_mem_virt = dmam_alloc_coherent(&pdev->dev, fb_mem_len, &fb_mem_phys,
+ 				GFP_KERNEL);
+ 	if (!fb_mem_virt) {
+@@ -364,8 +352,8 @@ static int wm8505fb_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 	}
+ 
+-	fbi->fb.var.xres_virtual	= of_mode.xres;
+-	fbi->fb.var.yres_virtual	= of_mode.yres * 2;
++	fbi->fb.var.xres_virtual	= mode.xres;
++	fbi->fb.var.yres_virtual	= mode.yres * 2;
+ 	fbi->fb.var.bits_per_pixel	= bpp;
+ 
+ 	fbi->fb.fix.smem_start		= fb_mem_phys;
 -- 
 1.7.9.5
