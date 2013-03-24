@@ -1,31 +1,30 @@
-From: paolo.pisati@canonical.com (Paolo Pisati)
-Date: Sun, 24 Mar 2013 21:29:45 +0100
-Subject: [PATCH 7/7] ARM: l2x0: don't set .set_debug in l310 case
-In-Reply-To: <1364149654-16163-1-git-send-email-p.pisati@gmail.com>
-References: <1364149654-16163-1-git-send-email-p.pisati@gmail.com>
-Message-ID: <1364156985-20264-1-git-send-email-paolo.pisati@canonical.com>
+From: gmbnomis@gmail.com (Simon Baatz)
+Date: Sun, 24 Mar 2013 21:33:59 +0100
+Subject: [PATCH 1/2] net: mvmdio: define module alias for platform device
+In-Reply-To: <1364157240-28883-1-git-send-email-gmbnomis@gmail.com>
+References: <1364157240-28883-1-git-send-email-gmbnomis@gmail.com>
+Message-ID: <1364157240-28883-2-git-send-email-gmbnomis@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit 74ddcdb ("l2x0: Only set .set_debug on PL310 r3p0 and earlier")
-to actually work needs .set_debug to be not set during definition
+The mvmdio driver can be instantiated using device tree or as a classic
+platform device.  In order to load the driver automatically by udev in
+the latter case, the driver needs to define a module alias for the
+platform device.
 
-Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+Signed-off-by: Simon Baatz <gmbnomis@gmail.com>
 ---
- arch/arm/mm/cache-l2x0.c |    1 -
- 1 file changed, 1 deletion(-)
+ drivers/net/ethernet/marvell/mvmdio.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index d457653..37f1364 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -724,7 +724,6 @@ static const struct l2x0_of_data pl310_data = {
- 		.flush_all   = l2x0_flush_all,
- 		.inv_all     = l2x0_inv_all,
- 		.disable     = l2x0_disable,
--		.set_debug   = pl310_set_debug,
- 	},
- };
- 
+diff --git a/drivers/net/ethernet/marvell/mvmdio.c b/drivers/net/ethernet/marvell/mvmdio.c
+index 3472574..7b5158f 100644
+--- a/drivers/net/ethernet/marvell/mvmdio.c
++++ b/drivers/net/ethernet/marvell/mvmdio.c
+@@ -295,3 +295,4 @@ module_platform_driver(orion_mdio_driver);
+ MODULE_DESCRIPTION("Marvell MDIO interface driver");
+ MODULE_AUTHOR("Thomas Petazzoni <thomas.petazzoni@free-electrons.com>");
+ MODULE_LICENSE("GPL");
++MODULE_ALIAS("platform:orion-mdio");
 -- 
-1.7.10.4
+1.7.9.5
