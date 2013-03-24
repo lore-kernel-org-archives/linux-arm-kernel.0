@@ -1,9 +1,9 @@
 From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Sun, 24 Mar 2013 15:45:29 +0100
-Subject: [PATCH v2 1/2] gpio: mvebu: add dbg_show function
+Date: Sun, 24 Mar 2013 15:45:30 +0100
+Subject: [PATCH v2 2/2] ARM: Orion: add dbg_show function to gpio-orion driver
 In-Reply-To: <1364136330-28193-1-git-send-email-simon.guinot@sequanux.org>
 References: <1364136330-28193-1-git-send-email-simon.guinot@sequanux.org>
-Message-ID: <1364136330-28193-2-git-send-email-simon.guinot@sequanux.org>
+Message-ID: <1364136330-28193-3-git-send-email-simon.guinot@sequanux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,35 +17,35 @@ Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
 Changes for v2:
  - In order to match registers type, swith msk type to u32.
 
- drivers/gpio/gpio-mvebu.c |   59 +++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/plat-orion/gpio.c |   59 ++++++++++++++++++++++++++++++++++++++++++++
  1 file changed, 59 insertions(+)
 
-diff --git a/drivers/gpio/gpio-mvebu.c b/drivers/gpio/gpio-mvebu.c
-index 61a6fde..3bd0398 100644
---- a/drivers/gpio/gpio-mvebu.c
-+++ b/drivers/gpio/gpio-mvebu.c
-@@ -470,6 +470,64 @@ static void mvebu_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+diff --git a/arch/arm/plat-orion/gpio.c b/arch/arm/plat-orion/gpio.c
+index c29ee7e..e39c2ba 100644
+--- a/arch/arm/plat-orion/gpio.c
++++ b/arch/arm/plat-orion/gpio.c
+@@ -439,6 +439,64 @@ static void gpio_irq_handler(unsigned irq, struct irq_desc *desc)
  	}
  }
  
 +#ifdef CONFIG_DEBUG_FS
 +#include <linux/seq_file.h>
 +
-+static void mvebu_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
++static void orion_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
 +{
-+	struct mvebu_gpio_chip *mvchip =
-+		container_of(chip, struct mvebu_gpio_chip, chip);
++	struct orion_gpio_chip *ochip =
++		container_of(chip, struct orion_gpio_chip, chip);
 +	u32 out, io_conf, blink, in_pol, data_in, cause, edg_msk, lvl_msk;
 +	int i;
 +
-+	out	= readl_relaxed(mvebu_gpioreg_out(mvchip));
-+	io_conf	= readl_relaxed(mvebu_gpioreg_io_conf(mvchip));
-+	blink	= readl_relaxed(mvebu_gpioreg_blink(mvchip));
-+	in_pol	= readl_relaxed(mvebu_gpioreg_in_pol(mvchip));
-+	data_in	= readl_relaxed(mvebu_gpioreg_data_in(mvchip));
-+	cause	= readl_relaxed(mvebu_gpioreg_edge_cause(mvchip));
-+	edg_msk	= readl_relaxed(mvebu_gpioreg_edge_mask(mvchip));
-+	lvl_msk	= readl_relaxed(mvebu_gpioreg_level_mask(mvchip));
++	out	= readl_relaxed(GPIO_OUT(ochip));
++	io_conf	= readl_relaxed(GPIO_IO_CONF(ochip));
++	blink	= readl_relaxed(GPIO_BLINK_EN(ochip));
++	in_pol	= readl_relaxed(GPIO_IN_POL(ochip));
++	data_in	= readl_relaxed(GPIO_DATA_IN(ochip));
++	cause	= readl_relaxed(GPIO_EDGE_CAUSE(ochip));
++	edg_msk	= readl_relaxed(GPIO_EDGE_MASK(ochip));
++	lvl_msk	= readl_relaxed(GPIO_LEVEL_MASK(ochip));
 +
 +	for (i = 0; i < chip->ngpio; i++) {
 +		const char *label;
@@ -83,19 +83,19 @@ index 61a6fde..3bd0398 100644
 +	}
 +}
 +#else
-+#define mvebu_gpio_dbg_show NULL
++#define orion_gpio_dbg_show NULL
 +#endif
 +
- static struct of_device_id mvebu_gpio_of_match[] = {
- 	{
- 		.compatible = "marvell,orion-gpio",
-@@ -550,6 +608,7 @@ static int mvebu_gpio_probe(struct platform_device *pdev)
- 	mvchip->chip.ngpio = ngpios;
- 	mvchip->chip.can_sleep = 0;
- 	mvchip->chip.of_node = np;
-+	mvchip->chip.dbg_show = mvebu_gpio_dbg_show;
+ void __init orion_gpio_init(struct device_node *np,
+ 			    int gpio_base, int ngpio,
+ 			    void __iomem *base, int mask_offset,
+@@ -471,6 +529,7 @@ void __init orion_gpio_init(struct device_node *np,
+ #ifdef CONFIG_OF
+ 	ochip->chip.of_node = np;
+ #endif
++	ochip->chip.dbg_show = orion_gpio_dbg_show;
  
- 	spin_lock_init(&mvchip->lock);
- 	mvchip->membase = devm_ioremap_resource(&pdev->dev, res);
+ 	spin_lock_init(&ochip->lock);
+ 	ochip->base = (void __iomem *)base;
 -- 
 1.7.10.4
