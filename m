@@ -1,40 +1,182 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 24 Mar 2013 22:35:28 +0800
-Subject: [PATCH v3 1/1 net-next] net: fec: put tx to napi poll function
- to fix dead lock
-In-Reply-To: <CAOMZO5B-ipzyb2uiLW12fFd3PD3JfLS8R0YLM5vtLgFNz8abUw@mail.gmail.com>
-References: <1362368065-5809-1-git-send-email-Frank.Li@freescale.com>
- <20130320114824.GA6088@S2101-09.ap.freescale.net>
- <CAOMZO5B-ipzyb2uiLW12fFd3PD3JfLS8R0YLM5vtLgFNz8abUw@mail.gmail.com>
-Message-ID: <20130324143525.GI6281@S2101-09.ap.freescale.net>
+From: francescolavra.fl@gmail.com (Francesco Lavra)
+Date: Sun, 24 Mar 2013 15:37:36 +0100
+Subject: [PATCH 1/2] cpufreq: Notify all policy->cpus in
+ cpufreq_notify_transition()
+In-Reply-To: <981c23bd4b2a14c346820685e1203ab7054378f8.1364132845.git.viresh.kumar@linaro.org>
+References: <981c23bd4b2a14c346820685e1203ab7054378f8.1364132845.git.viresh.kumar@linaro.org>
+Message-ID: <514F0FB0.8030109@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 22, 2013 at 04:00:26PM -0300, Fabio Estevam wrote:
-> On Wed, Mar 20, 2013 at 8:48 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> > Frank,
-> >
-> > I'm running v3.9-rc3 image with NFS on imx6q, and seeing system fail
-> > to resume back.  The resume seems being stopped by fec driver.  If you
-> > wait long enough, you might see the repeated "eth0: tx queue full!."
-> > error message.
+On 03/24/2013 02:48 PM, Viresh Kumar wrote:
+> policy->cpus contains all online cpus that have single shared clock line. And
+> their frequencies are always updated together.
 > 
-> On mx28, only reverting this patch does not solve the suspend/resume issue.
+> Many SMP system's cpufreq drivers take care of this in individual drivers but
+> the best place for this code is in cpufreq core.
+> 
+> This patch modifies cpufreq_notify_transition() to notify frequency change for
+> all cpus in policy->cpus and hence updates all users of this API.
+> 
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Eric Miao <eric.y.miao@gmail.com>
+> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+> Cc: Ben Dooks <ben-linux@fluff.org>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Haavard Skinnemoen <hskinnemoen@gmail.com>
+> Cc: Hans-Christian Egtvedt <egtvedt@samfundet.no>
+> Cc: Mike Frysinger <vapier@gentoo.org>
+> Cc: Mikael Starvik <starvik@axis.com>
+> Cc: Jesper Nilsson <jesper.nilsson@axis.com>
+> Cc: Tony Luck <tony.luck@intel.com>
+> Cc: Fenghua Yu <fenghua.yu@intel.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> Cc: Ralf Baechle <ralf@linux-mips.org>
+> Cc: Paul Mundt <lethal@linux-sh.org>
+> Cc: David S. Miller <davem@davemloft.net>
+> Cc: Thomas Renninger <trenn@suse.de>
+> Cc: Borislav Petkov <bp@alien8.de>
+> Cc: Guan Xuetao <gxt@mprc.pku.edu.cn>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-cris-kernel at axis.com
+> Cc: linux-ia64 at vger.kernel.org
+> Cc: linuxppc-dev at lists.ozlabs.org
+> Cc: cbe-oss-dev at lists.ozlabs.org
+> Cc: linux-mips at linux-mips.org
+> Cc: linux-sh at vger.kernel.org
+> Cc: sparclinux at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  arch/arm/mach-davinci/cpufreq.c              |  5 +-
+>  arch/arm/mach-imx/cpufreq.c                  |  5 +-
+>  arch/arm/mach-integrator/cpu.c               |  6 +--
+>  arch/arm/mach-pxa/cpufreq-pxa2xx.c           |  5 +-
+>  arch/arm/mach-pxa/cpufreq-pxa3xx.c           |  5 +-
+>  arch/arm/mach-s3c24xx/cpufreq.c              |  8 +--
+>  arch/arm/mach-sa1100/cpu-sa1100.c            |  5 +-
+>  arch/arm/mach-sa1100/cpu-sa1110.c            |  5 +-
+>  arch/arm/mach-tegra/cpu-tegra.c              |  6 +--
+>  arch/avr32/mach-at32ap/cpufreq.c             |  5 +-
+>  arch/blackfin/mach-common/cpufreq.c          | 79 ++++++++++++----------------
+>  arch/cris/arch-v32/mach-a3/cpufreq.c         | 20 +++----
+>  arch/cris/arch-v32/mach-fs/cpufreq.c         | 17 +++---
+>  arch/ia64/kernel/cpufreq/acpi-cpufreq.c      | 22 ++++----
+>  arch/mips/kernel/cpufreq/loongson2_cpufreq.c |  5 +-
+>  arch/powerpc/platforms/cell/cbe_cpufreq.c    |  5 +-
+>  arch/powerpc/platforms/pasemi/cpufreq.c      |  5 +-
+>  arch/powerpc/platforms/powermac/cpufreq_32.c | 14 ++---
+>  arch/powerpc/platforms/powermac/cpufreq_64.c |  5 +-
+>  arch/sh/kernel/cpufreq.c                     |  5 +-
+>  arch/sparc/kernel/us2e_cpufreq.c             | 13 ++---
+>  arch/sparc/kernel/us3_cpufreq.c              | 13 ++---
+>  arch/unicore32/kernel/cpu-ucv2.c             |  5 +-
+>  drivers/cpufreq/acpi-cpufreq.c               | 11 +---
+>  drivers/cpufreq/cpufreq-cpu0.c               | 12 ++---
+>  drivers/cpufreq/cpufreq-nforce2.c            |  5 +-
+>  drivers/cpufreq/cpufreq.c                    | 45 +++++++++-------
+>  drivers/cpufreq/dbx500-cpufreq.c             |  6 +--
+>  drivers/cpufreq/e_powersaver.c               | 11 ++--
+>  drivers/cpufreq/elanfreq.c                   | 10 ++--
+>  drivers/cpufreq/exynos-cpufreq.c             |  7 +--
+>  drivers/cpufreq/gx-suspmod.c                 | 11 ++--
+>  drivers/cpufreq/imx6q-cpufreq.c              | 12 ++---
+>  drivers/cpufreq/kirkwood-cpufreq.c           | 10 ++--
+>  drivers/cpufreq/longhaul.c                   | 18 ++++---
+>  drivers/cpufreq/maple-cpufreq.c              |  5 +-
+>  drivers/cpufreq/omap-cpufreq.c               | 11 +---
+>  drivers/cpufreq/p4-clockmod.c                | 10 +---
+>  drivers/cpufreq/pcc-cpufreq.c                |  5 +-
+>  drivers/cpufreq/powernow-k6.c                | 12 ++---
+>  drivers/cpufreq/powernow-k7.c                | 10 ++--
+>  drivers/cpufreq/powernow-k8.c                | 16 +++---
+>  drivers/cpufreq/s3c2416-cpufreq.c            |  5 +-
+>  drivers/cpufreq/s3c64xx-cpufreq.c            |  7 ++-
+>  drivers/cpufreq/s5pv210-cpufreq.c            |  5 +-
+>  drivers/cpufreq/sc520_freq.c                 | 10 ++--
+>  drivers/cpufreq/spear-cpufreq.c              |  7 +--
+>  drivers/cpufreq/speedstep-centrino.c         | 24 ++-------
+>  drivers/cpufreq/speedstep-ich.c              | 12 +----
+>  drivers/cpufreq/speedstep-smi.c              |  5 +-
+>  include/linux/cpufreq.h                      |  4 +-
+>  51 files changed, 232 insertions(+), 337 deletions(-)
+[...]
+> diff --git a/arch/blackfin/mach-common/cpufreq.c b/arch/blackfin/mach-common/cpufreq.c
+> index d88bd31..4e67368 100644
+> --- a/arch/blackfin/mach-common/cpufreq.c
+> +++ b/arch/blackfin/mach-common/cpufreq.c
+> @@ -127,13 +127,13 @@ unsigned long cpu_set_cclk(int cpu, unsigned long new)
+>  }
+>  #endif
+>  
+> -static int bfin_target(struct cpufreq_policy *poli,
+> +static int bfin_target(struct cpufreq_policy *policy,
+>  			unsigned int target_freq, unsigned int relation)
+>  {
+>  #ifndef CONFIG_BF60x
+>  	unsigned int plldiv;
+>  #endif
+> -	unsigned int index, cpu;
+> +	unsigned int index;
+>  	unsigned long cclk_hz;
+>  	struct cpufreq_freqs freqs;
+>  	static unsigned long lpj_ref;
+> @@ -144,59 +144,48 @@ static int bfin_target(struct cpufreq_policy *poli,
+>  	cycles_t cycles;
+>  #endif
+>  
+> -	for_each_online_cpu(cpu) {
+> -		struct cpufreq_policy *policy = cpufreq_cpu_get(cpu);
+> +	if (cpufreq_frequency_table_target(policy, bfin_freq_table, target_freq,
+> +				relation, &index))
+> +		return -EINVAL;
+>  
+> -		if (!policy)
+> -			continue;
+> +	cclk_hz = bfin_freq_table[index].frequency;
+>  
+> -		if (cpufreq_frequency_table_target(policy, bfin_freq_table,
+> -				 target_freq, relation, &index))
+> -			return -EINVAL;
+> +	freqs.old = bfin_getfreq_khz(0);
+> +	freqs.new = cclk_hz;
+>  
+> -		cclk_hz = bfin_freq_table[index].frequency;
+> +	pr_debug("cpufreq: changing cclk to %lu; target = %u, oldfreq = %u\n",
+> +			cclk_hz, target_freq, freqs.old);
+>  
+> -		freqs.old = bfin_getfreq_khz(0);
+> -		freqs.new = cclk_hz;
+> -		freqs.cpu = cpu;
+> -
+> -		pr_debug("cpufreq: changing cclk to %lu; target = %u, oldfreq = %u\n",
+> -			 cclk_hz, target_freq, freqs.old);
+> -
+> -		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+> -		if (cpu == CPUFREQ_CPU) {
+> +	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
+>  #ifndef CONFIG_BF60x
+> -			plldiv = (bfin_read_PLL_DIV() & SSEL) |
+> -						dpm_state_table[index].csel;
+> -			bfin_write_PLL_DIV(plldiv);
+> +	plldiv = (bfin_read_PLL_DIV() & SSEL) | dpm_state_table[index].csel;
+> +	bfin_write_PLL_DIV(plldiv);
+>  #else
+> -			ret = cpu_set_cclk(cpu, freqs.new * 1000);
+> -			if (ret != 0) {
+> -				WARN_ONCE(ret, "cpufreq set freq failed %d\n", ret);
+> -				break;
+> -			}
+> +	ret = cpu_set_cclk(policy->cpu, freqs.new * 1000);
+> +	if (ret != 0) {
+> +		WARN_ONCE(ret, "cpufreq set freq failed %d\n", ret);
+> +		break;
 
-Are you sure?  After reverting the patch on next-20130322, I can get
-imx28 resume back to console as below.
+This doesn't even compile, as the break statement isn't in the
+for_each_online_cpu() loop anymore.
 
-Shawn
-
-root at freescale ~$ echo mem > /sys/power/state
-[   20.943170] PM: Syncing filesystems ... done.
-[   20.976303] Freezing user space processes ... (elapsed 0.01 seconds) done.
-[   20.998050] Freezing remaining freezable tasks ... (elapsed 0.01 seconds) done.
-[   21.025647] PM: suspend of devices complete after 6.283 msecs
-[   21.032543] PM: late suspend of devices complete after 1.092 msecs
-[   21.040489] PM: noirq suspend of devices complete after 1.603 msecs
-[   21.048045] PM: noirq resume of devices complete after 0.794 msecs
-[   21.055891] PM: early resume of devices complete after 1.088 msecs
-[   21.167790] PM: resume of devices complete after 105.641 msecs
-[   21.174939] Restarting tasks ... done.
-root at freescale ~$
+--
+Francesco
