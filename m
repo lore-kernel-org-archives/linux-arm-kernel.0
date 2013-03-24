@@ -1,32 +1,39 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sun, 24 Mar 2013 21:13:37 +0000
-Subject: [PATCH v10 0/12] Palmas updates
-In-Reply-To: <20130323060455.78a4c90c3f1e028434818fd1@canb.auug.org.au>
-References: <1363964122-19201-1-git-send-email-ian@slimlogic.co.uk>
- <20130323060455.78a4c90c3f1e028434818fd1@canb.auug.org.au>
-Message-ID: <20130324211336.GA18316@opensource.wolfsonmicro.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sun, 24 Mar 2013 16:14:57 -0500
+Subject: [PATCH] ARM: l2x0: don't set .set_debug in l310 case
+In-Reply-To: <1364149654-16163-1-git-send-email-p.pisati@gmail.com>
+References: <1364149654-16163-1-git-send-email-p.pisati@gmail.com>
+Message-ID: <514F6CD1.5010409@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 23, 2013 at 06:04:55AM +1100, Stephen Rothwell wrote:
-> On Fri, 22 Mar 2013 14:55:10 +0000 Ian Lartey <ian@slimlogic.co.uk> wrote:
+On 03/24/2013 01:27 PM, Paolo Pisati wrote:
+> From: Paolo Pisati <paolo.pisati@canonical.com>
+> 
+> commit 74ddcdb ("l2x0: Only set .set_debug on PL310 r3p0 and earlier")
+> to actually work needs .set_debug to be not set during definition
+> 
+> Signed-off-by: Paolo Pisati <p.pisati@gmail.com>
 
-> > Patches based on linux-next-20130319
+Ah crap, missed this part. Can I add this into my fix and I'll put it in
+Russell's patch system.
 
-> I can't really comment on the patch set except to say that you should not
-> base on linux-next, you should base on the tree to which you expect the
-> patch set to be applied.
+Rob
 
-It's fairly common to suggest to people working over lots of subsystems
-like this that they use -next since for most subsystems it contains the
-trees that should be submitted against and it's much more efficient.
-This works OK most of the time when people are posting patches as
-opposed to pull requests, though obviously cross tree issues do happen
-from time to time.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130324/e88a0cbc/attachment.sig>
+> ---
+>  arch/arm/mm/cache-l2x0.c |    1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+> index d457653..37f1364 100644
+> --- a/arch/arm/mm/cache-l2x0.c
+> +++ b/arch/arm/mm/cache-l2x0.c
+> @@ -724,7 +724,6 @@ static const struct l2x0_of_data pl310_data = {
+>  		.flush_all   = l2x0_flush_all,
+>  		.inv_all     = l2x0_inv_all,
+>  		.disable     = l2x0_disable,
+> -		.set_debug   = pl310_set_debug,
+>  	},
+>  };
+>  
+> 
