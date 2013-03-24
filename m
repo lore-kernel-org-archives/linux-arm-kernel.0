@@ -1,37 +1,32 @@
-From: davem@davemloft.net (David Miller)
-Date: Sun, 24 Mar 2013 17:07:26 -0400 (EDT)
-Subject: [PATCH 0/2] Fix for mv643xx_eth built as module
-In-Reply-To: <201303242148.33842.florian@openwrt.org>
-References: <1364157240-28883-1-git-send-email-gmbnomis@gmail.com>
- <201303242148.33842.florian@openwrt.org>
-Message-ID: <20130324.170726.2271831814087007906.davem@davemloft.net>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sun, 24 Mar 2013 21:13:37 +0000
+Subject: [PATCH v10 0/12] Palmas updates
+In-Reply-To: <20130323060455.78a4c90c3f1e028434818fd1@canb.auug.org.au>
+References: <1363964122-19201-1-git-send-email-ian@slimlogic.co.uk>
+ <20130323060455.78a4c90c3f1e028434818fd1@canb.auug.org.au>
+Message-ID: <20130324211336.GA18316@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Florian Fainelli <florian@openwrt.org>
-Date: Sun, 24 Mar 2013 21:48:33 +0100
+On Sat, Mar 23, 2013 at 06:04:55AM +1100, Stephen Rothwell wrote:
+> On Fri, 22 Mar 2013 14:55:10 +0000 Ian Lartey <ian@slimlogic.co.uk> wrote:
 
-> Hello Simon,
-> 
-> Le dimanche 24 mars 2013 21:33:58, Simon Baatz a ?crit :
->> Recently [1], mv643xx_eth was changed to make use of mvmdio. However,
->> this change introduces two problems when mvmdio and mv643xx_eth are
->> built as modules:
->> 
->> - mvmdio is not loaded automatically by udev
->> - mv643xx_eth oopses when it can't find its PHY, i.e. when mvmdio is
->>   not yet loaded
->> 
->> The first problem can be fixed easily by adding a module alias for the
->> respective platform device.  The proposed fix for the second problem
->> uses EPROBE_DEFER as suggested by Thomas Petazzoni when the driver
->> can't find its PHY.
->> 
->> These patches apply on top of Florian Fainelli's patchset. They have
->> been tested on Marvel Kirkwood non-DT.
-> 
-> Both fixes look good to me, thanks for fixing this!
-> 
-> Acked-by: Florian Fainelli <florian@openwrt.org>
+> > Patches based on linux-next-20130319
 
-All applied, thanks.
+> I can't really comment on the patch set except to say that you should not
+> base on linux-next, you should base on the tree to which you expect the
+> patch set to be applied.
+
+It's fairly common to suggest to people working over lots of subsystems
+like this that they use -next since for most subsystems it contains the
+trees that should be submitted against and it's much more efficient.
+This works OK most of the time when people are posting patches as
+opposed to pull requests, though obviously cross tree issues do happen
+from time to time.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130324/e88a0cbc/attachment.sig>
