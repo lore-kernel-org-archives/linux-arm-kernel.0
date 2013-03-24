@@ -1,39 +1,36 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 24 Mar 2013 16:14:57 -0500
-Subject: [PATCH] ARM: l2x0: don't set .set_debug in l310 case
-In-Reply-To: <1364149654-16163-1-git-send-email-p.pisati@gmail.com>
-References: <1364149654-16163-1-git-send-email-p.pisati@gmail.com>
-Message-ID: <514F6CD1.5010409@gmail.com>
+From: khc@pm.waw.pl (Krzysztof Halasa)
+Date: Sun, 24 Mar 2013 22:15:36 +0100
+Subject: [PATCH] Fix IXP4xx coherent allocations
+In-Reply-To: <1364152267.3620.31.camel@deadeye.wl.decadent.org.uk> (Ben
+ Hutchings's message of "Sun, 24 Mar 2013 19:11:07 +0000")
+References: <m3obe9lxil.fsf@intrepid.localdomain>
+ <20130323.195740.2108147521543354261.davem@davemloft.net>
+ <1364152267.3620.31.camel@deadeye.wl.decadent.org.uk>
+Message-ID: <m3r4j4sdmv.fsf@intrepid.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/24/2013 01:27 PM, Paolo Pisati wrote:
-> From: Paolo Pisati <paolo.pisati@canonical.com>
-> 
-> commit 74ddcdb ("l2x0: Only set .set_debug on PL310 r3p0 and earlier")
-> to actually work needs .set_debug to be not set during definition
-> 
-> Signed-off-by: Paolo Pisati <p.pisati@gmail.com>
+Ben Hutchings <bhutchings@solarflare.com> writes:
 
-Ah crap, missed this part. Can I add this into my fix and I'll put it in
-Russell's patch system.
+> I'm failing to see where it says the default can't be narrower than 32
+> bits due to platform limits.  And how do you think DMA mapping is
+> supposed to work for PCI devices on these platforms, anyway?
 
-Rob
+The problem on ARM (and probably on powerpc, and on something called
+"metag" - grep -r 'coherent DMA mask is unset' arch) is that the default
+coherent DMA mask is zero. IOW, coherent DMA allocations are, by
+default, disabled. A driver has to dma_set_coherent_mask() or, as many
+drivers do, set dev->coherent_dma_mask directly (IMHO
+dev->coherent_dma_mask along with dev->dma_mask are private DMA API
+stuff and e.g. device drivers have no interest there).
 
-> ---
->  arch/arm/mm/cache-l2x0.c |    1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-> index d457653..37f1364 100644
-> --- a/arch/arm/mm/cache-l2x0.c
-> +++ b/arch/arm/mm/cache-l2x0.c
-> @@ -724,7 +724,6 @@ static const struct l2x0_of_data pl310_data = {
->  		.flush_all   = l2x0_flush_all,
->  		.inv_all     = l2x0_inv_all,
->  		.disable     = l2x0_disable,
-> -		.set_debug   = pl310_set_debug,
->  	},
->  };
->  
-> 
+The zero default is IMHO, WRT the actual DMA API, an ARM bug (and
+powerpc's etc). Nevertheless, the patch I posted does everything as
+required by the API. Specifically, the IXP4xx arch part makes
+IXP4xx's dma_set_coherent_mask() compliant with DMA API, and the actual
+dma_set_coherent_mask() calls in drivers are both valid and I guess
+recommended by the API.
+
+The patch doesn't touch the core ARM issue, that's right.
+-- 
+Krzysztof Halasa
