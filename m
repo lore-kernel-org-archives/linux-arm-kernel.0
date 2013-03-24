@@ -1,36 +1,21 @@
-From: khc@pm.waw.pl (Krzysztof Halasa)
-Date: Sun, 24 Mar 2013 22:15:36 +0100
-Subject: [PATCH] Fix IXP4xx coherent allocations
-In-Reply-To: <1364152267.3620.31.camel@deadeye.wl.decadent.org.uk> (Ben
- Hutchings's message of "Sun, 24 Mar 2013 19:11:07 +0000")
-References: <m3obe9lxil.fsf@intrepid.localdomain>
- <20130323.195740.2108147521543354261.davem@davemloft.net>
- <1364152267.3620.31.camel@deadeye.wl.decadent.org.uk>
-Message-ID: <m3r4j4sdmv.fsf@intrepid.localdomain>
+From: davem@davemloft.net (David Miller)
+Date: Sun, 24 Mar 2013 17:17:38 -0400 (EDT)
+Subject: [PATCH net-next] dsa: add device tree bindings to register DSA
+ switches
+In-Reply-To: <2044972.NvctqPqDPo@bender>
+References: <2044972.NvctqPqDPo@bender>
+Message-ID: <20130324.171738.301089541347666424.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ben Hutchings <bhutchings@solarflare.com> writes:
+From: Florian Fainelli <florian@openwrt.org>
+Date: Fri, 22 Mar 2013 21:50:50 +0100
 
-> I'm failing to see where it says the default can't be narrower than 32
-> bits due to platform limits.  And how do you think DMA mapping is
-> supposed to work for PCI devices on these platforms, anyway?
+> This patch adds support for registering DSA switches using Device Tree
+> bindings. Note that we support programming the switch routing table even
+> though no in-tree user seems to require it. I tested this on Armada 370
+> with a Marvell 88E6172 (not supported by mainline yet).
+> 
+> Signed-off-by: Florian Fainelli <florian@openwrt.org>
 
-The problem on ARM (and probably on powerpc, and on something called
-"metag" - grep -r 'coherent DMA mask is unset' arch) is that the default
-coherent DMA mask is zero. IOW, coherent DMA allocations are, by
-default, disabled. A driver has to dma_set_coherent_mask() or, as many
-drivers do, set dev->coherent_dma_mask directly (IMHO
-dev->coherent_dma_mask along with dev->dma_mask are private DMA API
-stuff and e.g. device drivers have no interest there).
-
-The zero default is IMHO, WRT the actual DMA API, an ARM bug (and
-powerpc's etc). Nevertheless, the patch I posted does everything as
-required by the API. Specifically, the IXP4xx arch part makes
-IXP4xx's dma_set_coherent_mask() compliant with DMA API, and the actual
-dma_set_coherent_mask() calls in drivers are both valid and I guess
-recommended by the API.
-
-The patch doesn't touch the core ARM issue, that's right.
--- 
-Krzysztof Halasa
+Applied.
