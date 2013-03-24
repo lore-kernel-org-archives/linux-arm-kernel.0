@@ -1,76 +1,216 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Sun, 24 Mar 2013 20:23:27 +0530
-Subject: [PATCH 1/2] cpufreq: Notify all policy->cpus in
- cpufreq_notify_transition()
-In-Reply-To: <514F0FB0.8030109@gmail.com>
-References: <981c23bd4b2a14c346820685e1203ab7054378f8.1364132845.git.viresh.kumar@linaro.org>
- <514F0FB0.8030109@gmail.com>
-Message-ID: <CAKohpomznLtxYZYx31xg+V5FesNiMwOqNDN0QNqOqUw_7g4Uhw@mail.gmail.com>
+From: hechtb@gmail.com (Bastian Hecht)
+Date: Sun, 24 Mar 2013 16:54:35 +0100
+Subject: [PATCH] irqchip: intc-irqpin: Add support for shared interrupt lines
+Message-ID: <1364140475-27350-1-git-send-email-hechtb+renesas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 March 2013 20:07, Francesco Lavra <francescolavra.fl@gmail.com> wrote:
-> On 03/24/2013 02:48 PM, Viresh Kumar wrote:
->> policy->cpus contains all online cpus that have single shared clock line. And
->> their frequencies are always updated together.
->>
->> Many SMP system's cpufreq drivers take care of this in individual drivers but
->> the best place for this code is in cpufreq core.
->>
->> This patch modifies cpufreq_notify_transition() to notify frequency change for
->> all cpus in policy->cpus and hence updates all users of this API.
+On some hardware we don't have a 1-1 mapping from the external
+interrupts coming from INTC to the GIC SPI pins. We can however
+share lines to demux incoming IRQs on these SoCs.
 
-One thing about this work. I compiled it for ARM and Intel. Also this
-stuff is tested
-by "Fengguang Wu" <fengguang.wu@intel.com> automated build system.
+This patch enables the intc_irqpin driver to detect requests for shared
+interrupt lines and demuxes them properly by querying the INTC INTREQx0A
+registers.
 
-I am not sure if that builds all architectures or not.
-I tried to review my patch closely but their can be some minor mistakes.
+As multiple driver instances can use the same shared interrupt line, we
+need to pay extra attention during the device probing to exclude IRQ
+floods that would be caused by interrupts for which no handler has been
+set up yet.
 
-I thought of adding this in the patch details but forgot at last.
-
-Is their a simple way to compile stuff for all platforms? Sorry i am
-not aware of
-it :(
-
->> diff --git a/arch/blackfin/mach-common/cpufreq.c b/arch/blackfin/mach-common/cpufreq.c
->> +     ret = cpu_set_cclk(policy->cpu, freqs.new * 1000);
->> +     if (ret != 0) {
->> +             WARN_ONCE(ret, "cpufreq set freq failed %d\n", ret);
->> +             break;
->
-> This doesn't even compile, as the break statement isn't in the
-> for_each_online_cpu() loop anymore.
-
-I tried to review it very carefully but this situation was a bit tricky :)
-Thanks for trying it out.
-
-Following should fix it for you:
-
-commit 942ca8a6bc87e3c42beabc9102755136493e5355
-Author: Viresh Kumar <viresh.kumar@linaro.org>
-Date:   Sun Mar 24 20:21:43 2013 +0530
-
-    fixup! cpufreq: Notify all policy->cpus in cpufreq_notify_transition()
+Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
 ---
- arch/blackfin/mach-common/cpufreq.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/irqchip/irq-renesas-intc-irqpin.c |  110 ++++++++++++++++++++++++++---
+ 1 file changed, 101 insertions(+), 9 deletions(-)
 
-diff --git a/arch/blackfin/mach-common/cpufreq.c
-b/arch/blackfin/mach-common/cpufreq.c
-index 4e67368..995511e80 100644
---- a/arch/blackfin/mach-common/cpufreq.c
-+++ b/arch/blackfin/mach-common/cpufreq.c
-@@ -164,7 +164,7 @@ static int bfin_target(struct cpufreq_policy *policy,
-        ret = cpu_set_cclk(policy->cpu, freqs.new * 1000);
-        if (ret != 0) {
-                WARN_ONCE(ret, "cpufreq set freq failed %d\n", ret);
--               break;
-+               return ret;
-        }
- #endif
-        on_each_cpu(bfin_adjust_core_timer, &index, 1);
-
-
-@Rafael: Let me add fixups for now, i will send final patch later after others
-also review their part.
+diff --git a/drivers/irqchip/irq-renesas-intc-irqpin.c b/drivers/irqchip/irq-renesas-intc-irqpin.c
+index fd5dabc..b6fc6a6 100644
+--- a/drivers/irqchip/irq-renesas-intc-irqpin.c
++++ b/drivers/irqchip/irq-renesas-intc-irqpin.c
+@@ -74,8 +74,11 @@ struct intc_irqpin_priv {
+ 	struct platform_device *pdev;
+ 	struct irq_chip irq_chip;
+ 	struct irq_domain *irq_domain;
++	u8 shared_irq_mask;
+ };
+ 
++enum { IRQ_SCAN_START, IRQ_SCAN_SHARED, IRQ_SCAN_SINGLE, IRQ_SCAN_ERROR };
++
+ static unsigned long intc_irqpin_read32(void __iomem *iomem)
+ {
+ 	return ioread32(iomem);
+@@ -182,6 +185,8 @@ static void intc_irqpin_irq_enable(struct irq_data *d)
+ 
+ 	intc_irqpin_dbg(&p->irq[hw_irq], "enable");
+ 	intc_irqpin_irq_write_hwirq(p, INTC_IRQPIN_REG_CLEAR, hw_irq);
++
++	p->shared_irq_mask &= ~BIT(hw_irq);
+ }
+ 
+ static void intc_irqpin_irq_disable(struct irq_data *d)
+@@ -191,6 +196,8 @@ static void intc_irqpin_irq_disable(struct irq_data *d)
+ 
+ 	intc_irqpin_dbg(&p->irq[hw_irq], "disable");
+ 	intc_irqpin_irq_write_hwirq(p, INTC_IRQPIN_REG_MASK, hw_irq);
++
++	p->shared_irq_mask |= BIT(hw_irq);
+ }
+ 
+ static void intc_irqpin_irq_enable_force(struct irq_data *d)
+@@ -261,8 +268,27 @@ static irqreturn_t intc_irqpin_irq_handler(int irq, void *dev_id)
+ 	return IRQ_NONE;
+ }
+ 
++static irqreturn_t intc_irqpin_shared_irq_handler(int irq, void *dev_id)
++{
++	struct intc_irqpin_priv *p = dev_id;
++	unsigned int reg_source = intc_irqpin_read(p, INTC_IRQPIN_REG_SOURCE);
++	irqreturn_t status = IRQ_NONE;
++	int k;
++
++	for (k = 0; k < 8; k++) {
++		if (reg_source & BIT(7 - k)) {
++			if (BIT(k) & p->shared_irq_mask)
++				continue;
++
++			status |= intc_irqpin_irq_handler(irq, &p->irq[k]);
++		}
++	}
++
++	return status;
++}
++
+ static int intc_irqpin_irq_domain_map(struct irq_domain *h, unsigned int virq,
+-				      irq_hw_number_t hw)
++					irq_hw_number_t hw)
+ {
+ 	struct intc_irqpin_priv *p = h->host_data;
+ 
+@@ -278,7 +304,7 @@ static int intc_irqpin_irq_domain_map(struct irq_domain *h, unsigned int virq,
+ 
+ static struct irq_domain_ops intc_irqpin_irq_domain_ops = {
+ 	.map	= intc_irqpin_irq_domain_map,
+-	.xlate  = irq_domain_xlate_twocell,
++	.xlate	= irq_domain_xlate_twocell,
+ };
+ 
+ static int intc_irqpin_probe(struct platform_device *pdev)
+@@ -292,6 +318,8 @@ static int intc_irqpin_probe(struct platform_device *pdev)
+ 	void (*enable_fn)(struct irq_data *d);
+ 	void (*disable_fn)(struct irq_data *d);
+ 	const char *name = dev_name(&pdev->dev);
++	int scan_status;
++	int reg_prio;
+ 	int ret;
+ 	int k;
+ 
+@@ -369,9 +397,13 @@ static int intc_irqpin_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	/* mask all interrupts using priority */
++	reg_prio = intc_irqpin_read(p, INTC_IRQPIN_REG_PRIO);
+ 	for (k = 0; k < p->number_of_irqs; k++)
+ 		intc_irqpin_mask_unmask_prio(p, k, 1);
+ 
++	/* clear all pending interrupts */
++	intc_irqpin_write(p, INTC_IRQPIN_REG_SOURCE, 0x0);
++
+ 	/* use more severe masking method if requested */
+ 	if (p->config.control_parent) {
+ 		enable_fn = intc_irqpin_irq_enable_force;
+@@ -400,18 +432,78 @@ static int intc_irqpin_probe(struct platform_device *pdev)
+ 		goto err0;
+ 	}
+ 
+-	/* request and set priority on interrupts one by one */
+-	for (k = 0; k < p->number_of_irqs; k++) {
+-		if (devm_request_irq(&pdev->dev, p->irq[k].requested_irq,
+-				     intc_irqpin_irq_handler,
+-				     0, name, &p->irq[k])) {
++	/* scan for shared interrupt lines */
++	scan_status = IRQ_SCAN_START;
++	for (k = 1; k < p->number_of_irqs; k++) {
++		if (p->irq[k].requested_irq == p->irq[0].requested_irq) {
++			if (scan_status == IRQ_SCAN_SINGLE) {
++				scan_status = IRQ_SCAN_ERROR;
++				break;
++			}
++			scan_status = IRQ_SCAN_SHARED;
++		} else {
++			if (scan_status == IRQ_SCAN_SHARED) {
++				scan_status = IRQ_SCAN_ERROR;
++				break;
++			}
++			scan_status = IRQ_SCAN_SINGLE;
++		}
++	}
++
++	switch (scan_status) {
++	case IRQ_SCAN_START:	/* means we got only 1 interrupt */
++	case IRQ_SCAN_SINGLE:
++		/* request interrupts one by one */
++		for (k = 0; k < p->number_of_irqs; k++) {
++			if (devm_request_irq(&pdev->dev,
++					p->irq[k].requested_irq,
++					intc_irqpin_irq_handler,
++					0, name, &p->irq[k])) {
++				dev_err(&pdev->dev,
++					"failed to request low IRQ\n");
++				ret = -ENOENT;
++				goto err1;
++			}
++		}
++		break;
++
++	case IRQ_SCAN_SHARED:
++		/* request one shared interrupt
++		 *
++		 * On some hardware (like r8a7740) the shared interrupt only
++		 * is silent if we mask out REG_PRIO *and* REG_MASK. To save
++		 * the user from an IRQ-flood when using multiple intc_irqpin
++		 * instances in a shared fashion, we enforce this masking a
++		 * priori.
++		 */
++		p->shared_irq_mask = intc_irqpin_read(p, INTC_IRQPIN_REG_MASK);
++		if (p->shared_irq_mask != 0xff || reg_prio != 0x00) {
++			dev_err(&pdev->dev,
++				"expected all interrupts to be masked out "\
++				"when using shared interrupts\n");
++			ret = -EINVAL;
++			goto err1;
++		}
++		if (devm_request_irq(&pdev->dev, p->irq[0].requested_irq,
++				intc_irqpin_shared_irq_handler,
++				IRQF_SHARED, name, p)) {
+ 			dev_err(&pdev->dev, "failed to request low IRQ\n");
+ 			ret = -ENOENT;
+ 			goto err1;
+ 		}
+-		intc_irqpin_mask_unmask_prio(p, k, 0);
++		break;
++
++	case IRQ_SCAN_ERROR:
++		dev_err(&pdev->dev,
++			"mixing single and shared IRQ lines not supported\n");
++		ret = -EINVAL;
++		goto err0;
+ 	}
+ 
++	/* unmask all interrupts on prio level */
++	for (k = 0; k < p->number_of_irqs; k++)
++		intc_irqpin_mask_unmask_prio(p, k, 0);
++
+ 	dev_info(&pdev->dev, "driving %d irqs\n", p->number_of_irqs);
+ 
+ 	/* warn in case of mismatch if irq base is specified */
+@@ -450,7 +542,7 @@ static struct platform_driver intc_irqpin_device_driver = {
+ 	.driver		= {
+ 		.name	= "renesas_intc_irqpin",
+ 		.of_match_table = intc_irqpin_dt_ids,
+-		.owner  = THIS_MODULE,
++		.owner	= THIS_MODULE,
+ 	}
+ };
+ 
+-- 
+1.7.9.5
