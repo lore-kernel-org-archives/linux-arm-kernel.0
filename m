@@ -1,101 +1,76 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Sun, 24 Mar 2013 15:45:30 +0100
-Subject: [PATCH v2 2/2] ARM: Orion: add dbg_show function to gpio-orion driver
-In-Reply-To: <1364136330-28193-1-git-send-email-simon.guinot@sequanux.org>
-References: <1364136330-28193-1-git-send-email-simon.guinot@sequanux.org>
-Message-ID: <1364136330-28193-3-git-send-email-simon.guinot@sequanux.org>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Sun, 24 Mar 2013 20:23:27 +0530
+Subject: [PATCH 1/2] cpufreq: Notify all policy->cpus in
+ cpufreq_notify_transition()
+In-Reply-To: <514F0FB0.8030109@gmail.com>
+References: <981c23bd4b2a14c346820685e1203ab7054378f8.1364132845.git.viresh.kumar@linaro.org>
+ <514F0FB0.8030109@gmail.com>
+Message-ID: <CAKohpomznLtxYZYx31xg+V5FesNiMwOqNDN0QNqOqUw_7g4Uhw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a dedicated dbg_show function to the gpio-mvebu driver.
-In addition to the generic gpiolib informations, this function displays
-informations related with the specific Marvell registers (blink enable,
-data in polarity, interrupt masks and cause).
+On 24 March 2013 20:07, Francesco Lavra <francescolavra.fl@gmail.com> wrote:
+> On 03/24/2013 02:48 PM, Viresh Kumar wrote:
+>> policy->cpus contains all online cpus that have single shared clock line. And
+>> their frequencies are always updated together.
+>>
+>> Many SMP system's cpufreq drivers take care of this in individual drivers but
+>> the best place for this code is in cpufreq core.
+>>
+>> This patch modifies cpufreq_notify_transition() to notify frequency change for
+>> all cpus in policy->cpus and hence updates all users of this API.
 
-Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+One thing about this work. I compiled it for ARM and Intel. Also this
+stuff is tested
+by "Fengguang Wu" <fengguang.wu@intel.com> automated build system.
+
+I am not sure if that builds all architectures or not.
+I tried to review my patch closely but their can be some minor mistakes.
+
+I thought of adding this in the patch details but forgot at last.
+
+Is their a simple way to compile stuff for all platforms? Sorry i am
+not aware of
+it :(
+
+>> diff --git a/arch/blackfin/mach-common/cpufreq.c b/arch/blackfin/mach-common/cpufreq.c
+>> +     ret = cpu_set_cclk(policy->cpu, freqs.new * 1000);
+>> +     if (ret != 0) {
+>> +             WARN_ONCE(ret, "cpufreq set freq failed %d\n", ret);
+>> +             break;
+>
+> This doesn't even compile, as the break statement isn't in the
+> for_each_online_cpu() loop anymore.
+
+I tried to review it very carefully but this situation was a bit tricky :)
+Thanks for trying it out.
+
+Following should fix it for you:
+
+commit 942ca8a6bc87e3c42beabc9102755136493e5355
+Author: Viresh Kumar <viresh.kumar@linaro.org>
+Date:   Sun Mar 24 20:21:43 2013 +0530
+
+    fixup! cpufreq: Notify all policy->cpus in cpufreq_notify_transition()
 ---
-Changes for v2:
- - In order to match registers type, swith msk type to u32.
+ arch/blackfin/mach-common/cpufreq.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- arch/arm/plat-orion/gpio.c |   59 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 59 insertions(+)
-
-diff --git a/arch/arm/plat-orion/gpio.c b/arch/arm/plat-orion/gpio.c
-index c29ee7e..e39c2ba 100644
---- a/arch/arm/plat-orion/gpio.c
-+++ b/arch/arm/plat-orion/gpio.c
-@@ -439,6 +439,64 @@ static void gpio_irq_handler(unsigned irq, struct irq_desc *desc)
- 	}
- }
- 
-+#ifdef CONFIG_DEBUG_FS
-+#include <linux/seq_file.h>
-+
-+static void orion_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
-+{
-+	struct orion_gpio_chip *ochip =
-+		container_of(chip, struct orion_gpio_chip, chip);
-+	u32 out, io_conf, blink, in_pol, data_in, cause, edg_msk, lvl_msk;
-+	int i;
-+
-+	out	= readl_relaxed(GPIO_OUT(ochip));
-+	io_conf	= readl_relaxed(GPIO_IO_CONF(ochip));
-+	blink	= readl_relaxed(GPIO_BLINK_EN(ochip));
-+	in_pol	= readl_relaxed(GPIO_IN_POL(ochip));
-+	data_in	= readl_relaxed(GPIO_DATA_IN(ochip));
-+	cause	= readl_relaxed(GPIO_EDGE_CAUSE(ochip));
-+	edg_msk	= readl_relaxed(GPIO_EDGE_MASK(ochip));
-+	lvl_msk	= readl_relaxed(GPIO_LEVEL_MASK(ochip));
-+
-+	for (i = 0; i < chip->ngpio; i++) {
-+		const char *label;
-+		u32 msk;
-+		bool is_out;
-+
-+		label = gpiochip_is_requested(chip, i);
-+		if (!label)
-+			continue;
-+
-+		msk = 1 << i;
-+		is_out = !(io_conf & msk);
-+
-+		seq_printf(s, " gpio-%-3d (%-20.20s)", chip->base + i, label);
-+
-+		if (is_out) {
-+			seq_printf(s, " out %s %s\n",
-+				   out & msk ? "hi" : "lo",
-+				   blink & msk ? "(blink )" : "");
-+			continue;
-+		}
-+
-+		seq_printf(s, " in  %s (act %s) - IRQ",
-+			   (data_in ^ in_pol) & msk  ? "hi" : "lo",
-+			   in_pol & msk ? "lo" : "hi");
-+		if (!((edg_msk | lvl_msk) & msk)) {
-+			seq_printf(s, " disabled\n");
-+			continue;
-+		}
-+		if (edg_msk & msk)
-+			seq_printf(s, " edge ");
-+		if (lvl_msk & msk)
-+			seq_printf(s, " level");
-+		seq_printf(s, " (%s)\n", cause & msk ? "pending" : "clear  ");
-+	}
-+}
-+#else
-+#define orion_gpio_dbg_show NULL
-+#endif
-+
- void __init orion_gpio_init(struct device_node *np,
- 			    int gpio_base, int ngpio,
- 			    void __iomem *base, int mask_offset,
-@@ -471,6 +529,7 @@ void __init orion_gpio_init(struct device_node *np,
- #ifdef CONFIG_OF
- 	ochip->chip.of_node = np;
+diff --git a/arch/blackfin/mach-common/cpufreq.c
+b/arch/blackfin/mach-common/cpufreq.c
+index 4e67368..995511e80 100644
+--- a/arch/blackfin/mach-common/cpufreq.c
++++ b/arch/blackfin/mach-common/cpufreq.c
+@@ -164,7 +164,7 @@ static int bfin_target(struct cpufreq_policy *policy,
+        ret = cpu_set_cclk(policy->cpu, freqs.new * 1000);
+        if (ret != 0) {
+                WARN_ONCE(ret, "cpufreq set freq failed %d\n", ret);
+-               break;
++               return ret;
+        }
  #endif
-+	ochip->chip.dbg_show = orion_gpio_dbg_show;
- 
- 	spin_lock_init(&ochip->lock);
- 	ochip->base = (void __iomem *)base;
--- 
-1.7.10.4
+        on_each_cpu(bfin_adjust_core_timer, &index, 1);
+
+
+@Rafael: Let me add fixups for now, i will send final patch later after others
+also review their part.
