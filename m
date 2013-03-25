@@ -1,56 +1,51 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 25 Mar 2013 23:22:49 +0800
-Subject: [PATCH 1/3] ARM: mxs: get icoll base address from device tree
-In-Reply-To: <1364224971-28431-1-git-send-email-shawn.guo@linaro.org>
-References: <1364224971-28431-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1364224971-28431-2-git-send-email-shawn.guo@linaro.org>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Mon, 25 Mar 2013 12:27:05 -0300
+Subject: [PATCH for 3.10 0/4] thermal: Add Armada 370/XP support
+Message-ID: <1364225229-2857-1-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rather than using the static definition, it gets icoll base address
-with mapping from device tree.
+After Andrew Lunn objected the single driver approach [1] that merged
+all the Marvell EBU SoC thermal drivers, we have agreed to proceed step
+by step. For the time being we are adding support for Armada 370/XP only.
+Given both Armada 370 and Armada XP have a similar feature set, it
+makes sense to provide a single driver for them.
 
-As the result, <mach/mxs.h> inclusion can be removed from the driver
-now.
+In the future we can unify this with the other drivers,
+if this proves to be worthwhile.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/mach-mxs/icoll.c |    7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+This driver has been influenced by the existing Kirkwood driver,
+also taking account of suggestions made by Jason Gunthorpe.
 
-diff --git a/arch/arm/mach-mxs/icoll.c b/arch/arm/mach-mxs/icoll.c
-index e26eeba..1cf32af 100644
---- a/arch/arm/mach-mxs/icoll.c
-+++ b/arch/arm/mach-mxs/icoll.c
-@@ -22,9 +22,9 @@
- #include <linux/irqdomain.h>
- #include <linux/io.h>
- #include <linux/of.h>
-+#include <linux/of_address.h>
- #include <linux/of_irq.h>
- #include <asm/exception.h>
--#include <mach/mxs.h>
- #include <mach/common.h>
- 
- #define HW_ICOLL_VECTOR				0x0000
-@@ -38,7 +38,7 @@
- 
- #define ICOLL_NUM_IRQS		128
- 
--static void __iomem *icoll_base = MXS_IO_ADDRESS(MXS_ICOLL_BASE_ADDR);
-+static void __iomem *icoll_base;
- static struct irq_domain *icoll_domain;
- 
- static void icoll_ack_irq(struct irq_data *d)
-@@ -103,6 +103,9 @@ static struct irq_domain_ops icoll_irq_domain_ops = {
- static void __init icoll_of_init(struct device_node *np,
- 			  struct device_node *interrupt_parent)
- {
-+	icoll_base = of_iomap(np, 0);
-+	WARN_ON(!icoll_base);
-+
- 	/*
- 	 * Interrupt Collector reset, which initializes the priority
- 	 * for each irq to level 0.
+Testing has been done on the following boards:
+
+For Armada 370: Globalscale Mirabox and Marvell Armada 370 RD
+For Armada XP:  Plat'home Openblocks AX3 and Marvell Armada XP DB-MV784MP-GP
+
+This series is based in v3.9-rc2. To make testing easier this patchset
+has been pushed on a github branch [2].
+
+Any feedback or comments are welcome!
+
+[1] http://permalink.gmane.org/gmane.linux.power-management.general/32123
+[2] https://github.com/MISL-EBU-System-SW/mainline-public/tree/armada-thermal
+
+Ezequiel Garcia (4):
+  thermal: Add driver for Armada 370/XP SoC thermal management
+  ARM: mvebu: Add thermal support to Armada XP device tree
+  ARM: mvebu: Add thermal support to Armada 370 device tree
+  ARM: configs: Update mvebu defconfig for thermal
+
+ .../devicetree/bindings/thermal/armada-thermal.txt |   22 ++
+ arch/arm/boot/dts/armada-370.dtsi                  |    6 +
+ arch/arm/boot/dts/armada-xp.dtsi                   |    6 +
+ arch/arm/configs/mvebu_defconfig                   |    2 +
+ drivers/thermal/Kconfig                            |    8 +
+ drivers/thermal/Makefile                           |    1 +
+ drivers/thermal/armada_thermal.c                   |  236 ++++++++++++++++++++
+ 7 files changed, 281 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/thermal/armada-thermal.txt
+ create mode 100644 drivers/thermal/armada_thermal.c
+
 -- 
-1.7.9.5
+1.7.8.6
