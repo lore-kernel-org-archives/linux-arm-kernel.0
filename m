@@ -1,68 +1,62 @@
-From: illia.ragozin@grapecom.com (Elijah Ragozin)
-Date: Mon, 25 Mar 2013 19:49:11 +0200
-Subject: [PATCH] [ARM] Feroceon: fix kexec by setting outer_cache.inv_all
-In-Reply-To: <20130325172113.GC16690@obsidianresearch.com>
-References: <514E0D70.3060202@grapecom.com>
- <20130325172113.GC16690@obsidianresearch.com>
-Message-ID: <51508E17.6010701@grapecom.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 25 Mar 2013 18:55:25 +0100
+Subject: [PATCH 00/15] ARM: cpuidle: code consolidation
+Message-ID: <1364234140-514-1-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
+The flag CPUIDLE_FLAG_TIMER_STOP has been introduced in the commit
+89878baa73f0f1c679355006bd8632e5d78f96c2.
 
-thanks for your answer.
+The flag tells the cpuidle framework the local timer will stop in the
+idle state.
 
-That's not about the boot path. I have zImage decompression error after 
-kexec.
+It is now easy to know if the cpuidle driver will use or not the broadcast
+timer by looking at the different states for this flag and then setup
+the broadcast timer consequently.
 
-So on this stage boot process is not started yet, enable_l2 is called 
-later - after zImage decompressed and started.
+When we remove the timer initialization duplicated code in the different
+drivers, we have most of the drivers with the same init function. This
+init function is changed to be generic and moved in the ARM cpuidle driver
+and used from the drivers. That cleanups code and removes a lot of annoying
+duplicated code.
 
-Please look at arch/arm/kernel/machine_kexec.c
-Just before the run the code which load and run the new kernel we do:
-         setup_mm_for_reboot(0);
-         flush_cache_all();
-         outer_flush_all(); // <- this has no map in cache-feroceon-l2.c 
-, do nothing
-         outer_disable(); // <- and this has no map in 
-cache-feroceon-l2.c , do nothing
-         cpu_proc_fin();
-         outer_inv_all(); // <- and my patch is supposed to add this 
-function, w/o the patch do nothing
-         flush_cache_all();
-         cpu_reset(reboot_code_buffer_phys);
+There is still some modification in OMAP4, tegra2, tegra3 and imx, especially
+around the coupled idle states, but we are more and more closer to a common
+squeleton for all the ARM drivers.
 
-So there is no actually disable and invalidation cache after the old 
-kernel finished and the new one is not started yet, we're not safe to 
-relocate and decompress the kernel.
+Daniel Lezcano (15):
+  timer: move enum definition out of ifdef section
+  cpuidle: initialize the broadcast timer framework
+  cpuidle: ux500: remove timer broadcast initialization
+  cpuidle: OMAP4: remove timer broadcast initialization
+  cpuidle: imx6: remove timer broadcast initialization
+  ARM: cpuidle: remove useless declaration
+  ARM: cpuidle: add init/exit routine
+  ARM: ux500: cpuidle: use init/exit common routine
+  ARM: at91: cpuidle: use init/exit common routine
+  ARM: OMAP3: cpuidle: use init/exit common routine
+  ARM: s3c64xx: cpuidle: use init/exit common routine
+  ARM: tegra1: cpuidle: use init/exit common routine
+  ARM: shmobile: pm: fix init sections
+  ARM: shmobile: cpuidle: remove useless WFI function
+  ARM: shmobile: cpuidle: use init/exit common routine
 
-If in your case everything is working could you please send for me 
-.config and your kernel version, probably I also miss smth.
-But I think the patch is necessary, it just adds the call of function 
-used for other ARMs, but missed for Feroceon.
---
-BR, Illia.
+ arch/arm/include/asm/cpuidle.h         |   11 +++---
+ arch/arm/kernel/cpuidle.c              |   57 +++++++++++++++++++++++++++++++-
+ arch/arm/mach-at91/cpuidle.c           |   17 ++--------
+ arch/arm/mach-imx/cpuidle-imx6q.c      |   15 ---------
+ arch/arm/mach-omap2/cpuidle34xx.c      |   18 ++--------
+ arch/arm/mach-omap2/cpuidle44xx.c      |   14 --------
+ arch/arm/mach-s3c64xx/cpuidle.c        |   15 ++-------
+ arch/arm/mach-shmobile/cpuidle.c       |   22 ++----------
+ arch/arm/mach-shmobile/pm-sh7372.c     |    4 +--
+ arch/arm/mach-tegra/cpuidle-tegra114.c |   27 +--------------
+ arch/arm/mach-ux500/cpuidle.c          |   50 +---------------------------
+ drivers/cpuidle/driver.c               |   35 ++++++++++++++++++--
+ include/linux/clockchips.h             |   22 ++++++------
+ include/linux/cpuidle.h                |    2 ++
+ 14 files changed, 120 insertions(+), 189 deletions(-)
 
-On 25.03.2013 19:21, Jason Gunthorpe wrote:
-> On Sat, Mar 23, 2013 at 10:15:44PM +0200, Elijah Ragozin wrote:
->> Hello,
->>
->> I have a simple fix for kexec on Marvell Feroceon SoC.
->> Originally created and tested on kernel version 2.6.39.2,
->> but appliable for the 3.9 kernel as well.
->> Could you pls review. The patch is below.
-> Hmm, I am using kexec on Kirkwood (a Feroceon SOC) and haven't had any
-> problems with L2 coherency.. What exactly goes wrong here?
->
-> The only reason I could think of that this would make a difference is
-> if something along the boot path was turning on/off the L2? However if
-> you turn off the L2 then it needs to be invalidated before it is
-> turned on again. enable_l2 already does this properly..
->
-> Is the decompressor fiddling with the L2?
->
-> Jason
->
 -- 
-Best Regards,
-Illia Ragozin.
+1.7.9.5
