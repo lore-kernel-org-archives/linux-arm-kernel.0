@@ -1,111 +1,93 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 25 Mar 2013 18:19:40 +0000
-Subject: [PATCH 3/4] ARM: mm: kill unused TLB_CAN_READ_FROM_L1_CACHE and use
- ALT_SMP instead
-In-Reply-To: <1364235581-17900-1-git-send-email-will.deacon@arm.com>
-References: <1364235581-17900-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1364235581-17900-4-git-send-email-will.deacon@arm.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Mon, 25 Mar 2013 11:27:24 -0700
+Subject: RFC v2: Zynq Clock Controller
+In-Reply-To: <515093B4.2090701@wwwdotorg.org>
+References: <27dae808-1d3a-4001-8eb2-b0a6e2a34b8f@AM1EHSMHS013.ehs.local>
+ <515093B4.2090701@wwwdotorg.org>
+Message-ID: <8fd7278d-37c5-48ff-8d06-edc64d532a96@VA3EHSMHS037.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Many ARMv7 cores have hardware page table walkers that can read the L1
-cache. This is discoverable from the ID_MMFR3 register, although this
-can be expensive to access from the low-level set_pte functions and is a
-pain to cache, particularly with multi-cluster systems.
+Hi Stephen,
 
-A useful observation is that the multi-processing extensions for ARMv7
-require coherent table walks, meaning that we can make use of ALT_SMP
-patching in proc-v7-* to patch away the cache flush safely for these
-cores.
+On Mon, Mar 25, 2013 at 12:13:08PM -0600, Stephen Warren wrote:
+> On 03/20/2013 05:56 PM, S?ren Brinkmann wrote:
+> > Hi,
+> > 
+> > I spent some time working on this and incorporating feedback. Here's an updated proposal for a clock controller for Zynq:
+> > 
+> > Required properties:
+> >  - #clock-cells : Must be 1
+> >  - compatible : "xlnx,ps7-clkc"  (this may become 'xlnx,zynq-clkc' terminology differs a bit between Xilinx internal and mainline)
+> >  - ps-clk-frequency : Frequency of the oscillator providing ps_clk in HZ
+> >                      (usually 33 MHz oscillators are used for Zynq platforms)
+> 
+> This may have been mentioned before, but shouldn't the input clock be
+> represented as an actual clock in DT, and hence as an entry in this
+> node's clocks property? The crystal/... itself can be represented in DT
+> as a fixed-clock.
+Lars-Peter brought that up, too. Please refer to my answer to him.
 
-Reported-by: Albin Tonnerre <Albin.Tonnerre@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/include/asm/tlbflush.h | 2 +-
- arch/arm/mm/proc-v6.S           | 2 --
- arch/arm/mm/proc-v7-2level.S    | 3 ++-
- arch/arm/mm/proc-v7-3level.S    | 3 ++-
- arch/arm/mm/proc-v7.S           | 4 ++--
- 5 files changed, 7 insertions(+), 7 deletions(-)
+> 
+> >  - clock-output-names : List of strings used to name the clock outputs. Shall be a list of the outputs given below.
+> 
+> That shouldn't be required.
+When I want to support of_clk_get_parent_name() for my clocks, I think
+it is. And I'm inclined to not brake this functionality.
 
-diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
-index c7cdb59..42d155e 100644
---- a/arch/arm/include/asm/tlbflush.h
-+++ b/arch/arm/include/asm/tlbflush.h
-@@ -169,7 +169,7 @@
- # define v6wbi_always_flags	(-1UL)
- #endif
- 
--#define v7wbi_tlb_flags_smp	(TLB_WB | TLB_DCLEAN | TLB_BARRIER | \
-+#define v7wbi_tlb_flags_smp	(TLB_WB | TLB_BARRIER | \
- 				 TLB_V6_U_FULL | TLB_V6_U_PAGE | \
- 				 TLB_V6_U_ASID | TLB_V6_BP | \
- 				 TLB_V7_UIS_FULL | TLB_V7_UIS_PAGE | \
-diff --git a/arch/arm/mm/proc-v6.S b/arch/arm/mm/proc-v6.S
-index bcaaa8d..a286d47 100644
---- a/arch/arm/mm/proc-v6.S
-+++ b/arch/arm/mm/proc-v6.S
-@@ -80,12 +80,10 @@ ENTRY(cpu_v6_do_idle)
- 	mov	pc, lr
- 
- ENTRY(cpu_v6_dcache_clean_area)
--#ifndef TLB_CAN_READ_FROM_L1_CACHE
- 1:	mcr	p15, 0, r0, c7, c10, 1		@ clean D entry
- 	add	r0, r0, #D_CACHE_LINE_SIZE
- 	subs	r1, r1, #D_CACHE_LINE_SIZE
- 	bhi	1b
--#endif
- 	mov	pc, lr
- 
- /*
-diff --git a/arch/arm/mm/proc-v7-2level.S b/arch/arm/mm/proc-v7-2level.S
-index 78f520b..9704097 100644
---- a/arch/arm/mm/proc-v7-2level.S
-+++ b/arch/arm/mm/proc-v7-2level.S
-@@ -110,7 +110,8 @@ ENTRY(cpu_v7_set_pte_ext)
-  ARM(	str	r3, [r0, #2048]! )
-  THUMB(	add	r0, r0, #2048 )
-  THUMB(	str	r3, [r0] )
--	mcr	p15, 0, r0, c7, c10, 1		@ flush_pte
-+	ALT_SMP(mov	pc,lr)
-+	ALT_UP (mcr	p15, 0, r0, c7, c10, 1)		@ flush_pte
- #endif
- 	mov	pc, lr
- ENDPROC(cpu_v7_set_pte_ext)
-diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
-index 6ffd78c..363027e 100644
---- a/arch/arm/mm/proc-v7-3level.S
-+++ b/arch/arm/mm/proc-v7-3level.S
-@@ -73,7 +73,8 @@ ENTRY(cpu_v7_set_pte_ext)
- 	tst	r3, #1 << (55 - 32)		@ L_PTE_DIRTY
- 	orreq	r2, #L_PTE_RDONLY
- 1:	strd	r2, r3, [r0]
--	mcr	p15, 0, r0, c7, c10, 1		@ flush_pte
-+	ALT_SMP(mov	pc, lr)
-+	ALT_UP (mcr	p15, 0, r0, c7, c10, 1)		@ flush_pte
- #endif
- 	mov	pc, lr
- ENDPROC(cpu_v7_set_pte_ext)
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index 3a3c015..37716b0 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -75,14 +75,14 @@ ENTRY(cpu_v7_do_idle)
- ENDPROC(cpu_v7_do_idle)
- 
- ENTRY(cpu_v7_dcache_clean_area)
--#ifndef TLB_CAN_READ_FROM_L1_CACHE
-+	ALT_SMP(mov	pc, lr)			@ MP extensions imply L1 PTW
-+	ALT_UP(W(nop))
- 	dcache_line_size r2, r3
- 1:	mcr	p15, 0, r0, c7, c10, 1		@ clean D entry
- 	add	r0, r0, r2
- 	subs	r1, r1, r2
- 	bhi	1b
- 	dsb
--#endif
- 	mov	pc, lr
- ENDPROC(cpu_v7_dcache_clean_area)
- 
--- 
-1.8.0
+> 
+> > Optional properties:
+> >  - clocks : as described in the clock bindings
+> >  - clock-names : as described in the clock bindings
+> 
+> I think clocks should be required, with at least the main crystal clock
+> input always present, but perhaps having some optional entries for the
+> (E)MIO feature you mention.
+This is why I have the xtal separate. This way these props are purely
+optional and the xtal frequency is obtained separately. It also makes it
+a little easier internally, because I don't have to cope with a variable
+name for the xtal this way.
+
+Describing the xtal as fixed clock in DT means a mandatory entry for
+'clocks' and 'clock-names' and a variable name for the xtal clock. I
+wanted to avoid this.
+
+> 
+> > Example:
+> >         clkc: clkc {
+> >                 #clock-cells = <1>;
+> >                 compatible = "xlnx,ps7-clkc";
+> >                 ps-clk-frequency = <33333333>;
+> >                 clock-output-names = "armpll", "ddrpll", "iopll", "cpu_6or4x", "cpu_3or2x", "cpu_2x", "cpu_1x", "ddr2x", "ddr3x", "dci", "lqspi", "smc", "pcap", "gem0", "gem1", "fclk0", "fclk1", "fclk2", "fclk3", "can0", "can1", "sdio0", "sdio1", "uart0", "uart1", "spi0", "spi1", "dma", "usb0_aper", "usb1_aper", "gem0_aper", "gem1_aper", "sdio0_aper", "sdio1_aper", "spi0_aper", "spi1_aper", "can0_aper", "can1_aper", "i2c0_aper", "i2c1_aper", "uart0_aper", "uart1_aper", "gpio_aper", "lqspi_aper", "smc_aper", "swdt", "dbg_trc", "dbg_apb";  /* long list... explanation below */
+> >                 /* optional props */
+> >                 clocks = <&clkc 16>, <&clk_foo>;
+> >                 clock-names = "gem1_emio_clk", "can_mio_clk_23";
+> >         };
+> > 
+> > The downside of supporting this is, that I don't see a way around explicitly listing the clock output names in the DT.
+> 
+> (Please wrap your emails to ~74 characters or so)
+I changed my settings.
+
+> 
+> As Mike mentioned off-list, one can create a new clk registration API
+> that takes a struct clk* as parent rather than a char *clk_name.
+Then we also have to make sure clocks are probed in a specific order. To
+obtain a 'struct clk *' through clk_get() the requested clock has to be
+already been probed. Currently clock probing relies purely on data present
+in DT. This makes this proposal not that trivial, IMHO.
+
+e.g. in this case the clock controller probe would fail if the potential
+fixed clock describing the xtal isn't probed first.
+
+> 
+> > This email and any attachments are intended for the sole use of the named recipient(s)...
+> 
+> It's not good form to include that kind of disclaimer on public mailing
+> list posts. That's why many people use their personal email when posting
+> to mailing lists.
+My apologies. IT is currently messing with the email configuration and broke
+the flows which used to work. AFAIK, it's currently fixed. And I
+sincerely hope it stays this way.
+
+	S?ren
