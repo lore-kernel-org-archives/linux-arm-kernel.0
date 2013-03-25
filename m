@@ -1,33 +1,43 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 25 Mar 2013 18:17:39 +0000
-Subject: [PATCH v2 5/5] ARM: modules: don't export cpu_set_pte_ext when !MMU
-In-Reply-To: <1364235459-17672-1-git-send-email-will.deacon@arm.com>
-References: <1364235459-17672-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1364235459-17672-6-git-send-email-will.deacon@arm.com>
+Date: Mon, 25 Mar 2013 18:17:34 +0000
+Subject: [PATCH v2 0/5] Fix 740t support and remove more unused ARMv3 code
+Message-ID: <1364235459-17672-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cpu_set_pte_ext is only guaranteed to be defined when CONFIG_MMU, so
-don't export it to modules otherwise.
+Hello,
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/mm/proc-syms.c | 2 ++
- 1 file changed, 2 insertions(+)
+This is a rebased version of the patches I originally posted here:
 
-diff --git a/arch/arm/mm/proc-syms.c b/arch/arm/mm/proc-syms.c
-index 3e6210b..054b491 100644
---- a/arch/arm/mm/proc-syms.c
-+++ b/arch/arm/mm/proc-syms.c
-@@ -17,7 +17,9 @@
- 
- #ifndef MULTI_CPU
- EXPORT_SYMBOL(cpu_dcache_clean_area);
-+#ifdef CONFIG_MMU
- EXPORT_SYMBOL(cpu_set_pte_ext);
-+#endif
- #else
- EXPORT_SYMBOL(processor);
- #endif
+  http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/146095.html
+
+The only changes are that it is now based on 3.9-rc4 and the final patch
+has been dropped, having been merged via arm-soc.
+
+I plan to send this via Russell for 3.10.
+
+Cheers,
+
+Will
+
+
+Will Deacon (5):
+  ARM: tlbflush: remove ARMv3 support
+  ARM: cache: remove ARMv3 support code
+  ARM: mm: fix numerous hideous errors in proc-arm740.S
+  ARM: mm: remove broken condition check for v4 flushing
+  ARM: modules: don't export cpu_set_pte_ext when !MMU
+
+ arch/arm/include/asm/glue-cache.h |   8 ---
+ arch/arm/include/asm/tlbflush.h   |  11 +--
+ arch/arm/mm/Kconfig               |   5 +-
+ arch/arm/mm/Makefile              |   1 -
+ arch/arm/mm/cache-v3.S            | 137 --------------------------------------
+ arch/arm/mm/cache-v4.S            |   2 +-
+ arch/arm/mm/proc-arm740.S         |  30 +++++----
+ arch/arm/mm/proc-syms.c           |   2 +
+ 8 files changed, 23 insertions(+), 173 deletions(-)
+ delete mode 100644 arch/arm/mm/cache-v3.S
+
 -- 
 1.8.0
