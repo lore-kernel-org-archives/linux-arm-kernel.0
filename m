@@ -1,58 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Mar 2013 15:40:50 +0000
-Subject: [PATCH 2/3] mfd: db8500-prcmu: Fetch the PRCMU TCDM base address
- from Device Tree
-In-Reply-To: <1364223758-17621-2-git-send-email-lee.jones@linaro.org>
-References: <1364223758-17621-1-git-send-email-lee.jones@linaro.org>
- <1364223758-17621-2-git-send-email-lee.jones@linaro.org>
-Message-ID: <201303251540.51104.arnd@arndb.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 25 Mar 2013 16:48:43 +0100
+Subject: [PATCH 5/6] ARM: ux500: move PRCMU functions into the CPUidle
+ driver
+In-Reply-To: <201303251513.21361.arnd@arndb.de>
+References: <1363866553-15054-1-git-send-email-linus.walleij@stericsson.com>
+ <201303251411.43356.arnd@arndb.de>
+ <CACRpkda=FT1cHA=2oZkNcxxB=NvGLbuKia=hHkxSzEBu07CL8g@mail.gmail.com>
+ <201303251513.21361.arnd@arndb.de>
+Message-ID: <CACRpkdYLypH+N8AQ7BQ7_Sh-Zvz057im3qR948Ofnw+F7B-O3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 25 March 2013, Lee Jones wrote:
->         res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
->                                            "prcmu-tcpm");
->         if (!res) {
-> -               dev_err(&pdev->dev,
-> -                       "Error: no prcmu tcpm memory region provided\n");
-> -               return;
-> -       }
-> -       tcpm_base = ioremap(res->start, resource_size(res));
-> +               if (np) {
-> +                       tcpm_np = of_find_node_by_name(np->parent,
-> +                                                      "prcmu-tcpm-per4");
-> +                       if (!tcpm_np) {
-> +                               dev_err(&pdev->dev,
-> +                                       "no prcmu tcpm mem region provided\n");
-> +                               return;
-> +                       }
-> +                       tcpm_base = of_iomap(tcpm_np, 0);
-> +               }
-> +       } else
-> +               tcpm_base = ioremap(res->start, resource_size(res));
-> +
+On Mon, Mar 25, 2013 at 4:13 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 25 March 2013, Linus Walleij wrote:
+>> This set of functions are called both for idling and suspend, i.e.
+>> both by the machine-specific cpuidle driver and the machine-specific
+>> suspend code.
+>>
+>> They are conceptually coherent functions but messing with both PRCMU
+>> and GIC registers, moving the responsibility of keeping track of the
+>> IRQs back and forth between the GIC and the PRCMU.
+>>
+>> Being able to freeze and decouple the GIC and check if a CPU is
+>> in WFI is a ux500-PRCMU-specific pecularity but saves us a lot of
+>> criss-cross IPIs when going to idle or sleep.
+>
+> I still don't understand. From what I can tell, all those functions are
+> now statically declared in the cpuidle driver after your patch, so it
+> sounds like you do not need a header file for them any more, where
+> you needed one before. Which of those would you declare in a hypothetical
+> linux/pm/ux500.h header file?
 
-Why don't you just add these extra registers to the prcmu node itself like
+So the issue raised by Rickard was that his suspend code (which
+was just yesterday posted to linux-pm) is making use of the same
+functions, so they need to be shared somehow.
 
-diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
-index 9de9309..6ee6c31 100644
---- a/arch/arm/boot/dts/dbx5x0.dtsi
-+++ b/arch/arm/boot/dts/dbx5x0.dtsi
-@@ -191,8 +191,8 @@
- 
- 		prcmu: prcmu at 80157000 {
- 			compatible = "stericsson,db8500-prcmu";
--			reg = <0x80157000 0x1000>;
--			reg-names = "prcmu";
-+			reg = <0x80157000 0x1000>, <0x801b0000 0x1000>, <0x801b8000 0x1000>;
-+			reg-names = "prcmu", "prcmu-tcpm", "prcmu-tcdm-per4";
- 			interrupts = <0 47 0x4>;
- 			#address-cells = <1>;
- 			#size-cells = <1>;
+Reference:
+http://marc.info/?l=linux-pm&m=136397049416914&w=2
 
+You find that this uses the affected funtions.
 
-and document those in the prcmu binding?
+So they are not only for idling, and there are pending
+patches for suspend making use of them, and suspend
+needs to live in the machine.
 
-That would keep the code simpler and the same for both cases.
-
-	Arnd
+Yours,
+Linus Walleij
