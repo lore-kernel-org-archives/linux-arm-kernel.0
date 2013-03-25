@@ -1,77 +1,104 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 25 Mar 2013 15:34:58 +0530
-Subject: [PATCH v2 06/18] ARM: OMAP5: PM: Enable Mercury retention mode on
- CPUx powerdomains
+Date: Mon, 25 Mar 2013 15:34:57 +0530
+Subject: [PATCH v2 05/18] ARM: OMAP5: PM: Enables ES2 PM mode by default
 In-Reply-To: <1364205910-32392-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1364205910-32392-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1364205910-32392-7-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1364205910-32392-6-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In addition to the standard power-management technique, the OMAP5
-MPU subsystem also employs an SR3-APG (mercury) power management
-technology to reduce leakage.
+Enables MPUSS ES2 power management mode using ES2_PM_MODE in
+AMBA_IF_MODE register.
 
-It allows for full logic and memories retention on MPU_C0 and MPU_C1 and
-is controlled by the PRCM_MPU.
+0x0: ES1 behavior, CPU cores would enter and exit OFF mode together. Broken
+0x1: ES2 behavior, CPU cores are allowed to enter/exit OFF mode independently.
+
+The AMBA_IF_MODE register value is stored on SAR RAM and restored by
+ROM code.
 
 Acked-by: Nishanth Menon <nm@ti.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/mach-omap2/omap-mpuss-lowpower.c |   27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+ arch/arm/mach-omap2/omap-secure.h    |    2 ++
+ arch/arm/mach-omap2/omap-wakeupgen.c |   19 +++++++++++++++++++
+ arch/arm/mach-omap2/omap-wakeupgen.h |    1 +
+ 3 files changed, 22 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-index b1441b1..d390d18 100644
---- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-+++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-@@ -62,6 +62,10 @@
- #include "prm44xx.h"
- #include "prm-regbits-44xx.h"
+diff --git a/arch/arm/mach-omap2/omap-secure.h b/arch/arm/mach-omap2/omap-secure.h
+index 0e72917..82b3c4c 100644
+--- a/arch/arm/mach-omap2/omap-secure.h
++++ b/arch/arm/mach-omap2/omap-secure.h
+@@ -42,6 +42,8 @@
+ #define OMAP4_MON_L2X0_AUXCTRL_INDEX	0x109
+ #define OMAP4_MON_L2X0_PREFETCH_INDEX	0x113
  
-+/* Add defines needed for mercury mode. Refer MPU's PRM_PSCON_COUNT */
-+#define PRM_PSCON_HG_EN		(1 << 24)
-+#define PRM_PSCON_HG_RAMPUP	(1 << 25)
++#define OMAP5_MON_AMBA_IF_INDEX		0x108
 +
- #ifdef CONFIG_SMP
+ /* Secure PPA(Primary Protected Application) APIs */
+ #define OMAP4_PPA_L2_POR_INDEX		0x23
+ #define OMAP4_PPA_CPU_ACTRL_SMP_INDEX	0x25
+diff --git a/arch/arm/mach-omap2/omap-wakeupgen.c b/arch/arm/mach-omap2/omap-wakeupgen.c
+index f8bb3b9..8bcaa8c 100644
+--- a/arch/arm/mach-omap2/omap-wakeupgen.c
++++ b/arch/arm/mach-omap2/omap-wakeupgen.c
+@@ -42,6 +42,7 @@
+ #define CPU1_ID			0x1
+ #define OMAP4_NR_BANKS		4
+ #define OMAP4_NR_IRQS		128
++#define OMAP5_AMBA_IF_PM_MODE	(1 << 5)
  
- struct omap4_cpu_pm_info {
-@@ -337,6 +341,28 @@ int __cpuinit omap4_hotplug_cpu(unsigned int cpu, unsigned int power_state)
- 	return 0;
- }
+ static void __iomem *wakeupgen_base;
+ static void __iomem *sar_base;
+@@ -265,6 +266,11 @@ static inline void omap5_irq_save_context(void)
+ 	val = __raw_readl(wakeupgen_base + OMAP_AUX_CORE_BOOT_0);
+ 	__raw_writel(val, sar_base + OMAP5_AUXCOREBOOT1_OFFSET);
  
-+/**
-+ * enable_mercury_retention_mode: Enable OMAP5 mercury retention feature
-+ *
-+ * OMAP5 devices supports  SR3-APG (mercury) power management technology to
-+ * reduce leakage. It allows for full logic and memories retention on
-+ * MPU_C0 and MPU_C1 and is controlled by the PRCM_MPU. The function enable
-+ * the mercury retention feature.
-+ */
-+static void enable_mercury_retention_mode(void)
-+{
-+	u32 reg;
++	/* Save AMBA_IF_PM_MODE regsiter */
++	val = __raw_readl(wakeupgen_base + OMAP_AMBA_IF_MODE);
++	val |= OMAP5_AMBA_IF_PM_MODE;
++	__raw_writel(val, sar_base + OMAP5_AMBA_IF_MODE_OFFSET);
 +
+ 	/* Set the Backup Bit Mask status */
+ 	val = __raw_readl(sar_base + OMAP5_SAR_BACKUP_STATUS_OFFSET);
+ 	val |= SAR_BACKUP_STATUS_WAKEUPGEN;
+@@ -402,6 +408,7 @@ int __init omap_wakeupgen_init(void)
+ {
+ 	int i;
+ 	unsigned int boot_cpu = smp_processor_id();
++	u32 val;
+ 
+ 	/* Not supported on OMAP4 ES1.0 silicon */
+ 	if (omap_rev() == OMAP4430_REV_ES1_0) {
+@@ -443,6 +450,18 @@ int __init omap_wakeupgen_init(void)
+ 	for (i = 0; i < max_irqs; i++)
+ 		irq_target_cpu[i] = boot_cpu;
+ 
 +	/*
-+	 * To enable mercury mode, both HG_EN and HG_RAMPUP needs to be
-+	 * enabled from PRM_PSCON_COUNT register.
++	 * Enables OMAP5 ES2 PM Mode using ES2_PM_MODE in AMBA_IF_MODE
++	 * 0x0:	ES1 behavior, CPU cores would enter and exit OFF mode together.
++	 * 0x1:	ES2 behavior, CPU cores are allowed to enter/exit OFF mode
++	 * independently.
 +	 */
-+	reg = omap4_prcm_mpu_read_inst_reg(OMAP54XX_PRCM_MPU_DEVICE_INST,
-+			OMAP54XX_PRCM_MPU_PRM_PSCON_COUNT_OFFSET);
-+	reg |= PRM_PSCON_HG_EN | PRM_PSCON_HG_RAMPUP;
-+	omap4_prcm_mpu_write_inst_reg(reg, OMAP54XX_PRCM_MPU_DEVICE_INST,
-+			OMAP54XX_PRCM_MPU_PRM_PSCON_COUNT_OFFSET);
-+}
++	if (soc_is_omap54xx()) {
++		val = __raw_readl(wakeupgen_base + OMAP_AMBA_IF_MODE);
++		val |= OMAP5_AMBA_IF_PM_MODE;
++		omap_smc1(OMAP5_MON_AMBA_IF_INDEX, val);
++	}
++
+ 	irq_hotplug_init();
+ 	irq_pm_init();
  
- /*
-  * Initialise OMAP4 MPUSS
-@@ -415,6 +441,7 @@ int __init omap4_mpuss_init(void)
- 		cpu_context_offset = OMAP4_RM_CPU0_CPU0_CONTEXT_OFFSET;
- 	} else if (soc_is_omap54xx()) {
- 		cpu_context_offset = OMAP54XX_RM_CPU0_CPU0_CONTEXT_OFFSET;
-+		enable_mercury_retention_mode();
- 	}
- 
- 	return 0;
+diff --git a/arch/arm/mach-omap2/omap-wakeupgen.h b/arch/arm/mach-omap2/omap-wakeupgen.h
+index b0fd16f..b3c8ecc 100644
+--- a/arch/arm/mach-omap2/omap-wakeupgen.h
++++ b/arch/arm/mach-omap2/omap-wakeupgen.h
+@@ -27,6 +27,7 @@
+ #define OMAP_WKG_ENB_E_1			0x420
+ #define OMAP_AUX_CORE_BOOT_0			0x800
+ #define OMAP_AUX_CORE_BOOT_1			0x804
++#define OMAP_AMBA_IF_MODE			0x80c
+ #define OMAP_PTMSYNCREQ_MASK			0xc00
+ #define OMAP_PTMSYNCREQ_EN			0xc04
+ #define OMAP_TIMESTAMPCYCLELO			0xc08
 -- 
 1.7.9.5
