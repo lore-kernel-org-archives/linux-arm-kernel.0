@@ -1,58 +1,53 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Mon, 25 Mar 2013 10:31:59 +0100
-Subject: [PATCH] ARM: dove: add more hardware description in the DT
-Message-ID: <20130325103159.0c1b4f17@armhf>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 25 Mar 2013 09:33:16 +0000
+Subject: [PATCH 1/8] pinctrl: sirf: convert to linear irq domain
+In-Reply-To: <CAGsJ_4wR8UaSZ6NVANw3CTj+w6=41oxJRkffaJhOh4HBW8e3zg@mail.gmail.com>
+References: <1363779679-16880-1-git-send-email-arnd@arndb.de>
+ <1363779679-16880-2-git-send-email-arnd@arndb.de>
+ <CAGsJ_4wR8UaSZ6NVANw3CTj+w6=41oxJRkffaJhOh4HBW8e3zg@mail.gmail.com>
+Message-ID: <201303250933.16921.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 88AP510 chip (Marvell Dove) contains a LCD and display controler
-and two audio controlers.
+On Monday 25 March 2013, Barry Song wrote:
+> > @@ -1770,9 +1767,8 @@ static int sirfsoc_gpio_probe(struct device_node *np)
+> >                         goto out;
+> >                 }
+> >
+> > -               bank->domain = irq_domain_add_legacy(np, SIRFSOC_GPIO_BANK_SIZE,
+> > -                       SIRFSOC_GPIO_IRQ_START + i * SIRFSOC_GPIO_BANK_SIZE, 0,
+> > -                       &sirfsoc_gpio_irq_simple_ops, bank);
+> > +               bank->domain = irq_domain_add_linear(np, SIRFSOC_GPIO_BANK_SIZE,
+> > +                                               &sirfsoc_gpio_irq_simple_ops, bank);
+> 
+> this line breaks the gpio/irq mapping and gpio irq_domain:
+> 
+>        printk("%s gpio_to_irq: %d %d %d\n", __func__,
+>                gpio_to_irq(0), gpio_to_irq(32), gpio_to_irq(65));
+> 
+> result:
+> sdhci_sirf_probe gpio_to_irq: 0 0 0
+> 
+> for the old codes, it works:
+> sdhci_sirf_probe gpio_to_irq: 128 160 193
 
-Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
----
- arch/arm/boot/dts/dove.dtsi |   31 +++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+Does it work if you add the hunk below?
 
-diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-index f7509ca..6bd36b0 100644
---- a/arch/arm/boot/dts/dove.dtsi
-+++ b/arch/arm/boot/dts/dove.dtsi
-@@ -253,5 +253,36 @@
- 				dmacap,xor;
- 			};
- 		};
-+
-+		lcd0: lcd0 at 820000 {
-+			compatible = "marvell,dove-lcd";
-+			reg = <0x820000 0x1c8>;
-+			interrupts = <47>;
-+			status = "disabled";
-+		};
-+
-+		lcd1: lcd1 at 810000 {
-+			compatible = "marvell,dove-lcd";
-+			reg = <0x810000 0x1c8>;
-+			interrupts = <46>;
-+			status = "disabled";
-+		};
-+
-+		i2s0: i2s0 at b0000 {
-+			compatible = "marvell,kirkwood-i2s";
-+			reg = <0xb0000 0x4000>;
-+			interrupt-parent = <&gpio0>;
-+			interrupts = <19 2>;
-+			clocks = <&gate_clk 12>;
-+			status = "disabled";
-+		};
-+		i2s1: i2s1 at b4000 {
-+			compatible = "marvell,kirkwood-i2s";
-+			reg = <0xb4000 0x4000>;
-+			interrupt-parent = <&gpio0>;
-+			interrupts = <21 2>;
-+			clocks = <&gate_clk 13>;
-+			status = "disabled";
-+		};
- 	};
- };
--- 
-1.7.10.4
+I think the problem is that with irq_domain_add_linear, we don't create
+a mapping for all the interrupts right away.
+
+	Arnd
+
+diff --git a/drivers/pinctrl/pinctrl-sirf.c b/drivers/pinctrl/pinctrl-sirf.c
+index d02498b..5f031ca 100644
+--- a/drivers/pinctrl/pinctrl-sirf.c
++++ b/drivers/pinctrl/pinctrl-sirf.c
+@@ -1347,7 +1347,7 @@ static inline int sirfsoc_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
+ 	struct sirfsoc_gpio_bank *bank = container_of(to_of_mm_gpio_chip(chip),
+ 		struct sirfsoc_gpio_bank, chip);
+ 
+-	return irq_find_mapping(bank->domain, offset);
++	return irq_create_mapping(bank->domain, offset);
+ }
+ 
+ static inline int sirfsoc_gpio_to_offset(unsigned int gpio)
