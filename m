@@ -1,307 +1,148 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Mon, 25 Mar 2013 16:48:23 +0530
-Subject: [PATCH V3] clk: Add composite clock type
-In-Reply-To: <1363780834-1289-1-git-send-email-pgaikwad@nvidia.com>
-References: <1363780834-1289-1-git-send-email-pgaikwad@nvidia.com>
-Message-ID: <5150327F.7060006@nvidia.com>
+From: prabhakar.csengg@gmail.com (Prabhakar lad)
+Date: Mon, 25 Mar 2013 16:51:35 +0530
+Subject: [PATCH] ARM: davinci: use is IS_ENABLED macro
+Message-ID: <1364210495-7938-1-git-send-email-prabhakar.csengg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mike,
+From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
 
-Please merge this patch.
+This patches replaces #if defined() by IS_ENABLED macro, which provides
+better readability.
 
-Thanks & Regards,
-PrashantG
+Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+Cc: Sekhar Nori <nsekhar@ti.com>
+---
+ Note: This patch is compile tested only for davinci_all_defconfig
+       and da8xx_omapl_defconfig.
 
-On Wednesday 20 March 2013 05:30 PM, Prashant Gaikwad wrote:
-> Not all clocks are required to be decomposed into basic clock
-> types but at the same time want to use the functionality
-> provided by these basic clock types instead of duplicating.
->
-> For example, Tegra SoC has ~100 clocks which can be decomposed
-> into Mux -> Div -> Gate clock types making the clock count to
-> ~300. Also, parent change operation can not be performed on gate
-> clock which forces to use mux clock in driver if want to change
-> the parent.
->
-> Instead aggregate the basic clock types functionality into one
-> clock and just use this clock for all operations. This clock
-> type re-uses the functionality of basic clock types and not
-> limited to basic clock types but any hardware-specific
-> implementation.
->
-> Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
-> ---
->
-> Changes from V2:
-> - Move clk_ops inside clk_composite instead of dynamically allocation.
->
-> ---
->   drivers/clk/Makefile         |    1 +
->   drivers/clk/clk-composite.c  |  201 ++++++++++++++++++++++++++++++++++++++++++
->   include/linux/clk-provider.h |   31 +++++++
->   3 files changed, 233 insertions(+), 0 deletions(-)
->   create mode 100644 drivers/clk/clk-composite.c
->
-> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-> index 0147022..097ed01 100644
-> --- a/drivers/clk/Makefile
-> +++ b/drivers/clk/Makefile
-> @@ -7,6 +7,7 @@ obj-$(CONFIG_COMMON_CLK)	+= clk-fixed-factor.o
->   obj-$(CONFIG_COMMON_CLK)	+= clk-fixed-rate.o
->   obj-$(CONFIG_COMMON_CLK)	+= clk-gate.o
->   obj-$(CONFIG_COMMON_CLK)	+= clk-mux.o
-> +obj-$(CONFIG_COMMON_CLK)	+= clk-composite.o
->   
->   # SoCs specific
->   obj-$(CONFIG_ARCH_BCM2835)	+= clk-bcm2835.o
-> diff --git a/drivers/clk/clk-composite.c b/drivers/clk/clk-composite.c
-> new file mode 100644
-> index 0000000..097dee4
-> --- /dev/null
-> +++ b/drivers/clk/clk-composite.c
-> @@ -0,0 +1,201 @@
-> +/*
-> + * Copyright (c) 2013 NVIDIA CORPORATION.  All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/clk-provider.h>
-> +#include <linux/err.h>
-> +#include <linux/slab.h>
-> +
-> +#define to_clk_composite(_hw) container_of(_hw, struct clk_composite, hw)
-> +
-> +static u8 clk_composite_get_parent(struct clk_hw *hw)
-> +{
-> +	struct clk_composite *composite = to_clk_composite(hw);
-> +	const struct clk_ops *mux_ops = composite->mux_ops;
-> +	struct clk_hw *mux_hw = composite->mux_hw;
-> +
-> +	mux_hw->clk = hw->clk;
-> +
-> +	return mux_ops->get_parent(mux_hw);
-> +}
-> +
-> +static int clk_composite_set_parent(struct clk_hw *hw, u8 index)
-> +{
-> +	struct clk_composite *composite = to_clk_composite(hw);
-> +	const struct clk_ops *mux_ops = composite->mux_ops;
-> +	struct clk_hw *mux_hw = composite->mux_hw;
-> +
-> +	mux_hw->clk = hw->clk;
-> +
-> +	return mux_ops->set_parent(mux_hw, index);
-> +}
-> +
-> +static unsigned long clk_composite_recalc_rate(struct clk_hw *hw,
-> +					    unsigned long parent_rate)
-> +{
-> +	struct clk_composite *composite = to_clk_composite(hw);
-> +	const struct clk_ops *div_ops = composite->div_ops;
-> +	struct clk_hw *div_hw = composite->div_hw;
-> +
-> +	div_hw->clk = hw->clk;
-> +
-> +	return div_ops->recalc_rate(div_hw, parent_rate);
-> +}
-> +
-> +static long clk_composite_round_rate(struct clk_hw *hw, unsigned long rate,
-> +				  unsigned long *prate)
-> +{
-> +	struct clk_composite *composite = to_clk_composite(hw);
-> +	const struct clk_ops *div_ops = composite->div_ops;
-> +	struct clk_hw *div_hw = composite->div_hw;
-> +
-> +	div_hw->clk = hw->clk;
-> +
-> +	return div_ops->round_rate(div_hw, rate, prate);
-> +}
-> +
-> +static int clk_composite_set_rate(struct clk_hw *hw, unsigned long rate,
-> +			       unsigned long parent_rate)
-> +{
-> +	struct clk_composite *composite = to_clk_composite(hw);
-> +	const struct clk_ops *div_ops = composite->div_ops;
-> +	struct clk_hw *div_hw = composite->div_hw;
-> +
-> +	div_hw->clk = hw->clk;
-> +
-> +	return div_ops->set_rate(div_hw, rate, parent_rate);
-> +}
-> +
-> +static int clk_composite_is_enabled(struct clk_hw *hw)
-> +{
-> +	struct clk_composite *composite = to_clk_composite(hw);
-> +	const struct clk_ops *gate_ops = composite->gate_ops;
-> +	struct clk_hw *gate_hw = composite->gate_hw;
-> +
-> +	gate_hw->clk = hw->clk;
-> +
-> +	return gate_ops->is_enabled(gate_hw);
-> +}
-> +
-> +static int clk_composite_enable(struct clk_hw *hw)
-> +{
-> +	struct clk_composite *composite = to_clk_composite(hw);
-> +	const struct clk_ops *gate_ops = composite->gate_ops;
-> +	struct clk_hw *gate_hw = composite->gate_hw;
-> +
-> +	gate_hw->clk = hw->clk;
-> +
-> +	return gate_ops->enable(gate_hw);
-> +}
-> +
-> +static void clk_composite_disable(struct clk_hw *hw)
-> +{
-> +	struct clk_composite *composite = to_clk_composite(hw);
-> +	const struct clk_ops *gate_ops = composite->gate_ops;
-> +	struct clk_hw *gate_hw = composite->gate_hw;
-> +
-> +	gate_hw->clk = hw->clk;
-> +
-> +	gate_ops->disable(gate_hw);
-> +}
-> +
-> +struct clk *clk_register_composite(struct device *dev, const char *name,
-> +			const char **parent_names, int num_parents,
-> +			struct clk_hw *mux_hw, const struct clk_ops *mux_ops,
-> +			struct clk_hw *div_hw, const struct clk_ops *div_ops,
-> +			struct clk_hw *gate_hw, const struct clk_ops *gate_ops,
-> +			unsigned long flags)
-> +{
-> +	struct clk *clk;
-> +	struct clk_init_data init;
-> +	struct clk_composite *composite;
-> +	struct clk_ops *clk_composite_ops;
-> +
-> +	composite = kzalloc(sizeof(*composite), GFP_KERNEL);
-> +	if (!composite) {
-> +		pr_err("%s: could not allocate composite clk\n", __func__);
-> +		return ERR_PTR(-ENOMEM);
-> +	}
-> +
-> +	init.name = name;
-> +	init.flags = flags | CLK_IS_BASIC;
-> +	init.parent_names = parent_names;
-> +	init.num_parents = num_parents;
-> +
-> +	clk_composite_ops = &composite->ops;
-> +
-> +	if (mux_hw && mux_ops) {
-> +		if (!mux_ops->get_parent || !mux_ops->set_parent) {
-> +			clk = ERR_PTR(-EINVAL);
-> +			goto err;
-> +		}
-> +
-> +		composite->mux_hw = mux_hw;
-> +		composite->mux_ops = mux_ops;
-> +		clk_composite_ops->get_parent = clk_composite_get_parent;
-> +		clk_composite_ops->set_parent = clk_composite_set_parent;
-> +	}
-> +
-> +	if (div_hw && div_ops) {
-> +		if (!div_ops->recalc_rate || !div_ops->round_rate ||
-> +		    !div_ops->set_rate) {
-> +			clk = ERR_PTR(-EINVAL);
-> +			goto err;
-> +		}
-> +
-> +		composite->div_hw = div_hw;
-> +		composite->div_ops = div_ops;
-> +		clk_composite_ops->recalc_rate = clk_composite_recalc_rate;
-> +		clk_composite_ops->round_rate = clk_composite_round_rate;
-> +		clk_composite_ops->set_rate = clk_composite_set_rate;
-> +	}
-> +
-> +	if (gate_hw && gate_ops) {
-> +		if (!gate_ops->is_enabled || !gate_ops->enable ||
-> +		    !gate_ops->disable) {
-> +			clk = ERR_PTR(-EINVAL);
-> +			goto err;
-> +		}
-> +
-> +		composite->gate_hw = gate_hw;
-> +		composite->gate_ops = gate_ops;
-> +		clk_composite_ops->is_enabled = clk_composite_is_enabled;
-> +		clk_composite_ops->enable = clk_composite_enable;
-> +		clk_composite_ops->disable = clk_composite_disable;
-> +	}
-> +
-> +	init.ops = clk_composite_ops;
-> +	composite->hw.init = &init;
-> +
-> +	clk = clk_register(dev, &composite->hw);
-> +	if (IS_ERR(clk))
-> +		goto err;
-> +
-> +	if (composite->mux_hw)
-> +		composite->mux_hw->clk = clk;
-> +
-> +	if (composite->div_hw)
-> +		composite->div_hw->clk = clk;
-> +
-> +	if (composite->gate_hw)
-> +		composite->gate_hw->clk = clk;
-> +
-> +	return clk;
-> +
-> +err:
-> +	kfree(composite);
-> +	return clk;
-> +}
-> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> index 7f197d7..33e7e64 100644
-> --- a/include/linux/clk-provider.h
-> +++ b/include/linux/clk-provider.h
-> @@ -325,6 +325,37 @@ struct clk *clk_register_fixed_factor(struct device *dev, const char *name,
->   		const char *parent_name, unsigned long flags,
->   		unsigned int mult, unsigned int div);
->   
-> +/***
-> + * struct clk_composite - aggregate clock of mux, divider and gate clocks
-> + *
-> + * @hw:		handle between common and hardware-specific interfaces
-> + * @mux_hw:	handle between composite and hardware-specifix mux clock
-> + * @div_hw:	handle between composite and hardware-specifix divider clock
-> + * @gate_hw:	handle between composite and hardware-specifix gate clock
-> + * @mux_ops:	clock ops for mux
-> + * @div_ops:	clock ops for divider
-> + * @gate_ops:	clock ops for gate
-> + */
-> +struct clk_composite {
-> +	struct clk_hw	hw;
-> +	struct clk_ops	ops;
-> +
-> +	struct clk_hw	*mux_hw;
-> +	struct clk_hw	*div_hw;
-> +	struct clk_hw	*gate_hw;
-> +
-> +	const struct clk_ops	*mux_ops;
-> +	const struct clk_ops	*div_ops;
-> +	const struct clk_ops	*gate_ops;
-> +};
-> +
-> +struct clk *clk_register_composite(struct device *dev, const char *name,
-> +		const char **parent_names, int num_parents,
-> +		struct clk_hw *mux_hw, const struct clk_ops *mux_ops,
-> +		struct clk_hw *div_hw, const struct clk_ops *div_ops,
-> +		struct clk_hw *gate_hw, const struct clk_ops *gate_ops,
-> +		unsigned long flags);
-> +
->   /**
->    * clk_register - allocate a new clock, register it and return an opaque cookie
->    * @dev: device that is registering this clock
+ arch/arm/mach-davinci/board-da830-evm.c   |    2 +-
+ arch/arm/mach-davinci/board-da850-evm.c   |    3 +--
+ arch/arm/mach-davinci/board-dm644x-evm.c  |    9 +++------
+ arch/arm/mach-davinci/board-dm646x-evm.c  |    3 +--
+ arch/arm/mach-davinci/board-neuros-osd2.c |    6 ++----
+ arch/arm/mach-davinci/devices.c           |    2 +-
+ arch/arm/mach-davinci/usb.c               |    2 +-
+ 7 files changed, 10 insertions(+), 17 deletions(-)
+
+diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
+index 6da25ee..68ade71 100644
+--- a/arch/arm/mach-davinci/board-da830-evm.c
++++ b/arch/arm/mach-davinci/board-da830-evm.c
+@@ -298,7 +298,7 @@ static const short da830_evm_emif25_pins[] = {
+ 	-1
+ };
+ 
+-#if defined(CONFIG_MMC_DAVINCI) || defined(CONFIG_MMC_DAVINCI_MODULE)
++#if IS_ENABLED(CONFIG_MMC_DAVINCI)
+ #define HAS_MMC	1
+ #else
+ #define HAS_MMC	0
+diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+index c2dfe06..3475769 100644
+--- a/arch/arm/mach-davinci/board-da850-evm.c
++++ b/arch/arm/mach-davinci/board-da850-evm.c
+@@ -335,8 +335,7 @@ static const short da850_evm_nor_pins[] = {
+ 	-1
+ };
+ 
+-#if defined(CONFIG_MMC_DAVINCI) || \
+-    defined(CONFIG_MMC_DAVINCI_MODULE)
++#if IS_ENABLED(CONFIG_MMC_DAVINCI)
+ #define HAS_MMC 1
+ #else
+ #define HAS_MMC 0
+diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
+index 71735e7..d0f6365 100644
+--- a/arch/arm/mach-davinci/board-dm644x-evm.c
++++ b/arch/arm/mach-davinci/board-dm644x-evm.c
+@@ -750,22 +750,19 @@ static int davinci_phy_fixup(struct phy_device *phydev)
+ 	return 0;
+ }
+ 
+-#if defined(CONFIG_BLK_DEV_PALMCHIP_BK3710) || \
+-    defined(CONFIG_BLK_DEV_PALMCHIP_BK3710_MODULE)
++#if IS_ENABLED(CONFIG_BLK_DEV_PALMCHIP_BK3710)
+ #define HAS_ATA 1
+ #else
+ #define HAS_ATA 0
+ #endif
+ 
+-#if defined(CONFIG_MTD_PHYSMAP) || \
+-    defined(CONFIG_MTD_PHYSMAP_MODULE)
++#if IS_ENABLED(CONFIG_MTD_PHYSMAP)
+ #define HAS_NOR 1
+ #else
+ #define HAS_NOR 0
+ #endif
+ 
+-#if defined(CONFIG_MTD_NAND_DAVINCI) || \
+-    defined(CONFIG_MTD_NAND_DAVINCI_MODULE)
++#if IS_ENABLED(CONFIG_MTD_NAND_DAVINCI)
+ #define HAS_NAND 1
+ #else
+ #define HAS_NAND 0
+diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
+index de7adff..c84fdd5 100644
+--- a/arch/arm/mach-davinci/board-dm646x-evm.c
++++ b/arch/arm/mach-davinci/board-dm646x-evm.c
+@@ -117,8 +117,7 @@ static struct platform_device davinci_nand_device = {
+ 	},
+ };
+ 
+-#if defined(CONFIG_BLK_DEV_PALMCHIP_BK3710) || \
+-    defined(CONFIG_BLK_DEV_PALMCHIP_BK3710_MODULE)
++#if IS_ENABLED(CONFIG_BLK_DEV_PALMCHIP_BK3710)
+ #define HAS_ATA 1
+ #else
+ #define HAS_ATA 0
+diff --git a/arch/arm/mach-davinci/board-neuros-osd2.c b/arch/arm/mach-davinci/board-neuros-osd2.c
+index 1c98107..8bd0a43 100644
+--- a/arch/arm/mach-davinci/board-neuros-osd2.c
++++ b/arch/arm/mach-davinci/board-neuros-osd2.c
+@@ -168,15 +168,13 @@ static struct davinci_mmc_config davinci_ntosd2_mmc_config = {
+ };
+ 
+ 
+-#if defined(CONFIG_BLK_DEV_PALMCHIP_BK3710) || \
+-	defined(CONFIG_BLK_DEV_PALMCHIP_BK3710_MODULE)
++#if IS_ENABLED(CONFIG_BLK_DEV_PALMCHIP_BK3710)
+ #define HAS_ATA 1
+ #else
+ #define HAS_ATA 0
+ #endif
+ 
+-#if defined(CONFIG_MTD_NAND_DAVINCI) || \
+-	defined(CONFIG_MTD_NAND_DAVINCI_MODULE)
++#if IS_ENABLED(CONFIG_MTD_NAND_DAVINCI)
+ #define HAS_NAND 1
+ #else
+ #define HAS_NAND 0
+diff --git a/arch/arm/mach-davinci/devices.c b/arch/arm/mach-davinci/devices.c
+index 4c48a36..df135de 100644
+--- a/arch/arm/mach-davinci/devices.c
++++ b/arch/arm/mach-davinci/devices.c
+@@ -119,7 +119,7 @@ void __init davinci_init_ide(void)
+ 	platform_device_register(&ide_device);
+ }
+ 
+-#if	defined(CONFIG_MMC_DAVINCI) || defined(CONFIG_MMC_DAVINCI_MODULE)
++#if IS_ENABLED(CONFIG_MMC_DAVINCI)
+ 
+ static u64 mmcsd0_dma_mask = DMA_BIT_MASK(32);
+ 
+diff --git a/arch/arm/mach-davinci/usb.c b/arch/arm/mach-davinci/usb.c
+index 34509ff..5764d65 100644
+--- a/arch/arm/mach-davinci/usb.c
++++ b/arch/arm/mach-davinci/usb.c
+@@ -17,7 +17,7 @@
+ #define DA8XX_USB0_BASE 	0x01e00000
+ #define DA8XX_USB1_BASE 	0x01e25000
+ 
+-#if defined(CONFIG_USB_MUSB_HDRC) || defined(CONFIG_USB_MUSB_HDRC_MODULE)
++#if IS_ENABLED(CONFIG_USB_MUSB_HDRC)
+ static struct musb_hdrc_eps_bits musb_eps[] = {
+ 	{ "ep1_tx", 8, },
+ 	{ "ep1_rx", 8, },
+-- 
+1.7.4.1
