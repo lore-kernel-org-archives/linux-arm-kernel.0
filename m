@@ -1,60 +1,49 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 25 Mar 2013 12:13:08 -0600
-Subject: RFC v2: Zynq Clock Controller
-In-Reply-To: <27dae808-1d3a-4001-8eb2-b0a6e2a34b8f@AM1EHSMHS013.ehs.local>
-References: <27dae808-1d3a-4001-8eb2-b0a6e2a34b8f@AM1EHSMHS013.ehs.local>
-Message-ID: <515093B4.2090701@wwwdotorg.org>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Mon, 25 Mar 2013 12:13:46 -0600
+Subject: [PATCH] [ARM] Feroceon: fix kexec by setting outer_cache.inv_all
+In-Reply-To: <51508E17.6010701@grapecom.com>
+References: <514E0D70.3060202@grapecom.com>
+ <20130325172113.GC16690@obsidianresearch.com>
+ <51508E17.6010701@grapecom.com>
+Message-ID: <20130325181346.GA28029@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/20/2013 05:56 PM, S?ren Brinkmann wrote:
-> Hi,
-> 
-> I spent some time working on this and incorporating feedback. Here's an updated proposal for a clock controller for Zynq:
-> 
-> Required properties:
->  - #clock-cells : Must be 1
->  - compatible : "xlnx,ps7-clkc"  (this may become 'xlnx,zynq-clkc' terminology differs a bit between Xilinx internal and mainline)
->  - ps-clk-frequency : Frequency of the oscillator providing ps_clk in HZ
->                      (usually 33 MHz oscillators are used for Zynq platforms)
+On Mon, Mar 25, 2013 at 07:49:11PM +0200, Elijah Ragozin wrote:
 
-This may have been mentioned before, but shouldn't the input clock be
-represented as an actual clock in DT, and hence as an entry in this
-node's clocks property? The crystal/... itself can be represented in DT
-as a fixed-clock.
+> So there is no actually disable and invalidation cache after the old
+> kernel finished and the new one is not started yet, we're not safe
+> to relocate and decompress the kernel.
 
->  - clock-output-names : List of strings used to name the clock outputs. Shall be a list of the outputs given below.
+Upon closer inspection I found the spec passage that the L2 becomes
+non-coherent with the CPU once the L1 D cache is turned off.
 
-That shouldn't be required.
+So, the L2 has to be invalidated after the L1 D cache is turned off,
+or before the L1 D cache is turned on..
 
-> Optional properties:
->  - clocks : as described in the clock bindings
->  - clock-names : as described in the clock bindings
+Looks likes 'cpu_proc_fin' turns off the both L1 caches, so the
+invalidate is properly after.
 
-I think clocks should be required, with at least the main crystal clock
-input always present, but perhaps having some optional entries for the
-(E)MIO feature you mention.
+This looks right to me then.
 
-> Example:
->         clkc: clkc {
->                 #clock-cells = <1>;
->                 compatible = "xlnx,ps7-clkc";
->                 ps-clk-frequency = <33333333>;
->                 clock-output-names = "armpll", "ddrpll", "iopll", "cpu_6or4x", "cpu_3or2x", "cpu_2x", "cpu_1x", "ddr2x", "ddr3x", "dci", "lqspi", "smc", "pcap", "gem0", "gem1", "fclk0", "fclk1", "fclk2", "fclk3", "can0", "can1", "sdio0", "sdio1", "uart0", "uart1", "spi0", "spi1", "dma", "usb0_aper", "usb1_aper", "gem0_aper", "gem1_aper", "sdio0_aper", "sdio1_aper", "spi0_aper", "spi1_aper", "can0_aper", "can1_aper", "i2c0_aper", "i2c1_aper", "uart0_aper", "uart1_aper", "gpio_aper", "lqspi_aper", "smc_aper", "swdt", "dbg_trc", "dbg_apb";  /* long list... explanation below */
->                 /* optional props */
->                 clocks = <&clkc 16>, <&clk_foo>;
->                 clock-names = "gem1_emio_clk", "can_mio_clk_23";
->         };
-> 
-> The downside of supporting this is, that I don't see a way around explicitly listing the clock output names in the DT.
+You might want to add some additional info to the the commit message
+along the lines of:
 
-(Please wrap your emails to ~74 characters or so)
+  On Feroceon the L2 cache becomes non-coherent with the CPU when the
+  L1 caches are disabled. Thus the L2 needs to be invalidated after
+  both L1 caches are disabled.
 
-As Mike mentioned off-list, one can create a new clk registration API
-that takes a struct clk* as parent rather than a char *clk_name.
+  .. text about kexec being the motivation ..
 
-> This email and any attachments are intended for the sole use of the named recipient(s)...
 
-It's not good form to include that kind of disclaimer on public mailing
-list posts. That's why many people use their personal email when posting
-to mailing lists.
+> If in your case everything is working could you please send for me
+> .config and your kernel version, probably I also miss smth. 
+
+Upon deeper reflection, in my case the L2 is re-initialized by a boot
+stub we use on the kexec path...
+
+Also, I will warn you that I could not figure out how to get Linux to
+shut off the DMA's in things like the ethernet, so kexec is very flaky
+on these systems.
+
+Jason
