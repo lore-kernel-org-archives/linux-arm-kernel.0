@@ -1,97 +1,37 @@
 From: chao.xie@marvell.com (Chao Xie)
-Date: Mon, 25 Mar 2013 03:06:54 -0400
-Subject: [PATCH V2 3/6] usb: ehci: mv_ehci: remove unused clock
+Date: Mon, 25 Mar 2013 03:06:55 -0400
+Subject: [PATCH V2 4/6] arm: mmp: remove clock from usb pdata for aspenite
 In-Reply-To: <1364195217-1226-1-git-send-email-chao.xie@marvell.com>
 References: <1364195217-1226-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1364195217-1226-4-git-send-email-chao.xie@marvell.com>
+Message-ID: <1364195217-1226-5-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The origianl understanding of clock is wrong. The EHCI controller
-only have one clock input.
-Passing clock name by pdata is wrong. The clock is defined by device
-iteself.
+The clock name will directly get by driver. Removing
+the name from pdata.
 
 Signed-off-by: Chao Xie <chao.xie@marvell.com>
 ---
- drivers/usb/host/ehci-mv.c |   35 ++++++++++-------------------------
- 1 files changed, 10 insertions(+), 25 deletions(-)
+ arch/arm/mach-mmp/aspenite.c |    6 ------
+ 1 files changed, 0 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/usb/host/ehci-mv.c b/drivers/usb/host/ehci-mv.c
-index 3804820..6bad41a 100644
---- a/drivers/usb/host/ehci-mv.c
-+++ b/drivers/usb/host/ehci-mv.c
-@@ -33,25 +33,17 @@ struct ehci_hcd_mv {
- 
- 	struct mv_usb_platform_data *pdata;
- 
--	/* clock source and total clock number */
--	unsigned int clknum;
--	struct clk *clk[0];
-+	struct clk *clk;
+diff --git a/arch/arm/mach-mmp/aspenite.c b/arch/arm/mach-mmp/aspenite.c
+index 9f64d56..76901f4 100644
+--- a/arch/arm/mach-mmp/aspenite.c
++++ b/arch/arm/mach-mmp/aspenite.c
+@@ -223,13 +223,7 @@ static struct pxa27x_keypad_platform_data aspenite_keypad_info __initdata = {
  };
  
- static void ehci_clock_enable(struct ehci_hcd_mv *ehci_mv)
- {
--	unsigned int i;
+ #if defined(CONFIG_USB_EHCI_MV)
+-static char *pxa168_sph_clock_name[] = {
+-	[0] = "PXA168-USBCLK",
+-};
 -
--	for (i = 0; i < ehci_mv->clknum; i++)
--		clk_prepare_enable(ehci_mv->clk[i]);
-+	clk_prepare_enable(ehci_mv->clk);
- }
- 
- static void ehci_clock_disable(struct ehci_hcd_mv *ehci_mv)
- {
--	unsigned int i;
--
--	for (i = 0; i < ehci_mv->clknum; i++)
--		clk_disable_unprepare(ehci_mv->clk[i]);
-+	clk_disable_unprepare(ehci_mv->clk);
- }
- 
- static int mv_ehci_enable(struct ehci_hcd_mv *ehci_mv)
-@@ -144,9 +136,8 @@ static int mv_ehci_probe(struct platform_device *pdev)
- 	struct ehci_hcd *ehci;
- 	struct ehci_hcd_mv *ehci_mv;
- 	struct resource *r;
--	int clk_i, retval = -ENODEV;
-+	int retval = -ENODEV;
- 	u32 offset;
--	size_t size;
- 
- 	if (!pdata) {
- 		dev_err(&pdev->dev, "missing platform_data\n");
-@@ -160,8 +151,7 @@ static int mv_ehci_probe(struct platform_device *pdev)
- 	if (!hcd)
- 		return -ENOMEM;
- 
--	size = sizeof(*ehci_mv) + sizeof(struct clk *) * pdata->clknum;
--	ehci_mv = devm_kzalloc(&pdev->dev, size, GFP_KERNEL);
-+	ehci_mv = devm_kzalloc(&pdev->dev, sizeof(*ehci_mv), GFP_KERNEL);
- 	if (ehci_mv == NULL) {
- 		dev_err(&pdev->dev, "cannot allocate ehci_hcd_mv\n");
- 		retval = -ENOMEM;
-@@ -172,16 +162,11 @@ static int mv_ehci_probe(struct platform_device *pdev)
- 	ehci_mv->pdata = pdata;
- 	ehci_mv->hcd = hcd;
- 
--	ehci_mv->clknum = pdata->clknum;
--	for (clk_i = 0; clk_i < ehci_mv->clknum; clk_i++) {
--		ehci_mv->clk[clk_i] =
--		    devm_clk_get(&pdev->dev, pdata->clkname[clk_i]);
--		if (IS_ERR(ehci_mv->clk[clk_i])) {
--			dev_err(&pdev->dev, "error get clck \"%s\"\n",
--				pdata->clkname[clk_i]);
--			retval = PTR_ERR(ehci_mv->clk[clk_i]);
--			goto err_clear_drvdata;
--		}
-+	ehci_mv->clk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(ehci_mv->clk)) {
-+		dev_err(&pdev->dev, "error getting clock\n");
-+		retval = PTR_ERR(ehci_mv->clk);
-+		goto err_clear_drvdata;
- 	}
- 
- 	r = platform_get_resource_byname(pdev, IORESOURCE_MEM, "phyregs");
+ static struct mv_usb_platform_data pxa168_sph_pdata = {
+-	.clknum         = 1,
+-	.clkname        = pxa168_sph_clock_name,
+ 	.mode           = MV_USB_MODE_HOST,
+ 	.phy_init	= pxa_usb_phy_init,
+ 	.phy_deinit	= pxa_usb_phy_deinit,
 -- 
 1.7.4.1
