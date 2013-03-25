@@ -1,22 +1,63 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Mon, 25 Mar 2013 17:27:06 +0800
-Subject: [PATCH 6/8] ARM: sirf: use clocksource_of infrastructure
-In-Reply-To: <1363779679-16880-7-git-send-email-arnd@arndb.de>
-References: <1363779679-16880-1-git-send-email-arnd@arndb.de>
- <1363779679-16880-7-git-send-email-arnd@arndb.de>
-Message-ID: <CAGsJ_4zs-j83dq-hJKLRt68e1SFETsiy2b+0JU8Lksdu71FUTA@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 25 Mar 2013 10:30:01 +0100
+Subject: [PATCH v2 00/14] Marvell EBU thermal sensor consolidation
+In-Reply-To: <1363991114-4225-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1363991114-4225-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20130325093001.GH5627@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/3/20, Arnd Bergmann <arnd@arndb.de>:
-> This moves the two sirf clocksource drivers to drivers/clocksource
-> and integrates them into the framework for locating the clock sources
-> automatically.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: John Stultz <john.stultz@linaro.org>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
+On Fri, Mar 22, 2013 at 07:25:00PM -0300, Ezequiel Garcia wrote:
+> Given Armada 370/XP and the other Marvell SoC with thermal support,
+> namely Kirkwood and Dove, have fairly similar thermal devices it
+> makes sense to integrate all of them into a single driver: mvebu-thermal.
 
-Tested-by: Barry Song <Baohua.Song@csr.com>
+Hi Ezequiel
 
--barry
+I'm still not convinced that one driver is the right way to go.
+
+As you have recently seen, Dove needs its own get_value() function,
+adding yet more differences. There is still the open question about
+370 "managed" temperature, do that also need exporting?
+
+Lets also try to look into the crystal ball about what may happen
+next. 
+
+There is an out of tree Dove driver
+
+https://github.com/rabeeh/linux-2.6.32.9/blob/master/arch/arm/mach-dove/hwmon.c
+
+This shows that the same register space is also used for core and CPU
+voltage measurements. At some point it might be nice to add support
+for these, and it probably needs to be in this driver, otherwise the
+locking is not nice. That driver also adds basic thermal management,
+by scaling the CPU frequency. Most of the scaling code will go into a
+driver in drivers/cpu_freq, but i guess there needs to be some glue
+somewhere?
+
+370 seems to have some thermal management hardware. There are
+registers called Thermal Manager Control and Status Register, Thermal
+Manager Cooling Delay Register, Thermal Manager Overheat Delay
+Register. I've no idea what they do, if they are setup once and
+forgotten, or if there needs to be active monitoring etc? Maybe we
+will want to again link to cpu_freq? Will this need 370 specific glue
+code?
+
+I assume XP also have some thermal management system, since this is a
+server class CPU. More glue to cpu_freq, again specific to XP? Maybe
+the 370 and XP require the same glue?
+
+Orion and Kirkwood are simple, in that i've never seen any thermal
+management, other than a fan for the whole box, often controlled by a
+PIC, sometimes by GPIO lines.
+
+What does all this mean? I _think_ there will be less and less shared
+code in future as these extra features are added.
+
+I've not a strong opinion, but i think separate drivers are better. 
+
+If we do stick to one driver, i would however want #ifdef
+CONFIG_ARCH_DOVE, CONFIG_ARCH_KIRKWOOD, CONFIG_MACH_ARMADA_XP &
+CONFIG_MACH_ARMADA_370 scattered through the code.
+
+       Andrew
