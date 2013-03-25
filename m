@@ -1,30 +1,32 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 25 Mar 2013 23:11:39 +0800
-Subject: [PATCH] ARM: mxs: remove unneeded mach-types.h inclusion
-Message-ID: <1364224299-28255-1-git-send-email-shawn.guo@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 25 Mar 2013 15:13:21 +0000
+Subject: [PATCH 5/6] ARM: ux500: move PRCMU functions into the CPUidle
+ driver
+In-Reply-To: <CACRpkda=FT1cHA=2oZkNcxxB=NvGLbuKia=hHkxSzEBu07CL8g@mail.gmail.com>
+References: <1363866553-15054-1-git-send-email-linus.walleij@stericsson.com>
+ <201303251411.43356.arnd@arndb.de>
+ <CACRpkda=FT1cHA=2oZkNcxxB=NvGLbuKia=hHkxSzEBu07CL8g@mail.gmail.com>
+Message-ID: <201303251513.21361.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the unneeded mach-types.h inclusion from mxs.h, which is a
-leftover from commit 845da6b (ARM: mxs: detect SoC by checking CHIPID
-register).
+On Monday 25 March 2013, Linus Walleij wrote:
+> This set of functions are called both for idling and suspend, i.e.
+> both by the machine-specific cpuidle driver and the machine-specific
+> suspend code.
+> 
+> They are conceptually coherent functions but messing with both PRCMU
+> and GIC registers, moving the responsibility of keeping track of the
+> IRQs back and forth between the GIC and the PRCMU.
+> 
+> Being able to freeze and decouple the GIC and check if a CPU is
+> in WFI is a ux500-PRCMU-specific pecularity but saves us a lot of
+> criss-cross IPIs when going to idle or sleep.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/mach-mxs/include/mach/mxs.h |    1 -
- 1 file changed, 1 deletion(-)
+I still don't understand. From what I can tell, all those functions are
+now statically declared in the cpuidle driver after your patch, so it
+sounds like you do not need a header file for them any more, where
+you needed one before. Which of those would you declare in a hypothetical
+linux/pm/ux500.h header file?
 
-diff --git a/arch/arm/mach-mxs/include/mach/mxs.h b/arch/arm/mach-mxs/include/mach/mxs.h
-index 7d4fb6d..a9be80a 100644
---- a/arch/arm/mach-mxs/include/mach/mxs.h
-+++ b/arch/arm/mach-mxs/include/mach/mxs.h
-@@ -22,7 +22,6 @@
- #ifndef __ASSEMBLER__
- #include <linux/io.h>
- #endif
--#include <asm/mach-types.h>
- #include <mach/digctl.h>
- #include <mach/hardware.h>
- 
--- 
-1.7.9.5
+	Arnd
