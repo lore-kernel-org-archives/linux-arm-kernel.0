@@ -1,57 +1,36 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 25 Mar 2013 18:18:05 +0000
-Subject: [PATCH 2/3] ARM: cacheflush: don't bother rounding to nearest vma
-In-Reply-To: <1364235486-17738-1-git-send-email-will.deacon@arm.com>
-References: <1364235486-17738-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1364235486-17738-3-git-send-email-will.deacon@arm.com>
+Date: Mon, 25 Mar 2013 18:18:03 +0000
+Subject: [PATCH 0/3] Optimise cache-flushing system call and add iovec variant
+Message-ID: <1364235486-17738-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-do_cache_op finds the lowest VMA contained in the specified address
-range and rounds the range to cover only the mapped addresses.
+Hello,
 
-Since commit 4542b6a0fa6b ("ARM: 7365/1: drop unused parameter from
-flush_cache_user_range") the VMA is not used for anything else in this
-code and seeing as the low-level cache flushing routines return -EFAULT
-if the address is not valid, there is no need for this range truncation.
+This patch series has been sitting on my box for some time, pending
+benchmark results and analysis.
 
-This patch removes the VMA handling code from the cacheflushing syscall.
+The results are that, with the first two patches in this series, we see
+~2% improvement in browser benchmark scores, which flush the cache fairly
+regularly in response to jitting JS code.
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/kernel/traps.c | 17 +----------------
- 1 file changed, 1 insertion(+), 16 deletions(-)
+The final patch is more of an RFC, since I don't have any software that
+uses it outside of my toy programs.
 
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index 1c08911..da5e268 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -509,25 +509,10 @@ static int bad_syscall(int n, struct pt_regs *regs)
- static inline int
- do_cache_op(unsigned long start, unsigned long end, int flags)
- {
--	struct mm_struct *mm = current->active_mm;
--	struct vm_area_struct *vma;
--
- 	if (end < start || flags)
- 		return -EINVAL;
- 
--	down_read(&mm->mmap_sem);
--	vma = find_vma(mm, start);
--	if (vma && vma->vm_start < end) {
--		if (start < vma->vm_start)
--			start = vma->vm_start;
--		if (end > vma->vm_end)
--			end = vma->vm_end;
--
--		up_read(&mm->mmap_sem);
--		return flush_cache_user_range(start, end);
--	}
--	up_read(&mm->mmap_sem);
--	return -EINVAL;
-+	return flush_cache_user_range(start, end);
- }
- 
- /*
+All feedback welcome,
+
+Will
+
+
+Will Deacon (3):
+  ARM: cacheflush: don't round address range up to nearest page
+  ARM: cacheflush: don't bother rounding to nearest vma
+  ARM: cacheflush: add new iovec-based cache flushing system call
+
+ arch/arm/include/asm/cacheflush.h  |  3 +--
+ arch/arm/include/uapi/asm/unistd.h |  1 +
+ arch/arm/kernel/traps.c            | 49 +++++++++++++++++++++++++++-----------
+ 3 files changed, 37 insertions(+), 16 deletions(-)
+
 -- 
 1.8.0
