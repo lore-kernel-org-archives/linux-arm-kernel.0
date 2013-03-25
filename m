@@ -1,73 +1,56 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 25 Mar 2013 19:35:05 +0100
-Subject: [RFC patch 02/11] cpuidle / arm : a single cpuidle driver
-In-Reply-To: <CAHkRjk45cGSKiC003izHrLSZPb3wsmjXPTG3e0raSaXAdQRqEQ@mail.gmail.com>
-References: <1363357630-22214-1-git-send-email-daniel.lezcano@linaro.org>
- <1363357630-22214-3-git-send-email-daniel.lezcano@linaro.org>
- <201303151447.06150.arnd@arndb.de> <51433949.1030204@linaro.org>
- <CAHkRjk45cGSKiC003izHrLSZPb3wsmjXPTG3e0raSaXAdQRqEQ@mail.gmail.com>
-Message-ID: <515098D9.2000107@linaro.org>
+From: illia.ragozin@grapecom.com (Elijah Ragozin)
+Date: Mon, 25 Mar 2013 20:43:23 +0200
+Subject: [PATCH] [ARM] Feroceon: fix kexec by setting outer_cache.inv_all
+In-Reply-To: <20130325181346.GA28029@obsidianresearch.com>
+References: <514E0D70.3060202@grapecom.com>
+ <20130325172113.GC16690@obsidianresearch.com> <51508E17.6010701@grapecom.com>
+ <20130325181346.GA28029@obsidianresearch.com>
+Message-ID: <51509ACB.5010806@grapecom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/25/2013 07:27 PM, Catalin Marinas wrote:
-> On 15 March 2013 15:07, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
->> On 03/15/2013 03:47 PM, Arnd Bergmann wrote:
->>> On Friday 15 March 2013, Daniel Lezcano wrote:
->>>> The cpuidle drivers are duplicating a lot of code and in most
->>>> of the case there is a common pattern we can factor out:
->>>>
->>>>         * setup the broadcast timers
->>>>         * register the driver
->>>>         * register the devices
->>>>
->>>> This arm driver is the common part between all the ARM cpuidle drivers,
->>>> with the code factored out.
->>>>
->>>> It does not handle the coupled idle state for now but it is the first
->>>> step to have everyone to converge to the same code pattern.
->>>>
->>>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->>>
->>> Unfortunately, I missed the session in Hong Kong, but I'd like to understand
->>> what part of this driver is actually ARM specific. I assume there is nothing
->>> in it that depends on 32 bit ARM hardware, right?
->>
->> What depends on the 32bits ARM hardware is the drivers themselves. This
->> ARM driver is the first step to consolidate all SoC cpuidle specific
->> code we find in arch/arm. The code is designated to factor out these
->> drivers, as a first step. The second step is to consolidate more this
->> driver (eg. moving the code in arch/arm/kernel/cpuidle.c in this driver).
->>
->> The last man standing algorithm we have in mach-ux500 and mach-imx is
->> the same, and will be moved in the ARM cpuidle driver.
->>
->> The more it will be consolidated, the more it will be ARM specific.
->>
->> The final step will be to use the device tree to be passed to this
->> driver and do the cpuidle driver initialization from there.
->>
->>> Would the same code be used with arch/arm64?
->>
->> I can't tell but IIUC, a single ARM driver will be used based on the
->> psci for ARM64, but it does not exist for now. It is possible some code
->> pattern could be used from the ARM32 cpuidle driver.
-> 
-> While we recommend PSCI if EL3 (secure mode) is available, not all
-> ARMv8 CPU implementations will have this and most likely we'll have to
-> reuse existing cpuidle drivers. So if you can make it as generic as
-> possible it would really help.
+On 25.03.2013 20:13, Jason Gunthorpe wrote:
+> On Mon, Mar 25, 2013 at 07:49:11PM +0200, Elijah Ragozin wrote:
+>
+>> So there is no actually disable and invalidation cache after the old
+>> kernel finished and the new one is not started yet, we're not safe
+>> to relocate and decompress the kernel.
+> Upon closer inspection I found the spec passage that the L2 becomes
+> non-coherent with the CPU once the L1 D cache is turned off.
+>
+> So, the L2 has to be invalidated after the L1 D cache is turned off,
+> or before the L1 D cache is turned on..
+>
+> Looks likes 'cpu_proc_fin' turns off the both L1 caches, so the
+> invalidate is properly after.
+>
+> This looks right to me then.
+>
+> You might want to add some additional info to the the commit message
+> along the lines of:
+>
+>    On Feroceon the L2 cache becomes non-coherent with the CPU when the
+>    L1 caches are disabled. Thus the L2 needs to be invalidated after
+>    both L1 caches are disabled.
+>
+>    .. text about kexec being the motivation ..
+>
+>
+>> If in your case everything is working could you please send for me
+>> .config and your kernel version, probably I also miss smth.
+> Upon deeper reflection, in my case the L2 is re-initialized by a boot
+> stub we use on the kexec path...
+>
+> Also, I will warn you that I could not figure out how to get Linux to
+> shut off the DMA's in things like the ethernet, so kexec is very flaky
+> on these systems.
+>
+> Jason
+>
 
-Sure, I will keep it in mind.
-
-Thanks for the information.
-
- -- Daniel
-
+Thank you for this clarification,
+I'll rework the commit message and resend the patch then.
 
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Best Regards,
+Illia Ragozin.
