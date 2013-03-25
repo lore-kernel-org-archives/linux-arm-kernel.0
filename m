@@ -1,43 +1,62 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Mar 2013 14:11:43 +0000
-Subject: [PATCH 5/6] ARM: ux500: move PRCMU functions into the CPUidle
- driver
-In-Reply-To: <CACRpkdab+iT4m5gDtuH2vYpRQRgTyOho4=s+zj0cEDfxE5g_FQ@mail.gmail.com>
-References: <1363866553-15054-1-git-send-email-linus.walleij@stericsson.com>
- <51505816.1020302@linaro.org>
- <CACRpkdab+iT4m5gDtuH2vYpRQRgTyOho4=s+zj0cEDfxE5g_FQ@mail.gmail.com>
-Message-ID: <201303251411.43356.arnd@arndb.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 25 Mar 2013 15:11:50 +0100
+Subject: [PATCH] ARM: at91: add Acme Systems Aria G25 board
+In-Reply-To: <20130325122220.GF2001@game.jcrosoft.org>
+References: <1364201369-12047-1-git-send-email-nicolas.ferre@atmel.com>
+ <20130325122220.GF2001@game.jcrosoft.org>
+Message-ID: <51505B26.7040508@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 25 March 2013, Linus Walleij wrote:
-> On Mon, Mar 25, 2013 at 2:58 PM, Daniel Lezcano
-> <daniel.lezcano@linaro.org> wrote:
-> > On 03/25/2013 02:44 PM, Linus Walleij wrote:
+On 03/25/2013 01:22 PM, Jean-Christophe PLAGNIOL-VILLARD :
+> On 09:49 Mon 25 Mar     , Nicolas Ferre wrote:
+>> From: Douglas Gilbert <dgilbert@interlog.com>
+>>
+>> Signed-off-by: Douglas Gilbert <dgilbert@interlog.com>
+>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> ---
+>>  arch/arm/boot/dts/ariag25.dts | 168 ++++++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 168 insertions(+)
+>>  create mode 100644 arch/arm/boot/dts/ariag25.dts
+>>
+>> diff --git a/arch/arm/boot/dts/ariag25.dts b/arch/arm/boot/dts/ariag25.dts
+>> new file mode 100644
+>> index 0000000..d18ef50
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/ariag25.dts
+>> @@ -0,0 +1,168 @@
+>> +/*
+>> + * ariag25.dts - Device Tree file for Acme Systems Aria G25 (AT91SAM9G25 based)
+>> + *
+>> + * Copyright (C) 2013 Douglas Gilbert <dgilbert@interlog.com>,
+>> + *                    Robert Nelson <robertcnelson@gmail.com>
+>> + *
+>> + * Licensed under GPLv2 or later.
+>> + */
+>> +/dts-v1/;
+>> +/include/ "at91sam9g25.dtsi"
+>> +
+>> +/ {
+>> +	model = "Acme Systems Aria G25";
+>> +	compatible = "acme,ariag25", "atmel,at91sam9g25ek", "atmel,at91sam9x5ek",
+>> +		     "atmel,at91sam9x5", "atmel,at91sam9";
+> I doube the code is compatible with the 9g25ek
 > 
-> >> Shall I put it in <linux/platform_data/arm-ux500-pm.h> or so,
-> >> with the implementation in arch/arm/mach-ux500/pm.c
-> >> or so?
-> >
-> > Wouldn't <asm/pm.h> be better ? So we can have the same header name for
-> > all the drivers, no ?
-> 
-> I don't think that works with multiplatform. When building multiple
-> systems our approach is to not let any two header files have the same
-> name.
-> 
-> What we did for debug macro for example was to create the <debug/*>
-> namespace, so the old <mach/debug-macro.S> is now <debug/imx.S>,
-> <debug/vt8500.h>, <debug/ux500.h> ... etc.
-> 
-> So what would be needed would then rather be <pm/*> in
-> arch/arm/include/pm and under this we would create
-> <pm/ux500.h>.
-> 
-> But that require Russell and Arnds/Olofs consent I think,
-> what do you guys say? Other recommendations?
+> specially when you do not include it
 
-I would first like to understand what contents you actually need to
-have in the header file.
+Ok, I remove it.
 
-	Arnd
+>> +
+>> +	aliases {
+>> +		serial4 = &usart3;
+>> +		serial5 = &uart0;
+>> +	};
+> you need to specify all
+
+Well I do not think so: other are taken from
+
+/include/ "at91sam9g25.dtsi"
+
+Bye,
+-- 
+Nicolas Ferre
