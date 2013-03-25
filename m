@@ -1,36 +1,75 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Mon, 25 Mar 2013 11:03:45 -0300
-Subject: [PATCH v2 12/17] ARM: mach-imx: tzic: Staticize *tzic_base
-Message-ID: <1364220225-14476-1-git-send-email-fabio.estevam@freescale.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Mon, 25 Mar 2013 15:04:36 +0100
+Subject: [PATCH 2/3] ARM: zynq: get slcr base earlier
+In-Reply-To: <1364043450-18700-3-git-send-email-s.trumtrar@pengutronix.de>
+References: <1364043450-18700-1-git-send-email-s.trumtrar@pengutronix.de>
+ <1364043450-18700-3-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <CAHTX3dJDTvs4UXoTa_8u4M83fQ9N2n96ecZzFjaXLsXkp_vWjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the following sparse warning:
+2013/3/23 Steffen Trumtrar <s.trumtrar@pengutronix.de>:
+> The slcr is needed for pinctrl, clocks and reset. Therefore we want it as early
+> as possible. As there is no driver that handles it and instead a pointer needs
+> to be passed around, rename the variable to something a little more obvious.
+>
+> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> Cc: Michal Simek <michal.simek@xilinx.com>
+> ---
+>  arch/arm/mach-zynq/common.c | 27 ++++++++++++++++++---------
+>  1 file changed, 18 insertions(+), 9 deletions(-)
+>
+> diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
+> index 014131c..1b9bb3d 100644
+> --- a/arch/arm/mach-zynq/common.c
+> +++ b/arch/arm/mach-zynq/common.c
+> @@ -38,6 +38,7 @@
+>
+>  #include "common.h"
+>
+> +void __iomem *slcr_base_addr;
+>  void __iomem *scu_base;
+>
+>  static struct of_device_id zynq_of_bus_ids[] __initdata = {
+> @@ -61,19 +62,21 @@ static void __init xilinx_init_machine(void)
+>
+>  static void __init xilinx_zynq_timer_init(void)
+>  {
+> -       struct device_node *np;
+> -       void __iomem *slcr;
+> -
+> -       np = of_find_compatible_node(NULL, NULL, "xlnx,zynq-slcr");
+> -       slcr = of_iomap(np, 0);
+> -       WARN_ON(!slcr);
+> -
+> -       xilinx_zynq_clocks_init(slcr);
+> +       xilinx_zynq_clocks_init(slcr_base_addr);
+>
+>         twd_local_timer_of_register();
+>         xttcps_timer_init();
+>  }
+>
+> +static void zynq_slcr_init(void)
+> +{
+> +       struct device_node *np;
+> +
+> +       np = of_find_compatible_node(NULL, NULL, "xlnx,zynq-slcr");
+> +       slcr_base_addr = of_iomap(np, 0);
+> +       WARN_ON(!slcr_base_addr);
+> +}
 
-arch/arm/mach-imx/tzic.c:52:14: warning: symbol 'tzic_base' was not declared. Should it be static?
+Xilinx is using separate driver for slcr and IMHO make sense to have it
+like that because this IP can handle more things which will be just messy
+to have it in one file.
+What do you think?
 
-Also, remove the comment, as it does not apply for kernels newer than 3.2.
+Thanks,
+Michal
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Changes since v1:
-- Remove the comment as per Sascha's suggestion.
- 
- arch/arm/mach-imx/tzic.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-imx/tzic.c b/arch/arm/mach-imx/tzic.c
-index 9721161..1488a4a 100644
---- a/arch/arm/mach-imx/tzic.c
-+++ b/arch/arm/mach-imx/tzic.c
-@@ -49,7 +49,7 @@
- #define TZIC_SWINT	0x0F00	/* Software Interrupt Rigger Register */
- #define TZIC_ID0	0x0FD0	/* Indentification Register 0 */
- 
--void __iomem *tzic_base; /* Used as irq controller base in entry-macro.S */
-+static void __iomem *tzic_base;
- static struct irq_domain *domain;
- 
- #define TZIC_NUM_IRQS 128
 -- 
-1.7.9.5
+Michal Simek, Ing. (M.Eng)
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
