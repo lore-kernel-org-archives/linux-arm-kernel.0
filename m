@@ -1,33 +1,36 @@
 From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Mon, 25 Mar 2013 09:20:40 -0300
-Subject: [PATCH 13/17] ARM: mach-imx: avic: Staticize *avic_base
+Date: Mon, 25 Mar 2013 09:20:42 -0300
+Subject: [PATCH 15/17] ARM: mach-imx: gpc: Include "common.h"
 In-Reply-To: <1364214044-13950-1-git-send-email-fabio.estevam@freescale.com>
 References: <1364214044-13950-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <1364214044-13950-13-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <1364214044-13950-15-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the following sparse warning:
+Fix the following sparse warnings:
 
-arch/arm/mach-imx/avic.c:54:14: warning: symbol 'avic_base' was not declared. Should it be static?
+arch/arm/mach-imx/gpc.c:29:6: warning: symbol 'imx_gpc_pre_suspend' was not declared. Should it be static?
+arch/arm/mach-imx/gpc.c:43:6: warning: symbol 'imx_gpc_post_resume' was not declared. Should it be static?
+arch/arm/mach-imx/gpc.c:71:6: warning: symbol 'imx_gpc_mask_all' was not declared. Should it be static?
+arch/arm/mach-imx/gpc.c:83:6: warning: symbol 'imx_gpc_restore_all' was not declared. Should it be static?
+arch/arm/mach-imx/gpc.c:122:13: warning: symbol 'imx_gpc_init' was not declared. Should it be static?
 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/mach-imx/avic.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-imx/gpc.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-imx/avic.c b/arch/arm/mach-imx/avic.c
-index 0eff23e..9c3e014 100644
---- a/arch/arm/mach-imx/avic.c
-+++ b/arch/arm/mach-imx/avic.c
-@@ -51,7 +51,7 @@
+diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
+index c20445c..44a65e9 100644
+--- a/arch/arm/mach-imx/gpc.c
++++ b/arch/arm/mach-imx/gpc.c
+@@ -16,6 +16,7 @@
+ #include <linux/of_address.h>
+ #include <linux/of_irq.h>
+ #include <linux/irqchip/arm-gic.h>
++#include "common.h"
  
- #define AVIC_NUM_IRQS 64
- 
--void __iomem *avic_base;
-+static void __iomem *avic_base;
- static struct irq_domain *domain;
- 
- static u32 avic_saved_mask_reg[2];
+ #define GPC_IMR1		0x008
+ #define GPC_PGC_CPU_PDN		0x2a0
 -- 
 1.7.9.5
