@@ -1,81 +1,66 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Mar 2013 11:13:43 +0000
-Subject: [PATCH 3/8] ARM: sirf: move irq driver to drivers/irqchip
-In-Reply-To: <CAGsJ_4yPRE8SBSk5eLH3j3Y9bf9tbhy15i0kEE+83VcPNk80Cw@mail.gmail.com>
-References: <1363779679-16880-1-git-send-email-arnd@arndb.de>
- <201303250941.14399.arnd@arndb.de>
- <CAGsJ_4yPRE8SBSk5eLH3j3Y9bf9tbhy15i0kEE+83VcPNk80Cw@mail.gmail.com>
-Message-ID: <201303251113.44076.arnd@arndb.de>
+From: pgaikwad@nvidia.com (Prashant Gaikwad)
+Date: Mon, 25 Mar 2013 16:44:11 +0530
+Subject: [PATCH] clk: tegra: Don't enable PLLs during early boot
+In-Reply-To: <20130325101542.GB18519@tbergstrom-lnx.Nvidia.com>
+References: <1363953308-28828-1-git-send-email-pdeschrijver@nvidia.com>
+ <514C7D3B.40602@wwwdotorg.org>
+ <20130325101542.GB18519@tbergstrom-lnx.Nvidia.com>
+Message-ID: <51503183.2010609@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 25 March 2013, Barry Song wrote:
-> 2013/3/25, Arnd Bergmann <arnd@arndb.de>:
-> > On Monday 25 March 2013, Barry Song wrote:
-> >> 2013/3/20, Arnd Bergmann <arnd@arndb.de>:
-> >> this breaks the hwirq and irq mapping. the hwirq 0 is mapped to
-> >> no_irqs, then setup_irq will fail in
-> >> drivers/clocksource/timer-prima2.c.
-> >
-> > Hmm, I don't understand yet what is going on there. This should create
-> > a domain with all dynamically allocated interrupt descriptors,
-> > and the hwirq number is just local to the controller then.
-> 
-> suppose we think the hardware register flag bit of timer-prima2 is 0,
-> irq_of_parse_and_map() will return 16 in patch2 for the timer-prima2
-> which uses the 1st hardware IRQ in the system.
-> 
-> if add nr_irqs=288 in ATLAS6 machine, irq_of_parse_and_map() will
-> return 288 in patch2. it looks like the first hw irq will always be
-> mapped to nr_irqs.
+On Monday 25 March 2013 03:45 PM, Peter De Schrijver wrote:
+> On Fri, Mar 22, 2013 at 04:48:11PM +0100, Stephen Warren wrote:
+>> On 03/22/2013 05:54 AM, Peter De Schrijver wrote:
+>>> The PLL code relies on udelay() which is not available when CCF is
+>>> initialized. Hence we can't enable any PLL during this phase.
+>>>
+>>> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+>>>
+>>> --
+>>>
+>>> Stephen,
+>>>
+>>> Can you confirm this is ok for the audio drivers?
+>>>
+>>> We used to be lucky that this has worked up to now, but I will introduce some
+>>> changes to the pll lock check code which cause this to fail due to the
+>>> slight differences in timing.
+>> No, this won't work for the audio drivers; they assume the clock is
+>> enabled when they start.
+>>
+>> This assumption was made long ago. I know drivers are supposed to assume
+>> that clocks are disabled when they're probed, but historically that
+>> wasn't always the case, so if the audio drivers assumed that, and then
+>> did clk_enable() as the first thing, they got a warning due to the
+>> enabling an already enabled clock and/or later attempts to disable the
+> That should be ok. You can enable a clock more than once.
+>
+>> clocks wouldn't actually disable them. Perhaps this has changed now, but
+>> either way, audio driver changes would be needed to support this change.
+>>
+> But indeed, the clock won't be disabled then when the driver does
+> clk_disable(). The reference count will just be decremented. That's however
+> not a functional problem, just not optimal from a power consumption point of
+> view. So we could change the drivers first and keep the clocks disabled at
+> boottime in a second phase.
+>
+>> Perhaps this is due to initializing the Tegra clock driver in the
+>> machine descriptor's init_irq function, rather than in the init_machine
+>> function? Can this be moved?
+> Maybe. But we need the clockframework before the timers are initialized...
+> So I have to check the dependencies.
 
-right.
+I have moved the initialization after slab allocator is initialized and 
+before timer initialization.
+This is later that it used to happen with our legacy framework or which 
+happens in our downstream kernel.
 
-> > Without patch 2 of the series, this would fail, because that interrupt
-> > is not mapped, but as far as I can tell, we correctly instantiate
-> > the domain here, so the irq_of_parse_and_map() in sirfsoc_of_timer_map
-> > should return a valid interrupt number. Can you check what it returns
-> > instead? Does it work if you revert to a legacy domain here?
-> 
-> actually patch2 can work without patch3 by irq_domain_add legacy. as
-> you can see, my old timer-marco.c uses irq_of_parse_and_map() instead
-> of reading interrupts manually.
+Isn't this problem observed in downstream kernel?
 
-Yes, irq_of_parse_and_map() should always work.
+May be we can split the clock initialization and move clock init from 
+table to some later stage.
 
->         void __iomem *base = of_iomap(np, 0);
->         if (!base)
->                 panic("unable to map intc cpu registers\n");
-> 
-> -       sirfsoc_irqdomain = irq_domain_add_linear(np, SIRFSOC_NUM_IRQS,
-> +       sirfsoc_irqdomain = irq_domain_add_legacy(np, SIRFSOC_NUM_IRQS, 0, 0,
->                                  &irq_domain_simple_ops, base);
-> 
->         sirfsoc_alloc_gc(base, 0, 32);
-> ...
-> drivers/pinctrl/pinctrl-sirf.c:
-> -                bank->domain = irq_domain_add_linear(np,
-> SIRFSOC_GPIO_BANK_SIZE,
-> +                bank->domain = irq_domain_add_legacy(np,
-> SIRFSOC_GPIO_BANK_SIZE,
-> +                        128 + i * SIRFSOC_GPIO_BANK_SIZE, 0,
->                         &sirfsoc_gpio_irq_simple_ops, bank);
-
-Right, but if we do this, we encode static IRQ numbers into the
-irqchip drivers, which should not be necessary if all interrupts
-can be mapped dynamically.
-
-This means that the interrupt numbers that Linux reports in
-/proc/interrupts will all change, but I don't see anything that
-still depends on those, unless you have additional out of tree
-patches that rely on hardcoded numbers.
-
-Digging a bit deeper, I found that the generic irqchip implemmentation
-does not deal with linear irq domains yet. There was a patch[1] least
-year from Rob Herring, but it never got merged. I guess we can move
-back to using the legacy domain for drivers/irqchip/irq-sirfsoc.c for
-now and hardwire the assumption that its interrupts start at number 0.
-
-	Arnd
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2012-January/082455.html
+> Cheers,
+>
+> Peter.
