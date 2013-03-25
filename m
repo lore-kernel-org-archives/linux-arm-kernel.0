@@ -1,515 +1,82 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 25 Mar 2013 06:34:32 -0300
-Subject: [PATCH v2 11/14] thermal: mvebu: Add support for Marvell Dove
- SoC family
-In-Reply-To: <514D914D.3010105@gmail.com>
-References: <1363991114-4225-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1363991114-4225-12-git-send-email-ezequiel.garcia@free-electrons.com>
- <514D914D.3010105@gmail.com>
-Message-ID: <20130325093430.GA2502@localhost>
+From: avinashphilip@ti.com (Philip Avinash)
+Date: Mon, 25 Mar 2013 15:07:48 +0530
+Subject: [PATCH v3 1/3] ARM: davinci: clk framework support for enable/disable
+ functionality
+In-Reply-To: <1364197789-16783-1-git-send-email-avinashphilip@ti.com>
+References: <1364197789-16783-1-git-send-email-avinashphilip@ti.com>
+Message-ID: <1364204268-15010-1-git-send-email-avinashphilip@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sebastian,
+Davinci clock framework currently not supporting clock enable/disable
+functionality on clock nodes. In Davinci platform, EHRPWM module requires
+support for clock enable/disable for TBCLK support. Hence this patch
+adds support for enabling/disabling clocks depends on the availability
+of the functionality.
 
-Thanks again for your testing.
-
-On Sat, Mar 23, 2013 at 12:26:05PM +0100, Sebastian Hesselbarth wrote:
-[...]
-> 
-> maybe Dove thermal isn't that compatible with the others as you thought.
-> 
-> Have a look at DOVE_THERMAL_TEMP_OFFSET above, it is 1 while MVEBU_THERMAL_TEMP_OFFSET
-> is 10. I've tested your patches on Dove and they break thermal. You either need
-> a dove_get_temp() that uses correct DOVE_THERMAL_TEMP_OFFSET or have it stored
-> within mvebu_thermal_ops and use it in mvebu_get_temp().
-> 
-
-Can you try replacing this patch (i.e. the whole Dove patch) with the
-one below?
-
-If you confirm this is working, I can send v3 patchset.
-
--------------------------------------8<-------------------------------------------
-
->From 8695c7cbdb4922cf0ab7004fd185fea199db6174 Mon Sep 17 00:00:00 2001
-From: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-Date: Fri, 15 Mar 2013 18:28:41 -0300
-Subject: [PATCH] thermal: mvebu: Add support for Marvell Dove SoC
- family
-
-With the infrastructure added in mvebu-thermal to support multiple SoC
-families, it is now possible to add support for Dove SoC.
-This patch adds such support taking the implementation from the
-dove-thermal driver, and then removing it.
-
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Signed-off-by: Philip Avinash <avinashphilip@ti.com>
 ---
- .../devicetree/bindings/thermal/dove-thermal.txt   |   18 --
- .../devicetree/bindings/thermal/mvebu-thermal.txt  |    8 +
- drivers/thermal/Kconfig                            |    8 -
- drivers/thermal/Makefile                           |    1 -
- drivers/thermal/dove_thermal.c                     |  210 --------------------
- drivers/thermal/mvebu_thermal.c                    |   86 ++++++++
- 6 files changed, 94 insertions(+), 237 deletions(-)
- delete mode 100644 Documentation/devicetree/bindings/thermal/dove-thermal.txt
- delete mode 100644 drivers/thermal/dove_thermal.c
+Changes since v2:
+	- start using "usecount" field in clk structure to
+	  enable/disable clocks.
 
-diff --git a/Documentation/devicetree/bindings/thermal/dove-thermal.txt b/Documentation/devicetree/bindings/thermal/dove-thermal.txt
-deleted file mode 100644
-index 6f47467..0000000
---- a/Documentation/devicetree/bindings/thermal/dove-thermal.txt
-+++ /dev/null
-@@ -1,18 +0,0 @@
--* Dove Thermal
--
--This driver is for Dove SoCs which contain a thermal sensor.
--
--Required properties:
--- compatible : "marvell,dove-thermal"
--- reg : Address range of the thermal registers
--
--The reg properties should contain two ranges. The first is for the
--three Thermal Manager registers, while the second range contains the
--Thermal Diode Control Registers.
--
--Example:
--
--	thermal at 10078 {
--		compatible = "marvell,dove-thermal";
--		reg = <0xd001c 0x0c>, <0xd005c 0x08>;
--	};
-diff --git a/Documentation/devicetree/bindings/thermal/mvebu-thermal.txt b/Documentation/devicetree/bindings/thermal/mvebu-thermal.txt
-index 49d55a9..2c5297a 100644
---- a/Documentation/devicetree/bindings/thermal/mvebu-thermal.txt
-+++ b/Documentation/devicetree/bindings/thermal/mvebu-thermal.txt
-@@ -6,6 +6,7 @@ Required properties:
- 		marvell,kirkwood-thermal
- 		marvell,armadaxp-thermal
- 		marvell,armada370-thermal
-+		marvell,dove-thermal
- 
- - reg:		Device's register space.
- 		One or two entries are expected, see the examples below.
-@@ -21,3 +22,10 @@ Kirkwood example:
- 		compatible = "marvell,kirkwood-thermal";
- 		reg = <0x10078 0x4>;
- 	};
-+
-+Dove example:
-+
-+	thermal: thermal at d001c {
-+		compatible = "marvell,dove-thermal";
-+		reg = <0xd001c 0x0c>, <0xd005c 0x08>;
-+	};
-diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-index 74f6b97..237c3e6 100644
---- a/drivers/thermal/Kconfig
-+++ b/drivers/thermal/Kconfig
-@@ -126,14 +126,6 @@ config EXYNOS_THERMAL_EMUL
- 	  device directory to support emulation mode. With emulation mode sysfs
- 	  node, you can manually input temperature to TMU for simulation purpose.
- 
--config DOVE_THERMAL
--	tristate "Temperature sensor on Marvell Dove SoCs"
--	depends on ARCH_DOVE
--	depends on OF
--	help
--	  Support for the Dove thermal sensor driver in the Linux thermal
--	  framework.
--
- config DB8500_THERMAL
- 	bool "DB8500 thermal management"
- 	depends on ARCH_U8500
-diff --git a/drivers/thermal/Makefile b/drivers/thermal/Makefile
-index 40293a1..ddd77f4 100644
---- a/drivers/thermal/Makefile
-+++ b/drivers/thermal/Makefile
-@@ -17,7 +17,6 @@ obj-$(CONFIG_SPEAR_THERMAL)	+= spear_thermal.o
- obj-$(CONFIG_RCAR_THERMAL)	+= rcar_thermal.o
- obj-$(CONFIG_MVEBU_THERMAL)	+= mvebu_thermal.o
- obj-$(CONFIG_EXYNOS_THERMAL)	+= exynos_thermal.o
--obj-$(CONFIG_DOVE_THERMAL)  	+= dove_thermal.o
- obj-$(CONFIG_DB8500_THERMAL)	+= db8500_thermal.o
- obj-$(CONFIG_DB8500_CPUFREQ_COOLING)	+= db8500_cpufreq_cooling.o
- obj-$(CONFIG_INTEL_POWERCLAMP)	+= intel_powerclamp.o
-diff --git a/drivers/thermal/dove_thermal.c b/drivers/thermal/dove_thermal.c
-deleted file mode 100644
-index ddd73a5..0000000
---- a/drivers/thermal/dove_thermal.c
-+++ /dev/null
-@@ -1,210 +0,0 @@
--/*
-- * Dove thermal sensor driver
-- *
-- * Copyright (C) 2013 Andrew Lunn <andrew@lunn.ch>
-- *
-- * This software is licensed under the terms of the GNU General Public
-- * License version 2, as published by the Free Software Foundation, and
-- * may be copied, distributed, and modified under those terms.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-- * GNU General Public License for more details.
-- *
-- */
--#include <linux/device.h>
--#include <linux/err.h>
--#include <linux/io.h>
--#include <linux/kernel.h>
--#include <linux/of.h>
--#include <linux/module.h>
--#include <linux/platform_device.h>
--#include <linux/thermal.h>
--
--#define DOVE_THERMAL_TEMP_OFFSET	1
--#define DOVE_THERMAL_TEMP_MASK		0x1FF
--
--/* Dove Thermal Manager Control and Status Register */
--#define PMU_TM_DISABLE_OFFS		0
--#define PMU_TM_DISABLE_MASK		(0x1 << PMU_TM_DISABLE_OFFS)
--
--/* Dove Theraml Diode Control 0 Register */
--#define PMU_TDC0_SW_RST_MASK		(0x1 << 1)
--#define PMU_TDC0_SEL_VCAL_OFFS		5
--#define PMU_TDC0_SEL_VCAL_MASK		(0x3 << PMU_TDC0_SEL_VCAL_OFFS)
--#define PMU_TDC0_REF_CAL_CNT_OFFS	11
--#define PMU_TDC0_REF_CAL_CNT_MASK	(0x1FF << PMU_TDC0_REF_CAL_CNT_OFFS)
--#define PMU_TDC0_AVG_NUM_OFFS		25
--#define PMU_TDC0_AVG_NUM_MASK		(0x7 << PMU_TDC0_AVG_NUM_OFFS)
--
--/* Dove Thermal Diode Control 1 Register */
--#define PMU_TEMP_DIOD_CTRL1_REG		0x04
--#define PMU_TDC1_TEMP_VALID_MASK	(0x1 << 10)
--
--/* Dove Thermal Sensor Dev Structure */
--struct dove_thermal_priv {
--	void __iomem *sensor;
--	void __iomem *control;
--};
--
--static int dove_init_sensor(const struct dove_thermal_priv *priv)
--{
--	u32 reg;
--	u32 i;
--
--	/* Configure the Diode Control Register #0 */
--	reg = readl_relaxed(priv->control);
--
--	/* Use average of 2 */
--	reg &= ~PMU_TDC0_AVG_NUM_MASK;
--	reg |= (0x1 << PMU_TDC0_AVG_NUM_OFFS);
--
--	/* Reference calibration value */
--	reg &= ~PMU_TDC0_REF_CAL_CNT_MASK;
--	reg |= (0x0F1 << PMU_TDC0_REF_CAL_CNT_OFFS);
--
--	/* Set the high level reference for calibration */
--	reg &= ~PMU_TDC0_SEL_VCAL_MASK;
--	reg |= (0x2 << PMU_TDC0_SEL_VCAL_OFFS);
--	writel(reg, priv->control);
--
--	/* Reset the sensor */
--	reg = readl_relaxed(priv->control);
--	writel((reg | PMU_TDC0_SW_RST_MASK), priv->control);
--	writel(reg, priv->control);
--
--	/* Enable the sensor */
--	reg = readl_relaxed(priv->sensor);
--	reg &= ~PMU_TM_DISABLE_MASK;
--	writel(reg, priv->sensor);
--
--	/* Poll the sensor for the first reading */
--	for (i = 0; i < 1000000; i++) {
--		reg = readl_relaxed(priv->sensor);
--		if (reg & DOVE_THERMAL_TEMP_MASK)
--			break;
--	}
--
--	if (i == 1000000)
--		return -EIO;
--
--	return 0;
--}
--
--static int dove_get_temp(struct thermal_zone_device *thermal,
--			  unsigned long *temp)
--{
--	unsigned long reg;
--	struct dove_thermal_priv *priv = thermal->devdata;
--
--	/* Valid check */
--	reg = readl_relaxed(priv->control + PMU_TEMP_DIOD_CTRL1_REG);
--	if ((reg & PMU_TDC1_TEMP_VALID_MASK) == 0x0) {
--		dev_err(&thermal->device,
--			"Temperature sensor reading not valid\n");
--		return -EIO;
--	}
--
--	/*
--	 * Calculate temperature. According to Marvell internal
--	 * documentation the formula for this is:
--	 * Celsius = (322-reg)/1.3625
--	 */
--	reg = readl_relaxed(priv->sensor);
--	reg = (reg >> DOVE_THERMAL_TEMP_OFFSET) & DOVE_THERMAL_TEMP_MASK;
--	*temp = ((3220000000UL - (10000000UL * reg)) / 13625);
--
--	return 0;
--}
--
--static struct thermal_zone_device_ops ops = {
--	.get_temp = dove_get_temp,
--};
--
--static const struct of_device_id dove_thermal_id_table[] = {
--	{ .compatible = "marvell,dove-thermal" },
--	{}
--};
--
--static int dove_thermal_probe(struct platform_device *pdev)
--{
--	struct thermal_zone_device *thermal = NULL;
--	struct dove_thermal_priv *priv;
--	struct resource *res;
--	int ret;
--
--	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	if (!res) {
--		dev_err(&pdev->dev, "Failed to get platform resource\n");
--		return -ENODEV;
--	}
--
--	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
--	if (!priv)
--		return -ENOMEM;
--
--	priv->sensor = devm_request_and_ioremap(&pdev->dev, res);
--	if (!priv->sensor) {
--		dev_err(&pdev->dev, "Failed to request_ioremap memory\n");
--		return -EADDRNOTAVAIL;
--	}
--
--	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
--	if (!res) {
--		dev_err(&pdev->dev, "Failed to get platform resource\n");
--		return -ENODEV;
--	}
--	priv->control = devm_request_and_ioremap(&pdev->dev, res);
--	if (!priv->control) {
--		dev_err(&pdev->dev, "Failed to request_ioremap memory\n");
--		return -EADDRNOTAVAIL;
--	}
--
--	ret = dove_init_sensor(priv);
--	if (ret) {
--		dev_err(&pdev->dev, "Failed to initialize sensor\n");
--		return ret;
--	}
--
--	thermal = thermal_zone_device_register("dove_thermal", 0, 0,
--					       priv, &ops, NULL, 0, 0);
--	if (IS_ERR(thermal)) {
--		dev_err(&pdev->dev,
--			"Failed to register thermal zone device\n");
--		return PTR_ERR(thermal);
--	}
--
--	platform_set_drvdata(pdev, thermal);
--
--	return 0;
--}
--
--static int dove_thermal_exit(struct platform_device *pdev)
--{
--	struct thermal_zone_device *dove_thermal =
--		platform_get_drvdata(pdev);
--
--	thermal_zone_device_unregister(dove_thermal);
--	platform_set_drvdata(pdev, NULL);
--
--	return 0;
--}
--
--MODULE_DEVICE_TABLE(of, dove_thermal_id_table);
--
--static struct platform_driver dove_thermal_driver = {
--	.probe = dove_thermal_probe,
--	.remove = dove_thermal_exit,
--	.driver = {
--		.name = "dove_thermal",
--		.owner = THIS_MODULE,
--		.of_match_table = of_match_ptr(dove_thermal_id_table),
--	},
--};
--
--module_platform_driver(dove_thermal_driver);
--
--MODULE_AUTHOR("Andrew Lunn <andrew@lunn.ch>");
--MODULE_DESCRIPTION("Dove thermal driver");
--MODULE_LICENSE("GPL");
-diff --git a/drivers/thermal/mvebu_thermal.c b/drivers/thermal/mvebu_thermal.c
-index 60d50c7..b043da3 100644
---- a/drivers/thermal/mvebu_thermal.c
-+++ b/drivers/thermal/mvebu_thermal.c
-@@ -2,6 +2,7 @@
-  * Marvell EBU thermal sensor driver
-  *
-  * Copyright (C) 2013 Marvell
-+ * Copyright (C) 2013 Andrew Lunn <andrew@lunn.ch>
-  * Copyright (C) 2012 Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
-  *
-  * This software is licensed under the terms of the GNU General Public
-@@ -30,6 +31,9 @@
- #define MVEBU_THERMAL_TEMP_OFFSET	10
- #define MVEBU_THERMAL_TEMP_MASK		0x1FF
- 
-+#define DOVE_THERMAL_TEMP_OFFSET	1
-+#define DOVE_THERMAL_TEMP_MASK		0x1FF
-+
- /* Thermal Manager Control and Status Register */
- #define PMU_TDC0_SW_RST_MASK		(0x1 << 1)
- #define PMU_TM_DISABLE_OFFS		0
-@@ -38,6 +42,14 @@
- #define PMU_TDC0_REF_CAL_CNT_MASK	(0x1ff << PMU_TDC0_REF_CAL_CNT_OFFS)
- #define PMU_TDC0_OTF_CAL_MASK		(0x1 << 30)
- #define PMU_TDC0_START_CAL_MASK		(0x1 << 25)
-+#define PMU_TDC0_AVG_NUM_OFFS		25
-+#define PMU_TDC0_AVG_NUM_MASK		(0x7 << PMU_TDC0_AVG_NUM_OFFS)
-+#define PMU_TDC0_SEL_VCAL_OFFS		5
-+#define PMU_TDC0_SEL_VCAL_MASK		(0x3 << PMU_TDC0_SEL_VCAL_OFFS)
-+
-+/* Dove Thermal Diode Control 1 Register */
-+#define PMU_TEMP_DIOD_CTRL1_REG		0x04
-+#define PMU_TDC1_TEMP_VALID_MASK	(0x1 << 10)
- 
- struct mvebu_thermal_ops;
- 
-@@ -113,6 +125,53 @@ static void armada370_init_sensor(struct mvebu_thermal_priv *priv)
- 	mdelay(10);
- }
- 
-+static void dove_init_sensor(struct mvebu_thermal_priv *priv)
-+{
-+	unsigned long reg;
-+	int i;
-+
-+	if (!priv->control)
-+		return;
-+
-+	/* Configure the Diode Control Register #0 */
-+	reg = readl_relaxed(priv->control);
-+
-+	/* Use average of 2 */
-+	reg &= ~PMU_TDC0_AVG_NUM_MASK;
-+	reg |= (0x1 << PMU_TDC0_AVG_NUM_OFFS);
-+
-+	/* Reference calibration value */
-+	reg &= ~PMU_TDC0_REF_CAL_CNT_MASK;
-+	reg |= (0x0F1 << PMU_TDC0_REF_CAL_CNT_OFFS);
-+
-+	/* Set the high level reference for calibration */
-+	reg &= ~PMU_TDC0_SEL_VCAL_MASK;
-+	reg |= (0x2 << PMU_TDC0_SEL_VCAL_OFFS);
-+	writel(reg, priv->control);
-+
-+	/* Reset the sensor */
-+	reg = readl_relaxed(priv->control);
-+	writel((reg | PMU_TDC0_SW_RST_MASK), priv->control);
-+	writel(reg, priv->control);
-+
-+	/* Enable the sensor */
-+	reg = readl_relaxed(priv->sensor);
-+	reg &= ~PMU_TM_DISABLE_MASK;
-+	writel(reg, priv->sensor);
-+
-+	/*
-+	 * FIXME: This looks really ugly. Can't we just remove it?
-+	 * Poll the sensor for the first reading
-+	 */
-+	for (i = 0; i < 1000000; i++) {
-+		reg = (readl_relaxed(priv->sensor) >> MVEBU_THERMAL_TEMP_OFFSET)
-+			& MVEBU_THERMAL_TEMP_MASK;
-+		if (reg)
-+			break;
+Changes since v1:
+	- Add support for clock enable/disable functionality.
+
+ arch/arm/mach-davinci/clock.c |   21 ++++++++++++++-------
+ arch/arm/mach-davinci/clock.h |    2 ++
+ 2 files changed, 16 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm/mach-davinci/clock.c b/arch/arm/mach-davinci/clock.c
+index d458558..960c7a5 100644
+--- a/arch/arm/mach-davinci/clock.c
++++ b/arch/arm/mach-davinci/clock.c
+@@ -35,19 +35,26 @@ static void __clk_enable(struct clk *clk)
+ {
+ 	if (clk->parent)
+ 		__clk_enable(clk->parent);
+-	if (clk->usecount++ == 0 && (clk->flags & CLK_PSC))
+-		davinci_psc_config(clk->domain, clk->gpsc, clk->lpsc,
+-				true, clk->flags);
++	if (clk->usecount++ == 0) {
++		if (clk->flags & CLK_PSC)
++			davinci_psc_config(clk->domain, clk->gpsc, clk->lpsc,
++					true, clk->flags);
++		else if (clk->clk_enable)
++			clk->clk_enable(clk);
 +	}
-+	return;
-+}
-+
- static bool mvebu_is_valid(struct mvebu_thermal_priv *priv)
- {
- 	unsigned long reg = readl_relaxed(priv->sensor);
-@@ -130,6 +189,15 @@ static unsigned long kirkwood_sensor_temp(struct mvebu_thermal_priv *priv)
- 	return (3220000000UL - (10000000UL * reg)) / 13625;
  }
  
-+static unsigned long dove_sensor_temp(struct mvebu_thermal_priv *priv)
-+{
-+	unsigned long reg = readl_relaxed(priv->sensor);
-+
-+	reg = (reg >> DOVE_THERMAL_TEMP_OFFSET) &
-+		DOVE_THERMAL_TEMP_MASK;
-+	return (3220000000UL - (10000000UL * reg)) / 13625;
-+}
-+
- static unsigned long armada_sensor_temp(struct mvebu_thermal_priv *priv)
+ static void __clk_disable(struct clk *clk)
  {
- 	unsigned long reg = readl_relaxed(priv->sensor);
-@@ -139,6 +207,13 @@ static unsigned long armada_sensor_temp(struct mvebu_thermal_priv *priv)
- 	return (3153000000UL - (10000000UL*reg)) / 13825;
+ 	if (WARN_ON(clk->usecount == 0))
+ 		return;
+-	if (--clk->usecount == 0 && !(clk->flags & CLK_PLL) &&
+-	    (clk->flags & CLK_PSC))
+-		davinci_psc_config(clk->domain, clk->gpsc, clk->lpsc,
+-				false, clk->flags);
++	if (--clk->usecount == 0) {
++		if (!(clk->flags & CLK_PLL) && (clk->flags & CLK_PSC))
++			davinci_psc_config(clk->domain, clk->gpsc, clk->lpsc,
++					false, clk->flags);
++		else if (clk->clk_disable)
++			clk->clk_disable(clk);
++	}
+ 	if (clk->parent)
+ 		__clk_disable(clk->parent);
  }
- 
-+static bool dove_is_valid(struct mvebu_thermal_priv *priv)
-+{
-+	unsigned long reg =
-+		readl_relaxed(priv->control + PMU_TEMP_DIOD_CTRL1_REG);
-+	return reg & PMU_TDC1_TEMP_VALID_MASK;
-+}
-+
- static int mvebu_get_temp(struct thermal_zone_device *thermal,
- 			  unsigned long *temp)
- {
-@@ -164,6 +239,12 @@ static const struct mvebu_thermal_ops kirkwood_ops = {
- 	.is_valid = mvebu_is_valid,
+diff --git a/arch/arm/mach-davinci/clock.h b/arch/arm/mach-davinci/clock.h
+index 8694b39..1e4e836 100644
+--- a/arch/arm/mach-davinci/clock.h
++++ b/arch/arm/mach-davinci/clock.h
+@@ -104,6 +104,8 @@ struct clk {
+ 	int (*set_rate) (struct clk *clk, unsigned long rate);
+ 	int (*round_rate) (struct clk *clk, unsigned long rate);
+ 	int (*reset) (struct clk *clk, bool reset);
++	void (*clk_enable) (struct clk *clk);
++	void (*clk_disable) (struct clk *clk);
  };
  
-+static const struct mvebu_thermal_ops dove_ops = {
-+	.sensor_temp = dove_sensor_temp,
-+	.is_valid = dove_is_valid,
-+	.init_sensor = dove_init_sensor,
-+};
-+
- static const struct mvebu_thermal_ops armadaxp_ops = {
- 	.sensor_temp = armada_sensor_temp,
- 	.init_sensor = armadaxp_init_sensor,
-@@ -189,6 +270,10 @@ static const struct of_device_id mvebu_thermal_id_table[] = {
- 		.data       = &armada370_ops,
- 	},
- 	{
-+		.compatible = "marvell,dove-thermal",
-+		.data       = &dove_ops,
-+	},
-+	{
- 		/* sentinel */
- 	},
- };
-@@ -267,6 +352,7 @@ static struct platform_driver mvebu_thermal_driver = {
- 
- module_platform_driver(mvebu_thermal_driver);
- 
-+MODULE_AUTHOR("Andrew Lunn <andrew@lunn.ch>");
- MODULE_AUTHOR("Nobuhiro Iwamatsu <iwamatsu@nigauri.org>");
- MODULE_AUTHOR("Ezequiel Garcia <ezequiel.garcia@free-electrons.com>");
- MODULE_DESCRIPTION("mvebu thermal driver");
+ /* Clock flags: SoC-specific flags start at BIT(16) */
 -- 
-1.7.8.6
-
-------------------------------------->8-------------------------------------------
-
-
-Thanks a lot,
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+1.7.9.5
