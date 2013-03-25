@@ -1,41 +1,54 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 25 Mar 2013 17:57:42 -0400 (EDT)
-Subject: [PATCH 07/15] ARM: cpuidle: add init/exit routine
-In-Reply-To: <5150C74E.1040903@linaro.org>
-References: <1364234140-514-1-git-send-email-daniel.lezcano@linaro.org>
- <1364234140-514-8-git-send-email-daniel.lezcano@linaro.org>
- <20130325181038.GA631@lunn.ch> <51509873.1010408@linaro.org>
- <alpine.LFD.2.03.1303251616070.1372@syhkavp.arg>
- <5150C74E.1040903@linaro.org>
-Message-ID: <alpine.LFD.2.03.1303251756000.1372@syhkavp.arg>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 25 Mar 2013 22:00:46 +0000
+Subject: [PATCH v5 7/7] irqchip: s3c24xx: add devicetree support
+In-Reply-To: <201303252234.21314.heiko@sntech.de>
+References: <201303252226.21402.heiko@sntech.de>
+ <201303252234.21314.heiko@sntech.de>
+Message-ID: <201303252200.46258.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 25 Mar 2013, Daniel Lezcano wrote:
-
-> On 03/25/2013 09:28 PM, Nicolas Pitre wrote:
-> > On Mon, 25 Mar 2013, Daniel Lezcano wrote:
-> > 
-> >> In the future, when all the ARM cpuidle driver will be fully
-> >> consolidated, that will be easier to identify the common parts across
-> >> the different arch and then move them to the generic framework.
-> > 
-> > Nothing prevents you from doing that consolidation work right in 
-> > drivers/cpuidle/.
+On Monday 25 March 2013, Heiko St?bner wrote:
+> Add the necessary code to initialize the interrupt controller
+> thru devicetree data using the irqchip infrastructure.
 > 
-> I fully agree with you but I think there is a misunderstanding.
-> 
-> The idea is to consolidate the ARM code in the ARM cpuidle driver which
-> is mostly empty. The init/exit functions could falsely lead someone to
-> think they could be moved in the generic framework but IMO it is too
-> soon because the code consolidation will bring some arch specificity and
-> in this case we will going back and forth. I want to avoid that.
-> 
-> Let me consolidate the ARM driver, cleanup the headers to split the arch
-> specific code from the rest and then move this driver to
-> drivers/cpuidle. This is just a question of a week.
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 
-OK.
+The binding looks fine now. I have a few detail comments but am happy
+with the series otherwise.
 
+> +Required properties:
+> +- compatible: Compatible property value should be "samsung,s3c24xx-irq"
+> +  for non s3c2416 machines and "samsung,s3c2416-irq" for s3c2416 machines
 
-Nicolas
+We try to avoid wildcards in the "compatible" properties. Better use
+the name of the first SoC that had this controller, and let the other
+ones mark themselves as compatible with that one.
+
+I guess "samsung,s3c2410-irq" would be the right identifier here.
+
+> +- #interrupt-cells : Specifies the number of cells needed to encode an
+> +  interrupt source. The value shall be 4 and interrupt descriptor shall
+> +  have the following format:
+> +      <ctrl_num ctrl_irq parent_irq type>
+> +
+> +  ctrl_num contains the controller to use:
+> +      - 0 ... main controller
+> +      - 1 ... sub controller
+> +      - 2 ... second main controller on s3c2416 and s3c2450
+> +  ctrl_irq contains the interrupt bit of the controller
+> +  parent_irq contains the parent bit in the main controller and will be
+> +             ignored in main controllers
+
+I expected the second and third cell to be in the opposite order, so
+the meaning of the second cell is always the same.
+
+> +	/* we're using individual domains for the non-dt case
+> +	 * and one big domain for the dt case where the subintc
+> +	 * starts at hwirq number 32.
+> +	 */
+> +	offset = (intc->domain->of_node) ? 32 : 0;
+
+Wouldn't it be easier to always use the same setup for the domains here?
+
+	Arnd
