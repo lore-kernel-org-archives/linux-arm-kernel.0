@@ -1,178 +1,63 @@
-From: keyuan.liu@gmail.com (Kevin Liu)
-Date: Mon, 25 Mar 2013 15:58:31 +0800
-Subject: FW: [PATCH v2 3/4] mmc: sdhci-pxa: Add SDHCI driver for PXA16x
-In-Reply-To: <25B60CDC2F704E4E9D88FFD52780CB4C0BDEC87120@SC-VEXCH1.marvell.com>
-References: <25B60CDC2F704E4E9D88FFD52780CB4C0BDEC87120@SC-VEXCH1.marvell.com>
-Message-ID: <CADz5_gJTyxbTHnAN+BH_Q257DVp+KwNCyFOuVt7tGRgrH46+MA@mail.gmail.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Mon, 25 Mar 2013 21:11:40 +1300
+Subject: [PATCH] arm: vt8500: Add wm8850 config options to multi_v7_defconfig
+Message-ID: <1364199100-12300-1-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-mmc-owner at vger.kernel.org [mailto:linux-mmc-owner at vger.kernel.org] On Behalf Of Tanmay Upadhyay
-> Sent: Monday, March 18, 2013 2:20 AM
-> To: Zhangfei Gao; dwang4 at marvell.com; njun at marvell.com; Qiming Wu; prakity at marvell.com
-> Cc: cjb at laptop.org; linux-mmc at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Tanmay Upadhyay
-> Subject: [PATCH v2 3/4] mmc: sdhci-pxa: Add SDHCI driver for PXA16x
->
-> PXA16x devices uses SDHCI controller v1. As it's not much different
-> than v2 controller, v1 driver is merged with sdhci-pxav2 driver
->
-> v2 - instead of having separate file sdhci-pxav1, merge code with
->      sdhci-pxav2 driver code as suggested by Chris Ball
->
-> Signed-off-by: Philip Rakity <prakity@marvell.com>
-> Signed-off-by: Tanmay Upadhyay <tanmay.upadhyay@einfochips.com>
-> ---
->  drivers/mmc/host/Kconfig                |    7 ++++---
->  drivers/mmc/host/sdhci-pxav2.c          |   30 +++++++++++++++++++++++++++++-
->  drivers/mmc/host/sdhci.c                |    3 +++
->  drivers/mmc/host/sdhci.h                |    1 +
->  include/linux/platform_data/pxa_sdhci.h |    2 ++
->  5 files changed, 39 insertions(+), 4 deletions(-)
->
-> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-> index e5faed8..875e2475 100644
-> --- a/drivers/mmc/host/Kconfig
-> +++ b/drivers/mmc/host/Kconfig
-> @@ -207,14 +207,15 @@ config MMC_SDHCI_PXAV3
->           If unsure, say N.
->
->  config MMC_SDHCI_PXAV2
-> -       tristate "Marvell PXA9XX SD Host Controller support (PXAV2)"
-> +       tristate "Marvell PXA16X/PXA9XX SD Host Controller support (PXAV1/V2)"
->         depends on CLKDEV_LOOKUP
->         select MMC_SDHCI
->         select MMC_SDHCI_PLTFM
->         default y if CPU_PXA910
-> +       default y if CPU_PXA168
->         help
-> -         This selects the Marvell(R) PXAV2 SD Host Controller.
-> -         If you have a PXA9XX platform with SD Host Controller
-> +         This selects the Marvell(R) PXAV1/V2 SD Host Controller.
-> +         If you have a PXA16X or PXA9XX platform with SD Host Controller
->           and a card slot, say Y or M here.
->
->           If unsure, say N.
-> diff --git a/drivers/mmc/host/sdhci-pxav2.c b/drivers/mmc/host/sdhci-pxav2.c
-> index ac854aa..5af7d46 100644
-> --- a/drivers/mmc/host/sdhci-pxav2.c
-> +++ b/drivers/mmc/host/sdhci-pxav2.c
-> @@ -30,6 +30,7 @@
->  #include <linux/slab.h>
->  #include <linux/of.h>
->  #include <linux/of_device.h>
-> +#include <linux/delay.h>
->
->  #include "sdhci.h"
->  #include "sdhci-pltfm.h"
-> @@ -75,7 +76,13 @@ static void pxav2_set_private_registers(struct sdhci_host *host, u8 mask)
->                         writew(tmp, host->ioaddr + SD_CLOCK_BURST_SIZE_SETUP);
->                 }
->
-> -               if (pdata && (pdata->flags & PXA_FLAG_ENABLE_CLOCK_GATING)) {
-> +               if (pdata && pdata->pxav1_controller) {
-> +                       /* no clock gating */
-> +                       tmp = readw(host->ioaddr + SD_FIFO_PARAM);
-> +                       tmp |= DIS_PAD_SD_CLK_GATE;
-> +                       writew(tmp, host->ioaddr + SD_FIFO_PARAM);
+This patch finally adds the WM8850 SoC to the multi_v7_defconfig.
+We don't have a seperate defconfig for this SoC as it is only
+available as a multiplatform option.
 
-Why above code needed? And why just disable bit DIS_PAD_SD_CLK_GATE?
-Below code when PXA_FLAG_ENABLE_CLOCK_GATING is not set can disable
-clock gating.
+Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+---
+ arch/arm/configs/multi_v7_defconfig |    8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-> +               } else if (pdata && (pdata->flags
-> +                               & PXA_FLAG_ENABLE_CLOCK_GATING)) {
->                         tmp = readw(host->ioaddr + SD_FIFO_PARAM);
->                         tmp &= ~CLK_GATE_SETTING_BITS;
->                         writew(tmp, host->ioaddr + SD_FIFO_PARAM);
-> @@ -118,6 +125,20 @@ static u32 pxav2_get_max_clock(struct sdhci_host *host)
->         return clk_get_rate(pltfm_host->clk);
->  }
->
-> +/*
-> + * we cannot talk to controller for 8 bus cycles according to sdio spec
-> + * at lowest speed this is 100,000 HZ per cycle or 800,000 cycles
-> + * which is quite a LONG TIME on a fast cpu -- so delay if needed
-> + */
-> +static void platform_specific_completion(struct sdhci_host *host)
-> +{
-> +       struct platform_device *pdev = to_platform_device(mmc_dev(host->mmc));
-> +       struct sdhci_pxa_platdata *pdata = pdev->dev.platform_data;
-> +
-> +       if (host->clock < 3200000 && pdata && pdata->delay_in_ms)
-> +               mdelay(pdata->delay_in_ms);
-> +}
-
-Do we need this? Can you point out the spec?
-And Why 3200000?
-And I think it's better to delay according to host->clock.
-
-> +
->  static struct sdhci_ops pxav2_sdhci_ops = {
->         .get_max_clock = pxav2_get_max_clock,
->         .platform_reset_exit = pxav2_set_private_registers,
-> @@ -218,6 +239,13 @@ static int sdhci_pxav2_probe(struct platform_device *pdev)
->                 if (pdata->flags & PXA_FLAG_SD_8_BIT_CAPABLE_SLOT)
->                         host->mmc->caps |= MMC_CAP_8_BIT_DATA;
->
-> +               if (pdata->pxav1_controller) {
-> +                       host->quirks |= SDHCI_QUIRK_NO_BUSY_IRQ
-> +                                       | SDHCI_QUIRK_32BIT_DMA_SIZE;
-> +                       pxav2_sdhci_ops.platform_specific_completion
-> +                               = platform_specific_completion;
-> +               }
-> +
->                 if (pdata->quirks)
->                         host->quirks |= pdata->quirks;
->                 if (pdata->host_caps)
-> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-> index 6f0bfc0..430eabd 100644
-> --- a/drivers/mmc/host/sdhci.c
-> +++ b/drivers/mmc/host/sdhci.c
-> @@ -1001,6 +1001,9 @@ static void sdhci_send_command(struct sdhci_host *host, struct mmc_command *cmd)
->                 mdelay(1);
->         }
->
-> +       if (host->ops->platform_specific_completion)
-> +               host->ops->platform_specific_completion(host);
-> +
->         mod_timer(&host->timer, jiffies + 10 * HZ);
->
->         host->cmd = cmd;
-> diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
-> index a6d69b7..ef2efd3 100644
-> --- a/drivers/mmc/host/sdhci.h
-> +++ b/drivers/mmc/host/sdhci.h
-> @@ -282,6 +282,7 @@ struct sdhci_ops {
->         void    (*platform_resume)(struct sdhci_host *host);
->         void    (*adma_workaround)(struct sdhci_host *host, u32 intmask);
->         void    (*platform_init)(struct sdhci_host *host);
-> +       void    (*platform_specific_completion)(struct sdhci_host *host);
->  };
->
->  #ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS
-> diff --git a/include/linux/platform_data/pxa_sdhci.h b/include/linux/platform_data/pxa_sdhci.h
-> index 27d3156..865a578 100644
-> --- a/include/linux/platform_data/pxa_sdhci.h
-> +++ b/include/linux/platform_data/pxa_sdhci.h
-> @@ -54,6 +54,8 @@ struct sdhci_pxa_platdata {
->         unsigned int    quirks;
->         unsigned int    quirks2;
->         unsigned int    pm_caps;
-> +       bool            pxav1_controller;  /* set if pxa168 */
-> +       unsigned int    delay_in_ms;
->  };
->
->  struct sdhci_pxa {
-> --
-> 1.7.9.5
->
-> *************************************************************************************************************************************************************
-> eInfochips Business Disclaimer : This e-mail message and all attachments transmitted with it are intended solely for the use of the addressee and may contain legally privileged and confidential information. If the reader of this message is not the intended recipient, or an employee or agent responsible for delivering this message to the intended recipient, you are hereby notified that any dissemination, distribution, copying, or other use of this message or its attachments is strictly prohibited. If you have received this message in error, please notify the sender immediately by replying to this message and please delete it from your computer. Any views expressed in this message are those of the individual sender unless otherwise stated. Company has taken enough precautions to prevent the spread of viruses. However the company accepts no liability for any damage caused by any virus transmitted by this email.
-> *************************************************************************************************************************************************************
->
->
-> ---------------------------------------------------------------------------------------------
-> Notice:
-> This message has been scanned by Trend Micro Mail Security scanner and is believed to be clean
-> --------------------------------------------------------------------------------------------- ??{.n?+???????+%??lzwm??b ?????r??zX?? ?r)????w*jg??? ???????j/ ??z?????2???????&?)???a?? ?? ?G? ?h? ?j:+v???w????
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index e31d442..206119c 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -7,6 +7,7 @@ CONFIG_MACH_ARMADA_XP=y
+ CONFIG_ARCH_HIGHBANK=y
+ CONFIG_ARCH_SOCFPGA=y
+ CONFIG_ARCH_SUNXI=y
++CONFIG_ARCH_WM8850=y
+ # CONFIG_ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA is not set
+ CONFIG_ARCH_ZYNQ=y
+ CONFIG_ARM_ERRATA_754322=y
+@@ -34,6 +35,8 @@ CONFIG_SERIAL_8250_DW=y
+ CONFIG_SERIAL_AMBA_PL011=y
+ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+ CONFIG_SERIAL_OF_PLATFORM=y
++CONFIG_SERIAL_VT8500=y
++CONFIG_SERIAL_VT8500_CONSOLE=y
+ CONFIG_IPMI_HANDLER=y
+ CONFIG_IPMI_SI=y
+ CONFIG_I2C=y
+@@ -42,6 +45,7 @@ CONFIG_SPI=y
+ CONFIG_SPI_PL022=y
+ CONFIG_FB=y
+ CONFIG_FB_ARMCLCD=y
++CONFIG_FB_WM8505=y
+ CONFIG_FRAMEBUFFER_CONSOLE=y
+ CONFIG_USB=y
+ CONFIG_USB_ISP1760_HCD=y
+@@ -50,11 +54,15 @@ CONFIG_MMC=y
+ CONFIG_MMC_ARMMMCI=y
+ CONFIG_MMC_SDHCI=y
+ CONFIG_MMC_SDHCI_PLTFM=y
++CONFIG_MMC_WMT=y
+ CONFIG_EDAC=y
+ CONFIG_EDAC_MM_EDAC=y
+ CONFIG_EDAC_HIGHBANK_MC=y
+ CONFIG_EDAC_HIGHBANK_L2=y
+ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_DRV_PL031=y
++CONFIG_RTC_DRV_VT8500=y
++CONFIG_PWM=y
++CONFIG_PWM_VT8500=y
+ CONFIG_DMADEVICES=y
+ CONFIG_PL330_DMA=y
+-- 
+1.7.9.5
