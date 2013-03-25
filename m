@@ -1,89 +1,199 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 25 Mar 2013 15:32:10 +0000
-Subject: [PATCH 2/3] mfd: db8500-prcmu: Fetch the PRCMU TCDM base address
- from Device Tree
-In-Reply-To: <1364223758-17621-2-git-send-email-lee.jones@linaro.org>
-References: <1364223758-17621-1-git-send-email-lee.jones@linaro.org>
- <1364223758-17621-2-git-send-email-lee.jones@linaro.org>
-Message-ID: <20130325153210.GE3568@gmail.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Mon, 25 Mar 2013 16:34:19 +0100
+Subject: [PATCH v2] mmc: mxcmmc: DT support
+Message-ID: <1364225659-29677-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sam, and this one, sorry.
+Adding devicetree support for imx21-mmc and imx31-mmc. Based on generic
+gpio helper functions by Guennadi and generic DMA devicetree bindings.
 
-> A recent move to send the base addresses though the PRCMU platform
-> device resource instead of defines found in <mach/*>, means that dbx500
-> devices can no longer boot successfully when booting with Device Tree
-> enabled. This patch ensures the addresses are obtained correctly from
-> DT.
-> 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  drivers/mfd/db8500-prcmu.c |   28 ++++++++++++++++++++--------
->  1 file changed, 20 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
-> index 21f261b..8602bf8 100644
-> --- a/drivers/mfd/db8500-prcmu.c
-> +++ b/drivers/mfd/db8500-prcmu.c
-> @@ -17,6 +17,8 @@
->  #include <linux/err.h>
->  #include <linux/spinlock.h>
->  #include <linux/io.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
->  #include <linux/slab.h>
->  #include <linux/mutex.h>
->  #include <linux/completion.h>
-> @@ -2790,19 +2792,29 @@ static int db8500_irq_init(struct device_node *np)
->  }
->  
->  static void dbx500_fw_version_init(struct platform_device *pdev,
-> -			    u32 version_offset)
-> +				   u32 version_offset,
-> +				   struct device_node *np)
->  {
-> +	struct device_node *tcpm_np;
->  	struct resource *res;
-> -	void __iomem *tcpm_base;
-> +	void __iomem *tcpm_base = NULL;
->  
->  	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
->  					   "prcmu-tcpm");
->  	if (!res) {
-> -		dev_err(&pdev->dev,
-> -			"Error: no prcmu tcpm memory region provided\n");
-> -		return;
-> -	}
-> -	tcpm_base = ioremap(res->start, resource_size(res));
-> +		if (np) {
-> +			tcpm_np = of_find_node_by_name(np->parent,
-> +						       "prcmu-tcpm-per4");
-> +			if (!tcpm_np) {
-> +				dev_err(&pdev->dev,
-> +					"no prcmu tcpm mem region provided\n");
-> +				return;
-> +			}
-> +			tcpm_base = of_iomap(tcpm_np, 0);
-> +		}
-> +	} else
-> +		tcpm_base = ioremap(res->start, resource_size(res));
-> +
->  	if (tcpm_base != NULL) {
->  		u32 version;
->  
-> @@ -3154,7 +3166,7 @@ static int db8500_prcmu_probe(struct platform_device *pdev)
->  
->  	init_prcm_registers();
->  
-> -	dbx500_fw_version_init(pdev, pdata->version_offset);
-> +	dbx500_fw_version_init(pdev, pdata->version_offset, np);
->  	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "prcmu-tcdm");
->  	if (!res) {
->  		dev_err(&pdev->dev, "no prcmu tcdm region provided\n");
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+Cc: Anatolij Gustschin <agust@denx.de>
+---
 
+Notes:
+    Changes in v2:
+    - Documentation fix
+    - Use dma_request_slave_channel instead of of_*
+
+ .../devicetree/bindings/mmc/fsl-imx-mmc.txt        | 24 +++++++
+ drivers/mmc/host/mxcmmc.c                          | 79 +++++++++++++++++-----
+ 2 files changed, 85 insertions(+), 18 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mmc/fsl-imx-mmc.txt
+
+diff --git a/Documentation/devicetree/bindings/mmc/fsl-imx-mmc.txt b/Documentation/devicetree/bindings/mmc/fsl-imx-mmc.txt
+new file mode 100644
+index 0000000..db44235
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mmc/fsl-imx-mmc.txt
+@@ -0,0 +1,24 @@
++* Freescale Secure Digital Host Controller for i.MX2/3 series
++
++This file documents differences to the properties defined in mmc.txt.
++
++Required properties:
++- compatible : Should be "fsl,<chip>-mmc", chip can be imx21 or imx31
++
++Optional properties:
++- dmas: One DMA phandle with arguments as defined by the devicetree bindings
++	of the used DMA controller.
++- dma-names: Has to be "rx-tx".
++
++Example:
++
++sdhci1: sdhci at 10014000 {
++	compatible = "fsl,imx27-mmc", "fsl,imx21-mmc";
++	reg = <0x10014000 0x1000>;
++	interrupts = <11>;
++	dmas = <&dma 7>;
++	dma-names = "rx-tx";
++	bus-width = <4>;
++	cd-gpios = <&gpio3 29>;
++	status = "okay";
++};
+diff --git a/drivers/mmc/host/mxcmmc.c b/drivers/mmc/host/mxcmmc.c
+index a72936e..f477b4f 100644
+--- a/drivers/mmc/host/mxcmmc.c
++++ b/drivers/mmc/host/mxcmmc.c
+@@ -34,6 +34,10 @@
+ #include <linux/regulator/consumer.h>
+ #include <linux/dmaengine.h>
+ #include <linux/types.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/of_dma.h>
++#include <linux/of_gpio.h>
+ 
+ #include <asm/dma.h>
+ #include <asm/irq.h>
+@@ -173,6 +177,19 @@ static struct platform_device_id mxcmci_devtype[] = {
+ };
+ MODULE_DEVICE_TABLE(platform, mxcmci_devtype);
+ 
++static const struct of_device_id mxcmci_of_match[] = {
++	{
++		.compatible = "fsl,imx21-mmc",
++		.data = &mxcmci_devtype[IMX21_MMC],
++	}, {
++		.compatible = "fsl,imx31-mmc",
++		.data = &mxcmci_devtype[IMX31_MMC],
++	}, {
++		/* sentinel */
++	}
++};
++MODULE_DEVICE_TABLE(of, mxcmci_of_match);
++
+ static inline int is_imx31_mmc(struct mxcmci_host *host)
+ {
+ 	return host->devtype == IMX31_MMC;
+@@ -935,10 +952,15 @@ static int mxcmci_probe(struct platform_device *pdev)
+ 	struct mxcmci_host *host = NULL;
+ 	struct resource *iores, *r;
+ 	int ret = 0, irq;
++	bool dat3_card_detect = false;
+ 	dma_cap_mask_t mask;
++	const struct of_device_id *of_id;
++	struct imxmmc_platform_data *pdata = pdev->dev.platform_data;
+ 
+ 	pr_info("i.MX SDHC driver\n");
+ 
++	of_id = of_match_device(mxcmci_of_match, &pdev->dev);
++
+ 	iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	irq = platform_get_irq(pdev, 0);
+ 	if (!iores || irq < 0)
+@@ -954,8 +976,14 @@ static int mxcmci_probe(struct platform_device *pdev)
+ 		goto out_release_mem;
+ 	}
+ 
++	mmc_of_parse(mmc);
+ 	mmc->ops = &mxcmci_ops;
+-	mmc->caps = MMC_CAP_4_BIT_DATA | MMC_CAP_SDIO_IRQ;
++
++	/* For devicetree parsing, the bus width is read from devicetree */
++	if (pdata)
++		mmc->caps = MMC_CAP_4_BIT_DATA | MMC_CAP_SDIO_IRQ;
++	else
++		mmc->caps |= MMC_CAP_SDIO_IRQ;
+ 
+ 	/* MMC core transfer sizes tunable parameters */
+ 	mmc->max_segs = 64;
+@@ -971,14 +999,25 @@ static int mxcmci_probe(struct platform_device *pdev)
+ 		goto out_free;
+ 	}
+ 
++	if (of_id) {
++		const struct platform_device_id *id_entry = of_id->data;
++		host->devtype = id_entry->driver_data;
++	} else {
++		host->devtype = pdev->id_entry->driver_data;
++	}
+ 	host->mmc = mmc;
+-	host->pdata = pdev->dev.platform_data;
+-	host->devtype = pdev->id_entry->driver_data;
++	host->pdata = pdata;
+ 	spin_lock_init(&host->lock);
+ 
++	if (pdata)
++		dat3_card_detect = pdata->dat3_card_detect;
++	else if (!(mmc->caps & MMC_CAP_NONREMOVABLE)
++			&& !of_property_read_bool(pdev->dev.of_node, "cd-gpios"))
++		dat3_card_detect = true;
++
+ 	mxcmci_init_ocr(host);
+ 
+-	if (host->pdata && host->pdata->dat3_card_detect)
++	if (dat3_card_detect)
+ 		host->default_irq_mask =
+ 			INT_CARD_INSERTION_EN | INT_CARD_REMOVAL_EN;
+ 	else
+@@ -1020,21 +1059,24 @@ static int mxcmci_probe(struct platform_device *pdev)
+ 
+ 	writel(host->default_irq_mask, host->base + MMC_REG_INT_CNTR);
+ 
+-	r = platform_get_resource(pdev, IORESOURCE_DMA, 0);
+-	if (r) {
+-		host->dmareq = r->start;
+-		host->dma_data.peripheral_type = IMX_DMATYPE_SDHC;
+-		host->dma_data.priority = DMA_PRIO_LOW;
+-		host->dma_data.dma_request = host->dmareq;
+-		dma_cap_zero(mask);
+-		dma_cap_set(DMA_SLAVE, mask);
+-		host->dma = dma_request_channel(mask, filter, host);
+-		if (host->dma)
+-			mmc->max_seg_size = dma_get_max_seg_size(
+-					host->dma->device->dev);
++	if (!host->pdata) {
++		host->dma = dma_request_slave_channel(pdev->dev, "rx-tx");
++	} else {
++		r = platform_get_resource(pdev, IORESOURCE_DMA, 0);
++		if (r) {
++			host->dmareq = r->start;
++			host->dma_data.peripheral_type = IMX_DMATYPE_SDHC;
++			host->dma_data.priority = DMA_PRIO_LOW;
++			host->dma_data.dma_request = host->dmareq;
++			dma_cap_zero(mask);
++			dma_cap_set(DMA_SLAVE, mask);
++			host->dma = dma_request_channel(mask, filter, host);
++		}
+ 	}
+-
+-	if (!host->dma)
++	if (host->dma)
++		mmc->max_seg_size = dma_get_max_seg_size(
++				host->dma->device->dev);
++	else
+ 		dev_info(mmc_dev(host->mmc), "dma not available. Using PIO\n");
+ 
+ 	INIT_WORK(&host->datawork, mxcmci_datawork);
+@@ -1153,6 +1195,7 @@ static struct platform_driver mxcmci_driver = {
+ #ifdef CONFIG_PM
+ 		.pm	= &mxcmci_pm_ops,
+ #endif
++		.of_match_table	= mxcmci_of_match,
+ 	}
+ };
+ 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.8.1.5
