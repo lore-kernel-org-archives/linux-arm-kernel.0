@@ -1,58 +1,42 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Mon, 25 Mar 2013 12:15:42 +0200
-Subject: [PATCH] clk: tegra: Don't enable PLLs during early boot
-In-Reply-To: <514C7D3B.40602@wwwdotorg.org>
-References: <1363953308-28828-1-git-send-email-pdeschrijver@nvidia.com>
- <514C7D3B.40602@wwwdotorg.org>
-Message-ID: <20130325101542.GB18519@tbergstrom-lnx.Nvidia.com>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Mon, 25 Mar 2013 15:45:51 +0530
+Subject: [PATCH 2/2] media: davinci: vpbe: venc: move the enabling of vpss
+ clocks to driver
+In-Reply-To: <514FE307.5090201@ti.com>
+References: <1363938793-22246-1-git-send-email-prabhakar.csengg@gmail.com>
+ <1363938793-22246-3-git-send-email-prabhakar.csengg@gmail.com>
+ <514FE307.5090201@ti.com>
+Message-ID: <CA+V-a8tShKHreai51GHsyfHvW5yCvEiEcTTks7Tsy0s54bEekQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 22, 2013 at 04:48:11PM +0100, Stephen Warren wrote:
-> On 03/22/2013 05:54 AM, Peter De Schrijver wrote:
-> > The PLL code relies on udelay() which is not available when CCF is
-> > initialized. Hence we can't enable any PLL during this phase.
-> > 
-> > Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
-> > 
-> > --
-> > 
-> > Stephen,
-> > 
-> > Can you confirm this is ok for the audio drivers?
-> > 
-> > We used to be lucky that this has worked up to now, but I will introduce some
-> > changes to the pll lock check code which cause this to fail due to the
-> > slight differences in timing.
-> 
-> No, this won't work for the audio drivers; they assume the clock is
-> enabled when they start.
-> 
-> This assumption was made long ago. I know drivers are supposed to assume
-> that clocks are disabled when they're probed, but historically that
-> wasn't always the case, so if the audio drivers assumed that, and then
-> did clk_enable() as the first thing, they got a warning due to the
-> enabling an already enabled clock and/or later attempts to disable the
+Hi Sekhar,
 
-That should be ok. You can enable a clock more than once.
+On Mon, Mar 25, 2013 at 11:09 AM, Sekhar Nori <nsekhar@ti.com> wrote:
+> On 3/22/2013 1:23 PM, Prabhakar lad wrote:
+>> From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+>>
+>> The vpss clocks were enabled by calling a exported function from a driver
+>> in a machine code. calling driver code from platform code is incorrect way.
+>>
+>> This patch fixes this issue and calls the function from driver code itself.
+>>
+>> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+>> ---
+>>  Note: This patch is based on the comment from Sekhar
+>>       (https://patchwork-mail1.kernel.org/patch/2278441/).
+>>       Shekar I haven't completely removed the callback, I just added
+>>       the function calls after the callback. As you mentioned just to
+>>       pass the VPSS_CLK_CTRL as a resource to venc but the VPSS_CLK_CTRL
+>>       is already being used by VPSS driver. I'll take this cleanup task later
+>>       point of time.
+>
+> Fine by me.
+>
+Can I have your ACK on this patch ?
 
-> clocks wouldn't actually disable them. Perhaps this has changed now, but
-> either way, audio driver changes would be needed to support this change.
-> 
+Regards,
+--Prabhakar
 
-But indeed, the clock won't be disabled then when the driver does
-clk_disable(). The reference count will just be decremented. That's however
-not a functional problem, just not optimal from a power consumption point of
-view. So we could change the drivers first and keep the clocks disabled at
-boottime in a second phase.
-
-> Perhaps this is due to initializing the Tegra clock driver in the
-> machine descriptor's init_irq function, rather than in the init_machine
-> function? Can this be moved?
-
-Maybe. But we need the clockframework before the timers are initialized...
-So I have to check the dependencies.
-
-Cheers,
-
-Peter.
+> Thanks,
+> Sekhar
