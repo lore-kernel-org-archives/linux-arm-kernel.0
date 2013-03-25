@@ -1,99 +1,81 @@
-From: mfuzzey@parkeon.com (Martin Fuzzey)
-Date: Mon, 25 Mar 2013 12:07:51 +0100
-Subject: [RFC PATCH] CLK: Allow parent clock and rate to be configured
- in DT.
-In-Reply-To: <20130325101707.GZ1906@pengutronix.de>
-References: <20130319170933.28337.50448.stgit@localhost>
- <20130325101707.GZ1906@pengutronix.de>
-Message-ID: <51503007.5020403@parkeon.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 25 Mar 2013 11:13:43 +0000
+Subject: [PATCH 3/8] ARM: sirf: move irq driver to drivers/irqchip
+In-Reply-To: <CAGsJ_4yPRE8SBSk5eLH3j3Y9bf9tbhy15i0kEE+83VcPNk80Cw@mail.gmail.com>
+References: <1363779679-16880-1-git-send-email-arnd@arndb.de>
+ <201303250941.14399.arnd@arndb.de>
+ <CAGsJ_4yPRE8SBSk5eLH3j3Y9bf9tbhy15i0kEE+83VcPNk80Cw@mail.gmail.com>
+Message-ID: <201303251113.44076.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+On Monday 25 March 2013, Barry Song wrote:
+> 2013/3/25, Arnd Bergmann <arnd@arndb.de>:
+> > On Monday 25 March 2013, Barry Song wrote:
+> >> 2013/3/20, Arnd Bergmann <arnd@arndb.de>:
+> >> this breaks the hwirq and irq mapping. the hwirq 0 is mapped to
+> >> no_irqs, then setup_irq will fail in
+> >> drivers/clocksource/timer-prima2.c.
+> >
+> > Hmm, I don't understand yet what is going on there. This should create
+> > a domain with all dynamically allocated interrupt descriptors,
+> > and the hwirq number is just local to the controller then.
+> 
+> suppose we think the hardware register flag bit of timer-prima2 is 0,
+> irq_of_parse_and_map() will return 16 in patch2 for the timer-prima2
+> which uses the 1st hardware IRQ in the system.
+> 
+> if add nr_irqs=288 in ATLAS6 machine, irq_of_parse_and_map() will
+> return 288 in patch2. it looks like the first hw irq will always be
+> mapped to nr_irqs.
 
-thanks for the comments.
+right.
 
-[corrected Mike's email address - I originally sent it to the old one]
+> > Without patch 2 of the series, this would fail, because that interrupt
+> > is not mapped, but as far as I can tell, we correctly instantiate
+> > the domain here, so the irq_of_parse_and_map() in sirfsoc_of_timer_map
+> > should return a valid interrupt number. Can you check what it returns
+> > instead? Does it work if you revert to a legacy domain here?
+> 
+> actually patch2 can work without patch3 by irq_domain_add legacy. as
+> you can see, my old timer-marco.c uses irq_of_parse_and_map() instead
+> of reading interrupts manually.
 
-On 25/03/13 11:17, Sascha Hauer wrote:
-> On Tue, Mar 19, 2013 at 06:09:33PM +0100, Martin Fuzzey wrote:
->> Even on platforms where the entire clock tree is not represented in the DT
->> it can still be useful to allow parents and rates to be set from the DT.
->>
->> An example of such a case is when a multiplexable clock output from a SOC
->> is used to supply external chips (eg an audio codec connected to the i.MX53
->> cko1 pin).
->>
->> The cko1 pin can output various internal clock signals but, in
->> order to obtain a suitable frequency for the codec, an appropriate parent must
->> be selected.
->>
->> Another example is setting root clock dividers.
->>
->> This is board specific rather than device driver or platform clock framework
->> specific information and thus would be better in the DT.
-> I see what the patch does and that it could be very useful, but there's
-> a problem: The devicetree is for hardware *description*, not
-> *configuration*.
->
->> +For example:
->> +	clock-configuration {
->> +		compatible = "clock-configuration";
->> +		clko1 {
->> +			clocks = <&clks 160>; /* cko1_sel */
->> +			parent = <&clks 114>; /* pll3_sw */
->> +		};
->> +
->> +		esdhca {
->> +			clocks = <&clks 102>; /* esdhc_a_podf */
->> +			clock-frequency = <200000000>;
->> +		};
-> This example shows this. For some reason we adjust the esdhc frequency
-> to 200MHz in the code currently, but this is because it matches our
-> current usecase. Once you move this into devicetree, we can't change
-> this anymore in the kernel, even if we find a much better way to adjust
-> the frequency in the future (i.e. smaller values might be good for power
-> savings, higher values might increase performance, we even might
-> dynamically change this frequency).
->
-Yes but the problem is that the rates are currently set in 
-clk-imx51-53.c which should be generic
-to all such platforms whereas, as you point out, there may well be valid 
-reasons to choose
-different values depending on the board design and / or intended 
-application.
+Yes, irq_of_parse_and_map() should always work.
 
-The cko case is even worse - due to a board design decision that clock 
-needs to have
-a frequency suitable for supplying some external chip. We don't want 
-board specific code in
-the platform clock code and we're trying to get away from board files...
+>         void __iomem *base = of_iomap(np, 0);
+>         if (!base)
+>                 panic("unable to map intc cpu registers\n");
+> 
+> -       sirfsoc_irqdomain = irq_domain_add_linear(np, SIRFSOC_NUM_IRQS,
+> +       sirfsoc_irqdomain = irq_domain_add_legacy(np, SIRFSOC_NUM_IRQS, 0, 0,
+>                                  &irq_domain_simple_ops, base);
+> 
+>         sirfsoc_alloc_gc(base, 0, 32);
+> ...
+> drivers/pinctrl/pinctrl-sirf.c:
+> -                bank->domain = irq_domain_add_linear(np,
+> SIRFSOC_GPIO_BANK_SIZE,
+> +                bank->domain = irq_domain_add_legacy(np,
+> SIRFSOC_GPIO_BANK_SIZE,
+> +                        128 + i * SIRFSOC_GPIO_BANK_SIZE, 0,
+>                         &sirfsoc_gpio_irq_simple_ops, bank);
 
-> So no, this shouldn't be in the devicetree, even though it's very
-> tempting to do so.
->
-> I wonder when someone comes up with a 'configtree' where we could put in
-> such stuff.
-I don't understand why we need a seperate tree for this why can't just
-a subtree of the DT be used?
+Right, but if we do this, we encode static IRQ numbers into the
+irqchip drivers, which should not be necessary if all interrupts
+can be mapped dynamically.
 
-After all the DT already contains "configuration" nodes such as "chosen".
+This means that the interrupt numbers that Linux reports in
+/proc/interrupts will all change, but I don't see anything that
+still depends on those, unless you have additional out of tree
+patches that rely on hardcoded numbers.
 
-Indeed Documentation/devicetree/usage-model.txt  says:
-     "The chosen node may also optionally contain an arbitrary number of
-     additional properties for platform-specific configuration data."
+Digging a bit deeper, I found that the generic irqchip implemmentation
+does not deal with linear irq domains yet. There was a patch[1] least
+year from Rob Herring, but it never got merged. I guess we can move
+back to using the legacy domain for drivers/irqchip/irq-sirfsoc.c for
+now and hardwire the assumption that its interrupts start at number 0.
 
-So what stops us simply placing the clock-configuration node above under 
-chosen? (which already works - just tested it)
+	Arnd
 
-If the issue is that hardware vendors should be able to supply a DT 
-without knowing
-the configuration parameters couldn't that be resolved by letting the 
-bootloader
-merge DT subtrees this would give us "configtree" without adding more 
-code to
-the kernel to handle it.
-
-Regards,
-
-Martin
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2012-January/082455.html
