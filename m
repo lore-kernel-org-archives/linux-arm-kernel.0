@@ -1,58 +1,65 @@
-From: avinashphilip@ti.com (Philip, Avinash)
-Date: Mon, 25 Mar 2013 08:30:45 +0000
-Subject: [PATCH v3 0/3] Platform support for EHRPWM & ECAP devices in
- DAVINCI.
-In-Reply-To: <5150076D.3080904@ti.com>
-References: <1364197789-16783-1-git-send-email-avinashphilip@ti.com>
- <5150076D.3080904@ti.com>
-Message-ID: <518397C60809E147AF5323E0420B992E3EAA19F4@DBDE01.ent.ti.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 25 Mar 2013 09:43:12 +0100
+Subject: [PATCHv2 1/4] arm: orion5x: fix orion5x.dtsi gpio parameters
+In-Reply-To: <1364077797-21206-2-git-send-email-alex@digriz.org.uk>
+References: <1364077797-21206-1-git-send-email-alex@digriz.org.uk>
+ <1364077797-21206-2-git-send-email-alex@digriz.org.uk>
+Message-ID: <20130325084312.GE5627@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 25, 2013 at 13:44:37, Nori, Sekhar wrote:
-> On 3/25/2013 1:19 PM, Philip Avinash wrote:
-> > Add platform support for EHRPWM and ECAP by providing clock nodes and
-> > device tree nodes.
-> > This series depends on [1] and [2] and is available for testing at [3].
-> > Tested for back light support in da850 EVM with EHRPWM PWM device.
-> > 
-> > [1] http://gitorious.org/linux-davinci/linux-davinci/trees/davinci-for-v3.9/dt-2
-> > [2] https://gitorious.org/linux-pwm/linux-pwm/trees/for-next
-> > [3] https://github.com/avinashphilip/am335x_linux/tree/davinci-for-v3.9_soc_pwm
-> > 
-> > Note:
-> > DT support for EHRPWM backlight has not been added in da850-evm.dts as there is
-> > conflicting pin-mux requirement with SPI flash.
-> > 
-> > Philip Avinash (3):
-> >   ARM: davinci: clk framework support for enable/disable functionality
+On Sat, Mar 23, 2013 at 10:29:54PM +0000, Alexander Clouter wrote:
+> orion5x.dtsi is missing the gpio alias as well as including a typo
+> ('ngpio' instead of 'ngpios') that prevented the orion-gpio driver
+> from loading.  This patches resolves this.
 > 
-> Patch 1/3 did not reach me. I cant find it in archives either so most
-> likely no one received it. Can you please send that one patch again?
+> Signed-off-by: Alexander Clouter <alex@digriz.org.uk>
+> ---
+>  arch/arm/boot/dts/orion5x.dtsi |    5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/orion5x.dtsi b/arch/arm/boot/dts/orion5x.dtsi
+> index 8aad00f..9bde027 100644
+> --- a/arch/arm/boot/dts/orion5x.dtsi
+> +++ b/arch/arm/boot/dts/orion5x.dtsi
+> @@ -13,6 +13,9 @@
+>  	compatible = "marvell,orion5x";
+>  	interrupt-parent = <&intc>;
+>  
+> +	aliases {
+> +		gpio0 = &gpio0;
+> +	};
+>  	intc: interrupt-controller {
+>  		compatible = "marvell,orion-intc", "marvell,intc";
+>  		interrupt-controller;
+> @@ -32,7 +35,7 @@
+>  			#gpio-cells = <2>;
+>  			gpio-controller;
+>  			reg = <0x10100 0x40>;
+> -			ngpio = <32>;
+> +			ngpios = <32>;
+>  			interrupts = <6>, <7>, <8>, <9>;
+>  		};
 
-Done.
+Hi Alex
 
-> 
-> >   arm: davinci: clock node support for ECAP & EHRPWM
-> 
-> For future, please be consistent and capitalize 'ARM' in subject line.
+If you look at Dove, Kirkwood, etc, you see:
 
-Ok I will take care.
+                gpio0: gpio at d0400 {
+                        compatible = "marvell,orion-gpio";
+                        #gpio-cells = <2>;
+                        gpio-controller;
+                        reg = <0xd0400 0x20>;
+                        ngpios = <32>;
+                        interrupt-controller;
+                        #interrupt-cells = <2>;
+                        interrupts = <12>, <13>, <14>, <60>;
+                };
 
-Thanks
-Avinash
-> 
-> >   ARM: davinci: da850: add EHRPWM & ECAP DT node
-> > 
-> >  arch/arm/boot/dts/da850.dtsi               |   30 ++++++++++++++++++
-> >  arch/arm/mach-davinci/clock.c              |   21 ++++++++-----
-> >  arch/arm/mach-davinci/clock.h              |    2 ++
-> >  arch/arm/mach-davinci/da850.c              |   46 ++++++++++++++++++++++++++++
-> >  arch/arm/mach-davinci/da8xx-dt.c           |    5 +++
-> >  arch/arm/mach-davinci/include/mach/da8xx.h |    1 +
-> >  6 files changed, 98 insertions(+), 7 deletions(-)
-> > 
-> 
-> Thanks,
-> Sekhar
-> 
+I think you also need to add
+
+                        interrupt-controller;
+                        #interrupt-cells = <2>;
+
+
+	Andrew
