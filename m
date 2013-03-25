@@ -1,32 +1,70 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 25 Mar 2013 12:27:09 -0300
-Subject: [PATCH 4/4] ARM: configs: Update mvebu defconfig for thermal
-In-Reply-To: <1364225229-2857-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1364225229-2857-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1364225229-2857-5-git-send-email-ezequiel.garcia@free-electrons.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 25 Mar 2013 15:31:42 +0000
+Subject: [PATCH 3/3] mfd: db8500-prcmu: Fetch the PRCMU TCPM base address
+ from Device Tree
+In-Reply-To: <1364223758-17621-3-git-send-email-lee.jones@linaro.org>
+References: <1364223758-17621-1-git-send-email-lee.jones@linaro.org>
+ <1364223758-17621-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <20130325153142.GD3568@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The thermal management driver for Armada XP/370 has been added
-so we update the defconfig to reflect this.
+Sorry Sam, looks like I missed you on this one.
 
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
- arch/arm/configs/mvebu_defconfig |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+> A recent move to send the base addresses though the PRCMU platform
+> device resource instead of defines found in <mach/*>, means that dbx500
+> devices can no longer boot successfully when booting with Device Tree
+> enabled. This patch ensures the addresses are obtained correctly from
+> DT instead.
+> 
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/mfd/db8500-prcmu.c |   21 +++++++++++++++------
+>  1 file changed, 15 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
+> index 8602bf8..a998edc 100644
+> --- a/drivers/mfd/db8500-prcmu.c
+> +++ b/drivers/mfd/db8500-prcmu.c
+> @@ -3159,8 +3159,9 @@ static void db8500_prcmu_update_cpufreq(void)
+>   */
+>  static int db8500_prcmu_probe(struct platform_device *pdev)
+>  {
+> -	struct device_node *np = pdev->dev.of_node;
+>  	struct prcmu_pdata *pdata = dev_get_platdata(&pdev->dev);
+> +	struct device_node *np = pdev->dev.of_node;
+> +	struct device_node *tcdm_np;
+>  	int irq = 0, err = 0, i;
+>  	struct resource *res;
+>  
+> @@ -3169,11 +3170,19 @@ static int db8500_prcmu_probe(struct platform_device *pdev)
+>  	dbx500_fw_version_init(pdev, pdata->version_offset, np);
+>  	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "prcmu-tcdm");
+>  	if (!res) {
+> -		dev_err(&pdev->dev, "no prcmu tcdm region provided\n");
+> -		return -ENOENT;
+> -	}
+> -	tcdm_base = devm_ioremap(&pdev->dev, res->start,
+> -			resource_size(res));
+> +		if (np) {
+> +			tcdm_np = of_find_node_by_name(np->parent,
+> +						       "prcmu-tcdm-per4");
+> +			if (!tcdm_np) {
+> +				dev_err(&pdev->dev,
+> +					"no prcmu tcdm region provided\n");
+> +				return -ENOENT;
+> +			}
+> +			tcdm_base = of_iomap(tcdm_np, 0);
+> +		}
+> +	} else
+> +		tcdm_base = devm_ioremap(&pdev->dev, res->start,
+> +					 resource_size(res));
+>  
+>  	/* Clean up the mailbox interrupts after pre-kernel code. */
+>  	writel(ALL_MBOX_BITS, PRCM_ARM_IT1_CLR);
 
-diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
-index 2ec8119..fc7e8be 100644
---- a/arch/arm/configs/mvebu_defconfig
-+++ b/arch/arm/configs/mvebu_defconfig
-@@ -49,6 +49,8 @@ CONFIG_MTD_M25P80=y
- CONFIG_SERIAL_8250_DW=y
- CONFIG_GPIOLIB=y
- CONFIG_GPIO_SYSFS=y
-+CONFIG_THERMAL=y
-+CONFIG_ARMADA_THERMAL=y
- CONFIG_USB_SUPPORT=y
- CONFIG_USB=y
- CONFIG_USB_EHCI_HCD=y
 -- 
-1.7.8.6
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
