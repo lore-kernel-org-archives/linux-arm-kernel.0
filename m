@@ -1,63 +1,47 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Mon, 25 Mar 2013 21:11:40 +1300
-Subject: [PATCH] arm: vt8500: Add wm8850 config options to multi_v7_defconfig
-Message-ID: <1364199100-12300-1-git-send-email-linux@prisktech.co.nz>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 25 Mar 2013 13:44:37 +0530
+Subject: [PATCH v3 0/3] Platform support for EHRPWM & ECAP devices in
+ DAVINCI.
+In-Reply-To: <1364197789-16783-1-git-send-email-avinashphilip@ti.com>
+References: <1364197789-16783-1-git-send-email-avinashphilip@ti.com>
+Message-ID: <5150076D.3080904@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch finally adds the WM8850 SoC to the multi_v7_defconfig.
-We don't have a seperate defconfig for this SoC as it is only
-available as a multiplatform option.
+On 3/25/2013 1:19 PM, Philip Avinash wrote:
+> Add platform support for EHRPWM and ECAP by providing clock nodes and
+> device tree nodes.
+> This series depends on [1] and [2] and is available for testing at [3].
+> Tested for back light support in da850 EVM with EHRPWM PWM device.
+> 
+> [1] http://gitorious.org/linux-davinci/linux-davinci/trees/davinci-for-v3.9/dt-2
+> [2] https://gitorious.org/linux-pwm/linux-pwm/trees/for-next
+> [3] https://github.com/avinashphilip/am335x_linux/tree/davinci-for-v3.9_soc_pwm
+> 
+> Note:
+> DT support for EHRPWM backlight has not been added in da850-evm.dts as there is
+> conflicting pin-mux requirement with SPI flash.
+> 
+> Philip Avinash (3):
+>   ARM: davinci: clk framework support for enable/disable functionality
 
-Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
----
- arch/arm/configs/multi_v7_defconfig |    8 ++++++++
- 1 file changed, 8 insertions(+)
+Patch 1/3 did not reach me. I cant find it in archives either so most
+likely no one received it. Can you please send that one patch again?
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index e31d442..206119c 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -7,6 +7,7 @@ CONFIG_MACH_ARMADA_XP=y
- CONFIG_ARCH_HIGHBANK=y
- CONFIG_ARCH_SOCFPGA=y
- CONFIG_ARCH_SUNXI=y
-+CONFIG_ARCH_WM8850=y
- # CONFIG_ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA is not set
- CONFIG_ARCH_ZYNQ=y
- CONFIG_ARM_ERRATA_754322=y
-@@ -34,6 +35,8 @@ CONFIG_SERIAL_8250_DW=y
- CONFIG_SERIAL_AMBA_PL011=y
- CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
- CONFIG_SERIAL_OF_PLATFORM=y
-+CONFIG_SERIAL_VT8500=y
-+CONFIG_SERIAL_VT8500_CONSOLE=y
- CONFIG_IPMI_HANDLER=y
- CONFIG_IPMI_SI=y
- CONFIG_I2C=y
-@@ -42,6 +45,7 @@ CONFIG_SPI=y
- CONFIG_SPI_PL022=y
- CONFIG_FB=y
- CONFIG_FB_ARMCLCD=y
-+CONFIG_FB_WM8505=y
- CONFIG_FRAMEBUFFER_CONSOLE=y
- CONFIG_USB=y
- CONFIG_USB_ISP1760_HCD=y
-@@ -50,11 +54,15 @@ CONFIG_MMC=y
- CONFIG_MMC_ARMMMCI=y
- CONFIG_MMC_SDHCI=y
- CONFIG_MMC_SDHCI_PLTFM=y
-+CONFIG_MMC_WMT=y
- CONFIG_EDAC=y
- CONFIG_EDAC_MM_EDAC=y
- CONFIG_EDAC_HIGHBANK_MC=y
- CONFIG_EDAC_HIGHBANK_L2=y
- CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_PL031=y
-+CONFIG_RTC_DRV_VT8500=y
-+CONFIG_PWM=y
-+CONFIG_PWM_VT8500=y
- CONFIG_DMADEVICES=y
- CONFIG_PL330_DMA=y
--- 
-1.7.9.5
+>   arm: davinci: clock node support for ECAP & EHRPWM
+
+For future, please be consistent and capitalize 'ARM' in subject line.
+
+>   ARM: davinci: da850: add EHRPWM & ECAP DT node
+> 
+>  arch/arm/boot/dts/da850.dtsi               |   30 ++++++++++++++++++
+>  arch/arm/mach-davinci/clock.c              |   21 ++++++++-----
+>  arch/arm/mach-davinci/clock.h              |    2 ++
+>  arch/arm/mach-davinci/da850.c              |   46 ++++++++++++++++++++++++++++
+>  arch/arm/mach-davinci/da8xx-dt.c           |    5 +++
+>  arch/arm/mach-davinci/include/mach/da8xx.h |    1 +
+>  6 files changed, 98 insertions(+), 7 deletions(-)
+> 
+
+Thanks,
+Sekhar
