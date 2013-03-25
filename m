@@ -1,210 +1,111 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 25 Mar 2013 18:19:38 +0000
-Subject: [PATCH 1/4] ARM: tlb: don't perform inner-shareable invalidation for
- local TLB ops
+Date: Mon, 25 Mar 2013 18:19:40 +0000
+Subject: [PATCH 3/4] ARM: mm: kill unused TLB_CAN_READ_FROM_L1_CACHE and use
+ ALT_SMP instead
 In-Reply-To: <1364235581-17900-1-git-send-email-will.deacon@arm.com>
 References: <1364235581-17900-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1364235581-17900-2-git-send-email-will.deacon@arm.com>
+Message-ID: <1364235581-17900-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Inner-shareable TLB invalidation is typically more expensive than local
-(non-shareable) invalidation, so performing the broadcasting for
-local_flush_tlb_* operations is a waste of cycles and needlessly
-clobbers entries in the TLBs of other CPUs.
+Many ARMv7 cores have hardware page table walkers that can read the L1
+cache. This is discoverable from the ID_MMFR3 register, although this
+can be expensive to access from the low-level set_pte functions and is a
+pain to cache, particularly with multi-cluster systems.
 
-This patch introduces __flush_tlb_* versions for many of the TLB
-invalidation functions, which only respect inner-shareable variants of
-the invalidation instructions. This allows us to modify the v7 SMP TLB
-flags to include *both* inner-shareable and non-shareable operations and
-then check the relevant flags depending on whether the operation is
-local or not.
-
-This gains us around 0.5% in hackbench scores for a dual-core A15, but I
-would expect this to improve as more cores (and clusters) are added to
-the equation.
+A useful observation is that the multi-processing extensions for ARMv7
+require coherent table walks, meaning that we can make use of ALT_SMP
+patching in proc-v7-* to patch away the cache flush safely for these
+cores.
 
 Reported-by: Albin Tonnerre <Albin.Tonnerre@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/include/asm/tlbflush.h | 67 ++++++++++++++++++++++++++++++++++++++---
- arch/arm/kernel/smp_tlb.c       |  8 ++---
- arch/arm/mm/context.c           |  5 +--
- 3 files changed, 68 insertions(+), 12 deletions(-)
+ arch/arm/include/asm/tlbflush.h | 2 +-
+ arch/arm/mm/proc-v6.S           | 2 --
+ arch/arm/mm/proc-v7-2level.S    | 3 ++-
+ arch/arm/mm/proc-v7-3level.S    | 3 ++-
+ arch/arm/mm/proc-v7.S           | 4 ++--
+ 5 files changed, 7 insertions(+), 7 deletions(-)
 
 diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
-index 4db8c88..ae9f34f 100644
+index c7cdb59..42d155e 100644
 --- a/arch/arm/include/asm/tlbflush.h
 +++ b/arch/arm/include/asm/tlbflush.h
-@@ -170,6 +170,8 @@
+@@ -169,7 +169,7 @@
+ # define v6wbi_always_flags	(-1UL)
  #endif
  
- #define v7wbi_tlb_flags_smp	(TLB_WB | TLB_DCLEAN | TLB_BARRIER | \
-+				 TLB_V6_U_FULL | TLB_V6_U_PAGE | \
-+				 TLB_V6_U_ASID | \
+-#define v7wbi_tlb_flags_smp	(TLB_WB | TLB_DCLEAN | TLB_BARRIER | \
++#define v7wbi_tlb_flags_smp	(TLB_WB | TLB_BARRIER | \
+ 				 TLB_V6_U_FULL | TLB_V6_U_PAGE | \
+ 				 TLB_V6_U_ASID | TLB_V6_BP | \
  				 TLB_V7_UIS_FULL | TLB_V7_UIS_PAGE | \
- 				 TLB_V7_UIS_ASID | TLB_V7_UIS_BP)
- #define v7wbi_tlb_flags_up	(TLB_WB | TLB_DCLEAN | TLB_BARRIER | \
-@@ -334,6 +336,21 @@ static inline void local_flush_tlb_all(void)
- 	tlb_op(TLB_V4_U_FULL | TLB_V6_U_FULL, "c8, c7, 0", zero);
- 	tlb_op(TLB_V4_D_FULL | TLB_V6_D_FULL, "c8, c6, 0", zero);
- 	tlb_op(TLB_V4_I_FULL | TLB_V6_I_FULL, "c8, c5, 0", zero);
-+
-+	if (tlb_flag(TLB_BARRIER)) {
-+		dsb();
-+		isb();
-+	}
-+}
-+
-+static inline void __flush_tlb_all(void)
-+{
-+	const int zero = 0;
-+	const unsigned int __tlb_flag = __cpu_tlb_flags;
-+
-+	if (tlb_flag(TLB_WB))
-+		dsb();
-+
- 	tlb_op(TLB_V7_UIS_FULL, "c8, c3, 0", zero);
+diff --git a/arch/arm/mm/proc-v6.S b/arch/arm/mm/proc-v6.S
+index bcaaa8d..a286d47 100644
+--- a/arch/arm/mm/proc-v6.S
++++ b/arch/arm/mm/proc-v6.S
+@@ -80,12 +80,10 @@ ENTRY(cpu_v6_do_idle)
+ 	mov	pc, lr
  
- 	if (tlb_flag(TLB_BARRIER)) {
-@@ -352,22 +369,33 @@ static inline void local_flush_tlb_mm(struct mm_struct *mm)
- 		dsb();
+ ENTRY(cpu_v6_dcache_clean_area)
+-#ifndef TLB_CAN_READ_FROM_L1_CACHE
+ 1:	mcr	p15, 0, r0, c7, c10, 1		@ clean D entry
+ 	add	r0, r0, #D_CACHE_LINE_SIZE
+ 	subs	r1, r1, #D_CACHE_LINE_SIZE
+ 	bhi	1b
+-#endif
+ 	mov	pc, lr
  
- 	if (possible_tlb_flags & (TLB_V3_FULL|TLB_V4_U_FULL|TLB_V4_D_FULL|TLB_V4_I_FULL)) {
--		if (cpumask_test_cpu(get_cpu(), mm_cpumask(mm))) {
-+		if (!cpumask_test_cpu(smp_processor_id(), mm_cpumask(mm))) {
- 			tlb_op(TLB_V3_FULL, "c6, c0, 0", zero);
- 			tlb_op(TLB_V4_U_FULL, "c8, c7, 0", zero);
- 			tlb_op(TLB_V4_D_FULL, "c8, c6, 0", zero);
- 			tlb_op(TLB_V4_I_FULL, "c8, c5, 0", zero);
- 		}
--		put_cpu();
- 	}
- 
- 	tlb_op(TLB_V6_U_ASID, "c8, c7, 2", asid);
- 	tlb_op(TLB_V6_D_ASID, "c8, c6, 2", asid);
- 	tlb_op(TLB_V6_I_ASID, "c8, c5, 2", asid);
-+
-+	if (tlb_flag(TLB_BARRIER))
-+		dsb();
-+}
-+
-+static inline void __flush_tlb_mm(struct mm_struct *mm)
-+{
-+	const unsigned int __tlb_flag = __cpu_tlb_flags;
-+
-+	if (tlb_flag(TLB_WB))
-+		dsb();
-+
- #ifdef CONFIG_ARM_ERRATA_720789
--	tlb_op(TLB_V7_UIS_ASID, "c8, c3, 0", zero);
-+	tlb_op(TLB_V7_UIS_ASID, "c8, c3, 0", 0);
- #else
--	tlb_op(TLB_V7_UIS_ASID, "c8, c3, 2", asid);
-+	tlb_op(TLB_V7_UIS_ASID, "c8, c3, 2", ASID(mm));
+ /*
+diff --git a/arch/arm/mm/proc-v7-2level.S b/arch/arm/mm/proc-v7-2level.S
+index 78f520b..9704097 100644
+--- a/arch/arm/mm/proc-v7-2level.S
++++ b/arch/arm/mm/proc-v7-2level.S
+@@ -110,7 +110,8 @@ ENTRY(cpu_v7_set_pte_ext)
+  ARM(	str	r3, [r0, #2048]! )
+  THUMB(	add	r0, r0, #2048 )
+  THUMB(	str	r3, [r0] )
+-	mcr	p15, 0, r0, c7, c10, 1		@ flush_pte
++	ALT_SMP(mov	pc,lr)
++	ALT_UP (mcr	p15, 0, r0, c7, c10, 1)		@ flush_pte
  #endif
+ 	mov	pc, lr
+ ENDPROC(cpu_v7_set_pte_ext)
+diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
+index 6ffd78c..363027e 100644
+--- a/arch/arm/mm/proc-v7-3level.S
++++ b/arch/arm/mm/proc-v7-3level.S
+@@ -73,7 +73,8 @@ ENTRY(cpu_v7_set_pte_ext)
+ 	tst	r3, #1 << (55 - 32)		@ L_PTE_DIRTY
+ 	orreq	r2, #L_PTE_RDONLY
+ 1:	strd	r2, r3, [r0]
+-	mcr	p15, 0, r0, c7, c10, 1		@ flush_pte
++	ALT_SMP(mov	pc, lr)
++	ALT_UP (mcr	p15, 0, r0, c7, c10, 1)		@ flush_pte
+ #endif
+ 	mov	pc, lr
+ ENDPROC(cpu_v7_set_pte_ext)
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index 3a3c015..37716b0 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -75,14 +75,14 @@ ENTRY(cpu_v7_do_idle)
+ ENDPROC(cpu_v7_do_idle)
  
- 	if (tlb_flag(TLB_BARRIER))
-@@ -398,6 +426,21 @@ local_flush_tlb_page(struct vm_area_struct *vma, unsigned long uaddr)
- 	tlb_op(TLB_V6_U_PAGE, "c8, c7, 1", uaddr);
- 	tlb_op(TLB_V6_D_PAGE, "c8, c6, 1", uaddr);
- 	tlb_op(TLB_V6_I_PAGE, "c8, c5, 1", uaddr);
-+
-+	if (tlb_flag(TLB_BARRIER))
-+		dsb();
-+}
-+
-+static inline void
-+__flush_tlb_page(struct vm_area_struct *vma, unsigned long uaddr)
-+{
-+	const unsigned int __tlb_flag = __cpu_tlb_flags;
-+
-+	uaddr = (uaddr & PAGE_MASK) | ASID(vma->vm_mm);
-+
-+	if (tlb_flag(TLB_WB))
-+		dsb();
-+
- #ifdef CONFIG_ARM_ERRATA_720789
- 	tlb_op(TLB_V7_UIS_PAGE, "c8, c3, 3", uaddr & PAGE_MASK);
- #else
-@@ -428,6 +471,22 @@ static inline void local_flush_tlb_kernel_page(unsigned long kaddr)
- 	tlb_op(TLB_V6_U_PAGE, "c8, c7, 1", kaddr);
- 	tlb_op(TLB_V6_D_PAGE, "c8, c6, 1", kaddr);
- 	tlb_op(TLB_V6_I_PAGE, "c8, c5, 1", kaddr);
-+
-+	if (tlb_flag(TLB_BARRIER)) {
-+		dsb();
-+		isb();
-+	}
-+}
-+
-+static inline void __flush_tlb_kernel_page(unsigned long kaddr)
-+{
-+	const unsigned int __tlb_flag = __cpu_tlb_flags;
-+
-+	kaddr &= PAGE_MASK;
-+
-+	if (tlb_flag(TLB_WB))
-+		dsb();
-+
- 	tlb_op(TLB_V7_UIS_PAGE, "c8, c3, 1", kaddr);
+ ENTRY(cpu_v7_dcache_clean_area)
+-#ifndef TLB_CAN_READ_FROM_L1_CACHE
++	ALT_SMP(mov	pc, lr)			@ MP extensions imply L1 PTW
++	ALT_UP(W(nop))
+ 	dcache_line_size r2, r3
+ 1:	mcr	p15, 0, r0, c7, c10, 1		@ clean D entry
+ 	add	r0, r0, r2
+ 	subs	r1, r1, r2
+ 	bhi	1b
+ 	dsb
+-#endif
+ 	mov	pc, lr
+ ENDPROC(cpu_v7_dcache_clean_area)
  
- 	if (tlb_flag(TLB_BARRIER)) {
-diff --git a/arch/arm/kernel/smp_tlb.c b/arch/arm/kernel/smp_tlb.c
-index bd03005..6ae08b1 100644
---- a/arch/arm/kernel/smp_tlb.c
-+++ b/arch/arm/kernel/smp_tlb.c
-@@ -74,7 +74,7 @@ void flush_tlb_all(void)
- 	if (tlb_ops_need_broadcast())
- 		on_each_cpu(ipi_flush_tlb_all, NULL, 1);
- 	else
--		local_flush_tlb_all();
-+		__flush_tlb_all();
- }
- 
- void flush_tlb_mm(struct mm_struct *mm)
-@@ -82,7 +82,7 @@ void flush_tlb_mm(struct mm_struct *mm)
- 	if (tlb_ops_need_broadcast())
- 		on_each_cpu_mask(mm_cpumask(mm), ipi_flush_tlb_mm, mm, 1);
- 	else
--		local_flush_tlb_mm(mm);
-+		__flush_tlb_mm(mm);
- }
- 
- void flush_tlb_page(struct vm_area_struct *vma, unsigned long uaddr)
-@@ -94,7 +94,7 @@ void flush_tlb_page(struct vm_area_struct *vma, unsigned long uaddr)
- 		on_each_cpu_mask(mm_cpumask(vma->vm_mm), ipi_flush_tlb_page,
- 					&ta, 1);
- 	} else
--		local_flush_tlb_page(vma, uaddr);
-+		__flush_tlb_page(vma, uaddr);
- }
- 
- void flush_tlb_kernel_page(unsigned long kaddr)
-@@ -104,7 +104,7 @@ void flush_tlb_kernel_page(unsigned long kaddr)
- 		ta.ta_start = kaddr;
- 		on_each_cpu(ipi_flush_tlb_kernel_page, &ta, 1);
- 	} else
--		local_flush_tlb_kernel_page(kaddr);
-+		__flush_tlb_kernel_page(kaddr);
- }
- 
- void flush_tlb_range(struct vm_area_struct *vma,
-diff --git a/arch/arm/mm/context.c b/arch/arm/mm/context.c
-index a5a4b2bc..550acf8 100644
---- a/arch/arm/mm/context.c
-+++ b/arch/arm/mm/context.c
-@@ -134,10 +134,7 @@ static void flush_context(unsigned int cpu)
- 	}
- 
- 	/* Queue a TLB invalidate and flush the I-cache if necessary. */
--	if (!tlb_ops_need_broadcast())
--		cpumask_set_cpu(cpu, &tlb_flush_pending);
--	else
--		cpumask_setall(&tlb_flush_pending);
-+	cpumask_setall(&tlb_flush_pending);
- 
- 	if (icache_is_vivt_asid_tagged())
- 		__flush_icache_all();
 -- 
 1.8.0
