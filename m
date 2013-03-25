@@ -1,82 +1,41 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 25 Mar 2013 15:02:37 +0000
-Subject: [PATCH 2/3] mfd: db8500-prcmu: Fetch the PRCMU TCDM base address from
- Device Tree
-In-Reply-To: <1364223758-17621-1-git-send-email-lee.jones@linaro.org>
-References: <1364223758-17621-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1364223758-17621-2-git-send-email-lee.jones@linaro.org>
+Date: Mon, 25 Mar 2013 15:02:36 +0000
+Subject: [PATCH 1/3] ARM: ux500: Add device nodes for TCDM and TCPM memory
+ locations
+Message-ID: <1364223758-17621-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A recent move to send the base addresses though the PRCMU platform
-device resource instead of defines found in <mach/*>, means that dbx500
-devices can no longer boot successfully when booting with Device Tree
-enabled. This patch ensures the addresses are obtained correctly from
-DT.
+The PRCMU requires the Tightly Coupled Memory (TCM) locations in
+order to function correctly. A recent move to send the base
+addresses though the PRCMU platform device resource instead of
+defines found in <mach/*>, means that dbx500 devices can no longer
+boot successfully. These new nodes will allow the PRCMU to extract
+the base memory locations from Device Tree instead.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mfd/db8500-prcmu.c |   28 ++++++++++++++++++++--------
- 1 file changed, 20 insertions(+), 8 deletions(-)
+ arch/arm/boot/dts/snowball.dts |    8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
-index 21f261b..8602bf8 100644
---- a/drivers/mfd/db8500-prcmu.c
-+++ b/drivers/mfd/db8500-prcmu.c
-@@ -17,6 +17,8 @@
- #include <linux/err.h>
- #include <linux/spinlock.h>
- #include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
- #include <linux/slab.h>
- #include <linux/mutex.h>
- #include <linux/completion.h>
-@@ -2790,19 +2792,29 @@ static int db8500_irq_init(struct device_node *np)
- }
+diff --git a/arch/arm/boot/dts/snowball.dts b/arch/arm/boot/dts/snowball.dts
+index d3ec32f..6195ffa 100644
+--- a/arch/arm/boot/dts/snowball.dts
++++ b/arch/arm/boot/dts/snowball.dts
+@@ -126,6 +126,14 @@
+ 			 };
+ 		};
  
- static void dbx500_fw_version_init(struct platform_device *pdev,
--			    u32 version_offset)
-+				   u32 version_offset,
-+				   struct device_node *np)
- {
-+	struct device_node *tcpm_np;
- 	struct resource *res;
--	void __iomem *tcpm_base;
-+	void __iomem *tcpm_base = NULL;
- 
- 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
- 					   "prcmu-tcpm");
- 	if (!res) {
--		dev_err(&pdev->dev,
--			"Error: no prcmu tcpm memory region provided\n");
--		return;
--	}
--	tcpm_base = ioremap(res->start, resource_size(res));
-+		if (np) {
-+			tcpm_np = of_find_node_by_name(np->parent,
-+						       "prcmu-tcpm-per4");
-+			if (!tcpm_np) {
-+				dev_err(&pdev->dev,
-+					"no prcmu tcpm mem region provided\n");
-+				return;
-+			}
-+			tcpm_base = of_iomap(tcpm_np, 0);
-+		}
-+	} else
-+		tcpm_base = ioremap(res->start, resource_size(res));
++		prcmu-tcpm-per4 at 801b0000 {
++			reg = <0x801b0000 0x1000>;
++		};
 +
- 	if (tcpm_base != NULL) {
- 		u32 version;
++		prcmu-tcdm-per4 at 801b8000 {
++			reg = <0x801b8000 0x1000>;
++		};
++
+ 		external-bus at 50000000 {
+ 			status = "okay";
  
-@@ -3154,7 +3166,7 @@ static int db8500_prcmu_probe(struct platform_device *pdev)
- 
- 	init_prcm_registers();
- 
--	dbx500_fw_version_init(pdev, pdata->version_offset);
-+	dbx500_fw_version_init(pdev, pdata->version_offset, np);
- 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "prcmu-tcdm");
- 	if (!res) {
- 		dev_err(&pdev->dev, "no prcmu tcdm region provided\n");
 -- 
 1.7.10.4
