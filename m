@@ -1,140 +1,58 @@
-From: sourav.poddar@ti.com (Sourav Poddar)
-Date: Mon, 25 Mar 2013 18:30:08 +0530
-Subject: [PATCH v2 00/18] ARM: OMAP5: PM: Add MPUSS suspend and CPUidle
- support
-In-Reply-To: <51504770.9080505@ti.com>
-References: <1364205910-32392-1-git-send-email-santosh.shilimkar@ti.com>
- <515042CF.3040806@ti.com> <51504770.9080505@ti.com>
-Message-ID: <51504A58.1090707@ti.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 25 Mar 2013 14:03:20 +0100
+Subject: [PATCH] ARM: dove: add more hardware description in the DT
+In-Reply-To: <20130325134222.56fe44fc@armhf>
+References: <20130325103159.0c1b4f17@armhf>
+ <CABJ1b_RrFpKdH3w=v4gvRQ-8UniKOz9o9VVJ8Q=AQz5WaN0NRQ@mail.gmail.com>
+ <20130325134222.56fe44fc@armhf>
+Message-ID: <CABJ1b_Tdi4RrBPpNS_xUBQ77rQ_G74vCBNLpgwOv_DXoBWGong@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rajendra,
-On Monday 25 March 2013 06:17 PM, Rajendra Nayak wrote:
-> On Monday 25 March 2013 05:57 PM, Sourav Poddar wrote:
->> Hi Santosh,
->> On Monday 25 March 2013 03:34 PM, Santosh Shilimkar wrote:
->>> Kevin,
->>>
->>> Here is the refreshed version(v2) of the OMAP5 PM suspport which was posted
->>> earlier (March 1st 2013). Patch-set incorporates comments from Nishant
->>> Menon (Thanks for review NM) and his acked-by tags. I would like to get this
->>> queued for 3.10 merge window if you are ok with the series.
->>>
->>> Series is built on top of my pull requests [1] [2] [3] sent to Tony and your
->>> 'for_3.10/pm/cleanup' branch. For testing, I have created a branch [4]
->>> which put together all the needed dependencies, fixes which should make it
->>> to 3.10 merge window.
->>>
->>> Series adds OMAP5 MPUSS power management support for system wide suspend
->>> and CPUidle. Its heavy re-use from OMAP4 and hence only ~400 odd lines are
->>> needed to add OMAP5 PM support on top of existing OMAP4 PM support.
->>>
->>> OMAP5 adds a mercury retention feature which is an enhancement of
->>> existing retention feature to reduce the leakage. No change in
->>> programming model except one time enabling of mercury retention
->>> during init.
->>>
->>> One more notable change in OMAP5 vs OMAP4 devices, CPUx power domains
->>> support retention state which lets you hit MPUSS and Core retention with
->>> very low latency C-states.
->>>
->>> Tested on OMAP4430 SDP, OMAP4460 Panda, OMAP5430 SDP and OMAP5432 Panda
->>> devices with suspend and CPUIdle. Rootfs is mounted over ramdisk since
->>> the mmc and nfs based fs needs DMA engine patches. For suspend wakeup,
->>> I used Sourav's couple of serial wakeup wip patches from the lists.
->>>
->>> The following changes since commit 9981cde24de52e5bb9a7cd918d1e54de241f85c9:
->>>
->>>     Merge branch 'for_3.10/omap5_data_files' of git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux into for_3.10/omap5_pm (2013-03-25 12:29:34 +0530)
->>>
->>> are available in the git repository at:
->>>
->>>
->>>     git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux.git for_3.10/omap5_pm
->>>
->>> for you to fetch changes up to 75bd846d3103da858a208fe07127151903d1f608:
->>>
->>>     ARM: OMAP5: PM: handle device instance for warm reset (2013-03-25 12:37:44 +0530)
->>>
->>> ----------------------------------------------------------------
->>> Nishanth Menon (1):
->>>     ARM: OMAP5: PM: handle device instance for warm reset
->>>
->>> Santosh Shilimkar (17):
->>>     ARM: OMAP4+: PM: Consolidate MPU subsystem PM code for re-use
->>>     ARM: OMAP5: PM: Update CPU context register offset
->>>     ARM: OMAP4+: PM: Consolidate and use OMAP4 PM code for OMAP5
->>>     ARM: OMAP5: PM: Set MPUSS-EMIF clock-domain static dependency
->>>     ARM: OMAP5: PM: Enables ES2 PM mode by default
->>>     ARM: OMAP5: PM: Enable Mercury retention mode on CPUx powerdomains
->>>     ARM: OMAP5: Add init_late() hook to enable pm initialization
->>>     ARM: OMAP5: PM: Add CPU power off in hotplug path
->>>     ARM: OMAP4+: PM: Restore CPU power state to ON with clockdomain force
->>>       wakeup method
->>>     ARM: OMAP5: PM: Add MPU Open Switch Retention support
->>>     ARM: OMAP5: PM: Add L2 memory power down support
->>>     ARM: OMAP4: CPUidle: Avoid double idle driver registration
->>>     ARM: OMAP: CPUidle: Unregister drivere on device registration failure
->>>     ARM: OMAP4: CPUidle: Make C-state description field more precise
->>>     ARM: OMAP4+: CPUidle: Consolidate idle driver for OMAP5 support
->>>     ARM: OMAP4+: CPUidle: Deprecate use of
->>>       omap4_mpuss_read_prev_context_state()
->>>     ARM: OMAP4+: CPUidle: Add OMAP5 idle driver support
->>>
->>>    arch/arm/mach-omap2/Kconfig                        |    1 +
->>>    arch/arm/mach-omap2/Makefile                       |   12 +-
->>>    arch/arm/mach-omap2/board-generic.c                |    1 +
->>>    arch/arm/mach-omap2/common.h                       |    8 +-
->>>    arch/arm/mach-omap2/cpuidle34xx.c                  |    6 +-
->>>    .../{cpuidle44xx.c =>   cpuidle_omap4plus.c}         |  151 ++++++++++++++++---
->>>    arch/arm/mach-omap2/io.c                           |    8 +
->>>    arch/arm/mach-omap2/omap-mpuss-lowpower.c          |  155 +++++++++++++++-----
->>>    arch/arm/mach-omap2/omap-secure.h                  |    9 ++
->>>    arch/arm/mach-omap2/omap-smp.c                     |   12 +-
->>>    arch/arm/mach-omap2/omap-wakeupgen.c               |   30 +++-
->>>    arch/arm/mach-omap2/omap-wakeupgen.h               |    1 +
->>>    arch/arm/mach-omap2/omap4-sar-layout.h             |    2 +
->>>    arch/arm/mach-omap2/{pm44xx.c =>   pm_omap4plus.c}   |   90 ++++++++++--
->>>    arch/arm/mach-omap2/prminst44xx.c                  |   10 +-
->>>    .../mach-omap2/{sleep44xx.S =>   sleep_omap4plus.S}  |  106 +++++++++++++
->>>    16 files changed, 512 insertions(+), 90 deletions(-)
->>>    rename arch/arm/mach-omap2/{cpuidle44xx.c =>   cpuidle_omap4plus.c} (58%)
->>>    rename arch/arm/mach-omap2/{pm44xx.c =>   pm_omap4plus.c} (74%)
->>>    rename arch/arm/mach-omap2/{sleep44xx.S =>   sleep_omap4plus.S} (77%)
->>>
->> Build tested [1] for omap2plus_defconfig.
+Also added Russell to the discussion, as I am sure he wants to comment
+on dove drm driver ;)
+
+On Mon, Mar 25, 2013 at 1:42 PM, Jean-Francois Moine <moinejf@free.fr> wrote:
+> On Mon, 25 Mar 2013 11:21:13 +0100
+> Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
+>> On Mon, Mar 25, 2013 at 10:31 AM, Jean-Francois Moine <moinejf@free.fr> wrote:
+>> Besides lcd and i2s there is also
 >>
->> For [2], where omap5_pm_branch[1] is merged, testing details are as follows:
->>     * Boot tested on omap4430 sdp, omap5 evm.
+>> dcon: display-controller at 830000 and
+>> ire: image-rotation-engine at 831000
 >>
->>     * Wakeup from UART after suspend using dt was tested on omap4430sdp and
->>        omap5430 evm.
->>        Note: For  the above UART testing, we need to append "no_console_suspend" in our
->>                 bootargs.
-> Is this for both omap4 and omap5 that you need 'no_console_suspend'?
+>> I am not yet 100% sure how to hook them up in dove-drm that I am
+>> writing on but I want to have them in somehow. DCON will allow to
+>> mux lcd0/lcd1 data streams, i.e. clone or pan lcd0 to lcd1. IRE allows
+>> to rotate the memory buffer loaded by -90/90deg.
 >
-For omap5, using "no_console_suspend" is mandatory as of now.
+> My first aim is to have the dove-drm in the mainline. These devices
+> could be added later, as the ac'97, gpu and vpu. Also, rotating the
+> image is not very useful when your monitor cannot rotate! (I wonder if
+> such monitors still exist as the one I used on a MAC in the 80's)
 
-For omap4 dt case,
-   We can also do without "no_console_suspend".
+I guess you let the user choose to have it rotated or not.
 
-  But the tested branch[2] contains a patch which fixes wakeup from uart 
-on both
-  omap4/5 with dt, while using "no_console_suspend" in the bootargs..
+> But, anyway, I may do it. The only problem is that dcon and ire are
+> sharing the same irq. How should I declare that?
 
-~Sourav
->>        Tested-by: Sourav Poddar<sourav.poddar@ti.com>
->>
->> Thanks,
->> Sourav
->>
->> [1] git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux for_3.10/omap5_pm
->> [2] git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux.git testing/3.10/omap5_int
->>
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Then just have one node
+
+dcon: display-controller at 830000 {
+   compatible = "marvell,dove-dcon";
+   reg = <0x830000 0xc4>, <0x831000 0x8c>;
+   interrupts = <45>;
+};
+
+We can detect if ire is available on the second reg property.
+
+> BTW, I am ready to upload a new version of the dove-drm on my site. It
+> now uses the dt for getting the hdmi encoder. Do you prefer I or you do
+> the merge?
+
+>From the current status of either yours or mine driver none of it is ready
+for mainline. You can of course have your own repo and provide a version
+there. As soon as we are both happy with one of the drivers, we can send
+a patch here.
+
+Sebastian
