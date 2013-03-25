@@ -1,93 +1,60 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Mon, 25 Mar 2013 11:27:24 -0700
-Subject: RFC v2: Zynq Clock Controller
-In-Reply-To: <515093B4.2090701@wwwdotorg.org>
-References: <27dae808-1d3a-4001-8eb2-b0a6e2a34b8f@AM1EHSMHS013.ehs.local>
- <515093B4.2090701@wwwdotorg.org>
-Message-ID: <8fd7278d-37c5-48ff-8d06-edc64d532a96@VA3EHSMHS037.ehs.local>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 25 Mar 2013 18:27:20 +0000
+Subject: [RFC patch 02/11] cpuidle / arm : a single cpuidle driver
+In-Reply-To: <51433949.1030204@linaro.org>
+References: <1363357630-22214-1-git-send-email-daniel.lezcano@linaro.org>
+ <1363357630-22214-3-git-send-email-daniel.lezcano@linaro.org>
+ <201303151447.06150.arnd@arndb.de> <51433949.1030204@linaro.org>
+Message-ID: <CAHkRjk45cGSKiC003izHrLSZPb3wsmjXPTG3e0raSaXAdQRqEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On 15 March 2013 15:07, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
+> On 03/15/2013 03:47 PM, Arnd Bergmann wrote:
+>> On Friday 15 March 2013, Daniel Lezcano wrote:
+>>> The cpuidle drivers are duplicating a lot of code and in most
+>>> of the case there is a common pattern we can factor out:
+>>>
+>>>         * setup the broadcast timers
+>>>         * register the driver
+>>>         * register the devices
+>>>
+>>> This arm driver is the common part between all the ARM cpuidle drivers,
+>>> with the code factored out.
+>>>
+>>> It does not handle the coupled idle state for now but it is the first
+>>> step to have everyone to converge to the same code pattern.
+>>>
+>>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>>
+>> Unfortunately, I missed the session in Hong Kong, but I'd like to understand
+>> what part of this driver is actually ARM specific. I assume there is nothing
+>> in it that depends on 32 bit ARM hardware, right?
+>
+> What depends on the 32bits ARM hardware is the drivers themselves. This
+> ARM driver is the first step to consolidate all SoC cpuidle specific
+> code we find in arch/arm. The code is designated to factor out these
+> drivers, as a first step. The second step is to consolidate more this
+> driver (eg. moving the code in arch/arm/kernel/cpuidle.c in this driver).
+>
+> The last man standing algorithm we have in mach-ux500 and mach-imx is
+> the same, and will be moved in the ARM cpuidle driver.
+>
+> The more it will be consolidated, the more it will be ARM specific.
+>
+> The final step will be to use the device tree to be passed to this
+> driver and do the cpuidle driver initialization from there.
+>
+>> Would the same code be used with arch/arm64?
+>
+> I can't tell but IIUC, a single ARM driver will be used based on the
+> psci for ARM64, but it does not exist for now. It is possible some code
+> pattern could be used from the ARM32 cpuidle driver.
 
-On Mon, Mar 25, 2013 at 12:13:08PM -0600, Stephen Warren wrote:
-> On 03/20/2013 05:56 PM, S?ren Brinkmann wrote:
-> > Hi,
-> > 
-> > I spent some time working on this and incorporating feedback. Here's an updated proposal for a clock controller for Zynq:
-> > 
-> > Required properties:
-> >  - #clock-cells : Must be 1
-> >  - compatible : "xlnx,ps7-clkc"  (this may become 'xlnx,zynq-clkc' terminology differs a bit between Xilinx internal and mainline)
-> >  - ps-clk-frequency : Frequency of the oscillator providing ps_clk in HZ
-> >                      (usually 33 MHz oscillators are used for Zynq platforms)
-> 
-> This may have been mentioned before, but shouldn't the input clock be
-> represented as an actual clock in DT, and hence as an entry in this
-> node's clocks property? The crystal/... itself can be represented in DT
-> as a fixed-clock.
-Lars-Peter brought that up, too. Please refer to my answer to him.
+While we recommend PSCI if EL3 (secure mode) is available, not all
+ARMv8 CPU implementations will have this and most likely we'll have to
+reuse existing cpuidle drivers. So if you can make it as generic as
+possible it would really help.
 
-> 
-> >  - clock-output-names : List of strings used to name the clock outputs. Shall be a list of the outputs given below.
-> 
-> That shouldn't be required.
-When I want to support of_clk_get_parent_name() for my clocks, I think
-it is. And I'm inclined to not brake this functionality.
-
-> 
-> > Optional properties:
-> >  - clocks : as described in the clock bindings
-> >  - clock-names : as described in the clock bindings
-> 
-> I think clocks should be required, with at least the main crystal clock
-> input always present, but perhaps having some optional entries for the
-> (E)MIO feature you mention.
-This is why I have the xtal separate. This way these props are purely
-optional and the xtal frequency is obtained separately. It also makes it
-a little easier internally, because I don't have to cope with a variable
-name for the xtal this way.
-
-Describing the xtal as fixed clock in DT means a mandatory entry for
-'clocks' and 'clock-names' and a variable name for the xtal clock. I
-wanted to avoid this.
-
-> 
-> > Example:
-> >         clkc: clkc {
-> >                 #clock-cells = <1>;
-> >                 compatible = "xlnx,ps7-clkc";
-> >                 ps-clk-frequency = <33333333>;
-> >                 clock-output-names = "armpll", "ddrpll", "iopll", "cpu_6or4x", "cpu_3or2x", "cpu_2x", "cpu_1x", "ddr2x", "ddr3x", "dci", "lqspi", "smc", "pcap", "gem0", "gem1", "fclk0", "fclk1", "fclk2", "fclk3", "can0", "can1", "sdio0", "sdio1", "uart0", "uart1", "spi0", "spi1", "dma", "usb0_aper", "usb1_aper", "gem0_aper", "gem1_aper", "sdio0_aper", "sdio1_aper", "spi0_aper", "spi1_aper", "can0_aper", "can1_aper", "i2c0_aper", "i2c1_aper", "uart0_aper", "uart1_aper", "gpio_aper", "lqspi_aper", "smc_aper", "swdt", "dbg_trc", "dbg_apb";  /* long list... explanation below */
-> >                 /* optional props */
-> >                 clocks = <&clkc 16>, <&clk_foo>;
-> >                 clock-names = "gem1_emio_clk", "can_mio_clk_23";
-> >         };
-> > 
-> > The downside of supporting this is, that I don't see a way around explicitly listing the clock output names in the DT.
-> 
-> (Please wrap your emails to ~74 characters or so)
-I changed my settings.
-
-> 
-> As Mike mentioned off-list, one can create a new clk registration API
-> that takes a struct clk* as parent rather than a char *clk_name.
-Then we also have to make sure clocks are probed in a specific order. To
-obtain a 'struct clk *' through clk_get() the requested clock has to be
-already been probed. Currently clock probing relies purely on data present
-in DT. This makes this proposal not that trivial, IMHO.
-
-e.g. in this case the clock controller probe would fail if the potential
-fixed clock describing the xtal isn't probed first.
-
-> 
-> > This email and any attachments are intended for the sole use of the named recipient(s)...
-> 
-> It's not good form to include that kind of disclaimer on public mailing
-> list posts. That's why many people use their personal email when posting
-> to mailing lists.
-My apologies. IT is currently messing with the email configuration and broke
-the flows which used to work. AFAIK, it's currently fixed. And I
-sincerely hope it stays this way.
-
-	S?ren
+-- 
+Catalin
