@@ -1,39 +1,54 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 25 Mar 2013 11:05:15 -0600
-Subject: [PATCHv2 3/7] pinctrl: gpio: vt8500: Add pincontrol driver for
- arch-vt8500
-In-Reply-To: <1364015633-18580-4-git-send-email-linux@prisktech.co.nz>
-References: <1364015633-18580-1-git-send-email-linux@prisktech.co.nz>
- <1364015633-18580-4-git-send-email-linux@prisktech.co.nz>
-Message-ID: <515083CB.1060908@wwwdotorg.org>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 25 Mar 2013 18:06:21 +0100
+Subject: [PATCH v5 0/8] Reset controller API to reset IP modules on i.MX5 and
+ i.MX6
+Message-ID: <1364231189-12497-1-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/22/2013 11:13 PM, Tony Prisk wrote:
-> This patch adds support for the GPIO/pinmux controller found on the VIA
-> VT8500 and Wondermedia WM8xxx-series SoCs.
-> 
-> Each pin within the controller is capable of operating as a GPIO or as
-> an alternate function. The pins are numbered according to their control
-> bank/bit so that if new pins are added, the existing numbering is maintained.
-> 
-> All currently supported SoCs are included: VT8500, WM8505, WM8650, WM8750 and
-> WM8850.
+The system reset controller (SRC) on i.MX51, i.MX53, and i.MX6q controls
+reset lines to the GPU, VPU, IPU, and OpenVG IP modules.
 
-> diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-vt8500.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-vt8500.txt
+The following patches add a simple API for devices to request being reset
+by separate reset controller hardware and implements the reset signal
+device tree binding proposed by Stephen Warren. Contrary to Tegra hardware,
+the i.MX SRC contains self-deasserting reset registers, so I've included
+both ops to manually assert/deassert a reset line, as well as a "reset"
+operation that is supposed to assert the reset line and wait for it to
+deassert.
 
-> +Required properties:
+The i.MX SRC is enhanced to provide a reset controller and the IPU driver
+is made to request being reset by calling the device_reset(&pdev->dev)
+convenience wrapper during probing.
 
-> +- gpio-controller: Marks the device node as a GPIO controller.
-> +- #gpio-cells : Should be two. The first cell is the pin number and the
-> +  second cell is used to specify optional parameters.
+Changes since v4:
+ - removed flags parameter from .of_xlate / of_reset_simple_xlate
+ - warn also if reset_spec->args_count > rcdev->of_reset_n_cells
+ - unlock list mutex only after try_module_get
+ - tighten devm_reset_control_match a bit
 
-What are those optional parameters? This binding should define them.
+regards
+Philipp
 
-> +Optional properties:
-> +- wm,pinmux: A value and mask pair describing the configuration changes to
-> +  the pinmux register. Only bits marked 1 in the mask will be changed.
-
-This needs more explanation. What does this do and why is it needed?
-
-Other than that, this binding looks fine.
+---
+ .../devicetree/bindings/reset/fsl,imx-src.txt      |  49 ++++
+ .../devicetree/bindings/reset/gpio-reset.txt       |  37 +++
+ Documentation/devicetree/bindings/reset/reset.txt  |  75 ++++++
+ .../bindings/staging/imx-drm/fsl-imx-drm.txt       |   3 +
+ arch/arm/boot/dts/imx51.dtsi                       |   7 +
+ arch/arm/boot/dts/imx53.dtsi                       |   7 +
+ arch/arm/boot/dts/imx6q.dtsi                       |   1 +
+ arch/arm/boot/dts/imx6qdl.dtsi                     |   4 +-
+ arch/arm/mach-imx/Kconfig                          |   3 +
+ arch/arm/mach-imx/mm-imx5.c                        |   2 +
+ arch/arm/mach-imx/src.c                            |  69 ++++-
+ drivers/Kconfig                                    |   2 +
+ drivers/Makefile                                   |   3 +
+ drivers/reset/Kconfig                              |  26 ++
+ drivers/reset/Makefile                             |   2 +
+ drivers/reset/core.c                               | 297 +++++++++++++++++++++
+ drivers/reset/gpio-reset.c                         | 208 +++++++++++++++
+ drivers/staging/imx-drm/ipu-v3/ipu-common.c        |  12 +-
+ include/linux/reset-controller.h                   |  51 ++++
+ include/linux/reset.h                              |  17 ++
+ 20 files changed, 870 insertions(+), 5 deletions(-)
