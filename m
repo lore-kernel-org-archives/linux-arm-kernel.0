@@ -1,250 +1,131 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 25 Mar 2013 18:54:58 +0900
-Subject: [PATCH v3] ARM: DTS: CROS5250: Add max77686 device tree support
-In-Reply-To: <CAM4voande7QK7=TE5w+zdw-NY+7A243OrKG_YDbEDb9L=w_+uw@mail.gmail.com>
-References: <1354099900-24779-1-git-send-email-a.kesavan@samsung.com>
- <1354677702-22669-1-git-send-email-a.kesavan@samsung.com>
- <CAM4voande7QK7=TE5w+zdw-NY+7A243OrKG_YDbEDb9L=w_+uw@mail.gmail.com>
-Message-ID: <177601ce293e$cfc4b790$6f4e26b0$%kim@samsung.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Mon, 25 Mar 2013 17:56:41 +0800
+Subject: [PATCH 3/8] ARM: sirf: move irq driver to drivers/irqchip
+In-Reply-To: <201303250941.14399.arnd@arndb.de>
+References: <1363779679-16880-1-git-send-email-arnd@arndb.de>
+ <1363779679-16880-4-git-send-email-arnd@arndb.de>
+ <CAGsJ_4wUtgEGY9fc_RGq4m+=wzzgS1MxCOCLRm6Xh+-5kVMAdQ@mail.gmail.com>
+ <201303250941.14399.arnd@arndb.de>
+Message-ID: <CAGsJ_4yPRE8SBSk5eLH3j3Y9bf9tbhy15i0kEE+83VcPNk80Cw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Abhilash Kesavan wrote:
-> 
-> Adding Kukjin Kim who was accidentally missed out in the re-worked
-patches.
-> 
-Abhilash, please re-send patch so that I could apply this into samsung tree.
+2013/3/25, Arnd Bergmann <arnd@arndb.de>:
+> On Monday 25 March 2013, Barry Song wrote:
+>> 2013/3/20, Arnd Bergmann <arnd@arndb.de>:
+>
+>> > +static asmlinkage void __exception_irq_entry sirfsoc_handle_irq(struct
+>> > pt_regs *regs)
+>> > +{
+>> > +	void __iomem *base = sirfsoc_irqdomain->host_data;
+>> > +	u32 irqstat, irqnr;
+>> > +
+>> > +	irqstat = readl_relaxed(base + SIRFSOC_INIT_IRQ_ID);
+>> > +	irqnr = irq_find_mapping(sirfsoc_irqdomain, irqstat & 0xff);
+>> > +
+>> > +	handle_IRQ(irqnr, regs);
+>> > +}
+>> > +
+>> > +static void __init sirfsoc_irq_init(struct device_node *np, struct
+>> > device_node *parent)
+>>
+>> this function should be changed from void to int.
+>
+> Right.
+>
+>> > +{
+>> > +	void __iomem *base = of_iomap(np, 0);
+>> > +	if (!base)
+>> > +		panic("unable to map intc cpu registers\n");
+>> > +
+>> > +	sirfsoc_irqdomain = irq_domain_add_linear(np, SIRFSOC_NUM_IRQS,
+>> > +				 &irq_domain_simple_ops, base);
+>>
+>> this breaks the hwirq and irq mapping. the hwirq 0 is mapped to
+>> no_irqs, then setup_irq will fail in
+>> drivers/clocksource/timer-prima2.c.
+>
+> Hmm, I don't understand yet what is going on there. This should create
+> a domain with all dynamically allocated interrupt descriptors,
+> and the hwirq number is just local to the controller then.
 
-Thanks.
+suppose we think the hardware register flag bit of timer-prima2 is 0,
+irq_of_parse_and_map() will return 16 in patch2 for the timer-prima2
+which uses the 1st hardware IRQ in the system.
 
-- Kukjin
+if add nr_irqs=288 in ATLAS6 machine, irq_of_parse_and_map() will
+return 288 in patch2. it looks like the first hw irq will always be
+mapped to nr_irqs.
 
-> On Wed, Dec 5, 2012 at 8:51 AM, Abhilash Kesavan <a.kesavan@samsung.com>
-> wrote:
-> > The exynos5250 based chromebooks have a max77686 pmic on i2c channel 0.
-> > Add support for the pmic in the common cros5250 dts file.
-> > Tested after enabling cpufreq support for exynos5250 SoC and varying the
-> > arm frequency/voltage using the userspace governer.
-> >
-> > Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-> > Acked-by: Doug Anderson <dianders@chromium.org>
-> > ---
-> > Changes since v1:
-> > * Used generic names for the regulators
-> > * Changed BUCK5 as being default "ON"
-> > Changes since v2:
-> > * Fixed the LDO7 name from "P1.0V_LDO_OUT7" to "P1.1V_LDO_OUT7"
-> >
-> >  arch/arm/boot/dts/cros5250-common.dtsi |  138
-> ++++++++++++++++++++++++++++++++
-> >  1 files changed, 138 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/arch/arm/boot/dts/cros5250-common.dtsi
-> b/arch/arm/boot/dts/cros5250-common.dtsi
-> > index fddd174..8ab8394 100644
-> > --- a/arch/arm/boot/dts/cros5250-common.dtsi
-> > +++ b/arch/arm/boot/dts/cros5250-common.dtsi
-> > @@ -24,6 +24,144 @@
-> >                 samsung,i2c-max-bus-freq = <378000>;
-> >                 gpios = <&gpb3 0 2 3 0>,
-> >                         <&gpb3 1 2 3 0>;
-> > +
-> > +               max77686 at 09 {
-> > +                       compatible = "maxim,max77686";
-> > +                       reg = <0x09>;
-> > +
-> > +                       voltage-regulators {
-> > +                               ldo1_reg: LDO1 {
-> > +                                       regulator-name =
-"P1.0V_LDO_OUT1";
-> > +                                       regulator-min-microvolt =
-<1000000>;
-> > +                                       regulator-max-microvolt =
-<1000000>;
-> > +                                       regulator-always-on;
-> > +                               };
-> > +
-> > +                               ldo2_reg: LDO2 {
-> > +                                       regulator-name =
-"P1.8V_LDO_OUT2";
-> > +                                       regulator-min-microvolt =
-<1800000>;
-> > +                                       regulator-max-microvolt =
-<1800000>;
-> > +                                       regulator-always-on;
-> > +                               };
-> > +
-> > +                               ldo3_reg: LDO3 {
-> > +                                       regulator-name =
-"P1.8V_LDO_OUT3";
-> > +                                       regulator-min-microvolt =
-<1800000>;
-> > +                                       regulator-max-microvolt =
-<1800000>;
-> > +                                       regulator-always-on;
-> > +                               };
-> > +
-> > +                               ldo7_reg: LDO7 {
-> > +                                       regulator-name =
-"P1.1V_LDO_OUT7";
-> > +                                       regulator-min-microvolt =
-<1100000>;
-> > +                                       regulator-max-microvolt =
-<1100000>;
-> > +                                       regulator-always-on;
-> > +                               };
-> > +
-> > +                               ldo8_reg: LDO8 {
-> > +                                       regulator-name =
-"P1.0V_LDO_OUT8";
-> > +                                       regulator-min-microvolt =
-<1000000>;
-> > +                                       regulator-max-microvolt =
-<1000000>;
-> > +                                       regulator-always-on;
-> > +                               };
-> > +
-> > +                               ldo10_reg: LDO10 {
-> > +                                       regulator-name =
-"P1.8V_LDO_OUT10";
-> > +                                       regulator-min-microvolt =
-<1800000>;
-> > +                                       regulator-max-microvolt =
-<1800000>;
-> > +                                       regulator-always-on;
-> > +                               };
-> > +
-> > +                               ldo12_reg: LDO12 {
-> > +                                       regulator-name =
-"P3.0V_LDO_OUT12";
-> > +                                       regulator-min-microvolt =
-<3000000>;
-> > +                                       regulator-max-microvolt =
-<3000000>;
-> > +                                       regulator-always-on;
-> > +                               };
-> > +
-> > +                               ldo14_reg: LDO14 {
-> > +                                       regulator-name =
-"P1.8V_LDO_OUT14";
-> > +                                       regulator-min-microvolt =
-<1800000>;
-> > +                                       regulator-max-microvolt =
-<1800000>;
-> > +                                       regulator-always-on;
-> > +                               };
-> > +
-> > +                               ldo15_reg: LDO15 {
-> > +                                       regulator-name =
-"P1.0V_LDO_OUT15";
-> > +                                       regulator-min-microvolt =
-<1000000>;
-> > +                                       regulator-max-microvolt =
-<1000000>;
-> > +                                       regulator-always-on;
-> > +                               };
-> > +
-> > +                               ldo16_reg: LDO16 {
-> > +                                       regulator-name =
-"P1.8V_LDO_OUT16";
-> > +                                       regulator-min-microvolt =
-<1800000>;
-> > +                                       regulator-max-microvolt =
-<1800000>;
-> > +                                       regulator-always-on;
-> > +                               };
-> > +
-> > +                               buck1_reg: BUCK1 {
-> > +                                       regulator-name = "vdd_mif";
-> > +                                       regulator-min-microvolt =
-<950000>;
-> > +                                       regulator-max-microvolt =
-<1300000>;
-> > +                                       regulator-always-on;
-> > +                                       regulator-boot-on;
-> > +                               };
-> > +
-> > +                               buck2_reg: BUCK2 {
-> > +                                       regulator-name = "vdd_arm";
-> > +                                       regulator-min-microvolt =
-<850000>;
-> > +                                       regulator-max-microvolt =
-<1350000>;
-> > +                                       regulator-always-on;
-> > +                                       regulator-boot-on;
-> > +                               };
-> > +
-> > +                               buck3_reg: BUCK3 {
-> > +                                       regulator-name = "vdd_int";
-> > +                                       regulator-min-microvolt =
-<900000>;
-> > +                                       regulator-max-microvolt =
-<1200000>;
-> > +                                       regulator-always-on;
-> > +                                       regulator-boot-on;
-> > +                               };
-> > +
-> > +                               buck4_reg: BUCK4 {
-> > +                                       regulator-name = "vdd_g3d";
-> > +                                       regulator-min-microvolt =
-<850000>;
-> > +                                       regulator-max-microvolt =
-<1300000>;
-> > +                                       regulator-always-on;
-> > +                                       regulator-boot-on;
-> > +                               };
-> > +
-> > +                               buck5_reg: BUCK5 {
-> > +                                       regulator-name =
-"P1.8V_BUCK_OUT5";
-> > +                                       regulator-min-microvolt =
-<1800000>;
-> > +                                       regulator-max-microvolt =
-<1800000>;
-> > +                                       regulator-always-on;
-> > +                                       regulator-boot-on;
-> > +                               };
-> > +
-> > +                               buck6_reg: BUCK6 {
-> > +                                       regulator-name =
-"P1.35V_BUCK_OUT6";
-> > +                                       regulator-min-microvolt =
-<1350000>;
-> > +                                       regulator-max-microvolt =
-<1350000>;
-> > +                                       regulator-always-on;
-> > +                               };
-> > +
-> > +                               buck7_reg: BUCK7 {
-> > +                                       regulator-name =
-"P2.0V_BUCK_OUT7";
-> > +                                       regulator-min-microvolt =
-<2000000>;
-> > +                                       regulator-max-microvolt =
-<2000000>;
-> > +                                       regulator-always-on;
-> > +                               };
-> > +
-> > +                               buck8_reg: BUCK8 {
-> > +                                       regulator-name =
-"P2.85V_BUCK_OUT8";
-> > +                                       regulator-min-microvolt =
-<2850000>;
-> > +                                       regulator-max-microvolt =
-<2850000>;
-> > +                                       regulator-always-on;
-> > +                               };
-> > +                       };
-> > +               };
-> >         };
-> >
-> >         i2c at 12C70000 {
-> > --
-> > 1.6.6.1
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+> Without patch 2 of the series, this would fail, because that interrupt
+> is not mapped, but as far as I can tell, we correctly instantiate
+> the domain here, so the irq_of_parse_and_map() in sirfsoc_of_timer_map
+> should return a valid interrupt number. Can you check what it returns
+> instead? Does it work if you revert to a legacy domain here?
+
+actually patch2 can work without patch3 by irq_domain_add legacy. as
+you can see, my old timer-marco.c uses irq_of_parse_and_map() instead
+of reading interrupts manually.
+
+the irq mapping works with the following changes:
+-------------------------------------------------------------------------
+-------------------------------------------------------------------------
+arch/arm/mach-prima2/common.c:
+
+ DT_MACHINE_START(ATLAS6_DT, "Generic ATLAS6 (Flattened Device Tree)")
+        /* Maintainer: Barry Song <baohua.song@csr.com> */
+        .map_io         = sirfsoc_map_io,
++       .nr_irqs        = 288,
+        .init_irq       = irqchip_init,
+        .init_time      = sirfsoc_init_time,
+        .init_machine   = sirfsoc_mach_init,
+
+-------------------------------------------------------------------------
+-------------------------------------------------------------------------
+drivers/irqchip/irq-sirfsoc.c:
+index 9a6a925..271f905 100644
+--- a/drivers/irqchip/irq-sirfsoc.c
++++ b/drivers/irqchip/irq-sirfsoc.c
+@@ -54,13 +54,13 @@ static asmlinkage void __exception_irq_entry
+sirfsoc_handle_irq(struct pt_regs *
+        handle_IRQ(irqnr, regs);
+ }
+
+-static void __init sirfsoc_irq_init(struct device_node *np, struct
+device_node *parent)
++static int __init sirfsoc_irq_init(struct device_node *np, struct
+device_node *parent)
+ {
+        void __iomem *base = of_iomap(np, 0);
+        if (!base)
+                panic("unable to map intc cpu registers\n");
+
+-       sirfsoc_irqdomain = irq_domain_add_linear(np, SIRFSOC_NUM_IRQS,
++       sirfsoc_irqdomain = irq_domain_add_legacy(np, SIRFSOC_NUM_IRQS, 0, 0,
+                                 &irq_domain_simple_ops, base);
+
+        sirfsoc_alloc_gc(base, 0, 32);
+@@ -73,6 +73,8 @@ static void __init sirfsoc_irq_init(struct
+device_node *np, struct device_node *
+        writel_relaxed(0, base + SIRFSOC_INT_RISC_MASK1);
+
+        set_handle_irq(sirfsoc_handle_irq);
++
++       return 0;
+ }
+ IRQCHIP_DECLARE(sirfsoc_intc, "sirf,prima2-intc", sirfsoc_irq_init);
+
+-------------------------------------------------------------------------
+-------------------------------------------------------------------------
+drivers/pinctrl/pinctrl-sirf.c:
+-                bank->domain = irq_domain_add_linear(np,
+SIRFSOC_GPIO_BANK_SIZE,
++                bank->domain = irq_domain_add_legacy(np,
+SIRFSOC_GPIO_BANK_SIZE,
++                        128 + i * SIRFSOC_GPIO_BANK_SIZE, 0,
+                        &sirfsoc_gpio_irq_simple_ops, bank);
+
+@@ -65,13 +74,14 @@ MACHINE_END
+
+-barry
