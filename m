@@ -1,51 +1,74 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 25 Mar 2013 18:19:37 +0000
-Subject: [PATCH 0/4] TLB and mm-related optimisations
-Message-ID: <1364235581-17900-1-git-send-email-will.deacon@arm.com>
+Date: Mon, 25 Mar 2013 18:19:39 +0000
+Subject: [PATCH 2/4] ARM: tlb: don't perform inner-shareable invalidation for
+ local BP ops
+In-Reply-To: <1364235581-17900-1-git-send-email-will.deacon@arm.com>
+References: <1364235581-17900-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1364235581-17900-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello again,
+Now that the ASID allocator doesn't require inner-shareable maintenance,
+we can convert the local_bp_flush_all function to perform only
+non-shareable flushing, in a similar manner to the TLB invalidation
+routines.
 
-This is another slightly random set of patches which I cooked up when
-trying to optimise various bits and pieces in arch/arm/mm after writing
-my changes to the ASID allocator.
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/include/asm/tlbflush.h | 16 +++++++++++++---
+ arch/arm/kernel/smp_tlb.c       |  2 +-
+ 2 files changed, 14 insertions(+), 4 deletions(-)
 
-The first two patches modify the local_* variants of our TLB and BP
-invalidation functions to use the non-shareable versions, avoiding the
-need to broadcast them in hardware. This allows us to update the ASID
-allocator to use only local operations (which it needs anyway for
-11MPCore).
-
-The third patch removes some redundant cache-flushing when writing page
-table entries for ARMv7 SMP targets (which require table walking at L1)
-and the final patch allows us to use non-exclusive instructions for
-atomic64 read/set (like we do for the 32-bit variants) when we have LPAE,
-since this requires atomicity of aligned double-word accesses in order to
-manipulate ptes atomically.
-
-All feedback welcome,
-
-Will
-
-
-Will Deacon (4):
-  ARM: tlb: don't perform inner-shareable invalidation for local TLB
-    ops
-  ARM: tlb: don't perform inner-shareable invalidation for local BP ops
-  ARM: mm: kill unused TLB_CAN_READ_FROM_L1_CACHE and use ALT_SMP
-    instead
-  ARM: atomics: don't use exclusives for atomic64 read/set with LPAE
-
- arch/arm/include/asm/atomic.h   | 24 ++++++++++++
- arch/arm/include/asm/tlbflush.h | 83 +++++++++++++++++++++++++++++++++++++----
- arch/arm/kernel/smp_tlb.c       | 10 ++---
- arch/arm/mm/context.c           |  5 +--
- arch/arm/mm/proc-v6.S           |  2 -
- arch/arm/mm/proc-v7-2level.S    |  3 +-
- arch/arm/mm/proc-v7-3level.S    |  3 +-
- arch/arm/mm/proc-v7.S           |  4 +-
- 8 files changed, 112 insertions(+), 22 deletions(-)
-
+diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
+index ae9f34f..c7cdb59 100644
+--- a/arch/arm/include/asm/tlbflush.h
++++ b/arch/arm/include/asm/tlbflush.h
+@@ -171,7 +171,7 @@
+ 
+ #define v7wbi_tlb_flags_smp	(TLB_WB | TLB_DCLEAN | TLB_BARRIER | \
+ 				 TLB_V6_U_FULL | TLB_V6_U_PAGE | \
+-				 TLB_V6_U_ASID | \
++				 TLB_V6_U_ASID | TLB_V6_BP | \
+ 				 TLB_V7_UIS_FULL | TLB_V7_UIS_PAGE | \
+ 				 TLB_V7_UIS_ASID | TLB_V7_UIS_BP)
+ #define v7wbi_tlb_flags_up	(TLB_WB | TLB_DCLEAN | TLB_BARRIER | \
+@@ -495,14 +495,24 @@ static inline void __flush_tlb_kernel_page(unsigned long kaddr)
+ 	}
+ }
+ 
+-static inline void local_flush_bp_all(void)
++static inline void __flush_bp_all(void)
+ {
+ 	const int zero = 0;
+ 	const unsigned int __tlb_flag = __cpu_tlb_flags;
+ 
+ 	if (tlb_flag(TLB_V7_UIS_BP))
+ 		asm("mcr p15, 0, %0, c7, c1, 6" : : "r" (zero));
+-	else if (tlb_flag(TLB_V6_BP))
++
++	if (tlb_flag(TLB_BARRIER))
++		isb();
++}
++
++static inline void local_flush_bp_all(void)
++{
++	const int zero = 0;
++	const unsigned int __tlb_flag = __cpu_tlb_flags;
++
++	if (tlb_flag(TLB_V6_BP))
+ 		asm("mcr p15, 0, %0, c7, c5, 6" : : "r" (zero));
+ 
+ 	if (tlb_flag(TLB_BARRIER))
+diff --git a/arch/arm/kernel/smp_tlb.c b/arch/arm/kernel/smp_tlb.c
+index 6ae08b1..bc3617a 100644
+--- a/arch/arm/kernel/smp_tlb.c
++++ b/arch/arm/kernel/smp_tlb.c
+@@ -137,5 +137,5 @@ void flush_bp_all(void)
+ 	if (tlb_ops_need_broadcast())
+ 		on_each_cpu(ipi_flush_bp_all, NULL, 1);
+ 	else
+-		local_flush_bp_all();
++		__flush_bp_all();
+ }
 -- 
 1.8.0
