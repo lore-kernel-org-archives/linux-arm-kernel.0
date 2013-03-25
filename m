@@ -1,65 +1,210 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 25 Mar 2013 18:19:41 +0000
-Subject: [PATCH 4/4] ARM: atomics: don't use exclusives for atomic64 read/set
- with LPAE
+Date: Mon, 25 Mar 2013 18:19:38 +0000
+Subject: [PATCH 1/4] ARM: tlb: don't perform inner-shareable invalidation for
+ local TLB ops
 In-Reply-To: <1364235581-17900-1-git-send-email-will.deacon@arm.com>
 References: <1364235581-17900-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1364235581-17900-5-git-send-email-will.deacon@arm.com>
+Message-ID: <1364235581-17900-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To ease page table updates with 64-bit descriptors, CPUs implementing
-LPAE are required to implement ldrd/strd as atomic operations.
+Inner-shareable TLB invalidation is typically more expensive than local
+(non-shareable) invalidation, so performing the broadcasting for
+local_flush_tlb_* operations is a waste of cycles and needlessly
+clobbers entries in the TLBs of other CPUs.
 
-This patch uses these accessors instead of the exclusive variants when
-performing atomic64_{read,set} on LPAE systems.
+This patch introduces __flush_tlb_* versions for many of the TLB
+invalidation functions, which only respect inner-shareable variants of
+the invalidation instructions. This allows us to modify the v7 SMP TLB
+flags to include *both* inner-shareable and non-shareable operations and
+then check the relevant flags depending on whether the operation is
+local or not.
 
+This gains us around 0.5% in hackbench scores for a dual-core A15, but I
+would expect this to improve as more cores (and clusters) are added to
+the equation.
+
+Reported-by: Albin Tonnerre <Albin.Tonnerre@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/include/asm/atomic.h | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+ arch/arm/include/asm/tlbflush.h | 67 ++++++++++++++++++++++++++++++++++++++---
+ arch/arm/kernel/smp_tlb.c       |  8 ++---
+ arch/arm/mm/context.c           |  5 +--
+ 3 files changed, 68 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/include/asm/atomic.h b/arch/arm/include/asm/atomic.h
-index c79f61f..da1c77d 100644
---- a/arch/arm/include/asm/atomic.h
-+++ b/arch/arm/include/asm/atomic.h
-@@ -243,6 +243,29 @@ typedef struct {
+diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
+index 4db8c88..ae9f34f 100644
+--- a/arch/arm/include/asm/tlbflush.h
++++ b/arch/arm/include/asm/tlbflush.h
+@@ -170,6 +170,8 @@
+ #endif
  
- #define ATOMIC64_INIT(i) { (i) }
- 
-+#ifdef CONFIG_ARM_LPAE
-+static inline u64 atomic64_read(const atomic64_t *v)
-+{
-+	u64 result;
+ #define v7wbi_tlb_flags_smp	(TLB_WB | TLB_DCLEAN | TLB_BARRIER | \
++				 TLB_V6_U_FULL | TLB_V6_U_PAGE | \
++				 TLB_V6_U_ASID | \
+ 				 TLB_V7_UIS_FULL | TLB_V7_UIS_PAGE | \
+ 				 TLB_V7_UIS_ASID | TLB_V7_UIS_BP)
+ #define v7wbi_tlb_flags_up	(TLB_WB | TLB_DCLEAN | TLB_BARRIER | \
+@@ -334,6 +336,21 @@ static inline void local_flush_tlb_all(void)
+ 	tlb_op(TLB_V4_U_FULL | TLB_V6_U_FULL, "c8, c7, 0", zero);
+ 	tlb_op(TLB_V4_D_FULL | TLB_V6_D_FULL, "c8, c6, 0", zero);
+ 	tlb_op(TLB_V4_I_FULL | TLB_V6_I_FULL, "c8, c5, 0", zero);
 +
-+	__asm__ __volatile__("@ atomic64_read\n"
-+"	ldrd	%0, %H0, [%1]"
-+	: "=&r" (result)
-+	: "r" (&v->counter), "Qo" (v->counter)
-+	);
-+
-+	return result;
++	if (tlb_flag(TLB_BARRIER)) {
++		dsb();
++		isb();
++	}
 +}
 +
-+static inline void atomic64_set(atomic64_t *v, u64 i)
++static inline void __flush_tlb_all(void)
 +{
-+	__asm__ __volatile__("@ atomic64_set\n"
-+"	strd	%2, %H2, [%1]"
-+	: "=Qo" (v->counter)
-+	: "r" (&v->counter), "r" (i)
-+	);
++	const int zero = 0;
++	const unsigned int __tlb_flag = __cpu_tlb_flags;
++
++	if (tlb_flag(TLB_WB))
++		dsb();
++
+ 	tlb_op(TLB_V7_UIS_FULL, "c8, c3, 0", zero);
+ 
+ 	if (tlb_flag(TLB_BARRIER)) {
+@@ -352,22 +369,33 @@ static inline void local_flush_tlb_mm(struct mm_struct *mm)
+ 		dsb();
+ 
+ 	if (possible_tlb_flags & (TLB_V3_FULL|TLB_V4_U_FULL|TLB_V4_D_FULL|TLB_V4_I_FULL)) {
+-		if (cpumask_test_cpu(get_cpu(), mm_cpumask(mm))) {
++		if (!cpumask_test_cpu(smp_processor_id(), mm_cpumask(mm))) {
+ 			tlb_op(TLB_V3_FULL, "c6, c0, 0", zero);
+ 			tlb_op(TLB_V4_U_FULL, "c8, c7, 0", zero);
+ 			tlb_op(TLB_V4_D_FULL, "c8, c6, 0", zero);
+ 			tlb_op(TLB_V4_I_FULL, "c8, c5, 0", zero);
+ 		}
+-		put_cpu();
+ 	}
+ 
+ 	tlb_op(TLB_V6_U_ASID, "c8, c7, 2", asid);
+ 	tlb_op(TLB_V6_D_ASID, "c8, c6, 2", asid);
+ 	tlb_op(TLB_V6_I_ASID, "c8, c5, 2", asid);
++
++	if (tlb_flag(TLB_BARRIER))
++		dsb();
 +}
-+#else
- static inline u64 atomic64_read(const atomic64_t *v)
- {
- 	u64 result;
-@@ -269,6 +292,7 @@ static inline void atomic64_set(atomic64_t *v, u64 i)
- 	: "r" (&v->counter), "r" (i)
- 	: "cc");
++
++static inline void __flush_tlb_mm(struct mm_struct *mm)
++{
++	const unsigned int __tlb_flag = __cpu_tlb_flags;
++
++	if (tlb_flag(TLB_WB))
++		dsb();
++
+ #ifdef CONFIG_ARM_ERRATA_720789
+-	tlb_op(TLB_V7_UIS_ASID, "c8, c3, 0", zero);
++	tlb_op(TLB_V7_UIS_ASID, "c8, c3, 0", 0);
+ #else
+-	tlb_op(TLB_V7_UIS_ASID, "c8, c3, 2", asid);
++	tlb_op(TLB_V7_UIS_ASID, "c8, c3, 2", ASID(mm));
+ #endif
+ 
+ 	if (tlb_flag(TLB_BARRIER))
+@@ -398,6 +426,21 @@ local_flush_tlb_page(struct vm_area_struct *vma, unsigned long uaddr)
+ 	tlb_op(TLB_V6_U_PAGE, "c8, c7, 1", uaddr);
+ 	tlb_op(TLB_V6_D_PAGE, "c8, c6, 1", uaddr);
+ 	tlb_op(TLB_V6_I_PAGE, "c8, c5, 1", uaddr);
++
++	if (tlb_flag(TLB_BARRIER))
++		dsb();
++}
++
++static inline void
++__flush_tlb_page(struct vm_area_struct *vma, unsigned long uaddr)
++{
++	const unsigned int __tlb_flag = __cpu_tlb_flags;
++
++	uaddr = (uaddr & PAGE_MASK) | ASID(vma->vm_mm);
++
++	if (tlb_flag(TLB_WB))
++		dsb();
++
+ #ifdef CONFIG_ARM_ERRATA_720789
+ 	tlb_op(TLB_V7_UIS_PAGE, "c8, c3, 3", uaddr & PAGE_MASK);
+ #else
+@@ -428,6 +471,22 @@ static inline void local_flush_tlb_kernel_page(unsigned long kaddr)
+ 	tlb_op(TLB_V6_U_PAGE, "c8, c7, 1", kaddr);
+ 	tlb_op(TLB_V6_D_PAGE, "c8, c6, 1", kaddr);
+ 	tlb_op(TLB_V6_I_PAGE, "c8, c5, 1", kaddr);
++
++	if (tlb_flag(TLB_BARRIER)) {
++		dsb();
++		isb();
++	}
++}
++
++static inline void __flush_tlb_kernel_page(unsigned long kaddr)
++{
++	const unsigned int __tlb_flag = __cpu_tlb_flags;
++
++	kaddr &= PAGE_MASK;
++
++	if (tlb_flag(TLB_WB))
++		dsb();
++
+ 	tlb_op(TLB_V7_UIS_PAGE, "c8, c3, 1", kaddr);
+ 
+ 	if (tlb_flag(TLB_BARRIER)) {
+diff --git a/arch/arm/kernel/smp_tlb.c b/arch/arm/kernel/smp_tlb.c
+index bd03005..6ae08b1 100644
+--- a/arch/arm/kernel/smp_tlb.c
++++ b/arch/arm/kernel/smp_tlb.c
+@@ -74,7 +74,7 @@ void flush_tlb_all(void)
+ 	if (tlb_ops_need_broadcast())
+ 		on_each_cpu(ipi_flush_tlb_all, NULL, 1);
+ 	else
+-		local_flush_tlb_all();
++		__flush_tlb_all();
  }
-+#endif
  
- static inline void atomic64_add(u64 i, atomic64_t *v)
- {
+ void flush_tlb_mm(struct mm_struct *mm)
+@@ -82,7 +82,7 @@ void flush_tlb_mm(struct mm_struct *mm)
+ 	if (tlb_ops_need_broadcast())
+ 		on_each_cpu_mask(mm_cpumask(mm), ipi_flush_tlb_mm, mm, 1);
+ 	else
+-		local_flush_tlb_mm(mm);
++		__flush_tlb_mm(mm);
+ }
+ 
+ void flush_tlb_page(struct vm_area_struct *vma, unsigned long uaddr)
+@@ -94,7 +94,7 @@ void flush_tlb_page(struct vm_area_struct *vma, unsigned long uaddr)
+ 		on_each_cpu_mask(mm_cpumask(vma->vm_mm), ipi_flush_tlb_page,
+ 					&ta, 1);
+ 	} else
+-		local_flush_tlb_page(vma, uaddr);
++		__flush_tlb_page(vma, uaddr);
+ }
+ 
+ void flush_tlb_kernel_page(unsigned long kaddr)
+@@ -104,7 +104,7 @@ void flush_tlb_kernel_page(unsigned long kaddr)
+ 		ta.ta_start = kaddr;
+ 		on_each_cpu(ipi_flush_tlb_kernel_page, &ta, 1);
+ 	} else
+-		local_flush_tlb_kernel_page(kaddr);
++		__flush_tlb_kernel_page(kaddr);
+ }
+ 
+ void flush_tlb_range(struct vm_area_struct *vma,
+diff --git a/arch/arm/mm/context.c b/arch/arm/mm/context.c
+index a5a4b2bc..550acf8 100644
+--- a/arch/arm/mm/context.c
++++ b/arch/arm/mm/context.c
+@@ -134,10 +134,7 @@ static void flush_context(unsigned int cpu)
+ 	}
+ 
+ 	/* Queue a TLB invalidate and flush the I-cache if necessary. */
+-	if (!tlb_ops_need_broadcast())
+-		cpumask_set_cpu(cpu, &tlb_flush_pending);
+-	else
+-		cpumask_setall(&tlb_flush_pending);
++	cpumask_setall(&tlb_flush_pending);
+ 
+ 	if (icache_is_vivt_asid_tagged())
+ 		__flush_icache_all();
 -- 
 1.8.0
