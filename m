@@ -1,409 +1,126 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 25 Mar 2013 14:30:27 +0100
-Subject: [PATCH 04/10] clocksource: sunxi: Rename sunxi to sun4i
+Date: Mon, 25 Mar 2013 14:30:32 +0100
+Subject: [PATCH 09/10] ARM: sunxi: Rework the restart code
 In-Reply-To: <1364218233-29636-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1364218233-29636-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1364218233-29636-5-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1364218233-29636-10-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During the introduction of the Allwinner SoC platforms, sunxi was
-initially meant as a generic name for all the variants of the Allwinner
-SoC.
+The Allwinner sun6i (A31) has a slightly different watchdog, that
+doesn't allow to use the already existing restart code.
 
-It was ok at the time of the support of only the A10 and A13 that
-looks pretty much the same, but it's beginning to be troublesome with
-the future addition of the Allwinner A31 (sun6i) that is quite
-different, and would introduce some weird logic, where sunxi would
-actually mean in some case sun4i and sun5i but without sun6i...
+Rework a bit the restart code to allow to plug in more easily different
+restart handlers depending on the device tree.
 
-Moreover, it makes the compatible strings naming scheme not consistent
-with other architectures, where usually for this kind of compability, we
-just use the oldest SoC name that has this IP, so let's do just this.
+In the past, we were also meaning sunxi as a generic name covering all
+Allwinner SoCs. This won't be true anymore with the A31 (sun6i) that
+differs pretty much from sun4i and sun5i, and we will end up having
+sunxi, for sun4i and sun5i, and sun6i, which is neither consistent nor
+convenient. So, while we're at it, also change sunxi to sun4i.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/mach-sunxi/Kconfig       |    4 +-
- drivers/clocksource/Kconfig       |    2 +-
- drivers/clocksource/Makefile      |    2 +-
- drivers/clocksource/sun4i_timer.c |  161 +++++++++++++++++++++++++++++++++++++
- drivers/clocksource/sunxi_timer.c |  161 -------------------------------------
- 5 files changed, 165 insertions(+), 165 deletions(-)
- create mode 100644 drivers/clocksource/sun4i_timer.c
- delete mode 100644 drivers/clocksource/sunxi_timer.c
+ arch/arm/mach-sunxi/sunxi.c |   58 ++++++++++++++++++++++++++-----------------
+ 1 file changed, 35 insertions(+), 23 deletions(-)
 
-diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
-index 06c2894..d259c78 100644
---- a/arch/arm/mach-sunxi/Kconfig
-+++ b/arch/arm/mach-sunxi/Kconfig
-@@ -7,5 +7,5 @@ config ARCH_SUNXI
- 	select GENERIC_IRQ_CHIP
- 	select PINCTRL
- 	select SPARSE_IRQ
--	select SUNXI_TIMER
--	select PINCTRL_SUNXI
-\ No newline at end of file
-+	select SUN4I_TIMER
-+	select PINCTRL_SUNXI
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index e507ab7..9002185 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -25,7 +25,7 @@ config DW_APB_TIMER_OF
- config ARMADA_370_XP_TIMER
- 	bool
+diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+index 634e335..e6f5101 100644
+--- a/arch/arm/mach-sunxi/sunxi.c
++++ b/arch/arm/mach-sunxi/sunxi.c
+@@ -22,50 +22,63 @@
  
--config SUNXI_TIMER
-+config SUN4I_TIMER
- 	bool
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
++#include <asm/system_misc.h>
  
- config VT8500_TIMER
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index 4d8283a..7d5d23a 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -16,7 +16,7 @@ obj-$(CONFIG_CLKSRC_NOMADIK_MTU)	+= nomadik-mtu.o
- obj-$(CONFIG_CLKSRC_DBX500_PRCMU)	+= clksrc-dbx500-prcmu.o
- obj-$(CONFIG_ARMADA_370_XP_TIMER)	+= time-armada-370-xp.o
- obj-$(CONFIG_ARCH_BCM2835)	+= bcm2835_timer.o
--obj-$(CONFIG_SUNXI_TIMER)	+= sunxi_timer.o
-+obj-$(CONFIG_SUN4I_TIMER)	+= sun4i_timer.o
- obj-$(CONFIG_ARCH_TEGRA)	+= tegra20_timer.o
- obj-$(CONFIG_VT8500_TIMER)	+= vt8500_timer.o
+ #include "sunxi.h"
  
-diff --git a/drivers/clocksource/sun4i_timer.c b/drivers/clocksource/sun4i_timer.c
-new file mode 100644
-index 0000000..16fcb7c
---- /dev/null
-+++ b/drivers/clocksource/sun4i_timer.c
-@@ -0,0 +1,161 @@
-+/*
-+ * Allwinner A1X SoCs timer handling.
-+ *
-+ * Copyright (C) 2012 Maxime Ripard
-+ *
-+ * Maxime Ripard <maxime.ripard@free-electrons.com>
-+ *
-+ * Based on code from
-+ * Allwinner Technology Co., Ltd. <www.allwinnertech.com>
-+ * Benn Huang <benn@allwinnertech.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/clockchips.h>
-+#include <linux/interrupt.h>
-+#include <linux/irq.h>
-+#include <linux/irqreturn.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <linux/clk/sunxi.h>
-+
-+#define TIMER_IRQ_EN_REG	0x00
-+#define TIMER_IRQ_EN(val)		(1 << val)
-+#define TIMER_IRQ_ST_REG	0x04
-+#define TIMER_CTL_REG(val)	(0x10 * val + 0x10)
-+#define TIMER_CTL_ENABLE		(1 << 0)
-+#define TIMER_CTL_AUTORELOAD		(1 << 1)
-+#define TIMER_CTL_ONESHOT		(1 << 7)
-+#define TIMER_INTVAL_REG(val)	(0x10 * val + 0x14)
-+#define TIMER_CNTVAL_REG(val)	(0x10 * val + 0x18)
-+
-+#define TIMER_SCAL		16
-+
-+static void __iomem *timer_base;
-+
-+static void sun4i_clkevt_mode(enum clock_event_mode mode,
-+			      struct clock_event_device *clk)
-+{
-+	u32 u = readl(timer_base + TIMER_CTL_REG(0));
-+
-+	switch (mode) {
-+	case CLOCK_EVT_MODE_PERIODIC:
-+		u &= ~(TIMER_CTL_ONESHOT);
-+		writel(u | TIMER_CTL_ENABLE, timer_base + TIMER_CTL_REG(0));
-+		break;
-+
-+	case CLOCK_EVT_MODE_ONESHOT:
-+		writel(u | TIMER_CTL_ONESHOT, timer_base + TIMER_CTL_REG(0));
-+		break;
-+	case CLOCK_EVT_MODE_UNUSED:
-+	case CLOCK_EVT_MODE_SHUTDOWN:
-+	default:
-+		writel(u & ~(TIMER_CTL_ENABLE), timer_base + TIMER_CTL_REG(0));
-+		break;
-+	}
-+}
-+
-+static int sun4i_clkevt_next_event(unsigned long evt,
-+				   struct clock_event_device *unused)
-+{
-+	u32 u = readl(timer_base + TIMER_CTL_REG(0));
-+	writel(evt, timer_base + TIMER_CNTVAL_REG(0));
-+	writel(u | TIMER_CTL_ENABLE | TIMER_CTL_AUTORELOAD,
-+	       timer_base + TIMER_CTL_REG(0));
-+
-+	return 0;
-+}
-+
-+static struct clock_event_device sun4i_clockevent = {
-+	.name = "sun4i_tick",
-+	.rating = 300,
-+	.features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
-+	.set_mode = sun4i_clkevt_mode,
-+	.set_next_event = sun4i_clkevt_next_event,
+-#define WATCHDOG_CTRL_REG	0x00
+-#define WATCHDOG_CTRL_RESTART		(1 << 0)
+-#define WATCHDOG_MODE_REG	0x04
+-#define WATCHDOG_MODE_ENABLE		(1 << 0)
+-#define WATCHDOG_MODE_RESET_ENABLE	(1 << 1)
++#define SUN4I_WATCHDOG_CTRL_REG		0x00
++#define SUN4I_WATCHDOG_CTRL_RESTART		(1 << 0)
++#define SUN4I_WATCHDOG_MODE_REG		0x04
++#define SUN4I_WATCHDOG_MODE_ENABLE		(1 << 0)
++#define SUN4I_WATCHDOG_MODE_RESET_ENABLE	(1 << 1)
+ 
+ static void __iomem *wdt_base;
+ 
+-static void sunxi_setup_restart(void)
+-{
+-	struct device_node *np = of_find_compatible_node(NULL, NULL,
+-						"allwinner,sunxi-wdt");
+-	if (WARN(!np, "unable to setup watchdog restart"))
+-		return;
+-
+-	wdt_base = of_iomap(np, 0);
+-	WARN(!wdt_base, "failed to map watchdog base address");
+-}
+-
+-static void sunxi_restart(char mode, const char *cmd)
++static void sun4i_restart(char mode, const char *cmd)
+ {
+ 	if (!wdt_base)
+ 		return;
+ 
+ 	/* Enable timer and set reset bit in the watchdog */
+-	writel(WATCHDOG_MODE_ENABLE | WATCHDOG_MODE_RESET_ENABLE,
+-		wdt_base + WATCHDOG_MODE_REG);
++	writel(SUN4I_WATCHDOG_MODE_ENABLE | SUN4I_WATCHDOG_MODE_RESET_ENABLE,
++	       wdt_base + SUN4I_WATCHDOG_MODE_REG);
+ 
+ 	/*
+ 	 * Restart the watchdog. The default (and lowest) interval
+ 	 * value for the watchdog is 0.5s.
+ 	 */
+-	writel(WATCHDOG_CTRL_RESTART, wdt_base + WATCHDOG_CTRL_REG);
++	writel(SUN4I_WATCHDOG_CTRL_RESTART, wdt_base + SUN4I_WATCHDOG_CTRL_REG);
+ 
+ 	while (1) {
+ 		mdelay(5);
+-		writel(WATCHDOG_MODE_ENABLE | WATCHDOG_MODE_RESET_ENABLE,
+-			wdt_base + WATCHDOG_MODE_REG);
++		writel(SUN4I_WATCHDOG_MODE_ENABLE | SUN4I_WATCHDOG_MODE_RESET_ENABLE,
++		       wdt_base + SUN4I_WATCHDOG_MODE_REG);
+ 	}
+ }
+ 
++static struct of_device_id sunxi_restart_ids[] = {
++	{ .compatible = "allwinner,sun4i-wdt", .data = sun4i_restart },
++	{ /*sentinel*/ }
 +};
 +
-+
-+static irqreturn_t sun4i_timer_interrupt(int irq, void *dev_id)
++static void sunxi_setup_restart(void)
 +{
-+	struct clock_event_device *evt = (struct clock_event_device *)dev_id;
++	const struct of_device_id *of_id;
++	struct device_node *np;
 +
-+	writel(0x1, timer_base + TIMER_IRQ_ST_REG);
-+	evt->event_handler(evt);
++	np = of_find_matching_node(NULL, sunxi_restart_ids);
++	if (WARN(!np, "unable to setup watchdog restart"))
++		return;
 +
-+	return IRQ_HANDLED;
++	wdt_base = of_iomap(np, 0);
++	WARN(!wdt_base, "failed to map watchdog base address");
++
++	of_id = of_match_node(sunxi_restart_ids, np);
++	WARN(!of_id, "restart function not available");
++
++	arm_pm_restart = of_id->data;
 +}
 +
-+static struct irqaction sun4i_timer_irq = {
-+	.name = "sun4i_timer0",
-+	.flags = IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
-+	.handler = sun4i_timer_interrupt,
-+	.dev_id = &sun4i_clockevent,
-+};
-+
-+static struct of_device_id sun4i_timer_dt_ids[] = {
-+	{ .compatible = "allwinner,sun4i-timer" },
-+	{ }
-+};
-+
-+void __init sun4i_timer_init(void)
-+{
-+	struct device_node *node;
-+	unsigned long rate = 0;
-+	struct clk *clk;
-+	int ret, irq;
-+	u32 val;
-+
-+	node = of_find_matching_node(NULL, sun4i_timer_dt_ids);
-+	if (!node)
-+		panic("No sun4i timer node");
-+
-+	timer_base = of_iomap(node, 0);
-+	if (!timer_base)
-+		panic("Can't map registers");
-+
-+	irq = irq_of_parse_and_map(node, 0);
-+	if (irq <= 0)
-+		panic("Can't parse IRQ");
-+
-+	sunxi_init_clocks();
-+
-+	clk = of_clk_get(node, 0);
-+	if (IS_ERR(clk))
-+		panic("Can't get timer clock");
-+
-+	rate = clk_get_rate(clk);
-+
-+	writel(rate / (TIMER_SCAL * HZ),
-+	       timer_base + TIMER_INTVAL_REG(0));
-+
-+	/* set clock source to HOSC, 16 pre-division */
-+	val = readl(timer_base + TIMER_CTL_REG(0));
-+	val &= ~(0x07 << 4);
-+	val &= ~(0x03 << 2);
-+	val |= (4 << 4) | (1 << 2);
-+	writel(val, timer_base + TIMER_CTL_REG(0));
-+
-+	/* set mode to auto reload */
-+	val = readl(timer_base + TIMER_CTL_REG(0));
-+	writel(val | TIMER_CTL_AUTORELOAD, timer_base + TIMER_CTL_REG(0));
-+
-+	ret = setup_irq(irq, &sun4i_timer_irq);
-+	if (ret)
-+		pr_warn("failed to setup irq %d\n", irq);
-+
-+	/* Enable timer0 interrupt */
-+	val = readl(timer_base + TIMER_IRQ_EN_REG);
-+	writel(val | TIMER_IRQ_EN(0), timer_base + TIMER_IRQ_EN_REG);
-+
-+	sun4i_clockevent.cpumask = cpumask_of(0);
-+
-+	clockevents_config_and_register(&sun4i_clockevent, rate / TIMER_SCAL,
-+					0x1, 0xff);
-+}
-+CLOCKSOURCE_OF_DECLARE(sun4i, "allwinner,sun4i-timer",
-+		       sun4i_timer_init);
-diff --git a/drivers/clocksource/sunxi_timer.c b/drivers/clocksource/sunxi_timer.c
-deleted file mode 100644
-index 0b46b7f..0000000
---- a/drivers/clocksource/sunxi_timer.c
-+++ /dev/null
-@@ -1,161 +0,0 @@
--/*
-- * Allwinner A1X SoCs timer handling.
-- *
-- * Copyright (C) 2012 Maxime Ripard
-- *
-- * Maxime Ripard <maxime.ripard@free-electrons.com>
-- *
-- * Based on code from
-- * Allwinner Technology Co., Ltd. <www.allwinnertech.com>
-- * Benn Huang <benn@allwinnertech.com>
-- *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2.  This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- */
--
--#include <linux/clk.h>
--#include <linux/clockchips.h>
--#include <linux/interrupt.h>
--#include <linux/irq.h>
--#include <linux/irqreturn.h>
--#include <linux/of.h>
--#include <linux/of_address.h>
--#include <linux/of_irq.h>
--#include <linux/clk/sunxi.h>
--
--#define TIMER_IRQ_EN_REG	0x00
--#define TIMER_IRQ_EN(val)		(1 << val)
--#define TIMER_IRQ_ST_REG	0x04
--#define TIMER_CTL_REG(val)	(0x10 * val + 0x10)
--#define TIMER_CTL_ENABLE		(1 << 0)
--#define TIMER_CTL_AUTORELOAD		(1 << 1)
--#define TIMER_CTL_ONESHOT		(1 << 7)
--#define TIMER_INTVAL_REG(val)	(0x10 * val + 0x14)
--#define TIMER_CNTVAL_REG(val)	(0x10 * val + 0x18)
--
--#define TIMER_SCAL		16
--
--static void __iomem *timer_base;
--
--static void sunxi_clkevt_mode(enum clock_event_mode mode,
--			      struct clock_event_device *clk)
--{
--	u32 u = readl(timer_base + TIMER_CTL_REG(0));
--
--	switch (mode) {
--	case CLOCK_EVT_MODE_PERIODIC:
--		u &= ~(TIMER_CTL_ONESHOT);
--		writel(u | TIMER_CTL_ENABLE, timer_base + TIMER_CTL_REG(0));
--		break;
--
--	case CLOCK_EVT_MODE_ONESHOT:
--		writel(u | TIMER_CTL_ONESHOT, timer_base + TIMER_CTL_REG(0));
--		break;
--	case CLOCK_EVT_MODE_UNUSED:
--	case CLOCK_EVT_MODE_SHUTDOWN:
--	default:
--		writel(u & ~(TIMER_CTL_ENABLE), timer_base + TIMER_CTL_REG(0));
--		break;
--	}
--}
--
--static int sunxi_clkevt_next_event(unsigned long evt,
--				   struct clock_event_device *unused)
--{
--	u32 u = readl(timer_base + TIMER_CTL_REG(0));
--	writel(evt, timer_base + TIMER_CNTVAL_REG(0));
--	writel(u | TIMER_CTL_ENABLE | TIMER_CTL_AUTORELOAD,
--	       timer_base + TIMER_CTL_REG(0));
--
--	return 0;
--}
--
--static struct clock_event_device sunxi_clockevent = {
--	.name = "sunxi_tick",
--	.rating = 300,
--	.features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
--	.set_mode = sunxi_clkevt_mode,
--	.set_next_event = sunxi_clkevt_next_event,
--};
--
--
--static irqreturn_t sunxi_timer_interrupt(int irq, void *dev_id)
--{
--	struct clock_event_device *evt = (struct clock_event_device *)dev_id;
--
--	writel(0x1, timer_base + TIMER_IRQ_ST_REG);
--	evt->event_handler(evt);
--
--	return IRQ_HANDLED;
--}
--
--static struct irqaction sunxi_timer_irq = {
--	.name = "sunxi_timer0",
--	.flags = IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
--	.handler = sunxi_timer_interrupt,
--	.dev_id = &sunxi_clockevent,
--};
--
--static struct of_device_id sunxi_timer_dt_ids[] = {
--	{ .compatible = "allwinner,sunxi-timer" },
--	{ }
--};
--
--void __init sunxi_timer_init(void)
--{
--	struct device_node *node;
--	unsigned long rate = 0;
--	struct clk *clk;
--	int ret, irq;
--	u32 val;
--
--	node = of_find_matching_node(NULL, sunxi_timer_dt_ids);
--	if (!node)
--		panic("No sunxi timer node");
--
--	timer_base = of_iomap(node, 0);
--	if (!timer_base)
--		panic("Can't map registers");
--
--	irq = irq_of_parse_and_map(node, 0);
--	if (irq <= 0)
--		panic("Can't parse IRQ");
--
--	sunxi_init_clocks();
--
--	clk = of_clk_get(node, 0);
--	if (IS_ERR(clk))
--		panic("Can't get timer clock");
--
--	rate = clk_get_rate(clk);
--
--	writel(rate / (TIMER_SCAL * HZ),
--	       timer_base + TIMER_INTVAL_REG(0));
--
--	/* set clock source to HOSC, 16 pre-division */
--	val = readl(timer_base + TIMER_CTL_REG(0));
--	val &= ~(0x07 << 4);
--	val &= ~(0x03 << 2);
--	val |= (4 << 4) | (1 << 2);
--	writel(val, timer_base + TIMER_CTL_REG(0));
--
--	/* set mode to auto reload */
--	val = readl(timer_base + TIMER_CTL_REG(0));
--	writel(val | TIMER_CTL_AUTORELOAD, timer_base + TIMER_CTL_REG(0));
--
--	ret = setup_irq(irq, &sunxi_timer_irq);
--	if (ret)
--		pr_warn("failed to setup irq %d\n", irq);
--
--	/* Enable timer0 interrupt */
--	val = readl(timer_base + TIMER_IRQ_EN_REG);
--	writel(val | TIMER_IRQ_EN(0), timer_base + TIMER_IRQ_EN_REG);
--
--	sunxi_clockevent.cpumask = cpumask_of(0);
--
--	clockevents_config_and_register(&sunxi_clockevent, rate / TIMER_SCAL,
--					0x1, 0xff);
--}
--CLOCKSOURCE_OF_DECLARE(sunxi, "allwinner,sun4i-timer",
--		       sunxi_timer_init);
+ static struct map_desc sunxi_io_desc[] __initdata = {
+ 	{
+ 		.virtual	= (unsigned long) SUNXI_REGS_VIRT_BASE,
+@@ -97,7 +110,6 @@ DT_MACHINE_START(SUNXI_DT, "Allwinner A1X (Device Tree)")
+ 	.init_machine	= sunxi_dt_init,
+ 	.map_io		= sunxi_map_io,
+ 	.init_irq	= irqchip_init,
+-	.restart	= sunxi_restart,
+ 	.init_time	= clocksource_of_init,
+ 	.dt_compat	= sunxi_board_dt_compat,
+ MACHINE_END
 -- 
 1.7.10.4
