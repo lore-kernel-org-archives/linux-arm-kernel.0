@@ -1,37 +1,97 @@
 From: chao.xie@marvell.com (Chao Xie)
-Date: Mon, 25 Mar 2013 03:06:56 -0400
-Subject: [PATCH V2 5/6] arm: mmp: remove clock name from usb pdata for ttc
+Date: Mon, 25 Mar 2013 03:06:54 -0400
+Subject: [PATCH V2 3/6] usb: ehci: mv_ehci: remove unused clock
 In-Reply-To: <1364195217-1226-1-git-send-email-chao.xie@marvell.com>
 References: <1364195217-1226-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1364195217-1226-6-git-send-email-chao.xie@marvell.com>
+Message-ID: <1364195217-1226-4-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clock name will directly get by driver. Removing
-the name from pdata.
+The origianl understanding of clock is wrong. The EHCI controller
+only have one clock input.
+Passing clock name by pdata is wrong. The clock is defined by device
+iteself.
 
 Signed-off-by: Chao Xie <chao.xie@marvell.com>
 ---
- arch/arm/mach-mmp/ttc_dkb.c |    6 ------
- 1 files changed, 0 insertions(+), 6 deletions(-)
+ drivers/usb/host/ehci-mv.c |   35 ++++++++++-------------------------
+ 1 files changed, 10 insertions(+), 25 deletions(-)
 
-diff --git a/arch/arm/mach-mmp/ttc_dkb.c b/arch/arm/mach-mmp/ttc_dkb.c
-index 22a9058..6528a5f 100644
---- a/arch/arm/mach-mmp/ttc_dkb.c
-+++ b/arch/arm/mach-mmp/ttc_dkb.c
-@@ -162,13 +162,7 @@ static struct i2c_board_info ttc_dkb_i2c_info[] = {
- #ifdef CONFIG_USB_SUPPORT
- #if defined(CONFIG_USB_MV_UDC) || defined(CONFIG_USB_EHCI_MV_U2O)
+diff --git a/drivers/usb/host/ehci-mv.c b/drivers/usb/host/ehci-mv.c
+index 3804820..6bad41a 100644
+--- a/drivers/usb/host/ehci-mv.c
++++ b/drivers/usb/host/ehci-mv.c
+@@ -33,25 +33,17 @@ struct ehci_hcd_mv {
  
--static char *pxa910_usb_clock_name[] = {
--	[0] = "U2OCLK",
--};
+ 	struct mv_usb_platform_data *pdata;
+ 
+-	/* clock source and total clock number */
+-	unsigned int clknum;
+-	struct clk *clk[0];
++	struct clk *clk;
+ };
+ 
+ static void ehci_clock_enable(struct ehci_hcd_mv *ehci_mv)
+ {
+-	unsigned int i;
 -
- static struct mv_usb_platform_data ttc_usb_pdata = {
--	.clknum		= 1,
--	.clkname	= pxa910_usb_clock_name,
- 	.vbus		= NULL,
- 	.mode		= MV_USB_MODE_OTG,
- 	.otg_force_a_bus_req = 1,
+-	for (i = 0; i < ehci_mv->clknum; i++)
+-		clk_prepare_enable(ehci_mv->clk[i]);
++	clk_prepare_enable(ehci_mv->clk);
+ }
+ 
+ static void ehci_clock_disable(struct ehci_hcd_mv *ehci_mv)
+ {
+-	unsigned int i;
+-
+-	for (i = 0; i < ehci_mv->clknum; i++)
+-		clk_disable_unprepare(ehci_mv->clk[i]);
++	clk_disable_unprepare(ehci_mv->clk);
+ }
+ 
+ static int mv_ehci_enable(struct ehci_hcd_mv *ehci_mv)
+@@ -144,9 +136,8 @@ static int mv_ehci_probe(struct platform_device *pdev)
+ 	struct ehci_hcd *ehci;
+ 	struct ehci_hcd_mv *ehci_mv;
+ 	struct resource *r;
+-	int clk_i, retval = -ENODEV;
++	int retval = -ENODEV;
+ 	u32 offset;
+-	size_t size;
+ 
+ 	if (!pdata) {
+ 		dev_err(&pdev->dev, "missing platform_data\n");
+@@ -160,8 +151,7 @@ static int mv_ehci_probe(struct platform_device *pdev)
+ 	if (!hcd)
+ 		return -ENOMEM;
+ 
+-	size = sizeof(*ehci_mv) + sizeof(struct clk *) * pdata->clknum;
+-	ehci_mv = devm_kzalloc(&pdev->dev, size, GFP_KERNEL);
++	ehci_mv = devm_kzalloc(&pdev->dev, sizeof(*ehci_mv), GFP_KERNEL);
+ 	if (ehci_mv == NULL) {
+ 		dev_err(&pdev->dev, "cannot allocate ehci_hcd_mv\n");
+ 		retval = -ENOMEM;
+@@ -172,16 +162,11 @@ static int mv_ehci_probe(struct platform_device *pdev)
+ 	ehci_mv->pdata = pdata;
+ 	ehci_mv->hcd = hcd;
+ 
+-	ehci_mv->clknum = pdata->clknum;
+-	for (clk_i = 0; clk_i < ehci_mv->clknum; clk_i++) {
+-		ehci_mv->clk[clk_i] =
+-		    devm_clk_get(&pdev->dev, pdata->clkname[clk_i]);
+-		if (IS_ERR(ehci_mv->clk[clk_i])) {
+-			dev_err(&pdev->dev, "error get clck \"%s\"\n",
+-				pdata->clkname[clk_i]);
+-			retval = PTR_ERR(ehci_mv->clk[clk_i]);
+-			goto err_clear_drvdata;
+-		}
++	ehci_mv->clk = devm_clk_get(&pdev->dev, NULL);
++	if (IS_ERR(ehci_mv->clk)) {
++		dev_err(&pdev->dev, "error getting clock\n");
++		retval = PTR_ERR(ehci_mv->clk);
++		goto err_clear_drvdata;
+ 	}
+ 
+ 	r = platform_get_resource_byname(pdev, IORESOURCE_MEM, "phyregs");
 -- 
 1.7.4.1
