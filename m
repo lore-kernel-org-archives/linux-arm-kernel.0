@@ -1,50 +1,39 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 25 Mar 2013 09:50:27 +0100
-Subject: [PATCH for 3.9 0/2] thermal: Marvell SoC thermal formula fixes
-In-Reply-To: <1364199456.2465.46.camel@rzhang1-mobl4>
-References: <1363954983-30822-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1364199456.2465.46.camel@rzhang1-mobl4>
-Message-ID: <20130325085027.GG5627@lunn.ch>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 25 Mar 2013 14:41:00 +0530
+Subject: [PATCH] ARM: hw_breakpoint: Enable debug powerdown only if system
+ supports 'has_ossr'
+In-Reply-To: <20130319102803.GB22452@mudshark.cambridge.arm.com>
+References: <1363157553-21085-1-git-send-email-lokeshvutla@ti.com>
+ <51406BA7.8010306@arm.com> <51407120.7030709@ti.com>
+ <51417E58.5050501@ti.com> <20130315050014.GA15706@tiny-lites>
+ <5146B972.1010002@ti.com> <20130318150724.GC28585@mudshark.cambridge.arm.com>
+ <514736D4.4070906@ti.com> <20130318170649.GA29585@mudshark.cambridge.arm.com>
+ <5148082A.3060503@ti.com> <20130319102803.GB22452@mudshark.cambridge.arm.com>
+Message-ID: <515014A4.5020504@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 25, 2013 at 04:17:36PM +0800, Zhang Rui wrote:
-> Hi,
-> 
-> Ezequiel, thanks for your patch.
-> 
-> On Fri, 2013-03-22 at 09:23 -0300, Ezequiel Garcia wrote:
-> > This is a small patchset that fixes thermal sensor formulas for Kirkwood
-> > and Dove thermal driver. The old formulas had been taken from 88AP510 public
-> > datasheets which appears to be slightly wrong.
-> > 
-> > The current formula comes from Marvell internal documentation
-> > and has been confirmed by Lior Amsalem.
-> > 
-> > This has been tested on a Kirkwood board (Openblocks A6) only.
-> > If at all possible, I would like to have the Dove fix tested
-> > before this is merged.
-> > 
-> > Please note that this fix was previously part of a bigger thermal
-> > patchset [1]. I've taken this out so it can be applied on v3.9 first.
-> > 
-> > [1] http://www.spinics.net/lists/arm-kernel/msg231697.html
-> > 
-> > Ezequiel Garcia (2):
-> >   thermal: kirkwood: Fix thermal sensor formula
-> >   thermal: dove: Fix thermal sensor formula
-> > 
-> 
-> Nobuhiro and Andrew,
-> 
-> what do you think of these patches?
-> As I have no idea of the hardware details, I need your comments before
-> applying them.
+Will,
 
-I have no access to the internal documentation, so i cannot say if
-this formula is correct or not. However, Lior Amsalem should be in the
-know.
+On Tuesday 19 March 2013 03:58 PM, Will Deacon wrote:
+> On Tue, Mar 19, 2013 at 06:39:38AM +0000, Santosh Shilimkar wrote:
+>> On Monday 18 March 2013 10:36 PM, Will Deacon wrote:
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
+[..]
 
-	  Andrew
+>>> Well, we could just add the warn_once prints but that doesn't stop debug
+>>> from breaking after the first pm/suspend/hotplug operation.
+>>>
+>> Probably we should drop the $subject patch approach and use warn_once
+>> at least for current rc. Ofcourse it doesn't help to get working
+>> hw_breakpoint support. Patch end of the email with warn_once.
+> 
+> Yeah, I'll merge that, but it's a real shame that this breaks hardware debug
+> on one of the few platforms where it was reported to work.
+> 
+Are you going to send the patch for 3.9-rcx ? As I said before without the
+patch OMAP4 CPUILDE is unusable because of that debug noise and hence it
+will be good to get that patch in
+
+Regards,
+Santosh
