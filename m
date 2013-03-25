@@ -1,60 +1,128 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 25 Mar 2013 10:08:02 +0900
-Subject: [PATCH v4 0/4] Initial Device Tree support for S3C64xx
-In-Reply-To: <2474214.PvUtMM3R7F@flatron>
-References: <1362860975-18635-1-git-send-email-tomasz.figa@gmail.com>
- <2474214.PvUtMM3R7F@flatron>
-Message-ID: <16de01ce28f5$32d3e850$987bb8f0$%kim@samsung.com>
+Date: Mon, 25 Mar 2013 10:08:19 +0900
+Subject: [PATCH v2] mfd: remove twelve unused Kconfig symbols
+In-Reply-To: <1363770579.1390.82.camel@x61.thuisdomein>
+References: <1363732701.1390.45.camel@x61.thuisdomein>
+ <20130320082427.GB28775@opensource.wolfsonmicro.com>
+ <1363770579.1390.82.camel@x61.thuisdomein>
+Message-ID: <16df01ce28f5$3d2904c0$b77b0e40$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz Figa wrote:
+Paul Bolle wrote:
 > 
-> Hi,
+> Twelve Kconfig symbols, all related to WM8350, WM8351, and WM8352, are
+> unused. Commit 19d57ed5a308472a02e773f33c03ad4cb2ec6a9 ("mfd: Remove
+> custom wm8350 cache implementation") removed all their (actual) users.
+> Remove these symbols too.
 > 
-> On Saturday 09 of March 2013 21:29:31 Tomasz Figa wrote:
-> > This series adds Device Tree support for Samsung S3C64xx SoC series.
-> >
-> > It fixes several problems preventing from booting an S3C64xx-based
-> > system using Device Tree, adds all the infrastructure for Device
-> > Tree-based board support, including mach-s3c64xx-dt and dts include
-> > files for S3C64xx SoCs, and (very) basic device tree source for
-> > FriendlyARM Mini6410 board.
-> >
-> > Current support is very limited and allows only basic bootup with UART
-> > and SDHCI, but should be fine as a start and will be extended in
-> > future, hopefully with help of S3C64xx board maintainers.
-> >
-> > This series depends on my other series reworking samsung-time for
-> > multiplatform: [PATCH v3 00/12] ARM: samsung-time: Prepare for
-> > multiplatform support
-> > http://thread.gmane.org/gmane.linux.kernel.samsung-soc/16664
-> >
-> > Changes since v3:
-> >  - Rebased onto current for-next branch of Kgene's tree
-> >  - Updated timer node for next version of samsung-time patches
-> >  - Replaced local s3c64xx_dt_init_irq with irqchip_init
-> >
-> > Changes since v2:
-> >  - Updated timer node for next version of samsung-time patches
-> >
-> > Changes since v1:
-> >  - Dropped two VIC-related patches that are no longer necessary
-> >  - Added Device Tree-based instantation of system timers
-> >  - Corrected VIC interrupt specifiers
-> >  - Adjusted CPU compatible values and dropped @id
-> >
-> > Tomasz Figa (4):
-> >   ARM: common: vic: Parse interrupt and resume masks from device tree
-> >   ARM: s3c64xx: Add board file for boot using Device Tree
-> >   ARM: dts: Add basic dts include files for Samsung S3C64xx SoCs
-> >   ARM: dts: Add dts file for S3C6410-based Mini6410 board
-> 
-> Any comments for this series?
-> 
-Basically, looks good to me but I need to check your samsung-time patches,
-if any updates, let you know.
+> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+> Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 
 Thanks.
 
 - Kukjin
+
+> ---
+> 0) This version adds Mark's ACK. It is now also sent to the ARM
+> maintainers, as Mark suggested.
+> 
+> 1) Still only eyeball tested.
+> 
+>  arch/arm/mach-imx/Kconfig     |  2 --
+>  arch/arm/mach-s3c64xx/Kconfig |  3 ---
+>  drivers/mfd/Kconfig           | 48 -----------------------------------------
+> --
+>  3 files changed, 53 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> index 4c9c6f9..6d9ae09 100644
+> --- a/arch/arm/mach-imx/Kconfig
+> +++ b/arch/arm/mach-imx/Kconfig
+> @@ -481,8 +481,6 @@ config MACH_MX31ADS_WM1133_EV1
+>  	depends on MACH_MX31ADS
+>  	depends on MFD_WM8350_I2C
+>  	depends on REGULATOR_WM8350 = y
+> -	select MFD_WM8350_CONFIG_MODE_0
+> -	select MFD_WM8352_CONFIG_MODE_0
+>  	help
+>  	  Include support for the Wolfson Microelectronics 1133-EV1 PMU
+>  	  and audio module for the MX31ADS platform.
+> diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
+> index 131c862..041da51 100644
+> --- a/arch/arm/mach-s3c64xx/Kconfig
+> +++ b/arch/arm/mach-s3c64xx/Kconfig
+> @@ -198,10 +198,7 @@ endchoice
+>  config SMDK6410_WM1190_EV1
+>  	bool "Support Wolfson Microelectronics 1190-EV1 PMIC card"
+>  	depends on MACH_SMDK6410
+> -	select MFD_WM8350_CONFIG_MODE_0
+> -	select MFD_WM8350_CONFIG_MODE_3
+>  	select MFD_WM8350_I2C
+> -	select MFD_WM8352_CONFIG_MODE_0
+>  	select REGULATOR
+>  	select REGULATOR_WM8350
+>  	select SAMSUNG_GPIO_EXTRA64
+> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+> index c346941..ebb1bed 100644
+> --- a/drivers/mfd/Kconfig
+> +++ b/drivers/mfd/Kconfig
+> @@ -687,54 +687,6 @@ config MFD_WM8350
+>  	bool
+>  	depends on GENERIC_HARDIRQS
+> 
+> -config MFD_WM8350_CONFIG_MODE_0
+> -	bool
+> -	depends on MFD_WM8350
+> -
+> -config MFD_WM8350_CONFIG_MODE_1
+> -	bool
+> -	depends on MFD_WM8350
+> -
+> -config MFD_WM8350_CONFIG_MODE_2
+> -	bool
+> -	depends on MFD_WM8350
+> -
+> -config MFD_WM8350_CONFIG_MODE_3
+> -	bool
+> -	depends on MFD_WM8350
+> -
+> -config MFD_WM8351_CONFIG_MODE_0
+> -	bool
+> -	depends on MFD_WM8350
+> -
+> -config MFD_WM8351_CONFIG_MODE_1
+> -	bool
+> -	depends on MFD_WM8350
+> -
+> -config MFD_WM8351_CONFIG_MODE_2
+> -	bool
+> -	depends on MFD_WM8350
+> -
+> -config MFD_WM8351_CONFIG_MODE_3
+> -	bool
+> -	depends on MFD_WM8350
+> -
+> -config MFD_WM8352_CONFIG_MODE_0
+> -	bool
+> -	depends on MFD_WM8350
+> -
+> -config MFD_WM8352_CONFIG_MODE_1
+> -	bool
+> -	depends on MFD_WM8350
+> -
+> -config MFD_WM8352_CONFIG_MODE_2
+> -	bool
+> -	depends on MFD_WM8350
+> -
+> -config MFD_WM8352_CONFIG_MODE_3
+> -	bool
+> -	depends on MFD_WM8350
+> -
+>  config MFD_WM8350_I2C
+>  	bool "Support Wolfson Microelectronics WM8350 with I2C"
+>  	select MFD_WM8350
+> --
+> 1.7.11.7
