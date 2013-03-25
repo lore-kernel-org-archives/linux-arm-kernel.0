@@ -1,40 +1,65 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Mon, 25 Mar 2013 12:19:35 +0530
-Subject: [PATCH 0/2] ARM: dts: Add default pin states for client nodes
- on Exynos4/5 platforms
-In-Reply-To: <CACRpkdbsCpV5_P=z44CMvsgps=AS9C62oprn6To6ExhoWZkvhA@mail.gmail.com>
-References: <1362573398-15126-1-git-send-email-thomas.abraham@linaro.org>
- <CACRpkdbsCpV5_P=z44CMvsgps=AS9C62oprn6To6ExhoWZkvhA@mail.gmail.com>
-Message-ID: <514FF37F.7090405@linaro.org>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 25 Mar 2013 12:20:49 +0530
+Subject: [PATCH v3 02/11] clk: davinci - add PSC clock driver
+In-Reply-To: <20130322203715.834.30085@quantum>
+References: <1351181518-11882-1-git-send-email-m-karicheri2@ti.com>
+ <1351181518-11882-3-git-send-email-m-karicheri2@ti.com>
+ <50950908.1060302@ti.com> <5097D6FC.7040202@ti.com>
+ <20121110022254.18014.31873@nucleus> <50B4D6B1.3000903@ti.com>
+ <20121127172900.21126.89528@nucleus> <50B6101C.30502@ti.com>
+ <514C3E7C.3000705@ti.com> <20130322203715.834.30085@quantum>
+Message-ID: <514FF3C9.1000000@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/07/2013 01:45 PM, Linus Walleij wrote:
-> On Wed, Mar 6, 2013 at 1:36 PM, Thomas Abraham
-> <thomas.abraham@linaro.org> wrote:
-> 
->> This patch series populates the default pin states in client nodes
->> of Exynos4 and Exynos5 platforms. Exynos4/5 platforms are migrating
->> to use pinctrl framework and having the default pin states listed
->> in the client nodes allows the device core to setup the default
->> pin configuration for all the controllers.
-> 
-> The series:
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> Yours,
-> Linus Walleij
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Hi Mike,
 
-Kukjin,
+On 3/23/2013 2:07 AM, Mike Turquette wrote:
+> Quoting Sekhar Nori (2013-03-22 04:20:28)
+>> Mike,
+>>
+>> On 11/28/2012 6:52 PM, Sekhar Nori wrote:
+>>> On 11/27/2012 10:59 PM, Mike Turquette wrote:
+>>
+>>>> Also have you looked into regmap?  Since you are defining your own clock
+>>>> type that might be something nice for you.
+>>>
+>>> No, haven't looked at regmap yet. Will look at that.
+>>
+>> I could get to this only now. regmap needs a valid struct device. We
+>> aren't modelling psc clocks as device so regmap cannot be used here.
+>>
+> 
+> According to Murali's reply back in November it was still not known if
+> the PTCMD register was going to be concurrently accessed by sources
+> outside the clock framework.  If this is so then neither the existing
 
-Would you be applying this patch-set to your tree? We need that to
-rebase Arndale related patches for v3.10.
+I can confirm that PTCMD is a PSC specific register and it is not
+accessed outside of clock framework.
 
+> framework-level lock (e.g. enable_lock) nor the shared clock driver lock
+> (e.g. spinlock in struct clk_psc) are adequate.  You may need a device
+> driver which represents the PSC and use accessor functions to write to
+> those register which provide coordination.
 
--- 
-Tushar Behera
+Well the only reason to access *any* PSC register outside of clock
+framework would be to handle the corner case where DSP needs to be reset
+using its PSC.
+
+In this case, there needs to be an access to MDCTL register specific to
+that module (ie the DSP). Right now this functionality is implemented
+using the function davinci_psc_reset().
+
+When moving to common clock framework, I think this can be moved to
+drivers/clk/davinci/clk-psc.c (it will be similar to the way
+tegra_periph_reset() is handled in drivers/clk/tegra/clk-periph-gate.c).
+
+And in this case I do agree we need a spinlock local to clk-psc.c (like
+the periph_ref_lock spinlock used in tegra implementation). That said,
+the current series only enables DM644x and does not really implement the
+reset stuff needed for DA850. So we can either add the spinlock now, or
+defer it to later when DA850 get supported (so there is a clear history
+trace of why it was added).
+
+Thanks,
+Sekhar
