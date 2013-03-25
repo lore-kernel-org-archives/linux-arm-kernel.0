@@ -1,389 +1,154 @@
-From: durgadoss.r@intel.com (R, Durgadoss)
-Date: Mon, 25 Mar 2013 17:27:24 +0000
-Subject: [PATCH 1/4] thermal: Add driver for Armada 370/XP SoC thermal
- management
-In-Reply-To: <1364225229-2857-2-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1364225229-2857-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1364225229-2857-2-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <4D68720C2E767A4AA6A8796D42C8EB59C587D8@BGSMSX101.gar.corp.intel.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Mon, 25 Mar 2013 10:30:19 -0700
+Subject: [PATCH v4 0/6] support other fsl SoCs with usbmisc + small fixes
+In-Reply-To: <20130325162931.GB22810@pengutronix.de>
+References: <1354033021-10585-1-git-send-email-m.grzeschik@pengutronix.de>
+ <20121128025217.GC18593@nchen-desktop>
+ <87ip6mor1e.fsf@ashishki-desk.ger.corp.intel.com>
+ <CAOMZO5ArDLKDLEzhYc7EP2CNQGcT=vO7ctbiEsjzsGs+EaT7Dw@mail.gmail.com>
+ <20130325162931.GB22810@pengutronix.de>
+Message-ID: <20130325173019.GA1992@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-pm-owner at vger.kernel.org [mailto:linux-pm-
-> owner at vger.kernel.org] On Behalf Of Ezequiel Garcia
-> Sent: Monday, March 25, 2013 8:57 PM
-> To: linux-arm-kernel at lists.infradead.org; linux-pm at vger.kernel.org
-> Cc: Lior Amsalem; Nobuhiro Iwamatsu; Zhang, Rui; Sebastian Hesselbarth;
-> Andrew Lunn; Thomas Petazzoni; Gregory Clement; Jason Cooper; Ezequiel
-> Garcia
-> Subject: [PATCH 1/4] thermal: Add driver for Armada 370/XP SoC thermal
-> management
+On Mon, Mar 25, 2013 at 05:29:31PM +0100, Michael Grzeschik wrote:
+> Hi Alexander, Fabio, Greg,
 > 
-> This driver supports both Armada 370 and Armada XP SoC
-> thermal management controllers.
+> On Mon, Mar 25, 2013 at 10:11:15AM -0300, Fabio Estevam wrote:
+> > Hi Alexander,
+> > 
+> > On Thu, Jan 24, 2013 at 7:42 AM, Alexander Shishkin
+> > <alexander.shishkin@linux.intel.com> wrote:
+> > > Peter Chen <peter.chen@freescale.com> writes:
+> > >
+> > >> On Tue, Nov 27, 2012 at 05:16:55PM +0100, Michael Grzeschik wrote:
+> > >>> Nearly every SoC from Freescale has this non-core usb registers. This series
+> > >>> adds support for more users of this driver.
+> > >>>
+> > >>> This series is based on Peter Chen's work. Its needed to merge his master branch
+> > >>> before applying this series:
+> > >>>
+> > >>> https://github.com/hzpeterchen/linux-usb.git
+> > >>
+> > >> I have tested it at i.mx6q sabrelite board, it works good.
+> > >>
+> > >> I have pushed your commit to my git, please cc me
+> > >> your coming chipidea patches, thanks.
+> > >>
+> > >> Alex, please add:
+> > >>
+> > >> Reviewed-by: Peter Chen <peter.chen@freescale.com>
+> > >> Tested-by: Peter Chen <peter.chen@freescale.com>
+> > >
+> > > Looks good, queueing this one for submission.
+> > 
+> > Could you please let us know what is preventing this series to be applied?
 > 
-> Armada 370 has a register to check a valid temperature, whereas
-> Armada XP does not. Each has a different initialization (i.e. calibration)
-> function. The temperature conversion formula is the same for both.
+> That's what our chipidea usb disaster currently looks like in detail:
 > 
-> The controller present in each SoC have a very similar feature set,
-> so it corresponds to have one driver to support both of them.
+> http://git.pengutronix.de/git/mgr/linux.git v3.9/topic/usb-phy
+> 4414a59 Merge 'v3.9/topic/usb-phy' into usb-3.9
+> a806027 usb: otg: mxs-phy: remove clkgate/sftrst clearing
+> 026881b usb: otg: mxs-phy: Improve mxs phy initialization
+> ed42fa9 usb: mxs-phy: register phy at usb phy library
+> d2783aa usb: phy: remove NULL pointer check in usb_add_phy()
 > 
-> Although this driver may present similarities to Dove and Kirkwood
-> thermal driver, the exact differences and coincidences are not fully
-> known. For this reason, support is given through a separate driver.
-
-Nice commit message, that has all the details :-)
-
+> /*
+>  * The series usb-ci-udc has already been posted some times
+>  * but it currently got no replies by Alexander.
+>  */
+> http://git.pengutronix.de/git/mgr/linux.git v3.9/topic/usb-ci-udc
+> e548c9d Merge 'v3.9/topic/usb-ci-udc' into usb-3.9
+> 80538f3 usb: chipidea: udc: add multiple td support to hardware_{en,de}queue
+> 02e1c7b usb: chipidea: udc: manage dynamic amount of tds with an linked list
+> 0ebb8f4 usb: chipidea: udc: prepare qhead with dma_alloc_coherent
+> 39be042 usb: chipidea: udc: add the define TD_PAGE_COUNT and fix all users
+> c2f0562 usb: chipidea: udc: use gfp_flags in _hardware_enqueue
+> f818222 usb: chipidea: udc: move _ep_queue into an unlocked function
+> 8aea3b0 usb: chipidea: udc: configure iso endpoints
+> 8e61a12 usb: chipidea: udc: rework ep_enable cap setting
+> e5ceed7 usb: chipidea: udc: move ZLT flag change to ep_enable
+> 2e33742 usb: chipidea: udc: read status of td only once in hardware_dequeue
+> 516803b usb: chipidea: udc: only clear active and halted bits in qhead
+> ee95a49 usb: chipidea: udc: use {read,write}l to handle mapped data
 > 
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
->  .../devicetree/bindings/thermal/armada-thermal.txt |   22 ++
->  drivers/thermal/Kconfig                            |    8 +
->  drivers/thermal/Makefile                           |    1 +
->  drivers/thermal/armada_thermal.c                   |  236
-> ++++++++++++++++++++
->  4 files changed, 267 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/thermal/armada-
-> thermal.txt
->  create mode 100644 drivers/thermal/armada_thermal.c
+> http://git.pengutronix.de/git/mgr/linux.git v3.9/topic/imx-usbmisc
+> 1174002 Merge 'v3.9/topic/imx-usbmisc' into usb-3.9
+> f406383 usb: chipidea: usbmisc: skip clocks on i.MX6
+> d5c8d53 usb: chipidea: usbmisc: use module_platform_driver
+> 105d5d0 usb: chipidea: usbmisc: add support for ahb, ipg and per clock
 > 
-> diff --git a/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-> b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-> new file mode 100644
-> index 0000000..fff93d5
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-> @@ -0,0 +1,22 @@
-> +* Marvell Armada 370/XP thermal management
-> +
-> +Required properties:
-> +
-> +- compatible:	Should be set to one of the following:
-> +		marvell,armada370-thermal
-> +		marvell,armadaxp-thermal
-> +
-> +- reg:		Device's register space.
-> +		Two entries are expected, see the examples below.
-> +		The first one is required for the sensor register;
-> +		the second one is required for the control register
-> +		to be used for sensor initialization (a.k.a. calibration).
-> +
-> +Example:
-> +
-> +	thermal at d0018300 {
-> +		compatible = "marvell,armada370-thermal";
-> +                reg = <0xd0018300 0x4
-> +		       0xd0018304 0x4>;
-> +		status = "okay";
-> +	};
-> diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-> index a764f16..fcd5a27 100644
-> --- a/drivers/thermal/Kconfig
-> +++ b/drivers/thermal/Kconfig
-> @@ -134,6 +134,14 @@ config DOVE_THERMAL
->  	  Support for the Dove thermal sensor driver in the Linux thermal
->  	  framework.
+> http://git.pengutronix.de/git/mgr/linux.git v3.9/topic/imx-usb
+> df11f8b Merge 'v3.9/topic/imx-usb' into usb-3.9
+> 9a967c4 usb: chipidea: udc: add force-full-speed option
+> a02af86 USB: chipidea: set STS bit in serial mode
+> af34326 usb: chipidea: ci13xxx_imx: add 2nd and 3rd clock to support imx5x and newer
+> 5b7f6d8 usb: chipidea: pci: mark platformdata as static
 > 
-> +config ARMADA_THERMAL
-> +	tristate "Armada 370/XP thermal management"
-> +	depends on ARCH_MVEBU
-> +	depends on OF
-> +	help
-> +	  Enable this option if you want to have support for thermal
-> management
-> +	  controller present in Armada 370 and Armada XP SoC.
-> +
->  config DB8500_THERMAL
->  	bool "DB8500 thermal management"
->  	depends on ARCH_U8500
-> diff --git a/drivers/thermal/Makefile b/drivers/thermal/Makefile
-> index d3a2b38..4209054 100644
-> --- a/drivers/thermal/Makefile
-> +++ b/drivers/thermal/Makefile
-> @@ -13,6 +13,7 @@ obj-$(CONFIG_THERMAL_GOV_USER_SPACE)	+=
-> user_space.o
->  obj-$(CONFIG_CPU_THERMAL)	+= cpu_cooling.o
+> /*
+>  * All above branches depent on the lower branches of Alexander and Peter
+>  * which we currently have rebased on v3.9-rc3 and on top of each other.
+>  * It is named alex-and-peter-for-3.9.
+>  */
+> http://git.pengutronix.de/git/mgr/linux.git alex-and-peter-for-3.9
 > 
->  # platform thermal drivers
-> +obj-$(CONFIG_ARMADA_THERMAL)	+= armada_thermal.o
->  obj-$(CONFIG_SPEAR_THERMAL)	+= spear_thermal.o
->  obj-$(CONFIG_RCAR_THERMAL)	+= rcar_thermal.o
->  obj-$(CONFIG_KIRKWOOD_THERMAL)  += kirkwood_thermal.o
-> diff --git a/drivers/thermal/armada_thermal.c
-> b/drivers/thermal/armada_thermal.c
-> new file mode 100644
-> index 0000000..dc83a86
-> --- /dev/null
-> +++ b/drivers/thermal/armada_thermal.c
-> @@ -0,0 +1,236 @@
-> +/*
-> + * Marvell Armada 370/XP thermal sensor driver
-> + *
-> + * Copyright (C) 2013 Marvell
-> + *
-> + * This software is licensed under the terms of the GNU General Public
-> + * License version 2, as published by the Free Software Foundation, and
-> + * may be copied, distributed, and modified under those terms.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-> + * GNU General Public License for more details.
-> + *
-> + */
-> +#include <linux/device.h>
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/kernel.h>
-> +#include <linux/of.h>
-> +#include <linux/module.h>
-> +#include <linux/delay.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/of_device.h>
-> +#include <linux/thermal.h>
-> +
-> +#define THERMAL_VALID_OFFSET		9
-> +#define THERMAL_VALID_MASK		0x1
-> +#define THERMAL_TEMP_OFFSET		10
-> +#define THERMAL_TEMP_MASK		0x1ff
-> +
-> +/* Thermal Manager Control and Status Register */
-> +#define PMU_TDC0_SW_RST_MASK		(0x1 << 1)
-> +#define PMU_TM_DISABLE_OFFS		0
-> +#define PMU_TM_DISABLE_MASK		(0x1 <<
-> PMU_TM_DISABLE_OFFS)
-> +#define PMU_TDC0_REF_CAL_CNT_OFFS	11
-> +#define PMU_TDC0_REF_CAL_CNT_MASK	(0x1ff <<
-> PMU_TDC0_REF_CAL_CNT_OFFS)
-> +#define PMU_TDC0_OTF_CAL_MASK		(0x1 << 30)
-> +#define PMU_TDC0_START_CAL_MASK		(0x1 << 25)
-> +
-> +struct armada_thermal_ops;
-> +
-> +/* Marvell EBU Thermal Sensor Dev Structure */
-> +struct armada_thermal_priv {
-> +	void __iomem *sensor;
-> +	void __iomem *control;
-> +	struct armada_thermal_ops *ops;
-> +};
-> +
-> +struct armada_thermal_ops {
-> +	/* Initialize the sensor */
-> +	void (*init_sensor)(struct armada_thermal_priv *);
-> +
-> +	/* Test for a valid sensor value (optional) */
-> +	bool (*is_valid)(struct armada_thermal_priv *);
-> +};
-> +
-> +static void armadaxp_init_sensor(struct armada_thermal_priv *priv)
-> +{
-> +	unsigned long reg;
-> +
-> +	/* ??? */
-> +	reg = readl_relaxed(priv->control);
-> +	reg |= PMU_TDC0_OTF_CAL_MASK;
-> +	writel(reg, priv->control);
-> +
-> +	/* Reference calibration value */
-> +	reg &= ~PMU_TDC0_REF_CAL_CNT_MASK;
-> +	reg |= (0xf1 << PMU_TDC0_REF_CAL_CNT_OFFS);
-> +	writel(reg, priv->control);
-
-I see these two blocks of code being the same for the below
-function as well. Any specific reason for not making this block 
-as a common function and calling it from both the 
-_init_sensor functions ?
-
-> +
-> +	/* Reset the sensor */
-> +	reg = readl_relaxed(priv->control);
-> +	writel((reg | PMU_TDC0_SW_RST_MASK), priv->control);
-> +
-> +	writel(reg, priv->control);
-> +
-> +	/* Enable the sensor */
-> +	reg = readl_relaxed(priv->sensor);
-> +	reg &= ~PMU_TM_DISABLE_MASK;
-> +	writel(reg, priv->sensor);
-> +}
-> +
-> +static void armada370_init_sensor(struct armada_thermal_priv *priv)
-> +{
-> +	unsigned long reg;
-> +
-> +	/* ??? */
-> +	reg = readl_relaxed(priv->control);
-> +	reg |= PMU_TDC0_OTF_CAL_MASK;
-> +	writel(reg, priv->control);
-> +
-> +	/* Reference calibration value */
-> +	reg &= ~PMU_TDC0_REF_CAL_CNT_MASK;
-> +	reg |= (0xf1 << PMU_TDC0_REF_CAL_CNT_OFFS);
-> +	writel(reg, priv->control);
-> +
-> +	/* ??? */
-> +	reg &= ~PMU_TDC0_START_CAL_MASK;
-> +	writel(reg, priv->control);
-> +
-> +	/* FIXME: Why do we need this delay? */
-> +	mdelay(10);
-> +}
-> +
-> +static bool armada_is_valid(struct armada_thermal_priv *priv)
-> +{
-> +	unsigned long reg = readl_relaxed(priv->sensor);
-> +
-> +	return (reg >> THERMAL_VALID_OFFSET) & THERMAL_VALID_MASK;
-> +}
-> +
-> +static int armada_get_temp(struct thermal_zone_device *thermal,
-> +			  unsigned long *temp)
-> +{
-> +	struct armada_thermal_priv *priv = thermal->devdata;
-> +	unsigned long reg;
-> +
-> +	/* Valid check */
-> +	if (priv->ops->is_valid && !priv->ops->is_valid(priv)) {
-> +		dev_err(&thermal->device,
-> +			"Temperature sensor reading not valid\n");
-> +		return -EIO;
-> +	}
-> +
-> +	reg = (readl_relaxed(priv->sensor) >> THERMAL_TEMP_OFFSET) &
-
-Can we have the readl_relaxed call as a separate statement ?
-
-> +		THERMAL_TEMP_MASK;
-> +	*temp = (3153000000UL - (10000000UL*reg)) / 13825;
-
-If I substitute 1 for 'reg' I get  227341.7721... 
-Does this mean the temperature is 227 C ??
-
-If you have the info, can you add a comment on what is the
-valid range that 'reg' can take ?
-
-Also, Is the resulting temperature
-in MillidegreeCelsius ? If so, please add a comment saying so.
-
-Thanks,
-Durga
-
-> +	return 0;
-> +}
-> +
-> +static struct thermal_zone_device_ops ops = {
-> +	.get_temp = armada_get_temp,
-> +};
-> +
-> +static const struct armada_thermal_ops armadaxp_ops = {
-> +	.init_sensor = armadaxp_init_sensor,
-> +};
-> +
-> +static const struct armada_thermal_ops armada370_ops = {
-> +	.is_valid = armada_is_valid,
-> +	.init_sensor = armada370_init_sensor,
-> +};
-> +
-> +static const struct of_device_id armada_thermal_id_table[] = {
-> +	{
-> +		.compatible = "marvell,armadaxp-thermal",
-> +		.data       = &armadaxp_ops,
-> +	},
-> +	{
-> +		.compatible = "marvell,armada370-thermal",
-> +		.data       = &armada370_ops,
-> +	},
-> +	{
-> +		/* sentinel */
-> +	},
-> +};
-> +MODULE_DEVICE_TABLE(of, armada_thermal_id_table);
-> +
-> +static int armada_thermal_probe(struct platform_device *pdev)
-> +{
-> +	struct thermal_zone_device *thermal;
-> +	const struct of_device_id *match;
-> +	struct armada_thermal_priv *priv;
-> +	struct resource *res;
-> +
-> +	match = of_match_device(armada_thermal_id_table, &pdev->dev);
-> +	if (!match)
-> +		return -ENODEV;
-> +
-> +	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
-> +	if (!priv)
-> +		return -ENOMEM;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!res) {
-> +		dev_err(&pdev->dev, "Failed to get platform resource\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	priv->sensor = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(priv->sensor))
-> +		return PTR_ERR(priv->sensor);
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-> +	if (!res) {
-> +		dev_err(&pdev->dev, "Failed to get platform resource\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	priv->control = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(priv->control))
-> +		return PTR_ERR(priv->control);
-> +
-> +	priv->ops = (struct armada_thermal_ops *)match->data;
-> +	priv->ops->init_sensor(priv);
-> +
-> +	thermal = thermal_zone_device_register("armada_thermal", 0, 0,
-> +					       priv, &ops, NULL, 0, 0);
-> +	if (IS_ERR(thermal)) {
-> +		dev_err(&pdev->dev,
-> +			"Failed to register thermal zone device\n");
-> +		return PTR_ERR(thermal);
-> +	}
-> +
-> +	platform_set_drvdata(pdev, thermal);
-> +
-> +	return 0;
-> +}
-> +
-> +static int armada_thermal_exit(struct platform_device *pdev)
-> +{
-> +	struct thermal_zone_device *armada_thermal =
-> +		platform_get_drvdata(pdev);
-> +
-> +	thermal_zone_device_unregister(armada_thermal);
-> +	platform_set_drvdata(pdev, NULL);
-> +
-> +	return 0;
-> +}
-> +
-> +static struct platform_driver armada_thermal_driver = {
-> +	.probe = armada_thermal_probe,
-> +	.remove = armada_thermal_exit,
-> +	.driver = {
-> +		.name = "armada_thermal",
-> +		.owner = THIS_MODULE,
-> +		.of_match_table =
-> of_match_ptr(armada_thermal_id_table),
-> +	},
-> +};
-> +
-> +module_platform_driver(armada_thermal_driver);
-> +
-> +MODULE_AUTHOR("Ezequiel Garcia <ezequiel.garcia@free-
-> electrons.com>");
-> +MODULE_DESCRIPTION("Armada 370/XP thermal driver");
-> +MODULE_LICENSE("GPL v2");
-> --
-> 1.7.8.6
+> /*
+>  * Peters branch already contain the usbmisc series,
+>  * but they never made it to ci-for-greg, although
+>  * Alexander already mentioned (24 Jan 2013) to queue them.
+>  */
+> https://github.com/hzpeterchen/linux-usb.git master^^
+> 4d36511 Merge 'v3.9/topic/usb-peterchen'
+> 90314f3 usb: chipidea: usbmisc: add post handling and errata fix for mx25
+> edde2ad usb: chipidea: usbmisc: add mx53 support
+> 6150722 usb: chipidea: usbmisc: prepare driver to handle more than one soc
+> 542384e usb: chipidea: usbmisc: fix a potential race condition
+> cdffb44 usb: chipidea: usbmisc: unset global varibale usbmisc on driver remove
+> b8e47e3 usb: chipidea: usbmisc: rename file, struct and functions to usbmisc_imx
+> c5863f9 usb: chipidea: imx: select usb id pin using syscon interface
+> 8c8a1f5 usb: chipidea: udc: fix the oops when plugs in usb cable after rmmod gadget
+> c703723 usb: chipidea: imx: add getting vbus regulator code
+> e897d66 usb: chipidea: delete the delayed work
+> 4c0be3e usb: chipidea: add vbus regulator control
+> f1e52f8 usb: chipidea: udc: retire the flag CI13_PULLUP_ON_VBUS
+> af4e743 usb: chipidea: udc: add pullup/pulldown dp at hw_device_state
+> 1be0011 usb: chipidea: add otg id switch and vbus connect/disconnect detect
+> 7c3c62d usb: chipidea: add otg file
+> 618bfec Revert "USB: chipidea: add vbus detect for udc"
+> bfe5248 USB chipidea i.MX: use devm_usb_get_phy_by_phandle to get phy
+> 705620f USB mxs-phy: Register phy with framework
+> f5e9796 USB chipidea i.MX: introduce dr_mode property
+> dc622c4 USB chipidea: introduce dual role mode pdata flags
+> b1d4a9e USB: chipidea: add PTW and PTS handling
+> 747eee3 USB: chipidea: ci13xxx-imx: create dynamic platformdata
+> 2f2bb89 USB: add devicetree helpers for determining dr_mode and phy_type
+> 4f30039 USB: move bulk of otg/otg.c to phy/phy.c
+> 760d9a8 nop-xceiv: make nop to use usb_add_phy_dev
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> /*
+>  * This branch is already one month old and stays untouched
+>  * /
+> https://github.com/hzpeterchen/linux-ci.git ci-for-greg
+> e0fe4d5 Merge 'ci-for-greg'
+> e160513 usb: chipidea: don't redefine __ffs()
+> 93b27aa usb: chipidea: fix precedence bug in ci_requests_show()
+> 67d0531 usb: chipidea: move debug files creation/removal to the core
+> 5a958dd usb: chipidea: move role to debugfs
+> 038429c usb: chipidea: convert debug entries in sysfs to debugfs
+> 25dc0fb usb: chipidea: replace interrupt accounting with tracepoints
+> dc43e8c usb: chipidea: convert events to tracepoints
+> a84a5bf usb: chipidea: trim include list in the core
+> f2bf55e usb: chipidea: trim include list in udc code
+> adf1889 usb: chipidea: drop redundant includes
+
+Ugh, this is getting to be a horrible mess.
+
+Alexander, what is going on here?  You can't just constantly ignore
+patches, that's reserved for kernel developers with more experience :)
+
+If I don't hear back from you by Wednesday this week, with a specific
+plan for how to get all of these fixes to me by the end of this week,
+I'm going to assume that you are missing, and will just start taking
+chipidea patches directly myself, sorry.
+
+greg k-h
