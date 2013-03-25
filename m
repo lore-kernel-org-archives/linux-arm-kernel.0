@@ -1,212 +1,157 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 25 Mar 2013 09:16:25 -0500
-Subject: [PATCH 08/10] arm: zynq: Add smp support
-In-Reply-To: <1364219596-4954-8-git-send-email-michal.simek@xilinx.com>
-References: <1364219596-4954-1-git-send-email-michal.simek@xilinx.com>
- <1364219596-4954-8-git-send-email-michal.simek@xilinx.com>
-Message-ID: <51505C39.4060507@gmail.com>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Mon, 25 Mar 2013 15:25:33 +0100
+Subject: [PATCH 1/3] ARM: zynq: read scu base from SoC
+In-Reply-To: <CAHTX3dK30HZxJXcNjwVqgqW_Qqag=26PEFWra6r7H6JGnpPHXQ@mail.gmail.com>
+References: <1364043450-18700-1-git-send-email-s.trumtrar@pengutronix.de>
+ <1364043450-18700-2-git-send-email-s.trumtrar@pengutronix.de>
+ <CAHTX3dK30HZxJXcNjwVqgqW_Qqag=26PEFWra6r7H6JGnpPHXQ@mail.gmail.com>
+Message-ID: <20130325142533.GB27739@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/25/2013 08:53 AM, Michal Simek wrote:
-> Zynq is dual core Cortex A9 which starts always
-> at zero. Using simple trampoline ensure long jump
-> to secondary_startup code.
+On Mon, Mar 25, 2013 at 03:01:59PM +0100, Michal Simek wrote:
+> 2013/3/23 Steffen Trumtrar <s.trumtrar@pengutronix.de>:
+> > Instead of hardcoding the base address of the SCU get it from the device.
+> > While at it, add the SCU to the DT.
+> >
+> > Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> > Cc: Michal Simek <michal.simek@xilinx.com>
+> > Cc: Josh Cartwright <josh.cartwright@ni.com>
+> > ---
+> >  arch/arm/boot/dts/zynq-7000.dtsi |  5 +++++
+> >  arch/arm/mach-zynq/common.c      | 34 ++++++++++++++++++++++------------
+> >  2 files changed, 27 insertions(+), 12 deletions(-)
+> >
+> > diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+> > index 88564fa..c103082 100644
+> > --- a/arch/arm/boot/dts/zynq-7000.dtsi
+> > +++ b/arch/arm/boot/dts/zynq-7000.dtsi
+> > @@ -199,6 +199,11 @@
+> >                         };
+> >                 };
+> >
+> > +               scu: scu at f8f000000 {
+> > +                       compatible = "arm,cortex-a9-scu";
+> > +                       reg = <0xf8f00000 0x58>;
+> > +               };
+> > +
+> >                 timer: timer at f8f00600 {
+> >                         compatible = "arm,cortex-a9-twd-timer";
+> >                         reg = <0xf8f00600 0x20>;
+> > diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
+> > index 920e20a..014131c 100644
+> > --- a/arch/arm/mach-zynq/common.c
+> > +++ b/arch/arm/mach-zynq/common.c
+> > @@ -32,11 +32,14 @@
+> >  #include <asm/mach-types.h>
+> >  #include <asm/page.h>
+> >  #include <asm/pgtable.h>
+> > +#include <asm/smp_scu.h>
+> >  #include <asm/smp_twd.h>
+> >  #include <asm/hardware/cache-l2x0.h>
+> >
+> >  #include "common.h"
+> >
+> > +void __iomem *scu_base;
 > 
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-> ---
->  arch/arm/mach-zynq/Makefile  |    1 +
->  arch/arm/mach-zynq/common.c  |    1 +
->  arch/arm/mach-zynq/common.h  |    7 ++
->  arch/arm/mach-zynq/platsmp.c |  160 ++++++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-zynq/slcr.c    |   29 ++++++++
->  5 files changed, 198 insertions(+)
->  create mode 100644 arch/arm/mach-zynq/platsmp.c
-
-[...]
-
-> +/* Secondary CPU kernel startup is a 2 step process. The primary CPU
-> + * starts the secondary CPU by giving it the address of the kernel and
-> + * then sending it an event to wake it up. The secondary CPU then
-> + * starts the kernel and tells the primary CPU it's up and running.
-> + */
-> +static void __cpuinit zynq_secondary_init(unsigned int cpu)
-> +{
-> +	/*
-> +	 * if any interrupts are already enabled for the primary
-> +	 * core (e.g. timer irq), then they will not have been enabled
-> +	 * for us: do so
-> +	 */
-> +	gic_secondary_init(0);
-> +
-> +	/*
-> +	 * Synchronise with the boot thread.
-> +	 */
-> +	spin_lock(&boot_lock);
-> +	spin_unlock(&boot_lock);
-
-Why do you think this is needed? Platforms that need this
-synchronization are only the ones that just do wfi for hotplug rather
-than properly reseting the core. You appear to do the latter and should
-not need this.
-
-> +}
-> +
-> +int __cpuinit zynq_cpun_start(u32 address, int cpu)
-> +{
-> +	if (cpu > ncores) {
-> +		pr_warn("CPU No. is not available in the system\n");
-> +		return -1;
-> +	}
-> +
-> +	/* MS: Expectation that SLCR are directly map and accessible */
-> +	/* Not possible to jump to non aligned address */
-> +	if (!(address & 3) && (!address || (address >= 0xC))) {
-
-What about Thumb2 kernel entry?
-
-> +		slcr_cpu_stop(cpu);
-
-Isn't a secondary cpu already stopped?
-
-> +
-> +		/*
-> +		 * This is elegant way how to jump to any address
-> +		 * 0x0: Load address at 0x8 to r0
-> +		 * 0x4: Jump by mov instruction
-> +		 * 0x8: Jumping address
-> +		 */
-> +		if (address) {
-> +			/* 0: ldr r0, [8] */
-> +			__raw_writel(0xe59f0000, phys_to_virt(0x0));
-> +			/* 4: mov pc, r0 */
-> +			__raw_writel(0xe1a0f000, phys_to_virt(0x4));
-> +			__raw_writel(address, phys_to_virt(0x8));
-> +		}
-> +
-> +		flush_cache_all();
-> +		outer_flush_all();
-
-You should only need to flush range on address 0-4 here.
-
-> +		wmb();
-> +
-> +		slcr_cpu_start(cpu);
-> +
-> +		return 0;
-> +	}
-> +
-> +	pr_warn("Can't start CPU%d: Wrong starting address %x\n", cpu, address);
-> +
-> +	return -1;
-> +}
-> +EXPORT_SYMBOL(zynq_cpun_start);
-> +
-> +static int __cpuinit zynq_boot_secondary(unsigned int cpu,
-> +						struct task_struct *idle)
-> +{
-> +	int ret;
-> +
-> +	/*
-> +	 * set synchronisation state between this boot processor
-> +	 * and the secondary one
-> +	 */
-> +	spin_lock(&boot_lock);
-> +
-> +	ret = zynq_cpun_start(virt_to_phys(secondary_startup), cpu);
-> +	if (ret) {
-> +		spin_unlock(&boot_lock);
-> +		return -1;
-> +	}
-> +
-> +	/*
-> +	 * now the secondary core is starting up let it run its
-> +	 * calibrations, then wait for it to finish
-> +	 */
-> +	spin_unlock(&boot_lock);
-> +
-> +	return 0;
-> +}
-> +
-> +/*
-> + * Initialise the CPU possible map early - this describes the CPUs
-> + * which may be present or become present in the system.
-> + */
-> +static void __init zynq_smp_init_cpus(void)
-> +{
-> +	int i;
-> +
-> +	ncores = scu_get_core_count(scu_base);
-> +
-> +	for (i = 0; i < ncores && i < CONFIG_NR_CPUS; i++)
-> +		set_cpu_possible(i, true);
-> +}
-> +
-> +static void __init zynq_smp_prepare_cpus(unsigned int max_cpus)
-> +{
-> +	int i;
-> +
-> +	/*
-> +	 * Initialise the present map, which describes the set of CPUs
-> +	 * actually populated at the present time.
-> +	 */
-> +	for (i = 0; i < max_cpus; i++)
-> +		set_cpu_present(i, true);
-> +
-> +	scu_enable(scu_base);
-> +}
-> +
-> +struct smp_operations zynq_smp_ops __initdata = {
-> +	.smp_init_cpus		= zynq_smp_init_cpus,
-> +	.smp_prepare_cpus	= zynq_smp_prepare_cpus,
-> +	.smp_secondary_init	= zynq_secondary_init,
-> +	.smp_boot_secondary	= zynq_boot_secondary,
-> +};
-> diff --git a/arch/arm/mach-zynq/slcr.c b/arch/arm/mach-zynq/slcr.c
-> index 36b79d8..7f2a919 100644
-> --- a/arch/arm/mach-zynq/slcr.c
-> +++ b/arch/arm/mach-zynq/slcr.c
-> @@ -33,6 +33,11 @@
->  #define SLCR_UNLOCK			0x8   /* SCLR unlock register */
->  
->  #define SLCR_PSS_RST_CTRL_OFFSET	0x200 /* PS Software Reset Control */
-> +
-> +#define SLCR_A9_CPU_CLKSTOP		0x10
-> +#define SLCR_A9_CPU_RST			0x1
-> +
-> +#define SLCR_A9_CPU_RST_CTRL		0x244 /* CPU Software Reset Control */
->  #define SLCR_REBOOT_STATUS		0x258 /* PS Reboot Status */
->  
->  void __iomem *zynq_slcr_base;
-> @@ -61,6 +66,30 @@ void slcr_system_reset(void)
->  }
->  
->  /**
-> + * slcr_cpu_start - Start cpu
-> + * @cpu:	cpu number
-> + */
-> +void slcr_cpu_start(int cpu)
-> +{
-> +	/* enable CPUn */
-> +	writel(SLCR_A9_CPU_CLKSTOP << cpu,
-> +	       zynq_slcr_base + SLCR_A9_CPU_RST_CTRL);
-> +	/* enable CLK for CPUn */
-> +	writel(0x0 << cpu, zynq_slcr_base + SLCR_A9_CPU_RST_CTRL);
-> +}
-> +
-> +/**
-> + * slcr_cpu_stop - Stop cpu
-> + * @cpu:	cpu number
-> + */
-> +void slcr_cpu_stop(int cpu)
-> +{
-> +	/* stop CLK and reset CPUn */
-> +	writel((SLCR_A9_CPU_CLKSTOP | SLCR_A9_CPU_RST) << cpu,
-> +	       zynq_slcr_base + SLCR_A9_CPU_RST_CTRL);
-> +}
-> +
-> +/**
->   * xslcr_init()
->   * Returns 0 on success, negative errno otherwise.
->   *
+> This must be defined in header - will produce sparse warning.
 > 
+
+Okay. No problem. I can change that.
+
+> > +
+> >  static struct of_device_id zynq_of_bus_ids[] __initdata = {
+> >         { .compatible = "simple-bus", },
+> >         {}
+> > @@ -56,17 +59,6 @@ static void __init xilinx_init_machine(void)
+> >         of_platform_bus_probe(NULL, zynq_of_bus_ids, NULL);
+> >  }
+> >
+> > -#define SCU_PERIPH_PHYS                0xF8F00000
+> > -#define SCU_PERIPH_SIZE                SZ_8K
+> > -#define SCU_PERIPH_VIRT                (VMALLOC_END - SCU_PERIPH_SIZE)
+> > -
+> > -static struct map_desc scu_desc __initdata = {
+> > -       .virtual        = SCU_PERIPH_VIRT,
+> > -       .pfn            = __phys_to_pfn(SCU_PERIPH_PHYS),
+> > -       .length         = SCU_PERIPH_SIZE,
+> > -       .type           = MT_DEVICE,
+> > -};
+> > -
+> >  static void __init xilinx_zynq_timer_init(void)
+> >  {
+> >         struct device_node *np;
+> > @@ -82,13 +74,31 @@ static void __init xilinx_zynq_timer_init(void)
+> >         xttcps_timer_init();
+> >  }
+> >
+> > +static struct map_desc zynq_cortex_a9_scu_map __initdata = {
+> > +       .length = SZ_8K,
+> 
+> That's bogus. Size 8k is too big because it also cover gic which is wrong.
+> As you can see from xilinx git repo correct size is 256 or less.
+> 
+
+Hm,... you are obviously correct. 256 it is.
+
+> > +       .type   = MT_DEVICE,
+> > +};
+> > +
+> > +void __init zynq_scu_map_io(void)
+> 
+> Should be static.
+> 
+
+Yes.
+
+> > +{
+> > +       if (scu_a9_has_base()) {
+> 
+> I am not calling this function because I think it is not necessary to do so
+> because it is run only on a9 where scu_a9_get_base will just work.
+> Of did I miss anything?
+> 
+
+As long as this file is only used for zynqs with A9 this call is not needed.
+Right.
+
+> 
+> > +               unsigned long base;
+> > +
+> > +               base = scu_a9_get_base();
+> > +               zynq_cortex_a9_scu_map.pfn = __phys_to_pfn(base);
+> > +               zynq_cortex_a9_scu_map.virtual = base;
+> > +               iotable_init(&zynq_cortex_a9_scu_map, 1);
+> > +               scu_base = ioremap(base, zynq_cortex_a9_scu_map.length);
+> > +       }
+> > +}
+> > +
+> >  /**
+> >   * xilinx_map_io() - Create memory mappings needed for early I/O.
+> >   */
+> >  static void __init xilinx_map_io(void)
+> >  {
+> >         debug_ll_io_init();
+> > -       iotable_init(&scu_desc, 1);
+> > +       zynq_scu_map_io();
+> >  }
+> 
+> You are using a little bit different names than we have in xilinx git tree
+> but maybe worth to call it as you.
+> 
+
+I propose using the common mainline way of calling this functions.
+When there maybe will be more xilinx SoCs in mainline it will be easier to find
+what one is looking for.
+I actually wanted to make an RFC patch naming everything to zynq_* instead of
+xilinx_* and replace the "MACHINE_START(XILINX_EP107,...".
+Didn't get around to is though.
+
+Regards,
+Steffen
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
