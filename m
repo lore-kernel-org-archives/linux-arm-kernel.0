@@ -1,40 +1,48 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Mon, 25 Mar 2013 15:53:01 -0700
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 25 Mar 2013 23:07:30 +0000
 Subject: [PATCH] ARM: convert arm/arm64 arch timer to use CLKSRC_OF init
-In-Reply-To: <201303252236.23270.arnd@arndb.de>
+In-Reply-To: <5150C16A.3040208@gmail.com>
 References: <1363818875-15978-1-git-send-email-robherring2@gmail.com>
- <20130325172633.GP30923@n2100.arm.linux.org.uk> <5150C16A.3040208@gmail.com>
- <201303252236.23270.arnd@arndb.de>
-Message-ID: <5150D54D.1070004@linaro.org>
+ <20130321110646.GE15279@e106331-lin.cambridge.arm.com>
+ <20130325172633.GP30923@n2100.arm.linux.org.uk>
+ <5150C16A.3040208@gmail.com>
+Message-ID: <20130325230730.GA5518@MacBook-Pro.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/25/2013 03:36 PM, Arnd Bergmann wrote:
-> On Monday 25 March 2013, Rob Herring wrote:
->> I count integrator-cp, realview, versatile and non-DT VExpress that do
->> this (not surprisingly) and 25 platforms or timer implementations plus
->> arm64 that do sched_clock setup in time_init. What's broken by not
->> moving these earlier?
-> timekeeping_init() will leave the persistent_clock_exist variable as "false",
-> which is read in rtc_suspend() and timekeeping_inject_sleeptime().
+On Mon, Mar 25, 2013 at 09:28:10PM +0000, Rob Herring wrote:
+> On 03/25/2013 12:26 PM, Russell King - ARM Linux wrote:
+> > On Thu, Mar 21, 2013 at 11:06:47AM +0000, Mark Rutland wrote:
+> >> On TC2 this series leads to using the vexpress 24MHz clock as the sched clock
+> >> in preference to the architected timer:
+> >>
+> >>   Architected local timer running at 24.00MHz (virt).
+> >>   Switching to timer-based delay loop
+> >>   Registered arch_counter_get_cntvct+0x0/0x14 as sched_clock source
+> >>   sched_clock: 32 bits at 24MHz, resolution 41ns, wraps every 178956ms
+> >>   Registered versatile_read_sched_clock+0x0/0x28 as sched_clock source
+> >>
+> >> As they both have the same frequency, neither overrides the other, and
+> >> whichever gets registered last is used as the sched_clock. As accesses
+> >> to the architected timer are going to have a much lower overhead, this
+> >> isn't very nice (and it could be better to use it even if it had a lower
+> >> frequency).
+> > 
+> > I'll remind people that sched_clock() is supposed to be functional at
+> > the point in the boot sequence where the call to sched_init() is called.
+> > That is after setup_arch() and *before* time_init() is called.
+> 
+> I count integrator-cp, realview, versatile and non-DT VExpress that do
+> this (not surprisingly) and 25 platforms or timer implementations plus
+> arm64 that do sched_clock setup in time_init.
 
-Are you mixing up the persistent_clock and sched_clock here? From a 
-generic stand-point they have different requirements.
+Before time_init(), sched_clock() currently returns 0 with the
+architected timers (though I don't particularly like this for arm64).
+Marc Rutland has patches to make arch_timer_read_counter() a function
+which always returns the virtual counter. It requires the CNTVOFF
+register to be set to 0 on AArch32 during boot. But this way
+sched_clock() on arm64 would always return meaningful values as we have
+the architected timers.
 
-> For all I can tell, you will get a little jitter every time you
-> do a suspend in that case. Or perhaps it means the system clock
-> will be forwarded by the amount of time spent in suspend twice
-> after wakeup, but I'm probably misreading the code for that case.
-
-No, you shouldn't see timekeeping being incremented twice, we check in 
-rtc_resume code if the persistent clock is present if so we won't inject 
-any measured suspend time there. But you're probably right that we're 
-being a little overly paranoid checking the same value twice.
-
-As far as the benefit to the persistent clock: it is just a little 
-better to use, since we can access it earlier in resume, prior to 
-interrupts being enabled. So we should see less time error introduced 
-each suspend.
-
-thanks
--john
+-- 
+Catalin
