@@ -1,49 +1,65 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Mon, 25 Mar 2013 10:10:10 +0800
-Subject: [Suggestion] ARM:S5pv210: compiling issue for s5pv210 by using
- randconfig
-Message-ID: <514FB202.3040807@asianux.com>
+From: Frank.Li@freescale.com (Frank Li)
+Date: Mon, 25 Mar 2013 09:03:42 +0800
+Subject: [PATCH 1/1 net-next] net: fec: build fec.c and fec_ptp.c to one module
+Message-ID: <1364173422-7865-1-git-send-email-Frank.Li@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Maintainers:
+fec_ptp.ko can't run individually
+rename fec.c to fec_main.c
+Build fec.o and fec_ptp.o into one fec.ko
+Remove unnessary EXPORT_SYMBOL in fec_ptp
 
-  is it an issue that need solving ?
+Signed-off-by: Frank Li <Frank.Li@freescale.com>
+---
+ drivers/net/ethernet/freescale/Makefile            |    3 ++-
+ .../net/ethernet/freescale/{fec.c => fec_main.c}   |    0
+ drivers/net/ethernet/freescale/fec_ptp.c           |    3 ---
+ 3 files changed, 2 insertions(+), 4 deletions(-)
+ rename drivers/net/ethernet/freescale/{fec.c => fec_main.c} (100%)
 
-  :-)
-
-
-details:
-
-  make:
-    make V=1 EXTRA_CFLAGS=-W ARCH=arm randconfig
-    make V=1 EXTRA_CFLAGS=-W ARCH=arm menuconfig
-      set arm-linux-gnu-  for "Cross-compiler tool prefix"
-      set "Samsung S5PV210/S5PC210" for "ARM system type"
-    make V=1 EXTRA_CFLAGS=-W ARCH=arm
-
-
-  err:
-    arch/arm/kernel/entry-armv.S: Assembler messages:
-    arch/arm/kernel/entry-armv.S:207: Error: selected processor does not support ARM mode `clrex'
-    arch/arm/kernel/entry-armv.S:231: Error: selected processor does not support ARM mode `clrex'
-    arch/arm/kernel/entry-armv.S:314: Error: selected processor does not support ARM mode `clrex'
-    arch/arm/kernel/entry-armv.S:335: Error: selected processor does not support ARM mode `clrex'
-    arch/arm/kernel/entry-armv.S:813: Error: selected processor does not support ARM mode `ldrd r4,r5,[r0]'
-    arch/arm/kernel/entry-armv.S:814: Error: selected processor does not support ARM mode `ldrd r6,r7,[r1]'
-    arch/arm/kernel/entry-armv.S:816: Error: selected processor does not support ARM mode `ldrexd r0,r1,[r2]'
-    arch/arm/kernel/entry-armv.S:819: Error: selected processor does not support ARM mode `strexdeq r3,r6,r7,[r2]'
-    make[1]: *** [arch/arm/kernel/entry-armv.o] Error 1
-    make: *** [arch/arm/kernel] Error 2
-
-  related gcc command:
-arm-linux-gnu-gcc -Wp,-MD,arch/arm/kernel/.entry-armv.o.d  -nostdinc -isystem /usr/lib/gcc/arm-linux-gnueabi/4.7.1/include -I/android/public-kernel/linux-next/arch/arm/include -Iarch/arm/include/generated  -Iinclude -I/android/public-kernel/linux-next/arch/arm/include/uapi -Iarch/arm/include/generated/uapi -I/android/public-kernel/linux-next/include/uapi -Iinclude/generated/uapi -include /android/public-kernel/linux-next/include/linux/kconfig.h -D__KERNEL__ -mlittle-endian -Iarch/arm/mach-s5pv210/include -Iarch/arm/plat-samsung/include  -D__ASSEMBLY__ -mabi=apcs-gnu -mno-thumb-interwork -marm -D__LINUX_ARM_ARCH__=4 -march=armv4t -mtune=arm9tdmi -include asm/unified.h -msoft-float          -c -o arch/arm/kernel/entry-armv.o arch/arm/kernel/entry-armv.S
-
-
-
-  thanks.
-
+diff --git a/drivers/net/ethernet/freescale/Makefile b/drivers/net/ethernet/freescale/Makefile
+index b7d58fe..549ce13 100644
+--- a/drivers/net/ethernet/freescale/Makefile
++++ b/drivers/net/ethernet/freescale/Makefile
+@@ -2,7 +2,8 @@
+ # Makefile for the Freescale network device drivers.
+ #
+ 
+-obj-$(CONFIG_FEC) += fec.o fec_ptp.o
++obj-$(CONFIG_FEC) += fec.o
++fec-objs :=fec_main.o fec_ptp.o
+ obj-$(CONFIG_FEC_MPC52xx) += fec_mpc52xx.o
+ ifeq ($(CONFIG_FEC_MPC52xx_MDIO),y)
+ 	obj-$(CONFIG_FEC_MPC52xx) += fec_mpc52xx_phy.o
+diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec_main.c
+similarity index 100%
+rename from drivers/net/ethernet/freescale/fec.c
+rename to drivers/net/ethernet/freescale/fec_main.c
+diff --git a/drivers/net/ethernet/freescale/fec_ptp.c b/drivers/net/ethernet/freescale/fec_ptp.c
+index 0d8df40..1f17ca0 100644
+--- a/drivers/net/ethernet/freescale/fec_ptp.c
++++ b/drivers/net/ethernet/freescale/fec_ptp.c
+@@ -128,7 +128,6 @@ void fec_ptp_start_cyclecounter(struct net_device *ndev)
+ 
+ 	spin_unlock_irqrestore(&fep->tmreg_lock, flags);
+ }
+-EXPORT_SYMBOL(fec_ptp_start_cyclecounter);
+ 
+ /**
+  * fec_ptp_adjfreq - adjust ptp cycle frequency
+@@ -319,7 +318,6 @@ int fec_ptp_ioctl(struct net_device *ndev, struct ifreq *ifr, int cmd)
+ 	return copy_to_user(ifr->ifr_data, &config, sizeof(config)) ?
+ 	    -EFAULT : 0;
+ }
+-EXPORT_SYMBOL(fec_ptp_ioctl);
+ 
+ /**
+  * fec_time_keep - call timecounter_read every second to avoid timer overrun
+@@ -385,4 +383,3 @@ void fec_ptp_init(struct net_device *ndev, struct platform_device *pdev)
+ 		pr_info("registered PHC device on %s\n", ndev->name);
+ 	}
+ }
+-EXPORT_SYMBOL(fec_ptp_init);
 -- 
-Chen Gang
-
-Asianux Corporation
+1.7.1
