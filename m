@@ -1,277 +1,168 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 25 Mar 2013 14:53:14 +0100
-Subject: [PATCH 08/10] arm: zynq: Add smp support
+Date: Mon, 25 Mar 2013 14:53:16 +0100
+Subject: [PATCH 10/10] arm: zynq: Add cpuidle support
 In-Reply-To: <1364219596-4954-1-git-send-email-michal.simek@xilinx.com>
 References: <1364219596-4954-1-git-send-email-michal.simek@xilinx.com>
-Message-ID: <1364219596-4954-8-git-send-email-michal.simek@xilinx.com>
+Message-ID: <1364219596-4954-10-git-send-email-michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Zynq is dual core Cortex A9 which starts always
-at zero. Using simple trampoline ensure long jump
-to secondary_startup code.
+Add support for cpuidle.
 
 Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 ---
  arch/arm/mach-zynq/Makefile  |    1 +
- arch/arm/mach-zynq/common.c  |    1 +
- arch/arm/mach-zynq/common.h  |    7 ++
- arch/arm/mach-zynq/platsmp.c |  160 ++++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-zynq/slcr.c    |   29 ++++++++
- 5 files changed, 198 insertions(+)
- create mode 100644 arch/arm/mach-zynq/platsmp.c
+ arch/arm/mach-zynq/cpuidle.c |  131 ++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 132 insertions(+)
+ create mode 100644 arch/arm/mach-zynq/cpuidle.c
 
 diff --git a/arch/arm/mach-zynq/Makefile b/arch/arm/mach-zynq/Makefile
-index 13ee09b..8493a89 100644
+index 8e75490..a085d86 100644
 --- a/arch/arm/mach-zynq/Makefile
 +++ b/arch/arm/mach-zynq/Makefile
-@@ -4,3 +4,4 @@
+@@ -4,5 +4,6 @@
  
  # Common support
  obj-y				:= common.o slcr.o
-+obj-$(CONFIG_SMP)		+= platsmp.o
-diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
-index 292f775..a58f9d6 100644
---- a/arch/arm/mach-zynq/common.c
-+++ b/arch/arm/mach-zynq/common.c
-@@ -103,6 +103,7 @@ static const char *xilinx_dt_match[] = {
- };
- 
- MACHINE_START(XILINX_EP107, "Xilinx Zynq Platform")
-+	.smp		= smp_ops(zynq_smp_ops),
- 	.map_io		= xilinx_map_io,
- 	.init_irq	= irqchip_init,
- 	.init_machine	= xilinx_init_machine,
-diff --git a/arch/arm/mach-zynq/common.h b/arch/arm/mach-zynq/common.h
-index e5628f7..84145fb 100644
---- a/arch/arm/mach-zynq/common.h
-+++ b/arch/arm/mach-zynq/common.h
-@@ -19,6 +19,13 @@
- 
- extern int slcr_init(void);
- extern void slcr_system_reset(void);
-+extern void slcr_cpu_stop(int cpu);
-+extern void slcr_cpu_start(int cpu);
-+
-+#ifdef CONFIG_SMP
-+extern void secondary_startup(void);
-+#endif
-+extern struct smp_operations zynq_smp_ops __initdata;
- 
- extern void __iomem *zynq_slcr_base;
- extern void __iomem *scu_base;
-diff --git a/arch/arm/mach-zynq/platsmp.c b/arch/arm/mach-zynq/platsmp.c
++obj-$(CONFIG_CPU_IDLE) 		+= cpuidle.o
+ obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
+ obj-$(CONFIG_SMP)		+= platsmp.o
+diff --git a/arch/arm/mach-zynq/cpuidle.c b/arch/arm/mach-zynq/cpuidle.c
 new file mode 100644
-index 0000000..d31ef72
+index 0000000..24f0333
 --- /dev/null
-+++ b/arch/arm/mach-zynq/platsmp.c
-@@ -0,0 +1,160 @@
++++ b/arch/arm/mach-zynq/cpuidle.c
+@@ -0,0 +1,131 @@
 +/*
-+ * This file contains Xilinx specific SMP code, used to start up
-+ * the second processor.
++ * based on arch/arm/mach-at91/cpuidle.c
 + *
-+ * Copyright (C) 2011 - 2013 Xilinx
++ * CPU idle support for Xilinx
 + *
-+ * based on linux/arch/arm/mach-realview/platsmp.c
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
 + *
-+ * Copyright (C) 2002 ARM Ltd.
++ * The cpu idle uses wait-for-interrupt and RAM self refresh in order
++ * to implement two idle states -
++ * #1 wait-for-interrupt
++ * #2 wait-for-interrupt and RAM self refresh
 + *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
++ * Note that this code is only intended as a prototype and is not tested
++ * well yet, or tuned for the Xilinx Cortex A9. Also note that for a
++ * tickless kernel, high res timers must not be turned on. The cpuidle
++ * framework must also be turned on in the kernel.
 + */
 +
-+#include <linux/export.h>
-+#include <linux/jiffies.h>
++#include <linux/kernel.h>
 +#include <linux/init.h>
++#include <linux/platform_device.h>
++#include <linux/cpuidle.h>
 +#include <linux/io.h>
-+#include <asm/cacheflush.h>
-+#include <asm/smp_scu.h>
-+#include <linux/irqchip/arm-gic.h>
-+#include "common.h"
++#include <linux/export.h>
++#include <linux/clockchips.h>
++#include <linux/cpu_pm.h>
++#include <linux/clk.h>
++#include <linux/err.h>
++#include <asm/proc-fns.h>
 +
-+static DEFINE_SPINLOCK(boot_lock);
++#define XILINX_MAX_STATES	1
 +
-+/*
-+ * Store number of cores in the system
-+ * Because of scu_get_core_count() must be in __init section and can't
-+ * be called from zynq_cpun_start() because it is in __cpuinit section.
-+ */
-+static int ncores;
++static DEFINE_PER_CPU(struct cpuidle_device, xilinx_cpuidle_device);
 +
-+/* Secondary CPU kernel startup is a 2 step process. The primary CPU
-+ * starts the secondary CPU by giving it the address of the kernel and
-+ * then sending it an event to wake it up. The secondary CPU then
-+ * starts the kernel and tells the primary CPU it's up and running.
-+ */
-+static void __cpuinit zynq_secondary_init(unsigned int cpu)
++/* Actual code that puts the SoC in different idle states */
++static int xilinx_enter_idle(struct cpuidle_device *dev,
++		struct cpuidle_driver *drv, int index)
 +{
-+	/*
-+	 * if any interrupts are already enabled for the primary
-+	 * core (e.g. timer irq), then they will not have been enabled
-+	 * for us: do so
-+	 */
-+	gic_secondary_init(0);
++	struct timeval before, after;
++	int idle_time;
 +
-+	/*
-+	 * Synchronise with the boot thread.
-+	 */
-+	spin_lock(&boot_lock);
-+	spin_unlock(&boot_lock);
-+}
++	local_irq_disable();
++	do_gettimeofday(&before);
 +
-+int __cpuinit zynq_cpun_start(u32 address, int cpu)
-+{
-+	if (cpu > ncores) {
-+		pr_warn("CPU No. is not available in the system\n");
-+		return -1;
++	if (index == 0)
++		/* Wait for interrupt state */
++		cpu_do_idle();
++
++	else if (index == 1) {
++		unsigned int cpu_id = smp_processor_id();
++
++		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu_id);
++
++		/* Devices must be stopped here */
++		cpu_pm_enter();
++
++		/* Add code for DDR self refresh start */
++
++		cpu_do_idle();
++		/*cpu_suspend(foo, bar);*/
++
++		/* Add code for DDR self refresh stop */
++
++		cpu_pm_exit();
++
++		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu_id);
 +	}
 +
-+	/* MS: Expectation that SLCR are directly map and accessible */
-+	/* Not possible to jump to non aligned address */
-+	if (!(address & 3) && (!address || (address >= 0xC))) {
-+		slcr_cpu_stop(cpu);
++	do_gettimeofday(&after);
++	local_irq_enable();
++	idle_time = (after.tv_sec - before.tv_sec) * USEC_PER_SEC +
++			(after.tv_usec - before.tv_usec);
 +
-+		/*
-+		 * This is elegant way how to jump to any address
-+		 * 0x0: Load address at 0x8 to r0
-+		 * 0x4: Jump by mov instruction
-+		 * 0x8: Jumping address
-+		 */
-+		if (address) {
-+			/* 0: ldr r0, [8] */
-+			__raw_writel(0xe59f0000, phys_to_virt(0x0));
-+			/* 4: mov pc, r0 */
-+			__raw_writel(0xe1a0f000, phys_to_virt(0x4));
-+			__raw_writel(address, phys_to_virt(0x8));
-+		}
-+
-+		flush_cache_all();
-+		outer_flush_all();
-+		wmb();
-+
-+		slcr_cpu_start(cpu);
-+
-+		return 0;
-+	}
-+
-+	pr_warn("Can't start CPU%d: Wrong starting address %x\n", cpu, address);
-+
-+	return -1;
++	dev->last_residency = idle_time;
++	return index;
 +}
-+EXPORT_SYMBOL(zynq_cpun_start);
 +
-+static int __cpuinit zynq_boot_secondary(unsigned int cpu,
-+						struct task_struct *idle)
++static struct cpuidle_driver xilinx_idle_driver = {
++	.name = "xilinx_idle",
++	.owner = THIS_MODULE,
++	.state_count = XILINX_MAX_STATES,
++	/* Wait for interrupt state */
++	.states[0] = {
++		.enter = xilinx_enter_idle,
++		.exit_latency = 1,
++		.target_residency = 10000,
++		.flags = CPUIDLE_FLAG_TIME_VALID,
++		.name = "WFI",
++		.desc = "Wait for interrupt",
++	},
++	/* Wait for interrupt and RAM self refresh state */
++	.states[1] = {
++		.enter = xilinx_enter_idle,
++		.exit_latency = 10,
++		.target_residency = 10000,
++		.flags = CPUIDLE_FLAG_TIME_VALID,
++		.name = "RAM_SR",
++		.desc = "WFI and RAM Self Refresh",
++	},
++};
++
++/* Initialize CPU idle by registering the idle states */
++static int xilinx_init_cpuidle(void)
 +{
++	unsigned int cpu;
++	struct cpuidle_device *device;
 +	int ret;
 +
-+	/*
-+	 * set synchronisation state between this boot processor
-+	 * and the secondary one
-+	 */
-+	spin_lock(&boot_lock);
-+
-+	ret = zynq_cpun_start(virt_to_phys(secondary_startup), cpu);
++	ret = cpuidle_register_driver(&xilinx_idle_driver);
 +	if (ret) {
-+		spin_unlock(&boot_lock);
-+		return -1;
++		pr_err("Registering Xilinx CpuIdle Driver failed.\n");
++		return ret;
 +	}
 +
-+	/*
-+	 * now the secondary core is starting up let it run its
-+	 * calibrations, then wait for it to finish
-+	 */
-+	spin_unlock(&boot_lock);
++	for_each_possible_cpu(cpu) {
++		device = &per_cpu(xilinx_cpuidle_device, cpu);
++		device->state_count = XILINX_MAX_STATES;
++		device->cpu = cpu;
++		ret = cpuidle_register_device(device);
++		if (ret) {
++			pr_err("xilinx_init_cpuidle: Failed registering\n");
++			return ret;
++		}
++	}
 +
++	pr_info("Xilinx CpuIdle Driver started\n");
 +	return 0;
 +}
-+
-+/*
-+ * Initialise the CPU possible map early - this describes the CPUs
-+ * which may be present or become present in the system.
-+ */
-+static void __init zynq_smp_init_cpus(void)
-+{
-+	int i;
-+
-+	ncores = scu_get_core_count(scu_base);
-+
-+	for (i = 0; i < ncores && i < CONFIG_NR_CPUS; i++)
-+		set_cpu_possible(i, true);
-+}
-+
-+static void __init zynq_smp_prepare_cpus(unsigned int max_cpus)
-+{
-+	int i;
-+
-+	/*
-+	 * Initialise the present map, which describes the set of CPUs
-+	 * actually populated@the present time.
-+	 */
-+	for (i = 0; i < max_cpus; i++)
-+		set_cpu_present(i, true);
-+
-+	scu_enable(scu_base);
-+}
-+
-+struct smp_operations zynq_smp_ops __initdata = {
-+	.smp_init_cpus		= zynq_smp_init_cpus,
-+	.smp_prepare_cpus	= zynq_smp_prepare_cpus,
-+	.smp_secondary_init	= zynq_secondary_init,
-+	.smp_boot_secondary	= zynq_boot_secondary,
-+};
-diff --git a/arch/arm/mach-zynq/slcr.c b/arch/arm/mach-zynq/slcr.c
-index 36b79d8..7f2a919 100644
---- a/arch/arm/mach-zynq/slcr.c
-+++ b/arch/arm/mach-zynq/slcr.c
-@@ -33,6 +33,11 @@
- #define SLCR_UNLOCK			0x8   /* SCLR unlock register */
- 
- #define SLCR_PSS_RST_CTRL_OFFSET	0x200 /* PS Software Reset Control */
-+
-+#define SLCR_A9_CPU_CLKSTOP		0x10
-+#define SLCR_A9_CPU_RST			0x1
-+
-+#define SLCR_A9_CPU_RST_CTRL		0x244 /* CPU Software Reset Control */
- #define SLCR_REBOOT_STATUS		0x258 /* PS Reboot Status */
- 
- void __iomem *zynq_slcr_base;
-@@ -61,6 +66,30 @@ void slcr_system_reset(void)
- }
- 
- /**
-+ * slcr_cpu_start - Start cpu
-+ * @cpu:	cpu number
-+ */
-+void slcr_cpu_start(int cpu)
-+{
-+	/* enable CPUn */
-+	writel(SLCR_A9_CPU_CLKSTOP << cpu,
-+	       zynq_slcr_base + SLCR_A9_CPU_RST_CTRL);
-+	/* enable CLK for CPUn */
-+	writel(0x0 << cpu, zynq_slcr_base + SLCR_A9_CPU_RST_CTRL);
-+}
-+
-+/**
-+ * slcr_cpu_stop - Stop cpu
-+ * @cpu:	cpu number
-+ */
-+void slcr_cpu_stop(int cpu)
-+{
-+	/* stop CLK and reset CPUn */
-+	writel((SLCR_A9_CPU_CLKSTOP | SLCR_A9_CPU_RST) << cpu,
-+	       zynq_slcr_base + SLCR_A9_CPU_RST_CTRL);
-+}
-+
-+/**
-  * xslcr_init()
-  * Returns 0 on success, negative errno otherwise.
-  *
++device_initcall(xilinx_init_cpuidle);
 -- 
 1.7.9.7
