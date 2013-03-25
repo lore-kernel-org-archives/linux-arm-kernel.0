@@ -1,98 +1,170 @@
 From: monstr@monstr.eu (Michal Simek)
-Date: Mon, 25 Mar 2013 15:55:26 +0100
-Subject: [PATCH 2/3] ARM: zynq: get slcr base earlier
-In-Reply-To: <20130325143900.GC27739@pengutronix.de>
+Date: Mon, 25 Mar 2013 15:59:14 +0100
+Subject: [PATCH 1/3] ARM: zynq: read scu base from SoC
+In-Reply-To: <20130325142533.GB27739@pengutronix.de>
 References: <1364043450-18700-1-git-send-email-s.trumtrar@pengutronix.de>
- <1364043450-18700-3-git-send-email-s.trumtrar@pengutronix.de>
- <CAHTX3dJDTvs4UXoTa_8u4M83fQ9N2n96ecZzFjaXLsXkp_vWjg@mail.gmail.com>
- <20130325143900.GC27739@pengutronix.de>
-Message-ID: <CAHTX3dJ3gzG90GqG2H4CqqW8GkDPbSEjOsQ0j_azg84SuRphTA@mail.gmail.com>
+ <1364043450-18700-2-git-send-email-s.trumtrar@pengutronix.de>
+ <CAHTX3dK30HZxJXcNjwVqgqW_Qqag=26PEFWra6r7H6JGnpPHXQ@mail.gmail.com>
+ <20130325142533.GB27739@pengutronix.de>
+Message-ID: <CAHTX3d+619gU64e-fxi5PLmjnmO6kNEJN4o5tFbbxZ-ccw+HtQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Steffen,
+
 2013/3/25 Steffen Trumtrar <s.trumtrar@pengutronix.de>:
-> On Mon, Mar 25, 2013 at 03:04:36PM +0100, Michal Simek wrote:
+> On Mon, Mar 25, 2013 at 03:01:59PM +0100, Michal Simek wrote:
 >> 2013/3/23 Steffen Trumtrar <s.trumtrar@pengutronix.de>:
->> > The slcr is needed for pinctrl, clocks and reset. Therefore we want it as early
->> > as possible. As there is no driver that handles it and instead a pointer needs
->> > to be passed around, rename the variable to something a little more obvious.
+>> > Instead of hardcoding the base address of the SCU get it from the device.
+>> > While at it, add the SCU to the DT.
 >> >
 >> > Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
 >> > Cc: Michal Simek <michal.simek@xilinx.com>
+>> > Cc: Josh Cartwright <josh.cartwright@ni.com>
 >> > ---
->> >  arch/arm/mach-zynq/common.c | 27 ++++++++++++++++++---------
->> >  1 file changed, 18 insertions(+), 9 deletions(-)
+>> >  arch/arm/boot/dts/zynq-7000.dtsi |  5 +++++
+>> >  arch/arm/mach-zynq/common.c      | 34 ++++++++++++++++++++++------------
+>> >  2 files changed, 27 insertions(+), 12 deletions(-)
 >> >
+>> > diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+>> > index 88564fa..c103082 100644
+>> > --- a/arch/arm/boot/dts/zynq-7000.dtsi
+>> > +++ b/arch/arm/boot/dts/zynq-7000.dtsi
+>> > @@ -199,6 +199,11 @@
+>> >                         };
+>> >                 };
+>> >
+>> > +               scu: scu at f8f000000 {
+>> > +                       compatible = "arm,cortex-a9-scu";
+>> > +                       reg = <0xf8f00000 0x58>;
+>> > +               };
+>> > +
+>> >                 timer: timer at f8f00600 {
+>> >                         compatible = "arm,cortex-a9-twd-timer";
+>> >                         reg = <0xf8f00600 0x20>;
 >> > diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
->> > index 014131c..1b9bb3d 100644
+>> > index 920e20a..014131c 100644
 >> > --- a/arch/arm/mach-zynq/common.c
 >> > +++ b/arch/arm/mach-zynq/common.c
->> > @@ -38,6 +38,7 @@
+>> > @@ -32,11 +32,14 @@
+>> >  #include <asm/mach-types.h>
+>> >  #include <asm/page.h>
+>> >  #include <asm/pgtable.h>
+>> > +#include <asm/smp_scu.h>
+>> >  #include <asm/smp_twd.h>
+>> >  #include <asm/hardware/cache-l2x0.h>
 >> >
 >> >  #include "common.h"
 >> >
->> > +void __iomem *slcr_base_addr;
->> >  void __iomem *scu_base;
->> >
+>> > +void __iomem *scu_base;
+>>
+>> This must be defined in header - will produce sparse warning.
+>>
+>
+> Okay. No problem. I can change that.
+>
+>> > +
 >> >  static struct of_device_id zynq_of_bus_ids[] __initdata = {
->> > @@ -61,19 +62,21 @@ static void __init xilinx_init_machine(void)
+>> >         { .compatible = "simple-bus", },
+>> >         {}
+>> > @@ -56,17 +59,6 @@ static void __init xilinx_init_machine(void)
+>> >         of_platform_bus_probe(NULL, zynq_of_bus_ids, NULL);
+>> >  }
 >> >
+>> > -#define SCU_PERIPH_PHYS                0xF8F00000
+>> > -#define SCU_PERIPH_SIZE                SZ_8K
+>> > -#define SCU_PERIPH_VIRT                (VMALLOC_END - SCU_PERIPH_SIZE)
+>> > -
+>> > -static struct map_desc scu_desc __initdata = {
+>> > -       .virtual        = SCU_PERIPH_VIRT,
+>> > -       .pfn            = __phys_to_pfn(SCU_PERIPH_PHYS),
+>> > -       .length         = SCU_PERIPH_SIZE,
+>> > -       .type           = MT_DEVICE,
+>> > -};
+>> > -
 >> >  static void __init xilinx_zynq_timer_init(void)
 >> >  {
->> > -       struct device_node *np;
->> > -       void __iomem *slcr;
->> > -
->> > -       np = of_find_compatible_node(NULL, NULL, "xlnx,zynq-slcr");
->> > -       slcr = of_iomap(np, 0);
->> > -       WARN_ON(!slcr);
->> > -
->> > -       xilinx_zynq_clocks_init(slcr);
->> > +       xilinx_zynq_clocks_init(slcr_base_addr);
->> >
->> >         twd_local_timer_of_register();
+>> >         struct device_node *np;
+>> > @@ -82,13 +74,31 @@ static void __init xilinx_zynq_timer_init(void)
 >> >         xttcps_timer_init();
 >> >  }
 >> >
->> > +static void zynq_slcr_init(void)
->> > +{
->> > +       struct device_node *np;
->> > +
->> > +       np = of_find_compatible_node(NULL, NULL, "xlnx,zynq-slcr");
->> > +       slcr_base_addr = of_iomap(np, 0);
->> > +       WARN_ON(!slcr_base_addr);
->> > +}
+>> > +static struct map_desc zynq_cortex_a9_scu_map __initdata = {
+>> > +       .length = SZ_8K,
 >>
->> Xilinx is using separate driver for slcr and IMHO make sense to have it
->> like that because this IP can handle more things which will be just messy
->> to have it in one file.
->> What do you think?
+>> That's bogus. Size 8k is too big because it also cover gic which is wrong.
+>> As you can see from xilinx git repo correct size is 256 or less.
 >>
 >
-> Definitely. I think we should have a main slcr driver for locking/unlocking
-> etc. and the clock/reset/mio-drivers should be "clients" of this.
-> Then for example the clockdriver would request a write to a register.
-> The slcr can then unlock and make the write.
-> But maybe this is overengineering. I haven't found time to look at the
-> xilinx driver. And I'm actually not sure why I would want to lock the
-> slcr. But as Xilinx opted for this feature, it should be handeled correctly.
-> At the moment I was trying to make do with what is there.
+> Hm,... you are obviously correct. 256 it is.
+>
+>> > +       .type   = MT_DEVICE,
+>> > +};
+>> > +
+>> > +void __init zynq_scu_map_io(void)
+>>
+>> Should be static.
+>>
+>
+> Yes.
+>
+>> > +{
+>> > +       if (scu_a9_has_base()) {
+>>
+>> I am not calling this function because I think it is not necessary to do so
+>> because it is run only on a9 where scu_a9_get_base will just work.
+>> Of did I miss anything?
+>>
+>
+> As long as this file is only used for zynqs with A9 this call is not needed.
+> Right.
+>
+>>
+>> > +               unsigned long base;
+>> > +
+>> > +               base = scu_a9_get_base();
+>> > +               zynq_cortex_a9_scu_map.pfn = __phys_to_pfn(base);
+>> > +               zynq_cortex_a9_scu_map.virtual = base;
+>> > +               iotable_init(&zynq_cortex_a9_scu_map, 1);
+>> > +               scu_base = ioremap(base, zynq_cortex_a9_scu_map.length);
+>> > +       }
+>> > +}
+>> > +
+>> >  /**
+>> >   * xilinx_map_io() - Create memory mappings needed for early I/O.
+>> >   */
+>> >  static void __init xilinx_map_io(void)
+>> >  {
+>> >         debug_ll_io_init();
+>> > -       iotable_init(&scu_desc, 1);
+>> > +       zynq_scu_map_io();
+>> >  }
+>>
+>> You are using a little bit different names than we have in xilinx git tree
+>> but maybe worth to call it as you.
+>>
+>
+> I propose using the common mainline way of calling this functions.
+> When there maybe will be more xilinx SoCs in mainline it will be easier to find
+> what one is looking for.
 
-I was thinking about locking and unlocking slcr for normal linux runs
-and I haven't found a reason why to locking/unlocking them.
-That's why we just unlock them and use them.
-But for some application locking could make sense because slcr
-is too powerful.
-We might find out the proper way how to handle it in future.
-Currently I am ok to keep it unlock or unlock it in every slcr function.
+yes. Let's wait for finishing this discussion and I also like your names.
+I will change my patches to it and I will also add you as the author.
 
-lock();
-do_something()
-unlock();
+> I actually wanted to make an RFC patch naming everything to zynq_* instead of
+> xilinx_* and replace the "MACHINE_START(XILINX_EP107,...".
+> Didn't get around to is though.
+
+I haven't started with it but yes, I would like to do this change too.
+IRC: The original post was done by John Linn and it has to go through
+Russel I think.
+EP107 was emulating platform and none is using it right now.
+Also I hope we have removed all PSS prefix from all files.
+It was caused because we didn't know what will be commercial name for
+this product.
 
 Thanks,
 Michal
-
-
 
 
 -- 
