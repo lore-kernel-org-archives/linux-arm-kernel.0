@@ -1,83 +1,38 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 25 Mar 2013 18:18:19 +0000
-Subject: [PATCH] ARM: delay: use private ticks_per_jiffy field for timer-based
- delay ops
-Message-ID: <1364235499-17797-1-git-send-email-will.deacon@arm.com>
+Date: Mon, 25 Mar 2013 18:19:11 +0000
+Subject: [PATCH 1/2] ARM: tegra: use setup_mm_for_reboot rather than explicit
+ pgd switch
+Message-ID: <1364235552-17851-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 70264367a243 ("ARM: 7653/2: do not scale loops_per_jiffy when
-using a constant delay clock") fixed a problem with our timer-based
-delay loop, where loops_per_jiffy is scaled by cpufreq yet used directly
-by the timer delay ops.
+This patch changes the Tegra PM code to use the setup_mm_for_reboot
+helper rather than call cpu_switch_mm directly. This keeps things like
+TLB invalidation in one place.
 
-This patch fixes the problem in a more elegant way by keeping a private
-ticks_per_jiffy field in the delay ops, independent of loops_per_jiffy
-and therefore not subject to scaling. The loop-based delay continues to
-use loops_per_jiffy directly, as it should.
-
+Cc: Stephen Warren <swarren@wwwdotorg.org>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/include/asm/delay.h | 2 +-
- arch/arm/kernel/smp.c        | 3 ---
- arch/arm/lib/delay.c         | 8 +++++---
- 3 files changed, 6 insertions(+), 7 deletions(-)
+ arch/arm/mach-tegra/pm.c | 7 +------
+ 1 file changed, 1 insertion(+), 6 deletions(-)
 
-diff --git a/arch/arm/include/asm/delay.h b/arch/arm/include/asm/delay.h
-index 720799f..dff714d 100644
---- a/arch/arm/include/asm/delay.h
-+++ b/arch/arm/include/asm/delay.h
-@@ -24,7 +24,7 @@ extern struct arm_delay_ops {
- 	void (*delay)(unsigned long);
- 	void (*const_udelay)(unsigned long);
- 	void (*udelay)(unsigned long);
--	bool const_clock;
-+	unsigned long ticks_per_jiffy;
- } arm_delay_ops;
+diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c
+index 523604d..a77ed48 100644
+--- a/arch/arm/mach-tegra/pm.c
++++ b/arch/arm/mach-tegra/pm.c
+@@ -183,12 +183,7 @@ bool tegra_set_cpu_in_lp2(int phy_cpu_id)
  
- #define __delay(n)		arm_delay_ops.delay(n)
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 79078ed..1f2cccc 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -673,9 +673,6 @@ static int cpufreq_callback(struct notifier_block *nb,
- 	if (freq->flags & CPUFREQ_CONST_LOOPS)
- 		return NOTIFY_OK;
- 
--	if (arm_delay_ops.const_clock)
--		return NOTIFY_OK;
--
- 	if (!per_cpu(l_p_j_ref, cpu)) {
- 		per_cpu(l_p_j_ref, cpu) =
- 			per_cpu(cpu_data, cpu).loops_per_jiffy;
-diff --git a/arch/arm/lib/delay.c b/arch/arm/lib/delay.c
-index 6b93f6a..64dbfa5 100644
---- a/arch/arm/lib/delay.c
-+++ b/arch/arm/lib/delay.c
-@@ -58,7 +58,7 @@ static void __timer_delay(unsigned long cycles)
- static void __timer_const_udelay(unsigned long xloops)
+ static int tegra_sleep_cpu(unsigned long v2p)
  {
- 	unsigned long long loops = xloops;
--	loops *= loops_per_jiffy;
-+	loops *= arm_delay_ops.ticks_per_jiffy;
- 	__timer_delay(loops >> UDELAY_SHIFT);
- }
+-	/* Switch to the identity mapping. */
+-	cpu_switch_mm(idmap_pgd, &init_mm);
+-
+-	/* Flush the TLB. */
+-	local_flush_tlb_all();
+-
++	setup_mm_for_reboot();
+ 	tegra_sleep_cpu_finish(v2p);
  
-@@ -73,11 +73,13 @@ void __init register_current_timer_delay(const struct delay_timer *timer)
- 		pr_info("Switching to timer-based delay loop\n");
- 		delay_timer			= timer;
- 		lpj_fine			= timer->freq / HZ;
--		loops_per_jiffy			= lpj_fine;
-+
-+		/* cpufreq may scale loops_per_jiffy, so keep a private copy */
-+		arm_delay_ops.ticks_per_jiffy	= lpj_fine;
- 		arm_delay_ops.delay		= __timer_delay;
- 		arm_delay_ops.const_udelay	= __timer_const_udelay;
- 		arm_delay_ops.udelay		= __timer_udelay;
--		arm_delay_ops.const_clock	= true;
-+
- 		delay_calibrated		= true;
- 	} else {
- 		pr_info("Ignoring duplicate/late registration of read_current_timer delay\n");
+ 	/* should never here */
 -- 
 1.8.0
