@@ -1,126 +1,58 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 25 Mar 2013 14:30:32 +0100
-Subject: [PATCH 09/10] ARM: sunxi: Rework the restart code
-In-Reply-To: <1364218233-29636-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1364218233-29636-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1364218233-29636-10-git-send-email-maxime.ripard@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 25 Mar 2013 13:32:13 +0000
+Subject: [GIT PULL] arm-soc: bug fixes for 3.9-rc4
+Message-ID: <201303251332.13859.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner sun6i (A31) has a slightly different watchdog, that
-doesn't allow to use the already existing restart code.
+The following changes since commit a937536b868b8369b98967929045f1df54234323:
 
-Rework a bit the restart code to allow to plug in more easily different
-restart handlers depending on the device tree.
+  Linux 3.9-rc3 (2013-03-17 15:59:32 -0700)
 
-In the past, we were also meaning sunxi as a generic name covering all
-Allwinner SoCs. This won't be true anymore with the A31 (sun6i) that
-differs pretty much from sun4i and sun5i, and we will end up having
-sunxi, for sun4i and sun5i, and sun6i, which is neither consistent nor
-convenient. So, while we're at it, also change sunxi to sun4i.
+are available in the git repository at:
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/mach-sunxi/sunxi.c |   58 ++++++++++++++++++++++++++-----------------
- 1 file changed, 35 insertions(+), 23 deletions(-)
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes
 
-diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-index 634e335..e6f5101 100644
---- a/arch/arm/mach-sunxi/sunxi.c
-+++ b/arch/arm/mach-sunxi/sunxi.c
-@@ -22,50 +22,63 @@
- 
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
-+#include <asm/system_misc.h>
- 
- #include "sunxi.h"
- 
--#define WATCHDOG_CTRL_REG	0x00
--#define WATCHDOG_CTRL_RESTART		(1 << 0)
--#define WATCHDOG_MODE_REG	0x04
--#define WATCHDOG_MODE_ENABLE		(1 << 0)
--#define WATCHDOG_MODE_RESET_ENABLE	(1 << 1)
-+#define SUN4I_WATCHDOG_CTRL_REG		0x00
-+#define SUN4I_WATCHDOG_CTRL_RESTART		(1 << 0)
-+#define SUN4I_WATCHDOG_MODE_REG		0x04
-+#define SUN4I_WATCHDOG_MODE_ENABLE		(1 << 0)
-+#define SUN4I_WATCHDOG_MODE_RESET_ENABLE	(1 << 1)
- 
- static void __iomem *wdt_base;
- 
--static void sunxi_setup_restart(void)
--{
--	struct device_node *np = of_find_compatible_node(NULL, NULL,
--						"allwinner,sunxi-wdt");
--	if (WARN(!np, "unable to setup watchdog restart"))
--		return;
--
--	wdt_base = of_iomap(np, 0);
--	WARN(!wdt_base, "failed to map watchdog base address");
--}
--
--static void sunxi_restart(char mode, const char *cmd)
-+static void sun4i_restart(char mode, const char *cmd)
- {
- 	if (!wdt_base)
- 		return;
- 
- 	/* Enable timer and set reset bit in the watchdog */
--	writel(WATCHDOG_MODE_ENABLE | WATCHDOG_MODE_RESET_ENABLE,
--		wdt_base + WATCHDOG_MODE_REG);
-+	writel(SUN4I_WATCHDOG_MODE_ENABLE | SUN4I_WATCHDOG_MODE_RESET_ENABLE,
-+	       wdt_base + SUN4I_WATCHDOG_MODE_REG);
- 
- 	/*
- 	 * Restart the watchdog. The default (and lowest) interval
- 	 * value for the watchdog is 0.5s.
- 	 */
--	writel(WATCHDOG_CTRL_RESTART, wdt_base + WATCHDOG_CTRL_REG);
-+	writel(SUN4I_WATCHDOG_CTRL_RESTART, wdt_base + SUN4I_WATCHDOG_CTRL_REG);
- 
- 	while (1) {
- 		mdelay(5);
--		writel(WATCHDOG_MODE_ENABLE | WATCHDOG_MODE_RESET_ENABLE,
--			wdt_base + WATCHDOG_MODE_REG);
-+		writel(SUN4I_WATCHDOG_MODE_ENABLE | SUN4I_WATCHDOG_MODE_RESET_ENABLE,
-+		       wdt_base + SUN4I_WATCHDOG_MODE_REG);
- 	}
- }
- 
-+static struct of_device_id sunxi_restart_ids[] = {
-+	{ .compatible = "allwinner,sun4i-wdt", .data = sun4i_restart },
-+	{ /*sentinel*/ }
-+};
-+
-+static void sunxi_setup_restart(void)
-+{
-+	const struct of_device_id *of_id;
-+	struct device_node *np;
-+
-+	np = of_find_matching_node(NULL, sunxi_restart_ids);
-+	if (WARN(!np, "unable to setup watchdog restart"))
-+		return;
-+
-+	wdt_base = of_iomap(np, 0);
-+	WARN(!wdt_base, "failed to map watchdog base address");
-+
-+	of_id = of_match_node(sunxi_restart_ids, np);
-+	WARN(!of_id, "restart function not available");
-+
-+	arm_pm_restart = of_id->data;
-+}
-+
- static struct map_desc sunxi_io_desc[] __initdata = {
- 	{
- 		.virtual	= (unsigned long) SUNXI_REGS_VIRT_BASE,
-@@ -97,7 +110,6 @@ DT_MACHINE_START(SUNXI_DT, "Allwinner A1X (Device Tree)")
- 	.init_machine	= sunxi_dt_init,
- 	.map_io		= sunxi_map_io,
- 	.init_irq	= irqchip_init,
--	.restart	= sunxi_restart,
- 	.init_time	= clocksource_of_init,
- 	.dt_compat	= sunxi_board_dt_compat,
- MACHINE_END
--- 
-1.7.10.4
+for you to fetch changes up to c69d72aec52eb5234f433259ac5dcc3b68f1480d:
+
+  MAINTAINERS: update email address for Kevin Hilman (2013-03-22 21:57:15 +0100)
+
+----------------------------------------------------------------
+Four patches for arm-soc this week:
+- Kevin Hilman is no longer reachable under his previous email address.
+  He submitted the patch earlier, but nobody felt responsible to pick
+  it up.
+
+- One Tegra fix for an incorect register address in device tree.
+
+- IMX multiplatform support exposes a configuration option that
+  leads to unbootable kernels on all other machines and that needs
+  to depend on that platform.
+
+- A nontrivial bug fix for the setup of the mxs video output.
+
+----------------------------------------------------------------
+Arnd Bergmann (2):
+      Merge tag 'mxs-fixes-3.9-3' of git://git.linaro.org/people/shawnguo/linux-2.6 into fixes
+      Merge tag 'imx-fixes-3.9-3' of git://git.linaro.org/people/shawnguo/linux-2.6 into fixes
+
+Kevin Hilman (1):
+      MAINTAINERS: update email address for Kevin Hilman
+
+Laxman Dewangan (1):
+      ARM: tegra: fix register address of slink controller
+
+Marek Vasut (1):
+      ARM: video: mxs: Fix mxsfb misconfiguring VDCTRL0
+
+Shawn Guo (1):
+      ARM: imx: add dependency check for DEBUG_IMX_UART_PORT
+
+ MAINTAINERS                    |  6 +++---
+ arch/arm/Kconfig.debug         |  1 +
+ arch/arm/boot/dts/tegra20.dtsi |  2 +-
+ arch/arm/boot/dts/tegra30.dtsi |  2 +-
+ arch/arm/mach-mxs/mach-mxs.c   | 24 ++++++++++++------------
+ drivers/video/mxsfb.c          |  7 +++++--
+ include/linux/mxsfb.h          |  7 +++++--
+ 7 files changed, 28 insertions(+), 21 deletions(-)
