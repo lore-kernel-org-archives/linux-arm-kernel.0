@@ -1,48 +1,91 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 25 Mar 2013 23:17:32 +0800
-Subject: [PATCH 6/6] ARM: mxs: move timer driver into drivers/clocksource
-In-Reply-To: <1364224652-28332-1-git-send-email-shawn.guo@linaro.org>
-References: <1364224652-28332-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1364224652-28332-7-git-send-email-shawn.guo@linaro.org>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Mon, 25 Mar 2013 16:21:54 +0100
+Subject: [PATCH] ARM: zynq: add gem support
+In-Reply-To: <CAHTX3dLDUC+o25y-ZBxFqMt53iCa_eKeJi9GOp0vCkhm27e6cQ@mail.gmail.com>
+References: <1364042295-16710-1-git-send-email-s.trumtrar@pengutronix.de>
+ <CAHTX3dLDUC+o25y-ZBxFqMt53iCa_eKeJi9GOp0vCkhm27e6cQ@mail.gmail.com>
+Message-ID: <20130325152154.GD27739@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move mxs timer driver into drivers/clocksource as mxs_timer.c.
+On Mon, Mar 25, 2013 at 02:58:15PM +0100, Michal Simek wrote:
+> 2013/3/23 Steffen Trumtrar <s.trumtrar@pengutronix.de>:
+> > The zynq includes a Cadence GEM IP core. This is compatible with the macb driver.
+> > Add it to the zynq-7000 DT.
+> >
+> > Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> > Cc: Michal Simek <michal.simek@xilinx.com>
+> > Cc: Josh Cartwright <josh.cartwright@ni.com>
+> > ---
+> >  arch/arm/boot/dts/zynq-7000.dtsi | 36 ++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 36 insertions(+)
+> >
+> > diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+> > index 0dd2dc7..88564fa 100644
+> > --- a/arch/arm/boot/dts/zynq-7000.dtsi
+> > +++ b/arch/arm/boot/dts/zynq-7000.dtsi
+> > @@ -54,6 +54,26 @@
+> >                         clocks = <&uart_clk 1>;
+> >                 };
+> >
+> > +               gem0: ethernet at e000b000 {
+> > +                       compatible = "cdns,gem";
+> > +                       reg = <0xe000b000 0x4000>;
+> > +                       status = "disabled";
+> > +                       interrupts = <0 22 4>;
+> > +                       clocks = <&gem0_clk 0>, <&gem0_clk 0>;
+> > +                       clock-names = "pclk", "hclk";
+> > +                       phy-mode = "rgmii";
+> > +               };
+> > +
+> > +               gem1: ethernet at e000c000 {
+> > +                       compatible = "cdns,gem";
+> > +                       reg = <0xe000c000 0x4000>;
+> > +                       status = "disabled";
+> > +                       interrupts = <0 45 4>;
+> > +                       clocks = <&gem1_clk 0>, <&gem1_clk 0>;
+> > +                       clock-names = "pclk", "hclk";
+> > +                       phy-mode = "rgmii";
+> > +               };
+> > +
+> >                 slcr: slcr at f8000000 {
+> >                         compatible = "xlnx,zynq-slcr";
+> >                         reg = <0xF8000000 0x1000>;
+> > @@ -89,6 +109,22 @@
+> >                                         reg = <0x108 0x118>;
+> >                                         clock-output-names = "iopll";
+> >                                 };
+> > +                               gem0_clk: gem0_clk {
+> > +                                       #clock-cells = <1>;
+> > +                                       compatible = "xlnx,zynq-periph-clock";
+> > +                                       clocks = <&iopll &armpll &ddrpll>;
+> > +                                       reg = <0x140>;
+> > +                                       clock-output-names = "gem0_ref_clk1",
+> > +                                                            "gem0_ref_clk2";
+> > +                               };
+> > +                               gem1_clk: gem1_clk {
+> > +                                       #clock-cells = <1>;
+> > +                                       compatible = "xlnx,zynq-periph-clock";
+> > +                                       clocks = <&iopll &armpll &ddrpll>;
+> > +                                       reg = <0x144>;
+> > +                                       clock-output-names = "gem1_ref_clk1",
+> > +                                                            "gem1_ref_clk2";
+> > +                               };
+> 
+> This is nice. Will look at it.
+> I have checked you have sent some macb related patches.
+> Do I need them to apply them to get this to work?
+> 
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/mach-mxs/Makefile                         |    2 +-
- drivers/clocksource/Makefile                       |    1 +
- .../timer.c => drivers/clocksource/mxs_timer.c     |    0
- 3 files changed, 2 insertions(+), 1 deletion(-)
- rename arch/arm/mach-mxs/timer.c => drivers/clocksource/mxs_timer.c (100%)
+Yes. Those patches are necessary for the driver to work.
+One fixes the endianess, without that patch all your packages will be bogus.
+And the ISR patch is needed, too.
 
-diff --git a/arch/arm/mach-mxs/Makefile b/arch/arm/mach-mxs/Makefile
-index 3d3c8a9..76c336e 100644
---- a/arch/arm/mach-mxs/Makefile
-+++ b/arch/arm/mach-mxs/Makefile
-@@ -1,5 +1,5 @@
- # Common support
--obj-y := icoll.o ocotp.o system.o timer.o mm.o
-+obj-y := icoll.o ocotp.o system.o mm.o
- 
- obj-$(CONFIG_PM) += pm.o
- 
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index 4d8283a..89c5adc 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -16,6 +16,7 @@ obj-$(CONFIG_CLKSRC_NOMADIK_MTU)	+= nomadik-mtu.o
- obj-$(CONFIG_CLKSRC_DBX500_PRCMU)	+= clksrc-dbx500-prcmu.o
- obj-$(CONFIG_ARMADA_370_XP_TIMER)	+= time-armada-370-xp.o
- obj-$(CONFIG_ARCH_BCM2835)	+= bcm2835_timer.o
-+obj-$(CONFIG_ARCH_MXS)		+= mxs_timer.o
- obj-$(CONFIG_SUNXI_TIMER)	+= sunxi_timer.o
- obj-$(CONFIG_ARCH_TEGRA)	+= tegra20_timer.o
- obj-$(CONFIG_VT8500_TIMER)	+= vt8500_timer.o
-diff --git a/arch/arm/mach-mxs/timer.c b/drivers/clocksource/mxs_timer.c
-similarity index 100%
-rename from arch/arm/mach-mxs/timer.c
-rename to drivers/clocksource/mxs_timer.c
+Regards,
+Steffen
+
 -- 
-1.7.9.5
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
