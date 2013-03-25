@@ -1,65 +1,99 @@
-From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Mon, 25 Mar 2013 08:09:17 +0100
-Subject: [PATCH 2/2] pwm: pwm-tiehrpwm: Update device-tree binding document
-In-Reply-To: <1364195093-1357-3-git-send-email-avinashphilip@ti.com> (Philip
- Avinash's message of "Mon, 25 Mar 2013 12:34:53 +0530")
-References: <1364195093-1357-1-git-send-email-avinashphilip@ti.com>
- <1364195093-1357-3-git-send-email-avinashphilip@ti.com>
-Message-ID: <87ehf4ez1e.fsf@dell.be.48ers.dk>
+From: chao.xie@marvell.com (Chao Xie)
+Date: Mon, 25 Mar 2013 03:06:52 -0400
+Subject: [PATCH V2 1/6] usb: gadget: mv_udc_core: remove unused clock
+In-Reply-To: <1364195217-1226-1-git-send-email-chao.xie@marvell.com>
+References: <1364195217-1226-1-git-send-email-chao.xie@marvell.com>
+Message-ID: <1364195217-1226-2-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Philip" == Philip Avinash <avinashphilip@ti.com> writes:
+The origianl understanding of clock is wrong. The UDC controller
+only have one clock input.
+Passing clock name by pdata is wrong. The clock is defined by device
+iteself.
 
- Philip> Update binding document of pwm-tiehrpwm to reflect the usage of similar
- Philip> modules in da850 and am3xx SOCs.
+Signed-off-by: Chao Xie <chao.xie@marvell.com>
+---
+ drivers/usb/gadget/mv_udc.h      |    3 +--
+ drivers/usb/gadget/mv_udc_core.c |   27 +++++++--------------------
+ 2 files changed, 8 insertions(+), 22 deletions(-)
 
-Acked-by: Peter Korsgaard <jacmet@sunsite.dk>
-
- Philip> Signed-off-by: Philip Avinash <avinashphilip@ti.com>
- Philip> Cc: Grant Likely <grant.likely@secretlab.ca>
- Philip> Cc: Rob Herring <rob.herring@calxeda.com>
- Philip> Cc: Rob Landley <rob@landley.net>
- Philip> ---
- Philip>  .../devicetree/bindings/pwm/pwm-tiehrpwm.txt       |   12 ++++++++++--
- Philip>  1 file changed, 10 insertions(+), 2 deletions(-)
-
- Philip> diff --git a/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt b/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt
- Philip> index 4fc7079..9a71369 100644
- Philip> --- a/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt
- Philip> +++ b/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt
- Philip> @@ -1,7 +1,9 @@
- Philip>  TI SOC EHRPWM based PWM controller
+diff --git a/drivers/usb/gadget/mv_udc.h b/drivers/usb/gadget/mv_udc.h
+index 9073436..be77f20 100644
+--- a/drivers/usb/gadget/mv_udc.h
++++ b/drivers/usb/gadget/mv_udc.h
+@@ -222,8 +222,7 @@ struct mv_udc {
+ 	struct mv_usb_platform_data     *pdata;
  
- Philip>  Required properties:
- Philip> -- compatible : Must be "ti,am33xx-ehrpwm"
- Philip> +- compatible: Must be "ti,<soc>-ehrpwm".
- Philip> +  for am33xx - compatible = "ti,am33xx-ehrpwm";
- Philip> +  for da850  - compatible = "ti,da850-ehrpwm", "ti,am33xx-ehrpwm";
- Philip>  - #pwm-cells: Should be 3. Number of cells being used to specify PWM property.
- Philip>    First cell specifies the per-chip index of the PWM to use, the second
- Philip>    cell is the period in nanoseconds and bit 0 in the third cell is used to
- Philip> @@ -15,9 +17,15 @@ Optional properties:
+ 	/* some SOC has mutiple clock sources for USB*/
+-	unsigned int    clknum;
+-	struct clk      *clk[0];
++	struct clk      *clk;
+ };
  
- Philip>  Example:
+ /* endpoint data structure */
+diff --git a/drivers/usb/gadget/mv_udc_core.c b/drivers/usb/gadget/mv_udc_core.c
+index 9a68c05..593147b 100644
+--- a/drivers/usb/gadget/mv_udc_core.c
++++ b/drivers/usb/gadget/mv_udc_core.c
+@@ -972,18 +972,12 @@ static struct usb_ep_ops mv_ep_ops = {
  
- Philip> -ehrpwm0: ehrpwm at 0 {
- Philip> +ehrpwm0: ehrpwm at 0 { /* EHRPWM on am33xx */
- Philip>  	compatible = "ti,am33xx-ehrpwm";
- Philip>  	#pwm-cells = <3>;
- Philip>  	reg = <0x48300200 0x100>;
- Philip>  	ti,hwmods = "ehrpwm0";
- Philip>  };
- Philip> +
- Philip> +ehrpwm0: ehrpwm at 0 { /* EHRPWM on da850 */
- Philip> +	compatible = "ti,da850-ehrpwm", "ti,am33xx-ehrpwm";
- Philip> +	#pwm-cells = <3>;
- Philip> +	reg = <0x300000 0x2000>;
- Philip> +};
- Philip> -- 
- Philip> 1.7.9.5
-
-
-
+ static void udc_clock_enable(struct mv_udc *udc)
+ {
+-	unsigned int i;
+-
+-	for (i = 0; i < udc->clknum; i++)
+-		clk_prepare_enable(udc->clk[i]);
++	clk_prepare_enable(udc->clk);
+ }
+ 
+ static void udc_clock_disable(struct mv_udc *udc)
+ {
+-	unsigned int i;
+-
+-	for (i = 0; i < udc->clknum; i++)
+-		clk_disable_unprepare(udc->clk[i]);
++	clk_disable_unprepare(udc->clk);
+ }
+ 
+ static void udc_stop(struct mv_udc *udc)
+@@ -2105,7 +2099,6 @@ static int mv_udc_probe(struct platform_device *pdev)
+ 	struct mv_usb_platform_data *pdata = pdev->dev.platform_data;
+ 	struct mv_udc *udc;
+ 	int retval = 0;
+-	int clk_i = 0;
+ 	struct resource *r;
+ 	size_t size;
+ 
+@@ -2114,8 +2107,7 @@ static int mv_udc_probe(struct platform_device *pdev)
+ 		return -ENODEV;
+ 	}
+ 
+-	size = sizeof(*udc) + sizeof(struct clk *) * pdata->clknum;
+-	udc = devm_kzalloc(&pdev->dev, size, GFP_KERNEL);
++	udc = devm_kzalloc(&pdev->dev, sizeof(*udc), GFP_KERNEL);
+ 	if (udc == NULL) {
+ 		dev_err(&pdev->dev, "failed to allocate memory for udc\n");
+ 		return -ENOMEM;
+@@ -2141,15 +2133,10 @@ static int mv_udc_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
+-	udc->clknum = pdata->clknum;
+-	for (clk_i = 0; clk_i < udc->clknum; clk_i++) {
+-		udc->clk[clk_i] = devm_clk_get(&pdev->dev,
+-					pdata->clkname[clk_i]);
+-		if (IS_ERR(udc->clk[clk_i])) {
+-			retval = PTR_ERR(udc->clk[clk_i]);
+-			return retval;
+-		}
+-	}
++	/* udc only have one sysclk. */
++	udc->clk = devm_clk_get(&pdev->dev, NULL);
++	if (IS_ERR(udc->clk))
++		return PTR_ERR(udc->clk);
+ 
+ 	r = platform_get_resource_byname(udc->dev, IORESOURCE_MEM, "capregs");
+ 	if (r == NULL) {
 -- 
-Bye, Peter Korsgaard
+1.7.4.1
