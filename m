@@ -1,283 +1,163 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Mon, 25 Mar 2013 17:34:22 +0100
-Subject: [PATCH 3/3] ARM: zynq: add SMP support
-In-Reply-To: <CAHTX3d+DiWx=qfh5St9no4HFduiLJJyRzh8+dYP+scq0uGTJdA@mail.gmail.com>
-References: <1364043450-18700-1-git-send-email-s.trumtrar@pengutronix.de>
- <1364043450-18700-4-git-send-email-s.trumtrar@pengutronix.de>
- <CAHTX3d+DiWx=qfh5St9no4HFduiLJJyRzh8+dYP+scq0uGTJdA@mail.gmail.com>
-Message-ID: <20130325163422.GG27739@pengutronix.de>
+From: monstr@monstr.eu (Michal Simek)
+Date: Mon, 25 Mar 2013 17:37:34 +0100
+Subject: [PATCH 05/10] arm: zynq: Move slcr initialization to separate file
+In-Reply-To: <20130325161902.GF27739@pengutronix.de>
+References: <1364219596-4954-1-git-send-email-michal.simek@xilinx.com>
+ <1364219596-4954-5-git-send-email-michal.simek@xilinx.com>
+ <20130325161902.GF27739@pengutronix.de>
+Message-ID: <51507D4E.5010403@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 25, 2013 at 03:27:57PM +0100, Michal Simek wrote:
-> 2013/3/23 Steffen Trumtrar <s.trumtrar@pengutronix.de>:
-> > The Zynq7000 has a CortexA9 with at least 2 cores. Add support to boot them all.
-> > To do this a trampoline is needed. At runtime the jump address and two
-> > instructions are copied to RAM by CPU0 and then executed by CPU1.
-> >
-> > Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> > Cc: Michal Simek <michal.simek@xilinx.com>
-> > ---
-> >  arch/arm/boot/dts/zynq-7000.dtsi |  14 +++++
-> >  arch/arm/mach-zynq/Makefile      |   2 +
-> >  arch/arm/mach-zynq/common.c      |   1 +
-> >  arch/arm/mach-zynq/common.h      |  14 +++++
-> >  arch/arm/mach-zynq/headsmp.S     |  20 +++++++
-> >  arch/arm/mach-zynq/platsmp.c     | 110 +++++++++++++++++++++++++++++++++++++++
-> >  6 files changed, 161 insertions(+)
-> >  create mode 100644 arch/arm/mach-zynq/headsmp.S
-> >  create mode 100644 arch/arm/mach-zynq/platsmp.c
-> >
-> > diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
-> > index c103082..258b6c9 100644
-> > --- a/arch/arm/boot/dts/zynq-7000.dtsi
-> > +++ b/arch/arm/boot/dts/zynq-7000.dtsi
-> > @@ -15,6 +15,20 @@
-> >  / {
-> >         compatible = "xlnx,zynq-7000";
-> >
-> > +       cpus {
-> > +               cpu at 0 {
-> > +                       compatible = "arm,cortex-a9";
-> > +                       next-level-cache = <&L2>;
-> > +                       clocks = <&armpll 0>;
-> > +               };
-> > +
-> > +               cpu at 1 {
-> > +                       compatible = "arm,cortex-a9";
-> > +                       next-level-cache = <&L2>;
-> > +                       clocks = <&armpll 0>;
-> > +               };
-> > +       };
-> 
-> Is this really needed?
-> 
-I don't know if it is really necessary for the SMP stuff, but my reasoning is:
-the DT describes the HW and not only for Linux that is. We have two cores, so
-we should specify that. Also, you can add other properties here like
-imx6q.dtsi does for the operating-points for example.
-So, I think it is valid to have those entries here.
+On 03/25/2013 05:19 PM, Steffen Trumtrar wrote:
+> On Mon, Mar 25, 2013 at 02:53:11PM +0100, Michal Simek wrote:
+>> Create separate slcr driver instead of pollute common code.
+>>
+>> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+>> ---
+>>   arch/arm/mach-zynq/Makefile |    2 +-
+>>   arch/arm/mach-zynq/common.c |   10 +------
+>>   arch/arm/mach-zynq/common.h |    3 ++
+>>   arch/arm/mach-zynq/slcr.c   |   69 +++++++++++++++++++++++++++++++++++++++++++
+>>   4 files changed, 74 insertions(+), 10 deletions(-)
+>>   create mode 100644 arch/arm/mach-zynq/slcr.c
+>>
+>> diff --git a/arch/arm/mach-zynq/Makefile b/arch/arm/mach-zynq/Makefile
+>> index 320faed..13ee09b 100644
+>> --- a/arch/arm/mach-zynq/Makefile
+>> +++ b/arch/arm/mach-zynq/Makefile
+>> @@ -3,4 +3,4 @@
+>>   #
+>>
+>>   # Common support
+>> -obj-y				:= common.o
+>> +obj-y				:= common.o slcr.o
+>> diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
+>> index 13f9d8b..2734bd6 100644
+>> --- a/arch/arm/mach-zynq/common.c
+>> +++ b/arch/arm/mach-zynq/common.c
+>> @@ -61,15 +61,7 @@ static void __init xilinx_init_machine(void)
+>>
+>>   static void __init xilinx_zynq_timer_init(void)
+>>   {
+>> -	struct device_node *np;
+>> -	void __iomem *slcr;
+>> -
+>> -	np = of_find_compatible_node(NULL, NULL, "xlnx,zynq-slcr");
+>> -	slcr = of_iomap(np, 0);
+>> -	WARN_ON(!slcr);
+>> -
+>> -	xilinx_zynq_clocks_init(slcr);
+>> -
+>> +	slcr_init();
+>>   	clocksource_of_init();
+>>   }
+>>
+>> diff --git a/arch/arm/mach-zynq/common.h b/arch/arm/mach-zynq/common.h
+>> index 38727a2..e30898a 100644
+>> --- a/arch/arm/mach-zynq/common.h
+>> +++ b/arch/arm/mach-zynq/common.h
+>> @@ -17,6 +17,9 @@
+>>   #ifndef __MACH_ZYNQ_COMMON_H__
+>>   #define __MACH_ZYNQ_COMMON_H__
+>>
+>> +extern int slcr_init(void);
+>> +
+>> +extern void __iomem *zynq_slcr_base;
+>>   extern void __iomem *scu_base;
+>>
+>>   #endif
+>> diff --git a/arch/arm/mach-zynq/slcr.c b/arch/arm/mach-zynq/slcr.c
+>> new file mode 100644
+>> index 0000000..1883b70
+>> --- /dev/null
+>> +++ b/arch/arm/mach-zynq/slcr.c
+>> @@ -0,0 +1,69 @@
+>> +/*
+>> + * Xilinx SLCR driver
+>> + *
+>> + * Copyright (c) 2011-2013 Xilinx Inc.
+>> + *
+>> + * This program is free software; you can redistribute it and/or
+>> + * modify it under the terms of the GNU General Public License
+>> + * as published by the Free Software Foundation; either version
+>> + * 2 of the License, or (at your option) any later version.
+>> + *
+>> + * You should have received a copy of the GNU General Public
+>> + * License along with this program; if not, write to the Free
+>> + * Software Foundation, Inc., 675 Mass Ave, Cambridge, MA
+>> + * 02139, USA.
+>> + */
+>> +
+>> +#include <linux/export.h>
+>> +#include <linux/io.h>
+>> +#include <linux/fs.h>
+>> +#include <linux/interrupt.h>
+>> +#include <linux/init.h>
+>> +#include <linux/kernel.h>
+>> +#include <linux/module.h>
+>> +#include <linux/of_address.h>
+>> +#include <linux/uaccess.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/slab.h>
+>> +#include <linux/string.h>
+>> +#include <linux/clk/zynq.h>
+>> +#include "common.h"
+>> +
+>> +#define SLCR_UNLOCK_MAGIC		0xDF0D
+>> +#define SLCR_UNLOCK			0x8   /* SCLR unlock register */
+> --------------------------------------------------^ small typo
+>> +
+>> +void __iomem *zynq_slcr_base;
+>> +
+>> +/**
+>> + * xslcr_init()
+>> + * Returns 0 on success, negative errno otherwise.
+>> + *
+>> + * Called early during boot from platform code to remap SLCR area.
+>> + */
+>> +int __init slcr_init(void)
+>> +{
+>> +	struct device_node *np;
+>> +
+>> +	np = of_find_compatible_node(NULL, NULL, "xlnx,zynq-slcr");
+>> +	if (!np) {
+>> +		pr_err("%s: no slcr node found\n", __func__);
+>> +		BUG();
+>> +	}
+>> +
+>> +	zynq_slcr_base = of_iomap(np, 0);
+>> +	if (!zynq_slcr_base) {
+>> +		pr_err("%s: Unable to map I/O memory\n", __func__);
+>> +		BUG();
+>> +	}
+>> +
+>> +	/* unlock the SLCR so that registers can be changed */
+>> +	writel(SLCR_UNLOCK_MAGIC, zynq_slcr_base + SLCR_UNLOCK);
+>> +
+>> +	pr_info("%s mapped to %p\n", np->name, zynq_slcr_base);
+>> +
+>> +	xilinx_zynq_clocks_init(zynq_slcr_base);
+>> +
+>> +	of_node_put(np);
+>> +
+>> +	return 0;
+>> +}
+>
+> The slcr should definitely get it's own driver. I like that.
+> But wouldn't it be better to call this in the map_io call and then, for the time
+> being, assume that the slcr is unlocked and put the clocks_init-call in
+> zynq_timer_init?
 
-> > +
-> >         amba {
-> >                 compatible = "simple-bus";
-> >                 #address-cells = <1>;
-> > diff --git a/arch/arm/mach-zynq/Makefile b/arch/arm/mach-zynq/Makefile
-> > index 397268c..906d199 100644
-> > --- a/arch/arm/mach-zynq/Makefile
-> > +++ b/arch/arm/mach-zynq/Makefile
-> > @@ -4,3 +4,5 @@
-> >
-> >  # Common support
-> >  obj-y                          := common.o timer.o
-> > +AFLAGS_headsmp.o :=-Wa,-march=armv7-a
-> > +obj-$(CONFIG_SMP) += headsmp.o platsmp.o
-> > diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
-> > index 1b9bb3d..4053962 100644
-> > --- a/arch/arm/mach-zynq/common.c
-> > +++ b/arch/arm/mach-zynq/common.c
-> > @@ -117,6 +117,7 @@ static const char *xilinx_dt_match[] = {
-> >  };
-> >
-> >  MACHINE_START(XILINX_EP107, "Xilinx Zynq Platform")
-> > +       .smp            = smp_ops(zynq_smp_ops),
-> >         .map_io         = xilinx_map_io,
-> >         .init_irq       = xilinx_irqchip_init,
-> >         .init_machine   = xilinx_init_machine,
-> > diff --git a/arch/arm/mach-zynq/common.h b/arch/arm/mach-zynq/common.h
-> > index 8b4dbba..451d386 100644
-> > --- a/arch/arm/mach-zynq/common.h
-> > +++ b/arch/arm/mach-zynq/common.h
-> > @@ -19,4 +19,18 @@
-> >
-> >  void __init xttcps_timer_init(void);
-> >
-> > +#ifdef CONFIG_SMP
-> > +extern void secondary_startup(void);
-> > +extern char secondary_trampoline, secondary_trampoline_end;
-> > +#endif
-> > +
-> > +extern struct smp_operations __initdata zynq_smp_ops;
-> > +extern void __iomem *slcr_base_addr;
-> > +extern void __iomem *scu_base;
-> > +
-> > +#define SLCR_UNLOCK_MAGIC      0xdf0d
-> > +
-> > +#define SLCR_UNLOCK            0x8
-> > +#define SLCR_A9_CPU_RST_CTRL   0x244
-> 
-> As previous code.
-> 
-> > +
-> >  #endif
-> > diff --git a/arch/arm/mach-zynq/headsmp.S b/arch/arm/mach-zynq/headsmp.S
-> > new file mode 100644
-> > index 0000000..145bbae
-> > --- /dev/null
-> > +++ b/arch/arm/mach-zynq/headsmp.S
-> > @@ -0,0 +1,20 @@
-> > +/*
-> > + *  Copyright (c) 2013 Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> > + *
-> > + * based on mach-socfpga/headsmp.S
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + */
-> > +#include <linux/linkage.h>
-> > +#include <linux/init.h>
-> > +
-> > +       __CPUINIT
-> > +       .arch   armv7-a
-> > +
-> > +ENTRY(secondary_trampoline)
-> > +       ldr     r0, [pc]
-> > +       mov     pc, r0
-> 
-> This code is familiar to me. It looks like my jump trampoline which I
-> wrote in C. :-)
-> 
-Of course. I shouldn't have only mentioned that in the platsmp.c
-But I think asm is a little easier on the eyes than machine code ;-)
+map_io can work with static mapping. Dynamic mapping only doesn't work in that time.
+That's why it must be done later.
+The reason why I call xilinx_zynq_clocks_init() from this code is
+that slcr IP contains almost everything and clocks are logical subnode of this device.
 
-> > +
-> > +ENTRY(secondary_trampoline_end)
-> > diff --git a/arch/arm/mach-zynq/platsmp.c b/arch/arm/mach-zynq/platsmp.c
-> > new file mode 100644
-> > index 0000000..1ea3d4f
-> > --- /dev/null
-> > +++ b/arch/arm/mach-zynq/platsmp.c
-> > @@ -0,0 +1,110 @@
-> > +/*
-> > + * Copyright (c) 2013 Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> > + *
-> > + * based on
-> > + *  linux/arch/arm/mach-zynq/platsmp.c Copyright (C) 2011 Xilinx
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + */
-> > +#include <linux/delay.h>
-> > +#include <linux/errno.h>
-> > +#include <linux/init.h>
-> > +#include <linux/irqchip/arm-gic.h>
-> > +#include <linux/io.h>
-> > +#include <linux/jiffies.h>
-> > +#include <linux/smp.h>
-> > +
-> > +#include <asm/cacheflush.h>
-> > +#include <asm/mach/arch.h>
-> > +#include <asm/mach/map.h>
-> > +#include <asm/smp_scu.h>
-> > +
-> > +#include "common.h"
-> > +
-> > +#define A9_RST_MASK    (1 << 0)
-> > +#define A9_CLKSTOP_MASK        (1 << 4)
-> 
-> as I wrote above moving to separate driver make sense to me.
-> 
-> > +
-> > +static DEFINE_SPINLOCK(boot_lock);
-> > +
-> > +static void __cpuinit zynq_smp_secondary_init(unsigned int cpu)
-> > +{
-> > +       /*
-> > +        * if any interrupts are already enabled for the primary
-> > +        * core (e.g. timer irq), then they will not have been enabled
-> > +        * for us: do so
-> > +        */
-> > +       gic_secondary_init(0);
-> > +
-> > +       /*
-> > +        * Synchronise with the boot thread.
-> > +        */
-> > +       spin_lock(&boot_lock);
-> > +       spin_unlock(&boot_lock);
-> > +}
-> > +
-> > +static inline void zynq_set_cpu_jump(int cpu, void *jump_addr)
-> > +{
-> > +       if (jump_addr) {
-> 
-> This is wrong because if jump_addr is 0x1 - 0xF then you are rewriting.
-> It is unlikely but it should be captured.
-> The main reason is AMP solution where Linux can't be added from 0x0
-> and user amp code can setup any entry point. Better to check it just for sure.
-> 
-> > +               int trampoline_size = &secondary_trampoline_end - &secondary_trampoline;
-> > +
-> > +               writel(virt_to_phys(jump_addr), phys_to_virt(8));
-> 
-> This will probably generate sparse warning.
-> 
-> > +               memcpy(phys_to_virt(0), &secondary_trampoline, trampoline_size);
-> 
-> This is nice solution. I am hardcoding instruction and this looks like
-> good solution.
-> Let me do some experiment with it because maybe this could be
-> problematic when Linux
-> kernel starts from different address than 0x0.
-> 
-> > +
-> > +               flush_cache_all();
-> > +               outer_flush_all();
-> > +               smp_wmb();
-> > +       }
-> > +}
-> > +
-> > +static void zynq_enable_cpu(int cpu, bool enable)
-> > +{
-> > +       writel(A9_CLKSTOP_MASK << cpu, slcr_base_addr + SLCR_A9_CPU_RST_CTRL);
-> > +       writel(0, slcr_base_addr + SLCR_A9_CPU_RST_CTRL);
-> > +}
-> > +
-> > +int __cpuinit zynq_smp_boot_secondary(unsigned int cpu, struct task_struct *idle)
-> > +{
-> > +       writel(SLCR_UNLOCK_MAGIC, slcr_base_addr + SLCR_UNLOCK);
-> > +       writel((A9_CLKSTOP_MASK | A9_RST_MASK) << cpu,
-> > +               slcr_base_addr + SLCR_A9_CPU_RST_CTRL);
-> > +
-> > +       zynq_set_cpu_jump(cpu, secondary_startup);
-> > +       zynq_enable_cpu(cpu, true);
-> > +
-> > +       return 0;
-> > +}
-> > +
-> > +/*
-> > + * Initialise the CPU possible map early - this describes the CPUs
-> > + * which may be present or become present in the system.
-> > + */
-> > +static void __init zynq_smp_init_cpus(void)
-> > +{
-> > +       unsigned int ncores, i;
-> > +
-> > +       ncores = scu_get_core_count(scu_base);
-> > +
-> > +       for (i = 0; i < ncores; ++i)
-> > +               set_cpu_possible(i, true);
-> > +
-> > +       /* sanity check */
-> > +       if (ncores > num_possible_cpus()) {
-> > +               pr_warn("zynq: no. of cores (%d) greater than configured"
-> > +                       "maximum of %d - clipping\n", ncores, num_possible_cpus());
-> > +               ncores = num_possible_cpus();
-> > +       }
-> 
-> Is this necessary?
-> IRC: There is checking in smp_prepare_cpus in arch/arm/kernel/smp.c for it.
-> 
-
-As our solutions are pretty much alike, I think I will not work on this patch
-in the future. Makes no sense to do everything twice :-)
-
-Regards,
-Steffen
-
+Thanks,
+Michal
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Michal Simek, Ing. (M.Eng)
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel 2.6 Microblaze Linux - http://www.monstr.eu/fdt/
+Microblaze U-BOOT custodian
