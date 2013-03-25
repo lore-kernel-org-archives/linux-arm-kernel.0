@@ -1,621 +1,112 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 25 Mar 2013 14:30:24 +0100
-Subject: [PATCH 01/10] ARM: sunxi: dt: Reorganize the dtsi
+Date: Mon, 25 Mar 2013 14:30:26 +0100
+Subject: [PATCH 03/10] clocksource: sunxi: make use of CLKSRC_OF
 In-Reply-To: <1364218233-29636-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1364218233-29636-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1364218233-29636-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1364218233-29636-4-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the early days, the A10 and A13 shared quite some code. Nowadays it
-shares less and less code, the A31 diverging even more, so it doesn't
-make much sense to continue to maintain this structure, just use one
-DTSI for every SoC, and that's it.
+Using CLKSRC_OF allows to remove the SoC specific sunxi_timer.h header,
+and instead of using a custom init function in the machine definition
+use the standard clocksource_of_init function.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun4i-a10-cubieboard.dts |    2 +-
- arch/arm/boot/dts/sun4i-a10-hackberry.dts  |    2 +-
- arch/arm/boot/dts/sun4i-a10.dtsi           |  157 +++++++++++++++++++++++++--
- arch/arm/boot/dts/sun5i-a13-olinuxino.dts  |    2 +-
- arch/arm/boot/dts/sun5i-a13.dtsi           |  145 ++++++++++++++++++++++++-
- arch/arm/boot/dts/sunxi.dtsi               |  159 ----------------------------
- 6 files changed, 295 insertions(+), 172 deletions(-)
- delete mode 100644 arch/arm/boot/dts/sunxi.dtsi
+ arch/arm/mach-sunxi/Kconfig       |    1 +
+ arch/arm/mach-sunxi/sunxi.c       |    4 ++--
+ drivers/clocksource/sunxi_timer.c |    3 ++-
+ include/linux/sunxi_timer.h       |   24 ------------------------
+ 4 files changed, 5 insertions(+), 27 deletions(-)
+ delete mode 100644 include/linux/sunxi_timer.h
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-index cd06a3c..8e95845 100644
---- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-@@ -26,7 +26,7 @@
- 		bootargs = "earlyprintk console=ttyS0,115200";
- 	};
- 
--	soc {
-+	soc at 01c20000 {
- 		pinctrl at 01c20800 {
- 			led_pins_cubieboard: led_pins at 0 {
- 				allwinner,pins = "PH20", "PH21";
-diff --git a/arch/arm/boot/dts/sun4i-a10-hackberry.dts b/arch/arm/boot/dts/sun4i-a10-hackberry.dts
-index 2046000..b9efac1 100644
---- a/arch/arm/boot/dts/sun4i-a10-hackberry.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-hackberry.dts
-@@ -22,7 +22,7 @@
- 		bootargs = "earlyprintk console=ttyS0,115200";
- 	};
- 
--	soc {
-+	soc at 01c20000 {
- 		uart0: serial at 01c28000 {
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&uart0_pins_a>;
-diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index 68a27fc..5c0920b 100644
---- a/arch/arm/boot/dts/sun4i-a10.dtsi
-+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -10,14 +10,123 @@
-  * http://www.gnu.org/copyleft/gpl.html
+diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
+index 8709a39..06c2894 100644
+--- a/arch/arm/mach-sunxi/Kconfig
++++ b/arch/arm/mach-sunxi/Kconfig
+@@ -1,6 +1,7 @@
+ config ARCH_SUNXI
+ 	bool "Allwinner A1X SOCs" if ARCH_MULTI_V7
+ 	select CLKSRC_MMIO
++	select CLKSRC_OF
+ 	select COMMON_CLK
+ 	select GENERIC_CLOCKEVENTS
+ 	select GENERIC_IRQ_CHIP
+diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+index 23afb73..2c01182 100644
+--- a/arch/arm/mach-sunxi/sunxi.c
++++ b/arch/arm/mach-sunxi/sunxi.c
+@@ -10,6 +10,7 @@
+  * warranty of any kind, whether express or implied.
   */
  
--/include/ "sunxi.dtsi"
-+/include/ "skeleton.dtsi"
++#include <linux/clocksource.h>
+ #include <linux/delay.h>
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+@@ -17,7 +18,6 @@
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
+ #include <linux/io.h>
+-#include <linux/sunxi_timer.h>
  
- / {
-+	interrupt-parent = <&intc>;
-+
-+	cpus {
-+		cpu at 0 {
-+			compatible = "arm,cortex-a8";
-+		};
-+	};
-+
- 	memory {
- 		reg = <0x40000000 0x80000000>;
- 	};
+ #include <linux/irqchip/sunxi.h>
  
--	soc {
-+	clocks {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		/*
-+		 * This is a dummy clock, to be used as placeholder on
-+		 * other mux clocks when a specific parent clock is not
-+		 * yet implemented. It should be dropped when the driver
-+		 * is complete.
-+		 */
-+		dummy: dummy {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <0>;
-+		};
-+
-+		osc24M_fixed: osc24M_fixed {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <24000000>;
-+		};
-+
-+		osc24M: osc24M at 01c20050 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sunxi-osc-clk";
-+			reg = <0x01c20050 0x4>;
-+			clocks = <&osc24M_fixed>;
-+		};
-+
-+		osc32k: osc32k {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <32768>;
-+		};
-+
-+		pll1: pll1 at 01c20000 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sunxi-pll1-clk";
-+			reg = <0x01c20000 0x4>;
-+			clocks = <&osc24M>;
-+		};
-+
-+		/* dummy is 200M */
-+		cpu: cpu at 01c20054 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sunxi-cpu-clk";
-+			reg = <0x01c20054 0x4>;
-+			clocks = <&osc32k>, <&osc24M>, <&pll1>, <&dummy>;
-+		};
-+
-+		axi: axi at 01c20054 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sunxi-axi-clk";
-+			reg = <0x01c20054 0x4>;
-+			clocks = <&cpu>;
-+		};
-+
-+		ahb: ahb at 01c20054 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sunxi-ahb-clk";
-+			reg = <0x01c20054 0x4>;
-+			clocks = <&axi>;
-+		};
-+
-+		apb0: apb0 at 01c20054 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sunxi-apb0-clk";
-+			reg = <0x01c20054 0x4>;
-+			clocks = <&ahb>;
-+		};
-+
-+		/* dummy is pll62 */
-+		apb1_mux: apb1_mux at 01c20058 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sunxi-apb1-mux-clk";
-+			reg = <0x01c20058 0x4>;
-+			clocks = <&osc24M>, <&dummy>, <&osc32k>;
-+		};
-+
-+		apb1: apb1 at 01c20058 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sunxi-apb1-clk";
-+			reg = <0x01c20058 0x4>;
-+			clocks = <&apb1_mux>;
-+		};
-+	};
-+
-+	soc at 01c20000 {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		reg = <0x01c20000 0x300000>;
-+		ranges;
-+
-+		intc: interrupt-controller at 01c20400 {
-+			compatible = "allwinner,sunxi-ic";
-+			reg = <0x01c20400 0x400>;
-+			interrupt-controller;
-+			#interrupt-cells = <1>;
-+		};
-+
- 		pio: pinctrl at 01c20800 {
- 			compatible = "allwinner,sun4i-a10-pinctrl";
- 			reg = <0x01c20800 0x400>;
-@@ -48,13 +157,35 @@
- 			};
- 		};
+@@ -100,6 +100,6 @@ DT_MACHINE_START(SUNXI_DT, "Allwinner A1X (Device Tree)")
+ 	.init_irq	= sunxi_init_irq,
+ 	.handle_irq	= sunxi_handle_irq,
+ 	.restart	= sunxi_restart,
+-	.init_time	= &sunxi_timer_init,
++	.init_time	= clocksource_of_init,
+ 	.dt_compat	= sunxi_board_dt_compat,
+ MACHINE_END
+diff --git a/drivers/clocksource/sunxi_timer.c b/drivers/clocksource/sunxi_timer.c
+index 7a3ea23..0b46b7f 100644
+--- a/drivers/clocksource/sunxi_timer.c
++++ b/drivers/clocksource/sunxi_timer.c
+@@ -22,7 +22,6 @@
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+ #include <linux/of_irq.h>
+-#include <linux/sunxi_timer.h>
+ #include <linux/clk/sunxi.h>
  
-+		timer at 01c20c00 {
-+			compatible = "allwinner,sunxi-timer";
-+			reg = <0x01c20c00 0x90>;
-+			interrupts = <22>;
-+			clocks = <&osc24M>;
-+		};
-+
-+		wdt: watchdog at 01c20c90 {
-+			compatible = "allwinner,sunxi-wdt";
-+			reg = <0x01c20c90 0x10>;
-+		};
-+
- 		uart0: serial at 01c28000 {
- 			compatible = "snps,dw-apb-uart";
- 			reg = <0x01c28000 0x400>;
- 			interrupts = <1>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clocks = <&osc>;
-+			clocks = <&osc24M>;
-+			status = "disabled";
-+		};
-+
-+		uart1: serial at 01c28400 {
-+			compatible = "snps,dw-apb-uart";
-+			reg = <0x01c28400 0x400>;
-+			interrupts = <2>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			clocks = <&osc24M>;
- 			status = "disabled";
- 		};
- 
-@@ -64,7 +195,17 @@
- 			interrupts = <3>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clocks = <&osc>;
-+			clocks = <&osc24M>;
-+			status = "disabled";
-+		};
-+
-+		uart3: serial at 01c28c00 {
-+			compatible = "snps,dw-apb-uart";
-+			reg = <0x01c28c00 0x400>;
-+			interrupts = <4>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			clocks = <&osc24M>;
- 			status = "disabled";
- 		};
- 
-@@ -74,7 +215,7 @@
- 			interrupts = <17>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clocks = <&osc>;
-+			clocks = <&osc24M>;
- 			status = "disabled";
- 		};
- 
-@@ -84,7 +225,7 @@
- 			interrupts = <18>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clocks = <&osc>;
-+			clocks = <&osc24M>;
- 			status = "disabled";
- 		};
- 
-@@ -94,7 +235,7 @@
- 			interrupts = <19>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clocks = <&osc>;
-+			clocks = <&osc24M>;
- 			status = "disabled";
- 		};
- 
-@@ -104,7 +245,7 @@
- 			interrupts = <20>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clocks = <&osc>;
-+			clocks = <&osc24M>;
- 			status = "disabled";
- 		};
- 	};
-diff --git a/arch/arm/boot/dts/sun5i-a13-olinuxino.dts b/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
-index f1579a8..3ca5506 100644
---- a/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
-+++ b/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
-@@ -22,7 +22,7 @@
- 		bootargs = "earlyprintk console=ttyS0,115200";
- 	};
- 
--	soc {
-+	soc at 01c20000 {
- 		pinctrl at 01c20800 {
- 			led_pins_olinuxino: led_pins at 0 {
- 				allwinner,pins = "PG9";
-diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
-index 945bfac..fdc5346 100644
---- a/arch/arm/boot/dts/sun5i-a13.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a13.dtsi
-@@ -11,14 +11,123 @@
-  * http://www.gnu.org/copyleft/gpl.html
-  */
- 
--/include/ "sunxi.dtsi"
-+/include/ "skeleton.dtsi"
- 
- / {
-+	interrupt-parent = <&intc>;
-+
-+	cpus {
-+		cpu at 0 {
-+			compatible = "arm,cortex-a8";
-+		};
-+	};
-+
- 	memory {
- 		reg = <0x40000000 0x20000000>;
- 	};
- 
--	soc {
-+	clocks {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		/*
-+		 * This is a dummy clock, to be used as placeholder on
-+		 * other mux clocks when a specific parent clock is not
-+		 * yet implemented. It should be dropped when the driver
-+		 * is complete.
-+		 */
-+		dummy: dummy {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <0>;
-+		};
-+
-+		osc24M_fixed: osc24M_fixed {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <24000000>;
-+		};
-+
-+		osc24M: osc24M at 01c20050 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sunxi-osc-clk";
-+			reg = <0x01c20050 0x4>;
-+			clocks = <&osc24M_fixed>;
-+		};
-+
-+		osc32k: osc32k {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <32768>;
-+		};
-+
-+		pll1: pll1 at 01c20000 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sunxi-pll1-clk";
-+			reg = <0x01c20000 0x4>;
-+			clocks = <&osc24M>;
-+		};
-+
-+		/* dummy is 200M */
-+		cpu: cpu at 01c20054 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sunxi-cpu-clk";
-+			reg = <0x01c20054 0x4>;
-+			clocks = <&osc32k>, <&osc24M>, <&pll1>, <&dummy>;
-+		};
-+
-+		axi: axi at 01c20054 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sunxi-axi-clk";
-+			reg = <0x01c20054 0x4>;
-+			clocks = <&cpu>;
-+		};
-+
-+		ahb: ahb at 01c20054 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sunxi-ahb-clk";
-+			reg = <0x01c20054 0x4>;
-+			clocks = <&axi>;
-+		};
-+
-+		apb0: apb0 at 01c20054 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sunxi-apb0-clk";
-+			reg = <0x01c20054 0x4>;
-+			clocks = <&ahb>;
-+		};
-+
-+		/* dummy is pll62 */
-+		apb1_mux: apb1_mux at 01c20058 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sunxi-apb1-mux-clk";
-+			reg = <0x01c20058 0x4>;
-+			clocks = <&osc24M>, <&dummy>, <&osc32k>;
-+		};
-+
-+		apb1: apb1 at 01c20058 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sunxi-apb1-clk";
-+			reg = <0x01c20058 0x4>;
-+			clocks = <&apb1_mux>;
-+		};
-+	};
-+
-+	soc at 01c20000 {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		reg = <0x01c20000 0x300000>;
-+		ranges;
-+
-+		intc: interrupt-controller at 01c20400 {
-+			compatible = "allwinner,sunxi-ic";
-+			reg = <0x01c20400 0x400>;
-+			interrupt-controller;
-+			#interrupt-cells = <1>;
-+		};
-+
- 		pio: pinctrl at 01c20800 {
- 			compatible = "allwinner,sun5i-a13-pinctrl";
- 			reg = <0x01c20800 0x400>;
-@@ -41,5 +150,37 @@
- 				allwinner,pull = <0>;
- 			};
- 		};
-+
-+		timer at 01c20c00 {
-+			compatible = "allwinner,sunxi-timer";
-+			reg = <0x01c20c00 0x90>;
-+			interrupts = <22>;
-+			clocks = <&osc24M>;
-+		};
-+
-+		wdt: watchdog at 01c20c90 {
-+			compatible = "allwinner,sunxi-wdt";
-+			reg = <0x01c20c90 0x10>;
-+		};
-+
-+		uart1: serial at 01c28400 {
-+			compatible = "snps,dw-apb-uart";
-+			reg = <0x01c28400 0x400>;
-+			interrupts = <2>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			clocks = <&osc24M>;
-+			status = "disabled";
-+		};
-+
-+		uart3: serial at 01c28c00 {
-+			compatible = "snps,dw-apb-uart";
-+			reg = <0x01c28c00 0x400>;
-+			interrupts = <4>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			clocks = <&osc24M>;
-+			status = "disabled";
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/sunxi.dtsi b/arch/arm/boot/dts/sunxi.dtsi
+ #define TIMER_IRQ_EN_REG	0x00
+@@ -158,3 +157,5 @@ void __init sunxi_timer_init(void)
+ 	clockevents_config_and_register(&sunxi_clockevent, rate / TIMER_SCAL,
+ 					0x1, 0xff);
+ }
++CLOCKSOURCE_OF_DECLARE(sunxi, "allwinner,sun4i-timer",
++		       sunxi_timer_init);
+diff --git a/include/linux/sunxi_timer.h b/include/linux/sunxi_timer.h
 deleted file mode 100644
-index cafd393..0000000
---- a/arch/arm/boot/dts/sunxi.dtsi
+index 1808178..0000000
+--- a/include/linux/sunxi_timer.h
 +++ /dev/null
-@@ -1,159 +0,0 @@
+@@ -1,24 +0,0 @@
 -/*
 - * Copyright 2012 Maxime Ripard
 - *
 - * Maxime Ripard <maxime.ripard@free-electrons.com>
 - *
-- * The code contained herein is licensed under the GNU General Public
-- * License. You may obtain a copy of the GNU General Public License
-- * Version 2 or later at the following locations:
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
 - *
-- * http://www.opensource.org/licenses/gpl-license.html
-- * http://www.gnu.org/copyleft/gpl.html
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
 - */
 -
--/include/ "skeleton.dtsi"
+-#ifndef __SUNXI_TIMER_H
+-#define __SUNXI_TIMER_H
 -
--/ {
--	interrupt-parent = <&intc>;
+-#include <asm/mach/time.h>
 -
--	cpus {
--		cpu at 0 {
--			compatible = "arm,cortex-a8";
--		};
--	};
+-void sunxi_timer_init(void);
 -
--	clocks {
--		#address-cells = <1>;
--		#size-cells = <1>;
--		ranges;
--
--		/*
--		 * This is a dummy clock, to be used as placeholder on
--		 * other mux clocks when a specific parent clock is not
--		 * yet implemented. It should be dropped when the driver
--		 * is complete.
--		 */
--		dummy: dummy {
--			#clock-cells = <0>;
--			compatible = "fixed-clock";
--			clock-frequency = <0>;
--		};
--
--		osc24M_fixed: osc24M_fixed {
--			#clock-cells = <0>;
--			compatible = "fixed-clock";
--			clock-frequency = <24000000>;
--		};
--
--		osc24M: osc24M at 01c20050 {
--			#clock-cells = <0>;
--			compatible = "allwinner,sunxi-osc-clk";
--			reg = <0x01c20050 0x4>;
--			clocks = <&osc24M_fixed>;
--		};
--
--		osc32k: osc32k {
--			#clock-cells = <0>;
--			compatible = "fixed-clock";
--			clock-frequency = <32768>;
--		};
--
--		pll1: pll1 at 01c20000 {
--			#clock-cells = <0>;
--			compatible = "allwinner,sunxi-pll1-clk";
--			reg = <0x01c20000 0x4>;
--			clocks = <&osc24M>;
--		};
--
--		/* dummy is 200M */
--		cpu: cpu at 01c20054 {
--			#clock-cells = <0>;
--			compatible = "allwinner,sunxi-cpu-clk";
--			reg = <0x01c20054 0x4>;
--			clocks = <&osc32k>, <&osc24M>, <&pll1>, <&dummy>;
--		};
--
--		axi: axi at 01c20054 {
--			#clock-cells = <0>;
--			compatible = "allwinner,sunxi-axi-clk";
--			reg = <0x01c20054 0x4>;
--			clocks = <&cpu>;
--		};
--
--		ahb: ahb at 01c20054 {
--			#clock-cells = <0>;
--			compatible = "allwinner,sunxi-ahb-clk";
--			reg = <0x01c20054 0x4>;
--			clocks = <&axi>;
--		};
--
--		apb0: apb0 at 01c20054 {
--			#clock-cells = <0>;
--			compatible = "allwinner,sunxi-apb0-clk";
--			reg = <0x01c20054 0x4>;
--			clocks = <&ahb>;
--		};
--
--		/* dummy is pll62 */
--		apb1_mux: apb1_mux at 01c20058 {
--			#clock-cells = <0>;
--			compatible = "allwinner,sunxi-apb1-mux-clk";
--			reg = <0x01c20058 0x4>;
--			clocks = <&osc24M>, <&dummy>, <&osc32k>;
--		};
--
--		apb1: apb1 at 01c20058 {
--			#clock-cells = <0>;
--			compatible = "allwinner,sunxi-apb1-clk";
--			reg = <0x01c20058 0x4>;
--			clocks = <&apb1_mux>;
--		};
--	};
--
--	soc {
--		compatible = "simple-bus";
--		#address-cells = <1>;
--		#size-cells = <1>;
--		reg = <0x01c20000 0x300000>;
--		ranges;
--
--		timer at 01c20c00 {
--			compatible = "allwinner,sunxi-timer";
--			reg = <0x01c20c00 0x90>;
--			interrupts = <22>;
--			clocks = <&osc24M>;
--		};
--
--		wdt: watchdog at 01c20c90 {
--			compatible = "allwinner,sunxi-wdt";
--			reg = <0x01c20c90 0x10>;
--		};
--
--		intc: interrupt-controller at 01c20400 {
--			compatible = "allwinner,sunxi-ic";
--			reg = <0x01c20400 0x400>;
--			interrupt-controller;
--			#interrupt-cells = <1>;
--		};
--
--		uart1: serial at 01c28400 {
--			compatible = "snps,dw-apb-uart";
--			reg = <0x01c28400 0x400>;
--			interrupts = <2>;
--			reg-shift = <2>;
--			reg-io-width = <4>;
--			clocks = <&osc>;
--			status = "disabled";
--		};
--
--		uart3: serial at 01c28c00 {
--			compatible = "snps,dw-apb-uart";
--			reg = <0x01c28c00 0x400>;
--			interrupts = <4>;
--			reg-shift = <2>;
--			reg-io-width = <4>;
--			clocks = <&osc>;
--			status = "disabled";
--		};
--	};
--};
+-#endif
 -- 
 1.7.10.4
