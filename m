@@ -1,238 +1,99 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 25 Mar 2013 18:17:36 +0000
-Subject: [PATCH v2 2/5] ARM: cache: remove ARMv3 support code
-In-Reply-To: <1364235459-17672-1-git-send-email-will.deacon@arm.com>
-References: <1364235459-17672-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1364235459-17672-3-git-send-email-will.deacon@arm.com>
+Date: Mon, 25 Mar 2013 18:18:06 +0000
+Subject: [PATCH 3/3] ARM: cacheflush: add new iovec-based cache flushing
+ system call
+In-Reply-To: <1364235486-17738-1-git-send-email-will.deacon@arm.com>
+References: <1364235486-17738-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1364235486-17738-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is only used by 740t, which is a v4 core and (by my reading of the
-datasheet for the CPU) ignores CRm for the cp15 cache flush operation,
-making the v4 cache implementation in cache-v4.S sufficient for this
-CPU.
+The cacheflush system call flushes a contiguous range, specified by a
+pair of addresses. This means that user applications wishing to flush
+discrete ranges must issue multiple system calls, since attempting to
+flush past a vma results in range truncation.
 
-Tested with 740T core-tile on Integrator/AP baseboard.
+This patch introduces a new private system call for ARM, cacheflush_iov,
+which processes a range of addresses described in an iovec structure.
 
-Cc: Hyok S. Choi <hyok.choi@samsung.com>
-Cc: Greg Ungerer <gerg@uclinux.org>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/include/asm/glue-cache.h |   8 ---
- arch/arm/mm/Kconfig               |   5 +-
- arch/arm/mm/Makefile              |   1 -
- arch/arm/mm/cache-v3.S            | 137 --------------------------------------
- arch/arm/mm/proc-arm740.S         |   2 +-
- 5 files changed, 2 insertions(+), 151 deletions(-)
- delete mode 100644 arch/arm/mm/cache-v3.S
+ arch/arm/include/uapi/asm/unistd.h |  1 +
+ arch/arm/kernel/traps.c            | 36 ++++++++++++++++++++++++++++++++++++
+ 2 files changed, 37 insertions(+)
 
-diff --git a/arch/arm/include/asm/glue-cache.h b/arch/arm/include/asm/glue-cache.h
-index cca9f15..ea289e1 100644
---- a/arch/arm/include/asm/glue-cache.h
-+++ b/arch/arm/include/asm/glue-cache.h
-@@ -19,14 +19,6 @@
- #undef _CACHE
- #undef MULTI_CACHE
+diff --git a/arch/arm/include/uapi/asm/unistd.h b/arch/arm/include/uapi/asm/unistd.h
+index af33b44..bcad38c 100644
+--- a/arch/arm/include/uapi/asm/unistd.h
++++ b/arch/arm/include/uapi/asm/unistd.h
+@@ -421,6 +421,7 @@
+ #define __ARM_NR_usr26			(__ARM_NR_BASE+3)
+ #define __ARM_NR_usr32			(__ARM_NR_BASE+4)
+ #define __ARM_NR_set_tls		(__ARM_NR_BASE+5)
++#define __ARM_NR_cacheflush_iov		(__ARM_NR_BASE+6)
  
--#if defined(CONFIG_CPU_CACHE_V3)
--# ifdef _CACHE
--#  define MULTI_CACHE 1
--# else
--#  define _CACHE v3
--# endif
--#endif
--
- #if defined(CONFIG_CPU_CACHE_V4)
- # ifdef _CACHE
- #  define MULTI_CACHE 1
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 025d173..4045c49 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -43,7 +43,7 @@ config CPU_ARM740T
- 	depends on !MMU
- 	select CPU_32v4T
- 	select CPU_ABRT_LV4T
--	select CPU_CACHE_V3	# although the core is v4t
-+	select CPU_CACHE_V4
- 	select CPU_CP15_MPU
- 	select CPU_PABRT_LEGACY
- 	help
-@@ -469,9 +469,6 @@ config CPU_PABRT_V7
- 	bool
+ /*
+  * *NOTE*: This is a ghost syscall private to the kernel.  Only the
+diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+index da5e268..f83eed6 100644
+--- a/arch/arm/kernel/traps.c
++++ b/arch/arm/kernel/traps.c
+@@ -25,6 +25,7 @@
+ #include <linux/delay.h>
+ #include <linux/init.h>
+ #include <linux/sched.h>
++#include <linux/slab.h>
  
- # The cache model
--config CPU_CACHE_V3
--	bool
--
- config CPU_CACHE_V4
- 	bool
+ #include <linux/atomic.h>
+ #include <asm/cacheflush.h>
+@@ -515,6 +516,37 @@ do_cache_op(unsigned long start, unsigned long end, int flags)
+ 	return flush_cache_user_range(start, end);
+ }
  
-diff --git a/arch/arm/mm/Makefile b/arch/arm/mm/Makefile
-index 4e333fa..9e51be9 100644
---- a/arch/arm/mm/Makefile
-+++ b/arch/arm/mm/Makefile
-@@ -33,7 +33,6 @@ obj-$(CONFIG_CPU_PABRT_LEGACY)	+= pabort-legacy.o
- obj-$(CONFIG_CPU_PABRT_V6)	+= pabort-v6.o
- obj-$(CONFIG_CPU_PABRT_V7)	+= pabort-v7.o
++static inline int
++do_cache_op_iov(const struct iovec __user *uiov, unsigned long cnt, int flags)
++{
++	int i, ret = 0;
++	unsigned long len = cnt * sizeof(struct iovec);
++	struct iovec *iov = kmalloc(len, GFP_KERNEL);
++
++	if (iov == NULL) {
++		ret = -ENOMEM;
++		goto out;
++	}
++
++	if (copy_from_user(iov, uiov, len)) {
++		ret = -EFAULT;
++		goto out_free;
++	}
++
++	for (i = 0; i < cnt; ++i) {
++		unsigned long start = (unsigned long __force)iov[i].iov_base;
++		unsigned long end = start + iov[i].iov_len;
++		ret = do_cache_op(start, end, flags);
++		if (ret)
++			break;
++	}
++
++out_free:
++	kfree(iov);
++out:
++	return ret;
++}
++
+ /*
+  * Handle all unrecognised system calls.
+  *  0x9f0000 - 0x9fffff are some more esoteric system calls
+@@ -560,6 +592,10 @@ asmlinkage int arm_syscall(int no, struct pt_regs *regs)
+ 	case NR(cacheflush):
+ 		return do_cache_op(regs->ARM_r0, regs->ARM_r1, regs->ARM_r2);
  
--obj-$(CONFIG_CPU_CACHE_V3)	+= cache-v3.o
- obj-$(CONFIG_CPU_CACHE_V4)	+= cache-v4.o
- obj-$(CONFIG_CPU_CACHE_V4WT)	+= cache-v4wt.o
- obj-$(CONFIG_CPU_CACHE_V4WB)	+= cache-v4wb.o
-diff --git a/arch/arm/mm/cache-v3.S b/arch/arm/mm/cache-v3.S
-deleted file mode 100644
-index 8a3fade..0000000
---- a/arch/arm/mm/cache-v3.S
-+++ /dev/null
-@@ -1,137 +0,0 @@
--/*
-- *  linux/arch/arm/mm/cache-v3.S
-- *
-- *  Copyright (C) 1997-2002 Russell king
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--#include <linux/linkage.h>
--#include <linux/init.h>
--#include <asm/page.h>
--#include "proc-macros.S"
--
--/*
-- *	flush_icache_all()
-- *
-- *	Unconditionally clean and invalidate the entire icache.
-- */
--ENTRY(v3_flush_icache_all)
--	mov	pc, lr
--ENDPROC(v3_flush_icache_all)
--
--/*
-- *	flush_user_cache_all()
-- *
-- *	Invalidate all cache entries in a particular address
-- *	space.
-- *
-- *	- mm	- mm_struct describing address space
-- */
--ENTRY(v3_flush_user_cache_all)
--	/* FALLTHROUGH */
--/*
-- *	flush_kern_cache_all()
-- *
-- *	Clean and invalidate the entire cache.
-- */
--ENTRY(v3_flush_kern_cache_all)
--	/* FALLTHROUGH */
--
--/*
-- *	flush_user_cache_range(start, end, flags)
-- *
-- *	Invalidate a range of cache entries in the specified
-- *	address space.
-- *
-- *	- start - start address (may not be aligned)
-- *	- end	- end address (exclusive, may not be aligned)
-- *	- flags	- vma_area_struct flags describing address space
-- */
--ENTRY(v3_flush_user_cache_range)
--	mov	ip, #0
--	mcreq	p15, 0, ip, c7, c0, 0		@ flush ID cache
--	mov	pc, lr
--
--/*
-- *	coherent_kern_range(start, end)
-- *
-- *	Ensure coherency between the Icache and the Dcache in the
-- *	region described by start.  If you have non-snooping
-- *	Harvard caches, you need to implement this function.
-- *
-- *	- start  - virtual start address
-- *	- end	 - virtual end address
-- */
--ENTRY(v3_coherent_kern_range)
--	/* FALLTHROUGH */
--
--/*
-- *	coherent_user_range(start, end)
-- *
-- *	Ensure coherency between the Icache and the Dcache in the
-- *	region described by start.  If you have non-snooping
-- *	Harvard caches, you need to implement this function.
-- *
-- *	- start  - virtual start address
-- *	- end	 - virtual end address
-- */
--ENTRY(v3_coherent_user_range)
--	mov	r0, #0
--	mov	pc, lr
--
--/*
-- *	flush_kern_dcache_area(void *page, size_t size)
-- *
-- *	Ensure no D cache aliasing occurs, either with itself or
-- *	the I cache
-- *
-- *	- addr	- kernel address
-- *	- size	- region size
-- */
--ENTRY(v3_flush_kern_dcache_area)
--	/* FALLTHROUGH */
--
--/*
-- *	dma_flush_range(start, end)
-- *
-- *	Clean and invalidate the specified virtual address range.
-- *
-- *	- start  - virtual start address
-- *	- end	 - virtual end address
-- */
--ENTRY(v3_dma_flush_range)
--	mov	r0, #0
--	mcr	p15, 0, r0, c7, c0, 0		@ flush ID cache
--	mov	pc, lr
--
--/*
-- *	dma_unmap_area(start, size, dir)
-- *	- start	- kernel virtual start address
-- *	- size	- size of region
-- *	- dir	- DMA direction
-- */
--ENTRY(v3_dma_unmap_area)
--	teq	r2, #DMA_TO_DEVICE
--	bne	v3_dma_flush_range
--	/* FALLTHROUGH */
--
--/*
-- *	dma_map_area(start, size, dir)
-- *	- start	- kernel virtual start address
-- *	- size	- size of region
-- *	- dir	- DMA direction
-- */
--ENTRY(v3_dma_map_area)
--	mov	pc, lr
--ENDPROC(v3_dma_unmap_area)
--ENDPROC(v3_dma_map_area)
--
--	.globl	v3_flush_kern_cache_louis
--	.equ	v3_flush_kern_cache_louis, v3_flush_kern_cache_all
--
--	__INITDATA
--
--	@ define struct cpu_cache_fns (see <asm/cacheflush.h> and proc-macros.S)
--	define_cache_functions v3
-diff --git a/arch/arm/mm/proc-arm740.S b/arch/arm/mm/proc-arm740.S
-index dc5de5d..2088234 100644
---- a/arch/arm/mm/proc-arm740.S
-+++ b/arch/arm/mm/proc-arm740.S
-@@ -145,5 +145,5 @@ __arm740_proc_info:
- 	.long	arm740_processor_functions
- 	.long	0
- 	.long	0
--	.long	v3_cache_fns			@ cache model
-+	.long	v4_cache_fns			@ cache model
- 	.size	__arm740_proc_info, . - __arm740_proc_info
++	case NR(cacheflush_iov):
++		return do_cache_op_iov((const struct iovec __user *)regs->ARM_r0,
++					regs->ARM_r1, regs->ARM_r2);
++
+ 	case NR(usr26):
+ 		if (!(elf_hwcap & HWCAP_26BIT))
+ 			break;
 -- 
 1.8.0
