@@ -1,47 +1,48 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 25 Mar 2013 13:44:37 +0530
-Subject: [PATCH v3 0/3] Platform support for EHRPWM & ECAP devices in
- DAVINCI.
-In-Reply-To: <1364197789-16783-1-git-send-email-avinashphilip@ti.com>
-References: <1364197789-16783-1-git-send-email-avinashphilip@ti.com>
-Message-ID: <5150076D.3080904@ti.com>
+From: rui.zhang@intel.com (Zhang Rui)
+Date: Mon, 25 Mar 2013 16:17:36 +0800
+Subject: [PATCH for 3.9 0/2] thermal: Marvell SoC thermal formula fixes
+In-Reply-To: <1363954983-30822-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1363954983-30822-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1364199456.2465.46.camel@rzhang1-mobl4>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/25/2013 1:19 PM, Philip Avinash wrote:
-> Add platform support for EHRPWM and ECAP by providing clock nodes and
-> device tree nodes.
-> This series depends on [1] and [2] and is available for testing at [3].
-> Tested for back light support in da850 EVM with EHRPWM PWM device.
-> 
-> [1] http://gitorious.org/linux-davinci/linux-davinci/trees/davinci-for-v3.9/dt-2
-> [2] https://gitorious.org/linux-pwm/linux-pwm/trees/for-next
-> [3] https://github.com/avinashphilip/am335x_linux/tree/davinci-for-v3.9_soc_pwm
-> 
-> Note:
-> DT support for EHRPWM backlight has not been added in da850-evm.dts as there is
-> conflicting pin-mux requirement with SPI flash.
-> 
-> Philip Avinash (3):
->   ARM: davinci: clk framework support for enable/disable functionality
+Hi,
 
-Patch 1/3 did not reach me. I cant find it in archives either so most
-likely no one received it. Can you please send that one patch again?
+Ezequiel, thanks for your patch.
 
->   arm: davinci: clock node support for ECAP & EHRPWM
-
-For future, please be consistent and capitalize 'ARM' in subject line.
-
->   ARM: davinci: da850: add EHRPWM & ECAP DT node
+On Fri, 2013-03-22 at 09:23 -0300, Ezequiel Garcia wrote:
+> This is a small patchset that fixes thermal sensor formulas for Kirkwood
+> and Dove thermal driver. The old formulas had been taken from 88AP510 public
+> datasheets which appears to be slightly wrong.
 > 
->  arch/arm/boot/dts/da850.dtsi               |   30 ++++++++++++++++++
->  arch/arm/mach-davinci/clock.c              |   21 ++++++++-----
->  arch/arm/mach-davinci/clock.h              |    2 ++
->  arch/arm/mach-davinci/da850.c              |   46 ++++++++++++++++++++++++++++
->  arch/arm/mach-davinci/da8xx-dt.c           |    5 +++
->  arch/arm/mach-davinci/include/mach/da8xx.h |    1 +
->  6 files changed, 98 insertions(+), 7 deletions(-)
+> The current formula comes from Marvell internal documentation
+> and has been confirmed by Lior Amsalem.
+> 
+> This has been tested on a Kirkwood board (Openblocks A6) only.
+> If at all possible, I would like to have the Dove fix tested
+> before this is merged.
+> 
+> Please note that this fix was previously part of a bigger thermal
+> patchset [1]. I've taken this out so it can be applied on v3.9 first.
+> 
+> [1] http://www.spinics.net/lists/arm-kernel/msg231697.html
+> 
+> Ezequiel Garcia (2):
+>   thermal: kirkwood: Fix thermal sensor formula
+>   thermal: dove: Fix thermal sensor formula
 > 
 
-Thanks,
-Sekhar
+Nobuhiro and Andrew,
+
+what do you think of these patches?
+As I have no idea of the hardware details, I need your comments before
+applying them.
+
+thanks,
+rui
+
+>  drivers/thermal/dove_thermal.c     |    7 ++++---
+>  drivers/thermal/kirkwood_thermal.c |    8 ++++----
+>  2 files changed, 8 insertions(+), 7 deletions(-)
+> 
