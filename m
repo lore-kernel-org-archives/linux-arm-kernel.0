@@ -1,58 +1,58 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 25 Mar 2013 18:55:36 +0100
-Subject: [PATCH 11/15] ARM: s3c64xx: cpuidle: use init/exit common routine
+Date: Mon, 25 Mar 2013 18:55:38 +0100
+Subject: [PATCH 13/15] ARM: shmobile: pm: fix init sections
 In-Reply-To: <1364234140-514-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1364234140-514-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1364234140-514-12-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1364234140-514-14-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the duplicate code and use the arm cpuidle driver's common code
-for initialization.
+Add the __init section for the functions which are called
+at init time.
 
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Signed-off-by: Daniel Lezcano <daniel.linaro.org>
 ---
- arch/arm/mach-s3c64xx/cpuidle.c |   15 ++-------------
- 1 file changed, 2 insertions(+), 13 deletions(-)
+ arch/arm/mach-shmobile/cpuidle.c   |    4 ++--
+ arch/arm/mach-shmobile/pm-sh7372.c |    4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-s3c64xx/cpuidle.c b/arch/arm/mach-s3c64xx/cpuidle.c
-index ead5fab..ce56142 100644
---- a/arch/arm/mach-s3c64xx/cpuidle.c
-+++ b/arch/arm/mach-s3c64xx/cpuidle.c
-@@ -16,6 +16,7 @@
- #include <linux/export.h>
- #include <linux/time.h>
+diff --git a/arch/arm/mach-shmobile/cpuidle.c b/arch/arm/mach-shmobile/cpuidle.c
+index 9e05026..068f9ca 100644
+--- a/arch/arm/mach-shmobile/cpuidle.c
++++ b/arch/arm/mach-shmobile/cpuidle.c
+@@ -36,12 +36,12 @@ static struct cpuidle_driver shmobile_cpuidle_default_driver = {
  
-+#include <asm/cpuidle.h>
- #include <asm/proc-fns.h>
+ static struct cpuidle_driver *cpuidle_drv = &shmobile_cpuidle_default_driver;
  
- #include <mach/map.h>
-@@ -40,8 +41,6 @@ static int s3c64xx_enter_idle(struct cpuidle_device *dev,
- 	return index;
- }
- 
--static DEFINE_PER_CPU(struct cpuidle_device, s3c64xx_cpuidle_device);
--
- static struct cpuidle_driver s3c64xx_cpuidle_driver = {
- 	.name	= "s3c64xx_cpuidle",
- 	.owner  = THIS_MODULE,
-@@ -61,16 +60,6 @@ static struct cpuidle_driver s3c64xx_cpuidle_driver = {
- 
- static int __init s3c64xx_init_cpuidle(void)
+-void shmobile_cpuidle_set_driver(struct cpuidle_driver *drv)
++void __init shmobile_cpuidle_set_driver(struct cpuidle_driver *drv)
  {
--	int ret;
--
--	cpuidle_register_driver(&s3c64xx_cpuidle_driver);
--
--	ret = cpuidle_register_device(&s3c64xx_cpuidle_device);
--	if (ret) {
--		pr_err("Failed to register cpuidle device: %d\n", ret);
--		return ret;
--	}
--
--	return 0;
-+	return arm_cpuidle_init(&s3c64xx_cpuidle_driver);
+ 	cpuidle_drv = drv;
  }
- device_initcall(s3c64xx_init_cpuidle);
+ 
+-int shmobile_cpuidle_init(void)
++int __init shmobile_cpuidle_init(void)
+ {
+ 	struct cpuidle_device *dev = &shmobile_cpuidle_dev;
+ 
+diff --git a/arch/arm/mach-shmobile/pm-sh7372.c b/arch/arm/mach-shmobile/pm-sh7372.c
+index a0826a4..f6b14ca 100644
+--- a/arch/arm/mach-shmobile/pm-sh7372.c
++++ b/arch/arm/mach-shmobile/pm-sh7372.c
+@@ -450,12 +450,12 @@ static struct cpuidle_driver sh7372_cpuidle_driver = {
+ 	},
+ };
+ 
+-static void sh7372_cpuidle_init(void)
++static void __init sh7372_cpuidle_init(void)
+ {
+ 	shmobile_cpuidle_set_driver(&sh7372_cpuidle_driver);
+ }
+ #else
+-static void sh7372_cpuidle_init(void) {}
++static void __init sh7372_cpuidle_init(void) {}
+ #endif
+ 
+ #ifdef CONFIG_SUSPEND
 -- 
 1.7.9.5
