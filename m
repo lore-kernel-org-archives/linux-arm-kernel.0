@@ -1,363 +1,136 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 25 Mar 2013 09:00:09 -0500
-Subject: [PATCH 07/10] irqchip: sunxi: Rename sunxi to sun4i
-In-Reply-To: <1364218233-29636-8-git-send-email-maxime.ripard@free-electrons.com>
-References: <1364218233-29636-1-git-send-email-maxime.ripard@free-electrons.com>
- <1364218233-29636-8-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <51505869.8010203@gmail.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Mon, 25 Mar 2013 15:01:59 +0100
+Subject: [PATCH 1/3] ARM: zynq: read scu base from SoC
+In-Reply-To: <1364043450-18700-2-git-send-email-s.trumtrar@pengutronix.de>
+References: <1364043450-18700-1-git-send-email-s.trumtrar@pengutronix.de>
+ <1364043450-18700-2-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <CAHTX3dK30HZxJXcNjwVqgqW_Qqag=26PEFWra6r7H6JGnpPHXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/25/2013 08:30 AM, Maxime Ripard wrote:
-> During the introduction of the Allwinner SoC platforms, sunxi was
-> initially meant as a generic name for all the variants of the Allwinner
-> SoC.
-> 
-> It was ok at the time of the support of only the A10 and A13 that
-> looks pretty much the same, but it's beginning to be troublesome with
-> the future addition of the Allwinner A31 (sun6i) that is quite
-> different, and would introduce some weird logic, where sunxi would
-> actually mean in some case sun4i and sun5i but without sun6i...
-> 
-> Moreover, it makes the compatible strings naming scheme not consistent
-> with other architectures, where usually for this kind of compability, we
-> just use the oldest SoC name that has this IP, so let's do just this.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+2013/3/23 Steffen Trumtrar <s.trumtrar@pengutronix.de>:
+> Instead of hardcoding the base address of the SCU get it from the device.
+> While at it, add the SCU to the DT.
+>
+> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> Cc: Michal Simek <michal.simek@xilinx.com>
+> Cc: Josh Cartwright <josh.cartwright@ni.com>
 > ---
->  drivers/irqchip/Makefile    |    2 +-
->  drivers/irqchip/irq-sun4i.c |  149 +++++++++++++++++++++++++++++++++++++++++++
->  drivers/irqchip/irq-sunxi.c |  149 -------------------------------------------
->  3 files changed, 150 insertions(+), 150 deletions(-)
+>  arch/arm/boot/dts/zynq-7000.dtsi |  5 +++++
+>  arch/arm/mach-zynq/common.c      | 34 ++++++++++++++++++++++------------
+>  2 files changed, 27 insertions(+), 12 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+> index 88564fa..c103082 100644
+> --- a/arch/arm/boot/dts/zynq-7000.dtsi
+> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
+> @@ -199,6 +199,11 @@
+>                         };
+>                 };
+>
+> +               scu: scu at f8f000000 {
+> +                       compatible = "arm,cortex-a9-scu";
+> +                       reg = <0xf8f00000 0x58>;
+> +               };
+> +
+>                 timer: timer at f8f00600 {
+>                         compatible = "arm,cortex-a9-twd-timer";
+>                         reg = <0xf8f00600 0x20>;
+> diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
+> index 920e20a..014131c 100644
+> --- a/arch/arm/mach-zynq/common.c
+> +++ b/arch/arm/mach-zynq/common.c
+> @@ -32,11 +32,14 @@
+>  #include <asm/mach-types.h>
+>  #include <asm/page.h>
+>  #include <asm/pgtable.h>
+> +#include <asm/smp_scu.h>
+>  #include <asm/smp_twd.h>
+>  #include <asm/hardware/cache-l2x0.h>
+>
+>  #include "common.h"
+>
+> +void __iomem *scu_base;
 
-You need to use the -M option for git-format-patch when sending this patch.
+This must be defined in header - will produce sparse warning.
 
-Rob
-
->  create mode 100644 drivers/irqchip/irq-sun4i.c
->  delete mode 100644 drivers/irqchip/irq-sunxi.c
-> 
-> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-> index 98e3b87..5416965 100644
-> --- a/drivers/irqchip/Makefile
-> +++ b/drivers/irqchip/Makefile
-> @@ -4,7 +4,7 @@ obj-$(CONFIG_ARCH_BCM2835)		+= irq-bcm2835.o
->  obj-$(CONFIG_ARCH_EXYNOS)		+= exynos-combiner.o
->  obj-$(CONFIG_METAG)			+= irq-metag-ext.o
->  obj-$(CONFIG_METAG_PERFCOUNTER_IRQS)	+= irq-metag.o
-> -obj-$(CONFIG_ARCH_SUNXI)		+= irq-sunxi.o
-> +obj-$(CONFIG_ARCH_SUNXI)		+= irq-sun4i.o
->  obj-$(CONFIG_ARCH_SPEAR3XX)		+= spear-shirq.o
->  obj-$(CONFIG_ARM_GIC)			+= irq-gic.o
->  obj-$(CONFIG_ARM_VIC)			+= irq-vic.o
-> diff --git a/drivers/irqchip/irq-sun4i.c b/drivers/irqchip/irq-sun4i.c
-> new file mode 100644
-> index 0000000..b66d4ae
-> --- /dev/null
-> +++ b/drivers/irqchip/irq-sun4i.c
-> @@ -0,0 +1,149 @@
-> +/*
-> + * Allwinner A1X SoCs IRQ chip driver.
-> + *
-> + * Copyright (C) 2012 Maxime Ripard
-> + *
-> + * Maxime Ripard <maxime.ripard@free-electrons.com>
-> + *
-> + * Based on code from
-> + * Allwinner Technology Co., Ltd. <www.allwinnertech.com>
-> + * Benn Huang <benn@allwinnertech.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
 > +
-> +#include <linux/io.h>
-> +#include <linux/irq.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_irq.h>
-> +
-> +#include <asm/exception.h>
-> +#include <asm/mach/irq.h>
-> +
-> +#include "irqchip.h"
-> +
-> +#define SUN4I_IRQ_VECTOR_REG		0x00
-> +#define SUN4I_IRQ_PROTECTION_REG	0x08
-> +#define SUN4I_IRQ_NMI_CTRL_REG		0x0c
-> +#define SUN4I_IRQ_PENDING_REG(x)	(0x10 + 0x4 * x)
-> +#define SUN4I_IRQ_FIQ_PENDING_REG(x)	(0x20 + 0x4 * x)
-> +#define SUN4I_IRQ_ENABLE_REG(x)		(0x40 + 0x4 * x)
-> +#define SUN4I_IRQ_MASK_REG(x)		(0x50 + 0x4 * x)
-> +
-> +static void __iomem *sun4i_irq_base;
-> +static struct irq_domain *sun4i_irq_domain;
-> +
-> +static asmlinkage void __exception_irq_entry sun4i_handle_irq(struct pt_regs *regs);
-> +
-> +void sun4i_irq_ack(struct irq_data *irqd)
-> +{
-> +	unsigned int irq = irqd_to_hwirq(irqd);
-> +	unsigned int irq_off = irq % 32;
-> +	int reg = irq / 32;
-> +	u32 val;
-> +
-> +	val = readl(sun4i_irq_base + SUN4I_IRQ_PENDING_REG(reg));
-> +	writel(val | (1 << irq_off),
-> +	       sun4i_irq_base + SUN4I_IRQ_PENDING_REG(reg));
-> +}
-> +
-> +static void sun4i_irq_mask(struct irq_data *irqd)
-> +{
-> +	unsigned int irq = irqd_to_hwirq(irqd);
-> +	unsigned int irq_off = irq % 32;
-> +	int reg = irq / 32;
-> +	u32 val;
-> +
-> +	val = readl(sun4i_irq_base + SUN4I_IRQ_ENABLE_REG(reg));
-> +	writel(val & ~(1 << irq_off),
-> +	       sun4i_irq_base + SUN4I_IRQ_ENABLE_REG(reg));
-> +}
-> +
-> +static void sun4i_irq_unmask(struct irq_data *irqd)
-> +{
-> +	unsigned int irq = irqd_to_hwirq(irqd);
-> +	unsigned int irq_off = irq % 32;
-> +	int reg = irq / 32;
-> +	u32 val;
-> +
-> +	val = readl(sun4i_irq_base + SUN4I_IRQ_ENABLE_REG(reg));
-> +	writel(val | (1 << irq_off),
-> +	       sun4i_irq_base + SUN4I_IRQ_ENABLE_REG(reg));
-> +}
-> +
-> +static struct irq_chip sun4i_irq_chip = {
-> +	.name		= "sun4i_irq",
-> +	.irq_ack	= sun4i_irq_ack,
-> +	.irq_mask	= sun4i_irq_mask,
-> +	.irq_unmask	= sun4i_irq_unmask,
-> +};
-> +
-> +static int sun4i_irq_map(struct irq_domain *d, unsigned int virq,
-> +			 irq_hw_number_t hw)
-> +{
-> +	irq_set_chip_and_handler(virq, &sun4i_irq_chip,
-> +				 handle_level_irq);
-> +	set_irq_flags(virq, IRQF_VALID | IRQF_PROBE);
-> +
-> +	return 0;
-> +}
-> +
-> +static struct irq_domain_ops sun4i_irq_ops = {
-> +	.map = sun4i_irq_map,
-> +	.xlate = irq_domain_xlate_onecell,
-> +};
-> +
-> +static int __init sun4i_of_init(struct device_node *node,
-> +				struct device_node *parent)
-> +{
-> +	sun4i_irq_base = of_iomap(node, 0);
-> +	if (!sun4i_irq_base)
-> +		panic("%s: unable to map IC registers\n",
-> +			node->full_name);
-> +
-> +	/* Disable all interrupts */
-> +	writel(0, sun4i_irq_base + SUN4I_IRQ_ENABLE_REG(0));
-> +	writel(0, sun4i_irq_base + SUN4I_IRQ_ENABLE_REG(1));
-> +	writel(0, sun4i_irq_base + SUN4I_IRQ_ENABLE_REG(2));
-> +
-> +	/* Mask all the interrupts */
-> +	writel(0, sun4i_irq_base + SUN4I_IRQ_MASK_REG(0));
-> +	writel(0, sun4i_irq_base + SUN4I_IRQ_MASK_REG(1));
-> +	writel(0, sun4i_irq_base + SUN4I_IRQ_MASK_REG(2));
-> +
-> +	/* Clear all the pending interrupts */
-> +	writel(0xffffffff, sun4i_irq_base + SUN4I_IRQ_PENDING_REG(0));
-> +	writel(0xffffffff, sun4i_irq_base + SUN4I_IRQ_PENDING_REG(1));
-> +	writel(0xffffffff, sun4i_irq_base + SUN4I_IRQ_PENDING_REG(2));
-> +
-> +	/* Enable protection mode */
-> +	writel(0x01, sun4i_irq_base + SUN4I_IRQ_PROTECTION_REG);
-> +
-> +	/* Configure the external interrupt source type */
-> +	writel(0x00, sun4i_irq_base + SUN4I_IRQ_NMI_CTRL_REG);
-> +
-> +	sun4i_irq_domain = irq_domain_add_linear(node, 3 * 32,
-> +						 &sun4i_irq_ops, NULL);
-> +	if (!sun4i_irq_domain)
-> +		panic("%s: unable to create IRQ domain\n", node->full_name);
-> +
-> +	set_handle_irq(sun4i_handle_irq);
-> +
-> +	return 0;
-> +}
-> +IRQCHIP_DECLARE(allwinner_sun4i_ic, "allwinner,sun4i-ic", sun4i_of_init);
-> +
-> +static asmlinkage void __exception_irq_entry sun4i_handle_irq(struct pt_regs *regs)
-> +{
-> +	u32 irq, hwirq;
-> +
-> +	hwirq = readl(sun4i_irq_base + SUN4I_IRQ_VECTOR_REG) >> 2;
-> +	while (hwirq != 0) {
-> +		irq = irq_find_mapping(sun4i_irq_domain, hwirq);
-> +		handle_IRQ(irq, regs);
-> +		hwirq = readl(sun4i_irq_base + SUN4I_IRQ_VECTOR_REG) >> 2;
-> +	}
-> +}
-> diff --git a/drivers/irqchip/irq-sunxi.c b/drivers/irqchip/irq-sunxi.c
-> deleted file mode 100644
-> index 0fc49c5..0000000
-> --- a/drivers/irqchip/irq-sunxi.c
-> +++ /dev/null
-> @@ -1,149 +0,0 @@
-> -/*
-> - * Allwinner A1X SoCs IRQ chip driver.
-> - *
-> - * Copyright (C) 2012 Maxime Ripard
-> - *
-> - * Maxime Ripard <maxime.ripard@free-electrons.com>
-> - *
-> - * Based on code from
-> - * Allwinner Technology Co., Ltd. <www.allwinnertech.com>
-> - * Benn Huang <benn@allwinnertech.com>
-> - *
-> - * This file is licensed under the terms of the GNU General Public
-> - * License version 2.  This program is licensed "as is" without any
-> - * warranty of any kind, whether express or implied.
-> - */
+>  static struct of_device_id zynq_of_bus_ids[] __initdata = {
+>         { .compatible = "simple-bus", },
+>         {}
+> @@ -56,17 +59,6 @@ static void __init xilinx_init_machine(void)
+>         of_platform_bus_probe(NULL, zynq_of_bus_ids, NULL);
+>  }
+>
+> -#define SCU_PERIPH_PHYS                0xF8F00000
+> -#define SCU_PERIPH_SIZE                SZ_8K
+> -#define SCU_PERIPH_VIRT                (VMALLOC_END - SCU_PERIPH_SIZE)
 > -
-> -#include <linux/io.h>
-> -#include <linux/irq.h>
-> -#include <linux/of.h>
-> -#include <linux/of_address.h>
-> -#include <linux/of_irq.h>
-> -
-> -#include <asm/exception.h>
-> -#include <asm/mach/irq.h>
-> -
-> -#include "irqchip.h"
-> -
-> -#define SUNXI_IRQ_VECTOR_REG		0x00
-> -#define SUNXI_IRQ_PROTECTION_REG	0x08
-> -#define SUNXI_IRQ_NMI_CTRL_REG		0x0c
-> -#define SUNXI_IRQ_PENDING_REG(x)	(0x10 + 0x4 * x)
-> -#define SUNXI_IRQ_FIQ_PENDING_REG(x)	(0x20 + 0x4 * x)
-> -#define SUNXI_IRQ_ENABLE_REG(x)		(0x40 + 0x4 * x)
-> -#define SUNXI_IRQ_MASK_REG(x)		(0x50 + 0x4 * x)
-> -
-> -static void __iomem *sunxi_irq_base;
-> -static struct irq_domain *sunxi_irq_domain;
-> -
-> -static asmlinkage void __exception_irq_entry sunxi_handle_irq(struct pt_regs *regs);
-> -
-> -void sunxi_irq_ack(struct irq_data *irqd)
-> -{
-> -	unsigned int irq = irqd_to_hwirq(irqd);
-> -	unsigned int irq_off = irq % 32;
-> -	int reg = irq / 32;
-> -	u32 val;
-> -
-> -	val = readl(sunxi_irq_base + SUNXI_IRQ_PENDING_REG(reg));
-> -	writel(val | (1 << irq_off),
-> -	       sunxi_irq_base + SUNXI_IRQ_PENDING_REG(reg));
-> -}
-> -
-> -static void sunxi_irq_mask(struct irq_data *irqd)
-> -{
-> -	unsigned int irq = irqd_to_hwirq(irqd);
-> -	unsigned int irq_off = irq % 32;
-> -	int reg = irq / 32;
-> -	u32 val;
-> -
-> -	val = readl(sunxi_irq_base + SUNXI_IRQ_ENABLE_REG(reg));
-> -	writel(val & ~(1 << irq_off),
-> -	       sunxi_irq_base + SUNXI_IRQ_ENABLE_REG(reg));
-> -}
-> -
-> -static void sunxi_irq_unmask(struct irq_data *irqd)
-> -{
-> -	unsigned int irq = irqd_to_hwirq(irqd);
-> -	unsigned int irq_off = irq % 32;
-> -	int reg = irq / 32;
-> -	u32 val;
-> -
-> -	val = readl(sunxi_irq_base + SUNXI_IRQ_ENABLE_REG(reg));
-> -	writel(val | (1 << irq_off),
-> -	       sunxi_irq_base + SUNXI_IRQ_ENABLE_REG(reg));
-> -}
-> -
-> -static struct irq_chip sunxi_irq_chip = {
-> -	.name		= "sunxi_irq",
-> -	.irq_ack	= sunxi_irq_ack,
-> -	.irq_mask	= sunxi_irq_mask,
-> -	.irq_unmask	= sunxi_irq_unmask,
+> -static struct map_desc scu_desc __initdata = {
+> -       .virtual        = SCU_PERIPH_VIRT,
+> -       .pfn            = __phys_to_pfn(SCU_PERIPH_PHYS),
+> -       .length         = SCU_PERIPH_SIZE,
+> -       .type           = MT_DEVICE,
 > -};
 > -
-> -static int sunxi_irq_map(struct irq_domain *d, unsigned int virq,
-> -			 irq_hw_number_t hw)
-> -{
-> -	irq_set_chip_and_handler(virq, &sunxi_irq_chip,
-> -				 handle_level_irq);
-> -	set_irq_flags(virq, IRQF_VALID | IRQF_PROBE);
-> -
-> -	return 0;
-> -}
-> -
-> -static struct irq_domain_ops sunxi_irq_ops = {
-> -	.map = sunxi_irq_map,
-> -	.xlate = irq_domain_xlate_onecell,
-> -};
-> -
-> -static int __init sunxi_of_init(struct device_node *node,
-> -				struct device_node *parent)
-> -{
-> -	sunxi_irq_base = of_iomap(node, 0);
-> -	if (!sunxi_irq_base)
-> -		panic("%s: unable to map IC registers\n",
-> -			node->full_name);
-> -
-> -	/* Disable all interrupts */
-> -	writel(0, sunxi_irq_base + SUNXI_IRQ_ENABLE_REG(0));
-> -	writel(0, sunxi_irq_base + SUNXI_IRQ_ENABLE_REG(1));
-> -	writel(0, sunxi_irq_base + SUNXI_IRQ_ENABLE_REG(2));
-> -
-> -	/* Mask all the interrupts */
-> -	writel(0, sunxi_irq_base + SUNXI_IRQ_MASK_REG(0));
-> -	writel(0, sunxi_irq_base + SUNXI_IRQ_MASK_REG(1));
-> -	writel(0, sunxi_irq_base + SUNXI_IRQ_MASK_REG(2));
-> -
-> -	/* Clear all the pending interrupts */
-> -	writel(0xffffffff, sunxi_irq_base + SUNXI_IRQ_PENDING_REG(0));
-> -	writel(0xffffffff, sunxi_irq_base + SUNXI_IRQ_PENDING_REG(1));
-> -	writel(0xffffffff, sunxi_irq_base + SUNXI_IRQ_PENDING_REG(2));
-> -
-> -	/* Enable protection mode */
-> -	writel(0x01, sunxi_irq_base + SUNXI_IRQ_PROTECTION_REG);
-> -
-> -	/* Configure the external interrupt source type */
-> -	writel(0x00, sunxi_irq_base + SUNXI_IRQ_NMI_CTRL_REG);
-> -
-> -	sunxi_irq_domain = irq_domain_add_linear(node, 3 * 32,
-> -						 &sunxi_irq_ops, NULL);
-> -	if (!sunxi_irq_domain)
-> -		panic("%s: unable to create IRQ domain\n", node->full_name);
-> -
-> -	set_handle_irq(sunxi_handle_irq);
-> -
-> -	return 0;
-> -}
-> -IRQCHIP_DECLARE(allwinner_sunxi_ic, "allwinner,sunxi-ic", sunxi_of_init);
-> -
-> -static asmlinkage void __exception_irq_entry sunxi_handle_irq(struct pt_regs *regs)
-> -{
-> -	u32 irq, hwirq;
-> -
-> -	hwirq = readl(sunxi_irq_base + SUNXI_IRQ_VECTOR_REG) >> 2;
-> -	while (hwirq != 0) {
-> -		irq = irq_find_mapping(sunxi_irq_domain, hwirq);
-> -		handle_IRQ(irq, regs);
-> -		hwirq = readl(sunxi_irq_base + SUNXI_IRQ_VECTOR_REG) >> 2;
-> -	}
-> -}
-> 
+>  static void __init xilinx_zynq_timer_init(void)
+>  {
+>         struct device_node *np;
+> @@ -82,13 +74,31 @@ static void __init xilinx_zynq_timer_init(void)
+>         xttcps_timer_init();
+>  }
+>
+> +static struct map_desc zynq_cortex_a9_scu_map __initdata = {
+> +       .length = SZ_8K,
+
+That's bogus. Size 8k is too big because it also cover gic which is wrong.
+As you can see from xilinx git repo correct size is 256 or less.
+
+> +       .type   = MT_DEVICE,
+> +};
+> +
+> +void __init zynq_scu_map_io(void)
+
+Should be static.
+
+> +{
+> +       if (scu_a9_has_base()) {
+
+I am not calling this function because I think it is not necessary to do so
+because it is run only on a9 where scu_a9_get_base will just work.
+Of did I miss anything?
+
+
+> +               unsigned long base;
+> +
+> +               base = scu_a9_get_base();
+> +               zynq_cortex_a9_scu_map.pfn = __phys_to_pfn(base);
+> +               zynq_cortex_a9_scu_map.virtual = base;
+> +               iotable_init(&zynq_cortex_a9_scu_map, 1);
+> +               scu_base = ioremap(base, zynq_cortex_a9_scu_map.length);
+> +       }
+> +}
+> +
+>  /**
+>   * xilinx_map_io() - Create memory mappings needed for early I/O.
+>   */
+>  static void __init xilinx_map_io(void)
+>  {
+>         debug_ll_io_init();
+> -       iotable_init(&scu_desc, 1);
+> +       zynq_scu_map_io();
+>  }
+
+You are using a little bit different names than we have in xilinx git tree
+but maybe worth to call it as you.
+
+Thanks,
+Michal
+
+
+-- 
+Michal Simek, Ing. (M.Eng)
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
