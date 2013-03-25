@@ -1,45 +1,73 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 25 Mar 2013 15:35:04 +0530
-Subject: [PATCH v2 12/18] ARM: OMAP4: CPUidle: Avoid double idle driver
- registration
+Date: Mon, 25 Mar 2013 15:35:05 +0530
+Subject: [PATCH v2 13/18] ARM: OMAP: CPUidle: Unregister drivere on device
+ registration failure
 In-Reply-To: <1364205910-32392-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1364205910-32392-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1364205910-32392-13-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1364205910-32392-14-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP4 CPUidle driver registration call is under a loop which leads
-to calling cpuidle_register_driver twice which is not intended.
+If the CPUidle device registration fails for some reason, we should
+unregister the driver on error path.
 
-Fix it by moving the driver registration outside the loop.
+Fix the code accordingly. Also when at it, check of the driver registration
+failure too.
 
-Reported-by: Nishanth Menon <nm@ti.com>
 Acked-by: Nishanth Menon <nm@ti.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/mach-omap2/cpuidle44xx.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/cpuidle34xx.c |    6 +++++-
+ arch/arm/mach-omap2/cpuidle44xx.c |    6 +++++-
+ 2 files changed, 10 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
+index 06f567f..e193ea2 100644
+--- a/arch/arm/mach-omap2/cpuidle34xx.c
++++ b/arch/arm/mach-omap2/cpuidle34xx.c
+@@ -355,7 +355,10 @@ int __init omap3_idle_init(void)
+ 	if (!mpu_pd || !core_pd || !per_pd || !cam_pd)
+ 		return -ENODEV;
+ 
+-	cpuidle_register_driver(&omap3_idle_driver);
++	if (cpuidle_register_driver(&omap3_idle_driver)) {
++		pr_err("%s: CPUidle driver register failed\n", __func__);
++		return -EIO;
++	}
+ 
+ 	dev = &per_cpu(omap3_idle_dev, smp_processor_id());
+ 	dev->cpu = 0;
+@@ -363,6 +366,7 @@ int __init omap3_idle_init(void)
+ 	if (cpuidle_register_device(dev)) {
+ 		printk(KERN_ERR "%s: CPUidle register device failed\n",
+ 		       __func__);
++		cpuidle_unregister_driver(&omap3_idle_driver);
+ 		return -EIO;
+ 	}
+ 
 diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle44xx.c
-index 9de47a7..d00b1ec 100644
+index d00b1ec..908114d 100644
 --- a/arch/arm/mach-omap2/cpuidle44xx.c
 +++ b/arch/arm/mach-omap2/cpuidle44xx.c
-@@ -233,14 +233,14 @@ int __init omap4_idle_init(void)
+@@ -233,7 +233,10 @@ int __init omap4_idle_init(void)
  	/* Configure the broadcast timer on each cpu */
  	on_each_cpu(omap_setup_broadcast_timer, NULL, 1);
  
-+	cpuidle_register_driver(&omap4_idle_driver);
-+
+-	cpuidle_register_driver(&omap4_idle_driver);
++	if (cpuidle_register_driver(&omap4_idle_driver)) {
++		pr_err("%s: CPUidle driver register failed\n", __func__);
++		return -EIO;
++	}
+ 
  	for_each_cpu(cpu_id, cpu_online_mask) {
  		dev = &per_cpu(omap4_idle_dev, cpu_id);
- 		dev->cpu = cpu_id;
- #ifdef CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED
- 		dev->coupled_cpus = *cpu_online_mask;
+@@ -243,6 +246,7 @@ int __init omap4_idle_init(void)
  #endif
--		cpuidle_register_driver(&omap4_idle_driver);
--
  		if (cpuidle_register_device(dev)) {
  			pr_err("%s: CPUidle register failed\n", __func__);
++			cpuidle_unregister_driver(&omap4_idle_driver);
  			return -EIO;
+ 		}
+ 	}
 -- 
 1.7.9.5
