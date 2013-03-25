@@ -1,39 +1,32 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 25 Mar 2013 12:27:08 -0300
-Subject: [PATCH 3/4] ARM: mvebu: Add thermal support to Armada 370 device tree
+Date: Mon, 25 Mar 2013 12:27:09 -0300
+Subject: [PATCH 4/4] ARM: configs: Update mvebu defconfig for thermal
 In-Reply-To: <1364225229-2857-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1364225229-2857-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1364225229-2857-4-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1364225229-2857-5-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for the thermal controller available in
-all Armada 370 boards. This controller has two 4-byte registers:
-one to read the thermal sensor, the other for sensor initialization.
+The thermal management driver for Armada XP/370 has been added
+so we update the defconfig to reflect this.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
-This patch depends on the patch to support Armada 370 thermal driver:
-'thermal: Add driver for Armada 370/XP SoC thermal management'
+ arch/arm/configs/mvebu_defconfig |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
- arch/arm/boot/dts/armada-370.dtsi |    6 ++++++
- 1 files changed, 6 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-index 8188d13..5831994 100644
---- a/arch/arm/boot/dts/armada-370.dtsi
-+++ b/arch/arm/boot/dts/armada-370.dtsi
-@@ -153,5 +153,11 @@
- 			clocks = <&coreclk 0>;
- 		};
- 
-+		thermal at d0018300 {
-+			compatible = "marvell,armada370-thermal";
-+			reg = <0xd0018300 0x4
-+			       0xd0018304 0x4>;
-+			status = "okay";
-+		};
- 	};
- };
+diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
+index 2ec8119..fc7e8be 100644
+--- a/arch/arm/configs/mvebu_defconfig
++++ b/arch/arm/configs/mvebu_defconfig
+@@ -49,6 +49,8 @@ CONFIG_MTD_M25P80=y
+ CONFIG_SERIAL_8250_DW=y
+ CONFIG_GPIOLIB=y
+ CONFIG_GPIO_SYSFS=y
++CONFIG_THERMAL=y
++CONFIG_ARMADA_THERMAL=y
+ CONFIG_USB_SUPPORT=y
+ CONFIG_USB=y
+ CONFIG_USB_EHCI_HCD=y
 -- 
 1.7.8.6
