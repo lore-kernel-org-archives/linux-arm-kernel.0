@@ -1,50 +1,86 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 25 Mar 2013 23:17:29 +0800
-Subject: [PATCH 3/6] ARM: mxs: get timrot base address from device tree
+Date: Mon, 25 Mar 2013 23:17:28 +0800
+Subject: [PATCH 2/6] ARM: mxs: look up timrot clock from device tree
 In-Reply-To: <1364224652-28332-1-git-send-email-shawn.guo@linaro.org>
 References: <1364224652-28332-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1364224652-28332-4-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1364224652-28332-3-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of using static defines, it gets timrot base address with
-mapping from device tree.
+Change call clk_get_sys() to of_clk_get() to look up timrot clock from
+device tree, so that the clk_register_clkdev() call for timrot can be
+saved in clock driver.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/mach-mxs/timer.c |    6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/imx23.dtsi |    1 +
+ arch/arm/boot/dts/imx28.dtsi |    1 +
+ arch/arm/mach-mxs/timer.c    |    2 +-
+ drivers/clk/mxs/clk-imx23.c  |    2 --
+ drivers/clk/mxs/clk-imx28.c  |    1 -
+ 5 files changed, 3 insertions(+), 4 deletions(-)
 
+diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
+index 56afcf4..27ce807 100644
+--- a/arch/arm/boot/dts/imx23.dtsi
++++ b/arch/arm/boot/dts/imx23.dtsi
+@@ -426,6 +426,7 @@
+ 				compatible = "fsl,imx23-timrot", "fsl,timrot";
+ 				reg = <0x80068000 0x2000>;
+ 				interrupts = <28 29 30 31>;
++				clocks = <&clks 28>;
+ 			};
+ 
+ 			auart0: serial at 8006c000 {
+diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+index 7ba4966..c2f10d3 100644
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -838,6 +838,7 @@
+ 				compatible = "fsl,imx28-timrot", "fsl,timrot";
+ 				reg = <0x80068000 0x2000>;
+ 				interrupts = <48 49 50 51>;
++				clocks = <&clks 26>;
+ 			};
+ 
+ 			auart0: serial at 8006a000 {
 diff --git a/arch/arm/mach-mxs/timer.c b/arch/arm/mach-mxs/timer.c
-index f5142aa..c8cda18 100644
+index fe2903d..f5142aa 100644
 --- a/arch/arm/mach-mxs/timer.c
 +++ b/arch/arm/mach-mxs/timer.c
-@@ -26,6 +26,7 @@
- #include <linux/clockchips.h>
- #include <linux/clk.h>
- #include <linux/of.h>
-+#include <linux/of_address.h>
- #include <linux/of_irq.h>
- 
- #include <asm/mach/time.h>
-@@ -79,7 +80,7 @@
- static struct clock_event_device mxs_clockevent_device;
- static enum clock_event_mode mxs_clockevent_mode = CLOCK_EVT_MODE_UNUSED;
- 
--static void __iomem *mxs_timrot_base = MXS_IO_ADDRESS(MXS_TIMROT_BASE_ADDR);
-+static void __iomem *mxs_timrot_base;
- static u32 timrot_major_version;
- 
- static inline void timrot_irq_disable(void)
-@@ -247,6 +248,9 @@ static void __init mxs_timer_init(struct device_node *np)
+@@ -247,7 +247,7 @@ static void __init mxs_timer_init(struct device_node *np)
  	struct clk *timer_clk;
  	int irq;
  
-+	mxs_timrot_base = of_iomap(np, 0);
-+	WARN_ON(!mxs_timrot_base);
-+
- 	timer_clk = of_clk_get(np, 0);
+-	timer_clk = clk_get_sys("timrot", NULL);
++	timer_clk = of_clk_get(np, 0);
  	if (IS_ERR(timer_clk)) {
  		pr_err("%s: failed to get clk\n", __func__);
+ 		return;
+diff --git a/drivers/clk/mxs/clk-imx23.c b/drivers/clk/mxs/clk-imx23.c
+index 52e0365..f65b19c 100644
+--- a/drivers/clk/mxs/clk-imx23.c
++++ b/drivers/clk/mxs/clk-imx23.c
+@@ -160,8 +160,6 @@ int __init mx23_clocks_init(void)
+ 		of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
+ 	}
+ 
+-	clk_register_clkdev(clks[clk32k], NULL, "timrot");
+-
+ 	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
+ 		clk_prepare_enable(clks[clks_init_on[i]]);
+ 
+diff --git a/drivers/clk/mxs/clk-imx28.c b/drivers/clk/mxs/clk-imx28.c
+index 03918e1..3cc82ea 100644
+--- a/drivers/clk/mxs/clk-imx28.c
++++ b/drivers/clk/mxs/clk-imx28.c
+@@ -238,7 +238,6 @@ int __init mx28_clocks_init(void)
+ 		of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
+ 	}
+ 
+-	clk_register_clkdev(clks[xbus], NULL, "timrot");
+ 	clk_register_clkdev(clks[enet_out], NULL, "enet_out");
+ 
+ 	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
 -- 
 1.7.9.5
