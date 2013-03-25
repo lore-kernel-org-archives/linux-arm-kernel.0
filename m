@@ -1,75 +1,45 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 25 Mar 2013 15:35:03 +0530
-Subject: [PATCH v2 11/18] ARM: OMAP5: PM: Add L2 memory power down support
+Date: Mon, 25 Mar 2013 15:35:04 +0530
+Subject: [PATCH v2 12/18] ARM: OMAP4: CPUidle: Avoid double idle driver
+ registration
 In-Reply-To: <1364205910-32392-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1364205910-32392-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1364205910-32392-12-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1364205910-32392-13-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the entire MPUSS cluster is powered down in device off state, L2 cache
-memory looses it's content and hence while targetting such a state,
-l2 cache needs to be flushed to main memory.
+OMAP4 CPUidle driver registration call is under a loop which leads
+to calling cpuidle_register_driver twice which is not intended.
 
-Add the necessary low power code support for the same.
+Fix it by moving the driver registration outside the loop.
 
+Reported-by: Nishanth Menon <nm@ti.com>
 Acked-by: Nishanth Menon <nm@ti.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/mach-omap2/omap-secure.h     |    1 +
- arch/arm/mach-omap2/sleep_omap4plus.S |   21 +++++++++++++++++++++
- 2 files changed, 22 insertions(+)
+ arch/arm/mach-omap2/cpuidle44xx.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap-secure.h b/arch/arm/mach-omap2/omap-secure.h
-index 1739468..a171a5a 100644
---- a/arch/arm/mach-omap2/omap-secure.h
-+++ b/arch/arm/mach-omap2/omap-secure.h
-@@ -47,6 +47,7 @@
- #define OMAP4_MON_L2X0_PREFETCH_INDEX	0x113
- #define OMAP5_MON_CACHES_CLEAN_INDEX	0x103
- #define OMAP5_MON_AUX_CTRL_INDEX	0x107
-+#define OMAP5_MON_L2AUX_CTRL_INDEX	0x104
+diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle44xx.c
+index 9de47a7..d00b1ec 100644
+--- a/arch/arm/mach-omap2/cpuidle44xx.c
++++ b/arch/arm/mach-omap2/cpuidle44xx.c
+@@ -233,14 +233,14 @@ int __init omap4_idle_init(void)
+ 	/* Configure the broadcast timer on each cpu */
+ 	on_each_cpu(omap_setup_broadcast_timer, NULL, 1);
  
- #define OMAP5_MON_AMBA_IF_INDEX		0x108
- 
-diff --git a/arch/arm/mach-omap2/sleep_omap4plus.S b/arch/arm/mach-omap2/sleep_omap4plus.S
-index 4a5e2e4..288f62f 100644
---- a/arch/arm/mach-omap2/sleep_omap4plus.S
-+++ b/arch/arm/mach-omap2/sleep_omap4plus.S
-@@ -337,6 +337,7 @@ ENDPROC(omap4_cpu_resume)
-  *	0 - Nothing lost and no need to save: MPUSS INA/CSWR
-  *	1 - CPUx L1 and logic lost: CPU OFF, MPUSS INA/CSWR
-  *	2 - CPUx L1 and logic lost + GIC lost: MPUSS OSWR
-+ *	3 - CPUx L1 and logic lost + GIC,L2 lost: MPU OSWR & L2 lost(debug only)
-  */
- ENTRY(omap5_finish_suspend)
- 	stmfd	sp!, {r4-r12, lr}
-@@ -391,6 +392,26 @@ skip_secure_l1_clean_op:
- 	isb
- 	dsb
- 
-+	bl	omap4_get_sar_ram_base
-+	mov	r8, r0
-+	mrc	p15, 0, r5, c0, c0, 5		@ Read MPIDR
-+	ands	r5, r5, #0x0f
-+	ldreq	r0, [r8, #L2X0_SAVE_OFFSET0]	@ Retrieve L2 state
-+	ldrne	r0, [r8, #L2X0_SAVE_OFFSET1]
-+	cmp	r0, #3
-+	bne	do_wfi
-+	bl	omap4_get_sar_ram_base
-+	ldr	r9, [r0, #OMAP_TYPE_OFFSET]
-+	cmp	r9, #0x1			@ Check for HS device
-+	bne	skip_secure_l2_clean_op
-+	mov	r0, #1				@ Clean secure L2
-+	stmfd   r13!, {r4-r12, r14}
-+	ldr	r12, =OMAP5_MON_CACHES_CLEAN_INDEX
-+	DO_SMC
-+	ldmfd   r13!, {r4-r12, r14}
-+skip_secure_l2_clean_op:
-+	bl	v7_flush_dcache_all
++	cpuidle_register_driver(&omap4_idle_driver);
 +
- do_wfi:
- 	bl	omap_do_wfi
- 
+ 	for_each_cpu(cpu_id, cpu_online_mask) {
+ 		dev = &per_cpu(omap4_idle_dev, cpu_id);
+ 		dev->cpu = cpu_id;
+ #ifdef CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED
+ 		dev->coupled_cpus = *cpu_online_mask;
+ #endif
+-		cpuidle_register_driver(&omap4_idle_driver);
+-
+ 		if (cpuidle_register_device(dev)) {
+ 			pr_err("%s: CPUidle register failed\n", __func__);
+ 			return -EIO;
 -- 
 1.7.9.5
