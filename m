@@ -1,25 +1,58 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Mar 2013 22:36:23 +0000
-Subject: [PATCH] ARM: convert arm/arm64 arch timer to use CLKSRC_OF init
-In-Reply-To: <5150C16A.3040208@gmail.com>
-References: <1363818875-15978-1-git-send-email-robherring2@gmail.com>
- <20130325172633.GP30923@n2100.arm.linux.org.uk> <5150C16A.3040208@gmail.com>
-Message-ID: <201303252236.23270.arnd@arndb.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 25 Mar 2013 16:44:15 -0600
+Subject: [PATCH v8 00/14] Tegra114 clockframework
+In-Reply-To: <514CAB71.7020005@wwwdotorg.org>
+References: <1363956029-31873-1-git-send-email-pdeschrijver@nvidia.com>
+ <514CAB71.7020005@wwwdotorg.org>
+Message-ID: <5150D33F.1000206@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 25 March 2013, Rob Herring wrote:
-> I count integrator-cp, realview, versatile and non-DT VExpress that do
-> this (not surprisingly) and 25 platforms or timer implementations plus
-> arm64 that do sched_clock setup in time_init. What's broken by not
-> moving these earlier?
+On 03/22/2013 01:05 PM, Stephen Warren wrote:
+> On 03/22/2013 06:39 AM, Peter De Schrijver wrote:
+>> This is the eight version of the Tegra114 clockframework. It is based on the
+>> next-20130320-fixed branch of
+>> git://nv-tegra.nvidia.com/user/swarren/linux-2.6.git,
+> 
+> Hmmm. Basing this on v3.9-rcX would be better, since when I apply it to
+> the Tegra tree, that's what it will be based on. Luckily, it applies
+> there with trivial conflicts.
+> 
+>> http://patchwork.ozlabs.org/patch/229972/ and
+>> http://patchwork.ozlabs.org/patch/229978/
+> 
+> The series,
+> 
+> Tested-by: Stephen Warren <swarren@nvidia.com>
+> 
+> (based on my personal next-20130318-fixed branch, without
+> http://patchwork.ozlabs.org/patch/229972/ applied, but instead with the
+> audio clocks initialized per the patch I posted yesterday to do this).
+> 
+> I tested: serial console, eMMC for the root filesystem, audio playback
+> using different pll_a rates, reboot, and shutdown.
+> 
+> This version also solves the hard hang I was seeing with V7 during
+> shutdown or reboot. Now I don't have to rely on my filesystem journal:-)
 
-timekeeping_init() will leave the persistent_clock_exist variable as "false",
-which is read in rtc_suspend() and timekeeping_inject_sleeptime().
+Hmm. I retract that Tested-by now.
 
-For all I can tell, you will get a little jitter every time you
-do a suspend in that case. Or perhaps it means the system clock
-will be forwarded by the amount of time spent in suspend twice
-after wakeup, but I'm probably misreading the code for that case.
+If I apply the series on top of Tegra's for-next branch (which is
+currently entirely based on v3.9-rc1) then it works fine. (Similarly, it
+works fine on top of next-20130318, as I reported above).
 
-	Arnd
+If I merge in v3.9-rc3, it's still fine. If I merge in v3.9-rc4, I see a
+hard hang during boot. I believe that "hard hang" here means that some
+module's registers are being touched with the clock turned off, which
+locks up the CPU/bus. Certainly, sysrq doesn't work once it's hung.
+
+I tracked this down to some interaction with commit f7db706 "ARM:
+7674/1: smp: Avoid dummy clockevent being preferred over real hardware
+clock-event". So says a "git bisect" between v3.9-rc3 and v3.9-rc4,
+applying this CCF V8 series at each point.
+
+If I revert that commit, the problem is solved/hidden. I tested this in
+my local dev branch that's based on next-20130325 plus this CCF V8
+series, plus a bunch of other cruft.
+
+Can you please investigate what the problem is? Thanks.
