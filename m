@@ -1,88 +1,238 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 25 Mar 2013 18:17:37 +0000
-Subject: [PATCH v2 3/5] ARM: mm: fix numerous hideous errors in proc-arm740.S
+Date: Mon, 25 Mar 2013 18:17:36 +0000
+Subject: [PATCH v2 2/5] ARM: cache: remove ARMv3 support code
 In-Reply-To: <1364235459-17672-1-git-send-email-will.deacon@arm.com>
 References: <1364235459-17672-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1364235459-17672-4-git-send-email-will.deacon@arm.com>
+Message-ID: <1364235459-17672-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The setup code in proc-arm740.S is completely broken and, as far as I
-can tell, always has been. I was >this< close to ripping it out, when a
-740t core-tile materialised in the office, so I've had a crack at fixing
-things up:
+This is only used by 740t, which is a v4 core and (by my reading of the
+datasheet for the CPU) ignores CRm for the cp15 cache flush operation,
+making the v4 cache implementation in cache-v4.S sufficient for this
+CPU.
 
-	- Fix the ram/flash area calculations so that we actually set
-	  the condition flags before testing them...
-	- Fix the proc_info structure so that __cpu_io_mmu_flags are
-	  defined as 0, placing the __cpu_flush pointer at the correct
-	  offset
-	- Re-number the registers used during __arm740_setup so that
-	  we don't clobber the machine ID et al
-	- Advertise Thumb support via the hwcaps, since 740T is the only
-	  740 implementation.
+Tested with 740T core-tile on Integrator/AP baseboard.
 
-Acked-by: Hyok S. Choi <hyok.choi@samsung.com>
+Cc: Hyok S. Choi <hyok.choi@samsung.com>
+Cc: Greg Ungerer <gerg@uclinux.org>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/mm/proc-arm740.S | 28 ++++++++++++++++------------
- 1 file changed, 16 insertions(+), 12 deletions(-)
+ arch/arm/include/asm/glue-cache.h |   8 ---
+ arch/arm/mm/Kconfig               |   5 +-
+ arch/arm/mm/Makefile              |   1 -
+ arch/arm/mm/cache-v3.S            | 137 --------------------------------------
+ arch/arm/mm/proc-arm740.S         |   2 +-
+ 5 files changed, 2 insertions(+), 151 deletions(-)
+ delete mode 100644 arch/arm/mm/cache-v3.S
 
+diff --git a/arch/arm/include/asm/glue-cache.h b/arch/arm/include/asm/glue-cache.h
+index cca9f15..ea289e1 100644
+--- a/arch/arm/include/asm/glue-cache.h
++++ b/arch/arm/include/asm/glue-cache.h
+@@ -19,14 +19,6 @@
+ #undef _CACHE
+ #undef MULTI_CACHE
+ 
+-#if defined(CONFIG_CPU_CACHE_V3)
+-# ifdef _CACHE
+-#  define MULTI_CACHE 1
+-# else
+-#  define _CACHE v3
+-# endif
+-#endif
+-
+ #if defined(CONFIG_CPU_CACHE_V4)
+ # ifdef _CACHE
+ #  define MULTI_CACHE 1
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index 025d173..4045c49 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -43,7 +43,7 @@ config CPU_ARM740T
+ 	depends on !MMU
+ 	select CPU_32v4T
+ 	select CPU_ABRT_LV4T
+-	select CPU_CACHE_V3	# although the core is v4t
++	select CPU_CACHE_V4
+ 	select CPU_CP15_MPU
+ 	select CPU_PABRT_LEGACY
+ 	help
+@@ -469,9 +469,6 @@ config CPU_PABRT_V7
+ 	bool
+ 
+ # The cache model
+-config CPU_CACHE_V3
+-	bool
+-
+ config CPU_CACHE_V4
+ 	bool
+ 
+diff --git a/arch/arm/mm/Makefile b/arch/arm/mm/Makefile
+index 4e333fa..9e51be9 100644
+--- a/arch/arm/mm/Makefile
++++ b/arch/arm/mm/Makefile
+@@ -33,7 +33,6 @@ obj-$(CONFIG_CPU_PABRT_LEGACY)	+= pabort-legacy.o
+ obj-$(CONFIG_CPU_PABRT_V6)	+= pabort-v6.o
+ obj-$(CONFIG_CPU_PABRT_V7)	+= pabort-v7.o
+ 
+-obj-$(CONFIG_CPU_CACHE_V3)	+= cache-v3.o
+ obj-$(CONFIG_CPU_CACHE_V4)	+= cache-v4.o
+ obj-$(CONFIG_CPU_CACHE_V4WT)	+= cache-v4wt.o
+ obj-$(CONFIG_CPU_CACHE_V4WB)	+= cache-v4wb.o
+diff --git a/arch/arm/mm/cache-v3.S b/arch/arm/mm/cache-v3.S
+deleted file mode 100644
+index 8a3fade..0000000
+--- a/arch/arm/mm/cache-v3.S
++++ /dev/null
+@@ -1,137 +0,0 @@
+-/*
+- *  linux/arch/arm/mm/cache-v3.S
+- *
+- *  Copyright (C) 1997-2002 Russell king
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-#include <linux/linkage.h>
+-#include <linux/init.h>
+-#include <asm/page.h>
+-#include "proc-macros.S"
+-
+-/*
+- *	flush_icache_all()
+- *
+- *	Unconditionally clean and invalidate the entire icache.
+- */
+-ENTRY(v3_flush_icache_all)
+-	mov	pc, lr
+-ENDPROC(v3_flush_icache_all)
+-
+-/*
+- *	flush_user_cache_all()
+- *
+- *	Invalidate all cache entries in a particular address
+- *	space.
+- *
+- *	- mm	- mm_struct describing address space
+- */
+-ENTRY(v3_flush_user_cache_all)
+-	/* FALLTHROUGH */
+-/*
+- *	flush_kern_cache_all()
+- *
+- *	Clean and invalidate the entire cache.
+- */
+-ENTRY(v3_flush_kern_cache_all)
+-	/* FALLTHROUGH */
+-
+-/*
+- *	flush_user_cache_range(start, end, flags)
+- *
+- *	Invalidate a range of cache entries in the specified
+- *	address space.
+- *
+- *	- start - start address (may not be aligned)
+- *	- end	- end address (exclusive, may not be aligned)
+- *	- flags	- vma_area_struct flags describing address space
+- */
+-ENTRY(v3_flush_user_cache_range)
+-	mov	ip, #0
+-	mcreq	p15, 0, ip, c7, c0, 0		@ flush ID cache
+-	mov	pc, lr
+-
+-/*
+- *	coherent_kern_range(start, end)
+- *
+- *	Ensure coherency between the Icache and the Dcache in the
+- *	region described by start.  If you have non-snooping
+- *	Harvard caches, you need to implement this function.
+- *
+- *	- start  - virtual start address
+- *	- end	 - virtual end address
+- */
+-ENTRY(v3_coherent_kern_range)
+-	/* FALLTHROUGH */
+-
+-/*
+- *	coherent_user_range(start, end)
+- *
+- *	Ensure coherency between the Icache and the Dcache in the
+- *	region described by start.  If you have non-snooping
+- *	Harvard caches, you need to implement this function.
+- *
+- *	- start  - virtual start address
+- *	- end	 - virtual end address
+- */
+-ENTRY(v3_coherent_user_range)
+-	mov	r0, #0
+-	mov	pc, lr
+-
+-/*
+- *	flush_kern_dcache_area(void *page, size_t size)
+- *
+- *	Ensure no D cache aliasing occurs, either with itself or
+- *	the I cache
+- *
+- *	- addr	- kernel address
+- *	- size	- region size
+- */
+-ENTRY(v3_flush_kern_dcache_area)
+-	/* FALLTHROUGH */
+-
+-/*
+- *	dma_flush_range(start, end)
+- *
+- *	Clean and invalidate the specified virtual address range.
+- *
+- *	- start  - virtual start address
+- *	- end	 - virtual end address
+- */
+-ENTRY(v3_dma_flush_range)
+-	mov	r0, #0
+-	mcr	p15, 0, r0, c7, c0, 0		@ flush ID cache
+-	mov	pc, lr
+-
+-/*
+- *	dma_unmap_area(start, size, dir)
+- *	- start	- kernel virtual start address
+- *	- size	- size of region
+- *	- dir	- DMA direction
+- */
+-ENTRY(v3_dma_unmap_area)
+-	teq	r2, #DMA_TO_DEVICE
+-	bne	v3_dma_flush_range
+-	/* FALLTHROUGH */
+-
+-/*
+- *	dma_map_area(start, size, dir)
+- *	- start	- kernel virtual start address
+- *	- size	- size of region
+- *	- dir	- DMA direction
+- */
+-ENTRY(v3_dma_map_area)
+-	mov	pc, lr
+-ENDPROC(v3_dma_unmap_area)
+-ENDPROC(v3_dma_map_area)
+-
+-	.globl	v3_flush_kern_cache_louis
+-	.equ	v3_flush_kern_cache_louis, v3_flush_kern_cache_all
+-
+-	__INITDATA
+-
+-	@ define struct cpu_cache_fns (see <asm/cacheflush.h> and proc-macros.S)
+-	define_cache_functions v3
 diff --git a/arch/arm/mm/proc-arm740.S b/arch/arm/mm/proc-arm740.S
-index 2088234..fde2d2a 100644
+index dc5de5d..2088234 100644
 --- a/arch/arm/mm/proc-arm740.S
 +++ b/arch/arm/mm/proc-arm740.S
-@@ -77,24 +77,27 @@ __arm740_setup:
- 	mcr	p15, 0, r0, c6,	c0		@ set area 0, default
- 
- 	ldr	r0, =(CONFIG_DRAM_BASE & 0xFFFFF000) @ base[31:12] of RAM
--	ldr	r1, =(CONFIG_DRAM_SIZE >> 12)	@ size of RAM (must be >= 4KB)
--	mov	r2, #10				@ 11 is the minimum (4KB)
--1:	add	r2, r2, #1			@ area size *= 2
--	mov	r1, r1, lsr #1
-+	ldr	r3, =(CONFIG_DRAM_SIZE >> 12)	@ size of RAM (must be >= 4KB)
-+	mov	r4, #10				@ 11 is the minimum (4KB)
-+1:	add	r4, r4, #1			@ area size *= 2
-+	movs	r3, r3, lsr #1
- 	bne	1b				@ count not zero r-shift
--	orr	r0, r0, r2, lsl #1		@ the area register value
-+	orr	r0, r0, r4, lsl #1		@ the area register value
- 	orr	r0, r0, #1			@ set enable bit
- 	mcr	p15, 0, r0, c6,	c1		@ set area 1, RAM
- 
- 	ldr	r0, =(CONFIG_FLASH_MEM_BASE & 0xFFFFF000) @ base[31:12] of FLASH
--	ldr	r1, =(CONFIG_FLASH_SIZE >> 12)	@ size of FLASH (must be >= 4KB)
--	mov	r2, #10				@ 11 is the minimum (4KB)
--1:	add	r2, r2, #1			@ area size *= 2
--	mov	r1, r1, lsr #1
-+	ldr	r3, =(CONFIG_FLASH_SIZE >> 12)	@ size of FLASH (must be >= 4KB)
-+	cmp	r3, #0
-+	moveq	r0, #0
-+	beq	2f
-+	mov	r4, #10				@ 11 is the minimum (4KB)
-+1:	add	r4, r4, #1			@ area size *= 2
-+	movs	r3, r3, lsr #1
- 	bne	1b				@ count not zero r-shift
--	orr	r0, r0, r2, lsl #1		@ the area register value
-+	orr	r0, r0, r4, lsl #1		@ the area register value
- 	orr	r0, r0, #1			@ set enable bit
--	mcr	p15, 0, r0, c6,	c2		@ set area 2, ROM/FLASH
-+2:	mcr	p15, 0, r0, c6,	c2		@ set area 2, ROM/FLASH
- 
- 	mov	r0, #0x06
- 	mcr	p15, 0, r0, c2, c0		@ Region 1&2 cacheable
-@@ -137,10 +140,11 @@ __arm740_proc_info:
- 	.long	0x41807400
- 	.long	0xfffffff0
- 	.long	0
-+	.long	0
- 	b	__arm740_setup
- 	.long	cpu_arch_name
- 	.long	cpu_elf_name
--	.long	HWCAP_SWP | HWCAP_HALF | HWCAP_26BIT
-+	.long	HWCAP_SWP | HWCAP_HALF | HWCAP_THUMB | HWCAP_26BIT
- 	.long	cpu_arm740_name
+@@ -145,5 +145,5 @@ __arm740_proc_info:
  	.long	arm740_processor_functions
  	.long	0
+ 	.long	0
+-	.long	v3_cache_fns			@ cache model
++	.long	v4_cache_fns			@ cache model
+ 	.size	__arm740_proc_info, . - __arm740_proc_info
 -- 
 1.8.0
