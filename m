@@ -1,46 +1,26 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 25 Mar 2013 12:54:17 +0100
-Subject: [PATCH v3] clk: add si5351 i2c common clock driver
-In-Reply-To: <5149E85E.90701@gmail.com>
-References: <fa.WZVD0OA/Ooajh6BejiLf7TwBsJ8@ifi.uio.no>
- <fa.iIqrS6k+Vb5mLqAeL7iTsNsbKyo@ifi.uio.no>
- <fa.L0b41q+fYFZG0WOFTGKLhn/cGPA@ifi.uio.no>
- <fa.XCuSmq9Zwp3+wqFO8NEjpwADVZ0@ifi.uio.no>
- <6e120226-8a3c-415f-90f2-c44e7b6bbf96@googlegroups.com>
- <5149E85E.90701@gmail.com>
-Message-ID: <CABJ1b_T2x-DkTuYZGLBiedFRWcgYbcN3VCorN2nm3Y54A--wyw@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 25 Mar 2013 12:02:57 +0000
+Subject: EXYNOS will support only DT from v3.10
+In-Reply-To: <17a501ce2948$17037610$450a6230$%kim@samsung.com>
+References: <17a501ce2948$17037610$450a6230$%kim@samsung.com>
+Message-ID: <20130325120256.GM18316@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 20, 2013 at 5:48 PM, Daniel Mack <zonque@gmail.com> wrote:
-> On 20.03.2013 14:55, michal.bachraty at gmail.com wrote:
->> Thanks for writing this driver! I have tested your si5351 clock
->> driver and his tuning capabilities. It works well, it generates
->> proper clock frequency, but when new frequency is generated, little
->> clock gap (1ms) is generated. Si5351 datasheet and WP claims, clock
->> tuning can be without gaps -
->> http://www.silabs.com/Support%20Documents/TechnicalDocs/Si5350-51-Frequency-Shifting-WP.pdf
->>
->> I made some tests with Si5351A chip and I found that when tuning touch
->> only Multisynth registers, it can tune without gaps. There is no need
->> for soft PLL reset. I found also, accessing Multisynth registers is not
->> atomic, so there can be another frequency at output, while not all
->> registers are written. Writing only to one register seems to be atomic.
+On Mon, Mar 25, 2013 at 08:01:23PM +0900, Kukjin Kim wrote:
 
-Michael,
+> As we discussed before, it's time to decide to support non-DT for EXYNOS
+> SoCs.
 
-if you don't configure the clock output to modify the pll, changing output
-frequency will not alter pll config and there will be no reset of pll.
+> If everybody else agrees to drop non-DT support from v3.10, I will. Feel
+> free to talk your opinion about that.
 
-> Yeah, but limiting possible changes to the PLLs to one single register
-> also means that you cannot offer to generate all the frequencies any
-> more. What could probably be done is refine the algorithm so that it
-> stays 'as close as possible' to the former values, but I'm not sure how
-> much work that implies.
->
-> Can you provide a patch against Sebastian's v3 to do that? Then it can
-> be cleanly applied on top of the driver later.
-
-Ack. Feel free to post a patch on top of v4 now.
-
-Sebastian
+No problem for me on Exynos, though it would be a bit of an issue to
+loose it for s3c64xx right now.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130325/769e4c12/attachment.sig>
