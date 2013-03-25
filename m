@@ -1,117 +1,66 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 25 Mar 2013 14:29:35 +0100
-Subject: [RFC PATCH] CLK: Allow parent clock and rate to be configured in
- DT.
-In-Reply-To: <51503007.5020403@parkeon.com>
-References: <20130319170933.28337.50448.stgit@localhost>
- <20130325101707.GZ1906@pengutronix.de>
- <51503007.5020403@parkeon.com>
-Message-ID: <20130325132935.GE1906@pengutronix.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 25 Mar 2013 14:30:23 +0100
+Subject: [PATCH 00/10] ARM: sunxi: Architecture cleanups and rework
+Message-ID: <1364218233-29636-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 25, 2013 at 12:07:51PM +0100, Martin Fuzzey wrote:
-> Hi Sascha,
-> 
-> thanks for the comments.
-> 
-> [corrected Mike's email address - I originally sent it to the old one]
-> 
-> On 25/03/13 11:17, Sascha Hauer wrote:
-> >On Tue, Mar 19, 2013 at 06:09:33PM +0100, Martin Fuzzey wrote:
-> >>Even on platforms where the entire clock tree is not represented in the DT
-> >>it can still be useful to allow parents and rates to be set from the DT.
-> >>
-> >>An example of such a case is when a multiplexable clock output from a SOC
-> >>is used to supply external chips (eg an audio codec connected to the i.MX53
-> >>cko1 pin).
-> >>
-> >>The cko1 pin can output various internal clock signals but, in
-> >>order to obtain a suitable frequency for the codec, an appropriate parent must
-> >>be selected.
-> >>
-> >>Another example is setting root clock dividers.
-> >>
-> >>This is board specific rather than device driver or platform clock framework
-> >>specific information and thus would be better in the DT.
-> >I see what the patch does and that it could be very useful, but there's
-> >a problem: The devicetree is for hardware *description*, not
-> >*configuration*.
-> >
-> >>+For example:
-> >>+	clock-configuration {
-> >>+		compatible = "clock-configuration";
-> >>+		clko1 {
-> >>+			clocks = <&clks 160>; /* cko1_sel */
-> >>+			parent = <&clks 114>; /* pll3_sw */
-> >>+		};
-> >>+
-> >>+		esdhca {
-> >>+			clocks = <&clks 102>; /* esdhc_a_podf */
-> >>+			clock-frequency = <200000000>;
-> >>+		};
-> >This example shows this. For some reason we adjust the esdhc frequency
-> >to 200MHz in the code currently, but this is because it matches our
-> >current usecase. Once you move this into devicetree, we can't change
-> >this anymore in the kernel, even if we find a much better way to adjust
-> >the frequency in the future (i.e. smaller values might be good for power
-> >savings, higher values might increase performance, we even might
-> >dynamically change this frequency).
-> >
-> Yes but the problem is that the rates are currently set in
-> clk-imx51-53.c which should be generic
-> to all such platforms whereas, as you point out, there may well be
-> valid reasons to choose
-> different values depending on the board design and / or intended
-> application.
+Hi,
 
-Put it differently. OpenBSD might have much better clock support.
-Imagine it can dynamically figure out the correct esdhc frequencies
-for different usecases on the fly. In this situation it would be
-counterproductive if Linux requires static values for these in the
-devicetree.
+This patchset is a serie of various cleanups and reworks in the sunxi
+architecture to prepare a clean landing for the next Allwinner SoC, the
+A31 (sun6i).
 
-> 
-> The cko case is even worse - due to a board design decision that
-> clock needs to have
-> a frequency suitable for supplying some external chip. We don't want
-> board specific code in
-> the platform clock code and we're trying to get away from board files...
+The A31 is significantly different from the previous Allwinner SoC we
+supported, the A10 and A13, to no longer make the generic sunxi prefix
+we used in most compatible string relevant, while it should really have
+been sun4i in the first place.
 
-The codec could be provided a phandle to the cko clk. This is hardware
-description and is fine for putting into the devicetree.
+This set is also the occasion to cleanup the timer and irq code by
+switching to the recently introduced clocksource and irqchip
+infrastructures.
 
-> 
-> >So no, this shouldn't be in the devicetree, even though it's very
-> >tempting to do so.
-> >
-> >I wonder when someone comes up with a 'configtree' where we could put in
-> >such stuff.
-> I don't understand why we need a seperate tree for this why can't just
-> a subtree of the DT be used?
-> 
-> After all the DT already contains "configuration" nodes such as "chosen".
-> 
-> Indeed Documentation/devicetree/usage-model.txt  says:
->     "The chosen node may also optionally contain an arbitrary number of
->     additional properties for platform-specific configuration data."
-> 
-> So what stops us simply placing the clock-configuration node above
-> under chosen? (which already works - just tested it)
+This set depends on the UART patches I sent previously.
 
-What stops us doing so is that currently we have the policy that the
-devicetree is hardware description only, even if there are already
-counteraxamples in the devicetree.
+Maxime
 
-I know that we currently have no place to put such information. There
-recently was a similar discussion with CMA descriptions in the
-devicetree and I remember several other discussions of the same type,
-all of which ended at the dont-know-but-not-in-the-devicetree point.
+Maxime Ripard (10):
+  ARM: sunxi: dt: Reorganize the dtsi
+  clocksource: sunxi: Cleanup the timer code
+  clocksource: sunxi: make use of CLKSRC_OF
+  clocksource: sunxi: Rename sunxi to sun4i
+  ARM: sunxi: dt: Update timer compatible string
+  irqchip: sunxi: Make use of the IRQCHIP_DECLARE macro
+  irqchip: sunxi: Rename sunxi to sun4i
+  ARM: sunxi: dt: Update interrupt controller compatible string
+  ARM: sunxi: Rework the restart code
+  ARM: sunxi: dt: Update watchdog compatible string
 
-Sascha
+ arch/arm/boot/dts/sun4i-a10-cubieboard.dts |    2 +-
+ arch/arm/boot/dts/sun4i-a10-hackberry.dts  |    2 +-
+ arch/arm/boot/dts/sun4i-a10.dtsi           |  157 +++++++++++++++++++++++++--
+ arch/arm/boot/dts/sun5i-a13-olinuxino.dts  |    2 +-
+ arch/arm/boot/dts/sun5i-a13.dtsi           |  145 ++++++++++++++++++++++++-
+ arch/arm/boot/dts/sunxi.dtsi               |  159 ---------------------------
+ arch/arm/mach-sunxi/Kconfig                |    5 +-
+ arch/arm/mach-sunxi/sunxi.c                |   68 +++++++-----
+ drivers/clocksource/Kconfig                |    2 +-
+ drivers/clocksource/Makefile               |    2 +-
+ drivers/clocksource/sun4i_timer.c          |  161 ++++++++++++++++++++++++++++
+ drivers/clocksource/sunxi_timer.c          |  160 ---------------------------
+ drivers/irqchip/Makefile                   |    2 +-
+ drivers/irqchip/irq-sun4i.c                |  149 +++++++++++++++++++++++++
+ drivers/irqchip/irq-sunxi.c                |  151 --------------------------
+ include/linux/irqchip/sunxi.h              |   27 -----
+ include/linux/sunxi_timer.h                |   24 -----
+ 17 files changed, 650 insertions(+), 568 deletions(-)
+ delete mode 100644 arch/arm/boot/dts/sunxi.dtsi
+ create mode 100644 drivers/clocksource/sun4i_timer.c
+ delete mode 100644 drivers/clocksource/sunxi_timer.c
+ create mode 100644 drivers/irqchip/irq-sun4i.c
+ delete mode 100644 drivers/irqchip/irq-sunxi.c
+ delete mode 100644 include/linux/irqchip/sunxi.h
+ delete mode 100644 include/linux/sunxi_timer.h
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.10.4
