@@ -1,203 +1,101 @@
-From: emilio@elopez.com.ar (=?UTF-8?B?RW1pbGlvIEzDs3Bleg==?=)
-Date: Mon, 25 Mar 2013 07:17:37 -0300
-Subject: [PATCH 1/6] clk: sunxi: Add support for AXI, AHB, APB0 and APB1
- gates
-In-Reply-To: <51501C42.70207@free-electrons.com>
-References: <1363962042-29536-1-git-send-email-emilio@elopez.com.ar>
- <1363962042-29536-2-git-send-email-emilio@elopez.com.ar>
- <51501C42.70207@free-electrons.com>
-Message-ID: <51502441.8090708@elopez.com.ar>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 25 Mar 2013 11:21:13 +0100
+Subject: [PATCH] ARM: dove: add more hardware description in the DT
+In-Reply-To: <20130325103159.0c1b4f17@armhf>
+References: <20130325103159.0c1b4f17@armhf>
+Message-ID: <CABJ1b_RrFpKdH3w=v4gvRQ-8UniKOz9o9VVJ8Q=AQz5WaN0NRQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+On Mon, Mar 25, 2013 at 10:31 AM, Jean-Francois Moine <moinejf@free.fr> wrote:
+> The 88AP510 chip (Marvell Dove) contains a LCD and display controler
+> and two audio controlers.
+>
+> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+> ---
+>  arch/arm/boot/dts/dove.dtsi |   31 +++++++++++++++++++++++++++++++
+>  1 file changed, 31 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
+> index f7509ca..6bd36b0 100644
+> --- a/arch/arm/boot/dts/dove.dtsi
+> +++ b/arch/arm/boot/dts/dove.dtsi
+> @@ -253,5 +253,36 @@
+>                                 dmacap,xor;
+>                         };
+>                 };
+> +
+> +               lcd0: lcd0 at 820000 {
 
-El 25/03/13 06:43, Maxime Ripard escribi?:
-> Hi Emilio,
-> 
-> I have a few comments below,
-> 
-> Le 22/03/2013 15:20, Emilio L?pez a ?crit :
->> This patchset adds DT support for all the AXI, AHB, APB0 and APB1
->> gates present on sunxi SoCs.
->>
->> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
->> ---
->>  Documentation/devicetree/bindings/clock/sunxi.txt | 108 +++++++++++++++++++++-
->>  drivers/clk/sunxi/clk-sunxi.c                     |  90 +++++++++++++++++-
->>  2 files changed, 196 insertions(+), 2 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
->> index b23cfbd..c5432c4 100644
->> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
->> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
->> @@ -10,15 +10,23 @@ Required properties:
->>  	"allwinner,sunxi-pll1-clk" - for the main PLL clock
->>  	"allwinner,sunxi-cpu-clk" - for the CPU multiplexer clock
->>  	"allwinner,sunxi-axi-clk" - for the sunxi AXI clock
->> +	"allwinner,sunxi-axi-gates-clk" - for the AXI gates
->>  	"allwinner,sunxi-ahb-clk" - for the sunxi AHB clock
->> +	"allwinner,sunxi-ahb-gates-clk" - for the AHB gates
->>  	"allwinner,sunxi-apb0-clk" - for the sunxi APB0 clock
->> +	"allwinner,sunxi-apb0-gates-clk" - for the APB0 gates
->>  	"allwinner,sunxi-apb1-clk" - for the sunxi APB1 clock
->>  	"allwinner,sunxi-apb1-mux-clk" - for the sunxi APB1 clock muxing
->> +	"allwinner,sunxi-apb1-gates-clk" - for the APB1 gates
-> 
-> It has been pointed to me that the usual way of dealing with compatible
-> IPs in several generation of SoC in device tree is usually to use the
-> oldest SoC name to support it, and not some generic term like we use.
-> 
-> I'm currently struggling while doing some work on the A31, where some
-> IPs differ in a significant way from the A10/A13, and we can't just use
-> sunxi anymore.
-> 
-> I have a patchset that renames every other IP we have doing this, but
-> could you rename your compatible strings to allwinner,sun4i* as a first
-> patch for the already existing clocks, and use that prefix in the
-> following patches as well? Moreover, since it has been mostly tested on
-> an A10, if the IP came to differ to some aspect in the A13, it will make
-> our life easier as well.
+Jean-Francois,
 
-Ok, I'll do so.
+please choose a more informative node names like
 
-> 
->>  
->>  Required properties for all clocks:
->>  - reg : shall be the control register address for the clock.
->>  - clocks : shall be the input parent clock(s) phandle for the clock
->> -- #clock-cells : from common clock binding; shall be set to 0.
->> +- #clock-cells : from common clock binding; shall be set to 0 except for
->> +	"allwinner,sunxi-*-gates-clk" where it shall be set to 1
->> +
->> +Additionally, "allwinner,sunxi-*-gates-clk" clocks require:
->> +- clock-output-names : the corresponding gate names that the clock controls
->>  
->>  For example:
->>  
->> @@ -42,3 +50,101 @@ cpu: cpu at 01c20054 {
->>  	reg = <0x01c20054 0x4>;
->>  	clocks = <&osc32k>, <&osc24M>, <&pll1>;
->>  };
->> +
->> +
->> +
->> +Gate clock outputs
->> +
->> +The "allwinner,sunxi-*-gates-clk" clocks provide several gatable outputs;
->> +their corresponding offsets are listed below:
->> +
->> +  * AXI gates ("allwinner,sunxi-axi-gates-clk")
->> +
->> +    DRAM                                                                0
->> +
->> +  * AHB gates ("allwinner,sunxi-ahb-gates-clk")
->> +
->> +    USB0                                                                0
->> +    EHCI0                                                               1
->> +    OHCI0                                                               2*
->> +    EHCI1                                                               3
->> +    OHCI1                                                               4*
->> +    SS                                                                  5
->> +    DMA                                                                 6
->> +    BIST                                                                7
->> +    MMC0                                                                8
->> +    MMC1                                                                9
->> +    MMC2                                                                10
->> +    MMC3                                                                11
->> +    MS                                                                  12**
->> +    NAND                                                                13
->> +    SDRAM                                                               14
->> +
->> +    ACE                                                                 16
->> +    EMAC                                                                17
-> 
-> Hmmm, this makes me thinking that I used wemac in the pinctrl driver,
-> and that it's not really consistent with the datasheet, what you have
-> here, and what I did in the EMAC driver. I'll need to change that...
-> 
->> +    TS                                                                  18
->> +
->> +    SPI0                                                                20
->> +    SPI1                                                                21
->> +    SPI2                                                                22
->> +    SPI3                                                                23
->> +    PATA                                                                24
->> +    SATA                                                                25**
->> +    GPS                                                                 26*
->> +
->> +    VE                                                                  32
->> +    TVD                                                                 33
->> +    TVE0                                                                34
->> +    TVE1                                                                35
->> +    LCD0                                                                36
->> +    LCD1                                                                37
->> +
->> +    CSI0                                                                40
->> +    CSI1                                                                41
->> +
->> +    HDMI                                                                43
->> +    DE_BE0                                                              44
->> +    DE_BE1                                                              45
->> +    DE_FE0                                                              46
->> +    DE_FE1                                                              47
->> +
->> +    MP                                                                  50
->> +
->> +    MALI400                                                             52
->> +
->> +  * APB0 gates ("allwinner,sunxi-apb0-gates-clk")
->> +
->> +    CODEC                                                               0
->> +    SPDIF                                                               1*
->> +    AC97                                                                2
->> +    IIS                                                                 3
->> +
->> +    PIO                                                                 5
->> +    IR0                                                                 6
->> +    IR1                                                                 7
->> +
->> +    KEYPAD                                                              10
->> +
->> +  * APB1 gates ("allwinner,sunxi-apb1-gates-clk")
->> +
->> +    TWI0                                                                0
->> +    TWI1                                                                1
->> +    TWI2                                                                2
-> 
-> I'd rather see here I2C. I know that it's called TWI in the datasheet,
-> but the term I2C is more commonly used in the kernel.
+lcd0: lcd-controller at 820000 and
+i2s0: audio-controller at b0000
 
-Ok, I'll change it. Do you want me to rename the gate names on the DT
-too to match? ("apb1_twi0" -> "apb1_i2c0")
+Besides lcd and i2s there is also
 
-> 
->> +    CAN                                                                 4
->> +    SCR                                                                 5
->> +    PS20                                                                6
->> +    PS21                                                                7
->> +
->> +    UART0                                                               16
->> +    UART1                                                               17
->> +    UART2                                                               18
->> +    UART3                                                               19
->> +    UART4                                                               20
->> +    UART5                                                               21
->> +    UART6                                                               22
->> +    UART7                                                               23
->> +
->> +Notation:
->> + [*]:  The datasheet didn't mention these, but they are present on AW code
->> + [**]: The datasheet had this marked as "NC" but they are used on AW code
-> 
-> I'm really happy with the general documentation, thanks for this.
-> However, all of this is true only for the A10, could you mention it
-> somewhere?
+dcon: display-controller at 830000 and
+ire: image-rotation-engine at 831000
 
-I could add a note saying so. We could also rename this file to
-sun4i.txt and then and add a sun5i.txt with the A13 gate descriptions
-too; what would you prefer?
+I am not yet 100% sure how to hook them up in dove-drm that I am
+writing on but I want to have them in somehow. DCON will allow to
+mux lcd0/lcd1 data streams, i.e. clone or pan lcd0 to lcd1. IRE allows
+to rotate the memory buffer loaded by -90/90deg.
 
-Thanks for the review,
+I also checked Armada 160 datasheets and they have LCD that looks
+quite compatible with Dove's LCD, while DCON and IRE are not available.
+I also guess there is some more Marvell SoCs out there that also share
+LCD with Dove/Armada 160.
 
-Emilio
+> +                       compatible = "marvell,dove-lcd";
+> +                       reg = <0x820000 0x1c8>;
+> +                       interrupts = <47>;
+> +                       status = "disabled";
+> +               };
+> +
+> +               lcd1: lcd1 at 810000 {
+> +                       compatible = "marvell,dove-lcd";
+> +                       reg = <0x810000 0x1c8>;
+> +                       interrupts = <46>;
+> +                       status = "disabled";
+> +               };
+> +
+> +               i2s0: i2s0 at b0000 {
+> +                       compatible = "marvell,kirkwood-i2s";
+> +                       reg = <0xb0000 0x4000>;
+> +                       interrupt-parent = <&gpio0>;
+> +                       interrupts = <19 2>;
+
+Why did you choose gpio interrupt-parent for i2s?
+
+>From Dove datasheet I can see that, Audio0 has irqs 19, 20
+and Audio1 has irqs 21, 22 on the main irq controller.
+The corresponding nodes for i2s0 and i2s1 should look like
+
+i2s0: audio-controller at b0000 {
+        compatible = "marvell,kirkwood-i2s";
+        reg = <0xb0000 0x4000>;
+        interrupts = <19>, <20>;
+        clocks = <&gate_clk 12>;
+        status = "disabled";
+}
+
+Sebastian
+
+> +                       clocks = <&gate_clk 12>;
+> +                       status = "disabled";
+> +               };
+> +               i2s1: i2s1 at b4000 {
+> +                       compatible = "marvell,kirkwood-i2s";
+> +                       reg = <0xb4000 0x4000>;
+> +                       interrupt-parent = <&gpio0>;
+> +                       interrupts = <21 2>;
+> +                       clocks = <&gate_clk 13>;
+> +                       status = "disabled";
+> +               };
+>         };
+>  };
+> --
+> 1.7.10.4
