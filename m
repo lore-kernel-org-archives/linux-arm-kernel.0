@@ -1,43 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Mar 2013 12:37:38 +0000
-Subject: EXYNOS will support only DT from v3.10
-In-Reply-To: <20130325120256.GM18316@opensource.wolfsonmicro.com>
-References: <17a501ce2948$17037610$450a6230$%kim@samsung.com>
- <20130325120256.GM18316@opensource.wolfsonmicro.com>
-Message-ID: <201303251237.38782.arnd@arndb.de>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Mon, 25 Mar 2013 09:39:30 -0300
+Subject: [PATCH v2 00/14] Marvell EBU thermal sensor consolidation
+In-Reply-To: <CABJ1b_S9c=tFT17=HycmuRbW1g4y8AvWJpmwMRJwvQ214Yb3fw@mail.gmail.com>
+References: <1363991114-4225-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130325093001.GH5627@lunn.ch> <20130325104513.GC2502@localhost>
+ <CABJ1b_S9c=tFT17=HycmuRbW1g4y8AvWJpmwMRJwvQ214Yb3fw@mail.gmail.com>
+Message-ID: <20130325123928.GD2502@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 25 March 2013, Mark Brown wrote:
-> On Mon, Mar 25, 2013 at 08:01:23PM +0900, Kukjin Kim wrote:
+Sebastian,
+
+On Mon, Mar 25, 2013 at 01:23:32PM +0100, Sebastian Hesselbarth wrote:
+> On Mon, Mar 25, 2013 at 11:45 AM, Ezequiel Garcia
+> <ezequiel.garcia@free-electrons.com> wrote:
+> > On Mon, Mar 25, 2013 at 10:30:01AM +0100, Andrew Lunn wrote:
+> >> I've not a strong opinion, but i think separate drivers are better.
+> >
+> > Don't you think a single driver could make maintenance cheaper?
 > 
-> > As we discussed before, it's time to decide to support non-DT for EXYNOS
-> > SoCs.
+> Ezequiel, Andrew,
 > 
-> > If everybody else agrees to drop non-DT support from v3.10, I will. Feel
-> > free to talk your opinion about that.
+> just to sum up my opinion on the whole discussion
 > 
-> No problem for me on Exynos, though it would be a bit of an issue to
-> loose it for s3c64xx right now.
 
-We don't have any DT support for S3C and S5P upstream yet, so I would
-certainly agree on that. I think we should plan at least one release of
-supporting both simultaneously in order to find bugs with the DT
-implementation before we can consider removing ATAGS support for any
-major platform.
+Thanks for jumping in.
 
-However, I also really want to see all ARMv6 and ARMv7 platforms
-get moved over to use ARCH_MULTIPLATFORM, and it probably makes sense
-to eventually move over all platforms that support ARCH_MULTIPLATFORM
-to be DT-only. I hope we do both for EXYNOS in 3.10, and then do at
-least MULTIPLATFORM support for S5P* in 3.11, possibly also for S3C64xx,
-in order to convert all ARMv6 and ARMv7 platforms to MULTIPLATFORM.
+> +1 for formula fixes for kirkwood and dove
 
-For the ARMv5 platforms (S3C24xx and others), we can be much more flexible
-with the timing, plus we can keep S3C and S5P in a state where they are
-DT-only in multiplatform configurations but allow ATAGS when configured
-as standalone like we do today, at least for a couple of releases after
-introducing multiplatform support, until we are comfortable with the DT
-support and don't break any working platforms.
+Could you test the Dove formula fixes and provide a Tested-by?
+However little the patches maybe, it still makes me nervous
+to send untested patches.
 
-	Arnd
+> +1 for separate drivers
+
+I'll send an Armada only patchset soon.
+
+Thanks,
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
