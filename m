@@ -1,20 +1,18 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Mar 2013 10:54:31 +0000
-Subject: [PATCH 7/8] ARM: sirf: enable multiplatform support
-In-Reply-To: <CAGsJ_4ySCncEh8_03B_CXBuS=h-N=CN5LezVRGoMhME78YPaWg@mail.gmail.com>
-References: <1363779679-16880-1-git-send-email-arnd@arndb.de>
- <1363779679-16880-8-git-send-email-arnd@arndb.de>
- <CAGsJ_4ySCncEh8_03B_CXBuS=h-N=CN5LezVRGoMhME78YPaWg@mail.gmail.com>
-Message-ID: <201303251054.31271.arnd@arndb.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 25 Mar 2013 20:01:23 +0900
+Subject: EXYNOS will support only DT from v3.10
+Message-ID: <17a501ce2948$17037610$450a6230$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 25 March 2013, Barry Song wrote:
-> will this mean we will don't support "uncompress ..." printed in the
-> early uncompress stage before lluart work?
+Hi all,
 
-No, with the work that Shawn Guo did, the uncompress code will fall back
-to an implementation based on the debug_ll code now, so you still get
-the early output.
+As we discussed before, it's time to decide to support non-DT for EXYNOS
+SoCs.
 
-	Arnd
+If everybody else agrees to drop non-DT support from v3.10, I will. Feel
+free to talk your opinion about that.
+
+Thanks.
+
+- Kukjin
