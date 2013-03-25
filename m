@@ -1,96 +1,309 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 25 Mar 2013 17:33:10 -0600
-Subject: RFC v2: Zynq Clock Controller
-In-Reply-To: <8fd7278d-37c5-48ff-8d06-edc64d532a96@VA3EHSMHS037.ehs.local>
-References: <27dae808-1d3a-4001-8eb2-b0a6e2a34b8f@AM1EHSMHS013.ehs.local>
- <515093B4.2090701@wwwdotorg.org>
- <8fd7278d-37c5-48ff-8d06-edc64d532a96@VA3EHSMHS037.ehs.local>
-Message-ID: <5150DEB6.7070208@wwwdotorg.org>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 25 Mar 2013 16:43:43 -0700
+Subject: [PATCH V3] clk: Add composite clock type
+In-Reply-To: <1363780834-1289-1-git-send-email-pgaikwad@nvidia.com>
+References: <1363780834-1289-1-git-send-email-pgaikwad@nvidia.com>
+Message-ID: <20130325234343.4014.28487@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/25/2013 12:27 PM, S?ren Brinkmann wrote:
-> Hi Stephen,
+Quoting Prashant Gaikwad (2013-03-20 05:00:34)
+> Not all clocks are required to be decomposed into basic clock
+> types but at the same time want to use the functionality
+> provided by these basic clock types instead of duplicating.
 > 
-> On Mon, Mar 25, 2013 at 12:13:08PM -0600, Stephen Warren wrote:
->> On 03/20/2013 05:56 PM, S?ren Brinkmann wrote:
->>> Hi,
->>>
->>> I spent some time working on this and incorporating feedback. Here's an updated proposal for a clock controller for Zynq:
->>>
->>> Required properties:
->>>  - #clock-cells : Must be 1
->>>  - compatible : "xlnx,ps7-clkc"  (this may become 'xlnx,zynq-clkc' terminology differs a bit between Xilinx internal and mainline)
->>>  - ps-clk-frequency : Frequency of the oscillator providing ps_clk in HZ
->>>                      (usually 33 MHz oscillators are used for Zynq platforms)
->>
->> This may have been mentioned before, but shouldn't the input clock be
->> represented as an actual clock in DT, and hence as an entry in this
->> node's clocks property? The crystal/... itself can be represented in DT
->> as a fixed-clock.
-> Lars-Peter brought that up, too. Please refer to my answer to him.
+> For example, Tegra SoC has ~100 clocks which can be decomposed
+> into Mux -> Div -> Gate clock types making the clock count to
+> ~300. Also, parent change operation can not be performed on gate
+> clock which forces to use mux clock in driver if want to change
+> the parent.
 > 
->>
->>>  - clock-output-names : List of strings used to name the clock outputs. Shall be a list of the outputs given below.
->>
->> That shouldn't be required.
->
-> When I want to support of_clk_get_parent_name() for my clocks, I think
-> it is. And I'm inclined to not brake this functionality.
-
-The solution here is to make clock parent names irrelevant.
-
-Also note that device tree is supposed to describe HW. As such, this
-kind of internal implementation detail of the Linux clock driver should
-have basically zero effect on the DT binding definition.
-
->>> Optional properties:
->>>  - clocks : as described in the clock bindings
->>>  - clock-names : as described in the clock bindings
->>
->> I think clocks should be required, with at least the main crystal clock
->> input always present, but perhaps having some optional entries for the
->> (E)MIO feature you mention.
->
-> This is why I have the xtal separate. This way these props are purely
-> optional and the xtal frequency is obtained separately. It also makes it
-> a little easier internally, because I don't have to cope with a variable
-> name for the xtal this way.
+> Instead aggregate the basic clock types functionality into one
+> clock and just use this clock for all operations. This clock
+> type re-uses the functionality of basic clock types and not
+> limited to basic clock types but any hardware-specific
+> implementation.
 > 
-> Describing the xtal as fixed clock in DT means a mandatory entry for
-> 'clocks' and 'clock-names' and a variable name for the xtal clock. I
-> wanted to avoid this.
+> Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
 
-I don't see any benefit with some properties being purely optional.
-Having optional entries in a property seems just fine to me.
+This version looks cleaner.  Thanks for the respin.  Taken into
+clk-next.
 
-The name of the crystal clock should be irrelevant; that issue simply
-needs to be fixed. It's driving too much of this discussion, and it will
-be irrelevant once it's fixed.
+Regards,
+Mike
 
->>> Example:
->>>         clkc: clkc {
->>>                 #clock-cells = <1>;
->>>                 compatible = "xlnx,ps7-clkc";
->>>                 ps-clk-frequency = <33333333>;
->>>                 clock-output-names = "armpll", "ddrpll", "iopll", "cpu_6or4x", "cpu_3or2x", "cpu_2x", "cpu_1x", "ddr2x", "ddr3x", "dci", "lqspi", "smc", "pcap", "gem0", "gem1", "fclk0", "fclk1", "fclk2", "fclk3", "can0", "can1", "sdio0", "sdio1", "uart0", "uart1", "spi0", "spi1", "dma", "usb0_aper", "usb1_aper", "gem0_aper", "gem1_aper", "sdio0_aper", "sdio1_aper", "spi0_aper", "spi1_aper", "can0_aper", "can1_aper", "i2c0_aper", "i2c1_aper", "uart0_aper", "uart1_aper", "gpio_aper", "lqspi_aper", "smc_aper", "swdt", "dbg_trc", "dbg_apb";  /* long list... explanation below */
->>>                 /* optional props */
->>>                 clocks = <&clkc 16>, <&clk_foo>;
->>>                 clock-names = "gem1_emio_clk", "can_mio_clk_23";
->>>         };
->>>
->>> The downside of supporting this is, that I don't see a way around explicitly listing the clock output names in the DT.
->>
->> (Please wrap your emails to ~74 characters or so)
-> I changed my settings.
+> ---
 > 
->>
->> As Mike mentioned off-list, one can create a new clk registration API
->> that takes a struct clk* as parent rather than a char *clk_name.
->
-> Then we also have to make sure clocks are probed in a specific order. To
-> obtain a 'struct clk *' through clk_get() the requested clock has to be
-> already been probed. Currently clock probing relies purely on data present
-> in DT. This makes this proposal not that trivial, IMHO.
-
-Simply use deferred probe.
+> Changes from V2:
+> - Move clk_ops inside clk_composite instead of dynamically allocation.
+> 
+> ---
+>  drivers/clk/Makefile         |    1 +
+>  drivers/clk/clk-composite.c  |  201 ++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/clk-provider.h |   31 +++++++
+>  3 files changed, 233 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/clk/clk-composite.c
+> 
+> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+> index 0147022..097ed01 100644
+> --- a/drivers/clk/Makefile
+> +++ b/drivers/clk/Makefile
+> @@ -7,6 +7,7 @@ obj-$(CONFIG_COMMON_CLK)        += clk-fixed-factor.o
+>  obj-$(CONFIG_COMMON_CLK)       += clk-fixed-rate.o
+>  obj-$(CONFIG_COMMON_CLK)       += clk-gate.o
+>  obj-$(CONFIG_COMMON_CLK)       += clk-mux.o
+> +obj-$(CONFIG_COMMON_CLK)       += clk-composite.o
+>  
+>  # SoCs specific
+>  obj-$(CONFIG_ARCH_BCM2835)     += clk-bcm2835.o
+> diff --git a/drivers/clk/clk-composite.c b/drivers/clk/clk-composite.c
+> new file mode 100644
+> index 0000000..097dee4
+> --- /dev/null
+> +++ b/drivers/clk/clk-composite.c
+> @@ -0,0 +1,201 @@
+> +/*
+> + * Copyright (c) 2013 NVIDIA CORPORATION.  All rights reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/clk-provider.h>
+> +#include <linux/err.h>
+> +#include <linux/slab.h>
+> +
+> +#define to_clk_composite(_hw) container_of(_hw, struct clk_composite, hw)
+> +
+> +static u8 clk_composite_get_parent(struct clk_hw *hw)
+> +{
+> +       struct clk_composite *composite = to_clk_composite(hw);
+> +       const struct clk_ops *mux_ops = composite->mux_ops;
+> +       struct clk_hw *mux_hw = composite->mux_hw;
+> +
+> +       mux_hw->clk = hw->clk;
+> +
+> +       return mux_ops->get_parent(mux_hw);
+> +}
+> +
+> +static int clk_composite_set_parent(struct clk_hw *hw, u8 index)
+> +{
+> +       struct clk_composite *composite = to_clk_composite(hw);
+> +       const struct clk_ops *mux_ops = composite->mux_ops;
+> +       struct clk_hw *mux_hw = composite->mux_hw;
+> +
+> +       mux_hw->clk = hw->clk;
+> +
+> +       return mux_ops->set_parent(mux_hw, index);
+> +}
+> +
+> +static unsigned long clk_composite_recalc_rate(struct clk_hw *hw,
+> +                                           unsigned long parent_rate)
+> +{
+> +       struct clk_composite *composite = to_clk_composite(hw);
+> +       const struct clk_ops *div_ops = composite->div_ops;
+> +       struct clk_hw *div_hw = composite->div_hw;
+> +
+> +       div_hw->clk = hw->clk;
+> +
+> +       return div_ops->recalc_rate(div_hw, parent_rate);
+> +}
+> +
+> +static long clk_composite_round_rate(struct clk_hw *hw, unsigned long rate,
+> +                                 unsigned long *prate)
+> +{
+> +       struct clk_composite *composite = to_clk_composite(hw);
+> +       const struct clk_ops *div_ops = composite->div_ops;
+> +       struct clk_hw *div_hw = composite->div_hw;
+> +
+> +       div_hw->clk = hw->clk;
+> +
+> +       return div_ops->round_rate(div_hw, rate, prate);
+> +}
+> +
+> +static int clk_composite_set_rate(struct clk_hw *hw, unsigned long rate,
+> +                              unsigned long parent_rate)
+> +{
+> +       struct clk_composite *composite = to_clk_composite(hw);
+> +       const struct clk_ops *div_ops = composite->div_ops;
+> +       struct clk_hw *div_hw = composite->div_hw;
+> +
+> +       div_hw->clk = hw->clk;
+> +
+> +       return div_ops->set_rate(div_hw, rate, parent_rate);
+> +}
+> +
+> +static int clk_composite_is_enabled(struct clk_hw *hw)
+> +{
+> +       struct clk_composite *composite = to_clk_composite(hw);
+> +       const struct clk_ops *gate_ops = composite->gate_ops;
+> +       struct clk_hw *gate_hw = composite->gate_hw;
+> +
+> +       gate_hw->clk = hw->clk;
+> +
+> +       return gate_ops->is_enabled(gate_hw);
+> +}
+> +
+> +static int clk_composite_enable(struct clk_hw *hw)
+> +{
+> +       struct clk_composite *composite = to_clk_composite(hw);
+> +       const struct clk_ops *gate_ops = composite->gate_ops;
+> +       struct clk_hw *gate_hw = composite->gate_hw;
+> +
+> +       gate_hw->clk = hw->clk;
+> +
+> +       return gate_ops->enable(gate_hw);
+> +}
+> +
+> +static void clk_composite_disable(struct clk_hw *hw)
+> +{
+> +       struct clk_composite *composite = to_clk_composite(hw);
+> +       const struct clk_ops *gate_ops = composite->gate_ops;
+> +       struct clk_hw *gate_hw = composite->gate_hw;
+> +
+> +       gate_hw->clk = hw->clk;
+> +
+> +       gate_ops->disable(gate_hw);
+> +}
+> +
+> +struct clk *clk_register_composite(struct device *dev, const char *name,
+> +                       const char **parent_names, int num_parents,
+> +                       struct clk_hw *mux_hw, const struct clk_ops *mux_ops,
+> +                       struct clk_hw *div_hw, const struct clk_ops *div_ops,
+> +                       struct clk_hw *gate_hw, const struct clk_ops *gate_ops,
+> +                       unsigned long flags)
+> +{
+> +       struct clk *clk;
+> +       struct clk_init_data init;
+> +       struct clk_composite *composite;
+> +       struct clk_ops *clk_composite_ops;
+> +
+> +       composite = kzalloc(sizeof(*composite), GFP_KERNEL);
+> +       if (!composite) {
+> +               pr_err("%s: could not allocate composite clk\n", __func__);
+> +               return ERR_PTR(-ENOMEM);
+> +       }
+> +
+> +       init.name = name;
+> +       init.flags = flags | CLK_IS_BASIC;
+> +       init.parent_names = parent_names;
+> +       init.num_parents = num_parents;
+> +
+> +       clk_composite_ops = &composite->ops;
+> +
+> +       if (mux_hw && mux_ops) {
+> +               if (!mux_ops->get_parent || !mux_ops->set_parent) {
+> +                       clk = ERR_PTR(-EINVAL);
+> +                       goto err;
+> +               }
+> +
+> +               composite->mux_hw = mux_hw;
+> +               composite->mux_ops = mux_ops;
+> +               clk_composite_ops->get_parent = clk_composite_get_parent;
+> +               clk_composite_ops->set_parent = clk_composite_set_parent;
+> +       }
+> +
+> +       if (div_hw && div_ops) {
+> +               if (!div_ops->recalc_rate || !div_ops->round_rate ||
+> +                   !div_ops->set_rate) {
+> +                       clk = ERR_PTR(-EINVAL);
+> +                       goto err;
+> +               }
+> +
+> +               composite->div_hw = div_hw;
+> +               composite->div_ops = div_ops;
+> +               clk_composite_ops->recalc_rate = clk_composite_recalc_rate;
+> +               clk_composite_ops->round_rate = clk_composite_round_rate;
+> +               clk_composite_ops->set_rate = clk_composite_set_rate;
+> +       }
+> +
+> +       if (gate_hw && gate_ops) {
+> +               if (!gate_ops->is_enabled || !gate_ops->enable ||
+> +                   !gate_ops->disable) {
+> +                       clk = ERR_PTR(-EINVAL);
+> +                       goto err;
+> +               }
+> +
+> +               composite->gate_hw = gate_hw;
+> +               composite->gate_ops = gate_ops;
+> +               clk_composite_ops->is_enabled = clk_composite_is_enabled;
+> +               clk_composite_ops->enable = clk_composite_enable;
+> +               clk_composite_ops->disable = clk_composite_disable;
+> +       }
+> +
+> +       init.ops = clk_composite_ops;
+> +       composite->hw.init = &init;
+> +
+> +       clk = clk_register(dev, &composite->hw);
+> +       if (IS_ERR(clk))
+> +               goto err;
+> +
+> +       if (composite->mux_hw)
+> +               composite->mux_hw->clk = clk;
+> +
+> +       if (composite->div_hw)
+> +               composite->div_hw->clk = clk;
+> +
+> +       if (composite->gate_hw)
+> +               composite->gate_hw->clk = clk;
+> +
+> +       return clk;
+> +
+> +err:
+> +       kfree(composite);
+> +       return clk;
+> +}
+> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> index 7f197d7..33e7e64 100644
+> --- a/include/linux/clk-provider.h
+> +++ b/include/linux/clk-provider.h
+> @@ -325,6 +325,37 @@ struct clk *clk_register_fixed_factor(struct device *dev, const char *name,
+>                 const char *parent_name, unsigned long flags,
+>                 unsigned int mult, unsigned int div);
+>  
+> +/***
+> + * struct clk_composite - aggregate clock of mux, divider and gate clocks
+> + *
+> + * @hw:                handle between common and hardware-specific interfaces
+> + * @mux_hw:    handle between composite and hardware-specifix mux clock
+> + * @div_hw:    handle between composite and hardware-specifix divider clock
+> + * @gate_hw:   handle between composite and hardware-specifix gate clock
+> + * @mux_ops:   clock ops for mux
+> + * @div_ops:   clock ops for divider
+> + * @gate_ops:  clock ops for gate
+> + */
+> +struct clk_composite {
+> +       struct clk_hw   hw;
+> +       struct clk_ops  ops;
+> +
+> +       struct clk_hw   *mux_hw;
+> +       struct clk_hw   *div_hw;
+> +       struct clk_hw   *gate_hw;
+> +
+> +       const struct clk_ops    *mux_ops;
+> +       const struct clk_ops    *div_ops;
+> +       const struct clk_ops    *gate_ops;
+> +};
+> +
+> +struct clk *clk_register_composite(struct device *dev, const char *name,
+> +               const char **parent_names, int num_parents,
+> +               struct clk_hw *mux_hw, const struct clk_ops *mux_ops,
+> +               struct clk_hw *div_hw, const struct clk_ops *div_ops,
+> +               struct clk_hw *gate_hw, const struct clk_ops *gate_ops,
+> +               unsigned long flags);
+> +
+>  /**
+>   * clk_register - allocate a new clock, register it and return an opaque cookie
+>   * @dev: device that is registering this clock
+> -- 
+> 1.7.4.1
