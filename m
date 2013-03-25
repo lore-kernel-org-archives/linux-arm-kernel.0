@@ -1,131 +1,225 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Mon, 25 Mar 2013 17:56:41 +0800
-Subject: [PATCH 3/8] ARM: sirf: move irq driver to drivers/irqchip
-In-Reply-To: <201303250941.14399.arnd@arndb.de>
-References: <1363779679-16880-1-git-send-email-arnd@arndb.de>
- <1363779679-16880-4-git-send-email-arnd@arndb.de>
- <CAGsJ_4wUtgEGY9fc_RGq4m+=wzzgS1MxCOCLRm6Xh+-5kVMAdQ@mail.gmail.com>
- <201303250941.14399.arnd@arndb.de>
-Message-ID: <CAGsJ_4yPRE8SBSk5eLH3j3Y9bf9tbhy15i0kEE+83VcPNk80Cw@mail.gmail.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Mon, 25 Mar 2013 10:58:26 +0100
+Subject: [RFC PATCH v3 0/6] sched: packing small tasks
+In-Reply-To: <514D9837.6050300@linux.vnet.ibm.com>
+References: <1363955155-18382-1-git-send-email-vincent.guittot@linaro.org>
+ <514D9837.6050300@linux.vnet.ibm.com>
+Message-ID: <CAKfTPtATncavrhMTeidH+hC_emwpmS0Mugwh3+oar-XVXzjNzg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/3/25, Arnd Bergmann <arnd@arndb.de>:
-> On Monday 25 March 2013, Barry Song wrote:
->> 2013/3/20, Arnd Bergmann <arnd@arndb.de>:
+On 23 March 2013 12:55, Preeti U Murthy <preeti@linux.vnet.ibm.com> wrote:
+> Hi Vincent,
 >
->> > +static asmlinkage void __exception_irq_entry sirfsoc_handle_irq(struct
->> > pt_regs *regs)
->> > +{
->> > +	void __iomem *base = sirfsoc_irqdomain->host_data;
->> > +	u32 irqstat, irqnr;
->> > +
->> > +	irqstat = readl_relaxed(base + SIRFSOC_INIT_IRQ_ID);
->> > +	irqnr = irq_find_mapping(sirfsoc_irqdomain, irqstat & 0xff);
->> > +
->> > +	handle_IRQ(irqnr, regs);
->> > +}
->> > +
->> > +static void __init sirfsoc_irq_init(struct device_node *np, struct
->> > device_node *parent)
+> The power aware scheduler patchset that has been released by Alex
+> recently [https://lkml.org/lkml/2013/2/18/4], also has the idea of
+> packing of small tasks.In that patchset, the waking of small tasks in
+> done on a leader cpu, which of course varies dynamically.
+> https://lkml.org/lkml/2013/2/18/6
+>
+> I will refer henceforth to the above patchset as Patch A and your
+> current patchset in this mail as Patch B.
+>
+> The difference in Patch A is that it is packing small tasks onto a
+> leader cpu, i.e. a cpu which has just enough capacity to take on itself
+> a light weight task. Essentially belonging to a group which has a
+> favourable grp_power and the leader cpu having a suitable rq->util.
+>
+> In Patch B, you are choosing a buddy cpu, belonging to a group with the
+> least cpu power, and while deciding to pack tasks onto the buddy cpu,
+> this again boils down to, verifying if the
+> grp_power is favourable and the buddy cpu has a suitable rq->util.
+>
+> In my opinion, this goes to say that both the patches are using similar
+> metrics to decide if a cpu is capable of handling the light weight task.
+> The difference lies in how far the search for the appropriate cpu can
+> proceed. While Patch A continues to search at all levels of sched
+> domains till the last to find the appropriate cpu, Patch B queries only
+> the buddy CPU.
+>
+> The point I am trying to make is that, considering the above
+> similarities and differences, is it possible for us to see if the ideas
+> that both these patches bring in can be merged into one, since both of
+> them are having the common goal of packing small tasks.
+
+Hi Preeti,
+
+I agree that the final goal is similar but we also have important
+differences to keep in mind among which the share (or not) of power
+domain that is used to decide where it's worth packing, the selection
+of leader CPU which is the most power efficient core and the use of a
+knob to select a policy. So, you're right that we should find a way to
+have both working together and still keep these specificities.
+
+Regards,
+Vincent
+
+>
+> Thanks
+>
+> Regards
+> Preeti U Murthy
+>
+> On 03/22/2013 05:55 PM, Vincent Guittot wrote:
+>> Hi,
 >>
->> this function should be changed from void to int.
->
-> Right.
->
->> > +{
->> > +	void __iomem *base = of_iomap(np, 0);
->> > +	if (!base)
->> > +		panic("unable to map intc cpu registers\n");
->> > +
->> > +	sirfsoc_irqdomain = irq_domain_add_linear(np, SIRFSOC_NUM_IRQS,
->> > +				 &irq_domain_simple_ops, base);
+>> This patchset takes advantage of the new per-task load tracking that is
+>> available in the kernel for packing the small tasks in as few as possible
+>> CPU/Cluster/Core. The main goal of packing small tasks is to reduce the power
+>> consumption in the low load use cases by minimizing the number of power domain
+>> that are enabled. The packing is done in 2 steps:
 >>
->> this breaks the hwirq and irq mapping. the hwirq 0 is mapped to
->> no_irqs, then setup_irq will fail in
->> drivers/clocksource/timer-prima2.c.
+>> The 1st step looks for the best place to pack tasks in a system according to
+>> its topology and it defines a pack buddy CPU for each CPU if there is one
+>> available. We define the best CPU during the build of the sched_domain instead
+>> of evaluating it at runtime because it can be difficult to define a stable
+>> buddy CPU in a low CPU load situation. The policy for defining a buddy CPU is
+>> that we pack at all levels inside a node where a group of CPU can be power
+>> gated independently from others. For describing this capability, a new flag
+>> has been introduced SD_SHARE_POWERDOMAIN that is used to indicate whether the
+>> groups of CPUs of a scheduling domain are sharing their power state. By
+>> default, this flag has been set in all sched_domain in order to keep unchanged
+>> the current behavior of the scheduler and only ARM platform clears the
+>> SD_SHARE_POWERDOMAIN flag for MC and CPU level.
+>>
+>> In a 2nd step, the scheduler checks the load average of a task which wakes up
+>> as well as the load average of the buddy CPU and it can decide to migrate the
+>> light tasks on a not busy buddy. This check is done during the wake up because
+>> small tasks tend to wake up between periodic load balance and asynchronously
+>> to each other which prevents the default mechanism to catch and migrate them
+>> efficiently. A light task is defined by a runnable_avg_sum that is less than
+>> 20% of the runnable_avg_period. In fact, the former condition encloses 2 ones:
+>> The average CPU load of the task must be less than 20% and the task must have
+>> been runnable less than 10ms when it woke up last time in order to be
+>> electable for the packing migration. So, a task than runs 1 ms each 5ms will
+>> be considered as a small task but a task that runs 50 ms with a period of
+>> 500ms, will not.
+>> Then, the business of the buddy CPU depends of the load average for the rq and
+>> the number of running tasks. A CPU with a load average greater than 50% will
+>> be considered as busy CPU whatever the number of running tasks is and this
+>> threshold will be reduced by the number of running tasks in order to not
+>> increase too much the wake up latency of a task. When the buddy CPU is busy,
+>> the scheduler falls back to default CFS policy.
+>>
+>> Change since V2:
+>>
+>>  - Migrate only a task that wakes up
+>>  - Change the light tasks threshold to 20%
+>>  - Change the loaded CPU threshold to not pull tasks if the current number of
+>>    running tasks is null but the load average is already greater than 50%
+>>  - Fix the algorithm for selecting the buddy CPU.
+>>
+>> Change since V1:
+>>
+>> Patch 2/6
+>>  - Change the flag name which was not clear. The new name is
+>>    SD_SHARE_POWERDOMAIN.
+>>  - Create an architecture dependent function to tune the sched_domain flags
+>> Patch 3/6
+>>  - Fix issues in the algorithm that looks for the best buddy CPU
+>>  - Use pr_debug instead of pr_info
+>>  - Fix for uniprocessor
+>> Patch 4/6
+>>  - Remove the use of usage_avg_sum which has not been merged
+>> Patch 5/6
+>>  - Change the way the coherency of runnable_avg_sum and runnable_avg_period is
+>>    ensured
+>> Patch 6/6
+>>  - Use the arch dependent function to set/clear SD_SHARE_POWERDOMAIN for ARM
+>>    platform
+>>
+>>
+>> New results for v3:
+>>
+>> This series has been tested with hackbench on ARM platform and the results
+>> don't show any performance regression
+>>
+>> Hackbench             3.9-rc2  +patches
+>> Mean Time (10 tests): 2.048    2.015
+>> stdev               : 0.047    0.068
+>>
+>> Previous results for V2:
+>>
+>> This series has been tested with MP3 play back on ARM platform:
+>> TC2 HMP (dual CA-15 and 3xCA-7 cluster).
+>>
+>> The measurements have been done on an Ubuntu image during 60 seconds of
+>> playback and the result has been normalized to 100.
+>>
+>>               | CA15 | CA7  | total |
+>> -------------------------------------
+>> default       |  81  |   97 | 178   |
+>> pack          |  13  |  100 | 113   |
+>> -------------------------------------
+>>
+>> Previous results for V1:
+>>
+>> The patch-set has been tested on ARM platforms: quad CA-9 SMP and TC2 HMP
+>> (dual CA-15 and 3xCA-7 cluster). For ARM platform, the results have
+>> demonstrated that it's worth packing small tasks at all topology levels.
+>>
+>> The performance tests have been done on both platforms with sysbench. The
+>> results don't show any performance regressions. These results are aligned with
+>> the policy which uses the normal behavior with heavy use cases.
+>>
+>> test: sysbench --test=cpu --num-threads=N --max-requests=R run
+>>
+>> Results below is the average duration of 3 tests on the quad CA-9.
+>> default is the current scheduler behavior (pack buddy CPU is -1)
+>> pack is the scheduler with the pack mechanism
+>>
+>>               | default |  pack   |
+>> -----------------------------------
+>> N=8;  R=200   |  3.1999 |  3.1921 |
+>> N=8;  R=2000  | 31.4939 | 31.4844 |
+>> N=12; R=200   |  3.2043 |  3.2084 |
+>> N=12; R=2000  | 31.4897 | 31.4831 |
+>> N=16; R=200   |  3.1774 |  3.1824 |
+>> N=16; R=2000  | 31.4899 | 31.4897 |
+>> -----------------------------------
+>>
+>> The power consumption tests have been done only on TC2 platform which has got
+>> accessible power lines and I have used cyclictest to simulate small tasks. The
+>> tests show some power consumption improvements.
+>>
+>> test: cyclictest -t 8 -q -e 1000000 -D 20 & cyclictest -t 8 -q -e 1000000 -D 20
+>>
+>> The measurements have been done during 16 seconds and the result has been
+>> normalized to 100
+>>
+>>               | CA15 | CA7  | total |
+>> -------------------------------------
+>> default       | 100  |  40  | 140   |
+>> pack          |  <1  |  45  | <46   |
+>> -------------------------------------
+>>
+>> The A15 cluster is less power efficient than the A7 cluster but if we assume
+>> that the tasks is well spread on both clusters, we can guest estimate that the
+>> power consumption on a dual cluster of CA7 would have been for a default
+>> kernel:
+>>
+>>               | CA7  | CA7  | total |
+>> -------------------------------------
+>> default       |  40  |  40  |  80   |
+>> -------------------------------------
+>>
+>> Vincent Guittot (6):
+>>   Revert "sched: Introduce temporary FAIR_GROUP_SCHED dependency for
+>>     load-tracking"
+>>   sched: add a new SD_SHARE_POWERDOMAIN flag for sched_domain
+>>   sched: pack small tasks
+>>   sched: secure access to other CPU statistics
+>>   sched: pack the idle load balance
+>>   ARM: sched: clear SD_SHARE_POWERDOMAIN
+>>
+>>  arch/arm/kernel/topology.c       |    9 +++
+>>  arch/ia64/include/asm/topology.h |    1 +
+>>  arch/tile/include/asm/topology.h |    1 +
+>>  include/linux/sched.h            |    9 +--
+>>  include/linux/topology.h         |    4 +
+>>  kernel/sched/core.c              |   14 ++--
+>>  kernel/sched/fair.c              |  149 +++++++++++++++++++++++++++++++++++---
+>>  kernel/sched/sched.h             |   14 ++--
+>>  8 files changed, 169 insertions(+), 32 deletions(-)
+>>
 >
-> Hmm, I don't understand yet what is going on there. This should create
-> a domain with all dynamically allocated interrupt descriptors,
-> and the hwirq number is just local to the controller then.
-
-suppose we think the hardware register flag bit of timer-prima2 is 0,
-irq_of_parse_and_map() will return 16 in patch2 for the timer-prima2
-which uses the 1st hardware IRQ in the system.
-
-if add nr_irqs=288 in ATLAS6 machine, irq_of_parse_and_map() will
-return 288 in patch2. it looks like the first hw irq will always be
-mapped to nr_irqs.
-
->
-> Without patch 2 of the series, this would fail, because that interrupt
-> is not mapped, but as far as I can tell, we correctly instantiate
-> the domain here, so the irq_of_parse_and_map() in sirfsoc_of_timer_map
-> should return a valid interrupt number. Can you check what it returns
-> instead? Does it work if you revert to a legacy domain here?
-
-actually patch2 can work without patch3 by irq_domain_add legacy. as
-you can see, my old timer-marco.c uses irq_of_parse_and_map() instead
-of reading interrupts manually.
-
-the irq mapping works with the following changes:
--------------------------------------------------------------------------
--------------------------------------------------------------------------
-arch/arm/mach-prima2/common.c:
-
- DT_MACHINE_START(ATLAS6_DT, "Generic ATLAS6 (Flattened Device Tree)")
-        /* Maintainer: Barry Song <baohua.song@csr.com> */
-        .map_io         = sirfsoc_map_io,
-+       .nr_irqs        = 288,
-        .init_irq       = irqchip_init,
-        .init_time      = sirfsoc_init_time,
-        .init_machine   = sirfsoc_mach_init,
-
--------------------------------------------------------------------------
--------------------------------------------------------------------------
-drivers/irqchip/irq-sirfsoc.c:
-index 9a6a925..271f905 100644
---- a/drivers/irqchip/irq-sirfsoc.c
-+++ b/drivers/irqchip/irq-sirfsoc.c
-@@ -54,13 +54,13 @@ static asmlinkage void __exception_irq_entry
-sirfsoc_handle_irq(struct pt_regs *
-        handle_IRQ(irqnr, regs);
- }
-
--static void __init sirfsoc_irq_init(struct device_node *np, struct
-device_node *parent)
-+static int __init sirfsoc_irq_init(struct device_node *np, struct
-device_node *parent)
- {
-        void __iomem *base = of_iomap(np, 0);
-        if (!base)
-                panic("unable to map intc cpu registers\n");
-
--       sirfsoc_irqdomain = irq_domain_add_linear(np, SIRFSOC_NUM_IRQS,
-+       sirfsoc_irqdomain = irq_domain_add_legacy(np, SIRFSOC_NUM_IRQS, 0, 0,
-                                 &irq_domain_simple_ops, base);
-
-        sirfsoc_alloc_gc(base, 0, 32);
-@@ -73,6 +73,8 @@ static void __init sirfsoc_irq_init(struct
-device_node *np, struct device_node *
-        writel_relaxed(0, base + SIRFSOC_INT_RISC_MASK1);
-
-        set_handle_irq(sirfsoc_handle_irq);
-+
-+       return 0;
- }
- IRQCHIP_DECLARE(sirfsoc_intc, "sirf,prima2-intc", sirfsoc_irq_init);
-
--------------------------------------------------------------------------
--------------------------------------------------------------------------
-drivers/pinctrl/pinctrl-sirf.c:
--                bank->domain = irq_domain_add_linear(np,
-SIRFSOC_GPIO_BANK_SIZE,
-+                bank->domain = irq_domain_add_legacy(np,
-SIRFSOC_GPIO_BANK_SIZE,
-+                        128 + i * SIRFSOC_GPIO_BANK_SIZE, 0,
-                        &sirfsoc_gpio_irq_simple_ops, bank);
-
-@@ -65,13 +74,14 @@ MACHINE_END
-
--barry
