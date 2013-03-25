@@ -1,23 +1,28 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 25 Mar 2013 21:47:42 +0100 (CET)
-Subject: [PATCHv3 01/10] clocksource: add generic dummy timer driver
-In-Reply-To: <20130325180007.GA4065@e106331-lin.cambridge.arm.com>
-References: <1363198676-30417-1-git-send-email-sboyd@codeaurora.org>
- <1363198676-30417-2-git-send-email-sboyd@codeaurora.org>
- <20130321180922.GB10716@e106331-lin.cambridge.arm.com>
- <514B4DBD.4060403@codeaurora.org>
- <20130322180305.GB1436@e106331-lin.cambridge.arm.com>
- <5150800E.2000905@codeaurora.org>
- <20130325180007.GA4065@e106331-lin.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.02.1303252147080.22263@ionos>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 25 Mar 2013 22:18:15 +0100
+Subject: [RFC PATCH 1/6] ARM, TCM: initialize TCM in paging_init(),
+ instead of setup_arch()
+In-Reply-To: <1364184674-13798-2-git-send-email-iamjoonsoo.kim@lge.com>
+References: <1364184674-13798-1-git-send-email-iamjoonsoo.kim@lge.com>
+ <1364184674-13798-2-git-send-email-iamjoonsoo.kim@lge.com>
+Message-ID: <CACRpkdYifJ+Lk4EETvmOwYk6R-cKcw=6TzZdLcHpGe3MxjY+OA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 25 Mar 2013, Mark Rutland wrote:
-> Thomas, do you have an idea of if/when tip/timers/urgent will hit mainline?
+On Mon, Mar 25, 2013 at 5:11 AM, Joonsoo Kim <iamjoonsoo.kim@lge.com> wrote:
 
-Thanks for the reminder. I just sent a pull request Linuswards.
+> tcm_init() call iotable_init() and it use early_alloc variants which
+> do memblock allocation. Directly using memblock allocation after
+> initializing bootmem should not permitted, because bootmem can't know
+> where are additinally reserved.
+> So move tcm_init() to a safe place before initalizing bootmem.
+>
+> Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
 
-Thanks,
+Tested-by: Linus Walleij <linus.walleij@linaro.org>
+(On the U300)
 
-	tglx
+You should put this into Russell's patch tracker for his judgement.
+
+Yours,
+Linus Walleij
