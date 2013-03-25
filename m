@@ -1,36 +1,46 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 25 Mar 2013 18:18:03 +0000
-Subject: [PATCH 0/3] Optimise cache-flushing system call and add iovec variant
-Message-ID: <1364235486-17738-1-git-send-email-will.deacon@arm.com>
+Date: Mon, 25 Mar 2013 18:18:04 +0000
+Subject: [PATCH 1/3] ARM: cacheflush: don't round address range up to nearest
+ page
+In-Reply-To: <1364235486-17738-1-git-send-email-will.deacon@arm.com>
+References: <1364235486-17738-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1364235486-17738-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The flush_cache_user_range macro takes a pair of addresses describing
+the start and end of the virtual address range to flush. Due to an
+accidental oversight when flush_cache_range_user was introduced, the
+address range was rounded up so that the start and end addresses were
+page-aligned.
 
-This patch series has been sitting on my box for some time, pending
-benchmark results and analysis.
+For historical reference, the interesting commits in history.git are:
 
-The results are that, with the first two patches in this series, we see
-~2% improvement in browser benchmark scores, which flush the cache fairly
-regularly in response to jitting JS code.
+10eacf1775e1 ("[ARM] Clean up ARM cache handling interfaces (part 1)")
+71432e79b76b ("[ARM] Add flush_cache_user_page() for sys_cacheflush()")
 
-The final patch is more of an RFC, since I don't have any software that
-uses it outside of my toy programs.
+This patch removes the alignment code, reducing the amount of flushing
+required for ranges that are not an exact multiple of PAGE_SIZE.
 
-All feedback welcome,
+Reported-by: Jonathan Austin <jonathan.austin@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/include/asm/cacheflush.h | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-Will
-
-
-Will Deacon (3):
-  ARM: cacheflush: don't round address range up to nearest page
-  ARM: cacheflush: don't bother rounding to nearest vma
-  ARM: cacheflush: add new iovec-based cache flushing system call
-
- arch/arm/include/asm/cacheflush.h  |  3 +--
- arch/arm/include/uapi/asm/unistd.h |  1 +
- arch/arm/kernel/traps.c            | 49 +++++++++++++++++++++++++++-----------
- 3 files changed, 37 insertions(+), 16 deletions(-)
-
+diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
+index e1489c5..2965ad1 100644
+--- a/arch/arm/include/asm/cacheflush.h
++++ b/arch/arm/include/asm/cacheflush.h
+@@ -268,8 +268,7 @@ extern void flush_cache_page(struct vm_area_struct *vma, unsigned long user_addr
+  * Harvard caches are synchronised for the user space address range.
+  * This is used for the ARM private sys_cacheflush system call.
+  */
+-#define flush_cache_user_range(start,end) \
+-	__cpuc_coherent_user_range((start) & PAGE_MASK, PAGE_ALIGN(end))
++#define flush_cache_user_range(s,e)	__cpuc_coherent_user_range(s,e)
+ 
+ /*
+  * Perform necessary cache operations to ensure that data previously
 -- 
 1.8.0
