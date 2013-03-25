@@ -1,82 +1,39 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Mon, 25 Mar 2013 11:04:48 -0600
-Subject: [PATCH 6/6] ARM: dts: Add pcie controller node for Samsung
- EXYNOS5440 SoC
-In-Reply-To: <00c501ce277c$30e49dc0$92add940$%han@samsung.com>
-References: <00c001ce277b$92b26ab0$b8174010$%han@samsung.com>
- <00c501ce277c$30e49dc0$92add940$%han@samsung.com>
-Message-ID: <20130325170448.GB16690@obsidianresearch.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 25 Mar 2013 11:05:15 -0600
+Subject: [PATCHv2 3/7] pinctrl: gpio: vt8500: Add pincontrol driver for
+ arch-vt8500
+In-Reply-To: <1364015633-18580-4-git-send-email-linux@prisktech.co.nz>
+References: <1364015633-18580-1-git-send-email-linux@prisktech.co.nz>
+ <1364015633-18580-4-git-send-email-linux@prisktech.co.nz>
+Message-ID: <515083CB.1060908@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 23, 2013 at 01:09:18PM +0900, Jingoo Han wrote:
+On 03/22/2013 11:13 PM, Tony Prisk wrote:
+> This patch adds support for the GPIO/pinmux controller found on the VIA
+> VT8500 and Wondermedia WM8xxx-series SoCs.
+> 
+> Each pin within the controller is capable of operating as a GPIO or as
+> an alternate function. The pins are numbered according to their control
+> bank/bit so that if new pins are added, the existing numbering is maintained.
+> 
+> All currently supported SoCs are included: VT8500, WM8505, WM8650, WM8750 and
+> WM8850.
 
-> +	pcie0 at 40000000 {
-> +		compatible = "samsung,exynos5440-pcie";
-> +		reg = <0x40000000 0x4000
-> +			0x290000 0x1000
-> +			0x270000 0x1000
-> +			0x271000 0x40>;
-> +		interrupts = <0 20 0>, <0 21 0>, <0 22 0>;
-> +		#address-cells = <3>;
-> +		#size-cells = <2>;
-> +		device_type = "pci";
-> +		bus-range = <0x0 0xf>;
-> +		ranges = <0x00000800 0 0x40000000 0x40000000 0 0x00200000   /* configuration space */
-> +			  0x81000000 0 0	  0x40200000 0 0x00004000   /* downstream I/O */
-> +			  0x82000000 0 0	  0x40204000 0 0x10000000>; /* non-prefetchable memory */
-> +	};
+> diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-vt8500.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-vt8500.txt
 
-Can you send the lspci output so these bindings can be properly
-reviewed? What PCI devices are internal to the SOC?
+> +Required properties:
 
-What is behind 'exynos_pcie_wr_own_conf' ? Is this a root port bridge
-config space? What line is it in the lspci output? Can you include a
-lspci -vv for it as well?
+> +- gpio-controller: Marks the device node as a GPIO controller.
+> +- #gpio-cells : Should be two. The first cell is the pin number and the
+> +  second cell is used to specify optional parameters.
 
-Your DT has overlapping bus-ranges, and two top level nodes. This is
-going to require separate PCI domains in Linux.
+What are those optional parameters? This binding should define them.
 
-However, based on your driver this HW looks similar to tegra, did you
-review how tegra is setup? Merging all the ports into a single domain
-is certainly preferred.
+> +Optional properties:
+> +- wm,pinmux: A value and mask pair describing the configuration changes to
+> +  the pinmux register. Only bits marked 1 in the mask will be changed.
 
-> +	pcie1 at 60000000 {
-> +		compatible = "samsung,exynos5440-pcie";
-> +		reg = <0x60000000 0x4000
-> +			0x2a0000 0x1000
-> +			0x272000 0x1000
-> +			0x271040 0x40>;
-> +		interrupts = <0 23 0>, <0 24 0>, <0 25 0>;
-> +		#address-cells = <3>;
-> +		#size-cells = <2>;
-> +		device_type = "pci";
-> +		bus-range = <0x0 0xf>;
-> +		ranges = <0x00000800 0 0x60000000 0x60000000 0 0x00200000   /* configuration space */
+This needs more explanation. What does this do and why is it needed?
 
-Do not include configuration space in ranges
-
-> +			  0x81000000 0 0	  0x60200000 0 0x00004000   /* downstream I/O */
-
-Please confirm that an MMIO to 0x60200000 produces a PCI-E IO TLP to
-address 0
-
-> +			  0x82000000 0 0	  0x60204000 0 0x10000000>; /* non-prefetchable memory */
-
-Please check this, generally it should be:
-
-			  0x82000000 0 0x60204000 0x60204000 0 0x10000000>; /* non-prefetchable memory */
-
-Reflecting an identity mapping for MMIO - eg MMIO access to 0x60204000
-producse a PCI Memory TLP to address 0x60204000 - unless your hardware
-is actually doing address translation (then there are other things to
-confirm..)
-
-It is usual to have an interrupt-map - have you tested that interrupts
-resolve properly?
-
-It looks like the INTx's should be routed by an interrupt-map to the
-pulse pin. Consider an interrupt controller to decode the INT ABCD.
-
-Regards,
-Jason
+Other than that, this binding looks fine.
