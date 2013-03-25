@@ -1,160 +1,36 @@
-From: rdunlap@infradead.org (Randy Dunlap)
-Date: Mon, 25 Mar 2013 07:16:57 -0700
-Subject: [PATCH] ARM: davinci: use is IS_ENABLED macro
-In-Reply-To: <1364210495-7938-1-git-send-email-prabhakar.csengg@gmail.com>
-References: <1364210495-7938-1-git-send-email-prabhakar.csengg@gmail.com>
-Message-ID: <51505C59.1040607@infradead.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 25 Mar 2013 23:17:26 +0800
+Subject: [PATCH 0/6] ARM: mxs: timer code cleanup
+Message-ID: <1364224652-28332-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/25/13 04:21, Prabhakar lad wrote:
-> From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
-> 
-> This patches replaces #if defined() by IS_ENABLED macro, which provides
-> better readability.
-> 
-> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
-> Cc: Sekhar Nori <nsekhar@ti.com>
-> ---
->  Note: This patch is compile tested only for davinci_all_defconfig
->        and da8xx_omapl_defconfig.
+The series cleans up mxs timer driver and then moves it into
+drivers/clocksource.  It moves mxs platform one step toward
+multiplatform support.
 
-Source files that use IS_ENABLED() etc. should also
-#include <linux/kconfig.h>
+It's based on arm-soc/clksrc/cleanup.
 
-Is that already done in all of these source files?
+Shawn Guo (6):
+  ARM: mxs: use CLKSRC_OF helper to initialize timer
+  ARM: mxs: look up timrot clock from device tree
+  ARM: mxs: get timrot base address from device tree
+  ARM: mxs: remove cpu_is_mx23() call from timer code
+  ARM: mxs: select STMP_DEVICE and use it for timer code
+  ARM: mxs: move timer driver into drivers/clocksource
 
-
->  arch/arm/mach-davinci/board-da830-evm.c   |    2 +-
->  arch/arm/mach-davinci/board-da850-evm.c   |    3 +--
->  arch/arm/mach-davinci/board-dm644x-evm.c  |    9 +++------
->  arch/arm/mach-davinci/board-dm646x-evm.c  |    3 +--
->  arch/arm/mach-davinci/board-neuros-osd2.c |    6 ++----
->  arch/arm/mach-davinci/devices.c           |    2 +-
->  arch/arm/mach-davinci/usb.c               |    2 +-
->  7 files changed, 10 insertions(+), 17 deletions(-)
-> 
-> diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
-> index 6da25ee..68ade71 100644
-> --- a/arch/arm/mach-davinci/board-da830-evm.c
-> +++ b/arch/arm/mach-davinci/board-da830-evm.c
-> @@ -298,7 +298,7 @@ static const short da830_evm_emif25_pins[] = {
->  	-1
->  };
->  
-> -#if defined(CONFIG_MMC_DAVINCI) || defined(CONFIG_MMC_DAVINCI_MODULE)
-> +#if IS_ENABLED(CONFIG_MMC_DAVINCI)
->  #define HAS_MMC	1
->  #else
->  #define HAS_MMC	0
-> diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-> index c2dfe06..3475769 100644
-> --- a/arch/arm/mach-davinci/board-da850-evm.c
-> +++ b/arch/arm/mach-davinci/board-da850-evm.c
-> @@ -335,8 +335,7 @@ static const short da850_evm_nor_pins[] = {
->  	-1
->  };
->  
-> -#if defined(CONFIG_MMC_DAVINCI) || \
-> -    defined(CONFIG_MMC_DAVINCI_MODULE)
-> +#if IS_ENABLED(CONFIG_MMC_DAVINCI)
->  #define HAS_MMC 1
->  #else
->  #define HAS_MMC 0
-> diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
-> index 71735e7..d0f6365 100644
-> --- a/arch/arm/mach-davinci/board-dm644x-evm.c
-> +++ b/arch/arm/mach-davinci/board-dm644x-evm.c
-> @@ -750,22 +750,19 @@ static int davinci_phy_fixup(struct phy_device *phydev)
->  	return 0;
->  }
->  
-> -#if defined(CONFIG_BLK_DEV_PALMCHIP_BK3710) || \
-> -    defined(CONFIG_BLK_DEV_PALMCHIP_BK3710_MODULE)
-> +#if IS_ENABLED(CONFIG_BLK_DEV_PALMCHIP_BK3710)
->  #define HAS_ATA 1
->  #else
->  #define HAS_ATA 0
->  #endif
->  
-> -#if defined(CONFIG_MTD_PHYSMAP) || \
-> -    defined(CONFIG_MTD_PHYSMAP_MODULE)
-> +#if IS_ENABLED(CONFIG_MTD_PHYSMAP)
->  #define HAS_NOR 1
->  #else
->  #define HAS_NOR 0
->  #endif
->  
-> -#if defined(CONFIG_MTD_NAND_DAVINCI) || \
-> -    defined(CONFIG_MTD_NAND_DAVINCI_MODULE)
-> +#if IS_ENABLED(CONFIG_MTD_NAND_DAVINCI)
->  #define HAS_NAND 1
->  #else
->  #define HAS_NAND 0
-> diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
-> index de7adff..c84fdd5 100644
-> --- a/arch/arm/mach-davinci/board-dm646x-evm.c
-> +++ b/arch/arm/mach-davinci/board-dm646x-evm.c
-> @@ -117,8 +117,7 @@ static struct platform_device davinci_nand_device = {
->  	},
->  };
->  
-> -#if defined(CONFIG_BLK_DEV_PALMCHIP_BK3710) || \
-> -    defined(CONFIG_BLK_DEV_PALMCHIP_BK3710_MODULE)
-> +#if IS_ENABLED(CONFIG_BLK_DEV_PALMCHIP_BK3710)
->  #define HAS_ATA 1
->  #else
->  #define HAS_ATA 0
-> diff --git a/arch/arm/mach-davinci/board-neuros-osd2.c b/arch/arm/mach-davinci/board-neuros-osd2.c
-> index 1c98107..8bd0a43 100644
-> --- a/arch/arm/mach-davinci/board-neuros-osd2.c
-> +++ b/arch/arm/mach-davinci/board-neuros-osd2.c
-> @@ -168,15 +168,13 @@ static struct davinci_mmc_config davinci_ntosd2_mmc_config = {
->  };
->  
->  
-> -#if defined(CONFIG_BLK_DEV_PALMCHIP_BK3710) || \
-> -	defined(CONFIG_BLK_DEV_PALMCHIP_BK3710_MODULE)
-> +#if IS_ENABLED(CONFIG_BLK_DEV_PALMCHIP_BK3710)
->  #define HAS_ATA 1
->  #else
->  #define HAS_ATA 0
->  #endif
->  
-> -#if defined(CONFIG_MTD_NAND_DAVINCI) || \
-> -	defined(CONFIG_MTD_NAND_DAVINCI_MODULE)
-> +#if IS_ENABLED(CONFIG_MTD_NAND_DAVINCI)
->  #define HAS_NAND 1
->  #else
->  #define HAS_NAND 0
-> diff --git a/arch/arm/mach-davinci/devices.c b/arch/arm/mach-davinci/devices.c
-> index 4c48a36..df135de 100644
-> --- a/arch/arm/mach-davinci/devices.c
-> +++ b/arch/arm/mach-davinci/devices.c
-> @@ -119,7 +119,7 @@ void __init davinci_init_ide(void)
->  	platform_device_register(&ide_device);
->  }
->  
-> -#if	defined(CONFIG_MMC_DAVINCI) || defined(CONFIG_MMC_DAVINCI_MODULE)
-> +#if IS_ENABLED(CONFIG_MMC_DAVINCI)
->  
->  static u64 mmcsd0_dma_mask = DMA_BIT_MASK(32);
->  
-> diff --git a/arch/arm/mach-davinci/usb.c b/arch/arm/mach-davinci/usb.c
-> index 34509ff..5764d65 100644
-> --- a/arch/arm/mach-davinci/usb.c
-> +++ b/arch/arm/mach-davinci/usb.c
-> @@ -17,7 +17,7 @@
->  #define DA8XX_USB0_BASE 	0x01e00000
->  #define DA8XX_USB1_BASE 	0x01e25000
->  
-> -#if defined(CONFIG_USB_MUSB_HDRC) || defined(CONFIG_USB_MUSB_HDRC_MODULE)
-> +#if IS_ENABLED(CONFIG_USB_MUSB_HDRC)
->  static struct musb_hdrc_eps_bits musb_eps[] = {
->  	{ "ep1_tx", 8, },
->  	{ "ep1_rx", 8, },
-> 
-
+ arch/arm/Kconfig                                   |    2 ++
+ arch/arm/boot/dts/imx23.dtsi                       |    1 +
+ arch/arm/boot/dts/imx28.dtsi                       |    1 +
+ arch/arm/mach-mxs/Makefile                         |    2 +-
+ arch/arm/mach-mxs/include/mach/common.h            |    1 -
+ arch/arm/mach-mxs/mach-mxs.c                       |    3 ++
+ drivers/clk/mxs/clk-imx23.c                        |    4 ---
+ drivers/clk/mxs/clk-imx28.c                        |    3 --
+ drivers/clocksource/Makefile                       |    1 +
+ .../timer.c => drivers/clocksource/mxs_timer.c     |   36 +++++++++-----------
+ 10 files changed, 26 insertions(+), 28 deletions(-)
+ rename arch/arm/mach-mxs/timer.c => drivers/clocksource/mxs_timer.c (91%)
 
 -- 
-~Randy
+1.7.9.5
