@@ -1,68 +1,23 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 25 Mar 2013 16:28:21 -0400 (EDT)
-Subject: [PATCH 07/15] ARM: cpuidle: add init/exit routine
-In-Reply-To: <51509873.1010408@linaro.org>
-References: <1364234140-514-1-git-send-email-daniel.lezcano@linaro.org>
- <1364234140-514-8-git-send-email-daniel.lezcano@linaro.org>
- <20130325181038.GA631@lunn.ch> <51509873.1010408@linaro.org>
-Message-ID: <alpine.LFD.2.03.1303251616070.1372@syhkavp.arg>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 25 Mar 2013 21:47:42 +0100 (CET)
+Subject: [PATCHv3 01/10] clocksource: add generic dummy timer driver
+In-Reply-To: <20130325180007.GA4065@e106331-lin.cambridge.arm.com>
+References: <1363198676-30417-1-git-send-email-sboyd@codeaurora.org>
+ <1363198676-30417-2-git-send-email-sboyd@codeaurora.org>
+ <20130321180922.GB10716@e106331-lin.cambridge.arm.com>
+ <514B4DBD.4060403@codeaurora.org>
+ <20130322180305.GB1436@e106331-lin.cambridge.arm.com>
+ <5150800E.2000905@codeaurora.org>
+ <20130325180007.GA4065@e106331-lin.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.02.1303252147080.22263@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 25 Mar 2013, Daniel Lezcano wrote:
+On Mon, 25 Mar 2013, Mark Rutland wrote:
+> Thomas, do you have an idea of if/when tip/timers/urgent will hit mainline?
 
-> On 03/25/2013 07:10 PM, Andrew Lunn wrote:
-> > On Mon, Mar 25, 2013 at 06:55:32PM +0100, Daniel Lezcano wrote:
-> >> The init and exit routine for most of the drivers are the same,
-> >> that is register the driver and register the device.
-> >>
-> >> Provide a common function to do that in the cpuidle driver for ARM,
-> >> so we can get rid of a lot of code duplication in the different SOC
-> >> cpuidle drivers.
-> > 
-> > Hi Daniel
-> > 
-> > Please could you add a comment in the code about which piece is
-> > specific to ARM, because its not obvious to me. Its not like there is
-> > a reference to WFI for example. It looks like this code could go in
-> > drivers/cpuidle/cpuidle.c
-> 
-> Yes, I agree. At the first glance, the code, as it is, could go in this
-> file but more ARM specific code will be moved to this ARM generic code
-> driver like device tree description and couple idle states. The init
-> function would be more arch specific then.
-> 
-> For this reason, I think it is reasonable to move to
-> arm/kernel/cpuidle.c rather than drivers/cpuidle/cpuidle.c first.
+Thanks for the reminder. I just sent a pull request Linuswards.
 
-No.
+Thanks,
 
-Please move things under drivers/cpuidle/ upfront.
-
-We do want drivers to be gathered according to their purpose and 
-subsystem, not according to the architecture they belong to.
-
-This is a simple maintenance optimization to do so.
-
-The reason is when someone wishes to improve the subsystem then that 
-someone who might know nothing about the ARM or other architectures 
-won't have to look for obscure drivers buried into arch specific 
-directories.  When things are gathered under a common directory it is 
-then much easier to perform wide ranging changes to a subsystem.
-
-And for those who do know the ARM architecture and wish to modify the 
-ARM driver it is not that hard to locate the driver once.
-
-The "downside" for you might be that the activity under drivers/cpuidle/ 
-is more closely scrutinized by more people.  But that isn't a bad thing 
-either.
-
-> In the future, when all the ARM cpuidle driver will be fully
-> consolidated, that will be easier to identify the common parts across
-> the different arch and then move them to the generic framework.
-
-Nothing prevents you from doing that consolidation work right in 
-drivers/cpuidle/.
-
-
-Nicolas
+	tglx
