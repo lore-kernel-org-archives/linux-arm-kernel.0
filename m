@@ -1,254 +1,84 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Mon, 25 Mar 2013 22:31:34 +0100
-Subject: [PATCH v5 5/7] irqchip: s3c24xx: globally keep track of the created
- intc instances
-In-Reply-To: <201303252226.21402.heiko@sntech.de>
-References: <201303252226.21402.heiko@sntech.de>
-Message-ID: <201303252231.34833.heiko@sntech.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 25 Mar 2013 22:32:40 +0100
+Subject: [PATCH 2/3] mfd: db8500-prcmu: Fetch the PRCMU TCDM base address
+ from Device Tree
+In-Reply-To: <20130325164600.GA11734@gmail.com>
+References: <1364223758-17621-1-git-send-email-lee.jones@linaro.org>
+ <1364223758-17621-2-git-send-email-lee.jones@linaro.org>
+ <201303251540.51104.arnd@arndb.de>
+ <20130325164600.GA11734@gmail.com>
+Message-ID: <CACRpkdbn4WARSp7_MUpCZTghTrsPYvsa9GEUC31T7nP_=9oZag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For dt-enabled machines we want to use a big irq_domain over all controllers
-and therefore need to access not only the main controllers but the
-sub-controller as well.
+On Mon, Mar 25, 2013 at 5:46 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- drivers/irqchip/irq-s3c24xx.c |   99 +++++++++++++++++++++--------------------
- 1 file changed, 50 insertions(+), 49 deletions(-)
+>> >         res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+>> >                                            "prcmu-tcpm");
+>> >         if (!res) {
+>> > -               dev_err(&pdev->dev,
+>> > -                       "Error: no prcmu tcpm memory region provided\n");
+>> > -               return;
+>> > -       }
+>> > -       tcpm_base = ioremap(res->start, resource_size(res));
+>> > +               if (np) {
+>> > +                       tcpm_np = of_find_node_by_name(np->parent,
+>> > +                                                      "prcmu-tcpm-per4");
+>> > +                       if (!tcpm_np) {
+>> > +                               dev_err(&pdev->dev,
+>> > +                                       "no prcmu tcpm mem region provided\n");
+>> > +                               return;
+>> > +                       }
+>> > +                       tcpm_base = of_iomap(tcpm_np, 0);
+>> > +               }
+>> > +       } else
+>> > +               tcpm_base = ioremap(res->start, resource_size(res));
+>> > +
+>>
+>> Why don't you just add these extra registers to the prcmu node itself like
+>>
+>> diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
+>> index 9de9309..6ee6c31 100644
+>> --- a/arch/arm/boot/dts/dbx5x0.dtsi
+>> +++ b/arch/arm/boot/dts/dbx5x0.dtsi
+>> @@ -191,8 +191,8 @@
+>>
+>>               prcmu: prcmu at 80157000 {
+>>                       compatible = "stericsson,db8500-prcmu";
+>> -                     reg = <0x80157000 0x1000>;
+>> -                     reg-names = "prcmu";
+>> +                     reg = <0x80157000 0x1000>, <0x801b0000 0x1000>, <0x801b8000 0x1000>;
+>> +                     reg-names = "prcmu", "prcmu-tcpm", "prcmu-tcdm-per4";
+>>                       interrupts = <0 47 0x4>;
+>>                       #address-cells = <1>;
+>>                       #size-cells = <1>;
+>>
+>>
+>> and document those in the prcmu binding?
+>>
+>> That would keep the code simpler and the same for both cases.
+>
+> I'm not sure you can. These addresses differ from platform to
+> platform, so I'd need to provide the base PRCMU address in
+> dbx5x0.dtsi, then the other two in the dts files. Can you do that?
 
-diff --git a/drivers/irqchip/irq-s3c24xx.c b/drivers/irqchip/irq-s3c24xx.c
-index 7cba4f0..9914abd 100644
---- a/drivers/irqchip/irq-s3c24xx.c
-+++ b/drivers/irqchip/irq-s3c24xx.c
-@@ -69,6 +69,14 @@ struct s3c_irq_intc {
- 	struct s3c_irq_data	*irqs;
- };
- 
-+/*
-+ * Array holding pointers to the global controller structs
-+ * [0] ... main_intc
-+ * [1] ... sub_intc
-+ * [2] ... main_intc2 on s3c2416
-+ */
-+static struct s3c_irq_intc *s3c_intc[3];
-+
- static void s3c_irq_mask(struct irq_data *data)
- {
- 	struct s3c_irq_intc *intc = data->domain->host_data;
-@@ -307,9 +315,6 @@ static void s3c_irq_demux(unsigned int irq, struct irq_desc *desc)
- 	chained_irq_exit(chip, desc);
- }
- 
--static struct s3c_irq_intc *main_intc;
--static struct s3c_irq_intc *main_intc2;
--
- static inline int s3c24xx_handle_intc(struct s3c_irq_intc *intc,
- 				      struct pt_regs *regs)
- {
-@@ -345,12 +350,12 @@ static inline int s3c24xx_handle_intc(struct s3c_irq_intc *intc,
- asmlinkage void __exception_irq_entry s3c24xx_handle_irq(struct pt_regs *regs)
- {
- 	do {
--		if (likely(main_intc))
--			if (s3c24xx_handle_intc(main_intc, regs))
-+		if (likely(s3c_intc[0]))
-+			if (s3c24xx_handle_intc(s3c_intc[0], regs))
- 				continue;
- 
--		if (main_intc2)
--			if (s3c24xx_handle_intc(main_intc2, regs))
-+		if (s3c_intc[2])
-+			if (s3c24xx_handle_intc(s3c_intc[2], regs))
- 				continue;
- 
- 		break;
-@@ -577,11 +582,6 @@ static struct s3c_irq_intc *s3c24xx_init_intc(struct device_node *np,
- 		goto err;
- 	}
- 
--	if (address == 0x4a000000)
--		main_intc = intc;
--	else if (address == 0x4a000040)
--		main_intc2 = intc;
--
- 	set_handle_irq(s3c24xx_handle_irq);
- 
- 	return intc;
-@@ -670,20 +670,20 @@ static struct s3c_irq_data init_s3c2410subint[32] = {
- 
- void __init s3c2410_init_irq(void)
- {
--	struct s3c_irq_intc *main_intc;
--
- #ifdef CONFIG_FIQ
- 	init_FIQ(FIQ_START);
- #endif
- 
--	main_intc = s3c24xx_init_intc(NULL, &init_s3c2410base[0], NULL, 0x4a000000);
--	if (IS_ERR(main_intc)) {
-+	s3c_intc[0] = s3c24xx_init_intc(NULL, &init_s3c2410base[0], NULL,
-+					0x4a000000);
-+	if (IS_ERR(s3c_intc[0])) {
- 		pr_err("irq: could not create main interrupt controller\n");
- 		return;
- 	}
- 
--	s3c24xx_init_intc(NULL, &init_s3c2410subint[0], main_intc, 0x4a000018);
--	s3c24xx_init_intc(NULL, &init_eint[0], main_intc, 0x560000a4);
-+	s3c_intc[1] = s3c24xx_init_intc(NULL, &init_s3c2410subint[0],
-+					s3c_intc[0], 0x4a000018);
-+	s3c24xx_init_intc(NULL, &init_eint[0], s3c_intc[0], 0x560000a4);
- }
- #endif
- 
-@@ -770,22 +770,22 @@ static struct s3c_irq_data init_s3c2412subint[32] = {
- 
- void s3c2412_init_irq(void)
- {
--	struct s3c_irq_intc *main_intc;
--
- 	pr_info("S3C2412: IRQ Support\n");
- 
- #ifdef CONFIG_FIQ
- 	init_FIQ(FIQ_START);
- #endif
- 
--	main_intc = s3c24xx_init_intc(NULL, &init_s3c2412base[0], NULL, 0x4a000000);
--	if (IS_ERR(main_intc)) {
-+	s3c_intc[0] = s3c24xx_init_intc(NULL, &init_s3c2412base[0], NULL,
-+					0x4a000000);
-+	if (IS_ERR(s3c_intc[0])) {
- 		pr_err("irq: could not create main interrupt controller\n");
- 		return;
- 	}
- 
--	s3c24xx_init_intc(NULL, &init_s3c2412eint[0], main_intc, 0x560000a4);
--	s3c24xx_init_intc(NULL, &init_s3c2412subint[0], main_intc, 0x4a000018);
-+	s3c24xx_init_intc(NULL, &init_s3c2412eint[0], s3c_intc[0], 0x560000a4);
-+	s3c_intc[1] = s3c24xx_init_intc(NULL, &init_s3c2412subint[0],
-+					s3c_intc[0], 0x4a000018);
- }
- #endif
- 
-@@ -869,24 +869,25 @@ static struct s3c_irq_data init_s3c2416_second[32] = {
- 
- void __init s3c2416_init_irq(void)
- {
--	struct s3c_irq_intc *main_intc;
--
- 	pr_info("S3C2416: IRQ Support\n");
- 
- #ifdef CONFIG_FIQ
- 	init_FIQ(FIQ_START);
- #endif
- 
--	main_intc = s3c24xx_init_intc(NULL, &init_s3c2416base[0], NULL, 0x4a000000);
--	if (IS_ERR(main_intc)) {
-+	s3c_intc[0] = s3c24xx_init_intc(NULL, &init_s3c2416base[0], NULL,
-+					0x4a000000);
-+	if (IS_ERR(s3c_intc[0])) {
- 		pr_err("irq: could not create main interrupt controller\n");
- 		return;
- 	}
- 
--	s3c24xx_init_intc(NULL, &init_eint[0], main_intc, 0x560000a4);
--	s3c24xx_init_intc(NULL, &init_s3c2416subint[0], main_intc, 0x4a000018);
-+	s3c24xx_init_intc(NULL, &init_eint[0], s3c_intc[0], 0x560000a4);
-+	s3c_intc[1] = s3c24xx_init_intc(NULL, &init_s3c2416subint[0],
-+					s3c_intc[0], 0x4a000018);
- 
--	s3c24xx_init_intc(NULL, &init_s3c2416_second[0], NULL, 0x4a000040);
-+	s3c_intc[2] = s3c24xx_init_intc(NULL, &init_s3c2416_second[0],
-+					NULL, 0x4a000040);
- }
- 
- #endif
-@@ -947,22 +948,22 @@ static struct s3c_irq_data init_s3c2440subint[32] = {
- 
- void __init s3c2440_init_irq(void)
- {
--	struct s3c_irq_intc *main_intc;
--
- 	pr_info("S3C2440: IRQ Support\n");
- 
- #ifdef CONFIG_FIQ
- 	init_FIQ(FIQ_START);
- #endif
- 
--	main_intc = s3c24xx_init_intc(NULL, &init_s3c2440base[0], NULL, 0x4a000000);
--	if (IS_ERR(main_intc)) {
-+	s3c_intc[0] = s3c24xx_init_intc(NULL, &init_s3c2440base[0], NULL,
-+					0x4a000000);
-+	if (IS_ERR(s3c_intc[0])) {
- 		pr_err("irq: could not create main interrupt controller\n");
- 		return;
- 	}
- 
--	s3c24xx_init_intc(NULL, &init_eint[0], main_intc, 0x560000a4);
--	s3c24xx_init_intc(NULL, &init_s3c2440subint[0], main_intc, 0x4a000018);
-+	s3c24xx_init_intc(NULL, &init_eint[0], s3c_intc[0], 0x560000a4);
-+	s3c_intc[1] = s3c24xx_init_intc(NULL, &init_s3c2440subint[0],
-+					s3c_intc[0], 0x4a000018);
- }
- #endif
- 
-@@ -1020,22 +1021,22 @@ static struct s3c_irq_data init_s3c2442subint[32] = {
- 
- void __init s3c2442_init_irq(void)
- {
--	struct s3c_irq_intc *main_intc;
--
- 	pr_info("S3C2442: IRQ Support\n");
- 
- #ifdef CONFIG_FIQ
- 	init_FIQ(FIQ_START);
- #endif
- 
--	main_intc = s3c24xx_init_intc(NULL, &init_s3c2442base[0], NULL, 0x4a000000);
--	if (IS_ERR(main_intc)) {
-+	s3c_intc[0] = s3c24xx_init_intc(NULL, &init_s3c2442base[0], NULL,
-+					0x4a000000);
-+	if (IS_ERR(s3c_intc[0])) {
- 		pr_err("irq: could not create main interrupt controller\n");
- 		return;
- 	}
- 
--	s3c24xx_init_intc(NULL, &init_eint[0], main_intc, 0x560000a4);
--	s3c24xx_init_intc(NULL, &init_s3c2442subint[0], main_intc, 0x4a000018);
-+	s3c24xx_init_intc(NULL, &init_eint[0], s3c_intc[0], 0x560000a4);
-+	s3c_intc[1] = s3c24xx_init_intc(NULL, &init_s3c2442subint[0],
-+					s3c_intc[0], 0x4a000018);
- }
- #endif
- 
-@@ -1110,21 +1111,21 @@ static struct s3c_irq_data init_s3c2443subint[32] = {
- 
- void __init s3c2443_init_irq(void)
- {
--	struct s3c_irq_intc *main_intc;
--
- 	pr_info("S3C2443: IRQ Support\n");
- 
- #ifdef CONFIG_FIQ
- 	init_FIQ(FIQ_START);
- #endif
- 
--	main_intc = s3c24xx_init_intc(NULL, &init_s3c2443base[0], NULL, 0x4a000000);
--	if (IS_ERR(main_intc)) {
-+	s3c_intc[0] = s3c24xx_init_intc(NULL, &init_s3c2443base[0], NULL,
-+					0x4a000000);
-+	if (IS_ERR(s3c_intc[0])) {
- 		pr_err("irq: could not create main interrupt controller\n");
- 		return;
- 	}
- 
--	s3c24xx_init_intc(NULL, &init_eint[0], main_intc, 0x560000a4);
--	s3c24xx_init_intc(NULL, &init_s3c2443subint[0], main_intc, 0x4a000018);
-+	s3c24xx_init_intc(NULL, &init_eint[0], s3c_intc[0], 0x560000a4);
-+	s3c_intc[1] = s3c24xx_init_intc(NULL, &init_s3c2443subint[0],
-+					s3c_intc[0], 0x4a000018);
- }
- #endif
--- 
-1.7.10.4
+Better ask on devicetree-discuss.
+
+What it reflects are differences between SoC:s, so I think the
+right solution is to split it in a three-layer cake:
+
+dbx5x0.dtsi -> included by
+db8500.dtsi -> included by
+snowball/hrefv60plus.dts
+
+dbx5x0.dtsi -> included by
+dbx540.dtsi -> included by
+ccu9540/ccu8540.dts
+
+Here you may insert the reg property into the node at the
+db8500.dtsi or dbx540.dtsi layer.
+
+If you prefer I can cook a patch...
+
+Yours,
+Linus Walleij
