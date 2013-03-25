@@ -1,87 +1,73 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 25 Mar 2013 19:33:57 +0100
-Subject: [PATCH 1/4] thermal: Add driver for Armada 370/XP SoC thermal
- management
-In-Reply-To: <1364225229-2857-2-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1364225229-2857-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1364225229-2857-2-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20130325183357.GB631@lunn.ch>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 25 Mar 2013 19:35:05 +0100
+Subject: [RFC patch 02/11] cpuidle / arm : a single cpuidle driver
+In-Reply-To: <CAHkRjk45cGSKiC003izHrLSZPb3wsmjXPTG3e0raSaXAdQRqEQ@mail.gmail.com>
+References: <1363357630-22214-1-git-send-email-daniel.lezcano@linaro.org>
+ <1363357630-22214-3-git-send-email-daniel.lezcano@linaro.org>
+ <201303151447.06150.arnd@arndb.de> <51433949.1030204@linaro.org>
+ <CAHkRjk45cGSKiC003izHrLSZPb3wsmjXPTG3e0raSaXAdQRqEQ@mail.gmail.com>
+Message-ID: <515098D9.2000107@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 25, 2013 at 12:27:06PM -0300, Ezequiel Garcia wrote:
-> This driver supports both Armada 370 and Armada XP SoC
-> thermal management controllers.
+On 03/25/2013 07:27 PM, Catalin Marinas wrote:
+> On 15 March 2013 15:07, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
+>> On 03/15/2013 03:47 PM, Arnd Bergmann wrote:
+>>> On Friday 15 March 2013, Daniel Lezcano wrote:
+>>>> The cpuidle drivers are duplicating a lot of code and in most
+>>>> of the case there is a common pattern we can factor out:
+>>>>
+>>>>         * setup the broadcast timers
+>>>>         * register the driver
+>>>>         * register the devices
+>>>>
+>>>> This arm driver is the common part between all the ARM cpuidle drivers,
+>>>> with the code factored out.
+>>>>
+>>>> It does not handle the coupled idle state for now but it is the first
+>>>> step to have everyone to converge to the same code pattern.
+>>>>
+>>>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>>>
+>>> Unfortunately, I missed the session in Hong Kong, but I'd like to understand
+>>> what part of this driver is actually ARM specific. I assume there is nothing
+>>> in it that depends on 32 bit ARM hardware, right?
+>>
+>> What depends on the 32bits ARM hardware is the drivers themselves. This
+>> ARM driver is the first step to consolidate all SoC cpuidle specific
+>> code we find in arch/arm. The code is designated to factor out these
+>> drivers, as a first step. The second step is to consolidate more this
+>> driver (eg. moving the code in arch/arm/kernel/cpuidle.c in this driver).
+>>
+>> The last man standing algorithm we have in mach-ux500 and mach-imx is
+>> the same, and will be moved in the ARM cpuidle driver.
+>>
+>> The more it will be consolidated, the more it will be ARM specific.
+>>
+>> The final step will be to use the device tree to be passed to this
+>> driver and do the cpuidle driver initialization from there.
+>>
+>>> Would the same code be used with arch/arm64?
+>>
+>> I can't tell but IIUC, a single ARM driver will be used based on the
+>> psci for ARM64, but it does not exist for now. It is possible some code
+>> pattern could be used from the ARM32 cpuidle driver.
 > 
-> Armada 370 has a register to check a valid temperature, whereas
-> Armada XP does not. Each has a different initialization (i.e. calibration)
-> function. The temperature conversion formula is the same for both.
-> 
-> The controller present in each SoC have a very similar feature set,
-> so it corresponds to have one driver to support both of them.
-> 
-> Although this driver may present similarities to Dove and Kirkwood
-> thermal driver, the exact differences and coincidences are not fully
-> known. For this reason, support is given through a separate driver.
-> 
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
->  .../devicetree/bindings/thermal/armada-thermal.txt |   22 ++
->  drivers/thermal/Kconfig                            |    8 +
->  drivers/thermal/Makefile                           |    1 +
->  drivers/thermal/armada_thermal.c                   |  236 ++++++++++++++++++++
->  4 files changed, 267 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/thermal/armada-thermal.txt
->  create mode 100644 drivers/thermal/armada_thermal.c
-> 
-> diff --git a/Documentation/devicetree/bindings/thermal/armada-thermal.txt b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-> new file mode 100644
-> index 0000000..fff93d5
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-> @@ -0,0 +1,22 @@
-> +* Marvell Armada 370/XP thermal management
-> +
-> +Required properties:
-> +
-> +- compatible:	Should be set to one of the following:
-> +		marvell,armada370-thermal
-> +		marvell,armadaxp-thermal
-> +
-> +- reg:		Device's register space.
-> +		Two entries are expected, see the examples below.
-> +		The first one is required for the sensor register;
-> +		the second one is required for the control register
-> +		to be used for sensor initialization (a.k.a. calibration).
-> +
-> +Example:
-> +
-> +	thermal at d0018300 {
-> +		compatible = "marvell,armada370-thermal";
-> +                reg = <0xd0018300 0x4
-> +		       0xd0018304 0x4>;
-> +		status = "okay";
-> +	};
-> diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-> index a764f16..fcd5a27 100644
-> --- a/drivers/thermal/Kconfig
-> +++ b/drivers/thermal/Kconfig
-> @@ -134,6 +134,14 @@ config DOVE_THERMAL
->  	  Support for the Dove thermal sensor driver in the Linux thermal
->  	  framework.
->  
-> +config ARMADA_THERMAL
-> +	tristate "Armada 370/XP thermal management"
-> +	depends on ARCH_MVEBU
-> +	depends on OF
-> +	help
-> +	  Enable this option if you want to have support for thermal management
-> +	  controller present in Armada 370 and Armada XP SoC.
-> +
+> While we recommend PSCI if EL3 (secure mode) is available, not all
+> ARMv8 CPU implementations will have this and most likely we'll have to
+> reuse existing cpuidle drivers. So if you can make it as generic as
+> possible it would really help.
 
-Hi Ezequiel
+Sure, I will keep it in mind.
 
-For some unknown reason, the Kconfig entries are in reverse alphabetic
-order. So you should insert this entry after DB8500. Same for the Makefile.
+Thanks for the information.
 
-       Andrew
+ -- Daniel
+
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
