@@ -1,54 +1,82 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Mon, 25 Mar 2013 16:02:31 +0100
-Subject: [PATCH 2/2] mmc: mxs-mmc: add non-removeable property
-In-Reply-To: <1364223751-28253-1-git-send-email-mkl@pengutronix.de>
-References: <1364223751-28253-1-git-send-email-mkl@pengutronix.de>
-Message-ID: <1364223751-28253-3-git-send-email-mkl@pengutronix.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 25 Mar 2013 15:02:37 +0000
+Subject: [PATCH 2/3] mfd: db8500-prcmu: Fetch the PRCMU TCDM base address from
+ Device Tree
+In-Reply-To: <1364223758-17621-1-git-send-email-lee.jones@linaro.org>
+References: <1364223758-17621-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1364223758-17621-2-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some boards have non removeable cards like eMMC. Handle such case.
+A recent move to send the base addresses though the PRCMU platform
+device resource instead of defines found in <mach/*>, means that dbx500
+devices can no longer boot successfully when booting with Device Tree
+enabled. This patch ensures the addresses are obtained correctly from
+DT.
 
-Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mmc/host/mxs-mmc.c | 10 +++++++---
- 1 file changed, 7 insertions(+), 3 deletions(-)
+ drivers/mfd/db8500-prcmu.c |   28 ++++++++++++++++++++--------
+ 1 file changed, 20 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
-index 0cdf1f6..b85f383 100644
---- a/drivers/mmc/host/mxs-mmc.c
-+++ b/drivers/mmc/host/mxs-mmc.c
-@@ -73,6 +73,7 @@ struct mxs_mmc_host {
- 	int				wp_gpio;
- 	bool				wp_inverted;
- 	bool				cd_inverted;
-+	bool				non_removeable;
- };
- 
- static int mxs_mmc_get_ro(struct mmc_host *mmc)
-@@ -96,8 +97,9 @@ static int mxs_mmc_get_cd(struct mmc_host *mmc)
- 	struct mxs_mmc_host *host = mmc_priv(mmc);
- 	struct mxs_ssp *ssp = &host->ssp;
- 
--	return !(readl(ssp->base + HW_SSP_STATUS(ssp)) &
--		 BM_SSP_STATUS_CARD_DETECT)) ^ host->cd_inverted;
-+	return host->non_removeable ||
-+		!(readl(ssp->base + HW_SSP_STATUS(ssp)) &
-+		  BM_SSP_STATUS_CARD_DETECT) ^ host->cd_inverted;
+diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
+index 21f261b..8602bf8 100644
+--- a/drivers/mfd/db8500-prcmu.c
++++ b/drivers/mfd/db8500-prcmu.c
+@@ -17,6 +17,8 @@
+ #include <linux/err.h>
+ #include <linux/spinlock.h>
+ #include <linux/io.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
+ #include <linux/slab.h>
+ #include <linux/mutex.h>
+ #include <linux/completion.h>
+@@ -2790,19 +2792,29 @@ static int db8500_irq_init(struct device_node *np)
  }
  
- static void mxs_mmc_reset(struct mxs_mmc_host *host)
-@@ -687,8 +689,10 @@ static int mxs_mmc_probe(struct platform_device *pdev)
- 		mmc->caps |= MMC_CAP_4_BIT_DATA;
- 	else if (bus_width == 8)
- 		mmc->caps |= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA;
-+	host->non_removeable = of_property_read_bool(np, "non-removable");
-+	if (host->non_removeable)
-+		mmc->caps |= MMC_CAP_NONREMOVABLE;
- 	host->wp_gpio = of_get_named_gpio_flags(np, "wp-gpios", 0, &flags);
--
- 	if (flags & OF_GPIO_ACTIVE_LOW)
- 		host->wp_inverted = 1;
+ static void dbx500_fw_version_init(struct platform_device *pdev,
+-			    u32 version_offset)
++				   u32 version_offset,
++				   struct device_node *np)
+ {
++	struct device_node *tcpm_np;
+ 	struct resource *res;
+-	void __iomem *tcpm_base;
++	void __iomem *tcpm_base = NULL;
  
+ 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+ 					   "prcmu-tcpm");
+ 	if (!res) {
+-		dev_err(&pdev->dev,
+-			"Error: no prcmu tcpm memory region provided\n");
+-		return;
+-	}
+-	tcpm_base = ioremap(res->start, resource_size(res));
++		if (np) {
++			tcpm_np = of_find_node_by_name(np->parent,
++						       "prcmu-tcpm-per4");
++			if (!tcpm_np) {
++				dev_err(&pdev->dev,
++					"no prcmu tcpm mem region provided\n");
++				return;
++			}
++			tcpm_base = of_iomap(tcpm_np, 0);
++		}
++	} else
++		tcpm_base = ioremap(res->start, resource_size(res));
++
+ 	if (tcpm_base != NULL) {
+ 		u32 version;
+ 
+@@ -3154,7 +3166,7 @@ static int db8500_prcmu_probe(struct platform_device *pdev)
+ 
+ 	init_prcm_registers();
+ 
+-	dbx500_fw_version_init(pdev, pdata->version_offset);
++	dbx500_fw_version_init(pdev, pdata->version_offset, np);
+ 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "prcmu-tcdm");
+ 	if (!res) {
+ 		dev_err(&pdev->dev, "no prcmu tcdm region provided\n");
 -- 
-1.8.2.rc2
+1.7.10.4
