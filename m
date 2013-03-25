@@ -1,473 +1,220 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 25 Mar 2013 18:06:23 +0100
-Subject: [PATCH v5 2/8] reset: Add reset controller API
-In-Reply-To: <1364231189-12497-1-git-send-email-p.zabel@pengutronix.de>
-References: <1364231189-12497-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1364231189-12497-3-git-send-email-p.zabel@pengutronix.de>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon, 25 Mar 2013 18:04:32 +0100
+Subject: [PATCH] ARM: at91: add Acme Systems Aria G25 board
+In-Reply-To: <51506BED.4040203@interlog.com>
+References: <1364201369-12047-1-git-send-email-nicolas.ferre@atmel.com>
+ <20130325122220.GF2001@game.jcrosoft.org>
+ <5150559D.3030109@interlog.com>
+ <20130325143147.GA20693@game.jcrosoft.org>
+ <51506BED.4040203@interlog.com>
+Message-ID: <20130325170432.GE20693@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a simple API for devices to request being reset
-by separate reset controller hardware and implements the
-reset signal device tree binding.
+On 11:23 Mon 25 Mar     , Douglas Gilbert wrote:
+> On 13-03-25 10:31 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> >On 09:48 Mon 25 Mar     , Douglas Gilbert wrote:
+> >>On 13-03-25 08:22 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> >>>On 09:49 Mon 25 Mar     , Nicolas Ferre wrote:
+> >>>>From: Douglas Gilbert <dgilbert@interlog.com>
+> >>>>
+> >>>>Signed-off-by: Douglas Gilbert <dgilbert@interlog.com>
+> >>>>Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> >>>>---
+> >>>>  arch/arm/boot/dts/ariag25.dts | 168 ++++++++++++++++++++++++++++++++++++++++++
+> >>>>  1 file changed, 168 insertions(+)
+> >>>>  create mode 100644 arch/arm/boot/dts/ariag25.dts
+> >>>>
+> >>>>diff --git a/arch/arm/boot/dts/ariag25.dts b/arch/arm/boot/dts/ariag25.dts
+> >>>>new file mode 100644
+> >>>>index 0000000..d18ef50
+> >>>>--- /dev/null
+> >>>>+++ b/arch/arm/boot/dts/ariag25.dts
+> >>>>@@ -0,0 +1,168 @@
+> >>>>+/*
+> >>>>+ * ariag25.dts - Device Tree file for Acme Systems Aria G25 (AT91SAM9G25 based)
+> >>>>+ *
+> >>>>+ * Copyright (C) 2013 Douglas Gilbert <dgilbert@interlog.com>,
+> >>>>+ *                    Robert Nelson <robertcnelson@gmail.com>
+> >>>>+ *
+> >>>>+ * Licensed under GPLv2 or later.
+> >>>>+ */
+> >>>>+/dts-v1/;
+> >>>>+/include/ "at91sam9g25.dtsi"
+> >>>>+
+> >>>>+/ {
+> >>>>+	model = "Acme Systems Aria G25";
+> >>>>+	compatible = "acme,ariag25", "atmel,at91sam9g25ek", "atmel,at91sam9x5ek",
+> >>>>+		     "atmel,at91sam9x5", "atmel,at91sam9";
+> >>>I doube the code is compatible with the 9g25ek
+> >>>
+> >>>specially when you do not include it
+> >>>>+
+> >>>>+	aliases {
+> >>>>+		serial4 = &usart3;
+> >>>>+		serial5 = &uart0;
+> >>>>+	};
+> >>>you need to specify all
+> >>>>+
+> >>>>+	chosen {
+> >>>>+		bootargs = "console=ttyS0,115200 root=/dev/mmcblk0p2 rw rootwait";
+> >>>>+	};
+> >>>>+
+> >>>>+	memory {
+> >>>>+		/* 128 MB, change this for 256 MB revision */
+> >>>>+		reg = <0x20000000 0x8000000>;
+> >>>>+	};
+> >>>>+
+> >>>>+	clocks {
+> >>>>+		#address-cells = <1>;
+> >>>>+		#size-cells = <1>;
+> >>>>+		ranges;
+> >>>>+
+> >>>>+		main_clock: clock at 0 {
+> >>>>+			compatible = "atmel,osc", "fixed-clock";
+> >>>>+			clock-frequency = <12000000>;
+> >>>>+		};
+> >>>>+	};
+> >>>>+
+> >>>>+	ahb {
+> >>>>+		apb {
+> >>>>+			mmc0: mmc at f0008000 {
+> >>>>+				/* N.B. Aria has no SD card detect (CD), assumed present */
+> >>>>+
+> >>>>+				pinctrl-0 = <
+> >>>>+					&pinctrl_mmc0_slot0_clk_cmd_dat0
+> >>>>+					&pinctrl_mmc0_slot0_dat1_3>;
+> >>>>+				status = "okay";
+> >>>>+				slot at 0 {
+> >>>>+					reg = <0>;
+> >>>>+					bus-width = <4>;
+> >>>>+				};
+> >>>>+			};
+> >>>>+
+> >>>>+			i2c0: i2c at f8010000 {
+> >>>>+				status = "okay";
+> >>>>+			};
+> >>>>+
+> >>>>+			i2c1: i2c at f8014000 {
+> >>>>+				status = "okay";
+> >>>>+			};
+> >>>>+
+> >>>>+			/* TWD2+TCLK2 hidden behind ethernet, so no i2c2 */
+> >>>>+
+> >>>>+			usart0: serial at f801c000 {
+> >>>>+				pinctrl-0 = <&pinctrl_usart0
+> >>>>+					     &pinctrl_usart0_rts
+> >>>>+					     &pinctrl_usart0_cts>;
+> >>>>+				status = "okay";
+> >>>>+			};
+> >>>>+
+> >>>>+			usart1: serial at f8020000 {
+> >>>>+				pinctrl-0 = <&pinctrl_usart1
+> >>>>+					     /* &pinctrl_usart1_rts */
+> >>>>+					     /* &pinctrl_usart1_cts */
+> >>>>+					    >;
+> >>>>+				status = "okay";
+> >>>>+			};
+> >>>>+
+> >>>>+			usart2: serial at f8024000 {
+> >>>>+				/* cannot activate RTS2+CTS2, clash with
+> >>>>+				 * ethernet on PB0 and PB1 */
+> >>>>+				pinctrl-0 = <&pinctrl_usart2>;
+> >>>>+				status = "okay";
+> >>>>+			};
+> >>>>+
+> >>>>+			usart3: serial at f8028000 {
+> >>>>+				compatible = "atmel,at91sam9260-usart";
+> >>>>+				reg = <0xf8028000 0x200>;
+> >>>>+				interrupts = <8 4 5>;
+> >>>>+				pinctrl-names = "default";
+> >>>>+				pinctrl-0 = <&pinctrl_usart3
+> >>>>+					     /* &pinctrl_usart3_rts */
+> >>>>+					     /* &pinctrl_usart3_cts */
+> >>>>+					    >;
+> >>>>+				status = "okay";
+> >>>>+			};
+> >>>>+
+> >>>>+			macb0: ethernet at f802c000 {
+> >>>>+				phy-mode = "rmii";
+> >>>>+				/* following can be overwritten by uboot 'ftd set' command */
+> >>>>+				local-mac-address = [00 04 25 dd 10 01];
+> >>>drop this, this is board specific
+> >>>>+				status = "okay";
+> >>
+> >>Also the local-mac-address line is needed since it is edited
+> >>by u-boot via this line:
+> >>
+> >>mod_dtb=fdt addr 0x27FF0000 ; fdt set ${eth0_dt_path}
+> >>local-mac-address [ ${my_ethaddr} ]
+> >>
+> >>Interesting technique that: editing the dtb from u-boot prior to the
+> >>Linux kernel using it ...
+> >>
+> >>So the u-boot environment file actually sets the MAC address. The Aria
+> >>G25 has no NAND, flash or switches for setting a quasi unique MAC
+> >>address. There seems to be no way to pass the MAC address on the
+> >>kernel boot line (there was in the past). That leaves the microSD card
+> >>and IMO u-boot is the best place to set that MAC address. My guess
+> >>is that the Aria G25 is not the only board that has this "setting the
+> >>MAC address" challenge.
+> >>
+> >>Finally of course that line is "board specific", that is why the
+> >>file is called ariag25.dts :-)
+> >The mac address is board (hw) uniq so no default in the dts, if none present
+> >the kernel will generate one (private class).
+> 
+> Since when have MAC addresses been hw uniq? 
+since EVER this is why you can resolve the IP <=> MAC on public network
+That's why when you buy a mac address range, you need to prouve how you handle
+it to buy a second range.
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-Reviewed-by: Stephen Warren <swarren@nvidia.com>
-Reviewed-by: Shawn Guo <shawn.guo@linaro.org>
----
-Changes since v4:
- - removed flags parameter from .of_xlate / of_reset_simple_xlate
- - warn also if reset_spec->args_count > rcdev->of_reset_n_cells
- - unlock list mutex only after try_module_get
- - tighten devm_reset_control_match a bit
----
- drivers/Kconfig                  |   2 +
- drivers/Makefile                 |   3 +
- drivers/reset/Kconfig            |  13 ++
- drivers/reset/Makefile           |   1 +
- drivers/reset/core.c             | 297 +++++++++++++++++++++++++++++++++++++++
- include/linux/reset-controller.h |  51 +++++++
- include/linux/reset.h            |  17 +++
- 7 files changed, 384 insertions(+)
- create mode 100644 drivers/reset/Kconfig
- create mode 100644 drivers/reset/Makefile
- create mode 100644 drivers/reset/core.c
- create mode 100644 include/linux/reset-controller.h
- create mode 100644 include/linux/reset.h
+> My guess is
+> a huge majority of MAC addresses are set in firmware.
+> Since many embedded systems with wired ethernet face
+> this problem, is it the job of Linux to make this more
+> difficult than it already is?
+yes but NEVER set the same mac address for every board (hw) in a DT or in C
+> 
+> >If the mac is specifued in the register the kernel re-use it.
+> 
+> Unless u-boot (or whatever) edits the dtb file before the
+> Linux kernel sees it.
+> 
+> >This is the job of the booloader to set one. The dts in the kernel will be
+> >used for every Aria not one board in particular
+> 
+> It is the job of someone to set it. A MAC address can be
+> compiled into u-boot but that is about as useful as
+> compiling it into Linux kernel.
+no default one in the kernel dt
 
-diff --git a/drivers/Kconfig b/drivers/Kconfig
-index 202fa6d..847f8e3 100644
---- a/drivers/Kconfig
-+++ b/drivers/Kconfig
-@@ -162,4 +162,6 @@ source "drivers/irqchip/Kconfig"
- 
- source "drivers/ipack/Kconfig"
- 
-+source "drivers/reset/Kconfig"
-+
- endmenu
-diff --git a/drivers/Makefile b/drivers/Makefile
-index dce39a9..1a64c4c 100644
---- a/drivers/Makefile
-+++ b/drivers/Makefile
-@@ -37,6 +37,9 @@ obj-$(CONFIG_XEN)		+= xen/
- # regulators early, since some subsystems rely on them to initialize
- obj-$(CONFIG_REGULATOR)		+= regulator/
- 
-+# reset controllers early, since gpu drivers might rely on them to initialize
-+obj-$(CONFIG_RESET_CONTROLLER)	+= reset/
-+
- # tty/ comes before char/ so that the VT console is the boot-time
- # default.
- obj-y				+= tty/
-diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
-new file mode 100644
-index 0000000..c9d04f7
---- /dev/null
-+++ b/drivers/reset/Kconfig
-@@ -0,0 +1,13 @@
-+config ARCH_HAS_RESET_CONTROLLER
-+	bool
-+
-+menuconfig RESET_CONTROLLER
-+	bool "Reset Controller Support"
-+	default y if ARCH_HAS_RESET_CONTROLLER
-+	help
-+	  Generic Reset Controller support.
-+
-+	  This framework is designed to abstract reset handling of devices
-+	  via GPIOs or SoC-internal reset controller modules.
-+
-+	  If unsure, say no.
-diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
-new file mode 100644
-index 0000000..1e2d83f
---- /dev/null
-+++ b/drivers/reset/Makefile
-@@ -0,0 +1 @@
-+obj-$(CONFIG_RESET_CONTROLLER) += core.o
-diff --git a/drivers/reset/core.c b/drivers/reset/core.c
-new file mode 100644
-index 0000000..66ce332
---- /dev/null
-+++ b/drivers/reset/core.c
-@@ -0,0 +1,297 @@
-+/*
-+ * Reset Controller framework
-+ *
-+ * Copyright 2013 Philipp Zabel, Pengutronix
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+#include <linux/device.h>
-+#include <linux/err.h>
-+#include <linux/export.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/reset.h>
-+#include <linux/reset-controller.h>
-+#include <linux/slab.h>
-+
-+static DEFINE_MUTEX(reset_controller_list_mutex);
-+static LIST_HEAD(reset_controller_list);
-+
-+/**
-+ * struct reset_control - a reset control
-+ * @rcdev: a pointer to the reset controller device
-+ *         this reset control belongs to
-+ * @id: ID of the reset controller in the reset
-+ *      controller device
-+ */
-+struct reset_control {
-+	struct reset_controller_dev *rcdev;
-+	struct device *dev;
-+	unsigned int id;
-+};
-+
-+/**
-+ * of_reset_simple_xlate - translate reset_spec to the reset line number
-+ * @rcdev: a pointer to the reset controller device
-+ * @reset_spec: reset line specifier as found in the device tree
-+ * @flags: a flags pointer to fill in (optional)
-+ *
-+ * This simple translation function should be used for reset controllers
-+ * with 1:1 mapping, where reset lines can be indexed by number without gaps.
-+ */
-+int of_reset_simple_xlate(struct reset_controller_dev *rcdev,
-+			  const struct of_phandle_args *reset_spec)
-+{
-+	if (WARN_ON(reset_spec->args_count != rcdev->of_reset_n_cells))
-+		return -EINVAL;
-+
-+	if (reset_spec->args[0] >= rcdev->nr_resets)
-+		return -EINVAL;
-+
-+	return reset_spec->args[0];
-+}
-+EXPORT_SYMBOL_GPL(of_reset_simple_xlate);
-+
-+/**
-+ * reset_controller_register - register a reset controller device
-+ * @rcdev: a pointer to the initialized reset controller device
-+ */
-+int reset_controller_register(struct reset_controller_dev *rcdev)
-+{
-+	if (!rcdev->of_xlate) {
-+		rcdev->of_reset_n_cells = 1;
-+		rcdev->of_xlate = of_reset_simple_xlate;
-+	}
-+
-+	mutex_lock(&reset_controller_list_mutex);
-+	list_add(&rcdev->list, &reset_controller_list);
-+	mutex_unlock(&reset_controller_list_mutex);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(reset_controller_register);
-+
-+/**
-+ * reset_controller_unregister - unregister a reset controller device
-+ * @rcdev: a pointer to the reset controller device
-+ */
-+void reset_controller_unregister(struct reset_controller_dev *rcdev)
-+{
-+	mutex_lock(&reset_controller_list_mutex);
-+	list_del(&rcdev->list);
-+	mutex_unlock(&reset_controller_list_mutex);
-+}
-+EXPORT_SYMBOL_GPL(reset_controller_unregister);
-+
-+/**
-+ * reset_control_reset - reset the controlled device
-+ * @rstc: reset controller
-+ */
-+int reset_control_reset(struct reset_control *rstc)
-+{
-+	if (rstc->rcdev->ops->reset)
-+		return rstc->rcdev->ops->reset(rstc->rcdev, rstc->id);
-+
-+	return -ENOSYS;
-+}
-+EXPORT_SYMBOL_GPL(reset_control_reset);
-+
-+/**
-+ * reset_control_assert - asserts the reset line
-+ * @rstc: reset controller
-+ */
-+int reset_control_assert(struct reset_control *rstc)
-+{
-+	if (rstc->rcdev->ops->assert)
-+		return rstc->rcdev->ops->assert(rstc->rcdev, rstc->id);
-+
-+	return -ENOSYS;
-+}
-+EXPORT_SYMBOL_GPL(reset_control_assert);
-+
-+/**
-+ * reset_control_deassert - deasserts the reset line
-+ * @rstc: reset controller
-+ */
-+int reset_control_deassert(struct reset_control *rstc)
-+{
-+	if (rstc->rcdev->ops->deassert)
-+		return rstc->rcdev->ops->deassert(rstc->rcdev, rstc->id);
-+
-+	return -ENOSYS;
-+}
-+EXPORT_SYMBOL_GPL(reset_control_deassert);
-+
-+/**
-+ * reset_control_get - Lookup and obtain a reference to a reset controller.
-+ * @dev: device to be reset by the controller
-+ * @id: reset line name
-+ *
-+ * Returns a struct reset_control or IS_ERR() condition containing errno.
-+ *
-+ * Use of id names is optional.
-+ */
-+struct reset_control *reset_control_get(struct device *dev, const char *id)
-+{
-+	struct reset_control *rstc = ERR_PTR(-EPROBE_DEFER);
-+	struct reset_controller_dev *r, *rcdev;
-+	struct of_phandle_args args;
-+	int index = 0;
-+	int rstc_id;
-+	int ret;
-+
-+	if (!dev)
-+		return ERR_PTR(-EINVAL);
-+
-+	if (id)
-+		index = of_property_match_string(dev->of_node,
-+						 "reset-names", id);
-+	ret = of_parse_phandle_with_args(dev->of_node, "resets", "#reset-cells",
-+					 index, &args);
-+	if (ret)
-+		return ERR_PTR(ret);
-+
-+	mutex_lock(&reset_controller_list_mutex);
-+	rcdev = NULL;
-+	list_for_each_entry(r, &reset_controller_list, list) {
-+		if (args.np == r->of_node) {
-+			rcdev = r;
-+			break;
-+		}
-+	}
-+	of_node_put(args.np);
-+
-+	if (!rcdev) {
-+		mutex_unlock(&reset_controller_list_mutex);
-+		return ERR_PTR(-ENODEV);
-+	}
-+
-+	rstc_id = rcdev->of_xlate(rcdev, &args);
-+	if (rstc_id < 0) {
-+		mutex_unlock(&reset_controller_list_mutex);
-+		return ERR_PTR(rstc_id);
-+	}
-+
-+	try_module_get(rcdev->owner);
-+	mutex_unlock(&reset_controller_list_mutex);
-+
-+	rstc = kzalloc(sizeof(*rstc), GFP_KERNEL);
-+	if (!rstc) {
-+		module_put(rstc->rcdev->owner);
-+		return ERR_PTR(-ENOMEM);
-+	}
-+
-+	rstc->dev = dev;
-+	rstc->rcdev = rcdev;
-+	rstc->id = rstc_id;
-+
-+	return rstc;
-+}
-+EXPORT_SYMBOL_GPL(reset_control_get);
-+
-+/**
-+ * reset_control_put - free the reset controller
-+ * @rstc: reset controller
-+ */
-+
-+void reset_control_put(struct reset_control *rstc)
-+{
-+	if (IS_ERR(rstc))
-+		return;
-+
-+	module_put(rstc->rcdev->owner);
-+	kfree(rstc);
-+}
-+EXPORT_SYMBOL_GPL(reset_control_put);
-+
-+static void devm_reset_control_release(struct device *dev, void *res)
-+{
-+	reset_control_put(*(struct reset_control **)res);
-+}
-+
-+/**
-+ * devm_reset_control_get - resource managed reset_control_get()
-+ * @dev: device to be reset by the controller
-+ * @id: reset line name
-+ *
-+ * Managed reset_control_get(). For reset controllers returned from this
-+ * function, reset_control_put() is called automatically on driver detach.
-+ * See reset_control_get() for more information.
-+ */
-+struct reset_control *devm_reset_control_get(struct device *dev, const char *id)
-+{
-+	struct reset_control **ptr, *rstc;
-+
-+	ptr = devres_alloc(devm_reset_control_release, sizeof(*ptr),
-+			   GFP_KERNEL);
-+	if (!ptr)
-+		return ERR_PTR(-ENOMEM);
-+
-+	rstc = reset_control_get(dev, id);
-+	if (!IS_ERR(rstc)) {
-+		*ptr = rstc;
-+		devres_add(dev, ptr);
-+	} else {
-+		devres_free(ptr);
-+	}
-+
-+	return rstc;
-+}
-+EXPORT_SYMBOL_GPL(devm_reset_control_get);
-+
-+static int devm_reset_control_match(struct device *dev, void *res, void *data)
-+{
-+	struct reset_control **rstc = res;
-+	if (WARN_ON(!rstc || !*rstc))
-+		return 0;
-+	return *rstc == data;
-+}
-+
-+/**
-+ * devm_reset_control_put - resource managed reset_control_put()
-+ * @rstc: reset controller to free
-+ *
-+ * Deallocate a reset control allocated withd devm_reset_control_get().
-+ * This function will not need to be called normally, as devres will take
-+ * care of freeing the resource.
-+ */
-+void devm_reset_control_put(struct reset_control *rstc)
-+{
-+	int ret;
-+
-+	ret = devres_release(rstc->dev, devm_reset_control_release,
-+			     devm_reset_control_match, rstc);
-+	if (ret)
-+		WARN_ON(ret);
-+}
-+EXPORT_SYMBOL_GPL(devm_reset_control_put);
-+
-+/**
-+ * device_reset - find reset controller associated with the device
-+ *                and perform reset
-+ * @dev: device to be reset by the controller
-+ *
-+ * Convenience wrapper for reset_control_get() and reset_control_reset().
-+ * This is useful for the common case of devices with single, dedicated reset
-+ * lines.
-+ */
-+int device_reset(struct device *dev)
-+{
-+	struct reset_control *rstc;
-+	int ret;
-+
-+	rstc = reset_control_get(dev, NULL);
-+	if (IS_ERR(rstc))
-+		return PTR_ERR(rstc);
-+
-+	ret = reset_control_reset(rstc);
-+
-+	reset_control_put(rstc);
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(device_reset);
-diff --git a/include/linux/reset-controller.h b/include/linux/reset-controller.h
-new file mode 100644
-index 0000000..2f61311
---- /dev/null
-+++ b/include/linux/reset-controller.h
-@@ -0,0 +1,51 @@
-+#ifndef _LINUX_RESET_CONTROLLER_H_
-+#define _LINUX_RESET_CONTROLLER_H_
-+
-+#include <linux/list.h>
-+
-+struct reset_controller_dev;
-+
-+/**
-+ * struct reset_control_ops
-+ *
-+ * @reset: for self-deasserting resets, does all necessary
-+ *         things to reset the device
-+ * @assert: manually assert the reset line, if supported
-+ * @deassert: manually deassert the reset line, if supported
-+ */
-+struct reset_control_ops {
-+	int (*reset)(struct reset_controller_dev *rcdev, unsigned long id);
-+	int (*assert)(struct reset_controller_dev *rcdev, unsigned long id);
-+	int (*deassert)(struct reset_controller_dev *rcdev, unsigned long id);
-+};
-+
-+struct module;
-+struct device_node;
-+
-+/**
-+ * struct reset_controller_dev - reset controller entity that might
-+ *                               provide multiple reset controls
-+ * @ops: a pointer to device specific struct reset_control_ops
-+ * @owner: kernel module of the reset controller driver
-+ * @list: internal list of reset controller devices
-+ * @of_node: corresponding device tree node as phandle target
-+ * @of_reset_n_cells: number of cells in reset line specifiers
-+ * @of_xlate: translation function to translate from specifier as found in the
-+ *            device tree to id as given to the reset control ops
-+ * @nr_resets: number of reset controls in this reset controller device
-+ */
-+struct reset_controller_dev {
-+	struct reset_control_ops *ops;
-+	struct module *owner;
-+	struct list_head list;
-+	struct device_node *of_node;
-+	int of_reset_n_cells;
-+	int (*of_xlate)(struct reset_controller_dev *rcdev,
-+			const struct of_phandle_args *reset_spec);
-+	unsigned int nr_resets;
-+};
-+
-+int reset_controller_register(struct reset_controller_dev *rcdev);
-+void reset_controller_unregister(struct reset_controller_dev *rcdev);
-+
-+#endif
-diff --git a/include/linux/reset.h b/include/linux/reset.h
-new file mode 100644
-index 0000000..6082247
---- /dev/null
-+++ b/include/linux/reset.h
-@@ -0,0 +1,17 @@
-+#ifndef _LINUX_RESET_H_
-+#define _LINUX_RESET_H_
-+
-+struct device;
-+struct reset_control;
-+
-+int reset_control_reset(struct reset_control *rstc);
-+int reset_control_assert(struct reset_control *rstc);
-+int reset_control_deassert(struct reset_control *rstc);
-+
-+struct reset_control *reset_control_get(struct device *dev, const char *id);
-+void reset_control_put(struct reset_control *rstc);
-+struct reset_control *devm_reset_control_get(struct device *dev, const char *id);
-+
-+int device_reset(struct device *dev);
-+
-+#endif
--- 
-1.8.2.rc2
+on some server we flash a dtb with a mac inside but this handle at production
+level and the dts in the kernel does not have ANY default mac address
+> 
+> >if you keep the mac addres in the dts NACK
+> 
+> Seems strange to object to setting
+>   local-mac-address = [00 00 00 00 00 00];
+> when if the kernel sees that line it will do exactly the
+> same thing as without that line? But the advantage of that
+> line is that it gives the u-boot environment file the
+> ability to edit the ariag25.dtb before the kernel sees it.
+> And if the u-boot environment file is properly configured
+> by the board manufacturer, then a quasi uniq, stable MAC
+> address is generated.
+in you patch you put a mac address not 00 00 00 00 00 00
+and if u-boot is not able to add a property fix it
+
+> 
+> For more information about this technique see:
+>   http://www.petalogix.com/support/kb/mac_addr_update
+I known how dt work and how to handle it at bootloader level
+for more than 6 years
+
+Best Regards,
+J.
+> 
+> 
+> Doug Gilbert
+> 
