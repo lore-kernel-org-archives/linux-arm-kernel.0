@@ -1,55 +1,22 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 25 Mar 2013 17:27:51 +0100
-Subject: [PATCH 08/10] ARM: sunxi: dt: Update interrupt controller
- compatible string
-In-Reply-To: <51505825.2060805@gmail.com>
-References: <1364218233-29636-1-git-send-email-maxime.ripard@free-electrons.com>
- <1364218233-29636-9-git-send-email-maxime.ripard@free-electrons.com>
- <51505825.2060805@gmail.com>
-Message-ID: <51507B07.4050204@free-electrons.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Mon, 25 Mar 2013 10:29:24 -0600
+Subject: [PATCH v2 00/14] Marvell EBU thermal sensor consolidation
+In-Reply-To: <20130325123928.GD2502@localhost>
+References: <1363991114-4225-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130325093001.GH5627@lunn.ch> <20130325104513.GC2502@localhost>
+ <CABJ1b_S9c=tFT17=HycmuRbW1g4y8AvWJpmwMRJwvQ214Yb3fw@mail.gmail.com>
+ <20130325123928.GD2502@localhost>
+Message-ID: <20130325162924.GA16690@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Mon, Mar 25, 2013 at 09:39:30AM -0300, Ezequiel Garcia wrote:
 
-Le 25/03/2013 14:59, Rob Herring a ?crit :
-> On 03/25/2013 08:30 AM, Maxime Ripard wrote:
->> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->> ---
->>  arch/arm/boot/dts/sun4i-a10.dtsi |    2 +-
->>  arch/arm/boot/dts/sun5i-a13.dtsi |    2 +-
->>  2 files changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
->> index be71782..805d704 100644
->> --- a/arch/arm/boot/dts/sun4i-a10.dtsi
->> +++ b/arch/arm/boot/dts/sun4i-a10.dtsi
->> @@ -121,7 +121,7 @@
->>  		ranges;
->>  
->>  		intc: interrupt-controller at 01c20400 {
->> -			compatible = "allwinner,sunxi-ic";
->> +			compatible = "allwinner,sun4i-ic";
-> 
-> Generally speaking, this is a bad thing to do. This breaks compatibility
-> between dtb and kernel versions. If that breakage is not yet a concern
-> for sunxi, then it is okay.
+> Could you test the Dove formula fixes and provide a Tested-by?
+> However little the patches maybe, it still makes me nervous
+> to send untested patches.
 
-Yes, I know, but I thought it was okay since sunxi has never been in an
-usable state, and it seemed odd to me to begin to maintain an history
-for a platform that has never actually been booted by a user.
+FWIW, I reviewed and confirmed your new calculation based on the
+Kirkwood doc's I have.
 
-On the other end, if someone speaks up, I'd be happy to keep the old
-compatible around as well.
-
-> Also, I don't see any documentation updates for any of these changes.
-
-Ah, yes, my bad.
-
-Thanks,
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Jason
