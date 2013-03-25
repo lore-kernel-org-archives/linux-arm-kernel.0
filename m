@@ -1,9 +1,9 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 25 Mar 2013 18:55:33 +0100
-Subject: [PATCH 08/15] ARM: ux500: cpuidle: use init/exit common routine
+Date: Mon, 25 Mar 2013 18:55:34 +0100
+Subject: [PATCH 09/15] ARM: at91: cpuidle: use init/exit common routine
 In-Reply-To: <1364234140-514-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1364234140-514-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1364234140-514-9-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1364234140-514-10-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,62 +12,44 @@ for initialization.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- arch/arm/mach-ux500/cpuidle.c |   32 +-------------------------------
- 1 file changed, 1 insertion(+), 31 deletions(-)
+ arch/arm/mach-at91/cpuidle.c |   17 ++---------------
+ 1 file changed, 2 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/cpuidle.c b/arch/arm/mach-ux500/cpuidle.c
-index 1b16d9e..ee81d22 100644
---- a/arch/arm/mach-ux500/cpuidle.c
-+++ b/arch/arm/mach-ux500/cpuidle.c
-@@ -21,7 +21,6 @@
+diff --git a/arch/arm/mach-at91/cpuidle.c b/arch/arm/mach-at91/cpuidle.c
+index 0c63815..0aa2c0f 100644
+--- a/arch/arm/mach-at91/cpuidle.c
++++ b/arch/arm/mach-at91/cpuidle.c
+@@ -27,8 +27,6 @@
  
- static atomic_t master = ATOMIC_INIT(0);
- static DEFINE_SPINLOCK(master_lock);
--static DEFINE_PER_CPU(struct cpuidle_device, ux500_cpuidle_device);
+ #define AT91_MAX_STATES	2
  
- static inline int ux500_enter_idle(struct cpuidle_device *dev,
- 				   struct cpuidle_driver *drv, int index)
-@@ -113,40 +112,11 @@ static struct cpuidle_driver ux500_idle_driver = {
+-static DEFINE_PER_CPU(struct cpuidle_device, at91_cpuidle_device);
+-
+ /* Actual code that puts the SoC in different idle states */
+ static int at91_enter_idle(struct cpuidle_device *dev,
+ 			struct cpuidle_driver *drv,
+@@ -61,20 +59,9 @@ static struct cpuidle_driver at91_idle_driver = {
+ };
  
- int __init ux500_idle_init(void)
+ /* Initialize CPU idle by registering the idle states */
+-static int at91_init_cpuidle(void)
++static int __init at91_init_cpuidle(void)
  {
--	int ret, cpu;
 -	struct cpuidle_device *device;
 -
-         /* Configure wake up reasons */
- 	prcmu_enable_wakeups(PRCMU_WAKEUP(ARM) | PRCMU_WAKEUP(RTC) |
- 			     PRCMU_WAKEUP(ABB));
- 
--	ret = cpuidle_register_driver(&ux500_idle_driver);
--	if (ret) {
--		printk(KERN_ERR "failed to register ux500 idle driver\n");
--		return ret;
--	}
+-	device = &per_cpu(at91_cpuidle_device, smp_processor_id());
+-	device->state_count = AT91_MAX_STATES;
 -
--	for_each_online_cpu(cpu) {
--		device = &per_cpu(ux500_cpuidle_device, cpu);
--		device->cpu = cpu;
--		ret = cpuidle_register_device(device);
--		if (ret) {
--			printk(KERN_ERR "Failed to register cpuidle "
--			       "device for cpu%d\n", cpu);
--			goto out_unregister;
--		}
--	}
--out:
--	return ret;
+-	cpuidle_register_driver(&at91_idle_driver);
 -
--out_unregister:
--	for_each_online_cpu(cpu) {
--		device = &per_cpu(ux500_cpuidle_device, cpu);
--		cpuidle_unregister_device(device);
+-	if (cpuidle_register_device(device)) {
+-		printk(KERN_ERR "at91_init_cpuidle: Failed registering\n");
+-		return -EIO;
 -	}
--
--	cpuidle_unregister_driver(&ux500_idle_driver);
--	goto out;
-+	return arm_cpuidle_init(&ux500_idle_driver);
+-	return 0;
++	return arm_cpuidle_init(&at91_idle_driver);
  }
  
- device_initcall(ux500_idle_init);
+ device_initcall(at91_init_cpuidle);
 -- 
 1.7.9.5
