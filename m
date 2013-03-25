@@ -1,68 +1,252 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 25 Mar 2013 15:35:10 +0530
-Subject: [PATCH v2 18/18] ARM: OMAP5: PM: handle device instance for warm reset
+Date: Mon, 25 Mar 2013 15:35:00 +0530
+Subject: [PATCH v2 08/18] ARM: OMAP5: PM: Add CPU power off in hotplug path
 In-Reply-To: <1364205910-32392-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1364205910-32392-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1364205910-32392-19-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1364205910-32392-9-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nishanth Menon <nm@ti.com>
+Add power management code to handle the CPU off mode to enable CPUP hotplug
+mode for OMAP5 devices. Separate suspend finisher is used for OMAP5(Cortex-A15)
+because it doesn't use SCU power status register and external PL310 L2 cache
+which makes code flow bit different.
 
-OMAP5 and OMAP4 have different device instance offsets.
-
-So to handle them properly, use a runtime detected instance offset
-Other bit offsets and register offsets remained constant.
-
-Creating a new function is not really worthwhile here as the logic
-will be replicated without much benefit.
-
-Signed-off-by: Nishanth Menon <nm@ti.com>
-[santosh.shilimkar at ti.com: Refreshed patch against 3.9]
+Acked-by: Nishanth Menon <nm@ti.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/mach-omap2/prminst44xx.c |   10 +++++++---
- 1 file changed, 7 insertions(+), 3 deletions(-)
+ arch/arm/mach-omap2/omap-mpuss-lowpower.c |   30 ++++++++---
+ arch/arm/mach-omap2/omap-secure.h         |    1 +
+ arch/arm/mach-omap2/omap4-sar-layout.h    |    2 +
+ arch/arm/mach-omap2/sleep_omap4plus.S     |   84 +++++++++++++++++++++++++++++
+ 4 files changed, 110 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/prminst44xx.c b/arch/arm/mach-omap2/prminst44xx.c
-index c12320c..430fb1d 100644
---- a/arch/arm/mach-omap2/prminst44xx.c
-+++ b/arch/arm/mach-omap2/prminst44xx.c
-@@ -20,10 +20,12 @@
- #include "common.h"
- #include "prcm-common.h"
- #include "prm44xx.h"
-+#include "prm54xx.h"
- #include "prminst44xx.h"
- #include "prm-regbits-44xx.h"
- #include "prcm44xx.h"
- #include "prcm_mpu44xx.h"
-+#include "soc.h"
+diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+index d390d18..096f489 100644
+--- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
++++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+@@ -81,6 +81,7 @@ struct omap4_cpu_pm_info {
+  * @finish_suspend:	CPU suspend finisher function pointer
+  * @resume:		CPU resume function pointer
+  * @scu_prepare:	CPU Snoop Control program function pointer
++ * @hotplug_restart:	CPU hotplug restart kernel hook pointer
+  *
+  * Structure holds functions pointer for CPU low power operations like
+  * suspend, resume and scu programming.
+@@ -89,10 +90,12 @@ struct cpu_pm_ops {
+ 	int (*finish_suspend)(unsigned long cpu_state);
+ 	void (*resume)(void);
+ 	void (*scu_prepare)(unsigned int cpu_id, unsigned int cpu_state);
++	void (*hotplug_restart)(void);
+ };
  
- static void __iomem *_prm_bases[OMAP4_MAX_PRCM_PARTITIONS];
+ extern int omap4_finish_suspend(unsigned long cpu_state);
+ extern void omap4_cpu_resume(void);
++extern int omap5_finish_suspend(unsigned long cpu_state);
  
-@@ -165,17 +167,19 @@ int omap4_prminst_deassert_hardreset(u8 shift, u8 part, s16 inst,
- void omap4_prminst_global_warm_sw_reset(void)
+ static DEFINE_PER_CPU(struct omap4_cpu_pm_info, omap4_pm_info);
+ static struct powerdomain *mpuss_pd;
+@@ -115,6 +118,7 @@ struct cpu_pm_ops omap_pm_ops = {
+ 	.finish_suspend		= default_finish_suspend,
+ 	.resume			= dummy_cpu_resume,
+ 	.scu_prepare		= dummy_scu_prepare,
++	.hotplug_restart	= dummy_cpu_resume,
+ };
+ 
+ /*
+@@ -327,7 +331,7 @@ int __cpuinit omap4_hotplug_cpu(unsigned int cpu, unsigned int power_state)
+ 
+ 	pwrdm_clear_all_prev_pwrst(pm_info->pwrdm);
+ 	pwrdm_set_next_pwrst(pm_info->pwrdm, power_state);
+-	set_cpu_wakeup_addr(cpu, virt_to_phys(pm_info->secondary_startup));
++	set_cpu_wakeup_addr(cpu, virt_to_phys(omap_pm_ops.hotplug_restart));
+ 	omap_pm_ops.scu_prepare(cpu, power_state);
+ 
+ 	/*
+@@ -370,6 +374,7 @@ static void enable_mercury_retention_mode(void)
+ int __init omap4_mpuss_init(void)
  {
- 	u32 v;
-+	s16 dev_inst = cpu_is_omap44xx() ? OMAP4430_PRM_DEVICE_INST :
-+					   OMAP54XX_PRM_DEVICE_INST;
+ 	struct omap4_cpu_pm_info *pm_info;
++	u32 cpu_wakeup_addr = 0;
  
- 	v = omap4_prminst_read_inst_reg(OMAP4430_PRM_PARTITION,
--				    OMAP4430_PRM_DEVICE_INST,
-+				    dev_inst,
- 				    OMAP4_PRM_RSTCTRL_OFFSET);
- 	v |= OMAP4430_RST_GLOBAL_WARM_SW_MASK;
- 	omap4_prminst_write_inst_reg(v, OMAP4430_PRM_PARTITION,
--				 OMAP4430_PRM_DEVICE_INST,
-+				 dev_inst,
- 				 OMAP4_PRM_RSTCTRL_OFFSET);
+ 	if (omap_rev() == OMAP4430_REV_ES1_0) {
+ 		WARN(1, "Power Management not supported on OMAP4430 ES1.0\n");
+@@ -379,9 +384,13 @@ int __init omap4_mpuss_init(void)
+ 	sar_base = omap4_get_sar_ram_base();
  
- 	/* OCP barrier */
- 	v = omap4_prminst_read_inst_reg(OMAP4430_PRM_PARTITION,
--				    OMAP4430_PRM_DEVICE_INST,
-+				    dev_inst,
- 				    OMAP4_PRM_RSTCTRL_OFFSET);
+ 	/* Initilaise per CPU PM information */
++	if (cpu_is_omap44xx())
++		cpu_wakeup_addr = CPU0_WAKEUP_NS_PA_ADDR_OFFSET;
++	else if (soc_is_omap54xx())
++		cpu_wakeup_addr = OMAP5_CPU0_WAKEUP_NS_PA_ADDR_OFFSET;
+ 	pm_info = &per_cpu(omap4_pm_info, 0x0);
+ 	pm_info->scu_sar_addr = sar_base + SCU_OFFSET0;
+-	pm_info->wkup_sar_addr = sar_base + CPU0_WAKEUP_NS_PA_ADDR_OFFSET;
++	pm_info->wkup_sar_addr = sar_base + cpu_wakeup_addr;
+ 	pm_info->l2x0_sar_addr = sar_base + L2X0_SAVE_OFFSET0;
+ 	pm_info->pwrdm = pwrdm_lookup("cpu0_pwrdm");
+ 	if (!pm_info->pwrdm) {
+@@ -396,14 +405,14 @@ int __init omap4_mpuss_init(void)
+ 	/* Initialise CPU0 power domain state to ON */
+ 	pwrdm_set_next_pwrst(pm_info->pwrdm, PWRDM_POWER_ON);
+ 
++	if (cpu_is_omap44xx())
++		cpu_wakeup_addr = CPU1_WAKEUP_NS_PA_ADDR_OFFSET;
++	else if (soc_is_omap54xx())
++		cpu_wakeup_addr = OMAP5_CPU1_WAKEUP_NS_PA_ADDR_OFFSET;
+ 	pm_info = &per_cpu(omap4_pm_info, 0x1);
+ 	pm_info->scu_sar_addr = sar_base + SCU_OFFSET1;
+-	pm_info->wkup_sar_addr = sar_base + CPU1_WAKEUP_NS_PA_ADDR_OFFSET;
++	pm_info->wkup_sar_addr = sar_base + cpu_wakeup_addr;
+ 	pm_info->l2x0_sar_addr = sar_base + L2X0_SAVE_OFFSET1;
+-	if (cpu_is_omap446x())
+-		pm_info->secondary_startup = omap_secondary_startup_4460;
+-	else
+-		pm_info->secondary_startup = omap_secondary_startup;
+ 
+ 	pm_info->pwrdm = pwrdm_lookup("cpu1_pwrdm");
+ 	if (!pm_info->pwrdm) {
+@@ -436,14 +445,21 @@ int __init omap4_mpuss_init(void)
+ 
+ 	if (cpu_is_omap44xx()) {
+ 		omap_pm_ops.finish_suspend = omap4_finish_suspend;
++		omap_pm_ops.hotplug_restart = omap_secondary_startup;
+ 		omap_pm_ops.resume = omap4_cpu_resume;
+ 		omap_pm_ops.scu_prepare = scu_pwrst_prepare;
+ 		cpu_context_offset = OMAP4_RM_CPU0_CPU0_CONTEXT_OFFSET;
+ 	} else if (soc_is_omap54xx()) {
++		omap_pm_ops.finish_suspend = omap5_finish_suspend;
++		omap_pm_ops.hotplug_restart = omap5_secondary_startup;
+ 		cpu_context_offset = OMAP54XX_RM_CPU0_CPU0_CONTEXT_OFFSET;
+ 		enable_mercury_retention_mode();
+ 	}
+ 
++	/* Over-write the OMAP4 hook to take care of ROM BUG */
++	if (cpu_is_omap446x())
++		omap_pm_ops.hotplug_restart = omap_secondary_startup_4460;
++
+ 	return 0;
  }
+ 
+diff --git a/arch/arm/mach-omap2/omap-secure.h b/arch/arm/mach-omap2/omap-secure.h
+index 82b3c4c..6f4dbee 100644
+--- a/arch/arm/mach-omap2/omap-secure.h
++++ b/arch/arm/mach-omap2/omap-secure.h
+@@ -41,6 +41,7 @@
+ #define OMAP4_MON_L2X0_CTRL_INDEX	0x102
+ #define OMAP4_MON_L2X0_AUXCTRL_INDEX	0x109
+ #define OMAP4_MON_L2X0_PREFETCH_INDEX	0x113
++#define OMAP5_MON_CACHES_CLEAN_INDEX	0x103
+ 
+ #define OMAP5_MON_AMBA_IF_INDEX		0x108
+ 
+diff --git a/arch/arm/mach-omap2/omap4-sar-layout.h b/arch/arm/mach-omap2/omap4-sar-layout.h
+index 792b106..5b2966a 100644
+--- a/arch/arm/mach-omap2/omap4-sar-layout.h
++++ b/arch/arm/mach-omap2/omap4-sar-layout.h
+@@ -31,6 +31,8 @@
+ /* CPUx Wakeup Non-Secure Physical Address offsets in SAR_BANK3 */
+ #define CPU0_WAKEUP_NS_PA_ADDR_OFFSET		0xa04
+ #define CPU1_WAKEUP_NS_PA_ADDR_OFFSET		0xa08
++#define OMAP5_CPU0_WAKEUP_NS_PA_ADDR_OFFSET	0xe00
++#define OMAP5_CPU1_WAKEUP_NS_PA_ADDR_OFFSET	0xe04
+ 
+ #define SAR_BACKUP_STATUS_OFFSET		(SAR_BANK3_OFFSET + 0x500)
+ #define SAR_SECURE_RAM_SIZE_OFFSET		(SAR_BANK3_OFFSET + 0x504)
+diff --git a/arch/arm/mach-omap2/sleep_omap4plus.S b/arch/arm/mach-omap2/sleep_omap4plus.S
+index 88ff83a..5a372a6 100644
+--- a/arch/arm/mach-omap2/sleep_omap4plus.S
++++ b/arch/arm/mach-omap2/sleep_omap4plus.S
+@@ -326,6 +326,90 @@ skip_l2en:
+ 
+ 	b	cpu_resume			@ Jump to generic resume
+ ENDPROC(omap4_cpu_resume)
++
++/*
++ * ================================
++ * == OMAP5 CPU suspend finisher ==
++ * ================================
++ *
++ * OMAP5 MPUSS states for the context save:
++ * save_state =
++ *	0 - Nothing lost and no need to save: MPUSS INA/CSWR
++ *	1 - CPUx L1 and logic lost: CPU OFF, MPUSS INA/CSWR
++ */
++ENTRY(omap5_finish_suspend)
++	stmfd	sp!, {r4-r12, lr}
++	cmp	r0, #0x0
++	beq	do_wfi				@ No lowpower state, jump to WFI
++
++	/*
++	 * Flush all data from the L1 data cache before disabling
++	 * SCTLR.C bit. Since we modify stack here, we must clean and
++	 * invalidate the local cache here to avoid stack corruption.
++	 */
++	bl	omap4_get_sar_ram_base
++	ldr	r9, [r0, #OMAP_TYPE_OFFSET]
++	cmp	r9, #0x1			@ Check for HS device
++	bne	skip_secure_l1_clean_op
++	mov	r0, #0				@ Clean secure L1
++	stmfd   r13!, {r4-r12, r14}
++	ldr	r12, =OMAP5_MON_CACHES_CLEAN_INDEX
++	DO_SMC
++	ldmfd   r13!, {r4-r12, r14}
++skip_secure_l1_clean_op:
++	bl	v7_flush_dcache_louis
++
++	/*
++	 * Clear the SCTLR.C bit to prevent further data cache
++	 * allocation.
++	 */
++	mrc	p15, 0, r0, c1, c0, 0
++	bic	r0, r0, #(1 << 2)		@ Disable the C bit
++	mcr	p15, 0, r0, c1, c0, 0
++	isb
++
++	/*
++	 * Clean and invalidate all data from the L1 data cache. The L2
++	 * duplicate snoop tag RAM for this processor is now empty. This
++	 * prevents any new data cache snoops or data cache maintenance
++	 * operations from other processors in the MPCore device being
++	 * issued to this processor.
++	 */
++	bl	v7_flush_dcache_louis
++
++	/*
++	 * Take CPU out of Symmetric Multiprocessing (SMP) mode and thus
++	 * preventing the CPU from receiving cache, TLB, or BTB
++	 * maintenance operations broadcast by other CPUs in the cluster.
++	 */
++	mrc	p15, 0, r0, c1, c1, 2		@ Read NSACR data
++	tst	r0, #(1 << 18)
++	mrcne	p15, 0, r0, c1, c0, 1
++	bicne	r0, r0, #(1 << 6)		@ Disable SMP bit
++	mcrne	p15, 0, r0, c1, c0, 1
++	isb
++	dsb
++
++do_wfi:
++	bl	omap_do_wfi
++
++	/*
++	 * CPU is here when it failed to enter OFF/DORMANT or
++	 * no low power state was attempted.
++	 */
++	mrc	p15, 0, r0, c1, c0, 0
++	tst	r0, #(1 << 2)			@ Check C bit enabled?
++	orreq	r0, r0, #(1 << 2)		@ Enable the C bit
++	mcreq	p15, 0, r0, c1, c0, 0
++	isb
++	mrc	p15, 0, r0, c1, c0, 1
++	tst	r0, #(1 << 6)			@ Check SMP bit enabled?
++	orreq	r0, r0, #(1 << 6)
++	mcreq	p15, 0, r0, c1, c0, 1
++	isb
++	dsb
++	ldmfd	sp!, {r4-r12, pc}
++ENDPROC(omap5_finish_suspend)
+ #endif
+ 
+ #ifndef CONFIG_OMAP4_ERRATA_I688
 -- 
 1.7.9.5
