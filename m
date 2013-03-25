@@ -1,29 +1,35 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 25 Mar 2013 16:44:20 +0900
-Subject: [PATCH 00/04] ARM: shmobile: r8a7790 SoC and Lager board support
-In-Reply-To: <514AF14A.4020308@cogentembedded.com>
-References: <20130320143604.32377.32634.sendpatchset@w520>
- <514AF14A.4020308@cogentembedded.com>
-Message-ID: <20130325074417.GA23486@verge.net.au>
+From: avinashphilip@ti.com (Philip Avinash)
+Date: Mon, 25 Mar 2013 13:19:46 +0530
+Subject: [PATCH v3 0/3] Platform support for EHRPWM & ECAP devices in DAVINCI.
+Message-ID: <1364197789-16783-1-git-send-email-avinashphilip@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 21, 2013 at 03:38:50PM +0400, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 20-03-2013 18:36, Magnus Damm wrote:
-> 
-> >ARM: shmobile: r8a7790 SoC and Lager board support
-> 
-> >[PATCH 01/04] ARM: shmobile: Initial r8a7790 SoC support
-> >[PATCH 02/04] ARM: shmobile: r8a7790 SCIF support
-> >[PATCH 03/04] ARM: shmobile: r8a7790 IRQC support
-> >[PATCH 04/04] ARM: shmobile: Lager support
-> >
-> >This series adds initial support for r8a7790 and Lager. The SoC
-> >is known as r8a7790 which is built around Cortex-A15 and makes use
-> >of SCIF for serial and IRQC interrupt controller for external IRQs.
-> 
->    Is it the same as R-Car H2?
+Add platform support for EHRPWM and ECAP by providing clock nodes and
+device tree nodes.
+This series depends on [1] and [2] and is available for testing at [3].
+Tested for back light support in da850 EVM with EHRPWM PWM device.
 
-Yes, I believe so.
+[1] http://gitorious.org/linux-davinci/linux-davinci/trees/davinci-for-v3.9/dt-2
+[2] https://gitorious.org/linux-pwm/linux-pwm/trees/for-next
+[3] https://github.com/avinashphilip/am335x_linux/tree/davinci-for-v3.9_soc_pwm
+
+Note:
+DT support for EHRPWM backlight has not been added in da850-evm.dts as there is
+conflicting pin-mux requirement with SPI flash.
+
+Philip Avinash (3):
+  ARM: davinci: clk framework support for enable/disable functionality
+  arm: davinci: clock node support for ECAP & EHRPWM
+  ARM: davinci: da850: add EHRPWM & ECAP DT node
+
+ arch/arm/boot/dts/da850.dtsi               |   30 ++++++++++++++++++
+ arch/arm/mach-davinci/clock.c              |   21 ++++++++-----
+ arch/arm/mach-davinci/clock.h              |    2 ++
+ arch/arm/mach-davinci/da850.c              |   46 ++++++++++++++++++++++++++++
+ arch/arm/mach-davinci/da8xx-dt.c           |    5 +++
+ arch/arm/mach-davinci/include/mach/da8xx.h |    1 +
+ 6 files changed, 98 insertions(+), 7 deletions(-)
+
+-- 
+1.7.9.5
