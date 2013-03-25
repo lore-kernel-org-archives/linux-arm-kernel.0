@@ -1,45 +1,20 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 25 Mar 2013 18:55:40 +0100
-Subject: [PATCH 15/15] ARM: shmobile: cpuidle: use init/exit common routine
-In-Reply-To: <1364234140-514-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1364234140-514-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1364234140-514-16-git-send-email-daniel.lezcano@linaro.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 25 Mar 2013 17:59:28 +0000
+Subject: [PATCH] ARM64: early_printk: Fix check for CONFIG_ARM64_64K_PAGES
+In-Reply-To: <1363988871.3728.46.camel@deadeye.wl.decadent.org.uk>
+References: <1363988871.3728.46.camel@deadeye.wl.decadent.org.uk>
+Message-ID: <20130325175928.GF3894@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the duplicate code and use the arm cpuidle driver's common code
-for initialization.
+On Fri, Mar 22, 2013 at 09:47:51PM +0000, Ben Hutchings wrote:
+> The 'CONFIG_' prefix is not implicit in IS_ENABLED().
+> 
+> Signed-off-by: Ben Hutchings <ben@decadent.org.uk>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Paul Bolle <pebolle@tiscali.nl>
 
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
----
- arch/arm/mach-shmobile/cpuidle.c |   10 +---------
- 1 file changed, 1 insertion(+), 9 deletions(-)
+Thanks. I'll push it upstream.
 
-diff --git a/arch/arm/mach-shmobile/cpuidle.c b/arch/arm/mach-shmobile/cpuidle.c
-index c872ae8..9744d88 100644
---- a/arch/arm/mach-shmobile/cpuidle.c
-+++ b/arch/arm/mach-shmobile/cpuidle.c
-@@ -16,7 +16,6 @@
- #include <asm/cpuidle.h>
- #include <asm/io.h>
- 
--static struct cpuidle_device shmobile_cpuidle_dev;
- static struct cpuidle_driver shmobile_cpuidle_default_driver = {
- 	.name			= "shmobile_cpuidle",
- 	.owner			= THIS_MODULE,
-@@ -35,12 +34,5 @@ void __init shmobile_cpuidle_set_driver(struct cpuidle_driver *drv)
- 
- int __init shmobile_cpuidle_init(void)
- {
--	struct cpuidle_device *dev = &shmobile_cpuidle_dev;
--
--	cpuidle_register_driver(cpuidle_drv);
--
--	dev->state_count = cpuidle_drv->state_count;
--	cpuidle_register_device(dev);
--
--	return 0;
-+	return arm_cpuidle_init(cpuidle_drv);
- }
 -- 
-1.7.9.5
+Catalin
