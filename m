@@ -1,45 +1,25 @@
-From: gwenhael.goavec-merou@armadeus.com (gwenhael.goavec)
-Date: Mon, 25 Mar 2013 12:01:14 +0100
-Subject: [PATCH] ARM: imx1: mm: add call to mxc_device_init
-In-Reply-To: <1363448999-3936-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-References: <1363448999-3936-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-Message-ID: <20130325120114.15e11bc0@dell.trabucayre.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 25 Mar 2013 11:02:36 +0000
+Subject: [PATCH] clk: tegra: Don't enable PLLs during early boot
+In-Reply-To: <514C7D3B.40602@wwwdotorg.org>
+References: <1363953308-28828-1-git-send-email-pdeschrijver@nvidia.com>
+ <514C7D3B.40602@wwwdotorg.org>
+Message-ID: <20130325110236.GP4977@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping?
-Gwenhael
+On Fri, Mar 22, 2013 at 09:48:11AM -0600, Stephen Warren wrote:
+> This assumption was made long ago. I know drivers are supposed to assume
+> that clocks are disabled when they're probed, but historically that
+> wasn't always the case, so if the audio drivers assumed that, and then
+> did clk_enable() as the first thing, they got a warning due to the
+> enabling an already enabled clock and/or later attempts to disable the
+> clocks wouldn't actually disable them.
 
-On Sat, 16 Mar 2013 16:49:59 +0100
-Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com> wrote:
+No.  clocks have always been able to be enabled multiple times.  You
+should only get a warning if you try and disable it more times than you
+enabled it, because that's a violation of the API.
 
-> mxc_device_init() is mandatory for mxc_aips and mxc_ahb bus registration, needed 
-> as parents, at least, for gpio and dma.
-> 
-> Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
-> ---
->  arch/arm/mach-imx/mm-imx1.c | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/mach-imx/mm-imx1.c b/arch/arm/mach-imx/mm-imx1.c
-> index 7a14667..3c609c5 100644
-> --- a/arch/arm/mach-imx/mm-imx1.c
-> +++ b/arch/arm/mach-imx/mm-imx1.c
-> @@ -51,6 +51,8 @@ void __init mx1_init_irq(void)
->  
->  void __init imx1_soc_init(void)
->  {
-> +	mxc_device_init();
-> +
->  	mxc_register_gpio("imx1-gpio", 0, MX1_GPIO1_BASE_ADDR, SZ_256,
->  						MX1_GPIO_INT_PORTA, 0);
->  	mxc_register_gpio("imx1-gpio", 1, MX1_GPIO2_BASE_ADDR, SZ_256,
-> -- 
-> 1.8.1.5
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Consider two drivers sharing the same input clock.  If one driver
+disables the clock more times than it enables it, then it's treading
+on the other drivers need to have the clock enabled.
