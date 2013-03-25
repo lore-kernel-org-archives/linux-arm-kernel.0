@@ -1,103 +1,46 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 25 Mar 2013 09:06:12 -0500
-Subject: [PATCH 04/10] arm: zynq: Load scu baseaddress at run time
-In-Reply-To: <1364219596-4954-4-git-send-email-michal.simek@xilinx.com>
-References: <1364219596-4954-1-git-send-email-michal.simek@xilinx.com>
- <1364219596-4954-4-git-send-email-michal.simek@xilinx.com>
-Message-ID: <515059D4.5070903@gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 25 Mar 2013 15:09:40 +0100
+Subject: [PATCH] ARM: imx1: mm: add call to mxc_device_init
+In-Reply-To: <1363448999-3936-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
+References: <1363448999-3936-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
+Message-ID: <20130325140940.GH1906@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/25/2013 08:53 AM, Michal Simek wrote:
-> Use Cortex a9 cp15 to read scu baseaddress.
+On Sat, Mar 16, 2013 at 04:49:59PM +0100, Gwenhael Goavec-Merou wrote:
+> mxc_device_init() is mandatory for mxc_aips and mxc_ahb bus registration, needed 
+> as parents, at least, for gpio and dma.
 > 
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
+
+Applied, thanks
+
+Sascha
+
 > ---
->  arch/arm/boot/dts/zynq-7000.dtsi |    5 +++++
->  arch/arm/mach-zynq/common.c      |   33 +++++++++++++++++++++------------
->  arch/arm/mach-zynq/common.h      |    2 ++
->  3 files changed, 28 insertions(+), 12 deletions(-)
+>  arch/arm/mach-imx/mm-imx1.c | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
-> index 2a72339..4943568 100644
-> --- a/arch/arm/boot/dts/zynq-7000.dtsi
-> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
-> @@ -22,6 +22,11 @@
->  		interrupt-parent = <&intc>;
->  		ranges;
+> diff --git a/arch/arm/mach-imx/mm-imx1.c b/arch/arm/mach-imx/mm-imx1.c
+> index 7a14667..3c609c5 100644
+> --- a/arch/arm/mach-imx/mm-imx1.c
+> +++ b/arch/arm/mach-imx/mm-imx1.c
+> @@ -51,6 +51,8 @@ void __init mx1_init_irq(void)
 >  
-> +		scu: scu at f8f000000 {
-> +			compatible = "arm,cortex-a9-scu";
-> +			reg = <0xf8f00000 0x58>;
-> +		};
-> +
-
-It's fine to add this, but you don't really need it for this patch.
-
->  		intc: interrupt-controller at f8f01000 {
->  			compatible = "arm,cortex-a9-gic";
->  			#interrupt-cells = <3>;
-> diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
-> index 68e0907..13f9d8b 100644
-> --- a/arch/arm/mach-zynq/common.c
-> +++ b/arch/arm/mach-zynq/common.c
-> @@ -33,10 +33,13 @@
->  #include <asm/mach-types.h>
->  #include <asm/page.h>
->  #include <asm/pgtable.h>
-> +#include <asm/smp_scu.h>
->  #include <asm/hardware/cache-l2x0.h>
->  
->  #include "common.h"
->  
-> +void __iomem *scu_base;
-> +
->  static struct of_device_id zynq_of_bus_ids[] __initdata = {
->  	{ .compatible = "simple-bus", },
->  	{}
-> @@ -56,17 +59,6 @@ static void __init xilinx_init_machine(void)
->  	of_platform_bus_probe(NULL, zynq_of_bus_ids, NULL);
->  }
->  
-> -#define SCU_PERIPH_PHYS		0xF8F00000
-> -#define SCU_PERIPH_SIZE		SZ_8K
-> -#define SCU_PERIPH_VIRT		(VMALLOC_END - SCU_PERIPH_SIZE)
-> -
-> -static struct map_desc scu_desc __initdata = {
-> -	.virtual	= SCU_PERIPH_VIRT,
-> -	.pfn		= __phys_to_pfn(SCU_PERIPH_PHYS),
-> -	.length		= SCU_PERIPH_SIZE,
-> -	.type		= MT_DEVICE,
-> -};
-> -
->  static void __init xilinx_zynq_timer_init(void)
+>  void __init imx1_soc_init(void)
 >  {
->  	struct device_node *np;
-> @@ -81,13 +73,30 @@ static void __init xilinx_zynq_timer_init(void)
->  	clocksource_of_init();
->  }
->  
-> +static struct map_desc zynq_cortex_a9_scu_map __initdata = {
-> +	.length	= SZ_256,
-> +	.type	= MT_DEVICE,
-> +};
+> +	mxc_device_init();
 > +
-> +static void __init scu_init(void)
-> +{
-> +	unsigned long base;
-> +
-> +	base = scu_a9_get_base();
-> +	zynq_cortex_a9_scu_map.pfn = __phys_to_pfn(base);
-> +	zynq_cortex_a9_scu_map.virtual = base;
+>  	mxc_register_gpio("imx1-gpio", 0, MX1_GPIO1_BASE_ADDR, SZ_256,
+>  						MX1_GPIO_INT_PORTA, 0);
+>  	mxc_register_gpio("imx1-gpio", 1, MX1_GPIO2_BASE_ADDR, SZ_256,
+> -- 
+> 1.8.1.5
+> 
+> 
 
-You are setting the virtual address to the physical base?
-
-> +	iotable_init(&zynq_cortex_a9_scu_map, 1);
-
-Then creating a static mapping...
-
-> +	scu_base = ioremap(base, zynq_cortex_a9_scu_map.length);
-
-And also a dynamic mapping?
-
-Rob
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
