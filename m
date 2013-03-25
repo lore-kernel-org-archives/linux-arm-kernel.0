@@ -1,168 +1,92 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 25 Mar 2013 14:53:16 +0100
-Subject: [PATCH 10/10] arm: zynq: Add cpuidle support
-In-Reply-To: <1364219596-4954-1-git-send-email-michal.simek@xilinx.com>
-References: <1364219596-4954-1-git-send-email-michal.simek@xilinx.com>
-Message-ID: <1364219596-4954-10-git-send-email-michal.simek@xilinx.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Mon, 25 Mar 2013 14:57:18 +0100
+Subject: [PATCH] ARM: zynq: add smp_twd timer
+In-Reply-To: <1364042233-16583-1-git-send-email-s.trumtrar@pengutronix.de>
+References: <1364042233-16583-1-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <CAHTX3d+Fv22h2P9tpYEW6cK=qF3Zjo=hvKDYkOGYd6nfW5hRVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for cpuidle.
+Hi Steffen,
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
- arch/arm/mach-zynq/Makefile  |    1 +
- arch/arm/mach-zynq/cpuidle.c |  131 ++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 132 insertions(+)
- create mode 100644 arch/arm/mach-zynq/cpuidle.c
+nice to see patches from you.
+I have created bunch of patches last week which targets the similar
+areas as you.
+I have sent them and you are also in CC.
+I will comment your patches and I hope you will also review my patches
+and we find out a way how to add them together.
 
-diff --git a/arch/arm/mach-zynq/Makefile b/arch/arm/mach-zynq/Makefile
-index 8e75490..a085d86 100644
---- a/arch/arm/mach-zynq/Makefile
-+++ b/arch/arm/mach-zynq/Makefile
-@@ -4,5 +4,6 @@
- 
- # Common support
- obj-y				:= common.o slcr.o
-+obj-$(CONFIG_CPU_IDLE) 		+= cpuidle.o
- obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
- obj-$(CONFIG_SMP)		+= platsmp.o
-diff --git a/arch/arm/mach-zynq/cpuidle.c b/arch/arm/mach-zynq/cpuidle.c
-new file mode 100644
-index 0000000..24f0333
---- /dev/null
-+++ b/arch/arm/mach-zynq/cpuidle.c
-@@ -0,0 +1,131 @@
-+/*
-+ * based on arch/arm/mach-at91/cpuidle.c
-+ *
-+ * CPU idle support for Xilinx
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ *
-+ * The cpu idle uses wait-for-interrupt and RAM self refresh in order
-+ * to implement two idle states -
-+ * #1 wait-for-interrupt
-+ * #2 wait-for-interrupt and RAM self refresh
-+ *
-+ * Note that this code is only intended as a prototype and is not tested
-+ * well yet, or tuned for the Xilinx Cortex A9. Also note that for a
-+ * tickless kernel, high res timers must not be turned on. The cpuidle
-+ * framework must also be turned on in the kernel.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/platform_device.h>
-+#include <linux/cpuidle.h>
-+#include <linux/io.h>
-+#include <linux/export.h>
-+#include <linux/clockchips.h>
-+#include <linux/cpu_pm.h>
-+#include <linux/clk.h>
-+#include <linux/err.h>
-+#include <asm/proc-fns.h>
-+
-+#define XILINX_MAX_STATES	1
-+
-+static DEFINE_PER_CPU(struct cpuidle_device, xilinx_cpuidle_device);
-+
-+/* Actual code that puts the SoC in different idle states */
-+static int xilinx_enter_idle(struct cpuidle_device *dev,
-+		struct cpuidle_driver *drv, int index)
-+{
-+	struct timeval before, after;
-+	int idle_time;
-+
-+	local_irq_disable();
-+	do_gettimeofday(&before);
-+
-+	if (index == 0)
-+		/* Wait for interrupt state */
-+		cpu_do_idle();
-+
-+	else if (index == 1) {
-+		unsigned int cpu_id = smp_processor_id();
-+
-+		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu_id);
-+
-+		/* Devices must be stopped here */
-+		cpu_pm_enter();
-+
-+		/* Add code for DDR self refresh start */
-+
-+		cpu_do_idle();
-+		/*cpu_suspend(foo, bar);*/
-+
-+		/* Add code for DDR self refresh stop */
-+
-+		cpu_pm_exit();
-+
-+		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu_id);
-+	}
-+
-+	do_gettimeofday(&after);
-+	local_irq_enable();
-+	idle_time = (after.tv_sec - before.tv_sec) * USEC_PER_SEC +
-+			(after.tv_usec - before.tv_usec);
-+
-+	dev->last_residency = idle_time;
-+	return index;
-+}
-+
-+static struct cpuidle_driver xilinx_idle_driver = {
-+	.name = "xilinx_idle",
-+	.owner = THIS_MODULE,
-+	.state_count = XILINX_MAX_STATES,
-+	/* Wait for interrupt state */
-+	.states[0] = {
-+		.enter = xilinx_enter_idle,
-+		.exit_latency = 1,
-+		.target_residency = 10000,
-+		.flags = CPUIDLE_FLAG_TIME_VALID,
-+		.name = "WFI",
-+		.desc = "Wait for interrupt",
-+	},
-+	/* Wait for interrupt and RAM self refresh state */
-+	.states[1] = {
-+		.enter = xilinx_enter_idle,
-+		.exit_latency = 10,
-+		.target_residency = 10000,
-+		.flags = CPUIDLE_FLAG_TIME_VALID,
-+		.name = "RAM_SR",
-+		.desc = "WFI and RAM Self Refresh",
-+	},
-+};
-+
-+/* Initialize CPU idle by registering the idle states */
-+static int xilinx_init_cpuidle(void)
-+{
-+	unsigned int cpu;
-+	struct cpuidle_device *device;
-+	int ret;
-+
-+	ret = cpuidle_register_driver(&xilinx_idle_driver);
-+	if (ret) {
-+		pr_err("Registering Xilinx CpuIdle Driver failed.\n");
-+		return ret;
-+	}
-+
-+	for_each_possible_cpu(cpu) {
-+		device = &per_cpu(xilinx_cpuidle_device, cpu);
-+		device->state_count = XILINX_MAX_STATES;
-+		device->cpu = cpu;
-+		ret = cpuidle_register_device(device);
-+		if (ret) {
-+			pr_err("xilinx_init_cpuidle: Failed registering\n");
-+			return ret;
-+		}
-+	}
-+
-+	pr_info("Xilinx CpuIdle Driver started\n");
-+	return 0;
-+}
-+device_initcall(xilinx_init_cpuidle);
+Look below.
+
+Thanks,
+Michal
+
+
+
+
+2013/3/23 Steffen Trumtrar <s.trumtrar@pengutronix.de>:
+> The zynq has a Cortex-A9 with the corresponding smp_twd timers. Use them.
+>
+> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> Cc: Michal Simek <michal.simek@xilinx.com>
+> Cc: Josh Cartwright <josh.cartwright@ni.com>
+> ---
+>  arch/arm/boot/dts/zynq-7000.dtsi | 7 +++++++
+>  arch/arm/mach-zynq/common.c      | 2 ++
+>  2 files changed, 9 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+> index 5914b56..0dd2dc7 100644
+> --- a/arch/arm/boot/dts/zynq-7000.dtsi
+> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
+> @@ -162,5 +162,12 @@
+>                                 interrupts = <0 39 4>;
+>                         };
+>                 };
+> +
+> +               timer: timer at f8f00600 {
+> +                       compatible = "arm,cortex-a9-twd-timer";
+> +                       reg = <0xf8f00600 0x20>;
+> +                       clocks = <&cpu_clk 1>;
+> +                       interrupts = <1 13 0xf01>;
+> +               };
+
+There is proposal from Soren about clock description but should be ok
+just to use what it is in the tree. If you have any comments about
+managing zynq clock
+please look at that thread too.
+
+
+>         };
+>  };
+> diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
+> index 5c89832..920e20a 100644
+> --- a/arch/arm/mach-zynq/common.c
+> +++ b/arch/arm/mach-zynq/common.c
+> @@ -32,6 +32,7 @@
+>  #include <asm/mach-types.h>
+>  #include <asm/page.h>
+>  #include <asm/pgtable.h>
+> +#include <asm/smp_twd.h>
+>  #include <asm/hardware/cache-l2x0.h>
+>
+>  #include "common.h"
+> @@ -77,6 +78,7 @@ static void __init xilinx_zynq_timer_init(void)
+>
+>         xilinx_zynq_clocks_init(slcr);
+>
+> +       twd_local_timer_of_register();
+
+This is wrong because smp_twd has been moved to CLOCKSOURCE_OF_DECLARE
+by Rob and it is in the arm-next tree.
+Look at my patch. It is solved there.
+
+Thanks,
+Michal
+
 -- 
-1.7.9.7
+Michal Simek, Ing. (M.Eng)
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
