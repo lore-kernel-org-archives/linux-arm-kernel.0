@@ -1,54 +1,83 @@
-From: jonathan.austin@arm.com (Jonathan Austin)
-Date: Mon, 25 Mar 2013 18:44:54 +0000
-Subject: [PATCH 0/3] Optimise cache-flushing system call and add iovec
- variant
-In-Reply-To: <1364235486-17738-1-git-send-email-will.deacon@arm.com>
-References: <1364235486-17738-1-git-send-email-will.deacon@arm.com>
-Message-ID: <51509B26.1050909@arm.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Tue, 26 Mar 2013 07:51:07 +1300
+Subject: [PATCHv2 3/7] pinctrl: gpio: vt8500: Add pincontrol driver for
+ arch-vt8500
+In-Reply-To: <515083CB.1060908@wwwdotorg.org>
+References: <1364015633-18580-1-git-send-email-linux@prisktech.co.nz>
+ <1364015633-18580-4-git-send-email-linux@prisktech.co.nz>
+ <515083CB.1060908@wwwdotorg.org>
+Message-ID: <1364237467.18777.9.camel@gitbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Mon, 2013-03-25 at 11:05 -0600, Stephen Warren wrote:
+> On 03/22/2013 11:13 PM, Tony Prisk wrote:
+> > This patch adds support for the GPIO/pinmux controller found on the VIA
+> > VT8500 and Wondermedia WM8xxx-series SoCs.
+> > 
+> > Each pin within the controller is capable of operating as a GPIO or as
+> > an alternate function. The pins are numbered according to their control
+> > bank/bit so that if new pins are added, the existing numbering is maintained.
+> > 
+> > All currently supported SoCs are included: VT8500, WM8505, WM8650, WM8750 and
+> > WM8850.
+> 
+> > diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-vt8500.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-vt8500.txt
+> 
+> > +Required properties:
+> 
+> > +- gpio-controller: Marks the device node as a GPIO controller.
+> > +- #gpio-cells : Should be two. The first cell is the pin number and the
+> > +  second cell is used to specify optional parameters.
+> 
+> What are those optional parameters? This binding should define them.
+There are actually no optional parameters at the moment - but there will
+be at some point. In our original GPIO driver binding it was suggested
+that a flags cell be added. When moving it to the pinctrl driver
+binding, the bank + pin number cells were combined as we have linear
+numbering now, and the flags property was retained.
 
-On 25/03/13 18:18, Will Deacon wrote:
-> Hello,
->
-> This patch series has been sitting on my box for some time, pending
-> benchmark results and analysis.
->
-> The results are that, with the first two patches in this series, we see
-> ~2% improvement in browser benchmark scores, which flush the cache fairly
-> regularly in response to jitting JS code.
->
-> The final patch is more of an RFC, since I don't have any software that
-> uses it outside of my toy programs.
->
-> All feedback welcome,
->
+- #gpio-cells : should be <3>.
+	1) bank
+	2) pin number
+	3) flags - should be 0
 
-For all three patches
-Tested-by: Jonathan Austin <Jonathan.Austin@arm.com>
+I will clarify this in the next version.
+> 
+> > +Optional properties:
+> > +- wm,pinmux: A value and mask pair describing the configuration changes to
+> > +  the pinmux register. Only bits marked 1 in the mask will be changed.
+> 
+> This needs more explanation. What does this do and why is it needed?
 
-The last one was tested with a modified jit that was hacked to use the 
-new API as a direct replacement for the old one (IE no cleverness with 
-delayed flushing/grouping of calls). The performance decrease from using 
-the new call instead of the old one was well within the noise of the 
-tests. We are, however, yet to test the improvement from actually 
-*exploiting* the new mechanism. If there's a positive response to the 
-idea then I can encourage the jit guys to have another look.
+This is the bit that is causing most of the trouble with this patchset.
 
-Jonny
+This binding exposes a 32-bit register which is basically a mux
+register, but a messy one at that.
 
-> Will
->
->
-> Will Deacon (3):
->    ARM: cacheflush: don't round address range up to nearest page
->    ARM: cacheflush: don't bother rounding to nearest vma
->    ARM: cacheflush: add new iovec-based cache flushing system call
->
->   arch/arm/include/asm/cacheflush.h  |  3 +--
->   arch/arm/include/uapi/asm/unistd.h |  1 +
->   arch/arm/kernel/traps.c            | 49 +++++++++++++++++++++++++++-----------
->   3 files changed, 37 insertions(+), 16 deletions(-)
->
+The bit values seem to change on each of the different SoCs, we have no
+hardware docs for most of the later SoCs so it's very much guess-work.
+Because we don't have the doc's, we don't know which pins are
+function-swapped when changing bits in this register so writing a proper
+pinmux driver is impossible.
+
+We currently only use this register to ensure the DVO/LCD output is
+enabled for the framebuffer driver. On the vt8500 SoC, this is bit 0 -
+all later SoCs use bit 31.
+
+I exposed it this was so that we don't need to change anything in the
+future as new functions are found. The DTS can be modified to
+enable/disable the functions directly. It would make even more sense
+once we get a C header or similar with #define's to describe what each
+bit does.
+
+Given the confusion/hesitation around this one property, I am tempted to
+drop it from the patchset and leave the original code in
+arch/arm/vt8500.c to enable the LCD output.
+
+
+> Other than that, this binding looks fine.
+
+Regards
+
+Tony Prisk
