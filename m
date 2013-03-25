@@ -1,145 +1,87 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 25 Mar 2013 19:33:23 +0100
-Subject: [PATCH 07/15] ARM: cpuidle: add init/exit routine
-In-Reply-To: <20130325181038.GA631@lunn.ch>
-References: <1364234140-514-1-git-send-email-daniel.lezcano@linaro.org>
- <1364234140-514-8-git-send-email-daniel.lezcano@linaro.org>
- <20130325181038.GA631@lunn.ch>
-Message-ID: <51509873.1010408@linaro.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 25 Mar 2013 19:33:57 +0100
+Subject: [PATCH 1/4] thermal: Add driver for Armada 370/XP SoC thermal
+ management
+In-Reply-To: <1364225229-2857-2-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1364225229-2857-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1364225229-2857-2-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20130325183357.GB631@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/25/2013 07:10 PM, Andrew Lunn wrote:
-> On Mon, Mar 25, 2013 at 06:55:32PM +0100, Daniel Lezcano wrote:
->> The init and exit routine for most of the drivers are the same,
->> that is register the driver and register the device.
->>
->> Provide a common function to do that in the cpuidle driver for ARM,
->> so we can get rid of a lot of code duplication in the different SOC
->> cpuidle drivers.
+On Mon, Mar 25, 2013 at 12:27:06PM -0300, Ezequiel Garcia wrote:
+> This driver supports both Armada 370 and Armada XP SoC
+> thermal management controllers.
 > 
-> Hi Daniel
+> Armada 370 has a register to check a valid temperature, whereas
+> Armada XP does not. Each has a different initialization (i.e. calibration)
+> function. The temperature conversion formula is the same for both.
 > 
-> Please could you add a comment in the code about which piece is
-> specific to ARM, because its not obvious to me. Its not like there is
-> a reference to WFI for example. It looks like this code could go in
-> drivers/cpuidle/cpuidle.c
+> The controller present in each SoC have a very similar feature set,
+> so it corresponds to have one driver to support both of them.
+> 
+> Although this driver may present similarities to Dove and Kirkwood
+> thermal driver, the exact differences and coincidences are not fully
+> known. For this reason, support is given through a separate driver.
+> 
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+>  .../devicetree/bindings/thermal/armada-thermal.txt |   22 ++
+>  drivers/thermal/Kconfig                            |    8 +
+>  drivers/thermal/Makefile                           |    1 +
+>  drivers/thermal/armada_thermal.c                   |  236 ++++++++++++++++++++
+>  4 files changed, 267 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/thermal/armada-thermal.txt
+>  create mode 100644 drivers/thermal/armada_thermal.c
+> 
+> diff --git a/Documentation/devicetree/bindings/thermal/armada-thermal.txt b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
+> new file mode 100644
+> index 0000000..fff93d5
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
+> @@ -0,0 +1,22 @@
+> +* Marvell Armada 370/XP thermal management
+> +
+> +Required properties:
+> +
+> +- compatible:	Should be set to one of the following:
+> +		marvell,armada370-thermal
+> +		marvell,armadaxp-thermal
+> +
+> +- reg:		Device's register space.
+> +		Two entries are expected, see the examples below.
+> +		The first one is required for the sensor register;
+> +		the second one is required for the control register
+> +		to be used for sensor initialization (a.k.a. calibration).
+> +
+> +Example:
+> +
+> +	thermal at d0018300 {
+> +		compatible = "marvell,armada370-thermal";
+> +                reg = <0xd0018300 0x4
+> +		       0xd0018304 0x4>;
+> +		status = "okay";
+> +	};
+> diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
+> index a764f16..fcd5a27 100644
+> --- a/drivers/thermal/Kconfig
+> +++ b/drivers/thermal/Kconfig
+> @@ -134,6 +134,14 @@ config DOVE_THERMAL
+>  	  Support for the Dove thermal sensor driver in the Linux thermal
+>  	  framework.
+>  
+> +config ARMADA_THERMAL
+> +	tristate "Armada 370/XP thermal management"
+> +	depends on ARCH_MVEBU
+> +	depends on OF
+> +	help
+> +	  Enable this option if you want to have support for thermal management
+> +	  controller present in Armada 370 and Armada XP SoC.
+> +
 
-Yes, I agree. At the first glance, the code, as it is, could go in this
-file but more ARM specific code will be moved to this ARM generic code
-driver like device tree description and couple idle states. The init
-function would be more arch specific then.
+Hi Ezequiel
 
-For this reason, I think it is reasonable to move to
-arm/kernel/cpuidle.c rather than drivers/cpuidle/cpuidle.c first.
+For some unknown reason, the Kconfig entries are in reverse alphabetic
+order. So you should insert this entry after DB8500. Same for the Makefile.
 
-In the future, when all the ARM cpuidle driver will be fully
-consolidated, that will be easier to identify the common parts across
-the different arch and then move them to the generic framework.
-
->> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->> ---
->>  arch/arm/include/asm/cpuidle.h |    4 +++
->>  arch/arm/kernel/cpuidle.c      |   57 +++++++++++++++++++++++++++++++++++++++-
->>  2 files changed, 60 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/include/asm/cpuidle.h b/arch/arm/include/asm/cpuidle.h
->> index 7367787..83a38ac 100644
->> --- a/arch/arm/include/asm/cpuidle.h
->> +++ b/arch/arm/include/asm/cpuidle.h
->> @@ -4,6 +4,10 @@
->>  extern int arm_cpuidle_simple_enter(struct cpuidle_device *dev,
->>  				    struct cpuidle_driver *drv, int index);
->>  
->> +extern int arm_cpuidle_init(struct cpuidle_driver *drv);
->> +
->> +extern void arm_cpuidle_exit(struct cpuidle_driver *drv);
->> +
->>  /* Common ARM WFI state */
->>  #define ARM_CPUIDLE_WFI_STATE_PWR(p) {\
->>  	.enter                  = arm_cpuidle_simple_enter,\
->> diff --git a/arch/arm/kernel/cpuidle.c b/arch/arm/kernel/cpuidle.c
->> index 89545f6..13cfe3e 100644
->> --- a/arch/arm/kernel/cpuidle.c
->> +++ b/arch/arm/kernel/cpuidle.c
->> @@ -9,13 +9,68 @@
->>   * http://www.gnu.org/copyleft/gpl.html
->>   */
->>  
->> +#include <linux/module.h>
->>  #include <linux/cpuidle.h>
->>  #include <asm/proc-fns.h>
->>  
->> +static DEFINE_PER_CPU(struct cpuidle_device, cpuidle_device);
->> +
->>  int arm_cpuidle_simple_enter(struct cpuidle_device *dev,
->> -		struct cpuidle_driver *drv, int index)
->> +			     struct cpuidle_driver *drv, int index)
->>  {
->>  	cpu_do_idle();
->>  
->>  	return index;
->>  }
->> +
->> +int __init arm_cpuidle_init(struct cpuidle_driver *drv)
->> +{
->> +       int ret, cpu;
->> +       struct cpuidle_device *device;
->> +
->> +       ret = cpuidle_register_driver(drv);
->> +       if (ret) {
->> +               printk(KERN_ERR "failed to register idle driver '%s'\n",
->> +                       drv->name);
->> +               return ret;
->> +       }
->> +
->> +       for_each_online_cpu(cpu) {
->> +
->> +               device = &per_cpu(cpuidle_device, cpu);
->> +               device->cpu = cpu;
->> +               ret = cpuidle_register_device(device);
->> +               if (ret) {
->> +                       printk(KERN_ERR "Failed to register cpuidle "
->> +                              "device for cpu%d\n", cpu);
->> +                       goto out_unregister;
->> +               }
->> +       }
->> +
->> +out:
->> +       return ret;
->> +
->> +out_unregister:
->> +       for_each_online_cpu(cpu) {
->> +               device = &per_cpu(cpuidle_device, cpu);
->> +               cpuidle_unregister_device(device);
->> +       }
->> +
->> +       cpuidle_unregister_driver(drv);
->> +       goto out;
->> +}
->> +EXPORT_SYMBOL_GPL(arm_cpuidle_init);
->> +
->> +void __exit arm_cpuidle_exit(struct cpuidle_driver *drv)
->> +{
->> +	int cpu;
->> +	struct cpuidle_device *device;
->> +
->> +	for_each_online_cpu(cpu) {
->> +		device = &per_cpu(cpuidle_device, cpu);
->> +		cpuidle_unregister_device(device);
->> +	}
->> +
->> +	cpuidle_unregister_driver(drv);
->> +}
->> +EXPORT_SYMBOL_GPL(arm_cpuidle_exit);
->> -- 
->> 1.7.9.5
->>
-
-
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+       Andrew
