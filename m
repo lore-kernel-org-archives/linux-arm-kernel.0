@@ -1,146 +1,69 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 25 Mar 2013 15:34:53 +0530
-Subject: [PATCH v2 01/18] ARM: OMAP4+: PM: Consolidate MPU subsystem PM code
- for re-use
+Date: Mon, 25 Mar 2013 15:34:54 +0530
+Subject: [PATCH v2 02/18] ARM: OMAP5: PM: Update CPU context register offset
 In-Reply-To: <1364205910-32392-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1364205910-32392-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1364205910-32392-2-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1364205910-32392-3-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP5 and future OMAP based SOCs has backward compatible MPUSS
-IP block with OMAP4. It's programming model is mostly similar.
-Hence consolidate the OMAP MPUSS code so that it can be re-used
-on OMAP5 and future SOCs.
-
-No functional change.
+On OMAP5, RM_CPUi_CPUi_CONTEXT offset has changed. Update the code
+so that same code works for OMAP4+ devices.
 
 Acked-by: Nishanth Menon <nm@ti.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/mach-omap2/omap-mpuss-lowpower.c |   65 ++++++++++++++++++++++++-----
- 1 file changed, 54 insertions(+), 11 deletions(-)
+ arch/arm/mach-omap2/omap-mpuss-lowpower.c |   13 +++++++++----
+ 1 file changed, 9 insertions(+), 4 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-index d650f91..d9e4843 100644
+index d9e4843..b1441b1 100644
 --- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
 +++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-@@ -71,10 +71,46 @@ struct omap4_cpu_pm_info {
- 	void (*secondary_startup)(void);
- };
- 
-+/**
-+ * struct cpu_pm_ops - CPU pm operations
-+ * @finish_suspend:	CPU suspend finisher function pointer
-+ * @resume:		CPU resume function pointer
-+ * @scu_prepare:	CPU Snoop Control program function pointer
-+ *
-+ * Structure holds functions pointer for CPU low power operations like
-+ * suspend, resume and scu programming.
-+ */
-+struct cpu_pm_ops {
-+	int (*finish_suspend)(unsigned long cpu_state);
-+	void (*resume)(void);
-+	void (*scu_prepare)(unsigned int cpu_id, unsigned int cpu_state);
-+};
-+
-+extern int omap4_finish_suspend(unsigned long cpu_state);
-+extern void omap4_cpu_resume(void);
-+
+@@ -56,6 +56,7 @@
+ #include "omap4-sar-layout.h"
+ #include "pm.h"
+ #include "prcm_mpu44xx.h"
++#include "prcm_mpu54xx.h"
+ #include "prminst44xx.h"
+ #include "prcm44xx.h"
+ #include "prm44xx.h"
+@@ -92,6 +93,7 @@ extern void omap4_cpu_resume(void);
  static DEFINE_PER_CPU(struct omap4_cpu_pm_info, omap4_pm_info);
  static struct powerdomain *mpuss_pd;
  static void __iomem *sar_base;
++static u32 cpu_context_offset;
  
-+static int default_finish_suspend(unsigned long cpu_state)
-+{
-+	omap_do_wfi();
-+	return 0;
-+}
-+
-+static void dummy_cpu_resume(void)
-+{}
-+
-+static void dummy_scu_prepare(unsigned int cpu_id, unsigned int cpu_state)
-+{}
-+
-+struct cpu_pm_ops omap_pm_ops = {
-+	.finish_suspend		= default_finish_suspend,
-+	.resume			= dummy_cpu_resume,
-+	.scu_prepare		= dummy_scu_prepare,
-+};
-+
- /*
-  * Program the wakeup routine address for the CPU0 and CPU1
-  * used for OFF or DORMANT wakeup.
-@@ -172,11 +208,12 @@ static void save_l2x0_context(void)
+ static int default_finish_suspend(unsigned long cpu_state)
  {
- 	u32 val;
- 	void __iomem *l2x0_base = omap4_get_l2cache_base();
--
--	val = __raw_readl(l2x0_base + L2X0_AUX_CTRL);
--	__raw_writel(val, sar_base + L2X0_AUXCTRL_OFFSET);
--	val = __raw_readl(l2x0_base + L2X0_PREFETCH_CTRL);
--	__raw_writel(val, sar_base + L2X0_PREFETCH_CTRL_OFFSET);
-+	if (l2x0_base) {
-+		val = __raw_readl(l2x0_base + L2X0_AUX_CTRL);
-+		__raw_writel(val, sar_base + L2X0_AUXCTRL_OFFSET);
-+		val = __raw_readl(l2x0_base + L2X0_PREFETCH_CTRL);
-+		__raw_writel(val, sar_base + L2X0_PREFETCH_CTRL_OFFSET);
-+	}
- }
- #else
- static void save_l2x0_context(void)
-@@ -239,17 +276,17 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
+@@ -164,14 +166,14 @@ static inline void cpu_clear_prev_logic_pwrst(unsigned int cpu_id)
  
- 	cpu_clear_prev_logic_pwrst(cpu);
- 	pwrdm_set_next_pwrst(pm_info->pwrdm, power_state);
--	set_cpu_wakeup_addr(cpu, virt_to_phys(omap4_cpu_resume));
--	scu_pwrst_prepare(cpu, power_state);
-+	set_cpu_wakeup_addr(cpu, virt_to_phys(omap_pm_ops.resume));
-+	omap_pm_ops.scu_prepare(cpu, power_state);
- 	l2x0_pwrst_prepare(cpu, save_state);
- 
- 	/*
- 	 * Call low level function  with targeted low power state.
- 	 */
- 	if (save_state)
--		cpu_suspend(save_state, omap4_finish_suspend);
-+		cpu_suspend(save_state, omap_pm_ops.finish_suspend);
- 	else
--		omap4_finish_suspend(save_state);
-+		omap_pm_ops.finish_suspend(save_state);
- 
- 	/*
- 	 * Restore the CPUx power state to ON otherwise CPUx
-@@ -285,14 +322,14 @@ int __cpuinit omap4_hotplug_cpu(unsigned int cpu, unsigned int power_state)
- 	pwrdm_clear_all_prev_pwrst(pm_info->pwrdm);
- 	pwrdm_set_next_pwrst(pm_info->pwrdm, power_state);
- 	set_cpu_wakeup_addr(cpu, virt_to_phys(pm_info->secondary_startup));
--	scu_pwrst_prepare(cpu, power_state);
-+	omap_pm_ops.scu_prepare(cpu, power_state);
- 
- 	/*
- 	 * CPU never retuns back if targeted power state is OFF mode.
- 	 * CPU ONLINE follows normal CPU ONLINE ptah via
- 	 * omap_secondary_startup().
- 	 */
--	omap4_finish_suspend(cpu_state);
-+	omap_pm_ops.finish_suspend(cpu_state);
- 
- 	pwrdm_set_next_pwrst(pm_info->pwrdm, PWRDM_POWER_ON);
- 	return 0;
-@@ -369,6 +406,12 @@ int __init omap4_mpuss_init(void)
- 
- 	save_l2x0_context();
- 
-+	if (cpu_is_omap44xx()) {
-+		omap_pm_ops.finish_suspend = omap4_finish_suspend;
-+		omap_pm_ops.resume = omap4_cpu_resume;
-+		omap_pm_ops.scu_prepare = scu_pwrst_prepare;
-+	}
-+
- 	return 0;
+ 	if (cpu_id) {
+ 		reg = omap4_prcm_mpu_read_inst_reg(OMAP4430_PRCM_MPU_CPU1_INST,
+-					OMAP4_RM_CPU1_CPU1_CONTEXT_OFFSET);
++					cpu_context_offset);
+ 		omap4_prcm_mpu_write_inst_reg(reg, OMAP4430_PRCM_MPU_CPU1_INST,
+-					OMAP4_RM_CPU1_CPU1_CONTEXT_OFFSET);
++					cpu_context_offset);
+ 	} else {
+ 		reg = omap4_prcm_mpu_read_inst_reg(OMAP4430_PRCM_MPU_CPU0_INST,
+-					OMAP4_RM_CPU0_CPU0_CONTEXT_OFFSET);
++					cpu_context_offset);
+ 		omap4_prcm_mpu_write_inst_reg(reg, OMAP4430_PRCM_MPU_CPU0_INST,
+-					OMAP4_RM_CPU0_CPU0_CONTEXT_OFFSET);
++					cpu_context_offset);
+ 	}
  }
  
+@@ -410,6 +412,9 @@ int __init omap4_mpuss_init(void)
+ 		omap_pm_ops.finish_suspend = omap4_finish_suspend;
+ 		omap_pm_ops.resume = omap4_cpu_resume;
+ 		omap_pm_ops.scu_prepare = scu_pwrst_prepare;
++		cpu_context_offset = OMAP4_RM_CPU0_CPU0_CONTEXT_OFFSET;
++	} else if (soc_is_omap54xx()) {
++		cpu_context_offset = OMAP54XX_RM_CPU0_CPU0_CONTEXT_OFFSET;
+ 	}
+ 
+ 	return 0;
 -- 
 1.7.9.5
