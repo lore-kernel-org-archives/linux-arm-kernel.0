@@ -1,49 +1,85 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Mon, 25 Mar 2013 12:13:46 -0600
-Subject: [PATCH] [ARM] Feroceon: fix kexec by setting outer_cache.inv_all
-In-Reply-To: <51508E17.6010701@grapecom.com>
-References: <514E0D70.3060202@grapecom.com>
- <20130325172113.GC16690@obsidianresearch.com>
- <51508E17.6010701@grapecom.com>
-Message-ID: <20130325181346.GA28029@obsidianresearch.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 25 Mar 2013 18:17:35 +0000
+Subject: [PATCH v2 1/5] ARM: tlbflush: remove ARMv3 support
+In-Reply-To: <1364235459-17672-1-git-send-email-will.deacon@arm.com>
+References: <1364235459-17672-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1364235459-17672-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 25, 2013 at 07:49:11PM +0200, Elijah Ragozin wrote:
+We no longer support any ARMv3 platforms, so remove the old tlbflushing
+code.
 
-> So there is no actually disable and invalidation cache after the old
-> kernel finished and the new one is not started yet, we're not safe
-> to relocate and decompress the kernel.
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/include/asm/tlbflush.h | 11 ++---------
+ 1 file changed, 2 insertions(+), 9 deletions(-)
 
-Upon closer inspection I found the spec passage that the L2 becomes
-non-coherent with the CPU once the L1 D cache is turned off.
-
-So, the L2 has to be invalidated after the L1 D cache is turned off,
-or before the L1 D cache is turned on..
-
-Looks likes 'cpu_proc_fin' turns off the both L1 caches, so the
-invalidate is properly after.
-
-This looks right to me then.
-
-You might want to add some additional info to the the commit message
-along the lines of:
-
-  On Feroceon the L2 cache becomes non-coherent with the CPU when the
-  L1 caches are disabled. Thus the L2 needs to be invalidated after
-  both L1 caches are disabled.
-
-  .. text about kexec being the motivation ..
-
-
-> If in your case everything is working could you please send for me
-> .config and your kernel version, probably I also miss smth. 
-
-Upon deeper reflection, in my case the L2 is re-initialized by a boot
-stub we use on the kexec path...
-
-Also, I will warn you that I could not figure out how to get Linux to
-shut off the DMA's in things like the ethernet, so kexec is very flaky
-on these systems.
-
-Jason
+diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
+index 4db8c88..a223003 100644
+--- a/arch/arm/include/asm/tlbflush.h
++++ b/arch/arm/include/asm/tlbflush.h
+@@ -14,7 +14,6 @@
+ 
+ #include <asm/glue.h>
+ 
+-#define TLB_V3_PAGE	(1 << 0)
+ #define TLB_V4_U_PAGE	(1 << 1)
+ #define TLB_V4_D_PAGE	(1 << 2)
+ #define TLB_V4_I_PAGE	(1 << 3)
+@@ -22,7 +21,6 @@
+ #define TLB_V6_D_PAGE	(1 << 5)
+ #define TLB_V6_I_PAGE	(1 << 6)
+ 
+-#define TLB_V3_FULL	(1 << 8)
+ #define TLB_V4_U_FULL	(1 << 9)
+ #define TLB_V4_D_FULL	(1 << 10)
+ #define TLB_V4_I_FULL	(1 << 11)
+@@ -52,7 +50,6 @@
+  *	=============
+  *
+  *	We have the following to choose from:
+- *	  v3    - ARMv3
+  *	  v4    - ARMv4 without write buffer
+  *	  v4wb  - ARMv4 with write buffer without I TLB flush entry instruction
+  *	  v4wbi - ARMv4 with write buffer with I TLB flush entry instruction
+@@ -330,7 +327,6 @@ static inline void local_flush_tlb_all(void)
+ 	if (tlb_flag(TLB_WB))
+ 		dsb();
+ 
+-	tlb_op(TLB_V3_FULL, "c6, c0, 0", zero);
+ 	tlb_op(TLB_V4_U_FULL | TLB_V6_U_FULL, "c8, c7, 0", zero);
+ 	tlb_op(TLB_V4_D_FULL | TLB_V6_D_FULL, "c8, c6, 0", zero);
+ 	tlb_op(TLB_V4_I_FULL | TLB_V6_I_FULL, "c8, c5, 0", zero);
+@@ -351,9 +347,8 @@ static inline void local_flush_tlb_mm(struct mm_struct *mm)
+ 	if (tlb_flag(TLB_WB))
+ 		dsb();
+ 
+-	if (possible_tlb_flags & (TLB_V3_FULL|TLB_V4_U_FULL|TLB_V4_D_FULL|TLB_V4_I_FULL)) {
++	if (possible_tlb_flags & (TLB_V4_U_FULL|TLB_V4_D_FULL|TLB_V4_I_FULL)) {
+ 		if (cpumask_test_cpu(get_cpu(), mm_cpumask(mm))) {
+-			tlb_op(TLB_V3_FULL, "c6, c0, 0", zero);
+ 			tlb_op(TLB_V4_U_FULL, "c8, c7, 0", zero);
+ 			tlb_op(TLB_V4_D_FULL, "c8, c6, 0", zero);
+ 			tlb_op(TLB_V4_I_FULL, "c8, c5, 0", zero);
+@@ -385,9 +380,8 @@ local_flush_tlb_page(struct vm_area_struct *vma, unsigned long uaddr)
+ 	if (tlb_flag(TLB_WB))
+ 		dsb();
+ 
+-	if (possible_tlb_flags & (TLB_V3_PAGE|TLB_V4_U_PAGE|TLB_V4_D_PAGE|TLB_V4_I_PAGE|TLB_V4_I_FULL) &&
++	if (possible_tlb_flags & (TLB_V4_U_PAGE|TLB_V4_D_PAGE|TLB_V4_I_PAGE|TLB_V4_I_FULL) &&
+ 	    cpumask_test_cpu(smp_processor_id(), mm_cpumask(vma->vm_mm))) {
+-		tlb_op(TLB_V3_PAGE, "c6, c0, 0", uaddr);
+ 		tlb_op(TLB_V4_U_PAGE, "c8, c7, 1", uaddr);
+ 		tlb_op(TLB_V4_D_PAGE, "c8, c6, 1", uaddr);
+ 		tlb_op(TLB_V4_I_PAGE, "c8, c5, 1", uaddr);
+@@ -418,7 +412,6 @@ static inline void local_flush_tlb_kernel_page(unsigned long kaddr)
+ 	if (tlb_flag(TLB_WB))
+ 		dsb();
+ 
+-	tlb_op(TLB_V3_PAGE, "c6, c0, 0", kaddr);
+ 	tlb_op(TLB_V4_U_PAGE, "c8, c7, 1", kaddr);
+ 	tlb_op(TLB_V4_D_PAGE, "c8, c6, 1", kaddr);
+ 	tlb_op(TLB_V4_I_PAGE, "c8, c5, 1", kaddr);
+-- 
+1.8.0
