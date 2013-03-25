@@ -1,43 +1,70 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 25 Mar 2013 09:39:30 -0300
-Subject: [PATCH v2 00/14] Marvell EBU thermal sensor consolidation
-In-Reply-To: <CABJ1b_S9c=tFT17=HycmuRbW1g4y8AvWJpmwMRJwvQ214Yb3fw@mail.gmail.com>
-References: <1363991114-4225-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130325093001.GH5627@lunn.ch> <20130325104513.GC2502@localhost>
- <CABJ1b_S9c=tFT17=HycmuRbW1g4y8AvWJpmwMRJwvQ214Yb3fw@mail.gmail.com>
-Message-ID: <20130325123928.GD2502@localhost>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Mon, 25 Mar 2013 13:42:22 +0100
+Subject: [PATCH] ARM: dove: add more hardware description in the DT
+In-Reply-To: <CABJ1b_RrFpKdH3w=v4gvRQ-8UniKOz9o9VVJ8Q=AQz5WaN0NRQ@mail.gmail.com>
+References: <20130325103159.0c1b4f17@armhf>
+ <CABJ1b_RrFpKdH3w=v4gvRQ-8UniKOz9o9VVJ8Q=AQz5WaN0NRQ@mail.gmail.com>
+Message-ID: <20130325134222.56fe44fc@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sebastian,
+On Mon, 25 Mar 2013 11:21:13 +0100
+Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
 
-On Mon, Mar 25, 2013 at 01:23:32PM +0100, Sebastian Hesselbarth wrote:
-> On Mon, Mar 25, 2013 at 11:45 AM, Ezequiel Garcia
-> <ezequiel.garcia@free-electrons.com> wrote:
-> > On Mon, Mar 25, 2013 at 10:30:01AM +0100, Andrew Lunn wrote:
-> >> I've not a strong opinion, but i think separate drivers are better.
-> >
-> > Don't you think a single driver could make maintenance cheaper?
+> On Mon, Mar 25, 2013 at 10:31 AM, Jean-Francois Moine <moinejf@free.fr> wrote:
+> > The 88AP510 chip (Marvell Dove) contains a LCD and display controler
+> > and two audio controlers.
+	[snip]
+> > +               lcd0: lcd0 at 820000 {
 > 
-> Ezequiel, Andrew,
+> please choose a more informative node names like
 > 
-> just to sum up my opinion on the whole discussion
+> lcd0: lcd-controller at 820000 and
+> i2s0: audio-controller at b0000
+
+OK.
+
+> Besides lcd and i2s there is also
 > 
+> dcon: display-controller at 830000 and
+> ire: image-rotation-engine at 831000
+> 
+> I am not yet 100% sure how to hook them up in dove-drm that I am
+> writing on but I want to have them in somehow. DCON will allow to
+> mux lcd0/lcd1 data streams, i.e. clone or pan lcd0 to lcd1. IRE allows
+> to rotate the memory buffer loaded by -90/90deg.
 
-Thanks for jumping in.
+My first aim is to have the dove-drm in the mainline. These devices
+could be added later, as the ac'97, gpu and vpu. Also, rotating the
+image is not very useful when your monitor cannot rotate! (I wonder if
+such monitors still exist as the one I used on a MAC in the 80's)
 
-> +1 for formula fixes for kirkwood and dove
+But, anyway, I may do it. The only problem is that dcon and ire are
+sharing the same irq. How should I declare that?
 
-Could you test the Dove formula fixes and provide a Tested-by?
-However little the patches maybe, it still makes me nervous
-to send untested patches.
+	[snip]
+> Why did you choose gpio interrupt-parent for i2s?
 
-> +1 for separate drivers
+Bug. Thanks.
 
-I'll send an Armada only patchset soon.
+> From Dove datasheet I can see that, Audio0 has irqs 19, 20
+> and Audio1 has irqs 21, 22 on the main irq controller.
+> The corresponding nodes for i2s0 and i2s1 should look like
+> 
+> i2s0: audio-controller at b0000 {
+>         compatible = "marvell,kirkwood-i2s";
+>         reg = <0xb0000 0x4000>;
+>         interrupts = <19>, <20>;
+>         clocks = <&gate_clk 12>;
+>         status = "disabled";
+> }
 
-Thanks,
+OK.
+
+BTW, I am ready to upload a new version of the dove-drm on my site. It
+now uses the dt for getting the hdmi encoder. Do you prefer I or you do
+the merge?
+
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
