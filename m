@@ -1,54 +1,97 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Mar 2013 22:00:46 +0000
-Subject: [PATCH v5 7/7] irqchip: s3c24xx: add devicetree support
-In-Reply-To: <201303252234.21314.heiko@sntech.de>
-References: <201303252226.21402.heiko@sntech.de>
- <201303252234.21314.heiko@sntech.de>
-Message-ID: <201303252200.46258.arnd@arndb.de>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 25 Mar 2013 17:49:59 -0400 (EDT)
+Subject: [PATCH] ARM: delay: use private ticks_per_jiffy field for
+ timer-based delay ops
+In-Reply-To: <1364235499-17797-1-git-send-email-will.deacon@arm.com>
+References: <1364235499-17797-1-git-send-email-will.deacon@arm.com>
+Message-ID: <alpine.LFD.2.03.1303251749120.1372@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 25 March 2013, Heiko St?bner wrote:
-> Add the necessary code to initialize the interrupt controller
-> thru devicetree data using the irqchip infrastructure.
+On Mon, 25 Mar 2013, Will Deacon wrote:
+
+> Commit 70264367a243 ("ARM: 7653/2: do not scale loops_per_jiffy when
+> using a constant delay clock") fixed a problem with our timer-based
+> delay loop, where loops_per_jiffy is scaled by cpufreq yet used directly
+> by the timer delay ops.
 > 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> This patch fixes the problem in a more elegant way by keeping a private
+> ticks_per_jiffy field in the delay ops, independent of loops_per_jiffy
+> and therefore not subject to scaling. The loop-based delay continues to
+> use loops_per_jiffy directly, as it should.
+> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-The binding looks fine now. I have a few detail comments but am happy
-with the series otherwise.
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
-> +Required properties:
-> +- compatible: Compatible property value should be "samsung,s3c24xx-irq"
-> +  for non s3c2416 machines and "samsung,s3c2416-irq" for s3c2416 machines
-
-We try to avoid wildcards in the "compatible" properties. Better use
-the name of the first SoC that had this controller, and let the other
-ones mark themselves as compatible with that one.
-
-I guess "samsung,s3c2410-irq" would be the right identifier here.
-
-> +- #interrupt-cells : Specifies the number of cells needed to encode an
-> +  interrupt source. The value shall be 4 and interrupt descriptor shall
-> +  have the following format:
-> +      <ctrl_num ctrl_irq parent_irq type>
+> ---
+>  arch/arm/include/asm/delay.h | 2 +-
+>  arch/arm/kernel/smp.c        | 3 ---
+>  arch/arm/lib/delay.c         | 8 +++++---
+>  3 files changed, 6 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/delay.h b/arch/arm/include/asm/delay.h
+> index 720799f..dff714d 100644
+> --- a/arch/arm/include/asm/delay.h
+> +++ b/arch/arm/include/asm/delay.h
+> @@ -24,7 +24,7 @@ extern struct arm_delay_ops {
+>  	void (*delay)(unsigned long);
+>  	void (*const_udelay)(unsigned long);
+>  	void (*udelay)(unsigned long);
+> -	bool const_clock;
+> +	unsigned long ticks_per_jiffy;
+>  } arm_delay_ops;
+>  
+>  #define __delay(n)		arm_delay_ops.delay(n)
+> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+> index 79078ed..1f2cccc 100644
+> --- a/arch/arm/kernel/smp.c
+> +++ b/arch/arm/kernel/smp.c
+> @@ -673,9 +673,6 @@ static int cpufreq_callback(struct notifier_block *nb,
+>  	if (freq->flags & CPUFREQ_CONST_LOOPS)
+>  		return NOTIFY_OK;
+>  
+> -	if (arm_delay_ops.const_clock)
+> -		return NOTIFY_OK;
+> -
+>  	if (!per_cpu(l_p_j_ref, cpu)) {
+>  		per_cpu(l_p_j_ref, cpu) =
+>  			per_cpu(cpu_data, cpu).loops_per_jiffy;
+> diff --git a/arch/arm/lib/delay.c b/arch/arm/lib/delay.c
+> index 6b93f6a..64dbfa5 100644
+> --- a/arch/arm/lib/delay.c
+> +++ b/arch/arm/lib/delay.c
+> @@ -58,7 +58,7 @@ static void __timer_delay(unsigned long cycles)
+>  static void __timer_const_udelay(unsigned long xloops)
+>  {
+>  	unsigned long long loops = xloops;
+> -	loops *= loops_per_jiffy;
+> +	loops *= arm_delay_ops.ticks_per_jiffy;
+>  	__timer_delay(loops >> UDELAY_SHIFT);
+>  }
+>  
+> @@ -73,11 +73,13 @@ void __init register_current_timer_delay(const struct delay_timer *timer)
+>  		pr_info("Switching to timer-based delay loop\n");
+>  		delay_timer			= timer;
+>  		lpj_fine			= timer->freq / HZ;
+> -		loops_per_jiffy			= lpj_fine;
 > +
-> +  ctrl_num contains the controller to use:
-> +      - 0 ... main controller
-> +      - 1 ... sub controller
-> +      - 2 ... second main controller on s3c2416 and s3c2450
-> +  ctrl_irq contains the interrupt bit of the controller
-> +  parent_irq contains the parent bit in the main controller and will be
-> +             ignored in main controllers
-
-I expected the second and third cell to be in the opposite order, so
-the meaning of the second cell is always the same.
-
-> +	/* we're using individual domains for the non-dt case
-> +	 * and one big domain for the dt case where the subintc
-> +	 * starts at hwirq number 32.
-> +	 */
-> +	offset = (intc->domain->of_node) ? 32 : 0;
-
-Wouldn't it be easier to always use the same setup for the domains here?
-
-	Arnd
+> +		/* cpufreq may scale loops_per_jiffy, so keep a private copy */
+> +		arm_delay_ops.ticks_per_jiffy	= lpj_fine;
+>  		arm_delay_ops.delay		= __timer_delay;
+>  		arm_delay_ops.const_udelay	= __timer_const_udelay;
+>  		arm_delay_ops.udelay		= __timer_udelay;
+> -		arm_delay_ops.const_clock	= true;
+> +
+>  		delay_calibrated		= true;
+>  	} else {
+>  		pr_info("Ignoring duplicate/late registration of read_current_timer delay\n");
+> -- 
+> 1.8.0
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
