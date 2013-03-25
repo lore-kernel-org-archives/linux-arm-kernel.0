@@ -1,66 +1,124 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 25 Mar 2013 14:30:23 +0100
-Subject: [PATCH 00/10] ARM: sunxi: Architecture cleanups and rework
-Message-ID: <1364218233-29636-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Mon, 25 Mar 2013 14:30:25 +0100
+Subject: [PATCH 02/10] clocksource: sunxi: Cleanup the timer code
+In-Reply-To: <1364218233-29636-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1364218233-29636-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1364218233-29636-3-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The timer code was not exact to some aspects, since most of this code
+was written wihout any datasheet. Make the needed corrections to match
+the datasheet.
 
-This patchset is a serie of various cleanups and reworks in the sunxi
-architecture to prepare a clean landing for the next Allwinner SoC, the
-A31 (sun6i).
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/clocksource/sunxi_timer.c |   48 ++++++++++++++++++-------------------
+ 1 file changed, 24 insertions(+), 24 deletions(-)
 
-The A31 is significantly different from the previous Allwinner SoC we
-supported, the A10 and A13, to no longer make the generic sunxi prefix
-we used in most compatible string relevant, while it should really have
-been sun4i in the first place.
-
-This set is also the occasion to cleanup the timer and irq code by
-switching to the recently introduced clocksource and irqchip
-infrastructures.
-
-This set depends on the UART patches I sent previously.
-
-Maxime
-
-Maxime Ripard (10):
-  ARM: sunxi: dt: Reorganize the dtsi
-  clocksource: sunxi: Cleanup the timer code
-  clocksource: sunxi: make use of CLKSRC_OF
-  clocksource: sunxi: Rename sunxi to sun4i
-  ARM: sunxi: dt: Update timer compatible string
-  irqchip: sunxi: Make use of the IRQCHIP_DECLARE macro
-  irqchip: sunxi: Rename sunxi to sun4i
-  ARM: sunxi: dt: Update interrupt controller compatible string
-  ARM: sunxi: Rework the restart code
-  ARM: sunxi: dt: Update watchdog compatible string
-
- arch/arm/boot/dts/sun4i-a10-cubieboard.dts |    2 +-
- arch/arm/boot/dts/sun4i-a10-hackberry.dts  |    2 +-
- arch/arm/boot/dts/sun4i-a10.dtsi           |  157 +++++++++++++++++++++++++--
- arch/arm/boot/dts/sun5i-a13-olinuxino.dts  |    2 +-
- arch/arm/boot/dts/sun5i-a13.dtsi           |  145 ++++++++++++++++++++++++-
- arch/arm/boot/dts/sunxi.dtsi               |  159 ---------------------------
- arch/arm/mach-sunxi/Kconfig                |    5 +-
- arch/arm/mach-sunxi/sunxi.c                |   68 +++++++-----
- drivers/clocksource/Kconfig                |    2 +-
- drivers/clocksource/Makefile               |    2 +-
- drivers/clocksource/sun4i_timer.c          |  161 ++++++++++++++++++++++++++++
- drivers/clocksource/sunxi_timer.c          |  160 ---------------------------
- drivers/irqchip/Makefile                   |    2 +-
- drivers/irqchip/irq-sun4i.c                |  149 +++++++++++++++++++++++++
- drivers/irqchip/irq-sunxi.c                |  151 --------------------------
- include/linux/irqchip/sunxi.h              |   27 -----
- include/linux/sunxi_timer.h                |   24 -----
- 17 files changed, 650 insertions(+), 568 deletions(-)
- delete mode 100644 arch/arm/boot/dts/sunxi.dtsi
- create mode 100644 drivers/clocksource/sun4i_timer.c
- delete mode 100644 drivers/clocksource/sunxi_timer.c
- create mode 100644 drivers/irqchip/irq-sun4i.c
- delete mode 100644 drivers/irqchip/irq-sunxi.c
- delete mode 100644 include/linux/irqchip/sunxi.h
- delete mode 100644 include/linux/sunxi_timer.h
-
+diff --git a/drivers/clocksource/sunxi_timer.c b/drivers/clocksource/sunxi_timer.c
+index 0ce85e2..7a3ea23 100644
+--- a/drivers/clocksource/sunxi_timer.c
++++ b/drivers/clocksource/sunxi_timer.c
+@@ -25,15 +25,15 @@
+ #include <linux/sunxi_timer.h>
+ #include <linux/clk/sunxi.h>
+ 
+-#define TIMER_CTL_REG		0x00
+-#define TIMER_CTL_ENABLE		(1 << 0)
++#define TIMER_IRQ_EN_REG	0x00
++#define TIMER_IRQ_EN(val)		(1 << val)
+ #define TIMER_IRQ_ST_REG	0x04
+-#define TIMER0_CTL_REG		0x10
+-#define TIMER0_CTL_ENABLE		(1 << 0)
+-#define TIMER0_CTL_AUTORELOAD		(1 << 1)
+-#define TIMER0_CTL_ONESHOT		(1 << 7)
+-#define TIMER0_INTVAL_REG	0x14
+-#define TIMER0_CNTVAL_REG	0x18
++#define TIMER_CTL_REG(val)	(0x10 * val + 0x10)
++#define TIMER_CTL_ENABLE		(1 << 0)
++#define TIMER_CTL_AUTORELOAD		(1 << 1)
++#define TIMER_CTL_ONESHOT		(1 << 7)
++#define TIMER_INTVAL_REG(val)	(0x10 * val + 0x14)
++#define TIMER_CNTVAL_REG(val)	(0x10 * val + 0x18)
+ 
+ #define TIMER_SCAL		16
+ 
+@@ -42,21 +42,21 @@ static void __iomem *timer_base;
+ static void sunxi_clkevt_mode(enum clock_event_mode mode,
+ 			      struct clock_event_device *clk)
+ {
+-	u32 u = readl(timer_base + TIMER0_CTL_REG);
++	u32 u = readl(timer_base + TIMER_CTL_REG(0));
+ 
+ 	switch (mode) {
+ 	case CLOCK_EVT_MODE_PERIODIC:
+-		u &= ~(TIMER0_CTL_ONESHOT);
+-		writel(u | TIMER0_CTL_ENABLE, timer_base + TIMER0_CTL_REG);
++		u &= ~(TIMER_CTL_ONESHOT);
++		writel(u | TIMER_CTL_ENABLE, timer_base + TIMER_CTL_REG(0));
+ 		break;
+ 
+ 	case CLOCK_EVT_MODE_ONESHOT:
+-		writel(u | TIMER0_CTL_ONESHOT, timer_base + TIMER0_CTL_REG);
++		writel(u | TIMER_CTL_ONESHOT, timer_base + TIMER_CTL_REG(0));
+ 		break;
+ 	case CLOCK_EVT_MODE_UNUSED:
+ 	case CLOCK_EVT_MODE_SHUTDOWN:
+ 	default:
+-		writel(u & ~(TIMER0_CTL_ENABLE), timer_base + TIMER0_CTL_REG);
++		writel(u & ~(TIMER_CTL_ENABLE), timer_base + TIMER_CTL_REG(0));
+ 		break;
+ 	}
+ }
+@@ -64,10 +64,10 @@ static void sunxi_clkevt_mode(enum clock_event_mode mode,
+ static int sunxi_clkevt_next_event(unsigned long evt,
+ 				   struct clock_event_device *unused)
+ {
+-	u32 u = readl(timer_base + TIMER0_CTL_REG);
+-	writel(evt, timer_base + TIMER0_CNTVAL_REG);
+-	writel(u | TIMER0_CTL_ENABLE | TIMER0_CTL_AUTORELOAD,
+-	       timer_base + TIMER0_CTL_REG);
++	u32 u = readl(timer_base + TIMER_CTL_REG(0));
++	writel(evt, timer_base + TIMER_CNTVAL_REG(0));
++	writel(u | TIMER_CTL_ENABLE | TIMER_CTL_AUTORELOAD,
++	       timer_base + TIMER_CTL_REG(0));
+ 
+ 	return 0;
+ }
+@@ -132,26 +132,26 @@ void __init sunxi_timer_init(void)
+ 	rate = clk_get_rate(clk);
+ 
+ 	writel(rate / (TIMER_SCAL * HZ),
+-	       timer_base + TIMER0_INTVAL_REG);
++	       timer_base + TIMER_INTVAL_REG(0));
+ 
+ 	/* set clock source to HOSC, 16 pre-division */
+-	val = readl(timer_base + TIMER0_CTL_REG);
++	val = readl(timer_base + TIMER_CTL_REG(0));
+ 	val &= ~(0x07 << 4);
+ 	val &= ~(0x03 << 2);
+ 	val |= (4 << 4) | (1 << 2);
+-	writel(val, timer_base + TIMER0_CTL_REG);
++	writel(val, timer_base + TIMER_CTL_REG(0));
+ 
+ 	/* set mode to auto reload */
+-	val = readl(timer_base + TIMER0_CTL_REG);
+-	writel(val | TIMER0_CTL_AUTORELOAD, timer_base + TIMER0_CTL_REG);
++	val = readl(timer_base + TIMER_CTL_REG(0));
++	writel(val | TIMER_CTL_AUTORELOAD, timer_base + TIMER_CTL_REG(0));
+ 
+ 	ret = setup_irq(irq, &sunxi_timer_irq);
+ 	if (ret)
+ 		pr_warn("failed to setup irq %d\n", irq);
+ 
+ 	/* Enable timer0 interrupt */
+-	val = readl(timer_base + TIMER_CTL_REG);
+-	writel(val | TIMER_CTL_ENABLE, timer_base + TIMER_CTL_REG);
++	val = readl(timer_base + TIMER_IRQ_EN_REG);
++	writel(val | TIMER_IRQ_EN(0), timer_base + TIMER_IRQ_EN_REG);
+ 
+ 	sunxi_clockevent.cpumask = cpumask_of(0);
+ 
 -- 
 1.7.10.4
