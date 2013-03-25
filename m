@@ -1,63 +1,35 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 25 Mar 2013 15:02:38 +0000
-Subject: [PATCH 3/3] mfd: db8500-prcmu: Fetch the PRCMU TCPM base address from
- Device Tree
-In-Reply-To: <1364223758-17621-1-git-send-email-lee.jones@linaro.org>
-References: <1364223758-17621-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1364223758-17621-3-git-send-email-lee.jones@linaro.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 25 Mar 2013 10:07:48 -0500
+Subject: [PATCH] ARM: l2x0: don't set .set_debug in l310 case
+In-Reply-To: <1364149654-16163-1-git-send-email-p.pisati@gmail.com>
+References: <1364149654-16163-1-git-send-email-p.pisati@gmail.com>
+Message-ID: <51506844.3030108@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A recent move to send the base addresses though the PRCMU platform
-device resource instead of defines found in <mach/*>, means that dbx500
-devices can no longer boot successfully when booting with Device Tree
-enabled. This patch ensures the addresses are obtained correctly from
-DT instead.
+On 03/24/2013 01:27 PM, Paolo Pisati wrote:
+> From: Paolo Pisati <paolo.pisati@canonical.com>
+> 
+> commit 74ddcdb ("l2x0: Only set .set_debug on PL310 r3p0 and earlier")
+> to actually work needs .set_debug to be not set during definition
+> 
+> Signed-off-by: Paolo Pisati <p.pisati@gmail.com>
+> ---
+>  arch/arm/mm/cache-l2x0.c |    1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+> index d457653..37f1364 100644
+> --- a/arch/arm/mm/cache-l2x0.c
+> +++ b/arch/arm/mm/cache-l2x0.c
+> @@ -724,7 +724,6 @@ static const struct l2x0_of_data pl310_data = {
+>  		.flush_all   = l2x0_flush_all,
+>  		.inv_all     = l2x0_inv_all,
+>  		.disable     = l2x0_disable,
+> -		.set_debug   = pl310_set_debug,
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/mfd/db8500-prcmu.c |   21 +++++++++++++++------
- 1 file changed, 15 insertions(+), 6 deletions(-)
+This actually breaks the cases that need set_debug because the memcpy of
+the function pointers is after the set_debug init. So I'll come up with
+something else.
 
-diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
-index 8602bf8..a998edc 100644
---- a/drivers/mfd/db8500-prcmu.c
-+++ b/drivers/mfd/db8500-prcmu.c
-@@ -3159,8 +3159,9 @@ static void db8500_prcmu_update_cpufreq(void)
-  */
- static int db8500_prcmu_probe(struct platform_device *pdev)
- {
--	struct device_node *np = pdev->dev.of_node;
- 	struct prcmu_pdata *pdata = dev_get_platdata(&pdev->dev);
-+	struct device_node *np = pdev->dev.of_node;
-+	struct device_node *tcdm_np;
- 	int irq = 0, err = 0, i;
- 	struct resource *res;
- 
-@@ -3169,11 +3170,19 @@ static int db8500_prcmu_probe(struct platform_device *pdev)
- 	dbx500_fw_version_init(pdev, pdata->version_offset, np);
- 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "prcmu-tcdm");
- 	if (!res) {
--		dev_err(&pdev->dev, "no prcmu tcdm region provided\n");
--		return -ENOENT;
--	}
--	tcdm_base = devm_ioremap(&pdev->dev, res->start,
--			resource_size(res));
-+		if (np) {
-+			tcdm_np = of_find_node_by_name(np->parent,
-+						       "prcmu-tcdm-per4");
-+			if (!tcdm_np) {
-+				dev_err(&pdev->dev,
-+					"no prcmu tcdm region provided\n");
-+				return -ENOENT;
-+			}
-+			tcdm_base = of_iomap(tcdm_np, 0);
-+		}
-+	} else
-+		tcdm_base = devm_ioremap(&pdev->dev, res->start,
-+					 resource_size(res));
- 
- 	/* Clean up the mailbox interrupts after pre-kernel code. */
- 	writel(ALL_MBOX_BITS, PRCM_ARM_IT1_CLR);
--- 
-1.7.10.4
+Rob
