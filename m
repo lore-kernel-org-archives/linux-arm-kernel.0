@@ -1,220 +1,233 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 25 Mar 2013 18:04:32 +0100
-Subject: [PATCH] ARM: at91: add Acme Systems Aria G25 board
-In-Reply-To: <51506BED.4040203@interlog.com>
-References: <1364201369-12047-1-git-send-email-nicolas.ferre@atmel.com>
- <20130325122220.GF2001@game.jcrosoft.org>
- <5150559D.3030109@interlog.com>
- <20130325143147.GA20693@game.jcrosoft.org>
- <51506BED.4040203@interlog.com>
-Message-ID: <20130325170432.GE20693@game.jcrosoft.org>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Mon, 25 Mar 2013 10:08:32 -0700
+Subject: RFC v2: Zynq Clock Controller
+In-Reply-To: <5150634B.9060601@metafoo.de>
+References: <27dae808-1d3a-4001-8eb2-b0a6e2a34b8f@AM1EHSMHS013.ehs.local>
+ <514B5254.50101@metafoo.de>
+ <128fc723-ace7-4f4c-95d9-971b42a52080@CH1EHSMHS028.ehs.local>
+ <5150634B.9060601@metafoo.de>
+Message-ID: <e44aac14-ca51-446c-b564-00a7a440384a@TX2EHSMHS041.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11:23 Mon 25 Mar     , Douglas Gilbert wrote:
-> On 13-03-25 10:31 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> >On 09:48 Mon 25 Mar     , Douglas Gilbert wrote:
-> >>On 13-03-25 08:22 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> >>>On 09:49 Mon 25 Mar     , Nicolas Ferre wrote:
-> >>>>From: Douglas Gilbert <dgilbert@interlog.com>
-> >>>>
-> >>>>Signed-off-by: Douglas Gilbert <dgilbert@interlog.com>
-> >>>>Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> >>>>---
-> >>>>  arch/arm/boot/dts/ariag25.dts | 168 ++++++++++++++++++++++++++++++++++++++++++
-> >>>>  1 file changed, 168 insertions(+)
-> >>>>  create mode 100644 arch/arm/boot/dts/ariag25.dts
-> >>>>
-> >>>>diff --git a/arch/arm/boot/dts/ariag25.dts b/arch/arm/boot/dts/ariag25.dts
-> >>>>new file mode 100644
-> >>>>index 0000000..d18ef50
-> >>>>--- /dev/null
-> >>>>+++ b/arch/arm/boot/dts/ariag25.dts
-> >>>>@@ -0,0 +1,168 @@
-> >>>>+/*
-> >>>>+ * ariag25.dts - Device Tree file for Acme Systems Aria G25 (AT91SAM9G25 based)
-> >>>>+ *
-> >>>>+ * Copyright (C) 2013 Douglas Gilbert <dgilbert@interlog.com>,
-> >>>>+ *                    Robert Nelson <robertcnelson@gmail.com>
-> >>>>+ *
-> >>>>+ * Licensed under GPLv2 or later.
-> >>>>+ */
-> >>>>+/dts-v1/;
-> >>>>+/include/ "at91sam9g25.dtsi"
-> >>>>+
-> >>>>+/ {
-> >>>>+	model = "Acme Systems Aria G25";
-> >>>>+	compatible = "acme,ariag25", "atmel,at91sam9g25ek", "atmel,at91sam9x5ek",
-> >>>>+		     "atmel,at91sam9x5", "atmel,at91sam9";
-> >>>I doube the code is compatible with the 9g25ek
+Hi Lars,
+
+On Mon, Mar 25, 2013 at 03:46:35PM +0100, Lars-Peter Clausen wrote:
+> Hi,
+> 
+> On 03/22/2013 11:41 PM, S?ren Brinkmann wrote:
+> > Hi Lars,
+> > 
+> > On Thu, Mar 21, 2013 at 07:32:52PM +0100, Lars-Peter Clausen wrote:
+> >> On 03/21/2013 12:56 AM, S?ren Brinkmann wrote:
+> >>> Hi,
 > >>>
-> >>>specially when you do not include it
-> >>>>+
-> >>>>+	aliases {
-> >>>>+		serial4 = &usart3;
-> >>>>+		serial5 = &uart0;
-> >>>>+	};
-> >>>you need to specify all
-> >>>>+
-> >>>>+	chosen {
-> >>>>+		bootargs = "console=ttyS0,115200 root=/dev/mmcblk0p2 rw rootwait";
-> >>>>+	};
-> >>>>+
-> >>>>+	memory {
-> >>>>+		/* 128 MB, change this for 256 MB revision */
-> >>>>+		reg = <0x20000000 0x8000000>;
-> >>>>+	};
-> >>>>+
-> >>>>+	clocks {
-> >>>>+		#address-cells = <1>;
-> >>>>+		#size-cells = <1>;
-> >>>>+		ranges;
-> >>>>+
-> >>>>+		main_clock: clock at 0 {
-> >>>>+			compatible = "atmel,osc", "fixed-clock";
-> >>>>+			clock-frequency = <12000000>;
-> >>>>+		};
-> >>>>+	};
-> >>>>+
-> >>>>+	ahb {
-> >>>>+		apb {
-> >>>>+			mmc0: mmc at f0008000 {
-> >>>>+				/* N.B. Aria has no SD card detect (CD), assumed present */
-> >>>>+
-> >>>>+				pinctrl-0 = <
-> >>>>+					&pinctrl_mmc0_slot0_clk_cmd_dat0
-> >>>>+					&pinctrl_mmc0_slot0_dat1_3>;
-> >>>>+				status = "okay";
-> >>>>+				slot at 0 {
-> >>>>+					reg = <0>;
-> >>>>+					bus-width = <4>;
-> >>>>+				};
-> >>>>+			};
-> >>>>+
-> >>>>+			i2c0: i2c at f8010000 {
-> >>>>+				status = "okay";
-> >>>>+			};
-> >>>>+
-> >>>>+			i2c1: i2c at f8014000 {
-> >>>>+				status = "okay";
-> >>>>+			};
-> >>>>+
-> >>>>+			/* TWD2+TCLK2 hidden behind ethernet, so no i2c2 */
-> >>>>+
-> >>>>+			usart0: serial at f801c000 {
-> >>>>+				pinctrl-0 = <&pinctrl_usart0
-> >>>>+					     &pinctrl_usart0_rts
-> >>>>+					     &pinctrl_usart0_cts>;
-> >>>>+				status = "okay";
-> >>>>+			};
-> >>>>+
-> >>>>+			usart1: serial at f8020000 {
-> >>>>+				pinctrl-0 = <&pinctrl_usart1
-> >>>>+					     /* &pinctrl_usart1_rts */
-> >>>>+					     /* &pinctrl_usart1_cts */
-> >>>>+					    >;
-> >>>>+				status = "okay";
-> >>>>+			};
-> >>>>+
-> >>>>+			usart2: serial at f8024000 {
-> >>>>+				/* cannot activate RTS2+CTS2, clash with
-> >>>>+				 * ethernet on PB0 and PB1 */
-> >>>>+				pinctrl-0 = <&pinctrl_usart2>;
-> >>>>+				status = "okay";
-> >>>>+			};
-> >>>>+
-> >>>>+			usart3: serial at f8028000 {
-> >>>>+				compatible = "atmel,at91sam9260-usart";
-> >>>>+				reg = <0xf8028000 0x200>;
-> >>>>+				interrupts = <8 4 5>;
-> >>>>+				pinctrl-names = "default";
-> >>>>+				pinctrl-0 = <&pinctrl_usart3
-> >>>>+					     /* &pinctrl_usart3_rts */
-> >>>>+					     /* &pinctrl_usart3_cts */
-> >>>>+					    >;
-> >>>>+				status = "okay";
-> >>>>+			};
-> >>>>+
-> >>>>+			macb0: ethernet at f802c000 {
-> >>>>+				phy-mode = "rmii";
-> >>>>+				/* following can be overwritten by uboot 'ftd set' command */
-> >>>>+				local-mac-address = [00 04 25 dd 10 01];
-> >>>drop this, this is board specific
-> >>>>+				status = "okay";
+> >>> I spent some time working on this and incorporating feedback. Here's an updated proposal for a clock controller for Zynq:
+> >>>
+> >>> Required properties:
+> >>>  - #clock-cells : Must be 1
+> >>>  - compatible : "xlnx,ps7-clkc"  (this may become 'xlnx,zynq-clkc' terminology differs a bit between Xilinx internal and mainline)
+> >>>  - ps-clk-frequency : Frequency of the oscillator providing ps_clk in HZ
+> >>>                      (usually 33 MHz oscillators are used for Zynq platforms)
+> >>>  - clock-output-names : List of strings used to name the clock outputs. Shall be a list of the outputs given below.
+> >>>
+> >>> Optional properties:
+> >>>  - clocks : as described in the clock bindings
+> >>>  - clock-names : as described in the clock bindings
+> >>>
+> >>> Clock inputs:
+> >>> The following strings are optional parameters to the 'clock-names' property in
+> >>> order to provide optional (E)MIO clock sources.
+> >>>  - swdt_ext_clk
+> >>>  - gem0_emio_clk
+> >>>  - gem1_emio_clk
+> >>>  - mio_clk_XX          # with XX = 00..53
+> >>>
+> >>> Example:
+> >>>         clkc: clkc {
+> >>>                 #clock-cells = <1>;
+> >>>                 compatible = "xlnx,ps7-clkc";
+> >>>                 ps-clk-frequency = <33333333>;
 > >>
-> >>Also the local-mac-address line is needed since it is edited
-> >>by u-boot via this line:
-> >>
-> >>mod_dtb=fdt addr 0x27FF0000 ; fdt set ${eth0_dt_path}
-> >>local-mac-address [ ${my_ethaddr} ]
-> >>
-> >>Interesting technique that: editing the dtb from u-boot prior to the
-> >>Linux kernel using it ...
-> >>
-> >>So the u-boot environment file actually sets the MAC address. The Aria
-> >>G25 has no NAND, flash or switches for setting a quasi unique MAC
-> >>address. There seems to be no way to pass the MAC address on the
-> >>kernel boot line (there was in the past). That leaves the microSD card
-> >>and IMO u-boot is the best place to set that MAC address. My guess
-> >>is that the Aria G25 is not the only board that has this "setting the
-> >>MAC address" challenge.
-> >>
-> >>Finally of course that line is "board specific", that is why the
-> >>file is called ariag25.dts :-)
-> >The mac address is board (hw) uniq so no default in the dts, if none present
-> >the kernel will generate one (private class).
+> >> The input frequency should be a clock as well.
+> > Again, monolithic vs split. I don't see a reason not to just internally
+> > call clk_register_fixed_rate(). That way its children do not have to
+> > cope with a variable name for the xtal.
+> > Also, with my proposal 'clocks' and 'clock-names' would be purely
+> > optional properties, only required if optional external inputs are
+> > present. Having the xtal defined externally would add mandatory entries for
+> > those props.
 > 
-> Since when have MAC addresses been hw uniq? 
-since EVER this is why you can resolve the IP <=> MAC on public network
-That's why when you buy a mac address range, you need to prouve how you handle
-it to buy a second range.
+> 
+> 
+> > 
+> >>
+> >>>                 clock-output-names = "armpll", "ddrpll", "iopll", "cpu_6or4x", "cpu_3or2x", "cpu_2x", "cpu_1x", "ddr2x", "ddr3x", "dci", "lqspi", "smc", "pcap", "gem0", "gem1", "fclk0", "fclk1", "fclk2", "fclk3", "can0", "can1", "sdio0", "sdio1", "uart0", "uart1", "spi0", "spi1", "dma", "usb0_aper", "usb1_aper", "gem0_aper", "gem1_aper", "sdio0_aper", "sdio1_aper", "spi0_aper", "spi1_aper", "can0_aper", "can1_aper", "i2c0_aper", "i2c1_aper", "uart0_aper", "uart1_aper", "gpio_aper", "lqspi_aper", "smc_aper", "swdt", "dbg_trc", "dbg_apb";  /* long list... explanation below */
+> >>>                 /* optional props */
+> >>>                 clocks = <&clkc 16>, <&clk_foo>;
+> >>>                 clock-names = "gem1_emio_clk", "can_mio_clk_23";
+> >>>         };
+> >>>
+> >>> With this revised bindings arbitrary upstream and downstream clock providers should be supported and it's also possible to loop back an output as input. The downside of supporting this is, that I don't see a way around explicitly listing the clock output names in the DT.
+> >>> The reason for this is, that a downstream clock provider should use of_clk_get_parent_name() to obtain its parent clock name. For a block with multiple outputs of_clk_get_parent_name() can return a valid clock name only when 'clock-output-names' is present.
+> >>> Probably the fclks are the only realistic use case to become parent of downstream clock providers, but I could imagine that e.g. a device driver like UART wants to use the CCF to model its internal clocks, hence it would require its parent clock name. Even though a device driver could use clk_get_parent() and __clk_get_name(), of_clk_get_parent_name() should probably work as well. I simply have a bad feeling about breaking of_clk_get_parent_name() for any clock.
+> >>> But after all, I'm open for finding a better solution for this.
+> >>>
+> >>>
+> >>> Similar, inputs for optional clock sources through (E)MIO pins can be defined as described in the clock bindings using the 'clocks' and 'clock-names' properties, with 'clock-names' being an arbitrary subset of the documented names. The actual parent clock names are internally resolved using of_clk_get_parent_name().
+> >>>
+> >>>
+> >>> Regarding this monolithic solution versus a finer granular split:
+> >>>
+> >>> On cost of more complex probing we would also have:
+> >>>  - one clock driver covering the peripheral clocks
+> >>>  - one for the CPU clock domain
+> >>>  - one for the DDR clock domain
+> >>>  - one for GEM
+> >>>  - one for CAN
+> >>>  - one for the APER clks
+> >>>  - one for the PLLs
+> >>>  - one for fclks
+> >>
+> >> fclks are the same as peripheral clocks except for the gate bit, as far as I
+> >> can see.
+> > And that makes them quite different, since they have to access multiple
+> > registers instead of a single one. Also, the fclks have two dividers.
+> > If you want to cover all of those with a single driver, you need a
+> > plethora of arguments/properties to catch the small differences.
+> > 
+> >>
+> >>>  - probably one for the debug clocks (not sure whether we need those)
+> >>>
+> >>> Except for the peripheral one and probably the fclk, they would all be instantiated just once. So, there is not a lot of reuse going on.
+> >>
+> >> PLLs are going to be instantiated multiple times as well.
+> > As mentioned in the very next sentence, I rather see a single driver
+> > with multiple outputs. Take suspend: My plan is to have a few functions
+> > like zynq_clk_(suspend|resume). That should take care of bypassing
+> > shutting down the PLLs (and probably more). Therefore it's easier to
+> > have them all in a single driver.
+> > And if it turned out, that other clocks require special handling for
+> > such system level functions, that could be addressed that way too with
+> > the monolithic approach.
+> > 
+> >>
+> >>> Fclks I would probably also rather put into one driver with four outputs instead of instantiating a single output driver multiple times. Same for PLLs.
+> >>>
+> >>> And then there is e.g. a mux for the system watchdog input which doesn't really fit anywhere and it would be pretty much ridiculous to have another clock driver just for that one and it would also become "hidden" in one of the others.
+> >>>
+> >>> In my opinion that's just not necessary. We would create a bunch of clock drivers including DT bindings for them, probing would become more complex and it doesn't really help with the probe/naming issue. So, I don't think it's beneficial to go down that road.
+> >>>
+> >>> The monolithic solution would need one custom driver for the PLLs, DT bindings wouldn't be required for it though. Everything else should be internally described using the clock-primitives.
+> >>>
+> >>> Other than having a much simpler probe and init process, I still think it might be beneficial to have this monolithic block with a holistic view of the clock tree. For suspend e.g. I think the clock controller could export functions like zynq_clkc_(suspend|resume) and then the controller handles the PLL bypassing/shutdown.
+> >>> Regarding full dynamic reparenting, I don't know how exactly that could work, but with the clock controller there is at least a block where that intelligence would be going and which has knowledge of all the 'struct clk *' required to reparent clocks.
+> >>>
+> >>> Regarding the DT description, it is probably controversial what is considered better. I, like the Tegra folks, think having one clock controller in there is fine and hides irrelevant implementation details.
+> >>>
+> >>
+> >> I still don't like the monolithic solution. From my point of view it is
+> >> architecturally inferior, it is a bad abstraction. You argue that for a
+> >> non-monolithic version you'd have to implement a clock driver for each
+> >> different type of clock. But you still have to do this for the monolithic
+> >> version, they'd probably just end up in one huge messy file. Unless you are
+> >> going to duplicate huge amounts of lines you'd probably have functions like
+> >> add_gem_clk, add_peripheral_clk, add_pll_clk and so on in your monolithic drivers.
+> > It probably makes sense to differ between having custom drivers and
+> > describing the whole clock tree in DT.
+> > 
+> > From reusability perspective, it may make sense to factor out some code
+> > in drivers. IMHO, this does only apply to the peripheral clocks, since
+> > everything else isn't reused and/or quite Zynq specific.
+> > But a monolithic approach would not even prevent this. You could just
+> > transparently change the implementation: Just add a clock driver,
+> > replace the original code in the controller to use the new driver
+> > instead and you're good. No need to touch DT bindings.
+> > 
+> > In Zynq a peripheral clock is essentially described by:
+> >         clk = clk_register_mux(NULL, mux_name, parents, 4, 0,                    
+> >                         clk_ctrl, 4, 2, 0, lock);                                
+> >                                                                                  
+> >         clk = clk_register_divider(NULL, div_name, mux_name, 0, clk_ctrl, 8, 6,  
+> >                         CLK_DIVIDER_ONE_BASED, lock);                            
+> >                                                                                  
+> >         clks[clk0] = clk_register_gate(NULL, clk_name0, div_name,                
+> >                         CLK_SET_RATE_PARENT, clk_ctrl, 0, 0, lock);              
+> > 
+> > If we wrapped this by a driver, any code outside of that driver couldn't
+> > change the mux setting, since its struct clk* is not exposed outside.
+> > To get around this we'd have to reimplement all the clock ops, to create a
+> > clock which supports all possible operations.
+> > In the monolithic approach we could simply remember that struct clk* and
+> > work with it.
+> > 
+> > Bottom line: Factoring out some parts of the monolithic driver might
+> > make sense for some parts. But it can be done later in a transparent way,
+> > especially w/o touching DT bindings.
+> > 
+> > 
+> > The other thing is describing the whole clock tree in DT:
+> > That would force us to not only describe clocks for which it might make
+> > sense, but also all Zynq specific clocks in custom drivers and DT
+> > bindings and we gain nothing from it.
+> > 
+> >>
+> >> The SLCR is a virtual construct, which groups the clock units together. But the
+> >> clock units are the actual entities. E.g. imagine a Zync 2.0, it would probably
+> >> reuse the same clock units, but there would quite likely be different clocks
+> >> mapped at different addresses. If you choose a non-monolithic implementation
+> >> you'd just have to update your devicetree to make this work, with a monolithic
+> >> version you'd have to add a almost identical driver for the v2.
+> > Either way you'll end up with a lot of lines describing the hierarchy.
+> > Either in the dts or in the clock driver.
+> > 
+> > 
+> > I think, my problem is, that I do not yet know how certain functionality
+> > will be implemented later and what exact use-cases have to be supported.
+> > With the monolithic approach I keep all options open. We hopefully will
+> > never have to touch its DT bindings again. And refactoring the code and
+> > migrating it to use dedicated clock drivers should be transparent
+> > changes, if deemed beneficial.
+> > Furthermore, I have a driver, which has references to all strucht clk*
+> > in the system and can work with the whole clock tree leveraging a system
+> > level view. Separating things in smaller blocks might complicate things
+> > if a use case requires this.
+> > And finally pushing the whole hierarchy description into the DT seems to
+> > be the most restrictive approach, without offering big rewards.
+> 
+> I don't see those restrictions you see with a dt binding which has nodes for
+> each clock block. You seem to be under the impression, that each device tree
+> node requires its own driver or device. This is not the case, have you looked
+> at how the current upstream zynq clock support is implemented? This is still
+> one monolithic driver, but there are multiple dt nodes, one for each clock
+> block.
+I thought the one "huge messy" file was one thing you wanted to avoid?
+Also, how does it address my concern regarding inaccessible
+'struct clk *'? A clk_register_foo() will only return a single struct
+clk *. So, wrapping several clk_register() calls within one
+clk_register_foo() makes all but the actual output inaccessible.
+And if we do not directly call clk_register_foo() but do the probing
+through DT the clock init code does not even get hold of that struct clk
+*.
 
-> My guess is
-> a huge majority of MAC addresses are set in firmware.
-> Since many embedded systems with wired ethernet face
-> this problem, is it the job of Linux to make this more
-> difficult than it already is?
-yes but NEVER set the same mac address for every board (hw) in a DT or in C
-> 
-> >If the mac is specifued in the register the kernel re-use it.
-> 
-> Unless u-boot (or whatever) edits the dtb file before the
-> Linux kernel sees it.
-> 
-> >This is the job of the booloader to set one. The dts in the kernel will be
-> >used for every Aria not one board in particular
-> 
-> It is the job of someone to set it. A MAC address can be
-> compiled into u-boot but that is about as useful as
-> compiling it into Linux kernel.
-no default one in the kernel dt
+> This leads to a very clean and well structured code and also nicely
+> structured dt, which represents the tree as it is in hardware. If I understand
+> you correctly what you suggest is that you basically want to copy 'n paste the
+> same 10 lines to instantiate a peripheral clock, which you mentioned above,
+> again and again. This will be quite messy.
+For the peripheral clocks you're right, there is some reuse possible.
+For those I have a helper, like zynq_clk_register_periph(). But for pretty much
+everything else I don't.
 
-on some server we flash a dtb with a mac inside but this handle at production
-level and the dts in the kernel does not have ANY default mac address
-> 
-> >if you keep the mac addres in the dts NACK
-> 
-> Seems strange to object to setting
->   local-mac-address = [00 00 00 00 00 00];
-> when if the kernel sees that line it will do exactly the
-> same thing as without that line? But the advantage of that
-> line is that it gives the u-boot environment file the
-> ability to edit the ariag25.dtb before the kernel sees it.
-> And if the u-boot environment file is properly configured
-> by the board manufacturer, then a quasi uniq, stable MAC
-> address is generated.
-in you patch you put a mac address not 00 00 00 00 00 00
-and if u-boot is not able to add a property fix it
+In conclusion, I see the DT approach limiting my ability to modify the
+clock tree when implementing system level functionality. 
+Probably quite a stretch, but imagine some smart power management code,
+which might try to reparent all and every clock in the system to certain
+PLLs. How would such a power manager get hold of all the struct clk * it
+needs. In a system probing fully through DT we cannot get hold of those
+and even less if we wrap several clocks in one clock_foo. Unless, we add
+a dummy device which has every clock in the system as its input. And
+that sounds even wackier than having a clock controller which provides
+all the clocks to consumers.
 
-> 
-> For more information about this technique see:
->   http://www.petalogix.com/support/kb/mac_addr_update
-I known how dt work and how to handle it at bootloader level
-for more than 6 years
-
-Best Regards,
-J.
-> 
-> 
-> Doug Gilbert
-> 
+	S?ren
