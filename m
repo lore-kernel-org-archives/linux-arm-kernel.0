@@ -1,46 +1,42 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 25 Mar 2013 15:09:40 +0100
-Subject: [PATCH] ARM: imx1: mm: add call to mxc_device_init
-In-Reply-To: <1363448999-3936-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-References: <1363448999-3936-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-Message-ID: <20130325140940.GH1906@pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 25 Mar 2013 15:10:04 +0100
+Subject: [PATCH 5/6] ARM: ux500: move PRCMU functions into the CPUidle
+ driver
+In-Reply-To: <51505816.1020302@linaro.org>
+References: <1363866553-15054-1-git-send-email-linus.walleij@stericsson.com>
+ <1363866553-15054-6-git-send-email-linus.walleij@stericsson.com>
+ <514AF99F.7040100@stericsson.com> <514AFD67.20205@linaro.org>
+ <CACRpkdZa1NMRjatD5W7zcYZC=QWu6f7L4oqn48PWR0j5AqSmPw@mail.gmail.com>
+ <51505816.1020302@linaro.org>
+Message-ID: <CACRpkdab+iT4m5gDtuH2vYpRQRgTyOho4=s+zj0cEDfxE5g_FQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 16, 2013 at 04:49:59PM +0100, Gwenhael Goavec-Merou wrote:
-> mxc_device_init() is mandatory for mxc_aips and mxc_ahb bus registration, needed 
-> as parents, at least, for gpio and dma.
-> 
-> Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
+On Mon, Mar 25, 2013 at 2:58 PM, Daniel Lezcano
+<daniel.lezcano@linaro.org> wrote:
+> On 03/25/2013 02:44 PM, Linus Walleij wrote:
 
-Applied, thanks
+>> Shall I put it in <linux/platform_data/arm-ux500-pm.h> or so,
+>> with the implementation in arch/arm/mach-ux500/pm.c
+>> or so?
+>
+> Wouldn't <asm/pm.h> be better ? So we can have the same header name for
+> all the drivers, no ?
 
-Sascha
+I don't think that works with multiplatform. When building multiple
+systems our approach is to not let any two header files have the same
+name.
 
-> ---
->  arch/arm/mach-imx/mm-imx1.c | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/mach-imx/mm-imx1.c b/arch/arm/mach-imx/mm-imx1.c
-> index 7a14667..3c609c5 100644
-> --- a/arch/arm/mach-imx/mm-imx1.c
-> +++ b/arch/arm/mach-imx/mm-imx1.c
-> @@ -51,6 +51,8 @@ void __init mx1_init_irq(void)
->  
->  void __init imx1_soc_init(void)
->  {
-> +	mxc_device_init();
-> +
->  	mxc_register_gpio("imx1-gpio", 0, MX1_GPIO1_BASE_ADDR, SZ_256,
->  						MX1_GPIO_INT_PORTA, 0);
->  	mxc_register_gpio("imx1-gpio", 1, MX1_GPIO2_BASE_ADDR, SZ_256,
-> -- 
-> 1.8.1.5
-> 
-> 
+What we did for debug macro for example was to create the <debug/*>
+namespace, so the old <mach/debug-macro.S> is now <debug/imx.S>,
+<debug/vt8500.h>, <debug/ux500.h> ... etc.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+So what would be needed would then rather be <pm/*> in
+arch/arm/include/pm and under this we would create
+<pm/ux500.h>.
+
+But that require Russell and Arnds/Olofs consent I think,
+what do you guys say? Other recommendations?
+
+Yours,
+Linus Walleij
