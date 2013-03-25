@@ -1,116 +1,283 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Mon, 25 Mar 2013 17:31:08 +0100
-Subject: [PATCH 08/10] arm: zynq: Add smp support
-In-Reply-To: <51505C39.4060507@gmail.com>
-References: <1364219596-4954-1-git-send-email-michal.simek@xilinx.com>
- <1364219596-4954-8-git-send-email-michal.simek@xilinx.com>
- <51505C39.4060507@gmail.com>
-Message-ID: <51507BCC.2050707@monstr.eu>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Mon, 25 Mar 2013 17:34:22 +0100
+Subject: [PATCH 3/3] ARM: zynq: add SMP support
+In-Reply-To: <CAHTX3d+DiWx=qfh5St9no4HFduiLJJyRzh8+dYP+scq0uGTJdA@mail.gmail.com>
+References: <1364043450-18700-1-git-send-email-s.trumtrar@pengutronix.de>
+ <1364043450-18700-4-git-send-email-s.trumtrar@pengutronix.de>
+ <CAHTX3d+DiWx=qfh5St9no4HFduiLJJyRzh8+dYP+scq0uGTJdA@mail.gmail.com>
+Message-ID: <20130325163422.GG27739@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/25/2013 03:16 PM, Rob Herring wrote:
-> On 03/25/2013 08:53 AM, Michal Simek wrote:
->> Zynq is dual core Cortex A9 which starts always
->> at zero. Using simple trampoline ensure long jump
->> to secondary_startup code.
->>
->> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
->> ---
->>   arch/arm/mach-zynq/Makefile  |    1 +
->>   arch/arm/mach-zynq/common.c  |    1 +
->>   arch/arm/mach-zynq/common.h  |    7 ++
->>   arch/arm/mach-zynq/platsmp.c |  160 ++++++++++++++++++++++++++++++++++++++++++
->>   arch/arm/mach-zynq/slcr.c    |   29 ++++++++
->>   5 files changed, 198 insertions(+)
->>   create mode 100644 arch/arm/mach-zynq/platsmp.c
->
-> [...]
->
->> +/* Secondary CPU kernel startup is a 2 step process. The primary CPU
->> + * starts the secondary CPU by giving it the address of the kernel and
->> + * then sending it an event to wake it up. The secondary CPU then
->> + * starts the kernel and tells the primary CPU it's up and running.
->> + */
->> +static void __cpuinit zynq_secondary_init(unsigned int cpu)
->> +{
->> +	/*
->> +	 * if any interrupts are already enabled for the primary
->> +	 * core (e.g. timer irq), then they will not have been enabled
->> +	 * for us: do so
->> +	 */
->> +	gic_secondary_init(0);
->> +
->> +	/*
->> +	 * Synchronise with the boot thread.
->> +	 */
->> +	spin_lock(&boot_lock);
->> +	spin_unlock(&boot_lock);
->
-> Why do you think this is needed? Platforms that need this
-> synchronization are only the ones that just do wfi for hotplug rather
-> than properly reseting the core. You appear to do the latter and should
-> not need this.
+On Mon, Mar 25, 2013 at 03:27:57PM +0100, Michal Simek wrote:
+> 2013/3/23 Steffen Trumtrar <s.trumtrar@pengutronix.de>:
+> > The Zynq7000 has a CortexA9 with at least 2 cores. Add support to boot them all.
+> > To do this a trampoline is needed. At runtime the jump address and two
+> > instructions are copied to RAM by CPU0 and then executed by CPU1.
+> >
+> > Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> > Cc: Michal Simek <michal.simek@xilinx.com>
+> > ---
+> >  arch/arm/boot/dts/zynq-7000.dtsi |  14 +++++
+> >  arch/arm/mach-zynq/Makefile      |   2 +
+> >  arch/arm/mach-zynq/common.c      |   1 +
+> >  arch/arm/mach-zynq/common.h      |  14 +++++
+> >  arch/arm/mach-zynq/headsmp.S     |  20 +++++++
+> >  arch/arm/mach-zynq/platsmp.c     | 110 +++++++++++++++++++++++++++++++++++++++
+> >  6 files changed, 161 insertions(+)
+> >  create mode 100644 arch/arm/mach-zynq/headsmp.S
+> >  create mode 100644 arch/arm/mach-zynq/platsmp.c
+> >
+> > diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+> > index c103082..258b6c9 100644
+> > --- a/arch/arm/boot/dts/zynq-7000.dtsi
+> > +++ b/arch/arm/boot/dts/zynq-7000.dtsi
+> > @@ -15,6 +15,20 @@
+> >  / {
+> >         compatible = "xlnx,zynq-7000";
+> >
+> > +       cpus {
+> > +               cpu at 0 {
+> > +                       compatible = "arm,cortex-a9";
+> > +                       next-level-cache = <&L2>;
+> > +                       clocks = <&armpll 0>;
+> > +               };
+> > +
+> > +               cpu at 1 {
+> > +                       compatible = "arm,cortex-a9";
+> > +                       next-level-cache = <&L2>;
+> > +                       clocks = <&armpll 0>;
+> > +               };
+> > +       };
+> 
+> Is this really needed?
+> 
+I don't know if it is really necessary for the SMP stuff, but my reasoning is:
+the DT describes the HW and not only for Linux that is. We have two cores, so
+we should specify that. Also, you can add other properties here like
+imx6q.dtsi does for the operating-points for example.
+So, I think it is valid to have those entries here.
 
-ok.
+> > +
+> >         amba {
+> >                 compatible = "simple-bus";
+> >                 #address-cells = <1>;
+> > diff --git a/arch/arm/mach-zynq/Makefile b/arch/arm/mach-zynq/Makefile
+> > index 397268c..906d199 100644
+> > --- a/arch/arm/mach-zynq/Makefile
+> > +++ b/arch/arm/mach-zynq/Makefile
+> > @@ -4,3 +4,5 @@
+> >
+> >  # Common support
+> >  obj-y                          := common.o timer.o
+> > +AFLAGS_headsmp.o :=-Wa,-march=armv7-a
+> > +obj-$(CONFIG_SMP) += headsmp.o platsmp.o
+> > diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
+> > index 1b9bb3d..4053962 100644
+> > --- a/arch/arm/mach-zynq/common.c
+> > +++ b/arch/arm/mach-zynq/common.c
+> > @@ -117,6 +117,7 @@ static const char *xilinx_dt_match[] = {
+> >  };
+> >
+> >  MACHINE_START(XILINX_EP107, "Xilinx Zynq Platform")
+> > +       .smp            = smp_ops(zynq_smp_ops),
+> >         .map_io         = xilinx_map_io,
+> >         .init_irq       = xilinx_irqchip_init,
+> >         .init_machine   = xilinx_init_machine,
+> > diff --git a/arch/arm/mach-zynq/common.h b/arch/arm/mach-zynq/common.h
+> > index 8b4dbba..451d386 100644
+> > --- a/arch/arm/mach-zynq/common.h
+> > +++ b/arch/arm/mach-zynq/common.h
+> > @@ -19,4 +19,18 @@
+> >
+> >  void __init xttcps_timer_init(void);
+> >
+> > +#ifdef CONFIG_SMP
+> > +extern void secondary_startup(void);
+> > +extern char secondary_trampoline, secondary_trampoline_end;
+> > +#endif
+> > +
+> > +extern struct smp_operations __initdata zynq_smp_ops;
+> > +extern void __iomem *slcr_base_addr;
+> > +extern void __iomem *scu_base;
+> > +
+> > +#define SLCR_UNLOCK_MAGIC      0xdf0d
+> > +
+> > +#define SLCR_UNLOCK            0x8
+> > +#define SLCR_A9_CPU_RST_CTRL   0x244
+> 
+> As previous code.
+> 
+> > +
+> >  #endif
+> > diff --git a/arch/arm/mach-zynq/headsmp.S b/arch/arm/mach-zynq/headsmp.S
+> > new file mode 100644
+> > index 0000000..145bbae
+> > --- /dev/null
+> > +++ b/arch/arm/mach-zynq/headsmp.S
+> > @@ -0,0 +1,20 @@
+> > +/*
+> > + *  Copyright (c) 2013 Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> > + *
+> > + * based on mach-socfpga/headsmp.S
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > + */
+> > +#include <linux/linkage.h>
+> > +#include <linux/init.h>
+> > +
+> > +       __CPUINIT
+> > +       .arch   armv7-a
+> > +
+> > +ENTRY(secondary_trampoline)
+> > +       ldr     r0, [pc]
+> > +       mov     pc, r0
+> 
+> This code is familiar to me. It looks like my jump trampoline which I
+> wrote in C. :-)
+> 
+Of course. I shouldn't have only mentioned that in the platsmp.c
+But I think asm is a little easier on the eyes than machine code ;-)
 
+> > +
+> > +ENTRY(secondary_trampoline_end)
+> > diff --git a/arch/arm/mach-zynq/platsmp.c b/arch/arm/mach-zynq/platsmp.c
+> > new file mode 100644
+> > index 0000000..1ea3d4f
+> > --- /dev/null
+> > +++ b/arch/arm/mach-zynq/platsmp.c
+> > @@ -0,0 +1,110 @@
+> > +/*
+> > + * Copyright (c) 2013 Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> > + *
+> > + * based on
+> > + *  linux/arch/arm/mach-zynq/platsmp.c Copyright (C) 2011 Xilinx
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > + */
+> > +#include <linux/delay.h>
+> > +#include <linux/errno.h>
+> > +#include <linux/init.h>
+> > +#include <linux/irqchip/arm-gic.h>
+> > +#include <linux/io.h>
+> > +#include <linux/jiffies.h>
+> > +#include <linux/smp.h>
+> > +
+> > +#include <asm/cacheflush.h>
+> > +#include <asm/mach/arch.h>
+> > +#include <asm/mach/map.h>
+> > +#include <asm/smp_scu.h>
+> > +
+> > +#include "common.h"
+> > +
+> > +#define A9_RST_MASK    (1 << 0)
+> > +#define A9_CLKSTOP_MASK        (1 << 4)
+> 
+> as I wrote above moving to separate driver make sense to me.
+> 
+> > +
+> > +static DEFINE_SPINLOCK(boot_lock);
+> > +
+> > +static void __cpuinit zynq_smp_secondary_init(unsigned int cpu)
+> > +{
+> > +       /*
+> > +        * if any interrupts are already enabled for the primary
+> > +        * core (e.g. timer irq), then they will not have been enabled
+> > +        * for us: do so
+> > +        */
+> > +       gic_secondary_init(0);
+> > +
+> > +       /*
+> > +        * Synchronise with the boot thread.
+> > +        */
+> > +       spin_lock(&boot_lock);
+> > +       spin_unlock(&boot_lock);
+> > +}
+> > +
+> > +static inline void zynq_set_cpu_jump(int cpu, void *jump_addr)
+> > +{
+> > +       if (jump_addr) {
+> 
+> This is wrong because if jump_addr is 0x1 - 0xF then you are rewriting.
+> It is unlikely but it should be captured.
+> The main reason is AMP solution where Linux can't be added from 0x0
+> and user amp code can setup any entry point. Better to check it just for sure.
+> 
+> > +               int trampoline_size = &secondary_trampoline_end - &secondary_trampoline;
+> > +
+> > +               writel(virt_to_phys(jump_addr), phys_to_virt(8));
+> 
+> This will probably generate sparse warning.
+> 
+> > +               memcpy(phys_to_virt(0), &secondary_trampoline, trampoline_size);
+> 
+> This is nice solution. I am hardcoding instruction and this looks like
+> good solution.
+> Let me do some experiment with it because maybe this could be
+> problematic when Linux
+> kernel starts from different address than 0x0.
+> 
+> > +
+> > +               flush_cache_all();
+> > +               outer_flush_all();
+> > +               smp_wmb();
+> > +       }
+> > +}
+> > +
+> > +static void zynq_enable_cpu(int cpu, bool enable)
+> > +{
+> > +       writel(A9_CLKSTOP_MASK << cpu, slcr_base_addr + SLCR_A9_CPU_RST_CTRL);
+> > +       writel(0, slcr_base_addr + SLCR_A9_CPU_RST_CTRL);
+> > +}
+> > +
+> > +int __cpuinit zynq_smp_boot_secondary(unsigned int cpu, struct task_struct *idle)
+> > +{
+> > +       writel(SLCR_UNLOCK_MAGIC, slcr_base_addr + SLCR_UNLOCK);
+> > +       writel((A9_CLKSTOP_MASK | A9_RST_MASK) << cpu,
+> > +               slcr_base_addr + SLCR_A9_CPU_RST_CTRL);
+> > +
+> > +       zynq_set_cpu_jump(cpu, secondary_startup);
+> > +       zynq_enable_cpu(cpu, true);
+> > +
+> > +       return 0;
+> > +}
+> > +
+> > +/*
+> > + * Initialise the CPU possible map early - this describes the CPUs
+> > + * which may be present or become present in the system.
+> > + */
+> > +static void __init zynq_smp_init_cpus(void)
+> > +{
+> > +       unsigned int ncores, i;
+> > +
+> > +       ncores = scu_get_core_count(scu_base);
+> > +
+> > +       for (i = 0; i < ncores; ++i)
+> > +               set_cpu_possible(i, true);
+> > +
+> > +       /* sanity check */
+> > +       if (ncores > num_possible_cpus()) {
+> > +               pr_warn("zynq: no. of cores (%d) greater than configured"
+> > +                       "maximum of %d - clipping\n", ncores, num_possible_cpus());
+> > +               ncores = num_possible_cpus();
+> > +       }
+> 
+> Is this necessary?
+> IRC: There is checking in smp_prepare_cpus in arch/arm/kernel/smp.c for it.
+> 
 
->> +}
->> +
->> +int __cpuinit zynq_cpun_start(u32 address, int cpu)
->> +{
->> +	if (cpu > ncores) {
->> +		pr_warn("CPU No. is not available in the system\n");
->> +		return -1;
->> +	}
->> +
->> +	/* MS: Expectation that SLCR are directly map and accessible */
->> +	/* Not possible to jump to non aligned address */
->> +	if (!(address & 3) && (!address || (address >= 0xC))) {
->
-> What about Thumb2 kernel entry?
+As our solutions are pretty much alike, I think I will not work on this patch
+in the future. Makes no sense to do everything twice :-)
 
-I have no idea what's that.
-Still more microblaze guy than Arm one.
-
->
->> +		slcr_cpu_stop(cpu);
->
-> Isn't a secondary cpu already stopped?
-
-On the normal boot this is really necessary because first stage bootloader
-doesn't stop cpu just keep it in loop and without stopping cpu
-and starting it again it doesn't work.
-
->> +
->> +		/*
->> +		 * This is elegant way how to jump to any address
->> +		 * 0x0: Load address at 0x8 to r0
->> +		 * 0x4: Jump by mov instruction
->> +		 * 0x8: Jumping address
->> +		 */
->> +		if (address) {
->> +			/* 0: ldr r0, [8] */
->> +			__raw_writel(0xe59f0000, phys_to_virt(0x0));
->> +			/* 4: mov pc, r0 */
->> +			__raw_writel(0xe1a0f000, phys_to_virt(0x4));
->> +			__raw_writel(address, phys_to_virt(0x8));
->> +		}
->> +
->> +		flush_cache_all();
->> +		outer_flush_all();
->
-> You should only need to flush range on address 0-4 here.
-
-ok.
-
-Thanks,
-Michal
-
-
+Regards,
+Steffen
 
 -- 
-Michal Simek, Ing. (M.Eng)
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel 2.6 Microblaze Linux - http://www.monstr.eu/fdt/
-Microblaze U-BOOT custodian
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
