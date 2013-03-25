@@ -1,23 +1,28 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Mon, 25 Mar 2013 13:22:06 +0100
-Subject: EXYNOS will support only DT from v3.10
-In-Reply-To: <17a501ce2948$17037610$450a6230$%kim@samsung.com>
-References: <17a501ce2948$17037610$450a6230$%kim@samsung.com>
-Message-ID: <201303251322.06495.heiko@sntech.de>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 25 Mar 2013 13:23:32 +0100
+Subject: [PATCH v2 00/14] Marvell EBU thermal sensor consolidation
+In-Reply-To: <20130325104513.GC2502@localhost>
+References: <1363991114-4225-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130325093001.GH5627@lunn.ch> <20130325104513.GC2502@localhost>
+Message-ID: <CABJ1b_S9c=tFT17=HycmuRbW1g4y8AvWJpmwMRJwvQ214Yb3fw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 25. M?rz 2013, 12:01:23 schrieb Kukjin Kim:
-> Hi all,
-> 
-> As we discussed before, it's time to decide to support non-DT for EXYNOS
-> SoCs.
-> 
-> If everybody else agrees to drop non-DT support from v3.10, I will. Feel
-> free to talk your opinion about that.
+On Mon, Mar 25, 2013 at 11:45 AM, Ezequiel Garcia
+<ezequiel.garcia@free-electrons.com> wrote:
+> On Mon, Mar 25, 2013 at 10:30:01AM +0100, Andrew Lunn wrote:
+>> I've not a strong opinion, but i think separate drivers are better.
+>
+> Don't you think a single driver could make maintenance cheaper?
 
-no problems here ... as long as the platform hooks in the drivers exynos and 
-s3c24xx share stay where they are.
+Ezequiel, Andrew,
 
+just to sum up my opinion on the whole discussion
 
-Heiko
++1 for formula fixes for kirkwood and dove
++1 for separate drivers
++1 for thermal-mmio as Jason Gunthorpe suggested
+
+And then port thermal drivers to thermal-mmio..
+
+Sebastian
