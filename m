@@ -1,43 +1,30 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 25 Mar 2013 10:11:15 -0300
-Subject: [PATCH v4 0/6] support other fsl SoCs with usbmisc + small fixes
-In-Reply-To: <87ip6mor1e.fsf@ashishki-desk.ger.corp.intel.com>
-References: <1354033021-10585-1-git-send-email-m.grzeschik@pengutronix.de>
- <20121128025217.GC18593@nchen-desktop>
- <87ip6mor1e.fsf@ashishki-desk.ger.corp.intel.com>
-Message-ID: <CAOMZO5ArDLKDLEzhYc7EP2CNQGcT=vO7ctbiEsjzsGs+EaT7Dw@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 25 Mar 2013 14:12:25 +0100
+Subject: [PATCH 5/9] staging: ste_rmi4: kill platform_data hack
+In-Reply-To: <1363902674-6456-6-git-send-email-arnd@arndb.de>
+References: <1363866553-15054-1-git-send-email-linus.walleij@stericsson.com>
+ <1363902674-6456-1-git-send-email-arnd@arndb.de>
+ <1363902674-6456-6-git-send-email-arnd@arndb.de>
+Message-ID: <CACRpkdb+_8QLopuc1K_s2hmF=OcMzsG1OR9DnHS1t3f4U+tGKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexander,
+On Thu, Mar 21, 2013 at 10:51 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-On Thu, Jan 24, 2013 at 7:42 AM, Alexander Shishkin
-<alexander.shishkin@linux.intel.com> wrote:
-> Peter Chen <peter.chen@freescale.com> writes:
+> There is only one instance of the platform data for synaptics_i2c_rmi4
+> in the mainline kernel, so there is no point of pretending its
+> variable here. The only member that has a dependency on the platform
+> is actually the interrupt number, and there is a field in the
+> i2c_client structure that gets initialized from the board info,
+> so we can trivially move the board_into into the platform without
+> knowledge of the platform_data structure.
 >
->> On Tue, Nov 27, 2012 at 05:16:55PM +0100, Michael Grzeschik wrote:
->>> Nearly every SoC from Freescale has this non-core usb registers. This series
->>> adds support for more users of this driver.
->>>
->>> This series is based on Peter Chen's work. Its needed to merge his master branch
->>> before applying this series:
->>>
->>> https://github.com/hzpeterchen/linux-usb.git
->>
->> I have tested it at i.mx6q sabrelite board, it works good.
->>
->> I have pushed your commit to my git, please cc me
->> your coming chipidea patches, thanks.
->>
->> Alex, please add:
->>
->> Reviewed-by: Peter Chen <peter.chen@freescale.com>
->> Tested-by: Peter Chen <peter.chen@freescale.com>
->
-> Looks good, queueing this one for submission.
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Could you please let us know what is preventing this series to be applied?
+Greg can we have your ACK on this patch to staging so we can take
+it through the ARM SoC tree?
 
-Thanks,
+(Tell me if you can't retrieve it and I'll send it verbose.)
 
-Fabio Estevam
+Yours,
+Linus Walleij
