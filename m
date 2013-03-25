@@ -1,27 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Mar 2013 10:53:11 +0000
-Subject: [PATCH 4/8] ARM: sirf: enable sparse IRQ
-In-Reply-To: <CAGsJ_4xUjH_kcMv4=r8-duZFR9Xz25V-KZRGwv0SM8pUAnfdyQ@mail.gmail.com>
-References: <1363779679-16880-1-git-send-email-arnd@arndb.de>
- <1363779679-16880-5-git-send-email-arnd@arndb.de>
- <CAGsJ_4xUjH_kcMv4=r8-duZFR9Xz25V-KZRGwv0SM8pUAnfdyQ@mail.gmail.com>
-Message-ID: <201303251053.11854.arnd@arndb.de>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 25 Mar 2013 16:25:37 +0530
+Subject: [PATCH] ARM: hw_breakpoint: Enable debug powerdown only if system
+ supports 'has_ossr'
+In-Reply-To: <20130325104910.GE12110@mudshark.cambridge.arm.com>
+References: <51407120.7030709@ti.com> <51417E58.5050501@ti.com>
+ <20130315050014.GA15706@tiny-lites> <5146B972.1010002@ti.com>
+ <20130318150724.GC28585@mudshark.cambridge.arm.com> <514736D4.4070906@ti.com>
+ <20130318170649.GA29585@mudshark.cambridge.arm.com> <5148082A.3060503@ti.com>
+ <20130319102803.GB22452@mudshark.cambridge.arm.com> <515014A4.5020504@ti.com>
+ <20130325104910.GE12110@mudshark.cambridge.arm.com>
+Message-ID: <51502D29.1010307@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 25 March 2013, Barry Song wrote:
-> > -#define SIRFSOC_INTENAL_IRQ_START  0
-> > -#define SIRFSOC_INTENAL_IRQ_END    127
-> > -#define SIRFSOC_GPIO_IRQ_START     (SIRFSOC_INTENAL_IRQ_END + 1)
-> > -#define NR_IRQS      288
+On Monday 25 March 2013 04:19 PM, Will Deacon wrote:
+> On Mon, Mar 25, 2013 at 09:11:00AM +0000, Santosh Shilimkar wrote:
+>> Will,
 > 
-> after dropping NR_IRQS and enabling SPARSE_IRQ, should we add .nr_irqs
-> = 288 to MACHINE_START(ATLAS6/PRIMA2/MARCO_DT...)?
+> Hi Santosh,
 > 
+>> Are you going to send the patch for 3.9-rcx ? As I said before without the
+>> patch OMAP4 CPUILDE is unusable because of that debug noise and hence it
+>> will be good to get that patch in
+> 
+> It's in Russell's tree, so should be queued for mainline fairly soon.
+> 
+Thanks Will !!
 
-No, that's only necessary as long as we need legacy irq domains. If we
-can figure out how to get the irqchip driver to use the linear domain,
-it is not needed any more. If we move only the pinctrl domain to
-linear but leave the main irqchip as legacy, we should set .nr_irqs=128.
-
-	Arnd
+Regards
+Santosh
