@@ -1,46 +1,83 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 25 Mar 2013 18:18:04 +0000
-Subject: [PATCH 1/3] ARM: cacheflush: don't round address range up to nearest
- page
-In-Reply-To: <1364235486-17738-1-git-send-email-will.deacon@arm.com>
-References: <1364235486-17738-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1364235486-17738-2-git-send-email-will.deacon@arm.com>
+Date: Mon, 25 Mar 2013 18:18:19 +0000
+Subject: [PATCH] ARM: delay: use private ticks_per_jiffy field for timer-based
+ delay ops
+Message-ID: <1364235499-17797-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The flush_cache_user_range macro takes a pair of addresses describing
-the start and end of the virtual address range to flush. Due to an
-accidental oversight when flush_cache_range_user was introduced, the
-address range was rounded up so that the start and end addresses were
-page-aligned.
+Commit 70264367a243 ("ARM: 7653/2: do not scale loops_per_jiffy when
+using a constant delay clock") fixed a problem with our timer-based
+delay loop, where loops_per_jiffy is scaled by cpufreq yet used directly
+by the timer delay ops.
 
-For historical reference, the interesting commits in history.git are:
+This patch fixes the problem in a more elegant way by keeping a private
+ticks_per_jiffy field in the delay ops, independent of loops_per_jiffy
+and therefore not subject to scaling. The loop-based delay continues to
+use loops_per_jiffy directly, as it should.
 
-10eacf1775e1 ("[ARM] Clean up ARM cache handling interfaces (part 1)")
-71432e79b76b ("[ARM] Add flush_cache_user_page() for sys_cacheflush()")
-
-This patch removes the alignment code, reducing the amount of flushing
-required for ranges that are not an exact multiple of PAGE_SIZE.
-
-Reported-by: Jonathan Austin <jonathan.austin@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/include/asm/cacheflush.h | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ arch/arm/include/asm/delay.h | 2 +-
+ arch/arm/kernel/smp.c        | 3 ---
+ arch/arm/lib/delay.c         | 8 +++++---
+ 3 files changed, 6 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
-index e1489c5..2965ad1 100644
---- a/arch/arm/include/asm/cacheflush.h
-+++ b/arch/arm/include/asm/cacheflush.h
-@@ -268,8 +268,7 @@ extern void flush_cache_page(struct vm_area_struct *vma, unsigned long user_addr
-  * Harvard caches are synchronised for the user space address range.
-  * This is used for the ARM private sys_cacheflush system call.
-  */
--#define flush_cache_user_range(start,end) \
--	__cpuc_coherent_user_range((start) & PAGE_MASK, PAGE_ALIGN(end))
-+#define flush_cache_user_range(s,e)	__cpuc_coherent_user_range(s,e)
+diff --git a/arch/arm/include/asm/delay.h b/arch/arm/include/asm/delay.h
+index 720799f..dff714d 100644
+--- a/arch/arm/include/asm/delay.h
++++ b/arch/arm/include/asm/delay.h
+@@ -24,7 +24,7 @@ extern struct arm_delay_ops {
+ 	void (*delay)(unsigned long);
+ 	void (*const_udelay)(unsigned long);
+ 	void (*udelay)(unsigned long);
+-	bool const_clock;
++	unsigned long ticks_per_jiffy;
+ } arm_delay_ops;
  
- /*
-  * Perform necessary cache operations to ensure that data previously
+ #define __delay(n)		arm_delay_ops.delay(n)
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 79078ed..1f2cccc 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -673,9 +673,6 @@ static int cpufreq_callback(struct notifier_block *nb,
+ 	if (freq->flags & CPUFREQ_CONST_LOOPS)
+ 		return NOTIFY_OK;
+ 
+-	if (arm_delay_ops.const_clock)
+-		return NOTIFY_OK;
+-
+ 	if (!per_cpu(l_p_j_ref, cpu)) {
+ 		per_cpu(l_p_j_ref, cpu) =
+ 			per_cpu(cpu_data, cpu).loops_per_jiffy;
+diff --git a/arch/arm/lib/delay.c b/arch/arm/lib/delay.c
+index 6b93f6a..64dbfa5 100644
+--- a/arch/arm/lib/delay.c
++++ b/arch/arm/lib/delay.c
+@@ -58,7 +58,7 @@ static void __timer_delay(unsigned long cycles)
+ static void __timer_const_udelay(unsigned long xloops)
+ {
+ 	unsigned long long loops = xloops;
+-	loops *= loops_per_jiffy;
++	loops *= arm_delay_ops.ticks_per_jiffy;
+ 	__timer_delay(loops >> UDELAY_SHIFT);
+ }
+ 
+@@ -73,11 +73,13 @@ void __init register_current_timer_delay(const struct delay_timer *timer)
+ 		pr_info("Switching to timer-based delay loop\n");
+ 		delay_timer			= timer;
+ 		lpj_fine			= timer->freq / HZ;
+-		loops_per_jiffy			= lpj_fine;
++
++		/* cpufreq may scale loops_per_jiffy, so keep a private copy */
++		arm_delay_ops.ticks_per_jiffy	= lpj_fine;
+ 		arm_delay_ops.delay		= __timer_delay;
+ 		arm_delay_ops.const_udelay	= __timer_const_udelay;
+ 		arm_delay_ops.udelay		= __timer_udelay;
+-		arm_delay_ops.const_clock	= true;
++
+ 		delay_calibrated		= true;
+ 	} else {
+ 		pr_info("Ignoring duplicate/late registration of read_current_timer delay\n");
 -- 
 1.8.0
