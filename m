@@ -1,101 +1,70 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 25 Mar 2013 15:36:46 +0100
-Subject: [PATCH 5/6] ARM: ux500: move PRCMU functions into the CPUidle
- driver
-In-Reply-To: <201303251411.43356.arnd@arndb.de>
-References: <1363866553-15054-1-git-send-email-linus.walleij@stericsson.com>
- <51505816.1020302@linaro.org>
- <CACRpkdab+iT4m5gDtuH2vYpRQRgTyOho4=s+zj0cEDfxE5g_FQ@mail.gmail.com>
- <201303251411.43356.arnd@arndb.de>
-Message-ID: <CACRpkda=FT1cHA=2oZkNcxxB=NvGLbuKia=hHkxSzEBu07CL8g@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon, 25 Mar 2013 15:34:38 +0100
+Subject: [PATCH] ARM: at91: add Acme Systems Aria G25 board
+In-Reply-To: <51505B26.7040508@atmel.com>
+References: <1364201369-12047-1-git-send-email-nicolas.ferre@atmel.com>
+ <20130325122220.GF2001@game.jcrosoft.org>
+ <51505B26.7040508@atmel.com>
+Message-ID: <20130325143438.GB20693@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 25, 2013 at 3:11 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 25 March 2013, Linus Walleij wrote:
->> On Mon, Mar 25, 2013 at 2:58 PM, Daniel Lezcano
->> <daniel.lezcano@linaro.org> wrote:
->> > On 03/25/2013 02:44 PM, Linus Walleij wrote:
->>
->> >> Shall I put it in <linux/platform_data/arm-ux500-pm.h> or so,
->> >> with the implementation in arch/arm/mach-ux500/pm.c
->> >> or so?
->> >
->> > Wouldn't <asm/pm.h> be better ? So we can have the same header name for
->> > all the drivers, no ?
->>
->> I don't think that works with multiplatform. When building multiple
->> systems our approach is to not let any two header files have the same
->> name.
->>
->> What we did for debug macro for example was to create the <debug/*>
->> namespace, so the old <mach/debug-macro.S> is now <debug/imx.S>,
->> <debug/vt8500.h>, <debug/ux500.h> ... etc.
->>
->> So what would be needed would then rather be <pm/*> in
->> arch/arm/include/pm and under this we would create
->> <pm/ux500.h>.
->>
->> But that require Russell and Arnds/Olofs consent I think,
->> what do you guys say? Other recommendations?
->
-> I would first like to understand what contents you actually need to
-> have in the header file.
+On 15:11 Mon 25 Mar     , Nicolas Ferre wrote:
+> On 03/25/2013 01:22 PM, Jean-Christophe PLAGNIOL-VILLARD :
+> > On 09:49 Mon 25 Mar     , Nicolas Ferre wrote:
+> >> From: Douglas Gilbert <dgilbert@interlog.com>
+> >>
+> >> Signed-off-by: Douglas Gilbert <dgilbert@interlog.com>
+> >> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> >> ---
+> >>  arch/arm/boot/dts/ariag25.dts | 168 ++++++++++++++++++++++++++++++++++++++++++
+> >>  1 file changed, 168 insertions(+)
+> >>  create mode 100644 arch/arm/boot/dts/ariag25.dts
+> >>
+> >> diff --git a/arch/arm/boot/dts/ariag25.dts b/arch/arm/boot/dts/ariag25.dts
+> >> new file mode 100644
+> >> index 0000000..d18ef50
+> >> --- /dev/null
+> >> +++ b/arch/arm/boot/dts/ariag25.dts
+> >> @@ -0,0 +1,168 @@
+> >> +/*
+> >> + * ariag25.dts - Device Tree file for Acme Systems Aria G25 (AT91SAM9G25 based)
+> >> + *
+> >> + * Copyright (C) 2013 Douglas Gilbert <dgilbert@interlog.com>,
+> >> + *                    Robert Nelson <robertcnelson@gmail.com>
+> >> + *
+> >> + * Licensed under GPLv2 or later.
+> >> + */
+> >> +/dts-v1/;
+> >> +/include/ "at91sam9g25.dtsi"
+> >> +
+> >> +/ {
+> >> +	model = "Acme Systems Aria G25";
+> >> +	compatible = "acme,ariag25", "atmel,at91sam9g25ek", "atmel,at91sam9x5ek",
+> >> +		     "atmel,at91sam9x5", "atmel,at91sam9";
+> > I doube the code is compatible with the 9g25ek
+> > 
+> > specially when you do not include it
+> 
+> Ok, I remove it.
+> 
+> >> +
+> >> +	aliases {
+> >> +		serial4 = &usart3;
+> >> +		serial5 = &uart0;
+> >> +	};
+> > you need to specify all
+> 
+> Well I do not think so: other are taken from
+> 
+> /include/ "at91sam9g25.dtsi"
+if I touch the dtsi then I break the Aria
 
-So in this case headers for the PRCMU+GIC code moving out
-of the PRCMU driver. These are the functions and the comments
-right above them:
+if you modify the alias do it on all
 
-/* This function decouple the gic from the prcmu */
-prcmu_gic_decouple()
-
-/* This function recouple the gic with the prcmu */
-prcmu_gic_recouple()
-
-/*
- * This function checks if there are pending irq on the gic. It only
- * makes sense if the gic has been decoupled before with the
- * db8500_prcmu_gic_decouple function. Disabling an interrupt only
- * disables the forwarding of the interrupt to any CPU interface. It
- * does not prevent the interrupt from changing state, for example
- * becoming pending, or active and pending if it is already
- * active. Hence, we have to check the interrupt is pending *and* is
- * active.
- */
-prcmu_gic_pending_irq()
-
-/*
- * This function checks if there are pending interrupt on the
- * prcmu which has been delegated to monitor the irqs with the
- * db8500_prcmu_copy_gic_settings function.
- */
-bool prcmu_pending_irq()
-
-/*
- * This function checks if the specified cpu is in in WFI. It's usage
- * makes sense only if the gic is decoupled with the db8500_prcmu_gic_decouple
- * function. Of course passing smp_processor_id() to this function will
- * always return false...
- */
-bool prcmu_is_cpu_in_wfi()
-
-/*
- * This function copies the gic SPI settings to the prcmu in order to
- * monitor them and abort/finish the retention/off sequence or state.
- */
-int prcmu_copy_gic_settings()
-
-This set of functions are called both for idling and suspend, i.e.
-both by the machine-specific cpuidle driver and the machine-specific
-suspend code.
-
-They are conceptually coherent functions but messing with both PRCMU
-and GIC registers, moving the responsibility of keeping track of the
-IRQs back and forth between the GIC and the PRCMU.
-
-Being able to freeze and decouple the GIC and check if a CPU is
-in WFI is a ux500-PRCMU-specific pecularity but saves us a lot of
-criss-cross IPIs when going to idle or sleep.
-
-Yours,
-Linus Walleij
+Best Regards,
+J.
+> 
+> Bye,
+> -- 
+> Nicolas Ferre
