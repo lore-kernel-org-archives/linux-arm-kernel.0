@@ -1,199 +1,69 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 25 Mar 2013 16:34:19 +0100
-Subject: [PATCH v2] mmc: mxcmmc: DT support
-Message-ID: <1364225659-29677-1-git-send-email-mpa@pengutronix.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 25 Mar 2013 10:37:21 -0500
+Subject: [PATCH 04/10] arm: zynq: Load scu baseaddress at run time
+In-Reply-To: <CAHTX3dJfvFNNuyJC54fS=NCpRxovVsxHTss8wJd_QOB2PaxL7g@mail.gmail.com>
+References: <1364219596-4954-1-git-send-email-michal.simek@xilinx.com>
+ <1364219596-4954-4-git-send-email-michal.simek@xilinx.com>
+ <515059D4.5070903@gmail.com>
+ <CAHTX3dJfvFNNuyJC54fS=NCpRxovVsxHTss8wJd_QOB2PaxL7g@mail.gmail.com>
+Message-ID: <51506F31.2080709@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding devicetree support for imx21-mmc and imx31-mmc. Based on generic
-gpio helper functions by Guennadi and generic DMA devicetree bindings.
+On 03/25/2013 09:51 AM, Michal Simek wrote:
+> Hi Rob,
+> 
+> 2013/3/25 Rob Herring <robherring2@gmail.com>:
+>> On 03/25/2013 08:53 AM, Michal Simek wrote:
+>>> Use Cortex a9 cp15 to read scu baseaddress.
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-Cc: Anatolij Gustschin <agust@denx.de>
----
+[...]
 
-Notes:
-    Changes in v2:
-    - Documentation fix
-    - Use dma_request_slave_channel instead of of_*
+>>> +static void __init scu_init(void)
+>>> +{
+>>> +     unsigned long base;
+>>> +
+>>> +     base = scu_a9_get_base();
+>>> +     zynq_cortex_a9_scu_map.pfn = __phys_to_pfn(base);
+>>> +     zynq_cortex_a9_scu_map.virtual = base;
+>>
+>> You are setting the virtual address to the physical base?
+>>
+>>> +     iotable_init(&zynq_cortex_a9_scu_map, 1);
+>>
+>> Then creating a static mapping...
+>>
+>>> +     scu_base = ioremap(base, zynq_cortex_a9_scu_map.length);
+>>
+>> And also a dynamic mapping?
+> 
+> Yes - exactly.
 
- .../devicetree/bindings/mmc/fsl-imx-mmc.txt        | 24 +++++++
- drivers/mmc/host/mxcmmc.c                          | 79 +++++++++++++++++-----
- 2 files changed, 85 insertions(+), 18 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mmc/fsl-imx-mmc.txt
+You are simply getting lucky that it works. If the physical address did
+not happen to be in the vmalloc address region, it would not work. You
+should not do this because you have an implicit requirement and the code
+will look broken to anyone that reads it.
 
-diff --git a/Documentation/devicetree/bindings/mmc/fsl-imx-mmc.txt b/Documentation/devicetree/bindings/mmc/fsl-imx-mmc.txt
-new file mode 100644
-index 0000000..db44235
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mmc/fsl-imx-mmc.txt
-@@ -0,0 +1,24 @@
-+* Freescale Secure Digital Host Controller for i.MX2/3 series
-+
-+This file documents differences to the properties defined in mmc.txt.
-+
-+Required properties:
-+- compatible : Should be "fsl,<chip>-mmc", chip can be imx21 or imx31
-+
-+Optional properties:
-+- dmas: One DMA phandle with arguments as defined by the devicetree bindings
-+	of the used DMA controller.
-+- dma-names: Has to be "rx-tx".
-+
-+Example:
-+
-+sdhci1: sdhci at 10014000 {
-+	compatible = "fsl,imx27-mmc", "fsl,imx21-mmc";
-+	reg = <0x10014000 0x1000>;
-+	interrupts = <11>;
-+	dmas = <&dma 7>;
-+	dma-names = "rx-tx";
-+	bus-width = <4>;
-+	cd-gpios = <&gpio3 29>;
-+	status = "okay";
-+};
-diff --git a/drivers/mmc/host/mxcmmc.c b/drivers/mmc/host/mxcmmc.c
-index a72936e..f477b4f 100644
---- a/drivers/mmc/host/mxcmmc.c
-+++ b/drivers/mmc/host/mxcmmc.c
-@@ -34,6 +34,10 @@
- #include <linux/regulator/consumer.h>
- #include <linux/dmaengine.h>
- #include <linux/types.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/of_dma.h>
-+#include <linux/of_gpio.h>
- 
- #include <asm/dma.h>
- #include <asm/irq.h>
-@@ -173,6 +177,19 @@ static struct platform_device_id mxcmci_devtype[] = {
- };
- MODULE_DEVICE_TABLE(platform, mxcmci_devtype);
- 
-+static const struct of_device_id mxcmci_of_match[] = {
-+	{
-+		.compatible = "fsl,imx21-mmc",
-+		.data = &mxcmci_devtype[IMX21_MMC],
-+	}, {
-+		.compatible = "fsl,imx31-mmc",
-+		.data = &mxcmci_devtype[IMX31_MMC],
-+	}, {
-+		/* sentinel */
-+	}
-+};
-+MODULE_DEVICE_TABLE(of, mxcmci_of_match);
-+
- static inline int is_imx31_mmc(struct mxcmci_host *host)
- {
- 	return host->devtype == IMX31_MMC;
-@@ -935,10 +952,15 @@ static int mxcmci_probe(struct platform_device *pdev)
- 	struct mxcmci_host *host = NULL;
- 	struct resource *iores, *r;
- 	int ret = 0, irq;
-+	bool dat3_card_detect = false;
- 	dma_cap_mask_t mask;
-+	const struct of_device_id *of_id;
-+	struct imxmmc_platform_data *pdata = pdev->dev.platform_data;
- 
- 	pr_info("i.MX SDHC driver\n");
- 
-+	of_id = of_match_device(mxcmci_of_match, &pdev->dev);
-+
- 	iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	irq = platform_get_irq(pdev, 0);
- 	if (!iores || irq < 0)
-@@ -954,8 +976,14 @@ static int mxcmci_probe(struct platform_device *pdev)
- 		goto out_release_mem;
- 	}
- 
-+	mmc_of_parse(mmc);
- 	mmc->ops = &mxcmci_ops;
--	mmc->caps = MMC_CAP_4_BIT_DATA | MMC_CAP_SDIO_IRQ;
-+
-+	/* For devicetree parsing, the bus width is read from devicetree */
-+	if (pdata)
-+		mmc->caps = MMC_CAP_4_BIT_DATA | MMC_CAP_SDIO_IRQ;
-+	else
-+		mmc->caps |= MMC_CAP_SDIO_IRQ;
- 
- 	/* MMC core transfer sizes tunable parameters */
- 	mmc->max_segs = 64;
-@@ -971,14 +999,25 @@ static int mxcmci_probe(struct platform_device *pdev)
- 		goto out_free;
- 	}
- 
-+	if (of_id) {
-+		const struct platform_device_id *id_entry = of_id->data;
-+		host->devtype = id_entry->driver_data;
-+	} else {
-+		host->devtype = pdev->id_entry->driver_data;
-+	}
- 	host->mmc = mmc;
--	host->pdata = pdev->dev.platform_data;
--	host->devtype = pdev->id_entry->driver_data;
-+	host->pdata = pdata;
- 	spin_lock_init(&host->lock);
- 
-+	if (pdata)
-+		dat3_card_detect = pdata->dat3_card_detect;
-+	else if (!(mmc->caps & MMC_CAP_NONREMOVABLE)
-+			&& !of_property_read_bool(pdev->dev.of_node, "cd-gpios"))
-+		dat3_card_detect = true;
-+
- 	mxcmci_init_ocr(host);
- 
--	if (host->pdata && host->pdata->dat3_card_detect)
-+	if (dat3_card_detect)
- 		host->default_irq_mask =
- 			INT_CARD_INSERTION_EN | INT_CARD_REMOVAL_EN;
- 	else
-@@ -1020,21 +1059,24 @@ static int mxcmci_probe(struct platform_device *pdev)
- 
- 	writel(host->default_irq_mask, host->base + MMC_REG_INT_CNTR);
- 
--	r = platform_get_resource(pdev, IORESOURCE_DMA, 0);
--	if (r) {
--		host->dmareq = r->start;
--		host->dma_data.peripheral_type = IMX_DMATYPE_SDHC;
--		host->dma_data.priority = DMA_PRIO_LOW;
--		host->dma_data.dma_request = host->dmareq;
--		dma_cap_zero(mask);
--		dma_cap_set(DMA_SLAVE, mask);
--		host->dma = dma_request_channel(mask, filter, host);
--		if (host->dma)
--			mmc->max_seg_size = dma_get_max_seg_size(
--					host->dma->device->dev);
-+	if (!host->pdata) {
-+		host->dma = dma_request_slave_channel(pdev->dev, "rx-tx");
-+	} else {
-+		r = platform_get_resource(pdev, IORESOURCE_DMA, 0);
-+		if (r) {
-+			host->dmareq = r->start;
-+			host->dma_data.peripheral_type = IMX_DMATYPE_SDHC;
-+			host->dma_data.priority = DMA_PRIO_LOW;
-+			host->dma_data.dma_request = host->dmareq;
-+			dma_cap_zero(mask);
-+			dma_cap_set(DMA_SLAVE, mask);
-+			host->dma = dma_request_channel(mask, filter, host);
-+		}
- 	}
--
--	if (!host->dma)
-+	if (host->dma)
-+		mmc->max_seg_size = dma_get_max_seg_size(
-+				host->dma->device->dev);
-+	else
- 		dev_info(mmc_dev(host->mmc), "dma not available. Using PIO\n");
- 
- 	INIT_WORK(&host->datawork, mxcmci_datawork);
-@@ -1153,6 +1195,7 @@ static struct platform_driver mxcmci_driver = {
- #ifdef CONFIG_PM
- 		.pm	= &mxcmci_pm_ops,
- #endif
-+		.of_match_table	= mxcmci_of_match,
- 	}
- };
- 
--- 
-1.8.1.5
+> I was talking to Olof about this code at ELC and he mentioned that someone
+> else might know better way how to do it.
+> 
+> It is quite a long time I played with this code.
+> I found this solution in vexpress platform (mach-vexpress/platsmp.c)
+> 
+> IRC: Static mapping is necessary to be able to access device so early.
+
+Only to read the number of cores. That's not really worth an early
+mapping. I would move to using DT to count the number of cores. Support
+for that is already in place.
+
+> On the other hand you can't use this static mapping when kernel runs
+> for that you need to use dynamic allocation.
+> Calling ioremap so early caused that the return address is the same
+> and you can just use it later. and it is also in the correct vmalloc area.
+> 
+> We are using scu_base for power management code.
+> Let me check if dynamic mapping is also required.
+
+The should be no reason you need both.
+
+Rob
