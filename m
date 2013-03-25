@@ -1,48 +1,87 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 25 Mar 2013 16:48:43 +0100
-Subject: [PATCH 5/6] ARM: ux500: move PRCMU functions into the CPUidle
- driver
-In-Reply-To: <201303251513.21361.arnd@arndb.de>
-References: <1363866553-15054-1-git-send-email-linus.walleij@stericsson.com>
- <201303251411.43356.arnd@arndb.de>
- <CACRpkda=FT1cHA=2oZkNcxxB=NvGLbuKia=hHkxSzEBu07CL8g@mail.gmail.com>
- <201303251513.21361.arnd@arndb.de>
-Message-ID: <CACRpkdYLypH+N8AQ7BQ7_Sh-Zvz057im3qR948Ofnw+F7B-O3w@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 25 Mar 2013 10:48:46 -0500
+Subject: [PATCH v2] ARM: cache-l2x0: fix masking of RTL revision numbering and
+ set_debug init
+Message-ID: <1364226526-7369-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 25, 2013 at 4:13 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 25 March 2013, Linus Walleij wrote:
->> This set of functions are called both for idling and suspend, i.e.
->> both by the machine-specific cpuidle driver and the machine-specific
->> suspend code.
->>
->> They are conceptually coherent functions but messing with both PRCMU
->> and GIC registers, moving the responsibility of keeping track of the
->> IRQs back and forth between the GIC and the PRCMU.
->>
->> Being able to freeze and decouple the GIC and check if a CPU is
->> in WFI is a ux500-PRCMU-specific pecularity but saves us a lot of
->> criss-cross IPIs when going to idle or sleep.
->
-> I still don't understand. From what I can tell, all those functions are
-> now statically declared in the cpuidle driver after your patch, so it
-> sounds like you do not need a header file for them any more, where
-> you needed one before. Which of those would you declare in a hypothetical
-> linux/pm/ux500.h header file?
+From: Rob Herring <rob.herring@calxeda.com>
 
-So the issue raised by Rickard was that his suspend code (which
-was just yesterday posted to linux-pm) is making use of the same
-functions, so they need to be shared somehow.
+Commit b8db6b8 (ARM: 7547/4: cache-l2x0: add support for Aurora L2 cache
+ctrl) moved the masking of the part ID which caused the RTL version to be
+lost. Commit 6248d06 (ARM: 7545/1: cache-l2x0: make outer_cache_fns a
+field of l2x0_of_data) changed how .set_debug is initialized. Both commits
+break commit 74ddcdb (ARM: 7608/1: l2x0: Only set .set_debug
+on PL310 r3p0 and earlier) which uses the RTL version to conditionally set
+.set_debug function pointer. Commit b8db6b8 also caused the printed cache
+ID to be missing the version information.
 
-Reference:
-http://marc.info/?l=linux-pm&m=136397049416914&w=2
+Fix this by reverting how the part number is masked so the RTL version
+info is maintained. The cache-id-part DT property does not set the RTL
+bits so masking them should have no effect. Also, re-arrange the order
+of the function pointer init so the .set_debug function can be overridden.
 
-You find that this uses the affected funtions.
+Reported-by: Paolo Pisati <paolo.pisati@canonical.com>
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Cc: Yehuda Yitschak <yehuday@marvell.com>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+v2: Add the fix related to commit 6248d06 changing the set_debug init
 
-So they are not only for idling, and there are pending
-patches for suspend making use of them, and suspend
-needs to live in the machine.
+ arch/arm/mm/cache-l2x0.c |   11 ++++-------
+ 1 file changed, 4 insertions(+), 7 deletions(-)
 
-Yours,
-Linus Walleij
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index c2f3739..c465fac 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -299,7 +299,7 @@ static void l2x0_unlock(u32 cache_id)
+ 	int lockregs;
+ 	int i;
+ 
+-	switch (cache_id) {
++	switch (cache_id & L2X0_CACHE_ID_PART_MASK) {
+ 	case L2X0_CACHE_ID_PART_L310:
+ 		lockregs = 8;
+ 		break;
+@@ -333,15 +333,14 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
+ 	if (cache_id_part_number_from_dt)
+ 		cache_id = cache_id_part_number_from_dt;
+ 	else
+-		cache_id = readl_relaxed(l2x0_base + L2X0_CACHE_ID)
+-			& L2X0_CACHE_ID_PART_MASK;
++		cache_id = readl_relaxed(l2x0_base + L2X0_CACHE_ID);
+ 	aux = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
+ 
+ 	aux &= aux_mask;
+ 	aux |= aux_val;
+ 
+ 	/* Determine the number of ways */
+-	switch (cache_id) {
++	switch (cache_id & L2X0_CACHE_ID_PART_MASK) {
+ 	case L2X0_CACHE_ID_PART_L310:
+ 		if (aux & (1 << 16))
+ 			ways = 16;
+@@ -725,7 +724,6 @@ static const struct l2x0_of_data pl310_data = {
+ 		.flush_all   = l2x0_flush_all,
+ 		.inv_all     = l2x0_inv_all,
+ 		.disable     = l2x0_disable,
+-		.set_debug   = pl310_set_debug,
+ 	},
+ };
+ 
+@@ -814,9 +812,8 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
+ 		data->save();
+ 
+ 	of_init = true;
+-	l2x0_init(l2x0_base, aux_val, aux_mask);
+-
+ 	memcpy(&outer_cache, &data->outer_cache, sizeof(outer_cache));
++	l2x0_init(l2x0_base, aux_val, aux_mask);
+ 
+ 	return 0;
+ }
+-- 
+1.7.10.4
