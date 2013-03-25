@@ -1,32 +1,160 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Mar 2013 15:13:21 +0000
-Subject: [PATCH 5/6] ARM: ux500: move PRCMU functions into the CPUidle
- driver
-In-Reply-To: <CACRpkda=FT1cHA=2oZkNcxxB=NvGLbuKia=hHkxSzEBu07CL8g@mail.gmail.com>
-References: <1363866553-15054-1-git-send-email-linus.walleij@stericsson.com>
- <201303251411.43356.arnd@arndb.de>
- <CACRpkda=FT1cHA=2oZkNcxxB=NvGLbuKia=hHkxSzEBu07CL8g@mail.gmail.com>
-Message-ID: <201303251513.21361.arnd@arndb.de>
+From: rdunlap@infradead.org (Randy Dunlap)
+Date: Mon, 25 Mar 2013 07:16:57 -0700
+Subject: [PATCH] ARM: davinci: use is IS_ENABLED macro
+In-Reply-To: <1364210495-7938-1-git-send-email-prabhakar.csengg@gmail.com>
+References: <1364210495-7938-1-git-send-email-prabhakar.csengg@gmail.com>
+Message-ID: <51505C59.1040607@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 25 March 2013, Linus Walleij wrote:
-> This set of functions are called both for idling and suspend, i.e.
-> both by the machine-specific cpuidle driver and the machine-specific
-> suspend code.
+On 03/25/13 04:21, Prabhakar lad wrote:
+> From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
 > 
-> They are conceptually coherent functions but messing with both PRCMU
-> and GIC registers, moving the responsibility of keeping track of the
-> IRQs back and forth between the GIC and the PRCMU.
+> This patches replaces #if defined() by IS_ENABLED macro, which provides
+> better readability.
 > 
-> Being able to freeze and decouple the GIC and check if a CPU is
-> in WFI is a ux500-PRCMU-specific pecularity but saves us a lot of
-> criss-cross IPIs when going to idle or sleep.
+> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> ---
+>  Note: This patch is compile tested only for davinci_all_defconfig
+>        and da8xx_omapl_defconfig.
 
-I still don't understand. From what I can tell, all those functions are
-now statically declared in the cpuidle driver after your patch, so it
-sounds like you do not need a header file for them any more, where
-you needed one before. Which of those would you declare in a hypothetical
-linux/pm/ux500.h header file?
+Source files that use IS_ENABLED() etc. should also
+#include <linux/kconfig.h>
 
-	Arnd
+Is that already done in all of these source files?
+
+
+>  arch/arm/mach-davinci/board-da830-evm.c   |    2 +-
+>  arch/arm/mach-davinci/board-da850-evm.c   |    3 +--
+>  arch/arm/mach-davinci/board-dm644x-evm.c  |    9 +++------
+>  arch/arm/mach-davinci/board-dm646x-evm.c  |    3 +--
+>  arch/arm/mach-davinci/board-neuros-osd2.c |    6 ++----
+>  arch/arm/mach-davinci/devices.c           |    2 +-
+>  arch/arm/mach-davinci/usb.c               |    2 +-
+>  7 files changed, 10 insertions(+), 17 deletions(-)
+> 
+> diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
+> index 6da25ee..68ade71 100644
+> --- a/arch/arm/mach-davinci/board-da830-evm.c
+> +++ b/arch/arm/mach-davinci/board-da830-evm.c
+> @@ -298,7 +298,7 @@ static const short da830_evm_emif25_pins[] = {
+>  	-1
+>  };
+>  
+> -#if defined(CONFIG_MMC_DAVINCI) || defined(CONFIG_MMC_DAVINCI_MODULE)
+> +#if IS_ENABLED(CONFIG_MMC_DAVINCI)
+>  #define HAS_MMC	1
+>  #else
+>  #define HAS_MMC	0
+> diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+> index c2dfe06..3475769 100644
+> --- a/arch/arm/mach-davinci/board-da850-evm.c
+> +++ b/arch/arm/mach-davinci/board-da850-evm.c
+> @@ -335,8 +335,7 @@ static const short da850_evm_nor_pins[] = {
+>  	-1
+>  };
+>  
+> -#if defined(CONFIG_MMC_DAVINCI) || \
+> -    defined(CONFIG_MMC_DAVINCI_MODULE)
+> +#if IS_ENABLED(CONFIG_MMC_DAVINCI)
+>  #define HAS_MMC 1
+>  #else
+>  #define HAS_MMC 0
+> diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
+> index 71735e7..d0f6365 100644
+> --- a/arch/arm/mach-davinci/board-dm644x-evm.c
+> +++ b/arch/arm/mach-davinci/board-dm644x-evm.c
+> @@ -750,22 +750,19 @@ static int davinci_phy_fixup(struct phy_device *phydev)
+>  	return 0;
+>  }
+>  
+> -#if defined(CONFIG_BLK_DEV_PALMCHIP_BK3710) || \
+> -    defined(CONFIG_BLK_DEV_PALMCHIP_BK3710_MODULE)
+> +#if IS_ENABLED(CONFIG_BLK_DEV_PALMCHIP_BK3710)
+>  #define HAS_ATA 1
+>  #else
+>  #define HAS_ATA 0
+>  #endif
+>  
+> -#if defined(CONFIG_MTD_PHYSMAP) || \
+> -    defined(CONFIG_MTD_PHYSMAP_MODULE)
+> +#if IS_ENABLED(CONFIG_MTD_PHYSMAP)
+>  #define HAS_NOR 1
+>  #else
+>  #define HAS_NOR 0
+>  #endif
+>  
+> -#if defined(CONFIG_MTD_NAND_DAVINCI) || \
+> -    defined(CONFIG_MTD_NAND_DAVINCI_MODULE)
+> +#if IS_ENABLED(CONFIG_MTD_NAND_DAVINCI)
+>  #define HAS_NAND 1
+>  #else
+>  #define HAS_NAND 0
+> diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
+> index de7adff..c84fdd5 100644
+> --- a/arch/arm/mach-davinci/board-dm646x-evm.c
+> +++ b/arch/arm/mach-davinci/board-dm646x-evm.c
+> @@ -117,8 +117,7 @@ static struct platform_device davinci_nand_device = {
+>  	},
+>  };
+>  
+> -#if defined(CONFIG_BLK_DEV_PALMCHIP_BK3710) || \
+> -    defined(CONFIG_BLK_DEV_PALMCHIP_BK3710_MODULE)
+> +#if IS_ENABLED(CONFIG_BLK_DEV_PALMCHIP_BK3710)
+>  #define HAS_ATA 1
+>  #else
+>  #define HAS_ATA 0
+> diff --git a/arch/arm/mach-davinci/board-neuros-osd2.c b/arch/arm/mach-davinci/board-neuros-osd2.c
+> index 1c98107..8bd0a43 100644
+> --- a/arch/arm/mach-davinci/board-neuros-osd2.c
+> +++ b/arch/arm/mach-davinci/board-neuros-osd2.c
+> @@ -168,15 +168,13 @@ static struct davinci_mmc_config davinci_ntosd2_mmc_config = {
+>  };
+>  
+>  
+> -#if defined(CONFIG_BLK_DEV_PALMCHIP_BK3710) || \
+> -	defined(CONFIG_BLK_DEV_PALMCHIP_BK3710_MODULE)
+> +#if IS_ENABLED(CONFIG_BLK_DEV_PALMCHIP_BK3710)
+>  #define HAS_ATA 1
+>  #else
+>  #define HAS_ATA 0
+>  #endif
+>  
+> -#if defined(CONFIG_MTD_NAND_DAVINCI) || \
+> -	defined(CONFIG_MTD_NAND_DAVINCI_MODULE)
+> +#if IS_ENABLED(CONFIG_MTD_NAND_DAVINCI)
+>  #define HAS_NAND 1
+>  #else
+>  #define HAS_NAND 0
+> diff --git a/arch/arm/mach-davinci/devices.c b/arch/arm/mach-davinci/devices.c
+> index 4c48a36..df135de 100644
+> --- a/arch/arm/mach-davinci/devices.c
+> +++ b/arch/arm/mach-davinci/devices.c
+> @@ -119,7 +119,7 @@ void __init davinci_init_ide(void)
+>  	platform_device_register(&ide_device);
+>  }
+>  
+> -#if	defined(CONFIG_MMC_DAVINCI) || defined(CONFIG_MMC_DAVINCI_MODULE)
+> +#if IS_ENABLED(CONFIG_MMC_DAVINCI)
+>  
+>  static u64 mmcsd0_dma_mask = DMA_BIT_MASK(32);
+>  
+> diff --git a/arch/arm/mach-davinci/usb.c b/arch/arm/mach-davinci/usb.c
+> index 34509ff..5764d65 100644
+> --- a/arch/arm/mach-davinci/usb.c
+> +++ b/arch/arm/mach-davinci/usb.c
+> @@ -17,7 +17,7 @@
+>  #define DA8XX_USB0_BASE 	0x01e00000
+>  #define DA8XX_USB1_BASE 	0x01e25000
+>  
+> -#if defined(CONFIG_USB_MUSB_HDRC) || defined(CONFIG_USB_MUSB_HDRC_MODULE)
+> +#if IS_ENABLED(CONFIG_USB_MUSB_HDRC)
+>  static struct musb_hdrc_eps_bits musb_eps[] = {
+>  	{ "ep1_tx", 8, },
+>  	{ "ep1_rx", 8, },
+> 
+
+
+-- 
+~Randy
