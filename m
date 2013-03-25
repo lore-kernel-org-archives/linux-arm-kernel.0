@@ -1,65 +1,32 @@
-From: Frank.Li@freescale.com (Frank Li)
-Date: Mon, 25 Mar 2013 09:03:42 +0800
-Subject: [PATCH 1/1 net-next] net: fec: build fec.c and fec_ptp.c to one module
-Message-ID: <1364173422-7865-1-git-send-email-Frank.Li@freescale.com>
+From: anton@enomsg.org (Anton Vorontsov)
+Date: Sun, 24 Mar 2013 20:09:35 -0700
+Subject: [PATCH 6/9] power: pm2301_charger: remove __devinit annotations
+In-Reply-To: <CACRpkdZ0mYeNVQ16CkV_S-tO3p2PPd5cgEjiCNQskh4YXkBHjw@mail.gmail.com>
+References: <1363866553-15054-1-git-send-email-linus.walleij@stericsson.com>
+ <1363902674-6456-1-git-send-email-arnd@arndb.de>
+ <1363902674-6456-7-git-send-email-arnd@arndb.de>
+ <CACRpkdZ0mYeNVQ16CkV_S-tO3p2PPd5cgEjiCNQskh4YXkBHjw@mail.gmail.com>
+Message-ID: <20130325030934.GA12979@lizard>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-fec_ptp.ko can't run individually
-rename fec.c to fec_main.c
-Build fec.o and fec_ptp.o into one fec.ko
-Remove unnessary EXPORT_SYMBOL in fec_ptp
+On Fri, Mar 22, 2013 at 01:14:55PM +0100, Linus Walleij wrote:
+> On Thu, Mar 21, 2013 at 10:51 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> 
+> > These got missed in the treewide changes because they came in through
+> > a new branch, and it now breaks allmodconfig builds.
+> >
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> Anton can you pick this fix directly to the power subsystem
+> tree?
 
-Signed-off-by: Frank Li <Frank.Li@freescale.com>
----
- drivers/net/ethernet/freescale/Makefile            |    3 ++-
- .../net/ethernet/freescale/{fec.c => fec_main.c}   |    0
- drivers/net/ethernet/freescale/fec_ptp.c           |    3 ---
- 3 files changed, 2 insertions(+), 4 deletions(-)
- rename drivers/net/ethernet/freescale/{fec.c => fec_main.c} (100%)
+It appears that Lars-Peter Clausen sent a similar patch a bit earlier. I
+added Arnd's Signed-off-by to give a credit, though. So, it is in
+battery-urgent now.
 
-diff --git a/drivers/net/ethernet/freescale/Makefile b/drivers/net/ethernet/freescale/Makefile
-index b7d58fe..549ce13 100644
---- a/drivers/net/ethernet/freescale/Makefile
-+++ b/drivers/net/ethernet/freescale/Makefile
-@@ -2,7 +2,8 @@
- # Makefile for the Freescale network device drivers.
- #
- 
--obj-$(CONFIG_FEC) += fec.o fec_ptp.o
-+obj-$(CONFIG_FEC) += fec.o
-+fec-objs :=fec_main.o fec_ptp.o
- obj-$(CONFIG_FEC_MPC52xx) += fec_mpc52xx.o
- ifeq ($(CONFIG_FEC_MPC52xx_MDIO),y)
- 	obj-$(CONFIG_FEC_MPC52xx) += fec_mpc52xx_phy.o
-diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec_main.c
-similarity index 100%
-rename from drivers/net/ethernet/freescale/fec.c
-rename to drivers/net/ethernet/freescale/fec_main.c
-diff --git a/drivers/net/ethernet/freescale/fec_ptp.c b/drivers/net/ethernet/freescale/fec_ptp.c
-index 0d8df40..1f17ca0 100644
---- a/drivers/net/ethernet/freescale/fec_ptp.c
-+++ b/drivers/net/ethernet/freescale/fec_ptp.c
-@@ -128,7 +128,6 @@ void fec_ptp_start_cyclecounter(struct net_device *ndev)
- 
- 	spin_unlock_irqrestore(&fep->tmreg_lock, flags);
- }
--EXPORT_SYMBOL(fec_ptp_start_cyclecounter);
- 
- /**
-  * fec_ptp_adjfreq - adjust ptp cycle frequency
-@@ -319,7 +318,6 @@ int fec_ptp_ioctl(struct net_device *ndev, struct ifreq *ifr, int cmd)
- 	return copy_to_user(ifr->ifr_data, &config, sizeof(config)) ?
- 	    -EFAULT : 0;
- }
--EXPORT_SYMBOL(fec_ptp_ioctl);
- 
- /**
-  * fec_time_keep - call timecounter_read every second to avoid timer overrun
-@@ -385,4 +383,3 @@ void fec_ptp_init(struct net_device *ndev, struct platform_device *pdev)
- 		pr_info("registered PHC device on %s\n", ndev->name);
- 	}
- }
--EXPORT_SYMBOL(fec_ptp_init);
--- 
-1.7.1
+Thanks!
+
+Anton
