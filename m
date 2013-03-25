@@ -1,42 +1,65 @@
-From: andrew.murray@arm.com (Andrew Murray)
-Date: Mon, 25 Mar 2013 10:21:06 +0000
-Subject: [PATCH 1/6] of/pci: Provide support for parsing PCI DT ranges
- property
-In-Reply-To: <20130323143704.5da5d20c@skate>
-References: <00c001ce277b$92b26ab0$b8174010$%han@samsung.com>
- <20130323104156.GL4977@n2100.arm.linux.org.uk>
- <20130323143704.5da5d20c@skate>
-Message-ID: <20130325102106.GA20770@arm.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Mon, 25 Mar 2013 18:22:46 +0800
+Subject: [PATCH 7/8] ARM: sirf: enable multiplatform support
+In-Reply-To: <1363779679-16880-8-git-send-email-arnd@arndb.de>
+References: <1363779679-16880-1-git-send-email-arnd@arndb.de>
+ <1363779679-16880-8-git-send-email-arnd@arndb.de>
+Message-ID: <CAGsJ_4ySCncEh8_03B_CXBuS=h-N=CN5LezVRGoMhME78YPaWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 23, 2013 at 01:37:04PM +0000, Thomas Petazzoni wrote:
-> 
-> On Sat, 23 Mar 2013 10:41:56 +0000, Russell King - ARM Linux wrote:
-> 
-> > Please look at how IORESOURCE_* stuff is defined:
-> > #define IORESOURCE_TYPE_BITS    0x00001f00      /* Resource type */
-> > #define IORESOURCE_IO           0x00000100      /* PCI/ISA I/O ports */
-> > #define IORESOURCE_MEM          0x00000200
-> > #define IORESOURCE_REG          0x00000300      /* Register offsets */
-> > #define IORESOURCE_IRQ          0x00000400
-> > #define IORESOURCE_DMA          0x00000800
-> > #define IORESOURCE_BUS          0x00001000
-> > 
-> > Notice that it's not an array of bits.
-> > 
-> > So this should be:
-> > 		if ((iter.flags & IORESOURCE_TYPE_BITS) == IORESOURCE_IO) {
-> 
-> What I've done for the Marvell PCIe driver is:
-> 
-> +	for_each_of_pci_range(&iter, np) {
-> +		unsigned long restype = iter.flags & IORESOURCE_TYPE_BITS;
-> +		if (restype == IORESOURCE_IO) {
-> [...]
-> +		if (restype == IORESOURCE_MEM) {
-> [...]
+> diff --git a/arch/arm/mach-prima2/include/mach/uncompress.h
+> b/arch/arm/mach-prima2/include/mach/uncompress.h
+> deleted file mode 100644
+> index d1513a3..0000000
+> --- a/arch/arm/mach-prima2/include/mach/uncompress.h
+> +++ /dev/null
+> @@ -1,41 +0,0 @@
+> -/*
+> - * arch/arm/mach-prima2/include/mach/uncompress.h
+> - *
+> - * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group
+> company.
+> - *
+> - * Licensed under GPLv2 or later.
+> - */
+> -
+> -#ifndef __ASM_ARCH_UNCOMPRESS_H
+> -#define __ASM_ARCH_UNCOMPRESS_H
+> -
+> -#include <linux/io.h>
+> -#include <mach/hardware.h>
+> -#include <mach/uart.h>
+> -
+> -void arch_decomp_setup(void)
+> -{
+> -}
+> -
+> -static __inline__ void putc(char c)
+> -{
+> -	/*
+> -	 * during kernel decompression, all mappings are flat:
+> -	 *  virt_addr == phys_addr
+> -	 */
+> -	if (!SIRFSOC_UART1_PA_BASE)
+> -		return;
+> -
+> -	while (__raw_readl((void __iomem *)SIRFSOC_UART1_PA_BASE +
+> SIRFSOC_UART_TXFIFO_STATUS)
+> -		& SIRFSOC_UART1_TXFIFO_FULL)
+> -		barrier();
+> -
+> -	__raw_writel(c, (void __iomem *)SIRFSOC_UART1_PA_BASE +
+> SIRFSOC_UART_TXFIFO_DATA);
+> -}
+> -
+> -static inline void flush(void)
+> -{
+> -}
+> -
+> -#endif
 
-OK I'll update this patch and also include Thierry's suggestions.
+will this mean we will don't support "uncompress ..." printed in the
+early uncompress stage before lluart work?
 
-Andrew Murray
+-barry
