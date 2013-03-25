@@ -1,73 +1,66 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 25 Mar 2013 15:35:05 +0530
-Subject: [PATCH v2 13/18] ARM: OMAP: CPUidle: Unregister drivere on device
- registration failure
-In-Reply-To: <1364205910-32392-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1364205910-32392-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1364205910-32392-14-git-send-email-santosh.shilimkar@ti.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Mon, 25 Mar 2013 18:08:14 +0800
+Subject: [PATCH 1/8] pinctrl: sirf: convert to linear irq domain
+In-Reply-To: <201303250933.16921.arnd@arndb.de>
+References: <1363779679-16880-1-git-send-email-arnd@arndb.de>
+ <1363779679-16880-2-git-send-email-arnd@arndb.de>
+ <CAGsJ_4wR8UaSZ6NVANw3CTj+w6=41oxJRkffaJhOh4HBW8e3zg@mail.gmail.com>
+ <201303250933.16921.arnd@arndb.de>
+Message-ID: <CAGsJ_4y74yphbxerqWsF8Xs_5cH5BxPOy3djF5jqY0oRAiW6ng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the CPUidle device registration fails for some reason, we should
-unregister the driver on error path.
+2013/3/25, Arnd Bergmann <arnd@arndb.de>:
+> On Monday 25 March 2013, Barry Song wrote:
+>> > @@ -1770,9 +1767,8 @@ static int sirfsoc_gpio_probe(struct device_node
+>> > *np)
+>> >                         goto out;
+>> >                 }
+>> >
+>> > -               bank->domain = irq_domain_add_legacy(np,
+>> > SIRFSOC_GPIO_BANK_SIZE,
+>> > -                       SIRFSOC_GPIO_IRQ_START + i *
+>> > SIRFSOC_GPIO_BANK_SIZE, 0,
+>> > -                       &sirfsoc_gpio_irq_simple_ops, bank);
+>> > +               bank->domain = irq_domain_add_linear(np,
+>> > SIRFSOC_GPIO_BANK_SIZE,
+>> > +
+>> > &sirfsoc_gpio_irq_simple_ops, bank);
+>>
+>> this line breaks the gpio/irq mapping and gpio irq_domain:
+>>
+>>        printk("%s gpio_to_irq: %d %d %d\n", __func__,
+>>                gpio_to_irq(0), gpio_to_irq(32), gpio_to_irq(65));
+>>
+>> result:
+>> sdhci_sirf_probe gpio_to_irq: 0 0 0
+>>
+>> for the old codes, it works:
+>> sdhci_sirf_probe gpio_to_irq: 128 160 193
+>
+> Does it work if you add the hunk below?
+>
+> I think the problem is that with irq_domain_add_linear, we don't create
+> a mapping for all the interrupts right away.
+>
+> 	Arnd
+>
+> diff --git a/drivers/pinctrl/pinctrl-sirf.c
+> b/drivers/pinctrl/pinctrl-sirf.c
+> index d02498b..5f031ca 100644
+> --- a/drivers/pinctrl/pinctrl-sirf.c
+> +++ b/drivers/pinctrl/pinctrl-sirf.c
+> @@ -1347,7 +1347,7 @@ static inline int sirfsoc_gpio_to_irq(struct gpio_chip
+> *chip, unsigned offset)
+>  	struct sirfsoc_gpio_bank *bank = container_of(to_of_mm_gpio_chip(chip),
+>  		struct sirfsoc_gpio_bank, chip);
+>
+> -	return irq_find_mapping(bank->domain, offset);
+> +	return irq_create_mapping(bank->domain, offset);
 
-Fix the code accordingly. Also when at it, check of the driver registration
-failure too.
+yes. this one works now. the only problem is
+drivers/irqchip/irq-sirfsoc.c  still fails by irq_domain_add_linear().
+the old irq_domain_add_legacy() works for
+drivers/irqchip/irq-sirfsoc.c.
 
-Acked-by: Nishanth Menon <nm@ti.com>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- arch/arm/mach-omap2/cpuidle34xx.c |    6 +++++-
- arch/arm/mach-omap2/cpuidle44xx.c |    6 +++++-
- 2 files changed, 10 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
-index 06f567f..e193ea2 100644
---- a/arch/arm/mach-omap2/cpuidle34xx.c
-+++ b/arch/arm/mach-omap2/cpuidle34xx.c
-@@ -355,7 +355,10 @@ int __init omap3_idle_init(void)
- 	if (!mpu_pd || !core_pd || !per_pd || !cam_pd)
- 		return -ENODEV;
- 
--	cpuidle_register_driver(&omap3_idle_driver);
-+	if (cpuidle_register_driver(&omap3_idle_driver)) {
-+		pr_err("%s: CPUidle driver register failed\n", __func__);
-+		return -EIO;
-+	}
- 
- 	dev = &per_cpu(omap3_idle_dev, smp_processor_id());
- 	dev->cpu = 0;
-@@ -363,6 +366,7 @@ int __init omap3_idle_init(void)
- 	if (cpuidle_register_device(dev)) {
- 		printk(KERN_ERR "%s: CPUidle register device failed\n",
- 		       __func__);
-+		cpuidle_unregister_driver(&omap3_idle_driver);
- 		return -EIO;
- 	}
- 
-diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle44xx.c
-index d00b1ec..908114d 100644
---- a/arch/arm/mach-omap2/cpuidle44xx.c
-+++ b/arch/arm/mach-omap2/cpuidle44xx.c
-@@ -233,7 +233,10 @@ int __init omap4_idle_init(void)
- 	/* Configure the broadcast timer on each cpu */
- 	on_each_cpu(omap_setup_broadcast_timer, NULL, 1);
- 
--	cpuidle_register_driver(&omap4_idle_driver);
-+	if (cpuidle_register_driver(&omap4_idle_driver)) {
-+		pr_err("%s: CPUidle driver register failed\n", __func__);
-+		return -EIO;
-+	}
- 
- 	for_each_cpu(cpu_id, cpu_online_mask) {
- 		dev = &per_cpu(omap4_idle_dev, cpu_id);
-@@ -243,6 +246,7 @@ int __init omap4_idle_init(void)
- #endif
- 		if (cpuidle_register_device(dev)) {
- 			pr_err("%s: CPUidle register failed\n", __func__);
-+			cpuidle_unregister_driver(&omap4_idle_driver);
- 			return -EIO;
- 		}
- 	}
--- 
-1.7.9.5
+-barry
