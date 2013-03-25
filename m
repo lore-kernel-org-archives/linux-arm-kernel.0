@@ -1,104 +1,75 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 25 Mar 2013 15:34:57 +0530
-Subject: [PATCH v2 05/18] ARM: OMAP5: PM: Enables ES2 PM mode by default
+Date: Mon, 25 Mar 2013 15:34:59 +0530
+Subject: [PATCH v2 07/18] ARM: OMAP5: Add init_late() hook to enable pm
+ initialization
 In-Reply-To: <1364205910-32392-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1364205910-32392-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1364205910-32392-6-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1364205910-32392-8-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enables MPUSS ES2 power management mode using ES2_PM_MODE in
-AMBA_IF_MODE register.
-
-0x0: ES1 behavior, CPU cores would enter and exit OFF mode together. Broken
-0x1: ES2 behavior, CPU cores are allowed to enter/exit OFF mode independently.
-
-The AMBA_IF_MODE register value is stored on SAR RAM and restored by
-ROM code.
+With consolidated code, now we can add the .init_late hook for
+OMAP5 to enable power management and mux initialization.
 
 Acked-by: Nishanth Menon <nm@ti.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/mach-omap2/omap-secure.h    |    2 ++
- arch/arm/mach-omap2/omap-wakeupgen.c |   19 +++++++++++++++++++
- arch/arm/mach-omap2/omap-wakeupgen.h |    1 +
- 3 files changed, 22 insertions(+)
+ arch/arm/mach-omap2/board-generic.c |    1 +
+ arch/arm/mach-omap2/common.h        |    3 ++-
+ arch/arm/mach-omap2/io.c            |    8 ++++++++
+ 3 files changed, 11 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-omap2/omap-secure.h b/arch/arm/mach-omap2/omap-secure.h
-index 0e72917..82b3c4c 100644
---- a/arch/arm/mach-omap2/omap-secure.h
-+++ b/arch/arm/mach-omap2/omap-secure.h
-@@ -42,6 +42,8 @@
- #define OMAP4_MON_L2X0_AUXCTRL_INDEX	0x109
- #define OMAP4_MON_L2X0_PREFETCH_INDEX	0x113
+diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+index e54a480..8e261a6 100644
+--- a/arch/arm/mach-omap2/board-generic.c
++++ b/arch/arm/mach-omap2/board-generic.c
+@@ -180,6 +180,7 @@ DT_MACHINE_START(OMAP5_DT, "Generic OMAP5 (Flattened Device Tree)")
+ 	.init_irq	= omap_gic_of_init,
+ 	.init_machine	= omap_generic_init,
+ 	.init_time	= omap5_realtime_timer_init,
++	.init_late	= omap5_init_late,
+ 	.dt_compat	= omap5_boards_compat,
+ 	.restart	= omap44xx_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+index 40f4a03..f75d972 100644
+--- a/arch/arm/mach-omap2/common.h
++++ b/arch/arm/mach-omap2/common.h
+@@ -59,7 +59,7 @@ static inline int omap3_pm_init(void)
+ }
+ #endif
  
-+#define OMAP5_MON_AMBA_IF_INDEX		0x108
+-#if defined(CONFIG_PM) && defined(CONFIG_ARCH_OMAP4)
++#if defined(CONFIG_PM) && (defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5))
+ int omap4_pm_init(void);
+ #else
+ static inline int omap4_pm_init(void)
+@@ -108,6 +108,7 @@ void omap35xx_init_late(void);
+ void omap3630_init_late(void);
+ void am35xx_init_late(void);
+ void ti81xx_init_late(void);
++void omap5_init_late(void);
+ int omap2_common_pm_late_init(void);
+ 
+ #if defined(CONFIG_SOC_OMAP2420) || defined(CONFIG_SOC_OMAP2430)
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index e948a39..cdd1264 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -636,6 +636,14 @@ void __init omap5_init_early(void)
+ 	omap_hwmod_init_postsetup();
+ 
+ }
 +
- /* Secure PPA(Primary Protected Application) APIs */
- #define OMAP4_PPA_L2_POR_INDEX		0x23
- #define OMAP4_PPA_CPU_ACTRL_SMP_INDEX	0x25
-diff --git a/arch/arm/mach-omap2/omap-wakeupgen.c b/arch/arm/mach-omap2/omap-wakeupgen.c
-index f8bb3b9..8bcaa8c 100644
---- a/arch/arm/mach-omap2/omap-wakeupgen.c
-+++ b/arch/arm/mach-omap2/omap-wakeupgen.c
-@@ -42,6 +42,7 @@
- #define CPU1_ID			0x1
- #define OMAP4_NR_BANKS		4
- #define OMAP4_NR_IRQS		128
-+#define OMAP5_AMBA_IF_PM_MODE	(1 << 5)
++void __init omap5_init_late(void)
++{
++	omap_mux_late_init();
++	omap2_common_pm_late_init();
++	omap4_pm_init();
++	omap2_clk_enable_autoidle_all();
++}
+ #endif
  
- static void __iomem *wakeupgen_base;
- static void __iomem *sar_base;
-@@ -265,6 +266,11 @@ static inline void omap5_irq_save_context(void)
- 	val = __raw_readl(wakeupgen_base + OMAP_AUX_CORE_BOOT_0);
- 	__raw_writel(val, sar_base + OMAP5_AUXCOREBOOT1_OFFSET);
- 
-+	/* Save AMBA_IF_PM_MODE regsiter */
-+	val = __raw_readl(wakeupgen_base + OMAP_AMBA_IF_MODE);
-+	val |= OMAP5_AMBA_IF_PM_MODE;
-+	__raw_writel(val, sar_base + OMAP5_AMBA_IF_MODE_OFFSET);
-+
- 	/* Set the Backup Bit Mask status */
- 	val = __raw_readl(sar_base + OMAP5_SAR_BACKUP_STATUS_OFFSET);
- 	val |= SAR_BACKUP_STATUS_WAKEUPGEN;
-@@ -402,6 +408,7 @@ int __init omap_wakeupgen_init(void)
- {
- 	int i;
- 	unsigned int boot_cpu = smp_processor_id();
-+	u32 val;
- 
- 	/* Not supported on OMAP4 ES1.0 silicon */
- 	if (omap_rev() == OMAP4430_REV_ES1_0) {
-@@ -443,6 +450,18 @@ int __init omap_wakeupgen_init(void)
- 	for (i = 0; i < max_irqs; i++)
- 		irq_target_cpu[i] = boot_cpu;
- 
-+	/*
-+	 * Enables OMAP5 ES2 PM Mode using ES2_PM_MODE in AMBA_IF_MODE
-+	 * 0x0:	ES1 behavior, CPU cores would enter and exit OFF mode together.
-+	 * 0x1:	ES2 behavior, CPU cores are allowed to enter/exit OFF mode
-+	 * independently.
-+	 */
-+	if (soc_is_omap54xx()) {
-+		val = __raw_readl(wakeupgen_base + OMAP_AMBA_IF_MODE);
-+		val |= OMAP5_AMBA_IF_PM_MODE;
-+		omap_smc1(OMAP5_MON_AMBA_IF_INDEX, val);
-+	}
-+
- 	irq_hotplug_init();
- 	irq_pm_init();
- 
-diff --git a/arch/arm/mach-omap2/omap-wakeupgen.h b/arch/arm/mach-omap2/omap-wakeupgen.h
-index b0fd16f..b3c8ecc 100644
---- a/arch/arm/mach-omap2/omap-wakeupgen.h
-+++ b/arch/arm/mach-omap2/omap-wakeupgen.h
-@@ -27,6 +27,7 @@
- #define OMAP_WKG_ENB_E_1			0x420
- #define OMAP_AUX_CORE_BOOT_0			0x800
- #define OMAP_AUX_CORE_BOOT_1			0x804
-+#define OMAP_AMBA_IF_MODE			0x80c
- #define OMAP_PTMSYNCREQ_MASK			0xc00
- #define OMAP_PTMSYNCREQ_EN			0xc04
- #define OMAP_TIMESTAMPCYCLELO			0xc08
+ void __init omap_sdrc_init(struct omap_sdrc_params *sdrc_cs0,
 -- 
 1.7.9.5
