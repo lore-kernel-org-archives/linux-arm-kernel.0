@@ -1,62 +1,95 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 25 Mar 2013 18:55:25 +0100
-Subject: [PATCH 00/15] ARM: cpuidle: code consolidation
-Message-ID: <1364234140-514-1-git-send-email-daniel.lezcano@linaro.org>
+Date: Mon, 25 Mar 2013 18:55:26 +0100
+Subject: [PATCH 01/15] timer: move enum definition out of ifdef section
+In-Reply-To: <1364234140-514-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1364234140-514-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1364234140-514-2-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The flag CPUIDLE_FLAG_TIMER_STOP has been introduced in the commit
-89878baa73f0f1c679355006bd8632e5d78f96c2.
+The next patch will setup automatically the broadcast timer for
+the different cpuidle driver when one idle state stops its timer.
+This will be part of the generic code.
 
-The flag tells the cpuidle framework the local timer will stop in the
-idle state.
+But some ARM boards, like s3c64xx, uses cpuidle but without the
+CONFIG_GENERIC_CLOCKEVENTS_BUILD set. Hence the cpuidle framework
+will be compiled with the code supposed to be generic, that is
+with clockevents_notify and the different enum, but will fail to
+compile because the enum is not defined.
 
-It is now easy to know if the cpuidle driver will use or not the broadcast
-timer by looking at the different states for this flag and then setup
-the broadcast timer consequently.
+Also the function clockevents_notify is a noop macro, this is fine
+except the usual code is:
 
-When we remove the timer initialization duplicated code in the different
-drivers, we have most of the drivers with the same init function. This
-init function is changed to be generic and moved in the ARM cpuidle driver
-and used from the drivers. That cleanups code and removes a lot of annoying
-duplicated code.
+	int cpu = smp_processor_id();
+	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ON, &cpu);
 
-There is still some modification in OMAP4, tegra2, tegra3 and imx, especially
-around the coupled idle states, but we are more and more closer to a common
-squeleton for all the ARM drivers.
+and that raises a warning telling the variable 'cpu' is not used.
 
-Daniel Lezcano (15):
-  timer: move enum definition out of ifdef section
-  cpuidle: initialize the broadcast timer framework
-  cpuidle: ux500: remove timer broadcast initialization
-  cpuidle: OMAP4: remove timer broadcast initialization
-  cpuidle: imx6: remove timer broadcast initialization
-  ARM: cpuidle: remove useless declaration
-  ARM: cpuidle: add init/exit routine
-  ARM: ux500: cpuidle: use init/exit common routine
-  ARM: at91: cpuidle: use init/exit common routine
-  ARM: OMAP3: cpuidle: use init/exit common routine
-  ARM: s3c64xx: cpuidle: use init/exit common routine
-  ARM: tegra1: cpuidle: use init/exit common routine
-  ARM: shmobile: pm: fix init sections
-  ARM: shmobile: cpuidle: remove useless WFI function
-  ARM: shmobile: cpuidle: use init/exit common routine
+Move the clock_event_nofitiers enum definition out of the
+CONFIG_GENERIC_CLOCKEVENTS_BUILD section to prevent a compilation
+error when these are used in the code.
 
- arch/arm/include/asm/cpuidle.h         |   11 +++---
- arch/arm/kernel/cpuidle.c              |   57 +++++++++++++++++++++++++++++++-
- arch/arm/mach-at91/cpuidle.c           |   17 ++--------
- arch/arm/mach-imx/cpuidle-imx6q.c      |   15 ---------
- arch/arm/mach-omap2/cpuidle34xx.c      |   18 ++--------
- arch/arm/mach-omap2/cpuidle44xx.c      |   14 --------
- arch/arm/mach-s3c64xx/cpuidle.c        |   15 ++-------
- arch/arm/mach-shmobile/cpuidle.c       |   22 ++----------
- arch/arm/mach-shmobile/pm-sh7372.c     |    4 +--
- arch/arm/mach-tegra/cpuidle-tegra114.c |   27 +--------------
- arch/arm/mach-ux500/cpuidle.c          |   50 +---------------------------
- drivers/cpuidle/driver.c               |   35 ++++++++++++++++++--
- include/linux/clockchips.h             |   22 ++++++------
- include/linux/cpuidle.h                |    2 ++
- 14 files changed, 120 insertions(+), 189 deletions(-)
+Change the clockevents_notify macro to a static inline noop function
+to prevent a compilation warning.
 
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+---
+ include/linux/clockchips.h |   22 +++++++++++-----------
+ 1 file changed, 11 insertions(+), 11 deletions(-)
+
+diff --git a/include/linux/clockchips.h b/include/linux/clockchips.h
+index 6634652..ba661e9 100644
+--- a/include/linux/clockchips.h
++++ b/include/linux/clockchips.h
+@@ -8,15 +8,6 @@
+ #ifndef _LINUX_CLOCKCHIPS_H
+ #define _LINUX_CLOCKCHIPS_H
+ 
+-#ifdef CONFIG_GENERIC_CLOCKEVENTS_BUILD
+-
+-#include <linux/clocksource.h>
+-#include <linux/cpumask.h>
+-#include <linux/ktime.h>
+-#include <linux/notifier.h>
+-
+-struct clock_event_device;
+-
+ /* Clock event mode commands */
+ enum clock_event_mode {
+ 	CLOCK_EVT_MODE_UNUSED = 0,
+@@ -40,6 +31,15 @@ enum clock_event_nofitiers {
+ 	CLOCK_EVT_NOTIFY_CPU_DEAD,
+ };
+ 
++#ifdef CONFIG_GENERIC_CLOCKEVENTS_BUILD
++
++#include <linux/clocksource.h>
++#include <linux/cpumask.h>
++#include <linux/ktime.h>
++#include <linux/notifier.h>
++
++struct clock_event_device;
++
+ /*
+  * Clock event features
+  */
+@@ -173,7 +173,7 @@ extern int tick_receive_broadcast(void);
+ #ifdef CONFIG_GENERIC_CLOCKEVENTS
+ extern void clockevents_notify(unsigned long reason, void *arg);
+ #else
+-# define clockevents_notify(reason, arg) do { } while (0)
++static inline void clockevents_notify(unsigned long reason, void *arg) {}
+ #endif
+ 
+ #else /* CONFIG_GENERIC_CLOCKEVENTS_BUILD */
+@@ -181,7 +181,7 @@ extern void clockevents_notify(unsigned long reason, void *arg);
+ static inline void clockevents_suspend(void) {}
+ static inline void clockevents_resume(void) {}
+ 
+-#define clockevents_notify(reason, arg) do { } while (0)
++static inline void clockevents_notify(unsigned long reason, void *arg) {}
+ 
+ #endif
+ 
 -- 
 1.7.9.5
