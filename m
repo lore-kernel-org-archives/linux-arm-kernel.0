@@ -1,44 +1,67 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Tue, 26 Mar 2013 13:46:38 +0100
-Subject: [RFC PATCH v3 3/6] sched: pack small tasks
-In-Reply-To: <1363955155-18382-4-git-send-email-vincent.guittot@linaro.org>
-References: <1363955155-18382-1-git-send-email-vincent.guittot@linaro.org>
- <1363955155-18382-4-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <1364301998.5053.17.camel@laptop>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Tue, 26 Mar 2013 13:46:55 +0100
+Subject: [PATCH 1/3] ARM: zynq: read scu base from SoC
+In-Reply-To: <CAHTX3dKoPfY=qHzsiVkESkEyiWpCT4xkimRqFoQHmye66w_qEA@mail.gmail.com>
+References: <1364043450-18700-1-git-send-email-s.trumtrar@pengutronix.de>
+ <1364043450-18700-2-git-send-email-s.trumtrar@pengutronix.de>
+ <CAHTX3dK30HZxJXcNjwVqgqW_Qqag=26PEFWra6r7H6JGnpPHXQ@mail.gmail.com>
+ <20130325142533.GB27739@pengutronix.de>
+ <CAHTX3d+619gU64e-fxi5PLmjnmO6kNEJN4o5tFbbxZ-ccw+HtQ@mail.gmail.com>
+ <20130326110819.GA32647@pengutronix.de>
+ <CAHTX3dKoPfY=qHzsiVkESkEyiWpCT4xkimRqFoQHmye66w_qEA@mail.gmail.com>
+Message-ID: <20130326124655.GB32647@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-03-22 at 13:25 +0100, Vincent Guittot wrote:
-> During the creation of sched_domain, we define a pack buddy CPU for
-> each CPU
-> when one is available. We want to pack at all levels where a group of
-> CPU can
-> be power gated independently from others.
-> On a system that can't power gate a group of CPUs independently, the
-> flag is
-> set at all sched_domain level and the buddy is set to -1. This is the
-> default
-> behavior.
-> On a dual clusters / dual cores system which can power gate each core
-> and
-> cluster independently, the buddy configuration will be :
+Hi Michal!
+
+On Tue, Mar 26, 2013 at 01:35:31PM +0100, Michal Simek wrote:
+> >> Hi Steffen,
+> >> I haven't started with it but yes, I would like to do this change too.
+> >> IRC: The original post was done by John Linn and it has to go through
+> >> Russel I think.
+> >> EP107 was emulating platform and none is using it right now.
+> >> Also I hope we have removed all PSS prefix from all files.
+> >> It was caused because we didn't know what will be commercial name for
+> >> this product.
+> >>
+> >
+> > Okay, I'm confused now. What/Where is the official for-next branch for
+> > Zynq? MAINTAINERS says arch/arm/mach-zynq goes via
+> >         git://git.xilinx.com/linux-xlnx.git
+> > But the arm-next branch in there is behind mainline.
 > 
->       | Cluster 0   | Cluster 1   |
->       | CPU0 | CPU1 | CPU2 | CPU3 |
-> -----------------------------------
-> buddy | CPU0 | CPU0 | CPU0 | CPU2 |
+> That's correct. All reviewed patches go to this branch.
+> Currently there are just old patches which were already merged via
+> arm-soc tree to mainline to v3.9
+> because we don't have new patches. I will add there all patches which
+> we are discussing right now.
+> Also this branch is merged to linux-next.
+> 
+> > Are the patches collected in arm-soc/for-next instead?
+> 
+> No. I am asking Arnd and Olof for merging that branch above.
+> 
+> > If I'm doing this patch I need to have the correct base for it.
+> 
+> Give me some time. I am incorporating all changes from your series and
+> other comments to v2 which I will send.
+> 
 
-I suppose this is adequate for the 'small' systems you currently have;
-but given that Samsung is already bragging with its 'octo'-core Exynos
-5 (4+4 big-little thing) does this solution scale?
+Very good. That is what I was expecting, but as you mentioned Russel,
+I got confused, as he doesn't care for such stuff.
 
-Isn't this basically related to picking the NO_HZ cpu; if the system
-isn't fully symmetric with its power gates you want the NO_HZ cpu to be
-the 'special' cpu. If it is symmetric we really don't care which core
-is left 'running' and we can even select a new pack cpu from the idle
-cores once the old one is fully utilized.
+> I will also add your Signed-off-by lines to that patches.
+> I hope that you are ok with it. Let me know if not.
+> 
 
-Re-using (or integrating) with NO_HZ has the dual advantage that you'll
-make NO_HZ do the right thing for big-little (you typically want a
-little core to be the one staying 'awake' and once someone makes NO_HZ
-scale this all gets to scale along with it.
+I'm definitely okay with that.
+
+Regards,
+Steffen
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
