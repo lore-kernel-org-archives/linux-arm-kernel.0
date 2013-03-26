@@ -1,97 +1,117 @@
-From: prasanna.ps@samsung.com (Prasanna Kumar)
-Date: Tue, 26 Mar 2013 10:12:15 +0530
-Subject: [PATCH] arm:exynos5250: Restore CLK_SRC_TOP3 register via CCF
-Message-ID: <1364272935-30607-1-git-send-email-prasanna.ps@samsung.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 26 Mar 2013 10:09:53 +0530
+Subject: [PATCH 02/15] cpuidle: initialize the broadcast timer framework
+In-Reply-To: <1364234140-514-3-git-send-email-daniel.lezcano@linaro.org>
+References: <1364234140-514-1-git-send-email-daniel.lezcano@linaro.org>
+ <1364234140-514-3-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <51512699.2050609@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Prasanna Kumar <prasanna.ps@samsung.com>
+On Monday 25 March 2013 11:25 PM, Daniel Lezcano wrote:
+> The commit 89878baa73f0f1c679355006bd8632e5d78f96c2 introduced
+> the CPUIDLE_FLAG_TIMER_STOP flag where we specify a specific idle
+> state stops the local timer.
+> 
+> Now use this flag to check at init time if one state will need
+> the broadcast timer and, in this case, setup the broadcast timer
+> framework. That prevents multiple code duplication in the drivers.
+> 
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> ---
+>  drivers/cpuidle/driver.c |   35 +++++++++++++++++++++++++++++++++--
+>  include/linux/cpuidle.h  |    2 ++
+>  2 files changed, 35 insertions(+), 2 deletions(-)
+> 
+Make sense. Minor comments.
 
-This patch adds support for restoring CLK_SRC_TOP3 register
-which gets modified while powergating corresponding power domains
-after a cycle of Suspend-to-Resume.
+> diff --git a/drivers/cpuidle/driver.c b/drivers/cpuidle/driver.c
+> index 422c7b6..476ce0c 100644
+> --- a/drivers/cpuidle/driver.c
+> +++ b/drivers/cpuidle/driver.c
+> @@ -11,6 +11,8 @@
+>  #include <linux/mutex.h>
+>  #include <linux/module.h>
+>  #include <linux/cpuidle.h>
+> +#include <linux/cpumask.h>
+> +#include <linux/clockchips.h>
+>  
+>  #include "cpuidle.h"
+>  
+> @@ -19,9 +21,30 @@ DEFINE_SPINLOCK(cpuidle_driver_lock);
+>  static void __cpuidle_set_cpu_driver(struct cpuidle_driver *drv, int cpu);
+>  static struct cpuidle_driver * __cpuidle_get_cpu_driver(int cpu);
+>  
+> -static void __cpuidle_driver_init(struct cpuidle_driver *drv)
+> +static void cpuidle_setup_broadcast_timer(void *arg)
+>  {
+> +	int cpu = smp_processor_id();
+> +	clockevents_notify((long)(arg), &cpu);
+> +}
+> +
+> +static void __cpuidle_driver_init(struct cpuidle_driver *drv, int cpu)
+> +{
+> +	int i;
+> +
+Un-necessary extra line..
 
-Please refer below URL to know the background of this issue.
-http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg14347.html.
-
-This is based on Common Clock Framework defined for exynos5250 and 
-patch mentioned here
-http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg16739.html
-
-Signed-off-by: Prasanna Kumar <prasanna.ps@samsung.com>
----
- arch/arm/mach-exynos/pm_domains.c |   43 +++++++++++++++++++++++++++++++++++++
- 1 files changed, 43 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
-index 9f1351d..b5ed384 100644
---- a/arch/arm/mach-exynos/pm_domains.c
-+++ b/arch/arm/mach-exynos/pm_domains.c
-@@ -21,8 +21,11 @@
- #include <linux/of_address.h>
- #include <linux/of_platform.h>
- #include <linux/sched.h>
-+#include <linux/clk.h>
-+#include <linux/clk-private.h>
- 
- #include <mach/regs-pmu.h>
-+#include <plat/cpu.h>
- #include <plat/devs.h>
- 
- /*
-@@ -35,6 +38,43 @@ struct exynos_pm_domain {
- 	struct generic_pm_domain pd;
- };
- 
-+static int exynos_pdclk_restore(struct exynos_pm_domain *domain)
-+{
-+	int i = 0;
-+	struct clk *p_clk;
-+	struct clk_hw *hw_clk;
-+	const struct clk_ops *p_ops;
-+
-+	const char *pdclks[][2] = {
-+					{ "gsc-power-domain",
-+						"m_sub_aclk266" },
-+					{ "gsc-power-domain",
-+						"m_sub_aclk300" },
-+					{ "mfc-power-domain",
-+						"m_sub_aclk333" },
-+				};
-+
-+	for (i = 0; i < ARRAY_SIZE(pdclks); i++) {
-+		if (!strcmp(domain->name, pdclks[i][0])) {
-+			p_clk = clk_get(NULL, pdclks[i][1]);
-+			if (IS_ERR(p_clk)) {
-+				pr_err("failed to get base clk\n");
-+				return PTR_ERR(p_clk);
-+			}
-+
-+			hw_clk = __clk_get_hw(p_clk);
-+			if (IS_ERR(hw_clk)) {
-+				pr_err("failed to get hw_clk\n");
-+				return PTR_ERR(hw_clk);
-+			}
-+			p_ops = p_clk->ops;
-+			if (p_ops != NULL && p_ops->set_parent != NULL)
-+				p_clk->ops->set_parent(hw_clk, 1);
-+		}
-+	}
-+	return 0;
-+}
-+
- static int exynos_pd_power(struct generic_pm_domain *domain, bool power_on)
- {
- 	struct exynos_pm_domain *pd;
-@@ -61,6 +101,9 @@ static int exynos_pd_power(struct generic_pm_domain *domain, bool power_on)
- 		cpu_relax();
- 		usleep_range(80, 100);
- 	}
-+
-+	if (!power_on && soc_is_exynos5250())
-+		exynos_pdclk_restore(pd);
- 	return 0;
- }
- 
--- 
-1.7.5.4
+>  	drv->refcnt = 0;
+> +
+> +	for (i = drv->state_count - 1; i >= 0 ; i--) {
+> +
+here as well
+> +		if (!(drv->states[i].flags & CPUIDLE_FLAG_TIMER_STOP))
+> +			continue;
+> +
+> +		drv->bctimer = 1;
+> +
+ditto
+> +		on_each_cpu_mask(get_cpu_mask(cpu), cpuidle_setup_broadcast_timer,
+> +				 (void *)CLOCK_EVT_NOTIFY_BROADCAST_ON, 1);
+> +
+ditto
+> +		break;
+> +	}
+>  }
+>  
+>  static int __cpuidle_register_driver(struct cpuidle_driver *drv, int cpu)
+> @@ -35,7 +58,7 @@ static int __cpuidle_register_driver(struct cpuidle_driver *drv, int cpu)
+>  	if (__cpuidle_get_cpu_driver(cpu))
+>  		return -EBUSY;
+>  
+> -	__cpuidle_driver_init(drv);
+> +	__cpuidle_driver_init(drv, cpu);
+>  
+>  	__cpuidle_set_cpu_driver(drv, cpu);
+>  
+> @@ -49,6 +72,14 @@ static void __cpuidle_unregister_driver(struct cpuidle_driver *drv, int cpu)
+>  
+>  	if (!WARN_ON(drv->refcnt > 0))
+>  		__cpuidle_set_cpu_driver(NULL, cpu);
+> +
+> +	if (drv->bctimer) {
+> +
+> +		drv->bctimer = 0;
+> +
+> +
+no need of extra line here
+		on_each_cpu_mask(get_cpu_mask(cpu), cpuidle_setup_broadcast_timer,
+> +				 (void *)CLOCK_EVT_NOTIFY_BROADCAST_OFF, 1);
+> +	}
+>  }
+>  
+>  #ifdef CONFIG_CPU_IDLE_MULTIPLE_DRIVERS
+> diff --git a/include/linux/cpuidle.h b/include/linux/cpuidle.h
+> index a837b33..fc3e580 100644
+> --- a/include/linux/cpuidle.h
+> +++ b/include/linux/cpuidle.h
+> @@ -107,6 +107,8 @@ struct cpuidle_driver {
+>  
+>  	/* set to 1 to use the core cpuidle time keeping (for all states). */
+>  	unsigned int		en_core_tk_irqen:1;
+> +        /* used by the cpuidle framework to setup the broadcast timer */
+> +	unsigned int            bctimer:1;
+>  	/* states array must be ordered in decreasing power consumption */
+>  	struct cpuidle_state	states[CPUIDLE_STATE_MAX];
+>  	int			state_count;
+> 
