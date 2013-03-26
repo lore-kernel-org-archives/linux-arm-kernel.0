@@ -1,48 +1,41 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 26 Mar 2013 15:04:44 +0000
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 26 Mar 2013 15:09:02 +0000
 Subject: [PATCH v2 6/6] [RFC] arm: use PSCI if available
-In-Reply-To: <1364308875-26484-6-git-send-email-stefano.stabellini@eu.citrix.com>
+In-Reply-To: <201303261458.55183.arnd@arndb.de>
 References: <alpine.DEB.2.02.1303261423530.4430@kaball.uk.xensource.com>
  <1364308875-26484-6-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <20130326150444.GI20252@mudshark.cambridge.arm.com>
+ <201303261458.55183.arnd@arndb.de>
+Message-ID: <alpine.DEB.2.02.1303261508370.4430@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefano,
-
-On Tue, Mar 26, 2013 at 02:41:15PM +0000, Stefano Stabellini wrote:
-> Check for the presence of PSCI before setting smp_ops, use PSCI if it is
-> available.
+On Tue, 26 Mar 2013, Arnd Bergmann wrote:
+> On Tuesday 26 March 2013, Stefano Stabellini wrote:
+> > Check for the presence of PSCI before setting smp_ops, use PSCI if it is
+> > available.
+> > 
+> > This is useful because at least when running on Xen it's possible to have a
+> > PSCI node for example on a Versatile Express or an Exynos5 machine. In these
+> > cases the PSCI SMP calls should be the ones to be called.
+> > 
+> > Remove virt_smp_ops and platsmp.c from mach-virt because they aren't needed
+> > anymore.
 > 
-> This is useful because at least when running on Xen it's possible to have a
-> PSCI node for example on a Versatile Express or an Exynos5 machine. In these
-> cases the PSCI SMP calls should be the ones to be called.
+> Very nice, I had a similar idea but had not gotten around to write a patch.
+> This fits in nicely with my plans to make all fields of machine_desc optional.
 > 
-> Remove virt_smp_ops and platsmp.c from mach-virt because they aren't needed
-> anymore.
+> >  void __init smp_set_ops(struct smp_operations *ops)
+> >  {
+> > -       if (ops)
+> > +       int rc = -ENODEV;
+> > +#ifdef CONFIG_ARM_PSCI
+> > +       rc = psci_init(&smp_ops);
+> > +#endif
+> > +       if (rc && ops)
+> >                smp_ops = *ops;
+> >  };
+> 
+> Could you move this into the caller, i.e. setup_arch() so we call smp_set_ops
+> either for psci_smp_ops or for machine_desc->smp?
 
-[...]
-
-> +struct smp_operations __initdata psci_smp_ops = {
-> +	.smp_init_cpus		= psci_smp_init_cpus,
-> +	.smp_prepare_cpus	= psci_smp_prepare_cpus,
-> +	.smp_secondary_init	= psci_secondary_init,
-> +	.smp_boot_secondary	= psci_boot_secondary,
-> +};
-
-Whilst I like the idea of this, I don't think things will pan out this
-nicely in practice. There will almost always be a level of indirection
-required between the internal Linux SMP operations and the expectations of
-the PSCI firmware, whether this is in CPU numbering or other,
-platform-specific fields in various parameters.
-
-Tying these two things together like this confuses the layering in my
-opinion and will likely lead to potentially subtle breakages if platforms
-start trying to adopt this.
-
-If this can indeed work for the virtual platforms (Xen and KVM), then I
-think it would be better expressed using `virt' smp_ops, which map directly
-to PSCI, rather than putting them here. Even then, it's tying KVM and Xen
-together on the firmware side of things...
-
-Will
+Sure, I can do that.
