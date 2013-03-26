@@ -1,78 +1,138 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 26 Mar 2013 15:37:30 +0000
-Subject: [PATCH v2 6/6] [RFC] arm: use PSCI if available
-In-Reply-To: <alpine.DEB.2.02.1303261509080.4430@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1303261423530.4430@kaball.uk.xensource.com>
- <1364308875-26484-6-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130326150444.GI20252@mudshark.cambridge.arm.com>
- <alpine.DEB.2.02.1303261509080.4430@kaball.uk.xensource.com>
-Message-ID: <20130326153730.GA22368@mudshark.cambridge.arm.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 26 Mar 2013 16:38:29 +0100
+Subject: [PATCH 01/11] staging: drm/imx: Add LDB support
+In-Reply-To: <20130326153455.5a093e15@skate>
+References: <1364307246-9017-1-git-send-email-p.zabel@pengutronix.de>
+ <1364307246-9017-2-git-send-email-p.zabel@pengutronix.de>
+ <20130326153455.5a093e15@skate>
+Message-ID: <1364312309.4085.16.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 26, 2013 at 03:25:55PM +0000, Stefano Stabellini wrote:
-> On Tue, 26 Mar 2013, Will Deacon wrote:
-> > On Tue, Mar 26, 2013 at 02:41:15PM +0000, Stefano Stabellini wrote:
-> > > +struct smp_operations __initdata psci_smp_ops = {
-> > > +	.smp_init_cpus		= psci_smp_init_cpus,
-> > > +	.smp_prepare_cpus	= psci_smp_prepare_cpus,
-> > > +	.smp_secondary_init	= psci_secondary_init,
-> > > +	.smp_boot_secondary	= psci_boot_secondary,
-> > > +};
-> > 
-> > Whilst I like the idea of this, I don't think things will pan out this
-> > nicely in practice. There will almost always be a level of indirection
-> > required between the internal Linux SMP operations and the expectations of
-> > the PSCI firmware, whether this is in CPU numbering or other,
-> > platform-specific fields in various parameters.
-> > 
-> > Tying these two things together like this confuses the layering in my
-> > opinion and will likely lead to potentially subtle breakages if platforms
-> > start trying to adopt this.
+Hi Thomas,
+
+Am Dienstag, den 26.03.2013, 15:34 +0100 schrieb Thomas Petazzoni:
+> Dear Philipp Zabel,
 > 
-> What you are saying is that psci could either be used directly, like we
-> are doing, or it could just be the base of some higher level platform
-> specific smp_ops.
+> On Tue, 26 Mar 2013 15:13:56 +0100, Philipp Zabel wrote:
 > 
-> Honestly I think that psci is already high level enough that I would
-> worry if somebody started to wrap it around something else.
-
-I don't agree. PSCI is a low-level firmware interface, which will naturally
-have implementation-specific parts to it. For example, many of the CPU power
-functions have platform-specific state ID parameters which we can't just
-ignore. Furthermore, the method by which a CPU is identified needn't match
-the value in our logical map. The purpose of the PSCI code in Linux is to
-provide a basic abstraction on top of this interface, so that platforms can
-incorporate them into higher-level power management functions, which
-themselves might be plumbed into smp_operations structures.
-
-> However we still support that use case just fine:  they can just avoid
-> having a psci node on device tree and just keep using their machine
-> specific smp_ops. It's up to them really.
-
-Why get rid of the node? That's there to initialise the PSCI backend
-accordingly and shouldn't have anything to do with SMP.
-
-> They can even base the implementation of their smp_ops on the current
-> psci code, in order to facilitate that I could get rid of psci_ops
-> (which initialization is based on device tree) and export the psci_cpu_*
-> functions instead, so that they can be called directly by other smp_ops.
-
-Again, I think this destroys the layering. The whole point is that the PSCI
-functions are called from within something that understands precisely how to
-talk to the firmware and what it is capable of.
-
-> > If this can indeed work for the virtual platforms (Xen and KVM), then I
-> > think it would be better expressed using `virt' smp_ops, which map directly
-> > to PSCI, rather than putting them here. Even then, it's tying KVM and Xen
-> > together on the firmware side of things...
+> > +/*
+> > + * For a device declaring compatible = "fsl,imx6q-ldb", "fsl,imx53-ldb",
+> > + * of_match_device will walk through this list and take the first entry
+> > + * matching any of its compatible values. Therefore, the more generic
+> > + * entries (in this case fsl,imx53-ldb) need to be ordered last.
+> > + */
+> > +static const struct of_device_id imx_ldb_dt_ids[] = {
+> > +	{ .compatible = "fsl,imx6q-ldb", .data = imx6q_lvds_mux, },
+> > +	{ .compatible = "fsl,imx53-ldb", .data = NULL, },
+> > +	{ }
+> > +};
 > 
-> Keep in mind that dom0 on Xen boots as a native machine (versatile
-> express or exynos5 for example) with a Xen hypervisor node on it.  We
-> would need to find a way to override the default machine smp_ops with
-> a set of xen_smp_ops early at boot.
-> I don't like this option very much, I think is fragile.
+> You probably want a new DT binding documentation in
+> Documentation/devicetree/bindings/.
 
-Why can't dom0 use whatever smp ops the native machine would use?
+Yes, this could be something along the lines of:
 
-Will
+Device-Tree bindings for LVDS Display Bridge (ldb)
+
+LVDS Display Bridge
+===================
+
+The LVDS Display Bridge device tree node contains up to two lvds-channel
+nodes describing each of the two LVDS encoder channels of the bridge.
+
+Required properties:
+ - #address-cells : should be <1>
+ - #size-cells : should be <0>
+ - compatible : should be "fsl,imx53-ldb" or "fsl,imx6q-ldb".
+                Both LDB versions are similar, but i.MX6 has an additional
+                multiplexer in the front to select any of the four IPU display
+                interfaces as input.
+ - gpr : should be <&gpr> on i.MX53 and i.MX6q.
+         The phandle points to the iomuxc-gpr region containing the LVDS
+         control register.
+ - clocks : phandles pointing to the LDB display interface clocks, LDB source
+            selector clocks
+- clocks, clock-names : phandles to the LDB divider and selector clocks and to
+                        the display interface selector clocks, as described in
+                        Documentation/devicetree/bindings/clock/clock-bindings.txt
+	The following clocks are expected on i.MX53:
+		"di0_pll" - LDB LVDS channel 0 mux
+		"di1_pll" - LDB LVDS channel 1 mux
+		"di0" - LDB LVDS channel 0 gate
+		"di1" - LDB LVDS channel 1 gate
+		"di0_sel" - IPU1 DI0 mux
+		"di1_sel" - IPU1 DI1 mux
+	On i.MX6q the following additional clocks are needed:
+		"di2_sel" - IPU2 DI0 mux
+		"di3_sel" - IPU2 DI1 mux
+	The needed clock numbers for each are documented in
+	Documentation/devicetree/bindings/clock/imx5-clock.txt, and in
+	Documentation/devicetree/bindings/clock/imx6q-clock.txt.
+
+Optional properties:
+ - pinctrl-names : should be "default" on i.MX53, not used on i.MX6q
+ - pinctrl-0 : should be <&pinctrl_lvds1_1> on i.MX53, not used on i.MX6q
+ - fsl,dual-channel : boolean. if it exists, only LVDS channel 0 should
+   be configured - one input will be distributed on both outputs in dual
+   channel mode
+
+LVDS Channel
+============
+
+Each LVDS Channel has to contain a display-timings node that describes the
+video timings for the connected LVDS display. For detailed information,
+have a look at Documentation/devicetree/bindings/video/display-timing.txt.
+
+Required properties:
+ - reg : should be <0> or <1>
+ - crtcs : a list of phandles with index pointing to the IPU display interfaces
+           that can be used as video source for this channel.
+ - fsl,data-mapping : should be "spwg" or "jeida"
+                      This describes how the color bits are laid out in the
+                      serialized LVDS signal.
+ - fsl,data-width : should be <18> or <24>
+
+Example:
+
+        gpr: iomuxc-gpr at 53fa8000 {
+                /* ... */
+        };
+
+        ldb: ldb at 53fa8008 {
+                #address-cells = <1>;
+                #size-cells = <0>;
+                compatible = "fsl,imx53-ldb";
+                gpr = <&gpr>;
+                clocks = <&clks 122>, <&clks 120>,
+                         <&clks 115>, <&clks 116>,
+                         <&clks 123>, <&clks 85>;
+                clock-names = "di0_pll", "di1_pll",
+                              "di0_sel", "di1_sel",
+                              "di0", "di1";
+
+                lvds-channel at 0 {
+                        reg = <0>;
+                        crtcs = <&ipu 0>;
+                        fsl,data-mapping = "spwg";
+                        fsl,data-width = <24>;
+
+                        display-timings {
+                                /* ... */
+                        };
+                };
+
+                lvds-channel at 1 {
+                        reg = <1>;
+                        crtcs = <&ipu 1>;
+                        fsl,data-mapping = "spwg";
+                        fsl,data-width = <24>;
+
+                        display-timings {
+                                /* ... */
+                        };
+                };
+        };
+
+thanks
+Philipp
