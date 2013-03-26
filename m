@@ -1,28 +1,18 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 26 Mar 2013 20:50:12 +0000
-Subject: [PATCHv6 10/17] arm: mvebu: add PCIe Device Tree informations for
- Armada 370
-In-Reply-To: <20130326201654.GA7109@avionic-0098.mockup.avionic-design.de>
-References: <1364314719-1049-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130326163421.GA30255@obsidianresearch.com>
- <20130326201654.GA7109@avionic-0098.mockup.avionic-design.de>
-Message-ID: <201303262050.12847.arnd@arndb.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 26 Mar 2013 14:54:04 -0600
+Subject: [PATCH] ARM: tegra: enable Tegra114 in defconfig,
+ rebuild defconfig
+In-Reply-To: <1364330887-6039-1-git-send-email-swarren@wwwdotorg.org>
+References: <1364330887-6039-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <51520AEC.4000207@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 26 March 2013, Thierry Reding wrote:
->                 pci at 1,0 {
->                         device_type = "pci";
->                         assigned-addresses = <0x82000800 0 0x80000000 0 0x1000>;
->                         reg = <0x000800 0 0 0 0>;
->                         status = "disabled";
+On 03/26/2013 02:48 PM, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
 > 
->                         #address-cells = <3>;
->                         #size-cells = <2>;
-> 
->                         nvidia,num-lanes = <2>;
->                 };
+> This enables CONFIG_ARCH_TEGRA_114_SOC, and rebuilds tegra_defconfig
+> based on v3.9-rc1. Hence, some other changes are includes, due to moved,
+> removed, or now-default options.
 
-Shouldn't there be an empty ranges property in there as well?
-
-	Arnd
+I have squashed this into Tegra's for-3.10/defconfig branch.
