@@ -1,43 +1,47 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 26 Mar 2013 14:41:14 +0000
-Subject: [PATCH v2 5/6] xenvm: add a simple PSCI node and a second cpu
+Date: Tue, 26 Mar 2013 14:41:12 +0000
+Subject: [PATCH v2 3/6] xen: move the xenvm machine to mach-virt
 In-Reply-To: <alpine.DEB.2.02.1303261423530.4430@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1303261423530.4430@kaball.uk.xensource.com>
-Message-ID: <1364308875-26484-5-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1364308875-26484-3-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-CC: rob.herring at calxeda.com
-CC: will.deacon at arm.com
-CC: marc.zyngier at arm.com
-CC: arnd at arndb.de
----
- arch/arm/boot/dts/xenvm-4.2.dts |   12 ++++++++++++
- 1 files changed, 12 insertions(+), 0 deletions(-)
+xenvm is based on mach-vexpress, move it to mach-virt.
 
-diff --git a/arch/arm/boot/dts/xenvm-4.2.dts b/arch/arm/boot/dts/xenvm-4.2.dts
-index 7a2cf30..66efd22 100644
---- a/arch/arm/boot/dts/xenvm-4.2.dts
-+++ b/arch/arm/boot/dts/xenvm-4.2.dts
-@@ -29,6 +29,18 @@
- 			compatible = "arm,cortex-a15";
- 			reg = <0>;
- 		};
-+
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <1>;
-+		};
-+	};
-+
-+	psci {
-+		compatible      = "arm,psci";
-+		method          = "hvc";
-+		cpu_on          = <2>;
- 	};
+Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+CC: will.deacon at arm.com
+CC: arnd at arndb.de
+CC: rob.herring at calxeda.com
+---
+ arch/arm/mach-vexpress/v2m.c |    1 -
+ arch/arm/mach-virt/virt.c    |    1 +
+ 2 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
+index 915683c..c43ec78 100644
+--- a/arch/arm/mach-vexpress/v2m.c
++++ b/arch/arm/mach-vexpress/v2m.c
+@@ -469,7 +469,6 @@ static void __init v2m_dt_init(void)
  
- 	memory at 80000000 {
+ static const char * const v2m_dt_match[] __initconst = {
+ 	"arm,vexpress",
+-	"xen,xenvm",
+ 	NULL,
+ };
+ 
+diff --git a/arch/arm/mach-virt/virt.c b/arch/arm/mach-virt/virt.c
+index 31666f6..528c05e 100644
+--- a/arch/arm/mach-virt/virt.c
++++ b/arch/arm/mach-virt/virt.c
+@@ -40,6 +40,7 @@ static void __init virt_timer_init(void)
+ 
+ static const char *virt_dt_match[] = {
+ 	"linux,dummy-virt",
++	"xen,xenvm",
+ 	NULL
+ };
+ 
 -- 
 1.7.2.5
