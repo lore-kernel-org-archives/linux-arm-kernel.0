@@ -1,156 +1,42 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 26 Mar 2013 13:48:31 +0800
-Subject: [PATCH V5 6/9] ARM: mxs: Provide regulator to pwm-backlight
-In-Reply-To: <1364260913-25490-7-git-send-email-achew@nvidia.com>
-References: <1364260913-25490-1-git-send-email-achew@nvidia.com>
- <1364260913-25490-7-git-send-email-achew@nvidia.com>
-Message-ID: <20130326054830.GD5148@S2101-09.ap.freescale.net>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Mon, 25 Mar 2013 23:17:06 -0700 (PDT)
+Subject: [PATCH 0/1] ARM: shmobile: r8a73a4 thermal support
+In-Reply-To: <20130326013414.11796.9937.sendpatchset@w520>
+References: <20130326013414.11796.9937.sendpatchset@w520>
+Message-ID: <87mwtqit29.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 25, 2013 at 06:21:50PM -0700, Andrew Chew wrote:
-> The pwm-backlight driver now takes a mandatory regulator that is gotten
-> during driver probe.  Initialize a dummy regulator to satisfy this
-> requirement.
-> 
-> Signed-off-by: Andrew Chew <achew@nvidia.com>
-> Acked-by: Alexandre Courbot <acourbot@nvidia.com>
-> ---
-> Moved backlight power regulator into top-level regulators node.
-> 
->  arch/arm/boot/dts/imx23-evk.dts      |  6 ++++++
->  arch/arm/boot/dts/imx28-apf28dev.dts |  6 ++++++
->  arch/arm/boot/dts/imx28-cfa10049.dts |  6 ++++++
->  arch/arm/boot/dts/imx28-evk.dts      |  6 ++++++
->  arch/arm/boot/dts/imx28-tx28.dts     | 11 +++++++++++
->  5 files changed, 35 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx23-evk.dts b/arch/arm/boot/dts/imx23-evk.dts
-> index 035c13f..ce5048e 100644
-> --- a/arch/arm/boot/dts/imx23-evk.dts
-> +++ b/arch/arm/boot/dts/imx23-evk.dts
-> @@ -95,6 +95,11 @@
->  			regulator-max-microvolt = <3300000>;
->  			gpio = <&gpio1 29 0>;
->  		};
-> +
-> +		reg_backlight_power: fixed-regulator {
 
-What I meant is the node name "fixed-regulator" is too generic.  But it
-shouldn't an issue right away, and we can fix that later.
+Hi Simon, Magnus
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+This patch add thermal driver support on r8a73a4.
 
-> +			compatible = "regulator-fixed";
-> +			regulator-name = "backlight-power";
-> +	        };
->  	};
->  
->  	backlight {
-> @@ -102,5 +107,6 @@
->  		pwms = <&pwm 2 5000000>;
->  		brightness-levels = <0 4 8 16 32 64 128 255>;
->  		default-brightness-level = <6>;
-> +		power-supply = <&reg_backlight_power>;
->  	};
->  };
-> diff --git a/arch/arm/boot/dts/imx28-apf28dev.dts b/arch/arm/boot/dts/imx28-apf28dev.dts
-> index 6d8865b..e354dc5 100644
-> --- a/arch/arm/boot/dts/imx28-apf28dev.dts
-> +++ b/arch/arm/boot/dts/imx28-apf28dev.dts
-> @@ -132,6 +132,11 @@
->  			regulator-max-microvolt = <5000000>;
->  			gpio = <&gpio1 23 1>;
->  		};
-> +
-> +		reg_backlight_power: fixed-regulator {
-> +			compatible = "regulator-fixed";
-> +			regulator-name = "backlight-power";
-> +		};
->  	};
->  
->  	leds {
-> @@ -150,5 +155,6 @@
->  		pwms = <&pwm 3 191000>;
->  		brightness-levels = <0 4 8 16 32 64 128 255>;
->  		default-brightness-level = <6>;
-> +		power-supply = <&reg_backlight_power>;
->  	};
->  };
-> diff --git a/arch/arm/boot/dts/imx28-cfa10049.dts b/arch/arm/boot/dts/imx28-cfa10049.dts
-> index a0d3e9f..a6eddd6 100644
-> --- a/arch/arm/boot/dts/imx28-cfa10049.dts
-> +++ b/arch/arm/boot/dts/imx28-cfa10049.dts
-> @@ -205,6 +205,11 @@
->  			regulator-max-microvolt = <5000000>;
->  			gpio = <&gpio0 7 1>;
->  		};
-> +
-> +		reg_backlight_power: fixed-regulator {
-> +			compatible = "regulator-fixed";
-> +			regulator-name = "backlight-power";
-> +		};
->  	};
->  
->  	ahb at 80080000 {
-> @@ -304,5 +309,6 @@
->  		pwms = <&pwm 3 5000000>;
->  		brightness-levels = <0 4 8 16 32 64 128 255>;
->  		default-brightness-level = <6>;
-> +		power-supply = <&reg_backlight_power>;
->  	};
->  };
-> diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
-> index 2da316e..7ba7216 100644
-> --- a/arch/arm/boot/dts/imx28-evk.dts
-> +++ b/arch/arm/boot/dts/imx28-evk.dts
-> @@ -285,6 +285,11 @@
->  			gpio = <&gpio3 8 0>;
->  			enable-active-high;
->  		};
-> +
-> +		reg_backlight_power: fixed-regulator {
-> +			compatible = "regulator-fixed";
-> +			regulator-name = "backlight-power";
-> +		};
->  	};
->  
->  	sound {
-> @@ -312,5 +317,6 @@
->  		pwms = <&pwm 2 5000000>;
->  		brightness-levels = <0 4 8 16 32 64 128 255>;
->  		default-brightness-level = <6>;
-> +		power-supply = <&reg_backlight_power>;
->  	};
->  };
-> diff --git a/arch/arm/boot/dts/imx28-tx28.dts b/arch/arm/boot/dts/imx28-tx28.dts
-> index 37be532..7fa5a44 100644
-> --- a/arch/arm/boot/dts/imx28-tx28.dts
-> +++ b/arch/arm/boot/dts/imx28-tx28.dts
-> @@ -97,6 +97,16 @@
->  		};
->  	};
->  
-> +	regulators {
-> +		compatible = "simple-bus";
-> +
-> +		reg_backlight_power: fixed-regulator {
-> +			compatible = "regulator-fixed";
-> +			regulator-name = "backlight-power";
-> +		};
-> +	};
-> +
-> +
->  	leds {
->  		compatible = "gpio-leds";
->  
-> @@ -112,5 +122,6 @@
->  		pwms = <&pwm 0 5000000>;
->  		brightness-levels = <0 4 8 16 32 64 128 255>;
->  		default-brightness-level = <6>;
-> +		power-supply = <&reg_backlight_power>;
->  	};
->  };
-> -- 
-> 1.8.1.5
-> 
+> ARM: shmobile: r8a73a4 SoC support V3
+> [PATCH 01/04] ARM: shmobile: Initial r8a73a4 SoC support V3
+> [PATCH 02/04] ARM: shmobile: r8a73a4 SCIF support V3
+> [PATCH 03/04] ARM: shmobile: r8a73a4 IRQC support V2
+> [PATCH 04/04] ARM: shmobile: r8a73a4 PFC support
+
+This patch is based on...
+
+simon/next branch
+
+And, Magnus's
+    ARM: shmobile: r8a73a4 SoC support V3
+    sh-pfc: Initial r8a73a4 PFC support
+    ARM: shmobile: r8a73a4 APE6EVM board support V2
+
+And, Zhang's (= PM ML)
+
+f0e68fc3caf677e834f7bd0f601800e686b56c98
+(thermal: rcar: fix missing unlock on error in rcar_thermal_update_temp())
+
+fb84d9907f0ff0e3f7d70d55039ddf0f78d2a472
+(thermal: rcar_thermal: propagate return value of thermal_zone_device_register)
+
+And, my previous
+      thermal: rcar: tidyup registration failure case
+      thermal: rcar: add pm_runtime_xxx() support
+
+Simon, please let me know if you need my help
