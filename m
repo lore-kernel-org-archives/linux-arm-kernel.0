@@ -1,42 +1,54 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 26 Mar 2013 10:34:57 -0700
-Subject: [PATCHv2] ARM: Push selects for TWD/SCU into machine entries
-In-Reply-To: <5144C8DC.9010104@codeaurora.org>
-References: <1362007694-3419-1-git-send-email-sboyd@codeaurora.org>
- <512E9A39.3070207@wwwdotorg.org> <51354E35.1080804@codeaurora.org>
- <201303052234.32723.arnd@arndb.de> <5144C8DC.9010104@codeaurora.org>
-Message-ID: <5151DC41.7090307@codeaurora.org>
+Date: Tue, 26 Mar 2013 10:35:49 -0700
+Subject: [PATCH] ARM: sched_clock: Add more notrace to prevent recursion
+In-Reply-To: <514B483F.7000304@codeaurora.org>
+References: <1363306086-23501-1-git-send-email-sboyd@codeaurora.org>
+ <514B483F.7000304@codeaurora.org>
+Message-ID: <5151DC75.7030606@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/16/13 12:32, Stephen Boyd wrote:
-> On 3/5/2013 2:34 PM, Arnd Bergmann wrote:
->> On Tuesday 05 March 2013, Stephen Boyd wrote:
->>> On 02/27/13 15:43, Stephen Warren wrote:
->>>> Seems simple enough it doesn't really need many, but for Tegra,
->>>> Acked-by: Stephen Warren <swarren@nvidia.com>
->>>>
->>>> Which kernel is this going into? It's possible Tegra will get converted
->>>> to multi-platform in 3.10, which might move that main ARCH_TEGRA block
->>>> from arch/arm/Kconfig into arch/arm/mach-tegra/Kconfig, although I
->>>> suppose it doesn't have to move it. I think some/all(?) other
->>>> multi-platform conversions have moved their main Kconfig option like
->>>> that though.
->>> Thanks. I'm hoping that Arnd/Olof can pick this up. I'm not sure which
->>> version it will go into.
->>>
->> Hmm, it certainly looks useful to me. I think it should go into the next
->> cleanup branch as a base, so others can build on top of it. We will
->> also need it for the Exynos multiplatform patches that I hope can land
->> in 3.10 as well.
->>
->> Sneaking it in through the fixes branch would make life easier for us,
->> but it doesn't feel right.
-> Arnd, can you pick this up into the arm-soc tree now? It would be good
-> to get this into next so that conflicts are avoided later on.
->
+On 03/21/13 10:49, Stephen Boyd wrote:
+> On 03/14/13 17:08, Stephen Boyd wrote:
+>> cyc_to_sched_clock() is called by sched_clock() and cyc_to_ns()
+>> is called by cyc_to_sched_clock(). I suspect that some compilers
+>> inline both of these functions into sched_clock() and so we've
+>> been getting away without having a notrace marking. It seems that
+>> my compiler isn't inlining cyc_to_sched_clock() though, so I'm
+>> hitting a recursion bug when I enable the function graph tracer,
+>> causing my system to crash. Marking these functions notrace fixes
+>> it. Technically cyc_to_ns() doesn't need the notrace because it's
+>> already marked inline, but let's just add it so that if we ever
+>> remove inline from that function it doesn't blow up.
+> Anyone else seeing this problem?
 
-Arnd?
+Russell, should I put this into the patch tracker?
+
+>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>> ---
+>>  arch/arm/kernel/sched_clock.c | 4 ++--
+>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/kernel/sched_clock.c b/arch/arm/kernel/sched_clock.c
+>> index bd6f56b..59d2adb 100644
+>> --- a/arch/arm/kernel/sched_clock.c
+>> +++ b/arch/arm/kernel/sched_clock.c
+>> @@ -45,12 +45,12 @@ static u32 notrace jiffy_sched_clock_read(void)
+>>  
+>>  static u32 __read_mostly (*read_sched_clock)(void) = jiffy_sched_clock_read;
+>>  
+>> -static inline u64 cyc_to_ns(u64 cyc, u32 mult, u32 shift)
+>> +static inline u64 notrace cyc_to_ns(u64 cyc, u32 mult, u32 shift)
+>>  {
+>>  	return (cyc * mult) >> shift;
+>>  }
+>>  
+>> -static unsigned long long cyc_to_sched_clock(u32 cyc, u32 mask)
+>> +static unsigned long long notrace cyc_to_sched_clock(u32 cyc, u32 mask)
+>>  {
+>>  	u64 epoch_ns;
+>>  	u32 epoch_cyc;
+
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
