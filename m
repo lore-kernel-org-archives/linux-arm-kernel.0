@@ -1,38 +1,54 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 26 Mar 2013 15:13:55 +0100
-Subject: [PATCH 0/11] LVDS Display Bridge support for i.MX
-Message-ID: <1364307246-9017-1-git-send-email-p.zabel@pengutronix.de>
+Date: Tue, 26 Mar 2013 15:14:05 +0100
+Subject: [PATCH 10/11] ARM i.MX53: Add LDB device to device tree
+In-Reply-To: <1364307246-9017-1-git-send-email-p.zabel@pengutronix.de>
+References: <1364307246-9017-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1364307246-9017-11-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-the following patches add support for LVDS displays on
-i.MX53 and i.MX6q boards.
-
-The clock patches are needed because the LVDS serial clock
-has to be in lockstep with the IPU display interface clock
-providing the pixel data. A fixed factor of 7:1 (or 3.5:1 in
-dual link mode) needs to be maintained. This is achieved on
-i.MX by clocking the LDB interface clock directly from a PLL,
-and manually setting the 3.5/7:1 divider depending on dual/single
-link mode. The IPU display interface clock is then sourced
-from the divided LDB clock.
-
-regards
-Philipp
-
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
- arch/arm/boot/dts/imx51.dtsi        |   2 +
- arch/arm/boot/dts/imx53.dtsi        |  34 ++
- arch/arm/boot/dts/imx6q.dtsi        |  17 +
- arch/arm/boot/dts/imx6qdl.dtsi      |  26 ++
- arch/arm/mach-imx/clk-imx51-imx53.c |  19 +-
- arch/arm/mach-imx/clk-imx6q.c       |  43 ++-
- arch/arm/mach-imx/clk.h             |  17 +
- arch/arm/mach-imx/common.h          |   1 +
- arch/arm/mach-imx/mach-imx6q.c      |   2 +-
- drivers/staging/imx-drm/Kconfig     |   7 +
- drivers/staging/imx-drm/Makefile    |   1 +
- drivers/staging/imx-drm/imx-ldb.c   | 614 ++++++++++++++++++++++++++++++++++++
- 12 files changed, 758 insertions(+), 25 deletions(-)
+ arch/arm/boot/dts/imx53.dtsi | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index b07bbdcc..30aed40 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -511,6 +511,33 @@
+ 				reg = <0x53fa8000 0xc>;
+ 			};
+ 
++			ldb: ldb at 53fa8008 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				compatible = "fsl,imx53-ldb";
++				reg = <0x53fa8008 0x4>;
++				gpr = <&gpr>;
++				clocks = <&clks 122>, <&clks 120>,
++					 <&clks 115>, <&clks 116>,
++					 <&clks 123>, <&clks 85>;
++				clock-names = "di0_pll", "di1_pll",
++					      "di0_sel", "di1_sel",
++					      "di0", "di1";
++				status = "disabled";
++
++				lvds-channel at 0 {
++					reg = <0>;
++					crtcs = <&ipu 0>;
++					status = "disabled";
++				};
++
++				lvds-channel at 1 {
++					reg = <1>;
++					crtcs = <&ipu 1>;
++					status = "disabled";
++				};
++			};
++
+ 			pwm1: pwm at 53fb4000 {
+ 				#pwm-cells = <2>;
+ 				compatible = "fsl,imx53-pwm", "fsl,imx27-pwm";
+-- 
+1.8.2.rc2
