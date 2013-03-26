@@ -1,56 +1,47 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 26 Mar 2013 18:44:37 +0000 (UTC)
-Subject: OMAP baseline test results for v3.9-rc1
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EC281B4@DBDE01.ent.ti.com>
-References: <alpine.DEB.2.00.1303121634080.2723@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83EC281B4@DBDE01.ent.ti.com>
-Message-ID: <alpine.DEB.2.00.1303261843500.23957@utopia.booyaka.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Tue, 26 Mar 2013 14:45:28 -0400 (EDT)
+Subject: [PATCHv2] usb: ehci: unlink_empty_async_suspended() only used
+ with CONFIG_PM
+In-Reply-To: <1364321673-2030-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <Pine.LNX.4.44L0.1303261443550.999-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, 27 Mar 2013, Tony Prisk wrote:
 
-On Thu, 14 Mar 2013, Hiremath, Vaibhav wrote:
+> Compiling with !CONFIG_PM generates an unused function warning on
+> unlink_empty_async_suspended().
+> 
+> Enclose the function in a #ifdef CONFIG_PM
+> 
+> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+> ---
+> Fixed up the commit message.
+>  drivers/usb/host/ehci-q.c |    3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/usb/host/ehci-q.c b/drivers/usb/host/ehci-q.c
+> index 23d1369..3638b28 100644
+> --- a/drivers/usb/host/ehci-q.c
+> +++ b/drivers/usb/host/ehci-q.c
+> @@ -1316,6 +1316,7 @@ static void unlink_empty_async(struct ehci_hcd *ehci)
+>  	}
+>  }
+>  
+> +#ifdef CONFIG_PM
+>  /* The root hub is suspended; unlink all the async QHs */
+>  static void unlink_empty_async_suspended(struct ehci_hcd *ehci)
+>  {
+> @@ -1328,7 +1329,7 @@ static void unlink_empty_async_suspended(struct ehci_hcd *ehci)
+>  	}
+>  	start_iaa_cycle(ehci, false);
+>  }
+> -
+> +#endif
+>  /* makes sure the async qh will become idle */
+>  /* caller must own ehci->lock */
 
-> > -----Original Message-----
-> > From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
-> > owner at vger.kernel.org] On Behalf Of Paul Walmsley
-> > Sent: Tuesday, March 12, 2013 10:10 PM
-> > To: linux-omap at vger.kernel.org
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Subject: OMAP baseline test results for v3.9-rc1
-> > 
-> > 
-> > Here are some basic OMAP test results for Linux v3.9-rc1.
-> > Logs and other details at:
-> > 
-> >     http://www.pwsan.com/omap/testlogs/test_v3.9-rc1/20130312100243/
-> > 
-> > 
-> > Test summary
-> > ------------
-> > 
-> > Build:
-> >     FAIL ( 4/16): am33xx_only, omap1_defconfig,
-> This requires some cleanup in Makefile and Kconfig handling,
-> 
-> Either you disable SMP support for non-SMP devices like AM33xx 
-> 
-> OR
-> 
-> Fix the Makefile to resolve the build dependencies (may not be trivial)
-> 
-> OR
-> 
-> Make functions __weak so that build will go through.
-> 
-> 
-> 
-> I have created below patch, if it is ok with you then I can
-> Submit patch for the same (build tested with am33xx_only and omap2plus_defconfig).
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
 
-Santosh's suggestion seems the right way to go.  Care to implement a patch 
-for #2 above?
-
-
-- Paul
+... except that the blank line before the comment in the hunk above
+should be retained, not removed.
