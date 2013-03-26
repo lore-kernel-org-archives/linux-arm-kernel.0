@@ -1,38 +1,38 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 26 Mar 2013 17:01:06 +0000
-Subject: [PATCH v2 11/30] arm64: KVM: CPU specific system registers handling
+Date: Tue, 26 Mar 2013 17:01:01 +0000
+Subject: [PATCH v2 06/30] arm64: KVM: Basic ESR_EL2 helpers and vcpu register
+ access
 In-Reply-To: <1364317285-20937-1-git-send-email-marc.zyngier@arm.com>
 References: <1364317285-20937-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1364317285-20937-12-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1364317285-20937-7-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the support code for CPU specific system registers. Not much
-here yet.
+Implements helpers for dealing with the EL2 syndrome register as
+well as accessing the vcpu registers.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/sys_regs_generic_v8.c | 85 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 85 insertions(+)
- create mode 100644 arch/arm64/kvm/sys_regs_generic_v8.c
+ arch/arm64/include/asm/kvm_emulate.h | 163 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 163 insertions(+)
+ create mode 100644 arch/arm64/include/asm/kvm_emulate.h
 
-diff --git a/arch/arm64/kvm/sys_regs_generic_v8.c b/arch/arm64/kvm/sys_regs_generic_v8.c
+diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
 new file mode 100644
-index 0000000..a38254b
+index 0000000..80128cd
 --- /dev/null
-+++ b/arch/arm64/kvm/sys_regs_generic_v8.c
-@@ -0,0 +1,85 @@
++++ b/arch/arm64/include/asm/kvm_emulate.h
+@@ -0,0 +1,163 @@
 +/*
 + * Copyright (C) 2012 - ARM Ltd
 + * Author: Marc Zyngier <marc.zyngier@arm.com>
 + *
-+ * Based on arch/arm/kvm/coproc_a15.c:
++ * Derived from arch/arm/include/kvm_emulate.h
 + * Copyright (C) 2012 - Virtual Open Systems and Columbia University
-+ * Authors: Rusty Russell <rusty@rustcorp.au>
-+ *          Christoffer Dall <c.dall@virtualopensystems.com>
++ * Author: Christoffer Dall <c.dall@virtualopensystems.com>
 + *
 + * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License, version 2, as
++ * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
 + *
 + * This program is distributed in the hope that it will be useful,
@@ -43,69 +43,148 @@ index 0000000..a38254b
 + * You should have received a copy of the GNU General Public License
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
++
++#ifndef __ARM64_KVM_EMULATE_H__
++#define __ARM64_KVM_EMULATE_H__
++
 +#include <linux/kvm_host.h>
-+#include <asm/cputype.h>
-+#include <asm/kvm_arm.h>
 +#include <asm/kvm_asm.h>
-+#include <asm/kvm_host.h>
-+#include <asm/kvm_emulate.h>
-+#include <asm/kvm_coproc.h>
-+#include <linux/init.h>
++#include <asm/kvm_arm.h>
++#include <asm/kvm_mmio.h>
++#include <asm/ptrace.h>
 +
-+#include "sys_regs.h"
++void kvm_inject_undefined(struct kvm_vcpu *vcpu);
++void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr);
++void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr);
 +
-+static bool access_actlr(struct kvm_vcpu *vcpu,
-+			 const struct sys_reg_params *p,
-+			 const struct sys_reg_desc *r)
++static inline unsigned long *vcpu_pc(const struct kvm_vcpu *vcpu)
 +{
-+	if (p->is_write)
-+		return ignore_write(vcpu, p);
-+
-+	*vcpu_reg(vcpu, p->Rt) = vcpu_sys_reg(vcpu, ACTLR_EL1);
-+	return true;
++	return (unsigned long *)&vcpu_gp_regs(vcpu)->regs.pc;
 +}
 +
-+static void reset_actlr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
++static inline unsigned long *vcpu_elr_el1(const struct kvm_vcpu *vcpu)
 +{
-+	u64 actlr;
-+
-+	asm volatile("mrs %0, actlr_el1\n" : "=r" (actlr));
-+	vcpu_sys_reg(vcpu, ACTLR_EL1) = actlr;
++	return (unsigned long *)&vcpu_gp_regs(vcpu)->elr_el1;
 +}
 +
-+/*
-+ * Implementation specific sys-reg registers.
-+ * Important: Must be sorted ascending by Op0, Op1, CRn, CRm, Op2
-+ */
-+static const struct sys_reg_desc genericv8_sys_regs[] = {
-+	/* ACTLR_EL1 */
-+	{ Op0(0b11), Op1(0b000), CRn(0b0001), CRm(0b0000), Op2(0b001),
-+	  access_actlr, reset_actlr, ACTLR_EL1 },
-+};
-+
-+static struct kvm_sys_reg_target_table genericv8_target_table = {
-+	.table64 = {
-+		.table = genericv8_sys_regs,
-+		.num = ARRAY_SIZE(genericv8_sys_regs),
-+	},
-+};
-+
-+static int __init sys_reg_genericv8_init(void)
++static inline unsigned long *vcpu_cpsr(const struct kvm_vcpu *vcpu)
 +{
-+	unsigned int i;
-+
-+	for (i = 1; i < ARRAY_SIZE(genericv8_sys_regs); i++)
-+		BUG_ON(cmp_sys_reg(&genericv8_sys_regs[i-1],
-+			       &genericv8_sys_regs[i]) >= 0);
-+
-+	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_AEM_V8,
-+					  &genericv8_target_table);
-+	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_FOUNDATION_V8,
-+					  &genericv8_target_table);
-+	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_CORTEX_A57,
-+					  &genericv8_target_table);
-+	return 0;
++	return (unsigned long *)&vcpu_gp_regs(vcpu)->regs.pstate;
 +}
-+late_initcall(sys_reg_genericv8_init);
++
++static inline bool vcpu_mode_is_32bit(const struct kvm_vcpu *vcpu)
++{
++	return false;	/* 32bit? Bahhh... */
++}
++
++static inline bool kvm_condition_valid(const struct kvm_vcpu *vcpu)
++{
++	return true;	/* No conditionals on arm64 */
++}
++
++static inline void kvm_skip_instr(struct kvm_vcpu *vcpu, bool is_wide_instr)
++{
++	*vcpu_pc(vcpu) += 4;
++}
++
++static inline void vcpu_set_thumb(struct kvm_vcpu *vcpu)
++{
++}
++
++static inline unsigned long *vcpu_reg(const struct kvm_vcpu *vcpu, u8 reg_num)
++{
++	return (unsigned long *)&vcpu_gp_regs(vcpu)->regs.regs[reg_num];
++}
++
++/* Get vcpu SPSR for current mode */
++static inline unsigned long *vcpu_spsr(const struct kvm_vcpu *vcpu)
++{
++	return (unsigned long *)&vcpu_gp_regs(vcpu)->spsr[KVM_SPSR_EL1];
++}
++
++static inline bool kvm_vcpu_reg_is_pc(const struct kvm_vcpu *vcpu, int reg)
++{
++	return false;
++}
++
++static inline bool vcpu_mode_priv(const struct kvm_vcpu *vcpu)
++{
++	u32 mode = *vcpu_cpsr(vcpu) & PSR_MODE_MASK;
++
++	return mode != PSR_MODE_EL0t;
++}
++
++static inline u32 kvm_vcpu_get_hsr(const struct kvm_vcpu *vcpu)
++{
++	return vcpu->arch.fault.esr_el2;
++}
++
++static inline unsigned long kvm_vcpu_get_hfar(const struct kvm_vcpu *vcpu)
++{
++	return vcpu->arch.fault.far_el2;
++}
++
++static inline phys_addr_t kvm_vcpu_get_fault_ipa(const struct kvm_vcpu *vcpu)
++{
++	return ((phys_addr_t)vcpu->arch.fault.hpfar_el2 & HPFAR_MASK) << 8;
++}
++
++static inline bool kvm_vcpu_dabt_isvalid(const struct kvm_vcpu *vcpu)
++{
++	return !!(kvm_vcpu_get_hsr(vcpu) & ESR_EL2_ISV);
++}
++
++static inline bool kvm_vcpu_dabt_iswrite(const struct kvm_vcpu *vcpu)
++{
++	return !!(kvm_vcpu_get_hsr(vcpu) & ESR_EL2_WNR);
++}
++
++static inline bool kvm_vcpu_dabt_issext(const struct kvm_vcpu *vcpu)
++{
++	return !!(kvm_vcpu_get_hsr(vcpu) & ESR_EL2_SSE);
++}
++
++static inline int kvm_vcpu_dabt_get_rd(const struct kvm_vcpu *vcpu)
++{
++	return (kvm_vcpu_get_hsr(vcpu) & ESR_EL2_SRT_MASK) >> ESR_EL2_SRT_SHIFT;
++}
++
++static inline bool kvm_vcpu_dabt_isextabt(const struct kvm_vcpu *vcpu)
++{
++	return !!(kvm_vcpu_get_hsr(vcpu) & ESR_EL2_EA);
++}
++
++static inline bool kvm_vcpu_dabt_iss1tw(const struct kvm_vcpu *vcpu)
++{
++	return !!(kvm_vcpu_get_hsr(vcpu) & ESR_EL2_S1PTW);
++}
++
++static inline int kvm_vcpu_dabt_get_as(const struct kvm_vcpu *vcpu)
++{
++	return 1 << ((kvm_vcpu_get_hsr(vcpu) & ESR_EL2_SAS) >> ESR_EL2_SAS_SHIFT);
++}
++
++/* This one is not specific to Data Abort */
++static inline bool kvm_vcpu_trap_il_is32bit(const struct kvm_vcpu *vcpu)
++{
++	return !!(kvm_vcpu_get_hsr(vcpu) & ESR_EL2_IL);
++}
++
++static inline u8 kvm_vcpu_trap_get_class(const struct kvm_vcpu *vcpu)
++{
++	return kvm_vcpu_get_hsr(vcpu) >> ESR_EL2_EC_SHIFT;
++}
++
++static inline bool kvm_vcpu_trap_is_iabt(const struct kvm_vcpu *vcpu)
++{
++	return kvm_vcpu_trap_get_class(vcpu) == ESR_EL2_EC_IABT;
++}
++
++static inline u8 kvm_vcpu_trap_get_fault(const struct kvm_vcpu *vcpu)
++{
++	return kvm_vcpu_get_hsr(vcpu) & ESR_EL2_FSC_TYPE;
++}
++
++#endif /* __ARM64_KVM_EMULATE_H__ */
 -- 
 1.8.1.4
