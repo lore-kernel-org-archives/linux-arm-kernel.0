@@ -1,80 +1,89 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 26 Mar 2013 21:14:33 +0100
-Subject: [PATCH 1/2] ARM: kirkwood: fix a not initialized variable in
- the sound subsystem
-In-Reply-To: <20130326210512.6c9c8990@armhf>
-References: <20130326190513.1671a3be@armhf> <5151F9F4.2040005@gmail.com>
- <20130326210512.6c9c8990@armhf>
-Message-ID: <515201A9.5030003@gmail.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Tue, 26 Mar 2013 21:16:54 +0100
+Subject: [PATCHv6 10/17] arm: mvebu: add PCIe Device Tree informations
+ for Armada 370
+In-Reply-To: <20130326163421.GA30255@obsidianresearch.com>
+References: <1364314719-1049-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1364314719-1049-11-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130326163421.GA30255@obsidianresearch.com>
+Message-ID: <20130326201654.GA7109@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/26/2013 09:05 PM, Jean-Francois Moine wrote:
-> On Tue, 26 Mar 2013 20:41:40 +0100
-> Sebastian Hesselbarth<sebastian.hesselbarth@gmail.com>  wrote:
->
->> On 03/26/2013 07:05 PM, Jean-Francois Moine wrote:
->>> In the function kirkwood_set_rate, in case of a non dco supported rate
->>> and no external clock, the clock source was set to an undefined value.
->>> This patch just displays a message without changing the clock source.
->>>
->>> Signed-off-by: Jean-Francois Moine<moinejf@free.fr>
->>> ---
->>>    sound/soc/kirkwood/kirkwood-i2s.c |    3 +++
->>>    1 file changed, 3 insertions(+)
->>>
->>> diff --git a/sound/soc/kirkwood/kirkwood-i2s.c b/sound/soc/kirkwood/kirkwood-i2s.c
->>> index c74c890..afca1ec 100644
->>> --- a/sound/soc/kirkwood/kirkwood-i2s.c
->>> +++ b/sound/soc/kirkwood/kirkwood-i2s.c
->>> @@ -118,6 +118,9 @@ static void kirkwood_set_rate(struct snd_soc_dai *dai,
->>>    		clk_set_rate(priv->extclk, 256 * rate);
->>>
->>>    		clks_ctrl = KIRKWOOD_MCLK_SOURCE_EXTCLK;
->>> +	} else {
->>> +		dev_err(dai->dev, "%s: no clock\n", __func__);
->>> +		return;
->>>    	}
->>>    	writel(clks_ctrl, priv->io + KIRKWOOD_CLOCKS_CTRL);
->>>    }
->>
->> NACK.
->>
->> Having no clock at all should be catched during _probe. Moreover,
->> not having the internal clock enabled will lead to system hang due to
->> clock gating. You should rather pass an optional (DT-only) extclk phandle
->> on the second clocks property.
->>
->> Sebastian
->>
->> P.S. as this is alsa stuff you should have some alsa maintainers on your
->> Cc list. Please run ./scripts/get_maintainer.pl on your patches next time.
->> It will give you a list of people you have to to Cc.
->
-> It is a compilation error: the variable clks_ctrl is not initialized.
+On Tue, Mar 26, 2013 at 10:34:21AM -0600, Jason Gunthorpe wrote:
+[...]
+> This basically looks fine to me, however, I think it is valuable if
+> you and Thierry could use the same method to pass per-port registers. I
+> expect others are going to reference these bindings for future work,
+> and one standard method is more clear than two.
+> 
+> Thierry: Did you settle on using assigned-addresses? Can you share the
+> final binding for your driver?
 
-If it is about non-initialized clks_ctrl, I suggest to remove it
-completely and clone the writel to both if and else branch.
+Yes, I have the final bindings ready and I was waiting for Andrew's new
+version of the ranges parsing patch before sending the next (and
+hopefully final) version of the series. He posted that patch now so I
+should have something ready soon. For now here's what I currently use
+for DT:
 
-> The sequence has been created by the commit 363589bf110aa0352a2031
->     "ASoC: kirkwood-i2s: add support for external clock rates"
-> Russell is in the Cc list.
+	pcie-controller {
+		compatible = "nvidia,tegra20-pcie";
+		device_type = "pci";
+		reg = <0x80003000 0x00000800   /* PADS registers */
+		       0x80003800 0x00000200   /* AFI registers */
+		       0x90000000 0x10000000>; /* configuration space */
+		reg-names = "pads", "afi", "cs";
+		interrupts = <0 98 0x04   /* controller interrupt */
+		              0 99 0x04>; /* MSI interrupt */
+		interrupt-names = "intr", "msi";
 
-Russell was the commit author and also should be added because of his
-ARM maintainer status. But kirkwood-i2s is alsa and needs some sound
-maintainers to be Cc'd:
+		bus-range = <0x00 0xff>;
+		#address-cells = <3>;
+		#size-cells = <2>;
 
-$ ./scripts/get_maintainer.pl -f sound/soc/kirkwood/kirkwood-i2s.c
-Liam Girdwood <lgirdwood@gmail.com> (supporter:SOUND - SOC LAYER...)
-Mark Brown <broonie@opensource.wolfsonmicro.com> (supporter:SOUND - SOC 
-LAYER...,commit_signer:9/11=82%)
-Jaroslav Kysela <perex@perex.cz> (maintainer:SOUND)
-Takashi Iwai <tiwai@suse.de> (maintainer:SOUND)
-Russell King <rmk+kernel@arm.linux.org.uk> (commit_signer:6/11=55%)
-Greg Kroah-Hartman <gregkh@linuxfoundation.org> (commit_signer:2/11=18%)
-Andrew Lumm <andrew@lunn.ch> (commit_signer:2/11=18%)
-Thierry Reding <thierry.reding@avionic-design.de> (commit_signer:1/11=9%)
-alsa-devel at alsa-project.org (moderated list:SOUND - SOC LAYER...)
-linux-kernel at vger.kernel.org (open list)
+		ranges = <0x82000000 0 0x80000000 0x80000000 0 0x00001000   /* port 0 registers */
+			  0x82000000 0 0x80001000 0x80001000 0 0x00001000   /* port 1 registers */
+			  0x81000000 0 0          0x82000000 0 0x00010000   /* downstream I/O */
+			  0x82000000 0 0xa0000000 0xa0000000 0 0x10000000   /* non-prefetchable memory */
+			  0xc2000000 0 0xb0000000 0xb0000000 0 0x10000000>; /* prefetchable memory */
 
-Sebastian
+		clocks = <&tegra_car 70>, <&tegra_car 72>, <&tegra_car 74>,
+			 <&tegra_car 118>;
+		clock-names = "pex", "afi", "pcie_xclk", "pll_e";
+		status = "disabled";
+
+		pci at 1,0 {
+			device_type = "pci";
+			assigned-addresses = <0x82000800 0 0x80000000 0 0x1000>;
+			reg = <0x000800 0 0 0 0>;
+			status = "disabled";
+
+			#address-cells = <3>;
+			#size-cells = <2>;
+
+			nvidia,num-lanes = <2>;
+		};
+
+		pci at 2,0 {
+			device_type = "pci";
+			assigned-addresses = <0x82001000 0 0x80001000 0 0x1000>;
+			reg = <0x001000 0 0 0 0>;
+			status = "disabled";
+
+			#address-cells = <3>;
+			#size-cells = <2>;
+
+			nvidia,num-lanes = <2>;
+		};
+	};
+
+I think that has everything that we discussed previously.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130326/ca9f45b0/attachment.sig>
