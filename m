@@ -1,53 +1,36 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 26 Mar 2013 14:05:25 +0100
-Subject: mvebu: Device bus driver resurrection
-In-Reply-To: <20130326124337.GD2454@localhost>
-References: <20130326124337.GD2454@localhost>
-Message-ID: <20130326140525.0167bd72@skate>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Tue, 26 Mar 2013 14:06:38 +0100
+Subject: [RFC PATCH v3 4/6] sched: secure access to other CPU statistics
+In-Reply-To: <1364302242.5053.19.camel@laptop>
+References: <1363955155-18382-1-git-send-email-vincent.guittot@linaro.org>
+ <1363955155-18382-5-git-send-email-vincent.guittot@linaro.org>
+ <1364302242.5053.19.camel@laptop>
+Message-ID: <CAKfTPtA0xpGmyKr6pqiV9wjv4ZQ_xQGjR=+7h_xTe_LLA+Do9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 26 March 2013 13:50, Peter Zijlstra <peterz@infradead.org> wrote:
+> On Fri, 2013-03-22 at 13:25 +0100, Vincent Guittot wrote:
+>> @@ -3364,13 +3364,16 @@ done:
+>>  static bool is_buddy_busy(int cpu)
+>>  {
+>>         struct rq *rq = cpu_rq(cpu);
+>> +       u32 sum = rq->avg.runnable_avg_sum;
+>> +       u32 period = rq->avg.runnable_avg_period;
+>> +
+>> +       sum = min(sum, period);
+>
+> OK this makes sense; use a simple sanity constraint instead of going
+> overboard on serialization -- however, why is this a separate patch?
 
-On Tue, 26 Mar 2013 09:43:38 -0300, Ezequiel Garcia wrote:
+There is no real reason other than explaining why I have added this
+additional check
 
-> Now that we've all agreed on a mvebu mbus driver (or a first version of it)
-> I'd like to resurrect the Device Bus driver.
-> 
-> As far as I can remember, the last things said about this driver were:
-> 
->   * The timing parameters should be in {nano,pico,etc} seconds,
->     instead of ticks.
-> 
->   * Although not everyone agreed, this driver was a good thing to have
->     so we no longer depend on the bootloader setting these parameters.
->     
->   * The address decoding windows should *not* be setup by this driver,
->     but rather be described in the device tree itself.
-> 
-> If anyone has aditional comments, please speak your mind.
-> 
-> My plan is to address all of the above comments, and send a v2 soon.
-> 
-> However, since we do not yet describe the address windows at the device tree,
-> the plan is to do window allocation/release in this devbus driver
-> **only as a temporal solution**.
-> 
-> Once the address decoding windows are properly described in the DTS,
-> we can remove that handling from the driver for good.
-> 
-> Does this sound sane enough?
+>
+> That is, this could easily be part of the patch that introduces
+> is_buddy_busy(); also you likely want part of this patch's changelog
+> to become a comment that goes right above this min() :-)
 
-Of course I do agree with your proposal, and I'd like to say that I'm
-committed to work on a proper DT binding for the mvebu-mbus driver so
-that the static windows can ultimately be defined in the Device Tree.
-So what Ezequiel presents here as a temporary solution really is.
+Yes, i 'm going to do that
 
-Thanks,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+>
