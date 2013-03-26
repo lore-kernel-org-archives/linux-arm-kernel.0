@@ -1,55 +1,47 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 26 Mar 2013 11:16:50 +0100
-Subject: [GIT PULL] at91: fixes for 3.9-rc #2
-Message-ID: <51517592.5010300@atmel.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 26 Mar 2013 10:19:44 +0000
+Subject: [PATCH 2/3] mfd: db8500-prcmu: Fetch the PRCMU TCDM base address
+ from Device Tree
+In-Reply-To: <201303261000.33615.arnd@arndb.de>
+References: <1364223758-17621-1-git-send-email-lee.jones@linaro.org>
+ <CACRpkdZxU197moM_00UQr-tHdip4b50c+CfYkR5OK+MbwsE-aw@mail.gmail.com>
+ <20130326094848.GA14151@gmail.com>
+ <201303261000.33615.arnd@arndb.de>
+Message-ID: <20130326101944.GA15177@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+On Tue, 26 Mar 2013, Arnd Bergmann wrote:
 
-Another "fixes" pull-request for AT91 on top of material that you have already
-taken. Fixes are manly typos but the bad node declaration and some misspelling
-can cause confusion.
+> On Tuesday 26 March 2013, Lee Jones wrote:
+> > Bit for information for you. 
+> > 
+> > I have confirmed that the address locations are the same for
+> > all SoCs are the same. However, the size of the TCDM changes from 4k
+> > on the db8500 to 12k on the db8540.
+> > 
+> > Is there a way we can increase the size for the db8540 without
+> > creating an entire new DTS file? Seems overkill.
+> 
+> You can always override a property by setting it again, like
+> 
+> 	soc {
+> 		prcmu: db8500-prcmu at abcd0000 {
+> 			reg = <0xabcd0000 0x1000>;
+> 		};
+> 	};
+> 
+> ...
+> 
+> 
+> 	&prcmu {
+> 		reg = <0xabcd0000 0x3000>;
+> 	}
 
-The following changes since commit 0ed66befaae893e82c9f016238282d73ef9fd6c7:
-
-  ARM: at91: fix infinite loop in at91_irq_suspend/resume (2013-03-14 09:37:55 +0100)
-
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git tags/at91-fixes
-
-for you to fetch changes up to 9476a186078f47bdc5f03560074691de98cd767b:
-
-  ARM: at91: Fix typo in restart code panic message (2013-03-26 11:00:02 +0100)
-
-----------------------------------------------------------------
-Little fixes mainly related to at91sam9x5 DT.
-One typo is the only modification in C code.
-
-----------------------------------------------------------------
-Maxime Ripard (1):
-      ARM: at91: Fix typo in restart code panic message
-
-Nicolas Ferre (4):
-      ARM: at91/dt: fix macb node declaration
-      ARM: at91/trivial: typos in compatible property
-      ARM: at91/trivial: fix model name for SAM9G15-EK
-      ARM: at91: remove partial parameter in bootargs for at91sam9x5ek.dtsi
-
- arch/arm/boot/dts/at91sam9g15.dtsi  |  2 +-
- arch/arm/boot/dts/at91sam9g15ek.dts |  2 +-
- arch/arm/boot/dts/at91sam9g25.dtsi  |  2 +-
- arch/arm/boot/dts/at91sam9g25ek.dts |  9 +++++++++
- arch/arm/boot/dts/at91sam9g35.dtsi  |  2 +-
- arch/arm/boot/dts/at91sam9g35ek.dts |  9 +++++++++
- arch/arm/boot/dts/at91sam9x25.dtsi  |  2 +-
- arch/arm/boot/dts/at91sam9x25ek.dts | 14 ++++++++++++++
- arch/arm/boot/dts/at91sam9x35.dtsi  |  2 +-
- arch/arm/boot/dts/at91sam9x35ek.dts |  9 +++++++++
- arch/arm/boot/dts/at91sam9x5ek.dtsi |  7 +------
- arch/arm/mach-at91/setup.c          |  2 +-
- 12 files changed, 49 insertions(+), 13 deletions(-)
+Perfect, thanks.
 
 -- 
-Nicolas Ferre
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
