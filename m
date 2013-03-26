@@ -1,40 +1,42 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 26 Mar 2013 10:33:55 -0700
-Subject: [PATCH] irqchip: gic: fix irq_trigger return
-In-Reply-To: <1363734349-32635-1-git-send-email-sboyd@codeaurora.org>
-References: <1363734349-32635-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <5151DC03.6070108@codeaurora.org>
+Date: Tue, 26 Mar 2013 10:34:57 -0700
+Subject: [PATCHv2] ARM: Push selects for TWD/SCU into machine entries
+In-Reply-To: <5144C8DC.9010104@codeaurora.org>
+References: <1362007694-3419-1-git-send-email-sboyd@codeaurora.org>
+ <512E9A39.3070207@wwwdotorg.org> <51354E35.1080804@codeaurora.org>
+ <201303052234.32723.arnd@arndb.de> <5144C8DC.9010104@codeaurora.org>
+Message-ID: <5151DC41.7090307@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/19/13 16:05, Stephen Boyd wrote:
-> From: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
+On 03/16/13 12:32, Stephen Boyd wrote:
+> On 3/5/2013 2:34 PM, Arnd Bergmann wrote:
+>> On Tuesday 05 March 2013, Stephen Boyd wrote:
+>>> On 02/27/13 15:43, Stephen Warren wrote:
+>>>> Seems simple enough it doesn't really need many, but for Tegra,
+>>>> Acked-by: Stephen Warren <swarren@nvidia.com>
+>>>>
+>>>> Which kernel is this going into? It's possible Tegra will get converted
+>>>> to multi-platform in 3.10, which might move that main ARCH_TEGRA block
+>>>> from arch/arm/Kconfig into arch/arm/mach-tegra/Kconfig, although I
+>>>> suppose it doesn't have to move it. I think some/all(?) other
+>>>> multi-platform conversions have moved their main Kconfig option like
+>>>> that though.
+>>> Thanks. I'm hoping that Arnd/Olof can pick this up. I'm not sure which
+>>> version it will go into.
+>>>
+>> Hmm, it certainly looks useful to me. I think it should go into the next
+>> cleanup branch as a base, so others can build on top of it. We will
+>> also need it for the Exynos multiplatform patches that I hope can land
+>> in 3.10 as well.
+>>
+>> Sneaking it in through the fixes branch would make life easier for us,
+>> but it doesn't feel right.
+> Arnd, can you pick this up into the arm-soc tree now? It would be good
+> to get this into next so that conflicts are avoided later on.
 >
-> The genirq layer expects a 0 in case of failure but the code is
-> returning -ENXIO. Fix it.
->
-> Signed-off-by: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  drivers/irqchip/irq-gic.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> index 644d724..2ebf28a 100644
-> --- a/drivers/irqchip/irq-gic.c
-> +++ b/drivers/irqchip/irq-gic.c
-> @@ -236,7 +236,8 @@ static int gic_retrigger(struct irq_data *d)
->  	if (gic_arch_extn.irq_retrigger)
->  		return gic_arch_extn.irq_retrigger(d);
->  
-> -	return -ENXIO;
-> +	/* the genirq layer expects 0 for a failure */
-> +	return 0;
->  }
->  
->  #ifdef CONFIG_SMP
 
-Ping.
+Arnd?
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
