@@ -1,194 +1,219 @@
-From: jonathan.austin@arm.com (Jonathan Austin)
-Date: Tue, 26 Mar 2013 11:56:33 +0000
-Subject: [PATCH v9 2/3] ARM: ARMv7-M: Add support for exception handling
-In-Reply-To: <20130326101508.GG20530@pengutronix.de>
-References: <1363901310-9474-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1363901310-9474-3-git-send-email-u.kleine-koenig@pengutronix.de>
- <51509C83.5000907@arm.com> <20130326101508.GG20530@pengutronix.de>
-Message-ID: <51518CF1.8090008@arm.com>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Tue, 26 Mar 2013 14:08:05 +0200
+Subject: [PATCH v4 0/6] support other fsl SoCs with usbmisc + small fixes
+In-Reply-To: <20130325162931.GB22810@pengutronix.de>
+References: <1354033021-10585-1-git-send-email-m.grzeschik@pengutronix.de>
+ <20121128025217.GC18593@nchen-desktop>
+ <87ip6mor1e.fsf@ashishki-desk.ger.corp.intel.com>
+ <CAOMZO5ArDLKDLEzhYc7EP2CNQGcT=vO7ctbiEsjzsGs+EaT7Dw@mail.gmail.com>
+ <20130325162931.GB22810@pengutronix.de>
+Message-ID: <87wqsujrdm.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+Michael Grzeschik <mgr@pengutronix.de> writes:
 
-On 26/03/13 10:15, Uwe Kleine-K?nig wrote:
-> Hi Jonny,
+> Hi Alexander, Fabio, Greg,
 >
-> On Mon, Mar 25, 2013 at 06:50:43PM +0000, Jonathan Austin wrote:
->> On 21/03/13 21:28, Uwe Kleine-K?nig wrote:
->>> This patch implements the exception handling for the ARMv7-M
->>> architecture (pretty different from the A or R profiles).
->>>
-[...]
->>> +	ldmia	r9!, {r8, r10-r12}
->>> +
->>> +	@ calculate the original stack pointer value.
->>> +	@ r9 currently points to the memory location just above the auto saved
->>> +	@ xPSR.
->>> +	@ The cpu might automatically 8-byte align the stack. Bit 9
->>> +	@ of the saved xPSR specifies if stack aligning took place. In this case
->>> +	@ another 32-bit value is included in the stack.
->>> +
->>> +	tst	r12, V7M_xPSR_FPALIGN
->>
->> Minor nit, but we should explain the relationship to FP and bit 9 of
->> the xPSR if we're going to call it this... (see B1.5.7 --Note--)
-> This doesn't have anything to do with FP as in floating point. In
-> ARMARMv7M I didn't fine a mnemonic for this bit, so I used FPALIGN
-> modelled after the variable "frameptralign" in the PushStack()
-> pseudocode function. Maybe better use V7M_xPSR_FRAMEPTRALIGN? Or does
-> there exist an official name that I just didn't manage to find?
+> On Mon, Mar 25, 2013 at 10:11:15AM -0300, Fabio Estevam wrote:
+>> Hi Alexander,
+>> 
+>> On Thu, Jan 24, 2013 at 7:42 AM, Alexander Shishkin
+>> <alexander.shishkin@linux.intel.com> wrote:
+>> > Peter Chen <peter.chen@freescale.com> writes:
+>> >
+>> >> On Tue, Nov 27, 2012 at 05:16:55PM +0100, Michael Grzeschik wrote:
+>> >>> Nearly every SoC from Freescale has this non-core usb registers. This series
+>> >>> adds support for more users of this driver.
+>> >>>
+>> >>> This series is based on Peter Chen's work. Its needed to merge his master branch
+>> >>> before applying this series:
+>> >>>
+>> >>> https://github.com/hzpeterchen/linux-usb.git
+>> >>
+>> >> I have tested it at i.mx6q sabrelite board, it works good.
+>> >>
+>> >> I have pushed your commit to my git, please cc me
+>> >> your coming chipidea patches, thanks.
+>> >>
+>> >> Alex, please add:
+>> >>
+>> >> Reviewed-by: Peter Chen <peter.chen@freescale.com>
+>> >> Tested-by: Peter Chen <peter.chen@freescale.com>
+>> >
+>> > Looks good, queueing this one for submission.
+>> 
+>> Could you please let us know what is preventing this series to be
+>> applied?
 
-Heh, I read this
-"On an implementation that includes the FP extension, if software 
-enables automatic FP state preservation on exception entry, that state 
-preservation enforces 8-byte stack alignment, ignoring the CCR.STKALIGN
-bit value"
+I think the main problem is that there is a bunch of patchsets with
+interdependencies that are quite obscure at least to me. Also, I see a
+whole lot of patches that were posted some time ago, commented on, never
+reposted.
+Right now, I'm looking at one patchset which you have sent last
+friday. So far it looks like a good candidate, although I see a few
+comments there that suggest that it still needs fixing.
 
-and assumed you had said "Floating point stack saving guarantees 8-byte 
-alignment so when it is 8-byte aligned it is like the floating-point 
-case" :)
-
-So, I'd definitely use FRAMEPTRALIGN!
-
-
->
->> Otherwise the casual reader is confused by why FP suddenly ended up
->> in here :)
->>
->>> +	addne	r9, r9, #4
->>> +
->>> +	@ store saved r12 using str to have a register to hold the base for stm
->>> +	str	r8, [sp, #S_IP]
->>> +	add	r8, sp, #S_SP
->>> +	@ store r13-r15, xPSR
->>> +	stmia	r8!, {r9-r12}
->>> +	@ store old_r0
->>> +	str	r0, [r8]
->>> +	.endm
->>> +
->>> +
->>> +/*
->>> + * We won't return to kernel space here because a kernel thread runs in SVCALL
->>> + * context and so cannot be preempted by PENDSV.
->>> + */
->>
->> The reason we can't return to kernel space isn't the context we're
->> in, but rather the priority we set for the exceptions... (both at
->> the same priority => can't preempt each other)
-> Well, it's both isn't it? A kernel thread has execution priority of
-> SVCALL. As PENDSV and SVCALL are configured to the same priority a
-> kernel thread is never preempted. I'll make it:
->
-> 	/*
-> 	 * PENDSV and SVCALL have the same exception priorities. As a
-> 	 * kernel thread runs at SVCALL execution priority it can never
-> 	 * be preempted and so we will never have to return to a kernel
-> 	 * thread here.
-> 	 */
-> 	
-> Better?
-
-Yea, perhaps just tweak to add that we *control* the priorities - IE it 
-is us that have set them to be the same...
-
->
->>> +	.macro	v7m_exception_slow_exit ret_r0
->>> +	cpsid	i
->>> +	ldr	lr, =EXC_RET_THREADMODE_PROCESSSTACK
->>> +
->>> +	@ read original r12, sp, lr, pc and xPSR
->>> +	add	r12, sp, #S_IP
->>> +	ldmia	r12, {r1-r5}
->>> +
->>> +	@ an exception frame is always 8-byte aligned. To tell the hardware if
->>> +	@ the sp to be restored is aligned or not set bit 9 of the saved xPSR
->>> +	@ accordingly.
->>
->> Does this comment make sense? I can't make much of it, because it
->> says that the exception frame is always 8-byte aligned by then
->> checks to see if it is...
-> The exception frame must be aligned, the restored value of sp not
-> necessarily. Depending on bit 9 of the xPSR saved in the exception frame
-> sp is restored to point to either directly over the exception frame or
-> if there is an additional reserved word. See B1.5.7.
+> That's what our chipidea usb disaster currently looks like in detail:
 >
 
-Yea, that full explanation is better.
-The ARM ARM has quite a clear description, actually:
+this patchset
 
-On an exception return when CCR.STKALIGN is set to 1, the processor uses 
-the value of bit [9] of the PSR value popped from the stack to determine 
-whether it must adjust the stack pointer alignment. This reverses any 
-forced stack alignment performed on the exception entry.
+> http://git.pengutronix.de/git/mgr/linux.git v3.9/topic/usb-phy
+> 4414a59 Merge 'v3.9/topic/usb-phy' into usb-3.9
+> a806027 usb: otg: mxs-phy: remove clkgate/sftrst clearing
+> 026881b usb: otg: mxs-phy: Improve mxs phy initialization
+> ed42fa9 usb: mxs-phy: register phy at usb phy library
+> d2783aa usb: phy: remove NULL pointer check in usb_add_phy()
 
-Something of that going in to your comment would be good.
+looks like Felipe's call, doesn't it? I also can't seem to find these in
+my inbox. If you want me to ack them, you should at least send them to
+me. :)
 
->>> +	tst	r2, #4
->>> +	subne	r2, r2, #4
->>> +	orrne	r5, V7M_xPSR_FPALIGN
->>> +	biceq	r5, V7M_xPSR_FPALIGN
->>> +
->>
->> As we've discussed a bit already on IRC, I don't think we need to
->> test the stack pointer here and modify r5, we should be able to use
->> the saved xPSR value. This is a pretty hot path and I think we're
->> better tp have fewer instructions!
->>
->> As far as I can see, if sp's alignment here is different to what it
->> was when we took the exception, we either have a bug (some code
->> hasn't respected the stack), or someone's interfered externally and
->> is about to cause a bug.
->>
->> What use cases do you think we are adding this test for? If it is
->> just people manually modifying sp with debuggers then I'd really
->> rather not have it.
-> I don't really have a scenario in mind that makes this fix here
-> necessary. It's more that I think the two instructions are cheap enough
-> to stick to a defensive coding style.
+Felipe, btw, is also often not copied on chipidea-related phy patches
+that I see. And just in case, Cc'ing him on this thread.
 
-I've just talked through this with Catalin in detail. If we don't modify 
-r5 we can just bic r2 in order to ensure alignment (either it was 
-aligned before, the bic does nothing and r5 is already correct, or it 
-wasn't aligned before, we make it aligned and r5 is also still correct)
+> /*
+>  * The series usb-ci-udc has already been posted some times
+>  * but it currently got no replies by Alexander.
+>  */
+> http://git.pengutronix.de/git/mgr/linux.git v3.9/topic/usb-ci-udc
+> e548c9d Merge 'v3.9/topic/usb-ci-udc' into usb-3.9
+> 80538f3 usb: chipidea: udc: add multiple td support to hardware_{en,de}queue
+> 02e1c7b usb: chipidea: udc: manage dynamic amount of tds with an linked list
+> 0ebb8f4 usb: chipidea: udc: prepare qhead with dma_alloc_coherent
+> 39be042 usb: chipidea: udc: add the define TD_PAGE_COUNT and fix all users
+> c2f0562 usb: chipidea: udc: use gfp_flags in _hardware_enqueue
+> f818222 usb: chipidea: udc: move _ep_queue into an unlocked function
+> 8aea3b0 usb: chipidea: udc: configure iso endpoints
+> 8e61a12 usb: chipidea: udc: rework ep_enable cap setting
+> e5ceed7 usb: chipidea: udc: move ZLT flag change to ep_enable
+> 2e33742 usb: chipidea: udc: read status of td only once in hardware_dequeue
+> 516803b usb: chipidea: udc: only clear active and halted bits in qhead
+> ee95a49 usb: chipidea: udc: use {read,write}l to handle mapped data
 
-Does that seem right to you? It still gives you the chance to have the 
-sp modified by some debug stuff, but assumes that nothing will modify 
-the saved version of xPSR on the stack, which I think is a safe assumption.
+Yes, that's the one. You were in discussion with Peter about some of
+these patches, so I haven't had a close look before.
+
+> http://git.pengutronix.de/git/mgr/linux.git v3.9/topic/imx-usbmisc
+> 1174002 Merge 'v3.9/topic/imx-usbmisc' into usb-3.9
+> f406383 usb: chipidea: usbmisc: skip clocks on i.MX6
+> d5c8d53 usb: chipidea: usbmisc: use module_platform_driver
+
+These two do not exist in my inbox.
+
+> 105d5d0 usb: chipidea: usbmisc: add support for ahb, ipg and per clock
+
+This one is ok, but it was posted in a patchset, which claims to depend
+on Peter's vbus detection patchset, which is still a work in progress.
+
+> http://git.pengutronix.de/git/mgr/linux.git v3.9/topic/imx-usb
+> df11f8b Merge 'v3.9/topic/imx-usb' into usb-3.9
+> 9a967c4 usb: chipidea: udc: add force-full-speed option
+
+The only version that I have of this patch in my inbox has a problem
+wrt DEVLC vs PORTSC in lpm/nolpm devices. I have seen you fix this
+problem for the phy mode configuration patch, but not for this one.
+
+> a02af86 USB: chipidea: set STS bit in serial mode
+
+Doesn't exist in my inbox.
+
+> af34326 usb: chipidea: ci13xxx_imx: add 2nd and 3rd clock to support
+> imx5x and newer
+
+This patch started a discussion which didn't end in a revised version of
+the patch in my inbox.
+
+> 5b7f6d8 usb: chipidea: pci: mark platformdata as static
+
+That obviously should go in. It is not applied because it was posted as
+a part of the patchset that required fixing.
 
 >
->> ...
->>> +#ifdef CONFIG_CPU_V7M
->>> +	.macro	restore_user_regs, fast = 0, offset = 0
->>> +	@ XXX: clrex?
->>
->> As we've discussed, above, I don't think this is required... It is
->> also fine to have it, but definitely remove the @XXX before putting
->> in next.
->>
->> Also perhaps replace this XXX comment with one explaining that
->> exception return guarantees the monitor is cleared? Otherwise
->> someone reading the code and comparing V7M with V7 might wonder
->> where the clrex went.
-> ack
+> /*
+>  * All above branches depent on the lower branches of Alexander and Peter
+>  * which we currently have rebased on v3.9-rc3 and on top of each other.
+>  * It is named alex-and-peter-for-3.9.
+>  */
+> http://git.pengutronix.de/git/mgr/linux.git alex-and-peter-for-3.9
 >
->> ...
->>> +	.align	2
->>> +__irq_entry:
->>> +	v7m_exception_entry
->>> +
->>> +	@
->>> +	@ Invoke the IRQ handler
->>> +	@
->>> +	mrs	r0, ipsr
->>> +	ldr	r1, =0x1ff
->>
->> Did this mask not get defined in v7m.h for a reason?
-> Yeah, the reason is I missed it :-) Will fix that for the next
-> iteration.
+> /*
+>  * Peters branch already contain the usbmisc series,
+>  * but they never made it to ci-for-greg, although
+>  * Alexander already mentioned (24 Jan 2013) to queue them.
+>  */
+> https://github.com/hzpeterchen/linux-usb.git master^^
+> 4d36511 Merge 'v3.9/topic/usb-peterchen'
+> 90314f3 usb: chipidea: usbmisc: add post handling and errata fix for mx25
+> edde2ad usb: chipidea: usbmisc: add mx53 support
+> 6150722 usb: chipidea: usbmisc: prepare driver to handle more than one soc
+> 542384e usb: chipidea: usbmisc: fix a potential race condition
+> cdffb44 usb: chipidea: usbmisc: unset global varibale usbmisc on driver remove
+> b8e47e3 usb: chipidea: usbmisc: rename file, struct and functions to usbmisc_imx
+> c5863f9 usb: chipidea: imx: select usb id pin using syscon interface
+> 8c8a1f5 usb: chipidea: udc: fix the oops when plugs in usb cable after rmmod gadget
+> c703723 usb: chipidea: imx: add getting vbus regulator code
+> e897d66 usb: chipidea: delete the delayed work
+> 4c0be3e usb: chipidea: add vbus regulator control
+> f1e52f8 usb: chipidea: udc: retire the flag CI13_PULLUP_ON_VBUS
+> af4e743 usb: chipidea: udc: add pullup/pulldown dp at hw_device_state
+> 1be0011 usb: chipidea: add otg id switch and vbus connect/disconnect detect
+> 7c3c62d usb: chipidea: add otg file
+
+This patchset is a work in progress, it can't be applied anywhere yet.
+
+> 618bfec Revert "USB: chipidea: add vbus detect for udc"
+
+This one, though, I will pick.
+
+> bfe5248 USB chipidea i.MX: use devm_usb_get_phy_by_phandle to get phy
+> 705620f USB mxs-phy: Register phy with framework
+> f5e9796 USB chipidea i.MX: introduce dr_mode property
+> dc622c4 USB chipidea: introduce dual role mode pdata flags
+> b1d4a9e USB: chipidea: add PTW and PTS handling
+> 747eee3 USB: chipidea: ci13xxx-imx: create dynamic platformdata
+
+> 2f2bb89 USB: add devicetree helpers for determining dr_mode and
+> phy_type
+
+This guy was commented on and didn't show up in my inbox after that.
+
+> 4f30039 USB: move bulk of otg/otg.c to phy/phy.c
+
+this one seems to be in Felipe's testing branch
+
+> 760d9a8 nop-xceiv: make nop to use usb_add_phy_dev
+
+doesn't exist in my inbox and looks like Felipe's call.
+
 >
+> /*
+>  * This branch is already one month old and stays untouched
+>  * /
+> https://github.com/hzpeterchen/linux-ci.git ci-for-greg
+> e0fe4d5 Merge 'ci-for-greg'
+> e160513 usb: chipidea: don't redefine __ffs()
+> 93b27aa usb: chipidea: fix precedence bug in ci_requests_show()
+> 67d0531 usb: chipidea: move debug files creation/removal to the core
+> 5a958dd usb: chipidea: move role to debugfs
+> 038429c usb: chipidea: convert debug entries in sysfs to debugfs
+> 25dc0fb usb: chipidea: replace interrupt accounting with tracepoints
+> dc43e8c usb: chipidea: convert events to tracepoints
+> a84a5bf usb: chipidea: trim include list in the core
+> f2bf55e usb: chipidea: trim include list in udc code
+> adf1889 usb: chipidea: drop redundant includes
 
-Cool - looking forward to it...
+Yes, I am still waiting for the patches that can be actually
+applied. There is one fix from Felipe and a few that I mentioned above
+and probably also one or two from Svetoslav.
 
-Thanks,
-Jonny
+So, if you feel like including any of the above patches in this round,
+please add them on top of the patchset that you're currently resending
+or at least point me at the fixed versions (that could be, for example,
+the force fullspeed patch) or the patches that can be taken out of
+context of the patchsets that they were sent in.
+
+Regards,
+--
+Alex
