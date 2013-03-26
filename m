@@ -1,131 +1,143 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 26 Mar 2013 17:00:57 +0000
-Subject: [PATCH v2 02/30] arm64: KVM: define HYP and Stage-2 translation page
- flags
+Date: Tue, 26 Mar 2013 17:01:04 +0000
+Subject: [PATCH v2 09/30] arm64: KVM: user space interface
 In-Reply-To: <1364317285-20937-1-git-send-email-marc.zyngier@arm.com>
 References: <1364317285-20937-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1364317285-20937-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1364317285-20937-10-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add HYP and S2 page flags, for both normal and device memory.
+Provide the kvm.h file that defines the user space visible
+interface.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/pgtable-hwdef.h | 13 +++++++++++++
- arch/arm64/include/asm/pgtable.h       | 13 +++++++++++++
- arch/arm64/mm/mmu.c                    |  6 +++++-
- 3 files changed, 31 insertions(+), 1 deletion(-)
+ arch/arm64/include/uapi/asm/kvm.h | 117 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 117 insertions(+)
+ create mode 100644 arch/arm64/include/uapi/asm/kvm.h
 
-diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
-index 75fd13d..acb4ee5 100644
---- a/arch/arm64/include/asm/pgtable-hwdef.h
-+++ b/arch/arm64/include/asm/pgtable-hwdef.h
-@@ -35,6 +35,7 @@
- /*
-  * Section
-  */
-+#define PMD_SECT_USER		(_AT(pteval_t, 1) << 6)		/* AP[1] */
- #define PMD_SECT_S		(_AT(pmdval_t, 3) << 8)
- #define PMD_SECT_AF		(_AT(pmdval_t, 1) << 10)
- #define PMD_SECT_NG		(_AT(pmdval_t, 1) << 11)
-@@ -68,6 +69,18 @@
- #define PTE_ATTRINDX_MASK	(_AT(pteval_t, 7) << 2)
- 
- /*
-+ * 2nd stage PTE definitions
-+ */
-+#define PTE_S2_RDONLY		 (_AT(pteval_t, 1) << 6)   /* HAP[1]   */
-+#define PTE_S2_RDWR		 (_AT(pteval_t, 2) << 6)   /* HAP[2:1] */
-+
+diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+new file mode 100644
+index 0000000..d9c4d76
+--- /dev/null
++++ b/arch/arm64/include/uapi/asm/kvm.h
+@@ -0,0 +1,117 @@
 +/*
-+ * EL2/HYP PTE/PMD definitions
++ * Copyright (C) 2012 - ARM Ltd
++ * Author: Marc Zyngier <marc.zyngier@arm.com>
++ *
++ * Derived from arch/arm/include/uapi/asm/kvm.h:
++ * Copyright (C) 2012 - Virtual Open Systems and Columbia University
++ * Author: Christoffer Dall <c.dall@virtualopensystems.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+#define PMD_HYP			PMD_SECT_USER
-+#define PTE_HYP			PTE_USER
 +
-+/*
-  * 40-bit physical address supported.
-  */
- #define PHYS_MASK_SHIFT		(40)
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index e333a24..11c608a 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -60,6 +60,7 @@ extern void __pgd_error(const char *file, int line, unsigned long val);
- #define _PAGE_DEFAULT		PTE_TYPE_PAGE | PTE_AF
- 
- extern pgprot_t pgprot_default;
-+extern pgprot_t	pgprot_device;
- 
- #define __pgprot_modify(prot,mask,bits) \
- 	__pgprot((pgprot_val(prot) & ~(mask)) | (bits))
-@@ -76,6 +77,12 @@ extern pgprot_t pgprot_default;
- #define PAGE_KERNEL		_MOD_PROT(pgprot_default, PTE_PXN | PTE_UXN | PTE_DIRTY)
- #define PAGE_KERNEL_EXEC	_MOD_PROT(pgprot_default, PTE_UXN | PTE_DIRTY)
- 
-+#define PAGE_HYP		_MOD_PROT(pgprot_default, PTE_HYP)
-+#define PAGE_HYP_DEVICE		_MOD_PROT(pgprot_device, PTE_HYP)
++#ifndef __ARM_KVM_H__
++#define __ARM_KVM_H__
 +
-+#define PAGE_S2			_MOD_PROT(pgprot_default, PTE_USER | PTE_S2_RDONLY)
-+#define PAGE_S2_DEVICE		_MOD_PROT(pgprot_device, PTE_USER | PTE_S2_RDWR)
++#define KVM_SPSR_EL1	0
++#define KVM_NR_SPSR	1
 +
- #define __PAGE_NONE		__pgprot(((_PAGE_DEFAULT) & ~PTE_TYPE_MASK) | PTE_PROT_NONE)
- #define __PAGE_SHARED		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN)
- #define __PAGE_SHARED_EXEC	__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN)
-@@ -197,6 +204,12 @@ extern pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
- 
- #define pmd_bad(pmd)		(!(pmd_val(pmd) & 2))
- 
-+#define pmd_table(pmd)		((pmd_val(pmd) & PMD_TYPE_MASK) == \
-+				 PMD_TYPE_TABLE)
-+#define pmd_sect(pmd)		((pmd_val(pmd) & PMD_TYPE_MASK) == \
-+				 PMD_TYPE_SECT)
++#ifndef __ASSEMBLY__
++#include <asm/types.h>
++#include <asm/ptrace.h>
 +
++#define __KVM_HAVE_GUEST_DEBUG
++#define __KVM_HAVE_IRQ_LINE
 +
- static inline void set_pmd(pmd_t *pmdp, pmd_t pmd)
- {
- 	*pmdp = pmd;
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 224b44a..df03aea 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -44,6 +44,7 @@ struct page *empty_zero_page;
- EXPORT_SYMBOL(empty_zero_page);
- 
- pgprot_t pgprot_default;
-+pgprot_t pgprot_device;
- EXPORT_SYMBOL(pgprot_default);
- 
- static pmdval_t prot_sect_kernel;
-@@ -127,10 +128,11 @@ early_param("cachepolicy", early_cachepolicy);
-  */
- static void __init init_mem_pgprot(void)
- {
--	pteval_t default_pgprot;
-+	pteval_t default_pgprot, device_pgprot;
- 	int i;
- 
- 	default_pgprot = PTE_ATTRINDX(MT_NORMAL);
-+	device_pgprot = PTE_ATTRINDX(MT_DEVICE_nGnRE) | PTE_PXN | PTE_UXN;
- 	prot_sect_kernel = PMD_TYPE_SECT | PMD_SECT_AF | PMD_ATTRINDX(MT_NORMAL);
- 
- #ifdef CONFIG_SMP
-@@ -138,6 +140,7 @@ static void __init init_mem_pgprot(void)
- 	 * Mark memory with the "shared" attribute for SMP systems
- 	 */
- 	default_pgprot |= PTE_SHARED;
-+	device_pgprot |= PTE_SHARED;
- 	prot_sect_kernel |= PMD_SECT_S;
- #endif
- 
-@@ -147,6 +150,7 @@ static void __init init_mem_pgprot(void)
- 	}
- 
- 	pgprot_default = __pgprot(PTE_TYPE_PAGE | PTE_AF | default_pgprot);
-+	pgprot_device = __pgprot(PTE_TYPE_PAGE | PTE_AF | device_pgprot);
- }
- 
- pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
++#define KVM_REG_SIZE(id)						\
++	(1U << (((id) & KVM_REG_SIZE_MASK) >> KVM_REG_SIZE_SHIFT))
++
++struct kvm_regs {
++	struct user_pt_regs regs;	/* sp = sp_el0 */
++
++	__u64	sp_el1;
++	__u64	elr_el1;
++
++	__u64	spsr[KVM_NR_SPSR];
++
++	struct user_fpsimd_state fp_regs;
++};
++
++/* Supported Processor Types */
++#define KVM_ARM_TARGET_AEM_V8		0
++#define KVM_ARM_TARGET_FOUNDATION_V8	1
++#define KVM_ARM_TARGET_CORTEX_A57	2
++
++#define KVM_ARM_NUM_TARGETS		3
++
++/* KVM_ARM_SET_DEVICE_ADDR ioctl id encoding */
++#define KVM_ARM_DEVICE_TYPE_SHIFT	0
++#define KVM_ARM_DEVICE_TYPE_MASK	(0xffff << KVM_ARM_DEVICE_TYPE_SHIFT)
++#define KVM_ARM_DEVICE_ID_SHIFT		16
++#define KVM_ARM_DEVICE_ID_MASK		(0xffff << KVM_ARM_DEVICE_ID_SHIFT)
++
++/* Supported device IDs */
++#define KVM_ARM_DEVICE_VGIC_V2		0
++
++/* Supported VGIC address types  */
++#define KVM_VGIC_V2_ADDR_TYPE_DIST	0
++#define KVM_VGIC_V2_ADDR_TYPE_CPU	1
++
++#define KVM_VGIC_V2_DIST_SIZE		0x1000
++#define KVM_VGIC_V2_CPU_SIZE		0x2000
++
++struct kvm_vcpu_init {
++	__u32 target;
++	__u32 features[7];
++};
++
++struct kvm_sregs {
++};
++
++struct kvm_fpu {
++};
++
++struct kvm_guest_debug_arch {
++};
++
++struct kvm_debug_exit_arch {
++};
++
++struct kvm_sync_regs {
++};
++
++struct kvm_arch_memory_slot {
++};
++
++/* KVM_IRQ_LINE irq field index values */
++#define KVM_ARM_IRQ_TYPE_SHIFT		24
++#define KVM_ARM_IRQ_TYPE_MASK		0xff
++#define KVM_ARM_IRQ_VCPU_SHIFT		16
++#define KVM_ARM_IRQ_VCPU_MASK		0xff
++#define KVM_ARM_IRQ_NUM_SHIFT		0
++#define KVM_ARM_IRQ_NUM_MASK		0xffff
++
++/* irq_type field */
++#define KVM_ARM_IRQ_TYPE_CPU		0
++#define KVM_ARM_IRQ_TYPE_SPI		1
++#define KVM_ARM_IRQ_TYPE_PPI		2
++
++/* out-of-kernel GIC cpu interrupt injection irq_number field */
++#define KVM_ARM_IRQ_CPU_IRQ		0
++#define KVM_ARM_IRQ_CPU_FIQ		1
++
++/* Highest supported SPI, from VGIC_NR_IRQS */
++#define KVM_ARM_IRQ_GIC_MAX		127
++
++#endif
++
++#endif /* __ARM_KVM_H__ */
 -- 
 1.8.1.4
