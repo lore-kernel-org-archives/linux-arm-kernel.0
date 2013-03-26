@@ -1,109 +1,136 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 26 Mar 2013 17:01:18 +0000
-Subject: [PATCH v2 23/30] arm64: KVM: define 32bit specific registers
+Date: Tue, 26 Mar 2013 17:01:16 +0000
+Subject: [PATCH v2 21/30] arm64: KVM: PSCI implementation
 In-Reply-To: <1364317285-20937-1-git-send-email-marc.zyngier@arm.com>
 References: <1364317285-20937-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1364317285-20937-24-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1364317285-20937-22-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the 32bit specific registers (SPSRs, cp15...).
-
-Most CPU registers are directly mapped to a 64bit register
-(r0->x0...). Only the SPSRs have separate registers.
-
-cp15 registers are also mapped into their 64bit counterpart in most
-cases.
+Wire the PSCI backend into the exit handling code.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_asm.h  | 38 +++++++++++++++++++++++++++++++++++++-
- arch/arm64/include/asm/kvm_host.h |  5 ++++-
- arch/arm64/include/uapi/asm/kvm.h |  7 ++++++-
- 3 files changed, 47 insertions(+), 3 deletions(-)
+ arch/arm64/include/asm/kvm_host.h |  2 +-
+ arch/arm64/include/asm/kvm_psci.h | 23 +++++++++++++++++++++++
+ arch/arm64/include/uapi/asm/kvm.h | 16 ++++++++++++++++
+ arch/arm64/kvm/handle_exit.c      | 16 +++++++---------
+ 4 files changed, 47 insertions(+), 10 deletions(-)
+ create mode 100644 arch/arm64/include/asm/kvm_psci.h
 
-diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-index 851fee5..3e31c41 100644
---- a/arch/arm64/include/asm/kvm_asm.h
-+++ b/arch/arm64/include/asm/kvm_asm.h
-@@ -42,7 +42,43 @@
- #define	TPIDR_EL1	18	/* Thread ID, Privileged */
- #define	AMAIR_EL1	19	/* Aux Memory Attribute Indirection Register */
- #define	CNTKCTL_EL1	20	/* Timer Control Register (EL1) */
--#define	NR_SYS_REGS	21
-+/* 32bit specific registers. Keep them at the end of the range */
-+#define	DACR32_EL2	21	/* Domain Access Control Register */
-+#define	IFSR32_EL2	22	/* Instruction Fault Status Register */
-+#define	FPEXC32_EL2	23	/* Floating-Point Exception Control Register */
-+#define	DBGVCR32_EL2	24	/* Debug Vector Catch Register */
-+#define	TEECR32_EL1	25	/* ThumbEE Configuration Register */
-+#define	TEEHBR32_EL1	26	/* ThumbEE Handler Base Register */
-+#define	NR_SYS_REGS	27
-+
-+/* 32bit mapping */
-+#define c0_MPIDR	(MPIDR_EL1 * 2)	/* MultiProcessor ID Register */
-+#define c0_CSSELR	(CSSELR_EL1 * 2)/* Cache Size Selection Register */
-+#define c1_SCTLR	(SCTLR_EL1 * 2)	/* System Control Register */
-+#define c1_ACTLR	(ACTLR_EL1 * 2)	/* Auxiliary Control Register */
-+#define c1_CPACR	(CPACR_EL1 * 2)	/* Coprocessor Access Control */
-+#define c2_TTBR0	(TTBR0_EL1 * 2)	/* Translation Table Base Register 0 */
-+#define c2_TTBR0_high	(c2_TTBR0 + 1)	/* TTBR0 top 32 bits */
-+#define c2_TTBR1	(TTBR1_EL1 * 2)	/* Translation Table Base Register 1 */
-+#define c2_TTBR1_high	(c2_TTBR1 + 1)	/* TTBR1 top 32 bits */
-+#define c2_TTBCR	(TCR_EL1 * 2)	/* Translation Table Base Control R. */
-+#define c3_DACR		(DACR32_EL2 * 2)/* Domain Access Control Register */
-+#define c5_DFSR		(ESR_EL1 * 2)	/* Data Fault Status Register */
-+#define c5_IFSR		(IFSR32_EL2 * 2)/* Instruction Fault Status Register */
-+#define c5_ADFSR	(AFSR0_EL1 * 2)	/* Auxiliary Data Fault Status R */
-+#define c5_AIFSR	(AFSR1_EL1 * 2)	/* Auxiliary Instr Fault Status R */
-+#define c6_DFAR		(FAR_EL1 * 2)	/* Data Fault Address Register */
-+#define c6_IFAR		(c6_DFAR + 1)	/* Instruction Fault Address Register */
-+#define c10_PRRR	(MAIR_EL1 * 2)	/* Primary Region Remap Register */
-+#define c10_NMRR	(c10_PRRR + 1)	/* Normal Memory Remap Register */
-+#define c12_VBAR	(VBAR_EL1 * 2)	/* Vector Base Address Register */
-+#define c13_CID		(CONTEXTIDR_EL1 * 2)	/* Context ID Register */
-+#define c13_TID_URW	(TPIDR_EL0 * 2)	/* Thread ID, User R/W */
-+#define c13_TID_URO	(TPIDRRO_EL0 * 2)/* Thread ID, User R/O */
-+#define c13_TID_PRIV	(TPIDR_EL1 * 2)	/* Thread ID, Privileged */
-+#define c10_AMAIR	(AMAIR_EL1 * 2)	/* Aux Memory Attr Indirection Reg */
-+#define c14_CNTKCTL	(CNTKCTL_EL1 * 2) /* Timer Control Register (PL1) */
-+#define NR_CP15_REGS	(NR_SYS_REGS * 2)
- 
- #define ARM_EXCEPTION_IRQ	  0
- #define ARM_EXCEPTION_TRAP	  1
 diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 9884c32..544866a 100644
+index 36eb276..9884c32 100644
 --- a/arch/arm64/include/asm/kvm_host.h
 +++ b/arch/arm64/include/asm/kvm_host.h
-@@ -83,7 +83,10 @@ struct kvm_vcpu_fault_info {
+@@ -34,7 +34,7 @@
+ #include <asm/kvm_vgic.h>
+ #include <asm/kvm_arch_timer.h>
  
- struct kvm_cpu_context {
- 	struct kvm_regs	gp_regs;
--	u64 sys_regs[NR_SYS_REGS];
-+	union {
-+		u64 sys_regs[NR_SYS_REGS];
-+		u32 cp15[NR_CP15_REGS];
-+	};
- };
+-#define KVM_VCPU_MAX_FEATURES 0
++#define KVM_VCPU_MAX_FEATURES 1
  
- typedef struct kvm_cpu_context kvm_cpu_context_t;
+ /* We don't currently support large pages. */
+ #define KVM_HPAGE_GFN_SHIFT(x)	0
+diff --git a/arch/arm64/include/asm/kvm_psci.h b/arch/arm64/include/asm/kvm_psci.h
+new file mode 100644
+index 0000000..d96f054
+--- /dev/null
++++ b/arch/arm64/include/asm/kvm_psci.h
+@@ -0,0 +1,23 @@
++/*
++ * Copyright (C) 2012 - ARM Ltd
++ * Author: Marc Zyngier <marc.zyngier@arm.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#ifndef __ARM64_KVM_PSCI_H__
++#define __ARM64_KVM_PSCI_H__
++
++bool kvm_psci_call(struct kvm_vcpu *vcpu);
++
++#endif /* __ARM64_KVM_PSCI_H__ */
 diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-index b320caa..4dee5c9 100644
+index 891b8e7..b320caa 100644
 --- a/arch/arm64/include/uapi/asm/kvm.h
 +++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -23,7 +23,12 @@
- #define __ARM_KVM_H__
+@@ -69,6 +69,8 @@ struct kvm_regs {
+ #define KVM_VGIC_V2_DIST_SIZE		0x1000
+ #define KVM_VGIC_V2_CPU_SIZE		0x2000
  
- #define KVM_SPSR_EL1	0
--#define KVM_NR_SPSR	1
-+#define KVM_SPSR_SVC	KVM_SPSR_EL1
-+#define KVM_SPSR_ABT	1
-+#define KVM_SPSR_UND	2
-+#define KVM_SPSR_IRQ	3
-+#define KVM_SPSR_FIQ	4
-+#define KVM_NR_SPSR	5
++#define KVM_ARM_VCPU_POWER_OFF		0 /* CPU is started in OFF state */
++
+ struct kvm_vcpu_init {
+ 	__u32 target;
+ 	__u32 features[7];
+@@ -141,6 +143,20 @@ struct kvm_arch_memory_slot {
+ /* Highest supported SPI, from VGIC_NR_IRQS */
+ #define KVM_ARM_IRQ_GIC_MAX		127
  
- #ifndef __ASSEMBLY__
- #include <asm/types.h>
++/* PSCI interface */
++#define KVM_PSCI_FN_BASE		0x95c1ba5e
++#define KVM_PSCI_FN(n)			(KVM_PSCI_FN_BASE + (n))
++
++#define KVM_PSCI_FN_CPU_SUSPEND		KVM_PSCI_FN(0)
++#define KVM_PSCI_FN_CPU_OFF		KVM_PSCI_FN(1)
++#define KVM_PSCI_FN_CPU_ON		KVM_PSCI_FN(2)
++#define KVM_PSCI_FN_MIGRATE		KVM_PSCI_FN(3)
++
++#define KVM_PSCI_RET_SUCCESS		0
++#define KVM_PSCI_RET_NI			((unsigned long)-1)
++#define KVM_PSCI_RET_INVAL		((unsigned long)-2)
++#define KVM_PSCI_RET_DENIED		((unsigned long)-3)
++
+ #endif
+ 
+ #endif /* __ARM_KVM_H__ */
+diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+index 0e1fa4e..fa38230 100644
+--- a/arch/arm64/kvm/handle_exit.c
++++ b/arch/arm64/kvm/handle_exit.c
+@@ -24,26 +24,24 @@
+ #include <asm/kvm_emulate.h>
+ #include <asm/kvm_coproc.h>
+ #include <asm/kvm_mmu.h>
++#include <asm/kvm_psci.h>
+ 
+ typedef int (*exit_handle_fn)(struct kvm_vcpu *, struct kvm_run *);
+ 
+ static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ {
+-	/*
+-	 * Guest called HVC instruction:
+-	 * Let it know we don't want that by injecting an undefined exception.
+-	 */
+-	kvm_debug("hvc: %x (at %08lx)", kvm_vcpu_get_hsr(vcpu) & ((1 << 16) - 1),
+-		  *vcpu_pc(vcpu));
+-	kvm_debug("         HSR: %8x", kvm_vcpu_get_hsr(vcpu));
++	if (kvm_psci_call(vcpu))
++		return 1;
++
+ 	kvm_inject_undefined(vcpu);
+ 	return 1;
+ }
+ 
+ static int handle_smc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ {
+-	/* We don't support SMC; don't do that. */
+-	kvm_debug("smc:@%08lx", *vcpu_pc(vcpu));
++	if (kvm_psci_call(vcpu))
++		return 1;
++
+ 	kvm_inject_undefined(vcpu);
+ 	return 1;
+ }
 -- 
 1.8.1.4
