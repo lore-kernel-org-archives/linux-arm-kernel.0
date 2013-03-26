@@ -1,47 +1,30 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Tue, 26 Mar 2013 14:45:28 -0400 (EDT)
-Subject: [PATCHv2] usb: ehci: unlink_empty_async_suspended() only used
- with CONFIG_PM
-In-Reply-To: <1364321673-2030-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <Pine.LNX.4.44L0.1303261443550.999-100000@iolanthe.rowland.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 26 Mar 2013 18:47:32 +0000 (UTC)
+Subject: [PATCHv3 02/14] ARM: OMAP2+: mbox: remove dependencies with soc.h
+In-Reply-To: <1363145036-14407-1-git-send-email-s-anna@ti.com>
+References: <1363145036-14407-1-git-send-email-s-anna@ti.com>
+Message-ID: <alpine.DEB.2.00.1303261845390.23957@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 27 Mar 2013, Tony Prisk wrote:
+Hi,
 
-> Compiling with !CONFIG_PM generates an unused function warning on
-> unlink_empty_async_suspended().
-> 
-> Enclose the function in a #ifdef CONFIG_PM
-> 
-> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
-> ---
-> Fixed up the commit message.
->  drivers/usb/host/ehci-q.c |    3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/usb/host/ehci-q.c b/drivers/usb/host/ehci-q.c
-> index 23d1369..3638b28 100644
-> --- a/drivers/usb/host/ehci-q.c
-> +++ b/drivers/usb/host/ehci-q.c
-> @@ -1316,6 +1316,7 @@ static void unlink_empty_async(struct ehci_hcd *ehci)
->  	}
->  }
->  
-> +#ifdef CONFIG_PM
->  /* The root hub is suspended; unlink all the async QHs */
->  static void unlink_empty_async_suspended(struct ehci_hcd *ehci)
->  {
-> @@ -1328,7 +1329,7 @@ static void unlink_empty_async_suspended(struct ehci_hcd *ehci)
->  	}
->  	start_iaa_cycle(ehci, false);
->  }
-> -
-> +#endif
->  /* makes sure the async qh will become idle */
->  /* caller must own ehci->lock */
+On Tue, 12 Mar 2013, Suman Anna wrote:
 
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
+> The OMAP mailbox platform driver code has been cleaned up to
+> remove the dependencies with soc.h in preparation for moving
+> the mailbox code to drivers folder.
+> 
+> The code relied on cpu_is_xxx/soc_is_xxx macros previously to
+> pick the the right set of mailbox devices and register with the
+> mailbox driver. This data is now represented in a concise format
+> and moved to the respective omap_hwmod data files and published
+> to the driver through the platform data.
+> 
+> Signed-off-by: Suman Anna <s-anna@ti.com>
 
-... except that the blank line before the comment in the hunk above
-should be retained, not removed.
+The hwmod/dev_attr parts look fine to me, but please start thinking about 
+how to convert the driver to get this data from DT instead.
+
+
+- Paul
