@@ -1,35 +1,86 @@
-From: dgilbert@interlog.com (Douglas Gilbert)
-Date: Tue, 26 Mar 2013 17:09:59 -0400
-Subject: [PATCH] rtc: rtc-at91rm9200: use a variable for storing IMR
-In-Reply-To: <20130326192713.GA31628@localhost>
-References: <1363369032-12639-1-git-send-email-nicolas.ferre@atmel.com>
- <20130326192713.GA31628@localhost>
-Message-ID: <51520EA7.8090808@interlog.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 26 Mar 2013 21:31:45 +0000
+Subject: [RFCv1 07/11] irqchip: armada-370-xp: add MSI support to
+ interrupt controller driver
+In-Reply-To: <20130326221654.34bce6d7@skate>
+References: <1364316746-8702-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130326180245.GA22775@obsidianresearch.com> <20130326221654.34bce6d7@skate>
+Message-ID: <201303262131.45410.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-03-26 03:27 PM, Johan Hovold wrote:
-> On Fri, Mar 15, 2013 at 06:37:12PM +0100, Nicolas Ferre wrote:
->> On some revisions of AT91 SoCs, the RTC IMR register is not working.
->> Instead of elaborating a workaround for that specific SoC or IP version,
->> we simply use a software variable to store the Interrupt Mask Register and
->> modify it for each enabling/disabling of an interrupt. The overhead of this
->> is negligible anyway.
->
-> The patch does not add any memory barriers or register read-backs when
-> manipulating the interrupt-mask variable. This could possibly lead to
-> spurious interrupts both when enabling and disabling the various
-> RTC-interrupts due to write reordering and bus latencies.
->
-> Has this been considered? And is this reason enough for a more targeted
-> work-around so that the SOCs with functional RTC_IMR are not affected?
+On Tuesday 26 March 2013, Thomas Petazzoni wrote:
+> > FWIW, MSI-X is not restricted to 16 bits, so if you can detect from
+> > the PCI layer if it is setting up MSI or MSI-X you could allocate low
+> > bits first to MSI-X and high bits first to MSI, increasing the number
+> > of available MSI/MSI-X vectors.
+> 
+> This could be an improvement. There are also other, non-per-CPU,
+> doorbell interrupts that could potentially be used. Can we consider
+> this a possible improvement, and not something that is fundamentally
+> necessary? For now, I'm trying to get the current feature set merged,
+> and not necessarily to extend it to cover all possible features of the
+> hardware.
 
-The SoCs in question use a single embedded ARM926EJ-S and
-according to the Atmel documentation, that CPU's instruction
-set contains no barrier (or related) instructions.
+If we are extending the DT binding for the current feature, we should
+at least think about how it would look like for future extensions, to
+make sure it won't be fundamentally incompatible.
 
-In the arch/arm/mach-at91 sub-tree of the kernel source
-I can find no use of the wmb() call. Also checked all drivers
-in the kernel containing "at91" and none called wmb().
+> > > +   - marvell,doorbell: Gives the physical address at which PCIe
+> > > +     devices should write to signal an MSI interrupt.
+> > 
+> > Why is this necessary? Can't the doorbell register physical address be
+> > computed by the driver? AFAIK there is no possibility for address
+> > translation on SOC inbound TLPs.
+> 
+> It is the responsibility of the PCIe driver to prepare the 'struct
+> msi_msg', which contains the physical address at which the PCIe device
+> should write to trigger an MSI. But this physical address is part of
+> the interrupt controller registers, so there is no way for the PCIe
+> driver to magically know about it.
 
-Doug Gilbert
+If we introduce an irq_find_msi_host() interface, we can also introduce
+an interface to return the doorbell register, or more. I suppose
+we could actually have a generic version of your mvebu_pcie_setup_msi_irq()
+function that looks up the domain from the device node and calls
+a new irq_domain_ops function, which allocates a free MSI hwirq number,
+creates a mapping for it, and fills out a struct msi_msg with the
+doorbell register and data.
+
+> > Thinking about it a bit, maybe less magic code is needed here, be
+> > explicit about the available interrupts in the DT:
+> > 
+> > pcie-controller {
+> >    msi-interrupts = <0xd0020a04 (1<<16) &msi 16
+> >                      0xd0020a04 (1<<17) &msi 17
+> >                      [..]
+> >    msi-x-interrupts = <0xd0020a04 (1<<1) &msi 1
+> >                        0xd0020a04 (1<<2) &msi 2
+> >                        [..]
+> > 
+> > There is a better chance of that supporting other Marvell SOCs.. Not
+> > sure, just throwing it out there.
+> 
+> Isn't that very verbose, to list each and every MSI interrupt, bit per
+> bit? I'm fine with doing that (except maybe implement both MSI and
+> MSI-X support, I'd like to stick with the current feature set for now),
+> but it sounds like a lot more code in the DT and a lot more code in the
+> driver to parse this... just to get the exact same feature.
+> 
+> Arnd, what is your feeling about this suggestion?
+
+I think we should only need an msi-parent property and let the details
+be handled by the irq driver.
+ 
+> > Also, I'm not super familiar with the irq stuff, but is
+> > irq_find_mapping the best way? Most of the drivers I looked at used
+> > irq_alloc_descs to get a contiguous range of irq numbers and then just
+> > used a simple offset in the handle_irq...
+> 
+> I'll let Arnd answer this one, but I'm pretty sure that using IRQ
+> domains is the way to go. The fact that a number of drivers don't yet
+> use IRQ domains is maybe just because they haven't been converted yet.
+
+Yes, irq_find_mapping is what we should be using here.
+
+	Arnd
