@@ -1,9 +1,9 @@
 From: achew@nvidia.com (Andrew Chew)
-Date: Mon, 25 Mar 2013 18:21:52 -0700
-Subject: [PATCH V5 8/9] ARM: tegra: Provide regulator to pwm-backlight
+Date: Mon, 25 Mar 2013 18:21:48 -0700
+Subject: [PATCH V5 4/9] ARM: EXYNOS: Provide regulator to pwm-backlight
 In-Reply-To: <1364260913-25490-1-git-send-email-achew@nvidia.com>
 References: <1364260913-25490-1-git-send-email-achew@nvidia.com>
-Message-ID: <1364260913-25490-9-git-send-email-achew@nvidia.com>
+Message-ID: <1364260913-25490-5-git-send-email-achew@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,38 +13,68 @@ requirement.
 
 Signed-off-by: Andrew Chew <achew@nvidia.com>
 Acked-by: Alexandre Courbot <acourbot@nvidia.com>
-Acked-by: Stephen Warren <swarren@nvidia.com>
 ---
- arch/arm/boot/dts/tegra20-medcom-wide.dts | 1 +
- arch/arm/boot/dts/tegra20-tamonten.dtsi   | 5 +++++
- 2 files changed, 6 insertions(+)
+ arch/arm/mach-exynos/mach-nuri.c      | 7 +++++++
+ arch/arm/plat-samsung/dev-backlight.c | 9 +++++++++
+ 2 files changed, 16 insertions(+)
 
-diff --git a/arch/arm/boot/dts/tegra20-medcom-wide.dts b/arch/arm/boot/dts/tegra20-medcom-wide.dts
-index a2d6d65..90d665e 100644
---- a/arch/arm/boot/dts/tegra20-medcom-wide.dts
-+++ b/arch/arm/boot/dts/tegra20-medcom-wide.dts
-@@ -32,6 +32,7 @@
+diff --git a/arch/arm/mach-exynos/mach-nuri.c b/arch/arm/mach-exynos/mach-nuri.c
+index 1ea7973..0223863 100644
+--- a/arch/arm/mach-exynos/mach-nuri.c
++++ b/arch/arm/mach-exynos/mach-nuri.c
+@@ -294,6 +294,10 @@ static void nuri_bl_exit(struct device *dev)
+ 	gpio_free(EXYNOS4_GPE2(3));
+ }
  
- 		brightness-levels = <0 4 8 16 32 64 128 255>;
- 		default-brightness-level = <6>;
-+		power-supply = <&backlight_power_reg>;
- 	};
- 
- 	sound {
-diff --git a/arch/arm/boot/dts/tegra20-tamonten.dtsi b/arch/arm/boot/dts/tegra20-tamonten.dtsi
-index 6e9d91f..2d8e7f2 100644
---- a/arch/arm/boot/dts/tegra20-tamonten.dtsi
-+++ b/arch/arm/boot/dts/tegra20-tamonten.dtsi
-@@ -485,5 +485,10 @@
- 			regulator-max-microvolt = <5000000>;
- 			regulator-always-on;
- 		};
++/* Dummy regulator for pwm-backlight driver */
++static struct regulator_consumer_supply backlight_supply =
++	REGULATOR_SUPPLY("power", "pwm-backlight");
 +
-+		backlight_power_reg: regulator at 1 {
-+			compatible = "regulator-fixed";
-+			regulator-name = "backlight-power";
-+		};
- 	};
- };
+ /* nuri pwm backlight */
+ static struct platform_pwm_backlight_data nuri_backlight_data = {
+ 	.pwm_id			= 0,
+@@ -1368,6 +1372,9 @@ static void __init nuri_machine_init(void)
+ 	nuri_ehci_init();
+ 	s3c_hsotg_set_platdata(&nuri_hsotg_pdata);
+ 
++	regulator_register_always_on(-1, "backlight-power",
++				     &backlight_supply, 1, 0);
++
+ 	/* Last */
+ 	platform_add_devices(nuri_devices, ARRAY_SIZE(nuri_devices));
+ }
+diff --git a/arch/arm/plat-samsung/dev-backlight.c b/arch/arm/plat-samsung/dev-backlight.c
+index 5f197dc..23ce16b 100644
+--- a/arch/arm/plat-samsung/dev-backlight.c
++++ b/arch/arm/plat-samsung/dev-backlight.c
+@@ -14,12 +14,18 @@
+ #include <linux/platform_device.h>
+ #include <linux/slab.h>
+ #include <linux/io.h>
++#include <linux/regulator/machine.h>
++#include <linux/regulator/fixed.h>
+ #include <linux/pwm_backlight.h>
+ 
+ #include <plat/devs.h>
+ #include <plat/gpio-cfg.h>
+ #include <plat/backlight.h>
+ 
++/* Dummy regulator for pwm-backlight driver */
++static struct regulator_consumer_supply backlight_supply =
++	REGULATOR_SUPPLY("power", "pwm-backlight");
++
+ static int samsung_bl_init(struct device *dev)
+ {
+ 	int ret = 0;
+@@ -37,6 +43,9 @@ static int samsung_bl_init(struct device *dev)
+ 	/* Configure GPIO pin with specific GPIO function for PWM timer */
+ 	s3c_gpio_cfgpin(bl_gpio_info->no, bl_gpio_info->func);
+ 
++	regulator_register_always_on(-1, "backlight-power",
++				     &backlight_supply, 1, 0);
++
+ 	return 0;
+ }
+ 
 -- 
 1.8.1.5
