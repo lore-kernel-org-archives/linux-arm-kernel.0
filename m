@@ -1,78 +1,50 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Tue, 26 Mar 2013 08:38:42 +0100
-Subject: [PATCH v5 7/7] irqchip: s3c24xx: add devicetree support
-In-Reply-To: <201303252200.46258.arnd@arndb.de>
-References: <201303252226.21402.heiko@sntech.de>
- <201303252234.21314.heiko@sntech.de> <201303252200.46258.arnd@arndb.de>
-Message-ID: <201303260838.42804.heiko@sntech.de>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Tue, 26 Mar 2013 08:37:09 +0100
+Subject: [PATCH V5 9/9] pwm_bl: Add mandatory backlight power regulator
+In-Reply-To: <1364260913-25490-10-git-send-email-achew@nvidia.com>
+References: <1364260913-25490-1-git-send-email-achew@nvidia.com>
+ <1364260913-25490-10-git-send-email-achew@nvidia.com>
+Message-ID: <20130326073709.GB31388@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Mon, Mar 25, 2013 at 06:21:53PM -0700, Andrew Chew wrote:
+[...]
+> diff --git a/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt b/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt
+> index 1e4fc72..cb2d46a 100644
+> --- a/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt
+> +++ b/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt
+> @@ -10,6 +10,11 @@ Required properties:
+>        last value in the array represents a 100% duty cycle (brightest).
+>    - default-brightness-level: the default brightness level (index into the
+>        array defined by the "brightness-levels" property)
+> +  - power-supply: A phandle to the regulator device tree node. This
+> +      regulator will be turned on and off as the pwm is enabled and disabled.
 
-thanks again for taking the time to look at the changes.
+Please use "PWM" instead of "pwm" in prose.
 
+>  Optional properties:
+>    - pwm-names: a list of names for the PWM devices specified in the
+> @@ -19,10 +24,19 @@ Optional properties:
+>  
+>  Example:
+>  
+> +	bl_en: fixed-regulator {
+> +                compatible = "regulator-fixed";
+> +                regulator-name = "bl-en-supply";
+> +                regulator-boot-on;
+> +                gpio = <&some_gpio>;
+> +                enable-active-high;
+> +	};
 
-Am Montag, 25. M?rz 2013, 23:00:46 schrieb Arnd Bergmann:
-> On Monday 25 March 2013, Heiko St?bner wrote:
-> > Add the necessary code to initialize the interrupt controller
-> > thru devicetree data using the irqchip infrastructure.
-> > 
-> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> 
-> The binding looks fine now. I have a few detail comments but am happy
-> with the series otherwise.
-> 
-> > +Required properties:
-> > +- compatible: Compatible property value should be "samsung,s3c24xx-irq"
-> > +  for non s3c2416 machines and "samsung,s3c2416-irq" for s3c2416
-> > machines
-> 
-> We try to avoid wildcards in the "compatible" properties. Better use
-> the name of the first SoC that had this controller, and let the other
-> ones mark themselves as compatible with that one.
-> 
-> I guess "samsung,s3c2410-irq" would be the right identifier here.
+This uses a mix of tabs and spaces for indentation. Please stick to
+tabs.
 
-ok, sounds sensible
-
-
-> > +- #interrupt-cells : Specifies the number of cells needed to encode an
-> > +  interrupt source. The value shall be 4 and interrupt descriptor shall
-> > +  have the following format:
-> > +      <ctrl_num ctrl_irq parent_irq type>
-> > +
-> > +  ctrl_num contains the controller to use:
-> > +      - 0 ... main controller
-> > +      - 1 ... sub controller
-> > +      - 2 ... second main controller on s3c2416 and s3c2450
-> > +  ctrl_irq contains the interrupt bit of the controller
-> > +  parent_irq contains the parent bit in the main controller and will be
-> > +             ignored in main controllers
-> 
-> I expected the second and third cell to be in the opposite order, so
-> the meaning of the second cell is always the same.
-
-ok, so we do <ctrl_num parent_irq ctrl_irq type>, right? ... As it only 
-involves exchanging the intspec values, that's easy :-)
-
-
-> > +	/* we're using individual domains for the non-dt case
-> > +	 * and one big domain for the dt case where the subintc
-> > +	 * starts at hwirq number 32.
-> > +	 */
-> > +	offset = (intc->domain->of_node) ? 32 : 0;
-> 
-> Wouldn't it be easier to always use the same setup for the domains here?
-
-nope ... the non-dt domains are not uniform (different lengths and start-irqs) 
-to recreate the static irq mappings that are still needed. For the non-dt case 
-it also implement the handling of the external interrupts that is not part of 
-the interrupt-controller itself but comes from the gpio-registers and will 
-move to pinctrl for dt machines.
-
-My hope is still to move to dt in a "reasonable" time, so this stuff can go 
-away then altogether.
-
-
-Heiko
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130326/5f2190e7/attachment.sig>
