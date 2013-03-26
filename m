@@ -1,35 +1,39 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 26 Mar 2013 20:40:10 +0800
-Subject: [PATCH 05/15] cpuidle: imx6: remove timer broadcast initialization
-In-Reply-To: <51516DC1.1000807@linaro.org>
-References: <1364234140-514-1-git-send-email-daniel.lezcano@linaro.org>
- <1364234140-514-6-git-send-email-daniel.lezcano@linaro.org>
- <20130326072458.GA7141@S2101-09.ap.freescale.net>
- <51516DC1.1000807@linaro.org>
-Message-ID: <CAAQ0ZWQ-zex62SKNREK+fuRSg-djpu6dF-qN1Me+8ZEJ=E3F9w@mail.gmail.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 26 Mar 2013 09:43:38 -0300
+Subject: mvebu: Device bus driver resurrection
+Message-ID: <20130326124337.GD2454@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 26, 2013 at 10:43:29AM +0100, Daniel Lezcano wrote:
-> Hi Shawn,
->
-> actually this is because the patch applies on top of:
->
-Ah, ok. It will be helpful for people who want to test the series on
-their platform, if you can publish a branch for that.
+Hello everyone,
 
-Shawn
+Now that we've all agreed on a mvebu mbus driver (or a first version of it)
+I'd like to resurrect the Device Bus driver.
 
-> commit 12e849504b861470e5bf991f79c0be71b97c8dac
-> Author: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Date:   Thu Mar 21 12:21:33 2013 +0000
->
->     cpuidle / imx6 : use CPUIDLE_FLAG_TIMER_STOP flag
->
->     Use the CPUIDLE_FLAG_TIMER_STOP and let the cpuidle framework
->     to handle the CLOCK_EVT_NOTIFY_BROADCAST_ENTER/EXIT when entering
->     this state.
->
->     Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->     Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->     Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+As far as I can remember, the last things said about this driver were:
+
+  * The timing parameters should be in {nano,pico,etc} seconds,
+    instead of ticks.
+
+  * Although not everyone agreed, this driver was a good thing to have
+    so we no longer depend on the bootloader setting these parameters.
+    
+  * The address decoding windows should *not* be setup by this driver,
+    but rather be described in the device tree itself.
+
+If anyone has aditional comments, please speak your mind.
+
+My plan is to address all of the above comments, and send a v2 soon.
+
+However, since we do not yet describe the address windows at the device tree,
+the plan is to do window allocation/release in this devbus driver
+**only as a temporal solution**.
+
+Once the address decoding windows are properly described in the DTS,
+we can remove that handling from the driver for good.
+
+Does this sound sane enough?
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
