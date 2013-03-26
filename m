@@ -1,44 +1,47 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 26 Mar 2013 17:18:37 +0100
-Subject: [PATCHv6 15/17] arm: mvebu: PCIe Device Tree informations for Armada
- 370 DB
+Date: Tue, 26 Mar 2013 17:18:38 +0100
+Subject: [PATCHv6 16/17] arm: mvebu: PCIe Device Tree informations for Armada
+ XP GP
 In-Reply-To: <1364314719-1049-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1364314719-1049-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1364314719-1049-16-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1364314719-1049-17-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Marvell evaluation board (DB) for the Armada 370 SoC has 2
-physical full-size PCIe slots, so we enable the corresponding PCIe
-interfaces in the Device Tree.
+The Marvell Armada XP GP board has 3 physical full-size PCIe slots, so
+we enable the corresponding PCIe interfaces in the Device Tree.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-370-db.dts |   17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ arch/arm/boot/dts/armada-xp-gp.dts |   21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
-index e34b280..6403acd 100644
---- a/arch/arm/boot/dts/armada-370-db.dts
-+++ b/arch/arm/boot/dts/armada-370-db.dts
-@@ -94,5 +94,22 @@
- 				spi-max-frequency = <50000000>;
+diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
+index 1c8afe2..e2bf6b4 100644
+--- a/arch/arm/boot/dts/armada-xp-gp.dts
++++ b/arch/arm/boot/dts/armada-xp-gp.dts
+@@ -109,5 +109,26 @@
+ 				spi-max-frequency = <108000000>;
  			};
  		};
 +
 +		pcie-controller {
 +			status = "okay";
++
 +			/*
-+			 * The two PCIe units are accessible through
-+			 * both standard PCIe slots and mini-PCIe
-+			 * slots on the board.
++			 * The 3 slots are physically present as
++			 * standard PCIe slots on the board.
 +			 */
 +			pcie at 1,0 {
 +				/* Port 0, Lane 0 */
 +				status = "okay";
 +			};
-+			pcie at 2,0 {
-+				/* Port 1, Lane 0 */
++			pcie at 9,0 {
++				/* Port 2, Lane 0 */
++				status = "okay";
++			};
++			pcie at 10,0 {
++				/* Port 3, Lane 0 */
 +				status = "okay";
 +			};
 +		};
