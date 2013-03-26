@@ -1,47 +1,52 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 26 Mar 2013 20:41:40 +0100
-Subject: [PATCH 1/2] ARM: kirkwood: fix a not initialized variable in
- the sound subsystem
-In-Reply-To: <20130326190513.1671a3be@armhf>
-References: <20130326190513.1671a3be@armhf>
-Message-ID: <5151F9F4.2040005@gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 26 Mar 2013 12:47:41 -0700
+Subject: [PATCH] ARM: mach-imx: clk-busy: Adapt to new the clk_mux
+ structure
+In-Reply-To: <1364305330-21638-1-git-send-email-fabio.estevam@freescale.com>
+References: <1364305330-21638-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20130326194741.4014.86133@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/26/2013 07:05 PM, Jean-Francois Moine wrote:
-> In the function kirkwood_set_rate, in case of a non dco supported rate
-> and no external clock, the clock source was set to an undefined value.
-> This patch just displays a message without changing the clock source.
->
-> Signed-off-by: Jean-Francois Moine<moinejf@free.fr>
+Quoting Fabio Estevam (2013-03-26 06:42:10)
+> Commit ce4f3313b05 (clk: add table lookup to mux) caused the following build 
+> error on imx_v4_v5_defconfig/imx_v6_v7_defconfig:
+> 
+> arch/arm/mach-imx/clk-busy.c:172:11: error: 'struct clk_mux' has no member named 'width'
+> 
+> Fix it by passing the 'mask' field.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+
+Oops!  I just sent the same patch to the list.  I'll take yours into
+clk-next since you were first Fabio ;-)
+
+Thanks,
+Mike
+
 > ---
->   sound/soc/kirkwood/kirkwood-i2s.c |    3 +++
->   1 file changed, 3 insertions(+)
->
-> diff --git a/sound/soc/kirkwood/kirkwood-i2s.c b/sound/soc/kirkwood/kirkwood-i2s.c
-> index c74c890..afca1ec 100644
-> --- a/sound/soc/kirkwood/kirkwood-i2s.c
-> +++ b/sound/soc/kirkwood/kirkwood-i2s.c
-> @@ -118,6 +118,9 @@ static void kirkwood_set_rate(struct snd_soc_dai *dai,
->   		clk_set_rate(priv->extclk, 256 * rate);
->
->   		clks_ctrl = KIRKWOOD_MCLK_SOURCE_EXTCLK;
-> +	} else {
-> +		dev_err(dai->dev, "%s: no clock\n", __func__);
-> +		return;
->   	}
->   	writel(clks_ctrl, priv->io + KIRKWOOD_CLOCKS_CTRL);
->   }
-
-NACK.
-
-Having no clock at all should be catched during _probe. Moreover,
-not having the internal clock enabled will lead to system hang due to
-clock gating. You should rather pass an optional (DT-only) extclk phandle
-on the second clocks property.
-
-Sebastian
-
-P.S. as this is alsa stuff you should have some alsa maintainers on your
-Cc list. Please run ./scripts/get_maintainer.pl on your patches next time.
-It will give you a list of people you have to to Cc.
+>  arch/arm/mach-imx/clk-busy.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-imx/clk-busy.c b/arch/arm/mach-imx/clk-busy.c
+> index 1ab91b5..85b728c 100644
+> --- a/arch/arm/mach-imx/clk-busy.c
+> +++ b/arch/arm/mach-imx/clk-busy.c
+> @@ -169,7 +169,7 @@ struct clk *imx_clk_busy_mux(const char *name, void __iomem *reg, u8 shift,
+>  
+>         busy->mux.reg = reg;
+>         busy->mux.shift = shift;
+> -       busy->mux.width = width;
+> +       busy->mux.mask = BIT(width) - 1;
+>         busy->mux.lock = &imx_ccm_lock;
+>         busy->mux_ops = &clk_mux_ops;
+>  
+> -- 
+> 1.7.9.5
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
