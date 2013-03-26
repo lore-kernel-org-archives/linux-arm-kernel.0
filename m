@@ -1,100 +1,171 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Tue, 26 Mar 2013 18:43:38 +0100
-Subject: [PATCH v2 06/10] arm: zynq: Add support for system reset
+Date: Tue, 26 Mar 2013 18:43:41 +0100
+Subject: [PATCH v2 09/10] arm: zynq: Add hotplug support
 In-Reply-To: <1364319822-5504-1-git-send-email-michal.simek@xilinx.com>
 References: <1364319822-5504-1-git-send-email-michal.simek@xilinx.com>
-Message-ID: <62a24b6d95de2f126cf7e6985acf1757cac69927.1364319776.git.michal.simek@xilinx.com>
+Message-ID: <a972b7b7491f7f83b42a40d97de3fb38d25ecc47.1364319776.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Do system reset via slcr registers.
-
 Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
-v2: Fix comment
-    use writel instead of __raw_writel
-    Do not use PSS - use PS instead
----
- arch/arm/mach-zynq/common.c |    6 ++++++
- arch/arm/mach-zynq/common.h |    1 +
- arch/arm/mach-zynq/slcr.c   |   28 ++++++++++++++++++++++++++++
- 3 files changed, 35 insertions(+)
 
-diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
-index 2cb94ab..4ad3560 100644
---- a/arch/arm/mach-zynq/common.c
-+++ b/arch/arm/mach-zynq/common.c
-@@ -92,6 +92,11 @@ static void __init xilinx_map_io(void)
- 	zynq_scu_map_io();
- }
+---
+v2: Change platform_cpu_die name function to zynq_platform_cpu_dio
+    Fix header
+    Add cpu compilation flags to be able to build on V6 too
+---
+ arch/arm/mach-zynq/Makefile  |    3 ++
+ arch/arm/mach-zynq/common.h  |    3 ++
+ arch/arm/mach-zynq/hotplug.c |  104 ++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-zynq/platsmp.c |    3 ++
+ 4 files changed, 113 insertions(+)
+ create mode 100644 arch/arm/mach-zynq/hotplug.c
+
+diff --git a/arch/arm/mach-zynq/Makefile b/arch/arm/mach-zynq/Makefile
+index b595d22..1b25d92 100644
+--- a/arch/arm/mach-zynq/Makefile
++++ b/arch/arm/mach-zynq/Makefile
+@@ -4,4 +4,7 @@
  
-+static void xilinx_system_reset(char mode, const char *cmd)
-+{
-+	slcr_system_reset();
-+}
-+
- static const char *xilinx_dt_match[] = {
- 	"xlnx,zynq-zc702",
- 	"xlnx,zynq-7000",
-@@ -104,4 +109,5 @@ MACHINE_START(XILINX_EP107, "Xilinx Zynq Platform")
- 	.init_machine	= xilinx_init_machine,
- 	.init_time	= xilinx_zynq_timer_init,
- 	.dt_compat	= xilinx_dt_match,
-+	.restart	= xilinx_system_reset,
- MACHINE_END
+ # Common support
+ obj-y				:= common.o slcr.o
++CFLAGS_REMOVE_hotplug.o		=-march=armv6k
++CFLAGS_hotplug.o 		=-Wa,-march=armv7-a -mcpu=cortex-a9
++obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
+ obj-$(CONFIG_SMP)		+= headsmp.o platsmp.o
 diff --git a/arch/arm/mach-zynq/common.h b/arch/arm/mach-zynq/common.h
-index e30898a..e5628f7 100644
+index 33cdc23..7a1eaec 100644
 --- a/arch/arm/mach-zynq/common.h
 +++ b/arch/arm/mach-zynq/common.h
-@@ -18,6 +18,7 @@
- #define __MACH_ZYNQ_COMMON_H__
- 
- extern int slcr_init(void);
-+extern void slcr_system_reset(void);
- 
+@@ -34,4 +34,7 @@ extern struct smp_operations zynq_smp_ops __initdata;
  extern void __iomem *zynq_slcr_base;
  extern void __iomem *scu_base;
-diff --git a/arch/arm/mach-zynq/slcr.c b/arch/arm/mach-zynq/slcr.c
-index 1883b70..3b4695b 100644
---- a/arch/arm/mach-zynq/slcr.c
-+++ b/arch/arm/mach-zynq/slcr.c
-@@ -32,9 +32,37 @@
- #define SLCR_UNLOCK_MAGIC		0xDF0D
- #define SLCR_UNLOCK			0x8   /* SCLR unlock register */
  
-+#define SLCR_PS_RST_CTRL_OFFSET		0x200 /* PS Software Reset Control */
-+#define SLCR_REBOOT_STATUS		0x258 /* PS Reboot Status */
++/* Hotplug */
++extern void zynq_platform_cpu_die(unsigned int cpu);
 +
- void __iomem *zynq_slcr_base;
- 
- /**
-+ * xslcr_system_reset - Reset the entire system.
+ #endif
+diff --git a/arch/arm/mach-zynq/hotplug.c b/arch/arm/mach-zynq/hotplug.c
+new file mode 100644
+index 0000000..64e3d6ec
+--- /dev/null
++++ b/arch/arm/mach-zynq/hotplug.c
+@@ -0,0 +1,104 @@
++/*
++ * Copyright (C) 2012-2013 Xilinx
 + *
++ * based on linux/arch/arm/mach-realview/hotplug.c
++ *
++ * Copyright (C) 2002 ARM Ltd.
++ * All Rights Reserved
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + */
-+void slcr_system_reset(void)
++#include <linux/kernel.h>
++#include <linux/errno.h>
++#include <linux/smp.h>
++
++#include <asm/cacheflush.h>
++#include <asm/cp15.h>
++#include "common.h"
++
++static inline void cpu_enter_lowpower(void)
 +{
-+	u32 reboot;
++	unsigned int v;
 +
++	flush_cache_all();
++	asm volatile(
++	"	mcr	p15, 0, %1, c7, c5, 0\n"
++	"	dsb\n"
 +	/*
-+	 * Unlock the SLCR then reset the system.
-+	 * Note that this seems to require raw i/o
-+	 * functions or there's a lockup?
++	 * Turn off coherency
 +	 */
-+	writel(SLCR_UNLOCK_MAGIC, zynq_slcr_base + SLCR_UNLOCK);
-+
-+	/*
-+	 * Clear 0x0F000000 bits of reboot status register to workaround
-+	 * the FSBL not loading the bitstream after soft-reboot
-+	 * This is a temporary solution until we know more.
-+	 */
-+	reboot = readl(zynq_slcr_base + SLCR_REBOOT_STATUS);
-+	writel(reboot & 0xF0FFFFFF, zynq_slcr_base + SLCR_REBOOT_STATUS);
-+	writel(1, zynq_slcr_base + SLCR_PS_RST_CTRL_OFFSET);
++	"	mrc	p15, 0, %0, c1, c0, 1\n"
++	"	bic	%0, %0, #0x40\n"
++	"	mcr	p15, 0, %0, c1, c0, 1\n"
++	"	mrc	p15, 0, %0, c1, c0, 0\n"
++	"	bic	%0, %0, %2\n"
++	"	mcr	p15, 0, %0, c1, c0, 0\n"
++	  : "=&r" (v)
++	  : "r" (0), "Ir" (CR_C)
++	  : "cc");
 +}
 +
-+/**
-  * xslcr_init()
-  * Returns 0 on success, negative errno otherwise.
-  *
++static inline void cpu_leave_lowpower(void)
++{
++	unsigned int v;
++
++	asm volatile(
++	"	mrc	p15, 0, %0, c1, c0, 0\n"
++	"	orr	%0, %0, %1\n"
++	"	mcr	p15, 0, %0, c1, c0, 0\n"
++	"	mrc	p15, 0, %0, c1, c0, 1\n"
++	"	orr	%0, %0, #0x40\n"
++	"	mcr	p15, 0, %0, c1, c0, 1\n"
++	  : "=&r" (v)
++	  : "Ir" (CR_C)
++	  : "cc");
++}
++
++static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
++{
++	/*
++	 * there is no power-control hardware on this platform, so all
++	 * we can do is put the core into WFI; this is safe as the calling
++	 * code will have already disabled interrupts
++	 */
++	for (;;) {
++		dsb();
++		wfi();
++
++		/*
++		 * Getting here, means that we have come out of WFI without
++		 * having been woken up - this shouldn't happen
++		 *
++		 * Just note it happening - when we're woken, we can report
++		 * its occurrence.
++		 */
++		(*spurious)++;
++	}
++}
++
++/*
++ * platform-specific code to shutdown a CPU
++ *
++ * Called with IRQs disabled
++ */
++void zynq_platform_cpu_die(unsigned int cpu)
++{
++	int spurious = 0;
++
++	/*
++	 * we're ready for shutdown now, so do it
++	 */
++	cpu_enter_lowpower();
++	platform_do_lowpower(cpu, &spurious);
++
++	/*
++	 * bring this CPU back into the world of cache
++	 * coherency, and then restore interrupts
++	 */
++	cpu_leave_lowpower();
++
++	if (spurious)
++		pr_warn("CPU%u: %u spurious wakeup calls\n", cpu, spurious);
++}
+diff --git a/arch/arm/mach-zynq/platsmp.c b/arch/arm/mach-zynq/platsmp.c
+index 062b319..b1be091 100644
+--- a/arch/arm/mach-zynq/platsmp.c
++++ b/arch/arm/mach-zynq/platsmp.c
+@@ -146,4 +146,7 @@ struct smp_operations zynq_smp_ops __initdata = {
+ 	.smp_prepare_cpus	= zynq_smp_prepare_cpus,
+ 	.smp_secondary_init	= zynq_secondary_init,
+ 	.smp_boot_secondary	= zynq_boot_secondary,
++#ifdef CONFIG_HOTPLUG_CPU
++	.cpu_die		= zynq_platform_cpu_die,
++#endif
+ };
 -- 
 1.7.9.7
