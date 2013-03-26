@@ -1,254 +1,114 @@
 From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Tue, 26 Mar 2013 23:09:24 +0100
-Subject: [PATCH v6 5/7] irqchip: s3c24xx: globally keep track of the created
- intc instances
+Date: Tue, 26 Mar 2013 23:09:57 +0100
+Subject: [PATCH v6 6/7] irqchip: s3c24xx: make interrupt handling independent
+ of irq_domain structure
 In-Reply-To: <201303262305.49725.heiko@sntech.de>
 References: <201303262305.49725.heiko@sntech.de>
-Message-ID: <201303262309.24501.heiko@sntech.de>
+Message-ID: <201303262309.57990.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For dt-enabled machines we want to use a big irq_domain over all controllers
-and therefore need to access not only the main controllers but the
-sub-controller as well.
+Keep a pointer to the corresponding s3c_irq_data struct as irq_chip_data.
+This removes the need to fetch the intc struct from the irq_domains
+host_data, thus making it independent of the underlying irq_domain
+structure.
+
+Also keep the real register offset of the interrupt in the s3c_irq_data
+struct to make it independent of the hwirq structure in the irq_domain
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- drivers/irqchip/irq-s3c24xx.c |   99 +++++++++++++++++++++--------------------
- 1 file changed, 50 insertions(+), 49 deletions(-)
+ drivers/irqchip/irq-s3c24xx.c |   25 +++++++++++++++----------
+ 1 file changed, 15 insertions(+), 10 deletions(-)
 
 diff --git a/drivers/irqchip/irq-s3c24xx.c b/drivers/irqchip/irq-s3c24xx.c
-index 7cba4f0..9914abd 100644
+index 9914abd..02b82db 100644
 --- a/drivers/irqchip/irq-s3c24xx.c
 +++ b/drivers/irqchip/irq-s3c24xx.c
-@@ -69,6 +69,14 @@ struct s3c_irq_intc {
- 	struct s3c_irq_data	*irqs;
- };
+@@ -43,6 +43,7 @@
  
-+/*
-+ * Array holding pointers to the global controller structs
-+ * [0] ... main_intc
-+ * [1] ... sub_intc
-+ * [2] ... main_intc2 on s3c2416
-+ */
-+static struct s3c_irq_intc *s3c_intc[3];
-+
+ struct s3c_irq_data {
+ 	unsigned int type;
++	unsigned long offset;
+ 	unsigned long parent_irq;
+ 
+ 	/* data gets filled during init */
+@@ -79,15 +80,15 @@ static struct s3c_irq_intc *s3c_intc[3];
+ 
  static void s3c_irq_mask(struct irq_data *data)
  {
- 	struct s3c_irq_intc *intc = data->domain->host_data;
-@@ -307,9 +315,6 @@ static void s3c_irq_demux(unsigned int irq, struct irq_desc *desc)
- 	chained_irq_exit(chip, desc);
- }
+-	struct s3c_irq_intc *intc = data->domain->host_data;
++	struct s3c_irq_data *irq_data = irq_data_get_irq_chip_data(data);
++	struct s3c_irq_intc *intc = irq_data->intc;
+ 	struct s3c_irq_intc *parent_intc = intc->parent;
+-	struct s3c_irq_data *irq_data = &intc->irqs[data->hwirq];
+ 	struct s3c_irq_data *parent_data;
+ 	unsigned long mask;
+ 	unsigned int irqno;
  
--static struct s3c_irq_intc *main_intc;
--static struct s3c_irq_intc *main_intc2;
--
- static inline int s3c24xx_handle_intc(struct s3c_irq_intc *intc,
- 				      struct pt_regs *regs)
+ 	mask = __raw_readl(intc->reg_mask);
+-	mask |= (1UL << data->hwirq);
++	mask |= (1UL << irq_data->offset);
+ 	__raw_writel(mask, intc->reg_mask);
+ 
+ 	if (parent_intc) {
+@@ -104,14 +105,14 @@ static void s3c_irq_mask(struct irq_data *data)
+ 
+ static void s3c_irq_unmask(struct irq_data *data)
  {
-@@ -345,12 +350,12 @@ static inline int s3c24xx_handle_intc(struct s3c_irq_intc *intc,
- asmlinkage void __exception_irq_entry s3c24xx_handle_irq(struct pt_regs *regs)
+-	struct s3c_irq_intc *intc = data->domain->host_data;
++	struct s3c_irq_data *irq_data = irq_data_get_irq_chip_data(data);
++	struct s3c_irq_intc *intc = irq_data->intc;
+ 	struct s3c_irq_intc *parent_intc = intc->parent;
+-	struct s3c_irq_data *irq_data = &intc->irqs[data->hwirq];
+ 	unsigned long mask;
+ 	unsigned int irqno;
+ 
+ 	mask = __raw_readl(intc->reg_mask);
+-	mask &= ~(1UL << data->hwirq);
++	mask &= ~(1UL << irq_data->offset);
+ 	__raw_writel(mask, intc->reg_mask);
+ 
+ 	if (parent_intc) {
+@@ -123,8 +124,9 @@ static void s3c_irq_unmask(struct irq_data *data)
+ 
+ static inline void s3c_irq_ack(struct irq_data *data)
  {
- 	do {
--		if (likely(main_intc))
--			if (s3c24xx_handle_intc(main_intc, regs))
-+		if (likely(s3c_intc[0]))
-+			if (s3c24xx_handle_intc(s3c_intc[0], regs))
- 				continue;
+-	struct s3c_irq_intc *intc = data->domain->host_data;
+-	unsigned long bitval = 1UL << data->hwirq;
++	struct s3c_irq_data *irq_data = irq_data_get_irq_chip_data(data);
++	struct s3c_irq_intc *intc = irq_data->intc;
++	unsigned long bitval = 1UL << irq_data->offset;
  
--		if (main_intc2)
--			if (s3c24xx_handle_intc(main_intc2, regs))
-+		if (s3c_intc[2])
-+			if (s3c24xx_handle_intc(s3c_intc[2], regs))
- 				continue;
+ 	__raw_writel(bitval, intc->reg_pending);
+ 	if (intc->reg_intpnd)
+@@ -291,8 +293,7 @@ static struct irq_chip s3c_irq_eint0t4 = {
+ static void s3c_irq_demux(unsigned int irq, struct irq_desc *desc)
+ {
+ 	struct irq_chip *chip = irq_desc_get_chip(desc);
+-	struct s3c_irq_intc *intc = desc->irq_data.domain->host_data;
+-	struct s3c_irq_data *irq_data = &intc->irqs[desc->irq_data.hwirq];
++	struct s3c_irq_data *irq_data = irq_desc_get_chip_data(desc);
+ 	struct s3c_irq_intc *sub_intc = irq_data->sub_intc;
+ 	unsigned long src;
+ 	unsigned long msk;
+@@ -406,6 +407,7 @@ static int s3c24xx_irq_map(struct irq_domain *h, unsigned int virq,
  
- 		break;
-@@ -577,11 +582,6 @@ static struct s3c_irq_intc *s3c24xx_init_intc(struct device_node *np,
- 		goto err;
+ 	/* attach controller pointer to irq_data */
+ 	irq_data->intc = intc;
++	irq_data->offset = hw;
+ 
+ 	parent_intc = intc->parent;
+ 
+@@ -444,6 +446,9 @@ static int s3c24xx_irq_map(struct irq_domain *h, unsigned int virq,
+ 		pr_err("irq-s3c24xx: unsupported irqtype %d\n", irq_data->type);
+ 		return -EINVAL;
  	}
++
++	irq_set_chip_data(virq, irq_data);
++
+ 	set_irq_flags(virq, IRQF_VALID);
  
--	if (address == 0x4a000000)
--		main_intc = intc;
--	else if (address == 0x4a000040)
--		main_intc2 = intc;
--
- 	set_handle_irq(s3c24xx_handle_irq);
- 
- 	return intc;
-@@ -670,20 +670,20 @@ static struct s3c_irq_data init_s3c2410subint[32] = {
- 
- void __init s3c2410_init_irq(void)
- {
--	struct s3c_irq_intc *main_intc;
--
- #ifdef CONFIG_FIQ
- 	init_FIQ(FIQ_START);
- #endif
- 
--	main_intc = s3c24xx_init_intc(NULL, &init_s3c2410base[0], NULL, 0x4a000000);
--	if (IS_ERR(main_intc)) {
-+	s3c_intc[0] = s3c24xx_init_intc(NULL, &init_s3c2410base[0], NULL,
-+					0x4a000000);
-+	if (IS_ERR(s3c_intc[0])) {
- 		pr_err("irq: could not create main interrupt controller\n");
- 		return;
- 	}
- 
--	s3c24xx_init_intc(NULL, &init_s3c2410subint[0], main_intc, 0x4a000018);
--	s3c24xx_init_intc(NULL, &init_eint[0], main_intc, 0x560000a4);
-+	s3c_intc[1] = s3c24xx_init_intc(NULL, &init_s3c2410subint[0],
-+					s3c_intc[0], 0x4a000018);
-+	s3c24xx_init_intc(NULL, &init_eint[0], s3c_intc[0], 0x560000a4);
- }
- #endif
- 
-@@ -770,22 +770,22 @@ static struct s3c_irq_data init_s3c2412subint[32] = {
- 
- void s3c2412_init_irq(void)
- {
--	struct s3c_irq_intc *main_intc;
--
- 	pr_info("S3C2412: IRQ Support\n");
- 
- #ifdef CONFIG_FIQ
- 	init_FIQ(FIQ_START);
- #endif
- 
--	main_intc = s3c24xx_init_intc(NULL, &init_s3c2412base[0], NULL, 0x4a000000);
--	if (IS_ERR(main_intc)) {
-+	s3c_intc[0] = s3c24xx_init_intc(NULL, &init_s3c2412base[0], NULL,
-+					0x4a000000);
-+	if (IS_ERR(s3c_intc[0])) {
- 		pr_err("irq: could not create main interrupt controller\n");
- 		return;
- 	}
- 
--	s3c24xx_init_intc(NULL, &init_s3c2412eint[0], main_intc, 0x560000a4);
--	s3c24xx_init_intc(NULL, &init_s3c2412subint[0], main_intc, 0x4a000018);
-+	s3c24xx_init_intc(NULL, &init_s3c2412eint[0], s3c_intc[0], 0x560000a4);
-+	s3c_intc[1] = s3c24xx_init_intc(NULL, &init_s3c2412subint[0],
-+					s3c_intc[0], 0x4a000018);
- }
- #endif
- 
-@@ -869,24 +869,25 @@ static struct s3c_irq_data init_s3c2416_second[32] = {
- 
- void __init s3c2416_init_irq(void)
- {
--	struct s3c_irq_intc *main_intc;
--
- 	pr_info("S3C2416: IRQ Support\n");
- 
- #ifdef CONFIG_FIQ
- 	init_FIQ(FIQ_START);
- #endif
- 
--	main_intc = s3c24xx_init_intc(NULL, &init_s3c2416base[0], NULL, 0x4a000000);
--	if (IS_ERR(main_intc)) {
-+	s3c_intc[0] = s3c24xx_init_intc(NULL, &init_s3c2416base[0], NULL,
-+					0x4a000000);
-+	if (IS_ERR(s3c_intc[0])) {
- 		pr_err("irq: could not create main interrupt controller\n");
- 		return;
- 	}
- 
--	s3c24xx_init_intc(NULL, &init_eint[0], main_intc, 0x560000a4);
--	s3c24xx_init_intc(NULL, &init_s3c2416subint[0], main_intc, 0x4a000018);
-+	s3c24xx_init_intc(NULL, &init_eint[0], s3c_intc[0], 0x560000a4);
-+	s3c_intc[1] = s3c24xx_init_intc(NULL, &init_s3c2416subint[0],
-+					s3c_intc[0], 0x4a000018);
- 
--	s3c24xx_init_intc(NULL, &init_s3c2416_second[0], NULL, 0x4a000040);
-+	s3c_intc[2] = s3c24xx_init_intc(NULL, &init_s3c2416_second[0],
-+					NULL, 0x4a000040);
- }
- 
- #endif
-@@ -947,22 +948,22 @@ static struct s3c_irq_data init_s3c2440subint[32] = {
- 
- void __init s3c2440_init_irq(void)
- {
--	struct s3c_irq_intc *main_intc;
--
- 	pr_info("S3C2440: IRQ Support\n");
- 
- #ifdef CONFIG_FIQ
- 	init_FIQ(FIQ_START);
- #endif
- 
--	main_intc = s3c24xx_init_intc(NULL, &init_s3c2440base[0], NULL, 0x4a000000);
--	if (IS_ERR(main_intc)) {
-+	s3c_intc[0] = s3c24xx_init_intc(NULL, &init_s3c2440base[0], NULL,
-+					0x4a000000);
-+	if (IS_ERR(s3c_intc[0])) {
- 		pr_err("irq: could not create main interrupt controller\n");
- 		return;
- 	}
- 
--	s3c24xx_init_intc(NULL, &init_eint[0], main_intc, 0x560000a4);
--	s3c24xx_init_intc(NULL, &init_s3c2440subint[0], main_intc, 0x4a000018);
-+	s3c24xx_init_intc(NULL, &init_eint[0], s3c_intc[0], 0x560000a4);
-+	s3c_intc[1] = s3c24xx_init_intc(NULL, &init_s3c2440subint[0],
-+					s3c_intc[0], 0x4a000018);
- }
- #endif
- 
-@@ -1020,22 +1021,22 @@ static struct s3c_irq_data init_s3c2442subint[32] = {
- 
- void __init s3c2442_init_irq(void)
- {
--	struct s3c_irq_intc *main_intc;
--
- 	pr_info("S3C2442: IRQ Support\n");
- 
- #ifdef CONFIG_FIQ
- 	init_FIQ(FIQ_START);
- #endif
- 
--	main_intc = s3c24xx_init_intc(NULL, &init_s3c2442base[0], NULL, 0x4a000000);
--	if (IS_ERR(main_intc)) {
-+	s3c_intc[0] = s3c24xx_init_intc(NULL, &init_s3c2442base[0], NULL,
-+					0x4a000000);
-+	if (IS_ERR(s3c_intc[0])) {
- 		pr_err("irq: could not create main interrupt controller\n");
- 		return;
- 	}
- 
--	s3c24xx_init_intc(NULL, &init_eint[0], main_intc, 0x560000a4);
--	s3c24xx_init_intc(NULL, &init_s3c2442subint[0], main_intc, 0x4a000018);
-+	s3c24xx_init_intc(NULL, &init_eint[0], s3c_intc[0], 0x560000a4);
-+	s3c_intc[1] = s3c24xx_init_intc(NULL, &init_s3c2442subint[0],
-+					s3c_intc[0], 0x4a000018);
- }
- #endif
- 
-@@ -1110,21 +1111,21 @@ static struct s3c_irq_data init_s3c2443subint[32] = {
- 
- void __init s3c2443_init_irq(void)
- {
--	struct s3c_irq_intc *main_intc;
--
- 	pr_info("S3C2443: IRQ Support\n");
- 
- #ifdef CONFIG_FIQ
- 	init_FIQ(FIQ_START);
- #endif
- 
--	main_intc = s3c24xx_init_intc(NULL, &init_s3c2443base[0], NULL, 0x4a000000);
--	if (IS_ERR(main_intc)) {
-+	s3c_intc[0] = s3c24xx_init_intc(NULL, &init_s3c2443base[0], NULL,
-+					0x4a000000);
-+	if (IS_ERR(s3c_intc[0])) {
- 		pr_err("irq: could not create main interrupt controller\n");
- 		return;
- 	}
- 
--	s3c24xx_init_intc(NULL, &init_eint[0], main_intc, 0x560000a4);
--	s3c24xx_init_intc(NULL, &init_s3c2443subint[0], main_intc, 0x4a000018);
-+	s3c24xx_init_intc(NULL, &init_eint[0], s3c_intc[0], 0x560000a4);
-+	s3c_intc[1] = s3c24xx_init_intc(NULL, &init_s3c2443subint[0],
-+					s3c_intc[0], 0x4a000018);
- }
- #endif
+ 	if (parent_intc && irq_data->type != S3C_IRQTYPE_NONE) {
 -- 
 1.7.10.4
