@@ -1,107 +1,114 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 26 Mar 2013 17:01:25 +0000
-Subject: [PATCH v2 30/30] arm64: KVM: enable initialization of a 32bit vcpu
+Date: Tue, 26 Mar 2013 17:01:23 +0000
+Subject: [PATCH v2 28/30] arm64: KVM: 32bit specific register world switch
 In-Reply-To: <1364317285-20937-1-git-send-email-marc.zyngier@arm.com>
 References: <1364317285-20937-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1364317285-20937-31-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1364317285-20937-29-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wire the init of a 32bit vcpu by allowing 32bit modes in pstate,
-and providing sensible defaults out of reset state.
-
-This feature is of course conditioned by the presence of 32bit
-capability on the physical CPU.
+Allow registers specific to 32bit guests to be saved/restored
+during the world switch.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_host.h |  2 +-
- arch/arm64/include/uapi/asm/kvm.h |  1 +
- arch/arm64/kvm/guest.c            |  6 ++++++
- arch/arm64/kvm/reset.c            | 22 +++++++++++++++++++++-
- 4 files changed, 29 insertions(+), 2 deletions(-)
+ arch/arm64/kvm/hyp.S | 70 ++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 70 insertions(+)
 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 544866a..67a1924 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -34,7 +34,7 @@
- #include <asm/kvm_vgic.h>
- #include <asm/kvm_arch_timer.h>
+diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+index 4b271b3..55bc3c3 100644
+--- a/arch/arm64/kvm/hyp.S
++++ b/arch/arm64/kvm/hyp.S
+@@ -266,6 +266,74 @@ __kvm_hyp_code_start:
+ 	msr	cntkctl_el1,	x23
+ .endm
  
--#define KVM_VCPU_MAX_FEATURES 1
-+#define KVM_VCPU_MAX_FEATURES 2
- 
- /* We don't currently support large pages. */
- #define KVM_HPAGE_GFN_SHIFT(x)	0
-diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-index 4dee5c9..5bf9c28 100644
---- a/arch/arm64/include/uapi/asm/kvm.h
-+++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -75,6 +75,7 @@ struct kvm_regs {
- #define KVM_VGIC_V2_CPU_SIZE		0x2000
- 
- #define KVM_ARM_VCPU_POWER_OFF		0 /* CPU is started in OFF state */
-+#define KVM_ARM_VCPU_EL1_32BIT		1 /* CPU running a 32bit VM */
- 
- struct kvm_vcpu_init {
- 	__u32 target;
-diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-index c54d40d..c444c8b 100644
---- a/arch/arm64/kvm/guest.c
-+++ b/arch/arm64/kvm/guest.c
-@@ -93,6 +93,12 @@ static int set_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
- 	if (off == KVM_REG_ARM_CORE_REG(regs.pstate)) {
- 		unsigned long mode = (*(unsigned long *)valp) & COMPAT_PSR_MODE_MASK;
- 		switch (mode) {
-+		case COMPAT_PSR_MODE_USR:
-+		case COMPAT_PSR_MODE_FIQ:
-+		case COMPAT_PSR_MODE_IRQ:
-+		case COMPAT_PSR_MODE_SVC:
-+		case COMPAT_PSR_MODE_ABT:
-+		case COMPAT_PSR_MODE_UND:
- 		case PSR_MODE_EL0t:
- 		case PSR_MODE_EL1t:
- 		case PSR_MODE_EL1h:
-diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-index 8cb0244..c50aa89 100644
---- a/arch/arm64/kvm/reset.c
-+++ b/arch/arm64/kvm/reset.c
-@@ -35,6 +35,19 @@ static struct kvm_regs default_regs_reset = {
- 	.regs.pstate = PSR_MODE_EL1h | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT,
- };
- 
-+static struct kvm_regs default_regs_reset32 = {
-+	.regs.pstate = (COMPAT_PSR_MODE_SVC | COMPAT_PSR_A_BIT |
-+			COMPAT_PSR_I_BIT | COMPAT_PSR_F_BIT),
-+};
++.macro skip_32bit_state tmp, target
++	// Skip 32bit state if not needed
++	mrs	\tmp, hcr_el2
++	tbnz	\tmp, #HCR_RW_SHIFT, \target
++.endm
 +
-+static bool cpu_has_32bit_el1(void)
-+{
-+	u64 pfr0;
++.macro skip_tee_state tmp, target
++	// Skip ThumbEE state if not needed
++	mrs	\tmp, id_pfr0_el1
++	tbz	\tmp, #12, \target
++.endm
 +
-+	pfr0 = read_cpuid(ID_AA64PFR0_EL1);
-+	return !!(pfr0 & 0x20);
-+}
++.macro save_guest_32bit_state
++	skip_32bit_state x3, 1f
 +
- /**
-  * kvm_reset_vcpu - sets core registers and sys_regs to reset value
-  * @vcpu: The VCPU pointer
-@@ -49,7 +62,14 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
++	add	x3, x2, #CPU_SPSR_OFFSET(KVM_SPSR_ABT)
++	mrs	x4, spsr_abt
++	mrs	x5, spsr_und
++	mrs	x6, spsr_irq
++	mrs	x7, spsr_fiq
++	stp	x4, x5, [x3]
++	stp	x6, x7, [x3, #16]
++
++	add	x3, x2, #CPU_SYSREG_OFFSET(DACR32_EL2)
++	mrs	x4, dacr32_el2
++	mrs	x5, ifsr32_el2
++	mrs	x6, fpexc32_el2
++	mrs	x7, dbgvcr32_el2
++	stp	x4, x5, [x3]
++	stp	x6, x7, [x3, #16]
++
++	skip_tee_state x8, 1f
++
++	add	x3, x2, #CPU_SYSREG_OFFSET(TEECR32_EL1)
++	mrs	x4, teecr32_el1
++	mrs	x5, teehbr32_el1
++	stp	x4, x5, [x3]
++1:
++.endm
++
++.macro restore_guest_32bit_state
++	skip_32bit_state x3, 1f
++
++	add	x3, x2, #CPU_SPSR_OFFSET(KVM_SPSR_ABT)
++	ldp	x4, x5, [x3]
++	ldp	x6, x7, [x3, #16]
++	msr	spsr_abt, x4
++	msr	spsr_und, x5
++	msr	spsr_irq, x6
++	msr	spsr_fiq, x7
++
++	add	x3, x2, #CPU_SYSREG_OFFSET(DACR32_EL2)
++	ldp	x4, x5, [x3]
++	ldp	x6, x7, [x3, #16]
++	msr	dacr32_el2, x4
++	msr	ifsr32_el2, x5
++	msr	fpexc32_el2, x6
++	msr	dbgvcr32_el2, x7
++
++	skip_tee_state x8, 1f
++
++	add	x3, x2, #CPU_SYSREG_OFFSET(TEECR32_EL1)
++	ldp	x4, x5, [x3]
++	msr	teecr32_el1, x4
++	msr	teehbr32_el1, x5
++1:
++.endm
++
+ .macro activate_traps
+ 	ldr	x2, [x0, #VCPU_IRQ_LINES]
+ 	ldr	x1, [x0, #VCPU_HCR_EL2]
+@@ -494,6 +562,7 @@ ENTRY(__kvm_vcpu_run)
  
- 	switch (vcpu->arch.target) {
- 	default:
--		cpu_reset = &default_regs_reset;
-+		if (test_bit(KVM_ARM_VCPU_EL1_32BIT, vcpu->arch.features)) {
-+			if (!cpu_has_32bit_el1())
-+				return -EINVAL;
-+			cpu_reset = &default_regs_reset32;
-+			vcpu->arch.hcr_el2 &= ~HCR_RW;
-+		} else {
-+			cpu_reset = &default_regs_reset;
-+		}
- 		break;
- 	}
+ 	bl __restore_sysregs
+ 	bl __restore_fpsimd
++	restore_guest_32bit_state
+ 	restore_guest_regs
  
+ 	// That's it, no more messing around.
+@@ -510,6 +579,7 @@ __kvm_vcpu_return:
+ 	save_guest_regs
+ 	bl __save_fpsimd
+ 	bl __save_sysregs
++	save_guest_32bit_state
+ 
+ 	save_timer_state
+ 	save_vgic_state
 -- 
 1.8.1.4
