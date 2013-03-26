@@ -1,31 +1,109 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 26 Mar 2013 17:01:10 +0000
-Subject: [PATCH v2 15/30] arm64: KVM: guest one-reg interface
+Date: Tue, 26 Mar 2013 17:01:19 +0000
+Subject: [PATCH v2 24/30] arm64: KVM: 32bit GP register access
 In-Reply-To: <1364317285-20937-1-git-send-email-marc.zyngier@arm.com>
 References: <1364317285-20937-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1364317285-20937-16-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1364317285-20937-25-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let userspace play with the guest registers.
+Allow access to the 32bit register file through the usual API.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/guest.c | 254 +++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 254 insertions(+)
- create mode 100644 arch/arm64/kvm/guest.c
+ arch/arm64/include/asm/kvm_emulate.h |  17 +++-
+ arch/arm64/kvm/Makefile              |   2 +-
+ arch/arm64/kvm/regmap.c              | 168 +++++++++++++++++++++++++++++++++++
+ 3 files changed, 184 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm64/kvm/regmap.c
 
-diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+index 80128cd..3c42f0c38 100644
+--- a/arch/arm64/include/asm/kvm_emulate.h
++++ b/arch/arm64/include/asm/kvm_emulate.h
+@@ -28,6 +28,9 @@
+ #include <asm/kvm_mmio.h>
+ #include <asm/ptrace.h>
+ 
++unsigned long *vcpu_reg32(const struct kvm_vcpu *vcpu, u8 reg_num);
++unsigned long *vcpu_spsr32(const struct kvm_vcpu *vcpu);
++
+ void kvm_inject_undefined(struct kvm_vcpu *vcpu);
+ void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr);
+ void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr);
+@@ -49,7 +52,7 @@ static inline unsigned long *vcpu_cpsr(const struct kvm_vcpu *vcpu)
+ 
+ static inline bool vcpu_mode_is_32bit(const struct kvm_vcpu *vcpu)
+ {
+-	return false;	/* 32bit? Bahhh... */
++	return !!(*vcpu_cpsr(vcpu) & PSR_MODE32_BIT);
+ }
+ 
+ static inline bool kvm_condition_valid(const struct kvm_vcpu *vcpu)
+@@ -64,28 +67,38 @@ static inline void kvm_skip_instr(struct kvm_vcpu *vcpu, bool is_wide_instr)
+ 
+ static inline void vcpu_set_thumb(struct kvm_vcpu *vcpu)
+ {
++	*vcpu_cpsr(vcpu) |= COMPAT_PSR_T_BIT;
+ }
+ 
+ static inline unsigned long *vcpu_reg(const struct kvm_vcpu *vcpu, u8 reg_num)
+ {
++	if (vcpu_mode_is_32bit(vcpu))
++		return vcpu_reg32(vcpu, reg_num);
++
+ 	return (unsigned long *)&vcpu_gp_regs(vcpu)->regs.regs[reg_num];
+ }
+ 
+ /* Get vcpu SPSR for current mode */
+ static inline unsigned long *vcpu_spsr(const struct kvm_vcpu *vcpu)
+ {
++	if (vcpu_mode_is_32bit(vcpu))
++		return vcpu_spsr32(vcpu);
++
+ 	return (unsigned long *)&vcpu_gp_regs(vcpu)->spsr[KVM_SPSR_EL1];
+ }
+ 
+ static inline bool kvm_vcpu_reg_is_pc(const struct kvm_vcpu *vcpu, int reg)
+ {
+-	return false;
++	return (vcpu_mode_is_32bit(vcpu)) && reg == 15;
+ }
+ 
+ static inline bool vcpu_mode_priv(const struct kvm_vcpu *vcpu)
+ {
+ 	u32 mode = *vcpu_cpsr(vcpu) & PSR_MODE_MASK;
+ 
++	if (vcpu_mode_is_32bit(vcpu))
++		return mode > COMPAT_PSR_MODE_USR;
++
+ 	return mode != PSR_MODE_EL0t;
+ }
+ 
+diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
+index b2ce0a7..e9c911f 100644
+--- a/arch/arm64/kvm/Makefile
++++ b/arch/arm64/kvm/Makefile
+@@ -10,7 +10,7 @@ obj-$(CONFIG_KVM_ARM_HOST) += $(addprefix ../../../virt/kvm/, kvm_main.o coalesc
+ 
+ obj-$(CONFIG_KVM_ARM_HOST) += $(addprefix ../../../arch/arm/kvm/, arm.o mmu.o mmio.o psci.o perf.o)
+ 
+-obj-$(CONFIG_KVM_ARM_HOST) += inject_fault.o
++obj-$(CONFIG_KVM_ARM_HOST) += inject_fault.o regmap.o
+ obj-$(CONFIG_KVM_ARM_HOST) += hyp.o hyp-init.o handle_exit.o idmap.o
+ obj-$(CONFIG_KVM_ARM_HOST) += guest.o reset.o sys_regs.o sys_regs_generic_v8.o
+ 
+diff --git a/arch/arm64/kvm/regmap.c b/arch/arm64/kvm/regmap.c
 new file mode 100644
-index 0000000..c54d40d
+index 0000000..9a6d2a5
 --- /dev/null
-+++ b/arch/arm64/kvm/guest.c
-@@ -0,0 +1,254 @@
++++ b/arch/arm64/kvm/regmap.c
+@@ -0,0 +1,168 @@
 +/*
 + * Copyright (C) 2012 - ARM Ltd
 + * Author: Marc Zyngier <marc.zyngier@arm.com>
 + *
-+ * Derived from arch/arm/kvm/guest.c:
++ * Derived from arch/arm/kvm/emulate.c:
 + * Copyright (C) 2012 - Virtual Open Systems and Columbia University
 + * Author: Christoffer Dall <c.dall@virtualopensystems.com>
 + *
@@ -42,238 +120,152 @@ index 0000000..c54d40d
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+#include <linux/errno.h>
-+#include <linux/err.h>
++#include <linux/mm.h>
 +#include <linux/kvm_host.h>
-+#include <linux/module.h>
-+#include <linux/vmalloc.h>
-+#include <linux/fs.h>
-+#include <asm/cputype.h>
-+#include <asm/uaccess.h>
-+#include <asm/kvm.h>
-+#include <asm/kvm_asm.h>
 +#include <asm/kvm_emulate.h>
-+#include <asm/kvm_coproc.h>
++#include <asm/ptrace.h>
 +
-+struct kvm_stats_debugfs_item debugfs_entries[] = {
-+	{ NULL }
++#define VCPU_NR_MODES 6
++#define REG_OFFSET(_reg) \
++	(offsetof(struct user_pt_regs, _reg) / sizeof(unsigned long))
++
++#define USR_REG_OFFSET(R) REG_OFFSET(compat_usr(R))
++
++static const unsigned long vcpu_reg_offsets[VCPU_NR_MODES][16] = {
++	/* USR Registers */
++	{
++		USR_REG_OFFSET(0), USR_REG_OFFSET(1), USR_REG_OFFSET(2),
++		USR_REG_OFFSET(3), USR_REG_OFFSET(4), USR_REG_OFFSET(5),
++		USR_REG_OFFSET(6), USR_REG_OFFSET(7), USR_REG_OFFSET(8),
++		USR_REG_OFFSET(9), USR_REG_OFFSET(10), USR_REG_OFFSET(11),
++		USR_REG_OFFSET(12), USR_REG_OFFSET(13),	USR_REG_OFFSET(14),
++		REG_OFFSET(pc)
++	},
++
++	/* FIQ Registers */
++	{
++		USR_REG_OFFSET(0), USR_REG_OFFSET(1), USR_REG_OFFSET(2),
++		USR_REG_OFFSET(3), USR_REG_OFFSET(4), USR_REG_OFFSET(5),
++		USR_REG_OFFSET(6), USR_REG_OFFSET(7),
++		REG_OFFSET(compat_r8_fiq),  /* r8 */
++		REG_OFFSET(compat_r9_fiq),  /* r9 */
++		REG_OFFSET(compat_r10_fiq), /* r10 */
++		REG_OFFSET(compat_r11_fiq), /* r11 */
++		REG_OFFSET(compat_r12_fiq), /* r12 */
++		REG_OFFSET(compat_sp_fiq),  /* r13 */
++		REG_OFFSET(compat_lr_fiq),  /* r14 */
++		REG_OFFSET(pc)
++	},
++
++	/* IRQ Registers */
++	{
++		USR_REG_OFFSET(0), USR_REG_OFFSET(1), USR_REG_OFFSET(2),
++		USR_REG_OFFSET(3), USR_REG_OFFSET(4), USR_REG_OFFSET(5),
++		USR_REG_OFFSET(6), USR_REG_OFFSET(7), USR_REG_OFFSET(8),
++		USR_REG_OFFSET(9), USR_REG_OFFSET(10), USR_REG_OFFSET(11),
++		USR_REG_OFFSET(12),
++		REG_OFFSET(compat_sp_irq), /* r13 */
++		REG_OFFSET(compat_lr_irq), /* r14 */
++		REG_OFFSET(pc)
++	},
++
++	/* SVC Registers */
++	{
++		USR_REG_OFFSET(0), USR_REG_OFFSET(1), USR_REG_OFFSET(2),
++		USR_REG_OFFSET(3), USR_REG_OFFSET(4), USR_REG_OFFSET(5),
++		USR_REG_OFFSET(6), USR_REG_OFFSET(7), USR_REG_OFFSET(8),
++		USR_REG_OFFSET(9), USR_REG_OFFSET(10), USR_REG_OFFSET(11),
++		USR_REG_OFFSET(12),
++		REG_OFFSET(compat_sp_svc), /* r13 */
++		REG_OFFSET(compat_lr_svc), /* r14 */
++		REG_OFFSET(pc)
++	},
++
++	/* ABT Registers */
++	{
++		USR_REG_OFFSET(0), USR_REG_OFFSET(1), USR_REG_OFFSET(2),
++		USR_REG_OFFSET(3), USR_REG_OFFSET(4), USR_REG_OFFSET(5),
++		USR_REG_OFFSET(6), USR_REG_OFFSET(7), USR_REG_OFFSET(8),
++		USR_REG_OFFSET(9), USR_REG_OFFSET(10), USR_REG_OFFSET(11),
++		USR_REG_OFFSET(12),
++		REG_OFFSET(compat_sp_abt), /* r13 */
++		REG_OFFSET(compat_lr_abt), /* r14 */
++		REG_OFFSET(pc)
++	},
++
++	/* UND Registers */
++	{
++		USR_REG_OFFSET(0), USR_REG_OFFSET(1), USR_REG_OFFSET(2),
++		USR_REG_OFFSET(3), USR_REG_OFFSET(4), USR_REG_OFFSET(5),
++		USR_REG_OFFSET(6), USR_REG_OFFSET(7), USR_REG_OFFSET(8),
++		USR_REG_OFFSET(9), USR_REG_OFFSET(10), USR_REG_OFFSET(11),
++		USR_REG_OFFSET(12),
++		REG_OFFSET(compat_sp_und), /* r13 */
++		REG_OFFSET(compat_lr_und), /* r14 */
++		REG_OFFSET(pc)
++	},
 +};
 +
-+int kvm_arch_vcpu_setup(struct kvm_vcpu *vcpu)
-+{
-+	vcpu->arch.hcr_el2 = HCR_GUEST_FLAGS;
-+	return 0;
-+}
-+
-+static u64 core_reg_offset_from_id(u64 id)
-+{
-+	return id & ~(KVM_REG_ARCH_MASK | KVM_REG_SIZE_MASK | KVM_REG_ARM_CORE);
-+}
-+
-+static int get_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-+{
-+	__u32 __user *uaddr = (__u32 __user *)(unsigned long)reg->addr;
-+	struct kvm_regs *regs = vcpu_gp_regs(vcpu);
-+	int nr_regs = sizeof(*regs) / sizeof(__u32);
-+	u32 off;
-+
-+	/* Our ID is an index into the kvm_regs struct. */
-+	off = core_reg_offset_from_id(reg->id);
-+	if (off >= nr_regs ||
-+	    (off + (KVM_REG_SIZE(reg->id) / sizeof(__u32))) >= nr_regs)
-+		return -ENOENT;
-+
-+	if (copy_to_user(uaddr, ((u32 *)regs) + off, KVM_REG_SIZE(reg->id)))
-+		return -EFAULT;
-+
-+	return 0;
-+}
-+
-+static int set_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-+{
-+	__u32 __user *uaddr = (__u32 __user *)(unsigned long)reg->addr;
-+	struct kvm_regs *regs = vcpu_gp_regs(vcpu);
-+	int nr_regs = sizeof(*regs) / sizeof(__u32);
-+	void *valp;
-+	u64 off;
-+	int err = 0;
-+
-+	/* Our ID is an index into the kvm_regs struct. */
-+	off = core_reg_offset_from_id(reg->id);
-+	if (off >= nr_regs ||
-+	    (off + (KVM_REG_SIZE(reg->id) / sizeof(__u32))) >= nr_regs)
-+		return -ENOENT;
-+
-+	valp = kmalloc(KVM_REG_SIZE(reg->id), GFP_KERNEL);
-+	if (!valp)
-+		return -ENOMEM;
-+
-+	if (copy_from_user(valp, uaddr, KVM_REG_SIZE(reg->id))) {
-+		err = -EFAULT;
-+		goto out;
-+	}
-+
-+	if (off == KVM_REG_ARM_CORE_REG(regs.pstate)) {
-+		unsigned long mode = (*(unsigned long *)valp) & COMPAT_PSR_MODE_MASK;
-+		switch (mode) {
-+		case PSR_MODE_EL0t:
-+		case PSR_MODE_EL1t:
-+		case PSR_MODE_EL1h:
-+			break;
-+		default:
-+			err = -EINVAL;
-+			goto out;
-+		}
-+	}
-+
-+	memcpy((u32 *)regs + off, valp, KVM_REG_SIZE(reg->id));
-+out:
-+	kfree(valp);
-+	return err;
-+}
-+
-+int kvm_arch_vcpu_ioctl_get_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
-+{
-+	return -EINVAL;
-+}
-+
-+int kvm_arch_vcpu_ioctl_set_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
-+{
-+	return -EINVAL;
-+}
-+
-+static unsigned long num_core_regs(void)
-+{
-+	return sizeof(struct kvm_regs) / sizeof(unsigned long);
-+}
-+
-+/**
-+ * kvm_arm_num_regs - how many registers do we present via KVM_GET_ONE_REG
-+ *
-+ * This is for all registers.
++/*
++ * Return a pointer to the register number valid in the current mode of
++ * the virtual CPU.
 + */
-+unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu)
++unsigned long *vcpu_reg32(const struct kvm_vcpu *vcpu, u8 reg_num)
 +{
-+	return num_core_regs() + kvm_arm_num_sys_reg_descs(vcpu);
-+}
++	unsigned long *reg_array = (unsigned long *)&vcpu->arch.ctxt.gp_regs.regs;
++	unsigned long mode = *vcpu_cpsr(vcpu) & COMPAT_PSR_MODE_MASK;
 +
-+/**
-+ * kvm_arm_copy_reg_indices - get indices of all registers.
-+ *
-+ * We do core registers right here, then we apppend system regs.
-+ */
-+int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
-+{
-+	unsigned int i;
-+	const u64 core_reg = KVM_REG_ARM64 | KVM_REG_SIZE_U64 | KVM_REG_ARM_CORE;
++	switch (mode) {
++	case COMPAT_PSR_MODE_USR ... COMPAT_PSR_MODE_SVC:
++		mode &= ~PSR_MODE32_BIT; /* 0 ... 3 */
++		break;
 +
-+	for (i = 0; i < sizeof(struct kvm_regs)/sizeof(unsigned long); i++) {
-+		if (put_user(core_reg | i, uindices))
-+			return -EFAULT;
-+		uindices++;
-+	}
++	case COMPAT_PSR_MODE_ABT:
++		mode = 4;
++		break;
 +
-+	return kvm_arm_copy_sys_reg_indices(vcpu, uindices);
-+}
++	case COMPAT_PSR_MODE_UND:
++		mode = 5;
++		break;
 +
-+int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-+{
-+	/* We currently use nothing arch-specific in upper 32 bits */
-+	if ((reg->id & ~KVM_REG_SIZE_MASK) >> 32 != KVM_REG_ARM64 >> 32)
-+		return -EINVAL;
++	case COMPAT_PSR_MODE_SYS:
++		mode = 0;	/* SYS maps to USR */
++		break;
 +
-+	/* Register group 16 means we want a core register. */
-+	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
-+		return get_core_reg(vcpu, reg);
-+
-+	return kvm_arm_sys_reg_get_reg(vcpu, reg);
-+}
-+
-+int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-+{
-+	/* We currently use nothing arch-specific in upper 32 bits */
-+	if ((reg->id & ~KVM_REG_SIZE_MASK) >> 32 != KVM_REG_ARM64 >> 32)
-+		return -EINVAL;
-+
-+	/* Register group 16 means we set a core register. */
-+	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
-+		return set_core_reg(vcpu, reg);
-+
-+	return kvm_arm_sys_reg_set_reg(vcpu, reg);
-+}
-+
-+int kvm_arch_vcpu_ioctl_get_sregs(struct kvm_vcpu *vcpu,
-+				  struct kvm_sregs *sregs)
-+{
-+	return -EINVAL;
-+}
-+
-+int kvm_arch_vcpu_ioctl_set_sregs(struct kvm_vcpu *vcpu,
-+				  struct kvm_sregs *sregs)
-+{
-+	return -EINVAL;
-+}
-+
-+int __attribute_const__ kvm_target_cpu(void)
-+{
-+	unsigned long implementor = read_cpuid_implementor();
-+	unsigned long part_number = read_cpuid_part_number();
-+
-+	if (implementor != ARM_CPU_IMP_ARM)
-+		return -EINVAL;
-+
-+	switch (part_number) {
-+	case ARM_CPU_PART_AEM_V8:
-+		return KVM_ARM_TARGET_AEM_V8;
-+	case ARM_CPU_PART_FOUNDATION:
-+		return KVM_ARM_TARGET_FOUNDATION_V8;
-+	case ARM_CPU_PART_CORTEX_A57:
-+		/* Currently handled by the generic backend */
-+		return KVM_ARM_TARGET_CORTEX_A57;
 +	default:
-+		return -EINVAL;
-+	}
-+}
-+
-+int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
-+			const struct kvm_vcpu_init *init)
-+{
-+	unsigned int i;
-+	int phys_target = kvm_target_cpu();
-+
-+	if (init->target != phys_target)
-+		return -EINVAL;
-+
-+	vcpu->arch.target = phys_target;
-+	bitmap_zero(vcpu->arch.features, KVM_VCPU_MAX_FEATURES);
-+
-+	/* -ENOENT for unknown features, -EINVAL for invalid combinations. */
-+	for (i = 0; i < sizeof(init->features)*8; i++) {
-+		if (init->features[i / 32] & (1 << (i % 32))) {
-+			if (i >= KVM_VCPU_MAX_FEATURES)
-+				return -ENOENT;
-+			set_bit(i, vcpu->arch.features);
-+		}
++		BUG();
 +	}
 +
-+	/* Now we know what it is, we can reset it. */
-+	return kvm_reset_vcpu(vcpu);
++	return reg_array + vcpu_reg_offsets[mode][reg_num];
 +}
 +
-+int kvm_arch_vcpu_ioctl_get_fpu(struct kvm_vcpu *vcpu, struct kvm_fpu *fpu)
++/*
++ * Return the SPSR for the current mode of the virtual CPU.
++ */
++unsigned long *vcpu_spsr32(const struct kvm_vcpu *vcpu)
 +{
-+	return -EINVAL;
-+}
++	unsigned long mode = *vcpu_cpsr(vcpu) & COMPAT_PSR_MODE_MASK;
++	switch (mode) {
++	case COMPAT_PSR_MODE_SVC:
++		mode = KVM_SPSR_SVC;
++		break;
++	case COMPAT_PSR_MODE_ABT:
++		mode = KVM_SPSR_ABT;
++		break;
++	case COMPAT_PSR_MODE_UND:
++		mode = KVM_SPSR_UND;
++		break;
++	case COMPAT_PSR_MODE_IRQ:
++		mode = KVM_SPSR_IRQ;
++		break;
++	case COMPAT_PSR_MODE_FIQ:
++		mode = KVM_SPSR_FIQ;
++		break;
++	default:
++		BUG();
++	}
 +
-+int kvm_arch_vcpu_ioctl_set_fpu(struct kvm_vcpu *vcpu, struct kvm_fpu *fpu)
-+{
-+	return -EINVAL;
-+}
-+
-+int kvm_arch_vcpu_ioctl_translate(struct kvm_vcpu *vcpu,
-+				  struct kvm_translation *tr)
-+{
-+	return -EINVAL;
++	return (unsigned long *)&vcpu_gp_regs(vcpu)->spsr[mode];
 +}
 -- 
 1.8.1.4
