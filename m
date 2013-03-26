@@ -1,9 +1,9 @@
 From: achew@nvidia.com (Andrew Chew)
-Date: Mon, 25 Mar 2013 18:21:48 -0700
-Subject: [PATCH V5 4/9] ARM: EXYNOS: Provide regulator to pwm-backlight
+Date: Mon, 25 Mar 2013 18:21:50 -0700
+Subject: [PATCH V5 6/9] ARM: mxs: Provide regulator to pwm-backlight
 In-Reply-To: <1364260913-25490-1-git-send-email-achew@nvidia.com>
 References: <1364260913-25490-1-git-send-email-achew@nvidia.com>
-Message-ID: <1364260913-25490-5-git-send-email-achew@nvidia.com>
+Message-ID: <1364260913-25490-7-git-send-email-achew@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,67 +14,134 @@ requirement.
 Signed-off-by: Andrew Chew <achew@nvidia.com>
 Acked-by: Alexandre Courbot <acourbot@nvidia.com>
 ---
- arch/arm/mach-exynos/mach-nuri.c      | 7 +++++++
- arch/arm/plat-samsung/dev-backlight.c | 9 +++++++++
- 2 files changed, 16 insertions(+)
+Moved backlight power regulator into top-level regulators node.
 
-diff --git a/arch/arm/mach-exynos/mach-nuri.c b/arch/arm/mach-exynos/mach-nuri.c
-index 1ea7973..0223863 100644
---- a/arch/arm/mach-exynos/mach-nuri.c
-+++ b/arch/arm/mach-exynos/mach-nuri.c
-@@ -294,6 +294,10 @@ static void nuri_bl_exit(struct device *dev)
- 	gpio_free(EXYNOS4_GPE2(3));
- }
- 
-+/* Dummy regulator for pwm-backlight driver */
-+static struct regulator_consumer_supply backlight_supply =
-+	REGULATOR_SUPPLY("power", "pwm-backlight");
+ arch/arm/boot/dts/imx23-evk.dts      |  6 ++++++
+ arch/arm/boot/dts/imx28-apf28dev.dts |  6 ++++++
+ arch/arm/boot/dts/imx28-cfa10049.dts |  6 ++++++
+ arch/arm/boot/dts/imx28-evk.dts      |  6 ++++++
+ arch/arm/boot/dts/imx28-tx28.dts     | 11 +++++++++++
+ 5 files changed, 35 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx23-evk.dts b/arch/arm/boot/dts/imx23-evk.dts
+index 035c13f..ce5048e 100644
+--- a/arch/arm/boot/dts/imx23-evk.dts
++++ b/arch/arm/boot/dts/imx23-evk.dts
+@@ -95,6 +95,11 @@
+ 			regulator-max-microvolt = <3300000>;
+ 			gpio = <&gpio1 29 0>;
+ 		};
 +
- /* nuri pwm backlight */
- static struct platform_pwm_backlight_data nuri_backlight_data = {
- 	.pwm_id			= 0,
-@@ -1368,6 +1372,9 @@ static void __init nuri_machine_init(void)
- 	nuri_ehci_init();
- 	s3c_hsotg_set_platdata(&nuri_hsotg_pdata);
++		reg_backlight_power: fixed-regulator {
++			compatible = "regulator-fixed";
++			regulator-name = "backlight-power";
++	        };
+ 	};
  
-+	regulator_register_always_on(-1, "backlight-power",
-+				     &backlight_supply, 1, 0);
+ 	backlight {
+@@ -102,5 +107,6 @@
+ 		pwms = <&pwm 2 5000000>;
+ 		brightness-levels = <0 4 8 16 32 64 128 255>;
+ 		default-brightness-level = <6>;
++		power-supply = <&reg_backlight_power>;
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/imx28-apf28dev.dts b/arch/arm/boot/dts/imx28-apf28dev.dts
+index 6d8865b..e354dc5 100644
+--- a/arch/arm/boot/dts/imx28-apf28dev.dts
++++ b/arch/arm/boot/dts/imx28-apf28dev.dts
+@@ -132,6 +132,11 @@
+ 			regulator-max-microvolt = <5000000>;
+ 			gpio = <&gpio1 23 1>;
+ 		};
 +
- 	/* Last */
- 	platform_add_devices(nuri_devices, ARRAY_SIZE(nuri_devices));
- }
-diff --git a/arch/arm/plat-samsung/dev-backlight.c b/arch/arm/plat-samsung/dev-backlight.c
-index 5f197dc..23ce16b 100644
---- a/arch/arm/plat-samsung/dev-backlight.c
-+++ b/arch/arm/plat-samsung/dev-backlight.c
-@@ -14,12 +14,18 @@
- #include <linux/platform_device.h>
- #include <linux/slab.h>
- #include <linux/io.h>
-+#include <linux/regulator/machine.h>
-+#include <linux/regulator/fixed.h>
- #include <linux/pwm_backlight.h>
++		reg_backlight_power: fixed-regulator {
++			compatible = "regulator-fixed";
++			regulator-name = "backlight-power";
++		};
+ 	};
  
- #include <plat/devs.h>
- #include <plat/gpio-cfg.h>
- #include <plat/backlight.h>
- 
-+/* Dummy regulator for pwm-backlight driver */
-+static struct regulator_consumer_supply backlight_supply =
-+	REGULATOR_SUPPLY("power", "pwm-backlight");
+ 	leds {
+@@ -150,5 +155,6 @@
+ 		pwms = <&pwm 3 191000>;
+ 		brightness-levels = <0 4 8 16 32 64 128 255>;
+ 		default-brightness-level = <6>;
++		power-supply = <&reg_backlight_power>;
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/imx28-cfa10049.dts b/arch/arm/boot/dts/imx28-cfa10049.dts
+index a0d3e9f..a6eddd6 100644
+--- a/arch/arm/boot/dts/imx28-cfa10049.dts
++++ b/arch/arm/boot/dts/imx28-cfa10049.dts
+@@ -205,6 +205,11 @@
+ 			regulator-max-microvolt = <5000000>;
+ 			gpio = <&gpio0 7 1>;
+ 		};
 +
- static int samsung_bl_init(struct device *dev)
- {
- 	int ret = 0;
-@@ -37,6 +43,9 @@ static int samsung_bl_init(struct device *dev)
- 	/* Configure GPIO pin with specific GPIO function for PWM timer */
- 	s3c_gpio_cfgpin(bl_gpio_info->no, bl_gpio_info->func);
++		reg_backlight_power: fixed-regulator {
++			compatible = "regulator-fixed";
++			regulator-name = "backlight-power";
++		};
+ 	};
  
-+	regulator_register_always_on(-1, "backlight-power",
-+				     &backlight_supply, 1, 0);
+ 	ahb at 80080000 {
+@@ -304,5 +309,6 @@
+ 		pwms = <&pwm 3 5000000>;
+ 		brightness-levels = <0 4 8 16 32 64 128 255>;
+ 		default-brightness-level = <6>;
++		power-supply = <&reg_backlight_power>;
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
+index 2da316e..7ba7216 100644
+--- a/arch/arm/boot/dts/imx28-evk.dts
++++ b/arch/arm/boot/dts/imx28-evk.dts
+@@ -285,6 +285,11 @@
+ 			gpio = <&gpio3 8 0>;
+ 			enable-active-high;
+ 		};
 +
- 	return 0;
- }
++		reg_backlight_power: fixed-regulator {
++			compatible = "regulator-fixed";
++			regulator-name = "backlight-power";
++		};
+ 	};
  
+ 	sound {
+@@ -312,5 +317,6 @@
+ 		pwms = <&pwm 2 5000000>;
+ 		brightness-levels = <0 4 8 16 32 64 128 255>;
+ 		default-brightness-level = <6>;
++		power-supply = <&reg_backlight_power>;
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/imx28-tx28.dts b/arch/arm/boot/dts/imx28-tx28.dts
+index 37be532..7fa5a44 100644
+--- a/arch/arm/boot/dts/imx28-tx28.dts
++++ b/arch/arm/boot/dts/imx28-tx28.dts
+@@ -97,6 +97,16 @@
+ 		};
+ 	};
+ 
++	regulators {
++		compatible = "simple-bus";
++
++		reg_backlight_power: fixed-regulator {
++			compatible = "regulator-fixed";
++			regulator-name = "backlight-power";
++		};
++	};
++
++
+ 	leds {
+ 		compatible = "gpio-leds";
+ 
+@@ -112,5 +122,6 @@
+ 		pwms = <&pwm 0 5000000>;
+ 		brightness-levels = <0 4 8 16 32 64 128 255>;
+ 		default-brightness-level = <6>;
++		power-supply = <&reg_backlight_power>;
+ 	};
+ };
 -- 
 1.8.1.5
