@@ -1,152 +1,69 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 26 Mar 2013 10:13:16 +0100
-Subject: [PATCH 09/10] ARM: sunxi: Rework the restart code
-In-Reply-To: <1364289198-11589-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1364289198-11589-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1364289198-11589-10-git-send-email-maxime.ripard@free-electrons.com>
+Date: Tue, 26 Mar 2013 10:20:21 +0100
+Subject: [PATCH v2 0/3] clock driver for sunxi
+In-Reply-To: <20130322164054.834.64867@quantum>
+References: <1358835176-7197-1-git-send-email-emilio@elopez.com.ar>
+ <1361803468-9899-1-git-send-email-emilio@elopez.com.ar>
+ <20130321215429.834.60042@quantum> <514C30E1.2020203@free-electrons.com>
+ <20130322164054.834.64867@quantum>
+Message-ID: <51516855.3020609@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner sun6i (A31) has a slightly different watchdog, that
-doesn't allow to use the already existing restart code.
+Hi Mike,
 
-Rework a bit the restart code to allow to plug in more easily different
-restart handlers depending on the device tree.
+Le 22/03/2013 17:40, Mike Turquette a ?crit :
+> Quoting Maxime Ripard (2013-03-22 03:22:25)
+>> Hi Mike,
+>>
+>> Le 21/03/2013 22:54, Mike Turquette a ?crit :
+>>> Quoting Emilio L?pez (2013-02-25 06:44:25)
+>>>> Hello everyone,
+>>>>
+>>>> This patchset adds basic clock support for sunxi devices. Currently, it
+>>>> implements support for the two oscillators, the main PLL, the CPU mux,
+>>>> its three divisor clocks and APB1. With this in place, it is possible to
+>>>> write a cpufreq driver and have it work, and with a little more code,
+>>>> represent the UART clocks correctly (I will be sending a separate
+>>>> patchset for this).
+>>>>
+>>>> I have tested this driver successfully on a Cubieboard (A10, sun4i)
+>>>> using the cpufreq driver from the linux-sunxi tree after minor
+>>>> modifications (the clock names are not the same).
+>>>>
+>>>> Any feedback will be highly appreciated
+>>>>
+>>>
+>>> Emilio,
+>>>
+>>> This is a nice series.  I appreciate the amount of comments in the code,
+>>> the kerneldoc and also the added sunxi clock documentation.
+>>>
+>>> Concerning the discussion from the v1 series, I prefer for the struct
+>>> clk instances in the tree to match 1-to-1 with hardware clocks.  As the
+>>> number of clocks in a system scales into the hundreds there are
+>>> certainly advantages to having fewer clocks in the hierarchy, not the
+>>> least of which is more easily associating these objects with hardware
+>>> clocks during a deep debug session.
+>>>
+>>> That can be changed at a later time if you wish.  Do you want me to take
+>>> the series into clk-next or do you just want my ack?
+>>
+>> Thanks for your feedback!
+>>
+>> Unless you have some objection, I was planning to merge it through my
+>> tree, with your Acked-by, of course.
+>>
+> 
+> Acked-by: Mike Turquette <mturquette@linaro.org>
 
-In the past, we were also meaning sunxi as a generic name covering all
-Allwinner SoCs. This won't be true anymore with the A31 (sun6i) that
-differs pretty much from sun4i and sun5i, and we will end up having
-sunxi, for sun4i and sun5i, and sun6i, which is neither consistent nor
-convenient. So, while we're at it, also change sunxi to sun4i.
+Arnd would prefer to get this serie going through your tree, could you
+merge the patches 1/3 and 3/3 with my Acked-by?
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- .../watchdog/{sunxi-wdt.txt => sun4i-wdt.txt}      |    6 +-
- arch/arm/mach-sunxi/sunxi.c                        |   58 ++++++++++++--------
- 2 files changed, 38 insertions(+), 26 deletions(-)
- rename Documentation/devicetree/bindings/watchdog/{sunxi-wdt.txt => sun4i-wdt.txt} (57%)
+Thanks,
+Maxime
 
-diff --git a/Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt b/Documentation/devicetree/bindings/watchdog/sun4i-wdt.txt
-similarity index 57%
-rename from Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt
-rename to Documentation/devicetree/bindings/watchdog/sun4i-wdt.txt
-index 0b27177..ecd650a 100644
---- a/Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt
-+++ b/Documentation/devicetree/bindings/watchdog/sun4i-wdt.txt
-@@ -1,13 +1,13 @@
--Allwinner sunXi Watchdog timer
-+Allwinner sun4i Watchdog timer
- 
- Required properties:
- 
--- compatible : should be "allwinner,sunxi-wdt"
-+- compatible : should be "allwinner,sun4i-wdt"
- - reg : Specifies base physical address and size of the registers.
- 
- Example:
- 
- wdt: watchdog at 01c20c90 {
--	compatible = "allwinner,sunxi-wdt";
-+	compatible = "allwinner,sun4i-wdt";
- 	reg = <0x01c20c90 0x10>;
- };
-diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-index c99ab1b..706ce35 100644
---- a/arch/arm/mach-sunxi/sunxi.c
-+++ b/arch/arm/mach-sunxi/sunxi.c
-@@ -24,50 +24,63 @@
- 
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
-+#include <asm/system_misc.h>
- 
- #include "sunxi.h"
- 
--#define WATCHDOG_CTRL_REG	0x00
--#define WATCHDOG_CTRL_RESTART		(1 << 0)
--#define WATCHDOG_MODE_REG	0x04
--#define WATCHDOG_MODE_ENABLE		(1 << 0)
--#define WATCHDOG_MODE_RESET_ENABLE	(1 << 1)
-+#define SUN4I_WATCHDOG_CTRL_REG		0x00
-+#define SUN4I_WATCHDOG_CTRL_RESTART		(1 << 0)
-+#define SUN4I_WATCHDOG_MODE_REG		0x04
-+#define SUN4I_WATCHDOG_MODE_ENABLE		(1 << 0)
-+#define SUN4I_WATCHDOG_MODE_RESET_ENABLE	(1 << 1)
- 
- static void __iomem *wdt_base;
- 
--static void sunxi_setup_restart(void)
--{
--	struct device_node *np = of_find_compatible_node(NULL, NULL,
--						"allwinner,sunxi-wdt");
--	if (WARN(!np, "unable to setup watchdog restart"))
--		return;
--
--	wdt_base = of_iomap(np, 0);
--	WARN(!wdt_base, "failed to map watchdog base address");
--}
--
--static void sunxi_restart(char mode, const char *cmd)
-+static void sun4i_restart(char mode, const char *cmd)
- {
- 	if (!wdt_base)
- 		return;
- 
- 	/* Enable timer and set reset bit in the watchdog */
--	writel(WATCHDOG_MODE_ENABLE | WATCHDOG_MODE_RESET_ENABLE,
--		wdt_base + WATCHDOG_MODE_REG);
-+	writel(SUN4I_WATCHDOG_MODE_ENABLE | SUN4I_WATCHDOG_MODE_RESET_ENABLE,
-+	       wdt_base + SUN4I_WATCHDOG_MODE_REG);
- 
- 	/*
- 	 * Restart the watchdog. The default (and lowest) interval
- 	 * value for the watchdog is 0.5s.
- 	 */
--	writel(WATCHDOG_CTRL_RESTART, wdt_base + WATCHDOG_CTRL_REG);
-+	writel(SUN4I_WATCHDOG_CTRL_RESTART, wdt_base + SUN4I_WATCHDOG_CTRL_REG);
- 
- 	while (1) {
- 		mdelay(5);
--		writel(WATCHDOG_MODE_ENABLE | WATCHDOG_MODE_RESET_ENABLE,
--			wdt_base + WATCHDOG_MODE_REG);
-+		writel(SUN4I_WATCHDOG_MODE_ENABLE | SUN4I_WATCHDOG_MODE_RESET_ENABLE,
-+		       wdt_base + SUN4I_WATCHDOG_MODE_REG);
- 	}
- }
- 
-+static struct of_device_id sunxi_restart_ids[] = {
-+	{ .compatible = "allwinner,sun4i-wdt", .data = sun4i_restart },
-+	{ /*sentinel*/ }
-+};
-+
-+static void sunxi_setup_restart(void)
-+{
-+	const struct of_device_id *of_id;
-+	struct device_node *np;
-+
-+	np = of_find_matching_node(NULL, sunxi_restart_ids);
-+	if (WARN(!np, "unable to setup watchdog restart"))
-+		return;
-+
-+	wdt_base = of_iomap(np, 0);
-+	WARN(!wdt_base, "failed to map watchdog base address");
-+
-+	of_id = of_match_node(sunxi_restart_ids, np);
-+	WARN(!of_id, "restart function not available");
-+
-+	arm_pm_restart = of_id->data;
-+}
-+
- static struct map_desc sunxi_io_desc[] __initdata = {
- 	{
- 		.virtual	= (unsigned long) SUNXI_REGS_VIRT_BASE,
-@@ -105,7 +118,6 @@ DT_MACHINE_START(SUNXI_DT, "Allwinner A1X (Device Tree)")
- 	.init_machine	= sunxi_dt_init,
- 	.map_io		= sunxi_map_io,
- 	.init_irq	= irqchip_init,
--	.restart	= sunxi_restart,
- 	.init_time	= sunxi_timer_init,
- 	.dt_compat	= sunxi_board_dt_compat,
- MACHINE_END
 -- 
-1.7.10.4
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
