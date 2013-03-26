@@ -1,55 +1,79 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Tue, 26 Mar 2013 13:52:39 +0100
-Subject: [RFC PATCH v3 5/6] sched: pack the idle load balance
-In-Reply-To: <1363955155-18382-6-git-send-email-vincent.guittot@linaro.org>
-References: <1363955155-18382-1-git-send-email-vincent.guittot@linaro.org>
- <1363955155-18382-6-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <1364302359.5053.21.camel@laptop>
+From: monstr@monstr.eu (Michal Simek)
+Date: Tue, 26 Mar 2013 13:53:06 +0100
+Subject: [PATCH 1/3] ARM: zynq: read scu base from SoC
+In-Reply-To: <20130326124655.GB32647@pengutronix.de>
+References: <1364043450-18700-1-git-send-email-s.trumtrar@pengutronix.de>
+ <1364043450-18700-2-git-send-email-s.trumtrar@pengutronix.de>
+ <CAHTX3dK30HZxJXcNjwVqgqW_Qqag=26PEFWra6r7H6JGnpPHXQ@mail.gmail.com>
+ <20130325142533.GB27739@pengutronix.de>
+ <CAHTX3d+619gU64e-fxi5PLmjnmO6kNEJN4o5tFbbxZ-ccw+HtQ@mail.gmail.com>
+ <20130326110819.GA32647@pengutronix.de>
+ <CAHTX3dKoPfY=qHzsiVkESkEyiWpCT4xkimRqFoQHmye66w_qEA@mail.gmail.com>
+ <20130326124655.GB32647@pengutronix.de>
+Message-ID: <CAHTX3dKW1R+MKYyyFVapOvFiW0-x4z0DEUpJmuxr4j4UEWpNfw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-03-22 at 13:25 +0100, Vincent Guittot wrote:
-> Look for an idle CPU close to the pack buddy CPU whenever possible.
-> The goal is to prevent the wake up of a CPU which doesn't share the
-> power
-> domain of the pack buddy CPU.
-> 
-> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
-> Reviewed-by: Morten Rasmussen <morten.rasmussen@arm.com>
-> ---
->  kernel/sched/fair.c |   18 ++++++++++++++++++
->  1 file changed, 18 insertions(+)
-> 
-> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-> index b636199..52a7736 100644
-> --- a/kernel/sched/fair.c
-> +++ b/kernel/sched/fair.c
-> @@ -5455,7 +5455,25 @@ static struct {
->  
->  static inline int find_new_ilb(int call_cpu)
->  {
-> +       struct sched_domain *sd;
->         int ilb = cpumask_first(nohz.idle_cpus_mask);
-> +       int buddy = per_cpu(sd_pack_buddy, call_cpu);
-> +
-> +       /*
-> +        * If we have a pack buddy CPU, we try to run load balance on
-> a CPU
-> +        * that is close to the buddy.
-> +        */
-> +       if (buddy != -1)
-> +               for_each_domain(buddy, sd) {
-> +                       if (sd->flags & SD_SHARE_CPUPOWER)
-> +                               continue;
-> +
-> +                       ilb = cpumask_first_and(sched_domain_span(sd),
-> +                                       nohz.idle_cpus_mask);
-> +
-> +                       if (ilb < nr_cpu_ids)
-> +                               break;
-> +               }
+2013/3/26 Steffen Trumtrar <s.trumtrar@pengutronix.de>:
+> Hi Michal!
+>
+> On Tue, Mar 26, 2013 at 01:35:31PM +0100, Michal Simek wrote:
+>> >> Hi Steffen,
+>> >> I haven't started with it but yes, I would like to do this change too.
+>> >> IRC: The original post was done by John Linn and it has to go through
+>> >> Russel I think.
+>> >> EP107 was emulating platform and none is using it right now.
+>> >> Also I hope we have removed all PSS prefix from all files.
+>> >> It was caused because we didn't know what will be commercial name for
+>> >> this product.
+>> >>
+>> >
+>> > Okay, I'm confused now. What/Where is the official for-next branch for
+>> > Zynq? MAINTAINERS says arch/arm/mach-zynq goes via
+>> >         git://git.xilinx.com/linux-xlnx.git
+>> > But the arm-next branch in there is behind mainline.
+>>
+>> That's correct. All reviewed patches go to this branch.
+>> Currently there are just old patches which were already merged via
+>> arm-soc tree to mainline to v3.9
+>> because we don't have new patches. I will add there all patches which
+>> we are discussing right now.
+>> Also this branch is merged to linux-next.
+>>
+>> > Are the patches collected in arm-soc/for-next instead?
+>>
+>> No. I am asking Arnd and Olof for merging that branch above.
+>>
+>> > If I'm doing this patch I need to have the correct base for it.
+>>
+>> Give me some time. I am incorporating all changes from your series and
+>> other comments to v2 which I will send.
+>>
+>
+> Very good. That is what I was expecting, but as you mentioned Russel,
+> I got confused, as he doesn't care for such stuff.
 
-/me hands you a fresh bucket of curlies, no reason to skimp on them.
+I mentioned Russel in connect to change machine name in
+arch/arm/tools/mach-types.
+Not about the handling zynq patches and provide the path to mainline.
 
-But ha! here's your NO_HZ link.. but does the above DTRT and ensure
-that the ILB is a little core when possible?
+>
+>> I will also add your Signed-off-by lines to that patches.
+>> I hope that you are ok with it. Let me know if not.
+>>
+>
+> I'm definitely okay with that.
+
+ok.
+
+Thanks,
+Michal
+
+
+
+-- 
+Michal Simek, Ing. (M.Eng)
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
