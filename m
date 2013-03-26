@@ -1,125 +1,128 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 26 Mar 2013 11:28:11 +0000
-Subject: [PATCHv3 01/10] clocksource: add generic dummy timer driver
-In-Reply-To: <5151049D.5040400@codeaurora.org>
-References: <1363198676-30417-1-git-send-email-sboyd@codeaurora.org>
- <1363198676-30417-2-git-send-email-sboyd@codeaurora.org>
- <20130321180922.GB10716@e106331-lin.cambridge.arm.com>
- <514B4DBD.4060403@codeaurora.org>
- <20130322180305.GB1436@e106331-lin.cambridge.arm.com>
- <5150800E.2000905@codeaurora.org>
- <20130325180007.GA4065@e106331-lin.cambridge.arm.com>
- <5151049D.5040400@codeaurora.org>
-Message-ID: <20130326112811.GD4065@e106331-lin.cambridge.arm.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 26 Mar 2013 12:28:13 +0100
+Subject: [PATCH] arm:exynos5250: Restore CLK_SRC_TOP3 register via CCF
+In-Reply-To: <1364272935-30607-1-git-send-email-prasanna.ps@samsung.com>
+References: <1364272935-30607-1-git-send-email-prasanna.ps@samsung.com>
+Message-ID: <2280810.4mfMsDOM0e@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 26, 2013 at 02:14:53AM +0000, Stephen Boyd wrote:
-> On 03/25/13 11:00, Mark Rutland wrote:
-> >
-> >>> I've spent the last few hours trying to get the dummy_timer driver working on
-> >>> tc2 with the sp804 as the broadcast source (with architected timer support
-> >>> disabled). It turns out that having dummy timer's rating so low means that it
-> >>> won't be selected as the tick device on cpu0 in preference to the sp804, and
-> >>> thus won't push the sp804 out of that spot (allowing it to become the broadcast
-> >>> source). This leads to boot stalling.
-> >> I'm not following here. Why would we want to remove sp804 from the tick
-> >> duty?
-> > To run an SMP system without local timers, we need the sp804 to be the
-> > broadcast timer. Unfortunately the tick device and broadcast timer are mutually
-> > exclusive positions, so we need to have a dummy timer knock the sp804 out of
-> > tick device duty to enable broadcast.
-> >
-> > When the dummy timer's rating was 400 (against the sp804's 350), this worked.
-> > The sp804 would be registered, and would become cpu0's tick device. Later the
-> > dummy would get registered, knocking the sp804 out (whereupon it would get
-> > cycled back through tick_check_new_device and become the broadcast timer).
-> >
-> > With the dummy timer's rating lower, the sp804 stays as cpu0's tick device, all
-> > other cpus get dummy timers, but there's no broadcast source, so the system
-> > locks up waiting for secondary cpus.
-> 
-> Ok. Thanks for clearing up my confusion.
-> 
-> Like you say, increasing the dummy timer rating seems like a hack. But
-> it also sounds like you want to keep the dummy timer driver fully self
-> contained. I'm not opposed to calling dummy_timer_register() at the
-> bottom of tick_init() if we have to, but it sounds like you don't like that.
+Hi Prasanna,
 
-I'd like to keep the dummy timer driver self-contained if we can, but if it
-makes it more robust and/or easier to deal with by having an external call to
-register the driver, then I'm not opposed to that.
-
+On Tuesday 26 of March 2013 10:12:15 Prasanna Kumar wrote:
+> From: Prasanna Kumar <prasanna.ps@samsung.com>
 > 
-> An alternative would be to push the dummy timer logic into the core
-> clockevents layer under the ifdef for arch has broadcast. This is
-> probably the correct approach because most devices don't want to have a
-> dummy timer sitting around unused. I might be able to take a look at
-> this tomorrow.
+> This patch adds support for restoring CLK_SRC_TOP3 register
+> which gets modified while powergating corresponding power domains
+> after a cycle of Suspend-to-Resume.
+> 
+> Please refer below URL to know the background of this issue.
+> http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg14347.html.
+> 
+> This is based on Common Clock Framework defined for exynos5250 and
+> patch mentioned here
+> http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg16739.html
+> 
+> Signed-off-by: Prasanna Kumar <prasanna.ps@samsung.com>
+> ---
+>  arch/arm/mach-exynos/pm_domains.c |   43
+> +++++++++++++++++++++++++++++++++++++ 1 files changed, 43 insertions(+), 0
+> deletions(-)
+> 
+> diff --git a/arch/arm/mach-exynos/pm_domains.c
+> b/arch/arm/mach-exynos/pm_domains.c index 9f1351d..b5ed384 100644
+> --- a/arch/arm/mach-exynos/pm_domains.c
+> +++ b/arch/arm/mach-exynos/pm_domains.c
 
-I'm also not opposed to this idea.
+First of all, why this is happening in power domain driver? It does not (and 
+should not) know anything about clocks. I'm sure you can find a better place 
+for this.
+
+> @@ -21,8 +21,11 @@
+>  #include <linux/of_address.h>
+>  #include <linux/of_platform.h>
+>  #include <linux/sched.h>
+> +#include <linux/clk.h>
+> +#include <linux/clk-private.h>
+
+This header is _not_ supposed included outside clock core and clock drivers.
 
 > 
-> One final question, if you remove all other CPUs besides the CPU that is
-> servicing the sp804 interrupt do we end up in a situation where the
-> sp804 is broadcasting to the dummy tick device? I haven't read through
-> all the code yet for that one. I would think tick_switch_to_oneshot()
-> would complain on your device?
+>  #include <mach/regs-pmu.h>
+> +#include <plat/cpu.h>
+>  #include <plat/devs.h>
+> 
+>  /*
+> @@ -35,6 +38,43 @@ struct exynos_pm_domain {
+>  	struct generic_pm_domain pd;
+>  };
+> +static int exynos_pdclk_restore(struct exynos_pm_domain *domain)
+> +{
+> +	int i = 0;
+> +	struct clk *p_clk;
+> +	struct clk_hw *hw_clk;
+> +	const struct clk_ops *p_ops;
+> +
+> +	const char *pdclks[][2] = {
+> +					{ "gsc-power-domain",
+> +						"m_sub_aclk266" },
+> +					{ "gsc-power-domain",
+> +						"m_sub_aclk300" },
+> +					{ "mfc-power-domain",
+> +						"m_sub_aclk333" },
+> +				};
+> +
+> +	for (i = 0; i < ARRAY_SIZE(pdclks); i++) {
+> +		if (!strcmp(domain->name, pdclks[i][0])) {
+> +			p_clk = clk_get(NULL, pdclks[i][1]);
+> +			if (IS_ERR(p_clk)) {
+> +				pr_err("failed to get base clk\n");
+> +				return PTR_ERR(p_clk);
+> +			}
+> +
+> +			hw_clk = __clk_get_hw(p_clk);
+> +			if (IS_ERR(hw_clk)) {
+> +				pr_err("failed to get hw_clk\n");
+> +				return PTR_ERR(hw_clk);
+> +			}
 
-The current code in arch/arm/kernel/smp.c only registers the local timer on
-cpu0 if we have more than one CPU, so the sp804 stays as cpu0's tick device.
+This is completely wrong: hw_clk is an internal structure that should be used 
+only inside the driver of this particular clock and clock core, nowhere else.
 
-With the generic dummy timer (with a rating bumped up to 400, using an
-early_initcall, and the dummy timers rejected as broadcast sources [1]), even
-when booting only with one cpu described in the dt the sp804 is relegated to
-broadcast timer duty, broadcasting to the dummy timer on cpu0. Echoing 'q' to
-/proc/sysrq-trigger gives me:
+> +			p_ops = p_clk->ops;
+> +			if (p_ops != NULL && p_ops->set_parent != NULL)
+> +				p_clk->ops->set_parent(hw_clk, 1);
 
-Tick Device: mode:     0
-Broadcast device
-Clock Event Device: v2m-timer0
- max_delta_ns:   4294966591000
- min_delta_ns:   14999
- mult:           2147484
- shift:          31
- mode:           2
- next_event:     9223372036854775807 nsecs
- set_next_event: sp804_set_next_event
- set_mode:       sp804_set_mode
- event_handler:  tick_handle_periodic_broadcast
- retries:        0
-tick_broadcast_mask: 00000001
-tick_broadcast_oneshot_mask: 00000000
+Same goes here: p_clk is an opaque pointer to something that can _not_ be 
+dereferenced outside clock core.
 
+> +		}
+> +	}
+> +	return 0;
+> +}
+> +
 
-Tick Device: mode:     0
-Per CPU device: 0
-Clock Event Device: dummy_timer
- max_delta_ns:   0
- min_delta_ns:   0
- mult:           0
- shift:          0
- mode:           1
- next_event:     9223372036854775807 nsecs
- set_next_event: <00000000>
- set_mode:       dummy_timer_set_mode
- event_handler:  tick_handle_periodic
- retries:        0
+NAK.
 
-Though "broadcasting" to the same cpu is special-cased in tick_do_broadcast,
-which will call the tick device's event_handler directly rather than having the
-cpu attempt to IPI to itself.
+This code contains so many Linux kernel development antipatterns, that it's 
+missing only IS_ERR_OR_NULL to be placed on top of hall of fame of such, if 
+one exists.
 
-As you suggest, tick_switch_to_oneshot does complain:
+>  static int exynos_pd_power(struct generic_pm_domain *domain, bool power_on)
+> {
+>  	struct exynos_pm_domain *pd;
+> @@ -61,6 +101,9 @@ static int exynos_pd_power(struct generic_pm_domain
+> *domain, bool power_on) cpu_relax();
+>  		usleep_range(80, 100);
+>  	}
+> +
+> +	if (!power_on && soc_is_exynos5250())
+> +		exynos_pdclk_restore(pd);
+>  	return 0;
+>  }
 
-Clockevents: could not switch to one-shot mode: dummy_timer is not functional.
-Could not switch to high resolution mode on CPU 0
-
-To handle this case we could check cpu_possible_mask when initialising the
-dummy and only register it if more than 1 cpu is possible. That would be
-roughly in line with how we handle this case in smp.c.
-
-Thanks,
-Mark.
-
-[1] https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=a7dc19b8652c862d5b7c4d2339bd3c428bd29c4a
+Best regards,
+-- 
+Tomasz Figa
+Samsung Poland R&D Center
+SW Solution Development, Kernel and System Framework
