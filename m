@@ -1,54 +1,29 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 26 Mar 2013 15:14:05 +0100
-Subject: [PATCH 10/11] ARM i.MX53: Add LDB device to device tree
-In-Reply-To: <1364307246-9017-1-git-send-email-p.zabel@pengutronix.de>
-References: <1364307246-9017-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1364307246-9017-11-git-send-email-p.zabel@pengutronix.de>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Tue, 26 Mar 2013 23:17:43 +0900
+Subject: [PATCH 00/04] ARM: shmobile: r8a73a4 SoC support V3
+In-Reply-To: <201303261148.56032.arnd@arndb.de>
+References: <20130326013414.11796.9937.sendpatchset@w520>
+ <201303261148.56032.arnd@arndb.de>
+Message-ID: <CANqRtoS73UGpq4bv_wkUG9w1AYH9KgSW8Q8Rfjp6Hr080hv6sw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
----
- arch/arm/boot/dts/imx53.dtsi | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+On Tue, Mar 26, 2013 at 8:48 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 26 March 2013, Magnus Damm wrote:
+>> ARM: shmobile: r8a73a4 SoC support V3
+>> [PATCH 01/04] ARM: shmobile: Initial r8a73a4 SoC support V3
+>> [PATCH 02/04] ARM: shmobile: r8a73a4 SCIF support V3
+>> [PATCH 03/04] ARM: shmobile: r8a73a4 IRQC support V2
+>> [PATCH 04/04] ARM: shmobile: r8a73a4 PFC support
+>>
+>> This series is V3 of initial support for the r8a73a4 SoC. The SoC
+>> is known as r8a73a4 which is built around Cortex-A15 and makes use
+>> of SCIF for serial, IRQC interrupt controller for external IRQs and
+>> PFC for combined support for pinmux and GPIO.
+>>
+>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-index b07bbdcc..30aed40 100644
---- a/arch/arm/boot/dts/imx53.dtsi
-+++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -511,6 +511,33 @@
- 				reg = <0x53fa8000 0xc>;
- 			};
- 
-+			ldb: ldb at 53fa8008 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "fsl,imx53-ldb";
-+				reg = <0x53fa8008 0x4>;
-+				gpr = <&gpr>;
-+				clocks = <&clks 122>, <&clks 120>,
-+					 <&clks 115>, <&clks 116>,
-+					 <&clks 123>, <&clks 85>;
-+				clock-names = "di0_pll", "di1_pll",
-+					      "di0_sel", "di1_sel",
-+					      "di0", "di1";
-+				status = "disabled";
-+
-+				lvds-channel at 0 {
-+					reg = <0>;
-+					crtcs = <&ipu 0>;
-+					status = "disabled";
-+				};
-+
-+				lvds-channel at 1 {
-+					reg = <1>;
-+					crtcs = <&ipu 1>;
-+					status = "disabled";
-+				};
-+			};
-+
- 			pwm1: pwm at 53fb4000 {
- 				#pwm-cells = <2>;
- 				compatible = "fsl,imx53-pwm", "fsl,imx27-pwm";
--- 
-1.8.2.rc2
+Thanks for your help!
+
+/ magnus
