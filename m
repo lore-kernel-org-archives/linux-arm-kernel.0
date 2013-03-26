@@ -1,41 +1,106 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 26 Mar 2013 21:46:58 +0000
-Subject: [PATCH v2 10/10] arm: zynq: Add cpuidle support
-In-Reply-To: <3395757de41837ecc1d84aac1a06ebcc23fe1367.1364319776.git.michal.simek@xilinx.com>
-References: <1364319822-5504-1-git-send-email-michal.simek@xilinx.com>
- <3395757de41837ecc1d84aac1a06ebcc23fe1367.1364319776.git.michal.simek@xilinx.com>
-Message-ID: <201303262146.58590.arnd@arndb.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 26 Mar 2013 22:47:13 +0100
+Subject: [RFCv1 07/11] irqchip: armada-370-xp: add MSI support to
+ interrupt controller driver
+In-Reply-To: <201303262131.45410.arnd@arndb.de>
+References: <1364316746-8702-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130326180245.GA22775@obsidianresearch.com>
+ <20130326221654.34bce6d7@skate> <201303262131.45410.arnd@arndb.de>
+Message-ID: <20130326224713.04c85cd3@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 26 March 2013, Michal Simek wrote:
-> Add support for cpuidle.
+Dear Arnd Bergmann,
+
+On Tue, 26 Mar 2013 21:31:45 +0000, Arnd Bergmann wrote:
+> On Tuesday 26 March 2013, Thomas Petazzoni wrote:
+> > > FWIW, MSI-X is not restricted to 16 bits, so if you can detect from
+> > > the PCI layer if it is setting up MSI or MSI-X you could allocate low
+> > > bits first to MSI-X and high bits first to MSI, increasing the number
+> > > of available MSI/MSI-X vectors.
+> > 
+> > This could be an improvement. There are also other, non-per-CPU,
+> > doorbell interrupts that could potentially be used. Can we consider
+> > this a possible improvement, and not something that is fundamentally
+> > necessary? For now, I'm trying to get the current feature set merged,
+> > and not necessarily to extend it to cover all possible features of the
+> > hardware.
 > 
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-> ---
-> v2: Fix file header
-> ---
->  arch/arm/mach-zynq/Makefile  |    1 +
->  arch/arm/mach-zynq/cpuidle.c |  133 ++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 134 insertions(+)
->  create mode 100644 arch/arm/mach-zynq/cpuidle.c
+> If we are extending the DT binding for the current feature, we should
+> at least think about how it would look like for future extensions, to
+> make sure it won't be fundamentally incompatible.
 
-Can you move that file to drivers/cpuidle instead?
+Sure.
 
->+/* Initialize CPU idle by registering the idle states */
->+static int xilinx_init_cpuidle(void)
->+{
->+       unsigned int cpu;
->+       struct cpuidle_device *device;
->+       int ret;
->+
->+       ret = cpuidle_register_driver(&xilinx_idle_driver);
->+       if (ret) {
->+               pr_err("Registering Xilinx CpuIdle Driver failed.\n");
->+               return ret;
->+       }
+> > > > +   - marvell,doorbell: Gives the physical address at which PCIe
+> > > > +     devices should write to signal an MSI interrupt.
+> > > 
+> > > Why is this necessary? Can't the doorbell register physical address be
+> > > computed by the driver? AFAIK there is no possibility for address
+> > > translation on SOC inbound TLPs.
+> > 
+> > It is the responsibility of the PCIe driver to prepare the 'struct
+> > msi_msg', which contains the physical address at which the PCIe device
+> > should write to trigger an MSI. But this physical address is part of
+> > the interrupt controller registers, so there is no way for the PCIe
+> > driver to magically know about it.
+> 
+> If we introduce an irq_find_msi_host() interface, we can also introduce
+> an interface to return the doorbell register, or more. I suppose
+> we could actually have a generic version of your mvebu_pcie_setup_msi_irq()
+> function that looks up the domain from the device node and calls
+> a new irq_domain_ops function, which allocates a free MSI hwirq number,
+> creates a mapping for it, and fills out a struct msi_msg with the
+> doorbell register and data.
 
-I think you have to check that you actually run on a Zynq system before
-registering the driver.
+Ok, sounds like a plan. I must admit I'm not very familiar with the IRQ
+domain code, but I guess I should take this as an opportunity to become
+a little bit more familiar :)
 
-	Arnd
+> > > Thinking about it a bit, maybe less magic code is needed here, be
+> > > explicit about the available interrupts in the DT:
+> > > 
+> > > pcie-controller {
+> > >    msi-interrupts = <0xd0020a04 (1<<16) &msi 16
+> > >                      0xd0020a04 (1<<17) &msi 17
+> > >                      [..]
+> > >    msi-x-interrupts = <0xd0020a04 (1<<1) &msi 1
+> > >                        0xd0020a04 (1<<2) &msi 2
+> > >                        [..]
+> > > 
+> > > There is a better chance of that supporting other Marvell SOCs.. Not
+> > > sure, just throwing it out there.
+> > 
+> > Isn't that very verbose, to list each and every MSI interrupt, bit per
+> > bit? I'm fine with doing that (except maybe implement both MSI and
+> > MSI-X support, I'd like to stick with the current feature set for now),
+> > but it sounds like a lot more code in the DT and a lot more code in the
+> > driver to parse this... just to get the exact same feature.
+> > 
+> > Arnd, what is your feeling about this suggestion?
+> 
+> I think we should only need an msi-parent property and let the details
+> be handled by the irq driver.
+
+Ok. Having the irq driver allocate the MSI interrupt number as you
+suggested above seems a good idea.
+
+> > > Also, I'm not super familiar with the irq stuff, but is
+> > > irq_find_mapping the best way? Most of the drivers I looked at used
+> > > irq_alloc_descs to get a contiguous range of irq numbers and then just
+> > > used a simple offset in the handle_irq...
+> > 
+> > I'll let Arnd answer this one, but I'm pretty sure that using IRQ
+> > domains is the way to go. The fact that a number of drivers don't yet
+> > use IRQ domains is maybe just because they haven't been converted yet.
+> 
+> Yes, irq_find_mapping is what we should be using here.
+
+Ok, thanks.
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
