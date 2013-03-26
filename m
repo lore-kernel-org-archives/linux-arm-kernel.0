@@ -1,46 +1,23 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 26 Mar 2013 22:42:51 +0100
-Subject: [RFCv1 07/11] irqchip: armada-370-xp: add MSI support to
- interrupt controller driver
-In-Reply-To: <201303262115.41200.arnd@arndb.de>
-References: <1364316746-8702-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1364316746-8702-8-git-send-email-thomas.petazzoni@free-electrons.com>
- <201303262115.41200.arnd@arndb.de>
-Message-ID: <20130326224251.6a925892@skate>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 26 Mar 2013 21:43:23 +0000
+Subject: [PATCH v2 05/10] arm: zynq: Move slcr initialization to separate
+ file
+In-Reply-To: <dc278dadd3614b4736f43a09b9c5d7ccd2232403.1364319776.git.michal.simek@xilinx.com>
+References: <1364319822-5504-1-git-send-email-michal.simek@xilinx.com>
+ <dc278dadd3614b4736f43a09b9c5d7ccd2232403.1364319776.git.michal.simek@xilinx.com>
+Message-ID: <201303262143.23708.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Arnd Bergmann,
-
-On Tue, 26 Mar 2013 21:15:40 +0000, Arnd Bergmann wrote:
-> On Tuesday 26 March 2013, Thomas Petazzoni wrote:
-> > +                       msimask = readl_relaxed(per_cpu_int_base +
-> > +                                       ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS)
-> > +                               & PCI_MSI_DOORBELL_MASK;
-> > +
-> > +                       writel(~PCI_MSI_DOORBELL_MASK, per_cpu_int_base +
-> > +                              ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS);
-> > +
+On Tuesday 26 March 2013, Michal Simek wrote:
+> Create separate slcr driver instead of pollute common code.
 > 
-> Upon reading this code again, I stumbled over the barriers. You use
-> a readl_relaxed() without barrier but a writel() with barrier. Is
-> that intentional? Are you sure that you don't need a full readl()
-> to guarantee that all inbound DMA that was sent by the device before
-> the MSI message has arrived by the time the interrupt handler function
-> is called? It depends on the implementation of the MSI controller whether
-> that guarantee is already made by the fact that you are handling the
-> interrupt.
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 
-This question I will have to raise to the Marvell HW engineers, the
-datasheet does not go into these considerations. For now, I'm rather
-trying to validate the 'architecture' of the code: DT binding,
-interaction between the IRQ controller driver and the PCIe driver, etc.
+Can't you move that code into the zynq_cpu_clk_setup function
+instead, and only call of_clk_init(NULL) from platform code?
 
-Thanks,
+I would like to eventually add a default call to of_clk_init(NULL)
+for all platforms, and that would be a step in that direction.
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+	Arnd
