@@ -1,43 +1,55 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Tue, 26 Mar 2013 14:53:06 +0200
-Subject: [PATCH v4 0/6] support other fsl SoCs with usbmisc + small fixes
-In-Reply-To: <20130325173019.GA1992@kroah.com>
-References: <1354033021-10585-1-git-send-email-m.grzeschik@pengutronix.de>
- <20121128025217.GC18593@nchen-desktop>
- <87ip6mor1e.fsf@ashishki-desk.ger.corp.intel.com>
- <CAOMZO5ArDLKDLEzhYc7EP2CNQGcT=vO7ctbiEsjzsGs+EaT7Dw@mail.gmail.com>
- <20130325162931.GB22810@pengutronix.de> <20130325173019.GA1992@kroah.com>
-Message-ID: <87r4j2jpal.fsf@ashishki-desk.ger.corp.intel.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Tue, 26 Mar 2013 13:52:39 +0100
+Subject: [RFC PATCH v3 5/6] sched: pack the idle load balance
+In-Reply-To: <1363955155-18382-6-git-send-email-vincent.guittot@linaro.org>
+References: <1363955155-18382-1-git-send-email-vincent.guittot@linaro.org>
+ <1363955155-18382-6-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <1364302359.5053.21.camel@laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greg KH <gregkh@linuxfoundation.org> writes:
+On Fri, 2013-03-22 at 13:25 +0100, Vincent Guittot wrote:
+> Look for an idle CPU close to the pack buddy CPU whenever possible.
+> The goal is to prevent the wake up of a CPU which doesn't share the
+> power
+> domain of the pack buddy CPU.
+> 
+> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+> Reviewed-by: Morten Rasmussen <morten.rasmussen@arm.com>
+> ---
+>  kernel/sched/fair.c |   18 ++++++++++++++++++
+>  1 file changed, 18 insertions(+)
+> 
+> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+> index b636199..52a7736 100644
+> --- a/kernel/sched/fair.c
+> +++ b/kernel/sched/fair.c
+> @@ -5455,7 +5455,25 @@ static struct {
+>  
+>  static inline int find_new_ilb(int call_cpu)
+>  {
+> +       struct sched_domain *sd;
+>         int ilb = cpumask_first(nohz.idle_cpus_mask);
+> +       int buddy = per_cpu(sd_pack_buddy, call_cpu);
+> +
+> +       /*
+> +        * If we have a pack buddy CPU, we try to run load balance on
+> a CPU
+> +        * that is close to the buddy.
+> +        */
+> +       if (buddy != -1)
+> +               for_each_domain(buddy, sd) {
+> +                       if (sd->flags & SD_SHARE_CPUPOWER)
+> +                               continue;
+> +
+> +                       ilb = cpumask_first_and(sched_domain_span(sd),
+> +                                       nohz.idle_cpus_mask);
+> +
+> +                       if (ilb < nr_cpu_ids)
+> +                               break;
+> +               }
 
-> Ugh, this is getting to be a horrible mess.
->
-> Alexander, what is going on here?  You can't just constantly ignore
-> patches, that's reserved for kernel developers with more experience :)
+/me hands you a fresh bucket of curlies, no reason to skimp on them.
 
-Long story short, I'm waiting for a coherent set of patches to arrive to
-my inbox (I guess that's a fair expectation) for them to be included in
-what I am going to send you on friday, if that's reasonable. I'll also
-post my current stack of chipidea patches later today to sync with
-everybody.
-
-This email did bring to my attention 6 patches that I could have missed
-otherwise. And these are the *only* patches from the abovementioned ones
-that don't have unaddressed comments or obscure dependencies on other
-patchsets and/or trees.
-
-> If I don't hear back from you by Wednesday this week, with a specific
-> plan for how to get all of these fixes to me by the end of this week,
-> I'm going to assume that you are missing, and will just start taking
-> chipidea patches directly myself, sorry.
-
-For a long story, see my other email [1].
-
-[1] http://marc.info/?l=linux-arm-kernel&m=136429960606655&w=2
-
-Regards,
---
-Alex
+But ha! here's your NO_HZ link.. but does the above DTRT and ensure
+that the ILB is a little core when possible?
