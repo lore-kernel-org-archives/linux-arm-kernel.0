@@ -1,66 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 26 Mar 2013 18:38:22 +0000
-Subject: [RFCv1 07/11] irqchip: armada-370-xp: add MSI support to
- interrupt controller driver
-In-Reply-To: <20130326181754.33b89559@skate>
-References: <1364316746-8702-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <201303261707.41563.arnd@arndb.de> <20130326181754.33b89559@skate>
-Message-ID: <201303261838.23246.arnd@arndb.de>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 26 Mar 2013 18:43:03 +0000 (UTC)
+Subject: OMAP baseline test results for v3.9-rc3
+In-Reply-To: <1363684373.15426.137.camel@sokoban>
+References: <alpine.DEB.2.00.1303181536230.29332@utopia.booyaka.com>
+ <51482707.6020501@ti.com> <1363684373.15426.137.camel@sokoban>
+Message-ID: <alpine.DEB.2.00.1303261829440.23957@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 26 March 2013, Thomas Petazzoni wrote:
+Hi.
 
-> 
-> I've tried to explain that in the commit log of PATCH 6, which says:
-> 
->     However, we need the driver to expose two different IRQ domains: one
->     for the main interrupt controller itself, and one for the MSI
->     interrupt controller. In order to achieve this, we will create two
->     subnodes in the interrupt-controller at d0020000 node: one subnode for
->     the main interrupt controller, and one subnode for the MSI interrupt
->     controller. The two irq domains can't be registered on the same DT
->     node, otherwise when irq_find_host() gets used by of_irq_map_one()
->     to resolve IRQs of devices, they may find the MSI interrupt
->     controller instead of the main interrupt controller.
+On Tue, 19 Mar 2013, Tero Kristo wrote:
 
-Right, I should have read the commit log better ...
+> I think you should definitely upgrade your bootloader, the old one you
+> are using is prone to cause trouble due to bugs it has, and we have no
+> simple way to workaround the issues it causes on kernel side.
 
->     Note that both the parent and the child node need to have the
->     'interrupt-controller' empty property:
->     
->       * The interrupt-controller property is needed in the main
->     interrupt controller node (interrupt-controller at d0020000) because
->     the of_irq_init() function skips nodes that are matching the given
->        compatible string, but that don't have the interrupt-controller
->        property.
->     
->      * The interrupt-controller property is needed in the child
->     interrupt controller node (main-intc at d0020000) otherwise the
->     resolution done by of_irq_map_one() doesn't work.
+So, the kernel should be independent of the bootloader that's used.  Many 
+of the rest of us have taken great care to ensure that devices get reset 
+to do this.  We've got pretty good coverage on OMAP3 and most of the other 
+OMAP4 IP blocks.
 
-If you add compatible properties to the children, that would work
-I suppose.
+You mention that there's no simple way to do it, but as far as I know, no 
+one has assessed what's needed to reset the remaining devices.  Or if 
+someone has this information, it hasn't been shared here - please do so.
 
-> So really, the thing is that irq_domain_add_linear() registers an IRQ
-> domain on a specific DT node, and then irq_find_host() finds back an
-> IRQ domain from a given DT node. So if you have two IRQ domains
-> registered on the same DT node, then you don't know which one will be
-> used.
-> 
-> So if I do the two irq_domain_add_linear() (one for MPIC, one for MSI)
-> on one single DT node, when the timer driver will request its
-> interrupt, it turns out that the MSI IRQ domain is used and not the
-> MPIC IRQ domain, even though the timer has <&mpic> as its interrupt
-> parent.
+So what I'd like you to do is:
 
-I still wonder if the real solution shouldn't instead be to make the
-irq domain code MSI aware. For instance, you don't really need a
-cell to describe an interrupt because the interrupt number is
-not a hardware property. So an MSI using device doesn't really
-needs an "msis" or "interrupts" property, just an "msi-parent",
-and we can add code to handle as a separate domain even if you
-have a single device node that can do both level and message
-interrupts.
+1. Determine what devices are remaining to be reset and idled on OMAP4 
+   with the bootloader that I use.  As far as I know, there are only four 
+   that block full-chip idle: M3, DSP, SL2IF, FSUSB
 
-	Arnd
+2. Determine what's needed to reset and idle them.  For the M3 and DSP, 
+   I'd assume this involves pointing the reset vector for those 
+   processors at a few lines of code that basically enter WFI or the C64x 
+   equivalent.
+
+3. At this point, we can determine the difficulty level of the task.
+
+4. Then, assuming it's of the level described in step 2, that reset/idle 
+   code should be implemented.
+
+This process will ensure both that users with "old" OMAP4 bootloaders -- 
+really, u-boot versions distributed less than a year ago, so not very old 
+at all -- will be able to successfully enter chip low power states.  It 
+will also ensure that users who boot to new kernels with kexec will be 
+able to do so successfully, with a minimum of interference from other 
+devices.
+
+
+- Paul
