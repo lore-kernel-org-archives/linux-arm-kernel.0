@@ -1,172 +1,76 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Tue, 26 Mar 2013 19:02:21 +0530
-Subject: [PATCH] ARM: davinci: use is IS_ENABLED macro
-In-Reply-To: <51505C59.1040607@infradead.org>
-References: <1364210495-7938-1-git-send-email-prabhakar.csengg@gmail.com>
- <51505C59.1040607@infradead.org>
-Message-ID: <CA+V-a8u2kHoCWW4xbKkPoUQkBHaJHJA=0xdp=kbCUCO2PcY8+w@mail.gmail.com>
+From: mgr@pengutronix.de (Michael Grzeschik)
+Date: Tue, 26 Mar 2013 14:34:18 +0100
+Subject: [PATCH v4 0/6] support other fsl SoCs with usbmisc + small fixes
+In-Reply-To: <87txnyjqdn.fsf@ashishki-desk.ger.corp.intel.com>
+References: <1354033021-10585-1-git-send-email-m.grzeschik@pengutronix.de>
+ <20121128025217.GC18593@nchen-desktop>
+ <87ip6mor1e.fsf@ashishki-desk.ger.corp.intel.com>
+ <CAOMZO5ArDLKDLEzhYc7EP2CNQGcT=vO7ctbiEsjzsGs+EaT7Dw@mail.gmail.com>
+ <20130325162931.GB22810@pengutronix.de>
+ <87txnyjqdn.fsf@ashishki-desk.ger.corp.intel.com>
+Message-ID: <20130326133418.GC22810@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Randy,
+Hi Alexander,
 
-On Mon, Mar 25, 2013 at 7:46 PM, Randy Dunlap <rdunlap@infradead.org> wrote:
-> On 03/25/13 04:21, Prabhakar lad wrote:
->> From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
->>
->> This patches replaces #if defined() by IS_ENABLED macro, which provides
->> better readability.
->>
->> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
->> Cc: Sekhar Nori <nsekhar@ti.com>
->> ---
->>  Note: This patch is compile tested only for davinci_all_defconfig
->>        and da8xx_omapl_defconfig.
->
-> Source files that use IS_ENABLED() etc. should also
-> #include <linux/kconfig.h>
->
-> Is that already done in all of these source files?
->
-as mentioned in  my NOTE when I built with the above
-mentioned  *defconfig's all the files which were modified
-in this patch got built (.o files were created), which indicates
-#include <linux/kconfig.h> is included :-)
+On Tue, Mar 26, 2013 at 02:29:40PM +0200, Alexander Shishkin wrote:
+> Michael Grzeschik <mgr@pengutronix.de> writes:
+> Some more fun:
+> 
+> > /*
+> >  * Peters branch already contain the usbmisc series,
+> >  * but they never made it to ci-for-greg, although
+> >  * Alexander already mentioned (24 Jan 2013) to queue them.
+> >  */
+> > https://github.com/hzpeterchen/linux-usb.git master^^
+> > 4d36511 Merge 'v3.9/topic/usb-peterchen'
+> > 90314f3 usb: chipidea: usbmisc: add post handling and errata fix for mx25
+> > edde2ad usb: chipidea: usbmisc: add mx53 support
+> > 6150722 usb: chipidea: usbmisc: prepare driver to handle more than one soc
+> > 542384e usb: chipidea: usbmisc: fix a potential race condition
+> > cdffb44 usb: chipidea: usbmisc: unset global varibale usbmisc on driver remove
+> > b8e47e3 usb: chipidea: usbmisc: rename file, struct and functions to usbmisc_imx
+> 
+> These patches were not part of Peter's patchset, but the one that I
+> acked before. Yes, these go in too.
 
-Regards,
---Prabhakar
+This are the patches that whole thread was basically about. I did not
+want to force pressure with our ground truth of patches, but as you did
+not collect the series on your extra prepared mainlining ci-for-greg
+tree and did not even answer on any mail about it, I just wanted some
+more eyes to pay attention.
 
->
->>  arch/arm/mach-davinci/board-da830-evm.c   |    2 +-
->>  arch/arm/mach-davinci/board-da850-evm.c   |    3 +--
->>  arch/arm/mach-davinci/board-dm644x-evm.c  |    9 +++------
->>  arch/arm/mach-davinci/board-dm646x-evm.c  |    3 +--
->>  arch/arm/mach-davinci/board-neuros-osd2.c |    6 ++----
->>  arch/arm/mach-davinci/devices.c           |    2 +-
->>  arch/arm/mach-davinci/usb.c               |    2 +-
->>  7 files changed, 10 insertions(+), 17 deletions(-)
->>
->> diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
->> index 6da25ee..68ade71 100644
->> --- a/arch/arm/mach-davinci/board-da830-evm.c
->> +++ b/arch/arm/mach-davinci/board-da830-evm.c
->> @@ -298,7 +298,7 @@ static const short da830_evm_emif25_pins[] = {
->>       -1
->>  };
->>
->> -#if defined(CONFIG_MMC_DAVINCI) || defined(CONFIG_MMC_DAVINCI_MODULE)
->> +#if IS_ENABLED(CONFIG_MMC_DAVINCI)
->>  #define HAS_MMC      1
->>  #else
->>  #define HAS_MMC      0
->> diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
->> index c2dfe06..3475769 100644
->> --- a/arch/arm/mach-davinci/board-da850-evm.c
->> +++ b/arch/arm/mach-davinci/board-da850-evm.c
->> @@ -335,8 +335,7 @@ static const short da850_evm_nor_pins[] = {
->>       -1
->>  };
->>
->> -#if defined(CONFIG_MMC_DAVINCI) || \
->> -    defined(CONFIG_MMC_DAVINCI_MODULE)
->> +#if IS_ENABLED(CONFIG_MMC_DAVINCI)
->>  #define HAS_MMC 1
->>  #else
->>  #define HAS_MMC 0
->> diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
->> index 71735e7..d0f6365 100644
->> --- a/arch/arm/mach-davinci/board-dm644x-evm.c
->> +++ b/arch/arm/mach-davinci/board-dm644x-evm.c
->> @@ -750,22 +750,19 @@ static int davinci_phy_fixup(struct phy_device *phydev)
->>       return 0;
->>  }
->>
->> -#if defined(CONFIG_BLK_DEV_PALMCHIP_BK3710) || \
->> -    defined(CONFIG_BLK_DEV_PALMCHIP_BK3710_MODULE)
->> +#if IS_ENABLED(CONFIG_BLK_DEV_PALMCHIP_BK3710)
->>  #define HAS_ATA 1
->>  #else
->>  #define HAS_ATA 0
->>  #endif
->>
->> -#if defined(CONFIG_MTD_PHYSMAP) || \
->> -    defined(CONFIG_MTD_PHYSMAP_MODULE)
->> +#if IS_ENABLED(CONFIG_MTD_PHYSMAP)
->>  #define HAS_NOR 1
->>  #else
->>  #define HAS_NOR 0
->>  #endif
->>
->> -#if defined(CONFIG_MTD_NAND_DAVINCI) || \
->> -    defined(CONFIG_MTD_NAND_DAVINCI_MODULE)
->> +#if IS_ENABLED(CONFIG_MTD_NAND_DAVINCI)
->>  #define HAS_NAND 1
->>  #else
->>  #define HAS_NAND 0
->> diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
->> index de7adff..c84fdd5 100644
->> --- a/arch/arm/mach-davinci/board-dm646x-evm.c
->> +++ b/arch/arm/mach-davinci/board-dm646x-evm.c
->> @@ -117,8 +117,7 @@ static struct platform_device davinci_nand_device = {
->>       },
->>  };
->>
->> -#if defined(CONFIG_BLK_DEV_PALMCHIP_BK3710) || \
->> -    defined(CONFIG_BLK_DEV_PALMCHIP_BK3710_MODULE)
->> +#if IS_ENABLED(CONFIG_BLK_DEV_PALMCHIP_BK3710)
->>  #define HAS_ATA 1
->>  #else
->>  #define HAS_ATA 0
->> diff --git a/arch/arm/mach-davinci/board-neuros-osd2.c b/arch/arm/mach-davinci/board-neuros-osd2.c
->> index 1c98107..8bd0a43 100644
->> --- a/arch/arm/mach-davinci/board-neuros-osd2.c
->> +++ b/arch/arm/mach-davinci/board-neuros-osd2.c
->> @@ -168,15 +168,13 @@ static struct davinci_mmc_config davinci_ntosd2_mmc_config = {
->>  };
->>
->>
->> -#if defined(CONFIG_BLK_DEV_PALMCHIP_BK3710) || \
->> -     defined(CONFIG_BLK_DEV_PALMCHIP_BK3710_MODULE)
->> +#if IS_ENABLED(CONFIG_BLK_DEV_PALMCHIP_BK3710)
->>  #define HAS_ATA 1
->>  #else
->>  #define HAS_ATA 0
->>  #endif
->>
->> -#if defined(CONFIG_MTD_NAND_DAVINCI) || \
->> -     defined(CONFIG_MTD_NAND_DAVINCI_MODULE)
->> +#if IS_ENABLED(CONFIG_MTD_NAND_DAVINCI)
->>  #define HAS_NAND 1
->>  #else
->>  #define HAS_NAND 0
->> diff --git a/arch/arm/mach-davinci/devices.c b/arch/arm/mach-davinci/devices.c
->> index 4c48a36..df135de 100644
->> --- a/arch/arm/mach-davinci/devices.c
->> +++ b/arch/arm/mach-davinci/devices.c
->> @@ -119,7 +119,7 @@ void __init davinci_init_ide(void)
->>       platform_device_register(&ide_device);
->>  }
->>
->> -#if  defined(CONFIG_MMC_DAVINCI) || defined(CONFIG_MMC_DAVINCI_MODULE)
->> +#if IS_ENABLED(CONFIG_MMC_DAVINCI)
->>
->>  static u64 mmcsd0_dma_mask = DMA_BIT_MASK(32);
->>
->> diff --git a/arch/arm/mach-davinci/usb.c b/arch/arm/mach-davinci/usb.c
->> index 34509ff..5764d65 100644
->> --- a/arch/arm/mach-davinci/usb.c
->> +++ b/arch/arm/mach-davinci/usb.c
->> @@ -17,7 +17,7 @@
->>  #define DA8XX_USB0_BASE      0x01e00000
->>  #define DA8XX_USB1_BASE      0x01e25000
->>
->> -#if defined(CONFIG_USB_MUSB_HDRC) || defined(CONFIG_USB_MUSB_HDRC_MODULE)
->> +#if IS_ENABLED(CONFIG_USB_MUSB_HDRC)
->>  static struct musb_hdrc_eps_bits musb_eps[] = {
->>       { "ep1_tx", 8, },
->>       { "ep1_rx", 8, },
->>
->
->
-> --
-> ~Randy
+> > c5863f9 usb: chipidea: imx: select usb id pin using syscon interface
+> 
+> Can't see it in my mailbox.
+
+Obviously we did not start posting every patch we got in the queue when
+we don't even see the oldest accepted patches show up where they should.
+
+> > 8c8a1f5 usb: chipidea: udc: fix the oops when plugs in usb cable after rmmod gadget
+> > c703723 usb: chipidea: imx: add getting vbus regulator code
+> > e897d66 usb: chipidea: delete the delayed work
+> > 4c0be3e usb: chipidea: add vbus regulator control
+> > f1e52f8 usb: chipidea: udc: retire the flag CI13_PULLUP_ON_VBUS
+> > af4e743 usb: chipidea: udc: add pullup/pulldown dp at hw_device_state
+> > 1be0011 usb: chipidea: add otg id switch and vbus connect/disconnect detect
+> > 7c3c62d usb: chipidea: add otg file
+> > 618bfec Revert "USB: chipidea: add vbus detect for udc"
+> 
+> This is, btw, an o-o-o-old version of Peter's work.
+
+Actually, its just the series he got in his github tree. [?]
+That the patches here are way to old is due to the missing
+workflow we all currently suffer from.
+
+[?] https://github.com/hzpeterchen/linux-usb.git master
+
+Thanks,
+Michael
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
