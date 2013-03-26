@@ -1,17 +1,16 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 26 Mar 2013 14:34:53 -0600
-Subject: [PATCH 2/2] ARM: tegra: use CS_LAR_KEY definition instead of
- 0xC5ACCE55
-In-Reply-To: <1364235552-17851-2-git-send-email-will.deacon@arm.com>
+Date: Tue, 26 Mar 2013 14:38:05 -0600
+Subject: [PATCH 1/2] ARM: tegra: use setup_mm_for_reboot rather than
+ explicit pgd switch
+In-Reply-To: <1364235552-17851-1-git-send-email-will.deacon@arm.com>
 References: <1364235552-17851-1-git-send-email-will.deacon@arm.com>
- <1364235552-17851-2-git-send-email-will.deacon@arm.com>
-Message-ID: <5152066D.8080804@wwwdotorg.org>
+Message-ID: <5152072D.6020201@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 03/25/2013 12:19 PM, Will Deacon wrote:
-> When enabling coresight on secondary cores for tegra, make use of our
-> fancy new definition for the magic lock code.
+> This patch changes the Tegra PM code to use the setup_mm_for_reboot
+> helper rather than call cpu_switch_mm directly. This keeps things like
+> TLB invalidation in one place.
 
-The code you're editing has actually been removed in the 3.10 cycle, so
-there's no need for this patch any more.
+I've applied this to Tegra's for-3.10/cleanup branch.
