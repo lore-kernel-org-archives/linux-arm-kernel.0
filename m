@@ -1,47 +1,46 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 26 Mar 2013 14:41:12 +0000
-Subject: [PATCH v2 3/6] xen: move the xenvm machine to mach-virt
-In-Reply-To: <alpine.DEB.2.02.1303261423530.4430@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1303261423530.4430@kaball.uk.xensource.com>
-Message-ID: <1364308875-26484-3-git-send-email-stefano.stabellini@eu.citrix.com>
+Date: Tue, 26 Mar 2013 14:40:56 +0000
+Subject: [PATCH v2 0/6] xen/arm: move to mach-virt and support SMP
+Message-ID: <alpine.DEB.2.02.1303261423530.4430@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-xenvm is based on mach-vexpress, move it to mach-virt.
+Hi all,
+this patch series, based on 3.9-rc3, moves xenvm to mach-virt and
+implements SMP support in Xen on ARM.
 
-Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-CC: will.deacon at arm.com
-CC: arnd at arndb.de
-CC: rob.herring at calxeda.com
----
- arch/arm/mach-vexpress/v2m.c |    1 -
- arch/arm/mach-virt/virt.c    |    1 +
- 2 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
-index 915683c..c43ec78 100644
---- a/arch/arm/mach-vexpress/v2m.c
-+++ b/arch/arm/mach-vexpress/v2m.c
-@@ -469,7 +469,6 @@ static void __init v2m_dt_init(void)
- 
- static const char * const v2m_dt_match[] __initconst = {
- 	"arm,vexpress",
--	"xen,xenvm",
- 	NULL,
- };
- 
-diff --git a/arch/arm/mach-virt/virt.c b/arch/arm/mach-virt/virt.c
-index 31666f6..528c05e 100644
---- a/arch/arm/mach-virt/virt.c
-+++ b/arch/arm/mach-virt/virt.c
-@@ -40,6 +40,7 @@ static void __init virt_timer_init(void)
- 
- static const char *virt_dt_match[] = {
- 	"linux,dummy-virt",
-+	"xen,xenvm",
- 	NULL
- };
- 
--- 
-1.7.2.5
+Changes from v1:
+- move the percpu variable argument fix in xen_init_events to a separate
+  patch;
+- remove unused variable in xen_init_events;
+- add an RFC patch to initialize PSCI from smp_set_ops and use it if
+  available.
+
+
+Stefano Stabellini (6):
+      xen/arm: actually pass a non-NULL percpu pointer to request_percpu_irq
+      xen/arm: SMP support
+      xen: move the xenvm machine to mach-virt
+      xen/arm: implement HYPERVISOR_vcpu_op
+      xenvm: add a simple PSCI node and a second cpu
+      [RFC] arm: use PSCI if available
+
+ arch/arm/boot/dts/xenvm-4.2.dts      |   12 +++++++
+ arch/arm/include/asm/psci.h          |    1 +
+ arch/arm/include/asm/xen/hypercall.h |    1 +
+ arch/arm/kernel/psci.c               |   42 ++++++++++++++++++++++--
+ arch/arm/kernel/smp.c                |    7 +++-
+ arch/arm/mach-vexpress/v2m.c         |    1 -
+ arch/arm/mach-virt/Makefile          |    1 -
+ arch/arm/mach-virt/platsmp.c         |   58 ----------------------------------
+ arch/arm/mach-virt/virt.c            |    4 +--
+ arch/arm/xen/enlighten.c             |   41 +++++++++++++++++++++++-
+ arch/arm/xen/hypercall.S             |    1 +
+ 11 files changed, 99 insertions(+), 70 deletions(-)
+
+git://xenbits.xen.org/people/sstabellini/linux-pvhvm.git 3.9-rc3-smp-2
+
+Cheers,
+
+Stefano
