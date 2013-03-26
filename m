@@ -1,73 +1,78 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Tue, 26 Mar 2013 08:07:19 +0100
-Subject: [PATCH v3] ARM: dove: add more hardware description in the DT
-Message-ID: <20130326080719.2d4d6450@armhf>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 26 Mar 2013 15:25:01 +0800
+Subject: [PATCH 05/15] cpuidle: imx6: remove timer broadcast initialization
+In-Reply-To: <1364234140-514-6-git-send-email-daniel.lezcano@linaro.org>
+References: <1364234140-514-1-git-send-email-daniel.lezcano@linaro.org>
+ <1364234140-514-6-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <20130326072458.GA7141@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 88AP510 chip (Marvell Dove) contains a LCD controller, a display
-controller and two audio controllers.
+On Mon, Mar 25, 2013 at 06:55:30PM +0100, Daniel Lezcano wrote:
+> The initialization is done from the cpuidle framework.
+> 
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> ---
+>  arch/arm/mach-imx/cpuidle-imx6q.c |   15 ---------------
+>  1 file changed, 15 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/cpuidle-imx6q.c b/arch/arm/mach-imx/cpuidle-imx6q.c
+> index 5ae22f7..a783a63 100644
+> --- a/arch/arm/mach-imx/cpuidle-imx6q.c
+> +++ b/arch/arm/mach-imx/cpuidle-imx6q.c
+> @@ -6,7 +6,6 @@
+>   * published by the Free Software Foundation.
+>   */
+>  
+> -#include <linux/clockchips.h>
 
-Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
----
-v3 from Sebastian Hesselbarth remarks
-   - dcon register block ends at 0xc4
-v2 from Sebastian Hesselbarth remarks
-   - better names for the devices
-   - fix bad i2s interrupt controller
-   - 2 irq's by audio controller
-   - display controller added
----
- arch/arm/boot/dts/dove.dtsi |   38 +++++++++++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
+Removing this causes the compile error below.
 
-diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-index f7509ca..4f5cfbf 100644
---- a/arch/arm/boot/dts/dove.dtsi
-+++ b/arch/arm/boot/dts/dove.dtsi
-@@ -253,5 +253,43 @@
- 				dmacap,xor;
- 			};
- 		};
-+
-+		lcd0: lcd-controller at 820000 {
-+			compatible = "marvell,dove-lcd";
-+			reg = <0x820000 0x1c8>;
-+			interrupts = <47>;
-+			status = "disabled";
-+		};
-+
-+		lcd1: lcd-controller at 810000 {
-+			compatible = "marvell,dove-lcd";
-+			reg = <0x810000 0x1c8>;
-+			interrupts = <46>;
-+			status = "disabled";
-+		};
-+
-+		i2s0: audio-controller at b0000 {
-+			compatible = "marvell,kirkwood-i2s";
-+			reg = <0xb0000 0x4000>;
-+			interrupts = <19>, <20>;
-+			clocks = <&gate_clk 12>;
-+			status = "disabled";
-+		};
-+
-+		i2s1: audio-controller at b4000 {
-+			compatible = "marvell,kirkwood-i2s";
-+			reg = <0xb4000 0x4000>;
-+			interrupts = <21>, <22>;
-+			clocks = <&gate_clk 13>;
-+			status = "disabled";
-+		};
-+
-+		/* display controller and image rotation engine */
-+		dcon: display-controller at 830000 {
-+			compatible = "marvell,dove-dcon";
-+			reg = <0x830000 0xc4>, <0x831000 0x8c>;
-+			interrupts = <45>;
-+			status = "disabled";
-+		};
- 	};
- };
--- 
-1.7.10.4
+  CC      arch/arm/mach-imx/cpuidle-imx6q.o
+arch/arm/mach-imx/cpuidle-imx6q.c: In function ?imx6q_enter_wait?:
+arch/arm/mach-imx/cpuidle-imx6q.c:25:2: error: implicit declaration of function ?clockevents_notify? [-Werror=implicit-function-declaration]
+arch/arm/mach-imx/cpuidle-imx6q.c:25:21: error: ?CLOCK_EVT_NOTIFY_BROADCAST_ENTER? undeclared (first use in this function)
+arch/arm/mach-imx/cpuidle-imx6q.c:25:21: note: each undeclared identifier is reported only once for each function it appears in
+arch/arm/mach-imx/cpuidle-imx6q.c:45:21: error: ?CLOCK_EVT_NOTIFY_BROADCAST_EXIT? undeclared (first use in this function)
+cc1: some warnings being treated as errors
+make[2]: *** [arch/arm/mach-imx/cpuidle-imx6q.o] Error 1
+
+Shawn
+
+>  #include <linux/cpuidle.h>
+>  #include <linux/module.h>
+>  #include <asm/cpuidle.h>
+> @@ -43,17 +42,6 @@ done:
+>  	return index;
+>  }
+>  
+> -/*
+> - * For each cpu, setup the broadcast timer because local timer
+> - * stops for the states other than WFI.
+> - */
+> -static void imx6q_setup_broadcast_timer(void *arg)
+> -{
+> -	int cpu = smp_processor_id();
+> -
+> -	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ON, &cpu);
+> -}
+> -
+>  static struct cpuidle_driver imx6q_cpuidle_driver = {
+>  	.name = "imx6q_cpuidle",
+>  	.owner = THIS_MODULE,
+> @@ -84,8 +72,5 @@ int __init imx6q_cpuidle_init(void)
+>  	/* Set chicken bit to get a reliable WAIT mode support */
+>  	imx6q_set_chicken_bit();
+>  
+> -	/* Configure the broadcast timer on each cpu */
+> -	on_each_cpu(imx6q_setup_broadcast_timer, NULL, 1);
+> -
+>  	return imx_cpuidle_init(&imx6q_cpuidle_driver);
+>  }
+> -- 
+> 1.7.9.5
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
