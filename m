@@ -1,34 +1,41 @@
-From: alex@digriz.org.uk (Alexander Clouter)
-Date: Tue, 26 Mar 2013 21:44:49 +0000
-Subject: [PATCHv3 4/4] arm: orion5x: correct IRQ used in dtsi for mv_cesa
-In-Reply-To: <1364334289-19669-1-git-send-email-alex@digriz.org.uk>
-References: <1364334289-19669-1-git-send-email-alex@digriz.org.uk>
-Message-ID: <1364334289-19669-5-git-send-email-alex@digriz.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 26 Mar 2013 21:46:58 +0000
+Subject: [PATCH v2 10/10] arm: zynq: Add cpuidle support
+In-Reply-To: <3395757de41837ecc1d84aac1a06ebcc23fe1367.1364319776.git.michal.simek@xilinx.com>
+References: <1364319822-5504-1-git-send-email-michal.simek@xilinx.com>
+ <3395757de41837ecc1d84aac1a06ebcc23fe1367.1364319776.git.michal.simek@xilinx.com>
+Message-ID: <201303262146.58590.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The crypto functionality in the orion5x dtsi uses the Ethernet IRQ and
-so things do not work and there is much grumbling at boot time.
-The IRQ for the crypto should be 28, and not 22, and that is what this
-patch corrects.
+On Tuesday 26 March 2013, Michal Simek wrote:
+> Add support for cpuidle.
+> 
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> ---
+> v2: Fix file header
+> ---
+>  arch/arm/mach-zynq/Makefile  |    1 +
+>  arch/arm/mach-zynq/cpuidle.c |  133 ++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 134 insertions(+)
+>  create mode 100644 arch/arm/mach-zynq/cpuidle.c
 
-Signed-off-by: Alexander Clouter <alex@digriz.org.uk>
----
- arch/arm/boot/dts/orion5x.dtsi |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Can you move that file to drivers/cpuidle instead?
 
-diff --git a/arch/arm/boot/dts/orion5x.dtsi b/arch/arm/boot/dts/orion5x.dtsi
-index c37290b..892c64e 100644
---- a/arch/arm/boot/dts/orion5x.dtsi
-+++ b/arch/arm/boot/dts/orion5x.dtsi
-@@ -129,7 +129,7 @@
- 			reg = <0x90000 0x10000>,
- 			      <0xf2200000 0x800>;
- 			reg-names = "regs", "sram";
--			interrupts = <22>;
-+			interrupts = <28>;
- 			status = "okay";
- 		};
- 	};
--- 
-1.7.10.4
+>+/* Initialize CPU idle by registering the idle states */
+>+static int xilinx_init_cpuidle(void)
+>+{
+>+       unsigned int cpu;
+>+       struct cpuidle_device *device;
+>+       int ret;
+>+
+>+       ret = cpuidle_register_driver(&xilinx_idle_driver);
+>+       if (ret) {
+>+               pr_err("Registering Xilinx CpuIdle Driver failed.\n");
+>+               return ret;
+>+       }
+
+I think you have to check that you actually run on a Zynq system before
+registering the driver.
+
+	Arnd
