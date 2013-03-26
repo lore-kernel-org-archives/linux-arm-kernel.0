@@ -1,38 +1,62 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 26 Mar 2013 10:45:05 -0600
-Subject: mvebu: Device bus driver resurrection
-In-Reply-To: <20130326124337.GD2454@localhost>
-References: <20130326124337.GD2454@localhost>
-Message-ID: <20130326164505.GB30255@obsidianresearch.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 26 Mar 2013 17:46:37 +0100
+Subject: [PATCH for 3.10 v2 0/4] thermal: Add Armada 370/XP support
+In-Reply-To: <1364292988-8358-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1364292988-8358-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20130326164637.GT5627@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 26, 2013 at 09:43:38AM -0300, Ezequiel Garcia wrote:
-> Hello everyone,
+On Tue, Mar 26, 2013 at 07:16:24AM -0300, Ezequiel Garcia wrote:
+> After Andrew Lunn objected the single driver approach [1] that merged
+> all the Marvell EBU SoC thermal drivers, we have agreed to proceed step
+> by step. For the time being we are adding support for Armada 370/XP only.
+> Given both Armada 370 and Armada XP have a similar feature set, it
+> makes sense to provide a single driver for them.
 > 
-> Now that we've all agreed on a mvebu mbus driver (or a first version of it)
-> I'd like to resurrect the Device Bus driver.
+> In the future we can unify this with the other drivers,
+> if this proves to be worthwhile.
 > 
-> As far as I can remember, the last things said about this driver were:
+> This driver has been influenced by the existing Kirkwood driver,
+> also taking account of suggestions made by Jason Gunthorpe.
 > 
->   * The timing parameters should be in {nano,pico,etc} seconds,
->     instead of ticks.
+> Testing has been done on the following boards:
+> 
+> For Armada 370: Globalscale Mirabox and Marvell Armada 370 RD
+> For Armada XP:  Plat'home Openblocks AX3 and Marvell Armada XP DB-MV784MP-GP
+> 
+> This series is based in v3.9-rc2. To make testing easier this patchset
+> can be found on a github branch [2].
+> 
+> Changes from v1:
+>   * Reorder Kconfig and Makefiles entries as requested by Andrew Lunn.
+>   * Make armada_get_temp() more readable, as requested by Durgadoss R.
+> 
+> Any feedback or comments are welcome!
 
-Yes, and I saw Rob Herring note that the DT parameters in cases like
-that should end in -ps
- 
->   * Although not everyone agreed, this driver was a good thing to have
->     so we no longer depend on the bootloader setting these parameters.
+Acked-by: Andrew Lunn <andrew@lunn.ch>
 
-Please make the timing parameters mandatory, not optional. If boot
-loader set timing is going to be used then this driver should not be
-involved. Otherwise the timing should be fully specified and no values
-from the bootloader should be retained.
-
->   * The address decoding windows should *not* be setup by this driver,
->     but rather be described in the device tree itself.
-
-I'm going to suggest you send out a quick DT sample for what you are
-thinking, that might save lots of effort?
-
-Jason
+> 
+> [1] http://permalink.gmane.org/gmane.linux.power-management.general/32123
+> [2] https://github.com/MISL-EBU-System-SW/mainline-public/tree/armada-thermal-v2
+> 
+> Ezequiel Garcia (4):
+>   thermal: Add driver for Armada 370/XP SoC thermal management
+>   ARM: mvebu: Add thermal support to Armada XP device tree
+>   ARM: mvebu: Add thermal support to Armada 370 device tree
+>   ARM: configs: Update mvebu defconfig for thermal
+> 
+>  .../devicetree/bindings/thermal/armada-thermal.txt |   22 ++
+>  arch/arm/boot/dts/armada-370.dtsi                  |    6 +
+>  arch/arm/boot/dts/armada-xp.dtsi                   |    6 +
+>  arch/arm/configs/mvebu_defconfig                   |    2 +
+>  drivers/thermal/Kconfig                            |    8 +
+>  drivers/thermal/Makefile                           |    1 +
+>  drivers/thermal/armada_thermal.c                   |  236 ++++++++++++++++++++
+>  7 files changed, 281 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/thermal/armada-thermal.txt
+>  create mode 100644 drivers/thermal/armada_thermal.c
+> 
+> -- 
+> 1.7.8.6
+> 
