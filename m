@@ -1,21 +1,78 @@
-From: arjan@linux.intel.com (Arjan van de Ven)
-Date: Tue, 26 Mar 2013 08:29:54 -0700
-Subject: [RFC PATCH v3 3/6] sched: pack small tasks
-In-Reply-To: <1364301998.5053.17.camel@laptop>
-References: <1363955155-18382-1-git-send-email-vincent.guittot@linaro.org>
- <1363955155-18382-4-git-send-email-vincent.guittot@linaro.org>
- <1364301998.5053.17.camel@laptop>
-Message-ID: <5151BEF2.9090100@linux.intel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 26 Mar 2013 15:37:30 +0000
+Subject: [PATCH v2 6/6] [RFC] arm: use PSCI if available
+In-Reply-To: <alpine.DEB.2.02.1303261509080.4430@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1303261423530.4430@kaball.uk.xensource.com>
+ <1364308875-26484-6-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130326150444.GI20252@mudshark.cambridge.arm.com>
+ <alpine.DEB.2.02.1303261509080.4430@kaball.uk.xensource.com>
+Message-ID: <20130326153730.GA22368@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Mar 26, 2013 at 03:25:55PM +0000, Stefano Stabellini wrote:
+> On Tue, 26 Mar 2013, Will Deacon wrote:
+> > On Tue, Mar 26, 2013 at 02:41:15PM +0000, Stefano Stabellini wrote:
+> > > +struct smp_operations __initdata psci_smp_ops = {
+> > > +	.smp_init_cpus		= psci_smp_init_cpus,
+> > > +	.smp_prepare_cpus	= psci_smp_prepare_cpus,
+> > > +	.smp_secondary_init	= psci_secondary_init,
+> > > +	.smp_boot_secondary	= psci_boot_secondary,
+> > > +};
+> > 
+> > Whilst I like the idea of this, I don't think things will pan out this
+> > nicely in practice. There will almost always be a level of indirection
+> > required between the internal Linux SMP operations and the expectations of
+> > the PSCI firmware, whether this is in CPU numbering or other,
+> > platform-specific fields in various parameters.
+> > 
+> > Tying these two things together like this confuses the layering in my
+> > opinion and will likely lead to potentially subtle breakages if platforms
+> > start trying to adopt this.
+> 
+> What you are saying is that psci could either be used directly, like we
+> are doing, or it could just be the base of some higher level platform
+> specific smp_ops.
+> 
+> Honestly I think that psci is already high level enough that I would
+> worry if somebody started to wrap it around something else.
 
-> Isn't this basically related to picking the NO_HZ cpu; if the system
-> isn't fully symmetric with its power gates you want the NO_HZ cpu to be
-> the 'special' cpu. If it is symmetric we really don't care which core
-> is left 'running' and we can even select a new pack cpu from the idle
-> cores once the old one is fully utilized.
+I don't agree. PSCI is a low-level firmware interface, which will naturally
+have implementation-specific parts to it. For example, many of the CPU power
+functions have platform-specific state ID parameters which we can't just
+ignore. Furthermore, the method by which a CPU is identified needn't match
+the value in our logical map. The purpose of the PSCI code in Linux is to
+provide a basic abstraction on top of this interface, so that platforms can
+incorporate them into higher-level power management functions, which
+themselves might be plumbed into smp_operations structures.
 
-you don't really care much sure, but there's some advantages for sorting "all the way left",
-e.g. to linux cpu 0.
-Some tasks only run there, and interrupts tend to be favored to that cpu as well on x86.
+> However we still support that use case just fine:  they can just avoid
+> having a psci node on device tree and just keep using their machine
+> specific smp_ops. It's up to them really.
+
+Why get rid of the node? That's there to initialise the PSCI backend
+accordingly and shouldn't have anything to do with SMP.
+
+> They can even base the implementation of their smp_ops on the current
+> psci code, in order to facilitate that I could get rid of psci_ops
+> (which initialization is based on device tree) and export the psci_cpu_*
+> functions instead, so that they can be called directly by other smp_ops.
+
+Again, I think this destroys the layering. The whole point is that the PSCI
+functions are called from within something that understands precisely how to
+talk to the firmware and what it is capable of.
+
+> > If this can indeed work for the virtual platforms (Xen and KVM), then I
+> > think it would be better expressed using `virt' smp_ops, which map directly
+> > to PSCI, rather than putting them here. Even then, it's tying KVM and Xen
+> > together on the firmware side of things...
+> 
+> Keep in mind that dom0 on Xen boots as a native machine (versatile
+> express or exynos5 for example) with a Xen hypervisor node on it.  We
+> would need to find a way to override the default machine smp_ops with
+> a set of xen_smp_ops early at boot.
+> I don't like this option very much, I think is fragile.
+
+Why can't dom0 use whatever smp ops the native machine would use?
+
+Will
