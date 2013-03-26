@@ -1,73 +1,39 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Tue, 26 Mar 2013 16:55:33 +0100
-Subject: [RFC PATCH v3 5/6] sched: pack the idle load balance
-In-Reply-To: <1364308932.5053.46.camel@laptop>
-References: <1363955155-18382-1-git-send-email-vincent.guittot@linaro.org>
- <1363955155-18382-6-git-send-email-vincent.guittot@linaro.org>
- <1364302359.5053.21.camel@laptop>
- <CAKfTPtD=_oS5gJeynUG=ft-Y1zEdxZEMhUPH9hSXx+H2pi4xgA@mail.gmail.com>
- <1364308932.5053.46.camel@laptop>
-Message-ID: <CAKfTPtDo3dmEZU-R62unQH9j5CxZWJj+Ws5CTBptOzTohkNJMA@mail.gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 26 Mar 2013 15:55:55 +0000
+Subject: [PATCH v2 6/6] [RFC] arm: use PSCI if available
+In-Reply-To: <201303261546.50194.arnd@arndb.de>
+References: <alpine.DEB.2.02.1303261423530.4430@kaball.uk.xensource.com>
+ <alpine.DEB.2.02.1303261509080.4430@kaball.uk.xensource.com>
+ <20130326153730.GA22368@mudshark.cambridge.arm.com>
+ <201303261546.50194.arnd@arndb.de>
+Message-ID: <alpine.DEB.2.02.1303261553120.4430@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 March 2013 15:42, Peter Zijlstra <peterz@infradead.org> wrote:
-> On Tue, 2013-03-26 at 15:03 +0100, Vincent Guittot wrote:
->> > But ha! here's your NO_HZ link.. but does the above DTRT and ensure
->> > that the ILB is a little core when possible?
->>
->> The loop looks for an idle CPU as close as possible to the buddy CPU
->> and the buddy CPU is the 1st CPU has been chosen. So if your buddy is
->> a little and there is an idle little, the ILB will be this idle
->> little.
->
-> Earlier you wrote:
->
->>       | Cluster 0   | Cluster 1   |
->>       | CPU0 | CPU1 | CPU2 | CPU3 |
->> -----------------------------------
->> buddy | CPU0 | CPU0 | CPU0 | CPU2 |
->
-> So extrapolating that to a 4+4 big-little you'd get something like:
->
->       |   little  A9  ||   big A15     |
->       | 0 | 1 | 2 | 3 || 4 | 5 | 6 | 7 |
-> ------+---+---+---+---++---+---+---+---+
-> buddy | 0 | 0 | 0 | 0 || 0 | 4 | 4 | 4 |
->
-> Right?
+On Tue, 26 Mar 2013, Arnd Bergmann wrote:
+> On Tuesday 26 March 2013, Will Deacon wrote:
+> > > They can even base the implementation of their smp_ops on the current
+> > > psci code, in order to facilitate that I could get rid of psci_ops
+> > > (which initialization is based on device tree) and export the psci_cpu_*
+> > > functions instead, so that they can be called directly by other smp_ops.
+> > 
+> > Again, I think this destroys the layering. The whole point is that the PSCI
+> > functions are called from within something that understands precisely how to
+> > talk to the firmware and what it is capable of.
+> 
+> Right, we probably the psci smp ops to be separate from the rest of the psci
+> code, but I also think that Stefano is right that we should let any platform
+> use the psci smp ops if possible, rather than having to implement their own.
 
-yes
+[...]
+ 
+> The part that I'm most interested in is making it possible for a platform
+> to kill off its native smp ops in the kernel by implementing the psci
+> ops. I think it's a good strategy to use psci by default if both 
+> platform and psci implementations are available.
 
->
-> So supposing the current ILB is 6, we'll only check 4, not 0-3, even
-> though there might be a perfectly idle cpu in there.
+I fully agree, and Xen would use it as is.
 
-We will check 4,5,7 at MC level in order to pack in the group of A15
-(because they are not sharing the same power domain). If none of them
-are idle, we will look at CPU level and will check CPUs 0-3.
-
->
-> Also, your scheme fails to pack when cpus 0,4 are filled, even when
-> there's idle cores around.
-
-The primary target is to pack the tasks only when we are in a not busy
-system so you will have a power improvement without performance
-decrease. is_light_task function returns false and  is_buddy_busy
-function true before the buddy is fully loaded and the scheduler will
-fall back into the default behavior which spreads tasks and races to
-idle.
-
-We can extend the buddy CPU and the packing mechanism to fill one CPU
-before filling another buddy but it's not always the best choice for
-performance and/or power and thus it will imply to have a knob to
-select this full packing mode.
-
->
-> If we'd use the ILB as packing cpu, we would simply select a next pack
-> target once the old one fills up.
-
-Yes, we will be able to pack the long running tasks and the wake up
-will take care of the short tasks
-
->
+If the psci node on DT only signifies the presence of psci, not that it
+should be used for smp_ops, then we need another DT node or property to
+say "this machine uses smp_psci_ops".
