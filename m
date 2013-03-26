@@ -1,116 +1,72 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 26 Mar 2013 10:11:13 +0100
-Subject: [PATCH 2/3] mfd: db8500-prcmu: Fetch the PRCMU TCDM base address
- from Device Tree
-In-Reply-To: <20130326081704.GB11734@gmail.com>
-References: <1364223758-17621-1-git-send-email-lee.jones@linaro.org>
- <1364223758-17621-2-git-send-email-lee.jones@linaro.org>
- <201303251540.51104.arnd@arndb.de>
- <20130325164600.GA11734@gmail.com>
- <CACRpkdbn4WARSp7_MUpCZTghTrsPYvsa9GEUC31T7nP_=9oZag@mail.gmail.com>
- <20130326081704.GB11734@gmail.com>
-Message-ID: <CACRpkdZxU197moM_00UQr-tHdip4b50c+CfYkR5OK+MbwsE-aw@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 26 Mar 2013 10:13:07 +0100
+Subject: [PATCHv2 00/10] ARM: sunxi: Architecture cleanups and rework
+Message-ID: <1364289198-11589-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 26, 2013 at 9:17 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Mon, 25 Mar 2013, Linus Walleij wrote:
->> On Mon, Mar 25, 2013 at 5:46 PM, Lee Jones <lee.jones@linaro.org> wrote:
->>
->> >> >         res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
->> >> >                                            "prcmu-tcpm");
->> >> >         if (!res) {
->> >> > -               dev_err(&pdev->dev,
->> >> > -                       "Error: no prcmu tcpm memory region provided\n");
->> >> > -               return;
->> >> > -       }
->> >> > -       tcpm_base = ioremap(res->start, resource_size(res));
->> >> > +               if (np) {
->> >> > +                       tcpm_np = of_find_node_by_name(np->parent,
->> >> > +                                                      "prcmu-tcpm-per4");
->> >> > +                       if (!tcpm_np) {
->> >> > +                               dev_err(&pdev->dev,
->> >> > +                                       "no prcmu tcpm mem region provided\n");
->> >> > +                               return;
->> >> > +                       }
->> >> > +                       tcpm_base = of_iomap(tcpm_np, 0);
->> >> > +               }
->> >> > +       } else
->> >> > +               tcpm_base = ioremap(res->start, resource_size(res));
->> >> > +
->> >>
->> >> Why don't you just add these extra registers to the prcmu node itself like
->> >>
->> >> diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
->> >> index 9de9309..6ee6c31 100644
->> >> --- a/arch/arm/boot/dts/dbx5x0.dtsi
->> >> +++ b/arch/arm/boot/dts/dbx5x0.dtsi
->> >> @@ -191,8 +191,8 @@
->> >>
->> >>               prcmu: prcmu at 80157000 {
->> >>                       compatible = "stericsson,db8500-prcmu";
->> >> -                     reg = <0x80157000 0x1000>;
->> >> -                     reg-names = "prcmu";
->> >> +                     reg = <0x80157000 0x1000>, <0x801b0000 0x1000>, <0x801b8000 0x1000>;
->> >> +                     reg-names = "prcmu", "prcmu-tcpm", "prcmu-tcdm-per4";
->> >>                       interrupts = <0 47 0x4>;
->> >>                       #address-cells = <1>;
->> >>                       #size-cells = <1>;
->> >>
->> >>
->> >> and document those in the prcmu binding?
->> >>
->> >> That would keep the code simpler and the same for both cases.
->> >
->> > I'm not sure you can. These addresses differ from platform to
->> > platform, so I'd need to provide the base PRCMU address in
->> > dbx5x0.dtsi, then the other two in the dts files. Can you do that?
->>
->> Better ask on devicetree-discuss.
->>
->> What it reflects are differences between SoC:s, so I think the
->> right solution is to split it in a three-layer cake:
->>
->> dbx5x0.dtsi -> included by
->> db8500.dtsi -> included by
->> snowball/hrefv60plus.dts
->>
->> dbx5x0.dtsi -> included by
->> dbx540.dtsi -> included by
->> ccu9540/ccu8540.dts
->>
->> Here you may insert the reg property into the node at the
->> db8500.dtsi or dbx540.dtsi layer.
->
-> It's easy done, if that's the right way.
->
->> If you prefer I can cook a patch...
->
-> ... and I'm fine to do it.
->
-> [5 mins later]
->
-> Hmm... it appears that in STE's kernel, the same address is used for
-> all SoCs:
->
->   #define U8500_PRCMU_TCDM_BASE    (U8500_PER4_BASE + 0x68000)
+Hi,
 
-Yes that's correct...
+This patchset is a serie of various cleanups and reworks in the sunxi
+architecture to prepare a clean landing for the next Allwinner SoC, the
+A31 (sun6i).
 
-> However, in Mainline there is another definition:
->
->   #define U9540_PRCMU_TCDM_BASE    (U8500_PER4_BASE + 0x6A000)
->
-> ... which doesn't seem to be in use anywhere - even for the u9540.
->
-> What's the deal big-man?
+The A31 is significantly different from the previous Allwinner SoC we
+supported, the A10 and A13, to no longer make the generic sunxi prefix
+we used in most compatible string relevant, while it should really have
+been sun4i in the first place.
 
-Probably there was another address at some point in some FPGA or
-early silicon and it now needs fixing.
+This set is also the occasion to cleanup the timer and irq code by
+switching to the recently introduced clocksource and irqchip
+infrastructures.
 
-So you should be able to use the same thing on all ASICs, put one
-single value in the dbx5x0.dtsi *and* fix this bug at the same time,
-good!
+This set depends on the UART patches I sent previously.
 
-Yours,
-Linus Walleij
+Maxime
+
+Changes from v1:
+  - Rebased on top of Rob Herring's clksrc/cleanup branch
+  - Updated the Documentation with the new compatible strings
+
+Maxime Ripard (10):
+  ARM: sunxi: dt: Reorganize the dtsi
+  clocksource: sunxi: Cleanup the timer code
+  clocksource: sunxi: make use of CLKSRC_OF
+  clocksource: sunxi: Rename sunxi to sun4i
+  ARM: sunxi: dt: Update timer compatible string
+  irqchip: sunxi: Make use of the IRQCHIP_DECLARE macro
+  irqchip: sunxi: Rename sunxi to sun4i
+  ARM: sunxi: dt: Update interrupt controller compatible string
+  ARM: sunxi: Rework the restart code
+  ARM: sunxi: dt: Update watchdog compatible string
+
+ ...lwinner,sunxi-ic.txt => allwinner,sun4i-ic.txt} |    4 +-
+ ...r,sunxi-timer.txt => allwinner,sun4i-timer.txt} |    4 +-
+ .../watchdog/{sunxi-wdt.txt => sun4i-wdt.txt}      |    6 +-
+ arch/arm/boot/dts/sun4i-a10-cubieboard.dts         |    2 +-
+ arch/arm/boot/dts/sun4i-a10-hackberry.dts          |    2 +-
+ arch/arm/boot/dts/sun4i-a10.dtsi                   |  157 ++++++++++++++++++-
+ arch/arm/boot/dts/sun5i-a13-olinuxino.dts          |    2 +-
+ arch/arm/boot/dts/sun5i-a13.dtsi                   |  145 +++++++++++++++++-
+ arch/arm/boot/dts/sunxi.dtsi                       |  159 --------------------
+ arch/arm/mach-sunxi/Kconfig                        |    5 +-
+ arch/arm/mach-sunxi/sunxi.c                        |   74 +++++----
+ drivers/clocksource/Kconfig                        |    2 +-
+ drivers/clocksource/Makefile                       |    2 +-
+ .../clocksource/{sunxi_timer.c => sun4i_timer.c}   |   94 +++++-------
+ drivers/irqchip/Makefile                           |    2 +-
+ drivers/irqchip/{irq-sunxi.c => irq-sun4i.c}       |  116 +++++++-------
+ include/linux/irqchip/sunxi.h                      |   27 ----
+ include/linux/sunxi_timer.h                        |   24 ---
+ 18 files changed, 452 insertions(+), 375 deletions(-)
+ rename Documentation/devicetree/bindings/interrupt-controller/{allwinner,sunxi-ic.txt => allwinner,sun4i-ic.txt} (94%)
+ rename Documentation/devicetree/bindings/timer/{allwinner,sunxi-timer.txt => allwinner,sun4i-timer.txt} (78%)
+ rename Documentation/devicetree/bindings/watchdog/{sunxi-wdt.txt => sun4i-wdt.txt} (57%)
+ delete mode 100644 arch/arm/boot/dts/sunxi.dtsi
+ rename drivers/clocksource/{sunxi_timer.c => sun4i_timer.c} (50%)
+ rename drivers/irqchip/{irq-sunxi.c => irq-sun4i.c} (38%)
+ delete mode 100644 include/linux/irqchip/sunxi.h
+ delete mode 100644 include/linux/sunxi_timer.h
+
+-- 
+1.7.10.4
