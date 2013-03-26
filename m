@@ -1,52 +1,74 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 26 Mar 2013 12:47:41 -0700
-Subject: [PATCH] ARM: mach-imx: clk-busy: Adapt to new the clk_mux
- structure
-In-Reply-To: <1364305330-21638-1-git-send-email-fabio.estevam@freescale.com>
-References: <1364305330-21638-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20130326194741.4014.86133@quantum>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 26 Mar 2013 20:48:29 +0100
+Subject: [PATCH 2/3] arm: kirkwood: factor pinmux descriptors for
+ OpenBlocks A6
+In-Reply-To: <20130322164440.5e5735d7@skate>
+References: <1362587021-32762-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1362587021-32762-3-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130306181648.GE3904@lunn.ch> <20130322164440.5e5735d7@skate>
+Message-ID: <20130326194829.GG631@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Fabio Estevam (2013-03-26 06:42:10)
-> Commit ce4f3313b05 (clk: add table lookup to mux) caused the following build 
-> error on imx_v4_v5_defconfig/imx_v6_v7_defconfig:
+On Fri, Mar 22, 2013 at 04:44:40PM +0100, Thomas Petazzoni wrote:
+> Dear Andrew Lunn,
 > 
-> arch/arm/mach-imx/clk-busy.c:172:11: error: 'struct clk_mux' has no member named 'width'
+> On Wed, 6 Mar 2013 19:16:48 +0100, Andrew Lunn wrote:
+> > On Wed, Mar 06, 2013 at 05:23:40PM +0100, Thomas Petazzoni wrote:
+> > > The OpenBlocks A6 .dts file was using a long list of pinmux
+> > > descriptors to select each GPIO of the external GPIO connector and the
+> > > internal DIP switch, for no apparent reason. This commit factors those
+> > > GPIO pins into two descriptors: one for the external GPIO connector
+> > > and one for the internal DIP switch.
+> > 
+> > Hi Thomas
+> > 
+> > There is no need to pinmux gpio pins at all. The pinctrl driver does
+> > it when the gpio driver requests the pins.
+> > 
+> > This stems from an error i made. I also didn't know this and added
+> > hogs for gpio pins as i converted some boards. Others have then just
+> > cut/paste my error.....
 > 
-> Fix it by passing the 'mask' field.
+> I was looking at this today to send an updated version of those
+> patches. However, it turns out that having the pinctrl-0 property to
+> associate pinmux configurations to a device has an advantage: pinctrl
+> knows about this association.
 > 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> If you keep the pinctrl-0 property in gpio-leds and gpio-keys,
+> then /sys/kernel/debug/pinctrl/f1010000.pinctrl/pinmux-pins looks like
+> this:
+> 
+> ======================================================================
+> pin 38 (PIN38): gpio_keys.2 mvebu-gpio:38 function gpio group mpp38
+> pin 39 (PIN39): (MUX UNCLAIMED) (GPIO UNCLAIMED)
+> pin 40 (PIN40): (MUX UNCLAIMED) (GPIO UNCLAIMED)
+> pin 41 (PIN41): gpio-leds.1 mvebu-gpio:41 function gpio group mpp41
+> pin 42 (PIN42): gpio-leds.1 mvebu-gpio:42 function gpio group mpp42
+> pin 43 (PIN43): gpio-leds.1 mvebu-gpio:43 function gpio group mpp43
+> ======================================================================
+> 
+> On the other hand, if you remove the pinctrl-0 property, the same file
+> looks like this:
+> 
+> ======================================================================
+> pin 38 (PIN38): (MUX UNCLAIMED) mvebu-gpio:38
+> pin 39 (PIN39): (MUX UNCLAIMED) (GPIO UNCLAIMED)
+> pin 40 (PIN40): (MUX UNCLAIMED) (GPIO UNCLAIMED)
+> pin 41 (PIN41): (MUX UNCLAIMED) mvebu-gpio:41
+> pin 42 (PIN42): (MUX UNCLAIMED) mvebu-gpio:42
+> pin 43 (PIN43): (MUX UNCLAIMED) mvebu-gpio:43
+> ======================================================================
+> 
+> So you no longer know by what device the pin is claimed. It is not
+> horrible of course, but I find it quite nice to be able to see which
+> pin is used by what device.
+> 
+> What do you think?
 
-Oops!  I just sent the same patch to the list.  I'll take yours into
-clk-next since you were first Fabio ;-)
+Hi Thomas
 
-Thanks,
-Mike
+I think the first is more informative. Please use that.
 
-> ---
->  arch/arm/mach-imx/clk-busy.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-imx/clk-busy.c b/arch/arm/mach-imx/clk-busy.c
-> index 1ab91b5..85b728c 100644
-> --- a/arch/arm/mach-imx/clk-busy.c
-> +++ b/arch/arm/mach-imx/clk-busy.c
-> @@ -169,7 +169,7 @@ struct clk *imx_clk_busy_mux(const char *name, void __iomem *reg, u8 shift,
->  
->         busy->mux.reg = reg;
->         busy->mux.shift = shift;
-> -       busy->mux.width = width;
-> +       busy->mux.mask = BIT(width) - 1;
->         busy->mux.lock = &imx_ccm_lock;
->         busy->mux_ops = &clk_mux_ops;
->  
-> -- 
-> 1.7.9.5
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+  Thanks
+	Andrew
