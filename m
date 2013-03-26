@@ -1,60 +1,44 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 26 Mar 2013 17:18:35 +0100
-Subject: [PATCHv6 13/17] arm: mvebu: PCIe Device Tree informations for Armada
- XP DB
+Date: Tue, 26 Mar 2013 17:18:36 +0100
+Subject: [PATCHv6 14/17] arm: mvebu: PCIe Device Tree informations for Armada
+ 370 Mirabox
 In-Reply-To: <1364314719-1049-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1364314719-1049-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1364314719-1049-14-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1364314719-1049-15-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Marvell evaluation board (DB) for the Armada XP SoC has 6
-physicals full-size PCIe slots, so we enable the corresponding PCIe
-interfaces in the Device Tree.
+The Globalscale Mirabox platform uses one PCIe interface for an
+available mini-PCIe slot, and the other PCIe interface for an internal
+USB 3.0 controller. We add the necessary Device Tree informations to
+enable those two interfaces.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-xp-db.dts |   33 +++++++++++++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
+ arch/arm/boot/dts/armada-370-mirabox.dts |   16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
-index e83505e..54cc5bb 100644
---- a/arch/arm/boot/dts/armada-xp-db.dts
-+++ b/arch/arm/boot/dts/armada-xp-db.dts
-@@ -121,5 +121,38 @@
- 				spi-max-frequency = <20000000>;
- 			};
+diff --git a/arch/arm/boot/dts/armada-370-mirabox.dts b/arch/arm/boot/dts/armada-370-mirabox.dts
+index dd0c57d..5549de6 100644
+--- a/arch/arm/boot/dts/armada-370-mirabox.dts
++++ b/arch/arm/boot/dts/armada-370-mirabox.dts
+@@ -70,5 +70,21 @@
+ 		usb at d0051000 {
+ 			status = "okay";
  		};
 +
 +		pcie-controller {
 +			status = "okay";
 +
-+			/*
-+			 * All 6 slots are physically present as
-+			 * standard PCIe slots on the board.
-+			 */
++			/* Internal mini-PCIe connector */
 +			pcie at 1,0 {
 +				/* Port 0, Lane 0 */
 +				status = "okay";
 +			};
++
++			/* Connected on the PCB to a USB 3.0 XHCI controller */
 +			pcie at 2,0 {
-+				/* Port 0, Lane 1 */
-+				status = "okay";
-+			};
-+			pcie at 3,0 {
-+				/* Port 0, Lane 2 */
-+				status = "okay";
-+			};
-+			pcie at 4,0 {
-+				/* Port 0, Lane 3 */
-+				status = "okay";
-+			};
-+			pcie at 9,0 {
-+				/* Port 2, Lane 0 */
-+				status = "okay";
-+			};
-+			pcie at 10,0 {
-+				/* Port 3, Lane 0 */
++				/* Port 1, Lane 0 */
 +				status = "okay";
 +			};
 +		};
