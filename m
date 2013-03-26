@@ -1,30 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 26 Mar 2013 15:02:24 +0000
-Subject: [PATCH v2 4/4] dmaengine: dw_dmac: simplify master selection
-In-Reply-To: <1364309637-25860-5-git-send-email-andriy.shevchenko@linux.intel.com>
-References: <1364309637-25860-1-git-send-email-andriy.shevchenko@linux.intel.com>
- <1364309637-25860-5-git-send-email-andriy.shevchenko@linux.intel.com>
-Message-ID: <201303261502.24982.arnd@arndb.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 26 Mar 2013 15:04:44 +0000
+Subject: [PATCH v2 6/6] [RFC] arm: use PSCI if available
+In-Reply-To: <1364308875-26484-6-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1303261423530.4430@kaball.uk.xensource.com>
+ <1364308875-26484-6-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <20130326150444.GI20252@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 26 March 2013, Andy Shevchenko wrote:
-> 
-> From: Arnd Bergmann <arnd@arndb.de>
-> 
-> The patch to add the common DMA binding added a dummy dw_dma_slave
-> structure into the dw_dma_chan structure in order to configure the
-> masters correctly. It turns out that this can be simplified if we
-> pick the DMA masters in the dwc_alloc_chan_resources function instead
-> and save them in the dw_dma_chan structure directly.
-> 
-> This could be simplified further once all users that today use
-> dw_dma_slave for configuration get converted to device tree based
-> setup instead.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> Cc: linux-arm-kernel at lists.infradead.org
+Hi Stefano,
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+On Tue, Mar 26, 2013 at 02:41:15PM +0000, Stefano Stabellini wrote:
+> Check for the presence of PSCI before setting smp_ops, use PSCI if it is
+> available.
+> 
+> This is useful because at least when running on Xen it's possible to have a
+> PSCI node for example on a Versatile Express or an Exynos5 machine. In these
+> cases the PSCI SMP calls should be the ones to be called.
+> 
+> Remove virt_smp_ops and platsmp.c from mach-virt because they aren't needed
+> anymore.
+
+[...]
+
+> +struct smp_operations __initdata psci_smp_ops = {
+> +	.smp_init_cpus		= psci_smp_init_cpus,
+> +	.smp_prepare_cpus	= psci_smp_prepare_cpus,
+> +	.smp_secondary_init	= psci_secondary_init,
+> +	.smp_boot_secondary	= psci_boot_secondary,
+> +};
+
+Whilst I like the idea of this, I don't think things will pan out this
+nicely in practice. There will almost always be a level of indirection
+required between the internal Linux SMP operations and the expectations of
+the PSCI firmware, whether this is in CPU numbering or other,
+platform-specific fields in various parameters.
+
+Tying these two things together like this confuses the layering in my
+opinion and will likely lead to potentially subtle breakages if platforms
+start trying to adopt this.
+
+If this can indeed work for the virtual platforms (Xen and KVM), then I
+think it would be better expressed using `virt' smp_ops, which map directly
+to PSCI, rather than putting them here. Even then, it's tying KVM and Xen
+together on the firmware side of things...
+
+Will
