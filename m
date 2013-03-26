@@ -1,84 +1,35 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 26 Mar 2013 17:01:20 +0000
-Subject: [PATCH v2 25/30] arm64: KVM: 32bit conditional execution emulation
+Date: Tue, 26 Mar 2013 17:01:10 +0000
+Subject: [PATCH v2 15/30] arm64: KVM: guest one-reg interface
 In-Reply-To: <1364317285-20937-1-git-send-email-marc.zyngier@arm.com>
 References: <1364317285-20937-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1364317285-20937-26-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1364317285-20937-16-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As conditional instructions can trap on AArch32, add the thinest
-possible emulation layer to keep 32bit guests happy.
+Let userspace play with the guest registers.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_emulate.h |  13 ++-
- arch/arm64/kvm/Makefile              |   2 +-
- arch/arm64/kvm/emulate.c             | 154 +++++++++++++++++++++++++++++++++++
- 3 files changed, 166 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm64/kvm/emulate.c
+ arch/arm64/kvm/guest.c | 254 +++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 254 insertions(+)
+ create mode 100644 arch/arm64/kvm/guest.c
 
-diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-index 3c42f0c38..8641d63 100644
---- a/arch/arm64/include/asm/kvm_emulate.h
-+++ b/arch/arm64/include/asm/kvm_emulate.h
-@@ -31,6 +31,9 @@
- unsigned long *vcpu_reg32(const struct kvm_vcpu *vcpu, u8 reg_num);
- unsigned long *vcpu_spsr32(const struct kvm_vcpu *vcpu);
- 
-+bool kvm_condition_valid32(const struct kvm_vcpu *vcpu);
-+void kvm_skip_instr32(struct kvm_vcpu *vcpu, bool is_wide_instr);
-+
- void kvm_inject_undefined(struct kvm_vcpu *vcpu);
- void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr);
- void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr);
-@@ -57,12 +60,18 @@ static inline bool vcpu_mode_is_32bit(const struct kvm_vcpu *vcpu)
- 
- static inline bool kvm_condition_valid(const struct kvm_vcpu *vcpu)
- {
--	return true;	/* No conditionals on arm64 */
-+	if (vcpu_mode_is_32bit(vcpu))
-+		return kvm_condition_valid32(vcpu);
-+
-+	return true;
- }
- 
- static inline void kvm_skip_instr(struct kvm_vcpu *vcpu, bool is_wide_instr)
- {
--	*vcpu_pc(vcpu) += 4;
-+	if (vcpu_mode_is_32bit(vcpu))
-+		kvm_skip_instr32(vcpu, is_wide_instr);
-+	else
-+		*vcpu_pc(vcpu) += 4;
- }
- 
- static inline void vcpu_set_thumb(struct kvm_vcpu *vcpu)
-diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
-index e9c911f..be11204 100644
---- a/arch/arm64/kvm/Makefile
-+++ b/arch/arm64/kvm/Makefile
-@@ -10,7 +10,7 @@ obj-$(CONFIG_KVM_ARM_HOST) += $(addprefix ../../../virt/kvm/, kvm_main.o coalesc
- 
- obj-$(CONFIG_KVM_ARM_HOST) += $(addprefix ../../../arch/arm/kvm/, arm.o mmu.o mmio.o psci.o perf.o)
- 
--obj-$(CONFIG_KVM_ARM_HOST) += inject_fault.o regmap.o
-+obj-$(CONFIG_KVM_ARM_HOST) += emulate.o inject_fault.o regmap.o
- obj-$(CONFIG_KVM_ARM_HOST) += hyp.o hyp-init.o handle_exit.o idmap.o
- obj-$(CONFIG_KVM_ARM_HOST) += guest.o reset.o sys_regs.o sys_regs_generic_v8.o
- 
-diff --git a/arch/arm64/kvm/emulate.c b/arch/arm64/kvm/emulate.c
+diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
 new file mode 100644
-index 0000000..01d4713
+index 0000000..c54d40d
 --- /dev/null
-+++ b/arch/arm64/kvm/emulate.c
-@@ -0,0 +1,154 @@
++++ b/arch/arm64/kvm/guest.c
+@@ -0,0 +1,254 @@
 +/*
-+ * (not much of an) Emulation layer for 32bit guests.
++ * Copyright (C) 2012 - ARM Ltd
++ * Author: Marc Zyngier <marc.zyngier@arm.com>
 + *
++ * Derived from arch/arm/kvm/guest.c:
 + * Copyright (C) 2012 - Virtual Open Systems and Columbia University
 + * Author: Christoffer Dall <c.dall@virtualopensystems.com>
 + *
-+ * This program is free software: you can redistribute it and/or modify
++ * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
 + *
@@ -91,140 +42,238 @@ index 0000000..01d4713
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
++#include <linux/errno.h>
++#include <linux/err.h>
 +#include <linux/kvm_host.h>
++#include <linux/module.h>
++#include <linux/vmalloc.h>
++#include <linux/fs.h>
++#include <asm/cputype.h>
++#include <asm/uaccess.h>
++#include <asm/kvm.h>
++#include <asm/kvm_asm.h>
 +#include <asm/kvm_emulate.h>
++#include <asm/kvm_coproc.h>
 +
-+/*
-+ * stolen from arch/arm/kernel/opcodes.c
-+ *
-+ * condition code lookup table
-+ * index into the table is test code: EQ, NE, ... LT, GT, AL, NV
-+ *
-+ * bit position in short is condition code: NZCV
-+ */
-+static const unsigned short cc_map[16] = {
-+	0xF0F0,			/* EQ == Z set            */
-+	0x0F0F,			/* NE                     */
-+	0xCCCC,			/* CS == C set            */
-+	0x3333,			/* CC                     */
-+	0xFF00,			/* MI == N set            */
-+	0x00FF,			/* PL                     */
-+	0xAAAA,			/* VS == V set            */
-+	0x5555,			/* VC                     */
-+	0x0C0C,			/* HI == C set && Z clear */
-+	0xF3F3,			/* LS == C clear || Z set */
-+	0xAA55,			/* GE == (N==V)           */
-+	0x55AA,			/* LT == (N!=V)           */
-+	0x0A05,			/* GT == (!Z && (N==V))   */
-+	0xF5FA,			/* LE == (Z || (N!=V))    */
-+	0xFFFF,			/* AL always              */
-+	0			/* NV                     */
++struct kvm_stats_debugfs_item debugfs_entries[] = {
++	{ NULL }
 +};
 +
-+static int kvm_vcpu_get_condition(const struct kvm_vcpu *vcpu)
++int kvm_arch_vcpu_setup(struct kvm_vcpu *vcpu)
 +{
-+	u32 esr = kvm_vcpu_get_hsr(vcpu);
-+
-+	if (esr & ESR_EL2_CV)
-+		return (esr & ESR_EL2_COND) >> ESR_EL2_COND_SHIFT;
-+
-+	return -1;
++	vcpu->arch.hcr_el2 = HCR_GUEST_FLAGS;
++	return 0;
 +}
 +
-+/*
-+ * Check if a trapped instruction should have been executed or not.
-+ */
-+bool kvm_condition_valid32(const struct kvm_vcpu *vcpu)
++static u64 core_reg_offset_from_id(u64 id)
 +{
-+	unsigned long cpsr;
-+	u32 cpsr_cond;
-+	int cond;
++	return id & ~(KVM_REG_ARCH_MASK | KVM_REG_SIZE_MASK | KVM_REG_ARM_CORE);
++}
 +
-+	/* Top two bits non-zero?  Unconditional. */
-+	if (kvm_vcpu_get_hsr(vcpu) >> 30)
-+		return true;
++static int get_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
++{
++	__u32 __user *uaddr = (__u32 __user *)(unsigned long)reg->addr;
++	struct kvm_regs *regs = vcpu_gp_regs(vcpu);
++	int nr_regs = sizeof(*regs) / sizeof(__u32);
++	u32 off;
 +
-+	/* Is condition field valid? */
-+	cond = kvm_vcpu_get_condition(vcpu);
-+	if (cond == 0xE)
-+		return true;
++	/* Our ID is an index into the kvm_regs struct. */
++	off = core_reg_offset_from_id(reg->id);
++	if (off >= nr_regs ||
++	    (off + (KVM_REG_SIZE(reg->id) / sizeof(__u32))) >= nr_regs)
++		return -ENOENT;
 +
-+	cpsr = *vcpu_cpsr(vcpu);
++	if (copy_to_user(uaddr, ((u32 *)regs) + off, KVM_REG_SIZE(reg->id)))
++		return -EFAULT;
 +
-+	if (cond < 0) {
-+		/* This can happen in Thumb mode: examine IT state. */
-+		unsigned long it;
++	return 0;
++}
 +
-+		it = ((cpsr >> 8) & 0xFC) | ((cpsr >> 25) & 0x3);
++static int set_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
++{
++	__u32 __user *uaddr = (__u32 __user *)(unsigned long)reg->addr;
++	struct kvm_regs *regs = vcpu_gp_regs(vcpu);
++	int nr_regs = sizeof(*regs) / sizeof(__u32);
++	void *valp;
++	u64 off;
++	int err = 0;
 +
-+		/* it == 0 => unconditional. */
-+		if (it == 0)
-+			return true;
++	/* Our ID is an index into the kvm_regs struct. */
++	off = core_reg_offset_from_id(reg->id);
++	if (off >= nr_regs ||
++	    (off + (KVM_REG_SIZE(reg->id) / sizeof(__u32))) >= nr_regs)
++		return -ENOENT;
 +
-+		/* The cond for this insn works out as the top 4 bits. */
-+		cond = (it >> 4);
++	valp = kmalloc(KVM_REG_SIZE(reg->id), GFP_KERNEL);
++	if (!valp)
++		return -ENOMEM;
++
++	if (copy_from_user(valp, uaddr, KVM_REG_SIZE(reg->id))) {
++		err = -EFAULT;
++		goto out;
 +	}
 +
-+	cpsr_cond = cpsr >> 28;
++	if (off == KVM_REG_ARM_CORE_REG(regs.pstate)) {
++		unsigned long mode = (*(unsigned long *)valp) & COMPAT_PSR_MODE_MASK;
++		switch (mode) {
++		case PSR_MODE_EL0t:
++		case PSR_MODE_EL1t:
++		case PSR_MODE_EL1h:
++			break;
++		default:
++			err = -EINVAL;
++			goto out;
++		}
++	}
 +
-+	if (!((cc_map[cond] >> cpsr_cond) & 1))
-+		return false;
++	memcpy((u32 *)regs + off, valp, KVM_REG_SIZE(reg->id));
++out:
++	kfree(valp);
++	return err;
++}
 +
-+	return true;
++int kvm_arch_vcpu_ioctl_get_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
++{
++	return -EINVAL;
++}
++
++int kvm_arch_vcpu_ioctl_set_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
++{
++	return -EINVAL;
++}
++
++static unsigned long num_core_regs(void)
++{
++	return sizeof(struct kvm_regs) / sizeof(unsigned long);
 +}
 +
 +/**
-+ * adjust_itstate - adjust ITSTATE when emulating instructions in IT-block
-+ * @vcpu:	The VCPU pointer
++ * kvm_arm_num_regs - how many registers do we present via KVM_GET_ONE_REG
 + *
-+ * When exceptions occur while instructions are executed in Thumb IF-THEN
-+ * blocks, the ITSTATE field of the CPSR is not advanved (updated), so we have
-+ * to do this little bit of work manually. The fields map like this:
-+ *
-+ * IT[7:0] -> CPSR[26:25],CPSR[15:10]
++ * This is for all registers.
 + */
-+static void kvm_adjust_itstate(struct kvm_vcpu *vcpu)
++unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu)
 +{
-+	unsigned long itbits, cond;
-+	unsigned long cpsr = *vcpu_cpsr(vcpu);
-+	bool is_arm = !(cpsr & COMPAT_PSR_T_BIT);
-+
-+	BUG_ON(is_arm && (cpsr & COMPAT_PSR_IT_MASK));
-+
-+	if (!(cpsr & COMPAT_PSR_IT_MASK))
-+		return;
-+
-+	cond = (cpsr & 0xe000) >> 13;
-+	itbits = (cpsr & 0x1c00) >> (10 - 2);
-+	itbits |= (cpsr & (0x3 << 25)) >> 25;
-+
-+	/* Perform ITAdvance (see page A-52 in ARM DDI 0406C) */
-+	if ((itbits & 0x7) == 0)
-+		itbits = cond = 0;
-+	else
-+		itbits = (itbits << 1) & 0x1f;
-+
-+	cpsr &= ~COMPAT_PSR_IT_MASK;
-+	cpsr |= cond << 13;
-+	cpsr |= (itbits & 0x1c) << (10 - 2);
-+	cpsr |= (itbits & 0x3) << 25;
-+	*vcpu_cpsr(vcpu) = cpsr;
++	return num_core_regs() + kvm_arm_num_sys_reg_descs(vcpu);
 +}
 +
 +/**
-+ * kvm_skip_instr - skip a trapped instruction and proceed to the next
-+ * @vcpu: The vcpu pointer
++ * kvm_arm_copy_reg_indices - get indices of all registers.
++ *
++ * We do core registers right here, then we apppend system regs.
 + */
-+void kvm_skip_instr32(struct kvm_vcpu *vcpu, bool is_wide_instr)
++int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
 +{
-+	bool is_thumb;
++	unsigned int i;
++	const u64 core_reg = KVM_REG_ARM64 | KVM_REG_SIZE_U64 | KVM_REG_ARM_CORE;
 +
-+	is_thumb = !!(*vcpu_cpsr(vcpu) & COMPAT_PSR_T_BIT);
-+	if (is_thumb && !is_wide_instr)
-+		*vcpu_pc(vcpu) += 2;
-+	else
-+		*vcpu_pc(vcpu) += 4;
-+	kvm_adjust_itstate(vcpu);
++	for (i = 0; i < sizeof(struct kvm_regs)/sizeof(unsigned long); i++) {
++		if (put_user(core_reg | i, uindices))
++			return -EFAULT;
++		uindices++;
++	}
++
++	return kvm_arm_copy_sys_reg_indices(vcpu, uindices);
++}
++
++int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
++{
++	/* We currently use nothing arch-specific in upper 32 bits */
++	if ((reg->id & ~KVM_REG_SIZE_MASK) >> 32 != KVM_REG_ARM64 >> 32)
++		return -EINVAL;
++
++	/* Register group 16 means we want a core register. */
++	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
++		return get_core_reg(vcpu, reg);
++
++	return kvm_arm_sys_reg_get_reg(vcpu, reg);
++}
++
++int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
++{
++	/* We currently use nothing arch-specific in upper 32 bits */
++	if ((reg->id & ~KVM_REG_SIZE_MASK) >> 32 != KVM_REG_ARM64 >> 32)
++		return -EINVAL;
++
++	/* Register group 16 means we set a core register. */
++	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
++		return set_core_reg(vcpu, reg);
++
++	return kvm_arm_sys_reg_set_reg(vcpu, reg);
++}
++
++int kvm_arch_vcpu_ioctl_get_sregs(struct kvm_vcpu *vcpu,
++				  struct kvm_sregs *sregs)
++{
++	return -EINVAL;
++}
++
++int kvm_arch_vcpu_ioctl_set_sregs(struct kvm_vcpu *vcpu,
++				  struct kvm_sregs *sregs)
++{
++	return -EINVAL;
++}
++
++int __attribute_const__ kvm_target_cpu(void)
++{
++	unsigned long implementor = read_cpuid_implementor();
++	unsigned long part_number = read_cpuid_part_number();
++
++	if (implementor != ARM_CPU_IMP_ARM)
++		return -EINVAL;
++
++	switch (part_number) {
++	case ARM_CPU_PART_AEM_V8:
++		return KVM_ARM_TARGET_AEM_V8;
++	case ARM_CPU_PART_FOUNDATION:
++		return KVM_ARM_TARGET_FOUNDATION_V8;
++	case ARM_CPU_PART_CORTEX_A57:
++		/* Currently handled by the generic backend */
++		return KVM_ARM_TARGET_CORTEX_A57;
++	default:
++		return -EINVAL;
++	}
++}
++
++int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
++			const struct kvm_vcpu_init *init)
++{
++	unsigned int i;
++	int phys_target = kvm_target_cpu();
++
++	if (init->target != phys_target)
++		return -EINVAL;
++
++	vcpu->arch.target = phys_target;
++	bitmap_zero(vcpu->arch.features, KVM_VCPU_MAX_FEATURES);
++
++	/* -ENOENT for unknown features, -EINVAL for invalid combinations. */
++	for (i = 0; i < sizeof(init->features)*8; i++) {
++		if (init->features[i / 32] & (1 << (i % 32))) {
++			if (i >= KVM_VCPU_MAX_FEATURES)
++				return -ENOENT;
++			set_bit(i, vcpu->arch.features);
++		}
++	}
++
++	/* Now we know what it is, we can reset it. */
++	return kvm_reset_vcpu(vcpu);
++}
++
++int kvm_arch_vcpu_ioctl_get_fpu(struct kvm_vcpu *vcpu, struct kvm_fpu *fpu)
++{
++	return -EINVAL;
++}
++
++int kvm_arch_vcpu_ioctl_set_fpu(struct kvm_vcpu *vcpu, struct kvm_fpu *fpu)
++{
++	return -EINVAL;
++}
++
++int kvm_arch_vcpu_ioctl_translate(struct kvm_vcpu *vcpu,
++				  struct kvm_translation *tr)
++{
++	return -EINVAL;
 +}
 -- 
 1.8.1.4
